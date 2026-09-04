@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>La fourmi de Langton</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --papier:#DFE7DC;
+  --carte:#F2F5EE;
+  --encre:#1D2A24;
+  --encre-doux:#5A6B60;
+  --trait:rgba(29,42,36,.10);
+  --bord:#1D2A24;
+  --fourmi:#B5174B;
+  --ombre:4px 4px 0 var(--bord);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:var(--encre);
+  background-color:var(--papier);
+  background-image:
+    linear-gradient(var(--trait) 1px,transparent 1px),
+    linear-gradient(90deg,var(--trait) 1px,transparent 1px);
+  background-size:22px 22px;
+  background-position:-1px -1px;
+  -webkit-text-size-adjust:100%;
+}
+.page{max-width:560px;margin:0 auto;padding:18px 16px 40px}
+h1{font-size:clamp(28px,8vw,38px);line-height:1.02;font-weight:700;letter-spacing:-.02em;margin:0}
+.sous-titre{margin:8px 0 0;max-width:34ch;color:var(--encre-doux);font-size:15px;line-height:1.45}
+
+.modes{display:flex;margin:18px 0 14px;border:2px solid var(--bord);border-radius:999px;overflow:hidden;background:var(--carte)}
+.mode{flex:1;appearance:none;border:0;background:transparent;cursor:pointer;font:inherit;font-weight:500;font-size:16px;color:var(--encre);padding:11px 8px}
+.mode.actif{background:var(--encre);color:var(--carte)}
+.mode:focus-visible{outline:3px solid var(--fourmi);outline-offset:-3px}
+
+.plateau{position:relative;border:2px solid var(--bord);border-radius:6px;box-shadow:var(--ombre);background:var(--carte);overflow:hidden}
+canvas{display:block;width:100%;aspect-ratio:1/1;touch-action:none}
+
+.voile{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;padding:24px;text-align:center;background:rgba(242,245,238,.94)}
+.voile[hidden]{display:none}
+.voile h2{margin:0;font-size:24px;font-weight:700}
+.voile p{margin:0;max-width:30ch;font-size:15px;line-height:1.5;color:var(--encre-doux)}
+.gros-score{font-size:52px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.gros-score[hidden]{display:none}
+
+.barre{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:14px 0 0;padding:10px 14px;border:2px solid var(--bord);border-radius:6px;background:var(--carte)}
+.barre[hidden]{display:none}
+.mesure{display:flex;flex-direction:column;line-height:1.15}
+.mesure .valeur{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;transition:transform .12s ease-out}
+.mesure .nom{font-size:12px;color:var(--encre-doux)}
+.mesure.pulse .valeur{transform:scale(1.3)}
+.energie{display:flex;gap:3px;margin:3px 0 2px}
+.pip{width:9px;height:15px;border:1.5px solid var(--bord);border-radius:2px;background:transparent}
+.pip.plein{background:var(--fourmi)}
+
+.commandes{margin:14px 0 0}
+.commandes[hidden]{display:none}
+.rangee{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}
+button.action,select,input[type=text]{font:inherit;font-size:15px;color:var(--encre);background:var(--carte);border:2px solid var(--bord);border-radius:999px;padding:9px 16px}
+button.action{cursor:pointer}
+select,input[type=text]{border-radius:6px;padding:9px 10px}
+button.action:active{transform:translate(1px,1px)}
+button.action.principal{background:var(--encre);color:var(--carte)}
+button.action.arme{background:var(--fourmi);color:var(--carte);border-color:var(--fourmi)}
+button.action:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--fourmi);outline-offset:2px}
+label.champ{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--encre-doux);flex:1;min-width:150px}
+input[type=range]{width:100%;accent-color:var(--fourmi)}
+select{width:100%}
+.ligne-regle{display:flex;gap:8px}
+.ligne-regle input{flex:1;min-width:0;letter-spacing:.08em}
+
+details{margin:22px 0 0;border-top:2px solid var(--bord);padding-top:12px}
+summary{cursor:pointer;font-weight:500;font-size:16px}
+details p{font-size:15px;line-height:1.55;color:var(--encre-doux);max-width:44ch}
+details b{color:var(--encre);font-weight:500}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>La fourmi de Langton</h1>
+  <p class="sous-titre">Une fourmi, deux règles, et un dessin qui finit par s'organiser tout seul.</p>
+
+  <div class="modes">
+    <button class="mode actif" id="btn-observer">Observer</button>
+    <button class="mode" id="btn-jouer">Jouer</button>
+  </div>
+
+  <div class="plateau">
+    <canvas id="grille"></canvas>
+    <div class="voile" id="voile" hidden>
+      <h2 id="voile-titre"></h2>
+      <div class="gros-score" id="voile-score" hidden></div>
+      <p id="voile-texte"></p>
+      <button class="action principal" id="voile-bouton"></button>
+    </div>
+  </div>
+
+  <div class="barre" id="barre-observer">
+    <div class="mesure"><span class="valeur" id="v-pas">0</span><span class="nom">pas</span></div>
+    <div class="mesure"><span class="valeur" id="v-fourmis">1</span><span class="nom">fourmis</span></div>
+    <div class="mesure"><span class="valeur" id="v-regle">RL</span><span class="nom">règle</span></div>
+  </div>
+
+  <div class="barre" id="barre-jeu" hidden>
+    <div class="mesure" id="m-score"><span class="valeur" id="v-score">0</span><span class="nom">graines</span></div>
+    <div class="mesure"><span class="valeur" id="v-temps">90</span><span class="nom">secondes</span></div>
+    <div class="mesure"><span class="energie" id="v-energie"></span><span class="nom">retouches</span></div>
+  </div>
+
+  <section class="commandes" id="commandes-observer">
+    <div class="rangee">
+      <button class="action principal" id="b-lecture">Pause</button>
+      <button class="action" id="b-pas">Un pas</button>
+      <button class="action" id="b-fourmi">Poser une fourmi</button>
+      <button class="action" id="b-effacer">Tout effacer</button>
+    </div>
+    <div class="rangee">
+      <label class="champ">Vitesse
+        <input type="range" id="b-vitesse" min="1" max="100" value="26">
+      </label>
+      <label class="champ">Taille du terrain
+        <select id="b-taille">
+          <option value="51">Petit</option>
+          <option value="101" selected>Moyen</option>
+          <option value="161">Grand</option>
+        </select>
+      </label>
+    </div>
+    <div class="rangee">
+      <label class="champ">Règle de la fourmi
+        <select id="b-preset">
+          <option value="RL">RL — la classique, celle qui trace une autoroute</option>
+          <option value="RLR">RLR — chaos en triangles</option>
+          <option value="LLRR">LLRR — symétrie qui grandit</option>
+          <option value="LRRRRRLLR">LRRRRRLLR — carré plein</option>
+          <option value="LLRRRLRLRLLR">LLRRRLRLRLLR — flocon en spirale</option>
+          <option value="RRLLLRLLLRRR">RRLLLRLLLRRR — dentelle</option>
+        </select>
+      </label>
+    </div>
+    <div class="rangee ligne-regle">
+      <input type="text" id="b-perso" value="RL" maxlength="12" autocapitalize="characters" spellcheck="false" aria-label="Règle personnalisée, uniquement des L et des R">
+      <button class="action" id="b-appliquer">Appliquer</button>
+    </div>
+    <p class="sous-titre" style="margin:0">Touche la grille pour colorier des cases devant la fourmi et voir comment son dessin change.</p>
+  </section>
+
+  <section class="commandes" id="commandes-jeu" hidden>
+    <div class="rangee">
+      <button class="action principal" id="j-pause">Pause</button>
+      <button class="action" id="j-rejouer">Recommencer</button>
+      <label class="champ" style="flex:0 0 auto;min-width:140px">Allure de la fourmi
+        <select id="j-vitesse">
+          <option value="340">Tranquille</option>
+          <option value="230" selected>Normale</option>
+          <option value="150">Pressée</option>
+        </select>
+      </label>
+    </div>
+    <p class="sous-titre" style="margin:0">Touche une case pour changer sa couleur : c'est ta seule façon de faire tourner la fourmi. Le carré rose montre où elle va poser la patte.</p>
+  </section>
+
+  <details>
+    <summary>Comment elle décide</summary>
+    <p>La fourmi ne connaît que deux consignes. Sur une <b>case claire</b>, elle tourne à droite, noircit la case, avance d'un pas. Sur une <b>case foncée</b>, elle tourne à gauche, éclaircit la case, avance d'un pas.</p>
+    <p>C'est tout. Pendant quelques centaines de pas le dessin part n'importe comment, puis vers 10 000 pas la fourmi se met à construire une autoroute et file tout droit sans plus jamais s'arrêter. Personne ne sait le démontrer autrement qu'en la regardant faire.</p>
+    <p>Une règle plus longue ajoute des couleurs : chaque lettre dit de quel côté tourner selon la couleur de la case, et la case passe à la couleur suivante quand la fourmi repart.</p>
+  </details>
+</div>
+
+<script>
+"use strict";
+
+var DIRS = [[0,-1],[1,0],[0,1],[-1,0]];
+var COULEURS = ['#F2F5EE','#2F4858','#B5174B','#E4A11B','#4C956C','#6D466B','#3A7CA5','#C1666B','#8A5A44','#7BAE7F','#D96C9A','#405D27'];
+function pack(hex){
+  var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return ((255<<24)|(b<<16)|(g<<8)|r)>>>0;
+}
+var COULEURS32 = COULEURS.map(pack);
+
+var canvas = document.getElementById('grille');
+var ctx = canvas.getContext('2d');
+var W = 0, H = 0;
+
+var cols = 101, rows = 101;
+var cells, img, buf, off, offCtx;
+var fourmis = [], regle = [1,0], pasTotal = 0;
+
+var mode = 'observer';
+var lecture = true, vitesse = 37, armeFourmi = false, tailleObs = 101, regleTexte = 'RL';
+
+var jeu = {
+  enCours:false, pause:false, score:0, record:0,
+  temps:90, energie:10, maxEnergie:10,
+  msParPas:230, accPas:0, accEnergie:0, graines:[]
+};
+
+/* ---------- grille ---------- */
+function litRegle(txt){
+  var propre = (txt || '').toUpperCase().replace(/[^LR]/g,'');
+  return propre.length >= 2 ? propre : 'RL';
+}
+function initGrille(taille, texteRegle){
+  cols = rows = taille;
+  regleTexte = litRegle(texteRegle);
+  regle = regleTexte.split('').map(function(c){ return c === 'R' ? 1 : 0; });
+  cells = new Uint8Array(cols*rows);
+  off = document.createElement('canvas');
+  off.width = cols; off.height = rows;
+  offCtx = off.getContext('2d');
+  img = offCtx.createImageData(cols, rows);
+  buf = new Uint32Array(img.data.buffer);
+  buf.fill(COULEURS32[0]);
+  fourmis = [];
+  pasTotal = 0;
+}
+function poserFourmi(x, y){ fourmis.push({x:x, y:y, d:0}); }
+function centre(){ return (cols-1)>>1; }
+
+function pas(){
+  var n = regle.length;
+  for(var k=0; k<fourmis.length; k++){
+    var f = fourmis[k];
+    var i = f.y*cols + f.x;
+    var c = cells[i];
+    f.d = (f.d + (regle[c] === 1 ? 1 : 3)) & 3;
+    var nc = (c+1) % n;
+    cells[i] = nc;
+    buf[i] = COULEURS32[nc];
+    f.x = (f.x + DIRS[f.d][0] + cols) % cols;
+    f.y = (f.y + DIRS[f.d][1] + rows) % rows;
+  }
+  pasTotal++;
+}
+function prochaineCase(f){
+  var c = cells[f.y*cols + f.x];
+  var d = (f.d + (regle[c] === 1 ? 1 : 3)) & 3;
+  return [(f.x + DIRS[d][0] + cols) % cols, (f.y + DIRS[d][1] + rows) % rows];
+}
+
+/* ---------- rendu ---------- */
+function ajusterCanvas(){
+  var rect = canvas.getBoundingClientRect();
+  var dpr = Math.min(2, window.devicePixelRatio || 1);
+  var taille = Math.max(1, Math.round(rect.width * dpr));
+  canvas.width = taille; canvas.height = taille;
+  W = taille; H = taille;
+}
+function dessiner(){
+  if(!offCtx) return;
+  offCtx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(off, 0, 0, cols, rows, 0, 0, W, H);
+  var cell = W/cols, i, g, cx, cy;
+
+  if(mode === 'jeu'){
+    for(i=0; i<jeu.graines.length; i++){
+      g = jeu.graines[i];
+      cx = (g.x+0.5)*cell; cy = (g.y+0.5)*cell;
+      ctx.beginPath();
+      ctx.arc(cx, cy, Math.max(3, cell*0.32), 0, Math.PI*2);
+      ctx.fillStyle = '#E4A11B'; ctx.fill();
+      ctx.lineWidth = Math.max(1, cell*0.1);
+      ctx.strokeStyle = '#1D2A24'; ctx.stroke();
+    }
+    if(fourmis[0]){
+      var p = prochaineCase(fourmis[0]);
+      var lw = Math.max(1.5, cell*0.14);
+      ctx.lineWidth = lw;
+      ctx.strokeStyle = '#B5174B';
+      ctx.strokeRect(p[0]*cell + lw/2, p[1]*cell + lw/2, cell - lw, cell - lw);
+    }
+  }
+
+  for(i=0; i<fourmis.length; i++){
+    var f = fourmis[i];
+    cx = (f.x+0.5)*cell; cy = (f.y+0.5)*cell;
+    var r = Math.max(2.2, cell*0.4);
+    var d = DIRS[f.d];
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + d[0]*r*2.1, cy + d[1]*r*2.1);
+    ctx.lineWidth = Math.max(1.2, cell*0.16);
+    ctx.strokeStyle = '#B5174B';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.fillStyle = '#B5174B'; ctx.fill();
+    ctx.lineWidth = Math.max(1, cell*0.14);
+    ctx.strokeStyle = '#F2F5EE'; ctx.stroke();
+  }
+}
+
+/* ---------- mode jeu ---------- */
+function poserGraine(){
+  for(var essai=0; essai<300; essai++){
+    var x = (Math.random()*cols)|0, y = (Math.random()*rows)|0;
+    var f = fourmis[0];
+    if(f && Math.abs(f.x-x) < 2 && Math.abs(f.y-y) < 2) continue;
+    var libre = true;
+    for(var k=0; k<jeu.graines.length; k++){
+      if(jeu.graines[k].x === x && jeu.graines[k].y === y){ libre = false; break; }
+    }
+    if(!libre) continue;
+    jeu.graines.push({x:x, y:y});
+    return;
+  }
+}
+function nouvellePartie(){
+  initGrille(21, 'RL');
+  poserFourmi(centre(), centre());
+  jeu.score = 0; jeu.temps = 90; jeu.energie = jeu.maxEnergie;
+  jeu.accPas = 0; jeu.accEnergie = 0; jeu.graines = [];
+  for(var i=0; i<3; i++) poserGraine();
+  jeu.enCours = true; jeu.pause = false;
+  document.getElementById('j-pause').textContent = 'Pause';
+  cacherVoile();
+  majBarres();
+}
+function verifierGraines(){
+  var f = fourmis[0];
+  if(!f) return;
+  for(var k=jeu.graines.length-1; k>=0; k--){
+    if(jeu.graines[k].x === f.x && jeu.graines[k].y === f.y){
+      jeu.graines.splice(k, 1);
+      jeu.score++;
+      poserGraine();
+      var m = document.getElementById('m-score');
+      m.classList.add('pulse');
+      setTimeout(function(){ m.classList.remove('pulse'); }, 150);
+    }
+  }
+}
+function finPartie(){
+  jeu.enCours = false;
+  var nouveauRecord = jeu.score > jeu.record;
+  if(nouveauRecord) jeu.record = jeu.score;
+  montrerVoile({
+    titre: 'Temps écoulé',
+    score: jeu.score,
+    texte: nouveauRecord && jeu.score > 0
+      ? 'Meilleur score de la session. La fourmi t\u2019écoute.'
+      : 'Meilleur score de la session : ' + jeu.record + '.',
+    bouton: 'Rejouer',
+    action: nouvellePartie
+  });
+}
+
+/* ---------- voile ---------- */
+var voile = document.getElementById('voile');
+var actionVoile = null;
+function montrerVoile(o){
+  document.getElementById('voile-titre').textContent = o.titre;
+  var s = document.getElementById('voile-score');
+  if(typeof o.score === 'number'){ s.textContent = o.score; s.hidden = false; } else { s.hidden = true; }
+  document.getElementById('voile-texte').textContent = o.texte;
+  document.getElementById('voile-bouton').textContent = o.bouton;
+  actionVoile = o.action;
+  voile.hidden = false;
+}
+function cacherVoile(){ voile.hidden = true; actionVoile = null; }
+document.getElementById('voile-bouton').addEventListener('click', function(){ if(actionVoile) actionVoile(); });
+
+/* ---------- barres ---------- */
+var pips = [];
+(function(){
+  var cont = document.getElementById('v-energie');
+  for(var i=0; i<10; i++){
+    var p = document.createElement('span');
+    p.className = 'pip';
+    cont.appendChild(p);
+    pips.push(p);
+  }
+})();
+function majBarres(){
+  if(mode === 'observer'){
+    document.getElementById('v-pas').textContent = pasTotal.toLocaleString('fr-FR');
+    document.getElementById('v-fourmis').textContent = fourmis.length;
+    document.getElementById('v-regle').textContent = regleTexte;
+  } else {
+    document.getElementById('v-score').textContent = jeu.score;
+    document.getElementById('v-temps').textContent = Math.max(0, Math.ceil(jeu.temps));
+    for(var i=0; i<pips.length; i++) pips[i].classList.toggle('plein', i < jeu.energie);
+  }
+}
+
+/* ---------- boucle ---------- */
+var dernier = 0;
+function boucle(t){
+  var dt = Math.min(120, t - dernier || 16);
+  dernier = t;
+  if(mode === 'observer'){
+    if(lecture && fourmis.length){
+      for(var i=0; i<vitesse; i++) pas();
+    }
+  } else if(jeu.enCours && !jeu.pause){
+    jeu.accPas += dt;
+    var garde = 0;
+    while(jeu.accPas >= jeu.msParPas && garde++ < 20){
+      jeu.accPas -= jeu.msParPas;
+      pas();
+      verifierGraines();
+    }
+    jeu.accEnergie += dt;
+    while(jeu.accEnergie >= 1100){
+      jeu.accEnergie -= 1100;
+      if(jeu.energie < jeu.maxEnergie) jeu.energie++;
+    }
+    jeu.temps -= dt/1000;
+    if(jeu.temps <= 0){ jeu.temps = 0; finPartie(); }
+  }
+  majBarres();
+  dessiner();
+  requestAnimationFrame(boucle);
+}
+
+/* ---------- interactions plateau ---------- */
+canvas.addEventListener('pointerdown', function(e){
+  e.preventDefault();
+  var rect = canvas.getBoundingClientRect();
+  var x = Math.floor((e.clientX - rect.left) / rect.width * cols);
+  var y = Math.floor((e.clientY - rect.top) / rect.height * rows);
+  if(x < 0 || y < 0 || x >= cols || y >= rows) return;
+  var i = y*cols + x;
+
+  if(mode === 'observer'){
+    if(armeFourmi){
+      poserFourmi(x, y);
+      armeFourmi = false;
+      document.getElementById('b-fourmi').classList.remove('arme');
+    } else {
+      var nc = (cells[i] + 1) % regle.length;
+      cells[i] = nc; buf[i] = COULEURS32[nc];
+    }
+  } else {
+    if(!jeu.enCours || jeu.pause || jeu.energie <= 0) return;
+    cells[i] = cells[i] === 0 ? 1 : 0;
+    buf[i] = COULEURS32[cells[i]];
+    jeu.energie--;
+  }
+  dessiner();
+});
+
+/* ---------- commandes observer ---------- */
+var bLecture = document.getElementById('b-lecture');
+bLecture.addEventListener('click', function(){
+  lecture = !lecture;
+  bLecture.textContent = lecture ? 'Pause' : 'Lecture';
+});
+document.getElementById('b-pas').addEventListener('click', function(){
+  lecture = false;
+  bLecture.textContent = 'Lecture';
+  pas();
+});
+document.getElementById('b-fourmi').addEventListener('click', function(e){
+  armeFourmi = !armeFourmi;
+  e.currentTarget.classList.toggle('arme', armeFourmi);
+});
+document.getElementById('b-effacer').addEventListener('click', function(){
+  initGrille(tailleObs, regleTexte);
+  poserFourmi(centre(), centre());
+});
+document.getElementById('b-vitesse').addEventListener('input', function(e){
+  var v = +e.target.value;
+  vitesse = Math.max(1, Math.round(0.055 * v * v));
+});
+document.getElementById('b-taille').addEventListener('change', function(e){
+  tailleObs = +e.target.value;
+  initGrille(tailleObs, regleTexte);
+  poserFourmi(centre(), centre());
+});
+document.getElementById('b-preset').addEventListener('change', function(e){
+  appliquerRegle(e.target.value);
+});
+document.getElementById('b-appliquer').addEventListener('click', function(){
+  appliquerRegle(document.getElementById('b-perso').value);
+});
+function appliquerRegle(txt){
+  var propre = litRegle(txt);
+  document.getElementById('b-perso').value = propre;
+  initGrille(tailleObs, propre);
+  poserFourmi(centre(), centre());
+  lecture = true;
+  bLecture.textContent = 'Pause';
+}
+
+/* ---------- commandes jeu ---------- */
+document.getElementById('j-pause').addEventListener('click', function(e){
+  if(!jeu.enCours) return;
+  jeu.pause = !jeu.pause;
+  e.currentTarget.textContent = jeu.pause ? 'Reprendre' : 'Pause';
+});
+document.getElementById('j-rejouer').addEventListener('click', nouvellePartie);
+document.getElementById('j-vitesse').addEventListener('change', function(e){ jeu.msParPas = +e.target.value; });
+
+/* ---------- modes ---------- */
+var btnObserver = document.getElementById('btn-observer');
+var btnJouer = document.getElementById('btn-jouer');
+function allerMode(m){
+  mode = m;
+  btnObserver.classList.toggle('actif', m === 'observer');
+  btnJouer.classList.toggle('actif', m === 'jeu');
+  document.getElementById('barre-observer').hidden = m !== 'observer';
+  document.getElementById('barre-jeu').hidden = m !== 'jeu';
+  document.getElementById('commandes-observer').hidden = m !== 'observer';
+  document.getElementById('commandes-jeu').hidden = m !== 'jeu';
+  if(m === 'observer'){
+    jeu.enCours = false;
+    cacherVoile();
+    initGrille(tailleObs, document.getElementById('b-perso').value);
+    poserFourmi(centre(), centre());
+    lecture = true;
+    bLecture.textContent = 'Pause';
+  } else {
+    initGrille(21, 'RL');
+    poserFourmi(centre(), centre());
+    jeu.enCours = false; jeu.graines = []; jeu.score = 0;
+    jeu.temps = 90; jeu.energie = jeu.maxEnergie;
+    montrerVoile({
+      titre: 'Chasse aux graines',
+      texte: 'La fourmi avance toute seule. Touche les cases pour la faire tourner et l\u2019amener sur les graines. 90 secondes, et 10 retouches en réserve qui se rechargent peu à peu.',
+      bouton: 'Commencer',
+      action: nouvellePartie
+    });
+  }
+  majBarres();
+  dessiner();
+}
+btnObserver.addEventListener('click', function(){ allerMode('observer'); });
+btnJouer.addEventListener('click', function(){ allerMode('jeu'); });
+
+/* ---------- clavier ---------- */
+window.addEventListener('keydown', function(e){
+  if(e.code === 'Space' && mode === 'observer' && e.target === document.body){
+    e.preventDefault();
+    bLecture.click();
+  }
+});
+
+/* ---------- démarrage ---------- */
+window.addEventListener('resize', function(){ ajusterCanvas(); dessiner(); });
+ajusterCanvas();
+initGrille(tailleObs, 'RL');
+poserFourmi(centre(), centre());
+majBarres();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
