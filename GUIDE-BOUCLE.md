@@ -4,8 +4,8 @@
 
 Chaque nuit, GitHub lance la boucle suivante, sans votre ordinateur :
 
-1. **L'agent Claude** lit `CLAUDE.md`, `CONSIGNES-JEU.md` et `IDEES-JEUX.md`, puis crée le jeu de la prochaine idée non cochée (une idée déjà prise par une pull request ouverte est sautée). Il note l'idée dans le `game.json` du jeu (champ `idee`) et ne modifie jamais `IDEES-JEUX.md`.
-2. **Il se teste lui-même** avec le robot de contrôle, et corrige au maximum 3 fois.
+1. **L'agent Claude** lit `CLAUDE.md`, `CONSIGNES-JEU.md` et `IDEES-JEUX.md`, prend la prochaine idée non cochée (une idée déjà prise par une pull request ouverte est sautée), écrit un **cahier de conception** (principe, niveaux, mécaniques, récompenses), puis code le jeu. Il note l'idée dans le `game.json` du jeu (champ `idee`) et ne modifie jamais `IDEES-JEUX.md`.
+2. **Il joue à son jeu** avec le robot de contrôle (30 secondes au hasard, avec des captures d'écran qu'il regarde), puis se relit : « qu'est-ce qui manque pour qu'un enfant y joue 15 minutes ? ». Il corrige au maximum 5 fois.
 3. **Un garde-fou** vérifie qu'il n'a touché qu'au dossier du nouveau jeu. Sinon, tout s'arrête.
 4. **Le robot refait un contrôle final** dans un vrai navigateur et fabrique la jaquette.
 5. **Une pull request** s'ouvre : c'est une proposition, rien n'est encore en ligne.
@@ -84,7 +84,7 @@ Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un 
 ## Au quotidien : valider un jeu (5 minutes)
 
 1. Ouvrez la pull request du jour.
-2. Cliquez sur le lien d'**aperçu Cloudflare** (une adresse en `.pages.dev` propre à la proposition) et jouez 2 minutes sur votre téléphone.
+2. Lisez le **cahier de conception** en haut de la pull request (et sa section « Relecture »), puis cliquez sur le lien d'**aperçu Cloudflare** (une adresse en `.pages.dev` propre à la proposition) et jouez quelques niveaux sur votre téléphone.
 3. Le jeu vous plaît : **Merge pull request** → **Confirm merge**. Il est en ligne quelques minutes plus tard.
 4. Le jeu ne vous plaît pas : **Close pull request**. Rien n'est publié et l'idée reste non cochée : elle sera retentée au prochain lancement. Pour l'abandonner, supprimez sa ligne dans `IDEES-JEUX.md`.
 
@@ -138,10 +138,12 @@ Bon à savoir :
 | Mettre la boucle en pause | Actions → Nouveau jeu → menu « … » → **Disable workflow** |
 | Comprendre un échec | Actions → cliquer sur le passage en rouge → lire l'étape en échec |
 | Contrôler un jeu sur mon PC | `npm run check` (ou `npm run check -- mon-jeu`) |
+| Voir un jeu joué au hasard, avec captures | `npm run check -- --jouer mon-jeu` (captures dans `captures/mon-jeu/`) |
 
 ## Bon à savoir
 
 - **Coûts** : la boucle consomme votre abonnement Claude, comme une conversation, et des minutes GitHub Actions, gratuites dans la limite du quota mensuel de votre compte. Une exécution par nuit reste modeste. Surveillez quand même la première semaine dans GitHub, menu Settings → Billing.
+- **Modèle et durée** : la boucle utilise le modèle Claude le plus performant (`claude-fable-5-1`) et jusqu'à 150 tours. Un jeu prend 30 à 90 minutes et consomme nettement plus qu'avant. Si votre abonnement n'a pas accès à ce modèle, ou si la limite d'utilisation est atteinte trop vite, remplacez `claude-fable-5-1` par `claude-opus-5-5` dans `nouveau-jeu.yml`.
 - **Plusieurs jeux d'un coup** : chaque jeu consomme autant qu'une nuit de boucle (5 jeux = 5 fois plus). Avec un abonnement Claude, 5 agents en même temps peuvent atteindre la limite d'utilisation : si des jeux échouent pour cette raison, relancez avec un nombre plus petit.
 - **Liste d'idées sans conflit** : les pull requests de jeux ne modifient jamais `IDEES-JEUX.md`. Chaque jeu note son idée dans son `game.json` (champ `idee`), et la ligne est cochée sur `main` au moment de la fusion. Vous pouvez donc modifier la liste à tout moment, même avec des pull requests ouvertes.
 - **Heure** : la boucle tourne à 01:23 UTC, soit vers 3 h du matin à Paris. Elle se règle à la ligne `cron` de `nouveau-jeu.yml`.
