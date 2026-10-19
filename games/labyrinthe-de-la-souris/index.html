@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le labyrinthe de la souris</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#2b2140;color:#fff;font-family:system-ui,sans-serif;user-select:none;-webkit-user-select:none}
+#app{display:flex;flex-direction:column;align-items:center;height:100%;padding:8px;gap:8px}
+#top{display:flex;justify-content:space-between;width:100%;max-width:520px;font-size:18px;font-weight:700}
+#zone{flex:1;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+canvas{background:#fff3c4;border-radius:12px;touch-action:none;box-shadow:0 4px 18px #0006}
+#pad{display:grid;grid-template-columns:repeat(3,60px);grid-template-rows:repeat(2,52px);gap:6px}
+#pad button{font-size:24px;border:0;border-radius:12px;background:#ffb703;color:#2b2140;min-width:44px;min-height:44px}
+#pad button:active{background:#ffd166}
+#haut{grid-column:2}#gauche{grid-row:2;grid-column:1}#bas{grid-row:2;grid-column:2}#droite{grid-row:2;grid-column:3}
+.ecran{position:fixed;inset:0;background:#2b2140ee;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px}
+.ecran.cache{display:none}
+.ecran h1{font-size:34px;margin:0;color:#ffd166}
+.ecran p{font-size:19px;margin:0;max-width:340px;line-height:1.4}
+.gros{font-size:24px;font-weight:700;border:0;border-radius:30px;padding:14px 44px;background:#ffb703;color:#2b2140;min-height:56px}
+.emoji{font-size:64px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top"><span id="niv">Niveau 1</span><span id="pas">Pas : 0</span></div>
+  <div id="zone"><canvas id="c"></canvas></div>
+  <div id="pad">
+    <button id="haut" aria-label="Haut">▲</button><button id="gauche" aria-label="Gauche">◀</button><button id="bas" aria-label="Bas">▼</button><button id="droite" aria-label="Droite">▶</button>
+  </div>
+</div>
+<div id="accueil" class="ecran">
+  <div class="emoji">🐭🧀</div>
+  <h1>Le labyrinthe de la souris</h1>
+  <p>Guide la souris jusqu'au fromage ! Glisse ton doigt, utilise les flèches ou les touches du clavier.</p>
+  <button class="gros" id="jouer">Jouer</button>
+</div>
+<div id="bravo" class="ecran cache">
+  <div class="emoji">🧀</div>
+  <h1 id="bt">Bravo !</h1>
+  <p id="bp"></p>
+  <button class="gros" id="suite">Suivant</button>
+</div>
+<script>
+// Taille du labyrinthe selon le niveau (cases de large x de haut)
+var NB_NIVEAUX = 10;
+function taille(n){ return 4 + n; } // niveau 1 : 5, niveau 10 : 14
+var cv = document.getElementById('c'), ctx = cv.getContext('2d');
+var zone = document.getElementById('zone');
+var niveau = 1, N = 5, murs, sx, sy, sortie, pas, cell = 40, fini = true, trace = [];
+// murs[i] : bits 1=haut 2=droite 4=bas 8=gauche (1 = mur présent)
+var DX = [0,1,0,-1], DY = [-1,0,1,0], BIT = [1,2,4,8];
+
+// Génération par parcours en profondeur (labyrinthe parfait)
+function generer(n){
+  murs = []; var vu = [], i;
+  for(i=0;i<n*n;i++){ murs.push(15); vu.push(false); }
+  var pile = [0]; vu[0] = true;
+  while(pile.length){
+    var cur = pile[pile.length-1], cx = cur%n, cy = (cur-cx)/n, vois = [];
+    for(var d=0;d<4;d++){
+      var nx = cx+DX[d], ny = cy+DY[d];
+      if(nx>=0&&ny>=0&&nx<n&&ny<n&&!vu[ny*n+nx]) vois.push(d);
+    }
+    if(!vois.length){ pile.pop(); continue; }
+    var dd = vois[Math.floor(Math.random()*vois.length)];
+    var nxt = (cy+DY[dd])*n+cx+DX[dd];
+    murs[cur] &= ~BIT[dd]; murs[nxt] &= ~BIT[(dd+2)%4];
+    vu[nxt] = true; pile.push(nxt);
+  }
+}
+
+function demarrer(){
+  N = taille(niveau); generer(N);
+  sx = 0; sy = 0; sortie = N*N-1; pas = 0; trace = [[0,0]]; fini = false;
+  document.getElementById('niv').textContent = 'Niveau ' + niveau + ' / ' + NB_NIVEAUX;
+  document.getElementById('pas').textContent = 'Pas : 0';
+  redim();
+}
+
+function redim(){
+  var t = Math.floor(Math.min(zone.clientWidth, zone.clientHeight, 520));
+  cell = Math.max(10, Math.floor(t / N));
+  var px = cell * N, r = window.devicePixelRatio || 1;
+  cv.style.width = px + 'px'; cv.style.height = px + 'px';
+  cv.width = px * r; cv.height = px * r;
+  ctx.setTransform(r,0,0,r,0,0);
+  dessiner();
+}
+
+function dessiner(){
+  if(!murs) return;
+  var px = cell*N;
+  ctx.clearRect(0,0,px,px);
+  // chemin parcouru
+  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = cell*0.3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for(var i=0;i<trace.length;i++){
+    var X = (trace[i][0]+0.5)*cell, Y = (trace[i][1]+0.5)*cell;
+    if(i) ctx.lineTo(X,Y); else ctx.moveTo(X,Y);
+  }
+  ctx.stroke();
+  // murs
+  ctx.strokeStyle = '#6b3fa0'; ctx.lineWidth = Math.max(2, cell*0.1);
+  ctx.beginPath();
+  for(var y=0;y<N;y++) for(var x=0;x<N;x++){
+    var m = murs[y*N+x], x0 = x*cell, y0 = y*cell;
+    if(m&1){ ctx.moveTo(x0,y0); ctx.lineTo(x0+cell,y0); }
+    if(m&2){ ctx.moveTo(x0+cell,y0); ctx.lineTo(x0+cell,y0+cell); }
+    if(m&4){ ctx.moveTo(x0,y0+cell); ctx.lineTo(x0+cell,y0+cell); }
+    if(m&8){ ctx.moveTo(x0,y0); ctx.lineTo(x0,y0+cell); }
+  }
+  ctx.stroke();
+  // fromage (dernière case) et souris
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = Math.floor(cell*0.7) + 'px serif';
+  ctx.fillText('🧀', (N-0.5)*cell, (N-0.5)*cell);
+  ctx.fillText('🐭', (sx+0.5)*cell, (sy+0.5)*cell);
+}
+
+function bouger(d){
+  if(fini) return;
+  if(murs[sy*N+sx] & BIT[d]) return; // mur : on ne passe pas
+  sx += DX[d]; sy += DY[d]; pas++;
+  // retour en arrière : on efface le bout du chemin
+  var n = trace.length;
+  if(n>1 && trace[n-2][0]===sx && trace[n-2][1]===sy) trace.pop(); else trace.push([sx,sy]);
+  document.getElementById('pas').textContent = 'Pas : ' + pas;
+  dessiner();
+  if(sy*N+sx === sortie){ fini = true; setTimeout(gagne, 350); }
+}
+
+function gagne(){
+  var dernier = niveau >= NB_NIVEAUX;
+  document.getElementById('bt').textContent = dernier ? 'Champion du labyrinthe !' : 'Bravo !';
+  document.getElementById('bp').textContent = dernier
+    ? 'La souris a mangé tout le fromage ! Tu as réussi les ' + NB_NIVEAUX + ' labyrinthes.'
+    : 'La souris a trouvé le fromage en ' + pas + ' pas. Le prochain labyrinthe est plus grand !';
+  document.getElementById('suite').textContent = dernier ? 'Rejouer' : 'Suivant';
+  document.getElementById('bravo').classList.remove('cache');
+}
+
+document.getElementById('jouer').onclick = function(){
+  document.getElementById('accueil').classList.add('cache'); niveau = 1; demarrer();
+};
+document.getElementById('suite').onclick = function(){
+  document.getElementById('bravo').classList.add('cache');
+  niveau = niveau >= NB_NIVEAUX ? 1 : niveau + 1; demarrer();
+};
+['haut','droite','bas','gauche'].forEach(function(id,d){
+  document.getElementById(id).addEventListener('pointerdown', function(e){ e.preventDefault(); bouger(d); });
+});
+var touches = {ArrowUp:0,ArrowRight:1,ArrowDown:2,ArrowLeft:3,w:0,d:1,s:2,a:3,z:0,q:3};
+document.addEventListener('keydown', function(e){
+  if(e.key in touches){ e.preventDefault(); bouger(touches[e.key]); }
+});
+// Glisser le doigt (ou la souris) sur le labyrinthe : un pas chaque fois qu'on avance de 0,6 case
+var px0 = 0, py0 = 0, glisse = false;
+cv.addEventListener('pointerdown', function(e){ glisse = true; px0 = e.clientX; py0 = e.clientY; });
+cv.addEventListener('pointermove', function(e){
+  if(!glisse) return;
+  var dx = e.clientX-px0, dy = e.clientY-py0, seuil = cell*0.6;
+  if(Math.max(Math.abs(dx),Math.abs(dy)) < seuil) return;
+  bouger(Math.abs(dx) > Math.abs(dy) ? (dx>0?1:3) : (dy>0?2:0));
+  px0 = e.clientX; py0 = e.clientY;
+});
+window.addEventListener('pointerup', function(){ glisse = false; });
+window.addEventListener('pointercancel', function(){ glisse = false; });
+window.addEventListener('resize', redim);
+redim();
+</script>
+</body>
+</html>
