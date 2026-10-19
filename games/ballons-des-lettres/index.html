@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ballons des lettres</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; background: #bfe6ff; color: #1d3557; touch-action: manipulation; user-select: none; }
+  #jeu { position: fixed; inset: 0; background: linear-gradient(#7ec8ff, #e6f6ff 70%, #c8f0b8 100%); overflow: hidden; }
+  .nuage { position: absolute; background: #fff; border-radius: 50px; opacity: .85; }
+  .nuage::before, .nuage::after { content: ""; position: absolute; background: #fff; border-radius: 50%; }
+  .nuage::before { width: 50%; height: 140%; left: 15%; top: -60%; }
+  .nuage::after { width: 40%; height: 120%; left: 50%; top: -40%; }
+  #haut { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; z-index: 5; font-weight: bold; font-size: 18px; }
+  #cible { background: #fff; border-radius: 16px; padding: 6px 16px; box-shadow: 0 3px 0 rgba(0,0,0,.15); text-align: center; line-height: 1.1; }
+  #cible small { display: block; font-size: 12px; font-weight: normal; }
+  #cible b { font-size: 40px; color: #e63946; }
+  .info { background: rgba(255,255,255,.8); border-radius: 12px; padding: 6px 12px; min-width: 70px; text-align: center; }
+  .ballon { position: absolute; top: 0; width: 74px; height: 96px; border: 0; padding: 0; background: none; cursor: pointer; z-index: 2; }
+  .ballon svg { width: 100%; height: 100%; overflow: visible; }
+  .ballon span { position: absolute; left: 0; right: 0; top: 18px; text-align: center; font-size: 32px; font-weight: bold; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.25); pointer-events: none; }
+  .ballon.pop { opacity: 0; transition: opacity .3s; pointer-events: none; }
+  .non svg { animation: non .3s; }
+  @keyframes non { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  .etoile { position: absolute; font-size: 26px; font-weight: bold; z-index: 4; pointer-events: none; animation: monte .8s forwards; }
+  @keyframes monte { to { transform: translateY(-60px); opacity: 0; } }
+  .ecran { position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; background: linear-gradient(#7ec8ff, #e6f6ff); }
+  .ecran.cache { display: none; }
+  .ecran h1 { font-size: 40px; margin: 8px 0; color: #e63946; text-shadow: 0 3px 0 #fff; line-height: 1.05; }
+  .ecran p { font-size: 19px; max-width: 330px; margin: 8px 0 20px; }
+  .gros { font-size: 28px; font-weight: bold; padding: 14px 40px; min-height: 56px; border: 0; border-radius: 40px; background: #ffb703; color: #1d3557; box-shadow: 0 5px 0 #d98c00; cursor: pointer; }
+  .gros:active { transform: translateY(3px); box-shadow: 0 2px 0 #d98c00; }
+  .deco { display: flex; gap: 6px; }
+  .deco svg { width: 70px; height: 92px; }
+</style>
+</head>
+<body>
+<div id="jeu">
+  <div class="nuage" style="width:90px;height:26px;top:20%;left:10%"></div>
+  <div class="nuage" style="width:120px;height:30px;top:48%;left:60%"></div>
+  <div id="haut">
+    <div class="info" id="score">⭐ 0</div>
+    <div id="cible"><small>Trouve la lettre</small><b id="lettre">A</b></div>
+    <div class="info" id="temps">⏱ 60</div>
+  </div>
+  <div id="debut" class="ecran">
+    <div class="deco" id="deco"></div>
+    <h1>Ballons<br>des lettres</h1>
+    <p>Une lettre est annoncée en haut. Touche tous les ballons qui portent cette lettre avant qu'ils s'envolent !</p>
+    <button class="gros" id="jouer">Jouer</button>
+  </div>
+  <div id="fin" class="ecran cache">
+    <h1 id="titreFin">Bravo !</h1>
+    <p id="texteFin"></p>
+    <button class="gros" id="rejouer">Rejouer</button>
+  </div>
+</div>
+<script>
+// Ballons des lettres : éclate les ballons portant la lettre demandée.
+(function () {
+  var jeu = document.getElementById('jeu');
+  var COULEURS = ['#e63946', '#2a9d8f', '#f77f00', '#8338ec', '#3a86ff', '#ff5d8f'];
+  var ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  var DUREE = 60;
+  var etat = null, ballons = [], dernier = 0, prochain = 0, tempsRestant = 0, rafId = 0;
+
+  // Dessin d'un ballon en SVG inline
+  function svgBallon(c) {
+    return '<svg viewBox="0 0 74 96"><path d="M37 80 L31 92 L43 92 Z" fill="' + c + '"/>' +
+      '<ellipse cx="37" cy="38" rx="32" ry="38" fill="' + c + '"/>' +
+      '<ellipse cx="25" cy="22" rx="8" ry="12" fill="#fff" opacity=".35"/></svg>';
+  }
+  var deco = document.getElementById('deco');
+  ['#e63946', '#ffb703', '#3a86ff'].forEach(function (c) { deco.innerHTML += svgBallon(c); });
+
+  // Sons simples en Web Audio (seulement après un geste du joueur)
+  var ac = null;
+  function bip(f, d) {
+    try {
+      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      var o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = f; o.type = 'triangle';
+      g.gain.setValueAtTime(.12, ac.currentTime);
+      g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + d);
+      o.connect(g); g.connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
+    } catch (e) {}
+  }
+
+  function majScore() { document.getElementById('score').textContent = '⭐ ' + etat.score; }
+
+  function nouvelleLettre() {
+    var l;
+    do { l = ALPHA[Math.floor(Math.random() * 26)]; } while (l === etat.lettre);
+    etat.lettre = l; etat.trouves = 0;
+    document.getElementById('lettre').textContent = l;
+  }
+
+  function creer(estCible) {
+    var l = estCible ? etat.lettre : ALPHA[Math.floor(Math.random() * 26)];
+    var b = document.createElement('button');
+    b.className = 'ballon';
+    b.setAttribute('aria-label', 'Lettre ' + l);
+    var c = COULEURS[Math.floor(Math.random() * COULEURS.length)];
+    b.innerHTML = svgBallon(c) + '<span>' + l + '</span>';
+    var x = Math.random() * Math.max(10, jeu.clientWidth - 80);
+    var o = { el: b, lettre: l, x: x, y: jeu.clientHeight + 20, v: 60 + etat.niveau * 12 + Math.random() * 30, ph: Math.random() * 6, fini: false };
+    b.style.left = x + 'px';
+    b.addEventListener('pointerdown', function (e) { e.preventDefault(); toucher(o); });
+    jeu.appendChild(b);
+    ballons.push(o);
+  }
+
+  function enlever(el) { if (el.parentNode) el.parentNode.removeChild(el); }
+
+  function retirer(o) {
+    var i = ballons.indexOf(o);
+    if (i >= 0) ballons.splice(i, 1);
+    enlever(o.el);
+  }
+
+  // Petit texte qui monte (récompense)
+  function etoile(x, y, txt) {
+    var s = document.createElement('div');
+    s.className = 'etoile'; s.textContent = txt;
+    s.style.left = x + 'px'; s.style.top = y + 'px';
+    jeu.appendChild(s);
+    setTimeout(function () { enlever(s); }, 800);
+  }
+
+  // Éclate un ballon avec un fondu
+  function eclater(o) {
+    o.fini = true;
+    o.el.classList.add('pop');
+    var i = ballons.indexOf(o); if (i >= 0) ballons.splice(i, 1);
+    setTimeout(function () { enlever(o.el); }, 300);
+  }
+
+  function toucher(o) {
+    if (!etat || o.fini) return;
+    if (o.lettre === etat.lettre) {
+      etoile(o.x + 25, o.y, '+1');
+      eclater(o);
+      bip(660 + etat.trouves * 60, .15);
+      etat.score++; etat.trouves++;
+      majScore();
+      if (etat.trouves >= 5) {
+        // Nouvelle lettre, un peu plus de vitesse, on vide l'écran
+        etat.niveau++;
+        ballons.slice().forEach(eclater);
+        nouvelleLettre();
+        etoile(jeu.clientWidth / 2 - 15, 120, '🎉');
+      }
+    } else {
+      bip(220, .2);
+      o.el.classList.remove('non'); void o.el.offsetWidth; o.el.classList.add('non');
+    }
+  }
+
+  function boucle(t) {
+    var dt = Math.min(.05, (t - dernier) / 1000); dernier = t;
+    tempsRestant -= dt;
+    document.getElementById('temps').textContent = '⏱ ' + Math.max(0, Math.ceil(tempsRestant));
+    if (tempsRestant <= 0) { finir(); return; }
+    prochain -= dt;
+    if (prochain <= 0) {
+      // Toujours au moins deux ballons cibles à l'écran
+      var cibles = ballons.filter(function (b) { return b.lettre === etat.lettre; }).length;
+      creer(cibles < 2 || Math.random() < .35);
+      prochain = Math.max(.45, 1.1 - etat.niveau * .1);
+    }
+    var h = jeu.clientHeight;
+    ballons.slice().forEach(function (o) {
+      o.y -= o.v * dt; o.ph += dt * 2;
+      o.el.style.transform = 'translate(' + (Math.sin(o.ph) * 10) + 'px,' + o.y + 'px)';
+      if (o.y < -110) retirer(o);
+    });
+    rafId = requestAnimationFrame(boucle);
+  }
+
+  function demarrer() {
+    ballons.forEach(function (o) { enlever(o.el); });
+    ballons = [];
+    etat = { score: 0, niveau: 0, lettre: '', trouves: 0 };
+    nouvelleLettre(); majScore();
+    tempsRestant = DUREE; prochain = 0;
+    document.getElementById('debut').classList.add('cache');
+    document.getElementById('fin').classList.add('cache');
+    bip(520, .1);
+    dernier = performance.now();
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(boucle);
+  }
+
+  function finir() {
+    var sc = etat.score, rec = 0;
+    try {
+      rec = parseInt(localStorage.getItem('ballons-lettres-record') || '0', 10) || 0;
+      if (sc > rec) localStorage.setItem('ballons-lettres-record', String(sc));
+    } catch (e) {}
+    rec = Math.max(rec, sc);
+    document.getElementById('titreFin').textContent = sc >= 25 ? 'Champion des lettres !' : sc >= 10 ? 'Bravo !' : 'Bien joué !';
+    document.getElementById('texteFin').textContent = 'Tu as éclaté ' + sc + ' ballon' + (sc > 1 ? 's' : '') + '. Meilleur score : ' + rec + '.';
+    document.getElementById('fin').classList.remove('cache');
+    etat = null;
+  }
+
+  // Clavier : taper la lettre éclate le ballon le plus haut qui la porte
+  document.addEventListener('keydown', function (e) {
+    if (!etat || !e.key || e.key.length !== 1) return;
+    var k = e.key.toUpperCase();
+    var cand = ballons.filter(function (b) { return b.lettre === k && !b.fini; }).sort(function (a, b) { return a.y - b.y; })[0];
+    if (cand) toucher(cand);
+  });
+  document.getElementById('jouer').addEventListener('click', demarrer);
+  document.getElementById('rejouer').addEventListener('click', demarrer);
+})();
+</script>
+</body>
+</html>
