@@ -2,7 +2,7 @@
 
 ## Comment ça marche
 
-Chaque nuit, GitHub lance la boucle suivante, sans votre ordinateur :
+Chaque nuit, GitHub lance la boucle suivante pour **2 jeux**, l'un après l'autre, sans votre ordinateur :
 
 1. **L'agent Claude** lit `CLAUDE.md`, `CONSIGNES-JEU.md` et `IDEES-JEUX.md`, prend la prochaine idée non cochée (une idée déjà prise par une pull request ouverte est sautée), écrit un **cahier de conception** (principe, niveaux, mécaniques, récompenses), puis code le jeu. Il note l'idée dans le `game.json` du jeu (champ `idee`) et ne modifie jamais `IDEES-JEUX.md`.
 2. **Il joue à son jeu** avec le robot de contrôle (30 secondes au hasard, avec des captures d'écran qu'il regarde), puis se relit : « qu'est-ce qui manque pour qu'un enfant y joue 15 minutes ? ». Il corrige au maximum 5 fois.
@@ -142,11 +142,11 @@ Bon à savoir :
 
 ## Bon à savoir
 
-- **Coûts** : la boucle consomme votre abonnement Claude, comme une conversation, et des minutes GitHub Actions, gratuites dans la limite du quota mensuel de votre compte. Une exécution par nuit reste modeste. Surveillez quand même la première semaine dans GitHub, menu Settings → Billing.
+- **Coûts** : la boucle consomme votre abonnement Claude, comme une conversation, et des minutes GitHub Actions, gratuites dans la limite du quota mensuel de votre compte. Avec 2 jeux par nuit sur le modèle le plus performant, la consommation est réelle : surveillez la première semaine (votre abonnement Claude, et GitHub, menu Settings → Billing).
 - **Modèle et durée** : la boucle utilise le modèle Claude le plus performant (`claude-fable-5-1`) et jusqu'à 150 tours. Un jeu prend 30 à 90 minutes et consomme nettement plus qu'avant. Si votre abonnement n'a pas accès à ce modèle, ou si la limite d'utilisation est atteinte trop vite, remplacez `claude-fable-5-1` par `claude-opus-5-5` dans `nouveau-jeu.yml`.
-- **Plusieurs jeux d'un coup** : chaque jeu consomme autant qu'une nuit de boucle (5 jeux = 5 fois plus). Avec un abonnement Claude, 5 agents en même temps peuvent atteindre la limite d'utilisation : si des jeux échouent pour cette raison, relancez avec un nombre plus petit.
+- **Plusieurs jeux d'un coup** : les jeux sont créés l'un après l'autre (un seul agent à la fois), 30 à 90 minutes chacun. Si l'un échoue, par exemple parce que la limite d'utilisation de l'abonnement est atteinte, les suivants sont quand même tentés ; ceux déjà terminés gardent leur pull request.
 - **Liste d'idées sans conflit** : les pull requests de jeux ne modifient jamais `IDEES-JEUX.md`. Chaque jeu note son idée dans son `game.json` (champ `idee`), et la ligne est cochée sur `main` au moment de la fusion. Vous pouvez donc modifier la liste à tout moment, même avec des pull requests ouvertes.
-- **Heure** : la boucle tourne à 01:23 UTC, soit vers 3 h du matin à Paris. Elle se règle à la ligne `cron` de `nouveau-jeu.yml`.
+- **Heure** : la boucle démarre à 01:23 UTC, soit vers 3 h du matin à Paris, et peut durer jusqu'à 4 heures avec 2 jeux. L'heure se règle à la ligne `cron` de `nouveau-jeu.yml`, le nombre de jeux de la nuit à la ligne `NOMBRE`.
 - **Sécurité** : l'agent ne peut que lire, écrire des fichiers et lancer le robot de contrôle. Il ne peut ni publier, ni toucher aux autres jeux ou au site.
 - **Jeton** : il expire au bout d'un an. Refaites alors les étapes 3 et 4.
-- **Étapes suivantes du plan** : plusieurs jeux par nuit, puis des agents spécialisés (idées, testeur, relecteur), une fois la qualité des premiers jeux vérifiée.
+- **Étapes suivantes du plan** : des agents spécialisés (idées, testeur, relecteur), une fois la qualité des premiers jeux vérifiée.

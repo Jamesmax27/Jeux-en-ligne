@@ -2,10 +2,12 @@
 # Boucle de production : des agents Claude créent de nouveaux jeux, le robot
 # de contrôle les vérifie, puis une pull request est ouverte par jeu.
 #
-#  - Automatique : chaque nuit, 1 jeu (01:23 UTC = 03:23 à Paris l'été,
-#    02:23 l'hiver).
+#  - Automatique : chaque nuit, 2 jeux (départ à 01:23 UTC = 03:23 à Paris
+#    l'été, 02:23 l'hiver).
 #  - À la main : onglet Actions → « Nouveau jeu » → « Run workflow » :
-#    nombre de jeux en parallèle (1 à 5) et idée imposée (facultative).
+#    nombre de jeux (1 à 5) et idée imposée (facultative).
+#  - Les jeux sont créés l'un après l'autre ; si l'un échoue (limite
+#    d'utilisation…), les suivants sont quand même tentés.
 #
 # Chaque jeu a sa branche et sa pull request, qui ne touche que son dossier
 # games/<id>/ : IDEES-JEUX.md n'est jamais modifié. Les idées sont prises
@@ -25,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       nombre:
-        description: "Nombre de jeux à créer en parallèle"
+        description: "Nombre de jeux à créer (l'un après l'autre)"
         type: choice
         options: ["1", "2", "3", "4", "5"]
         default: "1"
@@ -59,7 +61,8 @@ jobs:
         id: choix
         uses: actions/github-script@v7
         env:
-          NOMBRE: ${{ inputs.nombre || '1' }}
+          # La nuit : 2 jeux ; à la main : le nombre choisi.
+          NOMBRE: ${{ github.event_name == 'schedule' && '2' || inputs.nombre || '1' }}
           IDEE: ${{ inputs.idee }}
         with:
           script: |
@@ -102,12 +105,13 @@ jobs:
             for (const j of jeux) core.info(`Jeu n°${j.rang} : ${j.idee || '(idée à inventer)'}`);
             core.setOutput('jeux', JSON.stringify(jeux));
 
-  # 2. Un job par jeu, en parallèle : chacun sa branche et sa pull request.
+  # 2. Un job par jeu, l'un après l'autre : chacun son idée, sa branche et sa pull request.
   creer:
     needs: choisir
     name: Jeu n°${{ matrix.jeu.rang }}
     strategy:
-      fail-fast: false
+      fail-fast: false     # un jeu qui échoue n'arrête pas les suivants
+      max-parallel: 1      # un seul agent à la fois (limites d'utilisation de l'abonnement)
       matrix:
         jeu: ${{ fromJSON(needs.choisir.outputs.jeux) }}
     runs-on: ubuntu-latest
