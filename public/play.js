@@ -1,7 +1,10 @@
 // ==========================================================================
 // Jeux-en-ligne — lanceur de jeu (play.html?id=<id-du-jeu>)
 // Trouve le jeu dans catalog.json et le charge dans le cadre isolé.
+// Gère aussi les pouces 👍 / 👎 (voir votes.js).
 // ==========================================================================
+
+import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -10,6 +13,9 @@ const el = {
   cadre: document.getElementById('cadre-jeu'),
   scene: document.getElementById('scene'),
   pleinEcran: document.getElementById('plein-ecran'),
+  votePlus: document.getElementById('vote-plus'),
+  voteMoins: document.getElementById('vote-moins'),
+  infoVote: document.getElementById('info-vote'),
   message: document.getElementById('message'),
   messageTitre: document.getElementById('message-titre'),
   messageTexte: document.getElementById('message-texte'),
@@ -39,6 +45,42 @@ if (document.fullscreenEnabled) {
     el.pleinEcran.setAttribute('aria-label', document.fullscreenElement ? 'Quitter le plein écran' : 'Plein écran');
     el.cadre.focus();
   });
+}
+
+// --- Votes ------------------------------------------------------------------
+
+let minuteurInfo;
+
+function afficherInfoVote(texte) {
+  el.infoVote.textContent = texte;
+  el.infoVote.hidden = false;
+  clearTimeout(minuteurInfo);
+  minuteurInfo = setTimeout(() => { el.infoVote.hidden = true; }, 2500);
+}
+
+function afficherMonVote(valeur) {
+  el.votePlus.setAttribute('aria-pressed', String(valeur === 1));
+  el.voteMoins.setAttribute('aria-pressed', String(valeur === -1));
+}
+
+function activerVotes(gameId) {
+  afficherMonVote(monVote(gameId));
+  el.votePlus.hidden = false;
+  el.voteMoins.hidden = false;
+
+  const cliquer = async (pouce) => {
+    // Même pouce une 2e fois = annulation ; l'autre pouce = remplacement.
+    const valeur = monVote(gameId) === pouce ? 0 : pouce;
+    afficherMonVote(valeur); // l'affichage change tout de suite, même hors ligne
+    afficherInfoVote(valeur === 0 ? 'Vote annulé' : 'Merci pour ton vote !');
+    const resultat = await voter(gameId, valeur);
+    if (resultat === 'en-attente' && monVote(gameId) === valeur) {
+      afficherInfoVote('Vote gardé : il sera envoyé plus tard');
+    }
+    el.cadre.focus(); // le clavier revient au jeu
+  };
+  el.votePlus.addEventListener('click', () => cliquer(1));
+  el.voteMoins.addEventListener('click', () => cliquer(-1));
 }
 
 // --- Démarrage --------------------------------------------------------------
@@ -72,6 +114,10 @@ async function demarrer() {
   el.cadre.title = jeu.title;
   el.cadre.addEventListener('load', () => el.cadre.focus(), { once: true });
   el.cadre.src = jeu.play; // ex. « games/saut-obstacles/?v=1 »
+  activerVotes(jeu.id);
+
+  // Votes restés en attente (hors ligne lors d'une visite précédente).
+  if (votesEnAttente()) envoyerEnAttente();
 }
 
 demarrer();

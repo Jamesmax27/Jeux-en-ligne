@@ -123,28 +123,15 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 
 ## 7. Votes et base de données
 
-```sql
-CREATE TABLE votes (
-  game_id    TEXT NOT NULL,
-  voter_id   TEXT NOT NULL,
-  value      INTEGER NOT NULL CHECK (value IN (-1, 1)),
-  updated_at INTEGER NOT NULL,
-  PRIMARY KEY (game_id, voter_id)
-);
+Une seule table, `votes` (structure complète dans `schema.sql`) : `game_id`, `voter`, `value` (1 / -1), `country`, `created_at` ; clé primaire `(game_id, voter)`. Les totaux sont calculés à la lecture (pas de table `scores`).
 
-CREATE TABLE scores (
-  game_id TEXT PRIMARY KEY,
-  up      INTEGER NOT NULL DEFAULT 0,
-  down    INTEGER NOT NULL DEFAULT 0,
-  score   REAL    NOT NULL DEFAULT 0
-);
-```
-
-- `POST /api/vote` : corps `{ "gameId": "...", "value": 1 | -1 | 0, "voterId": "...", "turnstileToken"?: "..." }`. `0` = annulation. Met à jour `votes`, puis recalcule la ligne de `scores`.
-- `GET /api/scores` : renvoie `{ "<gameId>": { "up": n, "down": n, "score": x }, ... }`, en-tête de cache 5 minutes.
-- `voter_id` : identifiant aléatoire (UUID) généré par le navigateur à la première visite et conservé localement. Aucun compte, aucun e-mail.
-- Limite de débit : environ 30 votes par heure et par adresse IP.
-- Hors ligne : les votes sont mis en file d'attente localement et envoyés au retour du réseau.
+- `POST /api/vote` (`functions/api/vote.js`) : corps `{ "gameId": "...", "value": 1 | -1 | 0, "voterId": "...", "turnstileToken": "..." }`. `0` = annulation (la ligne est supprimée). Jeton Turnstile vérifié à **chaque** vote (secret `TURNSTILE_SECRET`, action `vote`). Renvoie les nouveaux totaux du jeu.
+- `GET /api/scores` (`functions/api/scores.js`) : renvoie `{ "<gameId>": { "up": n, "down": n, "score": x }, ... }`, cache 5 minutes. Filtre pays optionnel : `?pays=FR`.
+- `voter` : empreinte SHA-256 d'un identifiant aléatoire (UUID) créé par le navigateur et conservé localement. Aucun compte, aucun e-mail, aucune adresse IP enregistrée.
+- `country` : en-tête `CF-IPCountry` (« XX » si inconnu). `created_at` : date du dernier vote en millisecondes.
+- Navigateur (`public/votes.js`) : le vote est enregistré d'abord sur l'appareil, puis envoyé ; sans réseau ou si l'API ne répond pas, il reste en file d'attente et part au retour du réseau ou à la visite suivante. Turnstile n'est chargé qu'au moment d'envoyer un vote.
+- Catalogue sans API : derniers scores connus (stockés localement), sinon aucun ; le site reste utilisable.
+- À faire : limite de débit (~30 votes par heure et par adresse IP), proposition de vote au retour au catalogue.
 
 ## 8. Classement
 
@@ -161,6 +148,8 @@ Exemples de référence (pour les tests) : 90/10 → 0,826 ; 1/0 → 0,207 ; 20/
 - Onglet **Nouveautés** : jeux ajoutés depuis moins de 7 jours, du plus récent au plus ancien.
 - Onglet **Hors ligne** : jeux déjà en cache sur l'appareil.
 - **Archives** : jeux avec plus de 30 votes et un score inférieur à 0,2 (seuils ajustables), affichés en bas.
+
+Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2e et 4e position des Populaires), `ARCHIVE_VOTES_MIN`, `ARCHIVE_SCORE_MAX`.
 
 ## 9. Hors ligne (PWA)
 
@@ -204,7 +193,7 @@ Exemples de référence (pour les tests) : 90/10 → 0,826 ; 1/0 → 0,207 ; 20/
 ## 14. État actuel
 
 - [ ] Phase 1 — fichiers créés (catalogue avec recherche, onglets Tous / Nouveautés, filtres par thème ; lanceur avec plein écran ; build ; jeu d'exemple `pommes-du-poney`). Reste : intégrer les jeux existants et publier sur Cloudflare Pages.
-- [ ] Phase 2
+- [ ] Phase 2 — fichiers créés (`functions/api/vote.js`, `functions/api/scores.js`, `public/votes.js`, `schema.sql` ; pouces dans le lanceur ; onglet Populaires trié par Wilson avec nouveautés intercalées ; Archives). Reste : tester en ligne, limite de débit par IP, proposition de vote au retour au catalogue.
 - [ ] Phase 3
 - [ ] Phase 4
 
