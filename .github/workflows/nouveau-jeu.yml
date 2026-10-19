@@ -1,0 +1,139 @@
+# ==========================================================================
+# Boucle de production : un agent Claude crée un nouveau jeu, le robot de
+# contrôle le vérifie, puis une pull request est ouverte pour validation.
+#
+#  - Automatique : chaque nuit (heure en UTC : 01:23 UTC = 03:23 à Paris l'été,
+#    02:23 l'hiver).
+#  - À la main : onglet Actions → « Nouveau jeu » → « Run workflow »
+#    (champ facultatif pour imposer une idée).
+#
+# Rien n'est publié sans votre accord : le jeu arrive en pull request,
+# vous jouez à l'aperçu Cloudflare, puis vous cliquez « Merge ».
+# ==========================================================================
+
+name: Nouveau jeu
+
+on:
+  schedule:
+    - cron: "23 1 * * *"
+  workflow_dispatch:
+    inputs:
+      idee:
+        description: "Idée de jeu imposée (laisser vide pour prendre la suivante dans IDEES-JEUX.md)"
+        required: false
+        default: ""
+
+concurrency:
+  group: nouveau-jeu
+  cancel-in-progress: false
+
+jobs:
+  creer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installer le navigateur de test
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+
+      - name: L'agent crée le jeu
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Abonnement Claude (jeton créé avec « claude setup-token »).
+          # Avec une clé API à la place : anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --max-turns 60
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*)"
+          prompt: |
+            Tu es le développeur de jeux du site Jeux-en-ligne. Ta mission : créer UN nouveau mini-jeu complet.
+
+            1. Lis CLAUDE.md, puis CONSIGNES-JEU.md (règles obligatoires), puis IDEES-JEUX.md.
+            2. Liste les dossiers de games/ et lis leurs game.json pour connaître les jeux existants.
+            3. Choisis l'idée :
+               - idée imposée (si ce texte n'est pas vide) : « ${{ github.event.inputs.idee }} » ;
+               - sinon la première ligne non cochée « - [ ] » de IDEES-JEUX.md ;
+               - si toutes sont cochées, invente une idée originale, différente des jeux existants,
+                 et ajoute-la cochée à la fin de IDEES-JEUX.md.
+            4. Crée le dossier games/<id>/ avec exactement index.html et game.json
+               (pas de jaquette : elle est fabriquée automatiquement ensuite).
+               "added" = date du jour ; "author" = "Claude (agent)" ; "version" = 1.
+            5. Lance : node scripts/validate-games.mjs --browser <id>
+               Corrige toutes les erreurs et relance. 3 tentatives de correction au maximum.
+            6. Coche l'idée réalisée dans IDEES-JEUX.md (« - [x] ») en ajoutant « → <id> » à la fin de la ligne.
+
+            Interdits : modifier un autre fichier que games/<id>/* et IDEES-JEUX.md, toucher aux jeux
+            existants, utiliser la moindre ressource Internet dans le jeu.
+            Termine par un résumé de 3 lignes : titre, principe du jeu, points à vérifier en y jouant.
+
+      - name: Vérifier ce que l'agent a modifié
+        id: verif
+        run: |
+          set -euo pipefail
+          git status --porcelain --untracked-files=all > modifs.txt
+          cat modifs.txt
+          # Seuls games/<nouveau-jeu>/ et IDEES-JEUX.md peuvent changer.
+          if grep -v -E '^\?\? games/[a-z0-9-]+/|^ M IDEES-JEUX\.md$|^\?\? modifs\.txt$' modifs.txt; then
+            echo "::error::L'agent a modifié des fichiers non autorisés (liste ci-dessus)."
+            exit 1
+          fi
+          nouveaux=$( (grep -E '^\?\? games/' modifs.txt || true) | cut -d/ -f2 | sort -u | tr '\n' ' ')
+          rm modifs.txt
+          if [ -z "$nouveaux" ]; then
+            echo "::error::Aucun nouveau jeu n'a été créé."
+            exit 1
+          fi
+          for id in $nouveaux; do
+            if git ls-tree -d --name-only HEAD "games/$id" | grep -q .; then
+              echo "::error::Le jeu existant games/$id a été modifié."
+              exit 1
+            fi
+          done
+          echo "ids=$nouveaux" >> "$GITHUB_OUTPUT"
+          premier=$(echo $nouveaux | cut -d' ' -f1)
+          titre=$(node -e "console.log(require('./games/$premier/game.json').title)")
+          echo "titre=$titre" >> "$GITHUB_OUTPUT"
+
+      - name: Contrôle qualité final + jaquette
+        run: node scripts/validate-games.mjs --browser --covers ${{ steps.verif.outputs.ids }} | tee rapport.txt
+
+      - name: Préparer la description de la pull request
+        run: |
+          {
+            echo "Jeu créé automatiquement par l'agent, contrôlé par le robot de qualité."
+            echo
+            echo "**À faire avant de fusionner :** ouvrez l'aperçu Cloudflare (lien dans les vérifications ci-dessous), jouez 2 minutes, vérifiez que le contenu convient aux enfants."
+            echo
+            echo '```'
+            cat rapport.txt
+            echo '```'
+          } > description.md
+          rm rapport.txt
+
+      - name: Ouvrir la pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: nouveau-jeu/${{ github.run_number }}
+          commit-message: "Nouveau jeu : ${{ steps.verif.outputs.titre }}"
+          title: "Nouveau jeu : ${{ steps.verif.outputs.titre }}"
+          body-path: description.md
+          add-paths: |
+            games/**
+            IDEES-JEUX.md
+          delete-branch: true

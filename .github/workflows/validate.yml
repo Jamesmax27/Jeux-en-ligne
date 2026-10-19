@@ -1,0 +1,48 @@
+# ==========================================================================
+# Robot de contrôle : vérifie chaque jeu ajouté ou modifié dans une
+# pull request (proposée par vous, un autre agent ou une autre IA).
+# ==========================================================================
+
+name: Contrôle des jeux
+
+on:
+  pull_request:
+    paths:
+      - "games/**"
+      - "scripts/**"
+  workflow_dispatch:
+
+jobs:
+  controle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installer le navigateur de test
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+
+      - name: Trouver les jeux concernés
+        id: jeux
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            ids=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- games/ | cut -d/ -f2 | sort -u | while read -r id; do [ -d "games/$id" ] && echo "$id"; done | tr '\n' ' ')
+          else
+            ids=""
+          fi
+          echo "ids=$ids" >> "$GITHUB_OUTPUT"
+          echo "Jeux à contrôler : ${ids:-tous}"
+
+      - name: Contrôler
+        run: node scripts/validate-games.mjs --browser ${{ steps.jeux.outputs.ids }}

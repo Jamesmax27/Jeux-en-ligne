@@ -1,0 +1,15 @@
+# Idées de jeux à réaliser
+
+La boucle automatique prend chaque nuit **la première ligne non cochée**, crée le jeu, puis coche la ligne.
+Ajoutez, supprimez ou réordonnez librement les lignes. Format : `- [ ] Titre — principe (genre, âge)`.
+
+> Liste de départ proposée par Claude : à relire et à modifier selon vos envies.
+
+- [ ] La course des tables — un petit renard court ; tape la bonne réponse de multiplication pour sauter les obstacles (calcul, 7+)
+- [ ] Ballons des lettres — une lettre est annoncée à l'écran, éclate les ballons qui la portent (lecture, 4+)
+- [ ] Memory de la ferme — retrouve les paires d'animaux de la ferme, de plus en plus de cartes (mémoire, 4+)
+- [ ] Le grand tour des planètes — remets les planètes du système solaire dans l'ordre, avec une info sur chacune (puzzle, 7+)
+- [ ] Quelle heure est-il ? — lis l'heure sur une horloge à aiguilles et choisis la bonne réponse (quiz, 6+)
+- [ ] Drapeaux du monde — reconnais le drapeau de pays d'Europe, puis du monde entier (quiz, 8+)
+- [ ] Coloriage magique — colorie un dessin case par case en suivant les numéros (création, 4+)
+- [ ] Le labyrinthe de la souris — guide la souris jusqu'au fromage, labyrinthes de plus en plus grands (réflexion, 5+)
