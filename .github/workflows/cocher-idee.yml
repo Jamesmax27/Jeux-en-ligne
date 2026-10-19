@@ -1,9 +1,11 @@
 # ==========================================================================
 # Coche l'idée d'un jeu dans IDEES-JEUX.md quand sa pull request (branche
-# nouveau-jeu/…) est fusionnée. La coche est faite sur main, une fusion à
-# la fois : jamais de conflit, même avec plusieurs jeux créés en parallèle.
+# nouveau-jeu/…) est fusionnée sur main. La coche est faite sur main, une
+# fusion à la fois : jamais de conflit, même avec plusieurs jeux en parallèle.
 #
-#  - L'idée est retrouvée grâce au repère <!-- idee: … --> de la pull request.
+#  - L'idée est lue dans le champ "idee" du game.json du jeu (anciennes pull
+#    requests, sans ce champ : repère <!-- idee: … --> de leur description).
+#  - La ligne correspondante devient « - [x] … → <id> ».
 #  - Idée inventée ou imposée (absente de la liste) : ajoutée cochée à la
 #    fin, d'après le game.json du jeu.
 #  - Pull request fermée sans fusion : rien ne change, l'idée sera retentée.
@@ -14,6 +16,7 @@ name: Cocher l'idée
 on:
   pull_request:
     types: [closed]
+    branches: [main]
 
 concurrency:
   group: cocher-idee
@@ -51,19 +54,21 @@ jobs:
             const lignes = fs.readFileSync(FICHIER, 'utf8').split('\n');
             if (lignes.some((l) => l.endsWith(`→ ${id}`))) return core.info(`Idée de ${id} déjà cochée.`);
 
+            // L'idée réalisée : champ "idee" du game.json (anciennes pull requests : repère de la description).
+            const f = JSON.parse(fs.readFileSync(`games/${id}/game.json`, 'utf8'));
+            const idee = String(f.idee || (/<!-- idee: (.+?) -->/.exec(pr.body || '') || [])[1] || '').trim();
             const titreDe = (l) => l.replace(/^- \[[ xX]\] /, '').split(' — ')[0].trim().toLowerCase();
-            const repere = ((/<!-- idee: (.+?) -->/.exec(pr.body || '') || [])[1] || '').trim().toLowerCase();
-            const i = repere ? lignes.findIndex((l) => /^- \[ \] /.test(l) && titreDe(l) === repere) : -1;
+            // Ligne de cette idée, pas encore reliée à un jeu (cochée ou non).
+            const i = idee ? lignes.findIndex((l) => /^- \[[ xX]\] /.test(l) && !l.includes(' → ') && titreDe(l) === idee.toLowerCase()) : -1;
             if (i >= 0) {
-              lignes[i] = `${lignes[i].replace(/^- \[ \] /, '- [x] ')} → ${id}`;
+              lignes[i] = `${lignes[i].replace(/^- \[[ xX]\] /, '- [x] ')} → ${id}`;
             } else {
-              // Idée inventée ou imposée : ligne cochée à la fin de la liste, d'après la fiche du jeu.
-              const f = JSON.parse(fs.readFileSync(`games/${id}/game.json`, 'utf8'));
+              // Idée inventée ou imposée (absente de la liste) : ligne cochée à la fin, d'après la fiche du jeu.
               let desc = String(f.description || '').replace(/\s+/g, ' ').trim().replace(/[.!\s]+$/, '');
               desc = desc.charAt(0).toLowerCase() + desc.slice(1);
               const idees = lignes.map((l, k) => (/^- \[[ xX]\] /.test(l) ? k : -1)).filter((k) => k >= 0);
               const position = idees.length ? idees.at(-1) + 1 : lignes.length;
-              lignes.splice(position, 0, `- [x] ${f.title} — ${desc} (${f.genre}, ${f.ages}) → ${id}`);
+              lignes.splice(position, 0, `- [x] ${idee || f.title} — ${desc} (${f.genre}, ${f.ages}) → ${id}`);
             }
             fs.writeFileSync(FICHIER, lignes.join('\n'));
 

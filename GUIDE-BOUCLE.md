@@ -4,7 +4,7 @@
 
 Chaque nuit, GitHub lance la boucle suivante, sans votre ordinateur :
 
-1. **L'agent Claude** lit `CLAUDE.md`, `CONSIGNES-JEU.md` et `IDEES-JEUX.md`, puis crée le jeu de la prochaine idée non cochée (une idée qui a déjà une pull request ouverte est sautée).
+1. **L'agent Claude** lit `CLAUDE.md`, `CONSIGNES-JEU.md` et `IDEES-JEUX.md`, puis crée le jeu de la prochaine idée non cochée (une idée déjà prise par une pull request ouverte est sautée). Il note l'idée dans le `game.json` du jeu (champ `idee`) et ne modifie jamais `IDEES-JEUX.md`.
 2. **Il se teste lui-même** avec le robot de contrôle, et corrige au maximum 3 fois.
 3. **Un garde-fou** vérifie qu'il n'a touché qu'au dossier du nouveau jeu. Sinon, tout s'arrête.
 4. **Le robot refait un contrôle final** dans un vrai navigateur et fabrique la jaquette.
@@ -143,6 +143,7 @@ Bon à savoir :
 
 - **Coûts** : la boucle consomme votre abonnement Claude, comme une conversation, et des minutes GitHub Actions, gratuites dans la limite du quota mensuel de votre compte. Une exécution par nuit reste modeste. Surveillez quand même la première semaine dans GitHub, menu Settings → Billing.
 - **Plusieurs jeux d'un coup** : chaque jeu consomme autant qu'une nuit de boucle (5 jeux = 5 fois plus). Avec un abonnement Claude, 5 agents en même temps peuvent atteindre la limite d'utilisation : si des jeux échouent pour cette raison, relancez avec un nombre plus petit.
+- **Liste d'idées sans conflit** : les pull requests de jeux ne modifient jamais `IDEES-JEUX.md`. Chaque jeu note son idée dans son `game.json` (champ `idee`), et la ligne est cochée sur `main` au moment de la fusion. Vous pouvez donc modifier la liste à tout moment, même avec des pull requests ouvertes.
 - **Heure** : la boucle tourne à 01:23 UTC, soit vers 3 h du matin à Paris. Elle se règle à la ligne `cron` de `nouveau-jeu.yml`.
 - **Sécurité** : l'agent ne peut que lire, écrire des fichiers et lancer le robot de contrôle. Il ne peut ni publier, ni toucher aux autres jeux ou au site.
 - **Jeton** : il expire au bout d'un an. Refaites alors les étapes 3 et 4.

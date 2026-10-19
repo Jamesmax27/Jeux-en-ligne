@@ -8,9 +8,10 @@
 #    nombre de jeux en parallèle (1 à 5) et idée imposée (facultative).
 #
 # Chaque jeu a sa branche et sa pull request, qui ne touche que son dossier
-# games/<id>/. Les idées sont prises dans l'ordre de IDEES-JEUX.md (sauf
-# celles qui ont déjà une pull request ouverte) et cochées à la fusion par
-# cocher-idee.yml : pas de conflit entre les pull requests.
+# games/<id>/ : IDEES-JEUX.md n'est jamais modifié. Les idées sont prises
+# dans l'ordre de IDEES-JEUX.md (sauf celles déjà prises par une pull request
+# ouverte), notées dans le game.json du jeu (champ "idee") et cochées à la
+# fusion par cocher-idee.yml : pas de conflit entre les pull requests.
 #
 # Rien n'est publié sans votre accord : vous jouez à l'aperçu Cloudflare,
 # puis vous cliquez « Merge ».
@@ -67,13 +68,22 @@ jobs:
             const imposee = (process.env.IDEE || '').replace(/\s+/g, ' ').trim();
             const titreDe = (idee) => idee.split(' — ')[0].trim().toLowerCase();
 
-            // Idées déjà en cours : repère <!-- idee: … --> des pull requests ouvertes.
+            // Idées déjà prises : champ "idee" du game.json de chaque pull request ouverte
+            // (anciennes pull requests, sans ce champ : repère <!-- idee: … --> de leur description).
             const prs = await github.paginate(github.rest.pulls.list, { ...context.repo, state: 'open', per_page: 100 });
-            const enCours = new Set(prs
-              .filter((p) => p.head.ref.startsWith('nouveau-jeu/'))
-              .map((p) => (/<!-- idee: (.+?) -->/.exec(p.body || '') || [])[1])
-              .filter(Boolean)
-              .map(titreDe));
+            const enCours = new Set();
+            for (const pr of prs) {
+              const fichiers = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 });
+              for (const f of fichiers.filter((f) => /^games\/[a-z0-9-]+\/game\.json$/.test(f.filename) && f.status !== 'removed')) {
+                try {
+                  const { data } = await github.rest.repos.getContent({ ...context.repo, path: f.filename, ref: pr.head.sha });
+                  const idee = JSON.parse(Buffer.from(data.content, 'base64').toString('utf8')).idee;
+                  if (typeof idee === 'string' && idee.trim()) enCours.add(titreDe(idee));
+                } catch (e) { core.warning(`PR #${pr.number} : ${f.filename} illisible (${e.message})`); }
+              }
+              const ancien = (/<!-- idee: (.+?) -->/.exec(pr.body || '') || [])[1];
+              if (ancien) enCours.add(titreDe(ancien));
+            }
 
             // Idées non cochées, dans l'ordre du fichier, sans celles en cours.
             const libres = fs.readFileSync('IDEES-JEUX.md', 'utf8').split('\n')
@@ -84,7 +94,10 @@ jobs:
             // Jeu n°1 = idée imposée (s'il y en a une) ou 1re idée libre ; n°2 = la suivante, etc.
             // Plus aucune idée libre : un seul jeu, dont l'agent invente l'idée.
             const idees = (imposee ? [imposee, ...libres] : libres).slice(0, nombre);
-            const jeux = idees.length ? idees.map((idee, i) => ({ rang: i + 1, idee })) : [{ rang: 1, idee: '' }];
+            // titre = texte avant « — » : c'est la valeur du champ "idee" du game.json.
+            const jeux = idees.length
+              ? idees.map((idee, i) => ({ rang: i + 1, idee, titre: idee.split(' — ')[0].trim() }))
+              : [{ rang: 1, idee: '', titre: '' }];
             if (enCours.size) core.info(`Idées déjà en cours (sautées) : ${[...enCours].join(' ; ')}`);
             for (const j of jeux) core.info(`Jeu n°${j.rang} : ${j.idee || '(idée à inventer)'}`);
             core.setOutput('jeux', JSON.stringify(jeux));
@@ -141,13 +154,15 @@ jobs:
                D'autres agents créent peut-être d'autres jeux en même temps : réalise uniquement cette idée.
             4. Crée le dossier games/<id>/ avec exactement index.html et game.json
                (pas de jaquette : elle est fabriquée automatiquement ensuite).
-               "added" = date du jour ; "author" = "Claude (agent)" ; "version" = 1.
+               "added" = date du jour ; "author" = "Claude (agent)" ; "version" = 1 ;
+               "idee" = « ${{ matrix.jeu.titre }} » (titre de l'idée réalisée ; si ce texte est vide,
+               idée inventée : mets le titre de ton jeu).
             5. Lance : node scripts/validate-games.mjs --browser <id>
                Corrige toutes les erreurs et relance. 3 tentatives de correction au maximum.
 
-            Interdits : modifier un autre fichier que games/<id>/* (IDEES-JEUX.md compris : l'idée sera
-            cochée automatiquement quand la pull request sera fusionnée), toucher aux jeux existants,
-            utiliser la moindre ressource Internet dans le jeu.
+            Interdits : modifier un autre fichier que games/<id>/* ; en particulier, ne touche jamais à
+            IDEES-JEUX.md (l'idée est notée dans game.json et cochée automatiquement à la fusion) ;
+            toucher aux jeux existants ; utiliser la moindre ressource Internet dans le jeu.
             Termine par un résumé de 3 lignes : titre, principe du jeu, points à vérifier en y jouant.
 
       - name: Vérifier ce que l'agent a modifié
@@ -175,6 +190,25 @@ jobs:
           titre=$(node -e "console.log(require('./games/$id/game.json').title)")
           echo "titre=$titre" >> "$GITHUB_OUTPUT"
 
+      - name: Noter l'idée dans game.json
+        env:
+          ID: ${{ steps.verif.outputs.id }}
+          TITRE_IDEE: ${{ matrix.jeu.titre }}
+        run: |
+          # Le champ "idee" relie le jeu à sa ligne de IDEES-JEUX.md : il sert à sauter les
+          # idées en cours et à cocher la bonne ligne à la fusion (cocher-idee.yml).
+          node -e '
+            const fs = require("fs");
+            const f = `games/${process.env.ID}/game.json`;
+            const j = JSON.parse(fs.readFileSync(f, "utf8"));
+            const attendu = process.env.TITRE_IDEE || (typeof j.idee === "string" && j.idee.trim()) || j.title;
+            if (j.idee !== attendu) {
+              j.idee = attendu;
+              fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+              console.log(`Champ "idee" corrigé : ${attendu}`);
+            } else console.log(`Champ "idee" : ${attendu}`);
+          '
+
       - name: Contrôle qualité final + jaquette
         run: node scripts/validate-games.mjs --browser --covers "${{ steps.verif.outputs.id }}" | tee "$RUNNER_TEMP/rapport.txt"
 
@@ -182,16 +216,11 @@ jobs:
         env:
           IDEE: ${{ matrix.jeu.idee }}
         run: |
-          # Repère invisible (titre de l'idée) : lu au choix des idées suivantes
-          # (idée en cours) et à la fusion (cocher-idee.yml coche cette idée).
-          titre_idee="${IDEE%% — *}"
-          titre_idee="${titre_idee//-->/->}"
           {
             echo "Jeu créé automatiquement par l'agent, contrôlé par le robot de qualité."
             if [ -n "$IDEE" ]; then
               echo
               echo "**Idée :** $IDEE"
-              echo "<!-- idee: $titre_idee -->"
             fi
             echo
             echo "**À faire avant de fusionner :** ouvrez l'aperçu Cloudflare (lien dans les vérifications ci-dessous), jouez 2 minutes, vérifiez que le contenu convient aux enfants. L'idée sera cochée dans IDEES-JEUX.md à la fusion."

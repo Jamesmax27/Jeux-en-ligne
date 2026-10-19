@@ -1,6 +1,6 @@
 # Idées de jeux à réaliser
 
-La boucle automatique prend chaque nuit **la première ligne non cochée**, crée le jeu, puis coche la ligne.
+La boucle automatique prend chaque nuit **la première ligne non cochée** (sauf si une pull request ouverte l'a déjà prise) et crée le jeu. La ligne est cochée automatiquement quand vous fusionnez sa pull request.
 Ajoutez, supprimez ou réordonnez librement les lignes. Format : `- [ ] Titre — principe (genre, âge)`.
 
 > Liste de départ proposée par Claude : à relire et à modifier selon vos envies.
