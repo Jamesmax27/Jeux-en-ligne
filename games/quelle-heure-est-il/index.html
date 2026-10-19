@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quelle heure est-il ?</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,sans-serif;color:#1d2b4f;
+    background:linear-gradient(160deg,#ffe9a8,#ffb98a 60%,#f58fa0)}
+  #app{height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;text-align:center}
+  .ecran{display:none;width:100%;flex-direction:column;align-items:center;gap:12px}
+  .ecran.actif{display:flex}
+  h1{font-size:clamp(2rem,9vw,3rem);margin:0;line-height:1.05;text-shadow:0 3px 0 #fff8}
+  p{margin:0;font-size:1.1rem}
+  .gros{font-size:1.4rem;font-weight:700;min-height:56px;padding:10px 36px;border:0;border-radius:30px;
+    background:#1d2b4f;color:#fff;box-shadow:0 5px 0 #0c1530;cursor:pointer}
+  .gros:active{transform:translateY(3px);box-shadow:0 2px 0 #0c1530}
+  svg.horloge{width:min(62vw,36vh,300px);height:auto;filter:drop-shadow(0 6px 6px #0003)}
+  #haut{display:flex;justify-content:space-between;width:100%;font-weight:700;font-size:1.05rem}
+  #choix{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+  .rep{min-height:64px;font-size:1.7rem;font-weight:700;border:0;border-radius:18px;background:#fff;color:#1d2b4f;
+    box-shadow:0 5px 0 #c9a77a;cursor:pointer;font-variant-numeric:tabular-nums}
+  .rep:active{transform:translateY(3px)}
+  .rep.bon{background:#6fd48a;box-shadow:0 5px 0 #3d9d57}
+  .rep.mauvais{background:#ff9a9a;box-shadow:0 5px 0 #c85a5a}
+  #msg{min-height:1.6em;font-weight:700;font-size:1.2rem}
+  .etoiles{font-size:2.4rem}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="accueil" class="ecran actif">
+    <h1>Quelle heure<br>est-il ?</h1>
+    <div id="horlogeAccueil"></div>
+    <p>Regarde les aiguilles et choisis la bonne heure.<br>La petite aiguille montre les heures, la grande les minutes.</p>
+    <button class="gros" id="jouer">Jouer</button>
+  </section>
+  <section id="jeu" class="ecran">
+    <div id="haut"><span id="niveau"></span><span id="score"></span></div>
+    <div id="horloge"></div>
+    <div id="msg"></div>
+    <div id="choix"></div>
+  </section>
+  <section id="fin" class="ecran">
+    <h1 id="titreFin">Bravo !</h1>
+    <div class="etoiles" id="etoiles"></div>
+    <p id="texteFin"></p>
+    <button class="gros" id="rejouer">Rejouer</button>
+  </section>
+</div>
+<script>
+"use strict";
+// Nombre de questions par partie
+var TOTAL = 10;
+
+// Dessine une horloge à aiguilles (SVG) pour l'heure h (1-12) et les minutes m
+function horlogeSVG(h, m) {
+  var s = '<svg class="horloge" viewBox="0 0 200 200" role="img" aria-label="Horloge à aiguilles">' +
+    '<circle cx="100" cy="100" r="96" fill="#f6a23c"/><circle cx="100" cy="100" r="88" fill="#fffdf5"/>';
+  for (var i = 1; i <= 60; i++) {
+    var a = i * 6 * Math.PI / 180, grand = i % 5 === 0;
+    var r1 = grand ? 74 : 82, r2 = 86;
+    s += '<line x1="' + (100 + r1 * Math.sin(a)).toFixed(1) + '" y1="' + (100 - r1 * Math.cos(a)).toFixed(1) +
+      '" x2="' + (100 + r2 * Math.sin(a)).toFixed(1) + '" y2="' + (100 - r2 * Math.cos(a)).toFixed(1) +
+      '" stroke="#1d2b4f" stroke-width="' + (grand ? 3 : 1) + '"/>';
+  }
+  for (var n = 1; n <= 12; n++) {
+    var b = n * 30 * Math.PI / 180;
+    s += '<text x="' + (100 + 62 * Math.sin(b)).toFixed(1) + '" y="' + (100 - 62 * Math.cos(b) + 7).toFixed(1) +
+      '" text-anchor="middle" font-size="20" font-weight="700" font-family="system-ui,sans-serif" fill="#1d2b4f">' + n + '</text>';
+  }
+  var angH = ((h % 12) + m / 60) * 30, angM = m * 6;
+  s += '<line x1="100" y1="100" x2="100" y2="54" stroke="#e0457b" stroke-width="7" stroke-linecap="round" transform="rotate(' + angH + ' 100 100)"/>' +
+    '<line x1="100" y1="100" x2="100" y2="28" stroke="#2a6fdb" stroke-width="4" stroke-linecap="round" transform="rotate(' + angM + ' 100 100)"/>' +
+    '<circle cx="100" cy="100" r="6" fill="#1d2b4f"/></svg>';
+  return s;
+}
+
+function $(id) { return document.getElementById(id); }
+function montrer(id) {
+  ["accueil", "jeu", "fin"].forEach(function (e) { $(e).classList.toggle("actif", e === id); });
+}
+function deux(n) { return (n < 10 ? "0" : "") + n; }
+function texte(h, m) { return h + " h " + deux(m); }
+function alea(n) { return Math.floor(Math.random() * n); }
+
+var q = 0, score = 0, bonne = null, verrou = false, derniere = "", minuteur = null;
+
+// Minutes possibles selon la progression : pile, demie, quarts, puis tous les 5 min
+function minutesPossibles(num) {
+  if (num < 3) return [0];
+  if (num < 5) return [0, 30];
+  if (num < 7) return [0, 15, 30, 45];
+  return [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+}
+
+function question() {
+  verrou = false;
+  $("msg").textContent = "";
+  $("niveau").textContent = "Question " + (q + 1) + " / " + TOTAL;
+  $("score").textContent = "⭐ " + score;
+  var ms = minutesPossibles(q), h, m, cle;
+  do { h = 1 + alea(12); m = ms[alea(ms.length)]; cle = texte(h, m); } while (cle === derniere);
+  derniere = cle;
+  bonne = cle;
+  $("horloge").innerHTML = horlogeSVG(h, m);
+  // 3 mauvaises réponses plausibles : autre heure, autres minutes, aiguilles confondues
+  var rep = [cle], essais = 0;
+  while (rep.length < 4 && essais++ < 200) {
+    var hh = h, mm = m, t = alea(3);
+    if (t === 0) hh = 1 + alea(12);
+    else if (t === 1) mm = ms[alea(ms.length)];
+    else { hh = Math.round(m / 5) % 12 || 12; mm = (h % 12) * 5; }
+    var c = texte(hh, mm);
+    if (rep.indexOf(c) < 0) rep.push(c);
+  }
+  // Mélange
+  for (var i = rep.length - 1; i > 0; i--) { var j = alea(i + 1), x = rep[i]; rep[i] = rep[j]; rep[j] = x; }
+  var zone = $("choix");
+  zone.innerHTML = "";
+  rep.forEach(function (r, k) {
+    var b = document.createElement("button");
+    b.className = "rep";
+    b.textContent = r;
+    b.setAttribute("aria-label", "Réponse " + (k + 1) + " : " + r);
+    b.addEventListener("click", function () { choisir(b, r); });
+    zone.appendChild(b);
+  });
+}
+
+function choisir(bouton, r) {
+  if (verrou) return;
+  verrou = true;
+  var ok = r === bonne;
+  if (ok) { score++; bouton.classList.add("bon"); $("msg").textContent = "Bravo ! 🎉"; }
+  else {
+    bouton.classList.add("mauvais");
+    $("msg").textContent = "C'était " + bonne + " !";
+    Array.prototype.forEach.call(document.querySelectorAll(".rep"), function (b) { if (b.textContent === bonne) b.classList.add("bon"); });
+  }
+  $("score").textContent = "⭐ " + score;
+  minuteur = setTimeout(function () { q++; if (q >= TOTAL) fin(); else question(); }, ok ? 900 : 1900);
+}
+
+function fin() {
+  montrer("fin");
+  var e = score >= 9 ? 3 : score >= 6 ? 2 : 1;
+  $("etoiles").textContent = "⭐⭐⭐".slice(0, e) + "☆☆☆".slice(0, 3 - e);
+  $("titreFin").textContent = score >= 9 ? "Champion de l'heure !" : score >= 6 ? "Très bien !" : "Bien essayé !";
+  $("texteFin").textContent = "Tu as trouvé " + score + " bonne" + (score > 1 ? "s" : "") + " réponse" + (score > 1 ? "s" : "") + " sur " + TOTAL + ".";
+}
+
+function demarrer() { clearTimeout(minuteur); q = 0; score = 0; derniere = ""; montrer("jeu"); question(); }
+$("jouer").addEventListener("click", demarrer);
+$("rejouer").addEventListener("click", demarrer);
+$("horlogeAccueil").innerHTML = horlogeSVG(10, 10);
+// Clavier : touches 1 à 4 pour répondre, Entrée pour jouer / rejouer
+document.addEventListener("keydown", function (ev) {
+  if (ev.key >= "1" && ev.key <= "4" && $("jeu").classList.contains("actif")) {
+    var b = document.querySelectorAll(".rep")[Number(ev.key) - 1];
+    if (b) b.click();
+  } else if (ev.key === "Enter" && !$("jeu").classList.contains("actif")) {
+    demarrer();
+  }
+});
+</script>
+</body>
+</html>
