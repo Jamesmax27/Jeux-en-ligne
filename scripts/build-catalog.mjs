@@ -17,6 +17,7 @@ import { readdir, readFile, stat, rm, mkdir, cp, writeFile } from 'node:fs/promi
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GENRES } from './genres.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -70,6 +71,17 @@ async function lireJeu(nomDossier) {
     : [];
   if (tags.length === 0) avertir(nomDossier, 'aucun "tags" : le jeu n\'apparaîtra dans aucun thème');
 
+  // Genre : liste fermée (scripts/genres.mjs). Anciennes fiches sans "genre" :
+  // il est déduit des thèmes (autrefois, le premier thème était le genre).
+  let genre = typeof fiche.genre === 'string' ? fiche.genre.trim().toLowerCase().normalize('NFC') : '';
+  if (!GENRES.includes(genre)) {
+    const deduit = tags.find((t) => GENRES.includes(t.normalize('NFC'))) || '';
+    if (genre) avertir(nomDossier, `"genre" inconnu (« ${genre} ») : choisir dans ${GENRES.join(', ')}`);
+    else if (deduit) avertir(nomDossier, `"genre" absent : « ${deduit} » déduit des thèmes`);
+    else avertir(nomDossier, 'pas de "genre" : le jeu n\'apparaîtra dans aucun filtre de genre');
+    genre = deduit.normalize('NFC');
+  }
+
   let added = typeof fiche.added === 'string' ? fiche.added : '';
   if (!DATE_VALIDE.test(added)) {
     avertir(nomDossier, '"added" absent ou invalide (format AAAA-MM-JJ) : date du jour utilisée');
@@ -93,6 +105,7 @@ async function lireJeu(nomDossier) {
     id: fiche.id,
     title: fiche.title.trim().slice(0, 80),
     description: typeof fiche.description === 'string' ? fiche.description.trim().slice(0, 200) : '',
+    genre,
     tags,
     ages: typeof fiche.ages === 'string' ? fiche.ages.trim().slice(0, 10) : '',
     author: typeof fiche.author === 'string' ? fiche.author.trim().slice(0, 60) : '',
@@ -135,6 +148,7 @@ async function main() {
   const catalogue = {
     generatedAt: new Date().toISOString(),
     count: jeux.length,
+    genres: GENRES, // ordre des filtres de genre dans le catalogue
     games: jeux,
   };
   await writeFile(SORTIE_CATALOGUE, JSON.stringify(catalogue, null, 2) + '\n', 'utf8');

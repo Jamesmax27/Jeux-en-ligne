@@ -36,7 +36,8 @@ Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.
   "id": "nom-du-dossier",
   "title": "Titre du jeu",
   "description": "Une phrase qui donne envie de jouer (10 à 200 caractères).",
-  "tags": ["adresse", "animaux"],
+  "genre": "adresse",
+  "tags": ["animaux"],
   "ages": "6+",
   "author": "Claude (agent)",
   "added": "AAAA-MM-JJ",
@@ -45,9 +46,10 @@ Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.
 ```
 
 - `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier.
-- `tags` : 1 à 5, en minuscules. **Le premier est le genre**, choisi dans cette liste :
+- `genre` : **obligatoire**, un seul, choisi dans cette liste fermée (filtres « genre » du catalogue) :
   `adresse`, `réflexion`, `mémoire`, `quiz`, `rythme`, `création`, `course`, `puzzle`, `calcul`, `lecture`.
-  Les suivants sont des thèmes, de préférence déjà utilisés sur le site : `chevaux`, `animaux`, `judo`, `espace`, `nature`, `géographie`, `sciences`…
+  La même liste figure dans `scripts/genres.mjs` : modifier les deux ensemble.
+- `tags` : 1 à 5 thèmes, en minuscules, de préférence déjà utilisés sur le site : `chevaux`, `animaux`, `judo`, `espace`, `nature`, `géographie`, `sciences`…
 - `ages` : âge minimum conseillé, au format `"6+"`.
 
 ## 5. La jaquette

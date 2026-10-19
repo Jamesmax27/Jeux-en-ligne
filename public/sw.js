@@ -9,10 +9,12 @@
 //     catalogue n'est jamais pré-téléchargé en entier).
 //
 // Stratégies :
-//   - réseau d'abord, copie gardée en secours : coquille, catalog.json et
-//     /api/scores. En ligne, on a donc toujours la dernière version ;
+//   - réseau d'abord, copie gardée en secours : coquille et catalog.json.
+//     En ligne, on a donc toujours la dernière version ;
 //   - cache d'abord : jeux et jaquettes. Leur adresse contient la version
-//     (?v=…) : une nouvelle version est téléchargée et remplace l'ancienne.
+//     (?v=…) : une nouvelle version est téléchargée et remplace l'ancienne ;
+//   - /api/scores n'est pas gardé : sans réseau, le catalogue trie par
+//     nouveautés et n'affiche pas de compteurs de votes.
 //
 // VERSION : à augmenter quand la liste COQUILLE change, ou pour obliger tous
 // les appareils à re-télécharger la coquille. Les jeux gardés ne sont pas
@@ -21,7 +23,7 @@
 
 const VERSION = 'v1';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
-const CACHE_DONNEES = 'jel-donnees-v1';     // catalog.json et /api/scores
+const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
 const CACHE_JAQUETTES = 'jel-jaquettes-v1'; // jaquettes vues dans le catalogue
 const LIMITE_JAQUETTES = 300;               // au-delà, les plus anciennes sont effacées
@@ -89,8 +91,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(jaquette(event));
   } else if (chemin === 'catalog.json') {
     event.respondWith(reseauDabord(event, CACHE_DONNEES, URL_CATALOGUE));
-  } else if (chemin === 'api/scores') {
-    event.respondWith(reseauDabord(event, CACHE_DONNEES, url.href));
   } else {
     const cle = cleCoquille(chemin);
     if (cle) event.respondWith(reseauDabord(event, CACHE_COQUILLE, cle));
@@ -103,7 +103,7 @@ function cleCoquille(chemin) {
   return null;
 }
 
-// --- Réseau d'abord (coquille, catalogue, scores) ------------------------------
+// --- Réseau d'abord (coquille, catalogue) --------------------------------------
 
 async function reseauDabord(event, nomCache, cle) {
   const cache = await caches.open(nomCache);

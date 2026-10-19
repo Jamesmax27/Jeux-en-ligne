@@ -56,6 +56,7 @@ Jeux-en-ligne/
 │  └─ scores.js             GET  /api/scores
 ├─ scripts/
 │  ├─ build-catalog.mjs     lit games/*/game.json → public/catalog.json (+ copie des jeux)
+│  ├─ genres.mjs            liste fermée des genres (identique à CONSIGNES-JEU.md)
 │  └─ validate-games.mjs    contrôle qualité des jeux
 ├─ schema.sql               structure de la base D1
 ├─ CONSIGNES-JEU.md         règles que doit suivre toute IA qui crée un jeu
@@ -95,7 +96,8 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
   "id": "saut-obstacles",
   "title": "Saut d'obstacles",
   "description": "Ton poney galope, tape pour sauter les barres !",
-  "tags": ["chevaux", "adresse"],
+  "genre": "adresse",
+  "tags": ["chevaux"],
   "ages": "6+",
   "author": "Claude",
   "added": "2026-10-03",
@@ -104,7 +106,8 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 ```
 
 - `id` : minuscules, chiffres et tirets uniquement ; identique au nom du dossier ; unique.
-- `tags` : choisis de préférence dans la liste existante (voir `catalog.json`).
+- `genre` : un seul, dans la liste fermée de `CONSIGNES-JEU.md` (reprise dans `scripts/genres.mjs`). Sert aux filtres par genre du catalogue. Une ancienne fiche sans `genre` : le build le déduit des `tags`, avec un avertissement.
+- `tags` : des thèmes, choisis de préférence dans la liste existante (voir `catalog.json`).
 
 **Exigences de jouabilité :**
 - Jouable au doigt (tactile) **et** au clavier/souris.
@@ -130,11 +133,11 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 Une seule table, `votes` (structure complète dans `schema.sql`) : `game_id`, `voter`, `value` (1 / -1), `country`, `created_at` ; clé primaire `(game_id, voter)`. Les totaux sont calculés à la lecture (pas de table `scores`).
 
 - `POST /api/vote` (`functions/api/vote.js`) : corps `{ "gameId": "...", "value": 1 | -1 | 0, "voterId": "...", "turnstileToken": "..." }`. `0` = annulation (la ligne est supprimée). Jeton Turnstile vérifié à **chaque** vote (secret `TURNSTILE_SECRET`, action `vote`). Renvoie les nouveaux totaux du jeu.
-- `GET /api/scores` (`functions/api/scores.js`) : renvoie `{ "<gameId>": { "up": n, "down": n, "score": x }, ... }`, cache 5 minutes. Filtre pays optionnel : `?pays=FR`.
+- `GET /api/scores` (`functions/api/scores.js`) : renvoie `{ "<gameId>": { "up": n, "down": n, "score": x, "semaine": n }, ... }` (`semaine` = votes des 7 derniers jours, votes modifiés compris), cache 5 minutes. Filtre pays optionnel : `?pays=FR`. L'en-tête `X-Pays` donne le pays détecté du visiteur (absent s'il est inconnu).
 - `voter` : empreinte SHA-256 d'un identifiant aléatoire (UUID) créé par le navigateur et conservé localement. Aucun compte, aucun e-mail, aucune adresse IP enregistrée.
 - `country` : en-tête `CF-IPCountry` (« XX » si inconnu). `created_at` : date du dernier vote en millisecondes.
 - Navigateur (`public/votes.js`) : le vote est enregistré d'abord sur l'appareil, puis envoyé ; sans réseau ou si l'API ne répond pas, il reste en file d'attente et part au retour du réseau ou à la visite suivante. Turnstile n'est chargé qu'au moment d'envoyer un vote.
-- Catalogue sans API : derniers scores connus (stockés localement), sinon aucun ; le site reste utilisable.
+- Catalogue sans API (hors connexion, API en panne) : tri par nouveautés, sans compteurs de votes ; le site reste utilisable. Les votes reviennent dès le retour du réseau.
 - À faire : limite de débit (~30 votes par heure et par adresse IP), proposition de vote au retour au catalogue.
 
 ## 8. Classement
@@ -148,12 +151,19 @@ score = (p + z²/(2n) − z·√(p(1−p)/n + z²/(4n²))) / (1 + z²/n)     (sc
 
 Exemples de référence (pour les tests) : 90/10 → 0,826 ; 1/0 → 0,207 ; 20/30 → 0,276.
 
-- Onglet **Populaires** : tri par score décroissant, avec quelques jeux de moins de 7 jours intercalés en haut.
-- Onglet **Nouveautés** : jeux ajoutés depuis moins de 7 jours, du plus récent au plus ancien.
-- Onglet **Hors ligne** : jeux déjà en cache sur l'appareil.
-- **Archives** : jeux avec plus de 30 votes et un score inférieur à 0,2 (seuils ajustables), affichés en bas.
+Menu de tri du catalogue (égalités départagées par le score, puis le nombre de votes, puis la date) :
+- **Mieux notés** (par défaut) : score décroissant, avec quelques jeux de moins de 7 jours intercalés en haut.
+- **Plus populaires** : nombre total de votes (👍 + 👎).
+- **Populaires cette semaine** : nombre de votes des 7 derniers jours.
+- **Nouveautés** : tous les jeux, du plus récent au plus ancien (badge « Nouveau » pendant 7 jours).
 
-Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2e et 4e position des Populaires), `ARCHIVE_VOTES_MIN`, `ARCHIVE_SCORE_MAX`.
+- Portée : **Monde** ou **Mon pays** (pays donné par l'en-tête `X-Pays`). Si mon pays a moins de 20 votes en tout, le classement Monde est affiché, avec une phrase d'explication.
+- Filtres par **genre** (champ `genre`) et par **thème** (`tags`), combinables entre eux, avec le tri et la recherche.
+- Chaque jaquette affiche ses compteurs 👍 et 👎 (portée choisie). Sans API : tri par nouveautés, sans compteurs.
+- À faire : onglet **Hors ligne** (jeux déjà en cache sur l'appareil).
+- **Archives** : jeux avec plus de 30 votes et un score inférieur à 0,2 (seuils ajustables, votes du monde entier), affichés en bas.
+
+Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2e et 4e position de « Mieux notés »), `ARCHIVE_VOTES_MIN`, `ARCHIVE_SCORE_MAX`, `PAYS_VOTES_MIN`.
 
 ## 9. Hors ligne (PWA)
 
@@ -161,9 +171,9 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 - Jaquettes : mises en cache au fur et à mesure qu'elles sont affichées.
 - Jeux : mis en cache à leur première ouverture, ou via le bouton « Rendre disponible hors ligne ».
 - **Ne jamais pré-télécharger tout le catalogue.**
-- Stratégie : « réseau d'abord » pour `catalog.json` et `/api/scores` (avec repli sur le cache), « cache d'abord » pour les jeux et jaquettes (avec contrôle de `version`).
+- Stratégie : « réseau d'abord » pour `catalog.json` (avec repli sur le cache), « cache d'abord » pour les jeux et jaquettes (avec contrôle de `version`). `/api/scores` n'est pas gardé : hors connexion, le catalogue trie par nouveautés, sans compteurs.
 - La coquille (pages, CSS, JS, logo) est aussi en « réseau d'abord » (copie gardée servie après 3 s sans réponse) : les mises à jour du site arrivent dès la visite suivante.
-- Caches (`public/sw.js`) : `jel-coquille-<VERSION>`, `jel-donnees-v1` (catalogue, scores), `jel-jeux-v1` (jeux ouverts et leur jaquette), `jel-jaquettes-v1` (jaquettes vues, 300 au plus). Augmenter `VERSION` dans `sw.js` quand la liste de la coquille change ; les jeux gardés sont conservés.
+- Caches (`public/sw.js`) : `jel-coquille-<VERSION>`, `jel-donnees-v2` (catalogue), `jel-jeux-v1` (jeux ouverts et leur jaquette), `jel-jaquettes-v1` (jaquettes vues, 300 au plus). Augmenter `VERSION` dans `sw.js` quand la liste de la coquille change ; les jeux gardés sont conservés.
 - Hors connexion, un vote affiche « Pas de connexion : ton vote sera envoyé plus tard » ; un jeu jamais ouvert affiche une explication au lieu d'une erreur.
 
 ## 10. Ajout de jeux par des IA
@@ -203,6 +213,7 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 - [ ] Phase 2 — fichiers créés (`functions/api/vote.js`, `functions/api/scores.js`, `public/votes.js`, `schema.sql` ; pouces dans le lanceur ; onglet Populaires trié par Wilson avec nouveautés intercalées ; Archives). Reste : tester en ligne, limite de débit par IP, proposition de vote au retour au catalogue.
 - [ ] Phase 3 — fichiers créés (`public/sw.js`, `public/hors-ligne.js`, manifeste et icônes ; jeux affichés via `srcdoc` ; badge « Disponible hors ligne » ; messages clairs pour les votes et les jeux non gardés). Testé dans Chrome (serveur local et redirections façon Cloudflare). Reste : tester sur téléphone une fois en ligne, onglet « Hors ligne » et bouton « Rendre disponible hors ligne ».
 - [ ] Phase 4
+- Catalogue amélioré — fichiers modifiés (menu de tri à 4 choix, portée Monde / Mon pays, filtres par genre et par thème, compteurs 👍 👎 ; champ `genre` dans `game.json` et `scripts/genres.mjs` ; `semaine` et `X-Pays` dans `/api/scores`). Reste : tester en ligne avec de vrais votes (en local, l'API n'existe pas).
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 

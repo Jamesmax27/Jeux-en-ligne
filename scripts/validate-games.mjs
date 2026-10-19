@@ -19,6 +19,7 @@ import { existsSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { GENRES } from './genres.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -60,6 +61,7 @@ async function controlerFiche(id, dossier) {
   if (f.id !== id) erreur(id, `game.json : "id" doit valoir "${id}" (nom du dossier)`);
   if (typeof f.title !== 'string' || f.title.trim().length < 2 || f.title.length > 60) erreur(id, 'game.json : "title" obligatoire, 60 caractères maximum');
   if (typeof f.description !== 'string' || f.description.trim().length < 10 || f.description.length > 200) erreur(id, 'game.json : "description" obligatoire, 10 à 200 caractères');
+  if (!GENRES.includes(f.genre)) erreur(id, `game.json : "genre" obligatoire, au choix : ${GENRES.join(', ')}`);
   if (!Array.isArray(f.tags) || f.tags.length < 1 || f.tags.length > 5) erreur(id, 'game.json : "tags" doit contenir 1 à 5 thèmes');
   else if (f.tags.some((t) => typeof t !== 'string' || t !== t.trim().toLowerCase() || !t)) erreur(id, 'game.json : les "tags" doivent être en minuscules');
   if (typeof f.ages !== 'string' || !/^\d{1,2}\+$/.test(f.ages)) erreur(id, 'game.json : "ages" au format "6+"');

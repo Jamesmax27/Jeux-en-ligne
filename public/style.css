@@ -132,7 +132,7 @@ a { color: inherit; }
 }
 
 /* --------------------------------------------------------------------------
-   Onglets et filtres
+   Tri et filtres
    -------------------------------------------------------------------------- */
 
 .barre-filtres {
@@ -149,48 +149,95 @@ a { color: inherit; }
   margin: 0 auto;
 }
 
-.onglets,
-.etiquettes {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
+.ligne-tri {
   padding: 0 16px;
+}
+
+/* Menu de tri : une liste déroulante native (sélecteur du téléphone) */
+.tri {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  color: var(--fond);
+}
+
+.tri select {
+  -webkit-appearance: none;
+  appearance: none;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0 40px 0 42px;
+  border: 2px solid var(--encre);
+  border-radius: 999px;
+  background: var(--encre);
+  color: var(--fond);
+  font: inherit;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.tri svg {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.tri-icone { left: 16px; }
+.tri-fleche { right: 15px; }
+
+/* Genres puis thèmes, sur une seule rangée qui défile */
+.filtres {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 0 16px;
+  overflow-x: auto;
   scrollbar-width: none;
 }
 
-.onglets::-webkit-scrollbar,
-.etiquettes::-webkit-scrollbar { display: none; }
+.filtres::-webkit-scrollbar { display: none; }
 
-.etiquettes { margin-top: 8px; }
+.groupe-puces {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
 
-.onglet,
+.separateur {
+  flex: none;
+  width: 2px;
+  height: 24px;
+  border-radius: 2px;
+  background: var(--trait);
+}
+
+.groupe-puces[hidden],
+.separateur[hidden] { display: none; }
+
 .puce {
   flex: none;
-  min-height: 44px;
-  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
   border: 2px solid var(--trait);
   border-radius: 999px;
   background: var(--carte);
-  color: var(--encre);
+  color: var(--encre-douce);
   font: inherit;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
 
-.puce {
-  min-height: 36px;
-  padding: 0 14px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--encre-douce);
-}
-
-.onglet[aria-selected="true"] {
-  background: var(--encre);
-  border-color: var(--encre);
-  color: var(--fond);
-}
+.puce-picto { font-size: 15px; }
 
 .puce[aria-pressed="true"] {
   background: var(--accent-2);
@@ -208,12 +255,60 @@ main.catalogue {
   padding: 16px 16px 48px;
 }
 
-.compte {
+/* Nombre de jeux + choix Monde / Mon pays */
+.ligne-infos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin: 0 0 12px;
+}
+
+.compte {
+  margin: 0;
   font-size: 14px;
   color: var(--encre-douce);
   font-weight: 600;
 }
+
+.portee {
+  display: inline-flex;
+  flex: none;
+  padding: 3px;
+  border: 2px solid var(--trait);
+  border-radius: 999px;
+  background: var(--fond-2);
+}
+
+.portee[hidden] { display: none; }
+
+.portee button {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--encre-douce);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.portee button[aria-pressed="true"] {
+  background: var(--carte);
+  color: var(--encre);
+  box-shadow: 0 1px 4px rgba(42, 33, 64, .2);
+}
+
+/* Explication du classement (hors connexion, pays avec peu de votes…) */
+.note-tri {
+  margin: -4px 0 14px;
+  font-size: 14px;
+  color: var(--encre-douce);
+}
+
+.note-tri[hidden] { display: none; }
 
 .grille {
   display: grid;
@@ -308,6 +403,8 @@ main.catalogue {
 }
 
 .carte-pouces {
+  display: flex;
+  gap: 12px;
   margin: 4px 0 0;
   font-size: 13px;
   font-weight: 700;
