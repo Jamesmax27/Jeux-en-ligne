@@ -13,3 +13,4 @@ Ajoutez, supprimez ou réordonnez librement les lignes. Format : `- [ ] Titre �
 - [ ] Drapeaux du monde — reconnais le drapeau de pays d'Europe, puis du monde entier (quiz, 8+)
 - [ ] Coloriage magique — colorie un dessin case par case en suivant les numéros (création, 4+)
 - [ ] Le labyrinthe de la souris — guide la souris jusqu'au fromage, labyrinthes de plus en plus grands (réflexion, 5+)
+- [x] L'armée des Gribouilles — crée ton équipe de héros, endors les ennemis, gagne des pièces et améliore ton armée (réflexion, 6+) → armee-des-gribouilles
