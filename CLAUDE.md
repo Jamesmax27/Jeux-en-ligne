@@ -72,7 +72,11 @@ Autres fichiers ajoutés en phase 1 :
 - `package.json` : `npm run build` (construit) et `npm run dev` (construit + serveur sur http://localhost:8080).
 - `.gitignore` : `public/games/` et `public/catalog.json` sont générés, jamais versionnés.
 
-Le lanceur charge le jeu par l'adresse `games/<id>/?v=<version>` (Cloudflare retire `index.html` des adresses). Augmenter `version` dans `game.json` à chaque modification d'un jeu.
+Fichiers ajoutés en phase 3 (hors ligne) :
+- `public/sw.js` : service worker ; `public/hors-ligne.js` : enregistrement du service worker et liste des jeux gardés sur l'appareil (badge du catalogue).
+- `public/manifest.webmanifest` et icônes tirées de `logo.svg` : `public/assets/icone-192.png`, `icone-512.png`, `icone-masquable-512.png` (Android), `apple-touch-icon.png` (iPhone).
+
+Le lanceur lit le jeu à l'adresse `games/<id>/?v=<version>` (Cloudflare retire `index.html` des adresses), puis l'affiche dans le cadre via `srcdoc` (voir section 6). Augmenter `version` dans `game.json` à chaque modification d'un jeu.
 
 Le build est tolérant : un jeu invalide est ignoré avec un message, il ne bloque jamais la publication des autres. Les ressources externes détectées dans un jeu produisent un avertissement.
 
@@ -116,7 +120,7 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 
 ## 6. Lanceur de jeu
 
-- `play.html` charge `games/<id>/index.html` dans une iframe `sandbox="allow-scripts"` (sans `allow-same-origin`).
+- `play.js` lit `games/<id>/?v=<version>` puis l'affiche dans une iframe `sandbox="allow-scripts"` (sans `allow-same-origin`) via `srcdoc`, en plaçant en tête la règle de sécurité `CSP_JEU`. Raison : un tel cadre échappe au service worker ; chargé par son adresse, le jeu ne marcherait pas hors ligne.
 - Barre supérieure : retour au catalogue, plein écran, 👍, 👎.
 - Vote : toucher le même pouce une 2e fois annule ; toucher l'autre remplace.
 - Au retour au catalogue après ≥ 1 minute de jeu, proposer discrètement de voter.
@@ -158,6 +162,9 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 - Jeux : mis en cache à leur première ouverture, ou via le bouton « Rendre disponible hors ligne ».
 - **Ne jamais pré-télécharger tout le catalogue.**
 - Stratégie : « réseau d'abord » pour `catalog.json` et `/api/scores` (avec repli sur le cache), « cache d'abord » pour les jeux et jaquettes (avec contrôle de `version`).
+- La coquille (pages, CSS, JS, logo) est aussi en « réseau d'abord » (copie gardée servie après 3 s sans réponse) : les mises à jour du site arrivent dès la visite suivante.
+- Caches (`public/sw.js`) : `jel-coquille-<VERSION>`, `jel-donnees-v1` (catalogue, scores), `jel-jeux-v1` (jeux ouverts et leur jaquette), `jel-jaquettes-v1` (jaquettes vues, 300 au plus). Augmenter `VERSION` dans `sw.js` quand la liste de la coquille change ; les jeux gardés sont conservés.
+- Hors connexion, un vote affiche « Pas de connexion : ton vote sera envoyé plus tard » ; un jeu jamais ouvert affiche une explication au lieu d'une erreur.
 
 ## 10. Ajout de jeux par des IA
 
@@ -172,7 +179,7 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 - JavaScript moderne, sans dépendance côté client. Fichiers commentés en français.
 - Interface pensée mobile d'abord : 2 colonnes de jaquettes sur téléphone, 4 à 6 sur ordinateur ; images en `loading="lazy"`.
 - Accessibilité : boutons d'au moins 44 px, textes lisibles, contrastes suffisants.
-- Sécurité : en-tête `Content-Security-Policy` interdisant aux jeux tout accès réseau ; ne jamais exécuter de code venant de `game.json`.
+- Sécurité : en-tête `Content-Security-Policy` interdisant aux jeux tout accès réseau ; ne jamais exécuter de code venant de `game.json`. La même règle figure dans `public/_headers`, `scripts/serve.mjs` et `public/play.js` (`CSP_JEU`) : les garder identiques.
 - Respect des limites gratuites Cloudflare : 20 000 fichiers par site, 25 Mio par fichier, 100 000 appels de fonctions par jour.
 
 ## 12. Ce que les IA ne doivent pas faire
@@ -194,7 +201,7 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 
 - [ ] Phase 1 — fichiers créés (catalogue avec recherche, onglets Tous / Nouveautés, filtres par thème ; lanceur avec plein écran ; build ; jeu d'exemple `pommes-du-poney`). Reste : intégrer les jeux existants et publier sur Cloudflare Pages.
 - [ ] Phase 2 — fichiers créés (`functions/api/vote.js`, `functions/api/scores.js`, `public/votes.js`, `schema.sql` ; pouces dans le lanceur ; onglet Populaires trié par Wilson avec nouveautés intercalées ; Archives). Reste : tester en ligne, limite de débit par IP, proposition de vote au retour au catalogue.
-- [ ] Phase 3
+- [ ] Phase 3 — fichiers créés (`public/sw.js`, `public/hors-ligne.js`, manifeste et icônes ; jeux affichés via `srcdoc` ; badge « Disponible hors ligne » ; messages clairs pour les votes et les jeux non gardés). Testé dans Chrome (serveur local et redirections façon Cloudflare). Reste : tester sur téléphone une fois en ligne, onglet « Hors ligne » et bouton « Rendre disponible hors ligne ».
 - [ ] Phase 4
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».

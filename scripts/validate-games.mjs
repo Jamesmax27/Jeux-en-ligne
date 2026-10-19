@@ -169,7 +169,8 @@ async function testerNavigateur(ids) {
 
       await page.goto(`${base}/play.html?id=${id}`);
       await page.waitForTimeout(2500);
-      const cadre = page.frames().find((f) => f.url().includes(`/games/${id}/`));
+      // Le lanceur affiche le jeu via srcdoc : son cadre a pour adresse about:srcdoc.
+      const cadre = page.frames().find((f) => f.url() === 'about:srcdoc');
       if (!cadre) {
         erreur(id, 'le jeu ne se charge pas dans le lanceur');
       } else {

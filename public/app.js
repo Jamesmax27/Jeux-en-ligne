@@ -5,9 +5,11 @@
 // en HTML brut : tout passe par textContent (sécurité).
 // Les scores viennent de /api/scores ; sans réseau, on reprend les derniers
 // scores connus (ou aucun) : le catalogue reste toujours utilisable.
+// Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
 // ==========================================================================
 
 import { votesEnAttente, envoyerEnAttente } from './votes.js';
+import { activerHorsLigne, jeuxHorsLigne } from './hors-ligne.js';
 
 const NOUVEAU_JOURS = 7;          // un jeu est « nouveau » pendant 7 jours
 const NOUVEAUX_EN_TETE = 2;       // nombre de nouveautés intercalées en haut des Populaires
@@ -19,6 +21,7 @@ const CLE_SCORES = 'jel-scores';  // derniers scores reçus, pour le hors-ligne
 const etat = {
   jeux: [],
   scores: {},           // { gameId: { up, down, score } }
+  horsLigne: new Set(), // jeux gardés sur l'appareil
   onglet: 'populaires', // 'populaires' | 'nouveautes'
   etiquette: null,      // thème sélectionné, ou null
   texte: '',            // recherche
@@ -146,6 +149,14 @@ function creerCarte(jeu) {
     jaquette.append(badge);
   }
 
+  const horsLigne = etat.horsLigne.has(jeu.id);
+  if (horsLigne) {
+    const badge = document.createElement('span');
+    badge.className = 'badge-hors-ligne';
+    badge.textContent = 'Disponible hors ligne';
+    jaquette.append(badge);
+  }
+
   const texte = document.createElement('div');
   texte.className = 'carte-texte';
 
@@ -168,7 +179,7 @@ function creerCarte(jeu) {
   }
 
   lien.append(jaquette, texte);
-  lien.setAttribute('aria-label', `${jeu.title}. ${jeu.description}`);
+  lien.setAttribute('aria-label', `${jeu.title}. ${jeu.description}${horsLigne ? ' (disponible hors ligne)' : ''}`);
   li.append(lien);
   return li;
 }
@@ -234,6 +245,14 @@ el.recherche.addEventListener('input', () => {
   afficherGrille();
 });
 
+// Retour avec le bouton « Précédent » : la page réapparaît telle quelle,
+// alors qu'un jeu vient peut-être d'être gardé hors ligne.
+addEventListener('pageshow', async (evenement) => {
+  if (!evenement.persisted || etat.jeux.length === 0) return;
+  etat.horsLigne = await jeuxHorsLigne();
+  afficherGrille();
+});
+
 // --- Scores -----------------------------------------------------------------
 
 function scoresValides(donnees) {
@@ -276,6 +295,7 @@ async function chargerScores() {
 
 async function demarrer() {
   const scores = chargerScores(); // en parallèle du catalogue
+  const horsLigne = jeuxHorsLigne();
   try {
     const reponse = await fetch('catalog.json', { cache: 'no-cache' });
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
@@ -290,6 +310,7 @@ async function demarrer() {
     el.videTexte.textContent = 'Vérifie ta connexion, puis recharge la page.';
     return;
   }
+  etat.horsLigne = await horsLigne;
   afficherEtiquettes();
   afficherGrille();
 
@@ -297,4 +318,5 @@ async function demarrer() {
   if (votesEnAttente()) envoyerEnAttente();
 }
 
+activerHorsLigne();
 demarrer();

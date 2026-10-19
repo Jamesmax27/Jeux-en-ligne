@@ -5,8 +5,13 @@
 // ==========================================================================
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
+import { activerHorsLigne } from './hors-ligne.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+// Règle de sécurité des jeux : aucun accès réseau.
+// Identique à celle de public/_headers et de scripts/serve.mjs.
+const CSP_JEU = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'";
 
 const el = {
   titre: document.getElementById('titre-jeu'),
@@ -51,11 +56,11 @@ if (document.fullscreenEnabled) {
 
 let minuteurInfo;
 
-function afficherInfoVote(texte) {
+function afficherInfoVote(texte, duree = 2500) {
   el.infoVote.textContent = texte;
   el.infoVote.hidden = false;
   clearTimeout(minuteurInfo);
-  minuteurInfo = setTimeout(() => { el.infoVote.hidden = true; }, 2500);
+  minuteurInfo = setTimeout(() => { el.infoVote.hidden = true; }, duree);
 }
 
 function afficherMonVote(valeur) {
@@ -72,15 +77,42 @@ function activerVotes(gameId) {
     // Même pouce une 2e fois = annulation ; l'autre pouce = remplacement.
     const valeur = monVote(gameId) === pouce ? 0 : pouce;
     afficherMonVote(valeur); // l'affichage change tout de suite, même hors ligne
-    afficherInfoVote(valeur === 0 ? 'Vote annulé' : 'Merci pour ton vote !');
+    const horsConnexion = navigator.onLine === false;
+    if (horsConnexion) {
+      // Pas d'erreur : le vote est gardé sur l'appareil et partira au retour du réseau.
+      afficherInfoVote(valeur === 0
+        ? "Pas de connexion : l'annulation sera envoyée plus tard"
+        : 'Pas de connexion : ton vote sera envoyé plus tard', 4000);
+    } else {
+      afficherInfoVote(valeur === 0 ? 'Vote annulé' : 'Merci pour ton vote !');
+    }
     const resultat = await voter(gameId, valeur);
-    if (resultat === 'en-attente' && monVote(gameId) === valeur) {
-      afficherInfoVote('Vote gardé : il sera envoyé plus tard');
+    if (!horsConnexion && resultat === 'en-attente' && monVote(gameId) === valeur) {
+      afficherInfoVote('Vote gardé : il sera envoyé plus tard', 4000);
     }
     el.cadre.focus(); // le clavier revient au jeu
   };
   el.votePlus.addEventListener('click', () => cliquer(1));
   el.voteMoins.addEventListener('click', () => cliquer(-1));
+}
+
+// --- Chargement du jeu --------------------------------------------------------
+// Le lanceur lit lui-même le fichier du jeu, puis l'affiche dans le cadre isolé
+// (srcdoc). Un cadre sandbox sans allow-same-origin échappe en effet au service
+// worker : chargé par son adresse, le jeu ne pourrait pas marcher hors connexion.
+// Lu ici, il passe par le service worker et reste jouable sans réseau.
+
+// Ajoute la règle de sécurité avant tout le code du jeu (juste après <!doctype>,
+// pour ne pas changer son mode d'affichage).
+function proteger(html) {
+  const debut = /^﻿?(?:\s|<!--[\s\S]*?-->)*(?:<!doctype[^>]*>)?/i.exec(html)[0];
+  return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${html.slice(debut.length)}`;
+}
+
+async function chargerJeu(jeu) {
+  const reponse = await fetch(jeu.play); // ex. « games/saut-obstacles/?v=1 »
+  if (!reponse.ok) throw Object.assign(new Error(`HTTP ${reponse.status}`), { statut: reponse.status });
+  el.cadre.srcdoc = proteger(await reponse.text());
 }
 
 // --- Démarrage --------------------------------------------------------------
@@ -113,11 +145,24 @@ async function demarrer() {
   el.titre.textContent = jeu.title;
   el.cadre.title = jeu.title;
   el.cadre.addEventListener('load', () => el.cadre.focus(), { once: true });
-  el.cadre.src = jeu.play; // ex. « games/saut-obstacles/?v=1 »
+  try {
+    await chargerJeu(jeu);
+  } catch (erreur) {
+    console.error('Impossible de charger le jeu :', erreur);
+    if (erreur.statut === 404) {
+      afficherMessage('Jeu introuvable', "Ce jeu n'existe pas ou a été retiré.");
+    } else if (navigator.onLine === false) {
+      afficherMessage('Pas encore disponible hors connexion', 'Ouvre ce jeu une fois avec Internet : ensuite, il marchera même sans réseau.');
+    } else {
+      afficherMessage('Le jeu ne se charge pas', 'Vérifie ta connexion, puis réessaie.');
+    }
+    return;
+  }
   activerVotes(jeu.id);
 
   // Votes restés en attente (hors ligne lors d'une visite précédente).
   if (votesEnAttente()) envoyerEnAttente();
 }
 
+activerHorsLigne();
 demarrer();

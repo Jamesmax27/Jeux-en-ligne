@@ -10,7 +10,12 @@
 /catalog.json
   Cache-Control: no-cache
 
+# Le service worker (mode hors connexion) : toujours vérifié, pour que ses mises à jour arrivent.
+/sw.js
+  Cache-Control: no-cache
+
 # Les jeux : aucun accès à Internet, aucune ressource externe.
 # Tout doit être contenu dans le fichier index.html du jeu (règle du CLAUDE.md, section 5).
+# Le lanceur (play.js, CSP_JEU) applique la même règle aux jeux qu'il affiche : garder les deux identiques.
 /games/*
   Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'
