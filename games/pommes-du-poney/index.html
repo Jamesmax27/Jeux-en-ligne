@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pommes du poney</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe8ff; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; width: 100vw; height: 100vh; height: 100dvh; }
+  .ecran {
+    position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px; text-align: center; color: #2a2140;
+    font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif;
+    background: rgba(255, 247, 234, .86);
+  }
+  .ecran[hidden] { display: none; }
+  .ecran h1 { margin: 0; font-size: clamp(34px, 9vw, 56px); line-height: 1; letter-spacing: -0.02em; }
+  .ecran p { margin: 0; font-size: 19px; max-width: 22em; }
+  .ecran .gros { font-size: 44px; font-weight: 800; }
+  .ecran button {
+    margin-top: 8px; min-height: 56px; padding: 0 30px; border: 0; border-radius: 999px;
+    background: #ff5d3b; color: #fff; font: inherit; font-size: 21px; font-weight: 800; cursor: pointer;
+    box-shadow: 0 4px 0 #c7391b;
+  }
+  .ecran button:active { transform: translateY(3px); box-shadow: 0 1px 0 #c7391b; }
+</style>
+</head>
+<body>
+<canvas id="jeu"></canvas>
+
+<div class="ecran" id="accueil">
+  <h1>Pommes du poney</h1>
+  <p>Fais glisser ton doigt (ou utilise les flèches ← →) pour que le poney attrape les pommes.</p>
+  <p>🍎 = 1 point · 🥕 = 3 points. Si 3 pommes tombent dans l'herbe, c'est fini !</p>
+  <button id="bouton-jouer" type="button">Jouer</button>
+</div>
+
+<div class="ecran" id="fin" hidden>
+  <h1>Bravo !</h1>
+  <p class="gros" id="score-final">0</p>
+  <p id="record"></p>
+  <button id="bouton-rejouer" type="button">Rejouer</button>
+</div>
+
+<script>
+'use strict';
+// ------------------------------------------------------------------
+// Pommes du poney — jeu d'exemple pour Jeux-en-ligne.
+// Un seul fichier, aucune ressource externe (règle du CLAUDE.md).
+// ------------------------------------------------------------------
+
+const canvas = document.getElementById('jeu');
+const ctx = canvas.getContext('2d');
+const ecranAccueil = document.getElementById('accueil');
+const ecranFin = document.getElementById('fin');
+
+let L = 0, H = 0, echelle = 1;     // taille de l'écran et taille de référence
+let enJeu = false;
+let score = 0, vies = 3, temps = 0, prochaineChute = 0;
+let objets = [];                    // pommes et carottes qui tombent
+let particules = [];                // petites étoiles quand on attrape
+const poney = { x: 0, cible: 0, rebond: 0 };
+const touches = { gauche: false, droite: false };
+
+// Sauvegarde du record : peut être refusée dans le cadre isolé → try/catch.
+function lireRecord() { try { return Number(localStorage.getItem('pommes-du-poney-record')) || 0; } catch (e) { return 0; } }
+function ecrireRecord(v) { try { localStorage.setItem('pommes-du-poney-record', String(v)); } catch (e) { /* pas de sauvegarde possible */ } }
+
+function redimensionner() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  L = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(L * dpr); canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  echelle = Math.min(L / 420, H / 720, 1.6);
+  if (!poney.x) { poney.x = poney.cible = L / 2; }
+  poney.x = Math.min(Math.max(poney.x, 0), L);
+}
+window.addEventListener('resize', redimensionner);
+redimensionner();
+
+// --- Commandes ----------------------------------------------------
+function suivreDoigt(e) { if (enJeu) poney.cible = e.clientX; }
+canvas.addEventListener('pointerdown', suivreDoigt);
+canvas.addEventListener('pointermove', suivreDoigt);
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') touches.gauche = true;
+  if (e.key === 'ArrowRight') touches.droite = true;
+  if ((e.key === 'Enter' || e.key === ' ') && !enJeu) { e.preventDefault(); demarrer(); }
+});
+window.addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft') touches.gauche = false;
+  if (e.key === 'ArrowRight') touches.droite = false;
+});
+document.getElementById('bouton-jouer').addEventListener('click', demarrer);
+document.getElementById('bouton-rejouer').addEventListener('click', demarrer);
+
+// --- Partie --------------------------------------------------------
+function demarrer() {
+  score = 0; vies = 3; temps = 0; prochaineChute = 0.6;
+  objets = []; particules = [];
+  poney.x = poney.cible = L / 2;
+  ecranAccueil.hidden = true; ecranFin.hidden = true;
+  enJeu = true;
+}
+
+function terminer() {
+  enJeu = false;
+  const record = lireRecord();
+  document.getElementById('score-final').textContent = score + (score > 1 ? ' points' : ' point');
+  if (score > record) { ecrireRecord(score); document.getElementById('record').textContent = 'Nouveau record ! 🏆'; }
+  else { document.getElementById('record').textContent = 'Ton record : ' + record; }
+  ecranFin.hidden = false;
+  document.getElementById('bouton-rejouer').focus();
+}
+
+function vitesseChute() { return (150 + Math.min(score, 80) * 4) * echelle; }
+
+function lancerObjet() {
+  const carotte = Math.random() < 0.15;
+  const marge = 30 * echelle;
+  objets.push({
+    type: carotte ? 'carotte' : 'pomme',
+    x: marge + Math.random() * (L - 2 * marge),
+    y: -30 * echelle,
+    v: vitesseChute() * (0.85 + Math.random() * 0.3),
+    angle: Math.random() * Math.PI,
+  });
+}
+
+function etoiles(x, y, couleur) {
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2, s = (80 + Math.random() * 140) * echelle;
+    particules.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 60 * echelle, vie: 0.6, couleur });
+  }
+}
+
+function mettreAJour(dt) {
+  temps += dt;
+  // Déplacement du poney (doigt ou clavier)
+  const vitesseClavier = 520 * echelle;
+  if (touches.gauche) poney.cible = poney.x - vitesseClavier * dt * 3;
+  if (touches.droite) poney.cible = poney.x + vitesseClavier * dt * 3;
+  poney.cible = Math.min(Math.max(poney.cible, 40 * echelle), L - 40 * echelle);
+  poney.x += (poney.cible - poney.x) * Math.min(1, dt * 14);
+  poney.rebond = Math.max(0, poney.rebond - dt * 4);
+
+  // Apparition des objets, de plus en plus souvent
+  prochaineChute -= dt;
+  if (prochaineChute <= 0) {
+    lancerObjet();
+    prochaineChute = Math.max(0.38, 1.1 - score * 0.012);
+  }
+
+  const bouche = { x: poney.x, y: H - 120 * echelle, l: 62 * echelle };
+  for (const o of objets) {
+    o.y += o.v * dt;
+    o.angle += dt * 2;
+    if (!o.fini && o.y > bouche.y - 14 * echelle && o.y < bouche.y + 30 * echelle && Math.abs(o.x - bouche.x) < bouche.l) {
+      o.fini = true;
+      score += o.type === 'carotte' ? 3 : 1;
+      poney.rebond = 1;
+      etoiles(o.x, o.y, o.type === 'carotte' ? '#ff9f1c' : '#ffd23f');
+    } else if (!o.fini && o.y > H - 40 * echelle) {
+      o.fini = true;
+      if (o.type === 'pomme') {
+        vies -= 1;
+        etoiles(o.x, H - 40 * echelle, '#7cc35b');
+        if (vies <= 0) terminer();
+      }
+    }
+  }
+  objets = objets.filter((o) => !o.fini);
+
+  for (const p of particules) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 400 * echelle * dt; p.vie -= dt; }
+  particules = particules.filter((p) => p.vie > 0);
+}
+
+// --- Dessin ---------------------------------------------------------
+function dessinerDecor() {
+  const ciel = ctx.createLinearGradient(0, 0, 0, H);
+  ciel.addColorStop(0, '#8fd3ff'); ciel.addColorStop(1, '#e3f6ff');
+  ctx.fillStyle = ciel; ctx.fillRect(0, 0, L, H);
+  // soleil
+  ctx.fillStyle = '#ffe066';
+  ctx.beginPath(); ctx.arc(L - 60 * echelle, 70 * echelle, 34 * echelle, 0, Math.PI * 2); ctx.fill();
+  // nuages qui défilent
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  for (let i = 0; i < 3; i++) {
+    const x = ((temps * 12 * (i + 1) + i * 180) % (L + 200)) - 100;
+    const y = (110 + i * 70) * echelle;
+    nuage(x, y, (0.8 + i * 0.2) * echelle);
+  }
+  // collines et herbe
+  ctx.fillStyle = '#9ad46b';
+  ctx.beginPath(); ctx.ellipse(L * 0.2, H - 20 * echelle, L * 0.6, 110 * echelle, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#7cc35b';
+  ctx.beginPath(); ctx.ellipse(L * 0.85, H - 10 * echelle, L * 0.55, 90 * echelle, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#5fae46';
+  ctx.fillRect(0, H - 40 * echelle, L, 40 * echelle);
+}
+
+function nuage(x, y, s) {
+  ctx.beginPath();
+  ctx.arc(x, y, 22 * s, 0, Math.PI * 2);
+  ctx.arc(x + 24 * s, y - 10 * s, 26 * s, 0, Math.PI * 2);
+  ctx.arc(x + 52 * s, y, 20 * s, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function dessinerPomme(x, y, a, s) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(a) * 0.3); ctx.scale(s, s);
+  ctx.fillStyle = '#e8322b';
+  ctx.beginPath(); ctx.arc(-7, 2, 14, 0, Math.PI * 2); ctx.arc(7, 2, 14, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  ctx.beginPath(); ctx.ellipse(-8, -4, 4, 6, -0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#6b3e1f'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(2, -19); ctx.stroke();
+  ctx.fillStyle = '#4caf50';
+  ctx.beginPath(); ctx.ellipse(9, -17, 8, 4, -0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function dessinerCarotte(x, y, a, s) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI + Math.sin(a) * 0.4); ctx.scale(s, s);
+  ctx.fillStyle = '#ff8c1a';
+  ctx.beginPath(); ctx.moveTo(-10, -16); ctx.quadraticCurveTo(0, -20, 10, -16); ctx.lineTo(0, 26); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(160,70,0,.5)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(0, -4); ctx.moveTo(-3, 6); ctx.lineTo(3, 8); ctx.stroke();
+  ctx.fillStyle = '#3fa34d';
+  ctx.beginPath(); ctx.ellipse(-5, -24, 4, 10, -0.4, 0, Math.PI * 2); ctx.ellipse(5, -24, 4, 10, 0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function dessinerPoney() {
+  const s = echelle;
+  const x = poney.x, y = H - 70 * s - poney.rebond * 10 * s;
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  // cou
+  ctx.fillStyle = '#b07040';
+  ctx.fillRect(-34, 10, 68, 80);
+  // oreilles
+  ctx.fillStyle = '#9a5f33';
+  ctx.beginPath(); ctx.moveTo(-40, -70); ctx.lineTo(-30, -112); ctx.lineTo(-12, -78); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(40, -70); ctx.lineTo(30, -112); ctx.lineTo(12, -78); ctx.fill();
+  // tête
+  ctx.fillStyle = '#c47f4a';
+  ctx.beginPath(); ctx.ellipse(0, -30, 52, 62, 0, 0, Math.PI * 2); ctx.fill();
+  // crinière (toupet)
+  ctx.fillStyle = '#5a3418';
+  ctx.beginPath(); ctx.ellipse(-8, -86, 26, 16, -0.3, 0, Math.PI * 2); ctx.ellipse(12, -82, 20, 13, 0.4, 0, Math.PI * 2); ctx.fill();
+  // liste blanche
+  ctx.fillStyle = '#fff3e6';
+  ctx.beginPath(); ctx.ellipse(0, -44, 9, 26, 0, 0, Math.PI * 2); ctx.fill();
+  // yeux
+  for (const c of [-24, 24]) {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(c, -46, 11, 13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a2140'; ctx.beginPath(); ctx.arc(c + (c < 0 ? 2 : -2), -43, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(c + (c < 0 ? 4 : 0), -46, 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+  // museau + bouche ouverte
+  ctx.fillStyle = '#e8b48a';
+  ctx.beginPath(); ctx.ellipse(0, 6, 42, 30, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#7a3b2e';
+  ctx.beginPath(); ctx.ellipse(-14, -4, 5, 7, 0.2, 0, Math.PI * 2); ctx.ellipse(14, -4, 5, 7, -0.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#7a2f2f';
+  ctx.beginPath(); ctx.ellipse(0, 18, 18, 8 + poney.rebond * 4, 0, 0, Math.PI * 2); ctx.fill();
+  // joues roses
+  ctx.fillStyle = 'rgba(255,120,120,.35)';
+  ctx.beginPath(); ctx.arc(-38, -12, 9, 0, Math.PI * 2); ctx.arc(38, -12, 9, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+function dessinerInterface() {
+  const s = echelle;
+  ctx.font = `800 ${Math.round(30 * s)}px ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif`;
+  ctx.textBaseline = 'top';
+  ctx.lineWidth = 6 * s; ctx.strokeStyle = 'rgba(42,33,64,.35)'; ctx.fillStyle = '#fff';
+  ctx.strokeText(String(score), 18 * s, 16 * s); ctx.fillText(String(score), 18 * s, 16 * s);
+  for (let i = 0; i < 3; i++) {
+    ctx.globalAlpha = i < vies ? 1 : 0.25;
+    dessinerPomme(L / 2 - 30 * s + i * 30 * s, 34 * s, 0, 0.55 * s);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function dessiner() {
+  dessinerDecor();
+  for (const o of objets) (o.type === 'pomme' ? dessinerPomme : dessinerCarotte)(o.x, o.y, o.angle, echelle);
+  dessinerPoney();
+  for (const p of particules) {
+    ctx.globalAlpha = Math.max(0, p.vie / 0.6);
+    ctx.fillStyle = p.couleur;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 5 * echelle, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  if (enJeu) dessinerInterface();
+}
+
+let avant = performance.now();
+function boucle(maintenant) {
+  const dt = Math.min(0.05, (maintenant - avant) / 1000);
+  avant = maintenant;
+  if (enJeu) mettreAJour(dt); else temps += dt;
+  dessiner();
+  requestAnimationFrame(boucle);
+}
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>

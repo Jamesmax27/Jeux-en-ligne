@@ -1,0 +1,16 @@
+# En-têtes HTTP appliqués par Cloudflare Pages.
+# Documentation : https://developers.cloudflare.com/pages/configuration/headers/
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+
+# Le catalogue doit toujours être frais.
+/catalog.json
+  Cache-Control: no-cache
+
+# Les jeux : aucun accès à Internet, aucune ressource externe.
+# Tout doit être contenu dans le fichier index.html du jeu (règle du CLAUDE.md, section 5).
+/games/*
+  Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'
