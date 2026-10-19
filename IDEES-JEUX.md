@@ -13,3 +13,4 @@ Ajoutez, supprimez ou réordonnez librement les lignes. Format : `- [ ] Titre �
 - [ ] Drapeaux du monde — reconnais le drapeau de pays d'Europe, puis du monde entier (quiz, 8+)
 - [ ] Coloriage magique — colorie un dessin case par case en suivant les numéros (création, 4+)
 - [ ] Le labyrinthe de la souris — guide la souris jusqu'au fromage, labyrinthes de plus en plus grands (réflexion, 5+)
+- [x] Balle en voyage — plate-forme 3D : fais rouler une balle de plate-forme en plate-forme jusqu'à l'étoile, avec des drapeaux de sauvegarde (adresse, 6+) → balle-en-voyage
