@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coloriage magique</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; background: #fff4dc; color: #3a2a4a; }
+  #app { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 10px; text-align: center; }
+  h1 { font-size: clamp(34px, 11vw, 56px); margin: 0; line-height: 1; background: linear-gradient(90deg,#e8505b,#f5a623,#4caf50,#3b82f6,#9b59b6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  p { margin: 0; font-size: 18px; max-width: 340px; }
+  button { font: inherit; cursor: pointer; border: none; }
+  .gros { min-height: 56px; padding: 0 36px; font-size: 24px; font-weight: bold; border-radius: 28px; background: #e8505b; color: #fff; box-shadow: 0 4px 0 #a8333c; }
+  .gros:active { transform: translateY(3px); box-shadow: 0 1px 0 #a8333c; }
+  .menu { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: min(360px, 94vw); }
+  .vignette { background: #fff; border-radius: 12px; padding: 6px; border: 3px solid #e3d3b0; min-height: 44px; font-size: 14px; font-weight: bold; color: #3a2a4a; }
+  .vignette canvas { width: 100%; image-rendering: pixelated; display: block; }
+  .vignette.fait { border-color: #4caf50; }
+  #jeu { display: none; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+  #haut { display: flex; align-items: center; gap: 10px; width: min(380px, 96vw); justify-content: space-between; }
+  #haut button { min-width: 44px; min-height: 44px; border-radius: 12px; background: #fff; border: 2px solid #e3d3b0; font-size: 16px; font-weight: bold; padding: 0 12px; }
+  #titre { font-weight: bold; font-size: 18px; }
+  #grille { --t: min(92vw, 52vh, 420px); display: grid; width: var(--t); height: var(--t); gap: 2px; background: #e3d3b0; border: 3px solid #e3d3b0; border-radius: 8px; }
+  .c { display: flex; align-items: center; justify-content: center; background: #fff; font-size: calc(var(--t) / 24); font-weight: bold; color: #8a7a9a; padding: 0; border-radius: 3px; }
+  .c.vide { background: #fff4dc; color: transparent; cursor: default; }
+  .c.cible { background: #ffe9a8; }
+  .c.ok { color: transparent; }
+  .c.non { animation: sec .3s; }
+  @keyframes sec { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  #palette { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .p { width: 58px; height: 58px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 0 2px #b9a98a; font-size: 24px; font-weight: bold; color: #fff; text-shadow: 0 1px 2px #000a; }
+  .p.sel { box-shadow: 0 0 0 5px #3a2a4a; transform: scale(1.1); }
+  .p.fini { opacity: .45; }
+  #msg { min-height: 24px; font-size: 18px; font-weight: bold; }
+  #fin { display: none; flex-direction: column; align-items: center; gap: 12px; }
+  #fin canvas { width: min(60vw, 30vh); image-rendering: pixelated; border-radius: 8px; border: 4px solid #fff; box-shadow: 0 2px 8px #0003; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="accueil">
+    <h1>Coloriage<br>magique</h1>
+    <p style="margin:14px auto">Choisis une couleur, puis touche les cases qui ont le même numéro. Un dessin se cache !</p>
+    <button class="gros" id="jouer" style="margin-top:6px">Jouer</button>
+  </div>
+  <div id="choix" style="display:none">
+    <p style="font-weight:bold;font-size:22px;margin-bottom:12px">Choisis un dessin</p>
+    <div class="menu" id="menu"></div>
+  </div>
+  <div id="jeu">
+    <div id="haut"><button id="retour" aria-label="Changer de dessin">← Dessins</button><span id="titre"></span><span style="width:44px"></span></div>
+    <div id="grille"></div>
+    <div id="palette"></div>
+    <div id="msg"></div>
+  </div>
+  <div id="fin">
+    <h1 style="font-size:40px">Bravo !</h1>
+    <canvas id="final" width="10" height="10"></canvas>
+    <p id="nom"></p>
+    <button class="gros" id="autre">Un autre dessin</button>
+  </div>
+</div>
+<script>
+// Dessins : 10 x 10, '.' = case vide, chiffres = numéro de la couleur.
+const COULEURS = {
+  maison: ['#d9534f', '#f3d9a4', '#4a90e2', '#8b5a2b'],
+  poisson: ['#f5a623', '#4a90e2', '#ffffff'],
+  fleur: ['#ec6fa3', '#f7c82e', '#43a047'],
+  bateau: ['#e8505b', '#8b5a2b', '#4a90e2'],
+  arbre: ['#43a047', '#8b5a2b', '#d9534f']
+};
+const DESSINS = [
+  { id: 'maison', nom: 'La maison', g: ['..........','....11....','...1111...','..111111..','.11111111.','..222222..','..232242..','..232242..','..222242..','..222222..'] },
+  { id: 'poisson', nom: 'Le poisson', g: ['..........','...111....','..11111..2','.11131122.','1111111222','.111111122','..11111..2','...111....','..........','..........'] },
+  { id: 'fleur', nom: 'La fleur', g: ['..........','...111....','..11211...','...111....','....3.....','...33.....','....3.33..','....333...','....3.....','....3.....'] },
+  { id: 'bateau', nom: 'Le bateau', g: ['....2.....','....211...','....2111..','....21111.','....2.....','..222222..','...2222...','3333333333','3333333333','3333333333'] },
+  { id: 'arbre', nom: "L'arbre", g: ['...1111...','..113111..','.11111131.','..113111..','...1111...','....22....','....22....','....22....','....22....','..........'] }
+];
+const N = 10;
+const $ = id => document.getElementById(id);
+let fait = {};
+try { fait = JSON.parse(localStorage.getItem('coloriage-magique') || '{}') || {}; } catch (e) { fait = {}; }
+function sauver() { try { localStorage.setItem('coloriage-magique', JSON.stringify(fait)); } catch (e) {} }
+
+let dessin, couleur, restant, cases;
+
+function montrer(quoi) {
+  for (const id of ['accueil', 'choix', 'jeu', 'fin']) $(id).style.display = 'none';
+  $(quoi).style.display = quoi === 'jeu' || quoi === 'fin' ? 'flex' : 'block';
+}
+
+// Dessine le tableau fini sur un petit canvas (1 pixel = 1 case)
+function peindre(cv, d) {
+  const x = cv.getContext('2d');
+  x.fillStyle = '#fff4dc'; x.fillRect(0, 0, N, N);
+  d.g.forEach((l, y) => [...l].forEach((ch, i) => {
+    if (ch !== '.') { x.fillStyle = COULEURS[d.id][+ch - 1]; x.fillRect(i, y, 1, 1); }
+  }));
+}
+
+function menu() {
+  const m = $('menu'); m.innerHTML = '';
+  DESSINS.forEach(d => {
+    const b = document.createElement('button');
+    b.className = 'vignette' + (fait[d.id] ? ' fait' : '');
+    const cv = document.createElement('canvas'); cv.width = N; cv.height = N;
+    if (fait[d.id]) peindre(cv, d); else { const x = cv.getContext('2d'); x.fillStyle = '#eee'; x.fillRect(0, 0, N, N); }
+    b.append(cv, (fait[d.id] ? '✓ ' : '') + d.nom);
+    b.onclick = () => commencer(d);
+    m.append(b);
+  });
+  montrer('choix');
+}
+
+function commencer(d) {
+  dessin = d; restant = {}; cases = [];
+  const g = $('grille'); g.innerHTML = '';
+  g.style.gridTemplateColumns = 'repeat(' + N + ', 1fr)';
+  d.g.forEach(l => [...l.padEnd(N, '.')].forEach(ch => {
+    const b = document.createElement('button');
+    b.className = 'c' + (ch === '.' ? ' vide' : '');
+    b.dataset.n = ch;
+    b.textContent = ch === '.' ? '' : ch;
+    if (ch === '.') b.tabIndex = -1; else restant[ch] = (restant[ch] || 0) + 1;
+    b.onclick = () => toucher(b);
+    g.append(b); cases.push(b);
+  }));
+  const p = $('palette'); p.innerHTML = '';
+  COULEURS[d.id].forEach((c, k) => {
+    const b = document.createElement('button');
+    b.className = 'p'; b.style.background = c; b.textContent = k + 1;
+    b.id = 'p' + (k + 1);
+    b.setAttribute('aria-label', 'Couleur ' + (k + 1));
+    b.onclick = () => choisir(String(k + 1));
+    p.append(b);
+  });
+  $('titre').textContent = d.nom;
+  montrer('jeu');
+  choisir('1');
+}
+
+function choisir(n) {
+  couleur = n;
+  document.querySelectorAll('.p').forEach(b => b.classList.toggle('sel', b.id === 'p' + n));
+  cases.forEach(c => c.classList.toggle('cible', c.dataset.n === n && !c.classList.contains('ok')));
+  $('msg').textContent = 'Colorie les cases ' + n;
+}
+
+function toucher(b) {
+  const n = b.dataset.n;
+  if (n === '.' || b.classList.contains('ok')) return;
+  if (n !== couleur) {
+    b.classList.remove('non'); void b.offsetWidth; b.classList.add('non');
+    $('msg').textContent = 'Essaie la couleur ' + n + ' !';
+    return;
+  }
+  b.classList.add('ok'); b.classList.remove('cible');
+  b.style.background = COULEURS[dessin.id][+n - 1];
+  restant[n]--;
+  if (restant[n] === 0) {
+    $('p' + n).classList.add('fini');
+    const suite = Object.keys(restant).find(k => restant[k] > 0);
+    if (!suite) { setTimeout(fin, 500); return; }
+    choisir(suite);
+    $('msg').textContent = 'Bien joué ! Couleur ' + suite;
+  }
+}
+
+function fin() {
+  fait[dessin.id] = 1; sauver();
+  peindre($('final'), dessin);
+  $('nom').textContent = dessin.nom + ' est réussi !';
+  montrer('fin');
+}
+
+$('jouer').onclick = menu;
+$('retour').onclick = menu;
+$('autre').onclick = menu;
+// Clavier : touches 1 à 4 pour choisir la couleur
+document.addEventListener('keydown', e => {
+  if ($('jeu').style.display === 'flex' && $('p' + e.key)) choisir(e.key);
+});
+</script>
+</body>
+</html>
