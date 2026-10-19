@@ -1,0 +1,58 @@
+# Formulaire « Nouvelle idée de jeu » (onglet Issues → New issue).
+# Le workflow .github/workflows/idee-jeu.yml ajoute l'idée à IDEES-JEUX.md
+# puis ferme l'issue. Les libellés « ### … » sont lus par ce workflow :
+# les modifier ensemble.
+
+name: Nouvelle idée de jeu
+description: Proposer un mini-jeu ; il est ajouté tout seul à la liste des idées.
+labels: ["idee-jeu"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Le **titre** de la demande devient le titre du jeu (ex. « Memory de la ferme »).
+        L'idée est ajoutée à `IDEES-JEUX.md`, puis la demande se ferme toute seule.
+
+  - type: textarea
+    id: principe
+    attributes:
+      label: Principe du jeu
+      description: En une ou deux phrases, ce que fait le joueur.
+      placeholder: Retrouve les paires d'animaux de la ferme, avec de plus en plus de cartes.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: genre
+    attributes:
+      label: Genre
+      description: Même liste que CONSIGNES-JEU.md (filtres du catalogue).
+      options:
+        - adresse
+        - réflexion
+        - mémoire
+        - quiz
+        - rythme
+        - création
+        - course
+        - puzzle
+        - calcul
+        - lecture
+    validations:
+      required: true
+
+  - type: dropdown
+    id: age
+    attributes:
+      label: Âge conseillé
+      options: ["4+", "5+", "6+", "7+", "8+", "10+", "12+"]
+      default: 2
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: priorite
+    attributes:
+      label: Priorité
+      options:
+        - label: Le fabriquer cette nuit en priorité

@@ -88,10 +88,31 @@ Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un 
 3. Le jeu vous plaît : **Merge pull request** → **Confirm merge**. Il est en ligne quelques minutes plus tard.
 4. Le jeu ne vous plaît pas : **Close pull request**. Rien n'est publié. Pour le refaire, décochez l'idée dans `IDEES-JEUX.md`.
 
+## Proposer une idée depuis mon téléphone
+
+Un formulaire GitHub ajoute l'idée à `IDEES-JEUX.md` tout seul, sans ordinateur.
+
+**Une seule fois :** sur github.com, ouvrez le dépôt → **Issues** → **Labels** → **New label**.
+Nom : `idee-jeu`, puis **Create label**. Sans cette étiquette, le formulaire ne déclenche rien.
+
+**À chaque idée :**
+
+1. Sur le téléphone (application GitHub ou navigateur) : dépôt → **Issues** → **New issue** → **Nouvelle idée de jeu**.
+2. Le titre de la demande devient le titre du jeu. Remplissez le principe, le genre et l'âge.
+3. Cochez « Le fabriquer cette nuit en priorité » pour la placer en tête de liste ; sinon, elle s'ajoute à la fin.
+4. Envoyez. Moins d'une minute plus tard, un commentaire confirme l'ajout et la demande se ferme.
+
+Bon à savoir :
+
+- Seules vos demandes (et celles des collaborateurs du dépôt) sont traitées. Les autres restent ouvertes, sans effet.
+- Une idée dont le titre figure déjà dans la liste n'est pas ajoutée une deuxième fois.
+- Rien ne se passe ? Onglet **Actions** → **Idée de jeu** → cliquez sur le passage en rouge.
+
 ## Commandes utiles
 
 | Je veux… | Je fais… |
 | --- | --- |
+| Proposer une idée depuis mon téléphone | Issues → New issue → Nouvelle idée de jeu |
 | Imposer une idée précise | Actions → Nouveau jeu → Run workflow → remplir le champ « Idée de jeu imposée » |
 | Changer l'ordre des idées | Modifier `IDEES-JEUX.md`, puis Commit + Push |
 | Mettre la boucle en pause | Actions → Nouveau jeu → menu « … » → **Disable workflow** |

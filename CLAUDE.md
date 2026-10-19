@@ -215,6 +215,7 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 - [ ] Phase 4
 - Catalogue amélioré — fichiers modifiés (menu de tri à 4 choix, portée Monde / Mon pays, filtres par genre et par thème, compteurs 👍 👎 ; champ `genre` dans `game.json` et `scripts/genres.mjs` ; `semaine` et `X-Pays` dans `/api/scores`). Reste : tester en ligne avec de vrais votes (en local, l'API n'existe pas).
 - Design « Galaxie » — fait (`style.css` réécrit, fonctionnement inchangé). Toujours sombre : bleu nuit `#0b1020`, gris ardoise, blanc cassé `#eceae4`, un seul accent bleu lavande `#a8b3f0` (couleurs en variables dans `:root`). Champ d'étoiles fixe en CSS (`body::before` / `::after`, scintillement léger coupé si mouvements réduits). Logo planète à anneau : `assets/logo.svg` (sur fond, sert aussi aux icônes PNG) et copie sans fond dans l'en-tête de `index.html`. Pouces dessinés au trait (SVG dans `play.html`, masque CSS pour les compteurs des jaquettes). Boutons et puces d'au moins 44 px.
+- Idées depuis le téléphone — fichiers créés (`.github/ISSUE_TEMPLATE/idee-jeu.yml`, `.github/workflows/idee-jeu.yml`, section dans `GUIDE-BOUCLE.md`). Reste : créer l'étiquette `idee-jeu` sur GitHub et faire un premier essai.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 

@@ -1,0 +1,114 @@
+# ==========================================================================
+# Idées de jeux depuis le téléphone : une issue ouverte avec le formulaire
+# « Nouvelle idée de jeu » (étiquette idee-jeu) est ajoutée à IDEES-JEUX.md,
+# enregistrée sur main, puis l'issue reçoit une confirmation et se ferme.
+#
+#  - Case « priorité » cochée : tout en haut de la liste, donc fabriquée à
+#    la prochaine boucle de nuit (nouveau-jeu.yml prend la première ligne
+#    non cochée).
+#  - Sinon : à la fin de la liste.
+#  - Seules les issues du propriétaire et des collaborateurs sont traitées :
+#    la liste est lue par l'agent de nuit.
+# ==========================================================================
+
+name: Idée de jeu
+
+on:
+  issues:
+    types: [opened]
+
+# Une idée à la fois : deux envois rapprochés ne se marchent pas dessus.
+concurrency:
+  group: idee-jeu
+  cancel-in-progress: false
+
+jobs:
+  ajouter:
+    if: >-
+      contains(github.event.issue.labels.*.name, 'idee-jeu') &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v6
+
+      - name: Ajouter l'idée, enregistrer et répondre
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const issue = context.payload.issue;
+            const FICHIER = 'IDEES-JEUX.md';
+            // Même liste que scripts/genres.mjs et CONSIGNES-JEU.md.
+            const GENRES = ['adresse', 'réflexion', 'mémoire', 'quiz', 'rythme', 'création', 'course', 'puzzle', 'calcul', 'lecture'];
+
+            // Commentaire sous l'issue, puis fermeture si l'idée est traitée.
+            const repondre = async (texte, fermer) => {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: issue.number, body: texte });
+              if (fermer) await github.rest.issues.update({ ...context.repo, issue_number: issue.number, state: 'closed', state_reason: 'completed' });
+            };
+
+            // Réponses du formulaire : rubriques « ### Libellé » suivies de la valeur.
+            const reponses = {};
+            for (const bloc of (issue.body || '').split(/^###\s+/m).slice(1)) {
+              const [libelle, ...reste] = bloc.split(/\r?\n/);
+              const valeur = reste.join(' ').trim();
+              reponses[libelle.trim()] = valeur === '_No response_' ? '' : valeur;
+            }
+
+            // Tout tient sur une ligne : impossible d'ajouter d'autres lignes à la liste.
+            const uneLigne = (t, max) => String(t || '').replace(/\s+/g, ' ').trim().slice(0, max);
+            const titre = uneLigne(issue.title, 60);
+            let principe = uneLigne(reponses['Principe du jeu'], 200).replace(/[.\s]+$/, '');
+            principe = principe.charAt(0).toLowerCase() + principe.slice(1);
+            const genre = uneLigne(reponses['Genre'], 20);
+            const age = uneLigne(reponses['Âge conseillé'], 4);
+            const priorite = /\[x\]/i.test(reponses['Priorité'] || '');
+
+            if (titre.length < 2 || !principe || !GENRES.includes(genre) || !/^\d{1,2}\+$/.test(age)) {
+              return repondre("Je n'ai pas pu lire cette idée (titre, principe, genre ou âge manquant) : rien n'a été ajouté. Ouvre une nouvelle demande avec le formulaire « Nouvelle idée de jeu ».", false);
+            }
+
+            // Format de IDEES-JEUX.md : « - [ ] Titre — principe (genre, âge) ».
+            const entree = `- [ ] ${titre} — ${principe} (${genre}, ${age})`;
+            const lignes = fs.readFileSync(FICHIER, 'utf8').split('\n');
+            const estIdee = (l) => /^- \[[ xX]\] /.test(l);
+            const titreDe = (l) => l.replace(/^- \[[ xX]\] /, '').split(' — ')[0].trim().toLowerCase();
+            if (lignes.some((l) => estIdee(l) && titreDe(l) === titre.toLowerCase())) {
+              return repondre(`« ${titre} » est déjà dans la liste d'idées : rien n'a été ajouté.`, true);
+            }
+
+            // Priorité : avant toutes les lignes de la liste. Sinon : après la dernière.
+            const idees = lignes.map((l, i) => (estIdee(l) ? i : -1)).filter((i) => i >= 0);
+            let position;
+            if (idees.length === 0) position = lignes.at(-1) === '' ? lignes.length - 1 : lignes.length;
+            else position = priorite ? idees[0] : idees.at(-1) + 1;
+            const avant = lignes.slice(0, position).filter((l) => /^- \[ \] /.test(l)).length;
+            lignes.splice(position, 0, entree);
+            fs.writeFileSync(FICHIER, lignes.join('\n'));
+
+            // Commit sur main ; si main a bougé entre-temps, on se remet à jour et on réessaie.
+            const git = (...args) => exec.exec('git', args);
+            try {
+              await git('config', 'user.name', 'github-actions[bot]');
+              await git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com');
+              await git('commit', '-m', `Idée de jeu : ${titre} (#${issue.number})`, '--', FICHIER);
+              for (let essai = 1; ; essai++) {
+                try { await git('push', 'origin', 'HEAD:main'); break; }
+                catch (e) { if (essai === 3) throw e; await git('pull', '--rebase', 'origin', 'main'); }
+              }
+            } catch (e) {
+              await repondre("L'enregistrement a échoué : l'idée n'a pas été ajoutée. Détails dans l'onglet Actions → « Idée de jeu ».", false);
+              throw e;
+            }
+
+            const lien = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/blob/main/${FICHIER}`;
+            const place = priorite || avant === 0
+              ? 'Elle sera fabriquée à la prochaine boucle de nuit (vers 3 h du matin).'
+              : `Elle est en fin de liste : ${avant} idée${avant > 1 ? 's passent' : ' passe'} avant elle.`;
+            await repondre(`✅ Idée ajoutée à [${FICHIER}](${lien}) :\n\n\`${entree}\`\n\n${place}`, true);
