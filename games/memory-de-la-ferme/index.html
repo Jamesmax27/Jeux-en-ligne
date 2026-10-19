@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memory de la ferme</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  body { font-family: system-ui, sans-serif; background: linear-gradient(#bfe6ff 0%, #e8f7c8 60%, #9bd66b 100%); color: #3b2a14; display: flex; flex-direction: column; }
+  .ecran { position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; gap: 14px; background: linear-gradient(#bfe6ff 0%, #e8f7c8 60%, #9bd66b 100%); z-index: 5; }
+  .ecran.actif { display: flex; }
+  .grand { font-size: 84px; line-height: 1; }
+  h1 { margin: 0; font-size: clamp(32px, 9vw, 48px); color: #7a3e12; text-shadow: 0 2px 0 #fff; }
+  p { margin: 0; font-size: 19px; max-width: 320px; line-height: 1.35; }
+  button { font: inherit; font-weight: 700; font-size: 24px; min-height: 56px; min-width: 180px; padding: 10px 28px; border: 0; border-radius: 30px; background: #e0572b; color: #fff; box-shadow: 0 5px 0 #a73c1a; cursor: pointer; }
+  button:active { transform: translateY(3px); box-shadow: 0 2px 0 #a73c1a; }
+  #haut { display: flex; justify-content: space-around; align-items: center; padding: 10px 8px 4px; font-weight: 700; font-size: 18px; min-height: 48px; }
+  #plateau-zone { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 6px; }
+  #plateau { display: grid; gap: 8px; justify-content: center; align-content: center; }
+  .carte { perspective: 600px; padding: 0; background: none; border: 0; box-shadow: none; min-width: 0; min-height: 0; font-size: inherit; border-radius: 14px; }
+  .carte:active { transform: none; box-shadow: none; }
+  .carte .int { position: relative; width: 100%; height: 100%; transition: transform .35s; transform-style: preserve-3d; }
+  .carte.ouverte .int, .carte.trouvee .int { transform: rotateY(180deg); }
+  .face { position: absolute; inset: 0; border-radius: 14px; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: flex; align-items: center; justify-content: center; }
+  .dos { background: repeating-linear-gradient(45deg, #c9703a 0 10px, #b45f2c 10px 20px); border: 3px solid #7a3e12; }
+  .dos::after { content: "🐾"; font-size: var(--em); opacity: .55; }
+  .devant { background: #fffdf2; border: 3px solid #7a3e12; transform: rotateY(180deg); font-size: var(--em); }
+  .carte.trouvee .devant { background: #d8f5b0; border-color: #4e9a1c; }
+  .etoiles { font-size: 44px; letter-spacing: 6px; }
+</style>
+</head>
+<body>
+<div id="haut"><span id="niv">Niveau 1</span><span id="coups">Essais : 0</span><span id="paires">0 / 0</span></div>
+<div id="plateau-zone"><div id="plateau"></div></div>
+
+<div id="accueil" class="ecran actif">
+  <div class="grand">🐮🐷🐔</div>
+  <h1>Memory de la ferme</h1>
+  <p>Touche deux cartes pour les retourner. Retrouve les paires d'animaux identiques !</p>
+  <button id="jouer">Jouer</button>
+</div>
+<div id="fin" class="ecran">
+  <div class="grand" id="fin-img">🎉</div>
+  <h1 id="fin-titre">Bravo !</h1>
+  <div class="etoiles" id="fin-etoiles"></div>
+  <p id="fin-texte"></p>
+  <button id="suite">Niveau suivant</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  // Animaux de la ferme (emoji, aucune ressource externe)
+  var ANIMAUX = ["🐮","🐷","🐔","🐑","🐴","🐶","🐱","🐰","🦆","🐐","🐭","🐤"];
+  // Niveaux : [colonnes, lignes]
+  var NIVEAUX = [[3,2],[4,2],[4,3],[4,4],[4,5],[4,6]];
+
+  var niveau = 0, ouvertes = [], bloque = false, essais = 0, trouvees = 0, total = 0, meilleur = {};
+  try { meilleur = JSON.parse(localStorage.getItem("memoire-ferme") || "{}") || {}; } catch (e) { meilleur = {}; }
+
+  var plateau = document.getElementById("plateau");
+  var zone = document.getElementById("plateau-zone");
+
+  function el(id) { return document.getElementById(id); }
+  function montrer(id) {
+    el("accueil").classList.remove("actif"); el("fin").classList.remove("actif");
+    if (id) el(id).classList.add("actif");
+  }
+
+  // Son facultatif en Web Audio, seulement après une action du joueur
+  var ctx = null;
+  function bip(f, d) {
+    try {
+      if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f; o.type = "sine"; g.gain.value = 0.08;
+      o.connect(g); g.connect(ctx.destination);
+      o.start(); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + d); o.stop(ctx.currentTime + d);
+    } catch (e) {}
+  }
+
+  function melanger(t) {
+    for (var i = t.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var x = t[i]; t[i] = t[j]; t[j] = x; }
+    return t;
+  }
+
+  // Taille des cartes selon l'espace disponible
+  function dimensionner() {
+    var n = NIVEAUX[niveau], c = n[0], l = n[1], gap = 8;
+    var w = zone.clientWidth - 12, h = zone.clientHeight - 12;
+    var t = Math.floor(Math.min((w - gap * (c - 1)) / c, (h - gap * (l - 1)) / l, 130));
+    if (t < 20) t = 20;
+    plateau.style.gridTemplateColumns = "repeat(" + c + "," + t + "px)";
+    plateau.style.gridTemplateRows = "repeat(" + l + "," + t + "px)";
+    plateau.style.setProperty("--em", Math.floor(t * 0.6) + "px");
+  }
+
+  function lancerNiveau() {
+    var n = NIVEAUX[niveau];
+    total = n[0] * n[1] / 2; trouvees = 0; essais = 0; ouvertes = []; bloque = false;
+    var choix = melanger(ANIMAUX.slice()).slice(0, total);
+    var cartes = melanger(choix.concat(choix));
+    plateau.innerHTML = "";
+    cartes.forEach(function (a) {
+      var b = document.createElement("button");
+      b.className = "carte"; b.type = "button"; b.setAttribute("aria-label", "Carte cachée");
+      b.dataset.a = a;
+      b.innerHTML = '<div class="int"><div class="face dos"></div><div class="face devant">' + a + '</div></div>';
+      b.addEventListener("click", function () { toucher(b); });
+      plateau.appendChild(b);
+    });
+    montrer(null);
+    majInfos();
+    dimensionner();
+  }
+
+  function majInfos() {
+    el("niv").textContent = "Niveau " + (niveau + 1);
+    el("coups").textContent = "Essais : " + essais;
+    el("paires").textContent = trouvees + " / " + total;
+  }
+
+  function toucher(b) {
+    if (bloque || b.classList.contains("ouverte") || b.classList.contains("trouvee")) return;
+    b.classList.add("ouverte"); bip(500, 0.12);
+    ouvertes.push(b);
+    if (ouvertes.length < 2) return;
+    essais++; majInfos();
+    var a = ouvertes[0], c = ouvertes[1];
+    if (a.dataset.a === c.dataset.a) {
+      a.classList.add("trouvee"); c.classList.add("trouvee");
+      a.classList.remove("ouverte"); c.classList.remove("ouverte");
+      ouvertes = []; trouvees++; majInfos();
+      setTimeout(function () { bip(784, 0.2); }, 150);
+      if (trouvees === total) setTimeout(finir, 900);
+    } else {
+      bloque = true;
+      setTimeout(function () {
+        a.classList.remove("ouverte"); c.classList.remove("ouverte");
+        ouvertes = []; bloque = false;
+      }, 900);
+    }
+  }
+
+  function finir() {
+    // Étoiles selon le nombre d'essais par rapport au nombre de paires
+    var etoiles = essais <= total * 1.5 ? 3 : essais <= total * 2.5 ? 2 : 1;
+    var cle = "n" + niveau;
+    if (!meilleur[cle] || essais < meilleur[cle]) {
+      meilleur[cle] = essais;
+      try { localStorage.setItem("memoire-ferme", JSON.stringify(meilleur)); } catch (e) {}
+    }
+    var dernier = niveau === NIVEAUX.length - 1;
+    el("fin-etoiles").textContent = "⭐".repeat(etoiles) + "☆".repeat(3 - etoiles);
+    el("fin-titre").textContent = dernier ? "Champion de la ferme !" : "Bravo !";
+    el("fin-img").textContent = dernier ? "🏆" : "🎉";
+    el("fin-texte").textContent = "Tu as trouvé toutes les paires en " + essais + " essais. Ton record : " + meilleur[cle] + ".";
+    el("suite").textContent = dernier ? "Rejouer" : "Niveau suivant";
+    bip(660, 0.15); setTimeout(function () { bip(880, 0.25); }, 160);
+    montrer("fin");
+  }
+
+  el("jouer").addEventListener("click", function () { niveau = 0; lancerNiveau(); });
+  el("suite").addEventListener("click", function () {
+    niveau = niveau >= NIVEAUX.length - 1 ? 0 : niveau + 1;
+    lancerNiveau();
+  });
+  window.addEventListener("resize", dimensionner);
+})();
+</script>
+</body>
+</html>
