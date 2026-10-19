@@ -81,7 +81,8 @@ async function controlerJeu(id, dossier) {
   const html = await readFile(chemin, 'utf8');
   if (!/<html[\s>]/i.test(html)) erreur(id, 'index.html : balise <html> absente');
   if (!/<html[^>]*\blang\s*=\s*["']?fr/i.test(html)) avertir(id, 'index.html : ajouter lang="fr" sur la balise <html>');
-  if (!/name\s*=\s*["']viewport["']/i.test(html)) erreur(id, 'index.html : balise <meta name="viewport"> absente (affichage mobile)');
+  // Guillemets facultatifs : <meta name=viewport …> est du HTML valide.
+  if (!/name\s*=\s*["']?viewport\b/i.test(html)) erreur(id, 'index.html : balise <meta name="viewport"> absente (affichage mobile)');
 
   // Aucune adresse Internet, sauf les espaces de noms SVG/XML du W3C.
   const adresses = [...html.matchAll(/https?:\/\/[^\s"'<>)`]+/gi)]
