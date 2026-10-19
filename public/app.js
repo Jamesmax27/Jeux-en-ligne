@@ -232,15 +232,18 @@ function creerCarte(jeu, scores) {
   texte.append(titre, infos);
 
   // Compteurs de pouces, seulement quand l'API répond (jamais hors connexion).
+  // Le pouce lui-même est dessiné par style.css (.pouce-haut, .pouce-bas).
   let votes = '';
   if (scores) {
     const { up, down } = scores[jeu.id] || SANS_VOTE;
     const pouces = document.createElement('p');
     pouces.className = 'carte-pouces';
     const haut = document.createElement('span');
-    haut.textContent = `👍 ${up}`;
+    haut.className = 'pouce-haut';
+    haut.textContent = String(up);
     const bas = document.createElement('span');
-    bas.textContent = `👎 ${down}`;
+    bas.className = 'pouce-bas';
+    bas.textContent = String(down);
     pouces.append(haut, bas);
     texte.append(pouces);
     votes = `${up} j'aime, ${down} je n'aime pas.`;
