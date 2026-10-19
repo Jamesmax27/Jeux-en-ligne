@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le grand tour des planètes</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#0b1020;color:#eceae4;font-family:system-ui,sans-serif}
+body{background:radial-gradient(circle at 50% 0,#1c2550,#0b1020 70%)}
+#stars{position:fixed;inset:0;pointer-events:none}
+.ecran{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center;gap:14px}
+.ecran.on{display:flex}
+h1{font-size:clamp(30px,9vw,48px);margin:0;line-height:1.1;color:#fff}
+h1 span{color:#a8b3f0}
+p{margin:0;font-size:18px;line-height:1.4;max-width:420px}
+.btn{min-height:52px;min-width:160px;padding:12px 28px;font-size:22px;font-weight:700;border:0;border-radius:30px;background:#a8b3f0;color:#0b1020;cursor:pointer}
+.btn:focus-visible,.tuile:focus-visible,.slot:focus-visible{outline:3px solid #fff;outline-offset:2px}
+#jeu{padding:10px 10px 8px;gap:8px;justify-content:flex-start;max-width:520px;margin:0 auto}
+.haut{display:flex;justify-content:space-between;width:100%;font-size:17px;font-weight:700}
+#consigne{font-size:16px;min-height:22px;color:#a8b3f0}
+#grille{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+.slot{min-height:64px;border-radius:14px;border:2px dashed #4a5588;background:#161d3a;color:#eceae4;display:flex;align-items:center;gap:8px;padding:4px 10px;font-size:17px;font-weight:700;cursor:pointer;text-align:left}
+.slot .num{width:26px;height:26px;border-radius:50%;background:#2b3563;display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}
+.slot .nom{display:flex;align-items:center;gap:6px}
+.slot.plein{border-style:solid;border-color:#7fd99a;cursor:default}
+.slot.nok{animation:sec .4s}
+.slot svg{width:44px;height:44px;flex:none}
+@keyframes sec{25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.slot.indice{box-shadow:0 0 0 3px #ffd36b}
+#plateau{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;width:100%;min-height:80px}
+.tuile{width:78px;min-height:74px;border-radius:14px;border:2px solid #4a5588;background:#232c55;color:#eceae4;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:13px;font-weight:700;cursor:pointer;padding:3px}
+.tuile svg{width:44px;height:44px}
+.tuile.sel{border-color:#ffd36b;background:#3a3f6e;transform:scale(1.08)}
+#info{width:100%;min-height:84px;background:#161d3a;border-radius:14px;padding:10px 12px;font-size:16px;line-height:1.35;border-left:4px solid #a8b3f0;text-align:left}
+#info b{color:#ffd36b}
+.etoiles{font-size:34px;letter-spacing:4px;color:#ffd36b}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+
+<section class="ecran on" id="accueil">
+  <svg width="140" height="80" viewBox="0 0 140 80" aria-hidden="true"><circle cx="26" cy="40" r="24" fill="#ffb347"/><circle cx="64" cy="40" r="7" fill="#c9a27a"/><circle cx="90" cy="40" r="11" fill="#4aa3e0"/><circle cx="118" cy="40" r="8" fill="#e0663f"/></svg>
+  <h1>Le grand tour<br>des <span>planètes</span></h1>
+  <p>Range les planètes dans l'ordre, en partant du Soleil. Touche une planète, puis sa place !</p>
+  <button class="btn" id="jouer">Jouer</button>
+</section>
+
+<section class="ecran" id="jeu">
+  <div class="haut"><span id="niv">Niveau 1/3</span><span id="etoilesTot">⭐ 0</span></div>
+  <div id="consigne"></div>
+  <div id="grille"></div>
+  <div id="plateau"></div>
+  <div id="info"></div>
+</section>
+
+<section class="ecran" id="fin">
+  <h1 id="titreFin">Bravo !</h1>
+  <div class="etoiles" id="etFin"></div>
+  <p id="txtFin"></p>
+  <button class="btn" id="rejouer">Rejouer</button>
+</section>
+
+<script>
+// Données : couleur, taille du dessin et info amusante (l'indice dans le tableau = rang depuis le Soleil)
+const PL = [
+ {n:"Mercure",c:"#b5a79a",r:12,i:"C'est la plus petite et la plus proche du Soleil. Elle fait le tour du Soleil en 88 jours seulement !"},
+ {n:"Vénus",c:"#e8c36a",r:17,i:"C'est la plus chaude de toutes, sous ses gros nuages épais. On l'appelle l'étoile du berger."},
+ {n:"Terre",c:"#3f8fd8",r:18,i:"Notre maison ! C'est la seule planète où l'on sait qu'il y a de la vie et de l'eau liquide."},
+ {n:"Mars",c:"#d9593a",r:14,i:"La planète rouge : son sol est plein de rouille. Elle a le plus grand volcan du système solaire."},
+ {n:"Jupiter",c:"#d9a77a",r:23,i:"La plus grosse planète : on pourrait y mettre plus de mille Terres ! Sa grande tache rouge est une énorme tempête."},
+ {n:"Saturne",c:"#e3cf94",r:19,anneau:1,i:"Elle est célèbre pour ses anneaux de glace et de roche. Elle est si légère qu'elle flotterait sur l'eau !"},
+ {n:"Uranus",c:"#8fdde0",r:16,i:"Elle tourne couchée sur le côté, comme une boule qui roule autour du Soleil."},
+ {n:"Neptune",c:"#4b64d8",r:16,i:"La plus lointaine ! Il y souffle des vents très rapides et son année dure 165 ans."}
+];
+// Les 3 niveaux : indices des planètes
+const NIVEAUX = [[0,1,2,3],[4,5,6,7],[0,1,2,3,4,5,6,7]];
+const TXT = ["Les 4 planètes proches du Soleil","Les 4 planètes lointaines (n° 5 à 8)","Tout le système solaire !"];
+const $ = id => document.getElementById(id);
+
+// Dessin SVG d'une planète
+function svg(p){
+  const a = p.anneau ? '<ellipse cx="24" cy="24" rx="22" ry="7" fill="none" stroke="#c9b777" stroke-width="3" transform="rotate(-20 24 24)"/>' : "";
+  const r = Math.max(9, p.r*0.75+3);
+  return '<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="'+r+'" fill="'+p.c+'"/><circle cx="'+(24-r/3)+'" cy="'+(24-r/3)+'" r="'+(r/3)+'" fill="#fff" opacity=".18"/>'+a+'</svg>';
+}
+
+let niv, ordre, places, sel, erreurs, etoiles, ratesPlace, fini;
+
+function nouvellePartie(){ niv = 0; etoiles = 0; demarrerNiveau(); montrer("jeu"); }
+
+function demarrerNiveau(){
+  const ids = NIVEAUX[niv];
+  ordre = ids.slice();
+  places = {}; sel = null; erreurs = 0; ratesPlace = 0; fini = false;
+  // mélange du plateau, jamais déjà dans l'ordre
+  let m;
+  do { m = ids.slice().sort(() => Math.random() - .5); } while (m.every((v,k) => v === ids[k]));
+  $("niv").textContent = "Niveau " + (niv+1) + "/3";
+  $("etoilesTot").textContent = "⭐ " + etoiles;
+  $("consigne").textContent = TXT[niv];
+  $("info").innerHTML = "Touche une planète en bas, puis la case où elle doit aller. Le <b>Soleil ☀️</b> est avant la case n° 1.";
+  const g = $("grille"); g.innerHTML = "";
+  ids.forEach(id => {
+    const b = document.createElement("button");
+    b.className = "slot"; b.dataset.id = id;
+    b.setAttribute("aria-label", "Place numéro " + (id+1));
+    b.innerHTML = '<span class="num">' + (id+1) + '</span><span class="nom"></span>';
+    b.onclick = () => poser(id, b);
+    g.appendChild(b);
+  });
+  const t = $("plateau"); t.innerHTML = "";
+  m.forEach(id => {
+    const b = document.createElement("button");
+    b.className = "tuile"; b.dataset.id = id;
+    b.innerHTML = svg(PL[id]) + PL[id].n;
+    b.onclick = () => choisir(id, b);
+    t.appendChild(b);
+  });
+}
+
+function choisir(id, b){
+  if (fini) return;
+  document.querySelectorAll(".tuile.sel").forEach(e => e.classList.remove("sel"));
+  sel = id; b.classList.add("sel");
+}
+
+function poser(slotId, el){
+  if (fini || places[slotId] !== undefined) return;
+  if (sel === null){ $("info").innerHTML = "Choisis d'abord une planète en bas 👇"; return; }
+  if (sel === slotId){
+    places[slotId] = sel;
+    el.classList.add("plein");
+    el.querySelector(".nom").innerHTML = svg(PL[sel]) + PL[sel].n;
+    el.querySelector(".num").remove();
+    document.querySelectorAll(".slot.indice").forEach(e => e.classList.remove("indice"));
+    const tuile = document.querySelector('.tuile[data-id="' + sel + '"]');
+    if (tuile) tuile.remove();
+    $("info").innerHTML = "<b>" + PL[sel].n + "</b> (n° " + (sel+1) + ") : " + PL[sel].i;
+    sel = null; ratesPlace = 0;
+    if (Object.keys(places).length === ordre.length) finNiveau();
+  } else {
+    erreurs++; ratesPlace++;
+    el.classList.remove("nok"); void el.offsetWidth; el.classList.add("nok");
+    $("info").innerHTML = "Pas ici, essaie une autre case ! 🙂";
+    // après 2 essais ratés d'affilée, on éclaire la bonne case
+    if (ratesPlace >= 2){
+      const bon = document.querySelector('.slot[data-id="' + sel + '"]');
+      if (bon) bon.classList.add("indice");
+      $("info").innerHTML = "Petit coup de pouce : la case dorée est la bonne !";
+    }
+  }
+}
+
+function finNiveau(){
+  fini = true;
+  const e = erreurs <= 1 ? 3 : erreurs <= 4 ? 2 : 1;
+  etoiles += e;
+  $("etoilesTot").textContent = "⭐ " + etoiles;
+  $("info").innerHTML += "<br><b>" + "⭐".repeat(e) + "</b> Niveau réussi !";
+  setTimeout(() => {
+    if (niv < NIVEAUX.length - 1){ niv++; demarrerNiveau(); }
+    else finJeu();
+  }, 2800);
+}
+
+function finJeu(){
+  let meilleur = etoiles;
+  try {
+    const v = parseInt(localStorage.getItem("planetes-meilleur") || "0", 10);
+    meilleur = Math.max(v, etoiles);
+    localStorage.setItem("planetes-meilleur", String(meilleur));
+  } catch (e) {}
+  $("etFin").textContent = etoiles + " / 9 ⭐";
+  $("titreFin").textContent = etoiles >= 8 ? "Astronome expert !" : "Bravo, voyageur !";
+  $("txtFin").textContent = "Tu connais le chemin du Soleil jusqu'à Neptune. Meilleur score : " + meilleur + " / 9.";
+  montrer("fin");
+}
+
+function montrer(id){
+  document.querySelectorAll(".ecran").forEach(e => e.classList.toggle("on", e.id === id));
+}
+
+$("jouer").onclick = nouvellePartie;
+$("rejouer").onclick = nouvellePartie;
+
+// Fond d'étoiles dessiné une seule fois
+(function(){
+  const c = $("stars"), w = c.width = innerWidth, h = c.height = innerHeight, x = c.getContext("2d");
+  x.fillStyle = "#eceae4";
+  for (let k = 0; k < 90; k++){ x.globalAlpha = .2 + Math.random()*.6; x.fillRect(Math.random()*w, Math.random()*h, 1.5, 1.5); }
+})();
+</script>
+</body>
+</html>
