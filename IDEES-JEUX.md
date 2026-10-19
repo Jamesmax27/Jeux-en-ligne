@@ -9,7 +9,7 @@ Ajoutez, supprimez ou réordonnez librement les lignes. Format : `- [ ] Titre �
 - [x] Ballons des lettres — une lettre est annoncée à l'écran, éclate les ballons qui la portent (lecture, 4+) → ballons-des-lettres
 - [x] Memory de la ferme — retrouve les paires d'animaux de la ferme, de plus en plus de cartes (mémoire, 4+) → memory-de-la-ferme
 - [ ] Le grand tour des planètes — remets les planètes du système solaire dans l'ordre, avec une info sur chacune (puzzle, 7+)
-- [ ] Quelle heure est-il ? — lis l'heure sur une horloge à aiguilles et choisis la bonne réponse (quiz, 6+)
+- [x] Quelle heure est-il ? — lis l'heure sur une horloge à aiguilles et choisis la bonne réponse (quiz, 6+) → quelle-heure-est-il
 - [ ] Drapeaux du monde — reconnais le drapeau de pays d'Europe, puis du monde entier (quiz, 8+)
 - [ ] Coloriage magique — colorie un dessin case par case en suivant les numéros (création, 4+)
 - [x] Le labyrinthe de la souris — guide la souris jusqu'au fromage, labyrinthes de plus en plus grands (réflexion, 5+) → labyrinthe-de-la-souris
