@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drapeaux du monde</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#12306b;font-family:system-ui,sans-serif;color:#fff}
+body{background:radial-gradient(circle at 50% 0,#2a5fc4,#12306b 70%)}
+#app{height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;gap:12px;text-align:center}
+.ecran{display:none;width:100%;flex-direction:column;align-items:center;gap:14px}
+.ecran.actif{display:flex}
+h1{font-size:clamp(2rem,10vw,3rem);margin:0;text-shadow:0 3px 0 #0a1c40;line-height:1.05}
+p{margin:0;font-size:1.05rem;line-height:1.35}
+.btn{min-height:52px;min-width:44px;border:0;border-radius:16px;padding:12px 22px;font:700 1.15rem system-ui,sans-serif;color:#12306b;background:#ffd23f;box-shadow:0 4px 0 #b88e00;cursor:pointer}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #b88e00}
+.btn.autre{background:#fff;box-shadow:0 4px 0 #9aa7c7}
+.vitrine{display:flex;gap:8px}
+.vitrine svg{width:28vw;max-width:120px;border-radius:6px;box-shadow:0 3px 8px #0006}
+.drap{width:min(78vw,340px);aspect-ratio:3/2;border-radius:8px;box-shadow:0 6px 16px #0008;background:#fff;display:block}
+.drap.ok{animation:saut .4s}
+@keyframes saut{50%{transform:scale(1.07) rotate(-2deg)}}
+.haut{width:100%;display:flex;justify-content:space-between;font-weight:700;font-size:1.05rem}
+.barre{width:100%;height:10px;background:#0a1c40;border-radius:5px;overflow:hidden}
+.barre i{display:block;height:100%;background:#ffd23f;width:0;transition:width .3s}
+.choix{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.choix button{min-height:60px;border:0;border-radius:14px;font:700 1.05rem system-ui,sans-serif;color:#12306b;background:#fff;box-shadow:0 4px 0 #9aa7c7;padding:8px;cursor:pointer}
+.choix button.bon{background:#4cd17a;box-shadow:0 4px 0 #26914d}
+.choix button.faux{background:#ff7b7b;box-shadow:0 4px 0 #b84444}
+.retour{min-height:26px;font-weight:700;font-size:1.1rem}
+.etoiles{font-size:2.4rem;letter-spacing:6px}
+.grand{font-size:2.6rem;font-weight:800;color:#ffd23f}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Accueil -->
+  <section id="accueil" class="ecran actif">
+    <h1>Drapeaux<br>du monde</h1>
+    <div class="vitrine" id="vitrine"></div>
+    <p>Un drapeau apparaît : touche le bon pays parmi quatre !<br>10 questions par partie.</p>
+    <button class="btn" id="bEurope">Jouer : Europe</button>
+    <button class="btn autre" id="bMonde">Jouer : monde entier</button>
+    <p id="record"></p>
+  </section>
+  <!-- Question -->
+  <section id="jeu" class="ecran">
+    <div class="haut"><span id="num"></span><span id="pts"></span></div>
+    <div class="barre"><i id="prog"></i></div>
+    <div id="zoneDrap"></div>
+    <div class="choix" id="choix"></div>
+    <div class="retour" id="retour"></div>
+  </section>
+  <!-- Fin -->
+  <section id="fin" class="ecran">
+    <h1>Bravo !</h1>
+    <div class="etoiles" id="etoiles"></div>
+    <div class="grand" id="score"></div>
+    <p id="msg"></p>
+    <button class="btn" id="bRejouer">Rejouer</button>
+    <button class="btn autre" id="bMenu">Changer de niveau</button>
+  </section>
+</div>
+<script>
+// ===== Dessin des drapeaux (SVG inline, grille 90 x 60) =====
+const R = (x,y,w,h,c) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${c}"/>`;
+const C = (x,y,r,c) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>`;
+// Bandes horizontales ou verticales, avec poids facultatifs
+function bandes(couleurs, vert, poids) {
+  poids = poids || couleurs.map(() => 1);
+  const tot = poids.reduce((a,b) => a+b, 0), L = vert ? 90 : 60;
+  let pos = 0, s = '';
+  couleurs.forEach((c,i) => {
+    const t = L * poids[i] / tot;
+    s += vert ? R(pos,0,t+.3,60,c) : R(0,pos,90,t+.3,c);
+    pos += t;
+  });
+  return s;
+}
+// Etoile a 5 branches
+function etoile(cx, cy, r, c) {
+  const p = [];
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI/2 + i*Math.PI/5, rr = i%2 ? r*0.4 : r;
+    p.push((cx+rr*Math.cos(a)).toFixed(1)+','+(cy+rr*Math.sin(a)).toFixed(1));
+  }
+  return `<polygon points="${p.join(' ')}" fill="${c}"/>`;
+}
+// Croissant de lune (un disque, puis un disque de la couleur du fond)
+const croissant = (cx,cy,r,c,fond,dx) => C(cx,cy,r,c) + C(cx+dx,cy,r*.8,fond);
+// Croix nordique : fond, croix, et liseré intérieur facultatif
+function nordique(fond, croix, bord) {
+  let s = R(0,0,90,60,fond);
+  if (bord) s += R(0,22,90,16,croix) + R(22,0,16,60,croix) + R(0,26,90,8,bord) + R(26,0,8,60,bord);
+  else s += R(0,24,90,12,croix) + R(24,0,12,60,croix);
+  return s;
+}
+// Bandes alternees (Etats-Unis, Cuba, Grece)
+function alternees(n, a, b) { let s = ''; for (let i=0;i<n;i++) s += R(0,i*60/n,90,60/n+.3,i%2?b:a); return s; }
+function etoilesUSA() { let s = R(0,0,40,32,'#3c3b6e'); for (let y=0;y<4;y++) for (let x=0;x<5;x++) s += C(5+x*7.5,5+y*7.5,1.6,'#fff'); return s; }
+
+const DRAPEAUX = [
+  // ----- Europe (e:1) -----
+  {n:'France', e:1, d:bandes(['#0055a4','#fff','#ef4135'],1)},
+  {n:'Italie', e:1, d:bandes(['#009246','#fff','#ce2b37'],1)},
+  {n:'Irlande', e:1, d:bandes(['#169b62','#fff','#ff883e'],1)},
+  {n:'Belgique', e:1, d:bandes(['#000','#fae042','#ed2939'],1)},
+  {n:'Allemagne', e:1, d:bandes(['#000','#dd0000','#ffce00'])},
+  {n:'Pays-Bas', e:1, d:bandes(['#ae1c28','#fff','#21468b'])},
+  {n:'Luxembourg', e:1, d:bandes(['#ed2939','#fff','#00a1de'])},
+  {n:'Autriche', e:1, d:bandes(['#ed2939','#fff','#ed2939'])},
+  {n:'Hongrie', e:1, d:bandes(['#cd2a3e','#fff','#436f4d'])},
+  {n:'Bulgarie', e:1, d:bandes(['#fff','#00966e','#d62612'])},
+  {n:'Roumanie', e:1, d:bandes(['#002b7f','#fcd116','#ce1126'],1)},
+  {n:'Russie', e:1, d:bandes(['#fff','#0039a6','#d52b1e'])},
+  {n:'Pologne', e:1, d:bandes(['#fff','#dc143c'])},
+  {n:'Ukraine', e:1, d:bandes(['#0057b7','#ffd700'])},
+  {n:'Lituanie', e:1, d:bandes(['#fdb913','#006a44','#c1272d'])},
+  {n:'Estonie', e:1, d:bandes(['#0072ce','#000','#fff'])},
+  {n:'Lettonie', e:1, d:bandes(['#9e3039','#fff','#9e3039'],0,[2,1,2])},
+  {n:'Serbie', e:1, d:bandes(['#c6363c','#0c4076','#fff'])},
+  {n:'Espagne', e:1, d:bandes(['#aa151b','#f1bf00','#aa151b'],0,[1,2,1])},
+  {n:'Suisse', e:1, d:R(0,0,90,60,'#d52b1e')+R(37,12,16,36,'#fff')+R(27,22,36,16,'#fff')},
+  {n:'Danemark', e:1, d:nordique('#c8102e','#fff')},
+  {n:'Suède', e:1, d:nordique('#006aa7','#fecc00')},
+  {n:'Norvège', e:1, d:nordique('#ba0c2f','#fff','#00205b')},
+  {n:'Finlande', e:1, d:nordique('#fff','#003580')},
+  {n:'Islande', e:1, d:nordique('#02529c','#fff','#dc1e35')},
+  {n:'Grèce', e:1, d:alternees(9,'#0d5eaf','#fff')+R(0,0,33.4,33.4,'#0d5eaf')+R(13,0,7.4,33.4,'#fff')+R(0,13,33.4,7.4,'#fff')},
+  {n:'Royaume-Uni', e:1, d:R(0,0,90,60,'#012169')+
+    '<path d="M0 0L90 60M90 0L0 60" stroke="#fff" stroke-width="12"/><path d="M0 0L90 60M90 0L0 60" stroke="#c8102e" stroke-width="4"/>'+
+    R(0,20,90,20,'#fff')+R(35,0,20,60,'#fff')+R(0,24,90,12,'#c8102e')+R(39,0,12,60,'#c8102e')},
+  // ----- Monde -----
+  {n:'Japon', d:R(0,0,90,60,'#fff')+C(45,30,17,'#bc002d')},
+  {n:'Canada', d:R(0,0,90,60,'#fff')+R(0,0,22,60,'#d52b1e')+R(68,0,22,60,'#d52b1e')+
+    '<path d="M45 12L50 22L57 19L54 33L60 31L58 37L47 40L47 48L43 48L43 40L32 37L30 31L36 33L33 19L40 22Z" fill="#d52b1e"/>'},
+  {n:'États-Unis', d:alternees(13,'#b22234','#fff')+etoilesUSA()},
+  {n:'Brésil', d:R(0,0,90,60,'#009c3b')+'<polygon points="45,6 83,30 45,54 7,30" fill="#ffdf00"/>'+C(45,30,13,'#002776')+'<path d="M33 27Q45 24 57 33" stroke="#fff" stroke-width="2.5" fill="none"/>'},
+  {n:'Chine', d:R(0,0,90,60,'#de2910')+etoile(15,15,9,'#ffde00')+etoile(30,7,3,'#ffde00')+etoile(35,15,3,'#ffde00')+etoile(35,24,3,'#ffde00')+etoile(30,31,3,'#ffde00')},
+  {n:'Inde', d:bandes(['#ff9933','#fff','#138808'])+'<circle cx="45" cy="30" r="7.5" fill="none" stroke="#000080" stroke-width="1.5"/>'},
+  {n:'Mexique', d:bandes(['#006847','#fff','#ce1126'],1)+C(45,30,9,'#8c6b3c')},
+  {n:'Argentine', d:bandes(['#74acdf','#fff','#74acdf'])+C(45,30,6,'#f6b40e')},
+  {n:'Turquie', d:R(0,0,90,60,'#e30a17')+croissant(33,30,15,'#fff','#e30a17',5)+etoile(55,30,7,'#fff')},
+  {n:'Égypte', d:bandes(['#ce1126','#fff','#000'])+C(45,30,5,'#c09300')},
+  {n:'Nigeria', d:bandes(['#008751','#fff','#008751'],1)},
+  {n:'Côte d\'Ivoire', d:bandes(['#f77f00','#fff','#009e60'],1)},
+  {n:'Mali', d:bandes(['#14b53a','#fcd116','#ce1126'],1)},
+  {n:'Sénégal', d:bandes(['#00853f','#fdef42','#e31b23'],1)+etoile(45,30,9,'#00853f')},
+  {n:'Maroc', d:R(0,0,90,60,'#c1272d')+'<path d="M45 14L50 41L28 24L62 24L40 41Z" fill="none" stroke="#006233" stroke-width="2.4"/>'},
+  {n:'Algérie', d:bandes(['#006233','#fff'],1)+croissant(47,30,13,'#d21034','#fff',-4)+etoile(50,30,5,'#d21034')},
+  {n:'Jamaïque', d:R(0,0,90,60,'#009b3a')+'<polygon points="0,0 45,30 0,60" fill="#000"/><polygon points="90,0 45,30 90,60" fill="#000"/><path d="M0 0L90 60M90 0L0 60" stroke="#fed100" stroke-width="6"/>'},
+  {n:'Cuba', d:alternees(5,'#002a8f','#fff')+'<polygon points="0,0 52,30 0,60" fill="#cf142b"/>'+etoile(15,30,8,'#fff')},
+  {n:'Chili', d:R(0,0,90,60,'#fff')+R(0,30,90,30,'#d52b1e')+R(0,0,30,30,'#0039a6')+etoile(15,15,8,'#fff')},
+  {n:'Colombie', d:bandes(['#fcd116','#003893','#ce1126'],0,[2,1,1])},
+  {n:'Pérou', d:bandes(['#d91023','#fff','#d91023'],1)},
+  {n:'Bolivie', d:bandes(['#d52b1e','#f9e300','#007934'])},
+  {n:'Thaïlande', d:bandes(['#a51931','#f4f5f8','#2d2a4a','#f4f5f8','#a51931'],0,[1,1,2,1,1])},
+  {n:'Indonésie', d:bandes(['#ce1126','#fff'])},
+  {n:'Vietnam', d:R(0,0,90,60,'#da251d')+etoile(45,31,17,'#ff0')},
+  {n:'Bangladesh', d:R(0,0,90,60,'#006a4e')+C(40,30,17,'#f42a41')},
+];
+
+// ===== Jeu =====
+const NB = 10;
+const $ = id => document.getElementById(id);
+let mode = 'europe', questions = [], idx = 0, points = 0, bloque = false, record = {};
+
+const svg = (f, cls) => `<svg class="drap ${cls||''}" viewBox="0 0 90 60" role="img" aria-label="Drapeau à deviner">${f.d}</svg>`;
+function montrer(id) { document.querySelectorAll('.ecran').forEach(e => e.classList.toggle('actif', e.id === id)); }
+function melange(t) { t = t.slice(); for (let i=t.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [t[i],t[j]]=[t[j],t[i]]; } return t; }
+
+// Sauvegarde facultative des records
+function lire() { try { record = JSON.parse(localStorage.getItem('drapeaux-records')) || {}; } catch (e) { record = {}; } }
+function ecrire() { try { localStorage.setItem('drapeaux-records', JSON.stringify(record)); } catch (e) {} }
+function afficheRecord() {
+  const a = record.europe, b = record.monde;
+  $('record').textContent = (a || b) ? 'Records — Europe : ' + (a||0) + '/10 · Monde : ' + (b||0) + '/10' : '';
+}
+
+function lancer(m) {
+  mode = m; idx = 0; points = 0;
+  const pool = m === 'europe' ? DRAPEAUX.filter(f => f.e) : DRAPEAUX;
+  questions = melange(pool).slice(0, NB).map(f => {
+    // 3 mauvaises réponses prises dans le même groupe
+    const autres = melange(pool.filter(x => x !== f)).slice(0, 3);
+    return {f, options: melange([f].concat(autres))};
+  });
+  montrer('jeu'); poser();
+}
+
+function poser() {
+  bloque = false;
+  const q = questions[idx];
+  $('num').textContent = 'Question ' + (idx+1) + '/' + NB;
+  $('pts').textContent = '⭐ ' + points;
+  $('prog').style.width = (idx / NB * 100) + '%';
+  $('zoneDrap').innerHTML = svg(q.f);
+  $('retour').textContent = '';
+  $('choix').innerHTML = '';
+  q.options.forEach((o, i) => {
+    const b = document.createElement('button');
+    b.textContent = (i+1) + '. ' + o.n;
+    b.onclick = () => repondre(b, o);
+    $('choix').appendChild(b);
+  });
+}
+
+function repondre(bouton, o) {
+  if (bloque) return;
+  bloque = true;
+  const q = questions[idx], juste = o === q.f;
+  [...$('choix').children].forEach((b, i) => {
+    if (q.options[i] === q.f) b.classList.add('bon');
+  });
+  if (juste) {
+    points++; $('pts').textContent = '⭐ ' + points;
+    $('retour').textContent = '✅ Bravo !';
+    $('zoneDrap').firstChild.classList.add('ok');
+  } else {
+    bouton.classList.add('faux');
+    $('retour').textContent = 'C\'était : ' + q.f.n;
+  }
+  setTimeout(() => { idx++; idx < NB ? poser() : terminer(); }, juste ? 800 : 1700);
+}
+
+function terminer() {
+  $('prog').style.width = '100%';
+  if (points > (record[mode] || 0)) { record[mode] = points; ecrire(); }
+  const e = points >= 9 ? 3 : points >= 6 ? 2 : points >= 3 ? 1 : 0;
+  $('etoiles').textContent = '⭐'.repeat(e) + '☆'.repeat(3 - e);
+  $('score').textContent = points + ' / ' + NB;
+  $('msg').textContent = points >= 9 ? 'Tu es un champion des drapeaux !' : points >= 6 ? 'Très bien, continue !' : 'Bon début ! Rejoue pour progresser.';
+  montrer('fin');
+}
+
+$('bEurope').onclick = () => lancer('europe');
+$('bMonde').onclick = () => lancer('monde');
+$('bRejouer').onclick = () => lancer(mode);
+$('bMenu').onclick = () => { afficheRecord(); montrer('accueil'); };
+// Clavier : touches 1 à 4 pour répondre
+document.addEventListener('keydown', e => {
+  if (!$('jeu').classList.contains('actif') || bloque) return;
+  const b = $('choix').children[parseInt(e.key, 10) - 1];
+  if (b) b.click();
+});
+
+lire(); afficheRecord();
+$('vitrine').innerHTML = ['France','Japon','Brésil'].map(n => svg(DRAPEAUX.find(f => f.n === n))).join('');
+</script>
+</body>
+</html>
