@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>La course des tables</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,sans-serif;background:#cdeefb;color:#3a2a1a;user-select:none;touch-action:manipulation}
+  #app{position:relative;height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;background:#cdeefb}
+  #hud{display:flex;justify-content:space-between;padding:8px 12px;font-weight:700;font-size:18px;min-height:44px}
+  canvas{width:100%;flex:1 1 auto;min-height:0;display:block;object-fit:cover;object-position:left bottom}
+  #q{text-align:center;font-size:34px;font-weight:800;padding:6px;background:#fff8e6;border-top:4px solid #e9893a}
+  #bar{height:8px;background:#f3d9b0}
+  #barin{height:100%;width:100%;background:#4caf50}
+  #ans{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px;background:#fff8e6}
+  #ans button{min-height:56px;font-size:28px;font-weight:800;border:0;border-radius:14px;background:#e9893a;color:#fff;box-shadow:0 4px 0 #b4601c;cursor:pointer}
+  #ans button:active{transform:translateY(3px);box-shadow:0 1px 0 #b4601c}
+  #ans button.ok{background:#3aa34a;box-shadow:0 4px 0 #26732f}
+  #ans button.ko{background:#999;box-shadow:0 4px 0 #666}
+  .ecran{position:absolute;inset:0;background:linear-gradient(#ffb865,#e9893a);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:14px;color:#fff;z-index:5}
+  .ecran.cache{display:none}
+  .ecran h1{font-size:40px;margin:0;text-shadow:0 3px 0 #b4601c}
+  .ecran p{font-size:19px;margin:0;max-width:320px;line-height:1.35}
+  .gros{min-height:60px;padding:0 40px;font-size:26px;font-weight:800;border:0;border-radius:30px;background:#fff;color:#c4661a;cursor:pointer;box-shadow:0 5px 0 #b4601c}
+  .renard{font-size:90px;line-height:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud"><span id="vies"></span><span id="niv"></span><span id="pts"></span></div>
+  <canvas id="c" width="400" height="300"></canvas>
+  <div id="bar"><div id="barin"></div></div>
+  <div id="q">&nbsp;</div>
+  <div id="ans"></div>
+
+  <div id="accueil" class="ecran">
+    <div class="renard">🦊</div>
+    <h1>La course des tables</h1>
+    <p>Le renard court ! Choisis la bonne réponse pour sauter chaque obstacle avant qu'il arrive.</p>
+    <button class="gros" id="jouer">Jouer</button>
+  </div>
+  <div id="fin" class="ecran cache">
+    <div class="renard">🦊</div>
+    <h1>Bravo !</h1>
+    <p id="bilan"></p>
+    <button class="gros" id="rejouer">Rejouer</button>
+  </div>
+</div>
+<script>
+// === La course des tables : jeu de calcul mental ===
+var cv = document.getElementById('c'), ctx = cv.getContext('2d');
+var W = 400, H = 300;
+var $ = function (id) { return document.getElementById(id); };
+
+// Etat du jeu
+var etat = 'accueil';          // accueil | course | fin
+var score = 0, vies = 3, niveau = 1, bonnes = 0, meilleur = 0;
+var question, obst = null, duree = 9000, t0 = 0, renardY = 0, vy = 0, secousse = 0, scroll = 0, message = '', msgT = 0, figee = false, passe = false;
+
+try { meilleur = parseInt(localStorage.getItem('tables-best')) || 0; } catch (e) {}
+
+function alea(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+
+// Les tables s'élargissent avec le niveau
+function nouvelleQuestion() {
+  var maxT = Math.min(10, 2 + niveau);          // niveau 1 : tables 2 et 3
+  var a = alea(2, maxT), b = alea(2, 10);
+  if (Math.random() < 0.5) { var x = a; a = b; b = x; }
+  var bon = a * b, set = [bon], essais = 0;
+  while (set.length < 4 && essais++ < 100) {
+    var d = [(a + 1) * b, (a - 1) * b, a * (b + 1), a * (b - 1), bon + 10, bon - 10, bon + 2, bon - 2];
+    var c = d[alea(0, d.length - 1)];
+    if (c > 0 && set.indexOf(c) < 0) set.push(c);
+  }
+  set.sort(function () { return Math.random() - 0.5; });
+  question = { a: a, b: b, bon: bon };
+  var zone = $('ans'); zone.innerHTML = '';
+  set.forEach(function (v) {
+    var bt = document.createElement('button');
+    bt.textContent = v; bt.onclick = function () { repondre(v, bt); };
+    zone.appendChild(bt);
+  });
+  $('q').textContent = a + ' × ' + b + ' = ?';
+  obst = { x: W + 20 };
+  duree = Math.max(4000, 9000 - niveau * 600);   // temps pour répondre
+  t0 = performance.now();
+  figee = false; passe = false;
+}
+
+function majHud() {
+  $('vies').textContent = '❤️'.repeat(Math.max(0, vies)) + '🤍'.repeat(Math.max(0, 3 - vies));
+  $('niv').textContent = 'Niveau ' + niveau;
+  $('pts').textContent = '⭐ ' + score;
+}
+
+function demarrer() {
+  score = 0; vies = 3; niveau = 1; bonnes = 0; renardY = 0; vy = 0;
+  secousse = 0; message = ''; msgT = 0;
+  $('accueil').classList.add('cache'); $('fin').classList.add('cache');
+  etat = 'course'; majHud(); nouvelleQuestion();
+}
+
+function finir() {
+  etat = 'fin';
+  if (score > meilleur) { meilleur = score; try { localStorage.setItem('tables-best', meilleur); } catch (e) {} }
+  $('bilan').textContent = 'Tu as trouvé ' + bonnes + ' bonne' + (bonnes > 1 ? 's' : '') + ' réponse' + (bonnes > 1 ? 's' : '') + ' ! Score : ' + score + '. Meilleur score : ' + meilleur + '.';
+  $('fin').classList.remove('cache');
+}
+
+// Question suivante après une courte pause
+function suite() { setTimeout(function () { if (etat === 'course') nouvelleQuestion(); }, 900); }
+
+function repondre(v, bt) {
+  if (etat !== 'course' || figee) return;
+  figee = true;
+  if (v === question.bon) {
+    bt.classList.add('ok');
+    // Plus on répond vite, plus on gagne de points
+    var reste = Math.max(0, 1 - (performance.now() - t0) / duree);
+    score += 10 + Math.round(reste * 10); bonnes++;
+    vy = 9; passe = true; message = 'Bravo !'; msgT = 50;
+    if (bonnes % 5 === 0) { niveau++; message = 'Niveau ' + niveau + ' !'; }
+    majHud(); suite();
+  } else {
+    bt.classList.add('ko'); perdre('C\'était ' + question.bon);
+  }
+}
+
+// Une vie perdue : le renard se cogne doucement
+function perdre(txt) {
+  vies--; secousse = 25; message = txt; msgT = 60; majHud();
+  if (vies <= 0) setTimeout(finir, 900); else suite();
+}
+
+// --- Dessin ---
+function dessiner(now) {
+  var sol = H - 60;
+  ctx.fillStyle = '#cdeefb'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#fff'; // nuages
+  [[60, 50], [220, 30], [340, 70]].forEach(function (n, i) {
+    var x = ((n[0] - scroll * 0.2 * (i + 1)) % (W + 80) + W + 80) % (W + 80) - 40;
+    ctx.beginPath(); ctx.arc(x, n[1], 18, 0, 7); ctx.arc(x + 20, n[1] + 4, 14, 0, 7); ctx.arc(x - 18, n[1] + 6, 12, 0, 7); ctx.fill();
+  });
+  ctx.fillStyle = '#7fc46b'; // collines
+  for (var i = 0; i < 4; i++) {
+    var hx = ((i * 140 - scroll * 0.5) % 560 + 560) % 560 - 80;
+    ctx.beginPath(); ctx.arc(hx, sol, 70, Math.PI, 0); ctx.fill();
+  }
+  ctx.fillStyle = '#5aa84a'; ctx.fillRect(0, sol, W, H - sol);
+  ctx.fillStyle = '#8b5a2b'; ctx.fillRect(0, sol + 18, W, H - sol - 18);
+  ctx.fillStyle = '#6e4620';
+  for (var k = 0; k < 10; k++) ctx.fillRect(((k * 50 - scroll) % 500 + 500) % 500 - 40, sol + 38, 22, 5);
+
+  // Obstacle : une bûche
+  if (obst && obst.x > -60) {
+    ctx.fillStyle = '#7a4a1e'; ctx.fillRect(obst.x - 18, sol - 34, 36, 34);
+    ctx.fillStyle = '#d9a566'; ctx.beginPath(); ctx.ellipse(obst.x, sol - 17, 8, 15, 0, 0, 7); ctx.fill();
+  }
+  // Renard (emoji retourné pour regarder à droite)
+  var fx = 90 + (secousse > 0 ? Math.sin(secousse) * 6 : 0);
+  ctx.save(); ctx.font = '56px serif'; ctx.textAlign = 'center';
+  ctx.translate(fx, sol - renardY + (renardY > 0 ? 0 : Math.sin(now / 70) * 3));
+  ctx.scale(-1, 1); ctx.fillText('🦊', 0, 0); ctx.restore();
+
+  if (msgT > 0) {
+    ctx.font = 'bold 28px system-ui'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#b4601c'; ctx.lineWidth = 5;
+    ctx.strokeText(message, W / 2, 60); ctx.fillText(message, W / 2, 60);
+  }
+}
+
+// --- Boucle principale ---
+var dernier = 0;
+function boucle(now) {
+  requestAnimationFrame(boucle);
+  var dt = Math.min(50, now - (dernier || now)); dernier = now;
+  if (etat === 'course') {
+    var reste = Math.max(0, 1 - (now - t0) / duree);
+    if (!figee) {
+      scroll += dt * 0.12;
+      $('barin').style.width = (reste * 100) + '%';
+      $('barin').style.background = reste < 0.3 ? '#e53935' : '#4caf50';
+      // L'obstacle avance vers le renard pendant le temps imparti
+      obst.x = 120 + (W - 100) * reste;
+      if (reste <= 0) { figee = true; perdre('Trop lent !'); }
+    } else if (passe) {
+      scroll += dt * 0.12;
+      obst.x -= dt * 0.2;            // l'obstacle passe sous le renard
+    } else if (obst.x > 60) {
+      obst.x -= dt * 0.05;           // petit choc puis l'obstacle disparaît
+    } else {
+      obst.x = -100;
+    }
+  }
+  // Saut du renard
+  if (vy !== 0 || renardY > 0) {
+    renardY += vy * dt / 16; vy -= 0.45 * dt / 16;
+    if (renardY <= 0) { renardY = 0; vy = 0; }
+  }
+  if (secousse > 0) secousse -= dt / 16;
+  if (msgT > 0) msgT -= dt / 16;
+  dessiner(now);
+}
+
+// Clavier : touches 1 à 4 pour répondre, Entrée pour jouer
+document.addEventListener('keydown', function (e) {
+  var n = parseInt(e.key);
+  if (etat === 'course' && n >= 1 && n <= 4) {
+    var b = $('ans').children[n - 1]; if (b) b.click();
+  } else if ((e.key === 'Enter' || e.key === ' ') && etat !== 'course') {
+    demarrer();
+  }
+});
+
+$('jouer').onclick = demarrer; $('rejouer').onclick = demarrer;
+majHud(); requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
