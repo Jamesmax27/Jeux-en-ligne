@@ -4,12 +4,12 @@
 
 Chaque nuit, GitHub lance la boucle suivante, sans votre ordinateur :
 
-1. **L'agent Claude** lit `CLAUDE.md`, `CONSIGNES-JEU.md` et `IDEES-JEUX.md`, puis crée le jeu de la prochaine idée non cochée.
+1. **L'agent Claude** lit `CLAUDE.md`, `CONSIGNES-JEU.md` et `IDEES-JEUX.md`, puis crée le jeu de la prochaine idée non cochée (une idée déjà prise par une pull request ouverte est sautée). Il note l'idée dans le `game.json` du jeu (champ `idee`) et ne modifie jamais `IDEES-JEUX.md`.
 2. **Il se teste lui-même** avec le robot de contrôle, et corrige au maximum 3 fois.
-3. **Un garde-fou** vérifie qu'il n'a touché qu'au dossier du nouveau jeu et à la liste d'idées. Sinon, tout s'arrête.
+3. **Un garde-fou** vérifie qu'il n'a touché qu'au dossier du nouveau jeu. Sinon, tout s'arrête.
 4. **Le robot refait un contrôle final** dans un vrai navigateur et fabrique la jaquette.
 5. **Une pull request** s'ouvre : c'est une proposition, rien n'est encore en ligne.
-6. **Vous jouez à l'aperçu** Cloudflare, puis vous cliquez « Merge ». Le jeu est alors publié.
+6. **Vous jouez à l'aperçu** Cloudflare, puis vous cliquez « Merge ». Le jeu est alors publié, et son idée est cochée dans `IDEES-JEUX.md`.
 
 ---
 
@@ -86,13 +86,54 @@ Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un 
 1. Ouvrez la pull request du jour.
 2. Cliquez sur le lien d'**aperçu Cloudflare** (une adresse en `.pages.dev` propre à la proposition) et jouez 2 minutes sur votre téléphone.
 3. Le jeu vous plaît : **Merge pull request** → **Confirm merge**. Il est en ligne quelques minutes plus tard.
-4. Le jeu ne vous plaît pas : **Close pull request**. Rien n'est publié. Pour le refaire, décochez l'idée dans `IDEES-JEUX.md`.
+4. Le jeu ne vous plaît pas : **Close pull request**. Rien n'est publié et l'idée reste non cochée : elle sera retentée au prochain lancement. Pour l'abandonner, supprimez sa ligne dans `IDEES-JEUX.md`.
+
+## Proposer une idée depuis mon téléphone
+
+Un formulaire GitHub ajoute l'idée à `IDEES-JEUX.md` tout seul, sans ordinateur.
+
+**Une seule fois :** sur github.com, ouvrez le dépôt → **Issues** → **Labels** → **New label**.
+Nom : `idee-jeu`, puis **Create label**. Sans cette étiquette, le formulaire ne déclenche rien.
+
+**À chaque idée :**
+
+1. Sur le téléphone (application GitHub ou navigateur) : dépôt → **Issues** → **New issue** → **Nouvelle idée de jeu**.
+2. Le titre de la demande devient le titre du jeu. Remplissez le principe, le genre et l'âge.
+3. Cochez « Le fabriquer cette nuit en priorité » pour la placer en tête de liste ; sinon, elle s'ajoute à la fin.
+4. Envoyez. Moins d'une minute plus tard, un commentaire confirme l'ajout et la demande se ferme.
+
+Bon à savoir :
+
+- Seules vos demandes (et celles des collaborateurs du dépôt) sont traitées. Les autres restent ouvertes, sans effet.
+- Une idée dont le titre figure déjà dans la liste n'est pas ajoutée une deuxième fois.
+- Rien ne se passe ? Onglet **Actions** → **Idée de jeu** → cliquez sur le passage en rouge.
+
+## Faire corriger un jeu proposé
+
+Un jeu proposé ne vous convient pas tout à fait ? Demandez la correction en commentaire, même depuis le téléphone.
+
+1. Ouvrez la pull request du jeu et écrivez un commentaire qui contient `@claude`, suivi de votre demande.
+   Exemple : « @claude les ballons vont trop vite au niveau 1, et ajoute un petit son quand on gagne ».
+2. Envoyez. Un 👀 apparaît sur votre commentaire : la demande est prise en compte.
+3. Après 10 à 30 minutes, Claude répond avec un résumé des changements. La correction est ajoutée à la pull request et l'aperçu Cloudflare se met à jour.
+4. Rejouez à l'aperçu, puis **Merge**, ou une nouvelle demande `@claude`.
+
+Bon à savoir :
+
+- Seuls les commentaires de votre compte (Jamesmax27) déclenchent une correction.
+- Claude ne peut modifier que le dossier du jeu de la pull request. La jaquette automatique est refaite ; une jaquette faite à la main est gardée.
+- Si le contrôle qualité échoue encore après 3 essais, rien n'est ajouté : la réponse donne le rapport.
+- Une demande à la fois par pull request : la suivante attend la fin de la précédente.
+- Comme la boucle de nuit, chaque correction consomme votre abonnement Claude.
 
 ## Commandes utiles
 
 | Je veux… | Je fais… |
 | --- | --- |
-| Imposer une idée précise | Actions → Nouveau jeu → Run workflow → remplir le champ « Idée de jeu imposée » |
+| Proposer une idée depuis mon téléphone | Issues → New issue → Nouvelle idée de jeu |
+| Faire corriger un jeu proposé | Commentaire « @claude … » dans sa pull request |
+| Créer plusieurs jeux d'un coup | Actions → Nouveau jeu → Run workflow → « Nombre de jeux » (1 à 5) |
+| Imposer une idée précise | Actions → Nouveau jeu → Run workflow → remplir le champ « Idée imposée » (pour le 1er jeu) |
 | Changer l'ordre des idées | Modifier `IDEES-JEUX.md`, puis Commit + Push |
 | Mettre la boucle en pause | Actions → Nouveau jeu → menu « … » → **Disable workflow** |
 | Comprendre un échec | Actions → cliquer sur le passage en rouge → lire l'étape en échec |
@@ -101,6 +142,8 @@ Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un 
 ## Bon à savoir
 
 - **Coûts** : la boucle consomme votre abonnement Claude, comme une conversation, et des minutes GitHub Actions, gratuites dans la limite du quota mensuel de votre compte. Une exécution par nuit reste modeste. Surveillez quand même la première semaine dans GitHub, menu Settings → Billing.
+- **Plusieurs jeux d'un coup** : chaque jeu consomme autant qu'une nuit de boucle (5 jeux = 5 fois plus). Avec un abonnement Claude, 5 agents en même temps peuvent atteindre la limite d'utilisation : si des jeux échouent pour cette raison, relancez avec un nombre plus petit.
+- **Liste d'idées sans conflit** : les pull requests de jeux ne modifient jamais `IDEES-JEUX.md`. Chaque jeu note son idée dans son `game.json` (champ `idee`), et la ligne est cochée sur `main` au moment de la fusion. Vous pouvez donc modifier la liste à tout moment, même avec des pull requests ouvertes.
 - **Heure** : la boucle tourne à 01:23 UTC, soit vers 3 h du matin à Paris. Elle se règle à la ligne `cron` de `nouveau-jeu.yml`.
 - **Sécurité** : l'agent ne peut que lire, écrire des fichiers et lancer le robot de contrôle. Il ne peut ni publier, ni toucher aux autres jeux ou au site.
 - **Jeton** : il expire au bout d'un an. Refaites alors les étapes 3 et 4.

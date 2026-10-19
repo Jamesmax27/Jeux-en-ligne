@@ -51,6 +51,7 @@ Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.
   La même liste figure dans `scripts/genres.mjs` : modifier les deux ensemble.
 - `tags` : 1 à 5 thèmes, en minuscules, de préférence déjà utilisés sur le site : `chevaux`, `animaux`, `judo`, `espace`, `nature`, `géographie`, `sciences`…
 - `ages` : âge minimum conseillé, au format `"6+"`.
+- `idee` : rempli par la boucle automatique, titre de la ligne de `IDEES-JEUX.md` réalisée par ce jeu. Ne pas le modifier. Facultatif pour un jeu créé à la main.
 
 ## 5. La jaquette
 
