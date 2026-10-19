@@ -1,0 +1,209 @@
+# ==========================================================================
+# Correction d'un jeu proposé : un commentaire contenant « @claude » dans
+# une pull request (auteur : Jamesmax27) demande à l'agent de modifier le
+# jeu de cette pull request.
+#
+#  1. Vérifications : pull request ouverte, venant de ce dépôt, qui ne
+#     concerne qu'un seul jeu (games/<id>/).
+#  2. L'agent applique la demande, puis se teste (3 corrections au maximum).
+#  3. Garde-fou : seul games/<id>/ peut changer.
+#  4. Jaquette automatique refaite + contrôle final dans un vrai navigateur.
+#  5. Si tout passe : correction poussée sur la branche de la pull request.
+#     Dans tous les cas : réponse en commentaire.
+# ==========================================================================
+
+name: Corriger un jeu
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  preparer:
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == 'Jamesmax27' &&
+      contains(github.event.comment.body, '@claude')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    outputs:
+      ok: ${{ steps.pr.outputs.ok }}
+      id: ${{ steps.pr.outputs.id }}
+      branche: ${{ steps.pr.outputs.branche }}
+      publie: ${{ steps.pr.outputs.publie }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NUMERO: ${{ github.event.issue.number }}
+
+    steps:
+      - name: Accuser réception (👀 sur le commentaire)
+        run: gh api -X POST "repos/$GITHUB_REPOSITORY/issues/comments/${{ github.event.comment.id }}/reactions" -f content=eyes > /dev/null
+
+      - name: Lire la pull request
+        id: pr
+        run: |
+          set -euo pipefail
+          pr=$(gh pr view "$NUMERO" --repo "$GITHUB_REPOSITORY" --json state,headRefName,isCrossRepository,files)
+          ids=$(jq -r '.files[].path' <<<"$pr" | { grep -E '^games/[a-z0-9-]+/' || true; } | cut -d/ -f2 | sort -u)
+          nb=$(grep -c . <<<"$ids" || true)
+          probleme=""
+          if [ "$(jq -r .state <<<"$pr")" != "OPEN" ]; then probleme="elle n'est plus ouverte."
+          elif [ "$(jq -r .isCrossRepository <<<"$pr")" = "true" ]; then probleme="elle vient d'un autre dépôt."
+          elif [ "$nb" -ne 1 ]; then probleme="elle doit concerner exactement un jeu (dossiers games/ touchés : $nb)."
+          fi
+          if [ -n "$probleme" ]; then
+            gh pr comment "$NUMERO" --repo "$GITHUB_REPOSITORY" --body "Je ne peux pas corriger cette pull request : $probleme"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Déjà publié sur main ? Alors toute modification du jeu augmente sa version.
+          publie=false
+          if gh api "repos/$GITHUB_REPOSITORY/contents/games/$ids/game.json?ref=main" > /dev/null 2>&1; then publie=true; fi
+          { echo "ok=true"; echo "id=$ids"; echo "branche=$(jq -r .headRefName <<<"$pr")"; echo "publie=$publie"; } >> "$GITHUB_OUTPUT"
+
+  corriger:
+    needs: preparer
+    if: needs.preparer.outputs.ok == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Une correction à la fois par pull request.
+    concurrency:
+      group: corriger-jeu-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NUMERO: ${{ github.event.issue.number }}
+      ID: ${{ needs.preparer.outputs.id }}
+      BRANCHE: ${{ needs.preparer.outputs.branche }}
+
+    steps:
+      - name: Récupérer la branche de la pull request
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preparer.outputs.branche }}
+          fetch-depth: 1
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installer le navigateur de test
+        run: |
+          npm install --no-save --no-package-lock playwright
+          npx playwright install --with-deps chromium
+
+      - name: L'agent applique la demande
+        uses: anthropics/claude-code-action@v1
+        with:
+          # Abonnement Claude (jeton créé avec « claude setup-token »), comme nouveau-jeu.yml.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          show_full_output: true
+          claude_args: |
+            --max-turns 60
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*)"
+          prompt: |
+            Tu es le développeur de jeux du site Jeux-en-ligne. Le propriétaire demande une correction
+            du jeu games/${{ needs.preparer.outputs.id }}/ (pull request #${{ github.event.issue.number }}).
+
+            Sa demande :
+            <<<
+            ${{ github.event.comment.body }}
+            >>>
+
+            1. Lis CLAUDE.md, puis CONSIGNES-JEU.md (règles obligatoires), puis
+               games/${{ needs.preparer.outputs.id }}/index.html et game.json.
+            2. Applique la demande au jeu en respectant CONSIGNES-JEU.md. Si une partie de la demande
+               est contraire aux consignes ou impossible, ne l'applique pas et explique pourquoi dans le résumé.
+            3. Ce jeu est déjà publié sur le site : ${{ needs.preparer.outputs.publie == 'true' && 'oui' || 'non' }}.
+               S'il l'est et que tu modifies index.html, augmente "version" de 1 dans game.json.
+               Sinon, ne change pas "version".
+            4. Lance : node scripts/validate-games.mjs --browser ${{ needs.preparer.outputs.id }}
+               Corrige toutes les erreurs et relance jusqu'à « Tout est bon ». 3 tentatives de correction au maximum.
+            5. Écris dans resume-correction.md (à la racine du dépôt) un résumé en français pour le propriétaire :
+               3 à 6 puces courtes sur ce qui a changé, puis ce qu'il faut vérifier en jouant.
+
+            Interdits : modifier un autre fichier que ceux de games/${{ needs.preparer.outputs.id }}/ et
+            resume-correction.md ; toucher à la jaquette (elle est refaite automatiquement) ; utiliser la
+            moindre ressource Internet dans le jeu.
+
+      - name: Vérifier ce que l'agent a modifié
+        id: garde
+        run: |
+          set -euo pipefail
+          git status --porcelain --untracked-files=all > "$RUNNER_TEMP/modifs.txt"
+          cat "$RUNNER_TEMP/modifs.txt"
+          # Seuls games/<id>/ et le résumé de l'agent peuvent changer.
+          if grep -v -E "^.. games/$ID/|^\?\? resume-correction\.md$" "$RUNNER_TEMP/modifs.txt"; then
+            echo "::error::L'agent a modifié des fichiers non autorisés (liste ci-dessus)."
+            exit 1
+          fi
+          # Le résumé sert à la réponse, il n'est pas enregistré dans le dépôt.
+          if [ -f resume-correction.md ]; then mv resume-correction.md "$RUNNER_TEMP/resume.md"; fi
+          if grep -q -E "^.. games/$ID/" "$RUNNER_TEMP/modifs.txt"; then modifie=true; else modifie=false; fi
+          echo "modifie=$modifie" >> "$GITHUB_OUTPUT"
+
+      - name: Refaire la jaquette + contrôle final
+        id: controle
+        if: steps.garde.outputs.modifie == 'true'
+        run: |
+          # La jaquette automatique (cover.jpg) est refaite ; une jaquette faite à la main est gardée.
+          rm -f "games/$ID/cover.jpg"
+          if node scripts/validate-games.mjs --browser --covers "$ID" > "$RUNNER_TEMP/rapport.txt" 2>&1; then
+            echo "valide=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "valide=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat "$RUNNER_TEMP/rapport.txt"
+
+      - name: Pousser la correction sur la branche
+        if: steps.controle.outputs.valide == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A "games/$ID"
+          git commit -m "Correction du jeu $ID (demande dans la PR #$NUMERO)"
+          git push origin "HEAD:refs/heads/$BRANCHE"
+
+      - name: Répondre dans la pull request
+        env:
+          MODIFIE: ${{ steps.garde.outputs.modifie }}
+          VALIDE: ${{ steps.controle.outputs.valide }}
+        run: |
+          {
+            if [ "$MODIFIE" != "true" ]; then
+              echo "Je n'ai rien modifié dans \`games/$ID/\`."
+            elif [ "$VALIDE" = "true" ]; then
+              echo "✅ Correction ajoutée à la pull request. L'aperçu Cloudflare se met à jour dans quelques minutes."
+            else
+              echo "⚠️ Correction **non ajoutée** : le contrôle qualité échoue encore (rapport ci-dessous). Précise ta demande, ou corrige à la main."
+            fi
+            echo
+            if [ -s "$RUNNER_TEMP/resume.md" ]; then cat "$RUNNER_TEMP/resume.md"; else echo "_(pas de résumé de l'agent)_"; fi
+            if [ -f "$RUNNER_TEMP/rapport.txt" ]; then
+              echo
+              echo "<details><summary>Contrôle qualité</summary>"
+              echo
+              echo '```'
+              cat "$RUNNER_TEMP/rapport.txt"
+              echo '```'
+              echo "</details>"
+            fi
+          } > "$RUNNER_TEMP/reponse.md"
+          gh pr comment "$NUMERO" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/reponse.md"
+
+      - name: Signaler un échec
+        if: failure()
+        run: >-
+          gh pr comment "$NUMERO" --repo "$GITHUB_REPOSITORY" --body
+          "❌ La correction a échoué ou a été bloquée par le garde-fou : rien n'a été ajouté à la pull request.
+          Détails : $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

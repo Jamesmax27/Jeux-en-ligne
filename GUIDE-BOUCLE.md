@@ -108,11 +108,30 @@ Bon à savoir :
 - Une idée dont le titre figure déjà dans la liste n'est pas ajoutée une deuxième fois.
 - Rien ne se passe ? Onglet **Actions** → **Idée de jeu** → cliquez sur le passage en rouge.
 
+## Faire corriger un jeu proposé
+
+Un jeu proposé ne vous convient pas tout à fait ? Demandez la correction en commentaire, même depuis le téléphone.
+
+1. Ouvrez la pull request du jeu et écrivez un commentaire qui contient `@claude`, suivi de votre demande.
+   Exemple : « @claude les ballons vont trop vite au niveau 1, et ajoute un petit son quand on gagne ».
+2. Envoyez. Un 👀 apparaît sur votre commentaire : la demande est prise en compte.
+3. Après 10 à 30 minutes, Claude répond avec un résumé des changements. La correction est ajoutée à la pull request et l'aperçu Cloudflare se met à jour.
+4. Rejouez à l'aperçu, puis **Merge**, ou une nouvelle demande `@claude`.
+
+Bon à savoir :
+
+- Seuls les commentaires de votre compte (Jamesmax27) déclenchent une correction.
+- Claude ne peut modifier que le dossier du jeu de la pull request. La jaquette automatique est refaite ; une jaquette faite à la main est gardée.
+- Si le contrôle qualité échoue encore après 3 essais, rien n'est ajouté : la réponse donne le rapport.
+- Une demande à la fois par pull request : la suivante attend la fin de la précédente.
+- Comme la boucle de nuit, chaque correction consomme votre abonnement Claude.
+
 ## Commandes utiles
 
 | Je veux… | Je fais… |
 | --- | --- |
 | Proposer une idée depuis mon téléphone | Issues → New issue → Nouvelle idée de jeu |
+| Faire corriger un jeu proposé | Commentaire « @claude … » dans sa pull request |
 | Imposer une idée précise | Actions → Nouveau jeu → Run workflow → remplir le champ « Idée de jeu imposée » |
 | Changer l'ordre des idées | Modifier `IDEES-JEUX.md`, puis Commit + Push |
 | Mettre la boucle en pause | Actions → Nouveau jeu → menu « … » → **Disable workflow** |
