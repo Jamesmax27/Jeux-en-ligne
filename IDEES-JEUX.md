@@ -5,7 +5,7 @@ Ajoutez, supprimez ou réordonnez librement les lignes. Format : `- [ ] Titre �
 
 > Liste de départ proposée par Claude : à relire et à modifier selon vos envies.
 
-- [ ] La course des tables — un petit renard court ; tape la bonne réponse de multiplication pour sauter les obstacles (calcul, 7+)
+- [x] La course des tables — un petit renard court ; tape la bonne réponse de multiplication pour sauter les obstacles (calcul, 7+) → course-des-tables
 - [ ] Ballons des lettres — une lettre est annoncée à l'écran, éclate les ballons qui la portent (lecture, 4+)
 - [ ] Memory de la ferme — retrouve les paires d'animaux de la ferme, de plus en plus de cartes (mémoire, 4+)
 - [ ] Le grand tour des planètes — remets les planètes du système solaire dans l'ordre, avec une info sur chacune (puzzle, 7+)
