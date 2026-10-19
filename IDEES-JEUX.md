@@ -12,4 +12,4 @@ Ajoutez, supprimez ou réordonnez librement les lignes. Format : `- [ ] Titre �
 - [ ] Quelle heure est-il ? — lis l'heure sur une horloge à aiguilles et choisis la bonne réponse (quiz, 6+)
 - [ ] Drapeaux du monde — reconnais le drapeau de pays d'Europe, puis du monde entier (quiz, 8+)
 - [ ] Coloriage magique — colorie un dessin case par case en suivant les numéros (création, 4+)
-- [ ] Le labyrinthe de la souris — guide la souris jusqu'au fromage, labyrinthes de plus en plus grands (réflexion, 5+)
+- [x] Le labyrinthe de la souris — guide la souris jusqu'au fromage, labyrinthes de plus en plus grands (réflexion, 5+) → labyrinthe-de-la-souris
