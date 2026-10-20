@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Les Pouvoirs Élémentaires</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; touch-action: none;
+    font-family: system-ui, sans-serif; color: #2a1d4a; background: #2b1f5c;
+    user-select: none; -webkit-user-select: none;
+  }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* Barre du haut : pause, niveau, cœurs, score, son */
+  #barre {
+    position: fixed; left: 0; right: 0; top: 0; z-index: 3; display: flex; align-items: center; gap: 6px;
+    padding: 6px 8px; padding-top: max(6px, env(safe-area-inset-top));
+    background: linear-gradient(#3a2a7a, #33246c); color: #fff; box-shadow: 0 2px 8px rgba(20,10,50,.35);
+  }
+  body.accueil #barre { display: none; }
+  .rond {
+    width: 44px; height: 44px; flex: none; border: none; border-radius: 14px; cursor: pointer;
+    background: rgba(255,255,255,.16); color: #fff; display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .rond svg { width: 24px; height: 24px; }
+  .rond:active { transform: scale(.92); }
+  #infos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  #titre-niv { font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #jauge { height: 10px; border-radius: 5px; background: rgba(255,255,255,.2); overflow: hidden; }
+  #jauge-in { height: 100%; width: 0; background: linear-gradient(90deg, #7ef0c8, #ffe066); transition: width .25s; }
+  #coeurs { font-size: 20px; letter-spacing: 1px; color: #ff5d7a; white-space: nowrap; }
+  #coeurs .vide { color: rgba(255,255,255,.25); }
+  #score { min-width: 58px; text-align: right; font-weight: 800; font-size: 19px; color: #ffe066; }
+  #score.pulse { animation: pulse .3s; }
+  @keyframes pulse { 50% { transform: scale(1.3); } }
+
+  /* Écrans par-dessus le jeu */
+  .ecran {
+    position: fixed; inset: 0; z-index: 5; display: none; flex-direction: column; align-items: center; justify-content: center;
+    padding: 14px; text-align: center;
+  }
+  .ecran.visible { display: flex; }
+  .ecran.fond { background: rgba(25,12,60,.55); }
+  .carte {
+    background: #fffaf0; border-radius: 22px; padding: 18px 16px; width: min(92vw, 390px); max-height: 94vh; overflow: auto;
+    box-shadow: 0 10px 30px rgba(10,0,40,.45); animation: arrivee .35s ease-out;
+  }
+  @keyframes arrivee { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .ecran h2 { margin: 0 0 6px; font-size: 28px; color: #5a33c8; }
+  .ecran p { margin: 6px 0; font-size: 17px; line-height: 1.35; }
+  .gros-bouton {
+    display: block; width: 100%; min-height: 54px; margin-top: 10px; border: none; border-radius: 16px; cursor: pointer;
+    font: inherit; font-size: 21px; font-weight: 800; color: #fff; background: linear-gradient(#5fdc7f, #26a84c); box-shadow: 0 4px 0 #157033;
+  }
+  .gros-bouton.bleu { background: linear-gradient(#8f7cff, #5a40e0); box-shadow: 0 4px 0 #36239a; }
+  .gros-bouton.gris { background: linear-gradient(#b4adc8, #857ea0); box-shadow: 0 4px 0 #5c5674; font-size: 18px; }
+  .gros-bouton:active { transform: translateY(3px); box-shadow: none; }
+  .gros-bouton[hidden] { display: none; }
+
+  /* Accueil : titre en haut, esprits animés au milieu (canvas), boutons en bas */
+  #ecran-accueil { justify-content: space-between; padding: 0; }
+  .acc-haut { width: 100%; padding: max(30px, env(safe-area-inset-top)) 54px 34px; background: linear-gradient(rgba(30,16,80,.92), rgba(30,16,80,0)); color: #fff; }
+  .acc-haut h1 { margin: 0; font-size: clamp(32px, 9.5vw, 64px); line-height: 1.02; text-shadow: 0 4px 0 #2a136b, 0 0 24px rgba(255,200,120,.5); }
+  .acc-haut h1 span { display: block; padding-top: .12em; line-height: 1.1; background: linear-gradient(90deg, #ff9a4a, #ffe066, #6fd6ff, #8ff0b0); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(0 4px 0 #2a136b); }
+  .acc-haut p { margin: 12px auto 0; font-size: 18px; max-width: 360px; line-height: 1.3; font-weight: 600; }
+  .acc-bas { width: 100%; padding: 30px 16px max(16px, env(safe-area-inset-bottom)); background: linear-gradient(rgba(30,16,80,0), rgba(30,16,80,.92)); color: #fff; }
+  .acc-bas .gros-bouton { max-width: 380px; margin: 10px auto 0; }
+  #btn-jouer { font-size: 26px; min-height: 62px; }
+  #stats-accueil { margin-top: 10px; font-size: 16px; font-weight: 700; }
+  #btn-son2 { position: absolute; top: max(10px, env(safe-area-inset-top)); right: 10px; }
+
+  /* Choix du niveau */
+  #grille { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0 4px; }
+  .case {
+    min-height: 62px; border: none; border-radius: 14px; cursor: pointer; font: inherit; font-size: 22px; font-weight: 800; color: #fff;
+    background: linear-gradient(#8f7cff, #5a40e0); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px;
+  }
+  .case small { font-size: 13px; color: #ffe066; letter-spacing: 1px; }
+  .case small .vide { color: rgba(255,255,255,.35); }
+  .case:disabled { background: #c9c3da; cursor: default; }
+
+  /* Recettes (pause) */
+  #recettes { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
+  .recette { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 16px; font-weight: 700; }
+  .recette canvas { position: static; width: 34px; height: 34px; }
+
+  /* Bilan */
+  #etoiles-bilan { font-size: 54px; height: 66px; margin: 4px 0; }
+  #etoiles-bilan span { display: inline-block; color: #ddd6ea; transform: scale(.5); transition: transform .35s cubic-bezier(.3,1.8,.5,1), color .2s; }
+  #etoiles-bilan span.gagnee { color: #ffc61a; transform: scale(1.1); text-shadow: 0 3px 0 #c98a00; }
+  #score-bilan { font-size: 36px; font-weight: 900; color: #5a33c8; }
+  #record-bilan { font-weight: 800; color: #e0601b; min-height: 24px; font-size: 17px; }
+  .regle { font-size: 14px !important; color: #6a5f86; }
+</style>
+</head>
+<body class="accueil">
+<canvas id="scene"></canvas>
+
+<div id="barre">
+  <button id="btn-pause" class="rond" aria-label="Pause">
+    <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="#fff"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="#fff"/></svg>
+  </button>
+  <div id="infos"><div id="titre-niv">Niveau 1</div><div id="jauge"><div id="jauge-in"></div></div></div>
+  <div id="coeurs"></div>
+  <div id="score">0</div>
+  <button id="btn-son" class="rond btn-son" aria-label="Couper le son"></button>
+</div>
+
+<div id="ecran-accueil" class="ecran visible">
+  <button id="btn-son2" class="rond btn-son" aria-label="Couper le son"></button>
+  <div class="acc-haut">
+    <h1>Les Pouvoirs <span>Élémentaires</span></h1>
+    <p>Mélange le feu, l'eau, la terre et l'air pour aider le village. Ensemble, c'est magique !</p>
+  </div>
+  <div class="acc-bas">
+    <button id="btn-jouer" class="gros-bouton">Jouer</button>
+    <button id="btn-niveaux" class="gros-bouton bleu">Choisir un niveau</button>
+    <div id="stats-accueil"></div>
+  </div>
+</div>
+
+<div id="ecran-niveaux" class="ecran fond">
+  <div class="carte">
+    <h2>Les niveaux</h2>
+    <div id="grille"></div>
+    <button id="btn-retour" class="gros-bouton gris">Retour</button>
+  </div>
+</div>
+
+<div id="ecran-pause" class="ecran fond">
+  <div class="carte">
+    <h2>Pause</h2>
+    <p>Les recettes magiques :</p>
+    <div id="recettes"></div>
+    <button id="btn-reprendre" class="gros-bouton">Reprendre</button>
+    <button id="btn-recommencer" class="gros-bouton bleu">Recommencer</button>
+    <button id="btn-quitter" class="gros-bouton gris">Les niveaux</button>
+  </div>
+</div>
+
+<div id="ecran-bilan" class="ecran fond">
+  <div class="carte">
+    <h2 id="titre-bilan">Bravo !</h2>
+    <p id="texte-bilan"></p>
+    <div id="etoiles-bilan"><span>★</span><span>★</span><span>★</span></div>
+    <div id="score-bilan">0</div>
+    <div id="record-bilan"></div>
+    <p class="regle">★★★ : garde tes 3 cœurs. Chaque bulle vide coûte un cœur.</p>
+    <button id="btn-suivant" class="gros-bouton">Niveau suivant</button>
+    <button id="btn-rejouer" class="gros-bouton bleu">Rejouer</button>
+    <button id="btn-bilan-niveaux" class="gros-bouton gris">Les niveaux</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Les Pouvoirs Élémentaires
+   Quatre esprits (feu, eau, terre, air). On en touche un ou deux pour
+   préparer un pouvoir dans l'orbe, puis on touche l'objet du village
+   qui en a besoin avant que sa bulle se vide.
+   ===================================================================== */
+
+const $ = (id) => document.getElementById(id);
+const cv = $('scene');
+const ctx = cv.getContext('2d');
+const AVEC_SOURIS = window.matchMedia && window.matchMedia('(hover: hover)').matches;
+
+/* ---------- Sauvegarde (toujours protégée : le cadre peut la refuser) ---------- */
+const CLE = 'pouvoirs-elementaires-v1';
+let sauve = { niv: {}, debloque: 1, son: true };
+try {
+  const s = JSON.parse(localStorage.getItem(CLE));
+  if (s && typeof s === 'object') sauve = Object.assign(sauve, s);
+} catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+function ecrire() { try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* tant pis */ } }
+
+/* ---------- Éléments, pouvoirs et recettes ---------- */
+const ELEMS = ['feu', 'eau', 'terre', 'air'];
+const NOMS = { feu: 'Feu', eau: 'Eau', terre: 'Terre', air: 'Air', vapeur: 'Vapeur', pousse: 'Pousse',
+  brique: 'Brique', eclair: 'Éclair', pluie: 'Pluie', graines: 'Graines' };
+const ESPRITS = { feu: 'Flammèche', eau: 'Gouttine', terre: 'Caillou', air: 'Zéphyr' };
+const RECETTES = { vapeur: ['feu', 'eau'], pousse: ['eau', 'terre'], brique: ['feu', 'terre'],
+  eclair: ['feu', 'air'], pluie: ['eau', 'air'], graines: ['terre', 'air'] };
+const OBJETS = { eau: 'la plante', feu: 'le feu de camp', terre: 'le trou', air: 'le moulin', vapeur: 'le petit train',
+  pousse: 'la terre nue', brique: 'la maison', eclair: 'le lampadaire', pluie: 'le champ sec', graines: 'le champ vide' };
+const COUL = { feu: '#ff7a2f', eau: '#2f9bff', terre: '#a8713c', air: '#35c2b5', vapeur: '#b9c8d8', pousse: '#3fae45',
+  brique: '#d0563f', eclair: '#ffcc1a', pluie: '#4f95dd', graines: '#d6aa4a' };
+// Niveau où chaque pouvoir apparaît (sert aux indices).
+const INTRO = { eau: 1, feu: 1, terre: 2, air: 2, vapeur: 3, pousse: 3, eclair: 5, brique: 5, pluie: 6, graines: 6 };
+
+function melange(a, b) {
+  if (!b || a === b) return a;
+  for (const p in RECETTES) {
+    const r = RECETTES[p];
+    if ((r[0] === a && r[1] === b) || (r[0] === b && r[1] === a)) return p;
+  }
+  return a;
+}
+
+/* ---------- Les 12 niveaux ----------
+   n : besoins à satisfaire ; max : bulles en même temps ; pat : patience (s) ;
+   ecart : temps entre deux bulles ; neufs : pouvoirs mis en avant ;
+   grisou / dodo : secondes entre deux apparitions ; doubles / dore : probabilités. */
+const SIMPLES = ['eau', 'feu', 'terre', 'air'];
+const C1 = [...SIMPLES, 'vapeur', 'pousse'];
+const C2 = [...C1, 'eclair', 'brique'];
+const TOUS = [...C2, 'pluie', 'graines'];
+const NIVEAUX = [
+  { nom: 'Premières gouttes', n: 7, max: 1, pat: 14, ecart: 1.0, pouvoirs: ['eau', 'feu'], neufs: [], tuto: 'base', premier: 'eau' },
+  { nom: 'Les quatre amis', n: 9, max: 2, pat: 13, ecart: 2.4, pouvoirs: SIMPLES, neufs: ['terre', 'air'], tuto: 'quatre', premier: 'terre' },
+  { nom: 'Ensemble !', n: 10, max: 2, pat: 15, ecart: 2.6, pouvoirs: C1, neufs: ['vapeur', 'pousse'], tuto: 'combo', premier: 'vapeur' },
+  { nom: 'Le marché', n: 12, max: 3, pat: 13, ecart: 2.2, pouvoirs: C1, neufs: ['vapeur', 'pousse'] },
+  { nom: 'La nuit tombe', n: 12, max: 3, pat: 14, ecart: 2.3, pouvoirs: C2, neufs: ['eclair', 'brique'], tuto: 'recettes1' },
+  { nom: 'Jour de pluie', n: 14, max: 3, pat: 13, ecart: 2.1, pouvoirs: TOUS, neufs: ['pluie', 'graines'], tuto: 'recettes2' },
+  { nom: 'Grisou boude', n: 14, max: 3, pat: 13, ecart: 2.1, pouvoirs: TOUS, neufs: [], grisou: 7, tuto: 'grisou' },
+  { nom: 'Deux fois plus', n: 14, max: 3, pat: 13, ecart: 2.3, pouvoirs: TOUS, neufs: [], doubles: 0.4, grisou: 11, tuto: 'double' },
+  { nom: 'Bulles dorées', n: 16, max: 4, pat: 12, ecart: 1.9, pouvoirs: TOUS, neufs: [], doubles: 0.2, dore: 0.25, grisou: 10, tuto: 'dore' },
+  { nom: 'Qui dort ?', n: 16, max: 4, pat: 12, ecart: 1.9, pouvoirs: TOUS, neufs: [], doubles: 0.25, dore: 0.15, dodo: 8, tuto: 'dodo' },
+  { nom: 'Tous ensemble', n: 18, max: 4, pat: 11, ecart: 1.7, pouvoirs: TOUS, neufs: [], doubles: 0.3, dore: 0.2, grisou: 8, dodo: 10 },
+  { nom: 'La grande fête', n: 22, max: 5, pat: 10.5, ecart: 1.45, pouvoirs: TOUS, neufs: [], doubles: 0.35, dore: 0.25, grisou: 7, dodo: 9 },
+];
+
+/* ---------- Tutoriels animés (une main montre le geste) ----------
+   Chaque étape est une suite de touchers ; « carte » montre des recettes. */
+const TUTOS = {
+  base: { besoin: ['eau'], etapes: [
+    { taps: ['elem:eau'], texte: 'Touche Gouttine, l\'esprit de l\'eau.' },
+    { taps: ['spot'], texte: 'Puis touche la plante qui a soif !' }] },
+  quatre: { besoin: ['terre'], etapes: [
+    { taps: ['voir:terre', 'voir:air'], texte: 'Voici Caillou (terre) et Zéphyr (air) !' },
+    { taps: ['elem:terre', 'spot'], texte: 'Regarde la bulle : elle montre le pouvoir à envoyer.' }] },
+  combo: { besoin: ['vapeur'], etapes: [
+    { taps: ['elem:feu'], texte: 'Ensemble, les esprits font de la magie !' },
+    { taps: ['elem:eau'], texte: 'Feu + Eau = Vapeur.' },
+    { taps: ['spot'], texte: 'Envoie la vapeur au petit train ! Touche l\'orbe pour la vider.' }] },
+  recettes1: { carte: ['eclair', 'brique'], texte: 'Deux nouvelles recettes !' },
+  recettes2: { carte: ['pluie', 'graines'], texte: 'Encore deux recettes !' },
+  grisou: { besoin: ['eau'], grisou: true, etapes: [
+    { taps: ['voir:grisou'], texte: 'Grisou le nuage boude et cache le village.' },
+    { taps: ['elem:air', 'grisou'], texte: 'Souffle-le avec Zéphyr (air) !' }] },
+  double: { besoin: ['eau', 'feu'], etapes: [
+    { taps: ['elem:eau', 'spot'], texte: 'Bulle double : envoie d\'abord le premier pouvoir…' },
+    { taps: ['elem:feu', 'spot'], texte: '… puis le second !' }] },
+  dore: { besoin: ['feu'], dore: true, etapes: [
+    { taps: ['elem:feu', 'spot'], texte: 'Bulle dorée : elle se vide vite, mais rapporte 2 fois plus de points !' }] },
+  dodo: { besoin: ['terre'], dodo: 'terre', etapes: [
+    { taps: ['elem:terre', 'elem:terre', 'elem:terre'], texte: 'Un esprit s\'endort parfois. Touche-le 3 fois pour le réveiller !' }] },
+};
+
+/* ---------- Sons (Web Audio, aucun avant la première action) ---------- */
+let ac = null;
+function audio() {
+  if (!sauve.son) return null;
+  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (ac.state === 'suspended') ac.resume().catch(() => {});
+  return ac;
+}
+function bip(f, d, type = 'sine', v = 0.15, f2 = 0, delai = 0) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delai;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g); g.connect(a.destination);
+  o.start(t); o.stop(t + d + 0.05);
+}
+function bruit(d, f1, f2, v = 0.2) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime;
+  const buf = a.createBuffer(1, Math.floor(a.sampleRate * d), a.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const src = a.createBufferSource(); src.buffer = buf;
+  const fil = a.createBiquadFilter(); fil.type = 'bandpass'; fil.Q.value = 1.2;
+  fil.frequency.setValueAtTime(f1, t); fil.frequency.exponentialRampToValueAtTime(f2, t + d);
+  const g = a.createGain(); g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + d * 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  src.connect(fil); fil.connect(g); g.connect(a.destination); src.start(t); src.stop(t + d);
+}
+const SONS = {
+  feu: () => { bip(392, 0.16, 'triangle', 0.16); bruit(0.15, 1500, 600, 0.06); },
+  eau: () => bip(520, 0.2, 'sine', 0.2, 820),
+  terre: () => bip(196, 0.22, 'triangle', 0.22, 160),
+  air: () => { bip(660, 0.2, 'sine', 0.1, 990); bruit(0.25, 800, 2500, 0.05); },
+  melange: () => { bip(523, 0.14, 'sine', 0.12); bip(784, 0.18, 'sine', 0.12, 0, 0.07); bip(1047, 0.25, 'sine', 0.1, 0, 0.14); },
+  ok: () => [523, 659, 784, 1047].forEach((f, i) => bip(f, 0.16, 'triangle', 0.14, 0, i * 0.06)),
+  dore: () => [784, 988, 1175, 1568].forEach((f, i) => bip(f, 0.2, 'sine', 0.13, 0, i * 0.06)),
+  erreur: () => bip(240, 0.28, 'sine', 0.2, 140),
+  rate: () => { bip(440, 0.55, 'sawtooth', 0.05, 160); bip(330, 0.5, 'triangle', 0.1, 120); },
+  vide: () => bip(320, 0.08, 'sine', 0.08),
+  vider: () => bip(600, 0.12, 'sine', 0.08, 300),
+  toc: () => bip(720, 0.06, 'square', 0.05),
+  souffle: () => bruit(0.6, 400, 3000, 0.28),
+  grisou: () => { bip(180, 0.3, 'triangle', 0.12, 150); bip(150, 0.3, 'triangle', 0.1, 120, 0.25); },
+  dodo: () => { bip(500, 0.3, 'sine', 0.08, 300); bip(400, 0.35, 'sine', 0.07, 250, 0.3); },
+  reveil: () => [440, 660, 880].forEach((f, i) => bip(f, 0.1, 'square', 0.05, 0, i * 0.05)),
+  etoile: (i) => bip(880 + i * 220, 0.3, 'triangle', 0.16),
+  victoire: () => [523, 659, 784, 659, 784, 1047].forEach((f, i) => bip(f, i === 5 ? 0.5 : 0.16, 'triangle', 0.15, 0, i * 0.12)),
+  echec: () => [392, 349, 311, 262].forEach((f, i) => bip(f, 0.25, 'triangle', 0.13, 0, i * 0.17)),
+  clic: () => bip(660, 0.06, 'sine', 0.08),
+};
+function son(nom, x) { try { if (SONS[nom]) SONS[nom](x); } catch (e) { /* audio indisponible */ } }
+
+/* ---------- Outils de dessin ---------- */
+const PI = Math.PI;
+function rr(g, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  g.beginPath(); g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+function rond(g, x, y, r) { g.beginPath(); g.arc(x, y, Math.max(0, r), 0, PI * 2); }
+function ellipse(g, x, y, rx, ry, rot = 0) { g.beginPath(); g.ellipse(x, y, Math.max(0, rx), Math.max(0, ry), rot, 0, PI * 2); }
+function hex(c) { return [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)); }
+function mix(a, b, k) { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(',')})`; }
+function alea(t) { return t[Math.floor(Math.random() * t.length)]; }
+function lisse(k) { return k * k * (3 - 2 * k); }
+function lignes(g, texte, maxW) {
+  const mots = texte.replace(/ ([!?:;…])/g, ' $1').split(' '); const res = []; let l = '';
+  for (const m of mots) {
+    const essai = l ? l + ' ' + m : m;
+    if (g.measureText(essai).width > maxW && l) { res.push(l); l = m; } else l = essai;
+  }
+  if (l) res.push(l);
+  return res;
+}
+
+function flamme(g, x, y, r) {
+  g.beginPath(); g.moveTo(x, y - r);
+  g.bezierCurveTo(x + r * 0.5, y - r * 0.4, x + r * 0.85, y + r * 0.05, x + r * 0.8, y + r * 0.45);
+  g.bezierCurveTo(x + r * 0.75, y + r * 0.98, x - r * 0.75, y + r * 0.98, x - r * 0.8, y + r * 0.45);
+  g.bezierCurveTo(x - r * 0.85, y + r * 0.05, x - r * 0.5, y - r * 0.4, x, y - r);
+  g.closePath();
+}
+function goutte(g, x, y, r) {
+  g.beginPath(); g.moveTo(x, y - r);
+  g.bezierCurveTo(x + r * 0.2, y - r * 0.55, x + r * 0.78, y - r * 0.15, x + r * 0.78, y + r * 0.27);
+  g.arc(x, y + r * 0.27, r * 0.78, 0, PI, false);
+  g.bezierCurveTo(x - r * 0.78, y - r * 0.15, x - r * 0.2, y - r * 0.55, x, y - r);
+  g.closePath();
+}
+function nuage(g, x, y, r, bord, fond) {
+  const bulles = [[-0.5, 0.12, 0.38], [0, -0.15, 0.5], [0.5, 0.12, 0.38], [0, 0.22, 0.42]];
+  g.fillStyle = bord;
+  for (const [a, b, c] of bulles) { rond(g, x + a * r, y + b * r, c * r + r * 0.08); g.fill(); }
+  g.fillStyle = fond;
+  for (const [a, b, c] of bulles) { rond(g, x + a * r, y + b * r, c * r); g.fill(); }
+}
+function tourbillon(g, x, y, r, couleur) {
+  g.strokeStyle = couleur; g.lineWidth = Math.max(1.5, r * 0.14); g.lineCap = 'round';
+  g.beginPath(); g.moveTo(x - r * 0.65, y - r * 0.3); g.lineTo(x + r * 0.25, y - r * 0.3);
+  g.arc(x + r * 0.25, y - r * 0.5, r * 0.2, PI / 2, -PI * 0.9, true); g.stroke();
+  g.beginPath(); g.moveTo(x - r * 0.75, y + r * 0.05); g.lineTo(x + r * 0.45, y + r * 0.05);
+  g.arc(x + r * 0.45, y - r * 0.17, r * 0.22, PI / 2, -PI * 0.9, true); g.stroke();
+  g.beginPath(); g.moveTo(x - r * 0.55, y + r * 0.4); g.lineTo(x + r * 0.1, y + r * 0.4);
+  g.arc(x + r * 0.1, y + r * 0.6, r * 0.2, -PI / 2, PI * 0.9, false); g.stroke();
+}
+
+/* Icône d'un pouvoir, centrée en (x, y), de rayon r. */
+function icone(g, p, x, y, r) {
+  g.save(); g.lineJoin = 'round'; g.lineCap = 'round';
+  switch (p) {
+    case 'feu':
+      g.fillStyle = '#ff6a1f'; flamme(g, x, y, r); g.fill();
+      g.fillStyle = '#ffd23f'; flamme(g, x, y + r * 0.35, r * 0.55); g.fill();
+      break;
+    case 'eau':
+      g.fillStyle = '#2f9bff'; goutte(g, x, y, r); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.7)'; ellipse(g, x - r * 0.35, y + r * 0.05, r * 0.12, r * 0.24, 0.4); g.fill();
+      break;
+    case 'terre':
+      g.fillStyle = '#a8713c'; g.strokeStyle = '#6e4520'; g.lineWidth = Math.max(1, r * 0.08);
+      g.beginPath();
+      [[-0.85, 0.6], [-0.65, -0.2], [-0.1, -0.62], [0.5, -0.45], [0.88, 0.15], [0.7, 0.65]].forEach(([a, b], i) => i ? g.lineTo(x + a * r, y + b * r) : g.moveTo(x + a * r, y + b * r));
+      g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#c99158'; g.beginPath(); g.moveTo(x - r * 0.6, y - r * 0.15); g.lineTo(x - r * 0.1, y - r * 0.55); g.lineTo(x + r * 0.1, y - r * 0.05); g.closePath(); g.fill();
+      g.fillStyle = '#5bbf4a'; ellipse(g, x + r * 0.45, y - r * 0.48, r * 0.28, r * 0.12, -0.3); g.fill();
+      break;
+    case 'air':
+      g.fillStyle = '#d9f6f2'; rond(g, x, y, r * 0.95); g.fill();
+      tourbillon(g, x, y, r, '#21a596');
+      break;
+    case 'vapeur': // trois volutes de vapeur qui montent d'une petite marmite
+      g.fillStyle = '#5a6a8a'; rr(g, x - r * 0.6, y + r * 0.45, r * 1.2, r * 0.5, r * 0.18); g.fill();
+      g.fillStyle = '#7c8db0'; rr(g, x - r * 0.72, y + r * 0.38, r * 1.44, r * 0.16, r * 0.08); g.fill();
+      g.strokeStyle = '#8fa6c4'; g.lineWidth = Math.max(2, r * 0.17);
+      for (let i = -1; i <= 1; i++) {
+        const bx = x + i * r * 0.38;
+        g.beginPath(); g.moveTo(bx, y + r * 0.28);
+        g.bezierCurveTo(bx + r * 0.25, y + r * 0.05, bx - r * 0.25, y - r * 0.3, bx, y - r * 0.55 - (i === 0 ? r * 0.2 : 0)); g.stroke();
+      }
+      break;
+    case 'pousse':
+      g.fillStyle = '#8a5a33'; ellipse(g, x, y + r * 0.72, r * 0.72, r * 0.26); g.fill();
+      g.strokeStyle = '#2f8a35'; g.lineWidth = Math.max(1.5, r * 0.14);
+      g.beginPath(); g.moveTo(x, y + r * 0.6); g.lineTo(x, y - r * 0.2); g.stroke();
+      g.fillStyle = '#3fae45'; g.lineWidth = Math.max(1, r * 0.06);
+      ellipse(g, x - r * 0.36, y - r * 0.25, r * 0.4, r * 0.2, -0.5); g.fill(); g.stroke();
+      ellipse(g, x + r * 0.36, y - r * 0.5, r * 0.4, r * 0.2, 0.5); g.fill(); g.stroke();
+      break;
+    case 'brique':
+      g.fillStyle = '#d0563f'; g.strokeStyle = '#7a2a1d'; g.lineWidth = Math.max(1, r * 0.08);
+      rr(g, x - r * 0.9, y - r * 0.6, r * 1.8, r * 1.2, r * 0.12); g.fill(); g.stroke();
+      g.strokeStyle = '#f3dcc0'; g.lineWidth = Math.max(1, r * 0.09);
+      g.beginPath(); g.moveTo(x - r * 0.85, y); g.lineTo(x + r * 0.85, y);
+      g.moveTo(x, y - r * 0.55); g.lineTo(x, y);
+      g.moveTo(x - r * 0.45, y); g.lineTo(x - r * 0.45, y + r * 0.55);
+      g.moveTo(x + r * 0.45, y); g.lineTo(x + r * 0.45, y + r * 0.55); g.stroke();
+      break;
+    case 'eclair':
+      g.fillStyle = '#ffd23f'; g.strokeStyle = '#d18a00'; g.lineWidth = Math.max(1, r * 0.08);
+      g.beginPath();
+      [[0.2, -1], [-0.55, 0.12], [-0.05, 0.12], [-0.25, 1], [0.58, -0.2], [0.08, -0.2]].forEach(([a, b], i) => i ? g.lineTo(x + a * r, y + b * r) : g.moveTo(x + a * r, y + b * r));
+      g.closePath(); g.fill(); g.stroke();
+      break;
+    case 'pluie':
+      nuage(g, x, y - r * 0.35, r * 0.8, '#5d7fa8', '#d3e1f2');
+      g.strokeStyle = '#2f7fe0'; g.lineWidth = Math.max(1.5, r * 0.12);
+      for (let i = -1; i <= 1; i++) {
+        g.beginPath(); g.moveTo(x + i * r * 0.38 + r * 0.08, y + r * 0.3); g.lineTo(x + i * r * 0.38 - r * 0.06, y + r * 0.85); g.stroke();
+      }
+      break;
+    case 'graines':
+      g.strokeStyle = 'rgba(33,165,150,.6)'; g.lineWidth = Math.max(1, r * 0.08);
+      g.beginPath(); g.moveTo(x - r * 0.9, y - r * 0.55); g.quadraticCurveTo(x, y - r * 0.85, x + r * 0.8, y - r * 0.6); g.stroke();
+      g.fillStyle = '#d9b35a'; g.strokeStyle = '#8a6420'; g.lineWidth = Math.max(1, r * 0.07);
+      [[-0.45, -0.1, 0.4], [0.15, -0.25, -0.5], [0.5, 0.3, 0.9], [-0.15, 0.4, -0.2], [-0.6, 0.55, 0.6]].forEach(([a, b, rot]) => {
+        ellipse(g, x + a * r, y + b * r, r * 0.24, r * 0.15, rot); g.fill(); g.stroke();
+      });
+      break;
+  }
+  g.restore();
+}
+
+/* Visage d'un esprit. */
+function visage(g, x, y, r, dort, joie) {
+  const dx = r * 0.26, er = r * 0.11;
+  g.save(); g.lineCap = 'round';
+  if (dort) {
+    g.strokeStyle = '#2a1d3a'; g.lineWidth = Math.max(1.5, r * 0.07);
+    g.beginPath(); g.arc(x - dx, y, er, 0.1, PI - 0.1); g.stroke();
+    g.beginPath(); g.arc(x + dx, y, er, 0.1, PI - 0.1); g.stroke();
+  } else {
+    g.fillStyle = '#2a1d3a'; rond(g, x - dx, y, er); g.fill(); rond(g, x + dx, y, er); g.fill();
+    g.fillStyle = '#fff'; rond(g, x - dx + er * 0.35, y - er * 0.35, er * 0.38); g.fill(); rond(g, x + dx + er * 0.35, y - er * 0.35, er * 0.38); g.fill();
+  }
+  g.fillStyle = 'rgba(255,110,140,.45)'; rond(g, x - dx * 1.6, y + r * 0.16, er * 0.9); g.fill(); rond(g, x + dx * 1.6, y + r * 0.16, er * 0.9); g.fill();
+  g.strokeStyle = '#2a1d3a'; g.lineWidth = Math.max(1.5, r * 0.07);
+  g.beginPath();
+  if (dort) { g.arc(x, y + r * 0.26, r * 0.07, 0, PI * 2); }
+  else g.arc(x, y + r * 0.12, r * (joie ? 0.2 : 0.14), 0.2 * PI, 0.8 * PI);
+  g.stroke(); g.restore();
+}
+
+/* Un esprit : l'icône de son élément avec un visage. */
+function esprit(g, e, x, y, r, dort = false, joie = false) {
+  if (e === 'air') {
+    g.fillStyle = '#c4f2ec'; g.strokeStyle = '#21a596'; g.lineWidth = Math.max(1.5, r * 0.07);
+    rond(g, x, y + r * 0.1, r * 0.8); g.fill(); g.stroke();
+    tourbillon(g, x + r * 0.05, y - r * 0.68, r * 0.42, '#21a596');
+    visage(g, x, y + r * 0.1, r * 0.85, dort, joie);
+  } else {
+    icone(g, e, x, y, r);
+    const dy = { feu: 0.38, eau: 0.32, terre: 0.12 }[e];
+    visage(g, x, y + r * dy, r * 0.72, dort, joie);
+  }
+}
+
+/* Petite main qui montre le geste du tutoriel (bout du doigt en x, y). */
+function main(g, x, y, appui) {
+  g.save(); g.translate(x, y); g.rotate(-0.4);
+  const k = appui ? 0.88 : 1; g.scale(k, k);
+  g.fillStyle = '#fff'; g.strokeStyle = '#3a2a6b'; g.lineWidth = 2.5;
+  rr(g, -15, 22, 34, 30, 11); g.fill(); g.stroke();
+  rr(g, -6, 0, 12, 32, 6); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(6, 30); g.lineTo(6, 40); g.moveTo(12, 31); g.lineTo(12, 40); g.stroke();
+  g.restore();
+}
+
+/* ---------- Objets du village (k : 0 = a besoin, 1 = réparé) ----------
+   (x, sol) : milieu du sol de l'objet ; u : unité (taille / 100). */
+function objet(g, type, x, sol, u, k, t) {
+  g.save(); g.lineJoin = 'round'; g.lineCap = 'round';
+  switch (type) {
+    case 'eau': { // plante fanée → fleurie
+      const tigeX = x + 18 * u * (1 - k), tigeY = sol - 38 * u - 26 * u * k;
+      g.strokeStyle = mix('#8d9a4a', '#3d9a3a', k); g.lineWidth = 3.5 * u;
+      g.beginPath(); g.moveTo(x, sol - 26 * u); g.quadraticCurveTo(x + 2 * u * (1 - k), sol - 50 * u - 6 * u * k, tigeX, tigeY); g.stroke();
+      g.fillStyle = mix('#a5a85a', '#4cb84a', k);
+      ellipse(g, x - 7 * u, sol - 36 * u, 8 * u, 3.5 * u, -0.5 + (1 - k) * 0.6); g.fill();
+      ellipse(g, x + 7 * u, sol - 42 * u, 8 * u, 3.5 * u, 0.5 + (1 - k) * 0.5); g.fill();
+      g.fillStyle = mix('#b59a7a', '#ff6fa8', k);
+      const pr = (4 + 2.5 * k) * u;
+      for (let i = 0; i < 5; i++) { const a = i * PI * 2 / 5 + t * k * 0.5; rond(g, tigeX + Math.cos(a) * pr, tigeY + Math.sin(a) * pr, pr * 0.85); g.fill(); }
+      g.fillStyle = '#ffd23f'; rond(g, tigeX, tigeY, pr * 0.7); g.fill();
+      g.fillStyle = '#d9774a'; g.beginPath(); g.moveTo(x - 14 * u, sol - 22 * u); g.lineTo(x + 14 * u, sol - 22 * u); g.lineTo(x + 10 * u, sol); g.lineTo(x - 10 * u, sol); g.closePath(); g.fill();
+      g.fillStyle = '#b85a33'; rr(g, x - 16 * u, sol - 27 * u, 32 * u, 6 * u, 2 * u); g.fill();
+      break;
+    }
+    case 'feu': { // feu de camp éteint → allumé
+      g.fillStyle = '#9a9aa8';
+      for (let i = -2; i <= 2; i++) { ellipse(g, x + i * 10 * u, sol - 3 * u, 6 * u, 4 * u); g.fill(); }
+      g.fillStyle = '#7a4a26';
+      for (const a of [0.35, -0.35]) { g.save(); g.translate(x, sol - 8 * u); g.rotate(a); rr(g, -19 * u, -3.5 * u, 38 * u, 7 * u, 3 * u); g.fill(); g.restore(); }
+      if (k > 0) {
+        const f = 1 + 0.07 * Math.sin(t * 13);
+        g.globalAlpha = 0.35 * k; g.fillStyle = '#ffb347'; rond(g, x, sol - 22 * u, 26 * u * k); g.fill(); g.globalAlpha = 1;
+        icone(g, 'feu', x, sol - 24 * u * k, 18 * u * k * f);
+      } else {
+        for (let i = 0; i < 3; i++) {
+          const ph = (t * 0.4 + i / 3) % 1;
+          g.fillStyle = `rgba(140,140,160,${0.5 * (1 - ph)})`; rond(g, x + Math.sin(ph * 6 + i) * 4 * u, sol - 14 * u - ph * 28 * u, (3 + ph * 5) * u); g.fill();
+        }
+      }
+      break;
+    }
+    case 'terre': { // trou dans le chemin → réparé
+      g.fillStyle = '#e8cf9a'; rr(g, x - 36 * u, sol - 14 * u, 72 * u, 16 * u, 7 * u); g.fill();
+      g.fillStyle = '#4a3320'; ellipse(g, x, sol - 6 * u, 16 * u * (1 - k), 6 * u * (1 - k)); g.fill();
+      if (k < 1) {
+        g.globalAlpha = 1 - k;
+        g.strokeStyle = '#6b4a2a'; g.lineWidth = 2.5 * u; g.beginPath(); g.moveTo(x - 28 * u, sol - 6 * u); g.lineTo(x - 28 * u, sol - 34 * u); g.stroke();
+        g.fillStyle = '#ff8a2a'; g.beginPath(); g.moveTo(x - 28 * u, sol - 34 * u); g.lineTo(x - 14 * u, sol - 29 * u); g.lineTo(x - 28 * u, sol - 24 * u); g.closePath(); g.fill();
+        g.globalAlpha = 1;
+      }
+      if (k > 0) {
+        g.strokeStyle = '#3d9a3a'; g.lineWidth = 2 * u; g.beginPath(); g.moveTo(x, sol - 8 * u); g.lineTo(x, sol - 8 * u - 14 * u * k); g.stroke();
+        g.fillStyle = '#ffd23f'; rond(g, x, sol - 8 * u - 14 * u * k, 4 * u * k); g.fill();
+      }
+      break;
+    }
+    case 'air': { // moulin arrêté → qui tourne
+      g.fillStyle = '#f3ead7'; g.strokeStyle = '#b49b78'; g.lineWidth = 1.5 * u;
+      g.beginPath(); g.moveTo(x - 10 * u, sol - 40 * u); g.lineTo(x + 10 * u, sol - 40 * u); g.lineTo(x + 16 * u, sol); g.lineTo(x - 16 * u, sol); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#8a5a33'; rr(g, x - 4 * u, sol - 12 * u, 8 * u, 12 * u, 3 * u); g.fill();
+      g.fillStyle = '#c9483a'; g.beginPath(); g.moveTo(x - 13 * u, sol - 39 * u); g.lineTo(x + 13 * u, sol - 39 * u); g.lineTo(x, sol - 50 * u); g.closePath(); g.fill();
+      const ang = t * 4 * k + 0.3;
+      g.save(); g.translate(x, sol - 42 * u); g.rotate(ang);
+      g.fillStyle = '#fff8ea'; g.strokeStyle = '#a08560'; g.lineWidth = 1.2 * u;
+      for (let i = 0; i < 4; i++) { g.rotate(PI / 2); rr(g, 2 * u, -3 * u, 22 * u, 6.5 * u, 1.5 * u); g.fill(); g.stroke(); }
+      g.restore();
+      g.fillStyle = '#6b4a2a'; rond(g, x, sol - 42 * u, 3 * u); g.fill();
+      break;
+    }
+    case 'vapeur': { // petit train froid → qui fume
+      const b = Math.sin(t * 22) * 0.7 * u * k;
+      g.strokeStyle = '#8a5a33'; g.lineWidth = 2.5 * u; g.beginPath(); g.moveTo(x - 38 * u, sol - 1 * u); g.lineTo(x + 38 * u, sol - 1 * u); g.stroke();
+      g.fillStyle = '#3b6fd8'; rr(g, x - 30 * u, sol - 27 * u + b, 40 * u, 18 * u, 4 * u); g.fill();
+      g.fillStyle = '#2b55b0'; rr(g, x + 6 * u, sol - 40 * u + b, 20 * u, 31 * u, 3 * u); g.fill();
+      g.fillStyle = '#e04a3a'; rr(g, x + 3 * u, sol - 44 * u + b, 26 * u, 5 * u, 2 * u); g.fill();
+      g.fillStyle = '#bfe6ff'; rr(g, x + 10 * u, sol - 36 * u + b, 12 * u, 9 * u, 2 * u); g.fill();
+      g.fillStyle = '#333a55'; rr(g, x - 25 * u, sol - 38 * u + b, 8 * u, 12 * u, 2 * u); g.fill();
+      g.fillStyle = '#ffd23f'; rond(g, x - 31 * u, sol - 19 * u + b, 3 * u); g.fill();
+      g.fillStyle = '#333a55';
+      for (const dx of [-22, -8, 17]) { rond(g, x + dx * u, sol - 7 * u, 6 * u); g.fill(); }
+      g.fillStyle = '#c9d0e0';
+      for (const dx of [-22, -8, 17]) { rond(g, x + dx * u, sol - 7 * u, 2.2 * u); g.fill(); }
+      if (k > 0) for (let i = 0; i < 3; i++) {
+        const ph = (t * 0.9 + i / 3) % 1;
+        g.fillStyle = `rgba(255,255,255,${0.9 * (1 - ph) * k})`;
+        rond(g, x - 21 * u - ph * 16 * u, sol - 42 * u - ph * 26 * u, (4 + ph * 7) * u); g.fill();
+      }
+      break;
+    }
+    case 'pousse': { // terre nue → petit arbre
+      g.fillStyle = '#8a5a33'; ellipse(g, x, sol - 5 * u, 28 * u, 9 * u); g.fill();
+      g.fillStyle = '#6e4520'; rond(g, x - 12 * u, sol - 7 * u, 2 * u); g.fill(); rond(g, x + 9 * u, sol - 4 * u, 2.5 * u); g.fill();
+      if (k > 0) {
+        g.fillStyle = '#7a4a26'; rr(g, x - 3 * u, sol - 8 * u - 28 * u * k, 6 * u, 28 * u * k, 2 * u); g.fill();
+        g.fillStyle = '#3fae45';
+        rond(g, x, sol - 40 * u * k, 16 * u * k); g.fill();
+        rond(g, x - 11 * u * k, sol - 32 * u * k, 10 * u * k); g.fill();
+        rond(g, x + 11 * u * k, sol - 33 * u * k, 10 * u * k); g.fill();
+        g.fillStyle = '#ff5d5d'; rond(g, x + 6 * u * k, sol - 42 * u * k, 2.5 * u * k); g.fill(); rond(g, x - 7 * u * k, sol - 36 * u * k, 2.5 * u * k); g.fill();
+      } else {
+        g.strokeStyle = '#6e4520'; g.lineWidth = 1.5 * u;
+        g.beginPath(); g.moveTo(x - 6 * u, sol - 10 * u); g.lineTo(x - 2 * u, sol - 7 * u); g.lineTo(x + 3 * u, sol - 11 * u); g.stroke();
+      }
+      break;
+    }
+    case 'brique': { // maison au mur cassé → réparée
+      g.fillStyle = '#f2d9a6'; rr(g, x - 26 * u, sol - 34 * u, 52 * u, 34 * u, 2 * u); g.fill();
+      g.fillStyle = '#c4513f'; g.beginPath(); g.moveTo(x - 32 * u, sol - 33 * u); g.lineTo(x + 32 * u, sol - 33 * u); g.lineTo(x, sol - 54 * u); g.closePath(); g.fill();
+      g.fillStyle = '#8a5a33'; rr(g, x + 6 * u, sol - 19 * u, 12 * u, 19 * u, 3 * u); g.fill();
+      g.fillStyle = '#bfe6ff'; rr(g, x - 20 * u, sol - 28 * u, 10 * u, 9 * u, 1.5 * u); g.fill();
+      if (k < 1) {
+        g.globalAlpha = 1 - k; g.fillStyle = '#4a3320';
+        g.beginPath();
+        [[-8, -24], [0, -27], [-2, -20], [3, -14], [-4, -8], [-12, -11], [-14, -18]].forEach(([a, b], i) => i ? g.lineTo(x + a * u, sol + b * u) : g.moveTo(x + a * u, sol + b * u));
+        g.closePath(); g.fill(); g.globalAlpha = 1;
+      }
+      if (k > 0) {
+        g.globalAlpha = k; g.fillStyle = '#d0563f'; g.strokeStyle = '#f3dcc0'; g.lineWidth = 1 * u;
+        for (const [a, b] of [[-14, -26], [-6, -26], [-10, -20], [-2, -20], [-14, -14], [-6, -14]]) { g.fillRect(x + a * u, sol + b * u, 8 * u, 5.5 * u); g.strokeRect(x + a * u, sol + b * u, 8 * u, 5.5 * u); }
+        g.globalAlpha = 1;
+      }
+      break;
+    }
+    case 'eclair': { // lampadaire éteint → allumé
+      if (k > 0) {
+        const grad = g.createRadialGradient(x, sol - 52 * u, 2, x, sol - 52 * u, 32 * u);
+        grad.addColorStop(0, `rgba(255,230,110,${0.75 * k})`); grad.addColorStop(1, 'rgba(255,230,110,0)');
+        g.fillStyle = grad; rond(g, x, sol - 52 * u, 32 * u); g.fill();
+      }
+      g.fillStyle = '#4a4766'; rr(g, x - 2.5 * u, sol - 50 * u, 5 * u, 50 * u, 2 * u); g.fill();
+      rr(g, x - 8 * u, sol - 5 * u, 16 * u, 5 * u, 2 * u); g.fill();
+      g.beginPath(); g.moveTo(x - 9 * u, sol - 58 * u); g.lineTo(x + 9 * u, sol - 58 * u); g.lineTo(x + 5 * u, sol - 62 * u); g.lineTo(x - 5 * u, sol - 62 * u); g.closePath(); g.fill();
+      g.fillStyle = mix('#77778f', '#ffe46b', k); rr(g, x - 7 * u, sol - 58 * u, 14 * u, 10 * u, 3 * u); g.fill();
+      break;
+    }
+    case 'pluie': { // champ sec → vert
+      if (k > 0 && k < 1) {
+        g.strokeStyle = 'rgba(47,127,224,.8)'; g.lineWidth = 2 * u;
+        for (let i = 0; i < 7; i++) { const yy = sol - 50 * u + ((t * 90 + i * 23) % 40) * u; g.beginPath(); g.moveTo(x - 30 * u + i * 10 * u, yy); g.lineTo(x - 32 * u + i * 10 * u, yy + 6 * u); g.stroke(); }
+      }
+      g.fillStyle = mix('#d8b56a', '#6cc04a', k); rr(g, x - 36 * u, sol - 16 * u, 72 * u, 16 * u, 6 * u); g.fill();
+      if (k < 1) {
+        g.globalAlpha = 1 - k; g.strokeStyle = '#9a7432'; g.lineWidth = 1.5 * u;
+        g.beginPath(); g.moveTo(x - 26 * u, sol - 10 * u); g.lineTo(x - 18 * u, sol - 6 * u); g.lineTo(x - 10 * u, sol - 11 * u); g.lineTo(x - 2 * u, sol - 5 * u);
+        g.moveTo(x + 6 * u, sol - 12 * u); g.lineTo(x + 14 * u, sol - 7 * u); g.lineTo(x + 24 * u, sol - 10 * u); g.stroke();
+        g.strokeStyle = '#b89a4a'; g.lineWidth = 2 * u;
+        for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(x + i * 13 * u, sol - 15 * u); g.quadraticCurveTo(x + i * 13 * u + 3 * u, sol - 22 * u, x + i * 13 * u + 7 * u, sol - 19 * u); g.stroke(); }
+        g.globalAlpha = 1;
+      }
+      if (k > 0) {
+        g.strokeStyle = '#2f8a35'; g.lineWidth = 2.5 * u;
+        for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(x + i * 13 * u, sol - 14 * u); g.lineTo(x + i * 13 * u - 2 * u, sol - 14 * u - 12 * u * k); g.moveTo(x + i * 13 * u + 3 * u, sol - 14 * u); g.lineTo(x + i * 13 * u + 6 * u, sol - 14 * u - 9 * u * k); g.stroke(); }
+      }
+      break;
+    }
+    case 'graines': { // champ labouré vide → fleurs
+      g.fillStyle = '#7a4f2c'; rr(g, x - 36 * u, sol - 15 * u, 72 * u, 15 * u, 6 * u); g.fill();
+      g.strokeStyle = '#5a361c'; g.lineWidth = 2 * u;
+      for (const yy of [-11, -6]) { g.beginPath(); g.moveTo(x - 30 * u, sol + yy * u); g.lineTo(x + 30 * u, sol + yy * u); g.stroke(); }
+      if (k > 0) {
+        for (let i = -2; i <= 2; i++) {
+          const fx = x + i * 13 * u, h = (16 + (i & 1) * 6) * u * k;
+          g.strokeStyle = '#2f8a35'; g.lineWidth = 2 * u; g.beginPath(); g.moveTo(fx, sol - 9 * u); g.lineTo(fx, sol - 9 * u - h); g.stroke();
+          g.fillStyle = '#ffcf33'; rond(g, fx, sol - 9 * u - h, 5 * u * k); g.fill();
+          g.fillStyle = '#8a5a33'; rond(g, fx, sol - 9 * u - h, 2 * u * k); g.fill();
+        }
+      } else {
+        g.fillStyle = '#b48a5a'; g.font = `700 ${Math.round(14 * u)}px system-ui, sans-serif`; g.textAlign = 'center';
+        g.fillText('?', x + 24 * u, sol - 20 * u);
+      }
+      break;
+    }
+  }
+  g.restore();
+}
+
+/* Grisou, le nuage boudeur. */
+function dessinerGrisou(g, gr, s, t) {
+  const r = s * 0.5;
+  const surpris = gr.etat === 'part' && gr.souffle;
+  g.save();
+  if (gr.etat === 'part') g.globalAlpha = Math.max(0, 1 - gr.t * 0.9);
+  nuage(g, gr.x, gr.y, r, '#6f6f8a', '#a9a9c2');
+  const fy = gr.y + r * 0.05;
+  g.strokeStyle = '#3a3550'; g.lineWidth = Math.max(2, r * 0.06); g.lineCap = 'round';
+  if (surpris) {
+    g.fillStyle = '#3a3550'; rond(g, gr.x - r * 0.22, fy, r * 0.08); g.fill(); rond(g, gr.x + r * 0.22, fy, r * 0.08); g.fill();
+    rond(g, gr.x, fy + r * 0.25, r * 0.1); g.stroke();
+  } else {
+    g.beginPath(); g.moveTo(gr.x - r * 0.35, fy - r * 0.18); g.lineTo(gr.x - r * 0.12, fy - r * 0.1);
+    g.moveTo(gr.x + r * 0.35, fy - r * 0.18); g.lineTo(gr.x + r * 0.12, fy - r * 0.1); g.stroke();
+    g.fillStyle = '#3a3550'; rond(g, gr.x - r * 0.22, fy, r * 0.07); g.fill(); rond(g, gr.x + r * 0.22, fy, r * 0.07); g.fill();
+    g.beginPath(); g.arc(gr.x, fy + r * 0.32, r * 0.14, 1.15 * PI, 1.85 * PI); g.stroke();
+    // petites gouttes de bouderie
+    g.fillStyle = 'rgba(80,80,110,.6)';
+    for (let i = 0; i < 2; i++) { const ph = (t * 0.8 + i * 0.5) % 1; rond(g, gr.x + (i ? r * 0.5 : -r * 0.45), gr.y + r * 0.5 + ph * r * 0.5, r * 0.05); g.fill(); }
+  }
+  g.restore();
+}
+
+/* =====================================================================
+   État du jeu
+   ===================================================================== */
+let W = 0, H = 0, DPR = 1, barH = 0, gw = 0, gx = 0, panelY = 0, panelH = 0;
+let etat = 'accueil';            // accueil | tuto | jeu | pause | bilan
+let nivIdx = 0, cfg = NIVEAUX[0];
+const spots = Array.from({ length: 6 }, () => ({ besoin: null, objet: null, fini: 0, triste: 0, pop: 0, vibre: 0 }));
+let elems = [], orbeP = { x: 0, y: 0, r: 30 }, tutoSpot = 2;
+let orbe = [], orbePop = 0, indiceOrbe = 0;
+let coeurs = 3, score = 0, scoreAff = 0, serie = 0, faits = 0, rates = 0, apparus = 0, erreurs = 0;
+let prochain = 0, finT = 0, banniere = 0, temps = 0, secousse = 0, selection = -1;
+let grisou = null, grisouT = 0, dodo = { elem: null, t: 0, touches: 0 }, dodoT = 0;
+let particules = [], textes = [], vols = [], tirs = [];
+let tutoT = 0;
+const tutoVus = new Set();
+
+/* ---------- Mise en page (s'adapte à l'écran) ---------- */
+function mise() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  barH = document.body.classList.contains('accueil') ? 0 : $('barre').offsetHeight;
+  gw = Math.min(W, 760); gx = (W - gw) / 2;
+  panelH = Math.max(160, Math.min(210, H * 0.25));
+  panelY = H - panelH;
+  const er = Math.max(27, Math.min(38, gw / 11));
+  const ey = H - er - 24;
+  const pas = Math.min(gw / 4, 120);
+  elems = ELEMS.map((e, i) => ({ e, x: W / 2 + (i - 1.5) * pas, y: ey, r: er }));
+  const libre = ey - er - panelY;
+  orbeP = { x: W / 2, y: panelY + libre / 2 + 2, r: Math.max(22, Math.min(34, libre / 2 - 6)) };
+  // Six emplacements : 2 × 3 en portrait, 3 × 2 en paysage.
+  const haut = barH + 6, bas = panelY - 4, sh = bas - haut;
+  const paysage = gw > sh * 1.15;
+  const cols = paysage ? 3 : 2, rows = paysage ? 2 : 3;
+  const cw = gw / cols, ch = sh / rows;
+  const s = Math.min(cw * 0.78, ch * 0.8, 170);
+  spots.forEach((sp, i) => {
+    const c = i % cols, r = Math.floor(i / cols);
+    Object.assign(sp, {
+      cx: gx + cw * (c + 0.5), cy: haut + ch * (r + 0.5), w: cw, h: ch, s,
+      sol: haut + ch * (r + 0.5) + s * 0.42, by: haut + ch * (r + 0.5) - s * 0.33, rb: Math.max(22, s * 0.2),
+    });
+  });
+  tutoSpot = paysage ? 4 : 2;
+}
+window.addEventListener('resize', mise);
+
+/* =====================================================================
+   Déroulement d'un niveau
+   ===================================================================== */
+function remiseAZero() {
+  spots.forEach((s) => Object.assign(s, { besoin: null, objet: null, fini: 0, triste: 0, pop: 0, vibre: 0 }));
+  orbe = []; coeurs = 3; score = 0; scoreAff = 0; serie = 0; faits = 0; rates = 0; apparus = 0; erreurs = 0;
+  prochain = 0.6; finT = 0; grisou = null; grisouT = cfg.grisou ? 5 : 0;
+  dodo = { elem: null, t: 0, touches: 0 }; dodoT = cfg.dodo ? 5 : 0;
+  selection = -1; particules = []; textes = []; vols = []; tirs = []; indiceOrbe = 0;
+  majBarre();
+}
+
+function lancerNiveau(i) {
+  nivIdx = Math.max(0, Math.min(NIVEAUX.length - 1, i)); cfg = NIVEAUX[nivIdx];
+  document.body.classList.remove('accueil');
+  cacherEcrans(); mise(); remiseAZero();
+  if (cfg.tuto && !tutoVus.has(cfg.tuto)) { etat = 'tuto'; tutoT = 0; }
+  else { etat = 'jeu'; banniere = 2; }
+}
+
+function finirTuto() {
+  tutoVus.add(cfg.tuto);
+  remiseAZero(); etat = 'jeu'; banniere = 2; son('clic');
+}
+
+function pouvoirOrbe() { return orbe.length === 2 ? melange(orbe[0], orbe[1]) : orbe[0]; }
+
+function choisirPouvoir() {
+  const neufs = cfg.neufs || [];
+  if (neufs.length && Math.random() < 0.4) return alea(neufs);
+  // Évite de demander trop souvent le même pouvoir que les bulles déjà là.
+  const deja = spots.filter((s) => s.besoin).map((s) => s.besoin.pouvoirs[s.besoin.i]);
+  let p = alea(cfg.pouvoirs);
+  for (let k = 0; k < 3 && deja.includes(p); k++) p = alea(cfg.pouvoirs);
+  return p;
+}
+
+function apparaitre() {
+  const libres = spots.map((s, i) => i).filter((i) => {
+    const s = spots[i];
+    return !s.besoin && s.fini <= 0 && s.triste <= 0 && !(grisou && grisou.cible === i);
+  });
+  if (!libres.length) return false;
+  const i = alea(libres), s = spots[i];
+  const p1 = apparus === 0 && cfg.premier ? cfg.premier : choisirPouvoir();
+  const pouvoirs = [p1];
+  if (cfg.doubles && apparus > 0 && Math.random() < cfg.doubles) {
+    let p2 = alea(cfg.pouvoirs); while (p2 === p1) p2 = alea(cfg.pouvoirs);
+    pouvoirs.push(p2);
+  }
+  const dore = pouvoirs.length === 1 && !!cfg.dore && apparus > 0 && Math.random() < cfg.dore;
+  const T = cfg.pat * (pouvoirs.length > 1 ? 1.6 : 1) * (dore ? 0.55 : 1);
+  s.besoin = { pouvoirs, i: 0, t: T, T, dore, app: 0, indice: false };
+  s.objet = p1; s.pop = 0.35;
+  apparus++;
+  son('clic');
+  return true;
+}
+
+function indiceVisible(b) {
+  const p = b.pouvoirs[b.i];
+  if (!RECETTES[p]) return false;
+  return b.indice || nivIdx + 1 <= INTRO[p] + 1 || b.t / b.T < 0.5;
+}
+
+/* ---------- Actions du joueur ---------- */
+function toucherElem(e) {
+  if (dodo.elem === e) { // esprit endormi : 3 touchers pour le réveiller
+    dodo.touches++; son('toc');
+    const el = elems.find((o) => o.e === e);
+    etincelles(el.x, el.y - el.r, '#ffffff', 5);
+    if (dodo.touches >= 3) reveiller(true);
+    return;
+  }
+  if (orbe.length >= 2) orbe = [];
+  if (orbe.length === 1 && orbe[0] === e) { orbePop = 0.25; son(e); return; }
+  orbe.push(e); orbePop = 0.35; indiceOrbe = 0;
+  son(e);
+  const el = elems.find((o) => o.e === e);
+  for (let k = 0; k < 6; k++) {
+    particules.push({ x: el.x, y: el.y, vx: (orbeP.x - el.x) * (1.6 + Math.random()) + (Math.random() - 0.5) * 60, vy: (orbeP.y - el.y) * (1.6 + Math.random()) - 40, v: 0.45, max: 0.45, c: COUL[e], r: 3 + Math.random() * 3, grav: 0 });
+  }
+  if (orbe.length === 2) setTimeout(() => { if (orbe.length === 2) son('melange'); }, 90);
+}
+
+function viderOrbe() {
+  if (!orbe.length) return;
+  orbe = []; orbePop = 0.25; son('vider');
+}
+
+function reveiller(parJoueur) {
+  if (!dodo.elem) return;
+  const el = elems.find((o) => o.e === dodo.elem);
+  if (parJoueur) { son('reveil'); etincelles(el.x, el.y, '#ffe066', 14); texte(el.x, el.y - el.r - 16, 'Réveillé !', '#ffe066'); score += 30; }
+  dodo = { elem: null, t: 0, touches: 0 };
+  dodoT = (cfg.dodo || 9) * (0.8 + Math.random() * 0.5);
+}
+
+function lancerSur(i) {
+  const s = spots[i];
+  if (grisou && grisou.cible === i && grisou.etat !== 'part') return lancerSurGrisou();
+  if (!s.besoin) return;
+  if (!orbe.length) {
+    indiceOrbe = 1.6; son('vide');
+    texte(s.cx, s.by - s.rb - 6, 'Choisis un esprit !', '#ffffff');
+    return;
+  }
+  const p = pouvoirOrbe(); orbe = [];
+  const b = s.besoin, voulu = b.pouvoirs[b.i];
+  tirs.push({ x0: orbeP.x, y0: orbeP.y, x1: s.cx, y1: s.by, t: 0, c: COUL[p] });
+  if (p === voulu) {
+    serie++;
+    const rapide = Math.round(50 * Math.max(0, b.t) / b.T);
+    let pts = 100 + rapide + Math.min(100, (serie - 1) * 10);
+    if (b.dore) pts *= 2;
+    score += pts;
+    son(b.dore ? 'dore' : 'ok');
+    etincelles(s.cx, s.sol - s.s * 0.25, COUL[p], 18);
+    etincelles(s.cx, s.sol - s.s * 0.25, '#ffe066', 8, 'etoile');
+    texte(s.cx, s.by - s.rb, '+' + pts, b.dore ? '#ffd23f' : '#ffffff', 1.2);
+    if (serie >= 3) texte(s.cx, s.by - s.rb - 26, 'Série ×' + serie + ' !', '#7ef0c8', 1.2);
+    volEtoile(s.cx, s.by);
+    b.i++;
+    if (b.i >= b.pouvoirs.length) { s.besoin = null; s.fini = 1.4; s.objet = p; faits++; }
+    else { s.objet = b.pouvoirs[b.i]; s.pop = 0.4; b.t = Math.max(b.t, b.T * 0.6); }
+  } else {
+    serie = 0; erreurs++;
+    b.t -= b.T * 0.25; b.indice = true; s.vibre = 0.45;
+    son('erreur');
+    texte(s.cx, s.by - s.rb, 'Pas ça !', '#ff9aa8', 1);
+    if (b.t <= 0) rate(i);
+  }
+  majBarre();
+}
+
+function lancerSurGrisou() {
+  if (!orbe.length) { indiceOrbe = 1.6; son('vide'); return; }
+  const p = pouvoirOrbe(); orbe = [];
+  tirs.push({ x0: orbeP.x, y0: orbeP.y, x1: grisou.x, y1: grisou.y, t: 0, c: COUL[p] });
+  if (p === 'air') {
+    grisou.etat = 'part'; grisou.souffle = true; grisou.t = 0;
+    score += 50; son('souffle');
+    texte(grisou.x, grisou.y - 40, 'Ouste, Grisou ! +50', '#ffffff', 1.2);
+    for (let k = 0; k < 14; k++) particules.push({ x: grisou.x - 40, y: grisou.y + (Math.random() - 0.5) * 50, vx: 300 + Math.random() * 200, vy: (Math.random() - 0.5) * 40, v: 0.6, max: 0.6, c: '#c4f2ec', r: 3, grav: 0 });
+  } else {
+    serie = 0; son('erreur');
+    texte(grisou.x, grisou.y - 40, 'Grisou veut du vent !', '#ffffff', 1.2);
+  }
+  majBarre();
+}
+
+function rate(i) {
+  const s = spots[i];
+  s.besoin = null; s.triste = 1.2;
+  coeurs--; rates++; serie = 0;
+  secousse = 0.4; son('rate');
+  texte(s.cx, s.by, 'Oh non…', '#ffb0c0', 1.2);
+  majBarre();
+  if (coeurs <= 0) finNiveau(false);
+}
+
+/* ---------- Effets ---------- */
+function etincelles(x, y, c, n, forme = 'rond') {
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * PI * 2, v = 80 + Math.random() * 200;
+    particules.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 80, v: 0.8 + Math.random() * 0.4, max: 1.2, c, r: forme === 'etoile' ? 7 : 3 + Math.random() * 3, grav: 300, forme, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 8 });
+  }
+}
+function texte(x, y, t, c, duree = 1) {
+  if (textes.some((o) => o.t === t && o.max - o.v < 0.5)) return; // pas de doublon
+  textes.push({ x, y, t, c, v: duree, max: duree });
+}
+function volEtoile(x, y) {
+  const r = $('score').getBoundingClientRect();
+  vols.push({ x0: x, y0: y, x1: r.left + r.width / 2, y1: r.top + r.height / 2, t: 0 });
+}
+function confettis() {
+  const cs = ['#ff7a2f', '#2f9bff', '#a8713c', '#35c2b5', '#ffd23f', '#ff6fa8', '#8f7cff'];
+  for (let k = 0; k < 90; k++) {
+    particules.push({ x: Math.random() * W, y: -20 - Math.random() * H * 0.4, vx: (Math.random() - 0.5) * 80, vy: 80 + Math.random() * 120, v: 3.5, max: 3.5, c: alea(cs), r: 5 + Math.random() * 4, grav: 30, forme: 'carre', rot: Math.random() * 6, vr: (Math.random() - 0.5) * 10 });
+  }
+}
+
+/* ---------- Fin de niveau et bilan ---------- */
+let jetonBilan = 0;
+function finNiveau(victoire) {
+  if (etat !== 'jeu') return;
+  etat = 'bilan';
+  const n = nivIdx + 1;
+  const rec = sauve.niv[n] || { e: 0, s: 0 };
+  const etoiles = victoire ? Math.max(1, coeurs) : 0;
+  const ancien = rec.s;
+  const record = victoire && score > ancien;
+  if (victoire) {
+    rec.e = Math.max(rec.e, etoiles); rec.s = Math.max(rec.s, score); sauve.niv[n] = rec;
+    sauve.debloque = Math.max(sauve.debloque, Math.min(NIVEAUX.length, n + 1));
+    ecrire(); son('victoire'); confettis();
+  } else son('echec');
+  const jeton = ++jetonBilan;
+  setTimeout(() => { if (jeton === jetonBilan) montrerBilan(victoire, etoiles, record, ancien); }, 900);
+}
+
+function montrerBilan(victoire, etoiles, record, ancien) {
+  const dernier = nivIdx === NIVEAUX.length - 1;
+  $('titre-bilan').textContent = !victoire ? 'Oh non !' : dernier ? 'Le village fait la fête !' : ['', 'Bien joué !', 'Super !', 'Magnifique !'][etoiles];
+  $('texte-bilan').textContent = !victoire ? 'Trop de bulles se sont vidées. Essaie encore !'
+    : dernier ? `Tu as terminé les ${NIVEAUX.length} niveaux ! Total : ${totalEtoiles()} ★ sur ${NIVEAUX.length * 3}.`
+    : `Niveau ${nivIdx + 1} réussi : ${faits} besoins satisfaits${erreurs ? ', ' + erreurs + ' erreur' + (erreurs > 1 ? 's' : '') : ', aucune erreur'}.`;
+  $('record-bilan').textContent = !victoire ? '' : record ? (ancien ? '🏆 Nouveau record !' : '🏆 Premier record !') : `Record : ${ancien}`;
+  const spans = [...$('etoiles-bilan').children];
+  spans.forEach((sp) => sp.classList.remove('gagnee'));
+  $('btn-suivant').hidden = !victoire || dernier;
+  $('btn-rejouer').textContent = victoire ? 'Rejouer' : 'Réessayer';
+  $('btn-rejouer').className = 'gros-bouton' + (victoire && !dernier ? ' bleu' : '');
+  montrer('ecran-bilan');
+  const jeton = jetonBilan;
+  for (let i = 0; i < etoiles; i++) setTimeout(() => { if (jeton === jetonBilan) { spans[i].classList.add('gagnee'); son('etoile', i); } }, 350 + i * 380);
+  // compteur qui défile
+  const debut = performance.now(), cible = score;
+  const defile = (now) => {
+    if (jeton !== jetonBilan) return;
+    const k = Math.min(1, (now - debut) / 1000);
+    $('score-bilan').textContent = Math.round(cible * lisse(k)) + ' points';
+    if (k < 1) requestAnimationFrame(defile);
+  };
+  requestAnimationFrame(defile);
+}
+
+function totalEtoiles() { let t = 0; for (const k in sauve.niv) t += sauve.niv[k].e || 0; return t; }
+
+/* ---------- Écrans HTML ---------- */
+const ECRANS = ['ecran-accueil', 'ecran-niveaux', 'ecran-pause', 'ecran-bilan'];
+function cacherEcrans() { ECRANS.forEach((id) => $(id).classList.remove('visible')); }
+function montrer(id) { cacherEcrans(); $(id).classList.add('visible'); }
+
+function allerAccueil() {
+  jetonBilan++;
+  etat = 'accueil'; document.body.classList.add('accueil');
+  remiseAZero(); mise();
+  $('stats-accueil').textContent = `★ ${totalEtoiles()} / ${NIVEAUX.length * 3}  ·  Niveau ${Math.min(sauve.debloque, NIVEAUX.length)} atteint`;
+  montrer('ecran-accueil');
+}
+
+function ouvrirNiveaux() {
+  jetonBilan++;
+  const grille = $('grille'); grille.innerHTML = '';
+  NIVEAUX.forEach((nv, i) => {
+    const b = document.createElement('button');
+    b.className = 'case';
+    const e = (sauve.niv[i + 1] || {}).e || 0;
+    b.innerHTML = `${i + 1}<small>${'★'.repeat(e)}<span class="vide">${'★'.repeat(3 - e)}</span></small>`;
+    b.setAttribute('aria-label', `Niveau ${i + 1} : ${nv.nom}`);
+    b.disabled = i + 1 > sauve.debloque;
+    b.addEventListener('click', () => { son('clic'); lancerNiveau(i); });
+    grille.appendChild(b);
+  });
+  if (etat === 'jeu' || etat === 'tuto') etat = 'pause';
+  montrer('ecran-niveaux');
+}
+
+function ouvrirPause() {
+  if (etat !== 'jeu') return;
+  etat = 'pause';
+  const liste = $('recettes'); liste.innerHTML = '';
+  const atteint = Math.max(sauve.debloque, nivIdx + 1);
+  for (const p in RECETTES) {
+    if (INTRO[p] > atteint) continue;
+    const ligne = document.createElement('div'); ligne.className = 'recette';
+    const ic = (q) => { const c = document.createElement('canvas'); c.width = 68; c.height = 68; const g = c.getContext('2d'); g.scale(2, 2); icone(g, q, 17, 17, 13); return c; };
+    ligne.append(ic(RECETTES[p][0]), '+', ic(RECETTES[p][1]), '=', ic(p), NOMS[p]);
+    liste.appendChild(ligne);
+  }
+  if (!liste.children.length) liste.textContent = 'Touche un esprit, puis l\'objet qui en a besoin.';
+  montrer('ecran-pause');
+}
+
+function majBarre() {
+  if (!cfg) return;
+  $('titre-niv').textContent = `Niveau ${nivIdx + 1} · ${cfg.nom}`;
+  $('jauge-in').style.width = Math.min(100, (faits + rates) / cfg.n * 100) + '%';
+  $('coeurs').innerHTML = '♥'.repeat(Math.max(0, coeurs)) + `<span class="vide">${'♥'.repeat(3 - Math.max(0, coeurs))}</span>`;
+}
+
+const SVG_SON = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#fff"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+const SVG_MUET = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#fff"/><path d="M16 9l5 6M21 9l-5 6" stroke="#ff8a9a" stroke-width="2.4" stroke-linecap="round"/></svg>';
+function majSon() {
+  document.querySelectorAll('.btn-son').forEach((b) => {
+    b.innerHTML = sauve.son ? SVG_SON : SVG_MUET;
+    b.setAttribute('aria-label', sauve.son ? 'Couper le son' : 'Remettre le son');
+  });
+}
+function basculerSon() { sauve.son = !sauve.son; ecrire(); majSon(); son('clic'); }
+
+function brancher(id, f) {
+  $(id).addEventListener('click', (e) => { e.currentTarget.blur(); f(); });
+}
+brancher('btn-jouer', () => { son('clic'); lancerNiveau(Math.min(sauve.debloque, NIVEAUX.length) - 1); });
+brancher('btn-niveaux', () => { son('clic'); ouvrirNiveaux(); });
+brancher('btn-retour', () => { son('clic'); allerAccueil(); });
+brancher('btn-pause', () => { if (etat === 'tuto') finirTuto(); else ouvrirPause(); });
+brancher('btn-son', basculerSon);
+brancher('btn-son2', basculerSon);
+brancher('btn-reprendre', () => { son('clic'); cacherEcrans(); etat = 'jeu'; });
+brancher('btn-recommencer', () => { son('clic'); lancerNiveau(nivIdx); });
+brancher('btn-quitter', () => { son('clic'); ouvrirNiveaux(); });
+brancher('btn-suivant', () => { son('clic'); lancerNiveau(nivIdx + 1); });
+brancher('btn-rejouer', () => { son('clic'); lancerNiveau(nivIdx); });
+brancher('btn-bilan-niveaux', () => { son('clic'); ouvrirNiveaux(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) ouvrirPause(); });
+
+/* ---------- Toucher et souris ---------- */
+cv.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  const x = e.clientX, y = e.clientY;
+  if (etat === 'tuto') { if (tutoT > 0.5) finirTuto(); return; }
+  if (etat !== 'jeu') return;
+  for (const el of elems) if (Math.hypot(x - el.x, y - el.y) < el.r + 12) return toucherElem(el.e);
+  if (Math.hypot(x - orbeP.x, y - orbeP.y) < orbeP.r + 10) return viderOrbe();
+  if (y >= panelY) return;
+  if (grisou && grisou.etat !== 'part' && Math.hypot(x - grisou.x, y - grisou.y) < spots[0].s * 0.5) return lancerSurGrisou();
+  const i = spots.findIndex((s) => Math.abs(x - s.cx) <= s.w / 2 && Math.abs(y - s.cy) <= s.h / 2);
+  if (i >= 0) { selection = -1; lancerSur(i); }
+});
+
+/* ---------- Clavier : 1 à 4 = esprits, flèches = choisir, Entrée = envoyer ---------- */
+document.addEventListener('keydown', (e) => {
+  const k = e.key;
+  if (etat === 'accueil') { if (k === 'Enter' || k === ' ') { e.preventDefault(); $('btn-jouer').click(); } return; }
+  if (etat === 'tuto') { if (tutoT > 0.5) { e.preventDefault(); finirTuto(); } return; }
+  if (etat === 'bilan') {
+    if (k === 'Enter' || k === ' ') { e.preventDefault(); (!$('btn-suivant').hidden ? $('btn-suivant') : $('btn-rejouer')).click(); }
+    return;
+  }
+  if (etat === 'pause') { if (k === 'Escape' || k === 'p') { e.preventDefault(); $('btn-reprendre').click(); } return; }
+  if (etat !== 'jeu') return;
+  const n = { '1': 'feu', '2': 'eau', '3': 'terre', '4': 'air', '&': 'feu', 'é': 'eau', '"': 'terre', "'": 'air' }[k];
+  if (n) { e.preventDefault(); return toucherElem(n); }
+  if (k === 'Backspace' || k === '0' || k === 'Delete') { e.preventDefault(); return viderOrbe(); }
+  if (k === 'Escape' || k === 'p') { e.preventDefault(); return ouvrirPause(); }
+  if (k.startsWith('Arrow')) {
+    e.preventDefault();
+    const choix = spots.map((s, i) => i).filter((i) => spots[i].besoin || (grisou && grisou.cible === i && grisou.etat !== 'part'));
+    if (!choix.length) { selection = -1; return; }
+    const pos = choix.indexOf(selection);
+    const sens = (k === 'ArrowLeft' || k === 'ArrowUp') ? -1 : 1;
+    selection = choix[(pos + sens + choix.length + (pos < 0 && sens < 0 ? 1 : 0)) % choix.length];
+    son('toc');
+    return;
+  }
+  if (k === 'Enter' || k === ' ') {
+    e.preventDefault();
+    if (selection < 0 || !(spots[selection].besoin || (grisou && grisou.cible === selection))) {
+      const choix = spots.map((s, i) => i).filter((i) => spots[i].besoin);
+      if (choix.length) selection = choix[0];
+      son('toc');
+      return;
+    }
+    lancerSur(selection);
+  }
+});
+
+/* =====================================================================
+   Tutoriel : on rejoue la démonstration dans le vrai décor
+   ===================================================================== */
+const DUREE_TAP = 1.15;
+function tapsTuto(T) {
+  const res = [];
+  T.etapes.forEach((et, j) => { if (!et.taps.length) res.push({ cible: null, etape: j }); et.taps.forEach((c) => res.push({ cible: c, etape: j })); });
+  return res;
+}
+// « voir:… » : la main montre sans toucher.
+function posCible(c) {
+  if (!c) return { x: W * 0.72, y: panelY - 40 };
+  if (c.startsWith('voir:')) c = c.slice(5) === 'grisou' ? 'grisou' : 'elem:' + c.slice(5);
+  if (c.startsWith('elem:')) { const el = elems.find((o) => o.e === c.slice(5)); return { x: el.x, y: el.y + 4 }; }
+  if (c === 'grisou' && grisou) return { x: grisou.x, y: grisou.y + 10 };
+  const s = spots[tutoSpot]; return { x: s.cx, y: s.sol - s.s * 0.2 };
+}
+// Remet le décor de démonstration dans l'état atteint au temps tt.
+function rejouerTuto(T, taps, tt) {
+  spots.forEach((s) => Object.assign(s, { besoin: null, objet: null, fini: 0, triste: 0, pop: 0, vibre: 0 }));
+  const sp = spots[tutoSpot];
+  sp.besoin = { pouvoirs: T.besoin.slice(), i: 0, t: cfg.pat * 0.8, T: cfg.pat, dore: !!T.dore, app: 1, indice: true };
+  sp.objet = T.besoin[0];
+  orbe = [];
+  grisou = T.grisou ? { cible: tutoSpot, x: sp.cx, y: sp.cy - sp.s * 0.1, etat: 'boude', t: 0 } : null;
+  dodo = T.dodo ? { elem: T.dodo, t: 99, touches: 0 } : { elem: null, t: 0, touches: 0 };
+  taps.forEach((tp, j) => {
+    const depuis = tt - (j * DUREE_TAP + 0.7);
+    if (depuis < 0 || !tp.cible || tp.cible.startsWith('voir:')) return;
+    const c = tp.cible;
+    if (c.startsWith('elem:')) {
+      const e = c.slice(5);
+      if (dodo.elem === e) { dodo.touches++; if (dodo.touches >= 3) dodo.elem = null; }
+      else { if (orbe.length >= 2) orbe = []; if (orbe[0] !== e || orbe.length !== 1) orbe.push(e); }
+    } else if (c === 'grisou' && grisou) {
+      grisou.etat = 'part'; grisou.souffle = true; grisou.t = depuis; grisou.x += depuis * 500; orbe = [];
+    } else if (sp.besoin) {
+      orbe = []; sp.besoin.i++;
+      if (sp.besoin.i >= sp.besoin.pouvoirs.length) { sp.objet = sp.besoin.pouvoirs[sp.besoin.i - 1]; sp.besoin = null; sp.fini = Math.max(0.45, 1.4 - depuis); }
+      else sp.objet = sp.besoin.pouvoirs[sp.besoin.i];
+    }
+  });
+}
+
+function dessinerTuto(g) {
+  const T = TUTOS[cfg.tuto];
+  let texteEtape;
+  if (T.carte) {
+    dessinerCarte(g, T);
+  } else {
+    const taps = tapsTuto(T);
+    const cycle = taps.length * DUREE_TAP + 1.6;
+    const tt = tutoT % cycle;
+    rejouerTuto(T, taps, tt);
+    dessinerMonde(g);
+    const j = Math.min(taps.length - 1, Math.floor(tt / DUREE_TAP));
+    texteEtape = T.etapes[taps[j].etape].texte;
+    const loc = tt - j * DUREE_TAP;
+    const de = j === 0 ? posCible(null) : posCible(taps[j - 1].cible);
+    const vers = posCible(taps[j].cible);
+    const k = lisse(Math.min(1, loc / 0.65));
+    const hx = de.x + (vers.x - de.x) * k, hy = de.y + (vers.y - de.y) * k;
+    const appui = taps[j].cible && !taps[j].cible.startsWith('voir:') && loc > 0.65 && loc < 0.9;
+    if (appui) {
+      g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 3;
+      rond(g, hx, hy, 10 + (loc - 0.65) * 120); g.stroke();
+    }
+    main(g, hx, hy, appui);
+    // bulle de texte en haut
+    g.font = '700 18px system-ui, sans-serif';
+    const ls = lignes(g, `${T.etapes.length > 1 ? (taps[j].etape + 1) + '. ' : ''}${texteEtape}`, Math.min(gw, 420) - 48);
+    const bw = Math.min(gw, 420) - 20, bh = 20 + ls.length * 24;
+    const bx = W / 2 - bw / 2, by = barH + 10;
+    g.fillStyle = 'rgba(255,250,240,.96)'; rr(g, bx, by, bw, bh, 16); g.fill();
+    g.strokeStyle = '#8f7cff'; g.lineWidth = 3; g.stroke();
+    g.fillStyle = '#3a2a6b'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    ls.forEach((l, i) => g.fillText(l, W / 2, by + 22 + i * 24));
+  }
+  // invitation à commencer
+  const a = 0.6 + 0.4 * Math.sin(temps * 5);
+  g.font = '800 17px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const msg = 'Touche l\'écran pour jouer';
+  const mw = g.measureText(msg).width + 30;
+  g.fillStyle = `rgba(40,20,90,${0.75 * a + 0.2})`; rr(g, W / 2 - mw / 2, panelY - 46, mw, 34, 17); g.fill();
+  g.fillStyle = '#fff'; g.fillText(msg, W / 2, panelY - 29);
+}
+
+/* Carte animée des nouvelles recettes : A + B → pouvoir → objet. */
+function dessinerCarte(g, T) {
+  dessinerMonde(g);
+  const cw = Math.min(gw - 20, 400), lh = 92;
+  const ch = 70 + T.carte.length * lh;
+  const x0 = W / 2 - cw / 2, y0 = barH + Math.max(12, (panelY - barH - 50 - ch) / 2);
+  g.fillStyle = 'rgba(255,250,240,.97)'; rr(g, x0, y0, cw, ch, 20); g.fill();
+  g.strokeStyle = '#8f7cff'; g.lineWidth = 3; g.stroke();
+  g.fillStyle = '#5a33c8'; g.font = '800 22px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(T.texte, W / 2, y0 + 30);
+  T.carte.forEach((p, i) => {
+    const yy = y0 + 70 + i * lh + 26;
+    const ph = ((tutoT + i * 0.6) % 2.6) / 2.6;
+    const k = lisse(Math.min(1, ph / 0.4));
+    const [a, b] = RECETTES[p];
+    const cx = x0 + cw * 0.42, r = 18;
+    if (ph < 0.45) {
+      icone(g, a, cx - 70 + 50 * k, yy, r);
+      icone(g, b, cx + 70 - 50 * k, yy, r);
+      g.fillStyle = '#3a2a6b'; g.font = '800 22px system-ui, sans-serif'; g.fillText('+', cx, yy);
+    } else {
+      const pop = 1 + 0.25 * Math.sin(Math.min(1, (ph - 0.45) / 0.2) * PI);
+      g.fillStyle = COUL[p] + '44'; rond(g, cx, yy, r * 1.5 * pop); g.fill();
+      icone(g, p, cx, yy, r * pop);
+    }
+    objet(g, p, x0 + cw * 0.82, yy + 22, 0.55, ph > 0.55 ? Math.min(1, (ph - 0.55) / 0.25) : 0, temps);
+    g.fillStyle = '#3a2a6b'; g.font = '700 15px system-ui, sans-serif';
+    g.fillText(`${NOMS[a]} + ${NOMS[b]} = ${NOMS[p]}`, x0 + cw * 0.42, yy + 38);
+    g.fillStyle = '#6a5f86'; g.font = '600 13px system-ui, sans-serif';
+    g.fillText(`pour ${OBJETS[p]}`, x0 + cw * 0.82, yy + 38);
+  });
+}
+
+/* =====================================================================
+   Boucle principale
+   ===================================================================== */
+function maj(dt) {
+  temps += dt;
+  if (etat === 'tuto') tutoT += dt;
+  if (etat === 'jeu') {
+    if (banniere > 0) banniere -= dt;
+    // nouvelles bulles
+    prochain -= dt;
+    const actifs = spots.filter((s) => s.besoin).length;
+    if (actifs === 0) prochain = Math.min(prochain, 0.5);
+    if (apparus < cfg.n && actifs < cfg.max && prochain <= 0) {
+      if (apparaitre()) prochain = cfg.ecart * (0.8 + Math.random() * 0.4);
+    }
+    // patience des bulles
+    spots.forEach((s, i) => {
+      const b = s.besoin; if (!b) return;
+      b.app = Math.min(1, b.app + dt * 4);
+      b.t -= dt;
+      if (b.t <= 0) rate(i);
+    });
+    // Grisou
+    if (cfg.grisou) majGrisou(dt);
+    // esprit endormi
+    if (cfg.dodo) {
+      if (dodo.elem) { dodo.t -= dt; if (dodo.t <= 0) reveiller(false); }
+      else { dodoT -= dt; if (dodoT <= 0) { dodo = { elem: alea(ELEMS), t: 6, touches: 0 }; son('dodo'); } }
+    }
+    // fin du niveau
+    if (etat === 'jeu' && apparus >= cfg.n && !spots.some((s) => s.besoin)) {
+      finT += dt; if (finT > 0.9) finNiveau(true);
+    }
+  }
+  if (etat !== 'pause' && etat !== 'tuto') {
+    spots.forEach((s) => {
+      if (s.fini > 0) s.fini -= dt;
+      if (s.triste > 0) s.triste -= dt;
+      if (s.pop > 0) s.pop -= dt;
+      if (s.vibre > 0) s.vibre -= dt;
+    });
+    if (grisou && grisou.etat === 'part' && etat !== 'jeu') majGrisou(dt);
+  }
+  orbePop = Math.max(0, orbePop - dt); indiceOrbe = Math.max(0, indiceOrbe - dt);
+  secousse = Math.max(0, secousse - dt);
+  scoreAff += (score - scoreAff) * Math.min(1, dt * 8);
+  const aff = Math.round(scoreAff);
+  if ($('score').textContent !== String(aff)) $('score').textContent = aff;
+  for (const p of particules) { p.v -= dt; p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.rot !== undefined) p.rot += p.vr * dt; }
+  particules = particules.filter((p) => p.v > 0 && p.y < H + 40);
+  for (const t of textes) { t.v -= dt; t.y -= 40 * dt; }
+  textes = textes.filter((t) => t.v > 0);
+  for (const v of vols) v.t += dt * 1.6;
+  vols = vols.filter((v) => {
+    if (v.t < 1) return true;
+    const sc = $('score'); sc.classList.remove('pulse'); void sc.offsetWidth; sc.classList.add('pulse');
+    return false;
+  });
+  for (const t of tirs) t.t += dt * 6;
+  tirs = tirs.filter((t) => t.t < 1);
+}
+
+function majGrisou(dt) {
+  if (!grisou) {
+    grisouT -= dt;
+    if (grisouT <= 0) {
+      const cands = spots.map((s, i) => i).filter((i) => spots[i].besoin && !spots[i].besoin.dore && spots[i].besoin.t > 5);
+      if (cands.length) {
+        const i = alea(cands);
+        grisou = { cible: i, x: gx - 80, y: spots[i].cy - spots[i].s * 0.6, etat: 'arrive', t: 0 };
+        son('grisou');
+      } else grisouT = 1;
+    }
+    return;
+  }
+  grisou.t += dt;
+  const s = spots[grisou.cible];
+  const cy = s.cy - s.s * 0.1;
+  if (grisou.etat === 'arrive') {
+    const k = Math.min(1, dt * 3.5);
+    grisou.x += (s.cx - grisou.x) * k; grisou.y += (cy - grisou.y) * k;
+    if (Math.abs(grisou.x - s.cx) < 4) { grisou.etat = 'boude'; grisou.t = 0; }
+  } else if (grisou.etat === 'boude') {
+    grisou.x = s.cx + Math.sin(temps * 2) * 4; grisou.y = cy + Math.sin(temps * 3) * 3;
+    if (grisou.t > 9) { grisou.etat = 'part'; grisou.souffle = false; grisou.t = 0; }
+  } else {
+    grisou.x += (grisou.souffle ? 700 : 220) * dt; grisou.y -= 40 * dt;
+    if (grisou.x > W + 150 || grisou.t > 2) { grisou = null; grisouT = (cfg.grisou || 8) * (0.8 + Math.random() * 0.5); }
+  }
+}
+
+/* ---------- Dessin ---------- */
+function dessinerFond(g, accueil) {
+  // En jeu, l'horizon est juste sous la barre : tous les objets sont posés dans l'herbe.
+  const hz = accueil ? H * 0.45 : barH + Math.max(40, (panelY - barH) * 0.14);
+  const ciel = g.createLinearGradient(0, 0, 0, hz);
+  ciel.addColorStop(0, '#8fcfff'); ciel.addColorStop(1, '#dff3ff');
+  g.fillStyle = ciel; g.fillRect(0, 0, W, hz + 2);
+  const herbe = g.createLinearGradient(0, hz, 0, H);
+  herbe.addColorStop(0, '#a6dc86'); herbe.addColorStop(1, '#79c262');
+  g.fillStyle = herbe; g.fillRect(0, hz, W, H - hz);
+  if (!accueil) { g.fillStyle = 'rgba(255,225,100,.95)'; rond(g, W - 34, barH + 22, 15); g.fill(); }
+  g.globalAlpha = 0.85;
+  nuage(g, (temps * 8) % (W + 200) - 100, accueil ? H * 0.3 : barH + 16, 20, '#ffffff', '#ffffff');
+  nuage(g, (temps * 5 + W * 0.6) % (W + 200) - 100, accueil ? H * 0.36 : barH + 26, 14, '#ffffff', '#ffffff');
+  g.globalAlpha = 1;
+  // collines au loin
+  g.fillStyle = '#93d27a'; ellipse(g, W * 0.2, hz + 3, W * 0.5, Math.max(12, H * 0.025)); g.fill();
+  g.fillStyle = '#86c96e'; ellipse(g, W * 0.85, hz + 5, W * 0.45, Math.max(10, H * 0.02)); g.fill();
+  // petites fleurs et touffes d'herbe, toujours au même endroit
+  for (let i = 0; i < 28; i++) {
+    const x = ((i * 97) % 100) / 100 * W, y = hz + 22 + ((i * 53) % 100) / 100 * (H - hz - 40);
+    g.fillStyle = i % 3 ? 'rgba(70,140,60,.35)' : (i % 2 ? 'rgba(255,255,255,.85)' : 'rgba(255,210,63,.85)');
+    rond(g, x, y, i % 3 ? 3 : 2.5); g.fill();
+  }
+}
+
+function dessinerBulle(g, s) {
+  const b = s.besoin; if (!b) return;
+  const p = b.pouvoirs[b.i];
+  const reste = Math.max(0, b.t / b.T);
+  const urgent = reste < 0.25;
+  let sc = lisse(b.app) * (1 + (s.pop > 0 ? 0.25 * Math.sin(s.pop / 0.4 * PI) : 0));
+  if (urgent) sc *= 1 + 0.06 * Math.sin(temps * 18);
+  const dx = s.vibre > 0 ? Math.sin(s.vibre * 60) * 6 : 0;
+  const x = s.cx + dx, y = s.by, r = s.rb * sc;
+  g.save();
+  // pointe de la bulle
+  g.fillStyle = b.dore ? '#ffe27a' : '#ffffff';
+  g.beginPath(); g.moveTo(x - r * 0.3, y + r * 0.8); g.lineTo(x + r * 0.3, y + r * 0.8); g.lineTo(x, y + r * 1.25); g.closePath(); g.fill();
+  if (b.dore) {
+    const gr = g.createRadialGradient(x, y - r * 0.3, 2, x, y, r);
+    gr.addColorStop(0, '#fff6c8'); gr.addColorStop(1, '#ffc61a'); g.fillStyle = gr;
+  } else g.fillStyle = '#ffffff';
+  rond(g, x, y, r); g.fill();
+  // anneau de patience
+  g.lineWidth = 5; g.lineCap = 'round';
+  g.strokeStyle = 'rgba(60,40,110,.15)'; rond(g, x, y, r + 4); g.stroke();
+  g.strokeStyle = reste > 0.5 ? '#3fcf6a' : reste > 0.25 ? '#ffa31a' : '#ff4d6a';
+  g.beginPath(); g.arc(x, y, r + 4, -PI / 2, -PI / 2 + PI * 2 * reste); g.stroke();
+  icone(g, p, x, y, r * 0.6);
+  if (b.dore) {
+    g.fillStyle = '#fff';
+    for (let i = 0; i < 3; i++) { const a = temps * 2 + i * 2.1; etoileForme(g, x + Math.cos(a) * (r + 12), y + Math.sin(a) * (r + 12), 4.5, temps * 3); }
+  }
+  // pouvoir suivant (bulle double)
+  if (b.pouvoirs[b.i + 1]) {
+    const r2 = r * 0.55, x2 = x - r - r2 * 0.6, y2 = y - r * 0.35;
+    g.fillStyle = '#ffffff'; g.strokeStyle = '#c9bff0'; g.lineWidth = 2;
+    rond(g, x2, y2, r2); g.fill(); g.stroke();
+    icone(g, b.pouvoirs[b.i + 1], x2, y2, r2 * 0.6);
+    g.fillStyle = '#5a33c8'; g.font = `800 ${Math.round(Math.max(10, r * 0.34))}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('puis', x2, y2 + r2 + 8);
+  }
+  // indice : les deux esprits de la recette
+  if (indiceVisible(b)) {
+    const [a, c] = RECETTES[p];
+    const ir = Math.max(9, r * 0.36), px = x + r + 8, pw = ir * 4 + 18;
+    g.fillStyle = 'rgba(255,255,255,.92)'; rr(g, px, y - ir - 5, pw, ir * 2 + 10, ir + 5); g.fill();
+    g.strokeStyle = '#c9bff0'; g.lineWidth = 2; g.stroke();
+    icone(g, a, px + ir + 5, y, ir);
+    g.fillStyle = '#5a33c8'; g.font = `800 ${Math.round(ir * 1.2)}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('+', px + pw / 2, y + 1);
+    icone(g, c, px + pw - ir - 5, y, ir);
+  }
+  g.restore();
+}
+
+function etoileForme(g, x, y, r, rot) {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = rot + i * PI / 5, rr2 = i % 2 ? r * 0.45 : r;
+    g.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2);
+  }
+  g.closePath(); g.fill();
+}
+
+function dessinerSpot(g, s, i) {
+  const u = s.s / 100;
+  // petit tapis d'herbe
+  g.fillStyle = 'rgba(60,120,50,.25)'; ellipse(g, s.cx, s.sol, s.s * 0.44, s.s * 0.1); g.fill();
+  if (selection === i && etat === 'jeu') {
+    g.save(); g.strokeStyle = '#5a33c8'; g.lineWidth = 3; g.setLineDash([8, 6]); g.lineDashOffset = -temps * 30;
+    rr(g, s.cx - s.w / 2 + 6, s.cy - s.h / 2 + 4, s.w - 12, s.h - 8, 16); g.stroke(); g.restore();
+  }
+  if (s.besoin) {
+    const pop = s.pop > 0 ? 1 + 0.15 * Math.sin(s.pop / 0.4 * PI) : 1;
+    g.save(); g.translate(s.cx, s.sol); g.scale(pop, pop); g.translate(-s.cx, -s.sol);
+    objet(g, s.objet, s.cx, s.sol, u, 0, temps);
+    g.restore();
+  } else if (s.fini > 0 && s.objet) {
+    const k = Math.min(1, (1.4 - s.fini) / 0.5);
+    g.save(); g.globalAlpha = Math.min(1, s.fini / 0.35);
+    objet(g, s.objet, s.cx, s.sol, u, lisse(k), temps);
+    g.restore();
+  } else if (s.triste > 0 && s.objet) {
+    g.save(); g.globalAlpha = Math.min(1, s.triste / 0.6);
+    objet(g, s.objet, s.cx, s.sol, u, 0, temps);
+    const ph = 1 - s.triste / 1.2;
+    g.globalAlpha = (1 - ph) * 0.8;
+    nuage(g, s.cx, s.sol - s.s * 0.3 - ph * 20, s.s * 0.25 * (0.6 + ph), '#9a9ab0', '#c9c9d8');
+    g.restore();
+  }
+}
+
+function dessinerPanneau(g) {
+  const grad = g.createLinearGradient(0, panelY, 0, H);
+  grad.addColorStop(0, '#4a3592'); grad.addColorStop(1, '#2b1f5c');
+  g.fillStyle = grad; rr(g, gx - 30 < 0 ? 0 : gx - 30, panelY, gx - 30 < 0 ? W : gw + 60, H - panelY + 30, 26); g.fill();
+  // orbe
+  const o = orbeP, p = orbe.length ? pouvoirOrbe() : null;
+  const pop = 1 + (orbePop > 0 ? 0.18 * Math.sin(orbePop / 0.35 * PI) : 0);
+  const halo = g.createRadialGradient(o.x, o.y, 2, o.x, o.y, o.r * 1.9);
+  halo.addColorStop(0, (p ? COUL[p] : '#8f7cff') + 'aa'); halo.addColorStop(1, 'rgba(143,124,255,0)');
+  g.fillStyle = halo; rond(g, o.x, o.y, o.r * 1.9); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.18)'; g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2.5;
+  rond(g, o.x, o.y, o.r * pop); g.fill(); g.stroke();
+  // reflets qui tournent
+  g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 2;
+  g.beginPath(); g.arc(o.x, o.y, o.r * 0.8 * pop, temps * 2, temps * 2 + 1.2); g.stroke();
+  if (p) icone(g, p, o.x, o.y, o.r * 0.62 * pop);
+  else { g.fillStyle = 'rgba(255,255,255,.55)'; g.font = `800 ${Math.round(o.r * 0.8)}px system-ui, sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', o.x, o.y + 1); }
+  // nom du pouvoir et recette
+  g.textBaseline = 'middle';
+  if (p) {
+    g.fillStyle = '#fff'; g.font = '800 18px system-ui, sans-serif'; g.textAlign = 'left';
+    g.fillText(NOMS[p], o.x + o.r + 14, o.y - (orbe.length === 2 ? 9 : 0));
+    if (orbe.length === 2) { g.font = '600 13px system-ui, sans-serif'; g.fillStyle = '#d8d0ff'; g.fillText(`${NOMS[orbe[0]]} + ${NOMS[orbe[1]]}`, o.x + o.r + 14, o.y + 11); }
+    g.textAlign = 'right'; g.fillStyle = '#d8d0ff'; g.font = '600 13px system-ui, sans-serif';
+    g.fillText('toucher = vider', o.x - o.r - 14, o.y);
+  } else {
+    g.fillStyle = indiceOrbe > 0 ? '#ffe066' : '#d8d0ff'; g.font = '700 14px system-ui, sans-serif'; g.textAlign = 'center';
+    g.fillText(indiceOrbe > 0 ? 'Touche un esprit ↓' : '', o.x + o.r + 70, o.y);
+  }
+  // esprits
+  elems.forEach((el, i) => {
+    const dort = dodo.elem === el.e;
+    const dans = orbe.includes(el.e);
+    const saut = Math.sin(temps * 3 + i) * 2 + (indiceOrbe > 0 ? Math.sin(temps * 14) * 4 : 0);
+    g.fillStyle = dans ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.1)';
+    rond(g, el.x, el.y, el.r); g.fill();
+    if (dans) { g.strokeStyle = '#ffe066'; g.lineWidth = 3; rond(g, el.x, el.y, el.r); g.stroke(); }
+    g.save();
+    if (dort) g.globalAlpha = 0.55;
+    esprit(g, el.e, el.x, el.y + (dort ? 2 : saut), el.r * 0.68, dort, dans);
+    g.restore();
+    if (dort) {
+      g.fillStyle = '#d8d0ff'; g.font = '800 16px system-ui, sans-serif'; g.textAlign = 'center';
+      const z = (temps * 0.8) % 1;
+      g.globalAlpha = 1 - z; g.fillText('z', el.x + el.r * 0.6 + z * 8, el.y - el.r * 0.6 - z * 18); g.globalAlpha = 1;
+      g.fillText('Z', el.x + el.r * 0.75, el.y - el.r * 0.9);
+      for (let k = 0; k < 3; k++) { g.fillStyle = k < dodo.touches ? '#ffe066' : 'rgba(255,255,255,.3)'; rond(g, el.x - 10 + k * 10, el.y - el.r - 6, 3.5); g.fill(); }
+    }
+    g.fillStyle = '#fff'; g.font = '700 13px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(NOMS[el.e], el.x, el.y + el.r + 11);
+    if (AVEC_SOURIS) { g.fillStyle = 'rgba(255,255,255,.6)'; g.font = '700 11px system-ui, sans-serif'; g.fillText(String(i + 1), el.x - el.r + 4, el.y - el.r + 4); }
+  });
+}
+
+function dessinerMonde(g) {
+  dessinerFond(g);
+  spots.forEach((s, i) => dessinerSpot(g, s, i));
+  spots.forEach((s) => dessinerBulle(g, s));
+  if (grisou) dessinerGrisou(g, grisou, spots[0].s, temps);
+  dessinerPanneau(g);
+}
+
+function dessinerAccueil(g) {
+  dessinerFond(g, true);
+  // Les esprits dansent entre le titre et les boutons.
+  const hautBas = document.querySelector('.acc-haut').getBoundingClientRect().bottom - 20;
+  const basHaut = document.querySelector('.acc-bas').getBoundingClientRect().top + 20;
+  const cx = W / 2, cy = (hautBas + basHaut) / 2, R = Math.max(50, Math.min(W * 0.26, (basHaut - hautBas) * 0.4));
+  const halo = g.createRadialGradient(cx, cy, 4, cx, cy, R * 1.4);
+  halo.addColorStop(0, 'rgba(255,240,180,.9)'); halo.addColorStop(1, 'rgba(255,240,180,0)');
+  g.fillStyle = halo; rond(g, cx, cy, R * 1.4); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.5)'; g.strokeStyle = '#fff'; g.lineWidth = 3; rond(g, cx, cy, R * 0.32); g.fill(); g.stroke();
+  icone(g, alea2(['vapeur', 'pousse', 'brique', 'eclair', 'pluie', 'graines']), cx, cy, R * 0.2);
+  ELEMS.forEach((e, i) => {
+    const a = temps * 0.5 + i * PI / 2;
+    const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R * 0.75 + Math.sin(temps * 3 + i) * 5;
+    g.fillStyle = COUL[e] + '44'; rond(g, x, y, R * 0.36); g.fill();
+    esprit(g, e, x, y, R * 0.28, false, true);
+  });
+}
+// Pouvoir montré au centre de l'accueil : change toutes les 1,5 s.
+function alea2(t) { return t[Math.floor(temps / 1.5) % t.length]; }
+
+function dessiner() {
+  const g = ctx;
+  g.save();
+  if (secousse > 0) g.translate((Math.random() - 0.5) * 12 * secousse / 0.4, (Math.random() - 0.5) * 12 * secousse / 0.4);
+  if (etat === 'accueil') dessinerAccueil(g);
+  else if (etat === 'tuto') dessinerTuto(g);
+  else dessinerMonde(g);
+  // tirs : petite boule de pouvoir de l'orbe à la cible
+  for (const t of tirs) {
+    const k = t.t, x = t.x0 + (t.x1 - t.x0) * k, y = t.y0 + (t.y1 - t.y0) * k - Math.sin(k * PI) * 40;
+    g.fillStyle = t.c; rond(g, x, y, 9); g.fill(); g.fillStyle = 'rgba(255,255,255,.8)'; rond(g, x, y, 4); g.fill();
+  }
+  for (const p of particules) {
+    g.globalAlpha = Math.max(0, Math.min(1, p.v / p.max * 1.5)); g.fillStyle = p.c;
+    if (p.forme === 'etoile') etoileForme(g, p.x, p.y, p.r, p.rot);
+    else if (p.forme === 'carre') { g.save(); g.translate(p.x, p.y); g.rotate(p.rot); g.fillRect(-p.r / 2, -p.r / 3, p.r, p.r * 0.66); g.restore(); }
+    else { rond(g, p.x, p.y, p.r); g.fill(); }
+  }
+  g.globalAlpha = 1;
+  for (const v of vols) {
+    const k = lisse(Math.min(1, v.t));
+    const x = v.x0 + (v.x1 - v.x0) * k, y = v.y0 + (v.y1 - v.y0) * k - Math.sin(k * PI) * 60;
+    g.fillStyle = '#ffd23f'; g.strokeStyle = '#c98a00'; g.lineWidth = 2;
+    etoileForme(g, x, y, 10, temps * 6); g.stroke();
+  }
+  for (const t of textes) {
+    g.globalAlpha = Math.min(1, t.v / t.max * 2);
+    g.font = '900 20px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const demi = g.measureText(t.t).width / 2 + 8;
+    const x = Math.max(demi, Math.min(W - demi, t.x)); // toujours dans l'écran
+    g.lineWidth = 4; g.strokeStyle = 'rgba(40,20,90,.8)'; g.strokeText(t.t, x, t.y); g.fillStyle = t.c; g.fillText(t.t, x, t.y);
+  }
+  g.globalAlpha = 1;
+  if (etat === 'jeu' && banniere > 0) {
+    const a = Math.min(1, banniere / 0.5, (2 - banniere) / 0.3);
+    g.globalAlpha = Math.max(0, a);
+    const y = barH + (panelY - barH) * 0.45;
+    g.fillStyle = 'rgba(40,20,90,.8)'; rr(g, W / 2 - 150, y - 44, 300, 88, 22); g.fill();
+    g.fillStyle = '#ffe066'; g.font = '900 30px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(`Niveau ${nivIdx + 1}`, W / 2, y - 14);
+    g.fillStyle = '#fff'; g.font = '700 19px system-ui, sans-serif'; g.fillText(cfg.nom, W / 2, y + 20);
+    g.globalAlpha = 1;
+  }
+  g.restore();
+}
+
+let avant = performance.now();
+function boucle(now) {
+  const dt = Math.min(0.05, (now - avant) / 1000); avant = now;
+  maj(dt); dessiner();
+  requestAnimationFrame(boucle);
+}
+
+/* ---------- Démarrage ---------- */
+majSon(); mise(); allerAccueil();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
