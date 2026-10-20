@@ -48,7 +48,7 @@ export const UNIVERS = [
   { id: 'musique',      nom: 'Musique',            picto: '🎵', teinte: 310, tags: ['musique', 'sons', 'chansons', 'instruments', 'notes'] },
   { id: 'vehicules',    nom: 'Véhicules',          picto: '🚗', teinte: 355, tags: ['véhicules', 'voitures', 'trains', 'avions', 'camions', 'tracteurs'] },
   { id: 'dinosaures',   nom: 'Dinosaures',         picto: '🦕', teinte: 95,  tags: ['dinosaures', 'préhistoire', 'fossiles'] },
-  { id: 'magie',        nom: 'Magie et contes',    picto: '🧚', teinte: 290, tags: ['magie', 'contes', 'fées', 'dragons', 'licornes', 'sorcières', 'chevaliers', 'princesses'] },
+  { id: 'magie',        nom: 'Magie et contes',    picto: '🧚', teinte: 290, tags: ['magie', 'fantastique', 'contes', 'fées', 'dragons', 'licornes', 'sorcières', 'chevaliers', 'princesses'] },
   { id: 'cuisine',      nom: 'Cuisine',            picto: '🧁', teinte: 335, tags: ['cuisine', 'gâteaux', 'fruits', 'légumes', 'pâtisserie', 'recettes'] },
   { id: 'histoire',     nom: 'Histoire',           picto: '🏰', teinte: 35,  tags: ['histoire', 'châteaux', 'égypte', 'pirates', 'romains'] },
   { id: 'metiers',      nom: 'Métiers',            picto: '🧑‍🚒', teinte: 20,  tags: ['métiers', 'pompiers', 'docteur', 'vétérinaire', 'magasin'] },
