@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Les Caves de Brumefer</title>
+<style>
+  :root {
+    --fond: #0d0f1c;
+    --carte: #1b1f33;
+    --bouton: #2b3150;
+    --or: #ffcf5a;
+    --texte: #f3eee2;
+    --doux: #aab1c9;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: var(--fond); color: var(--texte);
+    font-family: system-ui, sans-serif; touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #app { position: fixed; inset: 0; max-width: 540px; margin: 0 auto; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 0%, #252a4a 0%, #11132a 55%, #090a14 100%); }
+  .ecran { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .cache { display: none !important; }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; min-height: 44px; min-width: 44px; border-radius: 14px; }
+  button:focus { outline: none; }
+  .gros {
+    background: linear-gradient(#ffdc78, #f0a830); color: #3a2306; font-weight: 800; font-size: 1.45rem;
+    padding: 14px 40px; box-shadow: 0 5px 0 #b87314, 0 8px 20px #0008;
+  }
+  .gros:active, .second:active { transform: translateY(3px); }
+  .second { background: var(--bouton); color: var(--texte); font-weight: 700; padding: 10px 18px; box-shadow: 0 4px 0 #161a2c; }
+  .second[disabled] { opacity: .45; }
+  #btnSon { position: absolute; top: 6px; right: 6px; z-index: 50; background: #2b3150dd; width: 44px; height: 44px;
+    display: grid; place-items: center; padding: 0; }
+  #btnSon svg { width: 26px; height: 26px; }
+
+  /* ---------- Accueil ---------- */
+  #accueil { align-items: center; justify-content: center; gap: 12px; padding: 16px; text-align: center; }
+  #art { width: min(92vw, 380px); height: min(56vw, 230px); }
+  h1 { margin: 0; font-size: clamp(2.2rem, 10vw, 3.3rem); line-height: 1.02; letter-spacing: .5px;
+    color: var(--or); text-shadow: 0 3px 0 #8a4b10, 0 0 24px #ffcf5a55; }
+  .regle { margin: 0; max-width: 340px; color: var(--doux); font-size: 1.05rem; line-height: 1.35; }
+  .ligne { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #recAccueil { margin: 0; color: var(--doux); font-size: .95rem; min-height: 1.2em; }
+
+  /* ---------- Étages ---------- */
+  #etages { padding: 12px 14px; gap: 12px; align-items: center; }
+  .barre { display: flex; align-items: center; gap: 12px; width: 100%; padding-right: 50px; }
+  .barre h2 { margin: 0; font-size: 1.5rem; color: var(--or); }
+  #grilleNiv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 420px; }
+  .niv { background: var(--carte); border: 2px solid #343a5c; padding: 8px 4px; display: flex; flex-direction: column;
+    align-items: center; gap: 2px; min-height: 84px; box-shadow: 0 4px 0 #0b0d18; }
+  .niv b { font-size: 1.7rem; }
+  .niv small { color: var(--doux); font-size: .78rem; }
+  .niv .ets { font-size: 1.05rem; letter-spacing: 1px; color: #3d4364; }
+  .niv .ets i { font-style: normal; color: var(--or); }
+  .niv[disabled] { opacity: .45; }
+  .niv.prof { grid-column: 1 / -1; flex-direction: row; justify-content: center; gap: 10px; min-height: 60px;
+    background: linear-gradient(90deg, #2b1f4a, #1b2346); border-color: #6a4fb0; }
+
+  /* ---------- Jeu ---------- */
+  #hud { display: flex; align-items: center; gap: 8px; padding: 4px 56px 2px 6px; height: 54px; flex: none; }
+  #bPause { background: var(--bouton); padding: 0; display: grid; place-items: center; }
+  #bPause svg { width: 20px; height: 20px; }
+  .hmil { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  #coeurs { display: flex; gap: 1px; height: 20px; }
+  #coeurs img { width: 20px; height: 20px; }
+  #coeurs img.perdu { animation: tremble .4s; }
+  .hinfo { display: flex; gap: 10px; font-size: .9rem; color: var(--doux); align-items: center; white-space: nowrap; }
+  .hinfo img { width: 18px; height: 18px; vertical-align: -4px; }
+  .hinfo b { color: var(--texte); }
+  .hscore { text-align: right; line-height: 1; }
+  .hscore small { display: block; color: var(--doux); font-size: .72rem; }
+  .hscore b { font-size: 1.35rem; color: var(--or); }
+  #msg { flex: none; height: 24px; text-align: center; font-size: .92rem; color: #ffe6a6; padding: 0 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .4s; }
+  #zone { flex: 1; position: relative; min-height: 0; }
+  #cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #bas { flex: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px 10px; }
+  #inv { display: grid; grid-template-columns: repeat(2, 62px); gap: 8px; }
+  .case { position: relative; width: 62px; height: 62px; background: var(--carte); border: 2px solid #343a5c;
+    border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; }
+  .case img { width: 34px; height: 34px; }
+  .case span { font-size: .8rem; font-weight: 700; color: var(--texte); line-height: 1; }
+  button.case { border-color: #6a5fb0; box-shadow: 0 3px 0 #0b0d18; }
+  button.case.vide { opacity: .4; }
+  .case.pulse { animation: pulse .5s; }
+  #pad { display: grid; grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(3, 54px); gap: 4px; }
+  #pad button { background: var(--bouton); padding: 0; display: grid; place-items: center; box-shadow: 0 3px 0 #11142a; }
+  #pad button:active { background: #3d4575; transform: translateY(2px); }
+  #pad svg { width: 26px; height: 26px; }
+  .pH { grid-column: 2; grid-row: 1; } .pG { grid-column: 1; grid-row: 2; } .pA { grid-column: 2; grid-row: 2; }
+  .pD { grid-column: 3; grid-row: 2; } .pB { grid-column: 2; grid-row: 3; }
+
+  /* ---------- Fenêtres ---------- */
+  .voile { position: absolute; inset: 0; z-index: 40; background: #05060ecc; display: flex; align-items: center;
+    justify-content: center; padding: 14px; }
+  .carteF { width: 100%; max-width: 370px; background: linear-gradient(#262b48, #171a2e); border: 2px solid #3f4775;
+    border-radius: 22px; padding: 16px 16px 18px; text-align: center; box-shadow: 0 10px 40px #000a; animation: entree .35s; }
+  .carteF h2 { margin: 0 0 8px; color: var(--or); font-size: 1.45rem; }
+  #demo { width: 230px; height: 138px; border-radius: 12px; background: #090a14; }
+  #introTexte { min-height: 3.9em; margin: 10px 0 12px; font-size: 1.05rem; line-height: 1.3; }
+  #bEtoiles { font-size: 3.2rem; letter-spacing: 6px; color: #343a5c; margin: 2px 0; }
+  #bEtoiles span { display: inline-block; }
+  #bEtoiles span.on { color: var(--or); animation: pop .45s; text-shadow: 0 0 18px #ffcf5a99; }
+  #bDetail { color: var(--doux); font-size: .95rem; line-height: 1.5; }
+  #bDetail i { font-style: normal; color: var(--or); }
+  #bScore { font-size: 1.2rem; margin-top: 6px; }
+  #bScore b { font-size: 2rem; color: var(--or); }
+  #bRecord { min-height: 1.4em; color: #8ff0b0; font-weight: 700; }
+  .boutons { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 10px; }
+  .boutons .ligne button { min-width: 120px; }
+  #fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
+
+  @keyframes pop { 0% { transform: scale(0) rotate(-40deg); } 70% { transform: scale(1.35); } 100% { transform: scale(1); } }
+  @keyframes entree { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes pulse { 50% { transform: scale(1.18); border-color: var(--or); } }
+  @keyframes tremble { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+  @media (max-height: 640px) {
+    #pad { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); }
+    .case { width: 54px; height: 54px; } #inv { grid-template-columns: repeat(2, 54px); }
+    #art { height: 150px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <button id="btnSon" aria-label="Couper le son"></button>
+
+  <!-- Écran d'accueil -->
+  <section id="accueil" class="ecran">
+    <canvas id="art"></canvas>
+    <h1>Les Caves<br>de Brumefer</h1>
+    <p class="regle">Guide le lutin dans les caves brumeuses&nbsp;: ramasse les gemmes, trouve l'escalier, et fonce sur les Brumelins pour les faire éclater&nbsp;!</p>
+    <button class="gros" id="bJouer">Jouer</button>
+    <div class="ligne">
+      <button class="second" id="bEtages">Les étages</button>
+      <button class="second" id="bProf">Profondeurs</button>
+    </div>
+    <p id="recAccueil"></p>
+  </section>
+
+  <!-- Choix de l'étage -->
+  <section id="etages" class="ecran cache">
+    <div class="barre"><button class="second" id="bRetour">Retour</button><h2>Les étages</h2></div>
+    <div id="grilleNiv"></div>
+  </section>
+
+  <!-- Partie -->
+  <section id="jeu" class="ecran cache">
+    <header id="hud">
+      <button id="bPause" aria-label="Pause"><svg viewBox="0 0 20 20"><rect x="4" y="3" width="4" height="14" rx="1.5" fill="#f3eee2"/><rect x="12" y="3" width="4" height="14" rx="1.5" fill="#f3eee2"/></svg></button>
+      <div class="hmil">
+        <div id="coeurs"></div>
+        <div class="hinfo"><span id="hEtage">Étage 1</span><span><img id="iGem" alt=""> <b id="hGem">0/0</b></span></div>
+      </div>
+      <div class="hscore"><small>Score</small><b id="hScore">0</b></div>
+    </header>
+    <div id="msg"></div>
+    <div id="zone"><canvas id="cv"></canvas></div>
+    <footer id="bas">
+      <div id="inv">
+        <div class="case" id="cArme"><img id="iArme" alt=""><span id="tArme">force 1</span></div>
+        <div class="case" id="cCle"><img id="iCle" alt=""><span id="tCle">0</span></div>
+        <button class="case" id="bPotion" aria-label="Boire une potion"><img id="iPotion" alt=""><span id="tPotion">0</span></button>
+        <button class="case" id="bParch" aria-label="Lire un parchemin"><img id="iParch" alt=""><span id="tParch">0</span></button>
+      </div>
+      <div id="pad">
+        <button class="pH" data-d="0,-1" aria-label="Haut"><svg viewBox="0 0 24 24"><path d="M12 5 L20 17 H4 Z" fill="#f3eee2"/></svg></button>
+        <button class="pG" data-d="-1,0" aria-label="Gauche"><svg viewBox="0 0 24 24"><path d="M5 12 L17 4 V20 Z" fill="#f3eee2"/></svg></button>
+        <button class="pA" data-d="0,0" aria-label="Attendre un tour"><svg viewBox="0 0 24 24"><path d="M6 3 H18 M6 21 H18 M7 3 C7 9 12 10 12 12 C12 14 7 15 7 21 M17 3 C17 9 12 10 12 12 C12 14 17 15 17 21" stroke="#f3eee2" stroke-width="2" fill="none" stroke-linecap="round"/></svg></button>
+        <button class="pD" data-d="1,0" aria-label="Droite"><svg viewBox="0 0 24 24"><path d="M19 12 L7 4 V20 Z" fill="#f3eee2"/></svg></button>
+        <button class="pB" data-d="0,1" aria-label="Bas"><svg viewBox="0 0 24 24"><path d="M12 19 L20 7 H4 Z" fill="#f3eee2"/></svg></button>
+      </div>
+    </footer>
+  </section>
+
+  <!-- Tutoriel et nouvelles mécaniques -->
+  <div id="intro" class="voile cache">
+    <div class="carteF">
+      <h2 id="introTitre">Comment jouer</h2>
+      <canvas id="demo"></canvas>
+      <p id="introTexte"></p>
+      <button class="gros" id="bCompris">Compris !</button>
+    </div>
+  </div>
+
+  <!-- Bilan de fin d'étage -->
+  <div id="bilan" class="voile cache">
+    <div class="carteF">
+      <h2 id="bTitre">Étage réussi !</h2>
+      <div id="bEtoiles"><span>★</span><span>★</span><span>★</span></div>
+      <div id="bDetail"></div>
+      <div id="bScore">Score : <b id="bPts">0</b></div>
+      <div id="bRecord"></div>
+      <div class="boutons">
+        <button class="gros" id="bSuivant">Niveau suivant</button>
+        <div class="ligne"><button class="second" id="bRejouer">Rejouer</button><button class="second" id="bCarte">Étages</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="voile cache">
+    <div class="carteF">
+      <h2>Pause</h2>
+      <div class="boutons">
+        <button class="gros" id="bReprendre">Reprendre</button>
+        <div class="ligne"><button class="second" id="bRecommencer">Recommencer</button><button class="second" id="bQuitter">Étages</button></div>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="fx"></canvas>
+</div>
+
+<script>
+'use strict';
+// ==========================================================================
+// Les Caves de Brumefer — petit roguelike au tour par tour pour enfants.
+// Un lutin à lanterne explore des caves générées au hasard, ramasse gemmes,
+// clés, potions et armes, et dissipe les Brumelins (créatures de brume).
+// Sections : 1. outils et sauvegarde  2. sons  3. dessins  4. étages
+//            5. génération  6. tours de jeu  7. rendu  8. commandes
+//            9. tutoriel animé  10. écrans  11. confettis  12. démarrage
+// ==========================================================================
+
+// ---------- 1. Outils et sauvegarde ----------
+const $ = (id) => document.getElementById(id);
+const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = (t) => t[Math.floor(Math.random() * t.length)];
+const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+// Typographie française : espace insécable avant ! ? : ; (pas de signe seul en début de ligne)
+const fr = (t) => String(t).replace(/ ([!?:;…])/g, ' $1');
+function melange(t) {
+  const r = t.slice();
+  for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; }
+  return r;
+}
+
+const CLE_SAUVE = 'caves-de-brumefer-v1';
+const sauv = { debloque: 1, etoiles: [], scores: [], prof: 0, profScore: 0, son: true, vus: {}, fini: false };
+function charger() {
+  try {
+    const t = localStorage.getItem(CLE_SAUVE);
+    if (t) Object.assign(sauv, JSON.parse(t));
+  } catch (e) { /* stockage indisponible : on joue sans sauvegarde */ }
+}
+function sauver() {
+  try { localStorage.setItem(CLE_SAUVE, JSON.stringify(sauv)); } catch (e) { /* pas grave */ }
+}
+
+// ---------- 2. Sons (Web Audio, aucun fichier) ----------
+let actx = null, bufBruit = null;
+function reveillerAudio() {
+  if (!actx) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; }
+  }
+  if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
+}
+function ton(f, d, type = 'sine', v = 0.12, f2 = null, delai = 0) {
+  if (!sauv.son || !actx) return;
+  const t = actx.currentTime + delai;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + d);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(actx.destination);
+  o.start(t); o.stop(t + d + 0.03);
+}
+function bruit(d, v = 0.1, freq = 1500, delai = 0) {
+  if (!sauv.son || !actx) return;
+  if (!bufBruit) {
+    bufBruit = actx.createBuffer(1, actx.sampleRate * 0.5, actx.sampleRate);
+    const ch = bufBruit.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+  }
+  const t = actx.currentTime + delai;
+  const s = actx.createBufferSource(), fl = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = bufBruit; fl.type = 'lowpass'; fl.frequency.value = freq;
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  s.connect(fl).connect(g).connect(actx.destination);
+  s.start(t); s.stop(t + d + 0.03);
+}
+const SON = {
+  pas() { ton(210, 0.05, 'triangle', 0.035, 150); },
+  mur() { ton(110, 0.08, 'square', 0.035, 80); },
+  gemme() { ton(988, 0.08, 'sine', 0.11); ton(1480, 0.16, 'sine', 0.09, null, 0.07); },
+  potion() { ton(300, 0.35, 'sine', 0.11, 900); ton(450, 0.3, 'triangle', 0.04, 1200, 0.05); },
+  cle() { ton(1320, 0.1, 'triangle', 0.09); ton(1760, 0.22, 'triangle', 0.07, null, 0.08); },
+  grille() { ton(170, 0.35, 'sawtooth', 0.05, 90); bruit(0.25, 0.07, 700); ton(880, 0.2, 'triangle', 0.06, null, 0.25); },
+  coffre() { [523, 659, 784, 1047].forEach((f, i) => ton(f, 0.15, 'triangle', 0.08, null, i * 0.07)); },
+  coup() { bruit(0.08, 0.14, 1800); ton(240, 0.08, 'square', 0.05, 120); },
+  dissipe() { ton(1200, 0.3, 'sine', 0.08, 300); bruit(0.2, 0.05, 4000, 0.05); },
+  aie() { ton(330, 0.25, 'sawtooth', 0.07, 110); },
+  gonfle() { ton(150, 0.22, 'sine', 0.1, 320); },
+  crache() { bruit(0.2, 0.12, 2500); ton(500, 0.15, 'sine', 0.04, 200); },
+  piques() { ton(700, 0.06, 'square', 0.05, 1200); },
+  parchemin() { [660, 880, 1100, 1320].forEach((f, i) => ton(f, 0.4, 'sine', 0.05, null, i * 0.06)); },
+  appel() { ton(80, 0.6, 'sawtooth', 0.07, 60); ton(120, 0.5, 'square', 0.03, 90, 0.1); },
+  arme() { ton(500, 0.12, 'square', 0.04, 1500); ton(1500, 0.3, 'sine', 0.06, null, 0.1); },
+  victoire() { [523, 659, 784, 1047, 1319].forEach((f, i) => ton(f, 0.25, 'triangle', 0.09, null, i * 0.1)); },
+  epuise() { [392, 330, 262, 196].forEach((f, i) => ton(f, 0.3, 'triangle', 0.08, null, i * 0.16)); },
+  etoile(i) { ton(880 + i * 220, 0.2, 'sine', 0.11); ton(1320 + i * 220, 0.25, 'sine', 0.05, null, 0.05); },
+  clic() { ton(660, 0.05, 'triangle', 0.05); },
+};
+
+// ---------- 3. Dessins (tout est dessiné au canvas) ----------
+// Chaque fonction reçoit le contexte c, le centre (cx, cy) de la case, sa taille s et le temps t.
+function rondRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+function disque(c, x, y, r, coul) { c.fillStyle = coul; c.beginPath(); c.arc(x, y, Math.max(0.1, r), 0, Math.PI * 2); c.fill(); }
+function ombre(c, cx, cy, r) { c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(cx, cy, r, r * 0.35, 0, 0, Math.PI * 2); c.fill(); }
+function yeux(c, cx, cy, s, ecart = 0.1, r = 0.065, regard = 0) {
+  for (const k of [-1, 1]) {
+    disque(c, cx + k * ecart * s, cy, r * s, '#fff');
+    disque(c, cx + k * ecart * s + regard * r * s * 0.4, cy + r * s * 0.15, r * s * 0.55, '#1b1630');
+  }
+}
+function coeur(c, cx, cy, r, coul) {
+  c.fillStyle = coul; c.beginPath();
+  c.moveTo(cx, cy + r * 0.9);
+  c.bezierCurveTo(cx - r * 1.4, cy - r * 0.1, cx - r * 0.7, cy - r * 1.15, cx, cy - r * 0.45);
+  c.bezierCurveTo(cx + r * 0.7, cy - r * 1.15, cx + r * 1.4, cy - r * 0.1, cx, cy + r * 0.9);
+  c.fill();
+}
+
+function dessHeros(c, cx, cy, s, t, dir = 1) {
+  const b = Math.sin(t / 180) * s * 0.015;
+  ombre(c, cx, cy + s * 0.36, s * 0.26);
+  // lueur de la lanterne
+  const lx = cx + dir * s * 0.3, ly = cy + s * 0.12 + b;
+  const g = c.createRadialGradient(lx, ly, 0, lx, ly, s * 0.45);
+  g.addColorStop(0, 'rgba(255,220,120,.55)'); g.addColorStop(1, 'rgba(255,220,120,0)');
+  c.fillStyle = g; c.fillRect(lx - s * 0.5, ly - s * 0.5, s, s);
+  // cape
+  c.fillStyle = '#d9643a'; c.beginPath();
+  c.moveTo(cx - s * 0.27, cy + s * 0.35);
+  c.quadraticCurveTo(cx, cy - s * 0.3 + b, cx + s * 0.27, cy + s * 0.35); c.closePath(); c.fill();
+  // tête
+  disque(c, cx, cy - s * 0.06 + b, s * 0.17, '#ffdcb5');
+  // capuche pointue
+  c.fillStyle = '#b8452a'; c.beginPath();
+  c.moveTo(cx - s * 0.2, cy - s * 0.03 + b);
+  c.quadraticCurveTo(cx - s * 0.2, cy - s * 0.3 + b, cx - dir * s * 0.08, cy - s * 0.44 + b);
+  c.quadraticCurveTo(cx + s * 0.2, cy - s * 0.3 + b, cx + s * 0.2, cy - s * 0.03 + b);
+  c.quadraticCurveTo(cx, cy - s * 0.2 + b, cx - s * 0.2, cy - s * 0.03 + b); c.fill();
+  // visage
+  disque(c, cx - s * 0.055 + dir * s * 0.03, cy - s * 0.04 + b, s * 0.028, '#2a1d14');
+  disque(c, cx + s * 0.055 + dir * s * 0.03, cy - s * 0.04 + b, s * 0.028, '#2a1d14');
+  disque(c, cx - s * 0.1 + dir * s * 0.03, cy + s * 0.02 + b, s * 0.03, '#ff9d8a');
+  disque(c, cx + s * 0.1 + dir * s * 0.03, cy + s * 0.02 + b, s * 0.03, '#ff9d8a');
+  // lanterne
+  c.fillStyle = '#5a4630'; c.fillRect(lx - s * 0.01, ly - s * 0.13, s * 0.02, s * 0.06);
+  c.fillStyle = '#ffd86b'; rondRect(c, lx - s * 0.07, ly - s * 0.08, s * 0.14, s * 0.16, s * 0.03); c.fill();
+  c.fillStyle = '#7a5a34'; c.fillRect(lx - s * 0.08, ly - s * 0.09, s * 0.16, s * 0.03);
+}
+
+function dessGluant(c, cx, cy, s, t) {
+  const q = Math.sin(t / 250) * 0.05;
+  ombre(c, cx, cy + s * 0.32, s * 0.3);
+  const w = s * (0.34 + q), h = s * (0.32 - q), base = cy + s * 0.32;
+  c.fillStyle = '#62c95d'; c.beginPath();
+  c.moveTo(cx - w, base); c.bezierCurveTo(cx - w, base - h * 1.7, cx + w, base - h * 1.7, cx + w, base); c.closePath(); c.fill();
+  disque(c, cx - w * 0.4, base - h * 0.95, s * 0.06, 'rgba(255,255,255,.45)');
+  yeux(c, cx, base - h * 0.55, s, 0.1, 0.07);
+}
+function dessChauve(c, cx, cy, s, t) {
+  const f = Math.sin(t / 70), by = cy + Math.sin(t / 160) * s * 0.05 - s * 0.05;
+  ombre(c, cx, cy + s * 0.36, s * 0.18);
+  c.fillStyle = '#8a6ad6';
+  for (const k of [-1, 1]) {
+    c.beginPath(); c.moveTo(cx + k * s * 0.1, by);
+    c.lineTo(cx + k * s * 0.44, by - s * 0.18 * f - s * 0.04);
+    c.lineTo(cx + k * s * 0.36, by + s * 0.1);
+    c.lineTo(cx + k * s * 0.22, by + s * 0.05); c.closePath(); c.fill();
+  }
+  c.fillStyle = '#5d3f9e';
+  for (const k of [-1, 1]) { c.beginPath(); c.moveTo(cx + k * s * 0.05, by - s * 0.12); c.lineTo(cx + k * s * 0.13, by - s * 0.27); c.lineTo(cx + k * s * 0.15, by - s * 0.08); c.fill(); }
+  disque(c, cx, by, s * 0.17, '#5d3f9e');
+  for (const k of [-1, 1]) disque(c, cx + k * s * 0.065, by - s * 0.02, s * 0.04, '#ffe680');
+  disque(c, cx, by + s * 0.07, s * 0.025, '#2a1d40');
+}
+function dessChampi(c, cx, cy, s, t, alerte) {
+  const sx = alerte ? Math.sin(t / 30) * s * 0.03 : 0;
+  ombre(c, cx, cy + s * 0.36, s * 0.24);
+  c.fillStyle = '#f1e3c6'; rondRect(c, cx - s * 0.15 + sx, cy - s * 0.02, s * 0.3, s * 0.36, s * 0.07); c.fill();
+  c.fillStyle = '#d8433b'; c.beginPath(); c.ellipse(cx + sx, cy + s * 0.02, s * 0.38, s * 0.34, 0, Math.PI, 0); c.closePath(); c.fill();
+  for (const [dx, dy, r] of [[-0.2, -0.08, 0.06], [0.05, -0.2, 0.07], [0.22, -0.06, 0.05]]) disque(c, cx + dx * s + sx, cy + dy * s, r * s, '#fff3e6');
+  if (alerte) yeux(c, cx + sx, cy + s * 0.14, s, 0.07, 0.045);
+  else {
+    c.strokeStyle = '#4a3420'; c.lineWidth = s * 0.03; c.beginPath();
+    c.moveTo(cx - s * 0.1, cy + s * 0.14); c.lineTo(cx - s * 0.03, cy + s * 0.14);
+    c.moveTo(cx + s * 0.03, cy + s * 0.14); c.lineTo(cx + s * 0.1, cy + s * 0.14); c.stroke();
+  }
+}
+function dessCrapaud(c, cx, cy, s, t, charge) {
+  const g = charge ? 1.15 + Math.sin(t / 60) * 0.04 : 1;
+  ombre(c, cx, cy + s * 0.34, s * 0.3);
+  c.fillStyle = '#3fa58f'; c.beginPath(); c.ellipse(cx, cy + s * 0.13, s * 0.33 * g, s * 0.22 * g, 0, 0, Math.PI * 2); c.fill();
+  disque(c, cx - s * 0.15, cy - s * 0.08, s * 0.1, '#3fa58f');
+  disque(c, cx + s * 0.15, cy - s * 0.08, s * 0.1, '#3fa58f');
+  yeux(c, cx, cy - s * 0.08, s, 0.15, 0.06);
+  if (charge) disque(c, cx, cy + s * 0.22, s * 0.13, '#a8f0d6');
+  c.strokeStyle = '#1f5a4c'; c.lineWidth = s * 0.03; c.beginPath(); c.arc(cx, cy + s * 0.08, s * 0.12, 0.2, Math.PI - 0.2); c.stroke();
+  if (charge) {
+    disque(c, cx + s * 0.28, cy - s * 0.34, s * 0.15, '#ffd84a');
+    c.fillStyle = '#3a2306'; c.font = `900 ${s * 0.24}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('!', cx + s * 0.28, cy - s * 0.33);
+  }
+}
+function dessFollet(c, cx, cy, s, t) {
+  const by = cy + Math.sin(t / 200) * s * 0.06;
+  c.save(); c.globalAlpha = 0.88;
+  c.fillStyle = '#a6e6ff'; c.beginPath();
+  c.moveTo(cx - s * 0.2, by);
+  for (let k = 0; k <= 4; k++) c.lineTo(cx - s * 0.2 + k * s * 0.1, by + s * 0.3 + (k % 2 ? -s * 0.08 : 0) + Math.sin(t / 120 + k) * s * 0.03);
+  c.lineTo(cx + s * 0.2, by); c.fill();
+  const g = c.createRadialGradient(cx, by - s * 0.05, 0, cx, by - s * 0.05, s * 0.32);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, '#bdefff'); g.addColorStop(1, 'rgba(120,210,255,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(cx, by - s * 0.05, s * 0.32, 0, Math.PI * 2); c.fill();
+  disque(c, cx, by - s * 0.02, s * 0.2, '#d8f6ff');
+  c.restore();
+  disque(c, cx - s * 0.07, by - s * 0.04, s * 0.035, '#2c4a6a');
+  disque(c, cx + s * 0.07, by - s * 0.04, s * 0.035, '#2c4a6a');
+  disque(c, cx, by + s * 0.05, s * 0.025, '#2c4a6a');
+}
+function dessGardien(c, cx, cy, s, t) {
+  const z = s * 1.3, y0 = cy - s * 0.12 + Math.sin(t / 400) * s * 0.02;
+  ombre(c, cx, cy + s * 0.4, s * 0.45);
+  disque(c, cx - z * 0.4, y0 + z * 0.12, z * 0.14, '#55526a');
+  disque(c, cx + z * 0.4, y0 + z * 0.12, z * 0.14, '#55526a');
+  c.fillStyle = '#6b6880'; rondRect(c, cx - z * 0.32, y0 - z * 0.25, z * 0.64, z * 0.62, z * 0.16); c.fill();
+  c.strokeStyle = '#4c4a5e'; c.lineWidth = z * 0.025; c.beginPath();
+  c.moveTo(cx - z * 0.2, y0 + z * 0.2); c.lineTo(cx - z * 0.08, y0 + z * 0.1); c.lineTo(cx - z * 0.12, y0 + z * 0.3); c.stroke();
+  c.fillStyle = '#b98cff'; c.beginPath();
+  c.moveTo(cx, y0 - z * 0.46); c.lineTo(cx + z * 0.09, y0 - z * 0.3); c.lineTo(cx, y0 - z * 0.2); c.lineTo(cx - z * 0.09, y0 - z * 0.3); c.fill();
+  const lu = 0.7 + Math.sin(t / 150) * 0.3;
+  c.fillStyle = `rgba(214,180,255,${lu})`;
+  c.fillRect(cx - z * 0.17, y0 - z * 0.08, z * 0.11, z * 0.06); c.fillRect(cx + z * 0.06, y0 - z * 0.08, z * 0.11, z * 0.06);
+}
+const DESS_ENNEMI = { gluant: dessGluant, chauve: dessChauve, champi: dessChampi, crapaud: dessCrapaud, follet: dessFollet, gardien: dessGardien };
+const COUL_ENNEMI = { gluant: '#7be276', chauve: '#a98af0', champi: '#ff7a6e', crapaud: '#66d6bb', follet: '#c7f1ff', gardien: '#c9a4ff' };
+
+// Objets posés au sol
+function dessGemme(c, cx, cy, s, t, coul = '#5ad1ff') {
+  const by = cy + Math.sin(t / 300 + cx) * s * 0.04;
+  ombre(c, cx, cy + s * 0.3, s * 0.16);
+  c.fillStyle = coul; c.beginPath();
+  c.moveTo(cx - s * 0.19, by - s * 0.06); c.lineTo(cx - s * 0.09, by - s * 0.19); c.lineTo(cx + s * 0.09, by - s * 0.19);
+  c.lineTo(cx + s * 0.19, by - s * 0.06); c.lineTo(cx, by + s * 0.21); c.closePath(); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.5)'; c.beginPath();
+  c.moveTo(cx - s * 0.09, by - s * 0.19); c.lineTo(cx, by - s * 0.06); c.lineTo(cx - s * 0.19, by - s * 0.06); c.fill();
+  c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = s * 0.015; c.beginPath();
+  c.moveTo(cx - s * 0.19, by - s * 0.06); c.lineTo(cx + s * 0.19, by - s * 0.06); c.stroke();
+}
+function dessPotion(c, cx, cy, s) {
+  ombre(c, cx, cy + s * 0.3, s * 0.18);
+  c.fillStyle = '#cfe8ff'; c.fillRect(cx - s * 0.06, cy - s * 0.2, s * 0.12, s * 0.14);
+  disque(c, cx, cy + s * 0.08, s * 0.19, '#cfe8ff');
+  disque(c, cx, cy + s * 0.1, s * 0.15, '#ef4f78');
+  disque(c, cx - s * 0.06, cy + s * 0.04, s * 0.04, 'rgba(255,255,255,.6)');
+  c.fillStyle = '#8a5a34'; rondRect(c, cx - s * 0.08, cy - s * 0.27, s * 0.16, s * 0.09, s * 0.03); c.fill();
+}
+function dessCle(c, cx, cy, s) {
+  ombre(c, cx, cy + s * 0.28, s * 0.2);
+  c.strokeStyle = '#f2c14e'; c.lineWidth = s * 0.07; c.lineCap = 'round';
+  c.beginPath(); c.arc(cx - s * 0.13, cy, s * 0.1, 0, Math.PI * 2); c.stroke();
+  c.beginPath(); c.moveTo(cx - s * 0.03, cy); c.lineTo(cx + s * 0.24, cy);
+  c.moveTo(cx + s * 0.18, cy); c.lineTo(cx + s * 0.18, cy + s * 0.1);
+  c.moveTo(cx + s * 0.08, cy); c.lineTo(cx + s * 0.08, cy + s * 0.08); c.stroke();
+  c.lineCap = 'butt';
+}
+function dessArme(c, cx, cy, s, t, sorte = 'fer') {
+  ombre(c, cx, cy + s * 0.3, s * 0.2);
+  c.save(); c.translate(cx, cy); c.rotate(-Math.PI / 4);
+  if (sorte === 'baton') {
+    c.fillStyle = '#9a6a3c'; rondRect(c, -s * 0.04, -s * 0.34, s * 0.08, s * 0.66, s * 0.04); c.fill();
+    disque(c, 0, -s * 0.34, s * 0.07, '#7cd06c');
+  } else {
+    c.fillStyle = sorte === 'cristal' ? '#8fe6ff' : '#d3d9e4';
+    c.beginPath(); c.moveTo(-s * 0.05, s * 0.08); c.lineTo(-s * 0.05, -s * 0.28); c.lineTo(0, -s * 0.36); c.lineTo(s * 0.05, -s * 0.28); c.lineTo(s * 0.05, s * 0.08); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(-s * 0.015, -s * 0.28, s * 0.02, s * 0.34);
+    c.fillStyle = '#f2c14e'; c.fillRect(-s * 0.15, s * 0.08, s * 0.3, s * 0.06);
+    c.fillStyle = '#7a4a26'; c.fillRect(-s * 0.035, s * 0.14, s * 0.07, s * 0.16);
+  }
+  c.restore();
+}
+function dessParchemin(c, cx, cy, s) {
+  ombre(c, cx, cy + s * 0.3, s * 0.22);
+  c.fillStyle = '#f0dfb0'; c.fillRect(cx - s * 0.18, cy - s * 0.17, s * 0.36, s * 0.34);
+  c.fillStyle = '#d4b77a'; disque(c, cx - s * 0.2, cy - s * 0.17, s * 0.06, '#d4b77a'); disque(c, cx + s * 0.2, cy - s * 0.17, s * 0.06, '#d4b77a');
+  c.fillRect(cx - s * 0.2, cy - s * 0.23, s * 0.4, s * 0.06);
+  c.strokeStyle = '#a0845a'; c.lineWidth = s * 0.02; c.beginPath();
+  for (let k = 0; k < 3; k++) { c.moveTo(cx - s * 0.12, cy - s * 0.06 + k * s * 0.08); c.lineTo(cx + s * 0.12, cy - s * 0.06 + k * s * 0.08); }
+  c.stroke();
+  disque(c, cx + s * 0.1, cy + s * 0.12, s * 0.05, '#ffd84a');
+}
+function dessCoffre(c, cx, cy, s, t, ouvert) {
+  ombre(c, cx, cy + s * 0.32, s * 0.3);
+  c.fillStyle = '#9a5b2e'; c.fillRect(cx - s * 0.28, cy - s * 0.04, s * 0.56, s * 0.32);
+  if (ouvert) {
+    c.fillStyle = '#5b3418'; c.fillRect(cx - s * 0.28, cy - s * 0.2, s * 0.56, s * 0.16);
+    c.fillStyle = '#2b1a0c'; c.fillRect(cx - s * 0.24, cy - s * 0.06, s * 0.48, s * 0.06);
+  } else {
+    c.fillStyle = '#b06b38'; rondRect(c, cx - s * 0.28, cy - s * 0.2, s * 0.56, s * 0.18, s * 0.08); c.fill();
+    c.fillStyle = '#f2c14e'; c.fillRect(cx - s * 0.05, cy - s * 0.08, s * 0.1, s * 0.13);
+  }
+  c.fillStyle = '#f2c14e'; c.fillRect(cx - s * 0.28, cy + s * 0.08, s * 0.56, s * 0.04);
+}
+function dessCristal(c, cx, cy, s, t) {
+  const by = cy + Math.sin(t / 250) * s * 0.05;
+  const g = c.createRadialGradient(cx, by, 0, cx, by, s * 0.5);
+  g.addColorStop(0, 'rgba(200,160,255,.7)'); g.addColorStop(1, 'rgba(200,160,255,0)');
+  c.fillStyle = g; c.fillRect(cx - s * 0.5, by - s * 0.5, s, s);
+  c.fillStyle = '#c59bff'; c.beginPath();
+  c.moveTo(cx, by - s * 0.34); c.lineTo(cx + s * 0.17, by - s * 0.05); c.lineTo(cx, by + s * 0.3); c.lineTo(cx - s * 0.17, by - s * 0.05); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath();
+  c.moveTo(cx, by - s * 0.34); c.lineTo(cx - s * 0.17, by - s * 0.05); c.lineTo(cx, by); c.fill();
+}
+function dessItem(c, it, cx, cy, s, t) {
+  switch (it.t) {
+    case 'gemme': return dessGemme(c, cx, cy, s, t, it.c);
+    case 'potion': return dessPotion(c, cx, cy, s);
+    case 'cle': return dessCle(c, cx, cy, s);
+    case 'arme': return dessArme(c, cx, cy, s, t, it.a);
+    case 'parchemin': return dessParchemin(c, cx, cy, s);
+    case 'coffre': return dessCoffre(c, cx, cy, s, t, false);
+    case 'ouvert': return dessCoffre(c, cx, cy, s, t, true);
+    case 'cristal': return dessCristal(c, cx, cy, s, t);
+  }
+}
+
+// Cases du décor (x, y = coin haut-gauche)
+function dessSol(c, x, y, s, gx, gy) {
+  c.fillStyle = (gx + gy) % 2 ? '#474e6b' : '#434a66'; c.fillRect(x, y, s + 0.5, s + 0.5);
+  if ((gx * 7 + gy * 13) % 5 === 0) disque(c, x + s * 0.3, y + s * 0.7, s * 0.05, '#4c5370');
+  if ((gx * 11 + gy * 3) % 7 === 0) disque(c, x + s * 0.72, y + s * 0.28, s * 0.04, '#33384d');
+}
+function dessMur(c, x, y, s, devant) {
+  c.fillStyle = '#272c45'; c.fillRect(x, y, s + 0.5, s + 0.5);
+  c.strokeStyle = '#343a5c'; c.lineWidth = Math.max(1, s * 0.04); c.strokeRect(x + s * 0.06, y + s * 0.06, s * 0.88, s * 0.88);
+  if (devant) { // face avant du mur, visible depuis le sol
+    c.fillStyle = '#3f4870'; c.fillRect(x, y + s * 0.45, s + 0.5, s * 0.55 + 0.5);
+    c.strokeStyle = '#2a3049'; c.lineWidth = Math.max(1, s * 0.03); c.beginPath();
+    c.moveTo(x, y + s * 0.72); c.lineTo(x + s, y + s * 0.72);
+    c.moveTo(x + s * 0.5, y + s * 0.45); c.lineTo(x + s * 0.5, y + s * 0.72);
+    c.moveTo(x + s * 0.25, y + s * 0.72); c.lineTo(x + s * 0.25, y + s); c.moveTo(x + s * 0.75, y + s * 0.72); c.lineTo(x + s * 0.75, y + s);
+    c.stroke();
+    c.fillStyle = '#454d72'; c.fillRect(x, y + s * 0.42, s + 0.5, s * 0.05);
+  }
+}
+function dessEscalier(c, x, y, s, ferme) {
+  c.fillStyle = '#0e1019'; c.fillRect(x + s * 0.1, y + s * 0.1, s * 0.8, s * 0.8);
+  for (let k = 0; k < 4; k++) {
+    c.fillStyle = ['#8a90ab', '#6d738f', '#525871', '#3a3f55'][k];
+    c.fillRect(x + s * 0.1, y + s * (0.12 + k * 0.18), s * 0.8, s * 0.12);
+  }
+  if (ferme) {
+    c.fillStyle = '#b4bccc';
+    for (let k = 0; k < 5; k++) c.fillRect(x + s * (0.14 + k * 0.17), y + s * 0.06, s * 0.05, s * 0.88);
+    c.fillRect(x + s * 0.08, y + s * 0.08, s * 0.84, s * 0.06); c.fillRect(x + s * 0.08, y + s * 0.86, s * 0.84, s * 0.06);
+    c.fillStyle = '#f2c14e'; rondRect(c, x + s * 0.38, y + s * 0.42, s * 0.24, s * 0.2, s * 0.04); c.fill();
+    c.fillStyle = '#3a2306'; c.fillRect(x + s * 0.48, y + s * 0.48, s * 0.04, s * 0.08);
+  }
+}
+function dessPiques(c, x, y, s, leve) {
+  c.fillStyle = '#2b3045'; rondRect(c, x + s * 0.08, y + s * 0.08, s * 0.84, s * 0.84, s * 0.1); c.fill();
+  for (const [px, py] of [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]]) {
+    if (leve) {
+      c.fillStyle = '#e6eaf2'; c.beginPath();
+      c.moveTo(x + s * (px - 0.11), y + s * (py + 0.11)); c.lineTo(x + s * px, y + s * (py - 0.16)); c.lineTo(x + s * (px + 0.11), y + s * (py + 0.11)); c.fill();
+      c.fillStyle = '#9aa2b6'; c.beginPath();
+      c.moveTo(x + s * px, y + s * (py - 0.16)); c.lineTo(x + s * (px + 0.11), y + s * (py + 0.11)); c.lineTo(x + s * px, y + s * (py + 0.11)); c.fill();
+    } else disque(c, x + s * px, y + s * py, s * 0.05, '#141724');
+  }
+}
+// Petite main du tutoriel (bout du doigt en x, y)
+function dessMain(c, x, y, s) {
+  c.save();
+  c.fillStyle = '#fff'; c.strokeStyle = '#1b1630'; c.lineWidth = s * 0.04;
+  rondRect(c, x - s * 0.07, y, s * 0.14, s * 0.36, s * 0.07); c.fill(); c.stroke();
+  rondRect(c, x - s * 0.17, y + s * 0.24, s * 0.36, s * 0.3, s * 0.1); c.fill(); c.stroke();
+  c.restore();
+}
+
+// Icônes de l'interface, fabriquées une fois avec les mêmes dessins
+function icone(f, taille = 64) {
+  const k = document.createElement('canvas');
+  k.width = k.height = taille;
+  f(k.getContext('2d'), taille / 2, taille / 2, taille);
+  return k.toDataURL();
+}
+const ICONES = {};
+function preparerIcones() {
+  ICONES.coeur = icone((c, x, y, s) => coeur(c, x, y + s * 0.06, s * 0.36, '#ff5d73'));
+  ICONES.vide = icone((c, x, y, s) => coeur(c, x, y + s * 0.06, s * 0.36, '#3a3f5c'));
+  ICONES.gemme = icone((c, x, y, s) => dessGemme(c, x, y, s * 1.4, 0, '#5ad1ff'));
+  ICONES.potion = icone((c, x, y, s) => dessPotion(c, x, y, s * 1.1));
+  ICONES.cle = icone((c, x, y, s) => dessCle(c, x, y, s * 1.2));
+  ICONES.parchemin = icone((c, x, y, s) => dessParchemin(c, x, y, s * 1.1));
+  for (const a of ['baton', 'fer', 'cristal']) ICONES[a] = icone((c, x, y, s) => dessArme(c, x, y, s * 1.1, 0, a));
+}
+
+// ---------- 4. Les étages ----------
+const ARMES = {
+  baton: { nom: 'Bâton', deg: 1, rang: 0 },
+  fer: { nom: 'Épée de fer', deg: 2, rang: 1 },
+  cristal: { nom: 'Épée de cristal', deg: 3, rang: 2 },
+};
+const TYPES = { gluant: 2, chauve: 1, champi: 3, crapaud: 2, follet: 2, gardien: 12 };
+const ETAGES = [
+  { taille: 20, salles: 5, gemmes: 6, ennemis: {}, potions: 0, pv: 5, arme: 'baton', intros: ['tuto'] },
+  { taille: 24, salles: 5, gemmes: 7, ennemis: { gluant: 3 }, potions: 2, pv: 5, arme: 'baton', intros: ['gluant', 'potion'] },
+  { taille: 26, salles: 6, gemmes: 8, ennemis: { gluant: 2, chauve: 3 }, potions: 2, armes: ['fer'], pv: 5, arme: 'baton', intros: ['chauve', 'arme'] },
+  { taille: 28, salles: 7, gemmes: 8, ennemis: { gluant: 3, chauve: 3 }, potions: 2, cles: true, coffre: 1, pv: 5, arme: 'fer', intros: ['cle'] },
+  { taille: 30, salles: 7, gemmes: 9, ennemis: { gluant: 2, chauve: 2, champi: 3 }, potions: 3, cles: true, coffre: 1, pv: 5, arme: 'fer', intros: ['champi'] },
+  { taille: 30, salles: 8, gemmes: 9, ennemis: { gluant: 3, chauve: 3, champi: 2 }, potions: 3, cles: true, coffre: 1, piques: 14, pv: 6, arme: 'fer', intros: ['piques'] },
+  { taille: 32, salles: 8, gemmes: 10, ennemis: { gluant: 2, chauve: 3, champi: 2, crapaud: 3 }, potions: 3, cles: true, coffre: 1, piques: 10, pv: 6, arme: 'fer', intros: ['crapaud'] },
+  { taille: 36, salles: 9, gemmes: 11, ennemis: { gluant: 3, chauve: 3, champi: 2, crapaud: 4 }, potions: 3, cles: true, coffre: 2, piques: 12, parchemins: 2, armes: ['cristal'], pv: 6, arme: 'fer', intros: ['parchemin', 'cristal'] },
+  { taille: 38, salles: 10, gemmes: 12, ennemis: { gluant: 3, chauve: 3, champi: 2, crapaud: 3, follet: 4 }, potions: 4, cles: true, coffre: 2, piques: 12, parchemins: 1, armes: ['cristal'], pv: 6, arme: 'fer', intros: ['follet'] },
+  { taille: 34, salles: 9, gemmes: 10, ennemis: { gluant: 2, chauve: 2, champi: 1, crapaud: 2, follet: 2 }, potions: 4, boss: true, piques: 8, parchemins: 1, armes: ['cristal'], pv: 7, arme: 'fer', intros: ['gardien'] },
+];
+const NB_ETAGES = ETAGES.length;
+// Profondeurs : étages sans fin qui mélangent tout, de plus en plus chargés.
+function cfgProf(p) {
+  const types = p < 3 ? ['gluant', 'chauve', 'champi', 'crapaud'] : ['gluant', 'chauve', 'champi', 'crapaud', 'follet'];
+  const ennemis = {};
+  for (let k = 0; k < 6 + Math.min(p, 12); k++) { const t = pick(types); ennemis[t] = (ennemis[t] || 0) + 1; }
+  const boss = p % 5 === 0;
+  return {
+    taille: 30 + Math.min(p * 2, 10), salles: 7 + Math.min(p, 4), gemmes: 8 + Math.min(p, 5), ennemis,
+    potions: p % 2 ? 2 : 1, cles: !boss && p % 2 === 0, coffre: !boss && p % 2 === 0 ? 1 : 0, boss,
+    piques: 6 + Math.min(p * 2, 12), parchemins: p % 3 === 0 ? 1 : 0, armes: p === 1 ? ['cristal'] : [],
+    pv: 7, arme: 'fer', intros: [],
+  };
+}
+
+// ---------- 5. Génération de la cave ----------
+function bfs(grid, W, H, sx, sy) {
+  const dist = new Int16Array(W * H).fill(-1);
+  const file = [sy * W + sx]; dist[file[0]] = 0;
+  for (let k = 0; k < file.length; k++) {
+    const i = file[k], x = i % W, y = (i / W) | 0;
+    for (const [dx, dy] of DIRS) {
+      const nx = x + dx, ny = y + dy, j = ny * W + nx;
+      if (nx < 0 || ny < 0 || nx >= W || ny >= H || grid[j] === 0 || dist[j] >= 0) continue;
+      dist[j] = dist[i] + 1; file.push(j);
+    }
+  }
+  return dist;
+}
+function essaiCave(cfg) {
+  const W = cfg.taille, H = cfg.taille;
+  const grid = new Uint8Array(W * H);   // 0 mur, 1 sol, 2 escalier, 3 escalier fermé (grille)
+  const salles = [];
+  for (let k = 0; k < 600 && salles.length < cfg.salles; k++) {
+    const w = ri(4, 8), h = ri(4, 7), x = ri(1, W - w - 1), y = ri(1, H - h - 1);
+    if (salles.some((r) => x < r.x + r.w + 1 && x + w + 1 > r.x && y < r.y + r.h + 1 && y + h + 1 > r.y)) continue;
+    salles.push({ x, y, w, h, cx: x + (w >> 1), cy: y + (h >> 1) });
+    for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) grid[yy * W + xx] = 1;
+  }
+  if (salles.length < 4) return null;
+  // Couloirs en L : chaque salle est reliée à la plus proche des précédentes, plus deux boucles.
+  const relier = (a, b) => {
+    let x = a.cx, y = a.cy;
+    const horiz = () => { while (x !== b.cx) { x += Math.sign(b.cx - x); grid[y * W + x] = 1; } };
+    const vert = () => { while (y !== b.cy) { y += Math.sign(b.cy - y); grid[y * W + x] = 1; } };
+    if (Math.random() < 0.5) { horiz(); vert(); } else { vert(); horiz(); }
+  };
+  for (let i = 1; i < salles.length; i++) {
+    let best = 0, bd = 1e9;
+    for (let j = 0; j < i; j++) {
+      const d = Math.abs(salles[i].cx - salles[j].cx) + Math.abs(salles[i].cy - salles[j].cy);
+      if (d < bd) { bd = d; best = j; }
+    }
+    relier(salles[i], salles[best]);
+  }
+  for (let k = 0; k < 2; k++) { const a = pick(salles), b = pick(salles); if (a !== b) relier(a, b); }
+  const dep = salles[0];
+  const dist = bfs(grid, W, H, dep.cx, dep.cy);
+  let fin = salles[1], fd = -1;
+  for (const r of salles) { const d = dist[r.cy * W + r.cx]; if (d > fd) { fd = d; fin = r; } }
+  if (fd < Math.min(14, cfg.taille * 0.6)) return null;
+  return { W, H, grid, salles, dep, fin, dist };
+}
+function genererCave(cfg) {
+  for (let k = 0; k < 80; k++) { const c = essaiCave(cfg); if (c) return c; }
+  return essaiCave({ ...cfg, salles: 4, taille: cfg.taille + 4 }) || essaiCave({ ...cfg, salles: 4, taille: 40 });
+}
+
+const COUL_GEMMES = ['#5ad1ff', '#ff6fae', '#7dff8a', '#ffd75a', '#c18bff'];
+function nouvelEnnemi(t, x, y) {
+  return { t, x, y, px: x, py: y, pv: TYPES[t], max: TYPES[t], n: 0, s: 0, cd: 0, eveil: false, charge: false, ax: 0, ay: 0, flash: 0 };
+}
+function peupler(cfg, cave) {
+  const { W, grid, salles, dep, fin, dist } = cave;
+  const occ = new Set([dep.cy * W + dep.cx]);
+  const items = new Map(), ens = [], piq = new Map();
+  const hors = salles.filter((r) => r !== dep);
+  const dansSalle = (i) => { const x = i % W, y = (i / W) | 0; return salles.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h); };
+  // Une case libre au hasard dans une des salles données, assez loin du départ.
+  const caseLibre = (liste, dmin = 2) => {
+    for (let k = 0; k < 300; k++) {
+      const r = pick(liste), x = ri(r.x, r.x + r.w - 1), y = ri(r.y, r.y + r.h - 1), i = y * W + x;
+      if (grid[i] !== 1 || occ.has(i) || dist[i] < dmin) continue;
+      occ.add(i); return i;
+    }
+    return -1;
+  };
+  const poser = (it, liste, dmin) => { const i = caseLibre(liste, dmin); if (i >= 0) items.set(i, it); return i; };
+  const reste = { ...cfg.ennemis };
+
+  // La sortie, ou le Gardien qui garde le Cristal.
+  const iS = fin.cy * W + fin.cx; occ.add(iS);
+  if (cfg.boss) ens.push(nouvelEnnemi('gardien', fin.cx, fin.cy));
+  else grid[iS] = cfg.cles ? 3 : 2;
+
+  if (cfg.cles) {
+    const autres = salles.filter((r) => r !== dep && r !== fin);
+    const iC = poser({ t: 'cle' }, autres.length ? autres : hors, 6);
+    // Un champignon garde la clé de la grille.
+    if (iC >= 0 && reste.champi > 0) {
+      const kx = iC % W, ky = (iC / W) | 0;
+      const voisins = DIRS.map(([dx, dy]) => (ky + dy) * W + kx + dx).filter((j) => grid[j] === 1 && !occ.has(j));
+      if (voisins.length) { const j = pick(voisins); occ.add(j); ens.push(nouvelEnnemi('champi', j % W, (j / W) | 0)); reste.champi--; }
+    }
+    for (let k = 0; k < (cfg.coffre || 0); k++) { poser({ t: 'coffre' }, hors, 4); poser({ t: 'cle' }, hors, 4); }
+  }
+  // Armes : l'épée de fer de l'étage 3 est près du départ.
+  for (const a of cfg.armes || []) {
+    const proches = hors.slice().sort((p, q) => dist[p.cy * W + p.cx] - dist[q.cy * W + q.cx]);
+    poser({ t: 'arme', a }, a === 'fer' ? [proches[0]] : hors, 3);
+  }
+  let gemmes = 0;
+  for (let k = 0; k < cfg.gemmes; k++) if (poser({ t: 'gemme', c: pick(COUL_GEMMES) }, salles, 2) >= 0) gemmes++;
+  for (let k = 0; k < (cfg.potions || 0); k++) poser({ t: 'potion' }, hors, 3);
+  for (let k = 0; k < (cfg.parchemins || 0); k++) poser({ t: 'parchemin' }, salles, 2);
+  for (const t of Object.keys(reste)) {
+    for (let k = 0; k < reste[t]; k++) {
+      const i = caseLibre(hors, 7);
+      if (i >= 0) ens.push(nouvelEnnemi(t, i % W, (i / W) | 0));
+    }
+  }
+  // Dalles à piques, surtout dans les couloirs.
+  for (let k = 0, essais = 0; k < (cfg.piques || 0) && essais < 3000; essais++) {
+    const i = ri(0, grid.length - 1);
+    if (grid[i] !== 1 || occ.has(i) || dist[i] < 3) continue;
+    if (dansSalle(i) && Math.random() < 0.65) continue;
+    occ.add(i); piq.set(i, ri(0, 1)); k++;
+  }
+  return { items, ens, piq, gemmes };
+}
+
+// ---------- 6. Tours de jeu ----------
+let S = null;            // état de la partie en cours
+let ecranCourant = 'accueil';
+let dernAction = 0;
+const idx = (x, y) => y * S.W + x;
+
+function lancer(mode, n, report) {
+  const cfg = mode === 'prof' ? cfgProf(n) : ETAGES[n - 1];
+  const cave = genererCave(cfg);
+  const pop = peupler(cfg, cave);
+  S = {
+    mode, n, cfg, W: cave.W, H: cave.H, grid: cave.grid,
+    seen: new Uint8Array(cave.W * cave.H), vis: new Uint8Array(cave.W * cave.H), dist: null,
+    items: pop.items, ens: pop.ens, piq: pop.piq, gemmesTot: pop.gemmes,
+    h: { x: cave.dep.cx, y: cave.dep.cy, px: cave.dep.cx, py: cave.dep.cy, dir: 1, ax: 0, ay: 0 },
+    pv: cfg.pv, pvMax: cfg.pv, arme: ARMES[cfg.arme], potions: 0, parchemins: 0, cles: 0,
+    gemmes: 0, vaincus: 0, perdu: 0, score: 0, tour: 0, fini: false, vue: 4,
+    part: [], textes: [], secousse: 0, flash: 0, banniere: 1, debut: performance.now(),
+  };
+  if (report) { // Profondeurs : on garde cœurs, arme, potions et score d'un étage à l'autre
+    S.pvMax = report.pvMax; S.pv = Math.min(report.pvMax, report.pv + 1);
+    S.arme = report.arme; S.potions = report.potions; S.parchemins = report.parchemins; S.scoreAvant = report.score;
+  } else if (mode === 'prof') { S.potions = 2; S.scoreAvant = 0; }
+  calcVue();
+  montrer('jeu');
+  redimensionner();
+  majHud(true);
+  msg(objectif());
+  // Tutoriel et nouvelles mécaniques jamais vues
+  const aVoir = (cfg.intros || []).filter((k) => !sauv.vus[k]);
+  if (aVoir.length) montrerIntros(aVoir);
+}
+function objectif() {
+  if (S.cfg.boss) return 'Dissipe le Gardien et prends le Cristal !';
+  if (S.cfg.cles) return 'Trouve une clé pour ouvrir la grille de l\'escalier.';
+  return 'Trouve l\'escalier qui descend !';
+}
+function peutJouer() {
+  return S && ecranCourant === 'jeu' && !S.fini && $('intro').classList.contains('cache') && $('pause').classList.contains('cache');
+}
+function marchable(x, y) { return x >= 0 && y >= 0 && x < S.W && y < S.H && S.grid[idx(x, y)] !== 0; }
+function ennemiA(x, y) { return S.ens.find((e) => e.x === x && e.y === y); }
+function occupe(x, y) { return !!ennemiA(x, y) || (S.h.x === x && S.h.y === y); }
+
+// Ce que la lanterne éclaire : lignes de vue jusqu'à S.vue cases.
+function ligneDeVue(x0, y0, x1, y1) {
+  let dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx + dy, x = x0, y = y0;
+  while (!(x === x1 && y === y1)) {
+    if (!(x === x0 && y === y0) && S.grid[idx(x, y)] === 0) return false;
+    const e2 = 2 * err;
+    if (e2 >= dy) { err += dy; x += sx; }
+    if (e2 <= dx) { err += dx; y += sy; }
+  }
+  return true;
+}
+function calcVue() {
+  const R = S.vue, hx = S.h.x, hy = S.h.y;
+  S.vis.fill(0);
+  for (let y = Math.max(0, hy - R); y <= Math.min(S.H - 1, hy + R); y++) {
+    for (let x = Math.max(0, hx - R); x <= Math.min(S.W - 1, hx + R); x++) {
+      if ((x - hx) ** 2 + (y - hy) ** 2 > R * R + R) continue;
+      if (ligneDeVue(hx, hy, x, y)) { const i = idx(x, y); S.vis[i] = 1; S.seen[i] = 1; }
+    }
+  }
+}
+function piqueLevee(x, y) {
+  const ph = S.piq.get(idx(x, y));
+  return ph !== undefined && (S.tour + ph) % 2 === 0;
+}
+
+// Action du joueur : un pas (dx, dy), ou attendre (0, 0).
+function action(dx, dy) {
+  if (!peutJouer()) return;
+  const now = performance.now();
+  if (now - dernAction < 110) return;
+  dernAction = now;
+  const h = S.h;
+  if (dx || dy) {
+    if (dx) h.dir = dx;
+    const nx = h.x + dx, ny = h.y + dy, e = ennemiA(nx, ny);
+    if (e) frapper(e, dx, dy);
+    else if (!marchable(nx, ny)) { SON.mur(); h.ax = dx * 0.15; h.ay = dy * 0.15; return; }
+    else if (S.grid[idx(nx, ny)] === 3) {
+      if (S.cles > 0) {
+        S.cles--; S.grid[idx(nx, ny)] = 2; SON.grille(); etincelles(nx, ny, '#ffcf5a', 18);
+        msg('La grille s\'ouvre ! Descends l\'escalier.'); pulse('cCle');
+      } else { SON.mur(); h.ax = dx * 0.15; h.ay = dy * 0.15; msg('La grille est fermée : trouve une clé !'); return; }
+    } else {
+      h.x = nx; h.y = ny; SON.pas();
+      ramasser();
+      if (S.fini) return;
+      if (S.grid[idx(nx, ny)] === 2) { victoire(); return; }
+    }
+  } else texte(h.x, h.y - 0.2, 'Zz', '#bfc6e0');
+  if (piqueLevee(h.x, h.y)) { SON.piques(); blesser(1); msg('Aïe, des piques ! Passe quand elles sont rentrées.'); }
+  finTour();
+}
+function finTour() {
+  if (S.pv <= 0) { defaite(); return; }
+  S.tour++;
+  calcVue();
+  S.dist = bfs(S.grid, S.W, S.H, S.h.x, S.h.y);
+  for (const e of S.ens) if (S.vis[idx(e.x, e.y)] || (e.t === 'follet' && Math.abs(e.x - S.h.x) + Math.abs(e.y - S.h.y) <= 5)) e.eveil = true;
+  for (const e of S.ens.slice()) { if (S.pv <= 0) break; agir(e); }
+  calcVue();
+  majHud();
+  if (S.pv <= 0) defaite();
+}
+function frapper(e, dx, dy) {
+  const h = S.h;
+  h.ax = dx * 0.35; h.ay = dy * 0.35;
+  e.pv -= S.arme.deg; e.flash = 1; e.eveil = true;
+  SON.coup();
+  texte(e.x, e.y - 0.3, '-' + S.arme.deg, '#ffffff');
+  if (e.pv <= 0) {
+    S.ens.splice(S.ens.indexOf(e), 1);
+    SON.dissipe();
+    bulles(e.x, e.y, COUL_ENNEMI[e.t]);
+    const pts = e.t === 'gardien' ? 100 : 15;
+    S.score += pts; S.vaincus++;
+    texte(e.x, e.y, '+' + pts, '#ffe27a');
+    if (e.t === 'gardien') {
+      S.items.set(idx(e.x, e.y), { t: 'cristal' });
+      S.secousse = 12;
+      msg('Le Gardien s\'est dissipé ! Prends le Cristal !');
+      for (const g of S.ens.slice()) if (g.t === 'gluant') { S.ens.splice(S.ens.indexOf(g), 1); bulles(g.x, g.y, COUL_ENNEMI.gluant); }
+    } else if (S.vaincus === 1 && S.mode === 'etage' && S.n <= 3) msg('Pouf ! Le Brumelin s\'est dissipé.');
+  }
+}
+function blesser(n) {
+  if (S.fini) return;
+  S.pv -= n; S.perdu += n;
+  S.secousse = 8; S.flash = 1;
+  SON.aie();
+  texte(S.h.x, S.h.y - 0.3, '-' + n, '#ff6b6b');
+  if (S.pv === 1) msg('Plus qu\'un cœur ! Bois une potion si tu en as.');
+}
+function ramasser() {
+  const i = idx(S.h.x, S.h.y), it = S.items.get(i);
+  if (!it) return;
+  const { x, y } = S.h;
+  switch (it.t) {
+    case 'gemme':
+      S.items.delete(i); S.gemmes++; S.score += 10; SON.gemme(); etincelles(x, y, it.c, 14); texte(x, y, '+10', '#ffe27a');
+      if (S.gemmes === S.gemmesTot) { msg('Toutes les gemmes ! Bravo !'); confettis(40); }
+      break;
+    case 'potion':
+      S.items.delete(i); S.potions++; SON.potion(); texte(x, y, '+1 potion', '#ff9ab0'); pulse('bPotion');
+      msg('Une potion ! Touche son bouton pour regagner 2 cœurs.');
+      break;
+    case 'cle':
+      S.items.delete(i); S.cles++; SON.cle(); texte(x, y, '+1 clé', '#ffcf5a'); pulse('cCle');
+      msg(S.grid.includes(3) ? 'Une clé ! Va ouvrir la grille de l\'escalier.' : 'Une clé ! Elle ouvre un coffre.');
+      break;
+    case 'arme':
+      S.items.delete(i);
+      if (ARMES[it.a].rang > S.arme.rang) {
+        S.arme = ARMES[it.a]; SON.arme(); etincelles(x, y, '#cfe8ff', 20); pulse('cArme');
+        msg(`${S.arme.nom} ! Chaque coup enlève ${S.arme.deg} points.`);
+      } else { S.score += 5; texte(x, y, '+5', '#ffe27a'); SON.gemme(); }
+      break;
+    case 'parchemin':
+      S.items.delete(i); S.parchemins++; SON.cle(); pulse('bParch');
+      msg('Un parchemin de lumière ! Touche son bouton pour voir la cave.');
+      break;
+    case 'coffre':
+      if (S.cles > 0) {
+        S.cles--; it.t = 'ouvert'; S.score += 50; S.potions++; SON.coffre();
+        etincelles(x, y, '#ffd75a', 26); texte(x, y, '+50', '#ffe27a'); pulse('bPotion');
+        msg('Le coffre contenait 50 points et une potion !');
+      } else msg('Ce coffre est fermé à clé.');
+      break;
+    case 'cristal':
+      S.items.delete(i); etincelles(x, y, '#c59bff', 30); victoire();
+      break;
+  }
+}
+function boirePotion() {
+  if (!peutJouer()) return;
+  if (S.potions <= 0) { msg('Pas de potion. Cherche-en dans la cave !'); SON.mur(); return; }
+  if (S.pv >= S.pvMax) { msg('Tu as déjà tous tes cœurs !'); return; }
+  S.potions--; S.pv = Math.min(S.pvMax, S.pv + 2);
+  SON.potion(); etincelles(S.h.x, S.h.y, '#ff7a95', 16); texte(S.h.x, S.h.y - 0.3, '+2', '#ff9ab0');
+  finTour();
+}
+function lireParchemin() {
+  if (!peutJouer()) return;
+  if (S.parchemins <= 0) { msg('Pas de parchemin pour l\'instant.'); SON.mur(); return; }
+  S.parchemins--;
+  for (let i = 0; i < S.grid.length; i++) {
+    if (S.grid[i] !== 0) { S.seen[i] = 1; continue; }
+    const x = i % S.W, y = (i / S.W) | 0;
+    if (DIRS.some(([dx, dy]) => marchable(x + dx, y + dy))) S.seen[i] = 1;
+  }
+  SON.parchemin(); S.flash = -1;
+  msg('La lumière dévoile toute la cave !');
+  majHud();
+}
+
+// Tour d'un Brumelin : chacun a son caractère.
+function adjacent(e) { return Math.abs(e.x - S.h.x) + Math.abs(e.y - S.h.y) === 1; }
+function attaque(e, n) { e.ax = (S.h.x - e.x) * 0.4; e.ay = (S.h.y - e.y) * 0.4; blesser(n); }
+function approcher(e) {
+  const d0 = S.dist[idx(e.x, e.y)];
+  let best = null, bd = d0 < 0 ? 1e9 : d0;
+  for (const [dx, dy] of melange(DIRS)) {
+    const nx = e.x + dx, ny = e.y + dy;
+    if (!marchable(nx, ny) || occupe(nx, ny) || S.grid[idx(nx, ny)] >= 2) continue;
+    const d = S.dist[idx(nx, ny)];
+    if (d >= 0 && d < bd) { bd = d; best = [nx, ny]; }
+  }
+  if (best) { e.x = best[0]; e.y = best[1]; }
+}
+function errer(e) {
+  const opts = DIRS.filter(([dx, dy]) => marchable(e.x + dx, e.y + dy) && !occupe(e.x + dx, e.y + dy) && S.grid[idx(e.x + dx, e.y + dy)] < 2);
+  if (opts.length) { const [dx, dy] = pick(opts); e.x += dx; e.y += dy; }
+}
+function voler(e) { // le feu follet passe à travers les murs
+  let best = null, bd = Math.abs(e.x - S.h.x) + Math.abs(e.y - S.h.y);
+  for (const [dx, dy] of melange(DIRS)) {
+    const nx = e.x + dx, ny = e.y + dy;
+    if (nx < 1 || ny < 1 || nx >= S.W - 1 || ny >= S.H - 1 || occupe(nx, ny)) continue;
+    const d = Math.abs(nx - S.h.x) + Math.abs(ny - S.h.y);
+    if (d < bd) { bd = d; best = [nx, ny]; }
+  }
+  if (best) { e.x = best[0]; e.y = best[1]; }
+}
+function ligneVers(e, portee) { // le crapaud voit-il le lutin en ligne droite ?
+  const h = S.h;
+  if (e.x !== h.x && e.y !== h.y) return null;
+  const d = Math.abs(h.x - e.x) + Math.abs(h.y - e.y);
+  if (d > portee) return null;
+  const dx = Math.sign(h.x - e.x), dy = Math.sign(h.y - e.y);
+  for (let k = 1; k < d; k++) if (S.grid[idx(e.x + dx * k, e.y + dy * k)] === 0) return null;
+  return [dx, dy];
+}
+function cracher(e) {
+  const [dx, dy] = e.dirTir;
+  let x = e.x, y = e.y, touche = false;
+  for (let k = 1; k <= 6; k++) {
+    if (!marchable(x + dx, y + dy)) break;
+    x += dx; y += dy;
+    if (x === S.h.x && y === S.h.y) { touche = true; break; }
+  }
+  SON.crache();
+  S.part.push({ tir: true, x0: e.x, y0: e.y, x1: x, y1: y, v: 0.25, max: 0.25 });
+  if (touche) { blesser(1); msg('Le crapaud t\'a arrosé ! Sors de sa ligne quand il gonfle.'); }
+}
+function agir(e) {
+  e.n++;
+  switch (e.t) {
+    case 'gluant': // lent : un tour sur deux
+      if (e.n % 2) return;
+      if (adjacent(e)) attaque(e, 1);
+      else if (e.eveil) approcher(e);
+      else if (Math.random() < 0.3) errer(e);
+      break;
+    case 'chauve': // rapide, vole à moitié au hasard
+      if (adjacent(e) && Math.random() < 0.75) attaque(e, 1);
+      else if (e.eveil && Math.random() < 0.5) approcher(e);
+      else errer(e);
+      break;
+    case 'champi': // immobile, frappe un tour sur deux quand on est à côté
+      e.alerte = adjacent(e);
+      if (e.alerte && e.n % 2 === 0) attaque(e, 1);
+      break;
+    case 'crapaud': // gonfle quand il est aligné, puis crache au tour suivant
+      if (e.charge) { cracher(e); e.charge = false; e.cd = 2; return; }
+      if (e.cd > 0) e.cd--;
+      if (e.eveil && e.cd === 0) {
+        const l = ligneVers(e, 6);
+        if (l) { e.charge = true; e.dirTir = l; SON.gonfle(); return; }
+      }
+      if (e.eveil && Math.abs(e.x - S.h.x) + Math.abs(e.y - S.h.y) > 3) approcher(e);
+      else if (Math.random() < 0.4) errer(e);
+      break;
+    case 'follet': // traverse les murs, deux tours sur trois
+      if (e.n % 3 === 0) return;
+      if (adjacent(e)) attaque(e, 1);
+      else if (e.eveil) voler(e);
+      break;
+    case 'gardien': // lent, frappe fort, appelle des gluants
+      if (!e.eveil) return;
+      e.s++;
+      if (e.s % 6 === 0 && S.ens.filter((g) => g.t === 'gluant').length < 4) {
+        const libres = DIRS.map(([dx, dy]) => [e.x + dx, e.y + dy]).filter(([x, y]) => marchable(x, y) && !occupe(x, y));
+        if (libres.length) {
+          const [x, y] = pick(libres), g = nouvelEnnemi('gluant', x, y);
+          g.eveil = true; S.ens.push(g); SON.appel(); bulles(x, y, COUL_ENNEMI.gluant);
+          msg('Le Gardien appelle un gluant !');
+        }
+        return;
+      }
+      if (e.n % 2) return;
+      if (adjacent(e)) attaque(e, 2);
+      else approcher(e);
+      break;
+  }
+}
+
+// Fin d'étage
+// 3e étoile : peu de cœurs perdus (un peu plus de marge contre le Gardien, qui frappe fort)
+const coeursToleres = () => (S.cfg.boss ? 3 : 1);
+function etoilesGagnees() { return 1 + (S.gemmes >= S.gemmesTot ? 1 : 0) + (S.perdu <= coeursToleres() ? 1 : 0); }
+function victoire() {
+  S.fini = true;
+  SON.victoire();
+  const bonusCoeurs = S.pv * 10;
+  S.score += 50 + bonusCoeurs;
+  const et = etoilesGagnees();
+  let record = false;
+  if (S.mode === 'etage') {
+    const k = S.n - 1;
+    const ancien = sauv.scores[k] || 0;
+    if (S.score > ancien) { record = ancien > 0; sauv.scores[k] = S.score; }
+    sauv.etoiles[k] = Math.max(sauv.etoiles[k] || 0, et);
+    if (S.n < NB_ETAGES) sauv.debloque = Math.max(sauv.debloque, S.n + 1);
+    else sauv.fini = true;
+  } else {
+    const total = S.scoreAvant + S.score;
+    if (S.n > sauv.prof) { sauv.prof = S.n; record = true; }
+    if (total > sauv.profScore) { sauv.profScore = total; record = true; }
+  }
+  sauver();
+  confettis(90);
+  setTimeout(() => montrerBilan(true, et, bonusCoeurs, record), 900);
+}
+function defaite() {
+  if (S.fini) return;
+  S.fini = true; S.pv = 0;
+  majHud();
+  SON.epuise();
+  bulles(S.h.x, S.h.y, '#ffb38a');
+  let record = false;
+  if (S.mode === 'prof') {
+    const total = S.scoreAvant + S.score;
+    if (total > sauv.profScore) { sauv.profScore = total; record = true; sauver(); }
+  }
+  setTimeout(() => montrerBilan(false, 0, 0, record), 1100);
+}
+
+// ---------- 7. Rendu ----------
+const cv = $('cv'), ctx = cv.getContext('2d');
+let cw = 0, ch = 0, ts = 40, dpr = 1;
+function redimensionner() {
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const z = $('zone');
+  cw = z.clientWidth; ch = z.clientHeight;
+  cv.width = Math.max(1, Math.round(cw * dpr)); cv.height = Math.max(1, Math.round(ch * dpr));
+  ts = Math.max(30, Math.min(64, Math.floor(Math.min(cw / 9, ch / 10))));
+  const art = $('art');
+  art.width = Math.round(art.clientWidth * dpr); art.height = Math.round(art.clientHeight * dpr);
+  const fx = $('fx');
+  fx.width = Math.round(fx.clientWidth * dpr); fx.height = Math.round(fx.clientHeight * dpr);
+}
+window.addEventListener('resize', redimensionner);
+
+// Effets : étincelles, bulles, textes qui s'envolent
+function etincelles(x, y, coul, n) {
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * Math.PI * 2, v = 1 + Math.random() * 2.5;
+    S.part.push({ x: x + 0.5, y: y + 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1.5, g: 4, v: 0.7, max: 0.7, c: coul, r: 0.05 + Math.random() * 0.05, etoile: k % 3 === 0 });
+  }
+}
+function bulles(x, y, coul) {
+  for (let k = 0; k < 14; k++) {
+    const a = Math.random() * Math.PI * 2, v = 0.4 + Math.random() * 1.2;
+    S.part.push({ x: x + 0.5, y: y + 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.8, g: -0.5, v: 0.9, max: 0.9, c: coul, r: 0.06 + Math.random() * 0.1, bulle: true });
+  }
+}
+function texte(x, y, t, c) { S.textes.push({ x: x + 0.5, y: y + 0.2, t, c, v: 1 }); }
+
+function dessinerJeu(t, dt) {
+  const c = ctx;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = '#07080f'; c.fillRect(0, 0, cw, ch);
+  if (!S) return;
+  const k = Math.min(1, dt / 70);
+  const h = S.h;
+  h.px += (h.x - h.px) * k; h.py += (h.y - h.py) * k;
+  h.ax *= 0.8; h.ay *= 0.8;
+  S.secousse *= 0.88;
+  const sx = (Math.random() - 0.5) * S.secousse, sy = (Math.random() - 0.5) * S.secousse;
+  const camX = h.px * ts + ts / 2 - cw / 2 + sx, camY = h.py * ts + ts / 2 - ch / 2 + sy;
+  c.save(); c.translate(-Math.round(camX), -Math.round(camY));
+  const x0 = Math.max(0, Math.floor(camX / ts) - 1), x1 = Math.min(S.W - 1, Math.ceil((camX + cw) / ts) + 1);
+  const y0 = Math.max(0, Math.floor(camY / ts) - 1), y1 = Math.min(S.H - 1, Math.ceil((camY + ch) / ts) + 1);
+  // Décor (seulement ce qui a déjà été vu : la mémoire de la cave)
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const i = idx(x, y);
+      if (!S.seen[i]) continue;
+      const g = S.grid[i], px = x * ts, py = y * ts;
+      if (g === 0) dessMur(c, px, py, ts, y + 1 < S.H && S.grid[i + S.W] !== 0 && S.seen[i + S.W]);
+      else {
+        dessSol(c, px, py, ts, x, y);
+        if (g >= 2) dessEscalier(c, px, py, ts, g === 3);
+        if (S.piq.has(i)) dessPiques(c, px, py, ts, piqueLevee(x, y));
+      }
+    }
+  }
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const i = idx(x, y);
+      if (!S.seen[i]) continue;
+      const it = S.items.get(i);
+      if (it) dessItem(c, it, x * ts + ts / 2, y * ts + ts / 2, ts, t);
+      if (!S.vis[i]) { c.fillStyle = 'rgba(6,8,18,.6)'; c.fillRect(x * ts, y * ts, ts + 0.5, ts + 0.5); }
+    }
+  }
+  // Brumelins visibles
+  for (const e of S.ens) {
+    e.px += (e.x - e.px) * k; e.py += (e.y - e.py) * k; e.ax *= 0.8; e.ay *= 0.8;
+    if (!S.vis[idx(e.x, e.y)]) continue;
+    const ex = (e.px + e.ax + 0.5) * ts, ey = (e.py + e.ay + 0.5) * ts;
+    DESS_ENNEMI[e.t](c, ex, ey, ts, t, e.t === 'crapaud' ? e.charge : e.alerte);
+    if (e.flash > 0) {
+      c.globalAlpha = e.flash; disque(c, ex, ey, ts * 0.42, 'rgba(255,255,255,.8)'); c.globalAlpha = 1;
+      e.flash = Math.max(0, e.flash - dt / 250);
+    }
+    if (e.pv < e.max) { // points de vie restants
+      const w = ts * 0.7, by = ey - ts * (e.t === 'gardien' ? 0.85 : 0.52);
+      c.fillStyle = '#0009'; c.fillRect(ex - w / 2, by, w, ts * 0.08);
+      c.fillStyle = '#ff7a6e'; c.fillRect(ex - w / 2, by, w * e.pv / e.max, ts * 0.08);
+    }
+  }
+  // Le lutin
+  dessHeros(c, (h.px + h.ax + 0.5) * ts, (h.py + h.ay + 0.5) * ts, ts, t, h.dir);
+  // Particules et tirs
+  for (const p of S.part) {
+    p.v -= dt / 1000;
+    if (p.tir) {
+      const q = 1 - p.v / p.max;
+      disque(c, (p.x0 + (p.x1 - p.x0) * q + 0.5) * ts, (p.y0 + (p.y1 - p.y0) * q + 0.5) * ts, ts * 0.12, '#a8f0d6');
+      continue;
+    }
+    p.vy += p.g * dt / 1000; p.x += p.vx * dt / 1000; p.y += p.vy * dt / 1000;
+    c.globalAlpha = Math.max(0, p.v / p.max);
+    if (p.bulle) { c.strokeStyle = p.c; c.lineWidth = 2; c.beginPath(); c.arc(p.x * ts, p.y * ts, p.r * ts, 0, Math.PI * 2); c.stroke(); }
+    else if (p.etoile) { c.fillStyle = p.c; c.font = `${ts * 0.35}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('★', p.x * ts, p.y * ts); }
+    else disque(c, p.x * ts, p.y * ts, p.r * ts, p.c);
+    c.globalAlpha = 1;
+  }
+  S.part = S.part.filter((p) => p.v > 0);
+  c.font = `900 ${Math.round(ts * 0.42)}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (const tx of S.textes) {
+    tx.v -= dt / 1000; tx.y -= dt / 1000 * 0.9;
+    c.globalAlpha = Math.max(0, Math.min(1, tx.v * 2));
+    c.lineWidth = 4; c.strokeStyle = '#0b0d18'; c.strokeText(tx.t, tx.x * ts, tx.y * ts);
+    c.fillStyle = tx.c; c.fillText(tx.t, tx.x * ts, tx.y * ts);
+    c.globalAlpha = 1;
+  }
+  S.textes = S.textes.filter((tx) => tx.v > 0);
+  c.restore();
+  // Halo de la lanterne
+  const hx = (h.px + 0.5) * ts - camX, hy = (h.py + 0.5) * ts - camY;
+  const g = c.createRadialGradient(hx, hy, ts * 1.5, hx, hy, ts * (S.vue + 1.6));
+  g.addColorStop(0, 'rgba(7,8,15,0)'); g.addColorStop(1, 'rgba(7,8,15,.55)');
+  c.fillStyle = g; c.fillRect(0, 0, cw, ch);
+  // Éclair rouge (coup reçu) ou doré (parchemin)
+  if (S.flash) {
+    const a = Math.abs(S.flash);
+    c.fillStyle = S.flash > 0 ? `rgba(255,60,60,${a * 0.35})` : `rgba(255,230,150,${a * 0.5})`;
+    c.fillRect(0, 0, cw, ch);
+    S.flash = Math.sign(S.flash) * Math.max(0, a - dt / 300);
+  }
+  dessinerMiniCarte(c);
+  // Bannière de début d'étage
+  if (S.banniere > 0) {
+    S.banniere -= dt / 3500;
+    c.globalAlpha = Math.min(1, S.banniere * 3);
+    c.fillStyle = '#0b0d18cc'; c.fillRect(0, ch * 0.18, cw, 56);
+    c.fillStyle = '#ffcf5a'; c.font = '800 26px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(nomEtage(), cw / 2, ch * 0.18 + 28);
+    c.globalAlpha = 1;
+  }
+}
+function dessinerMiniCarte(c) {
+  const m = Math.max(2, Math.floor(80 / S.W)), w = S.W * m, hh = S.H * m, ox = cw - w - 8, oy = 8;
+  c.fillStyle = 'rgba(5,6,14,.6)'; c.fillRect(ox - 3, oy - 3, w + 6, hh + 6);
+  for (let i = 0; i < S.grid.length; i++) {
+    if (!S.seen[i] || S.grid[i] === 0) continue;
+    c.fillStyle = S.grid[i] >= 2 ? '#ffcf5a' : '#7c84a3';
+    c.fillRect(ox + (i % S.W) * m, oy + ((i / S.W) | 0) * m, m, m);
+  }
+  for (const [i, it] of S.items) if (S.seen[i] && (it.t === 'cle' || it.t === 'cristal')) { c.fillStyle = '#ffe680'; c.fillRect(ox + (i % S.W) * m - 1, oy + ((i / S.W) | 0) * m - 1, m + 2, m + 2); }
+  c.fillStyle = performance.now() % 600 < 300 ? '#ff7a45' : '#ffffff';
+  c.fillRect(ox + S.h.x * m - 1, oy + S.h.y * m - 1, m + 2, m + 2);
+}
+function nomEtage() { return S.mode === 'prof' ? `Profondeur ${S.n}` : `Étage ${S.n}`; }
+
+// Image de l'accueil : le lutin et les Brumelins à l'entrée des caves
+function dessinerArt(t) {
+  const a = $('art'), c = a.getContext('2d');
+  const w = a.width / dpr, h = a.height / dpr;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+  // voûte de la cave
+  c.fillStyle = '#1a1d33'; rondRect(c, 0, 0, w, h, 26); c.fill();
+  c.fillStyle = '#0b0c17'; c.beginPath(); c.ellipse(w / 2, h * 1.02, w * 0.36, h * 0.82, 0, Math.PI, 0); c.fill();
+  const s = Math.min(w / 7, h / 3.3);
+  for (let k = 0; k < 7; k++) dessSol(c, w / 2 - 3.5 * s + k * s, h - s * 0.9, s, k, 0);
+  // brume
+  for (let k = 0; k < 6; k++) {
+    const x = ((t / 40 + k * 90) % (w + 160)) - 80, y = h * (0.35 + 0.08 * (k % 3));
+    const g = c.createRadialGradient(x, y, 0, x, y, 70);
+    g.addColorStop(0, 'rgba(170,180,230,.14)'); g.addColorStop(1, 'rgba(170,180,230,0)');
+    c.fillStyle = g; c.fillRect(x - 70, y - 70, 140, 140);
+  }
+  const base = h - s * 0.9 + s / 2;
+  dessGemme(c, w / 2 - 2.6 * s, base, s, t, '#ff6fae');
+  dessGluant(c, w / 2 - 1.5 * s, base, s, t);
+  dessHeros(c, w / 2, base - s * 0.05, s * 1.25, t, 1);
+  dessChampi(c, w / 2 + 1.5 * s, base, s, t, false);
+  dessGemme(c, w / 2 + 2.6 * s, base, s, t, '#5ad1ff');
+  dessChauve(c, w / 2 + 2 * s, base - 1.5 * s, s, t);
+  dessFollet(c, w / 2 - 2.3 * s, base - 1.6 * s, s, t);
+  dessCristal(c, w / 2, base - 1.9 * s, s * 0.9, t);
+}
+
+// ---------- 8. Commandes : flèches, glissés, touchers ----------
+document.addEventListener('pointerdown', reveillerAudio, true);
+document.addEventListener('keydown', (ev) => {
+  reveillerAudio();
+  const k = ev.key;
+  const dirs = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], z: [0, -1], w: [0, -1], s: [0, 1], q: [-1, 0], a: [-1, 0], d: [1, 0] };
+  if (ecranCourant === 'jeu') {
+    if (dirs[k] || dirs[k.toLowerCase()]) { ev.preventDefault(); const [dx, dy] = dirs[k] || dirs[k.toLowerCase()]; action(dx, dy); return; }
+    if (k === ' ' || k === '.') { ev.preventDefault(); action(0, 0); return; }
+    if (k === 'p' || k === 'P') { boirePotion(); return; }
+    if (k === 'l' || k === 'L') { lireParchemin(); return; }
+    if (k === 'Enter') ev.preventDefault();
+  } else if (k === ' ' || k === 'Enter') ev.preventDefault();
+});
+// Glisser ou toucher sur la cave
+let depart = null;
+cv.addEventListener('pointerdown', (ev) => { depart = { x: ev.clientX, y: ev.clientY }; });
+cv.addEventListener('pointerup', (ev) => {
+  if (!depart || !S) return;
+  const dx = ev.clientX - depart.x, dy = ev.clientY - depart.y;
+  depart = null;
+  if (Math.hypot(dx, dy) > 24) { // glissé
+    if (Math.abs(dx) > Math.abs(dy)) action(Math.sign(dx), 0); else action(0, Math.sign(dy));
+    return;
+  }
+  // toucher : on avance vers l'endroit touché
+  const r = cv.getBoundingClientRect();
+  const tx = ev.clientX - r.left - cw / 2, ty = ev.clientY - r.top - ch / 2;
+  if (Math.abs(tx) < ts / 2 && Math.abs(ty) < ts / 2) action(0, 0);
+  else if (Math.abs(tx) > Math.abs(ty)) action(Math.sign(tx), 0); else action(0, Math.sign(ty));
+});
+cv.addEventListener('pointercancel', () => { depart = null; });
+// Croix de direction (on peut garder le doigt appuyé)
+let repete = null;
+for (const b of document.querySelectorAll('#pad button')) {
+  const [dx, dy] = b.dataset.d.split(',').map(Number);
+  b.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    action(dx, dy);
+    clearInterval(repete);
+    let n = 0;
+    repete = setInterval(() => { if (++n > 2) action(dx, dy); }, 140);
+  });
+  for (const f of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(f, () => clearInterval(repete));
+}
+$('bPotion').addEventListener('click', boirePotion);
+$('bParch').addEventListener('click', lireParchemin);
+
+// ---------- 9. Tutoriel animé et nouvelles mécaniques ----------
+// Chaque scène est une suite d'images (750 ms chacune) sur une petite grille 5 × 3.
+// h : lutin, e : Brumelins [type, x, y, options], i : objets, p : piques [x, y, levées],
+// m : plan ('.' sol, '#' mur, '>' escalier, 'G' grille), main : glissé [x, y, dx, dy],
+// tap : toucher [x, y], fx : texte [x, y, 'texte'], poof : bulles [x, y], tir : [x0, y0, x1, y1],
+// noir : cave encore sombre, btn : bouton d'objet dessiné [type, x, y].
+const SOL = ['.....', '.....', '.....'];
+const SCENES = {
+  tuto: { titre: 'Comment jouer', images: [
+    { t: '1. Glisse ton doigt, touche une flèche ou utilise le clavier : le lutin avance d\'une case.', m: ['.....', '....>', '.....'], h: [0, 1], i: [['gemme', 2, 1]], e: [], main: [0.4, 1.6, 1, 0] },
+    { h: [1, 1], main: [1.4, 1.6, 1, 0] },
+    { t: '2. Marche sur les gemmes pour les ramasser : +10 points !', h: [2, 1] },
+    { i: [], fx: [2, 1, '+10'] },
+    { t: '3. Trouve l\'escalier pour descendre à l\'étage suivant.', h: [3, 1], main: [3.4, 1.6, 1, 0] },
+    { h: [4, 1], fx: [4, 1, 'Bravo !'] },
+    { h: [4, 1] },
+  ] },
+  gluant: { titre: 'Nouveau : le gluant', images: [
+    { t: 'Le gluant est lent : il bouge un tour sur deux.', m: SOL, h: [0, 1], e: [['gluant', 4, 1]], i: [] },
+    { h: [1, 1] },
+    { h: [2, 1], e: [['gluant', 3, 1]] },
+    { t: 'Fonce dessus pour le faire éclater en bulles !', e: [['gluant', 3, 1, { f: 1 }]], fx: [3, 1, '-1'] },
+    { e: [['gluant', 3, 1, { f: 1 }]], fx: [3, 1, '-1'] },
+    { e: [], poof: [3, 1] },
+    { h: [3, 1] },
+  ] },
+  potion: { titre: 'Nouveau : les potions', images: [
+    { t: 'Ramasse les potions : elles vont dans ton sac.', m: SOL, h: [0, 1], e: [], i: [['potion', 2, 1]] },
+    { h: [1, 1] },
+    { h: [2, 1] },
+    { i: [], fx: [2, 1, '+1'] },
+    { t: 'Touche le bouton potion pour regagner 2 cœurs.', btn: ['potion', 4, 1], tap: [4, 1] },
+    { tap: [4, 1], fx: [2, 1, '+2 cœurs'] },
+    { btn: null },
+  ] },
+  chauve: { titre: 'Nouveau : la chauve-souris', images: [
+    { t: 'La chauve-souris est rapide et vole un peu au hasard.', m: SOL, h: [0, 1], e: [['chauve', 4, 0]], i: [] },
+    { e: [['chauve', 3, 0]] },
+    { e: [['chauve', 3, 1]] },
+    { e: [['chauve', 2, 2]] },
+    { e: [['chauve', 1, 1]] },
+    { t: 'Elle est fragile : un seul coup suffit !', e: [['chauve', 1, 1, { f: 1 }]] },
+    { e: [], poof: [1, 1] },
+  ] },
+  arme: { titre: 'Nouveau : l\'épée de fer', images: [
+    { t: 'Ramasse l\'épée de fer : chaque coup compte double !', m: SOL, h: [0, 1], i: [['arme', 1, 1, 'fer']], e: [['gluant', 4, 1]] },
+    { h: [1, 1] },
+    { i: [], fx: [1, 1, 'Épée !'] },
+    { h: [2, 1] },
+    { h: [3, 1] },
+    { e: [['gluant', 4, 1, { f: 1 }]], fx: [4, 1, '-2'] },
+    { t: 'Un seul coup pour un gluant !', e: [], poof: [4, 1] },
+  ] },
+  cle: { titre: 'Nouveau : les clés', images: [
+    { t: 'Une grille ferme l\'escalier. Trouve une clé dans la cave !', m: ['.....', '....G', '.....'], h: [0, 1], i: [['cle', 1, 1], ['coffre', 3, 2]], e: [] },
+    { h: [1, 1] },
+    { i: [['coffre', 3, 2]], fx: [1, 1, 'Clé !'] },
+    { h: [2, 1] },
+    { t: 'Puis fonce sur la grille pour l\'ouvrir. Une clé de trop ? Elle ouvre un coffre !', h: [3, 1] },
+    { m: ['.....', '....>', '.....'], fx: [4, 1, 'Ouvert !'] },
+    { h: [4, 1] },
+  ] },
+  champi: { titre: 'Nouveau : le champignon', images: [
+    { t: 'Le champignon ne bouge jamais, mais il est solide. Il garde souvent une clé.', m: SOL, h: [0, 1], e: [['champi', 3, 1]], i: [['cle', 4, 1]] },
+    { h: [1, 1] },
+    { h: [2, 1], e: [['champi', 3, 1, { a: 1 }]] },
+    { e: [['champi', 3, 1, { a: 1, f: 1 }]], fx: [3, 1, '-2'] },
+    { e: [['champi', 3, 1, { a: 1, f: 1 }]], fx: [3, 1, '-2'] },
+    { e: [], poof: [3, 1] },
+    { h: [3, 1] },
+    { h: [4, 1] },
+    { i: [], fx: [4, 1, 'Clé !'] },
+  ] },
+  piques: { titre: 'Nouveau : les piques', images: [
+    { t: 'Les piques sortent un tour sur deux.', m: SOL, h: [0, 1], e: [], i: [], p: [[2, 1, 0]] },
+    { h: [1, 1], p: [[2, 1, 1]] },
+    { t: 'Attends qu\'elles soient rentrées, puis passe vite !', p: [[2, 1, 0]], h: [2, 1] },
+    { h: [3, 1], p: [[2, 1, 1]] },
+    { h: [4, 1], p: [[2, 1, 0]], fx: [4, 1, 'Ouf !'] },
+    { p: [[2, 1, 1]] },
+  ] },
+  crapaud: { titre: 'Nouveau : le crapaud cracheur', images: [
+    { t: 'Quand tu es sur sa ligne, le crapaud gonfle…', m: SOL, h: [1, 1], e: [['crapaud', 4, 1]], i: [] },
+    { e: [['crapaud', 4, 1, { c: 1 }]] },
+    { t: '…puis il crache tout droit. Sors vite de sa ligne !', h: [1, 0] },
+    { e: [['crapaud', 4, 1]], tir: [4, 1, 0, 1] },
+    { fx: [1, 0, 'Raté !'] },
+    { h: [1, 0] },
+  ] },
+  parchemin: { titre: 'Nouveau : le parchemin', images: [
+    { t: 'Le parchemin de lumière dévoile toute la cave…', m: ['.#...', '...#>', '.#...'], h: [0, 1], e: [], i: [['gemme', 3, 0], ['gemme', 2, 2], ['cle', 4, 2]], noir: true, btn: ['parchemin', 0, 2] },
+    { tap: [0, 2] },
+    { noir: false, fx: [2, 1, 'Lumière !'] },
+    { t: '…et montre où sont les trésors et l\'escalier.' },
+    { btn: null },
+  ] },
+  cristal: { titre: 'Nouveau : l\'épée de cristal', images: [
+    { t: 'L\'épée de cristal est la plus forte : 3 points par coup !', m: SOL, h: [0, 1], i: [['arme', 1, 1, 'cristal']], e: [['champi', 3, 1]] },
+    { h: [1, 1] },
+    { i: [], fx: [1, 1, 'Cristal !'] },
+    { h: [2, 1], e: [['champi', 3, 1, { a: 1 }]] },
+    { e: [['champi', 3, 1, { a: 1, f: 1 }]], fx: [3, 1, '-3'] },
+    { e: [], poof: [3, 1] },
+    { h: [3, 1] },
+  ] },
+  follet: { titre: 'Nouveau : le feu follet', images: [
+    { t: 'Le feu follet traverse les murs ! Impossible de se cacher.', m: ['..#..', '..#..', '..#..'], h: [0, 1], e: [['follet', 4, 1]], i: [] },
+    { e: [['follet', 3, 1]] },
+    { e: [['follet', 2, 1]] },
+    { e: [['follet', 1, 1]] },
+    { t: 'Une épée de fer le dissipe d\'un seul coup.', e: [['follet', 1, 1, { f: 1 }]], fx: [1, 1, '-2'] },
+    { e: [], poof: [1, 1] },
+  ] },
+  gardien: { titre: 'Le Gardien de Brumefer', images: [
+    { t: 'Le Gardien garde le Cristal de Brumefer. Il est très solide et frappe fort.', m: SOL, h: [0, 1], e: [['gardien', 3, 1]], i: [] },
+    { t: 'Il appelle des gluants à l\'aide !', e: [['gardien', 3, 1], ['gluant', 3, 0]], poof: [3, 0] },
+    { h: [1, 1] },
+    { t: 'Frappe-le encore et encore, et bois une potion quand il le faut.', h: [2, 1] },
+    { e: [['gardien', 3, 1, { f: 1 }], ['gluant', 3, 0]], fx: [3, 1, '-2'] },
+    { e: [['gardien', 3, 1, { f: 1 }], ['gluant', 3, 0]], fx: [3, 1, '-2'] },
+  ] },
+};
+// Chaque image reprend les éléments de la précédente, sauf les effets passagers.
+for (const sc of Object.values(SCENES)) {
+  let prec = {};
+  sc.cadres = sc.images.map((im) => {
+    const f = { ...prec, main: null, tap: null, fx: null, poof: null, tir: null, ...im };
+    prec = f; return f;
+  });
+}
+let introFile = [], introScene = null, introDebut = 0, introTexte = '';
+function montrerIntros(liste) {
+  introFile = liste.slice();
+  suivanteIntro();
+}
+function suivanteIntro() {
+  const k = introFile.shift();
+  if (!k) { $('intro').classList.add('cache'); introScene = null; return; }
+  sauv.vus[k] = true; sauver();
+  introScene = SCENES[k]; introDebut = performance.now(); introTexte = '';
+  $('introTitre').textContent = introScene.titre;
+  $('intro').classList.remove('cache');
+  const d = $('demo');
+  d.width = Math.round(230 * dpr); d.height = Math.round(138 * dpr);
+}
+function fermerIntro() { SON.clic(); suivanteIntro(); }
+$('bCompris').addEventListener('click', (ev) => { ev.stopPropagation(); fermerIntro(); });
+$('intro').addEventListener('click', fermerIntro);
+
+function dessinerIntro(t) {
+  if (!introScene) return;
+  const c = $('demo').getContext('2d'), s = 46, ox = 0, oy = 0;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = '#090a14'; c.fillRect(0, 0, 230, 138);
+  const DUREE = 750, el = Math.max(0, t - introDebut), n = introScene.cadres.length;
+  const k = Math.floor(el / DUREE) % n, q = (el % DUREE) / DUREE;
+  const f = introScene.cadres[k], prev = introScene.cadres[(k - 1 + n) % n];
+  if (f.t !== introTexte) { introTexte = f.t; $('introTexte').textContent = fr(f.t); }
+  const P = (x, y) => [ox + x * s + s / 2, oy + y * s + s / 2];
+  for (let y = 0; y < 3; y++) {
+    for (let x = 0; x < 5; x++) {
+      const ch2 = f.m[y][x];
+      if (ch2 === '#') dessMur(c, ox + x * s, oy + y * s, s, y < 2 && f.m[y + 1][x] !== '#');
+      else { dessSol(c, ox + x * s, oy + y * s, s, x, y); if (ch2 === '>' || ch2 === 'G') dessEscalier(c, ox + x * s, oy + y * s, s, ch2 === 'G'); }
+    }
+  }
+  for (const [x, y, l] of f.p || []) dessPiques(c, ox + x * s, oy + y * s, s, !!l);
+  for (const [ty, x, y, v] of f.i || []) dessItem(c, { t: ty, a: v, c: '#5ad1ff' }, ...P(x, y), s, t);
+  if (f.noir) {
+    for (let y = 0; y < 3; y++) for (let x = 0; x < 5; x++) if (Math.abs(x - f.h[0]) + Math.abs(y - f.h[1]) > 1) { c.fillStyle = '#05060c'; c.fillRect(ox + x * s, oy + y * s, s + 0.5, s + 0.5); }
+  }
+  for (const [ty, x, y, o = {}] of f.e || []) {
+    const [ex, ey] = P(x, y);
+    DESS_ENNEMI[ty](c, ex, ey, s * (ty === 'gardien' ? 0.8 : 1), t, ty === 'crapaud' ? !!o.c : !!o.a);
+    if (o.f && q < 0.5) disque(c, ex, ey, s * 0.4, `rgba(255,255,255,${0.8 - q * 1.6})`);
+  }
+  // Le lutin glisse d'une case à l'autre
+  const a = k > 0 ? prev.h : f.h, e2 = Math.min(1, q * 3.5);
+  const hx = a[0] + (f.h[0] - a[0]) * e2, hy = a[1] + (f.h[1] - a[1]) * e2;
+  dessHeros(c, ...P(hx, hy), s, t, 1);
+  if (f.btn) {
+    const [bx, by] = P(f.btn[1], f.btn[2]);
+    c.fillStyle = '#1b1f33'; c.strokeStyle = '#6a5fb0'; c.lineWidth = 2;
+    rondRect(c, bx - s * 0.42, by - s * 0.42, s * 0.84, s * 0.84, 10); c.fill(); c.stroke();
+    dessItem(c, { t: f.btn[0] }, bx, by, s * 0.9, 0);
+  }
+  if (f.tir) {
+    const [x0, y0] = P(f.tir[0], f.tir[1]), [x1, y1] = P(f.tir[2], f.tir[3]);
+    disque(c, x0 + (x1 - x0) * q, y0 + (y1 - y0) * q, s * 0.12, '#a8f0d6');
+  }
+  if (f.poof) {
+    const [px, py] = P(f.poof[0], f.poof[1]);
+    c.strokeStyle = '#c9f5d0'; c.lineWidth = 2; c.globalAlpha = 1 - q;
+    for (let j = 0; j < 7; j++) { const an = j * 0.9; c.beginPath(); c.arc(px + Math.cos(an) * s * 0.4 * q, py + Math.sin(an) * s * 0.4 * q - q * 10, 3 + j % 3 * 2, 0, Math.PI * 2); c.stroke(); }
+    c.globalAlpha = 1;
+  }
+  if (f.fx) {
+    const [fx2, fy] = P(f.fx[0], f.fx[1]);
+    c.font = '900 16px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.globalAlpha = 1 - q * 0.6; c.lineWidth = 4; c.strokeStyle = '#0b0d18';
+    c.strokeText(f.fx[2], fx2, fy - s * 0.4 - q * 14); c.fillStyle = '#ffe27a'; c.fillText(f.fx[2], fx2, fy - s * 0.4 - q * 14);
+    c.globalAlpha = 1;
+  }
+  if (f.main) { const [mx, my] = P(f.main[0] + f.main[2] * q * 0.8, f.main[1] + f.main[3] * q * 0.8); dessMain(c, mx - s / 2, my - s / 2, s); }
+  if (f.tap) { const [mx, my] = P(f.tap[0], f.tap[1]); c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 2; c.beginPath(); c.arc(mx, my, 6 + q * 16, 0, Math.PI * 2); c.stroke(); dessMain(c, mx, my + 4 - Math.sin(q * Math.PI) * 6, s); }
+}
+
+// ---------- 10. Écrans ----------
+function montrer(nom) {
+  ecranCourant = nom;
+  for (const id of ['accueil', 'etages', 'jeu']) $(id).classList.toggle('cache', id !== nom);
+  for (const id of ['bilan', 'pause']) $(id).classList.add('cache');
+  if (nom !== 'jeu') { $('intro').classList.add('cache'); introScene = null; }
+  if (nom === 'accueil') { majAccueil(); redimensionner(); }
+  if (nom === 'etages') majEtages();
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+function majAccueil() {
+  const tot = sauv.etoiles.reduce((a, b) => a + (b || 0), 0);
+  const parts = [];
+  if (tot) parts.push(`★ ${tot} / ${NB_ETAGES * 3}`);
+  if (sauv.prof) parts.push(`Profondeur record : ${sauv.prof}`);
+  $('recAccueil').textContent = parts.join('  ·  ');
+  $('bProf').disabled = !sauv.fini;
+  $('bProf').textContent = sauv.fini ? 'Profondeurs' : 'Profondeurs (après l\'étage 10)';
+}
+function majEtages() {
+  const g = $('grilleNiv');
+  g.textContent = '';
+  for (let n = 1; n <= NB_ETAGES; n++) {
+    const b = document.createElement('button');
+    b.className = 'niv';
+    const ok = n <= sauv.debloque, e = sauv.etoiles[n - 1] || 0;
+    b.disabled = !ok;
+    b.setAttribute('aria-label', `Étage ${n}`);
+    b.innerHTML = `<small>Étage</small><b>${n}</b><span class="ets">${'<i>★</i>'.repeat(e)}${'★'.repeat(3 - e)}</span>`;
+    if (!ok) b.querySelector('.ets').textContent = 'fermé';
+    b.addEventListener('click', () => { SON.clic(); lancer('etage', n); });
+    g.appendChild(b);
+  }
+  const p = document.createElement('button');
+  p.className = 'niv prof';
+  p.disabled = !sauv.fini;
+  p.innerHTML = sauv.fini ? `<b>Profondeurs</b><small>record : ${sauv.prof ? 'profondeur ' + sauv.prof : 'aucun'}</small>` : '<b>Profondeurs</b><small>après l\'étage 10</small>';
+  p.addEventListener('click', () => { SON.clic(); lancer('prof', 1); });
+  g.appendChild(p);
+}
+// Cœurs, gemmes, score et sac
+let pvAffiche = -1;
+function majHud(tout) {
+  if (!S) return;
+  const zc = $('coeurs');
+  if (tout || zc.children.length !== S.pvMax || pvAffiche !== S.pv) {
+    zc.textContent = '';
+    for (let k = 0; k < S.pvMax; k++) {
+      const im = document.createElement('img');
+      im.src = k < S.pv ? ICONES.coeur : ICONES.vide; im.alt = '';
+      if (!tout && k >= S.pv && k < pvAffiche) im.className = 'perdu';
+      zc.appendChild(im);
+    }
+    pvAffiche = S.pv;
+  }
+  $('hEtage').textContent = nomEtage();
+  $('hGem').textContent = `${S.gemmes}/${S.gemmesTot}`;
+  $('hScore').textContent = (S.scoreAvant || 0) + S.score;
+  $('iArme').src = ICONES[Object.keys(ARMES).find((a) => ARMES[a] === S.arme)];
+  $('tArme').textContent = `force ${S.arme.deg}`;
+  $('tCle').textContent = S.cles;
+  $('tPotion').textContent = S.potions;
+  $('tParch').textContent = S.parchemins;
+  $('bPotion').classList.toggle('vide', S.potions === 0);
+  $('bParch').classList.toggle('vide', S.parchemins === 0);
+}
+function pulse(id) { const e = $(id); e.classList.remove('pulse'); void e.offsetWidth; e.classList.add('pulse'); majHud(); }
+let minuterieMsg = 0;
+function msg(t) {
+  const m = $('msg');
+  m.textContent = fr(t); m.style.opacity = 1;
+  clearTimeout(minuterieMsg);
+  minuterieMsg = setTimeout(() => { m.style.opacity = 0; }, 4000);
+}
+
+// Bilan de fin d'étage : étoiles une à une et score qui défile
+function montrerBilan(gagne, et, bonusCoeurs, record) {
+  if (ecranCourant !== 'jeu' || !S) return;
+  const prof = S.mode === 'prof';
+  $('bTitre').textContent = gagne
+    ? (S.cfg.boss && !prof ? 'Tu as rapporté le Cristal !' : `${nomEtage()} réussi !`)
+    : 'Le lutin est épuisé !';
+  const spans = $('bEtoiles').querySelectorAll('span');
+  spans.forEach((s) => s.classList.remove('on'));
+  $('bEtoiles').style.display = gagne ? '' : 'none';
+  const lignes = [];
+  if (gagne) {
+    lignes.push(`<i>★</i> Sortie trouvée`);
+    lignes.push(`${S.gemmes >= S.gemmesTot ? '<i>★</i>' : '☆'} Gemmes : ${S.gemmes} / ${S.gemmesTot}`);
+    lignes.push(`${S.perdu <= coeursToleres() ? '<i>★</i>' : '☆'} Cœurs perdus : ${S.perdu} (${coeursToleres()} au plus)`);
+    lignes.push(`Brumelins dissipés : ${S.vaincus} · bonus cœurs : ${bonusCoeurs}`);
+    if (S.cfg.boss && !prof) lignes.push('Les Profondeurs sont ouvertes : descends le plus bas possible !');
+  } else {
+    lignes.push(`Gemmes : ${S.gemmes} / ${S.gemmesTot} · Brumelins dissipés : ${S.vaincus}`);
+    lignes.push(prof ? `Tu es arrivé à la profondeur ${S.n}. Record : ${sauv.prof || 0}` : 'Astuce : attends que les Brumelins viennent à toi, et bois tes potions.');
+  }
+  $('bDetail').innerHTML = fr(lignes.join('<br>'));
+  const total = prof ? S.scoreAvant + S.score : S.score;
+  const rec = prof ? sauv.profScore : sauv.scores[S.n - 1] || 0;
+  $('bRecord').textContent = record ? 'Nouveau record !' : (rec ? `Record : ${rec}` : '');
+  $('bSuivant').classList.toggle('cache', !gagne);
+  $('bSuivant').textContent = prof ? 'Niveau suivant : plus bas' : (S.n === NB_ETAGES ? 'Les Profondeurs' : 'Niveau suivant');
+  $('bilan').classList.remove('cache');
+  // Compteur qui défile
+  const deb = performance.now();
+  const tour = (now) => {
+    const q = Math.min(1, (now - deb) / 1100);
+    $('bPts').textContent = Math.round(total * (1 - (1 - q) ** 3));
+    if (q < 1 && !$('bilan').classList.contains('cache')) requestAnimationFrame(tour);
+  };
+  requestAnimationFrame(tour);
+  for (let k = 0; k < et; k++) setTimeout(() => { spans[k].classList.add('on'); SON.etoile(k); confettis(25); }, 450 + k * 450);
+  if (record) setTimeout(() => confettis(60), 450 + et * 450);
+}
+$('bSuivant').addEventListener('click', () => {
+  SON.clic();
+  if (S.mode === 'prof') lancer('prof', S.n + 1, { pv: S.pv, pvMax: S.pvMax, arme: S.arme, potions: S.potions, parchemins: S.parchemins, score: S.scoreAvant + S.score });
+  else if (S.n < NB_ETAGES) lancer('etage', S.n + 1);
+  else lancer('prof', 1);
+});
+$('bRejouer').addEventListener('click', () => { SON.clic(); if (S.mode === 'prof') lancer('prof', 1); else lancer('etage', S.n); });
+$('bCarte').addEventListener('click', () => { SON.clic(); montrer('etages'); });
+$('bPause').addEventListener('click', () => { if (!S || S.fini) return; SON.clic(); $('pause').classList.remove('cache'); });
+$('bReprendre').addEventListener('click', () => { SON.clic(); $('pause').classList.add('cache'); });
+$('bRecommencer').addEventListener('click', () => { SON.clic(); if (S.mode === 'prof') lancer('prof', 1); else lancer('etage', S.n); });
+$('bQuitter').addEventListener('click', () => { SON.clic(); montrer('etages'); });
+$('bJouer').addEventListener('click', () => {
+  SON.clic();
+  // Reprend au premier étage pas encore réussi.
+  let n = 1;
+  while (n < sauv.debloque && sauv.etoiles[n - 1]) n++;
+  lancer('etage', Math.min(n, NB_ETAGES));
+});
+$('bEtages').addEventListener('click', () => { SON.clic(); montrer('etages'); });
+$('bProf').addEventListener('click', () => { SON.clic(); lancer('prof', 1); });
+$('bRetour').addEventListener('click', () => { SON.clic(); montrer('accueil'); });
+
+// Bouton du son (choix mémorisé)
+function majSon() {
+  $('btnSon').innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 9 H8 L13 5 V19 L8 15 H4 Z" fill="#f3eee2"/>${sauv.son
+    ? '<path d="M16 9 Q18.5 12 16 15 M18.5 6.5 Q23 12 18.5 17.5" stroke="#f3eee2" stroke-width="2" fill="none" stroke-linecap="round"/>'
+    : '<path d="M16 9 L22 15 M22 9 L16 15" stroke="#ff7a6e" stroke-width="2.4" stroke-linecap="round"/>'}</svg>`;
+  $('btnSon').setAttribute('aria-label', sauv.son ? 'Couper le son' : 'Remettre le son');
+}
+$('btnSon').addEventListener('click', (ev) => { ev.stopPropagation(); sauv.son = !sauv.son; sauver(); majSon(); SON.clic(); });
+
+// ---------- 11. Confettis ----------
+const fx = $('fx'), fctx = fx.getContext('2d');
+let confs = [];
+function confettis(n) {
+  const w = fx.clientWidth;
+  for (let k = 0; k < n; k++) {
+    confs.push({ x: Math.random() * w, y: -10 - Math.random() * 80, vx: (Math.random() - 0.5) * 80, vy: 80 + Math.random() * 160,
+      r: Math.random() * 6, vr: (Math.random() - 0.5) * 10, c: pick(['#ffcf5a', '#ff6fae', '#5ad1ff', '#7dff8a', '#c18bff']), w: 5 + Math.random() * 5 });
+  }
+}
+function dessinerConfettis(dt) {
+  if (!confs.length) { if (fx.dataset.vide !== '1') { fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, fx.width, fx.height); fx.dataset.vide = '1'; } return; }
+  fx.dataset.vide = '0';
+  fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  fctx.clearRect(0, 0, fx.width, fx.height);
+  const h = fx.clientHeight;
+  for (const p of confs) {
+    p.x += p.vx * dt / 1000; p.y += p.vy * dt / 1000; p.r += p.vr * dt / 1000;
+    fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.r); fctx.fillStyle = p.c; fctx.fillRect(-p.w / 2, -p.w / 4, p.w, p.w / 2); fctx.restore();
+  }
+  confs = confs.filter((p) => p.y < h + 20);
+}
+
+// ---------- 12. Démarrage ----------
+let tPrec = performance.now();
+function boucle(t) {
+  const dt = Math.min(60, t - tPrec); tPrec = t;
+  if (ecranCourant === 'jeu') dessinerJeu(t, dt);
+  else if (ecranCourant === 'accueil') dessinerArt(t);
+  dessinerIntro(t);
+  dessinerConfettis(dt);
+  requestAnimationFrame(boucle);
+}
+charger();
+preparerIcones();
+$('iGem').src = ICONES.gemme; $('iCle').src = ICONES.cle; $('iPotion').src = ICONES.potion; $('iParch').src = ICONES.parchemin;
+majSon();
+montrer('accueil');
+redimensionner();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
