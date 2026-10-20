@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Potager Express</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: #5d9c3f;
+    font-family: system-ui, sans-serif; touch-action: none;
+    user-select: none; -webkit-user-select: none;
+  }
+  #jeu { position: relative; width: 100%; max-width: 520px; height: 100%; margin: 0 auto; overflow: hidden; background: #8fd16a; }
+  canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+  #effets { pointer-events: none; z-index: 3; }
+  .secousse { animation: secousse .35s; }
+  @keyframes secousse {
+    0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-6px, 2px); }
+    40% { transform: translate(5px, -3px); } 60% { transform: translate(-4px, 2px); } 80% { transform: translate(3px, -1px); }
+  }
+
+  /* Écrans par-dessus le jeu */
+  .ecran {
+    position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center;
+    padding: 16px; background: rgba(40, 60, 20, .45);
+  }
+  .ecran.cache { display: none; }
+  #ecran-accueil { align-items: flex-start; background: none; padding-top: 5vh; }
+  .carte {
+    background: rgba(255, 250, 235, .97); border-radius: 24px; padding: 18px 18px 20px; text-align: center;
+    box-shadow: 0 6px 0 rgba(0, 0, 0, .15), 0 12px 30px rgba(0, 0, 0, .25); width: 100%; max-width: 400px; color: #4a3320;
+    max-height: 100%; overflow: auto;
+  }
+  h1 {
+    margin: 4px 0 6px; font-size: clamp(44px, 14vw, 62px); line-height: .92; color: #f07b25; letter-spacing: -1px;
+    text-shadow: 0 3px 0 #a84a12, 0 6px 10px rgba(0, 0, 0, .2);
+  }
+  h1 span { color: #4caf50; text-shadow: 0 3px 0 #2e7d32, 0 6px 10px rgba(0, 0, 0, .2); }
+  h2 { margin: 2px 0 8px; font-size: 30px; color: #e8742a; }
+  p { margin: 8px 0; font-size: 17px; line-height: 1.3; }
+  .regle { font-size: 18px; font-weight: 600; }
+  .petit { font-size: 15px; color: #7a5b3c; }
+  button { font: inherit; min-height: 48px; min-width: 48px; border: none; border-radius: 16px; cursor: pointer; font-weight: 800; }
+  .gros { background: #ff9f1c; color: #fff; font-size: 26px; padding: 12px 40px; box-shadow: 0 5px 0 #c46f00; margin: 6px; }
+  .gros:active, .moyen:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(0, 0, 0, .25); }
+  .moyen { background: #4caf50; color: #fff; font-size: 18px; padding: 10px 20px; box-shadow: 0 4px 0 #2e7d32; margin: 6px; }
+  .moyen.gris { background: #a1887f; box-shadow: 0 4px 0 #6d4c41; }
+  .boutons { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+  .rond {
+    position: absolute; top: 8px; width: 44px; height: 44px; z-index: 4; background: rgba(255, 255, 255, .92);
+    border-radius: 50%; box-shadow: 0 2px 0 rgba(0, 0, 0, .2); display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .rond svg { width: 26px; height: 26px; }
+  #b-pause { left: 6px; }
+  #b-son { right: 6px; }
+  .grille-niv { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
+  .niv {
+    background: #fff; border: 3px solid #e2c99a; padding: 6px 4px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; color: #4a3320; font-size: 24px; min-height: 72px;
+  }
+  .niv span { font-size: 17px; color: #f5b301; letter-spacing: 1px; }
+  .niv span i { font-style: normal; color: #d8cdb6; }
+  .niv:disabled { opacity: .4; cursor: default; }
+  .etoiles { margin: 4px 0; height: 70px; }
+  .et { font-size: 60px; color: #d8cdb6; display: inline-block; line-height: 1; transition: color .2s; }
+  .et.on { color: #ffc107; text-shadow: 0 3px 0 #c98a00; animation: pop .5s; }
+  @keyframes pop {
+    0% { transform: scale(0) rotate(-40deg); } 70% { transform: scale(1.35) rotate(10deg); } 100% { transform: scale(1); }
+  }
+  .nombre { font-size: 40px; font-weight: 900; color: #c98a00; margin: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .nombre svg { width: 36px; height: 36px; }
+  .record { color: #2e7d32; font-weight: 800; }
+  .record.battu { color: #e8742a; animation: pop .6s; }
+</style>
+</head>
+<body>
+<div id="jeu">
+  <canvas id="scene"></canvas>
+  <canvas id="effets"></canvas>
+
+  <button id="b-pause" class="rond" aria-label="Pause" style="display:none">
+    <svg viewBox="0 0 24 24"><rect x="5" y="4" width="5" height="16" rx="2" fill="#5b3a22"/><rect x="14" y="4" width="5" height="16" rx="2" fill="#5b3a22"/></svg>
+  </button>
+  <button id="b-son" class="rond" aria-label="Couper le son">
+    <svg viewBox="0 0 24 24">
+      <path d="M3 9h4l5-4v14l-5-4H3z" fill="#5b3a22"/>
+      <g id="son-ondes" fill="none" stroke="#5b3a22" stroke-width="2.2" stroke-linecap="round"><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18 6a8.5 8.5 0 0 1 0 12"/></g>
+      <g id="son-coupe" stroke="#d84315" stroke-width="2.6" stroke-linecap="round"><path d="M15 9l6 6M21 9l-6 6"/></g>
+    </svg>
+  </button>
+
+  <!-- Accueil -->
+  <div id="ecran-accueil" class="ecran">
+    <div class="carte">
+      <h1>Potager<br><span>Express</span></h1>
+      <p class="regle">Plante, arrose et récolte vite tes légumes, puis vends-les au marché pour agrandir ta&nbsp;ferme&nbsp;!</p>
+      <button id="b-jouer" class="gros principal">Jouer</button><br>
+      <button id="b-niveaux" class="moyen">Choisir un niveau</button>
+      <p id="acc-record" class="petit"></p>
+    </div>
+  </div>
+
+  <!-- Choix du niveau -->
+  <div id="ecran-niveaux" class="ecran cache">
+    <div class="carte">
+      <h2>Les niveaux</h2>
+      <div id="grille-niv" class="grille-niv"></div>
+      <button id="b-retour" class="moyen gris principal">Retour</button>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="ecran-pause" class="ecran cache">
+    <div class="carte">
+      <h2>Pause</h2>
+      <p id="pause-rappel" class="petit"></p>
+      <div class="boutons">
+        <button id="b-reprendre" class="gros principal">Reprendre</button>
+      </div>
+      <div class="boutons">
+        <button id="b-recommencer" class="moyen">Recommencer</button>
+        <button id="b-menu-pause" class="moyen gris">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bilan de fin de niveau -->
+  <div id="ecran-bilan" class="ecran cache">
+    <div class="carte">
+      <h2 id="bil-titre">Bravo !</h2>
+      <div class="etoiles"><span class="et">★</span><span class="et">★</span><span class="et">★</span></div>
+      <p class="nombre"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="8.5" fill="#ffc83d" stroke="#d49a12" stroke-width="2"/><circle cx="10" cy="10" r="4.5" fill="none" stroke="#e0a91f" stroke-width="1.6"/></svg><span id="bil-pieces">0</span></p>
+      <p id="bil-detail" class="petit"></p>
+      <p id="bil-record" class="record"></p>
+      <p id="bil-terrain"></p>
+      <div class="boutons">
+        <button id="b-suivant" class="gros">Niveau suivant</button>
+      </div>
+      <div class="boutons">
+        <button id="b-rejouer" class="moyen">Rejouer</button>
+        <button id="b-menu" class="moyen gris">Menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Potager Express — planter, arroser, récolter et vendre au marché.
+   Tout est dessiné en canvas (aucune image, aucun fichier son).
+   ===================================================================== */
+
+// ---------- Petits outils ----------
+const $ = (s) => document.querySelector(s);
+const hasard = (a, b) => a + Math.random() * (b - a);
+const entier = (a, b) => Math.floor(hasard(a, b + 1));
+const borne = (v, a, b) => Math.max(a, Math.min(b, v));
+const choisir = (t) => t[Math.floor(Math.random() * t.length)];
+const lerp = (a, b, t) => a + (b - a) * t;
+const dans = (r, x, y) => r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+const centre = (r) => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
+
+// ---------- Sauvegarde (le cadre peut refuser le stockage) ----------
+const CLE = 'potager-express-v1';
+const sauvegarde = { niveauMax: 1, etoiles: [], records: [], muet: false, vus: [] };
+try {
+  const texte = localStorage.getItem(CLE);
+  if (texte) Object.assign(sauvegarde, JSON.parse(texte));
+} catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+function sauver() {
+  try { localStorage.setItem(CLE, JSON.stringify(sauvegarde)); } catch (e) { /* tant pis */ }
+}
+
+// ---------- Sons (Web Audio, créés après la première action) ----------
+let audio = null;
+function initAudio() {
+  if (audio) { if (audio.state === 'suspended') audio.resume(); return; }
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+}
+function note(freq, duree, o = {}) {
+  if (!audio || sauvegarde.muet) return;
+  const t0 = audio.currentTime + (o.delai || 0);
+  const osc = audio.createOscillator(), g = audio.createGain();
+  osc.type = o.type || 'sine';
+  osc.frequency.setValueAtTime(freq, t0);
+  if (o.glisse) osc.frequency.exponentialRampToValueAtTime(Math.max(40, freq + o.glisse), t0 + duree);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(o.vol || 0.15, t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + duree);
+  osc.connect(g).connect(audio.destination);
+  osc.start(t0); osc.stop(t0 + duree + 0.05);
+}
+function bruit(duree, vol, frequence) {
+  if (!audio || sauvegarde.muet) return;
+  const n = Math.floor(audio.sampleRate * duree), buf = audio.createBuffer(1, n, audio.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+  src.buffer = buf; f.type = 'lowpass'; f.frequency.value = frequence; g.gain.value = vol;
+  src.connect(f).connect(g).connect(audio.destination); src.start();
+}
+const SONS = {
+  planter: () => note(240, 0.14, { type: 'triangle', vol: 0.25, glisse: -110 }),
+  arroser: () => { note(600, 0.08, { glisse: 400, vol: 0.12 }); note(800, 0.08, { delai: 0.07, glisse: 400, vol: 0.1 }); note(700, 0.1, { delai: 0.14, glisse: 500, vol: 0.08 }); },
+  recolter: () => { note(880, 0.12, { type: 'triangle', vol: 0.2 }); note(1320, 0.2, { type: 'triangle', vol: 0.15, delai: 0.06 }); },
+  vendre: () => { note(1250, 0.07, { type: 'square', vol: 0.05 }); note(1700, 0.3, { type: 'triangle', vol: 0.16, delai: 0.06 }); note(2100, 0.25, { type: 'triangle', vol: 0.1, delai: 0.12 }); },
+  oeuf: () => { note(700, 0.07, { type: 'square', vol: 0.05, glisse: 200 }); note(950, 0.12, { type: 'square', vol: 0.05, delai: 0.09, glisse: -350 }); },
+  meuh: () => note(150, 0.7, { type: 'sawtooth', vol: 0.07, glisse: -50 }),
+  boing: () => note(260, 0.28, { vol: 0.25, glisse: 600 }),
+  triste: () => { note(392, 0.2, { type: 'triangle', vol: 0.14 }); note(311, 0.4, { type: 'triangle', vol: 0.14, delai: 0.18 }); },
+  erreur: () => note(170, 0.18, { type: 'square', vol: 0.05 }),
+  clic: () => note(660, 0.06, { type: 'triangle', vol: 0.12 }),
+  saison: () => [784, 988, 1175, 1568].forEach((f, i) => note(f, 0.35, { vol: 0.1, delai: i * 0.1 })),
+  etoile: () => [1046, 1318, 1568, 2093].forEach((f, i) => note(f, 0.16, { type: 'triangle', vol: 0.12, delai: i * 0.06 })),
+  magie: () => [880, 1108, 1318, 1760, 2217].forEach((f, i) => note(f, 0.2, { type: 'sine', vol: 0.1, delai: i * 0.05 })),
+  commande: () => [659, 880, 1318, 1760].forEach((f, i) => note(f, 0.22, { type: 'triangle', vol: 0.14, delai: i * 0.08 })),
+  victoire: () => [523, 659, 784, 1046, 784, 1046].forEach((f, i) => note(f, 0.24, { type: 'triangle', vol: 0.17, delai: i * 0.12 })),
+  echec: () => { note(392, 0.3, { type: 'triangle', vol: 0.14 }); note(294, 0.55, { type: 'triangle', vol: 0.14, delai: 0.26 }); },
+  pluie: () => bruit(1.4, 0.12, 1200),
+  chaud: () => note(300, 0.6, { type: 'sine', vol: 0.1, glisse: -120 }),
+};
+function jouerSon(nom) { try { if (SONS[nom]) SONS[nom](); } catch (e) { /* son ignoré */ } }
+
+// ---------- Données du jeu ----------
+// saison : 0 printemps, 1 été, 2 automne, 3 hiver (la culture y pousse 1,5 fois plus vite)
+const CULTURES = {
+  radis:     { nom: 'radis',          cout: 2, pousse: 6,  prix: 6,  eau: 1, saison: 0 },
+  carotte:   { nom: 'carottes',       cout: 3, pousse: 8,  prix: 9,  eau: 1, saison: 2 },
+  salade:    { nom: 'salades',        cout: 3, pousse: 8,  prix: 9,  eau: 1, saison: 0 },
+  fraise:    { nom: 'fraises',        cout: 4, pousse: 10, prix: 13, eau: 2, saison: 0 },
+  tomate:    { nom: 'tomates',        cout: 5, pousse: 11, prix: 16, eau: 2, saison: 1 },
+  mais:      { nom: 'maïs',           cout: 5, pousse: 11, prix: 16, eau: 1, saison: 1 },
+  chou:      { nom: 'choux',          cout: 4, pousse: 10, prix: 13, eau: 1, saison: 3 },
+  ble:       { nom: 'blé',            cout: 2, pousse: 7,  prix: 7,  eau: 1, saison: 3 },
+  pdt:       { nom: 'pommes de terre',cout: 4, pousse: 10, prix: 12, eau: 1, saison: 2 },
+  potiron:   { nom: 'potirons',       cout: 7, pousse: 14, prix: 24, eau: 2, saison: 2 },
+  aubergine: { nom: 'aubergines',     cout: 6, pousse: 12, prix: 20, eau: 2, saison: 1 },
+  pasteque:  { nom: 'pastèques',      cout: 8, pousse: 15, prix: 28, eau: 2, saison: 1 },
+};
+const PRODUITS = Object.assign({}, CULTURES, { oeuf: { nom: 'œufs', prix: 8 }, lait: { nom: 'lait', prix: 15 } });
+const NOMS_SAISON = ['le printemps', "l'été", "l'automne", "l'hiver"];
+const DELAI_SOIF = 7;               // secondes avant qu'une plante assoiffée fane
+const SEUILS = [1, 1.35, 1.7];      // étoiles : objectif × 1, × 1,35, × 1,7
+const DEPART = [12, 12, 15, 20, 25, 25, 25, 30, 35, 40, 40, 45];   // pièces au début de la journée
+
+// Chaque niveau ajoute ses nouveautés à celles des niveaux précédents.
+const NIVEAUX = [
+  { titre: 'Les premières carottes', nouveau: 'Plante et récolte des carottes.', parc: 4, duree: 60, obj: 85, cultures: ['carotte'] },
+  { titre: 'Ça a soif !', nouveau: 'Arrose les plantes qui ont soif. Nouveau : le radis.', parc: 4, duree: 70, obj: 95, cultures: ['carotte', 'radis'], eau: true },
+  { titre: 'Jour de marché', nouveau: 'Vends ta récolte au marché quand les prix sont hauts.', parc: 6, duree: 80, obj: 150, cultures: ['carotte', 'radis', 'salade'], marche: true },
+  { titre: "L'étoile dorée", nouveau: "Touche l'étoile dorée : tout pousse d'un coup ! Nouveau : tomate et fraise.", parc: 6, duree: 80, obj: 210, cultures: ['radis', 'salade', 'tomate', 'fraise'], engrais: true },
+  { titre: 'Les quatre saisons', nouveau: 'Les saisons passent : plante les légumes de saison, ils poussent plus vite.', parc: 8, duree: 90, obj: 250, cultures: ['radis', 'fraise', 'tomate', 'mais', 'carotte', 'chou'], saisons: true },
+  { titre: 'La poule', nouveau: 'Ramasse les œufs de la poule et vends-les. Nouveau : le blé.', parc: 8, duree: 90, obj: 285, cultures: ['radis', 'tomate', 'mais', 'carotte', 'ble', 'chou'], poule: true },
+  { titre: 'Les lapins gourmands', nouveau: 'Touche les lapins avant qu\'ils mangent tes plantes ! Nouveau : la pomme de terre.', parc: 9, duree: 90, obj: 300, cultures: ['fraise', 'tomate', 'carotte', 'pdt', 'ble', 'chou'], lapins: 1 },
+  { titre: 'La vache', nouveau: 'Donne du blé à la vache : elle te donne du lait. Nouveau : le potiron.', parc: 9, duree: 100, obj: 335, cultures: ['salade', 'mais', 'potiron', 'pdt', 'ble', 'chou'], vache: true },
+  { titre: 'Pluie et soleil', nouveau: 'La pluie arrose tout, la canicule assoiffe tes plantes. Nouveau : l\'aubergine.', parc: 12, duree: 100, obj: 380, cultures: ['radis', 'aubergine', 'tomate', 'potiron', 'ble', 'chou'], meteo: true },
+  { titre: 'Les commandes', nouveau: 'Prépare les commandes des clients pour une grosse prime. Nouveau : la pastèque.', parc: 12, duree: 100, obj: 450, cultures: ['fraise', 'pasteque', 'aubergine', 'potiron', 'ble', 'chou'], commandes: true },
+  { titre: 'La grande foire', nouveau: 'Deux lapins à la fois et des prix très agités !', parc: 12, duree: 100, obj: 480, cultures: ['radis', 'pasteque', 'mais', 'carotte', 'ble', 'chou'], lapins: 2, volatil: 1.6 },
+  { titre: "Le marché d'hiver", nouveau: 'Tout à la fois, avec de grosses commandes. Le grand défi !', parc: 12, duree: 110, obj: 550, cultures: ['fraise', 'aubergine', 'pasteque', 'potiron', 'ble', 'chou'], grossesCommandes: true },
+];
+const CONFS = [];
+{ let cumul = {}; for (const nv of NIVEAUX) { cumul = Object.assign({}, cumul, nv); CONFS.push(cumul); } }
+const NB_NIVEAUX = NIVEAUX.length;
+
+// ---------- Canvas ----------
+const jeu = $('#jeu'), scene = $('#scene'), effets = $('#effets');
+const cs = scene.getContext('2d'), cf = effets.getContext('2d');
+let W = 360, H = 640, DPR = 1;
+const Z = {};                      // zones de l'écran (calculées par miseEnPage)
+
+// ---------- Dessins de base ----------
+function rr(c, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+function ell(c, x, y, rx, ry, couleur, rot = 0, trait = null, lw = 2) {
+  c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2);
+  if (couleur) { c.fillStyle = couleur; c.fill(); }
+  if (trait) { c.strokeStyle = trait; c.lineWidth = lw; c.stroke(); }
+}
+function cheminEtoile(c, x, y, r, interieur = 0.45, branches = 5, rot = 0) {
+  c.beginPath();
+  for (let i = 0; i < branches * 2; i++) {
+    const a = rot - Math.PI / 2 + i * Math.PI / branches, rr2 = i % 2 ? r * interieur : r;
+    c.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2);
+  }
+  c.closePath();
+}
+function dessinerPiece(c, x, y, r) {
+  ell(c, x, y, r, r, '#ffc83d', 0, '#d49a12', Math.max(1.5, r * 0.22));
+  ell(c, x, y, r * 0.5, r * 0.5, null, 0, '#e0a91f', Math.max(1, r * 0.15));
+}
+function dessinerGoutte(c, x, y, r) {
+  c.beginPath(); c.moveTo(x, y - r);
+  c.bezierCurveTo(x + r * 0.9, y - r * 0.1, x + r * 0.8, y + r, x, y + r);
+  c.bezierCurveTo(x - r * 0.8, y + r, x - r * 0.9, y - r * 0.1, x, y - r);
+  c.fillStyle = '#3fa9f5'; c.fill();
+  ell(c, x - r * 0.25, y + r * 0.2, r * 0.15, r * 0.25, 'rgba(255,255,255,.7)');
+}
+function feuilles(c, n, x, y, longueur, couleur = '#4caf50') {
+  for (let i = 0; i < n; i++) {
+    const a = (i - (n - 1) / 2) * 0.5;
+    c.save(); c.translate(x, y); c.rotate(a);
+    ell(c, 0, -longueur * 0.5, longueur * 0.22, longueur * 0.5, couleur, 0, '#2e7d32', 1.5);
+    c.restore();
+  }
+}
+
+// Produit (légume, œuf, lait) dessiné dans une boîte de 100 unités, centré en (x, y), taille s.
+function dessinerProduit(c, type, x, y, s) {
+  c.save(); c.translate(x, y); c.scale(s / 100, s / 100);
+  c.lineJoin = 'round';
+  switch (type) {
+    case 'carotte':
+      feuilles(c, 3, 0, -26, 30);
+      c.beginPath(); c.moveTo(-18, -26); c.quadraticCurveTo(0, -34, 18, -26); c.quadraticCurveTo(12, 12, 0, 46); c.quadraticCurveTo(-12, 12, -18, -26);
+      c.fillStyle = '#f28c28'; c.fill(); c.strokeStyle = '#c0611a'; c.lineWidth = 3; c.stroke();
+      c.beginPath(); c.moveTo(-10, -8); c.lineTo(-2, -8); c.moveTo(4, 8); c.lineTo(10, 8); c.moveTo(-6, 22); c.lineTo(1, 22); c.stroke();
+      break;
+    case 'radis':
+      feuilles(c, 3, 0, -18, 34);
+      c.beginPath(); c.moveTo(-7, 30); c.lineTo(7, 30); c.lineTo(0, 48); c.closePath(); c.fillStyle = '#fff3f6'; c.fill();
+      ell(c, 0, 8, 28, 26, '#e8457a', 0, '#b02a57', 3);
+      ell(c, -9, -1, 6, 9, 'rgba(255,255,255,.45)', -0.4);
+      break;
+    case 'salade':
+    case 'chou': {
+      const [a, b, d] = type === 'salade' ? ['#8bd35a', '#5fb83a', '#b6ea8a'] : ['#7fbfa0', '#4f9b7a', '#b8e0cc'];
+      for (let i = 0; i < 9; i++) { const ang = i / 9 * Math.PI * 2; ell(c, Math.cos(ang) * 26, 6 + Math.sin(ang) * 22, 18, 16, a, ang, b, 2); }
+      ell(c, 0, 6, 28, 24, b);
+      ell(c, 0, 4, 20, 17, d, 0, b, 2);
+      c.strokeStyle = b; c.lineWidth = 2; c.beginPath(); c.moveTo(0, -10); c.lineTo(0, 18); c.moveTo(-10, 0); c.lineTo(0, 10); c.moveTo(10, 0); c.lineTo(0, 10); c.stroke();
+      break;
+    }
+    case 'tomate':
+      ell(c, 0, 8, 38, 34, '#e53935', 0, '#a51d1d', 3);
+      ell(c, -14, -4, 8, 12, 'rgba(255,255,255,.5)', -0.5);
+      for (let i = 0; i < 5; i++) { const ang = -Math.PI / 2 + i * Math.PI * 2 / 5; ell(c, Math.cos(ang) * 9, -24 + Math.sin(ang) * 5, 9, 4, '#43a047', ang); }
+      c.fillStyle = '#2e7d32'; c.fillRect(-2, -38, 4, 12);
+      break;
+    case 'fraise':
+      c.beginPath(); c.moveTo(0, 46); c.bezierCurveTo(-46, 10, -40, -30, 0, -24); c.bezierCurveTo(40, -30, 46, 10, 0, 46);
+      c.fillStyle = '#e5333f'; c.fill(); c.strokeStyle = '#a3182a'; c.lineWidth = 3; c.stroke();
+      c.fillStyle = '#ffe36e';
+      for (const [px, py] of [[-14, -6], [0, -10], [14, -6], [-18, 8], [-4, 6], [10, 8], [-8, 20], [6, 22], [0, 34]]) ell(c, px, py, 2.5, 3.5, '#ffe36e');
+      for (let i = 0; i < 5; i++) { const ang = -Math.PI / 2 + i * Math.PI * 2 / 5 + 0.3; ell(c, Math.cos(ang) * 12, -26 + Math.sin(ang) * 6, 11, 5, '#43a047', ang); }
+      break;
+    case 'mais':
+      ell(c, -16, 10, 12, 34, '#66bb6a', 0.35, '#2e7d32', 2);
+      ell(c, 0, -2, 17, 40, '#ffd54f', 0, '#e0a800', 3);
+      for (let j = -30; j <= 26; j += 9) for (let i = -8; i <= 8; i += 8) ell(c, i, j, 3, 3.5, '#f5b400');
+      ell(c, 16, 10, 12, 34, '#81c784', -0.35, '#2e7d32', 2);
+      break;
+    case 'ble':
+      c.strokeStyle = '#b5862a'; c.lineWidth = 4; c.lineCap = 'round';
+      for (const [dx, h] of [[-16, 30], [0, 40], [16, 30]]) {
+        c.beginPath(); c.moveTo(0, 46); c.quadraticCurveTo(dx * 0.6, 10, dx, -h + 20); c.stroke();
+        for (let k = 0; k < 4; k++) {
+          const yy = -h + 22 - k * 9;
+          ell(c, dx - 5, yy + 4, 4, 7, '#f2c14e', -0.5, '#b5862a', 1.5);
+          ell(c, dx + 5, yy + 4, 4, 7, '#f2c14e', 0.5, '#b5862a', 1.5);
+        }
+        ell(c, dx, -h - 16, 4, 7, '#f2c14e', 0, '#b5862a', 1.5);
+      }
+      break;
+    case 'pdt':
+      ell(c, 0, 8, 40, 30, '#c8955a', -0.2, '#8d6235', 3);
+      for (const [px, py] of [[-18, 0], [8, -6], [16, 16], [-6, 20], [22, 2]]) ell(c, px, py, 3, 2.5, '#8d6235');
+      ell(c, -14, -6, 8, 5, 'rgba(255,255,255,.3)', -0.4);
+      break;
+    case 'potiron':
+      c.fillStyle = '#6d4c41'; c.fillRect(-4, -36, 8, 16);
+      ell(c, 12, -32, 10, 5, '#43a047', -0.4);
+      ell(c, -22, 10, 22, 30, '#f57c00', 0, '#bf5600', 3);
+      ell(c, 22, 10, 22, 30, '#f57c00', 0, '#bf5600', 3);
+      ell(c, 0, 10, 20, 32, '#fb8c00', 0, '#bf5600', 3);
+      ell(c, -6, -2, 5, 12, 'rgba(255,255,255,.3)');
+      break;
+    case 'aubergine':
+      ell(c, 6, 12, 26, 34, '#6a3d9a', -0.45, '#41206b', 3);
+      ell(c, -8, -10, 17, 20, '#6a3d9a', -0.45);
+      ell(c, -2, 0, 6, 16, 'rgba(255,255,255,.25)', -0.45);
+      for (let i = 0; i < 4; i++) ell(c, -12 + Math.cos(i * 1.6) * 9, -24 + Math.sin(i * 1.6) * 5, 9, 5, '#43a047', i * 1.6);
+      c.fillStyle = '#2e7d32'; c.save(); c.rotate(-0.45); c.fillRect(-2, -46, 5, 14); c.restore();
+      break;
+    case 'pasteque':
+      c.beginPath(); c.arc(0, -8, 46, 0, Math.PI); c.closePath(); c.fillStyle = '#2e7d32'; c.fill();
+      c.beginPath(); c.arc(0, -8, 40, 0, Math.PI); c.closePath(); c.fillStyle = '#d7f0b6'; c.fill();
+      c.beginPath(); c.arc(0, -8, 35, 0, Math.PI); c.closePath(); c.fillStyle = '#ef5350'; c.fill();
+      for (const [px, py] of [[-20, 4], [-6, 14], [8, 6], [20, 2], [0, 24], [-12, -2]]) ell(c, px, py, 2.5, 4, '#3e2723');
+      break;
+    case 'oeuf':
+      ell(c, 0, 4, 28, 36, '#fff6e0', 0, '#d9c7a0', 3);
+      ell(c, -9, -10, 6, 10, 'rgba(255,255,255,.9)', -0.3);
+      break;
+    case 'lait':
+      rr(c, -20, -18, 40, 62, 10); c.fillStyle = '#ffffff'; c.fill(); c.strokeStyle = '#90a4ae'; c.lineWidth = 3; c.stroke();
+      rr(c, -10, -38, 20, 24, 5); c.fill(); c.stroke();
+      rr(c, -12, -48, 24, 11, 4); c.fillStyle = '#1e88e5'; c.fill();
+      c.fillStyle = '#64b5f6'; c.fillRect(-20, 4, 40, 18);
+      ell(c, 0, 13, 7, 5, '#ffffff');
+      break;
+  }
+  c.restore();
+}
+
+// Plante sur sa parcelle selon sa pousse (0 à 1).
+function dessinerPlante(c, type, g, x, y, s, t, fanee) {
+  if (fanee) {
+    c.save(); c.translate(x, y + s * 0.15);
+    c.strokeStyle = '#7b5a3a'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(4, -s * 0.18, s * 0.12, -s * 0.12); c.stroke();
+    ell(c, -s * 0.1, -s * 0.04, s * 0.12, s * 0.05, '#9c7b52', 0.5);
+    ell(c, s * 0.14, -s * 0.08, s * 0.12, s * 0.05, '#9c7b52', -0.6);
+    c.restore();
+    return;
+  }
+  if (g < 0.34) {
+    const k = 0.4 + g / 0.34 * 0.6;
+    ell(c, x, y + s * 0.2, s * 0.16, s * 0.06, '#6b4226');
+    feuilles(c, 2, x, y + s * 0.18, s * 0.28 * k, '#66bb6a');
+    return;
+  }
+  feuilles(c, 3, x, y + s * 0.26, s * 0.36);
+  if (g < 1) {
+    const k = 0.22 + 0.4 * (g - 0.34) / 0.66;
+    dessinerProduit(c, type, x, y + s * 0.02, s * k);
+  } else {
+    const bond = Math.sin(t * 4 + x) * s * 0.02;
+    ell(c, x, y, s * 0.36, s * 0.36, 'rgba(255,240,150,.35)');
+    dessinerProduit(c, type, x, y - s * 0.02 + bond, s * 0.68);
+  }
+}
+
+function dessinerPoule(c, x, y, s, t, agite) {
+  c.save();
+  c.translate(x, y + (agite > 0 ? -Math.abs(Math.sin(t * 14)) * 5 : Math.sin(t * 2) * 1));
+  c.scale(s / 100, s / 100);
+  c.strokeStyle = '#f39c12'; c.lineWidth = 5; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(-10, 28); c.lineTo(-12, 44); c.moveTo(10, 28); c.lineTo(12, 44); c.stroke();
+  ell(c, -34, -8, 14, 22, '#f5f0e6', -0.5, '#d0c8b8', 2);
+  ell(c, 0, 8, 36, 28, '#ffffff', 0, '#d0c8b8', 2);
+  ell(c, -4, 10, 18, 12, '#ece6da', -0.3);
+  ell(c, 26, -20, 16, 16, '#ffffff', 0, '#d0c8b8', 2);
+  for (const [px, py] of [[20, -38], [28, -40], [35, -34]]) ell(c, px, py, 6, 6, '#e53935');
+  c.beginPath(); c.moveTo(40, -24); c.lineTo(53, -19); c.lineTo(40, -14); c.closePath(); c.fillStyle = '#f39c12'; c.fill();
+  ell(c, 31, -23, 3, 3, '#222');
+  ell(c, 40, -7, 4, 6, '#e53935');
+  c.restore();
+}
+
+function dessinerVache(c, x, y, s, t, mange) {
+  c.save(); c.translate(x, y); c.scale(-s / 100, s / 100);   // tournée vers la gauche
+  const m = mange ? Math.sin(t * 10) * 3 : 0;
+  c.fillStyle = '#5d4037';
+  for (const lx of [-34, -18, 14, 28]) c.fillRect(lx, 14, 9, 26);
+  c.strokeStyle = '#5d4037'; c.lineWidth = 3; c.beginPath(); c.moveTo(-44, -6); c.quadraticCurveTo(-56, 10, -50, 22); c.stroke();
+  rr(c, -46, -22, 86, 46, 20); c.fillStyle = '#ffffff'; c.fill(); c.strokeStyle = '#555'; c.lineWidth = 2; c.stroke();
+  ell(c, -24, -6, 12, 9, '#333', 0.3); ell(c, 12, 6, 10, 8, '#333', -0.2); ell(c, 26, -12, 7, 6, '#333');
+  ell(c, 8, 22, 9, 6, '#f8bbd0');
+  c.save(); c.translate(48, -18 + m);
+  ell(c, -10, -16, 5, 9, '#d7ccc8', -0.6); ell(c, 12, -16, 5, 9, '#d7ccc8', 0.6);
+  ell(c, -16, -6, 10, 5, '#fff', -0.3, '#555', 1.5); ell(c, 18, -6, 10, 5, '#fff', 0.3, '#555', 1.5);
+  ell(c, 0, 0, 18, 20, '#ffffff', 0, '#555', 2);
+  ell(c, 0, 14, 16, 11, '#f8bbd0', 0, '#c48b9f', 1.5);
+  ell(c, -5, 14, 2.5, 3, '#8d5a6a'); ell(c, 5, 14, 2.5, 3, '#8d5a6a');
+  ell(c, -7, -3, 3, 3.5, '#222'); ell(c, 7, -3, 3, 3.5, '#222');
+  c.restore();
+  c.restore();
+}
+
+function dessinerLapin(c, x, y, s, t, dir, bouge) {
+  c.save();
+  c.translate(x, y - (bouge ? Math.abs(Math.sin(t * 11)) * 10 : 0));
+  c.scale(dir * s / 100, s / 100);
+  ell(c, -26, 4, 9, 9, '#ffffff');
+  ell(c, 0, 8, 28, 22, '#c9b79c', 0, '#8d7b62', 2);
+  ell(c, 14, -38, 7, 20, '#c9b79c', 0.2, '#8d7b62', 2); ell(c, 14, -38, 3.5, 14, '#f4b6c2', 0.2);
+  ell(c, 26, -36, 7, 20, '#c9b79c', 0.5, '#8d7b62', 2); ell(c, 26, -36, 3.5, 14, '#f4b6c2', 0.5);
+  ell(c, 22, -10, 17, 15, '#c9b79c', 0, '#8d7b62', 2);
+  ell(c, 27, -13, 3, 3.5, '#222');
+  ell(c, 37, -7, 3.5, 3, '#e57390');
+  ell(c, 8, 28, 10, 5, '#b8a587');
+  c.restore();
+}
+
+function dessinerSaison(c, s, x, y, r) {
+  c.save(); c.translate(x, y);
+  if (s === 0) { for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; ell(c, Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5, r * 0.42, r * 0.42, '#f48fb1'); } ell(c, 0, 0, r * 0.35, r * 0.35, '#ffd54f'); }
+  else if (s === 1) {
+    c.strokeStyle = '#ffb300'; c.lineWidth = r * 0.16; c.lineCap = 'round';
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; c.beginPath(); c.moveTo(Math.cos(a) * r * 0.6, Math.sin(a) * r * 0.6); c.lineTo(Math.cos(a) * r * 0.95, Math.sin(a) * r * 0.95); c.stroke(); }
+    ell(c, 0, 0, r * 0.48, r * 0.48, '#ffca28', 0, '#ffb300', 2);
+  } else if (s === 2) {
+    ell(c, 0, 0, r * 0.45, r * 0.85, '#ef6c00', 0.7, '#bf360c', 2);
+    c.strokeStyle = '#bf360c'; c.lineWidth = 2; c.beginPath(); c.moveTo(-r * 0.55, r * 0.6); c.lineTo(r * 0.5, -r * 0.55); c.stroke();
+  } else {
+    c.strokeStyle = '#4fc3f7'; c.lineWidth = r * 0.16; c.lineCap = 'round';
+    for (let i = 0; i < 3; i++) { const a = i * Math.PI / 3; c.beginPath(); c.moveTo(Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9); c.lineTo(-Math.cos(a) * r * 0.9, -Math.sin(a) * r * 0.9); c.stroke(); }
+    ell(c, 0, 0, r * 0.2, r * 0.2, '#e1f5fe');
+  }
+  c.restore();
+}
+
+function dessinerMain(c, x, y, k) {
+  c.save(); c.translate(x, y); c.rotate(-0.4); c.scale(k, k);
+  c.fillStyle = '#fff'; c.strokeStyle = '#333'; c.lineWidth = 3;
+  rr(c, -12, 26, 40, 42, 14); c.fill(); c.stroke();
+  rr(c, 10, 22, 13, 22, 6); c.fill(); c.stroke();
+  rr(c, 21, 28, 12, 20, 6); c.fill(); c.stroke();
+  rr(c, -8, 0, 17, 46, 8); c.fill(); c.stroke();
+  c.restore();
+}
+
+function dessinerEtoileDoree(c, x, y, r, t) {
+  ell(c, x, y, r * 1.6, r * 1.6, 'rgba(255,230,120,.35)');
+  cheminEtoile(c, x, y, r, 0.48, 5, t * 2);
+  c.fillStyle = '#ffd740'; c.fill(); c.strokeStyle = '#ff9800'; c.lineWidth = 3; c.stroke();
+  ell(c, x - r * 0.15, y - r * 0.2, r * 0.15, r * 0.1, 'rgba(255,255,255,.8)');
+}
+
+function dessinerClient(c, x, y, r) {
+  ell(c, x, y + r * 0.1, r * 0.8, r * 0.8, '#f2c49b', 0, '#c89466', 2);
+  ell(c, x, y - r * 0.45, r * 1.1, r * 0.28, '#e9c46a', 0, '#b8902f', 2);
+  ell(c, x, y - r * 0.62, r * 0.6, r * 0.38, '#e9c46a', 0, '#b8902f', 2);
+  ell(c, x - r * 0.28, y + r * 0.05, r * 0.08, r * 0.1, '#333'); ell(c, x + r * 0.28, y + r * 0.05, r * 0.08, r * 0.1, '#333');
+  c.strokeStyle = '#7a3e1d'; c.lineWidth = 2; c.beginPath(); c.arc(x, y + r * 0.25, r * 0.3, 0.2, Math.PI - 0.2); c.stroke();
+  ell(c, x - r * 0.5, y + r * 0.3, r * 0.13, r * 0.09, 'rgba(240,120,120,.5)'); ell(c, x + r * 0.5, y + r * 0.3, r * 0.13, r * 0.09, 'rgba(240,120,120,.5)');
+}
+
+function texte(c, t, x, y, taille, couleur, align = 'center', gras = 800) {
+  c.font = `${gras} ${taille}px system-ui, sans-serif`; c.textAlign = align; c.textBaseline = 'middle';
+  c.fillStyle = couleur; c.fillText(t, x, y);
+}
+function lignesDe(c, t, largeur) {
+  const res = []; let l = '';
+  for (const m of t.split(' ')) {
+    const essai = l ? l + ' ' + m : m;
+    if (c.measureText(essai).width > largeur && l) { res.push(l); l = m; } else l = essai;
+  }
+  if (l) res.push(l);
+  return res;
+}
+
+// ---------- État général ----------
+let etat = 'accueil';            // accueil, niveaux, jeu, pause, bilan
+let partie = null;
+let tuto = null;
+let T = 0;                        // horloge des animations
+const parts = [], vols = [], flottants = [];
+let banniereActive = null;
+
+// ---------- Mise en page ----------
+function miseEnPage() {
+  const conf = partie ? partie.conf : CONFS[0];
+  const produits = partie ? partie.produits : [];
+  const pad = 8, k = borne(H / 780, 0.72, 1);
+  Z.k = k;
+  Z.hud = { x: 0, y: 0, w: W, h: 60 };
+  let bas = H;
+  Z.tuiles = {}; Z.marche = null; Z.commande = null;
+  if (conf.marche) {
+    const nb = produits.length, rangs = nb > 6 ? 2 : 1, cols = Math.ceil(nb / rangs);
+    const th = Math.round(54 * k), gap = 6, entete = 22, hc = conf.commandes ? Math.round(48 * k) + 6 : 0;
+    const h = entete + hc + rangs * (th + gap) + 2;
+    Z.marche = { x: 0, y: H - h, w: W, h };
+    if (conf.commandes) Z.commande = { x: pad, y: Z.marche.y + entete, w: W - 2 * pad, h: hc - 6 };
+    const tw = (W - 2 * pad - (cols - 1) * gap) / cols;
+    produits.forEach((p, i) => {
+      Z.tuiles[p] = { x: pad + (i % cols) * (tw + gap), y: Z.marche.y + entete + hc + Math.floor(i / cols) * (th + gap), w: tw, h: th };
+    });
+    bas = Z.marche.y;
+  }
+  Z.graines = {}; Z.barre = null;
+  if (conf.cultures.length > 1) {
+    const h = Math.round(68 * k);
+    Z.barre = { x: 0, y: bas - h, w: W, h };
+    const n = conf.cultures.length, gap = 6, bw = Math.min(72, (W - 2 * pad - (n - 1) * gap) / n), x0 = (W - (n * bw + (n - 1) * gap)) / 2;
+    conf.cultures.forEach((p, i) => { Z.graines[p] = { x: x0 + i * (bw + gap), y: Z.barre.y + 5, w: bw, h: h - 10 }; });
+    bas = Z.barre.y;
+  }
+  Z.animaux = null;
+  if (conf.poule) {
+    const h = Math.round(82 * k);
+    Z.animaux = { x: 0, y: bas - h, w: W, h };
+    const cy = Z.animaux.y + h * 0.52;
+    Z.poule = { x: 46, y: cy, s: 60 * k };
+    Z.oeufs = [0, 1, 2].map((i) => ({ x: 98 + i * 38, y: cy + 12 * k, r: 22 }));
+    Z.vache = { x: W - 60, y: cy - 2, s: 84 * k, r: 44 };
+    Z.lait = { x: W - 138, y: cy + 8 * k, r: 24 };
+    bas = Z.animaux.y;
+  }
+  Z.champ = { x: 0, y: Z.hud.h, w: W, h: bas - Z.hud.h };
+  const n = conf.parc, cols = n <= 4 ? 2 : (n === 6 || n === 9 ? 3 : 4), rangs = Math.ceil(n / cols), gap = 10;
+  const s = Math.min(150,(W - 32 - (cols - 1) * gap) / cols, (Z.champ.h - 20 - (rangs - 1) * gap) / rangs);
+  const x0 = (W - (cols * s + (cols - 1) * gap)) / 2, y0 = Z.champ.y + (Z.champ.h - (rangs * s + (rangs - 1) * gap)) / 2;
+  Z.cols = cols;
+  Z.parcelles = [];
+  for (let i = 0; i < n; i++) Z.parcelles.push({ x: x0 + (i % cols) * (s + gap), y: y0 + Math.floor(i / cols) * (s + gap), w: s, h: s });
+  Z.hudPiece = { x: W / 2 - 30, y: 20 };
+  // Touffes d'herbe décoratives (toujours au même endroit)
+  let graine = 7;
+  const alea = () => (graine = (graine * 16807) % 2147483647) / 2147483647;
+  Z.touffes = Array.from({ length: 26 }, () => ({ x: alea() * W, y: Z.champ.y + alea() * Z.champ.h, f: alea() < 0.3 }));
+}
+
+function redimensionner() {
+  const r = jeu.getBoundingClientRect();
+  W = Math.max(280, r.width); H = Math.max(400, r.height);
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  for (const cv of [scene, effets]) { cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR); }
+  miseEnPage();
+}
+window.addEventListener('resize', redimensionner);
+
+// ---------- Partie ----------
+function parcelleVide() { return { culture: null, pousse: 0, soif: false, soifT: 0, seuils: [], fanee: false, mouille: 0, pulse: 0, mange: false }; }
+
+function nouvellePartie(n) {
+  const conf = CONFS[n - 1];
+  const produits = [...conf.cultures];
+  if (conf.poule) produits.push('oeuf');
+  if (conf.vache) produits.push('lait');
+  const P = {
+    n, conf, produits, temps: 0, pieces: DEPART[n - 1], aff: DEPART[n - 1], graine: conf.cultures[0],
+    parcelles: Array.from({ length: conf.parc }, parcelleVide),
+    panier: {}, prix: {}, pulseTuile: {}, chronoPrix: 2.5,
+    lapins: [], prochainLapin: 9, oeufs: [null, null, null], poule: { t: 3, agite: 0 }, vache: { etat: 'faim', t: 0 }, laitPret: false,
+    meteo: null, prochaineMeteo: hasard(10, 15), etoile: null, prochaineEtoile: hasard(8, 12),
+    commande: null, prochaineCommande: 5, saison: 0, fini: false, finDans: -1, curseur: 0, clavier: false, recolte: 0,
+  };
+  for (const p of produits) { P.panier[p] = 0; P.prix[p] = { f: 1, tend: 0 }; P.pulseTuile[p] = 0; }
+  return P;
+}
+
+function facteurSaison(k) {
+  if (!partie.conf.saisons) return 1;
+  if (CULTURES[k].saison === partie.saison) return 1.5;
+  return partie.saison === 3 ? 0.6 : 1;
+}
+function prixActuel(k) { return Math.max(1, Math.round(PRODUITS[k].prix * (partie.prix[k] ? partie.prix[k].f : 1))); }
+function seuilEtoile(i) { return Math.round(partie.conf.obj * SEUILS[i]); }
+
+function lancerNiveau(n) {
+  partie = nouvellePartie(n);
+  miseEnPage();
+  parts.length = 0; vols.length = 0; flottants.length = 0; banniereActive = null;
+  montrerEcran(null);
+  etat = 'jeu';
+  $('#b-pause').style.display = 'flex';
+  tuto = creerTuto(n);
+}
+
+// Ajoute des pièces avec une pièce qui vole vers le compteur.
+function gagner(montant, x, y) {
+  partie.pieces += montant;
+  for (let i = 0; i < Math.min(5, 1 + Math.floor(montant / 8)); i++) {
+    vols.push({ type: 'piece', x0: x + hasard(-10, 10), y0: y + hasard(-10, 10), x1: Z.hudPiece.x, y1: Z.hudPiece.y, t: -i * 0.06, d: 0.6 });
+  }
+  flottant(`+${montant}`, x, y - 10, '#c98a00');
+}
+
+function rienEnCours() {
+  const P = partie;
+  return !P.parcelles.some((p) => p.culture && !p.fanee) && !P.produits.some((k) => P.panier[k] > 0) && !P.oeufs.some(Boolean) && !P.laitPret;
+}
+
+function planter(pc, k) {
+  Object.assign(pc, parcelleVide(), { culture: k, seuils: CULTURES[k].eau === 2 ? [0.3, 0.65] : [0.4], pulse: 1 });
+}
+function arroser(pc, parJoueur, r) {
+  pc.soif = false; pc.seuils.shift(); pc.mouille = 1.5; pc.pulse = 1;
+  if (parJoueur) {
+    jouerSon('arroser');
+    const ct = centre(r);
+    for (let i = 0; i < 8; i++) parts.push({ x: ct.x + hasard(-20, 20), y: r.y + 4, vx: hasard(-30, 30), vy: hasard(40, 120), age: 0, vie: 0.6, coul: '#3fa9f5', taille: hasard(3, 5), forme: 'goutte', g: 400 });
+  }
+}
+
+// Toucher une parcelle : planter, arroser, récolter ou nettoyer.
+function actionParcelle(i) {
+  const P = partie, pc = P.parcelles[i], r = Z.parcelles[i], ct = centre(r);
+  if (!pc) return;
+  P.curseur = i;
+  if (!pc.culture) {
+    const cu = CULTURES[P.graine];
+    if (P.pieces >= cu.cout) {
+      P.pieces -= cu.cout;
+      planter(pc, P.graine);
+      flottant(`-${cu.cout}`, ct.x, ct.y - r.h * 0.3, '#8d6235');
+    } else if (rienEnCours()) {
+      planter(pc, P.graine);
+      banniere('Graines offertes !', '#2e7d32');
+    } else {
+      jouerSon('erreur');
+      banniere(P.conf.marche ? 'Pas assez de pièces : vends ta récolte !' : 'Pas assez de pièces : récolte d\'abord !', '#c62828');
+      return;
+    }
+    jouerSon('planter');
+    eclat(ct.x, ct.y + r.h * 0.2, ['#8d5a36', '#a1887f', '#6b4226'], 8, 'rond', 90);
+  } else if (pc.fanee) {
+    P.parcelles[i] = parcelleVide(); P.parcelles[i].pulse = 1;
+    jouerSon('clic');
+    eclat(ct.x, ct.y, ['#9c7b52', '#7b5a3a'], 8, 'rond', 80);
+  } else if (pc.soif) {
+    arroser(pc, true, r);
+  } else if (pc.pousse >= 1) {
+    recolter(i);
+  } else {
+    pc.pulse = 0.6;
+    jouerSon('clic');
+    if (!flottants.some((f) => f.t === 'Ça pousse…' && f.age < 0.6)) flottant('Ça pousse…', ct.x, r.y + 10, '#2e7d32', 15);
+  }
+}
+
+function recolter(i) {
+  const P = partie, pc = P.parcelles[i], r = Z.parcelles[i], ct = centre(r), k = pc.culture;
+  P.parcelles[i] = parcelleVide(); P.parcelles[i].pulse = 1;
+  P.recolte++;
+  jouerSon('recolter');
+  eclat(ct.x, ct.y, ['#ffd740', '#ffffff', '#8bc34a'], 14, 'etoile', 170);
+  if (P.conf.marche) {
+    const tu = Z.tuiles[k], cible = centre(tu);
+    vols.push({ type: k, x0: ct.x, y0: ct.y, x1: cible.x, y1: cible.y, t: 0, d: 0.55, fin: () => { P.panier[k]++; P.pulseTuile[k] = 1; } });
+  } else {
+    gagner(CULTURES[k].prix, ct.x, ct.y);
+  }
+}
+
+function vendre(k) {
+  const P = partie, n = P.panier[k], tu = Z.tuiles[k], ct = centre(tu);
+  if (!n) { jouerSon('clic'); flottant('Vide', ct.x, tu.y, '#8d6235', 14); P.pulseTuile[k] = 0.5; return; }
+  const gain = n * prixActuel(k);
+  P.panier[k] = 0; P.pulseTuile[k] = 1;
+  jouerSon('vendre');
+  gagner(gain, ct.x, ct.y);
+  eclat(ct.x, ct.y, ['#ffd740', '#ffc107', '#fff59d'], 10, 'rond', 140);
+}
+function toutVendre() { for (const k of partie.produits) if (partie.panier[k]) vendre(k); }
+
+function choisirCible() {
+  const P = partie, prises = P.lapins.filter((l) => l.etat !== 'fuit').map((l) => l.cible);
+  const libres = P.parcelles.map((p, i) => i).filter((i) => P.parcelles[i].culture && !P.parcelles[i].fanee && !prises.includes(i));
+  return libres.length ? choisir(libres) : -1;
+}
+
+function creerCommande() {
+  const P = partie, pool = [...P.produits];
+  const n = P.conf.grossesCommandes ? 3 : 2, items = {};
+  for (let i = 0; i < n && pool.length; i++) {
+    const k = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    items[k] = entier(1, P.conf.grossesCommandes ? 3 : 2);
+  }
+  let valeur = 0;
+  for (const k in items) valeur += PRODUITS[k].prix * items[k];
+  jouerSon('commande');
+  banniere('Un client passe commande !', '#6a1b9a');
+  return { items, prime: Math.round(valeur * 1.6 + 10), t: 40, d: 40 };
+}
+function livrerCommande() {
+  const P = partie, cmd = P.commande;
+  if (!cmd) return;
+  const ok = Object.keys(cmd.items).every((k) => P.panier[k] >= cmd.items[k]);
+  const ct = centre(Z.commande);
+  if (!ok) { jouerSon('erreur'); banniere('Il te manque encore des produits !', '#c62828'); return; }
+  for (const k in cmd.items) P.panier[k] -= cmd.items[k];
+  P.commande = null; P.prochaineCommande = 5;
+  jouerSon('commande');
+  gagner(cmd.prime, ct.x, ct.y);
+  eclat(ct.x, ct.y, ['#ffd740', '#e040fb', '#40c4ff', '#69f0ae'], 26, 'etoile', 240);
+  banniere('Commande livrée : bravo !', '#2e7d32');
+}
+
+// ---------- Mise à jour de la journée ----------
+function majPartie(dt) {
+  const P = partie, conf = P.conf;
+  P.temps += dt;
+  P.aff += (P.pieces - P.aff) * Math.min(1, dt * 6);
+  for (const k of P.produits) P.pulseTuile[k] = Math.max(0, P.pulseTuile[k] - dt * 3);
+
+  // Saisons
+  if (conf.saisons) {
+    const s = Math.min(3, Math.floor(P.temps / conf.duree * 4));
+    if (s !== P.saison) {
+      P.saison = s; jouerSon('saison');
+      banniere(`C'est ${NOMS_SAISON[s]} !`, ['#ad1457', '#ef6c00', '#bf360c', '#0277bd'][s]);
+    }
+  }
+  const pluie = P.meteo && P.meteo.type === 'pluie', canicule = P.meteo && P.meteo.type === 'canicule';
+
+  // Parcelles
+  P.parcelles.forEach((pc, i) => {
+    pc.pulse = Math.max(0, pc.pulse - dt * 3); pc.mouille = Math.max(0, pc.mouille - dt); pc.mange = false;
+    if (!pc.culture || pc.fanee || pc.pousse >= 1) return;
+    if (pc.soif) {
+      if (pluie) { arroser(pc, false); return; }
+      pc.soifT -= dt * (canicule ? 1.8 : 1);
+      if (pc.soifT <= 0) { pc.soif = false; pc.fanee = true; jouerSon('triste'); banniere('Oh non, une plante a fané…', '#8d6235'); }
+      return;
+    }
+    pc.pousse = Math.min(1, pc.pousse + dt / CULTURES[pc.culture].pousse * facteurSaison(pc.culture));
+    if (conf.eau && pc.seuils.length && pc.pousse >= pc.seuils[0]) {
+      if (pluie) { pc.seuils.shift(); pc.mouille = 1; } else { pc.soif = true; pc.soifT = DELAI_SOIF; }
+    }
+    if (pc.pousse >= 1) { pc.pulse = 1; const ct = centre(Z.parcelles[i]); eclat(ct.x, ct.y, ['#fff59d', '#ffffff'], 6, 'etoile', 80); }
+  });
+
+  // Marché : les prix bougent toutes les 2,5 s
+  if (conf.marche) {
+    P.chronoPrix -= dt;
+    if (P.chronoPrix <= 0) {
+      P.chronoPrix = 2.5;
+      const vol = conf.volatil || 1;
+      for (const k of P.produits) {
+        const pr = P.prix[k], avant = pr.f;
+        pr.f = borne(pr.f + (Math.random() - 0.5) * 0.32 * vol + (1 - pr.f) * 0.1, 0.5, 1.8);
+        pr.tend = pr.f - avant > 0.02 ? 1 : (pr.f - avant < -0.02 ? -1 : 0);
+      }
+      if (Math.random() < 0.12) {
+        const k = choisir(P.produits);
+        P.prix[k].f = hasard(1.7, 1.9); P.prix[k].tend = 1; P.pulseTuile[k] = 1;
+        banniere(`Super prix : ${PRODUITS[k].nom} !`, '#2e7d32');
+      }
+    }
+  }
+
+  // Étoile dorée (engrais magique)
+  if (conf.engrais) {
+    if (P.etoile) {
+      const e = P.etoile; e.t += dt;
+      e.x = lerp(-30, W + 30, e.t / e.d); e.y = e.y0 + Math.sin(e.t * 3) * 26;
+      if (e.t >= e.d) P.etoile = null;
+    } else if ((P.prochaineEtoile -= dt) <= 0) {
+      P.prochaineEtoile = hasard(14, 20);
+      P.etoile = { t: 0, d: 6, x: -30, y: 0, y0: Z.champ.y + hasard(0.25, 0.75) * Z.champ.h };
+    }
+  }
+
+  // Poule
+  if (conf.poule) {
+    P.poule.agite = Math.max(0, P.poule.agite - dt);
+    if ((P.poule.t -= dt) <= 0) {
+      const i = P.oeufs.indexOf(null);
+      if (i >= 0) { P.oeufs[i] = { age: 0 }; P.poule.agite = 0.6; jouerSon('oeuf'); }
+      P.poule.t = hasard(5, 7);
+    }
+  }
+  // Vache
+  if (conf.vache && P.vache.etat === 'mange' && (P.vache.t -= dt) <= 0) {
+    P.vache.etat = 'lait'; P.laitPret = true; jouerSon('meuh');
+  }
+
+  // Lapins
+  if (conf.lapins) {
+    const rapides = conf.lapins > 1, vit = rapides ? 70 : 45;
+    if ((P.prochainLapin -= dt) <= 0) {
+      P.prochainLapin = rapides ? hasard(7, 10) : hasard(12, 16);
+      if (P.lapins.filter((l) => l.etat !== 'fuit').length < conf.lapins) {
+        const cible = choisirCible();
+        if (cible >= 0) {
+          const gauche = Math.random() < 0.5;
+          P.lapins.push({ x: gauche ? -30 : W + 30, y: hasard(Z.champ.y + 40, Z.champ.y + Z.champ.h - 30), cible, etat: 'va', t: 0, dir: gauche ? 1 : -1, vit });
+        }
+      }
+    }
+    for (const l of P.lapins) {
+      l.t += dt;
+      if (l.etat === 'fuit') { l.x += l.dir * l.vit * 2.6 * dt; continue; }
+      let pc = P.parcelles[l.cible];
+      if (!pc || !pc.culture || pc.fanee) {
+        l.cible = choisirCible(); l.etat = 'va';
+        if (l.cible < 0) { l.etat = 'fuit'; l.dir = l.x < W / 2 ? -1 : 1; continue; }
+        pc = P.parcelles[l.cible];
+      }
+      const r = Z.parcelles[l.cible], cx = r.x + r.w / 2 + r.w * 0.28 * -l.dir, cy = r.y + r.h * 0.62;
+      if (l.etat === 'va') {
+        const dx = cx - l.x, dy = cy - l.y, d = Math.hypot(dx, dy);
+        if (Math.abs(dx) > 1) l.dir = dx > 0 ? 1 : -1;
+        if (d < 6) { l.etat = 'mange'; l.t = 0; }
+        else { l.x += dx / d * l.vit * dt; l.y += dy / d * l.vit * dt; }
+      } else if (l.etat === 'mange') {
+        pc.mange = true;
+        if (l.t > 3) {
+          P.parcelles[l.cible] = parcelleVide();
+          jouerSon('triste'); secouer();
+          banniere('Le lapin a mangé une plante !', '#8d6235');
+          l.etat = 'fuit'; l.dir = l.x < W / 2 ? -1 : 1;
+        }
+      }
+    }
+    P.lapins = P.lapins.filter((l) => !(l.etat === 'fuit' && (l.x < -60 || l.x > W + 60)));
+  }
+
+  // Météo
+  if (conf.meteo) {
+    if (P.meteo) { if ((P.meteo.t -= dt) <= 0) P.meteo = null; }
+    else if ((P.prochaineMeteo -= dt) <= 0) {
+      const type = Math.random() < 0.5 ? 'pluie' : 'canicule';
+      P.meteo = { type, t: type === 'pluie' ? 6 : 8 };
+      P.prochaineMeteo = hasard(14, 20);
+      if (type === 'pluie') { banniere('Il pleut : tout est arrosé !', '#0277bd'); jouerSon('pluie'); }
+      else { banniere('Canicule : vite, arrose !', '#e65100'); jouerSon('chaud'); }
+    }
+  }
+
+  // Commandes
+  if (conf.commandes) {
+    if (P.commande) { if ((P.commande.t -= dt) <= 0) { P.commande = null; P.prochaineCommande = 6; banniere('Le client est reparti…', '#8d6235'); } }
+    else if ((P.prochaineCommande -= dt) <= 0) P.commande = creerCommande();
+  }
+
+  // Fin de journée : temps écoulé, ou 3 étoiles déjà gagnées
+  if (P.finDans < 0 && P.pieces >= seuilEtoile(2)) {
+    P.finDans = 1.3; banniere('3 étoiles : journée parfaite !', '#e65100'); jouerSon('etoile');
+  }
+  if (P.finDans >= 0 && (P.finDans -= dt) <= 0) finJournee();
+  else if (P.temps >= conf.duree) finJournee();
+}
+
+function finJournee() {
+  const P = partie;
+  if (P.fini) return;
+  P.fini = true;
+  // Le marché ferme : ce qui reste dans le panier est vendu à moitié prix.
+  let reste = 0;
+  for (const k of P.produits) { reste += P.panier[k] * Math.max(1, Math.round(prixActuel(k) * 0.5)); P.panier[k] = 0; }
+  P.pieces += reste; P.reste = reste;
+  const score = P.pieces, n = P.n;
+  const etoiles = score >= seuilEtoile(2) ? 3 : score >= seuilEtoile(1) ? 2 : score >= seuilEtoile(0) ? 1 : 0;
+  const ancien = sauvegarde.records[n - 1] || 0;
+  const battu = score > ancien;
+  sauvegarde.records[n - 1] = Math.max(ancien, score);
+  sauvegarde.etoiles[n - 1] = Math.max(sauvegarde.etoiles[n - 1] || 0, etoiles);
+  if (etoiles > 0) sauvegarde.niveauMax = Math.max(sauvegarde.niveauMax, Math.min(NB_NIVEAUX, n + 1));
+  sauver();
+  banniere(P.temps >= P.conf.duree ? 'Fin de la journée !' : 'Bravo !', '#5d4037');
+  setTimeout(() => afficherBilan(score, etoiles, battu, ancien), 900);
+}
+
+// ---------- Effets ----------
+function eclat(x, y, couleurs, n, forme, force) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = hasard(0.4, 1) * force;
+    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - force * 0.3, age: 0, vie: hasard(0.5, 0.9), coul: choisir(couleurs), taille: hasard(3, 6), forme, g: 260, rot: Math.random() * 6, vr: hasard(-6, 6) });
+  }
+}
+function confettis() {
+  const couleurs = ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#e040fb', '#ff9100'];
+  for (let i = 0; i < 140; i++) {
+    parts.push({ x: Math.random() * W, y: hasard(-H * 0.5, -10), vx: hasard(-40, 40), vy: hasard(80, 220), age: 0, vie: hasard(2.5, 4), coul: choisir(couleurs), taille: hasard(5, 9), forme: 'confetti', g: 40, rot: Math.random() * 6, vr: hasard(-8, 8) });
+  }
+}
+function flottant(t, x, y, coul, taille = 20) { flottants.push({ t, x, y, coul, taille, age: 0 }); }
+function banniere(t, coul) { banniereActive = { t, coul: coul || '#5d4037', age: 0 }; }
+function secouer() { scene.classList.remove('secousse'); void scene.offsetWidth; scene.classList.add('secousse'); }
+
+function majEffets(dt) {
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.age += dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; if (p.rot !== undefined) p.rot += p.vr * dt;
+    if (p.age >= p.vie) parts.splice(i, 1);
+  }
+  for (let i = vols.length - 1; i >= 0; i--) {
+    const v = vols[i]; v.t += dt;
+    if (v.t >= v.d) { if (v.fin) v.fin(); vols.splice(i, 1); }
+  }
+  for (let i = flottants.length - 1; i >= 0; i--) { const f = flottants[i]; f.age += dt; f.y -= 40 * dt; if (f.age > 1.1) flottants.splice(i, 1); }
+  if (banniereActive && (banniereActive.age += dt) > 2.2) banniereActive = null;
+}
+
+// ---------- Rendu du jeu ----------
+const HERBE = ['#8fd16a', '#b3cf55', '#d6a64e', '#e3edf2'];
+function couleurHerbe() { return partie && partie.conf.saisons ? HERBE[partie.saison] : HERBE[0]; }
+
+function dessinerParcelle(c, pc, r, t, surligne) {
+  const k = 1 + pc.pulse * 0.07, s = r.w;
+  c.save(); c.translate(r.x + s / 2, r.y + s / 2); c.scale(k, k); c.translate(-s / 2, -s / 2);
+  // terre
+  rr(c, 0, 0, s, s, s * 0.16); c.fillStyle = 'rgba(0,0,0,.15)'; c.fill();
+  rr(c, 0, -3, s, s, s * 0.16); c.fillStyle = pc.mouille > 0 ? '#6b4226' : '#8b5a36'; c.fill();
+  c.strokeStyle = surligne ? '#ffeb3b' : '#5b3a22'; c.lineWidth = surligne ? 5 : 3; c.stroke();
+  c.strokeStyle = 'rgba(60,35,20,.35)'; c.lineWidth = 3;
+  for (let j = 1; j <= 3; j++) { c.beginPath(); c.moveTo(s * 0.15, s * j / 4.2); c.lineTo(s * 0.85, s * j / 4.2); c.stroke(); }
+  if (partie && partie.conf.saisons && partie.saison === 3) { ell(c, s * 0.25, s * 0.1, s * 0.18, s * 0.06, 'rgba(255,255,255,.8)'); ell(c, s * 0.75, s * 0.85, s * 0.15, s * 0.05, 'rgba(255,255,255,.7)'); }
+  const cx = s / 2, cy = s / 2 + (pc.mange ? Math.sin(t * 40) * 2 : 0);
+  if (pc.culture) {
+    dessinerPlante(c, pc.culture, pc.pousse, cx + (pc.mange ? Math.sin(t * 50) * 3 : 0), cy, s, t, pc.fanee);
+    if (!pc.fanee && pc.pousse < 1) {
+      rr(c, s * 0.15, s * 0.86, s * 0.7, 6, 3); c.fillStyle = 'rgba(0,0,0,.3)'; c.fill();
+      rr(c, s * 0.15, s * 0.86, s * 0.7 * pc.pousse, 6, 3); c.fillStyle = pc.soif ? '#90caf9' : '#aeea00'; c.fill();
+    }
+    if (pc.soif) {
+      const bx = s * 0.8, by = s * 0.18 + Math.sin(t * 6) * 3, br = s * 0.17;
+      ell(c, bx, by, br, br, '#ffffff', 0, '#1976d2', 2);
+      c.beginPath(); c.arc(bx, by, br + 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pc.soifT / DELAI_SOIF);
+      c.strokeStyle = pc.soifT < 2.5 ? '#e53935' : '#ff9800'; c.lineWidth = 4; c.stroke();
+      dessinerGoutte(c, bx, by, br * 0.6);
+    }
+    if (pc.pousse >= 1 && !pc.fanee) {
+      cheminEtoile(c, s * 0.18, s * 0.18, s * 0.08, 0.4, 4, t * 3); c.fillStyle = '#fff59d'; c.fill();
+    }
+  } else if (partie && partie.graine) {
+    c.globalAlpha = 0.25 + 0.1 * Math.sin(t * 3);
+    dessinerProduit(c, partie.graine, cx, cy, s * 0.4);
+    c.globalAlpha = 1;
+  }
+  c.restore();
+}
+
+function dessinerHud(c) {
+  const P = partie, conf = P.conf;
+  c.fillStyle = 'rgba(255,250,235,.96)'; c.fillRect(0, 0, W, Z.hud.h);
+  c.fillStyle = 'rgba(0,0,0,.12)'; c.fillRect(0, Z.hud.h, W, 3);
+  const x0 = 56, x1 = W - 56;
+  texte(c, `Niv. ${P.n}`, x0, 18, 15, '#5d4037', 'left');
+  dessinerPiece(c, Z.hudPiece.x, 18, 9);
+  texte(c, `${Math.round(P.aff)} / ${conf.obj}`, Z.hudPiece.x + 14, 19, 17, '#4a3320', 'left', 900);
+  const reste = Math.max(0, Math.ceil(conf.duree - P.temps)), urgent = reste <= 10;
+  texte(c, `${reste} s`, x1, 19, urgent ? 17 + Math.abs(Math.sin(T * 6)) * 2 : 16, urgent ? '#e53935' : '#5d4037', 'right', 900);
+  const hx = x1 - c.measureText(`${reste} s`).width - 13;
+  ell(c, hx, 18, 8, 8, '#fff', 0, urgent ? '#e53935' : '#5d4037', 2);
+  c.beginPath(); c.moveTo(hx, 18); c.lineTo(hx, 13); c.moveTo(hx, 18); c.lineTo(hx + 4, 20); c.stroke();
+  // Barre de progression avec les 3 étoiles
+  const bx1 = conf.saisons ? x1 - 38 : x1, bw = bx1 - x0, by = 36, max = seuilEtoile(2);
+  rr(c, x0, by, bw, 14, 7); c.fillStyle = '#e6dcc4'; c.fill();
+  const fr = borne(P.aff / max, 0, 1);
+  if (fr > 0) { rr(c, x0, by, Math.max(14, bw * fr), 14, 7); const g = c.createLinearGradient(x0, 0, bx1, 0); g.addColorStop(0, '#8bc34a'); g.addColorStop(1, '#ffc107'); c.fillStyle = g; c.fill(); }
+  for (let i = 0; i < 3; i++) {
+    const ex = x0 + bw * seuilEtoile(i) / max - (i === 2 ? 8 : 0);
+    cheminEtoile(c, ex, by + 7, 10, 0.45);
+    c.fillStyle = P.aff >= seuilEtoile(i) ? '#ffc107' : '#cfc3a6'; c.fill(); c.strokeStyle = '#8d6e3a'; c.lineWidth = 1.5; c.stroke();
+  }
+  if (conf.saisons) dessinerSaison(c, P.saison, x1 - 17, by + 7, 13);
+}
+
+function dessinerBarreGraines(c) {
+  const P = partie;
+  c.fillStyle = '#f3e3bf'; c.fillRect(Z.barre.x, Z.barre.y, W, Z.barre.h);
+  c.fillStyle = '#d9c08e'; c.fillRect(0, Z.barre.y, W, 3);
+  for (const k of P.conf.cultures) {
+    const b = Z.graines[k], cu = CULTURES[k], choisi = P.graine === k, peut = P.pieces >= cu.cout;
+    c.globalAlpha = peut ? 1 : 0.5;
+    rr(c, b.x, b.y, b.w, b.h, 12); c.fillStyle = choisi ? '#fff3b0' : '#ffffff'; c.fill();
+    c.strokeStyle = choisi ? '#f0a500' : '#d9c08e'; c.lineWidth = choisi ? 4 : 2; c.stroke();
+    dessinerProduit(c, k, b.x + b.w / 2, b.y + b.h * 0.4, Math.min(b.w, b.h) * 0.58);
+    dessinerPiece(c, b.x + b.w / 2 - 9, b.y + b.h - 10, 6);
+    texte(c, `${cu.cout}`, b.x + b.w / 2 - 1, b.y + b.h - 9, 14, '#5d4037', 'left', 900);
+    c.globalAlpha = 1;
+    if (P.conf.saisons && cu.saison === P.saison) dessinerSaison(c, cu.saison, b.x + b.w - 8, b.y + 9, 9);
+  }
+}
+
+function dessinerCommande(c, cmd, r) {
+  rr(c, r.x, r.y, r.w, r.h, 12); c.fillStyle = '#f3e5f5'; c.fill(); c.strokeStyle = '#8e24aa'; c.lineWidth = 3; c.stroke();
+  const h = r.h, cy = r.y + h / 2 - 2;
+  dessinerClient(c, r.x + h * 0.5, cy, h * 0.34);
+  let x = r.x + h + 2;
+  for (const k in cmd.items) {
+    const ok = partie && partie.panier[k] >= cmd.items[k];
+    dessinerProduit(c, k, x + 14, cy, h * 0.6);
+    texte(c, `×${cmd.items[k]}`, x + 30, cy + 2, 16, ok ? '#2e7d32' : '#4a3320', 'left', 900);
+    x += 62;
+  }
+  texte(c, '→', x + 4, cy, 20, '#6a1b9a');
+  dessinerPiece(c, x + 26, cy, 9);
+  texte(c, `+${cmd.prime}`, x + 38, cy + 1, 17, '#c98a00', 'left', 900);
+  rr(c, r.x + 8, r.y + h - 7, (r.w - 16) * borne(cmd.t / cmd.d, 0, 1), 4, 2); c.fillStyle = '#ab47bc'; c.fill();
+}
+
+function dessinerMarche(c) {
+  const P = partie, m = Z.marche;
+  c.fillStyle = '#c98b52'; c.fillRect(0, m.y, W, m.h);
+  for (let x = 0; x < W; x += 30) { c.fillStyle = (x / 30) % 2 ? '#ffffff' : '#e53935'; c.fillRect(x, m.y, 30, 8); }
+  texte(c, P.temps < 12 && P.n <= 4 ? 'MARCHÉ — touche un produit pour le vendre' : 'MARCHÉ', W / 2, m.y + 15, 12, '#fff8e1');
+  if (Z.commande) {
+    if (P.commande) dessinerCommande(c, P.commande, Z.commande);
+    else { rr(c, Z.commande.x, Z.commande.y, Z.commande.w, Z.commande.h, 12); c.fillStyle = 'rgba(255,255,255,.18)'; c.fill(); texte(c, 'En attente d\'un client…', W / 2, Z.commande.y + Z.commande.h / 2, 14, '#fff3e0', 'center', 600); }
+  }
+  for (const k of P.produits) {
+    const tu = Z.tuiles[k], n = P.panier[k], pu = P.pulseTuile[k], kk = 1 + pu * 0.08;
+    c.save(); c.translate(tu.x + tu.w / 2, tu.y + tu.h / 2); c.scale(kk, kk); c.translate(-tu.w / 2, -tu.h / 2);
+    rr(c, 0, 0, tu.w, tu.h, 10); c.fillStyle = n ? '#fffdf5' : '#efe2cf'; c.fill(); c.strokeStyle = n ? '#8d5a2b' : '#b99a76'; c.lineWidth = 2; c.stroke();
+    const is = Math.min(tu.h * 0.55, tu.w * 0.5);
+    c.globalAlpha = n ? 1 : 0.55;
+    dessinerProduit(c, k, tu.w * 0.3, tu.h * 0.36, is);
+    texte(c, `×${n}`, tu.w - 5, tu.h * 0.34, 15, '#4a3320', 'right', 900);
+    c.globalAlpha = 1;
+    const prix = prixActuel(k), tend = P.prix[k].tend;
+    dessinerPiece(c, tu.w / 2 - 15, tu.h * 0.8, 5.5);
+    texte(c, `${prix}`, tu.w / 2 - 7, tu.h * 0.8 + 1, 14, '#5d4037', 'left', 900);
+    if (tend) {
+      const ax = Math.min(tu.w - 7, tu.w / 2 + 22), ay = tu.h * 0.8;
+      c.beginPath();
+      if (tend > 0) { c.moveTo(ax - 5, ay + 4); c.lineTo(ax + 5, ay + 4); c.lineTo(ax, ay - 5); }
+      else { c.moveTo(ax - 5, ay - 4); c.lineTo(ax + 5, ay - 4); c.lineTo(ax, ay + 5); }
+      c.closePath(); c.fillStyle = tend > 0 ? '#2e7d32' : '#d32f2f'; c.fill();
+    }
+    if (P.prix[k].f >= 1.6) { cheminEtoile(c, tu.w - 8, tu.h - 9, 6, 0.45); c.fillStyle = '#ffc107'; c.fill(); }
+    c.restore();
+  }
+}
+
+function dessinerAnimaux(c, t) {
+  const P = partie, a = Z.animaux;
+  c.fillStyle = '#7fb85a'; c.fillRect(0, a.y, W, a.h);
+  c.fillStyle = '#a0764a';
+  c.fillRect(0, a.y + 10, W, 5); c.fillRect(0, a.y + 24, W, 5);
+  for (let x = 10; x < W; x += 46) c.fillRect(x, a.y + 4, 7, 32);
+  ell(c, 110, a.y + a.h * 0.8, 80, 10, 'rgba(240,210,120,.7)');
+  dessinerPoule(c, Z.poule.x, Z.poule.y, Z.poule.s, t, P.poule.agite);
+  P.oeufs.forEach((o, i) => { if (o) dessinerProduit(c, 'oeuf', Z.oeufs[i].x, Z.oeufs[i].y + Math.sin(t * 3 + i) * 1.5, 30); });
+  if (P.conf.vache) {
+    const v = P.vache;
+    dessinerVache(c, Z.vache.x, Z.vache.y, Z.vache.s, t, v.etat === 'mange');
+    const bx = Z.vache.x - 4, by = Z.vache.y - Z.vache.s * 0.48;
+    if (v.etat === 'faim') {
+      const ok = P.panier.ble > 0, pul = ok ? 1 + Math.sin(t * 6) * 0.08 : 1;
+      ell(c, bx, by, 17 * pul, 15 * pul, ok ? '#e8f5e9' : '#ffffff', 0, ok ? '#2e7d32' : '#8d6e63', 2);
+      dessinerProduit(c, 'ble', bx, by, 24);
+    } else if (v.etat === 'mange') {
+      ell(c, bx, by, 14, 14, '#ffffff', 0, '#8d6e63', 2);
+      c.beginPath(); c.moveTo(bx, by); c.arc(bx, by, 11, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - v.t / 5)); c.closePath(); c.fillStyle = '#90caf9'; c.fill();
+    }
+    if (P.laitPret) dessinerProduit(c, 'lait', Z.lait.x, Z.lait.y + Math.sin(t * 4) * 2, 34);
+  }
+}
+
+function dessinerMeteo(c, t) {
+  const P = partie, ch = Z.champ;
+  if (!P.meteo) return;
+  if (P.meteo.type === 'pluie') {
+    c.fillStyle = 'rgba(40,80,140,.15)'; c.fillRect(0, ch.y, W, ch.h);
+    c.strokeStyle = 'rgba(120,180,255,.75)'; c.lineWidth = 2;
+    for (let i = 0; i < 50; i++) {
+      const x = (i * 73 + t * 60) % W, y = ch.y + ((i * 131 + t * 520) % ch.h);
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x - 4, y + 14); c.stroke();
+    }
+  } else {
+    c.fillStyle = `rgba(255,140,0,${0.14 + Math.sin(t * 3) * 0.04})`; c.fillRect(0, ch.y, W, ch.h);
+    dessinerSaison(c, 1, W - 34, ch.y + 30, 22);
+  }
+}
+
+function dessinerChamp(c, t) {
+  const ch = Z.champ;
+  c.fillStyle = couleurHerbe(); c.fillRect(0, ch.y, W, ch.h);
+  for (const tf of Z.touffes) {
+    if (tf.f && (!partie.conf.saisons || partie.saison < 2)) { ell(c, tf.x, tf.y, 3, 3, '#ffffff'); ell(c, tf.x, tf.y, 1.5, 1.5, '#ffd54f'); }
+    else { c.strokeStyle = 'rgba(40,100,30,.35)'; c.lineWidth = 2; c.beginPath(); c.moveTo(tf.x - 4, tf.y); c.lineTo(tf.x - 6, tf.y - 7); c.moveTo(tf.x, tf.y); c.lineTo(tf.x, tf.y - 9); c.moveTo(tf.x + 4, tf.y); c.lineTo(tf.x + 6, tf.y - 7); c.stroke(); }
+  }
+  if (partie.conf.saisons && partie.saison === 3) {
+    c.fillStyle = 'rgba(255,255,255,.9)';
+    for (let i = 0; i < 30; i++) { const x = (i * 97 + Math.sin(t + i) * 20) % W, y = ch.y + ((i * 61 + t * 30) % ch.h); c.beginPath(); c.arc(x, y, 2.2, 0, Math.PI * 2); c.fill(); }
+  }
+}
+
+function dessinerPartie(c, t) {
+  const P = partie;
+  dessinerChamp(c, t);
+  P.parcelles.forEach((pc, i) => dessinerParcelle(c, pc, Z.parcelles[i], t, P.clavier && P.curseur === i));
+  if (P.etoile) dessinerEtoileDoree(c, P.etoile.x, P.etoile.y, 22, t);
+  for (const l of P.lapins) dessinerLapin(c, l.x, l.y, 54 * Z.k, t, l.dir, l.etat !== 'mange');
+  dessinerMeteo(c, t);
+  if (Z.animaux) dessinerAnimaux(c, t);
+  if (Z.barre) dessinerBarreGraines(c);
+  if (Z.marche) dessinerMarche(c);
+  dessinerHud(c);
+}
+
+// Décor de l'écran d'accueil : un potager en pleine récolte.
+function dessinerDecor(c, t) {
+  const g = c.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#9fe0ff'); g.addColorStop(0.45, '#d9f4ff'); g.addColorStop(0.46, '#8fd16a'); g.addColorStop(1, '#6fb84a');
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  ell(c, W * 0.2, H * 0.47, W * 0.5, H * 0.07, '#7cc456');
+  ell(c, W * 0.85, H * 0.48, W * 0.45, H * 0.06, '#86ca5e');
+  dessinerSaison(c, 1, W - 50, H * 0.08, 34);
+  const types = ['carotte', 'tomate', 'fraise', 'potiron', 'mais', 'salade'];
+  const s = Math.min(100, (W - 60) / 3, H * 0.15), gx = (W - 3 * s - 20) / 2, gy = H * 0.56;
+  types.forEach((k, i) => {
+    const r = { x: gx + (i % 3) * (s + 10), y: gy + Math.floor(i / 3) * (s + 10), w: s, h: s };
+    dessinerParcelle(c, { culture: k, pousse: 1, fanee: false, soif: false, pulse: 0, mouille: 0, mange: false }, r, t, false);
+  });
+  const by = gy + 2 * (s + 10) + 30;
+  dessinerPoule(c, W * 0.18, Math.min(H - 40, by), 64, t, Math.sin(t) > 0.7 ? 1 : 0);
+  dessinerProduit(c, 'oeuf', W * 0.18 + 46, Math.min(H - 40, by) + 18, 26);
+  dessinerVache(c, W * 0.8, Math.min(H - 44, by - 4), 84, t, false);
+  dessinerLapin(c, W * 0.5, Math.min(H - 30, by + 10), 50, t, 1, false);
+}
+
+// ---------- Effets et tutoriel (canvas du dessus) ----------
+function dessinerEffets(c) {
+  for (const p of parts) {
+    c.globalAlpha = 1 - p.age / p.vie;
+    if (p.forme === 'etoile') { cheminEtoile(c, p.x, p.y, p.taille * 1.4, 0.45, 5, p.rot); c.fillStyle = p.coul; c.fill(); }
+    else if (p.forme === 'confetti') { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.coul; c.fillRect(-p.taille / 2, -p.taille / 4, p.taille, p.taille / 2); c.restore(); }
+    else if (p.forme === 'goutte') dessinerGoutte(c, p.x, p.y, p.taille);
+    else { ell(c, p.x, p.y, p.taille, p.taille, p.coul); }
+  }
+  c.globalAlpha = 1;
+  for (const v of vols) {
+    if (v.t < 0) continue;
+    const k = v.t / v.d, e = 1 - (1 - k) * (1 - k);
+    const x = lerp(v.x0, v.x1, e), y = lerp(v.y0, v.y1, e) - Math.sin(k * Math.PI) * 60;
+    if (v.type === 'piece') dessinerPiece(c, x, y, 9); else dessinerProduit(c, v.type, x, y, 40 - k * 12);
+  }
+  for (const f of flottants) {
+    c.globalAlpha = 1 - f.age / 1.1;
+    c.font = `900 ${f.taille}px system-ui, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.lineWidth = 4; c.strokeStyle = '#fff'; c.strokeText(f.t, f.x, f.y); c.fillStyle = f.coul; c.fillText(f.t, f.x, f.y);
+  }
+  c.globalAlpha = 1;
+  if (banniereActive && etat === 'jeu') {
+    const b = banniereActive, a = Math.min(1, b.age * 6, (2.2 - b.age) * 3);
+    c.globalAlpha = a;
+    // Taille du texte réduite si besoin pour tenir dans la largeur
+    let taille = 17;
+    c.font = `800 ${taille}px system-ui, sans-serif`;
+    while (c.measureText(b.t).width > W - 56 && taille > 11) { taille--; c.font = `800 ${taille}px system-ui, sans-serif`; }
+    const w = c.measureText(b.t).width + 30, y = Z.champ.y + 17 - (1 - Math.min(1, b.age * 6)) * 20;
+    rr(c, W / 2 - w / 2, y - 14, w, 28, 14); c.fillStyle = 'rgba(255,255,255,.93)'; c.fill(); c.strokeStyle = b.coul; c.lineWidth = 3; c.stroke();
+    texte(c, b.t, W / 2, y + 1, taille, b.coul);
+    c.globalAlpha = 1;
+  }
+}
+
+// Tutoriel : quelques étapes, une main animée montre le geste. Un toucher passe à l'étape suivante.
+function cibleParcelle(i = 0) { return () => centre(Z.parcelles[i]); }
+const faux = (o) => Object.assign(parcelleVide(), o);
+function demoParcelle(o) { return (c, t) => dessinerParcelle(c, faux(o), Z.parcelles[0], t, false); }
+
+function creerTuto(n) {
+  const conf = CONFS[n - 1], etapes = [];
+  etapes.push({ carte: true, duree: 3 });
+  if (!sauvegarde.vus.includes(n)) {
+    const M = {
+      1: [
+        { texte: 'Touche la terre pour planter une graine.', cible: cibleParcelle(0) },
+        { texte: 'Attends qu\'elle pousse…', cible: cibleParcelle(0), demo: demoParcelle({ culture: 'carotte', pousse: 0.6 }), main: false },
+        { texte: 'Touche la carotte mûre : tu gagnes des pièces !', cible: cibleParcelle(0), demo: demoParcelle({ culture: 'carotte', pousse: 1 }) },
+      ],
+      2: [
+        { texte: 'Une goutte ? Ta plante a soif : touche-la vite pour l\'arroser !', cible: cibleParcelle(0), demo: demoParcelle({ culture: 'carotte', pousse: 0.45, soif: true, soifT: 5 }) },
+        { texte: 'Sinon, elle fane. Touche-la pour nettoyer la terre.', cible: cibleParcelle(0), demo: demoParcelle({ culture: 'carotte', pousse: 0.45, fanee: true }) },
+        { texte: 'Choisis ta graine en bas. Le radis pousse très vite !', cible: () => centre(Z.graines.radis) },
+      ],
+      3: [
+        { texte: 'Ta récolte va dans le panier du marché.', cible: () => centre(Z.tuiles.carotte), main: false },
+        { texte: 'Les prix changent ! Flèche verte : le prix monte.', cible: () => centre(Z.tuiles.radis), main: false },
+        { texte: 'Touche un produit pour tout vendre quand il est cher.', cible: () => centre(Z.tuiles.carotte) },
+      ],
+      4: [
+        { texte: 'Une étoile dorée passe parfois : touche-la !', cible: () => ({ x: W / 2, y: Z.champ.y + Z.champ.h / 2 }), demo: (c, t) => dessinerEtoileDoree(c, W / 2, Z.champ.y + Z.champ.h / 2, 22, t) },
+        { texte: 'Toutes tes plantes poussent d\'un coup et n\'ont plus soif !', cible: null, main: false },
+      ],
+      5: [
+        { texte: 'Les saisons passent pendant la journée.', cible: () => ({ x: W - 73, y: 43 }), r: 30, main: false },
+        { texte: 'Un petit dessin sur une graine : c\'est sa saison, elle pousse plus vite !', cible: () => centre(Z.graines.radis) },
+        { texte: 'En hiver, tout pousse lentement, sauf le chou et le blé.', cible: null, main: false },
+      ],
+      6: [
+        { texte: 'Voici la poule ! Touche ses œufs pour les ramasser.', cible: () => Z.oeufs[0], demo: (c) => dessinerProduit(c, 'oeuf', Z.oeufs[0].x, Z.oeufs[0].y, 30) },
+        { texte: 'Les œufs se vendent au marché.', cible: () => centre(Z.tuiles.oeuf), main: false },
+      ],
+      7: [
+        { texte: 'Un lapin gourmand arrive !', cible: () => ({ x: W * 0.3, y: Z.champ.y + Z.champ.h * 0.5 }), demo: (c, t) => dessinerLapin(c, W * 0.3, Z.champ.y + Z.champ.h * 0.5, 54 * Z.k, t, 1, true), main: false },
+        { texte: 'Touche-le vite, sinon il mange ta plante !', cible: () => ({ x: W * 0.3, y: Z.champ.y + Z.champ.h * 0.5 }), demo: (c, t) => dessinerLapin(c, W * 0.3, Z.champ.y + Z.champ.h * 0.5, 54 * Z.k, t, 1, false) },
+      ],
+      8: [
+        { texte: 'La vache mange du blé : plante du blé et récolte-le.', cible: () => centre(Z.graines.ble) },
+        { texte: 'Touche la vache pour lui donner du blé.', cible: () => Z.vache },
+        { texte: 'Elle te donne du lait : ramasse-le et vends-le !', cible: () => Z.lait, demo: (c) => dessinerProduit(c, 'lait', Z.lait.x, Z.lait.y, 34) },
+      ],
+      9: [
+        { texte: 'Quand il pleut, toutes tes plantes sont arrosées.', cible: null, main: false, demo: (c, t) => { partie.meteo = { type: 'pluie', t: 1 }; dessinerMeteo(c, t); partie.meteo = null; } },
+        { texte: 'Canicule : tes plantes ont soif très vite, arrose-les !', cible: null, main: false, demo: (c, t) => { partie.meteo = { type: 'canicule', t: 1 }; dessinerMeteo(c, t); partie.meteo = null; } },
+      ],
+      10: [
+        { texte: 'Un client passe une commande.', cible: () => centre(Z.commande), main: false, demo: (c) => dessinerCommande(c, { items: { fraise: 2, ble: 1 }, prime: 47, t: 40, d: 40 }, Z.commande) },
+        { texte: 'Récolte ce qu\'il veut, puis touche la commande : grosse prime !', cible: () => centre(Z.commande), demo: (c) => dessinerCommande(c, { items: { fraise: 2, ble: 1 }, prime: 47, t: 40, d: 40 }, Z.commande) },
+      ],
+    };
+    if (M[n]) etapes.push(...M[n]);
+  }
+  return { n, conf, etapes, i: 0, t: 0 };
+}
+
+function etapeSuivante() {
+  if (!tuto) return;
+  jouerSon('clic');
+  tuto.i++; tuto.t = 0;
+  if (tuto.i >= tuto.etapes.length) {
+    if (!sauvegarde.vus.includes(tuto.n)) { sauvegarde.vus.push(tuto.n); sauver(); }
+    tuto = null;
+    banniere('C\'est parti !', '#2e7d32');
+  }
+}
+
+function dessinerTuto(c) {
+  const e = tuto.etapes[tuto.i], t = tuto.t;
+  if (e.carte) {
+    c.fillStyle = 'rgba(30,40,15,.55)'; c.fillRect(0, 0, W, H);
+    const conf = tuto.conf, w = Math.min(W - 32, 360), h = 250, x = (W - w) / 2, y = H * 0.42 - h / 2;
+    const k = Math.min(1, t * 5), dy = (1 - k) * 40;
+    c.globalAlpha = k;
+    rr(c, x, y + dy, w, h, 22); c.fillStyle = '#fffaeb'; c.fill(); c.strokeStyle = '#f0a500'; c.lineWidth = 4; c.stroke();
+    texte(c, `Niveau ${tuto.n}`, W / 2, y + dy + 30, 18, '#8d6235');
+    texte(c, conf.titre, W / 2, y + dy + 62, 25, '#e8742a', 'center', 900);
+    c.font = '600 16px system-ui, sans-serif';
+    lignesDe(c, conf.nouveau, w - 36).slice(0, 3).forEach((l, i) => texte(c, l, W / 2, y + dy + 98 + i * 21, 16, '#4a3320', 'center', 600));
+    const obj = `Objectif : ${conf.obj} pièces en ${conf.duree} s`;
+    c.font = '800 16px system-ui, sans-serif';
+    const ox = W / 2 - (c.measureText(obj).width + 26) / 2;
+    dessinerPiece(c, ox + 10, y + dy + 172, 10);
+    texte(c, obj, ox + 26, y + dy + 173, 16, '#4a3320', 'left', 800);
+    for (let i = 0; i < 3; i++) {
+      const ex = x + w / 2 - 110 + i * 80;
+      cheminEtoile(c, ex, y + dy + 206, 10, 0.45); c.fillStyle = '#ffc107'; c.fill();
+      texte(c, `${Math.round(conf.obj * SEUILS[i])}`, ex + 14, y + dy + 207, 15, '#8d6235', 'left');
+    }
+    texte(c, 'Touche pour commencer', W / 2, y + dy + h - 12, 13, '#a1887f', 'center', 600);
+    c.globalAlpha = 1;
+    return;
+  }
+  const cible = e.cible ? e.cible() : null, r = e.r || 62;
+  c.fillStyle = 'rgba(20,30,10,.6)';
+  c.beginPath(); c.rect(0, 0, W, H);
+  if (cible) { c.moveTo(cible.x + r, cible.y); c.arc(cible.x, cible.y, r, 0, Math.PI * 2, true); }
+  c.fill('evenodd');
+  if (cible) { c.beginPath(); c.arc(cible.x, cible.y, r, 0, Math.PI * 2); c.strokeStyle = 'rgba(255,235,59,.9)'; c.lineWidth = 3; c.stroke(); }
+  if (e.demo) e.demo(c, T);
+  if (cible && e.main !== false) {
+    const p = (t % 1.6) / 1.6;
+    let hx = cible.x + 6, hy = cible.y + 8, k = 1;
+    if (p < 0.45) { const q = p / 0.45, ee = 1 - (1 - q) * (1 - q); hx = lerp(cible.x + 70, cible.x + 6, ee); hy = lerp(cible.y + 90, cible.y + 8, ee); }
+    else if (p < 0.7) {
+      k = 0.88;
+      c.beginPath(); c.arc(cible.x, cible.y, 10 + (p - 0.45) * 160, 0, Math.PI * 2);
+      c.strokeStyle = `rgba(255,255,255,${1 - (p - 0.45) * 4})`; c.lineWidth = 4; c.stroke();
+    }
+    dessinerMain(c, hx, hy, k);
+  }
+  // Bulle de texte, du côté opposé à la cible
+  const enHaut = !cible || cible.y > H * 0.5;
+  c.font = '800 19px system-ui, sans-serif';
+  const lignes = lignesDe(c, e.texte, W - 64), bh = 30 + lignes.length * 25 + 22, by = enHaut ? 74 : H - bh - 20;
+  rr(c, 16, by, W - 32, bh, 18); c.fillStyle = '#fffaeb'; c.fill(); c.strokeStyle = '#f0a500'; c.lineWidth = 3; c.stroke();
+  lignes.forEach((l, i) => texte(c, l, W / 2, by + 26 + i * 25, 19, '#4a3320'));
+  const nb = tuto.etapes.length - 1;
+  texte(c, `Touche pour continuer (${tuto.i}/${nb})`, W / 2, by + bh - 16, 13, '#a1887f', 'center', 600);
+}
+
+// ---------- Entrées ----------
+function toucher(x, y) {
+  const P = partie, conf = P.conf;
+  // Étoile dorée
+  if (P.etoile && Math.hypot(x - P.etoile.x, y - P.etoile.y) < 44) {
+    const e = P.etoile; P.etoile = null;
+    jouerSon('magie');
+    eclat(e.x, e.y, ['#ffd740', '#fff59d', '#ffffff'], 30, 'etoile', 260);
+    P.parcelles.forEach((pc, i) => {
+      if (pc.culture && !pc.fanee && pc.pousse < 1) {
+        pc.pousse = Math.min(1, pc.pousse + 0.4); pc.soif = false; pc.soifT = 0; pc.pulse = 1;
+        pc.seuils = pc.seuils.filter((s) => s > pc.pousse);
+        const ct = centre(Z.parcelles[i]); eclat(ct.x, ct.y, ['#ffd740', '#ffffff'], 6, 'etoile', 100);
+      }
+    });
+    banniere('Magie : tout pousse !', '#f57f17');
+    return;
+  }
+  // Lapins
+  for (const l of P.lapins) {
+    if (l.etat !== 'fuit' && Math.hypot(x - l.x, y - (l.y - 10)) < 46) {
+      l.etat = 'fuit'; l.dir = l.x < W / 2 ? -1 : 1;
+      jouerSon('boing'); eclat(l.x, l.y - 10, ['#ffffff', '#c9b79c'], 10, 'rond', 140);
+      gagner(2, l.x, l.y - 30);
+      return;
+    }
+  }
+  // Animaux
+  if (Z.animaux && dans(Z.animaux, x, y)) {
+    for (let i = 0; i < 3; i++) {
+      const o = Z.oeufs[i];
+      if (P.oeufs[i] && Math.hypot(x - o.x, y - o.y) < o.r + 6) { ramasser('oeuf', o.x, o.y); P.oeufs[i] = null; return; }
+    }
+    if (P.laitPret && Math.hypot(x - Z.lait.x, y - Z.lait.y) < Z.lait.r + 8) { P.laitPret = false; P.vache.etat = 'faim'; ramasser('lait', Z.lait.x, Z.lait.y); return; }
+    if (conf.vache && Math.hypot(x - Z.vache.x, y - Z.vache.y) < Z.vache.r + 6) { nourrirVache(); return; }
+    if (Math.hypot(x - Z.poule.x, y - Z.poule.y) < 40) { P.poule.agite = 0.4; jouerSon('oeuf'); flottant('Cot cot !', Z.poule.x, Z.poule.y - 40, '#5d4037', 16); return; }
+    return;
+  }
+  // Parcelles
+  for (let i = 0; i < Z.parcelles.length; i++) if (dans(Z.parcelles[i], x, y)) { actionParcelle(i); return; }
+  // Graines
+  for (const k of conf.cultures) {
+    if (Z.graines[k] && dans(Z.graines[k], x, y)) { choisirGraine(k); return; }
+  }
+  // Commande
+  if (Z.commande && dans(Z.commande, x, y)) { if (P.commande) livrerCommande(); return; }
+  // Marché
+  for (const k of P.produits) if (Z.tuiles[k] && dans(Z.tuiles[k], x, y)) { vendre(k); return; }
+}
+
+function choisirGraine(k) {
+  partie.graine = k; jouerSon('clic');
+  const b = Z.graines[k];
+  eclat(b.x + b.w / 2, b.y + b.h / 2, ['#fff59d', '#ffd740'], 6, 'etoile', 70);
+}
+function ramasser(k, x, y) {
+  jouerSon(k === 'oeuf' ? 'oeuf' : 'recolter');
+  eclat(x, y, ['#fff59d', '#ffffff'], 10, 'etoile', 120);
+  const tu = Z.tuiles[k], cible = centre(tu);
+  vols.push({ type: k, x0: x, y0: y, x1: cible.x, y1: cible.y, t: 0, d: 0.55, fin: () => { partie.panier[k]++; partie.pulseTuile[k] = 1; } });
+}
+function nourrirVache() {
+  const P = partie, v = P.vache;
+  if (v.etat === 'faim') {
+    if (P.panier.ble > 0) { P.panier.ble--; v.etat = 'mange'; v.t = 5; jouerSon('meuh'); eclat(Z.vache.x, Z.vache.y, ['#f2c14e', '#ffffff'], 10, 'rond', 100); }
+    else { jouerSon('meuh'); banniere('La vache veut du blé : plante du blé !', '#8d6235'); }
+  } else if (v.etat === 'mange') { flottant('Miam…', Z.vache.x, Z.vache.y - 50, '#5d4037', 16); }
+  else { flottant('Ramasse le lait !', Z.vache.x - 40, Z.vache.y - 50, '#1565c0', 15); }
+}
+
+scene.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  initAudio();
+  if (tuto) { if (tuto.t > 0.25) etapeSuivante(); return; }
+  if (etat !== 'jeu' || !partie || partie.fini) return;
+  const r = scene.getBoundingClientRect();
+  partie.clavier = false;
+  toucher(e.clientX - r.left, e.clientY - r.top);
+});
+document.addEventListener('pointerdown', initAudio, true);
+
+document.addEventListener('keydown', (e) => {
+  initAudio();
+  if (tuto) { e.preventDefault(); if (tuto.t > 0.25) etapeSuivante(); return; }
+  if (etat === 'jeu' && partie && !partie.fini) {
+    const P = partie, n = P.parcelles.length;
+    const deplacer = (d) => { P.curseur = (P.curseur + d + n) % n; P.clavier = true; };
+    switch (e.key) {
+      case 'ArrowLeft': deplacer(-1); break;
+      case 'ArrowRight': deplacer(1); break;
+      case 'ArrowUp': deplacer(-Z.cols); break;
+      case 'ArrowDown': deplacer(Z.cols); break;
+      case ' ': case 'Enter': P.clavier = true; actionParcelle(P.curseur); break;
+      case 'v': case 'V': if (P.conf.marche) toutVendre(); break;
+      case 'c': case 'C': livrerCommande(); break;
+      case 'Escape': case 'p': case 'P': mettreEnPause(); break;
+      default: {
+        const i = parseInt(e.key, 10) - 1;
+        if (i >= 0 && i < P.conf.cultures.length) choisirGraine(P.conf.cultures[i]);
+        else return;
+      }
+    }
+    e.preventDefault();
+    return;
+  }
+  // Sur les écrans : Entrée ou Espace = bouton principal
+  if ((e.key === ' ' || e.key === 'Enter') && !(document.activeElement && document.activeElement.tagName === 'BUTTON')) {
+    const b = document.querySelector('.ecran:not(.cache) .principal');
+    if (b && b.offsetParent) { e.preventDefault(); b.click(); }
+  }
+});
+
+// ---------- Écrans ----------
+const ECRANS = ['accueil', 'niveaux', 'pause', 'bilan'];
+function montrerEcran(nom) {
+  for (const n of ECRANS) $('#ecran-' + n).classList.toggle('cache', n !== nom);
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+function totalEtoiles() { return sauvegarde.etoiles.reduce((a, b) => a + (b || 0), 0); }
+
+function allerAccueil() {
+  etat = 'accueil'; partie = null; tuto = null;
+  miseEnPage();
+  $('#b-pause').style.display = 'none';
+  $('#acc-record').textContent = `★ ${totalEtoiles()} / ${NB_NIVEAUX * 3} étoiles · niveau ${sauvegarde.niveauMax} sur ${NB_NIVEAUX}`;
+  montrerEcran('accueil');
+}
+function allerNiveaux() {
+  etat = 'niveaux';
+  const g = $('#grille-niv'); g.textContent = '';
+  for (let n = 1; n <= NB_NIVEAUX; n++) {
+    const b = document.createElement('button'), e = sauvegarde.etoiles[n - 1] || 0;
+    b.className = 'niv';
+    b.disabled = n > sauvegarde.niveauMax;
+    b.setAttribute('aria-label', `Niveau ${n}`);
+    const num = document.createElement('b'); num.textContent = n;
+    const et = document.createElement('span');
+    et.textContent = '★'.repeat(e);
+    const vides = document.createElement('i'); vides.textContent = '★'.repeat(3 - e); et.appendChild(vides);
+    b.append(num, et);
+    b.addEventListener('click', () => { jouerSon('clic'); lancerNiveau(n); });
+    g.appendChild(b);
+  }
+  montrerEcran('niveaux');
+}
+function mettreEnPause() {
+  if (etat !== 'jeu' || !partie || partie.fini || tuto) return;
+  etat = 'pause';
+  $('#pause-rappel').textContent = `Niveau ${partie.n} : ${partie.conf.nouveau}`;
+  montrerEcran('pause');
+}
+
+function afficherBilan(score, etoiles, battu, ancien) {
+  const P = partie, n = P.n;
+  etat = 'bilan';
+  $('#b-pause').style.display = 'none';
+  const fin = n === NB_NIVEAUX && etoiles > 0;
+  $('#bil-titre').textContent = fin ? 'Tu as fini le jeu !' : etoiles === 3 ? 'Parfait !' : etoiles > 0 ? 'Bravo !' : 'Presque !';
+  $('#bil-detail').textContent = `Objectif : ${P.conf.obj} pièces` + (P.reste ? ` · panier vendu à moitié prix : +${P.reste}` : '') + ` · ${P.recolte} récoltes`;
+  const rec = $('#bil-record');
+  rec.className = 'record' + (battu && ancien > 0 ? ' battu' : '');
+  rec.textContent = battu ? (ancien > 0 ? `Nouveau record ! (avant : ${ancien})` : 'Premier record enregistré !') : `Record : ${Math.max(ancien, score)} pièces`;
+  let info = '';
+  if (fin) info = `Toutes tes étoiles : ${totalEtoiles()} sur ${NB_NIVEAUX * 3}. Rejoue pour toutes les avoir !`;
+  else if (etoiles > 0 && CONFS[n].parc > P.conf.parc) info = `Ton terrain s'agrandit : ${CONFS[n].parc} parcelles au prochain niveau !`;
+  else if (etoiles > 0) info = `Prochain niveau : ${CONFS[n].titre}.`;
+  else info = 'Il faut 1 étoile pour continuer. ' + (P.conf.marche ? 'Astuce : vends quand la flèche est verte !' : 'Astuce : replante dès que tu récoltes !');
+  $('#bil-terrain').textContent = info;
+  const suivant = $('#b-suivant');
+  suivant.style.display = etoiles > 0 && n < NB_NIVEAUX ? '' : 'none';
+  suivant.classList.toggle('principal', etoiles > 0 && n < NB_NIVEAUX);
+  $('#b-rejouer').classList.toggle('principal', !(etoiles > 0 && n < NB_NIVEAUX));
+  const ets = document.querySelectorAll('#ecran-bilan .et');
+  ets.forEach((el) => el.classList.remove('on'));
+  montrerEcran('bilan');
+  // Compteur qui défile, puis les étoiles une à une
+  const debut = performance.now(), dureeAnim = 1000, champ = $('#bil-pieces');
+  const anim = (m) => {
+    const k = Math.min(1, (m - debut) / dureeAnim);
+    champ.textContent = Math.round(score * (1 - (1 - k) * (1 - k)));
+    if (k < 1 && etat === 'bilan') requestAnimationFrame(anim);
+  };
+  requestAnimationFrame(anim);
+  for (let i = 0; i < etoiles; i++) setTimeout(() => { if (etat === 'bilan') { ets[i].classList.add('on'); jouerSon('etoile'); } }, 1000 + i * 380);
+  setTimeout(() => {
+    if (etat !== 'bilan') return;
+    if (etoiles > 0) { jouerSon('victoire'); confettis(); } else jouerSon('echec');
+  }, 1000 + etoiles * 380);
+}
+
+$('#b-jouer').addEventListener('click', () => { jouerSon('clic'); lancerNiveau(Math.min(sauvegarde.niveauMax, NB_NIVEAUX)); });
+$('#b-niveaux').addEventListener('click', () => { jouerSon('clic'); allerNiveaux(); });
+$('#b-retour').addEventListener('click', () => { jouerSon('clic'); allerAccueil(); });
+$('#b-pause').addEventListener('click', () => { jouerSon('clic'); mettreEnPause(); });
+$('#b-reprendre').addEventListener('click', () => { jouerSon('clic'); etat = 'jeu'; montrerEcran(null); });
+$('#b-recommencer').addEventListener('click', () => { jouerSon('clic'); lancerNiveau(partie.n); });
+$('#b-menu-pause').addEventListener('click', () => { jouerSon('clic'); allerAccueil(); });
+$('#b-suivant').addEventListener('click', () => { jouerSon('clic'); lancerNiveau(Math.min(NB_NIVEAUX, partie.n + 1)); });
+$('#b-rejouer').addEventListener('click', () => { jouerSon('clic'); lancerNiveau(partie.n); });
+$('#b-menu').addEventListener('click', () => { jouerSon('clic'); allerAccueil(); });
+
+function majBoutonSon() {
+  $('#son-ondes').style.display = sauvegarde.muet ? 'none' : '';
+  $('#son-coupe').style.display = sauvegarde.muet ? '' : 'none';
+  $('#b-son').setAttribute('aria-label', sauvegarde.muet ? 'Remettre le son' : 'Couper le son');
+}
+$('#b-son').addEventListener('click', () => {
+  sauvegarde.muet = !sauvegarde.muet; sauver(); majBoutonSon();
+  jouerSon('clic');
+  $('#b-son').blur();
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) mettreEnPause(); });
+
+// ---------- Boucle principale ----------
+let dernier = performance.now();
+function boucle(m) {
+  const dt = Math.min(0.05, Math.max(0, (m - dernier) / 1000)); dernier = m; T += dt;
+  if (tuto) {
+    tuto.t += dt;
+    const e = tuto.etapes[tuto.i];
+    if (tuto.t > (e.duree || 4.5)) etapeSuivante();
+  } else if (etat === 'jeu' && partie && !partie.fini) majPartie(dt);
+  majEffets(dt);
+  cs.setTransform(DPR, 0, 0, DPR, 0, 0); cs.clearRect(0, 0, W, H);
+  if (partie) dessinerPartie(cs, T); else dessinerDecor(cs, T);
+  cf.setTransform(DPR, 0, 0, DPR, 0, 0); cf.clearRect(0, 0, W, H);
+  dessinerEffets(cf);
+  if (tuto) dessinerTuto(cf);
+  requestAnimationFrame(boucle);
+}
+
+redimensionner();
+majBoutonSon();
+allerAccueil();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
