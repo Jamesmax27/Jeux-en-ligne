@@ -1,0 +1,1594 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grimoire des Sept Sceaux</title>
+<style>
+  /* ---------- Base : fond magique, pas de défilement de la page ---------- */
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;background:#120d22;
+    font-family:system-ui,sans-serif;color:#f6efe2;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
+  button:focus-visible{outline:3px solid #ffd76a;outline-offset:2px}
+  .cache{display:none!important}
+  #jeu{position:fixed;inset:0;max-width:560px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;
+    background:
+      radial-gradient(1px 1px at 12% 14%,#fff 99%,transparent),radial-gradient(1px 1px at 78% 8%,#fff 99%,transparent),
+      radial-gradient(1.5px 1.5px at 44% 30%,#e8d8ff 99%,transparent),radial-gradient(1px 1px at 90% 40%,#fff 99%,transparent),
+      radial-gradient(1px 1px at 6% 52%,#fff 99%,transparent),radial-gradient(1.5px 1.5px at 64% 20%,#fff 99%,transparent),
+      radial-gradient(ellipse at 50% 120%,#4a2a7a 0,transparent 65%),
+      linear-gradient(#1a1233,#22183f 60%,#1a1230)}
+  .ico{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.15em;flex:none}
+  .ico .p{fill:currentColor;stroke:none}
+
+  /* ---------- Barre du haut ---------- */
+  #barre{height:46px;flex:none;display:flex;align-items:center;gap:8px;padding:0 6px;background:rgba(0,0,0,.35);font-weight:700;font-size:15px}
+  #barre .pv{color:#ff7a8a}#barre .or{color:#f3c55b}#barre .et{color:#ffd76a}#barre .niv{color:#cbbcf5;font-size:13px}
+  #rels{flex:1;display:flex;gap:2px;overflow:hidden;min-width:0;height:44px;align-items:center}
+  #rels .rel{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:17px;flex:none}
+  .rond{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:22px;background:rgba(255,255,255,.1);flex:none}
+
+  #ecran{flex:1;position:relative;min-height:0;display:flex;flex-direction:column}
+  .btn{min-height:48px;padding:10px 18px;border-radius:14px;font-weight:800;font-size:17px;color:#2a1640;
+    background:linear-gradient(#ffe39a,#f3b94b);box-shadow:0 4px 0 #a8721e,0 6px 14px rgba(0,0,0,.35);transition:transform .1s}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #a8721e}
+  .btn.v{color:#fff;background:linear-gradient(#9b7cf0,#6a46c9);box-shadow:0 4px 0 #43288c,0 6px 14px rgba(0,0,0,.35)}
+  .btn.g{color:#fff;background:linear-gradient(#5b5577,#3d3858);box-shadow:0 4px 0 #262238}
+  .btn[disabled]{opacity:.45;filter:grayscale(.7)}
+
+  /* ---------- Accueil ---------- */
+  .accueil{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;text-align:center}
+  .titre{font-size:clamp(32px,10vw,50px);font-weight:900;line-height:1.02;margin:0;
+    background:linear-gradient(#fff3c4,#f3c55b 55%,#d98a2b);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 0 #4a2a7a) drop-shadow(0 0 18px rgba(243,197,91,.35))}
+  .regle{font-size:17px;max-width:340px;line-height:1.35;margin:0;color:#e9defc}
+  .record{font-size:14px;color:#cbbcf5}
+  .livre svg{width:min(70vw,260px);height:auto;animation:flotte 4s ease-in-out infinite}
+  @keyframes flotte{50%{transform:translateY(-8px)}}
+
+  /* ---------- Carte du monde ---------- */
+  .carteMonde{flex:1;display:flex;flex-direction:column;min-height:0}
+  .acte{text-align:center;padding:8px 6px 2px;font-weight:900;font-size:19px;color:#ffe39a}
+  .sceaux{display:flex;justify-content:center;gap:6px;padding:4px 0 6px}
+  .sceaux .s{width:30px;height:30px;color:#6d5a99}
+  .sceaux .s.ok{color:#ffd76a;filter:drop-shadow(0 0 6px #ffd76a)}
+  #chemin{position:relative;flex:1;overflow-y:auto;overscroll-behavior:contain;padding:6px 6px 20px;scrollbar-width:none}
+  .rang{display:flex;justify-content:center;gap:14px;position:relative}
+  .lien{width:4px;height:18px;margin:2px auto;background:repeating-linear-gradient(#8d7bc4 0 4px,transparent 4px 8px);opacity:.7}
+  .noeud{display:flex;flex-direction:column;align-items:center;gap:3px;width:86px;font-size:12.5px;font-weight:700;color:#e9defc}
+  .noeud .b{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:28px;color:#fff;border:3px solid rgba(255,255,255,.5);box-shadow:0 4px 10px rgba(0,0,0,.4)}
+  .noeud.fait .b{filter:grayscale(.2);border-color:#ffd76a}
+  .noeud.passe{opacity:.32}
+  .noeud.futur{opacity:.55}
+  .noeud.actif .b{animation:pulse 1.2s ease-in-out infinite;border-color:#fff}
+  @keyframes pulse{50%{transform:scale(1.12);box-shadow:0 0 0 8px rgba(255,227,154,.25)}}
+  .basCarte{display:flex;gap:10px;justify-content:center;padding:8px;flex:none}
+
+  /* ---------- Combat ---------- */
+  #combat{flex:1;display:flex;flex-direction:column;min-height:0;position:relative}
+  #zEn{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative}
+  #ennemis{display:flex;justify-content:center;align-items:flex-end;gap:4px;width:100%;padding:0 4px}
+  .en{flex:1;max-width:180px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 2px;border-radius:14px;border:2px solid transparent;position:relative;transition:opacity .3s}
+  .en.cible{border-color:rgba(255,227,154,.7);background:rgba(255,227,154,.07)}
+  .en .art{position:relative;line-height:0}
+  .en .art svg{width:100%;height:auto}
+  .en .nom{font-size:12.5px;font-weight:800;text-align:center;line-height:1.1}
+  .intent{min-height:30px;display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;background:rgba(0,0,0,.45);font-weight:900;font-size:15px;flex-wrap:wrap;justify-content:center}
+  .intent .ia{color:#ff8a7a}.intent .ib{color:#8cc8ff}.intent .ix{color:#d6b4ff}.intent .ic{color:#ffd76a}
+  .pvbar{position:relative;width:100%;max-width:120px;height:16px;border-radius:9px;background:#3a2238;overflow:visible}
+  .pvbar i{position:absolute;left:0;top:0;bottom:0;border-radius:9px;background:linear-gradient(#ff8a9a,#d9465c);transition:width .3s}
+  .pvbar span{position:absolute;inset:0;text-align:center;font-size:11.5px;font-weight:800;line-height:16px;text-shadow:0 1px 2px #000}
+  .pvbar b{position:absolute;left:-12px;top:-5px;min-width:26px;height:26px;padding:0 3px;border-radius:9px;background:#3b7fd0;font-size:12.5px;line-height:26px;text-align:center;border:2px solid #bfe0ff}
+  .pvbar b:empty{display:none}
+  .sts{display:flex;gap:3px;flex-wrap:wrap;justify-content:center;min-height:20px}
+  .st{display:inline-flex;align-items:center;gap:1px;padding:1px 4px;border-radius:8px;background:rgba(0,0,0,.5);font-size:12px;font-weight:800}
+  .en.libre{pointer-events:none;animation:libre 1.4s ease-out forwards}
+  @keyframes libre{0%{transform:none}30%{transform:translateY(6px) scale(1.05)}100%{transform:translateY(-120px) scale(.8);opacity:0}}
+  .en.parti{opacity:0;pointer-events:none}
+  .en.attaque{animation:fonce .35s ease-out}
+  @keyframes fonce{50%{transform:translateY(22px) scale(1.06)}}
+  .secoue{animation:secoue .35s}
+  @keyframes secoue{20%{transform:translateX(-7px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+  .aura{transform-box:fill-box;transform-origin:center;animation:tourne 6s linear infinite}
+  @keyframes tourne{to{transform:rotate(360deg)}}
+
+  #info{flex:none;min-height:44px;margin:0 6px;padding:5px 10px;border-radius:12px;background:rgba(0,0,0,.4);font-size:14px;line-height:1.25;display:flex;align-items:center;justify-content:center;text-align:center}
+  #info b{color:#ffe39a}
+  #zJ{flex:none;display:flex;align-items:center;gap:6px;padding:6px}
+  .joueur{flex:1;display:flex;align-items:center;gap:4px;min-width:0;border-radius:12px;padding:2px}
+  .joueur svg{width:46px;height:46px;flex:none}
+  .joueur .col{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+  .joueur .pvbar{max-width:none;margin-left:12px;width:auto}
+  #orbe{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:18px;color:#3b2200;flex:none;
+    background:radial-gradient(circle at 35% 30%,#fff6c8,#ffcf4d 55%,#d98a2b);box-shadow:0 0 14px rgba(255,207,77,.6)}
+  #orbe.vide{filter:grayscale(.8);box-shadow:none}
+  .tas{display:flex;flex-direction:column;align-items:center;font-size:12px;font-weight:800;color:#cbbcf5;min-width:44px;min-height:44px;justify-content:center}
+  #btnFin{padding:8px 12px;font-size:15px;min-height:48px;line-height:1.05}
+  #zMain{flex:none;height:136px;position:relative}
+  #main{position:absolute;inset:0 4px}
+
+  /* ---------- Cartes ---------- */
+  .carte{position:absolute;width:82px;height:116px;border-radius:11px;padding:4px;display:flex;flex-direction:column;align-items:center;
+    background:linear-gradient(#fbf3e2,#e9dcc3);color:#2a1a10;border:3px solid var(--c);box-shadow:0 4px 10px rgba(0,0,0,.45);
+    transition:transform .18s,left .18s,opacity .2s;transform-origin:50% 100%}
+  .carte .cout{position:absolute;left:-7px;top:-7px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:15px;
+    background:radial-gradient(circle at 35% 30%,#fff6c8,#ffcf4d 60%,#d98a2b);border:2px solid #7a4a10;color:#3b2200}
+  .carte .nomc{font-size:10.5px;font-weight:900;text-align:center;line-height:1.05;min-height:22px;display:flex;align-items:center;justify-content:center;padding:0 1px 0 15px;width:100%}
+  .carte .art{width:100%;flex:1;border-radius:7px;display:grid;place-items:center;font-size:24px;color:#fff;background:var(--c);margin:2px 0;min-height:0}
+  .carte .res{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;font-size:12px;font-weight:900;line-height:1}
+  .carte .res span{display:inline-flex;align-items:center;gap:1px}
+  .carte .txt{font-size:11px;line-height:1.15;text-align:center;font-weight:600}
+  .carte.plus{background:linear-gradient(#eaffea,#cdeccf)}
+  .carte.r2{box-shadow:0 0 0 2px #7fc4ff,0 4px 12px rgba(0,0,0,.45)}
+  .carte.r3{box-shadow:0 0 0 2px #ffd76a,0 0 14px #ffd76a}
+  .carte.trop{filter:grayscale(.55) brightness(.8)}
+  .carte.sel{z-index:50}
+  .carte .typ{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;opacity:.7}
+  .carte.g{position:relative;width:104px;height:156px}
+  .carte.g .nomc{font-size:12px}
+  .carte.g .art{flex:none;height:38px;font-size:24px}
+  .grille{display:flex;flex-wrap:wrap;gap:12px 10px;justify-content:center;padding:10px 4px}
+  .grille .item{display:flex;flex-direction:column;align-items:center;gap:4px}
+  .prix{font-weight:900;color:#f3c55b;font-size:14px}
+  .vendu{opacity:.3;pointer-events:none}
+
+  /* ---------- Panneaux (boutique, repos, événements, récompenses) ---------- */
+  .panneau{flex:1;overflow-y:auto;overscroll-behavior:contain;display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px 10px 18px;text-align:center}
+  .panneau h2{margin:4px 0 0;font-size:24px;color:#ffe39a}
+  .panneau p{margin:0;font-size:16px;line-height:1.35;max-width:380px}
+  .panneau .grosIco{font-size:64px;color:#ffe39a;filter:drop-shadow(0 0 12px rgba(255,227,154,.5))}
+  .choix{display:flex;flex-direction:column;gap:10px;width:100%;max-width:360px}
+  .choix .btn{font-size:15.5px}
+  .relChoix{display:flex;align-items:center;gap:10px;text-align:left;padding:8px 12px;border-radius:14px;background:rgba(255,255,255,.08);border:2px solid rgba(255,255,255,.15);min-height:56px;width:100%}
+  .relChoix .rel{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:24px;flex:none}
+  .relChoix small{display:block;font-weight:500;font-size:13px;opacity:.85}
+  .section{font-weight:900;color:#cbbcf5;font-size:14px;text-transform:uppercase;letter-spacing:1px;margin-top:6px}
+
+  /* ---------- Couche (bilans, choix de cartes) ---------- */
+  #couche{position:absolute;inset:0;z-index:100;background:rgba(10,6,24,.82);display:flex;align-items:center;justify-content:center;padding:12px}
+  .boite{width:100%;max-width:400px;max-height:100%;overflow-y:auto;overscroll-behavior:contain;background:linear-gradient(#2e2352,#211a3c);border:2px solid #6d5a99;border-radius:20px;padding:16px 12px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;animation:apparait .3s}
+  @keyframes apparait{from{transform:scale(.85);opacity:0}}
+  .boite h2{margin:0;font-size:25px;color:#ffe39a}
+  .boite p{margin:0;font-size:16px;line-height:1.35}
+  .etoiles{display:flex;gap:6px;justify-content:center}
+  .etoiles svg{width:54px;height:54px;color:#4b3f70;transition:transform .3s}
+  .etoiles svg.ok{color:#ffd76a;animation:etoile .5s;filter:drop-shadow(0 0 8px #ffd76a)}
+  @keyframes etoile{0%{transform:scale(0) rotate(-90deg)}70%{transform:scale(1.3)}}
+  .grosScore{font-size:30px;font-weight:900;color:#fff}
+  .badge{display:inline-block;padding:5px 12px;border-radius:12px;background:#ffd76a;color:#3b2200;font-weight:900;animation:pulse 1s infinite}
+  .ligneBtns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+
+  /* ---------- Effets ---------- */
+  #fx{position:absolute;inset:0;pointer-events:none;z-index:150;overflow:hidden}
+  #confettis{position:absolute;inset:0;pointer-events:none;z-index:160;width:100%;height:100%}
+  .flot{position:absolute;font-weight:900;font-size:26px;text-shadow:0 2px 0 #000,0 0 8px #000;animation:flot 1s ease-out forwards;transform:translateX(-50%);white-space:nowrap}
+  .flot.d{color:#ff6a6a}.flot.b{color:#8cc8ff}.flot.s{color:#7dffa0}.flot.t{color:#ffe39a;font-size:20px}
+  @keyframes flot{0%{transform:translate(-50%,10px) scale(.6);opacity:0}20%{transform:translate(-50%,0) scale(1.15);opacity:1}100%{transform:translate(-50%,-55px) scale(1);opacity:0}}
+  .grandTexte{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:34px;font-weight:900;color:#ffe39a;text-shadow:0 3px 0 #4a2a7a,0 0 18px #000;animation:grand 1.6s ease-out forwards;white-space:nowrap}
+  @keyframes grand{0%{transform:translate(-50%,-50%) scale(.3);opacity:0}20%{transform:translate(-50%,-50%) scale(1.1);opacity:1}80%{opacity:1}100%{transform:translate(-50%,-80%) scale(1);opacity:0}}
+  .ecranSecoue{animation:secoue .4s}
+  .flashRouge{animation:flashR .4s}
+  @keyframes flashR{30%{background:rgba(255,60,60,.35)}}
+  .fantome{position:fixed;z-index:200;pointer-events:none;transition:all .28s ease-in}
+
+  /* ---------- Tutoriel animé ---------- */
+  #tuto{position:absolute;inset:0;z-index:300}
+  #tuto .halo{position:absolute;border-radius:14px;box-shadow:0 0 0 9999px rgba(8,4,20,.62),0 0 0 3px #ffe39a,0 0 22px #ffe39a;transition:all .45s ease-in-out;pointer-events:none}
+  #tuto .main{position:absolute;width:44px;height:57px;transition:left .7s ease-in-out,top .7s ease-in-out;pointer-events:none;filter:drop-shadow(0 3px 4px rgba(0,0,0,.6))}
+  #tuto .main.tape svg{animation:tape .5s ease-in-out 2}
+  @keyframes tape{50%{transform:scale(.8) translateY(4px)}}
+  #tuto .bulle{position:absolute;left:12px;right:12px;padding:12px 14px;border-radius:16px;background:#fff7e0;color:#2a1640;font-size:17px;font-weight:700;line-height:1.3;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  #tuto .bulle .pts{display:flex;gap:6px;justify-content:center;margin-top:6px}
+  #tuto .bulle .pts i{width:9px;height:9px;border-radius:50%;background:#d8c9a8}
+  #tuto .bulle .pts i.on{background:#6a46c9}
+  #tuto .bulle .btn{margin-top:8px;min-height:44px;padding:6px 16px;font-size:15px}
+
+  /* ---------- Sceau qui se brise ---------- */
+  .sceauAnim{position:absolute;inset:0;z-index:250;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(10,6,24,.75);gap:14px}
+  .sceauAnim svg{width:180px;height:180px;animation:vibre .12s linear 10}
+  .sceauAnim .eclat{animation:eclate .9s 1.2s ease-out forwards}
+  .sceauAnim .fis{stroke-dasharray:120;stroke-dashoffset:120;animation:fissure .6s .5s forwards}
+  .sceauAnim h2{margin:0;color:#ffe39a;font-size:28px;text-shadow:0 2px 0 #4a2a7a}
+  @keyframes vibre{25%{transform:translate(-3px,2px)}75%{transform:translate(3px,-2px)}}
+  @keyframes fissure{to{stroke-dashoffset:0}}
+  @keyframes eclate{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+  .sceauAnim .morceau{transform-box:fill-box;transform-origin:center}
+
+  @media (min-height:760px){ #zMain{height:146px} }
+  @media (prefers-reduced-motion:reduce){ .aura,.livre svg{animation:none} }
+</style>
+</head>
+<body>
+<div id="jeu">
+  <header id="barre" class="cache"></header>
+  <main id="ecran"></main>
+  <div id="fx"></div>
+  <canvas id="confettis"></canvas>
+  <div id="couche" class="cache"></div>
+  <div id="tuto" class="cache"></div>
+</div>
+<script>
+'use strict';
+/* =====================================================================
+   Grimoire des Sept Sceaux — jeu de cartes (deckbuilding) en 3 actes.
+   Tout est dans ce fichier : données (cartes, reliques, ennemis,
+   événements), écrans (accueil, carte, combat, boutique…), sons Web Audio,
+   tutoriel animé et sauvegarde (localStorage protégé par try/catch).
+   ===================================================================== */
+
+// ---------- Petits outils ----------
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
+const rnd = (n) => Math.floor(Math.random() * n);
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const melange = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const ROMAIN = ['', 'I', 'II', 'III'];
+
+// Registre des actions des boutons : data-f="<n>" → fonction n.
+const FN = [];
+const on = (f) => { FN.push(f); return FN.length - 1; };
+document.addEventListener('click', (ev) => {
+  const el = ev.target.closest('[data-f]');
+  if (!el || el.disabled) return;
+  const f = FN[+el.dataset.f];
+  if (f) f(el, ev);
+});
+
+// ---------- Sauvegarde (toujours dans try/catch) ----------
+const CLE = 'grimoire-sept-sceaux-v1';
+const REC = { meilleur: 0, etoiles: 0, sceaux: 0, son: true, vus: {}, partie: null };
+function charger() { try { const t = localStorage.getItem(CLE); if (t) Object.assign(REC, JSON.parse(t)); } catch (e) { /* sans stockage, on joue quand même */ } }
+function sauver() { try { localStorage.setItem(CLE, JSON.stringify(REC)); } catch (e) { /* stockage refusé */ } }
+
+// ---------- Sons (Web Audio, aucun fichier) ----------
+let AC = null;
+function audio() {
+  if (!REC.son) return null;
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (AC.state === 'suspended') AC.resume().catch(() => {});
+  return AC;
+}
+function bip(f, dur, type = 'sine', vol = 0.12, delai = 0, f2 = 0) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delai, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
+}
+function bruit(dur, vol = 0.15, freq = 1200, delai = 0) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delai, n = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = a.createBufferSource(), fi = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = buf; fi.type = 'bandpass'; fi.frequency.value = freq; g.gain.value = vol;
+  s.connect(fi).connect(g).connect(a.destination); s.start(t);
+}
+const SONS = {
+  choix: () => bip(660, 0.07, 'triangle', 0.08),
+  clic: () => bip(520, 0.06, 'square', 0.05),
+  attaque: () => { bruit(0.14, 0.25, 900); bip(220, 0.15, 'sawtooth', 0.07, 0, 90); },
+  bouclier: () => { bip(880, 0.18, 'sine', 0.1); bip(1320, 0.25, 'sine', 0.06, 0.04); },
+  sort: () => { [700, 880, 1100].forEach((f, i) => bip(f, 0.12, 'sine', 0.08, i * 0.06)); },
+  pouvoir: () => { bip(300, 0.4, 'triangle', 0.1, 0, 900); bip(600, 0.3, 'sine', 0.06, 0.2); },
+  coup: () => { bip(140, 0.28, 'sawtooth', 0.12, 0, 55); bruit(0.18, 0.2, 400); },
+  brulure: () => bruit(0.25, 0.18, 2400),
+  gel: () => { bip(1600, 0.3, 'sine', 0.06); bip(2100, 0.35, 'sine', 0.05, 0.05); },
+  delivre: () => { [523, 659, 784, 1046].forEach((f, i) => bip(f, 0.16, 'triangle', 0.1, i * 0.08)); },
+  victoire: () => { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => bip(f, 0.2, 'square', 0.06, i * 0.12)); },
+  defaite: () => { [440, 370, 311, 262].forEach((f, i) => bip(f, 0.3, 'triangle', 0.1, i * 0.2)); },
+  sceau: () => { bruit(0.6, 0.25, 600); [262, 330, 392, 523, 659].forEach((f, i) => bip(f, 0.8, 'triangle', 0.07, 0.4 + i * 0.05)); },
+  etoile: () => { bip(1200, 0.12, 'sine', 0.1); bip(1600, 0.2, 'sine', 0.08, 0.08); },
+  piece: () => { bip(1300, 0.06, 'square', 0.05); bip(1750, 0.12, 'square', 0.05, 0.06); },
+  achat: () => { SONS.piece(); [660, 880].forEach((f, i) => bip(f, 0.15, 'triangle', 0.08, 0.15 + i * 0.08)); },
+  erreur: () => bip(180, 0.18, 'square', 0.06),
+  soin: () => { [600, 750, 900].forEach((f, i) => bip(f, 0.15, 'sine', 0.08, i * 0.07)); },
+};
+function son(n) { try { if (SONS[n]) SONS[n](); } catch (e) { /* son indisponible */ } }
+
+// ---------- Icônes (SVG dessinés à la main) ----------
+const IC = {
+  epee: '<path d="M19 5L9 15M19 5h-4M19 5v4M6.5 12.5l5 5M4 20l3.5-3.5"/>',
+  bouclier: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  coeur: '<path class="p" d="M12 20.5s-8-5-8-11a4.4 4.4 0 0 1 8-2.6 4.4 4.4 0 0 1 8 2.6c0 6-8 11-8 11z"/>',
+  flamme: '<path d="M12 3c.6 3.6 5 5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-3.6 2-5.6 1.4 1 2.5 2.6 2.5 4 1-2 1-5.4.5-8.4z"/>',
+  flocon: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9M9.5 4.6L12 7l2.5-2.4M9.5 19.4L12 17l2.5 2.4"/>',
+  eclair: '<path d="M13 2L4.5 13.5H11L10 22l9-12h-6.5z"/>',
+  piece: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/>',
+  etoile: '<path class="p" d="M12 2.5l2.8 5.8 6.3.8-4.6 4.4 1.2 6.3L12 16.8l-5.7 3 1.2-6.3L2.9 9.1l6.3-.8z"/>',
+  goutte: '<path class="p" d="M12 3c3 4.5 6 7.5 6 11.5a6 6 0 0 1-12 0C6 10.5 9 7.5 12 3z"/>',
+  haut: '<path d="M12 20V5M6 11l6-6 6 6"/>',
+  spirale: '<path d="M12 12a1.6 1.6 0 1 1 1.6 1.6A3.4 3.4 0 1 1 15.4 9a5.4 5.4 0 1 1-7.8 7.6A7.5 7.5 0 1 1 20 12"/>',
+  fissure: '<path d="M12 20.5s-8-5-8-11a4.4 4.4 0 0 1 8-2.6 4.4 4.4 0 0 1 8 2.6c0 6-8 11-8 11z"/><path d="M12 7l-1.8 4.2 3.4 2-1.6 4.3"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  livre: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5V5.5M8 7.5h8"/>',
+  epines: '<path d="M3 20l3-9 3 9 3-12 3 12 3-9 3 9z"/>',
+  feuille: '<path d="M5 19C5 10 11 5 20 5c0 9-5.5 14.5-14 14.5M5 19l7.5-7.5"/>',
+  sac: '<path d="M5 8h14l-1.2 12.5H6.2zM9 8V6.5a3 3 0 0 1 6 0V8"/>',
+  coffre: '<path d="M3 10.5h18V20H3zM3 10.5A4.5 4.5 0 0 1 7.5 6h9a4.5 4.5 0 0 1 4.5 4.5M10.5 12.5h3v3h-3z"/>',
+  question: '<path d="M8.8 9a3.2 3.2 0 1 1 4.8 2.8c-1 .6-1.6 1.2-1.6 2.6"/><circle class="p" cx="12" cy="18.5" r="1.4"/>',
+  feu: '<path d="M12 3.5c1 3 4 4 4 8a4 4 0 0 1-8 0c0-2 1-3 1.5-4.5 1 .8 1.6 2 1.6 3 .9-1.6 1.2-4 .9-6.5zM4.5 21l15-3.5M4.5 17.5l15 3.5"/>',
+  couronne: '<path d="M4 18.5h16M4.5 18.5L3 7.5l5 4 4-6.5 4 6.5 5-4-1.5 11"/>',
+  sceau: '<circle cx="12" cy="12" r="9"/><path d="M12 6.5l1.6 3.4 3.7.5-2.7 2.6.7 3.7L12 15l-3.3 1.7.7-3.7-2.7-2.6 3.7-.5z"/>',
+  sonOn: '<path d="M4 9h4l5-4v14l-5-4H4zM16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+  sonOff: '<path d="M4 9h4l5-4v14l-5-4H4zM16 9.5l5 5M21 9.5l-5 5"/>',
+  soleil: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  maison: '<path d="M4 11.5l8-7 8 7M6.5 10v10h11V10"/>',
+  gemme: '<path d="M6.5 4h11l3.5 5-9 11L3 9zM3 9h18M9.5 4L12 20M14.5 4L12 20"/>',
+  lune: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>',
+  fleur: '<circle cx="12" cy="12" r="2.5"/><path d="M12 9.5C10 6 10 3.5 12 3s2 3 0 6.5M14.5 12c3.5-2 6-2 6.5 0s-3 2-6.5 0M12 14.5c2 3.5 2 6 0 6.5s-2-3 0-6.5M9.5 12c-3.5 2-6 2-6.5 0s3-2 6.5 0"/>',
+  plume: '<path d="M20 4C11 4 6 10 5 19M20 4c0 8-5 12-12 12M9 12h6"/>',
+  cloche: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20.5a2 2 0 0 0 4 0"/>',
+  sablier: '<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/>',
+  anneau: '<circle cx="12" cy="14" r="6.5"/><path d="M9 6.5L12 3l3 3.5"/>',
+  trefle: '<path d="M12 12c-4-4-7-1-5 1.5S12 12 12 12zm0 0c4-4 7-1 5 1.5S12 12 12 12zm0 0c-3-5 0-8 0-8s3 3 0 8zm0 0v8"/>',
+  fer: '<path d="M7 4v8a5 5 0 0 0 10 0V4M5 4h4M15 4h4"/>',
+  cible: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/>',
+  oeil: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+};
+const ico = (n, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true">${IC[n] || IC.gemme}</svg>`;
+
+/* =====================================================================
+   DONNÉES — les 60 cartes
+   ops(p) : liste des effets, p = 1 si la carte est améliorée.
+   type : A attaque, D défense, S sort, P pouvoir, M malédiction (encre).
+   rare : 1 commune, 2 rare, 3 légendaire. niv : niveau d'apparition.
+   ===================================================================== */
+const CARTES = {};
+function K(id, nom, type, cout, rare, niv, ops, opt = {}) {
+  CARTES[id] = { id, nom, type, cout, rare, niv, ops, coutP: opt.cp ?? cout, ep: opt.ep || false, special: !!opt.special };
+}
+const d = (n, x = 1, o = {}) => ({ k: 'deg', n, x, ...o });
+const b = (n) => ({ k: 'bouc', n });
+const pi = (n) => ({ k: 'pioche', n });
+const en = (n) => ({ k: 'energie', n });
+const st = (s, n, tous = false) => ({ k: 'st', s, n, tous });
+const soi = (s, n) => ({ k: 'soi', s, n });
+const so = (n) => ({ k: 'soin', n });
+const pw = (p, n) => ({ k: 'pouv', p, n });
+
+// Cartes de départ
+K('etincelle', 'Étincelle', 'A', 1, 1, 0, (p) => [d(6 + 3 * p)]);
+K('bouclier', 'Bouclier', 'D', 1, 1, 0, (p) => [b(5 + 3 * p)]);
+K('rayon', 'Rayon de lune', 'A', 2, 1, 0, (p) => [d(8 + 3 * p), st('fragile', 2 + p)]);
+// Attaques
+K('baguette', 'Coup de baguette', 'A', 0, 1, 1, (p) => [d(3 + 2 * p), pi(1)]);
+K('doubleEtoile', 'Double étoile', 'A', 1, 1, 1, (p) => [d(4 + 2 * p, 2)]);
+K('pluieEtoiles', 'Pluie d’étoiles', 'A', 1, 1, 1, (p) => [d(5 + 3 * p, 1, { tous: 1 })]);
+K('bouleFeu', 'Boule de feu', 'A', 1, 1, 1, (p) => [d(6 + 2 * p), st('brulure', 3 + p)]);
+K('flecheGlace', 'Flèche de glace', 'A', 1, 1, 1, (p) => [d(6 + 3 * p), st('faible', 1)]);
+K('eclair', 'Éclair', 'A', 2, 1, 1, (p) => [d(14 + 5 * p)]);
+K('tourbillon', 'Tourbillon', 'A', 2, 1, 1, (p) => [d(3, 4 + p, { hasard: 1 })]);
+K('lameVent', 'Lames de vent', 'A', 1, 1, 1, (p) => [d(3 + p, 3)]);
+K('soleil', 'Rayon de soleil', 'A', 1, 1, 1, (p) => [d(7 + 2 * p), b(3 + p)]);
+K('gland', 'Gland magique', 'A', 0, 1, 1, (p) => [d(5 + 3 * p)], { ep: true });
+K('grele', 'Grêle', 'A', 2, 1, 3, (p) => [d(3 + p, 2, { tous: 1 }), st('faible', 1, true)]);
+K('marteau', 'Marteau de cristal', 'A', 2, 2, 3, (p) => [d(10 + 4 * p), st('fragile', 2)]);
+K('tempete', 'Tempête', 'A', 3, 2, 3, (p) => [d(12 + 4 * p, 1, { tous: 1 })]);
+K('griffon', 'Charge du griffon', 'A', 1, 2, 3, () => [{ k: 'degBouc' }], { cp: 0 });
+K('echo', 'Écho magique', 'A', 1, 2, 3, (p) => [{ k: 'echo', n: 4 + 2 * p, par: 3 }]);
+K('licorne', 'Corne de licorne', 'A', 1, 2, 3, (p) => [d(8 + 3 * p), { k: 'siFragile', en: 1 }]);
+K('souffleDragon', 'Souffle du dragon', 'A', 2, 2, 5, (p) => [d(4 + 2 * p, 1, { tous: 1 }), st('brulure', 4 + 2 * p, true)]);
+K('tonnerre', 'Tonnerre', 'A', 2, 2, 5, (p) => [d(8 + 3 * p, 1, { tous: 1 }), st('fragile', 1, true)]);
+K('flammeBleue', 'Flamme bleue', 'A', 1, 2, 5, (p) => [d(5 + 2 * p), { k: 'degBrul' }]);
+K('comete', 'Comète géante', 'A', 3, 3, 5, (p) => [d(26 + 8 * p)]);
+K('dernier', 'Dernier sortilège', 'A', 2, 3, 7, (p) => [d(18 + 6 * p), { k: 'siDelivre', en: 2, pi: 2 }]);
+// Défenses
+K('mur', 'Mur de pierre', 'D', 2, 1, 1, (p) => [b(12 + 4 * p)]);
+K('bulle', 'Bulle', 'D', 1, 1, 1, (p) => [b(4 + 2 * p), pi(1)]);
+K('garde', 'Garde rapide', 'D', 0, 1, 1, (p) => [b(3 + 2 * p)]);
+K('calin', 'Câlin d’ourson', 'D', 1, 1, 1, (p) => [b(4 + p), so(3 + 2 * p)], { ep: true });
+K('brouillard', 'Brouillard', 'D', 1, 1, 3, (p) => [b(4 + 2 * p), st('faible', 1, true)]);
+K('lianes', 'Filet de lianes', 'D', 1, 1, 3, (p) => [b(4 + 2 * p), st('faible', 2)]);
+K('miroir', 'Miroir', 'D', 1, 2, 3, (p) => [b(5 + 2 * p), soi('epines', 2 + p)]);
+K('lunaire', 'Bouclier lunaire', 'D', 2, 2, 3, (p) => [b(15 + 5 * p)]);
+K('rempart', 'Rempart', 'D', 2, 2, 3, (p) => [b(10 + 3 * p), soi('garde', 1)]);
+K('ecorce', 'Écorce', 'D', 1, 1, 5, (p) => [b(5 + 2 * p), soi('regen', 2 + p)]);
+K('forteresse', 'Forteresse', 'D', 2, 3, 5, () => [{ k: 'doubleBouc' }], { cp: 1, ep: true });
+K('givre', 'Barrière de givre', 'D', 2, 2, 7, (p) => [b(8 + 3 * p), st('gel', 1)], { ep: true });
+// Sorts
+K('concentration', 'Concentration', 'S', 0, 1, 1, (p) => [en(2 + p)], { ep: true });
+K('lecture', 'Lecture du grimoire', 'S', 1, 1, 1, (p) => [pi(3 + p)]);
+K('potion', 'Potion', 'S', 1, 1, 1, (p) => [so(6 + 3 * p)], { ep: true });
+K('poudre', 'Poudre de fée', 'S', 0, 1, 1, (p) => [st('fragile', 2 + p)]);
+K('berceuse', 'Berceuse', 'S', 1, 1, 3, (p) => [st('faible', 2 + p, true)]);
+K('inspiration', 'Inspiration', 'S', 1, 2, 3, (p) => [pi(2 + p), en(1)]);
+K('pages', 'Tourbillon de pages', 'S', 0, 2, 3, () => [{ k: 'recycle' }]);
+K('lutins', 'Appel des lutins', 'S', 1, 2, 3, (p) => [{ k: 'lutins', n: 2 + p }]);
+K('braises', 'Braises', 'S', 1, 1, 5, (p) => [st('brulure', 4 + 2 * p)]);
+K('cendres', 'Pluie de cendres', 'S', 2, 1, 5, (p) => [st('brulure', 3 + 2 * p, true)]);
+K('rosee', 'Rosée pure', 'S', 1, 1, 5, (p) => [{ k: 'purif' }, pi(1 + p)]);
+K('explosion', 'Explosion de braises', 'S', 1, 2, 5, () => [{ k: 'doubleBrul' }], { ep: 'base' });
+K('etoileFilante', 'Étoile filante', 'S', 1, 3, 5, (p) => [en(3), pi(1 + p)], { ep: true });
+K('sablier', 'Sablier de glace', 'S', 2, 2, 7, () => [st('gel', 1, true)], { cp: 1, ep: true });
+K('souffleGlace', 'Souffle glacé', 'S', 1, 2, 7, () => [st('gel', 1), pi(1)], { cp: 0, ep: true });
+// Pouvoirs (effet pour tout le combat)
+K('courage', 'Chant de courage', 'P', 1, 1, 5, (p) => [pw('force', 2 + p)]);
+K('carapace', 'Carapace d’épines', 'P', 1, 1, 5, (p) => [pw('epines', 3 + 2 * p)]);
+K('racines', 'Racines', 'P', 1, 1, 5, (p) => [pw('boucTour', 3 + 2 * p)]);
+K('aura', 'Aura de flammes', 'P', 1, 2, 5, (p) => [pw('auraFeu', 2 + p)]);
+K('meditation', 'Méditation', 'P', 2, 2, 5, () => [pw('energie', 1)], { cp: 1 });
+K('bibliotheque', 'Bibliothèque', 'P', 1, 2, 5, () => [pw('pioche', 1)], { cp: 0 });
+K('sagesse', 'Sagesse', 'P', 1, 2, 5, (p) => [pw('sortBouc', 2 + p)]);
+K('phenix', 'Cœur de phénix', 'P', 2, 3, 7, (p) => [pw('phenix', 2 + p)]);
+K('fureur', 'Fureur des étoiles', 'P', 2, 3, 7, (p) => [pw('atkEcho', 2 + p)]);
+// Cartes spéciales (jamais proposées en récompense)
+K('lutin', 'Lutin', 'A', 0, 1, 99, (p) => [d(3 + p)], { ep: true, special: true });
+K('encre', 'Tache d’encre', 'M', 0, 1, 99, () => [], { special: true });
+
+const TYPES = { A: { nom: 'Attaque', c: '#d9534a', ic: 'epee' }, D: { nom: 'Défense', c: '#3f86d1', ic: 'bouclier' },
+  S: { nom: 'Sort', c: '#9461d1', ic: 'etoile' }, P: { nom: 'Pouvoir', c: '#d79a26', ic: 'soleil' }, M: { nom: 'Encre', c: '#5a5566', ic: 'goutte' } };
+const NOMST = { brulure: 'Brûlure', faible: 'Faible', fragile: 'Fragile', gel: 'Gel', force: 'Force', epines: 'Épines', regen: 'Régénération', garde: 'Garde' };
+const ICST = { brulure: 'flamme', faible: 'spirale', fragile: 'fissure', gel: 'flocon', force: 'haut', epines: 'epines', regen: 'feuille', garde: 'bouclier' };
+const COLST = { brulure: '#ff9a4a', faible: '#b9a6ff', fragile: '#ff7a9a', gel: '#9fe3ff', force: '#ffd76a', epines: '#c6f08a', regen: '#7dffa0', garde: '#8cc8ff' };
+const TXTPOUV = {
+  force: (n) => `+${n} force pour tout le combat`, epines: (n) => `+${n} épines pour tout le combat`,
+  boucTour: (n) => `Chaque tour : +${n} bouclier`, auraFeu: (n) => `Chaque tour : Brûlure ${n} à tous`,
+  energie: (n) => `+${n} énergie à chaque tour`, pioche: (n) => `Pioche ${n} carte de plus à chaque tour`,
+  sortBouc: (n) => `Chaque sort joué : +${n} bouclier`, phenix: (n) => `Chaque tour : soigne ${n} PV`,
+  atkEcho: (n) => `Chaque attaque jouée : ${n} dégâts à tous`,
+};
+const defC = (c) => CARTES[c.id];
+const coutDe = (c) => (c.plus ? defC(c).coutP : defC(c).cout);
+const opsDe = (c) => defC(c).ops(c.plus ? 1 : 0);
+const epDe = (c) => { const e = defC(c).ep; return e === 'base' ? !c.plus : !!e; };
+const nomDe = (c) => defC(c).nom + (c.plus ? ' +' : '');
+
+function texteOp(o) {
+  switch (o.k) {
+    case 'deg': return `${o.n} dégâts` + (o.x > 1 ? ` × ${o.x}` : '') + (o.tous ? ' à tous' : o.hasard ? ' au hasard' : '');
+    case 'bouc': return `+${o.n} bouclier`;
+    case 'pioche': return `Pioche ${o.n}`;
+    case 'energie': return `+${o.n} énergie`;
+    case 'st': return `${NOMST[o.s]} ${o.n}` + (o.tous ? ' à tous' : '');
+    case 'soi': return o.s === 'garde' ? 'Ton bouclier reste au tour suivant' : `+${o.n} ${NOMST[o.s].toLowerCase()}`;
+    case 'soin': return `Soigne ${o.n} PV`;
+    case 'degBouc': return 'Dégâts égaux à ton bouclier';
+    case 'echo': return `${o.n} dégâts, +${o.par} par carte déjà jouée ce tour`;
+    case 'siFragile': return `Si l’ennemi est fragile : +${o.en} énergie`;
+    case 'siDelivre': return `S’il est délivré : +${o.en} énergie et pioche ${o.pi}`;
+    case 'doubleBrul': return 'Double la brûlure de l’ennemi';
+    case 'degBrul': return '+ dégâts égaux à sa brûlure';
+    case 'doubleBouc': return 'Double ton bouclier';
+    case 'lutins': return `Ajoute ${o.n} Lutins (0 : 3 dégâts) à ta main`;
+    case 'recycle': return 'Défausse ta main, pioche autant de cartes';
+    case 'purif': return 'Retire tes Faible, Fragile et Brûlure';
+    case 'pouv': return TXTPOUV[o.p](o.n);
+  }
+  return '';
+}
+function texteCarte(c) {
+  if (defC(c).type === 'M') return 'Ne fait rien. Disparaît à la fin du combat.';
+  return opsDe(c).map(texteOp).join('. ') + '.' + (epDe(c) ? ' Épuisée (une fois par combat).' : '');
+}
+// Petit résumé en icônes pour les cartes de la main
+function resumeCarte(c) {
+  const out = [];
+  for (const o of opsDe(c)) {
+    if (o.k === 'deg') out.push(`<span style="color:#b8322a">${ico('epee')}${o.n}${o.x > 1 ? '×' + o.x : ''}${o.tous ? '<small>tous</small>' : ''}</span>`);
+    else if (o.k === 'bouc') out.push(`<span style="color:#2a6bb0">${ico('bouclier')}${o.n}</span>`);
+    else if (o.k === 'pioche') out.push(`<span style="color:#6a3fa8">${ico('livre')}${o.n}</span>`);
+    else if (o.k === 'energie') out.push(`<span style="color:#b07a10">${ico('soleil')}${o.n}</span>`);
+    else if (o.k === 'st' || o.k === 'soi') out.push(`<span style="color:#7a3a90">${ico(ICST[o.s])}${o.s === 'garde' ? '' : o.n}${o.tous ? '<small>tous</small>' : ''}</span>`);
+    else if (o.k === 'soin') out.push(`<span style="color:#c2334d">${ico('coeur')}${o.n}</span>`);
+    else if (o.k === 'pouv') out.push(`<span style="color:#a06a00">${ico('soleil')}${o.n}</span>`);
+    else out.push(`<span style="color:#6a3fa8">${ico('etoile')}</span>`);
+  }
+  return out.slice(0, 3).join('');
+}
+function carteHTML(c, grand, extra = '') {
+  const dc = defC(c), t = TYPES[dc.type];
+  return `<div class="carte ${grand ? 'g' : ''} r${dc.rare} ${c.plus ? 'plus' : ''} ${extra}" style="--c:${t.c}">
+    ${dc.type === 'M' ? '' : `<div class="cout">${coutDe(c)}</div>`}
+    <div class="nomc">${nomDe(c)}</div>
+    <div class="art">${ico(t.ic)}</div>
+    ${grand ? `<div class="typ">${t.nom}</div><div class="txt">${texteCarte(c)}</div>` : `<div class="res">${resumeCarte(c)}</div>`}
+  </div>`;
+}
+
+/* =====================================================================
+   DONNÉES — les 19 reliques (effets passifs)
+   ===================================================================== */
+const RELIQUES = {
+  lanterne: { nom: 'Lanterne', ic: 'soleil', c: '#d79a26', txt: '+1 énergie au premier tour de chaque combat.' },
+  pierreLune: { nom: 'Pierre de lune', ic: 'lune', c: '#7a8ad9', txt: '+8 PV max.', prise: () => { S.pvMax += 8; S.pv += 8; } },
+  coquillage: { nom: 'Coquillage', ic: 'bouclier', c: '#3f86d1', txt: 'Commence chaque combat avec 8 bouclier.' },
+  fiole: { nom: 'Fiole rouge', ic: 'coeur', c: '#c2334d', txt: 'Soigne 5 PV après chaque combat.' },
+  bourse: { nom: 'Bourse de lutin', ic: 'piece', c: '#b0862a', txt: '+10 or après chaque combat.' },
+  etoileArgent: { nom: 'Étoile d’argent', ic: 'etoile', c: '#8a95a8', txt: 'Ta première attaque de chaque combat fait +8 dégâts.' },
+  grelot: { nom: 'Grelot', ic: 'cloche', c: '#c79a2a', txt: 'Début du combat : Fragile 1 à tous les ennemis.' },
+  plumePhenix: { nom: 'Plume de phénix', ic: 'plume', c: '#e0602a', txt: 'Une fois : si tes PV tombent à 0, tu reviens avec la moitié.' },
+  cristalForce: { nom: 'Cristal de force', ic: 'gemme', c: '#d9534a', txt: 'Commence chaque combat avec 1 force.' },
+  bougie: { nom: 'Bougie', ic: 'flamme', c: '#e07a2a', txt: 'Les brûlures que tu donnes ont +1.' },
+  sablier: { nom: 'Sablier d’or', ic: 'sablier', c: '#b0862a', txt: 'Tous les 3 tours : +1 énergie.' },
+  anneauEpines: { nom: 'Anneau d’épines', ic: 'anneau', c: '#5a9a3a', txt: 'Commence chaque combat avec 3 épines.' },
+  sacoche: { nom: 'Sacoche', ic: 'sac', c: '#8a5a3a', txt: 'Pioche 2 cartes de plus au premier tour.' },
+  ferCheval: { nom: 'Fer à cheval', ic: 'fer', c: '#6a7a8a', txt: 'Tout est 25 % moins cher à la boutique.' },
+  couronneFleurs: { nom: 'Couronne de fleurs', ic: 'fleur', c: '#d9609a', txt: 'Les feux de camp soignent 10 PV de plus.' },
+  trefle: { nom: 'Trèfle', ic: 'trefle', c: '#3a9a5a', txt: 'Une carte de plus au choix après chaque combat.' },
+  // Reliques de gardien (plus puissantes)
+  coeurCristal: { nom: 'Cœur de cristal', ic: 'gemme', c: '#9a5ad9', txt: '+1 énergie à chaque tour.', gardien: true },
+  grimoireDore: { nom: 'Grimoire doré', ic: 'livre', c: '#d79a26', txt: 'Pioche 1 carte de plus à chaque tour.', gardien: true },
+  ailesFee: { nom: 'Ailes de fée', ic: 'oeil', c: '#5ac0d9', txt: 'Gagne 3 bouclier au début de chaque tour.', gardien: true },
+};
+const aRel = (id) => S && S.rel.includes(id);
+function relHTML(id, grand) {
+  const r = RELIQUES[id];
+  return `<span class="rel" style="background:${r.c}" title="${r.nom}">${ico(r.ic)}</span>` + (grand ? `<span><b>${r.nom}</b><small>${r.txt}</small></span>` : '');
+}
+
+/* =====================================================================
+   DONNÉES — ennemis (créatures ensorcelées)
+   motif : intentions jouées dans l'ordre. a dégâts (x fois), b bouclier,
+   f force, brul/faible/fragile/gel donnés au joueur, encre, inv(ocation),
+   charge (prépare un gros coup).
+   ===================================================================== */
+const ENNEMIS = {
+  gelee: { nom: 'Gelée bleue', pv: 22, art: { f: 'goutte', c: '#5fb6e8' }, motif: [{ a: 5 }, { a: 7 }, { b: 5, a: 3 }] },
+  golem: { nom: 'Golem de mousse', pv: 48, boss: 1, art: { f: 'carre', c: '#7f9468', x: ['mousse', 'feuilles'] }, motif: [{ b: 9 }, { a: 8 }, { f: 2, b: 5 }, { a: 11 }] },
+  lutinF: { nom: 'Lutin farceur', pv: 15, art: { f: 'grand', c: '#9ccf6a', x: ['oreilles', 'chapeau'] }, motif: [{ a: 3, x: 2 }, { faible: 1, a: 3 }] },
+  champi: { nom: 'Champignon sauteur', pv: 18, art: { f: 'rond', c: '#f2dcc0', x: ['champi'] }, motif: [{ a: 6 }, { b: 6 }, { a: 8 }] },
+  reine: { nom: 'Reine des abeilles', pv: 56, boss: 1, art: { f: 'rond', c: '#f2c94c', x: ['ailes', 'rayures', 'couronne'] },
+    motif: [{ inv: 'abeille' }, { a: 9 }, { fragile: 2, a: 5 }, { faible: 1, a: 5 }, { a: 4, x: 3 }] },
+  abeille: { nom: 'Abeille', pv: 9, art: { f: 'rond', c: '#f7d660', x: ['ailes', 'rayures'] }, motif: [{ a: 4 }, { a: 3, fragile: 1 }] },
+  ours: { nom: 'Ours grognon', pv: 44, art: { f: 'rond', c: '#a0785a', x: ['oreilles'] }, motif: [{ a: 11 }, { f: 2, b: 8 }, { a: 5, x: 2 }] },
+  corbeau: { nom: 'Corbeau grincheux', pv: 13, hasard: 1, art: { f: 'goutte', c: '#5a5f7a', x: ['ailes', 'bec'] }, motif: [{ a: 5 }, { faible: 1, a: 2 }, { a: 4 }] },
+  follet: { nom: 'Feu follet', pv: 20, art: { f: 'goutte', c: '#8fd3ff', x: ['flamme'] }, motif: [{ brul: 3 }, { a: 6 }, { a: 4, brul: 2 }] },
+  dragonnet: { nom: 'Dragonnet de braise', pv: 92, boss: 1, rage: 1, art: { f: 'rond', c: '#e8693c', x: ['ailes', 'cornes', 'flamme'] },
+    motif: [{ a: 11 }, { brul: 5, a: 4 }, { b: 12, f: 2 }, { a: 6, x: 2 }], motifRage: [{ a: 8, x: 2 }, { brul: 6, b: 8 }, { a: 16 }] },
+  sorcier: { nom: 'Sorcier de boue', pv: 36, art: { f: 'grand', c: '#9a7a52', x: ['chapeau'] }, motif: [{ encre: 2 }, { a: 9 }, { b: 10 }, { a: 7, encre: 1 }] },
+  loup: { nom: 'Loup de brume', pv: 32, art: { f: 'rond', c: '#a3abc0', x: ['oreilles'] }, motif: [{ a: 10 }, { a: 5, x: 2 }, { b: 8, f: 1 }] },
+  chouette: { nom: 'Chouette du givre', pv: 100, boss: 1, art: { f: 'rond', c: '#d6ecfa', x: ['ailes', 'oreilles', 'bec'] },
+    motif: [{ gel: 1, a: 8 }, { a: 5, x: 3 }, { b: 14 }, { fragile: 2, faible: 2 }, { a: 15 }] },
+  armure: { nom: 'Armure enchantée', pv: 62, debut: { bouc: 15 }, art: { f: 'carre', c: '#9aa6bb', x: ['cornes'] }, motif: [{ b: 12 }, { a: 14 }, { a: 7, x: 2 }] },
+  herisson: { nom: 'Hérisson de cristal', pv: 36, debut: { epines: 3 }, art: { f: 'rond', c: '#b48ae8', x: ['pics'] }, motif: [{ a: 9 }, { b: 10 }, { a: 5, x: 2 }] },
+  gargouille: { nom: 'Gargouille', pv: 46, art: { f: 'carre', c: '#8b8f99', x: ['ailes', 'cornes'] }, motif: [{ a: 13 }, { b: 14 }, { fragile: 2, a: 6 }] },
+  hydre: { nom: 'Tête de lierre', pv: 40, boss: 1, debut: { regen: 3 }, art: { f: 'goutte', c: '#5dbb63', x: ['feuilles'] }, motif: [{ a: 7 }, { brul: 3 }, { b: 8 }, { a: 5, faible: 1 }] },
+  titan: { nom: 'Titan d’orage', pv: 140, boss: 1, art: { f: 'grand', c: '#6c7fd8', x: ['nuage', 'cornes'] },
+    motif: [{ a: 8, faible: 2 }, { charge: 1 }, { a: 28 }, { b: 18, f: 3 }, { a: 5, x: 3 }] },
+  gardien: { nom: 'Gardien des Sceaux', pv: 180, boss: 1, art: { f: 'grand', c: '#5a46a8', x: ['couronne', 'sceaux'] },
+    phases: [[{ a: 12 }, { encre: 2, b: 10 }, { a: 7, x: 2 }],
+      [{ brul: 6, a: 5 }, { a: 18 }, { gel: 1, a: 10 }, { b: 15, f: 2 }],
+      [{ charge: 1 }, { a: 34 }, { a: 8, x: 3 }, { fragile: 2, faible: 2, b: 12 }]] },
+  coffreF: { nom: 'Coffre farceur', pv: 80, art: { f: 'carre', c: '#c08a3e', x: ['coffre'] }, motif: [{ a: 15 }, { encre: 2, b: 10 }, { a: 6, x: 3 }] },
+  golemC: { nom: 'Golem de cristal', pv: 95, debut: { epines: 2 }, art: { f: 'carre', c: '#9fd8e8', x: ['cristaux'] }, motif: [{ b: 15 }, { a: 12, f: 2 }, { a: 20 }] },
+};
+// Les 12 niveaux (combats principaux) — sceau : numéro du sceau gardé.
+const NIVEAUX = [
+  { lieu: 'La clairière', en: ['gelee'], par: 4, intro: 'base' },
+  { lieu: 'Le vieux pont', en: ['golem'], par: 6, sceau: 1, intro: 'protege' },
+  { lieu: 'Le sous-bois', en: ['lutinF', 'champi'], par: 5, intro: 'cibles' },
+  { lieu: 'La ruche dorée', en: ['reine'], par: 7, sceau: 2, intro: 'statuts' },
+  { lieu: 'Les marais bleus', en: ['follet', 'follet'], par: 5, intro: 'brulure' },
+  { lieu: 'Le volcan endormi', en: ['dragonnet'], par: 8, sceau: 3, intro: 'rage' },
+  { lieu: 'La grotte de boue', en: ['sorcier', 'loup'], par: 7, intro: 'encre' },
+  { lieu: 'Le pic gelé', en: ['chouette'], par: 8, sceau: 4, intro: 'gel' },
+  { lieu: 'Le jardin de cristal', en: ['herisson', 'gargouille'], par: 7, intro: 'epines' },
+  { lieu: 'Les ruines de lierre', en: ['hydre', 'hydre', 'hydre'], par: 9, sceau: 5, intro: 'regen' },
+  { lieu: 'La tour d’orage', en: ['titan'], par: 9, sceau: 6, intro: 'charge' },
+  { lieu: 'Le cœur du grimoire', en: ['gardien'], par: 12, sceau: 7, intro: 'phases' },
+];
+const ACTES = ['', 'La forêt endormie', 'Les monts de braise', 'La citadelle d’orage'];
+const ELITES = { 1: [['ours'], ['corbeau', 'corbeau', 'corbeau']], 2: [['armure'], ['loup', 'loup']], 3: [['coffreF'], ['golemC']] };
+const acteDe = (niv) => Math.ceil(niv / 4);
+
+/* =====================================================================
+   Dessins : créatures (ensorcelées ou délivrées) et petit magicien
+   ===================================================================== */
+function creature(a, heureux) {
+  const c = a.c, x = a.x || [], c2 = 'rgba(0,0,0,.28)';
+  let s = '';
+  if (!heureux) s += '<circle class="aura" cx="50" cy="56" r="46" fill="none" stroke="#c48aff" stroke-width="2.5" stroke-dasharray="5 9" opacity=".8"/>';
+  if (x.includes('ailes')) s += '<ellipse cx="17" cy="48" rx="13" ry="20" fill="#eef6ff" opacity=".85" transform="rotate(-25 17 48)"/><ellipse cx="83" cy="48" rx="13" ry="20" fill="#eef6ff" opacity=".85" transform="rotate(25 83 48)"/>';
+  if (x.includes('pics')) for (let i = 0; i < 9; i++) { const an = Math.PI * (1.05 + i * 0.11); const cx = 50 + Math.cos(an) * 38, cy = 60 + Math.sin(an) * 33; s += `<path d="M${cx - 6} ${cy + 4}L${50 + Math.cos(an) * 52} ${60 + Math.sin(an) * 46}L${cx + 6} ${cy + 4}z" fill="#e3ccff"/>`; }
+  if (x.includes('nuage')) s += '<g fill="#cfd6f5"><circle cx="30" cy="22" r="12"/><circle cx="50" cy="15" r="15"/><circle cx="70" cy="22" r="12"/></g>';
+  if (x.includes('oreilles')) s += `<path d="M27 42L30 14 47 32zM73 42L70 14 53 32z" fill="${c}" stroke="${c2}" stroke-width="3"/>`;
+  if (x.includes('cornes')) s += '<path d="M33 34Q24 16 30 9Q35 24 41 30zM67 34Q76 16 70 9Q65 24 59 30z" fill="#f5e6c8"/>';
+  const corps = { rond: '<ellipse cx="50" cy="60" rx="34" ry="30"/>', goutte: '<path d="M50 20C62 38 84 48 84 66a34 26 0 0 1-68 0C16 48 38 38 50 20z"/>',
+    grand: '<rect x="24" y="24" width="52" height="70" rx="24"/>', carre: '<rect x="16" y="30" width="68" height="62" rx="14"/>' }[a.f];
+  s += `<g fill="${c}" stroke="${c2}" stroke-width="3">${corps}</g><ellipse cx="38" cy="${a.f === 'grand' ? 38 : 48}" rx="9" ry="5" fill="#fff" opacity=".3"/>`;
+  if (x.includes('rayures')) s += '<path d="M20 70h60M24 80h52" stroke="#4a3410" stroke-width="5" opacity=".7"/>';
+  if (x.includes('mousse')) s += '<g fill="#5a8a3a"><circle cx="26" cy="80" r="5"/><circle cx="72" cy="76" r="6"/><circle cx="60" cy="86" r="4"/></g>';
+  if (x.includes('feuilles')) s += '<g fill="#4fa04a"><path d="M50 26C40 10 30 16 32 26z"/><path d="M50 26C60 8 72 14 68 26z"/><path d="M50 28C50 12 50 12 50 28z"/></g>';
+  if (x.includes('champi')) s += '<path d="M10 50Q50 -6 90 50z" fill="#e2463c"/><g fill="#fff"><circle cx="34" cy="32" r="5"/><circle cx="58" cy="24" r="6"/><circle cx="74" cy="40" r="4"/></g>';
+  if (x.includes('flamme')) s += '<path d="M50 2c6 10 14 14 14 24a14 14 0 0 1-28 0c0-8 8-12 14-24z" fill="#ffb347" opacity=".95"/><path d="M50 14c3 6 7 8 7 13a7 7 0 0 1-14 0c0-4 4-7 7-13z" fill="#fff1a0"/>';
+  if (x.includes('chapeau')) s += '<path d="M28 28L58 -2 72 28z" fill="#3b2a6b"/><rect x="20" y="25" width="60" height="7" rx="3" fill="#2a1d50"/>';
+  if (x.includes('couronne')) s += '<path d="M33 24l4-14 7 8 6-11 6 11 7-8 4 14z" fill="#ffd34d" stroke="#c99a1a" stroke-width="2"/>';
+  if (x.includes('cristaux')) s += '<g fill="#e8fbff" stroke="#7ab8d0" stroke-width="2"><path d="M30 32l6-20 6 20z"/><path d="M46 30l6-26 6 26z"/><path d="M62 32l5-16 5 16z"/></g>';
+  if (x.includes('coffre')) s += '<path d="M16 50h68" stroke="#6a4410" stroke-width="4"/><rect x="44" y="44" width="12" height="14" rx="3" fill="#ffd34d" stroke="#6a4410" stroke-width="2"/>';
+  if (x.includes('sceaux')) s += '<g fill="none" stroke="#ffd76a" stroke-width="2"><circle cx="34" cy="80" r="5"/><circle cx="50" cy="84" r="5"/><circle cx="66" cy="80" r="5"/></g>';
+  const ey = a.f === 'grand' ? 48 : 58;
+  if (heureux) {
+    s += `<path d="M31 ${ey}q6-7 12 0M57 ${ey}q6-7 12 0" stroke="#2a1a10" stroke-width="3.5" fill="none" stroke-linecap="round"/>`;
+    s += `<circle cx="28" cy="${ey + 8}" r="5" fill="#ff8aa8" opacity=".6"/><circle cx="72" cy="${ey + 8}" r="5" fill="#ff8aa8" opacity=".6"/>`;
+    if (!x.includes('bec')) s += `<path d="M41 ${ey + 10}q9 10 18 0" stroke="#2a1a10" stroke-width="3.5" fill="none" stroke-linecap="round"/>`;
+  } else {
+    s += `<circle cx="38" cy="${ey}" r="8" fill="#fff"/><circle cx="62" cy="${ey}" r="8" fill="#fff"/><circle cx="39" cy="${ey + 1}" r="4" fill="#5a1a8a"/><circle cx="61" cy="${ey + 1}" r="4" fill="#5a1a8a"/>`;
+    s += `<path d="M29 ${ey - 12}l13 5M71 ${ey - 12}l-13 5" stroke="#2a1a10" stroke-width="3.5" stroke-linecap="round"/>`;
+    if (!x.includes('bec')) s += `<path d="M42 ${ey + 15}q4-4 8 0t8 0" stroke="#2a1a10" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  }
+  if (x.includes('bec')) s += `<path d="M44 ${ey + 8}l6 8 6-8z" fill="#f2a33a"/>`;
+  return `<svg viewBox="0 -4 100 104" aria-hidden="true">${s}</svg>`;
+}
+const MAGE = '<svg viewBox="0 0 60 60" aria-hidden="true"><path d="M14 58l6-22h20l6 22z" fill="#6a46c9"/><circle cx="30" cy="30" r="11" fill="#ffd9b8"/><circle cx="26" cy="30" r="1.8" fill="#2a1a10"/><circle cx="34" cy="30" r="1.8" fill="#2a1a10"/><path d="M26 35q4 3 8 0" stroke="#2a1a10" stroke-width="1.6" fill="none"/><path d="M14 24L33 0 46 24z" fill="#3b2a8b"/><rect x="11" y="21" width="38" height="6" rx="3" fill="#2a1d6b"/><path d="M30 8l1.5 3 3 .4-2.2 2 .6 3L30 15l-2.9 1.4.6-3-2.2-2 3-.4z" fill="#ffd76a"/><path d="M48 36l8-14" stroke="#a0703a" stroke-width="3"/><circle cx="56" cy="21" r="3.5" fill="#ffe39a"/></svg>';
+
+/* =====================================================================
+   ÉTAT DE LA PARTIE (S) et du combat (C)
+   ===================================================================== */
+let S = null;      // partie en cours (sauvegardée)
+let C = null;      // combat en cours
+let snap = null;   // copie de S au début du combat (pour Réessayer / Rejouer)
+let UID = 1;
+
+function nouvellePartie() {
+  S = { niv: 1, etape: 'combat', pv: 50, pvMax: 50, or: 60, score: 0, etoiles: {}, sceaux: 0, essais: 0, rel: [], choix: {}, fait: {}, evVus: [], phenix: false,
+    deck: [...Array(5).fill('etincelle'), ...Array(4).fill('bouclier'), 'rayon'].map((id) => ({ id, plus: 0 })) };
+}
+const totalEtoiles = () => Object.values(S.etoiles).reduce((a, n) => a + n, 0);
+function sauverPartie() { REC.partie = clone(S); sauver(); }
+function majRecords() {
+  let battu = false;
+  if (S.score > REC.meilleur) { REC.meilleur = S.score; battu = true; }
+  REC.etoiles = Math.max(REC.etoiles, totalEtoiles());
+  REC.sceaux = Math.max(REC.sceaux, S.sceaux);
+  sauver();
+  return battu;
+}
+function soigner(n) { const avant = S.pv; S.pv = Math.min(S.pvMax, S.pv + n); return S.pv - avant; }
+function prendreRelique(id) { if (S.rel.includes(id)) return; S.rel.push(id); const r = RELIQUES[id]; if (r.prise) r.prise(); }
+
+/* =====================================================================
+   ÉCRANS : outils communs
+   ===================================================================== */
+// garder = true : on redessine le même panneau en gardant sa position de défilement
+function ecran(html, garder) {
+  const p = $('#ecran .panneau'), haut = garder && p ? p.scrollTop : 0;
+  $('#ecran').innerHTML = html;
+  if (haut) { const q = $('#ecran .panneau'); if (q) q.scrollTop = haut; }
+}
+function ouvrirCouche(html) { const c = $('#couche'); c.innerHTML = `<div class="boite">${html}</div>`; c.classList.remove('cache'); }
+function fermerCouche() { $('#couche').classList.add('cache'); $('#couche').innerHTML = ''; }
+function majBarre(visible = true) {
+  const br = $('#barre');
+  br.classList.toggle('cache', !visible);
+  if (!visible || !S) return;
+  const pv = C ? C.j.pv : S.pv;
+  br.innerHTML = `<span class="pv">${ico('coeur')} ${pv}/${S.pvMax}</span><span class="or">${ico('piece')} ${S.or}</span>
+    <span class="et">${ico('etoile')} ${totalEtoiles()}</span><span class="niv">Niv ${Math.min(S.niv, 12)}/12</span>
+    <div id="rels" data-f="${on(voirReliques)}" role="button" aria-label="Mes reliques">${S.rel.map((id) => relHTML(id)).join('')}</div>
+    <button class="rond" data-f="${on(basculerSon)}" aria-label="Couper ou remettre le son">${ico(REC.son ? 'sonOn' : 'sonOff')}</button>`;
+}
+function basculerSon(el) { REC.son = !REC.son; sauver(); el.innerHTML = ico(REC.son ? 'sonOn' : 'sonOff'); if (REC.son) son('clic'); }
+function voirReliques() {
+  son('clic');
+  ouvrirCouche(`<h2>Mes reliques</h2>${S.rel.length ? S.rel.map((id) => `<div class="relChoix">${relHTML(id, true)}</div>`).join('') : '<p>Pas encore de relique. Les gardiens, les trésors et les élites en donnent !</p>'}
+    <button class="btn v" data-f="${on(fermerCouche)}">Fermer</button>`);
+}
+function voirPaquet() {
+  son('clic');
+  const tri = [...S.deck].sort((x, y) => (defC(x).type + defC(x).nom).localeCompare(defC(y).type + defC(y).nom));
+  ouvrirCouche(`<h2>Mon grimoire (${S.deck.length} cartes)</h2><div class="grille">${tri.map((c) => carteHTML(c, true)).join('')}</div>
+    <button class="btn v" data-f="${on(fermerCouche)}">Fermer</button>`);
+}
+// Choisir une carte du paquet (améliorer, retirer…). filtre(c) → bool
+function choisirDansPaquet(titre, filtre, action) {
+  return new Promise((res) => {
+    const liste = S.deck.map((c, i) => ({ c, i })).filter((o) => filtre(o.c));
+    if (!liste.length) { res(null); return; }
+    ouvrirCouche(`<h2>${titre}</h2><div class="grille">${liste.map((o) => `<button class="item" data-f="${on(() => { fermerCouche(); son('choix'); action(o.c, o.i); res(o.c); })}">${carteHTML(o.c, true)}</button>`).join('')}</div>
+      <button class="btn g" data-f="${on(() => { fermerCouche(); res(null); })}">Annuler</button>`);
+  });
+}
+function flotter(el, texte, cls) {
+  if (!el) return;
+  const r = el.getBoundingClientRect(), j = $('#jeu').getBoundingClientRect();
+  const f = document.createElement('div');
+  f.className = 'flot ' + cls; f.textContent = texte;
+  f.style.left = (r.left - j.left + r.width / 2 + (Math.random() * 24 - 12)) + 'px';
+  f.style.top = (r.top - j.top + r.height * 0.25) + 'px';
+  $('#fx').appendChild(f); setTimeout(() => f.remove(), 1000);
+}
+function grandTexte(t) {
+  const f = document.createElement('div'); f.className = 'grandTexte'; f.textContent = t;
+  $('#fx').appendChild(f); setTimeout(() => f.remove(), 1600);
+}
+function secouer(el, cls = 'secoue') { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+// Confettis (canvas)
+let confettisActifs = [];
+function confettis(n = 90) {
+  const cv = $('#confettis'), r = cv.getBoundingClientRect();
+  cv.width = r.width; cv.height = r.height;
+  const cols = ['#ffd76a', '#ff8aa8', '#8cc8ff', '#a6ff9a', '#c48aff', '#ffffff'];
+  for (let i = 0; i < n; i++) confettisActifs.push({ x: r.width / 2 + (Math.random() - 0.5) * 80, y: r.height * 0.35, vx: (Math.random() - 0.5) * 9, vy: -Math.random() * 9 - 3, c: cols[rnd(cols.length)], t: 0, r: Math.random() * 6 });
+  if (confettisActifs.length === n) requestAnimationFrame(animerConfettis);
+}
+function animerConfettis() {
+  const cv = $('#confettis'), g = cv.getContext('2d');
+  g.clearRect(0, 0, cv.width, cv.height);
+  confettisActifs = confettisActifs.filter((p) => p.t < 130 && p.y < cv.height + 20);
+  for (const p of confettisActifs) {
+    p.t++; p.vy += 0.22; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += 0.15;
+    g.save(); g.translate(p.x, p.y); g.rotate(p.r); g.fillStyle = p.c; g.fillRect(-4, -2.5, 8, 5); g.restore();
+  }
+  if (confettisActifs.length) requestAnimationFrame(animerConfettis); else g.clearRect(0, 0, cv.width, cv.height);
+}
+
+/* =====================================================================
+   TUTORIEL ANIMÉ : une main montre le geste, l'élément est mis en lumière.
+   etapes : [{ el: () => Element, el2?: () => Element, txt }]
+   Se joue tout seul en boucle ; un toucher le ferme.
+   ===================================================================== */
+const MAIN_SVG = '<svg viewBox="0 0 40 52"><path fill="#fff" stroke="#2a1640" stroke-width="2.5" stroke-linejoin="round" d="M14 5a4 4 0 0 1 8 0v17l2.5-.8a3.6 3.6 0 0 1 4.3 1.6l1.7-.4a3.6 3.6 0 0 1 4.5 2.6l.4.1a3.6 3.6 0 0 1 3.6 3.6V38c0 8-5.5 13-13 13h-3c-5 0-8-2.5-11-7.5L3.5 32a3.6 3.6 0 0 1 5.6-4.4L14 32z"/></svg>';
+let tutoActif = false;
+function astuce(cle, etapes) {
+  if (REC.vus[cle] || !etapes || !etapes.length) return Promise.resolve();
+  REC.vus[cle] = 1; sauver();
+  return new Promise((res) => {
+    tutoActif = true;
+    const t = $('#tuto');
+    t.innerHTML = `<div class="halo"></div><div class="main">${MAIN_SVG}</div><div class="bulle"><div class="txt"></div><div class="pts">${etapes.map(() => '<i></i>').join('')}</div><button class="btn v">J’ai compris !</button></div>`;
+    t.classList.remove('cache');
+    const halo = t.querySelector('.halo'), main = t.querySelector('.main'), bulle = t.querySelector('.bulle');
+    const jr = () => $('#jeu').getBoundingClientRect();
+    let i = 0, fini = false, minuteurs = [];
+    const debut = Date.now();
+    const viser = (el) => {
+      if (!el) return;
+      const r = el.getBoundingClientRect(), j = jr();
+      halo.style.left = (r.left - j.left - 6) + 'px'; halo.style.top = (r.top - j.top - 6) + 'px';
+      halo.style.width = (r.width + 12) + 'px'; halo.style.height = (r.height + 12) + 'px';
+      main.style.left = (r.left - j.left + r.width / 2 - 14) + 'px'; main.style.top = (r.top - j.top + r.height / 2 - 2) + 'px';
+      const haut = r.top - j.top + r.height / 2 < j.height / 2;
+      bulle.style.top = haut ? 'auto' : '14px'; bulle.style.bottom = haut ? '14px' : 'auto';
+      secouer(main, 'tape');
+    };
+    const etape = () => {
+      if (fini) return;
+      const e = etapes[i % etapes.length];
+      bulle.querySelector('.txt').textContent = e.txt;
+      bulle.querySelectorAll('.pts i').forEach((p, k) => p.classList.toggle('on', k === i % etapes.length));
+      viser(e.el());
+      if (e.el2) minuteurs.push(setTimeout(() => viser(e.el2()), 1400));
+      i++;
+      minuteurs.push(setTimeout(etape, e.el2 ? 3200 : 2600));
+    };
+    const fermer = () => {
+      if (fini || Date.now() - debut < 500) return;
+      fini = true; minuteurs.forEach(clearTimeout);
+      t.classList.add('cache'); t.innerHTML = ''; tutoActif = false; son('clic'); res();
+    };
+    t.onclick = fermer;
+    etape();
+  });
+}
+const carteEl = (i) => $$('#main .carte')[i] || $('#main');
+const enEl = (i) => $$('#ennemis .en:not(.parti):not(.libre)')[i] || $('#ennemis');
+const intentEl = (i) => { const e = enEl(i); return (e && e.querySelector('.intent')) || e; };
+const INTROS = {
+  base: () => [
+    { el: () => carteEl(0), txt: 'Touche une carte pour la choisir. Le chiffre jaune = son prix en énergie.' },
+    { el: () => carteEl(0), el2: () => enEl(0), txt: 'Touche-la encore, ou touche l’ennemi : la carte agit !' },
+    { el: () => intentEl(0), el2: () => $('#btnFin'), txt: 'En haut : ce que l’ennemi va faire. Plus d’énergie ? Touche « Fin du tour ».' }],
+  protege: () => [
+    { el: () => intentEl(0), txt: 'Le golem va se protéger : son bouclier bleu absorbe tes dégâts.' },
+    { el: () => $('#orbe'), txt: 'Tes boucliers aussi disparaissent à ton tour suivant : protège-toi juste avant ses attaques !' }],
+  cibles: () => [{ el: () => carteEl(0), el2: () => enEl(1), txt: 'Deux ennemis ! Choisis une carte, puis touche celui que tu vises.' }],
+  statuts: () => [
+    { el: () => intentEl(0), txt: 'La reine appelle des abeilles ! Les cartes « à tous » touchent tout le monde.' },
+    { el: () => $('#jst'), txt: 'Faible : tu fais moins de dégâts. Fragile : tu en reçois plus. Ça marche aussi sur les ennemis !' }],
+  brulure: () => [{ el: () => intentEl(0), txt: 'La flamme = Brûlure : on perd des PV à chaque tour. Tes cartes de feu en donnent aussi !' }],
+  rage: () => [{ el: () => enEl(0), txt: 'Le dragonnet se met en colère quand il perd la moitié de sa vie. Garde des boucliers !' }],
+  encre: () => [{ el: () => enEl(0), txt: 'Le sorcier jette des taches d’encre dans ton paquet. Elles partent à la fin du combat.' }],
+  gel: () => [{ el: () => intentEl(0), txt: 'Le flocon = Gel. Givré, tu as 1 énergie de moins au tour suivant. Un ennemi gelé, lui, passe son tour !' }],
+  epines: () => [{ el: () => enEl(0), txt: 'Épines : chaque coup sur le hérisson te pique. Préfère les gros coups aux petits coups répétés.' }],
+  regen: () => [{ el: () => enEl(1), txt: 'Chaque tête se soigne à chaque tour (feuille verte). Délivre-les une par une !' }],
+  charge: () => [{ el: () => enEl(0), txt: 'Quand le titan se concentre (éclair), il prépare un énorme coup : protège-toi au maximum !' }],
+  phases: () => [{ el: () => enEl(0), txt: 'Le Gardien change de pouvoir deux fois. C’est le combat final : courage !' }],
+};
+
+/* =====================================================================
+   ACCUEIL
+   ===================================================================== */
+function accueil() {
+  C = null; fermerCouche(); majBarre(false);
+  const livre = `<svg viewBox="0 0 260 190" aria-hidden="true">
+    <g stroke="#ffd76a" stroke-width="3" fill="#2a1d50">${[0, 1, 2, 3, 4, 5, 6].map((i) => { const an = Math.PI * (1.1 + i * 0.133); return `<circle cx="${130 + Math.cos(an) * 105}" cy="${110 + Math.sin(an) * 85}" r="13"/><path d="M${130 + Math.cos(an) * 105} ${102 + Math.sin(an) * 85}v16M${122 + Math.cos(an) * 105} ${110 + Math.sin(an) * 85}h16" stroke-width="2"/>`; }).join('')}</g>
+    <path d="M30 120Q80 100 130 120Q180 100 230 120V180Q180 160 130 180Q80 160 30 180z" fill="#7a3a2a" stroke="#4a2010" stroke-width="3"/>
+    <path d="M38 118Q84 100 128 116V172Q84 154 38 172z" fill="#fbf0d6"/><path d="M222 118Q176 100 132 116V172Q176 154 222 172z" fill="#f4e4c0"/>
+    <g stroke="#b9a07a" stroke-width="2"><path d="M50 128q35-10 66 0M50 140q35-10 66 0M50 152q35-10 66 0M144 128q35-10 66 0M144 140q35-10 66 0M144 152q35-10 66 0"/></g>
+    <circle cx="130" cy="88" r="16" fill="#ffd76a" opacity=".9"/><circle cx="130" cy="88" r="28" fill="#ffd76a" opacity=".2"/>
+  </svg>`;
+  const rec = REC.meilleur ? `Record : ${REC.meilleur} points · ${REC.etoiles} ★ · ${REC.sceaux}/7 sceaux` : 'Une aventure de cartes en 3 actes et 12 niveaux.';
+  ecran(`<div class="accueil">
+    <div class="livre">${livre}</div>
+    <h1 class="titre">Grimoire des<br>Sept Sceaux</h1>
+    <p class="regle">Joue les cartes de ton grimoire pour délivrer les créatures ensorcelées, gagne de nouvelles cartes et brise les 7 sceaux !</p>
+    <button class="btn" style="font-size:22px;padding:12px 46px" data-f="${on(() => { son('clic'); if (REC.partie) { S = REC.partie; carte(); } else { nouvellePartie(); lancerNiveau(); } })}">Jouer</button>
+    ${REC.partie ? `<button class="btn g" data-f="${on(() => { son('clic'); nouvellePartie(); sauverPartie(); carte(); })}">Nouvelle partie</button>` : ''}
+    <div class="record">${rec}</div>
+    <button class="rond" data-f="${on(basculerSon)}" aria-label="Couper ou remettre le son">${ico(REC.son ? 'sonOn' : 'sonOff')}</button>
+  </div>`);
+}
+
+/* =====================================================================
+   CARTE DU MONDE : chemins à embranchements
+   ===================================================================== */
+const NOEUDS = {
+  combat: { nom: 'Combat', ic: 'epee', c: '#c9463e' }, sceau: { nom: 'Gardien', ic: 'sceau', c: '#9a4ad0' },
+  repos: { nom: 'Feu de camp', ic: 'feu', c: '#e0832a' }, boutique: { nom: 'Boutique', ic: 'sac', c: '#2aa58a' },
+  evenement: { nom: 'Surprise', ic: 'question', c: '#3f86d1' }, tresor: { nom: 'Trésor', ic: 'coffre', c: '#c79a2a' },
+  elite: { nom: 'Élite', ic: 'couronne', c: '#d0407a' },
+};
+// Rangée de chemins avant le combat du niveau n
+function genererChoix(n) {
+  if (n === 2) return ['evenement', 'tresor'];
+  const avantGardien = !!NIVEAUX[n - 1].sceau;
+  const poids = { repos: 2, boutique: 2, evenement: 3, tresor: 1, elite: n >= 3 ? 2 : 0 };
+  const res = avantGardien ? ['repos'] : [];
+  if ((n === 3 || n === 7 || n === 11) && !res.includes('boutique')) res.push('boutique');
+  while (res.length < 3) {
+    const cand = Object.keys(poids).filter((k) => !res.includes(k) && poids[k] > 0);
+    const tot = cand.reduce((a, k) => a + poids[k], 0);
+    let r = Math.random() * tot;
+    for (const k of cand) { r -= poids[k]; if (r <= 0) { res.push(k); break; } }
+  }
+  return melange(res);
+}
+function carte() {
+  C = null; fermerCouche();
+  if (S.niv > 12) { finPartie(true); return; }
+  if (S.etape === 'choix' && !S.choix[S.niv]) S.choix[S.niv] = genererChoix(S.niv);
+  sauverPartie(); majBarre(true);
+  const a = acteDe(S.niv);
+  let lignes = '';
+  for (let n = 4 * a - 3; n <= 4 * a; n++) {
+    if (n > 1) {
+      const ch = S.choix[n];
+      const actifRang = n === S.niv && S.etape === 'choix';
+      if (ch) {
+        lignes += `<div class="rang">${ch.map((t, k) => {
+          const fait = S.fait[n] === k, passe = S.fait[n] !== undefined && !fait;
+          const cls = actifRang ? 'actif' : fait ? 'fait' : passe ? 'passe' : 'futur';
+          return `<button class="noeud ${cls}" ${actifRang ? `data-f="${on(() => choisirNoeud(n, k))}"` : 'disabled'}><span class="b" style="background:${NOEUDS[t].c}">${ico(NOEUDS[t].ic)}</span>${NOEUDS[t].nom}</button>`;
+        }).join('')}</div>`;
+      } else {
+        lignes += `<div class="rang"><div class="noeud futur"><span class="b" style="background:#3d3858">${ico('question')}</span>Chemins</div></div>`;
+      }
+      lignes += '<div class="lien"></div>';
+    }
+    const nv = NIVEAUX[n - 1], type = nv.sceau ? 'sceau' : 'combat';
+    const actif = n === S.niv && S.etape === 'combat', fait = n < S.niv;
+    const et = S.etoiles[n] ? ' ' + '★'.repeat(S.etoiles[n]) : '';
+    lignes += `<div class="rang"><button class="noeud ${actif ? 'actif' : fait ? 'fait' : 'futur'}" id="${actif ? 'noeudCombat' : ''}" ${actif ? `data-f="${on(lancerNiveau)}"` : 'disabled'}>
+      <span class="b" style="background:${NOEUDS[type].c}">${ico(NOEUDS[type].ic)}</span>${n}. ${nv.lieu}${nv.sceau ? ` (sceau ${nv.sceau})` : ''}<span style="color:#ffd76a">${et}</span></button></div>`;
+    if (n < 4 * a) lignes += '<div class="lien"></div>';
+  }
+  const sceaux = [1, 2, 3, 4, 5, 6, 7].map((k) => `<span class="s ${k <= S.sceaux ? 'ok' : ''}">${ico('sceau')}</span>`).join('');
+  ecran(`<div class="carteMonde">
+    <div class="acte">Acte ${ROMAIN[a]} — ${ACTES[a]}</div>
+    <div class="sceaux" aria-label="Sceaux brisés : ${S.sceaux} sur 7">${sceaux}</div>
+    <div id="chemin">${lignes}</div>
+    <div class="basCarte"><button class="btn v" data-f="${on(voirPaquet)}">${ico('livre')} Grimoire (${S.deck.length})</button>
+      <button class="btn g" data-f="${on(() => { son('clic'); accueil(); })}" aria-label="Accueil">${ico('maison')}</button></div>
+  </div>`);
+  const actif = $('#chemin .actif');
+  const ch = $('#chemin');
+  if (actif) ch.scrollTop = actif.offsetTop - ch.clientHeight / 2 + 40;
+  // Nouvel acte : grande annonce et fanfare
+  if (a > 1 && S.acteVu !== a) { S.acteVu = a; sauverPartie(); grandTexte(`Acte ${ROMAIN[a]} !`); son('victoire'); confettis(60); }
+  if (S.etape === 'choix') astuce('carte', [
+    { el: () => $('#chemin .actif') || $('#chemin'), txt: 'Choisis ton chemin ! Feu de camp, boutique, surprise, trésor ou élite.' },
+    { el: () => $('#chemin .futur') || $('#chemin'), txt: 'Ensuite, le combat suivant t’attend. Ton grimoire grandit à chaque victoire !' }]);
+}
+function choisirNoeud(n, k) {
+  son('clic');
+  S.fait[n] = k;
+  const t = S.choix[n][k];
+  const finEtape = () => { S.etape = 'combat'; carte(); };
+  ({ repos: () => feuDeCamp(finEtape), boutique: () => boutique(finEtape), evenement: () => evenement(finEtape),
+    tresor: () => tresor(finEtape), elite: () => lancerCombat(ELITES[acteDe(S.niv)][rnd(2)], 'elite') })[t]();
+}
+
+/* =====================================================================
+   FEU DE CAMP, TRÉSOR, BOUTIQUE, ÉVÉNEMENTS
+   ===================================================================== */
+function feuDeCamp(fin) {
+  majBarre(true);
+  const soin = Math.round(S.pvMax * 0.3) + (aRel('couronneFleurs') ? 10 : 0);
+  ecran(`<div class="panneau"><div class="grosIco">${ico('feu')}</div><h2>Feu de camp</h2>
+    <p>Les flammes dansent. Tu peux te reposer ou travailler ton grimoire.</p>
+    <div class="choix">
+      <button class="btn" data-f="${on(() => { son('soin'); const g = soigner(soin); majBarre(); fin(); grandTexte('+' + g + ' PV'); })}">${ico('coeur')} Se reposer : +${soin} PV</button>
+      <button class="btn v" data-f="${on(async () => { const c = await choisirDansPaquet('Améliorer une carte', (c) => !c.plus && defC(c).type !== 'M', (c) => { c.plus = 1; }); if (c) { son('sort'); fin(); grandTexte(nomDe(c) + ' !'); } })}">${ico('haut')} Améliorer une carte</button>
+    </div></div>`);
+}
+function tresor(fin) {
+  majBarre(true);
+  const or = 20 + rnd(16), dispo = Object.keys(RELIQUES).filter((id) => !RELIQUES[id].gardien && !S.rel.includes(id));
+  const rel = dispo.length ? dispo[rnd(dispo.length)] : null;
+  S.or += or; if (rel) prendreRelique(rel);
+  son('achat'); confettis(50);
+  ecran(`<div class="panneau"><div class="grosIco">${ico('coffre')}</div><h2>Un trésor !</h2>
+    <p>Le coffre s’ouvre dans un nuage d’étincelles.</p><p class="prix">+${or} or</p>
+    ${rel ? `<div class="relChoix">${relHTML(rel, true)}</div>` : ''}
+    <button class="btn" data-f="${on(() => { son('clic'); fin(); })}">Continuer</button></div>`);
+  majBarre(true);
+}
+function prixDe(base) { return Math.round(base * (aRel('ferCheval') ? 0.75 : 1)); }
+function boutique(fin) {
+  const cartes = tirerCartes(5, 0).map((c) => ({ c, prix: prixDe([0, 40, 70, 115][defC(c).rare] + rnd(8)), vendu: false }));
+  const dispo = melange(Object.keys(RELIQUES).filter((id) => !RELIQUES[id].gardien && !S.rel.includes(id))).slice(0, 2);
+  const rels = dispo.map((id) => ({ id, prix: prixDe(120 + rnd(30)), vendu: false }));
+  const soinPrix = prixDe(30), retraitPrix = prixDe(50);
+  let soinFait = false, retraitFait = false;
+  const acheter = (prix) => { if (S.or < prix) { son('erreur'); grandTexte('Pas assez d’or'); return false; } S.or -= prix; son('achat'); return true; };
+  const dessiner = () => {
+    majBarre(true);
+    ecran(`<div class="panneau"><h2>${ico('sac')} La boutique du hibou</h2><p>« Bienvenue, jeune magicien ! »</p>
+      <div class="section">Cartes</div>
+      <div class="grille">${cartes.map((o) => `<button class="item ${o.vendu ? 'vendu' : ''}" data-f="${on(() => { if (!o.vendu && acheter(o.prix)) { o.vendu = true; S.deck.push(o.c); dessiner(); } })}">${carteHTML(o.c, true)}<span class="prix">${ico('piece')} ${o.prix}</span></button>`).join('')}</div>
+      <div class="section">Reliques</div>
+      ${rels.map((o) => `<button class="relChoix ${o.vendu ? 'vendu' : ''}" data-f="${on(() => { if (!o.vendu && acheter(o.prix)) { o.vendu = true; prendreRelique(o.id); dessiner(); } })}">${relHTML(o.id, true)}<span class="prix" style="margin-left:auto">${o.prix}</span></button>`).join('') || '<p>Plus de reliques à vendre !</p>'}
+      <div class="section">Services</div>
+      <div class="choix">
+        <button class="btn v" ${soinFait ? 'disabled' : ''} data-f="${on(() => { if (!soinFait && acheter(soinPrix)) { soinFait = true; soigner(20); dessiner(); } })}">${ico('coeur')} Potion : +20 PV (${soinPrix} or)</button>
+        <button class="btn v" ${retraitFait ? 'disabled' : ''} data-f="${on(async () => { if (retraitFait) return; if (S.or < retraitPrix) { acheter(retraitPrix); return; } const c = await choisirDansPaquet('Retirer une carte', () => S.deck.length > 5, (c, i) => { S.deck.splice(i, 1); }); if (c) { S.or -= retraitPrix; son('achat'); retraitFait = true; dessiner(); } })}">${ico('plus')} Retirer une carte (${retraitPrix} or)</button>
+        <button class="btn" data-f="${on(() => { son('clic'); fin(); })}">Quitter la boutique</button>
+      </div></div>`, true);
+  };
+  dessiner();
+}
+function tirerCartes(n, bonus) {
+  const niv = Math.min(S.niv, 12), res = [];
+  const pool = Object.values(CARTES).filter((dc) => !dc.special && dc.niv >= 1 && dc.niv <= niv);
+  const leg = niv >= 5 ? (bonus ? 0.15 : 0.05) : 0, rare = bonus ? 0.5 : 0.3;
+  while (res.length < n) {
+    const r = Math.random(), rar = r < leg ? 3 : r < leg + rare ? 2 : 1;
+    let cand = pool.filter((dc) => dc.rare === rar && !res.includes(dc.id));
+    if (!cand.length) cand = pool.filter((dc) => !res.includes(dc.id));
+    res.push(cand[rnd(cand.length)].id);
+  }
+  return res.map((id) => ({ id, plus: 0 }));
+}
+function tirerReliques(n, gardien) {
+  let dispo = Object.keys(RELIQUES).filter((id) => !S.rel.includes(id) && !!RELIQUES[id].gardien === gardien);
+  if (dispo.length < n) dispo = dispo.concat(Object.keys(RELIQUES).filter((id) => !S.rel.includes(id) && !dispo.includes(id)));
+  return melange(dispo).slice(0, n);
+}
+// Énigmes du hibou : [question, bonne réponse, autres réponses]
+const ENIGMES = [
+  ['Qu’est-ce qui a des dents mais ne mange jamais ?', 'Un peigne', ['Un loup', 'Une souris']],
+  ['Plus on m’enlève de terre, plus je deviens grand. Qui suis-je ?', 'Un trou', ['Un arbre', 'Un gâteau']],
+  ['J’ai des aiguilles mais je ne pique pas. Qui suis-je ?', 'Une horloge', ['Un cactus', 'Un hérisson']],
+  ['Je réponds sans avoir de bouche quand tu cries dans la montagne.', 'L’écho', ['Le vent', 'Un oiseau']],
+  ['Je tombe en hiver sans jamais me faire mal. Qui suis-je ?', 'La neige', ['Une pomme', 'Un vase']],
+  ['Qu’est-ce qui monte et ne redescend jamais ?', 'L’âge', ['Un ballon', 'Un ascenseur']],
+  ['J’ai un lit mais je ne dors jamais. Qui suis-je ?', 'Une rivière', ['Un chat', 'Un hibou']],
+];
+const EVENEMENTS = [
+  { id: 'fontaine', ic: 'goutte', titre: 'La fontaine enchantée', txt: 'Une fontaine murmure des chansons. Son eau brille comme des étoiles.', choix: [
+    { t: 'Boire : soigne 15 PV', f: () => { son('soin'); soigner(15); return 'L’eau fraîche te redonne des forces !'; } },
+    { t: 'Jeter une pièce (10 or) : améliore une carte au hasard', si: () => S.or >= 10, f: () => { S.or -= 10; const c = ameliorerHasard(1)[0]; return c ? `Ta carte « ${nomDe(c)} » brille : elle est améliorée !` : 'Toutes tes cartes sont déjà améliorées !'; } }] },
+  { id: 'lutin', ic: 'piece', titre: 'Le lutin joueur', txt: '« Pile ou face ? Si tu gagnes, je te donne 40 pièces ! » dit un lutin malicieux.', choix: [
+    { t: 'Jouer (mise : 20 or)', si: () => S.or >= 20, f: () => { if (Math.random() < 0.5) { S.or += 40; son('achat'); return 'Gagné ! Le lutin te donne 40 pièces en riant.'; } S.or -= 20; son('erreur'); return 'Perdu… Le lutin garde tes 20 pièces, mais te fait un clin d’œil.'; } },
+    { t: 'Non merci', f: () => 'Le lutin hausse les épaules et disparaît dans un buisson.' }] },
+  { id: 'biblio', ic: 'livre', titre: 'La bibliothèque oubliée', txt: 'Des livres anciens flottent dans l’air et tournent leurs pages tout seuls.', choix: [
+    { t: 'Prendre un livre : une carte rare au choix', f: () => choixCarteRare() },
+    { t: 'Lire tranquillement : +5 PV max', f: () => { S.pvMax += 5; S.pv += 5; son('soin'); return 'Tu te sens plus fort : +5 PV max !'; } }] },
+  { id: 'arbre', ic: 'feuille', titre: 'L’arbre aux fruits d’or', txt: 'Un vieil arbre souriant porte des fruits dorés.', choix: [
+    { t: 'Manger un fruit : soigne 12 PV', f: () => { son('soin'); soigner(12); return 'Miam ! Le fruit est délicieux.'; } },
+    { t: 'Grimper au sommet : +7 PV max, mais perds 5 PV', f: () => { S.pvMax += 7; S.pv = Math.max(1, S.pv - 5); son('soin'); return 'Tu t’égratignes un peu, mais le fruit du sommet te rend plus fort !'; } }] },
+  { id: 'statue', ic: 'sceau', titre: 'La statue du sage', txt: 'Une statue tend la main : « Donne-moi une carte, je t’allégerai. »', choix: [
+    { t: 'Offrir une carte (elle quitte ton paquet)', si: () => S.deck.length > 5, f: async () => { const c = await choisirDansPaquet('Offrir une carte', () => true, (c, i) => S.deck.splice(i, 1)); return c ? `La statue sourit et emporte « ${nomDe(c)} ».` : 'Tu gardes tes cartes.'; } },
+    { t: 'La saluer et repartir : +15 or', f: () => { S.or += 15; son('piece'); return 'Une pièce roule de sa main… puis une autre ! +15 or.'; } }] },
+  { id: 'champi', ic: 'etoile', titre: 'Le champignon géant', txt: 'Un champignon énorme, bien rebondissant… Il y a des pièces au sommet !', choix: [
+    { t: 'Sauter dessus : +30 or, perds 5 PV', f: () => { S.or += 30; S.pv = Math.max(1, S.pv - 5); son('piece'); return 'Boing ! Tu attrapes les pièces mais tu atterris sur les fesses.'; } },
+    { t: 'Le contourner', f: () => 'Tu passes ton chemin en sifflotant.' }] },
+  { id: 'hibou', ic: 'oeil', titre: 'Le hibou savant', txt: '', enigme: true },
+  { id: 'forge', ic: 'feu', titre: 'La forge de l’elfe', txt: 'Une elfe forgeronne t’offre son aide pour renforcer ton grimoire.', choix: [
+    { t: 'Améliorer 2 cartes au hasard', f: () => { const l = ameliorerHasard(2); son('sort'); return l.length ? 'Améliorées : ' + l.map(nomDe).join(', ') + ' !' : 'Toutes tes cartes sont déjà améliorées !'; } },
+    { t: 'Améliorer 1 carte au choix', f: async () => { const c = await choisirDansPaquet('Améliorer une carte', (c) => !c.plus, (c) => { c.plus = 1; }); return c ? `« ${nomDe(c)} » est améliorée !` : 'Tu remercies l’elfe et repars.'; } }] },
+  { id: 'puits', ic: 'gemme', titre: 'Le puits à souhaits', txt: 'Un puits scintillant attend ton vœu.', choix: [
+    { t: 'Faire un vœu (30 or) : une relique', si: () => S.or >= 30, f: () => { S.or -= 30; const r = tirerReliques(1, false)[0]; if (r) prendreRelique(r); son('achat'); return r ? `Ton vœu est exaucé : ${RELIQUES[r].nom} ! ${RELIQUES[r].txt}` : 'Tu as déjà tout ce qu’il te faut.'; } },
+    { t: 'Partir', f: () => 'Tu garderas ton vœu pour plus tard.' }] },
+  { id: 'chaton', ic: 'coeur', titre: 'Le chaton perdu', txt: 'Un chaton miaule, perdu dans les fougères.', choix: [
+    { t: 'Le ramener chez lui', f: () => { if (!S.rel.includes('grelot')) { prendreRelique('grelot'); son('achat'); return 'Sa famille te remercie et t’offre un Grelot magique ! ' + RELIQUES.grelot.txt; } S.or += 25; son('piece'); return 'Sa famille te remercie : +25 or.'; } },
+    { t: 'Lui faire un câlin : soigne 8 PV', f: () => { soigner(8); son('soin'); return 'Ronron… Tu te sens tout doux : +8 PV.'; } }] },
+  { id: 'marchand', ic: 'sac', titre: 'Le marchand de potions', txt: 'Un marchand ambulant te salue en soulevant son chapeau.', choix: [
+    { t: 'Acheter une grande potion (25 or) : +22 PV', si: () => S.or >= 25, f: () => { S.or -= 25; soigner(22); son('soin'); return 'Glou glou… Tu te sens en pleine forme !'; } },
+    { t: 'Lui vendre une Étincelle : +20 or', si: () => S.deck.some((c) => c.id === 'etincelle'), f: () => { S.deck.splice(S.deck.findIndex((c) => c.id === 'etincelle'), 1); S.or += 20; son('piece'); return 'Marché conclu ! Ton paquet est plus léger.'; } }] },
+];
+function ameliorerHasard(n) {
+  const l = melange(S.deck.filter((c) => !c.plus && defC(c).type !== 'M')).slice(0, n);
+  l.forEach((c) => { c.plus = 1; });
+  return l;
+}
+function choixCarteRare() {
+  return new Promise((res) => {
+    const pool = melange(Object.values(CARTES).filter((dc) => !dc.special && dc.rare >= 2 && dc.niv <= Math.max(3, S.niv))).slice(0, 3).map((dc) => ({ id: dc.id, plus: 0 }));
+    ouvrirCouche(`<h2>Choisis un livre</h2><div class="grille">${pool.map((c) => `<button class="item" data-f="${on(() => { fermerCouche(); S.deck.push(c); son('sort'); res(`« ${nomDe(c)} » rejoint ton grimoire !`); })}">${carteHTML(c, true)}</button>`).join('')}</div>`);
+  });
+}
+function evenement(fin) {
+  majBarre(true);
+  let liste = EVENEMENTS.filter((e) => !S.evVus.includes(e.id));
+  if (!liste.length) { S.evVus = []; liste = EVENEMENTS; }
+  const ev = liste[rnd(liste.length)];
+  S.evVus.push(ev.id);
+  let choix = ev.choix, txt = ev.txt;
+  if (ev.enigme) {
+    const [q, bonne, autres] = ENIGMES[rnd(ENIGMES.length)];
+    txt = `« Hou hou ! Réponds à mon énigme : ${q} »`;
+    choix = melange([bonne, ...autres]).map((r) => ({ t: r, f: () => {
+      if (r === bonne) { const rel = tirerReliques(1, false)[0]; if (rel) prendreRelique(rel); son('victoire'); confettis(40); return `Bravo ! Le hibou t’offre : ${rel ? RELIQUES[rel].nom + '. ' + RELIQUES[rel].txt : '40 or'}`; }
+      S.or += 15; son('piece'); return `Le hibou rit gentiment : c’était « ${bonne} ». Il te donne quand même 15 pièces.`;
+    } }));
+  }
+  const fini = (msg) => {
+    majBarre(true);
+    ecran(`<div class="panneau"><div class="grosIco">${ico(ev.ic)}</div><h2>${ev.titre}</h2><p>${msg}</p>
+      <button class="btn" data-f="${on(() => { son('clic'); fin(); })}">Continuer</button></div>`);
+  };
+  ecran(`<div class="panneau"><div class="grosIco">${ico(ev.ic)}</div><h2>${ev.titre}</h2><p>${txt}</p>
+    <div class="choix">${choix.map((c) => `<button class="btn ${c.si && !c.si() ? 'g' : 'v'}" ${c.si && !c.si() ? 'disabled' : ''} data-f="${on(async () => { son('clic'); const m = await c.f(); fini(m); })}">${c.t}</button>`).join('')}</div></div>`);
+}
+
+/* =====================================================================
+   COMBAT
+   ===================================================================== */
+function lancerNiveau() { son('clic'); lancerCombat(NIVEAUX[S.niv - 1].en, 'niveau'); }
+function creerEnnemi(id, decal = 0) {
+  const dn = ENNEMIS[id];
+  const e = { uid: UID++, id, nom: dn.nom, pvMax: dn.pv, pv: dn.pv, bouc: (dn.debut && dn.debut.bouc) || 0,
+    st: { force: 0, faible: 0, fragile: 0, brulure: 0, gel: 0, epines: 0, regen: 0 },
+    motif: dn.phases ? dn.phases[0] : dn.motif, idx: decal, phase: 0, enrage: false, delivre: false, boss: !!dn.boss, dernier: -1 };
+  if (dn.debut) for (const k in dn.debut) if (k !== 'bouc') e.st[k] = dn.debut[k];
+  choisirIntention(e);
+  return e;
+}
+function choisirIntention(e) {
+  const dn = ENNEMIS[e.id];
+  if (dn.hasard) { let k; do { k = rnd(e.motif.length); } while (k === e.dernier && e.motif.length > 1); e.dernier = k; e.intention = e.motif[k]; return; }
+  e.intention = e.motif[e.idx % e.motif.length]; e.idx++;
+}
+function lancerCombat(liste, type) {
+  snap = clone(S);
+  S.etape = type === 'elite' ? 'elite' : 'combat';
+  const deck = melange(S.deck.map((c) => ({ ...c, uid: UID++ })));
+  C = { type, niv: S.niv, ennemis: liste.map((id, i) => creerEnnemi(id, i)), cible: null, sel: -1, occupe: false,
+    j: { pv: S.pv, bouc: 0, st: { force: 0, faible: 0, fragile: 0, brulure: 0, gel: 0, epines: 0, regen: 0, garde: 0 } },
+    pioche: deck, main: [], defausse: [], epuisees: [], energie: 0, energieMax: 3, tour: 0, jouees: 0, pouv: {},
+    premiereAttaque: true, pvDebut: S.pv, fini: false, vuPouvoir: false };
+  // Reliques de début de combat
+  if (aRel('cristalForce')) C.j.st.force += 1;
+  if (aRel('anneauEpines')) C.j.st.epines += 3;
+  if (aRel('grelot')) C.ennemis.forEach((e) => { e.st.fragile += 1; });
+  ecran(`<div id="combat">
+    <div id="zEn"><div id="ennemis"></div></div>
+    <div id="info"></div>
+    <div id="zJ">
+      <div class="joueur" id="joueur">${MAGE}<div class="col"><div class="pvbar"><i></i><span></span><b></b></div><div class="sts" id="jst"></div></div></div>
+      <div id="orbe" aria-label="Énergie">3/3</div>
+      <div class="tas" data-f="${on(() => info(`Pioche : ${C.pioche.length} cartes. Défausse : ${C.defausse.length}. Quand la pioche est vide, la défausse est mélangée.`))}">${ico('livre')}<span id="nbPioche">0</span></div>
+      <button class="btn" id="btnFin" data-f="${on(finTour)}">Fin du<br>tour</button>
+    </div>
+    <div id="zMain"><div id="main"></div></div>
+  </div>`);
+  majBarre(true);
+  construireEnnemis();
+  debutTourJoueur().then(async () => {
+    if (type === 'niveau') {
+      const nv = NIVEAUX[S.niv - 1];
+      grandTexte(nv.sceau ? `Sceau ${nv.sceau} !` : `Niveau ${S.niv}`);
+      await pause(900);
+      await astuce('intro-' + nv.intro, INTROS[nv.intro] && INTROS[nv.intro]());
+    } else { grandTexte('Élite !'); }
+  });
+}
+const vivants = () => C.ennemis.filter((e) => !e.delivre);
+function cibleCourante() {
+  let e = C.ennemis.find((x) => x.uid === C.cible && !x.delivre);
+  if (!e) { e = vivants()[0]; if (e) C.cible = e.uid; }
+  return e;
+}
+const elEn = (e) => document.getElementById('en-' + e.uid);
+
+function construireEnnemis() {
+  const zone = $('#ennemis'); if (!zone) return;
+  const n = C.ennemis.length, haut = ($('#zEn').clientHeight || 400) - 100;
+  zone.innerHTML = C.ennemis.map((e) => {
+    const taille = Math.max(70, Math.min(haut, e.boss && n === 1 ? 210 : n === 1 ? 180 : n === 2 ? 150 : n === 3 ? 105 : 80));
+    return `<div class="en ${e.delivre ? 'parti' : ''}" id="en-${e.uid}" data-f="${on(() => toucherEnnemi(e))}" style="max-width:${taille + 20}px">
+      <div class="intent"></div><div class="art" style="width:100%;max-width:${taille}px">${creature(ENNEMIS[e.id].art, e.delivre)}</div>
+      <div class="nom">${e.nom}</div><div class="pvbar"><i></i><span></span><b></b></div><div class="sts"></div></div>`;
+  }).join('');
+  majTout();
+}
+function stsHTML(stt) {
+  return Object.keys(stt).filter((k) => stt[k] > 0).map((k) => `<span class="st" style="color:${COLST[k]}">${ico(ICST[k])}${k === 'garde' ? '' : stt[k]}</span>`).join('');
+}
+function degatsEnnemi(e, base) {
+  let n = base + e.st.force;
+  if (e.st.faible > 0) n = Math.floor(n * 0.75);
+  if (C.j.st.fragile > 0) n = Math.floor(n * 1.5);
+  return Math.max(0, n);
+}
+function intentHTML(e) {
+  const it = e.intention; if (!it) return '';
+  const p = [];
+  if (it.charge) p.push(`<span class="ic">${ico('eclair')}!!</span>`);
+  if (it.a) p.push(`<span class="ia">${ico('epee')}${degatsEnnemi(e, it.a)}${it.x > 1 ? '×' + it.x : ''}</span>`);
+  if (it.b) p.push(`<span class="ib">${ico('bouclier')}${it.b}</span>`);
+  if (it.f) p.push(`<span class="ic">${ico('haut')}${it.f}</span>`);
+  if (it.brul) p.push(`<span class="ix" style="color:#ff9a4a">${ico('flamme')}${it.brul}</span>`);
+  if (it.faible) p.push(`<span class="ix">${ico('spirale')}</span>`);
+  if (it.fragile) p.push(`<span class="ix" style="color:#ff7a9a">${ico('fissure')}</span>`);
+  if (it.gel) p.push(`<span class="ix" style="color:#9fe3ff">${ico('flocon')}</span>`);
+  if (it.encre) p.push(`<span class="ix" style="color:#bbb">${ico('goutte')}${it.encre}</span>`);
+  if (it.inv) p.push(`<span class="ix" style="color:#ffd76a">${ico('plus')}</span>`);
+  return p.join('');
+}
+function texteIntention(e) {
+  const it = e.intention; if (!it) return '';
+  const p = [];
+  if (it.charge) p.push('se concentre pour un énorme coup');
+  if (it.a) p.push(`attaque : ${degatsEnnemi(e, it.a)} dégâts${it.x > 1 ? ' × ' + it.x : ''}`);
+  if (it.b) p.push(`se protège (+${it.b})`);
+  if (it.f) p.push(`devient plus fort (+${it.f})`);
+  if (it.brul) p.push(`Brûlure ${it.brul}`);
+  if (it.faible) p.push(`Faible ${it.faible}`);
+  if (it.fragile) p.push(`Fragile ${it.fragile}`);
+  if (it.gel) p.push('te givre');
+  if (it.encre) p.push(`jette ${it.encre} tache(s) d’encre`);
+  if (it.inv) p.push('appelle de l’aide');
+  return p.join(', ');
+}
+function majTout() {
+  if (!C || !$('#combat')) return;
+  const cible = cibleCourante();
+  for (const e of C.ennemis) {
+    const el = elEn(e); if (!el) continue;
+    el.classList.toggle('cible', !e.delivre && e === cible && vivants().length > 1);
+    el.querySelector('.intent').innerHTML = e.delivre ? '' : intentHTML(e);
+    el.querySelector('.pvbar i').style.width = Math.max(0, e.pv / e.pvMax * 100) + '%';
+    el.querySelector('.pvbar span').textContent = `${Math.max(0, e.pv)}/${e.pvMax}`;
+    el.querySelector('.pvbar b').textContent = e.bouc > 0 ? e.bouc : '';
+    el.querySelector('.sts').innerHTML = stsHTML(e.st);
+  }
+  const j = $('#joueur');
+  j.querySelector('.pvbar i').style.width = Math.max(0, C.j.pv / S.pvMax * 100) + '%';
+  j.querySelector('.pvbar span').textContent = `${Math.max(0, C.j.pv)}/${S.pvMax}`;
+  j.querySelector('.pvbar b').textContent = C.j.bouc > 0 ? C.j.bouc : '';
+  $('#jst').innerHTML = stsHTML(C.j.st);
+  const o = $('#orbe'); o.textContent = `${C.energie}/${C.energieMax}`; o.classList.toggle('vide', C.energie === 0);
+  $('#nbPioche').textContent = C.pioche.length;
+  majBarre(true);
+  dessinerMain();
+  if (C.sel < 0 && !C.occupe) info();
+}
+function info(t) {
+  const el = $('#info'); if (!el) return;
+  if (t) { el.innerHTML = `<span>${t}</span>`; return; }
+  const jouable = C.main.some((c) => defC(c).type !== 'M' && coutDe(c) <= C.energie);
+  el.innerHTML = jouable ? `<span>Énergie <b>${C.energie}</b> : choisis une carte !</span>` : '<span>Plus rien à jouer : touche <b>Fin du tour</b>.</span>';
+  // Le bouton « Fin du tour » pulse quand il n'y a plus rien à jouer
+  const bf = $('#btnFin'); if (bf) bf.style.animation = jouable || C.occupe ? '' : 'pulse 1.2s ease-in-out infinite';
+}
+function dessinerMain() {
+  const zone = $('#main'); if (!zone) return;
+  const w = (zone.clientWidth || 360) - 10, n = C.main.length, cw = 82;
+  const pas = n > 1 ? Math.min(cw + 4, (w - cw) / (n - 1)) : 0;
+  const total = pas * (n - 1) + cw, x0 = (w - total) / 2;
+  zone.innerHTML = C.main.map((c, i) => {
+    const trop = defC(c).type === 'M' || coutDe(c) > C.energie;
+    return carteHTML(c, false, (trop ? 'trop ' : '') + (i === C.sel ? 'sel' : '')).replace('<div class="carte', `<div data-f="${on(() => toucherCarte(i))}" role="button" aria-label="${nomDe(c)}" class="carte`);
+  }).join('');
+  zone.querySelectorAll('.carte').forEach((el, i) => {
+    const rot = n > 1 ? (i - (n - 1) / 2) * 3 : 0;
+    el.style.left = (5 + x0 + i * pas) + 'px';
+    el.style.top = '10px';
+    el.style.zIndex = i === C.sel ? 50 : i + 1;
+    el.style.transform = i === C.sel ? 'translateY(-14px) scale(1.08)' : `rotate(${rot}deg) translateY(${Math.abs(rot) * 0.8}px)`;
+  });
+}
+// Une carte vise-t-elle un seul ennemi ?
+function viseUn(c) {
+  return opsDe(c).some((o) => (o.k === 'deg' && !o.tous && !o.hasard) || (o.k === 'st' && !o.tous) || ['degBouc', 'echo', 'siFragile', 'doubleBrul', 'degBrul', 'siDelivre'].includes(o.k));
+}
+function toucherCarte(i) {
+  if (!C || C.occupe || C.fini || tutoActif) return;
+  const c = C.main[i]; if (!c) return;
+  if (C.sel === i) { jouerCarte(i, null); return; }
+  C.sel = i; son('choix');
+  dessinerMain();
+  const dc = defC(c);
+  let aide = '';
+  if (dc.type === 'M') aide = '';
+  else if (coutDe(c) > C.energie) aide = ' <i>(pas assez d’énergie)</i>';
+  else aide = viseUn(c) && vivants().length > 1 ? ' — touche l’ennemi visé' : ' — touche encore pour lancer';
+  info(`<span><b>${nomDe(c)}</b> (${dc.type === 'M' ? '–' : coutDe(c)}) : ${texteCarte(c)}${aide}</span>`);
+}
+function toucherEnnemi(e) {
+  if (!C || C.occupe || C.fini || e.delivre || tutoActif) return;
+  C.cible = e.uid;
+  if (C.sel >= 0) { jouerCarte(C.sel, e); return; }
+  son('choix'); majTout();
+  const sts = Object.keys(e.st).filter((k) => e.st[k] > 0).map((k) => `${NOMST[k]} ${e.st[k]}`).join(', ');
+  info(`<span><b>${e.nom}</b> ${texteIntention(e)}.${sts ? ' ' + sts + '.' : ''}${e.boss ? ' Insensible au gel.' : ''}</span>`);
+}
+// Clavier : 1-9 choisir/jouer, flèches pour changer de carte ou de cible, Entrée/Espace pour jouer, F pour finir le tour
+document.addEventListener('keydown', (ev) => {
+  if (!C || C.fini || !$('#combat') || !$('#couche').classList.contains('cache')) return;
+  if (tutoActif) return;
+  const k = ev.key;
+  if (/^[1-9]$/.test(k)) { toucherCarte(+k - 1); ev.preventDefault(); }
+  else if (k === 'ArrowRight' || k === 'ArrowLeft') { if (!C.main.length) return; const n = C.main.length; const i = C.sel < 0 ? 0 : (C.sel + (k === 'ArrowRight' ? 1 : n - 1)) % n; C.sel = -1; toucherCarte(i); ev.preventDefault(); }
+  else if (k === 'ArrowUp' || k === 'ArrowDown') { const v = vivants(); if (v.length) { const i = (v.indexOf(cibleCourante()) + 1) % v.length; C.cible = v[i].uid; son('choix'); majTout(); } ev.preventDefault(); }
+  else if (k === 'Enter' || k === ' ') { if (C.sel >= 0) jouerCarte(C.sel, null); ev.preventDefault(); }
+  else if (k === 'f' || k === 'F') finTour();
+});
+
+// ---------- Jouer une carte ----------
+async function jouerCarte(i, cibleE) {
+  if (C.occupe || C.fini) return;
+  const c = C.main[i]; if (!c) return;
+  const dc = defC(c);
+  if (dc.type === 'M') { son('erreur'); info('Une <b>tache d’encre</b> : elle ne se joue pas. Elle partira à la fin du combat.'); return; }
+  const cout = coutDe(c);
+  if (cout > C.energie) { son('erreur'); secouer($('#orbe')); info('Pas assez d’énergie ! Touche <b>Fin du tour</b> pour en retrouver.'); C.sel = -1; dessinerMain(); return; }
+  const cible = cibleE && !cibleE.delivre ? cibleE : cibleCourante();
+  if (cible) C.cible = cible.uid;
+  C.occupe = true; C.sel = -1;
+  C.energie -= cout;
+  // Petite carte qui vole vers sa cible
+  const elC = $$('#main .carte')[i];
+  if (elC) {
+    const r = elC.getBoundingClientRect(), g = elC.cloneNode(true);
+    g.classList.add('fantome'); g.removeAttribute('data-f');
+    Object.assign(g.style, { left: r.left + 'px', top: r.top + 'px', transform: 'none' });
+    document.body.appendChild(g);
+    const dest = dc.type === 'A' || viseUn(c) ? (cible ? elEn(cible) : null) : $('#joueur');
+    const rd = dest ? dest.getBoundingClientRect() : r;
+    requestAnimationFrame(() => Object.assign(g.style, { left: (rd.left + rd.width / 2 - 41) + 'px', top: (rd.top + rd.height / 2 - 58) + 'px', transform: 'scale(.4)', opacity: '0.2' }));
+    setTimeout(() => g.remove(), 320);
+  }
+  C.main.splice(i, 1);
+  dessinerMain();
+  await pause(230);
+  son(dc.type === 'A' ? 'attaque' : dc.type === 'D' ? 'bouclier' : dc.type === 'P' ? 'pouvoir' : 'sort');
+  const bonus = dc.type === 'A' && C.premiereAttaque && aRel('etoileArgent') ? 8 : 0;
+  for (const o of opsDe(c)) { await appliquerOp(o, cible, bonus); if (C.fini) break; }
+  if (dc.type === 'A') C.premiereAttaque = false;
+  // Pouvoirs déclenchés
+  if (dc.type === 'A' && C.pouv.atkEcho) { for (const e of vivants()) frapperEnnemi(e, C.pouv.atkEcho, true); }
+  if (dc.type === 'S' && C.pouv.sortBouc) gagnerBouclier(C.pouv.sortBouc);
+  C.jouees++;
+  if (dc.type === 'P') { /* le pouvoir reste actif, la carte quitte le combat */ }
+  else if (epDe(c)) { C.epuisees.push(c); flotter($('#orbe'), 'Épuisée', 't'); }
+  else C.defausse.push(c);
+  C.occupe = false;
+  majTout();
+  if (verifierVictoire()) return;
+  // Les épines de l'ennemi peuvent épuiser le joueur pendant son propre tour
+  if (C.j.pv <= 0) {
+    if (aRel('plumePhenix') && !S.phenix) { S.phenix = true; C.j.pv = Math.ceil(S.pvMax / 2); grandTexte('Plume de phénix !'); son('soin'); majTout(); }
+    else await defaite();
+  }
+}
+function gagnerBouclier(n) { C.j.bouc += n; flotter($('#joueur'), '+' + n, 'b'); }
+async function appliquerOp(o, cible, bonus) {
+  const v = vivants();
+  switch (o.k) {
+    case 'deg':
+      for (let k = 0; k < o.x; k++) {
+        const cibles = o.tous ? vivants() : o.hasard ? [vivants()[rnd(vivants().length)]] : [cible];
+        for (const e of cibles) if (e) frapperEnnemi(e, o.n + bonus);
+        majTout();
+        if (o.x > 1) { await pause(160); son('attaque'); }
+        if (!vivants().length) break;
+      }
+      break;
+    case 'bouc': gagnerBouclier(o.n); break;
+    case 'pioche': piocher(o.n); break;
+    case 'energie': C.energie += o.n; flotter($('#orbe'), '+' + o.n, 't'); break;
+    case 'st': for (const e of (o.tous ? v : [cible])) if (e) donnerStatut(e, o.s, o.n); break;
+    case 'soi': C.j.st[o.s] += o.n; flotter($('#joueur'), NOMST[o.s], 't'); break;
+    case 'soin': { const avant = C.j.pv; C.j.pv = Math.min(S.pvMax, C.j.pv + o.n); flotter($('#joueur'), '+' + (C.j.pv - avant), 's'); son('soin'); break; }
+    case 'degBouc': if (cible) frapperEnnemi(cible, C.j.bouc + bonus); break;
+    case 'echo': if (cible) frapperEnnemi(cible, o.n + o.par * C.jouees + bonus); break;
+    case 'siFragile': if (cible && cible.st.fragile > 0) { C.energie += o.en; flotter($('#orbe'), '+' + o.en, 't'); } break;
+    case 'siDelivre': if (cible && cible.delivre) { C.energie += o.en; piocher(o.pi); flotter($('#orbe'), '+' + o.en, 't'); } break;
+    case 'doubleBrul': if (cible) { cible.st.brulure *= 2; flotter(elEn(cible), 'Brûlure ×2', 't'); son('brulure'); } break;
+    case 'degBrul': if (cible && !cible.delivre && cible.st.brulure > 0) frapperEnnemi(cible, cible.st.brulure, true); break;
+    case 'doubleBouc': gagnerBouclier(C.j.bouc); break;
+    case 'lutins': for (let k = 0; k < o.n; k++) if (C.main.length < 10) C.main.push({ id: 'lutin', plus: 0, uid: UID++ }); break;
+    case 'recycle': { const n = C.main.length; C.defausse.push(...C.main); C.main = []; piocher(n); break; }
+    case 'purif': C.j.st.faible = 0; C.j.st.fragile = 0; C.j.st.brulure = 0; flotter($('#joueur'), 'Purifié !', 's'); break;
+    case 'pouv':
+      C.pouv[o.p] = (C.pouv[o.p] || 0) + o.n;
+      if (o.p === 'force') C.j.st.force += o.n;
+      if (o.p === 'epines') C.j.st.epines += o.n;
+      flotter($('#joueur'), 'Pouvoir !', 't'); grandTexte(TXTPOUV[o.p](o.n).split(':')[0]);
+      break;
+  }
+  majTout();
+}
+function donnerStatut(e, s, n) {
+  if (e.delivre) return;
+  if (s === 'gel' && e.boss) { flotter(elEn(e), 'Insensible', 't'); return; }
+  if (s === 'brulure' && aRel('bougie')) n += 1;
+  e.st[s] += n;
+  flotter(elEn(e), `${NOMST[s]} ${n}`, 't');
+  if (s === 'gel') son('gel'); else if (s === 'brulure') son('brulure');
+}
+// Le joueur frappe un ennemi (direct = sans force ni faiblesse)
+function frapperEnnemi(e, base, direct) {
+  if (e.delivre) return;
+  let n = direct ? base : base + C.j.st.force;
+  if (!direct && C.j.st.faible > 0) n = Math.floor(n * 0.75);
+  if (e.st.fragile > 0) n = Math.floor(n * 1.5);
+  const bloque = Math.min(e.bouc, n); e.bouc -= bloque; n -= bloque;
+  e.pv -= n;
+  const el = elEn(e);
+  flotter(el, n > 0 ? '-' + n : 'Bloqué', n > 0 ? 'd' : 'b');
+  secouer(el && el.querySelector('.art'));
+  if (!direct && e.st.epines > 0) { blesserJoueur(e.st.epines, null); flotter($('#joueur'), 'Épines !', 't'); }
+  if (e.pv <= 0) delivrer(e); else verifierPhase(e);
+}
+function delivrer(e) {
+  e.delivre = true; e.pv = 0; e.bouc = 0;
+  const el = elEn(e);
+  if (el) { el.querySelector('.art').innerHTML = creature(ENNEMIS[e.id].art, true); el.classList.add('libre'); flotter(el, 'Délivré !', 's'); setTimeout(() => { el.classList.remove('libre'); el.classList.add('parti'); }, 1400); }
+  son('delivre');
+}
+function verifierPhase(e) {
+  const dn = ENNEMIS[e.id];
+  if (dn.rage && !e.enrage && e.pv <= e.pvMax / 2) {
+    e.enrage = true; e.st.force += 3; e.motif = dn.motifRage; e.idx = 0; choisirIntention(e);
+    grandTexte('Colère !'); secouer($('#jeu'), 'ecranSecoue'); son('coup');
+  }
+  if (dn.phases) {
+    const r = e.pv / e.pvMax, ph = r > 0.66 ? 0 : r > 0.33 ? 1 : 2;
+    if (ph > e.phase) {
+      e.phase = ph; e.motif = dn.phases[ph]; e.idx = 0; choisirIntention(e);
+      e.st.faible = 0; e.st.fragile = 0;
+      grandTexte(`Phase ${ph + 1} !`); secouer($('#jeu'), 'ecranSecoue'); son('sceau');
+    }
+  }
+}
+// Le joueur reçoit des dégâts (source = ennemi qui attaque, pour les épines)
+function blesserJoueur(n, source) {
+  const bloque = Math.min(C.j.bouc, n); C.j.bouc -= bloque; n -= bloque;
+  C.j.pv -= n;
+  const jEl = $('#joueur');
+  flotter(jEl, n > 0 ? '-' + n : 'Bloqué', n > 0 ? 'd' : 'b');
+  if (n > 0) { son('coup'); secouer(jEl); secouer($('#combat'), 'flashRouge'); if (n >= 15) secouer($('#jeu'), 'ecranSecoue'); } else son('bouclier');
+  if (source && C.j.st.epines > 0 && !source.delivre) { source.pv -= C.j.st.epines; flotter(elEn(source), '-' + C.j.st.epines, 'd'); if (source.pv <= 0) delivrer(source); }
+}
+function piocher(n) {
+  for (let k = 0; k < n; k++) {
+    if (!C.pioche.length) { if (!C.defausse.length) break; C.pioche = melange(C.defausse); C.defausse = []; }
+    if (C.main.length >= 10) break;
+    C.main.push(C.pioche.pop());
+  }
+}
+async function debutTourJoueur() {
+  C.tour++;
+  if (C.j.st.garde > 0) C.j.st.garde = 0; else C.j.bouc = 0;
+  if (C.tour === 1 && aRel('coquillage')) C.j.bouc += 8;
+  if (C.j.st.brulure > 0) { const n = C.j.st.brulure; C.j.pv -= n; C.j.st.brulure--; flotter($('#joueur'), '-' + n, 'd'); son('brulure'); }
+  if (C.j.st.regen > 0) { C.j.pv = Math.min(S.pvMax, C.j.pv + C.j.st.regen); flotter($('#joueur'), '+' + C.j.st.regen, 's'); C.j.st.regen--; }
+  if (C.pouv.phenix) C.j.pv = Math.min(S.pvMax, C.j.pv + C.pouv.phenix);
+  if (C.pouv.boucTour) C.j.bouc += C.pouv.boucTour;
+  if (aRel('ailesFee')) C.j.bouc += 3;
+  if (C.pouv.auraFeu) for (const e of vivants()) donnerStatut(e, 'brulure', C.pouv.auraFeu);
+  let energie = 3 + (C.pouv.energie || 0) + (aRel('coeurCristal') ? 1 : 0) + (C.tour === 1 && aRel('lanterne') ? 1 : 0) + (aRel('sablier') && C.tour % 3 === 0 ? 1 : 0);
+  if (C.j.st.gel > 0) { energie -= C.j.st.gel; C.j.st.gel = 0; flotter($('#orbe'), 'Givré', 't'); }
+  C.energie = Math.max(0, energie); C.energieMax = C.energie;
+  piocher(5 + (C.pouv.pioche || 0) + (aRel('grimoireDore') ? 1 : 0) + (C.tour === 1 && aRel('sacoche') ? 2 : 0));
+  C.sel = -1;
+  majTout();
+  if (C.j.pv <= 0) { await defaite(); return; }
+  // Présentation de la première carte Pouvoir piochée
+  const iP = C.main.findIndex((c) => defC(c).type === 'P');
+  if (iP >= 0 && !REC.vus['pouvoir']) { await pause(600); await astuce('pouvoir', [{ el: () => carteEl(iP), txt: 'Carte Pouvoir (dorée) : une fois jouée, son effet dure tout le combat !' }]); }
+  const iE = C.main.findIndex((c) => epDe(c));
+  if (iE >= 0 && !REC.vus['epuisee'] && S.niv >= 2) { await pause(300); await astuce('epuisee', [{ el: () => carteEl(iE), txt: '« Épuisée » : cette carte ne sert qu’une fois par combat. Elle revient au combat suivant.' }]); }
+}
+async function finTour() {
+  if (!C || C.occupe || C.fini || tutoActif) return;
+  C.occupe = true; C.sel = -1; son('clic');
+  C.defausse.push(...C.main); C.main = [];
+  if (C.j.st.faible > 0) C.j.st.faible--;
+  if (C.j.st.fragile > 0) C.j.st.fragile--;
+  majTout(); info('Au tour des créatures…');
+  await pause(450);
+  for (const e of [...C.ennemis]) {
+    if (e.delivre) continue;
+    const el = elEn(e);
+    e.bouc = 0;
+    if (e.st.brulure > 0) { e.pv -= e.st.brulure; flotter(el, '-' + e.st.brulure, 'd'); e.st.brulure--; son('brulure'); if (e.pv <= 0) { delivrer(e); majTout(); await pause(500); continue; } verifierPhase(e); }
+    if (e.st.regen > 0) { const avant = e.pv; e.pv = Math.min(e.pvMax, e.pv + e.st.regen); if (e.pv > avant) flotter(el, '+' + (e.pv - avant), 's'); }
+    majTout();
+    if (e.st.gel > 0) { e.st.gel--; flotter(el, 'Gelé !', 't'); son('gel'); await pause(500); }
+    else await agir(e);
+    if (e.st.faible > 0) e.st.faible--;
+    if (e.st.fragile > 0) e.st.fragile--;
+    majTout();
+    if (C.j.pv <= 0) break;
+  }
+  if (C.j.pv <= 0) {
+    if (aRel('plumePhenix') && !S.phenix) { S.phenix = true; C.j.pv = Math.ceil(S.pvMax / 2); grandTexte('Plume de phénix !'); son('soin'); await pause(900); }
+    else { C.occupe = false; await defaite(); return; }
+  }
+  if (verifierVictoire()) return;
+  for (const e of vivants()) choisirIntention(e);
+  C.occupe = false;
+  await debutTourJoueur();
+}
+async function agir(e) {
+  const it = e.intention, el = elEn(e);
+  if (!it) return;
+  secouer(el, 'attaque');
+  await pause(200);
+  if (it.charge) { flotter(el, 'Concentration…', 't'); son('gel'); }
+  if (it.b) { e.bouc += it.b; flotter(el, '+' + it.b, 'b'); son('bouclier'); }
+  if (it.f) { e.st.force += it.f; flotter(el, 'Force +' + it.f, 't'); }
+  if (it.a) {
+    for (let k = 0; k < (it.x || 1); k++) {
+      blesserJoueur(degatsEnnemi(e, it.a), e); majTout();
+      await pause(it.x > 1 ? 220 : 120);
+      if (C.j.pv <= 0 || e.delivre) break;
+    }
+  }
+  if (it.brul) { C.j.st.brulure += it.brul; flotter($('#joueur'), 'Brûlure ' + it.brul, 't'); son('brulure'); }
+  if (it.faible) C.j.st.faible += it.faible;
+  if (it.fragile) C.j.st.fragile += it.fragile;
+  if (it.gel) { C.j.st.gel += it.gel; flotter($('#orbe'), 'Givré', 't'); son('gel'); }
+  if (it.encre) { for (let k = 0; k < it.encre; k++) C.defausse.push({ id: 'encre', plus: 0, uid: UID++ }); flotter($('#joueur'), `+${it.encre} encre`, 't'); }
+  if (it.inv && vivants().length < 4) {
+    C.ennemis.push(creerEnnemi(it.inv)); son('sort'); construireEnnemis(); flotter(elEn(C.ennemis[C.ennemis.length - 1]), 'Bzzz !', 't');
+  }
+  majTout();
+  await pause(380);
+}
+function verifierVictoire() {
+  if (!C || C.fini || vivants().length) return false;
+  C.fini = true;
+  setTimeout(victoire, 1100);
+  return true;
+}
+
+/* =====================================================================
+   FIN DE COMBAT : victoire, bilan, récompenses, défaite
+   ===================================================================== */
+async function victoire() {
+  const type = C.type, niv = C.niv, nv = NIVEAUX[niv - 1];
+  S.pv = Math.max(1, C.j.pv);
+  const perdus = C.pvDebut - S.pv, tours = C.tour;
+  if (aRel('fiole')) soigner(5);
+  let or = type === 'elite' ? 30 + rnd(10) : 10 + niv * 2 + rnd(6) + (nv.sceau ? 25 : 0);
+  if (aRel('bourse')) or += 10;
+  S.or += or;
+  son('victoire'); confettis();
+  let etoiles = 0, gain;
+  if (type === 'niveau') {
+    etoiles = 1 + (tours <= nv.par ? 1 : 0) + (perdus <= S.pvMax * 0.2 ? 1 : 0);
+    etoiles = Math.max(1, etoiles - S.essais);
+    S.etoiles[niv] = Math.max(S.etoiles[niv] || 0, etoiles);
+    gain = 100 * etoiles + 5 * S.pv + (nv.sceau ? 300 : 0);
+    if (nv.sceau) { S.sceaux = Math.max(S.sceaux, nv.sceau); S.pvMax += 4; soigner(10); }
+  } else gain = 150 + 5 * S.pv;
+  S.score += gain;
+  const battu = majRecords();
+  C = null;
+  if (type === 'niveau' && nv.sceau) await animSceau(nv.sceau);
+  const recomp = () => recompenses(type, nv, or);
+  const titre = type === 'elite' ? 'Élite délivrée !' : nv.sceau ? `Sceau ${nv.sceau} brisé !` : `Niveau ${niv} réussi !`;
+  const conseils = type === 'niveau' ? `<p style="font-size:13.5px;opacity:.85">★ victoire · ★ en ${nv.par} tours ou moins (toi : ${tours}) · ★ moins de ${Math.round(S.pvMax * 0.2)} PV perdus (toi : ${Math.max(0, perdus)})${S.essais ? ' · −1 ★ par nouvel essai' : ''}</p>` : '';
+  ouvrirCouche(`<h2>${titre}</h2>
+    ${type === 'niveau' ? `<div class="etoiles">${[0, 1, 2].map(() => `<svg viewBox="0 0 24 24">${IC.etoile.replace('class="p"', 'fill="currentColor"')}</svg>`).join('')}</div>` : ''}
+    ${conseils}
+    <div class="grosScore" id="cpt">${S.score - gain}</div><p>+${gain} points · +${or} or${nv.sceau && type === 'niveau' ? ' · +4 PV max' : ''}</p>
+    ${battu ? '<span class="badge">Nouveau record !</span>' : `<p style="font-size:14px;opacity:.8">Record : ${REC.meilleur}</p>`}
+    <div class="ligneBtns">
+      ${type === 'niveau' ? `<button class="btn g" data-f="${on(() => { son('clic'); S = clone(snap); fermerCouche(); lancerCombat(NIVEAUX[S.niv - 1].en, 'niveau'); })}">Rejouer</button>` : ''}
+      <button class="btn" data-f="${on(() => { son('clic'); fermerCouche(); recomp(); })}">${niv === 12 && type === 'niveau' ? 'Bilan final' : type === 'elite' ? 'Continuer' : 'Niveau suivant'}</button>
+    </div>`);
+  majBarre(true);
+  // Étoiles une par une, score qui défile
+  const ets = $$('#couche .etoiles svg');
+  for (let k = 0; k < etoiles; k++) { await pause(380); if (ets[k]) { ets[k].classList.add('ok'); son('etoile'); } }
+  const cpt = $('#cpt'), de = S.score - gain, t0 = performance.now();
+  const roule = (t) => { if (!cpt.isConnected) return; const p = Math.min(1, (t - t0) / 900); cpt.textContent = Math.round(de + gain * p); if (p < 1) requestAnimationFrame(roule); };
+  requestAnimationFrame(roule);
+}
+function animSceau(n) {
+  return new Promise((res) => {
+    son('sceau'); secouer($('#jeu'), 'ecranSecoue');
+    const morceaux = [[-60, -50, -40], [60, -40, 50], [-50, 60, 30], [55, 60, -60]].map(([dx, dy, r], k) => {
+      const q = ['M100 100L100 20A80 80 0 0 0 20 100z', 'M100 100L180 100A80 80 0 0 0 100 20z', 'M100 100L20 100A80 80 0 0 0 100 180z', 'M100 100L100 180A80 80 0 0 0 180 100z'][k];
+      return `<path class="morceau eclat" style="--dx:${dx}px;--dy:${dy}px;--r:${r}deg" d="${q}" fill="#7a3ac0" stroke="#ffd76a" stroke-width="4"/>`;
+    }).join('');
+    const div = document.createElement('div');
+    div.className = 'sceauAnim';
+    div.innerHTML = `<svg viewBox="0 0 200 200">${morceaux}<g class="eclat" style="--dx:0px;--dy:-30px;--r:0deg"><text x="100" y="118" text-anchor="middle" font-size="56" font-weight="900" fill="#ffd76a">${n}</text></g>
+      <path class="fis" d="M100 22L90 70 112 96 86 130 104 178" stroke="#fff" stroke-width="4" fill="none"/></svg><h2>Sceau ${n} brisé !</h2><p>La magie revient dans la forêt. +4 PV max</p>`;
+    $('#jeu').appendChild(div);
+    setTimeout(() => confettis(70), 1300);
+    setTimeout(() => { div.remove(); res(); }, 2500);
+  });
+}
+function recompenses(type, nv, or) {
+  if (type === 'niveau' && S.niv === 12) { S.niv = 13; finPartie(true); return; }
+  const nbCartes = 3 + (aRel('trefle') ? 1 : 0);
+  const cartes = tirerCartes(nbCartes, type === 'elite' || nv.sceau ? 1 : 0);
+  let rels = [], relDon = null;
+  if (type === 'elite') { relDon = tirerReliques(1, false)[0] || null; if (relDon) prendreRelique(relDon); }
+  else if (nv.sceau) rels = tirerReliques(2, [2, 4, 6].includes(nv.sceau));
+  let relPrise = false, cartePrise = false;
+  const suite = () => {
+    son('clic');
+    if (type === 'niveau') { S.niv++; S.essais = 0; S.etape = 'choix'; } else S.etape = 'combat';
+    carte();
+  };
+  const dessiner = () => {
+    majBarre(true);
+    ecran(`<div class="panneau"><h2>Récompenses</h2><p class="prix">${ico('piece')} +${or} or</p>
+      ${relDon ? `<div class="section">Relique gagnée</div><div class="relChoix">${relHTML(relDon, true)}</div>` : ''}
+      ${rels.length ? `<div class="section">${relPrise ? 'Relique choisie' : 'Choisis une relique'}</div>${rels.map((id) => `<button class="relChoix ${relPrise && !S.rel.includes(id) ? 'vendu' : ''}" ${relPrise ? 'disabled' : ''} data-f="${on(() => { if (relPrise) return; relPrise = true; prendreRelique(id); son('achat'); dessiner(); })}">${relHTML(id, true)}</button>`).join('')}` : ''}
+      <div class="section">${cartePrise ? 'Carte ajoutée !' : 'Ajoute une carte à ton grimoire'}</div>
+      <div class="grille">${cartes.map((c) => `<button class="item ${cartePrise && !c.pris ? 'vendu' : ''}" ${cartePrise ? 'disabled' : ''} data-f="${on(() => { if (cartePrise) return; cartePrise = true; c.pris = true; S.deck.push({ id: c.id, plus: 0 }); son('sort'); dessiner(); })}">${carteHTML(c, true)}</button>`).join('')}</div>
+      <button class="btn ${cartePrise && (relPrise || !rels.length) ? '' : 'g'}" data-f="${on(() => { if (rels.length && !relPrise) { son('erreur'); grandTexte('Choisis une relique'); return; } suite(); })}">${cartePrise ? 'Continuer' : 'Passer et continuer'}</button>
+    </div>`, true);
+  };
+  dessiner();
+  astuce('recompense', [{ el: () => $('.grille .item') || $('.panneau'), txt: 'Choisis une carte : elle rejoint ton grimoire pour toujours. Tu peux aussi passer.' }]);
+}
+async function defaite() {
+  C.fini = true; C.occupe = true;
+  son('defaite');
+  await pause(700);
+  const niveau = C.type === 'niveau';
+  ouvrirCouche(`<h2>Tu es épuisé…</h2>
+    <div style="width:110px">${MAGE}</div>
+    <p>Les créatures sont encore ensorcelées. La fée de la forêt peut t’aider à réessayer ce combat${niveau ? ' (une étoile de moins)' : ''}.</p>
+    <p style="font-size:14px;opacity:.85">Score : ${S.score} · Record : ${REC.meilleur}</p>
+    <div class="ligneBtns">
+      <button class="btn" data-f="${on(() => { son('clic'); const essais = S.essais; S = clone(snap); if (niveau) S.essais = essais + 1; S.pv = Math.max(S.pv, Math.ceil(S.pvMax * 0.6)); fermerCouche(); lancerCombat(niveau ? NIVEAUX[S.niv - 1].en : ELITES[acteDe(S.niv)][rnd(2)], niveau ? 'niveau' : 'elite'); })}">Réessayer</button>
+      <button class="btn g" data-f="${on(() => { son('clic'); finPartie(false); })}">Abandonner</button>
+    </div>`);
+}
+function finPartie(gagne) {
+  fermerCouche();
+  const battu = majRecords();
+  const sc = S.score, et = totalEtoiles(), sx = S.sceaux;
+  REC.partie = null; sauver();
+  C = null; majBarre(false);
+  if (gagne) { son('victoire'); confettis(140); setTimeout(() => confettis(100), 900); }
+  const amis = ['gelee', 'golem', 'reine', 'dragonnet', 'chouette', 'titan', 'gardien'].map((id) => `<div style="width:44px;display:inline-block">${creature(ENNEMIS[id].art, true)}</div>`).join('');
+  ecran(`<div class="panneau" style="justify-content:center">
+    <h2 style="font-size:28px">${gagne ? 'Les sept sceaux sont brisés !' : 'Fin de l’aventure'}</h2>
+    <p>${gagne ? 'Toutes les créatures sont délivrées et la forêt chante de joie. Tu es un grand magicien !' : 'Tu reviendras plus fort : chaque partie t’apprend de nouveaux combos !'}</p>
+    <div>${amis}</div>
+    <div class="grosScore">${sc} points</div>
+    <p>${ico('etoile')} ${et} étoiles · ${ico('sceau')} ${sx}/7 sceaux</p>
+    ${battu ? '<span class="badge">Nouveau record !</span>' : `<p style="opacity:.8">Record : ${REC.meilleur} points</p>`}
+    <div class="ligneBtns">
+      <button class="btn" data-f="${on(() => { son('clic'); nouvellePartie(); carte(); })}">Rejouer</button>
+      <button class="btn g" data-f="${on(() => { son('clic'); accueil(); })}">Accueil</button>
+    </div></div>`);
+}
+
+// Redessiner la main si la taille change (rotation du téléphone)
+window.addEventListener('resize', () => { if (C && $('#main')) dessinerMain(); });
+
+charger();
+accueil();
+</script>
+</body>
+</html>
