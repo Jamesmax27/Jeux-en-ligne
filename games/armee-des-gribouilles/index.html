@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L'armée des Gribouilles</title>
+<style>
+  /* Mise en page plein écran, sans défilement de la page */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; color: #fff;
+    background: linear-gradient(#2b1f5c, #4b3a8f 60%, #6d4fa8); user-select: none; touch-action: manipulation; }
+  .ecran { position: absolute; inset: 0; display: none; flex-direction: column; }
+  .ecran.actif { display: flex; }
+  button { font: inherit; color: inherit; cursor: pointer; border: 0; border-radius: 14px; min-height: 44px; padding: 8px 14px; }
+  .gros { background: #ffc93c; color: #3a2a00; font-weight: 800; font-size: 1.4rem; padding: 14px 36px; box-shadow: 0 5px 0 #c9951a; }
+  .gros:active { transform: translateY(3px); box-shadow: 0 2px 0 #c9951a; }
+  .centre { align-items: center; justify-content: center; text-align: center; padding: 20px; gap: 14px; }
+  h1 { font-size: 2.4rem; margin: 0; line-height: 1.1; text-shadow: 0 3px 0 #1b1240; }
+  p { margin: 0; font-size: 1.05rem; line-height: 1.4; max-width: 340px; }
+  .vitrine { display: flex; gap: 4px; justify-content: center; }
+  .vitrine svg { width: 70px; height: 70px; }
+
+  /* Barre du haut */
+  #haut { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(0,0,0,.3); font-weight: 800; gap: 8px; }
+  #haut span { font-size: 1.1rem; }
+  #vitesse { background: #6b5bb8; min-width: 56px; }
+  #vitesse[hidden] { display: none; }
+
+  /* Terrain : ennemis en haut, héros en bas */
+  #champ { position: relative; flex: 1 1 auto; min-height: 150px; display: flex; flex-direction: column; justify-content: space-around; padding: 6px 4px;
+    background: radial-gradient(ellipse at 50% 100%, #5fae5a 0, #3f8c4a 40%, transparent 41%), rgba(0,0,0,.12); }
+  .rang { display: flex; justify-content: center; gap: 4px; align-items: flex-end; min-height: 72px; }
+  .unite { position: relative; width: 19%; max-width: 86px; text-align: center; }
+  .unite.boss { width: 30%; max-width: 130px; }
+  .unite svg { width: 100%; height: auto; display: block; }
+  .barre { height: 7px; background: rgba(0,0,0,.5); border-radius: 4px; overflow: hidden; margin: 0 6px; }
+  .barre i { display: block; height: 100%; width: 100%; background: #6ee06e; transition: width .15s; }
+  .ennemi .barre i { background: #ff7a8a; }
+  .ennemi { cursor: pointer; }
+  .cible::after { content: "🎯"; position: absolute; top: -8px; right: 0; font-size: 1.1rem; }
+  .zz { display: none; }
+  .dort { opacity: .6; filter: grayscale(.6); }
+  .dort .yeux { display: none; }
+  .dort .zz { display: block; }
+  .coup { animation: coup .25s; }
+  .attaque { animation: attaque .25s; }
+  @keyframes coup { 0% { transform: scale(1); } 40% { transform: scale(.85) rotate(-6deg); filter: brightness(1.8); } 100% { transform: scale(1); } }
+  @keyframes attaque { 0% { transform: translateY(0); } 40% { transform: translateY(-10px) scale(1.08); } 100% { transform: translateY(0); } }
+  .flottant { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); font-weight: 900; font-size: 1.1rem; pointer-events: none;
+    text-shadow: 0 2px 0 #000; animation: monte .8s forwards; z-index: 5; white-space: nowrap; }
+  @keyframes monte { to { transform: translate(-50%, -34px); opacity: 0; } }
+  #message { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-size: 1.8rem; font-weight: 900; text-shadow: 0 3px 0 #1b1240; pointer-events: none; }
+
+  /* Panneau de préparation */
+  #panneau { flex: 0 0 auto; max-height: 56%; overflow-y: auto; background: #2a2060; padding: 8px 10px 10px; border-top: 3px solid #a99cf0; }
+  #panneau.cache { display: none; }
+  #panneau h2 { font-size: 1rem; margin: 6px 0; color: #ffe07a; }
+  .carte { display: flex; align-items: center; gap: 8px; background: #3b2f80; border-radius: 12px; padding: 4px 8px; margin-bottom: 6px; }
+  .carte svg { width: 46px; height: 46px; flex: 0 0 auto; }
+  .carte .infos { flex: 1; font-size: .85rem; line-height: 1.25; }
+  .carte b { font-size: .95rem; }
+  .achat { background: #ffc93c; color: #3a2a00; font-weight: 800; min-width: 92px; }
+  .achat:disabled { background: #6d6590; color: #bbb; }
+  #combat { width: 100%; margin-top: 4px; font-size: 1.2rem; padding: 10px; }
+  .bilan { font-size: 1.1rem; font-weight: 800; color: #ffe07a; }
+</style>
+</head>
+<body>
+
+<!-- Écran d'accueil -->
+<div id="accueil" class="ecran actif centre">
+  <h1>L'armée<br>des Gribouilles</h1>
+  <div class="vitrine" id="vitrine"></div>
+  <p>Forme ton équipe de héros ! Ils endorment les Gloups tout seuls. Gagne des pièces pour recruter et améliorer ton armée.</p>
+  <button class="gros" id="jouer">Jouer</button>
+  <p id="record"></p>
+</div>
+
+<!-- Écran de jeu -->
+<div id="jeu" class="ecran">
+  <div id="haut">
+    <span id="vague">Vague 1/10</span>
+    <span id="pieces">🪙 0</span>
+    <button id="vitesse" hidden>×1</button>
+  </div>
+  <div id="champ">
+    <div class="rang" id="rangEnnemis"></div>
+    <div class="rang" id="rangHeros"></div>
+    <div id="message"></div>
+  </div>
+  <div id="panneau"></div>
+</div>
+
+<!-- Écran de fin -->
+<div id="fin" class="ecran centre">
+  <h1 id="finTitre"></h1>
+  <p id="finTexte"></p>
+  <button class="gros" id="rejouer">Rejouer</button>
+</div>
+
+<script>
+"use strict";
+/* ===== Données du jeu ===== */
+const VAGUES = 10;      // nombre de vagues pour gagner
+const MAX_EQUIPE = 5;   // taille maximale de l'équipe
+const NIV_MAX = 8;      // niveau maximal d'un héros
+
+// Les 4 sortes de héros (créations originales)
+const TYPES = {
+  chevalier: { nom: "Chevalier Bouclier", role: "Solide, protège l'équipe", pv: 60, atk: 6, cd: 1.0, prix: 30, couleur: "#e8864a" },
+  archere:   { nom: "Archère Plume",      role: "Tire de loin",             pv: 35, atk: 8, cd: 0.9, prix: 50, couleur: "#5cc46a" },
+  magicien:  { nom: "Magicien Étoile",    role: "Gros dégâts, un peu lent", pv: 30, atk: 15, cd: 1.7, prix: 90, couleur: "#9a6be0" },
+  soigneuse: { nom: "Soigneuse Câline",   role: "Soigne ses amis",          pv: 40, atk: 8, cd: 1.4, prix: 70, couleur: "#f08ab8" }
+};
+
+/* ===== Dessins SVG (pas d'image externe) ===== */
+function figure(type, couleur) {
+  const yeux = '<g class="yeux"><circle cx="40" cy="52" r="5" fill="#fff"/><circle cx="60" cy="52" r="5" fill="#fff"/><circle cx="41" cy="53" r="2.6" fill="#222"/><circle cx="61" cy="53" r="2.6" fill="#222"/></g>' +
+    '<g class="zz"><path d="M35 53h10M55 53h10" stroke="#222" stroke-width="3" stroke-linecap="round"/><text x="68" y="30" font-size="18" font-weight="900" fill="#fff">z</text></g>';
+  const bouche = '<path d="M42 64q8 7 16 0" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>';
+  let deco = "";
+  if (type === "chevalier") deco = '<path d="M22 48a28 28 0 0 1 56 0z" fill="#b9c2d0"/><rect x="47" y="8" width="6" height="14" rx="3" fill="#e04a4a"/><path d="M14 66l12-4v18q-12 0-12-14z" fill="#4a6fd0"/>';
+  else if (type === "archere") deco = '<path d="M22 50a28 28 0 0 1 56 0q-28-14-56 0z" fill="#2f7a3c"/><path d="M82 40q14 20 0 40" stroke="#8a5a2b" stroke-width="4" fill="none"/><path d="M82 40v40" stroke="#eee" stroke-width="1.5"/>';
+  else if (type === "magicien") deco = '<path d="M50 -2l26 40h-52z" fill="#5a3aa8"/><rect x="22" y="36" width="56" height="7" rx="3" fill="#3f2780"/><circle cx="50" cy="24" r="4" fill="#ffe07a"/>';
+  else if (type === "soigneuse") deco = '<path d="M26 40a24 18 0 0 1 48 0z" fill="#fff"/><path d="M50 12v14M43 19h14" stroke="#e8467c" stroke-width="5" stroke-linecap="round"/>';
+  return '<svg viewBox="0 0 100 100"><ellipse cx="50" cy="92" rx="28" ry="6" fill="rgba(0,0,0,.25)"/>' +
+    '<circle cx="50" cy="60" r="32" fill="' + couleur + '"/>' + deco + yeux + bouche + '</svg>';
+}
+function gloup(couleur, boss) {
+  const couronne = boss ? '<path d="M30 30l8-16 12 12 12-12 8 16z" fill="#ffd34d" stroke="#c9951a" stroke-width="2"/>' : "";
+  return '<svg viewBox="0 0 100 100"><ellipse cx="50" cy="92" rx="34" ry="6" fill="rgba(0,0,0,.25)"/>' +
+    '<path d="M16 88q-6-34 14-52q20-16 40 0q20 18 14 52z" fill="' + couleur + '"/>' + couronne +
+    '<g class="yeux"><circle cx="38" cy="58" r="8" fill="#fff"/><circle cx="62" cy="58" r="8" fill="#fff"/><circle cx="40" cy="60" r="4" fill="#222"/><circle cx="60" cy="60" r="4" fill="#222"/>' +
+    '<path d="M32 48l12 4M68 48l-12 4" stroke="#222" stroke-width="3" stroke-linecap="round"/></g>' +
+    '<g class="zz"><path d="M30 60h16M54 60h16" stroke="#222" stroke-width="3" stroke-linecap="round"/><text x="70" y="32" font-size="18" font-weight="900" fill="#fff">z</text></g>' +
+    '<path d="M40 76q10 6 20 0" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/></svg>';
+}
+
+/* ===== État ===== */
+const $ = id => document.getElementById(id);
+let etat = null;        // partie en cours
+let record = 0;         // meilleure vague atteinte (sauvegarde facultative)
+try { record = parseInt(localStorage.getItem("gribouilles-record") || "0", 10) || 0; } catch (e) { record = 0; }
+
+function stat(h, nom) { // statistique d'un héros selon son niveau
+  return Math.round(TYPES[h.type][nom] * (1 + 0.3 * (h.niv - 1)));
+}
+function prixAmelio(h) { return Math.round(18 * Math.pow(1.45, h.niv - 1) + TYPES[h.type].prix / 3); }
+function nouveauHeros(type) { const h = { type: type, niv: 1, dort: false, t: 0 }; h.pv = stat(h, "pv"); return h; }
+
+function nouvellePartie() {
+  etat = { pieces: 20, vague: 1, equipe: [nouveauHeros("chevalier")], phase: "prep", ennemis: [], vitesse: 1, cible: null, gagne: 0 };
+  afficher("jeu");
+  montrerPrep();
+}
+
+function afficher(id) {
+  for (const e of document.querySelectorAll(".ecran")) e.classList.toggle("actif", e.id === id);
+}
+
+/* ===== Préparation : recruter et améliorer ===== */
+function montrerPrep(texteBilan) {
+  etat.phase = "prep";
+  for (const h of etat.equipe) { h.dort = false; h.pv = stat(h, "pv"); }
+  etat.ennemis = [];
+  $("vitesse").hidden = true;
+  $("message").textContent = "";
+  $("rangEnnemis").innerHTML = "";
+  dessinerHeros();
+  majHaut();
+  dessinerPanneau(texteBilan);
+}
+
+function dessinerPanneau(texteBilan) {
+  const p = $("panneau");
+  p.classList.remove("cache");
+  let h = "";
+  if (texteBilan) h += '<div class="bilan">' + texteBilan + '</div>';
+  h += "<h2>Mon équipe (" + etat.equipe.length + "/" + MAX_EQUIPE + ")</h2>";
+  etat.equipe.forEach((m, i) => {
+    const t = TYPES[m.type];
+    const max = m.niv >= NIV_MAX;
+    const px = prixAmelio(m);
+    h += '<div class="carte">' + figure(m.type, t.couleur) +
+      '<div class="infos"><b>' + t.nom + "</b> · niv. " + m.niv + "<br>❤️ " + stat(m, "pv") + " · " +
+      (m.type === "soigneuse" ? "💚 soigne " + stat(m, "atk") : "⚔️ " + stat(m, "atk")) + "</div>" +
+      '<button class="achat" data-a="amelio" data-i="' + i + '"' + (max || etat.pieces < px ? " disabled" : "") + ">" +
+      (max ? "Niveau max" : "⬆ 🪙 " + px) + "</button></div>";
+  });
+  if (etat.equipe.length < MAX_EQUIPE) {
+    h += "<h2>Recruter un héros</h2>";
+    for (const k in TYPES) {
+      const t = TYPES[k];
+      h += '<div class="carte">' + figure(k, t.couleur) + '<div class="infos"><b>' + t.nom + "</b><br>" + t.role + "</div>" +
+        '<button class="achat" data-a="recrute" data-t="' + k + '"' + (etat.pieces < t.prix ? " disabled" : "") + ">🪙 " + t.prix + "</button></div>";
+    }
+  }
+  h += '<button class="gros" id="combat">Combattre ! ⚔️</button>';
+  p.innerHTML = h;
+}
+
+$("panneau").addEventListener("click", ev => {
+  const b = ev.target.closest("button");
+  if (!b || b.disabled || etat.phase !== "prep") return;
+  if (b.id === "combat") { lancerVague(); return; }
+  if (b.dataset.a === "amelio") {
+    const m = etat.equipe[+b.dataset.i], px = prixAmelio(m);
+    if (etat.pieces >= px && m.niv < NIV_MAX) { etat.pieces -= px; m.niv++; }
+  } else if (b.dataset.a === "recrute") {
+    const t = TYPES[b.dataset.t];
+    if (etat.pieces >= t.prix && etat.equipe.length < MAX_EQUIPE) { etat.pieces -= t.prix; etat.equipe.push(nouveauHeros(b.dataset.t)); }
+  }
+  // met à jour l'affichage sans perdre la position de défilement
+  const haut = $("panneau").scrollTop;
+  for (const h of etat.equipe) h.pv = stat(h, "pv");
+  dessinerHeros(); majHaut(); dessinerPanneau(); $("panneau").scrollTop = haut;
+});
+
+/* ===== Affichage du terrain ===== */
+function majHaut() {
+  $("vague").textContent = "Vague " + etat.vague + "/" + VAGUES;
+  $("pieces").textContent = "🪙 " + etat.pieces;
+}
+function dessinerHeros() {
+  $("rangHeros").innerHTML = etat.equipe.map((h, i) =>
+    '<div class="unite' + (h.dort ? " dort" : "") + '" id="h' + i + '">' + figure(h.type, TYPES[h.type].couleur) +
+    '<div class="barre"><i></i></div></div>').join("");
+  etat.equipe.forEach((h, i) => { h.el = $("h" + i); majBarre(h); });
+}
+function majBarre(u) {
+  const max = u.max || stat(u, "pv");
+  u.el.querySelector(".barre i").style.width = Math.max(0, u.pv / max * 100) + "%";
+  u.el.classList.toggle("dort", !!u.dort);
+}
+function flotter(u, texte, couleur) {
+  const f = document.createElement("div");
+  f.className = "flottant"; f.textContent = texte; f.style.color = couleur;
+  u.el.appendChild(f);
+  setTimeout(() => f.remove(), 800);
+}
+function anim(el, classe) { el.classList.remove(classe); void el.offsetWidth; el.classList.add(classe); }
+
+/* ===== Combat ===== */
+const COULEURS_GLOUPS = ["#7ad0e8", "#e8d65a", "#e88a7a", "#b58ae8", "#7ae8a8"];
+
+function lancerVague() {
+  const n = etat.vague;
+  const boss = n === 5 || n === VAGUES;
+  const nb = boss ? 2 : Math.min(5, 1 + Math.ceil(n / 2));
+  etat.ennemis = [];
+  const couleur = COULEURS_GLOUPS[(n - 1) % COULEURS_GLOUPS.length];
+  for (let i = 0; i < nb; i++) {
+    const estBoss = boss && i === 0;
+    const pv = Math.round(20 * Math.pow(1.2, n - 1) * (estBoss ? 4 : 1));
+    etat.ennemis.push({ pv: pv, max: pv, atk: Math.round(3 * Math.pow(1.15, n - 1) * (estBoss ? 1.5 : 1)), cd: estBoss ? 1.8 : 1.4, t: 0.6 + i * 0.3,
+      prime: Math.round((8 + 3 * n) * (estBoss ? 4 : 1)), boss: estBoss, dort: false, couleur: couleur });
+  }
+  $("rangEnnemis").innerHTML = etat.ennemis.map((e, i) =>
+    '<div class="unite ennemi' + (e.boss ? " boss" : "") + '" id="e' + i + '" data-i="' + i + '">' + gloup(e.couleur, e.boss) +
+    '<div class="barre"><i></i></div></div>').join("");
+  etat.ennemis.forEach((e, i) => { e.el = $("e" + i); });
+  for (const h of etat.equipe) { h.t = Math.random() * 0.5; majBarre(h); }
+  etat.cible = null; etat.gagne = 0; etat.phase = "combat";
+  $("panneau").classList.add("cache");
+  $("vitesse").hidden = false;
+  $("message").textContent = boss ? "Un chef Gloup arrive !" : "";
+  if (boss) setTimeout(() => { if (etat.phase === "combat") $("message").textContent = ""; }, 1500);
+}
+
+// Toucher un Gloup : les héros le visent en premier
+$("rangEnnemis").addEventListener("click", ev => {
+  const u = ev.target.closest(".ennemi");
+  if (!u || etat.phase !== "combat") return;
+  const e = etat.ennemis[+u.dataset.i];
+  if (e.dort) return;
+  for (const x of etat.ennemis) x.el.classList.remove("cible");
+  etat.cible = e; e.el.classList.add("cible");
+});
+$("vitesse").addEventListener("click", () => {
+  etat.vitesse = etat.vitesse === 1 ? 2 : 1;
+  $("vitesse").textContent = "×" + etat.vitesse;
+});
+
+function vivants(liste) { return liste.filter(u => !u.dort); }
+
+function actionHeros(h) {
+  const ennemis = vivants(etat.ennemis);
+  if (!ennemis.length) return;
+  anim(h.el, "attaque");
+  if (h.type === "soigneuse") {
+    // soigne l'ami le plus fatigué
+    const amis = vivants(etat.equipe).sort((a, b) => a.pv / stat(a, "pv") - b.pv / stat(b, "pv"));
+    const ami = amis[0], soin = stat(h, "atk");
+    if (ami && ami.pv < stat(ami, "pv")) {
+      ami.pv = Math.min(stat(ami, "pv"), ami.pv + soin); majBarre(ami); flotter(ami, "+" + soin, "#8dffa0");
+    } else { // personne à soigner : petit coup de baguette
+      frapper(ennemis[0], Math.max(1, Math.round(soin / 2)));
+    }
+    return;
+  }
+  const cible = (etat.cible && !etat.cible.dort) ? etat.cible : ennemis[0];
+  frapper(cible, stat(h, "atk"));
+  if (h.type === "magicien") { // l'éclat touche aussi les voisins
+    for (const e of ennemis) if (e !== cible) frapper(e, Math.round(stat(h, "atk") * 0.4));
+  }
+}
+function frapper(e, degats) {
+  if (e.dort) return;
+  e.pv -= degats; flotter(e, "-" + degats, "#fff"); anim(e.el, "coup");
+  if (e.pv <= 0) {
+    e.dort = true; e.pv = 0; e.el.classList.remove("cible");
+    etat.pieces += e.prime; etat.gagne += e.prime; flotter(e, "+" + e.prime + " 🪙", "#ffe07a"); majHaut();
+  }
+  majBarre(e);
+}
+function actionEnnemi(e) {
+  const cibles = vivants(etat.equipe);
+  if (!cibles.length) return;
+  // le chevalier attire plus souvent les coups
+  const pond = [];
+  for (const c of cibles) { pond.push(c); if (c.type === "chevalier") pond.push(c, c); }
+  const c = pond[Math.floor(Math.random() * pond.length)];
+  anim(e.el, "attaque");
+  c.pv -= e.atk; flotter(c, "-" + e.atk, "#ff9aa8"); anim(c.el, "coup");
+  if (c.pv <= 0) { c.pv = 0; c.dort = true; }
+  majBarre(c);
+}
+
+let dernier = 0;
+function boucle(maintenant) {
+  requestAnimationFrame(boucle);
+  const dt = Math.min(0.1, (maintenant - dernier) / 1000) * (etat ? etat.vitesse : 1);
+  dernier = maintenant;
+  if (!etat || etat.phase !== "combat") return;
+  for (const h of vivants(etat.equipe)) {
+    h.t -= dt;
+    if (h.t <= 0) { h.t += TYPES[h.type].cd; actionHeros(h); }
+  }
+  for (const e of vivants(etat.ennemis)) {
+    e.t -= dt;
+    if (e.t <= 0) { e.t += e.cd; actionEnnemi(e); }
+  }
+  if (!vivants(etat.ennemis).length) finVague(true);
+  else if (!vivants(etat.equipe).length) finVague(false);
+}
+
+function finVague(victoire) {
+  etat.phase = "pause";
+  $("vitesse").hidden = true; etat.vitesse = 1; $("vitesse").textContent = "×1";
+  if (victoire) {
+    const prime = 10 + 2 * etat.vague;
+    etat.pieces += prime; etat.gagne += prime;
+    if (etat.vague > record) { record = etat.vague; try { localStorage.setItem("gribouilles-record", String(record)); } catch (e) { /* sans sauvegarde */ } }
+    majHaut();
+    $("message").textContent = "Vague gagnée ! 🎉";
+    setTimeout(() => {
+      if (etat.vague >= VAGUES) { terminer(); return; }
+      etat.vague++;
+      montrerPrep("Bravo ! Tu as gagné " + etat.gagne + " 🪙");
+    }, 1400);
+  } else {
+    $("message").textContent = "Tes héros ont sommeil… 💤";
+    setTimeout(() => montrerPrep("Pas grave ! Tu gardes " + etat.gagne + " 🪙. Améliore ton équipe et réessaie."), 1700);
+  }
+}
+
+function terminer() {
+  $("finTitre").textContent = "Victoire ! 🏆";
+  $("finTexte").textContent = "Ton armée a endormi tous les Gloups en " + VAGUES + " vagues, avec " + etat.equipe.length + " héros. Il te reste " + etat.pieces + " pièces. Bravo, chef !";
+  afficher("fin");
+}
+
+/* ===== Démarrage ===== */
+$("vitrine").innerHTML = ["chevalier", "archere", "magicien", "soigneuse"].map(k => figure(k, TYPES[k].couleur)).join("");
+if (record > 0) $("record").textContent = "Ton record : vague " + record + "/" + VAGUES;
+$("jouer").addEventListener("click", nouvellePartie);
+$("rejouer").addEventListener("click", nouvellePartie);
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
