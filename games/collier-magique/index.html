@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le collier magique</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,sans-serif;color:#fff;
+    background:radial-gradient(circle at 50% 20%,#7a3fb5,#2b1457 70%);user-select:none}
+  #app{height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:12px;text-align:center}
+  h1{font-size:clamp(34px,10vw,52px);margin:8px 0;line-height:1.05;text-shadow:0 3px 0 #0005}
+  p{font-size:clamp(17px,4.6vw,21px);margin:8px 0;line-height:1.35}
+  button{font:inherit;color:inherit;border:0;cursor:pointer}
+  .jouer{background:#ffd23f;color:#3a2200;font-weight:700;font-size:26px;padding:14px 44px;
+    border-radius:40px;min-height:56px;box-shadow:0 5px 0 #b88a00;margin-top:14px}
+  .jouer:active{transform:translateY(3px);box-shadow:0 2px 0 #b88a00}
+  .hidden{display:none!important}
+  #jeu{width:100%;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-around}
+  #haut{width:100%;display:flex;justify-content:space-between;font-size:20px;font-weight:700}
+  #consigne{font-size:clamp(18px,5vw,22px);min-height:30px}
+  #collier{width:100%;max-height:40vh}
+  #choix{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:420px}
+  .opt{width:68px;height:68px;border-radius:50%;background:#ffffff22;border:3px solid #ffffff55;padding:6px}
+  .opt:active{background:#ffffff55}
+  .opt svg{width:100%;height:100%}
+  .secoue{animation:sec .35s}
+  @keyframes sec{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+  @media (prefers-reduced-motion:reduce){.secoue{animation:none}}
+  #etoiles{font-size:44px;margin:6px}
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="accueil">
+    <svg width="150" height="60" viewBox="0 0 150 60" aria-hidden="true" id="deco"></svg>
+    <h1>Le collier magique</h1>
+    <p>Des perles se suivent toujours dans le même ordre.<br>Touche les perles qui manquent pour finir le collier !</p>
+    <button class="jouer" id="bJouer">Jouer</button>
+  </section>
+  <section id="jeu" class="hidden">
+    <div id="haut"><span id="manche"></span><span id="pts"></span></div>
+    <div id="consigne"></div>
+    <svg id="collier" viewBox="0 0 400 100" aria-label="Collier de perles"></svg>
+    <div id="choix"></div>
+  </section>
+  <section id="fin" class="hidden">
+    <h1>Bravo !</h1>
+    <div id="etoiles"></div>
+    <p id="bilan"></p>
+    <button class="jouer" id="bRejouer">Rejouer</button>
+  </section>
+</div>
+<script>
+// Le collier magique : compléter une suite de perles (couleur + forme).
+const COULEURS = ['#ff4d6d', '#ffb703', '#3ddc84', '#38bdf8', '#c77dff'];
+const FORMES = ['rond', 'etoile', 'coeur', 'carre', 'losange'];
+const NB_MANCHES = 10;
+const NS = 'http://www.w3.org/2000/svg';
+
+// Motifs possibles par niveau : chaque lettre est un type de perle
+const MOTIFS = [
+  ['AB'], ['AB', 'AAB'], ['AB', 'ABB', 'AAB'], ['ABB', 'AABB', 'ABC'],
+  ['ABC', 'AABB', 'ABCC'], ['ABC', 'ABCC', 'AABC', 'ABBC']
+];
+
+let manche, points, erreurs, perles, suivant, bloque;
+const $ = id => document.getElementById(id);
+const alea = n => Math.floor(Math.random() * n);
+const melange = t => { for (let i = t.length - 1; i > 0; i--) { const j = alea(i + 1); [t[i], t[j]] = [t[j], t[i]]; } return t; };
+
+// Chemin SVG d'une forme centrée en (0,0), de rayon r
+function chemin(forme, r) {
+  if (forme === 'etoile') {
+    let d = '';
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.5 : r * 1.1;
+      d += (i ? 'L' : 'M') + (Math.cos(a) * rr).toFixed(1) + ' ' + (Math.sin(a) * rr).toFixed(1);
+    }
+    return d + 'Z';
+  }
+  if (forme === 'coeur') return `M0 ${r*0.9}C${-r*1.5} ${-r*0.1} ${-r*0.7} ${-r*1.1} 0 ${-r*0.35}C${r*0.7} ${-r*1.1} ${r*1.5} ${-r*0.1} 0 ${r*0.9}Z`;
+  if (forme === 'carre') return `M${-r*0.85} ${-r*0.85}H${r*0.85}V${r*0.85}H${-r*0.85}Z`;
+  if (forme === 'losange') return `M0 ${-r*1.15}L${r*0.95} 0L0 ${r*1.15}L${-r*0.95} 0Z`;
+  return `M${-r} 0a${r} ${r} 0 1 0 ${2*r} 0a${r} ${r} 0 1 0 ${-2*r} 0Z`;
+}
+function el(nom, attrs, parent) {
+  const e = document.createElementNS(NS, nom);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+// Ajoute une perle dans un groupe SVG
+function dessinePerle(g, p, r) {
+  el('path', { d: chemin(p.f, r), fill: p.c, stroke: '#fff', 'stroke-width': 2.5, 'stroke-linejoin': 'round' }, g);
+  el('circle', { cx: -r * 0.35, cy: -r * 0.35, r: r * 0.18, fill: '#ffffff99' }, g);
+}
+function svgPerle(p) {
+  const s = el('svg', { viewBox: '-30 -30 60 60' });
+  dessinePerle(el('g', {}, s), p, 22);
+  return s;
+}
+
+// Décor de l'accueil
+(function () {
+  const d = $('deco');
+  for (let i = 0; i < 5; i++) {
+    const g = el('g', { transform: `translate(${15 + i * 30} 30)` }, d);
+    dessinePerle(g, { f: FORMES[i], c: COULEURS[i] }, 12);
+  }
+})();
+
+// Crée une manche selon le niveau
+function nouvelleManche() {
+  const niv = Math.min(5, Math.floor(manche * 6 / NB_MANCHES));
+  const motif = MOTIFS[niv][alea(MOTIFS[niv].length)];
+  const lettres = [...new Set(motif)];
+  const cs = melange(COULEURS.slice()), fs = melange(FORMES.slice());
+  const types = {};
+  // Niveaux faciles : seule la couleur change ; ensuite couleur et forme
+  lettres.forEach((l, i) => { types[l] = { c: cs[i], f: niv < 2 ? fs[0] : fs[i] }; });
+  const nbTrous = niv < 2 ? 1 : (niv < 4 ? 2 : 3);
+  const n = Math.min(10, Math.max(8, motif.length * 2 + nbTrous + 1));
+  perles = [];
+  for (let i = 0; i < n; i++) perles.push(types[motif[i % motif.length]]);
+  suivant = n - nbTrous; erreurs = 0; bloque = false;
+  // Choix : les types du motif, plus quelques perles pour tromper
+  const choix = lettres.map(l => types[l]);
+  while (choix.length < Math.min(5, lettres.length + 2)) {
+    const t = { c: COULEURS[alea(5)], f: niv < 2 ? fs[0] : FORMES[alea(5)] };
+    if (!choix.some(o => o.c === t.c && o.f === t.f)) choix.push(t);
+  }
+  afficheCollier(false);
+  const zone = $('choix'); zone.innerHTML = '';
+  melange(choix).forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'opt'; b.setAttribute('aria-label', 'Perle');
+    b.appendChild(svgPerle(t));
+    // La perle attendue est reconnue par couleur et forme
+    b.onclick = () => choisit(t, b);
+    zone.appendChild(b);
+  });
+  $('manche').textContent = 'Collier ' + (manche + 1) + '/' + NB_MANCHES;
+  $('pts').textContent = '⭐ ' + points;
+  $('consigne').textContent = nbTrous > 1 ? 'Quelles sont les ' + nbTrous + ' perles qui manquent ?' : 'Quelle est la perle qui manque ?';
+}
+
+// Dessine le fil en courbe et les perles (ou les trous « ? »)
+function afficheCollier(pop) {
+  const s = $('collier'); s.innerHTML = '';
+  const n = perles.length, pas = 400 / n;
+  const hauteur = t => 30 * (1 - t) * (1 - t) + 2 * 70 * t * (1 - t) + 30 * t * t;
+  el('path', { d: 'M0 30Q200 70 400 30', stroke: '#f5d98a', 'stroke-width': 3, fill: 'none' }, s);
+  const r = Math.min(20, pas * 0.42);
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n;
+    const g = el('g', { transform: `translate(${(pas * (i + 0.5)).toFixed(1)} ${(hauteur(t) + 12).toFixed(1)})` }, s);
+    if (i < suivant) {
+      dessinePerle(g, perles[i], r);
+    } else {
+      el('circle', { r, fill: '#ffffff22', stroke: i === suivant ? '#ffd23f' : '#ffffff99',
+        'stroke-width': 3, 'stroke-dasharray': '5 4' }, g);
+      const q = el('text', { 'text-anchor': 'middle', dy: '.35em', fill: '#fff', 'font-size': r, 'font-weight': 700 }, g);
+      q.textContent = '?';
+    }
+  }
+}
+
+function choisit(t, bouton) {
+  if (bloque) return;
+  const attendu = perles[suivant];
+  if (t.c === attendu.c && t.f === attendu.f) {
+    suivant++;
+    afficheCollier(true);
+    if (suivant === perles.length) {
+      bloque = true;
+      points += erreurs === 0 ? 3 : (erreurs === 1 ? 2 : 1);
+      $('pts').textContent = '⭐ ' + points;
+      $('consigne').textContent = erreurs === 0 ? 'Parfait ! 🎉' : 'Bien joué ! 👍';
+      setTimeout(() => { manche++; if (manche >= NB_MANCHES) fin(); else nouvelleManche(); }, 1100);
+    }
+  } else {
+    erreurs++;
+    bouton.classList.remove('secoue'); void bouton.offsetWidth; bouton.classList.add('secoue');
+    $('consigne').textContent = 'Regarde bien la suite… essaie encore !';
+  }
+}
+
+function montre(id) { ['accueil', 'jeu', 'fin'].forEach(s => $(s).classList.toggle('hidden', s !== id)); }
+function debut() { manche = 0; points = 0; montre('jeu'); nouvelleManche(); }
+function fin() {
+  montre('fin');
+  const max = NB_MANCHES * 3, e = points >= max * 0.9 ? 3 : (points >= max * 0.65 ? 2 : 1);
+  $('etoiles').textContent = '⭐'.repeat(e) + '☆'.repeat(3 - e);
+  $('bilan').textContent = points + ' étoiles sur ' + max + '. ' + (e === 3 ? 'Tu es un as des colliers !' : 'Tu peux faire encore mieux !');
+  try { const m = Number(localStorage.getItem('collier-record') || 0); if (points > m) localStorage.setItem('collier-record', points); } catch (er) { /* pas de sauvegarde */ }
+}
+$('bJouer').onclick = debut;
+$('bRejouer').onclick = debut;
+</script>
+</body>
+</html>
