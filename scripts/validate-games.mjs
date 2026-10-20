@@ -7,14 +7,17 @@
 //   … --browser   lance aussi chaque jeu dans un vrai navigateur (Playwright),
 //                 dans les mêmes conditions que sur le site (cadre isolé)
 //   … --covers    fabrique cover.jpg par capture d'écran si la jaquette manque
+//   … --jouer     (implique --browser) joue en plus 30 secondes au hasard sur
+//                 téléphone et enregistre des captures d'écran dans captures/<id>/
 //
 // Code de sortie : 0 = tout est bon, 1 = au moins une erreur.
 // Utilisé par l'agent qui crée les jeux, et par GitHub Actions.
-// Le mode --browser nécessite :  npm install --no-save playwright
-//                                npx playwright install chromium
+// Les modes --browser et --jouer nécessitent :  npm install --no-save playwright
+//                                               npx playwright install chromium
+// (ou CHROMIUM_PATH = chemin d'un navigateur Chromium déjà installé, ex. Edge)
 // ==========================================================================
 
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat, mkdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -32,7 +35,8 @@ const TAILLE_MAX_JAQUETTE = 300 * 1024;
 const PORT_TEST = 8123;
 
 const args = process.argv.slice(2);
-const avecNavigateur = args.includes('--browser');
+const avecPartie = args.includes('--jouer');                     // partie au hasard + captures
+const avecNavigateur = args.includes('--browser') || avecPartie;
 const avecJaquettes = args.includes('--covers');
 const idsDemandes = args.filter((a) => !a.startsWith('--'));
 
@@ -202,6 +206,8 @@ async function testerNavigateur(ids) {
       for (const p of [...new Set(problemes)].slice(0, 5)) erreur(id, p);
       await contexte.close();
 
+      if (avecPartie) await jouerPartie(navigateur, base, id);
+
       // Jaquette automatique (capture du jeu au démarrage, format portrait 600 × 800).
       const dossier = path.join(DOSSIER_JEUX, id);
       if (avecJaquettes && !erreurs.has(id) && !JAQUETTES.some((n) => existsSync(path.join(dossier, n)))) {
@@ -218,6 +224,74 @@ async function testerNavigateur(ids) {
     await navigateur.close();
     serveur.kill();
   }
+}
+
+// --------------------------------------------------------------------------
+// 3. Partie au hasard (--jouer) : 30 s d'actions variées sur téléphone, avec
+//    des captures d'écran à regarder ensuite (captures/<id>/, ignoré par git).
+// --------------------------------------------------------------------------
+
+async function jouerPartie(navigateur, base, id) {
+  const dossier = path.join(RACINE, 'captures', id);
+  await rm(dossier, { recursive: true, force: true });
+  await mkdir(dossier, { recursive: true });
+  const problemes = [];
+  let nbCaptures = 0;
+  const surveiller = (page) => {
+    page.on('pageerror', (e) => problemes.push(`erreur JavaScript pendant la partie : ${e.message}`));
+    page.on('console', (m) => { if (m.type() === 'error') problemes.push(`erreur console pendant la partie : ${m.text().slice(0, 160)}`); });
+  };
+  const capturer = async (page, nom) => { await page.screenshot({ path: path.join(dossier, nom) }); nbCaptures++; };
+
+  // Téléphone : accueil, démarrage (tutoriel attendu), puis 100 actions au hasard (≈ 30 s).
+  const tel = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  const page = await tel.newPage();
+  surveiller(page);
+  await page.goto(`${base}/play.html?id=${id}`);
+  await page.waitForTimeout(2000);
+  await capturer(page, '1-accueil.png');
+  const boite = await page.locator('#cadre-jeu').boundingBox();
+  if (boite) {
+    // Démarrer : bouton « Jouer » (ou équivalent) s'il existe, sinon un toucher au centre.
+    const cadre = page.frames().find((f) => f.url() === 'about:srcdoc');
+    const bouton = cadre?.getByRole('button', { name: /jouer|commencer|c.est parti|démarrer/i }).first();
+    if (bouton && await bouton.isVisible().catch(() => false)) await bouton.tap().catch(() => bouton.click());
+    else await page.touchscreen.tap(boite.x + boite.width / 2, boite.y + boite.height / 2);
+    await page.waitForTimeout(2500);
+    await capturer(page, '2-debut.png');
+
+    // Hasard reproductible : la même partie à chaque lancement.
+    let graine = 42;
+    const hasard = () => (graine = (graine * 16807) % 2147483647) / 2147483647;
+    const touches = ['Space', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+    for (let i = 1; i <= 100; i++) {
+      const x = boite.x + boite.width * (0.1 + 0.8 * hasard());
+      const y = boite.y + boite.height * (0.1 + 0.85 * hasard());
+      const r = hasard();
+      if (r < 0.55) await page.touchscreen.tap(x, y);
+      else if (r < 0.8) {                       // glissé
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + (hasard() - 0.5) * 240, y + (hasard() - 0.5) * 240, { steps: 6 });
+        await page.mouse.up();
+      } else await page.keyboard.press(touches[Math.floor(hasard() * touches.length)]);
+      await page.waitForTimeout(300);
+      if (i % 25 === 0) await capturer(page, `${2 + i / 25}-partie-${Math.round(i * 0.3)}s.png`);
+    }
+  }
+  await tel.close();
+
+  // Ordinateur : la mise en page doit aussi tenir sur grand écran.
+  const pc = await navigateur.newContext({ viewport: { width: 1280, height: 800 } });
+  const pagePc = await pc.newPage();
+  surveiller(pagePc);
+  await pagePc.goto(`${base}/play.html?id=${id}`);
+  await pagePc.waitForTimeout(2000);
+  await capturer(pagePc, '7-ordinateur.png');
+  await pc.close();
+
+  for (const p of [...new Set(problemes)].slice(0, 5)) erreur(id, p);
+  console.log(`  📸 ${id} : ${nbCaptures} captures dans captures/${id}/`);
 }
 
 // --------------------------------------------------------------------------

@@ -1,14 +1,22 @@
 # ==========================================================================
-# Boucle de production : un agent Claude crée un nouveau jeu, le robot de
-# contrôle le vérifie, puis une pull request est ouverte pour validation.
+# Boucle de production : des agents Claude créent de nouveaux jeux, le robot
+# de contrôle les vérifie, puis une pull request est ouverte par jeu.
 #
-#  - Automatique : chaque nuit (heure en UTC : 01:23 UTC = 03:23 à Paris l'été,
-#    02:23 l'hiver).
-#  - À la main : onglet Actions → « Nouveau jeu » → « Run workflow »
-#    (champ facultatif pour imposer une idée).
+#  - Automatique : chaque nuit, 2 jeux (départ à 01:23 UTC = 03:23 à Paris
+#    l'été, 02:23 l'hiver).
+#  - À la main : onglet Actions → « Nouveau jeu » → « Run workflow » :
+#    nombre de jeux (1 à 5) et idée imposée (facultative).
+#  - Les jeux sont créés l'un après l'autre ; si l'un échoue (limite
+#    d'utilisation…), les suivants sont quand même tentés.
 #
-# Rien n'est publié sans votre accord : le jeu arrive en pull request,
-# vous jouez à l'aperçu Cloudflare, puis vous cliquez « Merge ».
+# Chaque jeu a sa branche et sa pull request, qui ne touche que son dossier
+# games/<id>/ : IDEES-JEUX.md n'est jamais modifié. Les idées sont prises
+# dans l'ordre de IDEES-JEUX.md (sauf celles déjà prises par une pull request
+# ouverte), notées dans le game.json du jeu (champ "idee") et cochées à la
+# fusion par cocher-idee.yml : pas de conflit entre les pull requests.
+#
+# Rien n'est publié sans votre accord : vous jouez à l'aperçu Cloudflare,
+# puis vous cliquez « Merge ».
 # ==========================================================================
 
 name: Nouveau jeu
@@ -18,8 +26,13 @@ on:
     - cron: "23 1 * * *"
   workflow_dispatch:
     inputs:
+      nombre:
+        description: "Nombre de jeux à créer (l'un après l'autre)"
+        type: choice
+        options: ["1", "2", "3", "4", "5"]
+        default: "1"
       idee:
-        description: "Idée de jeu imposée (laisser vide pour prendre la suivante dans IDEES-JEUX.md)"
+        description: "Idée imposée pour le 1er jeu (laisser vide pour suivre IDEES-JEUX.md)"
         required: false
         default: ""
 
@@ -28,9 +41,81 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  creer:
+  # 1. Choix des idées : une par jeu, dans l'ordre de la liste.
+  choisir:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      jeux: ${{ steps.choix.outputs.jeux }}
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Choisir les idées
+        id: choix
+        uses: actions/github-script@v7
+        env:
+          # La nuit : 2 jeux ; à la main : le nombre choisi.
+          NOMBRE: ${{ github.event_name == 'schedule' && '2' || inputs.nombre || '1' }}
+          IDEE: ${{ inputs.idee }}
+        with:
+          script: |
+            const fs = require('fs');
+            const nombre = Math.min(5, Math.max(1, parseInt(process.env.NOMBRE, 10) || 1));
+            const imposee = (process.env.IDEE || '').replace(/\s+/g, ' ').trim();
+            const titreDe = (idee) => idee.split(' — ')[0].trim().toLowerCase();
+
+            // Idées déjà prises : champ "idee" du game.json de chaque pull request ouverte
+            // (anciennes pull requests, sans ce champ : repère <!-- idee: … --> de leur description).
+            const prs = await github.paginate(github.rest.pulls.list, { ...context.repo, state: 'open', per_page: 100 });
+            const enCours = new Set();
+            for (const pr of prs) {
+              const fichiers = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 });
+              for (const f of fichiers.filter((f) => /^games\/[a-z0-9-]+\/game\.json$/.test(f.filename) && f.status !== 'removed')) {
+                try {
+                  const { data } = await github.rest.repos.getContent({ ...context.repo, path: f.filename, ref: pr.head.sha });
+                  const idee = JSON.parse(Buffer.from(data.content, 'base64').toString('utf8')).idee;
+                  if (typeof idee === 'string' && idee.trim()) enCours.add(titreDe(idee));
+                } catch (e) { core.warning(`PR #${pr.number} : ${f.filename} illisible (${e.message})`); }
+              }
+              const ancien = (/<!-- idee: (.+?) -->/.exec(pr.body || '') || [])[1];
+              if (ancien) enCours.add(titreDe(ancien));
+            }
+
+            // Idées non cochées, dans l'ordre du fichier, sans celles en cours.
+            const libres = fs.readFileSync('IDEES-JEUX.md', 'utf8').split('\n')
+              .filter((l) => /^- \[ \] /.test(l))
+              .map((l) => l.slice(6).trim())
+              .filter((idee) => !enCours.has(titreDe(idee)));
+
+            // Jeu n°1 = idée imposée (s'il y en a une) ou 1re idée libre ; n°2 = la suivante, etc.
+            // Plus aucune idée libre : un seul jeu, dont l'agent invente l'idée.
+            const idees = (imposee ? [imposee, ...libres] : libres).slice(0, nombre);
+            // titre = texte avant « — » : c'est la valeur du champ "idee" du game.json.
+            const jeux = idees.length
+              ? idees.map((idee, i) => ({ rang: i + 1, idee, titre: idee.split(' — ')[0].trim() }))
+              : [{ rang: 1, idee: '', titre: '' }];
+            if (enCours.size) core.info(`Idées déjà en cours (sautées) : ${[...enCours].join(' ; ')}`);
+            for (const j of jeux) core.info(`Jeu n°${j.rang} : ${j.idee || '(idée à inventer)'}`);
+            core.setOutput('jeux', JSON.stringify(jeux));
+
+  # 2. Un job par jeu, l'un après l'autre : chacun son idée, sa branche et sa pull request.
+  creer:
+    needs: choisir
+    name: Jeu n°${{ matrix.jeu.rang }}
+    strategy:
+      fail-fast: false     # un jeu qui échoue n'arrête pas les suivants
+      max-parallel: 1      # un seul agent à la fois (limites d'utilisation de l'abonnement)
+      matrix:
+        jeu: ${{ fromJSON(needs.choisir.outputs.jeux) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
     permissions:
       contents: write
       pull-requests: write
@@ -59,82 +144,138 @@ jobs:
           # Avec une clé API à la place : anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: true
+          # Modèle le plus performant (s'il n'est pas inclus dans l'abonnement : claude-opus-5-5).
           claude_args: |
-            --max-turns 60
+            --model claude-opus-5-5
+            --max-turns 150
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*)"
           prompt: |
-            Tu es le développeur de jeux du site Jeux-en-ligne. Ta mission : créer UN nouveau mini-jeu complet.
+            Tu es le développeur de jeux du site Jeux-en-ligne. Ta mission : créer UN nouveau mini-jeu complet et riche,
+            auquel un enfant a envie de jouer au moins 15 minutes.
 
-            1. Lis CLAUDE.md, puis CONSIGNES-JEU.md (règles obligatoires), puis IDEES-JEUX.md.
+            1. Lis CLAUDE.md, puis CONSIGNES-JEU.md (règles obligatoires, en particulier le « minimum obligatoire »),
+               puis IDEES-JEUX.md.
             2. Liste les dossiers de games/ et lis leurs game.json pour connaître les jeux existants.
-            3. Choisis l'idée :
-               - idée imposée (si ce texte n'est pas vide) : « ${{ github.event.inputs.idee }} » ;
-               - sinon la première ligne non cochée « - [ ] » de IDEES-JEUX.md ;
-               - si toutes sont cochées, invente une idée originale, différente des jeux existants,
-                 et ajoute-la cochée à la fin de IDEES-JEUX.md.
-            4. Crée le dossier games/<id>/ avec exactement index.html et game.json
+            3. L'idée à réaliser : « ${{ matrix.jeu.idee }} »
+               Si ce texte est vide, invente une idée originale, différente des jeux existants et des idées de IDEES-JEUX.md.
+               D'autres agents créent peut-être d'autres jeux en même temps : réalise uniquement cette idée.
+            4. Avant d'écrire la moindre ligne de code, écris le cahier de conception dans conception.md (à la racine
+               du dépôt). Il deviendra la description de la pull request. En français, court :
+               - Principe : le but du jeu et le geste de base, en 2 phrases ;
+               - Mécaniques : chacune, avec le niveau où elle apparaît et comment elle se combine aux autres ;
+               - Progression : un tableau des niveaux (10 au moins) : nouveauté, difficulté, objectif ;
+               - Récompenses : score, règle des étoiles, record, effets de réussite ;
+               - Tutoriel et sons : ce que montre le tutoriel animé, la liste des sons.
+            5. Code le jeu en suivant le cahier : dossier games/<id>/ avec exactement index.html et game.json
                (pas de jaquette : elle est fabriquée automatiquement ensuite).
-               "added" = date du jour ; "author" = "Claude (agent)" ; "version" = 1.
-            5. Lance : node scripts/validate-games.mjs --browser <id>
-               Corrige toutes les erreurs et relance. 3 tentatives de correction au maximum.
-            6. Coche l'idée réalisée dans IDEES-JEUX.md (« - [x] ») en ajoutant « → <id> » à la fin de la ligne.
+               "added" = date du jour ; "author" = "Claude (agent)" ; "version" = 1 ;
+               "idee" = « ${{ matrix.jeu.titre }} » (titre de l'idée réalisée ; si ce texte est vide,
+               idée inventée : mets le titre de ton jeu).
+            6. Joue au jeu avec le robot : node scripts/validate-games.mjs --jouer <id>
+               Il ouvre le jeu sur un téléphone simulé, le joue au hasard pendant 30 secondes et enregistre des
+               captures d'écran dans captures/<id>/. Regarde chaque capture avec Read : rien ne doit être coupé,
+               illisible ou figé. Corrige les erreurs et ce que tu vois, puis relance.
+            7. Relecture : demande-toi « qu'est-ce qui manque pour qu'un enfant y joue 15 minutes ? ».
+               Vérifie un à un les points du minimum obligatoire de CONSIGNES-JEU.md, relis le code des niveaux pour
+               t'assurer que la difficulté progresse vraiment, et corrige les manques les plus importants.
+               Relance ensuite le robot (étape 6) jusqu'à « Tout est bon ».
+               Ajoute enfin à conception.md une section « Relecture » : ce que tu as ajouté ou corrigé, et ce qui
+               pourrait encore être amélioré.
+               En tout, 5 tentatives de correction au maximum après le premier passage du robot.
 
-            Interdits : modifier un autre fichier que games/<id>/* et IDEES-JEUX.md, toucher aux jeux
-            existants, utiliser la moindre ressource Internet dans le jeu.
+            Interdits : modifier un autre fichier que games/<id>/* et conception.md ; en particulier, ne touche jamais
+            à IDEES-JEUX.md (l'idée est notée dans game.json et cochée automatiquement à la fusion) ; toucher aux jeux
+            existants ; utiliser la moindre ressource Internet dans le jeu.
             Termine par un résumé de 3 lignes : titre, principe du jeu, points à vérifier en y jouant.
 
       - name: Vérifier ce que l'agent a modifié
         id: verif
         run: |
           set -euo pipefail
-          git status --porcelain --untracked-files=all > modifs.txt
-          cat modifs.txt
-          # Seuls games/<nouveau-jeu>/ et IDEES-JEUX.md peuvent changer.
-          if grep -v -E '^\?\? games/[a-z0-9-]+/|^ M IDEES-JEUX\.md$|^\?\? modifs\.txt$' modifs.txt; then
+          git status --porcelain --untracked-files=all > "$RUNNER_TEMP/modifs.txt"
+          cat "$RUNNER_TEMP/modifs.txt"
+          # Seuls le dossier d'un nouveau jeu, games/<id>/, et le cahier de conception peuvent apparaître.
+          if grep -v -E '^\?\? games/[a-z0-9-]+/|^\?\? conception\.md$' "$RUNNER_TEMP/modifs.txt"; then
             echo "::error::L'agent a modifié des fichiers non autorisés (liste ci-dessus)."
             exit 1
           fi
-          nouveaux=$( (grep -E '^\?\? games/' modifs.txt || true) | cut -d/ -f2 | sort -u | tr '\n' ' ')
-          rm modifs.txt
-          if [ -z "$nouveaux" ]; then
-            echo "::error::Aucun nouveau jeu n'a été créé."
+          # Le cahier va dans la description de la pull request, pas dans le dépôt.
+          if [ -f conception.md ]; then mv conception.md "$RUNNER_TEMP/conception.md"; else echo "::warning::Cahier de conception absent."; fi
+          nouveaux=$( (grep -E '^\?\? games/' "$RUNNER_TEMP/modifs.txt" || true) | cut -d/ -f2 | sort -u)
+          if [ "$(grep -c . <<<"$nouveaux" || true)" -ne 1 ]; then
+            echo "::error::L'agent doit créer exactement un nouveau jeu (trouvé : $(echo ${nouveaux:-aucun}))."
             exit 1
           fi
-          for id in $nouveaux; do
-            if git ls-tree -d --name-only HEAD "games/$id" | grep -q .; then
-              echo "::error::Le jeu existant games/$id a été modifié."
-              exit 1
-            fi
-          done
-          echo "ids=$nouveaux" >> "$GITHUB_OUTPUT"
-          premier=$(echo $nouveaux | cut -d' ' -f1)
-          titre=$(node -e "console.log(require('./games/$premier/game.json').title)")
+          id=$nouveaux
+          if git ls-tree -d --name-only HEAD "games/$id" | grep -q .; then
+            echo "::error::Le jeu existant games/$id a été modifié."
+            exit 1
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          titre=$(node -e "console.log(require('./games/$id/game.json').title)")
           echo "titre=$titre" >> "$GITHUB_OUTPUT"
 
+      - name: Noter l'idée dans game.json
+        env:
+          ID: ${{ steps.verif.outputs.id }}
+          TITRE_IDEE: ${{ matrix.jeu.titre }}
+        run: |
+          # Le champ "idee" relie le jeu à sa ligne de IDEES-JEUX.md : il sert à sauter les
+          # idées en cours et à cocher la bonne ligne à la fusion (cocher-idee.yml).
+          node -e '
+            const fs = require("fs");
+            const f = `games/${process.env.ID}/game.json`;
+            const j = JSON.parse(fs.readFileSync(f, "utf8"));
+            const attendu = process.env.TITRE_IDEE || (typeof j.idee === "string" && j.idee.trim()) || j.title;
+            if (j.idee !== attendu) {
+              j.idee = attendu;
+              fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+              console.log(`Champ "idee" corrigé : ${attendu}`);
+            } else console.log(`Champ "idee" : ${attendu}`);
+          '
+
       - name: Contrôle qualité final + jaquette
-        run: node scripts/validate-games.mjs --browser --covers ${{ steps.verif.outputs.ids }} | tee rapport.txt
+        run: |
+          # pipefail : sans lui, « | tee » masquerait l'échec du contrôle et la pull request serait ouverte quand même.
+          set -o pipefail
+          node scripts/validate-games.mjs --browser --covers "${{ steps.verif.outputs.id }}" | tee "$RUNNER_TEMP/rapport.txt"
 
       - name: Préparer la description de la pull request
+        env:
+          IDEE: ${{ matrix.jeu.idee }}
         run: |
           {
             echo "Jeu créé automatiquement par l'agent, contrôlé par le robot de qualité."
+            if [ -n "$IDEE" ]; then
+              echo
+              echo "**Idée :** $IDEE"
+            fi
             echo
-            echo "**À faire avant de fusionner :** ouvrez l'aperçu Cloudflare (lien dans les vérifications ci-dessous), jouez 2 minutes, vérifiez que le contenu convient aux enfants."
+            echo "**À faire avant de fusionner :** ouvrez l'aperçu Cloudflare (lien dans les vérifications ci-dessous), jouez quelques niveaux, vérifiez que le contenu convient aux enfants. L'idée sera cochée dans IDEES-JEUX.md à la fusion."
+            echo
+            if [ -s "$RUNNER_TEMP/conception.md" ]; then
+              echo "## Cahier de conception"
+              echo
+              head -c 40000 "$RUNNER_TEMP/conception.md"
+            else
+              echo "_(cahier de conception absent)_"
+            fi
+            echo
+            echo "<details><summary>Contrôle qualité</summary>"
             echo
             echo '```'
-            cat rapport.txt
+            cat "$RUNNER_TEMP/rapport.txt"
             echo '```'
-          } > description.md
-          rm rapport.txt
+            echo "</details>"
+          } > "$RUNNER_TEMP/description.md"
 
       - name: Ouvrir la pull request
         uses: peter-evans/create-pull-request@v7
         with:
-          branch: nouveau-jeu/${{ github.run_number }}
+          branch: nouveau-jeu/${{ github.run_number }}-${{ matrix.jeu.rang }}
           commit-message: "Nouveau jeu : ${{ steps.verif.outputs.titre }}"
           title: "Nouveau jeu : ${{ steps.verif.outputs.titre }}"
-          body-path: description.md
+          body-path: ${{ runner.temp }}/description.md
           add-paths: |
-            games/**
-            IDEES-JEUX.md
+            games/${{ steps.verif.outputs.id }}/**
           delete-branch: true

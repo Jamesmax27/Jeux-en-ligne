@@ -6,4 +6,4 @@
 // est celui des filtres affichés dans le catalogue.
 // ==========================================================================
 
-export const GENRES = ['adresse', 'réflexion', 'mémoire', 'quiz', 'rythme', 'création', 'course', 'puzzle', 'calcul', 'lecture'];
+export const GENRES = ['adresse', 'plateforme', 'course', 'sport', 'rythme', 'aventure', 'réflexion', 'stratégie', 'puzzle', 'mémoire', 'observation', 'quiz', 'calcul', 'lecture', 'création', 'simulation'];

@@ -177,25 +177,273 @@ body::after {
 }
 
 /* --------------------------------------------------------------------------
-   Tri et filtres
+   Regroupements : tuiles (raccourcis, âge, genres, univers)
+   Chaque tuile reçoit sa teinte (--teinte, 0 à 360) depuis app.js : un fond
+   sombre légèrement coloré, comme une nébuleuse. La sélection garde l'accent
+   lavande. Sur téléphone, genres et univers forment une bande de deux rangées
+   qui défile (« Tout voir » la déplie) ; sur grand écran, tout est déplié.
    -------------------------------------------------------------------------- */
 
-.barre-filtres {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  background: rgba(11, 16, 32, .94);
-  padding: 8px 0 4px;
-  border-bottom: 1px solid var(--trait);
-}
-
-.barre-filtres-int {
+.explorer {
   max-width: 1200px;
   margin: 0 auto;
+  padding-bottom: 6px;
 }
 
-.ligne-tri {
+.groupe { margin-top: 16px; }
+
+.groupe-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
   padding: 0 16px;
+  margin-bottom: 4px;
+}
+
+.groupe-tete h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.groupe-tete h2 small {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--encre-douce);
+}
+
+.tout-voir {
+  flex: none;
+  min-height: 44px;
+  margin: -6px -10px -6px 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Le rembourrage laisse la place au contour de focus et à la coche. */
+.tuiles {
+  display: grid;
+  gap: 8px;
+  padding: 6px 16px;
+}
+
+.tuiles-raccourcis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
+.tuiles-ages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.tuiles-bande {
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, auto);
+  grid-auto-columns: 92px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
+}
+
+.tuiles-bande::-webkit-scrollbar { display: none; }
+
+.tuiles-bande.deplie {
+  grid-auto-flow: row;
+  grid-template-rows: none;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  overflow: visible;
+}
+
+@media (min-width: 720px) {
+  .tuiles-bande,
+  .tuiles-bande.deplie {
+    grid-auto-flow: row;
+    grid-template-rows: none;
+    grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+    overflow: visible;
+  }
+  .tout-voir { display: none; }
+  .tuiles-raccourcis { grid-template-columns: repeat(3, minmax(0, 200px)); }
+  .tuiles-ages { grid-template-columns: repeat(4, minmax(0, 150px)); }
+}
+
+.tuile {
+  --teinte: 230;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 94px;
+  padding: 10px 6px 9px;
+  border: 1.5px solid hsl(var(--teinte) 35% 40% / .45);
+  border-radius: 14px;
+  background: linear-gradient(160deg, hsl(var(--teinte) 38% 24%), hsl(var(--teinte) 32% 14%));
+  box-shadow: var(--ombre);
+  color: var(--encre);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+
+.tuile-picto {
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.tuile-nom {
+  max-width: 100%;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.tuile-compte {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--encre-douce);
+}
+
+.tuile:active:not(:disabled) { transform: scale(.96); }
+
+/* Tuile choisie : contour lavande et coche */
+.tuile[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent), var(--ombre);
+  background: linear-gradient(160deg, hsl(var(--teinte) 48% 33%), hsl(var(--teinte) 40% 20%));
+}
+
+.tuile[aria-pressed="true"] .tuile-compte { color: var(--encre); }
+
+.tuile[aria-pressed="true"]::after {
+  content: "✓";
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-encre);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Aucun jeu avec les autres filtres choisis */
+.tuile-zero { opacity: .5; }
+
+/* Regroupement encore vide : grisé, en pointillés, pas cliquable */
+.tuile-bientot {
+  border-style: dashed;
+  border-color: var(--trait-fort);
+  background: rgba(22, 31, 56, .6);
+  box-shadow: none;
+  cursor: default;
+}
+
+.tuile-bientot .tuile-picto {
+  filter: grayscale(1);
+  opacity: .45;
+}
+
+.tuile-bientot .tuile-nom { color: var(--encre-douce); }
+.tuile-bientot .tuile-compte { font-style: italic; }
+
+/* Autres thèmes (tags rangés dans aucun univers) : petites puces */
+.autres-themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px 0;
+}
+
+.autres-themes[hidden] { display: none; }
+
+.puce {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1.5px solid var(--trait-fort);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--encre-douce);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.puce-picto { font-size: 16px; }
+
+.puce[aria-pressed="true"],
+.puce-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-encre);
+}
+
+/* Filtre choisi, rappelé au-dessus des jeux : toucher pour le retirer */
+.puce-active::after {
+  content: "✕";
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.puce-effacer {
+  border-color: transparent;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* --------------------------------------------------------------------------
+   En-tête des jeux : titre, nombre, tri
+   -------------------------------------------------------------------------- */
+
+.resultats-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
+  margin: 0 0 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--trait);
+  scroll-margin-top: 8px;
+}
+
+.resultats-tete h2 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.compte {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--encre-douce);
 }
 
 /* Menu de tri : une liste déroulante native (sélecteur du téléphone) */
@@ -239,62 +487,14 @@ body::after {
 .tri-icone { left: 17px; }
 .tri-fleche { right: 16px; }
 
-/* Genres puis thèmes, sur une seule rangée qui défile.
-   Le rembourrage vertical laisse la place au contour de focus. */
-.filtres {
+.filtres-actifs {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 2px;
-  padding: 6px 16px;
-  overflow-x: auto;
-  scrollbar-width: none;
+  margin: 0 0 12px;
 }
 
-.filtres::-webkit-scrollbar { display: none; }
-
-.groupe-puces {
-  display: flex;
-  flex: none;
-  gap: 8px;
-}
-
-.separateur {
-  flex: none;
-  width: 1px;
-  height: 26px;
-  background: var(--trait-fort);
-}
-
-.groupe-puces[hidden],
-.separateur[hidden] { display: none; }
-
-.puce {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 1.5px solid var(--trait-fort);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--encre-douce);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
-}
-
-.puce-picto { font-size: 16px; }
-
-.puce[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-encre);
-}
+.filtres-actifs[hidden] { display: none; }
 
 /* --------------------------------------------------------------------------
    Grille de jaquettes
@@ -306,25 +506,11 @@ main.catalogue {
   padding: 16px 16px 48px;
 }
 
-/* Nombre de jeux + choix Monde / Mon pays */
-.ligne-infos {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 14px;
-}
-
-.compte {
-  margin: 0;
-  font-size: 14px;
-  color: var(--encre-douce);
-  font-weight: 600;
-}
-
+/* Choix Monde / Mon pays */
 .portee {
   display: inline-flex;
   flex: none;
+  margin: 0 0 12px;
   padding: 2px;
   border: 1.5px solid var(--trait-fort);
   border-radius: 999px;
@@ -354,7 +540,7 @@ main.catalogue {
 
 /* Explication du classement (hors connexion, pays avec peu de votes…) */
 .note-tri {
-  margin: -4px 0 14px;
+  margin: 0 0 14px;
   font-size: 14px;
   color: var(--encre-douce);
 }
@@ -527,14 +713,21 @@ main.catalogue {
 @media (hover: hover) {
   .recherche input:hover:not(:focus),
   .tri select:hover,
-  .puce:hover:not([aria-pressed="true"]) {
+  .puce:hover:not([aria-pressed="true"]):not(.puce-active):not(.puce-effacer) {
     border-color: var(--encre-douce);
   }
 
-  .puce:hover:not([aria-pressed="true"]),
+  .puce:hover:not([aria-pressed="true"]):not(.puce-active),
   .portee button:hover:not([aria-pressed="true"]) {
     color: var(--encre);
   }
+
+  .tuile:hover:not(:disabled) {
+    transform: translateY(-2px);
+    border-color: hsl(var(--teinte) 45% 60% / .8);
+  }
+
+  .tuile[aria-pressed="true"]:hover { border-color: var(--accent); }
 
   .carte:hover {
     transform: translateY(-3px);
@@ -716,6 +909,8 @@ body.lanceur::after { animation: none; }
 
   .carte:hover,
   .carte:active,
+  .tuile:hover,
+  .tuile:active,
   .bouton-vote:active {
     transform: none;
   }

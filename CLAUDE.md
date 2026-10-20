@@ -68,6 +68,7 @@ Réglages Cloudflare Pages : build command `node scripts/build-catalog.mjs`, out
 
 Autres fichiers ajoutés en phase 1 :
 - `public/play.js` : script du lanceur ; `public/assets/` : logo et jaquette par défaut.
+- `public/regroupements.js` : univers (thèmes réunissant plusieurs tags), tranches d'âge, pictogrammes et teintes des genres (tuiles du catalogue).
 - `public/_headers` : en-têtes Cloudflare (dont la règle de sécurité des jeux : aucun accès réseau).
 - `scripts/serve.mjs` : serveur de test local (applique la même règle de sécurité).
 - `package.json` : `npm run build` (construit) et `npm run dev` (construit + serveur sur http://localhost:8080).
@@ -158,9 +159,13 @@ Menu de tri du catalogue (égalités départagées par le score, puis le nombre 
 - **Nouveautés** : tous les jeux, du plus récent au plus ancien (badge « Nouveau » pendant 7 jours).
 
 - Portée : **Monde** ou **Mon pays** (pays donné par l'en-tête `X-Pays`). Si mon pays a moins de 20 votes en tout, le classement Monde est affiché, avec une phrase d'explication.
-- Filtres par **genre** (champ `genre`) et par **thème** (`tags`), combinables entre eux, avec le tri et la recherche.
+- **Regroupements en tuiles** en haut de l'accueil (`public/regroupements.js`), combinables entre eux, avec le tri et la recherche ; chaque tuile compte ses jeux (selon les autres filtres) :
+  - raccourcis : 🎲 **Au hasard** (lance un jeu parmi ceux affichés), 👍 **J'ai aimé** (mes votes 👍 sur l'appareil), 📶 **Hors ligne** (jeux gardés sur l'appareil) ;
+  - **âge** (d'après `ages`) : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et + ;
+  - **genres** (champ `genre`, liste fermée de 16) ;
+  - **univers** (21, chacun réunit plusieurs `tags` et le genre ; un jeu peut en avoir plusieurs), plus « Autres thèmes » en petites puces pour les tags rangés dans aucun univers.
+  - Un regroupement encore vide reste affiché, grisé « Bientôt », après ceux qui ont des jeux. Sur téléphone, genres et univers forment une bande de 2 rangées qui défile (« Tout voir » la déplie) ; sur grand écran, tout est déplié. Les filtres choisis sont rappelés au-dessus des jeux (✕ pour retirer, « Tout effacer »).
 - Chaque jaquette affiche ses compteurs 👍 et 👎 (portée choisie). Sans API : tri par nouveautés, sans compteurs.
-- À faire : onglet **Hors ligne** (jeux déjà en cache sur l'appareil).
 - **Archives** : jeux avec plus de 30 votes et un score inférieur à 0,2 (seuils ajustables, votes du monde entier), affichés en bas.
 
 Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2e et 4e position de « Mieux notés »), `ARCHIVE_VOTES_MIN`, `ARCHIVE_SCORE_MAX`, `PAYS_VOTES_MIN`.
@@ -211,10 +216,15 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 
 - [ ] Phase 1 — fichiers créés (catalogue avec recherche, onglets Tous / Nouveautés, filtres par thème ; lanceur avec plein écran ; build ; jeu d'exemple `pommes-du-poney`). Reste : intégrer les jeux existants et publier sur Cloudflare Pages.
 - [ ] Phase 2 — fichiers créés (`functions/api/vote.js`, `functions/api/scores.js`, `public/votes.js`, `schema.sql` ; pouces dans le lanceur ; onglet Populaires trié par Wilson avec nouveautés intercalées ; Archives). Reste : tester en ligne, limite de débit par IP, proposition de vote au retour au catalogue.
-- [ ] Phase 3 — fichiers créés (`public/sw.js`, `public/hors-ligne.js`, manifeste et icônes ; jeux affichés via `srcdoc` ; badge « Disponible hors ligne » ; messages clairs pour les votes et les jeux non gardés). Testé dans Chrome (serveur local et redirections façon Cloudflare). Reste : tester sur téléphone une fois en ligne, onglet « Hors ligne » et bouton « Rendre disponible hors ligne ».
+- [ ] Phase 3 — fichiers créés (`public/sw.js`, `public/hors-ligne.js`, manifeste et icônes ; jeux affichés via `srcdoc` ; badge « Disponible hors ligne » ; messages clairs pour les votes et les jeux non gardés). Testé dans Chrome (serveur local et redirections façon Cloudflare). Tuile « Hors ligne » dans le catalogue. Reste : tester sur téléphone une fois en ligne, bouton « Rendre disponible hors ligne ».
 - [ ] Phase 4
 - Catalogue amélioré — fichiers modifiés (menu de tri à 4 choix, portée Monde / Mon pays, filtres par genre et par thème, compteurs 👍 👎 ; champ `genre` dans `game.json` et `scripts/genres.mjs` ; `semaine` et `X-Pays` dans `/api/scores`). Reste : tester en ligne avec de vrais votes (en local, l'API n'existe pas).
+- Regroupements en tuiles — fait (`public/regroupements.js`, accueil refait : raccourcis Au hasard / J'ai aimé / Hors ligne, âge, 16 genres dont 6 nouveaux — `plateforme`, `sport`, `aventure`, `stratégie`, `observation`, `simulation` —, 21 univers, autres thèmes ; regroupements vides grisés « Bientôt » ; `mesVotes()` dans `votes.js` ; coquille `v2` dans `sw.js`). Testé dans Chromium (téléphone et ordinateur). Reste : tester sur téléphone une fois en ligne.
 - Design « Galaxie » — fait (`style.css` réécrit, fonctionnement inchangé). Toujours sombre : bleu nuit `#0b1020`, gris ardoise, blanc cassé `#eceae4`, un seul accent bleu lavande `#a8b3f0` (couleurs en variables dans `:root`). Champ d'étoiles fixe en CSS (`body::before` / `::after`, scintillement léger coupé si mouvements réduits). Logo planète à anneau : `assets/logo.svg` (sur fond, sert aussi aux icônes PNG) et copie sans fond dans l'en-tête de `index.html`. Pouces dessinés au trait (SVG dans `play.html`, masque CSS pour les compteurs des jaquettes). Boutons et puces d'au moins 44 px.
+- Idées depuis le téléphone — fichiers créés (`.github/ISSUE_TEMPLATE/idee-jeu.yml`, `.github/workflows/idee-jeu.yml`, section dans `GUIDE-BOUCLE.md`). Reste : créer l'étiquette `idee-jeu` sur GitHub et faire un premier essai.
+- Corrections par commentaire — fichier créé (`.github/workflows/corriger-jeu.yml`, section dans `GUIDE-BOUCLE.md`). Reste : premier essai sur une vraie pull request.
+- Plusieurs jeux par lancement — `nouveau-jeu.yml` (entrée « nombre » 1 à 5, matrice, une pull request par jeu, jeux créés l'un après l'autre (`max-parallel: 1`, `fail-fast: false`), 2 la nuit et 1 à 5 à la main, idées déjà prises par une pull request ouverte sautées) et `cocher-idee.yml` (idée cochée sur main à la fusion). Les pull requests de jeux ne modifient jamais `IDEES-JEUX.md` : l'idée est notée dans `game.json` (champ `idee`, garanti par le workflow). Lecture de l'ancien repère `<!-- idee: … -->` des descriptions gardée en secours pour les pull requests créées avant ce champ : à retirer quand elles seront toutes fusionnées ou fermées.
+- Jeux plus complets — minimum obligatoire dans `CONSIGNES-JEU.md` (10 niveaux, tutoriel animé, étoiles, record, sons coupables, effets, bilan, mécaniques combinées) ; `nouveau-jeu.yml` : cahier de conception (description de la pull request), partie au hasard avec captures (`validate-games.mjs --jouer`, captures dans `captures/`, ignoré par git), relecture « 15 minutes », Claude Fable 5.1, 150 tours, 120 minutes. Reste : juger le premier jeu produit.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 

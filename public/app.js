@@ -8,14 +8,17 @@
 //   Populaires cette semaine, Nouveautés.
 // - Portée : votes du monde entier, ou de mon pays (pays détecté par l'API ;
 //   classement Monde tant que mon pays a moins de PAYS_VOTES_MIN votes).
-// - Filtres par genre et par thème, combinables entre eux, avec le tri et
-//   avec la recherche.
+// - Regroupements en tuiles (définis dans regroupements.js) : raccourcis
+//   (au hasard, jeux aimés, hors ligne), âge, genres, univers et autres
+//   thèmes. Combinables entre eux, avec le tri et avec la recherche ; chaque
+//   tuile compte ses jeux. Un regroupement encore vide est grisé (« Bientôt »).
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
 // - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
 // ==========================================================================
 
-import { votesEnAttente, envoyerEnAttente } from './votes.js';
+import { votesEnAttente, envoyerEnAttente, mesVotes } from './votes.js';
 import { activerHorsLigne, jeuxHorsLigne } from './hors-ligne.js';
+import { GENRES_AFFICHAGE, UNIVERS, TRANCHES_AGE } from './regroupements.js';
 
 const NOUVEAU_JOURS = 7;          // un jeu est « nouveau » pendant 7 jours
 const NOUVEAUX_EN_TETE = 2;       // nouveautés intercalées en haut du tri « Mieux notés »
@@ -24,10 +27,10 @@ const ARCHIVE_SCORE_MAX = 0.2;    // … et un score inférieur à 0,2 (votes du
 const PAYS_VOTES_MIN = 20;        // sous 20 votes dans mon pays, classement Monde
 const DELAI_SCORES = 4000;        // au-delà, on affiche sans attendre l'API
 
-// Pictogrammes des genres (liste fermée : scripts/genres.mjs).
-const PICTOS_GENRES = {
-  'adresse': '🎯', 'réflexion': '🧠', 'mémoire': '🃏', 'quiz': '❓', 'rythme': '🥁',
-  'création': '🎨', 'course': '🏁', 'puzzle': '🧩', 'calcul': '🔢', 'lecture': '📖',
+// Raccourcis du haut : des « collections » propres à l'appareil.
+const COLLECTIONS = {
+  aimes: { nom: "J'ai aimé", picto: '👍', teinte: 230, vide: 'Vote 👍 en jouant' },
+  'hors-ligne': { nom: 'Hors ligne', picto: '📶', teinte: 200, vide: 'Ouvre un jeu une fois' },
 };
 
 const SANS_VOTE = { up: 0, down: 0, score: 0, semaine: 0 };
@@ -39,10 +42,14 @@ const etat = {
   scoresPays: undefined,  // idem pour mon pays : undefined = pas chargé, null = indisponible
   pays: null,             // pays détecté par l'API (ex. « FR »), ou null
   horsLigne: new Set(),   // jeux gardés sur l'appareil
+  aimes: new Set(),       // jeux que j'ai notés 👍 sur cet appareil
   tri: 'notes',           // 'notes' | 'votes' | 'semaine' | 'nouveautes'
   portee: 'monde',        // 'monde' | 'pays'
+  collection: null,       // 'aimes' | 'hors-ligne' | null
+  age: null,              // tranche d'âge (TRANCHES_AGE), ou null
   genre: null,            // genre sélectionné, ou null
-  etiquette: null,        // thème sélectionné, ou null
+  univers: null,          // univers sélectionné (UNIVERS), ou null
+  etiquette: null,        // autre thème (tag hors univers), ou null
   texte: '',              // recherche
 };
 
@@ -59,9 +66,15 @@ const el = {
   tri: document.getElementById('tri'),
   portee: document.getElementById('portee'),
   porteeChoix: document.querySelectorAll('#portee button'),
+  resultats: document.getElementById('resultats'),
+  titre: document.getElementById('titre-texte'),
+  actifs: document.getElementById('filtres-actifs'),
+  raccourcis: document.getElementById('raccourcis'),
+  ages: document.getElementById('ages'),
   genres: document.getElementById('genres'),
-  separateur: document.getElementById('separateur'),
-  etiquettes: document.getElementById('etiquettes'),
+  univers: document.getElementById('univers'),
+  autresThemes: document.getElementById('autres-themes'),
+  toutVoir: document.querySelectorAll('.tout-voir'),
 };
 
 // --- Outils ----------------------------------------------------------------
@@ -95,6 +108,11 @@ function nomPays(code) {
   } catch {
     return code;
   }
+}
+
+// Jeux que j'ai notés 👍 sur cet appareil.
+function jeuxAimes() {
+  return new Set(Object.entries(mesVotes()).filter(([, v]) => v === 1).map(([id]) => id));
 }
 
 function totalVotes(scores) {
@@ -154,24 +172,52 @@ function intercalerNouveautes(liste) {
   return resultat;
 }
 
+// --- Regroupements ---------------------------------------------------------
+
+// « 6+ » → tranche « 5-6 » (TRANCHES_AGE) ; âge illisible → null.
+function trancheAge(ages) {
+  const age = parseInt(ages, 10);
+  if (Number.isNaN(age)) return null;
+  return TRANCHES_AGE.find((t) => age >= t.min && age <= t.max)?.id ?? null;
+}
+
+// Univers d'un jeu : ceux dont un tag correspond à son genre ou à l'un de ses tags.
+function universDuJeu(jeu) {
+  const mots = new Set([jeu.genre, ...jeu.tags].map((m) => m.normalize('NFC')));
+  return UNIVERS.filter((u) => u.tags.some((t) => mots.has(t))).map((u) => u.id);
+}
+
+function dansCollection(jeu, collection) {
+  return collection === 'aimes' ? etat.aimes.has(jeu.id) : etat.horsLigne.has(jeu.id);
+}
+
+// Le jeu passe-t-il tous les filtres choisis, sauf celui de la famille « sauf » ?
+// (Sert aussi à compter les jeux de chaque tuile en tenant compte des autres filtres.)
+function correspond(jeu, recherche, sauf = null) {
+  if (sauf !== 'collection' && etat.collection && !dansCollection(jeu, etat.collection)) return false;
+  if (sauf !== 'age' && etat.age && jeu.tranche !== etat.age) return false;
+  if (sauf !== 'genre' && etat.genre && jeu.genre !== etat.genre) return false;
+  if (sauf !== 'theme') {
+    if (etat.univers && !jeu.univers.includes(etat.univers)) return false;
+    if (etat.etiquette && !jeu.tags.includes(etat.etiquette)) return false;
+  }
+  return !recherche || jeu.texte.includes(recherche);
+}
+
+function rechercheNormalisee() {
+  return normaliser(etat.texte).trim();
+}
+
+function filtreActif() {
+  return !!(etat.collection || etat.age || etat.genre || etat.univers || etat.etiquette || rechercheNormalisee());
+}
+
 // --- Filtrage et tri --------------------------------------------------------
 
 // Renvoie { principaux, archives } (archives : seulement quand les votes sont connus).
 function jeuxVisibles() {
-  const recherche = normaliser(etat.texte).trim();
-  let liste = etat.jeux;
-
-  if (etat.genre) {
-    liste = liste.filter((j) => j.genre === etat.genre);
-  }
-  if (etat.etiquette) {
-    liste = liste.filter((j) => j.tags.includes(etat.etiquette));
-  }
-  if (recherche) {
-    liste = liste.filter((j) =>
-      normaliser([j.title, j.description, j.genre, ...j.tags].join(' ')).includes(recherche)
-    );
-  }
+  const recherche = rechercheNormalisee();
+  const liste = etat.jeux.filter((j) => correspond(j, recherche));
 
   const tri = triEffectif();
   const comparer = comparateur(tri, scoresAffiches());
@@ -263,7 +309,8 @@ function afficherGrille() {
   el.archives.hidden = archives.length === 0;
 
   const total = liste.length + archives.length;
-  el.compte.textContent = total === 1 ? '1 jeu' : `${total} jeux`;
+  el.titre.textContent = filtreActif() ? 'Jeux trouvés' : 'Tous les jeux';
+  el.compte.textContent = `· ${nombreDeJeux(total)}`;
   el.vide.hidden = total > 0;
 }
 
@@ -302,10 +349,54 @@ function afficher() {
   afficherTri();
   afficherPortee();
   afficherNote();
-  afficherGrille();
+  rafraichir();
 }
 
-function creerPuce(texte, picto, actif, action) {
+// « 0 jeu », « 1 jeu », « 2 jeux »
+function nombreDeJeux(n) {
+  return n <= 1 ? `${n} jeu` : `${n} jeux`;
+}
+
+// Tuile d'un regroupement. compte : jeux avec les autres filtres choisis ;
+// total : jeux du catalogue entier (0 = regroupement encore vide, grisé).
+function creerTuile({ cle, picto, nom, teinte, actif, compte, total, vide = 'Bientôt', aide, action }) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'tuile';
+  b.dataset.cle = cle;
+  if (teinte !== undefined) b.style.setProperty('--teinte', teinte);
+
+  const icone = document.createElement('span');
+  icone.className = 'tuile-picto';
+  icone.setAttribute('aria-hidden', 'true');
+  icone.textContent = picto;
+
+  const titre = document.createElement('span');
+  titre.className = 'tuile-nom';
+  titre.textContent = nom;
+
+  const sous = document.createElement('span');
+  sous.className = 'tuile-compte';
+  b.append(icone, titre, sous);
+
+  if (actif !== undefined) b.setAttribute('aria-pressed', String(actif));
+  if (total === 0) {
+    b.disabled = true;
+    b.classList.add('tuile-bientot');
+    sous.textContent = vide;
+    b.setAttribute('aria-label', `${nom} : ${vide.toLowerCase()}`);
+  } else if (compte !== undefined) {
+    sous.textContent = nombreDeJeux(compte);
+    if (compte === 0 && !actif) b.classList.add('tuile-zero');
+    b.setAttribute('aria-label', `${aide || nom} : ${nombreDeJeux(compte)}`);
+  } else {
+    sous.textContent = aide;
+  }
+  b.addEventListener('click', action);
+  return b;
+}
+
+function creerPuce(texte, picto, actif, action, etiquetteAria) {
   const b = document.createElement('button');
   b.className = 'puce';
   b.type = 'button';
@@ -317,39 +408,165 @@ function creerPuce(texte, picto, actif, action) {
     b.append(icone);
   }
   b.append(texte);
-  b.setAttribute('aria-pressed', String(actif));
+  if (actif !== null) b.setAttribute('aria-pressed', String(actif));
+  if (etiquetteAria) b.setAttribute('aria-label', etiquetteAria);
   b.addEventListener('click', action);
   return b;
 }
 
-function afficherFiltres() {
-  // Genres présents dans le catalogue, dans l'ordre de la liste fermée.
-  const presents = new Set(etat.jeux.map((j) => j.genre).filter(Boolean));
-  const genres = [...etat.genres.filter((g) => presents.has(g)), ...[...presents].filter((g) => !etat.genres.includes(g))];
-  el.genres.replaceChildren(...genres.map((genre) => creerPuce(majuscule(genre), PICTOS_GENRES[genre], etat.genre === genre, () => {
-    etat.genre = etat.genre === genre ? null : genre;
-    afficherFiltres();
-    afficherGrille();
-  })));
+// Choisit (ou retire, si déjà choisi) un filtre, puis met tout à jour.
+// Univers et « autres thèmes » s'excluent : un seul thème à la fois.
+function choisir(famille, valeur) {
+  etat[famille] = etat[famille] === valeur ? null : valeur;
+  if (famille === 'univers' && etat.univers) etat.etiquette = null;
+  if (famille === 'etiquette' && etat.etiquette) etat.univers = null;
+  rafraichir();
+  if (etat[famille]) montrerResultats();
+}
 
-  // Thèmes : les tags qui ne sont pas des genres, du plus fréquent au moins fréquent.
-  const nomsGenres = new Set([...etat.genres, ...presents]);
+// Après le choix d'une tuile, fait défiler jusqu'aux jeux s'ils sont hors de vue.
+function montrerResultats() {
+  if (el.resultats.getBoundingClientRect().top < innerHeight * 0.7) return;
+  const doux = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  el.resultats.scrollIntoView({ behavior: doux ? 'smooth' : 'auto', block: 'start' });
+}
+
+// Lance un jeu au hasard parmi ceux affichés (donc en respectant les filtres).
+function jouerAuHasard() {
+  const { principaux } = jeuxVisibles();
+  const liste = principaux.length ? principaux : etat.jeux;
+  const jeu = liste[Math.floor(Math.random() * liste.length)];
+  if (jeu) location.href = `play.html?id=${encodeURIComponent(jeu.id)}`;
+}
+
+// Nombre de jeux par valeur, en tenant compte des autres filtres (compte)
+// et sur le catalogue entier (total).
+function compter(famille, valeursDuJeu) {
+  const recherche = rechercheNormalisee();
   const compte = new Map();
+  const total = new Map();
   for (const jeu of etat.jeux) {
-    for (const tag of jeu.tags) if (!nomsGenres.has(tag)) compte.set(tag, (compte.get(tag) || 0) + 1);
+    const valeurs = valeursDuJeu(jeu);
+    const retenu = correspond(jeu, recherche, famille);
+    for (const v of valeurs) {
+      total.set(v, (total.get(v) || 0) + 1);
+      if (retenu) compte.set(v, (compte.get(v) || 0) + 1);
+    }
   }
-  const tags = [...compte.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'fr'))
-    .map(([tag]) => tag);
-  el.etiquettes.replaceChildren(...tags.map((tag) => creerPuce(majuscule(tag), null, etat.etiquette === tag, () => {
-    etat.etiquette = etat.etiquette === tag ? null : tag;
-    afficherFiltres();
-    afficherGrille();
+  return { compte: (v) => compte.get(v) || 0, total: (v) => total.get(v) || 0 };
+}
+
+// Les regroupements qui ont des jeux d'abord, les vides (« Bientôt ») ensuite ;
+// à l'intérieur, l'ordre des listes est gardé.
+function pleinsDAbord(liste, total) {
+  return [...liste.filter((x) => total(x) > 0), ...liste.filter((x) => total(x) === 0)];
+}
+
+function afficherRegroupements() {
+  // Les tuiles sont recréées : on rend le focus clavier à celle qui l'avait.
+  const cleFocus = document.activeElement?.dataset?.cle;
+
+  // Raccourcis : au hasard, jeux aimés, jeux hors ligne.
+  const collections = compter('collection', (j) => Object.keys(COLLECTIONS).filter((c) => dansCollection(j, c)));
+  el.raccourcis.replaceChildren(
+    creerTuile({
+      cle: 'hasard', picto: '🎲', nom: 'Au hasard', teinte: 265, aide: 'Lance un jeu',
+      total: etat.jeux.length, vide: 'Aucun jeu', action: jouerAuHasard,
+    }),
+    ...Object.entries(COLLECTIONS).map(([id, c]) => creerTuile({
+      cle: `collection:${id}`, picto: c.picto, nom: c.nom, teinte: c.teinte, vide: c.vide,
+      actif: etat.collection === id, compte: collections.compte(id), total: collections.total(id),
+      action: () => choisir('collection', id),
+    })),
+  );
+
+  // Âge conseillé.
+  const ages = compter('age', (j) => (j.tranche ? [j.tranche] : []));
+  el.ages.replaceChildren(...TRANCHES_AGE.map((t) => creerTuile({
+    cle: `age:${t.id}`, picto: t.picto, nom: t.nom, aide: t.aide,
+    actif: etat.age === t.id, compte: ages.compte(t.id), total: ages.total(t.id),
+    action: () => choisir('age', t.id),
   })));
 
-  el.genres.hidden = genres.length === 0;
-  el.etiquettes.hidden = tags.length === 0;
-  el.separateur.hidden = genres.length === 0 || tags.length === 0;
+  // Genres : la liste fermée (catalog.json), plus un genre inconnu éventuel.
+  const presents = new Set(etat.jeux.map((j) => j.genre).filter(Boolean));
+  const genres = compter('genre', (j) => (j.genre ? [j.genre] : []));
+  const listeGenres = [...etat.genres, ...[...presents].filter((g) => !etat.genres.includes(g))];
+  el.genres.replaceChildren(...pleinsDAbord(listeGenres, genres.total).map((genre) => {
+    const affichage = GENRES_AFFICHAGE[genre] || { picto: '🎮', teinte: 230 };
+    return creerTuile({
+      cle: `genre:${genre}`, picto: affichage.picto, nom: majuscule(genre), teinte: affichage.teinte,
+      actif: etat.genre === genre, compte: genres.compte(genre), total: genres.total(genre),
+      action: () => choisir('genre', genre),
+    });
+  }));
+
+  // Univers.
+  const univers = compter('theme', (j) => j.univers);
+  el.univers.replaceChildren(...pleinsDAbord(UNIVERS, (u) => univers.total(u.id)).map((u) => creerTuile({
+    cle: `univers:${u.id}`, picto: u.picto, nom: u.nom, teinte: u.teinte,
+    actif: etat.univers === u.id, compte: univers.compte(u.id), total: univers.total(u.id),
+    action: () => choisir('univers', u.id),
+  })));
+
+  // Autres thèmes : les tags rangés dans aucun univers (ni genres), en petites puces.
+  const dejaRanges = new Set([...UNIVERS.flatMap((u) => u.tags), ...listeGenres]);
+  const autres = compter('theme', (j) => j.tags.filter((t) => !dejaRanges.has(t.normalize('NFC'))));
+  const tags = [...new Set(etat.jeux.flatMap((j) => j.tags))]
+    .filter((t) => autres.total(t) > 0)
+    .sort((a, b) => autres.total(b) - autres.total(a) || a.localeCompare(b, 'fr'));
+  el.autresThemes.replaceChildren(...tags.map((tag) => creerPuce(majuscule(tag), null, etat.etiquette === tag,
+    () => choisir('etiquette', tag), `${majuscule(tag)} : ${nombreDeJeux(autres.compte(tag))}`)));
+  el.autresThemes.hidden = tags.length === 0;
+
+  if (cleFocus) document.querySelector(`[data-cle="${CSS.escape(cleFocus)}"]`)?.focus();
+}
+
+// Filtres choisis, rappelés au-dessus des jeux : une puce ✕ pour retirer chacun.
+function afficherFiltresActifs() {
+  const actifs = [];
+  const ajouter = (picto, nom, retirer) => actifs.push(
+    creerPuce(nom, picto, null, () => { retirer(); rafraichir(); }, `Retirer le filtre ${nom}`),
+  );
+  if (etat.collection) {
+    const c = COLLECTIONS[etat.collection];
+    ajouter(c.picto, c.nom, () => { etat.collection = null; });
+  }
+  if (etat.age) {
+    const t = TRANCHES_AGE.find((x) => x.id === etat.age);
+    ajouter(t.picto, t.nom, () => { etat.age = null; });
+  }
+  if (etat.genre) {
+    ajouter(GENRES_AFFICHAGE[etat.genre]?.picto || '🎮', majuscule(etat.genre), () => { etat.genre = null; });
+  }
+  if (etat.univers) {
+    const u = UNIVERS.find((x) => x.id === etat.univers);
+    ajouter(u.picto, u.nom, () => { etat.univers = null; });
+  }
+  if (etat.etiquette) ajouter('🏷️', majuscule(etat.etiquette), () => { etat.etiquette = null; });
+  if (rechercheNormalisee()) {
+    ajouter('🔎', `« ${etat.texte.trim()} »`, () => { etat.texte = ''; el.recherche.value = ''; });
+  }
+  for (const puce of actifs) puce.classList.add('puce-active');
+
+  if (actifs.length > 1) {
+    const tout = creerPuce('Tout effacer', null, null, () => {
+      Object.assign(etat, { collection: null, age: null, genre: null, univers: null, etiquette: null, texte: '' });
+      el.recherche.value = '';
+      rafraichir();
+    });
+    tout.classList.add('puce-effacer');
+    actifs.push(tout);
+  }
+  el.actifs.replaceChildren(...actifs);
+  el.actifs.hidden = actifs.length === 0;
+}
+
+// Tout ce qui dépend des filtres : tuiles (et leurs comptes), rappel des filtres, jeux.
+function rafraichir() {
+  afficherRegroupements();
+  afficherFiltresActifs();
+  afficherGrille();
 }
 
 // --- Scores -----------------------------------------------------------------
@@ -411,7 +628,17 @@ el.porteeChoix.forEach((bouton) => {
 
 el.recherche.addEventListener('input', () => {
   etat.texte = el.recherche.value;
-  afficherGrille();
+  rafraichir();
+});
+
+// « Tout voir » : la bande de tuiles qui défile devient une grille complète.
+el.toutVoir.forEach((bouton) => {
+  bouton.addEventListener('click', () => {
+    const tuiles = document.getElementById(bouton.getAttribute('aria-controls'));
+    const deplie = tuiles.classList.toggle('deplie');
+    bouton.setAttribute('aria-expanded', String(deplie));
+    bouton.textContent = deplie ? 'Réduire' : 'Tout voir';
+  });
 });
 
 // Retour de la connexion : on récupère les votes s'ils manquaient.
@@ -429,7 +656,8 @@ addEventListener('online', async () => {
 addEventListener('pageshow', async (evenement) => {
   if (!evenement.persisted || etat.jeux.length === 0) return;
   etat.horsLigne = await jeuxHorsLigne();
-  afficherGrille();
+  etat.aimes = jeuxAimes();
+  rafraichir();
 });
 
 // --- Démarrage --------------------------------------------------------------
@@ -441,11 +669,19 @@ async function demarrer() {
     const reponse = await fetch('catalog.json', { cache: 'no-cache' });
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
     const catalogue = await reponse.json();
-    etat.jeux = (catalogue.games || []).map((j) => ({
-      ...j,
-      genre: typeof j.genre === 'string' ? j.genre : '',
-      tags: Array.isArray(j.tags) ? j.tags : [],
-    }));
+    etat.jeux = (catalogue.games || []).map((j) => {
+      const jeu = {
+        ...j,
+        genre: typeof j.genre === 'string' ? j.genre : '',
+        tags: Array.isArray(j.tags) ? j.tags.filter((t) => typeof t === 'string') : [],
+      };
+      jeu.tranche = trancheAge(jeu.ages);
+      jeu.univers = universDuJeu(jeu);
+      // Texte de recherche : titre, description, genre, thèmes et noms des univers.
+      const nomsUnivers = UNIVERS.filter((u) => jeu.univers.includes(u.id)).map((u) => u.nom);
+      jeu.texte = normaliser([jeu.title, jeu.description, jeu.genre, ...jeu.tags, ...nomsUnivers].join(' '));
+      return jeu;
+    });
     etat.genres = Array.isArray(catalogue.genres) ? catalogue.genres.filter((g) => typeof g === 'string') : [];
   } catch (erreur) {
     console.error('Impossible de charger le catalogue :', erreur);
@@ -461,7 +697,7 @@ async function demarrer() {
     etat.pays = resultat.pays;
   }
   etat.horsLigne = await horsLigne;
-  afficherFiltres();
+  etat.aimes = jeuxAimes();
   afficher();
 
   // Votes restés en attente (faits hors ligne) : on retente l'envoi.

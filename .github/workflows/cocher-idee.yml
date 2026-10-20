@@ -1,0 +1,83 @@
+# ==========================================================================
+# Coche l'idée d'un jeu dans IDEES-JEUX.md quand sa pull request (branche
+# nouveau-jeu/…) est fusionnée sur main. La coche est faite sur main, une
+# fusion à la fois : jamais de conflit, même avec plusieurs jeux en parallèle.
+#
+#  - L'idée est lue dans le champ "idee" du game.json du jeu (anciennes pull
+#    requests, sans ce champ : repère <!-- idee: … --> de leur description).
+#  - La ligne correspondante devient « - [x] … → <id> ».
+#  - Idée inventée ou imposée (absente de la liste) : ajoutée cochée à la
+#    fin, d'après le game.json du jeu.
+#  - Pull request fermée sans fusion : rien ne change, l'idée sera retentée.
+# ==========================================================================
+
+name: Cocher l'idée
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+concurrency:
+  group: cocher-idee
+  cancel-in-progress: false
+
+jobs:
+  cocher:
+    if: github.event.pull_request.merged && startsWith(github.event.pull_request.head.ref, 'nouveau-jeu/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Récupérer main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Cocher l'idée et enregistrer
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const pr = context.payload.pull_request;
+            const FICHIER = 'IDEES-JEUX.md';
+
+            // Le jeu de la pull request : son dossier games/<id>/.
+            const fichiers = await github.paginate(github.rest.pulls.listFiles, { ...context.repo, pull_number: pr.number, per_page: 100 });
+            const ids = [...new Set(fichiers.map((f) => (/^games\/([a-z0-9-]+)\//.exec(f.filename) || [])[1]).filter(Boolean))];
+            if (ids.length !== 1) return core.warning(`PR #${pr.number} : pas un seul jeu (${ids.join(', ') || 'aucun'}), rien à cocher.`);
+            const id = ids[0];
+
+            const lignes = fs.readFileSync(FICHIER, 'utf8').split('\n');
+            if (lignes.some((l) => l.endsWith(`→ ${id}`))) return core.info(`Idée de ${id} déjà cochée.`);
+
+            // L'idée réalisée : champ "idee" du game.json (anciennes pull requests : repère de la description).
+            const f = JSON.parse(fs.readFileSync(`games/${id}/game.json`, 'utf8'));
+            const idee = String(f.idee || (/<!-- idee: (.+?) -->/.exec(pr.body || '') || [])[1] || '').trim();
+            const titreDe = (l) => l.replace(/^- \[[ xX]\] /, '').split(' — ')[0].trim().toLowerCase();
+            // Ligne de cette idée, pas encore reliée à un jeu (cochée ou non).
+            const i = idee ? lignes.findIndex((l) => /^- \[[ xX]\] /.test(l) && !l.includes(' → ') && titreDe(l) === idee.toLowerCase()) : -1;
+            if (i >= 0) {
+              lignes[i] = `${lignes[i].replace(/^- \[[ xX]\] /, '- [x] ')} → ${id}`;
+            } else {
+              // Idée inventée ou imposée (absente de la liste) : ligne cochée à la fin, d'après la fiche du jeu.
+              let desc = String(f.description || '').replace(/\s+/g, ' ').trim().replace(/[.!\s]+$/, '');
+              desc = desc.charAt(0).toLowerCase() + desc.slice(1);
+              const idees = lignes.map((l, k) => (/^- \[[ xX]\] /.test(l) ? k : -1)).filter((k) => k >= 0);
+              const position = idees.length ? idees.at(-1) + 1 : lignes.length;
+              lignes.splice(position, 0, `- [x] ${idee || f.title} — ${desc} (${f.genre}, ${f.ages}) → ${id}`);
+            }
+            fs.writeFileSync(FICHIER, lignes.join('\n'));
+
+            // Commit sur main ; si main a bougé entre-temps, on se remet à jour et on réessaie.
+            const git = (...args) => exec.exec('git', args);
+            await git('config', 'user.name', 'github-actions[bot]');
+            await git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com');
+            await git('commit', '-m', `Idée cochée : ${id} (PR #${pr.number})`, '--', FICHIER);
+            for (let essai = 1; ; essai++) {
+              try { await git('push', 'origin', 'HEAD:main'); break; }
+              catch (e) { if (essai === 3) throw e; await git('pull', '--rebase', 'origin', 'main'); }
+            }
