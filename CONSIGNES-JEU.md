@@ -10,13 +10,27 @@ Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.
 - Interdit : violence réaliste, peur, moquerie, compétition humiliante, publicité, achat, lien externe, chat, collecte de données.
 - Interdit : personnages, noms, logos ou univers existants (Pokémon, Mario, Disney…). Créations originales uniquement.
 
-## 2. La qualité attendue
+## 2. Le contenu et la qualité attendus
+
+### Minimum obligatoire (chaque nouveau jeu)
+
+Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient obligatoirement :
+
+1. **Au moins 10 niveaux ou vagues**, de difficulté progressive : les premiers se réussissent du premier coup, les derniers demandent de l'entraînement.
+2. **Plusieurs mécaniques qui se combinent** : une nouveauté (obstacle, bonus, règle, ennemi, type de carte…) apparaît tous les 2 ou 3 niveaux, puis se mélange aux précédentes.
+3. **Un tutoriel animé au début** : une courte démonstration montre le geste à faire (main ou flèche animée), en 3 étapes au plus, et se passe d'un toucher. Chaque nouvelle mécanique est présentée de la même façon à sa première apparition.
+4. **Un score et des récompenses** : 1 à 3 étoiles par niveau selon la réussite (ou médailles, objets à collectionner…).
+5. **Un record sauvegardé** (meilleur score, étoiles, niveaux atteints) dans `localStorage`, toujours dans `try { … } catch (e) { … }` : sans stockage, le jeu marche quand même.
+6. **Des sons générés avec Web Audio** (aucun fichier audio) pour les actions, réussites, erreurs et fins de niveau, avec un **bouton pour couper le son**, bien visible, dont le choix est mémorisé. Aucun son avant la première action du joueur.
+7. **Des animations et des effets de réussite** : confettis, étoiles qui s'envolent, compteur qui défile, légère secousse… à chaque réussite et à chaque fin de niveau.
+8. **Un écran de fin avec bilan** : à chaque fin de niveau et en fin de partie, score, étoiles gagnées, record battu ou non, et boutons « Niveau suivant » et « Rejouer ».
+
+### Le ressenti
 
 - **Compris en 10 secondes** : un écran d'accueil avec le titre, la règle en une ou deux phrases et un gros bouton « Jouer ».
-- **Amusant tout de suite**, puis de plus en plus difficile (niveaux, vitesse ou nombre d'éléments).
-- Un **score** ou une progression visible, et un écran de fin avec un bouton « Rejouer ».
-- Retours visuels à chaque action (animation, couleur, petite récompense). Les sons sont facultatifs, générés en Web Audio, et jamais au démarrage sans action du joueur.
-- Partie typique : 1 à 5 minutes.
+- **Amusant tout de suite**, puis de plus en plus riche.
+- Un retour visuel et sonore à chaque action.
+- Un niveau dure 1 à 2 minutes ; l'enfant peut s'arrêter et reprendre plus tard grâce à la sauvegarde.
 
 ## 3. Les règles techniques
 
@@ -47,10 +61,11 @@ Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.
 
 - `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier.
 - `genre` : **obligatoire**, un seul, choisi dans cette liste fermée (filtres « genre » du catalogue) :
-  `adresse`, `réflexion`, `mémoire`, `quiz`, `rythme`, `création`, `course`, `puzzle`, `calcul`, `lecture`.
+  `adresse`, `plateforme`, `course`, `sport`, `rythme`, `aventure`, `réflexion`, `stratégie`, `puzzle`, `mémoire`, `observation`, `quiz`, `calcul`, `lecture`, `création`, `simulation`.
+  (`observation` : cherche-et-trouve, différences ; `simulation` : soigner un animal, cuisiner, tenir une ferme…)
   La même liste figure dans `scripts/genres.mjs` : modifier les deux ensemble.
-- `tags` : 1 à 5 thèmes, en minuscules, de préférence déjà utilisés sur le site : `chevaux`, `animaux`, `judo`, `espace`, `nature`, `géographie`, `sciences`…
-- `ages` : âge minimum conseillé, au format `"6+"`.
+- `tags` : 1 à 5 thèmes, en minuscules. Ils rangent le jeu dans les **univers** du catalogue (liste dans `public/regroupements.js`) : utiliser de préférence un tag déjà prévu, par exemple `chevaux`, `animaux`, `judo`, `nature`, `mer`, `espace`, `géographie`, `lecture`, `calcul`, `sciences`, `formes`, `couleurs`, `cubes`, `labyrinthe`, `musique`, `véhicules`, `dinosaures`, `magie`, `fantastique`, `cuisine`, `histoire`, `métiers`, `noël`, `arcade`. Un tag rangé dans aucun univers apparaît seulement dans « Autres thèmes ».
+- `ages` : âge minimum conseillé, au format `"6+"` (tuiles d'âge du catalogue : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et +).
 - `idee` : rempli par la boucle automatique, titre de la ligne de `IDEES-JEUX.md` réalisée par ce jeu. Ne pas le modifier. Facultatif pour un jeu créé à la main.
 
 ## 5. La jaquette
@@ -61,7 +76,7 @@ Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.
 ## 6. Avant de proposer le jeu
 
 ```text
-node scripts/validate-games.mjs --browser <id>
+node scripts/validate-games.mjs --jouer <id>
 ```
 
-Le résultat doit être « Tout est bon ».
+Le robot ouvre le jeu dans un vrai navigateur, le joue 30 secondes au hasard et enregistre des captures d'écran dans `captures/<id>/` : regardez-les. Le résultat doit être « Tout est bon ».

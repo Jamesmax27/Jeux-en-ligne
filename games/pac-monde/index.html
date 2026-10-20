@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>PAC·MONDE — le monde qui s'agrandit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#07060f;
+  --ink:#ecebff;
+  --dim:#8b86b8;
+  --gold:#ffd166;
+  --alert:#ff5c7a;
+  --line:rgba(255,255,255,.08);
+  --disp:"Chakra Petch", "Futura", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;background:var(--void);color:var(--ink);font-family:var(--mono)}
+#wrap{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none}
+#game{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* ---- barre d'état ---- */
+#topbar{
+  position:absolute;left:0;right:0;top:0;display:flex;gap:2px;
+  padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;
+  background:linear-gradient(180deg,rgba(7,6,15,.92),rgba(7,6,15,0));
+  pointer-events:none;
+}
+.cell{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.lab{font-size:9px;letter-spacing:.18em;color:var(--dim)}
+.val{font-family:var(--disp);font-weight:700;font-size:17px;letter-spacing:.03em;line-height:1}
+#lives .val{color:var(--gold);letter-spacing:.12em}
+#btnpause{
+  pointer-events:auto;background:none;border:1px solid var(--line);border-radius:3px;
+  color:var(--dim);font-family:var(--mono);font-size:11px;padding:6px 9px;align-self:center
+}
+
+/* ---- carte ---- */
+#mapbox{
+  position:absolute;right:10px;top:calc(env(safe-area-inset-top) + 64px);
+  border:1px solid var(--line);border-radius:4px;background:rgba(9,8,20,.72);
+  padding:5px 5px 3px;backdrop-filter:blur(6px);pointer-events:none
+}
+#mapbox .lab{display:block;text-align:center;margin-bottom:3px;font-size:8px}
+#mini{display:block;image-rendering:auto}
+
+/* ---- messages ---- */
+#toast{
+  position:absolute;left:50%;top:38%;transform:translate(-50%,-6px);
+  font-family:var(--disp);font-weight:700;font-size:20px;letter-spacing:.06em;
+  text-align:center;opacity:0;transition:opacity .25s, transform .25s;pointer-events:none;
+  text-shadow:0 0 22px currentColor
+}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#toast small{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.2em;color:var(--dim);margin-top:5px;text-shadow:none}
+
+/* ---- manette tactile ---- */
+#pad{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);
+  display:none;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(3,54px);gap:4px;opacity:.5}
+#pad.on{display:grid}
+#pad button{
+  border:1px solid var(--line);background:rgba(255,255,255,.05);border-radius:6px;
+  color:var(--ink);font-size:17px;font-family:var(--mono)
+}
+#pad button:active{background:rgba(255,209,102,.25)}
+#pad .sp{visibility:hidden}
+
+/* ---- écrans ---- */
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(120% 90% at 50% 40%, rgba(20,9,42,.86), rgba(7,6,15,.97));
+  padding:24px;text-align:center}
+#overlay.off{display:none}
+#panel{max-width:340px}
+#title{font-family:var(--disp);font-weight:700;font-size:clamp(30px,11vw,46px);line-height:.95;letter-spacing:.02em}
+#title span{display:block;font-size:.42em;letter-spacing:.34em;color:var(--gold);margin-top:10px;font-weight:500}
+#msg{margin:18px 0 4px;font-size:13px;line-height:1.65;color:var(--dim)}
+#msg b{color:var(--ink);font-weight:600}
+#msg .rule{display:block;height:1px;background:var(--line);margin:14px 0}
+#go{
+  margin-top:20px;font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.12em;
+  padding:13px 30px;border-radius:3px;border:1px solid var(--gold);color:var(--void);background:var(--gold)
+}
+#go:active{transform:translateY(1px)}
+@media (prefers-reduced-motion: reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <header id="topbar">
+    <div class="cell"><span class="lab">SCORE</span><span class="val" id="score">0</span></div>
+    <div class="cell"><span class="lab">RÉGION</span><span class="val" id="lvl">1/10</span></div>
+    <div class="cell"><span class="lab">RESTE</span><span class="val" id="rest">—</span></div>
+    <div class="cell" id="lives"><span class="lab">VIES</span><span class="val">●●●</span></div>
+    <button id="btnpause">II</button>
+  </header>
+
+  <div id="mapbox"><span class="lab">CARTE</span><canvas id="mini" width="112" height="112"></canvas></div>
+
+  <div id="toast"></div>
+
+  <div id="pad">
+    <div class="sp"></div><button data-d="u">▲</button><div class="sp"></div>
+    <button data-d="l">◀</button><div class="sp"></div><button data-d="r">▶</button>
+    <div class="sp"></div><button data-d="d">▼</button><div class="sp"></div>
+  </div>
+
+  <div id="overlay">
+    <div id="panel">
+      <h1 id="title">PAC·MONDE<span>MONDE OUVERT</span></h1>
+      <p id="msg"></p>
+      <button id="go">COMMENCER</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   PAC·MONDE — un monde ouvert qui s'agrandit région par région.
+   Vide une région de ses pastilles : la porte scellée s'ouvre,
+   une nouvelle région se génère et se raccorde à la carte.
+   ============================================================ */
+
+const LW = 17, LH = 15;               // taille d'une région (tuiles, impaire)
+const MAX_LEVELS = 10;
+const DIRS = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+const HUES = [186, 320, 88, 38, 268, 350, 155, 210, 300, 60];
+
+const WALL=0, FLOOR=1, GATE_LOCKED=2, GATE_OPEN=3;
+
+const cvs = document.getElementById('game');
+const ctx = cvs.getContext('2d');
+const mini = document.getElementById('mini');
+const mctx = mini.getContext('2d');
+const el = {
+  score: document.getElementById('score'),
+  lvl:   document.getElementById('lvl'),
+  rest:  document.getElementById('rest'),
+  lives: document.querySelector('#lives .val'),
+  toast: document.getElementById('toast'),
+  overlay: document.getElementById('overlay'),
+  title: document.getElementById('title'),
+  msg:   document.getElementById('msg'),
+  go:    document.getElementById('go'),
+  pad:   document.getElementById('pad'),
+  pause: document.getElementById('btnpause'),
+};
+
+let W=0, H=0, DPR=1, TILE=22;
+
+const S = {
+  levels:new Map(), order:[], active:null, pendingExit:null,
+  player:null, cam:{x:0,y:0}, camInit:false,
+  score:0, lives:3, status:'menu',
+  fright:0, combo:1, invuln:0, fruit:null, fruitTimer:10, t:0,
+};
+
+const key = (mx,my)=> mx+','+my;
+const idx = (x,y)=> y*LW + x;
+const rnd = n => Math.floor(Math.random()*n);
+const pick = a => a[rnd(a.length)];
+
+/* ---------- monde ---------- */
+
+function tileAt(wx, wy){
+  const mx = Math.floor(wx/LW), my = Math.floor(wy/LH);
+  const lv = S.levels.get(key(mx,my));
+  if (!lv) return WALL;
+  return lv.grid[idx(wx - mx*LW, wy - my*LH)];
+}
+function levelAt(wx, wy){
+  return S.levels.get(key(Math.floor(wx/LW), Math.floor(wy/LH))) || null;
+}
+const passable = (x,y)=>{ const t = tileAt(x,y); return t===FLOOR || t===GATE_OPEN; };
+const ghostOk  = (x,y)=> tileAt(x,y)===FLOOR;   // les fantômes restent chez eux
+
+function makeMaze(){
+  const g = new Uint8Array(LW*LH);
+  const stack = [[1,1]];
+  g[idx(1,1)] = FLOOR;
+  while (stack.length){
+    const [x,y] = stack[stack.length-1];
+    const opts = [];
+    for (const d of DIRS){
+      const nx = x+d.x*2, ny = y+d.y*2;
+      if (nx>0 && ny>0 && nx<LW-1 && ny<LH-1 && g[idx(nx,ny)]===WALL)
+        opts.push([nx,ny,x+d.x,y+d.y]);
+    }
+    if (!opts.length){ stack.pop(); continue; }
+    const [nx,ny,wx,wy] = pick(opts);
+    g[idx(wx,wy)] = FLOOR; g[idx(nx,ny)] = FLOOR;
+    stack.push([nx,ny]);
+  }
+  // on perce des boucles : moins de culs-de-sac, plus d'esquives
+  for (let y=2;y<LH-2;y++) for (let x=2;x<LW-2;x++){
+    if (g[idx(x,y)]!==WALL || Math.random()>0.2) continue;
+    const h = g[idx(x-1,y)]===FLOOR && g[idx(x+1,y)]===FLOOR;
+    const v = g[idx(x,y-1)]===FLOOR && g[idx(x,y+1)]===FLOOR;
+    if (h || v) g[idx(x,y)] = FLOOR;
+  }
+  return g;
+}
+
+function createLevel(id, mx, my){
+  const lv = {
+    id, mx, my, hue: HUES[(id-1) % HUES.length],
+    grid: makeMaze(), pellets:null, count:0, ghosts:[], cleared:false,
+    ox: mx*LW, oy: my*LH,
+  };
+  lv.pellets = new Uint8Array(LW*LH);
+  const floors = [];
+  for (let y=1;y<LH-1;y++) for (let x=1;x<LW-1;x++)
+    if (lv.grid[idx(x,y)]===FLOOR){ lv.pellets[idx(x,y)] = 1; lv.count++; floors.push([x,y]); }
+
+  // super-pastilles dans les coins
+  const corners = [[1,1],[LW-2,1],[1,LH-2],[LW-2,LH-2]];
+  for (const [cx,cy] of corners){
+    let best=null, bd=1e9;
+    for (const [x,y] of floors){ const d=Math.hypot(x-cx,y-cy); if (d<bd){bd=d;best=[x,y];} }
+    if (best) lv.pellets[idx(best[0],best[1])] = 2;
+  }
+
+  lv.spawn = { x: lv.ox + (LW>>1|1), y: lv.oy + (LH>>1|1) };
+  if (lv.grid[idx(lv.spawn.x-lv.ox, lv.spawn.y-lv.oy)]!==FLOOR){
+    const f = pick(floors); lv.spawn = { x: lv.ox+f[0], y: lv.oy+f[1] };
+  }
+
+  const n = Math.min(2 + Math.floor((id-1)/2), 6);
+  for (let i=0;i<n;i++){
+    const far = floors.filter(f => Math.hypot(lv.ox+f[0]-lv.spawn.x, lv.oy+f[1]-lv.spawn.y) > 5);
+    const f = pick(far.length ? far : floors);
+    lv.ghosts.push(makeGhost(lv, lv.ox+f[0], lv.oy+f[1], i));
+  }
+
+  S.levels.set(key(mx,my), lv);
+  S.order.push(lv);
+  return lv;
+}
+
+function makeGhost(lv, x, y, i){
+  return {
+    gx:x, gy:y, nx:x, ny:y, x, y, t:0, dir:{x:0,y:0},
+    speed: 3.3 + lv.id*0.11 + i*0.05,
+    jitter: 2 + i*1.6,
+    home:{x,y}, stun:0, lvKey:key(lv.mx,lv.my),
+    hue: (lv.hue + 40 + i*52) % 360,
+  };
+}
+
+/* --- portes --- */
+function gateLocal(dir, pos){
+  if (dir.x===1)  return {a: idx(LW-1,pos), b: idx(0,pos)};
+  if (dir.x===-1) return {a: idx(0,pos),    b: idx(LW-1,pos)};
+  if (dir.y===1)  return {a: idx(pos,LH-1), b: idx(pos,0)};
+  return              {a: idx(pos,0),    b: idx(pos,LH-1)};
+}
+function gatePos(dir){
+  const span = dir.x!==0 ? LH : LW;
+  const opts = [];
+  for (let p=1;p<span-1;p+=2) opts.push(p);
+  return pick(opts);
+}
+function placeExitGate(pref){
+  const cands = [];
+  const scan = lv => { for (const d of DIRS) if (!S.levels.has(key(lv.mx+d.x, lv.my+d.y))) cands.push({lv,dir:d}); };
+  scan(pref);
+  if (!cands.length) for (let i=S.order.length-1;i>=0 && !cands.length;i--) scan(S.order[i]);
+  if (!cands.length){ S.pendingExit = null; return; }
+  const c = pick(cands);
+  let pos = gatePos(c.dir), guard = 0;
+  while (c.lv.grid[gateLocal(c.dir,pos).a] !== WALL && guard++ < 12) pos = gatePos(c.dir);
+  c.lv.grid[gateLocal(c.dir,pos).a] = GATE_LOCKED;
+  S.pendingExit = {lv:c.lv, dir:c.dir, pos};
+}
+function linkGate(a, b, dir, pos){
+  const g = gateLocal(dir, pos);
+  a.grid[g.a] = GATE_OPEN;
+  b.grid[g.b] = GATE_OPEN;
+}
+
+function openNextRegion(){
+  const ex = S.pendingExit;
+  if (!ex) return;
+  const nmx = ex.lv.mx + ex.dir.x, nmy = ex.lv.my + ex.dir.y;
+  const nl = createLevel(S.order.length + 1, nmx, nmy);
+  linkGate(ex.lv, nl, ex.dir, ex.pos);
+
+  // raccords bonus : le monde devient un réseau, pas un couloir
+  for (const d of DIRS){
+    const nb = S.levels.get(key(nmx+d.x, nmy+d.y));
+    if (!nb || nb === ex.lv) continue;
+    let pos = gatePos(d), guard = 0;
+    while (nl.grid[gateLocal(d,pos).a] !== WALL && guard++ < 12) pos = gatePos(d);
+    if (nl.grid[gateLocal(d,pos).a] === WALL) linkGate(nl, nb, d, pos);
+  }
+
+  ex.lv.cleared = true;
+  S.active = nl;
+  if (nl.id < MAX_LEVELS) placeExitGate(nl); else S.pendingExit = null;
+  toast('RÉGION ' + nl.id, 'la porte est ouverte', `hsl(${nl.hue} 90% 68%)`);
+}
+
+/* ---------- déplacements ---------- */
+
+function movePlayer(p, dt){
+  const step = p.speed*dt;
+  const cx = Math.round(p.x), cy = Math.round(p.y);
+  const tol = step + 0.02;
+  if (p.next && (p.next.x!==p.dir.x || p.next.y!==p.dir.y)){
+    if (p.next.x!==0 && Math.abs(p.y-cy)<tol && passable(cx+p.next.x, cy)){ p.dir=p.next; p.y=cy; }
+    else if (p.next.y!==0 && Math.abs(p.x-cx)<tol && passable(cx, cy+p.next.y)){ p.dir=p.next; p.x=cx; }
+  }
+  let nx = p.x + p.dir.x*step, ny = p.y + p.dir.y*step;
+  if (p.dir.x>0 && !passable(cx+1,cy) && nx>cx) nx=cx;
+  if (p.dir.x<0 && !passable(cx-1,cy) && nx<cx) nx=cx;
+  if (p.dir.y>0 && !passable(cx,cy+1) && ny>cy) ny=cy;
+  if (p.dir.y<0 && !passable(cx,cy-1) && ny<cy) ny=cy;
+  const moved = (nx!==p.x || ny!==p.y);
+  p.x=nx; p.y=ny;
+  if (moved) p.mouth += step*7;
+}
+
+function ghostDir(g){
+  const opts = DIRS.filter(d => ghostOk(g.gx+d.x, g.gy+d.y));
+  let list = opts.filter(d => !(d.x===-g.dir.x && d.y===-g.dir.y));
+  if (!list.length) list = opts;
+  if (!list.length){ g.nx=g.gx; g.ny=g.gy; g.dir={x:0,y:0}; return; }
+  const p = S.player;
+  const same = levelAt(p.x, p.y) && key(levelAt(p.x,p.y).mx, levelAt(p.x,p.y).my) === g.lvKey;
+  let best=null, bs=Infinity;
+  for (const d of list){
+    const tx=g.gx+d.x, ty=g.gy+d.y;
+    let sc;
+    if (!same) sc = Math.random()*10;
+    else { sc = Math.hypot(tx-p.x, ty-p.y); if (S.fright>0) sc = -sc; sc += Math.random()*g.jitter; }
+    if (sc<bs){ bs=sc; best=d; }
+  }
+  g.dir=best; g.nx=g.gx+best.x; g.ny=g.gy+best.y;
+}
+function moveGhost(g, dt){
+  if (g.stun>0){ g.stun-=dt; return; }
+  const spd = S.fright>0 ? g.speed*0.55 : g.speed;
+  g.t += spd*dt;
+  let guard=0;
+  while (g.t>=1 && guard++<4){ g.t-=1; g.gx=g.nx; g.gy=g.ny; ghostDir(g); }
+  g.x = g.gx + (g.nx-g.gx)*g.t;
+  g.y = g.gy + (g.ny-g.gy)*g.t;
+}
+
+/* ---------- boucle ---------- */
+
+function update(dt){
+  const p = S.player;
+  S.t += dt;
+  movePlayer(p, dt);
+  for (const lv of S.order) for (const g of lv.ghosts) moveGhost(g, dt);
+
+  if (S.fright>0) S.fright -= dt; else S.combo = 1;
+  if (S.invuln>0) S.invuln -= dt;
+
+  // pastilles
+  const lv = levelAt(p.x, p.y);
+  if (lv){
+    const cx = Math.round(p.x), cy = Math.round(p.y);
+    if (Math.abs(p.x-cx)<0.45 && Math.abs(p.y-cy)<0.45){
+      const i = idx(cx-lv.ox, cy-lv.oy);
+      if (i>=0 && i<lv.pellets.length && lv.pellets[i]){
+        const big = lv.pellets[i]===2;
+        lv.pellets[i]=0; lv.count--;
+        S.score += big ? 50 : 10;
+        if (big){ S.fright = 7; S.combo = 1; }
+        if (lv.count===0 && lv===S.active){
+          if (lv.id >= MAX_LEVELS){ finish('win'); return; }
+          S.score += 500; openNextRegion();
+        }
+      }
+    }
+  }
+
+  // fruit
+  S.fruitTimer -= dt;
+  if (!S.fruit && S.fruitTimer<=0){
+    const host = pick(S.order);
+    const spots=[];
+    for (let y=1;y<LH-1;y++) for (let x=1;x<LW-1;x++)
+      if (host.grid[idx(x,y)]===FLOOR && !host.pellets[idx(x,y)]) spots.push([x,y]);
+    if (spots.length){ const s=pick(spots); S.fruit={x:host.ox+s[0], y:host.oy+s[1], life:11}; }
+    S.fruitTimer = 14;
+  }
+  if (S.fruit){
+    S.fruit.life -= dt;
+    if (Math.hypot(S.fruit.x-p.x, S.fruit.y-p.y) < 0.7){ S.score += 200; S.fruit=null; toast('+200','fruit',' var(--gold)'); }
+    else if (S.fruit.life<=0) S.fruit=null;
+  }
+
+  // contacts
+  for (const l of S.order) for (const g of l.ghosts){
+    if (g.stun>0) continue;
+    if (Math.hypot(g.x-p.x, g.y-p.y) > 0.72) continue;
+    if (S.fright>0){
+      S.score += 200*S.combo; S.combo = Math.min(S.combo*2, 8);
+      g.gx=g.home.x; g.gy=g.home.y; g.nx=g.gx; g.ny=g.gy; g.x=g.gx; g.y=g.gy; g.t=0; g.stun=3;
+    } else if (S.invuln<=0){ die(); return; }
+  }
+
+  // caméra
+  const k = 1 - Math.pow(0.0015, dt);
+  S.cam.x += (p.x - S.cam.x)*k;
+  S.cam.y += (p.y - S.cam.y)*k;
+}
+
+function die(){
+  S.lives--;
+  if (S.lives<=0){ finish('over'); return; }
+  const lv = S.active;
+  S.player.x = lv.spawn.x; S.player.y = lv.spawn.y;
+  S.player.dir = {x:0,y:0}; S.player.next=null;
+  S.fright = 0; S.invuln = 2.2;
+  for (const l of S.order) for (const g of l.ghosts){
+    g.gx=g.home.x; g.gy=g.home.y; g.nx=g.gx; g.ny=g.gy; g.x=g.gx; g.y=g.gy; g.t=0; g.dir={x:0,y:0};
+  }
+  S.cam.x = S.player.x; S.cam.y = S.player.y;
+  toast('AÏE', S.lives + (S.lives>1?' vies restantes':' vie restante'), 'var(--alert)');
+  hud();
+}
+
+/* ---------- rendu ---------- */
+
+function w2s(x,y){ return { x:(x-S.cam.x)*TILE + W/2, y:(y-S.cam.y)*TILE + H/2 }; }
+function rr(c,x,y,w,h,r){
+  c.beginPath();
+  if (c.roundRect){ c.roundRect(x,y,w,h,r); return; }
+  c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+}
+
+function draw(){
+  ctx.fillStyle = '#05040c';
+  ctx.fillRect(0,0,W,H);
+
+  const half = { x: W/(2*TILE)+1, y: H/(2*TILE)+1 };
+  const x0 = Math.floor(S.cam.x-half.x), x1 = Math.ceil(S.cam.x+half.x);
+  const y0 = Math.floor(S.cam.y-half.y), y1 = Math.ceil(S.cam.y+half.y);
+
+  // fond de région
+  for (let my=Math.floor(y0/LH); my<=Math.floor(y1/LH); my++)
+    for (let mx=Math.floor(x0/LW); mx<=Math.floor(x1/LW); mx++){
+      const lv = S.levels.get(key(mx,my)); if (!lv) continue;
+      const s = w2s(lv.ox-0.5, lv.oy-0.5);
+      ctx.fillStyle = lv===S.active ? `hsl(${lv.hue} 45% 8%)` : `hsl(${lv.hue} 30% 5%)`;
+      ctx.fillRect(s.x, s.y, LW*TILE, LH*TILE);
+    }
+
+  // tuiles
+  for (let y=y0; y<=y1; y++) for (let x=x0; x<=x1; x++){
+    const lv = levelAt(x,y); if (!lv) continue;
+    const t = lv.grid[idx(x-lv.ox, y-lv.oy)];
+    const s = w2s(x-0.5, y-0.5);
+    const on = lv===S.active;
+    if (t===WALL){
+      const nb = (a,b)=> { const l2=levelAt(a,b); return l2 ? l2.grid[idx(a-l2.ox,b-l2.oy)]!==WALL : false; };
+      if (!nb(x+1,y)&&!nb(x-1,y)&&!nb(x,y+1)&&!nb(x,y-1)&&
+          !nb(x+1,y+1)&&!nb(x-1,y-1)&&!nb(x+1,y-1)&&!nb(x-1,y+1)) continue; // murs enterrés
+      ctx.fillStyle = on ? `hsl(${lv.hue} 62% 21%)` : `hsl(${lv.hue} 25% 12%)`;
+      rr(ctx, s.x+1, s.y+1, TILE-2, TILE-2, TILE*0.24); ctx.fill();
+      ctx.strokeStyle = on ? `hsl(${lv.hue} 92% 62%)` : `hsl(${lv.hue} 35% 34%)`;
+      ctx.lineWidth = 1.2; ctx.stroke();
+    } else if (t===GATE_LOCKED || t===GATE_OPEN){
+      drawGate(lv, x, y, s, t===GATE_OPEN);
+    }
+    if (t===FLOOR){
+      const pel = lv.pellets[idx(x-lv.ox, y-lv.oy)];
+      if (pel){
+        const c = w2s(x,y);
+        ctx.fillStyle = pel===2 ? '#fff3cf' : `hsl(${lv.hue} 80% 78%)`;
+        const r = pel===2 ? TILE*0.24*(1+0.12*Math.sin(S.t*6)) : TILE*0.1;
+        ctx.beginPath(); ctx.arc(c.x, c.y, r, 0, 6.284); ctx.fill();
+      }
+    }
+  }
+
+  if (S.fruit){
+    const c = w2s(S.fruit.x, S.fruit.y);
+    const a = Math.min(1, S.fruit.life/2);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#ff5c7a';
+    ctx.beginPath(); ctx.arc(c.x-TILE*0.11, c.y+TILE*0.12, TILE*0.17, 0, 6.284); ctx.fill();
+    ctx.beginPath(); ctx.arc(c.x+TILE*0.13, c.y+TILE*0.16, TILE*0.14, 0, 6.284); ctx.fill();
+    ctx.strokeStyle = '#7bd88f'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(c.x-TILE*0.1, c.y+TILE*0.05); ctx.lineTo(c.x+TILE*0.12, c.y-TILE*0.24); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  for (const lv of S.order) for (const g of lv.ghosts) drawGhost(g);
+  drawPlayer();
+  drawCompass();
+}
+
+function drawGate(lv, x, y, s, open){
+  const vert = (x===lv.ox || x===lv.ox+LW-1);   // passage horizontal → barreaux verticaux
+  if (open){
+    ctx.fillStyle = `hsl(${lv.hue} 70% 55% / .13)`;
+    ctx.fillRect(s.x, s.y, TILE, TILE);
+    ctx.strokeStyle = `hsl(${lv.hue} 90% 65% / .5)`;
+    ctx.lineWidth = 2; ctx.beginPath();
+    if (vert){ ctx.moveTo(s.x+TILE/2, s.y); ctx.lineTo(s.x+TILE/2, s.y+TILE*0.22);
+               ctx.moveTo(s.x+TILE/2, s.y+TILE*0.78); ctx.lineTo(s.x+TILE/2, s.y+TILE); }
+    else     { ctx.moveTo(s.x, s.y+TILE/2); ctx.lineTo(s.x+TILE*0.22, s.y+TILE/2);
+               ctx.moveTo(s.x+TILE*0.78, s.y+TILE/2); ctx.lineTo(s.x+TILE, s.y+TILE/2); }
+    ctx.stroke();
+    return;
+  }
+  const pulse = 0.55 + 0.45*Math.sin(S.t*3);
+  ctx.fillStyle = `hsl(42 60% 12%)`;
+  ctx.fillRect(s.x, s.y, TILE, TILE);
+  ctx.strokeStyle = `hsl(42 95% ${45+18*pulse}%)`;
+  ctx.lineWidth = 2.2; ctx.beginPath();
+  for (let i=1;i<=3;i++){
+    const f = i/4;
+    if (vert){ ctx.moveTo(s.x+TILE*f, s.y+2); ctx.lineTo(s.x+TILE*f, s.y+TILE-2); }
+    else     { ctx.moveTo(s.x+2, s.y+TILE*f); ctx.lineTo(s.x+TILE-2, s.y+TILE*f); }
+  }
+  ctx.stroke();
+}
+
+function drawPlayer(){
+  const p = S.player;
+  if (S.invuln>0 && Math.floor(S.t*12)%2===0) return;
+  const c = w2s(p.x, p.y);
+  const r = TILE*0.42;
+  let ang = 0;
+  if (p.dir.x===1) ang=0; else if (p.dir.x===-1) ang=Math.PI;
+  else if (p.dir.y===1) ang=Math.PI/2; else if (p.dir.y===-1) ang=-Math.PI/2;
+  const gap = (p.dir.x||p.dir.y) ? Math.abs(Math.sin(p.mouth))*0.62 : 0.25;
+  ctx.save();
+  ctx.translate(c.x, c.y); ctx.rotate(ang);
+  ctx.fillStyle = '#ffd166';
+  ctx.shadowColor = 'rgba(255,209,102,.75)'; ctx.shadowBlur = TILE*0.5;
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,r, gap, 6.283-gap); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.shadowBlur = 0;
+}
+
+function drawGhost(g){
+  const c = w2s(g.x, g.y);
+  if (c.x < -TILE || c.y < -TILE || c.x > W+TILE || c.y > H+TILE) return;
+  const r = TILE*0.4;
+  const scared = S.fright>0 && g.stun<=0;
+  const body = g.stun>0 ? null : (scared ? (S.fright<2 && Math.floor(S.t*8)%2===0 ? '#e8e8ff' : '#4a5cff') : `hsl(${g.hue} 78% 60%)`);
+  if (body){
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y-r*0.12, r, Math.PI, 0);
+    ctx.lineTo(c.x+r, c.y+r*0.75);
+    for (let i=0;i<3;i++){
+      const x1 = c.x + r - (2*r/3)*(i+0.5);
+      const x2 = c.x + r - (2*r/3)*(i+1);
+      ctx.quadraticCurveTo(x1, c.y+r*0.3, x2, c.y+r*0.75);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+  // yeux
+  const ex = g.dir.x*r*0.2, ey = g.dir.y*r*0.2;
+  for (const sx of [-1,1]){
+    ctx.fillStyle = '#f4f4ff';
+    ctx.beginPath(); ctx.ellipse(c.x+sx*r*0.36, c.y-r*0.14, r*0.24, r*0.3, 0,0,6.284); ctx.fill();
+    ctx.fillStyle = scared ? '#2a2a5c' : '#181430';
+    ctx.beginPath(); ctx.arc(c.x+sx*r*0.36+ex, c.y-r*0.14+ey, r*0.13, 0, 6.284); ctx.fill();
+  }
+}
+
+function drawCompass(){
+  const p = S.player, a = S.active;
+  const here = levelAt(p.x,p.y);
+  if (!a || here===a) return;
+  const tx = a.ox + LW/2, ty = a.oy + LH/2;
+  const ang = Math.atan2(ty-p.y, tx-p.x);
+  const c = w2s(p.x, p.y);
+  const d = TILE*1.25;
+  ctx.save();
+  ctx.translate(c.x + Math.cos(ang)*d, c.y + Math.sin(ang)*d);
+  ctx.rotate(ang);
+  ctx.fillStyle = `hsl(${a.hue} 90% 65% / .85)`;
+  ctx.beginPath(); ctx.moveTo(TILE*0.34,0); ctx.lineTo(-TILE*0.2,TILE*0.2); ctx.lineTo(-TILE*0.2,-TILE*0.2); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function drawMini(){
+  const m = mini.width;
+  mctx.clearRect(0,0,m,m);
+  let minx=99, maxx=-99, miny=99, maxy=-99;
+  for (const lv of S.order){
+    minx=Math.min(minx,lv.mx); maxx=Math.max(maxx,lv.mx);
+    miny=Math.min(miny,lv.my); maxy=Math.max(maxy,lv.my);
+  }
+  const cols = maxx-minx+1, rows = maxy-miny+1;
+  const cell = Math.min((m-6)/cols, (m-6)/rows);
+  const offx = (m - cols*cell)/2, offy = (m - rows*cell)/2;
+  for (const lv of S.order){
+    const x = offx + (lv.mx-minx)*cell, y = offy + (lv.my-miny)*cell;
+    mctx.fillStyle = lv===S.active ? `hsl(${lv.hue} 70% 30%)` : `hsl(${lv.hue} 45% 16%)`;
+    mctx.fillRect(x+1, y+1, cell-2, cell-2);
+    mctx.strokeStyle = `hsl(${lv.hue} 85% 60%)`;
+    mctx.lineWidth = 1; mctx.strokeRect(x+1.5, y+1.5, cell-3, cell-3);
+    mctx.fillStyle = `hsl(${lv.hue} 90% 78%)`;
+    mctx.font = '600 ' + Math.max(8, cell*0.34) + 'px ui-monospace, monospace';
+    mctx.textAlign='center'; mctx.textBaseline='middle';
+    mctx.fillText(lv.id, x+cell/2, y+cell/2);
+  }
+  const ex = S.pendingExit;
+  if (ex){
+    const x = offx + (ex.lv.mx-minx)*cell + cell/2 + ex.dir.x*cell*0.46;
+    const y = offy + (ex.lv.my-miny)*cell + cell/2 + ex.dir.y*cell*0.46;
+    mctx.fillStyle = `hsl(42 95% ${50+20*Math.sin(S.t*3)}%)`;
+    mctx.fillRect(x-2, y-2, 4, 4);
+  }
+  const lv = levelAt(S.player.x, S.player.y);
+  if (lv){
+    const px = offx + (lv.mx-minx)*cell + ((S.player.x-lv.ox)/LW)*cell;
+    const py = offy + (lv.my-miny)*cell + ((S.player.y-lv.oy)/LH)*cell;
+    mctx.fillStyle = '#ffd166';
+    mctx.beginPath(); mctx.arc(px, py, 2.6, 0, 6.284); mctx.fill();
+  }
+}
+
+/* ---------- interface ---------- */
+
+function hud(){
+  el.score.textContent = S.score;
+  el.lvl.textContent = (S.active ? S.active.id : 1) + '/' + MAX_LEVELS;
+  el.rest.textContent = S.active ? S.active.count : 0;
+  el.lives.textContent = '●'.repeat(Math.max(0,S.lives));
+}
+let toastT = 0;
+function toast(main, sub, color){
+  el.toast.innerHTML = main + (sub ? '<small>'+sub+'</small>' : '');
+  el.toast.style.color = color || 'var(--ink)';
+  el.toast.classList.add('on');
+  toastT = 2.2;
+}
+
+function screen(kind){
+  el.overlay.classList.remove('off');
+  if (kind==='menu'){
+    el.title.innerHTML = 'PAC·MONDE<span>MONDE OUVERT</span>';
+    el.msg.innerHTML = 'Le monde commence par <b>une seule région</b>.'
+      + '<span class="rule"></span>'
+      + 'Avale toutes les pastilles d\'une région : sa <b>porte scellée</b> s\'ouvre et une nouvelle région se génère, raccordée à celles d\'avant. '
+      + 'Les anciennes régions restent traversables — et leurs fantômes aussi.'
+      + '<span class="rule"></span>'
+      + 'Flèches, ZQSD, glisser ou manette. <b>10 régions</b> à ouvrir.';
+    el.go.textContent = 'COMMENCER';
+  } else if (kind==='over'){
+    el.title.innerHTML = 'PERDU<span>' + S.order.length + ' RÉGION' + (S.order.length>1?'S':'') + ' OUVERTES</span>';
+    el.msg.innerHTML = 'Score final <b>' + S.score + '</b>. Le monde s\'arrête de grandir ici.';
+    el.go.textContent = 'REJOUER';
+  } else if (kind==='win'){
+    el.title.innerHTML = 'MONDE COMPLET<span>10 / 10 RÉGIONS</span>';
+    el.msg.innerHTML = 'Score final <b>' + S.score + '</b>. Tu as tout avalé, jusqu\'au dernier couloir.';
+    el.go.textContent = 'NOUVEAU MONDE';
+  } else if (kind==='pause'){
+    el.title.innerHTML = 'PAUSE<span>RÉGION ' + S.active.id + '</span>';
+    el.msg.innerHTML = 'Score <b>' + S.score + '</b> — reste <b>' + S.active.count + '</b> pastilles avant la prochaine porte.';
+    el.go.textContent = 'REPRENDRE';
+  }
+}
+function finish(kind){ S.status = kind; screen(kind); }
+
+/* ---------- démarrage ---------- */
+
+function start(){
+  S.levels.clear(); S.order.length = 0;
+  S.score = 0; S.lives = 3; S.fright = 0; S.invuln = 1.2;
+  S.fruit = null; S.fruitTimer = 12; S.combo = 1;
+  const lv = createLevel(1, 0, 0);
+  S.active = lv;
+  placeExitGate(lv);
+  S.player = { x: lv.spawn.x, y: lv.spawn.y, dir:{x:0,y:0}, next:null, speed:5.3, mouth:0 };
+  S.cam.x = S.player.x; S.cam.y = S.player.y;
+  S.status = 'play';
+  el.overlay.classList.add('off');
+  hud();
+  toast('RÉGION 1', 'trouve la porte scellée', `hsl(${lv.hue} 90% 68%)`);
+}
+
+let last = 0;
+function frame(ts){
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.033, (ts - last)/1000 || 0);
+  last = ts;
+  if (S.status==='play'){
+    update(dt);
+    if (toastT>0){ toastT -= dt; if (toastT<=0) el.toast.classList.remove('on'); }
+    hud();
+  }
+  if (S.player){ draw(); drawMini(); }
+}
+
+/* ---------- entrées ---------- */
+
+const DIRMAP = { l:{x:-1,y:0}, r:{x:1,y:0}, u:{x:0,y:-1}, d:{x:0,y:1} };
+function input(d){ if (S.player && S.status==='play') S.player.next = DIRMAP[d]; }
+
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  const map = {arrowleft:'l', arrowright:'r', arrowup:'u', arrowdown:'d', a:'l', q:'l', d:'r', w:'u', z:'u', s:'d'};
+  if (map[k]){ e.preventDefault(); input(map[k]); }
+  if (k===' '||k==='p'){ e.preventDefault(); togglePause(); }
+});
+
+let tstart = null;
+cvs.addEventListener('touchstart', e => { const t=e.touches[0]; tstart={x:t.clientX,y:t.clientY}; }, {passive:true});
+cvs.addEventListener('touchmove', e => {
+  if (!tstart) return;
+  const t = e.touches[0], dx = t.clientX-tstart.x, dy = t.clientY-tstart.y;
+  if (Math.hypot(dx,dy) < 22) return;
+  input(Math.abs(dx)>Math.abs(dy) ? (dx>0?'r':'l') : (dy>0?'d':'u'));
+  tstart = {x:t.clientX, y:t.clientY};
+}, {passive:true});
+cvs.addEventListener('touchend', ()=>{ tstart=null; }, {passive:true});
+
+el.pad.querySelectorAll('button').forEach(b => {
+  const go = e => { e.preventDefault(); input(b.dataset.d); };
+  b.addEventListener('touchstart', go, {passive:false});
+  b.addEventListener('mousedown', go);
+});
+if ('ontouchstart' in window) el.pad.classList.add('on');
+
+function togglePause(){
+  if (S.status==='play'){ S.status='pause'; screen('pause'); }
+  else if (S.status==='pause'){ S.status='play'; el.overlay.classList.add('off'); }
+}
+el.pause.addEventListener('click', togglePause);
+el.go.addEventListener('click', () => {
+  if (S.status==='pause'){ S.status='play'; el.overlay.classList.add('off'); }
+  else start();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && S.status==='play'){ S.status='pause'; screen('pause'); }
+});
+
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = cvs.clientWidth; H = cvs.clientHeight;
+  cvs.width = Math.round(W*DPR); cvs.height = Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  TILE = Math.max(14, Math.min(34, Math.min(W/15, H/17)));
+  const ms = Math.max(88, Math.min(128, Math.round(W*0.3)));
+  mini.width = ms; mini.height = ms;
+  mini.style.width = ms+'px'; mini.style.height = ms+'px';
+}
+addEventListener('resize', resize);
+resize();
+screen('menu');
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

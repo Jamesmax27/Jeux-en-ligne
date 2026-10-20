@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le grand tour des planètes</title>
+<style>
+  /* ---------- Base : fond étoilé, pas de défilement ---------- */
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;font-family:system-ui,sans-serif;
+    color:#f3f1ea;user-select:none;-webkit-user-select:none;
+    background:
+      radial-gradient(1px 1px at 12% 18%,#fff 99%,transparent),radial-gradient(1px 1px at 72% 9%,#fff 99%,transparent),
+      radial-gradient(1.5px 1.5px at 40% 66%,#fff 99%,transparent),radial-gradient(1px 1px at 88% 52%,#fff 99%,transparent),
+      radial-gradient(1px 1px at 23% 84%,#fff 99%,transparent),radial-gradient(1.5px 1.5px at 60% 30%,#cfe 99%,transparent),
+      radial-gradient(1px 1px at 8% 48%,#fff 99%,transparent),radial-gradient(1px 1px at 93% 91%,#fff 99%,transparent),
+      radial-gradient(1px 1px at 51% 94%,#fff 99%,transparent),radial-gradient(1.5px 1.5px at 33% 6%,#fff 99%,transparent),
+      radial-gradient(ellipse at 70% 110%,#3b2a78 0,transparent 60%),
+      linear-gradient(#0a0f26,#141a3d)}
+  button{font:inherit;color:inherit;border:0;cursor:pointer;background:none;touch-action:manipulation}
+  button:focus-visible{outline:3px solid #ffd76a;outline-offset:2px}
+  .cache{display:none!important}
+  #jeu{position:fixed;inset:0;max-width:640px;margin:0 auto;display:flex;flex-direction:column}
+  .gros{background:linear-gradient(#ffd96a,#ffb22e);color:#3a2300;font-weight:800;font-size:24px;
+    min-height:56px;padding:10px 34px;border-radius:40px;box-shadow:0 5px 0 #b77600,0 0 24px #ffb22e66}
+  .gros:active{transform:translateY(3px);box-shadow:0 2px 0 #b77600}
+  .doux{background:#ffffff1c;border:2px solid #ffffff40;font-weight:700;font-size:18px;min-height:48px;
+    padding:8px 20px;border-radius:30px}
+  .doux:active{background:#ffffff38}
+
+  /* ---------- Bouton du son (toujours visible) ---------- */
+  #btn-son{position:fixed;top:6px;right:6px;width:44px;height:44px;border-radius:50%;background:#ffffff1c;
+    border:2px solid #ffffff40;font-size:20px;z-index:50;display:flex;align-items:center;justify-content:center}
+
+  /* ---------- Accueil ---------- */
+  #accueil{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    padding:14px 14px 10px;text-align:center;overflow:hidden}
+  #accueil h1{margin:0;font-size:clamp(32px,10vw,50px);line-height:1.02;
+    background:linear-gradient(#fff6c8,#ffc145);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 3px 0 #0008)}
+  #accueil p{margin:0;font-size:clamp(16px,4.4vw,19px);line-height:1.35;max-width:380px}
+  #deco{position:relative;width:min(78vw,300px);height:min(40vw,150px);flex:none}
+  #deco .soleil-deco{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px;border-radius:50%;
+    background:radial-gradient(circle,#fff8c4,#ffc93c 50%,#ff8a1a);box-shadow:0 0 30px #ffb84a}
+  #deco .orb{position:absolute;left:50%;top:50%;border:1.5px dashed #ffffff38;border-radius:50%;
+    transform:translate(-50%,-50%) scaleY(.42);}
+  #deco>.astre{position:absolute;left:50%;top:50%;z-index:1}
+  #deco .soleil-deco{z-index:1}
+  #record{font-size:15px;opacity:.9;min-height:20px}
+  #niveaux{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;width:min(100%,400px)}
+  .niv{min-height:48px;border-radius:12px;background:#ffffff16;border:2px solid #ffffff33;font-weight:800;font-size:17px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+  .niv small{font-size:10px;letter-spacing:-1px;color:#ffd76a;margin-top:2px;min-height:10px}
+  .niv:disabled{opacity:.35;cursor:default}
+  .niv.actuel{border-color:#ffd76a;box-shadow:0 0 12px #ffd76a66}
+  #ligne-boutons{display:flex;gap:10px}
+
+  /* ---------- Partie ---------- */
+  #partie{flex:1;display:flex;flex-direction:column;min-height:0}
+  #barre{display:flex;align-items:center;gap:6px;padding:6px 56px 4px 6px;min-height:56px}
+  .rond{width:44px;height:44px;border-radius:50%;background:#ffffff1c;border:2px solid #ffffff40;font-size:20px;
+    font-weight:800;flex:none;display:flex;align-items:center;justify-content:center}
+  #titre-niv{flex:1;min-width:0;line-height:1.15}
+  #titre-niv b{font-size:17px;display:block}
+  #mission{font-size:13px;opacity:.9;display:block;line-height:1.1}
+  #score{font-weight:800;font-size:20px;color:#ffd76a;min-width:56px;text-align:right}
+  #score.pop{animation:pop .35s}
+  @keyframes pop{50%{transform:scale(1.35)}}
+  #chrono{position:relative;height:24px;margin:0 10px 2px;border-radius:12px;background:#ffffff14;border:1px solid #ffffff2a}
+  #chrono .fin{position:absolute;right:6px;top:2px;font-size:13px;opacity:.85}
+  #comete-chrono{position:absolute;top:50%;left:0;transform:translate(-50%,-50%)}
+  #plateau{position:relative;flex:1;min-height:150px;margin:0 6px;overflow:hidden;touch-action:none}
+  #dessin{position:absolute;inset:0;pointer-events:none}
+  #dessin svg{width:100%;height:100%;display:block}
+  #soleil{position:absolute;border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle,#fffbd6,#ffd34d 40%,#ff9a1f 72%,#ff7a12);box-shadow:0 0 40px 8px #ffae3a88;
+    animation:brille 3s ease-in-out infinite alternate}
+  @keyframes brille{to{box-shadow:0 0 60px 14px #ffae3aaa}}
+  #soleil span{position:absolute;right:22%;bottom:22%;font-weight:800;font-size:13px;color:#7a3a00}
+  .place{position:absolute;border-radius:50%;border:2px dashed #ffffff66;background:#ffffff0c;
+    display:flex;align-items:center;justify-content:center;transform:translate(-50%,-50%);transition:background .2s}
+  .place .num{position:absolute;top:-7px;left:-7px;width:22px;height:22px;border-radius:50%;background:#2a3170;
+    border:2px solid #ffffff70;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;z-index:2}
+  .place .ombre{opacity:.45;filter:saturate(.7)}
+  .place.pleine{border-style:solid;border-color:#ffffff30;background:#ffffff08}
+  .place.cible{background:#ffd76a22;border-color:#ffd76a}
+  .place.quiz{border-color:#9fe7ff;box-shadow:0 0 14px #9fe7ff88;animation:pulse 1.2s infinite}
+  @keyframes pulse{50%{box-shadow:0 0 4px #9fe7ff44}}
+  .place.rebond{animation:rebond .45s}
+  @keyframes rebond{40%{transform:translate(-50%,-50%) scale(1.25)}}
+  .secoue{animation:secoue .4s}
+  .place.secoue{animation:secoueP .5s}
+  @keyframes secoue{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+  @keyframes secoueP{0%,90%{border-color:#ff7a7a}20%,60%{transform:translate(calc(-50% - 7px),-50%)}40%,80%{transform:translate(calc(-50% + 7px),-50%)}}
+  #boite{position:absolute;left:4px;bottom:4px;width:86px;height:74px;border-radius:14px;border:2px dashed #ff9fd0;
+    background:#ff9fd014;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;
+    font-weight:800;line-height:1.1;text-align:center;color:#ffd2ea}
+  #boite .icone{font-size:26px;line-height:1}
+  #boite.cible{background:#ff9fd033}
+  #info{min-height:50px;margin:4px 8px;padding:6px 10px;border-radius:14px;background:#ffffff12;font-size:15px;
+    line-height:1.25;display:flex;align-items:center;gap:8px}
+  #info.neuf{animation:arrive .4s}
+  @keyframes arrive{from{transform:translateY(8px);opacity:.2}}
+  #info .astre{flex:none}
+  #reserve{display:flex;flex-wrap:wrap;justify-content:center;align-content:flex-start;gap:6px;padding:4px 6px 10px;min-height:60px;
+    max-height:46%;overflow-y:auto;flex:none}
+  .piece{width:68px;min-height:72px;border-radius:14px;background:#ffffff14;border:2px solid #ffffff30;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 2px;
+    touch-action:none;transition:transform .15s,background .15s}
+  .piece .nom{font-size:13px;font-weight:700}
+  .piece.choisie{background:#ffd76a33;border-color:#ffd76a;transform:translateY(-5px);box-shadow:0 6px 14px #0006}
+  .piece.tenue{opacity:.35}
+  .piece.enigme{width:calc(50% - 6px);max-width:260px;min-height:44px;flex-direction:row;padding:4px 8px;gap:6px;
+    text-align:left;font-size:13px;line-height:1.2;background:#5b4bb526;border-color:#a99bff66}
+  .piece.enigme .q{flex:none;width:24px;height:24px;border-radius:50%;background:#a99bff;color:#1c1450;font-weight:900;
+    display:flex;align-items:center;justify-content:center}
+  .piece.enigme.choisie{background:#ffd76a33;border-color:#ffd76a}
+  .fantome{position:fixed;z-index:40;pointer-events:none;transform:translate(-50%,-50%) scale(1.1);opacity:.95}
+  .fantome.carte{background:#3a2f86;border:2px solid #ffd76a;border-radius:12px;padding:6px 8px;font-size:12px;max-width:170px}
+  .vole{position:fixed;z-index:40;pointer-events:none;transition:transform .35s cubic-bezier(.3,.7,.4,1)}
+
+  /* ---------- Astres dessinés en CSS (--d = diamètre) ---------- */
+  .astre{position:relative;border-radius:50%;flex:none;box-shadow:inset calc(var(--d)*-.16) calc(var(--d)*-.1) calc(var(--d)*.25) #0008}
+  .mercure{background:radial-gradient(circle at 62% 60%,#7d7870 0 10%,transparent 12%),radial-gradient(circle at 34% 64%,#857f77 0 7%,transparent 9%),
+    radial-gradient(circle at 35% 35%,#dcd8d0,#8f8a82 72%)}
+  .venus{background:linear-gradient(160deg,transparent 40%,#f6d48e55 45% 55%,transparent 60%),radial-gradient(circle at 35% 35%,#fdebb8,#d99b45 75%)}
+  .terre{background:radial-gradient(circle at 30% 42%,#48b85a 0 15%,transparent 17%),radial-gradient(circle at 64% 66%,#48b85a 0 18%,transparent 20%),
+    radial-gradient(circle at 70% 26%,#fff 0 7%,transparent 9%),radial-gradient(circle at 35% 35%,#69b4ff,#1d4db8 75%)}
+  .mars{background:radial-gradient(circle at 60% 38%,#8a2e14 0 9%,transparent 11%),radial-gradient(circle at 35% 35%,#f59466,#a83a1b 75%)}
+  .jupiter{background:radial-gradient(ellipse 17% 10% at 64% 66%,#c4492e 0 85%,transparent 100%),
+    linear-gradient(180deg,#e9cfa3 0 14%,#c98c55 14% 22%,#f3dfbd 22% 34%,#b9774b 34% 41%,#efd6ad 41% 55%,#c4834f 55% 62%,#ecd2a8 62% 78%,#b97a4c 78% 85%,#e5c79a 85%)}
+  .saturne{background:radial-gradient(circle at 35% 35%,#f8eabd,#c9a75a 75%)}
+  .saturne::before{content:'';position:absolute;left:-42%;right:-42%;top:39%;bottom:39%;border-radius:50%;
+    border:calc(var(--d)*.08) solid #ead7a0d9;transform:rotate(-16deg)}
+  .uranus{background:radial-gradient(circle at 35% 35%,#d8fcff,#58b8c6 75%)}
+  .uranus::before{content:'';position:absolute;left:44%;right:44%;top:-22%;bottom:-22%;border-radius:50%;
+    border:calc(var(--d)*.04) solid #d8fcff66;transform:rotate(8deg)}
+  .neptune{background:radial-gradient(circle at 62% 58%,#1a2f86 0 9%,transparent 11%),radial-gradient(circle at 35% 35%,#93b3ff,#2342ae 75%)}
+  .lune{background:radial-gradient(circle at 60% 58%,#8f8f8f 0 11%,transparent 13%),radial-gradient(circle at 32% 66%,#9a9a9a 0 8%,transparent 10%),
+    radial-gradient(circle at 35% 35%,#f1f1ee,#a3a39e 75%)}
+  .pluton{background:radial-gradient(circle at 60% 62%,#f6e8d4 0 22%,transparent 25%),radial-gradient(circle at 35% 35%,#dcbf9f,#86664b 75%)}
+  .comete{background:radial-gradient(circle at 40% 40%,#fff,#a6ecff 70%);box-shadow:0 0 calc(var(--d)*.4) #a6ecff}
+  .comete::before{content:'';position:absolute;right:55%;top:18%;bottom:18%;width:190%;border-radius:50% 0 0 50%;
+    background:linear-gradient(to left,#c7f4ffcc,transparent);z-index:-1}
+  .asteroide{border-radius:46% 54% 40% 60%/56% 44% 60% 40%;background:radial-gradient(circle at 60% 60%,#4c3f33 0 9%,transparent 11%),
+    radial-gradient(circle at 35% 35%,#ab9884,#5a4b3d 75%)}
+
+  /* ---------- Voiles : tutoriel, bilan, album ---------- */
+  .voile{position:fixed;inset:0;z-index:30;background:#060a1fd9;display:flex;align-items:center;justify-content:center;padding:12px}
+  .carte-voile{width:min(100%,420px);max-height:100%;overflow:auto;background:linear-gradient(#232a63,#171c45);
+    border:2px solid #ffffff30;border-radius:22px;padding:16px 16px 18px;text-align:center;box-shadow:0 10px 40px #000a;
+    animation:entre .35s}
+  @keyframes entre{from{transform:scale(.85);opacity:0}}
+  .carte-voile h2{margin:0 0 8px;font-size:24px;color:#ffd76a}
+  .etapes{list-style:none;margin:10px 0 14px;padding:0;text-align:left;font-size:16px;line-height:1.3}
+  .etapes li{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+  .etapes li b{flex:none;width:26px;height:26px;border-radius:50%;background:#ffd76a;color:#3a2300;display:flex;
+    align-items:center;justify-content:center;font-size:14px}
+  .boutons{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  /* Scène animée du tutoriel */
+  .scene{position:relative;width:260px;height:150px;margin:0 auto;border-radius:16px;background:#0b1030;border:1px solid #ffffff22;overflow:hidden}
+  .scene>*{position:absolute}
+  .scene .mini-place{width:46px;height:46px;border-radius:50%;border:2px dashed #ffffff88;display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:13px}
+  .scene .mini-boite{width:70px;height:52px;border-radius:12px;border:2px dashed #ff9fd0;color:#ffd2ea;font-size:11px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;text-align:center}
+  .scene .bulle{left:10px;right:10px;top:8px;background:#5b4bb5;border-radius:12px;padding:5px 8px;font-size:13px}
+  .scene .bouge{animation:demo 2.8s ease-in-out infinite}
+  .scene .main{font-size:30px;animation:demo 2.8s ease-in-out infinite;z-index:3;filter:drop-shadow(0 2px 2px #000)}
+  @keyframes demo{0%,12%{transform:translate(0,0) scale(1);opacity:1}86%{opacity:1}18%{transform:translate(0,0) scale(.85)}24%{transform:translate(0,0) scale(1)}
+    68%,86%{transform:translate(var(--dx),var(--dy))}100%{transform:translate(var(--dx),var(--dy));opacity:0}}
+  .scene .tap{animation:tap 1.4s ease-in-out infinite}
+  @keyframes tap{0%,100%{transform:translate(0,0)}50%{transform:translate(0,-10px)}}
+  .scene .fileante{animation:file 3s linear infinite}
+  @keyframes file{from{transform:translateX(0)}to{transform:translateX(200px)}}
+  #bilan-etoiles{font-size:50px;letter-spacing:6px;min-height:62px}
+  #bilan-etoiles span{display:inline-block;color:#ffffff30;transition:color .2s}
+  #bilan-etoiles span.gagnee{color:#ffd76a;animation:etoile .5s;text-shadow:0 0 18px #ffd76a}
+  @keyframes etoile{0%{transform:scale(.2) rotate(-90deg)}70%{transform:scale(1.35)}}
+  #bilan-score{font-size:34px;font-weight:900;margin:4px 0}
+  #bilan-details{font-size:15px;line-height:1.45;opacity:.95;margin-bottom:12px}
+  #bilan-record{font-weight:800;color:#9fe7ff;min-height:22px;margin-bottom:10px}
+  #bilan-record.nouveau{color:#ffd76a;animation:pop .6s 2}
+  #album-grille{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0 14px;text-align:left}
+  .fiche{background:#ffffff10;border-radius:12px;padding:8px;display:flex;gap:8px;align-items:center;font-size:12px;line-height:1.25;min-height:64px}
+  .fiche b{display:block;font-size:14px}
+  .fiche.vide{opacity:.4;justify-content:center;font-size:24px}
+
+  /* ---------- Effets ---------- */
+  .etincelle{position:fixed;z-index:45;pointer-events:none;width:8px;height:8px;border-radius:50%;
+    transition:transform .7s ease-out,opacity .7s ease-in}
+  .points{position:fixed;z-index:45;pointer-events:none;font-weight:900;font-size:20px;color:#ffd76a;
+    text-shadow:0 2px 0 #0008;transform:translate(-50%,-50%);animation:monte 1s ease-out forwards}
+  @keyframes monte{to{transform:translate(-50%,-260%);opacity:0}}
+  #confettis{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:35}
+  @media (prefers-reduced-motion:reduce){
+    .scene .bouge,.scene .main,#soleil{animation-duration:6s}
+    .secoue,.place.secoue{animation:none}
+  }
+  @media (min-height:760px){ .piece{width:76px;min-height:80px} #info{font-size:16px} }
+  /* Petits téléphones : tout doit tenir sans défilement */
+  @media (max-height:700px){
+    #barre{min-height:50px;padding-top:3px}
+    .piece{width:60px;min-height:62px} .piece .nom{font-size:12px}
+    .piece.enigme{font-size:12px;min-height:38px;padding:3px 6px}
+    #info{min-height:44px;font-size:14px;padding:4px 8px}
+    #accueil{gap:6px} #deco{height:min(32vw,120px)}
+  }
+</style>
+</head>
+<body>
+<div id="jeu">
+  <!-- Écran d'accueil -->
+  <section id="accueil">
+    <div id="deco" aria-hidden="true"></div>
+    <h1>Le grand tour<br>des planètes</h1>
+    <p>Remets les planètes dans l'ordre autour du Soleil et découvre un secret sur chacune !</p>
+    <button class="gros" id="btn-jouer">Jouer</button>
+    <div id="record"></div>
+    <div id="niveaux" aria-label="Choisir un niveau"></div>
+    <div id="ligne-boutons"><button class="doux" id="btn-album">📖 Album</button></div>
+  </section>
+
+  <!-- Écran de jeu -->
+  <section id="partie" class="cache">
+    <div id="barre">
+      <button class="rond" id="btn-menu" aria-label="Retour au menu">☰</button>
+      <div id="titre-niv"><b id="nom-niv">Niveau 1</b><span id="mission"></span></div>
+      <div id="score" aria-live="polite">0</div>
+      <button class="rond" id="btn-aide" aria-label="Revoir l'explication">?</button>
+    </div>
+    <div id="chrono" class="cache" aria-hidden="true"><span class="fin">🏁</span><div id="comete-chrono"></div></div>
+    <div id="plateau">
+      <div id="dessin"></div>
+      <div id="soleil"><span>Soleil</span></div>
+      <button id="boite" class="cache" aria-label="Boîte à intrus"><span class="icone">🗑️</span>Boîte à<br>intrus</button>
+    </div>
+    <div id="info" aria-live="polite"></div>
+    <div id="reserve"></div>
+  </section>
+</div>
+
+<button id="btn-son" aria-label="Couper le son">🔊</button>
+
+<!-- Tutoriel animé -->
+<div id="intro" class="voile cache" role="dialog" aria-modal="true">
+  <div class="carte-voile">
+    <h2 id="intro-titre"></h2>
+    <div class="scene" id="intro-scene"></div>
+    <ol class="etapes" id="intro-etapes"></ol>
+    <div class="boutons"><button class="gros" id="btn-compris">Compris !</button></div>
+  </div>
+</div>
+
+<!-- Bilan de fin de niveau / fin de partie -->
+<div id="bilan" class="voile cache" role="dialog" aria-modal="true">
+  <div class="carte-voile">
+    <h2 id="bilan-titre"></h2>
+    <div id="bilan-etoiles"><span>★</span><span>★</span><span>★</span></div>
+    <div id="bilan-score">0</div>
+    <div id="bilan-record"></div>
+    <div id="bilan-details"></div>
+    <div class="boutons">
+      <button class="gros" id="btn-suivant">Niveau suivant</button>
+      <button class="doux" id="btn-rejouer">Rejouer</button>
+      <button class="doux" id="btn-bilan-menu">Menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- Album des astres découverts -->
+<div id="album" class="voile cache" role="dialog" aria-modal="true">
+  <div class="carte-voile">
+    <h2>Mon album de l'espace</h2>
+    <div id="album-compte"></div>
+    <div id="album-grille"></div>
+    <button class="gros" id="btn-album-fermer">Fermer</button>
+  </div>
+</div>
+
+<canvas id="confettis"></canvas>
+
+<script>
+'use strict';
+// =====================================================================
+// Le grand tour des planètes — ranger les planètes, chasser les intrus,
+// deviner et découvrir une info sur chaque astre.
+// =====================================================================
+
+// ---------- Données des astres ----------
+// px = taille de dessin (respecte l'ordre réel des tailles)
+// e1 = devinette des cartes énigmes ; e2 = devinette du quiz
+const PLANETES = [
+  { id: 'mercure', nom: 'Mercure', px: 28, e1: 'Je suis la plus proche du Soleil.', e2: 'Je suis la plus petite planète.',
+    info: 'Mercure est la plus proche du Soleil. Son année ne dure que 88 jours !', taille: 'Mercure est la plus petite planète.' },
+  { id: 'venus', nom: 'Vénus', px: 38, e1: 'Je suis la planète la plus chaude.', e2: 'Le soir, je brille comme une étoile : on m’appelle l’étoile du Berger.',
+    info: 'Vénus est la plus chaude : ses épais nuages gardent la chaleur.', taille: 'Vénus est presque aussi grosse que la Terre.' },
+  { id: 'terre', nom: 'Terre', px: 40, e1: 'Je suis la seule où l’on trouve la vie.', e2: 'Je suis couverte d’océans d’eau.',
+    info: 'La Terre est notre maison : de l’eau, de l’air et la vie !', taille: 'La Terre est la plus grosse des planètes en roche.' },
+  { id: 'mars', nom: 'Mars', px: 32, e1: 'On m’appelle la planète rouge.', e2: 'Des robots roulent sur mon sol rouge.',
+    info: 'Mars est rouge car sa poussière contient de la rouille.', taille: 'Mars est deux fois plus petite que la Terre.' },
+  { id: 'jupiter', nom: 'Jupiter', px: 56, e1: 'Je suis la plus grosse planète.', e2: 'J’ai une grande tache rouge : une tempête géante.',
+    info: 'Jupiter est la plus grosse : plus de 1 000 Terres pourraient y entrer !', taille: 'Jupiter est la géante : la plus grosse de toutes !' },
+  { id: 'saturne', nom: 'Saturne', px: 49, e1: 'J’ai de grands anneaux brillants.', e2: 'Je suis si légère que je flotterais dans une baignoire géante.',
+    info: 'Saturne a de magnifiques anneaux de glace et de cailloux.', taille: 'Saturne est la 2e plus grosse planète.' },
+  { id: 'uranus', nom: 'Uranus', px: 45, e1: 'Je tourne couchée sur le côté.', e2: 'Je suis une géante de glace bleu-vert.',
+    info: 'Uranus roule sur le côté, comme une bille couchée.', taille: 'Uranus est un tout petit peu plus grosse que Neptune.' },
+  { id: 'neptune', nom: 'Neptune', px: 43, e1: 'Je suis la plus loin du Soleil.', e2: 'Chez moi soufflent les vents les plus forts.',
+    info: 'Neptune est la plus lointaine, avec des vents très forts.', taille: 'Neptune est 4 fois plus large que la Terre.' },
+];
+const INTRUS = [
+  { id: 'lune', nom: 'Lune', phrase: 'La Lune', px: 26, e1: 'Je tourne autour de la Terre.', info: 'La Lune est un satellite : elle tourne autour de la Terre.' },
+  { id: 'pluton', nom: 'Pluton', phrase: 'Pluton', px: 22, e1: 'Je suis une planète naine.', info: 'Pluton est une planète naine, plus petite que la Lune !' },
+  { id: 'comete', nom: 'Comète', phrase: 'La comète', px: 24, e1: 'J’ai une longue queue qui brille.', info: 'Une comète est une boule de glace avec une longue queue.' },
+  { id: 'asteroide', nom: 'Astéroïde', phrase: 'L’astéroïde', px: 26, e1: 'Je suis un gros caillou de l’espace.', info: 'Un astéroïde est un gros caillou qui voyage dans l’espace.' },
+];
+const ASTRES = {};
+PLANETES.forEach((p, i) => { p.rang = i + 1; p.phrase = p.nom === 'Terre' ? 'La Terre' : p.nom; ASTRES[p.id] = p; });
+INTRUS.forEach((p) => { p.intrus = true; ASTRES[p.id] = p; });
+const ORDRE_TAILLE = ['mercure', 'mars', 'venus', 'terre', 'neptune', 'uranus', 'saturne', 'jupiter'];
+const MEMO = 'Me Voici Toute Mouillée, J’ai Suivi Un Nuage';
+
+// ---------- Les 12 niveaux ----------
+// mode : 'distance' (depuis le Soleil) ou 'taille' ; ombres : silhouettes dans les places ;
+// quiz : nombre de questions « Qui suis-je ? » ; intrus : nombre d'intrus ;
+// enigmes : nombre de planètes cachées derrière une devinette ; chrono : secondes de la comète.
+const NIVEAUX = [
+  { mode: 'distance', planetes: 3, ombres: true, nouveau: 'base' },
+  { mode: 'distance', planetes: 4, ombres: true },
+  { mode: 'distance', planetes: 5, nouveau: 'sansOmbres' },
+  { mode: 'distance', planetes: 6, quiz: 2, nouveau: 'quiz' },
+  { mode: 'distance', planetes: 8, quiz: 2 },
+  { mode: 'distance', planetes: 6, intrus: 1, nouveau: 'intrus' },
+  { mode: 'distance', planetes: 8, intrus: 2, quiz: 2 },
+  { mode: 'taille', liste: ['mercure', 'mars', 'terre', 'neptune', 'saturne', 'jupiter'], nouveau: 'taille' },
+  { mode: 'taille', planetes: 8, quiz: 2 },
+  { mode: 'distance', planetes: 5, enigmes: 5, nouveau: 'enigmes' },
+  { mode: 'distance', planetes: 8, enigmes: 4, intrus: 1, chrono: 100, nouveau: 'chrono' },
+  { mode: 'distance', planetes: 8, enigmes: 8, intrus: 2, quiz: 3, chrono: 120 },
+];
+
+// ---------- Sauvegarde (toujours protégée : le cadre peut refuser le stockage) ----------
+const CLE = 'jel-grand-tour-planetes-v1';
+const sauve = { etoiles: NIVEAUX.map(() => 0), records: NIVEAUX.map(() => 0), debloque: 0, son: true, vus: {}, album: {} };
+try {
+  const o = JSON.parse(localStorage.getItem(CLE) || 'null');
+  if (o && typeof o === 'object') {
+    if (Array.isArray(o.etoiles)) o.etoiles.slice(0, NIVEAUX.length).forEach((v, i) => { sauve.etoiles[i] = Math.min(3, Math.max(0, v | 0)); });
+    if (Array.isArray(o.records)) o.records.slice(0, NIVEAUX.length).forEach((v, i) => { sauve.records[i] = Math.max(0, v | 0); });
+    sauve.debloque = Math.min(NIVEAUX.length - 1, Math.max(0, o.debloque | 0));
+    sauve.son = o.son !== false;
+    if (o.vus && typeof o.vus === 'object') sauve.vus = o.vus;
+    if (o.album && typeof o.album === 'object') sauve.album = o.album;
+  }
+} catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+function enregistrer() {
+  try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* ignoré */ }
+}
+
+// ---------- Sons (Web Audio, créés seulement après une action du joueur) ----------
+let ctxAudio = null;
+function audio() {
+  if (!sauve.son) return null;
+  try {
+    if (!ctxAudio) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctxAudio = new AC();
+    }
+    if (ctxAudio.state === 'suspended') ctxAudio.resume();
+  } catch (e) { return null; }
+  return ctxAudio;
+}
+function note(c, freq, debut, duree, type, vol, freqFin) {
+  const t = c.currentTime + debut;
+  const o = c.createOscillator();
+  const g = c.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t);
+  if (freqFin) o.frequency.exponentialRampToValueAtTime(freqFin, t + duree);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.15, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+  o.connect(g); g.connect(c.destination);
+  o.start(t); o.stop(t + duree + 0.05);
+}
+const SONS = {
+  prendre: (c) => note(c, 700, 0, 0.09, 'triangle', 0.12),
+  bon: (c) => [523, 659, 784, 1047].forEach((f, i) => note(c, f, i * 0.06, 0.18, 'triangle', 0.13)),
+  erreur: (c) => { note(c, 220, 0, 0.22, 'sine', 0.18, 160); note(c, 180, 0.12, 0.25, 'sine', 0.14, 130); },
+  intrus: (c) => note(c, 900, 0, 0.35, 'sine', 0.13, 180),
+  quiz: (c) => [784, 988, 1319].forEach((f, i) => note(c, f, i * 0.08, 0.2, 'sine', 0.13)),
+  tic: (c) => note(c, 1200, 0, 0.05, 'square', 0.05),
+  comete: (c) => note(c, 300, 0, 0.6, 'sawtooth', 0.06, 90),
+  fanfare: (c) => [523, 659, 784, 659, 784, 1047].forEach((f, i) => note(c, f, i * 0.11, 0.24, 'triangle', 0.14)),
+  etoile: (c) => note(c, 1319, 0, 0.25, 'sine', 0.13, 1760),
+  clic: (c) => note(c, 500, 0, 0.06, 'sine', 0.08),
+};
+function son(nom) {
+  const c = audio();
+  if (!c) return;
+  try { SONS[nom](c); } catch (e) { /* ignoré */ }
+}
+
+// ---------- Raccourcis ----------
+const $ = (id) => document.getElementById(id);
+const melanger = (t) => { for (let i = t.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [t[i], t[j]] = [t[j], t[i]]; } return t; };
+const ordinal = (n) => (n === 1 ? '1re' : n + 'e');
+function astre(id, d) {
+  const el = document.createElement('div');
+  el.className = 'astre ' + id;
+  el.style.width = el.style.height = d + 'px';
+  el.style.setProperty('--d', d + 'px');
+  return el;
+}
+function montrer(id, oui) { $(id).classList.toggle('cache', !oui); }
+
+// ---------- Bouton du son ----------
+function majSon() {
+  $('btn-son').textContent = sauve.son ? '🔊' : '🔇';
+  $('btn-son').setAttribute('aria-label', sauve.son ? 'Couper le son' : 'Remettre le son');
+}
+$('btn-son').addEventListener('click', () => {
+  sauve.son = !sauve.son;
+  if (!sauve.son && ctxAudio) { try { ctxAudio.suspend(); } catch (e) { /* ignoré */ } }
+  enregistrer(); majSon(); son('clic');
+});
+
+// =====================================================================
+// Accueil
+// =====================================================================
+let idDeco = 0;
+function dessinerDeco() {
+  const deco = $('deco');
+  deco.innerHTML = '<div class="soleil-deco"></div>';
+  const w = deco.clientWidth || 280;
+  const lent = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tours = ['mercure', 'terre', 'mars', 'jupiter', 'saturne'].map((id, i) => {
+    const r = 40 + i * (w / 2 - 50) / 4;
+    const orb = document.createElement('div');
+    orb.className = 'orb';
+    orb.style.width = orb.style.height = r * 2 + 'px';
+    deco.appendChild(orb);
+    const d = Math.round(ASTRES[id].px * 0.45 + 6);
+    const a = astre(id, d);
+    deco.appendChild(a);
+    return { a, r, d, vitesse: (lent ? 0.15 : 1) / (1.2 + i * 0.8), angle: i * 1.7 };
+  });
+  // Les planètes tournent sur des orbites aplaties (vues de biais)
+  cancelAnimationFrame(idDeco);
+  let tAvant = performance.now();
+  const anime = (t) => {
+    const dt = Math.min(0.1, (t - tAvant) / 1000);
+    tAvant = t;
+    tours.forEach((o) => {
+      o.angle += dt * o.vitesse;
+      const x = Math.cos(o.angle) * o.r, y = Math.sin(o.angle) * o.r * 0.42;
+      o.a.style.transform = `translate(${x - o.d / 2}px,${y - o.d / 2}px)`;
+      o.a.style.zIndex = y > 0 ? 2 : 0;     // devant ou derrière le Soleil
+    });
+    if (!$('accueil').classList.contains('cache')) idDeco = requestAnimationFrame(anime);
+  };
+  idDeco = requestAnimationFrame(anime);
+}
+function afficherAccueil() {
+  arreterBoucle();
+  montrer('partie', false); montrer('accueil', true);
+  montrer('bilan', false); montrer('intro', false); montrer('album', false);
+  const total = sauve.etoiles.reduce((a, b) => a + b, 0);
+  const points = sauve.records.reduce((a, b) => a + b, 0);
+  $('record').textContent = points > 0 ? `Record : ${points} points · ★ ${total} / ${NIVEAUX.length * 3}` : '12 niveaux à découvrir !';
+  $('btn-jouer').textContent = sauve.debloque > 0 ? `Jouer — niveau ${sauve.debloque + 1}` : 'Jouer';
+  const grille = $('niveaux');
+  grille.innerHTML = '';
+  NIVEAUX.forEach((_, i) => {
+    const b = document.createElement('button');
+    b.className = 'niv' + (i === sauve.debloque ? ' actuel' : '');
+    b.disabled = i > sauve.debloque;
+    b.innerHTML = `${i > sauve.debloque ? '🔒' : i + 1}<small>${'★'.repeat(sauve.etoiles[i])}</small>`;
+    b.setAttribute('aria-label', `Niveau ${i + 1}, ${sauve.etoiles[i]} étoiles`);
+    b.addEventListener('click', () => { son('clic'); demarrerNiveau(i); });
+    grille.appendChild(b);
+  });
+  dessinerDeco();
+}
+$('btn-jouer').addEventListener('click', () => { son('clic'); demarrerNiveau(sauve.debloque); });
+$('btn-album').addEventListener('click', () => { son('clic'); ouvrirAlbum(); });
+
+// ---------- Album ----------
+function ouvrirAlbum() {
+  const grille = $('album-grille');
+  grille.innerHTML = '';
+  let n = 0;
+  [...PLANETES, ...INTRUS].forEach((a) => {
+    const f = document.createElement('div');
+    if (sauve.album[a.id]) {
+      n++;
+      f.className = 'fiche';
+      f.appendChild(astre(a.id, 34));
+      const t = document.createElement('div');
+      t.innerHTML = `<b>${a.nom}</b>${a.info}`;
+      f.appendChild(t);
+    } else {
+      f.className = 'fiche vide';
+      f.textContent = '?';
+    }
+    grille.appendChild(f);
+  });
+  $('album-compte').textContent = `${n} fiche${n > 1 ? 's' : ''} sur 12 découvertes`;
+  montrer('album', true);
+  $('btn-album-fermer').focus();
+}
+$('btn-album-fermer').addEventListener('click', () => { son('clic'); montrer('album', false); });
+
+// =====================================================================
+// Partie
+// =====================================================================
+let etat = null;
+
+function demarrerNiveau(n) {
+  const cfg = NIVEAUX[n];
+  const ids = cfg.liste || PLANETES.slice(0, cfg.planetes).map((p) => p.id);
+  const ordre = cfg.mode === 'taille' ? ORDRE_TAILLE.filter((id) => ids.includes(id)) : ids.slice();
+  // Planètes cachées derrière une devinette
+  const cachees = new Set(melanger(ids.slice()).slice(0, cfg.enigmes || 0));
+  const intrus = melanger(INTRUS.slice()).slice(0, cfg.intrus || 0).map((a) => a.id);
+  let pieces = [...ids, ...intrus].map((id) => ({
+    id, enigme: cachees.has(id) || (ASTRES[id].intrus && (cfg.enigmes || 0) > 0), place: false, rate: 0,
+  }));
+  // Mélange, sans laisser les planètes déjà dans le bon ordre
+  do { melanger(pieces); } while (pieces.filter((p) => !ASTRES[p.id].intrus).map((p) => p.id).join() === ordre.join());
+
+  etat = {
+    n, cfg, ordre, pieces, places: ordre.map((id) => ({ attendu: id, pleine: false })),
+    score: 0, erreurs: 0, serie: 0, sel: null, phase: 'ranger', questions: [], temps: 0, cometePassee: false,
+    bonusChrono: 0, pause: false, dernierTic: 0,
+  };
+  montrer('accueil', false); montrer('bilan', false); montrer('partie', true);
+  $('nom-niv').textContent = `Niveau ${n + 1} / ${NIVEAUX.length}`;
+  majMission();
+  $('score').textContent = '0';
+  montrer('boite', intrus.length > 0);
+  montrer('soleil', cfg.mode === 'distance');
+  montrer('chrono', !!cfg.chrono);
+  if (cfg.chrono) {
+    const c = $('comete-chrono');
+    c.innerHTML = '';
+    c.appendChild(astre('comete', 14));
+    c.style.left = '0%';
+  }
+  construirePlaces();
+  construireReserve();
+  infoTexte(cfg.mode === 'taille' ? 'Touche une planète, puis sa place : de la plus petite à la plus grande.'
+    : 'Touche une planète, puis sa place autour du Soleil.');
+  requestAnimationFrame(placerPlateau);
+  demarrerBoucle();
+  const cle = cfg.nouveau;
+  if (cle && !sauve.vus[cle]) montrerIntro(cle);
+}
+
+function majMission() {
+  const cfg = etat.cfg;
+  let t;
+  if (etat.phase === 'quiz') t = 'Qui suis-je ?';
+  else if (cfg.mode === 'taille') t = 'Range par taille';
+  else t = 'Range depuis le Soleil';
+  if (cfg.intrus && etat.phase !== 'quiz') t += ' + intrus';
+  $('mission').textContent = t;
+}
+
+// ---------- Places (orbites) ----------
+function construirePlaces() {
+  const plateau = $('plateau');
+  plateau.querySelectorAll('.place').forEach((p) => p.remove());
+  etat.places.forEach((pl, j) => {
+    const b = document.createElement('button');
+    b.className = 'place';
+    b.dataset.j = j;
+    b.setAttribute('aria-label', etat.cfg.mode === 'taille' ? `Place ${j + 1}` : `Orbite ${j + 1}`);
+    b.addEventListener('click', () => toucherPlace(j));
+    plateau.appendChild(b);
+    pl.el = b;
+  });
+}
+function dessinerPlace(j) {
+  const pl = etat.places[j];
+  const b = pl.el;
+  b.innerHTML = `<span class="num">${j + 1}</span>`;
+  b.classList.toggle('pleine', pl.pleine);
+  const fit = (etat.taillePlace * 0.86) / 56;   // Jupiter (56) remplit la place
+  const d = Math.max(12, Math.round(ASTRES[pl.attendu].px * fit));
+  if (pl.pleine) b.appendChild(astre(pl.attendu, d));
+  else if (etat.cfg.ombres) { const o = astre(pl.attendu, d); o.classList.add('ombre'); b.appendChild(o); }
+}
+
+// Calcule la position des places : en diagonale depuis le Soleil (coin en haut à gauche).
+function placerPlateau() {
+  if (!etat) return;
+  const plateau = $('plateau');
+  const W = plateau.clientWidth, H = plateau.clientHeight;
+  if (!W || !H) return;
+  const n = etat.places.length;
+  const distance = etat.cfg.mode === 'distance';
+  const rSoleil = distance ? Math.max(30, Math.min(70, Math.min(W, H) * 0.2)) : 0;
+  const cx = distance ? rSoleil * 0.5 : 34, cy = distance ? rSoleil * 0.5 : 34;
+  let s = 56;
+  let pos = [];
+  for (let essai = 0; essai < 2; essai++) {
+    const m = s / 2 + 8;
+    const ex = W - m, ey = H - m;
+    const base = Math.atan2(ey - cy, ex - cx);
+    const rMax = Math.hypot(ex - cx, ey - cy);
+    const r0 = distance ? rSoleil + s * 0.55 + 6 : 0;   // la 1re orbite ne touche pas le Soleil
+    const pas = n > 1 ? (rMax - r0) / (n - 1) : 0;
+    s = Math.max(44, Math.min(64, pas * 1.02));
+    const zig = distance ? 0.2 : 0.12;
+    pos = [];
+    for (let i = 0; i < n; i++) {
+      const r = r0 + i * pas;
+      const a = base + (i === 0 ? 0 : (i % 2 ? 1 : -1) * zig * Math.min(1, r / 160));
+      let x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+      x = Math.max(s / 2 + 8, Math.min(W - s / 2 - 8, x));
+      y = Math.max(s / 2 + 10, Math.min(H - s / 2 - 6, y));
+      pos.push({ x, y, r });
+    }
+  }
+  etat.taillePlace = s;
+  etat.places.forEach((pl, j) => {
+    pl.el.style.left = pos[j].x + 'px';
+    pl.el.style.top = pos[j].y + 'px';
+    pl.el.style.width = pl.el.style.height = s + 'px';
+    dessinerPlace(j);
+  });
+  const sol = $('soleil');
+  sol.style.width = sol.style.height = rSoleil * 2 + 'px';
+  sol.style.left = cx - rSoleil + 'px';
+  sol.style.top = cy - rSoleil + 'px';
+  // Orbites (cercles autour du Soleil) ou flèche « petite → grande »
+  let svg = `<svg viewBox="0 0 ${W} ${H}" aria-hidden="true">`;
+  if (distance) {
+    pos.forEach((p) => {
+      const r = Math.hypot(p.x - cx, p.y - cy);
+      svg += `<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" fill="none" stroke="#ffffff22" stroke-width="1.5" stroke-dasharray="4 6"/>`;
+    });
+  } else {
+    svg += `<polyline points="${pos.map((p) => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')}" fill="none" stroke="#ffd76a55" stroke-width="3" stroke-dasharray="2 8" stroke-linecap="round"/>`;
+    const a = pos[n - 1], b = pos[n - 2] || { x: 0, y: 0 };
+    svg += `<text x="${Math.min(W - 70, pos[0].x + s / 2 + 6)}" y="${pos[0].y + 4}" fill="#ffd76a" font-size="13" font-weight="700">petite</text>`;
+    svg += `<text x="${Math.max(4, a.x - s / 2 - 60)}" y="${a.y + 4}" fill="#ffd76a" font-size="13" font-weight="700">grande</text>`;
+    void b;
+  }
+  svg += '</svg>';
+  $('dessin').innerHTML = svg;
+}
+// Le plateau se recalcule dès que sa taille change (fenêtre, réserve qui rétrécit…)
+let dernierW = 0, dernierH = 0;
+function surveillerPlateau() {
+  const p = $('plateau');
+  if (etat && !$('partie').classList.contains('cache') && (p.clientWidth !== dernierW || p.clientHeight !== dernierH)) {
+    dernierW = p.clientWidth; dernierH = p.clientHeight;
+    placerPlateau();
+  }
+}
+if (window.ResizeObserver) new ResizeObserver(surveillerPlateau).observe($('plateau'));
+window.addEventListener('resize', surveillerPlateau);
+
+// ---------- Réserve (pièces à placer) ----------
+function construireReserve() {
+  const res = $('reserve');
+  res.innerHTML = '';
+  etat.pieces.forEach((p, i) => {
+    const a = ASTRES[p.id];
+    const b = document.createElement('button');
+    b.dataset.i = i;
+    if (p.enigme) {
+      b.className = 'piece enigme';
+      b.innerHTML = `<span class="q">?</span><span class="txt">${a.e1}</span>`;
+      b.setAttribute('aria-label', 'Devinette : ' + a.e1);
+    } else {
+      b.className = 'piece';
+      b.appendChild(astre(p.id, Math.round(a.px * 0.8 + 6)));
+      const nom = document.createElement('span');
+      nom.className = 'nom';
+      nom.textContent = a.nom;
+      b.appendChild(nom);
+      b.setAttribute('aria-label', a.nom);
+    }
+    b.addEventListener('click', () => {
+      if (performance.now() - dernierGlisse < 350) return;   // fin d'un glisser
+      choisirPiece(i);
+    });
+    p.el = b;
+    res.appendChild(b);
+  });
+}
+
+function nomPiece(p) {
+  if (p.enigme && p.rate < 2) return 'cette planète mystère';
+  return ASTRES[p.id].phrase.replace(/^La /, 'la ').replace(/^L’/, 'l’');
+}
+
+function choisirPiece(i, garder) {
+  if (!etat || etat.phase !== 'ranger' || etat.pause) return;
+  const p = etat.pieces[i];
+  if (!p || p.place) return;
+  if (etat.sel === i && !garder) {
+    etat.sel = null;
+  } else {
+    etat.sel = i;
+    son('prendre');
+    infoTexte(`Où va ${nomPiece(p)} ? Touche sa place${etat.cfg.intrus ? ' (ou la boîte à intrus)' : ''}.`);
+  }
+  etat.pieces.forEach((q, k) => q.el.classList.toggle('choisie', k === etat.sel));
+}
+
+function toucherPlace(j) {
+  if (!etat || etat.pause) return;
+  if (etat.phase === 'quiz') { repondreQuiz(j); return; }
+  if (etat.phase !== 'ranger') return;
+  if (etat.sel === null) {
+    const pl = etat.places[j];
+    if (pl.pleine) infoAstre(pl.attendu);
+    else { infoTexte('Choisis d’abord une planète en bas.'); etat.pieces.forEach((p) => { if (!p.place) secouer(p.el); }); }
+    return;
+  }
+  essayer(etat.sel, j);
+}
+
+function essayer(i, j) {
+  const p = etat.pieces[i], pl = etat.places[j];
+  const a = ASTRES[p.id];
+  if (pl.pleine) { infoTexte('Cette place est déjà prise.'); secouer(pl.el); son('erreur'); return; }
+  if (p.id === pl.attendu) { reussite(i, pl.el, () => { pl.pleine = true; dessinerPlace(j); rebond(pl.el); }); return; }
+  // Erreur : la pièce revient, un indice aide
+  rater(p, pl.el);
+  let t;
+  if (a.intrus) {
+    t = p.enigme && p.rate < 2 ? 'Cette devinette ne parle pas d’une planète… Regarde la boîte à intrus !'
+      : `${a.phrase} n’est pas une planète : direction la boîte à intrus !`;
+  } else if (p.enigme && p.rate < 2) {
+    t = 'Pas là ! Relis bien la devinette.';
+  } else if (etat.cfg.mode === 'taille') {
+    t = p.rate < 2 ? 'Pas là ! Compare bien les tailles.' : `${a.taille} Sa place : la n° ${etat.ordre.indexOf(p.id) + 1}.`;
+  } else if (etat.cfg.ombres && p.rate < 2) {
+    t = 'Pas là ! Regarde la forme et la couleur des ombres.';
+  } else {
+    t = p.rate < 2 ? `Pas là ! Pense à la phrase : « ${MEMO} ».` : `${a.phrase} est la ${ordinal(a.rang)} planète depuis le Soleil.`;
+  }
+  if (p.enigme && p.rate === 2) revelerCarte(p);
+  infoTexte(t);
+}
+
+function toucherBoite() {
+  if (!etat || etat.pause || etat.phase !== 'ranger' || $('boite').classList.contains('cache')) return;
+  if (etat.sel === null) { infoTexte('La boîte à intrus attend ce qui n’est pas une planète. Choisis-le en bas !'); return; }
+  const p = etat.pieces[etat.sel];
+  const a = ASTRES[p.id];
+  if (a.intrus) {
+    son('intrus');
+    reussite(etat.sel, $('boite'), () => rebondBoite(), true);
+    return;
+  }
+  rater(p, $('boite'));
+  infoTexte(p.enigme && p.rate < 2 ? 'C’est une vraie planète ! Cherche sa place.' : `${a.phrase} est une vraie planète ! Cherche sa place.`);
+  if (p.enigme && p.rate === 2) revelerCarte(p);
+}
+$('boite').addEventListener('click', toucherBoite);
+
+function revelerCarte(p) {
+  const txt = p.el.querySelector('.txt');
+  if (txt) txt.innerHTML = `${ASTRES[p.id].e1} <b>(${ASTRES[p.id].nom})</b>`;
+}
+
+function rater(p, cible) {
+  etat.erreurs++;
+  etat.serie = 0;
+  p.rate++;
+  son('erreur');
+  secouer(cible);
+  secouer(p.el);
+}
+
+// Bonne réponse : la pièce vole jusqu'à sa place, points, étincelles, info.
+function reussite(i, cible, apres, estIntrus) {
+  const p = etat.pieces[i];
+  const a = ASTRES[p.id];
+  p.place = true;
+  etat.sel = null;
+  etat.serie++;
+  const gain = 100 + Math.min(100, 20 * (etat.serie - 1));
+  ajouterPoints(gain, cible);
+  if (!estIntrus) son('bon');
+  // Vol de la pièce
+  const de = p.el.getBoundingClientRect(), vers = cible.getBoundingClientRect();
+  const vol = astre(p.id, Math.round(a.px * 0.8 + 6));
+  vol.classList.add('vole');
+  vol.style.left = de.left + de.width / 2 - (a.px * 0.8 + 6) / 2 + 'px';
+  vol.style.top = de.top + de.height / 2 - (a.px * 0.8 + 6) / 2 + 'px';
+  document.body.appendChild(vol);
+  p.el.style.visibility = 'hidden';
+  requestAnimationFrame(() => {
+    vol.style.transform = `translate(${vers.left + vers.width / 2 - de.left - de.width / 2}px,${vers.top + vers.height / 2 - de.top - de.height / 2}px)${estIntrus ? ' scale(.3)' : ''}`;
+  });
+  setTimeout(() => {
+    vol.remove();
+    p.el.remove();
+    if (!etat || etat.pieces[i] !== p) return;
+    apres();
+    const r = cible.getBoundingClientRect();
+    etincelles(r.left + r.width / 2, r.top + r.height / 2, estIntrus ? '#ff9fd0' : '#ffd76a');
+    verifierFin();
+  }, 360);
+  sauve.album[p.id] = 1;
+  enregistrer();
+  infoAstre(p.id, estIntrus);
+  etat.pieces.forEach((q) => q.el.classList.remove('choisie'));
+}
+
+// Minuterie liée à la partie en cours : ignorée si le joueur a changé de niveau ou quitté.
+function plusTard(fn, ms) {
+  const e = etat;
+  setTimeout(() => { if (etat === e && !$('partie').classList.contains('cache')) fn(); }, ms);
+}
+
+function verifierFin() {
+  if (etat.phase !== 'ranger' || etat.pieces.some((p) => !p.place)) return;
+  if (etat.cfg.quiz) { etat.phase = 'transition'; plusTard(lancerQuiz, 1200); }
+  else { etat.phase = 'fini'; plusTard(finNiveau, 1300); }
+}
+
+// ---------- Quiz « Qui suis-je ? » ----------
+function lancerQuiz() {
+  if (!etat || etat.phase !== 'transition') return;
+  etat.phase = 'quiz';
+  etat.questions = melanger(etat.ordre.slice()).slice(0, etat.cfg.quiz);
+  etat.places.forEach((pl) => pl.el.classList.add('quiz'));
+  majMission();
+  poserQuestion();
+}
+function poserQuestion() {
+  const id = etat.questions[0];
+  const reste = etat.questions.length;
+  infoTexte(`<b>Qui suis-je ?</b> « ${ASTRES[id].e2} » <small>(${reste} question${reste > 1 ? 's' : ''})</small>`, true);
+}
+function repondreQuiz(j) {
+  const id = etat.questions[0];
+  const pl = etat.places[j];
+  if (!id) return;
+  if (pl.attendu === id) {
+    son('quiz');
+    etat.serie++;
+    ajouterPoints(50, pl.el);
+    rebond(pl.el);
+    const r = pl.el.getBoundingClientRect();
+    etincelles(r.left + r.width / 2, r.top + r.height / 2, '#9fe7ff');
+    etat.questions.shift();
+    if (etat.questions.length) {
+      infoTexte(`Bravo, c’était ${ASTRES[id].nom} !`);
+      plusTard(() => { if (etat.phase === 'quiz') poserQuestion(); }, 1100);
+    } else {
+      etat.phase = 'fini';
+      etat.places.forEach((p) => p.el.classList.remove('quiz'));
+      infoTexte(`Bravo, c’était ${ASTRES[id].nom} ! Tout le quiz est réussi.`);
+      plusTard(finNiveau, 1300);
+    }
+  } else {
+    etat.erreurs++;
+    etat.serie = 0;
+    son('erreur');
+    secouer(pl.el);
+    infoTexte(`Non, ce n’est pas ${ASTRES[pl.attendu].nom}. Relis : « ${ASTRES[id].e2} »`, true);
+  }
+}
+
+// ---------- Ligne d'information ----------
+function infoTexte(html, brut) {
+  const info = $('info');
+  info.innerHTML = brut ? html : '';
+  if (!brut) info.textContent = html;
+  info.classList.remove('neuf'); void info.offsetWidth; info.classList.add('neuf');
+}
+function infoAstre(id, estIntrus) {
+  const a = ASTRES[id];
+  const info = $('info');
+  info.innerHTML = '';
+  info.appendChild(astre(id, 30));
+  const t = document.createElement('span');
+  const texte = estIntrus ? a.info : (etat.cfg.mode === 'taille' ? a.taille : a.info);
+  t.innerHTML = `<b>${estIntrus ? 'Intrus démasqué ! ' : a.nom + ' : '}</b>`;
+  t.appendChild(document.createTextNode(texte));
+  info.appendChild(t);
+  info.classList.remove('neuf'); void info.offsetWidth; info.classList.add('neuf');
+}
+
+// ---------- Score ----------
+function ajouterPoints(n, cible) {
+  etat.score += n;
+  const sc = $('score');
+  sc.textContent = etat.score;
+  sc.classList.remove('pop'); void sc.offsetWidth; sc.classList.add('pop');
+  const r = cible.getBoundingClientRect();
+  const t = document.createElement('div');
+  t.className = 'points';
+  t.textContent = '+' + n;
+  t.style.left = r.left + r.width / 2 + 'px';
+  t.style.top = r.top + 'px';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1000);
+}
+
+// ---------- Glisser-déposer (doigt ou souris) ----------
+let glisse = null;
+let dernierGlisse = 0;
+$('reserve').addEventListener('pointerdown', (e) => {
+  const b = e.target.closest('.piece');
+  if (!b || !etat || etat.phase !== 'ranger' || etat.pause) return;
+  glisse = { i: +b.dataset.i, x0: e.clientX, y0: e.clientY, el: b, fantome: null, id: e.pointerId };
+});
+window.addEventListener('pointermove', (e) => {
+  if (!glisse || e.pointerId !== glisse.id) return;
+  if (!glisse.fantome) {
+    if (Math.hypot(e.clientX - glisse.x0, e.clientY - glisse.y0) < 10) return;
+    const p = etat.pieces[glisse.i];
+    if (!p || p.place) { glisse = null; return; }
+    choisirPiece(glisse.i, true);
+    let f;
+    if (p.enigme) { f = document.createElement('div'); f.className = 'fantome carte'; f.textContent = ASTRES[p.id].e1; }
+    else { f = astre(p.id, Math.round(ASTRES[p.id].px * 0.8 + 10)); f.classList.add('fantome'); }
+    document.body.appendChild(f);
+    glisse.fantome = f;
+    glisse.el.classList.add('tenue');
+  }
+  glisse.fantome.style.left = e.clientX + 'px';
+  glisse.fantome.style.top = e.clientY + 'px';
+  // Surbrillance de la cible survolée
+  const sous = document.elementFromPoint(e.clientX, e.clientY);
+  document.querySelectorAll('.cible').forEach((c) => c.classList.remove('cible'));
+  const c = sous && (sous.closest('.place') || sous.closest('#boite'));
+  if (c) c.classList.add('cible');
+});
+function finGlisse(e, annule) {
+  if (!glisse || e.pointerId !== glisse.id) return;
+  const g = glisse;
+  glisse = null;
+  if (!g.fantome) return;
+  g.fantome.remove();
+  g.el.classList.remove('tenue');
+  dernierGlisse = performance.now();
+  document.querySelectorAll('.cible').forEach((c) => c.classList.remove('cible'));
+  if (annule || !etat || etat.phase !== 'ranger') return;
+  const sous = document.elementFromPoint(e.clientX, e.clientY);
+  const place = sous && sous.closest('.place');
+  if (place) essayer(g.i, +place.dataset.j);
+  else if (sous && sous.closest('#boite')) toucherBoite();
+}
+window.addEventListener('pointerup', (e) => finGlisse(e, false));
+window.addEventListener('pointercancel', (e) => finGlisse(e, true));
+
+// ---------- Clavier ----------
+document.addEventListener('keydown', (e) => {
+  if (!$('intro').classList.contains('cache')) {
+    if (['Enter', ' ', 'Escape'].includes(e.key)) { e.preventDefault(); fermerIntro(); }
+    return;
+  }
+  if (!$('album').classList.contains('cache')) { if (e.key === 'Escape') montrer('album', false); return; }
+  if (!etat || $('partie').classList.contains('cache') || !$('bilan').classList.contains('cache')) return;
+  const surBouton = document.activeElement && document.activeElement.tagName === 'BUTTON';
+  if (/^[1-9]$/.test(e.key)) {
+    const j = +e.key - 1;
+    if (j < etat.places.length) toucherPlace(j);
+  } else if (e.key === 'i' || e.key === 'I' || e.key === '0') {
+    toucherBoite();
+  } else if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key) || (e.key === ' ' && !surBouton)) {
+    e.preventDefault();
+    if (etat.phase !== 'ranger') return;
+    const libres = etat.pieces.map((p, k) => (p.place ? -1 : k)).filter((k) => k >= 0);
+    if (!libres.length) return;
+    const pos = libres.indexOf(etat.sel);
+    const sens = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 1;
+    const k = libres[(pos + sens + libres.length) % libres.length];
+    choisirPiece(k, true);
+    etat.pieces[k].el.focus({ preventScroll: true });
+  }
+});
+
+// ---------- Chrono comète (boucle d'animation) ----------
+let idBoucle = 0, tPrec = 0;
+function demarrerBoucle() {
+  arreterBoucle();
+  tPrec = performance.now();
+  const pas = (t) => {
+    const dt = Math.min(0.1, (t - tPrec) / 1000);
+    tPrec = t;
+    if (etat && etat.cfg.chrono && !etat.pause && !document.hidden && (etat.phase === 'ranger' || etat.phase === 'quiz')) {
+      etat.temps += dt;
+      const total = etat.cfg.chrono;
+      const f = Math.min(1, etat.temps / total);
+      $('comete-chrono').style.left = (f * 100) + '%';
+      const reste = Math.ceil(total - etat.temps);
+      if (!etat.cometePassee && reste <= 10 && reste !== etat.dernierTic) { etat.dernierTic = reste; son('tic'); }
+      if (!etat.cometePassee && f >= 1) {
+        etat.cometePassee = true;
+        son('comete');
+        infoTexte('La comète est passée ! Pas grave : termine ton grand tour.');
+      }
+    }
+    idBoucle = requestAnimationFrame(pas);
+  };
+  idBoucle = requestAnimationFrame(pas);
+}
+function arreterBoucle() { if (idBoucle) cancelAnimationFrame(idBoucle); idBoucle = 0; }
+
+// ---------- Fin de niveau : bilan ----------
+function finNiveau() {
+  if (!etat) return;
+  const cfg = etat.cfg, n = etat.n;
+  let etoiles = etat.erreurs === 0 ? 3 : etat.erreurs <= 2 ? 2 : 1;
+  let bonus = 0;
+  if (cfg.chrono) {
+    if (etat.cometePassee) etoiles = Math.min(2, etoiles);
+    else bonus = Math.ceil(cfg.chrono - etat.temps) * 5;
+  }
+  const total = etat.score + bonus;
+  const ancien = sauve.records[n];
+  const nouveauRecord = total > ancien;
+  if (nouveauRecord) sauve.records[n] = total;
+  sauve.etoiles[n] = Math.max(sauve.etoiles[n], etoiles);
+  if (n + 1 < NIVEAUX.length) sauve.debloque = Math.max(sauve.debloque, n + 1);
+  enregistrer();
+
+  const dernier = n === NIVEAUX.length - 1;
+  $('bilan-titre').textContent = dernier ? 'Grand tour terminé !' : `Niveau ${n + 1} réussi !`;
+  const lignes = [`Erreurs : ${etat.erreurs}`];
+  if (cfg.chrono) lignes.push(etat.cometePassee ? 'La comète est passée avant la fin.' : `Plus rapide que la comète : +${bonus} points !`);
+  if (dernier) {
+    const te = sauve.etoiles.reduce((a, b) => a + b, 0);
+    const tp = sauve.records.reduce((a, b) => a + b, 0);
+    lignes.push(`Tous niveaux : ★ ${te} / ${NIVEAUX.length * 3} · record total ${tp} points`);
+    lignes.push(te < NIVEAUX.length * 3 ? 'Rejoue des niveaux pour gagner toutes les étoiles !' : 'Toutes les étoiles : tu es un vrai astronaute !');
+  } else if (etoiles < 3) {
+    lignes.push('Zéro erreur = 3 étoiles. Tu peux rejouer !');
+  }
+  $('bilan-details').innerHTML = lignes.map((l) => `<div>${l}</div>`).join('');
+  const rec = $('bilan-record');
+  rec.textContent = nouveauRecord ? (ancien > 0 ? '🏆 Nouveau record !' : '🏆 Premier record !') : `Record : ${ancien} points`;
+  rec.classList.toggle('nouveau', nouveauRecord);
+  montrer('btn-suivant', !dernier);
+  $('btn-rejouer').textContent = 'Rejouer';
+  const spans = $('bilan-etoiles').querySelectorAll('span');
+  spans.forEach((s) => s.classList.remove('gagnee'));
+  montrer('bilan', true);
+  son('fanfare');
+  confettis();
+  // Score qui défile, puis étoiles une à une
+  const sc = $('bilan-score');
+  const debut = performance.now();
+  const defile = (t) => {
+    const f = Math.min(1, (t - debut) / 900);
+    sc.textContent = Math.round(total * f) + ' points';
+    if (f < 1) requestAnimationFrame(defile);
+  };
+  requestAnimationFrame(defile);
+  for (let k = 0; k < etoiles; k++) {
+    setTimeout(() => { spans[k].classList.add('gagnee'); son('etoile'); }, 700 + k * 380);
+  }
+  setTimeout(() => (dernier ? $('btn-rejouer') : $('btn-suivant')).focus({ preventScroll: true }), 50);
+}
+$('btn-suivant').addEventListener('click', () => { son('clic'); demarrerNiveau(Math.min(NIVEAUX.length - 1, etat.n + 1)); });
+$('btn-rejouer').addEventListener('click', () => { son('clic'); demarrerNiveau(etat.n); });
+$('btn-bilan-menu').addEventListener('click', () => { son('clic'); afficherAccueil(); });
+$('btn-menu').addEventListener('click', () => { son('clic'); afficherAccueil(); });
+$('btn-aide').addEventListener('click', () => {
+  son('clic');
+  if (!etat) return;
+  // Revoir l'explication de la mécanique la plus récente de ce niveau
+  let cle = 'base';
+  for (let k = 0; k <= etat.n; k++) if (NIVEAUX[k].nouveau) cle = NIVEAUX[k].nouveau;
+  montrerIntro(cle);
+});
+
+// =====================================================================
+// Tutoriel animé : une main montre le geste, sans besoin de toucher
+// =====================================================================
+const INTROS = {
+  base: { titre: 'Comment jouer', scene: 'base',
+    etapes: ['Touche une planète en bas (ou fais-la glisser).', 'Touche son orbite : 1 = la plus proche du Soleil.', 'Lis l’info : elle rejoint ton album !'] },
+  sansOmbres: { titre: 'Les ombres ont disparu !', scene: 'sansOmbres',
+    etapes: ['Seul le numéro de l’orbite t’aide maintenant.', `Retiens : « ${MEMO} ».`, 'Me = Mercure, Voici = Vénus, Toute = Terre, Mouillée = Mars…'] },
+  quiz: { titre: 'Nouveau : Qui suis-je ?', scene: 'quiz',
+    etapes: ['Quand tout est rangé, une devinette apparaît.', 'Touche la planète qui parle.', 'Bonne réponse = 50 points de plus !'] },
+  intrus: { titre: 'Nouveau : les intrus', scene: 'intrus',
+    etapes: ['Un intrus se cache : ce n’est pas une planète !', 'Touche-le…', '…puis touche la boîte à intrus en bas à gauche.'] },
+  taille: { titre: 'Nouveau : par taille', scene: 'taille',
+    etapes: ['Cette fois, oublie le Soleil.', 'Range de la plus petite (1) à la plus grande.', 'Regarde bien : certaines se ressemblent !'] },
+  enigmes: { titre: 'Nouveau : les énigmes', scene: 'enigmes',
+    etapes: ['Les planètes se cachent derrière une devinette.', 'Lis-la et devine la planète…', '…puis pose la carte sur son orbite !'] },
+  chrono: { titre: 'Nouveau : la comète', scene: 'chrono',
+    etapes: ['Une comète traverse le ciel en haut.', 'Finis avant elle : bonus de points !', 'Trop lent ? Pas grave, termine quand même.'] },
+};
+// Place un élément dans la scène (coordonnées en px)
+function poser(el, x, y) { el.style.left = x + 'px'; el.style.top = y + 'px'; return el; }
+function elem(cls, html) { const d = document.createElement('div'); d.className = cls; if (html) d.innerHTML = html; return d; }
+function mouvement(el, dx, dy) { el.style.setProperty('--dx', dx + 'px'); el.style.setProperty('--dy', dy + 'px'); return el; }
+function construireScene(type) {
+  const sc = $('intro-scene');
+  sc.innerHTML = '';
+  const ajouter = (el) => { sc.appendChild(el); return el; };
+  if (type === 'base' || type === 'sansOmbres' || type === 'enigmes') {
+    // Soleil en haut à gauche, 3 orbites, une pièce glisse vers l'orbite 3
+    const sol = ajouter(poser(elem(''), -30, -30));
+    Object.assign(sol.style, { width: '80px', height: '80px', borderRadius: '50%', background: 'radial-gradient(circle,#fffbd6,#ffd34d 45%,#ff9a1f)' });
+    [[70, 34], [120, 52], [178, 62]].forEach(([x, y], k) => {
+      const p = ajouter(poser(elem('mini-place', `${k + 1}`), x, y));
+      if (type === 'base') { const o = astre(['mercure', 'venus', 'terre'][k], 22 + k * 3); o.style.opacity = '.3'; o.style.position = 'absolute'; p.appendChild(o); }
+    });
+    let piece;
+    if (type === 'enigmes') {
+      piece = elem('', '« Je suis la planète où tu habites. »');
+      Object.assign(piece.style, { width: '120px', fontSize: '11px', background: '#5b4bb5', borderRadius: '10px', padding: '4px 6px' });
+      poser(piece, 20, 104);
+      mouvement(piece, 140, -44);
+    } else {
+      piece = astre('terre', 30);
+      poser(piece, 40, 108);
+      mouvement(piece, 160, -38);
+    }
+    piece.classList.add('bouge');
+    ajouter(piece);
+    ajouter(mouvement(poser(elem('main', '👆'), 52, 118), type === 'enigmes' ? 140 : 160, type === 'enigmes' ? -44 : -38));
+  } else if (type === 'quiz') {
+    ajouter(poser(elem('bulle', 'Qui suis-je ? « J’ai de grands anneaux brillants. »'), 0, 0));
+    [['mars', 30], ['jupiter', 100], ['saturne', 180]].forEach(([id, x]) => {
+      const p = ajouter(poser(elem('mini-place'), x, 64));
+      p.appendChild(astre(id, id === 'mars' ? 20 : 32));
+    });
+    ajouter(mouvement(poser(elem('main', '👆'), 110, 112), 82, -10));
+  } else if (type === 'intrus') {
+    const lune = ajouter(mouvement(poser(astre('lune', 28), 170, 30), -128, 80));
+    lune.classList.add('bouge');
+    ajouter(poser(elem('mini-boite', '🗑️ Boîte à intrus'), 14, 92));
+    ajouter(poser(astre('mars', 24), 100, 34));
+    ajouter(mouvement(poser(elem('main', '👆'), 182, 44), -128, 80));
+  } else if (type === 'taille') {
+    [24, 92, 160].forEach((x, k) => ajouter(poser(elem('mini-place', `${k + 1}`), x, 28)));
+    const piece = ajouter(mouvement(poser(astre('mercure', 20), 172, 104), -136, -63));
+    piece.classList.add('bouge');
+    ajouter(poser(astre('terre', 34), 104, 98));
+    ajouter(poser(astre('jupiter', 44), 36, 92));
+    ajouter(mouvement(poser(elem('main', '👆'), 180, 114), -136, -63));
+    const fl = ajouter(poser(elem('', 'petite → grande'), 70, 4));
+    Object.assign(fl.style, { fontSize: '13px', fontWeight: '800', color: '#ffd76a' });
+  } else if (type === 'chrono') {
+    const piste = ajouter(poser(elem(''), 20, 40));
+    Object.assign(piste.style, { width: '220px', height: '24px', borderRadius: '12px', background: '#ffffff18' });
+    const c = ajouter(poser(astre('comete', 16), 22, 44));
+    c.classList.add('fileante');
+    ajouter(poser(elem('', '🏁'), 222, 42));
+    ajouter(poser(elem('', '+5 points par seconde gagnée !'), 30, 100)).style.fontSize = '14px';
+  }
+}
+let introOuverte = null;
+function montrerIntro(cle) {
+  const d = INTROS[cle];
+  if (!d) return;
+  introOuverte = cle;
+  if (etat) etat.pause = true;
+  $('intro-titre').textContent = d.titre;
+  $('intro-etapes').innerHTML = d.etapes.map((t, k) => `<li><b>${k + 1}</b><span>${t}</span></li>`).join('');
+  construireScene(d.scene);
+  montrer('intro', true);
+  $('btn-compris').focus({ preventScroll: true });
+}
+function fermerIntro() {
+  if (introOuverte) { sauve.vus[introOuverte] = 1; enregistrer(); }
+  introOuverte = null;
+  montrer('intro', false);
+  $('intro-scene').innerHTML = '';
+  if (etat) etat.pause = false;
+  son('clic');
+}
+$('btn-compris').addEventListener('click', fermerIntro);
+$('intro').addEventListener('click', (e) => { if (e.target === $('intro')) fermerIntro(); });
+
+// =====================================================================
+// Effets visuels
+// =====================================================================
+function secouer(el) { if (!el) return; el.classList.remove('secoue'); void el.offsetWidth; el.classList.add('secoue'); }
+function rebond(el) { el.classList.remove('rebond'); void el.offsetWidth; el.classList.add('rebond'); }
+function rebondBoite() { secouer($('boite')); }
+function etincelles(x, y, couleur) {
+  for (let k = 0; k < 14; k++) {
+    const s = document.createElement('div');
+    s.className = 'etincelle';
+    s.style.left = x - 4 + 'px';
+    s.style.top = y - 4 + 'px';
+    s.style.background = k % 3 ? couleur : '#fff';
+    document.body.appendChild(s);
+    const a = (k / 14) * Math.PI * 2, d = 30 + Math.random() * 40;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      s.style.transform = `translate(${Math.cos(a) * d}px,${Math.sin(a) * d}px) scale(.3)`;
+      s.style.opacity = '0';
+    }));
+    setTimeout(() => s.remove(), 750);
+  }
+}
+// Confettis en canvas pendant 2,5 secondes
+function confettis() {
+  const cv = $('confettis');
+  const c = cv.getContext('2d');
+  if (!c) return;
+  const W = cv.width = window.innerWidth, H = cv.height = window.innerHeight;
+  const couleurs = ['#ffd76a', '#9fe7ff', '#ff9fd0', '#a99bff', '#7dffb0', '#ffffff'];
+  const parts = Array.from({ length: 90 }, () => ({
+    x: W / 2 + (Math.random() - 0.5) * 80, y: H * 0.35, vx: (Math.random() - 0.5) * 9, vy: -Math.random() * 9 - 3,
+    r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, t: 5 + Math.random() * 5, col: couleurs[Math.floor(Math.random() * couleurs.length)],
+  }));
+  const debut = performance.now();
+  const anim = (t) => {
+    c.clearRect(0, 0, W, H);
+    parts.forEach((p) => {
+      p.vy += 0.22; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      c.save(); c.translate(p.x, p.y); c.rotate(p.r); c.fillStyle = p.col; c.fillRect(-p.t / 2, -p.t / 4, p.t, p.t / 2); c.restore();
+    });
+    if (t - debut < 2500) requestAnimationFrame(anim);
+    else c.clearRect(0, 0, W, H);
+  };
+  requestAnimationFrame(anim);
+}
+
+// ---------- Démarrage ----------
+majSon();
+afficherAccueil();
+</script>
+</body>
+</html>
