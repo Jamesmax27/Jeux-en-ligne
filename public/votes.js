@@ -63,6 +63,18 @@ export function monVote(gameId) {
   return lire(CLES.votes, {})[gameId] || 0;
 }
 
+/**
+ * Tous mes votes { gameId: 1 | -1 }, relus depuis le stockage : un vote a pu
+ * être fait dans le lanceur depuis le chargement de la page (bouton « Précédent »).
+ */
+export function mesVotes() {
+  try {
+    const brut = localStorage.getItem(CLES.votes);
+    if (brut) memoire[CLES.votes] = JSON.parse(brut);
+  } catch { /* stockage indisponible ou illisible : copie en mémoire */ }
+  return { ...lire(CLES.votes, {}) };
+}
+
 /** Y a-t-il des votes qui attendent d'être envoyés ? */
 export function votesEnAttente() {
   return Object.keys(lire(CLES.attente, {})).length > 0;

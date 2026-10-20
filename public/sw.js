@@ -21,7 +21,7 @@
 // touchés : ils ont leur propre cache, indépendant de VERSION.
 // ==========================================================================
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
 const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
@@ -31,7 +31,7 @@ const DELAI_RESEAU = 3000;                  // ms : au-delà, la copie gardée e
 
 // Fichiers de la coquille, relatifs au dossier du site.
 const COQUILLE = [
-  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'hors-ligne.js',
+  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'hors-ligne.js', 'regroupements.js',
   'manifest.webmanifest', 'assets/logo.svg', 'assets/sans-jaquette.svg',
 ];
 

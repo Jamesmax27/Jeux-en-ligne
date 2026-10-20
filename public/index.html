@@ -32,42 +32,58 @@
     </label>
   </header>
 
-  <nav class="barre-filtres" aria-label="Tri et filtres">
-    <div class="barre-filtres-int">
-      <div class="ligne-tri">
-        <label class="tri">
-          <span class="sr-only">Trier par</span>
-          <svg class="tri-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>
-          <select id="tri">
-            <option value="notes">Mieux notés</option>
-            <option value="votes">Plus populaires</option>
-            <option value="semaine">Populaires cette semaine</option>
-            <option value="nouveautes">Nouveautés</option>
-          </select>
-          <svg class="tri-fleche" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-        </label>
+  <!-- Regroupements : tuiles remplies par app.js (définitions dans regroupements.js) -->
+  <section class="explorer" aria-label="Explorer les jeux">
+    <div class="tuiles tuiles-raccourcis" id="raccourcis" role="group" aria-label="Raccourcis"></div>
+
+    <section class="groupe" aria-labelledby="titre-ages">
+      <div class="groupe-tete"><h2 id="titre-ages">Pour quel âge ?</h2></div>
+      <div class="tuiles tuiles-ages" id="ages" role="group" aria-labelledby="titre-ages"></div>
+    </section>
+
+    <section class="groupe" aria-labelledby="titre-genres">
+      <div class="groupe-tete">
+        <h2 id="titre-genres">Genres <small>comment on joue</small></h2>
+        <button class="tout-voir" type="button" aria-controls="genres" aria-expanded="false">Tout voir</button>
       </div>
-      <div class="filtres">
-        <div class="groupe-puces" id="genres" role="group" aria-label="Genres"></div>
-        <span class="separateur" id="separateur" aria-hidden="true"></span>
-        <div class="groupe-puces" id="etiquettes" role="group" aria-label="Thèmes"></div>
+      <div class="tuiles tuiles-bande" id="genres" role="group" aria-labelledby="titre-genres"></div>
+    </section>
+
+    <section class="groupe" aria-labelledby="titre-univers">
+      <div class="groupe-tete">
+        <h2 id="titre-univers">Univers <small>de quoi ça parle</small></h2>
+        <button class="tout-voir" type="button" aria-controls="univers" aria-expanded="false">Tout voir</button>
       </div>
-    </div>
-  </nav>
+      <div class="tuiles tuiles-bande" id="univers" role="group" aria-labelledby="titre-univers"></div>
+      <div class="autres-themes" id="autres-themes" role="group" aria-label="Autres thèmes" hidden></div>
+    </section>
+  </section>
 
   <main class="catalogue">
-    <div class="ligne-infos">
-      <p class="compte" id="compte" aria-live="polite"></p>
-      <div class="portee" id="portee" role="group" aria-label="Votes pris en compte" hidden>
-        <button type="button" data-portee="monde" aria-pressed="true">Monde</button>
-        <button type="button" data-portee="pays" aria-pressed="false">Mon pays</button>
-      </div>
+    <div class="resultats-tete" id="resultats">
+      <h2 id="titre-resultats"><span id="titre-texte">Tous les jeux</span> <span class="compte" id="compte" aria-live="polite"></span></h2>
+      <label class="tri">
+        <span class="sr-only">Trier par</span>
+        <svg class="tri-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>
+        <select id="tri">
+          <option value="notes">Mieux notés</option>
+          <option value="votes">Plus populaires</option>
+          <option value="semaine">Populaires cette semaine</option>
+          <option value="nouveautes">Nouveautés</option>
+        </select>
+        <svg class="tri-fleche" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </label>
+    </div>
+    <div class="filtres-actifs" id="filtres-actifs" role="group" aria-label="Filtres choisis" hidden></div>
+    <div class="portee" id="portee" role="group" aria-label="Votes pris en compte" hidden>
+      <button type="button" data-portee="monde" aria-pressed="true">Monde</button>
+      <button type="button" data-portee="pays" aria-pressed="false">Mon pays</button>
     </div>
     <p class="note-tri" id="note-tri" hidden></p>
     <ul class="grille" id="grille"></ul>
     <div class="vide" id="vide" hidden>
       <strong id="vide-titre">Aucun jeu trouvé</strong>
-      <span id="vide-texte">Essaie un autre mot, un autre genre ou un autre thème.</span>
+      <span id="vide-texte">Essaie un autre mot, un autre genre ou un autre univers.</span>
     </div>
 
     <section class="archives" id="archives" hidden aria-labelledby="archives-titre">
