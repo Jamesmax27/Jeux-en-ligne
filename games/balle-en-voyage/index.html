@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Balle en voyage</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b2a5c; font-family: system-ui, sans-serif; color: #fff; touch-action: none; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud { position: fixed; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; padding: 8px 12px; font-weight: 700; font-size: 16px; text-shadow: 0 2px 4px rgba(0,0,0,.5); pointer-events: none; }
+  #toast { position: fixed; top: 48px; left: 0; right: 0; text-align: center; font-weight: 800; font-size: 20px; text-shadow: 0 2px 6px rgba(0,0,0,.6); opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #toast.on { opacity: 1; }
+  #pad { position: fixed; left: 10px; bottom: 14px; width: 176px; height: 176px; }
+  .b { position: absolute; width: 58px; height: 58px; border-radius: 50%; border: 2px solid rgba(255,255,255,.7); background: rgba(255,255,255,.22); color: #fff; font-size: 26px; display: flex; align-items: center; justify-content: center; touch-action: none; }
+  .b.on { background: rgba(255,255,255,.55); }
+  #bU { left: 59px; top: 0; } #bD { left: 59px; bottom: 0; } #bL { left: 0; top: 59px; } #bR { right: 0; top: 59px; }
+  #bJ { position: fixed; right: 16px; bottom: 36px; width: 96px; height: 96px; font-size: 18px; font-weight: 800; background: rgba(255,200,60,.4); }
+  #ov { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; background: rgba(15,22,60,.72); gap: 14px; }
+  #ov.off { display: none; }
+  #ov h1 { font-size: 40px; margin: 0; color: #ffd75e; text-shadow: 0 3px 0 #b5552b, 0 6px 14px rgba(0,0,0,.5); line-height: 1.05; }
+  #ov p { margin: 0; font-size: 17px; line-height: 1.4; max-width: 340px; }
+  #ov button { min-height: 56px; min-width: 190px; font-size: 22px; font-weight: 800; border: 0; border-radius: 28px; background: #ffd75e; color: #3a2400; box-shadow: 0 4px 0 #b5552b; cursor: pointer; }
+  #ball { width: 90px; height: 90px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffb3a0, #e8412d 55%, #8f1a10); box-shadow: 0 8px 18px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><span id="hN">Niveau 1</span><span id="hG">💎 0</span><span id="hF">Chutes : 0</span></div>
+<div id="toast"></div>
+<div id="pad">
+  <div class="b" id="bU" aria-label="Avancer">▲</div>
+  <div class="b" id="bL" aria-label="Gauche">◀</div>
+  <div class="b" id="bR" aria-label="Droite">▶</div>
+  <div class="b" id="bD" aria-label="Reculer">▼</div>
+</div>
+<div class="b" id="bJ" aria-label="Sauter">SAUTE</div>
+<div id="ov">
+  <div id="ball"></div>
+  <h1 id="oT">Balle en voyage</h1>
+  <p id="oP">Fais rouler la balle de plate-forme en plate-forme jusqu'à l'étoile. Saute les trous ! Les drapeaux 🚩 sauvegardent ta place : si tu tombes, tu repars du dernier drapeau.<br><small>Flèches + Espace au clavier, ou les boutons.</small></p>
+  <button id="oB">Jouer</button>
+</div>
+<script>
+// ===== Balle en voyage : plate-forme 3D dessinée en canvas (perspective maison) =====
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+let W = 0, H = 0, F = 400, CY0 = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  F = Math.min(W * 1.1, H * 0.75); CY0 = H * 0.55;
+}
+window.addEventListener('resize', resize); resize();
+
+// ---- Générateur pseudo-aléatoire (niveaux toujours identiques) ----
+function rng(s) { return function () { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+const R = 0.5;                       // rayon de la balle
+const LEVELS = [
+  { n: 12, move: 0,   gap: 1.7, wMin: 2.8 },
+  { n: 18, move: 0.2, gap: 2.3, wMin: 2.3 },
+  { n: 24, move: 0.3, gap: 2.8, wMin: 1.9 }
+];
+let plats = [], gems = [], level = 0, cp = null, T = 0;
+
+// Construit les plates-formes d'un niveau
+function build(l) {
+  const L = LEVELS[l], r = rng(1234 + l * 77), a = (lo, hi) => lo + (hi - lo) * r();
+  plats = []; gems = [];
+  plats.push({ cx: 0, w: 4, z0: -2, z1: 2, top: 0, amp: 0, sp: 0, ph: 0, hue: 200, cp: false, start: true });
+  for (let i = 1; i <= L.n; i++) {
+    const p = plats[i - 1], last = i === L.n, isCp = !last && i % 5 === 0;
+    const w = last ? 4.4 : (isCp ? 3.4 : a(L.wMin, L.wMin + 1.2)), d = last ? 4.4 : (isCp ? 3.2 : a(2, 3.2));
+    const gap = last ? 1.4 : a(1.0, L.gap);
+    const z0 = p.z1 + gap;
+    const dy = [-0.5, 0, 0, 0.5][Math.floor(r() * 4)];
+    const top = Math.max(0, Math.min(3, p.top + dy));
+    const moving = !last && !isCp && r() < L.move;
+    const amp = moving ? 1.2 : 0;
+    const lim = (p.w + w) / 2 - 0.4 - p.amp - amp;
+    let cx = lim > 0.2 ? p.cx + (r() * 2 - 1) * Math.min(2.5, lim) : p.cx;
+    cx = Math.max(-5, Math.min(5, cx));
+    if (Math.abs(cx - p.cx) > Math.max(lim, 0)) cx = p.cx;
+    plats.push({ cx, w, z0, z1: z0 + d, top, amp, sp: a(0.8, 1.4), ph: a(0, 6), hue: (i * 37 + l * 90) % 360, cp: isCp, fin: last });
+    if (!last && !moving && r() < 0.55) gems.push({ x: cx, y: top + 1.0, z: z0 + d / 2, got: false });
+  }
+  plats.forEach(placePlat);
+}
+function placePlat(p) {
+  const x = p.cx + (p.amp ? Math.sin(T * p.sp + p.ph) * p.amp : 0);
+  p.dx = p.x0 === undefined ? 0 : x - (p.x0 + p.w / 2);
+  p.x0 = x - p.w / 2; p.x1 = x + p.w / 2;
+}
+
+// ---- État du joueur ----
+const ball = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, ax: 0, az: 0, ground: false, sup: null, coyote: 0, buf: 0 };
+let state = 'menu', falls = 0, score = 0, cam = { x: 0, y: 3, z: -6 }, toastT = 0, winT = 0;
+function spawn(p) {
+  ball.x = (p.x0 + p.x1) / 2; ball.z = (p.z0 + p.z1) / 2; ball.y = p.top + 0.05;
+  ball.vx = ball.vy = ball.vz = 0; ball.sup = p; ball.ground = true;
+}
+function startLevel(l) {
+  level = l; T = 0; build(l); cp = plats[0]; spawn(cp);
+  cam = { x: ball.x, y: ball.y + 3.5, z: ball.z - 6 };
+  document.getElementById('hN').textContent = 'Niveau ' + (l + 1) + '/3';
+  updHud();
+}
+function updHud() {
+  document.getElementById('hG').textContent = '💎 ' + score;
+  document.getElementById('hF').textContent = 'Chutes : ' + falls;
+}
+function toast(t) {
+  const e = document.getElementById('toast'); e.textContent = t; e.classList.add('on'); toastT = 1.8;
+}
+
+// ---- Commandes (clavier + boutons tactiles) ----
+const inp = { l: 0, r: 0, u: 0, d: 0, j: 0 };
+const KEYS = { ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd', ' ': 'j', a: 'l', q: 'l', d: 'r', w: 'u', z: 'u', s: 'd' };
+window.addEventListener('keydown', e => { const k = KEYS[e.key]; if (k) { inp[k] = 1; if (k === 'j') ball.buf = 0.15; e.preventDefault(); } });
+window.addEventListener('keyup', e => { const k = KEYS[e.key]; if (k) { inp[k] = 0; e.preventDefault(); } });
+window.addEventListener('blur', () => { for (const k in inp) inp[k] = 0; });
+[['bU', 'u'], ['bD', 'd'], ['bL', 'l'], ['bR', 'r'], ['bJ', 'j']].forEach(([id, k]) => {
+  const el = document.getElementById(id);
+  const on = e => { e.preventDefault(); inp[k] = 1; el.classList.add('on'); if (k === 'j') ball.buf = 0.15; try { el.setPointerCapture(e.pointerId); } catch (x) {} };
+  const off = e => { e.preventDefault(); inp[k] = 0; el.classList.remove('on'); };
+  el.addEventListener('pointerdown', on);
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(n => el.addEventListener(n, off));
+  el.addEventListener('contextmenu', e => e.preventDefault());
+});
+
+// ---- Physique ----
+function approach(v, t, a) { return v < t ? Math.min(v + a, t) : Math.max(v - a, t); }
+function step(dt) {
+  T += dt;
+  plats.forEach(placePlat);
+  // la plate-forme mobile emporte la balle
+  if (ball.ground && ball.sup) ball.x += ball.sup.dx;
+  const ix = inp.r - inp.l, iz = inp.u - inp.d * 0.7, sp = 5.2, ac = (ball.ground ? 32 : 14) * dt;
+  ball.vx = approach(ball.vx, ix * sp, ac);
+  ball.vz = approach(ball.vz, iz * sp, ac);
+  ball.buf -= dt; ball.coyote -= dt;
+  if (ball.ground) ball.coyote = 0.12;
+  if (ball.buf > 0 && ball.coyote > 0) { ball.vy = 8.4; ball.ground = false; ball.coyote = 0; ball.buf = 0; }
+  ball.vy -= 22 * dt;
+  ball.x += ball.vx * dt; ball.z += ball.vz * dt; ball.y += ball.vy * dt;
+  ball.az += ball.vx * dt / R; ball.ax += ball.vz * dt / R;
+  // atterrissage
+  ball.ground = false; ball.sup = null;
+  if (ball.vy <= 0) {
+    let best = null;
+    for (const p of plats) {
+      if (ball.x >= p.x0 - 0.2 && ball.x <= p.x1 + 0.2 && ball.z >= p.z0 - 0.2 && ball.z <= p.z1 + 0.2 &&
+          ball.y <= p.top + 0.02 && ball.y >= p.top - 0.6 && (!best || p.top > best.top)) best = p;
+    }
+    if (best) { ball.y = best.top; ball.vy = 0; ball.ground = true; ball.sup = best; }
+  }
+  const s = ball.sup;
+  if (s) {
+    if (s.cp && cp !== s && s.z0 > cp.z0) { cp = s; toast('🚩 Point de sauvegarde !'); }
+    if (s.fin) { winLevel(); return; }
+  }
+  // gemmes
+  for (const g of gems) if (!g.got && Math.hypot(g.x - ball.x, g.y - (ball.y + R), g.z - ball.z) < 0.9) { g.got = true; score++; updHud(); }
+  // chute
+  if (ball.y < -9) { falls++; updHud(); spawn(cp); toast('Oups ! On repart du drapeau'); }
+}
+
+// ---- Fin de niveau ----
+function winLevel() {
+  state = 'win'; winT = 0;
+  const last = level === LEVELS.length - 1;
+  document.getElementById('oT').textContent = last ? 'Bravo, champion !' : 'Niveau réussi !';
+  document.getElementById('oP').innerHTML = last
+    ? 'Tu as atteint la dernière étoile !<br>💎 ' + score + ' gemmes — ' + falls + ' chutes.'
+    : 'Tu as atteint l\'étoile ! 💎 ' + score + ' gemmes, ' + falls + ' chutes.';
+  document.getElementById('oB').textContent = last ? 'Rejouer' : 'Niveau suivant';
+  for (const k in inp) inp[k] = 0;
+  setTimeout(() => document.getElementById('ov').classList.remove('off'), 900);
+}
+document.getElementById('oB').addEventListener('click', () => {
+  if (state === 'win' && level < LEVELS.length - 1) startLevel(level + 1);
+  else { score = 0; falls = 0; startLevel(0); }
+  state = 'play';
+  document.getElementById('ov').classList.add('off');
+});
+
+// ---- Dessin 3D ----
+const PITCH = 0.36, CP = Math.cos(PITCH), SP = Math.sin(PITCH);
+function cs(x, y, z) { // monde -> repère caméra
+  const rx = x - cam.x, ry = y - cam.y, rz = z - cam.z;
+  return [rx, ry * CP + rz * SP, rz * CP - ry * SP];
+}
+function clip(c) { // coupe contre le plan proche
+  const N = 0.3, out = [];
+  for (let i = 0; i < c.length; i++) {
+    const a = c[i], b = c[(i + 1) % c.length], ia = a[2] >= N, ib = b[2] >= N;
+    if (ia) out.push(a);
+    if (ia !== ib) { const t = (N - a[2]) / (b[2] - a[2]); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, N]); }
+  }
+  return out;
+}
+const sx = c => W / 2 + F * c[0] / c[2], sy = c => CY0 - F * c[1] / c[2];
+function face(pts, fill, stroke) {
+  const c = clip(pts.map(p => cs(p[0], p[1], p[2])));
+  if (c.length < 3) return;
+  ctx.beginPath();
+  c.forEach((q, i) => i ? ctx.lineTo(sx(q), sy(q)) : ctx.moveTo(sx(q), sy(q)));
+  ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1.5; ctx.stroke(); }
+}
+function drawPlat(p) {
+  const x0 = p.x0, x1 = p.x1, z0 = p.z0, z1 = p.z1, t = p.top, b = t - 1.6;
+  const h = p.cp ? 48 : (p.fin ? 130 : p.hue), s = p.start ? 15 : 60;
+  if (cam.z < z0) face([[x0, t, z0], [x1, t, z0], [x1, b, z0], [x0, b, z0]], 'hsl(' + h + ' ' + s + '% 50%)');
+  if (cam.x < x0) face([[x0, t, z0], [x0, t, z1], [x0, b, z1], [x0, b, z0]], 'hsl(' + h + ' ' + s + '% 38%)');
+  if (cam.x > x1) face([[x1, t, z0], [x1, t, z1], [x1, b, z1], [x1, b, z0]], 'hsl(' + h + ' ' + s + '% 38%)');
+  face([[x0, t, z0], [x1, t, z0], [x1, t, z1], [x0, t, z1]], 'hsl(' + h + ' ' + (p.start ? 20 : 65) + '% 70%)', 'hsl(' + h + ' 60% 85%)');
+}
+function drawFlag(p) {
+  const x = p.x1 - 0.4, z = p.z1 - 0.5, on = cp === p;
+  const a = cs(x, p.top, z), b = cs(x, p.top + 1.8, z), c = cs(x + 0.9, p.top + 1.45, z), m = cs(x, p.top + 1.1, z);
+  if (a[2] < 0.3 || b[2] < 0.3 || c[2] < 0.3) return;
+  ctx.strokeStyle = '#eee'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(sx(a), sy(a)); ctx.lineTo(sx(b), sy(b)); ctx.stroke();
+  ctx.fillStyle = on ? '#3fd16a' : '#e8412d';
+  ctx.beginPath(); ctx.moveTo(sx(b), sy(b)); ctx.lineTo(sx(c), sy(c)); ctx.lineTo(sx(m), sy(m)); ctx.closePath(); ctx.fill();
+}
+function drawStar(x, y, z, size, col) {
+  const c = cs(x, y, z); if (c[2] < 0.3) return;
+  const px = sx(c), py = sy(c), r = F * size / c[2];
+  ctx.fillStyle = col; ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const ang = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(px + Math.cos(ang) * rr, py + Math.sin(ang) * rr);
+  }
+  ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#a86a00'; ctx.lineWidth = 2; ctx.stroke();
+}
+function drawGem(g) {
+  const bob = Math.sin(T * 3 + g.x) * 0.12, c = cs(g.x, g.y + bob, g.z); if (c[2] < 0.3) return;
+  const px = sx(c), py = sy(c), r = F * 0.28 / c[2];
+  ctx.fillStyle = '#5be0ff'; ctx.beginPath();
+  ctx.moveTo(px, py - r); ctx.lineTo(px + r * 0.8, py); ctx.lineTo(px, py + r); ctx.lineTo(px - r * 0.8, py); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+}
+function drawShadow() {
+  let best = null;
+  for (const p of plats) if (ball.x >= p.x0 && ball.x <= p.x1 && ball.z >= p.z0 && ball.z <= p.z1 && p.top <= ball.y + 0.1 && (!best || p.top > best.top)) best = p;
+  if (!best) return;
+  const k = Math.max(0.4, 1 - (ball.y - best.top) * 0.12), pts = [];
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; pts.push([ball.x + Math.cos(a) * R * k, best.top + 0.02, ball.z + Math.sin(a) * R * k]); }
+  face(pts, 'rgba(0,0,0,.35)');
+}
+const DOTS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+function drawBall() {
+  const c = cs(ball.x, ball.y + R, ball.z); if (c[2] < 0.3) return;
+  const px = sx(c), py = sy(c), r = F * R / c[2];
+  const g = ctx.createRadialGradient(px - r * 0.35, py - r * 0.4, r * 0.1, px, py, r);
+  g.addColorStop(0, '#ffb3a0'); g.addColorStop(0.55, '#e8412d'); g.addColorStop(1, '#8f1a10');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill();
+  // taches blanches qui tournent : montrent que la balle roule
+  const ca = Math.cos(ball.ax), sa = Math.sin(ball.ax), cz = Math.cos(ball.az), sz = Math.sin(ball.az);
+  for (const d of DOTS) {
+    let x = d[0], y = d[1], z = d[2];
+    const y1 = y * ca - z * sa, z1 = y * sa + z * ca; y = y1; z = z1;
+    const x1 = x * cz - y * sz, y2 = x * sz + y * cz; x = x1; y = y2;
+    if (z < -0.1) {
+      ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath();
+      ctx.ellipse(px + x * r * 0.8, py - y * r * 0.8, r * 0.22 * (-z), r * 0.22, 0, 0, 7); ctx.fill();
+    }
+  }
+}
+function sky() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#1b2a5c'); g.addColorStop(0.5, '#5a7bd8'); g.addColorStop(1, '#bcd6ff');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,255,255,.6)';
+  for (let i = 0; i < 6; i++) {
+    const x = ((((i * 173 - cam.x * 14) % (W + 120)) + W + 120) % (W + 120)) - 60, y = H * (0.08 + (i * 0.13) % 0.4);
+    ctx.beginPath(); ctx.ellipse(x, y, 46, 14, 0, 0, 7); ctx.ellipse(x + 22, y - 9, 28, 14, 0, 0, 7); ctx.fill();
+  }
+}
+function dist(p) { const dx = Math.max(p.x0 - cam.x, 0, cam.x - p.x1), dz = Math.max(p.z0 - cam.z, 0, cam.z - p.z1); return dx * dx + dz * dz; }
+function render() {
+  sky();
+  const order = plats.slice().sort((a, b) => dist(b) - dist(a));
+  for (const p of order) {
+    drawPlat(p);
+    if (p.cp) drawFlag(p);
+    if (p.fin) drawStar(p.cx, p.top + 2.2 + Math.sin(T * 2) * 0.2, (p.z0 + p.z1) / 2, 0.9, '#ffd75e');
+  }
+  gems.forEach(g => { if (!g.got) drawGem(g); });
+  drawShadow();
+  drawBall();
+}
+
+// ---- Boucle principale ----
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  if (state === 'play') { step(dt / 2); if (state === 'play') step(dt / 2); }
+  else { T += dt; plats.forEach(placePlat); }
+  // caméra douce derrière la balle
+  const k = 1 - Math.pow(0.001, dt);
+  cam.x += (ball.x * 0.85 - cam.x) * k;
+  cam.z += (ball.z - 6 - cam.z) * k;
+  const ty = (ball.sup ? ball.y : Math.max(ball.y, cam.y - 4)) + 3.5;
+  cam.y += (ty - cam.y) * k * 0.6;
+  if (toastT > 0) { toastT -= dt; if (toastT <= 0) document.getElementById('toast').classList.remove('on'); }
+  render();
+  requestAnimationFrame(frame);
+}
+startLevel(0);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
