@@ -235,7 +235,10 @@ jobs:
           '
 
       - name: Contrôle qualité final + jaquette
-        run: node scripts/validate-games.mjs --browser --covers "${{ steps.verif.outputs.id }}" | tee "$RUNNER_TEMP/rapport.txt"
+        run: |
+          # pipefail : sans lui, « | tee » masquerait l'échec du contrôle et la pull request serait ouverte quand même.
+          set -o pipefail
+          node scripts/validate-games.mjs --browser --covers "${{ steps.verif.outputs.id }}" | tee "$RUNNER_TEMP/rapport.txt"
 
       - name: Préparer la description de la pull request
         env:
