@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Le chemin de l'eau</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; touch-action: none;
+    font-family: system-ui, sans-serif; color: #1d2a4a; background: #cfe8ff;
+    user-select: none; -webkit-user-select: none;
+  }
+  #jeu { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+  /* Barre du haut : menu, niveau, encre, annuler, effacer, son */
+  .barre { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #2c4c86; color: #fff; }
+  .bouton-rond {
+    min-width: 44px; height: 44px; border: none; border-radius: 12px; font-size: 22px;
+    background: rgba(255,255,255,.18); color: #fff; cursor: pointer; padding: 0 6px;
+  }
+  .bouton-rond:active { transform: scale(.94); }
+  .bouton-rond:disabled { opacity: .4; }
+  #info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  #titre-niveau { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #jauge { position: relative; height: 14px; border-radius: 7px; background: rgba(255,255,255,.25); overflow: hidden; }
+  #jauge-encre { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: linear-gradient(90deg, #ffd34d, #ffb22e); transition: width .1s; }
+  .repere { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; opacity: .8; }
+  #jauge-texte { position: absolute; inset: 0; font-size: 11px; line-height: 14px; text-align: center; color: #3a2a00; font-weight: 700; }
+
+  #zone-canvas { position: relative; flex: 1; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* Barre du bas : indice et gros bouton Verser */
+  .barre-bas { display: flex; gap: 8px; padding: 8px; background: #2c4c86; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  #btn-verser {
+    flex: 1; height: 56px; border: none; border-radius: 16px; font-size: 22px; font-weight: 800;
+    background: linear-gradient(#4fc3ff, #1e8be0); color: #fff; box-shadow: 0 4px 0 #135a99; cursor: pointer;
+  }
+  #btn-verser.arreter { background: linear-gradient(#ffb36b, #f07c22); box-shadow: 0 4px 0 #a04e0c; }
+  #btn-verser:active { transform: translateY(3px); box-shadow: 0 1px 0 #135a99; }
+  #btn-indice { height: 56px; min-width: 56px; border: none; border-radius: 16px; font-size: 18px; font-weight: 700; background: #ffe17a; color: #5a4200; cursor: pointer; padding: 0 10px; }
+
+  /* Écrans par-dessus le jeu */
+  .ecran {
+    position: absolute; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: center;
+    padding: 16px; text-align: center; z-index: 5;
+  }
+  .ecran.visible { display: flex; }
+  .carte {
+    background: #fffdf6; border-radius: 22px; padding: 20px 18px; width: min(92vw, 380px);
+    box-shadow: 0 10px 30px rgba(0,30,80,.35); animation: arrivee .35s ease-out;
+  }
+  @keyframes arrivee { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .ecran h2 { margin: 0 0 8px; font-size: 30px; color: #1e5fb0; }
+  .ecran p { margin: 6px 0; font-size: 17px; line-height: 1.35; }
+  .gros-bouton {
+    display: block; width: 100%; min-height: 54px; margin-top: 10px; border: none; border-radius: 16px;
+    font-size: 21px; font-weight: 800; color: #fff; background: linear-gradient(#52d273, #23a64a);
+    box-shadow: 0 4px 0 #157033; cursor: pointer;
+  }
+  .gros-bouton.bleu { background: linear-gradient(#5cb8ff, #2a86dc); box-shadow: 0 4px 0 #1b5a96; }
+  .gros-bouton.gris { background: linear-gradient(#a9b4c8, #7d8aa3); box-shadow: 0 4px 0 #56617a; font-size: 18px; }
+  .gros-bouton:active { transform: translateY(3px); box-shadow: none; }
+
+  /* Accueil : titre en haut, démonstration au milieu (le canvas du jeu), boutons en bas */
+  .accueil-haut, .accueil-bas { display: none; text-align: center; color: #fff; background: #1d4a8f; }
+  body.accueil .accueil-haut, body.accueil .accueil-bas { display: block; }
+  body.accueil .barre, body.accueil .barre-bas { display: none; }
+  .accueil-haut { padding: 16px 12px 12px; background: linear-gradient(#173f7c, #1d4a8f); }
+  .accueil-haut h1 { margin: 0; font-size: clamp(32px, 10vw, 54px); line-height: 1.05; text-shadow: 0 4px 0 #0f2d5c; }
+  .accueil-haut h1 span { color: #8fdcff; }
+  .accueil-haut p { margin: 8px auto 0; font-size: 17px; max-width: 380px; line-height: 1.3; }
+  .accueil-bas { padding: 6px 16px max(14px, env(safe-area-inset-bottom)); background: linear-gradient(#1d4a8f, #173f7c); }
+  .accueil-bas .gros-bouton { max-width: 380px; margin: 10px auto 0; }
+  #stats-accueil { font-size: 16px; margin-top: 8px; opacity: .95; }
+
+  /* Choix du niveau */
+  #grille-niveaux { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 12px 0 4px; }
+  .case-niveau {
+    min-height: 58px; border: none; border-radius: 12px; font-size: 20px; font-weight: 800; color: #fff; cursor: pointer;
+    background: linear-gradient(#5cb8ff, #2a86dc); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px;
+  }
+  .case-niveau small { font-size: 11px; color: #ffe14d; letter-spacing: -1px; }
+  .case-niveau:disabled { background: #b8c2d4; cursor: default; }
+
+  /* Bilan */
+  #etoiles-bilan { font-size: 50px; margin: 6px 0; height: 62px; }
+  #etoiles-bilan span { display: inline-block; color: #d3d8e2; transform: scale(.4); transition: transform .35s cubic-bezier(.3,1.8,.5,1), color .2s; }
+  #etoiles-bilan span.gagnee { color: #ffc61a; transform: scale(1); text-shadow: 0 3px 0 #c98a00; }
+  #etoiles-bilan span.vue { transform: scale(1); }
+  #score-bilan { font-size: 34px; font-weight: 800; color: #1e5fb0; }
+  #record-bilan { font-weight: 700; color: #e0601b; min-height: 22px; }
+  .regle-etoiles { font-size: 13px !important; color: #5a6a88; }
+  .secousse { animation: secousse .4s; }
+  @keyframes secousse { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(5px); } }
+</style>
+</head>
+<body>
+<div id="jeu">
+  <div class="barre">
+    <button class="bouton-rond" id="btn-menu" aria-label="Choisir un niveau">☰</button>
+    <div id="info">
+      <div id="titre-niveau">Niveau 1</div>
+      <div id="jauge" aria-label="Encre restante"><div id="jauge-encre"></div><div class="repere" style="left:25%"></div><div class="repere" style="left:50%"></div><div id="jauge-texte">✏️ encre</div></div>
+    </div>
+    <button class="bouton-rond" id="btn-annuler" aria-label="Annuler le dernier trait">↶</button>
+    <button class="bouton-rond" id="btn-effacer" aria-label="Effacer tous les traits">🗑</button>
+    <button class="bouton-rond" id="btn-son" aria-label="Couper ou remettre le son">🔊</button>
+  </div>
+  <!-- Accueil (affiché autour de la démonstration) -->
+  <div class="accueil-haut">
+    <h1>Le chemin de <span>l'eau</span></h1>
+    <p>Dessine des rampes avec ton doigt pour guider l'eau du bac jusqu'au verre !</p>
+  </div>
+  <div id="zone-canvas"><canvas id="canvas"></canvas></div>
+  <div class="accueil-bas">
+    <button class="gros-bouton" id="btn-jouer">▶ Jouer</button>
+    <button class="gros-bouton bleu" id="btn-niveaux">⭐ Les niveaux</button>
+    <div id="stats-accueil"></div>
+  </div>
+  <div class="barre-bas">
+    <button id="btn-indice" style="display:none" aria-label="Voir un indice">💡 Indice</button>
+    <button id="btn-verser">💧 Verser</button>
+  </div>
+
+  <!-- Choix du niveau -->
+  <div class="ecran" id="ecran-niveaux">
+    <div class="carte">
+      <h2>Les niveaux</h2>
+      <p id="total-etoiles"></p>
+      <div id="grille-niveaux"></div>
+      <button class="gros-bouton gris" id="btn-retour-accueil">⌂ Accueil</button>
+    </div>
+  </div>
+
+  <!-- Bilan d'un niveau ou de la partie -->
+  <div class="ecran" id="ecran-bilan">
+    <div class="carte">
+      <h2 id="titre-bilan">Bravo !</h2>
+      <div id="etoiles-bilan"><span>★</span><span>★</span><span>★</span></div>
+      <div id="score-bilan">0</div>
+      <p id="detail-bilan"></p>
+      <p id="record-bilan"></p>
+      <p class="regle-etoiles">★ verre rempli · ★★ au plus 3/4 de l'encre · ★★★ au plus la moitié</p>
+      <button class="gros-bouton" id="btn-suivant">Niveau suivant ▶</button>
+      <button class="gros-bouton bleu" id="btn-rejouer">↻ Rejouer</button>
+      <button class="gros-bouton gris" id="btn-bilan-niveaux">⭐ Les niveaux</button>
+    </div>
+  </div>
+
+  <!-- Échec -->
+  <div class="ecran" id="ecran-echec">
+    <div class="carte" id="carte-echec">
+      <h2>Presque !</h2>
+      <p id="texte-echec"></p>
+      <p style="font-size:15px;color:#5a6a88">Tes traits sont gardés : modifie-les et réessaie.</p>
+      <button class="gros-bouton" id="btn-reessayer">↻ Réessayer</button>
+      <button class="gros-bouton gris" id="btn-tout-effacer">🗑 Tout effacer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ==========================================================================
+// Réglages du monde (unités « monde » : 360 × 560, mises à l'échelle de l'écran)
+// ==========================================================================
+const W = 360, H = 560;
+const R = 4.5;            // rayon d'une goutte
+const G = 800;            // gravité
+const FROTTEMENT = 0.04;  // frottement de l'eau sur les surfaces
+const DT = 1 / 120;       // pas de la physique
+const V_MAX = 520;        // vitesse maximale d'une goutte (évite qu'elle traverse un trait)
+const EP_TRAIT = 3.5;     // demi-épaisseur d'un trait dessiné
+const EP_PLANCHE = 6;     // demi-épaisseur d'une planche
+const EP_PAROI = 3;       // demi-épaisseur des parois du bac et du verre
+const PAS_TRAIT = 9;      // distance entre deux points d'un trait
+const CLE = 'chemin-eau-v1';
+
+// ==========================================================================
+// Les niveaux. Verre : x = centre, y = fond, w/h = intérieur, besoin = gouttes.
+// « solution » : un chemin possible, montré par le bouton Indice.
+// ==========================================================================
+const BAC_GAUCHE = { x: 24, y: 24, w: 96, h: 90, trous: [{ x: 34, w: 28 }], n: 90 };
+const BAC_DROITE = { x: 240, y: 24, w: 96, h: 90, trous: [{ x: 34, w: 28 }], n: 90 };
+const copie = (o) => JSON.parse(JSON.stringify(o));
+
+const NIVEAUX = [
+  { nom: 'Premier chemin', encre: 600, intro: 'tuto',
+    bacs: [copie(BAC_GAUCHE)], verres: [{ x: 250, y: 500, besoin: 20 }],
+    solution: [[[40, 170], [150, 225], [215, 275], [240, 330]]] },
+  { nom: 'Plus loin', encre: 650,
+    bacs: [copie(BAC_GAUCHE)], verres: [{ x: 305, y: 520, besoin: 25 }],
+    solution: [[[40, 170], [200, 250], [280, 300], [300, 360]]] },
+  { nom: 'La planche', encre: 600, intro: 'planche',
+    bacs: [copie(BAC_DROITE)], verres: [{ x: 80, y: 520, besoin: 25 }],
+    planches: [[190, 245, 340, 290]],
+    solution: [[[325, 165], [140, 220], [100, 270], [88, 330]]] },
+  { nom: 'Deux planches', encre: 620,
+    bacs: [copie(BAC_GAUCHE)], verres: [{ x: 290, y: 520, besoin: 28 }],
+    planches: [[20, 255, 150, 215], [205, 330, 205, 430]],
+    solution: [[[40, 165], [160, 200], [250, 260], [280, 330]]] },
+  { nom: 'Zone interdite', encre: 600, intro: 'zone',
+    bacs: [copie(BAC_GAUCHE)], verres: [{ x: 300, y: 520, besoin: 28 }],
+    zones: [{ x: 0, y: 205, w: 250, h: 210 }],
+    solution: [[[40, 155], [235, 192], [262, 210], [285, 260]]] },
+  { nom: 'Zigzag', encre: 700,
+    bacs: [copie(BAC_DROITE)], verres: [{ x: 75, y: 525, besoin: 30 }],
+    zones: [{ x: 120, y: 190, w: 240, h: 110 }],
+    planches: [[20, 330, 160, 380]],
+    solution: [[[335, 140], [150, 172], [110, 190]], [[200, 385], [110, 430], [90, 470]]] },
+  { nom: 'Pierre brûlante', encre: 600, intro: 'pierre',
+    bacs: [copie(BAC_GAUCHE)], verres: [{ x: 265, y: 520, besoin: 30 }],
+    pierres: [{ x: 30, y: 300, w: 130, h: 22 }],
+    solution: [[[40, 170], [200, 250], [245, 320]]] },
+  { nom: 'Feu et rayures', encre: 620,
+    bacs: [copie(BAC_DROITE)], verres: [{ x: 110, y: 525, besoin: 30 }],
+    zones: [{ x: 0, y: 160, w: 200, h: 120 }],
+    pierres: [{ x: 180, y: 390, w: 180, h: 22 }],
+    solution: [[[335, 150], [215, 245]], [[235, 290], [140, 345], [120, 400]]] },
+  { nom: 'Le verre glisse', encre: 600, intro: 'glisse',
+    bacs: [{ x: 24, y: 24, w: 96, h: 90, trous: [{ x: 36, w: 24 }], n: 100 }],
+    verres: [{ x: 200, y: 520, besoin: 18, va: { a: 55, v: 1.5 } }],
+    solution: [[[40, 170], [170, 240], [195, 300], [200, 360]]] },
+  { nom: 'Rail et feu', encre: 620,
+    bacs: [{ x: 24, y: 24, w: 96, h: 90, trous: [{ x: 36, w: 24 }], n: 100 }],
+    verres: [{ x: 230, y: 520, besoin: 20, va: { a: 60, v: 1.5 } }],
+    pierres: [{ x: 20, y: 270, w: 150, h: 22 }],
+    solution: [[[40, 165], [200, 240], [225, 300], [230, 360]]] },
+  { nom: 'Le vent', encre: 680, intro: 'vent',
+    bacs: [copie(BAC_GAUCHE)], verres: [{ x: 280, y: 525, besoin: 28 }],
+    vents: [{ x: 0, y: 220, w: 360, h: 140, fx: -650, fy: 0 }],
+    solution: [[[40, 160], [240, 200], [258, 215]], [[245, 225], [248, 370]]] },
+  { nom: 'Tempête', encre: 760,
+    bacs: [copie(BAC_DROITE)], verres: [{ x: 80, y: 525, besoin: 30 }],
+    zones: [{ x: 150, y: 165, w: 210, h: 90 }],
+    vents: [{ x: 0, y: 290, w: 360, h: 120, fx: 600, fy: 0 }],
+    solution: [[[350, 140], [170, 148], [125, 170], [100, 225]], [[118, 265], [116, 420]]] },
+  { nom: 'Deux verres', encre: 900, intro: 'deux',
+    bacs: [{ x: 132, y: 24, w: 96, h: 110, trous: [{ x: 6, w: 24 }, { x: 66, w: 24 }], n: 120 }],
+    verres: [{ x: 70, y: 520, besoin: 18 }, { x: 290, y: 520, besoin: 18 }],
+    solution: [[[76, 400], [78, 300], [95, 238], [180, 168], [265, 238], [282, 300], [284, 400]]] },
+  { nom: 'Deux bacs, deux feux', encre: 800,
+    bacs: [{ ...copie(BAC_GAUCHE), n: 75 }, { ...copie(BAC_DROITE), n: 75 }],
+    verres: [{ x: 140, y: 525, besoin: 24 }, { x: 225, y: 525, besoin: 22 }],
+    pierres: [{ x: 35, y: 265, w: 80, h: 20 }, { x: 245, y: 265, w: 80, h: 20 }],
+    planches: [[182, 300, 182, 400]],
+    solution: [[[40, 170], [120, 220], [138, 260], [140, 330]], [[320, 170], [240, 220], [224, 260], [222, 330]]] },
+  { nom: 'Le grand final', encre: 1300,
+    bacs: [{ ...copie(BAC_GAUCHE), n: 75 }, { ...copie(BAC_DROITE), n: 80 }],
+    verres: [{ x: 150, y: 525, besoin: 18 }, { x: 290, y: 525, besoin: 15, va: { a: 30, v: 1.6 } }],
+    pierres: [{ x: 240, y: 230, w: 110, h: 20 }],
+    zones: [{ x: 0, y: 170, w: 110, h: 100 }],
+    vents: [{ x: 0, y: 320, w: 200, h: 90, fx: -500, fy: 0 }],
+    solution: [[[35, 150], [130, 165], [150, 200], [152, 300]], [[135, 310], [135, 420]], [[335, 150], [225, 205], [208, 240]], [[172, 268], [285, 325], [290, 420]]] },
+];
+
+// Encre : au moins 2,15 fois la longueur du chemin-solution, pour que 3 étoiles
+// (moitié de l'encre au plus) restent possibles avec un trait un peu tremblé.
+for (const n of NIVEAUX) {
+  const l = n.solution.reduce((s, tr) => s + longueur(tr), 0);
+  n.encre = Math.max(n.encre, Math.ceil(l * 2.15 / 10) * 10);
+}
+
+// Présentation de chaque nouveauté (cible = élément entouré à l'écran).
+const INTROS = {
+  planche: { texte: 'Une planche ! L\'eau roule dessus. Elle peut t\'aider… ou te gêner.', cible: (n) => milieuPlanche(n.planches[0]) },
+  zone: { texte: 'Rayures rouges : interdit d\'y dessiner ! L\'eau, elle, peut passer.', cible: (n) => centreRect(n.zones[0]) },
+  pierre: { texte: 'Pierre brûlante ! L\'eau qui la touche s\'envole en vapeur.', cible: (n) => centreRect(n.pierres[0]) },
+  glisse: { texte: 'Le verre glisse sur son rail ! Verse au bon moment.', cible: (n) => ({ x: n.verres[0].x, y: n.verres[0].y - 40 }) },
+  vent: { texte: 'Le vent souffle et pousse les gouttes ! Dessine un mur pour les abriter.', cible: (n) => centreRect(n.vents[0]) },
+  deux: { texte: 'Deux verres assoiffés ! Partage l\'eau entre les deux.', cible: (n) => ({ x: W / 2, y: n.verres[0].y - 40 }) },
+};
+function milieuPlanche(p) { return { x: (p[0] + p[2]) / 2, y: (p[1] + p[3]) / 2 }; }
+function centreRect(r) { return { x: r.x + r.w / 2, y: r.y + r.h / 2 }; }
+
+// ==========================================================================
+// Sauvegarde (toujours protégée : le stockage peut être refusé)
+// ==========================================================================
+let sauvegarde = { etoiles: [], scores: [], son: true, vus: [] };
+try {
+  const brut = localStorage.getItem(CLE);
+  if (brut) sauvegarde = Object.assign(sauvegarde, JSON.parse(brut));
+} catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+function sauver() {
+  try { localStorage.setItem(CLE, JSON.stringify(sauvegarde)); } catch (e) { /* ignoré */ }
+}
+const totalEtoiles = () => sauvegarde.etoiles.reduce((a, b) => a + (b || 0), 0);
+const totalScore = () => sauvegarde.scores.reduce((a, b) => a + (b || 0), 0);
+const niveauDebloque = (i) => i === 0 || (sauvegarde.etoiles[i - 1] || 0) > 0;
+
+// ==========================================================================
+// Sons (Web Audio, créés seulement après la première action du joueur)
+// ==========================================================================
+let audio = null;
+function initAudio() {
+  if (audio) return;
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+}
+function note(freq, duree, type = 'sine', vol = 0.15, glisse = 0, retard = 0) {
+  if (!audio || !sauvegarde.son || modeDemo) return;
+  try {
+    const t = audio.currentTime + retard;
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (glisse) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + glisse), t + duree);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0008, t + duree);
+    o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + duree + 0.02);
+  } catch (e) { /* ignoré */ }
+}
+function bruit(duree, freq, vol = 0.1, typeFiltre = 'bandpass') {
+  if (!audio || !sauvegarde.son || modeDemo) return;
+  try {
+    const t = audio.currentTime;
+    const n = Math.floor(audio.sampleRate * duree);
+    const tampon = audio.createBuffer(1, n, audio.sampleRate);
+    const d = tampon.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+    s.buffer = tampon; f.type = typeFiltre; f.frequency.value = freq; g.gain.value = vol;
+    s.connect(f); f.connect(g); g.connect(audio.destination); s.start(t);
+  } catch (e) { /* ignoré */ }
+}
+const sons = {
+  clic: () => note(660, 0.07, 'triangle', 0.12),
+  crayon: () => bruit(0.05, 3200, 0.05),
+  interdit: () => { note(160, 0.18, 'square', 0.07); note(150, 0.18, 'square', 0.05, 0, 0.09); },
+  verser: () => { for (let i = 0; i < 5; i++) note(220 + Math.random() * 180, 0.12, 'sine', 0.14, 260, i * 0.08); },
+  plic: (f) => note(700 + 700 * f, 0.06, 'sine', 0.08, 200),
+  vapeur: () => bruit(0.25, 5000, 0.05, 'highpass'),
+  ligne: () => { note(1046, 0.25, 'triangle', 0.1); note(1318, 0.3, 'triangle', 0.1, 0, 0.1); },
+  reussite: () => [523, 659, 784, 1046].forEach((f, i) => note(f, 0.22, 'triangle', 0.14, 0, i * 0.11)),
+  etoile: (i) => note(880 + i * 220, 0.3, 'sine', 0.15, 300),
+  echec: () => [440, 370, 311].forEach((f, i) => note(f, 0.25, 'triangle', 0.12, 0, i * 0.15)),
+};
+
+// ==========================================================================
+// État de la partie
+// ==========================================================================
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let niv = 0;               // numéro du niveau en cours
+let N = NIVEAUX[0];        // données du niveau
+let etat = 'dessin';       // 'dessin' | 'verse' | 'fini'
+let modeDemo = true;       // démonstration derrière l'accueil
+let gouttes = [];          // {x, y, ox, oy, vx, vy}
+let traits = [];           // tableaux de points [x, y]
+let traitEnCours = null;
+let encreUtilisee = 0;
+let segments = [];         // segments solides fixes {ax, ay, bx, by, t}
+let segTraits = [];        // segments des traits dessinés
+let verres = [];           // verres du niveau (position courante)
+let temps = 0;             // temps du niveau
+let tVerse = 0, tPlein = 0, tCalme = 0;
+let echecs = 0, indiceUtilise = false, tIndice = 0;
+let intro = null;          // présentation en cours {type, t}
+let effets = [];           // vapeur, étincelles, confettis
+let flashZone = 0;
+let dernierPlic = 0, dejaPlein = [];
+
+// ==========================================================================
+// Construction d'un niveau
+// ==========================================================================
+function chargerNiveau(i, demo = false) {
+  niv = i; N = NIVEAUX[i]; modeDemo = demo;
+  traits = demo ? copie(N.solution) : [];
+  echecs = 0; indiceUtilise = false; tIndice = 0; temps = 0;
+  intro = null;
+  if (!demo) {
+    const cle = N.intro;
+    if (cle && !sauvegarde.vus.includes(cle)) intro = { type: cle, t: 0 };
+  }
+  preparerEau();
+  majInterface();
+  if (demo) setTimeout(() => { if (modeDemo) verser(); }, 600);
+}
+
+// Remet l'eau dans le bac (les traits sont gardés).
+function preparerEau() {
+  etat = 'dessin';
+  tVerse = 0; tPlein = 0; tCalme = 0;
+  gouttes = []; effets = [];
+  verres = N.verres.map((v) => ({ x0: v.x, x: v.x, y: v.y, w: v.w || 58, h: v.h || 84, besoin: v.besoin, va: v.va, compte: 0, joie: 0 }));
+  dejaPlein = verres.map(() => false);
+  // Gouttes rangées dans chaque bac, de bas en haut.
+  for (const b of N.bacs) {
+    const cols = Math.floor(b.w / (2 * R));
+    const marge = (b.w - cols * 2 * R) / 2 + R;
+    for (let k = 0; k < b.n; k++) {
+      const c = k % cols, l = Math.floor(k / cols);
+      const x = b.x + marge + c * 2 * R + (l % 2) * 0.8;
+      const y = b.y + b.h - R - l * 2 * R;
+      gouttes.push({ x, y, ox: x, oy: y, vx: 0, vy: 0 });
+    }
+  }
+  construireSegments();
+  calculerSegTraits();
+}
+
+// Parois des bacs (avec trappes fermées tant qu'on n'a pas versé) et planches.
+function construireSegments() {
+  segments = [];
+  for (const b of N.bacs) {
+    const bas = b.y + b.h + EP_PAROI;
+    const g = b.x - EP_PAROI, d = b.x + b.w + EP_PAROI;
+    segments.push({ ax: g, ay: b.y - 10, bx: g, by: bas, t: EP_PAROI });
+    segments.push({ ax: d, ay: b.y - 10, bx: d, by: bas, t: EP_PAROI });
+    let x = g;
+    const trous = [...b.trous].sort((a, c) => a.x - c.x);
+    for (const tr of trous) {
+      segments.push({ ax: x, ay: bas, bx: b.x + tr.x, by: bas, t: EP_PAROI });
+      if (etat === 'dessin') segments.push({ ax: b.x + tr.x, ay: bas, bx: b.x + tr.x + tr.w, by: bas, t: EP_PAROI, trappe: true });
+      x = b.x + tr.x + tr.w;
+    }
+    segments.push({ ax: x, ay: bas, bx: d, by: bas, t: EP_PAROI });
+  }
+  for (const p of N.planches || []) segments.push({ ax: p[0], ay: p[1], bx: p[2], by: p[3], t: EP_PLANCHE });
+}
+function segmentsVerre(v) {
+  const g = v.x - v.w / 2 - EP_PAROI, d = v.x + v.w / 2 + EP_PAROI, haut = v.y - v.h, bas = v.y + EP_PAROI;
+  return [
+    { ax: g, ay: haut, bx: g, by: bas, t: EP_PAROI },
+    { ax: d, ay: haut, bx: d, by: bas, t: EP_PAROI },
+    { ax: g, ay: bas, bx: d, by: bas, t: EP_PAROI },
+  ];
+}
+function calculerSegTraits() {
+  segTraits = [];
+  for (const tr of traits) {
+    for (let k = 1; k < tr.length; k++) segTraits.push({ ax: tr[k - 1][0], ay: tr[k - 1][1], bx: tr[k][0], by: tr[k][1], t: EP_TRAIT });
+    if (tr.length === 1) segTraits.push({ ax: tr[0][0], ay: tr[0][1], bx: tr[0][0], by: tr[0][1], t: EP_TRAIT });
+  }
+  encreUtilisee = traits.reduce((s, tr) => s + longueur(tr), 0) + (traitEnCours ? longueur(traitEnCours) : 0);
+}
+function longueur(tr) {
+  let l = 0;
+  for (let k = 1; k < tr.length; k++) l += Math.hypot(tr[k][0] - tr[k - 1][0], tr[k][1] - tr[k - 1][1]);
+  return l;
+}
+
+// ==========================================================================
+// Physique de l'eau (particules à positions corrigées)
+// ==========================================================================
+function verser() {
+  if (etat !== 'dessin') return;
+  etat = 'verse';
+  construireSegments();           // sans les trappes
+  sons.verser();
+  majInterface();
+}
+
+function collisionSegment(p, s) {
+  const m = R + s.t;
+  if (p.x < Math.min(s.ax, s.bx) - m || p.x > Math.max(s.ax, s.bx) + m || p.y < Math.min(s.ay, s.by) - m || p.y > Math.max(s.ay, s.by) + m) return;
+  const ex = s.bx - s.ax, ey = s.by - s.ay;
+  const l2 = ex * ex + ey * ey;
+  let u = l2 ? ((p.x - s.ax) * ex + (p.y - s.ay) * ey) / l2 : 0;
+  u = u < 0 ? 0 : u > 1 ? 1 : u;
+  const cx = s.ax + u * ex, cy = s.ay + u * ey;
+  let dx = p.x - cx, dy = p.y - cy;
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= m * m) return;
+  let d = Math.sqrt(d2);
+  if (d < 1e-6) { dx = 0; dy = -1; d = 1; } else { dx /= d; dy /= d; }
+  p.x += dx * (m - d); p.y += dy * (m - d);
+  // Frottement léger le long de la surface.
+  const mx = p.x - p.ox, my = p.y - p.oy;
+  const tang = mx * -dy + my * dx;
+  p.x -= -dy * tang * FROTTEMENT; p.y -= dx * tang * FROTTEMENT;
+}
+
+const grille = new Map();
+function pasPhysique() {
+  temps += DT;
+  // Verres qui glissent.
+  let segVerres = [];
+  for (const v of verres) {
+    if (v.va) v.x = v.x0 + v.va.a * Math.sin(temps * v.va.v);
+    segVerres = segVerres.concat(segmentsVerre(v));
+  }
+  if (etat !== 'verse') {
+    // Avant de verser, l'eau reste sagement dans le bac.
+    for (const p of gouttes) { p.vx = 0; p.vy = 0; }
+    return;
+  }
+  tVerse += DT;
+  const tous = segments.concat(segTraits, segVerres);
+  // 1. Prédiction : gravité, vent, vitesse limitée.
+  for (const p of gouttes) {
+    p.vy += G * DT;
+    for (const v of N.vents || []) {
+      if (p.x > v.x && p.x < v.x + v.w && p.y > v.y && p.y < v.y + v.h) { p.vx += v.fx * DT; p.vy += v.fy * DT; }
+    }
+    const vit = Math.hypot(p.vx, p.vy);
+    if (vit > V_MAX) { p.vx *= V_MAX / vit; p.vy *= V_MAX / vit; }
+    p.ox = p.x; p.oy = p.y;
+    p.x += p.vx * DT; p.y += p.vy * DT;
+  }
+  // 2. Corrections : gouttes entre elles, puis contre les solides.
+  for (let it = 0; it < 2; it++) {
+    grille.clear();
+    for (let k = 0; k < gouttes.length; k++) {
+      const p = gouttes[k];
+      const cle = Math.floor(p.x / 10) * 1000 + Math.floor(p.y / 10);
+      let c = grille.get(cle);
+      if (!c) grille.set(cle, c = []);
+      c.push(k);
+    }
+    for (let k = 0; k < gouttes.length; k++) {
+      const p = gouttes[k];
+      const gx = Math.floor(p.x / 10), gy = Math.floor(p.y / 10);
+      for (let ix = gx - 1; ix <= gx + 1; ix++) for (let iy = gy - 1; iy <= gy + 1; iy++) {
+        const c = grille.get(ix * 1000 + iy);
+        if (!c) continue;
+        for (const j of c) {
+          if (j <= k) continue;
+          const q = gouttes[j];
+          let dx = q.x - p.x, dy = q.y - p.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 >= 4 * R * R) continue;
+          let d = Math.sqrt(d2);
+          if (d < 1e-6) { dx = Math.random() - 0.5; dy = -0.5; d = Math.hypot(dx, dy); }
+          const pousse = (2 * R - d) / 2 / d;
+          p.x -= dx * pousse; p.y -= dy * pousse;
+          q.x += dx * pousse; q.y += dy * pousse;
+        }
+      }
+    }
+    for (const p of gouttes) for (const s of tous) collisionSegment(p, s);
+  }
+  // 3. Nouvelles vitesses, pierres brûlantes, gouttes perdues.
+  let actives = 0;
+  const restantes = [];
+  for (const p of gouttes) {
+    p.vx = (p.x - p.ox) / DT * 0.999; p.vy = (p.y - p.oy) / DT * 0.999;
+    let garder = p.y < H + 30 && p.x > -40 && p.x < W + 40;
+    for (const pi of N.pierres || []) {
+      if (p.x > pi.x - R && p.x < pi.x + pi.w + R && p.y > pi.y - R && p.y < pi.y + pi.h + R) {
+        garder = false;
+        if (!modeDemo || Math.random() < 0.5) effets.push({ type: 'vapeur', x: p.x, y: p.y, t: 0 });
+        if (temps - dernierVapeur > 0.12) { dernierVapeur = temps; sons.vapeur(); }
+      }
+    }
+    if (!garder) continue;
+    restantes.push(p);
+    if (!dansUnVerre(p) && Math.abs(p.vx) + Math.abs(p.vy) > 8) actives++;
+  }
+  gouttes = restantes;
+  // 4. Compte des gouttes dans chaque verre.
+  verres.forEach((v, i) => {
+    const avant = v.compte;
+    v.compte = 0;
+    for (const p of gouttes) if (dansVerre(p, v)) v.compte++;
+    if (v.compte > avant && temps - dernierPlic > 0.07) { dernierPlic = temps; sons.plic(Math.min(1, v.compte / v.besoin)); }
+    if (v.compte >= v.besoin && !dejaPlein[i]) {
+      dejaPlein[i] = true; sons.ligne();
+      for (let k = 0; k < 16; k++) effets.push({ type: 'etincelle', x: v.x, y: v.y - v.h, vx: (Math.random() - 0.5) * 220, vy: -Math.random() * 220 - 60, t: 0 });
+    }
+  });
+  // 5. Fin du niveau : réussite si tous les verres restent pleins, échec si l'eau ne bouge plus.
+  const pleins = verres.every((v) => v.compte >= v.besoin);
+  tPlein = pleins ? tPlein + DT : 0;
+  tCalme = actives === 0 && tVerse > 1.5 ? tCalme + DT : 0;
+  if (tPlein > 0.8) finirNiveau(true);
+  else if (tCalme > 1.5 || tVerse > 25) finirNiveau(false);
+}
+let dernierVapeur = 0;
+function dansVerre(p, v) { return p.x > v.x - v.w / 2 && p.x < v.x + v.w / 2 && p.y > v.y - v.h && p.y < v.y + 2; }
+function dansUnVerre(p) { return verres.some((v) => dansVerre(p, v)); }
+
+// ==========================================================================
+// Fin de niveau : bilan ou échec
+// ==========================================================================
+let derniersResultats = null;
+function finirNiveau(reussi) {
+  etat = 'fini';
+  if (modeDemo) { setTimeout(() => { if (modeDemo) chargerNiveau(niv, true); }, 1200); return; }
+  majInterface();
+  if (!reussi) {
+    echecs++;
+    const manque = verres.reduce((s, v) => s + Math.max(0, v.besoin - v.compte), 0);
+    document.getElementById('texte-echec').textContent = manque === 1 ? 'Il manque 1 goutte.' : `Il manque ${manque} gouttes.`;
+    sons.echec();
+    setTimeout(() => {
+      montrerEcran('ecran-echec');
+      const carte = document.getElementById('carte-echec');
+      carte.classList.remove('secousse'); void carte.offsetWidth; carte.classList.add('secousse');
+    }, 500);
+    majInterface();
+    return;
+  }
+  // Réussite : étoiles, score, record.
+  const part = encreUtilisee / N.encre;
+  let etoiles = 1 + (part <= 0.75 ? 1 : 0) + (part <= 0.5 ? 1 : 0);
+  if (indiceUtilise) etoiles = Math.min(2, etoiles);
+  const surplus = verres.reduce((s, v) => s + Math.max(0, v.compte - v.besoin), 0);
+  const score = 100 + Math.round((1 - part) * 100) + Math.min(50, surplus * 2);
+  const ancien = sauvegarde.scores[niv] || 0;
+  const record = score > ancien;
+  sauvegarde.etoiles[niv] = Math.max(sauvegarde.etoiles[niv] || 0, etoiles);
+  sauvegarde.scores[niv] = Math.max(ancien, score);
+  sauver();
+  derniersResultats = { etoiles, score, record, ancien, part, surplus };
+  sons.reussite();
+  for (let k = 0; k < 90; k++) effets.push({ type: 'confetti', x: Math.random() * W, y: -10 - Math.random() * 120, vx: (Math.random() - 0.5) * 80, vy: 80 + Math.random() * 120, rot: Math.random() * 6, c: `hsl(${Math.random() * 360},90%,60%)`, t: 0 });
+  verres.forEach((v) => { v.joie = 1; });
+  setTimeout(montrerBilan, 900);
+}
+
+function montrerBilan() {
+  const r = derniersResultats;
+  const fin = niv === NIVEAUX.length - 1;
+  document.getElementById('titre-bilan').textContent = fin ? '🏆 Bilan final' : ['Bien joué !', 'Bravo !', 'Super !'][r.etoiles - 1];
+  const spans = document.querySelectorAll('#etoiles-bilan span');
+  spans.forEach((s) => { s.className = ''; });
+  spans.forEach((s, i) => setTimeout(() => {
+    s.className = i < r.etoiles ? 'gagnee' : 'vue';
+    if (i < r.etoiles) sons.etoile(i);
+  }, 350 + i * 380));
+  // Compteur qui défile.
+  const el = document.getElementById('score-bilan');
+  const debut = performance.now();
+  const anim = (t) => {
+    const f = Math.min(1, (t - debut) / 900);
+    el.textContent = Math.round(r.score * f) + ' points';
+    if (f < 1 && document.getElementById('ecran-bilan').classList.contains('visible')) requestAnimationFrame(anim);
+  };
+  requestAnimationFrame(anim);
+  const pourcent = Math.round(r.part * 100);
+  let detail = `Encre utilisée : ${pourcent} %` + (r.surplus ? ` · ${r.surplus} gouttes en plus !` : '');
+  if (indiceUtilise) detail += ' · avec indice';
+  if (fin) detail = `Tu as fini les ${NIVEAUX.length} niveaux ! ⭐ ${totalEtoiles()} / ${NIVEAUX.length * 3} · ${totalScore()} points au total.`;
+  document.getElementById('detail-bilan').textContent = detail;
+  document.getElementById('record-bilan').textContent = r.record
+    ? (r.ancien ? `🎉 Nouveau record ! (avant : ${r.ancien})` : '🎉 Premier record pour ce niveau !')
+    : `Record du niveau : ${r.ancien}`;
+  const suivant = document.getElementById('btn-suivant');
+  suivant.style.display = fin ? 'none' : 'block';
+  montrerEcran('ecran-bilan');
+}
+
+// ==========================================================================
+// Dessin des traits au doigt / à la souris
+// ==========================================================================
+function versMonde(ev) {
+  const b = canvas.getBoundingClientRect();
+  return [((ev.clientX - b.left) - vue.ox) / vue.s, ((ev.clientY - b.top) - vue.oy) / vue.s];
+}
+function pointInterdit(x, y) {
+  if (x < 2 || x > W - 2 || y < 2 || y > H - 2) return 'bord';
+  for (const z of N.zones || []) if (x > z.x - EP_TRAIT && x < z.x + z.w + EP_TRAIT && y > z.y - EP_TRAIT && y < z.y + z.h + EP_TRAIT) return 'zone';
+  for (const b of N.bacs) if (x > b.x - 8 && x < b.x + b.w + 8 && y > b.y - 12 && y < b.y + b.h + 10) return 'bac';
+  return null;
+}
+function encreRestante() { return N.encre - encreUtilisee; }
+
+canvas.addEventListener('pointerdown', (ev) => {
+  ev.preventDefault();
+  initAudio();
+  if (modeDemo) return;
+  if (intro) { fermerIntro(); return; }
+  if (etat !== 'dessin') return;
+  const [x, y] = versMonde(ev);
+  if (pointInterdit(x, y)) { refus(); return; }
+  if (encreRestante() < 2) { refus(); return; }
+  try { canvas.setPointerCapture(ev.pointerId); } catch (e) { /* ignoré */ }
+  traitEnCours = [[x, y]];
+});
+canvas.addEventListener('pointermove', (ev) => {
+  if (!traitEnCours) return;
+  ev.preventDefault();
+  const [x, y] = versMonde(ev);
+  const [lx, ly] = traitEnCours[traitEnCours.length - 1];
+  let d = Math.hypot(x - lx, y - ly);
+  if (d < PAS_TRAIT) return;
+  // Le trait avance pas à pas : il s'arrête net sur une zone interdite ou quand l'encre manque.
+  const pas = Math.ceil(d / 3);
+  let fx = lx, fy = ly, bloque = false;
+  for (let k = 1; k <= pas; k++) {
+    const nx = lx + (x - lx) * k / pas, ny = ly + (y - ly) * k / pas;
+    if (pointInterdit(nx, ny) || encreUtilisee + Math.hypot(nx - lx, ny - ly) > N.encre) { bloque = true; break; }
+    fx = nx; fy = ny;
+  }
+  if (fx !== lx || fy !== ly) traitEnCours.push([fx, fy]);
+  calculerSegTraits();
+  if (performance.now() - dernierCrayonMs > 60) { dernierCrayonMs = performance.now(); sons.crayon(); }
+  if (bloque) { refus(); terminerTrait(); }
+  majJauge();
+});
+let dernierCrayonMs = 0;
+function terminerTrait() {
+  if (!traitEnCours) return;
+  if (traitEnCours.length > 1) traits.push(traitEnCours);
+  traitEnCours = null;
+  calculerSegTraits();
+  majInterface();
+}
+canvas.addEventListener('pointerup', terminerTrait);
+canvas.addEventListener('pointercancel', terminerTrait);
+function refus() { sons.interdit(); flashZone = 0.5; }
+
+// ==========================================================================
+// Présentations (tutoriel et nouveautés)
+// ==========================================================================
+function fermerIntro() {
+  if (!intro) return;
+  if (!sauvegarde.vus.includes(intro.type)) { sauvegarde.vus.push(intro.type); sauver(); }
+  intro = null;
+  sons.clic();
+}
+
+// ==========================================================================
+// Rendu
+// ==========================================================================
+const vue = { s: 1, ox: 0, oy: 0, dpr: 1, cw: 0, ch: 0 };
+function redimensionner() {
+  const b = canvas.getBoundingClientRect();
+  vue.dpr = Math.min(window.devicePixelRatio || 1, 2);
+  vue.cw = b.width; vue.ch = b.height;
+  canvas.width = Math.max(1, Math.round(b.width * vue.dpr));
+  canvas.height = Math.max(1, Math.round(b.height * vue.dpr));
+  vue.s = Math.min(b.width / W, b.height / H);
+  vue.ox = (b.width - W * vue.s) / 2;
+  vue.oy = (b.height - H * vue.s) / 2;
+}
+window.addEventListener('resize', redimensionner);
+
+function rectArrondi(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function dessiner() {
+  ctx.setTransform(vue.dpr, 0, 0, vue.dpr, 0, 0);
+  // Fond autour de la feuille.
+  const fond = ctx.createLinearGradient(0, 0, 0, vue.ch);
+  fond.addColorStop(0, '#9fd2ff'); fond.addColorStop(1, '#6aa8e8');
+  ctx.fillStyle = fond; ctx.fillRect(0, 0, vue.cw, vue.ch);
+  ctx.setTransform(vue.dpr * vue.s, 0, 0, vue.dpr * vue.s, vue.dpr * vue.ox, vue.dpr * vue.oy);
+
+  // Feuille de cahier.
+  ctx.fillStyle = '#fbfaf3'; rectArrondi(0, 0, W, H, 14); ctx.fill();
+  ctx.save(); rectArrondi(0, 0, W, H, 14); ctx.clip();
+  ctx.strokeStyle = 'rgba(80,140,220,.13)'; ctx.lineWidth = 1;
+  for (let y = 20; y < H; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  for (let x = 20; x < W; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+
+  // Vent : bandes qui défilent.
+  for (const v of N.vents || []) {
+    ctx.fillStyle = 'rgba(150,220,255,.22)'; rectArrondi(v.x, v.y, v.w, v.h, 10); ctx.fill();
+    ctx.save(); rectArrondi(v.x, v.y, v.w, v.h, 10); ctx.clip();
+    ctx.strokeStyle = 'rgba(70,160,220,.45)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    const sens = Math.sign(v.fx) || 1;
+    for (let k = 0; k < 9; k++) {
+      const yy = v.y + 12 + ((k * 37) % (v.h - 20));
+      const dec = ((temps * 160 * sens + k * 53) % (v.w + 80) + v.w + 80) % (v.w + 80) - 40;
+      const xx = v.x + dec;
+      ctx.beginPath(); ctx.moveTo(xx, yy); ctx.quadraticCurveTo(xx + 18 * sens, yy - 6, xx + 36 * sens, yy); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.font = '22px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('💨', sens > 0 ? v.x + 18 : v.x + v.w - 18, v.y + 18);
+  }
+
+  // Zones interdites : rayures rouges.
+  for (const z of N.zones || []) {
+    ctx.save(); rectArrondi(z.x, z.y, z.w, z.h, 8); ctx.clip();
+    ctx.fillStyle = flashZone > 0 ? `rgba(255,80,80,${0.12 + flashZone * 0.4})` : 'rgba(255,90,90,.1)';
+    ctx.fillRect(z.x, z.y, z.w, z.h);
+    ctx.strokeStyle = 'rgba(230,60,60,.35)'; ctx.lineWidth = 5;
+    for (let k = -z.h; k < z.w; k += 18) { ctx.beginPath(); ctx.moveTo(z.x + k, z.y + z.h); ctx.lineTo(z.x + k + z.h, z.y); ctx.stroke(); }
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(220,50,50,.7)'; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
+    rectArrondi(z.x, z.y, z.w, z.h, 8); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = '24px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🚫', z.x + z.w / 2, z.y + z.h / 2);
+  }
+
+  // Pierres brûlantes.
+  for (const p of N.pierres || []) {
+    const lueur = 0.5 + 0.5 * Math.sin(temps * 5);
+    ctx.shadowColor = '#ff6a00'; ctx.shadowBlur = 8 + lueur * 10;
+    const gr = ctx.createLinearGradient(0, p.y, 0, p.y + p.h);
+    gr.addColorStop(0, '#ffb347'); gr.addColorStop(1, '#e2421b');
+    ctx.fillStyle = gr; rectArrondi(p.x, p.y, p.w, p.h, 9); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.font = '14px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    for (let x = p.x + 16; x < p.x + p.w - 8; x += 30) ctx.fillText('🔥', x, p.y + 2 - 2 * Math.sin(temps * 8 + x));
+  }
+
+  // Planches.
+  for (const pl of N.planches || []) {
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#7a4a1e'; ctx.lineWidth = EP_PLANCHE * 2 + 2;
+    ctx.beginPath(); ctx.moveTo(pl[0], pl[1]); ctx.lineTo(pl[2], pl[3]); ctx.stroke();
+    ctx.strokeStyle = '#c4884a'; ctx.lineWidth = EP_PLANCHE * 2 - 3;
+    ctx.beginPath(); ctx.moveTo(pl[0], pl[1]); ctx.lineTo(pl[2], pl[3]); ctx.stroke();
+    ctx.fillStyle = '#5a3412';
+    for (const f of [0.15, 0.85]) { ctx.beginPath(); ctx.arc(pl[0] + (pl[2] - pl[0]) * f, pl[1] + (pl[3] - pl[1]) * f, 1.8, 0, 7); ctx.fill(); }
+  }
+
+  // Indice : chemin en pointillés.
+  if (tIndice > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, tIndice);
+    ctx.strokeStyle = '#ffb000'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.setLineDash([10, 9]); ctx.lineDashOffset = -temps * 40;
+    for (const tr of N.solution) { ctx.beginPath(); tr.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // Traits dessinés (crayon).
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const tr of traitEnCours ? traits.concat([traitEnCours]) : traits) {
+    ctx.strokeStyle = '#2e3554'; ctx.lineWidth = EP_TRAIT * 2;
+    ctx.beginPath(); tr.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); tr.forEach(([x, y], k) => (k ? ctx.lineTo(x, y - 1.5) : ctx.moveTo(x, y - 1.5))); ctx.stroke();
+  }
+
+  dessinerBacs();
+  dessinerEau();
+  verres.forEach(dessinerVerre);
+  dessinerEffets();
+  ctx.restore();
+
+  if (intro) dessinerIntro();
+}
+
+function dessinerBacs() {
+  for (const b of N.bacs) {
+    // Corps du bac en bois.
+    ctx.fillStyle = 'rgba(140,200,255,.18)'; ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#7a4a1e'; ctx.lineWidth = EP_PAROI * 2 + 2;
+    const bas = b.y + b.h + EP_PAROI;
+    ctx.beginPath(); ctx.moveTo(b.x - EP_PAROI, b.y - 10); ctx.lineTo(b.x - EP_PAROI, bas); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(b.x + b.w + EP_PAROI, b.y - 10); ctx.lineTo(b.x + b.w + EP_PAROI, bas); ctx.stroke();
+    let x = b.x - EP_PAROI;
+    for (const tr of [...b.trous].sort((a, c) => a.x - c.x)) {
+      ctx.beginPath(); ctx.moveTo(x, bas); ctx.lineTo(b.x + tr.x, bas); ctx.stroke();
+      x = b.x + tr.x + tr.w;
+      // Trappe : rouge fermée, s'ouvre au moment de verser.
+      if (etat === 'dessin') {
+        ctx.strokeStyle = '#e94b4b'; ctx.lineWidth = EP_PAROI * 2;
+        ctx.beginPath(); ctx.moveTo(b.x + tr.x, bas); ctx.lineTo(x, bas); ctx.stroke();
+        ctx.strokeStyle = '#7a4a1e'; ctx.lineWidth = EP_PAROI * 2 + 2;
+      } else {
+        ctx.strokeStyle = '#e94b4b'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(b.x + tr.x, bas); ctx.lineTo(b.x + tr.x - 4, bas + 14); ctx.stroke();
+        ctx.strokeStyle = '#7a4a1e'; ctx.lineWidth = EP_PAROI * 2 + 2;
+      }
+    }
+    ctx.beginPath(); ctx.moveTo(x, bas); ctx.lineTo(b.x + b.w + EP_PAROI, bas); ctx.stroke();
+    // Cerclages du bac.
+    ctx.strokeStyle = 'rgba(122,74,30,.35)'; ctx.lineWidth = 2;
+    for (const f of [0.3, 0.7]) { ctx.beginPath(); ctx.moveTo(b.x, b.y + b.h * f); ctx.lineTo(b.x + b.w, b.y + b.h * f); ctx.stroke(); }
+  }
+}
+
+function dessinerEau() {
+  ctx.fillStyle = '#2f80e0';
+  ctx.beginPath();
+  for (const p of gouttes) { ctx.moveTo(p.x + R + 2.2, p.y); ctx.arc(p.x, p.y, R + 2.2, 0, 7); }
+  ctx.fill();
+  ctx.fillStyle = '#58b2ff';
+  ctx.beginPath();
+  for (const p of gouttes) { ctx.moveTo(p.x + R + 0.6, p.y); ctx.arc(p.x, p.y, R + 0.6, 0, 7); }
+  ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  ctx.beginPath();
+  for (const p of gouttes) { ctx.moveTo(p.x - 1, p.y - 1.8); ctx.arc(p.x - 1.8, p.y - 1.8, 1.2, 0, 7); }
+  ctx.fill();
+}
+
+function dessinerVerre(v) {
+  const g = v.x - v.w / 2 - EP_PAROI, d = v.x + v.w / 2 + EP_PAROI, haut = v.y - v.h, bas = v.y + EP_PAROI;
+  // Rail du verre qui glisse.
+  if (v.va) {
+    ctx.strokeStyle = '#8e9bb5'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(v.x0 - v.va.a - v.w / 2, bas + 6); ctx.lineTo(v.x0 + v.va.a + v.w / 2, bas + 6); ctx.stroke();
+  } else {
+    // Petite étagère.
+    ctx.fillStyle = '#b07a46'; rectArrondi(g - 10, bas + 3, d - g + 20, 8, 3); ctx.fill();
+  }
+  // Ligne à atteindre (estimation de la hauteur d'eau correspondante).
+  const hLigne = Math.min(v.h - 4, v.besoin * 90 / v.w);
+  const yLigne = v.y - hLigne;
+  const plein = v.compte >= v.besoin;
+  // Verre transparent.
+  ctx.fillStyle = 'rgba(210,235,255,.35)';
+  ctx.beginPath(); ctx.moveTo(g, haut); ctx.lineTo(g, bas - 6); ctx.quadraticCurveTo(g, bas, g + 6, bas); ctx.lineTo(d - 6, bas); ctx.quadraticCurveTo(d, bas, d, bas - 6); ctx.lineTo(d, haut); ctx.fill();
+  ctx.strokeStyle = plein ? '#22b14c' : '#4a6fa5'; ctx.lineWidth = EP_PAROI * 2; ctx.lineJoin = 'round';
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(g + 7, haut + 8); ctx.lineTo(g + 7, bas - 14); ctx.stroke();
+  // Ligne pointillée.
+  ctx.strokeStyle = plein ? '#22b14c' : '#ff9d00'; ctx.lineWidth = 2.5; ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(g + 2, yLigne); ctx.lineTo(d - 2, yLigne); ctx.stroke(); ctx.setLineDash([]);
+  // Visage : bouche ouverte quand il a soif, sourire quand il se remplit.
+  const f = Math.min(1, v.compte / v.besoin);
+  const yeux = v.y - v.h * 0.62;
+  ctx.fillStyle = '#23324f';
+  if (plein || v.joie) {
+    ctx.strokeStyle = '#23324f'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(v.x + s * 11, yeux + 2, 4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); }
+  } else {
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(v.x + s * 11, yeux, 3.2, 0, 7); ctx.fill(); }
+  }
+  ctx.strokeStyle = '#23324f'; ctx.lineWidth = 2.2;
+  if (f < 0.3 && !plein) { ctx.beginPath(); ctx.ellipse(v.x, yeux + 13, 4, 5, 0, 0, 7); ctx.fill(); }
+  else { ctx.beginPath(); ctx.arc(v.x, yeux + 6, 4 + 5 * f, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); }
+  // Joues roses.
+  ctx.fillStyle = 'rgba(255,120,140,.35)';
+  for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(v.x + s * 18, yeux + 9, 3.5, 0, 7); ctx.fill(); }
+  // Compteur au-dessus du verre.
+  ctx.font = 'bold 15px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+  const texte = plein ? '✓ ' + v.compte : `${v.compte} / ${v.besoin}`;
+  const lw = ctx.measureText(texte).width + 14;
+  ctx.fillStyle = plein ? '#22b14c' : 'rgba(35,50,79,.85)';
+  rectArrondi(v.x - lw / 2, haut - 26, lw, 21, 10); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.fillText(texte, v.x, haut - 8);
+}
+
+function dessinerEffets() {
+  for (const e of effets) {
+    if (e.type === 'vapeur') {
+      ctx.fillStyle = `rgba(230,236,245,${Math.max(0, 0.8 - e.t)})`;
+      ctx.beginPath(); ctx.arc(e.x + Math.sin(e.t * 9) * 4, e.y - e.t * 50, 4 + e.t * 10, 0, 7); ctx.fill();
+    } else if (e.type === 'etincelle') {
+      ctx.fillStyle = `rgba(255,205,40,${Math.max(0, 1 - e.t)})`;
+      ctx.font = '14px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('✦', e.x, e.y);
+    } else if (e.type === 'confetti') {
+      ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.rot + e.t * 6);
+      ctx.fillStyle = e.c; ctx.fillRect(-4, -2.5, 8, 5); ctx.restore();
+    }
+  }
+}
+function majEffets(dt) {
+  for (const e of effets) {
+    e.t += dt;
+    if (e.type === 'etincelle') { e.x += e.vx * dt; e.y += e.vy * dt; e.vy += 300 * dt; }
+    if (e.type === 'confetti') { e.x += e.vx * dt; e.y += e.vy * dt; }
+  }
+  effets = effets.filter((e) => (e.type === 'vapeur' ? e.t < 0.8 : e.type === 'etincelle' ? e.t < 1 : e.y < H + 20));
+}
+
+// Main animée et flèches (en coordonnées monde).
+function dessinerMain(x, y, appui) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.font = '34px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 6;
+  if (appui) ctx.scale(0.88, 0.88);
+  ctx.fillText('👆', -12, -4);
+  ctx.restore();
+}
+function bulle(texte, y) {
+  ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const lignes = couper(texte, 300);
+  const h = lignes.length * 21 + 40;
+  ctx.fillStyle = 'rgba(255,253,246,.97)'; rectArrondi(18, y, W - 36, h, 16); ctx.fill();
+  ctx.strokeStyle = '#2c6cc0'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = '#1d2a4a';
+  lignes.forEach((l, k) => ctx.fillText(l, W / 2, y + 20 + k * 21));
+  ctx.font = '13px system-ui'; ctx.fillStyle = '#5a6a88';
+  ctx.fillText('Touche l\'écran pour jouer', W / 2, y + h - 13);
+}
+function couper(texte, largeur) {
+  const mots = texte.split(' '), lignes = [];
+  let l = '';
+  for (const m of mots) {
+    const essai = l ? l + ' ' + m : m;
+    if (ctx.measureText(essai).width > largeur && l) { lignes.push(l); l = m; } else l = essai;
+  }
+  if (l) lignes.push(l);
+  return lignes;
+}
+function dessinerIntro() {
+  ctx.setTransform(vue.dpr * vue.s, 0, 0, vue.dpr * vue.s, vue.dpr * vue.ox, vue.dpr * vue.oy);
+  const t = intro.t;
+  ctx.fillStyle = 'rgba(20,35,70,.28)'; ctx.fillRect(-vue.ox / vue.s, -vue.oy / vue.s, vue.cw / vue.s, vue.ch / vue.s);
+  if (intro.type === 'tuto') {
+    // 3 étapes en boucle : dessiner, verser, remplir.
+    const cycle = t % 7.5;
+    const chemin = N.solution[0];
+    if (cycle < 3.2) {
+      const f = Math.min(1, cycle / 2.4);
+      // Trait qui se dessine sous la main.
+      const pts = pointsJusqua(chemin, f);
+      ctx.strokeStyle = '#2e3554'; ctx.lineWidth = EP_TRAIT * 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+      const [mx, my] = pts[pts.length - 1];
+      dessinerMain(mx, my, true);
+      bulle('1. Dessine un chemin avec ton doigt.', 10);
+    } else if (cycle < 5.2) {
+      ctx.strokeStyle = '#2e3554'; ctx.lineWidth = EP_TRAIT * 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); chemin.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+      // La main descend vers le bouton Verser (sous la feuille).
+      const f = Math.min(1, (cycle - 3.2) / 0.9);
+      const appui = cycle > 4.3 && cycle < 4.7;
+      dessinerMain(W / 2 + 20, H - 200 + f * 175, appui);
+      ctx.font = 'bold 30px system-ui'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff';
+      ctx.fillText('⬇', W / 2 - 40, H - 30 + Math.sin(t * 8) * 5);
+      bulle('2. Touche « Verser » pour ouvrir le bac.', 200);
+    } else {
+      const v = verres[0];
+      const pulse = 1 + 0.1 * Math.sin(t * 8);
+      ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.ellipse(v.x, v.y - v.h / 2, 50 * pulse, 64 * pulse, 0, 0, 7); ctx.stroke();
+      bulle('3. Remplis le verre jusqu\'à la ligne orange !', 200);
+    }
+    return;
+  }
+  // Présentation d'une nouveauté : cercle qui pulse et flèche qui rebondit.
+  const info = INTROS[intro.type];
+  const c = info.cible(N);
+  const pulse = 1 + 0.12 * Math.sin(t * 7);
+  ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(c.x, c.y, 52 * pulse, 0, 7); ctx.stroke();
+  const haut = c.y > H / 2;
+  const fy = haut ? c.y - 70 - Math.abs(Math.sin(t * 5)) * 14 : c.y + 70 + Math.abs(Math.sin(t * 5)) * 14;
+  ctx.font = 'bold 40px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffcc00';
+  ctx.fillText(haut ? '⬇' : '⬆', c.x, fy);
+  if (intro.type === 'glisse') dessinerMain(verres[0].x, verres[0].y + 6, false);
+  bulle('Nouveau ! ' + info.texte, haut ? 130 : H - 150);
+}
+function pointsJusqua(chemin, f) {
+  const total = longueur(chemin);
+  let reste = total * f;
+  const pts = [chemin[0]];
+  for (let k = 1; k < chemin.length; k++) {
+    const [ax, ay] = chemin[k - 1], [bx, by] = chemin[k];
+    const l = Math.hypot(bx - ax, by - ay);
+    if (reste >= l) { pts.push(chemin[k]); reste -= l; } else { pts.push([ax + (bx - ax) * reste / l, ay + (by - ay) * reste / l]); break; }
+  }
+  return pts;
+}
+
+// ==========================================================================
+// Interface HTML
+// ==========================================================================
+const $ = (id) => document.getElementById(id);
+function montrerEcran(id) {
+  document.querySelectorAll('.ecran').forEach((e) => e.classList.toggle('visible', e.id === id));
+}
+function cacherEcrans() { montrerEcran(null); }
+
+function majJauge() {
+  const reste = Math.max(0, encreRestante()) / N.encre;
+  $('jauge-encre').style.width = (reste * 100) + '%';
+  $('jauge-encre').style.background = reste > 0.5 ? 'linear-gradient(90deg,#ffd34d,#ffb22e)' : reste > 0.25 ? 'linear-gradient(90deg,#ffc04d,#ff8c1a)' : 'linear-gradient(90deg,#ff8a7a,#e8452f)';
+  const etoiles = reste >= 0.5 ? '★★★' : reste >= 0.25 ? '★★' : '★';
+  $('jauge-texte').textContent = `✏️ encre ${Math.round(reste * 100)} % · ${etoiles}`;
+}
+function majInterface() {
+  const meilleur = sauvegarde.etoiles[niv] || 0;
+  $('titre-niveau').textContent = `Niveau ${niv + 1} · ${N.nom} ${'★'.repeat(meilleur)}`;
+  majJauge();
+  const dessin = etat === 'dessin';
+  $('btn-annuler').disabled = !dessin || traits.length === 0;
+  $('btn-effacer').disabled = !dessin || traits.length === 0;
+  const bv = $('btn-verser');
+  bv.textContent = etat === 'verse' ? '✋ Arrêter l\'eau' : '💧 Verser';
+  bv.classList.toggle('arreter', etat === 'verse');
+  bv.disabled = etat === 'fini';
+  $('btn-indice').style.display = echecs > 0 && !modeDemo ? 'block' : 'none';
+  $('btn-son').textContent = sauvegarde.son ? '🔊' : '🔇';
+}
+function majAccueil() {
+  const e = totalEtoiles();
+  $('stats-accueil').textContent = e ? `⭐ ${e} / ${NIVEAUX.length * 3} étoiles · Record : ${totalScore()} points` : `${NIVEAUX.length} niveaux à découvrir !`;
+}
+function majGrille() {
+  const grilleEl = $('grille-niveaux');
+  grilleEl.innerHTML = '';
+  NIVEAUX.forEach((n, i) => {
+    const b = document.createElement('button');
+    b.className = 'case-niveau';
+    const ouvert = niveauDebloque(i);
+    b.disabled = !ouvert;
+    const e = sauvegarde.etoiles[i] || 0;
+    b.innerHTML = ouvert ? `${i + 1}<small>${'★'.repeat(e)}${'☆'.repeat(3 - e)}</small>` : '🔒';
+    b.setAttribute('aria-label', `Niveau ${i + 1}`);
+    b.addEventListener('click', () => { sons.clic(); lancerNiveau(i); });
+    grilleEl.appendChild(b);
+  });
+  $('total-etoiles').textContent = `⭐ ${totalEtoiles()} / ${NIVEAUX.length * 3} étoiles · ${totalScore()} points`;
+}
+
+function lancerNiveau(i) {
+  cacherEcrans();
+  document.body.classList.remove('accueil');
+  chargerNiveau(i, false);
+}
+function premierNiveauAFaire() {
+  for (let i = 0; i < NIVEAUX.length; i++) if (!(sauvegarde.etoiles[i] > 0)) return i;
+  return 0;
+}
+function allerAccueil() {
+  majAccueil();
+  cacherEcrans();
+  document.body.classList.add('accueil');
+  chargerNiveau(0, true);
+}
+function recommencerEau() {
+  preparerEau();
+  majInterface();
+}
+
+$('btn-jouer').addEventListener('click', () => { initAudio(); sons.clic(); lancerNiveau(premierNiveauAFaire()); });
+$('btn-niveaux').addEventListener('click', () => { initAudio(); sons.clic(); majGrille(); montrerEcran('ecran-niveaux'); });
+$('btn-retour-accueil').addEventListener('click', () => { sons.clic(); allerAccueil(); });
+$('btn-menu').addEventListener('click', () => { initAudio(); sons.clic(); majGrille(); montrerEcran('ecran-niveaux'); });
+$('btn-bilan-niveaux').addEventListener('click', () => { sons.clic(); majGrille(); montrerEcran('ecran-niveaux'); });
+$('btn-suivant').addEventListener('click', () => { sons.clic(); lancerNiveau(Math.min(niv + 1, NIVEAUX.length - 1)); });
+$('btn-rejouer').addEventListener('click', () => { sons.clic(); lancerNiveau(niv); });
+$('btn-reessayer').addEventListener('click', () => { sons.clic(); cacherEcrans(); recommencerEau(); });
+$('btn-tout-effacer').addEventListener('click', () => { sons.clic(); cacherEcrans(); traits = []; recommencerEau(); });
+$('btn-annuler').addEventListener('click', () => { initAudio(); if (etat !== 'dessin') return; sons.clic(); traits.pop(); calculerSegTraits(); majInterface(); });
+$('btn-effacer').addEventListener('click', () => { initAudio(); if (etat !== 'dessin') return; sons.clic(); traits = []; calculerSegTraits(); majInterface(); });
+$('btn-son').addEventListener('click', () => { initAudio(); sauvegarde.son = !sauvegarde.son; sauver(); majInterface(); sons.clic(); });
+$('btn-indice').addEventListener('click', () => { initAudio(); sons.clic(); indiceUtilise = true; tIndice = 4; });
+$('btn-verser').addEventListener('click', actionVerser);
+function actionVerser() {
+  initAudio();
+  if (modeDemo) return;
+  if (intro) { fermerIntro(); return; }
+  if (etat === 'dessin') verser();
+  else if (etat === 'verse') { sons.clic(); recommencerEau(); }
+}
+
+// Clavier : Espace/Entrée = verser ou bouton principal, Z/Retour = annuler, R = recommencer.
+document.addEventListener('keydown', (ev) => {
+  initAudio();
+  const visible = document.querySelector('.ecran.visible');
+  if (ev.key === ' ' || ev.key === 'Enter') {
+    ev.preventDefault();
+    if (visible) {
+      const principal = visible.querySelector('.gros-bouton:not([style*="none"])');
+      if (principal) principal.click();
+      return;
+    }
+    if (document.body.classList.contains('accueil')) { $('btn-jouer').click(); return; }
+    actionVerser();
+  } else if (!visible && (ev.key === 'z' || ev.key === 'Z' || ev.key === 'Backspace')) {
+    $('btn-annuler').click();
+  } else if (!visible && (ev.key === 'r' || ev.key === 'R')) {
+    if (etat !== 'dessin') recommencerEau();
+  }
+});
+
+// ==========================================================================
+// Boucle principale
+// ==========================================================================
+let dernier = performance.now(), reserve = 0;
+function boucle(maintenant) {
+  const dt = Math.min(1 / 30, (maintenant - dernier) / 1000);
+  dernier = maintenant;
+  if (vue.cw !== canvas.getBoundingClientRect().width || vue.ch !== canvas.getBoundingClientRect().height) redimensionner();
+  // Pause pendant le choix du niveau ; l'eau reste figée sous le bilan.
+  const pause = $('ecran-niveaux').classList.contains('visible') && !modeDemo;
+  if (intro) intro.t += dt;
+  else if (!pause) {
+    reserve += dt;
+    while (reserve >= DT) { reserve -= DT; if (etat !== 'fini' || modeDemo) pasPhysique(); else temps += DT; }
+  }
+  if (tIndice > 0) tIndice -= dt;
+  if (flashZone > 0) flashZone -= dt;
+  majEffets(dt);
+  dessiner();
+  requestAnimationFrame(boucle);
+}
+
+redimensionner();
+allerAccueil();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
