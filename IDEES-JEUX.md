@@ -18,3 +18,4 @@ Ajoutez, supprimez ou réordonnez librement les lignes. Format : `- [ ] Titre �
 - [x] Les Caves de Brumefer (roguelike au tour par tour) — on explore un donjon sur une grille, généré différemment à chaque partie. Il y a des salles et des couloirs aléatoires, un inventaire (armes, potions, clés), des ennemis avec chacun leur comportement (mémoire, 6+) → caves-de-brumefer
 - [x] Le collier magique — observe la suite de perles et choisis celles qui manquent pour finir le collier (puzzle, 5+) → collier-magique
 - [x] Potager Express (gestion/ferme) — potager Express (gestion/ferme) : on plante, on arrose, on récolte et on vend pour agrandir son terrain. Le jeu inclut des saisons, une dizaine de cultures, des animaux, un marché aux prix variables e (adresse, 6+) → potager-express
+- [x] L'armée des Gribouilles — recrute ton équipe de héros, endors les Gloups, gagne des pièces et améliore ton armée vague après vague (réflexion, 6+) → armee-des-gribouilles
