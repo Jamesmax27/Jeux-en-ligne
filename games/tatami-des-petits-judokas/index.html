@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Le tatami des petits judokas</title>
+<style>
+  /* ===== Base : plein écran, sans défilement ===== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: #f3e2c0; color: #3a2a1e;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+  button { font-family: inherit; cursor: pointer; }
+  #jeu { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+  /* ===== Barre du haut (pendant la partie) ===== */
+  #hud { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #5b3a26; color: #fff8ec; }
+  .rond { width: 48px; height: 48px; border-radius: 50%; border: 3px solid #e9c98f; background: #fff8ec; color: #5b3a26;
+    display: grid; place-items: center; flex: 0 0 auto; }
+  .rond svg { width: 24px; height: 24px; }
+  .rond:active { transform: scale(.92); }
+  #hud-info { flex: 1; min-width: 0; text-align: center; line-height: 1.2; }
+  #hud-titre { font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
+  #hud-nom { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #hud-ceint { display: inline-block; width: 26px; height: 10px; border-radius: 3px; border: 1.5px solid #fff8ec; flex: 0 0 auto; }
+  #hud-sous { font-size: 13px; opacity: .92; }
+  #hud-score { font-weight: 800; font-size: 16px; min-width: 62px; text-align: right; }
+
+  /* ===== Zone de jeu ===== */
+  #zone { flex: 1; position: relative; min-height: 0; }
+  #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #consigne { flex: 0 0 auto; min-height: 66px; padding: 8px 14px; background: #fff8ec; border-top: 4px solid #c9a46a;
+    text-align: center; font-size: 18px; font-weight: 700; line-height: 1.25; display: flex; align-items: center; justify-content: center; }
+  #fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 60; }
+
+  /* ===== Écrans par-dessus le jeu ===== */
+  .ecran { position: absolute; inset: 0; z-index: 20; display: none; flex-direction: column; align-items: center;
+    justify-content: center; padding: 14px; text-align: center; overflow: hidden; }
+  .ecran.visible { display: flex; }
+  .voile { background: rgba(58, 38, 24, .62); }
+  .carte { background: #fff8ec; border-radius: 22px; border: 4px solid #c9a46a; padding: 18px 16px; width: min(94vw, 430px);
+    max-height: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; box-shadow: 0 10px 0 rgba(0,0,0,.15);
+    animation: arrive .35s ease-out both; }
+  @keyframes arrive { from { transform: translateY(30px) scale(.92); opacity: 0; } }
+  .carte h2 { font-size: 24px; color: #5b3a26; }
+  .gros { font-size: 26px; font-weight: 900; padding: 14px 44px; min-height: 60px; border-radius: 40px; border: none;
+    background: #d9453b; color: #fff; box-shadow: 0 6px 0 #9e2a22; letter-spacing: .5px; }
+  .gros:active, .moyen:active { transform: translateY(4px); box-shadow: 0 2px 0 #9e2a22; }
+  .moyen { font-size: 18px; font-weight: 800; padding: 10px 18px; min-height: 50px; border-radius: 30px; border: none;
+    background: #d9453b; color: #fff; box-shadow: 0 5px 0 #9e2a22; }
+  .clair { background: #fff; color: #5b3a26; border: 3px solid #c9a46a; box-shadow: 0 5px 0 #c9a46a; }
+  .boutons { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 4px; }
+
+  /* Accueil */
+  #accueil { background: radial-gradient(circle at 50% 18%, #fffaf0 0, #fbe3b8 55%, #efc98d 100%); gap: 10px; justify-content: space-evenly; }
+  #accueil::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 16%; z-index: -1;
+    background: repeating-linear-gradient(90deg, #b6cf7a 0 25%, #a9c46c 25% 50%); border-top: 6px solid #a8743f; }
+  #accueil h1 { font-size: clamp(34px, 10vw, 56px); line-height: 1.02; color: #5b3a26; font-weight: 900;
+    text-shadow: 0 3px 0 #fff, 0 6px 0 rgba(201,164,106,.7); }
+  #accueil h1 span { display: block; color: #d9453b; }
+  #illu { width: min(88vw, 400px); height: min(30vh, 230px); }
+  .regle { font-size: 18px; font-weight: 600; max-width: 24em; line-height: 1.3; background: rgba(255,248,236,.85);
+    padding: 8px 12px; border-radius: 14px; }
+  #acc-info { font-size: 15px; font-weight: 700; background: rgba(255,248,236,.9); border-radius: 12px; padding: 4px 10px; }
+  .rangee { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; align-items: center; }
+
+  /* Tutoriel */
+  #tuto-anim svg { width: min(78vw, 300px); height: auto; background: #fff; border-radius: 16px; border: 3px solid #e9d6b0; }
+  #tuto-etapes { list-style: none; text-align: left; font-size: 17px; font-weight: 600; display: flex; flex-direction: column; gap: 6px; width: 100%; }
+  #tuto-etapes li { padding: 6px 10px; border-radius: 10px; opacity: .45; transition: opacity .3s, background .3s; }
+  #tuto-etapes li.actif { opacity: 1; background: #ffe7b8; }
+  .petit { font-size: 14px; opacity: .8; }
+  .nouveau { background: #d9453b; color: #fff; font-weight: 800; font-size: 14px; border-radius: 20px; padding: 3px 12px; }
+
+  /* Bilan */
+  .etoiles { display: flex; gap: 8px; font-size: 56px; line-height: 1; }
+  .etoiles span { color: #e3d6bd; }
+  .etoiles span.gagnee { color: #f5b301; text-shadow: 0 3px 0 #c98c00; animation: pop .55s both; }
+  @keyframes pop { 0% { transform: scale(0) rotate(-120deg); } 70% { transform: scale(1.35); } 100% { transform: scale(1); } }
+  .gros-score { font-size: 22px; font-weight: 800; }
+  #bil-score { font-size: 34px; color: #d9453b; }
+  #bil-record.nouveau-record { color: #d9453b; font-weight: 900; animation: battre .8s ease-in-out infinite alternate; }
+  @keyframes battre { to { transform: scale(1.08); } }
+  .ceinture-grande { width: 150px; height: 22px; border-radius: 6px; border: 2px solid #5b3a26; }
+  #bil-bonus { font-weight: 700; color: #3f7d2f; }
+
+  /* Menus : ceintures, carnet, kimono */
+  .menu { background: #fbe9c8; justify-content: flex-start; gap: 10px; padding-top: 16px; }
+  .menu h2 { font-size: 26px; color: #5b3a26; }
+  .liste { flex: 1; min-height: 0; overflow-y: auto; width: min(96vw, 520px); touch-action: pan-y; display: grid; gap: 10px; padding: 4px; align-content: start; }
+  #liste-ceintures { grid-template-columns: 1fr 1fr; }
+  .ceint-btn { min-height: 74px; border-radius: 16px; border: 3px solid #c9a46a; background: #fff8ec; color: #3a2a1e;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 16px; font-weight: 800; padding: 6px; }
+  .ceint-btn:disabled { opacity: .5; }
+  .ceint-btn .bande { width: 80%; height: 12px; border-radius: 4px; border: 1.5px solid #5b3a26; }
+  .ceint-btn .et { color: #f5b301; font-size: 18px; letter-spacing: 2px; }
+  .ceint-btn .et i { color: #d8c9ab; font-style: normal; }
+  .fiche { background: #fff8ec; border: 3px solid #c9a46a; border-radius: 16px; padding: 10px 12px; text-align: left; }
+  .fiche b { font-size: 18px; color: #5b3a26; }
+  .fiche.cache { opacity: .55; border-style: dashed; }
+  .fiche small { display: block; font-size: 14px; margin-top: 3px; }
+  #apercu { width: 160px; height: 190px; background: #fff8ec; border-radius: 16px; border: 3px solid #c9a46a; }
+  .choix { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .pastille { width: 64px; min-height: 64px; border-radius: 14px; border: 3px solid #c9a46a; background: #fff; font-size: 12px; font-weight: 800;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #3a2a1e; padding: 2px; }
+  .pastille .rondc { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #5b3a26; }
+  .pastille canvas { width: 30px; height: 30px; }
+  .pastille.choisi { border-color: #d9453b; box-shadow: 0 0 0 3px #d9453b; }
+  .pastille:disabled { opacity: .45; }
+
+  /* Animations du tutoriel (SVG) */
+  .t-fond { fill: none; stroke: #e8dcc4; stroke-width: 16; stroke-linecap: round; }
+  .t-vert { fill: none; stroke: #4caf50; stroke-width: 16; stroke-linecap: round; }
+  .t-aig line { stroke: #5b3a26; stroke-width: 6; stroke-linecap: round; }
+  .t-aig circle { fill: #5b3a26; }
+  .t-aig { transform-origin: 130px 130px; }
+  .t-main rect { fill: #ffd9b8; stroke: #8a5a3a; stroke-width: 2.5; }
+  .t-main { transform-box: fill-box; transform-origin: 50% 0%; }
+  .t-onde { fill: none; stroke: #d9453b; stroke-width: 4; transform-box: fill-box; transform-origin: center; }
+  .t-fleche { fill: #f08a2c; stroke: #5b3a26; stroke-width: 3; stroke-linejoin: round; }
+  .t-trace { stroke: #f5b301; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 140; }
+  .t-barre { fill: #e8dcc4; }
+  .t-vertr { fill: #4caf50; }
+  .t-point { fill: #d9453b; stroke: #5b3a26; stroke-width: 3; }
+  .t-case { fill: #fff8ec; stroke: #c9a46a; stroke-width: 3; }
+  .t-ico { fill: #5b3a26; }
+  .t-txt { font: 800 16px system-ui, sans-serif; fill: #5b3a26; text-anchor: middle; }
+  .a-balance { animation: balance 2.4s ease-in-out infinite; }
+  @keyframes balance { 0%, 100% { transform: rotate(-78deg); } 50% { transform: rotate(78deg); } }
+  .a-tape { animation: tape 1.2s infinite; }
+  @keyframes tape { 0%, 100% { transform: translateY(0) scale(.9); } 12% { transform: translateY(-6px) scale(1); } 80% { transform: translateY(-12px) scale(1); } }
+  .a-onde { animation: onde 1.2s infinite; }
+  @keyframes onde { 0% { opacity: .9; transform: scale(.4); } 40%, 100% { opacity: 0; transform: scale(2); } }
+  .a-feinte { animation: feinte 3.2s ease-in-out infinite; }
+  @keyframes feinte { 0% { transform: rotate(-20deg); } 25% { transform: rotate(45deg); } 50% { transform: rotate(-10deg); } 72%, 84% { transform: rotate(78deg); } 100% { transform: rotate(-20deg); } }
+  .a-tapeTard { animation: tapeTard 3.2s infinite; }
+  @keyframes tapeTard { 0%, 70% { transform: translateY(-12px) scale(1); } 76% { transform: translateY(0) scale(.9); } 84%, 100% { transform: translateY(-12px) scale(1); } }
+  .a-ondeTard { animation: ondeTard 3.2s infinite; }
+  @keyframes ondeTard { 0%, 75% { opacity: 0; transform: scale(.4); } 76% { opacity: .9; transform: scale(.4); } 90%, 100% { opacity: 0; transform: scale(2); } }
+  .a-txt1 { animation: txt1 3.2s infinite; } @keyframes txt1 { 0%, 12%, 45%, 100% { opacity: 0; } 20%, 38% { opacity: 1; } }
+  .a-txt2 { animation: txt2 3.2s infinite; } @keyframes txt2 { 0%, 70%, 96%, 100% { opacity: 0; } 76%, 90% { opacity: 1; } }
+  .a-glisse { animation: glisse 1.8s ease-in-out infinite; }
+  @keyframes glisse { 0% { transform: translateX(0); opacity: 0; } 15% { transform: translateX(0); opacity: 1; } 65% { transform: translateX(140px); opacity: 1; } 85%, 100% { transform: translateX(140px); opacity: 0; } }
+  .a-trace { animation: trace 1.8s ease-in-out infinite; }
+  @keyframes trace { 0%, 15% { stroke-dashoffset: 140; opacity: 1; } 65% { stroke-dashoffset: 0; opacity: 1; } 85%, 100% { stroke-dashoffset: 0; opacity: 0; } }
+  .a-ic0 { animation: ic0 4s infinite; } @keyframes ic0 { 0%, 6% { opacity: 0; } 10%, 48% { opacity: 1; } 52%, 100% { opacity: 0; } }
+  .a-ic1 { animation: ic1 4s infinite; } @keyframes ic1 { 0%, 16% { opacity: 0; } 20%, 48% { opacity: 1; } 52%, 100% { opacity: 0; } }
+  .a-ic2 { animation: ic2 4s infinite; } @keyframes ic2 { 0%, 26% { opacity: 0; } 30%, 48% { opacity: 1; } 52%, 100% { opacity: 0; } }
+  .a-ques { animation: ques 4s infinite; } @keyframes ques { 0%, 50% { opacity: 0; } 54%, 100% { opacity: 1; } }
+  .a-mainEnch { animation: mainEnch 4s infinite; }
+  @keyframes mainEnch { 0%, 54% { opacity: 0; transform: translate(40px, 0); } 58% { opacity: 1; transform: translate(40px, 0); } 70% { opacity: 1; transform: translate(-40px, 0); } 76% { opacity: 1; transform: translate(0, 0) scale(1); } 82% { transform: translate(0, 6px) scale(.9); } 88% { opacity: 1; transform: translate(0, 0) scale(1); } 96%, 100% { opacity: 0; } }
+  .a-point { animation: point 3.4s ease-in-out infinite; }
+  @keyframes point { 0% { transform: translateX(0); } 40%, 48% { transform: translateX(-72px); } 85%, 100% { transform: translateX(0); } }
+  .a-mainCentre { animation: mainCentre 3.4s ease-in-out infinite; }
+  @keyframes mainCentre { 0%, 38% { opacity: 0; transform: translateX(-72px); } 48% { opacity: 1; transform: translateX(-72px); } 85% { opacity: 1; transform: translateX(0); } 95%, 100% { opacity: 0; transform: translateX(0); } }
+  .a-pousse { animation: pousse 3.4s infinite; } @keyframes pousse { 0%, 5% { opacity: 0; } 12%, 38% { opacity: 1; } 45%, 100% { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) { .carte { animation: none; } }
+  @media (min-width: 700px) { #consigne { font-size: 20px; } }
+  /* Petits téléphones : accueil plus compact */
+  @media (max-height: 680px) {
+    #accueil { gap: 6px; }
+    #accueil h1 { font-size: clamp(28px, 8vw, 44px); }
+    #illu { height: 20vh; }
+    .regle { font-size: 15px; padding: 6px 10px; }
+    .gros { padding: 10px 40px; min-height: 54px; }
+    #tuto-anim svg { width: min(60vw, 230px); }
+    #tuto-etapes { font-size: 15px; }
+  }
+</style>
+</head>
+<body>
+<div id="jeu">
+  <!-- Barre du haut : pause, ceinture et échange, score, son -->
+  <div id="hud">
+    <button id="b-pause" class="rond" aria-label="Pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="currentColor"/></svg></button>
+    <div id="hud-info">
+      <div id="hud-titre"><span id="hud-ceint"></span><span id="hud-nom">Ceinture blanche</span></div>
+      <div id="hud-sous">Salut</div>
+    </div>
+    <div id="hud-score">0 pts</div>
+    <button id="b-son" class="rond" aria-label="Couper le son"></button>
+  </div>
+  <div id="zone"><canvas id="scene"></canvas></div>
+  <div id="consigne">Touche l'écran pour saluer ton partenaire</div>
+
+  <!-- Écran d'accueil (sert aussi de jaquette) -->
+  <div id="accueil" class="ecran visible">
+    <h1>Le tatami <span>des petits judokas</span></h1>
+    <canvas id="illu"></canvas>
+    <p class="regle">Salue ton partenaire, puis touche quand il penche pour le poser en douceur sur le tapis. Gagne les 10&nbsp;ceintures&nbsp;!</p>
+    <button id="b-jouer" class="gros">Jouer</button>
+    <p id="acc-info"></p>
+    <div class="rangee">
+      <button id="b-ceintures" class="moyen clair">Ceintures</button>
+      <button id="b-carnet" class="moyen clair">Carnet</button>
+      <button id="b-kimono" class="moyen clair">Kimono</button>
+      <button id="b-son-acc" class="rond" aria-label="Couper le son"></button>
+    </div>
+  </div>
+
+  <!-- Tutoriel animé -->
+  <div id="tuto" class="ecran voile">
+    <div class="carte">
+      <span class="nouveau">Nouveau !</span>
+      <h2 id="tuto-titre"></h2>
+      <div id="tuto-anim"></div>
+      <ol id="tuto-etapes"></ol>
+      <button id="b-tuto" class="moyen">C'est parti !</button>
+      <p class="petit">Touche n'importe où pour commencer</p>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="ecran voile">
+    <div class="carte">
+      <h2>Pause</h2>
+      <p>Respire… Le combat t'attend.</p>
+      <div class="boutons" style="flex-direction:column;align-items:stretch;width:80%">
+        <button id="b-reprendre" class="moyen">Reprendre</button>
+        <button id="b-recommencer" class="moyen clair">Recommencer</button>
+        <button id="b-pause-accueil" class="moyen clair">Accueil</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bilan de fin de niveau / de partie -->
+  <div id="bilan" class="ecran voile">
+    <div class="carte">
+      <h2 id="bil-titre"></h2>
+      <div class="ceinture-grande" id="bil-ceinture"></div>
+      <div class="etoiles" id="bil-etoiles"><span>★</span><span>★</span><span>★</span></div>
+      <p class="gros-score"><span id="bil-score">0</span> points</p>
+      <p id="bil-detail"></p>
+      <p id="bil-record"></p>
+      <p id="bil-bonus"></p>
+      <div class="boutons">
+        <button id="b-suivant" class="gros">Niveau suivant</button>
+        <button id="b-rejouer" class="moyen">Rejouer</button>
+        <button id="b-bil-accueil" class="moyen clair">Accueil</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Choix de la ceinture (niveau) -->
+  <div id="ceintures" class="ecran menu">
+    <h2>Les ceintures</h2>
+    <div id="liste-ceintures" class="liste"></div>
+    <button class="moyen clair b-retour">Retour</button>
+  </div>
+
+  <!-- Carnet de prises -->
+  <div id="carnet" class="ecran menu">
+    <h2>Mon carnet de prises</h2>
+    <div id="liste-carnet" class="liste"></div>
+    <button class="moyen clair b-retour">Retour</button>
+  </div>
+
+  <!-- Kimono à personnaliser -->
+  <div id="kimono" class="ecran menu">
+    <h2>Mon kimono</h2>
+    <canvas id="apercu"></canvas>
+    <p class="petit" id="kim-info"></p>
+    <div class="liste" style="flex:0 1 auto">
+      <div id="choix-gi" class="choix"></div>
+      <div id="choix-ecusson" class="choix"></div>
+    </div>
+    <button class="moyen clair b-retour">Retour</button>
+  </div>
+</div>
+<canvas id="fx"></canvas>
+
+<script>
+'use strict';
+// ==========================================================================
+// Le tatami des petits judokas — jeu de judo tout en équilibre et en rythme.
+// On salue, puis on touche quand la jauge d'équilibre du partenaire penche.
+// 10 ceintures : chutes, enchaînements, feintes, centre, prise en mouvement.
+// ==========================================================================
+
+const $ = (s) => document.querySelector(s);
+const hasard = (a, b) => a + Math.random() * (b - a);
+const choisir = (t) => t[Math.floor(Math.random() * t.length)];
+const borne = (v, a, b) => Math.max(a, Math.min(b, v));
+const lisse = (u) => (1 - Math.cos(Math.PI * borne(u, 0, 1))) / 2;
+
+// ---------- Données du jeu ----------
+const CEINTURES = [
+  { nom: 'blanche', c1: '#f7f5ef' },
+  { nom: 'blanche et jaune', c1: '#f7f5ef', c2: '#f2cf3a' },
+  { nom: 'jaune', c1: '#f2cf3a' },
+  { nom: 'jaune et orange', c1: '#f2cf3a', c2: '#f08a2c' },
+  { nom: 'orange', c1: '#f08a2c' },
+  { nom: 'orange et verte', c1: '#f08a2c', c2: '#3fae55' },
+  { nom: 'verte', c1: '#3fae55' },
+  { nom: 'verte et bleue', c1: '#3fae55', c2: '#2f6fd0' },
+  { nom: 'bleue', c1: '#2f6fd0' },
+  { nom: 'marron', c1: '#7a4a2a' },
+];
+
+// Réglages de chaque niveau : vitesse de l'aiguille (allers par seconde), taille du vert,
+// pause de l'aiguille au bout, part de feintes, temps de chute, nombre de sens, longueur
+// et durée d'affichage des enchaînements, force des poussées, taille du centre, échanges.
+const NIVEAUX = [
+  { vitesse: 0.33, zone: 0.36, pause: 0.35, feinte: 0,    fenetre: 2.6, dirs: 2, longueur: 2, montre: 2.6, derive: 0.5,  centre: 0.34, duree: 5,   liste: { prise: 6 } },
+  { vitesse: 0.42, zone: 0.31, pause: 0.3,  feinte: 0,    fenetre: 2.6, dirs: 2, longueur: 2, montre: 2.6, derive: 0.5,  centre: 0.34, duree: 5,   liste: { prise: 7 } },
+  { vitesse: 0.45, zone: 0.3,  pause: 0.28, feinte: 0,    fenetre: 2.4, dirs: 2, longueur: 2, montre: 2.6, derive: 0.5,  centre: 0.34, duree: 5,   liste: { prise: 4, chute: 3 } },
+  { vitesse: 0.52, zone: 0.27, pause: 0.24, feinte: 0,    fenetre: 2.0, dirs: 2, longueur: 2, montre: 2.6, derive: 0.5,  centre: 0.34, duree: 5,   liste: { prise: 4, chute: 4 } },
+  { vitesse: 0.55, zone: 0.26, pause: 0.2,  feinte: 0,    fenetre: 1.9, dirs: 3, longueur: 2, montre: 2.6, derive: 0.5,  centre: 0.34, duree: 5,   liste: { prise: 3, chute: 2, ench: 3 } },
+  { vitesse: 0.6,  zone: 0.24, pause: 0.18, feinte: 0.3,  fenetre: 1.7, dirs: 3, longueur: 2, montre: 2.2, derive: 0.5,  centre: 0.34, duree: 5,   liste: { prise: 3, chute: 3, ench: 3 } },
+  { vitesse: 0.62, zone: 0.23, pause: 0.15, feinte: 0.3,  fenetre: 1.6, dirs: 4, longueur: 2, montre: 2.0, derive: 0.55, centre: 0.32, duree: 5,   liste: { prise: 3, chute: 2, ench: 2, depl: 3 } },
+  { vitesse: 0.7,  zone: 0.21, pause: 0.12, feinte: 0.35, fenetre: 1.45, dirs: 4, longueur: 3, montre: 2.4, derive: 0.7, centre: 0.3,  duree: 5.5, liste: { prise: 3, chute: 2, ench: 3, depl: 2 } },
+  { vitesse: 0.72, zone: 0.2,  pause: 0.1,  feinte: 0.4,  fenetre: 1.35, dirs: 4, longueur: 3, montre: 2.1, derive: 0.8, centre: 0.28, duree: 6,   liste: { prise: 2, mobile: 3, chute: 2, ench: 2, depl: 2 } },
+  { vitesse: 0.85, zone: 0.17, pause: 0.07, feinte: 0.45, fenetre: 1.2, dirs: 4, longueur: 3, montre: 1.7, derive: 0.95, centre: 0.26, duree: 6,   liste: { prise: 2, mobile: 3, chute: 2, ench: 2, depl: 2 } },
+];
+// Nouveauté présentée par le tutoriel au début de chaque niveau.
+const TUTO_NIVEAU = { 0: 'prise', 2: 'chute', 4: 'ench', 5: 'feinte', 6: 'depl', 7: 'ench3', 8: 'mobile' };
+const TYPE_NOUVEAU = { prise: 'prise', chute: 'chute', ench: 'ench', feinte: 'prise', depl: 'depl', ench3: 'ench', mobile: 'mobile' };
+const NOMS_TYPES = { prise: 'Prise douce', chute: 'Chute amortie', ench: 'Enchaînement', depl: 'Garde ton centre', mobile: 'Prise en mouvement' };
+const DIRS = ['gauche', 'droite', 'bas', 'haut'];
+const NOM_DIR = { gauche: 'la gauche', droite: 'la droite', bas: 'le bas', haut: 'le haut' };
+const VALEURS = ['la politesse', 'le courage', 'la sincérité', "l'honneur", 'la modestie', 'le respect', 'le contrôle de soi', "l'amitié", 'la patience', 'la persévérance'];
+
+// Un partenaire différent à chaque ceinture (prénom, peau, cheveux, queue-de-cheval).
+const PARTENAIRES = [
+  { nom: 'Léo', peau: '#d9a57c', cheveux: '#2b2b2b' },
+  { nom: 'Inès', peau: '#f1c7a2', cheveux: '#8a4b20', queue: true },
+  { nom: 'Malo', peau: '#f6d2b0', cheveux: '#e0b44c' },
+  { nom: 'Aya', peau: '#b9825a', cheveux: '#1f1a17', queue: true },
+  { nom: 'Noé', peau: '#8d5a3b', cheveux: '#1f1a17' },
+  { nom: 'Lina', peau: '#f6d2b0', cheveux: '#c0502a', queue: true },
+  { nom: 'Sacha', peau: '#e8b98f', cheveux: '#5a3a22' },
+  { nom: 'Yuna', peau: '#f1d0a8', cheveux: '#2b2b2b', queue: true },
+  { nom: 'Adam', peau: '#a86f48', cheveux: '#2b2b2b' },
+  { nom: 'Maître Rosa', peau: '#e0b08a', cheveux: '#c9c4bc', queue: true },
+];
+
+// Carnet : une technique par ceinture.
+const PRISES = [
+  { nom: 'O-goshi', fr: 'la grande hanche', desc: 'Tu fais rouler ton partenaire sur ta hanche, tout doucement.' },
+  { nom: 'De-ashi-barai', fr: 'le balayage du pied', desc: 'Au bon moment, ton pied balaie le sien, léger comme un plumeau.' },
+  { nom: 'Ukemi', fr: 'la chute amortie', desc: 'Tu tombes en tapant le tapis avec le bras : ça ne fait pas mal !' },
+  { nom: 'Hiza-guruma', fr: 'la roue autour du genou', desc: 'Ton partenaire tourne comme une roue autour de ton genou.' },
+  { nom: 'Tai-otoshi', fr: 'le renversement du corps', desc: 'Deux gestes enchaînés : on tire, on tourne, il se pose.' },
+  { nom: 'Ko-uchi-gari', fr: 'le petit fauchage', desc: 'Un tout petit geste du pied, quand il ne fait plus semblant.' },
+  { nom: 'Tsugi-ashi', fr: 'le pas chassé', desc: 'Des pas glissés pour garder ton centre bien sous toi.' },
+  { nom: 'Uki-goshi', fr: 'la hanche flottante', desc: 'Trois gestes bien liés et ton partenaire flotte autour de toi.' },
+  { nom: 'Sasae-tsuri-komi-ashi', fr: 'le pied qui bloque', desc: 'En marchant, tu bloques son pied et tu le guides au sol.' },
+  { nom: 'O-soto-gari', fr: 'le grand fauchage', desc: 'La prise des grands : équilibre, rythme et contrôle de soi.' },
+];
+
+// Kimono : couleurs et écussons débloqués avec les étoiles.
+const GIS = [
+  { nom: 'Blanc', c: '#f7f5ef', o: '#d6cfbf', min: 0 },
+  { nom: 'Ciel', c: '#bfe0ff', o: '#8fb8e0', min: 3 },
+  { nom: 'Rose', c: '#ffc9dc', o: '#e59fba', min: 6 },
+  { nom: 'Menthe', c: '#bff0d4', o: '#8dcaa8', min: 10 },
+  { nom: 'Soleil', c: '#ffe9a3', o: '#e3c56e', min: 15 },
+  { nom: 'Lavande', c: '#d9ccff', o: '#ae9fe0', min: 20 },
+  { nom: 'Nuit', c: '#36406b', o: '#232a4a', min: 26 },
+];
+const ECUSSONS = [
+  { nom: 'Aucun', min: 0 }, { nom: 'Étoile', min: 2 }, { nom: 'Cœur', min: 5 }, { nom: 'Feuille', min: 8 },
+  { nom: 'Soleil', min: 12 }, { nom: 'Vague', min: 18 }, { nom: 'Fleur', min: 24 },
+];
+
+// ---------- Sauvegarde (le jeu marche aussi sans stockage) ----------
+const CLE = 'tatami-petits-judokas-v1';
+let sauve = { niveauMax: 1, etoiles: [], records: [], prises: [], son: true, gi: 0, ecusson: 0 };
+try {
+  const lu = JSON.parse(localStorage.getItem(CLE) || 'null');
+  if (lu && typeof lu === 'object') sauve = Object.assign(sauve, lu);
+} catch (e) { /* stockage indisponible */ }
+for (const k of ['etoiles', 'records', 'prises']) {
+  if (!Array.isArray(sauve[k]) || sauve[k].length !== 10) sauve[k] = Array(10).fill(0);
+}
+sauve.niveauMax = borne(sauve.niveauMax | 0, 1, 10);
+sauve.gi = borne(sauve.gi | 0, 0, GIS.length - 1);
+sauve.ecusson = borne(sauve.ecusson | 0, 0, ECUSSONS.length - 1);
+function enregistrer() {
+  try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* tant pis */ }
+}
+const totalEtoiles = () => sauve.etoiles.reduce((a, b) => a + b, 0);
+
+// ---------- Sons (Web Audio, créés seulement après une action du joueur) ----------
+let ac = null;
+function audio() {
+  if (!sauve.son) return null;
+  try {
+    if (!ac) {
+      const C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      ac = new C();
+    }
+    if (ac.state === 'suspended' && !enPause) ac.resume().catch(() => {});
+  } catch (e) { return null; }
+  return ac;
+}
+function note(f, d, { type = 'sine', vol = 0.16, glisse = 0, retard = 0 } = {}) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + retard;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f, t);
+  if (glisse) o.frequency.exponentialRampToValueAtTime(Math.max(40, f + glisse), t + d);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(a.destination);
+  o.start(t); o.stop(t + d + 0.05);
+}
+function bruit(d, vol = 0.2, freq = 800, retard = 0) {
+  const a = audio(); if (!a) return;
+  const n = Math.floor(a.sampleRate * d);
+  const b = a.createBuffer(1, n, a.sampleRate);
+  const data = b.getChannelData(0);
+  for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = a.createBufferSource(); s.buffer = b;
+  const f = a.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq;
+  const g = a.createGain(); g.gain.value = vol;
+  s.connect(f).connect(g).connect(a.destination);
+  s.start(a.currentTime + retard);
+}
+const SONS = {
+  clic: () => note(660, 0.08, { type: 'triangle', vol: 0.12 }),
+  salut: () => { note(392, 1.3, { vol: 0.14 }); note(588, 1.0, { vol: 0.06, retard: 0.02 }); note(784, 0.8, { vol: 0.03, retard: 0.03 }); },
+  hajime: () => { note(523, 0.12, { type: 'square', vol: 0.06 }); note(784, 0.22, { type: 'square', vol: 0.06, retard: 0.14 }); },
+  prise: () => { bruit(0.3, 0.12, 1800); bruit(0.2, 0.3, 380, 0.42); note(140, 0.2, { vol: 0.12, retard: 0.42 }); },
+  parfait: () => [660, 880, 1175].forEach((f, i) => note(f, 0.18, { type: 'triangle', vol: 0.11, retard: 0.5 + i * 0.08 })),
+  rate: () => note(240, 0.3, { type: 'triangle', glisse: -90, vol: 0.14 }),
+  chute: () => { bruit(0.14, 0.4, 700); note(170, 0.15, { vol: 0.1 }); },
+  pouf: () => { bruit(0.3, 0.18, 300); },
+  geste: () => note(540, 0.08, { type: 'triangle', vol: 0.1 }),
+  montre: (i) => note(440 + i * 110, 0.14, { type: 'sine', vol: 0.1 }),
+  etoile: (i) => note(880 + i * 220, 0.3, { type: 'triangle', vol: 0.13, retard: 0.5 + i * 0.4 }),
+  fin: () => [523, 659, 784, 1046].forEach((f, i) => note(f, 0.32, { type: 'triangle', vol: 0.12, retard: i * 0.13 })),
+  presque: () => [440, 392, 440, 523].forEach((f, i) => note(f, 0.25, { type: 'triangle', vol: 0.1, retard: i * 0.16 })),
+  tic: () => note(1200, 0.03, { type: 'square', vol: 0.03 }),
+};
+function son(nom, ...args) { try { SONS[nom](...args); } catch (e) { /* son indisponible */ } }
+
+const ICONE_SON = '<svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>';
+const ICONE_MUET = '<svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M15 9l6 6M21 9l-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+function majSon() {
+  for (const b of [$('#b-son'), $('#b-son-acc')]) {
+    b.innerHTML = sauve.son ? ICONE_SON : ICONE_MUET;
+    b.setAttribute('aria-label', sauve.son ? 'Couper le son' : 'Remettre le son');
+  }
+}
+function basculerSon() {
+  sauve.son = !sauve.son; enregistrer(); majSon();
+  if (sauve.son) son('clic');
+}
+
+// ---------- Tutoriels animés (SVG) ----------
+const MAIN = '<rect x="-6" y="-30" width="12" height="32" rx="6"/><rect x="-15" y="-6" width="30" height="28" rx="10"/>';
+const JAUGE_SVG = '<path d="M50 130 A80 80 0 0 1 210 130" class="t-fond"/><path d="M50 130 A80 80 0 0 1 60.7 90" class="t-vert"/><path d="M199.3 90 A80 80 0 0 1 210 130" class="t-vert"/>';
+const ICO = {
+  gauche: '<path d="M14 0 H-2 V-8 L-16 0 L-2 8 V0" class="t-ico"/><rect x="-4" y="-4" width="18" height="8" class="t-ico"/>',
+  tap: '<circle r="9" class="t-ico"/><circle r="15" fill="none" stroke="#5b3a26" stroke-width="3"/>',
+  bas: '<g transform="rotate(-90)"><path d="M14 0 H-2 V-8 L-16 0 L-2 8 V0" class="t-ico"/><rect x="-4" y="-4" width="18" height="8" class="t-ico"/></g>',
+};
+function svgEnch(n) {
+  const icos = ['gauche', 'tap', 'bas'];
+  const x0 = 130 - (n - 1) * 40;
+  let s = '<svg viewBox="0 0 260 160">';
+  for (let k = 0; k < n; k++) {
+    const x = x0 + k * 80;
+    s += `<rect x="${x - 30}" y="20" width="60" height="60" rx="12" class="t-case"/>`;
+    s += `<g transform="translate(${x} 50)"><g class="a-ic${k}">${ICO[icos[k]]}</g></g>`;
+    s += `<text x="${x}" y="58" class="t-txt a-ques" style="font-size:26px">?</text>`;
+  }
+  s += `<g transform="translate(130 128)"><g class="a-mainEnch"><g class="t-main">${MAIN}</g></g></g></svg>`;
+  return s;
+}
+const SVG_DEPL = (ajout = '') => `<svg viewBox="0 0 260 160">${ajout}
+  <rect x="30" y="${ajout ? 92 : 62}" width="200" height="24" rx="12" class="t-barre"/>
+  <rect x="98" y="${ajout ? 92 : 62}" width="64" height="24" rx="8" class="t-vertr"/>
+  <g class="a-pousse"><text x="90" y="${ajout ? 84 : 48}" class="t-txt">← ça pousse !</text></g>
+  <g class="a-point"><circle cx="130" cy="${ajout ? 104 : 74}" r="13" class="t-point"/></g>
+  <g transform="translate(130 ${ajout ? 132 : 112})"><g class="a-mainCentre"><g class="t-main">${MAIN}</g></g></g></svg>`;
+const TUTOS = {
+  prise: {
+    titre: 'La prise douce',
+    etapes: ["L'aiguille montre l'équilibre de ton partenaire.", 'Dans le vert, il penche : c\'est le bon moment !', 'Touche l\'écran (ou Espace) : tu le poses en douceur.'],
+    svg: `<svg viewBox="0 0 260 160">${JAUGE_SVG}<g class="t-aig a-balance"><line x1="130" y1="130" x2="130" y2="62"/><circle cx="130" cy="130" r="8"/></g>
+      <circle cx="226" cy="112" r="10" class="t-onde a-onde"/><g transform="translate(226 140)"><g class="t-main a-tape">${MAIN}</g></g></svg>`,
+  },
+  chute: {
+    titre: 'La chute amortie',
+    etapes: ["Parfois, c'est ton partenaire qui fait la prise.", 'Une flèche montre le sens de ta chute.', 'Glisse le doigt dans ce sens (ou flèche du clavier), vite !'],
+    svg: `<svg viewBox="0 0 260 160"><path d="M50 60 H160 V40 L205 70 L160 100 V80 H50 Z" class="t-fleche"/>
+      <line x1="60" y1="118" x2="200" y2="118" class="t-trace a-trace"/><g transform="translate(60 130)"><g class="a-glisse"><g class="t-main">${MAIN}</g></g></g></svg>`,
+  },
+  ench: {
+    titre: "L'enchaînement",
+    etapes: ['Regarde bien les gestes qui s\'allument.', 'Ils se cachent : souviens-toi !', 'Refais-les dans l\'ordre : glisse ou touche.'],
+    svg: svgEnch(2),
+  },
+  feinte: {
+    titre: 'Attention aux feintes !',
+    etapes: ['Ton partenaire fait semblant de pencher…', "… et l'aiguille repart avant le vert.", 'Attends qu\'elle entre vraiment dans le vert !'],
+    svg: `<svg viewBox="0 0 260 160">${JAUGE_SVG}<g class="t-aig a-feinte"><line x1="130" y1="130" x2="130" y2="62"/><circle cx="130" cy="130" r="8"/></g>
+      <text x="130" y="22" class="t-txt a-txt1">Pas encore…</text><text x="130" y="22" class="t-txt a-txt2" style="fill:#2e7d32">Maintenant !</text>
+      <circle cx="226" cy="112" r="10" class="t-onde a-ondeTard"/><g transform="translate(226 140)"><g class="t-main a-tapeTard">${MAIN}</g></g></svg>`,
+  },
+  depl: {
+    titre: 'Garde ton centre',
+    etapes: ['Ton partenaire te pousse et te tire.', 'Le point rouge, c\'est ton centre.', 'Glisse le doigt (ou ← →) pour le garder dans le vert.'],
+    svg: SVG_DEPL(),
+  },
+  ench3: {
+    titre: 'Enchaînement de 3 gestes',
+    etapes: ['Maintenant, il y a trois gestes.', 'Regarde-les bien avant qu\'ils se cachent.', 'Refais-les dans l\'ordre, sans te presser.'],
+    svg: svgEnch(3),
+  },
+  mobile: {
+    titre: 'La prise en mouvement',
+    etapes: ['Garde ton centre dans le vert en glissant…', "… et touche quand l'aiguille est dans le vert.", 'Si tu es déséquilibré, la prise ne marche pas !'],
+    svg: SVG_DEPL(`<g transform="translate(65 4) scale(.5)">${JAUGE_SVG}<g class="t-aig a-balance"><line x1="130" y1="130" x2="130" y2="62"/><circle cx="130" cy="130" r="8"/></g></g>`),
+  },
+};
+
+// ---------- État général ----------
+let ecran = 'accueil';       // accueil | jeu | bilan | menu
+let enPause = false;
+let tutoOuvert = false, tutoT = 0, tutoEtape = 0, tutoDebut = 0;
+let jeu = null;              // partie en cours
+let parts = [];              // confettis et étoiles
+let bilanAnim = null;        // compteur de score qui défile
+const touches = { gauche: false, droite: false };
+
+const cv = $('#scene'), ctx = cv.getContext('2d');
+const fx = $('#fx'), fctx = fx.getContext('2d');
+const illu = $('#illu'), ictx = illu.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+
+function redim() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  const r = cv.getBoundingClientRect();
+  if (r.width && (r.width !== W || r.height !== H)) {
+    W = r.width; H = r.height;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  }
+  const fw = Math.round(innerWidth * DPR), fh = Math.round(innerHeight * DPR);
+  if (fx.width !== fw || fx.height !== fh) { fx.width = fw; fx.height = fh; }
+  const ri = illu.getBoundingClientRect();
+  const iw = Math.round(ri.width * DPR), ih = Math.round(ri.height * DPR);
+  if (iw && (illu.width !== iw || illu.height !== ih)) { illu.width = iw; illu.height = ih; }
+}
+
+function montrer(id, oui) { $('#' + id).classList.toggle('visible', oui); }
+// Espace insécable avant ! ? : (typographie française, jamais de « ! » seul en début de ligne)
+const insecable = (t) => t.replace(/ ([!?:;»])/g, ' $1');
+function consigne(t) { $('#consigne').textContent = insecable(t); }
+
+// ==========================================================================
+// Déroulement d'un niveau (combat amical)
+// ==========================================================================
+function lancer(i) {
+  i = borne(i, 0, 9);
+  const cfg = NIVEAUX[i];
+  // Liste des échanges, mélangée ; la nouveauté du niveau arrive en premier.
+  const liste = [];
+  for (const [t, n] of Object.entries(cfg.liste)) for (let k = 0; k < n; k++) liste.push(t);
+  for (let k = liste.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [liste[k], liste[j]] = [liste[j], liste[k]]; }
+  const nv = TYPE_NOUVEAU[TUTO_NIVEAU[i]];
+  if (nv && liste.includes(nv)) { liste.splice(liste.indexOf(nv), 1); liste.unshift(nv); }
+  jeu = {
+    i, cfg, liste, idx: -1, type: null, pts: 0, max: liste.length * 3, score: 0, combo: 0, meilleureSerie: 0,
+    phase: 'salut1', t: 0, haut: 'valeur', anim: '', dureeResultat: 1,
+    aig: { a: 0, s: 0, e: 1, d: 1, u: 0, att: 0 }, essais: 0, bloque: 0, vacille: 0,
+    centre: 0, pousse: 0, pousseCible: 0, pousseT: 0, dedans: 0,
+    dir: 'droite', seq: [], saisie: [], erreurEnch: -1, sensChute: 1,
+    textes: [], ondes: [], secousse: 0, reussites: 0,
+  };
+  ecran = 'jeu'; enPause = false; tutoOuvert = false; bilanAnim = null; doigt = null;
+  for (const id of ['accueil', 'bilan', 'pause', 'tuto', 'ceintures', 'carnet', 'kimono']) montrer(id, false);
+  touches.gauche = touches.droite = false;
+  consigne(`Ton partenaire : ${PARTENAIRES[i].nom}. Touche l'écran pour saluer (Rei)`);
+  majHud();
+  redim();
+  if (TUTO_NIVEAU[i]) ouvrirTuto(TUTO_NIVEAU[i]);
+}
+
+function aller(phase) { jeu.phase = phase; jeu.t = 0; }
+
+function majHud() {
+  if (!jeu) return;
+  const c = CEINTURES[jeu.i];
+  $('#hud-nom').textContent = `Ceinture ${c.nom}`;
+  $('#hud-ceint').style.background = c.c2 ? `linear-gradient(${c.c1} 50%, ${c.c2} 50%)` : c.c1;
+  const n = jeu.liste.length;
+  $('#hud-sous').textContent = `Niveau ${jeu.i + 1} · ` + (jeu.idx < 0 ? 'Salut' : jeu.idx >= n ? 'Salut final' : `Échange ${jeu.idx + 1} / ${n}`);
+  $('#hud-score').textContent = `${jeu.score} pts`;
+}
+
+// Échange suivant (ou salut final)
+function suivant() {
+  const J = jeu;
+  J.idx++;
+  J.vacille = 0;
+  if (J.idx >= J.liste.length) {
+    aller('salut2'); J.haut = 'valeur';
+    consigne(`Combat fini ! Touche pour saluer ${PARTENAIRES[J.i].nom}`);
+  } else {
+    J.type = J.liste[J.idx];
+    aller('prep'); J.haut = 'titre';
+    consigne(NOMS_TYPES[J.type] + ' !');
+  }
+  majHud();
+}
+
+function demarrerEchange() {
+  const J = jeu, c = J.cfg;
+  J.essais = 0; J.bloque = 0;
+  switch (J.type) {
+    case 'prise':
+    case 'mobile':
+      initAiguille();
+      J.centre = 0; J.pousse = 0; J.pousseT = 0;
+      aller(J.type); J.haut = 'jauge';
+      consigne(J.type === 'prise' ? "Touche quand l'aiguille est dans le vert !" : 'Garde ton centre et touche dans le vert !');
+      break;
+    case 'chute':
+      J.dir = choisir(DIRS.slice(0, c.dirs));
+      aller('chuteMonte'); J.haut = 'fleche';
+      consigne('Ton partenaire te fait chuter…');
+      break;
+    case 'ench': {
+      J.seq = [];
+      const gestes = ['tap', ...DIRS.slice(0, c.dirs)];
+      while (J.seq.length < c.longueur) {
+        const g = choisir(gestes);
+        if (g !== J.seq[J.seq.length - 1]) J.seq.push(g);
+      }
+      J.saisie = []; J.erreurEnch = -1;
+      aller('enchMontre'); J.haut = 'ench';
+      consigne('Regarde bien les gestes…');
+      break;
+    }
+    case 'depl':
+      J.centre = 0; J.dedans = 0; J.pousse = 0; J.pousseT = 0;
+      aller('depl'); J.haut = 'centre';
+      consigne('Glisse le doigt (ou ← →) pour garder ton centre dans le vert !');
+      break;
+  }
+}
+
+// ---------- Aiguille d'équilibre ----------
+function dureeSeg(s, e) { return Math.max(0.2, (Math.abs(e - s) / 2) / (2 * jeu.cfg.vitesse)); }
+function initAiguille() {
+  const A = jeu.aig;
+  A.s = 0; A.a = 0; A.u = 0; A.att = 0.2;
+  A.e = Math.random() < 0.5 ? 1 : -1;
+  A.d = dureeSeg(A.s, A.e);
+}
+function bougerAiguille(dt) {
+  const A = jeu.aig, c = jeu.cfg;
+  if (A.att > 0) { A.att -= dt; return; }
+  A.u += dt / A.d;
+  if (A.u >= 1) {
+    A.a = A.e; A.s = A.e; A.u = 0;
+    A.att = Math.abs(A.e) >= 1 ? c.pause : 0.06;
+    // Après un bout, l'aiguille repart de l'autre côté… ou fait une feinte (s'arrête avant le vert).
+    const feinte = Math.abs(A.s) >= 1 && Math.random() < c.feinte;
+    A.e = -Math.sign(A.s) * (feinte ? 0.5 : 1);
+    A.d = dureeSeg(A.s, A.e);
+  } else {
+    A.a = A.s + (A.e - A.s) * lisse(A.u);
+  }
+}
+
+// ---------- Poussées du partenaire (centre) ----------
+function deriver(dt, force) {
+  const J = jeu;
+  J.pousseT -= dt;
+  if (J.pousseT <= 0) {
+    J.pousseT = hasard(0.9, 1.8);
+    J.pousseCible = (J.centre > 0.15 ? 1 : J.centre < -0.15 ? -1 : choisir([-1, 1])) * hasard(0.6, 1);
+  }
+  J.pousse += (J.pousseCible - J.pousse) * Math.min(1, dt * 3);
+  let v = J.pousse * force;
+  if (touches.gauche) v -= 1.5;
+  if (touches.droite) v += 1.5;
+  J.centre = borne(J.centre + v * dt, -1.2, 1.2);
+}
+
+// ---------- Réussites et ratés ----------
+function texte(t, couleur = '#2e7d32', x = 0.5, y = 0.42) {
+  // Un même message n'est pas empilé s'il est déjà affiché
+  if (jeu.textes.some((m) => m.t === t && m.age < 1)) return;
+  jeu.textes.push({ t, couleur, x, y, age: 0 });
+}
+function reussite(p, msg, grand = true) {
+  const J = jeu;
+  J.pts += p; J.combo++; J.reussites++;
+  J.meilleureSerie = Math.max(J.meilleureSerie, J.combo);
+  const bonus = J.combo >= 3 ? 5 * Math.min(J.combo, 6) : 0;
+  J.score += p * 10 + bonus;
+  texte(`${msg} +${p * 10 + bonus}`, p >= 3 ? '#d9453b' : '#2e7d32');
+  if (J.combo >= 3) texte(`Série de ${J.combo} !`, '#f08a2c', 0.5, 0.52);
+  if (grand) {
+    J.secousse = 0.25;
+    const r = cv.getBoundingClientRect();
+    confettis(r.left + W * 0.62, r.top + H * 0.62, p >= 3 ? 28 : 16, true);
+  }
+  majHud();
+}
+function rateMsg(msg) { const J = jeu; J.combo = 0; texte(msg, '#b0442f'); son('rate'); }
+
+// Toucher pendant une prise (a = position de l'aiguille au moment de l'appui)
+function tapPrise(a) {
+  const J = jeu, c = J.cfg;
+  if (J.bloque > 0) return;
+  if (J.phase === 'mobile' && Math.abs(J.centre) > c.centre) {
+    ratePrise('Déséquilibré ! Garde ton centre.');
+    return;
+  }
+  const lim = 1 - c.zone;
+  if (Math.abs(a) >= lim) {
+    const parfait = Math.abs(a) >= 1 - c.zone * 0.45;
+    const p = Math.max(1, (parfait ? 3 : 2) - J.essais);
+    J.sensChute = 1;
+    reussite(p, parfait ? 'Parfait !' : 'Bien joué !');
+    son('prise'); if (parfait) son('parfait');
+    sauve.prises[J.i]++;
+    J.anim = 'priseOK'; J.dureeResultat = 1.7; aller('resultat');
+    consigne(parfait ? 'Ippon tout en douceur !' : 'Bien posé sur le tapis !');
+  } else {
+    ratePrise(Math.abs(a) > lim - 0.25 ? 'Presque ! Encore un peu…' : 'Trop tôt ! Attends le vert.');
+  }
+}
+function ratePrise(msg) {
+  const J = jeu;
+  J.essais++; rateMsg(msg);
+  J.bloque = 0.7; J.vacille = 0.7;
+  if (J.essais >= 2) {
+    J.anim = 'priseRatee'; J.dureeResultat = 1.2; aller('resultat');
+    consigne("Ce n'est pas grave, on continue !");
+  } else {
+    consigne('Encore un essai : attends le vert !');
+  }
+}
+
+function gesteChute(d) {
+  const J = jeu;
+  if (d === J.dir) {
+    const p = J.t < J.cfg.fenetre * 0.5 ? 3 : 2;
+    reussite(p, p === 3 ? 'Super chute !' : 'Belle chute !');
+    son('chute');
+    J.anim = 'chuteOK';
+    J.ondes.push({ x: 0, age: 0 });
+    consigne('Bravo, tu as tapé le tapis : aucune douleur !');
+  } else {
+    rateMsg(`Oups ! C'était vers ${NOM_DIR[J.dir]}.`);
+    son('pouf');
+    J.anim = 'chuteRatee';
+    consigne('On se relève et on continue !');
+  }
+  J.dureeResultat = 1.5; aller('resultat');
+}
+
+function entreeEnch(g) {
+  const J = jeu;
+  const attendu = J.seq[J.saisie.length];
+  if (g === attendu) {
+    J.saisie.push(g); son('geste');
+    if (J.saisie.length === J.seq.length) {
+      reussite(3, 'Enchaînement réussi !');
+      son('prise'); son('parfait');
+      sauve.prises[J.i]++;
+      J.anim = 'priseOK'; J.dureeResultat = 1.7; aller('resultat');
+      consigne('Quel enchaînement !');
+    }
+  } else {
+    J.erreurEnch = J.saisie.length;
+    if (J.saisie.length > 0) { J.pts += 1; J.score += 10; J.combo = 0; texte('Presque ! +10', '#f08a2c'); son('rate'); majHud(); }
+    else rateMsg("Ce n'était pas ce geste.");
+    J.anim = 'enchRate'; J.dureeResultat = 1.6; aller('resultat');
+    consigne('Regarde bien la prochaine fois !');
+  }
+}
+
+function finDepl() {
+  const J = jeu;
+  const r = J.dedans / J.cfg.duree;
+  const p = r >= 0.85 ? 3 : r >= 0.65 ? 2 : r >= 0.4 ? 1 : 0;
+  if (p > 0) { reussite(p, p === 3 ? 'Centre parfait !' : 'Bon équilibre !', p >= 2); son(p >= 2 ? 'parfait' : 'geste'); }
+  else rateMsg('Ton centre est parti… Ça viendra !');
+  consigne(`Centre gardé ${Math.round(r * 100)} % du temps`);
+  J.anim = 'deplFin'; J.dureeResultat = 1.3; aller('resultat');
+}
+
+// ---------- Entrées (toucher, glisser, clavier) ----------
+function tapAppui() {
+  const J = jeu; if (!J) return;
+  if (J.phase === 'salut1') { aller('rei'); son('salut'); consigne('Rei ! On se salue avec respect.'); }
+  else if (J.phase === 'salut2') { aller('reiFin'); son('salut'); consigne('Rei ! Merci pour ce beau combat.'); }
+  else if (J.phase === 'prise') tapPrise(J.aig.a);
+}
+function tapLache(aAppui) {
+  const J = jeu; if (!J) return;
+  if (J.phase === 'ench') entreeEnch('tap');
+  else if (J.phase === 'mobile') tapPrise(aAppui);
+  else if (J.phase === 'chute') texte('Glisse le doigt !', '#b0442f');
+  else if (J.phase === 'enchMontre') texte('Regarde d\'abord…', '#5b3a26');
+}
+function geste(d) {
+  const J = jeu; if (!J) return;
+  if (J.phase === 'chute') gesteChute(d);
+  else if (J.phase === 'ench') entreeEnch(d);
+}
+
+let doigt = null;
+function actif() { return ecran === 'jeu' && !enPause && !tutoOuvert && jeu; }
+function surAppui(e) {
+  if (!actif()) return;
+  e.preventDefault();
+  doigt = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, glisse: false, a: jeu.aig.a };
+  tapAppui();
+}
+function surMouvement(e) {
+  if (!doigt || e.pointerId !== doigt.id || !actif()) return;
+  const J = jeu;
+  if (J.phase === 'depl' || J.phase === 'mobile') {
+    J.centre = borne(J.centre + (e.clientX - doigt.x) / (W * 0.35), -1.2, 1.2);
+  } else if (!doigt.glisse) {
+    const dx = e.clientX - doigt.x0, dy = e.clientY - doigt.y0;
+    if (Math.hypot(dx, dy) > 34) {
+      doigt.glisse = true;
+      geste(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'droite' : 'gauche') : (dy > 0 ? 'bas' : 'haut'));
+    }
+  }
+  doigt.x = e.clientX;
+}
+function surLache(e) {
+  if (!doigt || e.pointerId !== doigt.id) return;
+  const d = doigt; doigt = null;
+  if (!actif() || d.glisse) return;
+  if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 22) tapLache(d.a);
+}
+for (const el of [$('#zone'), $('#consigne')]) {
+  el.addEventListener('pointerdown', surAppui);
+}
+addEventListener('pointermove', surMouvement);
+addEventListener('pointerup', surLache);
+addEventListener('pointercancel', () => { doigt = null; });
+
+const FLECHES = { ArrowLeft: 'gauche', ArrowRight: 'droite', ArrowUp: 'haut', ArrowDown: 'bas' };
+addEventListener('keydown', (e) => {
+  const k = e.key;
+  const action = k === ' ' || k === 'Enter';
+  if (tutoOuvert) { e.preventDefault(); if (!e.repeat) fermerTuto(); return; }
+  const focusBouton = document.activeElement && document.activeElement.tagName === 'BUTTON';
+  if (ecran === 'accueil') {
+    if (action && (!focusBouton || document.activeElement.id === 'b-jouer')) { e.preventDefault(); jouer(); }
+    return;
+  }
+  if (ecran === 'bilan') {
+    if (action && !focusBouton) { e.preventDefault(); ($('#b-suivant').style.display !== 'none' ? $('#b-suivant') : $('#b-rejouer')).click(); }
+    if (k === 'Escape') retourAccueil();
+    return;
+  }
+  if (ecran === 'menu') { if (k === 'Escape') retourAccueil(); return; }
+  if (ecran !== 'jeu') return;
+  if (k === 'Escape' || k === 'p' || k === 'P') { e.preventDefault(); if (enPause) reprendre(); else mettrePause(); return; }
+  if (enPause) { if (action && !focusBouton) { e.preventDefault(); reprendre(); } return; }
+  if (action || FLECHES[k]) e.preventDefault();
+  if (action && !e.repeat) { if (focusBouton) document.activeElement.blur(); tapAppui(); tapLache(jeu.aig.a); }
+  const d = FLECHES[k];
+  if (d) {
+    if (d === 'gauche') touches.gauche = true;
+    if (d === 'droite') touches.droite = true;
+    if (!e.repeat) geste(d);
+  }
+});
+addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft') touches.gauche = false;
+  if (e.key === 'ArrowRight') touches.droite = false;
+});
+
+// ---------- Pause ----------
+function mettrePause() {
+  if (ecran !== 'jeu' || enPause) return;
+  enPause = true; doigt = null; touches.gauche = touches.droite = false;
+  montrer('pause', true);
+  if (ac) ac.suspend().catch(() => {});
+}
+function reprendre() {
+  enPause = false; montrer('pause', false);
+  if (ac && sauve.son) ac.resume().catch(() => {});
+  son('clic');
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+
+// ---------- Tutoriel ----------
+function ouvrirTuto(cle) {
+  const T = TUTOS[cle];
+  tutoOuvert = true; tutoT = 0; tutoEtape = 0; tutoDebut = performance.now();
+  $('#tuto-titre').textContent = T.titre;
+  $('#tuto-anim').innerHTML = T.svg;
+  $('#tuto-etapes').innerHTML = T.etapes.map((t, k) => `<li>${k + 1}. ${insecable(t)}</li>`).join('');
+  majTuto();
+  montrer('tuto', true);
+}
+function majTuto() { [...$('#tuto-etapes').children].forEach((li, k) => li.classList.toggle('actif', k === tutoEtape)); }
+function fermerTuto() {
+  if (!tutoOuvert || performance.now() - tutoDebut < 400) return;
+  tutoOuvert = false; montrer('tuto', false); son('clic');
+}
+$('#tuto').addEventListener('pointerdown', fermerTuto);
+
+// ==========================================================================
+// Mise à jour (temps de jeu : tout s'arrête en pause)
+// ==========================================================================
+function maj(dt) {
+  const J = jeu, c = J.cfg;
+  J.t += dt;
+  for (const x of J.textes) x.age += dt;
+  J.textes = J.textes.filter((x) => x.age < 1.5);
+  for (const o of J.ondes) o.age += dt;
+  J.ondes = J.ondes.filter((o) => o.age < 0.9);
+  J.secousse = Math.max(0, J.secousse - dt);
+  J.bloque = Math.max(0, J.bloque - dt);
+  J.vacille = Math.max(0, J.vacille - dt);
+
+  switch (J.phase) {
+    case 'rei': if (J.t > 1.6) { aller('hajime'); J.haut = 'hajime'; son('hajime'); consigne('Hajime ! (Commencez !)'); } break;
+    case 'hajime': if (J.t > 1.0) suivant(); break;
+    case 'prep': if (J.t > 0.9) demarrerEchange(); break;
+    case 'prise':
+    case 'mobile':
+      bougerAiguille(dt);
+      if (J.phase === 'mobile') deriver(dt, c.derive * 0.6);
+      if (J.t > 12) { rateMsg('Le temps est passé…'); J.anim = 'priseRatee'; J.dureeResultat = 1.1; aller('resultat'); }
+      break;
+    case 'chuteMonte': if (J.t > 0.7) { aller('chute'); consigne('Glisse le doigt dans le sens de la flèche !'); son('tic'); } break;
+    case 'chute':
+      if (J.t > c.fenetre) {
+        rateMsg('Trop tard…'); son('pouf');
+        J.anim = 'chuteRatee'; J.dureeResultat = 1.5; aller('resultat');
+        consigne('On se relève et on continue !');
+      }
+      break;
+    case 'enchMontre': {
+      // Les gestes s'allument un par un, avec une petite note.
+      const n = J.seq.length, pas = c.montre / (n + 1);
+      const avant = Math.floor((J.t - dt) / pas), apres = Math.floor(J.t / pas);
+      if (apres > avant && apres >= 1 && apres <= n) son('montre', apres - 1);
+      if (J.t > c.montre) { aller('ench'); consigne('À toi ! Refais les gestes dans l\'ordre.'); }
+      break;
+    }
+    case 'ench':
+      if (J.t > 3 + J.seq.length * 1.5) {
+        J.erreurEnch = J.saisie.length;
+        rateMsg('Le temps est passé…');
+        J.anim = 'enchRate'; J.dureeResultat = 1.4; aller('resultat');
+      }
+      break;
+    case 'depl':
+      deriver(dt, c.derive);
+      if (Math.abs(J.centre) <= c.centre) J.dedans += dt;
+      if (J.t >= c.duree) finDepl();
+      break;
+    case 'resultat': if (J.t > J.dureeResultat) suivant(); break;
+    case 'reiFin': if (J.t > 1.7) finNiveau(); break;
+  }
+}
+
+// ==========================================================================
+// Fin de niveau et bilan
+// ==========================================================================
+function finNiveau() {
+  const J = jeu, i = J.i;
+  const ratio = J.pts / J.max;
+  const et = ratio >= 0.88 ? 3 : ratio >= 0.7 ? 2 : ratio >= 0.5 ? 1 : 0;
+  const etAvant = sauve.etoiles[i], totalAvant = totalEtoiles();
+  const record = J.score > sauve.records[i];
+  const ancienRecord = sauve.records[i];
+  if (record) sauve.records[i] = J.score;
+  if (et > etAvant) sauve.etoiles[i] = et;
+  if (et > 0) sauve.niveauMax = Math.max(sauve.niveauMax, Math.min(10, i + 2));
+  enregistrer();
+  const total = totalEtoiles();
+  const debloques = [...GIS.map((g) => 'kimono ' + g.nom.toLowerCase()), ...ECUSSONS.map((x) => 'écusson ' + x.nom.toLowerCase())]
+    .filter((_, k) => { const m = k < GIS.length ? GIS[k].min : ECUSSONS[k - GIS.length].min; return m > totalAvant && m <= total; });
+
+  ecran = 'bilan';
+  const c = CEINTURES[i];
+  const fini = et > 0 && i === 9;
+  $('#bil-titre').textContent = insecable(fini ? 'Toutes les ceintures !' : et > 0 ? `Ceinture ${c.nom} gagnée !` : 'Presque !');
+  $('#bil-ceinture').style.background = c.c2 ? `linear-gradient(${c.c1} 50%, ${c.c2} 50%)` : c.c1;
+  $('#bil-ceinture').style.opacity = et > 0 ? 1 : 0.35;
+  [...$('#bil-etoiles').children].forEach((s, k) => {
+    s.className = '';
+    if (k < et) { void s.offsetWidth; s.className = 'gagnee'; s.style.animationDelay = (0.5 + k * 0.4) + 's'; }
+  });
+  $('#bil-detail').textContent = insecable(`Points de technique : ${J.pts} / ${J.max} · meilleure série : ${J.meilleureSerie}` +
+    (et === 0 ? '. Il en faut la moitié pour gagner la ceinture.' : ''));
+  const rec = $('#bil-record');
+  rec.textContent = insecable(record ? (ancienRecord > 0 ? `Nouveau record ! (avant : ${ancienRecord})` : 'Premier record !') : `Record : ${sauve.records[i]} points`);
+  rec.classList.toggle('nouveau-record', record);
+  const bonus = [];
+  if (et > 0 && etAvant === 0) bonus.push(`Nouvelle prise dans ton carnet : ${PRISES[i].nom}`);
+  if (debloques.length) bonus.push('Débloqué : ' + debloques.join(', '));
+  if (fini) bonus.push('Tu es un vrai judoka : merci d\'avoir salué à chaque combat !');
+  $('#bil-bonus').textContent = insecable(bonus.join(' · '));
+  $('#b-suivant').style.display = et > 0 && i < 9 ? '' : 'none';
+  montrer('bilan', true);
+  bilanAnim = { cible: J.score, val: 0 };
+  $('#bil-score').textContent = '0';
+  if (et > 0) {
+    son('fin');
+    for (let k = 0; k < et; k++) son('etoile', k);
+    confettis(innerWidth / 2, innerHeight * 0.3, fini ? 120 : 60, true);
+  } else son('presque');
+}
+
+// ==========================================================================
+// Dessin
+// ==========================================================================
+function rr(c, x, y, w, h, r) {
+  c.beginPath(); c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+function cheminEtoile(c, x, y, r1, r2, n = 5) {
+  c.beginPath();
+  for (let i = 0; i < n * 2; i++) {
+    const r = i % 2 ? r2 : r1, a = -Math.PI / 2 + i * Math.PI / n;
+    c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+  }
+  c.closePath();
+}
+// Écusson cousu sur la veste (k = numéro dans ECUSSONS)
+function dessinerEcusson(c, k, x, y, r) {
+  if (!k) return;
+  c.save(); c.translate(x, y); c.lineWidth = 1.2; c.strokeStyle = '#4a3326';
+  if (k === 1) { cheminEtoile(c, 0, 0, r, r * 0.45); c.fillStyle = '#f5b301'; c.fill(); c.stroke(); }
+  else if (k === 2) {
+    c.beginPath(); c.moveTo(0, r * 0.8);
+    c.bezierCurveTo(-r * 1.6, -r * 0.2, -r * 0.6, -r * 1.4, 0, -r * 0.45);
+    c.bezierCurveTo(r * 0.6, -r * 1.4, r * 1.6, -r * 0.2, 0, r * 0.8);
+    c.fillStyle = '#e8506a'; c.fill(); c.stroke();
+  } else if (k === 3) {
+    c.rotate(-0.6); c.beginPath(); c.ellipse(0, 0, r, r * 0.5, 0, 0, Math.PI * 2);
+    c.fillStyle = '#3fae55'; c.fill(); c.stroke(); c.beginPath(); c.moveTo(-r, 0); c.lineTo(r, 0); c.stroke();
+  } else if (k === 4) {
+    c.fillStyle = '#f59e0b';
+    for (let i = 0; i < 8; i++) { c.save(); c.rotate(i * Math.PI / 4); c.fillRect(-1, -r * 1.25, 2, r * 0.5); c.restore(); }
+    c.beginPath(); c.arc(0, 0, r * 0.6, 0, Math.PI * 2); c.fill(); c.stroke();
+  } else if (k === 5) {
+    c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fillStyle = '#3d8ee0'; c.fill(); c.stroke();
+    c.strokeStyle = '#fff'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-r * 0.7, r * 0.1);
+    c.quadraticCurveTo(-r * 0.35, -r * 0.5, 0, r * 0.1); c.quadraticCurveTo(r * 0.35, r * 0.6, r * 0.7, 0); c.stroke();
+  } else if (k === 6) {
+    c.fillStyle = '#ff8fb8';
+    for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; c.beginPath(); c.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.45, 0, Math.PI * 2); c.fill(); c.stroke(); }
+    c.fillStyle = '#ffd23f'; c.beginPath(); c.arc(0, 0, r * 0.35, 0, Math.PI * 2); c.fill(); c.stroke();
+  }
+  c.restore();
+}
+
+// Un judoka dessiné de profil. Les rotations lean / rot sont « à l'écran » (positif = vers la droite).
+// o : face (1 = regarde à droite), gi, giO (ombre), c1/c2 (ceinture), ecusson, lean, rot, bow, dx, dy, bras, peau, cheveux
+const CONTOUR = '#4a3326';
+function dessinerJudoka(c, x, y, s, o) {
+  c.save();
+  c.translate(x + (o.dx || 0), y + (o.dy || 0));
+  c.rotate(o.lean || 0);
+  if (o.rot) { c.translate(0, -55 * s); c.rotate(o.rot); c.translate(0, 55 * s); }
+  c.scale(o.face * s, s);
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  c.strokeStyle = CONTOUR; c.lineWidth = 2.4;
+  // Jambes (pantalon) et pieds
+  c.fillStyle = o.gi;
+  rr(c, -17, -58, 15, 56, 6); c.fill(); c.stroke();
+  rr(c, 2, -58, 15, 56, 6); c.fill(); c.stroke();
+  c.fillStyle = o.peau;
+  c.beginPath(); c.ellipse(-8, -2, 10, 5, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.beginPath(); c.ellipse(13, -2, 10, 5, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+  // Haut du corps (se penche pour saluer)
+  c.save(); c.translate(0, -52); c.rotate(o.bow || 0);
+  dessinerBras(c, o, -1);
+  c.fillStyle = o.gi; rr(c, -21, -60, 42, 66, 12); c.fill(); c.stroke();
+  // Revers croisés de la veste
+  c.strokeStyle = o.giO; c.lineWidth = 4;
+  c.beginPath(); c.moveTo(-10, -58); c.lineTo(8, -14); c.moveTo(12, -58); c.lineTo(2, -30); c.stroke();
+  // Ceinture
+  c.strokeStyle = CONTOUR; c.lineWidth = 2;
+  c.fillStyle = o.c1; rr(c, -22, -10, 44, 11, 3); c.fill(); c.stroke();
+  if (o.c2) { c.fillStyle = o.c2; c.fillRect(-21, -4.5, 42, 4.5); }
+  c.fillStyle = o.c1;
+  c.save(); c.translate(15, -4);
+  rr(c, -5, -6, 10, 11, 3); c.fill(); c.stroke();
+  c.rotate(0.25); rr(c, -1, 4, 6, 16, 2); c.fill(); c.stroke();
+  c.rotate(-0.5); rr(c, -5, 4, 6, 14, 2); c.fill(); c.stroke();
+  c.restore();
+  dessinerEcusson(c, o.ecusson, -9, -40, 6);
+  dessinerBras(c, o, 1);
+  // Tête (queue-de-cheval derrière)
+  c.lineWidth = 2.4; c.strokeStyle = CONTOUR;
+  if (o.queue) { c.fillStyle = o.cheveux; c.beginPath(); c.ellipse(-17, -70, 7, 13, 0.4, 0, Math.PI * 2); c.fill(); c.stroke(); }
+  c.fillStyle = o.peau; c.beginPath(); c.arc(3, -80, 19, 0, Math.PI * 2); c.fill(); c.stroke();
+  c.fillStyle = o.cheveux;
+  c.beginPath(); c.arc(3, -81, 20, Math.PI * 0.82, Math.PI * 1.92); c.closePath(); c.fill();
+  // Visage souriant
+  c.fillStyle = CONTOUR; c.beginPath(); c.arc(13, -80, 2.4, 0, Math.PI * 2); c.fill();
+  c.lineWidth = 2; c.beginPath(); c.arc(12, -73, 4.5, 0.2 * Math.PI, 0.85 * Math.PI); c.stroke();
+  c.fillStyle = 'rgba(255,120,120,.45)'; c.beginPath(); c.arc(6, -73, 3.5, 0, Math.PI * 2); c.fill();
+  c.restore();
+  c.restore();
+}
+function dessinerBras(c, o, cote) {
+  // cote -1 : bras de derrière (plus sombre)
+  const ang = 1.45 + (0.3 - 1.45) * (o.bras || 0) + (cote < 0 ? 0.15 : 0);
+  const sx = cote < 0 ? -3 : 7, sy = -48, L = 36;
+  const ex = sx + Math.cos(ang) * L, ey = sy + Math.sin(ang) * L;
+  c.lineCap = 'round';
+  c.strokeStyle = CONTOUR; c.lineWidth = 15; c.beginPath(); c.moveTo(sx, sy); c.lineTo(ex, ey); c.stroke();
+  c.strokeStyle = cote < 0 ? o.giO : o.gi; c.lineWidth = 10.5; c.beginPath(); c.moveTo(sx, sy); c.lineTo(ex, ey); c.stroke();
+  c.fillStyle = o.peau; c.strokeStyle = CONTOUR; c.lineWidth = 2.2;
+  c.beginPath(); c.arc(ex, ey, 6, 0, Math.PI * 2); c.fill(); c.stroke();
+}
+function apparenceJoueur(i) {
+  const g = GIS[sauve.gi], b = CEINTURES[i];
+  return { face: 1, gi: g.c, giO: g.o, c1: b.c1, c2: b.c2, ecusson: sauve.ecusson, peau: '#f6d2b0', cheveux: '#6b4226' };
+}
+function apparencePartenaire(i) {
+  const b = CEINTURES[i], p = PARTENAIRES[i];
+  return { face: -1, gi: '#3b6fc4', giO: '#294f92', c1: b.c1, c2: b.c2, ecusson: 0, peau: p.peau, cheveux: p.cheveux, queue: p.queue };
+}
+
+// Décor : mur du dojo, fenêtres en papier, tatamis
+function dessinerDecor(c, W, H, sol) {
+  let g = c.createLinearGradient(0, 0, 0, sol);
+  g.addColorStop(0, '#fcf1da'); g.addColorStop(1, '#efd6a6');
+  c.fillStyle = g; c.fillRect(0, 0, W, sol);
+  // Fenêtres en papier (shoji)
+  const fw = Math.min(W * 0.2, 110), fh = sol * 0.55, fy = sol * 0.3;
+  for (const fx0 of [W * 0.04, W * 0.96 - fw]) {
+    c.fillStyle = '#fffaf0'; c.fillRect(fx0, fy, fw, fh);
+    c.strokeStyle = '#b98a55'; c.lineWidth = 4; c.strokeRect(fx0, fy, fw, fh);
+    c.lineWidth = 2; c.beginPath();
+    for (let k = 1; k < 3; k++) { c.moveTo(fx0 + fw * k / 3, fy); c.lineTo(fx0 + fw * k / 3, fy + fh); }
+    for (let k = 1; k < 4; k++) { c.moveTo(fx0, fy + fh * k / 4); c.lineTo(fx0 + fw, fy + fh * k / 4); }
+    c.stroke();
+  }
+  c.fillStyle = '#a8743f'; c.fillRect(0, sol - 10, W, 10);
+  // Tatamis
+  const hSol = H - sol;
+  c.fillStyle = '#b6cf7a'; c.fillRect(0, sol, W, hSol);
+  const n = Math.max(3, Math.round(W / 130)), lw = W / n;
+  for (let k = 0; k < n; k++) {
+    c.fillStyle = k % 2 ? '#aac66c' : '#bcd483';
+    c.fillRect(k * lw, sol, lw, hSol * 0.55);
+    c.fillStyle = k % 2 ? '#bcd483' : '#aac66c';
+    c.fillRect(k * lw, sol + hSol * 0.55, lw, hSol * 0.45);
+  }
+  c.strokeStyle = 'rgba(80,100,40,.35)'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(0, sol + hSol * 0.55); c.lineTo(W, sol + hSol * 0.55);
+  for (let k = 1; k < n; k++) { c.moveTo(k * lw, sol); c.lineTo(k * lw, H); }
+  c.stroke();
+  // Bande rouge de sécurité devant
+  c.fillStyle = '#d9644f'; c.fillRect(0, H - hSol * 0.12, W, hSol * 0.12);
+}
+
+// Flèche épaisse (dir : gauche, droite, haut, bas)
+const ANGLE_DIR = { droite: 0, bas: Math.PI / 2, gauche: Math.PI, haut: -Math.PI / 2 };
+function fleche(c, x, y, t, dir, couleur) {
+  c.save(); c.translate(x, y); c.rotate(ANGLE_DIR[dir]);
+  c.beginPath();
+  c.moveTo(-t, -t * 0.22); c.lineTo(t * 0.15, -t * 0.22); c.lineTo(t * 0.15, -t * 0.55); c.lineTo(t, 0);
+  c.lineTo(t * 0.15, t * 0.55); c.lineTo(t * 0.15, t * 0.22); c.lineTo(-t, t * 0.22); c.closePath();
+  c.fillStyle = couleur; c.fill(); c.strokeStyle = CONTOUR; c.lineWidth = 3; c.lineJoin = 'round'; c.stroke();
+  c.restore();
+}
+function iconeGeste(c, x, y, t, g, couleur) {
+  if (g === 'tap') {
+    c.fillStyle = couleur; c.strokeStyle = CONTOUR; c.lineWidth = 3;
+    c.beginPath(); c.arc(x, y, t * 0.38, 0, Math.PI * 2); c.fill(); c.stroke();
+    c.beginPath(); c.arc(x, y, t * 0.7, 0, Math.PI * 2); c.stroke();
+  } else fleche(c, x, y, t * 0.8, g, couleur);
+}
+
+function texteContour(c, t, x, y, taille, couleur) {
+  c.font = `900 ${taille}px system-ui, sans-serif`;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.lineWidth = Math.max(4, taille * 0.18); c.strokeStyle = '#fff8ec'; c.lineJoin = 'round';
+  c.strokeText(t, x, y); c.fillStyle = couleur; c.fillText(t, x, y);
+}
+// Ajuste la taille du texte pour qu'il tienne dans la largeur
+function tailleTexte(c, t, taille, largeur) {
+  c.font = `900 ${taille}px system-ui, sans-serif`;
+  const l = c.measureText(t).width;
+  return l > largeur ? Math.floor(taille * largeur / l) : taille;
+}
+
+// Poses des deux judokas selon la phase
+function poses(J, s) {
+  const p1 = { lean: 0, rot: 0, bow: 0, dx: 0, dy: 0, bras: 0.75 };
+  const p2 = { lean: 0, rot: 0, bow: 0, dx: 0, dy: 0, bras: 0.75 };
+  const t = J.t, respire = Math.sin(performance.now() / 500) * 0.02;
+  p1.lean = respire; p2.lean = -respire;
+  const ecart = (v) => { p1.dx -= v * s; p2.dx += v * s; };
+  switch (J.phase) {
+    case 'salut1': case 'salut2': p1.bras = p2.bras = 0; ecart(22); break;
+    case 'rei': case 'reiFin': {
+      const b = Math.sin(borne(t / 1.5, 0, 1) * Math.PI) * 0.55;
+      p1.bras = p2.bras = 0; p1.bow = p2.bow = b; ecart(22); break;
+    }
+    case 'hajime': { const u = lisse(t / 0.8); p1.bras = p2.bras = 0.75 * u; ecart(22 * (1 - u)); break; }
+    case 'prise': case 'mobile': {
+      const a = J.aig.a + (J.vacille > 0 ? Math.sin(J.vacille * 30) * 0.15 : 0);
+      p2.lean = a * 0.28; p1.lean = -a * 0.06;
+      if (J.phase === 'mobile') { p1.dx += J.centre * 26 * s; p2.dx += J.centre * 26 * s; p1.lean += J.centre * 0.12; }
+      break;
+    }
+    case 'chuteMonte': case 'chute': {
+      const u = J.phase === 'chute' ? 1 : lisse(t / 0.7);
+      const r = { droite: 0.35, gauche: -0.35, bas: 0, haut: 0.2 }[J.dir];
+      p1.rot = r * u; p1.dy = -18 * s * u + (J.phase === 'chute' ? Math.sin(t * 25) * 1.5 : 0);
+      p2.bow = 0.3 * u; p2.dx += 30 * s * u;
+      if (J.dir === 'bas') p1.bow = 0.2 * u;
+      break;
+    }
+    case 'depl':
+      p1.dx += J.centre * 26 * s; p2.dx += J.centre * 26 * s + J.pousse * 6 * s;
+      p1.lean = J.centre * 0.12; p2.lean = -J.pousse * 0.12; p2.bras = 0.95;
+      break;
+    case 'resultat': {
+      if (J.anim === 'priseOK') {
+        // Le partenaire est posé en douceur, puis se relève.
+        const u = lisse(t / 0.65), v = t > 1.1 ? lisse((t - 1.1) / 0.55) : 0, k = u * (1 - v);
+        p2.rot = k * Math.PI / 2; p2.dy = (-Math.sin(u * Math.PI) * 22 + k * 43) * s * (1 - v);
+        p2.dx -= k * 14 * s; p1.bow = 0.3 * k; p1.bras = 0.75 + 0.25 * k;
+      } else if (J.anim === 'chuteOK' || J.anim === 'chuteRatee') {
+        const u = lisse(t / 0.4), v = t > 0.95 ? lisse((t - 0.95) / 0.5) : 0, k = u * (1 - v);
+        p2.dx += 30 * s * (1 - v); p2.bow = 0.3 * (1 - v);
+        if (J.dir === 'droite') { p1.rot = k * Math.PI / 2; p1.dy = k * 43 * s; }
+        else if (J.dir === 'gauche') { p1.rot = -k * Math.PI / 2; p1.dy = k * 43 * s; }
+        else if (J.dir === 'bas') { p1.dy = k * 30 * s; p1.bow = 0.6 * k; p1.rot = -k * 0.5; }
+        else { p1.rot = (t < 0.95 ? u : 1) * Math.PI * 2; p1.dy = Math.sin(u * Math.PI) * 30 * s * (1 - v); p1.dx -= 0; }
+        if (J.anim === 'chuteRatee') p1.dy += Math.sin(t * 20) * 2 * k;
+      } else if (J.anim === 'priseRatee' || J.anim === 'enchRate') {
+        p2.lean = Math.sin(t * 9) * 0.08 * (1 - borne(t, 0, 1)); p1.bras = 0.6;
+      } else if (J.anim === 'deplFin') {
+        const u = lisse(t / 0.6);
+        p1.dx += J.centre * 26 * s * (1 - u); p2.dx += J.centre * 26 * s * (1 - u);
+      }
+      break;
+    }
+  }
+  return [p1, p2];
+}
+
+function dessinerJeu() {
+  const c = ctx, J = jeu;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.clearRect(0, 0, W, H);
+  if (J.secousse > 0) c.translate(Math.sin(J.t * 70) * 5 * J.secousse * 4, 0);
+  const sol = H * 0.66, pieds = sol + (H - sol) * 0.38;
+  const s = Math.min(W / 300, H / 450, 1.7);
+  dessinerDecor(c, W, H, sol);
+  const cx = W / 2;
+  const x1 = cx - 42 * s, x2 = cx + 42 * s;
+  const [p1, p2] = poses(J, s);
+
+  // Ondes sur le tapis (chute amortie)
+  for (const o of J.ondes) {
+    c.strokeStyle = `rgba(255,255,255,${0.8 * (1 - o.age / 0.9)})`; c.lineWidth = 4;
+    c.beginPath(); c.ellipse(x1 + (J.dir === 'droite' ? 50 : J.dir === 'gauche' ? -50 : 0) * s, pieds, 30 * s + o.age * 160 * s, 8 * s + o.age * 30 * s, 0, 0, Math.PI * 2); c.stroke();
+  }
+  // Ombres au sol
+  c.fillStyle = 'rgba(60,80,20,.25)';
+  for (const [x, p] of [[x1, p1], [x2, p2]]) { c.beginPath(); c.ellipse(x + p.dx, pieds + 2, 34 * s, 7 * s, 0, 0, Math.PI * 2); c.fill(); }
+  // Le partenaire tombé passe devant
+  const devant = J.phase === 'resultat' && J.anim === 'priseOK';
+  if (devant) { dessinerJudoka(c, x1, pieds, s, { ...apparenceJoueur(J.i), ...p1 }); dessinerJudoka(c, x2, pieds, s, { ...apparencePartenaire(J.i), ...p2 }); }
+  else { dessinerJudoka(c, x2, pieds, s, { ...apparencePartenaire(J.i), ...p2 }); dessinerJudoka(c, x1, pieds, s, { ...apparenceJoueur(J.i), ...p1 }); }
+
+  // Zone du haut : jauge, flèche, enchaînement…
+  const haut = pieds - 160 * s;            // sommet des têtes
+  const R = Math.min(W * 0.34, 130, Math.max(60, (haut - 46) * 0.8));
+  const gy = Math.min(haut - 14, 34 + R);   // centre de la jauge
+  if (J.haut === 'jauge') dessinerJauge(c, cx, gy, R);
+  else if (J.haut === 'fleche') dessinerFlecheChute(c, cx, gy - R * 0.25, R);
+  else if (J.haut === 'ench') dessinerEnch(c, cx, gy - R * 0.45, R);
+  else if (J.haut === 'valeur') dessinerValeur(c, cx, gy - R * 0.5, R);
+  else if (J.haut === 'hajime') texteContour(c, 'Hajime !', cx, gy - R * 0.4, tailleTexte(c, 'Hajime !', 54, W * 0.9), '#d9453b');
+  else if (J.haut === 'titre') {
+    const t = NOMS_TYPES[J.type] || '';
+    texteContour(c, t, cx, gy - R * 0.4, tailleTexte(c, t, 40, W * 0.9), '#5b3a26');
+  } else if (J.haut === 'centre') {
+    const rest = Math.max(0, J.cfg.duree - (J.phase === 'depl' ? J.t : J.cfg.duree));
+    texteContour(c, 'Garde ton centre !', cx, gy - R * 0.6, tailleTexte(c, 'Garde ton centre !', 34, W * 0.9), '#5b3a26');
+    // Barre de temps
+    const bw = W * 0.6;
+    const by = gy - R * 0.6 + 34;
+    c.fillStyle = '#e8dcc4'; rr(c, cx - bw / 2, by, bw, 14, 7); c.fill();
+    c.fillStyle = '#f08a2c'; rr(c, cx - bw / 2, by, Math.max(14, bw * rest / J.cfg.duree), 14, 7); c.fill();
+  }
+  // Barre du centre (déplacement et prise en mouvement)
+  if (J.phase === 'depl' || J.phase === 'mobile' || (J.phase === 'resultat' && J.anim === 'deplFin') || (J.phase === 'resultat' && J.type === 'mobile')) {
+    dessinerCentre(c, cx, sol + (H - sol) * 0.74, J);
+  }
+  // Textes qui s'envolent
+  for (const x of J.textes) {
+    const u = x.age / 1.5;
+    c.globalAlpha = 1 - Math.max(0, u - 0.6) / 0.4;
+    const taille = tailleTexte(c, x.t, 30, W * 0.92) * (u < 0.12 ? 0.6 + u * 3.3 : 1);
+    texteContour(c, x.t, W * x.x, H * x.y - u * 60, taille, x.couleur);
+    c.globalAlpha = 1;
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+function dessinerJauge(c, x, y, R) {
+  const J = jeu, z = J.cfg.zone, A = 1.22;      // angle maximal de l'aiguille (radians)
+  const ang = (a) => -Math.PI / 2 + a * A;
+  c.lineCap = 'butt';
+  c.lineWidth = R * 0.2;
+  c.strokeStyle = '#e8dcc4'; c.beginPath(); c.arc(x, y, R, ang(-1.08), ang(1.08)); c.stroke();
+  c.strokeStyle = '#6cc36f';
+  c.beginPath(); c.arc(x, y, R, ang(-1.08), ang(-(1 - z))); c.stroke();
+  c.beginPath(); c.arc(x, y, R, ang(1 - z), ang(1.08)); c.stroke();
+  c.strokeStyle = '#2e9d48';
+  c.beginPath(); c.arc(x, y, R, ang(-1.08), ang(-(1 - z * 0.45))); c.stroke();
+  c.beginPath(); c.arc(x, y, R, ang(1 - z * 0.45), ang(1.08)); c.stroke();
+  c.lineWidth = 3; c.strokeStyle = CONTOUR;
+  c.beginPath(); c.arc(x, y, R * 1.1, ang(-1.08), ang(1.08)); c.stroke();
+  c.beginPath(); c.arc(x, y, R * 0.9, ang(-1.08), ang(1.08)); c.stroke();
+  // Aiguille
+  const a = J.phase === 'resultat' ? J.aig.a * (1 - borne(J.t, 0, 1)) : J.aig.a;
+  const dans = Math.abs(a) >= 1 - z;
+  const g = ang(a);
+  c.lineCap = 'round';
+  c.strokeStyle = dans ? '#2e7d32' : CONTOUR; c.lineWidth = Math.max(5, R * 0.06);
+  c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(g) * R * 1.05, y + Math.sin(g) * R * 1.05); c.stroke();
+  c.fillStyle = dans ? '#2e7d32' : CONTOUR; c.beginPath(); c.arc(x, y, R * 0.1, 0, Math.PI * 2); c.fill();
+  if (dans && J.phase !== 'resultat') {
+    c.fillStyle = 'rgba(108,195,111,.35)'; c.beginPath(); c.arc(x + Math.cos(g) * R, y + Math.sin(g) * R, R * 0.2, 0, Math.PI * 2); c.fill();
+  }
+  const lib = 'Équilibre du partenaire';
+  texteContour(c, lib, x, y + R * 0.22, tailleTexte(c, lib, 16, R * 1.6), '#5b3a26');
+}
+
+function dessinerFlecheChute(c, x, y, R) {
+  const J = jeu;
+  if (J.phase === 'chuteMonte') { texteContour(c, 'Attention…', x, y, tailleTexte(c, 'Attention…', 34, W * 0.8), '#5b3a26'); return; }
+  const rate = J.phase === 'resultat' && J.anim === 'chuteRatee';
+  const ok = J.phase === 'resultat' && J.anim === 'chuteOK';
+  const t = Math.min(R * 0.6, 72);
+  const puls = J.phase === 'chute' ? 1 + Math.sin(J.t * 12) * 0.05 : 1;
+  // Chrono : anneau qui se vide
+  if (J.phase === 'chute') {
+    const reste = 1 - J.t / J.cfg.fenetre;
+    c.lineWidth = 8; c.strokeStyle = '#e8dcc4'; c.beginPath(); c.arc(x, y, t * 1.15, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = reste > 0.5 ? '#3fae55' : reste > 0.25 ? '#f08a2c' : '#d9453b';
+    c.beginPath(); c.arc(x, y, t * 1.15, -Math.PI / 2, -Math.PI / 2 + reste * Math.PI * 2); c.stroke();
+  }
+  fleche(c, x, y, t * puls, J.dir, ok ? '#6cc36f' : rate ? '#e3d6bd' : '#f08a2c');
+}
+
+function dessinerEnch(c, x, y, R) {
+  const J = jeu, n = J.seq.length;
+  const tc = Math.min(70, (W * 0.86) / n - 10), gap = 10;
+  const x0 = x - (n * tc + (n - 1) * gap) / 2;
+  const pas = J.cfg.montre / (n + 1);
+  for (let k = 0; k < n; k++) {
+    const cx = x0 + k * (tc + gap) + tc / 2;
+    const actuel = J.phase === 'ench' && k === J.saisie.length;
+    c.fillStyle = actuel ? '#fff1c9' : '#fff8ec'; c.strokeStyle = actuel ? '#d9453b' : '#c9a46a'; c.lineWidth = 4;
+    rr(c, cx - tc / 2, y - tc / 2, tc, tc, 12); c.fill(); c.stroke();
+    let montre = false, couleur = '#5b3a26';
+    if (J.phase === 'enchMontre') montre = J.t > (k + 1) * pas * 0.85;
+    else if (J.phase === 'ench') { montre = k < J.saisie.length; couleur = '#3fae55'; }
+    else if (J.phase === 'resultat') { montre = true; couleur = k < J.saisie.length ? '#3fae55' : k === J.erreurEnch ? '#d9453b' : '#c9a46a'; }
+    if (montre) iconeGeste(c, cx, y, tc * 0.5, J.seq[k], couleur);
+    else if (J.phase === 'ench') texteContour(c, '?', cx, y + 2, tc * 0.5, '#c9a46a');
+  }
+  const lib = J.phase === 'enchMontre' ? 'Mémorise !' : J.phase === 'ench' ? 'À toi !' : '';
+  if (lib) texteContour(c, lib, x, y + tc / 2 + 24, 24, '#d9453b');
+}
+
+function dessinerValeur(c, x, y, R) {
+  const J = jeu;
+  const w = Math.min(W * 0.84, 340), h = 86;
+  c.fillStyle = '#fff8ec'; c.strokeStyle = '#b98a55'; c.lineWidth = 4;
+  rr(c, x - w / 2, y - h / 2, w, h, 12); c.fill(); c.stroke();
+  c.fillStyle = '#a8743f'; c.fillRect(x - w / 2 - 8, y - h / 2 - 6, w + 16, 8); c.fillRect(x - w / 2 - 8, y + h / 2 - 2, w + 16, 8);
+  c.fillStyle = '#7a5a3a'; c.font = '700 15px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('Valeur du combat', x, y - 18);
+  const v = VALEURS[J.i];
+  const tv = v.charAt(0).toUpperCase() + v.slice(1);
+  texteContour(c, tv, x, y + 14, tailleTexte(c, tv, 28, w - 20), '#d9453b');
+}
+
+function dessinerCentre(c, x, y, J) {
+  const bw = W * 0.7, h = 24, zc = J.cfg.centre;
+  c.fillStyle = 'rgba(255,248,236,.9)'; rr(c, x - bw / 2 - 6, y - h / 2 - 6, bw + 12, h + 12, 16); c.fill();
+  c.fillStyle = '#e8dcc4'; rr(c, x - bw / 2, y - h / 2, bw, h, 12); c.fill();
+  c.fillStyle = '#6cc36f'; rr(c, x - zc * bw / 2, y - h / 2, zc * bw, h, 8); c.fill();
+  const px = x + borne(J.centre, -1.1, 1.1) * bw / 2;
+  const dans = Math.abs(J.centre) <= zc;
+  c.fillStyle = dans ? '#d9453b' : '#f08a2c'; c.strokeStyle = CONTOUR; c.lineWidth = 3;
+  c.beginPath(); c.arc(px, y, 15, 0, Math.PI * 2); c.fill(); c.stroke();
+  // Sens de la poussée
+  if (Math.abs(J.pousse) > 0.2 && J.phase !== 'resultat') {
+    const d = J.pousse > 0 ? 'droite' : 'gauche';
+    c.globalAlpha = 0.85; fleche(c, borne(px + (J.pousse > 0 ? 40 : -40), 20, W - 20), y, 16, d, '#f5b301'); c.globalAlpha = 1;
+  }
+  c.fillStyle = '#5b3a26'; c.font = '700 14px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(dans ? 'Ton centre : bien !' : 'Ramène ton centre !', x, y - h / 2 - 16);
+}
+
+// Illustration de l'accueil : deux judokas qui se saluent
+function dessinerIllu() {
+  const c = ictx, w = illu.width / DPR, h = illu.height / DPR;
+  if (!w || !h) return;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.clearRect(0, 0, w, h);
+  const sol = h * 0.84;
+  c.fillStyle = 'rgba(169,196,108,.9)'; rr(c, w * 0.08, sol - 10, w * 0.84, 22, 11); c.fill();
+  const s = Math.min(h / 175, w / 260);
+  const t = performance.now() / 1000;
+  const b = Math.max(0, Math.sin(t * 1.4)) * 0.5;
+  const i = borne(sauve.niveauMax - 1, 0, 9);
+  dessinerJudoka(c, w / 2 - 55 * s, sol, s, { ...apparenceJoueur(i), bow: b, bras: 0 });
+  dessinerJudoka(c, w / 2 + 55 * s, sol, s, { ...apparencePartenaire(i), bow: b, bras: 0 });
+}
+
+// Confettis et étoiles (couche d'effets au-dessus de tout)
+const COULEURS = ['#d9453b', '#f5b301', '#3fae55', '#2f6fd0', '#f08a2c', '#ff8fb8'];
+function confettis(x, y, n, etoiles) {
+  for (let k = 0; k < n; k++) {
+    parts.push({ x, y, vx: hasard(-220, 220), vy: hasard(-460, -140), r: hasard(0, 6), vr: hasard(-8, 8),
+      col: choisir(COULEURS), taille: hasard(5, 10), vie: hasard(1.1, 2), etoile: etoiles && Math.random() < 0.4 });
+  }
+}
+function majParts(dt) {
+  for (const p of parts) { p.vy += 620 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.r += p.vr * dt; p.vie -= dt; }
+  parts = parts.filter((p) => p.vie > 0 && p.y < innerHeight + 40);
+}
+function dessinerParts() {
+  const c = fctx;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.clearRect(0, 0, innerWidth, innerHeight);
+  for (const p of parts) {
+    c.save(); c.translate(p.x, p.y); c.rotate(p.r); c.globalAlpha = Math.min(1, p.vie * 2);
+    c.fillStyle = p.col;
+    if (p.etoile) { cheminEtoile(c, 0, 0, p.taille, p.taille * 0.45); c.fill(); }
+    else c.fillRect(-p.taille / 2, -p.taille / 4, p.taille, p.taille / 2);
+    c.restore();
+  }
+}
+
+// ==========================================================================
+// Boucle principale
+// ==========================================================================
+let dernier = performance.now();
+function boucle(maintenant) {
+  const dt = Math.min(0.05, (maintenant - dernier) / 1000);
+  dernier = maintenant;
+  redim();
+  if (tutoOuvert) {
+    tutoT += dt;
+    if (tutoT > 2.4) { tutoT = 0; tutoEtape = (tutoEtape + 1) % 3; majTuto(); }
+  }
+  if (actif()) maj(dt);
+  if (!enPause) majParts(dt);
+  if (jeu && W) dessinerJeu();
+  if (ecran === 'accueil') dessinerIllu();
+  if (ecran === 'menu' && $('#kimono').classList.contains('visible')) dessinerApercu();
+  dessinerParts();
+  if (bilanAnim && bilanAnim.val < bilanAnim.cible) {
+    bilanAnim.val = Math.min(bilanAnim.cible, bilanAnim.val + Math.max(1, bilanAnim.cible * dt / 1.2));
+    $('#bil-score').textContent = Math.round(bilanAnim.val);
+    if (Math.random() < 0.3) son('tic');
+  }
+  requestAnimationFrame(boucle);
+}
+
+// ==========================================================================
+// Accueil et menus
+// ==========================================================================
+function majAccueil() {
+  const gagnees = sauve.etoiles.filter((e) => e > 0).length;
+  $('#acc-info').textContent = insecable(gagnees
+    ? `Ceintures gagnées : ${gagnees} / 10 · ★ ${totalEtoiles()} / 30 · prochaine : ${CEINTURES[prochainNiveau()].nom}`
+    : 'Première ceinture à gagner : la blanche !');
+}
+function prochainNiveau() {
+  // La première ceinture pas encore gagnée, sinon la dernière débloquée.
+  for (let k = 0; k < sauve.niveauMax; k++) if (sauve.etoiles[k] === 0) return k;
+  return sauve.niveauMax - 1;
+}
+function jouer() { son('clic'); lancer(prochainNiveau()); }
+function retourAccueil() {
+  ecran = 'accueil'; enPause = false; jeu = null; tutoOuvert = false; bilanAnim = null;
+  for (const id of ['bilan', 'pause', 'tuto', 'ceintures', 'carnet', 'kimono']) montrer(id, false);
+  majAccueil(); montrer('accueil', true);
+  if (ac && sauve.son) ac.resume().catch(() => {});
+}
+function ouvrirMenu(id) {
+  son('clic'); ecran = 'menu';
+  montrer('accueil', false);
+  if (id === 'ceintures') remplirCeintures();
+  if (id === 'carnet') remplirCarnet();
+  if (id === 'kimono') remplirKimono();
+  montrer(id, true);
+}
+function fondCeinture(c) { return c.c2 ? `linear-gradient(${c.c1} 50%, ${c.c2} 50%)` : c.c1; }
+function remplirCeintures() {
+  const l = $('#liste-ceintures'); l.innerHTML = '';
+  CEINTURES.forEach((c, k) => {
+    const b = document.createElement('button');
+    b.className = 'ceint-btn';
+    const e = sauve.etoiles[k];
+    b.innerHTML = `<span class="bande" style="background:${fondCeinture(c)}"></span><span>${k + 1}. ${c.nom.charAt(0).toUpperCase() + c.nom.slice(1)}</span>` +
+      `<span class="et">${'★'.repeat(e)}<i>${'★'.repeat(3 - e)}</i></span>`;
+    if (k >= sauve.niveauMax) { b.disabled = true; b.querySelector('.et').textContent = 'À gagner'; }
+    b.addEventListener('click', () => { son('clic'); lancer(k); });
+    l.appendChild(b);
+  });
+}
+function remplirCarnet() {
+  const l = $('#liste-carnet'); l.innerHTML = '';
+  const nb = sauve.etoiles.filter((e) => e > 0).length;
+  const p = document.createElement('p');
+  p.className = 'petit'; p.textContent = `${nb} / 10 prises découvertes`;
+  l.appendChild(p);
+  PRISES.forEach((pr, k) => {
+    const d = document.createElement('div');
+    const connue = sauve.etoiles[k] > 0;
+    d.className = 'fiche' + (connue ? '' : ' cache');
+    d.innerHTML = connue
+      ? `<b>${pr.nom}</b> — ${pr.fr}<small>${pr.desc}</small><small>Ceinture ${CEINTURES[k].nom} · ${'★'.repeat(sauve.etoiles[k])} · réussie ${sauve.prises[k]} fois</small>`
+      : `<b>???</b><small>Gagne la ceinture ${CEINTURES[k].nom} pour découvrir cette prise.</small>`;
+    l.appendChild(d);
+  });
+}
+function remplirKimono() {
+  const total = totalEtoiles();
+  $('#kim-info').textContent = insecable(`Tu as ★ ${total} étoiles. Gagne des étoiles pour débloquer couleurs et écussons !`);
+  const cg = $('#choix-gi'); cg.innerHTML = '';
+  GIS.forEach((g, k) => {
+    const b = document.createElement('button');
+    b.className = 'pastille' + (sauve.gi === k ? ' choisi' : '');
+    b.innerHTML = `<span class="rondc" style="background:${g.c}"></span>${total >= g.min ? g.nom : '★ ' + g.min}`;
+    b.disabled = total < g.min;
+    b.setAttribute('aria-label', 'Kimono ' + g.nom);
+    b.addEventListener('click', () => { sauve.gi = k; enregistrer(); son('clic'); remplirKimono(); });
+    cg.appendChild(b);
+  });
+  const ce = $('#choix-ecusson'); ce.innerHTML = '';
+  ECUSSONS.forEach((x, k) => {
+    const b = document.createElement('button');
+    b.className = 'pastille' + (sauve.ecusson === k ? ' choisi' : '');
+    const mini = document.createElement('canvas');
+    mini.width = 60; mini.height = 60;
+    const m = mini.getContext('2d'); m.scale(2, 2);
+    if (k) dessinerEcusson(m, k, 15, 15, 10); else { m.strokeStyle = '#c9a46a'; m.lineWidth = 2; m.beginPath(); m.arc(15, 15, 10, 0, Math.PI * 2); m.stroke(); }
+    b.appendChild(mini);
+    b.appendChild(document.createTextNode(total >= x.min ? x.nom : '★ ' + x.min));
+    b.disabled = total < x.min;
+    b.setAttribute('aria-label', 'Écusson ' + x.nom);
+    b.addEventListener('click', () => { sauve.ecusson = k; enregistrer(); son('clic'); remplirKimono(); });
+    ce.appendChild(b);
+  });
+}
+function dessinerApercu() {
+  const a = $('#apercu');
+  const r = a.getBoundingClientRect();
+  const w = Math.round(r.width * DPR), h = Math.round(r.height * DPR);
+  if (a.width !== w || a.height !== h) { a.width = w; a.height = h; }
+  const c = a.getContext('2d');
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.clearRect(0, 0, r.width, r.height);
+  const s = r.height / 170;
+  dessinerJudoka(c, r.width / 2 - 6, r.height - 8, s, { ...apparenceJoueur(borne(sauve.niveauMax - 1, 0, 9)), bras: 0.2 + Math.sin(performance.now() / 600) * 0.1 });
+}
+
+// ---------- Boutons ----------
+$('#b-jouer').addEventListener('click', jouer);
+$('#b-ceintures').addEventListener('click', () => ouvrirMenu('ceintures'));
+$('#b-carnet').addEventListener('click', () => ouvrirMenu('carnet'));
+$('#b-kimono').addEventListener('click', () => ouvrirMenu('kimono'));
+document.querySelectorAll('.b-retour').forEach((b) => b.addEventListener('click', () => { son('clic'); retourAccueil(); }));
+$('#b-son').addEventListener('click', basculerSon);
+$('#b-son-acc').addEventListener('click', basculerSon);
+$('#b-pause').addEventListener('click', () => { son('clic'); mettrePause(); });
+$('#b-reprendre').addEventListener('click', reprendre);
+$('#b-recommencer').addEventListener('click', () => { enPause = false; son('clic'); if (ac && sauve.son) ac.resume().catch(() => {}); lancer(jeu.i); });
+$('#b-pause-accueil').addEventListener('click', () => { son('clic'); retourAccueil(); });
+$('#b-tuto').addEventListener('click', fermerTuto);
+$('#b-suivant').addEventListener('click', () => { son('clic'); lancer(jeu.i + 1); });
+$('#b-rejouer').addEventListener('click', () => { son('clic'); lancer(jeu.i); });
+$('#b-bil-accueil').addEventListener('click', () => { son('clic'); retourAccueil(); });
+// Les boutons de la barre ne déclenchent pas d'action de jeu
+for (const b of document.querySelectorAll('#hud button')) b.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+addEventListener('resize', redim);
+majSon();
+majAccueil();
+redim();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
