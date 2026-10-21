@@ -78,6 +78,10 @@ Fichiers ajoutés en phase 3 (hors ligne) :
 - `public/sw.js` : service worker ; `public/hors-ligne.js` : enregistrement du service worker et liste des jeux gardés sur l'appareil (badge du catalogue).
 - `public/manifest.webmanifest` et icônes tirées de `logo.svg` : `public/assets/icone-192.png`, `icone-512.png`, `icone-masquable-512.png` (Android), `apple-touch-icon.png` (iPhone).
 
+Fichiers ajoutés pour la validation automatique et la publicité :
+- `.github/workflows/valider-jeu.yml` : validation des pull requests de la boucle (robot + relecture Claude, puis fusion, correction ou fermeture) ; voir section 10.
+- `public/pub.js` : publicité préparée mais **désactivée** (`PUB_ACTIVE = false`), un seul emplacement en bas du catalogue, jamais dans les jeux ; `PUBLICITE.md` : ce qu'il faut fournir pour l'activer.
+
 Le lanceur lit le jeu à l'adresse `games/<id>/?v=<version>` (Cloudflare retire `index.html` des adresses), puis l'affiche dans le cadre via `srcdoc` (voir section 6). Augmenter `version` dans `game.json` à chaque modification d'un jeu.
 
 Le build est tolérant : un jeu invalide est ignoré avec un message, il ne bloque jamais la publication des autres. Les ressources externes détectées dans un jeu produisent un avertissement.
@@ -187,7 +191,9 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 2. Elle crée un nouveau dossier `games/<id>/` conforme à la section 5, sur une branche dédiée.
 3. Elle ouvre une **pull request** ; elle ne pousse jamais directement sur `main`.
 4. Le workflow `validate.yml` vérifie : présence et format des 3 fichiers, unicité de l'`id`, aucune URL `http(s)://` externe dans `index.html`, tailles maximales, ouverture sans erreur console dans Playwright (+ capture d'écran utilisable comme jaquette si `cover.webp` manque).
-5. Fusion : manuelle par le propriétaire pour les ~100 premiers jeux, puis automatique si le contrôle est au vert.
+   Les pull requests de la boucle (branches `nouveau-jeu/…`) sont validées par `valider-jeu.yml` : robot (`validate-games.mjs --jouer` : chargement, console, téléphone 390 × 844 au toucher, hors ligne, fiche, jaquette, taille), puis relecture par Claude avec la grille de `CONSIGNES-JEU.md` (section 7), résumée en commentaire.
+5. Fusion : **automatique** pour les pull requests de la boucle si tout passe (variable GitHub `FUSION_AUTO` = `non` pour revenir à une fusion manuelle). Sinon : étiquette `a-corriger` et correction par l'agent (`corriger-jeu.yml`), 2 fois au plus ; au 3e échec, la pull request est fermée et l'idée mise de côté (`- [-]` dans `IDEES-JEUX.md`). Les autres pull requests restent fusionnées à la main.
+   Une pull request ouverte, commentée ou fusionnée par le robot (jeton `GITHUB_TOKEN`) ne déclenche aucun autre workflow : ceux de la boucle s'enchaînent donc par lancement direct (`workflow_dispatch`).
 
 ## 11. Conventions de code
 
@@ -200,9 +206,10 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 ## 12. Ce que les IA ne doivent pas faire
 
 - Modifier les réglages Cloudflare, les secrets, les clés Turnstile ou le nom de domaine.
-- Pousser directement sur `main`, fusionner leurs propres pull requests (tant que la fusion automatique n'est pas activée par le propriétaire), ou supprimer des jeux existants.
+- Pousser directement sur `main`, fusionner des pull requests autrement que par la validation automatique (`valider-jeu.yml`), ou supprimer des jeux existants.
 - Modifier `public/catalog.json` à la main.
-- Ajouter des traceurs, de la publicité, des comptes utilisateurs ou une collecte de données personnelles.
+- Ajouter des traceurs, des comptes utilisateurs ou une collecte de données personnelles.
+- Mettre de la publicité ailleurs que dans l'emplacement prévu (`public/pub.js`, en bas du catalogue), ou l'activer : c'est une décision du propriétaire (voir `PUBLICITE.md`).
 
 ## 13. Feuille de route
 
@@ -226,6 +233,9 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 - Corrections par commentaire — fichier créé (`.github/workflows/corriger-jeu.yml`, section dans `GUIDE-BOUCLE.md`). Reste : premier essai sur une vraie pull request.
 - Plusieurs jeux par lancement — `nouveau-jeu.yml` (entrée « nombre » 1 à 5, matrice, une pull request par jeu, jeux créés l'un après l'autre (`max-parallel: 1`, `fail-fast: false`), 2 la nuit et 1 à 5 à la main, idées déjà prises par une pull request ouverte sautées) et `cocher-idee.yml` (idée cochée sur main à la fusion). Les pull requests de jeux ne modifient jamais `IDEES-JEUX.md` : l'idée est notée dans `game.json` (champ `idee`, garanti par le workflow). Lecture de l'ancien repère `<!-- idee: … -->` des descriptions gardée en secours pour les pull requests créées avant ce champ : à retirer quand elles seront toutes fusionnées ou fermées.
 - Jeux plus complets — minimum obligatoire dans `CONSIGNES-JEU.md` (10 niveaux, tutoriel animé, étoiles, record, sons coupables, effets, bilan, mécaniques combinées) ; `nouveau-jeu.yml` : cahier de conception (description de la pull request), partie au hasard avec captures (`validate-games.mjs --jouer`, captures dans `captures/`, ignoré par git), relecture « 15 minutes », Claude Fable 5.1, 150 tours, 120 minutes. Reste : juger le premier jeu produit.
+- Validation automatique — fichiers créés ou modifiés : `valider-jeu.yml` (nouveau) ; `nouveau-jeu.yml` la lance après chaque pull request ; `corriger-jeu.yml` accepte aussi les demandes du robot (`workflow_dispatch` : `pr`, `demande`), puis relance la validation ; `cocher-idee.yml` peut être lancé par le robot après une fusion ; `validate-games.mjs` : premier test au toucher, appels réseau détectés, 2e ouverture du jeu navigateur coupé du réseau. Fusion automatique active (interrupteur `FUSION_AUTO`). Reste : premier essai réel (lancement manuel de « Nouveau jeu »).
+- Consignes — minimum obligatoire complété (écran d'accueil, pause et Rejouer, contrôles tactiles et clavier) et grille de validation (`CONSIGNES-JEU.md`, section 7), commune à l'agent créateur, au correcteur et au relecteur.
+- Publicité — préparée, **désactivée** : `public/pub.js` (`PUB_ACTIVE = false`, aucun code de régie), emplacements cachés `#pub` (bas du catalogue) et `#consentement` dans `index.html`, `pub.js` ajouté à la coquille (`VERSION` `v3` dans `sw.js`), `PUBLICITE.md`. Reste : domaine, compte régie, identifiants, outil de consentement, pages légales.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 

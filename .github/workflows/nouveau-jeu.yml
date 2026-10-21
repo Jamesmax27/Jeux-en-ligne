@@ -15,8 +15,9 @@
 # ouverte), notées dans le game.json du jeu (champ "idee") et cochées à la
 # fusion par cocher-idee.yml : pas de conflit entre les pull requests.
 #
-# Rien n'est publié sans votre accord : vous jouez à l'aperçu Cloudflare,
-# puis vous cliquez « Merge ».
+# Chaque pull request est ensuite contrôlée par valider-jeu.yml (robot +
+# relecture Claude avec la grille de CONSIGNES-JEU.md) : fusionnée
+# automatiquement si tout est bon, sinon corrigée (2 fois au plus) ou fermée.
 # ==========================================================================
 
 name: Nouveau jeu
@@ -119,6 +120,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write       # lancer valider-jeu.yml
       id-token: write
 
     steps:
@@ -153,8 +155,8 @@ jobs:
             Tu es le développeur de jeux du site Jeux-en-ligne. Ta mission : créer UN nouveau mini-jeu complet et riche,
             auquel un enfant a envie de jouer au moins 15 minutes.
 
-            1. Lis CLAUDE.md, puis CONSIGNES-JEU.md (règles obligatoires, en particulier le « minimum obligatoire »),
-               puis IDEES-JEUX.md.
+            1. Lis CLAUDE.md, puis CONSIGNES-JEU.md (règles obligatoires, en particulier le « minimum obligatoire »
+               et la « grille de validation » : un relecteur l'appliquera avant la publication), puis IDEES-JEUX.md.
             2. Liste les dossiers de games/ et lis leurs game.json pour connaître les jeux existants.
             3. L'idée à réaliser : « ${{ matrix.jeu.idee }} »
                Si ce texte est vide, invente une idée originale, différente des jeux existants et des idées de IDEES-JEUX.md.
@@ -176,8 +178,9 @@ jobs:
                captures d'écran dans captures/<id>/. Regarde chaque capture avec Read : rien ne doit être coupé,
                illisible ou figé. Corrige les erreurs et ce que tu vois, puis relance.
             7. Relecture : demande-toi « qu'est-ce qui manque pour qu'un enfant y joue 15 minutes ? ».
-               Vérifie un à un les points du minimum obligatoire de CONSIGNES-JEU.md, relis le code des niveaux pour
-               t'assurer que la difficulté progresse vraiment, et corrige les manques les plus importants.
+               Vérifie un à un les points bloquants de la grille de validation de CONSIGNES-JEU.md (section 7) :
+               le jeu n'est publié que s'ils sont tous respectés. Relis le code des niveaux pour t'assurer que la
+               difficulté progresse vraiment, et corrige les manques les plus importants.
                Relance ensuite le robot (étape 6) jusqu'à « Tout est bon ».
                Ajoute enfin à conception.md une section « Relecture » : ce que tu as ajouté ou corrigé, et ce qui
                pourrait encore être amélioré.
@@ -251,7 +254,7 @@ jobs:
               echo "**Idée :** $IDEE"
             fi
             echo
-            echo "**À faire avant de fusionner :** ouvrez l'aperçu Cloudflare (lien dans les vérifications ci-dessous), jouez quelques niveaux, vérifiez que le contenu convient aux enfants. L'idée sera cochée dans IDEES-JEUX.md à la fusion."
+            echo "**Validation automatique :** le robot puis Claude (grille de CONSIGNES-JEU.md) vont contrôler ce jeu. S'il passe, il est fusionné automatiquement ; sinon, il est corrigé (2 fois au plus) ou la pull request est fermée. Le résultat arrive en commentaire. L'aperçu Cloudflare (lien dans les vérifications ci-dessous) permet d'y jouer en attendant. L'idée sera cochée dans IDEES-JEUX.md à la fusion."
             echo
             if [ -s "$RUNNER_TEMP/conception.md" ]; then
               echo "## Cahier de conception"
@@ -270,6 +273,7 @@ jobs:
           } > "$RUNNER_TEMP/description.md"
 
       - name: Ouvrir la pull request
+        id: pr
         uses: peter-evans/create-pull-request@v7
         with:
           branch: nouveau-jeu/${{ github.run_number }}-${{ matrix.jeu.rang }}
@@ -279,3 +283,10 @@ jobs:
           add-paths: |
             games/${{ steps.verif.outputs.id }}/**
           delete-branch: true
+
+      # Une pull request ouverte par le robot ne déclenche aucun workflow : on lance la validation.
+      - name: Lancer la validation automatique
+        if: steps.pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run valider-jeu.yml --repo "$GITHUB_REPOSITORY" --ref main -f pr="${{ steps.pr.outputs.pull-request-number }}"
