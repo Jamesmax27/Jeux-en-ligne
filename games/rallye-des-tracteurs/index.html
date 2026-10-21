@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Le rallye des tracteurs</title>
+<style>
+  :root { --jaune:#ffd34d; --creme:#fff8e6; --brun:#5a3a1c; --vert:#3f8f2f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#24451a; color:#2b1d0e;
+    font-family:system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    user-select:none; -webkit-user-select:none; touch-action:none; overscroll-behavior:none; }
+  #app { position:fixed; top:0; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:520px;
+    overflow:hidden; background:#5aa33e; }
+  canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+  button { font:inherit; cursor:pointer; border:none; touch-action:manipulation; color:inherit; }
+  [hidden] { display:none !important; }
+
+  /* ---------- Boutons ---------- */
+  .btn { min-height:52px; min-width:52px; padding:10px 22px; border-radius:16px; font-weight:800; font-size:20px;
+    background:var(--jaune); color:#3a2500; box-shadow:0 5px 0 #b8860b; }
+  .btn:active { transform:translateY(3px); box-shadow:0 2px 0 #b8860b; }
+  .btn.grand { font-size:32px; padding:14px 56px; border-radius:22px; box-shadow:0 7px 0 #b8860b; }
+  .btn.blanc { background:var(--creme); box-shadow:0 5px 0 #b9a77a; }
+  .btn.vert { background:#86d860; box-shadow:0 5px 0 #3d8a25; }
+  .btn:disabled { opacity:.45; }
+  .rond { width:50px; height:50px; border-radius:50%; background:rgba(255,248,230,.94); display:flex;
+    align-items:center; justify-content:center; box-shadow:0 3px 0 rgba(0,0,0,.28); padding:0; flex:none; }
+  .rond svg { width:26px; height:26px; }
+  .rond:active { transform:translateY(2px); }
+
+  /* ---------- Écrans ---------- */
+  .ecran { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; }
+  #accueil { justify-content:space-between; padding:18px 16px 26px;
+    background:linear-gradient(rgba(30,60,20,.15), rgba(30,60,20,.0) 40%, rgba(30,60,20,.45)); }
+  #accueil .son { position:absolute; top:12px; right:12px; }
+  .titre-bloc { margin-top:42px; text-align:center; }
+  h1 { margin:0; font-size:clamp(42px, 13vw, 62px); line-height:.95; color:#fff; font-weight:900; letter-spacing:.5px;
+    -webkit-text-stroke:2px #5a3a1c; paint-order:stroke fill;
+    text-shadow:0 4px 0 #5a3a1c, 0 8px 14px rgba(0,0,0,.35); transform:rotate(-3deg); }
+  h1 span { color:var(--jaune); }
+  .regle { margin:22px auto 0; max-width:330px; background:rgba(255,248,230,.95); border-radius:16px; padding:12px 16px;
+    font-size:18px; font-weight:700; line-height:1.3; box-shadow:0 4px 0 rgba(0,0,0,.2); }
+  .boutons { display:flex; flex-direction:column; align-items:center; gap:16px; }
+  .ligne { display:flex; gap:14px; }
+  .total { background:rgba(0,0,0,.45); color:#fff; font-weight:800; padding:6px 14px; border-radius:20px; font-size:17px; }
+  .etoile { color:#ffd34d; }
+
+  .plein { background:linear-gradient(#cfe9a8, #8fca62); padding:16px 14px 20px; overflow-y:auto; touch-action:pan-y; }
+  .plein h2 { margin:6px 0 10px; font-size:28px; color:#3a2500; }
+  #grille { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; width:100%; max-width:420px; }
+  .case { background:var(--creme); border-radius:16px; padding:8px 4px; min-height:92px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; box-shadow:0 4px 0 #9fb57a; gap:2px; }
+  .case b { font-size:26px; color:#5a3a1c; }
+  .case small { font-size:12px; font-weight:700; line-height:1.1; text-align:center; }
+  .case .et { font-size:16px; letter-spacing:1px; color:#c9b98a; }
+  .case .et i { font-style:normal; color:#f2a900; }
+  .case.ferme { opacity:.5; }
+  .case.bonus { grid-column:span 3; background:#f3d9ff; box-shadow:0 4px 0 #b28ccc; }
+  .bas { margin-top:14px; }
+  .garage-titre { font-weight:800; margin:10px 0 6px; font-size:18px; }
+  #couleurs, #klaxons { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; max-width:420px; }
+  .pastille-coul { width:96px; min-height:96px; border-radius:16px; background:var(--creme); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; box-shadow:0 4px 0 #9fb57a; font-size:13px; font-weight:800; padding:4px; }
+  .pastille-coul svg { width:44px; height:56px; }
+  .choisi { outline:4px solid #f2a900; }
+  .k { min-width:150px; }
+
+  /* ---------- Interface de course ---------- */
+  #hud { position:absolute; inset:0; pointer-events:none; }
+  #hud > * { pointer-events:auto; }
+  .barre { position:absolute; top:8px; left:8px; right:8px; display:flex; align-items:center; gap:8px; pointer-events:none; }
+  .barre > * { pointer-events:auto; }
+  .pastille { background:rgba(255,248,230,.94); border-radius:16px; height:50px; padding:0 12px; display:flex; align-items:center;
+    gap:6px; font-weight:900; font-size:22px; box-shadow:0 3px 0 rgba(0,0,0,.28); }
+  #place { min-width:74px; justify-content:center; font-size:26px; }
+  #place sup { font-size:14px; }
+  #foin svg { width:26px; height:22px; }
+  .espace { flex:1; }
+  #progres { position:absolute; top:66px; left:16px; right:16px; height:16px; pointer-events:none; }
+  #progres .piste { position:absolute; top:6px; left:0; right:0; height:5px; border-radius:3px; background:rgba(255,255,255,.55); }
+  #progres .fin { position:absolute; right:-6px; top:0; width:12px; height:16px;
+    background:repeating-conic-gradient(#222 0 25%, #fff 0 50%) 0 0 / 6px 6px; border-radius:2px; }
+  #progres i { position:absolute; top:2px; width:13px; height:13px; border-radius:50%; margin-left:-6px; border:2px solid #fff; }
+  #btn-klaxon { position:absolute; right:14px; bottom:22px; width:72px; height:72px; background:var(--jaune);
+    box-shadow:0 5px 0 #b8860b; }
+  #btn-klaxon svg { width:40px; height:40px; }
+  #btn-klaxon.attire { animation:pulse .6s ease-in-out infinite alternate; }
+  #jauge { position:absolute; left:14px; bottom:26px; width:150px; background:rgba(255,248,230,.94); border-radius:14px;
+    padding:6px 10px; font-weight:800; font-size:14px; box-shadow:0 3px 0 rgba(0,0,0,.28); pointer-events:none; }
+  #jauge div { height:12px; background:#ddd; border-radius:6px; overflow:hidden; margin-top:3px; }
+  #jauge i { display:block; height:100%; width:0; background:#5cc84a; }
+  #message { position:absolute; top:32%; left:0; right:0; text-align:center; font-size:30px; font-weight:900; color:#fff;
+    -webkit-text-stroke:1.5px #5a3a1c; paint-order:stroke fill; text-shadow:0 3px 0 #5a3a1c; pointer-events:none; }
+
+  /* ---------- Voiles (tutoriel, pause, bilan) ---------- */
+  .voile { position:absolute; inset:0; background:rgba(20,35,15,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .carte { background:var(--creme); border-radius:22px; padding:16px 18px 18px; width:100%; max-width:380px; text-align:center;
+    box-shadow:0 8px 0 rgba(0,0,0,.25); max-height:100%; overflow-y:auto; }
+  .carte h3 { margin:0 0 8px; font-size:24px; color:#5a3a1c; }
+  #tuto-anim svg { width:100%; max-width:300px; height:auto; border-radius:14px; background:#7cc153; }
+  #tuto-etapes { text-align:left; font-size:18px; font-weight:700; margin:10px 0 4px; padding-left:28px; line-height:1.35; }
+  .petit { font-size:15px; color:#6b5a3a; margin:8px 0 0; font-weight:700; }
+  .temps { height:6px; background:#e4d6b0; border-radius:3px; overflow:hidden; margin-top:8px; }
+  .temps i { display:block; height:100%; width:100%; background:#f2a900; transform-origin:left; }
+  .col { display:flex; flex-direction:column; gap:14px; align-items:stretch; margin-top:12px; }
+  #bilan-place { font-size:26px; font-weight:900; margin:2px 0; }
+  #bilan-etoiles { font-size:58px; letter-spacing:6px; line-height:1.1; color:#d9cba4; }
+  #bilan-etoiles span { display:inline-block; }
+  #bilan-etoiles .gagnee { color:#f2b600; animation:pop .5s ease-out both; text-shadow:0 3px 0 #b8860b; }
+  .stats { font-size:18px; font-weight:700; line-height:1.5; }
+  #bilan-score { font-size:34px; font-weight:900; color:#5a3a1c; }
+  #bilan-record { font-weight:900; color:#c0392b; font-size:18px; min-height:24px; }
+  #bilan-debloque { font-weight:800; color:#2f7d1f; font-size:16px; }
+
+  @keyframes pulse { from { transform:scale(1); } to { transform:scale(1.12); } }
+  @keyframes pop { 0% { transform:scale(0) rotate(-90deg); } 70% { transform:scale(1.35); } 100% { transform:scale(1); } }
+
+  /* Animations du tutoriel (SVG) */
+  .a-gd { animation:gd 2.6s ease-in-out infinite; }
+  @keyframes gd { 0%,100% { transform:translateX(-38px); } 50% { transform:translateX(38px); } }
+  .a-desc { animation:desc 2.6s linear infinite; }
+  @keyframes desc { from { transform:translateY(-70px); } to { transform:translateY(160px); } }
+  .a-desc2 { animation:desc 2.6s linear infinite; animation-delay:-1.3s; }
+  .a-evite { animation:evite 2.6s ease-in-out infinite; }
+  @keyframes evite { 0%,15% { transform:translateX(0); } 40%,70% { transform:translateX(46px); } 95%,100% { transform:translateX(0); } }
+  .a-trav { animation:trav 4s linear infinite; }
+  @keyframes trav { from { transform:translateX(-150px); } to { transform:translateX(230px); } }
+  .a-pulse { animation:pulse .6s ease-in-out infinite alternate; transform-box:fill-box; transform-origin:center; }
+  .a-tangue { animation:tangue 1.4s ease-in-out infinite alternate; }
+  @keyframes tangue { from { transform:translateX(-10px); } to { transform:translateX(10px); } }
+  .a-penche { animation:penche 1.3s ease-in-out infinite alternate; transform-box:fill-box; transform-origin:50% 0; }
+  @keyframes penche { from { transform:rotate(-14deg); } to { transform:rotate(14deg); } }
+  .a-pluie { animation:pluie .6s linear infinite; }
+  @keyframes pluie { from { transform:translate(0,-40px); } to { transform:translate(-12px,40px); } }
+  .a-brume { animation:brume 2.5s ease-in-out infinite alternate; }
+  @keyframes brume { from { opacity:.75; } to { opacity:.95; } }
+  .a-rac { animation:rac 3.2s ease-in-out infinite; }
+  @keyframes rac { 0%,10% { transform:translate(0,0); } 35% { transform:translate(48px,-30px); } 65% { transform:translate(48px,-70px); } 90%,100% { transform:translate(0,-100px); } }
+  .a-jauge { animation:jauge 1.3s ease-in-out infinite alternate; }
+  @keyframes jauge { from { transform:scaleX(.2); } to { transform:scaleX(.9); } }
+  .a-scint { animation:scint 1s ease-in-out infinite alternate; }
+  @keyframes scint { from { opacity:.2; } to { opacity:1; } }
+  @media (prefers-reduced-motion: reduce) { .a-pluie, .a-scint { animation:none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv"></canvas>
+
+  <!-- Interface de course -->
+  <div id="hud" hidden>
+    <div class="barre">
+      <button class="rond" id="btn-pause" aria-label="Pause">
+        <svg viewBox="0 0 24 24"><rect x="5" y="4" width="5" height="16" rx="1.5" fill="#5a3a1c"/><rect x="14" y="4" width="5" height="16" rx="1.5" fill="#5a3a1c"/></svg>
+      </button>
+      <div class="pastille" id="place" aria-live="polite">4<sup>e</sup></div>
+      <div class="pastille" id="foin" hidden>
+        <svg viewBox="0 0 26 22"><rect x="2" y="3" width="22" height="16" rx="5" fill="#f2c94c" stroke="#b8860b" stroke-width="2"/><path d="M8 4v14M13 4v14M18 4v14" stroke="#c99a1c" stroke-width="1.6"/></svg>
+        <span id="foin-txt">0</span>
+      </div>
+      <div class="espace"></div>
+      <button class="rond son" id="btn-son" aria-label="Couper le son"></button>
+    </div>
+    <div id="progres"><div class="piste"></div><div class="fin"></div></div>
+    <div id="jauge" hidden>Remorque<div><i id="jauge-i"></i></div></div>
+    <button class="rond" id="btn-klaxon" aria-label="Klaxon">
+      <svg viewBox="0 0 40 40"><circle cx="9" cy="20" r="7.5" fill="#e0402a" stroke="#5a3a1c" stroke-width="2"/><rect x="15" y="17" width="9" height="6" fill="#5a3a1c"/><path d="M23 17L37 8v24L23 23z" fill="#5a3a1c"/></svg>
+    </button>
+    <div id="message"></div>
+  </div>
+
+  <!-- Accueil -->
+  <section class="ecran" id="accueil">
+    <button class="rond son" id="btn-son-a" aria-label="Couper le son"></button>
+    <div class="titre-bloc">
+      <h1>Le rallye<br><span>des tracteurs</span></h1>
+      <p class="regle">Glisse le doigt à gauche ou à droite pour diriger ton tracteur. Dépasse les 3 rivaux et arrive le premier !</p>
+    </div>
+    <div class="boutons">
+      <button class="btn grand" id="btn-jouer">Jouer</button>
+      <div class="ligne">
+        <button class="btn blanc" id="btn-carte">Circuits</button>
+        <button class="btn blanc" id="btn-garage">Garage</button>
+      </div>
+      <div class="total"><span class="etoile">★</span> <span id="total-et">0</span> étoiles</div>
+    </div>
+  </section>
+
+  <!-- Carte des circuits -->
+  <section class="ecran plein" id="carte" hidden>
+    <h2>Les circuits</h2>
+    <div id="grille"></div>
+    <button class="btn blanc bas" id="carte-retour">Accueil</button>
+  </section>
+
+  <!-- Garage -->
+  <section class="ecran plein" id="garage" hidden>
+    <h2>Le garage</h2>
+    <div class="total"><span class="etoile">★</span> <span id="total-et2">0</span> étoiles</div>
+    <div class="garage-titre">Couleur du tracteur</div>
+    <div id="couleurs"></div>
+    <div class="garage-titre">Klaxon</div>
+    <div id="klaxons"></div>
+    <button class="btn blanc bas" id="garage-retour">Accueil</button>
+  </section>
+
+  <!-- Tutoriel animé -->
+  <div class="voile" id="tuto" hidden>
+    <div class="carte">
+      <h3 id="tuto-titre"></h3>
+      <div id="tuto-anim"></div>
+      <ol id="tuto-etapes"></ol>
+      <p class="petit" id="tuto-clavier"></p>
+      <p class="petit">Touche l'écran pour commencer</p>
+      <div class="temps"><i id="tuto-temps"></i></div>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div class="voile" id="pause" hidden>
+    <div class="carte">
+      <h3>Pause</h3>
+      <div class="col">
+        <button class="btn vert" id="p-reprendre">Reprendre</button>
+        <button class="btn" id="p-recommencer">Recommencer</button>
+        <button class="btn blanc" id="p-accueil">Accueil</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bilan -->
+  <div class="voile" id="bilan" hidden>
+    <div class="carte">
+      <h3 id="bilan-titre">Arrivée !</h3>
+      <div id="bilan-place"></div>
+      <div id="bilan-etoiles"><span>★</span><span>★</span><span>★</span></div>
+      <div class="stats" id="bilan-stats"></div>
+      <div id="bilan-score">0</div>
+      <div id="bilan-record"></div>
+      <div id="bilan-debloque"></div>
+      <div class="col">
+        <button class="btn vert" id="b-suivant">Niveau suivant</button>
+        <button class="btn" id="b-rejouer">Rejouer</button>
+        <button class="btn blanc" id="b-carte">Circuits</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Le rallye des tracteurs — course vue de dessus.
+   Le tracteur avance tout seul ; le joueur le dirige à gauche / à droite.
+   Monde : « d » = distance parcourue le long du chemin, « o » = décalage
+   latéral par rapport au milieu du chemin (unités ≈ pixels pour 400 px).
+   ===================================================================== */
+
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const VMAX = 260;                 // vitesse maximale (unités par seconde)
+
+// Générateur pseudo-aléatoire reproductible (un circuit = toujours le même tracé)
+function alea(graine) {
+  return function () {
+    graine |= 0; graine = graine + 0x6D2B79F5 | 0;
+    let t = Math.imul(graine ^ graine >>> 15, 1 | graine);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hasard(i) { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+
+/* ---------- Les circuits ---------- */
+// meteo : soleil, pluie, brouillard, couchant ; nouveau : mécanique présentée par le tutoriel
+const NIVEAUX = [
+  { nom:'Le pré fleuri',         meteo:'soleil',     courbe:.55, largeur:138, boue:0,  foin:0,  troupeau:0, raccourci:0, remorque:false, nouveau:'base' },
+  { nom:'La mare',               meteo:'soleil',     courbe:.65, largeur:132, boue:6,  foin:0,  troupeau:0, raccourci:0, remorque:false, nouveau:'boue' },
+  { nom:'Averse au moulin',      meteo:'pluie',      courbe:.7,  largeur:130, boue:7,  foin:0,  troupeau:0, raccourci:0, remorque:false, nouveau:'pluie' },
+  { nom:'La moisson',            meteo:'soleil',     courbe:.75, largeur:128, boue:7,  foin:8,  troupeau:0, raccourci:0, remorque:false, nouveau:'foin' },
+  { nom:'Le champ de blé',       meteo:'soleil',     courbe:.8,  largeur:125, boue:8,  foin:8,  troupeau:0, raccourci:1, remorque:false, nouveau:'raccourci' },
+  { nom:'Les vaches du pré',     meteo:'soleil',     courbe:.85, largeur:124, boue:7,  foin:9,  troupeau:2, raccourci:1, remorque:false, nouveau:'troupeau', animal:'vache' },
+  { nom:'Brume du matin',        meteo:'brouillard', courbe:.9,  largeur:122, boue:8,  foin:9,  troupeau:2, raccourci:1, remorque:false, nouveau:'brouillard', animal:'vache' },
+  { nom:'La remorque de foin',   meteo:'soleil',     courbe:.9,  largeur:122, boue:8,  foin:10, troupeau:1, raccourci:1, remorque:true,  nouveau:'remorque', animal:'vache' },
+  { nom:'Moutons sous la pluie', meteo:'pluie',      courbe:1,   largeur:116, boue:9,  foin:10, troupeau:2, raccourci:2, remorque:true,  animal:'mouton' },
+  { nom:'Le bois brumeux',       meteo:'brouillard', courbe:1.1, largeur:112, boue:10, foin:10, troupeau:3, raccourci:2, remorque:true,  animal:'mouton' },
+  { nom:'Orage sur la colline',  meteo:'pluie',      courbe:1.2, largeur:106, boue:11, foin:11, troupeau:3, raccourci:2, remorque:true,  animal:'vache' },
+  { nom:'Le grand final',        meteo:'soleil',     courbe:1.3, largeur:102, boue:12, foin:12, troupeau:3, raccourci:2, remorque:true,  animal:'mouton' },
+  { nom:'Les vignes',            meteo:'couchant',   courbe:1.05,largeur:112, boue:9,  foin:12, troupeau:3, raccourci:2, remorque:false, nouveau:'vignes', animal:'oie', bonus:true }
+];
+const NB_NORMAUX = 12;
+const ETOILES_BONUS = 18;
+
+const COULEURS = [
+  { nom:'Rouge',  c:'#e0402a', e:0 },  { nom:'Vert',   c:'#3fae3a', e:5 },
+  { nom:'Bleu',   c:'#2f7de0', e:10 }, { nom:'Orange', c:'#f08a1c', e:16 },
+  { nom:'Violet', c:'#8a4fd8', e:22 }, { nom:'Rose',   c:'#f065a8', e:28 }
+];
+const KLAXONS = [ { nom:'Pouet-pouet', e:0 }, { nom:'Meuh', e:8 }, { nom:'Coin-coin', e:14 }, { nom:'Cocorico', e:20 } ];
+const COUL_RIVAUX = ['#2f7de0', '#f2c230', '#8a4fd8', '#3fae3a', '#f08a1c', '#e0402a', '#f065a8'];
+
+/* ---------- Sauvegarde (toujours protégée : le cadre peut refuser le stockage) ---------- */
+const CLE = 'rallye-tracteurs-v1';
+const sauve = { etoiles:{}, records:{}, couleur:0, klaxon:0, son:true, vus:{} };
+try { const s = JSON.parse(localStorage.getItem(CLE)); if (s && typeof s === 'object') Object.assign(sauve, s); } catch (e) { /* sans stockage */ }
+function enregistrer() { try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* sans stockage */ } }
+function totalEtoiles() { let t = 0; for (const k in sauve.etoiles) t += sauve.etoiles[k] || 0; return t; }
+function niveauOuvert(n) {
+  if (n === 0) return true;
+  if (NIVEAUX[n].bonus) return totalEtoiles() >= ETOILES_BONUS;
+  return (sauve.etoiles[n - 1] || 0) >= 1;
+}
+
+/* =====================================================================
+   SONS (Web Audio, créés seulement après le premier toucher)
+   ===================================================================== */
+let AC = null, maitre = null, moteur = null;
+function audio() {
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      maitre = AC.createGain(); maitre.gain.value = sauve.son ? 1 : 0; maitre.connect(AC.destination);
+    } catch (e) { AC = null; }
+  }
+  if (AC && AC.state === 'suspended' && etat !== 'pause') AC.resume().catch(() => {});
+  return AC;
+}
+function bip(f, dur, type = 'sine', vol = .15, f2 = 0, delai = 0) {
+  if (!AC || !sauve.son || demo) return;
+  const t = AC.currentTime + delai, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .015);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(maitre); o.start(t); o.stop(t + dur + .05);
+}
+function bruit(dur, vol = .2, freq = 800, q = 1, delai = 0, freq2 = 0) {
+  if (!AC || !sauve.son || demo) return;
+  const t = AC.currentTime + delai, n = Math.floor(AC.sampleRate * dur);
+  const buf = AC.createBuffer(1, n, AC.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  const s = AC.createBufferSource(); s.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+  if (freq2) f.frequency.exponentialRampToValueAtTime(freq2, t + dur);
+  const g = AC.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(maitre); s.start(t);
+}
+const SONS = {
+  clic:     () => bip(660, .08, 'triangle', .12),
+  foin:     () => { bip(880, .1, 'triangle', .15); bip(1320, .14, 'triangle', .13, 0, .07); },
+  turbo:    () => bruit(.5, .18, 500, 2, 0, 2500),
+  boue:     () => { bruit(.35, .3, 300, 3, 0, 120); bip(140, .2, 'sine', .15, 70); },
+  choc:     () => bruit(.15, .22, 200, 1),
+  depasse:  () => { bip(700, .1, 'square', .07); bip(1050, .16, 'square', .07, 0, .09); },
+  recule:   () => bip(300, .2, 'triangle', .1, 200),
+  decompte: () => bip(520, .18, 'square', .1),
+  partez:   () => bip(1040, .45, 'square', .12),
+  renverse: () => { bruit(.5, .28, 400, 1, 0, 100); bip(400, .4, 'sawtooth', .07, 120); },
+  raccourci:() => { bip(523, .1, 'triangle', .12); bip(659, .1, 'triangle', .12, 0, .1); bip(784, .18, 'triangle', .12, 0, .2); },
+  arrivee:  () => [523, 659, 784, 1047].forEach((f, i) => bip(f, .25, 'triangle', .16, 0, i * .13)),
+  perdu:    () => [392, 349, 330].forEach((f, i) => bip(f, .25, 'triangle', .13, 0, i * .18)),
+  etoile:   i => bip(880 + i * 220, .25, 'triangle', .16),
+  record:   () => [784, 988, 1175, 1568].forEach((f, i) => bip(f, .16, 'square', .07, 0, i * .09)),
+  animal:   type => {
+    if (type === 'mouton') { bip(500, .45, 'sawtooth', .06, 470); bip(503, .45, 'sawtooth', .04, 480); }
+    else if (type === 'oie') { bip(820, .12, 'square', .07, 600); bip(820, .12, 'square', .07, 600, .16); }
+    else bip(190, .6, 'sawtooth', .08, 130);
+  },
+  klaxon: () => {
+    const k = sauve.klaxon;
+    if (k === 0) { bip(420, .12, 'square', .1, 400); bip(420, .2, 'square', .1, 390, .17); }
+    else if (k === 1) { bip(200, .7, 'sawtooth', .1, 120); }
+    else if (k === 2) { bip(760, .12, 'square', .08, 520); bip(760, .14, 'square', .08, 520, .17); }
+    else { bip(520, .12, 'triangle', .14); bip(660, .12, 'triangle', .14, 0, .13); bip(780, .4, 'triangle', .14, 560, .26); }
+  }
+};
+// Moteur : un ronronnement grave qui suit la vitesse
+function moteurDemarrer() {
+  if (!AC || moteur) return;
+  const o = AC.createOscillator(), f = AC.createBiquadFilter(), g = AC.createGain();
+  o.type = 'sawtooth'; o.frequency.value = 45; f.type = 'lowpass'; f.frequency.value = 380; g.gain.value = .035;
+  o.connect(f); f.connect(g); g.connect(maitre); o.start();
+  moteur = { o, g };
+}
+function moteurArreter() { if (moteur) { try { moteur.o.stop(); } catch (e) {} moteur = null; } }
+function majSon() {
+  if (maitre) maitre.gain.value = sauve.son ? 1 : 0;
+  const svg = sauve.son
+    ? '<svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z" fill="#5a3a1c"/><path d="M15.5 8.5c1.6 1.8 1.6 5.2 0 7M18.5 6c3 3.2 3 8.8 0 12" stroke="#5a3a1c" stroke-width="2" fill="none" stroke-linecap="round"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z" fill="#5a3a1c"/><path d="M16 9l6 6M22 9l-6 6" stroke="#c0392b" stroke-width="2.4" stroke-linecap="round"/></svg>';
+  for (const b of document.querySelectorAll('.son')) { b.innerHTML = svg; b.setAttribute('aria-label', sauve.son ? 'Couper le son' : 'Remettre le son'); }
+}
+function basculerSon() { sauve.son = !sauve.son; enregistrer(); audio(); majSon(); SONS.clic(); }
+
+/* =====================================================================
+   CIRCUIT : tracé, obstacles, bonus
+   ===================================================================== */
+function genererCircuit(n) {
+  const N = NIVEAUX[n], r = alea(4242 + n * 977);
+  const c = { n, N, L: 11000 + Math.min(n, 11) * 900, hw: N.largeur, objets: [], raccourcis: [], troupeaux: [], foinTotal: 0 };
+  const a = N.courbe;
+  const harm = [
+    { a: 120 * a, p: 850 + r() * 300, f: r() * 6.28 },
+    { a: 55 * a,  p: 380 + r() * 150, f: r() * 6.28 },
+    { a: 15 * a,  p: 230 + r() * 60,  f: r() * 6.28 }
+  ];
+  // Milieu du chemin selon la distance (départ en ligne droite)
+  c.centre = d => {
+    let x = 0;
+    for (const h of harm) x += h.a * (Math.sin(d / h.p + h.f) - Math.sin(h.f));
+    return x * clamp(d / 900, 0, 1);
+  };
+  const libre = (d, o, ecartD, ecartO) => c.objets.every(b => Math.abs(b.d - d) > ecartD || Math.abs(b.o - o) > ecartO);
+
+  // Raccourcis cachés dans le blé
+  for (let i = 0; i < N.raccourci; i++) {
+    const d0 = c.L * (.22 + .5 * i / N.raccourci) + r() * 500;
+    c.raccourcis.push({ d0, d1: d0 + 900 + r() * 300, cote: r() < .5 ? -1 : 1, vu: false });
+  }
+  const dansRac = d => c.raccourcis.some(rc => d > rc.d0 - 250 && d < rc.d1 + 250);
+  // Troupeaux qui traversent
+  for (let i = 0; i < N.troupeau; i++) {
+    let d = c.L * (.28 + .6 * (i + .5) / N.troupeau);
+    while (dansRac(d)) d += 300;
+    const nb = 3 + Math.min(3, Math.floor(n / 3));
+    c.troupeaux.push({ d, base: (r() - .5) * c.hw, dir: r() < .5 ? -1 : 1, vit: 38 + n * 2, nb, boost: 0, vu: false });
+  }
+  const presTroupeau = d => c.troupeaux.some(t => Math.abs(t.d - d) < 260);
+  // Foin sur les raccourcis (récompense de l'exploration)
+  for (const rc of c.raccourcis) {
+    for (const f of [.4, .62]) {
+      const d = rc.d0 + (rc.d1 - rc.d0) * f;
+      c.objets.push({ type: 'foin', d, o: oRaccourci(c, rc, d), pris: false });
+      if (N.foin) c.foinTotal++;
+    }
+  }
+  // Bottes de foin et flaques de boue sur le chemin
+  const place = (type, nb) => {
+    for (let i = 0; i < nb; i++) {
+      for (let essai = 0; essai < 30; essai++) {
+        const d = 1500 + (c.L - 2300) * ((i + r()) / nb);
+        const o = (r() * 2 - 1) * (c.hw - 40);
+        if (presTroupeau(d) || !libre(d, o, 130, 80)) continue;
+        if (type === 'boue') c.objets.push({ type, d, o, w: 70 + r() * 30 + n * 2, h: 44 + r() * 20, touche: false });
+        else { c.objets.push({ type, d, o, pris: false }); c.foinTotal++; }
+        break;
+      }
+    }
+  };
+  place('boue', N.boue);
+  if (N.foin) place('foin', N.foin);
+  if (!N.foin) c.objets = c.objets.filter(o => o.type !== 'foin');
+  c.foinBut = Math.ceil(c.foinTotal * .6);
+  c.objets.sort((x, y) => x.d - y.d);
+  return c;
+}
+// Décalage du chemin caché d'un raccourci : il s'écarte du chemin puis le rejoint
+function oRaccourci(c, rc, d) {
+  const t = clamp((d - rc.d0) / (rc.d1 - rc.d0), 0, 1);
+  return rc.cote * (c.hw - 10 + 120 * Math.sin(Math.PI * t));
+}
+
+/* =====================================================================
+   ÉTAT DU JEU
+   ===================================================================== */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+let W = 400, H = 800, DPR = 1, K = 1, PY = 600;
+let etat = 'demo', demo = true, etatAvantPause = null;
+let C = null, P = null, R = [], temps = 0, decompte = 0, arriveeT = 0, nbFinis = 0;
+let cam = { x: 0, d: 0 }, secousse = 0, placeAff = 4, bumpCd = 0, klaxonCd = 0;
+let partMonde = [], partEcran = [], gouttes = [], message = { txt: '', t: 0 };
+let resultat = null;
+const touches = { g: 0, d: 0 };
+let glisse = null;              // geste en cours : { id, x, base }
+
+function redimensionner() {
+  const r = $('#app').getBoundingClientRect();
+  W = r.width; H = r.height; DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  K = W / 400; PY = H * .76;
+}
+window.addEventListener('resize', redimensionner);
+
+function nouveauVehicule(d, o, coul) {
+  return { d, o, v: 0, vo: 0, cible: o, coul, boueT: 0, turboT: 0, stopT: 0, foin: 0, bascule: 0, fini: false, rang: 0 };
+}
+function preparerCourse(n, estDemo) {
+  demo = estDemo;
+  C = genererCircuit(n);
+  const maCoul = COULEURS[sauve.couleur].c;
+  const autres = COUL_RIVAUX.filter(c => c !== maCoul);
+  P = nouveauVehicule(0, 0, maCoul);
+  R = [];
+  const voies = [-.5, .5, 0];
+  for (let i = 0; i < 3; i++) {
+    const v = nouveauVehicule(70 + i * 75, voies[i] * C.hw, autres[i]);
+    v.base = (C.N.bonus ? .95 : .8 + n * .018) - i * .035;
+    v.voie = v.o; v.voieT = 2 + i; v.ph = i * 2;
+    R.push(v);
+  }
+  temps = 0; nbFinis = 0; placeAff = 4; partMonde = []; partEcran = []; secousse = 0;
+  cam.x = 0; cam.d = 0; glisse = null; touches.g = touches.d = 0;
+  gouttes = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), v: .8 + Math.random() * .6 }));
+}
+
+/* =====================================================================
+   MISE À JOUR
+   ===================================================================== */
+function dansRaccourci(e) {
+  for (const rc of C.raccourcis) {
+    if (e.d > rc.d0 && e.d < rc.d1 && Math.abs(e.o - oRaccourci(C, rc, e.d)) < 42) return rc;
+  }
+  return null;
+}
+function majVitesse(e, dt, joueur) {
+  let vmax = joueur ? 1 : e.vmax;
+  if (Math.abs(e.o) > C.hw - 6) {
+    const rc = joueur ? dansRaccourci(e) : null;
+    if (rc) {
+      vmax = 1.3;
+      if (!rc.vu && !demo) { rc.vu = true; afficherMessage('Raccourci !'); SONS.raccourci(); }
+    } else vmax = .5;
+  }
+  if (e.boueT > 0) { vmax = Math.min(vmax, .38); e.boueT -= dt; }
+  if (e.turboT > 0) { vmax *= 1.38; e.turboT -= dt; }
+  if (e.stopT > 0) { vmax = 0; e.stopT -= dt; }
+  const acc = e.v < vmax ? .55 : 2.5;
+  e.v += clamp(vmax - e.v, -acc * dt, acc * dt);
+  e.d += e.v * VMAX * dt;
+}
+
+function majCourse(dt) {
+  temps += dt;
+  bumpCd -= dt; klaxonCd -= dt;
+  const pluie = C.N.meteo === 'pluie';
+  const enCourse = etat === 'course' || etat === 'demo';
+
+  // ---- Joueur ----
+  const d0 = P.d;
+  if (enCourse || etat === 'arrivee') majVitesse(P, dt, true);
+  const dc = C.centre(P.d) - C.centre(d0);       // déplacement du chemin (virage)
+  if (demo || etat === 'arrivee') {
+    // Pilote automatique (démonstration de l'accueil, ou après la ligne d'arrivée)
+    P.cible = demo ? Math.sin(temps * .5) * C.hw * .5 : P.cible * .97;
+    for (const o of C.objets) if (o.type === 'boue' && o.d > P.d && o.d < P.d + 260 && Math.abs(o.o - P.cible) < o.w / 2 + 25)
+      P.cible = o.o + (o.o > 0 ? -1 : 1) * (o.w / 2 + 40);
+  } else {
+    // le virage déporte le tracteur : un peu au début, davantage ensuite et sous la pluie
+    const derive = .3 + Math.min(C.n, 11) * .02 + (pluie ? .12 : 0);
+    P.cible -= dc * derive;
+    if (glisse) glisse.base -= dc * derive;
+    P.cible += (touches.d - touches.g) * 230 * dt;
+  }
+  P.cible = clamp(P.cible, -C.hw - 140, C.hw + 140);
+  const reac = pluie ? 3.2 : 9;
+  let vo = clamp((P.cible - P.o) * reac, -290, 290);
+  if (pluie && enCourse) vo += Math.sin(temps * 1.7) * 16;   // ça glisse !
+  P.o += vo * dt;
+  P.vo = vo;
+
+  // ---- Remorque : se renverse si on tourne trop fort ----
+  if (C.N.remorque && etat === 'course') {
+    const vMonde = Math.abs(vo + dc / Math.max(dt, .001));
+    const exces = Math.max(0, vMonde - 150) / 90 * (P.turboT > 0 ? 1.3 : 1);
+    P.bascule = clamp(P.bascule + (exces * (1 + C.n * .05) - .5) * dt, 0, 1);
+    if (P.bascule >= 1) {
+      P.bascule = 0; P.stopT = 1; P.v = 0;
+      const perte = Math.min(2, P.foin); P.foin -= perte;
+      secousse = .5; SONS.renverse();
+      afficherMessage(perte ? 'Oups ! ' + perte + ' foin' + (perte > 1 ? 's' : '') + ' tombé' + (perte > 1 ? 's' : '') : 'Oups, la remorque !');
+      for (let i = 0; i < 14; i++) partMonde.push({ d: P.d - 50, o: P.o, vd: (Math.random() - .5) * 120, vo: (Math.random() - .5) * 160, vie: .9, coul: '#f2c94c', t: 5 });
+    }
+  }
+
+  // ---- Rivaux ----
+  if (enCourse || etat === 'arrivee') for (const r of R) {
+    r.voieT -= dt;
+    if (r.voieT <= 0) { r.voie = [-.55, 0, .55][Math.floor(Math.random() * 3)] * C.hw; r.voieT = 2.5 + Math.random() * 3; }
+    let base = r.base * (1 + .025 * Math.sin(temps * .8 + r.ph));
+    const ecart = r.d - P.d;
+    if (ecart > 800) base *= .93; else if (ecart < -800) base *= 1.08;   // la course reste serrée
+    r.vmax = base;
+    majVitesse(r, dt, false);
+    r.o += clamp((r.voie - r.o) * 2, -90, 90) * dt;
+    if (r.d >= C.L && !r.fini) { r.fini = true; r.rang = ++nbFinis; }
+  }
+
+  // ---- Bousculades avec les rivaux ----
+  for (const r of R) {
+    const dd = r.d - P.d, doo = r.o - P.o;
+    if (Math.abs(dd) < 58 && Math.abs(doo) < 42) {
+      const pousse = (42 - Math.abs(doo)) * .5 * (doo >= 0 ? 1 : -1);
+      r.o += pousse; P.o -= pousse; P.cible -= pousse * .6;
+      if (dd > 0) P.v *= .97; else r.v *= .97;
+      if (bumpCd <= 0) { bumpCd = .4; SONS.choc(); secousse = Math.max(secousse, .12); }
+    }
+  }
+
+  // ---- Objets ----
+  const tous = [P, ...R];
+  for (const ob of C.objets) {
+    if (ob.d < P.d - 400 && ob.d < Math.min(R[0].d, R[1].d, R[2].d) - 100) continue;
+    if (ob.type === 'boue') {
+      for (const e of tous) {
+        if (Math.abs(ob.d - e.d) < ob.h / 2 + 18 && Math.abs(ob.o - e.o) < ob.w / 2 + 6) {
+          e.boueT = .55;
+          if (e === P && !ob.touche) {
+            ob.touche = true; SONS.boue(); secousse = Math.max(secousse, .25);
+            for (let i = 0; i < 12; i++) partMonde.push({ d: P.d + 10, o: P.o, vd: (Math.random() - .3) * 150, vo: (Math.random() - .5) * 220, vie: .6, coul: '#6b4423', t: 4 });
+          }
+        }
+      }
+    } else if (ob.type === 'foin' && !ob.pris && !demo) {
+      if (Math.abs(ob.d - P.d) < 36 && Math.abs(ob.o - P.o) < 38) {
+        ob.pris = true; P.foin++; P.turboT = 1.4;
+        SONS.foin(); SONS.turbo();
+        afficherFlottant('+1 Turbo !', '#ffd34d');
+        for (let i = 0; i < 16; i++) partMonde.push({ d: ob.d, o: ob.o, vd: (Math.random() - .5) * 260, vo: (Math.random() - .5) * 260, vie: .7, coul: i % 2 ? '#ffe066' : '#fff', t: 3 });
+      }
+    }
+  }
+
+  // ---- Troupeaux ----
+  for (const t of C.troupeaux) {
+    t.boost -= dt;
+    if (Math.abs(t.d - P.d) < 1300 || R.some(r => Math.abs(t.d - r.d) < 600))
+      t.base += t.dir * t.vit * (t.boost > 0 ? 3.2 : 1) * dt;
+    if (!t.vu && !demo && t.d - P.d < 520 && t.d > P.d) { t.vu = true; SONS.animal(C.N.animal); $('#btn-klaxon').classList.add('attire'); setTimeout(() => $('#btn-klaxon').classList.remove('attire'), 2500); }
+    for (const a of animaux(t)) {
+      for (const e of tous) {
+        // seul un animal devant le tracteur l'arrête (on ne recule jamais)
+        if (a.d >= e.d && a.d - e.d < 44 && Math.abs(a.o - e.o) < 40) {
+          e.d = a.d - 44; e.v = 0; e.stopT = .35;
+          if (e === P && bumpCd <= 0) { bumpCd = .9; SONS.animal(C.N.animal); secousse = Math.max(secousse, .2); afficherFlottant(C.N.animal === 'mouton' ? 'Bêê !' : C.N.animal === 'oie' ? 'Coin !' : 'Meuh !', '#fff'); }
+        }
+      }
+    }
+  }
+
+  // ---- Place ----
+  if (etat === 'course') {
+    const place = 1 + R.filter(r => r.fini || r.d > P.d).length;
+    if (place < placeAff) { SONS.depasse(); afficherFlottant('Dépassé !', '#9cff7a'); }
+    else if (place > placeAff && temps > 3) SONS.recule();
+    placeAff = place;
+    if (P.d >= C.L) {
+      etat = 'arrivee'; arriveeT = 1.6;
+      resultat = { place: 1 + R.filter(r => r.fini).length, temps };
+      moteurArreter(); SONS.arrivee();
+      afficherMessage(resultat.place === 1 ? 'Victoire !' : 'Arrivée !');
+      confettis(resultat.place <= 3 ? 90 : 20);
+    }
+  }
+  if (demo && P.d > C.L - 300) preparerCourse(0, true);
+
+  // ---- Caméra et moteur ----
+  cam.d = P.d;
+  cam.x += (C.centre(P.d) + P.o * .45 - cam.x) * (1 - Math.exp(-dt * 5));
+  if (moteur) moteur.o.frequency.setTargetAtTime(40 + P.v * 55 + (P.turboT > 0 ? 25 : 0), AC.currentTime, .1);
+}
+
+// Positions des animaux d'un troupeau (ils traversent puis reviennent de l'autre côté)
+function animaux(t) {
+  const L = 2 * (C.hw + 150), res = [];
+  for (let i = 0; i < t.nb; i++) {
+    let o = t.base + i * 48 * -t.dir;
+    o = ((o + C.hw + 150) % L + L) % L - C.hw - 150;
+    res.push({ d: t.d + (i % 2) * 14 - 7, o, i });
+  }
+  return res;
+}
+
+function majParticules(dt) {
+  for (const p of partMonde) { p.d += p.vd * dt; p.o += p.vo * dt; p.vie -= dt; }
+  partMonde = partMonde.filter(p => p.vie > 0);
+  for (const p of partEcran) {
+    p.vie -= dt;
+    if (p.conf) { p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; p.rot += p.vr * dt; }
+    else p.y -= 50 * dt;
+  }
+  partEcran = partEcran.filter(p => p.vie > 0 && p.y < H + 30);
+  secousse = Math.max(0, secousse - dt);
+  if (message.t > 0) { message.t -= dt; if (message.t <= 0) $('#message').textContent = ''; }
+}
+function afficherMessage(txt) { message = { txt, t: 1.6 }; $('#message').textContent = txt; }
+function afficherFlottant(txt, coul) {
+  const x = clamp(ecranX(P.d, P.o), 90, W - 90);
+  partEcran.push({ x, y: PY - 70, txt, coul, vie: 1.1 });
+}
+function confettis(nb) {
+  const cs = ['#ffd34d', '#e0402a', '#2f7de0', '#3fae3a', '#f065a8', '#fff'];
+  for (let i = 0; i < nb; i++) partEcran.push({ conf: true, x: Math.random() * W, y: -20 - Math.random() * 120, vx: (Math.random() - .5) * 120,
+    vy: Math.random() * 120, rot: Math.random() * 6, vr: (Math.random() - .5) * 10, coul: cs[i % cs.length], vie: 3.5 });
+}
+
+/* =====================================================================
+   DESSIN
+   ===================================================================== */
+const ecranY = d => PY - (d - cam.d) * K;
+const ecranX = (d, o) => W / 2 + (C.centre(d) + o - cam.x) * K;
+function rr(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function rond(x, y, r, coul) { ctx.fillStyle = coul; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill(); }
+function plusClair(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const c = s => clamp(Math.round(((n >> s) & 255) + (255 - ((n >> s) & 255)) * f), 0, 255);
+  return 'rgb(' + c(16) + ',' + c(8) + ',' + c(0) + ')';
+}
+
+function dessiner() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (!C) { ctx.fillStyle = '#5aa33e'; ctx.fillRect(0, 0, W, H); return; }
+  const m = C.N.meteo;
+  ctx.save();
+  if (secousse > 0) ctx.translate((Math.random() - .5) * 10 * secousse, (Math.random() - .5) * 10 * secousse);
+  const herbe = m === 'pluie' ? '#4f8a37' : m === 'couchant' ? '#6f9a3a' : '#62ad44';
+  ctx.fillStyle = herbe; ctx.fillRect(-20, -20, W + 40, H + 40);
+  const dHaut = cam.d + (PY + 20) / K, dBas = cam.d - (H - PY + 40) / K;
+
+  // Bandes d'herbe tondue (sensation de vitesse)
+  ctx.fillStyle = 'rgba(255,255,255,.06)';
+  for (let b = Math.floor(dBas / 80); b * 80 < dHaut; b++) if (b % 2 === 0) { const y = ecranY(b * 80 + 80); ctx.fillRect(0, y, W, 80 * K); }
+
+  // Raccourcis (chemin caché dans le blé)
+  for (const rc of C.raccourcis) {
+    if (rc.d1 < dBas || rc.d0 > dHaut) continue;
+    // champ de blé autour du chemin
+    ctx.fillStyle = '#e2c25a';
+    ctx.beginPath();
+    for (let d = rc.d0 - 150; d <= rc.d1 + 150; d += 40) ctx.lineTo(ecranX(d, rc.cote * (C.hw + 10)), ecranY(d));
+    for (let d = rc.d1 + 150; d >= rc.d0 - 150; d -= 40) ctx.lineTo(ecranX(d, rc.cote * (C.hw + 230)), ecranY(d));
+    ctx.fill();
+    ctx.strokeStyle = '#c9a43b'; ctx.lineWidth = 2 * K;
+    for (let d = Math.ceil((rc.d0 - 140) / 26) * 26; d < rc.d1 + 140; d += 26) {
+      for (let j = 0; j < 7; j++) {
+        const o = rc.cote * (C.hw + 25 + j * 30 + (hasard(d + j) * 12));
+        const x = ecranX(d, o), y = ecranY(d);
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 3 * K, y - 8 * K); ctx.stroke();
+      }
+    }
+    // le chemin caché
+    ctx.strokeStyle = '#c99c62'; ctx.lineWidth = 64 * K; ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let d = rc.d0; d <= rc.d1; d += 30) ctx.lineTo(ecranX(d, oRaccourci(C, rc, d)), ecranY(d));
+    ctx.stroke();
+    // quelques épis par-dessus : le chemin est « caché »
+    ctx.strokeStyle = 'rgba(214,180,72,.85)'; ctx.lineWidth = 2.5 * K;
+    for (let d = rc.d0 + 40; d < rc.d1; d += 34) {
+      const o = oRaccourci(C, rc, d) + (hasard(d) - .5) * 50;
+      const x = ecranX(d, o), y = ecranY(d);
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 2 * K, y - 9 * K); ctx.stroke();
+    }
+    // panneau en bois
+    const px = ecranX(rc.d0 - 120, rc.cote * (C.hw + 18)), py = ecranY(rc.d0 - 120);
+    ctx.fillStyle = '#6b4423'; ctx.fillRect(px - 2 * K, py - 4 * K, 4 * K, 22 * K);
+    ctx.fillStyle = '#a8763e'; rr(px - 18 * K, py - 18 * K, 36 * K, 16 * K, 3 * K); ctx.fill();
+    // flèche blanche vers le raccourci
+    ctx.strokeStyle = '#fff8e6'; ctx.lineWidth = 3 * K; ctx.lineCap = 'round';
+    const fx = px, fy = py - 10 * K, s = rc.cote * 10 * K;
+    ctx.beginPath(); ctx.moveTo(fx - s, fy); ctx.lineTo(fx + s, fy); ctx.moveTo(fx + s * .4, fy - 5 * K); ctx.lineTo(fx + s, fy); ctx.lineTo(fx + s * .4, fy + 5 * K); ctx.stroke();
+  }
+
+  // Le chemin
+  const terre = m === 'pluie' ? '#9c7448' : '#c99c62';
+  ctx.fillStyle = terre;
+  ctx.beginPath();
+  for (let y = -12; y <= H + 12; y += 10) { const d = cam.d + (PY - y) / K; ctx.lineTo(ecranX(d, -C.hw), y); }
+  for (let y = H + 12; y >= -12; y -= 10) { const d = cam.d + (PY - y) / K; ctx.lineTo(ecranX(d, C.hw), y); }
+  ctx.fill();
+  // bordures et ornières
+  ctx.lineWidth = 6 * K; ctx.strokeStyle = 'rgba(70,110,40,.55)';
+  for (const s of [-1, 1]) {
+    ctx.beginPath();
+    for (let y = -12; y <= H + 12; y += 10) { const d = cam.d + (PY - y) / K; ctx.lineTo(ecranX(d, s * C.hw), y); }
+    ctx.stroke();
+  }
+  ctx.lineWidth = 10 * K; ctx.strokeStyle = 'rgba(120,80,40,.22)';
+  for (const s of [-.5, .5]) {
+    ctx.beginPath();
+    for (let y = -12; y <= H + 12; y += 10) { const d = cam.d + (PY - y) / K; ctx.lineTo(ecranX(d, s * C.hw), y); }
+    ctx.stroke();
+  }
+  // cailloux
+  ctx.fillStyle = 'rgba(90,60,30,.35)';
+  for (let b = Math.floor(dBas / 30); b * 30 < dHaut; b++) {
+    const o = (hasard(b) * 2 - 1) * (C.hw - 10);
+    ctx.beginPath(); ctx.arc(ecranX(b * 30, o), ecranY(b * 30), 2.2 * K, 0, 6.28); ctx.fill();
+  }
+
+  // Ligne de départ et d'arrivée
+  ligne(0, false); ligne(C.L, true);
+
+  // Décor : arbres, buissons, fleurs, clôtures, vignes
+  for (let b = Math.floor(dBas / 140) - 1; b * 140 < dHaut + 200; b++) {
+    for (const s of [-1, 1]) {
+      if (C.raccourcis.some(rc => rc.cote === s && b * 140 > rc.d0 - 300 && b * 140 < rc.d1 + 300)) continue;
+      const h = hasard(b * 2 + (s > 0 ? 1 : 0) + C.n * 1000), h2 = hasard(b * 7 + s + 3);
+      const d = b * 140 + h2 * 60;
+      if (C.N.bonus) { dessinerVignes(b, s); continue; }
+      const o = s * (C.hw + 40 + h2 * 150);
+      const x = ecranX(d, o), y = ecranY(d);
+      if (h < .22) dessinerArbre(x, y, 22 + h2 * 10);
+      else if (h < .4) { rond(x, y, 13 * K, '#3c7f2c'); rond(x + 9 * K, y + 4 * K, 10 * K, '#478f33'); }
+      else if (h < .58) for (let i = 0; i < 5; i++) rond(x + (hasard(b + i) - .5) * 40 * K, y + (hasard(b - i) - .5) * 40 * K, 3.5 * K, ['#fff', '#ffd34d', '#f065a8'][i % 3]);
+      else if (h < .7) { rond(x + 3 * K, y + 3 * K, 12 * K, 'rgba(0,0,0,.18)'); rond(x, y, 12 * K, '#9a9a92'); rond(x - 3 * K, y - 3 * K, 6 * K, '#b9b9b0'); }
+      else if (h < .82) {
+        // clôture : deux lisses et des piquets
+        ctx.strokeStyle = '#a8763e'; ctx.lineWidth = 2.5 * K;
+        for (const dec of [-3, 3]) {
+          ctx.beginPath();
+          for (let dd = 0; dd <= 140; dd += 35) ctx.lineTo(ecranX(b * 140 + dd, s * (C.hw + 22) + dec), ecranY(b * 140 + dd));
+          ctx.stroke();
+        }
+        for (let dd = 0; dd < 140; dd += 35) rond(ecranX(b * 140 + dd, s * (C.hw + 22)), ecranY(b * 140 + dd), 4 * K, '#6b4423');
+      }
+    }
+  }
+
+  // Objets
+  for (const ob of C.objets) {
+    if (ob.d < dBas - 60 || ob.d > dHaut + 60) continue;
+    const x = ecranX(ob.d, ob.o), y = ecranY(ob.d);
+    if (ob.type === 'boue') {
+      ctx.fillStyle = '#6b4423'; ctx.beginPath(); ctx.ellipse(x, y, ob.w / 2 * K, ob.h / 2 * K, 0, 0, 6.28); ctx.fill();
+      ctx.fillStyle = '#7d5430'; ctx.beginPath(); ctx.ellipse(x - 4 * K, y + 2 * K, ob.w / 3 * K, ob.h / 3.2 * K, 0, 0, 6.28); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.beginPath(); ctx.ellipse(x + ob.w / 6 * K, y - ob.h / 6 * K, 8 * K, 3 * K, -.4, 0, 6.28); ctx.fill();
+    } else if (ob.type === 'foin' && !ob.pris) {
+      const pul = 1 + Math.sin(temps * 6 + ob.d) * .06;
+      ctx.save(); ctx.translate(x, y); ctx.scale(K * pul, K * pul);
+      if (C.N.bonus) {
+        ctx.fillStyle = '#3c7f2c'; ctx.beginPath(); ctx.ellipse(0, -14, 9, 5, .4, 0, 6.28); ctx.fill();
+        for (const [gx, gy] of [[-8, -6], [0, -6], [8, -6], [-4, 2], [4, 2], [0, 10]]) rond(gx, gy, 6, '#7d3c98');
+        for (const [gx, gy] of [[-9, -8], [-1, -8], [7, -8]]) rond(gx, gy, 2, 'rgba(255,255,255,.5)');
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,.2)'; rr(-14, -9, 32, 24, 6); ctx.fill();
+        ctx.fillStyle = '#f2c94c'; rr(-17, -13, 34, 26, 7); ctx.fill();
+        ctx.strokeStyle = '#c99a1c'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.beginPath(); for (const lx of [-7, 0, 7]) { ctx.moveTo(lx, -12); ctx.lineTo(lx, 12); } ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  // Troupeaux
+  for (const t of C.troupeaux) {
+    if (t.d < dBas - 60 || t.d > dHaut + 60) continue;
+    for (const a of animaux(t)) dessinerAnimal(ecranX(a.d, a.o), ecranY(a.d), t.dir, C.N.animal, a.i);
+  }
+
+  // Particules du monde (boue, foin)
+  for (const p of partMonde) { ctx.globalAlpha = clamp(p.vie * 1.5, 0, 1); rond(ecranX(p.d, p.o), ecranY(p.d), p.t * K, p.coul); }
+  ctx.globalAlpha = 1;
+
+  // Tracteurs (du plus loin au plus proche)
+  const vehicules = [...R, P].sort((a, b) => b.d - a.d);
+  for (const e of vehicules) {
+    const y = ecranY(e.d);
+    if (y < -80 || y > H + 80) continue;
+    const ang = clamp((e === P ? P.vo : 0) * .0016 + (C.centre(e.d + 30) - C.centre(e.d - 30)) / 60 * .6, -.5, .5);
+    dessinerTracteur(ecranX(e.d, e.o), y, e.coul, ang, C.N.remorque, e === P ? e.bascule : 0, e.turboT > 0, e.boueT > 0);
+  }
+  // « Toi » au-dessus du joueur au début
+  if (!demo && temps < 4 && etat !== 'arrivee') {
+    const x = ecranX(P.d, P.o), y = ecranY(P.d) - 52 * K;
+    ctx.fillStyle = '#fff8e6'; rr(x - 22, y - 14, 44, 24, 10); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x - 6, y + 9); ctx.lineTo(x + 6, y + 9); ctx.lineTo(x, y + 16); ctx.fill();
+    ctx.fillStyle = '#5a3a1c'; ctx.font = 'bold 15px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Toi', x, y - 2);
+  }
+  ctx.restore();
+
+  // Météo
+  if (m === 'pluie') {
+    ctx.fillStyle = 'rgba(30,45,70,.18)'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(220,235,255,.55)'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (const g of gouttes) {
+      const y = ((g.y + temps * g.v * 1.6) % 1) * H, x = ((g.x - temps * .05 * g.v) % 1 + 1) % 1 * W;
+      ctx.moveTo(x, y); ctx.lineTo(x - 5, y + 16);
+    }
+    ctx.stroke();
+  } else if (m === 'brouillard') {
+    const g = ctx.createLinearGradient(0, 0, 0, PY - 60);
+    g.addColorStop(0, 'rgba(232,236,236,.97)'); g.addColorStop(.55, 'rgba(232,236,236,.9)'); g.addColorStop(1, 'rgba(232,236,236,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, PY - 60);
+  } else if (m === 'couchant') {
+    ctx.fillStyle = 'rgba(255,130,50,.14)'; ctx.fillRect(0, 0, W, H);
+  }
+
+  // Compte à rebours
+  if (etat === 'decompte') {
+    const n = Math.ceil(decompte);
+    ctx.font = '900 ' + Math.round(110 * Math.min(1.2, K)) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 10; ctx.strokeStyle = '#5a3a1c'; ctx.fillStyle = '#ffd34d';
+    const s = 1 + (decompte - Math.floor(decompte)) * .4;
+    ctx.save(); ctx.translate(W / 2, H * .38); ctx.scale(s, s);
+    ctx.strokeText(n, 0, 0); ctx.fillText(n, 0, 0); ctx.restore();
+  }
+
+  // Particules d'écran : textes et confettis
+  for (const p of partEcran) {
+    ctx.globalAlpha = clamp(p.vie, 0, 1);
+    if (p.conf) { ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.coul; ctx.fillRect(-5, -3, 10, 6); ctx.restore(); }
+    else {
+      ctx.font = '900 26px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.lineWidth = 5; ctx.strokeStyle = '#5a3a1c'; ctx.strokeText(p.txt, p.x, p.y); ctx.fillStyle = p.coul; ctx.fillText(p.txt, p.x, p.y);
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function ligne(d, arrivee) {
+  const y = ecranY(d);
+  if (y < -60 || y > H + 60) return;
+  const x0 = ecranX(d, -C.hw), x1 = ecranX(d, C.hw), n = 12, t = (x1 - x0) / n;
+  if (arrivee) {
+    for (let i = 0; i < n; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i + j) % 2 ? '#222' : '#fff'; ctx.fillRect(x0 + i * t, y - 12 * K + j * 12 * K, t + 1, 12 * K); }
+    for (const x of [x0 - 10 * K, x1 + 10 * K]) { rond(x, y, 7 * K, '#5a3a1c'); }
+    ctx.fillStyle = '#e0402a'; rr(x0 + (x1 - x0) / 2 - 60 * K, y - 50 * K, 120 * K, 26 * K, 8 * K); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(16 * K) + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('ARRIVÉE', (x0 + x1) / 2, y - 37 * K);
+  } else { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillRect(x0, y - 4 * K, x1 - x0, 8 * K); }
+}
+function dessinerArbre(x, y, r) {
+  rond(x + 6 * K, y + 6 * K, r * K, 'rgba(0,0,0,.18)');
+  rond(x, y, r * K, '#2f6e25'); rond(x - r * .3 * K, y - r * .3 * K, r * .65 * K, '#3d8a2e');
+  rond(x + r * .25 * K, y - r * .4 * K, r * .3 * K, '#5aa83f');
+}
+function dessinerVignes(b, s) {
+  for (let j = 0; j < 4; j++) {
+    const o = s * (C.hw + 34 + j * 42);
+    const x = ecranX(b * 140, o), y = ecranY(b * 140), x2 = ecranX(b * 140 + 140, o), y2 = ecranY(b * 140 + 140);
+    ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 2 * K; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x2, y2); ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      const d = b * 140 + i * 35 + 10, xx = ecranX(d, o), yy = ecranY(d);
+      rond(xx, yy, 11 * K, '#3f8a2a');
+      if (hasard(b * 13 + i * 5 + j) < .6) rond(xx + 4 * K, yy + 3 * K, 4 * K, '#7d3c98');
+    }
+  }
+}
+function dessinerAnimal(x, y, dir, type, i) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(K * dir, K);
+  const pas = Math.sin(temps * 9 + i) * 2;
+  ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(3, 4, 22, 14, 0, 0, 6.28); ctx.fill();
+  if (type === 'mouton') {
+    for (const [a, b] of [[-10, -6], [0, -8], [10, -6], [-12, 4], [0, 6], [12, 4], [0, -1]]) rond(a, b, 8, '#f6f3ea');
+    rond(22, pas * .5, 7, '#333'); rond(24, -5 + pas * .5, 2.5, '#333'); rond(24, 5 + pas * .5, 2.5, '#333');
+  } else if (type === 'oie') {
+    ctx.fillStyle = '#fbfbf5'; ctx.beginPath(); ctx.ellipse(0, 0, 16, 10, 0, 0, 6.28); ctx.fill();
+    ctx.fillStyle = '#e9e7dd'; ctx.beginPath(); ctx.ellipse(-4, 0, 9, 7, 0, 0, 6.28); ctx.fill();
+    rond(17, pas * .4, 6, '#fbfbf5'); ctx.fillStyle = '#f08a1c'; ctx.beginPath(); ctx.moveTo(22, -2 + pas * .4); ctx.lineTo(29, pas * .4); ctx.lineTo(22, 2 + pas * .4); ctx.fill();
+  } else {
+    ctx.fillStyle = '#fbfbf5'; rr(-20, -12, 38, 24, 10); ctx.fill();
+    rond(-8, -4, 6, '#2b2b2b'); rond(6, 5, 5, '#2b2b2b'); rond(-14, 7, 3.5, '#2b2b2b');
+    ctx.fillStyle = '#fbfbf5'; rr(16, -8 + pas * .4, 14, 16, 6); ctx.fill();
+    ctx.fillStyle = '#f4a6a6'; rr(25, -6 + pas * .4, 7, 12, 4); ctx.fill();
+    rond(19, -10 + pas * .4, 3, '#2b2b2b'); rond(19, 10 + pas * .4, 3, '#2b2b2b');
+  }
+  ctx.restore();
+}
+function dessinerTracteur(x, y, coul, ang, remorque, bascule, turbo, boue) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(K, K); ctx.rotate(ang);
+  if (remorque) {
+    // la remorque suit derrière, en penchant si la jauge monte
+    ctx.save(); ctx.translate(0, 30); ctx.rotate(-ang * .6 + Math.sin(temps * 14) * bascule * .12);
+    ctx.strokeStyle = '#444'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, -2); ctx.lineTo(0, 10); ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,.22)'; rr(-17, 14, 40, 44, 5); ctx.fill();
+    ctx.fillStyle = '#222'; rr(-24, 30, 6, 16, 2); ctx.fill(); rr(18, 30, 6, 16, 2); ctx.fill();
+    ctx.fillStyle = bascule > .7 ? '#d9534f' : '#a8763e'; rr(-20, 10, 40, 44, 5); ctx.fill();
+    ctx.fillStyle = '#f2c94c'; rr(-16, 14, 32, 16, 4); ctx.fill(); rr(-16, 34, 32, 16, 4); ctx.fill();
+    ctx.restore();
+  }
+  // ombre
+  ctx.fillStyle = 'rgba(0,0,0,.22)'; rr(-20, -30, 46, 64, 9); ctx.fill();
+  // roues arrière (grandes) et avant
+  ctx.fillStyle = '#222';
+  rr(-27, 2, 13, 26, 4); ctx.fill(); rr(14, 2, 13, 26, 4); ctx.fill();
+  rr(-21, -30, 9, 15, 3); ctx.fill(); rr(12, -30, 9, 15, 3); ctx.fill();
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
+  const roul = (temps * 30) % 6;
+  ctx.beginPath(); for (let i = 0; i < 5; i++) { const yy = 3 + ((i * 6 + roul) % 26); ctx.moveTo(-26, yy); ctx.lineTo(-15, yy); ctx.moveTo(15, yy); ctx.lineTo(26, yy); } ctx.stroke();
+  // capot
+  ctx.fillStyle = coul; rr(-11, -34, 22, 36, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,.25)'; rr(-8, -33, 16, 4, 2); ctx.fill();
+  // cabine
+  ctx.fillStyle = coul; rr(-16, -4, 32, 30, 6); ctx.fill();
+  ctx.fillStyle = plusClair(coul, .55); rr(-12, -1, 24, 22, 5); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; rr(-9, 1, 9, 5, 2); ctx.fill();
+  // pot d'échappement et fumée
+  rond(7, -16, 3.2, '#444');
+  if (turbo) for (let i = 0; i < 3; i++) rond(7 + Math.sin(temps * 20 + i) * 3, -22 - i * 8 - (temps * 40 % 8), 4 + i * 1.5, 'rgba(240,240,240,' + (.6 - i * .15) + ')');
+  if (boue) for (let i = 0; i < 2; i++) rond((i ? 20 : -20), 32 + Math.sin(temps * 30 + i) * 3, 4, '#6b4423');
+  ctx.restore();
+}
+
+/* =====================================================================
+   BOUCLE PRINCIPALE
+   ===================================================================== */
+let dernier = 0;
+function boucle(ts) {
+  const dt = Math.min(.05, (ts - dernier) / 1000 || 0); dernier = ts;
+  if (etat === 'demo' || etat === 'course' || etat === 'arrivee') majCourse(dt);
+  if (etat === 'decompte') {
+    const avant = Math.ceil(decompte); decompte -= dt;
+    cam.x += (C.centre(P.d) + P.o * .45 - cam.x) * .1;
+    if (Math.ceil(decompte) < avant && decompte > 0) SONS.decompte();
+    if (decompte <= 0) { etat = 'course'; SONS.partez(); moteurDemarrer(); afficherMessage('Partez !'); }
+  }
+  if (etat === 'arrivee') { arriveeT -= dt; if (arriveeT <= 0) montrerBilan(); }
+  if (etat !== 'pause' && etat !== 'tuto') majParticules(dt);
+  if (etat === 'course' || etat === 'arrivee' || etat === 'decompte') majHud();
+  dessiner();
+  requestAnimationFrame(boucle);
+}
+
+/* =====================================================================
+   INTERFACE
+   ===================================================================== */
+const ecrans = ['accueil', 'carte', 'garage'];
+function montrerEcran(id) {
+  for (const e of ecrans) $('#' + e).hidden = e !== id;
+  $('#hud').hidden = true; $('#tuto').hidden = true; $('#pause').hidden = true; $('#bilan').hidden = true;
+  $('#total-et').textContent = totalEtoiles(); $('#total-et2').textContent = totalEtoiles();
+  if (id === 'carte') remplirCarte();
+  if (id === 'garage') remplirGarage();
+}
+function allerAccueil() {
+  moteurArreter(); if (AC && AC.state === 'suspended') AC.resume().catch(() => {});
+  etat = 'demo'; preparerCourse(0, true); montrerEcran('accueil');
+}
+function etoilesTxt(n, max = 3) { let s = ''; for (let i = 0; i < max; i++) s += i < n ? '<i>★</i>' : '★'; return s; }
+function remplirCarte() {
+  const g = $('#grille'); g.innerHTML = '';
+  NIVEAUX.forEach((N, n) => {
+    const b = document.createElement('button');
+    const ouvert = niveauOuvert(n);
+    b.className = 'case' + (ouvert ? '' : ' ferme') + (N.bonus ? ' bonus' : '');
+    b.innerHTML = '<b>' + (N.bonus ? 'Bonus' : n + 1) + '</b><small>' + N.nom + '</small>' +
+      (ouvert ? '<span class="et">' + etoilesTxt(sauve.etoiles[n] || 0) + '</span>' : '<small>' + (N.bonus ? 'Gagne ' + ETOILES_BONUS + ' ★' : 'Fermé') + '</small>');
+    b.setAttribute('aria-label', 'Circuit ' + (n + 1) + ' : ' + N.nom);
+    b.addEventListener('click', () => { audio(); SONS.clic(); if (ouvert) lancerNiveau(n); });
+    g.appendChild(b);
+  });
+}
+function svgTracteur(coul) {
+  return '<svg viewBox="-30 -38 60 70"><rect x="-27" y="2" width="13" height="26" rx="4" fill="#222"/><rect x="14" y="2" width="13" height="26" rx="4" fill="#222"/>' +
+    '<rect x="-21" y="-30" width="9" height="15" rx="3" fill="#222"/><rect x="12" y="-30" width="9" height="15" rx="3" fill="#222"/>' +
+    '<rect x="-11" y="-34" width="22" height="36" rx="7" fill="' + coul + '"/><rect x="-16" y="-4" width="32" height="30" rx="6" fill="' + coul + '"/>' +
+    '<rect x="-12" y="-1" width="24" height="22" rx="5" fill="' + plusClair(coul, .55) + '"/><circle cx="7" cy="-16" r="3.2" fill="#444"/></svg>';
+}
+function remplirGarage() {
+  const tot = totalEtoiles();
+  const cs = $('#couleurs'); cs.innerHTML = '';
+  COULEURS.forEach((c, i) => {
+    const b = document.createElement('button');
+    const ok = tot >= c.e;
+    b.className = 'pastille-coul' + (sauve.couleur === i ? ' choisi' : '');
+    b.innerHTML = ok ? svgTracteur(c.c) + c.nom : svgTracteur('#999') + c.e + ' ★';
+    b.setAttribute('aria-label', 'Tracteur ' + c.nom);
+    b.addEventListener('click', () => { audio(); if (!ok) { SONS.recule(); return; } sauve.couleur = i; enregistrer(); SONS.clic(); remplirGarage(); });
+    cs.appendChild(b);
+  });
+  const ks = $('#klaxons'); ks.innerHTML = '';
+  KLAXONS.forEach((k, i) => {
+    const b = document.createElement('button');
+    const ok = tot >= k.e;
+    b.className = 'btn blanc k' + (sauve.klaxon === i ? ' choisi' : '');
+    b.textContent = ok ? k.nom : k.nom + ' (' + k.e + ' ★)';
+    b.disabled = !ok;
+    b.addEventListener('click', () => { audio(); sauve.klaxon = i; enregistrer(); SONS.klaxon(); remplirGarage(); });
+    ks.appendChild(b);
+  });
+}
+
+/* ---------- Tutoriels animés (SVG) ---------- */
+const svgT = (c, extra = '') => '<g>' + svgTracteur(c).replace(/^<svg[^>]*>/, '').replace('</svg>', '') + extra + '</g>';
+const MAIN = '<g transform="translate(0,46)"><path d="M-6 0v-16a5 5 0 0 1 10 0v12l10 2a6 6 0 0 1 5 7l-3 15h-22l-6-12a4 4 0 0 1 6-4z" fill="#fff" stroke="#5a3a1c" stroke-width="2.5"/></g>';
+const ROUTE = '<rect width="300" height="200" fill="#62ad44"/><rect x="80" width="140" height="200" fill="#c99c62"/><path d="M115 0v200M185 0v200" stroke="rgba(120,80,40,.25)" stroke-width="8"/>';
+const TUTOS = {
+  base: { titre: 'Conduis ton tracteur', clavier: 'Au clavier : flèches ← et →',
+    etapes: ['Pose ton doigt sur l’écran.', 'Glisse-le à gauche ou à droite pour tourner.', 'Dépasse les 3 tracteurs et arrive le premier !'],
+    svg: ROUTE + '<g class="a-desc"><g transform="translate(120,20) scale(.6)">' + svgT('#2f7de0') + '</g></g><g class="a-desc2"><g transform="translate(180,20) scale(.6)">' + svgT('#f2c230') + '</g></g>' +
+      '<g class="a-gd"><g transform="translate(150,135) scale(.75)">' + svgT('#e0402a') + MAIN + '</g></g>' },
+  boue: { titre: 'Attention, la boue !', etapes: ['Les flaques de boue te ralentissent.', 'Glisse le doigt pour passer à côté.'],
+    svg: ROUTE + '<g class="a-desc"><ellipse cx="150" cy="40" rx="38" ry="20" fill="#6b4423"/><ellipse cx="146" cy="42" rx="24" ry="12" fill="#7d5430"/></g>' +
+      '<g class="a-evite"><g transform="translate(150,150) scale(.75)">' + svgT('#e0402a') + '</g></g>' },
+  pluie: { titre: 'Il pleut : ça glisse !', etapes: ['Ton tracteur réagit plus lentement.', 'Tourne un peu plus tôt dans les virages.'],
+    svg: ROUTE.replace('#c99c62', '#9c7448') + '<g class="a-tangue"><g transform="translate(150,120) scale(.8)">' + svgT('#e0402a') + '</g></g>' +
+      '<g class="a-pluie" stroke="#dbe9ff" stroke-width="2">' + Array.from({ length: 22 }, (_, i) => '<line x1="' + (i * 14 + 5) + '" y1="' + (i * 37 % 200) + '" x2="' + (i * 14) + '" y2="' + (i * 37 % 200 + 14) + '"/>').join('') + '</g>' },
+  foin: { titre: 'Ramasse le foin !', etapes: ['Roule sur les bottes de foin.', 'Chaque botte donne un petit coup de turbo.', 'Beaucoup de foin = une étoile en plus !'],
+    svg: ROUTE + '<g class="a-desc"><rect x="133" y="20" width="34" height="26" rx="7" fill="#f2c94c" stroke="#c99a1c" stroke-width="2"/></g>' +
+      '<g transform="translate(150,150) scale(.75)">' + svgT('#e0402a') + '</g><g class="a-scint" fill="#fff"><circle cx="120" cy="110" r="4"/><circle cx="182" cy="104" r="3"/><circle cx="170" cy="128" r="3"/></g>' },
+  raccourci: { titre: 'Des raccourcis cachés !', etapes: ['Un panneau en bois montre un chemin dans le blé.', 'Sur ce chemin, ton tracteur va plus vite !'],
+    svg: ROUTE + '<rect x="220" width="80" height="200" fill="#e2c25a"/><path d="M200 200 Q262 100 200 0" stroke="#c99c62" stroke-width="30" fill="none"/>' +
+      '<rect x="222" y="168" width="4" height="26" fill="#6b4423"/><rect x="208" y="160" width="32" height="14" rx="3" fill="#a8763e"/><path d="M216 167h14l-4-4M230 167l-4 4" stroke="#fff" stroke-width="2.5" fill="none"/>' +
+      '<g class="a-rac"><g transform="translate(180,170) scale(.65)">' + svgT('#e0402a') + '</g></g>' },
+  troupeau: { titre: 'Un troupeau traverse !', etapes: ['Attends ou passe dans le trou.', 'Ou touche le klaxon : les animaux se pressent !'], clavier: 'Au clavier : Espace pour klaxonner',
+    svg: ROUTE + '<g class="a-trav">' + [0, 44, 88].map(x => '<g transform="translate(' + x + ',70)"><rect x="-20" y="-12" width="38" height="24" rx="10" fill="#fbfbf5"/><circle cx="-8" cy="-4" r="6" fill="#2b2b2b"/><circle cx="6" cy="5" r="5" fill="#2b2b2b"/><rect x="16" y="-8" width="14" height="16" rx="6" fill="#fbfbf5"/><rect x="25" y="-6" width="7" height="12" rx="4" fill="#f4a6a6"/></g>').join('') + '</g>' +
+      '<g transform="translate(150,160) scale(.7)">' + svgT('#e0402a') + '</g><g class="a-pulse"><circle cx="262" cy="160" r="26" fill="#ffd34d" stroke="#b8860b" stroke-width="3"/><g transform="translate(244,142)"><circle cx="9" cy="18" r="6.5" fill="#e0402a"/><rect x="14" y="15.5" width="8" height="5" fill="#5a3a1c"/><path d="M21 15.5L33 8v20L21 20.5z" fill="#5a3a1c"/></g></g>' },
+  brouillard: { titre: 'Le brouillard !', etapes: ['On voit beaucoup moins loin.', 'Reste attentif : la boue et les animaux arrivent d’un coup !'],
+    svg: ROUTE + '<g class="a-desc"><ellipse cx="130" cy="40" rx="30" ry="16" fill="#6b4423"/></g><g transform="translate(150,160) scale(.7)">' + svgT('#e0402a') + '</g>' +
+      '<defs><linearGradient id="gb" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8ecec" stop-opacity="1"/><stop offset="1" stop-color="#e8ecec" stop-opacity="0"/></linearGradient></defs><rect class="a-brume" width="300" height="130" fill="url(#gb)"/>' },
+  remorque: { titre: 'La remorque de foin', etapes: ['Ta remorque peut se renverser !', 'Tourne en douceur : la jauge ne doit pas se remplir.'],
+    svg: ROUTE + '<g class="a-gd"><g transform="translate(150,90) scale(.8)">' + svgT('#e0402a') + '<g class="a-penche"><rect x="-20" y="38" width="40" height="44" rx="5" fill="#a8763e"/><rect x="-16" y="42" width="32" height="16" rx="4" fill="#f2c94c"/><rect x="-16" y="62" width="32" height="16" rx="4" fill="#f2c94c"/></g></g></g>' +
+      '<rect x="10" y="170" width="100" height="16" rx="8" fill="#fff8e6"/><rect class="a-jauge" x="14" y="174" width="92" height="8" rx="4" fill="#e0402a" style="transform-origin:14px 178px"/>' },
+  vignes: { titre: 'Le circuit des vignes', etapes: ['Ramasse les grappes de raisin pour le turbo.', 'Attention aux oies qui traversent !'],
+    svg: ROUTE + '<g fill="#3f8a2a">' + [20, 50, 250, 280].map(x => [20, 60, 100, 140, 180].map(y => '<circle cx="' + x + '" cy="' + y + '" r="11"/>').join('')).join('') + '</g>' +
+      '<g class="a-desc">' + [[-8, -6], [0, -6], [8, -6], [-4, 2], [4, 2], [0, 10]].map(([x, y]) => '<circle cx="' + (150 + x) + '" cy="' + (30 + y) + '" r="6" fill="#7d3c98"/>').join('') + '</g>' +
+      '<g transform="translate(150,155) scale(.7)">' + svgT('#e0402a') + '</g>' }
+};
+let tutoMinuteur = null, tutoFin = null;
+function montrerTuto(cle, suite) {
+  const t = TUTOS[cle];
+  etat = 'tuto';
+  $('#tuto-titre').textContent = t.titre;
+  $('#tuto-anim').innerHTML = '<svg viewBox="0 0 300 200">' + t.svg + '</svg>';
+  $('#tuto-etapes').innerHTML = t.etapes.map(e => '<li>' + e + '</li>').join('');
+  $('#tuto-clavier').textContent = t.clavier || '';
+  $('#tuto').hidden = false;
+  const barre = $('#tuto-temps'), duree = 4000 + t.etapes.length * 1500;
+  barre.style.transition = 'none'; barre.style.transform = 'scaleX(1)';
+  requestAnimationFrame(() => { barre.style.transition = 'transform ' + duree + 'ms linear'; barre.style.transform = 'scaleX(0)'; });
+  sauve.vus[cle] = true; enregistrer();
+  tutoFin = () => { clearTimeout(tutoMinuteur); tutoFin = null; $('#tuto').hidden = true; suite(); };
+  clearTimeout(tutoMinuteur);
+  tutoMinuteur = setTimeout(() => { if (tutoFin) tutoFin(); }, duree);
+}
+$('#tuto').addEventListener('pointerdown', e => { e.preventDefault(); audio(); if (tutoFin) { SONS.clic(); tutoFin(); } });
+
+/* ---------- Lancer un circuit ---------- */
+let niveauCourant = 0;
+function lancerNiveau(n) {
+  audio(); moteurArreter();
+  niveauCourant = n;
+  for (const e of ecrans) $('#' + e).hidden = true;
+  $('#bilan').hidden = true; $('#pause').hidden = true;
+  preparerCourse(n, false);
+  const N = NIVEAUX[n];
+  $('#hud').hidden = false;
+  $('#foin').hidden = !N.foin; $('#jauge').hidden = !N.remorque;
+  $('#btn-klaxon').classList.remove('attire');
+  // pastilles de la barre de progression
+  const pr = $('#progres'); pr.querySelectorAll('i').forEach(i => i.remove());
+  for (const v of [...R, P]) { const i = document.createElement('i'); i.style.background = v.coul; if (v === P) { i.style.width = i.style.height = '17px'; i.style.top = '0'; i.style.zIndex = 2; } pr.appendChild(i); v.point = i; }
+  hudPlace = hudFoin = -1;
+  majHud();
+  const depart = () => {
+    etat = 'decompte'; decompte = 3; SONS.decompte();
+    afficherMessage(N.bonus ? 'Bonus : ' + N.nom : 'Circuit ' + (n + 1) + ' : ' + N.nom);
+    message.t = 2.4;
+  };
+  const aMontrer = [];
+  if (n === 0 || !sauve.vus.base) aMontrer.push('base');
+  if (N.nouveau && N.nouveau !== 'base' && !sauve.vus[N.nouveau]) aMontrer.push(N.nouveau);
+  if (n === 0 && sauve.vus.base && (sauve.etoiles[0] || 0) > 0) aMontrer.length = 0;   // déjà gagné : pas besoin de revoir
+  const enchainer = () => { const k = aMontrer.shift(); if (k) montrerTuto(k, enchainer); else depart(); };
+  etat = 'tuto';
+  enchainer();
+}
+function niveauConseille() {
+  for (let n = 0; n < NB_NORMAUX; n++) if (!(sauve.etoiles[n] >= 1)) return n;
+  if (niveauOuvert(NB_NORMAUX) && !sauve.etoiles[NB_NORMAUX]) return NB_NORMAUX;
+  for (let n = 0; n < NB_NORMAUX; n++) if (sauve.etoiles[n] < 3) return n;
+  return NB_NORMAUX - 1;
+}
+
+/* ---------- HUD ---------- */
+let hudPlace = -1, hudFoin = -1;
+function majHud() {
+  if (placeAff !== hudPlace) { hudPlace = placeAff; $('#place').innerHTML = placeAff + '<sup>' + (placeAff === 1 ? 'er' : 'e') + '</sup>'; }
+  if (P.foin !== hudFoin) { hudFoin = P.foin; $('#foin-txt').textContent = P.foin + ' / ' + C.foinBut; }
+  for (const v of [...R, P]) if (v.point) v.point.style.left = clamp(v.d / C.L, 0, 1) * 100 + '%';
+  if (C.N.remorque) {
+    const j = $('#jauge-i'); j.style.width = P.bascule * 100 + '%';
+    j.style.background = P.bascule > .7 ? '#e0402a' : P.bascule > .4 ? '#f2a900' : '#5cc84a';
+  }
+}
+
+/* ---------- Bilan ---------- */
+function montrerBilan() {
+  etat = 'bilan';
+  const n = niveauCourant, place = resultat.place;
+  const avecFoin = C.foinTotal > 0 && C.N.foin > 0;
+  const foinOk = !avecFoin || P.foin >= C.foinBut;
+  let et;
+  if (!avecFoin) et = place === 1 ? 3 : place === 2 ? 2 : place === 3 ? 1 : 0;
+  else { et = place === 1 ? 2 : place <= 3 ? 1 : 0; if (et > 0 && foinOk) et++; }
+  const par = C.L / 235;
+  const score = [600, 400, 250, 100][place - 1] + P.foin * 50 + Math.max(0, Math.round((par - resultat.temps) * 10));
+  const totalAvant = totalEtoiles();
+  const ancien = sauve.records[n] || 0;
+  const record = score > ancien;
+  if (record) sauve.records[n] = score;
+  if (et > (sauve.etoiles[n] || 0)) sauve.etoiles[n] = et;
+  enregistrer();
+  const totalApres = totalEtoiles();
+
+  $('#bilan-titre').textContent = place === 1 ? 'Victoire !' : place <= 3 ? 'Bravo !' : 'Presque !';
+  $('#bilan-place').textContent = 'Tu arrives ' + place + (place === 1 ? 'er' : 'e') + ' sur 4';
+  const spans = $('#bilan-etoiles').children;
+  for (let i = 0; i < 3; i++) { spans[i].className = ''; spans[i].style.animationDelay = (.3 + i * .35) + 's'; }
+  for (let i = 0; i < et; i++) { spans[i].className = 'gagnee'; setTimeout(() => { if (etat === 'bilan') SONS.etoile(i); }, 300 + i * 350); }
+  let stats = '';
+  if (avecFoin) stats += (C.N.bonus ? 'Raisins' : 'Foin') + ' : ' + P.foin + ' / ' + C.foinTotal + (foinOk ? ' ✔' : ' (il en fallait ' + C.foinBut + ')') + '<br>';
+  stats += 'Temps : ' + resultat.temps.toFixed(1) + ' s';
+  if (et === 0) stats += '<br>Termine dans les 3 premiers pour gagner une étoile.';
+  $('#bilan-stats').innerHTML = stats;
+  // score qui défile
+  const el = $('#bilan-score'), debut = performance.now();
+  const defile = t => { const f = Math.min(1, (t - debut) / 1200); el.textContent = Math.round(score * f) + ' points'; if (f < 1 && etat === 'bilan') requestAnimationFrame(defile); };
+  requestAnimationFrame(defile);
+  $('#bilan-record').textContent = record ? 'Nouveau record !' : 'Record : ' + ancien + ' points';
+  if (record && ancien > 0) setTimeout(() => SONS.record(), 1400);
+  // déblocages
+  const neufs = [];
+  for (const c of COULEURS) if (c.e > totalAvant && c.e <= totalApres) neufs.push('tracteur ' + c.nom.toLowerCase());
+  for (const k of KLAXONS) if (k.e > totalAvant && k.e <= totalApres) neufs.push('klaxon ' + k.nom);
+  if (ETOILES_BONUS > totalAvant && ETOILES_BONUS <= totalApres) neufs.push('circuit bonus des vignes');
+  let deb = neufs.length ? 'Nouveau au garage : ' + neufs.join(', ') + ' !' : '';
+  if (n === NB_NORMAUX - 1 && et > 0) deb = 'Tu as fini le rallye ! ' + (totalApres >= ETOILES_BONUS ? 'Essaie le circuit bonus !' : 'Gagne ' + ETOILES_BONUS + ' étoiles pour ouvrir le circuit bonus.') + (deb ? ' ' + deb : '');
+  $('#bilan-debloque').textContent = deb;
+  if (et > 0) confettis(60); else SONS.perdu();
+  const suivant = n + 1 < NIVEAUX.length && niveauOuvert(n + 1);
+  $('#b-suivant').hidden = !suivant;
+  $('#jauge').hidden = true;
+  $('#bilan').hidden = false;
+}
+
+/* ---------- Pause ---------- */
+function mettrePause() {
+  if (!['course', 'decompte', 'arrivee'].includes(etat)) return;
+  etatAvantPause = etat; etat = 'pause'; glisse = null; touches.g = touches.d = 0;
+  if (AC) AC.suspend().catch(() => {});
+  $('#pause').hidden = false;
+}
+function reprendre() {
+  if (etat !== 'pause') return;
+  etat = etatAvantPause; $('#pause').hidden = true;
+  if (AC) AC.resume().catch(() => {});
+  dernier = performance.now();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+
+/* =====================================================================
+   CONTRÔLES : glisser le doigt (ou la souris), flèches du clavier
+   ===================================================================== */
+cv.addEventListener('pointerdown', e => {
+  audio();
+  if (etat !== 'course' && etat !== 'decompte') return;
+  glisse = { id: e.pointerId, x: e.clientX, base: P.cible };
+  try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+});
+cv.addEventListener('pointermove', e => {
+  if (!glisse || glisse.id !== e.pointerId || !P) return;
+  P.cible = glisse.base + (e.clientX - glisse.x) / K * 1.3;
+});
+const finGlisse = e => { if (glisse && glisse.id === e.pointerId) glisse = null; };
+cv.addEventListener('pointerup', finGlisse);
+cv.addEventListener('pointercancel', finGlisse);
+
+function klaxonner() {
+  if (etat !== 'course' || klaxonCd > 0) return;
+  klaxonCd = .6; SONS.klaxon();
+  afficherFlottant('♪ ♪', '#fff');
+  for (const t of C.troupeaux) if (t.d > P.d - 60 && t.d < P.d + 800) t.boost = 2.5;
+}
+$('#btn-klaxon').addEventListener('pointerdown', e => { e.preventDefault(); audio(); klaxonner(); });
+
+document.addEventListener('keydown', e => {
+  const k = e.key;
+  if (etat === 'tuto') { if (tutoFin) { audio(); tutoFin(); } e.preventDefault(); return; }
+  if (k === 'Escape' || k === 'p' || k === 'P') { if (etat === 'pause') reprendre(); else mettrePause(); e.preventDefault(); return; }
+  if (k === 'ArrowLeft' || k === 'q' || k === 'a') { touches.g = 1; e.preventDefault(); }
+  if (k === 'ArrowRight' || k === 'd') { touches.d = 1; e.preventDefault(); }
+  if ((k === ' ' || k === 'h' || k === 'k') && etat === 'course') { audio(); klaxonner(); e.preventDefault(); }
+  if (k === 'Enter' && !$('#accueil').hidden) { audio(); lancerNiveau(niveauConseille()); }
+});
+document.addEventListener('keyup', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'q' || e.key === 'a') touches.g = 0;
+  if (e.key === 'ArrowRight' || e.key === 'd') touches.d = 0;
+});
+
+// Boutons
+const sur = (id, f) => $(id).addEventListener('click', () => { audio(); SONS.clic(); f(); });
+sur('#btn-jouer', () => lancerNiveau(niveauConseille()));
+sur('#btn-carte', () => montrerEcran('carte'));
+sur('#btn-garage', () => montrerEcran('garage'));
+sur('#carte-retour', () => montrerEcran('accueil'));
+sur('#garage-retour', () => montrerEcran('accueil'));
+sur('#btn-pause', mettrePause);
+$('#btn-son').addEventListener('click', basculerSon);
+$('#btn-son-a').addEventListener('click', basculerSon);
+$('#p-reprendre').addEventListener('click', () => { reprendre(); SONS.clic(); });
+$('#p-recommencer').addEventListener('click', () => { $('#pause').hidden = true; if (AC) AC.resume().catch(() => {}); lancerNiveau(niveauCourant); });
+$('#p-accueil').addEventListener('click', () => { $('#pause').hidden = true; allerAccueil(); });
+sur('#b-suivant', () => lancerNiveau(niveauCourant + 1));
+sur('#b-rejouer', () => lancerNiveau(niveauCourant));
+sur('#b-carte', () => { allerAccueil(); montrerEcran('carte'); });
+
+// Démarrage : démonstration silencieuse derrière l'écran d'accueil
+redimensionner();
+majSon();
+allerAccueil();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
