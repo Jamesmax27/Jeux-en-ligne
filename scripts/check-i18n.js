@@ -284,6 +284,7 @@ function chercherTextesEnDur(id, code, clesFr = new Set()) {
       if (!LETTRES.test(texte)) continue;
       if (!MOTS.test(texte) && !/[àâäçéèêëîïôöùûüÿœæ]/i.test(texte)) continue;
       const avant = js.slice(Math.max(0, m.index - 40), m.index);
+      if (/^@[\w.]+$/.test(texte.trim()) || /class=\s*$/.test(avant)) continue;          // pseudo (@nom), classes CSS
       const ligne = js.slice(js.lastIndexOf('\n', m.index) + 1, m.index);
       if (/(?:^|[^\w$])(?:t|traduire)\(\s*$|JEL_I18N\.\w+\(\s*$/.test(avant)) continue;   // t('…')
       if (/console\.\w+\(|font\s*=|font:|\.font\b|querySelector|getElementById|matchMedia|addEventListener|createElement|classList|setAttribute\(\s*['"](?:class|style|id|role)/.test(ligne)) continue;
@@ -339,7 +340,9 @@ async function debordements(page) {
       if (style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
       const texte = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim();
       if (!/\p{L}{2,}/u.test(texte)) continue;
-      const deborde = el.scrollWidth > el.clientWidth + 2 && /hidden|clip/.test(style.overflowX + style.overflow);
+      // Texte coupé exprès par le jeu (« … », nombre de lignes limité) : pas un débordement.
+      const coupeVoulue = style.textOverflow === 'ellipsis' || (style.webkitLineClamp && style.webkitLineClamp !== 'none');
+      const deborde = !coupeVoulue && el.scrollWidth > el.clientWidth + 2 && /hidden|clip/.test(style.overflowX + style.overflow);
       const horsEcran = r.right > L + 2 || r.left < -2;
       if (deborde || horsEcran) resultat.push(texte.slice(0, 40));
     }
