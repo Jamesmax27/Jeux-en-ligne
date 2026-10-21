@@ -57,7 +57,10 @@ Jeux-en-ligne/
 ├─ scripts/
 │  ├─ build-catalog.mjs     lit games/*/game.json → public/catalog.json (+ copie des jeux)
 │  ├─ genres.mjs            liste fermée des genres (identique à CONSIGNES-JEU.md)
+│  ├─ idees.mjs             file d'idées de la boucle de nuit (choix, archivage, contrôles)
 │  └─ validate-games.mjs    contrôle qualité des jeux
+├─ idees.json               idées à fabriquer (« en_attente », « en_cours »)
+├─ idees-archive.json       idées réalisées (« faite », avec jeu_id)
 ├─ schema.sql               structure de la base D1
 ├─ CONSIGNES-JEU.md         règles que doit suivre toute IA qui crée un jeu
 ├─ CLAUDE.md                ce fichier
@@ -79,7 +82,7 @@ Fichiers ajoutés en phase 3 (hors ligne) :
 - `public/manifest.webmanifest` et icônes tirées de `logo.svg` : `public/assets/icone-192.png`, `icone-512.png`, `icone-masquable-512.png` (Android), `apple-touch-icon.png` (iPhone).
 
 Fichiers ajoutés pour la validation automatique et la publicité :
-- `.github/workflows/valider-jeu.yml` : validation des pull requests de la boucle (robot + relecture Claude, puis fusion, correction ou fermeture) ; voir section 10.
+- `.github/workflows/boucle-de-nuit.yml` : boucle de nuit complète (idéation, choix, fabrication, vérification, fusion, archivage des idées) ; voir section 10.
 - `public/pub.js` : publicité préparée mais **désactivée** (`PUB_ACTIVE = false`), un seul emplacement en bas du catalogue, jamais dans les jeux ; `PUBLICITE.md` : ce qu'il faut fournir pour l'activer.
 
 Le lanceur lit le jeu à l'adresse `games/<id>/?v=<version>` (Cloudflare retire `index.html` des adresses), puis l'affiche dans le cadre via `srcdoc` (voir section 6). Augmenter `version` dans `game.json` à chaque modification d'un jeu.
@@ -187,13 +190,24 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 
 ## 10. Ajout de jeux par des IA
 
-1. L'IA lit ce fichier, `CONSIGNES-JEU.md` et `public/catalog.json` (pour éviter les doublons de concept et de titre).
-2. Elle crée un nouveau dossier `games/<id>/` conforme à la section 5, sur une branche dédiée.
-3. Elle ouvre une **pull request** ; elle ne pousse jamais directement sur `main`.
-4. Le workflow `validate.yml` vérifie : présence et format des 3 fichiers, unicité de l'`id`, aucune URL `http(s)://` externe dans `index.html`, tailles maximales, ouverture sans erreur console dans Playwright (+ capture d'écran utilisable comme jaquette si `cover.webp` manque).
-   Les pull requests de la boucle (branches `nouveau-jeu/…`) sont validées par `valider-jeu.yml` : robot (`validate-games.mjs --jouer` : chargement, console, téléphone 390 × 844 au toucher, hors ligne, fiche, jaquette, taille), puis relecture par Claude avec la grille de `CONSIGNES-JEU.md` (section 7), résumée en commentaire.
-5. Fusion : **automatique** pour les pull requests de la boucle si tout passe (variable GitHub `FUSION_AUTO` = `non` pour revenir à une fusion manuelle). Sinon : étiquette `a-corriger` et correction par l'agent (`corriger-jeu.yml`), 2 fois au plus ; au 3e échec, la pull request est fermée et l'idée mise de côté (`- [-]` dans `IDEES-JEUX.md`). Les autres pull requests restent fusionnées à la main.
-   Une pull request ouverte, commentée ou fusionnée par le robot (jeton `GITHUB_TOKEN`) ne déclenche aucun autre workflow : ceux de la boucle s'enchaînent donc par lancement direct (`workflow_dispatch`).
+**Catalogue de référence** : tous les jeux publiés (y compris ceux d'avant la boucle) sont les dossiers `games/*/` ; leur fiche `game.json` est leur entrée de catalogue (genre et tags obligatoires), et `public/catalog.json` en est tiré au build. Une pull request de jeu ne touche que `games/<id>/` : jamais de conflit sur le catalogue.
+
+**File d'idées** (`scripts/idees.mjs`, détails en tête du fichier) :
+- `idees.json` : idées `en_attente` ou `en_cours` ; `idees-archive.json` : idées `faite` avec `jeu_id`.
+- Champs : `id`, `titre`, `description`, `genre`, `tags`, `source` (`humain` / `agent`), `date_ajout`, `statut`, `jeu_id` (`null` tant que le jeu n'est pas publié) ; `essais` (facultatif) compte les jeux refusés : à 3, l'idée n'est plus choisie.
+- Ordre de fabrication : idées `humain` dans l'ordre du fichier, puis idées `agent`. Un jeu est relié à son idée par le champ `idee` de son `game.json` (= `id` de l'idée).
+- Ajout humain : à la main dans `idees.json`, ou formulaire « Nouvelle idée de jeu » (`idee-jeu.yml`).
+
+**Boucle de nuit** (`.github/workflows/boucle-de-nuit.yml`, 00:00 et 05:00 UTC, ou à la main ; un seul passage à la fois) :
+1. a) **Idéation** : moins de 15 idées en attente → un agent lit `node scripts/idees.mjs catalogue` (titre, genre et tags des jeux, effectifs par genre et univers), `idees.json` et les titres de l'archive, puis propose des idées riches pour les genres et univers sous-représentés (source `agent`). Il n'écrit que `nouvelles-idees.json`.
+2. b) **Choix** : idées mises à jour (jeu publié → archive ; `en_cours` sans pull request ouverte → `en_attente`), idées de l'agent ajoutées après contrôle, puis 5 idées `en_cours`. Enregistré sur `main`.
+3. c) **Fabrication** : une tâche par idée, en parallèle (5 au plus) : jeu, jaquette, `game.json` avec le genre et les tags de l'idée, pull request (branche `nouveau-jeu/<n° du passage>/<id de l'idée>`).
+4. d) **Vérification** de chaque pull request de la boucle dont l'idée est `en_cours` (y compris celles restées ouvertes) : robot (`validate-games.mjs --jouer` : chargement, console, téléphone 390 × 844 au toucher, hors ligne, fiche, jaquette, taille ; `idees.mjs controler` : entrée du catalogue), puis relecture par Claude avec la grille de `CONSIGNES-JEU.md` (section 7). Puis, une pull request à la fois : tout est bon → fusion (branche mise à jour si `main` a bougé) ; sinon → commentaire, fermeture, idée remise `en_attente` (+1 essai). Vérification interrompue (limite d'utilisation…) : rien n'est décidé, reprise au passage suivant.
+5. e) **Mise à jour** : idées des jeux fusionnés → `idees-archive.json` (`faite`, `jeu_id`). Enregistré sur `main`. Cloudflare Pages publie à chaque fusion.
+
+Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `idees-archive.json`, jamais les tâches parallèles ; ces enregistrements portent `[CF-Pages-Skip]` (pas de build Cloudflare). Fusion automatique désactivable : variable GitHub `FUSION_AUTO` = `non` (les jeux validés reçoivent l'étiquette `valide` et attendent une fusion à la main). Corrections à la demande : commentaire `@claude` du propriétaire (`corriger-jeu.yml`). Une pull request ouverte ou fusionnée par le robot (jeton `GITHUB_TOKEN`) ne déclenche aucun autre workflow : toute la séquence tient donc dans `boucle-de-nuit.yml`.
+
+**Autre IA ou personne** : lire ce fichier, `CONSIGNES-JEU.md` et `public/catalog.json` (doublons de concept et de titre), créer `games/<id>/` conforme à la section 5 sur une branche dédiée, ouvrir une **pull request** (jamais de push direct sur `main`). `validate.yml` vérifie : présence et format des fichiers, aucune URL `http(s)://` externe, tailles, ouverture sans erreur console dans Playwright. Fusion à la main.
 
 ## 11. Conventions de code
 
@@ -206,7 +220,8 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 ## 12. Ce que les IA ne doivent pas faire
 
 - Modifier les réglages Cloudflare, les secrets, les clés Turnstile ou le nom de domaine.
-- Pousser directement sur `main`, fusionner des pull requests autrement que par la validation automatique (`valider-jeu.yml`), ou supprimer des jeux existants.
+- Pousser directement sur `main`, fusionner des pull requests autrement que par la vérification de la boucle de nuit (`boucle-de-nuit.yml`), ou supprimer des jeux existants.
+- Écrire dans `idees.json` ou `idees-archive.json` depuis une tâche de fabrication de jeu (réservé aux étapes b et e de la boucle et au formulaire d'idées).
 - Modifier `public/catalog.json` à la main.
 - Ajouter des traceurs, des comptes utilisateurs ou une collecte de données personnelles.
 - Mettre de la publicité ailleurs que dans l'emplacement prévu (`public/pub.js`, en bas du catalogue), ou l'activer : c'est une décision du propriétaire (voir `PUBLICITE.md`).
@@ -231,10 +246,10 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 - Design « Galaxie » — fait (`style.css` réécrit, fonctionnement inchangé). Toujours sombre : bleu nuit `#0b1020`, gris ardoise, blanc cassé `#eceae4`, un seul accent bleu lavande `#a8b3f0` (couleurs en variables dans `:root`). Champ d'étoiles fixe en CSS (`body::before` / `::after`, scintillement léger coupé si mouvements réduits). Logo planète à anneau : `assets/logo.svg` (sur fond, sert aussi aux icônes PNG) et copie sans fond dans l'en-tête de `index.html`. Pouces dessinés au trait (SVG dans `play.html`, masque CSS pour les compteurs des jaquettes). Boutons et puces d'au moins 44 px.
 - Idées depuis le téléphone — fichiers créés (`.github/ISSUE_TEMPLATE/idee-jeu.yml`, `.github/workflows/idee-jeu.yml`, section dans `GUIDE-BOUCLE.md`). Reste : créer l'étiquette `idee-jeu` sur GitHub et faire un premier essai.
 - Corrections par commentaire — fichier créé (`.github/workflows/corriger-jeu.yml`, section dans `GUIDE-BOUCLE.md`). Reste : premier essai sur une vraie pull request.
-- Plusieurs jeux par lancement — `nouveau-jeu.yml` (entrée « nombre » 1 à 5, matrice, une pull request par jeu, jeux créés l'un après l'autre (`max-parallel: 1`, `fail-fast: false`), 2 la nuit et 1 à 5 à la main, idées déjà prises par une pull request ouverte sautées) et `cocher-idee.yml` (idée cochée sur main à la fusion). Les pull requests de jeux ne modifient jamais `IDEES-JEUX.md` : l'idée est notée dans `game.json` (champ `idee`, garanti par le workflow). Lecture de l'ancien repère `<!-- idee: … -->` des descriptions gardée en secours pour les pull requests créées avant ce champ : à retirer quand elles seront toutes fusionnées ou fermées.
-- Jeux plus complets — minimum obligatoire dans `CONSIGNES-JEU.md` (10 niveaux, tutoriel animé, étoiles, record, sons coupables, effets, bilan, mécaniques combinées) ; `nouveau-jeu.yml` : cahier de conception (description de la pull request), partie au hasard avec captures (`validate-games.mjs --jouer`, captures dans `captures/`, ignoré par git), relecture « 15 minutes », Claude Fable 5.1, 150 tours, 120 minutes. Reste : juger le premier jeu produit.
-- Validation automatique — fichiers créés ou modifiés : `valider-jeu.yml` (nouveau) ; `nouveau-jeu.yml` la lance après chaque pull request ; `corriger-jeu.yml` accepte aussi les demandes du robot (`workflow_dispatch` : `pr`, `demande`), puis relance la validation ; `cocher-idee.yml` peut être lancé par le robot après une fusion ; `validate-games.mjs` : premier test au toucher, appels réseau détectés, 2e ouverture du jeu navigateur coupé du réseau. Fusion automatique active (interrupteur `FUSION_AUTO`). Reste : premier essai réel (lancement manuel de « Nouveau jeu »).
+- Jeux plus complets — minimum obligatoire dans `CONSIGNES-JEU.md` (10 niveaux, tutoriel animé, étoiles, record, sons coupables, effets, bilan, mécaniques combinées) ; agent créateur : cahier de conception (description de la pull request), partie au hasard avec captures (`validate-games.mjs --jouer`, captures dans `captures/`, ignoré par git), relecture « 15 minutes », `claude-opus-5-5`, 150 tours. `validate-games.mjs` : premier test au toucher, appels réseau détectés, 2e ouverture du jeu navigateur coupé du réseau.
+- Boucle de nuit et file d'idées JSON — fait : `boucle-de-nuit.yml` (remplace `nouveau-jeu.yml`, `valider-jeu.yml` et `cocher-idee.yml` ; étapes a à e de la section 10, 2 passages par nuit, 5 jeux en parallèle, fusions une par une), `scripts/idees.mjs`, `idees.json` et `idees-archive.json` (migrés depuis l'ancien `IDEES-JEUX.md`, supprimé) ; `idee-jeu.yml` écrit dans `idees.json` (champ « Thèmes » ajouté au formulaire) ; `corriger-jeu.yml` ne sert plus qu'aux commentaires `@claude`. Plus de correction automatique : un jeu refusé est fermé et son idée remise en attente (3 refus au plus). Tous les jeux du catalogue ont un genre et des tags. Reste : premier passage réel (lancement manuel de « Boucle de nuit », 1 jeu), surveiller la consommation de l'abonnement Claude (5 agents en parallèle) et le quota de 500 builds Cloudflare par mois (une publication par jeu fusionné).
 - Consignes — minimum obligatoire complété (écran d'accueil, pause et Rejouer, contrôles tactiles et clavier) et grille de validation (`CONSIGNES-JEU.md`, section 7), commune à l'agent créateur, au correcteur et au relecteur.
+- Genres — 17, dont `action` (ajouté en octobre 2026) ; liste dans `scripts/genres.mjs`, `CONSIGNES-JEU.md`, `public/regroupements.js` (pictogramme, teinte) et le formulaire `.github/ISSUE_TEMPLATE/idee-jeu.yml`.
 - Publicité — préparée, **désactivée** : `public/pub.js` (`PUB_ACTIVE = false`, aucun code de régie), emplacements cachés `#pub` (bas du catalogue) et `#consentement` dans `index.html`, `pub.js` ajouté à la coquille (`VERSION` `v3` dans `sw.js`), `PUBLICITE.md`. Reste : domaine, compte régie, identifiants, outil de consentement, pages légales.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».

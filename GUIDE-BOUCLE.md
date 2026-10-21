@@ -1,47 +1,67 @@
-# Boucle automatique de création de jeux — mise en route
+# Boucle de nuit — création automatique de jeux
 
 ## Comment ça marche
 
-Chaque nuit, GitHub lance la boucle suivante pour **2 jeux**, l'un après l'autre, sans votre ordinateur :
+Deux fois par nuit (vers 1 h et 6 h du matin à Paris en hiver, 2 h et 7 h en été), GitHub lance la **boucle de nuit**, sans votre ordinateur. Chaque passage suit 5 étapes :
 
-1. **L'agent Claude** lit `CLAUDE.md`, `CONSIGNES-JEU.md` et `IDEES-JEUX.md`, prend la prochaine idée non cochée (une idée déjà prise par une pull request ouverte est sautée), écrit un **cahier de conception** (principe, niveaux, mécaniques, récompenses), puis code le jeu. Il note l'idée dans le `game.json` du jeu (champ `idee`) et ne modifie jamais `IDEES-JEUX.md`.
-2. **Il joue à son jeu** avec le robot de contrôle (30 secondes au hasard, avec des captures d'écran qu'il regarde), puis se relit : « qu'est-ce qui manque pour qu'un enfant y joue 15 minutes ? ». Il corrige au maximum 5 fois.
-3. **Un garde-fou** vérifie qu'il n'a touché qu'au dossier du nouveau jeu. Sinon, tout s'arrête.
-4. **Le robot refait un contrôle final** dans un vrai navigateur et fabrique la jaquette.
-5. **Une pull request** s'ouvre : c'est une proposition, rien n'est encore en ligne.
-6. **La validation automatique** commence : le robot rejoue le jeu (téléphone, toucher, hors ligne…), puis Claude le relit avec la grille de `CONSIGNES-JEU.md` (section 7). Un commentaire résume le résultat dans la pull request.
-7. **Tout est bon** : la pull request est fusionnée toute seule. Le jeu est en ligne quelques minutes plus tard, et son idée est cochée dans `IDEES-JEUX.md`.
-   **Sinon** : étiquette `a-corriger`. L'agent corrige le jeu d'après le commentaire, puis la validation recommence (2 corrections au plus). Au 3e échec, la pull request est fermée et l'idée est mise de côté (`- [-]` dans `IDEES-JEUX.md`) : la boucle ne la reprend plus.
+1. **Idées** : s'il reste moins de 15 idées en attente dans `idees.json`, un agent Claude en propose de nouvelles. Il lit un résumé du catalogue (titre, genre et thèmes de chaque jeu) et vise les genres et les univers qui ont peu de jeux. Ces idées ont la source `agent`.
+2. **Choix** : 5 idées passent « en cours » : d'abord les vôtres (source `humain`), dans l'ordre de la liste, puis celles de l'agent.
+3. **Fabrication** : 5 agents créent les 5 jeux en même temps. Chacun écrit un cahier de conception, code le jeu, y joue avec le robot (captures d'écran), se relit, puis ouvre une **pull request**. La fiche du jeu reprend le genre et les thèmes de l'idée. Rien n'est encore en ligne.
+4. **Vérification** : pour chaque pull request, le robot rejoue le jeu (chargement, erreurs, téléphone, toucher, hors ligne, fiche du catalogue), puis Claude le relit avec la grille de `CONSIGNES-JEU.md` (section 7). Le résultat arrive en commentaire.
+   - **Tout est bon** : la pull request est fusionnée. Le jeu est en ligne quelques minutes plus tard.
+   - **Sinon** : la pull request est fermée et l'idée revient en attente ; un nouveau jeu sera tenté à un prochain passage. Au 3e jeu refusé pour la même idée, celle-ci est mise de côté.
+5. **Mise à jour** : les idées des jeux publiés passent dans `idees-archive.json` (statut `faite`, avec le nom du jeu).
+
+Un passage dure en général 1 h 30 à 4 h. Si le premier n'est pas fini à l'heure du second, le second attend.
 
 ---
 
-## Mise en place (une seule fois, environ 20 minutes)
+## La file d'idées
 
-### 1. Ajouter les fichiers au dépôt
+Deux fichiers à la racine du dépôt :
 
-Copiez le contenu du zip à la racine de votre dépôt, en remplaçant les fichiers existants :
+| Fichier | Contenu |
+| --- | --- |
+| `idees.json` | les idées à fabriquer : `"en_attente"` ou `"en_cours"` (en fabrication) |
+| `idees-archive.json` | les idées réalisées : `"faite"`, avec `"jeu_id"` (le dossier du jeu) |
 
-```text
-.github/workflows/nouveau-jeu.yml   la boucle nocturne
-.github/workflows/validate.yml      le contrôle des propositions
-scripts/validate-games.mjs          le robot de contrôle
-CONSIGNES-JEU.md                    les règles de création
-IDEES-JEUX.md                       la liste d'idées (à modifier à votre goût)
-GUIDE-BOUCLE.md                     ce guide
-package.json                        mis à jour
+Une idée ressemble à ceci :
+
+```json
+{
+  "id": "coloriage-magique",
+  "titre": "Coloriage magique",
+  "description": "Colorie un dessin case par case en suivant les numéros. Âge conseillé : 4+.",
+  "genre": "création",
+  "tags": ["couleurs", "nombres"],
+  "source": "humain",
+  "date_ajout": "2026-10-19",
+  "statut": "en_attente",
+  "jeu_id": null
+}
 ```
 
-Relisez `IDEES-JEUX.md` et adaptez les idées. Faites ensuite « Commit to main » puis « Push origin » dans GitHub Desktop.
+- `id` : minuscules sans accents, chiffres et tirets, unique.
+- `genre` : un seul, dans la liste de `CONSIGNES-JEU.md` (section 4).
+- `tags` : 0 à 5 thèmes en minuscules. Liste vide : l'agent les choisit.
+- Mettez l'âge conseillé à la fin de la description (« Âge conseillé : 6+. »).
+- `"essais"` (s'il apparaît) : nombre de jeux refusés pour cette idée. À 3, elle n'est plus choisie.
 
-Le dossier `.github` est caché sous Windows : affichez les éléments masqués pour le copier.
+**Modifier la file à la main** : ouvrez `idees.json`, ajoutez, supprimez ou déplacez des idées (l'ordre de la liste est l'ordre de fabrication), puis « Commit to main » et « Push origin » dans GitHub Desktop. Ne touchez pas aux idées `"en_cours"` pendant qu'une boucle tourne. Pour vérifier le fichier sur votre PC : `npm run idees`.
 
-### 2. Installer l'application Claude sur GitHub
+---
+
+## Mise en place
+
+Les réglages de l'ancienne boucle restent valables (jeton Claude, application Claude, permissions). Pour une installation neuve :
+
+### 1. Installer l'application Claude sur GitHub
 
 1. Ouvrez https://github.com/apps/claude et cliquez sur **Install**.
 2. Choisissez **Only select repositories**, puis cochez uniquement `Jeux-en-ligne`.
 3. Validez.
 
-### 3. Créer le jeton de votre abonnement Claude
+### 2. Créer le jeton de votre abonnement Claude
 
 Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un an.
 
@@ -61,38 +81,34 @@ Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un 
 4. Une page s'ouvre dans le navigateur : acceptez. Le jeton s'affiche dans PowerShell.
 5. **Copiez-le** (il n'est enregistré nulle part) et ne le partagez avec personne.
 
-### 4. Donner le jeton à GitHub
+### 3. Donner le jeton à GitHub
 
 1. Sur github.com, ouvrez votre dépôt → **Settings** → **Secrets and variables** → **Actions**.
 2. Cliquez sur **New repository secret**.
 3. Nom : `CLAUDE_CODE_OAUTH_TOKEN`. Valeur : le jeton copié. Cliquez sur **Add secret**.
 
-### 5. Autoriser GitHub à ouvrir des pull requests
+### 4. Autoriser GitHub à ouvrir des pull requests
 
 1. Toujours dans **Settings** → **Actions** → **General**, descendez jusqu'à **Workflow permissions**.
 2. Choisissez **Read and write permissions**.
 3. Cochez **Allow GitHub Actions to create and approve pull requests**.
 4. Cliquez sur **Save**.
 
-### 6. Premier essai, sans attendre la nuit
+### 5. Premier essai, sans attendre la nuit
 
-1. Onglet **Actions** du dépôt → **Nouveau jeu** dans la liste de gauche.
-2. Cliquez sur **Run workflow**, puis sur le bouton vert **Run workflow**.
-3. Attendez la fin, en général 10 à 30 minutes : une coche verte apparaît.
-4. Onglet **Pull requests** → ouvrez « Nouveau jeu : … ».
+1. Onglet **Actions** du dépôt → **Boucle de nuit** dans la liste de gauche.
+2. Cliquez sur **Run workflow**, choisissez **1** jeu pour ce premier essai, puis le bouton vert **Run workflow**.
+3. Attendez la fin (1 à 2 heures) : une coche verte apparaît.
+4. Onglet **Pull requests** → filtre « Closed » : « Nouveau jeu : … » est fusionnée (pastille violette) ou fermée, avec un commentaire qui explique pourquoi.
 
 ---
 
 ## Au quotidien : suivre les jeux (2 minutes)
 
-La validation automatique fusionne seule les jeux qui passent. Ouvrez l'onglet **Pull requests** :
-
-1. **Jeux fusionnés** (filtre « Closed », pastille violette) : ils sont en ligne. Le commentaire de validation donne la grille point par point et quelques conseils. Jouez-y sur le site.
-2. **Étiquette `a-corriger`** : une correction est en cours, rien à faire. La validation recommence toute seule ensuite.
-3. **Pull request fermée par le robot** (3 échecs) : rien n'est publié et l'idée est mise de côté. Pour la retenter, remplacez `- [-]` par `- [ ]` devant sa ligne dans `IDEES-JEUX.md`.
-4. **Commentaire « ⚠️ Validation automatique interrompue »** (limite d'utilisation de l'abonnement, panne…) : rien n'est décidé. Relancez-la : onglet **Actions** → **Valider un jeu** → **Run workflow** → numéro de la pull request.
-
-Vous pouvez toujours intervenir avant la fin de la validation : jouer à l'aperçu Cloudflare (lien dans les vérifications de la pull request), fusionner ou fermer vous-même, ou demander une correction avec `@claude`.
+- **Ce qui s'est passé cette nuit** : onglet **Actions** → **Boucle de nuit** → le dernier passage. Le résumé en bas de page liste chaque pull request : fusionnée, refusée, ou en attente.
+- **Jeux fusionnés** (onglet Pull requests, filtre « Closed », pastille violette) : ils sont en ligne. Le commentaire donne la grille point par point et quelques conseils.
+- **Jeux refusés** (pull request fermée, pastille rouge) : le commentaire liste les problèmes. L'idée est déjà remise en attente.
+- **« ⚠️ Vérification interrompue »** (limite d'utilisation de l'abonnement, panne…) : rien n'est décidé, la pull request reste ouverte et sera vérifiée au passage suivant. Pour ne pas attendre : **Actions** → **Boucle de nuit** → **Run workflow** avec **0** jeu.
 
 ## Fusion automatique : la couper ou la remettre
 
@@ -101,13 +117,13 @@ Elle est **active** par défaut. Pour revenir à une fusion manuelle :
 1. Sur github.com, dépôt → **Settings** → **Secrets and variables** → **Actions** → onglet **Variables**.
 2. **New repository variable** : nom `FUSION_AUTO`, valeur `non`, puis **Add variable**.
 
-La validation continue (commentaire, corrections, fermeture au 3e échec), mais c'est vous qui cliquez « Merge » sur les jeux validés. Pour la remettre : supprimez la variable.
+Les jeux validés reçoivent alors l'étiquette `valide` et restent ouverts : à vous de cliquer « Merge ». Leur idée est archivée au passage suivant. Les jeux refusés sont toujours fermés. Pour remettre la fusion automatique : supprimez la variable.
 
-Si une règle de protection de `main` exige une relecture humaine, la fusion par le robot échoue (commentaire « erreur technique ») : retirez cette règle ou coupez la fusion automatique.
+Si une règle de protection de `main` exige une relecture humaine, la boucle ne peut pas fusionner : les jeux validés reçoivent l'étiquette `valide` et un commentaire vous demande de cliquer « Merge ».
 
 ## Proposer une idée depuis mon téléphone
 
-Un formulaire GitHub ajoute l'idée à `IDEES-JEUX.md` tout seul, sans ordinateur.
+Un formulaire GitHub ajoute l'idée à `idees.json` tout seul, sans ordinateur.
 
 **Une seule fois :** sur github.com, ouvrez le dépôt → **Issues** → **Labels** → **New label**.
 Nom : `idee-jeu`, puis **Create label**. Sans cette étiquette, le formulaire ne déclenche rien.
@@ -115,25 +131,25 @@ Nom : `idee-jeu`, puis **Create label**. Sans cette étiquette, le formulaire ne
 **À chaque idée :**
 
 1. Sur le téléphone (application GitHub ou navigateur) : dépôt → **Issues** → **New issue** → **Nouvelle idée de jeu**.
-2. Le titre de la demande devient le titre du jeu. Remplissez le principe, le genre et l'âge.
-3. Cochez « Le fabriquer cette nuit en priorité » pour la placer en tête de liste ; sinon, elle s'ajoute à la fin.
+2. Le titre de la demande devient le titre du jeu. Remplissez le principe, le genre, l'âge et, si vous voulez, les thèmes.
+3. Cochez « Le fabriquer cette nuit en priorité » pour la placer en tête de la file ; sinon, elle s'ajoute à la fin des idées humaines (toujours avant celles de l'agent).
 4. Envoyez. Moins d'une minute plus tard, un commentaire confirme l'ajout et la demande se ferme.
 
 Bon à savoir :
 
 - Seules vos demandes (et celles des collaborateurs du dépôt) sont traitées. Les autres restent ouvertes, sans effet.
-- Une idée dont le titre figure déjà dans la liste n'est pas ajoutée une deuxième fois.
+- Une idée dont le titre existe déjà (idée prévue, idée réalisée ou jeu du site) n'est pas ajoutée.
 - Rien ne se passe ? Onglet **Actions** → **Idée de jeu** → cliquez sur le passage en rouge.
 
 ## Faire corriger un jeu proposé
 
-Un jeu proposé ne vous convient pas tout à fait ? Demandez la correction en commentaire, même depuis le téléphone.
+Quand une pull request de jeu est ouverte (fusion automatique coupée, vérification interrompue, ou jeu proposé par quelqu'un d'autre), vous pouvez demander une correction en commentaire, même depuis le téléphone.
 
 1. Ouvrez la pull request du jeu et écrivez un commentaire qui contient `@claude`, suivi de votre demande.
    Exemple : « @claude les ballons vont trop vite au niveau 1, et ajoute un petit son quand on gagne ».
 2. Envoyez. Un 👀 apparaît sur votre commentaire : la demande est prise en compte.
-3. Après 10 à 30 minutes, Claude répond avec un résumé des changements. La correction est ajoutée à la pull request et l'aperçu Cloudflare se met à jour.
-4. Rejouez à l'aperçu, puis **Merge**, ou une nouvelle demande `@claude`.
+3. Après 10 à 30 minutes, Claude répond avec un résumé des changements, et la correction est ajoutée à la pull request.
+4. Pull request de la boucle : elle sera revérifiée au passage suivant (ou tout de suite : **Run workflow** avec **0** jeu).
 
 Bon à savoir :
 
@@ -141,7 +157,6 @@ Bon à savoir :
 - Claude ne peut modifier que le dossier du jeu de la pull request. La jaquette automatique est refaite ; une jaquette faite à la main est gardée.
 - Si le contrôle qualité échoue encore après 3 essais, rien n'est ajouté : la réponse donne le rapport.
 - Une demande à la fois par pull request : la suivante attend la fin de la précédente.
-- Sur une pull request de la boucle, la validation automatique est relancée après votre correction : si tout passe, le jeu est fusionné tout seul. Si elle échoue, cela compte parmi les 3 essais.
 - Comme la boucle de nuit, chaque correction consomme votre abonnement Claude.
 
 ## Commandes utiles
@@ -149,26 +164,23 @@ Bon à savoir :
 | Je veux… | Je fais… |
 | --- | --- |
 | Proposer une idée depuis mon téléphone | Issues → New issue → Nouvelle idée de jeu |
+| Ajouter, retirer ou réordonner des idées | Modifier `idees.json`, puis Commit + Push |
+| Retenter une idée mise de côté | Dans `idees.json`, remplacer `"essais": 3` par `"essais": 0` |
+| Lancer la boucle sans attendre la nuit | Actions → Boucle de nuit → Run workflow (1 à 5 jeux) |
+| Revérifier les pull requests en attente | Actions → Boucle de nuit → Run workflow → 0 jeu |
 | Faire corriger un jeu proposé | Commentaire « @claude … » dans sa pull request |
-| Créer plusieurs jeux d'un coup | Actions → Nouveau jeu → Run workflow → « Nombre de jeux » (1 à 5) |
-| Imposer une idée précise | Actions → Nouveau jeu → Run workflow → remplir le champ « Idée imposée » (pour le 1er jeu) |
-| Relancer la validation d'une pull request | Actions → Valider un jeu → Run workflow → numéro de la pull request |
 | Couper la fusion automatique | Variable `FUSION_AUTO` = `non` (voir plus haut) |
-| Retenter une idée mise de côté | Dans `IDEES-JEUX.md`, remplacer `- [-]` par `- [ ]` devant sa ligne |
-| Changer l'ordre des idées | Modifier `IDEES-JEUX.md`, puis Commit + Push |
-| Mettre la boucle en pause | Actions → Nouveau jeu → menu « … » → **Disable workflow** |
+| Mettre la boucle en pause | Actions → Boucle de nuit → menu « … » → **Disable workflow** |
 | Comprendre un échec | Actions → cliquer sur le passage en rouge → lire l'étape en échec |
+| Vérifier `idees.json` sur mon PC | `npm run idees` |
 | Contrôler un jeu sur mon PC | `npm run check` (ou `npm run check -- mon-jeu`) |
 | Voir un jeu joué au hasard, avec captures | `npm run check -- --jouer mon-jeu` (captures dans `captures/mon-jeu/`) |
 
 ## Bon à savoir
 
-- **Coûts** : la boucle consomme votre abonnement Claude, comme une conversation, et des minutes GitHub Actions, gratuites dans la limite du quota mensuel de votre compte. Avec 2 jeux par nuit sur le modèle le plus performant, la consommation est réelle : surveillez la première semaine (votre abonnement Claude, et GitHub, menu Settings → Billing).
-- **Modèle et durée** : la boucle utilise le modèle Claude le plus performant (`claude-fable-5-1`) et jusqu'à 150 tours. Un jeu prend 30 à 90 minutes et consomme nettement plus qu'avant. Si votre abonnement n'a pas accès à ce modèle, ou si la limite d'utilisation est atteinte trop vite, remplacez `claude-fable-5-1` par `claude-opus-5-5` dans `nouveau-jeu.yml`.
-- **Plusieurs jeux d'un coup** : les jeux sont créés l'un après l'autre (un seul agent créateur à la fois), 30 à 90 minutes chacun. Si l'un échoue, par exemple parce que la limite d'utilisation de l'abonnement est atteinte, les suivants sont quand même tentés ; ceux déjà terminés gardent leur pull request.
-- **Validation et consommation** : chaque jeu est relu 1 à 3 fois par Claude et corrigé jusqu'à 2 fois, ce qui s'ajoute à sa création. La validation du jeu n°1 commence dès sa pull request ouverte, pendant la création du jeu n°2 : deux agents peuvent donc tourner en même temps.
-- **Liste d'idées sans conflit** : les pull requests de jeux ne modifient jamais `IDEES-JEUX.md`. Chaque jeu note son idée dans son `game.json` (champ `idee`), et la ligne est cochée sur `main` au moment de la fusion. Vous pouvez donc modifier la liste à tout moment, même avec des pull requests ouvertes.
-- **Heure** : la boucle démarre à 01:23 UTC, soit vers 3 h du matin à Paris, et peut durer jusqu'à 4 heures avec 2 jeux. L'heure se règle à la ligne `cron` de `nouveau-jeu.yml`, le nombre de jeux de la nuit à la ligne `NOMBRE`.
-- **Sécurité** : l'agent créateur ne peut que lire, écrire des fichiers et lancer le robot de contrôle. Il ne peut ni publier, ni toucher aux autres jeux ou au site. Le relecteur ne peut que lire et écrire son verdict. Seule la validation automatique fusionne, et seulement une pull request de la boucle qui ajoute un seul nouveau jeu sans toucher au reste du dépôt.
-- **Jeton** : il expire au bout d'un an. Refaites alors les étapes 3 et 4.
-- **Étapes suivantes du plan** : des agents spécialisés (idées, testeur), une fois la qualité des premiers jeux vérifiée.
+- **Consommation** : chaque passage fait travailler jusqu'à 11 agents Claude (1 pour les idées, 5 créateurs en même temps, 5 relecteurs), deux fois par nuit, sur votre abonnement. Si la limite d'utilisation est atteinte, les jeux en cours échouent ou leur vérification est interrompue : rien n'est perdu, les idées reviennent en attente. Si cela arrive souvent, réduisez le nombre de jeux : remplacez `nombre="${NOMBRE_MANUEL:-5}"` par `:-2` dans `boucle-de-nuit.yml`, ou retirez l'une des deux lignes `cron`.
+- **Minutes GitHub** : gratuites et illimitées pour un dépôt public ; pour un dépôt privé, le quota mensuel du compte s'applique (Settings → Billing).
+- **Publications Cloudflare** : chaque jeu fusionné déclenche une publication du site (500 par mois avec l'offre gratuite, soit environ 10 par nuit au maximum ici). Les mises à jour de la file d'idées n'en déclenchent pas (`[CF-Pages-Skip]` dans leur message).
+- **Heure** : lignes `cron` de `boucle-de-nuit.yml`, en heure UTC (`0 0` = 1 h à Paris l'hiver). GitHub démarre parfois les tâches planifiées avec un peu de retard.
+- **Sécurité** : l'agent des idées ne peut écrire que sa liste de propositions, contrôlée ensuite (genre, doublons, longueur). Les agents créateurs ne peuvent que lire, écrire des fichiers et lancer le robot : un garde-fou refuse tout ce qui sort du dossier du nouveau jeu. Le relecteur ne peut que lire et écrire son verdict. Seule la boucle fusionne, et seulement une pull request qui ajoute un seul nouveau jeu sans toucher au reste.
+- **Jeton** : il expire au bout d'un an. Refaites alors les étapes 2 et 3 de la mise en place.

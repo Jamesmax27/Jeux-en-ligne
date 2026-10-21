@@ -69,7 +69,8 @@ Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient oblig
   La même liste figure dans `scripts/genres.mjs` : modifier les deux ensemble.
 - `tags` : 1 à 5 thèmes, en minuscules. Ils rangent le jeu dans les **univers** du catalogue (liste dans `public/regroupements.js`) : utiliser de préférence un tag déjà prévu, par exemple `chevaux`, `animaux`, `judo`, `nature`, `mer`, `espace`, `géographie`, `lecture`, `calcul`, `sciences`, `formes`, `couleurs`, `cubes`, `labyrinthe`, `musique`, `véhicules`, `dinosaures`, `magie`, `fantastique`, `cuisine`, `histoire`, `métiers`, `noël`, `arcade`. Un tag rangé dans aucun univers apparaît seulement dans « Autres thèmes ».
 - `ages` : âge minimum conseillé, au format `"6+"` (tuiles d'âge du catalogue : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et +).
-- `idee` : rempli par la boucle automatique, titre de la ligne de `IDEES-JEUX.md` réalisée par ce jeu. Ne pas le modifier. Facultatif pour un jeu créé à la main.
+- `idee` : rempli par la boucle de nuit, `id` de l'idée de `idees.json` réalisée par ce jeu (à la fusion, l'idée passe dans `idees-archive.json`). Ne pas le modifier. Facultatif pour un jeu créé à la main.
+- Jeu de la boucle de nuit : `genre` et `tags` sont ceux de l'idée (si l'idée n'a pas de tags, l'agent les choisit). La vérification refuse un jeu dont l'entrée du catalogue ne correspond pas.
 
 ## 5. La jaquette
 
@@ -86,7 +87,7 @@ Le robot ouvre le jeu dans un vrai navigateur, le joue 30 secondes au hasard et 
 
 ## 7. Grille de validation
 
-Avant d'être publié, chaque jeu de la boucle automatique passe par la validation automatique (`valider-jeu.yml`) : le robot, puis un relecteur Claude qui suit cette grille. **Le jeu n'est publié que si tous les points bloquants sont respectés.** Sinon, l'agent reçoit la liste des points à corriger (2 corrections au plus), puis la proposition est abandonnée.
+Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérification automatique (`boucle-de-nuit.yml`, étape d) : le robot, puis un relecteur Claude qui suit cette grille. **Le jeu n'est publié que si tous les points bloquants sont respectés.** Sinon, la pull request est fermée et l'idée remise en attente : un nouveau jeu sera créé à un prochain passage (3 jeux refusés au plus par idée).
 
 ### Contrôles automatiques (robot)
 
@@ -97,6 +98,7 @@ Avant d'être publié, chaque jeu de la boucle automatique passe par la validati
 | Téléphone | une erreur survient pendant la partie au toucher, sur un écran de 390 × 844 |
 | Hors ligne | le jeu tente un appel réseau, ou ne marche pas avec le navigateur coupé du réseau |
 | Fichiers | `game.json` incomplet ou invalide, jaquette absente ou trop lourde, `index.html` de plus de 2 Mo, fichier en trop |
+| Catalogue | le jeu manque au catalogue construit, ou son genre et ses tags ne sont pas ceux de son idée (`scripts/idees.mjs controler`) |
 
 ### Relecture (Claude)
 

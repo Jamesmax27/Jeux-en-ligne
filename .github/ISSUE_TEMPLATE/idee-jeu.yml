@@ -1,17 +1,17 @@
 # Formulaire « Nouvelle idée de jeu » (onglet Issues → New issue).
-# Le workflow .github/workflows/idee-jeu.yml ajoute l'idée à IDEES-JEUX.md
+# Le workflow .github/workflows/idee-jeu.yml ajoute l'idée à idees.json
 # puis ferme l'issue. Les libellés « ### … » sont lus par ce workflow :
-# les modifier ensemble.
+# les modifier ensemble. Genres : même liste que scripts/genres.mjs.
 
 name: Nouvelle idée de jeu
-description: Proposer un mini-jeu ; il est ajouté tout seul à la liste des idées.
+description: Proposer un mini-jeu ; il est ajouté tout seul à la file d'idées.
 labels: ["idee-jeu"]
 body:
   - type: markdown
     attributes:
       value: |
         Le **titre** de la demande devient le titre du jeu (ex. « Memory de la ferme »).
-        L'idée est ajoutée à `IDEES-JEUX.md`, puis la demande se ferme toute seule.
+        L'idée est ajoutée à `idees.json`, puis la demande se ferme toute seule.
 
   - type: textarea
     id: principe
@@ -56,6 +56,13 @@ body:
       default: 2
     validations:
       required: true
+
+  - type: input
+    id: themes
+    attributes:
+      label: Thèmes
+      description: Facultatif. 1 à 5 thèmes séparés par des virgules (ex. chevaux, nature). Vide = l'agent les choisit.
+      placeholder: animaux, ferme
 
   - type: checkboxes
     id: priorite
