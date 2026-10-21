@@ -6,6 +6,7 @@
 //   node scripts/check-i18n.js mon-jeu autre   site + seulement ces jeux
 //   … --statique     sans navigateur (vérifications statiques seulement)
 //   … --rapport      affiche le détail des textes en dur suspects
+//   … --sans-site    sans tester le catalogue et le lanceur dans le navigateur
 //
 // Bloquant (code de sortie 1) :
 //   - JSON invalide ; fichier de langue sans exactement les mêmes clés que fr ;
@@ -46,6 +47,7 @@ const PORT_TEST = 8124;
 const args = process.argv.slice(2);
 const statique = args.includes('--statique');
 const rapportComplet = args.includes('--rapport');
+const sansSite = args.includes('--sans-site');
 const idsDemandes = args.filter((a) => !a.startsWith('--'));
 
 const erreurs = new Map();       // sujet → [messages]
@@ -438,7 +440,7 @@ async function main() {
   if (navigateur) {
     try {
       await testerJeux(navigateur, jeux);
-      await testerSite(navigateur, jeux[0]?.id);
+      if (!sansSite) await testerSite(navigateur, jeux[0]?.id);
     } finally {
       await navigateur.close();
     }
