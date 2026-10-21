@@ -259,6 +259,7 @@ function chercherTextesEnDur(id, code, clesFr = new Set()) {
   for (const m of masque.matchAll(/<([a-zA-Z][\w-]*)\b([^>]*)>([^<]+)/g)) {
     const [, balise, attributs, texte] = m;
     if (!LETTRES.test(texte.replace(/&#?\w+;/g, ' ')) || /^(script|style)$/i.test(balise)) continue;
+    if (/^\s*[IVX]{1,4}\s*$/.test(texte)) continue;                                // « II » : symbole de pause
     if (/\bdata-i18n(?:-html)?\s*=/.test(attributs)) continue;
     noter(m.index, texte, `HTML <${balise}>`);
   }
@@ -276,7 +277,7 @@ function chercherTextesEnDur(id, code, clesFr = new Set()) {
     const debut = s.index + s[0].indexOf(js);
     for (const m of js.matchAll(/(["'`])((?:\\.|(?!\1)[^\\\n])*)\1/g)) {
       const texte = m[2].replace(/\$\{[^}]*\}/g, ' ').replace(/<[^>]*>?/g, ' ');   // sans ${…} ni balises HTML
-      if (/^\s*(?:https?:|data:|blob:)/.test(texte)) continue;
+      if (/^\s*(?:https?:|data:|blob:)/.test(texte) || /^\s*(?:var|calc|url|hsla?|rgba?)\(/.test(texte)) continue;
       if (!LETTRES.test(texte)) continue;
       if (!MOTS.test(texte) && !/[àâäçéèêëîïôöùûüÿœæ]/i.test(texte)) continue;
       const avant = js.slice(Math.max(0, m.index - 40), m.index);
