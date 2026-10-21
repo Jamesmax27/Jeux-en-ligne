@@ -25,3 +25,4 @@ Une ligne en `- [-]` est **mise de côté** : son jeu a échoué 3 fois à la va
 - [ ] Bouge eau — tu un bac d'équipe et tu doit mettre l'eau dans un verre en dessinent (création, 7+)
 - [x] tu dois mettre de l'eau (qui dans un bac) dans un verre en dessinant — dessine des rampes au doigt pour guider l'eau du bac jusqu'au verre assoiffé : planches, vent et pierres brûlantes t'attendent (puzzle, 6+) → chemin-de-l-eau
 - [x] insenble pouvoir élémentaire — feu, eau, terre et air : mélange les pouvoirs des quatre petits esprits pour aider le village. Ensemble, c'est magique (réflexion, 6+) → pouvoirs-elementaires
+- [x] La chorale des grenouilles — les lucioles descendent en musique : touche les grenouilles au bon moment pour qu'elles chantent la mélodie de la mare (rythme, 5+) → chorale-des-grenouilles
