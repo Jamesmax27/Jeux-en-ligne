@@ -255,7 +255,7 @@ function chercherTextesEnDur(id, code) {
     .replace(/(<([a-zA-Z][\w-]*)\b[^>]*\bdata-i18n(?:-html)?\s*=[^>]*>)([\s\S]*?)(<\/\2>)/g, (m, o, b, dedans, f) => o + blanc(dedans) + f);
   for (const m of masque.matchAll(/<([a-zA-Z][\w-]*)\b([^>]*)>([^<]+)/g)) {
     const [, balise, attributs, texte] = m;
-    if (!LETTRES.test(texte) || /^(script|style)$/i.test(balise)) continue;
+    if (!LETTRES.test(texte.replace(/&#?\w+;/g, ' ')) || /^(script|style)$/i.test(balise)) continue;
     if (/\bdata-i18n(?:-html)?\s*=/.test(attributs)) continue;
     noter(m.index, texte, `HTML <${balise}>`);
   }

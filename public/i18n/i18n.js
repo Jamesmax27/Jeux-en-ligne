@@ -34,6 +34,7 @@
    le bloc <script type="application/json" id="jel-i18n-textes"> qui contient
    { "fr": {…}, "en": {…}, … }. Un petit bouton de langue s'ajoute dans le coin
    indiqué par data-coin (haut-gauche, haut-droite, bas-gauche, bas-droite ;
+   data-coin-decalage="52px" l'éloigne du bord haut ou bas, ex. sous une barre ;
    data-coin="aucun" pour le placer soi-même avec creerSelecteur). Changer de
    langue relance le jeu dans la nouvelle langue.
    Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie ce fichier).
@@ -270,7 +271,8 @@
     selecteurs.forEach(function (s) { s.maj(); });
   }
 
-  // options : { conteneur, classe, coin } ; coin = selecteur de jeu isolé, fixé dans ce coin.
+  // options : { conteneur, classe, coin, decalage } ; coin = sélecteur de jeu isolé, fixé dans ce coin,
+  // éloigné du bord haut ou bas de « decalage » (longueur CSS, ex. « 52px ») s'il est donné.
   function creerSelecteur(options) {
     options = options || {};
     var coin = options.coin && COINS[options.coin] ? options.coin : null;
@@ -359,7 +361,7 @@
       element.className = 'jel-langue';
       var place = COINS[coin];
       var style = { position: 'fixed', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'block' };
-      for (var p in place) style[p] = place[p];
+      for (var p in place) style[p] = options.decalage && /^(top|bottom)$/.test(p) ? 'calc(' + place[p] + ' + ' + options.decalage + ')' : place[p];
       for (var nomStyle in style) element.style.setProperty(nomStyle, style[nomStyle], 'important');
       var ombre = element.attachShadow ? element.attachShadow({ mode: 'open' }) : element;
       var feuille = document.createElement('style');
@@ -432,7 +434,7 @@
       appliquer(document);
       var coin = blocJeu.getAttribute('data-coin') || 'haut-gauche';
       if (coin !== 'aucun' && document.body) {
-        creerSelecteur({ conteneur: document.body, coin: coin });
+        creerSelecteur({ conteneur: document.body, coin: coin, decalage: blocJeu.getAttribute('data-coin-decalage') || '' });
       }
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
