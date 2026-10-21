@@ -247,7 +247,10 @@ function chercherTextesEnDur(id, code) {
 
   // HTML : textes entre balises, hors <script>, <style> et commentaires,
   // dont la balise ouvrante n'a pas d'attribut data-i18n.
-  const masque = code.replace(/<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<!--[\s\S]*?-->/gi, (m) => ' '.repeat(m.length));
+  const blanc = (m) => m.replace(/[^\n]/g, ' ');
+  const masque = code.replace(/<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>|<!--[\s\S]*?-->/gi, blanc)
+    // contenu d'un élément déjà traduit (data-i18n, data-i18n-html) : <br>, <b>… compris
+    .replace(/(<([a-zA-Z][\w-]*)\b[^>]*\bdata-i18n(?:-html)?\s*=[^>]*>)([\s\S]*?)(<\/\2>)/g, (m, o, b, dedans, f) => o + blanc(dedans) + f);
   for (const m of masque.matchAll(/<([a-zA-Z][\w-]*)\b([^>]*)>([^<]+)/g)) {
     const [, balise, attributs, texte] = m;
     if (!LETTRES.test(texte) || /^(script|style)$/i.test(balise)) continue;
@@ -267,7 +270,7 @@ function chercherTextesEnDur(id, code) {
     const js = s[1];
     const debut = s.index + s[0].indexOf(js);
     for (const m of js.matchAll(/(["'`])((?:\\.|(?!\1)[^\\\n])*)\1/g)) {
-      const texte = m[2];
+      const texte = m[2].replace(/<[^>]*>?/g, ' ');                                // sans balises HTML
       if (!LETTRES.test(texte)) continue;
       if (!MOTS.test(texte) && !/[àâäçéèêëîïôöùûüÿœæ]/i.test(texte)) continue;
       const avant = js.slice(Math.max(0, m.index - 40), m.index);
