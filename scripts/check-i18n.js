@@ -195,7 +195,7 @@ async function verifierJeu(id, moduleCommun) {
     return { fiche, html };
   }
   if (!module) erreur(sujet, 'index.html : module commun <script id="jel-i18n"> absent (copie de public/i18n/i18n.js)');
-  else if (module[1].trim() !== moduleCommun.trim()) erreur(sujet, 'index.html : module commun pas à jour : lancer node scripts/i18n-jeu.mjs (ou recopier public/i18n/i18n.js)');
+  else if (module[1].replace(/\r\n/g, '\n').trim() !== moduleCommun.replace(/\r\n/g, '\n').trim()) erreur(sujet, 'index.html : module commun pas à jour : lancer node scripts/i18n-jeu.mjs (ou recopier public/i18n/i18n.js)');
   if (module && bloc.index > module.index) erreur(sujet, 'index.html : le bloc jel-i18n-textes doit être placé avant le module commun jel-i18n');
   if (module) {
     const premierScript = /<script\b(?![^>]*\bid=["']jel-i18n(?:-textes)?["'])(?![^>]*type=["']application\/json)[^>]*>/i.exec(html);
@@ -274,7 +274,7 @@ function chercherTextesEnDur(id, code) {
       const ligne = js.slice(js.lastIndexOf('\n', m.index) + 1, m.index);
       if (/(?:^|[^\w$])t\(\s*$|JEL_I18N\.\w+\(\s*$/.test(avant)) continue;          // t('…')
       if (/console\.\w+\(|font\s*=|font:|\.font\b|querySelector|getElementById|addEventListener|createElement|classList|setAttribute\(\s*['"](?:class|style|id|role)/.test(ligne)) continue;
-      if (/^\s*[\w.-]+\s*$/.test(texte)) continue;                                    // clé ou identifiant
+      if (/^\s*[\w.-]+\s*$/.test(texte) || texte === 'use strict') continue;          // clé ou identifiant
       if (/^[\s\w#.,:;()%+\-*/>=!~[\]"'@-]*$/.test(texte) && !MOTS.test(texte.replace(/[#.][\w-]+/g, ''))) continue;
       if (/\b(?:px|rem|em|vh|vw|rgba?|hsla?|deg|ms)\b|#[0-9a-f]{3,8}\b|^\s*\d/.test(texte) && !/[àâäçéèêëîïôöùûüÿœæ]/i.test(texte)) continue;
       if (/^(?:bold|normal|italic|\d{3})\b|\bsans-serif\b|\bsystem-ui\b|\bmonospace\b/.test(texte)) continue;

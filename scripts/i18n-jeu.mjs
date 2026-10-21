@@ -25,7 +25,7 @@ const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
 const RE_MODULE = /(<script\b[^>]*\bid=["']jel-i18n["'][^>]*>)[\s\S]*?(<\/script>)/i;
 
-const module = (await readFile(path.join(RACINE, 'public', 'i18n', 'i18n.js'), 'utf8')).trim();
+const module = (await readFile(path.join(RACINE, 'public', 'i18n', 'i18n.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
 let ids = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 if (ids.length === 0) {
   ids = (await readdir(DOSSIER_JEUX, { withFileTypes: true }))
