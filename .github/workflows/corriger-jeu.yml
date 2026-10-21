@@ -1,6 +1,6 @@
 # ==========================================================================
 # Correction d'un jeu proposé : un commentaire contenant « @claude » dans
-# une pull request (auteur : Jamesmax27) demande à l'agent de modifier le
+# une pull request (auteurs autorisés : Jamesmax27, celest27) demande à l'agent de modifier le
 # jeu de cette pull request. La validation automatique (valider-jeu.yml)
 # envoie aussi ses demandes ici (lancement direct : pr + demande).
 #
@@ -35,7 +35,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' || (
       github.event.issue.pull_request &&
-      github.event.comment.user.login == 'Jamesmax27' &&
+      contains(fromJSON('["Jamesmax27", "celest27"]'), github.event.comment.user.login) &&
       contains(github.event.comment.body, '@claude'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -122,6 +122,9 @@ jobs:
         with:
           # Abonnement Claude (jeton créé avec « claude setup-token »), comme nouveau-jeu.yml.
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Lancement par la validation automatique = acteur « github-actions[bot] » :
+          # sans cette ligne, l'action refuse de démarrer (« non-human actor »).
+          allowed_bots: github-actions
           show_full_output: true
           claude_args: |
             --max-turns 100
