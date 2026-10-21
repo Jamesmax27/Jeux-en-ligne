@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>La chorale des grenouilles</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #140f33; color: #fff8e8;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas { position: absolute; inset: 0; display: block; }
+
+  /* Boutons ronds en haut à droite (pause, son) */
+  #barre { position: absolute; top: 8px; right: 8px; display: flex; gap: 8px; z-index: 20; }
+  .rond {
+    width: 46px; height: 46px; border-radius: 50%; border: 2px solid rgba(255,255,255,.55);
+    background: rgba(20,15,51,.6); color: #fff; display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .rond svg { width: 24px; height: 24px; }
+  .rond:active { transform: scale(.92); }
+  #btSon .barre-son { display: none; }
+  #btSon.muet .ondes { display: none; }
+  #btSon.muet .barre-son { display: inline; }
+
+  /* Écrans par-dessus la mare */
+  .ecran {
+    position: absolute; inset: 0; z-index: 10;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 70px 18px 24px; text-align: center;
+  }
+  .cache { display: none !important; }
+  .voile { background: rgba(14,10,40,.72); }
+
+  h1 {
+    font-size: clamp(38px, 11vw, 64px); line-height: 1.02; font-weight: 900;
+    color: #fff3c4; letter-spacing: .5px;
+    text-shadow: 0 4px 0 #2e7d4f, 0 8px 22px rgba(0,0,0,.6), 0 0 30px rgba(255,214,92,.45);
+  }
+  h1 small { display: block; font-size: .5em; color: #b8f5a8; text-shadow: 0 3px 0 #1d4d34, 0 6px 16px rgba(0,0,0,.6); }
+  h2 { font-size: 30px; font-weight: 900; color: #fff3c4; text-shadow: 0 3px 0 #2e7d4f; }
+  .regle {
+    max-width: 340px; font-size: 18px; line-height: 1.35; font-weight: 600;
+    background: rgba(14,10,40,.55); padding: 10px 14px; border-radius: 16px;
+  }
+  button.gros, button.moyen {
+    font: inherit; font-weight: 900; cursor: pointer; border: none; border-radius: 999px;
+    color: #17361f; box-shadow: 0 6px 0 #2a7a3f, 0 10px 20px rgba(0,0,0,.35);
+    background: linear-gradient(#c8f7a0, #6fd36b);
+  }
+  button.gros { font-size: 30px; padding: 16px 64px; min-height: 64px; }
+  button.moyen { font-size: 19px; padding: 11px 26px; min-height: 48px; }
+  button.secondaire { background: linear-gradient(#fff3c4, #ffd65c); box-shadow: 0 6px 0 #b58a1c, 0 10px 20px rgba(0,0,0,.35); color: #4a3200; }
+  button.gros:active, button.moyen:active { transform: translateY(4px); box-shadow: 0 2px 0 #2a7a3f; }
+  .rangee { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .petit { font-size: 15px; opacity: .85; }
+  #accueil { justify-content: flex-start; padding-top: 9vh; }
+  #accueil .espace { flex: 1; max-height: 40px; }
+
+  /* Carte des niveaux */
+  #grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: min(100%, 400px); }
+  .case {
+    font: inherit; border: none; border-radius: 16px; padding: 8px 4px; min-height: 84px; cursor: pointer;
+    background: linear-gradient(#3fb67a, #24785a); color: #fff; box-shadow: 0 4px 0 #18503c;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  }
+  .case b { font-size: 26px; line-height: 1; }
+  .case span { font-size: 11px; line-height: 1.1; opacity: .95; }
+  .case i { font-style: normal; font-size: 16px; color: #ffd65c; letter-spacing: 1px; }
+  .case i .vide { color: rgba(255,255,255,.3); font-size: inherit; opacity: 1; }
+  #btSuivant { font-size: 26px; padding: 14px 36px; white-space: nowrap; }
+  .case:disabled { background: #3b3760; box-shadow: 0 4px 0 #24213f; color: #9b97bf; cursor: default; }
+
+  /* Tutoriel : la mare reste visible derrière */
+  #tuto { justify-content: flex-start; padding-top: 96px; background: transparent; }
+  #bulle {
+    background: rgba(255,248,232,.95); color: #1f2a4a; border-radius: 18px; padding: 12px 16px;
+    max-width: 340px; font-size: 19px; font-weight: 700; line-height: 1.3; box-shadow: 0 8px 22px rgba(0,0,0,.4);
+  }
+  #bulle .etape { display: block; font-size: 13px; color: #2e7d4f; margin-bottom: 4px; letter-spacing: 1px; }
+  #tutoTitre { font-size: 22px; font-weight: 900; color: #ffd65c; text-shadow: 0 2px 6px #000; }
+  #tutoClavier { font-size: 13px; opacity: .8; text-shadow: 0 1px 3px #000; }
+
+  /* Bilan */
+  #etoiles { display: flex; gap: 10px; font-size: 58px; line-height: 1; }
+  #etoiles span { color: rgba(255,255,255,.2); transform: scale(.8); transition: transform .3s, color .3s; }
+  #etoiles span.pleine { color: #ffd65c; transform: scale(1.15); text-shadow: 0 0 18px rgba(255,214,92,.9); animation: pop .45s ease-out; }
+  @keyframes pop { 0% { transform: scale(.2) rotate(-40deg); } 70% { transform: scale(1.4); } 100% { transform: scale(1.15); } }
+  #bilanScore { font-size: 40px; font-weight: 900; color: #fff3c4; }
+  #bilanDetails { font-size: 16px; line-height: 1.5; background: rgba(0,0,0,.25); padding: 8px 14px; border-radius: 14px; }
+  #record { background: #ff8fb1; color: #4a0f26; font-weight: 900; padding: 6px 16px; border-radius: 999px; animation: balance 1s infinite alternate; }
+  @keyframes balance { from { transform: rotate(-4deg) scale(1); } to { transform: rotate(4deg) scale(1.08); } }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="barre">
+  <button id="btPause" class="rond cache" aria-label="Pause">
+    <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+  </button>
+  <button id="btSon" class="rond" aria-label="Couper ou remettre le son">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/>
+      <path class="ondes" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>
+      <path class="barre-son" d="M16 9l5 6M21 9l-5 6"/>
+    </svg>
+  </button>
+</div>
+
+<!-- Accueil -->
+<section id="accueil" class="ecran">
+  <h1>La chorale<small>des grenouilles</small></h1>
+  <p class="regle">Les lucioles descendent en musique. Quand une luciole arrive dans le rond, touche la grenouille : elle chante !</p>
+  <div class="espace"></div>
+  <button id="btJouer" class="gros">Jouer</button>
+  <button id="btNiveaux" class="moyen secondaire">Niveaux</button>
+  <p id="resume" class="petit"></p>
+</section>
+
+<!-- Carte des niveaux -->
+<section id="carte" class="ecran voile cache">
+  <h2>Les niveaux</h2>
+  <p id="totalEtoiles" class="petit"></p>
+  <div id="grille"></div>
+  <button id="btRetour" class="moyen secondaire">Retour</button>
+</section>
+
+<!-- Tutoriel animé -->
+<section id="tuto" class="ecran cache">
+  <p id="tutoTitre"></p>
+  <p id="bulle"><span class="etape"></span><span class="texte"></span></p>
+  <p id="tutoClavier"></p>
+  <div style="flex:1"></div>
+  <button id="btPasser" class="moyen">C'est parti !</button>
+  <p class="petit" style="text-shadow:0 1px 3px #000">Touche l'écran pour commencer</p>
+  <div style="height:170px"></div>
+</section>
+
+<!-- Pause -->
+<section id="pause" class="ecran voile cache">
+  <h2>Pause</h2>
+  <button id="btReprendre" class="gros">Reprendre</button>
+  <div class="rangee">
+    <button id="btRecommencer" class="moyen secondaire">Recommencer</button>
+    <button id="btPauseNiveaux" class="moyen secondaire">Niveaux</button>
+  </div>
+</section>
+
+<!-- Bilan de fin de niveau -->
+<section id="bilan" class="ecran voile cache">
+  <h2 id="bilanTitre"></h2>
+  <div id="etoiles"><span>★</span><span>★</span><span>★</span></div>
+  <p id="bilanScore">0</p>
+  <p id="record" class="cache">Nouveau record !</p>
+  <p id="bilanDetails"></p>
+  <button id="btSuivant" class="gros">Niveau suivant</button>
+  <div class="rangee">
+    <button id="btRejouer" class="moyen secondaire">Rejouer</button>
+    <button id="btBilanNiveaux" class="moyen secondaire">Niveaux</button>
+  </div>
+</section>
+
+<script>
+'use strict';
+
+// =====================================================================
+// 1. Les niveaux
+// =====================================================================
+// bpm : tempo ; voies : nombre de grenouilles ; duree : secondes de chant ;
+// dens : chance d'une note sur chaque temps ; croches : chance d'une note entre deux temps ;
+// longues / accords / feuilles / dorees / tetards : proportions de chaque nouveauté ;
+// trajet : temps (ms) pour qu'une luciole descende ; rate : énergie perdue par note ratée ;
+// fen : largeur de la fenêtre de précision (1 = normale) ; nouveau : tutoriel à montrer.
+const NIVEAUX = [
+  { nom: 'Premier chant',     bpm: 76,  voies: 2, duree: 55, dens: .55, croches: 0,   trajet: 2600, rate: 4,  fen: 1.4,  nouveau: 'base' },
+  { nom: 'Trois voix',        bpm: 80,  voies: 3, duree: 58, dens: .6,  croches: 0,   trajet: 2500, rate: 5,  fen: 1.3,  nouveau: 'voie3' },
+  { nom: 'Longues lucioles',  bpm: 80,  voies: 3, duree: 62, dens: .55, croches: 0,   longues: .22, trajet: 2400, rate: 5, fen: 1.25, nouveau: 'longue' },
+  { nom: 'Lucioles dorées',   bpm: 88,  voies: 3, duree: 64, dens: .6,  croches: .08, longues: .16, dorees: .12, trajet: 2300, rate: 6, fen: 1.2, nouveau: 'doree' },
+  { nom: 'Accords',           bpm: 88,  voies: 3, duree: 66, dens: .6,  croches: .08, longues: .12, accords: .2, dorees: .08, trajet: 2200, rate: 6, fen: 1.15, nouveau: 'accord' },
+  { nom: "Le chœur s'anime",  bpm: 100, voies: 3, duree: 68, dens: .65, croches: .18, longues: .14, accords: .16, dorees: .08, trajet: 2000, rate: 7, fen: 1.1 },
+  { nom: 'Feuilles mortes',   bpm: 96,  voies: 3, duree: 68, dens: .6,  croches: .12, longues: .12, accords: .12, feuilles: .3, dorees: .06, trajet: 2000, rate: 7, fen: 1.05, nouveau: 'feuille' },
+  { nom: "Pluie d'automne",   bpm: 108, voies: 3, duree: 70, dens: .68, croches: .22, longues: .14, accords: .18, feuilles: .34, dorees: .06, trajet: 1850, rate: 8, fen: 1 },
+  { nom: 'Quatre voix',       bpm: 96,  voies: 4, duree: 70, dens: .62, croches: .12, longues: .14, accords: .14, feuilles: .22, dorees: .06, trajet: 1900, rate: 8, fen: 1, nouveau: 'voie4' },
+  { nom: "Nuit d'été",        bpm: 112, voies: 4, duree: 72, dens: .7,  croches: .25, longues: .15, accords: .2, feuilles: .3, dorees: .06, trajet: 1750, rate: 9, fen: .95 },
+  { nom: 'Têtards sauteurs',  bpm: 104, voies: 4, duree: 74, dens: .66, croches: .2,  longues: .12, accords: .15, feuilles: .24, tetards: .22, dorees: .06, trajet: 1800, rate: 9, fen: .95, nouveau: 'tetard' },
+  { nom: 'Grand concert',     bpm: 120, voies: 4, duree: 85, dens: .74, croches: .3,  longues: .15, accords: .22, feuilles: .3, tetards: .2, dorees: .06, trajet: 1600, rate: 10, fen: .9 }
+];
+const TONALITES = [0, 2, 4, 5, 7, 9, 0, 2, 4, 5, 7, 0];        // demi-tons au-dessus de do
+const PENTA = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];          // gamme pentatonique (toujours jolie)
+const BASSES = [0, 7, 9, 5];                                    // do, sol, la, fa : grille du morceau
+const COULEURS_GRENOUILLES = ['#5cc96b', '#3fb6a8', '#9ad14f', '#4fa3d9'];
+const COULEURS_LUCIOLES = ['#ffd65c', '#ff8fb1', '#8fe3ff', '#c6a0ff'];
+const POINTS = { P: 100, B: 70, O: 40 };
+const CREDIT = { P: 1, B: .8, O: .5 };
+const TEXTES = { P: 'Parfait !', B: 'Bien !', O: 'OK' };
+
+// =====================================================================
+// 2. Sauvegarde (toujours dans try/catch : le stockage peut être refusé)
+// =====================================================================
+const CLE = 'chorale-des-grenouilles-v1';
+let rec = { etoiles: [], meilleur: [], debloque: 0, son: true, tutos: [] };
+try {
+  const brut = localStorage.getItem(CLE);
+  if (brut) rec = Object.assign(rec, JSON.parse(brut));
+} catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+function sauver() {
+  try { localStorage.setItem(CLE, JSON.stringify(rec)); } catch (e) { /* tant pis */ }
+}
+const totalEtoiles = () => rec.etoiles.reduce((s, e) => s + (e || 0), 0);
+
+// =====================================================================
+// 3. Sons (Web Audio, créés seulement après le premier toucher)
+// =====================================================================
+let ac = null, maitre = null, bufBruit = null;
+function initAudio() {
+  if (ac) { if (ac.state === 'suspended') ac.resume().catch(() => {}); return; }
+  try {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return;
+    ac = new C();
+    maitre = ac.createGain();
+    maitre.gain.value = rec.son ? .8 : 0;
+    const comp = ac.createDynamicsCompressor();
+    maitre.connect(comp); comp.connect(ac.destination);
+    bufBruit = ac.createBuffer(1, ac.sampleRate * .5, ac.sampleRate);
+    const d = bufBruit.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  } catch (e) { ac = null; }
+}
+// Une note simple avec enveloppe douce ; glisse = facteur de fréquence à la fin.
+function ton(freq, dur, type, vol, quand, glisse) {
+  if (!ac || !rec.son) return;
+  const t = ac.currentTime + (quand || 0);
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t);
+  if (glisse) o.frequency.exponentialRampToValueAtTime(freq * glisse, t + dur);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + .012);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(maitre);
+  o.start(t); o.stop(t + dur + .05);
+}
+function bruit(dur, vol, freq, type, quand) {
+  if (!ac || !rec.son || !bufBruit) return;
+  const t = ac.currentTime + (quand || 0);
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = bufBruit; f.type = type; f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(f); f.connect(g); g.connect(maitre);
+  s.start(t); s.stop(t + dur + .02);
+}
+const son = {
+  // Chant de grenouille : petite glissade vers la note, comme un « croâ » musical.
+  chant(freq, vol) {
+    if (!ac || !rec.son) return;
+    const t = ac.currentTime;
+    const o = ac.createOscillator(), o2 = ac.createOscillator(), g = ac.createGain();
+    o.type = 'triangle'; o2.type = 'sine';
+    o.frequency.setValueAtTime(freq * .82, t); o.frequency.exponentialRampToValueAtTime(freq, t + .05);
+    o2.frequency.setValueAtTime(freq * 2, t);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .015);
+    g.gain.exponentialRampToValueAtTime(.0001, t + .32);
+    const g2 = ac.createGain(); g2.gain.value = .25;
+    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(maitre);
+    o.start(t); o2.start(t); o.stop(t + .36); o2.stop(t + .36);
+  },
+  // Note tenue avec vibrato ; renvoie une fonction pour l'arrêter.
+  tenue(freq) {
+    if (!ac || !rec.son) return () => {};
+    const t = ac.currentTime;
+    const o = ac.createOscillator(), lfo = ac.createOscillator(), lg = ac.createGain(), g = ac.createGain();
+    o.type = 'triangle'; o.frequency.value = freq;
+    lfo.frequency.value = 5.5; lg.gain.value = freq * .012;
+    lfo.connect(lg); lg.connect(o.frequency);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.16, t + .04);
+    o.connect(g); g.connect(maitre); o.start(t); lfo.start(t);
+    return () => {
+      const t2 = ac.currentTime;
+      g.gain.cancelScheduledValues(t2); g.gain.setValueAtTime(g.gain.value || .1, t2);
+      g.gain.exponentialRampToValueAtTime(.0001, t2 + .15);
+      o.stop(t2 + .2); lfo.stop(t2 + .2);
+    };
+  },
+  doree(freq) { [1, 1.25, 1.5, 2].forEach((m, i) => ton(freq * m, .2, 'sine', .12, i * .05)); },
+  rate() { ton(260, .28, 'sine', .14, 0, .55); },
+  feuille() { bruit(.3, .3, 700, 'lowpass'); ton(140, .3, 'square', .05, 0, .5); },
+  kick() { ton(120, .16, 'sine', .22, 0, .4); },
+  charleston() { bruit(.04, .05, 7000, 'highpass'); },
+  basse(freq, dur) { ton(freq, dur, 'triangle', .1); },
+  decompte(fort) { ton(fort ? 1320 : 880, .08, 'square', .05); },
+  victoire() { [523, 659, 784, 1047, 1319].forEach((f, i) => ton(f, .35, 'triangle', .14, i * .1)); },
+  echec() { [392, 330, 262].forEach((f, i) => ton(f, .4, 'triangle', .12, i * .18)); },
+  etoile(i) { ton(880 * Math.pow(1.26, i), .3, 'sine', .16); ton(1760 * Math.pow(1.26, i), .2, 'sine', .05, .03); },
+  clic() { ton(620, .07, 'sine', .1, 0, 1.6); },
+  vide(freq) { ton(freq, .12, 'sine', .05); }
+};
+
+// =====================================================================
+// 4. Dessin : préparation du canvas et du décor
+// =====================================================================
+const cv = document.getElementById('scene');
+const cx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, decor = null;
+function redimensionner() {
+  W = window.innerWidth; H = window.innerHeight;
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  preparerDecor();
+}
+// Le décor fixe (ciel, lune, roseaux, eau) est dessiné une fois dans un canvas caché.
+function preparerDecor() {
+  decor = document.createElement('canvas');
+  decor.width = cv.width; decor.height = cv.height;
+  const d = decor.getContext('2d');
+  d.scale(DPR, DPR);
+  const horizon = H * .3;
+  let g = d.createLinearGradient(0, 0, 0, horizon);
+  g.addColorStop(0, '#140f33'); g.addColorStop(.7, '#3a2a6e'); g.addColorStop(1, '#8a4f86');
+  d.fillStyle = g; d.fillRect(0, 0, W, horizon + 2);
+  // Étoiles
+  let graine = 7;
+  const al = () => (graine = (graine * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 70; i++) {
+    d.fillStyle = `rgba(255,255,240,${.3 + al() * .6})`;
+    d.beginPath(); d.arc(al() * W, al() * horizon * .9, al() * 1.4 + .3, 0, 7); d.fill();
+  }
+  // Lune
+  const lx = W * .82, ly = horizon * .38;
+  g = d.createRadialGradient(lx, ly, 5, lx, ly, 70);
+  g.addColorStop(0, 'rgba(255,245,200,.5)'); g.addColorStop(1, 'rgba(255,245,200,0)');
+  d.fillStyle = g; d.beginPath(); d.arc(lx, ly, 70, 0, 7); d.fill();
+  d.fillStyle = '#fff4cf'; d.beginPath(); d.arc(lx, ly, 22, 0, 7); d.fill();
+  // Collines et arbres lointains
+  d.fillStyle = '#2a1f55';
+  d.beginPath(); d.moveTo(0, horizon);
+  for (let x = 0; x <= W; x += 20) d.lineTo(x, horizon - 18 - Math.sin(x * .02) * 12 - Math.sin(x * .053) * 8);
+  d.lineTo(W, horizon); d.fill();
+  // Eau de la mare
+  g = d.createLinearGradient(0, horizon, 0, H);
+  g.addColorStop(0, '#3d4f8a'); g.addColorStop(.25, '#1f4a63'); g.addColorStop(1, '#0d2a33');
+  d.fillStyle = g; d.fillRect(0, horizon, W, H - horizon);
+  // Reflet de lune
+  d.fillStyle = 'rgba(255,244,207,.12)';
+  for (let i = 0; i < 6; i++) d.fillRect(lx - 30 + i * 3, horizon + 8 + i * 9, 60 - i * 6, 2);
+  // Rides
+  d.strokeStyle = 'rgba(255,255,255,.06)'; d.lineWidth = 1.5;
+  for (let i = 0; i < 18; i++) {
+    const y = horizon + 20 + al() * (H - horizon), x = al() * W, l = 20 + al() * 50;
+    d.beginPath(); d.moveTo(x - l, y); d.quadraticCurveTo(x, y - 3, x + l, y); d.stroke();
+  }
+  // Roseaux sur les côtés
+  const roseau = (x, haut, pench) => {
+    d.strokeStyle = '#1d4d34'; d.lineWidth = 3;
+    d.beginPath(); d.moveTo(x, H); d.quadraticCurveTo(x + pench * .5, H - haut * .5, x + pench, H - haut); d.stroke();
+    d.fillStyle = '#6b3f22';
+    d.beginPath(); d.ellipse(x + pench, H - haut + 12, 4.5, 14, pench * .01, 0, 7); d.fill();
+  };
+  for (let i = 0; i < 5; i++) { roseau(4 + i * 7, H * .35 + al() * H * .2, -10 + al() * 20); roseau(W - 4 - i * 7, H * .35 + al() * H * .2, -10 + al() * 20); }
+}
+
+// =====================================================================
+// 5. Génération des partitions (graine fixe : un niveau s'apprend)
+// =====================================================================
+function alea(graine) {
+  let s = graine * 9301 + 49297;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
+// Hauteur d'une note : la voie donne la note, la mesure fait évoluer la mélodie.
+function frequence(voie, voies, beat, ton0) {
+  const decal = [0, 1, 2, 1][Math.floor(beat / 4) % 4];
+  const deg = Math.min(PENTA.length - 1, voie * (voies === 2 ? 2 : 1) + decal + 1);
+  return 261.63 * Math.pow(2, (PENTA[deg] + ton0) / 12);
+}
+function genererPartition(i) {
+  const def = NIVEAUX[i], r = alea(i * 131 + 17);
+  const beatMs = 60000 / def.bpm, voies = def.voies;
+  const total = Math.round(def.bpm * def.duree / 60 / 4) * 4;
+  const notes = [];
+  let derniere = Math.floor(voies / 2), dernierBeat = -9, occupe = 0;
+  const ajouter = (b, voie, type, len) => {
+    const n = { t: b * beatMs, beat: b, voie, type, etat: 0, freq: frequence(voie, voies, b, TONALITES[i]) };
+    if (type === 'longue') n.fin = (b + len) * beatMs;
+    notes.push(n); return n;
+  };
+  for (let b = 4; b < total; b += .5) {
+    const surTemps = b % 1 === 0;
+    if ((b - 4) % 16 >= 14) continue;                  // respiration en fin de phrase
+    if (b < occupe) continue;                          // une note tenue occupe la mare
+    const p = surTemps ? def.dens : (def.croches || 0);
+    if (r() >= p) {
+      // Temps libre : parfois une feuille morte qui tombe (à ne pas toucher)
+      if (def.feuilles && surTemps && r() < def.feuilles && b - dernierBeat >= 1) {
+        let v = Math.floor(r() * voies);
+        if (v === derniere) v = (v + 1 + Math.floor(r() * (voies - 1))) % voies;
+        ajouter(b, v, 'feuille');
+      }
+      continue;
+    }
+    // Mélodie : surtout des petits pas d'une voie à la voisine
+    let v = derniere + [-1, 0, 1][Math.floor(r() * 3)];
+    if (r() < .25) v = Math.floor(r() * voies);
+    if (b - dernierBeat <= .5 && v === derniere) v = derniere + (r() < .5 ? -1 : 1);
+    if (v < 0) v = 1; if (v >= voies) v = voies - 2;
+    let type = 'simple';
+    const finPhrase = 4 + Math.floor((b - 4) / 16) * 16 + 14;
+    if (def.longues && surTemps && r() < def.longues && b + 2.5 < finPhrase) type = 'longue';
+    else if (def.tetards && r() < def.tetards && b - dernierBeat >= 1) type = 'tetard';
+    else if (def.dorees && r() < def.dorees) type = 'doree';
+    const len = type === 'longue' ? (r() < .5 ? 1 : 2) : 0;
+    const n = ajouter(b, v, type, len);
+    if (type === 'tetard') {
+      n.de = (v + 1 + Math.floor(r() * (voies - 1))) % voies;   // voie de départ différente
+    }
+    if (type === 'longue') occupe = b + len + 1;
+    // Accord : une deuxième luciole en même temps, sur une autre voie
+    else if (def.accords && surTemps && type !== 'tetard' && r() < def.accords) {
+      let v2 = (v + 1 + Math.floor(r() * (voies - 1))) % voies;
+      ajouter(b, v2, 'simple').accord = true;
+      n.accord = true;
+    }
+    derniere = v; dernierBeat = b;
+  }
+  notes.sort((a, b) => a.t - b.t);
+  return { notes, total };
+}
+
+// Tutoriels : petite partition jouée toute seule, avec une main qui montre le geste.
+// Notes : [temps, voie, type, longueur, voie de départ]
+const TUTOS = {
+  base: { titre: 'Comment jouer', voies: 2, notes: [[0, 0], [2, 1], [4, 0], [5, 1], [6, 0]],
+    textes: ['Les lucioles descendent vers les grenouilles.', 'Attends que la luciole arrive dans le rond…', '…et touche la grenouille : elle chante !'] },
+  voie3: { titre: 'Une nouvelle amie !', voies: 3, notes: [[0, 0], [1, 1], [2, 2], [3, 1], [4, 0]],
+    textes: ['Une troisième grenouille rejoint la chorale.', 'Regarde bien dans quelle voie tombe la luciole…', '…et touche la bonne grenouille.'] },
+  longue: { titre: 'Les longues lucioles', voies: 3, notes: [[0, 1], [2, 0, 'longue', 2], [5, 2, 'longue', 1]],
+    textes: ['Certaines lucioles ont une longue traîne.', 'Touche quand la tête arrive dans le rond…', '…et garde le doigt appuyé jusqu\'au bout !'] },
+  doree: { titre: 'La luciole dorée', voies: 3, notes: [[0, 1], [1, 0], [2, 2, 'doree'], [3, 1], [4, 0, 'doree']],
+    textes: ['Voici la luciole dorée !', 'Elle rapporte 3 fois plus de points…', '…et redonne de l\'énergie à la chorale.'] },
+  accord: { titre: 'Les accords', voies: 3, notes: [[0, 0, 'accord'], [0, 2, 'accord'], [2, 1], [3, 0, 'accord'], [3, 1, 'accord']],
+    textes: ['Parfois, deux lucioles arrivent ensemble.', 'C\'est un accord : deux grenouilles chantent.', 'Touche les deux grenouilles en même temps !'] },
+  feuille: { titre: 'Attention aux feuilles !', voies: 3, notes: [[0, 0], [1, 2, 'feuille'], [2, 1], [3, 0, 'feuille'], [4, 2]],
+    textes: ['Des feuilles mortes tombent dans la mare.', 'Les feuilles ne chantent pas.', 'Ne les touche pas : laisse-les passer !'] },
+  voie4: { titre: 'La chorale au complet !', voies: 4, notes: [[0, 0], [1, 1], [2, 2], [3, 3], [4, 2]],
+    textes: ['Une quatrième grenouille arrive !', 'Il y a maintenant quatre voies.', 'Garde l\'œil sur toutes les lucioles.'] },
+  tetard: { titre: 'Les têtards sauteurs', voies: 4, notes: [[0, 1, 'tetard', 0, 3], [2, 2, 'tetard', 0, 0], [4, 0, 'tetard', 0, 2]],
+    textes: ['Les têtards sautent d\'une voie à l\'autre !', 'Suis-le des yeux jusqu\'au bout…', '…et touche la grenouille où il arrive.'] }
+};
+
+// =====================================================================
+// 6. La partie en cours
+// =====================================================================
+let P = null;               // partie (ou démonstration) en cours
+let ecran = 'accueil';
+const grenouilles = [0, 1, 2, 3].map(() => ({ chant: 0, triste: 0, saut: 0, appui: false }));
+const particules = [], textes = [], lucioles = [];
+let secousse = 0, finTuto = null, tutoDebut = 0;
+
+function creerPartie(opt) {
+  const p = Object.assign({
+    t: -600, score: 0, scoreAff: 0, combo: 0, maxCombo: 0, energie: 100, credit: 0,
+    compte: { P: 0, B: 0, O: 0, R: 0 }, dernierBeat: -1, actif: true, enPause: false, tenues: [], arrets: [], decompte: null
+  }, opt);
+  p.beatMs = 60000 / p.bpm;
+  p.total = p.notes.filter((n) => n.type !== 'feuille').length;
+  p.fin = Math.max(...p.notes.map((n) => n.fin || n.t)) + p.beatMs * 2;
+  p.fenP = 55 * p.fen; p.fenB = 110 * p.fen; p.fenO = 170 * p.fen;
+  grenouilles.forEach((g) => { g.chant = 0; g.triste = 0; g.appui = false; });
+  return p;
+}
+function demarrerPartie(i) {
+  const def = NIVEAUX[i];
+  const part = genererPartition(i);
+  P = creerPartie({ niv: i, def, bpm: def.bpm, voies: def.voies, trajet: def.trajet, fen: def.fen, notes: part.notes, beats: part.total, demo: false });
+  montrer(null);
+  document.getElementById('btPause').classList.remove('cache');
+  ecran = 'jeu';
+}
+function lancerNiveau(i) {
+  const def = NIVEAUX[i];
+  if (def.nouveau && !rec.tutos.includes(def.nouveau)) lancerTuto(def.nouveau, () => demarrerPartie(i));
+  else demarrerPartie(i);
+}
+function lancerTuto(cle, suite) {
+  const tu = TUTOS[cle];
+  const bpm = 90, beatMs = 60000 / bpm, trajet = 2200, depart = trajet + 600;
+  const notes = tu.notes.map(([b, voie, type, len, de]) => {
+    const n = { t: depart + b * beatMs, voie, type: type === 'accord' ? 'simple' : (type || 'simple'), etat: 0,
+      freq: frequence(voie, tu.voies, b, 0), beat: b };
+    if (type === 'longue') n.fin = n.t + len * beatMs;
+    if (type === 'tetard') n.de = de;
+    return n;
+  });
+  P = creerPartie({ niv: -1, bpm, voies: tu.voies, trajet, fen: 1.3, notes, beats: 0, demo: true, tuto: tu });
+  P.t = 0;
+  P.premiere = notes[0].t;
+  document.getElementById('tutoTitre').textContent = tu.titre;
+  const clav = { 2: '← →', 3: '← ↓ →', 4: '← ↓ ↑ →' }[tu.voies];
+  document.getElementById('tutoClavier').textContent = `Au clavier : ${clav} (ou D F J K)`;
+  document.getElementById('bulle').dataset.etape = '';
+  majBulle(0);
+  finTuto = () => {
+    if (!rec.tutos.includes(cle)) { rec.tutos.push(cle); sauver(); }
+    suite();
+  };
+  tutoDebut = performance.now();
+  montrer('tuto');
+  ecran = 'tuto';
+}
+function majBulle(etape) {
+  const b = document.getElementById('bulle');
+  if (b.dataset.etape === String(etape)) return;
+  b.dataset.etape = etape;
+  b.querySelector('.etape').textContent = `ÉTAPE ${etape + 1} / 3`;
+  b.querySelector('.texte').textContent = P.tuto.textes[etape];
+}
+function passerTuto() {
+  if (ecran !== 'tuto' || performance.now() - tutoDebut < 500) return;
+  arreterTenues();
+  son.clic();
+  const f = finTuto; finTuto = null;
+  if (f) f();
+}
+
+// Position des voies à l'écran
+function dispo(voies) {
+  const lz = Math.min(W - 16, 460);
+  const x0 = (W - lz) / 2, lw = lz / voies;
+  const ligneY = H - Math.max(120, Math.min(175, H * .2));
+  const r = Math.min(lw * .34, 44);
+  return { x0, lw, ligneY, hautY: 92, r, x: (i) => x0 + lw * (i + .5) };
+}
+
+// Le joueur appuie sur une voie
+function presser(voie) {
+  if (!P || !P.actif || P.enPause || voie < 0 || voie >= P.voies) return;
+  const g = grenouilles[voie];
+  g.appui = true;
+  const t = P.t;
+  let cible = null, ecart = Infinity;
+  for (const n of P.notes) {
+    if (n.t - t > P.fenO) break;
+    if (n.etat !== 0 || n.type === 'feuille' || n.voie !== voie) continue;
+    const d = Math.abs(t - n.t);
+    if (d <= P.fenO && d < ecart) { cible = n; ecart = d; }
+  }
+  const D = dispo(P.voies);
+  if (cible) {
+    const q = ecart <= P.fenP ? 'P' : ecart <= P.fenB ? 'B' : 'O';
+    if (cible.type === 'longue') {
+      cible.etat = 1; cible.q = q;
+      P.tenues[voie] = cible;
+      P.arrets[voie] = son.tenue(cible.freq);
+      g.chant = 1;
+      texte(D.x(voie), D.ligneY - D.r * 1.5, TEXTES[q], COULEURS_LUCIOLES[voie]);
+    } else {
+      cible.etat = 2;
+      reussite(cible, q, 1);
+    }
+    return;
+  }
+  // Pas de luciole : une feuille morte touchée ?
+  for (const n of P.notes) {
+    if (n.t - t > P.fenO) break;
+    if (n.etat === 0 && n.type === 'feuille' && n.voie === voie && Math.abs(t - n.t) <= P.fenO * .85) {
+      n.etat = 3;
+      if (!P.demo) { P.energie -= 12; P.combo = 0; }
+      son.feuille();
+      g.triste = 1; secousse = 8;
+      texte(D.x(voie), D.ligneY - D.r * 1.5, 'Oups, une feuille !', '#ffb36b');
+      eclats(D.x(voie), D.ligneY, '#c9772e', 14);
+      return;
+    }
+  }
+  // Toucher dans le vide : petit son doux, rien de perdu
+  son.vide(frequence(voie, P.voies, Math.max(0, t / P.beatMs), P.niv >= 0 ? TONALITES[P.niv] : 0));
+  g.saut = .5;
+}
+function relacher(voie) {
+  if (!P || voie < 0 || voie >= 4) return;
+  grenouilles[voie].appui = false;
+  const n = P.tenues && P.tenues[voie];
+  if (!n) return;
+  const D = dispo(P.voies);
+  if (P.t >= n.fin - P.fenB) finirTenue(n, voie, 1);
+  else {
+    const frac = Math.max(0, (P.t - n.t) / (n.fin - n.t));
+    finirTenue(n, voie, frac);
+    texte(D.x(voie), D.ligneY - D.r * 2.2, 'Trop tôt !', '#ffb36b');
+  }
+}
+function finirTenue(n, voie, frac) {
+  n.etat = 2;
+  P.tenues[voie] = null;
+  if (P.arrets[voie]) { P.arrets[voie](); P.arrets[voie] = null; }
+  if (frac >= 1) reussite(n, n.q, 1, true);
+  else {
+    P.credit += CREDIT[n.q] * frac;
+    P.compte.O++;
+    P.score += Math.round(50 * frac * (n.fin - n.t) / P.beatMs);
+    if (!P.demo) P.combo = 0;
+  }
+}
+function arreterTenues() {
+  if (!P) return;
+  for (let v = 0; v < 4; v++) {
+    if (P.arrets[v]) { P.arrets[v](); P.arrets[v] = null; }
+    P.tenues[v] = null; grenouilles[v].appui = false;
+  }
+}
+// Une note réussie : points, combo, énergie, effets
+function reussite(n, q, frac, tenue) {
+  const D = dispo(P.voies), x = D.x(n.voie), y = D.ligneY;
+  P.combo++; P.maxCombo = Math.max(P.maxCombo, P.combo);
+  P.compte[q]++;
+  const mult = 1 + Math.min(3, Math.floor(P.combo / 10)) * .5;
+  let pts = POINTS[q] * (n.type === 'doree' ? 3 : 1) * mult;
+  if (tenue) pts += 50 * (n.fin - n.t) / P.beatMs;
+  P.score += Math.round(pts);
+  P.credit += CREDIT[q] * frac;
+  P.energie = Math.min(100, P.energie + (q === 'P' ? 3 : 2) + (n.type === 'doree' ? 15 : 0));
+  const g = grenouilles[n.voie];
+  g.chant = 1; g.saut = 1;
+  if (!tenue) son.chant(n.freq, q === 'O' ? .14 : .2);
+  if (n.type === 'doree') {
+    son.doree(n.freq);
+    eclats(x, y, '#ffd65c', 26, true);
+    texte(x, y - D.r * 1.5, 'Doré ! ×3', '#ffd65c');
+  } else {
+    eclats(x, y, COULEURS_LUCIOLES[n.voie], q === 'P' ? 16 : 9);
+    if (!tenue) texte(x, y - D.r * 1.5, TEXTES[q], q === 'P' ? '#fff3c4' : '#d8f7c8');
+    else texte(x, y - D.r * 1.5, 'Bravo !', '#fff3c4');
+  }
+  if (P.combo > 0 && P.combo % 10 === 0 && !P.demo) {
+    texte(W / 2, H * .42, `Combo ${P.combo} !`, '#ffd65c', 34);
+    eclats(W / 2, H * .42, '#ffd65c', 20, true);
+  }
+}
+function rate(n) {
+  n.etat = 2;
+  const D = dispo(P.voies);
+  P.compte.R++;
+  if (!P.demo) { P.combo = 0; P.energie -= P.def.rate; secousse = 5; }
+  grenouilles[n.voie].triste = 1;
+  son.rate();
+  texte(D.x(n.voie), D.ligneY - D.r * 1.5, 'Raté', '#9fb4d9');
+}
+
+// Un temps de musique : batterie douce, basse, décompte au début
+function surBeat(k) {
+  grenouilles.forEach((g) => { g.saut = Math.max(g.saut, .25); });
+  if (P.demo) { if (k % 2 === 0) son.kick(); son.charleston(); return; }
+  if (k < 4) {
+    P.decompte = { texte: ['3', '2', '1', 'Chantez !'][k], t: P.t };
+    son.decompte(k === 3);
+    return;
+  }
+  if (k >= P.beats) return;
+  if (k % 2 === 0) son.kick();
+  son.charleston();
+  if (k % 4 === 0) son.basse(130.81 * Math.pow(2, (BASSES[(k / 4) % 4] + TONALITES[P.niv]) / 12), P.beatMs * 3.5 / 1000);
+}
+
+function miseAJour(dt) {
+  if (!P || !P.actif || P.enPause) return;
+  P.t += dt;
+  const t = P.t;
+  const k = Math.floor(t / P.beatMs);
+  while (P.dernierBeat < k) { P.dernierBeat++; if (P.dernierBeat >= 0) surBeat(P.dernierBeat); }
+
+  // Démonstration : le jeu joue tout seul, au temps parfait
+  if (P.demo) {
+    for (let v = 0; v < 4; v++) grenouilles[v].appui = !!P.tenues[v];
+    for (const n of P.notes) {
+      if (n.t > t) break;
+      if (n.etat === 0 && n.type !== 'feuille') presser(n.voie);
+    }
+    const e = t < P.premiere - 1300 ? 0 : t < P.premiere - 150 ? 1 : 2;
+    majBulle(e);
+  }
+  // Notes tenues : terminées quand la traîne arrive au rond
+  for (let v = 0; v < 4; v++) {
+    const n = P.tenues[v];
+    if (!n) continue;
+    if (t >= n.fin) { finirTenue(n, v, 1); if (P.demo) grenouilles[v].appui = false; }
+    else if (Math.random() < .3) { const D = dispo(P.voies); eclats(D.x(v), D.ligneY, COULEURS_LUCIOLES[v], 1); grenouilles[v].chant = 1; }
+  }
+  // Lucioles passées sans être touchées
+  for (const n of P.notes) {
+    if (n.t > t) break;
+    if (n.etat === 0 && t - n.t > P.fenO) {
+      if (n.type === 'feuille') { n.etat = 2; if (!P.demo) P.score += 10; }
+      else rate(n);
+    }
+  }
+  // Fin
+  if (P.demo) {
+    if (t > P.fin + 600) {             // la démonstration recommence
+      P.notes.forEach((n) => { n.etat = 0; });
+      P.t = 0; P.dernierBeat = -1;
+    }
+    return;
+  }
+  if (P.energie <= 0) { P.energie = 0; terminer(false); }
+  else if (t >= P.fin) terminer(true);
+}
+
+// =====================================================================
+// 7. Effets : étincelles, textes, confettis
+// =====================================================================
+function eclats(x, y, couleur, nb, etoile) {
+  for (let i = 0; i < nb; i++) {
+    const a = Math.random() * Math.PI * 2, v = 1.5 + Math.random() * 4;
+    particules.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2, vie: 1, duree: 600 + Math.random() * 500,
+      couleur, taille: 2 + Math.random() * 3, etoile: !!etoile, g: .08 });
+  }
+}
+function confettis(nb) {
+  const cs = ['#ffd65c', '#ff8fb1', '#8fe3ff', '#c6a0ff', '#9ad14f'];
+  for (let i = 0; i < nb; i++) {
+    particules.push({ x: Math.random() * W, y: -10 - Math.random() * H * .4, vx: (Math.random() - .5) * 2, vy: 1 + Math.random() * 2,
+      vie: 1, duree: 3500, couleur: cs[i % cs.length], taille: 4 + Math.random() * 4, confetti: true, rot: Math.random() * 6, g: .02 });
+  }
+}
+function texte(x, y, txt, couleur, taille) {
+  textes.push({ x, y, txt, couleur, taille: taille || 22, vie: 1 });
+}
+
+// =====================================================================
+// 8. Dessin de la scène
+// =====================================================================
+function grenouille(x, y, s, i, g, temps) {
+  const coul = COULEURS_GRENOUILLES[i];
+  const saut = g.saut * s * .25;
+  // Nénuphar
+  cx.fillStyle = '#2f8a4e';
+  cx.beginPath(); cx.ellipse(x, y + s * .8, s * 1.3, s * .42, 0, .25, Math.PI * 2 - .05); cx.lineTo(x, y + s * .8); cx.fill();
+  cx.fillStyle = '#3fa45e';
+  cx.beginPath(); cx.ellipse(x, y + s * .74, s * 1.15, s * .32, 0, .3, Math.PI * 2 - .1); cx.lineTo(x, y + s * .74); cx.fill();
+  if (g.appui) {
+    cx.fillStyle = 'rgba(255,255,255,.18)';
+    cx.beginPath(); cx.ellipse(x, y + s * .78, s * 1.35, s * .46, 0, 0, 7); cx.fill();
+  }
+  y -= saut;
+  const gonfle = 1 + g.chant * .08;
+  // Corps et pattes
+  cx.fillStyle = coul;
+  cx.beginPath(); cx.ellipse(x - s * .7, y + s * .55, s * .32, s * .18, -.3, 0, 7); cx.fill();
+  cx.beginPath(); cx.ellipse(x + s * .7, y + s * .55, s * .32, s * .18, .3, 0, 7); cx.fill();
+  cx.beginPath(); cx.ellipse(x, y + s * .2, s * .92 * gonfle, s * .62, 0, 0, 7); cx.fill();
+  // Ventre
+  cx.fillStyle = 'rgba(255,255,220,.35)';
+  cx.beginPath(); cx.ellipse(x, y + s * .35, s * .55, s * .35, 0, 0, 7); cx.fill();
+  // Sac vocal qui se gonfle quand elle chante
+  if (g.chant > .05) {
+    cx.fillStyle = `rgba(255,230,190,${.55 + g.chant * .4})`;
+    cx.beginPath(); cx.ellipse(x, y + s * .2, s * .42 * g.chant + s * .05, s * .3 * g.chant + s * .04, 0, 0, 7); cx.fill();
+  }
+  // Yeux
+  for (const c of [-1, 1]) {
+    const ex = x + c * s * .42, ey = y - s * .35;
+    cx.fillStyle = coul; cx.beginPath(); cx.arc(ex, ey, s * .27, 0, 7); cx.fill();
+    cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(ex, ey, s * .19, 0, 7); cx.fill();
+    cx.fillStyle = '#1b1b2f'; cx.beginPath(); cx.arc(ex, ey - s * .05, s * .1, 0, 7); cx.fill();
+    cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(ex + s * .03, ey - s * .09, s * .035, 0, 7); cx.fill();
+  }
+  // Joues
+  cx.fillStyle = 'rgba(255,140,170,.55)';
+  cx.beginPath(); cx.arc(x - s * .55, y + s * .02, s * .1, 0, 7); cx.arc(x + s * .55, y + s * .02, s * .1, 0, 7); cx.fill();
+  // Bouche
+  cx.strokeStyle = '#1b3a24'; cx.lineWidth = Math.max(2, s * .06); cx.lineCap = 'round';
+  if (g.chant > .35) {
+    cx.fillStyle = '#7a2440';
+    cx.beginPath(); cx.ellipse(x, y - s * .04, s * .16, s * .12 * g.chant + s * .03, 0, 0, 7); cx.fill();
+  } else if (g.triste > .2) {
+    cx.beginPath(); cx.arc(x, y + s * .12, s * .2, Math.PI * 1.15, Math.PI * 1.85); cx.stroke();
+  } else {
+    cx.beginPath(); cx.arc(x, y - s * .12, s * .25, Math.PI * .2, Math.PI * .8); cx.stroke();
+  }
+  // Petite décoration différente pour chaque grenouille
+  if (i === 0) {             // nœud rose
+    cx.fillStyle = '#ff8fb1';
+    cx.beginPath(); cx.moveTo(x - s * .8, y - s * .55); cx.lineTo(x - s * 1.05, y - s * .7); cx.lineTo(x - s * 1.02, y - s * .38); cx.fill();
+    cx.beginPath(); cx.moveTo(x - s * .8, y - s * .55); cx.lineTo(x - s * .62, y - s * .82); cx.lineTo(x - s * .5, y - s * .55); cx.fill();
+  } else if (i === 2) {      // fleur
+    cx.fillStyle = '#fff3c4';
+    for (let a = 0; a < 5; a++) { cx.beginPath(); cx.arc(x + s * .78 + Math.cos(a * 1.256) * s * .1, y - s * .6 + Math.sin(a * 1.256) * s * .1, s * .08, 0, 7); cx.fill(); }
+    cx.fillStyle = '#ffb347'; cx.beginPath(); cx.arc(x + s * .78, y - s * .6, s * .06, 0, 7); cx.fill();
+  } else if (i === 3) {      // petit chapeau
+    cx.fillStyle = '#5a3fa0';
+    cx.fillRect(x - s * .3, y - s * .82, s * .6, s * .08);
+    cx.fillRect(x - s * .18, y - s * 1.08, s * .36, s * .28);
+  }
+}
+function luciole(x, y, r, couleur, temps, alpha) {
+  cx.globalAlpha = alpha;
+  const g = cx.createRadialGradient(x, y, 1, x, y, r * 1.1);
+  g.addColorStop(0, couleur); g.addColorStop(1, 'rgba(0,0,0,0)');
+  cx.fillStyle = g; cx.beginPath(); cx.arc(x, y, r * 1.1, 0, 7); cx.fill();
+  // ailes
+  const b = Math.sin(temps / 50) * .3;
+  cx.fillStyle = 'rgba(255,255,255,.55)';
+  cx.beginPath(); cx.ellipse(x - r * .35, y - r * .3, r * .3, r * .15, -.6 + b, 0, 7); cx.fill();
+  cx.beginPath(); cx.ellipse(x + r * .35, y - r * .3, r * .3, r * .15, .6 - b, 0, 7); cx.fill();
+  cx.fillStyle = couleur; cx.beginPath(); cx.arc(x, y, r * .42, 0, 7); cx.fill();
+  cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(x - r * .1, y - r * .1, r * .16, 0, 7); cx.fill();
+  cx.globalAlpha = 1;
+}
+function etoileForme(x, y, rExt, rInt, branches, rot) {
+  cx.beginPath();
+  for (let i = 0; i < branches * 2; i++) {
+    const rr = i % 2 ? rInt : rExt, a = rot + i * Math.PI / branches;
+    cx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  cx.closePath();
+}
+function feuille(x, y, r, temps, alpha) {
+  cx.save(); cx.globalAlpha = alpha;
+  cx.translate(x, y); cx.rotate(Math.sin(temps / 300 + x) * .5);
+  cx.fillStyle = '#c9772e';
+  cx.beginPath(); cx.moveTo(0, -r * .8);
+  cx.quadraticCurveTo(r * .75, -r * .2, 0, r * .8); cx.quadraticCurveTo(-r * .75, -r * .2, 0, -r * .8); cx.fill();
+  cx.strokeStyle = '#7a3f12'; cx.lineWidth = 2;
+  cx.beginPath(); cx.moveTo(0, -r * .7); cx.lineTo(0, r * .95); cx.stroke();
+  cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(r * .3, -r * .25); cx.moveTo(0, r * .3); cx.lineTo(-r * .3, r * .05); cx.stroke();
+  cx.restore();
+}
+function tetard(x, y, r, couleur, temps, alpha) {
+  cx.globalAlpha = alpha;
+  const g = cx.createRadialGradient(x, y, 1, x, y, r * 1.1);
+  g.addColorStop(0, couleur); g.addColorStop(1, 'rgba(0,0,0,0)');
+  cx.fillStyle = g; cx.beginPath(); cx.arc(x, y, r * 1.1, 0, 7); cx.fill();
+  cx.strokeStyle = '#2b3b2e'; cx.lineWidth = r * .22; cx.lineCap = 'round';
+  cx.beginPath(); cx.moveTo(x, y - r * .2);
+  for (let k = 1; k <= 6; k++) cx.lineTo(x + Math.sin(temps / 70 + k) * r * .12 * k / 2, y - r * .2 - k * r * .14);
+  cx.stroke();
+  cx.fillStyle = '#2b3b2e'; cx.beginPath(); cx.ellipse(x, y + r * .05, r * .42, r * .36, 0, 0, 7); cx.fill();
+  cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(x - r * .15, y + r * .12, r * .1, 0, 7); cx.arc(x + r * .15, y + r * .12, r * .1, 0, 7); cx.fill();
+  cx.globalAlpha = 1;
+}
+// Main du tutoriel
+function main(x, y, appui) {
+  cx.save(); cx.translate(x, y); const s = appui ? .88 : 1; cx.scale(s, s);
+  cx.fillStyle = '#ffe2c4'; cx.strokeStyle = '#6b4a2e'; cx.lineWidth = 2.5;
+  cx.beginPath();
+  cx.moveTo(-6, 0); cx.lineTo(-6, 30);
+  cx.quadraticCurveTo(-6, 38, -14, 36); cx.quadraticCurveTo(-24, 34, -18, 46);
+  cx.lineTo(-6, 66); cx.quadraticCurveTo(4, 78, 22, 72);
+  cx.quadraticCurveTo(34, 66, 30, 44); cx.lineTo(28, 30); cx.quadraticCurveTo(26, 24, 18, 26);
+  cx.lineTo(6, 26); cx.lineTo(6, 0); cx.quadraticCurveTo(0, -8, -6, 0);
+  cx.fill(); cx.stroke();
+  cx.restore();
+  if (appui) {
+    cx.strokeStyle = 'rgba(255,255,255,.8)'; cx.lineWidth = 3;
+    cx.beginPath(); cx.arc(x, y, 18, 0, 7); cx.stroke();
+  }
+}
+
+let tempsGlobal = 0;
+function dessiner(dt) {
+  tempsGlobal += dt;
+  const T = tempsGlobal;
+  cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (secousse > 0) { cx.translate((Math.random() - .5) * secousse, (Math.random() - .5) * secousse); secousse *= .85; if (secousse < .3) secousse = 0; }
+  if (decor) cx.drawImage(decor, 0, 0, W, H);
+
+  // Lucioles d'ambiance
+  while (lucioles.length < 22) lucioles.push({ x: Math.random() * W, y: H * .2 + Math.random() * H * .6, a: Math.random() * 6, v: .2 + Math.random() * .4 });
+  for (const l of lucioles) {
+    l.a += .01 * l.v * dt / 16; l.x += Math.cos(l.a) * l.v; l.y += Math.sin(l.a * 1.3) * l.v * .6;
+    if (l.x < 0) l.x = W; if (l.x > W) l.x = 0; if (l.y < H * .15) l.y = H * .8; if (l.y > H) l.y = H * .2;
+    cx.fillStyle = `rgba(255,240,150,${.25 + .25 * Math.sin(T / 400 + l.a * 5)})`;
+    cx.beginPath(); cx.arc(l.x, l.y, 2, 0, 7); cx.fill();
+  }
+
+  const voies = P ? P.voies : 4;
+  const D = dispo(voies);
+  const t = P ? P.t : 0;
+
+  if (P) {
+    // Couloirs et ronds
+    for (let v = 0; v < voies; v++) {
+      const x = D.x(v);
+      cx.strokeStyle = 'rgba(255,255,255,.08)'; cx.lineWidth = 2; cx.setLineDash([4, 10]);
+      cx.beginPath(); cx.moveTo(x, D.hautY); cx.lineTo(x, D.ligneY - D.r * .7); cx.stroke();
+      cx.setLineDash([]);
+      const pulse = 1 + (grenouilles[v].saut > .2 ? .06 : 0);
+      cx.strokeStyle = grenouilles[v].appui ? COULEURS_LUCIOLES[v] : 'rgba(255,255,255,.55)';
+      cx.lineWidth = grenouilles[v].appui ? 5 : 3;
+      cx.beginPath(); cx.arc(x, D.ligneY, D.r * .66 * pulse, 0, 7); cx.stroke();
+      if (grenouilles[v].appui) {
+        cx.fillStyle = 'rgba(255,255,255,.12)'; cx.beginPath(); cx.arc(x, D.ligneY, D.r * .66, 0, 7); cx.fill();
+      }
+    }
+    // Notes, de la plus lointaine à la plus proche
+    const yDe = (temps) => D.ligneY - (temps - t) / P.trajet * (D.ligneY - D.hautY);
+    for (let k = P.notes.length - 1; k >= 0; k--) {
+      const n = P.notes[k];
+      if (n.etat === 2 || n.etat === 3) continue;
+      if (n.t - t > P.trajet * 1.08) continue;
+      let y = yDe(n.t);
+      const alpha = Math.max(0, Math.min(1, (y - D.hautY + 30) / 40));
+      let x = D.x(n.voie);
+      const r = D.r * .62;
+      if (n.type === 'longue') {
+        const yFin = Math.max(D.hautY - 20, yDe(n.fin));
+        if (n.etat === 1) y = D.ligneY;
+        cx.globalAlpha = alpha * (n.etat === 1 ? .85 : .55);
+        cx.fillStyle = COULEURS_LUCIOLES[n.voie];
+        const l = r * .7;
+        cx.beginPath(); cx.roundRect ? cx.roundRect(x - l / 2, yFin, l, y - yFin, l / 2) : cx.rect(x - l / 2, yFin, l, y - yFin); cx.fill();
+        cx.globalAlpha = 1;
+        cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(x, yFin, l * .55, 0, 7); cx.fill();
+        luciole(x, y, r, COULEURS_LUCIOLES[n.voie], T, alpha);
+      } else if (n.type === 'doree') {
+        cx.globalAlpha = alpha;
+        const g = cx.createRadialGradient(x, y, 1, x, y, r * 1.5);
+        g.addColorStop(0, 'rgba(255,214,92,.9)'); g.addColorStop(1, 'rgba(255,214,92,0)');
+        cx.fillStyle = g; cx.beginPath(); cx.arc(x, y, r * 1.5, 0, 7); cx.fill();
+        cx.fillStyle = '#ffd65c'; cx.strokeStyle = '#fff6c9'; cx.lineWidth = 2;
+        etoileForme(x, y, r * .85, r * .4, 5, T / 300); cx.fill(); cx.stroke();
+        cx.globalAlpha = 1;
+      } else if (n.type === 'feuille') {
+        feuille(x + Math.sin(T / 250 + k) * 4, y, r, T, alpha);
+      } else if (n.type === 'tetard') {
+        const tSaut = n.t - P.trajet * .45;
+        const pj = Math.max(0, Math.min(1, (t - tSaut) / 260));
+        const e = pj * pj * (3 - 2 * pj);
+        x = D.x(n.de) + (D.x(n.voie) - D.x(n.de)) * e;
+        y -= Math.sin(pj * Math.PI) * D.r * 1.2;
+        tetard(x, y, r, COULEURS_LUCIOLES[pj < .5 ? n.de : n.voie], T, alpha);
+      } else {
+        luciole(x, y, r, COULEURS_LUCIOLES[n.voie], T, alpha);
+      }
+      if (n.accord && alpha > .5 && n.etat === 0) {
+        cx.strokeStyle = 'rgba(255,255,255,.7)'; cx.lineWidth = 2;
+        cx.beginPath(); cx.arc(x, y, r * 1.05, 0, 7); cx.stroke();
+      }
+    }
+  }
+  // Grenouilles
+  for (let v = 0; v < voies; v++) {
+    const g = grenouilles[v];
+    grenouille(D.x(v), D.ligneY + D.r * .95, D.r, v, g, T);
+    g.chant = Math.max(0, g.chant - dt / 300);
+    g.triste = Math.max(0, g.triste - dt / 600);
+    g.saut = Math.max(0, g.saut - dt / 180);
+  }
+  // À l'accueil, les grenouilles chantonnent en silence
+  if (!P && Math.random() < .02) { const v = Math.floor(Math.random() * 4); grenouilles[v].chant = 1; grenouilles[v].saut = 1; eclats(D.x(v), D.ligneY, COULEURS_LUCIOLES[v], 5); }
+
+  // Main du tutoriel
+  if (P && P.demo) {
+    const proch = P.notes.filter((n) => (n.etat === 0 && n.type !== 'feuille') || n.etat === 1);
+    const feuilleProche = P.notes.find((n) => n.etat === 0 && n.type === 'feuille' && n.t - t < 700 && n.t - t > -200);
+    if (proch.length) {
+      const n = proch[0];
+      if (P.mainX === undefined) P.mainX = D.x(n.voie);
+      P.mainX += (D.x(n.voie) - P.mainX) * Math.min(1, dt / 120);
+      const appui = n.etat === 1 || Math.abs(n.t - t) < 110;
+      let yMain = D.ligneY + D.r * .4 + (appui ? 0 : 14 + Math.sin(T / 200) * 6);
+      if (feuilleProche && !appui && feuilleProche.t < n.t) yMain += 40;
+      main(P.mainX, yMain, appui);
+      const autre = proch.find((m) => m !== n && m.t === n.t);
+      if (autre) main(D.x(autre.voie), yMain, appui);
+    }
+    if (feuilleProche) {
+      const x = D.x(feuilleProche.voie), y = D.ligneY - D.r * 1.6;
+      cx.strokeStyle = '#ff6b6b'; cx.lineWidth = 6; cx.lineCap = 'round';
+      cx.beginPath(); cx.moveTo(x - 12, y - 12); cx.lineTo(x + 12, y + 12); cx.moveTo(x + 12, y - 12); cx.lineTo(x - 12, y + 12); cx.stroke();
+    }
+  }
+
+  // Particules
+  for (let i = particules.length - 1; i >= 0; i--) {
+    const p = particules[i];
+    p.vie -= dt / p.duree;
+    if (p.vie <= 0) { particules.splice(i, 1); continue; }
+    p.x += p.vx * dt / 16; p.y += p.vy * dt / 16; p.vy += p.g * dt / 16;
+    if (p.confetti) p.vx += Math.sin(T / 300 + i) * .02;
+    cx.globalAlpha = Math.min(1, p.vie * 2);
+    cx.fillStyle = p.couleur;
+    if (p.confetti) {
+      cx.save(); cx.translate(p.x, p.y); cx.rotate(p.rot + T / 200); cx.fillRect(-p.taille / 2, -p.taille / 4, p.taille, p.taille / 2); cx.restore();
+    } else if (p.etoile) {
+      etoileForme(p.x, p.y, p.taille * 1.6, p.taille * .7, 5, T / 200); cx.fill();
+    } else { cx.beginPath(); cx.arc(p.x, p.y, p.taille, 0, 7); cx.fill(); }
+  }
+  cx.globalAlpha = 1;
+  // Textes flottants
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  for (let i = textes.length - 1; i >= 0; i--) {
+    const s = textes[i];
+    s.vie -= dt / 800; s.y -= dt * .04;
+    if (s.vie <= 0) { textes.splice(i, 1); continue; }
+    const echelle = s.vie > .85 ? 1 + (s.vie - .85) * 2 : 1;
+    cx.globalAlpha = Math.min(1, s.vie * 2.5);
+    cx.font = `900 ${Math.round(s.taille * echelle)}px system-ui, sans-serif`;
+    cx.lineWidth = 5; cx.strokeStyle = 'rgba(20,15,51,.85)'; cx.strokeText(s.txt, s.x, s.y);
+    cx.fillStyle = s.couleur; cx.fillText(s.txt, s.x, s.y);
+  }
+  cx.globalAlpha = 1;
+
+  if (P && !P.demo) dessinerHUD(dt);
+}
+
+function dessinerHUD(dt) {
+  // Barre d'avancement du chant
+  cx.fillStyle = 'rgba(255,255,255,.15)'; cx.fillRect(8, 3, W - 16, 4);
+  cx.fillStyle = '#b8f5a8'; cx.fillRect(8, 3, (W - 16) * Math.max(0, Math.min(1, P.t / P.fin)), 4);
+  cx.textBaseline = 'middle';
+  // Niveau
+  cx.textAlign = 'left'; cx.fillStyle = '#fff8e8';
+  cx.font = '800 16px system-ui, sans-serif'; cx.fillText(`Niveau ${P.niv + 1}`, 12, 26);
+  cx.font = '600 12px system-ui, sans-serif'; cx.globalAlpha = .75;
+  cx.fillText(P.def.nom, 12, 44); cx.globalAlpha = 1;
+  // Score qui défile
+  P.scoreAff += (P.score - P.scoreAff) * Math.min(1, dt / 120);
+  if (Math.abs(P.score - P.scoreAff) < 1) P.scoreAff = P.score;
+  cx.textAlign = 'center';
+  cx.font = '900 28px system-ui, sans-serif'; cx.fillStyle = '#fff3c4';
+  cx.fillText(String(Math.round(P.scoreAff)), W / 2, 27);
+  if (P.combo >= 3) {
+    const mult = 1 + Math.min(3, Math.floor(P.combo / 10)) * .5;
+    cx.font = `800 ${14 + Math.min(6, P.combo / 10)}px system-ui, sans-serif`; cx.fillStyle = '#ffd65c';
+    cx.fillText(`Combo ${P.combo}  ×${String(mult).replace('.', ',')}`, W / 2, 52);
+  }
+  // Énergie de la chorale
+  const bx = 12, by = 66, bw = W - 24, bh = 10;
+  cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fillRect(bx, by, bw, bh);
+  const e = Math.max(0, P.energie) / 100;
+  cx.fillStyle = e > .5 ? '#7ee07a' : e > .25 ? '#ffc04d' : '#ff6b6b';
+  cx.fillRect(bx, by, bw * e, bh);
+  cx.strokeStyle = 'rgba(255,255,255,.5)'; cx.lineWidth = 1.5; cx.strokeRect(bx, by, bw, bh);
+  cx.font = '700 11px system-ui, sans-serif'; cx.fillStyle = '#fff'; cx.textAlign = 'left';
+  cx.fillText('énergie', bx + 4, by + bh + 9);
+  // Décompte « 3, 2, 1, Chantez ! »
+  if (P.decompte && P.t - P.decompte.t < P.beatMs) {
+    const a = 1 - (P.t - P.decompte.t) / P.beatMs;
+    cx.globalAlpha = a; cx.textAlign = 'center';
+    cx.font = `900 ${Math.round(60 + (1 - a) * 20)}px system-ui, sans-serif`;
+    cx.lineWidth = 8; cx.strokeStyle = '#1d4d34'; cx.strokeText(P.decompte.texte, W / 2, H * .4);
+    cx.fillStyle = '#fff3c4'; cx.fillText(P.decompte.texte, W / 2, H * .4);
+    cx.globalAlpha = 1;
+  }
+}
+
+// =====================================================================
+// 9. Écrans et bilan
+// =====================================================================
+const ECRANS = ['accueil', 'carte', 'tuto', 'pause', 'bilan'];
+function montrer(nom) {
+  ECRANS.forEach((e) => document.getElementById(e).classList.toggle('cache', e !== nom));
+}
+function allerAccueil() {
+  arreterTenues(); P = null; ecran = 'accueil';
+  document.getElementById('btPause').classList.add('cache');
+  const tot = totalEtoiles();
+  document.getElementById('resume').textContent = tot ? `★ ${tot} / ${NIVEAUX.length * 3} étoiles · niveau ${Math.min(NIVEAUX.length, rec.debloque + 1)}` : '12 niveaux à chanter';
+  montrer('accueil');
+}
+function allerCarte() {
+  arreterTenues(); P = null; ecran = 'carte';
+  document.getElementById('btPause').classList.add('cache');
+  const gr = document.getElementById('grille');
+  gr.innerHTML = '';
+  NIVEAUX.forEach((def, i) => {
+    const b = document.createElement('button');
+    b.className = 'case';
+    const ok = i <= rec.debloque;
+    b.disabled = !ok;
+    const e = rec.etoiles[i] || 0;
+    const etoiles = ok ? '★'.repeat(e) + `<span class="vide">${'★'.repeat(3 - e)}</span>` : '<span class="vide">— —</span>';
+    b.innerHTML = `<b>${i + 1}</b><span>${def.nom}</span><i>${etoiles}</i>`;
+    b.setAttribute('aria-label', `Niveau ${i + 1} : ${def.nom}`);
+    b.addEventListener('click', () => { initAudio(); son.clic(); lancerNiveau(i); });
+    gr.appendChild(b);
+  });
+  document.getElementById('totalEtoiles').textContent = `★ ${totalEtoiles()} / ${NIVEAUX.length * 3} étoiles`;
+  montrer('carte');
+}
+function terminer(reussi) {
+  P.actif = false;
+  arreterTenues();
+  document.getElementById('btPause').classList.add('cache');
+  ecran = 'bilan';
+  const i = P.niv;
+  const prec = P.total ? P.credit / P.total : 0;
+  const etoiles = reussi ? (prec >= .9 ? 3 : prec >= .75 ? 2 : 1) : 0;
+  const ancien = rec.meilleur[i] || 0;
+  const record = reussi && P.score > ancien;
+  if (reussi) {
+    rec.etoiles[i] = Math.max(rec.etoiles[i] || 0, etoiles);
+    rec.meilleur[i] = Math.max(ancien, P.score);
+    rec.debloque = Math.min(NIVEAUX.length - 1, Math.max(rec.debloque, i + 1));
+    sauver();
+  }
+  const dernier = i === NIVEAUX.length - 1;
+  document.getElementById('bilanTitre').textContent = !reussi ? 'La chorale est fatiguée…'
+    : dernier ? 'Grand concert réussi !' : ['Bien joué !', 'Super chant !', 'Magnifique !'][etoiles - 1];
+  const spans = document.querySelectorAll('#etoiles span');
+  spans.forEach((s) => s.classList.remove('pleine'));
+  for (let k = 0; k < etoiles; k++) {
+    setTimeout(() => { spans[k].classList.add('pleine'); son.etoile(k); confettis(12); }, 500 + k * 450);
+  }
+  document.getElementById('record').classList.toggle('cache', !record);
+  let details = `Précision : ${Math.round(prec * 100)} %<br>Parfait ${P.compte.P} · Bien ${P.compte.B} · OK ${P.compte.O} · Raté ${P.compte.R}<br>Meilleur combo : ${P.maxCombo}`;
+  if (!reussi) details += `<br>Tu as chanté ${Math.round(Math.min(1, P.t / P.fin) * 100)} % du morceau.<br>Essaie de toucher pile quand la luciole est dans le rond !`;
+  else details += `<br>Record du niveau : ${rec.meilleur[i]}`;
+  if (reussi && dernier) details += `<br>Total : ★ ${totalEtoiles()} / ${NIVEAUX.length * 3}`;
+  document.getElementById('bilanDetails').innerHTML = details;
+  document.getElementById('btSuivant').classList.toggle('cache', !reussi || dernier);
+  // Le score défile jusqu'au total
+  const el = document.getElementById('bilanScore'), cible = P.score, debut = performance.now();
+  const defile = () => {
+    const a = Math.min(1, (performance.now() - debut) / 1200);
+    el.textContent = Math.round(cible * a * (2 - a));
+    if (a < 1 && ecran === 'bilan') requestAnimationFrame(defile);
+  };
+  defile();
+  if (reussi) { son.victoire(); confettis(70); } else son.echec();
+  montrer('bilan');
+}
+function mettrePause() {
+  if (!P || P.demo || !P.actif || P.enPause) return;
+  P.enPause = true; arreterTenues();
+  ecran = 'pause'; montrer('pause');
+}
+function reprendre() {
+  if (!P) return;
+  montrer(null); ecran = 'jeu';
+  // On recule un peu pour laisser le temps de se replacer
+  P.t -= 1000; P.enPause = false;
+  P.dernierBeat = Math.floor(P.t / P.beatMs);
+  P.notes.forEach((n) => { if (n.etat === 1) n.etat = 2; });
+}
+
+// =====================================================================
+// 10. Commandes : doigt, souris, clavier
+// =====================================================================
+const doigts = new Map();
+function voieDe(x) {
+  const D = dispo(P.voies);
+  return Math.max(0, Math.min(P.voies - 1, Math.floor((x - D.x0) / D.lw)));
+}
+cv.addEventListener('pointerdown', (e) => {
+  initAudio();
+  if (!P || P.demo || ecran !== 'jeu') return;
+  e.preventDefault();
+  const v = voieDe(e.clientX);
+  doigts.set(e.pointerId, v);
+  presser(v);
+});
+const lever = (e) => {
+  if (!doigts.has(e.pointerId)) return;
+  const v = doigts.get(e.pointerId); doigts.delete(e.pointerId);
+  if ([...doigts.values()].includes(v)) return;   // un autre doigt tient encore la voie
+  relacher(v);
+};
+window.addEventListener('pointerup', lever);
+window.addEventListener('pointercancel', lever);
+document.getElementById('tuto').addEventListener('pointerdown', (e) => { initAudio(); if (e.target.id !== 'btPasser') passerTuto(); });
+
+const CLAVIER = {
+  2: [['ArrowLeft', 'KeyD', 'KeyF'], ['ArrowRight', 'KeyJ', 'KeyK']],
+  3: [['ArrowLeft', 'KeyD'], ['ArrowDown', 'ArrowUp', 'KeyF', 'KeyJ'], ['ArrowRight', 'KeyK']],
+  4: [['ArrowLeft', 'KeyD'], ['ArrowDown', 'KeyF'], ['ArrowUp', 'KeyJ'], ['ArrowRight', 'KeyK']]
+};
+const touchesTenues = new Map();
+window.addEventListener('keydown', (e) => {
+  initAudio();
+  if (ecran === 'tuto' && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); passerTuto(); return; }
+  if (ecran !== 'jeu' || !P) return;
+  if (e.code === 'Escape' || e.code === 'KeyP') { mettrePause(); return; }
+  if (e.repeat) { e.preventDefault(); return; }
+  let v = CLAVIER[P.voies].findIndex((l) => l.includes(e.code));
+  if (v < 0 && (e.code === 'Space' || e.code === 'Enter')) {
+    // Espace : touche la luciole la plus proche, quelle que soit sa voie
+    let mieux = Infinity; v = -1;
+    for (const n of P.notes) {
+      if (n.etat !== 0 || n.type === 'feuille') continue;
+      const d = Math.abs(n.t - P.t);
+      if (d < mieux) { mieux = d; v = n.voie; }
+      if (n.t > P.t + 400) break;
+    }
+    if (v < 0) v = 0;
+  }
+  if (v < 0) return;
+  e.preventDefault();
+  touchesTenues.set(e.code, v);
+  presser(v);
+});
+window.addEventListener('keyup', (e) => {
+  if (!touchesTenues.has(e.code)) return;
+  const v = touchesTenues.get(e.code); touchesTenues.delete(e.code);
+  if (![...touchesTenues.values()].includes(v)) relacher(v);
+});
+
+// Boutons
+const clic = (id, f) => document.getElementById(id).addEventListener('click', () => { initAudio(); son.clic(); f(); });
+clic('btJouer', () => {
+  // Le premier niveau sans étoile, sinon le dernier débloqué
+  let i = 0;
+  while (i < rec.debloque && rec.etoiles[i]) i++;
+  lancerNiveau(i);
+});
+clic('btNiveaux', allerCarte);
+clic('btRetour', allerAccueil);
+clic('btPasser', passerTuto);
+clic('btPause', mettrePause);
+clic('btReprendre', reprendre);
+clic('btRecommencer', () => demarrerPartie(P.niv));
+clic('btPauseNiveaux', allerCarte);
+clic('btSuivant', () => lancerNiveau(P.niv + 1));
+clic('btRejouer', () => demarrerPartie(P.niv));
+clic('btBilanNiveaux', allerCarte);
+const btSon = document.getElementById('btSon');
+function majSon() {
+  btSon.classList.toggle('muet', !rec.son);
+  if (maitre) maitre.gain.value = rec.son ? .8 : 0;
+}
+btSon.addEventListener('click', () => { initAudio(); rec.son = !rec.son; sauver(); majSon(); son.clic(); });
+majSon();
+document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+window.addEventListener('resize', redimensionner);
+
+// =====================================================================
+// 11. Boucle principale
+// =====================================================================
+let avant = performance.now();
+function boucle(maintenant) {
+  const dt = Math.min(50, maintenant - avant);
+  avant = maintenant;
+  miseAJour(dt);
+  dessiner(dt);
+  requestAnimationFrame(boucle);
+}
+redimensionner();
+allerAccueil();
+requestAnimationFrame(boucle);</script>
+</body>
+</html>
