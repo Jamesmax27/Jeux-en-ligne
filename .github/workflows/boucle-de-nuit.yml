@@ -115,6 +115,9 @@ jobs:
         with:
           # Abonnement Claude (jeton créé avec « claude setup-token »), comme les autres agents.
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Passage lancé par un robot (acteur « github-actions[bot] ») : sans cette ligne,
+          # l'action refuse de démarrer (« non-human actor »).
+          allowed_bots: github-actions
           show_full_output: true
           claude_args: |
             --model claude-opus-5-5
@@ -272,6 +275,7 @@ jobs:
           # Abonnement Claude (jeton créé avec « claude setup-token »).
           # Avec une clé API à la place : anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: github-actions   # voir l'étape d'idéation
           show_full_output: true
           claude_args: |
             --model claude-opus-5-5
@@ -560,6 +564,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: github-actions   # voir l'étape d'idéation
           show_full_output: true
           claude_args: |
             --model claude-opus-5-5

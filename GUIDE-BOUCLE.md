@@ -151,7 +151,13 @@ Quand une pull request de jeu est ouverte (fusion automatique coupée, vérifica
 3. Après 10 à 30 minutes, Claude répond avec un résumé des changements, et la correction est ajoutée à la pull request.
 4. Pull request de la boucle : elle sera revérifiée au passage suivant (ou tout de suite : **Run workflow** avec **0** jeu).
 
-Seuls les commentaires de votre compte (Jamesmax27) déclenchent une correction. Claude ne peut modifier que le dossier du jeu.
+Bon à savoir :
+
+- Seuls les commentaires des comptes Jamesmax27 et celest27 déclenchent une correction (liste dans `corriger-jeu.yml`). Le compte celest27 doit être collaborateur du dépôt avec l'accès en écriture, sinon Claude refuse la demande.
+- Claude ne peut modifier que le dossier du jeu de la pull request. La jaquette automatique est refaite ; une jaquette faite à la main est gardée.
+- Si le contrôle qualité échoue encore après 3 essais, rien n'est ajouté : la réponse donne le rapport.
+- Une demande à la fois par pull request : la suivante attend la fin de la précédente.
+- Comme la boucle de nuit, chaque correction consomme votre abonnement Claude.
 
 ## Commandes utiles
 

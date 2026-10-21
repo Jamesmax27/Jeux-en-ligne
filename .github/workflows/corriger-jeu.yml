@@ -1,7 +1,7 @@
 # ==========================================================================
 # Correction d'un jeu proposé : un commentaire contenant « @claude » dans
-# une pull request (auteur : Jamesmax27) demande à l'agent de modifier le
-# jeu de cette pull request.
+# une pull request (auteurs autorisés : Jamesmax27, celest27) demande à
+# l'agent de modifier le jeu de cette pull request.
 #
 #  1. Vérifications : pull request ouverte, venant de ce dépôt, qui ne
 #     concerne qu'un seul jeu (games/<id>/).
@@ -25,7 +25,7 @@ jobs:
   preparer:
     if: >-
       github.event.issue.pull_request &&
-      github.event.comment.user.login == 'Jamesmax27' &&
+      contains(fromJSON('["Jamesmax27", "celest27"]'), github.event.comment.user.login) &&
       contains(github.event.comment.body, '@claude')
     runs-on: ubuntu-latest
     timeout-minutes: 5
