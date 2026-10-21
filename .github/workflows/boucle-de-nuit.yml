@@ -390,7 +390,10 @@ jobs:
             echo "Jeu créé automatiquement par la boucle de nuit, contrôlé par le robot de qualité."
             echo
             echo "**Idée :** $TITRE_IDEE — $DESCRIPTION_IDEE"
-            echo "**Genre :** $GENRE — **Tags :** ${TAGS:-choisis par l'agent}"
+            # Pas d'apostrophe dans « ${TAGS:-…} » : entre guillemets, Bash la prendrait pour un début de chaîne.
+            tags="$TAGS"
+            if [ -z "$tags" ]; then tags="choisis par l'agent"; fi
+            echo "**Genre :** $GENRE — **Tags :** $tags"
             echo
             echo "**Vérification :** dans le même passage de la boucle, le robot puis Claude (grille de CONSIGNES-JEU.md) contrôlent ce jeu. S'il passe, il est fusionné automatiquement et son idée archivée ; sinon, la pull request est fermée et l'idée remise en attente. Le résultat arrive en commentaire."
             echo
