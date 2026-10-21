@@ -15,6 +15,7 @@
 
 export const GENRES_AFFICHAGE = {
   'adresse':     { picto: '🎯', teinte: 350 },
+  'action':      { picto: '⚡', teinte: 90 },
   'plateforme':  { picto: '🦘', teinte: 25 },
   'course':      { picto: '🏁', teinte: 5 },
   'sport':       { picto: '⚽', teinte: 120 },

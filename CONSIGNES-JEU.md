@@ -64,8 +64,8 @@ Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient oblig
 
 - `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier.
 - `genre` : **obligatoire**, un seul, choisi dans cette liste fermée (filtres « genre » du catalogue) :
-  `adresse`, `plateforme`, `course`, `sport`, `rythme`, `aventure`, `réflexion`, `stratégie`, `puzzle`, `mémoire`, `observation`, `quiz`, `calcul`, `lecture`, `création`, `simulation`.
-  (`observation` : cherche-et-trouve, différences ; `simulation` : soigner un animal, cuisiner, tenir une ferme…)
+  `adresse`, `action`, `plateforme`, `course`, `sport`, `rythme`, `aventure`, `réflexion`, `stratégie`, `puzzle`, `mémoire`, `observation`, `quiz`, `calcul`, `lecture`, `création`, `simulation`.
+  (`action` : jeu rapide où l'on esquive et réagit vite, sans violence ; `observation` : cherche-et-trouve, différences ; `simulation` : soigner un animal, cuisiner, tenir une ferme…)
   La même liste figure dans `scripts/genres.mjs` : modifier les deux ensemble.
 - `tags` : 1 à 5 thèmes, en minuscules. Ils rangent le jeu dans les **univers** du catalogue (liste dans `public/regroupements.js`) : utiliser de préférence un tag déjà prévu, par exemple `chevaux`, `animaux`, `judo`, `nature`, `mer`, `espace`, `géographie`, `lecture`, `calcul`, `sciences`, `formes`, `couleurs`, `cubes`, `labyrinthe`, `musique`, `véhicules`, `dinosaures`, `magie`, `fantastique`, `cuisine`, `histoire`, `métiers`, `noël`, `arcade`. Un tag rangé dans aucun univers apparaît seulement dans « Autres thèmes ».
 - `ages` : âge minimum conseillé, au format `"6+"` (tuiles d'âge du catalogue : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et +).

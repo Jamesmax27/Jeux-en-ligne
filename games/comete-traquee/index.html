@@ -1,0 +1,840 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Comète Traquée</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout : une colonne façon appli de téléphone — en-tête de l'appli citoyenne, plan de la ville (canvas), jauge du grappin, puis fil des signalements à côté de la croix directionnelle. Look nuit unique, assumé. */
+:root{
+  --night:#0a1416;
+  --panel:#10201f;
+  --rule:#223b3b;
+  --asphalt:#0e1a1c;
+  --block:#1a3034;
+  --block-hi:#2c4c50;
+  --park:#12291f;
+  --tree:#1d4433;
+  --ink:#e3ebe5;
+  --muted:#84a099;
+  --amber:#ffb547;
+  --ping:#ff5d8f;
+  --ping-soft:rgba(255,93,143,.14);
+  --alert:#4fe0c8;
+  --walker:#d4dce2;
+  --drone:#b5a3ff;
+  --scrim:rgba(8,16,18,.8);
+  --f-display:"Bungee","Arial Black",Impact,sans-serif;
+  --f-ui:"Barlow Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+[hidden]{display:none!important}
+body{
+  background:var(--night);color:var(--ink);font-family:var(--f-ui);font-size:16px;line-height:1.3;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-tap-highlight-color:transparent;overscroll-behavior:none;
+}
+.app{max-width:460px;margin-inline:auto;padding-block:10px 14px;display:flex;flex-direction:column;gap:10px}
+.head{display:flex;flex-direction:column;gap:8px}
+.top{display:flex;align-items:center;gap:10px}
+.logo{width:32px;height:32px;flex:none;border-radius:9px;background:var(--panel);border:1px solid var(--rule)}
+.logo .tail{stroke:var(--amber);fill:none;stroke-linecap:round}
+.logo .core{fill:var(--amber)}
+.brand{flex:1;min-width:0}
+h1{font-family:var(--f-display);font-weight:400;font-size:18px;line-height:1;margin:0;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand p{margin:3px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.live{flex:none;display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:var(--ping-soft);color:var(--ping);font-family:var(--f-mono);font-size:11px;font-variant-numeric:tabular-nums}
+.live .dot{width:7px;height:7px;border-radius:50%;background:var(--ping);animation:blink 1.4s steps(2,start) infinite}
+@keyframes blink{to{opacity:.25}}
+.stats{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;background:var(--panel);border:1px solid var(--rule);border-radius:10px}
+.stat{min-width:0;padding:5px 8px 6px;border-left:1px solid var(--rule)}
+.stat:first-child{border-left:0}
+.k{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.v{display:block;font-size:17px;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.masks{display:flex;gap:3px;align-items:center;height:20px}
+.masks svg{width:18px;height:11px;flex:none}
+.masks .on{fill:var(--amber)}
+.masks .off{fill:var(--rule)}
+.masks .eye{fill:var(--panel)}
+.map-wrap{position:relative;width:fit-content;max-width:100%;margin-inline:auto;border:1px solid var(--rule);border-radius:12px;overflow:hidden;line-height:0;background:var(--asphalt)}
+#map{display:block;touch-action:none;cursor:pointer}
+.pause{flex:none;width:34px;height:34px;border-radius:9px;border:1px solid var(--rule);background:var(--scrim);color:var(--ink);display:grid;place-items:center;cursor:pointer;padding:0}
+.pause svg{width:14px;height:14px;fill:currentColor}
+.cable{display:flex;align-items:center;gap:10px;min-height:34px}
+.cable .k{flex:none}
+.segs{flex:1;display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.segs i{height:8px;border-radius:2px;background:var(--rule);transition:background .15s}
+.segs i.on{background:var(--amber)}
+.where{flex:none;font-size:14px;font-weight:600;color:var(--muted);min-width:9.5em;text-align:right}
+.where.warn{color:var(--ping)}
+.bottom{display:flex;gap:10px;align-items:stretch}
+.feed{flex:1;min-width:0;background:var(--panel);border:1px solid var(--rule);border-radius:10px;padding:7px 10px 8px;display:flex;flex-direction:column;gap:5px}
+.feed-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.clock{font-family:var(--f-mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+#feedList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;height:86px;overflow:hidden}
+#feedList li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px;font-size:14px;line-height:1.18}
+#feedList .t{font-family:var(--f-mono);font-size:10.5px;color:var(--muted);padding-top:2px}
+#feedList .m{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#feedList .who{font-weight:700}
+#feedList .sight .who{color:var(--ping)}
+#feedList .alert .who{color:var(--alert)}
+#feedList .sys .who{color:var(--amber)}
+#feedList li.new{animation:slide .3s ease-out}
+@keyframes slide{from{transform:translateY(-6px);opacity:.3}}
+.dpad{flex:none;align-self:center;display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(2,44px);gap:6px}
+.dpad button{border:1px solid var(--rule);background:var(--panel);color:var(--ink);border-radius:10px;display:grid;place-items:center;cursor:pointer;padding:0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.dpad button.down{background:var(--amber);color:var(--night);border-color:var(--amber)}
+.dpad svg{width:16px;height:16px;fill:currentColor}
+.dpad [data-dir=up]{grid-column:2;grid-row:1}
+.dpad [data-dir=left]{grid-column:1;grid-row:2}
+.dpad [data-dir=down]{grid-column:2;grid-row:2}
+.dpad [data-dir=right]{grid-column:3;grid-row:2}
+.foot{margin:0;font-size:13px;color:var(--muted);text-align:center}
+button:focus-visible{outline:2px solid var(--alert);outline-offset:2px}
+
+.overlay{position:fixed;inset:0;z-index:20;background:var(--scrim);display:flex;overflow:auto;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.card{width:100%;max-width:360px;margin:auto;background:var(--panel);border:1px solid var(--rule);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:12px}
+.eyebrow{margin:0;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ping)}
+.card h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:26px;line-height:1.05;color:var(--amber);text-wrap:balance}
+.card p{margin:0;font-size:16px;line-height:1.35}
+.rules{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.rules li{display:grid;grid-template-columns:12px 1fr;gap:9px;align-items:start;font-size:15.5px;line-height:1.3}
+.rules .sw{margin-top:4px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;font-weight:600;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:11px;height:11px;flex:none;display:inline-block;border-radius:50%}
+.sw.hero{background:var(--amber)}
+.sw.walker{background:var(--walker)}
+.sw.drone{border:2px solid var(--drone);border-radius:2px;transform:rotate(45deg);width:9px;height:9px}
+.sw.ping{border:2px solid var(--ping)}
+.sw.alert{background:var(--alert);border-radius:1px;transform:rotate(45deg);width:9px;height:9px}
+.sw.roof{background:var(--block-hi);border-radius:2px}
+.btn{font-family:var(--f-display);font-size:15px;letter-spacing:.02em;background:var(--amber);color:var(--night);border:0;border-radius:10px;padding:13px 16px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule);font-family:var(--f-ui);font-weight:700;font-size:16px;padding:11px 16px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .btn{flex:1}
+.card .fine{font-size:13.5px;color:var(--muted)}
+.score-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.score-grid div{min-width:0;background:var(--night);border:1px solid var(--rule);border-radius:8px;padding:7px 9px}
+.next{border:1px solid var(--rule);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:var(--night)}
+.next strong{font-family:var(--f-display);font-weight:400;font-size:18px;color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.live .dot,#feedList li.new{animation:none}}
+</style>
+
+<div class="app" id="app">
+  <header class="head">
+    <div class="top">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <path class="tail" d="M7 25L17 15" stroke-width="3" opacity=".3"/>
+        <path class="tail" d="M10 27L18 19" stroke-width="2" opacity=".5"/>
+        <path class="tail" d="M5 21L14 13" stroke-width="2" opacity=".5"/>
+        <circle class="core" cx="20.5" cy="11.5" r="5.5"/>
+      </svg>
+      <div class="brand">
+        <h1>Où est Comète&nbsp;?</h1>
+        <p>Signalements en direct</p>
+      </div>
+      <div class="live" title="Personnes connectées à l'appli"><span class="dot"></span><span id="watchers">5&nbsp;000</span></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="k">Quartier</span><span class="v" id="district">Niv. 1 · Vieux-Port</span></div>
+      <div class="stat"><span class="k">Sauvés</span><span class="v" id="rescues">0/3</span></div>
+      <div class="stat"><span class="k">Score</span><span class="v" id="score">0</span></div>
+      <div class="stat"><span class="k">Masques</span><span class="v masks" id="lives"></span></div>
+    </div>
+  </header>
+
+  <div class="map-wrap" id="mapWrap">
+    <canvas id="map" role="img" aria-label="Plan du quartier : Comète, les traqueurs, les signalements et l'incident en cours"></canvas>
+  </div>
+
+  <div class="cable">
+    <span class="k">Grappin</span>
+    <div class="segs" id="segs"></div>
+    <span class="where" id="where">Au sol · recharge</span>
+    <button class="pause" id="pauseBtn" type="button" aria-label="Mettre en pause" hidden>
+      <svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2" y="1" width="3.5" height="12" rx="1"/><rect x="8.5" y="1" width="3.5" height="12" rx="1"/></svg>
+    </button>
+  </div>
+
+  <div class="bottom">
+    <section class="feed">
+      <div class="feed-head"><span class="k">Signalements</span><span class="clock" id="clock">21:00</span></div>
+      <ol id="feedList" aria-live="polite"></ol>
+    </section>
+    <div class="dpad" role="group" aria-label="Déplacer Comète">
+      <button type="button" data-dir="up" aria-label="Haut"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3l6 9H2z"/></svg></button>
+      <button type="button" data-dir="left" aria-label="Gauche"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8l9-6v12z"/></svg></button>
+      <button type="button" data-dir="down" aria-label="Bas"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13L2 4h12z"/></svg></button>
+      <button type="button" data-dir="right" aria-label="Droite"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8L4 14V2z"/></svg></button>
+    </div>
+  </div>
+  <p class="foot">Flèches ou ZQSD · glisse ou touche le plan · Espace pour la pause</p>
+</div>
+
+<div class="overlay" id="overlay" hidden></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- Constantes ---------- */
+const COLS=11, ROWS=14, STREET=0, ROOF=1, PARK=2;
+const MOVE_MS=165, CABLE_MAX=6, CABLE_REGEN_MS=420, INV_MS=2200, PI2=Math.PI*2;
+const DIRS={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+const DV=[[1,0],[-1,0],[0,1],[0,-1]];
+const BEST_KEY='comete-traquee-best';
+const $=s=>document.querySelector(s);
+const reduceMotion=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const rs=getComputedStyle(document.documentElement);
+const C={};
+for(const k of ['night','panel','rule','asphalt','block','block-hi','park','tree','ink','muted','amber','ping','alert','walker','drone']) C[k]=rs.getPropertyValue('--'+k).trim()||'#888888';
+function rgba(hex,a){const h=hex.replace('#','');const n=parseInt(h.length===3?h.replace(/./g,'$&$&'):h,16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}
+const rnd=n=>Math.floor(Math.random()*n);
+const pick=a=>a[rnd(a.length)];
+const man=(a,b,c,d)=>Math.abs(a-c)+Math.abs(b-d);
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;}
+const fmt=n=>String(n).replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const pad=n=>String(n).padStart(2,'0');
+
+/* ---------- Contenu ---------- */
+const DISTRICTS=[
+  {name:'Vieux-Port',note:'Deux traqueurs arpentent les quais. Prends tes marques.'},
+  {name:'Les Halles',note:'Un traqueur de plus, et ils marchent plus vite.'},
+  {name:'Quartier des Docks',note:'Dans la rue, les signalements tombent plus souvent.'},
+  {name:"Centre d'affaires",note:'Nouveau : un drone de presse. Lui survole aussi les toits.'},
+  {name:'Gare Centrale',note:'Foule dense et incidents plus pressants.'},
+  {name:'Colline Nord',note:'Deux drones en vol. Reste imprévisible.'},
+  {name:'Faubourg Est',note:"La ville entière a l'appli ouverte."},
+  {name:'Île Basse',note:'Trois drones. Les toits ne suffisent plus.'}
+];
+const ROMAN=['','II','III','IV','V','VI'];
+function district(L){
+  const d=DISTRICTS[(L-1)%DISTRICTS.length], lap=Math.floor((L-1)/DISTRICTS.length);
+  return lap?{name:d.name+' '+ROMAN[Math.min(lap,ROMAN.length-1)],note:'Retour dans un quartier connu, en plus coriace.'}:d;
+}
+const RUES=['Rue des Tanneurs','Rue du Four','Rue Verte','Rue des Cordiers','Rue Saint-Roch','Rue Haute','Rue des Lilas','Rue Pavée','Rue du Puits','Rue des Remparts'];
+const AVS=['Av. Pasteur','Bd Voltaire','Av. des Docks','Bd Carnot','Av. Jaurès','Bd du Port','Av. Foch'];
+const PSEUDOS=['@lea.photo','@kev_du_76','@mamie.ginette','@nono_skate','@ines.reporter','@le_vrai_tom','@fan2comete','@sacha.velo','@yanis_b','@chloe.mtl','@papy_rene','@zoe.lol','@clara.ouf','@hugo_live'];
+const INCIDENTS=['chat coincé sur une enseigne','vol de sac à l’arraché','ascenseur bloqué','scooter en feu','enfant perdu','fuite d’eau géante','camion sans frein','vitrine brisée','échafaudage instable','chien tombé dans le canal'];
+
+function cfgFor(L){return{
+  need:Math.min(6,3+Math.floor(L/2)),
+  walkers:Math.min(7,1+L),
+  walkMs:Math.max(290,640-45*(L-1)),
+  drones:L<4?0:Math.min(3,Math.floor((L-2)/2)),
+  pStreet:Math.min(0.45,0.22+0.03*(L-1)),
+  pPark:Math.min(0.3,0.14+0.02*(L-1)),
+  pRoof:0.03,
+  base:Math.max(5,9-0.5*(L-1)),
+  perTile:Math.max(0.42,0.75-0.04*(L-1))
+};}
+
+/* ---------- État ---------- */
+let S=null, cfg=cfgFor(1);
+let grid=[], lane=[], deco=[], vLines=[], hLines=[], rueOf={}, avOf={};
+let T=28, W=COLS*28, H=ROWS*28, dpr=1, bg=null, held=null;
+
+function fresh(){return{level:1,score:0,lives:3,phase:'menu',time:0,play:0,sightings:0,fx:[],trail:[],pings:[],walkers:[],drones:[],hero:{c:0,r:0,pc:0,pr:0,mt:-1e9}};}
+function ent(p,next){return{c:p.c,r:p.r,pc:p.c,pr:p.r,mt:-1e9,next,target:null,chasing:false};}
+
+/* ---------- Génération de la ville ---------- */
+function lines(n,minG,maxG){
+  const out=[0];let x=0;
+  for(;;){
+    const nx=x+minG+rnd(maxG-minG+1);
+    if(nx>=n-1||(n-1-nx)<minG){out.push(n-1);break;}
+    out.push(nx);x=nx;
+  }
+  return out;
+}
+const inB=(c,r)=>c>=0&&r>=0&&c<COLS&&r<ROWS;
+const isT=(c,r,t)=>inB(c,r)&&grid[r][c]===t;
+const ground=t=>t!==ROOF;
+
+function genCity(){
+  vLines=lines(COLS,3,4); hLines=lines(ROWS,3,5);
+  const vs=new Set(vLines), hs=new Set(hLines);
+  grid=[];deco=[];
+  for(let r=0;r<ROWS;r++){grid.push([]);deco.push([]);for(let c=0;c<COLS;c++){grid[r].push(vs.has(c)||hs.has(r)?STREET:ROOF);deco[r].push(Math.random());}}
+  const blocks=[];
+  for(let i=0;i<vLines.length-1;i++)for(let j=0;j<hLines.length-1;j++){
+    const c0=vLines[i]+1,c1=vLines[i+1]-1,r0=hLines[j]+1,r1=hLines[j+1]-1;
+    if(c1>=c0&&r1>=r0)blocks.push({c0,c1,r0,r1});
+  }
+  shuffle(blocks);
+  blocks.forEach((b,i)=>{
+    const w=b.c1-b.c0+1,h=b.r1-b.r0+1;
+    if(i===0||Math.random()<0.1){for(let r=b.r0;r<=b.r1;r++)for(let c=b.c0;c<=b.c1;c++)grid[r][c]=PARK;return;}
+    let dir=null;
+    if(w>=4)dir='v';else if(h>=5)dir='h';else if(Math.random()<0.25)dir=w>=h?(w>=3?'v':null):(h>=3?'h':null);
+    if(dir==='v'){const c=b.c0+Math.floor(w/2);for(let r=b.r0;r<=b.r1;r++)grid[r][c]=STREET;}
+    if(dir==='h'){const r=b.r0+Math.floor(h/2);for(let c=b.c0;c<=b.c1;c++)grid[r][c]=STREET;}
+  });
+  lane=grid.map((row,r)=>row.map((t,c)=>{
+    if(t!==STREET)return '';
+    const hz=isT(c-1,r,STREET)||isT(c+1,r,STREET), vt=isT(c,r-1,STREET)||isT(c,r+1,STREET);
+    return hz&&vt?'x':hz?'h':'v';
+  }));
+  const rues=shuffle(RUES.slice()), avs=shuffle(AVS.slice());
+  rueOf={};hLines.forEach((r,i)=>rueOf[r]=rues[i%rues.length]);
+  avOf={};vLines.forEach((c,i)=>avOf[c]=avs[i%avs.length]);
+}
+function nearest(arr,v){return arr.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a);}
+function placeName(c,r){
+  const rue=rueOf[nearest(hLines,r)], av=avOf[nearest(vLines,c)], t=grid[r][c];
+  if(t===ROOF)return `sur les toits, ${rue}`;
+  if(t===PARK)return `dans le square, ${av}`;
+  const onH=hLines.includes(r), onV=vLines.includes(c);
+  if(onH&&onV)return `à l'angle ${rue} / ${av}`;
+  if(onH)return `${rue}, côté ${av}`;
+  if(onV)return `${av}, hauteur ${rue}`;
+  return `dans une ruelle, ${rue}`;
+}
+function randTile(pred,from,minD){
+  const o=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(!pred(grid[r][c],c,r))continue;
+    if(from&&man(c,r,from.c,from.r)<minD)continue;
+    o.push({c,r});
+  }
+  return o.length?pick(o):null;
+}
+
+/* ---------- Niveaux ---------- */
+function startLevel(phase){
+  cfg=cfgFor(S.level);
+  genCity();buildBg();
+  const inter=[];for(const r of hLines)for(const c of vLines)inter.push({c,r});
+  const lower=inter.filter(p=>p.r>=ROWS/2&&p.c>0&&p.c<COLS-1);
+  const sp=pick(lower.length?lower:inter);
+  S.hero={c:sp.c,r:sp.r,pc:sp.c,pr:sp.r,mt:-1e9};
+  S.walkers=[];for(let i=0;i<cfg.walkers;i++){const p=randTile(ground,S.hero,6)||randTile(ground,S.hero,3);S.walkers.push(ent(p,500+i*150));}
+  S.drones=[];for(let i=0;i<cfg.drones;i++){const p=randTile(()=>true,S.hero,7)||randTile(()=>true,S.hero,4);S.drones.push(ent(p,900+i*250));}
+  Object.assign(S,{time:0,pings:[],lastPing:null,mission:null,missionAt:700,rescues:0,cable:CABLE_MAX,cableAcc:0,nextMoveAt:0,queued:null,invUntil:0,lastSightAt:-1e9,shakeUntil:0,cableFlash:0,fx:[],trail:[],demoPingAt:1500});
+  setPhase(phase);updateHUD();
+}
+function newGame(){
+  S=fresh();clearFeed();hideOverlay();
+  startLevel('play');
+  addFeed('sys','Où est Comète ?',`${district(1).name} : ${cfg.need} incidents signalés cette nuit.`);
+}
+function levelDone(){
+  const bonus=250+S.lives*50;S.score+=bonus;
+  const done=district(S.level).name, healed=S.lives<3;
+  S.level++;S.lives=Math.min(3,S.lives+1);saveBest();
+  startLevel('intro');
+  addFeed('sys','Où est Comète ?',`${done} sécurisé. Cap sur ${district(S.level).name}.`);
+  showOverlay('next',{done,bonus,healed});
+}
+function gameOver(reason){
+  setPhase('over');
+  const prev=getBest(), nb=saveBest();
+  showOverlay('over',{reason,best:Math.max(prev,S.score),nb});
+}
+function setPhase(p){
+  S.phase=p;
+  $('#pauseBtn').hidden=p!=='play';
+  if(p!=='play'){held=null;document.querySelectorAll('.dpad .down').forEach(b=>b.classList.remove('down'));}
+}
+
+/* ---------- Boucle de jeu ---------- */
+function update(dt){
+  S.time+=dt;
+  const demo=S.phase==='menu', h=S.hero;
+  if(!demo){
+    S.play+=dt;
+    const want=S.queued||held;
+    if(want&&S.time>=S.nextMoveAt){S.queued=null;tryMove(want);if(S.phase!=='play')return;}
+    if(grid[h.r][h.c]!==ROOF){
+      S.cableAcc+=dt;
+      while(S.cableAcc>=CABLE_REGEN_MS){S.cableAcc-=CABLE_REGEN_MS;if(S.cable<CABLE_MAX)S.cable++;}
+    }else S.cableAcc=0;
+    if(!S.mission&&S.time>=S.missionAt)spawnMission();
+    if(S.mission&&S.time>=S.mission.expires){missionFailed();if(S.phase!=='play')return;}
+  }else if(S.time>=S.demoPingAt){
+    S.pings.push({c:h.c,r:h.r,t:S.time});S.demoPingAt=S.time+3200;
+  }
+  for(const w of S.walkers)if(S.time>=w.next){stepWalker(w);w.next=S.time+cfg.walkMs*(0.85+Math.random()*0.3);}
+  for(const d of S.drones)if(S.time>=d.next){stepDrone(d);d.next=S.time+cfg.walkMs*1.7*(0.85+Math.random()*0.3);}
+  if(!demo){
+    proximity();checkCatch();
+    if(S.phase!=='play')return;
+    if(S.lastPing&&S.time-S.lastPing.t>9000)S.lastPing=null;
+  }
+  S.pings=S.pings.filter(p=>S.time-p.t<2000);
+  S.fx=S.fx.filter(f=>S.time-f.t<900);
+}
+
+function tryMove(d){
+  const h=S.hero,[dx,dy]=DIRS[d],nc=h.c+dx,nr=h.r+dy;
+  if(!inB(nc,nr))return false;
+  const t=grid[nr][nc];
+  if(t===ROOF){
+    if(S.cable<=0){S.cableFlash=S.time+600;return false;}
+    S.cable--;
+  }
+  h.pc=h.c;h.pr=h.r;h.c=nc;h.r=nr;h.mt=S.time;S.nextMoveAt=S.time+MOVE_MS;
+  const p=t===STREET?cfg.pStreet:t===PARK?cfg.pPark:cfg.pRoof;
+  if(Math.random()<p)sighting(t===ROOF?'roof':'roll');
+  if(S.mission&&S.mission.c===nc&&S.mission.r===nr){rescue();if(S.phase!=='play')return true;}
+  checkCatch();
+  return true;
+}
+
+function bfsStep(s,tgt){
+  const N=COLS*ROWS, prev=new Int16Array(N).fill(-1), dist=new Int16Array(N).fill(-1);
+  const start=s.r*COLS+s.c, q=[start];dist[start]=0;
+  let best=start,bestScore=man(s.c,s.r,tgt.c,tgt.r)*1000,head=0;
+  while(head<q.length){
+    const id=q[head++],c=id%COLS,r=(id/COLS)|0;
+    const sc=man(c,r,tgt.c,tgt.r)*1000+dist[id];
+    if(sc<bestScore){best=id;bestScore=sc;}
+    for(const [dx,dy] of DV){
+      const nc=c+dx,nr=r+dy;
+      if(!inB(nc,nr))continue;
+      const nid=nr*COLS+nc;
+      if(dist[nid]>=0||grid[nr][nc]===ROOF)continue;
+      dist[nid]=dist[id]+1;prev[nid]=id;q.push(nid);
+    }
+  }
+  if(best===start)return null;
+  let id=best;while(prev[id]!==start)id=prev[id];
+  return{c:id%COLS,r:(id/COLS)|0};
+}
+function moveEnt(e,n){e.pc=e.c;e.pr=e.r;e.c=n.c;e.r=n.r;e.mt=S.time;}
+function stepWalker(w){
+  if(w.target&&w.c===w.target.c&&w.r===w.target.r){w.target=null;w.chasing=false;}
+  if(!w.target){w.target=randTile(ground);w.chasing=false;}
+  let n=null;
+  if(Math.random()<0.1){const o=DV.map(([dx,dy])=>({c:w.c+dx,r:w.r+dy})).filter(p=>inB(p.c,p.r)&&ground(grid[p.r][p.c]));if(o.length)n=pick(o);}
+  else n=bfsStep(w,w.target);
+  if(n)moveEnt(w,n);else{w.target=null;w.chasing=false;}
+}
+function stepDrone(d){
+  if(!d.target||(d.c===d.target.c&&d.r===d.target.r)){d.target=randTile(()=>true);d.chasing=false;}
+  const dx=Math.sign(d.target.c-d.c),dy=Math.sign(d.target.r-d.r);
+  let nc=d.c,nr=d.r;
+  if(dx&&(!dy||Math.random()<0.5))nc+=dx;else if(dy)nr+=dy;
+  if(nc!==d.c||nr!==d.r)moveEnt(d,{c:nc,r:nr});
+}
+
+function sightMsg(kind,where){
+  if(kind==='drone')return `Images aériennes de Comète ${where}`;
+  if(kind==='roof')return pick([`Silhouette ${where} !`,`Ça bouge ${where}, c'est Comète ?`]);
+  if(kind==='near')return pick([`Comète juste devant moi, ${where} !`,`Je suis à deux pas de Comète, ${where}`]);
+  return pick([`Vu ${where} !!`,`Comète vient de passer ${where}`,`Photo floue mais c'est Comète, ${where}`]);
+}
+function sighting(kind){
+  if(S.phase!=='play'||S.time-S.lastSightAt<900)return;
+  S.lastSightAt=S.time;
+  const h=S.hero,p={c:h.c,r:h.r,t:S.time};
+  S.pings.push(p);S.lastPing=p;S.sightings++;
+  for(const e of S.walkers.concat(S.drones)){e.target={c:p.c,r:p.r};e.chasing=true;}
+  addFeed('sight',kind==='drone'?'@drone_presse':pick(PSEUDOS),sightMsg(kind,placeName(h.c,h.r)));
+}
+function proximity(){
+  const h=S.hero;
+  if(grid[h.r][h.c]!==ROOF){for(const w of S.walkers)if(man(w.c,w.r,h.c,h.r)<=2){sighting('near');break;}}
+  for(const d of S.drones)if(man(d.c,d.r,h.c,h.r)<=2){sighting('drone');break;}
+}
+function checkCatch(){
+  if(S.phase!=='play'||S.time<S.invUntil)return;
+  const h=S.hero;
+  const w=S.walkers.find(e=>e.c===h.c&&e.r===h.r), d=S.drones.find(e=>e.c===h.c&&e.r===h.r);
+  if(w||d)caught(!!d);
+}
+function caught(byDrone){
+  S.lives--;S.invUntil=S.time+INV_MS;S.shakeUntil=S.time+350;
+  addFeed('sight',byDrone?'@drone_presse':pick(PSEUDOS),'Photo nette de Comète ! Masque perdu.');
+  const h=S.hero;
+  for(const w of S.walkers){const p=randTile(ground,h,6)||randTile(ground,h,3);w.c=w.pc=p.c;w.r=w.pr=p.r;w.target=null;w.chasing=false;}
+  for(const d of S.drones){const p=randTile(()=>true,h,7)||randTile(()=>true,h,4);d.c=d.pc=p.c;d.r=d.pr=p.r;d.target=null;d.chasing=false;}
+  S.lastPing=null;
+  updateHUD();
+  if(S.lives<=0)gameOver("Trop de photos nettes : l'identité de Comète ne tient plus qu'à un fil.");
+}
+function spawnMission(){
+  const h=S.hero;
+  const p=randTile((t,c,r)=>ground(t)&&!S.walkers.some(w=>w.c===c&&w.r===r),h,5)||randTile(ground,h,3)||randTile(ground);
+  const inc=pick(INCIDENTS), dur=(cfg.base+man(p.c,p.r,h.c,h.r)*cfg.perTile)*1000;
+  S.mission={c:p.c,r:p.r,inc,dur,expires:S.time+dur};
+  addFeed('alert','Alerte',`${cap(inc)}, ${placeName(p.c,p.r)}`);
+}
+function rescue(){
+  const m=S.mission, pts=100+Math.round(Math.max(0,m.expires-S.time)/100);
+  S.score+=pts;S.rescues++;S.mission=null;S.missionAt=S.time+900;
+  S.fx.push({c:m.c,r:m.r,t:S.time,text:'+'+pts});
+  addFeed('sys',pick(PSEUDOS),`Merci Comète pour : ${m.inc} ! (+${pts})`);
+  updateHUD();
+  if(S.rescues>=cfg.need)levelDone();
+}
+function missionFailed(){
+  const m=S.mission;S.mission=null;S.missionAt=S.time+1200;S.lives--;S.shakeUntil=S.time+250;
+  addFeed('alert','Alerte',`Personne n'est venu : ${m.inc}. Masque perdu.`);
+  updateHUD();
+  if(S.lives<=0)gameOver("Trop d'incidents sans réponse : la ville ne compte plus sur Comète.");
+}
+
+/* ---------- Rendu ---------- */
+const cv=$('#map'), ctx=cv.getContext('2d');
+function drawMerged(g,type,color,inset){
+  g.fillStyle=color;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(grid[r][c]!==type)continue;
+    const L=isT(c-1,r,type)?0:inset,R=isT(c+1,r,type)?0:inset,U=isT(c,r-1,type)?0:inset,D=isT(c,r+1,type)?0:inset;
+    g.fillRect(c*T+L,r*T+U,T-L-R,T-U-D);
+  }
+}
+function buildBg(){
+  bg=document.createElement('canvas');bg.width=Math.round(W*dpr);bg.height=Math.round(H*dpr);
+  const g=bg.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle=C.asphalt;g.fillRect(0,0,W,H);
+  g.fillStyle=rgba(C.ink,0.07);
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(grid[r][c]!==STREET)continue;
+    const x=c*T,y=r*T,l=lane[r][c];
+    if(l==='h')g.fillRect(x+T*0.28,y+T/2-0.75,T*0.44,1.5);
+    else if(l==='v')g.fillRect(x+T/2-0.75,y+T*0.28,1.5,T*0.44);
+  }
+  drawMerged(g,PARK,C.park,1.5);
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(grid[r][c]!==PARK)continue;
+    const d=deco[r][c],x=c*T,y=r*T;
+    g.fillStyle=C.tree;
+    g.beginPath();g.arc(x+T*(0.28+0.2*d),y+T*(0.3+0.25*((d*7)%1)),T*0.17,0,PI2);g.fill();
+    g.beginPath();g.arc(x+T*(0.72-0.15*d),y+T*(0.72-0.2*((d*13)%1)),T*0.12,0,PI2);g.fill();
+  }
+  g.fillStyle='rgba(0,0,0,0.5)';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)if(grid[r][c]===ROOF)g.fillRect(c*T+3,r*T+4,T,T);
+  drawMerged(g,ROOF,C.block,2);
+  g.fillStyle=C['block-hi'];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(grid[r][c]!==ROOF)continue;
+    const L=!isT(c-1,r,ROOF),R=!isT(c+1,r,ROOF),U=!isT(c,r-1,ROOF),D=!isT(c,r+1,ROOF);
+    const x0=c*T+(L?2:0),x1=c*T+T-(R?2:0),y0=r*T+(U?2:0),y1=r*T+T-(D?2:0);
+    if(U)g.fillRect(x0,y0,x1-x0,1.5);
+    if(L)g.fillRect(x0,y0,1.5,y1-y0);
+  }
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(grid[r][c]!==ROOF)continue;
+    const d=deco[r][c],x=c*T,y=r*T;
+    if(d<0.22){g.fillStyle=rgba(C.night,0.55);g.fillRect(x+T*0.28,y+T*0.34,T*0.3,T*0.24);g.fillStyle=rgba(C.ink,0.1);g.fillRect(x+T*0.28,y+T*0.34,T*0.3,1);}
+    else if(d<0.36){g.fillStyle=rgba(C.amber,0.2);g.fillRect(x+T*0.52,y+T*0.22,T*0.22,T*0.32);}
+    else if(d<0.46){g.strokeStyle=rgba(C.ink,0.13);g.lineWidth=1;g.beginPath();g.arc(x+T*0.4,y+T*0.55,T*0.17,0,PI2);g.stroke();}
+  }
+}
+function lp(e,now,dur){
+  let k=(now-e.mt)/dur;k=k<0?0:k>1?1:k;const q=1-(1-k)*(1-k);
+  return{x:(e.pc+(e.c-e.pc)*q)*T+T/2,y:(e.pr+(e.r-e.pr)*q)*T+T/2,k};
+}
+function circle(x,y,r){ctx.beginPath();ctx.arc(x,y,r,0,PI2);}
+function drawMission(m,now,t){
+  const x=m.c*T+T/2,y=m.r*T+T/2,left=Math.max(0,Math.min(1,(m.expires-now)/m.dur)),col=left<0.3?C.ping:C.alert;
+  const pulse=reduceMotion?0.5:0.5+0.5*Math.sin(t/170);
+  ctx.fillStyle=rgba(col,0.12+0.1*pulse);circle(x,y,T*0.5);ctx.fill();
+  ctx.lineWidth=3;ctx.strokeStyle=rgba(col,0.22);circle(x,y,T*0.44);ctx.stroke();
+  ctx.strokeStyle=col;ctx.beginPath();ctx.arc(x,y,T*0.44,-Math.PI/2,-Math.PI/2+PI2*left);ctx.stroke();
+  const s=T*0.24;ctx.fillStyle=col;
+  ctx.beginPath();ctx.moveTo(x,y-s);ctx.lineTo(x+s,y);ctx.lineTo(x,y+s);ctx.lineTo(x-s,y);ctx.closePath();ctx.fill();
+  ctx.fillStyle=C.night;ctx.fillRect(x-T*0.03,y-s*0.55,T*0.06,s*0.65);ctx.fillRect(x-T*0.03,y+s*0.22,T*0.06,T*0.06);
+}
+function drawHero(now,t){
+  const h=S.hero,p=lp(h,now,MOVE_MS*0.9),onRoof=grid[h.r][h.c]===ROOF;
+  if(S.phase==='play'||S.phase==='menu'){S.trail.push({x:p.x,y:p.y});if(S.trail.length>10)S.trail.shift();}
+  const n=S.trail.length;
+  for(let i=0;i<n-1;i++){const q=S.trail[i],f=(i+1)/n;ctx.fillStyle=rgba(C.amber,0.08+0.35*f);circle(q.x,q.y,T*0.26*f);ctx.fill();}
+  if(onRoof&&p.k<1){
+    const ax=(h.c+(h.c-h.pc)*0.7)*T+T/2, ay=(h.r+(h.r-h.pr)*0.7)*T+T/2-T*0.2;
+    ctx.strokeStyle=rgba(C.ink,0.75*(1-p.k));ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(p.x,p.y);ctx.lineTo(ax,ay);ctx.stroke();
+  }
+  const R=T*(onRoof?0.34:0.3);
+  ctx.fillStyle='rgba(0,0,0,.45)';ctx.beginPath();ctx.ellipse(p.x+(onRoof?4:2),p.y+(onRoof?5:2.5),R,R*0.85,0,0,PI2);ctx.fill();
+  if(now<S.invUntil&&Math.floor(t/90)%2===0)return;
+  ctx.fillStyle=C.amber;circle(p.x,p.y,R);ctx.fill();
+  ctx.lineWidth=1.5;ctx.strokeStyle=C.night;ctx.stroke();
+  ctx.fillStyle=C.night;ctx.beginPath();ctx.ellipse(p.x,p.y-R*0.08,R*0.78,R*0.27,0,0,PI2);ctx.fill();
+  ctx.fillStyle=C.ink;circle(p.x-R*0.33,p.y-R*0.08,R*0.12);ctx.fill();circle(p.x+R*0.33,p.y-R*0.08,R*0.12);ctx.fill();
+}
+function render(t){
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle=C.asphalt;ctx.fillRect(0,0,W,H);
+  if(!bg||!S)return;
+  const now=S.time;
+  let sx=0,sy=0;
+  if(!reduceMotion&&now<S.shakeUntil&&S.phase==='play'){sx=(Math.random()-.5)*6;sy=(Math.random()-.5)*6;}
+  ctx.save();ctx.translate(sx,sy);
+  ctx.drawImage(bg,0,0,W,H);
+  const wDur=Math.min(260,cfg.walkMs*0.6), dDur=Math.min(380,cfg.walkMs*1.02);
+  for(const d of S.drones){
+    const p=lp(d,now,dDur),R=T*2.5;
+    ctx.fillStyle=rgba(C.drone,0.07);ctx.strokeStyle=rgba(C.drone,0.25);ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(p.x,p.y-R);ctx.lineTo(p.x+R,p.y);ctx.lineTo(p.x,p.y+R);ctx.lineTo(p.x-R,p.y);ctx.closePath();ctx.fill();ctx.stroke();
+  }
+  if(S.lastPing){
+    const x=S.lastPing.c*T+T/2,y=S.lastPing.r*T+T/2;
+    ctx.setLineDash([3,3]);ctx.strokeStyle=rgba(C.ping,0.85);ctx.lineWidth=1.5;circle(x,y,T*0.44);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=C.ping;circle(x,y,Math.max(2,T*0.08));ctx.fill();
+  }
+  for(const p of S.pings){
+    const x=p.c*T+T/2,y=p.r*T+T/2;
+    for(let k=0;k<2;k++){
+      const a=(now-p.t)/1300-k*0.3;if(a<0||a>1)continue;
+      ctx.strokeStyle=rgba(C.ping,(1-a)*0.9);ctx.lineWidth=2;circle(x,y,T*(0.3+a*1.9));ctx.stroke();
+    }
+  }
+  if(S.mission)drawMission(S.mission,now,t);
+  for(const w of S.walkers){
+    const p=lp(w,now,wDur),r=T*0.22;
+    ctx.fillStyle='rgba(0,0,0,.35)';circle(p.x+1.5,p.y+2,r);ctx.fill();
+    ctx.fillStyle=C.walker;circle(p.x,p.y,r);ctx.fill();
+    if(w.chasing){ctx.strokeStyle=C.ping;ctx.lineWidth=2;ctx.stroke();}
+    ctx.fillStyle=C.night;ctx.fillRect(p.x+r*0.1,p.y-r*0.55,r*0.55,r*0.85);
+    if(w.chasing&&Math.floor(t/260)%3===0){ctx.fillStyle=C.ink;circle(p.x+r*0.38,p.y-r*0.4,r*0.2);ctx.fill();}
+  }
+  for(const d of S.drones){
+    const p=lp(d,now,dDur),a=T*0.26;
+    ctx.strokeStyle=C.drone;ctx.lineWidth=2;ctx.beginPath();
+    ctx.moveTo(p.x-a,p.y-a);ctx.lineTo(p.x+a,p.y+a);ctx.moveTo(p.x+a,p.y-a);ctx.lineTo(p.x-a,p.y+a);ctx.stroke();
+    ctx.lineWidth=1.5;
+    for(const [ux,uy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){circle(p.x+ux*a,p.y+uy*a,T*0.1);ctx.stroke();}
+    ctx.fillStyle=d.chasing?C.ping:C.drone;ctx.fillRect(p.x-T*0.08,p.y-T*0.08,T*0.16,T*0.16);
+  }
+  for(const f of S.fx){
+    const a=(now-f.t)/900,x=f.c*T+T/2,y=f.r*T+T/2;
+    ctx.strokeStyle=rgba(C.alert,1-a);ctx.lineWidth=2.5;circle(x,y,T*(0.3+a*1.2));ctx.stroke();
+    ctx.fillStyle=rgba(C.alert,1-a);ctx.font=`700 ${Math.round(T*0.6)}px "Barlow Condensed", "Arial Narrow", sans-serif`;ctx.textAlign='center';
+    ctx.fillText(f.text,x,y-T*0.6-a*T*0.6);
+  }
+  drawHero(now,t);
+  ctx.restore();
+}
+
+/* ---------- Interface ---------- */
+const segsEl=$('#segs'), whereEl=$('#where'), feedEl=$('#feedList'), ov=$('#overlay');
+for(let i=0;i<CABLE_MAX;i++)segsEl.appendChild(document.createElement('i'));
+const segEls=[...segsEl.children];
+const MASK=k=>`<svg viewBox="0 0 18 11" aria-hidden="true"><path class="${k}" d="M1 3.2C5 .6 13 .6 17 3.2 17 8 15 10 12.4 10 10.6 10 9.8 8.6 9 7.6 8.2 8.6 7.4 10 5.6 10 3 10 1 8 1 3.2Z"/><circle class="eye" cx="5.3" cy="5" r="1.6"/><circle class="eye" cx="12.7" cy="5" r="1.6"/></svg>`;
+
+function updateHUD(){
+  $('#district').textContent=`Niv. ${S.level} · ${district(S.level).name}`;
+  $('#rescues').textContent=`${S.rescues}/${cfg.need}`;
+  $('#score').textContent=fmt(S.score);
+  const lv=$('#lives');lv.innerHTML=[0,1,2].map(i=>MASK(i<S.lives?'on':'off')).join('');
+  lv.setAttribute('aria-label',`${S.lives} masque${S.lives>1?'s':''}`);
+}
+let lastCableKey='';
+function hudFrame(){
+  const onRoof=grid[S.hero.r][S.hero.c]===ROOF, warn=S.time<S.cableFlash;
+  const key=S.cable+'|'+onRoof+'|'+warn;
+  if(key===lastCableKey)return;
+  lastCableKey=key;
+  segEls.forEach((el,i)=>el.classList.toggle('on',i<S.cable));
+  whereEl.textContent=warn?'Câble vide !':onRoof?'Sur les toits · discret':'Au sol · recharge';
+  whereEl.classList.toggle('warn',warn);
+}
+function clockStr(){const m=21*60+Math.floor((S?S.play:0)/2000);return pad(Math.floor(m/60)%24)+':'+pad(m%60);}
+function slowHud(){
+  $('#watchers').textContent=fmt(2400+S.level*2600+S.sightings*143+rnd(90));
+  $('#clock').textContent=clockStr();
+}
+function clearFeed(){feedEl.innerHTML='';}
+function addFeed(kind,who,msg,time){
+  const li=document.createElement('li');li.className=kind+(reduceMotion?'':' new');
+  const ts=document.createElement('span');ts.className='t';ts.textContent=time||clockStr();
+  const m=document.createElement('span');m.className='m';
+  const w=document.createElement('span');w.className='who';w.textContent=who;
+  m.append(w,' '+msg);li.append(ts,m);feedEl.prepend(li);
+  while(feedEl.children.length>4)feedEl.lastElementChild.remove();
+}
+
+/* ---------- Écrans ---------- */
+function getBest(){try{return parseInt(localStorage.getItem(BEST_KEY)||'0',10)||0;}catch(_){return 0;}}
+function saveBest(){if(S.score>getBest()){try{localStorage.setItem(BEST_KEY,String(S.score));}catch(_){}return true;}return false;}
+const sw=k=>`<i class="sw ${k}"></i>`;
+const SCREENS={
+  menu:()=>{const best=getBest();return `
+  <div class="card" role="dialog" aria-labelledby="ovt">
+    <p class="eyebrow">Mini-jeu · un quartier par niveau</p>
+    <h2 id="ovt">Comète Traquée</h2>
+    <p>Toute la ville suit Comète sur l'appli <b>Où est Comète&nbsp;?</b> Chaque signalement envoie les traqueurs vers ta dernière position connue.</p>
+    <ul class="rules">
+      <li>${sw('alert')}<span>Fonce sur chaque incident avant la fin du compte à rebours. Assez de sauvetages et tu passes au quartier suivant.</span></li>
+      <li>${sw('roof')}<span>Dans la rue, on te repère vite. Sur les toits, presque jamais, mais le grappin s'use et ne se recharge qu'au sol.</span></li>
+      <li>${sw('walker')}<span>Un traqueur ou un drone sur ta case, c'est une photo et un masque en moins. Tu en as trois.</span></li>
+    </ul>
+    <div class="legend"><span>${sw('hero')}Comète</span><span>${sw('walker')}Traqueur</span><span>${sw('drone')}Drone</span><span>${sw('ping')}Signalement</span><span>${sw('alert')}Incident</span></div>
+    <button class="btn" type="button" data-act="start">Lancer la traque</button>
+    <p class="fine">${best?`Record : ${fmt(best)} pts. `:''}Clavier : flèches ou ZQSD. Téléphone : croix, ou glisse sur le plan.</p>
+  </div>`;},
+  next:d=>{const dist=district(S.level);return `
+  <div class="card" role="dialog" aria-labelledby="ovt">
+    <p class="eyebrow">Quartier sécurisé · +${fmt(d.bonus)} pts</p>
+    <h2 id="ovt">${d.done}</h2>
+    <p>Score : <b>${fmt(S.score)}</b>.${d.healed?' Un masque récupéré au passage.':''}</p>
+    <div class="next">
+      <span class="k">Niveau ${S.level} · prochain quartier</span>
+      <strong>${dist.name}</strong>
+      <p>${dist.note}</p>
+      <p class="fine">${cfg.need} incidents · ${cfg.walkers} traqueurs${cfg.drones?` · ${cfg.drones} drone${cfg.drones>1?'s':''}`:''}</p>
+    </div>
+    <button class="btn" type="button" data-act="go">Entrer dans le quartier</button>
+  </div>`;},
+  pause:()=>`
+  <div class="card" role="dialog" aria-labelledby="ovt">
+    <p class="eyebrow">Pause · niveau ${S.level}</p>
+    <h2 id="ovt">Comète se cache</h2>
+    <p>Personne ne bouge tant que tu ne reprends pas.</p>
+    <div class="row"><button class="btn" type="button" data-act="resume">Reprendre</button><button class="btn ghost" type="button" data-act="menu">Abandonner</button></div>
+  </div>`,
+  over:d=>`
+  <div class="card" role="dialog" aria-labelledby="ovt">
+    <p class="eyebrow">Fin de la traque</p>
+    <h2 id="ovt">Masques épuisés</h2>
+    <p>${d.reason}</p>
+    <div class="score-grid">
+      <div><span class="k">Score</span><span class="v">${fmt(S.score)}</span></div>
+      <div><span class="k">Niveau</span><span class="v">${S.level}</span></div>
+      <div><span class="k">Record</span><span class="v">${fmt(d.best)}</span></div>
+    </div>
+    ${d.nb?'<p class="fine">Nouveau record !</p>':''}
+    <div class="row"><button class="btn" type="button" data-act="again">Rejouer</button><button class="btn ghost" type="button" data-act="menu">Menu</button></div>
+  </div>`
+};
+function showOverlay(kind,data){ov.innerHTML=SCREENS[kind](data||{});ov.hidden=false;}
+function hideOverlay(){ov.hidden=true;ov.innerHTML='';}
+ov.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const a=b.dataset.act;
+  if(a==='start'||a==='again')newGame();
+  else if(a==='go'||a==='resume'){hideOverlay();setPhase('play');}
+  else if(a==='menu')showMenu();
+});
+function togglePause(){
+  if(!S)return;
+  if(S.phase==='play'){setPhase('paused');showOverlay('pause');}
+  else if(S.phase==='paused'){hideOverlay();setPhase('play');}
+}
+$('#pauseBtn').addEventListener('click',togglePause);
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&S&&S.phase==='play')togglePause();});
+
+function showMenu(){
+  S=fresh();startLevel('menu');
+  const m=randTile(ground,S.hero,5)||randTile(ground);
+  S.mission={c:m.c,r:m.r,inc:INCIDENTS[0],dur:1e9,expires:0.62e9};
+  S.lastPing={c:S.hero.c,r:S.hero.r,t:0};
+  clearFeed();
+  addFeed('sys','Où est Comète ?',"L'appli est ouverte dans toute la ville.",'20:57');
+  addFeed('alert','Alerte',`${cap(INCIDENTS[0])}, ${placeName(m.c,m.r)}`,'20:58');
+  addFeed('sight',pick(PSEUDOS),`Vu ${placeName(S.hero.c,S.hero.r)} !!`,'20:59');
+  showOverlay('menu');
+}
+
+/* ---------- Commandes ---------- */
+const KEYMAP={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',KeyW:'up',KeyS:'down',KeyA:'left',KeyD:'right'};
+function nudge(d){
+  if(!S||S.phase!=='play')return;
+  if(S.time>=S.nextMoveAt)tryMove(d);else S.queued=d;
+}
+addEventListener('keydown',e=>{
+  if(e.code==='Space'||e.code==='KeyP'||e.code==='Escape'){
+    if(S&&(S.phase==='play'||S.phase==='paused')){e.preventDefault();togglePause();}
+    return;
+  }
+  if(e.code==='Enter'||e.code==='NumpadEnter'){
+    if(e.target.closest&&e.target.closest('button'))return;
+    const b=!ov.hidden&&ov.querySelector('[data-act]');
+    if(b){e.preventDefault();b.click();}
+    return;
+  }
+  const d=KEYMAP[e.code];if(!d)return;
+  e.preventDefault();
+  if(e.repeat)return;
+  held=d;nudge(d);
+});
+addEventListener('keyup',e=>{if(KEYMAP[e.code]&&KEYMAP[e.code]===held)held=null;});
+addEventListener('blur',()=>{held=null;});
+
+document.querySelectorAll('.dpad button').forEach(b=>{
+  const d=b.dataset.dir;
+  b.addEventListener('pointerdown',e=>{
+    e.preventDefault();
+    try{b.setPointerCapture(e.pointerId);}catch(_){}
+    held=d;b.classList.add('down');nudge(d);
+  });
+  const up=()=>{if(held===d)held=null;b.classList.remove('down');};
+  b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);
+  b.addEventListener('click',e=>{if(e.detail===0)nudge(d);});
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+});
+
+let swipe=null;
+cv.addEventListener('pointerdown',e=>{
+  swipe={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false};
+  try{cv.setPointerCapture(e.pointerId);}catch(_){}
+});
+cv.addEventListener('pointermove',e=>{
+  if(!swipe||e.pointerId!==swipe.id)return;
+  const dx=e.clientX-swipe.x,dy=e.clientY-swipe.y,th=Math.max(14,T*0.55);
+  if(Math.abs(dx)<th&&Math.abs(dy)<th)return;
+  swipe.x=e.clientX;swipe.y=e.clientY;swipe.moved=true;
+  nudge(Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up'));
+});
+cv.addEventListener('pointerup',e=>{
+  if(swipe&&!swipe.moved&&S&&S.phase==='play'){
+    const rect=cv.getBoundingClientRect();
+    const tc=Math.floor((e.clientX-rect.left)/T),tr=Math.floor((e.clientY-rect.top)/T);
+    const dx=tc-S.hero.c,dy=tr-S.hero.r;
+    if(dx||dy)nudge(Math.abs(dx)>=Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up'));
+  }
+  swipe=null;
+});
+cv.addEventListener('pointercancel',()=>{swipe=null;});
+
+/* ---------- Taille ---------- */
+function resize(){
+  dpr=Math.min(2,window.devicePixelRatio||1);
+  const bs=getComputedStyle(document.body), rt=getComputedStyle(document.documentElement);
+  const availW=Math.min(460,document.body.clientWidth-parseFloat(bs.paddingLeft)-parseFloat(bs.paddingRight))-2;
+  const used=['.head','.cable','.bottom','.foot'].reduce((s,q)=>s+($(q)?$(q).offsetHeight:0),0)+40+24+2;
+  const rootPad=(parseFloat(rt.paddingTop)||0)+(parseFloat(rt.paddingBottom)||0);
+  const availH=window.innerHeight-used-rootPad;
+  T=Math.max(20,Math.min(40,Math.floor(Math.min(availW/COLS,availH/ROWS))));
+  W=T*COLS;H=T*ROWS;
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  cv.style.width=W+'px';cv.style.height=H+'px';
+  if(grid.length)buildBg();
+  if(S)S.trail=[];
+}
+let rq=0;
+addEventListener('resize',()=>{cancelAnimationFrame(rq);rq=requestAnimationFrame(resize);});
+
+/* ---------- Démarrage ---------- */
+let lastT=0,hudT=0;
+function loop(t){
+  const dt=Math.min(50,Math.max(0,t-lastT));lastT=t;
+  if(S&&(S.phase==='play'||S.phase==='menu'))update(dt);
+  render(t);
+  if(S){hudFrame();if(t-hudT>600){hudT=t;slowHud();}}
+  requestAnimationFrame(loop);
+}
+function boot(data){
+  resize();
+  if(data&&data.level>0){
+    S=fresh();S.level=data.level|0;S.score=data.score|0;S.lives=Math.max(1,Math.min(3,data.lives|0||3));
+    clearFeed();startLevel('paused');
+    addFeed('sys','Où est Comète ?',`Partie reprise au niveau ${S.level}.`);
+    showOverlay('pause');
+  }else showMenu();
+  requestAnimationFrame(t=>{lastT=t;loop(t);});
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize).catch(()=>{});
+}
+try{if(window.claude&&window.claude.hot&&window.claude.hot.snapshot)window.claude.hot.snapshot(()=>S&&S.phase!=='menu'&&S.phase!=='over'?{level:S.level,score:S.score,lives:S.lives}:{});}catch(_){}
+const hot=window.claude&&window.claude.hot;
+if(hot&&hot.ready)hot.ready(boot);else boot((hot&&hot.data)||{});
+})();
+</script>
+
+</body></html>

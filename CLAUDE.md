@@ -166,7 +166,7 @@ Menu de tri du catalogue (égalités départagées par le score, puis le nombre 
 - **Regroupements en tuiles** en haut de l'accueil (`public/regroupements.js`), combinables entre eux, avec le tri et la recherche ; chaque tuile compte ses jeux (selon les autres filtres) :
   - raccourcis : 🎲 **Au hasard** (lance un jeu parmi ceux affichés), 👍 **J'ai aimé** (mes votes 👍 sur l'appareil), 📶 **Hors ligne** (jeux gardés sur l'appareil) ;
   - **âge** (d'après `ages`) : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et + ;
-  - **genres** (champ `genre`, liste fermée de 16) ;
+  - **genres** (champ `genre`, liste fermée de 17, dont `action`) ;
   - **univers** (21, chacun réunit plusieurs `tags` et le genre ; un jeu peut en avoir plusieurs), plus « Autres thèmes » en petites puces pour les tags rangés dans aucun univers.
   - Un regroupement encore vide reste affiché, grisé « Bientôt », après ceux qui ont des jeux. Sur téléphone, genres et univers forment une bande de 2 rangées qui défile (« Tout voir » la déplie) ; sur grand écran, tout est déplié. Les filtres choisis sont rappelés au-dessus des jeux (✕ pour retirer, « Tout effacer »).
 - Chaque jaquette affiche ses compteurs 👍 et 👎 (portée choisie). Sans API : tri par nouveautés, sans compteurs.
