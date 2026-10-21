@@ -96,7 +96,7 @@ Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un 
 
 ### 5. Premier essai, sans attendre la nuit
 
-1. Onglet **Actions** du dépôt → **Boucle de nuit** dans la liste de gauche.
+1. Onglet **Actions** du dépôt → **Créer des jeux (boucle de nuit)** dans la liste de gauche.
 2. Cliquez sur **Run workflow**, choisissez **1** jeu pour ce premier essai, puis le bouton vert **Run workflow**.
 3. Attendez la fin (1 à 2 heures) : une coche verte apparaît.
 4. Onglet **Pull requests** → filtre « Closed » : « Nouveau jeu : … » est fusionnée (pastille violette) ou fermée, avec un commentaire qui explique pourquoi.
@@ -105,10 +105,10 @@ Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un 
 
 ## Au quotidien : suivre les jeux (2 minutes)
 
-- **Ce qui s'est passé cette nuit** : onglet **Actions** → **Boucle de nuit** → le dernier passage. Le résumé en bas de page liste chaque pull request : fusionnée, refusée, ou en attente.
+- **Ce qui s'est passé cette nuit** : onglet **Actions** → **Créer des jeux (boucle de nuit)** → le dernier passage. Le résumé en bas de page liste chaque pull request : fusionnée, refusée, ou en attente.
 - **Jeux fusionnés** (onglet Pull requests, filtre « Closed », pastille violette) : ils sont en ligne. Le commentaire donne la grille point par point et quelques conseils.
 - **Jeux refusés** (pull request fermée, pastille rouge) : le commentaire liste les problèmes. L'idée est déjà remise en attente.
-- **« ⚠️ Vérification interrompue »** (limite d'utilisation de l'abonnement, panne…) : rien n'est décidé, la pull request reste ouverte et sera vérifiée au passage suivant. Pour ne pas attendre : **Actions** → **Boucle de nuit** → **Run workflow** avec **0** jeu.
+- **« ⚠️ Vérification interrompue »** (limite d'utilisation de l'abonnement, panne…) : rien n'est décidé, la pull request reste ouverte et sera vérifiée au passage suivant. Pour ne pas attendre : **Actions** → **Créer des jeux (boucle de nuit)** → **Run workflow** avec **0** jeu.
 
 ## Fusion automatique : la couper ou la remettre
 
@@ -166,11 +166,11 @@ Bon à savoir :
 | Proposer une idée depuis mon téléphone | Issues → New issue → Nouvelle idée de jeu |
 | Ajouter, retirer ou réordonner des idées | Modifier `idees.json`, puis Commit + Push |
 | Retenter une idée mise de côté | Dans `idees.json`, remplacer `"essais": 3` par `"essais": 0` |
-| Lancer la boucle sans attendre la nuit | Actions → Boucle de nuit → Run workflow (1 à 5 jeux) |
-| Revérifier les pull requests en attente | Actions → Boucle de nuit → Run workflow → 0 jeu |
+| Lancer la boucle sans attendre la nuit | Actions → Créer des jeux (boucle de nuit) → Run workflow (1 à 5 jeux) |
+| Revérifier les pull requests en attente | Actions → Créer des jeux (boucle de nuit) → Run workflow → 0 jeu |
 | Faire corriger un jeu proposé | Commentaire « @claude … » dans sa pull request |
 | Couper la fusion automatique | Variable `FUSION_AUTO` = `non` (voir plus haut) |
-| Mettre la boucle en pause | Actions → Boucle de nuit → menu « … » → **Disable workflow** |
+| Mettre la boucle en pause | Actions → Créer des jeux (boucle de nuit) → menu « … » → **Disable workflow** |
 | Comprendre un échec | Actions → cliquer sur le passage en rouge → lire l'étape en échec |
 | Vérifier `idees.json` sur mon PC | `npm run idees` |
 | Contrôler un jeu sur mon PC | `npm run check` (ou `npm run check -- mon-jeu`) |
