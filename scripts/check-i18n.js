@@ -274,7 +274,8 @@ function chercherTextesEnDur(id, code, clesFr = new Set()) {
   // JavaScript : chaînes d'au moins deux mots (ou avec accents) hors t(…),
   // hors console, police, couleurs, sélecteurs CSS et clés de traduction.
   for (const s of code.matchAll(/<script\b(?![^>]*type=["']application\/json)[^>]*>([\s\S]*?)<\/script>/gi)) {
-    const js = s[1];
+    // Commentaires retirés (même longueur, pour garder les numéros de ligne).
+    const js = s[1].replace(/\/\*[\s\S]*?\*\//g, blanc).replace(/(^|[^:\\'"`])(\/\/[^\n]*)/gm, (m, avant, com) => avant + blanc(com));
     const debut = s.index + s[0].indexOf(js);
     for (const m of js.matchAll(/(["'`])((?:\\.|(?!\1)[^\\\n])*)\1/g)) {
       const texte = m[2].replace(/\$\{[^}]*\}/g, ' ').replace(/<[^>]*>?/g, ' ')   // sans ${…} ni balises HTML,
