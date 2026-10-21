@@ -276,7 +276,9 @@ function chercherTextesEnDur(id, code, clesFr = new Set()) {
     const js = s[1];
     const debut = s.index + s[0].indexOf(js);
     for (const m of js.matchAll(/(["'`])((?:\\.|(?!\1)[^\\\n])*)\1/g)) {
-      const texte = m[2].replace(/\$\{[^}]*\}/g, ' ').replace(/<[^>]*>?/g, ' ');   // sans ${…} ni balises HTML
+      const texte = m[2].replace(/\$\{[^}]*\}/g, ' ').replace(/<[^>]*>?/g, ' ')   // sans ${…} ni balises HTML,
+        .replace(/[\w:-]+\s*=\s*(?:"[^"]*"?|'[^']*'?)/g, ' ')                       // ni attributs (x="…"),
+        .replace(/\[[^\]]*\]/g, ' ').replace(/\b[a-z]+\/[a-z0-9+.-]+\b/g, ' ');     // ni sélecteurs [data-x], ni types MIME
       if (/^\s*(?:https?:|data:|blob:)/.test(texte) || /^\s*(?:var|calc|url|hsla?|rgba?)\(/.test(texte)) continue;
       if (!LETTRES.test(texte)) continue;
       if (!MOTS.test(texte) && !/[àâäçéèêëîïôöùûüÿœæ]/i.test(texte)) continue;
@@ -323,6 +325,13 @@ async function debordements(page) {
     const resultat = [];
     for (const el of document.querySelectorAll('button, a, h1, h2, h3, p, span, div, label, li')) {
       if (el.closest('.jel-langue')) continue;
+      // Dans une zone qui défile (onglets, liste…), sortir de l'écran est voulu.
+      let defile = false;
+      for (let a = el.parentElement; a && !defile; a = a.parentElement) {
+        const s = getComputedStyle(a);
+        defile = /auto|scroll/.test(s.overflowX + s.overflowY) && (a.scrollWidth > a.clientWidth + 2 || a.scrollHeight > a.clientHeight + 2);
+      }
+      if (defile) continue;
       const r = el.getBoundingClientRect();
       if (!r.width || !r.height || el.offsetParent === null) continue;
       const style = getComputedStyle(el);

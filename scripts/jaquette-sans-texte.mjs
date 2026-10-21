@@ -13,6 +13,8 @@
 //     --touche <touche>      appuie sur une touche (ex. Enter), répétable
 //     --attendre <ms>        attente avant la capture (défaut 1500)
 //     --cacher "<sélecteur>" masque en plus ces éléments (ex. un panneau vide)
+//     --fin                masque seulement les textes (et les boutons qui en
+//                            portent), jamais un bloc entier (écran de jeu chargé)
 //     --largeur / --hauteur  taille de l'image (défaut : celle de la jaquette
 //                            existante, sinon 600 × 800)
 //     --qualite <0-100>      qualité JPEG/WebP (défaut 80, comme --covers)
@@ -52,7 +54,7 @@ export function scriptCanvasSansTexte() {
  * - un bloc sans dessin (canvas, svg, img, emoji) qui contient du texte : caché en entier ;
  * - sinon, seuls ses textes sont cachés, ses dessins restent.
  */
-export function masquerTextes(selecteursEnPlus = []) {
+export function masquerTextes({ selecteursEnPlus = [], fin = false } = {}) {
   const ecrit = /[\p{L}\p{N}]/u;
   const cacher = (el) => el.style.setProperty('visibility', 'hidden', 'important');
   const emojiSeul = (texte) => texte.trim() && !ecrit.test(texte);
@@ -75,7 +77,7 @@ export function masquerTextes(selecteursEnPlus = []) {
     const texte = el.textContent || '';
     if (el.matches('button, input, select, textarea, a, [role="button"], label') && (ecrit.test(texte) || el.matches('input, select, textarea'))) { cacher(el); return; }
     if (el instanceof SVGElement && el.matches('text, tspan, textPath')) { if (ecrit.test(texte)) cacher(el); return; }
-    if (!(el instanceof SVGElement) && !aUnDessin(el) && ecrit.test(texte)) { cacher(el); return; }
+    if (!fin && !(el instanceof SVGElement) && !aUnDessin(el) && ecrit.test(texte)) { cacher(el); return; }
     for (const enfant of [...el.childNodes]) {
       if (enfant.nodeType === Node.TEXT_NODE) {
         if (ecrit.test(enfant.textContent)) {
@@ -101,7 +103,7 @@ export function masquerTextes(selecteursEnPlus = []) {
  * Ouvre l'adresse du jeu dans « navigateur », fait les gestes demandés,
  * masque les textes et renvoie la capture (Buffer PNG).
  */
-export async function capturerSansTexte(navigateur, adresse, { largeur = 600, hauteur = 800, clics = [], touches = [], attendre = 1500, cacher = [] } = {}) {
+export async function capturerSansTexte(navigateur, adresse, { largeur = 600, hauteur = 800, clics = [], touches = [], attendre = 1500, cacher = [], fin = false } = {}) {
   const contexte = await navigateur.newContext({ viewport: { width: largeur, height: hauteur }, deviceScaleFactor: 1 });
   try {
     const page = await contexte.newPage();
@@ -111,7 +113,7 @@ export async function capturerSansTexte(navigateur, adresse, { largeur = 600, ha
     for (const s of clics) { await page.click(s, { timeout: 5000 }); await page.waitForTimeout(400); }
     for (const k of touches) { await page.keyboard.press(k); await page.waitForTimeout(300); }
     await page.waitForTimeout(attendre);
-    await page.evaluate(masquerTextes, cacher);
+    await page.evaluate(masquerTextes, { selecteursEnPlus: cacher, fin });
     await page.waitForTimeout(150);
     return await page.screenshot({ type: 'png' });
   } finally {
@@ -195,6 +197,7 @@ async function principal() {
       touches: valeurs('--touche'),
       attendre: Number(valeur('--attendre')) || 1500,
       cacher: valeurs('--cacher'),
+      fin: args.includes('--fin'),
     });
     const image = await convertir(navigateur, png, format, Number(valeur('--qualite')) || 80);
     await writeFile(sortie, image);
