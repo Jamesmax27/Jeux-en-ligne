@@ -156,10 +156,11 @@ function codeDuJeu(html) {
   return html.replace(RE_BLOC_TEXTES, '').replace(RE_BLOC_MODULE, '');
 }
 
-// Clés écrites en toutes lettres dans le code : t('…'), JEL_I18N.t('…'), data-i18n…="…".
+// Clés écrites en toutes lettres dans le code : t('…'), JEL_I18N.t('…'), traduire('…')
+// (alias de t() dans un jeu où « t » est déjà une variable), data-i18n…="…".
 function clesUtilisees(code) {
   const cles = new Set();
-  for (const m of code.matchAll(/(?:^|[^\w$.])(?:JEL_I18N\.)?t\(\s*(['"])([^'"\\]+)\1\s*[,)]/g)) cles.add(m[2]);
+  for (const m of code.matchAll(/(?:^|[^\w$.])(?:JEL_I18N\.t|t|traduire)\(\s*(['"])([^'"\\]+)\1\s*[,)]/g)) cles.add(m[2]);
   for (const m of code.matchAll(/\bdata-i18n(?:-html|-placeholder|-title|-aria)?\s*=\s*(['"])([^'"]+)\1/g)) cles.add(m[2]);
   return cles;
 }
@@ -245,7 +246,7 @@ function ligneDe(code, index) {
 
 function chercherTextesEnDur(id, code, clesFr = new Set()) {
   // Clés construites dans le code, ex. t('pays.' + nom) : « nom » est alors un identifiant, pas un texte.
-  const prefixes = [...new Set([...code.matchAll(/(?:^|[^\w$.])t\(\s*['`"]([\w.-]+\.)['`"]\s*\+/g)].map((m) => m[1]))];
+  const prefixes = [...new Set([...code.matchAll(/(?:^|[^\w$.])(?:t|traduire)\(\s*['`"]([\w.-]+\.)['`"]\s*\+/g)].map((m) => m[1]))];
   const estCle = (texte) => prefixes.some((p) => clesFr.has(p + texte.replace(/\\(.)/g, '$1')));
   const trouves = [];
   const noter = (index, texte, ou) => trouves.push(`ligne ${ligneDe(code, index)} (${ou}) : ${texte.replace(/\s+/g, ' ').trim().slice(0, 70)}`);
@@ -284,8 +285,8 @@ function chercherTextesEnDur(id, code, clesFr = new Set()) {
       if (!MOTS.test(texte) && !/[àâäçéèêëîïôöùûüÿœæ]/i.test(texte)) continue;
       const avant = js.slice(Math.max(0, m.index - 40), m.index);
       const ligne = js.slice(js.lastIndexOf('\n', m.index) + 1, m.index);
-      if (/(?:^|[^\w$])t\(\s*$|JEL_I18N\.\w+\(\s*$/.test(avant)) continue;          // t('…')
-      if (/console\.\w+\(|font\s*=|font:|\.font\b|querySelector|getElementById|addEventListener|createElement|classList|setAttribute\(\s*['"](?:class|style|id|role)/.test(ligne)) continue;
+      if (/(?:^|[^\w$])(?:t|traduire)\(\s*$|JEL_I18N\.\w+\(\s*$/.test(avant)) continue;   // t('…')
+      if (/console\.\w+\(|font\s*=|font:|\.font\b|querySelector|getElementById|matchMedia|addEventListener|createElement|classList|setAttribute\(\s*['"](?:class|style|id|role)/.test(ligne)) continue;
       if (/^\s*[\w.-]+\s*$/.test(texte) || texte === 'use strict' || estCle(m[2])) continue;          // clé ou identifiant
       if (/^[\s\w#.,:;()%+\-*/>=!~[\]"'@-]*$/.test(texte) && !MOTS.test(texte.replace(/[#.][\w-]+/g, ''))) continue;
       if (/\b(?:px|rem|em|vh|vw|rgba?|hsla?|deg|ms)\b|#[0-9a-f]{3,8}\b|^\s*\d/.test(texte) && !/[àâäçéèêëîïôöùûüÿœæ]/i.test(texte)) continue;
