@@ -2,6 +2,7 @@
 
 La boucle automatique prend chaque nuit **la première ligne non cochée** (sauf si une pull request ouverte l'a déjà prise) et crée le jeu. La ligne est cochée automatiquement quand vous fusionnez sa pull request.
 Ajoutez, supprimez ou réordonnez librement les lignes. Format : `- [ ] Titre — principe (genre, âge)`.
+Une ligne en `- [-]` est **mise de côté** : son jeu a échoué 3 fois à la validation automatique, la boucle ne la reprend plus. Pour la retenter, remettez `- [ ]`.
 
 > Liste de départ proposée par Claude : à relire et à modifier selon vos envies.
 

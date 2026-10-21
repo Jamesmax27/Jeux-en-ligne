@@ -1,7 +1,7 @@
 # Consignes pour créer un jeu
 
 Règles obligatoires pour toute IA (ou personne) qui ajoute un jeu au site Jeux-en-ligne.
-Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.mjs` en vérifie la plupart automatiquement.
+Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.mjs` en vérifie une partie automatiquement ; la relecture de la section 7 vérifie le reste avant toute publication.
 
 ## 1. Le public
 
@@ -16,18 +16,21 @@ Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.
 
 Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient obligatoirement :
 
-1. **Au moins 10 niveaux ou vagues**, de difficulté progressive : les premiers se réussissent du premier coup, les derniers demandent de l'entraînement.
-2. **Plusieurs mécaniques qui se combinent** : une nouveauté (obstacle, bonus, règle, ennemi, type de carte…) apparaît tous les 2 ou 3 niveaux, puis se mélange aux précédentes.
-3. **Un tutoriel animé au début** : une courte démonstration montre le geste à faire (main ou flèche animée), en 3 étapes au plus, et se passe d'un toucher. Chaque nouvelle mécanique est présentée de la même façon à sa première apparition.
-4. **Un score et des récompenses** : 1 à 3 étoiles par niveau selon la réussite (ou médailles, objets à collectionner…).
-5. **Un record sauvegardé** (meilleur score, étoiles, niveaux atteints) dans `localStorage`, toujours dans `try { … } catch (e) { … }` : sans stockage, le jeu marche quand même.
-6. **Des sons générés avec Web Audio** (aucun fichier audio) pour les actions, réussites, erreurs et fins de niveau, avec un **bouton pour couper le son**, bien visible, dont le choix est mémorisé. Aucun son avant la première action du joueur.
-7. **Des animations et des effets de réussite** : confettis, étoiles qui s'envolent, compteur qui défile, légère secousse… à chaque réussite et à chaque fin de niveau.
-8. **Un écran de fin avec bilan** : à chaque fin de niveau et en fin de partie, score, étoiles gagnées, record battu ou non, et boutons « Niveau suivant » et « Rejouer ».
+1. **Un écran d'accueil** : le titre en grand, la règle en une ou deux phrases et un gros bouton « Jouer ». Il sert aussi de jaquette (section 5).
+2. **Au moins 10 niveaux ou vagues**, de difficulté progressive : les premiers se réussissent du premier coup, les derniers demandent de l'entraînement.
+3. **Plusieurs mécaniques qui se combinent** : une nouveauté (obstacle, bonus, règle, ennemi, type de carte…) apparaît tous les 2 ou 3 niveaux, puis se mélange aux précédentes.
+4. **Un tutoriel animé au début** : une courte démonstration montre le geste à faire (main ou flèche animée), en 3 étapes au plus, et se passe d'un toucher. Chaque nouvelle mécanique est présentée de la même façon à sa première apparition.
+5. **Pause et Rejouer** : un bouton pause toujours visible pendant la partie (et la touche Échap ou P) fige tout (temps, mouvements, sons) et propose « Reprendre », « Recommencer » et « Accueil ». Le jeu se met aussi en pause tout seul quand l'écran est caché (`visibilitychange`). Même un jeu sans chrono a ce menu.
+6. **Des contrôles tactiles et clavier** : tout se joue au doigt (cibles d'au moins 44 px) et aussi au clavier (flèches, Espace, Entrée) ou à la souris.
+7. **Un score et des récompenses** : 1 à 3 étoiles par niveau selon la réussite (ou médailles, objets à collectionner…).
+8. **Un record sauvegardé** (meilleur score, étoiles, niveaux atteints) dans `localStorage`, toujours dans `try { … } catch (e) { … }` : sans stockage, le jeu marche quand même.
+9. **Des sons générés avec Web Audio** (aucun fichier audio) pour les actions, réussites, erreurs et fins de niveau, avec un **bouton pour couper le son**, bien visible, dont le choix est mémorisé. Aucun son avant la première action du joueur.
+10. **Des animations et des effets de réussite** : confettis, étoiles qui s'envolent, compteur qui défile, légère secousse… à chaque réussite et à chaque fin de niveau.
+11. **Un écran de fin avec bilan** : à chaque fin de niveau et en fin de partie, score, étoiles gagnées, record battu ou non, et boutons « Niveau suivant » et « Rejouer ».
 
 ### Le ressenti
 
-- **Compris en 10 secondes** : un écran d'accueil avec le titre, la règle en une ou deux phrases et un gros bouton « Jouer ».
+- **Compris en 10 secondes**, grâce à l'écran d'accueil et au tutoriel.
 - **Amusant tout de suite**, puis de plus en plus riche.
 - Un retour visuel et sonore à chaque action.
 - Un niveau dure 1 à 2 minutes ; l'enfant peut s'arrêter et reprendre plus tard grâce à la sauvegarde.
@@ -79,4 +82,36 @@ Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient oblig
 node scripts/validate-games.mjs --jouer <id>
 ```
 
-Le robot ouvre le jeu dans un vrai navigateur, le joue 30 secondes au hasard et enregistre des captures d'écran dans `captures/<id>/` : regardez-les. Le résultat doit être « Tout est bon ».
+Le robot ouvre le jeu dans un vrai navigateur, le joue 30 secondes au hasard et enregistre des captures d'écran dans `captures/<id>/` : regardez-les. Le résultat doit être « Tout est bon ». Vérifiez ensuite la grille de la section 7, point par point.
+
+## 7. Grille de validation
+
+Avant d'être publié, chaque jeu de la boucle automatique passe par la validation automatique (`valider-jeu.yml`) : le robot, puis un relecteur Claude qui suit cette grille. **Le jeu n'est publié que si tous les points bloquants sont respectés.** Sinon, l'agent reçoit la liste des points à corriger (2 corrections au plus), puis la proposition est abandonnée.
+
+### Contrôles automatiques (robot)
+
+| Point | Bloquant si… |
+| --- | --- |
+| Chargement | le jeu ne s'ouvre pas dans le lanceur, ou l'écran reste vide |
+| Console | une erreur apparaît au démarrage ou pendant 30 secondes de partie au hasard |
+| Téléphone | une erreur survient pendant la partie au toucher, sur un écran de 390 × 844 |
+| Hors ligne | le jeu tente un appel réseau, ou ne marche pas avec le navigateur coupé du réseau |
+| Fichiers | `game.json` incomplet ou invalide, jaquette absente ou trop lourde, `index.html` de plus de 2 Mo, fichier en trop |
+
+### Relecture (Claude)
+
+Points bloquants, vérifiés dans le code et sur les captures d'écran du robot :
+
+1. **Accueil** : titre, règle en une ou deux phrases, gros bouton « Jouer ».
+2. **Tutoriel** : démonstration animée du geste au début, et à l'arrivée de chaque nouvelle mécanique.
+3. **Pause et Rejouer** : bouton pause visible (et touche Échap ou P) qui fige vraiment le jeu ; « Rejouer » en fin de niveau et en fin de partie.
+4. **Progression** : au moins 10 niveaux ou vagues, et la difficulté augmente réellement d'après le code.
+5. **Mécaniques** : plusieurs mécaniques qui apparaissent au fil des niveaux et se combinent.
+6. **Récompenses et record** : score, étoiles (ou équivalent), meilleur score ou progression sauvegardés dans `localStorage` à l'intérieur de `try { … } catch (e) { … }`.
+7. **Contrôles** : jouable entièrement au doigt, et au clavier ou à la souris ; cibles tactiles d'au moins 44 px.
+8. **Son** : sons Web Audio, bouton pour couper le son visible et mémorisé, aucun son avant la première action.
+9. **Effets et bilan** : effets de réussite ; écran de bilan avec score, étoiles, record, « Niveau suivant » et « Rejouer ».
+10. **Écran de téléphone** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page.
+11. **Contenu** : adapté aux enfants, en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
+
+Conseils (non bloquants, notés dans la relecture) : amusant dès la première minute, variété d'un niveau à l'autre, de quoi jouer 15 minutes.

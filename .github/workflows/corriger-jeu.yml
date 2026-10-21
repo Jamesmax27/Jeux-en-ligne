@@ -1,7 +1,8 @@
 # ==========================================================================
 # Correction d'un jeu proposé : un commentaire contenant « @claude » dans
 # une pull request (auteur : Jamesmax27) demande à l'agent de modifier le
-# jeu de cette pull request.
+# jeu de cette pull request. La validation automatique (valider-jeu.yml)
+# envoie aussi ses demandes ici (lancement direct : pr + demande).
 #
 #  1. Vérifications : pull request ouverte, venant de ce dépôt, qui ne
 #     concerne qu'un seul jeu (games/<id>/).
@@ -10,6 +11,9 @@
 #  4. Jaquette automatique refaite + contrôle final dans un vrai navigateur.
 #  5. Si tout passe : correction poussée sur la branche de la pull request.
 #     Dans tous les cas : réponse en commentaire.
+#  6. Pull request de la boucle (nouveau-jeu/…) : la validation automatique
+#     est relancée après une correction ajoutée et, pour une demande de la
+#     validation, même sans correction (l'essai compte).
 # ==========================================================================
 
 name: Corriger un jeu
@@ -17,13 +21,22 @@ name: Corriger un jeu
 on:
   issue_comment:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Numéro de la pull request"
+        required: true
+      demande:
+        description: "Corrections demandées (envoyées par la validation automatique)"
+        required: true
 
 jobs:
   preparer:
     if: >-
+      github.event_name == 'workflow_dispatch' || (
       github.event.issue.pull_request &&
       github.event.comment.user.login == 'Jamesmax27' &&
-      contains(github.event.comment.body, '@claude')
+      contains(github.event.comment.body, '@claude'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -37,10 +50,11 @@ jobs:
       publie: ${{ steps.pr.outputs.publie }}
     env:
       GH_TOKEN: ${{ github.token }}
-      NUMERO: ${{ github.event.issue.number }}
+      NUMERO: ${{ inputs.pr || github.event.issue.number }}
 
     steps:
       - name: Accuser réception (👀 sur le commentaire)
+        if: github.event_name == 'issue_comment'
         run: gh api -X POST "repos/$GITHUB_REPOSITORY/issues/comments/${{ github.event.comment.id }}/reactions" -f content=eyes > /dev/null
 
       - name: Lire la pull request
@@ -69,19 +83,20 @@ jobs:
     needs: preparer
     if: needs.preparer.outputs.ok == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     # Une correction à la fois par pull request.
     concurrency:
-      group: corriger-jeu-${{ github.event.issue.number }}
+      group: corriger-jeu-${{ inputs.pr || github.event.issue.number }}
       cancel-in-progress: false
     permissions:
       contents: write
       pull-requests: write
       issues: write
+      actions: write       # relancer valider-jeu.yml
       id-token: write
     env:
       GH_TOKEN: ${{ github.token }}
-      NUMERO: ${{ github.event.issue.number }}
+      NUMERO: ${{ inputs.pr || github.event.issue.number }}
       ID: ${{ needs.preparer.outputs.id }}
       BRANCHE: ${{ needs.preparer.outputs.branche }}
 
@@ -109,15 +124,15 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: true
           claude_args: |
-            --max-turns 60
+            --max-turns 100
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*)"
           prompt: |
-            Tu es le développeur de jeux du site Jeux-en-ligne. Le propriétaire demande une correction
-            du jeu games/${{ needs.preparer.outputs.id }}/ (pull request #${{ github.event.issue.number }}).
+            Tu es le développeur de jeux du site Jeux-en-ligne. ${{ github.event_name == 'workflow_dispatch' && 'La validation automatique' || 'Le propriétaire' }} demande une correction
+            du jeu games/${{ needs.preparer.outputs.id }}/ (pull request #${{ inputs.pr || github.event.issue.number }}).
 
-            Sa demande :
+            La demande :
             <<<
-            ${{ github.event.comment.body }}
+            ${{ inputs.demande || github.event.comment.body }}
             >>>
 
             1. Lis CLAUDE.md, puis CONSIGNES-JEU.md (règles obligatoires), puis
@@ -129,6 +144,9 @@ jobs:
                Sinon, ne change pas "version".
             4. Lance : node scripts/validate-games.mjs --browser ${{ needs.preparer.outputs.id }}
                Corrige toutes les erreurs et relance jusqu'à « Tout est bon ». 3 tentatives de correction au maximum.
+               Pour voir le jeu sur téléphone : node scripts/validate-games.mjs --jouer ${{ needs.preparer.outputs.id }}
+               (captures dans captures/${{ needs.preparer.outputs.id }}/, à regarder avec Read).
+               Avant de terminer, vérifie que le jeu respecte toujours la grille de validation (CONSIGNES-JEU.md, section 7).
             5. Écris dans resume-correction.md (à la racine du dépôt) un résumé en français pour le propriétaire :
                3 à 6 puces courtes sur ce qui a changé, puis ce qu'il faut vérifier en jouant.
 
@@ -178,6 +196,7 @@ jobs:
         env:
           MODIFIE: ${{ steps.garde.outputs.modifie }}
           VALIDE: ${{ steps.controle.outputs.valide }}
+          RELANCE: ${{ startsWith(needs.preparer.outputs.branche, 'nouveau-jeu/') && (github.event_name == 'workflow_dispatch' || steps.controle.outputs.valide == 'true') }}
         run: |
           {
             if [ "$MODIFIE" != "true" ]; then
@@ -186,6 +205,10 @@ jobs:
               echo "✅ Correction ajoutée à la pull request. L'aperçu Cloudflare se met à jour dans quelques minutes."
             else
               echo "⚠️ Correction **non ajoutée** : le contrôle qualité échoue encore (rapport ci-dessous). Précise ta demande, ou corrige à la main."
+            fi
+            if [ "$RELANCE" = "true" ]; then
+              echo
+              echo "🔁 La validation automatique est relancée."
             fi
             echo
             if [ -s "$RUNNER_TEMP/resume.md" ]; then cat "$RUNNER_TEMP/resume.md"; else echo "_(pas de résumé de l'agent)_"; fi
@@ -201,9 +224,18 @@ jobs:
           } > "$RUNNER_TEMP/reponse.md"
           gh pr comment "$NUMERO" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/reponse.md"
 
+      # Pull request de la boucle : la validation reprend après une correction ajoutée ;
+      # pour une demande de la validation, même sans correction (l'essai est compté).
+      - name: Relancer la validation automatique
+        if: >-
+          startsWith(needs.preparer.outputs.branche, 'nouveau-jeu/') &&
+          (github.event_name == 'workflow_dispatch' || steps.controle.outputs.valide == 'true')
+        run: gh workflow run valider-jeu.yml --repo "$GITHUB_REPOSITORY" --ref main -f pr="$NUMERO"
+
       - name: Signaler un échec
         if: failure()
         run: >-
           gh pr comment "$NUMERO" --repo "$GITHUB_REPOSITORY" --body
           "❌ La correction a échoué ou a été bloquée par le garde-fou : rien n'a été ajouté à la pull request.
+          Pour reprendre la validation automatique : onglet Actions → « Valider un jeu » → numéro $NUMERO.
           Détails : $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

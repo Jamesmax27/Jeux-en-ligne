@@ -5,7 +5,8 @@
 //   node scripts/validate-games.mjs                 contrôle tous les jeux
 //   node scripts/validate-games.mjs mon-jeu autre   contrôle seulement ceux-là
 //   … --browser   lance aussi chaque jeu dans un vrai navigateur (Playwright),
-//                 dans les mêmes conditions que sur le site (cadre isolé)
+//                 dans les mêmes conditions que sur le site (cadre isolé),
+//                 au toucher sur téléphone, puis une 2e fois coupé du réseau
 //   … --covers    fabrique cover.jpg par capture d'écran si la jaquette manque
 //   … --jouer     (implique --browser) joue en plus 30 secondes au hasard sur
 //                 téléphone et enregistre des captures d'écran dans captures/<id>/
@@ -138,6 +139,20 @@ async function attendreServeur(url, essais = 50) {
   throw new Error('le serveur de test ne démarre pas');
 }
 
+// Le jeu affiche-t-il quelque chose (texte ou dessin) ?
+async function ecranVisible(cadre) {
+  return cadre.evaluate(() => {
+    const b = document.body;
+    if (!b) return false;
+    const texte = b.innerText.trim().length > 0;
+    const dessin = [...document.querySelectorAll('canvas, svg, img')].some((e) => e.getBoundingClientRect().width > 20);
+    return texte || dessin;
+  }).catch(() => false);
+}
+
+// Requêtes réseau (http, https, ws) : seules celles vers le site de test sont permises.
+function estReseau(url) { return /^(?:https?|wss?):/i.test(url); }
+
 async function testerNavigateur(ids) {
   let playwright;
   try { playwright = await import('playwright'); }
@@ -173,6 +188,9 @@ async function testerNavigateur(ids) {
         if (/Content Security Policy/i.test(t)) problemes.push(`ressource bloquée : ${t.slice(0, 160)}`);
         else problemes.push(`erreur console : ${t.slice(0, 160)}`);
       });
+      page.on('request', (r) => {
+        if (estReseau(r.url()) && !r.url().startsWith(`${base}/`)) problemes.push(`appel réseau externe interdit : ${r.url().slice(0, 120)}`);
+      });
 
       await page.goto(`${base}/play.html?id=${id}`);
       await page.waitForTimeout(2500);
@@ -181,21 +199,14 @@ async function testerNavigateur(ids) {
       if (!cadre) {
         erreur(id, 'le jeu ne se charge pas dans le lanceur');
       } else {
-        const visible = await cadre.evaluate(() => {
-          const b = document.body;
-          if (!b) return false;
-          const texte = b.innerText.trim().length > 0;
-          const dessin = [...document.querySelectorAll('canvas, svg, img')].some((e) => e.getBoundingClientRect().width > 20);
-          return texte || dessin;
-        }).catch(() => false);
-        if (!visible) erreur(id, 'écran vide au démarrage');
+        if (!(await ecranVisible(cadre))) erreur(id, 'écran vide au démarrage');
 
         // Un toucher au centre puis un peu de jeu, pour détecter les erreurs au lancement.
         const boite = await page.locator('#cadre-jeu').boundingBox();
         if (boite) {
-          await page.mouse.click(boite.x + boite.width / 2, boite.y + boite.height / 2);
+          await page.touchscreen.tap(boite.x + boite.width / 2, boite.y + boite.height / 2);
           await page.waitForTimeout(400);
-          await page.mouse.click(boite.x + boite.width / 2, boite.y + boite.height * 0.7);
+          await page.touchscreen.tap(boite.x + boite.width / 2, boite.y + boite.height * 0.7);
           await page.keyboard.press('Space');
           await page.keyboard.press('ArrowRight');
           await page.waitForTimeout(1500);
@@ -206,6 +217,7 @@ async function testerNavigateur(ids) {
       for (const p of [...new Set(problemes)].slice(0, 5)) erreur(id, p);
       await contexte.close();
 
+      await testerHorsLigne(navigateur, id);
       if (avecPartie) await jouerPartie(navigateur, base, id);
 
       // Jaquette automatique (capture du jeu au démarrage, format portrait 600 × 800).
@@ -224,6 +236,33 @@ async function testerNavigateur(ids) {
     await navigateur.close();
     serveur.kill();
   }
+}
+
+// Hors ligne : le jeu seul (sans le site autour), navigateur coupé du réseau.
+// Il doit s'afficher et réagir sans erreur, sans tenter le moindre appel réseau.
+async function testerHorsLigne(navigateur, id) {
+  const html = await readFile(path.join(DOSSIER_JEUX, id, 'index.html'), 'utf8');
+  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, offline: true });
+  const page = await contexte.newPage();
+  const problemes = [];
+  page.on('pageerror', (e) => problemes.push(`hors ligne : erreur JavaScript : ${e.message}`));
+  page.on('console', (m) => { if (m.type() === 'error') problemes.push(`hors ligne : erreur console : ${m.text().slice(0, 160)}`); });
+  page.on('request', (r) => { if (estReseau(r.url())) problemes.push(`hors ligne : appel réseau interdit : ${r.url().slice(0, 120)}`); });
+
+  try {
+    await page.setContent(html, { waitUntil: 'load', timeout: 15000 });
+    await page.waitForTimeout(1500);
+    if (!(await ecranVisible(page.mainFrame()))) problemes.push('hors ligne : écran vide au démarrage');
+    await page.touchscreen.tap(195, 422);
+    await page.waitForTimeout(400);
+    await page.touchscreen.tap(195, 590);
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(1000);
+  } catch (e) {
+    problemes.push(`hors ligne : le jeu ne se charge pas (${e.message.split('\n')[0]})`);
+  }
+  for (const p of [...new Set(problemes)].slice(0, 3)) erreur(id, p);
+  await contexte.close();
 }
 
 // --------------------------------------------------------------------------

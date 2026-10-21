@@ -9,7 +9,9 @@ Chaque nuit, GitHub lance la boucle suivante pour **2 jeux**, l'un après l'autr
 3. **Un garde-fou** vérifie qu'il n'a touché qu'au dossier du nouveau jeu. Sinon, tout s'arrête.
 4. **Le robot refait un contrôle final** dans un vrai navigateur et fabrique la jaquette.
 5. **Une pull request** s'ouvre : c'est une proposition, rien n'est encore en ligne.
-6. **Vous jouez à l'aperçu** Cloudflare, puis vous cliquez « Merge ». Le jeu est alors publié, et son idée est cochée dans `IDEES-JEUX.md`.
+6. **La validation automatique** commence : le robot rejoue le jeu (téléphone, toucher, hors ligne…), puis Claude le relit avec la grille de `CONSIGNES-JEU.md` (section 7). Un commentaire résume le résultat dans la pull request.
+7. **Tout est bon** : la pull request est fusionnée toute seule. Le jeu est en ligne quelques minutes plus tard, et son idée est cochée dans `IDEES-JEUX.md`.
+   **Sinon** : étiquette `a-corriger`. L'agent corrige le jeu d'après le commentaire, puis la validation recommence (2 corrections au plus). Au 3e échec, la pull request est fermée et l'idée est mise de côté (`- [-]` dans `IDEES-JEUX.md`) : la boucle ne la reprend plus.
 
 ---
 
@@ -81,12 +83,27 @@ Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un 
 
 ---
 
-## Au quotidien : valider un jeu (5 minutes)
+## Au quotidien : suivre les jeux (2 minutes)
 
-1. Ouvrez la pull request du jour.
-2. Lisez le **cahier de conception** en haut de la pull request (et sa section « Relecture »), puis cliquez sur le lien d'**aperçu Cloudflare** (une adresse en `.pages.dev` propre à la proposition) et jouez quelques niveaux sur votre téléphone.
-3. Le jeu vous plaît : **Merge pull request** → **Confirm merge**. Il est en ligne quelques minutes plus tard.
-4. Le jeu ne vous plaît pas : **Close pull request**. Rien n'est publié et l'idée reste non cochée : elle sera retentée au prochain lancement. Pour l'abandonner, supprimez sa ligne dans `IDEES-JEUX.md`.
+La validation automatique fusionne seule les jeux qui passent. Ouvrez l'onglet **Pull requests** :
+
+1. **Jeux fusionnés** (filtre « Closed », pastille violette) : ils sont en ligne. Le commentaire de validation donne la grille point par point et quelques conseils. Jouez-y sur le site.
+2. **Étiquette `a-corriger`** : une correction est en cours, rien à faire. La validation recommence toute seule ensuite.
+3. **Pull request fermée par le robot** (3 échecs) : rien n'est publié et l'idée est mise de côté. Pour la retenter, remplacez `- [-]` par `- [ ]` devant sa ligne dans `IDEES-JEUX.md`.
+4. **Commentaire « ⚠️ Validation automatique interrompue »** (limite d'utilisation de l'abonnement, panne…) : rien n'est décidé. Relancez-la : onglet **Actions** → **Valider un jeu** → **Run workflow** → numéro de la pull request.
+
+Vous pouvez toujours intervenir avant la fin de la validation : jouer à l'aperçu Cloudflare (lien dans les vérifications de la pull request), fusionner ou fermer vous-même, ou demander une correction avec `@claude`.
+
+## Fusion automatique : la couper ou la remettre
+
+Elle est **active** par défaut. Pour revenir à une fusion manuelle :
+
+1. Sur github.com, dépôt → **Settings** → **Secrets and variables** → **Actions** → onglet **Variables**.
+2. **New repository variable** : nom `FUSION_AUTO`, valeur `non`, puis **Add variable**.
+
+La validation continue (commentaire, corrections, fermeture au 3e échec), mais c'est vous qui cliquez « Merge » sur les jeux validés. Pour la remettre : supprimez la variable.
+
+Si une règle de protection de `main` exige une relecture humaine, la fusion par le robot échoue (commentaire « erreur technique ») : retirez cette règle ou coupez la fusion automatique.
 
 ## Proposer une idée depuis mon téléphone
 
@@ -124,6 +141,7 @@ Bon à savoir :
 - Claude ne peut modifier que le dossier du jeu de la pull request. La jaquette automatique est refaite ; une jaquette faite à la main est gardée.
 - Si le contrôle qualité échoue encore après 3 essais, rien n'est ajouté : la réponse donne le rapport.
 - Une demande à la fois par pull request : la suivante attend la fin de la précédente.
+- Sur une pull request de la boucle, la validation automatique est relancée après votre correction : si tout passe, le jeu est fusionné tout seul. Si elle échoue, cela compte parmi les 3 essais.
 - Comme la boucle de nuit, chaque correction consomme votre abonnement Claude.
 
 ## Commandes utiles
@@ -134,6 +152,9 @@ Bon à savoir :
 | Faire corriger un jeu proposé | Commentaire « @claude … » dans sa pull request |
 | Créer plusieurs jeux d'un coup | Actions → Nouveau jeu → Run workflow → « Nombre de jeux » (1 à 5) |
 | Imposer une idée précise | Actions → Nouveau jeu → Run workflow → remplir le champ « Idée imposée » (pour le 1er jeu) |
+| Relancer la validation d'une pull request | Actions → Valider un jeu → Run workflow → numéro de la pull request |
+| Couper la fusion automatique | Variable `FUSION_AUTO` = `non` (voir plus haut) |
+| Retenter une idée mise de côté | Dans `IDEES-JEUX.md`, remplacer `- [-]` par `- [ ]` devant sa ligne |
 | Changer l'ordre des idées | Modifier `IDEES-JEUX.md`, puis Commit + Push |
 | Mettre la boucle en pause | Actions → Nouveau jeu → menu « … » → **Disable workflow** |
 | Comprendre un échec | Actions → cliquer sur le passage en rouge → lire l'étape en échec |
@@ -144,9 +165,10 @@ Bon à savoir :
 
 - **Coûts** : la boucle consomme votre abonnement Claude, comme une conversation, et des minutes GitHub Actions, gratuites dans la limite du quota mensuel de votre compte. Avec 2 jeux par nuit sur le modèle le plus performant, la consommation est réelle : surveillez la première semaine (votre abonnement Claude, et GitHub, menu Settings → Billing).
 - **Modèle et durée** : la boucle utilise le modèle Claude le plus performant (`claude-fable-5-1`) et jusqu'à 150 tours. Un jeu prend 30 à 90 minutes et consomme nettement plus qu'avant. Si votre abonnement n'a pas accès à ce modèle, ou si la limite d'utilisation est atteinte trop vite, remplacez `claude-fable-5-1` par `claude-opus-5-5` dans `nouveau-jeu.yml`.
-- **Plusieurs jeux d'un coup** : les jeux sont créés l'un après l'autre (un seul agent à la fois), 30 à 90 minutes chacun. Si l'un échoue, par exemple parce que la limite d'utilisation de l'abonnement est atteinte, les suivants sont quand même tentés ; ceux déjà terminés gardent leur pull request.
+- **Plusieurs jeux d'un coup** : les jeux sont créés l'un après l'autre (un seul agent créateur à la fois), 30 à 90 minutes chacun. Si l'un échoue, par exemple parce que la limite d'utilisation de l'abonnement est atteinte, les suivants sont quand même tentés ; ceux déjà terminés gardent leur pull request.
+- **Validation et consommation** : chaque jeu est relu 1 à 3 fois par Claude et corrigé jusqu'à 2 fois, ce qui s'ajoute à sa création. La validation du jeu n°1 commence dès sa pull request ouverte, pendant la création du jeu n°2 : deux agents peuvent donc tourner en même temps.
 - **Liste d'idées sans conflit** : les pull requests de jeux ne modifient jamais `IDEES-JEUX.md`. Chaque jeu note son idée dans son `game.json` (champ `idee`), et la ligne est cochée sur `main` au moment de la fusion. Vous pouvez donc modifier la liste à tout moment, même avec des pull requests ouvertes.
 - **Heure** : la boucle démarre à 01:23 UTC, soit vers 3 h du matin à Paris, et peut durer jusqu'à 4 heures avec 2 jeux. L'heure se règle à la ligne `cron` de `nouveau-jeu.yml`, le nombre de jeux de la nuit à la ligne `NOMBRE`.
-- **Sécurité** : l'agent ne peut que lire, écrire des fichiers et lancer le robot de contrôle. Il ne peut ni publier, ni toucher aux autres jeux ou au site.
+- **Sécurité** : l'agent créateur ne peut que lire, écrire des fichiers et lancer le robot de contrôle. Il ne peut ni publier, ni toucher aux autres jeux ou au site. Le relecteur ne peut que lire et écrire son verdict. Seule la validation automatique fusionne, et seulement une pull request de la boucle qui ajoute un seul nouveau jeu sans toucher au reste du dépôt.
 - **Jeton** : il expire au bout d'un an. Refaites alors les étapes 3 et 4.
-- **Étapes suivantes du plan** : des agents spécialisés (idées, testeur, relecteur), une fois la qualité des premiers jeux vérifiée.
+- **Étapes suivantes du plan** : des agents spécialisés (idées, testeur), une fois la qualité des premiers jeux vérifiée.

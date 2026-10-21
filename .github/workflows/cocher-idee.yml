@@ -8,7 +8,11 @@
 #  - La ligne correspondante devient « - [x] … → <id> ».
 #  - Idée inventée ou imposée (absente de la liste) : ajoutée cochée à la
 #    fin, d'après le game.json du jeu.
-#  - Pull request fermée sans fusion : rien ne change, l'idée sera retentée.
+#  - Pull request fermée sans fusion : rien ne change, l'idée sera retentée
+#    (sauf fermeture par la validation automatique : elle met l'idée de côté).
+#  - Fusion faite par la validation automatique (valider-jeu.yml) : GitHub ne
+#    déclenche pas « closed » pour une fusion du robot, qui lance donc ce
+#    workflow directement avec le numéro de la pull request.
 # ==========================================================================
 
 name: Cocher l'idée
@@ -17,6 +21,11 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Numéro de la pull request fusionnée"
+        required: true
 
 concurrency:
   group: cocher-idee
@@ -24,7 +33,9 @@ concurrency:
 
 jobs:
   cocher:
-    if: github.event.pull_request.merged && startsWith(github.event.pull_request.head.ref, 'nouveau-jeu/')
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged && startsWith(github.event.pull_request.head.ref, 'nouveau-jeu/'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -39,10 +50,14 @@ jobs:
 
       - name: Cocher l'idée et enregistrer
         uses: actions/github-script@v7
+        env:
+          PR: ${{ inputs.pr }}
         with:
           script: |
             const fs = require('fs');
-            const pr = context.payload.pull_request;
+            const pr = context.payload.pull_request
+              || (await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PR) })).data;
+            if (!pr.merged || !pr.head.ref.startsWith('nouveau-jeu/')) return core.warning(`PR #${pr.number} : pas une pull request de la boucle fusionnée, rien à cocher.`);
             const FICHIER = 'IDEES-JEUX.md';
 
             // Le jeu de la pull request : son dossier games/<id>/.
