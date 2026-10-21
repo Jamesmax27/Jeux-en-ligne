@@ -14,11 +14,18 @@
 //   tuile compte ses jeux. Un regroupement encore vide est grisé (« Bientôt »).
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
 // - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
+// - Textes en 5 langues (langue.js, i18n/site/*.json). Le titre traduit du jeu
+//   est affiché en bandeau sur sa jaquette (les jaquettes n'ont aucun texte).
+//   Changer de langue ne change ni le tri, ni les votes, ni les filtres.
 // ==========================================================================
 
 import { votesEnAttente, envoyerEnAttente, mesVotes } from './votes.js';
 import { activerHorsLigne, jeuxHorsLigne } from './hors-ligne.js';
 import { GENRES_AFFICHAGE, UNIVERS, TRANCHES_AGE } from './regroupements.js';
+import {
+  t, getLang, demarrerLangue, surChangementLangue, majSeo,
+  nomGenre, nomTag, titreJeu, descriptionJeu, jeuDisponible, jeuEnFrancais,
+} from './langue.js';
 
 const NOUVEAU_JOURS = 7;          // un jeu est « nouveau » pendant 7 jours
 const NOUVEAUX_EN_TETE = 2;       // nouveautés intercalées en haut du tri « Mieux notés »
@@ -27,16 +34,17 @@ const ARCHIVE_SCORE_MAX = 0.2;    // … et un score inférieur à 0,2 (votes du
 const PAYS_VOTES_MIN = 20;        // sous 20 votes dans mon pays, classement Monde
 const DELAI_SCORES = 4000;        // au-delà, on affiche sans attendre l'API
 
-// Raccourcis du haut : des « collections » propres à l'appareil.
+// Raccourcis du haut : des « collections » propres à l'appareil (noms : clés de traduction).
 const COLLECTIONS = {
-  aimes: { nom: "J'ai aimé", picto: '👍', teinte: 230, vide: 'Vote 👍 en jouant' },
-  'hors-ligne': { nom: 'Hors ligne', picto: '📶', teinte: 200, vide: 'Ouvre un jeu une fois' },
+  aimes: { nom: 'collection.aimes', picto: '👍', teinte: 230, vide: 'collection.aimesVide' },
+  'hors-ligne': { nom: 'collection.horsLigne', picto: '📶', teinte: 200, vide: 'collection.horsLigneVide' },
 };
 
 const SANS_VOTE = { up: 0, down: 0, score: 0, semaine: 0 };
 
 const etat = {
-  jeux: [],
+  tous: [],               // tout le catalogue (catalog.json)
+  jeux: [],               // jeux proposés dans la langue courante
   genres: [],             // ordre des genres (catalog.json)
   scoresMonde: null,      // { gameId: { up, down, score, semaine } } ; null = API indisponible
   scoresPays: undefined,  // idem pour mon pays : undefined = pas chargé, null = indisponible
@@ -51,6 +59,7 @@ const etat = {
   univers: null,          // univers sélectionné (UNIVERS), ou null
   etiquette: null,        // autre thème (tag hors univers), ou null
   texte: '',              // recherche
+  erreur: false,          // le catalogue n'a pas pu être chargé
 };
 
 const el = {
@@ -75,6 +84,7 @@ const el = {
   univers: document.getElementById('univers'),
   autresThemes: document.getElementById('autres-themes'),
   toutVoir: document.querySelectorAll('.tout-voir'),
+  langue: document.getElementById('langue'),
 };
 
 // --- Outils ----------------------------------------------------------------
@@ -97,18 +107,17 @@ function estNouveau(jeu) {
   return joursDepuis(jeu.added) < NOUVEAU_JOURS;
 }
 
-function majuscule(mot) {
-  return mot.charAt(0).toUpperCase() + mot.slice(1);
-}
-
-// « FR » → « France » (nom du pays en français).
+// « FR » → « France » (nom du pays dans la langue du site).
 function nomPays(code) {
   try {
-    return new Intl.DisplayNames(['fr'], { type: 'region' }).of(code) || code;
+    return new Intl.DisplayNames([getLang()], { type: 'region' }).of(code) || code;
   } catch {
     return code;
   }
 }
+
+const nomUnivers = (u) => t(`univers.${u.id}`);
+const nomAge = (tranche) => t(`age.${tranche.id}`);
 
 // Jeux que j'ai notés 👍 sur cet appareil.
 function jeuxAimes() {
@@ -144,6 +153,7 @@ function estArchive(jeu) {
 
 // --- Tri ---------------------------------------------------------------------
 
+// Départage final par le titre français : le même ordre dans toutes les langues.
 function parDate(a, b) {
   return String(b.added).localeCompare(String(a.added)) || a.title.localeCompare(b.title, 'fr');
 }
@@ -231,6 +241,7 @@ function jeuxVisibles() {
 
 function creerCarte(jeu, scores) {
   const li = document.createElement('li');
+  const titreAffiche = titreJeu(jeu);
 
   const lien = document.createElement('a');
   lien.className = 'carte';
@@ -249,10 +260,17 @@ function creerCarte(jeu, scores) {
   img.addEventListener('error', () => { img.src = 'assets/sans-jaquette.svg'; }, { once: true });
   jaquette.append(img);
 
+  // Titre traduit, en bandeau sur le bas de la jaquette (elle ne contient aucun texte).
+  const titre = document.createElement('h2');
+  titre.className = 'carte-titre';
+  titre.lang = getLang();
+  titre.textContent = titreAffiche;
+  jaquette.append(titre);
+
   if (estNouveau(jeu)) {
     const badge = document.createElement('span');
     badge.className = 'badge-nouveau';
-    badge.textContent = 'Nouveau';
+    badge.textContent = t('carte.nouveau');
     jaquette.append(badge);
   }
 
@@ -260,22 +278,20 @@ function creerCarte(jeu, scores) {
   if (horsLigne) {
     const badge = document.createElement('span');
     badge.className = 'badge-hors-ligne';
-    badge.textContent = 'Disponible hors ligne';
+    badge.textContent = t('carte.horsLigne');
     jaquette.append(badge);
   }
 
   const texte = document.createElement('div');
   texte.className = 'carte-texte';
 
-  const titre = document.createElement('h2');
-  titre.className = 'carte-titre';
-  titre.textContent = jeu.title;
-
   const infos = document.createElement('p');
   infos.className = 'carte-infos';
   const themes = [jeu.genre, ...jeu.tags.filter((t) => t !== jeu.genre)].filter(Boolean).slice(0, 2);
-  infos.textContent = [themes.map(majuscule).join(' · '), jeu.ages].filter(Boolean).join(' — ');
-  texte.append(titre, infos);
+  const enFrancais = jeuEnFrancais(jeu) ? `(${t('carte.enFrancais')})` : '';
+  infos.textContent = [themes.map((m, i) => (i === 0 && m === jeu.genre ? nomGenre(m) : nomTag(m))).join(' · '), jeu.ages, enFrancais]
+    .filter(Boolean).join(' — ');
+  texte.append(infos);
 
   // Compteurs de pouces, seulement quand l'API répond (jamais hors connexion).
   // Le pouce lui-même est dessiné par style.css (.pouce-haut, .pouce-bas).
@@ -292,11 +308,11 @@ function creerCarte(jeu, scores) {
     bas.textContent = String(down);
     pouces.append(haut, bas);
     texte.append(pouces);
-    votes = `${up} j'aime, ${down} je n'aime pas.`;
+    votes = t('carte.votesAria', { up, down });
   }
 
   lien.append(jaquette, texte);
-  lien.setAttribute('aria-label', [`${jeu.title}.`, jeu.description, votes, horsLigne && '(disponible hors ligne)'].filter(Boolean).join(' '));
+  lien.setAttribute('aria-label', [`${titreAffiche}.`, descriptionJeu(jeu), enFrancais, votes, horsLigne && t('carte.horsLigneAria')].filter(Boolean).join(' '));
   li.append(lien);
   return li;
 }
@@ -309,9 +325,11 @@ function afficherGrille() {
   el.archives.hidden = archives.length === 0;
 
   const total = liste.length + archives.length;
-  el.titre.textContent = filtreActif() ? 'Jeux trouvés' : 'Tous les jeux';
+  el.titre.textContent = filtreActif() ? t('resultats.trouves') : t('resultats.tous');
   el.compte.textContent = `· ${nombreDeJeux(total)}`;
   el.vide.hidden = total > 0;
+  el.videTitre.textContent = t('vide.titre');
+  el.videTexte.textContent = t('vide.texte');
 }
 
 // Menu de tri : sans API, seules les « Nouveautés » restent possibles.
@@ -331,15 +349,13 @@ function afficherPortee() {
 function afficherNote() {
   let note = '';
   if (!etat.scoresMonde) {
-    note = navigator.onLine === false
-      ? 'Hors connexion : jeux du plus récent au plus ancien, sans les votes.'
-      : 'Votes indisponibles pour le moment : jeux du plus récent au plus ancien.';
+    note = navigator.onLine === false ? t('note.horsConnexion') : t('note.votesIndisponibles');
   } else if (etat.portee === 'pays' && etat.pays) {
     const pays = nomPays(etat.pays);
-    if (etat.scoresPays === undefined) note = `Chargement des votes de ton pays (${pays})…`;
-    else if (etat.scoresPays === null) note = 'Votes de ton pays indisponibles : classement Monde affiché.';
-    else if (!paysRetenu()) note = `Moins de ${PAYS_VOTES_MIN} votes dans ton pays (${pays}) pour l'instant : classement Monde affiché.`;
-    else note = `Votes de ton pays uniquement (${pays}).`;
+    if (etat.scoresPays === undefined) note = t('note.chargementPays', { pays });
+    else if (etat.scoresPays === null) note = t('note.paysIndisponible');
+    else if (!paysRetenu()) note = t('note.paysPeuDeVotes', { min: PAYS_VOTES_MIN, pays });
+    else note = t('note.paysSeul', { pays });
   }
   el.note.textContent = note;
   el.note.hidden = !note;
@@ -352,14 +368,14 @@ function afficher() {
   rafraichir();
 }
 
-// « 0 jeu », « 1 jeu », « 2 jeux »
+// « 0 jeu », « 1 jeu », « 2 jeux » (pluriels selon la langue)
 function nombreDeJeux(n) {
-  return n <= 1 ? `${n} jeu` : `${n} jeux`;
+  return t('nombre.jeux', { n });
 }
 
 // Tuile d'un regroupement. compte : jeux avec les autres filtres choisis ;
 // total : jeux du catalogue entier (0 = regroupement encore vide, grisé).
-function creerTuile({ cle, picto, nom, teinte, actif, compte, total, vide = 'Bientôt', aide, action }) {
+function creerTuile({ cle, picto, nom, teinte, actif, compte, total, vide = t('tuile.bientot'), aide, action }) {
   const b = document.createElement('button');
   b.type = 'button';
   b.className = 'tuile';
@@ -373,6 +389,7 @@ function creerTuile({ cle, picto, nom, teinte, actif, compte, total, vide = 'Bie
 
   const titre = document.createElement('span');
   titre.className = 'tuile-nom';
+  titre.lang = getLang();
   titre.textContent = nom;
 
   const sous = document.createElement('span');
@@ -384,11 +401,11 @@ function creerTuile({ cle, picto, nom, teinte, actif, compte, total, vide = 'Bie
     b.disabled = true;
     b.classList.add('tuile-bientot');
     sous.textContent = vide;
-    b.setAttribute('aria-label', `${nom} : ${vide.toLowerCase()}`);
+    b.setAttribute('aria-label', t('tuile.aria', { nom, etat: vide.toLocaleLowerCase(getLang()) }));
   } else if (compte !== undefined) {
     sous.textContent = nombreDeJeux(compte);
     if (compte === 0 && !actif) b.classList.add('tuile-zero');
-    b.setAttribute('aria-label', `${aide || nom} : ${nombreDeJeux(compte)}`);
+    b.setAttribute('aria-label', t('tuile.aria', { nom: aide || nom, etat: nombreDeJeux(compte) }));
   } else {
     sous.textContent = aide;
   }
@@ -470,11 +487,11 @@ function afficherRegroupements() {
   const collections = compter('collection', (j) => Object.keys(COLLECTIONS).filter((c) => dansCollection(j, c)));
   el.raccourcis.replaceChildren(
     creerTuile({
-      cle: 'hasard', picto: '🎲', nom: 'Au hasard', teinte: 265, aide: 'Lance un jeu',
-      total: etat.jeux.length, vide: 'Aucun jeu', action: jouerAuHasard,
+      cle: 'hasard', picto: '🎲', nom: t('raccourci.hasard'), teinte: 265, aide: t('raccourci.hasardAide'),
+      total: etat.jeux.length, vide: t('raccourci.aucunJeu'), action: jouerAuHasard,
     }),
     ...Object.entries(COLLECTIONS).map(([id, c]) => creerTuile({
-      cle: `collection:${id}`, picto: c.picto, nom: c.nom, teinte: c.teinte, vide: c.vide,
+      cle: `collection:${id}`, picto: c.picto, nom: t(c.nom), teinte: c.teinte, vide: t(c.vide),
       actif: etat.collection === id, compte: collections.compte(id), total: collections.total(id),
       action: () => choisir('collection', id),
     })),
@@ -482,10 +499,10 @@ function afficherRegroupements() {
 
   // Âge conseillé.
   const ages = compter('age', (j) => (j.tranche ? [j.tranche] : []));
-  el.ages.replaceChildren(...TRANCHES_AGE.map((t) => creerTuile({
-    cle: `age:${t.id}`, picto: t.picto, nom: t.nom, aide: t.aide,
-    actif: etat.age === t.id, compte: ages.compte(t.id), total: ages.total(t.id),
-    action: () => choisir('age', t.id),
+  el.ages.replaceChildren(...TRANCHES_AGE.map((tr) => creerTuile({
+    cle: `age:${tr.id}`, picto: tr.picto, nom: nomAge(tr), aide: t(`age.${tr.id}.aide`),
+    actif: etat.age === tr.id, compte: ages.compte(tr.id), total: ages.total(tr.id),
+    action: () => choisir('age', tr.id),
   })));
 
   // Genres : la liste fermée (catalog.json), plus un genre inconnu éventuel.
@@ -495,7 +512,7 @@ function afficherRegroupements() {
   el.genres.replaceChildren(...pleinsDAbord(listeGenres, genres.total).map((genre) => {
     const affichage = GENRES_AFFICHAGE[genre] || { picto: '🎮', teinte: 230 };
     return creerTuile({
-      cle: `genre:${genre}`, picto: affichage.picto, nom: majuscule(genre), teinte: affichage.teinte,
+      cle: `genre:${genre}`, picto: affichage.picto, nom: nomGenre(genre), teinte: affichage.teinte,
       actif: etat.genre === genre, compte: genres.compte(genre), total: genres.total(genre),
       action: () => choisir('genre', genre),
     });
@@ -504,7 +521,7 @@ function afficherRegroupements() {
   // Univers.
   const univers = compter('theme', (j) => j.univers);
   el.univers.replaceChildren(...pleinsDAbord(UNIVERS, (u) => univers.total(u.id)).map((u) => creerTuile({
-    cle: `univers:${u.id}`, picto: u.picto, nom: u.nom, teinte: u.teinte,
+    cle: `univers:${u.id}`, picto: u.picto, nom: nomUnivers(u), teinte: u.teinte,
     actif: etat.univers === u.id, compte: univers.compte(u.id), total: univers.total(u.id),
     action: () => choisir('univers', u.id),
   })));
@@ -513,10 +530,10 @@ function afficherRegroupements() {
   const dejaRanges = new Set([...UNIVERS.flatMap((u) => u.tags), ...listeGenres]);
   const autres = compter('theme', (j) => j.tags.filter((t) => !dejaRanges.has(t.normalize('NFC'))));
   const tags = [...new Set(etat.jeux.flatMap((j) => j.tags))]
-    .filter((t) => autres.total(t) > 0)
-    .sort((a, b) => autres.total(b) - autres.total(a) || a.localeCompare(b, 'fr'));
-  el.autresThemes.replaceChildren(...tags.map((tag) => creerPuce(majuscule(tag), null, etat.etiquette === tag,
-    () => choisir('etiquette', tag), `${majuscule(tag)} : ${nombreDeJeux(autres.compte(tag))}`)));
+    .filter((tag) => autres.total(tag) > 0)
+    .sort((a, b) => autres.total(b) - autres.total(a) || nomTag(a).localeCompare(nomTag(b), getLang()));
+  el.autresThemes.replaceChildren(...tags.map((tag) => creerPuce(nomTag(tag), null, etat.etiquette === tag,
+    () => choisir('etiquette', tag), t('tuile.aria', { nom: nomTag(tag), etat: nombreDeJeux(autres.compte(tag)) }))));
   el.autresThemes.hidden = tags.length === 0;
 
   if (cleFocus) document.querySelector(`[data-cle="${CSS.escape(cleFocus)}"]`)?.focus();
@@ -526,31 +543,31 @@ function afficherRegroupements() {
 function afficherFiltresActifs() {
   const actifs = [];
   const ajouter = (picto, nom, retirer) => actifs.push(
-    creerPuce(nom, picto, null, () => { retirer(); rafraichir(); }, `Retirer le filtre ${nom}`),
+    creerPuce(nom, picto, null, () => { retirer(); rafraichir(); }, t('filtres.retirer', { nom })),
   );
   if (etat.collection) {
     const c = COLLECTIONS[etat.collection];
-    ajouter(c.picto, c.nom, () => { etat.collection = null; });
+    ajouter(c.picto, t(c.nom), () => { etat.collection = null; });
   }
   if (etat.age) {
-    const t = TRANCHES_AGE.find((x) => x.id === etat.age);
-    ajouter(t.picto, t.nom, () => { etat.age = null; });
+    const tr = TRANCHES_AGE.find((x) => x.id === etat.age);
+    ajouter(tr.picto, nomAge(tr), () => { etat.age = null; });
   }
   if (etat.genre) {
-    ajouter(GENRES_AFFICHAGE[etat.genre]?.picto || '🎮', majuscule(etat.genre), () => { etat.genre = null; });
+    ajouter(GENRES_AFFICHAGE[etat.genre]?.picto || '🎮', nomGenre(etat.genre), () => { etat.genre = null; });
   }
   if (etat.univers) {
     const u = UNIVERS.find((x) => x.id === etat.univers);
-    ajouter(u.picto, u.nom, () => { etat.univers = null; });
+    ajouter(u.picto, nomUnivers(u), () => { etat.univers = null; });
   }
-  if (etat.etiquette) ajouter('🏷️', majuscule(etat.etiquette), () => { etat.etiquette = null; });
+  if (etat.etiquette) ajouter('🏷️', nomTag(etat.etiquette), () => { etat.etiquette = null; });
   if (rechercheNormalisee()) {
-    ajouter('🔎', `« ${etat.texte.trim()} »`, () => { etat.texte = ''; el.recherche.value = ''; });
+    ajouter('🔎', t('filtres.recherche', { texte: etat.texte.trim() }), () => { etat.texte = ''; el.recherche.value = ''; });
   }
   for (const puce of actifs) puce.classList.add('puce-active');
 
   if (actifs.length > 1) {
-    const tout = creerPuce('Tout effacer', null, null, () => {
+    const tout = creerPuce(t('filtres.toutEffacer'), null, null, () => {
       Object.assign(etat, { collection: null, age: null, genre: null, univers: null, etiquette: null, texte: '' });
       el.recherche.value = '';
       rafraichir();
@@ -564,10 +581,50 @@ function afficherFiltresActifs() {
 
 // Tout ce qui dépend des filtres : tuiles (et leurs comptes), rappel des filtres, jeux.
 function rafraichir() {
+  if (etat.erreur) return;
   afficherRegroupements();
   afficherFiltresActifs();
   afficherGrille();
 }
+
+// « Tout voir » / « Réduire », selon l'état de la bande.
+function afficherToutVoir() {
+  el.toutVoir.forEach((bouton) => {
+    const deplie = bouton.getAttribute('aria-expanded') === 'true';
+    bouton.textContent = deplie ? t('groupe.reduire') : t('groupe.toutVoir');
+  });
+}
+
+// --- Langue -----------------------------------------------------------------
+
+function afficherSeo() {
+  majSeo({ titre: t('meta.titre'), description: t('meta.description') });
+}
+
+// Jeux proposés dans la langue courante, avec leur texte de recherche
+// (titre et description en français et dans la langue courante, noms affichés
+// du genre, des tags et des univers).
+function preparerJeux() {
+  etat.jeux = etat.tous.filter(jeuDisponible);
+  for (const jeu of etat.jeux) {
+    const nomsUnivers = UNIVERS.filter((u) => jeu.univers.includes(u.id)).map(nomUnivers);
+    jeu.texte = normaliser([
+      jeu.title, jeu.description, titreJeu(jeu), descriptionJeu(jeu),
+      jeu.genre, nomGenre(jeu.genre), ...jeu.tags, ...jeu.tags.map(nomTag), ...nomsUnivers,
+    ].join(' '));
+  }
+}
+
+surChangementLangue(() => {
+  afficherSeo();
+  afficherToutVoir();
+  if (etat.erreur) {
+    afficherErreurCatalogue();
+    return;
+  }
+  preparerJeux();
+  afficher();
+});
 
 // --- Scores -----------------------------------------------------------------
 
@@ -637,7 +694,7 @@ el.toutVoir.forEach((bouton) => {
     const tuiles = document.getElementById(bouton.getAttribute('aria-controls'));
     const deplie = tuiles.classList.toggle('deplie');
     bouton.setAttribute('aria-expanded', String(deplie));
-    bouton.textContent = deplie ? 'Réduire' : 'Tout voir';
+    afficherToutVoir();
   });
 });
 
@@ -662,14 +719,22 @@ addEventListener('pageshow', async (evenement) => {
 
 // --- Démarrage --------------------------------------------------------------
 
+function afficherErreurCatalogue() {
+  el.compte.textContent = '';
+  el.vide.hidden = false;
+  el.videTitre.textContent = t('catalogue.erreurTitre');
+  el.videTexte.textContent = t('catalogue.erreurTexte');
+}
+
 async function demarrer() {
-  const scores = chargerScores(); // en parallèle du catalogue
+  const scores = chargerScores(); // en parallèle du catalogue et des textes
   const horsLigne = jeuxHorsLigne();
+  const textes = demarrerLangue(el.langue);
   try {
     const reponse = await fetch('catalog.json', { cache: 'no-cache' });
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
     const catalogue = await reponse.json();
-    etat.jeux = (catalogue.games || []).map((j) => {
+    etat.tous = (catalogue.games || []).map((j) => {
       const jeu = {
         ...j,
         genre: typeof j.genre === 'string' ? j.genre : '',
@@ -677,20 +742,22 @@ async function demarrer() {
       };
       jeu.tranche = trancheAge(jeu.ages);
       jeu.univers = universDuJeu(jeu);
-      // Texte de recherche : titre, description, genre, thèmes et noms des univers.
-      const nomsUnivers = UNIVERS.filter((u) => jeu.univers.includes(u.id)).map((u) => u.nom);
-      jeu.texte = normaliser([jeu.title, jeu.description, jeu.genre, ...jeu.tags, ...nomsUnivers].join(' '));
       return jeu;
     });
     etat.genres = Array.isArray(catalogue.genres) ? catalogue.genres.filter((g) => typeof g === 'string') : [];
   } catch (erreur) {
     console.error('Impossible de charger le catalogue :', erreur);
-    el.compte.textContent = '';
-    el.vide.hidden = false;
-    el.videTitre.textContent = 'Le catalogue ne se charge pas';
-    el.videTexte.textContent = 'Vérifie ta connexion, puis recharge la page.';
+    etat.erreur = true;
+    await textes;
+    afficherSeo();
+    afficherToutVoir();
+    afficherErreurCatalogue();
     return;
   }
+  await textes;
+  afficherSeo();
+  afficherToutVoir();
+  preparerJeux();
   const resultat = await scores;
   if (resultat) {
     etat.scoresMonde = resultat.scores;

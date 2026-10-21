@@ -6,7 +6,11 @@
 //   2. vérifie les règles de base ; un jeu invalide est ignoré (avec un
 //      message), il ne bloque jamais la publication des autres
 //   3. copie les jeux valides dans public/games/
-//   4. écrit public/catalog.json
+//   4. écrit public/catalog.json (avec les titres et descriptions traduits)
+//   5. écrit public/sitemap.xml (accueil et jeux, une variante ?lang= par
+//      langue) et public/robots.txt. Adresse du site : variable SITE_URL
+//      (réglage Cloudflare Pages, à définir avec le nom de domaine), sinon
+//      ADRESSE_PAR_DEFAUT.
 //
 // Lancé automatiquement par Cloudflare Pages (commande de build),
 // et en local avec :  npm run build   (ou  npm run dev  pour tester).
@@ -24,6 +28,8 @@ const DOSSIER_JEUX = path.join(RACINE, 'games');
 const DOSSIER_PUBLIC = path.join(RACINE, 'public');
 const SORTIE_JEUX = path.join(DOSSIER_PUBLIC, 'games');
 const SORTIE_CATALOGUE = path.join(DOSSIER_PUBLIC, 'catalog.json');
+const LANGUES = ['fr', 'en', 'es', 'pt', 'de'];          // même liste que public/i18n/i18n.js
+const ADRESSE_PAR_DEFAUT = 'https://jeux-en-ligne.pages.dev/';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DATE_VALIDE = /^\d{4}-\d{2}-\d{2}$/;
@@ -101,10 +107,28 @@ async function lireJeu(nomDossier) {
     avertir(nomDossier, 'pas de jaquette (cover.webp) : image par défaut utilisée');
   }
 
+  // --- traductions (titre et description dans les autres langues) ---
+  const i18n = {};
+  const traductions = fiche.i18n && typeof fiche.i18n === 'object' ? fiche.i18n : {};
+  const manquantes = [];
+  for (const lang of LANGUES.filter((l) => l !== 'fr')) {
+    const t = traductions[lang];
+    const title = typeof t?.title === 'string' ? t.title.trim().slice(0, 80) : '';
+    const description = typeof t?.description === 'string' ? t.description.trim().slice(0, 200) : '';
+    if (title || description) i18n[lang] = { title, description };
+    if (!title || !description) manquantes.push(lang);
+  }
+  if (manquantes.length) avertir(nomDossier, `titre ou description non traduits (${manquantes.join(', ')}) dans game.json ("i18n") : le français sera affiché`);
+  // Langues dans lesquelles le catalogue propose le jeu (absent = toutes).
+  const langues = Array.isArray(fiche.langues) ? fiche.langues.filter((l) => LANGUES.includes(l)) : [];
+
   return {
     id: fiche.id,
     title: fiche.title.trim().slice(0, 80),
     description: typeof fiche.description === 'string' ? fiche.description.trim().slice(0, 200) : '',
+    i18n,
+    ...(fiche.non_traduisible === true ? { non_traduisible: true } : {}),
+    ...(langues.length ? { langues } : {}),
     genre,
     tags,
     ages: typeof fiche.ages === 'string' ? fiche.ages.trim().slice(0, 10) : '',
@@ -152,11 +176,50 @@ async function main() {
     games: jeux,
   };
   await writeFile(SORTIE_CATALOGUE, JSON.stringify(catalogue, null, 2) + '\n', 'utf8');
+  await ecrireSitemap(jeux);
 
   console.log(`\nCatalogue : ${jeux.length} jeu(x) publié(s), ${rejets.length} ignoré(s).`);
   if (rejets.length) console.log('\nJeux ignorés :\n' + rejets.join('\n'));
   if (avertissements.length) console.log('\nAvertissements :\n' + avertissements.join('\n'));
   console.log('');
+}
+
+// --- Plan du site pour les moteurs de recherche --------------------------------
+
+function adresseDuSite() {
+  const brute = process.env.SITE_URL || ADRESSE_PAR_DEFAUT;
+  try {
+    const u = new URL(brute);
+    return u.href.endsWith('/') ? u.href : `${u.href}/`;
+  } catch {
+    return ADRESSE_PAR_DEFAUT;
+  }
+}
+
+function echapperXml(texte) {
+  return texte.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Une entrée par page et par langue, chacune listant toutes les variantes (hreflang).
+// Un jeu limité à certaines langues (« langues ») n'a que ces variantes.
+async function ecrireSitemap(jeux) {
+  const site = adresseDuSite();
+  const pages = [{ chemin: '', langues: LANGUES }];
+  for (const jeu of jeux) pages.push({ chemin: `play.html?id=${encodeURIComponent(jeu.id)}`, langues: jeu.langues || LANGUES });
+
+  const avecLangue = (chemin, lang) => `${site}${chemin}${chemin.includes('?') ? '&' : '?'}lang=${lang}`;
+  const lignes = ['<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'];
+  for (const page of pages) {
+    const variantes = page.langues.map((lang) => `    <xhtml:link rel="alternate" hreflang="${lang}" href="${echapperXml(avecLangue(page.chemin, lang))}"/>`);
+    variantes.push(`    <xhtml:link rel="alternate" hreflang="x-default" href="${echapperXml(site + page.chemin)}"/>`);
+    for (const lang of page.langues) {
+      lignes.push('  <url>', `    <loc>${echapperXml(avecLangue(page.chemin, lang))}</loc>`, ...variantes, '  </url>');
+    }
+  }
+  lignes.push('</urlset>');
+  await writeFile(path.join(DOSSIER_PUBLIC, 'sitemap.xml'), lignes.join('\n') + '\n', 'utf8');
+  await writeFile(path.join(DOSSIER_PUBLIC, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${site}sitemap.xml\n`, 'utf8');
 }
 
 main().catch((e) => {

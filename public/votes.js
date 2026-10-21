@@ -156,6 +156,12 @@ async function envoyer() {
 
 let chargementTurnstile = null;
 
+// Langue de la case à cocher éventuelle : celle du site (portugais du Brésil).
+function langueTurnstile() {
+  const lang = window.JEL_I18N?.getLang() || 'fr';
+  return lang === 'pt' ? 'pt-br' : lang;
+}
+
 function chargerTurnstile() {
   if (window.turnstile) return Promise.resolve(window.turnstile);
   if (!chargementTurnstile) {
@@ -204,7 +210,7 @@ async function jetonTurnstile() {
       sitekey: CLE_TURNSTILE,
       action: 'vote',
       appearance: 'interaction-only',
-      language: 'fr',
+      language: langueTurnstile(),
       callback: (jeton) => finir(null, jeton),
       'error-callback': () => { finir(new Error('Turnstile : erreur')); return true; },
       'expired-callback': () => finir(new Error('Turnstile : jeton expiré')),

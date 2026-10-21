@@ -10,40 +10,47 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
+  <!-- Traductions : i18n/i18n.js (module commun), textes dans i18n/site/<langue>.json.
+       Les balises <link rel="alternate" hreflang> sont ajoutées par app.js. -->
+  <script src="i18n/i18n.js"></script>
 </head>
 <body>
   <header class="entete">
-    <h1 class="marque">
-      <!-- Logo : planète à anneau, sans fond (assets/logo.svg = même dessin sur fond bleu nuit) -->
-      <svg class="marque-logo" viewBox="0 0 64 64" aria-hidden="true">
-        <defs><clipPath id="logo-planete"><circle cx="32" cy="33" r="15"/></clipPath></defs>
-        <path transform="rotate(-18 32 33)" d="M5 33a27 8 0 0 1 54 0" fill="none" stroke="#eceae4" stroke-width="3.2" stroke-linecap="round"/>
-        <circle cx="32" cy="33" r="15" fill="#a8b3f0"/>
-        <circle cx="38" cy="38.5" r="15" fill="#929ee6" clip-path="url(#logo-planete)"/>
-        <path transform="rotate(-18 32 33)" d="M5 33a27 8 0 0 0 54 0" fill="none" stroke="#eceae4" stroke-width="3.2" stroke-linecap="round"/>
-      </svg>
-      <span>Jeux-en-ligne<small>Des mini-jeux à jouer partout, sans publicité</small></span>
-    </h1>
+    <div class="entete-haut">
+      <h1 class="marque">
+        <!-- Logo : planète à anneau, sans fond (assets/logo.svg = même dessin sur fond bleu nuit) -->
+        <svg class="marque-logo" viewBox="0 0 64 64" aria-hidden="true">
+          <defs><clipPath id="logo-planete"><circle cx="32" cy="33" r="15"/></clipPath></defs>
+          <path transform="rotate(-18 32 33)" d="M5 33a27 8 0 0 1 54 0" fill="none" stroke="#eceae4" stroke-width="3.2" stroke-linecap="round"/>
+          <circle cx="32" cy="33" r="15" fill="#a8b3f0"/>
+          <circle cx="38" cy="38.5" r="15" fill="#929ee6" clip-path="url(#logo-planete)"/>
+          <path transform="rotate(-18 32 33)" d="M5 33a27 8 0 0 0 54 0" fill="none" stroke="#eceae4" stroke-width="3.2" stroke-linecap="round"/>
+        </svg>
+        <span>Jeux-en-ligne<small data-i18n="entete.slogan">Des mini-jeux à jouer partout, sans publicité</small></span>
+      </h1>
+      <!-- Sélecteur de langue (créé par app.js avec JEL_I18N.creerSelecteur) -->
+      <div class="entete-langue" id="langue"></div>
+    </div>
 
     <label class="recherche">
-      <span class="sr-only">Chercher un jeu</span>
+      <span class="sr-only" data-i18n="recherche.etiquette">Chercher un jeu</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="recherche" type="search" placeholder="Chercher un jeu…" autocomplete="off" enterkeyhint="search">
+      <input id="recherche" type="search" placeholder="Chercher un jeu…" data-i18n-placeholder="recherche.placeholder" autocomplete="off" enterkeyhint="search">
     </label>
   </header>
 
   <!-- Regroupements : tuiles remplies par app.js (définitions dans regroupements.js) -->
-  <section class="explorer" aria-label="Explorer les jeux">
-    <div class="tuiles tuiles-raccourcis" id="raccourcis" role="group" aria-label="Raccourcis"></div>
+  <section class="explorer" aria-label="Explorer les jeux" data-i18n-aria="explorer.aria">
+    <div class="tuiles tuiles-raccourcis" id="raccourcis" role="group" aria-label="Raccourcis" data-i18n-aria="raccourcis.aria"></div>
 
     <section class="groupe" aria-labelledby="titre-ages">
-      <div class="groupe-tete"><h2 id="titre-ages">Pour quel âge ?</h2></div>
+      <div class="groupe-tete"><h2 id="titre-ages" data-i18n="groupe.ages">Pour quel âge ?</h2></div>
       <div class="tuiles tuiles-ages" id="ages" role="group" aria-labelledby="titre-ages"></div>
     </section>
 
     <section class="groupe" aria-labelledby="titre-genres">
       <div class="groupe-tete">
-        <h2 id="titre-genres">Genres <small>comment on joue</small></h2>
+        <h2 id="titre-genres"><span data-i18n="groupe.genres">Genres</span> <small data-i18n="groupe.genresAide">comment on joue</small></h2>
         <button class="tout-voir" type="button" aria-controls="genres" aria-expanded="false">Tout voir</button>
       </div>
       <div class="tuiles tuiles-bande" id="genres" role="group" aria-labelledby="titre-genres"></div>
@@ -51,11 +58,11 @@
 
     <section class="groupe" aria-labelledby="titre-univers">
       <div class="groupe-tete">
-        <h2 id="titre-univers">Univers <small>de quoi ça parle</small></h2>
+        <h2 id="titre-univers"><span data-i18n="groupe.univers">Univers</span> <small data-i18n="groupe.universAide">de quoi ça parle</small></h2>
         <button class="tout-voir" type="button" aria-controls="univers" aria-expanded="false">Tout voir</button>
       </div>
       <div class="tuiles tuiles-bande" id="univers" role="group" aria-labelledby="titre-univers"></div>
-      <div class="autres-themes" id="autres-themes" role="group" aria-label="Autres thèmes" hidden></div>
+      <div class="autres-themes" id="autres-themes" role="group" aria-label="Autres thèmes" data-i18n-aria="groupe.autresThemes" hidden></div>
     </section>
   </section>
 
@@ -63,21 +70,21 @@
     <div class="resultats-tete" id="resultats">
       <h2 id="titre-resultats"><span id="titre-texte">Tous les jeux</span> <span class="compte" id="compte" aria-live="polite"></span></h2>
       <label class="tri">
-        <span class="sr-only">Trier par</span>
+        <span class="sr-only" data-i18n="tri.etiquette">Trier par</span>
         <svg class="tri-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>
         <select id="tri">
-          <option value="notes">Mieux notés</option>
-          <option value="votes">Plus populaires</option>
-          <option value="semaine">Populaires cette semaine</option>
-          <option value="nouveautes">Nouveautés</option>
+          <option value="notes" data-i18n="tri.notes">Mieux notés</option>
+          <option value="votes" data-i18n="tri.votes">Plus populaires</option>
+          <option value="semaine" data-i18n="tri.semaine">Populaires cette semaine</option>
+          <option value="nouveautes" data-i18n="tri.nouveautes">Nouveautés</option>
         </select>
         <svg class="tri-fleche" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </label>
     </div>
-    <div class="filtres-actifs" id="filtres-actifs" role="group" aria-label="Filtres choisis" hidden></div>
-    <div class="portee" id="portee" role="group" aria-label="Votes pris en compte" hidden>
-      <button type="button" data-portee="monde" aria-pressed="true">Monde</button>
-      <button type="button" data-portee="pays" aria-pressed="false">Mon pays</button>
+    <div class="filtres-actifs" id="filtres-actifs" role="group" aria-label="Filtres choisis" data-i18n-aria="filtres.aria" hidden></div>
+    <div class="portee" id="portee" role="group" aria-label="Votes pris en compte" data-i18n-aria="portee.aria" hidden>
+      <button type="button" data-portee="monde" aria-pressed="true" data-i18n="portee.monde">Monde</button>
+      <button type="button" data-portee="pays" aria-pressed="false" data-i18n="portee.pays">Mon pays</button>
     </div>
     <p class="note-tri" id="note-tri" hidden></p>
     <ul class="grille" id="grille"></ul>
@@ -87,19 +94,19 @@
     </div>
 
     <section class="archives" id="archives" hidden aria-labelledby="archives-titre">
-      <h2 id="archives-titre">Archives</h2>
-      <p>Les jeux les moins appréciés. Tu peux quand même y jouer !</p>
+      <h2 id="archives-titre" data-i18n="archives.titre">Archives</h2>
+      <p data-i18n="archives.texte">Les jeux les moins appréciés. Tu peux quand même y jouer !</p>
       <ul class="grille" id="grille-archives"></ul>
     </section>
   </main>
 
   <!-- Publicité (désactivée) : un seul emplacement, en bas du catalogue, jamais dans les jeux.
        Rempli par pub.js si PUB_ACTIVE vaut true (voir PUBLICITE.md). -->
-  <aside class="pub" id="pub" aria-label="Publicité" hidden>
-    <p class="pub-mention">Publicité</p>
+  <aside class="pub" id="pub" aria-label="Publicité" data-i18n-aria="pub.mention" hidden>
+    <p class="pub-mention" data-i18n="pub.mention">Publicité</p>
   </aside>
 
-  <footer class="pied">
+  <footer class="pied" data-i18n="pied.texte">
     Jeux originaux, gratuits et sans publicité.
   </footer>
 
