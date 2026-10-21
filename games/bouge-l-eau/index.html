@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bouge l'eau !</title>
+<style>
+  /* ---------- Base : plein écran, aucun défilement ---------- */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe7fb; }
+  body { font-family: system-ui, sans-serif; color: #1f2a44; user-select: none; -webkit-user-select: none; touch-action: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  #jeu { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+  /* Barre du haut : niveaux, titre, aide, son */
+  #barre-haut { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #2b5fa8; color: #fff; }
+  #titre-niveau { flex: 1; min-width: 0; font-weight: 800; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #titre-niveau small { display: block; font-weight: 600; font-size: 12px; opacity: .85; }
+  .rond { width: 44px; height: 44px; flex: 0 0 44px; border: 0; border-radius: 14px; background: rgba(255,255,255,.18); color: #fff; font-size: 20px; font-weight: 800; display: grid; place-items: center; }
+  .rond:active { transform: scale(.92); }
+
+  /* Zone de jeu : le canevas s'adapte */
+  #zone { position: relative; flex: 1 1 auto; min-height: 0; }
+  #toile { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #zone.secoue { animation: secoue .45s; }
+  @keyframes secoue { 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(2px); } }
+
+  /* Barre du bas : encre et outils */
+  #barre-bas { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: #e9f3fd; border-top: 2px solid #b9d6f2; }
+  #encre { flex: 1; min-width: 60px; }
+  #encre-texte { font-size: 12px; font-weight: 700; color: #3b4a6b; margin-bottom: 3px; }
+  #encre-fond { height: 12px; border-radius: 6px; background: #c9d8ea; overflow: hidden; }
+  #encre-barre { height: 100%; width: 100%; border-radius: 6px; background: linear-gradient(90deg, #6a4fd8, #9a7bff); transition: width .1s; }
+  #encre-barre.bas { background: linear-gradient(90deg, #e2584d, #ff8c6b); }
+  .outil { min-width: 44px; height: 46px; border: 0; border-radius: 14px; background: #fff; color: #2b3a5c; font-size: 20px; font-weight: 800; box-shadow: 0 2px 0 #b9cbe2; padding: 0 8px; }
+  .outil:active { transform: translateY(2px); box-shadow: none; }
+  #btn-ouvrir { background: #2f9bff; color: #fff; box-shadow: 0 2px 0 #1b6dc0; font-size: 16px; padding: 0 12px; }
+  #btn-ouvrir.attire { animation: attire 1s infinite; }
+  @keyframes attire { 50% { transform: scale(1.08); } }
+
+  /* Écrans (accueil, niveaux, bilan) */
+  .ecran { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px; z-index: 5; }
+  .ecran.visible { display: flex; }
+  .carte { width: 100%; max-width: 400px; max-height: 100%; overflow: auto; background: #fff; border-radius: 26px; padding: 20px 18px; text-align: center; box-shadow: 0 10px 30px rgba(20,40,90,.3); }
+  .voile { background: rgba(25,45,90,.55); }
+  .gros-bouton { display: block; width: 100%; min-height: 54px; margin: 10px 0 0; border: 0; border-radius: 18px; background: #2f9bff; color: #fff; font-size: 20px; font-weight: 800; box-shadow: 0 4px 0 #1b6dc0; }
+  .gros-bouton:active { transform: translateY(3px); box-shadow: 0 1px 0 #1b6dc0; }
+  .gros-bouton.vert { background: #36b45a; box-shadow: 0 4px 0 #237a3c; }
+  .gros-bouton.gris { background: #7d8db0; box-shadow: 0 4px 0 #56658a; }
+
+  /* Accueil */
+  #accueil { background: linear-gradient(180deg, #8fd0ff 0%, #d9f0ff 60%, #fdf6e3 100%); flex-direction: column; }
+  #accueil h1 { margin: 0; font-size: clamp(40px, 12vw, 64px); white-space: nowrap; line-height: 1; color: #1d4f9c; text-shadow: 0 4px 0 #fff, 0 7px 0 rgba(29,79,156,.25); letter-spacing: -1px; }
+  #accueil .sous { font-size: 18px; font-weight: 700; color: #2b5fa8; margin: 8px 0 4px; }
+  #accueil svg { width: min(78vw, 300px); height: auto; margin: 4px 0; }
+  #accueil .regle { max-width: 360px; font-size: 17px; line-height: 1.35; background: rgba(255,255,255,.75); border-radius: 18px; padding: 10px 14px; margin: 0 0 6px; }
+  #accueil .boutons { width: 100%; max-width: 340px; }
+  #accueil .total { margin-top: 10px; font-weight: 700; color: #2b5fa8; min-height: 20px; }
+
+  /* Choix du niveau */
+  #grille { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0 4px; }
+  .case { min-height: 62px; border: 0; border-radius: 16px; background: #2f9bff; color: #fff; font-size: 22px; font-weight: 800; box-shadow: 0 3px 0 #1b6dc0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .case small { font-size: 12px; color: #ffe14d; letter-spacing: 1px; }
+  .case:disabled { background: #c3cede; box-shadow: none; cursor: default; }
+
+  /* Bilan */
+  #bilan h2 { margin: 0 0 6px; font-size: 30px; color: #1d4f9c; }
+  #etoiles { font-size: 52px; letter-spacing: 6px; height: 66px; }
+  #etoiles span { display: inline-block; color: #d5dbe6; transform: scale(.6); transition: transform .35s cubic-bezier(.3,1.8,.5,1), color .2s; }
+  #etoiles span.gagnee { color: #ffc61a; transform: scale(1.1); text-shadow: 0 3px 0 #d99a00; }
+  #score { font-size: 34px; font-weight: 900; color: #2b5fa8; }
+  #detail, #record { font-size: 16px; margin: 6px 0; line-height: 1.35; }
+  #record.battu { color: #2e9a4c; font-weight: 800; animation: attire .8s 3; }
+
+  /* Bulle du tutoriel et des nouveautés */
+  #bulle { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: min(92%, 380px); background: #fffbe8; border: 3px solid #ffcf2e; border-radius: 20px; padding: 10px 14px; font-size: 17px; font-weight: 700; line-height: 1.3; text-align: center; box-shadow: 0 6px 18px rgba(0,0,0,.18); display: none; z-index: 3; pointer-events: none; }
+  #bulle.visible { display: block; animation: arrive .35s; }
+  #bulle small { display: block; margin-top: 4px; font-size: 13px; font-weight: 600; color: #7a6a2a; }
+  @keyframes arrive { from { transform: translate(-50%, -12px); opacity: 0; } }
+
+  /* Petit message en bas de la zone de jeu */
+  #toast { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); width: max-content; max-width: 92%; background: rgba(31,42,68,.88); color: #fff; border-radius: 16px; padding: 8px 14px; font-size: 15px; font-weight: 700; text-align: center; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 2; }
+  #toast.visible { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="jeu">
+  <div id="barre-haut">
+    <button class="rond" id="btn-menu" aria-label="Choisir un niveau">☰</button>
+    <div id="titre-niveau">Niveau 1<small>Premier verre</small></div>
+    <button class="rond" id="btn-aide" aria-label="Revoir l'explication">?</button>
+    <button class="rond" id="btn-son" aria-label="Couper le son">🔊</button>
+  </div>
+  <div id="zone">
+    <canvas id="toile"></canvas>
+    <div id="bulle"></div>
+    <div id="toast"></div>
+  </div>
+  <div id="barre-bas">
+    <div id="encre">
+      <div id="encre-texte">✏️ Encre</div>
+      <div id="encre-fond"><div id="encre-barre"></div></div>
+    </div>
+    <button class="outil" id="btn-annuler" aria-label="Annuler le dernier trait">↩</button>
+    <button class="outil" id="btn-effacer" aria-label="Effacer tous les traits">🧽</button>
+    <button class="outil" id="btn-recommencer" aria-label="Refaire le niveau depuis le début">↻</button>
+    <button class="outil" id="btn-ouvrir" aria-label="Ouvrir un bac">💧 Ouvrir</button>
+  </div>
+</div>
+
+<!-- Accueil -->
+<div class="ecran visible" id="accueil">
+  <h1>Bouge l'eau&nbsp;!</h1>
+  <div class="sous">L'équipe des bacs de couleur</div>
+  <svg viewBox="0 0 300 190" aria-hidden="true">
+    <!-- trait dessiné -->
+    <path d="M30 92 Q120 120 205 150" stroke="#5b46b8" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <!-- bacs : bleu et jaune -->
+    <rect x="12" y="18" width="62" height="48" rx="8" fill="#e8f3ff" stroke="#24406e" stroke-width="4"/>
+    <rect x="16" y="36" width="54" height="26" rx="5" fill="#3b9cff"/>
+    <circle cx="33" cy="28" r="5" fill="#fff" stroke="#24406e" stroke-width="2"/><circle cx="34" cy="29" r="2.4" fill="#24406e"/>
+    <circle cx="53" cy="28" r="5" fill="#fff" stroke="#24406e" stroke-width="2"/><circle cx="54" cy="29" r="2.4" fill="#24406e"/>
+    <rect x="226" y="10" width="62" height="48" rx="8" fill="#fff8df" stroke="#24406e" stroke-width="4"/>
+    <rect x="230" y="28" width="54" height="26" rx="5" fill="#ffcf2e"/>
+    <circle cx="247" cy="20" r="5" fill="#fff" stroke="#24406e" stroke-width="2"/><circle cx="246" cy="21" r="2.4" fill="#24406e"/>
+    <circle cx="267" cy="20" r="5" fill="#fff" stroke="#24406e" stroke-width="2"/><circle cx="266" cy="21" r="2.4" fill="#24406e"/>
+    <!-- gouttes qui coulent -->
+    <circle cx="40" cy="80" r="6" fill="#3b9cff"/><circle cx="70" cy="96" r="6" fill="#3b9cff"/>
+    <circle cx="100" cy="106" r="6" fill="#3b9cff"/><circle cx="135" cy="118" r="6" fill="#3b9cff"/>
+    <circle cx="255" cy="76" r="6" fill="#ffcf2e"/><circle cx="244" cy="98" r="6" fill="#ffcf2e"/><circle cx="232" cy="122" r="6" fill="#ffcf2e"/>
+    <path d="M286 66 Q250 110 222 136" stroke="#5b46b8" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <!-- verre vert -->
+    <path d="M180 132 L190 186 L250 186 L260 132" fill="rgba(255,255,255,.6)" stroke="#24406e" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M184 154 L190 184 L250 184 L256 154 Z" fill="#3fcf5a"/>
+    <circle cx="203" cy="166" r="4" fill="#fff" opacity=".7"/>
+  </svg>
+  <p class="regle">Dessine des chemins avec ton doigt. Touche un bac pour l'ouvrir : chaque couleur doit couler dans son verre !</p>
+  <div class="boutons">
+    <button class="gros-bouton vert" id="btn-jouer">▶ Jouer</button>
+    <button class="gros-bouton" id="btn-niveaux">⭐ Les niveaux</button>
+  </div>
+  <div class="total" id="total-accueil"></div>
+</div>
+
+<!-- Choix du niveau -->
+<div class="ecran voile" id="ecran-niveaux">
+  <div class="carte">
+    <h2 style="margin:0;color:#1d4f9c">Les niveaux</h2>
+    <div id="total-niveaux" style="font-weight:700;margin-top:4px"></div>
+    <div id="grille"></div>
+    <button class="gros-bouton gris" id="btn-fermer-niveaux">✕ Fermer</button>
+  </div>
+</div>
+
+<!-- Bilan d'un niveau -->
+<div class="ecran voile" id="bilan">
+  <div class="carte">
+    <h2 id="bilan-titre">Bravo !</h2>
+    <div id="etoiles"><span>★</span><span>★</span><span>★</span></div>
+    <div id="score">0</div>
+    <div id="detail"></div>
+    <div id="record"></div>
+    <button class="gros-bouton vert" id="btn-suivant">Niveau suivant ▶</button>
+    <button class="gros-bouton" id="btn-rejouer">↻ Rejouer</button>
+    <button class="gros-bouton gris" id="btn-bilan-niveaux">⭐ Les niveaux</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// =====================================================================
+// Bouge l'eau ! — une équipe de bacs d'eau de couleur, des traits dessinés
+// au doigt, et des verres à remplir (avec des mélanges de couleurs).
+// Monde logique : 360 × 600, mis à l'échelle de l'écran.
+// =====================================================================
+
+const W = 360, H = 600;
+const R = 4.5;               // rayon de collision d'une goutte
+const G = 1000;              // gravité (px/s²)
+const VMAX = 520;            // vitesse maximale d'une goutte
+const FROTTEMENT = 0.95;   // freinage (par pas) d'une goutte qui touche un trait ou un bord
+const R_TUYAU = 24;         // rayon d'aspiration de l'entrée d'un tuyau
+const PAS = 1 / 120;         // pas de la simulation
+const EP_TRAIT = 3.5;        // demi-épaisseur d'un trait dessiné
+const EP_MUR = 6;            // demi-épaisseur d'un mur de pierre
+const EP_VERRE = 3;          // demi-épaisseur des bords des verres et des bacs
+const PT_MIN = 7;            // distance minimale entre deux points d'un trait
+
+// Les couleurs de l'équipe, et les mélanges
+const COUL = {
+  b: { nom: 'bleu', hex: '#3b9cff', rgb: [59, 156, 255] },
+  j: { nom: 'jaune', hex: '#ffcf2e', rgb: [255, 207, 46] },
+  r: { nom: 'rouge', hex: '#ff5b6b', rgb: [255, 91, 107] },
+};
+const MELANGE = {
+  b: { nom: 'bleu', hex: '#3b9cff' }, j: { nom: 'jaune', hex: '#ffcf2e' }, r: { nom: 'rouge', hex: '#ff5b6b' },
+  bj: { nom: 'vert', hex: '#3fcf5a' }, br: { nom: 'violet', hex: '#a35cff' }, jr: { nom: 'orange', hex: '#ff9a2e' },
+};
+const hexVersRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+
+// ---------------------------------------------------------------------
+// Les niveaux.
+// bacs : x (gauche), c (couleur), n (gouttes) ; y = 40 et w = 90 par défaut.
+// verres : x (centre), y (fond), w, h, veut { couleur: gouttes }, mobile { amp, vit }.
+// rochers [x, y, r] ; zones interdites [x, y, w, h] ; éponges [x, y, w, h] ;
+// murs [x1, y1, x2, y2] ; tuyaux { ax, ay (entrée), bx, by (sortie) }.
+// encre : longueur de trait disponible ; seuil : part des gouttes à ranger pour ★★.
+// ---------------------------------------------------------------------
+const NIVEAUX = [
+  { nom: 'Premier verre', encre: 600, intro: 'tuto',
+    bacs: [{ x: 40, c: 'b', n: 40 }],
+    verres: [{ x: 240, y: 575, w: 76, h: 90, veut: { b: 20 } }] },
+  { nom: 'Le grand saut', encre: 620,
+    bacs: [{ x: 250, c: 'b', n: 45 }],
+    verres: [{ x: 70, y: 575, w: 66, h: 90, veut: { b: 25 } }],
+    rochers: [[175, 560, 26]] },
+  { nom: 'Les rochers', encre: 650, intro: 'rochers',
+    bacs: [{ x: 135, c: 'b', n: 45 }],
+    verres: [{ x: 300, y: 575, w: 66, h: 90, veut: { b: 25 } }],
+    rochers: [[180, 335, 32], [95, 450, 26]],
+    zones: [[205, 140, 155, 150]] },
+  { nom: "L'équipe", encre: 560, intro: 'equipe',
+    bacs: [{ x: 20, c: 'b', n: 40 }, { x: 250, c: 'j', n: 40 }],
+    verres: [{ x: 140, y: 575, w: 62, h: 85, veut: { b: 20 } }, { x: 225, y: 575, w: 62, h: 85, veut: { j: 20 } }],
+    murs: [[182, 440, 182, 600]] },
+  { nom: 'Chacun son tour', encre: 750, intro: 'tour',
+    bacs: [{ x: 20, c: 'b', n: 40 }, { x: 250, c: 'j', n: 40 }],
+    verres: [{ x: 300, y: 575, w: 66, h: 85, veut: { b: 20 } }, { x: 60, y: 575, w: 66, h: 85, veut: { j: 20 } }],
+    rochers: [[180, 430, 24]] },
+  { nom: 'Vert !', encre: 650, intro: 'melange',
+    bacs: [{ x: 20, c: 'b', n: 40 }, { x: 250, c: 'j', n: 40 }],
+    verres: [{ x: 180, y: 575, w: 80, h: 90, veut: { b: 18, j: 18 } }],
+    rochers: [[180, 320, 30]] },
+  { nom: 'Mélange caché', encre: 820, seuil: 0.5, astuce: 'Le bleu doit aller dans les deux verres !',
+    bacs: [{ x: 135, c: 'b', n: 55 }, { x: 250, c: 'j', n: 35 }],
+    verres: [{ x: 60, y: 575, w: 62, h: 85, veut: { b: 12 } }, { x: 290, y: 575, w: 72, h: 90, veut: { b: 15, j: 15 } }],
+    zones: [[130, 220, 100, 140]],
+    rochers: [[180, 470, 28]] },
+  { nom: "L'éponge", encre: 620, intro: 'eponge',
+    bacs: [{ x: 135, c: 'r', n: 45 }],
+    verres: [{ x: 60, y: 575, w: 66, h: 85, veut: { r: 25 } }],
+    eponges: [[140, 300, 80, 40], [150, 470, 60, 34]] },
+  { nom: 'Le verre qui bouge', encre: 520, seuil: 0.5, intro: 'mobile',
+    bacs: [{ x: 135, c: 'b', n: 50 }],
+    verres: [{ x: 180, y: 575, w: 80, h: 80, veut: { b: 22 }, mobile: { amp: 100, vit: 0.7 } }],
+    zones: [[0, 380, 360, 110]] },
+  { nom: 'Le tuyau magique', encre: 520, intro: 'tuyau',
+    bacs: [{ x: 20, c: 'j', n: 45 }],
+    verres: [{ x: 285, y: 575, w: 70, h: 85, veut: { j: 25 } }],
+    murs: [[205, 262, 205, 600], [205, 262, 360, 262]],
+    tuyaux: [{ ax: 120, ay: 410, bx: 285, by: 330 }] },
+  { nom: 'Arc-en-ciel', encre: 750, seuil: 0.5, intro: 'partage', astuce: 'Violet = bleu + rouge. Orange = rouge + jaune.',
+    bacs: [{ x: 20, c: 'b', n: 35 }, { x: 135, c: 'r', n: 50 }, { x: 250, c: 'j', n: 35 }],
+    verres: [{ x: 120, y: 575, w: 70, h: 90, veut: { b: 12, r: 12 } }, { x: 240, y: 575, w: 70, h: 90, veut: { r: 12, j: 12 } }],
+    eponges: [[150, 205, 60, 28]],
+    murs: [[180, 430, 180, 600]] },
+  { nom: 'Le grand final', encre: 850, seuil: 0.4, astuce: 'Tout ensemble : passe par le tuyau, évite l’éponge, attends le verre !',
+    bacs: [{ x: 20, c: 'b', n: 40 }, { x: 250, c: 'j', n: 40 }],
+    verres: [{ x: 180, y: 575, w: 84, h: 85, veut: { b: 15, j: 15 }, mobile: { amp: 80, vit: 0.6 } }],
+    eponges: [[260, 190, 70, 28]],
+    tuyaux: [{ ax: 60, ay: 360, bx: 300, by: 150 }],
+    zones: [[0, 445, 360, 45]] },
+];
+
+// Présentations des nouveautés (bulle + flèche animée sur l'élément)
+const INTROS = {
+  rochers: { texte: 'Des rochers ! Et la zone rayée : on ne peut pas y dessiner.', cible: (n) => ({ x: n.zones[0][0] + n.zones[0][2] / 2, y: n.zones[0][1] + n.zones[0][3] / 2 }) },
+  equipe: { texte: "Voici l'équipe ! Chaque couleur va dans son verre. Touche chaque bac pour l'ouvrir.", cible: () => ({ x: 295, y: 75 }) },
+  tour: { texte: 'Les chemins se croisent ! Ouvre un bac, puis ↩ annule ton trait et trace l’autre chemin.', cible: () => ({ x: 180, y: 300 }) },
+  melange: { texte: 'Un verre vert ! Vert = bleu + jaune. Il lui faut les deux couleurs.', cible: (n) => ({ x: n.verres[0].x, y: 500 }) },
+  eponge: { texte: "Attention à l'éponge : elle boit les gouttes ! Fais passer l'eau à côté.", cible: (n) => ({ x: n.eponges[0][0] + 40, y: n.eponges[0][1] + 20 }) },
+  mobile: { texte: 'Ce verre bouge ! Astuce : garde l’eau dans un trait en creux, puis ↩ annule-le quand le verre passe.', cible: (n) => ({ x: n.verres[0].x, y: 500 }) },
+  partage: { texte: 'Le rouge doit aller dans les deux verres ! Un trait en pointe ∧ partage l’eau en deux.', cible: () => ({ x: 180, y: 165 }) },
+  tuyau: { texte: "Un tuyau magique : l'eau qui entre ici ressort de l'autre côté du mur !", cible: (n) => ({ x: n.tuyaux[0].ax, y: n.tuyaux[0].ay }) },
+};
+const TUTO_ETAPES = ['1. Dessine un chemin avec ton doigt', "2. Touche le bac pour l'ouvrir", "3. L'eau coule dans le verre !"];
+
+// ---------------------------------------------------------------------
+// Sauvegarde (toujours dans try/catch : le stockage peut être refusé)
+// ---------------------------------------------------------------------
+const CLE = 'bouge-l-eau';
+let sauve = { etoiles: [], scores: [], son: true, vus: {} };
+try {
+  const t = JSON.parse(localStorage.getItem(CLE) || 'null');
+  if (t && typeof t === 'object') sauve = Object.assign(sauve, t);
+} catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+if (!Array.isArray(sauve.etoiles)) sauve.etoiles = [];
+if (!Array.isArray(sauve.scores)) sauve.scores = [];
+if (!sauve.vus || typeof sauve.vus !== 'object') sauve.vus = {};
+function enregistrer() { try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* tant pis */ } }
+const niveauOuvert = (i) => i === 0 || (sauve.etoiles[i - 1] || 0) > 0;
+const totalEtoiles = () => sauve.etoiles.reduce((a, b) => a + (b || 0), 0);
+
+// ---------------------------------------------------------------------
+// Sons Web Audio (rien avant le premier geste)
+// ---------------------------------------------------------------------
+let audio = null;
+function initAudio() {
+  if (audio) { if (audio.state === 'suspended') audio.resume().catch(() => {}); return; }
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+}
+function note(freq, duree, type = 'sine', vol = 0.15, glisse = 0, delai = 0) {
+  if (!audio || !sauve.son) return;
+  try {
+    const t0 = audio.currentTime + delai;
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t0);
+    if (glisse) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + glisse), t0 + duree);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duree);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t0); o.stop(t0 + duree + 0.05);
+  } catch (e) { /* son ignoré */ }
+}
+const SON = {
+  clic: () => note(660, 0.06, 'triangle', 0.12),
+  trait: () => note(300 + Math.random() * 80, 0.04, 'triangle', 0.05),
+  interdit: () => { note(200, 0.12, 'square', 0.06); note(160, 0.14, 'square', 0.05, 0, 0.1); },
+  ouvrir: () => { note(420, 0.12, 'triangle', 0.15, 300); note(900, 0.08, 'sine', 0.08, 0, 0.08); },
+  bloup: (k) => note(380 + 500 * k, 0.09, 'sine', 0.1, 260),
+  faux: () => note(240, 0.12, 'sawtooth', 0.05, -80),
+  eponge: () => note(160, 0.1, 'sine', 0.08, -60),
+  tuyau: () => note(500, 0.18, 'sine', 0.06, 700),
+  plein: () => { [660, 880, 1100].forEach((f, i) => note(f, 0.14, 'triangle', 0.12, 0, i * 0.07)); },
+  victoire: () => { [523, 659, 784, 1046].forEach((f, i) => note(f, 0.22, 'triangle', 0.14, 0, i * 0.11)); },
+  etoile: (i) => note(880 + i * 220, 0.25, 'sine', 0.16, 200),
+  echec: () => { [392, 330, 262].forEach((f, i) => note(f, 0.24, 'triangle', 0.12, 0, i * 0.15)); },
+};
+
+// ---------------------------------------------------------------------
+// Éléments de la page
+// ---------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const toile = $('toile'), ctx = toile.getContext('2d'), zone = $('zone');
+let echelle = 1, decX = 0, decY = 0, dpr = 1;
+
+function redimensionner() {
+  const r = zone.getBoundingClientRect();
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  toile.width = Math.max(1, Math.round(r.width * dpr));
+  toile.height = Math.max(1, Math.round(r.height * dpr));
+  echelle = Math.min(r.width / W, r.height / H);
+  decX = (r.width - W * echelle) / 2;
+  decY = (r.height - H * echelle) / 2;
+}
+window.addEventListener('resize', redimensionner);
+
+// ---------------------------------------------------------------------
+// État d'un niveau
+// ---------------------------------------------------------------------
+let niv = 0, N = NIVEAUX[0];
+let etat = 'menu';         // menu | intro | jeu | victoire | fin
+let gouttes = [];          // { x, y, px, py, vx, vy, c, verre, attente, mix }
+let bacs = [], verres = [], traits = [], traitEnCours = null;
+let segFixes = [], segTraits = [];
+let tJeu = 0, tCalme = 0, tVict = 0, tEchec = 0, encrePic = 0, totalGouttes = 0;
+let absorbees = 0, perdues = 0, astuceMontree = false, coinceMontre = false;
+let effets = [];           // étincelles, confettis, textes qui montent
+let introCle = null, tIntro = 0;
+let dernierBloup = 0, dernierTrait = 0;
+
+function segment(ax, ay, bx, by, t) {
+  return { ax, ay, bx, by, t, minx: Math.min(ax, bx) - t - R, maxx: Math.max(ax, bx) + t + R, miny: Math.min(ay, by) - t - R, maxy: Math.max(ay, by) + t + R };
+}
+
+function chargerNiveau(i) {
+  niv = i; N = NIVEAUX[i];
+  bilanId++;
+  gouttes = []; traits = []; traitEnCours = null; segTraits = []; effets = [];
+  tJeu = 0; tCalme = 0; tVict = 0; tEchec = 0; encrePic = 0; absorbees = 0; perdues = 0;
+  astuceMontree = false; coinceMontre = false;
+  // Bacs et leurs gouttes rangées en quadrillage
+  bacs = N.bacs.map((b) => {
+    const w = b.w || 90, y = b.y || 40;
+    const cols = Math.floor((w - 8) / 9.2);
+    const lignes = Math.ceil(b.n / cols);
+    const h = Math.max(56, lignes * 9.2 + 14);
+    const bac = { x: b.x, y, w, h, c: b.c, n: b.n, ouvert: false, tOuvert: 0 };
+    for (let k = 0; k < b.n; k++) {
+      const cx = b.x + 8.5 + (k % cols) * 9.2 + ((Math.floor(k / cols) % 2) ? 2 : 0);
+      const cy = y + h - 7 - Math.floor(k / cols) * 9.2;
+      gouttes.push({ x: cx, y: cy, px: cx, py: cy, vx: 0, vy: 0, c: b.c, verre: -1, attente: 0, mix: 0 });
+    }
+    return bac;
+  });
+  totalGouttes = gouttes.length;
+  verres = N.verres.map((v) => {
+    const cles = Object.keys(v.veut).sort().join('');
+    return { ...v, x0: v.x, cles, teinte: MELANGE[cles].hex, compte: { b: 0, j: 0, r: 0 }, plein: false, trouble: false, tPlein: 0,
+      tolerance: Math.max(3, Math.round(0.15 * Object.values(v.veut).reduce((a, b) => a + b, 0))) };
+  });
+  eponges = (N.eponges || []).map((e) => ({ x: e[0], y: e[1], w: e[2], h: e[3], bu: 0, tBu: 0 }));
+  for (const t of N.tuyaux || []) { t.file = []; t.flash = 0; }
+  construireFixes();
+  $('titre-niveau').innerHTML = `Niveau ${i + 1} / ${NIVEAUX.length}<small>${N.nom}</small>`;
+  majEncre();
+  majOuvrir();
+  cacherToast();
+  // Présentation : tutoriel au niveau 1, nouveautés à leur première apparition
+  if (N.intro && !sauve.vus[N.intro]) montrerIntro(N.intro);
+  else { etat = 'jeu'; fermerBulle(); if (N.astuce) { montrerToast(N.astuce, 4000); astuceMontree = true; } }
+}
+let eponges = [];
+
+// Murs, bords des bacs, et bords des verres (reconstruits s'ils bougent)
+function construireFixes() {
+  segFixes = [];
+  for (const m of N.murs || []) segFixes.push(segment(m[0], m[1], m[2], m[3], EP_MUR));
+  for (const b of bacs) {
+    segFixes.push(segment(b.x, b.y, b.x, b.y + b.h, EP_VERRE));
+    segFixes.push(segment(b.x + b.w, b.y, b.x + b.w, b.y + b.h, EP_VERRE));
+    if (!b.ouvert) segFixes.push(segment(b.x, b.y + b.h, b.x + b.w, b.y + b.h, EP_VERRE));
+  }
+  for (const v of verres) majSegVerre(v);
+}
+function majSegVerre(v) {
+  const g = v.x - v.w / 2, d = v.x + v.w / 2;
+  v.segs = [segment(g, v.y - v.h, g + 2, v.y, EP_VERRE), segment(d, v.y - v.h, d - 2, v.y, EP_VERRE), segment(g + 2, v.y, d - 2, v.y, EP_VERRE)];
+}
+
+// Encre utilisée = longueur des traits présents
+const encreUtilisee = () => traits.reduce((a, t) => a + t.long, 0) + (traitEnCours ? traitEnCours.long : 0);
+function majEncre() {
+  const reste = Math.max(0, 1 - encreUtilisee() / N.encre);
+  const barre = $('encre-barre');
+  barre.style.width = (reste * 100).toFixed(1) + '%';
+  barre.classList.toggle('bas', reste < 0.2);
+  $('encre-texte').textContent = `✏️ Encre ${Math.round(reste * 100)} %`;
+}
+function majOuvrir() {
+  const reste = bacs.some((b) => !b.ouvert);
+  const btn = $('btn-ouvrir');
+  btn.disabled = !reste;
+  btn.style.opacity = reste ? 1 : 0.45;
+  btn.classList.toggle('attire', reste && traits.length > 0 && etat === 'jeu');
+}
+function reconstruireTraits() {
+  segTraits = [];
+  for (const t of traits) ajouterSegsTrait(t);
+  if (traitEnCours) ajouterSegsTrait(traitEnCours);
+}
+function ajouterSegsTrait(t) {
+  for (let k = 1; k < t.pts.length; k++) segTraits.push(segment(t.pts[k - 1][0], t.pts[k - 1][1], t.pts[k][0], t.pts[k][1], EP_TRAIT));
+}
+
+// ---------------------------------------------------------------------
+// Simulation de l'eau (dynamique « par positions », stable)
+// ---------------------------------------------------------------------
+function pousserSegment(p, s) {
+  if (p.x < s.minx || p.x > s.maxx || p.y < s.miny || p.y > s.maxy) return;
+  const dx = s.bx - s.ax, dy = s.by - s.ay;
+  const L2 = dx * dx + dy * dy || 1;
+  let u = ((p.x - s.ax) * dx + (p.y - s.ay) * dy) / L2;
+  u = u < 0 ? 0 : u > 1 ? 1 : u;
+  const cx = s.ax + u * dx, cy = s.ay + u * dy;
+  const ex = p.x - cx, ey = p.y - cy;
+  const md = R + s.t, d2 = ex * ex + ey * ey;
+  if (d2 >= md * md) return;
+  const d = Math.sqrt(d2);
+  p.frotte = true;
+  if (d < 1e-4) { p.y = cy - md; return; }
+  p.x = cx + ex / d * md; p.y = cy + ey / d * md;
+}
+
+const grille = new Map();
+function pas(dt) {
+  // 1. Prédiction
+  for (const p of gouttes) {
+    p.px = p.x; p.py = p.y;
+    p.vy += G * dt;
+    const v2 = p.vx * p.vx + p.vy * p.vy;
+    if (v2 > VMAX * VMAX) { const k = VMAX / Math.sqrt(v2); p.vx *= k; p.vy *= k; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+  }
+  // 2. Verres qui bougent : ils emportent l'eau qu'ils contiennent
+  for (const v of verres) {
+    if (!v.mobile) continue;
+    const nx = v.x0 + v.mobile.amp * Math.sin(tJeu * v.mobile.vit);
+    const dx = nx - v.x;
+    if (Math.abs(dx) > 1e-6) {
+      for (const p of gouttes) {
+        if (p.x > v.x - v.w / 2 && p.x < v.x + v.w / 2 && p.y > v.y - v.h && p.y < v.y + 2) { p.x += dx; p.px += dx; }
+      }
+      v.x = nx; majSegVerre(v);
+    }
+  }
+  // 3. Contraintes : gouttes entre elles, traits, murs, verres, rochers
+  for (let iter = 0; iter < 2; iter++) {
+    grille.clear();
+    for (let i = 0; i < gouttes.length; i++) {
+      const p = gouttes[i];
+      const cle = Math.floor(p.x / 10) * 1000 + Math.floor(p.y / 10) + 500000;
+      let l = grille.get(cle); if (!l) grille.set(cle, l = []);
+      l.push(i);
+    }
+    const D = 2 * R, D2 = D * D;
+    for (let i = 0; i < gouttes.length; i++) {
+      const p = gouttes[i];
+      const gx = Math.floor(p.x / 10), gy = Math.floor(p.y / 10);
+      for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+        const l = grille.get((gx + ox) * 1000 + gy + oy + 500000);
+        if (!l) continue;
+        for (const j of l) {
+          if (j <= i) continue;
+          const q = gouttes[j];
+          let dx = q.x - p.x, dy = q.y - p.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 >= D2) continue;
+          let d = Math.sqrt(d2);
+          if (d < 1e-4) { dx = Math.random() - 0.5; dy = -0.5; d = Math.hypot(dx, dy); }
+          const k = (D - d) / d * 0.25;
+          p.x -= dx * k; p.y -= dy * k; q.x += dx * k; q.y += dy * k;
+        }
+      }
+    }
+    for (const p of gouttes) {
+      for (const s of segFixes) pousserSegment(p, s);
+      for (const s of segTraits) pousserSegment(p, s);
+      for (const v of verres) for (const s of v.segs) pousserSegment(p, s);
+      for (const ro of N.rochers || []) {
+        const dx = p.x - ro[0], dy = p.y - ro[1], md = ro[2] + R;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < md * md) { const d = Math.sqrt(d2) || 1; p.x = ro[0] + dx / d * md; p.y = ro[1] + dy / d * md; }
+      }
+    }
+  }
+  // 4. Vitesses déduites des positions
+  // L'eau qui glisse sur un trait est freinée : elle coule sans être projetée au loin
+  for (const p of gouttes) {
+    const k = p.frotte ? FROTTEMENT : 0.998;
+    p.vx = (p.x - p.px) / dt * k; p.vy = (p.y - p.py) / dt * k;
+    p.frotte = false;
+  }
+  // 5. Tuyaux, éponges, sorties d'écran
+  // Un tuyau avale les gouttes et les rend une à une à la sortie, quand la place est libre
+  for (const t of N.tuyaux || []) {
+    for (const p of gouttes) {
+      if (p.attente > 0 || p.tuyau) continue;
+      if ((p.x - t.ax) ** 2 + (p.y - t.ay) ** 2 < R_TUYAU * R_TUYAU) {
+        p.tuyau = true; t.file.push(p); t.flash = 1;
+        if (tJeu - (t.tSon || 0) > 0.12) { SON.tuyau(); t.tSon = tJeu; }
+      }
+    }
+    if (t.file.length && !gouttes.some((q) => !q.tuyau && (q.x - t.bx) ** 2 + (q.y - t.by) ** 2 < 100)) {
+      const p = t.file.shift();
+      p.tuyau = false; p.attente = 0.4;
+      p.x = p.px = t.bx + (Math.random() - 0.5) * 4; p.y = p.py = t.by;
+      p.vx = (Math.random() - 0.5) * 30; p.vy = 90;
+      gouttes.push(p);
+    }
+  }
+  for (const p of gouttes) if (p.attente > 0) p.attente -= dt;
+  let k = 0;
+  for (const p of gouttes) {
+    if (p.tuyau) continue;   // dans le tuyau : sortie de la liste en attendant
+    let garde = true;
+    for (const e of eponges) {
+      if (p.x > e.x - R && p.x < e.x + e.w + R && p.y > e.y - R && p.y < e.y + e.h + R) {
+        garde = false; e.bu++; e.tBu = 0.25; absorbees++;
+        if (tJeu - dernierBloup > 0.08) { SON.eponge(); dernierBloup = tJeu; }
+        break;
+      }
+    }
+    if (garde && (p.y > H + 30 || p.x < -30 || p.x > W + 30)) { garde = false; perdues++; }
+    if (garde) gouttes[k++] = p;
+  }
+  gouttes.length = k;
+}
+
+// Comptage des gouttes dans chaque verre (une fois par image)
+function compterVerres() {
+  for (const v of verres) v.compte = { b: 0, j: 0, r: 0 };
+  for (const p of gouttes) {
+    let dans = -1;
+    for (let i = 0; i < verres.length; i++) {
+      const v = verres[i];
+      if (p.x > v.x - v.w / 2 + 1 && p.x < v.x + v.w / 2 - 1 && p.y > v.y - v.h - 2 && p.y < v.y + 1) { dans = i; break; }
+    }
+    if (dans >= 0) {
+      const v = verres[dans];
+      v.compte[p.c]++;
+      if (p.verre !== dans && etat === 'jeu') {
+        // Une goutte vient d'entrer
+        if (v.veut[p.c]) {
+          if (tJeu - dernierBloup > 0.06) {
+            const need = v.veut[p.c];
+            SON.bloup(Math.min(1, v.compte[p.c] / need)); dernierBloup = tJeu;
+          }
+        } else if (tJeu - dernierBloup > 0.1) { SON.faux(); dernierBloup = tJeu; }
+      }
+      // Dans un verre de mélange, la couleur se mélange peu à peu
+      if (v.cles.length > 1 && v.veut[p.c]) p.mix = Math.min(1, p.mix + 0.02);
+    }
+    p.verre = dans;
+  }
+  for (const v of verres) {
+    let faux = 0;
+    for (const c of 'bjr') if (!v.veut[c]) faux += v.compte[c];
+    v.trouble = faux > v.tolerance;
+    const ok = !v.trouble && Object.keys(v.veut).every((c) => v.compte[c] >= v.veut[c]);
+    if (ok && !v.plein && etat === 'jeu') {
+      SON.plein();
+      for (let i = 0; i < 14; i++) etincelle(v.x + (Math.random() - 0.5) * v.w, v.y - v.h - 10, '#ffd84a');
+    }
+    v.plein = ok;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Boucle de jeu
+// ---------------------------------------------------------------------
+let tPrec = performance.now(), reserve = 0;
+function boucle(maintenant) {
+  const dt = Math.min(0.05, (maintenant - tPrec) / 1000);
+  tPrec = maintenant;
+  if (etat === 'jeu' || etat === 'victoire') {
+    reserve += dt;
+    let n = 0;
+    while (reserve >= PAS && n < 5) { pas(PAS); tJeu += PAS; reserve -= PAS; n++; }
+    if (n === 5) reserve = 0;
+    compterVerres();
+    surveiller(dt);
+  } else if (etat === 'intro') {
+    tIntro += dt;
+    // L'eau se pose dans les bacs pendant la présentation (pause si elle coule déjà)
+    if (!bacs.some((b) => b.ouvert)) pas(PAS);
+  }
+  for (const b of bacs) if (b.ouvert) b.tOuvert = Math.min(1, b.tOuvert + dt * 4);
+  for (const e of eponges) e.tBu = Math.max(0, e.tBu - dt);
+  for (const t of N.tuyaux || []) t.flash = Math.max(0, (t.flash || 0) - dt * 3);
+  majEffets(dt);
+  dessiner();
+  requestAnimationFrame(boucle);
+}
+
+// Réussite, eau coincée ou plus assez d'eau
+function surveiller(dt) {
+  const tousOuverts = bacs.every((b) => b.ouvert);
+  let enMouvement = 0;
+  const vivantes = { b: 0, j: 0, r: 0 };
+  for (const p of gouttes) {
+    vivantes[p.c]++;
+    if (p.verre < 0 && p.vx * p.vx + p.vy * p.vy > 30 * 30) enMouvement++;
+  }
+  for (const t of N.tuyaux || []) { for (const p of t.file) vivantes[p.c]++; enMouvement += t.file.length; }
+  tCalme = enMouvement === 0 ? tCalme + dt : 0;
+
+  if (etat === 'jeu') {
+    if (verres.every((v) => v.plein)) {
+      verres.forEach((v) => (v.tPlein = tJeu));
+      etat = 'victoire'; tVict = 0; majOuvrir();
+      return;
+    }
+    // Impossible de réussir : il ne reste plus assez de gouttes d'une couleur
+    const besoin = { b: 0, j: 0, r: 0 };
+    for (const v of verres) for (const c in v.veut) besoin[c] += v.veut[c];
+    const impossible = ['b', 'j', 'r'].some((c) => vivantes[c] < besoin[c]) || verres.some((v) => v.trouble);
+    tEchec = impossible ? tEchec + dt : 0;
+    if (tEchec > 1.2 && (tCalme > 0.5 || tEchec > 3)) { finirNiveau(false); return; }
+    // Eau coincée : on aide sans arrêter la partie
+    if (tousOuverts && tCalme > 2.5 && !coinceMontre) {
+      coinceMontre = true;
+      montrerToast("L'eau ne bouge plus… ↩ annule un trait ou dessine un nouveau chemin !", 4500);
+    }
+    if (!tousOuverts && traits.length > 0 && !bacs.some((b) => b.ouvert) && tJeu > 6 && !coinceMontre && !toastVisible) {
+      coinceMontre = true;
+      montrerToast('Touche un bac (ou 💧 Ouvrir) pour faire couler l’eau !', 3500);
+    }
+  } else if (etat === 'victoire') {
+    tVict += dt;
+    if (tVict > 0.4 && tVict < 0.45) confettis();
+    if (tVict > 2.6 || (tVict > 1.2 && tCalme > 0.4)) finirNiveau(true);
+  }
+}
+
+// ---------------------------------------------------------------------
+// Fin de niveau et bilan
+// ---------------------------------------------------------------------
+let compteurAnim = null, bilanId = 0;
+function finirNiveau(reussi) {
+  etat = 'fin';
+  majOuvrir();
+  cacherToast();
+  const bien = verres.reduce((a, v) => a + Object.keys(v.veut).reduce((s, c) => s + v.compte[c], 0), 0);
+  const part = bien / totalGouttes;
+  const seuil = N.seuil || 0.6;
+  let etoiles = 0, score = 0;
+  if (reussi) {
+    etoiles = 1;
+    if (part >= seuil) etoiles = 2;
+    if (part >= seuil && encrePic <= N.encre * 0.6) etoiles = 3;
+    score = bien * 10 + Math.round(300 * Math.max(0, 1 - encrePic / N.encre));
+  }
+  const ancienScore = sauve.scores[niv] || 0;
+  const ancienEt = sauve.etoiles[niv] || 0;
+  const record = reussi && score > ancienScore;
+  if (reussi) {
+    sauve.etoiles[niv] = Math.max(ancienEt, etoiles);
+    sauve.scores[niv] = Math.max(ancienScore, score);
+    enregistrer();
+  }
+  // Remplissage de l'écran bilan
+  const fini = reussi && niv === NIVEAUX.length - 1;
+  $('bilan-titre').textContent = reussi ? (fini ? '🏆 Tu as tout réussi !' : ['Bravo !', 'Super !', 'Génial !'][etoiles - 1]) : 'Oups !';
+  const spans = $('etoiles').children;
+  for (const s of spans) s.classList.remove('gagnee');
+  $('score').textContent = '0';
+  if (reussi) {
+    $('detail').innerHTML = `💧 ${bien} gouttes bien rangées sur ${totalGouttes}<br>✏️ Encre utilisée : ${Math.round(encrePic / N.encre * 100)} %` +
+      (etoiles < 3 ? `<br><small>${etoiles < 2 ? `★★ : range ${Math.round(seuil * 100)} % des gouttes.` : '★★★ : utilise moins de 60 % de l’encre.'}</small>` : '') +
+      (fini ? `<br><b>⭐ ${totalEtoiles()} / ${NIVEAUX.length * 3} étoiles en tout !</b>` : '');
+    $('record').textContent = record ? (ancienScore ? `🎉 Nouveau record ! (avant : ${ancienScore})` : '🎉 Premier record pour ce niveau !') : `Record du niveau : ${ancienScore}`;
+    $('record').className = record ? 'battu' : '';
+  } else {
+    const raison = verres.some((v) => v.trouble) ? 'Un verre a reçu la mauvaise couleur.' : "Il n'y a plus assez d'eau pour remplir le verre.";
+    $('detail').textContent = raison + ' Essaie un autre chemin !';
+    $('record').textContent = ancienScore ? `Record du niveau : ${ancienScore}` : '';
+    $('record').className = '';
+    $('score').textContent = '';
+    zone.classList.remove('secoue'); void zone.offsetWidth; zone.classList.add('secoue');
+    SON.echec();
+  }
+  const suivant = $('btn-suivant');
+  suivant.style.display = reussi && niv < NIVEAUX.length - 1 ? 'block' : 'none';
+  // Numéro du bilan : les minuteries d'un bilan précédent n'ont plus d'effet
+  const id = ++bilanId;
+  cancelAnimationFrame(compteurAnim);
+  setTimeout(() => {
+    if (id !== bilanId) return;
+    $('bilan').classList.add('visible');
+    if (!reussi) return;
+    SON.victoire();
+    for (let i = 0; i < etoiles; i++) setTimeout(() => { if (id === bilanId) { spans[i].classList.add('gagnee'); SON.etoile(i); } }, 450 + i * 380);
+    // Le score défile
+    const debut = performance.now();
+    const defile = (t) => {
+      if (id !== bilanId) return;
+      const k = Math.min(1, (t - debut) / 1100);
+      $('score').textContent = Math.round(score * (1 - Math.pow(1 - k, 3))) + ' points';
+      if (k < 1) compteurAnim = requestAnimationFrame(defile);
+    };
+    compteurAnim = requestAnimationFrame(defile);
+  }, reussi ? 300 : 700);
+}
+
+// ---------------------------------------------------------------------
+// Effets : étincelles, confettis, textes
+// ---------------------------------------------------------------------
+function etincelle(x, y, coul) {
+  effets.push({ type: 'etin', x, y, vx: (Math.random() - 0.5) * 160, vy: -60 - Math.random() * 140, vie: 0.8 + Math.random() * 0.4, coul });
+}
+function confettis() {
+  const coul = ['#ff5b6b', '#ffcf2e', '#3b9cff', '#3fcf5a', '#a35cff', '#ff9a2e'];
+  for (let i = 0; i < 90; i++) {
+    effets.push({ type: 'conf', x: Math.random() * W, y: -10 - Math.random() * 120, vx: (Math.random() - 0.5) * 60, vy: 80 + Math.random() * 120,
+      rot: Math.random() * 6, vr: (Math.random() - 0.5) * 10, vie: 3, coul: coul[i % coul.length] });
+  }
+}
+function majEffets(dt) {
+  for (const e of effets) {
+    e.vie -= dt; e.x += e.vx * dt; e.y += e.vy * dt;
+    if (e.type === 'etin') e.vy += 300 * dt;
+    if (e.type === 'conf') e.rot += e.vr * dt;
+  }
+  effets = effets.filter((e) => e.vie > 0 && e.y < H + 40);
+}
+
+// ---------------------------------------------------------------------
+// Dessin
+// ---------------------------------------------------------------------
+function rondRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function couleurGoutte(p) {
+  if (p.mix > 0 && p.verre >= 0 && verres[p.verre]) {
+    const a = COUL[p.c].rgb, b = hexVersRgb(verres[p.verre].teinte), k = p.mix;
+    return `rgb(${Math.round(a[0] + (b[0] - a[0]) * k)},${Math.round(a[1] + (b[1] - a[1]) * k)},${Math.round(a[2] + (b[2] - a[2]) * k)})`;
+  }
+  return COUL[p.c].hex;
+}
+
+function dessiner() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const lw = toile.width / dpr, lh = toile.height / dpr;
+  ctx.fillStyle = '#cfe7fb';
+  ctx.fillRect(0, 0, lw, lh);
+  ctx.setTransform(dpr * echelle, 0, 0, dpr * echelle, dpr * decX, dpr * decY);
+
+  // Fond du monde : papier bleu clair à petits points
+  const fond = ctx.createLinearGradient(0, 0, 0, H);
+  fond.addColorStop(0, '#f4fbff'); fond.addColorStop(1, '#ddeefc');
+  ctx.fillStyle = fond;
+  rondRect(0, 0, W, H, 16); ctx.fill();
+  ctx.fillStyle = 'rgba(43,95,168,.10)';
+  for (let x = 15; x < W; x += 30) for (let y = 15; y < H; y += 30) ctx.fillRect(x - 1, y - 1, 2, 2);
+
+  // Zones interdites (hachures)
+  for (const z of N.zones || []) {
+    ctx.save();
+    rondRect(z[0], z[1], z[2], z[3], 8);
+    ctx.fillStyle = 'rgba(255,90,90,.10)'; ctx.fill();
+    ctx.clip();
+    ctx.strokeStyle = z.flash ? 'rgba(230,60,60,.6)' : 'rgba(230,80,80,.28)'; ctx.lineWidth = 4;
+    for (let k = -z[3]; k < z[2]; k += 16) { ctx.beginPath(); ctx.moveTo(z[0] + k, z[1] + z[3]); ctx.lineTo(z[0] + k + z[3], z[1]); ctx.stroke(); }
+    ctx.restore();
+    ctx.setLineDash([8, 6]); ctx.strokeStyle = 'rgba(220,70,70,.7)'; ctx.lineWidth = 2;
+    rondRect(z[0], z[1], z[2], z[3], 8); ctx.stroke(); ctx.setLineDash([]);
+    // Petit panneau « pas de crayon »
+    const cx = z[2] > 120 ? z[0] + 24 : z[0] + z[2] / 2, cy = z[1] + z[3] / 2;
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.arc(cx, cy, 13, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#e04848'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, 13, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 9, cy + 9); ctx.lineTo(cx + 9, cy - 9); ctx.stroke();
+    if (z.flash) z.flash = Math.max(0, z.flash - 0.03);
+  }
+
+  // Tuyaux magiques : entrée et sortie qui tourbillonnent
+  for (const t of N.tuyaux || []) {
+    ctx.save();
+    ctx.setLineDash([3, 7]); ctx.strokeStyle = 'rgba(140,90,220,.35)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(t.ax, t.ay); ctx.quadraticCurveTo((t.ax + t.bx) / 2, Math.min(t.ay, t.by) - 70, t.bx, t.by); ctx.stroke();
+    ctx.restore();
+    for (const [x, y, entree] of [[t.ax, t.ay, true], [t.bx, t.by, false]]) {
+      ctx.save(); ctx.translate(x, y);
+      ctx.fillStyle = entree ? '#5b2fa8' : '#9b6cff';
+      ctx.beginPath(); ctx.arc(0, 0, R_TUYAU - 2 + (t.flash || 0) * 3, 0, 7); ctx.fill();
+      ctx.rotate(tJeu * (entree ? 4 : -4) + tIntro * 3);
+      ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2.5;
+      for (let k = 0; k < 3; k++) { ctx.rotate(2.09); ctx.beginPath(); ctx.arc(0, 0, 10, 0, 1.6); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+
+  // Murs de pierre
+  ctx.lineCap = 'round';
+  for (const m of N.murs || []) {
+    ctx.strokeStyle = '#7f879c'; ctx.lineWidth = EP_MUR * 2;
+    ctx.beginPath(); ctx.moveTo(m[0], m[1]); ctx.lineTo(m[2], m[3]); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(m[0] - 2, m[1] - 2); ctx.lineTo(m[2] - 2, m[3] - 2); ctx.stroke();
+  }
+  // Rochers
+  for (const ro of N.rochers || []) {
+    ctx.fillStyle = '#8d93a6'; ctx.beginPath(); ctx.arc(ro[0], ro[1], ro[2], 0, 7); ctx.fill();
+    ctx.fillStyle = '#a7adbf'; ctx.beginPath(); ctx.arc(ro[0] - ro[2] * 0.25, ro[1] - ro[2] * 0.3, ro[2] * 0.6, 0, 7); ctx.fill();
+    ctx.fillStyle = '#c4c9d6'; ctx.beginPath(); ctx.arc(ro[0] - ro[2] * 0.4, ro[1] - ro[2] * 0.45, ro[2] * 0.2, 0, 7); ctx.fill();
+  }
+  // Éponges (gonflent quand elles boivent)
+  for (const e of eponges) {
+    const k = 1 + Math.min(0.25, e.bu * 0.006) + e.tBu * 0.3;
+    ctx.save(); ctx.translate(e.x + e.w / 2, e.y + e.h / 2); ctx.scale(k, k);
+    ctx.fillStyle = '#f4c542'; rondRect(-e.w / 2, -e.h / 2, e.w, e.h, 9); ctx.fill();
+    ctx.strokeStyle = '#c79a1c'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = '#d9a72a';
+    for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.arc(-e.w / 2 + 9 + ((i * 23) % (e.w - 16)), -e.h / 2 + 9 + ((i * 13) % (e.h - 16)), 3 + (i % 3), 0, 7); ctx.fill(); }
+    // Petite bouche qui boit
+    ctx.strokeStyle = '#8a6510'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 2, 6, 0.2, Math.PI - 0.2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Verres : intérieur
+  for (const v of verres) {
+    const g = v.x - v.w / 2;
+    ctx.fillStyle = 'rgba(255,255,255,.55)';
+    ctx.beginPath(); ctx.moveTo(g, v.y - v.h); ctx.lineTo(g + 2, v.y); ctx.lineTo(g + v.w - 2, v.y); ctx.lineTo(g + v.w, v.y - v.h); ctx.fill();
+    // Trait de la teinte voulue
+    ctx.fillStyle = v.teinte; ctx.globalAlpha = 0.22;
+    ctx.fillRect(g + 3, v.y - v.h, v.w - 6, 8);
+    ctx.globalAlpha = 1;
+  }
+
+  // Gouttes
+  for (const p of gouttes) {
+    ctx.fillStyle = couleurGoutte(p);
+    ctx.beginPath(); ctx.arc(p.x, p.y, 5.6, 0, 7); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  for (const p of gouttes) { ctx.beginPath(); ctx.arc(p.x - 1.6, p.y - 1.8, 1.5, 0, 7); ctx.fill(); }
+
+  // Verres : bords et étiquettes
+  for (const v of verres) {
+    const g = v.x - v.w / 2;
+    const saut = v.plein ? Math.max(0, Math.sin((tJeu - v.tPlein) * 10)) * 3 * Math.max(0, 1 - (tJeu - v.tPlein)) : 0;
+    ctx.strokeStyle = v.plein ? '#2e9a4c' : v.trouble ? '#d94545' : '#24406e'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(g, v.y - v.h - saut); ctx.lineTo(g + 2, v.y); ctx.lineTo(g + v.w - 2, v.y); ctx.lineTo(g + v.w, v.y - v.h - saut); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(g + 7, v.y - v.h + 10); ctx.lineTo(g + 8, v.y - 12); ctx.stroke();
+    dessinerEtiquette(v);
+  }
+
+  // Bacs de l'équipe
+  for (const b of bacs) dessinerBac(b);
+
+  // Traits dessinés
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  for (const t of traits.concat(traitEnCours ? [traitEnCours] : [])) {
+    if (t.pts.length < 2) { ctx.fillStyle = '#5b46b8'; ctx.beginPath(); ctx.arc(t.pts[0][0], t.pts[0][1], EP_TRAIT, 0, 7); ctx.fill(); continue; }
+    ctx.strokeStyle = t === traitEnCours ? '#7a5ce0' : '#5b46b8'; ctx.lineWidth = EP_TRAIT * 2 + 1;
+    ctx.beginPath(); ctx.moveTo(t.pts[0][0], t.pts[0][1]);
+    for (const q of t.pts) ctx.lineTo(q[0], q[1]);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // Effets
+  for (const e of effets) {
+    ctx.globalAlpha = Math.min(1, e.vie * 2);
+    ctx.fillStyle = e.coul;
+    if (e.type === 'etin') dessinerEtoile(e.x, e.y, 5);
+    else { ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.rot); ctx.fillRect(-4, -2.5, 8, 5); ctx.restore(); }
+  }
+  ctx.globalAlpha = 1;
+
+  if (etat === 'intro') dessinerIntro();
+}
+
+function dessinerEtoile(x, y, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+
+// Étiquette au-dessus du verre : une pastille par couleur voulue, avec le compte
+function dessinerEtiquette(v) {
+  const cles = Object.keys(v.veut);
+  const larg = cles.length * 52;
+  let x = Math.max(4, Math.min(W - 4 - larg, v.x - larg / 2));
+  const y = v.y - v.h - 26;
+  ctx.fillStyle = v.plein ? '#e2f7e7' : v.trouble ? '#ffe3e3' : 'rgba(255,255,255,.92)';
+  rondRect(x, y, larg, 20, 10); ctx.fill();
+  ctx.strokeStyle = v.plein ? '#2e9a4c' : v.trouble ? '#d94545' : v.teinte; ctx.lineWidth = 2; ctx.stroke();
+  ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  for (const c of cles) {
+    ctx.fillStyle = COUL[c].hex; ctx.beginPath(); ctx.arc(x + 11, y + 10, 6, 0, 7); ctx.fill();
+    ctx.fillStyle = '#1f2a44';
+    ctx.fillText(`${Math.min(v.compte[c], v.veut[c])}/${v.veut[c]}`, x + 20, y + 10.5);
+    x += 52;
+  }
+  if (v.plein) {
+    ctx.fillStyle = '#2e9a4c'; ctx.beginPath(); ctx.arc(v.x, y - 12, 10, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(v.x - 5, y - 12); ctx.lineTo(v.x - 1, y - 8); ctx.lineTo(v.x + 5, y - 16); ctx.stroke();
+  } else if (v.trouble) {
+    ctx.fillStyle = '#d94545'; ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('Mauvaise couleur !', v.x, y - 10);
+  } else if (cles.length > 1) {
+    ctx.fillStyle = v.teinte; ctx.font = 'bold 13px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(MELANGE[v.cles].nom, v.x, y - 10);
+  }
+}
+
+// Un bac de l'équipe : bord, visage, trappe
+function dessinerBac(b) {
+  const c = COUL[b.c].hex;
+  // Bandeau avec le visage, au-dessus du bac
+  const yb = b.y - 22;
+  ctx.fillStyle = c; rondRect(b.x - 3, yb, b.w + 6, 22, 10); ctx.fill();
+  ctx.strokeStyle = '#24406e'; ctx.lineWidth = 3; ctx.stroke();
+  const cligne = (Math.floor((tJeu + tIntro + b.x) * 1.3) % 5 === 0) && ((tJeu + tIntro) * 1.3 % 1 < 0.15);
+  for (const ox of [-14, 14]) {
+    const ex = b.x + b.w / 2 + ox, ey = yb + 11;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(ex, ey, 6, cligne ? 1.5 : 6, 0, 0, 7); ctx.fill();
+    if (!cligne) { ctx.fillStyle = '#24406e'; ctx.beginPath(); ctx.arc(ex + (b.ouvert ? 0 : 1.5), ey + (b.ouvert ? 2 : 1), 2.8, 0, 7); ctx.fill(); }
+  }
+  ctx.strokeStyle = '#24406e'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  if (b.ouvert) ctx.arc(b.x + b.w / 2, yb + 13, 5, 0.1, Math.PI - 0.1); else ctx.arc(b.x + b.w / 2, yb + 13, 3, 0.3, Math.PI - 0.3);
+  ctx.stroke();
+  // Parois
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#24406e'; ctx.lineWidth = EP_VERRE * 2 + 1;
+  ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x, b.y + b.h); ctx.moveTo(b.x + b.w, b.y); ctx.lineTo(b.x + b.w, b.y + b.h); ctx.stroke();
+  // Trappe : deux battants qui s'ouvrent vers le bas
+  const a = b.tOuvert * 1.35;
+  const demi = b.w / 2;
+  ctx.strokeStyle = b.ouvert ? '#6b7a99' : '#24406e';
+  ctx.beginPath();
+  ctx.moveTo(b.x, b.y + b.h); ctx.lineTo(b.x + Math.cos(a) * demi, b.y + b.h + Math.sin(a) * demi);
+  ctx.moveTo(b.x + b.w, b.y + b.h); ctx.lineTo(b.x + b.w - Math.cos(a) * demi, b.y + b.h + Math.sin(a) * demi);
+  ctx.stroke();
+  // « Touche-moi » qui clignote quand on peut ouvrir
+  if (!b.ouvert && etat === 'jeu') {
+    const k = 0.5 + 0.5 * Math.sin(tJeu * 5);
+    ctx.globalAlpha = 0.5 + 0.5 * k;
+    ctx.fillStyle = '#24406e'; ctx.font = 'bold 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('touche-moi', b.x + b.w / 2, b.y + b.h + 12);
+    ctx.globalAlpha = 1;
+  }
+}
+
+// Une main dessinée (index tendu, bout du doigt en x, y)
+function dessinerMain(x, y, appui) {
+  ctx.save();
+  if (appui) {
+    ctx.strokeStyle = 'rgba(255,140,40,.8)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, 10 + appui * 14, 0, 7); ctx.stroke();
+  }
+  ctx.translate(x, y); ctx.rotate(-0.35);
+  ctx.fillStyle = '#fff'; ctx.strokeStyle = '#24406e'; ctx.lineWidth = 2.5;
+  rondRect(-7, -2, 14, 40, 7); ctx.fill(); ctx.stroke();
+  rondRect(-10, 26, 36, 34, 12); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(6, 30); ctx.lineTo(6, 40); ctx.moveTo(15, 30); ctx.lineTo(15, 40); ctx.stroke();
+  ctx.restore();
+}
+
+// Présentation animée : tutoriel (3 étapes) ou nouveauté (flèche qui rebondit)
+function dessinerIntro() {
+  ctx.fillStyle = 'rgba(20,40,80,.12)'; ctx.fillRect(0, 0, W, H);
+  if (introCle === 'tuto') {
+    const cycle = 5.4, t = tIntro % cycle;
+    const b = bacs[0], v = verres[0];
+    const A = { x: b.x + 4, y: b.y + b.h + 50 }, B = { x: v.x - 12, y: v.y - v.h - 20 };
+    const etape = t < 2.4 ? 0 : t < 3.6 ? 1 : 2;
+    majBulle(TUTO_ETAPES[etape], true);
+    // Trait fantôme qui se dessine
+    const k = Math.min(1, t / 2.2);
+    ctx.setLineDash([10, 8]); ctx.strokeStyle = 'rgba(91,70,184,.75)'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(A.x + (B.x - A.x) * k, A.y + (B.y - A.y) * k); ctx.stroke();
+    ctx.setLineDash([]);
+    if (etape === 0) dessinerMain(A.x + (B.x - A.x) * k, A.y + (B.y - A.y) * k, 0);
+    else if (etape === 1) dessinerMain(b.x + b.w / 2, b.y + b.h / 2, ((t - 2.4) * 2) % 1);
+    else {
+      // Gouttes fantômes qui suivent le chemin, et flèche vers le verre
+      const u = (t - 3.6) / 1.8;
+      ctx.fillStyle = 'rgba(59,156,255,.85)';
+      for (let i = 0; i < 6; i++) {
+        const q = Math.min(1, Math.max(0, u * 1.4 - i * 0.1));
+        ctx.beginPath(); ctx.arc(A.x + (B.x - A.x) * q, A.y + (B.y - A.y) * q - 9, 5.5, 0, 7); ctx.fill();
+      }
+      dessinerFleche(v.x, v.y - v.h - 34);
+    }
+  } else {
+    const def = INTROS[introCle];
+    const c = def.cible(N);
+    const k = 0.5 + 0.5 * Math.sin(tIntro * 5);
+    ctx.strokeStyle = 'rgba(255,170,30,.9)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(c.x, c.y, 26 + k * 8, 0, 7); ctx.stroke();
+    if (introCle === 'tour') {
+      // Démonstration : deux chemins qui se croisent, l'un après l'autre
+      const t = tIntro % 4;
+      ctx.setLineDash([10, 8]); ctx.lineWidth = 6; ctx.lineCap = 'round';
+      ctx.strokeStyle = t < 2 ? 'rgba(59,156,255,.9)' : 'rgba(59,156,255,.2)';
+      ctx.beginPath(); ctx.moveTo(25, 180); ctx.lineTo(285, 460); ctx.stroke();
+      if (t >= 2) { ctx.strokeStyle = 'rgba(230,170,0,.9)'; ctx.beginPath(); ctx.moveTo(335, 180); ctx.lineTo(75, 460); ctx.stroke(); }
+      ctx.setLineDash([]);
+      dessinerMain(t < 2 ? 25 + 260 * Math.min(1, t / 1.6) : 335 - 260 * Math.min(1, (t - 2) / 1.6), t < 2 ? 180 + 280 * Math.min(1, t / 1.6) : 180 + 280 * Math.min(1, (t - 2) / 1.6), 0);
+    } else if (introCle === 'equipe') {
+      dessinerMain(bacs[1].x + bacs[1].w / 2, bacs[1].y + bacs[1].h / 2, (tIntro * 1.5) % 1);
+    } else {
+      dessinerFleche(c.x, c.y - 40 - k * 10);
+    }
+  }
+}
+function dessinerFleche(x, y) {
+  ctx.fillStyle = '#ff9a1f'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x, y + 18); ctx.lineTo(x - 14, y); ctx.lineTo(x - 6, y); ctx.lineTo(x - 6, y - 18);
+  ctx.lineTo(x + 6, y - 18); ctx.lineTo(x + 6, y); ctx.lineTo(x + 14, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+}
+
+// ---------------------------------------------------------------------
+// Bulle, message, présentation
+// ---------------------------------------------------------------------
+let texteBulle = '';
+function majBulle(texte, aide) {
+  if (texte === texteBulle) return;
+  texteBulle = texte;
+  const b = $('bulle');
+  b.innerHTML = texte + (aide ? '<small>Touche l’écran pour jouer</small>' : '');
+  b.classList.add('visible');
+}
+function fermerBulle() { texteBulle = ''; $('bulle').classList.remove('visible'); }
+// La bulle se place sous les bacs, ou plus bas si ce qu'elle montre est en haut
+function placerBulle(yMonde) {
+  $('bulle').style.top = Math.round(decY + yMonde * echelle) + 'px';
+}
+function montrerIntro(cle) {
+  introCle = cle; tIntro = 0; etat = 'intro';
+  if (cle === 'tuto') placerBulle(125);
+  else { placerBulle(INTROS[cle].cible(N).y < 300 ? 330 : 125); majBulle(INTROS[cle].texte, true); }
+  majOuvrir();
+}
+function fermerIntro() {
+  if (etat !== 'intro') return;
+  sauve.vus[introCle] = true; enregistrer();
+  introCle = null; etat = 'jeu'; fermerBulle(); SON.clic();
+  majOuvrir();
+  if (N.astuce && !astuceMontree) { astuceMontree = true; montrerToast(N.astuce, 4000); }
+}
+let minuterieToast = null, toastVisible = false;
+function montrerToast(texte, duree) {
+  const t = $('toast');
+  t.textContent = texte; t.classList.add('visible'); toastVisible = true;
+  clearTimeout(minuterieToast);
+  minuterieToast = setTimeout(cacherToast, duree);
+}
+function cacherToast() { $('toast').classList.remove('visible'); toastVisible = false; }
+
+// ---------------------------------------------------------------------
+// Actions du joueur
+// ---------------------------------------------------------------------
+function ouvrirBac(b) {
+  if (!b || b.ouvert || etat !== 'jeu') return;
+  b.ouvert = true; b.tOuvert = 0;
+  construireFixes();
+  SON.ouvrir();
+  for (let i = 0; i < 6; i++) etincelle(b.x + b.w / 2 + (Math.random() - 0.5) * b.w, b.y - 10, COUL[b.c].hex);
+  majOuvrir();
+  cacherToast();
+}
+function ouvrirSuivant() { ouvrirBac(bacs.find((b) => !b.ouvert)); }
+function annuler() {
+  if (etat !== 'jeu' && etat !== 'victoire') return;
+  if (traitEnCours) traitEnCours = null; else traits.pop();
+  reconstruireTraits(); majEncre(); majOuvrir(); SON.clic();
+}
+function effacer() {
+  if (etat !== 'jeu' && etat !== 'victoire') return;
+  traits = []; traitEnCours = null; reconstruireTraits(); majEncre(); majOuvrir(); SON.clic();
+}
+const dansZone = (x, y) => (N.zones || []).find((z) => x > z[0] - 2 && x < z[0] + z[2] + 2 && y > z[1] - 2 && y < z[1] + z[3] + 2);
+
+function versMonde(ev) {
+  const r = toile.getBoundingClientRect();
+  return { x: (ev.clientX - r.left - decX) / echelle, y: (ev.clientY - r.top - decY) / echelle };
+}
+toile.addEventListener('pointerdown', (ev) => {
+  ev.preventDefault();
+  initAudio();
+  if (etat === 'intro') { fermerIntro(); return; }
+  if (etat !== 'jeu' && etat !== 'victoire') return;
+  const p = versMonde(ev);
+  // Toucher un bac fermé l'ouvre
+  const bac = bacs.find((b) => !b.ouvert && p.x > b.x - 10 && p.x < b.x + b.w + 10 && p.y > b.y - 30 && p.y < b.y + b.h + 22);
+  if (bac) { ouvrirBac(bac); return; }
+  const z = dansZone(p.x, p.y);
+  if (z) { z.flash = 1; SON.interdit(); montrerToast('Zone rayée : on ne peut pas dessiner ici !', 1800); return; }
+  if (encreUtilisee() >= N.encre - 1) { SON.interdit(); montrerToast("Plus d'encre ! ↩ annule un trait.", 1800); return; }
+  traitEnCours = { pts: [[p.x, p.y]], long: 0 };
+  try { toile.setPointerCapture(ev.pointerId); } catch (e) { /* rien */ }
+});
+toile.addEventListener('pointermove', (ev) => {
+  if (!traitEnCours) return;
+  ev.preventDefault();
+  const p = versMonde(ev);
+  const der = traitEnCours.pts[traitEnCours.pts.length - 1];
+  let dx = p.x - der[0], dy = p.y - der[1];
+  let d = Math.hypot(dx, dy);
+  if (d < PT_MIN) return;
+  const reste = N.encre - encreUtilisee();
+  if (reste <= 0.5) { finirTrait(); montrerToast("Plus d'encre ! ↩ annule un trait.", 1800); return; }
+  if (d > reste) { dx *= reste / d; dy *= reste / d; d = reste; }
+  const nx = der[0] + dx, ny = der[1] + dy;
+  const z = dansZone(nx, ny) || dansZone(der[0] + dx / 2, der[1] + dy / 2);
+  if (z) { z.flash = 1; SON.interdit(); finirTrait(); return; }
+  traitEnCours.pts.push([nx, ny]);
+  traitEnCours.long += d;
+  segTraits.push(segment(der[0], der[1], nx, ny, EP_TRAIT));
+  encrePic = Math.max(encrePic, encreUtilisee());
+  majEncre();
+  if (performance.now() - dernierTrait > 70) { SON.trait(); dernierTrait = performance.now(); }
+});
+function finirTrait() {
+  if (!traitEnCours) return;
+  if (traitEnCours.pts.length >= 2) traits.push(traitEnCours);
+  traitEnCours = null;
+  reconstruireTraits(); majEncre(); majOuvrir();
+}
+toile.addEventListener('pointerup', finirTrait);
+toile.addEventListener('pointercancel', finirTrait);
+
+// Boutons
+function bouton(id, action) {
+  $(id).addEventListener('click', (ev) => { ev.preventDefault(); initAudio(); action(); });
+}
+bouton('btn-annuler', annuler);
+bouton('btn-effacer', effacer);
+bouton('btn-recommencer', () => { if (etat !== 'menu') { SON.clic(); chargerNiveau(niv); } });
+bouton('btn-ouvrir', () => { if (etat === 'intro') fermerIntro(); ouvrirSuivant(); });
+bouton('btn-aide', () => {
+  if (etat !== 'jeu') return;
+  const cle = N.intro || 'tuto';
+  if (cle === 'tuto' || INTROS[cle]) montrerIntro(cle);
+});
+bouton('btn-son', () => { sauve.son = !sauve.son; enregistrer(); majSon(); SON.clic(); });
+function majSon() {
+  $('btn-son').textContent = sauve.son ? '🔊' : '🔇';
+  $('btn-son').setAttribute('aria-label', sauve.son ? 'Couper le son' : 'Remettre le son');
+}
+bouton('btn-menu', ouvrirNiveaux);
+bouton('btn-niveaux', ouvrirNiveaux);
+bouton('btn-fermer-niveaux', () => {
+  $('ecran-niveaux').classList.remove('visible');
+  SON.clic();
+  if (etat === 'pause') etat = etatAvantPause;
+  else if (etat === 'fin') $('bilan').classList.add('visible');   // retour au bilan, jamais à un niveau figé
+});
+bouton('btn-jouer', () => {
+  // On reprend au premier niveau ouvert qui n'a pas encore 3 étoiles
+  let i = 0;
+  while (i < NIVEAUX.length - 1 && niveauOuvert(i + 1) && (sauve.etoiles[i] || 0) >= 3) i++;
+  lancer(i);
+});
+bouton('btn-suivant', () => lancer(Math.min(NIVEAUX.length - 1, niv + 1)));
+bouton('btn-rejouer', () => lancer(niv));
+bouton('btn-bilan-niveaux', () => { $('bilan').classList.remove('visible'); ouvrirNiveaux(); });
+
+let etatAvantPause = 'jeu';
+function ouvrirNiveaux() {
+  SON.clic();
+  if (etat === 'jeu' || etat === 'intro' || etat === 'victoire') { etatAvantPause = etat; etat = 'pause'; }
+  const grille = $('grille');
+  grille.innerHTML = '';
+  NIVEAUX.forEach((n, i) => {
+    const b = document.createElement('button');
+    b.className = 'case';
+    const et = sauve.etoiles[i] || 0;
+    b.innerHTML = niveauOuvert(i) ? `${i + 1}<small>${'★'.repeat(et)}${'☆'.repeat(3 - et)}</small>` : `🔒`;
+    b.setAttribute('aria-label', `Niveau ${i + 1} : ${n.nom}`);
+    b.disabled = !niveauOuvert(i);
+    b.addEventListener('click', () => { initAudio(); lancer(i); });
+    grille.appendChild(b);
+  });
+  $('total-niveaux').textContent = `⭐ ${totalEtoiles()} / ${NIVEAUX.length * 3}`;
+  $('ecran-niveaux').classList.add('visible');
+}
+function lancer(i) {
+  SON.clic();
+  for (const e of ['accueil', 'ecran-niveaux', 'bilan']) $(e).classList.remove('visible');
+  chargerNiveau(i);
+}
+
+// Clavier : Espace/Entrée ouvre un bac, Z ou Retour arrière annule, R recommence, M coupe le son
+document.addEventListener('keydown', (ev) => {
+  initAudio();
+  const k = ev.key;
+  if ($('accueil').classList.contains('visible')) {
+    if (k === 'Enter' || k === ' ') { ev.preventDefault(); $('btn-jouer').click(); }
+    return;
+  }
+  if ($('bilan').classList.contains('visible')) {
+    if (k === 'Enter' || k === ' ') { ev.preventDefault(); ($('btn-suivant').style.display !== 'none' ? $('btn-suivant') : $('btn-rejouer')).click(); }
+    return;
+  }
+  if ($('ecran-niveaux').classList.contains('visible')) { if (k === 'Escape') $('btn-fermer-niveaux').click(); return; }
+  if (etat === 'intro') { ev.preventDefault(); fermerIntro(); return; }
+  if (k === ' ' || k === 'Enter') { ev.preventDefault(); ouvrirSuivant(); }
+  else if (k === 'z' || k === 'Z' || k === 'Backspace') { ev.preventDefault(); annuler(); }
+  else if (k === 'r' || k === 'R') chargerNiveau(niv);
+  else if (k === 'm' || k === 'M') $('btn-son').click();
+  else if (k === 'Escape') ouvrirNiveaux();
+});
+
+// ---------------------------------------------------------------------
+// Démarrage : l'accueil, avec le niveau 1 en fond
+// ---------------------------------------------------------------------
+majSon();
+redimensionner();
+chargerNiveau(0);
+etat = 'menu'; fermerBulle();
+if (totalEtoiles() > 0) $('total-accueil').textContent = `⭐ ${totalEtoiles()} / ${NIVEAUX.length * 3} étoiles gagnées`;
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
