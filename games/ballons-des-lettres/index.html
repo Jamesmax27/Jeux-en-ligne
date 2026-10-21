@@ -127,6 +127,7 @@
    { "fr": {…}, "en": {…}, … }. Un petit bouton de langue s'ajoute dans le coin
    indiqué par data-coin (haut-gauche, haut-droite, bas-gauche, bas-droite ;
    data-coin-decalage="52px" l'éloigne du bord haut ou bas, ex. sous une barre ;
+   data-place="id1 id2" le met plutôt dans ces éléments du jeu (barre d'outils…) ;
    data-coin="aucun" pour le placer soi-même avec creerSelecteur). Changer de
    langue relance le jeu dans la nouvelle langue.
    Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie ce fichier).
@@ -363,14 +364,17 @@
     selecteurs.forEach(function (s) { s.maj(); });
   }
 
-  // options : { conteneur, classe, coin, decalage } ; coin = sélecteur de jeu isolé, fixé dans ce coin,
-  // éloigné du bord haut ou bas de « decalage » (longueur CSS, ex. « 52px ») s'il est donné.
+  // options : { conteneur, classe, coin, decalage, isole } ;
+  // - coin : sélecteur de jeu isolé, fixé dans ce coin, éloigné du bord haut ou bas de
+  //   « decalage » (longueur CSS, ex. « 52px ») s'il est donné ;
+  // - isole : sélecteur de jeu isolé, placé dans « conteneur » (ex. la barre du jeu).
   function creerSelecteur(options) {
     options = options || {};
     var coin = options.coin && COINS[options.coin] ? options.coin : null;
+    var isole = !!(coin || options.isole);
     var boite = document.createElement('div');
     boite.className = 'jel-langue' + (options.classe ? ' ' + options.classe : '') +
-      (coin ? ' compact' + (/droite/.test(coin) ? ' vers-gauche' : '') + (/bas/.test(coin) ? ' vers-haut' : '') : '');
+      (isole ? ' compact' : '') + (coin && /droite/.test(coin) ? ' vers-gauche' : '') + (coin && /bas/.test(coin) ? ' vers-haut' : '');
 
     var bouton = document.createElement('button');
     bouton.type = 'button';
@@ -404,6 +408,12 @@
     var hote = null; // jeu : élément <jel-langue> (un peu transparent, sauf liste ouverte)
     function opacite(v) { if (hote) hote.style.setProperty('opacity', v, 'important'); }
     function ouvrir() {
+      // Dans une barre : la liste s'ouvre vers l'intérieur de l'écran.
+      if (isole && !coin && hote) {
+        var r = hote.getBoundingClientRect();
+        boite.classList.toggle('vers-gauche', r.left > window.innerWidth / 2);
+        boite.classList.toggle('vers-haut', r.top > window.innerHeight / 2);
+      }
       menu.hidden = false;
       opacite('1');
       bouton.setAttribute('aria-expanded', 'true');
@@ -448,11 +458,13 @@
 
     // Élément ajouté à la page : la boîte elle-même (site), ou un hôte isolé (jeu).
     var element = boite;
-    if (coin) {
+    if (isole) {
       element = hote = document.createElement('jel-langue');
       element.className = 'jel-langue';
-      var place = COINS[coin];
-      var style = { position: 'fixed', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'block' };
+      var place = coin ? COINS[coin] : {};
+      var style = coin
+        ? { position: 'fixed', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'block' }
+        : { position: 'relative', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'inline-block', 'vertical-align': 'middle', flex: 'none' };
       for (var p in place) style[p] = options.decalage && /^(top|bottom)$/.test(p) ? 'calc(' + place[p] + ' + ' + options.decalage + ')' : place[p];
       for (var nomStyle in style) element.style.setProperty(nomStyle, style[nomStyle], 'important');
       var ombre = element.attachShadow ? element.attachShadow({ mode: 'open' }) : element;
@@ -524,8 +536,11 @@
   if (modeJeu) {
     var demarrer = function () {
       appliquer(document);
+      // data-place="id1 id2" : bouton(s) dans ces éléments du jeu ; sinon dans le coin data-coin.
+      var places = (blocJeu.getAttribute('data-place') || '').split(/\s+/).map(function (id) { return id && document.getElementById(id); }).filter(Boolean);
       var coin = blocJeu.getAttribute('data-coin') || 'haut-gauche';
-      if (coin !== 'aucun' && document.body) {
+      if (places.length) places.forEach(function (el) { creerSelecteur({ conteneur: el, isole: true }); });
+      else if (coin !== 'aucun' && document.body) {
         creerSelecteur({ conteneur: document.body, coin: coin, decalage: blocJeu.getAttribute('data-coin-decalage') || '' });
       }
     };
