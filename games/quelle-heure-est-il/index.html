@@ -345,6 +345,36 @@
   // Bouton (code de la langue) qui ouvre la liste des 5 langues, chacune avec
   // son code et son nom dans sa propre langue. Pas de drapeaux. Doigt et clavier
   // (Entrée, Espace, flèches, Échap).
+  // Dans un jeu, il est isolé dans un Shadow DOM (élément <jel-langue>) : le CSS
+  // du jeu (button {…}, * {…}) ne peut pas le déformer, et inversement.
+
+  var CSS_SELECTEUR =
+    '.jel-langue{position:relative;display:inline-block;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif;text-align:left;color:#eceae4}' +
+    '.jel-langue *{box-sizing:border-box}' +
+    '.jel-langue-bouton{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;margin:0;padding:0 10px;border:0;border-radius:999px;background:rgba(11,16,32,.55);color:#eceae4;font:inherit;line-height:1;cursor:pointer;box-shadow:none}' +
+    '.jel-langue-code{font-weight:800;letter-spacing:.04em}' +
+    '.jel-langue-menu{position:absolute;z-index:2147483001;min-width:170px;margin:6px 0 0;padding:6px;list-style:none;border-radius:14px;background:#161f38;box-shadow:0 10px 30px rgba(0,0,0,.45);border:1px solid #434e6b}' +
+    '.jel-langue-menu[hidden]{display:none}' +
+    '.jel-langue-menu li{margin:0;padding:0}' +
+    '.jel-langue-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;margin:0;padding:0 12px;border:0;border-radius:10px;background:none;color:#eceae4;font:inherit;text-align:left;cursor:pointer;box-shadow:none;white-space:nowrap}' +
+    '.jel-langue-menu button b{min-width:2.2em;color:#a8b3f0}' +
+    '.jel-langue-menu button[aria-current="true"]{background:#a8b3f0;color:#0b1020}' +
+    '.jel-langue-menu button[aria-current="true"] b{color:#0b1020}' +
+    '.jel-langue-menu button:hover:not([aria-current="true"]),.jel-langue-menu button:focus-visible{background:#1d2745}' +
+    '.jel-langue :focus-visible{outline:3px solid #a8b3f0;outline-offset:2px}' +
+    // Jeu : petit bouton discret (code seul) ; liste ouverte vers l'intérieur de l'écran.
+    '.jel-langue.compact .jel-langue-bouton{min-width:40px;min-height:40px;padding:0 8px;font-size:12px;background:rgba(11,16,32,.45);border:1px solid rgba(255,255,255,.3)}' +
+    '.jel-langue.compact .jel-langue-nom{display:none}' +
+    '.jel-langue.vers-gauche .jel-langue-menu{right:0}' +
+    '.jel-langue.vers-haut .jel-langue-menu{bottom:100%;margin:0 0 6px}';
+
+  // Place du bouton dans un jeu, selon le coin choisi (data-coin).
+  var COINS = {
+    'haut-gauche': { top: 'max(6px, env(safe-area-inset-top))', left: 'max(6px, env(safe-area-inset-left))' },
+    'haut-droite': { top: 'max(6px, env(safe-area-inset-top))', right: 'max(6px, env(safe-area-inset-right))' },
+    'bas-gauche': { bottom: 'max(6px, env(safe-area-inset-bottom))', left: 'max(6px, env(safe-area-inset-left))' },
+    'bas-droite': { bottom: 'max(6px, env(safe-area-inset-bottom))', right: 'max(6px, env(safe-area-inset-right))' },
+  };
 
   var selecteurs = [];
 
@@ -352,10 +382,13 @@
     selecteurs.forEach(function (s) { s.maj(); });
   }
 
+  // options : { conteneur, classe, coin } ; coin = selecteur de jeu isolé, fixé dans ce coin.
   function creerSelecteur(options) {
     options = options || {};
+    var coin = options.coin && COINS[options.coin] ? options.coin : null;
     var boite = document.createElement('div');
-    boite.className = 'jel-langue' + (options.classe ? ' ' + options.classe : '');
+    boite.className = 'jel-langue' + (options.classe ? ' ' + options.classe : '') +
+      (coin ? ' compact' + (/droite/.test(coin) ? ' vers-gauche' : '') + (/bas/.test(coin) ? ' vers-haut' : '') : '');
 
     var bouton = document.createElement('button');
     bouton.type = 'button';
@@ -386,8 +419,11 @@
       return b;
     });
 
+    var hote = null; // jeu : élément <jel-langue> (un peu transparent, sauf liste ouverte)
+    function opacite(v) { if (hote) hote.style.setProperty('opacity', v, 'important'); }
     function ouvrir() {
       menu.hidden = false;
+      opacite('1');
       bouton.setAttribute('aria-expanded', 'true');
       var actuel = choix[LANGUES.indexOf(langue)] || choix[0];
       actuel.focus();
@@ -395,6 +431,7 @@
     function fermer(rendreFocus) {
       if (menu.hidden) return;
       menu.hidden = true;
+      opacite('.85');
       bouton.setAttribute('aria-expanded', 'false');
       if (rendreFocus) bouton.focus();
     }
@@ -404,8 +441,9 @@
       if (menu.hidden) ouvrir(); else fermer(false);
     });
     menu.addEventListener('keydown', function (e) {
-      var i = choix.indexOf(document.activeElement);
-      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fermer(true); }
+      var racine = boite.getRootNode();
+      var i = choix.indexOf(racine.activeElement || document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); fermer(true); }
       else if (e.key === 'ArrowDown') { e.preventDefault(); choix[(i + 1) % choix.length].focus(); }
       else if (e.key === 'ArrowUp') { e.preventDefault(); choix[(i - 1 + choix.length) % choix.length].focus(); }
       else if (e.key === 'Tab') fermer(false);
@@ -416,15 +454,33 @@
       e.stopPropagation();
     });
     // Un toucher ailleurs referme la liste (sans gêner le jeu).
-    document.addEventListener('pointerdown', function (e) { if (!boite.contains(e.target)) fermer(false); }, true);
+    document.addEventListener('pointerdown', function (e) {
+      var chemin = e.composedPath ? e.composedPath() : [e.target];
+      if (chemin.indexOf(boite) < 0) fermer(false);
+    }, true);
     // Les gestes sur le sélecteur ne doivent pas arriver au jeu.
-    ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach(function (type) {
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click'].forEach(function (type) {
       boite.addEventListener(type, function (e) { e.stopPropagation(); });
     });
-
     boite.append(bouton, menu);
+
+    // Élément ajouté à la page : la boîte elle-même (site), ou un hôte isolé (jeu).
+    var element = boite;
+    if (coin) {
+      element = hote = document.createElement('jel-langue');
+      element.className = 'jel-langue';
+      var place = COINS[coin];
+      var style = { position: 'fixed', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'block' };
+      for (var p in place) style[p] = place[p];
+      for (var nomStyle in style) element.style.setProperty(nomStyle, style[nomStyle], 'important');
+      var ombre = element.attachShadow ? element.attachShadow({ mode: 'open' }) : element;
+      var feuille = document.createElement('style');
+      feuille.textContent = CSS_SELECTEUR;
+      ombre.append(feuille, boite);
+    }
+
     var s = {
-      element: boite,
+      element: element,
       maj: function () {
         code.textContent = langue.toUpperCase();
         nom.textContent = NOMS[langue];
@@ -439,38 +495,16 @@
     };
     s.maj();
     selecteurs.push(s);
-    if (options.conteneur) options.conteneur.append(boite);
-    return boite;
+    if (options.conteneur) options.conteneur.append(element);
+    return element;
   }
 
-  // Style de base du sélecteur (le site le complète dans style.css).
+  // Site : style de base du sélecteur dans la page (style.css le complète).
   function ajouterStyle() {
     if (document.getElementById('jel-langue-style')) return;
     var style = document.createElement('style');
     style.id = 'jel-langue-style';
-    style.textContent =
-      '.jel-langue{position:relative;display:inline-block;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif}' +
-      '.jel-langue-bouton{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;padding:0 10px;border:0;border-radius:999px;background:rgba(11,16,32,.55);color:#eceae4;font:inherit;cursor:pointer}' +
-      '.jel-langue-code{font-weight:800;letter-spacing:.04em}' +
-      '.jel-langue-menu{position:absolute;z-index:2147483001;min-width:170px;margin:6px 0 0;padding:6px;list-style:none;border-radius:14px;background:#161f38;box-shadow:0 10px 30px rgba(0,0,0,.45);border:1px solid #434e6b}' +
-      '.jel-langue-menu[hidden]{display:none}' +
-      '.jel-langue-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:0 12px;border:0;border-radius:10px;background:none;color:#eceae4;font:inherit;text-align:left;cursor:pointer}' +
-      '.jel-langue-menu button b{min-width:2.2em;color:#a8b3f0}' +
-      '.jel-langue-menu button[aria-current="true"]{background:#a8b3f0;color:#0b1020}' +
-      '.jel-langue-menu button[aria-current="true"] b{color:#0b1020}' +
-      '.jel-langue-menu button:hover:not([aria-current="true"]),.jel-langue-menu button:focus-visible{background:#1d2745}' +
-      '.jel-langue :focus-visible{outline:3px solid #a8b3f0;outline-offset:2px}' +
-      // Jeu : petit bouton discret dans un coin, au-dessus du jeu.
-      '.jel-langue-jeu{position:fixed;z-index:2147483000;opacity:.8}' +
-      '.jel-langue-jeu:hover,.jel-langue-jeu:focus-within{opacity:1}' +
-      '.jel-langue-jeu .jel-langue-bouton{min-width:40px;min-height:40px;padding:0 8px;font-size:12px;background:rgba(11,16,32,.45);border:1px solid rgba(255,255,255,.25)}' +
-      '.jel-langue-jeu .jel-langue-nom{display:none}' +
-      '.jel-coin-haut-gauche{top:max(6px,env(safe-area-inset-top));left:max(6px,env(safe-area-inset-left))}' +
-      '.jel-coin-haut-droite{top:max(6px,env(safe-area-inset-top));right:max(6px,env(safe-area-inset-right))}' +
-      '.jel-coin-bas-gauche{bottom:max(6px,env(safe-area-inset-bottom));left:max(6px,env(safe-area-inset-left))}' +
-      '.jel-coin-bas-droite{bottom:max(6px,env(safe-area-inset-bottom));right:max(6px,env(safe-area-inset-right))}' +
-      '.jel-coin-haut-droite .jel-langue-menu,.jel-coin-bas-droite .jel-langue-menu{right:0}' +
-      '.jel-coin-bas-gauche .jel-langue-menu,.jel-coin-bas-droite .jel-langue-menu{bottom:100%;margin:0 0 6px}';
+    style.textContent = CSS_SELECTEUR;
     (document.head || document.documentElement).append(style);
   }
 
@@ -503,14 +537,14 @@
   };
   if (!('t' in window)) window.t = t;
 
-  ajouterStyle();
+  if (!modeJeu) ajouterStyle();
 
   if (modeJeu) {
     var demarrer = function () {
       appliquer(document);
       var coin = blocJeu.getAttribute('data-coin') || 'haut-gauche';
       if (coin !== 'aucun' && document.body) {
-        creerSelecteur({ conteneur: document.body, classe: 'jel-langue-jeu jel-coin-' + coin });
+        creerSelecteur({ conteneur: document.body, coin: coin });
       }
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
