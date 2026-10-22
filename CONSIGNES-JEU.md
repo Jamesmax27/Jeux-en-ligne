@@ -46,6 +46,7 @@ Un nouveau jeu est **complet et travaillé, jamais un simple prototype** : il do
 - Le jeu tourne dans un **cadre isolé** : `localStorage` peut être refusé. Tout accès au stockage est entouré de `try { … } catch (e) { … }`, et le jeu fonctionne sans sauvegarde.
 - Interdits : `alert()`, `confirm()`, `prompt()`, `window.open()`, formulaires, fenêtres pop-up.
 - Aucune erreur dans la console, au démarrage comme pendant la partie.
+- **Suivi des parties : rien à ajouter dans le jeu.** Le lanceur place lui-même, en tête de chaque jeu (anciens comme nouveaux), le script commun de suivi (`SCRIPT_ERREURS` dans `public/suivi.js`), qui lui signale les erreurs JavaScript ; il mesure aussi le temps de jeu et l'envoie au site (« Tendances » de l'accueil). Le jeu ne contient donc **aucun code réseau** (`fetch`, `sendBeacon`… : bloqués par la règle de sécurité) et ne doit pas empêcher les erreurs d'arriver jusqu'à `window` (pas de `stopImmediatePropagation()` sur l'événement `error`) ; `window.onerror` reste utilisable.
 - Code lisible et commenté en français.
 
 ### Langues (obligatoire)

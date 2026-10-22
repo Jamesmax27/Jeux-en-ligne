@@ -13,15 +13,15 @@
 //     En ligne, on a donc toujours la dernière version ;
 //   - cache d'abord : jeux et jaquettes. Leur adresse contient la version
 //     (?v=…) : une nouvelle version est téléchargée et remplace l'ancienne ;
-//   - /api/scores n'est pas gardé : sans réseau, le catalogue trie par
-//     nouveautés et n'affiche pas de compteurs de votes.
+//   - /api/scores et /api/tendances ne sont pas gardés : sans réseau, le
+//     catalogue trie par nouveautés, sans compteurs de votes ni Tendances.
 //
 // VERSION : à augmenter quand la liste COQUILLE change, ou pour obliger tous
 // les appareils à re-télécharger la coquille. Les jeux gardés ne sont pas
 // touchés : ils ont leur propre cache, indépendant de VERSION.
 // ==========================================================================
 
-const VERSION = 'v4';
+const VERSION = 'v5';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
 const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
@@ -32,7 +32,7 @@ const DELAI_RESEAU = 3000;                  // ms : au-delà, la copie gardée e
 // Fichiers de la coquille, relatifs au dossier du site.
 // Les textes des 5 langues sont petits : tous gardés, pour changer de langue hors connexion.
 const COQUILLE = [
-  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'hors-ligne.js', 'regroupements.js', 'pub.js',
+  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'suivi.js', 'hors-ligne.js', 'regroupements.js', 'pub.js',
   'langue.js', 'i18n/i18n.js',
   'i18n/site/fr.json', 'i18n/site/en.json', 'i18n/site/es.json', 'i18n/site/pt.json', 'i18n/site/de.json',
   'manifest.webmanifest', 'assets/logo.svg', 'assets/sans-jaquette.svg',
@@ -49,6 +49,14 @@ const URL_CATALOGUE = new URL('catalog.json', RACINE).href;
 // --- Installation et mise à jour ---------------------------------------------
 
 self.addEventListener('install', (event) => {
+  // Les appels à l'API (votes, scores, suivi des parties) vont directement au
+  // réseau, sans passer par ce service worker : sinon, la durée de partie
+  // envoyée en quittant le jeu (sendBeacon, voir suivi.js) peut se perdre.
+  // (Chrome et Edge ; ailleurs, le filtre « fetch » ci-dessous les laisse passer.)
+  if (event.addRoutes && typeof URLPattern === 'function') {
+    event.addRoutes({ condition: { urlPattern: new URLPattern({ pathname: `${BASE}api/*` }) }, source: 'network' })
+      .catch((erreur) => console.warn('Routes du service worker refusées :', erreur));
+  }
   event.waitUntil((async () => {
     const coquille = await caches.open(CACHE_COQUILLE);
     const donnees = await caches.open(CACHE_DONNEES);

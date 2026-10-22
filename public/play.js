@@ -6,10 +6,13 @@
 //   car le cadre isolé n'a pas accès au stockage du site ;
 // - le bouton de langue du jeu envoie un message « jel-langue » : le lanceur
 //   enregistre le choix (partagé avec le catalogue) et relance le jeu.
+// Et le suivi des parties (suivi.js) : temps de jeu et erreurs JavaScript,
+// envoyés à /api/session pour les « Tendances » de l'accueil.
 // ==========================================================================
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
+import { SCRIPT_ERREURS, suivreJeu, noterErreur } from './suivi.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
   titreJeu, presentationJeu, jeuEnFrancais, jeuDisponible,
@@ -130,11 +133,12 @@ function activerVotes(gameId) {
 // Lu ici, il passe par le service worker et reste jouable sans réseau.
 
 // Ajoute la règle de sécurité avant tout le code du jeu (juste après <!doctype>,
-// pour ne pas changer son mode d'affichage), puis la langue choisie sur le site.
+// pour ne pas changer son mode d'affichage), puis la langue choisie sur le site
+// et le script qui signale les erreurs du jeu (suivi.js).
 function proteger(html) {
   const debut = /^﻿?(?:\s|<!--[\s\S]*?-->)*(?:<!doctype[^>]*>)?/i.exec(html)[0];
   const langue = `<script>window.JEL_LANG=${JSON.stringify(getLang())};</script>`;
-  return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${langue}${html.slice(debut.length)}`;
+  return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${langue}${SCRIPT_ERREURS}${html.slice(debut.length)}`;
 }
 
 function afficherJeu() {
@@ -149,10 +153,16 @@ async function chargerJeu(jeu) {
   afficherJeu();
 }
 
-// Le bouton de langue du jeu : on enregistre le choix et on relance le jeu.
+// Messages du jeu :
+// - « jel-langue » (bouton de langue) : on enregistre le choix et on relance le jeu ;
+// - « jel-erreur » (SCRIPT_ERREURS) : erreur JavaScript, notée pour le suivi.
 addEventListener('message', (evenement) => {
   if (evenement.source !== el.cadre.contentWindow) return;
   const donnees = evenement.data;
+  if (donnees?.type === 'jel-erreur' && typeof donnees.message === 'string') {
+    noterErreur(donnees.message);
+    return;
+  }
   if (!donnees || donnees.type !== 'jel-langue' || typeof donnees.lang !== 'string') return;
   window.JEL_I18N.setLang(donnees.lang).then(() => {
     if (htmlJeu) afficherJeu();
@@ -206,6 +216,7 @@ async function demarrer() {
     }
     return;
   }
+  suivreJeu(jeu.id);
   activerVotes(jeu.id);
 
   // Jeu dont le contenu (mots, lettres…) reste en français : on le signale.

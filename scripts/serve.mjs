@@ -5,6 +5,7 @@
 // Pour tester sur votre téléphone (même Wi-Fi) : utilisez l'adresse
 // « Réseau » affichée au démarrage.
 // Reproduit la règle de sécurité des jeux (aucun accès Internet), comme en ligne.
+// L'API des votes n'existe pas en local ; celle du suivi des parties répond à vide.
 // ==========================================================================
 
 import { createServer } from 'node:http';
@@ -39,6 +40,15 @@ const CSP_JEUX = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' b
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+
+    // Suivi des parties (functions/api/) : en local, rien n'est enregistré et
+    // les Tendances sont vides (la section reste cachée).
+    if (url.pathname === '/api/session') { res.writeHead(204).end(); return; }
+    if (url.pathname === '/api/tendances') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }).end('{"jours":7,"jeux":[]}');
+      return;
+    }
+
     let chemin = path.normalize(path.join(RACINE, decodeURIComponent(url.pathname)));
     if (!chemin.startsWith(RACINE)) { res.writeHead(403).end(); return; }
 

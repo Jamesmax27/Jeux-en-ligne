@@ -10,11 +10,15 @@
 //   personnelle, pas d'adresse IP enregistrée.
 // - Le pays vient de l'en-tête CF-IPCountry ajouté par Cloudflare.
 // - Un seul vote par jeu et par votant (clé primaire game_id + voter).
+// - Colonne « visiteur » : empreinte SHA-256 de l'adresse IP + IP_SALT
+//   (voir functions/_commun.js), jamais l'adresse elle-même. Elle ne sert
+//   pas à compter les votes.
 //
 // Réponse : { "ok": true, "gameId": "...", "value": v, "up": n, "down": n, "score": x }
 // ==========================================================================
 
 import { ligneScore } from './scores.js';
+import { empreinteVisiteur, jeuExiste } from '../_commun.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VOTANT_VALIDE = /^[A-Za-z0-9-]{16,64}$/;
@@ -47,26 +51,6 @@ async function verifierTurnstile(secret, jeton, ip) {
     console.error('Vérification Turnstile impossible :', erreur);
     return false;
   }
-}
-
-// Liste des jeux publiés, relue au plus toutes les 5 minutes par instance.
-let jeuxConnus = null;
-let jeuxConnusLe = 0;
-
-async function jeuExiste(env, request, gameId) {
-  if (!jeuxConnus || Date.now() - jeuxConnusLe > 300000) {
-    try {
-      const reponse = await env.ASSETS.fetch(new URL('/catalog.json', request.url));
-      const catalogue = await reponse.json();
-      jeuxConnus = new Set((catalogue.games || []).map((j) => j.id));
-      jeuxConnusLe = Date.now();
-    } catch (erreur) {
-      // Catalogue illisible : on ne bloque pas le vote, le format de l'id suffit.
-      console.error('Catalogue illisible :', erreur);
-      return true;
-    }
-  }
-  return jeuxConnus.has(gameId);
 }
 
 export async function onRequestPost({ request, env }) {
@@ -105,6 +89,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   const votant = await hacher(voterId);
+  const visiteur = await empreinteVisiteur(request, env);
   const paysBrut = (request.headers.get('CF-IPCountry') || '').toUpperCase();
   const pays = /^[A-Z][A-Z0-9]$/.test(paysBrut) ? paysBrut : 'XX'; // XX = inconnu
 
@@ -114,13 +99,14 @@ export async function onRequestPost({ request, env }) {
         .bind(gameId, votant).run();
     } else {
       await env.DB.prepare(
-        `INSERT INTO votes (game_id, voter, value, country, created_at)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO votes (game_id, voter, value, country, created_at, visiteur)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT (game_id, voter) DO UPDATE SET
            value = excluded.value,
            country = excluded.country,
-           created_at = excluded.created_at`
-      ).bind(gameId, votant, value, pays, Date.now()).run();
+           created_at = excluded.created_at,
+           visiteur = excluded.visiteur`
+      ).bind(gameId, votant, value, pays, Date.now(), visiteur).run();
     }
 
     const totaux = await env.DB.prepare(

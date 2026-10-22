@@ -14,6 +14,9 @@
 //   tuile compte ses jeux. Un regroupement encore vide est grisé (« Bientôt »).
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
 // - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
+// - Tendances, en haut : les TENDANCES_NOMBRE jeux les plus joués des 7 derniers
+//   jours (temps total, /api/tendances), sans tenir compte des filtres.
+//   Cachées sans API ou tant qu'aucune partie n'est enregistrée.
 // - Textes en 5 langues (langue.js, i18n/site/*.json). Le titre traduit du jeu
 //   est affiché en bandeau sur sa jaquette (les jaquettes n'ont aucun texte).
 //   Changer de langue ne change ni le tri, ni les votes, ni les filtres.
@@ -33,6 +36,7 @@ const ARCHIVE_VOTES_MIN = 30;     // archives : plus de 30 votes…
 const ARCHIVE_SCORE_MAX = 0.2;    // … et un score inférieur à 0,2 (votes du monde entier)
 const PAYS_VOTES_MIN = 20;        // sous 20 votes dans mon pays, classement Monde
 const DELAI_SCORES = 4000;        // au-delà, on affiche sans attendre l'API
+const TENDANCES_NOMBRE = 10;      // jeux montrés dans « Tendances »
 
 // Raccourcis du haut : des « collections » propres à l'appareil (noms : clés de traduction).
 const COLLECTIONS = {
@@ -49,6 +53,7 @@ const etat = {
   scoresMonde: null,      // { gameId: { up, down, score, semaine } } ; null = API indisponible
   scoresPays: undefined,  // idem pour mon pays : undefined = pas chargé, null = indisponible
   pays: null,             // pays détecté par l'API (ex. « FR »), ou null
+  tendances: null,        // [{ id, sessions, tempsTotal, tempsMoyen }] ; null = API indisponible
   horsLigne: new Set(),   // jeux gardés sur l'appareil
   aimes: new Set(),       // jeux que j'ai notés 👍 sur cet appareil
   tri: 'notes',           // 'notes' | 'votes' | 'semaine' | 'nouveautes'
@@ -85,6 +90,8 @@ const el = {
   autresThemes: document.getElementById('autres-themes'),
   toutVoir: document.querySelectorAll('.tout-voir'),
   langue: document.getElementById('langue'),
+  tendances: document.getElementById('tendances'),
+  tendancesListe: document.getElementById('tendances-liste'),
 };
 
 // --- Outils ----------------------------------------------------------------
@@ -239,14 +246,8 @@ function jeuxVisibles() {
 
 // --- Affichage --------------------------------------------------------------
 
-function creerCarte(jeu, scores) {
-  const li = document.createElement('li');
-  const titreAffiche = titreJeu(jeu);
-
-  const lien = document.createElement('a');
-  lien.className = 'carte';
-  lien.href = `play.html?id=${encodeURIComponent(jeu.id)}`;
-
+// Jaquette d'une carte : image, titre traduit en bandeau, badge « Nouveau ».
+function creerJaquette(jeu) {
   const jaquette = document.createElement('div');
   jaquette.className = 'jaquette';
 
@@ -264,7 +265,7 @@ function creerCarte(jeu, scores) {
   const titre = document.createElement('h2');
   titre.className = 'carte-titre';
   titre.lang = getLang();
-  titre.textContent = titreAffiche;
+  titre.textContent = titreJeu(jeu);
   jaquette.append(titre);
 
   if (estNouveau(jeu)) {
@@ -273,6 +274,18 @@ function creerCarte(jeu, scores) {
     badge.textContent = t('carte.nouveau');
     jaquette.append(badge);
   }
+  return jaquette;
+}
+
+function creerCarte(jeu, scores) {
+  const li = document.createElement('li');
+  const titreAffiche = titreJeu(jeu);
+
+  const lien = document.createElement('a');
+  lien.className = 'carte';
+  lien.href = `play.html?id=${encodeURIComponent(jeu.id)}`;
+
+  const jaquette = creerJaquette(jeu);
 
   const horsLigne = etat.horsLigne.has(jeu.id);
   if (horsLigne) {
@@ -330,6 +343,61 @@ function afficherGrille() {
   el.vide.hidden = total > 0;
   el.videTitre.textContent = t('vide.titre');
   el.videTexte.textContent = t('vide.texte');
+}
+
+// --- Tendances --------------------------------------------------------------
+
+// 40 → « 40 s » ; 75 → « 1 min » ; 8 100 → « 2 h 15 min »
+function formaterDuree(secondes) {
+  if (secondes < 60) return t('duree.secondes', { n: Math.max(1, Math.round(secondes)) });
+  const minutes = Math.round(secondes / 60);
+  if (minutes < 60) return t('duree.minutes', { n: minutes });
+  const h = Math.floor(minutes / 60);
+  const min = minutes % 60;
+  return min ? t('duree.heuresMinutes', { h, min }) : t('duree.heures', { h });
+}
+
+// Carte compacte : jaquette avec son rang, temps total joué, parties et temps moyen.
+function creerCarteTendance(jeu, tendance, rang) {
+  const li = document.createElement('li');
+  const lien = document.createElement('a');
+  lien.className = 'carte carte-tendance';
+  lien.href = `play.html?id=${encodeURIComponent(jeu.id)}`;
+
+  const jaquette = creerJaquette(jeu);
+  const numero = document.createElement('span');
+  numero.className = 'tendance-rang';
+  numero.textContent = String(rang);
+  jaquette.append(numero);
+
+  const total = formaterDuree(tendance.tempsTotal);
+  const parties = t('tendances.parties', { n: tendance.sessions });
+  const moyenne = t('tendances.moyenne', { duree: formaterDuree(tendance.tempsMoyen) });
+
+  const texte = document.createElement('div');
+  texte.className = 'carte-texte';
+  const temps = document.createElement('p');
+  temps.className = 'tendance-temps';
+  temps.textContent = total;
+  const detail = document.createElement('p');
+  detail.className = 'carte-infos';
+  detail.textContent = `${parties} · ${moyenne}`;
+  texte.append(temps, detail);
+
+  lien.append(jaquette, texte);
+  lien.setAttribute('aria-label', t('tendances.carteAria', { titre: titreJeu(jeu), rang, total, parties, moyenne }));
+  li.append(lien);
+  return li;
+}
+
+// Les premiers jeux des tendances proposés dans la langue courante.
+function afficherTendances() {
+  const parId = new Map(etat.jeux.map((jeu) => [jeu.id, jeu]));
+  const liste = (etat.tendances || [])
+    .filter((x) => parId.has(x.id) && x.tempsTotal > 0)
+    .slice(0, TENDANCES_NOMBRE);
+  el.tendancesListe.replaceChildren(...liste.map((x, i) => creerCarteTendance(parId.get(x.id), x, i + 1)));
+  el.tendances.hidden = liste.length === 0;
 }
 
 // Menu de tri : sans API, seules les « Nouveautés » restent possibles.
@@ -624,6 +692,7 @@ surChangementLangue(() => {
   }
   preparerJeux();
   afficher();
+  afficherTendances();
 });
 
 // --- Scores -----------------------------------------------------------------
@@ -663,6 +732,29 @@ async function chargerScores(pays) {
   }
 }
 
+// Ne lève jamais d'erreur. Renvoie la liste des tendances, ou null si l'API ne répond pas.
+async function chargerTendances() {
+  if (navigator.onLine === false) return null;
+  try {
+    const reponse = await fetch('api/tendances', {
+      signal: AbortSignal.timeout ? AbortSignal.timeout(DELAI_SCORES) : undefined,
+    });
+    if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
+    const donnees = await reponse.json();
+    return (Array.isArray(donnees?.jeux) ? donnees.jeux : [])
+      .filter((x) => typeof x?.id === 'string')
+      .map((x) => ({
+        id: x.id,
+        sessions: Number(x.sessions) || 0,
+        tempsTotal: Number(x.tempsTotal) || 0,
+        tempsMoyen: Number(x.tempsMoyen) || 0,
+      }));
+  } catch (erreur) {
+    console.warn('Tendances indisponibles :', erreur);
+    return null;
+  }
+}
+
 // --- Événements -------------------------------------------------------------
 
 el.tri.addEventListener('change', () => {
@@ -698,9 +790,16 @@ el.toutVoir.forEach((bouton) => {
   });
 });
 
-// Retour de la connexion : on récupère les votes s'ils manquaient.
+// Retour de la connexion : on récupère les votes et les tendances s'ils manquaient.
 addEventListener('online', async () => {
-  if (etat.scoresMonde || etat.jeux.length === 0) return;
+  if (etat.jeux.length === 0) return;
+  if (!etat.tendances) {
+    chargerTendances().then((tendances) => {
+      etat.tendances = tendances;
+      afficherTendances();
+    });
+  }
+  if (etat.scoresMonde) return;
   const resultat = await chargerScores();
   if (!resultat) return;
   etat.scoresMonde = resultat.scores;
@@ -728,6 +827,7 @@ function afficherErreurCatalogue() {
 
 async function demarrer() {
   const scores = chargerScores(); // en parallèle du catalogue et des textes
+  const tendances = chargerTendances();
   const horsLigne = jeuxHorsLigne();
   const textes = demarrerLangue(el.langue);
   try {
@@ -766,6 +866,10 @@ async function demarrer() {
   etat.horsLigne = await horsLigne;
   etat.aimes = jeuxAimes();
   afficher();
+
+  // Les tendances s'ajoutent en haut dès qu'elles arrivent, sans retarder le catalogue.
+  etat.tendances = await tendances;
+  afficherTendances();
 
   // Votes restés en attente (faits hors ligne) : on retente l'envoi.
   if (votesEnAttente()) envoyerEnAttente();
