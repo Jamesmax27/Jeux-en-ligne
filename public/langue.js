@@ -5,8 +5,8 @@
 // une balise <script> avant ce module. Textes : i18n/site/<langue>.json.
 // - demarrerLangue() : charge les textes, crée le sélecteur de l'en-tête.
 // - majSeo() : <title>, meta description et liens hreflang (?lang=…).
-// - nomGenre(), nomTag(), titreJeu(), descriptionJeu() : noms affichés ;
-//   les identifiants internes (genres, tags, id des jeux) ne changent jamais.
+// - nomGenre(), nomUnivers(), titreJeu(), descriptionJeu() : noms affichés ;
+//   les identifiants internes (genres, univers, id des jeux) ne changent jamais.
 // ==========================================================================
 
 const I = window.JEL_I18N;
@@ -26,26 +26,23 @@ export function surChangementLangue(f) {
   I.surChangement(f);
 }
 
-// « Équitation » : la clé garde l'accent (forme NFC, comme dans les fichiers).
-function cle(prefixe, mot) {
-  return `${prefixe}.${String(mot).normalize('NFC')}`;
-}
-
 function majuscule(mot) {
-  return mot.charAt(0).toUpperCase() + mot.slice(1);
+  const texte = String(mot ?? '');
+  return texte.charAt(0).toUpperCase() + texte.slice(1);
 }
 
-/** Nom affiché d'un genre (identifiant interne inchangé). */
-export function nomGenre(genre) {
-  return I.has(cle('genre', genre)) ? t(cle('genre', genre)) : majuscule(genre);
+// Libellé complet (« genre.<id> ») ou court (« genre.<id>.court ») ; à défaut, l'identifiant.
+function nomTaxonomie(famille, id, court) {
+  const cle = `${famille}.${id}`;
+  if (court && I.has(`${cle}.court`)) return t(`${cle}.court`);
+  return I.has(cle) ? t(cle) : majuscule(id);
 }
 
-/** Nom affiché d'un tag : sa traduction, sinon celle du genre du même nom, sinon le mot lui-même. */
-export function nomTag(tag) {
-  if (I.has(cle('tag', tag))) return t(cle('tag', tag));
-  if (I.has(cle('genre', tag))) return t(cle('genre', tag));
-  return majuscule(tag);
-}
+/** Nom affiché d'un genre (public/taxonomie.js) ; court = libellé des puces et des cartes. */
+export const nomGenre = (id, court = false) => nomTaxonomie('genre', id, court);
+
+/** Nom affiché d'un univers (public/taxonomie.js) ; court = libellé des puces et des cartes. */
+export const nomUnivers = (id, court = false) => nomTaxonomie('univers', id, court);
 
 /** Traduction d'un champ de la fiche d'un jeu (game.json → catalog.json). */
 function champJeu(jeu, champ) {

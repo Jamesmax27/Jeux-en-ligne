@@ -21,7 +21,7 @@ import { readdir, readFile, stat, rm, mkdir, cp, writeFile } from 'node:fs/promi
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENRES } from './genres.mjs';
+import { IDS_GENRES, IDS_UNIVERS, SECONDAIRES_MAX, UNIVERS_MAX } from '../public/taxonomie.js';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -72,21 +72,25 @@ async function lireJeu(nomDossier) {
   if (!ID_VALIDE.test(fiche.id)) return rejeter(nomDossier, '"id" : minuscules, chiffres et tirets uniquement');
   if (typeof fiche.title !== 'string' || !fiche.title.trim()) return rejeter(nomDossier, '"title" manquant');
 
-  const tags = Array.isArray(fiche.tags)
-    ? [...new Set(fiche.tags.filter((t) => typeof t === 'string' && t.trim()).map((t) => t.trim().toLowerCase()))]
-    : [];
-  if (tags.length === 0) avertir(nomDossier, 'aucun "tags" : le jeu n\'apparaîtra dans aucun thème');
-
-  // Genre : liste fermée (scripts/genres.mjs). Anciennes fiches sans "genre" :
-  // il est déduit des thèmes (autrefois, le premier thème était le genre).
-  let genre = typeof fiche.genre === 'string' ? fiche.genre.trim().toLowerCase().normalize('NFC') : '';
-  if (!GENRES.includes(genre)) {
-    const deduit = tags.find((t) => GENRES.includes(t.normalize('NFC'))) || '';
-    if (genre) avertir(nomDossier, `"genre" inconnu (« ${genre} ») : choisir dans ${GENRES.join(', ')}`);
-    else if (deduit) avertir(nomDossier, `"genre" absent : « ${deduit} » déduit des thèmes`);
-    else avertir(nomDossier, 'pas de "genre" : le jeu n\'apparaîtra dans aucun filtre de genre');
-    genre = deduit.normalize('NFC');
+  // Genres et univers : listes fermées de public/taxonomie.js. Une valeur hors
+  // liste est ignorée avec un avertissement (le robot, lui, la refuse).
+  const liste = (valeur) => (Array.isArray(valeur) ? valeur : []).filter((x) => typeof x === 'string').map((x) => x.trim());
+  let genre = typeof fiche.genre === 'string' ? fiche.genre.trim() : '';
+  if (!IDS_GENRES.includes(genre)) {
+    avertir(nomDossier, genre ? `"genre" hors liste (« ${genre} ») : voir public/taxonomie.js` : 'pas de "genre" : le jeu n\'apparaîtra dans aucun filtre de genre');
+    genre = '';
   }
+  const secondaires = [...new Set(liste(fiche.genres_secondaires))];
+  const horsListeG = secondaires.filter((g) => !IDS_GENRES.includes(g));
+  if (horsListeG.length) avertir(nomDossier, `"genres_secondaires" hors liste ignorés : ${horsListeG.join(', ')}`);
+  const genresSecondaires = secondaires.filter((g) => IDS_GENRES.includes(g) && g !== genre).slice(0, SECONDAIRES_MAX);
+
+  const universBruts = [...new Set(liste(fiche.univers))];
+  const horsListeU = universBruts.filter((u) => !IDS_UNIVERS.includes(u));
+  if (horsListeU.length) avertir(nomDossier, `"univers" hors liste ignorés : ${horsListeU.join(', ')}`);
+  const univers = universBruts.filter((u) => IDS_UNIVERS.includes(u)).slice(0, UNIVERS_MAX);
+  if (univers.length === 0) avertir(nomDossier, 'aucun "univers" : le jeu n\'apparaîtra dans aucun univers');
+  if (fiche.tags !== undefined) avertir(nomDossier, '"tags" n\'existe plus (remplacé par "univers") : champ ignoré');
 
   let added = typeof fiche.added === 'string' ? fiche.added : '';
   if (!DATE_VALIDE.test(added)) {
@@ -133,7 +137,8 @@ async function lireJeu(nomDossier) {
     ...(fiche.non_traduisible === true ? { non_traduisible: true } : {}),
     ...(langues.length ? { langues } : {}),
     genre,
-    tags,
+    genres_secondaires: genresSecondaires,
+    univers,
     ages: typeof fiche.ages === 'string' ? fiche.ages.trim().slice(0, 10) : '',
     author: typeof fiche.author === 'string' ? fiche.author.trim().slice(0, 60) : '',
     added,
@@ -175,8 +180,7 @@ async function main() {
   const catalogue = {
     generatedAt: new Date().toISOString(),
     count: jeux.length,
-    genres: GENRES, // ordre des filtres de genre dans le catalogue
-    games: jeux,
+    games: jeux,     // listes et ordre des genres et des univers : public/taxonomie.js
   };
   await writeFile(SORTIE_CATALOGUE, JSON.stringify(catalogue, null, 2) + '\n', 'utf8');
   await ecrireSitemap(jeux);

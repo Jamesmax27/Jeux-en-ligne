@@ -12,7 +12,8 @@
 //   - JSON invalide ; fichier de langue sans exactement les mêmes clés que fr ;
 //     valeur vide ; {variables} différentes d'une langue à l'autre ; pluriel
 //     sans forme « other » ;
-//   - site : genre, univers ou tranche d'âge sans nom ;
+//   - site : genre, univers ou tranche d'âge sans nom (genres et univers :
+//     libellé et libellé court ; en français, ceux de public/taxonomie.js) ;
 //   - jeu : titre ou description manquant dans une des 5 langues (game.json),
 //     ainsi que la présentation ("presentation") dès qu'elle existe en
 //     français (obligatoire pour les jeux "consignes": 2) ;
@@ -23,7 +24,7 @@
 //     <html lang> faux au chargement d'un jeu, du catalogue ou du lanceur,
 //     dans chacune des 5 langues.
 // Non bloquant (rapport) : textes en dur restants (recherche heuristique dans
-// le HTML et le JavaScript des jeux), tags sans traduction, CSS de bouton à
+// le HTML et le JavaScript des jeux), CSS de bouton à
 // largeur fixe ou sans retour à la ligne, textes qui débordent (navigateur,
 // en allemand surtout). Rapport complet : i18n-rapport.txt (ignoré par git).
 //
@@ -118,7 +119,7 @@ async function lireJson(sujet, chemin) {
   }
 }
 
-async function verifierSite(tagsDesJeux) {
+async function verifierSite() {
   const sujet = 'site';
   const dicos = {};
   for (const lang of LANGUES) {
@@ -129,20 +130,21 @@ async function verifierSite(tagsDesJeux) {
   if (LANGUES.some((l) => !dicos[l])) return;
   verifierDictionnaires(sujet, dicos);
 
-  // Noms des regroupements du catalogue.
-  const { GENRES } = await import(pathToFileURL(path.join(RACINE, 'scripts', 'genres.mjs')).href);
-  const { UNIVERS, TRANCHES_AGE } = await import(pathToFileURL(path.join(RACINE, 'public', 'regroupements.js')).href);
+  // Noms des regroupements du catalogue (listes de public/taxonomie.js) : libellé
+  // complet et libellé court de chaque genre et univers ; le français reprend
+  // exactement ceux de taxonomie.js. Les autres langues ont les mêmes clés (ci-dessus).
+  const { GENRES, UNIVERS, TRANCHES_AGE } = await import(pathToFileURL(path.join(RACINE, 'public', 'taxonomie.js')).href);
   const fr = dicos.fr;
-  for (const g of GENRES) if (!(`genre.${g}` in fr)) erreur(sujet, `nom du genre « ${g} » absent (clé genre.${g})`);
-  for (const u of UNIVERS) {
-    if (!(`univers.${u.id}` in fr)) erreur(sujet, `nom de l'univers « ${u.id} » absent (clé univers.${u.id})`);
-    for (const tag of u.tags) if (!(`tag.${tag}` in fr)) avertir(sujet, `tag « ${tag} » (univers ${u.id}) sans traduction (clé tag.${tag})`);
+  for (const [famille, liste] of [['genre', GENRES], ['univers', UNIVERS]]) {
+    for (const x of liste) {
+      for (const [cle, attendu] of [[`${famille}.${x.id}`, x.libelle], [`${famille}.${x.id}.court`, x.court]]) {
+        if (!(cle in fr)) erreur(sujet, `${famille} « ${x.id} » sans nom (clé ${cle})`);
+        else if (fr[cle] !== attendu) erreur(sujet, `fr : « ${cle} » doit valoir « ${attendu} » (public/taxonomie.js)`);
+      }
+    }
   }
   for (const a of TRANCHES_AGE) {
     if (!(`age.${a.id}` in fr) || !(`age.${a.id}.aide` in fr)) erreur(sujet, `tranche d'âge « ${a.id} » sans nom (clés age.${a.id} et age.${a.id}.aide)`);
-  }
-  for (const tag of tagsDesJeux) {
-    if (!(`tag.${tag}` in fr) && !(`genre.${tag}` in fr)) avertir(sujet, `tag « ${tag} » utilisé par un jeu sans traduction : ajouter « tag.${tag} » aux 5 fichiers de langue (sinon le mot français s'affiche)`);
   }
 }
 
@@ -456,14 +458,12 @@ async function main() {
   const moduleCommun = await readFile(MODULE_COMMUN, 'utf8');
 
   const jeux = [];
-  const tags = new Set();
   for (const id of ids) {
     if (!existsSync(path.join(DOSSIER_JEUX, id))) { erreur(id, `dossier games/${id}/ introuvable`); continue; }
     const resultat = await verifierJeu(id, moduleCommun);
-    if (resultat?.fiche && Array.isArray(resultat.fiche.tags)) resultat.fiche.tags.forEach((t) => tags.add(String(t).normalize('NFC')));
     if (resultat?.html && !erreurs.has(id)) jeux.push({ id, html: resultat.html });
   }
-  await verifierSite(tags);
+  await verifierSite();
 
   const navigateur = await ouvrirNavigateur();
   if (navigateur) {
