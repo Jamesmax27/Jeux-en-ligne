@@ -12,6 +12,12 @@
 //   … --jouer     (implique --browser) joue en plus 30 secondes au hasard sur
 //                 téléphone et enregistre des captures d'écran dans captures/<id>/
 //
+// Jeux faits selon les consignes de 2026 (game.json : "consignes": 2, posé par
+// la boucle de nuit) : au moins 20 niveaux, nombre déclaré dans game.json
+// ("niveaux") ET donné par le jeu lui-même (window.JEL_NIVEAUX, lu dans le
+// navigateur), présentation riche ("presentation", 150 à 1 200 caractères).
+// Les jeux plus anciens, sans ce champ, ne sont pas concernés.
+//
 // Code de sortie : 0 = tout est bon, 1 = au moins une erreur.
 // Utilisé par l'agent qui crée les jeux, et par GitHub Actions.
 // Les modes --browser et --jouer nécessitent :  npm install --no-save playwright
@@ -35,6 +41,11 @@ const FICHIERS_AUTORISES = new Set(['index.html', 'game.json', ...JAQUETTES]);
 const TAILLE_MAX_JEU = 2 * 1024 * 1024;
 const TAILLE_MAX_JAQUETTE = 300 * 1024;
 const PORT_TEST = 8123;
+// Consignes de 2026 (game.json "consignes": 2) : voir CONSIGNES-JEU.md.
+const NIVEAUX_MIN = 20;
+const PRESENTATION_MIN = 150, PRESENTATION_MAX = 1200;
+const fiches = new Map();        // id → contenu de game.json (pour le test dans le navigateur)
+const consignes2 = (id) => Number(fiches.get(id)?.consignes) >= 2;
 
 const args = process.argv.slice(2);
 const avecPartie = args.includes('--jouer');                     // partie au hasard + captures
@@ -75,6 +86,16 @@ async function controlerFiche(id, dossier) {
   if (!dateValide(f.added)) erreur(id, 'game.json : "added" doit être une date AAAA-MM-JJ');
   else if (Date.parse(f.added) > Date.now() + 86400000) erreur(id, 'game.json : "added" est dans le futur');
   if (!Number.isInteger(f.version) || f.version < 1) erreur(id, 'game.json : "version" doit être un entier ≥ 1');
+  fiches.set(id, f);
+
+  // Consignes de 2026 : jeu riche (20 niveaux au moins) et présentation de quelques phrases.
+  if (f.consignes !== undefined && (!Number.isInteger(f.consignes) || f.consignes < 1)) erreur(id, 'game.json : "consignes" doit être un entier (2 pour les nouveaux jeux)');
+  if (Number(f.consignes) >= 2) {
+    if (!Number.isInteger(f.niveaux) || f.niveaux < NIVEAUX_MIN) erreur(id, `game.json : "niveaux" doit indiquer le nombre de niveaux du jeu, ${NIVEAUX_MIN} au moins`);
+    if (typeof f.presentation !== 'string' || f.presentation.trim().length < PRESENTATION_MIN || f.presentation.length > PRESENTATION_MAX) {
+      erreur(id, `game.json : "presentation" obligatoire, ${PRESENTATION_MIN} à ${PRESENTATION_MAX} caractères (principe, objectif, ce qui rend le jeu amusant)`);
+    }
+  }
 }
 
 async function controlerJeu(id, dossier) {
@@ -201,6 +222,15 @@ async function testerNavigateur(ids) {
         erreur(id, 'le jeu ne se charge pas dans le lanceur');
       } else {
         if (!(await ecranVisible(cadre))) erreur(id, 'écran vide au démarrage');
+
+        // Consignes de 2026 : le jeu donne lui-même son nombre réel de niveaux.
+        if (consignes2(id)) {
+          const n = await cadre.evaluate(() => window.JEL_NIVEAUX).catch(() => undefined);
+          const annonce = fiches.get(id).niveaux;
+          if (!Number.isInteger(n)) erreur(id, 'window.JEL_NIVEAUX absent : le jeu doit donner son nombre réel de niveaux (ex. window.JEL_NIVEAUX = NIVEAUX.length)');
+          else if (n < NIVEAUX_MIN) erreur(id, `le jeu n'a que ${n} niveaux (window.JEL_NIVEAUX) : ${NIVEAUX_MIN} au moins`);
+          else if (n !== annonce) erreur(id, `nombre de niveaux différent : ${n} dans le jeu (window.JEL_NIVEAUX), ${annonce} dans game.json ("niveaux")`);
+        }
 
         // Un toucher au centre puis un peu de jeu, pour détecter les erreurs au lancement.
         const boite = await page.locator('#cadre-jeu').boundingBox();

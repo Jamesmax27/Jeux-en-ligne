@@ -113,7 +113,7 @@ jobs:
           show_full_output: true
           claude_args: |
             --max-turns 100
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*)"
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*),Bash(node scripts/check-i18n.js:*)"
           prompt: |
             Tu es le développeur de jeux du site Jeux-en-ligne. Le propriétaire demande une correction
             du jeu games/${{ needs.preparer.outputs.id }}/ (pull request #${{ github.event.issue.number }}).
@@ -135,6 +135,10 @@ jobs:
                Pour voir le jeu sur téléphone : node scripts/validate-games.mjs --jouer ${{ needs.preparer.outputs.id }}
                (captures dans captures/${{ needs.preparer.outputs.id }}/, à regarder avec Read).
                Avant de terminer, vérifie que le jeu respecte toujours la grille de validation (CONSIGNES-JEU.md, section 7).
+               Langues : tout texte ajouté ou modifié l'est dans les 5 langues du bloc jel-i18n-textes de index.html
+               (fr, en, es, pt, de ; aucun texte en dur), et dans "i18n" de game.json pour le titre, la description et
+               la présentation. Lance : node scripts/check-i18n.js ${{ needs.preparer.outputs.id }} --sans-site
+               jusqu'à « Traductions : tout est bon ».
             5. Écris dans resume-correction.md (à la racine du dépôt) un résumé en français pour le propriétaire :
                3 à 6 puces courtes sur ce qui a changé, puis ce qu'il faut vérifier en jouant.
 
@@ -164,7 +168,8 @@ jobs:
         run: |
           # La jaquette automatique (cover.jpg) est refaite ; une jaquette faite à la main est gardée.
           rm -f "games/$ID/cover.jpg"
-          if node scripts/validate-games.mjs --browser --covers "$ID" > "$RUNNER_TEMP/rapport.txt" 2>&1; then
+          if node scripts/validate-games.mjs --browser --covers "$ID" > "$RUNNER_TEMP/rapport.txt" 2>&1 \
+             && node scripts/check-i18n.js "$ID" --sans-site >> "$RUNNER_TEMP/rapport.txt" 2>&1; then
             echo "valide=true" >> "$GITHUB_OUTPUT"
           else
             echo "valide=false" >> "$GITHUB_OUTPUT"

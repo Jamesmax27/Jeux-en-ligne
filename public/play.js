@@ -12,7 +12,7 @@ import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
-  titreJeu, descriptionJeu, jeuEnFrancais, jeuDisponible,
+  titreJeu, presentationJeu, jeuEnFrancais, jeuDisponible,
 } from './langue.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -53,7 +53,7 @@ function afficherTextes() {
     const titre = titreJeu(jeuCourant);
     el.titre.textContent = titre;
     el.cadre.title = titre;
-    majSeo({ titre: t('jeu.titreDocument', { titre }), description: descriptionJeu(jeuCourant) });
+    majSeo({ titre: t('jeu.titreDocument', { titre }), description: presentationJeu(jeuCourant) });
   } else {
     el.cadre.title = t('jeu.cadre');
     majSeo({ titre: t('jeu.titrePage'), description: t('meta.description') });
