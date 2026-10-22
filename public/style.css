@@ -535,7 +535,7 @@ html.avec-tendances #tendances[hidden] {
 }
 
 .tuiles:empty { min-height: 63px; }
-.rangee:empty { min-height: 45px; }
+.rangee:empty { min-height: 63px; }
 
 @media (min-width: 720px) {
   html.avec-tendances #tendances[hidden] { min-height: 292px; }
@@ -804,12 +804,11 @@ html.avec-tendances #tendances[hidden] {
   line-height: 1;
 }
 
-/* Genres et univers : 2 rangées de petites puces. Le rembourrage vertical de
-   la rangée laisse la place à la zone de toucher agrandie (::before) et au
-   contour de focus. Rien ne dépasse des puces (ni halo, ni ombre, ni
-   déplacement) : la rangée qui défile le couperait.
+/* Genres et univers : 2 rangées de puces. Le rembourrage vertical de la
+   rangée laisse la place au contour de focus. Rien ne dépasse des puces (ni
+   halo, ni ombre, ni déplacement) : la rangée qui défile le couperait.
    Entre les deux rangées, 5 px de chaque côté : le contour de focus (4 px)
-   n'est jamais rogné, et les zones de toucher des deux rangées se touchent. */
+   n'est jamais rogné. */
 .rangee {
   display: flex;
   gap: 4px;
@@ -834,14 +833,17 @@ html.avec-tendances #tendances[hidden] {
   --l-contour: .52;
   position: relative;
   flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-height: 34px;
-  padding: 0 8px;
+  /* Icône en haut, au centre ; libellé et nombre de jeux en dessous. */
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  place-content: center;
+  align-items: baseline;
+  column-gap: 3px;
+  row-gap: 3px;
+  min-height: 52px;              /* zone de toucher de 44 px au moins */
+  padding: 4px 9px 5px;
   border: 1px solid oklch(var(--l-contour) var(--c) var(--teinte));
-  border-radius: 999px;
+  border-radius: var(--r-commande);
   background: oklch(.25 var(--c-fond) var(--teinte));
   color: var(--craie);
   font: inherit;
@@ -868,19 +870,21 @@ html.avec-tendances #tendances[hidden] {
   --c-fond: .012;
 }
 
-/* Zone de toucher de 44 px de haut sans agrandir la puce (5 px au-dessus
-   et au-dessous de ses 34 px ; inset compté depuis l'intérieur du contour). */
-.puce-filtre::before {
-  content: "";
-  position: absolute;
-  inset: -6px 0;
+/* Icône sur toute la largeur de la puce (au-dessus du libellé et du nombre).
+   Taille de l'icône dessinée : --ico-taille (bloc généré, en fin de fichier) ;
+   ce font-size ne sert qu'à l'emoji de repli. */
+.puce-filtre-picto {
+  grid-column: 1 / -1;
+  justify-self: center;
+  font-size: 22px;
+  line-height: 1.1;
 }
 
-.puce-filtre-picto { font-size: 13px; }
+/* « Bientôt » : pas de nombre, donc pas d'écart après le libellé. */
+.puce-bientot { column-gap: 0; }
 
 /* Nombre de jeux, en petit après le libellé, dans la teinte de la puce */
 .puce-filtre-compte {
-  margin-left: 2px;
   color: oklch(.84 var(--c) var(--teinte));
   font-size: .85em;
   font-weight: 700;
@@ -918,19 +922,17 @@ html.avec-tendances #tendances[hidden] {
 
 .puce-filtre[aria-pressed="true"] .puce-filtre-compte { color: var(--nuit); opacity: .75; }
 
-/* Grand écran : puces un peu plus serrées pour que chaque rangée tienne sur
-   la largeur du site (1 200 px), et qui se partagent la place restante.
-   11 px : à 11,5 px, la 2e rangée des genres défilait de 9 px en anglais. */
+/* Grand écran : puces qui se partagent la largeur du site (1 200 px) ; l'icône
+   n'étant plus à côté du libellé, chaque rangée tient sur une ligne. */
 @media (min-width: 720px) {
-  .rangee { gap: 2px; }
+  .rangee { gap: 4px; }
   .puce-filtre {
     flex: 1 0 auto;
-    gap: 2px;
-    padding: 0 4px;
-    font-size: 11px;
+    column-gap: 2px;
+    min-height: 56px;
+    padding: 4px 5px 5px;
   }
-  .puce-filtre-picto { font-size: 12px; }
-  .puce-filtre-compte { margin-left: 0; }
+  .puce-filtre-picto { font-size: 24px; }
 }
 
 /* --------------------------------------------------------------------------
@@ -2029,8 +2031,11 @@ body.lanceur::after { animation: none; }
    touche). Âges : une teinte par tranche, du chaud au froid (on grandit).
    Titre « Tendances » : or (ce qui brille). */
 
+/* Puces : icône de 28 px au-dessus du libellé, dont 24 px comptent dans la
+   hauteur (même marge de grille que les tuiles). */
 .puce-filtre {
-  --ico-taille: 16px;
+  --ico-taille: 28px;
+  --ico-marge: -2px;
   --ico-couleur-fond: oklch(.72 calc(var(--c) + .035) var(--teinte));
   --ico-couleur-trait: var(--craie);
 }
@@ -2058,6 +2063,7 @@ body.lanceur::after { animation: none; }
 
 @media (min-width: 720px) {
   .tuile { --ico-taille: 26px; --ico-marge: -3px; }
+  .puce-filtre { --ico-taille: 30px; --ico-marge: -3px; }
 }
 
 /* États. Choisie : la puce se remplit de sa teinte claire ; l'icône passe

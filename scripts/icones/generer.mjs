@@ -589,8 +589,11 @@ function cssGeneral(cles) {
    touche). Âges : une teinte par tranche, du chaud au froid (on grandit).
    Titre « Tendances » : or (ce qui brille). */
 
+/* Puces : icône de 28 px au-dessus du libellé, dont 24 px comptent dans la
+   hauteur (même marge de grille que les tuiles). */
 .puce-filtre {
-  --ico-taille: 16px;
+  --ico-taille: 28px;
+  --ico-marge: -2px;
   --ico-couleur-fond: oklch(.72 calc(var(--c) + .035) var(--teinte));
   --ico-couleur-trait: var(--craie);
 }
@@ -618,6 +621,7 @@ function cssGeneral(cles) {
 
 @media (min-width: 720px) {
   .tuile { --ico-taille: 26px; --ico-marge: -3px; }
+  .puce-filtre { --ico-taille: 30px; --ico-marge: -3px; }
 }
 
 /* États. Choisie : la puce se remplit de sa teinte claire ; l'icône passe
