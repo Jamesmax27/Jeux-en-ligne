@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Les trésors cachés du récif</title>
+<style>
+  /* ---------- Base ---------- */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #062a46; color: #fff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  * { box-sizing: border-box; }
+  button { font-family: inherit; cursor: pointer; border: none; color: inherit; }
+  .ecran { position: fixed; inset: 0; display: none; }
+  .ecran.actif { display: flex; }
+
+  .gros-bouton { min-height: 56px; padding: 12px 30px; border-radius: 30px; font-size: 22px; font-weight: 800;
+    background: linear-gradient(#ffd54a, #ff9f1c); color: #4a2500; box-shadow: 0 5px 0 #b86a00, 0 8px 20px rgba(0,0,0,.35); }
+  .gros-bouton:active { transform: translateY(3px); box-shadow: 0 2px 0 #b86a00; }
+  .bouton { min-height: 48px; min-width: 48px; padding: 10px 20px; border-radius: 24px; font-size: 17px; font-weight: 700;
+    background: rgba(255,255,255,.16); border: 2px solid rgba(255,255,255,.45); }
+  .bouton:active { background: rgba(255,255,255,.3); }
+  .rond { width: 46px; height: 46px; min-width: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.15); border: 2px solid rgba(255,255,255,.4); padding: 0; }
+  .rond svg { width: 24px; height: 24px; }
+  .rond:active { background: rgba(255,255,255,.3); }
+  :focus-visible { outline: 3px solid #ffe066; outline-offset: 2px; }
+
+  /* ---------- Accueil ---------- */
+  #accueil { flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden; }
+  #fond-accueil { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #accueil .contenu { position: relative; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 520px; }
+  #accueil h1 { margin: 0; font-size: clamp(38px, 11vw, 64px); line-height: 1.02; font-weight: 900; letter-spacing: .5px;
+    color: #fff6c9; text-shadow: 0 3px 0 #0b5d8a, 0 6px 0 #073a5c, 0 10px 24px rgba(0,0,0,.5); }
+  #accueil h1 span { display: block; color: #ffd54a; font-size: .62em; }
+  #accueil .regle { margin: 0; font-size: 18px; line-height: 1.35; font-weight: 600; background: rgba(4,40,70,.62);
+    padding: 10px 16px; border-radius: 16px; }
+  #accueil .ligne { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #accueil .bouton { background: rgba(4,40,70,.72); }
+  #accueil .total { font-size: 16px; font-weight: 700; color: #ffe58a; text-shadow: 0 2px 4px #000; }
+  #son-accueil { position: absolute; top: 10px; right: 10px; }
+
+  /* ---------- Écrans de liste (plongées, aquarium) ---------- */
+  .liste { flex-direction: column; background: linear-gradient(#0d6c9c, #073657 60%, #04223a); }
+  .liste header { display: flex; align-items: center; gap: 10px; padding: 10px; }
+  .liste h2 { margin: 0; flex: 1; font-size: 22px; }
+  .defile { flex: 1; overflow-y: auto; padding: 6px 12px 20px; -webkit-overflow-scrolling: touch; }
+  #grille-plongees { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; max-width: 760px; margin: 0 auto; }
+  .case-plongee { min-height: 104px; border-radius: 18px; padding: 8px 4px; background: rgba(255,255,255,.14); border: 2px solid rgba(255,255,255,.35);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+  .case-plongee b { font-size: 28px; }
+  .case-plongee small { font-size: 12px; line-height: 1.15; opacity: .92; }
+  .case-plongee .et { color: #ffd54a; font-size: 18px; letter-spacing: 2px; }
+  .case-plongee .et i { color: rgba(255,255,255,.28); font-style: normal; }
+  .case-plongee:disabled { opacity: .4; }
+  #grille-aquarium { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; max-width: 760px; margin: 0 auto; }
+  .carte { min-height: 112px; border-radius: 16px; padding: 6px; background: rgba(160,230,255,.13); border: 2px solid rgba(160,230,255,.35);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 700; }
+  .carte canvas { width: 64px; height: 64px; }
+  .carte.inconnue { opacity: .55; }
+  .compte { text-align: center; margin: 0 0 10px; font-weight: 700; color: #bdf0ff; }
+
+  /* ---------- Jeu ---------- */
+  #jeu { flex-direction: column; background: #0b4f7a; }
+  #hud { height: 58px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 6px; background: rgba(2,28,50,.92); }
+  #hud .centre { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  #nom-niveau { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .air { display: flex; align-items: center; gap: 5px; }
+  .air svg { width: 16px; height: 20px; flex: none; }
+  .jauge { flex: 1; height: 12px; border-radius: 6px; background: rgba(255,255,255,.18); overflow: hidden; border: 1px solid rgba(255,255,255,.4); }
+  #air-niveau { height: 100%; width: 100%; background: linear-gradient(90deg, #43e3ff, #9dfcff); border-radius: 6px; transition: width .25s; }
+  .air.bas #air-niveau { background: linear-gradient(90deg, #ff8a5c, #ffc36b); animation: clignote .6s infinite alternate; }
+  @keyframes clignote { to { opacity: .45; } }
+  #score { min-width: 54px; text-align: right; font-weight: 900; font-size: 18px; color: #ffe066; }
+  #bouton-indice.actif { background: rgba(255,224,102,.45); }
+  #zone { flex: 1; position: relative; min-height: 0; overflow: hidden; }
+  #scene { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  #barre { flex: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    background: rgba(2,28,50,.94); border-top: 2px solid rgba(120,220,255,.35); }
+  .puce { position: relative; width: calc(25% - 5px); max-width: 110px; height: 58px; border-radius: 12px; background: rgba(255,255,255,.12);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; line-height: 1.05; text-align: center; padding: 2px; }
+  #barre.cinq .puce { width: calc(20% - 5px); font-size: 10.5px; }
+  .puce canvas { width: 34px; height: 34px; }
+  .puce.trouvee { background: rgba(80,220,140,.32); }
+  .puce.trouvee::after { content: "✔"; position: absolute; top: 1px; right: 5px; color: #7dffa8; font-size: 16px; text-shadow: 0 1px 2px #000; }
+  .puce.pop { animation: pop .5s; }
+  .puce.eclaire { animation: eclaire .5s infinite alternate; }
+  @keyframes pop { 40% { transform: scale(1.25); } }
+  @keyframes eclaire { to { background: rgba(255,224,102,.55); } }
+
+  /* ---------- Voiles (pause, bilan, fiche) ---------- */
+  .voile { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(2,20,38,.66); z-index: 10; padding: 14px; }
+  .voile.actif { display: flex; }
+  .boite { width: 100%; max-width: 380px; max-height: 100%; overflow-y: auto; border-radius: 24px; padding: 20px 18px; text-align: center;
+    background: linear-gradient(#167fb0, #0a4c78); border: 3px solid rgba(160,235,255,.6); box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    display: flex; flex-direction: column; gap: 12px; align-items: stretch; animation: entree .35s; }
+  @keyframes entree { from { transform: scale(.7); opacity: 0; } }
+  .boite h2 { margin: 0; font-size: 26px; }
+  .boite p { margin: 0; font-size: 17px; line-height: 1.35; }
+  .etoiles { font-size: 46px; letter-spacing: 6px; color: rgba(255,255,255,.25); }
+  .etoiles span.oui { color: #ffd54a; text-shadow: 0 0 12px #ffb300; display: inline-block; animation: etoile .5s backwards; }
+  @keyframes etoile { from { transform: scale(0) rotate(-90deg); } 70% { transform: scale(1.4); } }
+  #bilan-score { font-size: 34px; font-weight: 900; color: #ffe066; }
+  .record { font-weight: 800; color: #9dffc0; }
+  .nouveaux { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+  .nouveaux canvas { width: 44px; height: 44px; background: rgba(255,255,255,.12); border-radius: 10px; }
+  #fiche canvas { width: 140px; height: 140px; margin: 0 auto; }
+</style>
+</head>
+<body>
+
+<!-- Accueil -->
+<section id="accueil" class="ecran actif">
+  <canvas id="fond-accueil"></canvas>
+  <button id="son-accueil" class="rond bouton-son" aria-label="Couper le son"></button>
+  <div class="contenu">
+    <h1>Les trésors cachés <span>du récif</span></h1>
+    <p class="regle">Trouve les animaux demandés en bas de l'écran et touche-les avant que ta bouteille d'air soit vide !</p>
+    <button id="bouton-jouer" class="gros-bouton">Jouer</button>
+    <div class="ligne">
+      <button id="bouton-plongees" class="bouton">Les plongées</button>
+      <button id="bouton-aquarium" class="bouton">Mon aquarium</button>
+    </div>
+    <div class="total" id="total-accueil"></div>
+  </div>
+</section>
+
+<!-- Choix des plongées -->
+<section id="plongees" class="ecran liste">
+  <header>
+    <button class="rond retour-accueil" aria-label="Accueil"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10h-6v-6H9v6H3z" fill="#fff"/></svg></button>
+    <h2>Les 12 plongées</h2>
+  </header>
+  <div class="defile"><div id="grille-plongees"></div></div>
+</section>
+
+<!-- Aquarium-collection -->
+<section id="aquarium" class="ecran liste">
+  <header>
+    <button class="rond retour-accueil" aria-label="Accueil"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10h-6v-6H9v6H3z" fill="#fff"/></svg></button>
+    <h2>Mon aquarium</h2>
+  </header>
+  <div class="defile"><p class="compte" id="compte-aquarium"></p><div id="grille-aquarium"></div></div>
+</section>
+
+<!-- Partie -->
+<section id="jeu" class="ecran">
+  <div id="hud">
+    <button id="bouton-pause" class="rond" aria-label="Pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="#fff"/><rect x="14" y="5" width="4" height="14" rx="1" fill="#fff"/></svg></button>
+    <div class="centre">
+      <div id="nom-niveau"></div>
+      <div class="air" id="air"><svg viewBox="0 0 16 20"><rect x="3" y="4" width="10" height="15" rx="4" fill="#ffd54a" stroke="#fff" stroke-width="1.2"/><rect x="6" y="1" width="4" height="4" rx="1" fill="#ccc"/></svg><div class="jauge"><div id="air-niveau"></div></div></div>
+    </div>
+    <div id="score">0</div>
+    <button id="bouton-indice" class="rond" aria-label="Indice"><svg viewBox="0 0 24 24"><circle cx="8" cy="16" r="4" fill="none" stroke="#fff" stroke-width="2"/><circle cx="15" cy="9" r="3" fill="none" stroke="#fff" stroke-width="2"/><circle cx="19" cy="17" r="2" fill="none" stroke="#fff" stroke-width="2"/><circle cx="10" cy="5" r="1.6" fill="#fff"/></svg></button>
+    <button id="son-jeu" class="rond bouton-son" aria-label="Couper le son"></button>
+  </div>
+  <div id="zone"><canvas id="scene"></canvas></div>
+  <div id="barre"></div>
+</section>
+
+<!-- Pause -->
+<div id="pause" class="voile">
+  <div class="boite">
+    <h2>Pause</h2>
+    <p>Le temps est arrêté. Ta bouteille d'air t'attend !</p>
+    <button id="reprendre" class="gros-bouton">Reprendre</button>
+    <button id="recommencer" class="bouton">Recommencer</button>
+    <button id="pause-accueil" class="bouton">Accueil</button>
+  </div>
+</div>
+
+<!-- Bilan d'une plongée -->
+<div id="bilan" class="voile">
+  <div class="boite">
+    <h2 id="bilan-titre"></h2>
+    <div class="etoiles" id="bilan-etoiles"></div>
+    <p id="bilan-trouves"></p>
+    <div id="bilan-score">0</div>
+    <p id="bilan-record" class="record"></p>
+    <div id="bilan-nouveaux-bloc"><p>Nouveaux amis dans l'aquarium :</p><div class="nouveaux" id="bilan-nouveaux"></div></div>
+    <button id="bilan-suivant" class="gros-bouton">Plongée suivante</button>
+    <button id="bilan-rejouer" class="bouton">Rejouer</button>
+    <button id="bilan-plongees" class="bouton">Les plongées</button>
+  </div>
+</div>
+
+<!-- Fiche d'un animal -->
+<div id="fiche" class="voile">
+  <div class="boite">
+    <canvas id="fiche-image" width="280" height="280"></canvas>
+    <h2 id="fiche-nom"></h2>
+    <p id="fiche-texte"></p>
+    <button id="fiche-fermer" class="gros-bouton">Fermer</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// =====================================================================
+//  Les trésors cachés du récif — cherche-et-trouve sous la mer.
+//  Tout est dessiné dans un canvas : aucun fichier extérieur.
+//  Le « monde » d'une plongée mesure H = 700 unités de haut ; il est
+//  agrandi ou réduit (facteur s) pour remplir la zone de jeu.
+// =====================================================================
+
+const H = 700;
+const $ = (id) => document.getElementById(id);
+const hasard = (a, b) => a + Math.random() * (b - a);
+const choisir = (t) => t[Math.floor(Math.random() * t.length)];
+const melanger = (t) => { for (let i = t.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [t[i], t[j]] = [t[j], t[i]]; } return t; };
+
+// Générateur au hasard « à graine » : le même décor est redessiné à l'identique.
+function graine(a) {
+  return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+// ---------------------------------------------------------------------
+//  Sauvegarde (toujours dans try/catch : le stockage peut être refusé)
+// ---------------------------------------------------------------------
+const CLE = 'tresors-caches-du-recif-v1';
+let sauvegarde = { etoiles: {}, records: {}, collection: {}, son: true };
+try {
+  const brut = localStorage.getItem(CLE);
+  if (brut) sauvegarde = Object.assign(sauvegarde, JSON.parse(brut));
+} catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+function sauver() {
+  try { localStorage.setItem(CLE, JSON.stringify(sauvegarde)); } catch (e) { /* tant pis */ }
+}
+
+// ---------------------------------------------------------------------
+//  Sons (Web Audio) — rien n'est joué avant la première action
+// ---------------------------------------------------------------------
+let audio = null;
+function reveillerAudio() {
+  if (audio) { if (audio.state === 'suspended' && !(J && J.pause)) audio.resume().catch(() => {}); return; }
+  try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+}
+document.addEventListener('pointerdown', reveillerAudio, true);
+document.addEventListener('keydown', reveillerAudio, true);
+
+// Une note : fréquence de départ, d'arrivée, durée, type d'onde, volume, retard.
+function note(f1, f2, duree, type = 'sine', vol = 0.18, retard = 0) {
+  if (!audio || !sauvegarde.son || audio.state !== 'running') return;
+  const t = audio.currentTime + retard;
+  const o = audio.createOscillator(), g = audio.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f1, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(30, f2), t + duree);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+  o.connect(g); g.connect(audio.destination);
+  o.start(t); o.stop(t + duree + 0.05);
+}
+const sons = {
+  bloup: () => note(380, 760, 0.12, 'sine', 0.14),
+  trouve: () => { note(660, 660, 0.12, 'triangle', 0.2); note(880, 880, 0.12, 'triangle', 0.2, 0.09); note(1175, 1175, 0.22, 'triangle', 0.2, 0.18); },
+  erreur: () => { note(260, 170, 0.25, 'sine', 0.2); },
+  cache: () => note(500, 300, 0.15, 'sine', 0.1),
+  indice: () => { for (let i = 0; i < 6; i++) note(300 + i * 90, 600 + i * 120, 0.09, 'sine', 0.1, i * 0.07); },
+  alerte: () => { note(990, 990, 0.1, 'sine', 0.12); note(990, 990, 0.1, 'sine', 0.12, 0.18); },
+  etoile: (i) => note(700 + i * 220, 1400 + i * 300, 0.25, 'triangle', 0.2),
+  fanfare: () => { [523, 659, 784, 1047].forEach((f, i) => note(f, f, 0.22, 'triangle', 0.2, i * 0.12)); },
+  rate: () => { [523, 440, 392].forEach((f, i) => note(f, f * 0.98, 0.25, 'sine', 0.16, i * 0.15)); },
+  nouveau: () => { for (let i = 0; i < 5; i++) note(1200 + i * 200, 1500 + i * 200, 0.08, 'sine', 0.08, 0.3 + i * 0.05); },
+  clic: () => note(600, 500, 0.06, 'square', 0.05),
+};
+
+// Boutons du son : le choix est mémorisé.
+const SVG_SON = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#fff"/><path d="M16 8c1.5 1.2 1.5 6.8 0 8M18.5 5.5c3 2.5 3 10.5 0 13" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+const SVG_MUET = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#fff"/><path d="M16 9l5 6M21 9l-5 6" stroke="#ff9b9b" stroke-width="2.4" stroke-linecap="round"/></svg>';
+function majBoutonsSon() {
+  document.querySelectorAll('.bouton-son').forEach((b) => {
+    b.innerHTML = sauvegarde.son ? SVG_SON : SVG_MUET;
+    b.setAttribute('aria-label', sauvegarde.son ? 'Couper le son' : 'Remettre le son');
+  });
+}
+document.querySelectorAll('.bouton-son').forEach((b) => b.addEventListener('click', () => {
+  sauvegarde.son = !sauvegarde.son; sauver(); majBoutonsSon(); sons.clic(); b.blur();
+}));
+majBoutonsSon();
+
+// ---------------------------------------------------------------------
+//  Les animaux et trésors : dessin (vers la droite, centré, taille r)
+// ---------------------------------------------------------------------
+function rond(g, x, y, r, c) { g.fillStyle = c; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+function ovale(g, x, y, rx, ry, c, rot = 0) { g.fillStyle = c; g.beginPath(); g.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); g.fill(); }
+function oeil(g, x, y, r) {
+  rond(g, x, y, r, '#fff'); rond(g, x + r * 0.15, y, r * 0.62, '#1b1b2f'); rond(g, x + r * 0.32, y - r * 0.28, r * 0.22, '#fff');
+}
+function contour(g, r) { g.strokeStyle = 'rgba(20,20,40,.45)'; g.lineWidth = r * 0.06; g.stroke(); }
+
+// Poisson de base : corps ovale, queue, nageoires, œil.
+function poisson(g, r, o) {
+  g.lineJoin = 'round';
+  g.fillStyle = o.queue; g.beginPath();
+  g.moveTo(-0.65 * r, 0); g.lineTo(-1.25 * r, -0.55 * r); g.quadraticCurveTo(-1.02 * r, 0, -1.25 * r, 0.55 * r); g.closePath(); g.fill(); contour(g, r);
+  g.fillStyle = o.nageoire; g.beginPath();
+  g.moveTo(-0.45 * r, -0.45 * r); g.quadraticCurveTo(-0.05 * r, -(o.haute || 1) * r, 0.35 * r, -0.48 * r); g.closePath(); g.fill(); contour(g, r);
+  g.beginPath(); g.moveTo(-0.3 * r, 0.45 * r); g.quadraticCurveTo(-0.05 * r, 0.85 * r, 0.2 * r, 0.47 * r); g.closePath(); g.fill(); contour(g, r);
+  g.beginPath(); g.ellipse(0, 0, 0.88 * r, (o.epais || 0.58) * r, 0, 0, Math.PI * 2);
+  g.fillStyle = o.corps; g.fill();
+  if (o.motif) { g.save(); g.clip(); o.motif(g, r); g.restore(); }
+  g.beginPath(); g.ellipse(0, 0, 0.88 * r, (o.epais || 0.58) * r, 0, 0, Math.PI * 2); contour(g, r);
+  ovale(g, 0.05 * r, 0.12 * r, 0.22 * r, 0.12 * r, o.nageoire, 0.5);
+  oeil(g, 0.5 * r, -0.12 * r, 0.16 * r);
+  g.strokeStyle = 'rgba(40,20,20,.7)'; g.lineWidth = r * 0.05; g.beginPath(); g.arc(0.74 * r, 0.12 * r, 0.08 * r, 0.2, 1.9); g.stroke();
+}
+function bandes(g, r, xs) {
+  for (const x of xs) {
+    g.fillStyle = '#1b1b2f'; g.fillRect(x * r - 0.12 * r, -r, 0.24 * r, 2 * r);
+    g.fillStyle = '#fff'; g.fillRect(x * r - 0.085 * r, -r, 0.17 * r, 2 * r);
+  }
+}
+function etoileForme(g, r, c, points) {
+  g.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, d = i % 2 ? 0.42 * r : 0.95 * r;
+    g.lineTo(Math.cos(a) * d, Math.sin(a) * d);
+  }
+  g.closePath(); g.fillStyle = c; g.strokeStyle = c; g.lineJoin = 'round'; g.lineWidth = 0.18 * r; g.stroke(); g.fill();
+  g.lineWidth = 0.05 * r; g.strokeStyle = 'rgba(40,10,10,.35)'; g.stroke();
+  for (let i = 0; i < 5; i++) {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / 5;
+    for (let k = 1; k <= 3; k++) rond(g, Math.cos(a) * k * 0.22 * r, Math.sin(a) * k * 0.22 * r, 0.06 * r, points);
+  }
+  rond(g, 0, 0, 0.08 * r, points);
+}
+function coquillage(g, r, raye) {
+  const cy = 0.55 * r, R = 1.0 * r, a1 = Math.PI * 1.12, a2 = Math.PI * 1.88, n = 9;
+  g.fillStyle = '#f4dcc0'; g.fillRect(-0.28 * r, cy - 0.1 * r, 0.56 * r, 0.3 * r);
+  g.beginPath(); g.moveTo(0, cy);
+  for (let i = 0; i < n; i++) {
+    const a = a1 + (a2 - a1) * (i + 0.5) / n;
+    g.arc(Math.cos(a) * R * 0.94, cy + Math.sin(a) * R * 0.94, R * 0.18, a - Math.PI / 2, a + Math.PI / 2);
+  }
+  g.closePath();
+  g.fillStyle = raye ? '#fbe6cf' : '#f9dcd2'; g.fill();
+  g.save(); g.clip();
+  for (let i = 0; i < n; i++) {
+    const a = a1 + (a2 - a1) * (i + 0.5) / n;
+    g.strokeStyle = raye ? (i % 2 ? '#c8562b' : '#e88a3a') : 'rgba(200,140,130,.35)';
+    g.lineWidth = raye ? 0.12 * r : 0.04 * r;
+    g.beginPath(); g.moveTo(0, cy); g.lineTo(Math.cos(a) * R * 1.2, cy + Math.sin(a) * R * 1.2); g.stroke();
+  }
+  g.restore();
+  g.beginPath(); g.moveTo(0, cy); g.arc(0, cy, R * 1.08, a1, a2); g.closePath(); g.strokeStyle = 'rgba(90,50,30,.35)'; g.lineWidth = 0.05 * r;
+  oeilBrillant(g, -0.25 * r, -0.05 * r, r);
+}
+function oeilBrillant(g, x, y, r) { g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(x, y, 0.12 * r, 0.06 * r, -0.6, 0, Math.PI * 2); g.fill(); }
+
+const ESPECES = {
+  'clown': { nom: 'Poisson-clown', type: 'animal', nage: true, sosie: 'demoiselle',
+    fiche: "Le poisson-clown vit caché dans les anémones. Leurs bras piquent les autres poissons, mais pas lui !",
+    dessin: (g, r) => poisson(g, r, { corps: '#ff7a1a', nageoire: '#ff8d33', queue: '#ff8d33', motif: (g, r) => bandes(g, r, [0.38, -0.08, -0.62]) }) },
+  'demoiselle': { nom: 'Demoiselle orange', type: 'animal', nage: true, sosie: 'clown',
+    fiche: "La demoiselle orange garde son coin de rocher. Elle ressemble au poisson-clown, mais elle n'a pas de bandes blanches.",
+    dessin: (g, r) => poisson(g, r, { corps: '#ff7f22', nageoire: '#ff9a44', queue: '#ff9a44' }) },
+  'chirurgien': { nom: 'Poisson-chirurgien', type: 'animal', nage: true,
+    fiche: "Le poisson-chirurgien est bleu avec une queue jaune. Il broute les petites algues du corail.",
+    dessin: (g, r) => poisson(g, r, { corps: '#2459ff', nageoire: '#1d3fb8', queue: '#ffd12a', haute: 0.9,
+      motif: (g, r) => { g.strokeStyle = '#0d1a4a'; g.lineWidth = 0.14 * r; g.beginPath(); g.moveTo(0.45 * r, -0.35 * r); g.quadraticCurveTo(-0.2 * r, -0.4 * r, -0.65 * r, 0.1 * r); g.stroke(); } }) },
+  'globe': { nom: 'Poisson-globe', type: 'animal', nage: true,
+    fiche: "Le poisson-globe se gonfle comme un ballon quand il a peur. Il devient alors trop gros pour être avalé !",
+    dessin: (g, r) => {
+      g.fillStyle = '#e8b830'; g.beginPath(); g.moveTo(-0.65 * r, 0); g.lineTo(-1.1 * r, -0.35 * r); g.lineTo(-1.1 * r, 0.35 * r); g.closePath(); g.fill();
+      g.strokeStyle = '#c99a1c'; g.lineWidth = 0.06 * r;
+      for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8; g.beginPath(); g.moveTo(Math.cos(a) * 0.72 * r, Math.sin(a) * 0.72 * r); g.lineTo(Math.cos(a) * 0.86 * r, Math.sin(a) * 0.86 * r); g.stroke(); }
+      rond(g, 0, 0, 0.75 * r, '#ffd84a'); ovale(g, 0, 0.3 * r, 0.6 * r, 0.35 * r, '#fff3c4');
+      for (const [x, y] of [[-0.3, -0.35], [0.05, -0.5], [-0.45, 0], [0.3, -0.3], [-0.15, -0.1]]) rond(g, x * r, y * r, 0.08 * r, '#8a5a1c');
+      g.beginPath(); g.arc(0, 0, 0.75 * r, 0, Math.PI * 2); contour(g, r);
+      oeil(g, 0.38 * r, -0.15 * r, 0.2 * r);
+      rond(g, 0.72 * r, 0.12 * r, 0.07 * r, '#b5651d');
+    } },
+  'hippocampe': { nom: 'Hippocampe', type: 'animal', nage: true,
+    fiche: "L'hippocampe nage tout droit, debout. Il s'accroche aux algues avec sa queue. C'est le papa qui porte les bébés !",
+    dessin: (g, r) => {
+      const c = '#f7b733';
+      g.strokeStyle = c; g.lineCap = 'round'; g.lineWidth = 0.22 * r;
+      g.beginPath(); g.moveTo(0.05 * r, 0.3 * r); g.quadraticCurveTo(0.1 * r, 0.85 * r, -0.2 * r, 0.9 * r); g.arc(-0.2 * r, 0.72 * r, 0.18 * r, Math.PI / 2, Math.PI * 2.2); g.stroke();
+      ovale(g, -0.42 * r, -0.05 * r, 0.22 * r, 0.12 * r, '#ffd77a', -1.2);
+      ovale(g, 0.02 * r, 0, 0.33 * r, 0.48 * r, c, 0.2);
+      g.strokeStyle = 'rgba(150,90,10,.5)'; g.lineWidth = 0.04 * r;
+      for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(-0.2 * r, i * 0.15 * r); g.lineTo(0.25 * r, i * 0.15 * r + 0.05 * r); g.stroke(); }
+      rond(g, 0.05 * r, -0.6 * r, 0.27 * r, c);
+      g.lineWidth = 0.17 * r; g.strokeStyle = c; g.beginPath(); g.moveTo(0.2 * r, -0.58 * r); g.lineTo(0.68 * r, -0.5 * r); g.stroke();
+      for (let i = 0; i < 3; i++) rond(g, -0.12 * r + i * 0.1 * r, -0.86 * r + i * 0.02 * r, 0.06 * r, '#e0951a');
+      oeil(g, 0.12 * r, -0.64 * r, 0.11 * r);
+    } },
+  'tortue': { nom: 'Tortue de mer', type: 'animal', nage: true, grand: 1.25,
+    fiche: "La tortue de mer nage avec ses grandes nageoires. Elle remonte à la surface pour respirer.",
+    dessin: (g, r) => {
+      const n = '#5aa36c';
+      ovale(g, 0.35 * r, -0.55 * r, 0.42 * r, 0.16 * r, n, -0.6); ovale(g, 0.35 * r, 0.55 * r, 0.42 * r, 0.16 * r, n, 0.6);
+      ovale(g, -0.55 * r, -0.4 * r, 0.25 * r, 0.12 * r, n, 0.5); ovale(g, -0.55 * r, 0.4 * r, 0.25 * r, 0.12 * r, n, -0.5);
+      rond(g, 0.82 * r, 0, 0.22 * r, '#7cc488');
+      ovale(g, 0, 0, 0.68 * r, 0.52 * r, '#2f7d4b');
+      g.beginPath(); g.ellipse(0, 0, 0.68 * r, 0.52 * r, 0, 0, Math.PI * 2); contour(g, r);
+      for (const [x, y] of [[0, 0], [-0.35, -0.22], [-0.35, 0.22], [0.35, -0.22], [0.35, 0.22], [0, -0.38], [0, 0.38]]) ovale(g, x * r, y * r, 0.16 * r, 0.12 * r, '#6fbf7f');
+      oeil(g, 0.9 * r, -0.06 * r, 0.08 * r);
+    } },
+  'pieuvre': { nom: 'Pieuvre', type: 'animal', nage: true,
+    fiche: "La pieuvre a huit bras couverts de ventouses. Elle change de couleur pour se cacher !",
+    dessin: (g, r) => {
+      const c = '#a05bc8';
+      g.strokeStyle = c; g.lineCap = 'round'; g.lineWidth = 0.17 * r;
+      for (let i = 0; i < 6; i++) {
+        const x = -0.45 * r + i * 0.18 * r, s = i < 3 ? -1 : 1;
+        g.beginPath(); g.moveTo(x, 0.05 * r); g.quadraticCurveTo(x + s * 0.3 * r, 0.6 * r, x + s * 0.12 * r, 0.85 * r);
+        g.arc(x + s * 0.24 * r, 0.85 * r, 0.12 * r, Math.PI, s > 0 ? Math.PI * 0.2 : Math.PI * 1.8, s < 0); g.stroke();
+      }
+      ovale(g, 0, -0.3 * r, 0.58 * r, 0.62 * r, c);
+      g.beginPath(); g.ellipse(0, -0.3 * r, 0.58 * r, 0.62 * r, 0, 0, Math.PI * 2); contour(g, r);
+      for (const [x, y] of [[-0.3, -0.6], [0.25, -0.65], [0, -0.75]]) rond(g, x * r, y * r, 0.07 * r, '#c98be6');
+      oeil(g, -0.2 * r, -0.15 * r, 0.14 * r); oeil(g, 0.2 * r, -0.15 * r, 0.14 * r);
+      g.strokeStyle = '#5a2780'; g.lineWidth = 0.05 * r; g.beginPath(); g.arc(0, 0.02 * r, 0.12 * r, 0.3, Math.PI - 0.3); g.stroke();
+    } },
+  'crabe': { nom: 'Crabe', type: 'animal', nage: false,
+    fiche: "Le crabe marche de côté. Il a dix pattes, dont deux grosses pinces.",
+    dessin: (g, r) => {
+      const c = '#e2452f';
+      g.strokeStyle = '#c0321f'; g.lineWidth = 0.1 * r; g.lineCap = 'round';
+      for (let i = 0; i < 3; i++) for (const s of [-1, 1]) {
+        g.beginPath(); g.moveTo(s * 0.4 * r, 0.1 * r + i * 0.12 * r); g.lineTo(s * 0.85 * r, 0.25 * r + i * 0.15 * r); g.lineTo(s * 0.95 * r, 0.55 * r + i * 0.12 * r); g.stroke();
+      }
+      g.lineWidth = 0.12 * r;
+      for (const s of [-1, 1]) {
+        g.beginPath(); g.moveTo(s * 0.4 * r, -0.1 * r); g.lineTo(s * 0.7 * r, -0.45 * r); g.stroke();
+        rond(g, s * 0.75 * r, -0.62 * r, 0.24 * r, c);
+        g.fillStyle = '#0d4f7a'; g.beginPath(); g.moveTo(s * 0.75 * r, -0.62 * r); g.lineTo(s * 0.95 * r, -0.9 * r); g.lineTo(s * 0.55 * r, -0.9 * r); g.closePath(); g.fill();
+      }
+      ovale(g, 0, 0.05 * r, 0.62 * r, 0.42 * r, c);
+      g.beginPath(); g.ellipse(0, 0.05 * r, 0.62 * r, 0.42 * r, 0, 0, Math.PI * 2); contour(g, r);
+      g.lineWidth = 0.06 * r; g.strokeStyle = c;
+      for (const s of [-1, 1]) { g.beginPath(); g.moveTo(s * 0.18 * r, -0.25 * r); g.lineTo(s * 0.22 * r, -0.48 * r); g.stroke(); oeil(g, s * 0.22 * r, -0.52 * r, 0.11 * r); }
+      g.strokeStyle = '#8a1e10'; g.lineWidth = 0.05 * r; g.beginPath(); g.arc(0, 0.05 * r, 0.15 * r, 0.3, Math.PI - 0.3); g.stroke();
+    } },
+  'meduse': { nom: 'Méduse', type: 'animal', nage: true,
+    fiche: "La méduse n'a ni os ni cerveau : elle est faite presque toute d'eau. Ses longs filaments piquent, on la regarde de loin.",
+    dessin: (g, r) => {
+      g.strokeStyle = 'rgba(255,150,210,.85)'; g.lineWidth = 0.07 * r; g.lineCap = 'round';
+      for (let i = 0; i < 6; i++) {
+        const x = -0.5 * r + i * 0.2 * r;
+        g.beginPath(); g.moveTo(x, -0.1 * r);
+        for (let k = 1; k <= 4; k++) g.quadraticCurveTo(x + (k % 2 ? 0.12 : -0.12) * r, -0.1 * r + (k - 0.5) * 0.27 * r, x, -0.1 * r + k * 0.27 * r);
+        g.stroke();
+      }
+      const gr = g.createRadialGradient(0, -0.5 * r, 0.05 * r, 0, -0.3 * r, 0.75 * r);
+      gr.addColorStop(0, '#ffe0f2'); gr.addColorStop(1, '#ff7fc4');
+      g.fillStyle = gr; g.beginPath(); g.arc(0, -0.1 * r, 0.72 * r, Math.PI, 0);
+      for (let i = 0; i < 6; i++) g.quadraticCurveTo(0.6 * r - i * 0.24 * r, 0.08 * r, 0.48 * r - i * 0.24 * r, -0.1 * r);
+      g.closePath(); g.fill(); contour(g, r);
+      oeil(g, -0.22 * r, -0.35 * r, 0.1 * r); oeil(g, 0.22 * r, -0.35 * r, 0.1 * r);
+      g.strokeStyle = '#b03b7c'; g.lineWidth = 0.05 * r; g.beginPath(); g.arc(0, -0.25 * r, 0.1 * r, 0.3, Math.PI - 0.3); g.stroke();
+    } },
+  'raie': { nom: 'Raie', type: 'animal', nage: true, grand: 1.2,
+    fiche: "La raie est toute plate. Elle glisse dans l'eau comme si elle volait avec ses grandes ailes.",
+    dessin: (g, r) => {
+      g.strokeStyle = '#46607e'; g.lineWidth = 0.08 * r; g.lineCap = 'round';
+      g.beginPath(); g.moveTo(-0.5 * r, 0); g.quadraticCurveTo(-0.95 * r, 0.12 * r, -1.3 * r, -0.05 * r); g.stroke();
+      g.fillStyle = '#6e8fb5'; g.beginPath(); g.moveTo(0.85 * r, 0);
+      g.quadraticCurveTo(0.4 * r, -0.25 * r, 0, -0.95 * r); g.quadraticCurveTo(-0.3 * r, -0.4 * r, -0.6 * r, 0);
+      g.quadraticCurveTo(-0.3 * r, 0.4 * r, 0, 0.95 * r); g.quadraticCurveTo(0.4 * r, 0.25 * r, 0.85 * r, 0); g.fill(); contour(g, r);
+      for (const [x, y] of [[0, -0.5], [-0.15, 0.35], [0.1, 0.2], [-0.3, -0.15], [0.05, 0.6]]) rond(g, x * r, y * r, 0.06 * r, '#b9d1ec');
+      oeil(g, 0.45 * r, -0.14 * r, 0.09 * r); oeil(g, 0.45 * r, 0.14 * r, 0.09 * r);
+    } },
+  'crevette': { nom: 'Crevette nettoyeuse', type: 'animal', nage: false,
+    fiche: "La crevette nettoyeuse fait la toilette des poissons : elle mange les petites saletés sur leur peau.",
+    dessin: (g, r) => {
+      g.strokeStyle = '#ff9fb2'; g.lineWidth = 0.035 * r; g.lineCap = 'round';
+      for (const d of [0, 0.15]) { g.beginPath(); g.moveTo(0.6 * r, -0.25 * r); g.quadraticCurveTo(1.0 * r, -0.9 * r - d * r, 1.2 * r, -0.5 * r + d * r); g.stroke(); }
+      g.lineWidth = 0.05 * r; g.strokeStyle = '#e46a85';
+      for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(0.4 * r - i * 0.2 * r, 0.05 * r + i * 0.05 * r); g.lineTo(0.42 * r - i * 0.2 * r, 0.4 * r + i * 0.03 * r); g.stroke(); }
+      g.fillStyle = '#ff6f91'; g.beginPath(); g.moveTo(-0.8 * r, 0.35 * r); g.lineTo(-1.15 * r, 0.1 * r); g.lineTo(-1.1 * r, 0.6 * r); g.closePath(); g.fill();
+      for (let i = 0; i < 6; i++) {
+        const x = 0.55 * r - i * 0.26 * r, y = -0.12 * r + i * i * 0.025 * r, rr = (0.3 - i * 0.025) * r;
+        ovale(g, x, y, rr, rr * 0.85, i % 2 ? '#ff8aa4' : '#ff6f91');
+        if (i % 2 === 0) { g.fillStyle = '#fff'; g.fillRect(x - 0.03 * r, y - rr * 0.8, 0.06 * r, rr * 1.6); }
+      }
+      oeil(g, 0.7 * r, -0.22 * r, 0.1 * r);
+    } },
+  'oursin': { nom: 'Oursin', type: 'animal', nage: false, grand: 0.85,
+    fiche: "L'oursin est une boule couverte de piquants. Il avance tout doucement sur de tout petits pieds.",
+    dessin: (g, r) => {
+      g.strokeStyle = '#3a1e5c'; g.lineCap = 'round';
+      for (let i = 0; i < 28; i++) { const a = i * Math.PI * 2 / 28; g.lineWidth = 0.06 * r; g.beginPath(); g.moveTo(Math.cos(a) * 0.4 * r, Math.sin(a) * 0.4 * r); g.lineTo(Math.cos(a) * (i % 2 ? 0.95 : 0.8) * r, Math.sin(a) * (i % 2 ? 0.95 : 0.8) * r); g.stroke(); }
+      rond(g, 0, 0, 0.5 * r, '#5b2d8a');
+      for (let i = 0; i < 10; i++) { const a = i * 0.63; rond(g, Math.cos(a) * 0.3 * r, Math.sin(a) * 0.3 * r, 0.05 * r, '#8d5cc4'); }
+      oeil(g, -0.16 * r, -0.08 * r, 0.11 * r); oeil(g, 0.16 * r, -0.08 * r, 0.11 * r);
+    } },
+  'etoile': { nom: 'Étoile de mer rouge', type: 'animal', nage: false, sosie: 'etoile-bleue',
+    fiche: "L'étoile de mer a cinq bras. Si elle en perd un, il repousse !",
+    dessin: (g, r) => etoileForme(g, r, '#ff5a36', '#ffc2a8') },
+  'etoile-bleue': { nom: 'Étoile de mer bleue', type: 'animal', nage: false, sosie: 'etoile',
+    fiche: "Cette étoile de mer est toute bleue. Elle vit sur les récifs des mers chaudes.",
+    dessin: (g, r) => etoileForme(g, r, '#3f7fe8', '#b4d0ff') },
+  'anemone': { nom: 'Anémone de mer', type: 'animal', nage: false,
+    fiche: "L'anémone ressemble à une fleur, mais c'est un animal ! Ses bras attrapent la nourriture.",
+    dessin: (g, r) => {
+      g.lineCap = 'round';
+      for (let i = 0; i < 13; i++) {
+        const a = Math.PI * (1.05 + i * 0.9 / 12), x0 = Math.cos(a) * 0.3 * r;
+        g.strokeStyle = i % 2 ? '#ff9ff3' : '#ffc6f7'; g.lineWidth = 0.15 * r;
+        g.beginPath(); g.moveTo(x0, 0.2 * r); g.quadraticCurveTo(Math.cos(a) * 0.6 * r, Math.sin(a) * 0.4 * r, Math.cos(a) * 0.95 * r, 0.2 * r + Math.sin(a) * 0.95 * r); g.stroke();
+        rond(g, Math.cos(a) * 0.95 * r, 0.2 * r + Math.sin(a) * 0.95 * r, 0.08 * r, '#fff0fb');
+      }
+      g.fillStyle = '#c0398b'; g.beginPath(); g.moveTo(-0.45 * r, 0.2 * r); g.quadraticCurveTo(-0.5 * r, 0.8 * r, -0.3 * r, 0.85 * r);
+      g.lineTo(0.3 * r, 0.85 * r); g.quadraticCurveTo(0.5 * r, 0.8 * r, 0.45 * r, 0.2 * r); g.closePath(); g.fill(); contour(g, r);
+      oeil(g, -0.15 * r, 0.45 * r, 0.1 * r); oeil(g, 0.15 * r, 0.45 * r, 0.1 * r);
+    } },
+  'nudibranche': { nom: 'Limace de mer', type: 'animal', nage: false,
+    fiche: "La limace de mer est très colorée. Ses couleurs disent aux autres : « Je ne suis pas bonne à manger ! »",
+    dessin: (g, r) => {
+      for (let i = 0; i < 12; i++) { const x = -0.8 * r + i * 0.145 * r; rond(g, x, -0.24 * r, 0.11 * r, '#ff9f1a'); rond(g, x, 0.24 * r, 0.11 * r, '#ff9f1a'); }
+      ovale(g, 0, 0, 0.92 * r, 0.3 * r, '#8e3fc0');
+      g.beginPath(); g.ellipse(0, 0, 0.92 * r, 0.3 * r, 0, 0, Math.PI * 2); contour(g, r);
+      g.strokeStyle = '#fff'; g.lineWidth = 0.07 * r; g.beginPath(); g.moveTo(-0.7 * r, 0); g.lineTo(0.6 * r, 0); g.stroke();
+      g.strokeStyle = '#ff9f1a'; g.lineWidth = 0.1 * r; g.lineCap = 'round';
+      for (const d of [-0.1, 0.1]) { g.beginPath(); g.moveTo(0.7 * r, d * r); g.lineTo(0.9 * r, (d * 3.5 - 0.15) * r - 0.2 * r); g.stroke(); }
+      for (let i = 0; i < 5; i++) { const a = Math.PI + (i - 2) * 0.35; g.beginPath(); g.moveTo(-0.65 * r, -0.1 * r); g.lineTo(-0.65 * r + Math.cos(a) * 0.3 * r, -0.1 * r + Math.sin(a) * 0.3 * r - 0.2 * r); g.stroke(); }
+      oeil(g, 0.6 * r, -0.08 * r, 0.08 * r);
+    } },
+  'langouste': { nom: 'Langouste', type: 'animal', nage: false, grand: 1.1,
+    fiche: "La langouste a de très longues antennes. Le jour, elle se cache au fond des grottes.",
+    dessin: (g, r) => {
+      g.strokeStyle = '#c0501c'; g.lineCap = 'round'; g.lineWidth = 0.06 * r;
+      for (const d of [-1, 1]) { g.beginPath(); g.moveTo(0.6 * r, -0.1 * r); g.quadraticCurveTo(1.1 * r, -0.4 * r + d * 0.2 * r, 1.25 * r, -0.95 * r + d * 0.15 * r); g.stroke(); }
+      for (let i = 0; i < 4; i++) { g.beginPath(); g.moveTo(0.1 * r + i * 0.15 * r, 0.15 * r); g.lineTo(0.05 * r + i * 0.18 * r, 0.5 * r); g.stroke(); }
+      g.fillStyle = '#e8742b'; g.beginPath(); g.moveTo(-0.85 * r, 0.05 * r); g.lineTo(-1.2 * r, -0.25 * r); g.lineTo(-1.2 * r, 0.35 * r); g.closePath(); g.fill();
+      for (let i = 0; i < 4; i++) ovale(g, -0.15 * r - i * 0.2 * r, 0.05 * r, 0.15 * r, 0.22 * r - i * 0.02 * r, i % 2 ? '#e8742b' : '#d9601e');
+      ovale(g, 0.3 * r, 0, 0.42 * r, 0.27 * r, '#e8742b');
+      g.beginPath(); g.ellipse(0.3 * r, 0, 0.42 * r, 0.27 * r, 0, 0, Math.PI * 2); contour(g, r);
+      for (const [x, y] of [[0.15, -0.1], [0.35, 0.08], [0.45, -0.12]]) rond(g, x * r, y * r, 0.05 * r, '#ffd0a8');
+      oeil(g, 0.62 * r, -0.12 * r, 0.09 * r);
+    } },
+  'coquillage-raye': { nom: 'Coquillage rayé', type: 'tresor', nage: false, sosie: 'coquillage-uni',
+    fiche: "Ce coquillage rayé était la maison d'un petit animal. Ses rayures orange le rendent unique.",
+    dessin: (g, r) => coquillage(g, r, true) },
+  'coquillage-uni': { nom: 'Coquillage uni', type: 'tresor', nage: false, sosie: 'coquillage-raye',
+    fiche: "Ce coquillage tout lisse n'a pas de rayures. Il brille doucement dans le sable.",
+    dessin: (g, r) => coquillage(g, r, false) },
+  'perle': { nom: 'Huître perlière', type: 'tresor', nage: false,
+    fiche: "La perle naît dans une huître. Elle grandit très lentement, pendant des années.",
+    dessin: (g, r) => {
+      ovale(g, 0, 0.25 * r, 0.9 * r, 0.42 * r, '#6b5b7a'); ovale(g, 0, 0.18 * r, 0.75 * r, 0.3 * r, '#f3d9ec');
+      g.fillStyle = '#7d6b8c'; g.beginPath(); g.ellipse(-0.05 * r, -0.35 * r, 0.85 * r, 0.32 * r, -0.25, Math.PI, Math.PI * 2); g.closePath(); g.fill(); contour(g, r);
+      const gr = g.createRadialGradient(-0.1 * r, 0.02 * r, 0.03 * r, 0, 0.1 * r, 0.32 * r);
+      gr.addColorStop(0, '#ffffff'); gr.addColorStop(1, '#d6d0ea');
+      g.fillStyle = gr; g.beginPath(); g.arc(0, 0.1 * r, 0.3 * r, 0, Math.PI * 2); g.fill();
+      rond(g, -0.1 * r, 0, 0.08 * r, '#fff');
+    } },
+  'ancre': { nom: 'Vieille ancre', type: 'tresor', nage: false, grand: 1.1,
+    fiche: "Cette vieille ancre retenait un bateau. Les algues et les coquillages s'y sont installés.",
+    dessin: (g, r) => {
+      g.strokeStyle = '#6f7a80'; g.lineCap = 'round'; g.lineWidth = 0.18 * r;
+      g.beginPath(); g.arc(0, -0.72 * r, 0.18 * r, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.moveTo(0, -0.55 * r); g.lineTo(0, 0.8 * r); g.stroke();
+      g.beginPath(); g.moveTo(-0.45 * r, -0.3 * r); g.lineTo(0.45 * r, -0.3 * r); g.stroke();
+      g.beginPath(); g.arc(0, 0.2 * r, 0.65 * r, 0.25, Math.PI - 0.25); g.stroke();
+      g.fillStyle = '#6f7a80';
+      for (const s of [-1, 1]) { g.beginPath(); g.moveTo(s * 0.7 * r, 0.25 * r); g.lineTo(s * 0.85 * r, 0.0); g.lineTo(s * 0.48 * r, 0.25 * r); g.closePath(); g.fill(); }
+      rond(g, 0.12 * r, 0.1 * r, 0.08 * r, '#48a860'); rond(g, -0.4 * r, 0.62 * r, 0.07 * r, '#d9773b');
+    } },
+  'coffre': { nom: 'Coffre au trésor', type: 'tresor', nage: false, grand: 1.15,
+    fiche: "Un vieux coffre tombé d'une épave ! Il est rempli de pièces dorées qui brillent.",
+    dessin: (g, r) => {
+      g.fillStyle = '#7a4a22'; g.beginPath(); g.moveTo(-0.8 * r, -0.2 * r); g.lineTo(-0.7 * r, -0.85 * r); g.lineTo(0.7 * r, -0.85 * r); g.lineTo(0.8 * r, -0.2 * r); g.closePath(); g.fill();
+      for (const [x, y] of [[-0.4, -0.3], [-0.1, -0.35], [0.2, -0.3], [0.45, -0.32], [0.05, -0.5], [-0.25, -0.52]]) { rond(g, x * r, y * r, 0.15 * r, '#ffcf3a'); rond(g, x * r - 0.04 * r, y * r - 0.04 * r, 0.05 * r, '#fff3b0'); }
+      g.fillStyle = '#8b5a2b'; g.fillRect(-0.8 * r, -0.2 * r, 1.6 * r, 0.9 * r);
+      g.strokeStyle = 'rgba(60,30,10,.6)'; g.lineWidth = 0.04 * r;
+      for (let i = 1; i < 3; i++) { g.beginPath(); g.moveTo(-0.8 * r, -0.2 * r + i * 0.3 * r); g.lineTo(0.8 * r, -0.2 * r + i * 0.3 * r); g.stroke(); }
+      g.fillStyle = '#f1c40f'; g.fillRect(-0.62 * r, -0.2 * r, 0.14 * r, 0.9 * r); g.fillRect(0.48 * r, -0.2 * r, 0.14 * r, 0.9 * r);
+      g.fillRect(-0.12 * r, 0, 0.24 * r, 0.26 * r); rond(g, 0, 0.13 * r, 0.05 * r, '#5a3410');
+      g.strokeStyle = 'rgba(30,15,5,.6)'; g.lineWidth = 0.06 * r; g.strokeRect(-0.8 * r, -0.2 * r, 1.6 * r, 0.9 * r);
+    } },
+};
+const LISTE_ESPECES = Object.keys(ESPECES);
+
+// ---------------------------------------------------------------------
+//  Les 12 plongées (difficulté croissante, une nouveauté tous les 2 niveaux)
+// ---------------------------------------------------------------------
+const NIVEAUX = [
+  { nom: 'Le jardin de corail', cibles: ['clown', 'etoile', 'coquillage-raye'], autres: 6, air: 100, taille: 34, tuto: 'base' },
+  { nom: "La prairie d'algues", cibles: ['tortue', 'crabe', 'hippocampe', 'perle'], autres: 9, air: 100, taille: 33 },
+  { nom: 'Les éponges colorées', cibles: ['pieuvre', 'oursin', 'crevette', 'anemone'], autres: 10, camo: 2, force: 0.45, air: 95, taille: 32, tuto: 'camo' },
+  { nom: 'Le tombant', cibles: ['nudibranche', 'etoile', 'crabe', 'chirurgien', 'ancre'], autres: 11, camo: 3, force: 0.6, air: 95, taille: 31 },
+  { nom: 'Le banc de poissons', cibles: ['chirurgien', 'tortue', 'meduse', 'globe', 'coquillage-raye'], autres: 11, bouge: 3, vitesse: 30, air: 95, taille: 31, tuto: 'bouge' },
+  { nom: 'La forêt de varech', cibles: ['raie', 'hippocampe', 'pieuvre', 'globe', 'crevette'], autres: 13, camo: 2, force: 0.62, bouge: 3, vitesse: 36, air: 90, taille: 29 },
+  { nom: 'La grotte bleue', cibles: ['langouste', 'perle', 'oursin', 'meduse'], autres: 8, grotte: true, lampe: 115, bouge: 1, vitesse: 26, air: 90, taille: 31, tuto: 'grotte' },
+  { nom: 'La grotte aux éponges', cibles: ['nudibranche', 'crabe', 'langouste', 'ancre', 'crevette'], autres: 9, grotte: true, lampe: 105, camo: 3, force: 0.6, air: 90, taille: 29 },
+  { nom: 'Les jumeaux du récif', cibles: ['demoiselle', 'coquillage-uni', 'etoile-bleue', 'hippocampe', 'crevette'], autres: 12, sosies: true, air: 90, taille: 30, tuto: 'sosies' },
+  { nom: 'Le grand récif', cibles: ['clown', 'coquillage-raye', 'etoile-bleue', 'raie', 'chirurgien', 'pieuvre'], autres: 15, sosies: true, camo: 2, force: 0.65, bouge: 3, vitesse: 40, air: 90, taille: 28 },
+  { nom: 'La grotte des jumeaux', cibles: ['demoiselle', 'etoile', 'coquillage-uni', 'langouste', 'meduse', 'globe'], autres: 11, grotte: true, lampe: 98, sosies: true, bouge: 3, vitesse: 34, air: 90, taille: 28 },
+  { nom: "Le trésor de l'épave", cibles: ['coffre', 'clown', 'etoile-bleue', 'coquillage-raye', 'tortue', 'nudibranche', 'perle'], autres: 16, sosies: true, camo: 3, force: 0.7, bouge: 3, vitesse: 44, air: 100, taille: 27, epave: true },
+];
+
+const COULEURS_CORAIL = ['#ff6f91', '#ff9f43', '#feca57', '#a29bfe', '#ff7eb3', '#48dbfb', '#1dd1a1', '#f368e0', '#e17055'];
+const COULEURS_GROTTE = ['#6c5ce7', '#00b894', '#e84393', '#0984e3', '#fdcb6e', '#d980fa'];
+
+// ---------------------------------------------------------------------
+//  Images des animaux (mises en cache)
+// ---------------------------------------------------------------------
+const cacheImages = new Map();
+// Image d'une espèce, de rayon r (unités du monde), à l'échelle px (pixels par unité).
+// Avec « camo », l'animal prend la couleur du corail (camouflage).
+function image(id, r, px, camo, force) {
+  const cle = id + '|' + r + '|' + px.toFixed(3) + '|' + (camo || '') + '|' + (force || 0);
+  let c = cacheImages.get(cle);
+  if (c) return c;
+  c = document.createElement('canvas');
+  const taille = Math.ceil(r * 2.8 * px);
+  c.width = c.height = taille;
+  const g = c.getContext('2d');
+  g.translate(taille / 2, taille / 2); g.scale(px, px);
+  ESPECES[id].dessin(g, r);
+  if (camo) {
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = 'source-atop';
+    g.globalAlpha = force; g.fillStyle = camo; g.fillRect(0, 0, taille, taille);
+    // Petites taches pour imiter la texture de l'éponge.
+    const h = graine(id.length * 31 + r);
+    g.globalAlpha = force * 0.8; g.fillStyle = 'rgba(0,0,0,.35)';
+    for (let i = 0; i < 26; i++) { g.beginPath(); g.arc(h() * taille, h() * taille, (0.04 + h() * 0.06) * r * px, 0, Math.PI * 2); g.fill(); }
+  }
+  if (cacheImages.size > 400) cacheImages.clear();
+  cacheImages.set(cle, c);
+  return c;
+}
+// Petite icône (barre du bas, aquarium) dessinée dans un canvas de taille CSS « cote ».
+function icone(id, cote, inconnu) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const c = document.createElement('canvas');
+  c.width = c.height = Math.round(cote * dpr);
+  const g = c.getContext('2d');
+  g.translate(c.width / 2, c.height / 2);
+  const r = cote / 2.7 * dpr;
+  ESPECES[id].dessin(g, r);
+  if (inconnu) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = '#0b3550'; g.fillRect(0, 0, c.width, c.height); }
+  return c;
+}
+
+// ---------------------------------------------------------------------
+//  Décor du récif (dessiné une fois par plongée dans un canvas caché)
+// ---------------------------------------------------------------------
+function corail(g, h, x, y, t, c, grotte) {
+  g.save(); g.translate(x, y);
+  const fonce = 'rgba(0,0,0,.18)';
+  const type = Math.floor(h() * 6);
+  if (type === 0) {            // corail branchu
+    g.strokeStyle = c; g.lineCap = 'round';
+    const branche = (x0, y0, a, l, w, n) => {
+      const x1 = x0 + Math.cos(a) * l, y1 = y0 + Math.sin(a) * l;
+      g.lineWidth = w; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      if (n > 0) { branche(x1, y1, a - 0.45 - h() * 0.2, l * 0.72, w * 0.72, n - 1); branche(x1, y1, a + 0.45 + h() * 0.2, l * 0.72, w * 0.72, n - 1); }
+    };
+    branche(0, 0, -Math.PI / 2, t * 0.5, t * 0.16, 3);
+  } else if (type === 1) {     // corail cerveau
+    ovale(g, 0, -t * 0.3, t * 0.55, t * 0.38, c);
+    g.strokeStyle = fonce; g.lineWidth = t * 0.04;
+    for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(-t * 0.45, -t * 0.5 + i * t * 0.1); for (let k = 0; k < 6; k++) g.quadraticCurveTo(-t * 0.4 + k * t * 0.15, -t * 0.55 + i * t * 0.1 + (k % 2 ? 1 : -1) * t * 0.05, -t * 0.32 + k * t * 0.15, -t * 0.5 + i * t * 0.1); g.stroke(); }
+  } else if (type === 2) {     // gorgone en éventail
+    g.strokeStyle = c; g.globalAlpha = 0.85; g.lineCap = 'round';
+    for (let i = 0; i < 9; i++) { const a = -Math.PI / 2 + (i - 4) * 0.17; g.lineWidth = t * 0.035; g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(Math.cos(a) * t * 0.5, Math.sin(a) * t * 0.6, Math.cos(a) * t * 0.9, Math.sin(a) * t * 0.95); g.stroke(); }
+    g.lineWidth = t * 0.02;
+    for (let k = 1; k < 5; k++) { g.beginPath(); g.arc(0, 0, t * k * 0.2, -Math.PI / 2 - 0.75, -Math.PI / 2 + 0.75); g.stroke(); }
+  } else if (type === 3) {     // tubes
+    for (let i = 0; i < 4; i++) {
+      const xx = (i - 1.5) * t * 0.16, hh = t * (0.35 + h() * 0.45);
+      g.fillStyle = c; g.fillRect(xx - t * 0.07, -hh, t * 0.14, hh);
+      ovale(g, xx, -hh, t * 0.07, t * 0.03, fonce);
+    }
+  } else if (type === 4) {     // éponge bosselée
+    g.fillStyle = c; g.beginPath();
+    for (let i = 0; i <= 12; i++) { const a = Math.PI + i * Math.PI / 12, rr = t * (0.42 + h() * 0.12); g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr * 0.9); }
+    g.closePath(); g.fill();
+    for (let i = 0; i < 6; i++) rond(g, (h() - 0.5) * t * 0.6, -h() * t * 0.3, t * 0.04, fonce);
+  } else {                     // bouquet de boules
+    for (let i = 0; i < 8; i++) rond(g, (h() - 0.5) * t * 0.7, -h() * t * 0.6, t * (0.08 + h() * 0.08), c);
+  }
+  if (grotte && h() < 0.5) { g.globalAlpha = 0.5; rond(g, 0, -t * 0.3, t * 0.06, '#e8fbff'); }
+  g.restore();
+}
+
+function dessinerFond(largeur, px, opts) {
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(largeur * px); c.height = Math.ceil(H * px);
+  const g = c.getContext('2d');
+  g.scale(px, px);
+  const h = graine(opts.graine);
+  const grotte = opts.grotte, couleurs = grotte ? COULEURS_GROTTE : COULEURS_CORAIL;
+  // Eau
+  const eau = g.createLinearGradient(0, 0, 0, H);
+  if (grotte) { eau.addColorStop(0, '#13284a'); eau.addColorStop(1, '#07142a'); }
+  else { eau.addColorStop(0, '#46d0e0'); eau.addColorStop(0.45, '#1a8fc0'); eau.addColorStop(1, '#0d4f86'); }
+  g.fillStyle = eau; g.fillRect(0, 0, largeur, H);
+  // Rayons de lumière
+  if (!grotte) {
+    for (let x = h() * 120; x < largeur; x += 140 + h() * 120) {
+      g.fillStyle = 'rgba(255,255,255,0.08)'; g.beginPath();
+      g.moveTo(x, 0); g.lineTo(x + 50, 0); g.lineTo(x + 170, H * 0.8); g.lineTo(x + 70, H * 0.8); g.closePath(); g.fill();
+    }
+  }
+  // Collines lointaines
+  g.fillStyle = grotte ? 'rgba(40,60,100,.6)' : 'rgba(10,60,110,.4)';
+  g.beginPath(); g.moveTo(0, H);
+  for (let x = 0; x <= largeur + 60; x += 60) g.lineTo(x, 470 + Math.sin(x * 0.01 + opts.graine) * 40 + h() * 25);
+  g.lineTo(largeur, H); g.closePath(); g.fill();
+  // Grotte : voûte rocheuse
+  if (grotte) {
+    g.fillStyle = '#1d2238';
+    g.beginPath(); g.moveTo(0, 0);
+    for (let x = 0; x <= largeur + 40; x += 40) g.lineTo(x, 50 + h() * 50 + (x % 160 < 40 ? 50 : 0));
+    g.lineTo(largeur, 0); g.closePath(); g.fill();
+  }
+  // Épave (dernière plongée)
+  if (opts.epave) {
+    g.save(); g.translate(largeur * 0.55, 560); g.rotate(-0.12);
+    g.fillStyle = '#3e3328'; g.beginPath(); g.moveTo(-260, 0); g.lineTo(220, 0); g.lineTo(280, -110); g.lineTo(-300, -110); g.closePath(); g.fill();
+    g.strokeStyle = '#2a2219'; g.lineWidth = 5;
+    for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(-290 + i * 8, -i * 27); g.lineTo(260 - i * 10, -i * 27); g.stroke(); }
+    g.fillStyle = '#2a2219'; g.fillRect(-30, -330, 16, 230);
+    for (const x of [-180, -80, 40, 150]) rond(g, x, -60, 13, '#1a3550');
+    g.restore();
+  }
+  // Rochers en piliers (pour que les animaux aient des endroits où se poser)
+  for (let x = 40 + h() * 80; x < largeur - 20; x += 180 + h() * 160) {
+    const haut = 300 + h() * 180, l = 90 + h() * 70;
+    g.fillStyle = grotte ? '#2b2f4c' : '#5f6f8f';
+    g.beginPath(); g.moveTo(x - l, H);
+    g.quadraticCurveTo(x - l * 0.9, haut + 40, x - l * 0.3, haut); g.quadraticCurveTo(x + l * 0.4, haut - 20, x + l * 0.8, haut + 50);
+    g.quadraticCurveTo(x + l, H - 100, x + l * 1.05, H); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.08)'; g.beginPath(); g.ellipse(x - l * 0.2, haut + 30, l * 0.5, 16, -0.1, 0, Math.PI * 2); g.fill();
+    for (let k = 0; k < 3; k++) corail(g, h, x - l * 0.5 + h() * l, haut + 15 + h() * 20, 50 + h() * 40, choisir2(h, couleurs), grotte);
+  }
+  // Herbes du fond
+  g.lineCap = 'round';
+  for (let x = h() * 30; x < largeur; x += 25 + h() * 40) {
+    g.strokeStyle = grotte ? 'rgba(40,130,110,.6)' : 'rgba(30,140,90,.75)'; g.lineWidth = 6;
+    const hh = 60 + h() * 90;
+    g.beginPath(); g.moveTo(x, H - 50); g.quadraticCurveTo(x + 20, H - 50 - hh / 2, x - 5 + h() * 20, H - 50 - hh); g.stroke();
+  }
+  // Sable
+  const sable = g.createLinearGradient(0, H - 90, 0, H);
+  if (grotte) { sable.addColorStop(0, '#5a5470'); sable.addColorStop(1, '#3a3550'); }
+  else { sable.addColorStop(0, '#ecd79e'); sable.addColorStop(1, '#c9a96a'); }
+  g.fillStyle = sable; g.beginPath(); g.moveTo(0, H);
+  for (let x = 0; x <= largeur + 50; x += 50) g.lineTo(x, H - 70 + Math.sin(x * 0.02) * 10);
+  g.lineTo(largeur, H); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(120,90,40,.25)'; g.lineWidth = 2;
+  for (let i = 0; i < largeur / 40; i++) { const x = h() * largeur, y = H - 45 + h() * 40; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 15, y - 5, x + 30, y); g.stroke(); }
+  for (let i = 0; i < largeur / 25; i++) rond(g, h() * largeur, H - 60 + h() * 55, 2 + h() * 4, grotte ? '#6d6688' : '#d9c08a');
+  // Coraux du premier plan (sur le sable)
+  for (let x = h() * 40; x < largeur; x += 55 + h() * 70) corail(g, h, x, H - 55 + h() * 30, 60 + h() * 60, choisir2(h, couleurs), grotte);
+  // Taches d'éponges derrière les animaux camouflés
+  for (const p of opts.taches) {
+    g.fillStyle = p.c; g.beginPath();
+    for (let i = 0; i <= 16; i++) { const a = i * Math.PI / 8, rr = p.r * (1.45 + h() * 0.25); g.lineTo(p.x + Math.cos(a) * rr, p.y + Math.sin(a) * rr * 0.85); }
+    g.closePath(); g.fill();
+    g.fillStyle = 'rgba(0,0,0,.18)';
+    for (let i = 0; i < 18; i++) rond(g, p.x + (h() - 0.5) * p.r * 2.4, p.y + (h() - 0.5) * p.r * 2, 2 + h() * 4, g.fillStyle);
+  }
+  return c;
+}
+function choisir2(h, t) { return t[Math.floor(h() * t.length)]; }
+
+// ---------------------------------------------------------------------
+//  État de la partie
+// ---------------------------------------------------------------------
+const canvas = $('scene'), ctx = canvas.getContext('2d');
+const nuit = document.createElement('canvas'), ctxNuit = nuit.getContext('2d');
+let J = null;          // la plongée en cours
+let ecran = 'accueil';
+let dpr = 1, W = 0, HH = 0, s = 1, visW = 0;
+
+function afficher(nom) {
+  ecran = nom;
+  document.querySelectorAll('.ecran').forEach((e) => e.classList.toggle('actif', e.id === nom));
+  if (nom === 'accueil') majAccueil();
+}
+function voile(id, actif) { $(id).classList.toggle('actif', actif); }
+
+function totalEtoiles() { let t = 0; for (let i = 0; i < NIVEAUX.length; i++) t += sauvegarde.etoiles[i] || 0; return t; }
+function debloque(n) { return n === 0 || (sauvegarde.etoiles[n - 1] || 0) >= 1; }
+
+// Taille de la zone de jeu.
+function mesurer() {
+  const z = $('zone');
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.max(1, z.clientWidth); HH = Math.max(1, z.clientHeight);
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(HH * dpr);
+  nuit.width = canvas.width; nuit.height = canvas.height;
+  s = HH / H; visW = W / s;
+}
+
+// Prépare une plongée : placement des cibles et des autres animaux.
+function lancerNiveau(n) {
+  const L = NIVEAUX[n];
+  afficher('jeu');
+  voile('bilan', false); voile('pause', false);
+  mesurer();
+  J = { n, L, objets: [], algues: [], effets: [], textes: [], volants: [], plancton: [],
+    t: 0, air: L.air, trouves: 0, erreurs: 0, indices: 0, score: 0, pause: false, fini: false,
+    camX: 0, camVise: null, derive: 1, repos: 0, lampe: { x: W / 2, y: HH / 2 }, curseur: { x: W / 2, y: HH / 2 }, clavier: false,
+    indice: null, alerte: 0, nouveaux: [], graine: Math.floor(Math.random() * 1e9), tuto: null, largeur: 0 };
+  J.largeur = L.grotte ? visW : Math.max(900, visW * 1.2);
+
+  // Cibles : lesquelles bougent, lesquelles sont camouflées.
+  const cibles = L.cibles.map((id) => ({ id, cible: true }));
+  const nageuses = melanger(cibles.filter((c) => ESPECES[c.id].nage));
+  for (let i = 0; i < (L.bouge || 0) && i < nageuses.length; i++) nageuses[i].bouge = true;
+  const fixes = melanger(cibles.filter((c) => !c.bouge));
+  for (let i = 0; i < (L.camo || 0) && i < fixes.length; i++) fixes[i].camo = true;
+
+  // Les autres animaux (pas de sosie avant la plongée des jumeaux).
+  const interdits = new Set(L.cibles);
+  if (!L.sosies) for (const id of L.cibles) if (ESPECES[id].sosie) interdits.add(ESPECES[id].sosie);
+  const autres = [];
+  if (L.sosies) for (const id of L.cibles) { const so = ESPECES[id].sosie; if (so && !interdits.has(so)) autres.push({ id: so }); }
+  const reserve = LISTE_ESPECES.filter((id) => !interdits.has(id) && (id !== 'coffre'));
+  while (autres.length < L.autres) {
+    const id = choisir(reserve);
+    if (autres.filter((a) => a.id === id).length < 2) autres.push({ id });
+  }
+  for (const a of autres) {
+    if (L.bouge && ESPECES[a.id].nage && Math.random() < 0.45) a.bouge = true;
+    else if (L.camo && Math.random() < 0.35) a.camo = true;
+  }
+
+  const tous = [...cibles, ...autres];
+  // Les plus gros d'abord : plus facile à placer.
+  for (const d of tous) d.r = Math.round(L.taille * (ESPECES[d.id].grand || 1));
+  tous.sort((a, b) => b.r - a.r);
+  for (const d of tous) placer(d);
+  J.objets.forEach((o) => { if (o.cible) o.ordre = L.cibles.indexOf(o.id); });
+
+  construireFond();
+  construireBarre();
+  majHud();
+  J.camX = Math.random() * Math.max(0, J.largeur - visW) * 0.3;
+  for (let i = 0; i < 40; i++) J.plancton.push({ x: Math.random() * J.largeur, y: Math.random() * H, v: 3 + Math.random() * 6, r: 1 + Math.random() * 2 });
+
+  // Tutoriel quand une mécanique apparaît.
+  if (L.tuto) demarrerTuto(L.tuto);
+}
+
+// Cherche une place libre pour un animal.
+function placer(d) {
+  const L = J.L, m = d.r + 16;
+  const fond = !ESPECES[d.id].nage;
+  let meilleur = null, meilleurEcart = -1;
+  for (let essai = 0; essai < 80; essai++) {
+    const x = hasard(m, J.largeur - m);
+    const y = d.bouge ? hasard(110, 470) : fond ? hasard(330, H - 40) : hasard(L.grotte ? 140 : 90, 560);
+    let ecart = Infinity;
+    for (const o of J.objets) {
+      const dx = o.x - x, dy = o.y - y;
+      ecart = Math.min(ecart, Math.hypot(dx, dy) - o.r - d.r);
+    }
+    if (ecart > 18) { meilleur = { x, y }; break; }
+    if (ecart > meilleurEcart) { meilleurEcart = ecart; meilleur = { x, y }; }
+  }
+  const o = { id: d.id, r: d.r, x: meilleur.x, y: meilleur.y, y0: meilleur.y, cible: !!d.cible, bouge: !!d.bouge,
+    trouve: false, dir: Math.random() < 0.5 ? -1 : 1, phase: Math.random() * 6, cache: false };
+  if (o.bouge) {
+    const longueur = Math.min(J.largeur - 2 * m, hasard(220, 360));
+    o.xa = Math.max(m, Math.min(o.x - longueur / 2, J.largeur - m - longueur));
+    o.xb = o.xa + longueur;
+    o.vit = (L.vitesse || 30) * hasard(0.8, 1.2) * (o.id === 'tortue' || o.id === 'hippocampe' ? 0.7 : 1);
+    // Touffe d'algues sur le trajet : l'animal passe derrière.
+    J.algues.push({ x: hasard(o.xa + 50, o.xb - 50), w: Math.max(62, o.r * 2.1), haut: o.y0 - o.r - 34, phase: Math.random() * 6 });
+  }
+  if (d.camo) { o.camo = choisir(L.grotte ? COULEURS_GROTTE : COULEURS_CORAIL); o.force = L.force || 0.5; }
+  J.objets.push(o);
+}
+
+function construireFond() {
+  const taches = J.objets.filter((o) => o.camo).map((o) => ({ x: o.x, y: o.y, r: o.r, c: o.camo }));
+  // Éponges vides des mêmes couleurs : la tache seule ne trahit pas l'animal caché.
+  if (taches.length) {
+    const h = graine(J.graine + 5), base = taches.length;
+    for (let i = 0; i < base * 2 + 3; i++) {
+      taches.push({ x: 40 + h() * (J.largeur - 80), y: 300 + h() * 330, r: J.L.taille * (0.8 + h() * 0.4), c: taches[i % base].c });
+    }
+  }
+  J.fond = dessinerFond(J.largeur, s * dpr, { graine: J.graine, grotte: J.L.grotte, epave: J.L.epave, taches });
+}
+
+function construireBarre() {
+  const b = $('barre'); b.innerHTML = '';
+  J.puces = [];
+  b.classList.toggle('cinq', J.L.cibles.length === 5);   // 5 cases : une seule rangée
+  for (const id of J.L.cibles) {
+    const p = document.createElement('div');
+    p.className = 'puce';
+    p.appendChild(icone(id, 34));
+    const t = document.createElement('span'); t.textContent = ESPECES[id].nom; p.appendChild(t);
+    b.appendChild(p); J.puces.push(p);
+  }
+  // La barre change la hauteur de la zone : on remesure.
+  requestAnimationFrame(() => { if (J) redimensionner(); });
+}
+
+function majHud() {
+  $('nom-niveau').textContent = 'Plongée ' + (J.n + 1) + ' · ' + J.L.nom;
+  const pct = Math.max(0, J.air / J.L.air);
+  $('air-niveau').style.width = (pct * 100).toFixed(1) + '%';
+  $('air').classList.toggle('bas', pct < 0.25);
+  $('score').textContent = J.score;
+  $('bouton-indice').classList.toggle('actif', !!J.indice);
+}
+
+// Écran redimensionné (rotation du téléphone, fenêtre) : on recalcule tout.
+function redimensionner() {
+  if (ecran === 'accueil') { tailleAccueil(); return; }
+  if (!J || ecran !== 'jeu') return;
+  const ancienne = J.largeur, ancienW = W, ancienH = HH;
+  mesurer();
+  if (W === ancienW && HH === ancienH && J.fond) return;
+  const nouvelle = J.L.grotte ? visW : Math.max(900, visW * 1.2);
+  const k = nouvelle / ancienne;
+  if (k !== 1) {
+    for (const o of J.objets) { o.x *= k; if (o.bouge) { o.xa *= k; o.xb *= k; } }
+    for (const a of J.algues) a.x *= k;
+    J.largeur = nouvelle;
+  }
+  J.lampe.x = Math.min(J.lampe.x, W); J.lampe.y = Math.min(J.lampe.y, HH);
+  J.curseur.x = Math.min(J.curseur.x, W); J.curseur.y = Math.min(J.curseur.y, HH);
+  borneCamera();
+  construireFond();
+}
+window.addEventListener('resize', redimensionner);
+
+function borneCamera() { J.camX = Math.max(0, Math.min(J.camX, J.largeur - visW)); }
+
+// ---------------------------------------------------------------------
+//  Tutoriel animé (passe tout seul, ou d'un toucher)
+// ---------------------------------------------------------------------
+function demarrerTuto(type) {
+  const L = J.L;
+  let obj = null;
+  const vivants = J.objets;
+  if (type === 'base') obj = vivants.find((o) => o.cible && o.ordre === 0);
+  if (type === 'camo') obj = vivants.find((o) => o.camo && !o.cible) || vivants.find((o) => o.camo);
+  if (type === 'bouge') obj = vivants.find((o) => o.bouge && !o.cible) || vivants.find((o) => o.bouge);
+  if (type === 'sosies') obj = vivants.find((o) => o.cible && ESPECES[o.id].sosie);
+  J.tuto = { type, t: 0, duree: type === 'base' ? 6 : 5, obj, depart: J.camX };
+  if (obj && !L.grotte) J.tuto.vise = Math.max(0, Math.min(obj.x - visW / 2, J.largeur - visW));
+}
+function finirTuto() {
+  if (!J || !J.tuto) return;
+  J.tuto = null;
+  J.camVise = null;
+  J.puces.forEach((p) => p.classList.remove('eclaire'));
+}
+
+// ---------------------------------------------------------------------
+//  Toucher, souris et clavier
+// ---------------------------------------------------------------------
+let appui = null;
+function posLocale(e) { const b = canvas.getBoundingClientRect(); return { x: e.clientX - b.left, y: e.clientY - b.top }; }
+
+canvas.addEventListener('pointerdown', (e) => {
+  if (!J || J.pause || J.fini) return;
+  e.preventDefault();
+  if (J.tuto) { finirTuto(); return; }
+  const p = posLocale(e);
+  appui = { x: p.x, y: p.y, x0: p.x, y0: p.y, glisse: false, id: e.pointerId };
+  J.clavier = false;
+  if (J.L.grotte) { J.lampe.x = p.x; J.lampe.y = p.y; }
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* rien */ }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!J || J.pause || J.fini) return;
+  const p = posLocale(e);
+  if (!appui) {
+    // Souris sans clic : la lampe suit le pointeur dans les grottes.
+    if (e.pointerType === 'mouse' && J.L.grotte && !J.tuto) { J.lampe.x = p.x; J.lampe.y = p.y; J.clavier = false; }
+    return;
+  }
+  const dx = p.x - appui.x;
+  if (!appui.glisse && Math.hypot(p.x - appui.x0, p.y - appui.y0) > 10) appui.glisse = true;
+  if (appui.glisse) {
+    if (J.L.grotte) { J.lampe.x = p.x; J.lampe.y = p.y; }
+    else { J.camX -= dx / s; J.camVise = null; J.repos = 3; borneCamera(); }
+  }
+  appui.x = p.x; appui.y = p.y;
+});
+function relacher(e) {
+  if (!appui) return;
+  const a = appui; appui = null;
+  if (!J || J.pause || J.fini || J.tuto) return;
+  if (!a.glisse) toucher(a.x0, a.y0);
+}
+canvas.addEventListener('pointerup', relacher);
+canvas.addEventListener('pointercancel', () => { appui = null; });
+
+document.addEventListener('keydown', (e) => {
+  const k = e.key;
+  if (ecran === 'jeu' && J && !J.fini) {
+    if (k === 'Escape' || k === 'p' || k === 'P') { e.preventDefault(); if (J.pause) reprendre(); else mettrePause(); return; }
+    if (J.pause) return;
+    if (J.tuto) { if ([' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(k)) { e.preventDefault(); finirTuto(); } return; }
+    const pas = 26;
+    const c = J.curseur;
+    let bouge = true;
+    if (k === 'ArrowLeft') c.x -= pas; else if (k === 'ArrowRight') c.x += pas;
+    else if (k === 'ArrowUp') c.y -= pas; else if (k === 'ArrowDown') c.y += pas;
+    else bouge = false;
+    if (bouge) {
+      e.preventDefault(); J.clavier = true;
+      // Au bord de l'écran, la scène défile.
+      if (!J.L.grotte) {
+        if (c.x < W * 0.15) { J.camX -= pas / s * 1.5; J.repos = 3; J.camVise = null; }
+        if (c.x > W * 0.85) { J.camX += pas / s * 1.5; J.repos = 3; J.camVise = null; }
+        borneCamera();
+      }
+      c.x = Math.max(8, Math.min(W - 8, c.x)); c.y = Math.max(8, Math.min(HH - 8, c.y));
+      if (J.L.grotte) { J.lampe.x = c.x; J.lampe.y = c.y; }
+      return;
+    }
+    if (k === ' ' || k === 'Enter') {
+      e.preventDefault();
+      if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+      J.clavier = true; toucher(c.x, c.y); return;
+    }
+    if (k === 'i' || k === 'I') { e.preventDefault(); donnerIndice(); }
+  }
+});
+
+// Un toucher dans la scène, en pixels de la zone.
+function toucher(x, y) {
+  const wx = J.camX + x / s, wy = y / s;
+  let meilleur = null, dmin = Infinity;
+  for (const o of J.objets) {
+    if (o.trouve) continue;
+    const d = Math.hypot(o.x - wx, o.y - wy);
+    const marge = o.r + 12;
+    if (d < marge && d < dmin) { dmin = d; meilleur = o; }
+  }
+  J.effets.push({ type: 'rond', x: wx, y: wy, t: 0, d: 0.4 });
+  if (!meilleur) { sons.bloup(); return; }
+  if (meilleur.bouge && meilleur.cache) { sons.cache(); texte(wx, wy - 30, 'Il est caché !', '#bdf0ff'); return; }
+  if (meilleur.cible) trouver(meilleur);
+  else {
+    J.erreurs++; J.air = Math.max(0, J.air - 4); J.score = Math.max(0, J.score - 20);
+    sons.erreur(); J.secousse = 0.3;
+    texte(meilleur.x, meilleur.y - meilleur.r - 14, "Ce n'est pas ça : " + ESPECES[meilleur.id].nom.toLowerCase(), '#ffd0c4');
+    majHud();
+  }
+}
+
+function trouver(o) {
+  o.trouve = true; J.trouves++; J.score += 100;
+  sons.trouve();
+  if (!sauvegarde.collection[o.id]) {
+    sauvegarde.collection[o.id] = true; sauver(); J.nouveaux.push(o.id);
+    sons.nouveau(); texte(o.x, o.y - o.r - 40, "Nouvel ami dans l'aquarium !", '#9dffc0');
+  }
+  texte(o.x, o.y - o.r - 14, 'Bravo ! +100', '#ffe066');
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 120;
+    J.effets.push({ type: i % 3 ? 'bulle' : 'etincelle', x: o.x, y: o.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, t: 0, d: 0.9 + Math.random() * 0.5, r: 3 + Math.random() * 5 });
+  }
+  // L'animal s'envole vers sa case dans la barre.
+  const puce = J.puces[o.ordre];
+  const bz = canvas.getBoundingClientRect(), bp = puce.getBoundingClientRect();
+  J.volants.push({ o, x0: (o.x - J.camX) * s, y0: o.y * s, x1: bp.left + bp.width / 2 - bz.left, y1: HH + 10, t: 0, d: 0.75, puce });
+  if (J.indice && J.indice.o === o) J.indice = null;
+  majHud();
+  if (J.trouves === J.L.cibles.length) setTimeout(() => finNiveau(true), 1100);
+}
+
+function texte(x, y, txt, c) { J.textes.push({ x, y, txt, c, t: 0, d: 2 }); }
+
+function donnerIndice() {
+  if (!J || J.pause || J.fini || J.tuto || J.indice) return;
+  const reste = J.objets.filter((o) => o.cible && !o.trouve);
+  if (!reste.length) return;
+  const o = choisir(reste);
+  J.indices++;
+  J.indice = { o, t: 0, d: 3.2 };
+  if (!J.L.grotte) J.camVise = Math.max(0, Math.min(o.x - visW / 2, J.largeur - visW));
+  sons.indice(); majHud();
+}
+$('bouton-indice').addEventListener('click', (e) => { e.currentTarget.blur(); donnerIndice(); });
+
+// ---------------------------------------------------------------------
+//  Pause
+// ---------------------------------------------------------------------
+function mettrePause() {
+  if (!J || J.fini || J.pause) return;
+  J.pause = true; appui = null; voile('pause', true);
+  if (audio && audio.state === 'running') audio.suspend().catch(() => {});
+  setTimeout(() => $('reprendre').focus(), 50);
+}
+function reprendre() {
+  if (!J) return;
+  J.pause = false; voile('pause', false); dernier = performance.now();
+  if (audio) audio.resume().catch(() => {});
+  sons.clic();
+}
+$('bouton-pause').addEventListener('click', (e) => { e.currentTarget.blur(); mettrePause(); });
+$('reprendre').addEventListener('click', reprendre);
+$('recommencer').addEventListener('click', () => { const n = J.n; reprendre(); lancerNiveau(n); });
+$('pause-accueil').addEventListener('click', () => { reprendre(); J = null; afficher('accueil'); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && ecran === 'jeu' && J && !J.fini) mettrePause(); });
+
+// ---------------------------------------------------------------------
+//  Fin d'une plongée et bilan
+// ---------------------------------------------------------------------
+function finNiveau(reussi) {
+  if (!J || J.fini) return;
+  J.fini = true; appui = null;
+  const total = J.L.cibles.length, tout = J.trouves === total;
+  const pctAir = Math.max(0, J.air / J.L.air);
+  let etoiles = tout ? (J.indices === 0 ? 3 : 2) : (J.trouves >= Math.ceil(total / 2) ? 1 : 0);
+  let score = J.trouves * 100 + (tout ? Math.round(pctAir * 200) : 0) + (tout && J.indices === 0 ? 100 : 0) - J.erreurs * 20;
+  score = Math.max(0, score);
+  const ancien = sauvegarde.records[J.n] || 0;
+  const record = score > ancien;
+  if (record) sauvegarde.records[J.n] = score;
+  sauvegarde.etoiles[J.n] = Math.max(sauvegarde.etoiles[J.n] || 0, etoiles);
+  sauver();
+
+  const derniere = J.n === NIVEAUX.length - 1;
+  $('bilan-titre').textContent = tout ? (derniere ? 'Tu as exploré tout le récif !' : 'Plongée réussie !') : (etoiles ? "Plus d'air : on remonte !" : "Plus d'air ! Essaie encore");
+  $('bilan-trouves').textContent = 'Trouvés : ' + J.trouves + ' / ' + total + (J.indices ? ' · indices : ' + J.indices : ' · sans indice') + (derniere && tout ? ' · étoiles : ' + totalEtoiles() + ' / 36' : '');
+  const be = $('bilan-etoiles'); be.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const sp = document.createElement('span'); sp.textContent = '★';
+    if (i < etoiles) { sp.className = 'oui'; sp.style.animationDelay = (0.4 + i * 0.35) + 's'; setTimeout(() => sons.etoile(i), 400 + i * 350); }
+    be.appendChild(sp);
+  }
+  $('bilan-record').textContent = record ? 'Nouveau record !' : 'Record : ' + ancien;
+  const nv = $('bilan-nouveaux'); nv.innerHTML = '';
+  for (const id of J.nouveaux) nv.appendChild(icone(id, 44));
+  $('bilan-nouveaux-bloc').style.display = J.nouveaux.length ? '' : 'none';
+  const suivant = $('bilan-suivant');
+  suivant.style.display = etoiles >= 1 && !derniere ? '' : 'none';
+  $('bilan-rejouer').textContent = etoiles >= 1 ? 'Rejouer' : 'Rejouer la plongée';
+  // Compteur de score qui défile.
+  const bs = $('bilan-score'); const debut = performance.now();
+  const defile = (t) => { const k = Math.min(1, (t - debut) / 1000); bs.textContent = Math.round(score * k) + ' points'; if (k < 1 && J && J.fini) requestAnimationFrame(defile); };
+  requestAnimationFrame(defile);
+  if (etoiles) {
+    sons.fanfare();
+    for (let i = 0; i < 60; i++) J.effets.push({ type: 'confetti', x: J.camX + Math.random() * visW, y: H + 20, vx: (Math.random() - 0.5) * 80, vy: -200 - Math.random() * 260, t: 0, d: 2.5 + Math.random(), r: 4 + Math.random() * 4, c: choisir(COULEURS_CORAIL) });
+  } else sons.rate();
+  setTimeout(() => { if (J && J.fini) { voile('bilan', true); (etoiles >= 1 && !derniere ? suivant : $('bilan-rejouer')).focus(); } }, 350);
+}
+$('bilan-suivant').addEventListener('click', () => { sons.clic(); lancerNiveau(J.n + 1); });
+$('bilan-rejouer').addEventListener('click', () => { sons.clic(); lancerNiveau(J.n); });
+$('bilan-plongees').addEventListener('click', () => { sons.clic(); voile('bilan', false); J = null; ouvrirPlongees(); });
+
+// ---------------------------------------------------------------------
+//  Boucle d'animation
+// ---------------------------------------------------------------------
+let dernier = performance.now();
+function boucle(maintenant) {
+  const dt = Math.min(0.05, (maintenant - dernier) / 1000);
+  dernier = maintenant;
+  if (ecran === 'jeu' && J) {
+    if (!J.pause) mettreAJour(dt);
+    dessiner();
+  } else if (ecran === 'accueil') dessinerAccueil(dt);
+  requestAnimationFrame(boucle);
+}
+
+function mettreAJour(dt) {
+  J.t += dt;
+  const T = J.tuto;
+  // Animaux qui nagent (même pendant le bilan, pour le plaisir des yeux).
+  for (const o of J.objets) {
+    if (o.trouve) continue;
+    if (o.bouge && !J.fini) {
+      o.x += o.dir * o.vit * dt;
+      if (o.x > o.xb) { o.x = o.xb; o.dir = -1; }
+      if (o.x < o.xa) { o.x = o.xa; o.dir = 1; }
+      o.y = o.y0 + Math.sin(J.t * 1.6 + o.phase) * (o.id === 'meduse' ? 22 : 8);
+      o.cache = J.algues.some((a) => Math.abs(o.x - a.x) < a.w / 2 - o.r * 0.15 && o.y > a.haut + o.r * 0.4);
+    }
+  }
+  for (const p of J.plancton) { p.y -= p.v * dt; p.x += Math.sin(J.t + p.r * 3) * 4 * dt; if (p.y < 0) { p.y = H; p.x = Math.random() * J.largeur; } }
+
+  if (T) {
+    T.t += dt;
+    if (T.vise !== undefined && T.type !== 'grotte') {
+      const k = Math.min(1, T.t / 2.0); const e = k * k * (3 - 2 * k);
+      J.camX = T.depart + (T.vise - T.depart) * e;
+    }
+    if (T.t >= T.duree) finirTuto();
+  } else if (!J.fini) {
+    // Bouteille d'air.
+    J.air -= dt;
+    const pct = J.air / J.L.air;
+    if (pct < 0.25) { J.alerte -= dt; if (J.alerte <= 0) { sons.alerte(); J.alerte = 5; } }
+    if (J.air <= 0) { J.air = 0; majHud(); finNiveau(false); }
+    if (Math.floor(J.t * 4) !== J.dernierHud) { J.dernierHud = Math.floor(J.t * 4); majHud(); }
+    // Caméra : vers l'indice, sinon dérive douce.
+    if (J.camVise !== null) {
+      J.camX += (J.camVise - J.camX) * Math.min(1, dt * 3);
+      if (Math.abs(J.camVise - J.camX) < 1) J.camVise = null;
+    } else if (J.repos > 0) J.repos -= dt;
+    else if (J.largeur > visW + 1) {
+      J.camX += J.derive * 14 * dt;
+      if (J.camX >= J.largeur - visW) { J.camX = J.largeur - visW; J.derive = -1; }
+      if (J.camX <= 0) { J.camX = 0; J.derive = 1; }
+    }
+    borneCamera();
+    if (J.indice) {
+      J.indice.t += dt;
+      if (Math.random() < dt * 25) {
+        const o = J.indice.o;
+        J.effets.push({ type: 'guide', x: o.x + (Math.random() - 0.5) * 50, y: H + 10, cx: o, t: 0, d: 1.6, r: 3 + Math.random() * 5 });
+      }
+      if (J.indice.t > J.indice.d) J.indice = null, majHud();
+    }
+  }
+  if (J.secousse > 0) J.secousse -= dt;
+  // Effets
+  for (const f of J.effets) {
+    f.t += dt;
+    if (f.type === 'bulle' || f.type === 'etincelle') { f.x += f.vx * dt; f.y += f.vy * dt; f.vy -= 30 * dt; f.vx *= 0.97; }
+    if (f.type === 'confetti') { f.x += f.vx * dt; f.y += f.vy * dt; f.vy += 160 * dt; }
+    if (f.type === 'guide') { const o = f.cx; const k = Math.min(1, f.t / f.d); f.y = H + 10 + (o.y - H - 10) * k; f.x += (o.x - f.x) * dt * 2.5; }
+  }
+  J.effets = J.effets.filter((f) => f.t < f.d);
+  for (const tx of J.textes) { tx.t += dt; tx.y -= 22 * dt; }
+  J.textes = J.textes.filter((tx) => tx.t < tx.d);
+  for (const v of J.volants) {
+    v.t += dt;
+    if (v.t >= v.d && !v.fin) { v.fin = true; v.puce.classList.add('trouvee', 'pop'); }
+  }
+  J.volants = J.volants.filter((v) => v.t < v.d);
+}
+
+// Une main de démonstration (pointe du doigt en x, y).
+function main(g, x, y, appuie) {
+  g.save(); g.translate(x, y + (appuie ? 4 : 0)); g.rotate(-0.25);
+  g.fillStyle = '#fff'; g.strokeStyle = '#1b3550'; g.lineWidth = 2.5;
+  g.beginPath(); g.roundRect ? g.roundRect(-7, 0, 14, 34, 7) : g.rect(-7, 0, 14, 34); g.fill(); g.stroke();
+  g.beginPath(); g.ellipse(4, 42, 20, 18, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+  g.fillStyle = '#fff'; g.fillRect(-5, 22, 10, 16);
+  g.restore();
+}
+
+function bandeau(g, lignes) {
+  const l = Math.min(W - 20, 380), x = (W - l) / 2, h = 22 + lignes.length * 24;
+  g.fillStyle = 'rgba(2,28,50,.85)'; g.strokeStyle = 'rgba(160,235,255,.7)'; g.lineWidth = 2;
+  g.beginPath(); g.roundRect ? g.roundRect(x, 12, l, h, 16) : g.rect(x, 12, l, h); g.fill(); g.stroke();
+  g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  lignes.forEach((t, i) => { g.font = (i === 0 ? '800 18px ' : '600 16px ') + 'system-ui, sans-serif'; g.fillText(t, W / 2, 34 + i * 24); });
+  g.font = '600 13px system-ui, sans-serif'; g.fillStyle = '#bdf0ff';
+  g.fillText('(touche pour commencer)', W / 2, 12 + h + 16);
+}
+
+function dessiner() {
+  const g = ctx;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const sec = J.secousse > 0 ? Math.sin(J.t * 80) * 5 * J.secousse / 0.3 : 0;
+  // Décor
+  const sx = J.camX * s * dpr;
+  g.drawImage(J.fond, sx, 0, Math.min(J.fond.width - sx, W * dpr), J.fond.height, sec, 0, Math.min(J.fond.width - sx, W * dpr) / dpr, HH);
+  // Monde : unités du récif
+  g.setTransform(s * dpr, 0, 0, s * dpr, (-J.camX * s + sec) * dpr, 0);
+  g.fillStyle = 'rgba(255,255,255,.45)';
+  for (const p of J.plancton) { g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill(); }
+  const px = s * dpr;
+  for (const o of J.objets) {
+    if (o.trouve) continue;
+    if (o.x + o.r * 1.5 < J.camX || o.x - o.r * 1.5 > J.camX + visW) continue;
+    const img = image(o.id, o.r, px, o.camo, o.force);
+    const bob = !o.bouge && ESPECES[o.id].nage ? Math.sin(J.t * 1.5 + o.phase) * 3 : 0;
+    const taille = img.width / px;
+    g.save(); g.translate(o.x, o.y + bob);
+    if (o.dir < 0 && ESPECES[o.id].nage) g.scale(-1, 1);
+    g.drawImage(img, -taille / 2, -taille / 2, taille, taille);
+    g.restore();
+  }
+  // Algues du premier plan (on peut s'y cacher)
+  for (const a of J.algues) dessinerAlgues(g, a);
+  // Ronds de toucher
+  for (const f of J.effets) {
+    const k = f.t / f.d;
+    if (f.type === 'rond') { g.strokeStyle = 'rgba(255,255,255,' + (1 - k) + ')'; g.lineWidth = 3; g.beginPath(); g.arc(f.x, f.y, 10 + k * 26, 0, Math.PI * 2); g.stroke(); }
+  }
+  // Grotte : noir autour de la lampe
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  if (J.L.grotte) {
+    const n = ctxNuit;
+    n.globalCompositeOperation = 'source-over';
+    n.clearRect(0, 0, nuit.width, nuit.height);
+    n.fillStyle = 'rgba(2,6,16,.965)'; n.fillRect(0, 0, nuit.width, nuit.height);
+    n.globalCompositeOperation = 'destination-out';
+    const R = J.L.lampe * s * dpr * (J.tuto ? 1.1 : 1);
+    let lx = J.lampe.x, ly = J.lampe.y;
+    if (J.tuto && J.tuto.type === 'grotte') { const a = J.tuto.t * 1.6; lx = W / 2 + Math.cos(a) * W * 0.28; ly = HH / 2 + Math.sin(a * 1.3) * HH * 0.22; J.lampe.x = lx; J.lampe.y = ly; }
+    const gr = n.createRadialGradient(lx * dpr, ly * dpr, R * 0.55, lx * dpr, ly * dpr, R);
+    gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    n.fillStyle = gr; n.beginPath(); n.arc(lx * dpr, ly * dpr, R, 0, Math.PI * 2); n.fill();
+    g.drawImage(nuit, 0, 0);
+    g.strokeStyle = 'rgba(255,240,180,.35)'; g.lineWidth = 2 * dpr; g.beginPath(); g.arc(lx * dpr, ly * dpr, R * 0.98, 0, Math.PI * 2); g.stroke();
+  }
+  // Bulles, étincelles, confettis (par-dessus le noir)
+  g.setTransform(s * dpr, 0, 0, s * dpr, (-J.camX * s + sec) * dpr, 0);
+  for (const f of J.effets) {
+    const k = f.t / f.d;
+    g.globalAlpha = Math.max(0, 1 - k);
+    if (f.type === 'bulle' || f.type === 'guide') { g.strokeStyle = f.type === 'guide' ? '#fff6a8' : '#e8fbff'; g.lineWidth = 2; g.beginPath(); g.arc(f.x, f.y, f.r, 0, Math.PI * 2); g.stroke(); rond(g, f.x - f.r * 0.35, f.y - f.r * 0.35, f.r * 0.25, '#fff'); }
+    else if (f.type === 'etincelle') { g.fillStyle = '#ffe066'; g.save(); g.translate(f.x, f.y); g.rotate(f.t * 6); g.fillRect(-f.r, -1.5, f.r * 2, 3); g.fillRect(-1.5, -f.r, 3, f.r * 2); g.restore(); }
+    else if (f.type === 'confetti') { g.fillStyle = f.c; g.save(); g.translate(f.x, f.y); g.rotate(f.t * 5 + f.r); g.fillRect(-f.r, -f.r / 2, f.r * 2, f.r); g.restore(); }
+  }
+  g.globalAlpha = 1;
+  // Indice : cercle doré qui pulse autour de la cible
+  if (J.indice) {
+    const o = J.indice.o; const p = 1 + Math.sin(J.t * 8) * 0.12;
+    g.strokeStyle = 'rgba(255,230,100,.9)'; g.lineWidth = 4; g.setLineDash([8, 8]);
+    g.beginPath(); g.arc(o.x, o.y, (o.r + 22) * p, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+  }
+  // Textes qui montent
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const tx of J.textes) {
+    g.globalAlpha = Math.max(0, Math.min(1, (tx.d - tx.t) / 0.6));   // bien lisible, puis s'efface
+    g.font = '800 ' + Math.round(17 / s) + 'px system-ui, sans-serif';
+    const x = Math.max(J.camX + 10 + g.measureText(tx.txt).width / 2, Math.min(tx.x, J.camX + visW - 10 - g.measureText(tx.txt).width / 2));
+    g.lineWidth = 4 / s; g.strokeStyle = 'rgba(2,28,50,.9)'; g.strokeText(tx.txt, x, tx.y);
+    g.fillStyle = tx.c; g.fillText(tx.txt, x, tx.y);
+  }
+  g.globalAlpha = 1;
+  // Écran : animaux qui s'envolent vers la barre, curseur, tutoriel
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (const v of J.volants) {
+    const k = Math.min(1, v.t / v.d), e = k * k;
+    const x = v.x0 + (v.x1 - v.x0) * e, y = v.y0 + (v.y1 - v.y0) * e - Math.sin(k * Math.PI) * 60;
+    const echelle = (1 + Math.sin(k * Math.PI) * 0.5) * (1 - k * 0.5);
+    const img = image(v.o.id, v.o.r, s * dpr);
+    const t = img.width / dpr * echelle;
+    g.drawImage(img, x - t / 2, y - t / 2, t, t);
+  }
+  if (J.clavier && !J.tuto) {
+    const c = J.curseur;
+    g.strokeStyle = '#ffe066'; g.lineWidth = 3; g.beginPath(); g.arc(c.x, c.y, 22, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.moveTo(c.x - 30, c.y); g.lineTo(c.x - 14, c.y); g.moveTo(c.x + 14, c.y); g.lineTo(c.x + 30, c.y);
+    g.moveTo(c.x, c.y - 30); g.lineTo(c.x, c.y - 14); g.moveTo(c.x, c.y + 14); g.lineTo(c.x, c.y + 30); g.stroke();
+  }
+  if (J.tuto) dessinerTuto(g);
+}
+
+function dessinerAlgues(g, a) {
+  const n = 6, l = a.w / n;
+  g.lineCap = 'round';
+  for (let i = 0; i < n; i++) {
+    const bx = a.x - a.w / 2 + (i + 0.5) * l;
+    const bal = Math.sin(J.t * 1.3 + i * 0.8 + a.phase) * 10;
+    g.strokeStyle = ['#1e8449', '#27ae60', '#229954'][i % 3]; g.lineWidth = l * 1.7;
+    g.beginPath(); g.moveTo(bx, H + 10); g.quadraticCurveTo(bx - bal * 0.5, (H + a.haut) / 2, bx + bal, a.haut + (i % 2) * 18); g.stroke();
+  }
+  g.strokeStyle = 'rgba(160,255,190,.35)'; g.lineWidth = 2;
+  for (let i = 0; i < n; i++) {
+    const bx = a.x - a.w / 2 + (i + 0.5) * l, bal = Math.sin(J.t * 1.3 + i * 0.8 + a.phase) * 10;
+    g.beginPath(); g.moveTo(bx, H); g.quadraticCurveTo(bx - bal * 0.5, (H + a.haut) / 2, bx + bal, a.haut + (i % 2) * 18 + 6); g.stroke();
+  }
+}
+
+function dessinerTuto(g) {
+  const T = J.tuto, t = T.t;
+  const ecranDe = (o) => ({ x: (o.x - J.camX) * s, y: o.y * s });
+  g.textAlign = 'center';
+  if (T.type === 'base') {
+    const o = T.obj; const p0 = { x: W / 2, y: HH - 20 };
+    let etape;
+    if (t < 1.6) { etape = 0; if (J.puces[0]) J.puces[0].classList.add('eclaire'); main(g, p0.x, p0.y - Math.sin(t * 4) * 8, false); }
+    else if (t < 3.6) {
+      etape = 1; const p = ecranDe(o);
+      const k = Math.min(1, (t - 1.6) / 1.4);
+      main(g, p0.x + (p.x - p0.x) * k, p0.y + (p.y - p0.y) * k, false);
+    } else {
+      etape = 2; const p = ecranDe(o); const ap = (t * 2) % 1 < 0.5;
+      main(g, p.x, p.y, ap);
+      if (ap) { g.strokeStyle = '#ffe066'; g.lineWidth = 4; g.beginPath(); g.arc(p.x, p.y, o.r * s + 12, 0, Math.PI * 2); g.stroke(); }
+    }
+    if (t >= 1.6 && J.puces[0]) J.puces[0].classList.remove('eclaire');
+    bandeau(g, [['1. Regarde ce qu\'il faut trouver en bas', '2. Cherche-le dans le récif', '3. Touche-le !'][etape], 'Glisse le doigt pour voir plus loin.']);
+  } else if (T.type === 'camo' || T.type === 'bouge') {
+    const o = T.obj;
+    if (o) {
+      const p = ecranDe(o), pul = 1 + Math.sin(t * 6) * 0.15;
+      g.strokeStyle = '#ffe066'; g.lineWidth = 4; g.setLineDash([10, 8]);
+      g.beginPath(); g.arc(p.x, p.y, (o.r * s + 16) * pul, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+      main(g, p.x + 26, p.y + o.r * s + 6, (t * 2) % 1 < 0.5);
+    }
+    bandeau(g, T.type === 'camo'
+      ? ['Attention : camouflage !', 'Certains animaux ont la couleur', 'du corail. Regarde bien les formes.']
+      : ['Ils nagent !', 'Derrière les algues, on ne peut pas', 'les toucher : attends qu\'ils ressortent.']);
+    if (T.type === 'bouge' && o) { const p = ecranDe(o); g.fillStyle = '#ffe066'; g.font = '800 15px system-ui'; g.fillText(o.cache ? 'Caché !' : 'Le voilà !', p.x, p.y - o.r * s - 26); }
+  } else if (T.type === 'grotte') {
+    main(g, J.lampe.x + 10, J.lampe.y + 10, false);
+    bandeau(g, ['La grotte est toute noire !', 'Promène la lampe avec ton doigt', '(ou la souris, ou les flèches).']);
+  } else if (T.type === 'sosies') {
+    const o = T.obj;
+    if (o) {
+      const so = ESPECES[o.id].sosie;
+      const l = Math.min(W - 40, 300), x = (W - l) / 2, y = HH / 2 - 70;
+      g.fillStyle = 'rgba(2,28,50,.88)'; g.strokeStyle = 'rgba(160,235,255,.7)'; g.lineWidth = 2;
+      g.beginPath(); g.roundRect ? g.roundRect(x, y, l, 170, 18) : g.rect(x, y, l, 170); g.fill(); g.stroke();
+      const r = 34, px = dpr;
+      const a = image(o.id, r, px), b = image(so, r, px);
+      const ta = a.width / dpr;
+      g.drawImage(a, x + l * 0.27 - ta / 2, y + 62 - ta / 2, ta, ta);
+      g.drawImage(b, x + l * 0.73 - ta / 2, y + 62 - ta / 2, ta, ta);
+      g.font = '900 34px system-ui'; g.textBaseline = 'middle';
+      g.fillStyle = '#7dffa8'; g.fillText('✔', x + l * 0.27, y + 122);
+      g.fillStyle = '#ff8a8a'; g.fillText('✘', x + l * 0.73, y + 122);
+      g.font = '700 13px system-ui'; g.fillStyle = '#fff';
+      g.fillText(ESPECES[o.id].nom, x + l * 0.27, y + 152); g.fillText(ESPECES[so].nom, x + l * 0.73, y + 152);
+      if ((t * 1.5) % 1 < 0.5) main(g, x + l * 0.27 + 10, y + 70, true);
+    }
+    bandeau(g, ['Attention aux sosies !', 'Certains se ressemblent beaucoup :', 'lis bien le nom dans la barre.']);
+  }
+}
+
+// ---------------------------------------------------------------------
+//  Accueil : petit récif animé derrière le titre
+// ---------------------------------------------------------------------
+const fondA = $('fond-accueil'), ctxA = fondA.getContext('2d');
+let accueil = null;
+function tailleAccueil() {
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  const w = window.innerWidth, h = window.innerHeight;
+  fondA.width = Math.round(w * d); fondA.height = Math.round(h * d);
+  const sa = h / H;
+  accueil = { d, w, h, sa, t: 0, fond: dessinerFond(w / sa, sa * d, { graine: 7, grotte: false, taches: [] }),
+    nageurs: ['clown', 'chirurgien', 'tortue', 'meduse', 'globe', 'demoiselle', 'raie'].map((id, i) => ({ id, x: Math.random() * w / sa, y: 90 + i * 70, v: (18 + Math.random() * 20) * (i % 2 ? -1 : 1), r: 30 * (ESPECES[id].grand || 1) })),
+    poses: [['etoile', 0.15, 640], ['crabe', 0.8, 650], ['coquillage-raye', 0.45, 660], ['anemone', 0.65, 610], ['hippocampe', 0.92, 520]] };
+}
+function dessinerAccueil(dt) {
+  if (!accueil || accueil.w !== window.innerWidth || accueil.h !== window.innerHeight) tailleAccueil();
+  const A = accueil, g = ctxA;
+  A.t += dt;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.drawImage(A.fond, 0, 0);
+  g.setTransform(A.sa * A.d, 0, 0, A.sa * A.d, 0, 0);
+  const lw = A.w / A.sa, px = A.sa * A.d;
+  for (const [id, fx, y] of A.poses) { const img = image(id, 30, px); const t = img.width / px; g.drawImage(img, fx * lw - t / 2, y - t / 2, t, t); }
+  for (const n of A.nageurs) {
+    n.x += n.v * dt;
+    if (n.x > lw + 60) n.x = -60; if (n.x < -60) n.x = lw + 60;
+    const img = image(n.id, n.r, px); const t = img.width / px;
+    g.save(); g.translate(n.x, n.y + Math.sin(A.t * 1.4 + n.r) * 10); if (n.v < 0) g.scale(-1, 1);
+    g.drawImage(img, -t / 2, -t / 2, t, t); g.restore();
+  }
+  g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 2;
+  for (let i = 0; i < 12; i++) { const y = H - ((A.t * 40 + i * 97) % H), x = (i * 137) % lw + Math.sin(A.t + i) * 8; g.beginPath(); g.arc(x, y, 3 + (i % 4), 0, Math.PI * 2); g.stroke(); }
+}
+function majAccueil() {
+  const t = totalEtoiles(), c = Object.keys(sauvegarde.collection).length;
+  $('total-accueil').textContent = (t || c) ? '★ ' + t + ' / 36   ·   aquarium : ' + c + ' / ' + LISTE_ESPECES.length : '';
+}
+
+// ---------------------------------------------------------------------
+//  Choix des plongées et aquarium
+// ---------------------------------------------------------------------
+function ouvrirPlongees() {
+  const grille = $('grille-plongees'); grille.innerHTML = '';
+  NIVEAUX.forEach((L, i) => {
+    const b = document.createElement('button');
+    b.className = 'case-plongee';
+    const e = sauvegarde.etoiles[i] || 0;
+    b.innerHTML = '<b>' + (i + 1) + '</b><small></small><span class="et">' + '★'.repeat(e) + '<i>' + '★'.repeat(3 - e) + '</i></span>';
+    b.querySelector('small').textContent = debloque(i) ? L.nom : 'Gagne une étoile à la plongée ' + i;
+    b.disabled = !debloque(i);
+    b.addEventListener('click', () => { sons.clic(); lancerNiveau(i); });
+    grille.appendChild(b);
+  });
+  afficher('plongees');
+  const prems = grille.querySelector('button:not(:disabled)'); if (prems) prems.focus();
+}
+function ouvrirAquarium() {
+  const grille = $('grille-aquarium'); grille.innerHTML = '';
+  let n = 0;
+  for (const id of LISTE_ESPECES) {
+    const connu = !!sauvegarde.collection[id]; if (connu) n++;
+    const b = document.createElement('button');
+    b.className = 'carte' + (connu ? '' : ' inconnue');
+    b.appendChild(icone(id, 64, !connu));
+    const t = document.createElement('span'); t.textContent = connu ? ESPECES[id].nom : '???'; b.appendChild(t);
+    b.addEventListener('click', () => {
+      sons.clic();
+      const c = $('fiche-image'), g = c.getContext('2d');
+      g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height);
+      g.translate(c.width / 2, c.height / 2); ESPECES[id].dessin(g, 100);
+      if (!connu) { g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-atop'; g.fillStyle = '#0b3550'; g.fillRect(0, 0, c.width, c.height); g.globalCompositeOperation = 'source-over'; }
+      $('fiche-nom').textContent = connu ? ESPECES[id].nom : 'Encore inconnu';
+      $('fiche-texte').textContent = connu ? ESPECES[id].fiche : 'Trouve-le pendant une plongée pour lire sa fiche !';
+      voile('fiche', true); $('fiche-fermer').focus();
+    });
+    grille.appendChild(b);
+  }
+  $('compte-aquarium').textContent = n + ' / ' + LISTE_ESPECES.length + ' animaux et trésors trouvés';
+  afficher('aquarium');
+}
+$('fiche-fermer').addEventListener('click', () => { sons.clic(); voile('fiche', false); });
+
+$('bouton-jouer').addEventListener('click', () => {
+  sons.clic();
+  // La première plongée débloquée sans étoile, sinon le choix des plongées.
+  for (let i = 0; i < NIVEAUX.length; i++) if (debloque(i) && !(sauvegarde.etoiles[i] >= 1)) { lancerNiveau(i); return; }
+  ouvrirPlongees();
+});
+$('bouton-plongees').addEventListener('click', () => { sons.clic(); ouvrirPlongees(); });
+$('bouton-aquarium').addEventListener('click', () => { sons.clic(); ouvrirAquarium(); });
+document.querySelectorAll('.retour-accueil').forEach((b) => b.addEventListener('click', () => { sons.clic(); afficher('accueil'); }));
+
+majAccueil();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
