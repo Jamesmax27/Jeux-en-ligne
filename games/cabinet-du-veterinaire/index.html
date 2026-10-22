@@ -1,0 +1,1743 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le cabinet du vétérinaire</title>
+<style>
+  /* ===== Mise en page générale ===== */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; overflow: hidden; background: #cdeee8;
+    font-family: system-ui, sans-serif; color: #24324a;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font-family: inherit; }
+  .cache { display: none !important; }
+
+  #jeu { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  #hud {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    background: #fff; box-shadow: 0 2px 6px #0002; z-index: 2;
+  }
+  .rond {
+    width: 46px; height: 46px; border-radius: 50%; border: none; flex: none;
+    background: #e3f0fa; display: grid; place-items: center; cursor: pointer;
+  }
+  .rond svg { width: 24px; height: 24px; }
+  #infos { flex: 1; text-align: center; font-weight: 800; font-size: 16px; line-height: 1.15; }
+  #infos small { font-weight: 600; font-size: 13px; color: #55657d; }
+  #scorebox { font-weight: 800; color: #c2410c; font-size: 17px; min-width: 70px; text-align: right; }
+
+  #zone { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+  #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #outil { position: absolute; left: 0; top: 0; pointer-events: none; filter: drop-shadow(0 3px 3px #0004); }
+  #outil svg { width: 100%; height: 100%; display: block; }
+
+  #panneau {
+    background: #fff; padding: 8px 10px 10px; min-height: 140px; z-index: 2;
+    box-shadow: 0 -2px 6px #0002;
+  }
+  #consigne { font-size: 17px; font-weight: 700; text-align: center; min-height: 24px; line-height: 1.3; }
+  #indices { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 7px 0; min-height: 32px; }
+  .puce {
+    display: flex; align-items: center; gap: 4px; padding: 2px 10px 2px 4px; border-radius: 16px;
+    background: #eef3f8; font-size: 14px; font-weight: 700; height: 32px;
+  }
+  .puce svg { width: 24px; height: 24px; }
+  .puce.alerte { background: #ffe1d6; color: #9b2c14; }
+  .puce.ok { background: #dcf3e3; color: #1b6136; }
+  .puce.vide { background: none; color: #8592a6; font-weight: 600; }
+  #cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-width: 520px; margin: 0 auto; }
+  .carte {
+    min-height: 58px; border: 3px solid #cfe0ee; border-radius: 14px; background: #f8fbff;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; color: #24324a; cursor: pointer; padding: 2px;
+  }
+  .carte svg { width: 32px; height: 32px; }
+  .carte.focus { border-color: #3b82c4; box-shadow: 0 0 0 3px #3b82c455; }
+  .carte.non { opacity: .35; animation: secoue .4s; }
+  .carte.bonne { border-color: #3fae6a; background: #e1f6e8; animation: saute .4s; }
+  @keyframes secoue { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  @keyframes saute { 50% { transform: scale(1.1); } }
+
+  /* ===== Écrans (accueil, journées, album) ===== */
+  .ecran {
+    position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px; padding: 14px; text-align: center;
+    background: linear-gradient(#bfe6f6, #e6f7ee 70%, #d3efc8);
+    overflow: hidden;
+  }
+  .ecran h1 { font-size: clamp(30px, 9vw, 46px); line-height: 1.05; color: #1f5f8b; text-shadow: 0 3px 0 #fff; }
+  .ecran h2 { font-size: 26px; color: #1f5f8b; }
+  .ecran h3 { font-size: 18px; color: #1f5f8b; margin-top: 4px; }
+  .regle { font-size: 17px; font-weight: 600; max-width: 360px; line-height: 1.35; }
+  #apercu { height: min(200px, 26vh); aspect-ratio: 3 / 2; width: auto; }
+  .coin { position: absolute; top: 10px; right: 10px; background: #fff; }
+  .bouton {
+    min-height: 52px; min-width: 150px; padding: 10px 22px; border: none; border-radius: 26px;
+    background: #3fae6a; color: #fff; font-weight: 800; font-size: 19px;
+    box-shadow: 0 4px 0 #2a7d4b; cursor: pointer; margin: 4px;
+  }
+  .bouton:active { transform: translateY(3px); box-shadow: 0 1px 0 #2a7d4b; }
+  .bouton.gros { font-size: 26px; min-width: 220px; min-height: 64px; border-radius: 32px; animation: respire 1.6s infinite; }
+  .bouton.second { background: #3b82c4; box-shadow: 0 4px 0 #285d8f; font-size: 17px; }
+  .bouton.gris { background: #7d8a9e; box-shadow: 0 4px 0 #5f6a7b; font-size: 17px; }
+  .bouton:focus-visible { outline: 4px solid #ffc93c; }
+  /* Halo qui respire (sans bouger le bouton) */
+  @keyframes respire { 50% { box-shadow: 0 4px 0 #2a7d4b, 0 0 0 10px #3fae6a44; } }
+  .rangee { display: flex; flex-wrap: wrap; justify-content: center; }
+  #acc-etoiles { font-size: 18px; font-weight: 800; color: #b7791f; min-height: 24px; }
+
+  #grille-jours { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; width: min(360px, 92vw); }
+  .jour {
+    min-height: 58px; border: none; border-radius: 16px; background: #fff; color: #24324a;
+    font-weight: 800; font-size: 16px; box-shadow: 0 3px 0 #b9cfe0; cursor: pointer;
+  }
+  .jour span { display: block; color: #e0a10a; font-size: 18px; letter-spacing: 2px; }
+  .jour:disabled { background: #e3e8ee; color: #8a96a8; cursor: default; }
+
+  #grille-album { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: min(380px, 94vw); }
+  .fiche { background: #fff; border-radius: 12px; padding: 3px; font-size: 11px; font-weight: 700; box-shadow: 0 2px 0 #b9cfe0; }
+  .fiche canvas { width: 100%; aspect-ratio: 1; display: block; }
+  #liste-recomp { font-size: 14px; font-weight: 600; line-height: 1.6; max-width: 360px; }
+  #liste-recomp .ok { color: #1b6136; }
+  #liste-recomp .non { color: #8a96a8; }
+
+  /* ===== Voiles (pause, bilan) ===== */
+  .voile {
+    position: fixed; inset: 0; z-index: 20; background: #16243acc;
+    display: flex; align-items: center; justify-content: center; padding: 14px;
+  }
+  .boite {
+    background: #fff; border-radius: 22px; padding: 18px 16px; text-align: center;
+    width: min(360px, 94vw); display: flex; flex-direction: column; align-items: center; gap: 4px;
+    animation: arrive .35s;
+  }
+  .boite h2 { font-size: 24px; color: #1f5f8b; }
+  @keyframes arrive { from { transform: scale(.7); opacity: 0; } }
+  #bilan-etoiles { font-size: 54px; line-height: 1; }
+  .et { display: inline-block; color: #d6dde6; transform: scale(.5); transition: transform .3s, color .3s; }
+  .et.on { color: #ffc22e; transform: scale(1); animation: envol .6s; text-shadow: 0 2px 0 #c98a00; }
+  @keyframes envol { 0% { transform: translateY(40px) scale(.2) rotate(-90deg); } 70% { transform: scale(1.35); } }
+  .gros-score { font-size: 28px; font-weight: 900; color: #c2410c; }
+  #bilan-record { font-weight: 800; font-size: 16px; }
+  #bilan-record.nouveau { color: #3fae6a; animation: saute .6s 2; }
+  #bilan-info, #bilan-debloque { font-size: 15px; font-weight: 600; }
+  #bilan-debloque { color: #8a4bb0; }
+
+  /* ===== Tutoriel ===== */
+  #tuto { position: fixed; inset: 0; z-index: 15; background: #0b162826; }
+  #tuto-bulle {
+    position: absolute; left: 50%; top: 62px; transform: translateX(-50%);
+    width: min(340px, 92vw); background: #fff; border-radius: 18px; padding: 10px 12px;
+    box-shadow: 0 6px 18px #0004; text-align: center; border: 3px solid #3b82c4;
+  }
+  #tuto-titre { font-size: 13px; font-weight: 800; color: #3b82c4; text-transform: uppercase; }
+  #tuto-texte { font-size: 18px; font-weight: 700; min-height: 48px; line-height: 1.3; margin: 2px 0 4px; }
+  #tuto-pas { color: #8592a6; font-size: 13px; font-weight: 700; }
+  #main {
+    position: fixed; left: 0; top: 0; width: 54px; height: 64px; z-index: 16; pointer-events: none;
+    filter: drop-shadow(0 3px 3px #0006); transition: transform .08s;
+  }
+  #onde {
+    position: fixed; left: 0; top: 0; width: 50px; height: 50px; margin: -25px 0 0 -25px; z-index: 16;
+    border-radius: 50%; border: 4px solid #ffc93c; pointer-events: none; opacity: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Partie ===== -->
+<div id="jeu">
+  <div id="hud">
+    <button class="rond" id="b-pause" aria-label="Pause">
+      <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="#24324a"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="#24324a"/></svg>
+    </button>
+    <div id="infos">Journée 1<br><small>Patient 1/3</small></div>
+    <div id="scorebox">0 pts</div>
+    <button class="rond b-son" aria-label="Couper le son"></button>
+  </div>
+  <div id="zone"><canvas id="scene"></canvas><div id="outil" class="cache"></div></div>
+  <div id="panneau">
+    <div id="consigne"></div>
+    <div id="indices"></div>
+    <div id="cartes"></div>
+  </div>
+</div>
+
+<!-- ===== Accueil ===== -->
+<section id="accueil" class="ecran">
+  <button class="rond coin b-son" aria-label="Couper le son"></button>
+  <h1 id="titre">Le cabinet<br>du vétérinaire</h1>
+  <canvas id="apercu" width="600" height="400"></canvas>
+  <p class="regle">Examine les animaux avec tes instruments, trouve leur petit souci et donne le bon soin pour les guérir !</p>
+  <button class="bouton gros" id="b-jouer">Jouer</button>
+  <div class="rangee">
+    <button class="bouton second" id="b-journees">Journées</button>
+    <button class="bouton second" id="b-album">Album</button>
+  </div>
+  <p id="acc-etoiles"></p>
+</section>
+
+<!-- ===== Choix de la journée ===== -->
+<section id="journees" class="ecran cache">
+  <h2>Les journées</h2>
+  <div id="grille-jours"></div>
+  <button class="bouton gris" data-retour>Retour</button>
+</section>
+
+<!-- ===== Album de la clinique ===== -->
+<section id="album" class="ecran cache">
+  <h2>Album de la clinique</h2>
+  <div id="grille-album"></div>
+  <h3>Instruments et salles</h3>
+  <div id="liste-recomp"></div>
+  <div class="rangee">
+    <button class="bouton second cache" id="b-salle">Salle</button>
+    <button class="bouton gris" data-retour>Retour</button>
+  </div>
+</section>
+
+<!-- ===== Pause ===== -->
+<div id="pause" class="voile cache">
+  <div class="boite">
+    <h2>Pause</h2>
+    <p class="regle">Les patients attendent sagement.</p>
+    <button class="bouton" id="b-reprendre">Reprendre</button>
+    <button class="bouton second" id="b-recommencer">Recommencer</button>
+    <button class="bouton gris" id="b-accueil">Accueil</button>
+  </div>
+</div>
+
+<!-- ===== Bilan de la journée ===== -->
+<div id="bilan" class="voile cache">
+  <div class="boite">
+    <h2 id="bilan-titre">Journée terminée !</h2>
+    <div id="bilan-etoiles"><span class="et">★</span><span class="et">★</span><span class="et">★</span></div>
+    <p class="gros-score"><span id="bilan-score">0</span> points</p>
+    <p id="bilan-record"></p>
+    <p id="bilan-info"></p>
+    <p id="bilan-debloque"></p>
+    <button class="bouton" id="b-suivant">Journée suivante</button>
+    <button class="bouton second" id="b-rejouer">Rejouer</button>
+    <button class="bouton gris" id="b-accueil2">Accueil</button>
+  </div>
+</div>
+
+<!-- ===== Tutoriel animé ===== -->
+<div id="tuto" class="cache">
+  <div id="tuto-bulle">
+    <div id="tuto-titre">Comment faire ?</div>
+    <p id="tuto-texte"></p>
+    <div id="tuto-pas"></div>
+    <button class="bouton" id="tuto-ok">J’ai compris !</button>
+  </div>
+</div>
+<div id="onde"></div>
+<div id="main" class="cache">
+  <svg viewBox="0 0 54 64"><path d="M20 3c3.5 0 5.5 2.6 5.5 5.6v17.6l12.6 2.6c4.6 1 7.4 4.6 6.5 9.2l-2.8 14.6c-.9 4.6-4.6 7.4-9.1 7.4H20.4c-3.7 0-6.4-1.8-8.2-5.4L3.8 38.4c-1.8-3.6.9-7.4 4.6-6.5l6.1 2.8V8.6C14.5 5.6 16.4 3 20 3z" fill="#fff" stroke="#24324a" stroke-width="3" stroke-linejoin="round"/></svg>
+</div>
+
+<script>
+'use strict';
+// =====================================================================
+//  Le cabinet du vétérinaire — jeu de simulation pour les 5 ans et plus
+//  Un seul fichier : dessins en canvas, sons générés avec Web Audio.
+// =====================================================================
+
+// ---------- Petits outils ----------
+const $ = (s) => document.querySelector(s);
+const hasard = (a, b) => a + Math.random() * (b - a);
+const entier = (a, b) => Math.floor(hasard(a, b + 1));
+const pioche = (t) => t[Math.floor(Math.random() * t.length)];
+const melange = (t) => { for (let i = t.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [t[i], t[j]] = [t[j], t[i]]; } return t; };
+const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+const borne = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// ---------- Sauvegarde (le jeu marche aussi sans stockage) ----------
+const CLE = 'cabinet-du-veterinaire-v1';
+const sauve = { jourMax: 1, journees: {}, album: {}, son: true, salle: 'clinique' };
+try {
+  const lu = JSON.parse(localStorage.getItem(CLE));
+  if (lu && typeof lu === 'object') Object.assign(sauve, lu);
+} catch (e) { /* stockage indisponible : tant pis */ }
+function enregistrer() {
+  try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* rien */ }
+}
+const totalEtoiles = () => Object.values(sauve.journees).reduce((s, j) => s + (j.etoiles || 0), 0);
+
+// ---------- Sons (Web Audio, créés seulement après une action du joueur) ----------
+let ac = null;
+function audio() {
+  if (!sauve.son) return null;
+  if (!ac) {
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  }
+  if (ac.state === 'suspended' && !enPause) ac.resume().catch(() => {});
+  return ac;
+}
+function bip(freq, duree, type = 'sine', vol = 0.15, delai = 0, glisse = 0) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delai;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (glisse) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + glisse), t + duree);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duree);
+  o.connect(g).connect(a.destination);
+  o.start(t); o.stop(t + duree + 0.05);
+}
+function souffle(duree, vol, freq) {
+  const a = audio(); if (!a) return;
+  const n = Math.floor(a.sampleRate * duree), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; g.gain.value = vol;
+  s.connect(f).connect(g).connect(a.destination); s.start();
+}
+const son = {
+  clic: () => bip(700, 0.07, 'triangle', 0.12),
+  coeur: () => { bip(85, 0.12, 'sine', 0.45, 0, -30); bip(70, 0.13, 'sine', 0.35, 0.15, -25); },
+  gargouille: () => { bip(150, 0.22, 'sine', 0.25, 0, -90); bip(230, 0.14, 'sine', 0.15, 0.12, 90); },
+  bien: () => { bip(880, 0.09, 'triangle', 0.14); bip(1320, 0.13, 'triangle', 0.12, 0.07); },
+  rate: () => bip(210, 0.2, 'square', 0.07, 0, -80),
+  indice: () => [660, 880, 1175].forEach((f, i) => bip(f, 0.13, 'sine', 0.14, i * 0.07)),
+  thermo: () => bip(1600, 0.05, 'square', 0.04),
+  attention: () => bip(520, 0.12, 'triangle', 0.12, 0, 200),
+  glisse: () => bip(520, 0.3, 'sawtooth', 0.06, 0, -360),
+  frotte: () => souffle(0.09, 0.25, 1700),
+  bulle: () => bip(420, 0.09, 'sine', 0.2, 0, 700),
+  non: () => { bip(300, 0.12, 'square', 0.07); bip(235, 0.2, 'square', 0.07, 0.13); },
+  gueri: () => [523, 659, 784, 1047].forEach((f, i) => bip(f, 0.2, 'triangle', 0.13, i * 0.09)),
+  etoile: () => bip(1100, 0.18, 'sine', 0.14, 0, 700),
+  fanfare: () => [523, 523, 659, 784, 659, 784, 1047].forEach((f, i) => bip(f, 0.22, 'triangle', 0.12, i * 0.12)),
+  calin: () => bip(600, 0.18, 'sine', 0.13, 0, 350),
+  pose: () => { bip(900, 0.08, 'sine', 0.1); bip(1200, 0.1, 'sine', 0.1, 0.08); },
+};
+let dernierFrotte = 0;
+
+// ---------- Icônes SVG (fiche, cartes de soin, outil) ----------
+const ICONES = {
+  stetho: '<path d="M9 5v11a8 8 0 0 0 16 0V5" fill="none" stroke="#3b5b8a" stroke-width="3" stroke-linecap="round"/><path d="M17 24v3a7 7 0 0 0 14 0v-5" fill="none" stroke="#3b5b8a" stroke-width="3"/><circle cx="31" cy="19" r="5" fill="#9fb3c8" stroke="#3b5b8a" stroke-width="2.5"/>',
+  loupe: '<circle cx="17" cy="17" r="10" fill="#d9f1ff" stroke="#3b5b8a" stroke-width="3.5"/><path d="M25 25l9 9" stroke="#8a5a2b" stroke-width="5" stroke-linecap="round"/>',
+  thermo: '<rect x="16" y="4" width="8" height="24" rx="4" fill="#fff" stroke="#3b5b8a" stroke-width="2.5"/><circle cx="20" cy="31" r="6" fill="#e5484d" stroke="#3b5b8a" stroke-width="2.5"/><rect x="18.5" y="14" width="3" height="16" fill="#e5484d"/>',
+  controle: '<rect x="8" y="6" width="24" height="30" rx="4" fill="#fff" stroke="#3b5b8a" stroke-width="2.5"/><rect x="14" y="3" width="12" height="7" rx="2" fill="#9fb3c8"/><path d="M13 22l5 5 9-11" fill="none" stroke="#3fae6a" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>',
+  coton: '<path d="M9 31L31 9" stroke="#7aa6d8" stroke-width="3.5" stroke-linecap="round"/><ellipse cx="9" cy="31" rx="6.5" ry="5.5" fill="#fff" stroke="#b9c7d8" stroke-width="1.5"/><ellipse cx="31" cy="9" rx="6.5" ry="5.5" fill="#fff" stroke="#b9c7d8" stroke-width="1.5"/>',
+  pince: '<path d="M18 4L9 34M22 4L31 34" stroke="#8b9bb0" stroke-width="4.5" stroke-linecap="round"/><path d="M16 5h8" stroke="#5f6f84" stroke-width="5" stroke-linecap="round"/>',
+  calin: '<path d="M20 35S5 26 5 15a7.5 7.5 0 0 1 15-2 7.5 7.5 0 0 1 15 2c0 11-15 20-15 20z" fill="#f2557a"/><path d="M12 13a4 4 0 0 1 5-2" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>',
+  sirop: '<rect x="8" y="13" width="15" height="22" rx="4" fill="#b76de0"/><rect x="11" y="6" width="9" height="8" rx="1.5" fill="#f3e6ff" stroke="#8a4bb0" stroke-width="1.5"/><rect x="10.5" y="20" width="10" height="7" rx="1" fill="#fff" opacity=".85"/><path d="M26 33l7-15" stroke="#9aa8b8" stroke-width="3" stroke-linecap="round"/><ellipse cx="34" cy="15" rx="4.5" ry="3.5" fill="#9aa8b8"/>',
+  compresse: '<rect x="5" y="9" width="30" height="22" rx="5" fill="#8fd3ff" stroke="#3b8fd1" stroke-width="2"/><path d="M11 16h18M11 21h18M11 26h12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>',
+  pansement: '<g transform="rotate(-28 20 20)"><rect x="2" y="13" width="36" height="14" rx="7" fill="#f2c79a" stroke="#c99868" stroke-width="1.5"/><rect x="14" y="14.5" width="12" height="11" rx="2" fill="#fbe6cf"/><circle cx="7" cy="20" r="1.3" fill="#c99868"/><circle cx="33" cy="20" r="1.3" fill="#c99868"/></g>',
+  tisane: '<path d="M7 16h21v10a8 8 0 0 1-8 8h-5a8 8 0 0 1-8-8z" fill="#7ccf8a"/><path d="M28 19h3a4 4 0 0 1 0 8h-3" fill="none" stroke="#4f9a5d" stroke-width="2.5"/><path d="M13 4c-3 4 3 6 0 10M21 4c-3 4 3 6 0 10" fill="none" stroke="#9fb3c8" stroke-width="2" stroke-linecap="round"/>',
+  brosseDents: '<path d="M5 33L28 13" stroke="#4fa3e0" stroke-width="5" stroke-linecap="round"/><g transform="rotate(-41 31 9)"><rect x="24" y="4" width="14" height="8" rx="2" fill="#fff" stroke="#9fb3c8" stroke-width="1.5"/></g>',
+  gouttes: '<rect x="15" y="3" width="10" height="9" rx="3" fill="#f27aa0"/><path d="M16 12h8l-1.5 14h-5z" fill="#e6f4ff" stroke="#7aa6d8" stroke-width="1.5"/><path d="M20 28c-3 4-3 6.5 0 7.5 3-1 3-3.5 0-7.5z" fill="#4fb2ff"/>',
+};
+const icone = (n) => `<svg viewBox="0 0 40 40" aria-hidden="true">${ICONES[n]}</svg>`;
+const SVG_SON = {
+  oui: '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#24324a"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="#24324a" stroke-width="2" fill="none" stroke-linecap="round"/></svg>',
+  non: '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#24324a"/><path d="M16 9l5 6M21 9l-5 6" stroke="#d9480f" stroke-width="2.4" stroke-linecap="round"/></svg>',
+};
+
+// ---------- Les patients ----------
+// Coordonnées « locales » d'un animal : origine au centre, tête vers y = -70, pattes vers y = 150.
+const ESPECES = [
+  { id: 'chaton', nom: 'chaton', art: 'le ', corps: '#f0a858', clair: '#fbe3c4', oreilles: 'pointu', museau: 'chat', rayures: true },
+  { id: 'chiot', nom: 'chiot', art: 'le ', corps: '#c99566', clair: '#f2dfc8', oreilles: 'tombant', museau: 'chien' },
+  { id: 'lapin', nom: 'lapin', art: 'le ', corps: '#d6d0ca', clair: '#f8f4ef', oreilles: 'long', museau: 'lapin' },
+  { id: 'poulain', nom: 'poulain', art: 'le ', corps: '#a8683c', clair: '#e9c9a6', oreilles: 'cheval', museau: 'cheval', criniere: '#5a3418' },
+  { id: 'tortue', nom: 'tortue', art: 'la ', f: true, corps: '#86c06f', clair: '#cfe8b8', oreilles: 'aucune', museau: 'tortue', carapace: '#9a7440' },
+  { id: 'hamster', nom: 'hamster', art: 'le ', corps: '#e8b27a', clair: '#fbeedd', oreilles: 'rond', museau: 'rongeur' },
+  { id: 'caneton', nom: 'caneton', art: 'le ', corps: '#f6d54a', clair: '#fbeaa0', oreilles: 'aucune', museau: 'bec', ailes: true, houppe: true },
+  { id: 'agneau', nom: 'agneau', art: 'l’', corps: '#f3efe6', clair: '#fffdf8', oreilles: 'cote', museau: 'mouton', laine: true },
+  { id: 'herisson', nom: 'hérisson', art: 'le ', corps: '#d9b48e', clair: '#f4e2cc', oreilles: 'rond', museau: 'herisson', piquants: '#7a5a3e' },
+  { id: 'perroquet', nom: 'perroquet', art: 'le ', corps: '#4fbf68', clair: '#c4ecae', oreilles: 'aucune', museau: 'bec', ailes: true, crete: true },
+  { id: 'cochon', nom: 'cochon d’Inde', art: 'le ', corps: '#c98a4e', clair: '#f8f2ea', oreilles: 'rond', museau: 'rongeur', taches: true },
+  { id: 'chevreau', nom: 'chevreau', art: 'le ', corps: '#e4d8c6', clair: '#fbf6ee', oreilles: 'cote', museau: 'cheval', cornes: true },
+];
+const NOMS = ['Caramel', 'Noisette', 'Pistache', 'Biscuit', 'Filou', 'Praline', 'Pompon', 'Moka', 'Réglisse', 'Grisou',
+  'Plume', 'Cannelle', 'Cookie', 'Mimosa', 'Toupie', 'Bulle', 'Myrtille', 'Nougat', 'Pépite', 'Sésame', 'Vanille', 'Galette'];
+
+// Les petits soucis : ce que révèlent les examens, et le soin qui guérit.
+const MAUX = {
+  oreilles: { jour: 1, coeur: 'calme', temp: 'normale', loupe: 'oreille', soin: 'coton', phrase: 'se gratte les oreilles.' },
+  epine: { jour: 1, coeur: 'calme', temp: 'normale', loupe: 'patte', soin: 'pince', phrase: 'boite un peu.' },
+  peur: { jour: 1, coeur: 'rapide', temp: 'normale', loupe: null, soin: 'calin', phrase: 'tremble un peu.' },
+  rhume: { jour: 2, coeur: 'calme', temp: 'fievre', loupe: 'nez', soin: 'sirop', phrase: 'fait « Atchoum ! ».' },
+  chaud: { jour: 2, coeur: 'rapide', temp: 'fievre', loupe: null, soin: 'compresse', phrase: 'a trop joué au soleil.' },
+  bobo: { jour: 3, coeur: 'calme', temp: 'normale', loupe: 'peau', soin: 'pansement', phrase: 'a glissé en jouant.' },
+  ventre: { jour: 4, coeur: 'gargouille', temp: 'normale', loupe: null, soin: 'tisane', phrase: 'ne veut plus manger.' },
+  dent: { jour: 6, coeur: 'calme', temp: 'normale', loupe: 'dent', soin: 'brosseDents', phrase: 'mâche de travers.' },
+  oeil: { jour: 8, coeur: 'calme', temp: 'normale', loupe: 'oeil', soin: 'gouttes', phrase: 'cligne de l’œil.' },
+};
+const SOINS = {
+  coton: { nom: 'Coton', partie: 'oreille', geste: 'le coton' },
+  pince: { nom: 'Pince', partie: 'patte', geste: 'la pince' },
+  calin: { nom: 'Câlin' },
+  sirop: { nom: 'Sirop', partie: 'bouche', geste: 'le sirop' },
+  compresse: { nom: 'Compresse', partie: 'front', geste: 'la compresse' },
+  pansement: { nom: 'Pansement' },
+  tisane: { nom: 'Tisane', partie: 'bouche', geste: 'la tisane' },
+  brosseDents: { nom: 'Brosse à dents', partie: 'dent', geste: 'la brosse à dents' },
+  gouttes: { nom: 'Gouttes', partie: 'oeil', geste: 'les gouttes' },
+};
+const TEXTE_LOUPE = { oreille: 'Oreille sale', patte: 'Épine dans la patte', nez: 'Nez qui coule', peau: 'Égratignure', dent: 'Dent sale', oeil: 'Œil rouge' };
+const NOUVEAUTES = ['Ton premier jour de vétérinaire !', 'Nouveau : le thermomètre !', 'Nouveau : le pansement !',
+  'Nouveau : le ventre qui gargouille !', 'Nouveau : la brosse et le bain !', 'Nouveau : les dents à brosser !',
+  'Nouveau : la salle d’attente !', 'Nouveau : les yeux, et une loupe plus petite !', 'Nouveau : les contrôles !',
+  'La grande journée : tout est mélangé !'];
+const RECOMPENSES = [
+  { etoiles: 6, id: 'stetho', nom: 'Stéthoscope doré' },
+  { etoiles: 12, id: 'loupe', nom: 'Loupe arc-en-ciel' },
+  { etoiles: 18, id: 'jardin', nom: 'Nouvelle salle : le jardin' },
+  { etoiles: 24, id: 'thermo', nom: 'Thermomètre étoilé' },
+  { etoiles: 30, id: 'couronne', nom: 'Couronne de super vétérinaire' },
+];
+const debloque = (id) => totalEtoiles() >= RECOMPENSES.find((r) => r.id === id).etoiles;
+
+// Réglages de difficulté de chaque journée (1 à 10).
+function cfgJour(j) {
+  const k = Math.max(0, j - 2), m = Math.max(0, j - 3), s = Math.max(0, j - 5);
+  return {
+    patients: [3, 3, 4, 4, 4, 5, 5, 5, 6, 6][j - 1],
+    calme: 1.05 - 0.035 * (j - 1),          // durée d'un battement calme (s)
+    rapide: 0.62 - 0.018 * (j - 1),         // durée d'un battement rapide (s)
+    fenetre: 0.2 - 0.012 * (j - 1),         // marge pour toucher au bon moment (s)
+    battements: j < 4 ? 3 : j < 9 ? 4 : 5,
+    duree: 1.8 + 0.15 * k,                  // temps de mesure du thermomètre (s)
+    calmeMin: 2.2 - 0.12 * k, calmeMax: 3.2 - 0.17 * k, alerte: 0.55 - 0.025 * k,
+    amp: 8 + 4 * m, ondes: j < 6 ? 1 : j < 9 ? 2 : 3, tol: 30 - 1.5 * m,
+    loupeR: j >= 8 ? 40 : 54 - (j - 1), points: j >= 8 ? 5 : j >= 4 ? 4 : 3,
+    cartes: [3, 4, 4, 5, 5, 5, 6, 6, 6, 6][j - 1],
+    sales: j < 5 ? 0 : j < 7 ? 1 : 2, taches: 3 + Math.floor(s / 2), frotter: 70 + 10 * s,
+    bulles: 5 + s, vitBulles: 18 + 7 * s,
+    attente: j >= 7, controles: j === 9 ? 1 : j === 10 ? 2 : 0,
+  };
+}
+
+function creerPatient(esp, nom, mal) {
+  return { esp, nom, mal, sale: false, boue: [], urgence: 1, controle: false, ref: null, gueri: false, soigne: false,
+    perte: 0, bonus: 0, indices: [], soinDonne: null, pansement: false, etapes: [], iEtape: -1 };
+}
+const nomComplet = (p) => `${p.nom} ${p.esp.art}${p.esp.nom}`;
+const accord = (p, m, f) => (p.esp.f ? f : m);
+
+function genererPatients(j, cfg) {
+  const maux = Object.keys(MAUX).filter((k) => MAUX[k].jour <= j);
+  const nouveaux = melange(Object.keys(MAUX).filter((k) => MAUX[k].jour === j));
+  const especes = melange(ESPECES.slice()), noms = melange(NOMS.slice());
+  const liste = [];
+  let dernier = null;
+  for (let i = 0; i < cfg.patients - cfg.controles; i++) {
+    let mal;
+    if (i < nouveaux.length) mal = nouveaux[i];
+    else do { mal = pioche(maux); } while (mal === dernier && maux.length > 1);
+    dernier = mal;
+    const p = creerPatient(especes[i % especes.length], noms[i], mal);
+    p.urgence = entier(1, 3);
+    liste.push(p);
+  }
+  // Patients tout sales (brosse et bain avant les examens).
+  melange(liste.slice()).slice(0, cfg.sales).forEach((p) => {
+    p.sale = true;
+    const places = melange([[-40, 60], [42, 105], [-22, -100], [34, -112], [-55, 118], [10, 30], [62, 55], [-62, 20]]);
+    p.boue = places.slice(0, cfg.taches).map(([x, y]) => ({ x, y, r: hasard(15, 21), a: 1 }));
+  });
+  // Contrôles : un patient déjà soigné revient plus tard dans la journée.
+  for (let c = 0; c < cfg.controles; c++) {
+    const ref = liste[c];
+    const ctrl = creerPatient(ref.esp, ref.nom, ref.mal);
+    ctrl.controle = true; ctrl.ref = ref; ctrl.urgence = 1;
+    liste.splice(Math.min(liste.length, 3 + c * 2), 0, ctrl);
+  }
+  return liste;
+}
+
+// ---------- Géométrie de la scène ----------
+const W = 360, H = 440;            // taille logique de la scène
+const AX = 180, AY = 232, AS = 0.9; // position et taille de l'animal sur la table
+const monde = (p) => ({ x: AX + p.x * AS, y: AY + p.y * AS });
+function pointPartie(esp, nom) {
+  switch (nom) {
+    case 'oreille': return ({ pointu: { x: -44, y: -128 }, tombant: { x: -58, y: -60 }, long: { x: -24, y: -166 }, cheval: { x: -34, y: -132 },
+      rond: { x: -44, y: -118 }, cote: { x: -70, y: -80 }, aucune: { x: -56, y: -72 } })[esp.oreilles];
+    case 'oeil': return { x: 24, y: -82 };
+    case 'nez': return { x: 0, y: -56 };
+    case 'dent': case 'bouche': return { x: 16, y: -32 };
+    case 'patte': return { x: 45, y: 150 };
+    case 'peau': return { x: 4, y: 88 };
+    case 'front': return { x: 0, y: -112 };
+    default: return { x: 0, y: 60 };
+  }
+}
+
+// ---------- Dessin ----------
+function ell(c, x, y, rx, ry, col, rot = 0) { c.fillStyle = col; c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); c.fill(); }
+function circ(c, x, y, r, col) { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); }
+function assombrir(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = borne(Math.round((n >> 16) * f), 0, 255), g = borne(Math.round(((n >> 8) & 255) * f), 0, 255), b = borne(Math.round((n & 255) * f), 0, 255);
+  return `rgb(${r},${g},${b})`;
+}
+function cheminCoeur(c, x, y, s) {
+  c.beginPath(); c.moveTo(x, y + s);
+  c.bezierCurveTo(x - s * 1.6, y - s * 0.2, x - s * 0.7, y - s * 1.3, x, y - s * 0.45);
+  c.bezierCurveTo(x + s * 0.7, y - s * 1.3, x + s * 1.6, y - s * 0.2, x, y + s);
+  c.closePath();
+}
+function rectArrondi(c, x, y, w, h, r) { c.beginPath(); c.roundRect ? c.roundRect(x, y, w, h, r) : c.rect(x, y, w, h); }
+function etoile(c, x, y, r, col) {
+  c.fillStyle = col; c.beginPath();
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  c.closePath(); c.fill();
+}
+function pique(c, cx, cy, rx, ry, a, l) {
+  const x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry, nx = Math.cos(a), ny = Math.sin(a);
+  c.beginPath(); c.moveTo(x - ny * 10, y + nx * 10); c.lineTo(x + nx * l, y + ny * l); c.lineTo(x + ny * 10, y - nx * 10); c.fill();
+}
+
+// Dessine un animal. o : { x, y, s, humeur, secoue, gigote, tremble, symptome, boue, pansement }
+function dessinerAnimal(c, p, o) {
+  const e = p.esp, fonce = assombrir(e.corps, 0.78), rose = '#f5aebf';
+  c.save();
+  c.translate(o.x, o.y); c.scale(o.s, o.s);
+  if (o.secoue > 0) c.translate(Math.sin(temps * 50) * 9 * Math.min(1, o.secoue * 2), 0);
+  if (o.tremble) c.translate(Math.sin(temps * 70) * 1.5, 0);
+  if (o.gigote) c.rotate(Math.sin(temps * 26) * 0.08);
+  ell(c, 0, 166, 100, 14, 'rgba(0,0,0,.13)');
+
+  // Derrière le corps : piquants, laine
+  if (e.piquants) {
+    c.fillStyle = e.piquants;
+    for (let i = 0; i <= 16; i++) pique(c, 0, 80, 84, 70, Math.PI * (1.0 + i / 16), 30);
+    for (let i = 0; i <= 10; i++) pique(c, 0, -72, 56, 56, Math.PI * (1.08 + i / 10 * 0.84), 24);
+  }
+  if (e.laine) for (let a = 0; a < Math.PI * 2; a += 0.42) { circ(c, Math.cos(a) * 82, 80 + Math.sin(a) * 68, 21, '#e9e3d6'); circ(c, Math.cos(a) * 80, 78 + Math.sin(a) * 66, 19, '#fffdf7'); }
+
+  // Corps et pattes
+  if (e.carapace) {
+    ell(c, -50, 146, 24, 17, e.corps); ell(c, 50, 146, 24, 17, e.corps);
+    ell(c, 0, 82, 96, 72, assombrir(e.carapace, 0.8));
+    ell(c, 0, 78, 88, 64, e.carapace);
+    [[0, 70, 22], [-46, 84, 17], [46, 84, 17], [-24, 38, 14], [24, 38, 14], [0, 114, 15], [-30, 120, 12], [30, 120, 12]]
+      .forEach(([x, y, r]) => circ(c, x, y, r, assombrir(e.carapace, 1.22)));
+  } else {
+    ell(c, 0, 80, 85, 72, e.corps);
+    if (e.taches) ell(c, 38, 62, 34, 26, '#fbf6ef');
+    ell(c, 0, 96, 50, 48, e.clair);
+    if (e.ailes) { ell(c, -80, 84, 22, 48, fonce, 0.25); ell(c, 80, 84, 22, 48, fonce, -0.25); }
+    ell(c, -45, 150, 26, 16, fonce); ell(c, 45, 150, 26, 16, fonce);
+    if (e.ailes) { ell(c, -45, 152, 22, 10, '#f39a2b'); ell(c, 45, 152, 22, 10, '#f39a2b'); }
+  }
+
+  // Oreilles (derrière la tête)
+  for (const sg of [-1, 1]) {
+    switch (e.oreilles) {
+      case 'pointu':
+        c.fillStyle = e.corps; c.beginPath(); c.moveTo(sg * 20, -118); c.lineTo(sg * 50, -156); c.lineTo(sg * 60, -96); c.fill();
+        c.fillStyle = rose; c.beginPath(); c.moveTo(sg * 28, -116); c.lineTo(sg * 48, -144); c.lineTo(sg * 54, -104); c.fill(); break;
+      case 'tombant': ell(c, sg * 58, -62, 19, 42, fonce, sg * 0.22); break;
+      case 'long': ell(c, sg * 24, -160, 16, 50, e.corps, sg * 0.12); ell(c, sg * 24, -158, 8, 38, rose, sg * 0.12); break;
+      case 'cheval': ell(c, sg * 34, -130, 12, 26, e.corps, sg * 0.35); ell(c, sg * 34, -128, 6, 17, assombrir(e.corps, 0.6), sg * 0.35); break;
+      case 'rond': circ(c, sg * 44, -118, 20, e.corps); circ(c, sg * 44, -118, 11, rose); break;
+      case 'cote': ell(c, sg * 70, -80, 28, 12, e.corps, sg * -0.3); ell(c, sg * 70, -80, 18, 6, rose, sg * -0.3); break;
+    }
+  }
+  if (e.laine) [-34, -12, 12, 34].forEach((x) => circ(c, x, -124, 17, '#fffdf7'));
+
+  // Cou, puis tête
+  ell(c, 0, e.carapace ? -2 : 0, e.carapace ? 24 : 36, 32, e.corps);
+  circ(c, 0, -70, e.carapace ? 54 : 60, e.corps);
+  if (e.rayures) { c.strokeStyle = fonce; c.lineWidth = 5; c.lineCap = 'round'; [-14, 0, 14].forEach((x) => { c.beginPath(); c.moveTo(x, -128); c.lineTo(x, -112); c.stroke(); }); }
+  if (e.taches) ell(c, -26, -96, 22, 18, '#fbf6ef', 0.4);
+  if (e.criniere) [-26, -12, 2, 16].forEach((x, i) => ell(c, x, -124 + i * 2, 13, 19, e.criniere, 0.4));
+  if (e.crete) { ell(c, -10, -136, 8, 18, '#f2593a', -0.3); ell(c, 4, -140, 8, 20, '#ffd23f'); ell(c, 16, -134, 7, 16, '#f2593a', 0.35); }
+  if (e.houppe) ell(c, 0, -134, 6, 12, e.corps, 0.25);
+  if (e.cornes) { c.fillStyle = '#b9ad9c'; for (const sg of [-1, 1]) { c.beginPath(); c.moveTo(sg * 12, -122); c.lineTo(sg * 22, -150); c.lineTo(sg * 30, -120); c.fill(); } }
+
+  // Museau et bouche
+  const sombre = '#2b2b35';
+  switch (e.museau) {
+    case 'chat':
+      ell(c, 0, -46, 26, 17, e.clair);
+      c.fillStyle = '#f07a95'; c.beginPath(); c.moveTo(-7, -57); c.lineTo(7, -57); c.lineTo(0, -49); c.fill();
+      c.strokeStyle = '#7a5b46'; c.lineWidth = 2;
+      [[-1, -52], [-1, -46], [1, -52], [1, -46]].forEach(([sg, y]) => { c.beginPath(); c.moveTo(sg * 22, y); c.lineTo(sg * 50, y - 4 + (y + 49)); c.stroke(); });
+      break;
+    case 'chien': ell(c, 0, -44, 30, 22, e.clair); ell(c, 0, -56, 11, 8, sombre); break;
+    case 'lapin': ell(c, 0, -46, 22, 16, e.clair); ell(c, 0, -55, 7, 5, '#f07a95'); c.fillStyle = '#fff'; c.fillRect(-6, -42, 5, 9); c.fillRect(1, -42, 5, 9); break;
+    case 'cheval': ell(c, 0, -42, 34, 28, e.clair); ell(c, -11, -46, 4, 6, assombrir(e.corps, 0.55)); ell(c, 11, -46, 4, 6, assombrir(e.corps, 0.55)); break;
+    case 'tortue': circ(c, -5, -56, 2.5, sombre); circ(c, 5, -56, 2.5, sombre); break;
+    case 'rongeur': ell(c, -30, -48, 18, 15, e.clair); ell(c, 30, -48, 18, 15, e.clair); circ(c, 0, -55, 6, '#f07a95'); c.fillStyle = '#fff'; c.fillRect(-5, -44, 4, 8); c.fillRect(1, -44, 4, 8); break;
+    case 'bec': ell(c, 0, -48, 24, 12, '#f39a2b'); ell(c, 0, -38, 17, 8, '#dd7f17'); break;
+    case 'mouton': ell(c, 0, -46, 24, 18, e.clair); c.strokeStyle = '#6b5a50'; c.lineWidth = 3; c.beginPath(); c.moveTo(-6, -56); c.lineTo(0, -51); c.lineTo(6, -56); c.stroke(); break;
+    case 'herisson': ell(c, 0, -46, 24, 18, e.clair); circ(c, 0, -57, 7, sombre); break;
+  }
+  if (e.museau !== 'bec') {
+    c.strokeStyle = '#5b3b33'; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath();
+    if (o.humeur === 'content') c.arc(0, -40, 11, 0.15 * Math.PI, 0.85 * Math.PI);
+    else if (o.humeur === 'triste') c.arc(0, -26, 8, 1.2 * Math.PI, 1.8 * Math.PI);
+    else { c.moveTo(-6, -34); c.lineTo(6, -34); }
+    c.stroke();
+    if (o.humeur === 'content' && e.museau === 'chien') ell(c, 0, -26, 6, 8, '#f07a95');
+  }
+
+  // Yeux
+  for (const sg of [-1, 1]) {
+    if (o.humeur === 'content') {
+      c.strokeStyle = sombre; c.lineWidth = 4; c.beginPath(); c.arc(sg * 24, -78, 8, 1.15 * Math.PI, 1.85 * Math.PI); c.stroke();
+    } else {
+      circ(c, sg * 24, -82, 9.5, sombre); circ(c, sg * 24 - 3, -85, 3.2, '#fff');
+      if (o.humeur === 'triste') { c.strokeStyle = sombre; c.lineWidth = 3; c.beginPath(); c.moveTo(sg * 14, -104); c.lineTo(sg * 32, -98); c.stroke(); }
+    }
+  }
+  const joues = o.symptome === 'chaud' ? 'rgba(240,70,70,.55)' : 'rgba(255,120,150,.35)';
+  circ(c, -40, -58, o.symptome === 'chaud' ? 12 : 8, joues); circ(c, 40, -58, o.symptome === 'chaud' ? 12 : 8, joues);
+
+  // Petits soucis visibles (surtout à la loupe)
+  if (o.symptome) {
+    const m = MAUX[o.symptome], pt = m.loupe ? pointPartie(e, m.loupe) : null;
+    switch (m.loupe) {
+      case 'oreille': [[-5, -4], [4, 2], [-2, 6], [6, -6], [0, 0]].forEach(([dx, dy]) => circ(c, pt.x + dx, pt.y + dy, 3, '#6e4a2a')); break;
+      case 'patte': c.fillStyle = '#5d636e'; c.beginPath(); c.moveTo(pt.x - 4, pt.y - 4); c.lineTo(pt.x + 4, pt.y - 4); c.lineTo(pt.x + 1, pt.y - 22); c.fill(); circ(c, pt.x, pt.y - 3, 3, '#ff9a9a'); break;
+      case 'nez': c.fillStyle = '#62bdf5'; c.beginPath(); c.moveTo(pt.x + 9, pt.y + 4); c.quadraticCurveTo(pt.x + 2, pt.y + 16, pt.x + 9, pt.y + 18); c.quadraticCurveTo(pt.x + 16, pt.y + 16, pt.x + 9, pt.y + 4); c.fill(); break;
+      case 'peau': if (!o.pansement) { c.strokeStyle = '#e2574c'; c.lineWidth = 3; [-6, 0, 6].forEach((d) => { c.beginPath(); c.moveTo(pt.x - 10 + d, pt.y - 8); c.lineTo(pt.x + 6 + d, pt.y + 8); c.stroke(); }); } break;
+      case 'dent': c.fillStyle = '#e7d47a'; c.fillRect(pt.x - 5, pt.y - 4, 10, 11); circ(c, pt.x + 1, pt.y + 2, 2.5, '#9b7a32'); break;
+      case 'oeil': c.strokeStyle = 'rgba(230,60,60,.75)'; c.lineWidth = 4; c.beginPath(); c.arc(pt.x, pt.y, 13, 0, Math.PI * 2); c.stroke(); ell(c, pt.x + 10, pt.y + 18, 4, 6, '#7cc9ff'); break;
+    }
+    if (o.symptome === 'chaud') ell(c, 34, -112, 5, 8, '#7cc9ff');
+  }
+  if (o.pansement) {
+    const pt = pointPartie(e, 'peau');
+    c.save(); c.translate(pt.x, pt.y); c.rotate(-0.15);
+    c.fillStyle = '#f2c79a'; rectArrondi(c, -26, -9, 52, 18, 9); c.fill();
+    c.fillStyle = '#fbe6cf'; c.fillRect(-9, -7, 18, 14); c.restore();
+  }
+  if (o.boue) for (const b of o.boue) {
+    if (b.a <= 0) continue;
+    c.globalAlpha = borne(b.a, 0, 1);
+    circ(c, b.x, b.y, b.r, '#7b5a3a'); circ(c, b.x + b.r * 0.6, b.y - b.r * 0.35, b.r * 0.6, '#7b5a3a'); circ(c, b.x - b.r * 0.5, b.y + b.r * 0.4, b.r * 0.55, '#6a4b2f');
+    c.globalAlpha = 1;
+  }
+  c.restore();
+}
+
+// Décor : la clinique, ou le jardin une fois débloqué.
+function dessinerFond(c, sansTable) {
+  if (sauve.salle === 'jardin') {
+    const g = c.createLinearGradient(0, -200, 0, 330); g.addColorStop(0, '#8fd0f2'); g.addColorStop(1, '#dff4ff');
+    c.fillStyle = g; c.fillRect(-1500, -1500, 3360, 1830);
+    circ(c, 310, 50, 26, '#ffe066');
+    [[70, 60], [210, 36]].forEach(([x, y]) => { circ(c, x, y, 16, '#fff'); circ(c, x + 18, y - 6, 20, '#fff'); circ(c, x + 38, y, 15, '#fff'); });
+    ell(c, 60, 330, 160, 60, '#a5dc8c'); ell(c, 320, 330, 170, 70, '#98d47e');
+    c.fillStyle = '#8fd17a'; c.fillRect(-1500, 320, 3360, 1500);
+    c.fillStyle = '#8a5a35'; c.fillRect(22, 200, 16, 130); circ(c, 30, 180, 44, '#5fb35a'); circ(c, 58, 205, 30, '#57a852'); circ(c, 4, 205, 28, '#57a852');
+    [[300, 350], [330, 372], [60, 366], [24, 352], [280, 380]].forEach(([x, y], i) => { circ(c, x, y, 6, i % 2 ? '#ff8fb1' : '#ffd23f'); circ(c, x, y, 2.5, '#fff'); });
+  } else {
+    c.fillStyle = '#d9f1ec'; c.fillRect(-1500, -1500, 3360, 1830);
+    c.fillStyle = '#cbe9e3'; for (let x = -300; x < 700; x += 36) c.fillRect(x, -1500, 14, 1830);
+    c.fillStyle = '#fff'; rectArrondi(c, 22, 34, 96, 84, 8); c.fill();
+    c.fillStyle = '#a9dcf7'; c.fillRect(30, 42, 80, 68);
+    c.fillStyle = '#fff'; c.fillRect(68, 42, 4, 68); c.fillRect(30, 74, 80, 4);
+    c.fillStyle = '#fff'; rectArrondi(c, 254, 30, 78, 98, 8); c.fill();
+    circ(c, 293, 86, 15, '#f2a0b4'); [[-15, -18], [-5, -26], [7, -26], [17, -18]].forEach(([dx, dy]) => circ(c, 293 + dx, 86 + dy, 6, '#f2a0b4'));
+    c.fillStyle = '#e9d6b8'; c.fillRect(-1500, 330, 3360, 1500);
+    c.fillStyle = '#d7c19f'; c.fillRect(-1500, 326, 3360, 6);
+  }
+  // Table d'examen
+  if (sansTable) return;
+  c.fillStyle = '#7fb6cc'; c.fillRect(56, 404, 10, 60); c.fillRect(294, 404, 10, 60);
+  c.fillStyle = '#9fd3e6'; rectArrondi(c, 28, 382, 304, 26, 12); c.fill();
+  c.fillStyle = '#c4e6f2'; rectArrondi(c, 36, 384, 288, 8, 4); c.fill();
+}
+
+// ---------- Canvas et coordonnées ----------
+const toile = $('#scene'), c = toile.getContext('2d');
+let echelle = 1, decX = 0, decY = 0, dpr = 1, largeur = 360, hauteur = 440;
+function redimensionner() {
+  const r = $('#zone').getBoundingClientRect();
+  largeur = Math.max(1, r.width); hauteur = Math.max(1, r.height);
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  toile.width = Math.round(largeur * dpr); toile.height = Math.round(hauteur * dpr);
+  echelle = Math.min(largeur / W, hauteur / H);
+  decX = (largeur - W * echelle) / 2; decY = (hauteur - H * echelle) / 2;
+}
+function versEcran(x, y) {   // coordonnées logiques → coordonnées de la fenêtre
+  const r = toile.getBoundingClientRect();
+  return { x: r.left + decX + x * echelle, y: r.top + decY + y * echelle };
+}
+function coord(ev) {
+  const r = toile.getBoundingClientRect();
+  return { x: (ev.clientX - r.left - decX) / echelle, y: (ev.clientY - r.top - decY) / echelle };
+}
+
+// ---------- État de la partie ----------
+let temps = 0, enPause = false, jeuActif = false, bilanOuvert = false, tutoActif = false;
+let partie = null, patient = null, etape = null;
+let minuteurs = [], particules = [], textes = [], secousse = 0, scoreAffiche = 0;
+const animal = { dx: 0, cible: 0, secoue: 0, gigote: false, joie: 0, bulle: '', bulleT: 0 };
+const tutosVus = new Set();
+
+function apres(s, fn) { minuteurs.push({ t: s, fn }); }
+function majMinuteurs(dt) {
+  const prets = [];
+  minuteurs = minuteurs.filter((m) => { m.t -= dt; if (m.t <= 0) { prets.push(m.fn); return false; } return true; });
+  prets.forEach((f) => f());
+}
+function perte(n) { if (patient) patient.perte = Math.min(70, patient.perte + n); }
+function texte(txt, x, y, couleur = '#1f5f8b') { textes.push({ txt, x, y, vie: 1.3, couleur }); }
+function secouer() { secousse = 0.35; animal.secoue = 0.5; }
+
+// Effets : confettis, cœurs, étoiles, mousse
+function confettis(x, y, n = 26) {
+  for (let i = 0; i < n; i++) particules.push({ type: 'confetti', x, y, vx: hasard(-170, 170), vy: hasard(-280, -80), g: 420, vie: hasard(1, 1.6),
+    couleur: pioche(['#f2557a', '#ffd23f', '#3fae6a', '#3b82c4', '#b76de0']), rot: hasard(0, 6), vr: hasard(-9, 9) });
+}
+function coeurs(x, y, n = 6) {
+  for (let i = 0; i < n; i++) particules.push({ type: 'coeur', x: x + hasard(-40, 40), y: y + hasard(-20, 20), vx: hasard(-30, 30), vy: hasard(-110, -60), g: -10, vie: hasard(0.9, 1.4), couleur: '#f2557a', rot: 0, vr: 0 });
+}
+function etincelles(x, y, n = 10, couleur = '#ffd23f') {
+  for (let i = 0; i < n; i++) { const a = hasard(0, 6.3), v = hasard(60, 160); particules.push({ type: 'etoile', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 60, vie: hasard(0.5, 0.9), couleur, rot: 0, vr: 0 }); }
+}
+function mousse(x, y) {
+  particules.push({ type: 'mousse', x: x + hasard(-12, 12), y: y + hasard(-12, 12), vx: hasard(-20, 20), vy: hasard(-40, -10), g: 0, vie: 0.7, couleur: '#fff', rot: 0, vr: 0 });
+}
+function majParticules(dt) {
+  for (const p of particules) { p.vie -= dt; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; }
+  particules = particules.filter((p) => p.vie > 0);
+  for (const t of textes) { t.vie -= dt; t.y -= 30 * dt; }
+  textes = textes.filter((t) => t.vie > 0);
+}
+function dessinerParticules(c) {
+  for (const p of particules) {
+    c.globalAlpha = borne(p.vie * 1.5, 0, 1);
+    if (p.type === 'confetti') { c.save(); c.translate(p.x, p.y); c.rotate(p.rot); c.fillStyle = p.couleur; c.fillRect(-4, -2.5, 8, 5); c.restore(); }
+    else if (p.type === 'coeur') { c.fillStyle = p.couleur; cheminCoeur(c, p.x, p.y, 8); c.fill(); }
+    else if (p.type === 'etoile') etoile(c, p.x, p.y, 6, p.couleur);
+    else { circ(c, p.x, p.y, 7, '#ffffffdd'); c.strokeStyle = '#a9dcf7'; c.lineWidth = 1.5; c.stroke(); }
+  }
+  c.globalAlpha = 1;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (const t of textes) {
+    c.globalAlpha = borne(t.vie * 1.5, 0, 1);
+    c.font = '900 24px system-ui, sans-serif'; c.lineWidth = 5; c.strokeStyle = '#fff';
+    c.strokeText(t.txt, t.x, t.y); c.fillStyle = t.couleur; c.fillText(t.txt, t.x, t.y);
+  }
+  c.globalAlpha = 1;
+}
+// Bulle de texte dessinée dans la scène
+function bulle(c, txt, x, y) {
+  c.font = '700 16px system-ui, sans-serif';
+  const w = Math.min(330, c.measureText(txt).width + 26);
+  const gx = borne(x - w / 2, 15, W - 15 - w);
+  c.fillStyle = '#fff'; c.strokeStyle = '#3b82c4'; c.lineWidth = 3;
+  rectArrondi(c, gx, y - 20, w, 40, 18); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(x - 10, y + 18); c.lineTo(x, y + 32); c.lineTo(x + 10, y + 18); c.fill();
+  c.fillStyle = '#24324a'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(txt, gx + w / 2, y + 1, w - 16);
+}
+
+// ---------- Interface (texte, fiche, cartes) ----------
+function consigne(t) { $('#consigne').textContent = t; }
+function majHud() {
+  if (!partie) return;
+  const n = partie.file.length, fait = partie.gueris.length + (patient && !patient.gueri ? 1 : 0);
+  $('#infos').innerHTML = `Journée ${partie.jour}<br><small>Patient ${Math.max(1, Math.min(n, fait))}/${n}</small>`;
+}
+function ajouterIndice(icon, txt, alerte) {
+  if (!patient) return;
+  patient.indices.push({ icon, txt, alerte });
+  majIndices();
+}
+function majIndices() {
+  const el = $('#indices'); el.innerHTML = '';
+  if (!patient) return;
+  if (!patient.indices.length) {
+    const s = document.createElement('span'); s.className = 'puce vide';
+    s.textContent = patient.controle ? 'Fiche : visite de contrôle' : 'Fiche du patient : examine-le !';
+    el.append(s); return;
+  }
+  for (const ind of patient.indices) {
+    const s = document.createElement('span');
+    s.className = 'puce ' + (ind.alerte ? 'alerte' : 'ok');
+    s.innerHTML = icone(ind.icon) + ind.txt;
+    el.append(s);
+  }
+}
+function viderCartes() { $('#cartes').innerHTML = ''; }
+function majBoutonsSon() {
+  document.querySelectorAll('.b-son').forEach((b) => {
+    b.innerHTML = sauve.son ? SVG_SON.oui : SVG_SON.non;
+    b.setAttribute('aria-label', sauve.son ? 'Couper le son' : 'Remettre le son');
+  });
+}
+
+// =====================================================================
+//  Les étapes d'une consultation. Chaque étape est un petit objet :
+//  debut(), maj(dt), dessiner(c), down/move/up(x, y), touche(k, appuye, repete)
+// =====================================================================
+
+// --- Annonce de la journée ---
+function etapeAnnonce() {
+  const j = partie.jour;
+  const e = {
+    nom: 'annonce', cacheAnimal: true, fini: false,
+    consigne: `${partie.file.length} patients t’attendent aujourd’hui.`,
+    debut() { apres(1.1, () => e.suite()); },
+    suite() { if (e.fini) return; e.fini = true; patientSuivant(); },
+    dessiner(c) {
+      c.fillStyle = '#ffffffee'; c.strokeStyle = '#3b82c4'; c.lineWidth = 4;
+      rectArrondi(c, 30, 130, 300, 160, 24); c.fill(); c.stroke();
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#1f5f8b';
+      c.font = '900 40px system-ui, sans-serif'; c.fillText(`Journée ${j}`, 180, 180);
+      c.font = '700 18px system-ui, sans-serif'; c.fillStyle = '#24324a'; c.fillText(NOUVEAUTES[j - 1], 180, 230, 280);
+      for (let i = 0; i < 3; i++) etoile(c, 140 + i * 40, 264, 12, i < (sauve.journees[j]?.etoiles || 0) ? '#ffc22e' : '#d6dde6');
+    },
+    down() { e.suite(); },
+    touche(k, on) { if (on && (k === ' ' || k === 'Enter')) e.suite(); },
+  };
+  return e;
+}
+
+// --- Salle d'attente : soigner d'abord celui qui a le plus mal ---
+function etapeAttente(liste) {
+  const COUL = ['#3fae6a', '#f29d38', '#e5484d'], MOTS = ['Ça va', 'Un peu mal', 'Très mal'];
+  // Un seul patient doit avoir « le plus mal » : on départage les égalités.
+  let max = Math.max(...liste.map((p) => p.urgence));
+  const premiers = liste.filter((p) => p.urgence === max);
+  if (premiers.length > 1) {
+    if (max < 3) { pioche(premiers).urgence = max + 1; max++; }
+    else { const garde = pioche(premiers); premiers.forEach((p) => { if (p !== garde) p.urgence = 2; }); }
+  }
+  const taille = liste.length === 2 ? 0.5 : 0.4;
+  const e = {
+    nom: 'attente', tuto: 'attente', cacheAnimal: true, sansTable: true, sel: 0, choisi: false,
+    consigne: 'Salle d’attente : qui soigner en premier ?',
+    pos(i) { return liste.length === 2 ? { x: i ? 255 : 105, y: 246 } : { x: 62 + i * 118, y: 262 }; },
+    indexUrgent() { return liste.findIndex((p) => p.urgence === max); },
+    dessiner(c) {
+      c.fillStyle = '#b98a5a'; rectArrondi(c, 10, 318, 340, 20, 8); c.fill();
+      c.fillStyle = '#8f6840'; c.fillRect(30, 338, 10, 40); c.fillRect(320, 338, 10, 40);
+      liste.forEach((p, i) => {
+        const { x, y } = e.pos(i);
+        if (!e.choisi && i === e.sel && e.clavier) { c.strokeStyle = '#3b82c4'; c.lineWidth = 4; rectArrondi(c, x - 56, y - 110, 112, 190, 16); c.stroke(); }
+        dessinerAnimal(c, p, { x, y, s: taille, humeur: p.controle ? 'content' : 'triste', boue: p.boue, tremble: p.urgence === 3 });
+        c.fillStyle = COUL[p.urgence - 1]; rectArrondi(c, x - 52, y - 126, 104, 30, 15); c.fill();
+        c.fillStyle = '#fff'; c.font = '800 14px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(p.controle ? 'Contrôle' : MOTS[p.urgence - 1], x, y - 110);
+        c.fillStyle = '#24324a'; c.font = '700 15px system-ui, sans-serif'; c.fillText(p.nom, x, y + 96);
+      });
+    },
+    down(x, y) {
+      e.clavier = false;
+      liste.forEach((p, i) => { const q = e.pos(i); if (Math.abs(x - q.x) < 58 && y > q.y - 130 && y < q.y + 110) e.choisir(i); });
+    },
+    touche(k, on, rep) {
+      if (!on || rep) return;
+      e.clavier = true;
+      if (k === 'ArrowLeft' || k === 'ArrowUp') e.sel = (e.sel + liste.length - 1) % liste.length;
+      if (k === 'ArrowRight' || k === 'ArrowDown') e.sel = (e.sel + 1) % liste.length;
+      if (k === ' ' || k === 'Enter') e.choisir(e.sel);
+    },
+    choisir(i) {
+      if (e.choisi) return;
+      e.choisi = true;
+      const p = liste[i], q = e.pos(i);
+      let cible = p;
+      if (p.urgence === max) { son.bien(); confettis(q.x, q.y - 60, 16); texte('Bon choix !', q.x, q.y - 150, '#3fae6a'); consigne('Bravo, on soigne d’abord celui qui a le plus mal !'); }
+      else {
+        cible = liste[e.indexUrgent()]; son.non(); secousse = 0.3;
+        cible.perte += 15; consigne(`Oups ! ${cible.nom} avait plus mal : on commence par lui.`);
+      }
+      apres(1.3, () => arrivee(cible));
+    },
+  };
+  return e;
+}
+
+// --- Stéthoscope : toucher en rythme quand l'anneau arrive sur le cœur ---
+function etapeStetho() {
+  const p = patient, cfg = partie.cfg;
+  const type = p.controle ? 'calme' : MAUX[p.mal].coeur;
+  const besoin = p.controle ? 2 : cfg.battements;
+  const h = monde(pointPartie(p.esp, 'coeur'));
+  const per = () => (type === 'rapide' ? cfg.rapide : type === 'gargouille' ? hasard(0.55, 1.15) : cfg.calme);
+  const e = {
+    nom: 'stetho', tuto: 'stetho', h, reussis: 0, rates: 0, t: 0, pulse: 0, fini: false, pris: -1,
+    consigne: 'Écoute le cœur : touche quand l’anneau arrive sur le cœur !',
+    debut() { e.periode = per(); e.dernier = 0.2; e.prochain = 0.2 + e.periode + 0.5; },
+    maj(dt) {
+      e.t += dt; e.pulse = Math.max(0, e.pulse - dt * 4);
+      if (e.t >= e.prochain) {
+        e.dernier = e.prochain; e.pulse = 1;
+        if (type === 'gargouille') son.gargouille(); else son.coeur();
+        e.periode = per(); e.prochain = e.dernier + e.periode;
+      }
+    },
+    taper() {
+      if (e.fini) return;
+      const avant = e.t - e.dernier, reste = e.prochain - e.t;
+      const cible = avant < reste ? e.dernier : e.prochain, ecart = Math.min(avant, reste);
+      if (ecart <= cfg.fenetre && e.pris !== cible) {
+        e.pris = cible; e.reussis++; son.bien(); etincelles(h.x, h.y, 8, '#3fae6a');
+        texte(pioche(['Bien !', 'Super !', 'Bravo !']), h.x, h.y - 50, '#3fae6a');
+        if (e.reussis >= besoin) e.finir();
+      } else {
+        e.rates++; son.rate(); if (e.rates <= 4) perte(6);
+        texte(avant < reste ? 'Trop tard !' : 'Trop tôt !', h.x, h.y - 50, '#e5484d');
+      }
+    },
+    finir() {
+      e.fini = true;
+      if (p.controle) ajouterIndice('stetho', 'Cœur en pleine forme', false);
+      else if (type === 'calme') ajouterIndice('stetho', 'Cœur calme', false);
+      else if (type === 'rapide') ajouterIndice('stetho', 'Cœur rapide !', true);
+      else ajouterIndice('stetho', 'Ventre qui gargouille !', true);
+      son.indice(); apres(0.9, etapeSuivante);
+    },
+    dessiner(c) {
+      // Tuyau et embout du stéthoscope
+      const coul = debloque('stetho') ? '#d4a017' : '#3b5b8a';
+      c.strokeStyle = coul; c.lineWidth = 6; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(h.x + 22, h.y + 6); c.bezierCurveTo(h.x + 110, h.y + 20, 330, 200, 320, 120); c.stroke();
+      c.beginPath(); c.moveTo(304, 96); c.quadraticCurveTo(320, 130, 336, 96); c.stroke();
+      circ(c, h.x + 20, h.y + 4, 10, coul);
+      // Anneau qui se resserre
+      let frac;
+      if (tutoActif) frac = 1 - ((tuto ? tuto.t : 0) % 1.3) / 1.3;
+      else frac = e.fini ? 0 : borne((e.prochain - e.t) / Math.max(0.2, e.prochain - e.dernier), 0, 1);
+      if (!e.fini) {
+        c.strokeStyle = frac < 0.2 ? '#3fae6a' : '#f29d38'; c.lineWidth = 5;
+        c.beginPath(); c.arc(h.x, h.y, 24 + frac * 80, 0, Math.PI * 2); c.stroke();
+        c.strokeStyle = '#3fae6a55'; c.lineWidth = 3; c.beginPath(); c.arc(h.x, h.y, 24, 0, Math.PI * 2); c.stroke();
+      }
+      const s = 15 + e.pulse * 6 + (tutoActif && frac < 0.08 ? 5 : 0);
+      c.fillStyle = type === 'gargouille' ? '#f29d38' : '#f2557a'; cheminCoeur(c, h.x, h.y, s); c.fill();
+      // Battements réussis
+      for (let i = 0; i < besoin; i++) circ(c, 180 - (besoin - 1) * 14 + i * 28, 22, 10, i < e.reussis ? '#3fae6a' : '#ffffffcc');
+    },
+    down() { e.taper(); },
+    touche(k, on, rep) { if (on && !rep && (k === ' ' || k === 'Enter')) e.taper(); },
+  };
+  return e;
+}
+
+// --- Loupe : examiner chaque « ? » pour trouver le bobo ---
+function etapeLoupe() {
+  const p = patient, cfg = partie.cfg, mal = MAUX[p.mal];
+  const autres = melange(['oreille', 'oeil', 'nez', 'patte', 'peau', 'dent'].filter((n) => n !== mal.loupe));
+  const noms = melange((mal.loupe ? [mal.loupe] : []).concat(autres).slice(0, cfg.points));
+  const pts = noms.map((n) => ({ nom: n, ...monde(pointPartie(p.esp, n)), vu: 0, etat: null }));
+  const e = {
+    nom: 'loupe', tuto: 'loupe', pts, lx: 316, ly: 64, cx: 316, cy: 64, r: cfg.loupeR, fini: false, appui: false, fl: {},
+    consigne: 'Glisse la loupe sur chaque « ? » pour chercher le bobo.',
+    maj(dt) {
+      const v = 230 * dt;
+      if (e.fl.ArrowLeft) e.cx -= v; if (e.fl.ArrowRight) e.cx += v; if (e.fl.ArrowUp) e.cy -= v; if (e.fl.ArrowDown) e.cy += v;
+      e.cx = borne(e.cx, 10, W - 10); e.cy = borne(e.cy, 10, H - 10);
+      e.lx += (e.cx - e.lx) * Math.min(1, dt * 14); e.ly += (e.cy - e.ly) * Math.min(1, dt * 14);
+      if (e.fini) return;
+      let proche = null, dmin = 18;
+      for (const q of pts) { const d = dist(q.x, q.y, e.lx, e.ly); if (!q.etat && d < dmin) { dmin = d; proche = q; } }
+      for (const q of pts) if (q !== proche && !q.etat) q.vu = Math.max(0, q.vu - dt);
+      if (proche) { proche.vu += dt; if (proche.vu >= 0.45) e.examiner(proche); }
+    },
+    examiner(q) {
+      if (q.nom === mal.loupe) {
+        q.etat = 'bobo'; son.indice(); etincelles(q.x, q.y, 12, '#e5484d');
+        texte('Trouvé !', q.x, q.y - 40, '#e5484d'); e.finir(true);
+      } else {
+        q.etat = 'ok'; son.clic();
+        if (pts.every((t) => t.etat)) e.finir(false);
+      }
+    },
+    finir(trouve) {
+      e.fini = true;
+      if (trouve) ajouterIndice('loupe', TEXTE_LOUPE[mal.loupe], true);
+      else { ajouterIndice('loupe', 'Rien vu à la loupe', false); son.indice(); }
+      apres(1.1, etapeSuivante);
+    },
+    suivant() { const q = pts.find((t) => !t.etat); if (q) { e.cx = q.x; e.cy = q.y; } },
+    dessiner(c) {
+      const { lx, ly, r } = e;
+      c.fillStyle = 'rgba(15,30,55,.5)'; c.beginPath(); c.rect(-1500, -1500, 3360, 3440); c.arc(lx, ly, r, 0, Math.PI * 2, true); c.fill();
+      c.save(); c.beginPath(); c.arc(lx, ly, r, 0, Math.PI * 2); c.clip();
+      c.translate(lx, ly); c.scale(1.8, 1.8); c.translate(-lx, -ly);
+      dessinerScene(c);
+      c.restore();
+      for (const q of pts) {
+        const col = q.etat === 'bobo' ? '#e5484d' : q.etat === 'ok' ? '#3fae6a' : '#ffffff';
+        circ(c, q.x, q.y, 11, col); c.strokeStyle = '#1f5f8b'; c.lineWidth = 2; c.beginPath(); c.arc(q.x, q.y, 11, 0, Math.PI * 2); c.stroke();
+        c.fillStyle = q.etat ? '#fff' : '#1f5f8b'; c.font = '900 15px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(q.etat === 'bobo' ? '!' : q.etat === 'ok' ? '✓' : '?', q.x, q.y + 1);
+        if (!q.etat && q.vu > 0) { c.strokeStyle = '#ffd23f'; c.lineWidth = 4; c.beginPath(); c.arc(q.x, q.y, 15, -Math.PI / 2, -Math.PI / 2 + q.vu / 0.45 * Math.PI * 2); c.stroke(); }
+      }
+      // Monture et manche de la loupe
+      const ca = Math.cos(0.8), sa = Math.sin(0.8);
+      c.strokeStyle = '#8a5a2b'; c.lineWidth = 12; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(lx + ca * (r + 4), ly + sa * (r + 4)); c.lineTo(lx + ca * (r + 44), ly + sa * (r + 44)); c.stroke();
+      if (debloque('loupe')) {
+        ['#e5484d', '#f29d38', '#ffd23f', '#3fae6a', '#3b82c4', '#b76de0'].forEach((col, i) => { c.strokeStyle = col; c.lineWidth = 3; c.beginPath(); c.arc(lx, ly, r + 1 + i * 2.2, 0, Math.PI * 2); c.stroke(); });
+      } else { c.strokeStyle = '#3b5b8a'; c.lineWidth = 7; c.beginPath(); c.arc(lx, ly, r + 3, 0, Math.PI * 2); c.stroke(); }
+    },
+    down(x, y) { e.appui = true; e.cx = x; e.cy = y; },
+    move(x, y) { if (e.appui) { e.cx = x; e.cy = y; } },
+    up() { e.appui = false; },
+    touche(k, on, rep) {
+      if (k.startsWith('Arrow')) e.fl[k] = on;
+      if (on && !rep && (k === ' ' || k === 'Enter')) e.suivant();
+    },
+  };
+  return e;
+}
+
+// --- Thermomètre : appuyer et tenir, lâcher quand l'animal gigote ---
+function etapeThermo() {
+  const p = patient, cfg = partie.cfg, fievre = MAUX[p.mal].temp === 'fievre';
+  const e = {
+    nom: 'thermo', tuto: 'thermo', prog: 0, tient: false, bloque: false, phase: 'calme', tp: hasard(0.9, 1.3), fini: false, bipT: 0,
+    consigne: 'Appuie et garde le doigt posé. Lâche quand il gigote !',
+    maj(dt) {
+      if (e.fini) return;
+      e.tp -= dt;
+      if (e.tp <= 0) {
+        if (e.phase === 'calme') { e.phase = 'alerte'; e.tp = cfg.alerte; son.attention(); }
+        else if (e.phase === 'alerte') { e.phase = 'gigote'; e.tp = 0.9; }
+        else { e.phase = 'calme'; e.tp = hasard(cfg.calmeMin, cfg.calmeMax); }
+      }
+      animal.gigote = e.phase === 'gigote';
+      if (e.tient && !e.bloque) {
+        if (e.phase === 'gigote') {
+          e.bloque = true; e.prog = Math.max(0, e.prog - 0.3); perte(8); son.glisse(); secouer();
+          texte('Oups, il a glissé !', 180, 120, '#e5484d');
+        } else {
+          e.prog += dt / cfg.duree; e.bipT -= dt;
+          if (e.bipT <= 0) { son.thermo(); e.bipT = 0.25; }
+          if (e.prog >= 1) e.finir();
+        }
+      }
+    },
+    finir() {
+      e.fini = true; e.prog = 1; animal.gigote = false;
+      if (fievre) ajouterIndice('thermo', 'Fièvre !', true); else ajouterIndice('thermo', 'Pas de fièvre', false);
+      son.indice(); etincelles(318, 120, 10); apres(1.1, etapeSuivante);
+    },
+    dessiner(c) {
+      // Petit thermomètre sous le bras
+      c.save(); c.translate(AX - 66, AY + 62); c.rotate(0.8);
+      c.fillStyle = '#fff'; rectArrondi(c, -4, -26, 8, 34, 4); c.fill(); circ(c, 0, 10, 6, '#e5484d'); c.restore();
+      // Grand cadran
+      const x = 318, haut = 96, bas = 316, niveau = e.prog * (fievre ? 0.92 : 0.6);
+      c.fillStyle = '#fff'; c.strokeStyle = '#3b5b8a'; c.lineWidth = 3;
+      rectArrondi(c, x - 14, haut - 10, 28, bas - haut + 20, 14); c.fill(); c.stroke();
+      circ(c, x, bas + 22, 22, '#e5484d'); c.beginPath(); c.arc(x, bas + 22, 22, 0, Math.PI * 2); c.stroke();
+      const brillant = debloque('thermo');
+      c.fillStyle = brillant ? '#b76de0' : '#e5484d';
+      c.fillRect(x - 6, bas - niveau * (bas - haut), 12, niveau * (bas - haut) + 8);
+      c.fillStyle = '#e5484d33'; c.fillRect(x - 13, haut, 26, (bas - haut) * 0.25);
+      if (brillant) etoile(c, x, bas + 22, 11, '#ffd23f');
+      if (e.fini) {
+        c.font = '900 20px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillStyle = fievre ? '#e5484d' : '#3fae6a'; c.fillText(fievre ? '40 °C' : '38 °C', x - 4, haut - 26);
+      }
+      // Messages
+      if (!e.fini) {
+        if (e.phase === 'alerte') bulle(c, 'Attention, il va gigoter !', 180, 40);
+        else if (e.phase === 'gigote') bulle(c, 'Il gigote : lâche !', 180, 40);
+        else if (!e.tient) bulle(c, 'Appuie et garde le doigt posé', 180, 40);
+        else bulle(c, 'Mesure en cours…', 180, 40);
+      }
+      // Jauge de progression
+      c.strokeStyle = '#ffffffaa'; c.lineWidth = 10; c.beginPath(); c.arc(60, 330, 26, 0, Math.PI * 2); c.stroke();
+      c.strokeStyle = '#3fae6a'; c.beginPath(); c.arc(60, 330, 26, -Math.PI / 2, -Math.PI / 2 + e.prog * Math.PI * 2); c.stroke();
+    },
+    down() { e.tient = true; },
+    up() { e.tient = false; e.bloque = false; },
+    touche(k, on) { if (k === ' ' || k === 'Enter') { if (on) e.tient = true; else { e.tient = false; e.bloque = false; } } },
+  };
+  return e;
+}
+
+// --- Pansement : suivre le tracé en pointillés ---
+function etapePansement() {
+  const p = patient, cfg = partie.cfg;
+  const pts = [];
+  for (let i = 0; i <= 100; i++) {
+    // Le tracé passe par l'égratignure (au milieu du ventre) et ondule de plus en plus.
+    const u = i / 100, lx = -74 + u * 148;
+    const ly = 88 + Math.sin(u * Math.PI * 2 * cfg.ondes) * cfg.amp;
+    pts.push(monde({ x: lx, y: ly }));
+  }
+  const e = {
+    nom: 'pansement', tuto: 'pansement', pts, idx: 0, appui: false, hors: false, sorties: 0, fini: false, doigt: null, fl: false,
+    consigne: 'Suis les pointillés avec le doigt pour poser le pansement.',
+    maj(dt) {
+      if (e.fl && !e.fini) { e.avance += dt * 16; while (e.avance >= 1) { e.avance--; e.idx = Math.min(pts.length - 1, e.idx + 1); } e.verifier(); }
+    },
+    verifier() { if (e.idx >= pts.length - 1 && !e.fini) e.finir(); },
+    suivre(x, y) {
+      e.doigt = { x, y };
+      let meilleur = -1;
+      for (let j = e.idx; j < Math.min(pts.length, e.idx + 14); j++) if (dist(pts[j].x, pts[j].y, x, y) < cfg.tol) meilleur = j;
+      if (meilleur >= 0) { if (meilleur > e.idx) { e.idx = meilleur; if (Math.random() < 0.3) son.thermo(); } e.hors = false; }
+      else {
+        let dmin = 1e9;
+        for (let j = Math.max(0, e.idx - 3); j < Math.min(pts.length, e.idx + 14); j++) dmin = Math.min(dmin, dist(pts[j].x, pts[j].y, x, y));
+        if (dmin > cfg.tol * 2 && !e.hors) {
+          e.hors = true; e.sorties++; son.rate(); if (e.sorties <= 4) perte(5);
+          texte('Reste sur les pointillés !', 180, 150, '#e5484d');
+        }
+      }
+      e.verifier();
+    },
+    finir() { e.fini = true; p.pansement = true; p.soigne = true; son.pose(); etincelles(pts[pts.length - 1].x, pts[pts.length - 1].y, 12); apres(0.7, etapeSuivante); },
+    dessiner(c) {
+      c.lineCap = 'round'; c.lineJoin = 'round';
+      c.strokeStyle = '#1f5f8b'; c.lineWidth = 6; c.setLineDash([2, 12]);
+      c.beginPath(); pts.forEach((q, i) => (i ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y))); c.stroke();
+      c.strokeStyle = '#fff'; c.lineWidth = 3; c.stroke(); c.setLineDash([]);
+      if (e.idx > 0 && !e.fini) {
+        c.strokeStyle = '#c99868'; c.lineWidth = 20; c.beginPath(); for (let i = 0; i <= e.idx; i++) (i ? c.lineTo(pts[i].x, pts[i].y) : c.moveTo(pts[i].x, pts[i].y)); c.stroke();
+        c.strokeStyle = '#f2c79a'; c.lineWidth = 16; c.stroke();
+      }
+      const a = pts[0], b = pts[pts.length - 1], q = pts[e.idx];
+      etoile(c, b.x, b.y, 14, '#ffd23f');
+      if (e.idx === 0) { circ(c, a.x, a.y, 14 + Math.sin(temps * 6) * 3, '#3fae6a'); c.fillStyle = '#fff'; c.font = '900 12px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('ici', a.x, a.y); }
+      else if (!e.fini) { circ(c, q.x, q.y, 9, '#fff'); c.strokeStyle = '#3fae6a'; c.lineWidth = 3; c.beginPath(); c.arc(q.x, q.y, 9, 0, Math.PI * 2); c.stroke(); }
+    },
+    down(x, y) { e.appui = true; e.suivre(x, y); },
+    move(x, y) { if (e.appui) e.suivre(x, y); },
+    up() { e.appui = false; e.hors = false; },
+    touche(k, on) { if (k === ' ' || k === 'Enter' || k === 'ArrowRight') { e.fl = on; e.avance = 0; } },
+  };
+  return e;
+}
+
+// --- Brosse : frotter les taches de boue ---
+function etapeBrosse() {
+  const p = patient, cfg = partie.cfg;
+  const e = {
+    nom: 'brosse', tuto: 'brosse', bx: 300, by: 380, appui: false, fl: {}, fini: false,
+    consigne: `${p.nom} est ${accord(p, 'tout sale', 'toute sale')} ! Frotte les taches de boue.`,
+    taches() { return p.boue.map((b) => ({ b, ...monde(b) })); },
+    frotter(x, y, d) {
+      for (const t of e.taches()) {
+        if (t.b.a > 0 && dist(t.x, t.y, x, y) < t.b.r * AS + 20) {
+          t.b.a -= d / cfg.frotter; if (Math.random() < 0.5) mousse(x, y);
+          if (temps - dernierFrotte > 0.12) { son.frotte(); dernierFrotte = temps; }
+          if (t.b.a <= 0) { etincelles(t.x, t.y, 8, '#a9dcf7'); son.bien(); }
+        }
+      }
+      if (!e.fini && p.boue.every((b) => b.a <= 0)) { e.fini = true; texte('Tout propre !', 180, 120, '#3fae6a'); apres(0.7, etapeSuivante); }
+    },
+    deplacer(x, y) { const d = dist(x, y, e.bx, e.by); e.bx = x; e.by = y; if (d > 0) e.frotter(x, y, Math.min(d, 40)); },
+    maj(dt) {
+      const v = 200 * dt; let x = e.bx, y = e.by;
+      if (e.fl.ArrowLeft) x -= v; if (e.fl.ArrowRight) x += v; if (e.fl.ArrowUp) y -= v; if (e.fl.ArrowDown) y += v;
+      if (x !== e.bx || y !== e.by) e.deplacer(borne(x, 0, W), borne(y, 0, H));
+    },
+    dessiner(c) {
+      if (!e.fini) for (const t of e.taches()) if (t.b.a > 0) { c.strokeStyle = '#ffffffaa'; c.lineWidth = 3; c.setLineDash([6, 6]); c.beginPath(); c.arc(t.x, t.y, t.b.r * AS + 10, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+      c.save(); c.translate(e.bx, e.by); c.rotate(-0.4);
+      c.fillStyle = '#c0843c'; rectArrondi(c, -28, -14, 56, 20, 8); c.fill();
+      c.fillStyle = '#8a5a2b'; rectArrondi(c, 22, -9, 34, 10, 5); c.fill();
+      c.fillStyle = '#f7e4b0'; for (let i = -24; i <= 22; i += 6) c.fillRect(i, 6, 3, 10);
+      c.restore();
+    },
+    down(x, y) { e.appui = true; e.bx = x; e.by = y; },
+    move(x, y) { if (e.appui) e.deplacer(x, y); },
+    up() { e.appui = false; },
+    touche(k, on, rep) {
+      if (k.startsWith('Arrow')) e.fl[k] = on;
+      if (on && !rep && (k === ' ' || k === 'Enter')) { const t = e.taches().find((q) => q.b.a > 0); if (t) { e.bx = t.x - 20; e.by = t.y; } }
+    },
+  };
+  return e;
+}
+
+// --- Bain : éclater les bulles de savon ---
+function etapeBulles() {
+  const cfg = partie.cfg;
+  const bulles = [];
+  for (let i = 0; i < cfg.bulles; i++) bulles.push({ x: hasard(60, 300), y: hasard(90, 360), r: hasard(18, 26), vx: hasard(-1, 1) * cfg.vitBulles, vy: -hasard(0.5, 1) * cfg.vitBulles, ph: hasard(0, 6) });
+  const e = {
+    nom: 'bulles', tuto: 'bulles', bulles, fini: false,
+    consigne: 'Le bain ! Éclate toutes les bulles pour le rincer.',
+    maj(dt) {
+      for (const b of bulles) {
+        b.x += b.vx * dt + Math.sin(temps * 2 + b.ph) * 0.4; b.y += b.vy * dt;
+        if (b.x < 40) b.vx = Math.abs(b.vx); else if (b.x > 320) b.vx = -Math.abs(b.vx);
+        if (b.y < 60) b.y = 380;
+      }
+    },
+    eclater(b) {
+      bulles.splice(bulles.indexOf(b), 1); son.bulle(); etincelles(b.x, b.y, 6, '#a9dcf7');
+      if (!bulles.length && !e.fini) { e.fini = true; texte('Tout beau !', 180, 120, '#3fae6a'); coeurs(AX, AY - 60, 4); apres(0.7, etapeSuivante); }
+    },
+    dessiner(c) {
+      for (const b of bulles) {
+        c.fillStyle = '#d6f1ff66'; c.beginPath(); c.arc(b.x, b.y, b.r, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = '#7cc9ff'; c.lineWidth = 2.5; c.stroke();
+        circ(c, b.x - b.r * 0.35, b.y - b.r * 0.35, b.r * 0.22, '#ffffffdd');
+      }
+    },
+    down(x, y) { const b = bulles.find((q) => dist(q.x, q.y, x, y) < q.r + 14); if (b) e.eclater(b); },
+    touche(k, on, rep) { if (on && !rep && (k === ' ' || k === 'Enter') && bulles.length) e.eclater(bulles[0]); },
+  };
+  return e;
+}
+
+// --- Cartes à choisir (choix du soin, et souvenir du contrôle) ---
+function afficherCartes(ids, rappel) {
+  const zone = $('#cartes'); zone.innerHTML = '';
+  ids.forEach((id) => {
+    const b = document.createElement('button');
+    b.className = 'carte'; b.dataset.id = id; b.innerHTML = icone(id) + SOINS[id].nom;
+    b.addEventListener('click', () => { if (actif()) { premiereAction(); rappel(id, b); } });
+    zone.append(b);
+  });
+}
+function navigationCartes(e, k, on, rep) {
+  if (!on || rep) return;
+  const cartes = [...document.querySelectorAll('#cartes .carte')];
+  if (!cartes.length) return;
+  if (k.startsWith('Arrow')) {
+    const pas = k === 'ArrowLeft' ? -1 : k === 'ArrowRight' ? 1 : k === 'ArrowUp' ? -3 : 3;
+    e.sel = e.sel == null ? 0 : (e.sel + pas + cartes.length * 3) % cartes.length;
+  } else if (k === ' ' || k === 'Enter') {
+    if (e.sel == null) e.sel = 0; else cartes[e.sel].click();
+  }
+  cartes.forEach((b, i) => b.classList.toggle('focus', i === e.sel));
+}
+function soinsConnus(j) { return [...new Set(Object.keys(MAUX).filter((k) => MAUX[k].jour <= j).map((k) => MAUX[k].soin))]; }
+
+function etapeChoix() {
+  const p = patient, bon = MAUX[p.mal].soin;
+  const autres = melange(soinsConnus(partie.jour).filter((s) => s !== bon)).slice(0, partie.cfg.cartes - 1);
+  const ids = melange([bon, ...autres]);
+  const e = {
+    nom: 'choix', tuto: 'choix', fini: false, sel: null, bon,
+    consigne: 'Regarde la fiche : quel soin va le guérir ?',
+    debut() { afficherCartes(ids, e.choisir); },
+    choisir(id, b) {
+      if (e.fini || b.classList.contains('non')) return;
+      if (id === bon) {
+        e.fini = true; b.classList.add('bonne'); son.bien(); p.soinDonne = id;
+        etincelles(AX, AY - 70, 10); texte('Bonne idée !', 180, 70, '#3fae6a');
+        apres(0.6, etapeSuivante);
+      } else {
+        b.classList.add('non'); son.non(); perte(15); animal.secoue = 0.6;
+        texte('Ce n’est pas ça…', 180, 70, '#e5484d');
+      }
+    },
+    touche(k, on, rep) { navigationCartes(e, k, on, rep); },
+  };
+  return e;
+}
+
+// --- Contrôle : se souvenir du soin donné plus tôt ---
+function etapeMemoire() {
+  const p = patient, ref = p.ref, bon = ref.soinDonne || MAUX[ref.mal].soin;
+  const autres = melange(soinsConnus(partie.jour).filter((s) => s !== bon)).slice(0, 3);
+  const ids = melange([bon, ...autres]);
+  const e = {
+    nom: 'memoire', tuto: 'controle', fini: false, sel: null,
+    consigne: `Te souviens-tu ? Quel soin avais-tu donné à ${p.nom} ?`,
+    debut() { afficherCartes(ids, e.choisir); },
+    choisir(id, b) {
+      if (e.fini) return;
+      e.fini = true;
+      if (id === bon) {
+        b.classList.add('bonne'); p.bonus = 20; son.bien(); confettis(180, 90, 14);
+        texte('Bonne mémoire ! +20', 180, 70, '#3fae6a');
+      } else {
+        b.classList.add('non'); son.non();
+        const juste = document.querySelector(`#cartes .carte[data-id="${bon}"]`); if (juste) juste.classList.add('bonne');
+        texte(`C’était : ${SOINS[bon].nom}`, 180, 70, '#b7791f');
+      }
+      ajouterIndice('controle', `Soin d’avant : ${SOINS[bon].nom}`, false);
+      apres(1.4, etapeSuivante);
+    },
+    touche(k, on, rep) { navigationCartes(e, k, on, rep); },
+  };
+  return e;
+}
+
+// --- Donner le soin : glisser l'outil sur l'endroit qui brille ---
+function etapeSoin() {
+  const p = patient, s = MAUX[p.mal].soin, cible = monde(pointPartie(p.esp, SOINS[s].partie));
+  const e = {
+    nom: 'soin', tuto: 'soin', ox: 180, oy: 402, depart: { x: 180, y: 402 }, cible, prise: false, auto: false, applique: 0, fini: false,
+    consigne: `Glisse ${SOINS[s].geste} sur l’endroit qui brille.`,
+    debut() { const o = $('#outil'); o.innerHTML = icone(s); o.classList.remove('cache'); },
+    maj(dt) {
+      if (e.auto && !e.applique) {
+        e.ox += (cible.x - e.ox) * Math.min(1, dt * 6); e.oy += (cible.y - e.oy) * Math.min(1, dt * 6);
+        e.tester();
+      }
+      if (e.applique) {
+        e.applique += dt;
+        e.ox = cible.x + Math.sin(e.applique * 18) * 7; e.oy = cible.y + Math.cos(e.applique * 14) * 4;
+        if (Math.random() < dt * 20) etincelles(cible.x, cible.y, 1, '#a9dcf7');
+        if (e.applique > 1.1 && !e.fini) {
+          e.fini = true; p.soigne = true; $('#outil').classList.add('cache');
+          coeurs(cible.x, cible.y, 4); etapeSuivante();
+        }
+      }
+    },
+    tester() { if (!e.applique && dist(e.ox, e.oy, cible.x, cible.y) < 30) { e.applique = 0.001; e.prise = false; son.pose(); } },
+    dessiner(c) {
+      if (!e.applique) {
+        const g = 20 + Math.sin(temps * 6) * 5;
+        c.fillStyle = '#ffd23f55'; c.beginPath(); c.arc(cible.x, cible.y, g + 8, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = '#ffd23f'; c.lineWidth = 4; c.beginPath(); c.arc(cible.x, cible.y, g, 0, Math.PI * 2); c.stroke();
+      }
+    },
+    down(x, y) {
+      if (e.applique) return;
+      if (dist(x, y, cible.x, cible.y) < 40) e.auto = true;
+      else { e.prise = true; e.ox = x; e.oy = y - 10; }
+    },
+    move(x, y) { if (e.prise && !e.applique) { e.ox = x; e.oy = y - 10; e.tester(); } },
+    up() { e.prise = false; },
+    touche(k, on, rep) { if (on && !rep && (k === ' ' || k === 'Enter')) e.auto = true; },
+  };
+  return e;
+}
+
+// --- Câlins : toucher l'animal ---
+function etapeCalin() {
+  const p = patient;
+  const e = {
+    nom: 'calin', tuto: 'calin', n: 0, fini: false,
+    consigne: `Touche ${p.nom} pour lui faire 3 câlins !`,
+    calin() {
+      if (e.fini) return;
+      e.n++; son.calin(); coeurs(AX, AY - 70, 5); animal.joie = 0.8;
+      texte('♥'.repeat(e.n), AX, AY - 160, '#f2557a');
+      if (e.n >= 3) { e.fini = true; p.soinDonne = 'calin'; p.soigne = true; apres(0.7, etapeSuivante); }
+    },
+    dessiner(c) { if (!e.fini) { c.strokeStyle = '#f2557a88'; c.lineWidth = 4; c.setLineDash([8, 8]); c.beginPath(); c.arc(AX, AY - 20, 130 + Math.sin(temps * 5) * 4, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); } },
+    down(x, y) { if (dist(x, y, AX, AY) < 170) e.calin(); },
+    touche(k, on, rep) { if (on && !rep && (k === ' ' || k === 'Enter')) e.calin(); },
+  };
+  return e;
+}
+
+const FABRIQUES = { stetho: etapeStetho, loupe: etapeLoupe, thermo: etapeThermo, choix: etapeChoix, soin: etapeSoin,
+  calin: etapeCalin, pansement: etapePansement, brosse: etapeBrosse, bulles: etapeBulles, memoire: etapeMemoire };
+
+function construireEtapes(p) {
+  if (p.controle) return ['memoire', 'stetho'];
+  const l = [];
+  if (p.sale) l.push('brosse', 'bulles');
+  l.push('stetho', 'loupe');
+  if (partie.jour >= 2) l.push('thermo');
+  l.push('choix');
+  const s = MAUX[p.mal].soin;
+  l.push(s === 'pansement' ? 'pansement' : s === 'calin' ? 'calin' : 'soin');
+  return l;
+}
+
+// =====================================================================
+//  Déroulement d'une journée
+// =====================================================================
+function cacherEcrans() { document.querySelectorAll('.ecran, .voile').forEach((el) => el.classList.add('cache')); }
+
+function demarrerJournee(j) {
+  cacherEcrans(); fermerTuto(true);
+  jeuActif = true; enPause = false; bilanOuvert = false;
+  minuteurs = []; particules = []; textes = []; patient = null;
+  const cfg = cfgJour(j);
+  partie = { jour: j, cfg, file: genererPatients(j, cfg), gueris: [], score: 0 };
+  partie.max = partie.file.reduce((s, p) => s + 100 + (p.controle ? 20 : 0), 0);
+  scoreAffiche = 0; $('#outil').classList.add('cache');
+  viderCartes(); majIndices(); majHud(); redimensionner();
+  lancerEtape(etapeAnnonce());
+}
+
+function lancerEtape(e) {
+  etape = e;
+  if (e.debut) e.debut();
+  consigne(e.consigne || '');
+  if (e.tuto && !tutosVus.has(e.tuto)) montrerTuto(e.tuto);
+}
+
+function patientSuivant() {
+  const dispo = partie.file.filter((p) => !p.gueri && (!p.controle || p.ref.gueri));
+  if (!dispo.length) return finJournee();
+  if (partie.cfg.attente && dispo.length >= 2) { patient = null; majIndices(); lancerEtape(etapeAttente(dispo.slice(0, 3))); }
+  else arrivee(dispo[0]);
+}
+
+function arrivee(p) {
+  patient = p; p.iEtape = -1; p.etapes = construireEtapes(p);
+  etape = null; viderCartes();
+  animal.dx = 340; animal.cible = 0; animal.secoue = 0; animal.gigote = false; animal.joie = 0;
+  animal.bulle = p.controle ? `${p.nom} revient pour un contrôle.` : `${p.nom} ${MAUX[p.mal].phrase}`;
+  animal.bulleT = 2.2;
+  majIndices(); majHud();
+  consigne(p.controle ? `Revoilà ${nomComplet(p)} !` : `Voici ${nomComplet(p)}.`);
+  son.clic();
+  apres(1.3, etapeSuivante);
+}
+
+function etapeSuivante() {
+  if (!patient || patient.gueri) return;
+  viderCartes(); $('#outil').classList.add('cache');
+  patient.iEtape++;
+  if (patient.iEtape >= patient.etapes.length) return guerir();
+  lancerEtape(FABRIQUES[patient.etapes[patient.iEtape]]());
+}
+
+function guerir() {
+  const p = patient;
+  etape = null; p.gueri = true; p.soigne = true; animal.gigote = false; animal.joie = 3;
+  const pts = Math.max(30, 100 - p.perte) + p.bonus;
+  p.points = pts; partie.score += pts; partie.gueris.push(p);
+  if (!p.controle) { sauve.album[p.esp.id] = (sauve.album[p.esp.id] || 0) + 1; enregistrer(); }
+  const t = monde({ x: 0, y: -70 });
+  son.gueri(); confettis(t.x, t.y, 30); coeurs(t.x, t.y, 8); texte(`+${pts}`, t.x, t.y - 80, '#c2410c');
+  consigne(p.controle ? `${p.nom} est en pleine forme !` : `${p.nom} est ${accord(p, 'guéri', 'guérie')} ! Merci docteur !`);
+  apres(1.8, () => {
+    animal.cible = -380;
+    apres(0.7, () => { patient = null; majIndices(); patientSuivant(); });
+  });
+}
+
+function finJournee() {
+  const j = partie.jour, ratio = partie.score / partie.max;
+  const et = ratio >= 0.85 ? 3 : ratio >= 0.6 ? 2 : 1;
+  const avant = totalEtoiles(), ancien = sauve.journees[j];
+  const record = !ancien || partie.score > ancien.score;
+  sauve.journees[j] = { etoiles: Math.max(et, ancien ? ancien.etoiles : 0), score: Math.max(partie.score, ancien ? ancien.score : 0) };
+  if (j < 10) sauve.jourMax = Math.max(sauve.jourMax, j + 1);
+  const apresTot = totalEtoiles();
+  const nouveaux = RECOMPENSES.filter((r) => r.etoiles > avant && r.etoiles <= apresTot);
+  if (nouveaux.some((r) => r.id === 'jardin')) sauve.salle = 'jardin';
+  enregistrer();
+
+  bilanOuvert = true; etape = null;
+  son.fanfare(); confettis(180, 120, 50);
+  $('#bilan-titre').textContent = j < 10 ? `Journée ${j} terminée !` : 'Bravo, super vétérinaire !';
+  $('#bilan-info').textContent = `${partie.gueris.length} patients soignés · Étoiles en tout : ${apresTot} / 30`;
+  $('#bilan-record').textContent = record ? (ancien ? 'Nouveau record !' : 'Premier record !') : `Record : ${ancien.score} points`;
+  $('#bilan-record').className = record ? 'nouveau' : '';
+  $('#bilan-debloque').textContent = nouveaux.length ? 'Débloqué : ' + nouveaux.map((r) => r.nom).join(', ') + ' !' : '';
+  $('#b-suivant').classList.toggle('cache', j >= 10);
+  const ets = document.querySelectorAll('.et'); ets.forEach((s) => s.classList.remove('on'));
+  $('#bilan').classList.remove('cache');
+  // Compteur qui défile et étoiles qui s'envolent
+  const debut = performance.now(), total = partie.score;
+  const compter = () => {
+    const u = borne((performance.now() - debut) / 1200, 0, 1);
+    $('#bilan-score').textContent = Math.round(total * u);
+    if (u < 1 && bilanOuvert) requestAnimationFrame(compter);
+  };
+  requestAnimationFrame(compter);
+  for (let i = 0; i < et; i++) setTimeout(() => { if (bilanOuvert) { ets[i].classList.add('on'); son.etoile(); } }, 500 + i * 450);
+  ($('#b-suivant').classList.contains('cache') ? $('#b-rejouer') : $('#b-suivant')).focus();
+}
+
+// =====================================================================
+//  Tutoriels animés : une main montre le geste (3 étapes au plus)
+// =====================================================================
+let tuto = null;
+const TUTOS = {
+  stetho: (e) => [
+    { t: 'Un anneau se resserre autour du cœur qui bat.', m: [{ x: e.h.x + 90, y: e.h.y + 70 }, { x: e.h.x + 40, y: e.h.y + 40 }] },
+    { t: 'Touche quand l’anneau arrive sur le cœur (ou Espace) !', m: [{ x: e.h.x + 10, y: e.h.y + 30 }, { x: e.h.x, y: e.h.y + 4, a: 1 }, { x: e.h.x + 10, y: e.h.y + 30 }] },
+  ],
+  loupe: (e) => [
+    { t: 'Glisse la loupe sur chaque « ? » (ou flèches et Espace).', m: [{ x: e.pts[0].x + 60, y: e.pts[0].y + 60, a: 1 }, { x: e.pts[0].x, y: e.pts[0].y, a: 1 }, { x: e.pts[1].x, y: e.pts[1].y, a: 1 }] },
+    { t: 'Reste un instant sur le « ? ». Un « ! » rouge : c’est le bobo !', m: [{ x: e.pts[1].x, y: e.pts[1].y, a: 1 }, { x: e.pts[1].x + 2, y: e.pts[1].y + 2, a: 1 }] },
+  ],
+  thermo: () => [
+    { t: 'Appuie et garde le doigt posé (ou garde Espace enfoncé).', m: [{ x: 180, y: 330 }, { x: 180, y: 300, a: 1 }, { x: 180, y: 300, a: 1 }] },
+    { t: 'Quand l’animal gigote, lève vite le doigt !', m: [{ x: 180, y: 300, a: 1 }, { x: 200, y: 250 }, { x: 200, y: 250 }] },
+    { t: 'Puis appuie de nouveau jusqu’au bout de la mesure.', m: [{ x: 200, y: 250 }, { x: 180, y: 300, a: 1 }, { x: 180, y: 300, a: 1 }] },
+  ],
+  choix: (e) => [
+    { t: 'Lis la fiche : ce sont les indices trouvés.', m: [{ sel: '#indices' }, { sel: '#indices', dy: 6 }] },
+    { t: 'Touche le soin qui va avec les indices (ou flèches et Entrée) !', m: [{ sel: `#cartes .carte[data-id="${e.bon}"]`, dy: 20 }, { sel: `#cartes .carte[data-id="${e.bon}"]`, a: 1 }] },
+  ],
+  soin: (e) => [
+    { t: 'Glisse l’outil jusqu’à l’endroit qui brille.', m: [{ x: e.depart.x, y: e.depart.y, a: 1 }, { x: e.cible.x, y: e.cible.y, a: 1 }, { x: e.cible.x, y: e.cible.y }] },
+  ],
+  calin: () => [
+    { t: 'Touche l’animal pour lui faire des câlins (ou Espace).', m: [{ x: AX + 30, y: AY - 20 }, { x: AX, y: AY - 60, a: 1 }, { x: AX + 30, y: AY - 20 }] },
+  ],
+  pansement: (e) => [
+    { t: 'Pose le doigt sur « ici », puis suis les pointillés jusqu’à l’étoile.', m: e.pts.filter((q, i) => i % 20 === 0).map((q) => ({ x: q.x, y: q.y, a: 1 })) },
+  ],
+  brosse: (e) => {
+    const t = e.taches()[0];
+    return [{ t: 'Frotte chaque tache de boue avec la brosse.', m: [{ x: t.x - 20, y: t.y, a: 1 }, { x: t.x + 20, y: t.y - 8, a: 1 }, { x: t.x - 20, y: t.y + 8, a: 1 }, { x: t.x + 20, y: t.y, a: 1 }] }];
+  },
+  bulles: (e) => [
+    { t: 'Touche les bulles pour les éclater (ou Espace).', m: e.bulles.slice(0, 3).flatMap((b) => [{ x: b.x, y: b.y + 20 }, { x: b.x, y: b.y, a: 1 }]) },
+  ],
+  attente: (e) => {
+    const i = e.indexUrgent(), q = e.pos(i);
+    return [
+      { t: 'Plusieurs patients attendent. Regarde les étiquettes.', m: [{ x: q.x - 60, y: q.y + 40 }, { x: q.x + 60, y: q.y + 40 }] },
+      { t: 'Choisis d’abord celui qui a le plus mal : l’étiquette rouge !', m: [{ x: q.x, y: q.y + 30 }, { x: q.x, y: q.y, a: 1 }] },
+    ];
+  },
+  controle: () => [
+    { t: 'Ce patient revient pour un contrôle.', m: [{ x: AX + 20, y: AY }, { x: AX, y: AY - 40 }] },
+    { t: 'Retrouve le soin que tu lui avais donné !', m: [{ sel: '#cartes .carte', dy: 20 }, { sel: '#cartes .carte:last-child', dy: 20 }] },
+  ],
+};
+function montrerTuto(cle) {
+  if (!etape || !TUTOS[cle]) return;
+  tutosVus.add(cle);
+  tuto = { pas: TUTOS[cle](etape), i: 0, t: 0, age: 0 };
+  tutoActif = true;
+  $('#tuto').classList.remove('cache'); $('#main').classList.remove('cache');
+  majTexteTuto();
+}
+function majTexteTuto() {
+  $('#tuto-texte').textContent = tuto.pas[tuto.i].t;
+  $('#tuto-pas').textContent = tuto.pas.length > 1 ? `Étape ${tuto.i + 1} sur ${tuto.pas.length}` : '';
+}
+function fermerTuto(silence) {
+  if (!tutoActif && !tuto) return;
+  tutoActif = false; tuto = null;
+  $('#tuto').classList.add('cache'); $('#main').classList.add('cache'); $('#onde').style.opacity = 0;
+  if (!silence) son.clic();
+}
+function positionCle(k) {
+  if (k.sel) {
+    const el = document.querySelector(k.sel);
+    if (!el) return { x: largeur / 2, y: hauteur / 2 };
+    const r = el.getBoundingClientRect();
+    return { x: r.left + Math.min(r.width / 2, 60), y: r.top + r.height / 2 + (k.dy || 0) };
+  }
+  return versEcran(k.x, k.y);
+}
+function majTuto(dt) {
+  tuto.t += dt; tuto.age += dt;
+  const duree = 2.6;
+  if (tuto.t > duree) { tuto.t = 0; tuto.i = (tuto.i + 1) % tuto.pas.length; majTexteTuto(); }
+  const m = tuto.pas[tuto.i].m, u = borne(tuto.t / (duree * 0.85), 0, 1) * (m.length - 1);
+  const i = Math.min(m.length - 2, Math.floor(u)), f = m.length > 1 ? u - i : 0;
+  const a = positionCle(m[Math.max(0, i)]), b = positionCle(m[Math.min(m.length - 1, i + 1)]);
+  const x = a.x + (b.x - a.x) * f, y = a.y + (b.y - a.y) * f;
+  const appui = (m[Math.round(u)] || {}).a;
+  $('#main').style.transform = `translate(${x - 20}px, ${y - 3}px) scale(${appui ? 0.88 : 1})`;
+  const onde = $('#onde');
+  onde.style.opacity = appui ? 0.9 : 0;
+  onde.style.transform = `translate(${x}px, ${y}px) scale(${appui ? 1 + (tuto.t * 2 % 1) * 0.6 : 0.5})`;
+}
+
+// =====================================================================
+//  Boucle principale
+// =====================================================================
+let dernierT = performance.now();
+function boucle(t) {
+  const dt = Math.min(0.05, (t - dernierT) / 1000); dernierT = t;
+  if (jeuActif && !enPause) {
+    if (tutoActif && tuto) majTuto(dt);
+    else {
+      temps += dt;
+      if (!bilanOuvert) majMinuteurs(dt);
+      if (etape && etape.maj && !bilanOuvert) etape.maj(dt);
+      animal.dx += (animal.cible - animal.dx) * Math.min(1, dt * 5);
+      animal.secoue = Math.max(0, animal.secoue - dt);
+      animal.joie = Math.max(0, animal.joie - dt);
+      animal.bulleT = Math.max(0, animal.bulleT - dt);
+      secousse = Math.max(0, secousse - dt);
+      majParticules(dt);
+      if (partie) { scoreAffiche += Math.ceil((partie.score - scoreAffiche) * 0.15); $('#scorebox').textContent = `${scoreAffiche} pts`; }
+    }
+    dessiner();
+  }
+  requestAnimationFrame(boucle);
+}
+
+function optionsAnimal() {
+  const p = patient, bouge = Math.abs(animal.dx - animal.cible) > 6;
+  return {
+    x: AX + animal.dx, y: AY - (bouge ? Math.abs(Math.sin(temps * 12)) * 12 : 0), s: AS,
+    humeur: p.soigne || p.controle || animal.joie > 0 ? 'content' : 'triste',
+    secoue: animal.secoue, gigote: animal.gigote, tremble: p.mal === 'peur' && !p.soigne && !p.controle,
+    symptome: !p.soigne && !p.controle ? p.mal : null, boue: p.boue, pansement: p.pansement,
+  };
+}
+function dessinerScene(c) {
+  dessinerFond(c, etape && etape.sansTable);
+  if (patient && !(etape && etape.cacheAnimal)) dessinerAnimal(c, patient, optionsAnimal());
+}
+function dessiner() {
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, largeur, hauteur);
+  c.save();
+  c.translate(decX, decY); c.scale(echelle, echelle);
+  if (secousse > 0) c.translate(hasard(-1, 1) * secousse * 14, hasard(-1, 1) * secousse * 14);
+  dessinerScene(c);
+  if (patient && animal.bulleT > 0 && !(etape && etape.cacheAnimal)) bulle(c, animal.bulle, 180, 34);
+  if (etape && etape.dessiner) etape.dessiner(c);
+  dessinerParticules(c);
+  c.restore();
+  // Outil de soin (icône SVG posée au-dessus du canvas)
+  if (etape && etape.nom === 'soin') {
+    const taille = 58 * echelle, o = $('#outil');
+    o.style.width = o.style.height = taille + 'px';
+    o.style.transform = `translate(${decX + etape.ox * echelle - taille / 2}px, ${decY + etape.oy * echelle - taille / 2}px)`;
+  }
+}
+
+// =====================================================================
+//  Commandes : doigt, souris, clavier
+// =====================================================================
+const actif = () => jeuActif && !enPause && !tutoActif && !bilanOuvert;
+function premiereAction() { audio(); }
+
+toile.addEventListener('pointerdown', (ev) => {
+  if (!actif()) return;
+  ev.preventDefault(); premiereAction();
+  try { toile.setPointerCapture(ev.pointerId); } catch (e) { /* rien */ }
+  const p = coord(ev);
+  if (etape && etape.down) etape.down(p.x, p.y);
+});
+toile.addEventListener('pointermove', (ev) => { if (!actif()) return; const p = coord(ev); if (etape && etape.move) etape.move(p.x, p.y); });
+const relache = () => { if (etape && etape.up) etape.up(); };
+toile.addEventListener('pointerup', relache);
+toile.addEventListener('pointercancel', relache);
+
+const TOUCHES_JEU = [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+addEventListener('keydown', (ev) => {
+  const k = ev.key;
+  if (k === 'Escape' || k === 'p' || k === 'P') {
+    if (jeuActif && !bilanOuvert) { ev.preventDefault(); basculerPause(!enPause); }
+    return;
+  }
+  if (!jeuActif || enPause || bilanOuvert) return;   // les boutons des menus gardent leur comportement normal
+  if (tutoActif) {
+    if ((k === ' ' || k === 'Enter') && tuto && tuto.age > 0.5) { ev.preventDefault(); fermerTuto(); }
+    return;
+  }
+  if (TOUCHES_JEU.includes(k)) {
+    ev.preventDefault(); premiereAction();
+    if (etape && etape.touche) etape.touche(k, true, ev.repeat);
+  }
+});
+addEventListener('keyup', (ev) => {
+  if (!actif()) return;
+  if (TOUCHES_JEU.includes(ev.key) && etape && etape.touche) etape.touche(ev.key, false, false);
+});
+
+// Tutoriel : un toucher n'importe où pour passer.
+$('#tuto').addEventListener('pointerdown', (ev) => { ev.preventDefault(); if (tuto && tuto.age > 0.5) { premiereAction(); fermerTuto(); } });
+
+// ---------- Pause ----------
+function basculerPause(on) {
+  if (!jeuActif || bilanOuvert) return;
+  enPause = on;
+  $('#pause').classList.toggle('cache', !on);
+  if (on) { relache(); if (etape && etape.fl) Object.keys(etape.fl).forEach((k) => (etape.fl[k] = false)); }
+  if (ac) { try { on ? ac.suspend() : ac.resume(); } catch (e) { /* rien */ } }
+  if (on) $('#b-reprendre').focus();
+  dernierT = performance.now();
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && jeuActif && !enPause && !bilanOuvert) basculerPause(true); });
+$('#b-pause').addEventListener('click', (ev) => { ev.currentTarget.blur(); premiereAction(); basculerPause(true); });
+$('#b-reprendre').addEventListener('click', () => { basculerPause(false); son.clic(); });
+$('#b-recommencer').addEventListener('click', () => { basculerPause(false); demarrerJournee(partie.jour); });
+$('#b-accueil').addEventListener('click', () => { basculerPause(false); allerAccueil(); });
+
+// ---------- Bilan ----------
+$('#b-suivant').addEventListener('click', () => { son.clic(); demarrerJournee(Math.min(10, partie.jour + 1)); });
+$('#b-rejouer').addEventListener('click', () => { son.clic(); demarrerJournee(partie.jour); });
+$('#b-accueil2').addEventListener('click', () => { son.clic(); allerAccueil(); });
+
+// ---------- Son ----------
+document.querySelectorAll('.b-son').forEach((b) => b.addEventListener('click', (ev) => {
+  ev.currentTarget.blur();
+  sauve.son = !sauve.son; enregistrer(); majBoutonsSon();
+  if (sauve.son) son.clic();
+}));
+
+// =====================================================================
+//  Écrans : accueil, journées, album
+// =====================================================================
+function allerAccueil() {
+  jeuActif = false; bilanOuvert = false; enPause = false; fermerTuto(true);
+  etape = null; patient = null; minuteurs = [];
+  $('#outil').classList.add('cache');
+  cacherEcrans(); $('#accueil').classList.remove('cache');
+  dessinerApercu();
+  const tot = totalEtoiles();
+  $('#acc-etoiles').textContent = tot ? `★ ${tot} / 30 étoiles` : '';
+  $('#titre').innerHTML = (debloque('couronne') ? '♛ ' : '') + 'Le cabinet<br>du vétérinaire';
+}
+function dessinerApercu() {
+  const cv = $('#apercu'), x = cv.getContext('2d');
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, cv.width, cv.height);
+  x.save(); x.scale(600 / W, 400 / 300); x.translate(0, -140);
+  dessinerFond(x);
+  x.restore();
+  const tri = [['lapin', 120, 0.58], ['poulain', 480, 0.58], ['chaton', 300, 0.72]];
+  for (const [id, px, s] of tri) dessinerAnimal(x, creerPatient(ESPECES.find((e) => e.id === id), '', 'oreilles'), { x: px, y: 260 - (1 - s) * 60, s, humeur: 'content' });
+  // Stéthoscope autour du cou du chaton
+  x.strokeStyle = '#3b5b8a'; x.lineWidth = 7; x.lineCap = 'round';
+  x.beginPath(); x.moveTo(250, 240); x.quadraticCurveTo(300, 300, 350, 240); x.stroke();
+  circ(x, 300, 282, 12, '#9fb3c8');
+  cheminCoeur(x, 300, 40, 18); x.fillStyle = '#f2557a'; x.fill();
+}
+$('#b-jouer').addEventListener('click', () => {
+  premiereAction(); son.clic();
+  let j = 1;
+  while (j < sauve.jourMax && sauve.journees[j]) j++;
+  demarrerJournee(Math.min(10, j));
+});
+$('#b-journees').addEventListener('click', () => {
+  premiereAction(); son.clic();
+  const g = $('#grille-jours'); g.innerHTML = '';
+  for (let j = 1; j <= 10; j++) {
+    const b = document.createElement('button'), et = sauve.journees[j]?.etoiles || 0;
+    b.className = 'jour'; b.disabled = j > sauve.jourMax;
+    b.innerHTML = `Journée ${j}<span>${j > sauve.jourMax ? 'fermée' : '★'.repeat(et) + '☆'.repeat(3 - et)}</span>`;
+    b.addEventListener('click', () => { son.clic(); demarrerJournee(j); });
+    g.append(b);
+  }
+  cacherEcrans(); $('#journees').classList.remove('cache');
+  g.querySelector('.jour').focus();
+});
+$('#b-album').addEventListener('click', () => { premiereAction(); son.clic(); ouvrirAlbum(); });
+function ouvrirAlbum() {
+  const g = $('#grille-album'); g.innerHTML = '';
+  for (const esp of ESPECES) {
+    const n = sauve.album[esp.id] || 0, d = document.createElement('div'), cv = document.createElement('canvas');
+    d.className = 'fiche'; cv.width = cv.height = 120;
+    const x = cv.getContext('2d');
+    dessinerAnimal(x, creerPatient(esp, '', 'oreilles'), { x: 60, y: 66, s: 0.3, humeur: n ? 'content' : 'neutre' });
+    if (!n) { x.globalCompositeOperation = 'source-atop'; x.fillStyle = '#9aa7b8'; x.fillRect(0, 0, 120, 120); x.globalCompositeOperation = 'source-over'; }
+    d.append(cv);
+    const t = document.createElement('div');
+    t.textContent = n ? `${esp.nom} ×${n}` : '?';
+    d.append(t); g.append(d);
+  }
+  const tot = totalEtoiles();
+  $('#liste-recomp').innerHTML = RECOMPENSES.map((r) => `<div class="${tot >= r.etoiles ? 'ok' : 'non'}">${tot >= r.etoiles ? '✓' : '★ ' + r.etoiles} — ${r.nom}</div>`).join('');
+  const bs = $('#b-salle');
+  bs.classList.toggle('cache', !debloque('jardin'));
+  bs.textContent = sauve.salle === 'jardin' ? 'Salle : le jardin' : 'Salle : la clinique';
+  cacherEcrans(); $('#album').classList.remove('cache');
+}
+$('#b-salle').addEventListener('click', () => {
+  son.clic(); sauve.salle = sauve.salle === 'jardin' ? 'clinique' : 'jardin'; enregistrer(); ouvrirAlbum();
+});
+document.querySelectorAll('[data-retour]').forEach((b) => b.addEventListener('click', () => { son.clic(); allerAccueil(); }));
+
+// ---------- Démarrage ----------
+new ResizeObserver(() => { redimensionner(); if (jeuActif) dessiner(); }).observe($('#zone'));
+redimensionner();
+majBoutonsSon();
+allerAccueil();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
