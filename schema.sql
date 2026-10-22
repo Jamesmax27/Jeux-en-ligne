@@ -16,3 +16,20 @@ CREATE TABLE IF NOT EXISTS votes (
 
 -- Accélère /api/scores?pays=FR
 CREATE INDEX IF NOT EXISTS votes_pays ON votes (country, game_id);
+
+-- --------------------------------------------------------------------------
+-- Ajouts faits à la main dans la base en ligne (jeux-votes), sans migration
+-- dans ce dépôt — rappel des colonnes utilisées par les fonctions :
+--
+--   votes.visiteur : empreinte SHA-256 de l'adresse IP + IP_SALT (jamais l'IP).
+--
+--   sessions (une ligne par partie, remplie par /api/session, lue par /api/tendances) :
+--     id             identifiant (laissé à la base s'il est entier, sinon UUID)
+--     jeu_id         id du jeu
+--     debut          début de la partie (millisecondes si colonne numérique, sinon date ISO)
+--     duree_secondes durée, de 2 s à 3 h
+--     pays           request.cf.country, « XX » si inconnu
+--     appareil       « mobile » ou « desktop »
+--     erreur_js      première erreur JavaScript du jeu, ou NULL
+--     visiteur       même empreinte que votes.visiteur
+-- --------------------------------------------------------------------------

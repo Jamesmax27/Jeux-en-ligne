@@ -26,7 +26,7 @@
 | --- | --- |
 | Code et jeux | Dépôt GitHub : https://github.com/Jamesmax27/Jeux-en-ligne |
 | Hébergement | Cloudflare Pages, déploiement automatique à chaque push sur `main` |
-| Serveur de votes | Cloudflare Pages Functions (`functions/api/`) |
+| Serveur de votes et suivi des parties | Cloudflare Pages Functions (`functions/api/`) |
 | Base de données | Cloudflare D1 (SQLite), liée au projet sous le nom `DB` |
 | Anti-robot | Cloudflare Turnstile (sur le premier vote d'un appareil) |
 | Hors ligne | PWA : `manifest.webmanifest` + service worker `sw.js` |
@@ -51,9 +51,13 @@ Jeux-en-ligne/
 │     ├─ index.html
 │     ├─ cover.webp
 │     └─ game.json
-├─ functions/api/
-│  ├─ vote.js               POST /api/vote
-│  └─ scores.js             GET  /api/scores
+├─ functions/
+│  ├─ _commun.js            outils communs (empreinte visiteur, jeux publiés, format de la table sessions)
+│  └─ api/
+│     ├─ vote.js            POST /api/vote
+│     ├─ scores.js          GET  /api/scores
+│     ├─ session.js         POST /api/session (temps de jeu d'une partie)
+│     └─ tendances.js       GET  /api/tendances (jeux les plus joués sur 7 jours)
 ├─ scripts/
 │  ├─ build-catalog.mjs     lit games/*/game.json → public/catalog.json (+ copie des jeux)
 │  ├─ genres.mjs            liste fermée des genres (identique à CONSIGNES-JEU.md)
@@ -89,6 +93,10 @@ Fichiers ajoutés pour les 5 langues (détails dans `I18N.md`) :
 - `public/i18n/i18n.js` : module commun de traduction (site et jeux, recopié dans chaque jeu) ; `public/i18n/site/{fr,en,es,pt,de}.json` : textes du site ; `public/langue.js` : sélecteur de langue, SEO (`hreflang`), noms traduits du catalogue.
 - `scripts/check-i18n.js` : vérification des traductions (bloquante dans `validate.yml`) ; `scripts/i18n-jeu.mjs` : recopie le module commun dans les jeux ; `scripts/jaquette-sans-texte.mjs` : jaquette sans texte.
 - Le build génère aussi `public/sitemap.xml` et `public/robots.txt` (variable `SITE_URL`).
+
+Fichiers ajoutés pour le suivi des parties et les Tendances (section 7) :
+- `public/suivi.js` : suivi des parties côté lanceur, et script commun `SCRIPT_ERREURS` placé par le lanceur en tête de chaque jeu.
+- `functions/_commun.js`, `functions/api/session.js`, `functions/api/tendances.js`.
 
 Le lanceur lit le jeu à l'adresse `games/<id>/?v=<version>` (Cloudflare retire `index.html` des adresses), puis l'affiche dans le cadre via `srcdoc` (voir section 6). Augmenter `version` dans `game.json` à chaque modification d'un jeu.
 
@@ -157,13 +165,16 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 
 - `play.js` lit `games/<id>/?v=<version>` puis l'affiche dans une iframe `sandbox="allow-scripts"` (sans `allow-same-origin`) via `srcdoc`, en plaçant en tête la règle de sécurité `CSP_JEU`. Raison : un tel cadre échappe au service worker ; chargé par son adresse, le jeu ne marcherait pas hors ligne.
 - Langue : le lanceur ajoute `window.JEL_LANG` au début du `srcdoc` (le cadre isolé n'a pas de stockage) ; un changement de langue dans le jeu (message `jel-langue`) est enregistré et relance le jeu.
+- Suivi des parties : le lanceur ajoute aussi, avant le code du jeu, `SCRIPT_ERREURS` (`public/suivi.js`), qui lui transmet les erreurs JavaScript du jeu (message `jel-erreur`) ; c'est le lanceur qui mesure la durée et l'envoie (les jeux n'ont aucun accès réseau). Aucun jeu ne contient donc de code de suivi.
 - Barre supérieure : retour au catalogue, plein écran, 👍, 👎.
 - Vote : toucher le même pouce une 2e fois annule ; toucher l'autre remplace.
 - Au retour au catalogue après ≥ 1 minute de jeu, proposer discrètement de voter.
 
 ## 7. Votes et base de données
 
-Une seule table, `votes` (structure complète dans `schema.sql`) : `game_id`, `voter`, `value` (1 / -1), `country`, `created_at` ; clé primaire `(game_id, voter)`. Les totaux sont calculés à la lecture (pas de table `scores`).
+Base D1 `jeux-votes`, deux tables (rappel dans `schema.sql`) :
+- `votes` : `game_id`, `voter`, `value` (1 / -1), `country`, `created_at`, `visiteur` ; clé primaire `(game_id, voter)`. Les totaux sont calculés à la lecture (pas de table `scores`).
+- `sessions` (créée à la main, sans migration dans le dépôt) : `id`, `jeu_id`, `debut`, `duree_secondes`, `pays`, `appareil`, `erreur_js`, `visiteur`. Ses types sont lus une fois par instance (`lireFormatSessions` dans `functions/_commun.js`).
 
 - `POST /api/vote` (`functions/api/vote.js`) : corps `{ "gameId": "...", "value": 1 | -1 | 0, "voterId": "...", "turnstileToken": "..." }`. `0` = annulation (la ligne est supprimée). Jeton Turnstile vérifié à **chaque** vote (secret `TURNSTILE_SECRET`, action `vote`). Renvoie les nouveaux totaux du jeu.
 - `GET /api/scores` (`functions/api/scores.js`) : renvoie `{ "<gameId>": { "up": n, "down": n, "score": x, "semaine": n }, ... }` (`semaine` = votes des 7 derniers jours, votes modifiés compris), cache 5 minutes. Filtre pays optionnel : `?pays=FR`. L'en-tête `X-Pays` donne le pays détecté du visiteur (absent s'il est inconnu).
@@ -171,7 +182,15 @@ Une seule table, `votes` (structure complète dans `schema.sql`) : `game_id`, `v
 - `country` : en-tête `CF-IPCountry` (« XX » si inconnu). `created_at` : date du dernier vote en millisecondes.
 - Navigateur (`public/votes.js`) : le vote est enregistré d'abord sur l'appareil, puis envoyé ; sans réseau ou si l'API ne répond pas, il reste en file d'attente et part au retour du réseau ou à la visite suivante. Turnstile n'est chargé qu'au moment d'envoyer un vote.
 - Catalogue sans API (hors connexion, API en panne) : tri par nouveautés, sans compteurs de votes ; le site reste utilisable. Les votes reviennent dès le retour du réseau.
+- `visiteur` (votes et sessions) : empreinte SHA-256 de `CF-Connecting-IP` + secret `IP_SALT` (`crypto.subtle`, `empreinteVisiteur` dans `functions/_commun.js`) ; l'adresse IP brute n'est jamais enregistrée. `null` si le secret manque. Elle ne change rien au comptage des votes.
 - À faire : limite de débit (~30 votes par heure et par adresse IP), proposition de vote au retour au catalogue.
+
+**Suivi des parties et Tendances** :
+- Lanceur (`public/suivi.js`) : une partie commence à l'ouverture du jeu (ou au retour sur la page) et se termine quand la page est cachée ou quittée (`visibilitychange`, `pagehide`) ; elle est alors envoyée par `navigator.sendBeacon` à `/api/session` avec la première erreur JavaScript du jeu. Parties de moins de 2 s, de plus de 3 h ou faites hors connexion : non envoyées.
+- `POST /api/session` (`functions/api/session.js`) : corps `{ "jeuId": "...", "duree": secondes, "erreur": "..." | null }`. Vérifie le jeu (catalogue) et la durée (entier de 2 s à 3 h) ; `debut` = maintenant − durée (horloge du serveur) ; `pays` = `request.cf.country` (« XX » si inconnu) ; `appareil` = `mobile` ou `desktop` (User-Agent) ; `visiteur` (ci-dessus). Répond 204.
+- `GET /api/tendances` (`functions/api/tendances.js`) : `{ "jours": 7, "jeux": [ { "id", "sessions", "tempsTotal", "tempsMoyen" } ] }`, jeux classés par temps total joué sur 7 jours (secondes, 50 au plus), cache 5 minutes.
+- Le service worker laisse passer `/api/*` directement au réseau (`addRoutes`, Chrome et Edge) : sinon, la durée envoyée en quittant la page se perd.
+- Ces données ne suppriment ni ne déplacent aucun jeu : elles servent seulement à la section « Tendances ».
 
 ## 8. Classement
 
@@ -191,6 +210,7 @@ Menu de tri du catalogue (égalités départagées par le score, puis le nombre 
 - **Nouveautés** : tous les jeux, du plus récent au plus ancien (badge « Nouveau » pendant 7 jours).
 
 - Portée : **Monde** ou **Mon pays** (pays donné par l'en-tête `X-Pays`). Si mon pays a moins de 20 votes en tout, le classement Monde est affiché, avec une phrase d'explication.
+- **Tendances** tout en haut de l'accueil (sous la recherche) : les 10 jeux les plus joués des 7 derniers jours (`/api/tendances`, réglage `TENDANCES_NOMBRE` dans `public/app.js`), en une bande de cartes qui défile, avec leur rang, le temps total joué, le nombre de parties et le temps moyen. Indépendantes des filtres ; cachées sans API ou tant qu'aucune partie n'est enregistrée.
 - **Regroupements en tuiles** en haut de l'accueil (`public/regroupements.js`), combinables entre eux, avec le tri et la recherche ; chaque tuile compte ses jeux (selon les autres filtres) :
   - raccourcis : 🎲 **Au hasard** (lance un jeu parmi ceux affichés), 👍 **J'ai aimé** (mes votes 👍 sur l'appareil), 📶 **Hors ligne** (jeux gardés sur l'appareil) ;
   - **âge** (d'après `ages`) : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et + ;
@@ -208,7 +228,7 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 - Jaquettes : mises en cache au fur et à mesure qu'elles sont affichées.
 - Jeux : mis en cache à leur première ouverture, ou via le bouton « Rendre disponible hors ligne ».
 - **Ne jamais pré-télécharger tout le catalogue.**
-- Stratégie : « réseau d'abord » pour `catalog.json` (avec repli sur le cache), « cache d'abord » pour les jeux et jaquettes (avec contrôle de `version`). `/api/scores` n'est pas gardé : hors connexion, le catalogue trie par nouveautés, sans compteurs.
+- Stratégie : « réseau d'abord » pour `catalog.json` (avec repli sur le cache), « cache d'abord » pour les jeux et jaquettes (avec contrôle de `version`). `/api/scores` et `/api/tendances` ne sont pas gardés : hors connexion, le catalogue trie par nouveautés, sans compteurs ni Tendances.
 - La coquille (pages, CSS, JS, logo) est aussi en « réseau d'abord » (copie gardée servie après 3 s sans réponse) : les mises à jour du site arrivent dès la visite suivante.
 - Caches (`public/sw.js`) : `jel-coquille-<VERSION>`, `jel-donnees-v2` (catalogue), `jel-jeux-v1` (jeux ouverts et leur jaquette), `jel-jaquettes-v1` (jaquettes vues, 300 au plus). Augmenter `VERSION` dans `sw.js` quand la liste de la coquille change ; les jeux gardés sont conservés.
 - Hors connexion, un vote affiche « Pas de connexion : ton vote sera envoyé plus tard » ; un jeu jamais ouvert affiche une explication au lieu d'une erreur.
@@ -248,7 +268,7 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
 - Pousser directement sur `main`, fusionner des pull requests autrement que par la vérification de la boucle de nuit (`boucle-de-nuit.yml`), ou supprimer des jeux existants.
 - Écrire dans `idees.json` ou `idees-archive.json` depuis une tâche de fabrication de jeu (réservé aux étapes b et e de la boucle et au formulaire d'idées).
 - Modifier `public/catalog.json` à la main.
-- Ajouter des traceurs, des comptes utilisateurs ou une collecte de données personnelles.
+- Ajouter des traceurs, des comptes utilisateurs ou une collecte de données personnelles (seul existe le suivi anonyme des parties décidé par le propriétaire, section 7 : ne pas l'étendre sans son accord).
 - Mettre de la publicité ailleurs que dans l'emplacement prévu (`public/pub.js`, en bas du catalogue), ou l'activer : c'est une décision du propriétaire (voir `PUBLICITE.md`).
 
 ## 13. Feuille de route
@@ -279,6 +299,7 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
 
 - Internationalisation (5 langues) — fait sur la branche `i18n` : module `public/i18n/i18n.js`, textes du site, sélecteur de langue (en-tête et dans chaque jeu), SEO (`hreflang`, `sitemap.xml`), 29 jeux traduits, jaquettes refaites sans texte (titre traduit affiché en bandeau par le site), `check-i18n.js` bloquant dans `validate.yml`, règles dans `CONSIGNES-JEU.md`. Reste : régler `SITE_URL` avec le nom de domaine. Détails : `I18N.md`.
 - Traduction et qualité dans la boucle de nuit — fait (branche `boucle-traduction-qualite`) : nouveaux jeux de 20 niveaux au moins (`"consignes": 2`, `window.JEL_NIVEAUX` vérifié par le robot), présentation riche dans `game.json` (meta description de la page du jeu), textes écrits dans `i18n-jeu/<id>/*.json` puis assemblés (`i18n-jeu.mjs --assembler`), traduction dans la même session d'après `fr.json` seul, `check-i18n.js` bloquant avec une seule réparation ciblée, jaquette avec texte refaite seule après la relecture. Reste : premier passage réel de la boucle (lancement manuel, 1 jeu) une fois fusionné.
+- Suivi des parties et Tendances — fait : `public/suivi.js` (durée et erreurs JS, script d'erreurs placé par le lanceur dans tous les jeux), `functions/api/session.js`, `functions/api/tendances.js`, `functions/_commun.js` (dont `jeuExiste`, sorti de `vote.js`), colonne `visiteur` remplie par `vote.js`, section « Tendances » de l'accueil (5 langues), `/api/*` hors du service worker (coquille `v5`), règle dans `CONSIGNES-JEU.md`. Testé en local (Chrome : téléphone et ordinateur ; fonctions sur une base SQLite de test, table `sessions` avec `id` entier ou texte). Reste : vérifier en ligne que les sessions arrivent dans D1 ; pistes : index sur `sessions (debut)` si la table grossit, limite de débit contre les fausses sessions, mention du suivi dans les pages légales.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 
