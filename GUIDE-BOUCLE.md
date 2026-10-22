@@ -4,15 +4,17 @@
 
 Deux fois par nuit (vers 1 h et 6 h du matin à Paris en hiver, 2 h et 7 h en été), GitHub lance la **boucle de nuit**, sans votre ordinateur. Chaque passage suit 5 étapes :
 
-1. **Idées** : s'il reste moins de 15 idées en attente dans `idees.json`, un agent Claude en propose de nouvelles. Il lit un résumé du catalogue (titre, genres et univers de chaque jeu) et vise les genres, les univers et surtout les combinaisons genre × univers qui ont peu de jeux. Il choisit uniquement dans les listes fermées de `public/taxonomie.js` : une idée avec un genre ou un univers inventé est refusée. Ces idées ont la source `agent`.
-2. **Choix** : 5 idées passent « en cours » : d'abord les vôtres (source `humain`), dans l'ordre de la liste, puis celles de l'agent. Vos idées restent toujours prioritaires.
-3. **Fabrication** : 5 agents créent les 5 jeux en même temps. Chacun écrit un cahier de conception, code le jeu, y joue avec le robot (captures d'écran), se relit, puis ouvre une **pull request**. La fiche du jeu reprend le genre et les univers de l'idée. Rien n'est encore en ligne.
-4. **Vérification** : pour chaque pull request, le robot rejoue le jeu (chargement, erreurs, téléphone, toucher, hors ligne, fiche du catalogue, genres et univers dans les listes), puis Claude le relit avec la grille de `CONSIGNES-JEU.md` (section 7). Le résultat arrive en commentaire.
-   - **Tout est bon** : la pull request est fusionnée. Le jeu est en ligne quelques minutes plus tard.
+1. **Idées** : s'il reste moins de 15 idées en attente dans `idees.json`, un agent Claude en propose de nouvelles. Il lit un résumé du catalogue (titre, genres et univers de chaque jeu, âges déjà couverts) et vise les genres, les univers et surtout les combinaisons genre × univers qui ont peu de jeux. Il choisit uniquement dans les listes fermées de `public/taxonomie.js` : une idée avec un genre ou un univers inventé est refusée. Il donne aussi l'âge conseillé (champ `ages`, « 6+ »). Ces idées ont la source `agent`.
+2. **Choix** : 5 idées passent « en cours » : d'abord celles de votre page privée `/idees` (la plus ancienne en tête), puis vos autres idées (source `humain`), dans l'ordre de la liste, puis celles de l'agent. Vos idées restent toujours prioritaires.
+3. **Fabrication** : 5 agents créent les 5 jeux en même temps. Chacun écrit un cahier de conception, code le jeu, y joue avec le robot (captures d'écran), se relit, puis écrit les **textes de la page du jeu** d'après le jeu fini (titre et description pour Google, « À propos du jeu », « Comment jouer », compétences, texte de la jaquette), les traduit avec le reste du jeu, les contrôle (`scripts/regles-seo.mjs`, puis `scripts/verifier-seo.mjs`) et ouvre une **pull request**. La fiche du jeu reprend le genre, les univers et l'âge de l'idée. La description de la pull request indique si le référencement est conforme ; s'il ne l'est pas, elle est ouverte quand même et c'est la vérification qui refusera le jeu. Rien n'est encore en ligne.
+4. **Vérification** : pour chaque pull request, le robot rejoue le jeu (chargement, erreurs, téléphone, toucher, hors ligne, fiche du catalogue, genres et univers dans les listes, traductions, référencement de la page du jeu), puis Claude le relit avec la grille de `CONSIGNES-JEU.md` (section 7), dont le point « Page du jeu » : textes fidèles au jeu, sans promesse fausse ni texte passe-partout. Le résultat arrive en commentaire.
+   - **Tout est bon** : la pull request est fusionnée. Le jeu est en ligne quelques minutes plus tard, avec sa page dans les 5 langues.
    - **Sinon** : la pull request est fermée et l'idée revient en attente ; un nouveau jeu sera tenté à un prochain passage. Au 3e jeu refusé pour la même idée, celle-ci est mise de côté.
 5. **Mise à jour** : les idées des jeux publiés passent dans `idees-archive.json` (statut `faite`, avec le nom du jeu).
 
 Un passage dure en général 1 h 30 à 4 h. Si le premier n'est pas fini à l'heure du second, le second attend.
+
+**Le référencement en bref** : chaque jeu a sa page (`/jeux/<id>/`, `/en/games/<id>/`…), générée à chaque publication à partir de sa fiche `game.json`. Ses textes ont des longueurs à respecter dans les 5 langues (détail dans `CONSIGNES-JEU.md`, section 4). Un jeu ajouté depuis le 24 octobre 2026 dont les textes ne sont pas conformes n'est pas publié : c'est pourquoi la vérification le refuse avant.
 
 ---
 
@@ -35,6 +37,7 @@ Une idée ressemble à ceci :
   "genre": "coloriage",
   "genres_secondaires": ["calcul"],
   "univers": ["abstrait"],
+  "ages": "4+",
   "source": "humain",
   "date_ajout": "2026-10-19",
   "statut": "en_attente",
@@ -47,8 +50,10 @@ Une idée ressemble à ceci :
 - `genre` : le genre principal, un seul.
 - `genres_secondaires` (facultatif) : 0 à 2 autres genres. Absent : l'agent créateur en ajoute s'il le juge utile.
 - `univers` : 0 à 2 univers. Liste vide `[]` : l'agent les choisit.
-- Mettez l'âge conseillé à la fin de la description (« Âge conseillé : 6+. »).
+- `ages` : l'âge conseillé, sous la forme `"6+"`. Le jeu reprendra exactement cet âge (la vérification refuse un jeu qui en a un autre). Sans ce champ, il est lu à la fin de la description (« Âge conseillé : 6+. »), comme pour les idées plus anciennes ; sans l'un ni l'autre, l'agent créateur le choisit.
+- Rien à écrire pour Google : le titre et la description pour les moteurs de recherche, le texte de la page du jeu, les compétences et le texte de la jaquette sont rédigés par l'agent créateur d'après le jeu fini.
 - `"essais"` (s'il apparaît) : nombre de jeux refusés pour cette idée. À 3, elle n'est plus choisie.
+- `"issue"` (s'il apparaît) : numéro de la demande GitHub d'où vient l'idée (page privée `/idees`).
 
 **Modifier la file à la main** : ouvrez `idees.json`, ajoutez, supprimez ou déplacez des idées (l'ordre de la liste est l'ordre de fabrication), puis « Commit to main » et « Push origin » dans GitHub Desktop. Ne touchez pas aux idées `"en_cours"` pendant qu'une boucle tourne. Pour vérifier le fichier sur votre PC : `npm run idees` (et `npm run taxonomie` pour les genres et univers).
 
@@ -110,9 +115,9 @@ Ce jeton permet à GitHub d'utiliser votre abonnement Claude. Il est valable un 
 
 ## Au quotidien : suivre les jeux (2 minutes)
 
-- **Ce qui s'est passé cette nuit** : onglet **Actions** → **Créer des jeux (boucle de nuit)** → le dernier passage. Le résumé en bas de page liste chaque pull request : fusionnée, refusée, ou en attente.
+- **Ce qui s'est passé cette nuit** : onglet **Actions** → **Créer des jeux (boucle de nuit)** → le dernier passage. Le résumé en bas de page liste chaque pull request : fusionnée, refusée, ou en attente. Pour une pull request refusée, il donne directement la raison : les 3 premiers problèmes (plus le premier problème de référencement s'il n'en fait pas partie), puis « (+ N autre(s)) ». Un avertissement signale aussi, dès la fabrication, un jeu dont les textes de référencement ne sont pas conformes.
 - **Jeux fusionnés** (onglet Pull requests, filtre « Closed », pastille violette) : ils sont en ligne. Le commentaire donne la grille point par point et quelques conseils.
-- **Jeux refusés** (pull request fermée, pastille rouge) : le commentaire liste les problèmes. L'idée est déjà remise en attente.
+- **Jeux refusés** (pull request fermée, pastille rouge) : le commentaire liste tous les problèmes ; ceux du référencement commencent par « Référencement : ». L'idée est déjà remise en attente.
 - **« ⚠️ Vérification interrompue »** (limite d'utilisation de l'abonnement, panne…) : rien n'est décidé, la pull request reste ouverte et sera vérifiée au passage suivant. Pour ne pas attendre : **Actions** → **Créer des jeux (boucle de nuit)** → **Run workflow** avec **0** jeu.
 
 ## Fusion automatique : la couper ou la remettre
@@ -136,15 +141,21 @@ Nom : `idee-jeu`, puis **Create label**. Sans cette étiquette, le formulaire ne
 **À chaque idée :**
 
 1. Sur le téléphone (application GitHub ou navigateur) : dépôt → **Issues** → **New issue** → **Nouvelle idée de jeu**.
-2. Le titre de la demande devient le titre du jeu. Remplissez le principe, le genre, l'âge et, si vous voulez, 1 ou 2 univers (listes déroulantes : rien d'autre n'est possible ; 3 univers cochés = idée refusée avec un message).
+2. Le titre de la demande devient le titre du jeu. Remplissez le principe, le genre, l'âge et, si vous voulez, 1 ou 2 univers (listes déroulantes : rien d'autre n'est possible ; 3 univers cochés = idée refusée avec un message). Le champ « Compétences travaillées » est facultatif : quelques mots, ajoutés à la description comme simple indication.
 3. Cochez « Le fabriquer cette nuit en priorité » pour la placer en tête de la file ; sinon, elle s'ajoute à la fin des idées humaines (toujours avant celles de l'agent).
 4. Envoyez. Moins d'une minute plus tard, un commentaire confirme l'ajout et la demande se ferme.
 
 Bon à savoir :
 
+- Rien à écrire pour Google : les textes de la page du jeu (titre et description pour les moteurs de recherche, présentation, règles, compétences, texte de la jaquette) sont rédigés d'après le jeu fini.
+- L'âge choisi est rangé dans le champ `ages` de l'idée : le jeu aura exactement cet âge.
 - Seules vos demandes (et celles des collaborateurs du dépôt) sont traitées. Les autres restent ouvertes, sans effet.
 - Une idée dont le titre existe déjà (idée prévue, idée réalisée ou jeu du site) n'est pas ajoutée.
 - Rien ne se passe ? Onglet **Actions** → **Idée de jeu** → cliquez sur le passage en rouge.
+
+### Depuis la page privée `/idees` du site
+
+La page `/idees` (protégée par Cloudflare Access, absente du catalogue et des moteurs de recherche) envoie aussi une idée : titre, genre, **âge** (obligatoire : 4+, 5+, 6+, 7+, 8+, 10+ ou 12+), **univers** (facultatif, 2 au plus ; « Autre » seul) et description. Elle crée une demande GitHub avec l'étiquette `idee-perso`. Au passage suivant, la boucle l'ajoute à `idees.json` (avec son âge et ses univers) et la fabrique **avant toutes les autres** ; la demande se ferme avec le lien de la pull request du jeu. Une valeur illisible (âge, univers hors liste) est écartée avec un message, l'idée est gardée.
 
 ## Faire corriger un jeu proposé
 
@@ -160,6 +171,8 @@ Bon à savoir :
 
 - Seuls les commentaires des comptes Jamesmax27 et celest27 déclenchent une correction (liste dans `corriger-jeu.yml`). Le compte celest27 doit être collaborateur du dépôt avec l'accès en écriture, sinon Claude refuse la demande.
 - Claude ne peut modifier que le dossier du jeu de la pull request. La jaquette automatique est refaite ; une jaquette faite à la main est gardée.
+- Si le jeu change (règles, touches, niveaux, écran titre…), ou si vous le demandez, Claude met aussi à jour les textes de la page du jeu dans les 5 langues (`node scripts/i18n-jeu.mjs --meta`, qui pose la date de modification `maj`), puis contrôle le référencement.
+- Référencement non conforme : la correction est refusée pour un jeu de la boucle ou un jeu ajouté depuis le 24 octobre 2026 ; pour un jeu plus ancien, elle est ajoutée quand même, avec une ligne ℹ️ (sa page reste seulement hors des moteurs de recherche). Une panne du contrôle ne bloque jamais.
 - Si le contrôle qualité échoue encore après 3 essais, rien n'est ajouté : la réponse donne le rapport.
 - Une demande à la fois par pull request : la suivante attend la fin de la précédente.
 - Comme la boucle de nuit, chaque correction consomme votre abonnement Claude.
@@ -180,6 +193,9 @@ Bon à savoir :
 | Vérifier `idees.json` sur mon PC | `npm run idees` |
 | Contrôler un jeu sur mon PC | `npm run check` (ou `npm run check -- mon-jeu`) |
 | Voir un jeu joué au hasard, avec captures | `npm run check -- --jouer mon-jeu` (captures dans `captures/mon-jeu/`) |
+| Contrôler les textes de la page d'un jeu | `npm run seo-textes -- mon-jeu` (sans rien construire ; `npm run seo-textes -- --categories` pour les pages de catégories) |
+| Contrôler le référencement de tout le site | `npm run seo` (construit le site, puis contrôle toutes les pages, le sitemap et robots.txt) ; `npm run seo -- mon-jeu` : seules les erreurs de ce jeu bloquent |
+| Contrôler le site en ligne | `node scripts/verifier-seo.mjs --en-ligne` (ajoute des contrôles sur https://freemicrogames.com/) |
 
 ## Bon à savoir
 
@@ -187,5 +203,5 @@ Bon à savoir :
 - **Minutes GitHub** : gratuites et illimitées pour un dépôt public ; pour un dépôt privé, le quota mensuel du compte s'applique (Settings → Billing).
 - **Publications Cloudflare** : chaque jeu fusionné déclenche une publication du site (500 par mois avec l'offre gratuite, soit environ 10 par nuit au maximum ici). Les mises à jour de la file d'idées n'en déclenchent pas (`[CF-Pages-Skip]` dans leur message).
 - **Heure** : lignes `cron` de `boucle-de-nuit.yml`, en heure UTC (`0 0` = 1 h à Paris l'hiver). GitHub démarre parfois les tâches planifiées avec un peu de retard.
-- **Sécurité** : l'agent des idées ne peut écrire que sa liste de propositions, contrôlée ensuite (genre et univers dans les listes fermées, doublons, longueur). Les agents créateurs ne peuvent que lire, écrire des fichiers et lancer le robot : un garde-fou refuse tout ce qui sort du dossier du nouveau jeu. Le relecteur ne peut que lire et écrire son verdict. Seule la boucle fusionne, et seulement une pull request qui ajoute un seul nouveau jeu sans toucher au reste.
+- **Sécurité** : l'agent des idées ne peut écrire que sa liste de propositions, contrôlée ensuite (genre et univers dans les listes fermées, doublons, longueur). Les agents créateurs ne peuvent que lire, écrire des fichiers et lancer le robot et les contrôles (traductions, référencement) : un garde-fou refuse tout ce qui sort du dossier du nouveau jeu. Le relecteur ne peut que lire et écrire son verdict. Seule la boucle fusionne, et seulement une pull request qui ajoute un seul nouveau jeu sans toucher au reste.
 - **Jeton** : il expire au bout d'un an. Refaites alors les étapes 2 et 3 de la mise en place.

@@ -24,8 +24,10 @@ Jeux-en-ligne/
 ├─ .gitignore
 ├─ games/
 │  └─ pommes-du-poney/   (index.html, cover.webp, game.json)
-├─ public/               (index.html, play.html, app.js, play.js, style.css, _headers, assets/)
-└─ scripts/              (build-catalog.mjs, serve.mjs)
+├─ gabarits/             (modèles des pages générées : accueil, page d'un jeu, catégorie, 404)
+├─ public/               (play.html, app.js, play.js, style.css, _headers, assets/ ;
+│                         l'accueil index.html et les pages des jeux sont générés au build)
+└─ scripts/              (build-catalog.mjs, pages-seo.mjs, verifier-seo.mjs, serve.mjs…)
 ```
 
 ## 2. Tester sur votre ordinateur
