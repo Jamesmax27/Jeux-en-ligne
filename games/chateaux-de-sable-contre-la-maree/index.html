@@ -1,0 +1,3540 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Châteaux de sable contre la marée</title>
+<style>
+  /* ==========================================================================
+     Châteaux de sable contre la marée — mise en page (téléphone d'abord)
+     ========================================================================== */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #bfe8ff; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #3b2a14; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  [hidden] { display: none !important; }
+  canvas { display: block; }
+  #fond, #effets { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #effets { pointer-events: none; z-index: 50; }
+
+  /* ---- Boutons ---- */
+  .bouton {
+    min-height: 48px; min-width: 48px; padding: 10px 18px; border: 0; border-radius: 16px;
+    background: #fff6e2; color: #5a3a12; font-weight: 700; font-size: 17px;
+    box-shadow: 0 4px 0 #c99a55, 0 6px 14px rgba(60, 30, 0, .18);
+    transition: transform .08s;
+  }
+  .bouton:active { transform: translateY(3px); box-shadow: 0 1px 0 #c99a55; }
+  .bouton.principal { background: #ff8a3d; color: #fff; box-shadow: 0 4px 0 #c45a16, 0 6px 14px rgba(60, 30, 0, .25); }
+  .bouton.bleu { background: #2f8fdc; color: #fff; box-shadow: 0 4px 0 #1a5d99, 0 6px 14px rgba(0, 30, 60, .25); }
+  .bouton.geant { font-size: 26px; padding: 14px 44px; border-radius: 22px; }
+  .bouton:disabled { opacity: .45; cursor: default; }
+  .rond {
+    width: 46px; height: 46px; border-radius: 50%; border: 0; font-size: 21px; line-height: 1;
+    background: rgba(255, 250, 238, .92); box-shadow: 0 3px 0 #c99a55; display: grid; place-items: center; flex: none;
+  }
+  .rond:active { transform: translateY(2px); box-shadow: 0 1px 0 #c99a55; }
+
+  /* ---- Écrans par-dessus le décor ---- */
+  .ecran {
+    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: max(12px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
+  }
+  .voile { background: rgba(20, 40, 70, .45); }
+  .carte {
+    background: #fff8ea; border-radius: 22px; padding: 18px 18px 16px; width: min(400px, 100%);
+    max-height: 100%; overflow: auto; text-align: center; box-shadow: 0 10px 30px rgba(0, 0, 0, .3);
+    border: 3px solid #f1d29a; animation: arrivee .25s ease-out;
+  }
+  @keyframes arrivee { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .carte h2 { margin: 0 0 6px; font-size: 25px; color: #b4561a; }
+  .carte p { margin: 6px 0; font-size: 16px; line-height: 1.35; }
+  .rangee { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+  .colonne { display: flex; flex-direction: column; gap: 10px; align-items: stretch; margin-top: 12px; }
+
+  /* ---- Accueil ---- */
+  #ecran-accueil { justify-content: space-between; padding-top: max(18px, env(safe-area-inset-top)); }
+  #accueil-haut { text-align: center; margin-top: 46px; }
+  #accueil-haut h1 {
+    margin: 0; font-size: clamp(30px, 9vw, 46px); line-height: 1.05; color: #fff;
+    text-shadow: 0 3px 0 #c4621d, 0 5px 12px rgba(0, 0, 0, .35); letter-spacing: .5px;
+  }
+  #accueil-haut p {
+    margin: 12px auto 0; max-width: 340px; font-size: 17px; font-weight: 600; color: #fff;
+    background: rgba(20, 60, 100, .45); padding: 8px 14px; border-radius: 14px;
+  }
+  #accueil-bas { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 10px; }
+  #accueil-etoiles { font-weight: 800; color: #fff; text-shadow: 0 2px 4px rgba(0, 0, 0, .5); font-size: 16px; }
+  .coin-g { position: fixed; top: max(8px, env(safe-area-inset-top)); left: 8px; z-index: 25; }
+  .coin-d { position: fixed; top: max(8px, env(safe-area-inset-top)); right: 8px; z-index: 25; }
+
+  /* ---- Partie ---- */
+  #jeu {
+    position: fixed; inset: 0; display: flex; flex-direction: column; max-width: 560px; margin: 0 auto;
+    padding: max(6px, env(safe-area-inset-top)) 6px max(6px, env(safe-area-inset-bottom));
+  }
+  #barre { display: flex; align-items: center; gap: 6px; flex: none; }
+  #titre-niveau {
+    flex: 1; min-width: 0; font-weight: 800; font-size: 16px; color: #5a3a12; line-height: 1.1;
+    background: rgba(255, 250, 238, .85); border-radius: 12px; padding: 4px 8px; min-height: 40px;
+  }
+  #titre-niveau small { color: #1a5d99; }
+  #titre-niveau small { display: block; font-size: 12px; font-weight: 600; opacity: .95; }
+  .compteur {
+    display: flex; align-items: center; gap: 4px; background: rgba(255, 250, 238, .92); border-radius: 14px;
+    padding: 4px 9px 4px 5px; font-weight: 800; font-size: 18px; min-height: 40px; box-shadow: 0 3px 0 #c99a55;
+  }
+  .compteur canvas { width: 28px; height: 28px; }
+  .compteur.pop { animation: pop .3s; }
+  @keyframes pop { 50% { transform: scale(1.25); } }
+  .compteur.non { animation: non .4s; }
+  @keyframes non { 25% { transform: translateX(-5px); background: #ffd0c4; } 75% { transform: translateX(5px); background: #ffd0c4; } }
+  #annonce {
+    flex: none; margin-top: 6px; display: flex; align-items: center; gap: 6px; min-height: 40px;
+    background: rgba(255, 250, 238, .8); border-radius: 14px; padding: 4px 8px;
+  }
+  #annonce-titre { font-size: 12px; font-weight: 800; color: #1a5d99; flex: none; max-width: 70px; line-height: 1.1; }
+  #vagues-liste { display: flex; gap: 4px; flex: 1; overflow: hidden; flex-wrap: wrap; }
+  .puce-vague {
+    display: flex; align-items: center; gap: 2px; padding: 2px 5px; border-radius: 9px; background: #d4ecff;
+    font-size: 13px; font-weight: 800; color: #1a5d99; border: 2px solid transparent; line-height: 1;
+  }
+  .puce-vague .force { display: inline-block; height: 6px; border-radius: 3px; background: #2f8fdc; }
+  .puce-vague.p2 { background: #eef6ff; border-color: #fff; box-shadow: 0 0 0 1px #8cc3ef; }
+  .puce-vague.p2 .force { background: #0f5fa8; }
+  .puce-vague.p3 { background: #e4dbff; border-color: #8b6fe0; color: #5a3fb8; }
+  .puce-vague.p3 .force { background: #6b4fd0; }
+  .puce-vague.prochaine { border-color: #ff8a3d; animation: battre 1s infinite; }
+  @keyframes battre { 50% { transform: scale(1.12); } }
+  .puce-vague.passee { opacity: .3; }
+  #zone-plage { flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; margin-top: 4px; }
+  #plage { touch-action: none; border-radius: 12px; }
+  #message {
+    flex: none; min-height: 26px; text-align: center; font-weight: 700; font-size: 14px; color: #3b2a14;
+    background: rgba(255, 250, 238, .85); border-radius: 10px; padding: 4px 8px; line-height: 1.2; margin: 4px 0;
+  }
+  #message:empty { background: transparent; }
+  #outils { flex: none; display: flex; gap: 5px; justify-content: center; }
+  .outil {
+    flex: 1 1 0; max-width: 96px; min-height: 58px; border: 3px solid transparent; border-radius: 14px;
+    background: rgba(255, 250, 238, .92); box-shadow: 0 3px 0 #c99a55; padding: 2px 2px 3px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  }
+  .outil canvas { width: 30px; height: 30px; }
+  .outil .nom { font-size: 11.5px; font-weight: 800; line-height: 1.05; }
+  .outil .cout { font-size: 10.5px; font-weight: 700; color: #8a6430; line-height: 1; }
+  .outil.choisi { border-color: #ff8a3d; background: #fff1d8; }
+  .outil:disabled { opacity: .45; }
+  #actions { flex: none; display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+  #b-lancer, #b-suivante { flex: 1; min-height: 50px; font-size: 17px; padding: 6px 10px; line-height: 1.1; }
+  #attente { flex: 1; height: 18px; border-radius: 9px; background: rgba(255, 255, 255, .6); overflow: hidden; }
+  #attente-barre { height: 100%; width: 0; background: linear-gradient(90deg, #2f8fdc, #7cc8ff); }
+  .rond.actif { background: #ffe0a8; box-shadow: 0 0 0 3px #ff8a3d; }
+
+  /* ---- Niveaux et décors ---- */
+  #liste-niveaux { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .groupe-plage h3 { margin: 4px 0 4px; font-size: 14px; color: #1a5d99; text-align: left; }
+  .grille-niv { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .niv {
+    min-height: 50px; border: 0; border-radius: 12px; background: #ffe2a8; box-shadow: 0 3px 0 #c99a55;
+    font-weight: 800; font-size: 17px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px;
+  }
+  .niv .et { font-size: 10px; letter-spacing: -1px; color: #e09a00; min-height: 11px; }
+  .niv.ferme { background: #d9d2c4; color: #8b8070; box-shadow: 0 3px 0 #a89f8f; }
+  .niv.courant { background: #ff8a3d; color: #fff; }
+  .section-decor h3 { margin: 10px 0 4px; font-size: 15px; color: #1a5d99; text-align: left; }
+  .choix-decor { display: flex; gap: 6px; flex-wrap: wrap; }
+  .decor {
+    width: 56px; min-height: 66px; border: 3px solid transparent; border-radius: 12px; background: #fff1d8;
+    box-shadow: 0 3px 0 #c99a55; padding: 2px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .decor canvas { width: 44px; height: 44px; }
+  .decor .verrou { font-size: 10.5px; font-weight: 800; color: #8b8070; line-height: 1.05; }
+  .decor.choisi { border-color: #ff8a3d; }
+  .decor:disabled { opacity: .55; }
+
+  /* ---- Fin de niveau ---- */
+  #fin-etoiles { font-size: 46px; letter-spacing: 6px; margin: 4px 0; min-height: 56px; }
+  #fin-etoiles span { display: inline-block; filter: grayscale(1) opacity(.35); }
+  #fin-etoiles span.on { filter: none; animation: etoile .45s ease-out; }
+  @keyframes etoile { 0% { transform: scale(0) rotate(-90deg); } 70% { transform: scale(1.35); } 100% { transform: scale(1); } }
+  #fin-score { font-size: 30px; font-weight: 900; color: #2f8fdc; }
+  .badge { display: inline-block; background: #ffde59; color: #6b4a00; font-weight: 800; border-radius: 10px; padding: 3px 10px; margin: 4px 2px; }
+  #fin-detail { font-size: 14px; color: #6b5536; }
+  #tuto-canvas { width: 240px; height: 268px; margin: 6px auto 0; border-radius: 14px; background: #bfe8ff; }
+  #tuto-texte { min-height: 66px; font-weight: 600; }
+  .objectifs { font-size: 15px; background: #fff0cf; border-radius: 12px; padding: 6px 10px; margin-top: 8px; text-align: left; }
+  .objectifs div { margin: 2px 0; }
+  .aide-clavier { font-size: 13px; color: #6b5536; margin-top: 10px; }
+  .points-tuto { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+  .points-tuto i { width: 9px; height: 9px; border-radius: 50%; background: #e5c98f; }
+  .points-tuto i.on { background: #ff8a3d; }
+</style>
+<script type="application/json" id="jel-i18n-textes" data-coin="aucun">
+{
+ "fr": {
+  "titre": "Châteaux de sable contre la marée",
+  "consignes_accueil": "Touche le sable pour construire des murets, puis lance la marée. Garde ton donjon au sec !",
+  "jouer": "Jouer",
+  "niveaux": "Niveaux",
+  "decors": "Décors",
+  "choisis_niveau": "Choisis ta marée",
+  "accueil": "Accueil",
+  "drapeaux": "Drapeaux",
+  "tours_decorees": "Tours décorées",
+  "plages": "Plages",
+  "pause": "Pause",
+  "son": "Son",
+  "vagues_annoncees": "Vagues annoncées",
+  "annuler": "Annuler",
+  "apercu": "Aperçu de la marée",
+  "lancer": "Lancer la marée",
+  "vague_suivante": "Vague suivante",
+  "cest_parti": "C'est parti !",
+  "compris": "J'ai compris !",
+  "pause_titre": "Pause",
+  "reprendre": "Reprendre",
+  "recommencer": "Recommencer",
+  "revoir_aide": "Revoir l'aide",
+  "aide_clavier": "Au clavier : flèches pour choisir une case, Espace pour construire, 1 à 5 pour les outils, A pour l'aperçu, L pour lancer la marée, U pour annuler.",
+  "niveau_suivant": "Niveau suivant",
+  "reessayer": "Réessayer",
+  "rejouer": "Rejouer",
+  "bilan_titre": "Toutes les marées !",
+  "bilan_phrase": "Bravo, tu as protégé ton château contre les 24 marées. Tu es un vrai bâtisseur de la plage !",
+  "bilan_bouton": "Bilan final",
+  "etoiles_total": "⭐ {n} / {max}",
+  "plage_0": "Plage des Mouettes",
+  "plage_1": "Crique des Crabes",
+  "plage_2": "Baie des Coquillages",
+  "plage_3": "Pointe des Rigoles",
+  "niveau_aria": {
+   "one": "Marée {n}, {e} étoile",
+   "other": "Marée {n}, {e} étoiles"
+  },
+  "decors_phrase": {
+   "one": "Tu as {n} étoile. Gagne des étoiles pour débloquer de nouveaux décors !",
+   "other": "Tu as {n} étoiles. Gagne des étoiles pour débloquer de nouveaux décors !"
+  },
+  "verrou_etoiles": "🔒 {n} ⭐",
+  "decor_drapeau_0": "Drapeau rouge",
+  "decor_drapeau_1": "Drapeau à étoile",
+  "decor_drapeau_2": "Drapeau rayé",
+  "decor_drapeau_3": "Drapeau de lune",
+  "decor_drapeau_4": "Drapeau de soleil",
+  "decor_drapeau_5": "Drapeau arc-en-ciel",
+  "decor_tour_0": "Tour simple",
+  "decor_tour_1": "Tour aux coquillages",
+  "decor_tour_2": "Tour à rayures",
+  "decor_tour_3": "Tour à fanions",
+  "decor_plage_0": "Plage en plein jour",
+  "decor_plage_1": "Plage au coucher du soleil",
+  "decor_plage_2": "Plage sous les étoiles",
+  "decor_plage_3": "Plage à l'aube rose",
+  "maree_n": "Marée {n}",
+  "outil_muret": "Muret",
+  "outil_fosse": "Fossé",
+  "outil_tour": "Tour",
+  "outil_coquillage": "Coquillage",
+  "outil_rigole": "Rigole",
+  "aide_muret": "Muret : 1 seau. Il arrête l'eau et tient 2 vagues.",
+  "aide_fosse": "Fossé : 1 seau. Il avale 3 cases d'eau, puis se remplit.",
+  "aide_tour": "Tour : 2 seaux. Très solide, elle tient 4 vagues.",
+  "aide_coquillage": "Coquillage : touche un mur pour lui ajouter 2 crans.",
+  "aide_rigole": "Rigole : 2 seaux. Elle renvoie l'eau à la mer à chaque vague.",
+  "msg_construis": "Touche le sable pour construire, puis lance la marée.",
+  "msg_coquillage_choisi": "Touche un muret ou une tour pour le renforcer.",
+  "msg_pas_coquillage": "Ramasse d'abord un coquillage sur la plage.",
+  "msg_rigole_choisie": "Creuse la rigole au bord de l'eau, ou à côté d'une autre rigole.",
+  "seaux_n": {
+   "one": "{n} seau de sable",
+   "other": "{n} seaux de sable"
+  },
+  "en_poche": "× {n}",
+  "cout_n": {
+   "one": "{n} seau",
+   "other": "{n} seaux"
+  },
+  "vague_normale": "Vague",
+  "vague_grande": "Grande vague : elle use les murs de 2 crans",
+  "vague_geante": "Vague géante : elle use les murs de 3 crans",
+  "nb_vagues": {
+   "one": "{n} vague",
+   "other": "{n} vagues"
+  },
+  "objectif_1": "Le donjon reste sec",
+  "objectif_2": {
+   "one": "… et tu gardes {n} seau",
+   "other": "… et tu gardes {n} seaux"
+  },
+  "objectif_3": {
+   "one": "… et tu gardes {n} seau",
+   "other": "… et tu gardes {n} seaux"
+  },
+  "intro_niveau": "Regarde d'où viennent les vagues, construis tes défenses, puis lance la marée.",
+  "intro_crabes": "Attention aux crabes pendant la marée : touche-les pour les chasser !",
+  "tuto_muret_1": "Touche une case de sable pour poser un muret. Il coûte 1 seau.",
+  "tuto_muret_2": "Quand tu es prêt, touche « Lancer la marée ».",
+  "tuto_muret_3": "L'eau s'arrête contre les murets : le donjon reste au sec !",
+  "tuto_reserve_1": "Ferme bien le passage autour du donjon.",
+  "tuto_reserve_2": "Touche l'œil pour voir où ira l'eau avant de lancer la marée.",
+  "tuto_reserve_3": "Garde des seaux en réserve : plus il en reste, plus tu gagnes d'étoiles !",
+  "tuto_fosse_1": "Nouvel outil : le fossé. Choisis-le en bas de l'écran.",
+  "tuto_fosse_2": "Touche le sable pour creuser un fossé (1 seau).",
+  "tuto_fosse_3": "Le fossé avale 3 cases d'eau, puis il devient une flaque.",
+  "tuto_rochers_1": "Les rochers arrêtent l'eau et ne s'usent jamais. Bouche les trous entre eux !",
+  "tuto_rochers_2": "Un seul muret suffit pour fermer le passage.",
+  "tuto_cote_1": "Regarde les flèches : cette vague arrive par le côté !",
+  "tuto_cote_2": "Protège aussi les côtés du donjon.",
+  "tuto_cote_3": "L'eau contourne par le bord de la plage.",
+  "tuto_tour_1": "Nouvel outil : la tour. Choisis-la en bas de l'écran.",
+  "tuto_tour_2": "La tour coûte 2 seaux, mais elle est très solide.",
+  "tuto_tour_3": "Elle tient 4 vagues : parfait pour un passage étroit !",
+  "tuto_crabe_1": "Un crabe ! Il creuse un trou dans ton mur, et l'eau peut passer.",
+  "tuto_crabe_2": "Touche le crabe pour le chasser vers la mer.",
+  "tuto_crabe_3": "Touche le trou pour le reboucher (1 seau).",
+  "tuto_grande_1": "Une grande vague, toute blanche d'écume ! Elle use les murs de 2 crans d'un coup.",
+  "tuto_grande_2": "Contre elle, construis plutôt des tours.",
+  "tuto_coquillage_1": "Touche un coquillage pour le ramasser, avant que la mer l'emporte.",
+  "tuto_coquillage_2": "Choisis l'outil coquillage en bas de l'écran…",
+  "tuto_coquillage_3": "… puis touche un mur : il gagne 2 crans de solidité !",
+  "tuto_seau_1": "Un seau perdu ! Touche-le pour gagner 2 seaux de sable.",
+  "tuto_seau_2": "Vite ! Si l'eau l'atteint, la mer l'emporte.",
+  "tuto_double_1": "Deux vagues arrivent en même temps, à deux endroits !",
+  "tuto_double_2": "Prépare tes défenses des deux côtés.",
+  "tuto_deux_1": "Cette fois, deux donjons doivent rester au sec !",
+  "tuto_deux_2": "Protège-les tous les deux, un mur après l'autre.",
+  "tuto_rigole_1": "Nouvel outil : la rigole. Choisis-la en bas de l'écran.",
+  "tuto_rigole_2": "Creuse-la au bord de l'eau, ou à côté d'une autre rigole (2 seaux).",
+  "tuto_rigole_3": "À chaque vague, chaque case de rigole renvoie 3 cases d'eau à la mer. Elle ne s'use jamais !",
+  "tuto_rapide_1": "Attention, les crabes rouges courent deux fois plus vite !",
+  "tuto_rapide_2": "Touche-les vite pour les chasser.",
+  "tuto_geante_1": "La vague géante, violette, use les murs de 3 crans d'un coup !",
+  "tuto_geante_2": "Renforce tes tours avec des coquillages pour qu'elles tiennent.",
+  "plus_n": "+{n}",
+  "moins_n": "−{n}",
+  "plus_crans": "+{n} 💪",
+  "crabe_chasse": "Ouste !",
+  "msg_attends_vague": "Attends que la vague soit passée…",
+  "msg_coquillage_ramasse": "Un coquillage ! Choisis l'outil coquillage pour renforcer un mur.",
+  "msg_seau_ramasse": "Super, 2 seaux de sable en plus !",
+  "msg_plus_de_seaux": "Tu n'as plus assez de seaux de sable !",
+  "msg_trou_rebouche": "Trou rebouché !",
+  "msg_coquillage_sur_mur": "Pose le coquillage sur un muret ou une tour.",
+  "msg_mur_renforce": "Mur renforcé : 2 crans de plus !",
+  "msg_deja_construit": "Il y a déjà une construction ici.",
+  "msg_case_mouillee": "Le sable est mouillé ici : impossible de construire.",
+  "msg_case_impossible": "Impossible de construire ici.",
+  "msg_rigole_bord": "La rigole doit toucher le bord de l'eau ou une autre rigole.",
+  "msg_dernier_seau": "C'était ton dernier seau !",
+  "apercu_noye": "Aïe ! L'eau atteindrait le donjon à la vague {n}.",
+  "apercu_sec": "Le donjon resterait au sec. Bien joué !",
+  "msg_maree_monte": "La marée monte ! Tu peux encore construire entre les vagues.",
+  "msg_vague": "Vague {n} sur {total} !",
+  "msg_grande_vague": "Grande vague {n} sur {total} !",
+  "msg_vague_geante": "Vague géante {n} sur {total} !",
+  "msg_maree_finie": "La marée redescend…",
+  "msg_entre_vagues": "Répare et renforce avant la prochaine vague !",
+  "msg_crabe_arrive": "Des crabes arrivent ! Touche-les pour les chasser.",
+  "msg_crabe_chasse": "Crabe chassé !",
+  "msg_trou": "Un crabe a creusé un trou ! Touche-le pour le reboucher.",
+  "msg_donjon_mouille": "Oh non, l'eau atteint le donjon !",
+  "victoire_titre": "Donjon au sec !",
+  "victoire_titre_3": "Château parfait !",
+  "victoire_phrase": {
+   "one": "La marée est passée. Il te reste {n} seau de sable.",
+   "other": "La marée est passée. Il te reste {n} seaux de sable."
+  },
+  "defaite_titre": "Le donjon est mouillé !",
+  "defaite_phrase": "La mer a trouvé un passage jusqu'au donjon.",
+  "defaite_conseil": "Astuce : touche l'œil pour voir où ira l'eau avant de lancer la marée.",
+  "score_n": "Score : {n}",
+  "detail_score": "Seaux gardés : {seaux} · Cases sèches : {cases} · Coquillages : {coqs} · Crabes chassés : {crabes}",
+  "record_n": "Record : {n}",
+  "nouveau_record": "Nouveau record !",
+  "premier_record": "Premier record !",
+  "decor_debloque": "Nouveau décor : {nom} !",
+  "score_total": "Score total des records : {n}"
+ },
+ "en": {
+  "titre": "Sandcastles vs the Tide",
+  "consignes_accueil": "Tap the sand to build little walls, then start the tide. Keep your keep dry!",
+  "jouer": "Play",
+  "niveaux": "Levels",
+  "decors": "Decorations",
+  "choisis_niveau": "Pick your tide",
+  "accueil": "Home",
+  "drapeaux": "Flags",
+  "tours_decorees": "Decorated towers",
+  "plages": "Beaches",
+  "pause": "Pause",
+  "son": "Sound",
+  "vagues_annoncees": "Waves coming",
+  "annuler": "Undo",
+  "apercu": "Tide preview",
+  "lancer": "Start the tide",
+  "vague_suivante": "Next wave",
+  "cest_parti": "Let's go!",
+  "compris": "Got it!",
+  "pause_titre": "Pause",
+  "reprendre": "Resume",
+  "recommencer": "Restart",
+  "revoir_aide": "See the help again",
+  "aide_clavier": "Keyboard: arrows to pick a square, Space to build, 1 to 5 for tools, A for the preview, L to start the tide, U to undo.",
+  "niveau_suivant": "Next level",
+  "reessayer": "Try again",
+  "rejouer": "Play again",
+  "bilan_titre": "Every tide!",
+  "bilan_phrase": "Well done, you protected your castle from all 24 tides. You're a true beach builder!",
+  "bilan_bouton": "Final results",
+  "etoiles_total": "⭐ {n} / {max}",
+  "plage_0": "Seagull Beach",
+  "plage_1": "Crab Cove",
+  "plage_2": "Seashell Bay",
+  "plage_3": "Channel Point",
+  "niveau_aria": {
+   "one": "Tide {n}, {e} star",
+   "other": "Tide {n}, {e} stars"
+  },
+  "decors_phrase": {
+   "one": "You have {n} star. Earn stars to unlock new decorations!",
+   "other": "You have {n} stars. Earn stars to unlock new decorations!"
+  },
+  "verrou_etoiles": "🔒 {n} ⭐",
+  "decor_drapeau_0": "Red flag",
+  "decor_drapeau_1": "Star flag",
+  "decor_drapeau_2": "Striped flag",
+  "decor_drapeau_3": "Moon flag",
+  "decor_drapeau_4": "Sun flag",
+  "decor_drapeau_5": "Rainbow flag",
+  "decor_tour_0": "Plain tower",
+  "decor_tour_1": "Seashell tower",
+  "decor_tour_2": "Striped tower",
+  "decor_tour_3": "Pennant tower",
+  "decor_plage_0": "Sunny beach",
+  "decor_plage_1": "Sunset beach",
+  "decor_plage_2": "Starry night beach",
+  "decor_plage_3": "Pink dawn beach",
+  "maree_n": "Tide {n}",
+  "outil_muret": "Wall",
+  "outil_fosse": "Moat",
+  "outil_tour": "Tower",
+  "outil_coquillage": "Shell",
+  "outil_rigole": "Channel",
+  "aide_muret": "Wall: 1 bucket. It stops the water and lasts 2 waves.",
+  "aide_fosse": "Moat: 1 bucket. It soaks up 3 squares of water, then fills up.",
+  "aide_tour": "Tower: 2 buckets. Super strong, it lasts 4 waves.",
+  "aide_coquillage": "Shell: tap a wall to give it 2 more notches.",
+  "aide_rigole": "Channel: 2 buckets. It sends water back to the sea with every wave.",
+  "msg_construis": "Tap the sand to build, then start the tide.",
+  "msg_coquillage_choisi": "Tap a wall or a tower to make it stronger.",
+  "msg_pas_coquillage": "First pick up a shell on the beach.",
+  "msg_rigole_choisie": "Dig the channel at the water's edge, or next to another channel.",
+  "seaux_n": {
+   "one": "{n} bucket of sand",
+   "other": "{n} buckets of sand"
+  },
+  "en_poche": "× {n}",
+  "cout_n": {
+   "one": "{n} bucket",
+   "other": "{n} buckets"
+  },
+  "vague_normale": "Wave",
+  "vague_grande": "Big wave: it wears walls down by 2 notches",
+  "vague_geante": "Giant wave: it wears walls down by 3 notches",
+  "nb_vagues": {
+   "one": "{n} wave",
+   "other": "{n} waves"
+  },
+  "objectif_1": "The keep stays dry",
+  "objectif_2": {
+   "one": "… and you keep {n} bucket",
+   "other": "… and you keep {n} buckets"
+  },
+  "objectif_3": {
+   "one": "… and you keep {n} bucket",
+   "other": "… and you keep {n} buckets"
+  },
+  "intro_niveau": "Look where the waves come from, build your defences, then start the tide.",
+  "intro_crabes": "Watch out for crabs during the tide: tap them to shoo them away!",
+  "tuto_muret_1": "Tap a sand square to build a wall. It costs 1 bucket.",
+  "tuto_muret_2": "When you're ready, tap \"Start the tide\".",
+  "tuto_muret_3": "The water stops at the walls: the keep stays dry!",
+  "tuto_reserve_1": "Close off every path around the keep.",
+  "tuto_reserve_2": "Tap the eye to see where the water will go before you start the tide.",
+  "tuto_reserve_3": "Save some buckets: the more you have left, the more stars you get!",
+  "tuto_fosse_1": "New tool: the moat. Pick it at the bottom of the screen.",
+  "tuto_fosse_2": "Tap the sand to dig a moat (1 bucket).",
+  "tuto_fosse_3": "The moat soaks up 3 squares of water, then it turns into a puddle.",
+  "tuto_rochers_1": "Rocks stop the water and never wear down. Plug the gaps between them!",
+  "tuto_rochers_2": "Just one wall is enough to block the way.",
+  "tuto_cote_1": "Look at the arrows: this wave comes from the side!",
+  "tuto_cote_2": "Protect the sides of the keep too.",
+  "tuto_cote_3": "The water sneaks around along the edge of the beach.",
+  "tuto_tour_1": "New tool: the tower. Pick it at the bottom of the screen.",
+  "tuto_tour_2": "The tower costs 2 buckets, but it's super strong.",
+  "tuto_tour_3": "It lasts 4 waves: perfect for a narrow gap!",
+  "tuto_crabe_1": "A crab! It digs a hole in your wall, and the water can get through.",
+  "tuto_crabe_2": "Tap the crab to chase it back to the sea.",
+  "tuto_crabe_3": "Tap the hole to fill it in (1 bucket).",
+  "tuto_grande_1": "A big wave, all white with foam! It wears walls down by 2 notches at once.",
+  "tuto_grande_2": "Against it, build towers instead.",
+  "tuto_coquillage_1": "Tap a shell to pick it up before the sea washes it away.",
+  "tuto_coquillage_2": "Pick the shell tool at the bottom of the screen…",
+  "tuto_coquillage_3": "… then tap a wall: it gets 2 more notches of strength!",
+  "tuto_seau_1": "A lost bucket! Tap it to get 2 buckets of sand.",
+  "tuto_seau_2": "Hurry! If the water reaches it, the sea washes it away.",
+  "tuto_double_1": "Two waves come at the same time, in two places!",
+  "tuto_double_2": "Get your defences ready on both sides.",
+  "tuto_deux_1": "This time, two keeps must stay dry!",
+  "tuto_deux_2": "Protect both of them, one wall at a time.",
+  "tuto_rigole_1": "New tool: the channel. Pick it at the bottom of the screen.",
+  "tuto_rigole_2": "Dig it at the water's edge, or next to another channel (2 buckets).",
+  "tuto_rigole_3": "With every wave, each channel square sends 3 squares of water back to the sea. It never wears down!",
+  "tuto_rapide_1": "Watch out, red crabs run twice as fast!",
+  "tuto_rapide_2": "Tap them quickly to shoo them away.",
+  "tuto_geante_1": "The purple giant wave wears walls down by 3 notches at once!",
+  "tuto_geante_2": "Make your towers stronger with shells so they hold.",
+  "plus_n": "+{n}",
+  "moins_n": "−{n}",
+  "plus_crans": "+{n} 💪",
+  "crabe_chasse": "Shoo!",
+  "msg_attends_vague": "Wait until the wave has passed…",
+  "msg_coquillage_ramasse": "A shell! Pick the shell tool to make a wall stronger.",
+  "msg_seau_ramasse": "Great, 2 more buckets of sand!",
+  "msg_plus_de_seaux": "You don't have enough buckets of sand!",
+  "msg_trou_rebouche": "Hole filled in!",
+  "msg_coquillage_sur_mur": "Put the shell on a wall or a tower.",
+  "msg_mur_renforce": "Wall made stronger: 2 more notches!",
+  "msg_deja_construit": "Something is already built here.",
+  "msg_case_mouillee": "The sand is wet here: you can't build.",
+  "msg_case_impossible": "You can't build here.",
+  "msg_rigole_bord": "The channel must touch the water's edge or another channel.",
+  "msg_dernier_seau": "That was your last bucket!",
+  "apercu_noye": "Uh-oh! The water would reach the keep on wave {n}.",
+  "apercu_sec": "The keep would stay dry. Nice work!",
+  "msg_maree_monte": "The tide is coming in! You can still build between waves.",
+  "msg_vague": "Wave {n} of {total}!",
+  "msg_grande_vague": "Big wave {n} of {total}!",
+  "msg_vague_geante": "Giant wave {n} of {total}!",
+  "msg_maree_finie": "The tide is going out…",
+  "msg_entre_vagues": "Fix and strengthen before the next wave!",
+  "msg_crabe_arrive": "Crabs are coming! Tap them to shoo them away.",
+  "msg_crabe_chasse": "Crab chased away!",
+  "msg_trou": "A crab dug a hole! Tap it to fill it in.",
+  "msg_donjon_mouille": "Oh no, the water is reaching the keep!",
+  "victoire_titre": "Keep's dry!",
+  "victoire_titre_3": "Perfect castle!",
+  "victoire_phrase": {
+   "one": "The tide has passed. You have {n} bucket of sand left.",
+   "other": "The tide has passed. You have {n} buckets of sand left."
+  },
+  "defaite_titre": "The keep got wet!",
+  "defaite_phrase": "The sea found a way through to the keep.",
+  "defaite_conseil": "Tip: tap the eye to see where the water will go before you start the tide.",
+  "score_n": "Score: {n}",
+  "detail_score": "Buckets saved: {seaux} · Dry squares: {cases} · Shells: {coqs} · Crabs chased: {crabes}",
+  "record_n": "Best: {n}",
+  "nouveau_record": "New best score!",
+  "premier_record": "First best score!",
+  "decor_debloque": "New decoration: {nom}!",
+  "score_total": "Total of best scores: {n}"
+ },
+ "es": {
+  "titre": "Castillos de arena contra la marea",
+  "consignes_accueil": "Toca la arena para construir muros y luego lanza la marea. ¡Mantén seca tu torre!",
+  "jouer": "Jugar",
+  "niveaux": "Niveles",
+  "decors": "Decorados",
+  "choisis_niveau": "Elige tu marea",
+  "accueil": "Inicio",
+  "drapeaux": "Banderas",
+  "tours_decorees": "Torres decoradas",
+  "plages": "Playas",
+  "pause": "Pausa",
+  "son": "Sonido",
+  "vagues_annoncees": "Olas que llegan",
+  "annuler": "Deshacer",
+  "apercu": "Vista previa de la marea",
+  "lancer": "Lanzar la marea",
+  "vague_suivante": "Siguiente ola",
+  "cest_parti": "¡Vamos!",
+  "compris": "¡Entendido!",
+  "pause_titre": "Pausa",
+  "reprendre": "Continuar",
+  "recommencer": "Empezar de nuevo",
+  "revoir_aide": "Ver la ayuda otra vez",
+  "aide_clavier": "Con el teclado: flechas para elegir una casilla, Espacio para construir, 1 a 5 para las herramientas, A para la vista previa, L para lanzar la marea, U para deshacer.",
+  "niveau_suivant": "Siguiente nivel",
+  "reessayer": "Intentar otra vez",
+  "rejouer": "Jugar otra vez",
+  "bilan_titre": "¡Todas las mareas!",
+  "bilan_phrase": "¡Bravo! Protegiste tu castillo de las 24 mareas. ¡Eres un verdadero constructor de playa!",
+  "bilan_bouton": "Resultado final",
+  "etoiles_total": "⭐ {n} / {max}",
+  "plage_0": "Playa de las Gaviotas",
+  "plage_1": "Cala de los Cangrejos",
+  "plage_2": "Bahía de las Conchas",
+  "plage_3": "Punta de los Canales",
+  "niveau_aria": {
+   "one": "Marea {n}, {e} estrella",
+   "other": "Marea {n}, {e} estrellas"
+  },
+  "decors_phrase": {
+   "one": "Tienes {n} estrella. ¡Gana estrellas para desbloquear nuevos decorados!",
+   "other": "Tienes {n} estrellas. ¡Gana estrellas para desbloquear nuevos decorados!"
+  },
+  "verrou_etoiles": "🔒 {n} ⭐",
+  "decor_drapeau_0": "Bandera roja",
+  "decor_drapeau_1": "Bandera con estrella",
+  "decor_drapeau_2": "Bandera de rayas",
+  "decor_drapeau_3": "Bandera de luna",
+  "decor_drapeau_4": "Bandera de sol",
+  "decor_drapeau_5": "Bandera arcoíris",
+  "decor_tour_0": "Torre sencilla",
+  "decor_tour_1": "Torre de conchas",
+  "decor_tour_2": "Torre de rayas",
+  "decor_tour_3": "Torre con banderines",
+  "decor_plage_0": "Playa a pleno sol",
+  "decor_plage_1": "Playa al atardecer",
+  "decor_plage_2": "Playa bajo las estrellas",
+  "decor_plage_3": "Playa al amanecer rosa",
+  "maree_n": "Marea {n}",
+  "outil_muret": "Muro",
+  "outil_fosse": "Foso",
+  "outil_tour": "Torre",
+  "outil_coquillage": "Concha",
+  "outil_rigole": "Canal",
+  "aide_muret": "Muro: 1 cubo. Detiene el agua y aguanta 2 olas.",
+  "aide_fosse": "Foso: 1 cubo. Se traga 3 casillas de agua y luego se llena.",
+  "aide_tour": "Torre: 2 cubos. Muy fuerte, aguanta 4 olas.",
+  "aide_coquillage": "Concha: toca un muro para darle 2 puntos más.",
+  "aide_rigole": "Canal: 2 cubos. Devuelve el agua al mar en cada ola.",
+  "msg_construis": "Toca la arena para construir y luego lanza la marea.",
+  "msg_coquillage_choisi": "Toca un muro o una torre para reforzarlo.",
+  "msg_pas_coquillage": "Primero recoge una concha en la playa.",
+  "msg_rigole_choisie": "Cava el canal a la orilla del agua o junto a otro canal.",
+  "seaux_n": {
+   "one": "{n} cubo de arena",
+   "other": "{n} cubos de arena"
+  },
+  "en_poche": "× {n}",
+  "cout_n": {
+   "one": "{n} cubo",
+   "other": "{n} cubos"
+  },
+  "vague_normale": "Ola",
+  "vague_grande": "Ola grande: desgasta los muros 2 puntos",
+  "vague_geante": "Ola gigante: desgasta los muros 3 puntos",
+  "nb_vagues": {
+   "one": "{n} ola",
+   "other": "{n} olas"
+  },
+  "objectif_1": "La torre sigue seca",
+  "objectif_2": {
+   "one": "… y guardas {n} cubo",
+   "other": "… y guardas {n} cubos"
+  },
+  "objectif_3": {
+   "one": "… y guardas {n} cubo",
+   "other": "… y guardas {n} cubos"
+  },
+  "intro_niveau": "Mira de dónde vienen las olas, construye tus defensas y lanza la marea.",
+  "intro_crabes": "Cuidado con los cangrejos durante la marea: ¡tócalos para espantarlos!",
+  "tuto_muret_1": "Toca una casilla de arena para poner un muro. Cuesta 1 cubo.",
+  "tuto_muret_2": "Cuando estés listo, toca «Lanzar la marea».",
+  "tuto_muret_3": "El agua se detiene en los muros: ¡la torre sigue seca!",
+  "tuto_reserve_1": "Cierra bien el paso alrededor de la torre.",
+  "tuto_reserve_2": "Toca el ojo para ver adónde irá el agua antes de lanzar la marea.",
+  "tuto_reserve_3": "Guarda cubos de reserva: ¡cuantos más te queden, más estrellas ganas!",
+  "tuto_fosse_1": "Nueva herramienta: el foso. Elígelo abajo en la pantalla.",
+  "tuto_fosse_2": "Toca la arena para cavar un foso (1 cubo).",
+  "tuto_fosse_3": "El foso se traga 3 casillas de agua y luego se convierte en un charco.",
+  "tuto_rochers_1": "Las rocas detienen el agua y nunca se desgastan. ¡Tapa los huecos entre ellas!",
+  "tuto_rochers_2": "Basta un solo muro para cerrar el paso.",
+  "tuto_cote_1": "Mira las flechas: ¡esta ola llega por un lado!",
+  "tuto_cote_2": "Protege también los lados de la torre.",
+  "tuto_cote_3": "El agua rodea por el borde de la playa.",
+  "tuto_tour_1": "Nueva herramienta: la torre. Elígela abajo en la pantalla.",
+  "tuto_tour_2": "La torre cuesta 2 cubos, pero es muy fuerte.",
+  "tuto_tour_3": "Aguanta 4 olas: ¡perfecta para un paso estrecho!",
+  "tuto_crabe_1": "¡Un cangrejo! Cava un agujero en tu muro y el agua puede pasar.",
+  "tuto_crabe_2": "Toca el cangrejo para espantarlo hacia el mar.",
+  "tuto_crabe_3": "Toca el agujero para taparlo (1 cubo).",
+  "tuto_grande_1": "¡Una ola grande, toda blanca de espuma! Desgasta los muros 2 puntos de golpe.",
+  "tuto_grande_2": "Contra ella, mejor construye torres.",
+  "tuto_coquillage_1": "Toca una concha para recogerla antes de que el mar se la lleve.",
+  "tuto_coquillage_2": "Elige la herramienta concha abajo en la pantalla…",
+  "tuto_coquillage_3": "… y luego toca un muro: ¡gana 2 puntos de fuerza!",
+  "tuto_seau_1": "¡Un cubo perdido! Tócalo para ganar 2 cubos de arena.",
+  "tuto_seau_2": "¡Rápido! Si el agua lo alcanza, el mar se lo lleva.",
+  "tuto_double_1": "¡Llegan dos olas a la vez, en dos lugares!",
+  "tuto_double_2": "Prepara tus defensas en los dos lados.",
+  "tuto_deux_1": "¡Esta vez, dos torres tienen que seguir secas!",
+  "tuto_deux_2": "Protégelas a las dos, un muro tras otro.",
+  "tuto_rigole_1": "Nueva herramienta: el canal. Elígelo abajo en la pantalla.",
+  "tuto_rigole_2": "Cávalo a la orilla del agua o junto a otro canal (2 cubos).",
+  "tuto_rigole_3": "En cada ola, cada casilla de canal devuelve 3 casillas de agua al mar. ¡Nunca se desgasta!",
+  "tuto_rapide_1": "¡Cuidado, los cangrejos rojos corren el doble de rápido!",
+  "tuto_rapide_2": "Tócalos rápido para espantarlos.",
+  "tuto_geante_1": "¡La ola gigante, morada, desgasta los muros 3 puntos de golpe!",
+  "tuto_geante_2": "Refuerza tus torres con conchas para que aguanten.",
+  "plus_n": "+{n}",
+  "moins_n": "−{n}",
+  "plus_crans": "+{n} 💪",
+  "crabe_chasse": "¡Fuera!",
+  "msg_attends_vague": "Espera a que pase la ola…",
+  "msg_coquillage_ramasse": "¡Una concha! Elige la herramienta concha para reforzar un muro.",
+  "msg_seau_ramasse": "¡Genial, 2 cubos de arena más!",
+  "msg_plus_de_seaux": "¡No te quedan suficientes cubos de arena!",
+  "msg_trou_rebouche": "¡Agujero tapado!",
+  "msg_coquillage_sur_mur": "Pon la concha en un muro o una torre.",
+  "msg_mur_renforce": "Muro reforzado: ¡2 puntos más!",
+  "msg_deja_construit": "Aquí ya hay una construcción.",
+  "msg_case_mouillee": "La arena está mojada aquí: no se puede construir.",
+  "msg_case_impossible": "No se puede construir aquí.",
+  "msg_rigole_bord": "El canal tiene que tocar la orilla del agua u otro canal.",
+  "msg_dernier_seau": "¡Era tu último cubo!",
+  "apercu_noye": "¡Ay! El agua llegaría a la torre en la ola {n}.",
+  "apercu_sec": "La torre seguiría seca. ¡Bien hecho!",
+  "msg_maree_monte": "¡Sube la marea! Todavía puedes construir entre las olas.",
+  "msg_vague": "¡Ola {n} de {total}!",
+  "msg_grande_vague": "¡Ola grande {n} de {total}!",
+  "msg_vague_geante": "¡Ola gigante {n} de {total}!",
+  "msg_maree_finie": "La marea baja…",
+  "msg_entre_vagues": "¡Repara y refuerza antes de la próxima ola!",
+  "msg_crabe_arrive": "¡Llegan cangrejos! Tócalos para espantarlos.",
+  "msg_crabe_chasse": "¡Cangrejo espantado!",
+  "msg_trou": "¡Un cangrejo cavó un agujero! Tócalo para taparlo.",
+  "msg_donjon_mouille": "¡Oh, no! ¡El agua llega a la torre!",
+  "victoire_titre": "¡Torre seca!",
+  "victoire_titre_3": "¡Castillo perfecto!",
+  "victoire_phrase": {
+   "one": "La marea pasó. Te queda {n} cubo de arena.",
+   "other": "La marea pasó. Te quedan {n} cubos de arena."
+  },
+  "defaite_titre": "¡La torre se mojó!",
+  "defaite_phrase": "El mar encontró un camino hasta la torre.",
+  "defaite_conseil": "Consejo: toca el ojo para ver adónde irá el agua antes de lanzar la marea.",
+  "score_n": "Puntos: {n}",
+  "detail_score": "Cubos guardados: {seaux} · Casillas secas: {cases} · Conchas: {coqs} · Cangrejos espantados: {crabes}",
+  "record_n": "Récord: {n}",
+  "nouveau_record": "¡Nuevo récord!",
+  "premier_record": "¡Primer récord!",
+  "decor_debloque": "Nuevo decorado: ¡{nom}!",
+  "score_total": "Total de récords: {n}"
+ },
+ "pt": {
+  "titre": "Castelos de areia contra a maré",
+  "consignes_accueil": "Toque na areia para construir muros e depois solte a maré. Mantenha sua torre seca!",
+  "jouer": "Jogar",
+  "niveaux": "Fases",
+  "decors": "Decorações",
+  "choisis_niveau": "Escolha sua maré",
+  "accueil": "Início",
+  "drapeaux": "Bandeiras",
+  "tours_decorees": "Torres decoradas",
+  "plages": "Praias",
+  "pause": "Pausa",
+  "son": "Som",
+  "vagues_annoncees": "Ondas chegando",
+  "annuler": "Desfazer",
+  "apercu": "Prévia da maré",
+  "lancer": "Soltar a maré",
+  "vague_suivante": "Próxima onda",
+  "cest_parti": "Vamos lá!",
+  "compris": "Entendi!",
+  "pause_titre": "Pausa",
+  "reprendre": "Continuar",
+  "recommencer": "Recomeçar",
+  "revoir_aide": "Ver a ajuda de novo",
+  "aide_clavier": "No teclado: setas para escolher uma casa, Espaço para construir, 1 a 5 para as ferramentas, A para a prévia, L para soltar a maré, U para desfazer.",
+  "niveau_suivant": "Próxima fase",
+  "reessayer": "Tentar de novo",
+  "rejouer": "Jogar de novo",
+  "bilan_titre": "Todas as marés!",
+  "bilan_phrase": "Parabéns, você protegeu seu castelo das 24 marés. Você é um verdadeiro construtor da praia!",
+  "bilan_bouton": "Resultado final",
+  "etoiles_total": "⭐ {n} / {max}",
+  "plage_0": "Praia das Gaivotas",
+  "plage_1": "Enseada dos Caranguejos",
+  "plage_2": "Baía das Conchas",
+  "plage_3": "Ponta das Canaletas",
+  "niveau_aria": {
+   "one": "Maré {n}, {e} estrela",
+   "other": "Maré {n}, {e} estrelas"
+  },
+  "decors_phrase": {
+   "one": "Você tem {n} estrela. Ganhe estrelas para desbloquear novas decorações!",
+   "other": "Você tem {n} estrelas. Ganhe estrelas para desbloquear novas decorações!"
+  },
+  "verrou_etoiles": "🔒 {n} ⭐",
+  "decor_drapeau_0": "Bandeira vermelha",
+  "decor_drapeau_1": "Bandeira com estrela",
+  "decor_drapeau_2": "Bandeira listrada",
+  "decor_drapeau_3": "Bandeira da lua",
+  "decor_drapeau_4": "Bandeira do sol",
+  "decor_drapeau_5": "Bandeira arco-íris",
+  "decor_tour_0": "Torre simples",
+  "decor_tour_1": "Torre de conchas",
+  "decor_tour_2": "Torre listrada",
+  "decor_tour_3": "Torre com bandeirinhas",
+  "decor_plage_0": "Praia em pleno dia",
+  "decor_plage_1": "Praia ao pôr do sol",
+  "decor_plage_2": "Praia sob as estrelas",
+  "decor_plage_3": "Praia no amanhecer cor-de-rosa",
+  "maree_n": "Maré {n}",
+  "outil_muret": "Muro",
+  "outil_fosse": "Fosso",
+  "outil_tour": "Torre",
+  "outil_coquillage": "Concha",
+  "outil_rigole": "Canaleta",
+  "aide_muret": "Muro: 1 balde. Ele segura a água e aguenta 2 ondas.",
+  "aide_fosse": "Fosso: 1 balde. Ele engole 3 casas de água e depois enche.",
+  "aide_tour": "Torre: 2 baldes. Muito forte, aguenta 4 ondas.",
+  "aide_coquillage": "Concha: toque num muro para dar mais 2 pontos a ele.",
+  "aide_rigole": "Canaleta: 2 baldes. Ela devolve a água ao mar a cada onda.",
+  "msg_construis": "Toque na areia para construir e depois solte a maré.",
+  "msg_coquillage_choisi": "Toque num muro ou numa torre para reforçar.",
+  "msg_pas_coquillage": "Primeiro junte uma concha na praia.",
+  "msg_rigole_choisie": "Cave a canaleta na beira da água ou ao lado de outra canaleta.",
+  "seaux_n": {
+   "one": "{n} balde de areia",
+   "other": "{n} baldes de areia"
+  },
+  "en_poche": "× {n}",
+  "cout_n": {
+   "one": "{n} balde",
+   "other": "{n} baldes"
+  },
+  "vague_normale": "Onda",
+  "vague_grande": "Onda grande: desgasta os muros em 2 pontos",
+  "vague_geante": "Onda gigante: desgasta os muros em 3 pontos",
+  "nb_vagues": {
+   "one": "{n} onda",
+   "other": "{n} ondas"
+  },
+  "objectif_1": "A torre fica seca",
+  "objectif_2": {
+   "one": "… e você guarda {n} balde",
+   "other": "… e você guarda {n} baldes"
+  },
+  "objectif_3": {
+   "one": "… e você guarda {n} balde",
+   "other": "… e você guarda {n} baldes"
+  },
+  "intro_niveau": "Veja de onde vêm as ondas, construa suas defesas e depois solte a maré.",
+  "intro_crabes": "Cuidado com os caranguejos durante a maré: toque neles para espantá-los!",
+  "tuto_muret_1": "Toque numa casa de areia para colocar um muro. Custa 1 balde.",
+  "tuto_muret_2": "Quando estiver pronto, toque em \"Soltar a maré\".",
+  "tuto_muret_3": "A água para nos muros: a torre fica seca!",
+  "tuto_reserve_1": "Feche bem a passagem em volta da torre.",
+  "tuto_reserve_2": "Toque no olho para ver aonde a água vai antes de soltar a maré.",
+  "tuto_reserve_3": "Guarde baldes de reserva: quanto mais sobrar, mais estrelas você ganha!",
+  "tuto_fosse_1": "Nova ferramenta: o fosso. Escolha lá embaixo na tela.",
+  "tuto_fosse_2": "Toque na areia para cavar um fosso (1 balde).",
+  "tuto_fosse_3": "O fosso engole 3 casas de água e depois vira uma poça.",
+  "tuto_rochers_1": "As pedras seguram a água e nunca se desgastam. Tape os buracos entre elas!",
+  "tuto_rochers_2": "Um muro só basta para fechar a passagem.",
+  "tuto_cote_1": "Olhe as setas: esta onda vem pelo lado!",
+  "tuto_cote_2": "Proteja também os lados da torre.",
+  "tuto_cote_3": "A água contorna pela beira da praia.",
+  "tuto_tour_1": "Nova ferramenta: a torre. Escolha lá embaixo na tela.",
+  "tuto_tour_2": "A torre custa 2 baldes, mas é muito forte.",
+  "tuto_tour_3": "Ela aguenta 4 ondas: perfeita para uma passagem estreita!",
+  "tuto_crabe_1": "Um caranguejo! Ele cava um buraco no seu muro, e a água pode passar.",
+  "tuto_crabe_2": "Toque no caranguejo para espantá-lo de volta ao mar.",
+  "tuto_crabe_3": "Toque no buraco para tapá-lo (1 balde).",
+  "tuto_grande_1": "Uma onda grande, toda branca de espuma! Ela desgasta os muros em 2 pontos de uma vez.",
+  "tuto_grande_2": "Contra ela, é melhor construir torres.",
+  "tuto_coquillage_1": "Toque numa concha para pegá-la antes que o mar a leve.",
+  "tuto_coquillage_2": "Escolha a ferramenta concha lá embaixo na tela…",
+  "tuto_coquillage_3": "… e depois toque num muro: ele ganha 2 pontos de força!",
+  "tuto_seau_1": "Um balde perdido! Toque nele para ganhar 2 baldes de areia.",
+  "tuto_seau_2": "Rápido! Se a água chegar nele, o mar leva embora.",
+  "tuto_double_1": "Duas ondas chegam ao mesmo tempo, em dois lugares!",
+  "tuto_double_2": "Prepare suas defesas dos dois lados.",
+  "tuto_deux_1": "Desta vez, duas torres precisam ficar secas!",
+  "tuto_deux_2": "Proteja as duas, um muro de cada vez.",
+  "tuto_rigole_1": "Nova ferramenta: a canaleta. Escolha lá embaixo na tela.",
+  "tuto_rigole_2": "Cave na beira da água ou ao lado de outra canaleta (2 baldes).",
+  "tuto_rigole_3": "A cada onda, cada casa de canaleta devolve 3 casas de água ao mar. Ela nunca se desgasta!",
+  "tuto_rapide_1": "Cuidado, os caranguejos vermelhos correm duas vezes mais rápido!",
+  "tuto_rapide_2": "Toque neles bem rápido para espantá-los.",
+  "tuto_geante_1": "A onda gigante, roxa, desgasta os muros em 3 pontos de uma vez!",
+  "tuto_geante_2": "Reforce suas torres com conchas para que aguentem.",
+  "plus_n": "+{n}",
+  "moins_n": "−{n}",
+  "plus_crans": "+{n} 💪",
+  "crabe_chasse": "Xô!",
+  "msg_attends_vague": "Espere a onda passar…",
+  "msg_coquillage_ramasse": "Uma concha! Escolha a ferramenta concha para reforçar um muro.",
+  "msg_seau_ramasse": "Oba, mais 2 baldes de areia!",
+  "msg_plus_de_seaux": "Você não tem baldes de areia suficientes!",
+  "msg_trou_rebouche": "Buraco tapado!",
+  "msg_coquillage_sur_mur": "Coloque a concha num muro ou numa torre.",
+  "msg_mur_renforce": "Muro reforçado: mais 2 pontos!",
+  "msg_deja_construit": "Já tem uma construção aqui.",
+  "msg_case_mouillee": "A areia está molhada aqui: não dá para construir.",
+  "msg_case_impossible": "Não dá para construir aqui.",
+  "msg_rigole_bord": "A canaleta precisa encostar na beira da água ou em outra canaleta.",
+  "msg_dernier_seau": "Era o seu último balde!",
+  "apercu_noye": "Ai! A água chegaria à torre na onda {n}.",
+  "apercu_sec": "A torre ficaria seca. Muito bem!",
+  "msg_maree_monte": "A maré está subindo! Você ainda pode construir entre as ondas.",
+  "msg_vague": "Onda {n} de {total}!",
+  "msg_grande_vague": "Onda grande {n} de {total}!",
+  "msg_vague_geante": "Onda gigante {n} de {total}!",
+  "msg_maree_finie": "A maré está baixando…",
+  "msg_entre_vagues": "Conserte e reforce antes da próxima onda!",
+  "msg_crabe_arrive": "Caranguejos chegando! Toque neles para espantá-los.",
+  "msg_crabe_chasse": "Caranguejo espantado!",
+  "msg_trou": "Um caranguejo cavou um buraco! Toque nele para tapar.",
+  "msg_donjon_mouille": "Ah, não, a água está chegando à torre!",
+  "victoire_titre": "Torre seca!",
+  "victoire_titre_3": "Castelo perfeito!",
+  "victoire_phrase": {
+   "one": "A maré passou. Sobrou {n} balde de areia.",
+   "other": "A maré passou. Sobraram {n} baldes de areia."
+  },
+  "defaite_titre": "A torre se molhou!",
+  "defaite_phrase": "O mar encontrou um caminho até a torre.",
+  "defaite_conseil": "Dica: toque no olho para ver aonde a água vai antes de soltar a maré.",
+  "score_n": "Pontos: {n}",
+  "detail_score": "Baldes guardados: {seaux} · Casas secas: {cases} · Conchas: {coqs} · Caranguejos espantados: {crabes}",
+  "record_n": "Recorde: {n}",
+  "nouveau_record": "Novo recorde!",
+  "premier_record": "Primeiro recorde!",
+  "decor_debloque": "Nova decoração: {nom}!",
+  "score_total": "Total dos recordes: {n}"
+ },
+ "de": {
+  "titre": "Sandburgen gegen die Flut",
+  "consignes_accueil": "Tippe auf den Sand, um Mauern zu bauen, und starte dann die Flut. Halte deinen Burgturm trocken!",
+  "jouer": "Spielen",
+  "niveaux": "Level",
+  "decors": "Deko",
+  "choisis_niveau": "Wähle deine Flut",
+  "accueil": "Start",
+  "drapeaux": "Fahnen",
+  "tours_decorees": "Verzierte Türme",
+  "plages": "Strände",
+  "pause": "Pause",
+  "son": "Ton",
+  "vagues_annoncees": "Kommende Wellen",
+  "annuler": "Rückgängig",
+  "apercu": "Vorschau der Flut",
+  "lancer": "Flut starten",
+  "vague_suivante": "Nächste Welle",
+  "cest_parti": "Los geht's!",
+  "compris": "Alles klar!",
+  "pause_titre": "Pause",
+  "reprendre": "Weiter",
+  "recommencer": "Neu starten",
+  "revoir_aide": "Hilfe noch mal ansehen",
+  "aide_clavier": "Tastatur: Pfeiltasten für ein Feld, Leertaste zum Bauen, 1 bis 5 für die Werkzeuge, A für die Vorschau, L für die Flut, U zum Rückgängigmachen.",
+  "niveau_suivant": "Nächstes Level",
+  "reessayer": "Noch mal versuchen",
+  "rejouer": "Noch mal spielen",
+  "bilan_titre": "Alle Fluten geschafft!",
+  "bilan_phrase": "Super, du hast deine Burg vor allen 24 Fluten beschützt. Du bist ein echter Strandbaumeister!",
+  "bilan_bouton": "Endergebnis",
+  "etoiles_total": "⭐ {n} / {max}",
+  "plage_0": "Möwenstrand",
+  "plage_1": "Krabbenbucht",
+  "plage_2": "Muschelbucht",
+  "plage_3": "Rinnenspitze",
+  "niveau_aria": {
+   "one": "Flut {n}, {e} Stern",
+   "other": "Flut {n}, {e} Sterne"
+  },
+  "decors_phrase": {
+   "one": "Du hast {n} Stern. Sammle Sterne, um neue Deko freizuschalten!",
+   "other": "Du hast {n} Sterne. Sammle Sterne, um neue Deko freizuschalten!"
+  },
+  "verrou_etoiles": "🔒 {n} ⭐",
+  "decor_drapeau_0": "Rote Fahne",
+  "decor_drapeau_1": "Sternenfahne",
+  "decor_drapeau_2": "Gestreifte Fahne",
+  "decor_drapeau_3": "Mondfahne",
+  "decor_drapeau_4": "Sonnenfahne",
+  "decor_drapeau_5": "Regenbogenfahne",
+  "decor_tour_0": "Einfacher Turm",
+  "decor_tour_1": "Muschelturm",
+  "decor_tour_2": "Gestreifter Turm",
+  "decor_tour_3": "Wimpelturm",
+  "decor_plage_0": "Strand bei Tag",
+  "decor_plage_1": "Strand im Sonnenuntergang",
+  "decor_plage_2": "Strand unter Sternen",
+  "decor_plage_3": "Strand im rosa Morgenrot",
+  "maree_n": "Flut {n}",
+  "outil_muret": "Mauer",
+  "outil_fosse": "Graben",
+  "outil_tour": "Turm",
+  "outil_coquillage": "Muschel",
+  "outil_rigole": "Rinne",
+  "aide_muret": "Mauer: 1 Eimer. Sie hält das Wasser auf und übersteht 2 Wellen.",
+  "aide_fosse": "Graben: 1 Eimer. Er schluckt 3 Felder Wasser und läuft dann voll.",
+  "aide_tour": "Turm: 2 Eimer. Sehr stark, er übersteht 4 Wellen.",
+  "aide_coquillage": "Muschel: Tippe auf eine Mauer, um ihr 2 Stufen mehr zu geben.",
+  "aide_rigole": "Rinne: 2 Eimer. Sie leitet bei jeder Welle Wasser zurück ins Meer.",
+  "msg_construis": "Tippe auf den Sand zum Bauen und starte dann die Flut.",
+  "msg_coquillage_choisi": "Tippe auf eine Mauer oder einen Turm, um sie zu stärken.",
+  "msg_pas_coquillage": "Sammle zuerst eine Muschel am Strand.",
+  "msg_rigole_choisie": "Grabe die Rinne am Wasserrand oder neben einer anderen Rinne.",
+  "seaux_n": {
+   "one": "{n} Eimer Sand",
+   "other": "{n} Eimer Sand"
+  },
+  "en_poche": "× {n}",
+  "cout_n": {
+   "one": "{n} Eimer",
+   "other": "{n} Eimer"
+  },
+  "vague_normale": "Welle",
+  "vague_grande": "Große Welle: Sie nimmt Mauern 2 Stufen",
+  "vague_geante": "Riesenwelle: Sie nimmt Mauern 3 Stufen",
+  "nb_vagues": {
+   "one": "{n} Welle",
+   "other": "{n} Wellen"
+  },
+  "objectif_1": "Der Burgturm bleibt trocken",
+  "objectif_2": {
+   "one": "… und du sparst {n} Eimer",
+   "other": "… und du sparst {n} Eimer"
+  },
+  "objectif_3": {
+   "one": "… und du sparst {n} Eimer",
+   "other": "… und du sparst {n} Eimer"
+  },
+  "intro_niveau": "Schau, woher die Wellen kommen, baue deine Verteidigung und starte dann die Flut.",
+  "intro_crabes": "Achtung, Krabben während der Flut: Tippe sie an, um sie zu verscheuchen!",
+  "tuto_muret_1": "Tippe auf ein Sandfeld, um eine Mauer zu bauen. Sie kostet 1 Eimer.",
+  "tuto_muret_2": "Wenn du bereit bist, tippe auf „Flut starten“.",
+  "tuto_muret_3": "Das Wasser stoppt an den Mauern: Der Burgturm bleibt trocken!",
+  "tuto_reserve_1": "Versperre jeden Weg rund um den Burgturm.",
+  "tuto_reserve_2": "Tippe auf das Auge, um zu sehen, wohin das Wasser fließt, bevor du die Flut startest.",
+  "tuto_reserve_3": "Spare Eimer: Je mehr übrig bleiben, desto mehr Sterne bekommst du!",
+  "tuto_fosse_1": "Neues Werkzeug: der Graben. Wähle ihn unten auf dem Bildschirm.",
+  "tuto_fosse_2": "Tippe auf den Sand, um einen Graben auszuheben (1 Eimer).",
+  "tuto_fosse_3": "Der Graben schluckt 3 Felder Wasser und wird dann zur Pfütze.",
+  "tuto_rochers_1": "Felsen halten das Wasser auf und gehen nie kaputt. Stopf die Lücken zwischen ihnen!",
+  "tuto_rochers_2": "Eine einzige Mauer reicht, um den Weg zu versperren.",
+  "tuto_cote_1": "Schau auf die Pfeile: Diese Welle kommt von der Seite!",
+  "tuto_cote_2": "Schütze auch die Seiten des Burgturms.",
+  "tuto_cote_3": "Das Wasser schleicht am Strandrand entlang herum.",
+  "tuto_tour_1": "Neues Werkzeug: der Turm. Wähle ihn unten auf dem Bildschirm.",
+  "tuto_tour_2": "Der Turm kostet 2 Eimer, aber er ist sehr stark.",
+  "tuto_tour_3": "Er übersteht 4 Wellen: perfekt für eine enge Lücke!",
+  "tuto_crabe_1": "Eine Krabbe! Sie gräbt ein Loch in deine Mauer, und das Wasser kommt durch.",
+  "tuto_crabe_2": "Tippe die Krabbe an, um sie zurück ins Meer zu jagen.",
+  "tuto_crabe_3": "Tippe auf das Loch, um es zu stopfen (1 Eimer).",
+  "tuto_grande_1": "Eine große Welle, ganz weiß vor Schaum! Sie nimmt Mauern 2 Stufen auf einmal.",
+  "tuto_grande_2": "Gegen sie baust du besser Türme.",
+  "tuto_coquillage_1": "Tippe auf eine Muschel, um sie aufzuheben, bevor das Meer sie mitnimmt.",
+  "tuto_coquillage_2": "Wähle unten das Muschel-Werkzeug …",
+  "tuto_coquillage_3": "… und tippe dann auf eine Mauer: Sie bekommt 2 Stufen mehr!",
+  "tuto_seau_1": "Ein verlorener Eimer! Tippe ihn an, um 2 Eimer Sand zu bekommen.",
+  "tuto_seau_2": "Schnell! Erreicht ihn das Wasser, nimmt das Meer ihn mit.",
+  "tuto_double_1": "Zwei Wellen kommen gleichzeitig, an zwei Stellen!",
+  "tuto_double_2": "Bereite auf beiden Seiten deine Verteidigung vor.",
+  "tuto_deux_1": "Diesmal müssen zwei Burgtürme trocken bleiben!",
+  "tuto_deux_2": "Schütze beide, eine Mauer nach der anderen.",
+  "tuto_rigole_1": "Neues Werkzeug: die Rinne. Wähle sie unten auf dem Bildschirm.",
+  "tuto_rigole_2": "Grabe sie am Wasserrand oder neben einer anderen Rinne (2 Eimer).",
+  "tuto_rigole_3": "Bei jeder Welle leitet jedes Rinnenfeld 3 Felder Wasser zurück ins Meer. Sie geht nie kaputt!",
+  "tuto_rapide_1": "Achtung, rote Krabben laufen doppelt so schnell!",
+  "tuto_rapide_2": "Tippe sie schnell an, um sie zu verscheuchen.",
+  "tuto_geante_1": "Die lila Riesenwelle nimmt Mauern 3 Stufen auf einmal!",
+  "tuto_geante_2": "Stärke deine Türme mit Muscheln, damit sie halten.",
+  "plus_n": "+{n}",
+  "moins_n": "−{n}",
+  "plus_crans": "+{n} 💪",
+  "crabe_chasse": "Husch!",
+  "msg_attends_vague": "Warte, bis die Welle vorbei ist …",
+  "msg_coquillage_ramasse": "Eine Muschel! Wähle das Muschel-Werkzeug, um eine Mauer zu stärken.",
+  "msg_seau_ramasse": "Super, 2 Eimer Sand mehr!",
+  "msg_plus_de_seaux": "Du hast nicht mehr genug Eimer Sand!",
+  "msg_trou_rebouche": "Loch gestopft!",
+  "msg_coquillage_sur_mur": "Setze die Muschel auf eine Mauer oder einen Turm.",
+  "msg_mur_renforce": "Mauer gestärkt: 2 Stufen mehr!",
+  "msg_deja_construit": "Hier steht schon etwas.",
+  "msg_case_mouillee": "Hier ist der Sand nass: Bauen geht nicht.",
+  "msg_case_impossible": "Hier kannst du nicht bauen.",
+  "msg_rigole_bord": "Die Rinne muss den Wasserrand oder eine andere Rinne berühren.",
+  "msg_dernier_seau": "Das war dein letzter Eimer!",
+  "apercu_noye": "Oje! Bei Welle {n} würde das Wasser den Burgturm erreichen.",
+  "apercu_sec": "Der Burgturm bliebe trocken. Gut gemacht!",
+  "msg_maree_monte": "Die Flut kommt! Zwischen den Wellen kannst du noch bauen.",
+  "msg_vague": "Welle {n} von {total}!",
+  "msg_grande_vague": "Große Welle {n} von {total}!",
+  "msg_vague_geante": "Riesenwelle {n} von {total}!",
+  "msg_maree_finie": "Das Wasser zieht sich zurück …",
+  "msg_entre_vagues": "Repariere und verstärke vor der nächsten Welle!",
+  "msg_crabe_arrive": "Krabben kommen! Tippe sie an, um sie zu verscheuchen.",
+  "msg_crabe_chasse": "Krabbe verscheucht!",
+  "msg_trou": "Eine Krabbe hat ein Loch gegraben! Tippe darauf, um es zu stopfen.",
+  "msg_donjon_mouille": "Oh nein, das Wasser erreicht den Burgturm!",
+  "victoire_titre": "Burgturm trocken!",
+  "victoire_titre_3": "Perfekte Burg!",
+  "victoire_phrase": {
+   "one": "Die Flut ist vorbei. Du hast noch {n} Eimer Sand.",
+   "other": "Die Flut ist vorbei. Du hast noch {n} Eimer Sand."
+  },
+  "defaite_titre": "Der Burgturm ist nass!",
+  "defaite_phrase": "Das Meer hat einen Weg zum Burgturm gefunden.",
+  "defaite_conseil": "Tipp: Tippe auf das Auge, um zu sehen, wohin das Wasser fließt, bevor du die Flut startest.",
+  "score_n": "Punkte: {n}",
+  "detail_score": "Gesparte Eimer: {seaux} · Trockene Felder: {cases} · Muscheln: {coqs} · Verscheuchte Krabben: {crabes}",
+  "record_n": "Rekord: {n}",
+  "nouveau_record": "Neuer Rekord!",
+  "premier_record": "Erster Rekord!",
+  "decor_debloque": "Neue Deko: {nom}!",
+  "score_total": "Summe der Rekorde: {n}"
+ }
+}
+</script>
+<script id="jel-i18n">
+/* ==========================================================================
+   Jeux-en-ligne — module commun de traduction (site ET jeux)        jel-i18n v1
+   JavaScript pur, sans dépendance, fonctionne hors ligne.
+
+   Langues : fr (source), en, es, pt (Brésil), de. Langue de secours : en.
+   Détection, dans l'ordre :
+     1. paramètre d'adresse ?lang=xx (enregistré comme choix) ;
+     2. choix enregistré : localStorage « lang » (dans un jeu affiché par le
+        site, le lanceur transmet ce choix par window.JEL_LANG, car le cadre
+        isolé n'a pas accès au stockage du site) ;
+     3. navigator.languages (préfixe seul : « pt-BR » → « pt ») ;
+     4. « en ».
+
+   API (window.JEL_I18N, et raccourci global t() s'il est libre) :
+     getLang()            langue courante
+     setLang(code)        change de langue (enregistre, <html lang>, textes)
+     t(cle, variables)    texte traduit ; {variables} remplacées ; pluriels
+                          via Intl.PluralRules si la valeur est un objet
+                          { "one": "…", "other": "…" } (variable n)
+     has(cle)             la clé existe-t-elle (langue courante ou fr) ?
+     nombre(x, options)   nombre formaté selon la langue (Intl.NumberFormat)
+     date(d, options)     date formatée selon la langue (Intl.DateTimeFormat)
+     appliquer(racine)    traduit le DOM : data-i18n (texte), data-i18n-html
+                          (dictionnaire de confiance seulement),
+                          data-i18n-placeholder, data-i18n-title, data-i18n-aria
+     ajouter(lang, dico)  ajoute des textes ; charger(dossier) : site seulement
+     surChangement(f)     appelle f(lang) après chaque changement de langue
+     creerSelecteur(opts) sélecteur de langue (code + nom dans sa langue)
+
+   Clé absente dans la langue choisie : texte français, sinon la clé brute,
+   avec un avertissement dans la console (une seule fois par clé).
+
+   Dans un jeu : ce fichier est recopié tel quel dans index.html, juste après
+   le bloc <script type="application/json" id="jel-i18n-textes"> qui contient
+   { "fr": {…}, "en": {…}, … }. Un petit bouton de langue s'ajoute dans le coin
+   indiqué par data-coin (haut-gauche, haut-droite, bas-gauche, bas-droite ;
+   data-coin-decalage="52px" l'éloigne du bord haut ou bas, ex. sous une barre ;
+   data-place="id1 id2" le met plutôt dans ces éléments du jeu (barre d'outils…) ;
+   data-coin="aucun" pour le placer soi-même avec creerSelecteur). Changer de
+   langue relance le jeu dans la nouvelle langue.
+   Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie ce fichier).
+   ========================================================================== */
+(function () {
+  'use strict';
+  if (window.JEL_I18N) return;
+
+  var LANGUES = ['fr', 'en', 'es', 'pt', 'de'];
+  var NOMS = { fr: 'Français', en: 'English', es: 'Español', pt: 'Português', de: 'Deutsch' };
+  var ETIQUETTE = { fr: 'Langue', en: 'Language', es: 'Idioma', pt: 'Idioma', de: 'Sprache' }; // nom du bouton
+  var SOURCE = 'fr';
+  var SECOURS = 'en';
+  var CLE_STOCKAGE = 'lang';
+
+  var dicos = {};          // { fr: { cle: texte }, en: {…} }
+  var ecouteurs = [];
+  var avertis = {};
+  var dossierSite = null;  // site : dossier des fichiers JSON (charger)
+  var blocJeu = document.getElementById('jel-i18n-textes');
+  var modeJeu = !!blocJeu;
+
+  // --- Outils ---------------------------------------------------------------
+
+  function valide(code) {
+    var c = String(code || '').trim().toLowerCase().split(/[-_]/)[0];
+    return LANGUES.indexOf(c) >= 0 ? c : null;
+  }
+  function lireStockage() { try { return localStorage.getItem(CLE_STOCKAGE); } catch (e) { return null; } }
+  function ecrireStockage(v) { try { localStorage.setItem(CLE_STOCKAGE, v); } catch (e) { /* stockage refusé */ } }
+  function paramAdresse() { try { return new URLSearchParams(location.search).get('lang'); } catch (e) { return null; } }
+
+  function detecter() {
+    var c = valide(paramAdresse());
+    if (c) { ecrireStockage(c); return c; }
+    c = valide(window.JEL_LANG) || valide(lireStockage());
+    if (c) return c;
+    var liste = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+    for (var i = 0; i < liste.length; i++) {
+      c = valide(liste[i]);
+      if (c) return c;
+    }
+    return SECOURS;
+  }
+
+  var langue = detecter();
+  document.documentElement.lang = langue;
+
+  function avertir(texte) {
+    if (avertis[texte]) return;
+    avertis[texte] = true;
+    try { console.warn('[i18n] ' + texte); } catch (e) { /* pas de console */ }
+  }
+
+  function trouver(lang, cle) {
+    var d = dicos[lang];
+    return d && Object.prototype.hasOwnProperty.call(d, cle) ? d[cle] : undefined;
+  }
+
+  function nombre(x, options) {
+    try { return new Intl.NumberFormat(langue, options).format(x); } catch (e) { return String(x); }
+  }
+
+  function date(d, options) {
+    try { return new Intl.DateTimeFormat(langue, options).format(d instanceof Date ? d : new Date(d)); } catch (e) { return String(d); }
+  }
+
+  // Valeur au pluriel : { one, other, … } selon Intl.PluralRules (variable n).
+  function pluriel(valeur, lang, variables) {
+    var n = variables && typeof variables.n === 'number' ? variables.n : 0;
+    var forme = 'other';
+    try { forme = new Intl.PluralRules(lang).select(n); } catch (e) { /* navigateur ancien */ }
+    if (n === 0 && typeof valeur.zero === 'string') return valeur.zero;
+    return typeof valeur[forme] === 'string' ? valeur[forme] : valeur.other;
+  }
+
+  function remplacer(texte, variables) {
+    if (!variables) return texte;
+    return texte.replace(/\{(\w+)\}/g, function (tout, nom) {
+      if (!Object.prototype.hasOwnProperty.call(variables, nom)) return tout;
+      var v = variables[nom];
+      return typeof v === 'number' ? nombre(v) : String(v);
+    });
+  }
+
+  // --- Traduction -----------------------------------------------------------
+
+  function t(cle, variables) {
+    var lang = langue;
+    var valeur = trouver(lang, cle);
+    if (valeur === undefined) {
+      lang = SOURCE;
+      valeur = trouver(SOURCE, cle);
+      if (langue !== SOURCE || valeur === undefined) avertir('clé manquante en ' + langue + ' : ' + cle);
+      if (valeur === undefined) return cle;
+    }
+    if (valeur && typeof valeur === 'object') valeur = pluriel(valeur, lang, variables);
+    return remplacer(String(valeur), variables);
+  }
+
+  function has(cle) {
+    return trouver(langue, cle) !== undefined || trouver(SOURCE, cle) !== undefined;
+  }
+
+  // Traduit tous les éléments marqués sous « racine » (document par défaut).
+  function appliquer(racine) {
+    racine = racine || document;
+    if (!racine.querySelectorAll) return;
+    var regles = [
+      ['data-i18n', function (el, v) { el.textContent = v; }],
+      ['data-i18n-html', function (el, v) { el.innerHTML = v; }],
+      ['data-i18n-placeholder', function (el, v) { el.setAttribute('placeholder', v); }],
+      ['data-i18n-title', function (el, v) { el.setAttribute('title', v); }],
+      ['data-i18n-aria', function (el, v) { el.setAttribute('aria-label', v); }],
+    ];
+    regles.forEach(function (regle) {
+      var liste = racine.querySelectorAll('[' + regle[0] + ']');
+      for (var i = 0; i < liste.length; i++) regle[1](liste[i], t(liste[i].getAttribute(regle[0])));
+    });
+  }
+
+  function ajouter(lang, dico) {
+    var c = valide(lang);
+    if (!c || !dico || typeof dico !== 'object') return;
+    dicos[c] = dicos[c] || {};
+    for (var cle in dico) {
+      if (Object.prototype.hasOwnProperty.call(dico, cle)) dicos[c][cle] = dico[cle];
+    }
+  }
+
+  // Site : charge <dossier><lang>.json (fr toujours, pour le repli).
+  function chargerUne(lang) {
+    if (dicos[lang] || !dossierSite) return Promise.resolve();
+    return fetch(dossierSite + lang + '.json')
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) { ajouter(lang, d); })
+      .catch(function (e) { avertir('textes « ' + lang + ' » indisponibles (' + e.message + ')'); });
+  }
+
+  function charger(dossier) {
+    dossierSite = dossier;
+    return Promise.all([chargerUne(SOURCE), chargerUne(langue)]).then(function () { appliquer(document); });
+  }
+
+  function surChangement(f) { if (typeof f === 'function') ecouteurs.push(f); }
+
+  function prevenir() {
+    for (var i = 0; i < ecouteurs.length; i++) {
+      try { ecouteurs[i](langue); } catch (e) { setTimeout(function () { throw e; }); }
+    }
+  }
+
+  // Changement de langue appliqué sur place (sans recharger la page).
+  function changerSurPlace(c) {
+    langue = c;
+    document.documentElement.lang = c;
+    appliquer(document);
+    majSelecteurs();
+    prevenir();
+  }
+
+  function setLang(code) {
+    var c = valide(code);
+    if (!c) return Promise.resolve(langue);
+    ecrireStockage(c);
+    if (modeJeu) {
+      if (c === langue) return Promise.resolve(langue);
+      // Jeu affiché par le site : le lanceur enregistre le choix et relance le jeu.
+      if (window.parent && window.parent !== window) {
+        try { window.parent.postMessage({ type: 'jel-langue', lang: c }, '*'); } catch (e) { /* cadre isolé */ }
+        // Si personne ne répond (jeu ouvert ailleurs), on change sur place.
+        setTimeout(function () { changerSurPlace(c); }, 700);
+        return Promise.resolve(c);
+      }
+      // Jeu ouvert seul : on le relance dans la nouvelle langue.
+      if (/^https?:$/.test(location.protocol)) {
+        var u = new URL(location.href);
+        u.searchParams.set('lang', c);
+        location.replace(u.href);
+        return Promise.resolve(c);
+      }
+      changerSurPlace(c);
+      return Promise.resolve(c);
+    }
+    // Site : l'adresse suit le choix si elle porte déjà ?lang=.
+    try {
+      var adresse = new URL(location.href);
+      if (adresse.searchParams.has('lang')) {
+        adresse.searchParams.set('lang', c);
+        history.replaceState(history.state, '', adresse.href);
+      }
+    } catch (e) { /* adresse spéciale */ }
+    return chargerUne(c).then(function () { changerSurPlace(c); return c; });
+  }
+
+  // --- Sélecteur de langue ---------------------------------------------------
+  // Bouton (code de la langue) qui ouvre la liste des 5 langues, chacune avec
+  // son code et son nom dans sa propre langue. Pas de drapeaux. Doigt et clavier
+  // (Entrée, Espace, flèches, Échap).
+  // Dans un jeu, il est isolé dans un Shadow DOM (élément <jel-langue>) : le CSS
+  // du jeu (button {…}, * {…}) ne peut pas le déformer, et inversement.
+
+  var CSS_SELECTEUR =
+    '.jel-langue{position:relative;display:inline-block;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif;text-align:left;color:#eceae4}' +
+    '.jel-langue *{box-sizing:border-box}' +
+    '.jel-langue-bouton{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;margin:0;padding:0 10px;border:0;border-radius:999px;background:rgba(11,16,32,.55);color:#eceae4;font:inherit;line-height:1;cursor:pointer;box-shadow:none}' +
+    '.jel-langue-code{font-weight:800;letter-spacing:.04em}' +
+    '.jel-langue-menu{position:absolute;z-index:2147483001;min-width:170px;margin:6px 0 0;padding:6px;list-style:none;border-radius:14px;background:#161f38;box-shadow:0 10px 30px rgba(0,0,0,.45);border:1px solid #434e6b}' +
+    '.jel-langue-menu[hidden]{display:none}' +
+    '.jel-langue-menu li{margin:0;padding:0}' +
+    '.jel-langue-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;margin:0;padding:0 12px;border:0;border-radius:10px;background:none;color:#eceae4;font:inherit;text-align:left;cursor:pointer;box-shadow:none;white-space:nowrap}' +
+    '.jel-langue-menu button b{min-width:2.2em;color:#a8b3f0}' +
+    '.jel-langue-menu button[aria-current="true"]{background:#a8b3f0;color:#0b1020}' +
+    '.jel-langue-menu button[aria-current="true"] b{color:#0b1020}' +
+    '.jel-langue-menu button:hover:not([aria-current="true"]),.jel-langue-menu button:focus-visible{background:#1d2745}' +
+    '.jel-langue :focus-visible{outline:3px solid #a8b3f0;outline-offset:2px}' +
+    // Jeu : petit bouton discret (code seul) ; liste ouverte vers l'intérieur de l'écran.
+    '.jel-langue.compact .jel-langue-bouton{min-width:40px;min-height:40px;padding:0 8px;font-size:12px;background:rgba(11,16,32,.45);border:1px solid rgba(255,255,255,.3)}' +
+    '.jel-langue.compact .jel-langue-nom{display:none}' +
+    '.jel-langue.vers-gauche .jel-langue-menu{right:0}' +
+    '.jel-langue.vers-haut .jel-langue-menu{bottom:100%;margin:0 0 6px}';
+
+  // Place du bouton dans un jeu, selon le coin choisi (data-coin).
+  var COINS = {
+    'haut-gauche': { top: 'max(6px, env(safe-area-inset-top))', left: 'max(6px, env(safe-area-inset-left))' },
+    'haut-droite': { top: 'max(6px, env(safe-area-inset-top))', right: 'max(6px, env(safe-area-inset-right))' },
+    'bas-gauche': { bottom: 'max(6px, env(safe-area-inset-bottom))', left: 'max(6px, env(safe-area-inset-left))' },
+    'bas-droite': { bottom: 'max(6px, env(safe-area-inset-bottom))', right: 'max(6px, env(safe-area-inset-right))' },
+  };
+
+  var selecteurs = [];
+
+  function majSelecteurs() {
+    selecteurs.forEach(function (s) { s.maj(); });
+  }
+
+  // options : { conteneur, classe, coin, decalage, isole } ;
+  // - coin : sélecteur de jeu isolé, fixé dans ce coin, éloigné du bord haut ou bas de
+  //   « decalage » (longueur CSS, ex. « 52px ») s'il est donné ;
+  // - isole : sélecteur de jeu isolé, placé dans « conteneur » (ex. la barre du jeu).
+  function creerSelecteur(options) {
+    options = options || {};
+    var coin = options.coin && COINS[options.coin] ? options.coin : null;
+    var isole = !!(coin || options.isole);
+    var boite = document.createElement('div');
+    boite.className = 'jel-langue' + (options.classe ? ' ' + options.classe : '') +
+      (isole ? ' compact' : '') + (coin && /droite/.test(coin) ? ' vers-gauche' : '') + (coin && /bas/.test(coin) ? ' vers-haut' : '');
+
+    var bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'jel-langue-bouton';
+    bouton.setAttribute('aria-haspopup', 'true');
+    bouton.setAttribute('aria-expanded', 'false');
+    var code = document.createElement('span');
+    code.className = 'jel-langue-code';
+    var nom = document.createElement('span');
+    nom.className = 'jel-langue-nom';
+    bouton.append(code, nom);
+
+    var menu = document.createElement('ul');
+    menu.className = 'jel-langue-menu';
+    menu.hidden = true;
+    var choix = LANGUES.map(function (l) {
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.lang = l;
+      b.dataset.lang = l;
+      var c = document.createElement('b');
+      c.textContent = l.toUpperCase();
+      b.append(c, document.createTextNode(' ' + NOMS[l]));
+      b.addEventListener('click', function () { fermer(true); setLang(l); });
+      li.append(b);
+      menu.append(li);
+      return b;
+    });
+
+    var hote = null; // jeu : élément <jel-langue> (un peu transparent, sauf liste ouverte)
+    function opacite(v) { if (hote) hote.style.setProperty('opacity', v, 'important'); }
+    function ouvrir() {
+      // Dans une barre : la liste s'ouvre vers l'intérieur de l'écran.
+      if (isole && !coin && hote) {
+        var r = hote.getBoundingClientRect();
+        boite.classList.toggle('vers-gauche', r.left > window.innerWidth / 2);
+        boite.classList.toggle('vers-haut', r.top > window.innerHeight / 2);
+      }
+      menu.hidden = false;
+      opacite('1');
+      bouton.setAttribute('aria-expanded', 'true');
+      var actuel = choix[LANGUES.indexOf(langue)] || choix[0];
+      actuel.focus();
+    }
+    function fermer(rendreFocus) {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      opacite('.85');
+      bouton.setAttribute('aria-expanded', 'false');
+      if (rendreFocus) bouton.focus();
+    }
+
+    bouton.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.hidden) ouvrir(); else fermer(false);
+    });
+    menu.addEventListener('keydown', function (e) {
+      var racine = boite.getRootNode();
+      var i = choix.indexOf(racine.activeElement || document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); fermer(true); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); choix[(i + 1) % choix.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); choix[(i - 1 + choix.length) % choix.length].focus(); }
+      else if (e.key === 'Tab') fermer(false);
+      e.stopPropagation(); // les touches du menu ne pilotent pas le jeu
+    });
+    bouton.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' && menu.hidden) { e.preventDefault(); ouvrir(); }
+      e.stopPropagation();
+    });
+    // Un toucher ailleurs referme la liste (sans gêner le jeu).
+    document.addEventListener('pointerdown', function (e) {
+      var chemin = e.composedPath ? e.composedPath() : [e.target];
+      if (chemin.indexOf(boite) < 0) fermer(false);
+    }, true);
+    // Les gestes sur le sélecteur ne doivent pas arriver au jeu.
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click'].forEach(function (type) {
+      boite.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
+    boite.append(bouton, menu);
+
+    // Élément ajouté à la page : la boîte elle-même (site), ou un hôte isolé (jeu).
+    var element = boite;
+    if (isole) {
+      element = hote = document.createElement('jel-langue');
+      element.className = 'jel-langue';
+      var place = coin ? COINS[coin] : {};
+      var style = coin
+        ? { position: 'fixed', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'block' }
+        : { position: 'relative', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'inline-block', 'vertical-align': 'middle', flex: 'none' };
+      for (var p in place) style[p] = options.decalage && /^(top|bottom)$/.test(p) ? 'calc(' + place[p] + ' + ' + options.decalage + ')' : place[p];
+      for (var nomStyle in style) element.style.setProperty(nomStyle, style[nomStyle], 'important');
+      var ombre = element.attachShadow ? element.attachShadow({ mode: 'open' }) : element;
+      var feuille = document.createElement('style');
+      feuille.textContent = CSS_SELECTEUR;
+      ombre.append(feuille, boite);
+    }
+
+    var s = {
+      element: element,
+      maj: function () {
+        code.textContent = langue.toUpperCase();
+        nom.textContent = NOMS[langue];
+        var etiquette = ETIQUETTE[langue] + ' : ' + NOMS[langue];
+        bouton.setAttribute('aria-label', etiquette);
+        bouton.title = etiquette;
+        choix.forEach(function (b) {
+          if (b.dataset.lang === langue) b.setAttribute('aria-current', 'true');
+          else b.removeAttribute('aria-current');
+        });
+      },
+    };
+    s.maj();
+    selecteurs.push(s);
+    if (options.conteneur) options.conteneur.append(element);
+    return element;
+  }
+
+  // Site : style de base du sélecteur dans la page (style.css le complète).
+  function ajouterStyle() {
+    if (document.getElementById('jel-langue-style')) return;
+    var style = document.createElement('style');
+    style.id = 'jel-langue-style';
+    style.textContent = CSS_SELECTEUR;
+    (document.head || document.documentElement).append(style);
+  }
+
+  // --- Démarrage ----------------------------------------------------------------
+
+  if (modeJeu) {
+    try {
+      var textes = JSON.parse(blocJeu.textContent);
+      for (var l in textes) if (Object.prototype.hasOwnProperty.call(textes, l)) ajouter(l, textes[l]);
+    } catch (e) {
+      avertir('textes du jeu illisibles (' + e.message + ')');
+    }
+  }
+
+  window.JEL_I18N = {
+    LANGUES: LANGUES.slice(),
+    NOMS: NOMS,
+    SOURCE: SOURCE,
+    getLang: function () { return langue; },
+    setLang: setLang,
+    t: t,
+    has: has,
+    nombre: nombre,
+    date: date,
+    appliquer: appliquer,
+    ajouter: ajouter,
+    charger: charger,
+    surChangement: surChangement,
+    creerSelecteur: creerSelecteur,
+  };
+  if (!('t' in window)) window.t = t;
+
+  if (!modeJeu) ajouterStyle();
+
+  if (modeJeu) {
+    var demarrer = function () {
+      appliquer(document);
+      // data-place="id1 id2" : bouton(s) dans ces éléments du jeu ; sinon dans le coin data-coin.
+      var places = (blocJeu.getAttribute('data-place') || '').split(/\s+/).map(function (id) { return id && document.getElementById(id); }).filter(Boolean);
+      var coin = blocJeu.getAttribute('data-coin') || 'haut-gauche';
+      if (places.length) places.forEach(function (el) { creerSelecteur({ conteneur: el, isole: true }); });
+      else if (coin !== 'aucun' && document.body) {
+        creerSelecteur({ conteneur: document.body, coin: coin, decalage: blocJeu.getAttribute('data-coin-decalage') || '' });
+      }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
+    else demarrer();
+  }
+})();
+</script>
+</head>
+<body>
+<canvas id="fond" aria-hidden="true"></canvas>
+
+<!-- ===== Accueil ===== -->
+<div id="ecran-accueil" class="ecran">
+  <div class="coin-g" id="langue-accueil"></div>
+  <button class="rond coin-d" id="b-son-accueil" data-i18n-aria="son"></button>
+  <div id="accueil-haut">
+    <h1 data-i18n="titre"></h1>
+    <p data-i18n="consignes_accueil"></p>
+  </div>
+  <div id="accueil-bas">
+    <div id="accueil-etoiles"></div>
+    <button class="bouton principal geant" id="b-jouer" data-i18n="jouer"></button>
+    <div class="rangee" style="margin-top:0">
+      <button class="bouton" id="b-niveaux-accueil" data-i18n="niveaux"></button>
+      <button class="bouton" id="b-decors" data-i18n="decors"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Choix du niveau ===== -->
+<div id="ecran-niveaux" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 data-i18n="choisis_niveau"></h2>
+    <p id="niveaux-total"></p>
+    <div id="liste-niveaux"></div>
+    <div class="rangee"><button class="bouton" id="b-niveaux-retour" data-i18n="accueil"></button></div>
+  </div>
+</div>
+
+<!-- ===== Décors (récompenses) ===== -->
+<div id="ecran-decors" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 data-i18n="decors"></h2>
+    <p id="decors-total"></p>
+    <div class="section-decor"><h3 data-i18n="drapeaux"></h3><div class="choix-decor" id="choix-drapeau"></div></div>
+    <div class="section-decor"><h3 data-i18n="tours_decorees"></h3><div class="choix-decor" id="choix-tour"></div></div>
+    <div class="section-decor"><h3 data-i18n="plages"></h3><div class="choix-decor" id="choix-plage"></div></div>
+    <div class="rangee"><button class="bouton" id="b-decors-retour" data-i18n="accueil"></button></div>
+  </div>
+</div>
+
+<!-- ===== Partie ===== -->
+<div id="jeu" hidden>
+  <div id="barre">
+    <button class="rond" id="b-pause" data-i18n-aria="pause">⏸</button>
+    <div id="titre-niveau"></div>
+    <div class="compteur" id="compteur-seaux"><canvas data-ico="seau" width="56" height="56"></canvas><span id="nb-seaux"></span></div>
+    <div class="compteur" id="compteur-coqs" hidden><canvas data-ico="coquillage" width="56" height="56"></canvas><span id="nb-coqs"></span></div>
+    <button class="rond" id="b-son-jeu" data-i18n-aria="son"></button>
+  </div>
+  <div id="annonce">
+    <div id="annonce-titre" data-i18n="vagues_annoncees"></div>
+    <div id="vagues-liste"></div>
+  </div>
+  <div id="zone-plage"><canvas id="plage"></canvas></div>
+  <div id="message" aria-live="polite"></div>
+  <div id="outils"></div>
+  <div id="actions">
+    <button class="rond" id="b-annuler" data-i18n-aria="annuler">↶</button>
+    <button class="rond" id="b-apercu" data-i18n-aria="apercu">👁</button>
+    <button class="bouton bleu" id="b-lancer" data-i18n="lancer"></button>
+    <div id="attente" hidden><div id="attente-barre"></div></div>
+    <button class="bouton bleu" id="b-suivante" data-i18n="vague_suivante" hidden></button>
+  </div>
+</div>
+
+<!-- ===== Tutoriel / présentation du niveau ===== -->
+<div id="ecran-carte" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 id="carte-titre"></h2>
+    <p id="carte-sous-titre"></p>
+    <canvas id="tuto-canvas" width="480" height="536" hidden></canvas>
+    <div class="points-tuto" id="tuto-points"></div>
+    <p id="tuto-texte"></p>
+    <div class="objectifs" id="carte-objectifs"></div>
+    <div class="rangee"><button class="bouton principal" id="b-carte-ok" data-i18n="cest_parti"></button></div>
+  </div>
+</div>
+
+<!-- ===== Pause ===== -->
+<div id="ecran-pause" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 data-i18n="pause_titre"></h2>
+    <div class="colonne">
+      <button class="bouton principal" id="b-reprendre" data-i18n="reprendre"></button>
+      <button class="bouton" id="b-recommencer" data-i18n="recommencer"></button>
+      <button class="bouton" id="b-aide" data-i18n="revoir_aide"></button>
+      <button class="bouton" id="b-pause-accueil" data-i18n="accueil"></button>
+    </div>
+    <div class="rangee"><button class="rond" id="b-son-pause" data-i18n-aria="son"></button><div id="langue-pause"></div></div>
+    <p class="aide-clavier" data-i18n="aide_clavier"></p>
+  </div>
+</div>
+
+<!-- ===== Fin de niveau (victoire ou défaite) ===== -->
+<div id="ecran-fin" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 id="fin-titre"></h2>
+    <p id="fin-phrase"></p>
+    <div id="fin-etoiles"><span>⭐</span><span>⭐</span><span>⭐</span></div>
+    <div id="fin-score"></div>
+    <div id="fin-badges"></div>
+    <p id="fin-detail"></p>
+    <div class="rangee" id="fin-boutons">
+      <button class="bouton principal" id="b-suivant" data-i18n="niveau_suivant"></button>
+      <button class="bouton principal" id="b-reessayer" data-i18n="reessayer"></button>
+      <button class="bouton" id="b-rejouer" data-i18n="rejouer"></button>
+      <button class="bouton" id="b-fin-niveaux" data-i18n="niveaux"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Bilan final ===== -->
+<div id="ecran-bilan" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 data-i18n="bilan_titre"></h2>
+    <p data-i18n="bilan_phrase"></p>
+    <div id="fin-etoiles-bilan" style="font-size:40px">⭐</div>
+    <p id="bilan-etoiles"></p>
+    <p id="bilan-score"></p>
+    <div class="rangee">
+      <button class="bouton principal" id="b-bilan-rejouer" data-i18n="rejouer"></button>
+      <button class="bouton" id="b-bilan-niveaux" data-i18n="niveaux"></button>
+      <button class="bouton" id="b-bilan-accueil" data-i18n="accueil"></button>
+    </div>
+  </div>
+</div>
+
+<canvas id="effets" aria-hidden="true"></canvas>
+
+<script>
+(function () {
+  'use strict';
+  var I18N = window.JEL_I18N;
+  // Texte traduit ; en français, espace insécable avant ! ? : ; (pas de « ! » seul en début de ligne)
+  function insecables(s) { return I18N.getLang() === 'fr' ? String(s).replace(/ ([!?:;])/g, ' $1') : s; }
+  function T(cle, vars) { return insecables(I18N.t(cle, vars)); }
+  function N(x) { return I18N.nombre(x); }
+  function $(id) { return document.getElementById(id); }
+
+  // ==========================================================================
+  // MOTEUR DE LA MARÉE (fonctions pures, sans dessin)
+  // Grille de LARG × HAUT cases ; rangées 0 et 1 = mer, rangées 2 à 9 = plage.
+  // Une vague, large de 3 cases, arrive par le haut ou par un côté avec une
+  // force (nombre de cases de sable qu'elle peut mouiller) : l'eau s'étale
+  // d'abord vers les cases les plus proches. L'eau déjà sur la plage reste :
+  // chaque vague repart de toute l'eau reliée à son entrée (la marée monte).
+  // Chaque mur que l'eau touche perd des crans (1, 2 ou 3 selon la vague) ;
+  // à 0, il s'effondre.
+  // ==========================================================================
+  var LARG = 7, HAUT = 10, PLAGE0 = 2;
+  var PV = { muret: 2, tour: 4 };            // crans des murs
+  var COUT = { muret: 1, fosse: 1, tour: 2, rigole: 2, coquillage: 0 };
+  var CAP_FOSSE = 3;                          // cases d'eau avalées par un fossé
+  var DEBIT_RIGOLE = 3;                       // cases d'eau renvoyées à la mer, par vague et par case de rigole
+  var BONUS_SEAU = 2;                         // seaux donnés par un seau perdu
+  var BONUS_COQ = 2;                          // crans ajoutés par un coquillage
+
+  // Carte du niveau (8 lignes de 7 caractères) → grille de cases.
+  //   .  sable   #  rocher   D  donjon   o  coquillage   s  seau perdu
+  function creerGrille(carte) {
+    var g = [];
+    for (var r = 0; r < HAUT; r++) {
+      for (var c = 0; c < LARG; c++) {
+        var ch = r < PLAGE0 ? '~' : carte[r - PLAGE0].charAt(c);
+        var k = { t: 'sable', pv: 0, cap: 0, troue: false, coq: false, seau: false, q: 0, coqs: 0 };
+        if (ch === '~') k.t = 'mer';
+        else if (ch === '#') k.t = 'rocher';
+        else if (ch === 'D') k.t = 'donjon';
+        else if (ch === 'o') k.coq = true;
+        else if (ch === 's') k.seau = true;
+        g.push(k);
+      }
+    }
+    return g;
+  }
+
+  function copierCase(k) { return { t: k.t, pv: k.pv, cap: k.cap, troue: k.troue, coq: k.coq, seau: k.seau, q: k.q, coqs: k.coqs }; }
+  function copierGrille(g) { return g.map(copierCase); }
+  function idx(r, c) { return r * LARG + c; }
+  function dansPlage(r, c) { return r >= PLAGE0 && r < HAUT && c >= 0 && c < LARG; }
+
+  // Vague du niveau → liste d'entrées { r, c, cote, cases } (cases du bord touchées).
+  //   { h: 3 } ou { h: [1, 5] } : par le haut (colonnes) ; { g: 5 } / { d: 5 } : côté gauche / droit (rangée)
+  //   f : force ; p : dégâts aux murs (1 par défaut, 2 grande vague, 3 vague géante)
+  function entreesVague(v) {
+    var e = [];
+    function largeur(r, c, cote) {
+      var cases = [];
+      for (var d = -1; d <= 1; d++) {
+        var rr = cote === 'h' ? r : r + d, cc = cote === 'h' ? c + d : c;
+        if (dansPlage(rr, cc)) cases.push(idx(rr, cc));
+      }
+      e.push({ r: r, c: c, cote: cote, cases: cases });
+    }
+    if (v.h !== undefined) [].concat(v.h).forEach(function (c) { largeur(PLAGE0, c, 'h'); });
+    if (v.g !== undefined) [].concat(v.g).forEach(function (r) { largeur(r, 0, 'g'); });
+    if (v.d !== undefined) [].concat(v.d).forEach(function (r) { largeur(r, LARG - 1, 'd'); });
+    return e;
+  }
+
+  function estMur(k) { return (k.t === 'muret' || k.t === 'tour') && !k.troue; }
+
+  // Peut-on construire ici ? (rigole : rangée du bord de l'eau ou à côté d'une autre rigole)
+  function peutConstruire(g, r, c, outil) {
+    if (!dansPlage(r, c)) return false;
+    var k = g[idx(r, c)];
+    if (outil === 'coquillage') return estMur(k);
+    if (k.t !== 'sable' || k.coq || k.seau) return false;
+    if (outil === 'rigole') {
+      if (r === PLAGE0) return true;
+      return [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].some(function (p) {
+        return dansPlage(p[0], p[1]) && g[idx(p[0], p[1])].t === 'rigole';
+      });
+    }
+    return true;
+  }
+
+  function construire(g, r, c, outil) {
+    var k = g[idx(r, c)];
+    if (outil === 'coquillage') { k.pv += BONUS_COQ; k.coqs++; return; }
+    k.t = outil;
+    if (outil === 'muret' || outil === 'tour') k.pv = PV[outil];
+    if (outil === 'fosse') k.cap = CAP_FOSSE;
+  }
+
+  // Une vague. Modifie la grille et renvoie ce qui s'est passé, dans l'ordre,
+  // pour l'animation : { pas: [{ i, quoi }], touches: [i], effondres: [i], noye: i | -1, emportes: [i] }
+  function vague(g, v) {
+    var res = { pas: [], touches: [], effondres: [], noye: -1, emportes: [] };
+    var touches = {};
+    var degats = v.p || 1;
+    g.forEach(function (k) { if (k.t === 'rigole') k.q = DEBIT_RIGOLE; });
+    var entrees = entreesVague(v);
+    for (var e = 0; e < entrees.length && res.noye < 0; e++) {
+      var V = v.f;
+      var dist = new Array(LARG * HAUT).fill(Infinity);
+      var vu = new Array(LARG * HAUT).fill(false);
+      var file = [];
+      var milieu = idx(entrees[e].r, entrees[e].c);
+      // Départ : les cases du bord touchées par la vague (case du milieu d'abord)
+      entrees[e].cases.slice().sort(function (a, b) { return Math.abs(a - milieu) - Math.abs(b - milieu); }).forEach(function (depart) {
+        var k0 = g[depart];
+        if (estMur(k0)) { touches[depart] = true; return; }
+        if (k0.t === 'rocher') return;
+        dist[depart] = 0;
+        file.push(depart);
+      });
+      while (file.length) {
+        var i = file.shift();
+        if (vu[i]) continue;
+        vu[i] = true;
+        var k = g[i];
+        var r = Math.floor(i / LARG), c = i % LARG;
+        var etaler = true;
+        if (k.t === 'eau') {
+          // déjà mouillée : l'eau passe
+        } else if (k.t === 'sable' || k.troue) {
+          if (V <= 0) break;
+          if (k.coq || k.seau) res.emportes.push(i);
+          res.pas.push({ i: i, quoi: k.troue ? 'troue' : 'eau', avant: copierCase(k) });
+          k.t = 'eau'; k.coq = false; k.seau = false; k.troue = false; k.pv = 0; k.coqs = 0;
+          V--;
+        } else if (k.t === 'fosse') {
+          if (V <= 0) break;
+          var avantF = copierCase(k);
+          var a = Math.min(V, k.cap);
+          k.cap -= a; V -= a;
+          res.pas.push({ i: i, quoi: k.cap === 0 ? 'fossePlein' : 'fosse', avant: avantF });
+          if (k.cap === 0) k.t = 'eau';
+          etaler = false;
+        } else if (k.t === 'rigole') {
+          if (k.q > 0) {
+            if (V <= 0) break;
+            var b = Math.min(V, k.q);
+            k.q -= b; V -= b;
+            res.pas.push({ i: i, quoi: 'rigole' });
+            if (k.q > 0) etaler = false;
+          }
+        } else if (k.t === 'donjon') {
+          if (V <= 0) break;
+          res.noye = i;
+          res.pas.push({ i: i, quoi: 'donjon' });
+          break;
+        }
+        if (!etaler) continue;
+        // Voisins : bas, gauche, droite, haut
+        var vois = [[r + 1, c], [r, c - 1], [r, c + 1], [r - 1, c]];
+        for (var n = 0; n < 4; n++) {
+          var rr = vois[n][0], cc = vois[n][1];
+          if (!dansPlage(rr, cc)) continue;
+          var j = idx(rr, cc), kj = g[j];
+          if (estMur(kj)) { touches[j] = true; continue; }
+          if (kj.t === 'rocher' || vu[j]) continue;
+          var cout = kj.t === 'eau' ? 0 : 1;
+          var d = dist[i] + cout;
+          if (d < dist[j]) {
+            dist[j] = d;
+            if (cout === 0) file.unshift(j); else file.push(j);
+          }
+        }
+      }
+    }
+    if (res.noye >= 0) return res;
+    // Usure des murs touchés
+    Object.keys(touches).forEach(function (s) {
+      var i = +s, k = g[i];
+      if (!estMur(k)) return;
+      res.touches.push(i);
+      k.pv -= degats;
+      if (k.pv <= 0) { res.effondres.push({ i: i, avant: copierCase(k) }); k.t = 'sable'; k.pv = 0; k.coqs = 0; }
+    });
+    return res;
+  }
+
+  // Toute la marée (aperçu, vérification) : { noye, vagueNoye, mouille: n° de vague par case ou -1 }
+  function simulerMaree(g, vagues) {
+    var mouille = g.map(function () { return -1; });
+    for (var n = 0; n < vagues.length; n++) {
+      var res = vague(g, vagues[n]);
+      res.pas.forEach(function (p) { if (mouille[p.i] < 0) mouille[p.i] = n; });
+      if (res.noye >= 0) return { noye: true, vagueNoye: n, mouille: mouille, iNoye: res.noye };
+    }
+    return { noye: false, vagueNoye: -1, mouille: mouille };
+  }
+
+  function casesSeches(g) {
+    var n = 0;
+    g.forEach(function (k) { if (k.t !== 'mer' && k.t !== 'eau' && k.t !== 'rocher') n++; });
+    return n;
+  }
+
+  // ==========================================================================
+  // NIVEAUX — carte de la plage (rangées 2 à 9), seaux, seuils d'étoiles
+  // (seaux gardés en réserve : s2 → 2 étoiles, s3 → 3 étoiles), vagues dans
+  // l'ordre, crabes (arrivent avant la vague n° v, par la colonne c),
+  // nouveauté présentée par un tutoriel.
+  //   carte :  .  sable   #  rocher   D  donjon   o  coquillage   s  seau perdu
+  //   vague :  h colonne(s) par le haut, g / d rangée par la gauche / la droite,
+  //            f force (cases mouillées), p dégâts aux murs (1, 2 ou 3)
+  // Chaque niveau a été vérifié par simulation : une solution 3 étoiles existe
+  // (sans compter les crabes) et, sans rien construire, le donjon est mouillé.
+  // ==========================================================================
+  var NIVEAUX = [
+    // ---- Plage des Mouettes ----
+    { plage: 0, nouveau: 'muret', seaux: 6, s2: 1, s3: 2,
+      carte: ['.......', '.......', '.......', '.......', '.......', '.......', '.......', '...D...'],
+      vagues: [{ h: 3, f: 60 }] },
+    { plage: 0, nouveau: 'reserve', seaux: 6, s2: 1, s3: 2,
+      carte: ['.......', '.......', '.......', '.......', '.......', '.......', '.......', '.D.....'],
+      vagues: [{ h: 1, f: 26 }, { h: 5, f: 30 }] },
+    { plage: 0, nouveau: 'fosse', seaux: 6, s2: 1, s3: 2,
+      carte: ['.......', '.......', '.......', '.......', '.......', '.......', '.......', '.....D.'],
+      vagues: [{ h: 5, f: 22 }, { h: 3, f: 16 }, { h: 6, f: 16 }] },
+    { plage: 0, nouveau: 'rochers', seaux: 5, s2: 1, s3: 2,
+      carte: ['.......', '.......', '.......', '.......', '##.#.##', '.......', '.......', '...D...'],
+      vagues: [{ h: 2, f: 20 }, { h: 4, f: 20 }, { h: 3, f: 24 }] },
+    { plage: 0, nouveau: 'cote', seaux: 7, s2: 1, s3: 2,
+      carte: ['.......', '.......', '.......', '.......', '.#.....', '.#.....', '.......', '.D.....'],
+      vagues: [{ h: 3, f: 24 }, { g: 7, f: 12 }, { h: 1, f: 20 }, { d: 9, f: 16 }] },
+    { plage: 0, nouveau: 'tour', seaux: 5, s2: 1, s3: 2,
+      carte: ['.......', '.......', '###.###', '.......', '.......', '.......', '.......', '...D...'],
+      vagues: [{ h: 3, f: 20 }, { h: 3, f: 20 }, { h: 3, f: 20 }, { h: 3, f: 20 }] },
+
+    // ---- Crique des Crabes ----
+    { plage: 1, nouveau: 'crabe', seaux: 7, s2: 2, s3: 3,
+      carte: ['.......', '.......', '.......', '.......', '.......', '.......', '#.....#', '##.D.##'],
+      vagues: [{ h: 3, f: 24 }, { h: 1, f: 18 }, { h: 5, f: 18 }],
+      crabes: [{ v: 0, c: 0 }, { v: 1, c: 6 }] },
+    { plage: 1, nouveau: 'grande', seaux: 7, s2: 2, s3: 3,
+      carte: ['.......', '.......', '.......', '.......', '.......', '.......', '.......', 'D......'],
+      vagues: [{ h: 2, f: 30 }, { h: 4, f: 20, p: 2 }, { h: 0, f: 16, p: 2 }],
+      crabes: [{ v: 1, c: 5 }] },
+    { plage: 1, seaux: 10, s2: 2, s3: 3,
+      carte: ['.......', '.......', '...#...', '...#...', '.......', '.......', '.......', '.....D.'],
+      vagues: [{ h: 4, f: 20 }, { d: 6, f: 10 }, { h: 2, f: 20 }, { d: 8, f: 10 }, { h: 5, f: 16, p: 2 }],
+      crabes: [{ v: 0, c: 1 }, { v: 2, c: 6 }, { v: 3, c: 0 }] },
+    { plage: 1, nouveau: 'coquillage', seaux: 7, s2: 2, s3: 3,
+      carte: ['.o.....', '.......', '.....o.', '.......', '.......', '.......', '.......', '...D...'],
+      vagues: [{ h: 3, f: 30, p: 2 }, { h: 2, f: 20, p: 2 }, { h: 4, f: 20, p: 2 }],
+      crabes: [{ v: 1, c: 0 }] },
+    { plage: 1, nouveau: 'seau', seaux: 6, s2: 2, s3: 3,
+      carte: ['.......', '.....s.', '.......', '.......', '#.....#', '.......', '.......', '..D....'],
+      vagues: [{ h: 2, f: 20 }, { h: 4, f: 18 }, { g: 7, f: 10 }, { h: 3, f: 18, p: 2 }],
+      crabes: [{ v: 1, c: 6 }, { v: 2, c: 0 }] },
+    { plage: 1, nouveau: 'double', seaux: 10, s2: 2, s3: 3,
+      carte: ['.......', '.......', '.......', '.......', '.......', '.......', '.......', '...D...'],
+      vagues: [{ h: [1, 5], f: 14 }, { h: [0, 6], f: 14 }, { h: [2, 4], f: 14 }, { h: 3, f: 18, p: 2 }],
+      crabes: [{ v: 1, c: 0 }, { v: 2, c: 6 }] },
+
+    // ---- Baie des Coquillages ----
+    { plage: 2, seaux: 7, s2: 2, s3: 3,
+      carte: ['.......', '.o...o.', '#.#.#.#', '.......', '.......', '.......', '.......', '.D.....'],
+      vagues: [{ h: [1, 5], f: 14 }, { h: 3, f: 20, p: 2 }, { h: [1, 3], f: 12 }, { g: 8, f: 10, p: 2 }],
+      crabes: [{ v: 1, c: 6 }, { v: 2, c: 0 }] },
+    { plage: 2, nouveau: 'deuxDonjons', seaux: 10, s2: 2, s3: 3,
+      carte: ['.......', '.......', '.......', '.......', '.......', '.......', '.......', 'D.....D'],
+      vagues: [{ h: 3, f: 26 }, { h: [1, 5], f: 12 }, { h: 3, f: 20, p: 2 }, { h: [0, 6], f: 10 }],
+      crabes: [{ v: 1, c: 3 }, { v: 3, c: 0 }] },
+    { plage: 2, seaux: 10, s2: 2, s3: 3,
+      carte: ['o.....o', '.......', '..#.#..', '.......', '...o...', '.......', '.......', '...D...'],
+      vagues: [{ h: 3, f: 20 }, { g: 5, f: 10 }, { h: [1, 5], f: 12, p: 2 }, { d: 7, f: 10 }, { h: 3, f: 16, p: 2 }, { g: 9, f: 8 }],
+      crabes: [{ v: 1, c: 0 }, { v: 2, c: 6 }, { v: 4, c: 1 }] },
+    { plage: 2, nouveau: 'rigole', seaux: 8, s2: 2, s3: 3,
+      carte: ['.......', '.......', '.......', '.......', '.......', '.......', '.......', '...D...'],
+      vagues: [{ h: 3, f: 14 }, { h: 3, f: 14 }, { h: 3, f: 14 }, { h: 3, f: 14 }, { h: 3, f: 14 }, { h: 3, f: 14 }] },
+    { plage: 2, seaux: 10, s2: 2, s3: 3,
+      carte: ['.......', '#.....#', '##...##', '.......', '.......', '.#...#.', '.......', '...D...'],
+      vagues: [{ h: 3, f: 14 }, { h: 2, f: 12 }, { h: 4, f: 12 }, { h: 3, f: 14, p: 2 }, { h: 3, f: 12 }, { h: [2, 4], f: 10 }, { h: 3, f: 14 }],
+      crabes: [{ v: 2, c: 0 }, { v: 4, c: 6 }] },
+    { plage: 2, seaux: 11, s2: 2, s3: 3,
+      carte: ['.......', '.......', '.......', '..o....', '.......', '.......', '.......', '....D..'],
+      vagues: [{ h: 4, f: 16 }, { g: 4, f: 10 }, { h: 2, f: 14 }, { d: 6, f: 10, p: 2 }, { h: 4, f: 14 }, { g: 8, f: 10 }, { h: [2, 5], f: 12, p: 2 }],
+      crabes: [{ v: 1, c: 6 }, { v: 3, c: 0 }, { v: 5, c: 6 }] },
+
+    // ---- Pointe des Rigoles ----
+    { plage: 3, nouveau: 'rapide', seaux: 9, s2: 2, s3: 3,
+      carte: ['.......', '.......', '.......', '.......', '...#...', '.......', '.......', '..D....'],
+      vagues: [{ h: 2, f: 20 }, { h: 4, f: 18 }, { g: 8, f: 10 }, { h: 2, f: 18, p: 2 }, { d: 6, f: 12 }],
+      crabes: [{ v: 0, c: 0, rapide: true }, { v: 2, c: 6, rapide: true }, { v: 3, c: 0 }] },
+    { plage: 3, seaux: 12, s2: 2, s3: 3,
+      carte: ['.......', '...s...', '.......', '.......', '.......', '.......', '.......', '.D...D.'],
+      vagues: [{ h: [1, 5], f: 14 }, { h: 3, f: 18, p: 2 }, { h: [0, 6], f: 12 }, { h: [2, 4], f: 12, p: 2 }, { h: 3, f: 16 }],
+      crabes: [{ v: 1, c: 0, rapide: true }, { v: 2, c: 6 }, { v: 4, c: 3, rapide: true }] },
+    { plage: 3, seaux: 10, s2: 2, s3: 3,
+      carte: ['.o.....', '.......', '.#...#.', '.......', '.....o.', '.......', '...s...', '..D....'],      vagues: [{ h: 3, f: 16 }, { d: 5, f: 10 }, { h: 1, f: 14, p: 2 }, { g: 6, f: 10 }, { h: [0, 4], f: 12 }, { d: 8, f: 10, p: 2 }, { h: 2, f: 14 }, { h: 0, f: 12, p: 2 }],
+      crabes: [{ v: 1, c: 6 }, { v: 3, c: 6, rapide: true }, { v: 5, c: 0 }, { v: 6, c: 6, rapide: true }] },
+    { plage: 3, nouveau: 'geante', seaux: 11, s2: 2, s3: 3,
+      carte: ['.......', '.o...o.', '.......', '.......', '.......', '.......', '.......', '...D...'],
+      vagues: [{ h: 3, f: 24 }, { h: 2, f: 14, p: 2 }, { h: 4, f: 18, p: 3 }, { h: 3, f: 14 }, { h: [1, 5], f: 12, p: 3 }],
+      crabes: [{ v: 1, c: 0 }, { v: 3, c: 6, rapide: true }] },
+    { plage: 3, seaux: 14, s2: 2, s3: 3,
+      carte: ['.......', '..#.#..', '.......', 'o.....o', '.......', '.#...#.', '.......', '.D...D.'],
+      vagues: [{ h: 3, f: 16 }, { g: 4, f: 10 }, { d: 4, f: 10 }, { h: [1, 5], f: 12, p: 2 }, { g: 8, f: 8 }, { d: 8, f: 8 }, { h: 3, f: 16, p: 3 }],
+      crabes: [{ v: 1, c: 0 }, { v: 3, c: 6, rapide: true }, { v: 5, c: 0, rapide: true }] },
+    { plage: 3, seaux: 12, s2: 2, s3: 3,
+      carte: ['.......', '.o.#.o.', '.......', '.......', '..s....', '.......', '##...##', '...D...'],
+      vagues: [{ h: [2, 4], f: 12 }, { g: 5, f: 10 }, { d: 5, f: 10, p: 2 }, { h: 3, f: 18, p: 3 }, { h: [0, 6], f: 12 }, { g: 8, f: 8 }, { d: 8, f: 8, p: 2 }, { h: 3, f: 16, p: 3 }],
+      crabes: [{ v: 0, c: 0 }, { v: 2, c: 6, rapide: true }, { v: 4, c: 0, rapide: true }, { v: 6, c: 6, rapide: true }] }
+  ];
+  window.JEL_NIVEAUX = NIVEAUX.length;
+
+  // Outils disponibles selon le niveau (indice à partir de 0)
+  function outilsDuNiveau(n) {
+    var o = ['muret'];
+    if (n >= 2) o.push('fosse');
+    if (n >= 5) o.push('tour');
+    if (n >= 9) o.push('coquillage');
+    if (n >= 15) o.push('rigole');
+    return o;
+  }
+  // Outils montrés en bas de l'écran : le coquillage seulement s'il y en a sur la plage
+  function outilsAffiches(n) {
+    var avecCoqs = NIVEAUX[n].carte.join('').indexOf('o') >= 0;
+    return outilsDuNiveau(n).filter(function (o) { return o !== 'coquillage' || avecCoqs; });
+  }
+
+  // ==========================================================================
+  // RÉCOMPENSES : décors débloqués par les étoiles
+  // ==========================================================================
+  var DRAPEAUX = [0, 5, 12, 20, 30, 45];        // étoiles nécessaires
+  var STYLES_TOUR = [0, 8, 18, 35];
+  var PLAGES_DECOR = [0, 10, 25, 50];
+  var PALETTES = [
+    { ciel: ['#7fcbff', '#d9f2ff'], mer: '#2588d0', merClair: '#62c3f2', eau: '#3b9fe0', eauClair: '#8fd4ff', sable: '#f2d69b', sableFonce: '#dcb877', grain: '#c99f5c', astre: '#fff2a0', corps: '#bfe8ff' },
+    { ciel: ['#ff8f6b', '#ffd59a'], mer: '#3a5ea8', merClair: '#e7898f', eau: '#4a72b8', eauClair: '#f2a6a0', sable: '#f0c48a', sableFonce: '#d9a466', grain: '#b98247', astre: '#ffd15c', corps: '#ffc49a' },
+    { ciel: ['#0d1b45', '#2c3f7a'], mer: '#143e70', merClair: '#3d6fa8', eau: '#22568f', eauClair: '#5f8fc4', sable: '#c9bf9f', sableFonce: '#ab9f7e', grain: '#8c8062', astre: '#f4f1d0', corps: '#1e2f60' },
+    { ciel: ['#f6a9cf', '#fde2c6'], mer: '#5d9ad6', merClair: '#c6a7e6', eau: '#6ea8de', eauClair: '#d6b8f0', sable: '#f6dab0', sableFonce: '#e2bd8a', grain: '#c99a6a', astre: '#fff0c0', corps: '#f8cfe0' }
+  ];
+
+  // ==========================================================================
+  // SAUVEGARDE (toujours dans try/catch : le cadre isolé peut refuser le stockage)
+  // ==========================================================================
+  var CLE = 'jel-chateaux-de-sable-v1';
+  var SAUVE = { debloque: 1, etoiles: [], records: [], son: true, drapeau: 0, tour: 0, plage: 0, tutos: {} };
+  try {
+    var lu = JSON.parse(localStorage.getItem(CLE) || 'null');
+    if (lu && typeof lu === 'object') Object.keys(SAUVE).forEach(function (k) { if (lu[k] !== undefined) SAUVE[k] = lu[k]; });
+  } catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+  function sauver() { try { localStorage.setItem(CLE, JSON.stringify(SAUVE)); } catch (e) { /* ignoré */ } }
+  function totalEtoiles() { return SAUVE.etoiles.reduce(function (s, e) { return s + (e || 0); }, 0); }
+  function palette() { return PALETTES[SAUVE.plage] || PALETTES[0]; }
+
+  // ==========================================================================
+  // SONS (Web Audio, aucun fichier ; rien avant le premier toucher)
+  // ==========================================================================
+  var audio = null, bruitBuf = null;
+  function demarrerAudio() {
+    if (audio) { if (audio.state === 'suspended' && !S.pause) audio.resume().catch(function () {}); return; }
+    try {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      audio = new AC();
+      bruitBuf = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
+      var d = bruitBuf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    } catch (e) { audio = null; }
+  }
+  function note(freq, duree, type, vol, retard, glisse) {
+    if (!audio || !SAUVE.son || audio.state !== 'running') return;
+    var t0 = audio.currentTime + (retard || 0);
+    var o = audio.createOscillator(), g = audio.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t0);
+    if (glisse) o.frequency.exponentialRampToValueAtTime(glisse, t0 + duree);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.15, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duree);
+    o.connect(g).connect(audio.destination);
+    o.start(t0); o.stop(t0 + duree + 0.05);
+  }
+  function bruit(duree, freq, vol, retard, freqFin, q) {
+    if (!audio || !SAUVE.son || audio.state !== 'running') return;
+    var t0 = audio.currentTime + (retard || 0);
+    var s = audio.createBufferSource(), f = audio.createBiquadFilter(), g = audio.createGain();
+    s.buffer = bruitBuf; s.loop = true;
+    f.type = 'bandpass'; f.Q.value = q || 1;
+    f.frequency.setValueAtTime(freq, t0);
+    if (freqFin) f.frequency.exponentialRampToValueAtTime(freqFin, t0 + duree);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + Math.min(0.08, duree / 3));
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duree);
+    s.connect(f).connect(g).connect(audio.destination);
+    s.start(t0); s.stop(t0 + duree + 0.05);
+  }
+  var SON = {
+    bouton: function () { note(660, 0.07, 'triangle', 0.08); },
+    pelle: function () { bruit(0.16, 900, 0.25, 0, 400, 0.8); note(180, 0.1, 'sine', 0.08); },
+    creuse: function () { bruit(0.22, 500, 0.25, 0, 220, 1.2); },
+    tour: function () { bruit(0.12, 900, 0.22); bruit(0.14, 700, 0.22, 0.12); note(330, 0.12, 'triangle', 0.08, 0.2); },
+    rigole: function () { bruit(0.3, 700, 0.2, 0, 1800, 2); },
+    vague: function (fort) { bruit(1.3, 300, fort ? 0.4 : 0.28, 0, 1400, 0.7); bruit(0.9, 1600, 0.12, 0.4, 500, 0.6); },
+    choc: function () { note(110, 0.18, 'sine', 0.22, 0, 60); bruit(0.12, 400, 0.15); },
+    effondre: function () { bruit(0.45, 350, 0.3, 0, 120, 0.8); note(90, 0.3, 'triangle', 0.15, 0, 45); },
+    crabe: function () { note(1200, 0.04, 'square', 0.04); note(1400, 0.04, 'square', 0.04, 0.07); },
+    chasse: function () { note(500, 0.2, 'triangle', 0.12, 0, 1400); },
+    trou: function () { bruit(0.25, 600, 0.22, 0, 250, 1.5); note(300, 0.15, 'square', 0.05, 0.05, 150); },
+    ramasse: function () { note(880, 0.1, 'sine', 0.14); note(1320, 0.16, 'sine', 0.14, 0.08); },
+    erreur: function () { note(180, 0.18, 'square', 0.07, 0, 140); },
+    etoile: function (n) { note(880 * Math.pow(1.26, n), 0.25, 'sine', 0.16); note(1760 * Math.pow(1.26, n), 0.2, 'triangle', 0.05, 0.03); },
+    victoire: function () { [523, 659, 784, 1047].forEach(function (f, i) { note(f, 0.28, 'triangle', 0.15, i * 0.12); }); },
+    defaite: function () { [392, 330, 262, 196].forEach(function (f, i) { note(f, 0.32, 'sine', 0.14, i * 0.16); }); },
+    eclabousse: function () { bruit(0.35, 1200, 0.2, 0, 400, 1); }
+  };
+
+  // ==========================================================================
+  // ÉTAT DE LA PARTIE
+  // ==========================================================================
+  var S = {
+    ecran: 'accueil', n: 0, niv: null, g: null, seaux: 0, coqs: 0, outil: 'muret', phase: 'construction',
+    vagueN: 0, attente: 0, anim: null, crabes: [], historique: [], apercu: false, apercuRes: null,
+    curseur: { r: 6, c: 3 }, curseurVisible: false, chasses: 0, pause: false, horloge: 0,
+    eauA: [], fantome: {}, secousse: {}, particules: [], textes: [], tremble: 0, finA: 0, issue: null, demarre: false
+  };
+
+  // ==========================================================================
+  // DESSIN — fonctions communes (plage, tutoriel, icônes, accueil)
+  // ==========================================================================
+  function hasard(i) { var x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+
+  function rondRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+
+  function dessinerSable(ctx, x, y, s, i, P) {
+    ctx.fillStyle = P.sable; ctx.fillRect(x, y, s + 0.5, s + 0.5);
+    ctx.fillStyle = P.grain;
+    for (var k = 0; k < 5; k++) {
+      ctx.globalAlpha = 0.35;
+      ctx.fillRect(x + hasard(i * 9 + k) * s, y + hasard(i * 7 + k * 3) * s, s * 0.05, s * 0.05);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function dessinerEau(ctx, x, y, s, i, P, temps, alpha) {
+    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
+    ctx.fillStyle = P.eau; ctx.fillRect(x, y, s + 0.5, s + 0.5);
+    ctx.strokeStyle = P.eauClair; ctx.lineWidth = Math.max(1, s * 0.05); ctx.lineCap = 'round';
+    for (var k = 0; k < 2; k++) {
+      var yy = y + s * (0.3 + k * 0.4), dx = Math.sin(temps / 600 + i + k * 2) * s * 0.12;
+      ctx.beginPath();
+      ctx.moveTo(x + s * 0.2 + dx, yy);
+      ctx.quadraticCurveTo(x + s * 0.35 + dx, yy - s * 0.08, x + s * 0.5 + dx, yy);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function dessinerRocher(ctx, x, y, s, i) {
+    var cx = x + s / 2, cy = y + s * 0.55;
+    ctx.fillStyle = '#7d828c';
+    ctx.beginPath();
+    for (var k = 0; k < 8; k++) {
+      var a = k / 8 * Math.PI * 2, rr = s * (0.38 + hasard(i * 3 + k) * 0.08);
+      var px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr * 0.85;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#a3a8b1';
+    ctx.beginPath(); ctx.ellipse(cx - s * 0.1, cy - s * 0.12, s * 0.16, s * 0.1, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5f646d';
+    ctx.beginPath(); ctx.ellipse(cx + s * 0.12, cy + s * 0.15, s * 0.14, s * 0.06, 0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Petits points qui montrent les crans restants d'un mur
+  function dessinerCrans(ctx, x, y, s, pv) {
+    var n = Math.min(pv, 8), r = s * 0.05, total = n * r * 2.6;
+    for (var k = 0; k < n; k++) {
+      ctx.fillStyle = '#5a3a12';
+      ctx.beginPath(); ctx.arc(x + s / 2 - total / 2 + r * 1.3 + k * r * 2.6, y + s * 0.9, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function dessinerCoquillage(ctx, cx, cy, s, couleur) {
+    ctx.save(); ctx.translate(cx, cy);
+    ctx.fillStyle = couleur || '#ffd3dc'; ctx.strokeStyle = '#d98a9c'; ctx.lineWidth = Math.max(1, s * 0.06);
+    ctx.beginPath(); ctx.moveTo(0, s * 0.42);
+    ctx.arc(0, s * 0.02, s * 0.42, Math.PI * 0.95, Math.PI * 2.05); ctx.closePath(); ctx.fill(); ctx.stroke();
+    for (var k = -2; k <= 2; k++) {
+      ctx.beginPath(); ctx.moveTo(0, s * 0.4); ctx.lineTo(Math.sin(k * 0.45) * s * 0.38, s * 0.02 - Math.cos(k * 0.45) * s * 0.36); ctx.stroke();
+    }
+    ctx.fillStyle = couleur || '#ffd3dc';
+    ctx.fillRect(-s * 0.12, s * 0.36, s * 0.24, s * 0.1);
+    ctx.restore();
+  }
+
+  function dessinerSeau(ctx, cx, cy, s, couleur) {
+    ctx.save(); ctx.translate(cx, cy);
+    ctx.strokeStyle = '#555'; ctx.lineWidth = Math.max(1, s * 0.05);
+    ctx.beginPath(); ctx.arc(0, -s * 0.18, s * 0.3, Math.PI, 0); ctx.stroke();
+    ctx.fillStyle = couleur || '#ff5a5a';
+    ctx.beginPath(); ctx.moveTo(-s * 0.36, -s * 0.2); ctx.lineTo(s * 0.36, -s * 0.2); ctx.lineTo(s * 0.27, s * 0.4); ctx.lineTo(-s * 0.27, s * 0.4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(-s * 0.34, -s * 0.2, s * 0.68, s * 0.1);
+    ctx.fillStyle = '#f2d69b'; ctx.beginPath(); ctx.ellipse(0, -s * 0.2, s * 0.34, s * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // Drapeau qui flotte (6 styles, sans texte)
+  function dessinerDrapeau(ctx, x, y, s, style, temps) {
+    ctx.strokeStyle = '#6b4a22'; ctx.lineWidth = Math.max(1, s * 0.05);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - s * 0.6); ctx.stroke();
+    var w = s * 0.42, h = s * 0.26, top = y - s * 0.6;
+    function bord(t) { return Math.sin(temps / 220 + t * 4) * s * 0.035 * t; }
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(x, top);
+    for (var k = 0; k <= 6; k++) ctx.lineTo(x + w * k / 6, top + bord(k / 6));
+    for (k = 6; k >= 0; k--) ctx.lineTo(x + w * k / 6, top + h + bord(k / 6));
+    ctx.closePath();
+    var coul = ['#e8423a', '#2f6fd6', '#2fa64a', '#7b4fd0', '#f2b21c', '#e8423a'][style] || '#e8423a';
+    ctx.fillStyle = coul; ctx.fill(); ctx.clip();
+    if (style === 1) etoileForme(ctx, x + w * 0.5, top + h * 0.5 + bord(0.5), h * 0.36, '#fff');
+    if (style === 2) { ctx.fillStyle = '#fff'; ctx.fillRect(x, top + h * 0.33 - s * 0.04, w, h * 0.16); ctx.fillRect(x, top + h * 0.7 - s * 0.04, w, h * 0.16); }
+    if (style === 3) { ctx.fillStyle = '#ffe066'; ctx.beginPath(); ctx.arc(x + w * 0.5, top + h * 0.5, h * 0.32, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = coul; ctx.beginPath(); ctx.arc(x + w * 0.6, top + h * 0.42, h * 0.28, 0, Math.PI * 2); ctx.fill(); }
+    if (style === 4) { ctx.fillStyle = '#ff7a1a'; ctx.beginPath(); ctx.arc(x + w * 0.5, top + h * 0.5, h * 0.25, 0, Math.PI * 2); ctx.fill(); }
+    if (style === 5) { ['#e8423a', '#ff9a1a', '#ffe066', '#3cbf5a', '#3c8fe0', '#8b5fe0'].forEach(function (c2, k2) { ctx.fillStyle = c2; ctx.fillRect(x, top - s * 0.05 + k2 * (h + s * 0.1) / 6, w, (h + s * 0.1) / 6 + 0.5); }); }
+    ctx.restore();
+  }
+
+  function etoileForme(ctx, cx, cy, r, couleur) {
+    ctx.fillStyle = couleur; ctx.beginPath();
+    for (var k = 0; k < 10; k++) {
+      var a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.45 : r;
+      ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+    }
+    ctx.closePath(); ctx.fill();
+  }
+
+  function couleursMur(P) { return { clair: '#f7dfae', moyen: P.sableFonce, fonce: '#b8915a' }; }
+
+  // Muret de sable (crénelé) ; troue = trou creusé par un crabe
+  function dessinerMuret(ctx, x, y, s, k, P) {
+    var C = couleursMur(P);
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(x + s * 0.1, y + s * 0.78, s * 0.84, s * 0.1);
+    ctx.fillStyle = C.moyen; rondRect(ctx, x + s * 0.08, y + s * 0.34, s * 0.84, s * 0.48, s * 0.06); ctx.fill();
+    ctx.fillStyle = C.clair; ctx.fillRect(x + s * 0.08, y + s * 0.34, s * 0.84, s * 0.1);
+    for (var k2 = 0; k2 < 3; k2++) { ctx.fillStyle = C.moyen; ctx.fillRect(x + s * (0.1 + k2 * 0.3), y + s * 0.2, s * 0.2, s * 0.16); ctx.fillStyle = C.clair; ctx.fillRect(x + s * (0.1 + k2 * 0.3), y + s * 0.2, s * 0.2, s * 0.05); }
+    ctx.strokeStyle = C.fonce; ctx.lineWidth = Math.max(1, s * 0.03);
+    ctx.beginPath(); ctx.moveTo(x + s * 0.1, y + s * 0.6); ctx.lineTo(x + s * 0.9, y + s * 0.6); ctx.stroke();
+    if (k.coqs) for (var c2 = 0; c2 < Math.min(k.coqs, 3); c2++) dessinerCoquillage(ctx, x + s * (0.3 + c2 * 0.2), y + s * 0.52, s * 0.22);
+    var max = PV.muret + (k.coqs || 0) * BONUS_COQ;
+    if (k.pv < max) fissures(ctx, x, y, s, 1 - k.pv / max);
+    if (k.troue) trou(ctx, x, y, s);
+    else dessinerCrans(ctx, x, y, s, k.pv);
+  }
+
+  // Tour (4 styles débloquables)
+  function dessinerTour(ctx, x, y, s, k, P, style) {
+    var C = couleursMur(P);
+    ctx.fillStyle = 'rgba(0,0,0,.14)'; ctx.beginPath(); ctx.ellipse(x + s / 2, y + s * 0.84, s * 0.4, s * 0.08, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.moyen; ctx.fillRect(x + s * 0.18, y + s * 0.22, s * 0.64, s * 0.6);
+    ctx.beginPath(); ctx.ellipse(x + s / 2, y + s * 0.82, s * 0.32, s * 0.07, 0, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = C.clair; ctx.fillRect(x + s * 0.18, y + s * 0.22, s * 0.14, s * 0.6);
+    if (style === 2) { ctx.fillStyle = 'rgba(232,66,58,.55)'; ctx.fillRect(x + s * 0.18, y + s * 0.4, s * 0.64, s * 0.08); ctx.fillRect(x + s * 0.18, y + s * 0.6, s * 0.64, s * 0.08); }
+    for (var k2 = 0; k2 < 3; k2++) { ctx.fillStyle = C.moyen; ctx.fillRect(x + s * (0.16 + k2 * 0.25), y + s * 0.1, s * 0.18, s * 0.14); }
+    ctx.fillStyle = '#6b4a22'; ctx.beginPath(); ctx.arc(x + s / 2, y + s * 0.44, s * 0.07, Math.PI, 0); ctx.fillRect(x + s * 0.43, y + s * 0.44, s * 0.14, s * 0.1); ctx.fill();
+    if (style === 1) { dessinerCoquillage(ctx, x + s * 0.3, y + s * 0.66, s * 0.2); dessinerCoquillage(ctx, x + s * 0.7, y + s * 0.66, s * 0.2, '#fff3c4'); }
+    if (style === 3) { ['#e8423a', '#2f6fd6', '#f2b21c'].forEach(function (c3, k3) { ctx.fillStyle = c3; ctx.beginPath(); var px = x + s * (0.2 + k3 * 0.25); ctx.moveTo(px, y + s * 0.02); ctx.lineTo(px + s * 0.13, y + s * 0.06); ctx.lineTo(px, y + s * 0.1); ctx.fill(); ctx.strokeStyle = '#6b4a22'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, y + s * 0.0); ctx.lineTo(px, y + s * 0.12); ctx.stroke(); }); }
+    if (k.coqs) for (var c2 = 0; c2 < Math.min(k.coqs, 3); c2++) dessinerCoquillage(ctx, x + s * (0.32 + c2 * 0.18), y + s * 0.3, s * 0.18);
+    if (k.deco) return;                    // tour décorative (accueil, décors) : ni crans ni fissures
+    var max = PV.tour + (k.coqs || 0) * BONUS_COQ;
+    if (k.pv < max) fissures(ctx, x, y, s, 1 - k.pv / max);
+    if (k.troue) trou(ctx, x, y, s);
+    else dessinerCrans(ctx, x, y, s, k.pv);
+  }
+
+  function fissures(ctx, x, y, s, part) {
+    ctx.strokeStyle = 'rgba(90,58,18,.75)'; ctx.lineWidth = Math.max(1, s * 0.03);
+    var n = Math.ceil(part * 3);
+    for (var k = 0; k < n; k++) {
+      var px = x + s * (0.28 + k * 0.22);
+      ctx.beginPath(); ctx.moveTo(px, y + s * 0.36); ctx.lineTo(px + s * 0.06, y + s * 0.48); ctx.lineTo(px - s * 0.03, y + s * 0.58); ctx.lineTo(px + s * 0.04, y + s * 0.72); ctx.stroke();
+    }
+  }
+
+  function trou(ctx, x, y, s) {
+    ctx.fillStyle = '#4a3014'; ctx.beginPath(); ctx.ellipse(x + s / 2, y + s * 0.6, s * 0.2, s * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2c1c08'; ctx.beginPath(); ctx.ellipse(x + s / 2, y + s * 0.63, s * 0.12, s * 0.09, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ff5a3d'; ctx.lineWidth = Math.max(2, s * 0.05); ctx.setLineDash([s * 0.08, s * 0.06]);
+    ctx.beginPath(); ctx.arc(x + s / 2, y + s * 0.6, s * 0.3, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function dessinerFosse(ctx, x, y, s, k, P, temps) {
+    ctx.fillStyle = P.sableFonce; ctx.beginPath(); ctx.ellipse(x + s / 2, y + s / 2, s * 0.4, s * 0.34, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#9c7a45'; ctx.beginPath(); ctx.ellipse(x + s / 2, y + s * 0.54, s * 0.32, s * 0.25, 0, 0, Math.PI * 2); ctx.fill();
+    var plein = (CAP_FOSSE - k.cap) / CAP_FOSSE;
+    if (plein > 0) {
+      ctx.fillStyle = P.eau; ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.ellipse(x + s / 2, y + s * 0.56, s * 0.3 * Math.sqrt(plein), s * 0.22 * Math.sqrt(plein), 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    // Trois petits traits : la place qui reste pour l'eau
+    for (var q = 0; q < k.cap; q++) { ctx.fillStyle = '#fff6df'; ctx.fillRect(x + s * (0.32 + q * 0.14), y + s * 0.84, s * 0.08, s * 0.05); }
+  }
+
+  function dessinerRigole(ctx, x, y, s, i, g, P, temps) {
+    var r = Math.floor(i / LARG), c = i % LARG;
+    ctx.strokeStyle = '#a7834c'; ctx.lineCap = 'round'; ctx.lineWidth = s * 0.36;
+    var bouts = [];
+    if (r === PLAGE0) bouts.push([0, -0.5]);
+    [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+      var rr = r + d[1], cc = c + d[0];
+      if (dansPlage(rr, cc) && g[idx(rr, cc)].t === 'rigole') bouts.push([d[0] * 0.5, d[1] * 0.5]);
+    });
+    if (!bouts.length) bouts.push([0, 0.2]);
+    bouts.forEach(function (b) { ctx.beginPath(); ctx.moveTo(x + s / 2, y + s / 2); ctx.lineTo(x + s / 2 + b[0] * s, y + s / 2 + b[1] * s); ctx.stroke(); });
+    ctx.lineWidth = s * 0.2; ctx.strokeStyle = P.eau;
+    bouts.forEach(function (b) { ctx.beginPath(); ctx.moveTo(x + s / 2, y + s / 2); ctx.lineTo(x + s / 2 + b[0] * s, y + s / 2 + b[1] * s); ctx.stroke(); });
+    ctx.lineWidth = Math.max(1, s * 0.05); ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.setLineDash([s * 0.08, s * 0.12]);
+    ctx.lineDashOffset = temps / 40;
+    bouts.forEach(function (b) { ctx.beginPath(); ctx.moveTo(x + s / 2 + b[0] * s, y + s / 2 + b[1] * s); ctx.lineTo(x + s / 2, y + s / 2); ctx.stroke(); });
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+  }
+
+  // Donjon : la tour principale du château, avec son drapeau
+  function dessinerDonjon(ctx, x, y, s, P, temps, mouille) {
+    var C = couleursMur(P);
+    if (mouille) {
+      ctx.fillStyle = C.moyen; ctx.beginPath(); ctx.ellipse(x + s / 2, y + s * 0.7, s * 0.42, s * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = C.fonce; ctx.beginPath(); ctx.ellipse(x + s / 2, y + s * 0.64, s * 0.24, s * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(x + s / 2, y + s * 0.9, s * 0.46, s * 0.08, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.moyen; ctx.fillRect(x + s * 0.06, y + s * 0.5, s * 0.88, s * 0.4);
+    ctx.fillStyle = C.clair; ctx.fillRect(x + s * 0.06, y + s * 0.5, s * 0.88, s * 0.07);
+    ctx.fillStyle = C.moyen; ctx.fillRect(x + s * 0.24, y + s * 0.14, s * 0.52, s * 0.4);
+    ctx.fillStyle = C.clair; ctx.fillRect(x + s * 0.24, y + s * 0.14, s * 0.12, s * 0.4);
+    for (var k = 0; k < 3; k++) { ctx.fillStyle = C.moyen; ctx.fillRect(x + s * (0.22 + k * 0.2), y + s * 0.04, s * 0.14, s * 0.12); }
+    for (k = 0; k < 4; k++) { ctx.fillStyle = C.moyen; ctx.fillRect(x + s * (0.05 + k * 0.25), y + s * 0.42, s * 0.14, s * 0.1); }
+    ctx.fillStyle = '#6b4a22'; ctx.beginPath(); ctx.arc(x + s / 2, y + s * 0.74, s * 0.1, Math.PI, 0); ctx.fillRect(x + s * 0.4, y + s * 0.74, s * 0.2, s * 0.16); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + s / 2, y + s * 0.3, s * 0.05, Math.PI, 0); ctx.fillRect(x + s * 0.45, y + s * 0.3, s * 0.1, s * 0.07); ctx.fill();
+    if (SAUVE.tour === 1) dessinerCoquillage(ctx, x + s * 0.24, y + s * 0.66, s * 0.18);
+    if (SAUVE.tour === 2) { ctx.fillStyle = 'rgba(232,66,58,.55)'; ctx.fillRect(x + s * 0.24, y + s * 0.22, s * 0.52, s * 0.05); }
+    dessinerDrapeau(ctx, x + s * 0.5, y + s * 0.06, s * 0.75, SAUVE.drapeau, temps);
+  }
+
+  // Crabe (rouge s'il est rapide)
+  function dessinerCrabe(ctx, cx, cy, s, rapide, temps, peur) {
+    ctx.save(); ctx.translate(cx, cy);
+    var coul = rapide ? '#e0302a' : '#f07a2a', fonce = rapide ? '#9e1a14' : '#b8521a';
+    var pas = Math.sin(temps / (rapide ? 50 : 90)) * s * 0.04;
+    ctx.strokeStyle = fonce; ctx.lineWidth = Math.max(1, s * 0.05); ctx.lineCap = 'round';
+    for (var k = -1; k <= 1; k++) {
+      ctx.beginPath(); ctx.moveTo(-s * 0.2, k * s * 0.08); ctx.lineTo(-s * 0.38, k * s * 0.12 + s * 0.1 + (k % 2 ? pas : -pas)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(s * 0.2, k * s * 0.08); ctx.lineTo(s * 0.38, k * s * 0.12 + s * 0.1 + (k % 2 ? -pas : pas)); ctx.stroke();
+    }
+    var pince = peur ? 0.3 : Math.sin(temps / 200) * 0.15;
+    [-1, 1].forEach(function (cote) {
+      ctx.fillStyle = coul;
+      ctx.beginPath(); ctx.ellipse(cote * s * 0.3, -s * 0.22 - pince * s * 0.1, s * 0.11, s * 0.08, cote * 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = fonce; ctx.beginPath(); ctx.moveTo(cote * s * 0.18, -s * 0.06); ctx.lineTo(cote * s * 0.28, -s * 0.18); ctx.stroke();
+    });
+    ctx.fillStyle = coul; ctx.beginPath(); ctx.ellipse(0, 0, s * 0.24, s * 0.17, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.beginPath(); ctx.ellipse(-s * 0.06, -s * 0.06, s * 0.1, s * 0.05, 0, 0, Math.PI * 2); ctx.fill();
+    [-1, 1].forEach(function (cote) {
+      ctx.strokeStyle = fonce; ctx.beginPath(); ctx.moveTo(cote * s * 0.07, -s * 0.12); ctx.lineTo(cote * s * 0.08, -s * 0.22); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cote * s * 0.08, -s * 0.24, s * 0.05, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(cote * s * 0.08, -s * 0.24 + (peur ? -s * 0.01 : 0), s * 0.025, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // Main qui montre le geste (tutoriel)
+  function dessinerMain(ctx, x, y, s, appui) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(appui ? 0.88 : 1, appui ? 0.88 : 1);
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#3b2a14'; ctx.lineWidth = Math.max(1.5, s * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(s * 0.08, -s * 0.02, s * 0.1, s * 0.1);
+    ctx.lineTo(s * 0.12, s * 0.35);
+    ctx.quadraticCurveTo(s * 0.32, s * 0.3, s * 0.38, s * 0.45);
+    ctx.quadraticCurveTo(s * 0.42, s * 0.75, s * 0.25, s * 0.85);
+    ctx.lineTo(s * 0.02, s * 0.85);
+    ctx.quadraticCurveTo(-s * 0.12, s * 0.6, -s * 0.14, s * 0.45);
+    ctx.quadraticCurveTo(-s * 0.12, s * 0.36, -s * 0.06, s * 0.4);
+    ctx.lineTo(-s * 0.08, s * 0.1);
+    ctx.quadraticCurveTo(-s * 0.08, -s * 0.02, 0, 0);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    if (appui) {
+      ctx.strokeStyle = 'rgba(255,138,61,.9)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x, y, s * 0.28, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  // Une case complète (sable dessous, puis son contenu)
+  function dessinerCase(ctx, x, y, s, k, i, g, P, temps, opts) {
+    opts = opts || {};
+    if (k.t === 'mer') return;
+    if (k.t === 'eau' && !opts.secheVisuel) dessinerEau(ctx, x, y, s, i, P, temps);
+    else dessinerSable(ctx, x, y, s, i, P);
+    if (opts.eauPartielle) dessinerEau(ctx, x, y, s, i, P, temps, opts.eauPartielle);
+    if (k.t === 'rocher') dessinerRocher(ctx, x, y, s, i);
+    else if (k.t === 'muret') dessinerMuret(ctx, x, y, s, k, P);
+    else if (k.t === 'tour') dessinerTour(ctx, x, y, s, k, P, SAUVE.tour);
+    else if (k.t === 'fosse') dessinerFosse(ctx, x, y, s, k, P, temps);
+    else if (k.t === 'rigole') dessinerRigole(ctx, x, y, s, i, g, P, temps);
+    else if (k.t === 'donjon') dessinerDonjon(ctx, x, y, s, P, temps, opts.noye);
+    if (k.coq) dessinerCoquillage(ctx, x + s / 2, y + s * 0.5 + Math.sin(temps / 400 + i) * s * 0.02, s * 0.46);
+    if (k.seau) dessinerSeau(ctx, x + s / 2, y + s * 0.52, s * 0.6);
+  }
+
+  function dessinerMer(ctx, x, y, w, h, P, temps) {
+    var gr = ctx.createLinearGradient(0, y, 0, y + h);
+    gr.addColorStop(0, P.mer); gr.addColorStop(1, P.merClair);
+    ctx.fillStyle = gr; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    for (var l = 0; l < 3; l++) {
+      ctx.beginPath();
+      for (var px = 0; px <= w; px += 6) {
+        var py = y + h * (0.22 + l * 0.28) + Math.sin(px / 18 + temps / 500 + l * 1.7) * 3;
+        if (px === 0) ctx.moveTo(x + px, py); else ctx.lineTo(x + px, py);
+      }
+      ctx.globalAlpha = 0.5 - l * 0.1; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // Écume au bord de la plage
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    for (px = 0; px < w; px += 10) {
+      ctx.beginPath(); ctx.arc(x + px + 5, y + h + Math.sin(px + temps / 300) * 1.5, 4 + Math.sin(px * 3 + temps / 200) * 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  // Icônes des outils et des compteurs (petits canvas)
+  function dessinerIcone(cv, quoi) {
+    var ctx = cv.getContext('2d'), s = cv.width, P = palette();
+    ctx.clearRect(0, 0, s, s);
+    var k = { t: quoi, pv: PV[quoi] || 0, cap: CAP_FOSSE, coqs: 0 };
+    if (quoi === 'seau') { dessinerSeau(ctx, s / 2, s / 2 + s * 0.06, s * 0.9); return; }
+    if (quoi === 'coquillage') { dessinerCoquillage(ctx, s / 2, s / 2, s * 0.85); return; }
+    ctx.save(); ctx.beginPath(); ctx.arc(s / 2, s / 2, s / 2, 0, Math.PI * 2); ctx.clip();
+    dessinerSable(ctx, 0, 0, s, 3, P);
+    if (quoi === 'muret') dessinerMuret(ctx, 0, 0, s, k, P);
+    if (quoi === 'tour') dessinerTour(ctx, 0, 0, s, k, P, SAUVE.tour);
+    if (quoi === 'fosse') dessinerFosse(ctx, 0, 0, s, k, P, 0);
+    if (quoi === 'rigole') { var g1 = creerGrille(['.......', '.......', '.......', '.......', '.......', '.......', '.......', '.......']); g1[idx(2, 0)].t = 'rigole'; dessinerRigole(ctx, 0, 0, s, idx(2, 0), g1, P, 0); }
+    ctx.restore();
+  }
+
+  // ==========================================================================
+  // CANVAS ET MISE À L'ÉCHELLE
+  // ==========================================================================
+  var cvPlage = $('plage'), ctxP = cvPlage.getContext('2d');
+  var cvFond = $('fond'), ctxF = cvFond.getContext('2d');
+  var cvEffets = $('effets'), ctxE = cvEffets.getContext('2d');
+  var DPR = Math.min(2, window.devicePixelRatio || 1);
+  var geo = { s: 40, mx: 12, w: 300, h: 400 };   // taille d'une case, marge des côtés
+
+  function ajusterCanvas(cv, w, h) {
+    cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+    cv.style.width = w + 'px'; cv.style.height = h + 'px';
+  }
+  function redimensionner() {
+    ajusterCanvas(cvFond, window.innerWidth, window.innerHeight);
+    ajusterCanvas(cvEffets, window.innerWidth, window.innerHeight);
+    if (S.ecran === 'jeu') {
+      var z = $('zone-plage').getBoundingClientRect();
+      var s = Math.floor(Math.min(z.width / (LARG + 0.8), z.height / HAUT));
+      s = Math.max(20, s);
+      geo.s = s; geo.mx = Math.round(s * 0.4);
+      geo.w = s * LARG + geo.mx * 2; geo.h = s * HAUT;
+      ajusterCanvas(cvPlage, geo.w, geo.h);
+    }
+  }
+  window.addEventListener('resize', redimensionner);
+
+  // ==========================================================================
+  // PARTICULES ET EFFETS
+  // ==========================================================================
+  function particules(x, y, n, couleur, type, force) {
+    for (var k = 0; k < n; k++) {
+      var a = Math.random() * Math.PI * 2, v = (0.4 + Math.random()) * (force || 1);
+      S.particules.push({ x: x, y: y, vx: Math.cos(a) * v * 2, vy: Math.sin(a) * v * 2 - 1.5, vie: 0, duree: 500 + Math.random() * 400, c: couleur, type: type || 'grain', t: 2 + Math.random() * 3 });
+    }
+  }
+  function texteFlottant(x, y, texte, couleur) { S.textes.push({ x: x, y: y, texte: texte, c: couleur || '#fff', vie: 0 }); }
+  var confettis = [];
+  function lancerConfettis(n) {
+    var cols = ['#ff8a3d', '#ffde59', '#2f8fdc', '#3cbf5a', '#e8423a', '#b07cff'];
+    for (var k = 0; k < n; k++) confettis.push({ x: Math.random() * window.innerWidth, y: -20 - Math.random() * 200, vx: (Math.random() - 0.5) * 2, vy: 2 + Math.random() * 3, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3, c: cols[k % cols.length], t: 6 + Math.random() * 6, etoile: Math.random() < 0.25 });
+  }
+
+  // ==========================================================================
+  // ÉCRANS
+  // ==========================================================================
+  var ECRANS = ['ecran-accueil', 'ecran-niveaux', 'ecran-decors', 'ecran-carte', 'ecran-pause', 'ecran-fin', 'ecran-bilan'];
+  function montrer(id) { ECRANS.forEach(function (e) { $(e).hidden = e !== id; }); }
+
+  function majBoutonsSon() {
+    ['b-son-accueil', 'b-son-jeu', 'b-son-pause'].forEach(function (id) { $(id).textContent = SAUVE.son ? '🔊' : '🔇'; $(id).classList.toggle('actif', !SAUVE.son); });
+  }
+
+  function allerAccueil() {
+    S.ecran = 'accueil'; S.pause = false;
+    $('jeu').hidden = true;
+    montrer('ecran-accueil');
+    var tot = totalEtoiles();
+    $('accueil-etoiles').textContent = tot > 0 ? T('etoiles_total', { n: tot, max: NIVEAUX.length * 3 }) : '';
+    $('b-niveaux-accueil').hidden = SAUVE.debloque <= 1 && tot === 0;
+  }
+
+  function ouvrirNiveaux() {
+    S.ecran = 'niveaux';
+    $('jeu').hidden = true;
+    montrer('ecran-niveaux');
+    var liste = $('liste-niveaux'); liste.innerHTML = '';
+    $('niveaux-total').textContent = T('etoiles_total', { n: totalEtoiles(), max: NIVEAUX.length * 3 });
+    for (var p = 0; p < 4; p++) {
+      var bloc = document.createElement('div'); bloc.className = 'groupe-plage';
+      var h = document.createElement('h3'); h.textContent = T('plage_' + p); bloc.appendChild(h);
+      var grille = document.createElement('div'); grille.className = 'grille-niv';
+      NIVEAUX.forEach(function (niv, n) {
+        if (niv.plage !== p) return;
+        var b = document.createElement('button');
+        var ouvert = n < SAUVE.debloque;
+        b.className = 'niv' + (ouvert ? '' : ' ferme') + (n === SAUVE.debloque - 1 ? ' courant' : '');
+        b.disabled = !ouvert;
+        var num = document.createElement('span'); num.textContent = ouvert ? N(n + 1) : '🔒';
+        var et = document.createElement('span'); et.className = 'et';
+        var e = SAUVE.etoiles[n] || 0; et.textContent = ouvert ? '★★★'.slice(0, e) + '☆☆☆'.slice(0, 3 - e) : '';
+        b.append(num, et);
+        b.setAttribute('aria-label', T('niveau_aria', { n: n + 1, e: e }));
+        b.addEventListener('click', function () { SON.bouton(); commencerNiveau(n); });
+        grille.appendChild(b);
+      });
+      bloc.appendChild(grille); liste.appendChild(bloc);
+    }
+  }
+
+  function ouvrirDecors() {
+    S.ecran = 'decors';
+    montrer('ecran-decors');
+    var tot = totalEtoiles();
+    $('decors-total').textContent = T('decors_phrase', { n: tot });
+    function remplir(idConteneur, seuils, cle, dessin) {
+      var cont = $(idConteneur); cont.innerHTML = '';
+      seuils.forEach(function (seuil, k) {
+        var b = document.createElement('button'); b.className = 'decor' + (SAUVE[cle] === k ? ' choisi' : '');
+        var cv = document.createElement('canvas'); cv.width = 88; cv.height = 88;
+        b.appendChild(cv);
+        var libre = tot >= seuil;
+        b.disabled = !libre;
+        if (!libre) { var v = document.createElement('span'); v.className = 'verrou'; v.textContent = T('verrou_etoiles', { n: seuil }); b.appendChild(v); }
+        b.setAttribute('aria-label', T('decor_' + cle + '_' + k) + (libre ? '' : ' — ' + T('verrou_etoiles', { n: seuil })));
+        b.title = T('decor_' + cle + '_' + k);
+        b.addEventListener('click', function () { SON.ramasse(); SAUVE[cle] = k; sauver(); ouvrirDecors(); });
+        cont.appendChild(b);
+        dessin(cv.getContext('2d'), 88, k);
+      });
+    }
+    remplir('choix-drapeau', DRAPEAUX, 'drapeau', function (ctx, s, k) { ctx.fillStyle = '#d9f2ff'; ctx.fillRect(0, 0, s, s); dessinerDrapeau(ctx, s * 0.3, s * 0.85, s * 1.1, k, 0); });
+    remplir('choix-tour', STYLES_TOUR, 'tour', function (ctx, s, k) { ctx.fillStyle = '#f2d69b'; ctx.fillRect(0, 0, s, s); dessinerTour(ctx, 0, 0, s, { pv: 4, coqs: 0, deco: true }, PALETTES[0], k); });
+    remplir('choix-plage', PLAGES_DECOR, 'plage', function (ctx, s, k) {
+      var P = PALETTES[k], gr = ctx.createLinearGradient(0, 0, 0, s * 0.5);
+      gr.addColorStop(0, P.ciel[0]); gr.addColorStop(1, P.ciel[1]); ctx.fillStyle = gr; ctx.fillRect(0, 0, s, s * 0.5);
+      ctx.fillStyle = P.astre; ctx.beginPath(); ctx.arc(s * 0.7, s * 0.3, s * 0.12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = P.mer; ctx.fillRect(0, s * 0.45, s, s * 0.2); ctx.fillStyle = P.sable; ctx.fillRect(0, s * 0.65, s, s * 0.35);
+    });
+  }
+
+  // ==========================================================================
+  // COMMENCER UN NIVEAU
+  // ==========================================================================
+  function commencerNiveau(n) {
+    var niv = NIVEAUX[n];
+    S.n = n; S.niv = niv; S.g = creerGrille(niv.carte);
+    S.seaux = niv.seaux; S.coqs = 0; S.outil = 'muret'; S.phase = 'construction';
+    S.vagueN = 0; S.attente = 0; S.anim = null; S.crabes = []; S.historique = []; S.apercu = false; S.apercuRes = null;
+    S.chasses = 0; S.pause = false; S.eauA = []; S.fantome = {}; S.secousse = {}; S.particules = []; S.textes = []; S.issue = null; S.finA = 0;
+    S.curseur = { r: 6, c: 3 };
+    S.ecran = 'jeu';
+    $('jeu').hidden = false;
+    montrer(null);
+    $('titre-niveau').innerHTML = '';
+    var t1 = document.createElement('span'); t1.textContent = T('maree_n', { n: n + 1 });
+    var t2 = document.createElement('small'); t2.textContent = T('plage_' + niv.plage);
+    $('titre-niveau').append(t1, t2);
+    document.body.style.background = palette().corps;
+    construireOutils();
+    majCompteurs(); majAnnonce(); majActions();
+    message(T('msg_construis'));
+    redimensionner();
+    montrerCarteNiveau(false);
+  }
+
+  function construireOutils() {
+    var cont = $('outils'); cont.innerHTML = '';
+    outilsAffiches(S.n).forEach(function (o, k) {
+      var b = document.createElement('button'); b.className = 'outil'; b.dataset.outil = o;
+      var cv = document.createElement('canvas'); cv.width = 60; cv.height = 60;
+      var nom = document.createElement('span'); nom.className = 'nom'; nom.textContent = T('outil_' + o);
+      var cout = document.createElement('span'); cout.className = 'cout';
+      b.append(cv, nom, cout);
+      b.setAttribute('aria-label', T('outil_' + o) + ' (' + N(k + 1) + ')');
+      b.addEventListener('click', function () { demarrerAudio(); SON.bouton(); choisirOutil(o); });
+      cont.appendChild(b);
+      dessinerIcone(cv, o);
+    });
+    choisirOutil(S.outil);
+  }
+  function choisirOutil(o) {
+    S.outil = o;
+    Array.prototype.forEach.call(document.querySelectorAll('.outil'), function (b) { b.classList.toggle('choisi', b.dataset.outil === o); });
+    if (o === 'coquillage') message(S.coqs ? T('msg_coquillage_choisi') : T('msg_pas_coquillage'));
+    else if (o === 'rigole') message(T('msg_rigole_choisie'));
+    else if (S.phase === 'construction') message(T('aide_' + o));
+  }
+  function majCompteurs() {
+    $('nb-seaux').textContent = N(S.seaux);
+    $('compteur-seaux').setAttribute('aria-label', T('seaux_n', { n: S.seaux }));
+    var avecCoqs = outilsAffiches(S.n).indexOf('coquillage') >= 0;
+    $('compteur-coqs').hidden = !avecCoqs;
+    $('nb-coqs').textContent = N(S.coqs);
+    Array.prototype.forEach.call(document.querySelectorAll('.outil'), function (b) {
+      var o = b.dataset.outil, c = b.querySelector('.cout');
+      c.textContent = o === 'coquillage' ? T('en_poche', { n: S.coqs }) : T('cout_n', { n: COUT[o] });
+    });
+  }
+  function anime(id, classe) { var e = $(id); e.classList.remove(classe); void e.offsetWidth; e.classList.add(classe); }
+
+  function majAnnonce() {
+    var cont = $('vagues-liste'); cont.innerHTML = '';
+    S.niv.vagues.forEach(function (v, n) {
+      var p = document.createElement('span');
+      p.className = 'puce-vague' + (v.p === 2 ? ' p2' : v.p === 3 ? ' p3' : '') + (n < S.vagueN ? ' passee' : n === S.vagueN ? ' prochaine' : '');
+      var fl = (v.h !== undefined ? [].concat(v.h).map(function () { return '↓'; }).join('') : '') + (v.g !== undefined ? '→' : '') + (v.d !== undefined ? '←' : '');
+      var f = document.createElement('span'); f.textContent = fl;
+      var bar = document.createElement('span'); bar.className = 'force'; bar.style.width = Math.round(6 + v.f * 0.45) + 'px';
+      p.append(f, bar);
+      p.title = T(v.p === 3 ? 'vague_geante' : v.p === 2 ? 'vague_grande' : 'vague_normale');
+      p.setAttribute('aria-label', p.title);
+      cont.appendChild(p);
+    });
+  }
+
+  function majActions() {
+    var c = S.phase === 'construction';
+    $('b-lancer').hidden = !c; $('b-annuler').hidden = !c; $('b-apercu').hidden = !c;
+    $('attente').hidden = c || S.phase !== 'maree'; $('b-suivante').hidden = c || S.phase !== 'maree';
+    $('b-annuler').disabled = !S.historique.length;
+    $('b-apercu').classList.toggle('actif', S.apercu);
+  }
+
+  function message(m) { $('message').textContent = m || ''; }
+
+  // Carte de présentation du niveau (avec tutoriel animé si nouveauté)
+  var tuto = null;
+  function montrerCarteNiveau(forcerAide) {
+    var niv = S.niv;
+    var cle = niv.nouveau && (forcerAide || !SAUVE.tutos[niv.nouveau]) ? niv.nouveau : (forcerAide ? 'muret' : null);
+    $('carte-titre').textContent = T('maree_n', { n: S.n + 1 });
+    $('carte-sous-titre').textContent = T('plage_' + niv.plage) + ' · ' + T('nb_vagues', { n: niv.vagues.length });
+    var obj = $('carte-objectifs'); obj.innerHTML = '';
+    [T('objectif_1'), T('objectif_2', { n: niv.s2 }), T('objectif_3', { n: niv.s3 })].forEach(function (txt, k) {
+      var d = document.createElement('div'); d.textContent = '⭐⭐⭐'.slice(0, k + 1) + ' ' + txt; obj.appendChild(d);
+    });
+    if (cle) {
+      tuto = { cle: cle, debut: performance.now(), etapes: TUTOS[cle].etapes };
+      $('tuto-canvas').hidden = false;
+      $('b-carte-ok').textContent = T('compris');
+    } else {
+      tuto = null;
+      $('tuto-canvas').hidden = true; $('tuto-points').innerHTML = '';
+      $('tuto-texte').textContent = niv.crabes ? T('intro_crabes') : T('intro_niveau');
+      $('b-carte-ok').textContent = T('cest_parti');
+    }
+    montrer('ecran-carte');
+  }
+  function fermerCarte() {
+    if (tuto) { SAUVE.tutos[tuto.cle] = true; sauver(); }
+    tuto = null;
+    montrer(null);
+    if (S.phase === 'construction') message(T('aide_' + S.outil));
+  }
+
+  // ==========================================================================
+  // TUTORIELS ANIMÉS (mini-plage de 5 × 5 cases, main qui touche)
+  //   carte : ~ mer  . sable  D donjon  # rocher  M muret  T tour  t tour usée
+  //           F fossé  R rigole  o coquillage  s seau  w eau  h muret troué  C muret renforcé
+  //   étape : main [r, c] | 'outil' | 'oeil' | 'bouton' ; poser { 'r,c': car } ; eau ['r,c'…] ;
+  //           fleche { cote, n } ; crabe { de, a, troue, rapide } ; fuite ; vague (couleur de l'écume)
+  // ==========================================================================
+  var TUTOS = {
+    muret: { carte: ['~~~~~', '.....', '.....', '.....', '.MDM.'], etapes: [
+      { cle: 'tuto_muret_1', main: [3, 2], poser: { '3,2': 'M' } },
+      { cle: 'tuto_muret_2', main: 'bouton' },
+      { cle: 'tuto_muret_3', eau: ['1,1', '1,2', '1,3', '1,0', '1,4', '2,0', '2,1', '2,2', '2,3', '2,4', '3,0', '3,1', '3,3', '3,4', '4,0', '4,4'], fleche: { cote: 'h', n: 2 } }
+    ] },
+    reserve: { carte: ['~~~~~', '.....', '.....', '.....', '.MDM.'], etapes: [
+      { cle: 'tuto_reserve_1', main: [3, 2], poser: { '3,2': 'M' } },
+      { cle: 'tuto_reserve_2', main: 'oeil', apercu: ['1,1', '1,2', '1,3', '1,0', '1,4', '2,0', '2,1', '2,2', '2,3', '2,4', '3,0', '3,1', '3,3', '3,4'] },
+      { cle: 'tuto_reserve_3', etoiles: true }
+    ] },
+    fosse: { carte: ['~~~~~', '.....', '.....', '.....', '..D..'], etapes: [
+      { cle: 'tuto_fosse_1', main: 'outil', icone: 'fosse' },
+      { cle: 'tuto_fosse_2', main: [2, 2], poser: { '2,2': 'F' }, icone: 'fosse' },
+      { cle: 'tuto_fosse_3', eau: ['1,2', '1,1', '1,3'], poser: { '2,2': 'w' }, fleche: { cote: 'h', n: 2 }, icone: 'fosse' }
+    ] },
+    rochers: { carte: ['~~~~~', '.....', '##.##', '.....', '..D..'], etapes: [
+      { cle: 'tuto_rochers_1', main: [2, 2], poser: { '2,2': 'M' } },
+      { cle: 'tuto_rochers_2', eau: ['1,0', '1,1', '1,2', '1,3', '1,4'], fleche: { cote: 'h', n: 2 } }
+    ] },
+    cote: { carte: ['~~~~~', '.....', '.....', '.M...', 'D....'], etapes: [
+      { cle: 'tuto_cote_1', fleche: { cote: 'g', n: 2 } },
+      { cle: 'tuto_cote_2', main: [3, 0], poser: { '3,0': 'M' }, fleche: { cote: 'g', n: 2 } },
+      { cle: 'tuto_cote_3', eau: ['2,0', '1,0', '2,1', '1,1', '2,2'], fleche: { cote: 'g', n: 2 } }
+    ] },
+    tour: { carte: ['~~~~~', '.....', '##.##', '.....', '..D..'], etapes: [
+      { cle: 'tuto_tour_1', main: 'outil', icone: 'tour' },
+      { cle: 'tuto_tour_2', main: [2, 2], poser: { '2,2': 'T' }, icone: 'tour' },
+      { cle: 'tuto_tour_3', eau: ['1,0', '1,1', '1,2', '1,3', '1,4'], fleche: { cote: 'h', n: 2 }, icone: 'tour' }
+    ] },
+    crabe: { carte: ['~~~~~', '.....', 'MMMMM', '.....', '..D..'], etapes: [
+      { cle: 'tuto_crabe_1', crabe: { de: [1, 0], a: [1, 1], troue: '2,1' } },
+      { cle: 'tuto_crabe_2', main: 'crabe', fuite: true },
+      { cle: 'tuto_crabe_3', main: [2, 1], poser: { '2,1': 'M' } }
+    ] },
+    grande: { carte: ['~~~~~', '.....', '.MMM.', '.....', '..D..'], etapes: [
+      { cle: 'tuto_grande_1', eau: ['1,1', '1,2', '1,3', '1,0', '1,4'], fleche: { cote: 'h', n: 2 }, vague: 'grande', poser: { '2,1': '.', '2,2': '.', '2,3': '.' } },
+      { cle: 'tuto_grande_2', main: 'outil', icone: 'tour' }
+    ] },
+    coquillage: { carte: ['~~~~~', '.o...', '.MMM.', '.....', '..D..'], etapes: [
+      { cle: 'tuto_coquillage_1', main: [1, 1], poser: { '1,1': '.' }, ramasse: true },
+      { cle: 'tuto_coquillage_2', main: 'outil', icone: 'coquillage' },
+      { cle: 'tuto_coquillage_3', main: [2, 2], poser: { '2,2': 'C' }, icone: 'coquillage' }
+    ] },
+    seau: { carte: ['~~~~~', '...s.', '.....', '.....', '..D..'], etapes: [
+      { cle: 'tuto_seau_1', main: [1, 3], poser: { '1,3': '.' }, ramasse: true },
+      { cle: 'tuto_seau_2', eau: ['1,3', '1,2', '1,4'], fleche: { cote: 'h', n: 3 } }
+    ] },
+    double: { carte: ['~~~~~', '.....', '.....', '.....', '..D..'], etapes: [
+      { cle: 'tuto_double_1', fleche: { cote: 'h', n: [0, 4] }, eau: ['1,0', '1,4', '1,1', '1,3', '2,0', '2,4'] },
+      { cle: 'tuto_double_2', main: [3, 2], poser: { '3,2': 'M' } }
+    ] },
+    deuxDonjons: { carte: ['~~~~~', '.....', '.....', '.....', 'D...D'], etapes: [
+      { cle: 'tuto_deux_1', main: [3, 0], poser: { '3,0': 'M' } },
+      { cle: 'tuto_deux_2', main: [3, 4], poser: { '3,4': 'M' } }
+    ] },
+    rigole: { carte: ['~~~~~', '.....', '.....', '.....', '..D..'], etapes: [
+      { cle: 'tuto_rigole_1', main: 'outil', icone: 'rigole' },
+      { cle: 'tuto_rigole_2', main: [1, 2], poser: { '1,2': 'R' }, icone: 'rigole' },
+      { cle: 'tuto_rigole_3', eau: ['1,1', '1,3'], fleche: { cote: 'h', n: 2 }, icone: 'rigole' }
+    ] },
+    rapide: { carte: ['~~~~~', '.....', '.MMM.', '.....', '..D..'], etapes: [
+      { cle: 'tuto_rapide_1', crabe: { de: [1, 4], a: [1, 3], rapide: true } },
+      { cle: 'tuto_rapide_2', main: 'crabe', fuite: true }
+    ] },
+    geante: { carte: ['~~~~~', '.....', '.TTT.', '.....', '..D..'], etapes: [
+      { cle: 'tuto_geante_1', eau: ['1,1', '1,2', '1,3', '1,0', '1,4'], fleche: { cote: 'h', n: 2 }, vague: 'geante', poser: { '2,1': 't', '2,2': 't', '2,3': 't' } },
+      { cle: 'tuto_geante_2', main: 'outil', icone: 'coquillage' }
+    ] }
+  };
+
+  var DUREE_ETAPE = 2800;
+  function caseTuto(ch) {
+    var k = { t: 'sable', pv: 0, cap: CAP_FOSSE, troue: false, coq: false, seau: false, coqs: 0 };
+    if (ch === '~') k.t = 'mer'; else if (ch === 'D') k.t = 'donjon'; else if (ch === '#') k.t = 'rocher';
+    else if (ch === 'M') { k.t = 'muret'; k.pv = 2; } else if (ch === 'T') { k.t = 'tour'; k.pv = 4; } else if (ch === 't') { k.t = 'tour'; k.pv = 1; }
+    else if (ch === 'F') k.t = 'fosse'; else if (ch === 'R') k.t = 'rigole'; else if (ch === 'o') k.coq = true; else if (ch === 's') k.seau = true;
+    else if (ch === 'w') k.t = 'eau'; else if (ch === 'h') { k.t = 'muret'; k.pv = 2; k.troue = true; } else if (ch === 'C') { k.t = 'muret'; k.pv = 4; k.coqs = 1; }
+    return k;
+  }
+
+  function dessinerTuto(maintenant) {
+    if (!tuto) return;
+    var cv = $('tuto-canvas'), ctx = cv.getContext('2d');
+    var def = TUTOS[tuto.cle], P = palette();
+    var W = 240, s = 44, ox = 10, oy = 6;
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    var nb = def.etapes.length, ecoule = Math.max(0, maintenant - tuto.debut);
+    var cycle = nb * DUREE_ETAPE + 900;
+    var tc = ecoule % cycle, e = Math.min(nb - 1, Math.floor(tc / DUREE_ETAPE)), p = Math.min(1, (tc - e * DUREE_ETAPE) / DUREE_ETAPE);
+    if (tc > nb * DUREE_ETAPE) { e = nb - 1; p = 1; }
+    var et = def.etapes[e];
+    // Texte et points d'étape
+    var txt = T(et.cle);
+    if ($('tuto-texte').textContent !== txt) $('tuto-texte').textContent = txt;
+    var pts = $('tuto-points');
+    if (pts.children.length !== nb) { pts.innerHTML = ''; for (var q = 0; q < nb; q++) pts.appendChild(document.createElement('i')); }
+    Array.prototype.forEach.call(pts.children, function (el, q) { el.classList.toggle('on', q === e); });
+    // État de la mini-plage : carte + changements des étapes précédentes
+    var cases = def.carte.map(function (l) { return l.split(''); });
+    var crabePos = null, crabeFuite = 0;
+    function appliquer(step, part) {
+      if (step.eau) {
+        var nEau = Math.floor(step.eau.length * Math.min(1, Math.max(0, (part - 0.3) / 0.55)));
+        for (var a = 0; a < nEau; a++) { var rc = step.eau[a].split(','); if (cases[rc[0]][rc[1]] === '.' || cases[rc[0]][rc[1]] === 's') cases[rc[0]][rc[1]] = 'w'; }
+      }
+      if (step.poser && part >= (step.eau ? 0.9 : 0.42)) Object.keys(step.poser).forEach(function (cle) { var rc2 = cle.split(','); cases[rc2[0]][rc2[1]] = step.poser[cle]; });
+      if (step.crabe) {
+        var pa = Math.min(1, part / 0.6);
+        crabePos = { r: step.crabe.de[0] + (step.crabe.a[0] - step.crabe.de[0]) * pa, c: step.crabe.de[1] + (step.crabe.a[1] - step.crabe.de[1]) * pa, rapide: step.crabe.rapide };
+        if (step.crabe.troue && part > 0.85) { var rc3 = step.crabe.troue.split(','); cases[rc3[0]][rc3[1]] = 'h'; }
+      }
+      if (step.fuite && crabePos) { crabeFuite = Math.max(0, (part - 0.45) / 0.4); if (crabeFuite >= 1) crabePos = null; }
+    }
+    for (var k = 0; k < e; k++) appliquer(def.etapes[k], 1);
+    appliquer(et, p);
+    // Dessin
+    var gr = ctx.createLinearGradient(0, 0, 0, 268); gr.addColorStop(0, P.ciel[0]); gr.addColorStop(1, P.ciel[1]);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, 268);
+    dessinerMer(ctx, ox, oy, s * 5, s, P, maintenant);
+    var g5 = [];
+    cases.forEach(function (ligne, r) { ligne.forEach(function (ch, c) { g5.push(caseTuto(ch)); }); });
+    cases.forEach(function (ligne, r) {
+      ligne.forEach(function (ch, c) {
+        if (r === 0) return;
+        var k2 = g5[r * 5 + c];
+        if (k2.t === 'rigole') dessinerSable(ctx, ox + c * s, oy + r * s, s, r * 5 + c, P);
+        if (k2.t === 'rigole') { ctx.save(); ctx.translate(ox + c * s, oy + r * s); dessinerRigolePetite(ctx, s, r === 1, P, maintenant); ctx.restore(); }
+        else dessinerCase(ctx, ox + c * s, oy + r * s, s, k2, r * 5 + c, null, P, maintenant);
+      });
+    });
+    // Aperçu (étape « œil »)
+    if (et.apercu && p > 0.45) et.apercu.forEach(function (rc) { var a = rc.split(','); ctx.fillStyle = 'rgba(120,200,255,.55)'; ctx.fillRect(ox + a[1] * s, oy + a[0] * s, s, s); });
+    // Flèches des vagues
+    if (et.fleche) {
+      [].concat(et.fleche.n).forEach(function (n) {
+        var pulse = 0.6 + Math.sin(maintenant / 150) * 0.4;
+        ctx.globalAlpha = pulse;
+        if (et.fleche.cote === 'h') fleche(ctx, ox + n * s + s / 2, oy + s * 0.2, 0, 1, s * 0.6, et.vague);
+        else fleche(ctx, ox - 2, oy + (n + 1.5) * s, 1, 0, s * 0.5, et.vague);
+        ctx.globalAlpha = 1;
+      });
+    }
+    if (crabePos) dessinerCrabe(ctx, ox + crabePos.c * s + s / 2, oy + (crabePos.r - crabeFuite * 1.5) * s + s / 2, s * 0.9, crabePos.rapide, maintenant, crabeFuite > 0);
+    // Barre du bas : outil, œil, bouton « lancer »
+    var by = oy + s * 5 + 6;
+    ctx.fillStyle = '#fff8ea'; rondRect(ctx, 10, by, 54, 30, 9); ctx.fill();
+    if (et.icone) { var ic = document.createElement('canvas'); ic.width = 48; ic.height = 48; dessinerIcone(ic, et.icone); ctx.drawImage(ic, 25, by + 3, 24, 24); }
+    else { ctx.save(); ctx.translate(25, by + 3); dessinerMuret(ctx, 0, 0, 24, { pv: 2, coqs: 0 }, P); ctx.restore(); }
+    ctx.fillStyle = '#fff8ea'; ctx.beginPath(); ctx.arc(110, by + 15, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#3b2a14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(110, by + 15, 9, 5, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#3b2a14'; ctx.beginPath(); ctx.arc(110, by + 15, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2f8fdc'; rondRect(ctx, 140, by, 90, 30, 10); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath();
+    for (var wx = 0; wx <= 50; wx += 2) ctx.lineTo(160 + wx, by + 15 + Math.sin(wx / 5 + maintenant / 200) * 4);
+    ctx.stroke();
+    if (et.etoiles) for (var st = 0; st < 3; st++) { var sc = Math.min(1, Math.max(0, p * 4 - st)); if (sc > 0) etoileForme(ctx, 70 + st * 50, 120, 20 * sc, '#ffcf26'); }
+    // Main
+    if (et.main) {
+      var cible;
+      if (et.main === 'outil') cible = [37, by + 15];
+      else if (et.main === 'oeil') cible = [110, by + 15];
+      else if (et.main === 'bouton') cible = [185, by + 15];
+      else if (et.main === 'crabe') cible = crabePos ? [ox + crabePos.c * s + s / 2, oy + crabePos.r * s + s / 2] : [ox + s * 1.5, oy + s * 1.5];
+      else cible = [ox + et.main[1] * s + s / 2, oy + et.main[0] * s + s / 2];
+      var pm = Math.min(1, p / 0.35), depart = [W - 30, 230];
+      var mx = depart[0] + (cible[0] - depart[0]) * pm, my = depart[1] + (cible[1] - depart[1]) * pm;
+      var appui = p > 0.35 && p < 0.5;
+      if (p > 0.7) { mx += (p - 0.7) * 60; my += (p - 0.7) * 60; }
+      dessinerMain(ctx, mx, my, 44, appui);
+      if (et.ramasse && p > 0.45 && p < 0.9) { ctx.fillStyle = '#ffde59'; ctx.font = 'bold 16px system-ui'; ctx.textAlign = 'center'; ctx.fillText(T('plus_n', { n: 2 }), cible[0], cible[1] - 20 - p * 20); }
+    }
+  }
+
+  function dessinerRigolePetite(ctx, s, bord, P, temps) {
+    ctx.strokeStyle = '#a7834c'; ctx.lineCap = 'round'; ctx.lineWidth = s * 0.36;
+    ctx.beginPath(); ctx.moveTo(s / 2, s / 2); ctx.lineTo(s / 2, bord ? 0 : s * 0.3); ctx.stroke();
+    ctx.lineWidth = s * 0.2; ctx.strokeStyle = P.eau; ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.setLineDash([4, 5]); ctx.lineDashOffset = temps / 40;
+    ctx.beginPath(); ctx.moveTo(s / 2, 0); ctx.lineTo(s / 2, s / 2); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  function fleche(ctx, x, y, dx, dy, l, type) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.atan2(dy, dx));
+    ctx.fillStyle = type === 'geante' ? '#8b6fe0' : type === 'grande' ? '#ffffff' : '#ffde59';
+    ctx.strokeStyle = 'rgba(0,40,80,.6)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -l * 0.18); ctx.lineTo(l * 0.55, -l * 0.18); ctx.lineTo(l * 0.55, -l * 0.4); ctx.lineTo(l, 0);
+    ctx.lineTo(l * 0.55, l * 0.4); ctx.lineTo(l * 0.55, l * 0.18); ctx.lineTo(0, l * 0.18); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ==========================================================================
+  // ACTIONS DU JOUEUR SUR LA PLAGE
+  // ==========================================================================
+  function centreCase(i) { return { x: geo.mx + (i % LARG) * geo.s + geo.s / 2, y: Math.floor(i / LARG) * geo.s + geo.s / 2 }; }
+
+  function toucherCase(r, c, px, py) {
+    if (S.phase === 'fin' || S.pause) return;
+    demarrerAudio();
+    // 1. Un crabe sous le doigt ?
+    if (px !== undefined) {
+      for (var q = 0; q < S.crabes.length; q++) {
+        var cr = S.crabes[q];
+        if (cr.etat === 'fuite') continue;
+        var cx = geo.mx + cr.c * geo.s + geo.s / 2, cy = cr.r * geo.s + geo.s / 2;
+        if (Math.hypot(px - cx, py - cy) < geo.s * 0.75) { chasserCrabe(cr); return; }
+      }
+    } else {
+      var crabeIci = S.crabes.filter(function (cr2) { return cr2.etat !== 'fuite' && Math.round(cr2.r) === r && Math.round(cr2.c) === c; })[0];
+      if (crabeIci) { chasserCrabe(crabeIci); return; }
+    }
+    if (!dansPlage(r, c)) return;
+    var i = idx(r, c), k = S.g[i], centre = centreCase(i);
+    if (S.anim) { message(T('msg_attends_vague')); return; }
+    // 2. Ramasser un coquillage ou un seau perdu
+    if (k.coq) {
+      k.coq = false; S.coqs++; SON.ramasse();
+      particules(centre.x, centre.y, 10, '#ffd3dc', 'etoile');
+      texteFlottant(centre.x, centre.y, T('plus_n', { n: 1 }), '#ffd3dc');
+      anime('compteur-coqs', 'pop'); majCompteurs(); majApercu();
+      message(T('msg_coquillage_ramasse')); return;
+    }
+    if (k.seau) {
+      k.seau = false; S.seaux += BONUS_SEAU; SON.ramasse();
+      particules(centre.x, centre.y, 12, '#ffde59', 'etoile');
+      texteFlottant(centre.x, centre.y, T('plus_n', { n: BONUS_SEAU }), '#ffde59');
+      anime('compteur-seaux', 'pop'); majCompteurs(); majApercu();
+      message(T('msg_seau_ramasse')); return;
+    }
+    // 3. Reboucher un trou de crabe
+    if (k.troue) {
+      if (S.seaux < 1) return refuser(T('msg_plus_de_seaux'));
+      S.seaux--; k.troue = false; SON.pelle();
+      particules(centre.x, centre.y, 12, palette().sableFonce);
+      texteFlottant(centre.x, centre.y, T('moins_n', { n: 1 }), '#fff');
+      anime('compteur-seaux', 'pop'); majCompteurs(); majApercu();
+      message(T('msg_trou_rebouche')); return;
+    }
+    // 4. Construire avec l'outil choisi
+    var o = S.outil;
+    if (o === 'coquillage') {
+      if (!S.coqs) return refuser(T('msg_pas_coquillage'));
+      if (!estMur(k)) return refuser(T('msg_coquillage_sur_mur'));
+      S.coqs--;
+      S.historique.push({ i: i, avant: copierCase(k), cout: 0, coq: 1 });
+      construire(S.g, r, c, 'coquillage');
+      SON.ramasse(); S.secousse[i] = S.horloge;
+      particules(centre.x, centre.y, 10, '#ffd3dc', 'etoile');
+      texteFlottant(centre.x, centre.y, T('plus_crans', { n: BONUS_COQ }), '#ffd3dc');
+      majCompteurs(); majActions(); majApercu(); message(T('msg_mur_renforce'));
+      return;
+    }
+    if (k.t === 'muret' || k.t === 'tour' || k.t === 'fosse' || k.t === 'rigole') return refuser(T('msg_deja_construit'));
+    if (k.t !== 'sable') return refuser(T(k.t === 'eau' ? 'msg_case_mouillee' : 'msg_case_impossible'));
+    if (!peutConstruire(S.g, r, c, o)) return refuser(T(o === 'rigole' ? 'msg_rigole_bord' : 'msg_case_impossible'));
+    if (S.seaux < COUT[o]) return refuser(T('msg_plus_de_seaux'));
+    S.seaux -= COUT[o];
+    if (S.phase === 'construction') S.historique.push({ i: i, avant: copierCase(k), cout: COUT[o] });
+    construire(S.g, r, c, o);
+    S.secousse[i] = S.horloge;
+    if (o === 'fosse' || o === 'rigole') SON[o === 'fosse' ? 'creuse' : 'rigole'](); else if (o === 'tour') SON.tour(); else SON.pelle();
+    particules(centre.x, centre.y, 14, palette().sableFonce);
+    texteFlottant(centre.x, centre.y - geo.s * 0.3, T('moins_n', { n: COUT[o] }), '#fff');
+    anime('compteur-seaux', 'pop');
+    majCompteurs(); majActions(); majApercu();
+    message(S.seaux === 0 ? T('msg_dernier_seau') : '');
+  }
+
+  function refuser(m) {
+    SON.erreur(); anime('compteur-seaux', 'non'); message(m);
+    S.tremble = S.horloge;
+  }
+
+  function annuler() {
+    var h = S.historique.pop();
+    if (!h) return;
+    S.g[h.i] = h.avant; S.seaux += h.cout; if (h.coq) S.coqs += h.coq;
+    SON.creuse();
+    var ce = centreCase(h.i); particules(ce.x, ce.y, 8, palette().sableFonce);
+    majCompteurs(); majActions(); majApercu();
+  }
+
+  function basculerApercu() {
+    S.apercu = !S.apercu; SON.bouton();
+    majApercu(); majActions();
+    if (!S.apercu) message('');
+  }
+  function majApercu() {
+    if (!S.apercu || S.phase !== 'construction') { S.apercuRes = null; return; }
+    var copie = copierGrille(S.g);
+    S.apercuRes = simulerMaree(copie, S.niv.vagues.slice(S.vagueN));
+    message(S.apercuRes.noye ? T('apercu_noye', { n: S.apercuRes.vagueNoye + 1 }) : T('apercu_sec'));
+  }
+
+  // ==========================================================================
+  // LA MARÉE : vagues successives, crabes
+  // ==========================================================================
+  var ATTENTE_VAGUE = 4000, PAS_EAU = 55, ANNONCE = 700;
+
+  function lancerMaree() {
+    if (S.phase !== 'construction') return;
+    demarrerAudio(); SON.bouton();
+    S.phase = 'maree'; S.apercu = false; S.apercuRes = null; S.historique = [];
+    S.attente = 1800; S.attenteMax = 1800;
+    arriverCrabes(0);
+    majActions(); majAnnonce();
+    message(T('msg_maree_monte'));
+  }
+
+  function vagueSuivante() {
+    if (S.phase === 'maree' && !S.anim) { SON.bouton(); S.attente = 0; }
+  }
+
+  function lancerVague() {
+    var v = S.niv.vagues[S.vagueN];
+    var res = vague(S.g, v);
+    var debut = S.horloge + ANNONCE;
+    var pas = Math.max(22, Math.min(PAS_EAU, 1600 / Math.max(1, res.pas.length)));
+    var fin = debut + res.pas.length * pas;
+    S.eauA = [];
+    // Ce qui était là avant l'eau reste dessiné jusqu'à son arrivée
+    res.pas.forEach(function (p, n) {
+      S.eauA[p.i] = debut + n * pas;
+      if (p.avant && (p.quoi !== 'eau' || p.avant.coq || p.avant.seau)) S.fantome[p.i] = { k: p.avant, jusqua: debut + n * pas };
+    });
+    res.effondres.forEach(function (e) { S.fantome[e.i] = { k: e.avant, jusqua: fin + 150 }; });
+    S.anim = { v: v, res: res, debut: debut, fin: fin + 250, choc: false };
+    SON.vague(v.p > 1);
+    message(T(v.p === 3 ? 'msg_vague_geante' : v.p === 2 ? 'msg_grande_vague' : 'msg_vague', { n: S.vagueN + 1, total: S.niv.vagues.length }));
+  }
+
+  function finirVague() {
+    var a = S.anim, res = a.res;
+    S.anim = null;
+    S.vagueN++;
+    if (res.noye >= 0) { defaite(res.noye); return; }
+    majAnnonce();
+    if (S.vagueN >= S.niv.vagues.length) {
+      S.phase = 'fin'; majActions();
+      message(T('msg_maree_finie'));
+      S.finA = S.horloge + 900; S.issue = 'victoire';
+      return;
+    }
+    S.attente = ATTENTE_VAGUE; S.attenteMax = ATTENTE_VAGUE;
+    arriverCrabes(S.vagueN);
+    if (!S.crabes.some(function (c) { return c.etat !== 'fuite'; })) message(T('msg_entre_vagues'));
+  }
+
+  // Effets au moment où l'eau touche les murs (fin de l'écoulement)
+  function effetsChoc() {
+    var res = S.anim.res;
+    if (res.touches.length) { SON.choc(); S.tremble = S.horloge; }
+    res.touches.forEach(function (i) {
+      S.secousse[i] = S.horloge;
+      var ce = centreCase(i); particules(ce.x, ce.y - geo.s * 0.2, 6, '#ffffff', 'goutte', 1.2);
+      texteFlottant(ce.x, ce.y - geo.s * 0.3, T('moins_n', { n: S.anim.v.p || 1 }), '#ffe7c2');
+    });
+    if (res.effondres.length) {
+      SON.effondre();
+      res.effondres.forEach(function (e) { var ce = centreCase(e.i); particules(ce.x, ce.y, 22, palette().sableFonce, 'grain', 1.6); });
+    }
+  }
+
+  // Les crabes sortent de la mer au début de l'attente de la vague n
+  function arriverCrabes(n) {
+    (S.niv.crabes || []).forEach(function (d) {
+      if (d.v !== n) return;
+      S.crabes.push({ r: PLAGE0 - 0.8, c: d.c, chemin: [[PLAGE0, d.c]], etat: 'marche', rapide: !!d.rapide, cible: -1, creuse: 0, vu: false });
+    });
+    if (S.crabes.some(function (c) { return !c.vu; })) {
+      SON.crabe();
+      message(T('msg_crabe_arrive'));
+      S.crabes.forEach(function (c) { c.vu = true; });
+    }
+  }
+
+  function passable(k) { return k.t !== 'rocher' && k.t !== 'donjon' && !estMur(k) && !(k.t === 'muret' || k.t === 'tour'); }
+
+  // Chemin le plus court (en cases) d'un crabe jusqu'à une case voisine d'un mur
+  function trouverCible(cr) {
+    var depart = idx(Math.max(PLAGE0, Math.round(cr.r)), Math.round(cr.c));
+    var prec = {}, file = [depart], vu = {}; vu[depart] = true;
+    var pris = {}; S.crabes.forEach(function (o) { if (o !== cr && o.cible >= 0) pris[o.cible] = true; });
+    while (file.length) {
+      var i = file.shift(), r = Math.floor(i / LARG), c = i % LARG;
+      var vois = [[r + 1, c], [r, c - 1], [r, c + 1], [r - 1, c]];
+      for (var n = 0; n < 4; n++) {
+        if (!dansPlage(vois[n][0], vois[n][1])) continue;
+        var j = idx(vois[n][0], vois[n][1]), k = S.g[j];
+        if (estMur(k) && !pris[j]) {
+          var chemin = [], x = i;
+          while (x !== undefined && x !== depart) { chemin.unshift([Math.floor(x / LARG), x % LARG]); x = prec[x]; }
+          return { cible: j, chemin: chemin };
+        }
+        if (vu[j] || !passable(k)) continue;
+        vu[j] = true; prec[j] = i; file.push(j);
+      }
+    }
+    return null;
+  }
+
+  function chasserCrabe(cr) {
+    cr.etat = 'fuite'; cr.cible = -1;
+    S.chasses++;
+    SON.chasse();
+    var ce = { x: geo.mx + cr.c * geo.s + geo.s / 2, y: cr.r * geo.s + geo.s / 2 };
+    particules(ce.x, ce.y, 12, '#ffde59', 'etoile');
+    texteFlottant(ce.x, ce.y - geo.s * 0.4, T('crabe_chasse'), '#ffde59');
+    message(T('msg_crabe_chasse'));
+  }
+
+  function majCrabes(dt) {
+    S.crabes.forEach(function (cr) {
+      var vitesse = (cr.rapide ? 2.3 : 1.1) * dt / 1000;   // cases par seconde
+      if (cr.etat === 'fuite' || cr.etat === 'part') {
+        var vf = cr.etat === 'fuite' ? vitesse * 3 : vitesse * 1.4;
+        cr.r -= vf;
+        if (cr.r < 0.3) cr.fini = true;
+        return;
+      }
+      if (cr.etat === 'creuse') {
+        var k = S.g[cr.cible];
+        if (!estMur(k)) { cr.etat = 'marche'; cr.chemin = []; cr.cible = -1; return; }
+        cr.creuse += dt;
+        if (Math.random() < dt / 300) { var ce = centreCase(cr.cible); particules(ce.x, ce.y + geo.s * 0.2, 2, palette().sableFonce); }
+        if (cr.creuse >= (cr.rapide ? 2200 : 3000)) {
+          k.troue = true; SON.trou(); S.secousse[cr.cible] = S.horloge;
+          message(T('msg_trou'));
+          cr.etat = 'part'; cr.cible = -1;
+        }
+        return;
+      }
+      // Marche : suivre le chemin, sinon chercher un nouveau mur
+      if (!cr.chemin.length) {
+        var t = trouverCible(cr);
+        if (!t) { cr.etat = 'part'; return; }
+        cr.cible = t.cible; cr.chemin = t.chemin;
+        if (!cr.chemin.length) { cr.etat = 'creuse'; cr.creuse = 0; SON.crabe(); return; }
+      }
+      var but = cr.chemin[0];
+      var dr = but[0] - cr.r, dc = but[1] - cr.c, d = Math.hypot(dr, dc);
+      if (d <= vitesse) {
+        cr.r = but[0]; cr.c = but[1]; cr.chemin.shift();
+        if (cr.cible >= 0 && !estMur(S.g[cr.cible])) { cr.chemin = []; cr.cible = -1; return; }
+        if (!cr.chemin.length && cr.cible >= 0) { cr.etat = 'creuse'; cr.creuse = 0; SON.crabe(); }
+      } else { cr.r += dr / d * vitesse; cr.c += dc / d * vitesse; }
+    });
+    S.crabes = S.crabes.filter(function (cr) { return !cr.fini; });
+  }
+
+  // ==========================================================================
+  // FIN DU NIVEAU
+  // ==========================================================================
+  function defaite(iNoye) {
+    S.phase = 'fin'; S.issue = 'defaite'; S.finA = S.horloge + 1400; S.iNoye = iNoye;
+    majActions();
+    SON.eclabousse(); S.tremble = S.horloge;
+    var ce = centreCase(iNoye); particules(ce.x, ce.y, 30, '#ffffff', 'goutte', 2);
+    message(T('msg_donjon_mouille'));
+  }
+
+  function calculerScore() {
+    return S.seaux * 100 + casesSeches(S.g) * 10 + S.coqs * 50 + S.chasses * 20;
+  }
+
+  function afficherFin() {
+    var gagne = S.issue === 'victoire', n = S.n, niv = S.niv;
+    S.crabes = [];
+    var etoiles = gagne ? 1 + (S.seaux >= niv.s2 ? 1 : 0) + (S.seaux >= niv.s3 ? 1 : 0) : 0;
+    var score = gagne ? calculerScore() : 0;
+    var ancienRecord = SAUVE.records[n] || 0, record = gagne && score > ancienRecord;
+    var avantTotal = totalEtoiles();
+    if (gagne) {
+      SAUVE.etoiles[n] = Math.max(SAUVE.etoiles[n] || 0, etoiles);
+      if (record) SAUVE.records[n] = score;
+      SAUVE.debloque = Math.max(SAUVE.debloque, Math.min(NIVEAUX.length, n + 2));
+      sauver();
+    }
+    var apresTotal = totalEtoiles();
+    $('fin-titre').textContent = gagne ? T(etoiles === 3 ? 'victoire_titre_3' : 'victoire_titre') : T('defaite_titre');
+    $('fin-phrase').textContent = gagne ? T('victoire_phrase', { n: S.seaux }) : T('defaite_phrase');
+    var spans = $('fin-etoiles').children;
+    for (var k = 0; k < 3; k++) spans[k].classList.remove('on');
+    $('fin-score').textContent = gagne ? T('score_n', { n: 0 }) : '';
+    $('fin-badges').innerHTML = '';
+    $('fin-detail').textContent = gagne ? T('detail_score', { seaux: S.seaux, cases: casesSeches(S.g), coqs: S.coqs, crabes: S.chasses }) : T('defaite_conseil');
+    if (!gagne && ancienRecord) $('fin-detail').textContent += ' ' + T('record_n', { n: ancienRecord });
+    var dernier = n === NIVEAUX.length - 1;
+    $('b-suivant').hidden = !gagne;
+    $('b-suivant').textContent = dernier ? T('bilan_bouton') : T('niveau_suivant');
+    $('b-reessayer').hidden = gagne;
+    $('b-rejouer').hidden = !gagne;
+    montrer('ecran-fin');
+    if (gagne) {
+      SON.victoire(); lancerConfettis(etoiles * 40 + 30);
+      S.compteur = { de: 0, a: score, debut: performance.now() };
+      for (var e = 0; e < etoiles; e++) (function (e2) {
+        setTimeout(function () { spans[e2].classList.add('on'); SON.etoile(e2); }, 400 + e2 * 380);
+      })(e);
+      setTimeout(function () {
+        var badges = $('fin-badges');
+        if (record) ajouterBadge(badges, ancienRecord ? T('nouveau_record') : T('premier_record'));
+        else ajouterBadge(badges, T('record_n', { n: ancienRecord }));
+        [[DRAPEAUX, 'drapeau'], [STYLES_TOUR, 'tour'], [PLAGES_DECOR, 'plage']].forEach(function (d) {
+          d[0].forEach(function (seuil, k2) { if (seuil > avantTotal && seuil <= apresTotal) ajouterBadge(badges, T('decor_debloque', { nom: T('decor_' + d[1] + '_' + k2) })); });
+        });
+      }, 400 + etoiles * 380);
+    } else SON.defaite();
+  }
+  function ajouterBadge(cont, txt) { var b = document.createElement('span'); b.className = 'badge'; b.textContent = txt; cont.appendChild(b); }
+
+  function afficherBilan() {
+    montrer('ecran-bilan');
+    $('bilan-etoiles').textContent = T('etoiles_total', { n: totalEtoiles(), max: NIVEAUX.length * 3 });
+    $('bilan-score').textContent = T('score_total', { n: SAUVE.records.reduce(function (s, x) { return s + (x || 0); }, 0) });
+    SON.victoire(); lancerConfettis(160);
+  }
+
+  // ==========================================================================
+  // PAUSE
+  // ==========================================================================
+  function mettrePause() {
+    if (S.ecran !== 'jeu' || S.pause || !$('ecran-fin').hidden || !$('ecran-bilan').hidden) return;
+    S.pause = true;
+    if (audio && audio.state === 'running') audio.suspend().catch(function () {});
+    montrer('ecran-pause');
+  }
+  function reprendre() {
+    S.pause = false;
+    if (audio && audio.state === 'suspended') audio.resume().catch(function () {});
+    montrer(tuto ? 'ecran-carte' : null);
+    if (tuto) montrer('ecran-carte');
+  }
+  document.addEventListener('visibilitychange', function () { if (document.hidden) mettrePause(); });
+
+  // ==========================================================================
+  // DESSIN DE LA PLAGE (chaque image)
+  // ==========================================================================
+  function dessinerPlage() {
+    var ctx = ctxP, s = geo.s, mx = geo.mx, P = palette(), h = S.horloge;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var tremble = S.horloge - S.tremble < 300 ? Math.sin(S.horloge / 20) * 3 * (1 - (S.horloge - S.tremble) / 300) : 0;
+    ctx.clearRect(0, 0, geo.w, geo.h);
+    ctx.save(); ctx.translate(tremble, 0);
+    // Bord de mer sur les côtés (vagues qui contournent)
+    ctx.fillStyle = P.merClair; ctx.globalAlpha = 0.7;
+    ctx.fillRect(0, 0, mx, geo.h); ctx.fillRect(geo.w - mx, 0, mx, geo.h);
+    ctx.globalAlpha = 1;
+    dessinerMer(ctx, 0, 0, geo.w, s * PLAGE0, P, h);
+    // Cases
+    for (var i = PLAGE0 * LARG; i < LARG * HAUT; i++) {
+      var r = Math.floor(i / LARG), c = i % LARG, x = mx + c * s, y = r * s;
+      var k = S.g[i], opts = {};
+      var f = S.fantome[i];
+      if (f && h >= f.jusqua) { delete S.fantome[i]; f = null; }
+      var arrivee = S.eauA[i];
+      var pasEncore = arrivee !== undefined && h < arrivee;
+      if (f && f.k) k = f.k;
+      if (k.t === 'eau' && pasEncore) opts.secheVisuel = true;
+      if (k.t === 'eau' && arrivee !== undefined && h >= arrivee && h < arrivee + 250) { opts.secheVisuel = true; opts.eauPartielle = (h - arrivee) / 250; }
+      if (k.t === 'donjon' && S.issue === 'defaite' && S.iNoye === i && arrivee !== undefined && h >= arrivee) { opts.noye = true; opts.eauPartielle = 0.6; }
+      var sec = S.secousse[i];
+      var dx = sec !== undefined && h - sec < 250 ? Math.sin((h - sec) / 25) * 3 : 0;
+      ctx.save(); ctx.translate(dx, 0);
+      dessinerCase(ctx, x, y, s, k, i, S.g, P, h, opts);
+      ctx.restore();
+    }
+    // Aperçu : où ira l'eau
+    if (S.apercuRes) {
+      S.apercuRes.mouille.forEach(function (n, i2) {
+        if (n < 0 || S.g[i2].t === 'eau') return;
+        var x2 = mx + (i2 % LARG) * s, y2 = Math.floor(i2 / LARG) * s;
+        ctx.fillStyle = 'rgba(110,190,255,' + (0.62 - n * 0.06) + ')'; ctx.fillRect(x2, y2, s, s);
+        ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 1; ctx.strokeRect(x2 + 1, y2 + 1, s - 2, s - 2);
+      });
+      if (S.apercuRes.noye) {
+        var ci = S.apercuRes.iNoye, xx = mx + (ci % LARG) * s, yy = Math.floor(ci / LARG) * s;
+        ctx.strokeStyle = 'rgba(255,60,40,' + (0.6 + Math.sin(h / 120) * 0.4) + ')'; ctx.lineWidth = 4;
+        ctx.strokeRect(xx + 2, yy + 2, s - 4, s - 4);
+      }
+    }
+    // Annonce de la prochaine vague : flèches au bord
+    var vn = S.anim ? S.anim.v : S.niv.vagues[S.vagueN];
+    if (vn && S.phase !== 'fin') {
+      var pulse = 0.55 + Math.sin(h / 160) * 0.45;
+      var type = vn.p === 3 ? 'geante' : vn.p === 2 ? 'grande' : '';
+      entreesVague(vn).forEach(function (e) {
+        ctx.globalAlpha = S.anim ? 1 : pulse;
+        if (e.cote === 'h') {
+          var ex = mx + e.c * s + s / 2;
+          ctx.fillStyle = type === 'geante' ? 'rgba(139,111,224,.45)' : 'rgba(255,255,255,.35)';
+          ctx.fillRect(mx + (e.c - 1) * s, s * 0.9, s * 3, s * 1.1);
+          var avance = S.anim ? Math.min(1, Math.max(0, (h - (S.anim.debut - ANNONCE)) / ANNONCE)) : 0;
+          fleche(ctx, ex, s * (0.15 + avance * 0.8), 0, 1, s * 0.95, type);
+        } else {
+          var ey = e.r * s + s / 2, gauche = e.cote === 'g';
+          ctx.fillStyle = 'rgba(255,255,255,.35)';
+          ctx.fillRect(gauche ? 0 : geo.w - mx, (e.r - 1) * s, mx, s * 3);
+          fleche(ctx, gauche ? 1 : geo.w - 1, ey, gauche ? 1 : -1, 0, mx * 1.6, type);
+        }
+        ctx.globalAlpha = 1;
+      });
+    }
+    // Choc de la vague contre les murs
+    if (S.anim && !S.anim.choc && h >= S.anim.fin - 250) { S.anim.choc = true; effetsChoc(); }
+    // Crabes
+    S.crabes.forEach(function (cr) {
+      var cx = mx + cr.c * s + s / 2, cy = cr.r * s + s / 2;
+      if (cr.etat === 'creuse') {
+        cx += Math.sin(h / 40) * 1.5;
+        var part = cr.creuse / (cr.rapide ? 2200 : 3000);
+        ctx.strokeStyle = '#ff5a3d'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.42, -Math.PI / 2, -Math.PI / 2 + part * Math.PI * 2); ctx.stroke();
+      }
+      dessinerCrabe(ctx, cx, cy, s * 0.85, cr.rapide, h, cr.etat === 'fuite');
+    });
+    // Curseur du clavier
+    if (S.curseurVisible && S.phase !== 'fin') {
+      ctx.strokeStyle = '#ff8a3d'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.lineDashOffset = -h / 50;
+      ctx.strokeRect(mx + S.curseur.c * s + 2, S.curseur.r * s + 2, s - 4, s - 4); ctx.setLineDash([]);
+    }
+    // Particules et textes
+    S.particules.forEach(function (p) {
+      var a = 1 - p.vie / p.duree;
+      ctx.globalAlpha = Math.max(0, a);
+      if (p.type === 'etoile') etoileForme(ctx, p.x, p.y, p.t * 1.6, p.c);
+      else { ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.t, 0, Math.PI * 2); ctx.fill(); }
+    });
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center'; ctx.font = 'bold ' + Math.round(s * 0.36) + 'px system-ui, sans-serif';
+    S.textes.forEach(function (t2) {
+      ctx.globalAlpha = Math.max(0, 1 - t2.vie / 1000);
+      ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(40,25,5,.7)'; ctx.strokeText(t2.texte, t2.x, t2.y - t2.vie / 30);
+      ctx.fillStyle = t2.c; ctx.fillText(t2.texte, t2.x, t2.y - t2.vie / 30);
+    });
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // ==========================================================================
+  // DÉCOR DE L'ACCUEIL (château de sable, mer animée, mouettes, crabe)
+  // ==========================================================================
+  function dessinerFond(t) {
+    var ctx = ctxF, W = window.innerWidth, H = window.innerHeight, P = palette();
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var gr = ctx.createLinearGradient(0, 0, 0, H * 0.5);
+    gr.addColorStop(0, P.ciel[0]); gr.addColorStop(1, P.ciel[1]);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+    if (SAUVE.plage === 2) for (var e = 0; e < 40; e++) { ctx.fillStyle = 'rgba(255,255,255,' + (0.4 + 0.4 * Math.sin(t / 500 + e)) + ')'; ctx.fillRect(hasard(e) * W, hasard(e + 50) * H * 0.4, 2, 2); }
+    // Astre
+    ctx.fillStyle = P.astre; ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.arc(W * 0.78, H * 0.2, 56, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1; ctx.beginPath(); ctx.arc(W * 0.78, H * 0.2, 38, 0, Math.PI * 2); ctx.fill();
+    // Nuages
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    [[0.15, 0.13, 1], [0.55, 0.08, 0.8], [0.9, 0.3, 0.7]].forEach(function (n) {
+      var nx = ((n[0] * W + t / 60 * n[2]) % (W + 160)) - 80, ny = n[1] * H;
+      ctx.beginPath(); ctx.arc(nx, ny, 22 * n[2], 0, Math.PI * 2); ctx.arc(nx + 24 * n[2], ny - 8, 26 * n[2], 0, Math.PI * 2); ctx.arc(nx + 50 * n[2], ny, 20 * n[2], 0, Math.PI * 2); ctx.fill();
+    });
+    // Mer
+    var merY = H * (W > H ? 0.3 : 0.42);        // écran en paysage : la mer monte pour laisser la place au château
+    dessinerMer(ctx, 0, merY, W, H * 0.14, P, t);
+    // Plage
+    var sy = merY + H * 0.14;
+    var gs = ctx.createLinearGradient(0, sy, 0, H);
+    gs.addColorStop(0, P.sable); gs.addColorStop(1, P.sableFonce);
+    ctx.fillStyle = gs; ctx.fillRect(0, sy, W, H - sy);
+    // Vague qui monte et redescend sur le sable
+    var monte = (Math.sin(t / 1400) + 1) / 2;
+    ctx.fillStyle = P.eau; ctx.globalAlpha = 0.65;
+    ctx.beginPath(); ctx.moveTo(0, sy);
+    for (var x = 0; x <= W; x += 10) ctx.lineTo(x, sy + 10 + monte * 22 + Math.sin(x / 40 + t / 600) * 6);
+    ctx.lineTo(W, sy); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255,255,255,.8)';
+    for (x = 0; x <= W; x += 14) { ctx.beginPath(); ctx.arc(x, sy + 10 + monte * 22 + Math.sin(x / 40 + t / 600) * 6, 4, 0, Math.PI * 2); ctx.fill(); }
+    for (var g = 0; g < 60; g++) { ctx.fillStyle = P.grain; ctx.globalAlpha = 0.3; ctx.fillRect(hasard(g) * W, sy + 40 + hasard(g + 9) * (H - sy - 40), 3, 3); }
+    ctx.globalAlpha = 1;
+    // Château de sable au centre
+    var base = Math.min(W * 0.8, 380), cx = W / 2;
+    var s = base / 4.4;
+    // Le château reste au-dessus des boutons du bas (environ 170 px)
+    var cy = Math.max(sy + s * 1.8, Math.min(sy + (H - sy) * 0.46, H - 175 - s));
+    var C = couleursMur(P);
+    ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.beginPath(); ctx.ellipse(cx, cy + s * 1.05, base * 0.55, s * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    // Muraille
+    ctx.fillStyle = C.moyen; ctx.fillRect(cx - s * 1.9, cy, s * 3.8, s);
+    ctx.fillStyle = C.clair; ctx.fillRect(cx - s * 1.9, cy, s * 3.8, s * 0.16);
+    for (var cr = 0; cr < 9; cr++) { ctx.fillStyle = C.moyen; ctx.fillRect(cx - s * 1.9 + cr * s * 0.44, cy - s * 0.2, s * 0.26, s * 0.22); }
+    ctx.fillStyle = '#6b4a22'; ctx.beginPath(); ctx.arc(cx, cy + s * 0.62, s * 0.28, Math.PI, 0); ctx.fillRect(cx - s * 0.28, cy + s * 0.62, s * 0.56, s * 0.38); ctx.fill();
+    // Tours et donjon
+    dessinerTour(ctx, cx - s * 2.5, cy - s * 0.55, s * 1.3, { pv: 4, coqs: 0, deco: true }, P, SAUVE.tour);
+    dessinerTour(ctx, cx + s * 1.2, cy - s * 0.55, s * 1.3, { pv: 4, coqs: 0, deco: true }, P, SAUVE.tour);
+    dessinerDonjon(ctx, cx - s * 0.9, cy - s * 1.7, s * 1.8, P, t, false);
+    dessinerDrapeau(ctx, cx - s * 1.85, cy - s * 0.45, s * 0.8, (SAUVE.drapeau + 1) % 6, t + 300);
+    dessinerDrapeau(ctx, cx + s * 1.85, cy - s * 0.45, s * 0.8, (SAUVE.drapeau + 2) % 6, t + 600);
+    // Seau, pelle, coquillages, crabe
+    dessinerSeau(ctx, cx - base * 0.48, cy + s * 1.5, s * 0.9, '#ff5a5a');
+    ctx.strokeStyle = '#2f8fdc'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx + base * 0.42, cy + s * 0.9); ctx.lineTo(cx + base * 0.52, cy + s * 1.7); ctx.stroke();
+    ctx.fillStyle = '#2f8fdc'; ctx.beginPath(); ctx.ellipse(cx + base * 0.53, cy + s * 1.8, s * 0.18, s * 0.26, -0.15, 0, Math.PI * 2); ctx.fill();
+    dessinerCoquillage(ctx, cx - base * 0.2, cy + s * 1.75, s * 0.4);
+    dessinerCoquillage(ctx, cx + base * 0.18, cy + s * 1.9, s * 0.34, '#fff3c4');
+    var crx = cx + Math.sin(t / 1800) * base * 0.3;
+    dessinerCrabe(ctx, crx, cy + s * 2.35, s * 0.75, false, t, false);
+    // Mouettes
+    ctx.strokeStyle = '#3b4a5a'; ctx.lineWidth = 2.5;
+    [[0.2, 0.25, 0], [0.32, 0.2, 1], [0.62, 0.3, 2]].forEach(function (m) {
+      var mx2 = ((m[0] * W + t / 25) % (W + 60)) - 30, my2 = m[1] * H + Math.sin(t / 700 + m[2]) * 8, ail = Math.sin(t / 150 + m[2]) * 5;
+      ctx.beginPath(); ctx.moveTo(mx2 - 12, my2 - ail); ctx.quadraticCurveTo(mx2 - 5, my2 - 8, mx2, my2); ctx.quadraticCurveTo(mx2 + 5, my2 - 8, mx2 + 12, my2 - ail); ctx.stroke();
+    });
+  }
+
+  function dessinerEffets(dt) {
+    var ctx = ctxE, W = window.innerWidth, H = window.innerHeight;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    confettis.forEach(function (c) {
+      c.x += c.vx; c.y += c.vy; c.r += c.vr;
+      ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.r);
+      if (c.etoile) etoileForme(ctx, 0, 0, c.t, c.c); else { ctx.fillStyle = c.c; ctx.fillRect(-c.t / 2, -c.t / 4, c.t, c.t / 2); }
+      ctx.restore();
+    });
+    confettis = confettis.filter(function (c) { return c.y < H + 30; });
+  }
+
+  // ==========================================================================
+  // BOUCLE PRINCIPALE
+  // ==========================================================================
+  var dernier = performance.now();
+  function boucle(maintenant) {
+    var dt = Math.min(50, maintenant - dernier); dernier = maintenant;
+    if (S.ecran === 'jeu') {
+      if (!S.pause && $('ecran-carte').hidden) {
+        S.horloge += dt;
+        if (S.phase === 'maree') {
+          if (S.anim) { if (S.horloge >= S.anim.fin) finirVague(); }
+          else {
+            S.attente -= dt;
+            if (S.attente <= 0) lancerVague();
+          }
+          $('attente-barre').style.width = (S.anim ? 100 : Math.max(0, 100 - S.attente / S.attenteMax * 100)) + '%';
+        }
+        if (S.phase === 'maree' || S.phase === 'construction') majCrabes(dt);
+        if (S.phase === 'fin' && S.finA && S.horloge >= S.finA) { S.finA = 0; afficherFin(); }
+        S.particules.forEach(function (p) { p.vie += dt; p.x += p.vx; p.y += p.vy; p.vy += 0.12; });
+        S.particules = S.particules.filter(function (p) { return p.vie < p.duree; });
+        S.textes.forEach(function (t2) { t2.vie += dt; });
+        S.textes = S.textes.filter(function (t2) { return t2.vie < 1000; });
+      }
+      dessinerPlage();
+    } else dessinerFond(maintenant);
+    if (tuto && !$('ecran-carte').hidden) dessinerTuto(maintenant);
+    if (S.compteur) {
+      var p = Math.min(1, (maintenant - S.compteur.debut) / 1200);
+      $('fin-score').textContent = T('score_n', { n: Math.round(S.compteur.a * p) });
+      if (p >= 1) S.compteur = null;
+    }
+    dessinerEffets(dt);
+    requestAnimationFrame(boucle);
+  }
+
+  // ==========================================================================
+  // ENTRÉES : doigt, souris, clavier
+  // ==========================================================================
+  cvPlage.addEventListener('pointerdown', function (ev) {
+    ev.preventDefault();
+    var b = cvPlage.getBoundingClientRect();
+    var px = ev.clientX - b.left, py = ev.clientY - b.top;
+    var c = Math.floor((px - geo.mx) / geo.s), r = Math.floor(py / geo.s);
+    S.curseurVisible = false;
+    if (c >= 0 && c < LARG) S.curseur = { r: Math.max(PLAGE0, Math.min(HAUT - 1, r)), c: c };
+    toucherCase(r, c, px, py);
+  });
+
+  function clic(id, f) { $(id).addEventListener('click', function () { demarrerAudio(); f(); }); }
+  clic('b-jouer', function () {
+    SON.bouton();
+    if (SAUVE.debloque <= 1 && !SAUVE.etoiles[0]) commencerNiveau(0); else ouvrirNiveaux();
+  });
+  clic('b-niveaux-accueil', function () { SON.bouton(); ouvrirNiveaux(); });
+  clic('b-decors', function () { SON.bouton(); ouvrirDecors(); });
+  clic('b-niveaux-retour', function () { SON.bouton(); allerAccueil(); });
+  clic('b-decors-retour', function () { SON.bouton(); allerAccueil(); });
+  clic('b-carte-ok', function () { SON.bouton(); fermerCarte(); });
+  $('ecran-carte').addEventListener('click', function (ev) { if (ev.target === $('ecran-carte')) { demarrerAudio(); fermerCarte(); } });
+  clic('b-pause', function () { SON.bouton(); mettrePause(); });
+  clic('b-reprendre', function () { reprendre(); SON.bouton(); });
+  clic('b-recommencer', function () { S.pause = false; if (audio) audio.resume().catch(function () {}); SON.bouton(); commencerNiveau(S.n); });
+  clic('b-aide', function () { S.pause = false; if (audio) audio.resume().catch(function () {}); SON.bouton(); montrerCarteNiveau(true); });
+  clic('b-pause-accueil', function () { S.pause = false; if (audio) audio.resume().catch(function () {}); SON.bouton(); allerAccueil(); });
+  clic('b-lancer', lancerMaree);
+  clic('b-suivante', vagueSuivante);
+  clic('b-annuler', annuler);
+  clic('b-apercu', basculerApercu);
+  clic('b-suivant', function () { SON.bouton(); if (S.n === NIVEAUX.length - 1) afficherBilan(); else commencerNiveau(S.n + 1); });
+  clic('b-reessayer', function () { SON.bouton(); commencerNiveau(S.n); });
+  clic('b-rejouer', function () { SON.bouton(); commencerNiveau(S.n); });
+  clic('b-fin-niveaux', function () { SON.bouton(); ouvrirNiveaux(); });
+  clic('b-bilan-rejouer', function () { SON.bouton(); commencerNiveau(S.n); });
+  clic('b-bilan-niveaux', function () { SON.bouton(); ouvrirNiveaux(); });
+  clic('b-bilan-accueil', function () { SON.bouton(); allerAccueil(); });
+  ['b-son-accueil', 'b-son-jeu', 'b-son-pause'].forEach(function (id) {
+    clic(id, function () { SAUVE.son = !SAUVE.son; sauver(); majBoutonsSon(); SON.bouton(); });
+  });
+
+  document.addEventListener('keydown', function (ev) {
+    demarrerAudio();
+    var code = ev.code;
+    if (code === 'Escape' || code === 'KeyP') {
+      if (S.ecran === 'jeu') { if (S.pause) reprendre(); else if ($('ecran-carte').hidden) mettrePause(); else fermerCarte(); }
+      ev.preventDefault(); return;
+    }
+    if (S.ecran !== 'jeu' || S.pause || !$('ecran-fin').hidden || !$('ecran-bilan').hidden) return;
+    if (!$('ecran-carte').hidden) { if (code === 'Space' || code === 'Enter') { ev.preventDefault(); fermerCarte(); } return; }
+    var dep = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[code];
+    if (dep) {
+      ev.preventDefault();
+      S.curseurVisible = true;
+      S.curseur.r = Math.max(PLAGE0, Math.min(HAUT - 1, S.curseur.r + dep[0]));
+      S.curseur.c = Math.max(0, Math.min(LARG - 1, S.curseur.c + dep[1]));
+      return;
+    }
+    if (code === 'Space' || code === 'Enter') {
+      if (document.activeElement && document.activeElement.tagName === 'BUTTON' && !S.curseurVisible) return;
+      ev.preventDefault(); S.curseurVisible = true; toucherCase(S.curseur.r, S.curseur.c); return;
+    }
+    var chiffre = /^Digit([1-5])$/.exec(code) || /^Numpad([1-5])$/.exec(code);
+    if (chiffre) { var o = outilsAffiches(S.n)[+chiffre[1] - 1]; if (o) { SON.bouton(); choisirOutil(o); } return; }
+    // Raccourcis lettres : la lettre écrite sur la touche (AZERTY comme QWERTY)
+    var lettre = (ev.key || '').toLowerCase();
+    if (lettre === 'l') { if (S.phase === 'construction') lancerMaree(); else vagueSuivante(); return; }
+    if (lettre === 'a' && S.phase === 'construction') { basculerApercu(); return; }
+    if ((lettre === 'u' || code === 'Backspace') && S.phase === 'construction') { ev.preventDefault(); annuler(); }
+  });
+
+  // ==========================================================================
+  // DÉMARRAGE
+  // ==========================================================================
+  Array.prototype.forEach.call(document.querySelectorAll('canvas[data-ico]'), function (cv) { dessinerIcone(cv, cv.dataset.ico); });
+  // Après la traduction du HTML par le module commun (data-i18n)
+  function insecablesHtml() { Array.prototype.forEach.call(document.querySelectorAll('[data-i18n]'), function (el) { el.textContent = insecables(el.textContent); }); }
+  document.addEventListener('DOMContentLoaded', insecablesHtml);
+  setTimeout(insecablesHtml, 0);
+  I18N.creerSelecteur({ conteneur: $('langue-accueil'), isole: true });
+  I18N.creerSelecteur({ conteneur: $('langue-pause'), isole: true });
+  majBoutonsSon();
+  redimensionner();
+  allerAccueil();
+  requestAnimationFrame(boucle);})();
+</script>
+</body>
+</html>
