@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L'île aux œufs de dinosaures</title>
+<style>
+  /* ===== Base ===== */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #174a3a; color: #2b2a1f;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    touch-action: none; user-select: none; -webkit-user-select: none; }
+  .ecran { position: absolute; inset: 0; display: none; flex-direction: column; }
+  .ecran.actif { display: flex; }
+  button { font-family: inherit; cursor: pointer; border: none; border-radius: 14px;
+    min-height: 48px; min-width: 48px; font-size: 18px; font-weight: 700; color: #2b3a20; }
+  button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .gros { background: linear-gradient(#ffc45c, #f28c28); color: #3d1f00; padding: 14px 40px;
+    font-size: 26px; box-shadow: 0 6px 0 #a95a12, 0 10px 18px rgba(0,0,0,.3); }
+  .gros:active { transform: translateY(4px); box-shadow: 0 2px 0 #a95a12; }
+  .second { background: #fff6dc; padding: 10px 18px; box-shadow: 0 4px 0 #b7a170; }
+  .second:active { transform: translateY(3px); box-shadow: 0 1px 0 #b7a170; }
+  .rond { background: rgba(255,248,225,.92); border-radius: 50%; width: 48px; height: 48px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+  .rond svg { width: 26px; height: 26px; }
+
+  /* ===== Accueil ===== */
+  #decor, #carteCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #accueil .contenu { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column;
+    align-items: center; text-align: center; padding: 6vh 18px 18px; }
+  h1 { margin: 0; font-size: clamp(34px, 10vw, 60px); line-height: 1.05; color: #fff8dc;
+    text-shadow: 0 3px 0 #b35b14, 0 6px 0 #6b3507, 0 10px 18px rgba(0,0,0,.4); letter-spacing: .5px; }
+  .regle { margin: 14px auto 0; max-width: 360px; background: rgba(255,248,225,.92); border-radius: 16px;
+    padding: 10px 14px; font-size: 17px; line-height: 1.35; box-shadow: 0 4px 0 rgba(0,0,0,.2); }
+  #accueil .boutons { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: 3vh; }
+  #accueil .ligne { display: flex; gap: 12px; }
+  #recordAccueil { color: #fff8dc; font-weight: 700; font-size: 15px; background: rgba(40,30,15,.6); border-radius: 12px; padding: 4px 12px; }
+  #recordAccueil:empty { display: none; }
+  .coin { position: absolute; top: 10px; right: 10px; z-index: 2; }
+
+  /* ===== Carte et nid ===== */
+  .entete { position: relative; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 10px; }
+  .entete h2 { flex: 1; margin: 0; color: #fff8dc; font-size: 22px; text-shadow: 0 2px 4px rgba(0,0,0,.6); }
+  #zonesCarte { position: absolute; inset: 0; z-index: 1; }
+  .zone { position: absolute; transform: translate(-50%, -50%); width: 54px; height: 54px; border-radius: 50%;
+    background: #fff6dc; border: 4px solid #f28c28; font-size: 20px; padding: 0; box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+  .zone.fermee { background: #b9c3c7; border-color: #7d8a90; color: #59656b; }
+  .zone.prochaine { animation: battre 1.2s infinite; }
+  .zone .et { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); white-space: nowrap;
+    font-size: 13px; color: #ffd84a; text-shadow: 0 1px 2px #000; margin-top: 2px; }
+  @keyframes battre { 50% { transform: translate(-50%, -50%) scale(1.12); } }
+  #nid { background: linear-gradient(#5c3b1f, #2f2012); }
+  #grilleNid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px; padding: 10px; touch-action: pan-y; align-content: start; }
+  .carteBebe { background: #fff6dc; border-radius: 16px; padding: 8px; text-align: center; font-size: 14px; line-height: 1.25; }
+  .carteBebe b { display: block; font-size: 15px; }
+  .carteBebe.cache { background: #c9b892; color: #6b5b3a; }
+  .carteBebe canvas { width: 110px; height: 80px; }
+
+  /* ===== Jeu ===== */
+  #jeu { background: #174a3a; }
+  #barre { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: rgba(0,0,0,.25); }
+  #infos { flex: 1; min-width: 0; color: #fff8dc; line-height: 1.15; }
+  #nomZone { font-size: 15px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #compteurs { font-size: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #compteurs span { display: inline-flex; align-items: center; gap: 3px; }
+  #compteurs svg { width: 18px; height: 18px; }
+  #plateau { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; }
+  #toile { display: block; border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.4); touch-action: none; }
+  #pouvoirs { display: flex; justify-content: center; gap: 10px; padding: 6px 8px 10px; min-height: 62px; }
+  .pouvoir { background: #fff6dc; padding: 6px 14px; display: inline-flex; align-items: center; gap: 6px;
+    box-shadow: 0 4px 0 #b7a170; font-size: 16px; }
+  .pouvoir svg { width: 22px; height: 22px; }
+  .pouvoir.arme { background: #ffd84a; box-shadow: 0 4px 0 #b08d00; }
+  .pouvoir:disabled { opacity: .45; }
+  #message { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); max-width: 92%;
+    background: rgba(255,248,225,.95); border-radius: 14px; padding: 8px 14px; font-size: 16px; font-weight: 600;
+    text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,.3); opacity: 0; transition: opacity .25s; pointer-events: none; }
+  #message.vu { opacity: 1; }
+
+  /* ===== Tutoriel ===== */
+  #tuto { position: absolute; inset: 0; z-index: 5; display: none; background: rgba(0,0,0,.18); }
+  #tuto.vu { display: block; }
+  #main { position: absolute; width: 64px; height: 64px; left: 0; top: 0; transition: transform .8s ease-in-out;
+    pointer-events: none; filter: drop-shadow(0 3px 3px rgba(0,0,0,.4)); }
+  #main svg { width: 64px; height: 64px; }
+  #main.tape svg { animation: tape .5s; }
+  @keyframes tape { 50% { transform: scale(.82) translateY(4px); } }
+  #anneau { position: absolute; width: 50px; height: 50px; border-radius: 50%; border: 4px solid #ffd84a;
+    opacity: 0; pointer-events: none; }
+  #anneau.go { animation: anneau .7s ease-out; }
+  @keyframes anneau { from { opacity: 1; transform: scale(.4); } to { opacity: 0; transform: scale(1.6); } }
+  #bulle { position: absolute; left: 50%; transform: translateX(-50%); width: min(92%, 380px); top: 8px;
+    background: #fff6dc; border-radius: 16px; padding: 10px 14px; font-size: 17px; font-weight: 600; text-align: center;
+    box-shadow: 0 6px 16px rgba(0,0,0,.35); }
+  #bulle small { display: block; font-weight: 400; color: #6b5b3a; margin-top: 4px; font-size: 13px; }
+
+  /* ===== Fenêtres (pause, bilan, fin) ===== */
+  .voile { position: absolute; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
+    background: rgba(10,30,20,.6); padding: 14px; }
+  .voile.vu { display: flex; }
+  .boite { background: #fff6dc; border-radius: 22px; padding: 18px; width: min(100%, 380px); text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,.45); animation: entre .35s ease-out; max-height: 100%; overflow-y: auto; }
+  @keyframes entre { from { transform: scale(.7); opacity: 0; } }
+  .boite h2 { margin: 0 0 8px; font-size: 26px; color: #b35b14; }
+  .boite .col { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .boite .col button { width: 100%; }
+  .etoiles { font-size: 46px; letter-spacing: 6px; height: 58px; }
+  .etoiles span { display: inline-block; color: #d6cdb4; transition: transform .3s; }
+  .etoiles span.on { color: #ffc61a; text-shadow: 0 3px 0 #c98a00; animation: pop .45s; }
+  @keyframes pop { 0% { transform: scale(.2) rotate(-40deg); } 70% { transform: scale(1.35); } 100% { transform: scale(1); } }
+  .score { font-size: 30px; font-weight: 800; color: #2b5d2f; }
+  .record { font-size: 16px; min-height: 22px; }
+  .record.nouveau { color: #d2390f; font-weight: 800; animation: pop .5s; }
+  #bebeBilan { width: 140px; height: 100px; }
+  .petit { font-size: 15px; line-height: 1.35; margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<!-- ===================== ÉCRAN D'ACCUEIL ===================== -->
+<section id="accueil" class="ecran actif">
+  <canvas id="decor"></canvas>
+  <button class="rond coin btnSon" aria-label="Couper ou remettre le son"></button>
+  <div class="contenu">
+    <h1>L'île aux œufs<br>de dinosaures</h1>
+    <p class="regle">Touche une case pour guider le petit dino.<br>Ramène chaque œuf perdu dans le nid de sa couleur !</p>
+    <div class="boutons">
+      <div id="recordAccueil"></div>
+      <button class="gros" id="btnJouer">Jouer</button>
+      <div class="ligne">
+        <button class="second" id="btnCarteAccueil">Carte de l'île</button>
+        <button class="second" id="btnNidAccueil">Le nid</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== CARTE DE L'ÎLE ===================== -->
+<section id="carte" class="ecran">
+  <canvas id="carteCanvas"></canvas>
+  <div class="entete">
+    <button class="rond" id="btnCarteRetour" aria-label="Retour à l'accueil">
+      <svg viewBox="0 0 24 24"><path d="M15 4 7 12l8 8" fill="none" stroke="#2b3a20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h2>Carte de l'île</h2>
+  </div>
+  <div id="zonesCarte"></div>
+</section>
+
+<!-- ===================== NID-COLLECTION ===================== -->
+<section id="nid" class="ecran">
+  <div class="entete">
+    <button class="rond" id="btnNidRetour" aria-label="Retour">
+      <svg viewBox="0 0 24 24"><path d="M15 4 7 12l8 8" fill="none" stroke="#2b3a20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h2>Le nid des bébés</h2>
+  </div>
+  <div id="grilleNid"></div>
+</section>
+
+<!-- ===================== JEU ===================== -->
+<section id="jeu" class="ecran">
+  <div id="barre">
+    <button class="rond" id="btnPause" aria-label="Pause">
+      <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="#2b3a20"/><rect x="14" y="5" width="4" height="14" rx="1" fill="#2b3a20"/></svg>
+    </button>
+    <div id="infos">
+      <div id="nomZone"></div>
+      <div id="compteurs">
+        <span><svg viewBox="0 0 24 24"><ellipse cx="12" cy="13" rx="7" ry="9" fill="#bfe9a0" stroke="#fff" stroke-width="1.5"/><circle cx="10" cy="11" r="1.6" fill="#6aa84f"/><circle cx="14" cy="15" r="1.3" fill="#6aa84f"/></svg><b id="cOeufs">0/0</b></span>
+        <span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#e8d3a8" stroke="#fff" stroke-width="1.5"/><path d="M12 12m0-1a1 1 0 1 1-1 1 2.5 2.5 0 0 1 2.5-2.5A4 4 0 0 1 17 13a5.5 5.5 0 0 1-5.5 5.5" fill="none" stroke="#8a6a3a" stroke-width="1.6"/></svg><b id="cFossiles">0/3</b></span>
+        <span id="cLianesBloc"><svg viewBox="0 0 24 24"><path d="M5 18c3-8 11-4 14-12" fill="none" stroke="#3f8f2f" stroke-width="3" stroke-linecap="round"/><ellipse cx="9" cy="12" rx="3" ry="1.6" fill="#6cc24a"/></svg><b id="cLianes">0</b></span>
+        <span id="cPas"></span>
+      </div>
+    </div>
+    <button class="rond" id="btnAnnuler" aria-label="Annuler le dernier pas">
+      <svg viewBox="0 0 24 24"><path d="M9 7H5V3M5.5 7.5A8 8 0 1 1 4 13" fill="none" stroke="#2b3a20" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="rond btnSon" aria-label="Couper ou remettre le son"></button>
+  </div>
+  <div id="plateau">
+    <canvas id="toile"></canvas>
+    <div id="message"></div>
+    <div id="tuto">
+      <div id="anneau"></div>
+      <div id="main"><svg viewBox="0 0 64 64">
+        <path d="M24 30V10a5 5 0 0 1 10 0v16l2-1a5 5 0 0 1 6 2l1 1a5 5 0 0 1 6 2l1 1a5 5 0 0 1 6 4v10c0 10-7 16-16 16h-4c-6 0-9-3-12-8L16 40a5 5 0 0 1 8-6z" fill="#fff" stroke="#3a2a1a" stroke-width="3" stroke-linejoin="round"/>
+      </svg></div>
+      <div id="bulle"></div>
+    </div>
+  </div>
+  <div id="pouvoirs">
+    <button class="pouvoir" id="btnFlair" aria-label="Flair : montre le chemin">
+      <svg viewBox="0 0 24 24"><g fill="#8a5a2b"><ellipse cx="12" cy="15" rx="4" ry="4.5"/><circle cx="6.5" cy="9" r="2.2"/><circle cx="12" cy="6.5" r="2.2"/><circle cx="17.5" cy="9" r="2.2"/></g></svg>Flair</button>
+    <button class="pouvoir" id="btnVol" aria-label="Vol : saute par-dessus un obstacle">
+      <svg viewBox="0 0 24 24"><path d="M2 14c5-1 7-6 10-9 3 3 5 8 10 9-4 0-7 2-10 5-3-3-6-5-10-5z" fill="#f4a261" stroke="#9a5a20" stroke-width="1.4" stroke-linejoin="round"/></svg>Vol</button>
+    <button class="pouvoir" id="btnChant" aria-label="Chant : calme les geysers">
+      <svg viewBox="0 0 24 24"><path d="M9 18V5l11-2v13" fill="none" stroke="#7b4fd1" stroke-width="2.4"/><circle cx="6.5" cy="18" r="3" fill="#7b4fd1"/><circle cx="17.5" cy="16" r="3" fill="#7b4fd1"/></svg>Chant</button>
+  </div>
+
+  <!-- Pause -->
+  <div class="voile" id="voilePause">
+    <div class="boite">
+      <h2>Pause</h2>
+      <p class="petit">Le petit dino t'attend sur l'île.</p>
+      <div class="col">
+        <button class="gros" id="btnReprendre">Reprendre</button>
+        <button class="second" id="btnRecommencer">Recommencer la zone</button>
+        <button class="second" id="btnPauseCarte">Carte de l'île</button>
+        <button class="second" id="btnPauseAccueil">Accueil</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bilan de zone -->
+  <div class="voile" id="voileBilan">
+    <div class="boite">
+      <h2 id="bilanTitre">Zone réussie !</h2>
+      <canvas id="bebeBilan" width="280" height="200"></canvas>
+      <p class="petit" id="bilanBebe"></p>
+      <div class="etoiles" id="bilanEtoiles"><span>★</span><span>★</span><span>★</span></div>
+      <div class="petit" id="bilanDetail"></div>
+      <div class="score" id="bilanScore">0</div>
+      <div class="record" id="bilanRecord"></div>
+      <div class="col">
+        <button class="gros" id="btnSuivant">Niveau suivant</button>
+        <button class="second" id="btnRejouer">Rejouer</button>
+        <button class="second" id="btnBilanCarte">Carte de l'île</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fin de l'aventure -->
+  <div class="voile" id="voileFin">
+    <div class="boite">
+      <h2>Bravo, explorateur !</h2>
+      <p class="petit">Tous les œufs de l'île sont rentrés au nid.</p>
+      <div class="etoiles" style="font-size:34px;height:44px"><span class="on">★</span></div>
+      <div class="petit" id="finDetail"></div>
+      <div class="score" id="finScore">0</div>
+      <div class="record" id="finRecord"></div>
+      <div class="col">
+        <button class="gros" id="btnFinRejouer">Rejouer</button>
+        <button class="second" id="btnFinNid">Voir le nid</button>
+        <button class="second" id="btnFinCarte">Carte de l'île</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+'use strict';
+/* =====================================================================
+   L'île aux œufs de dinosaures
+   Un petit dino ramène les œufs perdus dans les nids de leur couleur.
+   Tout est dessiné dans un canvas ; sons générés avec Web Audio.
+   ===================================================================== */
+
+/* ---------- Légende des cartes ----------
+   #  rocher / arbre (infranchissable)   .  sol       p  sol avec empreinte
+   ~  eau (un tronc poussé dedans → pont W)          x  ravin
+   L  tronc à pousser    F  fougère géante (l'ami tricératops l'écarte)
+   P  pont de lianes cassé (une liane le répare → =)  =  pont
+   g  geyser    T  ami tricératops    l  liane    *  fossile
+   1 2 3  œufs (vert, bleu, rose)     A B C  nids correspondants
+   @  départ du petit dino
+------------------------------------------ */
+/*NIVEAUX-DEBUT*/
+const NIVEAUX = [
+  { nom: "Plage de l'Arrivée", theme: 'plage', par: 26, carte: [
+    "########",
+    "#..*...#",
+    "#.1..A.#",
+    "#......#",
+    "#..##..#",
+    "#.*..2.#",
+    "#......#",
+    "#.B..*.#",
+    "#...@..#",
+    "########"] },
+  { nom: "La Rivière aux Troncs", theme: 'plage', par: 40, carte: [
+    "########",
+    "#.A.*B.#",
+    "#......#",
+    "~~~~~~~~",
+    "#..L...#",
+    "#....2.#",
+    "#.1....#",
+    "#.....*#",
+    "#*.@...#",
+    "########"] },
+  { nom: "Le Delta des Deux Rives", theme: 'plage', par: 46, carte: [
+    "########",
+    "#A.*..B#",
+    "#......#",
+    "#~~~~~~#",
+    "#.2..L.#",
+    "#*....1#",
+    "#~~~~~~#",
+    "#..L..*#",
+    "#...@..#",
+    "########"] },
+  { nom: "La Jungle des Fougères", theme: 'jungle', par: 50, carte: [
+    "########",
+    "#A..*.B#",
+    "#......#",
+    "#FFFFFF#",
+    "#..2...#",
+    "#*.##..#",
+    "#..1#T.#",
+    "#FF.#..#",
+    "#*F@#..#",
+    "########"] },
+  { nom: "Le Cœur de la Jungle", theme: 'jungle', ami: true, par: 56, carte: [
+    "########",
+    "#A..F.B#",
+    "#...F*.#",
+    "#~~~~~~#",
+    "#.L..F.#",
+    "#..F.L.#",
+    "#.1F.2.#",
+    "#FF...*#",
+    "#*F..@.#",
+    "########"] },
+  { nom: "Le Ravin des Lianes", theme: 'falaise', ami: true, par: 56, carte: [
+    "########",
+    "#A.*..B#",
+    "#......#",
+    "xxxPxxxx",
+    "#.l..2.#",
+    "#......#",
+    "xxxxxPxx",
+    "#*Fl.1.#",
+    "#F.@..*#",
+    "########"] },
+  { nom: "Le Marais Brumeux", theme: 'marais', ami: true, par: 70, carte: [
+    "########",
+    "#A..#.B#",
+    "#.*.F..#",
+    "#~P~~~~#",
+    "#.l..L.#",
+    "#F...3.#",
+    "#2~~~~~#",
+    "#.L..1C#",
+    "#*..@.*#",
+    "########"] },
+  { nom: "Les Grottes aux Empreintes", theme: 'grotte', ami: true, sombre: true, par: 70, carte: [
+    "########",
+    "#Ap.#*.#",
+    "##p##.##",
+    "#pp#pp1#",
+    "#p##p###",
+    "#pppp#B#",
+    "##p#p#p#",
+    "#2p#ppp#",
+    "#*.#.@*#",
+    "########"] },
+  { nom: "Le Volcan Endormi", theme: 'volcan', ami: true, par: 76, carte: [
+    "########",
+    "#A.#*.B#",
+    "#3.#...#",
+    "#.g..g.#",
+    "##g##g##",
+    "#..1..2#",
+    "#.g##g*#",
+    "#*.gg..#",
+    "#..@..C#",
+    "########"] },
+  { nom: "Le Sommet de l'Île", theme: 'volcan', ami: true, par: 80, carte: [
+    "########",
+    "#A.g.*C#",
+    "#F.#..g#",
+    "#~P~~~*#",
+    "#l.g.L.#",
+    "#3.##.2#",
+    "xx=xxPxx",
+    "#1F*g.l#",
+    "#..@..B#",
+    "########"] }
+];
+/*NIVEAUX-FIN*/
+
+// Tutoriels : main animée vers une case [x, y] ou vers un bouton (id).
+const TUTOS = [
+  [ { c: [2, 2], t: "Touche une case : le petit dino y marche tout seul." },
+    { c: [5, 2], t: "Ramène l'œuf dans le nid de la même couleur." },
+    { c: [3, 1], t: "Ramasse les fossiles : ils donnent des étoiles !" } ],
+  [ { c: [3, 4], t: "Touche le tronc quand tu es à côté : tu le pousses." },
+    { c: [3, 3], t: "Pousse-le dans la rivière : il devient un pont !" },
+    { b: 'btnFlair', t: "Nouveau pouvoir : Flair ! Il montre le chemin." } ],
+  [ { dino: true, t: "Ton bébé diplodocus t'aide : tu peux porter 2 œufs !" },
+    { c: [3, 7], t: "Deux rivières, deux troncs : réfléchis avant de pousser." },
+    { b: 'btnAnnuler', t: "Une erreur ? Ce bouton annule le dernier pas." } ],
+  [ { c: [5, 6], t: "Va voir le tricératops : il devient ton ami !" },
+    { c: [3, 3], t: "Touche une fougère géante : ton ami l'écarte." } ],
+  [ { b: 'btnVol', t: "Nouveau pouvoir : Vol ! Une fois par zone, saute par-dessus un obstacle." },
+    { c: [2, 4], t: "Il y a deux troncs. Un seul peut faire le pont !" } ],
+  [ { c: [3, 7], t: "Ramasse une liane." },
+    { c: [5, 6], t: "Touche un pont cassé pour le réparer avec la liane." } ],
+  [ { c: [5, 4], t: "Troncs, lianes, fougères : trouve ton chemin dans le marais !" },
+    { c: [5, 5], t: "Trois couleurs d'œufs maintenant." } ],
+  [ { c: [5, 7], t: "Il fait noir ! Suis les empreintes qui brillent." },
+    { dino: true, t: "Ton bébé stégosaure t'éclaire : tu vois plus loin." } ],
+  [ { c: [2, 4], t: "Les geysers crachent de la vapeur. Attends qu'ils se calment !" },
+    { b: 'btnChant', t: "Nouveau pouvoir : Chant ! Il calme les geysers un moment." } ],
+  [ { dino: true, t: "Le sommet ! Utilise tout ce que tu as appris." } ]
+];
+
+// Bébés dinosaures (un par zone réussie) et leurs pouvoirs.
+const BEBES = [
+  { nom: 'compsognathus', type: 'base', couleur: '#9ad85a', pouvoir: 'Flair : montre le chemin vers le prochain œuf ou nid.' },
+  { nom: 'diplodocus', type: 'cou', couleur: '#7fb7e8', pouvoir: 'Long cou : tu peux porter 2 œufs à la fois.' },
+  { nom: 'ankylosaure', type: 'carapace', couleur: '#c9a26b', pouvoir: '' },
+  { nom: 'ptéranodon', type: 'ailes', couleur: '#f4a261', pouvoir: 'Vol : une fois par zone, saute par-dessus un obstacle.' },
+  { nom: 'brachiosaure', type: 'cou', couleur: '#e9c46a', pouvoir: '' },
+  { nom: 'iguanodon', type: 'base', couleur: '#5fb3a1', pouvoir: '' },
+  { nom: 'stégosaure', type: 'plaques', couleur: '#ef8a6f', pouvoir: 'Lanterne : tu vois plus loin dans les grottes.' },
+  { nom: 'parasaurolophus', type: 'crete', couleur: '#b892ff', pouvoir: 'Chant : une fois par zone, calme les geysers.' },
+  { nom: 'spinosaure', type: 'voile', couleur: '#4fa3d1', pouvoir: '' },
+  { nom: 'petit tyrannosaure', type: 'rex', couleur: '#ff8fa3', pouvoir: '' }
+];
+
+const THEMES = {
+  plage:   { sol: '#f2dc9e', sol2: '#ead18c', mur: 'palmier', fond: '#3aa6c2', eau: '#4fb6e3' },
+  jungle:  { sol: '#9ccc6e', sol2: '#90c163', mur: 'arbre',   fond: '#245c33', eau: '#3f9fc9' },
+  falaise: { sol: '#e7be83', sol2: '#ddb276', mur: 'roche',   fond: '#8a5532', eau: '#4fa7d0' },
+  marais:  { sol: '#a7bb72', sol2: '#9cb069', mur: 'roseau',  fond: '#3d5a3c', eau: '#5c9a8f' },
+  grotte:  { sol: '#8f877a', sol2: '#857d70', mur: 'grotte',  fond: '#14110e', eau: '#3c7fa3' },
+  volcan:  { sol: '#bba18c', sol2: '#b09681', mur: 'basalte', fond: '#3a2828', eau: '#4f9ac4' }
+};
+const COUL_OEUF = { '1': '#8fe063', '2': '#62c4f7', '3': '#ff94c8' };
+const NOM_COUL = { '1': 'vert', '2': 'bleu', '3': 'rose' };
+const NID_DE = { A: '1', B: '2', C: '3' };
+const MARCHABLE = new Set(['.', '=', 'W', 'g', '1', '2', '3', '*', 'l', 'A', 'B', 'C', 'a', 'b', 'c']);
+const DUREE_PAS = 0.15;           // secondes par case
+const CYCLE_GEYSER = 3.4;         // éteint 2 s, bulles 0,6 s, vapeur 0,8 s
+
+/* ===================== Sauvegarde (toujours dans try/catch) ===================== */
+const CLE = 'ile-oeufs-dinosaures-v1';
+let sauve = { debloque: 1, etoiles: [], meilleurs: [], son: true, tutos: [] };
+try {
+  const brut = localStorage.getItem(CLE);
+  if (brut) { const o = JSON.parse(brut); if (o && typeof o === 'object') sauve = Object.assign(sauve, o); }
+} catch (e) { /* stockage indisponible : on joue sans sauvegarde */ }
+// sauvegarde abîmée : on remet des valeurs sûres
+['etoiles', 'meilleurs', 'tutos'].forEach((k) => { if (!Array.isArray(sauve[k])) sauve[k] = []; });
+if (!Number.isInteger(sauve.debloque) || sauve.debloque < 1) sauve.debloque = 1;
+sauve.debloque = Math.min(sauve.debloque, 11);
+function enregistrer() { try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* rien */ } }
+function totalEtoiles() { return sauve.etoiles.reduce((s, v) => s + (v || 0), 0); }
+function totalScore() { return sauve.meilleurs.reduce((s, v) => s + (v || 0), 0); }
+const aPouvoir = (k) => sauve.debloque > k;  // pouvoir du bébé de la zone k (1 à 10)
+
+/* ===================== Sons (Web Audio) ===================== */
+let actx = null;
+function audio() {
+  if (!sauve.son) return null;
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (actx.state === 'suspended' && !enPause) actx.resume().catch(() => {});
+  return actx;
+}
+function note(freq, dur, type = 'sine', vol = 0.14, delai = 0, glisse = 0) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delai;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (glisse) o.frequency.exponentialRampToValueAtTime(glisse, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
+}
+function souffle(dur, vol, freq, delai = 0) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delai;
+  const n = Math.floor(a.sampleRate * dur), buf = a.createBuffer(1, n, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 0.8; g.gain.value = vol;
+  s.connect(f); f.connect(g); g.connect(a.destination); s.start(t);
+}
+const SONS = {
+  pas() { note(220 + Math.random() * 40, 0.06, 'triangle', 0.05); },
+  oeuf() { note(660, 0.1, 'sine', 0.15); note(880, 0.14, 'sine', 0.13, 0.08); },
+  nid() { [523, 659, 784, 1047].forEach((f, i) => note(f, 0.22, 'triangle', 0.13, i * 0.07)); },
+  fossile() { [988, 1319, 1568].forEach((f, i) => note(f, 0.12, 'sine', 0.1, i * 0.05)); },
+  liane() { note(392, 0.12, 'triangle', 0.12); note(523, 0.14, 'triangle', 0.11, 0.07); },
+  pousse() { note(110, 0.18, 'square', 0.06, 0, 70); souffle(0.15, 0.2, 400); },
+  plouf() { souffle(0.45, 0.45, 700); note(300, 0.3, 'sine', 0.1, 0.02, 120); },
+  fougere() { souffle(0.35, 0.35, 2500); note(500, 0.15, 'triangle', 0.06, 0.05, 900); },
+  repare() { [0, 0.12, 0.24].forEach((d) => { note(180, 0.08, 'square', 0.06, d); souffle(0.05, 0.3, 1200, d); }); note(660, 0.2, 'triangle', 0.1, 0.36); },
+  ami() { note(196, 0.2, 'sawtooth', 0.06); note(262, 0.25, 'triangle', 0.12, 0.15); note(330, 0.3, 'triangle', 0.12, 0.3); },
+  bloque() { note(160, 0.14, 'square', 0.05, 0, 120); },
+  vapeur() { souffle(0.6, 0.35, 3200); },
+  vol() { note(400, 0.35, 'sine', 0.12, 0, 900); souffle(0.3, 0.15, 1800); },
+  chant() { [392, 494, 587, 784, 587, 784].forEach((f, i) => note(f, 0.25, 'triangle', 0.11, i * 0.13)); },
+  eclosion() { souffle(0.08, 0.4, 2000); [523, 659, 784, 988, 1175].forEach((f, i) => note(f, 0.18, 'sine', 0.12, 0.1 + i * 0.08)); },
+  victoire() { [523, 659, 784, 659, 784, 1047].forEach((f, i) => note(f, 0.26, 'triangle', 0.14, i * 0.12)); },
+  etoile(i) { note(880 + i * 220, 0.25, 'sine', 0.14); note(1320 + i * 220, 0.2, 'sine', 0.08, 0.05); },
+  clic() { note(600, 0.05, 'triangle', 0.08); },
+  indice() { note(740, 0.1, 'sine', 0.1); note(988, 0.12, 'sine', 0.08, 0.1); }
+};
+
+/* ===================== Outils ===================== */
+const $ = (id) => document.getElementById(id);
+const ICONE_SON = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#2b3a20"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="#2b3a20" stroke-width="2.2" stroke-linecap="round"/></svg>';
+const ICONE_MUET = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#2b3a20"/><path d="m16 9 6 6m0-6-6 6" stroke="#c0392b" stroke-width="2.4" stroke-linecap="round"/></svg>';
+function majBoutonsSon() { document.querySelectorAll('.btnSon').forEach((b) => { b.innerHTML = sauve.son ? ICONE_SON : ICONE_MUET; }); }
+
+function afficherEcran(id) {
+  document.querySelectorAll('.ecran').forEach((e) => e.classList.toggle('actif', e.id === id));
+  ecran = id;
+  if (id === 'accueil') redimDecor();
+  if (id === 'carte') construireCarte();
+  if (id === 'nid') construireNid();
+}
+let ecran = 'accueil';
+
+/* ===================== Dessins ===================== */
+function ellipse(c, x, y, rx, ry, coul) { c.fillStyle = coul; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill(); }
+function rondRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function assombrir(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (v) => Math.max(0, Math.min(255, Math.round(v * k)));
+  return 'rgb(' + f(n >> 16) + ',' + f((n >> 8) & 255) + ',' + f(n & 255) + ')';
+}
+
+// Dinosaure mignon dessiné dans un repère de 100 unités (s = taille en px).
+function dessinerDino(c, x, y, s, o = {}) {
+  const coul = o.couleur || '#6cc24a', fonce = assombrir(coul, 0.72), type = o.type || 'base';
+  c.save(); c.translate(x, y); c.scale((o.sens || 1) * s / 100, s / 100);
+  ellipse(c, 0, 38, 30, 7, 'rgba(0,0,0,.18)');
+  if (type === 'ailes') {           // ailes déployées
+    c.fillStyle = fonce; c.beginPath(); c.moveTo(-4, 4); c.lineTo(-48, -14 + (o.bat || 0)); c.lineTo(-20, 18); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(6, 4); c.lineTo(40, -20 - (o.bat || 0)); c.lineTo(20, 18); c.closePath(); c.fill();
+  }
+  if (type === 'voile') { c.fillStyle = '#e76f51'; c.beginPath(); c.moveTo(-18, 0); c.quadraticCurveTo(-4, -36, 14, -2); c.closePath(); c.fill(); }
+  if (type === 'plaques') { c.fillStyle = '#f4d35e'; [-16, -4, 8].forEach((px, i) => { c.beginPath(); c.moveTo(px - 7, -2); c.lineTo(px, -18 - (i === 1 ? 4 : 0)); c.lineTo(px + 7, -2); c.closePath(); c.fill(); }); }
+  // queue
+  c.fillStyle = coul; c.beginPath(); c.moveTo(-14, 8); c.quadraticCurveTo(-38, 6, -46, -8); c.quadraticCurveTo(-36, 24, -4, 26); c.closePath(); c.fill();
+  // pattes
+  c.fillStyle = fonce; rondRect(c, -15, 20, 10, 16, 4); c.fill(); rondRect(c, 5, 20, 10, 16, 4); c.fill();
+  // corps et ventre
+  ellipse(c, 0, 12, 24, 19, coul);
+  ellipse(c, 5, 17, 14, 11, 'rgba(255,255,230,.55)');
+  if (type === 'carapace') { c.fillStyle = '#8d6e47'; c.beginPath(); c.ellipse(-2, 4, 23, 14, 0, Math.PI, 0); c.fill(); c.fillStyle = '#f4e3c1'; [-14, -2, 10].forEach((px) => { c.beginPath(); c.arc(px, -3, 3, 0, Math.PI * 2); c.fill(); }); }
+  // tête
+  let hx = 18, hy = -8, hr = 15;
+  if (type === 'cou') { c.strokeStyle = coul; c.lineWidth = 12; c.lineCap = 'round'; c.beginPath(); c.moveTo(12, 4); c.quadraticCurveTo(22, -14, 18, -30); c.stroke(); hx = 22; hy = -34; hr = 11; }
+  if (type === 'rex') { hr = 18; hx = 20; hy = -10; }
+  if (type === 'crete') { c.strokeStyle = '#7b4fd1'; c.lineWidth = 6; c.lineCap = 'round'; c.beginPath(); c.moveTo(hx, hy - 8); c.quadraticCurveTo(hx - 14, hy - 26, hx - 26, hy - 22); c.stroke(); }
+  if (type === 'cornes') {  // collerette et cornes du tricératops
+    ellipse(c, hx - 8, hy - 2, 16, 19, '#f4c06a');
+    c.fillStyle = '#fff8e0'; c.beginPath(); c.moveTo(hx + 2, hy - 10); c.lineTo(hx + 16, hy - 26); c.lineTo(hx + 8, hy - 8); c.fill();
+    c.beginPath(); c.moveTo(hx + 12, hy - 2); c.lineTo(hx + 26, hy - 8); c.lineTo(hx + 14, hy + 4); c.fill();
+  }
+  ellipse(c, hx, hy, hr + 2, hr - 1, coul);
+  ellipse(c, hx + 4, hy + 4, hr - 5, hr - 8, 'rgba(255,255,230,.35)');
+  if (type === 'rex') { c.strokeStyle = fonce; c.lineWidth = 4; c.beginPath(); c.moveTo(14, 8); c.lineTo(22, 14); c.stroke(); }
+  // œil, joue, sourire
+  const cl = o.cligne ? 1 : 5;
+  ellipse(c, hx + 3, hy - 3, 5, cl, '#fff');
+  ellipse(c, hx + 4, hy - 3, 2.8, Math.min(cl, 2.8), '#1d1d1d');
+  ellipse(c, hx + 9, hy + 5, 3.5, 2.2, 'rgba(255,120,120,.55)');
+  c.strokeStyle = '#2b2a1f'; c.lineWidth = 2; c.beginPath(); c.arc(hx + 6, hy + 3, 6, 0.2, 1.2); c.stroke();
+  if (type === 'base' && !o.chapeau) { c.fillStyle = '#ffb347'; [-14, -4, 6].forEach((px) => { c.beginPath(); c.moveTo(px - 5, -5); c.lineTo(px, -14); c.lineTo(px + 5, -5); c.fill(); }); }
+  if (o.chapeau) {  // chapeau d'explorateur
+    c.fillStyle = '#c8a165'; c.beginPath(); c.ellipse(hx - 2, hy - hr + 3, 16, 4, -0.15, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#d9b77a'; c.beginPath(); c.ellipse(hx - 2, hy - hr - 1, 9, 7, -0.15, Math.PI, 0); c.fill();
+    c.fillStyle = '#8a5a2b'; c.fillRect(hx - 11, hy - hr + 0, 18, 2.5);
+  }
+  c.restore();
+}
+
+function dessinerOeuf(c, x, y, r, coul, angle = 0) {
+  c.save(); c.translate(x, y); c.rotate(angle);
+  ellipse(c, 0, r * 0.95, r * 0.75, r * 0.2, 'rgba(0,0,0,.18)');
+  c.fillStyle = coul; c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = Math.max(1.5, r * 0.08);
+  c.beginPath(); c.ellipse(0, 0, r * 0.72, r * 0.95, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+  ellipse(c, -r * 0.2, -r * 0.25, r * 0.15, r * 0.12, assombrir(coul, 0.7));
+  ellipse(c, r * 0.25, r * 0.2, r * 0.12, r * 0.1, assombrir(coul, 0.7));
+  ellipse(c, -r * 0.05, r * 0.45, r * 0.1, r * 0.08, assombrir(coul, 0.7));
+  ellipse(c, -r * 0.3, -r * 0.5, r * 0.12, r * 0.2, 'rgba(255,255,255,.6)');
+  c.restore();
+}
+
+function dessinerNid(c, x, y, s, coulOeuf, plein, t) {
+  ellipse(c, x, y + s * 0.12, s * 0.42, s * 0.26, '#7a4b24');
+  ellipse(c, x, y + s * 0.08, s * 0.3, s * 0.15, '#4a2d14');
+  c.strokeStyle = '#a8713c'; c.lineWidth = Math.max(1.5, s * 0.04);
+  for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; c.beginPath(); c.moveTo(x + Math.cos(a) * s * 0.3, y + s * 0.12 + Math.sin(a) * s * 0.18); c.lineTo(x + Math.cos(a + 0.8) * s * 0.42, y + s * 0.12 + Math.sin(a + 0.8) * s * 0.25); c.stroke(); }
+  if (plein) dessinerOeuf(c, x, y - s * 0.02, s * 0.24, coulOeuf, Math.sin(t * 6) * 0.08);
+  else if (coulOeuf) {  // fanion de couleur : le nid attend cet œuf
+    c.strokeStyle = '#5a3a1a'; c.lineWidth = 2; c.beginPath(); c.moveTo(x + s * 0.3, y + s * 0.1); c.lineTo(x + s * 0.3, y - s * 0.36); c.stroke();
+    c.fillStyle = coulOeuf; c.beginPath(); c.moveTo(x + s * 0.3, y - s * 0.36); c.lineTo(x + s * 0.3 - s * 0.24, y - s * 0.28 + Math.sin(t * 4) * 2); c.lineTo(x + s * 0.3, y - s * 0.2); c.fill();
+    c.globalAlpha = 0.35 + 0.2 * Math.sin(t * 3); dessinerOeuf(c, x, y + s * 0.02, s * 0.18, coulOeuf); c.globalAlpha = 1;
+  }
+}
+
+function dessinerFossile(c, x, y, s, t) {
+  const r = s * 0.24;
+  c.save(); c.translate(x, y + Math.sin(t * 3 + x) * 1.5);
+  ellipse(c, 0, 0, r, r, '#efdcb2');
+  c.strokeStyle = '#8a6a3a'; c.lineWidth = Math.max(1.5, s * 0.05); c.beginPath();
+  for (let a = 0; a < Math.PI * 5; a += 0.2) { const rr = r * 0.85 * (1 - a / (Math.PI * 5.4)); const px = Math.cos(a) * rr, py = Math.sin(a) * rr; a === 0 ? c.moveTo(px, py) : c.lineTo(px, py); }
+  c.stroke();
+  c.globalAlpha = 0.5 + 0.5 * Math.sin(t * 5 + y); c.fillStyle = '#fff';
+  c.beginPath(); c.arc(r * 0.7, -r * 0.7, s * 0.05, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1;
+  c.restore();
+}
+
+function dessinerLiane(c, x, y, s) {
+  c.strokeStyle = '#3f8f2f'; c.lineWidth = s * 0.08; c.lineCap = 'round';
+  c.beginPath(); for (let i = 0; i <= 20; i++) { const a = i / 20 * Math.PI * 4; const px = x - s * 0.25 + i / 20 * s * 0.5, py = y + Math.sin(a) * s * 0.12; i ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke();
+  ellipse(c, x - s * 0.1, y - s * 0.08, s * 0.1, s * 0.05, '#7fd35a'); ellipse(c, x + s * 0.15, y + s * 0.1, s * 0.1, s * 0.05, '#7fd35a');
+}
+
+function dessinerTronc(c, x, y, s) {
+  ellipse(c, x, y + s * 0.3, s * 0.4, s * 0.08, 'rgba(0,0,0,.2)');
+  c.fillStyle = '#8b5a2b'; rondRect(c, x - s * 0.42, y - s * 0.2, s * 0.84, s * 0.42, s * 0.12); c.fill();
+  c.strokeStyle = '#6b4220'; c.lineWidth = 2; c.beginPath(); c.moveTo(x - s * 0.3, y - s * 0.06); c.lineTo(x + s * 0.2, y - s * 0.06); c.moveTo(x - s * 0.2, y + s * 0.08); c.lineTo(x + s * 0.25, y + s * 0.08); c.stroke();
+  ellipse(c, x + s * 0.36, y, s * 0.1, s * 0.2, '#d9a066'); ellipse(c, x + s * 0.36, y, s * 0.05, s * 0.1, '#b07a44');
+}
+
+function dessinerFougere(c, x, y, s, t) {
+  for (let i = -3; i <= 3; i++) {
+    const a = -Math.PI / 2 + i * 0.38 + Math.sin(t * 2 + x + i) * 0.04;
+    c.save(); c.translate(x, y + s * 0.38); c.rotate(a + Math.PI / 2);
+    ellipse(c, 0, -s * 0.36, s * 0.11, s * 0.38, i % 2 ? '#2e8b3e' : '#3fa34d');
+    c.strokeStyle = '#1e6b2c'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, -s * 0.7); c.stroke();
+    c.restore();
+  }
+}
+
+function dessinerEmpreinte(c, x, y, s, lueur) {
+  c.save(); c.translate(x, y); c.rotate(((x * 7 + y * 3) % 5 - 2) * 0.2);
+  if (lueur) { c.shadowColor = '#ffe066'; c.shadowBlur = s * 0.25; }
+  const k = lueur ? '#ffe680' : 'rgba(90,70,40,.45)';
+  ellipse(c, 0, s * 0.08, s * 0.1, s * 0.12, k);
+  [-0.5, 0, 0.5].forEach((a) => ellipse(c, Math.sin(a) * s * 0.2, -Math.cos(a) * s * 0.16, s * 0.05, s * 0.08, k));
+  c.restore();
+}
+
+// Une case du décor (sol et obstacles fixes).
+function dessinerCase(c, i, j, T, tuile, th, t, sol) {
+  const x = i * T, y = j * T, cx = x + T / 2, cy = y + T / 2;
+  c.fillStyle = (i + j) % 2 ? th.sol : th.sol2; c.fillRect(x, y, T + 0.5, T + 0.5);
+  if (tuile === '#') {
+    if (th.mur === 'palmier') {
+      if ((i * 3 + j) % 3 === 0) { ellipse(c, cx, cy + T * 0.1, T * 0.4, T * 0.32, '#9aa3a8'); ellipse(c, cx - T * 0.1, cy, T * 0.2, T * 0.14, '#c2c9cc'); }
+      else { c.strokeStyle = '#8b5a2b'; c.lineWidth = T * 0.12; c.beginPath(); c.moveTo(cx, cy + T * 0.4); c.quadraticCurveTo(cx + T * 0.1, cy, cx, cy - T * 0.15); c.stroke();
+        for (let k = 0; k < 5; k++) { c.save(); c.translate(cx, cy - T * 0.15); c.rotate(k * 1.25 + Math.sin(t + i) * 0.05); ellipse(c, T * 0.22, 0, T * 0.24, T * 0.07, '#3c9a3c'); c.restore(); } }
+    } else if (th.mur === 'arbre') {
+      ellipse(c, cx, cy, T * 0.5, T * 0.48, '#2b6e36'); ellipse(c, cx - T * 0.15, cy - T * 0.12, T * 0.24, T * 0.2, '#3f8f45'); ellipse(c, cx + T * 0.18, cy + T * 0.1, T * 0.18, T * 0.15, '#36803e');
+    } else if (th.mur === 'roche') {
+      c.fillStyle = '#a8693c'; rondRect(c, x + 1, y + 1, T - 2, T - 2, T * 0.2); c.fill(); ellipse(c, cx - T * 0.12, cy - T * 0.15, T * 0.2, T * 0.1, '#c98a55');
+    } else if (th.mur === 'roseau') {
+      c.fillStyle = '#5c7a52'; c.fillRect(x, y, T + 0.5, T + 0.5);
+      c.strokeStyle = '#2f4d2a'; c.lineWidth = 2; for (let k = 0; k < 4; k++) { const rx = x + T * (0.2 + k * 0.2); c.beginPath(); c.moveTo(rx, y + T); c.lineTo(rx + Math.sin(t + k) * 2, y + T * 0.2); c.stroke(); ellipse(c, rx + Math.sin(t + k) * 2, y + T * 0.25, T * 0.04, T * 0.1, '#7a4b24'); }
+    } else if (th.mur === 'grotte') {
+      c.fillStyle = '#3a342d'; c.fillRect(x, y, T + 0.5, T + 0.5); ellipse(c, cx, cy, T * 0.36, T * 0.3, '#4a433a');
+    } else {
+      c.fillStyle = '#4a3a36'; rondRect(c, x + 1, y + 1, T - 2, T - 2, T * 0.15); c.fill();
+      c.strokeStyle = '#a0522d'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x + T * 0.3, y + T * 0.2); c.lineTo(cx, cy); c.lineTo(x + T * 0.6, y + T * 0.8); c.stroke();
+    }
+  } else if (tuile === '~' || tuile === 'W') {
+    c.fillStyle = th.eau; c.fillRect(x, y, T + 0.5, T + 0.5);
+    c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 2;
+    for (let k = 0; k < 2; k++) { const yy = y + T * (0.3 + k * 0.4); c.beginPath(); for (let u = 0; u <= T; u += 4) { const vy = yy + Math.sin((u + x) * 0.25 + t * 3 + k) * 2; u ? c.lineTo(x + u, vy) : c.moveTo(x + u, vy); } c.stroke(); }
+    if (tuile === 'W') { dessinerTronc(c, cx, cy, T * 1.05); }
+  } else if (tuile === 'x' || tuile === 'P' || (tuile === '=' && sol === 'x')) {
+    const g = c.createLinearGradient(0, y, 0, y + T); g.addColorStop(0, '#3a2414'); g.addColorStop(1, '#120a05');
+    c.fillStyle = g; c.fillRect(x, y, T + 0.5, T + 0.5);
+    if (tuile === 'P') {  // planches cassées
+      c.fillStyle = '#a0703c'; c.fillRect(x, cy - T * 0.25, T * 0.25, T * 0.5); c.fillRect(x + T * 0.75, cy - T * 0.25, T * 0.25, T * 0.5);
+      c.strokeStyle = '#3f8f2f'; c.lineWidth = 2; c.setLineDash([3, 3]); c.beginPath(); c.moveTo(x + T * 0.25, cy - T * 0.2); c.quadraticCurveTo(cx, cy + T * 0.2, x + T * 0.75, cy - T * 0.2); c.stroke(); c.setLineDash([]);
+    }
+  } else if (tuile === '=' && sol === '~') {
+    c.fillStyle = th.eau; c.fillRect(x, y, T + 0.5, T + 0.5);
+  }
+  if (tuile === '=') {  // pont de planches
+    c.fillStyle = '#b07a44'; for (let k = 0; k < 4; k++) { rondRect(c, x + T * 0.08 + k * T * 0.22, y + T * 0.06, T * 0.18, T * 0.88, 3); c.fill(); }
+    c.strokeStyle = '#3f8f2f'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, y + T * 0.2); c.lineTo(x + T, y + T * 0.2); c.moveTo(x, y + T * 0.8); c.lineTo(x + T, y + T * 0.8); c.stroke();
+  }
+  if (tuile === 'g') {
+    ellipse(c, cx, cy + T * 0.08, T * 0.36, T * 0.24, '#6b4b3a'); ellipse(c, cx, cy + T * 0.08, T * 0.24, T * 0.14, '#2f1f18');
+  }
+}
+
+/* ===================== État du niveau ===================== */
+let niv = 0, L = null;
+let enPause = false, tutoActif = false, horloge = 0, tempsJeu = 0;
+let particules = [];
+const toile = $('toile'), ctx = toile.getContext('2d');
+let T = 40;   // taille d'une case en px CSS
+
+function chargerNiveau(n) {
+  niv = n;
+  const d = NIVEAUX[n];
+  const haut = d.carte.length, larg = d.carte[0].length;
+  L = { larg, haut, grille: [], sol: [], foot: [], vus: [], x: 0, y: 0, px: 0, py: 0, porte: [], lianes: 0,
+    ami: !!d.ami, amiPos: null, fossiles: 0, poses: 0, nbOeufs: 0, pas: 0, chemin: [], anim: null, sens: 1,
+    histo: [], volUtilise: false, volArme: false, chantUtilise: false, calme: 0, indice: null, refus: null,
+    cogne: null, secousse: 0, fini: false, finT: 0, sombre: !!d.sombre, theme: THEMES[d.theme] };
+  for (let j = 0; j < haut; j++) for (let i = 0; i < larg; i++) {
+    let ch = d.carte[j][i];
+    L.foot.push(ch === 'p');
+    if (ch === 'p') ch = '.';
+    if (ch === '@') { L.x = L.px = i; L.y = L.py = j; ch = '.'; }
+    if ('123'.includes(ch)) L.nbOeufs++;
+    L.grille.push(ch);
+    L.sol.push(ch === '~' || ch === 'L' ? '~' : (ch === 'x' || ch === 'P' || ch === '=') ? 'x' : '.');
+    L.vus.push(!L.sombre);
+  }
+  // un tronc posé sur le sol : son « dessous » est du sol
+  for (let k = 0; k < L.grille.length; k++) if (L.grille[k] === 'L') L.sol[k] = '.';
+  particules = []; enPause = false; tempsJeu = 0;
+  voir();
+  afficherEcran('jeu');
+  redimToile();
+  majInfos();
+  $('voileBilan').classList.remove('vu'); $('voilePause').classList.remove('vu'); $('voileFin').classList.remove('vu');
+  // tutoriel à la première visite de la zone (ou toujours pour la zone 1 tant qu'elle n'est pas finie)
+  if (!sauve.tutos.includes(n) || (n === 0 && sauve.debloque === 1)) lancerTuto(TUTOS[n]);
+  else message(d.nom);
+}
+
+const idx = (i, j) => j * L.larg + i;
+const dans = (i, j) => i >= 0 && j >= 0 && i < L.larg && j < L.haut;
+const tuile = (i, j) => dans(i, j) ? L.grille[idx(i, j)] : '#';
+function poser(i, j, ch) { L.grille[idx(i, j)] = ch; }
+const capacite = () => aPouvoir(2) ? 2 : 1;
+const rayonVue = () => aPouvoir(7) ? 2.6 : 1.6;
+function voir() {
+  if (!L.sombre) return;
+  const r = rayonVue();
+  for (let j = 0; j < L.haut; j++) for (let i = 0; i < L.larg; i++) if (Math.hypot(i - L.x, j - L.y) <= r) L.vus[idx(i, j)] = true;
+}
+const connu = (i, j) => L.vus[idx(i, j)];
+
+function geyserEtat(i, j) {
+  if (tempsJeu < L.calme) return 'off';
+  const ph = (tempsJeu + (i * 0.9) % CYCLE_GEYSER) % CYCLE_GEYSER;
+  return ph < 2.0 ? 'off' : ph < 2.6 ? 'bulles' : 'vapeur';
+}
+
+function photo() {
+  return { g: L.grille.join(''), x: L.x, y: L.y, px: L.px, py: L.py, porte: L.porte.slice(), lianes: L.lianes,
+    ami: L.ami, amiPos: L.amiPos && L.amiPos.slice(), fossiles: L.fossiles, poses: L.poses, pas: L.pas, vol: L.volUtilise };
+}
+function restaurer(p) {
+  L.grille = p.g.split(''); L.x = p.x; L.y = p.y; L.px = p.px; L.py = p.py; L.porte = p.porte; L.lianes = p.lianes;
+  L.ami = p.ami; L.amiPos = p.amiPos; L.fossiles = p.fossiles; L.poses = p.poses; L.pas = p.pas; L.volUtilise = p.vol;
+  L.anim = null; L.chemin = []; L.volArme = false; voir(); majInfos();
+}
+function memoriser(p) { L.histo.push(p); if (L.histo.length > 300) L.histo.shift(); }
+
+/* ===================== Déplacements et règles ===================== */
+function refuser(i, j, texte) {
+  SONS.bloque();
+  L.refus = { x: i, y: j, t: 0.5 };
+  L.cogne = { dx: i - L.x, dy: j - L.y, t: 0.18 };
+  L.chemin = [];
+  if (texte) message(texte);
+}
+
+function deplacer(nx, ny, enVol) {
+  if (L.ami) L.amiPos = [L.x, L.y];
+  L.anim = { fx: L.x, fy: L.y, t: 0, vol: !!enVol };
+  L.px = L.x; L.py = L.y; L.x = nx; L.y = ny; L.pas++;
+  SONS.pas();
+  voir();
+}
+
+// Un pas dans une direction (marche, poussée, fougère, pont, ami). Renvoie vrai si quelque chose s'est passé.
+function pas(dx, dy) {
+  const nx = L.x + dx, ny = L.y + dy;
+  if (dx) L.sens = dx;
+  if (!dans(nx, ny)) { refuser(nx, ny); return false; }
+  const t = tuile(nx, ny), avant = photo();
+  if (t === '#') { refuser(nx, ny); return false; }
+  if (t === '~') { refuser(nx, ny, "L'eau est trop profonde. Pousse un tronc dedans !"); return false; }
+  if (t === 'x') { refuser(nx, ny, 'Le ravin est trop profond : il faut un pont.'); return false; }
+  if (t === 'F') {
+    if (!L.ami) { refuser(nx, ny, 'Une fougère géante ! Il faudrait un ami costaud…'); return false; }
+    memoriser(avant); poser(nx, ny, '.'); L.pas++;
+    SONS.fougere(); eclats(nx, ny, ['#3fa34d', '#2e8b3e', '#7fd35a'], 16);
+    L.charge = { x: nx, y: ny, t: 0.35 };
+    majInfos(); return true;
+  }
+  if (t === 'P') {
+    if (L.lianes <= 0) { refuser(nx, ny, 'Ce pont est cassé. Trouve une liane pour le réparer !'); return false; }
+    memoriser(avant); poser(nx, ny, '='); L.lianes--; L.pas++;
+    SONS.repare(); eclats(nx, ny, ['#b07a44', '#7fd35a', '#fff'], 14); texteVolant(nx, ny, 'Réparé !');
+    majInfos(); return true;
+  }
+  if (t === 'T') {
+    memoriser(avant); poser(nx, ny, '.'); L.ami = true; L.amiPos = [nx, ny]; L.pas++;
+    SONS.ami(); eclats(nx, ny, ['#ffd84a', '#b892ff', '#fff'], 20);
+    message('Le tricératops est ton ami ! Touche une fougère : il l\'écarte.');
+    majInfos(); return true;
+  }
+  if (t === 'L') {
+    const lx = nx + dx, ly = ny + dy, u = tuile(lx, ly);
+    if (u === '~') {
+      memoriser(avant); poser(lx, ly, 'W'); poser(nx, ny, '.'); deplacer(nx, ny);
+      SONS.plouf(); eclats(lx, ly, ['#bfe9ff', '#ffffff', '#4fb6e3'], 18); texteVolant(lx, ly, 'Un pont !');
+      majInfos(); return true;
+    }
+    if (u === '.') { memoriser(avant); poser(lx, ly, 'L'); poser(nx, ny, '.'); deplacer(nx, ny); SONS.pousse(); eclats(lx, ly, ['#c9a26b', '#e8d3a8'], 6); majInfos(); return true; }
+    refuser(nx, ny, 'Le tronc est coincé de ce côté.'); return false;
+  }
+  if (t === 'g' && geyserEtat(nx, ny) !== 'off') { refuser(nx, ny, 'Attention, la vapeur ! Attends qu\'elle se calme.'); return false; }
+  if (MARCHABLE.has(t)) { memoriser(avant); deplacer(nx, ny); arrivee(); majInfos(); return true; }
+  refuser(nx, ny); return false;
+}
+
+// Ce qui se passe en arrivant sur une case.
+function arrivee() {
+  const t = tuile(L.x, L.y);
+  if ('123'.includes(t)) {
+    if (L.porte.length < capacite()) {
+      L.porte.push(t); poser(L.x, L.y, '.'); SONS.oeuf(); eclats(L.x, L.y, [COUL_OEUF[t], '#fff'], 12);
+      message('Un œuf ' + NOM_COUL[t] + ' ! Ramène-le au nid ' + NOM_COUL[t] + '.');
+    } else message('Tes bras sont pleins : pose d\'abord un œuf.');
+  } else if (t === '*') {
+    L.fossiles++; poser(L.x, L.y, '.'); SONS.fossile(); eclats(L.x, L.y, ['#efdcb2', '#ffd84a', '#fff'], 14); texteVolant(L.x, L.y, '+150');
+  } else if (t === 'l') {
+    L.lianes++; poser(L.x, L.y, '.'); SONS.liane(); eclats(L.x, L.y, ['#7fd35a', '#3f8f2f'], 10); texteVolant(L.x, L.y, '+1 liane');
+  } else if (NID_DE[t]) {
+    const k = L.porte.indexOf(NID_DE[t]);
+    if (k >= 0) {
+      L.porte.splice(k, 1); poser(L.x, L.y, t.toLowerCase()); L.poses++;
+      SONS.nid(); confettis(L.x, L.y, 26); texteVolant(L.x, L.y, '+100');
+      if (L.poses >= L.nbOeufs) gagner();
+    } else if (L.porte.length) message('Ce nid attend un œuf ' + NOM_COUL[NID_DE[t]] + '.');
+  }
+}
+
+function gagner() {
+  L.fini = true; L.finT = 0; L.chemin = [];
+  SONS.victoire();
+  for (let k = 0; k < 4; k++) confettis(Math.random() * L.larg, Math.random() * L.haut, 20);
+}
+
+// Plus court chemin (BFS) vers une case qui vérifie « but ». Renvoie la liste des cases, sans la case de départ.
+function chercherChemin(but, eviterGeysers) {
+  const vu = new Int16Array(L.larg * L.haut).fill(-1), file = [idx(L.x, L.y)];
+  vu[file[0]] = file[0];
+  for (let q = 0; q < file.length; q++) {
+    const k = file[q], i = k % L.larg, j = (k / L.larg) | 0;
+    if (q > 0 && but(i, j)) {
+      const ch = []; let c = k; while (c !== file[0]) { ch.unshift([c % L.larg, (c / L.larg) | 0]); c = vu[c]; } return ch;
+    }
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ni = i + dx, nj = j + dy; if (!dans(ni, nj)) continue;
+      const nk = idx(ni, nj); if (vu[nk] !== -1) continue;
+      if (!connu(ni, nj)) continue;
+      const t = L.grille[nk];
+      if (!MARCHABLE.has(t) && !but(ni, nj)) continue;
+      if (!MARCHABLE.has(t)) { vu[nk] = k; file.push(nk); continue; }
+      if (eviterGeysers && t === 'g') continue;
+      vu[nk] = k; file.push(nk);
+    }
+  }
+  return null;
+}
+function versDirections(ch) {
+  let x = L.x, y = L.y; const d = [];
+  for (const [i, j] of ch) { d.push([i - x, j - y]); x = i; y = j; }
+  return d;
+}
+
+// Toucher une case du plateau.
+function toucherCase(i, j) {
+  if (!dans(i, j) || L.fini) return;
+  if (L.volArme) { essayerVol(i, j); return; }
+  const dist = Math.abs(i - L.x) + Math.abs(j - L.y);
+  if (dist === 0) return;
+  if (dist === 1) { L.chemin = [[i - L.x, j - L.y]]; return; }
+  const t = tuile(i, j);
+  if (MARCHABLE.has(t) && connu(i, j)) {
+    const ch = chercherChemin((a, b) => a === i && b === j);
+    if (ch) { L.chemin = versDirections(ch); return; }
+  }
+  // Tronc, fougère, pont cassé, ami : on va à côté, puis on agit.
+  if ('LFPT'.includes(t) && connu(i, j)) {
+    const ch = chercherChemin((a, b) => Math.abs(a - i) + Math.abs(b - j) === 1 && MARCHABLE.has(tuile(a, b)));
+    if (ch) { const der = ch[ch.length - 1]; L.chemin = versDirections(ch).concat([[i - der[0], j - der[1]]]); return; }
+  }
+  if (!connu(i, j)) refuser(i, j, 'Il fait trop noir là-bas. Avance pas à pas !');
+  else if (t === '#') refuser(i, j);
+  else if (t === '~' || t === 'x') refuser(i, j, t === '~' ? 'On ne peut pas marcher dans l\'eau.' : 'On ne peut pas marcher dans le ravin.');
+  else refuser(i, j, 'Je ne trouve pas de chemin jusque-là.');
+}
+
+/* ===================== Pouvoirs ===================== */
+function flair() {
+  if (!L || L.fini || !aPouvoir(1)) return;
+  const veut = L.porte.length < capacite() && L.poses + L.porte.length < L.nbOeufs;
+  const but = (i, j) => { const t = tuile(i, j); if (NID_DE[t] && L.porte.includes(NID_DE[t])) return true; return veut && '123'.includes(t); };
+  const ch = chercherChemin(but, false);
+  if (ch) { L.indice = { cases: ch, t: 3 }; SONS.indice(); }
+  else { SONS.bloque(); message('Pas de chemin pour l\'instant : ouvre un passage (tronc, fougère, pont) !'); }
+}
+function ciblesVol() {
+  const res = [];
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const mi = L.x + dx, mj = L.y + dy, ti = L.x + 2 * dx, tj = L.y + 2 * dy;
+    if (!dans(ti, tj) || !connu(ti, tj)) continue;
+    const t = tuile(ti, tj);
+    if (MARCHABLE.has(t) && !MARCHABLE.has(tuile(mi, mj)) && !(t === 'g' && geyserEtat(ti, tj) !== 'off')) res.push([ti, tj]);
+  }
+  return res;
+}
+function armerVol() {
+  if (!L || L.fini || !aPouvoir(4) || L.volUtilise) return;
+  if (L.volArme) { L.volArme = false; majInfos(); return; }
+  if (!ciblesVol().length) { SONS.bloque(); message('Pas d\'obstacle à survoler ici. Mets-toi juste devant !'); return; }
+  L.volArme = true; L.chemin = []; SONS.clic(); message('Touche une case brillante pour voler par-dessus l\'obstacle.'); majInfos();
+}
+function essayerVol(i, j) {
+  const ok = ciblesVol().some(([a, b]) => a === i && b === j);
+  L.volArme = false;
+  if (!ok) { majInfos(); message('Vol annulé.'); return; }
+  memoriser(photo()); L.volUtilise = true; L.sens = i > L.x ? 1 : i < L.x ? -1 : L.sens;
+  deplacer(i, j, true); SONS.vol(); eclats(i, j, ['#f4a261', '#fff'], 12); arrivee(); majInfos();
+}
+function chanter() {
+  if (!L || L.fini || !aPouvoir(8) || L.chantUtilise) return;
+  L.chantUtilise = true; L.calme = tempsJeu + 8; SONS.chant(); message('Les geysers s\'endorment pendant 8 secondes !');
+  for (let k = 0; k < 8; k++) texteVolant(L.x + (Math.random() - 0.5) * 2, L.y - 0.5, '♪');
+  majInfos();
+}
+function annuler() {
+  if (!L || L.fini || !L.histo.length) { SONS.bloque(); return; }
+  restaurer(L.histo.pop()); SONS.clic();
+}
+
+/* ===================== Effets ===================== */
+function eclats(i, j, couleurs, n) {
+  for (let k = 0; k < n; k++) {
+    const a = Math.random() * Math.PI * 2, v = 1.5 + Math.random() * 3;
+    particules.push({ x: i + 0.5, y: j + 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2, vie: 0.7 + Math.random() * 0.4, coul: couleurs[k % couleurs.length], r: 0.05 + Math.random() * 0.06, g: 6 });
+  }
+}
+function confettis(i, j, n) {
+  const c = ['#ff6b6b', '#ffd84a', '#62c4f7', '#8fe063', '#ff94c8', '#b892ff'];
+  for (let k = 0; k < n; k++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, v = 3 + Math.random() * 5;
+    particules.push({ x: i + 0.5, y: j + 0.5, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vie: 1.2 + Math.random() * 0.6, coul: c[k % c.length], r: 0.07, g: 9, carre: true, rot: Math.random() * 6 });
+  }
+}
+function texteVolant(i, j, texte) { particules.push({ x: i + 0.5, y: j + 0.3, vx: 0, vy: -1.2, vie: 1.2, texte, g: 0 }); }
+
+let minuteurMessage = 0;
+// espace insécable avant ! ? : (le signe ne passe jamais seul à la ligne)
+const insecable = (s) => s.replace(/ ([!?:])/g, ' $1');
+function message(texte) {
+  const m = $('message'); m.textContent = insecable(texte); m.classList.add('vu');
+  clearTimeout(minuteurMessage); minuteurMessage = setTimeout(() => m.classList.remove('vu'), 2600);
+}
+
+/* ===================== Interface du jeu ===================== */
+function majInfos() {
+  if (!L) return;
+  $('nomZone').textContent = 'Zone ' + (niv + 1) + ' · ' + NIVEAUX[niv].nom;
+  $('cOeufs').textContent = L.poses + '/' + L.nbOeufs;
+  $('cFossiles').textContent = L.fossiles + '/3';
+  $('cLianes').textContent = L.lianes;
+  $('cLianesBloc').style.display = niv >= 5 ? '' : 'none';
+  $('cPas').textContent = L.pas + ' pas';
+  $('btnFlair').style.display = aPouvoir(1) ? '' : 'none';
+  $('btnVol').style.display = aPouvoir(4) ? '' : 'none';
+  $('btnVol').disabled = L.volUtilise; $('btnVol').classList.toggle('arme', L.volArme);
+  $('btnChant').style.display = aPouvoir(8) ? '' : 'none';
+  $('btnChant').disabled = L.chantUtilise;
+  $('btnAnnuler').style.opacity = L.histo.length ? 1 : 0.5;
+}
+
+function redimToile() {
+  if (!L) return;
+  const zone = $('plateau').getBoundingClientRect();
+  T = Math.max(20, Math.floor(Math.min((zone.width - 8) / L.larg, (zone.height - 8) / L.haut)));
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  toile.style.width = T * L.larg + 'px'; toile.style.height = T * L.haut + 'px';
+  toile.width = Math.round(T * L.larg * dpr); toile.height = Math.round(T * L.haut * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+/* ===================== Boucle principale ===================== */
+let dernier = 0;
+function boucle(ts) {
+  requestAnimationFrame(boucle);
+  const dt = Math.min(0.05, Math.max(0, (ts - dernier) / 1000)); dernier = ts;
+  if (ecran === 'jeu' && L) {
+    if (!enPause && !tutoActif) maj(dt);
+    dessinerJeu();
+  } else if (ecran === 'accueil') { horloge += dt; dessinerDecor(); }
+  else if (ecran === 'carte') { horloge += dt; dessinerCarte(); }
+}
+
+function maj(dt) {
+  horloge += dt;
+  // particules
+  for (const p of particules) { p.vie -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += p.g * dt; if (p.rot !== undefined) p.rot += dt * 8; }
+  particules = particules.filter((p) => p.vie > 0);
+  if (L.refus) { L.refus.t -= dt; if (L.refus.t <= 0) L.refus = null; }
+  if (L.cogne) { L.cogne.t -= dt; if (L.cogne.t <= 0) L.cogne = null; }
+  if (L.charge) { L.charge.t -= dt; if (L.charge.t <= 0) L.charge = null; }
+  if (L.indice) { L.indice.t -= dt; if (L.indice.t <= 0) L.indice = null; }
+  if (L.secousse > 0) L.secousse -= dt;
+  if (L.fini) { L.finT += dt; if (L.finT > 1.3 && !$('voileBilan').classList.contains('vu')) montrerBilan(); return; }
+  tempsJeu += dt;
+  if (L.anim) { L.anim.t += dt / (L.anim.vol ? DUREE_PAS * 3 : DUREE_PAS); if (L.anim.t >= 1) L.anim = null; }
+  if (!L.anim && L.chemin.length) {
+    const [dx, dy] = L.chemin[0], nx = L.x + dx, ny = L.y + dy;
+    const attendre = tuile(nx, ny) === 'g' && geyserEtat(nx, ny) !== 'off' && L.chemin.length > 0;
+    if (!attendre) { L.chemin.shift(); if (!pas(dx, dy)) L.chemin = []; }
+  }
+  // Un geyser se réveille sous le dino : il est repoussé doucement.
+  if (!L.anim && tuile(L.x, L.y) === 'g' && geyserEtat(L.x, L.y) === 'vapeur') {
+    let bx = L.px, by = L.py;
+    if (!MARCHABLE.has(tuile(bx, by)) || tuile(bx, by) === 'g' || (bx === L.x && by === L.y)) {
+      const v = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b]) => [L.x + a, L.y + b]).find(([a, b]) => MARCHABLE.has(tuile(a, b)) && tuile(a, b) !== 'g');
+      if (v) { bx = v[0]; by = v[1]; }
+    }
+    if (bx !== L.x || by !== L.y) {
+      L.anim = { fx: L.x, fy: L.y, t: 0 }; L.x = bx; L.y = by; L.chemin = []; voir();
+      L.secousse = 0.35; SONS.vapeur(); message('Pschhh ! La vapeur te repousse. Attends qu\'elle se calme.');
+      arrivee(); majInfos();
+    }
+  }
+}
+
+function posDino() {
+  if (!L.anim) return [L.x, L.y, 0];
+  const k = Math.min(1, L.anim.t), e = k * k * (3 - 2 * k);
+  const saut = L.anim.vol ? Math.sin(k * Math.PI) * 1.1 : Math.sin(k * Math.PI) * 0.12;
+  return [L.anim.fx + (L.x - L.anim.fx) * e, L.anim.fy + (L.y - L.anim.fy) * e, saut];
+}
+
+function dessinerJeu() {
+  const c = ctx, th = L.theme, t = horloge;
+  c.save();
+  c.clearRect(0, 0, L.larg * T, L.haut * T);
+  if (L.secousse > 0) c.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
+  // 1. décor
+  for (let j = 0; j < L.haut; j++) for (let i = 0; i < L.larg; i++) {
+    const k = idx(i, j);
+    if (L.sombre && !L.vus[k]) continue;
+    const g = L.grille[k];
+    dessinerCase(c, i, j, T, g === 'L' ? '.' : g, th, t, L.sol[k]);
+    if (L.foot[k]) dessinerEmpreinte(c, i * T + T / 2, j * T + T / 2, T, L.sombre);
+  }
+  // 2. objets
+  for (let j = 0; j < L.haut; j++) for (let i = 0; i < L.larg; i++) {
+    const k = idx(i, j); if (L.sombre && !L.vus[k]) continue;
+    const g = L.grille[k], cx = i * T + T / 2, cy = j * T + T / 2;
+    if (g === 'L') dessinerTronc(c, cx, cy, T);
+    else if (g === 'F') dessinerFougere(c, cx, cy, T, t);
+    else if (g === '*') dessinerFossile(c, cx, cy, T, t);
+    else if (g === 'l') dessinerLiane(c, cx, cy, T);
+    else if ('123'.includes(g)) dessinerOeuf(c, cx, cy, T * 0.3, COUL_OEUF[g], Math.sin(t * 2 + i) * 0.1);
+    else if (NID_DE[g]) dessinerNid(c, cx, cy, T, COUL_OEUF[NID_DE[g]], false, t);
+    else if ('abc'.includes(g)) dessinerNid(c, cx, cy, T, COUL_OEUF[NID_DE[g.toUpperCase()]], true, t);
+    else if (g === 'T') dessinerDino(c, cx, cy, T * 0.95, { type: 'cornes', couleur: '#9b87d6', sens: -1, cligne: (t % 4) < 0.15 });
+    if (g === 'T' && !L.ami) { c.font = 'bold ' + (T * 0.4) + 'px system-ui'; c.textAlign = 'center'; c.fillStyle = '#fff'; c.fillText('?', cx + T * 0.3, cy - T * 0.35 + Math.sin(t * 4) * 2); }
+  }
+  // 3. aides : chemin du Flair, cibles du vol
+  if (L.indice) {
+    c.globalAlpha = Math.min(1, L.indice.t);
+    L.indice.cases.forEach(([i, j], n) => { const r = T * (0.1 + 0.05 * Math.sin(t * 8 - n * 0.6)); ellipse(c, i * T + T / 2, j * T + T / 2, r, r, '#ffd84a'); });
+    c.globalAlpha = 1;
+  }
+  if (L.volArme) ciblesVol().forEach(([i, j]) => { c.strokeStyle = '#ffd84a'; c.lineWidth = 4; c.globalAlpha = 0.6 + 0.4 * Math.sin(t * 8); rondRect(c, i * T + 3, j * T + 3, T - 6, T - 6, 8); c.stroke(); c.globalAlpha = 1; });
+  // 4. ami tricératops puis petit dino
+  const [dx, dy, saut] = posDino();
+  if (L.ami) {
+    const ap = L.amiPos || [L.x - 0.45, L.y + 0.1];
+    const ax = L.charge ? L.charge.x * 0.4 + ap[0] * 0.6 : ap[0], ay = L.charge ? L.charge.y * 0.4 + ap[1] * 0.6 : ap[1];
+    if (!(ap[0] === L.x && ap[1] === L.y)) dessinerDino(c, ax * T + T / 2, ay * T + T / 2, T * 0.85, { type: 'cornes', couleur: '#9b87d6', sens: L.sens, cligne: (t % 5) < 0.15 });
+  }
+  let ox = 0, oy = 0;
+  if (L.cogne) { const k = Math.sin(L.cogne.t / 0.18 * Math.PI) * 0.15; ox = L.cogne.dx * k; oy = L.cogne.dy * k; }
+  const bx = (dx + ox) * T + T / 2, by = (dy + oy - saut) * T + T / 2 + Math.sin(t * 5) * (L.anim ? 0 : 1);
+  dessinerDino(c, bx, by, T * 0.95, { chapeau: true, sens: L.sens, cligne: (t % 3.5) < 0.12 });
+  L.porte.forEach((o, n) => dessinerOeuf(c, bx - T * 0.05 + n * T * 0.26, by - T * 0.55, T * 0.17, COUL_OEUF[o], Math.sin(t * 4 + n) * 0.2));
+  // 5. vapeur des geysers (au-dessus de tout)
+  for (let j = 0; j < L.haut; j++) for (let i = 0; i < L.larg; i++) {
+    if (L.grille[idx(i, j)] !== 'g' || (L.sombre && !L.vus[idx(i, j)])) continue;
+    const e = geyserEtat(i, j), cx = i * T + T / 2, cy = j * T + T / 2;
+    if (e === 'bulles') for (let b = 0; b < 3; b++) { const r = T * 0.06 * (1 + Math.sin(t * 12 + b * 2)); ellipse(c, cx + (b - 1) * T * 0.12, cy + T * 0.05 - ((t * 2 + b * 0.3) % 1) * T * 0.15, r, r, 'rgba(255,255,255,.8)'); }
+    if (e === 'vapeur') for (let b = 0; b < 6; b++) { const h = ((t * 3 + b / 6) % 1); ellipse(c, cx + Math.sin(t * 5 + b) * T * 0.1, cy - h * T * 1.1, T * (0.18 + h * 0.2), T * (0.18 + h * 0.2), 'rgba(255,255,255,' + (0.85 - h * 0.6) + ')'); }
+    if (tempsJeu < L.calme) { c.font = (T * 0.35) + 'px system-ui'; c.textAlign = 'center'; c.fillStyle = '#b892ff'; c.fillText('z', cx + T * 0.2, cy - T * 0.2 - Math.sin(t * 3) * 3); }
+  }
+  // 6. obscurité des grottes : les empreintes et les nids brillent même dans le noir
+  if (L.sombre) {
+    const r = rayonVue();
+    for (let j = 0; j < L.haut; j++) for (let i = 0; i < L.larg; i++) {
+      const k = idx(i, j), d = Math.hypot(i - dx, j - dy);
+      if (!L.vus[k]) {
+        c.fillStyle = '#0c0a08'; c.fillRect(i * T, j * T, T + 0.5, T + 0.5);
+        if (L.foot[k]) dessinerEmpreinte(c, i * T + T / 2, j * T + T / 2, T, true);
+        if (NID_DE[L.grille[k]]) { c.globalAlpha = 0.6; dessinerNid(c, i * T + T / 2, j * T + T / 2, T, COUL_OEUF[NID_DE[L.grille[k]]], false, t); c.globalAlpha = 1; }
+      } else if (d > r) { c.fillStyle = 'rgba(8,6,4,' + Math.min(0.6, (d - r) * 0.35 + 0.2) + ')'; c.fillRect(i * T, j * T, T + 0.5, T + 0.5); if (L.foot[k]) dessinerEmpreinte(c, i * T + T / 2, j * T + T / 2, T, true); }
+    }
+  }
+  // 7. refus, particules
+  if (L.refus && dans(L.refus.x, L.refus.y)) {
+    const cx = L.refus.x * T + T / 2, cy = L.refus.y * T + T / 2, s = T * 0.2;
+    c.strokeStyle = 'rgba(220,40,40,' + L.refus.t * 2 + ')'; c.lineWidth = 4; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(cx - s, cy - s); c.lineTo(cx + s, cy + s); c.moveTo(cx + s, cy - s); c.lineTo(cx - s, cy + s); c.stroke();
+  }
+  for (const p of particules) {
+    c.globalAlpha = Math.max(0, Math.min(1, p.vie * 1.5));
+    if (p.texte) { c.font = 'bold ' + Math.round(T * 0.42) + 'px system-ui'; c.textAlign = 'center'; c.lineWidth = 4; c.strokeStyle = '#5a3a1a'; c.strokeText(p.texte, p.x * T, p.y * T); c.fillStyle = '#ffe066'; c.fillText(p.texte, p.x * T, p.y * T); }
+    else if (p.carre) { c.save(); c.translate(p.x * T, p.y * T); c.rotate(p.rot); c.fillStyle = p.coul; c.fillRect(-T * p.r, -T * p.r * 0.5, T * p.r * 2, T * p.r); c.restore(); }
+    else ellipse(c, p.x * T, p.y * T, T * p.r, T * p.r, p.coul);
+  }
+  c.globalAlpha = 1;
+  c.restore();
+}
+
+/* ===================== Entrées ===================== */
+toile.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (!L || enPause) return;
+  if (tutoActif) { finirTuto(); return; }
+  audio();
+  const r = toile.getBoundingClientRect();
+  toucherCase(Math.floor((e.clientX - r.left) / T), Math.floor((e.clientY - r.top) / T));
+});
+$('tuto').addEventListener('pointerdown', (e) => { e.preventDefault(); finirTuto(); });
+
+const DIRS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+document.addEventListener('keydown', (e) => {
+  if (ecran === 'accueil' && (e.key === 'Enter' || e.key === ' ') && document.activeElement === document.body) { e.preventDefault(); jouer(); return; }
+  if (ecran !== 'jeu' || !L) return;
+  if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') { e.preventDefault(); basculerPause(); return; }
+  if (enPause || $('voileBilan').classList.contains('vu') || $('voileFin').classList.contains('vu')) return;
+  if (tutoActif) { e.preventDefault(); finirTuto(); return; }
+  if (L.fini) return;
+  audio();
+  const d = DIRS[e.key];
+  if (d) {
+    e.preventDefault();
+    if (L.volArme) { essayerVol(L.x + 2 * d[0], L.y + 2 * d[1]); return; }
+    L.chemin = [d];
+  } else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flair(); }
+  else if (e.key === 'u' || e.key === 'U' || e.key === 'Backspace' || e.key === 'z' || e.key === 'Z') { e.preventDefault(); annuler(); }
+  else if (e.key === 'v' || e.key === 'V') armerVol();
+  else if (e.key === 'c' || e.key === 'C') chanter();
+});
+
+/* ===================== Tutoriel animé ===================== */
+let tutoEtapes = [], tutoN = 0, tutoMinuteurs = [];
+function lancerTuto(etapes) {
+  if (!etapes || !etapes.length) return;
+  tutoEtapes = etapes; tutoN = 0; tutoActif = true;
+  $('tuto').classList.add('vu');
+  if (!sauve.tutos.includes(niv)) { sauve.tutos.push(niv); enregistrer(); }
+  setTimeout(etapeTuto, 50);
+}
+function etapeTuto() {
+  tutoMinuteurs.forEach(clearTimeout); tutoMinuteurs = [];
+  if (!tutoActif) return;
+  if (tutoN >= tutoEtapes.length) { finirTuto(); return; }
+  const e = tutoEtapes[tutoN], zone = $('plateau').getBoundingClientRect();
+  let x, y;
+  if (e.b) { const r = $(e.b).getBoundingClientRect(); x = r.left + r.width / 2 - zone.left; y = r.top + r.height / 2 - zone.top; }
+  else {
+    const r = toile.getBoundingClientRect(), [i, j] = e.dino ? [L.x, L.y] : e.c;
+    x = r.left - zone.left + (i + 0.5) * T; y = r.top - zone.top + (j + 0.5) * T;
+  }
+  const main = $('main'), anneau = $('anneau'), bulle = $('bulle');
+  bulle.innerHTML = insecable(e.t) + '<small>Étape ' + (tutoN + 1) + ' / ' + tutoEtapes.length + ' · touche l\'écran pour jouer</small>';
+  // la bulle se place en bas si la main vise le haut de l'écran
+  bulle.style.top = y < zone.height * 0.4 ? 'auto' : '8px'; bulle.style.bottom = y < zone.height * 0.4 ? '8px' : 'auto';
+  main.style.transform = 'translate(' + (x - 14) + 'px,' + (y - 4) + 'px)';
+  tutoMinuteurs.push(setTimeout(() => {
+    main.classList.remove('tape'); void main.offsetWidth; main.classList.add('tape');
+    anneau.style.left = (x - 25) + 'px'; anneau.style.top = (y - 25) + 'px';
+    anneau.classList.remove('go'); void anneau.offsetWidth; anneau.classList.add('go');
+  }, 900));
+  tutoMinuteurs.push(setTimeout(() => { tutoN++; etapeTuto(); }, 2900));
+}
+function finirTuto() {
+  if (!tutoActif) return;
+  tutoActif = false; tutoMinuteurs.forEach(clearTimeout); tutoMinuteurs = [];
+  $('tuto').classList.remove('vu');
+  message('À toi de jouer !');
+}
+
+/* ===================== Pause ===================== */
+function basculerPause(forcer) {
+  if (!L || ecran !== 'jeu') return;
+  if ($('voileBilan').classList.contains('vu') || $('voileFin').classList.contains('vu')) return;
+  enPause = forcer !== undefined ? forcer : !enPause;
+  $('voilePause').classList.toggle('vu', enPause);
+  if (enPause) { if (actx && actx.state === 'running') actx.suspend().catch(() => {}); if (tutoActif) finirTuto(); }
+  else if (actx && sauve.son) actx.resume().catch(() => {});
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden && ecran === 'jeu' && !enPause) basculerPause(true); });
+
+/* ===================== Bilan de zone ===================== */
+function montrerBilan() {
+  const d = NIVEAUX[niv];
+  const etoiles = L.fossiles >= 3 ? 3 : L.fossiles >= 2 ? 2 : 1;
+  const bonus = Math.max(0, 300 - 10 * Math.max(0, L.pas - d.par));
+  const score = L.nbOeufs * 100 + L.fossiles * 150 + bonus;
+  const ancien = sauve.meilleurs[niv] || 0, record = score > ancien;
+  const nouveauBebe = sauve.debloque <= niv + 1;
+  if (record) sauve.meilleurs[niv] = score;
+  sauve.etoiles[niv] = Math.max(sauve.etoiles[niv] || 0, etoiles);
+  sauve.debloque = Math.max(sauve.debloque, niv + 2);
+  enregistrer();
+
+  const b = BEBES[niv];
+  $('bilanTitre').textContent = niv === 9 ? 'Le sommet est atteint !' : 'Zone réussie !';
+  $('bilanBebe').innerHTML = (nouveauBebe ? 'Un œuf éclot : voici un <b>bébé ' + b.nom + '</b> !' : 'Ton bébé ' + b.nom + ' est content de te revoir.') + (b.pouvoir ? '<br><b>Pouvoir</b> — ' + b.pouvoir : '');
+  $('bilanDetail').textContent = L.nbOeufs + ' œufs × 100 + ' + L.fossiles + ' fossile' + (L.fossiles > 1 ? 's' : '') + ' × 150 + rapidité ' + bonus + ' (' + L.pas + ' pas)';
+  $('bilanRecord').textContent = record ? (ancien ? 'Nouveau record ! (avant : ' + ancien + ')' : 'Nouveau record !') : 'Record de la zone : ' + ancien;
+  $('bilanRecord').classList.toggle('nouveau', record);
+  $('btnSuivant').textContent = niv === 9 ? 'Fin de l\'aventure' : 'Niveau suivant';
+  const spans = $('bilanEtoiles').querySelectorAll('span');
+  spans.forEach((s) => s.classList.remove('on'));
+  $('voileBilan').classList.add('vu');
+  bebeAnim = { b, t: 0 };
+  SONS.eclosion();
+  for (let k = 0; k < etoiles; k++) setTimeout(() => { spans[k].classList.add('on'); SONS.etoile(k); }, 600 + k * 450);
+  // compteur qui défile
+  const el = $('bilanScore'), debut = performance.now();
+  (function defile(now) { const k = Math.min(1, (now - debut) / 1200); el.textContent = Math.round(score * k); if (k < 1) requestAnimationFrame(defile); })(debut);
+  setTimeout(() => $('btnSuivant').focus(), 100);
+}
+// Éclosion animée du bébé dans le bilan
+let bebeAnim = null;
+(function animBebe() {
+  requestAnimationFrame(animBebe);
+  if (!bebeAnim || !$('voileBilan').classList.contains('vu')) return;
+  bebeAnim.t += 1 / 60;
+  const cv = $('bebeBilan'), c = cv.getContext('2d'), t = bebeAnim.t;
+  c.clearRect(0, 0, cv.width, cv.height);
+  dessinerNid(c, 140, 158, 170, null, false, 0);
+  if (t < 0.8) dessinerOeuf(c, 140, 120, 50, '#f3e6c4', Math.sin(t * 40) * 0.15 * t);
+  else {
+    const k = Math.min(1, (t - 0.8) * 3);
+    dessinerDino(c, 140, 112 - Math.abs(Math.sin(t * 4)) * 8, 150 * k, { type: bebeAnim.b.type, couleur: bebeAnim.b.couleur, bat: Math.sin(t * 10) * 8, cligne: (t % 3) < 0.12 });
+    if (t < 1.4) { c.fillStyle = '#f3e6c4'; c.beginPath(); c.moveTo(80, 140); c.lineTo(100, 115); c.lineTo(115, 135); c.lineTo(130, 112); c.lineTo(150, 136); c.lineTo(165, 114); c.lineTo(180, 138); c.lineTo(200, 118); c.lineTo(195, 150); c.lineTo(85, 150); c.fill(); }
+  }
+})();
+
+function montrerFin() {
+  $('voileBilan').classList.remove('vu');
+  $('finDetail').textContent = 'Étoiles : ' + totalEtoiles() + ' / 30 · Bébés éclos : ' + Math.min(10, sauve.debloque - 1) + ' / 10';
+  $('finScore').textContent = totalScore();
+  $('finRecord').textContent = 'Record : somme de tes meilleurs scores de zone';
+  $('voileFin').classList.add('vu');
+  SONS.victoire();
+  for (let k = 0; k < 6; k++) confettis(Math.random() * L.larg, Math.random() * L.haut * 0.5, 20);
+}
+
+/* ===================== Accueil (décor animé) ===================== */
+const decor = $('decor'), dctx = decor.getContext('2d');
+function redimDecor() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  decor.width = decor.clientWidth * dpr; decor.height = decor.clientHeight * dpr;
+  dctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const tot = totalEtoiles();
+  $('recordAccueil').textContent = sauve.debloque > 1 ? 'Zones : ' + Math.min(10, sauve.debloque - 1) + '/10 · Étoiles : ' + tot + '/30 · Record : ' + totalScore() : '';
+  $('btnJouer').textContent = sauve.debloque > 1 && sauve.debloque <= 10 ? 'Jouer (zone ' + sauve.debloque + ')' : 'Jouer';
+}
+function dessinerDecor() {
+  const c = dctx, w = decor.clientWidth, h = decor.clientHeight, t = horloge;
+  const ciel = c.createLinearGradient(0, 0, 0, h * 0.5); ciel.addColorStop(0, '#7fd0f0'); ciel.addColorStop(1, '#d4f3ff');
+  c.fillStyle = ciel; c.fillRect(0, 0, w, h * 0.5 + 1);
+  c.fillStyle = '#2fa3c9'; c.fillRect(0, h * 0.5, w, h * 0.5);
+  ellipse(c, w * 0.85, h * 0.07, 30, 30, '#fff3a8');
+  // volcan endormi (petit panache de fumée)
+  c.fillStyle = '#7a5a4a'; c.beginPath(); c.moveTo(w * 0.3, h * 0.56); c.lineTo(w * 0.56, h * 0.36); c.lineTo(w * 0.66, h * 0.36); c.lineTo(w * 0.96, h * 0.56); c.fill();
+  c.fillStyle = '#5e4438'; c.beginPath(); c.moveTo(w * 0.56, h * 0.36); c.lineTo(w * 0.66, h * 0.36); c.lineTo(w * 0.63, h * 0.39); c.lineTo(w * 0.59, h * 0.38); c.fill();
+  for (let k = 0; k < 4; k++) { const p = (t * 0.15 + k / 4) % 1; ellipse(c, w * 0.61 + Math.sin(p * 6) * 10, h * 0.35 - p * h * 0.1, 8 + p * 18, 8 + p * 18, 'rgba(255,255,255,' + (0.6 - p * 0.6) + ')'); }
+  // vagues sur la mer
+  c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 3;
+  for (let k = 0; k < 2; k++) { c.beginPath(); for (let x = 0; x <= w; x += 8) { const y = h * (0.515 + k * 0.03) + Math.sin(x * 0.03 + t * 2 + k) * 3; x ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); }
+  // île : colline de jungle puis plage
+  ellipse(c, w * 0.5, h * 0.68, w * 0.62, h * 0.13, '#4caf50');
+  ellipse(c, w * 0.3, h * 0.6, w * 0.16, h * 0.05, '#3c9a43');
+  ellipse(c, w * 0.5, h * 1.02, w * 0.9, h * 0.3, '#f2dc9e');
+  // palmiers
+  [[0.08, 0.74], [0.92, 0.76]].forEach(([px, py], n) => {
+    const x = w * px, y = h * py; c.strokeStyle = '#8b5a2b'; c.lineWidth = 10; c.beginPath(); c.moveTo(x, y + 40); c.quadraticCurveTo(x + 14, y - 10, x + 4, y - 60); c.stroke();
+    for (let k = 0; k < 6; k++) { c.save(); c.translate(x + 4, y - 60); c.rotate(k * 1.05 + Math.sin(t + n) * 0.06); ellipse(c, 30, 0, 34, 9, '#3c9a3c'); c.restore(); }
+  });
+  // nid, œufs, petit dino et son ami (au-dessus des boutons)
+  const s = Math.min(w * 0.38, h * 0.2), sol = h * 0.68;
+  dessinerNid(c, w * 0.28, sol + s * 0.1, s * 0.8, '#8fe063', true, t);
+  dessinerOeuf(c, w * 0.14, sol + s * 0.25, s * 0.13, '#62c4f7', Math.sin(t * 3) * 0.15);
+  dessinerOeuf(c, w * 0.42, sol + s * 0.3, s * 0.12, '#ff94c8', Math.sin(t * 3 + 1) * 0.15);
+  dessinerDino(c, w * 0.78, sol - s * 0.05, s * 0.7, { type: 'cornes', couleur: '#9b87d6', sens: -1, cligne: (t % 4) < 0.12 });
+  dessinerDino(c, w * 0.58, sol - Math.abs(Math.sin(t * 3)) * 8, s, { chapeau: true, sens: -1, cligne: (t % 3) < 0.12 });
+}
+
+/* ===================== Carte de l'île ===================== */
+const POS_ZONES = [[24, 84], [50, 88], [76, 80], [80, 63], [55, 62], [26, 60], [20, 42], [44, 40], [70, 32], [50, 17]];
+const cctx = $('carteCanvas').getContext('2d');
+function construireCarte() {
+  const cv = $('carteCanvas'), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr; cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const box = $('zonesCarte'); box.innerHTML = '';
+  NIVEAUX.forEach((d, n) => {
+    const ouverte = n < sauve.debloque, b = document.createElement('button');
+    b.className = 'zone' + (ouverte ? '' : ' fermee') + (n === sauve.debloque - 1 ? ' prochaine' : '');
+    b.style.left = POS_ZONES[n][0] + '%'; b.style.top = POS_ZONES[n][1] + '%';
+    b.textContent = ouverte ? n + 1 : '?';
+    b.setAttribute('aria-label', 'Zone ' + (n + 1) + (ouverte ? ' : ' + d.nom : ' : pas encore découverte'));
+    const et = document.createElement('span'); et.className = 'et';
+    et.textContent = ouverte ? '★'.repeat(sauve.etoiles[n] || 0) + '☆'.repeat(3 - (sauve.etoiles[n] || 0)) : '';
+    b.appendChild(et);
+    b.addEventListener('click', () => { if (ouverte) { SONS.clic(); chargerNiveau(n); } else { SONS.bloque(); } });
+    box.appendChild(b);
+  });
+}
+function dessinerCarte() {
+  const c = cctx, cv = $('carteCanvas'), w = cv.clientWidth, h = cv.clientHeight, t = horloge;
+  c.fillStyle = '#2fa3c9'; c.fillRect(0, 0, w, h);
+  c.strokeStyle = 'rgba(255,255,255,.25)'; c.lineWidth = 2;
+  for (let k = 0; k < 10; k++) { c.beginPath(); for (let x = 0; x <= w; x += 10) { const y = (k + 0.5) * h / 10 + Math.sin(x * 0.04 + t + k) * 3; x ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); }
+  const X = (p) => p / 100 * w, Y = (p) => p / 100 * h;
+  // île : plage, jungle, marais, falaise, grotte, volcan
+  c.fillStyle = '#f2dc9e'; c.beginPath(); c.ellipse(X(50), Y(56), X(46), Y(42), 0, 0, Math.PI * 2); c.fill();
+  ellipse(c, X(55), Y(56), X(38), Y(32), '#5fae4f');
+  ellipse(c, X(26), Y(48), X(15), Y(14), '#93a65e');
+  ellipse(c, X(78), Y(62), X(12), Y(10), '#3f8f45');
+  ellipse(c, X(44), Y(40), X(11), Y(8), '#7d7468');
+  c.fillStyle = '#7a5a4a'; c.beginPath(); c.moveTo(X(30), Y(32)); c.lineTo(X(46), Y(12)); c.lineTo(X(54), Y(12)); c.lineTo(X(72), Y(32)); c.fill();
+  ellipse(c, X(50), Y(12), X(4), Y(1.5), '#4a3530');
+  // chemin entre les zones découvertes
+  c.strokeStyle = '#fff6dc'; c.lineWidth = 4; c.setLineDash([6, 8]); c.beginPath();
+  for (let n = 0; n < Math.min(10, sauve.debloque); n++) { const [px, py] = POS_ZONES[n]; n ? c.lineTo(X(px), Y(py)) : c.moveTo(X(px), Y(py)); }
+  c.stroke(); c.setLineDash([]);
+  // brouillard sur les zones pas encore découvertes
+  for (let n = sauve.debloque; n < 10; n++) {
+    const [px, py] = POS_ZONES[n];
+    for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 + t * 0.2; ellipse(c, X(px) + Math.cos(a) * 18, Y(py) + Math.sin(a) * 12, 26, 20, 'rgba(240,245,250,.85)'); }
+  }
+}
+
+/* ===================== Nid-collection ===================== */
+function construireNid() {
+  const g = $('grilleNid'); g.innerHTML = '';
+  BEBES.forEach((b, n) => {
+    const eclos = sauve.debloque > n + 1, carte = document.createElement('div');
+    carte.className = 'carteBebe' + (eclos ? '' : ' cache');
+    const cv = document.createElement('canvas'); cv.width = 220; cv.height = 160; carte.appendChild(cv);
+    const c = cv.getContext('2d');
+    dessinerNid(c, 110, 125, 130, null, false, 0);
+    if (eclos) dessinerDino(c, 110, 95, 110, { type: b.type, couleur: b.couleur });
+    else dessinerOeuf(c, 110, 100, 42, '#e9dcbc');
+    const txt = document.createElement('div');
+    txt.innerHTML = eclos ? '<b>Bébé ' + b.nom + '</b>' + (b.pouvoir || 'Un ami de plus dans le nid !') : '<b>Zone ' + (n + 1) + '</b>Réussis la zone pour faire éclore cet œuf.';
+    carte.appendChild(txt); g.appendChild(carte);
+  });
+}
+
+/* ===================== Boutons ===================== */
+function jouer() {
+  SONS.clic();
+  if (sauve.debloque > 10) afficherEcran('carte'); else chargerNiveau(sauve.debloque - 1);
+}
+function clic(id, f) { $(id).addEventListener('click', (e) => { audio(); f(e); e.currentTarget.blur(); }); }
+clic('btnJouer', jouer);
+clic('btnCarteAccueil', () => { SONS.clic(); afficherEcran('carte'); });
+clic('btnNidAccueil', () => { SONS.clic(); afficherEcran('nid'); });
+clic('btnCarteRetour', () => { SONS.clic(); afficherEcran('accueil'); });
+clic('btnNidRetour', () => { SONS.clic(); afficherEcran('accueil'); });
+clic('btnPause', () => { SONS.clic(); basculerPause(true); });
+clic('btnReprendre', () => { basculerPause(false); SONS.clic(); });
+clic('btnRecommencer', () => { basculerPause(false); chargerNiveau(niv); });
+clic('btnPauseCarte', () => { basculerPause(false); afficherEcran('carte'); });
+clic('btnPauseAccueil', () => { basculerPause(false); afficherEcran('accueil'); });
+clic('btnAnnuler', () => { if (!tutoActif) annuler(); });
+clic('btnFlair', () => { if (tutoActif) finirTuto(); flair(); });
+clic('btnVol', () => { if (tutoActif) finirTuto(); armerVol(); });
+clic('btnChant', () => { if (tutoActif) finirTuto(); chanter(); });
+clic('btnSuivant', () => { SONS.clic(); if (niv >= 9) montrerFin(); else chargerNiveau(niv + 1); });
+clic('btnRejouer', () => { SONS.clic(); chargerNiveau(niv); });
+clic('btnBilanCarte', () => { SONS.clic(); $('voileBilan').classList.remove('vu'); afficherEcran('carte'); });
+clic('btnFinRejouer', () => { SONS.clic(); chargerNiveau(0); });
+clic('btnFinNid', () => { SONS.clic(); $('voileFin').classList.remove('vu'); afficherEcran('nid'); });
+clic('btnFinCarte', () => { SONS.clic(); $('voileFin').classList.remove('vu'); afficherEcran('carte'); });
+document.querySelectorAll('.btnSon').forEach((b) => b.addEventListener('click', () => {
+  sauve.son = !sauve.son; enregistrer(); majBoutonsSon();
+  if (sauve.son) { audio(); SONS.clic(); } else if (actx) actx.suspend().catch(() => {});
+  b.blur();
+}));
+
+window.addEventListener('resize', () => {
+  if (ecran === 'jeu') redimToile();
+  else if (ecran === 'accueil') redimDecor();
+  else if (ecran === 'carte') construireCarte();
+});
+
+majBoutonsSon();
+redimDecor();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
