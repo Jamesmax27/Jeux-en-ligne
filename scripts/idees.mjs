@@ -9,11 +9,14 @@
 // source ("humain" ou "agent"), date_ajout (AAAA-MM-JJ), statut et jeu_id
 // (null tant que le jeu n'est pas publié). Champ facultatif "essais" : nombre
 // de jeux de cette idée refusés par la vérification ; à ESSAIS_MAX, l'idée
-// n'est plus choisie (le remettre à 0 pour la retenter).
+// n'est plus choisie (le remettre à 0 pour la retenter). Champ facultatif
+// "issue" : numéro de l'issue « idee-perso » d'où vient l'idée (page privée
+// /idees) ; la boucle ferme cette issue quand la pull request du jeu est ouverte.
 //
-// Ordre de fabrication : les idées "humain" dans l'ordre du fichier (ordre
-// d'ajout ; une idée prioritaire du formulaire est placée en tête), puis les
-// idées "agent", dans l'ordre du fichier.
+// Ordre de fabrication : d'abord les idées perso (champ "issue"), de la plus
+// ancienne issue à la plus récente ; puis les idées "humain" dans l'ordre du
+// fichier (ordre d'ajout ; une idée prioritaire du formulaire est placée en
+// tête), puis les idées "agent", dans l'ordre du fichier.
 //
 // Le catalogue de référence est l'ensemble des games/*/game.json (dont
 // public/catalog.json est tiré au build). Un jeu est relié à son idée par le
@@ -28,6 +31,10 @@
 //   ajouter <fichier>      ajoute les idées proposées par l'agent d'idéation
 //   ajouter-humain         ajoute l'idée du formulaire (variables TITRE,
 //                          PRINCIPE, GENRE, AGE, THEMES, PRIORITE)
+//   importer-perso <fichier>
+//                          ajoute les idées des issues « idee-perso » (liste
+//                          JSON [{ issue, titre, genre, description }]) qui ne
+//                          sont pas déjà dans idees.json ou l'archive
 //   choisir <n>            passe n idées "en_cours" et écrit leur liste (JSON)
 //   reconcilier [--ouvertes id,…] [--echecs id,…]
 //                          idée dont le jeu est sur main → archive ; idée
@@ -53,7 +60,7 @@ const ESSAIS_MAX = 3;      // jeux refusés au-delà desquels une idée n'est pl
 const CHOIX_MAX = 5;       // idées choisies par passage (une tâche de fabrication chacune)
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DATE_VALIDE = /^\d{4}-\d{2}-\d{2}$/;
-const ORDRE_CHAMPS = ['id', 'titre', 'description', 'genre', 'tags', 'source', 'date_ajout', 'statut', 'jeu_id', 'essais'];
+const ORDRE_CHAMPS = ['id', 'titre', 'description', 'genre', 'tags', 'source', 'date_ajout', 'statut', 'jeu_id', 'issue', 'essais'];
 
 // --------------------------------------------------------------------------
 // Outils
@@ -92,11 +99,15 @@ const memesTags = (a, b) => {
   return x.size === y.size && [...x].every((t) => y.has(t));
 };
 
-// Ordre de fabrication : idées humaines, puis idées de l'agent (ordre du fichier).
+// Ordre de fabrication : idées perso (issue la plus ancienne d'abord), idées humaines, puis idées de l'agent
+// (ordre du fichier).
 const choisissables = (idees) => idees.filter((i) => i.statut === 'en_attente' && (i.essais || 0) < ESSAIS_MAX);
+const estPerso = (i) => Number.isInteger(i.issue);
 const ordreDeFabrication = (idees) => {
   const libres = choisissables(idees);
-  return [...libres.filter((i) => i.source === 'humain'), ...libres.filter((i) => i.source !== 'humain')];
+  const perso = libres.filter(estPerso).sort((a, b) => a.issue - b.issue);
+  const autres = libres.filter((i) => !estPerso(i));
+  return [...perso, ...autres.filter((i) => i.source === 'humain'), ...autres.filter((i) => i.source !== 'humain')];
 };
 
 // --------------------------------------------------------------------------
@@ -120,6 +131,7 @@ function problemesIdee(idee, fichier, statutsPermis) {
     if (typeof idee.jeu_id !== 'string' || !ID_VALIDE.test(idee.jeu_id)) p.push('"jeu_id" : id du jeu publié');
   } else if (idee.jeu_id !== null && idee.jeu_id !== undefined) p.push('"jeu_id" : null tant que le jeu n\'est pas publié');
   if (idee.essais !== undefined && !(Number.isInteger(idee.essais) && idee.essais >= 0)) p.push('"essais" : nombre entier ≥ 0');
+  if (idee.issue !== undefined && !(Number.isInteger(idee.issue) && idee.issue > 0)) p.push('"issue" : numéro d\'issue GitHub');
   return p.map((x) => `${fichier}, idée ${JSON.stringify(idee.id ?? idee.titre ?? '?')} : ${x}`);
 }
 
@@ -334,6 +346,40 @@ async function ajouterHumain() {
   repondre({ resultat: 'ajoutee', id: idee.id, titre, description, genre, tags, avant });
 }
 
+// Idées de la page privée /idees : issues ouvertes « idee-perso », lues par boucle-de-nuit.yml (étape b).
+// Une issue déjà importée (champ "issue" dans idees.json ou l'archive) est ignorée : elle reste ouverte
+// jusqu'à l'ouverture de la pull request de son jeu.
+async function importerPerso(fichier) {
+  if (!fichier) throw new Error('fichier des issues manquant : node scripts/idees.mjs importer-perso <fichier>');
+  const { idees, archive } = await charger();
+  let issues;
+  try { issues = JSON.parse((await readFile(fichier, 'utf8')).replace(/^﻿/, '')); }
+  catch (e) { throw new Error(`${fichier} illisible : ${e.message}`); }
+  if (!Array.isArray(issues)) issues = [];
+
+  const dejaImportees = new Set([...idees, ...archive].filter(estPerso).map((i) => i.issue));
+  const ids = new Set([...idees, ...archive].map((i) => i.id));
+  let ajoutees = 0;
+  for (const p of issues) {
+    const issue = Number(p?.issue);
+    if (!Number.isInteger(issue) || issue <= 0 || dejaImportees.has(issue)) continue;
+    const titre = uneLigne(String(p?.titre ?? '').replace(/^\s*idée\s*:\s*/i, ''), 80);
+    const genre = uneLigne(p?.genre, 30).toLowerCase();
+    let description = uneLigne(p?.description, 2000);
+    if (titre.length < 2) { console.log(`Issue #${issue} ignorée : titre manquant`); continue; }
+    if (!GENRES.includes(genre)) { console.log(`Issue #${issue} ignorée : genre hors liste (« ${genre} »)`); continue; }
+    // Description facultative sur la page : à défaut, le titre guide l'agent créateur.
+    if (description.length < 10) description = `Idée de jeu : ${titre}.`;
+
+    const id = idUnique(slug(titre), ids);
+    idees.push({ id, titre, description, genre, tags: [], source: 'humain', date_ajout: aujourdhui(), statut: 'en_attente', jeu_id: null, issue });
+    ids.add(id); dejaImportees.add(issue); ajoutees++;
+    console.log(`Idée perso ajoutée (issue #${issue}) : ${titre} (${genre})`);
+  }
+  await ecrire(FICHIER_IDEES, idees);
+  console.log(`${ajoutees} idée(s) perso ajoutée(s).`);
+}
+
 // Choix des idées à fabriquer : statut "en_cours". Seule sortie standard : la liste en JSON.
 async function choisir(n) {
   const nombre = Math.max(0, Math.min(CHOIX_MAX, parseInt(n, 10) || 0));
@@ -343,7 +389,9 @@ async function choisir(n) {
   await ecrire(FICHIER_IDEES, idees);
   for (const i of choix) console.error(`Choisie : ${i.titre} (${i.source})`);
   if (!choix.length) console.error('Aucune idée choisie.');
-  console.log(JSON.stringify(choix.map(({ id, titre, description, genre, tags }) => ({ id, titre, description, genre, tags }))));
+  // "issue" (idées perso) : la tâche de fabrication ferme l'issue une fois la pull request ouverte.
+  console.log(JSON.stringify(choix.map(({ id, titre, description, genre, tags, issue }) =>
+    ({ id, titre, description, genre, tags, ...(estPerso({ issue }) ? { issue } : {}) }))));
 }
 
 async function reconcilier(args) {
@@ -422,6 +470,7 @@ const COMMANDES = {
   manque,
   ajouter: () => ajouter(args[0]),
   'ajouter-humain': ajouterHumain,
+  'importer-perso': () => importerPerso(args[0]),
   choisir: () => choisir(args[0]),
   reconcilier: () => reconcilier(args),
   controler: () => controler(args[0]),

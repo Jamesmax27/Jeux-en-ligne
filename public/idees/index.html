@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Nouvelle idée de jeu</title>
+  <!-- Page privée (protégée par Cloudflare Access) : absente du catalogue, du menu et du sitemap. -->
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+  <!-- Style commun du site (fond étoilé, couleurs, police) ; le formulaire a ses règles ci-dessous. -->
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    .idees {
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 16px 16px 40px;
+    }
+
+    .idees .marque { margin-bottom: 20px; }
+
+    .idees-retour {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      margin-bottom: 8px;
+      color: var(--encre-douce);
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    .idees-carte {
+      padding: 18px 16px;
+      border: 1px solid var(--trait);
+      border-radius: var(--rayon);
+      background: var(--surface);
+      box-shadow: var(--ombre);
+    }
+
+    .champ { margin: 0 0 18px; }
+
+    .champ label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .champ label small {
+      font-weight: 400;
+      color: var(--encre-douce);
+    }
+
+    /* 16 px au moins : en dessous, l'iPhone zoome sur le champ quand on le touche. */
+    .champ input,
+    .champ select,
+    .champ textarea {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--trait-fort);
+      border-radius: 12px;
+      background: var(--fond);
+      color: var(--encre);
+      font: inherit;
+      font-size: 16px;
+    }
+
+    .champ textarea {
+      min-height: 160px;
+      resize: vertical;
+    }
+
+    .champ input:focus,
+    .champ select:focus,
+    .champ textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .compteur {
+      margin-top: 4px;
+      text-align: right;
+      font-size: 13px;
+      color: var(--encre-douce);
+    }
+
+    .envoyer {
+      width: 100%;
+      min-height: 48px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--accent);
+      color: var(--accent-encre);
+      font: inherit;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .envoyer:disabled { opacity: .55; cursor: default; }
+
+    .message {
+      margin: 16px 0 0;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    .message:empty { display: none; }
+    .message.ok { background: rgba(110, 200, 150, .15); color: #a9e6c2; }
+    .message.erreur { background: rgba(240, 120, 120, .15); color: #f3b2b2; }
+  </style>
+</head>
+<body>
+  <main class="idees">
+    <a class="idees-retour" href="/">← Catalogue</a>
+    <h1 class="marque">
+      <svg class="marque-logo" viewBox="0 0 64 64" aria-hidden="true">
+        <defs><clipPath id="logo-planete"><circle cx="32" cy="33" r="15"/></clipPath></defs>
+        <path transform="rotate(-18 32 33)" d="M5 33a27 8 0 0 1 54 0" fill="none" stroke="#eceae4" stroke-width="3.2" stroke-linecap="round"/>
+        <circle cx="32" cy="33" r="15" fill="#a8b3f0"/>
+        <circle cx="38" cy="38.5" r="15" fill="#929ee6" clip-path="url(#logo-planete)"/>
+        <path transform="rotate(-18 32 33)" d="M5 33a27 8 0 0 0 54 0" fill="none" stroke="#eceae4" stroke-width="3.2" stroke-linecap="round"/>
+      </svg>
+      <span>Nouvelle idée de jeu<small>Elle sera fabriquée en priorité par la boucle de nuit.</small></span>
+    </h1>
+
+    <form class="idees-carte" id="formulaire" novalidate>
+      <div class="champ">
+        <label for="titre">Titre</label>
+        <input id="titre" name="titre" type="text" required minlength="3" maxlength="100" autocomplete="off" enterkeyhint="next">
+      </div>
+
+      <div class="champ">
+        <label for="genre">Genre</label>
+        <select id="genre" name="genre" required>
+          <option value="" disabled selected>Chargement des genres…</option>
+        </select>
+      </div>
+
+      <div class="champ">
+        <label for="description">Description <small>(facultative)</small></label>
+        <textarea id="description" name="description" maxlength="2000"
+          placeholder="Principe, ce qu'on fait, ce qui change au fil des niveaux, âge conseillé…"></textarea>
+        <div class="compteur" id="compteur" aria-live="polite">0 / 2000</div>
+      </div>
+
+      <button class="envoyer" id="envoyer" type="submit">Envoyer</button>
+      <p class="message" id="message" role="status" aria-live="polite"></p>
+    </form>
+  </main>
+
+  <script type="module">
+    // Formulaire d'ajout d'idées : POST JSON vers /api/idees (functions/api/idees.js),
+    // qui vérifie la connexion Cloudflare Access et crée une issue « idee-perso » sur GitHub.
+    const formulaire = document.getElementById('formulaire');
+    const titre = document.getElementById('titre');
+    const genre = document.getElementById('genre');
+    const description = document.getElementById('description');
+    const compteur = document.getElementById('compteur');
+    const bouton = document.getElementById('envoyer');
+    const message = document.getElementById('message');
+
+    function afficher(texte, type) {
+      message.textContent = texte;
+      message.className = `message ${type}`;
+    }
+
+    const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+
+    // Genres déjà utilisés dans le catalogue, dans l'ordre des filtres du site.
+    async function chargerGenres() {
+      try {
+        const reponse = await fetch('/catalog.json', { cache: 'no-cache' });
+        if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
+        const catalogue = await reponse.json();
+        const utilises = new Set((catalogue.games || []).map((j) => j.genre).filter(Boolean));
+        const ordre = Array.isArray(catalogue.genres) ? catalogue.genres : [...utilises].sort((a, b) => a.localeCompare(b, 'fr'));
+        const genres = ordre.filter((g) => utilises.has(g));
+        genre.innerHTML = '';
+        genre.append(new Option('Choisir un genre…', '', true, true));
+        genre.options[0].disabled = true;
+        for (const g of genres) genre.append(new Option(majuscule(g), g));
+      } catch (erreur) {
+        console.error('Catalogue illisible :', erreur);
+        genre.options[0].textContent = 'Genres indisponibles';
+        bouton.disabled = true;
+        afficher('Impossible de charger la liste des genres. Recharge la page.', 'erreur');
+      }
+    }
+
+    description.addEventListener('input', () => {
+      compteur.textContent = `${description.value.length} / 2000`;
+    });
+
+    formulaire.addEventListener('submit', async (evenement) => {
+      evenement.preventDefault();
+      const donnees = {
+        titre: titre.value.trim(),
+        genre: genre.value,
+        description: description.value.trim(),
+      };
+      if (donnees.titre.length < 3 || donnees.titre.length > 100) {
+        afficher('Le titre doit faire entre 3 et 100 caractères.', 'erreur');
+        titre.focus();
+        return;
+      }
+      if (!donnees.genre) {
+        afficher('Choisis un genre.', 'erreur');
+        genre.focus();
+        return;
+      }
+
+      bouton.disabled = true;
+      afficher('Envoi en cours…', 'ok');
+      try {
+        const reponse = await fetch('/api/idees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(donnees),
+        });
+        let corps = {};
+        try { corps = await reponse.json(); } catch { /* réponse sans JSON */ }
+        if (reponse.ok && corps.ok) {
+          formulaire.reset();
+          compteur.textContent = '0 / 2000';
+          afficher(`Merci ! L'idée « ${donnees.titre} » est enregistrée${corps.numero ? ` (n° ${corps.numero})` : ''}.`, 'ok');
+        } else if (reponse.status === 403) {
+          afficher(corps.erreur || 'Accès refusé : recharge la page pour te reconnecter.', 'erreur');
+        } else {
+          afficher(corps.erreur || `Envoi impossible (erreur ${reponse.status}). Réessaie plus tard.`, 'erreur');
+        }
+      } catch (erreur) {
+        // Session Cloudflare Access expirée (redirection vers la connexion) ou pas de réseau.
+        console.error('Envoi impossible :', erreur);
+        afficher('Envoi impossible : vérifie ta connexion, ou recharge la page pour te reconnecter.', 'erreur');
+      } finally {
+        bouton.disabled = false;
+      }
+    });
+
+    chargerGenres();
+  </script>
+</body>
+</html>
