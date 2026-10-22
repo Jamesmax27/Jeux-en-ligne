@@ -211,7 +211,7 @@ function echapperXml(texte) {
 // Un jeu limité à certaines langues (« langues ») n'a que ces variantes.
 async function ecrireSitemap(jeux) {
   const site = adresseDuSite();
-  const pages = [{ chemin: '', langues: LANGUES }];
+  const pages = [{ chemin: '', langues: LANGUES }, { chemin: 'mentions-legales.html', langues: LANGUES }];
   for (const jeu of jeux) pages.push({ chemin: `play.html?id=${encodeURIComponent(jeu.id)}`, langues: jeu.langues || LANGUES });
 
   const avecLangue = (chemin, lang) => `${site}${chemin}${chemin.includes('?') ? '&' : '?'}lang=${lang}`;

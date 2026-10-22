@@ -19,7 +19,7 @@
 | **Les identifiants donnés par la régie** : identifiant éditeur (chez Google : `ca-pub-…`), identifiant du bloc d'annonce, adresse du script | Ils désignent votre compte et l'emplacement. | `REGIE` dans `public/pub.js` |
 | **La ligne `ads.txt`** donnée par la régie | Elle prouve que les annonces vendues sur votre site viennent bien de vous. | Fichier `public/ads.txt` |
 | **Un outil de consentement aux cookies** : en Europe, Google exige un outil certifié (le sien, « Confidentialité et messages », est inclus dans AdSense) | Obligatoire en France (CNIL) avant tout cookie publicitaire. | `demanderConsentement()` dans `public/pub.js` |
-| **Une page « Mentions légales » et une page « Confidentialité »** (prévues en phase 4) | Obligatoires : éditeur du site, hébergeur (Cloudflare), régie, cookies utilisés, comment retirer son consentement. | Nouvelles pages du site |
+| **Les champs [À COMPLÉTER] de la page « Mentions légales »** (`public/mentions-legales.html`, déjà en ligne) **et une page « Confidentialité »** (à créer) | Obligatoires : éditeur du site, hébergeur (Cloudflare), régie, cookies utilisés, comment retirer son consentement. | `public/mentions-legales.html` et nouvelle page du site |
 
 ## Réglages obligatoires (le public peut inclure des enfants)
 
@@ -36,9 +36,7 @@ Vérifiez ces points dans les conditions de la régie choisie au moment de l'ins
 2. Compléter `demanderConsentement()` et `chargerAnnonce()` avec le code donné par la régie, en gardant les réglages ci-dessus (non personnalisé, public enfant).
 3. Ajouter le fichier `public/ads.txt`.
 4. Ajouter les styles de `.pub` et `.consentement` dans `public/style.css` (il n'y en a pas encore, pour ne rien changer à l'affichage).
-5. Retirer « sans publicité » des textes du site :
-   - `public/index.html` : description, sous-titre de l'en-tête, pied de page ;
-   - `public/manifest.webmanifest` : description.
+5. Textes du site : rien à faire, ils ne promettent plus l'absence de publicité (branche `textes-coherence`). Ne jamais réintroduire « sans publicité » ou équivalent.
 6. Mettre `PUB_ACTIVE = true` dans `public/pub.js`.
 7. Augmenter `VERSION` dans `public/sw.js`, pour que les téléphones reçoivent la nouvelle version.
 8. Mettre à jour `CLAUDE.md` (sections 4 et 12).

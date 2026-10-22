@@ -409,7 +409,7 @@ async function testerSite(navigateur, idExemple) {
   const base = `http://localhost:${PORT_TEST}`;
   try {
     await attendreServeur(`${base}/`);
-    const pages = [['catalogue', '/'], ...(idExemple ? [['lanceur', `/play.html?id=${idExemple}`]] : [])];
+    const pages = [['catalogue', '/'], ['mentions légales', '/mentions-legales.html'], ...(idExemple ? [['lanceur', `/play.html?id=${idExemple}`]] : [])];
     for (const [nom, chemin] of pages) {
       for (const lang of LANGUES) {
         const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
