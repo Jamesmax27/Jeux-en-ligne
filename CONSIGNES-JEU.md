@@ -6,7 +6,7 @@ Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.
 ## 1. Le public
 
 - Enfants et familles, à partir de 4 ans selon le jeu. Jeux **éducatifs ou d'adresse**, toujours bienveillants.
-- Tout le texte est en **français**, simple et sans faute. Phrases courtes pour les jeunes lecteurs.
+- Tout le texte est écrit d'abord en **français**, simple et sans faute (phrases courtes pour les jeunes lecteurs), puis traduit en anglais, espagnol, portugais (Brésil) et allemand (section 3, « Langues »).
 - Interdit : violence réaliste, peur, moquerie, compétition humiliante, publicité, achat, lien externe, chat, collecte de données.
 - Interdit : personnages, noms, logos ou univers existants (Pokémon, Mario, Disney…). Créations originales uniquement.
 
@@ -14,19 +14,21 @@ Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.
 
 ### Minimum obligatoire (chaque nouveau jeu)
 
-Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient obligatoirement :
+Un nouveau jeu est **complet et travaillé, jamais un simple prototype** : il doit occuper un enfant **au moins 15 minutes**. La qualité et la richesse du jeu passent avant tout : ne jamais réduire le contenu, les textes, les niveaux ou le gameplay pour aller plus vite. Il contient obligatoirement :
 
-1. **Un écran d'accueil** : le titre en grand, la règle en une ou deux phrases et un gros bouton « Jouer ». Il sert aussi de jaquette (section 5).
-2. **Au moins 10 niveaux ou vagues**, de difficulté progressive : les premiers se réussissent du premier coup, les derniers demandent de l'entraînement.
-3. **Plusieurs mécaniques qui se combinent** : une nouveauté (obstacle, bonus, règle, ennemi, type de carte…) apparaît tous les 2 ou 3 niveaux, puis se mélange aux précédentes.
+1. **Un écran titre** : le titre en grand, des consignes claires en une ou deux phrases et un gros bouton « Jouer ». Il sert aussi de jaquette (section 5).
+2. **Au moins 20 niveaux** (les jeux publiés avant 2026-10-23 en ont 10), de difficulté progressive : les premiers se réussissent du premier coup, les derniers demandent de l'entraînement. Le jeu donne son nombre réel de niveaux, tiré de ses données : `window.JEL_NIVEAUX = NIVEAUX.length;` (même nombre que `"niveaux"` dans `game.json` : le robot les compare).
+3. **De vraies nouveautés au fil des niveaux** : une nouveauté (mécanique, obstacle, ennemi, objectif, règle, type de carte…) apparaît au moins tous les 2 ou 3 niveaux, puis se mélange aux précédentes. Pas de niveaux copiés les uns sur les autres.
 4. **Un tutoriel animé au début** : une courte démonstration montre le geste à faire (main ou flèche animée), en 3 étapes au plus, et se passe d'un toucher. Chaque nouvelle mécanique est présentée de la même façon à sa première apparition.
 5. **Pause et Rejouer** : un bouton pause toujours visible pendant la partie (et la touche Échap ou P) fige tout (temps, mouvements, sons) et propose « Reprendre », « Recommencer » et « Accueil ». Le jeu se met aussi en pause tout seul quand l'écran est caché (`visibilitychange`). Même un jeu sans chrono a ce menu.
 6. **Des contrôles tactiles et clavier** : tout se joue au doigt (cibles d'au moins 44 px) et aussi au clavier (flèches, Espace, Entrée) ou à la souris.
-7. **Un score et des récompenses** : 1 à 3 étoiles par niveau selon la réussite (ou médailles, objets à collectionner…).
-8. **Un record sauvegardé** (meilleur score, étoiles, niveaux atteints) dans `localStorage`, toujours dans `try { … } catch (e) { … }` : sans stockage, le jeu marche quand même.
-9. **Des sons générés avec Web Audio** (aucun fichier audio) pour les actions, réussites, erreurs et fins de niveau, avec un **bouton pour couper le son**, bien visible, dont le choix est mémorisé. Aucun son avant la première action du joueur.
-10. **Des animations et des effets de réussite** : confettis, étoiles qui s'envolent, compteur qui défile, légère secousse… à chaque réussite et à chaque fin de niveau.
-11. **Un écran de fin avec bilan** : à chaque fin de niveau et en fin de partie, score, étoiles gagnées, record battu ou non, et boutons « Niveau suivant » et « Rejouer ».
+7. **Un score ou des étoiles par niveau** : 1 à 3 étoiles selon la réussite (ou médailles, objets à collectionner…).
+8. **Une progression sauvegardée** (niveaux débloqués, étoiles, meilleur score) dans `localStorage`, toujours dans `try { … } catch (e) { … }` : sans stockage, le jeu marche quand même.
+9. **Une sélection des niveaux** : l'écran des niveaux montre ceux qui sont débloqués (avec leurs étoiles) et ceux qui restent fermés ; on peut rejouer n'importe quel niveau débloqué.
+10. **Des sons générés avec Web Audio** (aucun fichier audio) pour les actions, réussites, erreurs et fins de niveau, avec un **bouton pour couper le son**, bien visible, dont le choix est mémorisé. Aucun son avant la première action du joueur.
+11. **Des animations et des retours visuels soignés** : confettis, étoiles qui s'envolent, compteur qui défile, légère secousse… à chaque action, à chaque réussite et à chaque fin de niveau.
+12. **Un écran de victoire et un écran de défaite** : à chaque fin de niveau et en fin de partie, bilan avec score, étoiles gagnées, record battu ou non, et boutons « Niveau suivant » (victoire) ou « Réessayer » (défaite), « Rejouer » et « Niveaux ».
+13. **Une présentation riche** dans `game.json` : quelques phrases (principe, objectif, ce qui rend le jeu amusant), en plus de la description courte de la carte du catalogue (section 4).
 
 ### Le ressenti
 
@@ -65,6 +67,17 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 - **Touches** : lire `event.code` (position de la touche) ; écrire ZQSD en français, WASD dans les autres langues.
 - Jeu qui repose sur des mots ou des lettres du français : `"non_traduisible": true` dans `game.json` (l'interface reste traduite, le catalogue indique « en français »).
 
+**Méthode de la boucle de nuit (recommandée pour tout nouveau jeu)** : les textes sont écrits à part, un fichier par langue, dans `i18n-jeu/<id>/` (dossier ignoré par git) :
+
+```json
+{ "meta":   { "title": "…", "description": "…", "presentation": "…" },
+  "textes": { "cle": "texte", "etoiles": { "one": "{n} étoile", "other": "{n} étoiles" } } }
+```
+
+1. Créer le jeu complet en français, avec tous ses textes dans `fr.json`. Après chaque modification : `node scripts/i18n-jeu.mjs --assembler <id>` (range les textes dans `index.html`, crée au besoin le bloc et le module commun, recopie `meta` dans `game.json`).
+2. Le jeu terminé, écrire `en.json`, `es.json`, `pt.json` et `de.json` en lisant **seulement** `fr.json` (pas de relecture du code) : mêmes clés, mêmes `{variables}`, meta comprise. Ton simple et vivant, pas de mot à mot.
+3. `node scripts/i18n-jeu.mjs --assembler <id>` puis `node scripts/check-i18n.js <id> --sans-site` jusqu'à « tout est bon ». Une erreur de traduction se corrige dans les fichiers `.json`, jamais dans le code du jeu.
+
 ## 4. La fiche `game.json`
 
 ```json
@@ -72,23 +85,28 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
   "id": "nom-du-dossier",
   "title": "Titre du jeu",
   "description": "Une phrase qui donne envie de jouer (10 à 200 caractères).",
+  "presentation": "Trois à six phrases : le principe, l'objectif et ce qui rend le jeu amusant (150 à 1 200 caractères).",
   "i18n": {
-    "en": { "title": "Game title", "description": "One sentence that makes you want to play." },
-    "es": { "title": "…", "description": "…" },
-    "pt": { "title": "…", "description": "…" },
-    "de": { "title": "…", "description": "…" }
+    "en": { "title": "Game title", "description": "One sentence that makes you want to play.", "presentation": "…" },
+    "es": { "title": "…", "description": "…", "presentation": "…" },
+    "pt": { "title": "…", "description": "…", "presentation": "…" },
+    "de": { "title": "…", "description": "…", "presentation": "…" }
   },
   "genre": "adresse",
   "tags": ["animaux"],
   "ages": "6+",
   "author": "Claude (agent)",
   "added": "AAAA-MM-JJ",
-  "version": 1
+  "version": 1,
+  "niveaux": 20,
+  "consignes": 2
 }
 ```
 
 - `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier.
-- `title` et `description` restent en français ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire).
+- `title`, `description` et `presentation` restent en français ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). `description` : courte phrase de la carte du catalogue ; `presentation` : texte riche et attrayant, utilisé comme description de la page du jeu (référencement).
+- `niveaux` : nombre de niveaux du jeu (20 au moins), égal à `window.JEL_NIVEAUX`.
+- `consignes` : `2` pour les jeux faits selon ces consignes (posé automatiquement par la boucle de nuit) ; le robot applique alors les règles des nouveaux jeux (20 niveaux, présentation). Les jeux plus anciens n'ont pas ce champ.
 - `genre` : **obligatoire**, un seul, choisi dans cette liste fermée (filtres « genre » du catalogue) :
   `adresse`, `action`, `plateforme`, `course`, `sport`, `rythme`, `aventure`, `réflexion`, `stratégie`, `puzzle`, `mémoire`, `observation`, `quiz`, `calcul`, `lecture`, `création`, `simulation`.
   (`action` : jeu rapide où l'on esquive et réagit vite, sans violence ; `observation` : cherche-et-trouve, différences ; `simulation` : soigner un animal, cuisiner, tenir une ferme…)
@@ -98,16 +116,17 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 - `idee` : rempli par la boucle de nuit, `id` de l'idée de `idees.json` réalisée par ce jeu (à la fusion, l'idée passe dans `idees-archive.json`). Ne pas le modifier. Facultatif pour un jeu créé à la main.
 - Jeu de la boucle de nuit : `genre` et `tags` sont ceux de l'idée (si l'idée n'a pas de tags, l'agent les choisit). La vérification refuse un jeu dont l'entrée du catalogue ne correspond pas.
 
-## 5. La jaquette
+## 5. La jaquette et les images
 
 - Image portrait 600 × 800 px : `cover.webp` (idéal, moins de 100 Ko), sinon `cover.png` ou `cover.jpg` (moins de 300 Ko).
-- La boucle automatique la fabrique elle-même (capture de l'écran d'accueil du jeu, **textes masqués**) : la jaquette ne contient **aucun texte**, car le site affiche le titre traduit en bandeau sous l'image. L'écran d'accueil doit donc avoir un beau dessin, pas seulement du texte.
-- Jaquette faite à la main : sans aucun texte, ou `node scripts/jaquette-sans-texte.mjs <id>`.
+- La boucle automatique la fabrique elle-même, d'après le jeu terminé (capture de l'écran d'accueil du jeu, **textes masqués** ; une jaquette provisoire faite pendant la fabrication par `--covers` est remplacée) : la jaquette ne contient **aucun texte**, car le site affiche le titre traduit en HTML. L'écran d'accueil doit donc avoir un beau dessin, pas seulement du texte.
+- **Aucune image ne contient de texte** : ni la jaquette, ni les dessins du jeu (SVG, canvas) ; pas de titre, de lettre ni de chiffre dessinés. Les textes sont toujours écrits par `t()` (section 3), pour être traduits.
+- Jaquette faite à la main : sans aucun texte, ou `node scripts/jaquette-sans-texte.mjs <id>`. Si la relecture voit du texte sur la jaquette d'un jeu par ailleurs bon, la boucle refait seulement la jaquette avec ce script.
 
 ## 6. Avant de proposer le jeu
 
 ```text
-node scripts/validate-games.mjs --jouer <id>
+node scripts/validate-games.mjs --jouer <id>      (ajouter --covers si le jeu n'a pas encore de jaquette)
 node scripts/check-i18n.js <id> --rapport
 ```
 
@@ -126,24 +145,28 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Téléphone | une erreur survient pendant la partie au toucher, sur un écran de 390 × 844 |
 | Hors ligne | le jeu tente un appel réseau, ou ne marche pas avec le navigateur coupé du réseau |
 | Fichiers | `game.json` incomplet ou invalide, jaquette absente ou trop lourde, `index.html` de plus de 2 Mo, fichier en trop |
+| Niveaux | (jeux `"consignes": 2`) moins de 20 niveaux, `window.JEL_NIVEAUX` absent ou différent de `"niveaux"` dans `game.json`, présentation absente ou trop courte |
 | Catalogue | le jeu manque au catalogue construit, ou son genre et ses tags ne sont pas ceux de son idée (`scripts/idees.mjs controler`) |
-| Traductions | `scripts/check-i18n.js` signale une erreur : langue incomplète, clé manquante, titre non traduit, erreur dans une des 5 langues (contrôle des pull requests `validate.yml`) |
+| Traductions | `scripts/check-i18n.js` signale une erreur : langue incomplète, clé manquante, valeur vide, `{variables}` différentes, titre, description ou présentation non traduits, erreur dans une des 5 langues (boucle de nuit et `validate.yml`) |
 
 ### Relecture (Claude)
 
 Points bloquants, vérifiés dans le code et sur les captures d'écran du robot :
 
-1. **Accueil** : titre, règle en une ou deux phrases, gros bouton « Jouer ».
+1. **Écran titre** : titre, consignes claires en une ou deux phrases, gros bouton « Jouer ».
 2. **Tutoriel** : démonstration animée du geste au début, et à l'arrivée de chaque nouvelle mécanique.
 3. **Pause et Rejouer** : bouton pause visible (et touche Échap ou P) qui fige vraiment le jeu ; « Rejouer » en fin de niveau et en fin de partie.
-4. **Progression** : au moins 10 niveaux ou vagues, et la difficulté augmente réellement d'après le code.
-5. **Mécaniques** : plusieurs mécaniques qui apparaissent au fil des niveaux et se combinent.
-6. **Récompenses et record** : score, étoiles (ou équivalent), meilleur score ou progression sauvegardés dans `localStorage` à l'intérieur de `try { … } catch (e) { … }`.
-7. **Contrôles** : jouable entièrement au doigt, et au clavier ou à la souris ; cibles tactiles d'au moins 44 px.
-8. **Son** : sons Web Audio, bouton pour couper le son visible et mémorisé, aucun son avant la première action.
-9. **Effets et bilan** : effets de réussite ; écran de bilan avec score, étoiles, record, « Niveau suivant » et « Rejouer ».
-10. **Écran de téléphone** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page.
-11. **Contenu** : adapté aux enfants, en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
-12. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; jaquette sans texte (section 3, « Langues »).
+4. **Progression** : au moins 20 niveaux réellement différents (lus dans le code, pas seulement annoncés), et la difficulté augmente réellement.
+5. **Mécaniques** : de vraies nouveautés (mécaniques, obstacles, ennemis, objectifs) au fil des niveaux, qui se combinent.
+6. **Jeu complet** : un vrai jeu travaillé et riche, pas un prototype ni un jeu simpliste (niveaux copiés, écrans ou fonctions manquants, contenu maigre).
+7. **Récompenses et progression** : score ou étoiles par niveau, progression et record sauvegardés dans `localStorage` à l'intérieur de `try { … } catch (e) { … }`, sélection des niveaux débloqués.
+8. **Contrôles** : jouable entièrement au doigt, et au clavier ou à la souris ; cibles tactiles d'au moins 44 px.
+9. **Son** : sons Web Audio, bouton pour couper le son visible et mémorisé, aucun son avant la première action.
+10. **Effets et fins de niveau** : retours visuels soignés ; écran de victoire et écran de défaite avec score, étoiles, record, « Niveau suivant » ou « Réessayer », et « Rejouer ».
+11. **Écran de téléphone** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page.
+12. **Contenu** : adapté aux enfants, en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
+13. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; aucune image du jeu avec du texte (sections 3 et 5).
+
+À part, non bloquant pour le jeu : **la jaquette** ne contient aucun texte, aucune lettre, aucun chiffre. Sinon, la boucle refait seulement la jaquette (section 5).
 
 Conseils (non bloquants, notés dans la relecture) : amusant dès la première minute, variété d'un niveau à l'autre, de quoi jouer 15 minutes.

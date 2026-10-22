@@ -13,7 +13,9 @@
 //     valeur vide ; {variables} différentes d'une langue à l'autre ; pluriel
 //     sans forme « other » ;
 //   - site : genre, univers ou tranche d'âge sans nom ;
-//   - jeu : titre ou description manquant dans une des 5 langues (game.json) ;
+//   - jeu : titre ou description manquant dans une des 5 langues (game.json),
+//     ainsi que la présentation ("presentation") dès qu'elle existe en
+//     français (obligatoire pour les jeux "consignes": 2) ;
 //     bloc de textes (jel-i18n-textes) ou module commun (jel-i18n) absent ou
 //     pas à jour ; clé utilisée par le jeu (t('…'), data-i18n…) absente du
 //     français ;
@@ -180,6 +182,14 @@ async function verifierJeu(id, moduleCommun) {
       if (typeof t?.description !== 'string' || !t.description.trim()) erreur(sujet, `game.json : "i18n.${lang}.description" manquante`);
       else if (t.description.length > 200) erreur(sujet, `game.json : "i18n.${lang}.description" dépasse 200 caractères`);
       if (typeof t?.title === 'string' && t.title.length > 60) erreur(sujet, `game.json : "i18n.${lang}.title" dépasse 60 caractères`);
+      // Présentation (quelques phrases, nouveaux jeux) : traduite dès qu'elle existe en français.
+      if (typeof fiche.presentation === 'string' && fiche.presentation.trim()) {
+        if (typeof t?.presentation !== 'string' || !t.presentation.trim()) erreur(sujet, `game.json : "i18n.${lang}.presentation" manquante`);
+        else if (t.presentation.length > 1200) erreur(sujet, `game.json : "i18n.${lang}.presentation" dépasse 1 200 caractères`);
+      }
+    }
+    if (Number(fiche.consignes) >= 2 && (typeof fiche.presentation !== 'string' || !fiche.presentation.trim())) {
+      erreur(sujet, 'game.json : "presentation" (français) manquante (obligatoire pour les nouveaux jeux)');
     }
     if (fiche.langues !== undefined && (!Array.isArray(fiche.langues) || !fiche.langues.length || fiche.langues.some((l) => !LANGUES.includes(l)))) {
       erreur(sujet, `game.json : "langues" doit être une liste parmi ${LANGUES.join(', ')}`);

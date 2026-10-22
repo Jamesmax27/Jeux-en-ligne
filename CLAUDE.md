@@ -109,29 +109,35 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
   "id": "saut-obstacles",
   "title": "Saut d'obstacles",
   "description": "Ton poney galope, tape pour sauter les barres !",
+  "presentation": "Trois à six phrases : principe, objectif, ce qui rend le jeu amusant.",
   "i18n": {
-    "en": { "title": "Show Jumping", "description": "Your pony gallops: tap to jump over the bars!" },
-    "es": { "title": "…", "description": "…" },
-    "pt": { "title": "…", "description": "…" },
-    "de": { "title": "…", "description": "…" }
+    "en": { "title": "Show Jumping", "description": "Your pony gallops: tap to jump over the bars!", "presentation": "…" },
+    "es": { "title": "…", "description": "…", "presentation": "…" },
+    "pt": { "title": "…", "description": "…", "presentation": "…" },
+    "de": { "title": "…", "description": "…", "presentation": "…" }
   },
   "genre": "adresse",
   "tags": ["chevaux"],
   "ages": "6+",
   "author": "Claude",
   "added": "2026-10-03",
-  "version": 1
+  "version": 1,
+  "niveaux": 20,
+  "consignes": 2
 }
 ```
 
 - `id` : minuscules, chiffres et tirets uniquement ; identique au nom du dossier ; unique.
 - `genre` : un seul, dans la liste fermée de `CONSIGNES-JEU.md` (reprise dans `scripts/genres.mjs`). Sert aux filtres par genre du catalogue. Une ancienne fiche sans `genre` : le build le déduit des `tags`, avec un avertissement.
 - `tags` : des thèmes, choisis de préférence dans la liste existante (voir `catalog.json`).
-- `title` et `description` restent en français ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). Facultatif : `"non_traduisible": true` (jeu de mots ou de lettres en français : seule l'interface est traduite).
+- `title`, `description` et `presentation` restent en français ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). `description` : phrase courte de la carte du catalogue ; `presentation` (nouveaux jeux) : quelques phrases riches, description de la page du jeu. Facultatif : `"non_traduisible": true` (jeu de mots ou de lettres en français : seule l'interface est traduite).
+- Nouveaux jeux (`"consignes": 2`, posé par la boucle de nuit) : au moins 20 niveaux, nombre dans `"niveaux"` et donné par le jeu (`window.JEL_NIVEAUX`) ; le robot vérifie les deux. Les jeux plus anciens (10 niveaux) n'ont pas ce champ.
 
 **Langues (règle absolue pour tout nouveau jeu, détails dans `CONSIGNES-JEU.md`, section 3) :**
 - Aucun texte en dur : tout texte visible passe par `t('cle', { variables })` (canvas compris) ou `data-i18n="cle"` (`-html`, `-placeholder`, `-title`, `-aria`).
 - Dans le `<head>`, après `<title>` : le bloc `<script type="application/json" id="jel-i18n-textes" data-coin="…">` avec les textes complets en `fr`, `en`, `es`, `pt`, `de` (mêmes clés, mêmes `{variables}`), puis `<script id="jel-i18n"></script>` rempli par `node scripts/i18n-jeu.mjs <id>`.
+- Méthode recommandée (boucle de nuit) : textes écrits dans `i18n-jeu/<id>/fr.json` (puis `en.json`, `es.json`, `pt.json`, `de.json`, traduits d'après `fr.json` seul), rangés dans le jeu et sa fiche par `node scripts/i18n-jeu.mjs --assembler <id>`.
+- Aucune image avec du texte (jaquette, dessins du jeu) : pas de titre, de lettre ni de chiffre dessinés.
 - Bouton de langue : `data-coin` (coin de l'écran), `data-place="id…"` (dans des éléments du jeu) ou `data-coin="aucun"` + `JEL_I18N.creerSelecteur()`.
 - Avant la pull request : `node scripts/check-i18n.js <id>` doit afficher « tout est bon ».
 
@@ -220,8 +226,8 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 **Boucle de nuit** (`.github/workflows/boucle-de-nuit.yml`, 00:00 et 05:00 UTC, ou à la main ; un seul passage à la fois) :
 1. a) **Idéation** : moins de 15 idées en attente → un agent lit `node scripts/idees.mjs catalogue` (titre, genre et tags des jeux, effectifs par genre et univers), `idees.json` et les titres de l'archive, puis propose des idées riches pour les genres et univers sous-représentés (source `agent`). Il n'écrit que `nouvelles-idees.json`.
 2. b) **Choix** : idées mises à jour (jeu publié → archive ; `en_cours` sans pull request ouverte → `en_attente`), idées de l'agent ajoutées après contrôle, puis 5 idées `en_cours`. Enregistré sur `main`.
-3. c) **Fabrication** : une tâche par idée, en parallèle (5 au plus) : jeu, jaquette, `game.json` avec le genre et les tags de l'idée, pull request (branche `nouveau-jeu/n<n° du passage>/<id de l'idée>` ; le `n` évite les anciennes branches `nouveau-jeu/2`, `nouveau-jeu/3`…).
-4. d) **Vérification** de chaque pull request de la boucle dont l'idée est `en_cours` (y compris celles restées ouvertes) : robot (`validate-games.mjs --jouer` : chargement, console, téléphone 390 × 844 au toucher, hors ligne, fiche, jaquette, taille ; `idees.mjs controler` : entrée du catalogue), puis relecture par Claude avec la grille de `CONSIGNES-JEU.md` (section 7). Puis, une pull request à la fois : tout est bon → fusion (branche mise à jour si `main` a bougé) ; sinon → commentaire, fermeture, idée remise `en_attente` (+1 essai). Vérification interrompue (limite d'utilisation…) : rien n'est décidé, reprise au passage suivant.
+3. c) **Fabrication** : une tâche par idée, en parallèle (5 au plus) : jeu complet de 20 niveaux au moins, écrit en français avec ses textes dans `i18n-jeu/<id>/fr.json`, puis traduit dans la même session (`en.json`, `es.json`, `pt.json`, `de.json`, d'après `fr.json` seul) ; textes assemblés (`i18n-jeu.mjs --assembler`), traductions contrôlées par `check-i18n.js` (bloquant ; une seule réparation ciblée des fichiers de textes si besoin, sans toucher au code) ; jaquette sans texte, `game.json` avec le genre et les tags de l'idée et `"consignes": 2`, pull request (branche `nouveau-jeu/n<n° du passage>/<id de l'idée>` ; le `n` évite les anciennes branches `nouveau-jeu/2`, `nouveau-jeu/3`…).
+4. d) **Vérification** de chaque pull request de la boucle dont l'idée est `en_cours` (y compris celles restées ouvertes) : robot (`validate-games.mjs --jouer` : chargement, console, téléphone 390 × 844 au toucher, hors ligne, fiche, nombre de niveaux, jaquette, taille ; `check-i18n.js` : 5 langues ; `idees.mjs controler` : entrée du catalogue), puis relecture par Claude avec la grille de `CONSIGNES-JEU.md` (section 7 : jeu complet et non simpliste, jaquette sans texte). Jaquette avec du texte sur un jeu bon : seule la jaquette est refaite (`jaquette-sans-texte.mjs`) et enregistrée sur la branche avant la fusion. Puis, une pull request à la fois : tout est bon → fusion (branche mise à jour si `main` a bougé) ; sinon → commentaire, fermeture, idée remise `en_attente` (+1 essai). Vérification interrompue (limite d'utilisation…) : rien n'est décidé, reprise au passage suivant.
 5. e) **Mise à jour** : idées des jeux fusionnés → `idees-archive.json` (`faite`, `jeu_id`). Enregistré sur `main`. Cloudflare Pages publie à chaque fusion.
 
 Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `idees-archive.json`, jamais les tâches parallèles ; ces enregistrements portent `[CF-Pages-Skip]` (pas de build Cloudflare). Fusion automatique désactivable : variable GitHub `FUSION_AUTO` = `non` (les jeux validés reçoivent l'étiquette `valide` et attendent une fusion à la main). Corrections à la demande : commentaire `@claude` du propriétaire (`corriger-jeu.yml`). Une pull request ouverte ou fusionnée par le robot (jeton `GITHUB_TOKEN`) ne déclenche aucun autre workflow : toute la séquence tient donc dans `boucle-de-nuit.yml`.
@@ -271,7 +277,8 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
 - Genres — 17, dont `action` (ajouté en octobre 2026) ; liste dans `scripts/genres.mjs`, `CONSIGNES-JEU.md`, `public/regroupements.js` (pictogramme, teinte) et le formulaire `.github/ISSUE_TEMPLATE/idee-jeu.yml`.
 - Publicité — préparée, **désactivée** : `public/pub.js` (`PUB_ACTIVE = false`, aucun code de régie), emplacements cachés `#pub` (bas du catalogue) et `#consentement` dans `index.html`, `pub.js` ajouté à la coquille (`VERSION` `v3` dans `sw.js`), `PUBLICITE.md`. Reste : domaine, compte régie, identifiants, outil de consentement, pages légales.
 
-- Internationalisation (5 langues) — fait sur la branche `i18n` : module `public/i18n/i18n.js`, textes du site, sélecteur de langue (en-tête et dans chaque jeu), SEO (`hreflang`, `sitemap.xml`), 29 jeux traduits, jaquettes refaites sans texte (titre traduit affiché en bandeau par le site), `check-i18n.js` bloquant dans `validate.yml`, règles dans `CONSIGNES-JEU.md`. Reste : brancher la traduction dans `boucle-de-nuit.yml` (endroits décrits dans `I18N.md`, section 4), régler `SITE_URL` avec le nom de domaine. Détails : `I18N.md`.
+- Internationalisation (5 langues) — fait sur la branche `i18n` : module `public/i18n/i18n.js`, textes du site, sélecteur de langue (en-tête et dans chaque jeu), SEO (`hreflang`, `sitemap.xml`), 29 jeux traduits, jaquettes refaites sans texte (titre traduit affiché en bandeau par le site), `check-i18n.js` bloquant dans `validate.yml`, règles dans `CONSIGNES-JEU.md`. Reste : régler `SITE_URL` avec le nom de domaine. Détails : `I18N.md`.
+- Traduction et qualité dans la boucle de nuit — fait (branche `boucle-traduction-qualite`) : nouveaux jeux de 20 niveaux au moins (`"consignes": 2`, `window.JEL_NIVEAUX` vérifié par le robot), présentation riche dans `game.json` (meta description de la page du jeu), textes écrits dans `i18n-jeu/<id>/*.json` puis assemblés (`i18n-jeu.mjs --assembler`), traduction dans la même session d'après `fr.json` seul, `check-i18n.js` bloquant avec une seule réparation ciblée, jaquette avec texte refaite seule après la relecture. Reste : premier passage réel de la boucle (lancement manuel, 1 jeu) une fois fusionné.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 

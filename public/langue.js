@@ -56,6 +56,8 @@ function champJeu(jeu, champ) {
 
 export const titreJeu = (jeu) => champJeu(jeu, 'title');
 export const descriptionJeu = (jeu) => champJeu(jeu, 'description');
+/** Présentation de quelques phrases (nouveaux jeux), sinon la description courte. */
+export const presentationJeu = (jeu) => (jeu?.presentation ? champJeu(jeu, 'presentation') : descriptionJeu(jeu));
 
 /** Le jeu est-il proposé dans la langue courante ? (« langues » absent = toutes) */
 export function jeuDisponible(jeu) {

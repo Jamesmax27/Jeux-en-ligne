@@ -107,7 +107,7 @@ async function lireJeu(nomDossier) {
     avertir(nomDossier, 'pas de jaquette (cover.webp) : image par défaut utilisée');
   }
 
-  // --- traductions (titre et description dans les autres langues) ---
+  // --- traductions (titre, description et présentation dans les autres langues) ---
   const i18n = {};
   const traductions = fiche.i18n && typeof fiche.i18n === 'object' ? fiche.i18n : {};
   const manquantes = [];
@@ -115,7 +115,8 @@ async function lireJeu(nomDossier) {
     const t = traductions[lang];
     const title = typeof t?.title === 'string' ? t.title.trim().slice(0, 80) : '';
     const description = typeof t?.description === 'string' ? t.description.trim().slice(0, 200) : '';
-    if (title || description) i18n[lang] = { title, description };
+    const presentation = typeof t?.presentation === 'string' ? t.presentation.trim().slice(0, 1200) : '';
+    if (title || description) i18n[lang] = { title, description, ...(presentation ? { presentation } : {}) };
     if (!title || !description) manquantes.push(lang);
   }
   if (manquantes.length) avertir(nomDossier, `titre ou description non traduits (${manquantes.join(', ')}) dans game.json ("i18n") : le français sera affiché`);
@@ -126,6 +127,8 @@ async function lireJeu(nomDossier) {
     id: fiche.id,
     title: fiche.title.trim().slice(0, 80),
     description: typeof fiche.description === 'string' ? fiche.description.trim().slice(0, 200) : '',
+    // Présentation (quelques phrases) : meta description de la page du jeu ; la carte garde la description courte.
+    ...(typeof fiche.presentation === 'string' && fiche.presentation.trim() ? { presentation: fiche.presentation.trim().slice(0, 1200) } : {}),
     i18n,
     ...(fiche.non_traduisible === true ? { non_traduisible: true } : {}),
     ...(langues.length ? { langues } : {}),
