@@ -199,8 +199,14 @@ async function lireCatalogue() {
 }
 
 async function chargerUnivers() {
-  try { return (await import(pathToFileURL(path.join(RACINE, 'public', 'regroupements.js')).href)).UNIVERS || []; }
+  let univers = [];
+  try { univers = (await import(pathToFileURL(path.join(RACINE, 'public', 'regroupements.js')).href)).UNIVERS || []; }
   catch { return []; }
+  // Nom français de chaque univers : textes du site (clé univers.<id>), sinon son identifiant.
+  let textes = {};
+  try { textes = JSON.parse((await readFile(path.join(RACINE, 'public', 'i18n', 'site', 'fr.json'), 'utf8')).replace(/^﻿/, '')); }
+  catch { /* textes du site absents : identifiants */ }
+  return univers.map((u) => ({ ...u, nom: u.nom || textes[`univers.${u.id}`] || u.id }));
 }
 
 // --------------------------------------------------------------------------
