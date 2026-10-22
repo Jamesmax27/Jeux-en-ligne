@@ -14,7 +14,7 @@
 
 | Élément | Pourquoi | Où il ira |
 | --- | --- | --- |
-| **Un nom de domaine à vous** (par exemple `jeux-en-ligne.fr`), relié au projet Cloudflare Pages (onglet *Custom domains*) | Les régies refusent en général les adresses en `.pages.dev`. | Réglages Cloudflare |
+| **Un nom de domaine à vous** (`freemicrogames.com`), relié au projet Cloudflare Pages (onglet *Custom domains*) | Les régies refusent en général les adresses en `.pages.dev`. | Réglages Cloudflare |
 | **Un compte chez une régie** qui accepte les sites fréquentés par des enfants et les annonces non personnalisées (par exemple Google AdSense, après validation du site) | C'est elle qui fournit et paie les annonces. | — |
 | **Les identifiants donnés par la régie** : identifiant éditeur (chez Google : `ca-pub-…`), identifiant du bloc d'annonce, adresse du script | Ils désignent votre compte et l'emplacement. | `REGIE` dans `public/pub.js` |
 | **La ligne `ads.txt`** donnée par la régie | Elle prouve que les annonces vendues sur votre site viennent bien de vous. | Fichier `public/ads.txt` |

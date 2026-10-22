@@ -1,26 +1,50 @@
 /* ==========================================================================
-   Jeux-en-ligne — feuille de style commune (catalogue + lanceur)
-   Thème « Galaxie » : bleu nuit, gris ardoise, blanc cassé, accent lavande.
-   Pensée mobile d'abord. Animations minimales, coupées si l'appareil
+   Free Micro Games — feuille de style commune (catalogue, lanceur, mentions)
+   Thème « Constellation manette » : un ciel de nuit calme, semé de petites
+   croix de pixels, où une constellation dessine une manette (sa croix et
+   ses deux boutons), derrière l'en-tête seulement. L'emblème est une
+   manette dont les boutons sont une planète or et une étoile ; le nom est un mot-symbole dessiné, le point du i est une
+   étincelle or. Le reste est un instrument d'observation : fond étoilé
+   discret, commandes sombres et nettes, jaquettes sans boîte autour.
+   Deux rôles de couleur seulement : la lavande pour ce qu'on touche, l'or
+   pour ce qui brille (rare : marque, « Nouveau », podium des Tendances,
+   étincelle d'une puce ou d'une tuile choisie). La couleur vient des
+   jaquettes et des teintes des genres et des univers.
+   Les icônes des regroupements parlent la langue du logo : trait rond, et
+   au survol une petite constellation s'allume autour d'elles.
+   Pensée téléphone d'abord. Animations courtes et rares (5 étoiles qui
+   scintillent, icônes au survol ou au choix), toutes coupées si l'appareil
    demande de réduire les mouvements.
    ========================================================================== */
 
 :root {
-  --fond: #0b1020;            /* bleu nuit profond */
-  --fond-haut: #111934;       /* haut de page, à peine plus clair */
-  --surface: #161f38;         /* cartes, champs, boutons */
-  --surface-2: #1d2745;       /* surface au survol */
-  --trait: #2c3650;           /* gris ardoise : séparateurs */
-  --trait-fort: #434e6b;      /* contours des boutons et des champs */
-  --liseré: rgba(236, 234, 228, .07);
-  --encre: #eceae4;           /* blanc cassé : texte principal */
-  --encre-douce: #a3adc2;     /* ardoise clair : texte secondaire */
-  --accent: #a8b3f0;          /* bleu lavande : sélection, focus */
-  --accent-encre: #0b1020;    /* texte posé sur l'accent */
-  --ombre: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 22px -12px rgba(0, 0, 0, .7);
-  --ombre-haute: 0 2px 4px rgba(0, 0, 0, .3), 0 16px 32px -14px rgba(0, 0, 0, .8);
-  --rayon: 16px;
-  --police: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+  --nuit: #0b1020;              /* fond de page (= manifeste, theme-color, logo) */
+  --nuit-profonde: #070a14;     /* bandeau du titre, plaques des badges et du rang */
+  --surface: #161f38;           /* champs, tuiles, menu de langue, fiches */
+  --surface-relevee: #1d2745;   /* survol */
+  --surface-choisie: #2c3656;   /* tuile, portée, langue choisies */
+  --trait: #2c3650;             /* contour des puces « zéro », filets secondaires */
+  --orbite: #5a6688;            /* contours des commandes (3,3:1 sur la nuit) */
+  --lisere: rgba(236, 234, 228, .12);          /* liseré des tuiles, fiches, menu */
+  --lisere-jaquette: rgba(236, 234, 228, .13); /* cadre intérieur des jaquettes */
+  --craie: #eceae4;             /* texte principal */
+  --craie-douce: #a3adc2;       /* texte secondaire, icônes au trait */
+  --craie-faible: #8792ab;      /* états « zéro » et « Bientôt » (au lieu d'une opacité) */
+  --lavande: #a8b3f0;           /* ce qu'on touche : focus, choix, liens, bouton plein */
+  --or: #f2d27a;                /* ce qui brille : ✦ Nouveau, podium des Tendances */
+  --jaquette-fond: #111830;     /* jaquette en chargement (= sans-jaquette.svg) */
+
+  /* Une seule ombre, pour ce qui flotte au-dessus de la page. */
+  --ombre-flottante: 0 10px 30px rgba(0, 0, 0, .45);
+
+  /* Rayons hiérarchisés : plaques > commandes > étiquettes ; pilule réservée
+     aux puces et aux filtres actifs, cercle aux boutons ronds et à la coche. */
+  --r-plaque: 14px;
+  --r-commande: 12px;
+  --r-etiquette: 7px;
+
+  /* Polices système seulement (aucun fichier à charger) : arrondie sur Apple. */
+  --police: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
 
   /* Pouce au trait (compteurs des jaquettes), utilisé comme masque. */
   --icone-pouce: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 10.5v9.5M7 10.5l3.4-6.2a1.9 1.9 0 0 1 3.6.9V9h4.4a2 2 0 0 1 2 2.4l-1.3 6.7a2.3 2.3 0 0 1-2.3 1.9H4.8A1.8 1.8 0 0 1 3 18.2v-5.9a1.8 1.8 0 0 1 1.8-1.8z'/%3E%3C/svg%3E");
@@ -28,20 +52,39 @@
   --icone-globe: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z'/%3E%3C/svg%3E");
   /* Horloge au trait (temps joué, Tendances) */
   --icone-horloge: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");
+  /* Croix au trait (effacer la recherche) */
+  --icone-croix: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E");
+  /* Petite manette pleine, croix découpée : la silhouette de l'emblème
+     (messages vides du catalogue et du lanceur). */
+  --icone-manette: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='4 14 56 38'%3E%3Cpath fill-rule='evenodd' d='M32 16H45C51.5 16 55.6 20 56.6 26C57.8 33 59 39 58 43C57 48 50.6 49.6 47 46C44.6 43.6 42.6 40 39 40H25C21.4 40 19.4 43.6 17 46C13.4 49.6 7 48 6 43C5 39 6.2 33 7.4 26C8.4 20 12.5 16 19 16ZM16.6 21.6Q16.6 20.5 17.7 20.5H20.3Q21.4 20.5 21.4 21.6V25.1H24.9Q26 25.1 26 26.2V28.8Q26 29.9 24.9 29.9H21.4V33.4Q21.4 34.5 20.3 34.5H17.7Q16.6 34.5 16.6 33.4V29.9H13.1Q12 29.9 12 28.8V26.2Q12 25.1 13.1 25.1H16.6Z'/%3E%3C/svg%3E");
+
+  /* Constellation de l'en-tête (v2-outils/dessins.mjs) : une manette, en
+     trois tailles. Étoiles craie, traits lavande qui s'arrêtent avant chaque
+     étoile. Traits à 34 %, 42 % pour les deux petites (téléphone). */
+  --ciel-manette: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='136' height='78.8' viewBox='0 0 136 78.8'%3E%3Cg fill='none' stroke='%23a8b3f0' stroke-opacity='0.34' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M26.98 11.17L64.82 15.63M71.18 15.63L109.02 11.17M113.81 13.56L128.79 39.24M129.26 44.99L121.14 66.31M117.34 67.52L91.46 50.28M85.6 48.5L50.4 48.5M44.54 50.28L18.66 67.52M14.86 66.31L6.74 44.99M7.21 39.24L22.19 13.56M34.2 29.7L34.2 23.8M37.4 32.9L43.3 32.9M34.2 36.1L34.2 42M31 32.9L25.1 32.9'/%3E%3Ccircle cx='94' cy='38.1' r='5.46'/%3E%3Ccircle cx='107' cy='26.4' r='5.46'/%3E%3C/g%3E%3Cg fill='%23eceae4'%3E%3Ccircle cx='23.8' cy='10.8' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='23.8' cy='10.8' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='68' cy='16' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='112.2' cy='10.8' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='112.2' cy='10.8' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='130.4' cy='42' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='120' cy='69.3' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='120' cy='69.3' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='88.8' cy='48.5' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='47.2' cy='48.5' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='16' cy='69.3' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='16' cy='69.3' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='5.6' cy='42' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='34.2' cy='32.9' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='94' cy='38.1' r='1.3' fill-opacity='.75'/%3E%3Ccircle cx='107' cy='26.4' r='1.3' fill-opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
+  --ciel-manette-petite: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='42.96' viewBox='0 0 72 42.96'%3E%3Cg fill='none' stroke='%23a8b3f0' stroke-opacity='0.42' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M16.74 7.33L32.82 9.23M39.18 9.23L55.26 7.33M60.05 9.72L66.07 20.04M66.54 25.79L63.54 33.67M59.74 34.88L49.22 27.88M43.36 26.1L28.64 26.1M22.78 27.88L12.26 34.88M8.46 33.67L5.46 25.79M5.93 20.04L11.95 9.72M18.84 14.98L18.84 13.56M22.04 18.18L23.46 18.18M18.84 21.38L18.84 22.8M15.64 18.18L14.22 18.18'/%3E%3Ccircle cx='49.2' cy='20.82' r='3.36'/%3E%3Ccircle cx='55.8' cy='14.88' r='3.36'/%3E%3C/g%3E%3Cg fill='%23eceae4'%3E%3Ccircle cx='13.56' cy='6.96' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='13.56' cy='6.96' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='36' cy='9.6' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='58.44' cy='6.96' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='58.44' cy='6.96' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='67.68' cy='22.8' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='62.4' cy='36.66' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='62.4' cy='36.66' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='46.56' cy='26.1' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='25.44' cy='26.1' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='9.6' cy='36.66' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='9.6' cy='36.66' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='4.32' cy='22.8' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='18.84' cy='18.18' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='49.2' cy='20.82' r='1.3' fill-opacity='.75'/%3E%3Ccircle cx='55.8' cy='14.88' r='1.3' fill-opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
+  --ciel-manette-mini: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='66' height='39.6' viewBox='0 0 66 39.6'%3E%3Cg fill='none' stroke='%23a8b3f0' stroke-opacity='0.42' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M15.78 6.97L29.82 8.63M36.18 8.63L50.22 6.97M55.01 9.36L60.19 18.24M60.66 23.99L58.14 30.61M54.34 31.82L45.26 25.78M39.4 24L26.6 24M20.74 25.78L11.66 31.82M7.86 30.61L5.34 23.99M5.81 18.24L10.99 9.36'/%3E%3Ccircle cx='45' cy='19.2' r='3.36'/%3E%3Ccircle cx='51' cy='13.8' r='3.36'/%3E%3C/g%3E%3Cg fill='%23eceae4'%3E%3Ccircle cx='12.6' cy='6.6' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='12.6' cy='6.6' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='33' cy='9' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='53.4' cy='6.6' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='53.4' cy='6.6' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='61.8' cy='21' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='57' cy='33.6' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='57' cy='33.6' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='42.6' cy='24' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='23.4' cy='24' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='9' cy='33.6' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='9' cy='33.6' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='4.2' cy='21' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='17.4' cy='16.8' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='45' cy='19.2' r='1.3' fill-opacity='.75'/%3E%3Ccircle cx='51' cy='13.8' r='1.3' fill-opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
+  /* Étoiles de jeu vidéo : 5 petites croix de pixels (motif 509 × 433). */
+  --etoiles-jeu: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='509' height='433' shape-rendering='crispEdges'%3E%3Cpath d='M62 88.5h2M65 88.5h2M64.5 86v2M64.5 89v2' stroke='%23eceae4' stroke-opacity='0.33'/%3E%3Crect x='64' y='88' width='1' height='1' fill='%23eceae4' fill-opacity='0.9'/%3E%3Cpath d='M310 43.5h2M313 43.5h2M312.5 41v2M312.5 44v2' stroke='%23eceae4' stroke-opacity='0.28'/%3E%3Crect x='312' y='43' width='1' height='1' fill='%23eceae4' fill-opacity='0.8'/%3E%3Cpath d='M199 276.5h2M202 276.5h2M201.5 274v2M201.5 277v2' stroke='%23eceae4' stroke-opacity='0.3'/%3E%3Crect x='201' y='276' width='1' height='1' fill='%23eceae4' fill-opacity='0.85'/%3E%3Cpath d='M419 190.5h2M422 190.5h2M421.5 188v2M421.5 191v2' stroke='%23a8b3f0' stroke-opacity='0.33'/%3E%3Crect x='421' y='190' width='1' height='1' fill='%23a8b3f0' fill-opacity='0.9'/%3E%3Cpath d='M128 371.5h2M131 371.5h2M130.5 369v2M130.5 372v2' stroke='%23eceae4' stroke-opacity='0.25'/%3E%3Crect x='130' y='371' width='1' height='1' fill='%23eceae4' fill-opacity='0.75'/%3E%3C/svg%3E");
+
   color-scheme: dark;
 }
+
+/* Un élément caché par le JS reste caché, même si une classe lui donne un display. */
+[hidden] { display: none !important; }
 
 * { box-sizing: border-box; }
 
 html, body { margin: 0; }
 
 body {
-  /* Le fond passe au « canevas » de la page : les étoiles se dessinent par-dessus.
-     Légère lueur en haut, éteinte avant la barre de filtres (pas de marche visible). */
-  background: radial-gradient(130% 150px at 50% 0, var(--fond-haut), transparent) no-repeat, var(--fond);
-  color: var(--encre);
+  /* Fond posé sur body seulement (pas sur html) : il passe au « canevas » de la
+     page, et les étoiles (z-index: -1) se dessinent par-dessus. */
+  background: var(--nuit);
+  color: var(--craie);
   font-family: var(--police);
   font-size: 16px;
+  font-weight: 500;
   line-height: 1.45;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
@@ -49,8 +92,10 @@ body {
 
 a { color: inherit; }
 
+/* Contour de focus : 4 px hors de l'élément, il tient dans le rembourrage
+   des rangées et des Tendances qui défilent. */
 :focus-visible {
-  outline: 3px solid var(--accent);
+  outline: 2px solid var(--lavande);
   outline-offset: 2px;
 }
 
@@ -61,8 +106,9 @@ a { color: inherit; }
 
 /* --------------------------------------------------------------------------
    Champ d'étoiles fixe (CSS seul)
-   Deux calques de motifs de tailles différentes, pour que la répétition ne
-   se voie pas. Seul le second scintille, très doucement (opacité seulement).
+   Deux motifs de tailles premières entre elles (211 et 347 px) pour que la
+   répétition ne se voie pas, environ 60 étoiles par écran. Seul le second
+   calque scintille, très lentement (opacité seulement).
    -------------------------------------------------------------------------- */
 
 body::before,
@@ -74,55 +120,84 @@ body::after {
   pointer-events: none;
 }
 
-/* Étoiles fines, immobiles */
+/* Étoiles fines, immobiles (dont une lavande). Aucune étoile or : l'or reste
+   réservé à « Nouveau », au podium des Tendances et à la marque (planète de
+   l'emblème, point du i). */
 body::before {
   background-image:
-    radial-gradient(1px 1px at 23px 41px, rgba(236, 234, 228, .55), transparent),
-    radial-gradient(1px 1px at 87px 152px, rgba(236, 234, 228, .4), transparent),
-    radial-gradient(1.2px 1.2px at 141px 22px, rgba(236, 234, 228, .6), transparent),
-    radial-gradient(1px 1px at 198px 233px, rgba(236, 234, 228, .45), transparent),
+    radial-gradient(1px 1px at 23px 41px, rgba(236, 234, 228, .5), transparent),
+    radial-gradient(1px 1px at 97px 152px, rgba(236, 234, 228, .35), transparent),
+    radial-gradient(1.2px 1.2px at 151px 22px, rgba(236, 234, 228, .55), transparent),
+    radial-gradient(1px 1px at 188px 183px, rgba(236, 234, 228, .3), transparent),
+    radial-gradient(1px 1px at 52px 118px, rgba(168, 179, 240, .45), transparent),
+    radial-gradient(1px 1px at 41px 233px, rgba(236, 234, 228, .4), transparent),
     radial-gradient(1.3px 1.3px at 262px 97px, rgba(236, 234, 228, .55), transparent),
-    radial-gradient(1px 1px at 52px 268px, rgba(236, 234, 228, .4), transparent),
-    radial-gradient(.8px .8px at 176px 121px, rgba(236, 234, 228, .45), transparent),
-    radial-gradient(1px 1px at 283px 203px, rgba(168, 179, 240, .5), transparent),
-    radial-gradient(1px 1px at 118px 291px, rgba(236, 234, 228, .35), transparent);
-  background-size: 310px 310px;
+    radial-gradient(1px 1px at 176px 301px, rgba(236, 234, 228, .3), transparent),
+    radial-gradient(1px 1px at 309px 203px, rgba(236, 234, 228, .35), transparent),
+    radial-gradient(1px 1px at 118px 61px, rgba(236, 234, 228, .45), transparent),
+    radial-gradient(1.4px 1.4px at 221px 166px, rgba(236, 234, 228, .5), transparent);
+  background-size:
+    211px 211px, 211px 211px, 211px 211px, 211px 211px, 211px 211px,
+    347px 347px, 347px 347px, 347px 347px, 347px 347px, 347px 347px, 347px 347px;
 }
 
-/* Étoiles un peu plus visibles, qui scintillent */
+/* Cinq étoiles de jeu vidéo, un peu plus visibles, qui scintillent : de
+   petites croix de pixels (5 px), comme les étoiles des vieux jeux. */
 body::after {
-  background-image:
-    radial-gradient(1.4px 1.4px at 64px 88px, rgba(236, 234, 228, .8), transparent),
-    radial-gradient(1.2px 1.2px at 312px 43px, rgba(236, 234, 228, .7), transparent),
-    radial-gradient(1.5px 1.5px at 201px 276px, rgba(236, 234, 228, .75), transparent),
-    radial-gradient(1.2px 1.2px at 421px 190px, rgba(168, 179, 240, .7), transparent),
-    radial-gradient(1.3px 1.3px at 130px 371px, rgba(236, 234, 228, .65), transparent),
-    radial-gradient(1.4px 1.4px at 383px 334px, rgba(236, 234, 228, .7), transparent);
-  background-size: 470px 410px;
-  animation: scintiller 7s ease-in-out infinite alternate;
+  background-image: var(--etoiles-jeu);
+  background-size: 509px 433px;
+  animation: scintiller 9s ease-in-out infinite alternate;
 }
 
 @keyframes scintiller {
-  from { opacity: .55; }
+  from { opacity: .5; }
   to   { opacity: 1; }
 }
 
 /* --------------------------------------------------------------------------
-   En-tête du catalogue
+   En-tête : marque, langue, recherche, et les constellations derrière
    -------------------------------------------------------------------------- */
 
-/* Accueil compact : en-tête et tuiles serrés pour que les premières jaquettes
-   apparaissent en bas de l'écran dès l'arrivée, surtout sur téléphone. */
+/* Accueil compact : l'en-tête tient en 116 px sur téléphone. --deborde laisse
+   le ciel aller jusqu'au bord gauche de l'écran quand le site est plus étroit
+   que la fenêtre. */
 .entete {
-  padding: 12px 16px 4px;
+  --deborde: min(0px, (1200px - 100vw) / 2);
+  position: relative;
   max-width: 1200px;
   margin: 0 auto;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 6px max(16px, env(safe-area-inset-left));
 }
 
-/* Marque à gauche, sélecteur de langue à droite */
+/* Le ciel de l'en-tête : une constellation qui dessine une manette (sa croix
+   et ses deux boutons). Étoiles craie, traits lavande très fins qui
+   s'arrêtent avant chaque étoile, comme sur une carte du ciel. La figure est
+   une petite image (--ciel-manette…, trois tailles), posée dans un vide de
+   l'en-tête selon la largeur de l'écran, jamais sous un texte (placement à
+   la fin de cette section).
+   Derrière le contenu (z-index: -1 sans contexte d'empilement sur .entete).
+   Il descend 50 px sous l'en-tête, jusque dans les jaquettes des Tendances
+   (34 px sous l'en-tête), et s'efface sur ses 30 derniers px : la manette,
+   calée sur le bas de l'en-tête, suit sa hauteur (slogan sur 1 ou 2
+   lignes). À droite il s'arrête au bord de l'en-tête : aucun défilement
+   horizontal. */
+.entete::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: -50px;
+  left: var(--deborde);
+  right: 0;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 calc(100% - 30px), transparent);
+  mask: linear-gradient(#000 calc(100% - 30px), transparent);
+}
+
+/* Marque à gauche, sélecteur de langue à droite. */
 .entete-haut {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   margin: 0 0 10px;
@@ -134,67 +209,139 @@ body::after {
   gap: 10px;
   min-width: 0;
   margin: 0;
-  font-size: clamp(21px, 5vw, 30px);
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  color: var(--craie);
+  font-size: 16px;
+  font-weight: 800;
   line-height: 1.1;
 }
 
+/* Emblème : la manette-planète (cadrée sur la manette, 56 × 38). */
 .marque-logo {
-  width: 1.55em;
-  height: 1.55em;
   flex: none;
+  width: 44px;
+  height: 30px;
+}
+
+/* Mot-symbole « Free Micro Games » : lettres dessinées (aucune police à
+   charger, même dessin sur tous les appareils), couleur du texte, point du i
+   en étoile or. Le nom reste un vrai texte pour les lecteurs d'écran
+   (span.sr-only juste avant). */
+.marque-mot {
+  display: block;
+  height: 21px;
+  width: auto;
+  aspect-ratio: 296.5 / 32;
+  overflow: visible;
 }
 
 .marque small {
   display: block;
-  font-size: 12.5px;
+  margin-top: 4px;
+  color: var(--craie-douce);
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
-  color: var(--encre-douce);
-  margin-top: 2px;
+  line-height: 1.3;
 }
 
-/* Sélecteur de langue (créé par i18n/i18n.js) : code de la langue, et son nom
-   sur grand écran. La liste s'ouvre vers la gauche, sous le bouton. */
+/* Mentions légales : la marque est un lien vers l'accueil. */
+.marque-lien {
+  text-decoration: none;
+  color: inherit;
+  border-radius: 12px;
+}
+
+/* Très petit écran : marque un peu plus petite, pour laisser sa place au
+   bouton de langue. */
+@media (max-width: 359px) {
+  .marque { gap: 8px; }
+  .marque-logo { width: 38px; height: 26px; }
+  .marque-mot { height: 17px; }
+}
+
+/* Sélecteur de langue (créé par i18n/i18n.js, dont le CSS est injecté après
+   cette feuille) : chaque règle a une spécificité plus forte que la sienne.
+   Code de la langue, et son nom sur grand écran ; la liste s'ouvre vers la
+   gauche, sous le bouton. */
 .entete-langue { flex: none; }
+
+.jel-langue.selecteur-site {
+  font-family: var(--police);
+  font-weight: 500;
+}
 
 .selecteur-site .jel-langue-bouton {
   min-height: 44px;
-  padding: 0 14px;
-  border: 1.5px solid var(--trait-fort);
+  padding: 0 12px;
+  border: 1.5px solid var(--orbite);
+  border-radius: var(--r-commande);
   background: var(--surface);
-  color: var(--encre);
-  font-family: var(--police);
+  color: var(--craie);
+  font-family: inherit;
   font-size: 14px;
+  font-weight: 700;
+  transition: border-color .15s ease;
 }
 
 .selecteur-site .jel-langue-bouton::before {
   content: "";
   width: 17px;
   height: 17px;
-  background: var(--accent);
+  background: var(--craie-douce);
   -webkit-mask: var(--icone-globe) center / contain no-repeat;
   mask: var(--icone-globe) center / contain no-repeat;
+}
+
+.selecteur-site .jel-langue-code {
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .selecteur-site .jel-langue-nom { display: none; }
 
 .selecteur-site .jel-langue-menu {
   right: 0;
-  font-family: var(--police);
+  padding: 6px;
+  border: 1px solid rgba(236, 234, 228, .12);
+  border-radius: var(--r-commande);
+  background: var(--surface);
+  box-shadow: var(--ombre-flottante);
+  font-family: inherit;
+}
+
+.selecteur-site .jel-langue-menu button {
+  border-radius: 8px;
+  color: var(--craie);
+}
+
+.selecteur-site .jel-langue-menu button b { color: var(--lavande); }
+
+.selecteur-site .jel-langue-menu button:hover:not([aria-current="true"]),
+.selecteur-site .jel-langue-menu button:focus-visible {
+  background: var(--surface-relevee);
+}
+
+/* Langue en cours : surface choisie et anneau lavande (pas d'aplat). */
+.selecteur-site .jel-langue-menu button[aria-current="true"] {
+  background: var(--surface-choisie);
+  color: var(--craie);
+  box-shadow: inset 0 0 0 1.5px var(--lavande);
+}
+
+.selecteur-site .jel-langue-menu button[aria-current="true"] b { color: var(--lavande); }
+
+.jel-langue.selecteur-site :focus-visible {
+  outline: 2px solid var(--lavande);
+  outline-offset: 2px;
 }
 
 @media (min-width: 720px) {
-  .selecteur-site .jel-langue-nom { display: inline; font-weight: 500; color: var(--encre-douce); }
-}
-
-@media (hover: hover) {
-  .selecteur-site .jel-langue-bouton:hover { border-color: var(--encre-douce); }
+  .selecteur-site .jel-langue-nom { display: inline; font-weight: 500; color: var(--craie-douce); }
 }
 
 .recherche {
   position: relative;
+  display: block;
 }
 
 .recherche svg {
@@ -204,7 +351,7 @@ body::after {
   transform: translateY(-50%);
   width: 18px;
   height: 18px;
-  color: var(--encre-douce);
+  color: var(--craie-douce);
   pointer-events: none;
 }
 
@@ -212,32 +359,287 @@ body::after {
 .recherche input {
   width: 100%;
   height: 44px;
-  padding: 0 14px 0 40px;
-  border: 1.5px solid var(--trait-fort);
-  border-radius: 999px;
+  padding: 0 14px 0 42px;
+  border: 1.5px solid var(--orbite);
+  border-radius: var(--r-commande);
   background: var(--surface);
-  color: var(--encre);
+  color: var(--craie);
   font: inherit;
   font-size: 16px;
+  transition: border-color .15s ease;
 }
 
 .recherche input::placeholder {
-  color: var(--encre-douce);
+  color: var(--craie-douce);
   opacity: 1;
 }
 
+/* Focus : bordure et anneau lavande (le champ remplace le contour global). */
 .recherche input:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--lavande);
+  box-shadow: 0 0 0 1px var(--lavande);
+}
+
+/* Bouton d'effacement (WebKit, Blink) : la même croix au trait que nos icônes. */
+.recherche input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--craie-douce);
+  -webkit-mask: var(--icone-croix) center / contain no-repeat;
+  mask: var(--icone-croix) center / contain no-repeat;
+  cursor: pointer;
+}
+
+/* Ordinateur : marque, recherche et langue sur une seule ligne. */
+@media (min-width: 720px) {
+  .entete {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px 24px;
+  }
+  .entete-haut { display: contents; }
+  .marque { grid-column: 1; grid-row: 1; gap: 12px; }
+  .marque-logo { width: 53px; height: 36px; }
+  .marque-mot { height: 26px; }
+  .recherche { grid-column: 2; grid-row: 1; max-width: 520px; }
+  .entete-langue { grid-column: 3; grid-row: 1; }
+}
+
+/* Contraste élevé (couleurs forcées) : le corps du mot-symbole suit déjà la
+   couleur du texte (currentColor) ; l'étincelle or du i aussi, sinon elle
+   disparaîtrait sur un fond système clair. */
+@media (forced-colors: active) {
+  .marque-etincelle { fill: CanvasText; }
+}
+
+/* --- Placement de la constellation ---------------------------------------
+   Une seule figure par écran : la manette (relecture du directeur
+   artistique). L'étoile bonus et le cœur des premiers essais sont retirés :
+   près du nom, l'étoile bonus faisait concurrence à l'étincelle or du i ;
+   au milieu de l'ordinateur, elle flottait sans appui.
+   - ordinateur (dès 1 200 px) : la grande manette entre la recherche et la
+     langue, sur toutes les pages (la recherche s'arrête à 520 px et laisse
+     ce vide ; sur les mentions, il n'y a pas de recherche). Aucun besoin de
+     :has() : elle s'affiche aussi sur les navigateurs plus anciens ;
+   - avec :has() (Firefox 121, Safari 15.4 et plus récents) :
+     - téléphone (dès 360 px) : une petite manette à droite du titre
+       « Tendances », calée sur le bas de l'en-tête. En dessous de 360 px,
+       il n'y a pas de vide : seules les étoiles du fond ;
+     - ordinateur de 720 à 1 199 px : la petite manette à droite de la
+       bande sous la recherche ; sur les mentions, la grande manette entre
+       la marque et la langue ;
+     - sans Tendances (hors connexion…), les tuiles des raccourcis viennent
+       juste sous la recherche : la petite manette, qui serait cachée
+       derrière, s'efface ; sur les mentions (téléphone), rien non plus. */
+@media (min-width: 1200px) {
+  .entete::before {
+    background: var(--ciel-manette) no-repeat right 168px top 0;
+  }
+}
+
+@supports selector(:has(*)) {
+  /* 360 à 389 px : une manette plus petite, pour rester à droite du titre. */
+  @media (min-width: 360px) and (max-width: 719px) {
+    .entete::before {
+      background: var(--ciel-manette-mini) no-repeat right 10px bottom 16px;
+    }
+  }
+
+  @media (min-width: 390px) and (max-width: 719px) {
+    .entete::before {
+      background: var(--ciel-manette-petite) no-repeat right 12px bottom 14px;
+    }
+  }
+
+  /* Sous-titre des Tendances plus long : il irait jusqu'à la manette.
+     Allemand entre 360 et 389 px, espagnol entre 360 et 374 px (le
+     portugais et le français laissent un vide). lang est posé sur <html>
+     par i18n.js. */
+  @media (min-width: 360px) and (max-width: 389px) {
+    html:lang(de) .entete::before { background: none; }
+  }
+
+  @media (min-width: 360px) and (max-width: 374px) {
+    html:lang(es) .entete::before { background: none; }
+  }
+
+  /* Bande sous la recherche (y 57 à 98) : la petite manette à droite (top
+     50 px : son fondu s'achève avant le haut des jaquettes des Tendances). */
+  @media (min-width: 720px) and (max-width: 1199px) {
+    .entete::before {
+      background: var(--ciel-manette-petite) no-repeat right 20px top 50px;
+    }
+    /* Mentions légales : rien entre la marque et la langue, la grande manette s'y met. */
+    .entete:not(:has(.recherche))::before {
+      background: var(--ciel-manette) no-repeat right 168px top 0;
+    }
+  }
+
+  @media (max-width: 1199px) {
+    .entete:has(+ .tendances[hidden])::before { background: none; }
+  }
+
+  @media (max-width: 719px) {
+    .entete:not(:has(.recherche))::before { background: none; }
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Titres des rubriques (Tendances, âges, genres, univers)
+   -------------------------------------------------------------------------- */
+
+.groupe-tete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+}
+
+.groupe-tete h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.groupe-tete h2 small {
+  margin-left: 6px;
+  color: var(--craie-douce);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* --------------------------------------------------------------------------
+   Tendances : les jeux les plus joués de la semaine, en haut de l'accueil.
+   Une seule bande de jaquettes qui défile (barre fine avec une souris).
+   Rang sur une plaque sombre en haut à gauche, en or pour le podium.
+   -------------------------------------------------------------------------- */
+
+.tendances {
+  max-width: 1200px;
+  margin: 4px auto 4px;
+}
+
+/* Le rembourrage vertical laisse la place au contour de focus (5 px). */
+.tendances-liste {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 116px;
+  gap: 10px;
+  margin: 0;
+  padding: 6px 16px 8px;
+  list-style: none;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 16px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.tendances-liste::-webkit-scrollbar { display: none; }
+.tendances-liste > li { scroll-snap-align: start; }
+
+@media (hover: hover) and (pointer: fine) {
+  .tendances-liste {
+    padding-bottom: 12px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--orbite) transparent;
+  }
+  .tendances-liste::-webkit-scrollbar { display: block; height: 8px; }
+  .tendances-liste::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--orbite); }
+}
+
+.carte-tendance .carte-titre {
+  padding: 16px 7px 7px;
+  background: linear-gradient(rgba(7, 10, 20, 0), rgba(7, 10, 20, .88) 14px);
+  font-size: 13px;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.carte-tendance .carte-texte { padding: 6px 2px 0; }
+
+.carte-tendance .badge-nouveau {
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+}
+
+.carte-tendance .carte-infos {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--craie-douce);
+}
+
+.tendance-rang {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid rgba(236, 234, 228, .14);
+  border-radius: var(--r-etiquette);
+  background: rgba(7, 10, 20, .8);
+  color: var(--craie);
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* Podium : les trois premiers rangs en or. */
+.tendances-liste > li:nth-child(-n+3) .tendance-rang { color: var(--or); }
+
+/* Temps total joué cette semaine, avec une horloge au trait. */
+.tendance-temps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 1px;
+  color: var(--craie);
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.tendance-temps::before {
+  content: "";
+  flex: none;
+  width: 13px;
+  height: 13px;
+  background: var(--craie-douce);
+  -webkit-mask: var(--icone-horloge) center / contain no-repeat;
+  mask: var(--icone-horloge) center / contain no-repeat;
+}
+
+@media (min-width: 720px) {
+  .tendances-liste {
+    grid-auto-columns: 140px;
+    gap: 12px;
+  }
+  .carte-tendance .carte-titre { font-size: 14px; }
 }
 
 /* --------------------------------------------------------------------------
    Regroupements : tuiles (raccourcis, âge) et puces (genres, univers)
-   Chaque tuile ou puce reçoit sa teinte (--teinte, 0 à 360) depuis app.js :
-   un fond sombre légèrement coloré, comme une nébuleuse. La sélection garde
-   l'accent lavande. Genres et univers : 2 rangées de petites puces chacun,
-   sur téléphone comme sur ordinateur ; une rangée qui ne tient pas défile
-   horizontalement (jamais de 3e ligne).
+   Les tuiles restent neutres : seule leur icône a une teinte (section
+   « Icônes » en fin de fichier). Les puces portent la couleur
+   de leur genre ou de leur univers dans leur contour et leur nombre de jeux
+   (--teinte, posée par app.js depuis taxonomie.js : un angle OKLCH, pour que
+   toutes les teintes aient la même clarté). La sélection garde la lavande.
+   Genres et univers : 2 rangées de petites puces chacun ; une rangée qui ne
+   tient pas défile horizontalement (jamais de 3e ligne).
    -------------------------------------------------------------------------- */
 
 .explorer {
@@ -245,29 +647,7 @@ body::after {
   margin: 0 auto;
 }
 
-.groupe { margin-top: 4px; }
-
-.groupe-tete {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 24px;
-  padding: 0 16px;
-}
-
-.groupe-tete h2 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-}
-
-.groupe-tete h2 small {
-  margin-left: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--encre-douce);
-}
+.groupe { margin-top: 6px; }
 
 /* Le rembourrage laisse la place au contour de focus et à la coche. */
 .tuiles {
@@ -284,12 +664,22 @@ body::after {
 .tuiles-ages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 @media (min-width: 720px) {
-  .tuiles-raccourcis { grid-template-columns: repeat(3, minmax(0, 200px)); }
-  .tuiles-ages { grid-template-columns: repeat(4, minmax(0, 150px)); }
+  .tuiles-raccourcis { grid-template-columns: repeat(3, minmax(0, 170px)); }
+  .tuiles-ages { grid-template-columns: repeat(4, minmax(0, 130px)); }
+}
+
+/* Grand écran : raccourcis et âges côte à côte, genres et univers en dessous. */
+@media (min-width: 900px) {
+  .explorer {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 24px;
+  }
+  .explorer > .tuiles-raccourcis { align-self: end; }
+  .explorer > .groupe ~ .groupe { grid-column: 1 / -1; }
 }
 
 .tuile {
-  --teinte: 230;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -297,22 +687,21 @@ body::after {
   justify-content: center;
   gap: 0;
   min-width: 0;
-  min-height: 56px;
-  padding: 4px 4px 5px;
-  border: 1.5px solid hsl(var(--teinte) 35% 40% / .45);
-  border-radius: 11px;
-  background: linear-gradient(160deg, hsl(var(--teinte) 38% 24%), hsl(var(--teinte) 32% 14%));
-  box-shadow: var(--ombre);
-  color: var(--encre);
+  min-height: 54px;
+  padding: 3px 2px;              /* « Ouvre un jeu une fois » tient sur une ligne à 390 px */
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-plaque);
+  background: var(--surface);
+  color: var(--craie);
   font: inherit;
   text-align: center;
   cursor: pointer;
-  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+  transition: border-color .15s ease, background-color .15s ease, transform .12s ease;
 }
 
 .tuile-picto {
-  font-size: 19px;
-  line-height: 1.15;
+  font-size: 18px;
+  line-height: 1.1;
 }
 
 /* Noms longs (allemand…) : coupés avec un trait d'union plutôt que débordés. */
@@ -327,48 +716,25 @@ body::after {
 }
 
 .tuile-compte {
-  font-size: 10.5px;
-  font-weight: 600;
+  color: var(--craie-douce);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
   line-height: 1.2;
-  color: var(--encre-douce);
 }
 
 .tuile:active:not(:disabled) { transform: scale(.96); }
 
-/* Tuile choisie : contour lavande et coche */
-.tuile[aria-pressed="true"] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px var(--accent), var(--ombre);
-  background: linear-gradient(160deg, hsl(var(--teinte) 48% 33%), hsl(var(--teinte) 40% 20%));
-}
+/* Aucun jeu avec les autres filtres choisis : plus discret, mais lisible
+   (couleurs plus douces plutôt qu'une opacité qui ferait tomber le contraste). */
+.tuile-zero .tuile-nom { color: var(--craie-douce); }
+.tuile-zero .tuile-compte { color: var(--craie-faible); }
+.tuile-zero .tuile-picto { opacity: .6; }
 
-.tuile[aria-pressed="true"] .tuile-compte { color: var(--encre); }
-
-.tuile[aria-pressed="true"]::after {
-  content: "✓";
-  position: absolute;
-  top: 3px;
-  right: 3px;
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-encre);
-  font-size: 10px;
-  font-weight: 800;
-}
-
-/* Aucun jeu avec les autres filtres choisis */
-.tuile-zero { opacity: .5; }
-
-/* Regroupement encore vide : grisé, en pointillés, pas cliquable */
+/* Regroupement encore vide (« Bientôt ») : pointillés, pas cliquable. */
 .tuile-bientot {
-  border-style: dashed;
-  border-color: var(--trait-fort);
-  background: rgba(22, 31, 56, .6);
-  box-shadow: none;
+  border: 1px dashed var(--orbite);
+  background: transparent;
   cursor: default;
 }
 
@@ -377,31 +743,79 @@ body::after {
   opacity: .45;
 }
 
-.tuile-bientot .tuile-nom { color: var(--encre-douce); }
-.tuile-bientot .tuile-compte { font-style: italic; }
+.tuile-bientot .tuile-nom { color: var(--craie-douce); }
+.tuile-bientot .tuile-compte { color: var(--craie-faible); }
 
-/* Genres et univers : 2 rangées de petites puces. Chaque rangée reste sur une
-   ligne et défile horizontalement si elle ne tient pas (téléphone, allemand…).
-   Le rembourrage vertical de la rangée laisse la place à la zone de toucher
-   agrandie (::before) et au contour de focus. */
-.rangees { padding-bottom: 2px; }
+/* « J'ai aimé » et « Hors ligne » encore vides : une invitation (« Vote 👍 en
+   jouant »), pas une panne. Même allure qu'une tuile normale. */
+[data-cle^="collection:"].tuile-bientot {
+  border: 1px solid var(--lisere);
+  background: var(--surface);
+  cursor: default;
+}
 
+[data-cle^="collection:"].tuile-bientot .tuile-picto {
+  filter: none;
+  opacity: 1;
+}
+
+[data-cle^="collection:"].tuile-bientot .tuile-nom { color: var(--craie); }
+[data-cle^="collection:"].tuile-bientot .tuile-compte { color: var(--craie-douce); }
+
+/* Tuile choisie : surface plus claire, anneau lavande et coche. */
+.tuile[aria-pressed="true"] {
+  border-color: var(--lavande);
+  background: var(--surface-choisie);
+  box-shadow: 0 0 0 1px var(--lavande);
+}
+
+.tuile[aria-pressed="true"] .tuile-compte { color: var(--craie); }
+
+.tuile[aria-pressed="true"]::after {
+  content: "✓";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--lavande);
+  color: var(--nuit);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Genres et univers : 2 rangées de petites puces. Le rembourrage vertical de
+   la rangée laisse la place à la zone de toucher agrandie (::before) et au
+   contour de focus. Rien ne dépasse des puces (ni halo, ni ombre, ni
+   déplacement) : la rangée qui défile le couperait.
+   Entre les deux rangées, 5 px de chaque côté : le contour de focus (4 px)
+   n'est jamais rogné, et les zones de toucher des deux rangées se touchent. */
 .rangee {
   display: flex;
   gap: 4px;
-  padding: 5px 16px;
+  padding: 6px 16px 5px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-padding-inline: 16px;
   scrollbar-width: none;
 }
 
-.rangee + .rangee { padding-top: 0; }
+.rangee + .rangee { padding: 5px 16px 6px; }
 
 .rangee::-webkit-scrollbar { display: none; }
 
+/* Couleur d'une puce : fond de nuit à peine teinté, contour et nombre dans la
+   teinte, à clarté égale pour toutes (OKLCH). --c : chroma du contour et du
+   nombre ; --c-fond : chroma du fond ; --l-contour : clarté du contour. */
 .puce-filtre {
   --teinte: 230;
+  --c: .075;
+  --c-fond: .025;
+  --l-contour: .52;
   position: relative;
   flex: none;
   display: inline-flex;
@@ -410,147 +824,150 @@ body::after {
   gap: 3px;
   min-height: 34px;
   padding: 0 8px;
-  border: 1px solid hsl(var(--teinte) 35% 45% / .5);
+  border: 1px solid oklch(var(--l-contour) var(--c) var(--teinte));
   border-radius: 999px;
-  background: linear-gradient(160deg, hsl(var(--teinte) 38% 24%), hsl(var(--teinte) 32% 15%));
-  color: var(--encre);
+  background: oklch(.25 var(--c-fond) var(--teinte));
+  color: var(--craie);
   font: inherit;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 700;
   line-height: 1;
   white-space: nowrap;           /* jamais de retour à la ligne dans une puce */
   cursor: pointer;
-  transition: border-color .15s ease, opacity .15s ease, transform .15s ease;
+  transition: border-color .15s ease, background-color .15s ease, transform .12s ease;
 }
 
-/* Zone de toucher de 44 px de haut sans agrandir la puce. */
+/* Univers : couleurs plus éteintes que les genres (le sujet, pas la façon de jouer). */
+#univers .puce-filtre {
+  --c: .055;
+  --c-fond: .015;
+  --l-contour: .50;
+}
+
+/* « Autre » : ardoise neutre. Spécificité (1,1,0), placée après la règle des
+   univers pour l'emporter sur elle. */
+#genres [data-cle="genre:autre"],
+#univers [data-cle="univers:autre"] {
+  --c: .02;
+  --c-fond: .012;
+}
+
+/* Zone de toucher de 44 px de haut sans agrandir la puce (5 px au-dessus
+   et au-dessous de ses 34 px ; inset compté depuis l'intérieur du contour). */
 .puce-filtre::before {
   content: "";
   position: absolute;
-  inset: -5px 0;
+  inset: -6px 0;
 }
 
 .puce-filtre-picto { font-size: 13px; }
 
-/* Nombre de jeux, en petit après le libellé */
+/* Nombre de jeux, en petit après le libellé, dans la teinte de la puce */
 .puce-filtre-compte {
   margin-left: 2px;
+  color: oklch(.84 var(--c) var(--teinte));
   font-size: .85em;
   font-weight: 700;
-  color: var(--encre-douce);
   font-variant-numeric: tabular-nums;
 }
 
-.puce-filtre[aria-pressed="true"] .puce-filtre-compte { color: inherit; opacity: .75; }
+.puce-filtre:active:not(:disabled) { transform: scale(.96); }
 
-.puce-filtre:active:not(:disabled) { transform: scale(.95); }
-
-.puce-filtre[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-encre);
+/* Aucun jeu avec les autres filtres choisis : contour éteint, textes plus doux,
+   toujours lisibles (pas d'opacité). */
+.puce-zero {
+  border-color: var(--trait);
+  background: transparent;
+  color: var(--craie-douce);
 }
 
-/* Aucun jeu avec les autres filtres choisis */
-.puce-zero { opacity: .5; }
+.puce-zero .puce-filtre-compte { color: var(--craie-faible); }
 
-/* Regroupement encore vide : grisé, en pointillés, pas cliquable */
+/* Regroupement encore vide : pointillés, pas cliquable. */
 .puce-bientot {
-  border-style: dashed;
-  border-color: var(--trait-fort);
+  border: 1px dotted var(--orbite);
   background: transparent;
-  color: var(--encre-douce);
-  opacity: .7;
+  color: var(--craie-douce);
   cursor: default;
 }
 
 .puce-bientot .puce-filtre-picto { filter: grayscale(1); opacity: .5; }
 
+/* Puce choisie : remplie de sa propre teinte, claire, texte nuit. */
+.puce-filtre[aria-pressed="true"] {
+  border-color: oklch(.84 var(--c) var(--teinte));
+  background: oklch(.84 var(--c) var(--teinte));
+  color: var(--nuit);
+}
+
+.puce-filtre[aria-pressed="true"] .puce-filtre-compte { color: var(--nuit); opacity: .75; }
+
 /* Grand écran : puces un peu plus serrées pour que chaque rangée tienne sur
-   la largeur du site (1 200 px), et qui se partagent la place restante. */
+   la largeur du site (1 200 px), et qui se partagent la place restante.
+   11 px : à 11,5 px, la 2e rangée des genres défilait de 9 px en anglais. */
 @media (min-width: 720px) {
-  .rangee { gap: 3px; }
+  .rangee { gap: 2px; }
   .puce-filtre {
     flex: 1 0 auto;
     gap: 2px;
     padding: 0 4px;
-    font-size: 11.5px;
-    letter-spacing: -.01em;
+    font-size: 11px;
   }
   .puce-filtre-picto { font-size: 12px; }
   .puce-filtre-compte { margin-left: 0; }
 }
 
-.puce {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0 13px;
-  border: 1.5px solid var(--trait-fort);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--encre-douce);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  max-width: 100%;
-  overflow-wrap: anywhere;   /* textes longs (allemand…) : retour à la ligne */
-  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
-}
-
-.puce-picto { font-size: 15px; }
-
-.puce[aria-pressed="true"],
-.puce-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-encre);
-}
-
-/* Filtre choisi, rappelé au-dessus des jeux : toucher pour le retirer */
-.puce-active::after {
-  content: "✕";
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.puce-effacer {
-  border-color: transparent;
-  background: none;
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 /* --------------------------------------------------------------------------
-   En-tête des jeux : titre, nombre, tri
+   En-tête des jeux : horizon, titre, nombre, tri, filtres choisis, portée
    -------------------------------------------------------------------------- */
 
+main.catalogue {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 8px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
+}
+
 .resultats-tete {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 6px 12px;
-  margin: 0 0 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--trait);
+  margin: 0 0 8px;
+  padding-top: 12px;
   scroll-margin-top: 8px;
 }
 
-.resultats-tete h2 {
+/* L'« horizon » : un arc de planète très fin, fondu aux deux bouts, au lieu
+   d'un filet droit. Repris au-dessus des Archives. */
+.resultats-tete::before,
+.archives::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 10px;
+  border-top: 1px solid rgba(236, 234, 228, .16);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
+  pointer-events: none;
+}
+
+#titre-resultats {
   margin: 0;
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .compte {
+  color: var(--craie-douce);
   font-size: 14px;
-  font-weight: 600;
-  color: var(--encre-douce);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Menu de tri : une liste déroulante native (sélecteur du téléphone) */
@@ -558,7 +975,7 @@ body::after {
   position: relative;
   display: inline-block;
   max-width: 100%;
-  color: var(--accent);       /* couleur des deux icônes */
+  color: var(--craie-douce);  /* couleur des deux icônes */
 }
 
 .tri select {
@@ -567,20 +984,24 @@ body::after {
   max-width: 100%;
   min-height: 44px;
   padding: 0 38px 0 40px;     /* texte à 16 px : en dessous, l'iPhone zoome */
-  border: 1.5px solid var(--trait-fort);
-  border-radius: 999px;
+  border: 1.5px solid var(--orbite);
+  border-radius: var(--r-commande);
   background: var(--surface);
-  color: var(--encre);
+  color: var(--craie);
   font: inherit;
+  font-size: 16px;
   font-weight: 700;
   text-overflow: ellipsis;
   cursor: pointer;
+  transition: border-color .15s ease;
 }
 
 .tri select option {
   background: var(--surface);
-  color: var(--encre);
+  color: var(--craie);
 }
+
+.tri select option:disabled { color: var(--craie-faible); }
 
 .tri svg {
   position: absolute;
@@ -601,152 +1022,63 @@ body::after {
   margin: 0 0 10px;
 }
 
-.filtres-actifs[hidden] { display: none; }
-
-/* --------------------------------------------------------------------------
-   Tendances : les jeux les plus joués de la semaine, en haut de l'accueil.
-   Une seule bande de petites cartes qui défile (barre de défilement fine
-   avec une souris), pour laisser le catalogue en vue. Rang dans une
-   pastille lavande.
-   -------------------------------------------------------------------------- */
-
-.tendances {
-  max-width: 1200px;
-  margin: 2px auto 6px;
-}
-
-.tendances[hidden] { display: none; }
-
-.tendances-liste {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 132px;
-  gap: 10px;
-  margin: 0;
-  padding: 6px 16px 8px;
-  list-style: none;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-padding-inline: 16px;
-  scroll-snap-type: x proximity;
-  scrollbar-width: none;
-}
-
-.tendances-liste::-webkit-scrollbar { display: none; }
-.tendances-liste > li { scroll-snap-align: start; }
-
-@media (min-width: 720px) {
-  .tendances-liste {
-    grid-auto-columns: 156px;
-    gap: 12px;
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .tendances-liste {
-    padding-bottom: 12px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--trait-fort) transparent;
-  }
-  .tendances-liste::-webkit-scrollbar { display: block; height: 8px; }
-  .tendances-liste::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--trait-fort); }
-}
-
-.carte-tendance .carte-titre {
-  padding: 26px 9px 8px;
-  font-size: 13.5px;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-}
-
-.carte-tendance .badge-nouveau {
-  top: 7px;
-  right: 7px;
-  padding: 2px 7px;
-  font-size: 10px;
-}
-
-.carte-tendance .carte-texte { padding: 7px 9px 9px; }
-
-.carte-tendance .carte-infos {
-  font-size: 11.5px;
-  line-height: 1.3;
-}
-
-@media (min-width: 720px) {
-  .carte-tendance .carte-titre { padding: 28px 10px 9px; font-size: 14.5px; }
-  .carte-tendance .carte-infos { font-size: 12px; }
-}
-
-.tendance-rang {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  display: grid;
-  place-items: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
-  color: var(--accent-encre);
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-/* Temps total joué cette semaine, avec une horloge au trait. */
-.tendance-temps {
-  display: flex;
+/* Filtre choisi, rappelé au-dessus des jeux : toucher pour le retirer */
+.puce {
+  flex: none;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin: 0 0 2px;
-  color: var(--encre);
+  gap: 6px;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0 12px 0 14px;
+  border: 1.5px solid rgba(168, 179, 240, .55);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--craie);
+  font: inherit;
   font-size: 14px;
   font-weight: 700;
+  overflow-wrap: anywhere;   /* textes longs (allemand…) : retour à la ligne */
+  cursor: pointer;
+  transition: border-color .15s ease;
 }
 
-.tendance-temps::before {
-  content: "";
-  flex: none;
-  width: 14px;
-  height: 14px;
-  background: var(--accent);
-  -webkit-mask: var(--icone-horloge) center / contain no-repeat;
-  mask: var(--icone-horloge) center / contain no-repeat;
+.puce-picto { font-size: 15px; }
+
+.puce-active::after {
+  content: "✕";
+  color: var(--lavande);
+  font-size: 12px;
+  font-weight: 800;
 }
 
-/* --------------------------------------------------------------------------
-   Grille de jaquettes
-   -------------------------------------------------------------------------- */
-
-main.catalogue {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 8px 16px 48px;
+.puce-effacer {
+  padding: 0 8px;
+  border-color: transparent;
+  background: none;
+  color: var(--lavande);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-/* Choix Monde / Mon pays */
+/* Choix Monde / Mon pays : interrupteur à deux segments */
 .portee {
   display: inline-flex;
   flex: none;
   margin: 0 0 10px;
   padding: 2px;
-  border: 1.5px solid var(--trait-fort);
-  border-radius: 999px;
+  border: 1.5px solid var(--orbite);
+  border-radius: var(--r-commande);
   background: var(--surface);
 }
-
-.portee[hidden] { display: none; }
 
 .portee button {
   min-height: 44px;
   padding: 0 15px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 9px;
   background: transparent;
-  color: var(--encre-douce);
+  color: var(--craie-douce);
   font: inherit;
   font-size: 14px;
   font-weight: 700;
@@ -755,75 +1087,104 @@ main.catalogue {
 }
 
 .portee button[aria-pressed="true"] {
-  background: var(--accent);
-  color: var(--accent-encre);
+  background: var(--surface-choisie);
+  color: var(--craie);
+  box-shadow: inset 0 0 0 1.5px var(--lavande);
 }
 
 /* Explication du classement (hors connexion, pays avec peu de votes…) */
 .note-tri {
-  margin: 0 0 10px;
-  font-size: 13.5px;
-  color: var(--encre-douce);
+  margin: 0 0 8px;
+  color: var(--craie-douce);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
-.note-tri[hidden] { display: none; }
+/* --------------------------------------------------------------------------
+   Grille de jaquettes
+   Les jaquettes sont des plaques sans boîte autour : ce sont elles qui
+   portent la couleur. Titre en bandeau, infos et pouces dessous, sur la nuit.
+   -------------------------------------------------------------------------- */
 
 .grille {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 18px 12px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-@media (min-width: 640px)  { .grille { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; } }
+@media (min-width: 640px)  { .grille { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 16px; } }
 @media (min-width: 900px)  { .grille { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (min-width: 1150px) { .grille { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 
+/* Toute la carte est un lien ; le rayon donne sa forme au contour de focus. */
 .carte {
-  display: block;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  border-radius: 16px;
+  color: inherit;
   text-decoration: none;
-  background: var(--surface);
-  border: 1px solid var(--liseré);
-  border-radius: var(--rayon);
-  box-shadow: var(--ombre);
-  overflow: hidden;
-  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  transition: transform .12s ease;
 }
 
-.carte:active { transform: scale(.98); }
+.carte:focus-visible { outline-offset: 3px; }
 
+.carte:active { transform: scale(.97); }
+
+/* Jaquette en colonne : l'image remplit tout, le bandeau du titre (et le
+   badge « hors ligne » juste au-dessus) se posent en bas. */
 .jaquette {
   position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   aspect-ratio: 3 / 4;
-  background: #111830;
+  overflow: hidden;
+  border-radius: var(--r-plaque);
+  background: var(--jaquette-fond);
+  transition: transform .15s ease;
 }
 
 .jaquette img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-/* Titre du jeu, dans la langue choisie, en bandeau sur le bas de la jaquette
-   (les jaquettes ne contiennent aucun texte). Fond bleu nuit dégradé pour rester
-   lisible sur toutes les images ; jusqu'à 3 lignes, mots longs coupés. */
-.carte-titre {
+/* Cadre intérieur : rend leur contour aux jaquettes sombres. Dernier dans la
+   jaquette, il est peint par-dessus l'image et le bandeau. */
+.jaquette::after {
+  content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--lisere-jaquette), inset 0 1px 0 rgba(255, 255, 255, .1);
+  pointer-events: none;
+}
+
+/* Titre du jeu, dans la langue choisie, en bandeau sur le bas de la jaquette
+   (les jaquettes ne contiennent aucun texte). Fondu court de 16 px puis nuit
+   profonde à .88 : le texte est toujours sur la partie pleine, lisible sur
+   les ciels les plus clairs. Jusqu'à 3 lignes, mots longs coupés.
+   position: relative pour passer devant l'image (positionnée). */
+.carte-titre {
+  position: relative;
+  flex: none;
   margin: 0;
-  padding: 34px 12px 11px;
-  background: linear-gradient(to bottom, rgba(11, 16, 32, 0), rgba(11, 16, 32, .78) 42%, rgba(11, 16, 32, .94));
-  color: var(--encre);
-  font-size: 16px;
+  padding: 18px 10px 9px;
+  background: linear-gradient(rgba(7, 10, 20, 0), rgba(7, 10, 20, .88) 16px);
+  color: var(--craie);
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.2;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
   overflow-wrap: break-word;
   -webkit-hyphens: auto;
   hyphens: auto;
@@ -835,123 +1196,163 @@ main.catalogue {
 }
 
 @media (max-width: 380px) {
-  .carte-titre { font-size: 15px; padding: 30px 10px 9px; }
+  .carte-titre { padding: 16px 8px 8px; font-size: 14px; }
+}
+
+/* Badges : petites plaques sombres, sans majuscules forcées. */
+.badge-nouveau,
+.badge-hors-ligne {
+  padding: 3px 7px;
+  border: 1px solid rgba(236, 234, 228, .14);
+  border-radius: var(--r-etiquette);
+  background: rgba(7, 10, 20, .8);
+  color: var(--craie);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
 }
 
 .badge-nouveau {
   position: absolute;
   top: 8px;
   right: 8px;
-  padding: 3px 10px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-encre);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .05em;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
-/* Jeu déjà gardé sur l'appareil (jouable sans connexion) */
+.badge-nouveau::before {
+  content: "✦";
+  color: var(--or);
+}
+
+/* Jeu déjà gardé sur l'appareil : badge posé juste au-dessus du bandeau, en
+   bas à gauche ; il ne croise jamais « Nouveau » (en haut à droite).
+   z-index: 1 : un élément flex est peint dans l'ordre de « order » ; sans
+   lui, le badge (order: -1) passerait sous l'image. */
 .badge-hors-ligne {
-  position: absolute;
-  top: 8px;
-  left: 8px;
+  position: relative;
+  z-index: 1;
+  order: -1;
+  align-self: flex-start;
   max-width: calc(100% - 16px);
-  padding: 3px 9px;
-  border: 1px solid rgba(236, 234, 228, .14);
-  border-radius: 999px;
-  background: rgba(11, 16, 32, .88);
-  color: var(--encre);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.3;
+  margin: 0 0 6px 8px;
 }
 
 .badge-hors-ligne::before {
-  content: "✓ ";
-  color: var(--accent);
+  content: "✓";
+  margin-right: 4px;
+  color: var(--lavande);
 }
 
 .carte-texte {
-  padding: 10px 12px 12px;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 2px 0;
 }
 
 .carte-infos {
   margin: 0;
-  font-size: 13px;
-  color: var(--encre-douce);
+  color: var(--craie-douce);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
   overflow-wrap: break-word;
 }
 
-/* Compteurs de pouces : le nombre seul, le pouce est dessiné ici */
+/* Compteurs de pouces : le nombre seul, le pouce est dessiné ici. Poussés en
+   bas de la carte pour s'aligner d'une carte à l'autre dans la rangée. */
 .carte-pouces {
   display: flex;
-  gap: 14px;
-  margin: 6px 0 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--encre-douce);
+  gap: 12px;
+  margin: auto 0 0;
+  padding-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .carte-pouces span {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
 
 .carte-pouces span::before {
   content: "";
   flex: none;
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   background: currentColor;
   -webkit-mask: var(--icone-pouce) center / contain no-repeat;
   mask: var(--icone-pouce) center / contain no-repeat;
 }
 
+.carte-pouces .pouce-haut { color: var(--craie); }
+.carte-pouces .pouce-bas { color: var(--craie-douce); }
 .carte-pouces .pouce-bas::before { transform: rotate(180deg); }
 
+/* Archives : les jaquettes ternies (couleurs éteintes), textes intacts. */
 .archives {
-  margin-top: 44px;
+  position: relative;
+  margin-top: 40px;
   padding-top: 22px;
-  border-top: 1px solid var(--trait);
 }
 
 .archives h2 {
   margin: 0;
-  font-size: 19px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.3;
 }
 
 .archives > p {
   margin: 4px 0 14px;
+  color: var(--craie-douce);
   font-size: 14px;
-  color: var(--encre-douce);
 }
 
-.archives .carte { opacity: .75; }
+.archives .jaquette img { filter: saturate(.55) brightness(.92); }
 
+/* Aucun jeu trouvé : une petite manette, la silhouette de l'emblème. */
 .vide {
+  padding: 40px 16px;
+  color: var(--craie-douce);
   text-align: center;
-  padding: 48px 16px;
-  color: var(--encre-douce);
+}
+
+.vide::before {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 12px;
+  background: var(--lavande);
+  opacity: .7;
+  -webkit-mask: var(--icone-manette) center / contain no-repeat;
+  mask: var(--icone-manette) center / contain no-repeat;
 }
 
 .vide strong {
   display: block;
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--encre);
   margin-bottom: 6px;
+  color: var(--craie);
+  font-size: 18px;
+  font-weight: 800;
 }
 
+#vide-texte { font-size: 14px; }
+
+/* Publicité (#pub, .pub-mention) et consentement (#consentement) : aucune
+   règle, volontairement. Ils restent cachés (hidden) tant que la publicité
+   est désactivée. */
+
 .pied {
-  text-align: center;
+  padding: 8px 16px calc(32px + env(safe-area-inset-bottom));
+  color: var(--craie-douce);
   font-size: 13px;
-  color: var(--encre-douce);
-  padding: 0 16px 32px;
+  text-align: center;
 }
 
 .pied p { margin: 0 0 6px; }
@@ -962,23 +1363,39 @@ main.catalogue {
   align-items: center;
   min-height: 44px;
   padding: 0 8px;
+  color: var(--lavande);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* --------------------------------------------------------------------------
    Page « Mentions légales » (mentions-legales.html)
    -------------------------------------------------------------------------- */
 
-.marque-lien { text-decoration: none; }
-
 .legal {
   max-width: 720px;
   margin: 0 auto;
-  padding: 8px 16px 32px;
+  padding: 8px 16px calc(32px + env(safe-area-inset-bottom));
 }
 
-.legal h1 { font-size: 26px; margin: 8px 0 6px; }
-.legal h2 { font-size: 18px; margin: 28px 0 8px; }
-.legal-intro { color: var(--encre-douce); margin: 0 0 8px; }
+.legal h1 {
+  margin: 8px 0 6px;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.legal h2 {
+  margin: 28px 0 8px;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.legal-intro {
+  margin: 0 0 8px;
+  color: var(--craie-douce);
+}
 
 .legal dl {
   display: grid;
@@ -986,13 +1403,30 @@ main.catalogue {
   gap: 6px 16px;
   margin: 0;
   padding: 14px 16px;
-  border-radius: var(--rayon);
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-plaque);
   background: var(--surface);
-  border: 1px solid var(--liseré);
 }
 
-.legal dt { color: var(--encre-douce); }
-.legal dd { margin: 0; overflow-wrap: anywhere; }
+.legal dt {
+  color: var(--craie-douce);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.legal dd {
+  margin: 0;
+  color: var(--craie);
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.legal a:not(.bouton) {
+  color: var(--lavande);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 /* Téléphone : intitulé au-dessus de la valeur. */
 @media (max-width: 520px) {
@@ -1000,39 +1434,46 @@ main.catalogue {
   .legal dd + dt { margin-top: 10px; }
 }
 
+@media (min-width: 720px) {
+  .legal h1 { font-size: 26px; }
+}
+
 .legal-retour { margin: 32px 0 0; text-align: center; }
 
-/* Survol : seulement avec une souris (sur écran tactile, il resterait « collé »). */
+/* --------------------------------------------------------------------------
+   Survol : seulement avec une souris (sur écran tactile, il resterait
+   « collé »). Les bordures changent de couleur ; seule la jaquette monte
+   de 2 px.
+   -------------------------------------------------------------------------- */
+
 @media (hover: hover) {
   .recherche input:hover:not(:focus),
   .tri select:hover,
-  .puce:hover:not([aria-pressed="true"]):not(.puce-active):not(.puce-effacer) {
-    border-color: var(--encre-douce);
+  .selecteur-site .jel-langue-bouton:hover {
+    border-color: var(--craie-douce);
   }
 
-  .puce:hover:not([aria-pressed="true"]):not(.puce-active),
-  .portee button:hover:not([aria-pressed="true"]) {
-    color: var(--encre);
-  }
+  .puce:hover:not(.puce-effacer) { border-color: var(--lavande); }
 
-  .tuile:hover:not(:disabled) {
-    transform: translateY(-2px);
-    border-color: hsl(var(--teinte) 45% 60% / .8);
-  }
+  .portee button:hover:not([aria-pressed="true"]) { color: var(--craie); }
+
+  .tuile:hover:not(:disabled) { border-color: rgba(236, 234, 228, .28); }
+
+  .tuile[aria-pressed="true"]:hover { border-color: var(--lavande); }
 
   .puce-filtre:hover:not(:disabled):not([aria-pressed="true"]) {
-    border-color: hsl(var(--teinte) 45% 65% / .9);
+    border-color: oklch(.70 var(--c) var(--teinte));
   }
 
-  .tuile[aria-pressed="true"]:hover { border-color: var(--accent); }
+  .carte:hover .jaquette { transform: translateY(-2px); }
 
-  .carte:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--ombre-haute);
-    border-color: rgba(236, 234, 228, .14);
+  .carte:hover .jaquette::after {
+    box-shadow: inset 0 0 0 1px rgba(168, 179, 240, .45), inset 0 1px 0 rgba(255, 255, 255, .1);
   }
 
-  .archives .carte:hover { opacity: 1; }
+  .archives .carte:hover .jaquette img { filter: none; }
+
+  .marque-lien:hover .marque-mot { color: var(--lavande); }
 }
 
 /* --------------------------------------------------------------------------
@@ -1056,19 +1497,18 @@ body.lanceur::after { animation: none; }
   align-items: center;
   gap: 8px;
   height: 56px;
-  padding: 0 8px;
-  padding-top: env(safe-area-inset-top);
+  padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
   box-sizing: content-box;
-  background: var(--fond);
-  border-bottom: 1px solid var(--trait);
-  color: var(--encre);
+  border-bottom: 1px solid rgba(168, 179, 240, .18);
+  background: var(--nuit);
+  color: var(--craie);
 }
 
 .barre-jeu h1 {
   flex: 1;
   margin: 0;
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1081,9 +1521,9 @@ body.lanceur::after { animation: none; }
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px solid rgba(236, 234, 228, .1);
-  border-radius: 999px;
-  background: rgba(236, 234, 228, .07);
+  border: 1px solid var(--orbite);
+  border-radius: 50%;
+  background: rgba(236, 234, 228, .06);
   color: inherit;
   cursor: pointer;
   text-decoration: none;
@@ -1091,10 +1531,12 @@ body.lanceur::after { animation: none; }
 }
 
 .bouton-rond svg { width: 22px; height: 22px; }
-.bouton-rond[hidden] { display: none; }
 
 @media (hover: hover) {
-  .bouton-rond:hover { background: rgba(236, 234, 228, .14); }
+  .bouton-rond:hover {
+    border-color: var(--craie-douce);
+    background: var(--surface-relevee);
+  }
 }
 
 /* Pouces : au trait, et remplis quand c'est mon vote */
@@ -1102,9 +1544,9 @@ body.lanceur::after { animation: none; }
 
 .bouton-vote[aria-pressed="true"],
 .bouton-vote[aria-pressed="true"]:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--accent-encre);
+  border-color: var(--lavande);
+  background: var(--lavande);
+  color: var(--nuit);
 }
 
 .bouton-vote[aria-pressed="true"] svg { fill: currentColor; }
@@ -1115,6 +1557,10 @@ body.lanceur::after { animation: none; }
   min-height: 0;
 }
 
+.scene:fullscreen { background: var(--nuit); }
+.scene::backdrop { background: var(--nuit); }
+
+/* Fond blanc pour les jeux qui n'ont pas de fond propre. */
 .scene iframe {
   display: block;
   width: 100%;
@@ -1123,10 +1569,9 @@ body.lanceur::after { animation: none; }
   background: #fff;
 }
 
-.scene iframe[hidden] { display: none; }   /* jeu introuvable : le fond étoilé reste visible */
-
 .scene:fullscreen iframe { height: 100vh; }
 
+/* Jeu introuvable, pas de connexion… : sur le fond étoilé, sous une petite manette. */
 .message-jeu {
   position: absolute;
   inset: 0;
@@ -1136,17 +1581,29 @@ body.lanceur::after { animation: none; }
   justify-content: center;
   gap: 14px;
   padding: 24px;
+  color: var(--craie-douce);
   text-align: center;
-  color: var(--encre-douce);
+}
+
+.message-jeu::before {
+  content: "";
+  flex: none;
+  width: 40px;
+  height: 40px;
+  background: var(--lavande);
+  opacity: .7;
+  -webkit-mask: var(--icone-manette) center / contain no-repeat;
+  mask: var(--icone-manette) center / contain no-repeat;
 }
 
 .message-jeu strong {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--encre);
+  color: var(--craie);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.3;
 }
 
-.message-jeu[hidden] { display: none; }
+.message-jeu span { font-size: 15px; }
 
 /* Petit message après un vote (« Merci pour ton vote ! ») ;
    les messages plus longs (hors connexion) passent sur deux lignes. */
@@ -1159,18 +1616,16 @@ body.lanceur::after { animation: none; }
   max-width: calc(100% - 24px);
   margin: 0;
   padding: 8px 16px;
-  border: 1px solid var(--trait-fort);
-  border-radius: 22px;
-  background: var(--surface);
-  color: var(--encre);
+  border: 1px solid rgba(168, 179, 240, .35);
+  border-radius: var(--r-plaque);
+  background: rgba(22, 31, 56, .96);
+  color: var(--craie);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   text-align: center;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .45);
+  box-shadow: var(--ombre-flottante);
   pointer-events: none;
 }
-
-.info-vote[hidden] { display: none; }
 
 /* Vérification anti-robot : invisible, sauf si Cloudflare demande de cocher une case */
 .zone-turnstile {
@@ -1181,20 +1636,59 @@ body.lanceur::after { animation: none; }
   z-index: 50;
 }
 
+/* Bouton plein : le seul aplat lavande hors votes et coches. */
 .bouton {
   display: inline-flex;
   align-items: center;
   min-height: 48px;
   padding: 0 22px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-encre);
+  border-radius: var(--r-commande);
+  background: var(--lavande);
+  color: var(--nuit);
+  font-size: 16px;
   font-weight: 700;
   text-decoration: none;
+  transition: background-color .15s ease;
+}
+
+.bouton:focus-visible { outline-color: var(--craie); }
+
+@media (hover: hover) {
+  .bouton:hover { background: #b8c1f3; }
+}
+
+/* --------------------------------------------------------------------------
+   Navigateurs sans OKLCH (Safari < 15.4, Chrome < 111, Firefox < 113) :
+   puces neutres, sélection lavande. Bloc @supports et non double déclaration :
+   une déclaration avec var() l'emporte toujours sur la précédente, même
+   invalide. Placé après les états pour les reprendre tous.
+   -------------------------------------------------------------------------- */
+
+@supports not (color: oklch(0 0 0)) {
+  .puce-filtre {
+    border-color: var(--orbite);
+    background: var(--surface);
+  }
+  .puce-filtre-compte { color: var(--craie-douce); }
+  .puce-filtre.puce-zero { border-color: var(--trait); background: transparent; }
+  .puce-filtre.puce-zero .puce-filtre-compte { color: var(--craie-faible); }
+  .puce-filtre.puce-bientot { border-color: var(--orbite); background: transparent; }
+  .puce-filtre[aria-pressed="true"] {
+    border-color: var(--lavande);
+    background: var(--lavande);
+    color: var(--nuit);
+  }
+  .puce-filtre[aria-pressed="true"] .puce-filtre-compte { color: var(--nuit); }
+
+  @media (hover: hover) {
+    .puce-filtre:hover:not(:disabled):not([aria-pressed="true"]) { border-color: var(--craie-douce); }
+  }
 }
 
 /* --------------------------------------------------------------------------
    Mouvements réduits : ni scintillement, ni déplacement, ni transition.
+   Mêmes sélecteurs exactement que ceux qui posent un transform, sinon les
+   plus spécifiques (:not(:disabled)…) l'emporteraient encore.
    -------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
@@ -1204,12 +1698,1371 @@ body.lanceur::after { animation: none; }
     transition: none !important;
   }
 
-  .carte:hover,
   .carte:active,
-  .tuile:hover,
-  .tuile:active,
-  .puce-filtre:active,
+  .carte:hover .jaquette,
+  .tuile:active:not(:disabled),
+  .puce-filtre:active:not(:disabled),
   .bouton-vote:active {
     transform: none;
   }
+}
+
+/* DÉBUT DU BLOC GÉNÉRÉ : icônes (scripts/icones/generer.mjs) */
+/* ==========================================================================
+   Icônes des regroupements (tuiles, puces des genres et des univers, titre
+   « Tendances »). GÉNÉRÉ par scripts/icones/generer.mjs depuis
+   scripts/icones/sources/*.svg : ne pas modifier à la main (bloc entre les
+   repères DÉBUT / FIN DU BLOC GÉNÉRÉ).
+
+   app.js pose data-cle sur chaque tuile et puce ; l'emoji est dans un span
+   aria-hidden (.tuile-picto, .puce-filtre-picto). Pour les clés qui ont une
+   icône, l'emoji est masqué et l'icône est peinte par trois calques :
+     ::before  la masse colorée (masque --ico-fond, couleur --ico-couleur-fond) ;
+     ::after   le trait par-dessus (masque --ico-trait, couleur --ico-couleur-trait) ;
+     le span   le détail « extra » (image --ico-extra, ses vraies couleurs),
+               qui n'existe que pendant l'animation, derrière l'icône.
+   Une clé sans icône garde son emoji ; un navigateur sans masques CSS aussi.
+   Les détails « extra » dessinés en or sont repeints en craie par le
+   générateur ; l'or ne sert qu'à l'étincelle d'une
+   puce ou d'une tuile choisie (section suivante).
+   L'animation se joue au survol (souris), au focus clavier, et une fois quand
+   la tuile ou la puce apparaît choisie (app.js la recrée à chaque clic). Le
+   trait mène, la couleur suit un peu en retard. Rien ne bouge si l'appareil
+   demande de réduire les mouvements.
+   ========================================================================== */
+
+/* --- 1. Taille et couleurs selon le contexte ------------------------------
+   Puces : la masse prend la teinte de la puce (un peu plus vive que son
+   nombre), le trait est en craie. Tuiles des raccourcis : lavande (ce qu'on
+   touche). Âges : une teinte par tranche, du chaud au froid (on grandit).
+   Titre « Tendances » : or (ce qui brille). */
+
+.puce-filtre {
+  --ico-taille: 16px;
+  --ico-couleur-fond: oklch(.72 calc(var(--c) + .035) var(--teinte));
+  --ico-couleur-trait: var(--craie);
+}
+
+/* Tuiles : icône de 24 px, dont 20 px comptent dans la hauteur (la grille
+   24 × 24 garde 2 unités de marge) : les tuiles gardent leur hauteur. */
+.tuile {
+  --ico-taille: 24px;
+  --ico-marge: -2px;
+  --ico-couleur-fond: var(--lavande);
+  --ico-couleur-trait: var(--craie);
+}
+
+.tuile[data-cle^="age:"] { --ico-couleur-fond: oklch(.76 .085 var(--ico-teinte-age, 250)); }
+[data-cle="age:3-4"] { --ico-teinte-age: 28; }
+[data-cle="age:5-6"] { --ico-teinte-age: 82; }
+[data-cle="age:7-8"] { --ico-teinte-age: 152; }
+[data-cle="age:9+"]  { --ico-teinte-age: 236; }
+
+#titre-tendances {
+  --ico-taille: 20px;
+  --ico-couleur-fond: var(--or);
+  --ico-couleur-trait: var(--craie);
+}
+
+@media (min-width: 720px) {
+  .tuile { --ico-taille: 26px; --ico-marge: -3px; }
+}
+
+/* États. Choisie : la puce se remplit de sa teinte claire ; l'icône passe
+   en trait nuit (comme le texte) sur une masse plus soutenue de la même
+   teinte. « 0 jeu » : trait adouci, masse éteinte. « Bientôt » : gris
+   ardoise et immobile ; « J'ai aimé » et « Hors ligne » vides restent
+   normaux (c'est une invitation). */
+.puce-filtre[aria-pressed="true"] {
+  --ico-couleur-fond: oklch(.6 calc(var(--c) + .08) var(--teinte));
+  --ico-couleur-trait: var(--nuit);
+}
+
+.puce-filtre.puce-zero,
+.tuile.tuile-zero {
+  --ico-couleur-trait: var(--craie-douce);
+  --ico-opacite-fond: .45;
+}
+
+.puce-filtre.puce-bientot,
+.tuile.tuile-bientot {
+  --ico-couleur-fond: #323c5a;
+  --ico-couleur-trait: var(--craie-faible);
+}
+
+.tuile.tuile-bientot[data-cle^="collection:"] {
+  --ico-couleur-fond: var(--lavande);
+  --ico-couleur-trait: var(--craie);
+}
+
+/* Navigateurs sans OKLCH : masses en craie douce, lavande pour les âges. */
+@supports not (color: oklch(0 0 0)) {
+  .puce-filtre { --ico-couleur-fond: var(--craie-douce); }
+  .puce-filtre[aria-pressed="true"] { --ico-couleur-fond: var(--orbite); }
+  .tuile[data-cle^="age:"] { --ico-couleur-fond: var(--lavande); }
+}
+
+/* --- 2. Dessin : seulement si le navigateur sait faire des masques -------- */
+
+@supports ((-webkit-mask-image: none) or (mask-image: none)) {
+  /* Les clés qui ont une icône (liste générée). L'emoji (font-size: 0) ne
+     prend plus de place ; le span devient la boîte de l'icône. Il remplace
+     aussi l'opacité et le gris des états « 0 jeu » et « Bientôt » de l'emoji. */
+  :is(
+    [data-cle="hasard"],
+    [data-cle="collection:aimes"],
+    [data-cle="collection:hors-ligne"],
+    [data-cle="age:3-4"],
+    [data-cle="age:5-6"],
+    [data-cle="age:7-8"],
+    [data-cle="age:9+"],
+    [data-cle="genre:puzzle"],
+    [data-cle="genre:memoire"],
+    [data-cle="genre:quiz"],
+    [data-cle="genre:mots"],
+    [data-cle="genre:calcul"],
+    [data-cle="genre:reflexes"],
+    [data-cle="genre:arcade"],
+    [data-cle="genre:plateforme"],
+    [data-cle="genre:course"],
+    [data-cle="genre:sport"],
+    [data-cle="genre:tir"],
+    [data-cle="genre:combat"],
+    [data-cle="genre:labyrinthe"],
+    [data-cle="genre:aventure"],
+    [data-cle="genre:observation"],
+    [data-cle="genre:strategie"],
+    [data-cle="genre:defense"],
+    [data-cle="genre:gestion"],
+    [data-cle="genre:simulation"],
+    [data-cle="genre:creation"],
+    [data-cle="genre:construction"],
+    [data-cle="genre:musique"],
+    [data-cle="genre:societe"],
+    [data-cle="genre:coloriage"],
+    [data-cle="genre:role"],
+    [data-cle="genre:autre"],
+    [data-cle="univers:ferme"],
+    [data-cle="univers:chevaux"],
+    [data-cle="univers:compagnie"],
+    [data-cle="univers:sauvages"],
+    [data-cle="univers:dinosaures"],
+    [data-cle="univers:ocean"],
+    [data-cle="univers:espace"],
+    [data-cle="univers:fantasy"],
+    [data-cle="univers:chevaliers"],
+    [data-cle="univers:pirates"],
+    [data-cle="univers:monstres"],
+    [data-cle="univers:robots"],
+    [data-cle="univers:nature"],
+    [data-cle="univers:cuisine"],
+    [data-cle="univers:vehicules"],
+    [data-cle="univers:sport"],
+    [data-cle="univers:monde"],
+    [data-cle="univers:histoire"],
+    [data-cle="univers:corps"],
+    [data-cle="univers:ville"],
+    [data-cle="univers:fetes"],
+    [data-cle="univers:contes"],
+    [data-cle="univers:abstrait"],
+    [data-cle="univers:autre"]
+  ) > :is(.tuile-picto, .puce-filtre-picto),
+  #titre-tendances > span[aria-hidden="true"]:first-child {
+    --ico-contenu: "";
+    position: relative;
+    display: inline-block;
+    flex: none;
+    width: var(--ico-taille);
+    height: var(--ico-taille);
+    margin-block: var(--ico-marge, 0);
+    font-size: 0;
+    line-height: 0;
+    vertical-align: middle;
+    opacity: 1;
+    filter: none;
+    background: var(--ico-extra, none) no-repeat;
+    background-position: var(--ico-ex, 50%) var(--ico-ey, 50%);
+    background-size: 0 0;
+    animation: var(--ico-duree, 600ms) ease-in-out both;
+    animation-name: none;
+  }
+
+  /* Titre : centrée sur les minuscules (vertical-align: middle ; la ligne
+     de base du span, vide, serait son bord haut), remontée d'1 px pour les
+     majuscules. */
+  #titre-tendances > span[aria-hidden="true"]:first-child { top: -1px; }
+
+  /* Les deux calques : n'existent que si le span a une icône (--ico-contenu). */
+  :where(.tuile-picto, .puce-filtre-picto, #titre-tendances > span[aria-hidden="true"]:first-child)::before,
+  :where(.tuile-picto, .puce-filtre-picto, #titre-tendances > span[aria-hidden="true"]:first-child)::after {
+    content: var(--ico-contenu, none);
+    position: absolute;
+    inset: 0;
+    transform-origin: var(--ico-origine, 50% 50%);
+    animation: var(--ico-duree, 600ms) ease-in-out both;
+    animation-name: none;
+    pointer-events: none;
+  }
+
+  :where(.tuile-picto, .puce-filtre-picto, #titre-tendances > span[aria-hidden="true"]:first-child)::before {
+    background: var(--ico-couleur-fond);
+    opacity: var(--ico-opacite-fond, 1);
+    -webkit-mask: var(--ico-fond, none) 50% 50% / 100% 100% no-repeat;
+    mask: var(--ico-fond, none) 50% 50% / 100% 100% no-repeat;
+  }
+
+  :where(.tuile-picto, .puce-filtre-picto, #titre-tendances > span[aria-hidden="true"]:first-child)::after {
+    background: var(--ico-couleur-trait);
+    -webkit-mask: var(--ico-trait, none) 50% 50% / 100% 100% no-repeat;
+    mask: var(--ico-trait, none) 50% 50% / 100% 100% no-repeat;
+  }
+
+  /* Puce choisie : l'extra (or, craie, lavande) ne se verrait pas sur la
+     teinte claire ; seule l'icône bouge. */
+  .puce-filtre[aria-pressed="true"] > .puce-filtre-picto { background-image: none; }
+
+  /* Déclencheurs : survol (souris seulement : au doigt, il resterait
+     « collé »), focus clavier, et apparition à l'état choisi. */
+  @media (hover: hover) {
+    :is(.tuile, .puce-filtre):hover:not(:disabled) > :is(.tuile-picto, .puce-filtre-picto) { animation-name: var(--ico-anim-extra, none); }
+    :is(.tuile, .puce-filtre):hover:not(:disabled) > :is(.tuile-picto, .puce-filtre-picto)::before { animation-name: var(--ico-anim-fond, none); }
+    :is(.tuile, .puce-filtre):hover:not(:disabled) > :is(.tuile-picto, .puce-filtre-picto)::after { animation-name: var(--ico-anim-trait, none); }
+  }
+
+  :is(.tuile, .puce-filtre):is(:focus-visible, [aria-pressed="true"]) > :is(.tuile-picto, .puce-filtre-picto) { animation-name: var(--ico-anim-extra, none); }
+  :is(.tuile, .puce-filtre):is(:focus-visible, [aria-pressed="true"]) > :is(.tuile-picto, .puce-filtre-picto)::before { animation-name: var(--ico-anim-fond, none); }
+  :is(.tuile, .puce-filtre):is(:focus-visible, [aria-pressed="true"]) > :is(.tuile-picto, .puce-filtre-picto)::after { animation-name: var(--ico-anim-trait, none); }
+
+  /* Contraste élevé (couleurs forcées de Windows) : le navigateur remplacerait
+     les couleurs des calques par celle du fond, et l'icône disparaîtrait ;
+     on prend les couleurs du système. */
+  @media (forced-colors: active) {
+    :where(.tuile-picto, .puce-filtre-picto, #titre-tendances > span[aria-hidden="true"]:first-child)::before { forced-color-adjust: none; background: GrayText; }
+    :where(.tuile-picto, .puce-filtre-picto, #titre-tendances > span[aria-hidden="true"]:first-child)::after { forced-color-adjust: none; background: CanvasText; }
+  }
+
+  /* Mouvements réduits : icônes immobiles, pas d'extra. */
+  @media (prefers-reduced-motion: reduce) {
+    :where(.tuile-picto, .puce-filtre-picto, #titre-tendances > span[aria-hidden="true"]:first-child),
+    :where(.tuile-picto, .puce-filtre-picto, #titre-tendances > span[aria-hidden="true"]:first-child)::before,
+    :where(.tuile-picto, .puce-filtre-picto, #titre-tendances > span[aria-hidden="true"]:first-child)::after {
+      animation: none !important;
+    }
+  }
+}
+
+
+/* --- 3. Bibliothèque d'animations ----------------------------------------
+   Une animation = trois @keyframes : « -trait » (mène), « -fond » (suit, un
+   peu en retard) et « -extra » (taille et place de l'image du détail ; la
+   taille revient toujours à 0 à la fin). Choisie par icône avec data-anim. */
+
+/* sautiller (560 ms) : petit saut : s'écrase, bondit, retombe en souplesse. Extra : éclat à l'atterrissage (naît derrière l'icône et s'envole vers les bords). */
+@keyframes ico-sautiller-trait {
+  0%   { translate: 0 0; scale: 1; }
+  14%  { translate: 0 0; scale: 1.1 .86; }
+  40%  { translate: 0 -24%; scale: .94 1.08; }
+  62%  { translate: 0 0; scale: 1.08 .9; }
+  78%  { translate: 0 -5%; scale: .98 1.02; }
+  100% { translate: 0 0; scale: 1; }
+}
+@keyframes ico-sautiller-fond {
+  0%   { translate: 0 0; scale: 1; }
+  19%  { translate: 0 0; scale: 1.08 .88; }
+  46%  { translate: 0 -19%; scale: .95 1.06; }
+  68%  { translate: 0 0; scale: 1.1 .88; }
+  84%  { translate: 0 -4%; scale: 1; }
+  100% { translate: 0 0; scale: 1; }
+}
+@keyframes ico-sautiller-extra {
+  0%, 56% { background-size: 0 0; background-position: var(--ico-ex, 50%) var(--ico-ey, 50%); }
+  64%  { background-size: 70% 70%; }
+  99%  { background-size: 165% 165%; }
+  100% { background-size: 0 0; }
+}
+
+/* galoper (660 ms) : galop : se cabre deux fois en se balançant d'avant en arrière. Extra : poussière qui naît derrière (data-origine-extra) et file vers la gauche. */
+@keyframes ico-galoper-trait {
+  0%   { translate: 0 0; rotate: 0deg; }
+  16%  { translate: 0 -10%; rotate: -10deg; }
+  34%  { translate: 0 0; rotate: 5deg; }
+  52%  { translate: 0 -8%; rotate: -7deg; }
+  70%  { translate: 0 0; rotate: 3deg; }
+  86%  { translate: 0 0; rotate: -1deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+@keyframes ico-galoper-fond {
+  0%   { translate: 0 0; rotate: 0deg; }
+  21%  { translate: 0 -8%; rotate: -8deg; }
+  39%  { translate: 0 0; rotate: 4deg; }
+  57%  { translate: 0 -6%; rotate: -6deg; }
+  75%  { translate: 0 0; rotate: 2deg; }
+  90%  { translate: 0 0; rotate: -1deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+@keyframes ico-galoper-extra {
+  0%, 14% { background-size: 0 0; background-position: var(--ico-ex, 50%) var(--ico-ey, 50%); }
+  26%  { background-size: 100% 100%; background-position: calc(var(--ico-ex, 50%) - var(--ico-taille) * 0.04) var(--ico-ey, 50%); }
+  80%  { background-size: 100% 100%; background-position: calc(var(--ico-ex, 50%) - var(--ico-taille) * 0.4) var(--ico-ey, 50%); }
+  100% { background-size: 0 0; background-position: calc(var(--ico-ex, 50%) - var(--ico-taille) * 0.5) var(--ico-ey, 50%); }
+}
+
+/* osciller (720 ms) : balancement amorti autour d'un pivot (data-origine). Extra : petits détails qui naissent au point data-origine-extra et montent. */
+@keyframes ico-osciller-trait {
+  0%   { rotate: 0deg; }
+  14%  { rotate: -14deg; }
+  34%  { rotate: 11deg; }
+  54%  { rotate: -7deg; }
+  74%  { rotate: 3.5deg; }
+  90%  { rotate: -1deg; }
+  100% { rotate: 0deg; }
+}
+@keyframes ico-osciller-fond {
+  0%   { rotate: 0deg; }
+  19%  { rotate: -12deg; }
+  39%  { rotate: 9.5deg; }
+  59%  { rotate: -6deg; }
+  79%  { rotate: 3deg; }
+  94%  { rotate: -1deg; }
+  100% { rotate: 0deg; }
+}
+@keyframes ico-osciller-extra {
+  0%, 10% { background-size: 0 0; background-position: var(--ico-ex, 50%) calc(var(--ico-ey, 50%) + var(--ico-taille) * 0.06); }
+  28%  { background-size: 100% 100%; background-position: var(--ico-ex, 50%) calc(var(--ico-ey, 50%) + var(--ico-taille) * 0.04); }
+  80%  { background-size: 100% 100%; background-position: var(--ico-ex, 50%) calc(var(--ico-ey, 50%) - var(--ico-taille) * 0.22); }
+  100% { background-size: 0 0; background-position: var(--ico-ex, 50%) calc(var(--ico-ey, 50%) - var(--ico-taille) * 0.3); }
+}
+
+/* tourner (700 ms) : prend son élan, fait un tour complet en l'air, retombe. Extra : éclat à l'atterrissage (naît derrière l'icône et s'envole vers les bords). */
+@keyframes ico-tourner-trait {
+  0%   { translate: 0 0; rotate: 0deg; scale: 1; }
+  12%  { translate: 0 4%; rotate: -14deg; scale: 1.06 .92; }
+  48%  { translate: 0 -18%; rotate: 200deg; scale: 1; }
+  72%  { translate: 0 0; rotate: 360deg; scale: 1.08 .92; }
+  86%  { translate: 0 -3%; rotate: 360deg; scale: 1; }
+  100% { translate: 0 0; rotate: 360deg; scale: 1; }
+}
+@keyframes ico-tourner-fond {
+  0%   { translate: 0 0; rotate: 0deg; scale: 1; }
+  17%  { translate: 0 4%; rotate: -12deg; scale: 1.05 .93; }
+  53%  { translate: 0 -15%; rotate: 186deg; scale: 1; }
+  77%  { translate: 0 0; rotate: 360deg; scale: 1.08 .92; }
+  91%  { translate: 0 -2%; rotate: 360deg; scale: 1; }
+  100% { translate: 0 0; rotate: 360deg; scale: 1; }
+}
+@keyframes ico-tourner-extra {
+  0%, 66% { background-size: 0 0; background-position: var(--ico-ex, 50%) var(--ico-ey, 50%); }
+  74%  { background-size: 75% 75%; }
+  99%  { background-size: 170% 170%; }
+  100% { background-size: 0 0; }
+}
+
+/* decoller (720 ms) : recule comme un ressort, s'élance vers le haut à droite, revient se poser. Extra : flamme ou traînée née au point data-origine-extra, qui suit l'icône puis s'éteint. */
+@keyframes ico-decoller-trait {
+  0%   { translate: 0 0; rotate: 0deg; }
+  15%  { translate: -6% 6%; rotate: -3deg; }
+  42%  { translate: 16% -16%; rotate: 3deg; }
+  62%  { translate: 5% -5%; rotate: -2deg; }
+  80%  { translate: -2% 2%; rotate: 1deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+@keyframes ico-decoller-fond {
+  0%   { translate: 0 0; rotate: 0deg; }
+  20%  { translate: -6% 6%; rotate: -3deg; }
+  47%  { translate: 12% -12%; rotate: 2deg; }
+  67%  { translate: 4% -4%; rotate: -2deg; }
+  85%  { translate: -1% 1%; rotate: 1deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+@keyframes ico-decoller-extra {
+  0%, 12% { background-size: 0 0; background-position: calc(var(--ico-ex, 50%) - var(--ico-taille) * 0.06) calc(var(--ico-ey, 50%) + var(--ico-taille) * 0.06); }
+  20%  { background-size: 100% 100%; background-position: calc(var(--ico-ex, 50%) - var(--ico-taille) * 0.06) calc(var(--ico-ey, 50%) + var(--ico-taille) * 0.06); }
+  42%  { background-size: 115% 115%; background-position: calc(var(--ico-ex, 50%) + var(--ico-taille) * 0.16) calc(var(--ico-ey, 50%) - var(--ico-taille) * 0.16); }
+  62%  { background-size: 70% 70%; background-position: calc(var(--ico-ex, 50%) + var(--ico-taille) * 0.05) calc(var(--ico-ey, 50%) - var(--ico-taille) * 0.05); }
+  78%, 100% { background-size: 0 0; background-position: calc(var(--ico-ex, 50%) - var(--ico-taille) * 0.02) calc(var(--ico-ey, 50%) + var(--ico-taille) * 0.02); }
+}
+
+/* nager (720 ms) : ondule d'avant en arrière comme dans l'eau. Extra : bulles nées au point data-origine-extra, qui montent. */
+@keyframes ico-nager-trait {
+  0%   { translate: 0 0; rotate: 0deg; scale: 1; }
+  18%  { translate: -8% 2%; rotate: -8deg; scale: .96 1.04; }
+  42%  { translate: 10% -3%; rotate: 6deg; scale: 1.04 .97; }
+  66%  { translate: -4% 1%; rotate: -3deg; scale: 1; }
+  84%  { translate: 2% 0; rotate: 1deg; scale: 1; }
+  100% { translate: 0 0; rotate: 0deg; scale: 1; }
+}
+@keyframes ico-nager-fond {
+  0%   { translate: 0 0; rotate: 0deg; scale: 1; }
+  23%  { translate: -7% 2%; rotate: -7deg; scale: .97 1.03; }
+  47%  { translate: 8% -2%; rotate: 5deg; scale: 1.03 .98; }
+  71%  { translate: -3% 1%; rotate: -2deg; scale: 1; }
+  89%  { translate: 1% 0; rotate: 1deg; scale: 1; }
+  100% { translate: 0 0; rotate: 0deg; scale: 1; }
+}
+@keyframes ico-nager-extra {
+  0%, 34% { background-size: 0 0; background-position: var(--ico-ex, 50%) calc(var(--ico-ey, 50%) + var(--ico-taille) * 0.04); }
+  48%  { background-size: 100% 100%; background-position: var(--ico-ex, 50%) var(--ico-ey, 50%); }
+  84%  { background-size: 100% 100%; background-position: var(--ico-ex, 50%) calc(var(--ico-ey, 50%) - var(--ico-taille) * 0.24); }
+  100% { background-size: 0 0; background-position: var(--ico-ex, 50%) calc(var(--ico-ey, 50%) - var(--ico-taille) * 0.32); }
+}
+
+/* pulser (620 ms) : double battement : la couleur gonfle un peu plus que le trait. Extra : rayons qui naissent derrière au premier battement et s'envolent. */
+@keyframes ico-pulser-trait {
+  0%   { scale: 1; }
+  14%  { scale: 1.16; }
+  28%  { scale: .96; }
+  42%  { scale: 1.1; }
+  60%  { scale: .99; }
+  100% { scale: 1; }
+}
+@keyframes ico-pulser-fond {
+  0%   { scale: 1; }
+  18%  { scale: 1.24; }
+  32%  { scale: .94; }
+  46%  { scale: 1.16; }
+  64%  { scale: .98; }
+  100% { scale: 1; }
+}
+@keyframes ico-pulser-extra {
+  0%, 8% { background-size: 0 0; background-position: var(--ico-ex, 50%) var(--ico-ey, 50%); }
+  20%  { background-size: 85% 85%; }
+  99%  { background-size: 165% 165%; }
+  100% { background-size: 0 0; }
+}
+
+/* emboiter (640 ms) : se soulève en pivotant, puis s'enclenche avec un petit « clic ». Extra : traits du « clic » qui jaillissent au moment où la pièce s'enclenche. */
+@keyframes ico-emboiter-trait {
+  0%   { translate: 0 0; rotate: 0deg; scale: 1; }
+  26%  { translate: -10% -14%; rotate: -12deg; scale: 1.04; }
+  50%  { translate: 2% 3%; rotate: 2deg; scale: .98; }
+  64%  { translate: 0 0; rotate: 0deg; scale: 1.06 .94; }
+  80%  { translate: 0 0; rotate: 0deg; scale: .99 1.01; }
+  100% { translate: 0 0; rotate: 0deg; scale: 1; }
+}
+@keyframes ico-emboiter-fond {
+  0%   { translate: 0 0; rotate: 0deg; scale: 1; }
+  31%  { translate: -13% -18%; rotate: -15deg; scale: 1.04; }
+  55%  { translate: 3% 4%; rotate: 3deg; scale: .98; }
+  69%  { translate: 0 0; rotate: 0deg; scale: 1.06 .94; }
+  85%  { translate: 0 0; rotate: 0deg; scale: .99 1.01; }
+  100% { translate: 0 0; rotate: 0deg; scale: 1; }
+}
+@keyframes ico-emboiter-extra {
+  0%, 54% { background-size: 0 0; background-position: var(--ico-ex, 50%) var(--ico-ey, 50%); }
+  62%  { background-size: 80% 80%; }
+  99%  { background-size: 150% 150%; }
+  100% { background-size: 0 0; }
+}
+
+/* secouer (520 ms) : tremblement électrique : la couleur tremble à contretemps du trait. Extra : étincelles qui clignotent trois fois en place. */
+@keyframes ico-secouer-trait {
+  0%   { translate: 0 0; rotate: 0deg; }
+  10%  { translate: -9% 0; rotate: -7deg; }
+  22%  { translate: 8% 0; rotate: 6deg; }
+  34%  { translate: -7% 0; rotate: -5deg; }
+  46%  { translate: 5% 0; rotate: 3deg; }
+  58%  { translate: -3% 0; rotate: -2deg; }
+  72%  { translate: 1% 0; rotate: 1deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+@keyframes ico-secouer-fond {
+  0%   { translate: 0 0; rotate: 0deg; }
+  10%  { translate: 6% 2%; rotate: 4deg; }
+  22%  { translate: -6% -2%; rotate: -4deg; }
+  34%  { translate: 5% 1%; rotate: 3deg; }
+  46%  { translate: -4% -1%; rotate: -2deg; }
+  58%  { translate: 2% 0; rotate: 1deg; }
+  72%  { translate: -1% 0; rotate: 0deg; }
+  100% { translate: 0 0; rotate: 0deg; }
+}
+@keyframes ico-secouer-extra {
+  0%, 6% { background-size: 0 0; background-position: var(--ico-ex, 50%) var(--ico-ey, 50%); }
+  12%  { background-size: 100% 100%; }
+  20%  { background-size: 40% 40%; }
+  30%  { background-size: 100% 100%; }
+  40%  { background-size: 40% 40%; }
+  52%  { background-size: 105% 105%; }
+  66%, 100% { background-size: 0 0; }
+}
+
+/* scintiller (700 ms) : presque immobile : gonfle à peine en tournant un peu, et l'extra scintille. Extra : étincelles qui naissent derrière l'icône, s'installent puis s'envolent. */
+@keyframes ico-scintiller-trait {
+  0%   { rotate: 0deg; scale: 1; }
+  30%  { rotate: -5deg; scale: 1.1; }
+  60%  { rotate: 2deg; scale: .97; }
+  80%  { rotate: 0deg; scale: 1.02; }
+  100% { rotate: 0deg; scale: 1; }
+}
+@keyframes ico-scintiller-fond {
+  0%   { rotate: 0deg; scale: 1; }
+  36%  { rotate: -3deg; scale: 1.14; }
+  66%  { rotate: 1deg; scale: .96; }
+  86%  { rotate: 0deg; scale: 1.02; }
+  100% { rotate: 0deg; scale: 1; }
+}
+@keyframes ico-scintiller-extra {
+  0%, 8% { background-size: 0 0; background-position: var(--ico-ex, 50%) var(--ico-ey, 50%); }
+  30%  { background-size: 100% 100%; }
+  62%  { background-size: 108% 108%; }
+  99%  { background-size: 160% 160%; }
+  100% { background-size: 0 0; }
+}
+
+/* --- 4. Une règle par icône (58) -----------------------------------
+   Clés sans icône (emoji gardé) : aucune. */
+
+/* hasard — tourner */
+[data-cle="hasard"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M12 3l8 4.5v9L12 21l-8-4.5v-9Z M12 6.3a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4Z M6.4 10.35a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4Z M9.6 15.75a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4Z M18 9.7a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3Z M16 13.1a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3Z M14 16.5a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l8 4.5v9L12 21l-8-4.5v-9Z'/%3E%3Cpath d='M4 7.5 12 12l8-4.5M12 12v9'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3 1.4q0 2 2 2-2 0-2 2 0-2-2-2 2 0 2-2Z' fill='%23eceae4'/%3E%3Cpath d='M21.2 2.6q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M21 18.6q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-tourner-fond;
+  --ico-anim-trait: ico-tourner-trait;
+  --ico-anim-extra: ico-tourner-extra;
+  --ico-duree: 700ms;
+}
+
+/* collection:aimes — pulser */
+[data-cle="collection:aimes"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M7 10.5l3.4-6.2a1.9 1.9 0 0 1 3.6.9V9h4.4a2 2 0 0 1 2 2.4l-1.3 6.7a2.3 2.3 0 0 1-2.3 1.9H4.8A1.8 1.8 0 0 1 3 18.2v-5.9a1.8 1.8 0 0 1 1.8-1.8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 10.5v9.5M7 10.5l3.4-6.2a1.9 1.9 0 0 1 3.6.9V9h4.4a2 2 0 0 1 2 2.4l-1.3 6.7a2.3 2.3 0 0 1-2.3 1.9H4.8A1.8 1.8 0 0 1 3 18.2v-5.9a1.8 1.8 0 0 1 1.8-1.8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M20.6 6c-1.2-.8-2.3-1.6-2.3-2.8 0-.7.5-1.2 1.2-1.2.5 0 .9.3 1.1.7.2-.4.6-.7 1.1-.7.7 0 1.2.5 1.2 1.2 0 1.2-1.1 2-2.3 2.8Z' fill='%23eceae4'/%3E%3Cpath d='M2.6 3.2q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M21.8 18.6q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-pulser-fond;
+  --ico-anim-trait: ico-pulser-trait;
+  --ico-anim-extra: ico-pulser-extra;
+  --ico-duree: 620ms;
+  --ico-origine: 50% 55%;
+}
+
+/* collection:hors-ligne — sautiller */
+[data-cle="collection:hors-ligne"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Crect x='6.4' y='2.8' width='11.2' height='18.4' rx='2.6'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='6.4' y='2.8' width='11.2' height='18.4' rx='2.6'/%3E%3Cpath d='M12 6.6v6.8M9.2 10.6l2.8 2.8 2.8-2.8M9.6 17.2h4.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.2 3q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M20.8 15.2q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M21 2.2q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* age:3-4 — sautiller */
+[data-cle="age:3-4"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Ccircle cx='5.6' cy='7.2' r='3'/%3E%3Ccircle cx='18.4' cy='7.2' r='3'/%3E%3Cpath fill-rule='evenodd' d='M12 6.4a7.2 7.2 0 1 0 0 14.4 7.2 7.2 0 1 0 0-14.4ZM9.2 10.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4ZM14.8 10.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4ZM12 14.6c-.8 0-1.4.4-1.4.9s.6.9 1.4.9 1.4-.4 1.4-.9-.6-.9-1.4-.9Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='13.6' r='7.2'/%3E%3Cpath d='M5.65 10.2A3 3 0 1 1 8.6 7.25M15.4 7.25A3 3 0 1 1 18.35 10.2'/%3E%3Cpath fill='%23000' stroke='none' fill-rule='evenodd' d='M12 13.6c-2 0-3.5 1.2-3.5 2.8S10 19.2 12 19.2s3.5-1.2 3.5-2.8-1.5-2.8-3.5-2.8ZM12 14.6c-.8 0-1.4.4-1.4.9s.6.9 1.4.9 1.4-.4 1.4-.9-.6-.9-1.4-.9Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.4 15.4q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.6 15.8q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3Cpath d='M12 0.6q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* age:5-6 — osciller */
+[data-cle="age:5-6"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M18.5 3.1 19.7 12.6 9.8 17 9.5 6.2Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18.5 3.1 19.7 12.6 9.8 17 9.5 6.2Z'/%3E%3Cpath d='M18.5 3.1 9.8 17M9.5 6.2l10.2 6.4'/%3E%3Cpath d='M9.8 17c-.8 1.6-2.6 1-3.4 2.4-.5.9-1.2 1.4-2 1.6'/%3E%3Cpath fill='%23000' stroke='none' d='M5 17.9l2.2 1.2-1.8 1.5ZM8.4 18.4l-1.6.9 1.4 1.4Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23eceae4' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M1.4 7.2h3.4q1.2 0 1.2-1.2'/%3E%3Cpath d='M2.2 10.2h2.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-osciller-fond;
+  --ico-anim-trait: ico-osciller-trait;
+  --ico-anim-extra: ico-osciller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 18.33% 87.5%;
+  --ico-ex: 20.83%;
+  --ico-ey: 33.33%;
+}
+
+/* age:7-8 — galoper */
+[data-cle="age:7-8"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M6.2 10.6a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 1 0 0-7.2ZM6.2 12.9a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 1 0 0-2.6Z'/%3E%3Cpath fill-rule='evenodd' d='M17.8 10.6a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 1 0 0-7.2ZM17.8 12.9a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 1 0 0-2.6Z'/%3E%3Cpath d='M9.6 8.4h6l-4.2 5.8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6.2' cy='14.2' r='3.6'/%3E%3Ccircle cx='17.8' cy='14.2' r='3.6'/%3E%3Cpath d='M6.2 14.2h5.2l4.2-5.8H9.6L6.2 14.2M9.6 8.4l1.8 5.8M15.6 8.4l2.2 5.8M9.6 8.4l-.4-2.2M7.8 6.2h2.8M15.6 8.4l-.6-2.4h-1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23eceae4'%3E%3Ccircle cx='1.6' cy='16.6' r='1'/%3E%3Ccircle cx='1' cy='13.8' r='.7'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-galoper-fond;
+  --ico-anim-trait: ico-galoper-trait;
+  --ico-anim-extra: ico-galoper-extra;
+  --ico-duree: 660ms;
+  --ico-origine: 50% 90%;
+  --ico-ex: 8.33%;
+  --ico-ey: 62.5%;
+}
+
+/* age:9+ — decoller */
+[data-cle="age:9+"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cg transform='rotate(-16 12 12) translate(1.2 .1) scale(.9)'%3E%3Cpath d='M2.4 9.4a1.2 1.2 0 0 1 2.2-.6q.8 1.8 2.4 1.8h10q1.6 0 2.4-1.8a1.2 1.2 0 0 1 2.2.6q-.8 4.6-4.6 4.6H7Q3.2 14 2.4 9.4Z'/%3E%3Ccircle cx='7.6' cy='16.2' r='2.3'/%3E%3Ccircle cx='16.4' cy='16.2' r='2.3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='rotate(-16 12 12) translate(1.2 .1) scale(.9)'%3E%3Cpath d='M2.4 9.4a1.2 1.2 0 0 1 2.2-.6q.8 1.8 2.4 1.8h10q1.6 0 2.4-1.8a1.2 1.2 0 0 1 2.2.6q-.8 4.6-4.6 4.6H7Q3.2 14 2.4 9.4Z'/%3E%3Ccircle cx='7.6' cy='16.2' r='2.3'/%3E%3Ccircle cx='16.4' cy='16.2' r='2.3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-16 12 12) translate(1.2 .1) scale(.9)' fill='none' stroke='%23eceae4' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M-1.6 11h2.4M-.8 14.6h2'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-decoller-fond;
+  --ico-anim-trait: ico-decoller-trait;
+  --ico-anim-extra: ico-decoller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 50% 70%;
+  --ico-ex: 14.17%;
+  --ico-ey: 54.17%;
+}
+
+/* genre:puzzle — emboiter */
+[data-cle="genre:puzzle"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M3.5 7.5H7.7a2.6 2.6 0 1 1 4.6 0H16.5v4.2a2.6 2.6 0 1 1 0 4.6v4.2H3.5v-4.2a2.6 2.6 0 1 0 0-4.6Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 7.5H7.7a2.6 2.6 0 1 1 4.6 0H16.5v4.2a2.6 2.6 0 1 1 0 4.6v4.2H3.5v-4.2a2.6 2.6 0 1 0 0-4.6Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M1.6 5.4 0.6 4.4M3.6 4.6 3.4 3.2' stroke='%23eceae4'/%3E%3Cpath d='M18.6 21.6l1.2.8M19.4 19.8l1.4.1' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-emboiter-fond;
+  --ico-anim-trait: ico-emboiter-trait;
+  --ico-anim-extra: ico-emboiter-extra;
+  --ico-duree: 640ms;
+}
+
+/* genre:memoire — pulser */
+[data-cle="genre:memoire"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M4.6 3.2h4.2a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-1.4 1.4H4.6a1.4 1.4 0 0 1-1.4-1.4V4.6a1.4 1.4 0 0 1 1.4-1.4ZM6.7 4.7l.6 1.4 1.5.1-1.1 1 .3 1.5-1.3-.7-1.3.7.3-1.5-1.1-1 1.5-.1Z'/%3E%3Cpath fill-rule='evenodd' d='M15.2 13.8h4.2a1.4 1.4 0 0 1 1.4 1.4v4.2a1.4 1.4 0 0 1-1.4 1.4h-4.2a1.4 1.4 0 0 1-1.4-1.4v-4.2a1.4 1.4 0 0 1 1.4-1.4ZM17.3 15.3l.6 1.4 1.5.1-1.1 1 .3 1.5-1.3-.7-1.3.7.3-1.5-1.1-1 1.5-.1Z'/%3E%3Crect x='13.8' y='3.2' width='7' height='7' rx='1.4'/%3E%3Crect x='3.2' y='13.8' width='7' height='7' rx='1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.2' y='3.2' width='7' height='7' rx='1.4'/%3E%3Crect x='13.8' y='3.2' width='7' height='7' rx='1.4'/%3E%3Crect x='3.2' y='13.8' width='7' height='7' rx='1.4'/%3E%3Crect x='13.8' y='13.8' width='7' height='7' rx='1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M12 .4q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M22.2 10.7q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3Cpath d='M1.9 11.2q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-pulser-fond;
+  --ico-anim-trait: ico-pulser-trait;
+  --ico-anim-extra: ico-pulser-extra;
+  --ico-duree: 620ms;
+  --ico-origine: 50% 55%;
+}
+
+/* genre:quiz — osciller */
+[data-cle="genre:quiz"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M5.6 14.2A7.9 7.9 0 1 1 8.3 17.4Q6.4 19.4 3.8 20.6Q4.9 17.6 5.6 14.2Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.6 14.2A7.9 7.9 0 1 1 8.3 17.4Q6.4 19.4 3.8 20.6Q4.9 17.6 5.6 14.2Z'/%3E%3Cpath d='M10.4 8.3a2.4 2.4 0 1 1 4.8 0c0 1.5-.9 2.2-1.8 2.8-.6.4-.6.8-.6 1.1'/%3E%3Ccircle cx='12.8' cy='15.4' r='1.1' fill='%23000' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M20.6 2.2q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3Cpath d='M22.6 7.3q0 1.1 1.1 1.1-1.1 0-1.1 1.1 0-1.1-1.1-1.1 1.1 0 1.1-1.1Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-osciller-fond;
+  --ico-anim-trait: ico-osciller-trait;
+  --ico-anim-extra: ico-osciller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 16.67% 85%;
+  --ico-ex: 87.5%;
+  --ico-ey: 20.83%;
+}
+
+/* genre:mots — sautiller */
+[data-cle="genre:mots"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M10.8 3.4h2.4L21 20.6h-4.2L15.2 17H8.8l-1.6 3.6H3ZM12 10l1.7 3.8h-3.4Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.8 3.4h2.4L21 20.6h-4.2L15.2 17H8.8l-1.6 3.6H3Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M4 3q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 4.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3Cpath d='M12 19.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* genre:calcul — tourner */
+[data-cle="genre:calcul"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M7.3 9.9a2.1 2.1 0 0 1 4.2 0v2h2a2.1 2.1 0 0 1 0 4.2h-2v2a2.1 2.1 0 0 1-4.2 0v-2h-2a2.1 2.1 0 0 1 0-4.2h2Z'/%3E%3Cpath d='M14.9 3.5h4.2a1.9 1.9 0 0 1 0 3.8h-4.2a1.9 1.9 0 0 1 0-3.8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.3 9.9a2.1 2.1 0 0 1 4.2 0v2h2a2.1 2.1 0 0 1 0 4.2h-2v2a2.1 2.1 0 0 1-4.2 0v-2h-2a2.1 2.1 0 0 1 0-4.2h2Z'/%3E%3Cpath d='M14.9 3.5h4.2a1.9 1.9 0 0 1 0 3.8h-4.2a1.9 1.9 0 0 1 0-3.8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M19.4 17.6q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M4 2.9q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-tourner-fond;
+  --ico-anim-trait: ico-tourner-trait;
+  --ico-anim-extra: ico-tourner-extra;
+  --ico-duree: 700ms;
+}
+
+/* genre:reflexes — secouer */
+[data-cle="genre:reflexes"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M14.6 2 5 13.6h6.4L9.6 22l9.6-12.2h-6.4Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.6 2 5 13.6h6.4L9.6 22l9.6-12.2h-6.4Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M4.2 16.4q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M19.8 2.6q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M20.6 15q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-secouer-fond;
+  --ico-anim-trait: ico-secouer-trait;
+  --ico-anim-extra: ico-secouer-extra;
+  --ico-duree: 520ms;
+}
+
+/* genre:arcade — osciller */
+[data-cle="genre:arcade"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M5.4 15.6h13.2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H5.4a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2Z'/%3E%3Ccircle cx='10.4' cy='6.2' r='3.3'/%3E%3Cpath d='M14.6 15.6a2.2 2 0 0 1 4.4 0Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.4 15.6h13.2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H5.4a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2Z'/%3E%3Ccircle cx='10.4' cy='6.2' r='3.3'/%3E%3Cpath d='M10.4 9.5v6.1M14.6 15.6a2.2 2 0 0 1 4.4 0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Crect x='16.4' y='3.6' width='1.8' height='1.8' rx='.3' fill='%23eceae4'/%3E%3Crect x='19.6' y='6.6' width='1.8' height='1.8' rx='.3' fill='%23a8b3f0'/%3E%3Crect x='20' y='2' width='1.5' height='1.5' rx='.3' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-osciller-fond;
+  --ico-anim-trait: ico-osciller-trait;
+  --ico-anim-extra: ico-osciller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 43.33% 70.83%;
+  --ico-ex: 77.5%;
+  --ico-ey: 20.83%;
+}
+
+/* genre:plateforme — sautiller */
+[data-cle="genre:plateforme"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Crect x='3.2' y='17' width='7.6' height='3.8' rx='1.4'/%3E%3Crect x='13.2' y='11.4' width='7.6' height='3.8' rx='1.4'/%3E%3Ccircle cx='15.6' cy='5.8' r='2.6'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.2' y='17' width='7.6' height='3.8' rx='1.4'/%3E%3Crect x='13.2' y='11.4' width='7.6' height='3.8' rx='1.4'/%3E%3Ccircle cx='15.6' cy='5.8' r='2.6'/%3E%3Ccircle cx='5.8' cy='13.4' r='1' fill='%23000' stroke='none'/%3E%3Ccircle cx='7.2' cy='9.2' r='1' fill='%23000' stroke='none'/%3E%3Ccircle cx='9.9' cy='6.3' r='1' fill='%23000' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cellipse cx='21.6' cy='3.4' rx='1.1' ry='1.5' fill='%23eceae4'/%3E%3Cellipse cx='9.4' cy='1.6' rx='.9' ry='1.2' fill='%23eceae4'/%3E%3Cpath d='M2.6 4.4q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* genre:course — nager */
+[data-cle="genre:course"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M10.3 3.3l2.5 1.1 2.6.9v5l-2.6-.9-2.5-1.1Z'/%3E%3Cpath d='M5 9Q7.5 7.5 10.3 8.3v5Q7.5 12.5 5 14Z'/%3E%3Cpath d='M15.4 10.3Q17.9 10.9 20.8 9.4v5Q17.9 15.9 15.4 15.3Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4C8 2.2 10.4 3.2 12.8 4.4S17.8 6 20.8 4.4V14.4C17.8 16 15.2 15.6 12.8 14.4S8 12.2 5 14'/%3E%3Cpath d='M5 21V3.2'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M22.4 7q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3Cpath d='M16.4 17.8q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23a8b3f0'/%3E%3Cpath d='M10 18.2q0 1.1 1.1 1.1-1.1 0-1.1 1.1 0-1.1-1.1-1.1 1.1 0 1.1-1.1Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-nager-fond;
+  --ico-anim-trait: ico-nager-trait;
+  --ico-anim-extra: ico-nager-extra;
+  --ico-duree: 720ms;
+  --ico-ex: 70.83%;
+  --ico-ey: 66.67%;
+}
+
+/* genre:sport — tourner */
+[data-cle="genre:sport"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M12 3.4a8.6 8.6 0 1 0 0 17.2 8.6 8.6 0 1 0 0-17.2ZM12 9l2.9 2.1-1.1 3.4h-3.6l-1.1-3.4ZM12 3.5a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7ZM18.4 8.1a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7ZM15.9 15.6a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7ZM8.1 15.6a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7ZM5.6 8.1a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.6'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.2 1.8q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M21 19.1q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3Cpath d='M21.2 2.5q0 1.1 1.1 1.1-1.1 0-1.1 1.1 0-1.1-1.1-1.1 1.1 0 1.1-1.1Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-tourner-fond;
+  --ico-anim-trait: ico-tourner-trait;
+  --ico-anim-extra: ico-tourner-extra;
+  --ico-duree: 700ms;
+}
+
+/* genre:tir — secouer */
+[data-cle="genre:tir"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M10.6 5.8a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 1 0 0-15.2ZM10.6 11.7a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 1 0 0-3.4Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10.6' cy='13.4' r='7.6'/%3E%3Ccircle cx='10.6' cy='13.4' r='4.2'/%3E%3Cpath d='M10.6 13.4l9.8-9.8M17.4 3.6v3h3'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.6 2.9q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M21.2 12.2q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3Cpath d='M19.8 19.8q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-secouer-fond;
+  --ico-anim-trait: ico-secouer-trait;
+  --ico-anim-extra: ico-secouer-extra;
+  --ico-duree: 520ms;
+}
+
+/* genre:combat — decoller */
+[data-cle="genre:combat"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cg transform='rotate(-30 12 12)'%3E%3Cpath d='M4.4 9h3.4c.8-3.4 4.4-5 7.6-4.6 4 .6 5.8 4.2 5.4 8-.4 4-3.2 6.8-7.2 6.8-2.8 0-4.8-.6-5.8-1.8H4.4a1.2 1.2 0 0 1-1.2-1.2v-6A1.2 1.2 0 0 1 4.4 9Z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='rotate(-30 12 12)'%3E%3Cpath d='M4.4 9h3.4c.8-3.4 4.4-5 7.6-4.6 4 .6 5.8 4.2 5.4 8-.4 4-3.2 6.8-7.2 6.8-2.8 0-4.8-.6-5.8-1.8H4.4a1.2 1.2 0 0 1-1.2-1.2v-6A1.2 1.2 0 0 1 4.4 9Z'/%3E%3Cpath d='M7.8 9v8.4M8.6 13.8c2.6-1.8 6.8-1.6 8 .8.6 1.2-.2 2.4-1.6 2.6'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-30 12 12)' fill='none' stroke='%23eceae4' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M.2 11h1.8M.6 15.4h1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-decoller-fond;
+  --ico-anim-trait: ico-decoller-trait;
+  --ico-anim-extra: ico-decoller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 50% 70%;
+  --ico-ex: 12.5%;
+  --ico-ey: 76.67%;
+}
+
+/* genre:labyrinthe — tourner */
+[data-cle="genre:labyrinthe"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Crect x='3.4' y='3.4' width='17.2' height='17.2' rx='2.2'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.7 3.4H5.6a2.2 2.2 0 0 0-2.2 2.2v12.8a2.2 2.2 0 0 0 2.2 2.2H12M12 3.4h6.4a2.2 2.2 0 0 1 2.2 2.2v12.8a2.2 2.2 0 0 1-2.2 2.2h-2.1'/%3E%3Cpath d='M12 3.4v4.3h4.3M3.4 12h4.3V7.7M20.6 12H12v4.3M7.7 20.6v-4.3'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M1.9 .4q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M22.1 20.8q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3Cpath d='M22.4 1q0 1.1 1.1 1.1-1.1 0-1.1 1.1 0-1.1-1.1-1.1 1.1 0 1.1-1.1Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-tourner-fond;
+  --ico-anim-trait: ico-tourner-trait;
+  --ico-anim-extra: ico-tourner-extra;
+  --ico-duree: 700ms;
+}
+
+/* genre:aventure — osciller */
+[data-cle="genre:aventure"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M6 5.6c2 .8 4 .8 6 0s4-.8 6 0v12.8c-2-.8-4-.8-6 0s-4 .8-6 0Z'/%3E%3Crect x='3' y='4.4' width='3.2' height='15.2' rx='1.6'/%3E%3Crect x='17.8' y='4.4' width='3.2' height='15.2' rx='1.6'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4.4' width='3.2' height='15.2' rx='1.6'/%3E%3Crect x='17.8' y='4.4' width='3.2' height='15.2' rx='1.6'/%3E%3Cpath d='M6.2 5.6c1.9.8 3.9.8 5.8 0s3.9-.8 5.8 0M6.2 18.4c1.9.8 3.9.8 5.8 0s3.9-.8 5.8 0'/%3E%3Cpath d='M12.9 8.3l2.6 2.6M15.5 8.3l-2.6 2.6'/%3E%3Ccircle cx='8.7' cy='15.4' r='.85' fill='%23000' stroke='none'/%3E%3Ccircle cx='11.6' cy='14.6' r='.85' fill='%23000' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M1.6 1.8q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M22.4 1.6q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-osciller-fond;
+  --ico-anim-trait: ico-osciller-trait;
+  --ico-anim-extra: ico-osciller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 50% 83.33%;
+  --ico-ex: 50%;
+  --ico-ey: 20.83%;
+}
+
+/* genre:observation — nager */
+[data-cle="genre:observation"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Ccircle cx='9.8' cy='9.8' r='6.4'/%3E%3Cpath d='M12.9 15.4 18.5 21.1A1.8 1.8 0 0 0 21.1 18.5L15.4 12.9Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9.8' cy='9.8' r='6.4'/%3E%3Cpath d='M12.9 15.4 18.5 21.1A1.8 1.8 0 0 0 21.1 18.5L15.4 12.9'/%3E%3Cpath d='M6.6 9A3.3 3.3 0 0 1 9 6.6'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M19.6 2.6q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M22.2 7.4q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-nager-fond;
+  --ico-anim-trait: ico-nager-trait;
+  --ico-anim-extra: ico-nager-extra;
+  --ico-duree: 720ms;
+  --ico-ex: 81.25%;
+  --ico-ey: 25%;
+}
+
+/* genre:strategie — sautiller */
+[data-cle="genre:strategie"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M7 20.8H17a1.5 1.5 0 0 0 1.5-1.5v-.4a1.5 1.5 0 0 0-1.5-1.5h-.6C14.7 15.9 14.2 13.4 14.2 10.9H15a1.1 1.1 0 0 0 0-2.2h-.8A3.3 3.3 0 1 0 9.8 8.7H9a1.1 1.1 0 0 0 0 2.2h.8c0 2.5-.5 5-2.2 6.5H7a1.5 1.5 0 0 0-1.5 1.5v.4A1.5 1.5 0 0 0 7 20.8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 20.8H17a1.5 1.5 0 0 0 1.5-1.5v-.4a1.5 1.5 0 0 0-1.5-1.5h-.6C14.7 15.9 14.2 13.4 14.2 10.9H15a1.1 1.1 0 0 0 0-2.2h-.8A3.3 3.3 0 1 0 9.8 8.7H9a1.1 1.1 0 0 0 0 2.2h.8c0 2.5-.5 5-2.2 6.5H7a1.5 1.5 0 0 0-1.5 1.5v.4A1.5 1.5 0 0 0 7 20.8Z'/%3E%3Cpath d='M7.6 17.4h8.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.4 2.2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 2.6q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3Cpath d='M21.6 12.4q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* genre:defense — pulser */
+[data-cle="genre:defense"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 3c2.6 1.5 5.2 2.2 7.6 2.2v6c0 4.8-3.1 8-7.6 9.9-4.5-1.9-7.6-5.1-7.6-9.9v-6c2.4 0 5-.7 7.6-2.2Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3c2.6 1.5 5.2 2.2 7.6 2.2v6c0 4.8-3.1 8-7.6 9.9-4.5-1.9-7.6-5.1-7.6-9.9v-6c2.4 0 5-.7 7.6-2.2Z'/%3E%3Cpath fill='%23000' d='M12 8.6 12.8 10.6 15 10.8 13.3 12.2 13.8 14.4 12 13.2 10.2 14.4 10.7 12.2 9 10.8 11.2 10.6Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.6 2.2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 2.4q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 16.4q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-pulser-fond;
+  --ico-anim-trait: ico-pulser-trait;
+  --ico-anim-extra: ico-pulser-extra;
+  --ico-duree: 620ms;
+  --ico-origine: 50% 55%;
+}
+
+/* genre:gestion — sautiller */
+[data-cle="genre:gestion"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M5.2 8H18.8V20.6H5.2ZM10.2 20.6V16a1.8 1.8 0 0 1 3.6 0v4.6Z'/%3E%3Cpath d='M5 4.2H19l1.6 4.2a2.9 2 0 0 1-5.7 0 2.9 2 0 0 1-5.8 0 2.9 2 0 0 1-5.7 0Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4.2H19l1.6 4.2a2.9 2 0 0 1-5.7 0 2.9 2 0 0 1-5.8 0 2.9 2 0 0 1-5.7 0Z'/%3E%3Cpath d='M9.7 4.2 9.1 8.4M14.3 4.2l.6 4.2'/%3E%3Cpath d='M5.2 10.3V20.6H18.8V10.3M10.2 20.6V16a1.8 1.8 0 0 1 3.6 0v4.6'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Ccircle cx='2.2' cy='15.6' r='1.5' fill='%23eceae4'/%3E%3Ccircle cx='21.9' cy='14' r='1.2' fill='%23eceae4'/%3E%3Cpath d='M3.2 1.2q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* genre:simulation — emboiter */
+[data-cle="genre:simulation"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cg transform='rotate(45 12 12)'%3E%3Crect x='2.2' y='7.8' width='19.6' height='8.4' rx='4.2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='rotate(45 12 12)'%3E%3Crect x='2.2' y='7.8' width='19.6' height='8.4' rx='4.2'/%3E%3Crect x='9' y='10' width='6' height='4' rx='.9' fill='%23000' stroke='none'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(45 12 12)' fill='none' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M10.2 4.8 9.6 3.4M13.8 4.8l.6-1.4' stroke='%23eceae4'/%3E%3Cpath d='M10.2 19.2l-.6 1.4M13.8 19.2l.6 1.4' stroke='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-emboiter-fond;
+  --ico-anim-trait: ico-emboiter-trait;
+  --ico-anim-extra: ico-emboiter-extra;
+  --ico-duree: 640ms;
+}
+
+/* genre:creation — osciller */
+[data-cle="genre:creation"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M9.8 8.2C10.3 11.2 13.7 11.2 14.2 8.2L16.6 9.3C15.6 10.8 15 11.6 15 13.4L19.4 19.8Q12 22 4.6 19.8L9 13.4C9 11.6 8.4 10.8 7.4 9.3Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.4 10.6 12 7.2l7.6 3.4M12 7.2V5a1.3 1.3 0 1 1 2.6 0'/%3E%3Cpath d='M9.8 8.2C10.3 11.2 13.7 11.2 14.2 8.2M16.6 9.3C15.6 10.8 15 11.6 15 13.4L19.4 19.8Q12 22 4.6 19.8L9 13.4C9 11.6 8.4 10.8 7.4 9.3'/%3E%3Cpath d='M9 13.4h6'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.8 12.6q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M21.2 12q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-osciller-fond;
+  --ico-anim-trait: ico-osciller-trait;
+  --ico-anim-extra: ico-osciller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 55.42% 15.42%;
+  --ico-ex: 50%;
+  --ico-ey: 62.5%;
+}
+
+/* genre:construction — emboiter */
+[data-cle="genre:construction"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M3.8 13H20.2V20.8H3.8Z'/%3E%3Crect x='8.7' y='4.9' width='7.4' height='7.4' rx='.6' transform='rotate(-10 12.4 8.6)'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.8 13H20.2V20.8H3.8ZM12 13v7.8'/%3E%3Crect x='8.7' y='4.9' width='7.4' height='7.4' rx='.6' transform='rotate(-10 12.4 8.6)'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M3.4 8.6 2.2 7.8M5 6.6l-.4-1.3' stroke='%23eceae4'/%3E%3Cpath d='M20.6 8.6l1.2-.8M19 6.6l.4-1.3' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-emboiter-fond;
+  --ico-anim-trait: ico-emboiter-trait;
+  --ico-anim-extra: ico-emboiter-extra;
+  --ico-duree: 640ms;
+}
+
+/* genre:musique — osciller */
+[data-cle="genre:musique"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cellipse cx='7.2' cy='17.6' rx='3' ry='2.3' transform='rotate(-20 7.2 17.6)'/%3E%3Cellipse cx='16.2' cy='15.6' rx='3' ry='2.3' transform='rotate(-20 16.2 15.6)'/%3E%3Cpath d='M10 5.6 19 3.6v3.4L10 9Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cellipse cx='7.2' cy='17.6' rx='3' ry='2.3' transform='rotate(-20 7.2 17.6)'/%3E%3Cellipse cx='16.2' cy='15.6' rx='3' ry='2.3' transform='rotate(-20 16.2 15.6)'/%3E%3Cpath d='M10 16.9V5.6L19 3.6v11.3M10 9l9-2'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Ccircle cx='3.3' cy='9.4' r='1.2' fill='%23eceae4'/%3E%3Cpath d='M4.5 9.4V5.6l1.4.8' fill='none' stroke='%23eceae4' stroke-width='1.1' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='21.4' cy='11.2' r='1' fill='%23eceae4'/%3E%3Cpath d='M22.4 11.2V8.2' fill='none' stroke='%23eceae4' stroke-width='1' stroke-linecap='round'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-osciller-fond;
+  --ico-anim-trait: ico-osciller-trait;
+  --ico-anim-extra: ico-osciller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 50% 87.5%;
+}
+
+/* genre:societe — osciller */
+[data-cle="genre:societe"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M11.5 17.8 8.7 18.9A1.4 1.4 0 0 1 6.9 18.1L3.3 9.2A1.4 1.4 0 0 1 4.1 7.4L8.5 5.6A1.4 1.4 0 0 1 9.1 5.5L9 17.8Z'/%3E%3Cpath d='M14.9 5.5A1.4 1.4 0 0 1 15.5 5.6L19.9 7.4A1.4 1.4 0 0 1 20.7 9.2L17.1 18.1A1.4 1.4 0 0 1 15.3 18.9L12.5 17.8H15Z'/%3E%3Cpath fill-rule='evenodd' d='M9.6 5.4h4.8a1.4 1.4 0 0 1 1.4 1.4v9.6a1.4 1.4 0 0 1-1.4 1.4H9.6a1.4 1.4 0 0 1-1.4-1.4V6.8a1.4 1.4 0 0 1 1.4-1.4ZM12 14.6c-1.8-1.2-2.6-2.3-2.6-3.4 0-.9.7-1.6 1.5-1.6.5 0 .9.3 1.1.7.2-.4.6-.7 1.1-.7.8 0 1.5.7 1.5 1.6 0 1.1-.8 2.2-2.6 3.4Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.6 5.4h4.8a1.4 1.4 0 0 1 1.4 1.4v9.6a1.4 1.4 0 0 1-1.4 1.4H9.6a1.4 1.4 0 0 1-1.4-1.4V6.8a1.4 1.4 0 0 1 1.4-1.4Z'/%3E%3Cpath d='M11.5 17.8 8.7 18.9A1.4 1.4 0 0 1 6.9 18.1L3.3 9.2A1.4 1.4 0 0 1 4.1 7.4L8.5 5.6A1.4 1.4 0 0 1 9.1 5.5'/%3E%3Cpath d='M14.9 5.5A1.4 1.4 0 0 1 15.5 5.6L19.9 7.4A1.4 1.4 0 0 1 20.7 9.2L17.1 18.1A1.4 1.4 0 0 1 15.3 18.9L12.5 17.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.8 5.4c-1.2-.8-1.8-1.6-1.8-2.3 0-.6.5-1.1 1-1.1.4 0 .6.2.8.5.2-.3.4-.5.8-.5.5 0 1 .5 1 1.1 0 .7-.6 1.5-1.8 2.3Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 1.4l1.4 2-1.4 2-1.4-2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-osciller-fond;
+  --ico-anim-trait: ico-osciller-trait;
+  --ico-anim-extra: ico-osciller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 50% 83.33%;
+  --ico-ex: 50%;
+  --ico-ey: 25%;
+}
+
+/* genre:coloriage — nager */
+[data-cle="genre:coloriage"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M7.6 18c1.4 1.5 2.8 1.5 4.2 0s2.8-1.5 4.2 0 2.8 1.5 4.2 0' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath transform='rotate(45 12 12)' d='M9.4 3.4h5.2v10.4l-1.6 4.4h-2l-1.6-4.4Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath transform='rotate(45 12 12)' d='M9.4 3.4h5.2v10.4l-1.6 4.4h-2l-1.6-4.4ZM9.4 13.8h5.2M9.4 6.6h5.2'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3 9.4q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M7 4.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-nager-fond;
+  --ico-anim-trait: ico-nager-trait;
+  --ico-anim-extra: ico-nager-extra;
+  --ico-duree: 720ms;
+  --ico-ex: 20.83%;
+  --ico-ey: 50%;
+}
+
+/* genre:role — pulser */
+[data-cle="genre:role"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M10.4 6.6V9.6A5.8 5.8 0 1 0 13.6 9.6V6.6ZM13.6 16.4a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 1 0 0-2.8Z'/%3E%3Crect x='9.8' y='3' width='4.4' height='3.6' rx='1.1'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.4 6.6V9.6A5.8 5.8 0 1 0 13.6 9.6V6.6'/%3E%3Crect x='9.8' y='3' width='4.4' height='3.6' rx='1.1'/%3E%3Cpath d='M6.3 14.2c1.9-1 3.8 1 5.7 0s3.8-1 5.7 0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.6 3.2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 2.6q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23a8b3f0'/%3E%3Cpath d='M21.2 15.4q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-pulser-fond;
+  --ico-anim-trait: ico-pulser-trait;
+  --ico-anim-extra: ico-pulser-extra;
+  --ico-duree: 620ms;
+  --ico-origine: 50% 55%;
+}
+
+/* genre:autre — secouer */
+[data-cle="genre:autre"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M7.8 6.8H16.2c2.3 0 3.7 1.4 4.1 3.6l.5 3.5c.3 2-1 3.8-2.7 3.8-1.1 0-1.9-.5-2.5-1.4l-.9-1.4H9.3l-.9 1.4c-.6.9-1.4 1.4-2.5 1.4-1.7 0-3-1.8-2.7-3.8l.5-3.5c.4-2.2 1.8-3.6 4.1-3.6ZM6.9 9.3h1.8v1.4h1.4v1.8H8.7v1.4H6.9v-1.4H5.5v-1.8h1.4ZM15.4 11.8a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4ZM17.6 9a1.2 1.2 0 1 0 0 2.4 1.2 1.2 0 1 0 0-2.4Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.8 6.8H16.2c2.3 0 3.7 1.4 4.1 3.6l.5 3.5c.3 2-1 3.8-2.7 3.8-1.1 0-1.9-.5-2.5-1.4l-.9-1.4H9.3l-.9 1.4c-.6.9-1.4 1.4-2.5 1.4-1.7 0-3-1.8-2.7-3.8l.5-3.5c.4-2.2 1.8-3.6 4.1-3.6Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.8 1.8q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.2 2.2q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3Cpath d='M12 18.4q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-secouer-fond;
+  --ico-anim-trait: ico-secouer-trait;
+  --ico-anim-extra: ico-secouer-extra;
+  --ico-duree: 520ms;
+}
+
+/* univers:ferme — sautiller */
+[data-cle="univers:ferme"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M3.6 21V11.2l2.2-4.6L12 3l6.2 3.6 2.2 4.6V21ZM12 6.9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 1 0 0-3Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.6 21V11.2l2.2-4.6L12 3l6.2 3.6 2.2 4.6V21Z'/%3E%3Cpath d='M8.2 21v-7.6h7.6V21M8.2 13.4l7.6 7.6M15.8 13.4 8.2 21'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.4 2.6q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.6 2.4q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* univers:chevaux — galoper */
+[data-cle="univers:chevaux"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M10.4 2.2 11.8 5.8c3.2.8 6.1 3.8 8.1 7.4.8 1.5.5 3.4-1.3 4-1.3.4-2.5 0-3.5-.8-1-.8-2.2-.9-2.7-.1.3 2 1.1 3.8 2.2 5.3-2.8.8-5.6.8-8 0-.6-5-.1-11 2.2-15.4Z'/%3E%3Cpath d='M9.6 5C7.2 5.8 5.4 7.6 4.4 9.6c1 0 1.8.4 2.2 1-1.6 1.6-2.6 3.4-2.8 5 1-.2 1.8.2 2.4.8-1 1.6-1.4 3.2-1.2 4.8.6-.2 1.2 0 1.6.4C6 16.6 6.6 10.6 8.8 6.2Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.4 2.2 11.8 5.8c3.2.8 6.1 3.8 8.1 7.4.8 1.5.5 3.4-1.3 4-1.3.4-2.5 0-3.5-.8-1-.8-2.2-.9-2.7-.1.3 2 1.1 3.8 2.2 5.3-2.8.8-5.6.8-8 0-.6-5-.1-11 2.2-15.4Z'/%3E%3Cpath d='M9.6 5C7.2 5.8 5.4 7.6 4.4 9.6c1 0 1.8.4 2.2 1-1.6 1.6-2.6 3.4-2.8 5 1-.2 1.8.2 2.4.8-1 1.6-1.4 3.2-1.2 4.8.6-.2 1.2 0 1.6.4'/%3E%3Ccircle cx='14' cy='9.9' r='1.1' fill='%23000' stroke='none'/%3E%3Ccircle cx='18.9' cy='14.7' r='.75' fill='%23000' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23eceae4' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M.8 6.6h2.2M1.4 12.4h1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-galoper-fond;
+  --ico-anim-trait: ico-galoper-trait;
+  --ico-anim-extra: ico-galoper-extra;
+  --ico-duree: 660ms;
+  --ico-origine: 50% 90%;
+}
+
+/* univers:compagnie — sautiller */
+[data-cle="univers:compagnie"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M12 5.6c3.6 0 6 2.6 6 6.6 0 4.6-2.6 8.2-6 8.2s-6-3.6-6-8.2c0-4 2.4-6.6 6-6.6ZM10.5 10.3a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 1 0 0-2.2ZM13.5 10.3a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 1 0 0-2.2ZM12 13.9c-1 0-1.8.5-1.8 1.2s.8 1.3 1.8 1.3 1.8-.6 1.8-1.3-.8-1.2-1.8-1.2Z'/%3E%3Cpath d='M9 6.2C6.4 5.8 4 7.4 3.6 10.6c-.4 2.8.2 5.6 1.8 6 1.4.4 2.2-1.6 2.4-4.4.2-2 .5-4 1.2-6Z'/%3E%3Cpath d='M15 6.2c2.6-.4 5 1.2 5.4 4.4.4 2.8-.2 5.6-1.8 6-1.4.4-2.2-1.6-2.4-4.4-.2-2-.5-4-1.2-6Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5.6c3.6 0 6 2.6 6 6.6 0 4.6-2.6 8.2-6 8.2s-6-3.6-6-8.2c0-4 2.4-6.6 6-6.6Z'/%3E%3Cpath d='M9 6.2C6.4 5.8 4 7.4 3.6 10.6c-.4 2.8.2 5.6 1.8 6 1.4.4 2.2-1.6 2.4-4.4.2-2 .5-4 1.2-6Z'/%3E%3Cpath d='M15 6.2c2.6-.4 5 1.2 5.4 4.4.4 2.8-.2 5.6-1.8 6-1.4.4-2.2-1.6-2.4-4.4-.2-2-.5-4-1.2-6Z'/%3E%3Cpath fill='%23000' stroke='none' d='M10.9 17.2h2.2v1a1.1 1.1 0 0 1-2.2 0Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M20.4 18.2c.5-1 2.2-.8 2.2.5 0 1-1.2 1.8-2.2 2.6-1-.8-2.2-1.6-2.2-2.6 0-1.3 1.7-1.5 2.2-.5Z' fill='%23a8b3f0'/%3E%3Cpath d='M3 18q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* univers:sauvages — secouer */
+[data-cle="univers:sauvages"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M6.4 20.4C4.6 18.4 3.6 15.4 3.8 12 4 7.2 7.4 4 11.8 4 16 4 18.4 7 18.4 10.8V15.6Q18.4 17.4 19.6 17.4L20.2 16.8A1 1 0 0 1 21.1 17.6C21.1 19.8 19.4 21 17.4 21 15.6 21 14.8 19.8 14.8 17.6V16C13.6 17 11.4 17.8 9.6 18.2Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.4 20.4C4.6 18.4 3.6 15.4 3.8 12 4 7.2 7.4 4 11.8 4 16 4 18.4 7 18.4 10.8V15.6Q18.4 17.4 19.6 17.4L20.2 16.8A1 1 0 0 1 21.1 17.6C21.1 19.8 19.4 21 17.4 21 15.6 21 14.8 19.8 14.8 17.6V16C13.6 17 11.4 17.8 9.6 18.2Z'/%3E%3Cpath d='M9.8 6.6C7 6.8 6 9.4 6.4 12.2c.4 2.4 2 3.4 4.4 3.2'/%3E%3Ccircle cx='14.6' cy='9.4' r='1' fill='%23000' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M22.4 13.6l1.2-1.2M22.8 16.4H24' stroke='%23eceae4'/%3E%3Cpath d='M20.6 2.2l1.2-1.2M22.6 5.2l1.2-.6' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-secouer-fond;
+  --ico-anim-trait: ico-secouer-trait;
+  --ico-anim-extra: ico-secouer-extra;
+  --ico-duree: 520ms;
+}
+
+/* univers:dinosaures — galoper */
+[data-cle="univers:dinosaures"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M11.4 10.2C13.4 9 14.6 6.8 15.6 4.6 16.2 3.4 17.4 2.9 18.6 2.9 20 3 21 3.9 21 4.9 21 5.8 20.2 6.6 19 6.6 18.2 6.6 17.6 7 17.3 7.8 16.6 9.6 16.4 12 16.4 14V21H13.4V17.6C12 17.8 10.6 17.8 9.4 17.6V21H6.6V17C5.4 17.4 4 18.6 3.2 20 3 16.6 3.6 13 5.6 11.2 7.4 9.6 9.6 9.6 11.4 10.2ZM8.4 12a1.3 1.3 0 1 0 0 2.6 1.3 1.3 0 1 0 0-2.6ZM12.2 12.6a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11.4 10.2C13.4 9 14.6 6.8 15.6 4.6 16.2 3.4 17.4 2.9 18.6 2.9 20 3 21 3.9 21 4.9 21 5.8 20.2 6.6 19 6.6 18.2 6.6 17.6 7 17.3 7.8 16.6 9.6 16.4 12 16.4 14V21H13.4V17.6C12 17.8 10.6 17.8 9.4 17.6V21H6.6V17C5.4 17.4 4 18.6 3.2 20 3 16.6 3.6 13 5.6 11.2 7.4 9.6 9.6 9.6 11.4 10.2Z'/%3E%3Ccircle cx='18.8' cy='4.7' r='.75' fill='%23000' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Ccircle cx='3.6' cy='21.4' r='1.3' fill='%23eceae4'/%3E%3Ccircle cx='1.4' cy='19.8' r='.9' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-galoper-fond;
+  --ico-anim-trait: ico-galoper-trait;
+  --ico-anim-extra: ico-galoper-extra;
+  --ico-duree: 660ms;
+  --ico-origine: 50% 90%;
+  --ico-ex: 20.83%;
+  --ico-ey: 87.5%;
+}
+
+/* univers:ocean — nager */
+[data-cle="univers:ocean"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M20.5 12c-1.9-4-5.5-5.5-9-5-2.6.4-4.3 2-5.3 3.6L3 7.6v8.8l3.2-3c1 1.6 2.7 3.2 5.3 3.6 3.5.5 7.1-1 9-5Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.5 12c-1.9-4-5.5-5.5-9-5-2.6.4-4.3 2-5.3 3.6L3 7.6v8.8l3.2-3c1 1.6 2.7 3.2 5.3 3.6 3.5.5 7.1-1 9-5Z'/%3E%3Cpath d='M12.6 9.4c1 1.4 1 3.8 0 5.2'/%3E%3Ccircle cx='16.6' cy='10.8' r='1.1' fill='%23000' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23eceae4' stroke-width='1'%3E%3Ccircle cx='21.6' cy='7.2' r='1'/%3E%3Ccircle cx='19.6' cy='3.8' r='1.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-nager-fond;
+  --ico-anim-trait: ico-nager-trait;
+  --ico-anim-extra: ico-nager-extra;
+  --ico-duree: 720ms;
+  --ico-ex: 83.33%;
+  --ico-ey: 41.67%;
+}
+
+/* univers:espace — decoller */
+[data-cle="univers:espace"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cg transform='translate(-.2 .2) rotate(45 12 12)'%3E%3Cpath fill-rule='evenodd' d='M12 2.2c3.6 2.3 4.4 6.2 4.2 13.2H7.8c-.2-7 .6-10.9 4.2-13.2ZM12 6.7a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 1 0 0-3.4Z'/%3E%3Cpath d='M7.9 10.6 4.6 13.8v3.6l3.2-2ZM16.1 10.6l3.3 3.2v3.6l-3.2-2Z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='translate(-.2 .2) rotate(45 12 12)'%3E%3Cpath d='M12 2.2c3.6 2.3 4.4 6.2 4.2 13.2H7.8c-.2-7 .6-10.9 4.2-13.2Z'/%3E%3Ccircle cx='12' cy='8.4' r='1.7'/%3E%3Cpath d='M7.9 10.6 4.6 13.8v3.6l3.2-2M16.1 10.6l3.3 3.2v3.6l-3.2-2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(-.2 .2) rotate(45 12 12)'%3E%3Cpath d='M9.6 15.8c0 2.6 1 4.6 2.4 6.4 1.4-1.8 2.4-3.8 2.4-6.4Z' fill='%23eceae4'/%3E%3Cpath d='M10.9 15.8c0 1.5.4 2.8 1.1 3.9.7-1.1 1.1-2.4 1.1-3.9Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-decoller-fond;
+  --ico-anim-trait: ico-decoller-trait;
+  --ico-anim-extra: ico-decoller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 50% 70%;
+  --ico-ex: 39.17%;
+  --ico-ey: 60.83%;
+}
+
+/* univers:fantasy — scintiller */
+[data-cle="univers:fantasy"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M19.3 4.7 17.9 8.9 20.5 12.4 16.1 12.3 13.6 15.9 12.3 11.7 8.1 10.4 11.7 7.9 11.6 3.5 15.1 6.1Z'/%3E%3Cpath d='M13.5 12.9 5.8 20.6A1.7 1.7 0 0 1 3.4 18.2L11.1 10.5Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19.3 4.7 17.9 8.9 20.5 12.4 16.1 12.3 13.6 15.9 12.3 11.7 8.1 10.4 11.7 7.9 11.6 3.5 15.1 6.1Z'/%3E%3Cpath d='M12.8 13.6 5.8 20.6A1.7 1.7 0 0 1 3.4 18.2L10.4 11.2M6.2 15.4l2.4 2.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M4.4 2.6q0 2 2 2-2 0-2 2 0-2-2-2 2 0 2-2Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 15.8q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23a8b3f0'/%3E%3Cpath d='M21.6 0.8q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-scintiller-fond;
+  --ico-anim-trait: ico-scintiller-trait;
+  --ico-anim-extra: ico-scintiller-extra;
+  --ico-duree: 700ms;
+}
+
+/* univers:chevaliers — scintiller */
+[data-cle="univers:chevaliers"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M3 21V5.6h1v2.2h3.4V5.6h1V11h3V9h1.2v2h3V5.6h1v2.2H20V5.6h1V21h-7.2v-4.6a1.8 1.8 0 0 0-3.6 0V21Z'/%3E%3Cpath d='M12 2.9l2.8 1-2.8 1Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21V5.6h1v2.2h3.4V5.6h1V11h3V9h1.2v2h3V5.6h1v2.2H20V5.6h1V21h-7.2v-4.6a1.8 1.8 0 0 0-3.6 0V21Z'/%3E%3Cpath d='M12 9V2.9l2.8 1-2.8 1'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.6 0.8q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M21.2 0.6q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M7.4 1.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-scintiller-fond;
+  --ico-anim-trait: ico-scintiller-trait;
+  --ico-anim-extra: ico-scintiller-extra;
+  --ico-duree: 700ms;
+}
+
+/* univers:pirates — nager */
+[data-cle="univers:pirates"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M2.9 13.6Q4 15 6 15H18Q19.8 15 21.1 13.4L19 19.4Q18.6 20.6 17.2 20.6H6.8Q5.6 20.6 5.2 19.6ZM9.4 16.6a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3ZM14.6 16.6a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3Z'/%3E%3Cpath d='M6.6 7.2h10.8c1 1.6 1 3.2 0 4.8H6.6c1-1.6 1-3.2 0-4.8Z'/%3E%3Cpath d='M12 2.9l3.6 1-3.6 1Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.9 13.6Q4 15 6 15H18Q19.8 15 21.1 13.4L19 19.4Q18.6 20.6 17.2 20.6H6.8Q5.6 20.6 5.2 19.6Z'/%3E%3Cpath d='M6.6 7.2h10.8c1 1.6 1 3.2 0 4.8H6.6c1-1.6 1-3.2 0-4.8Z'/%3E%3Cpath d='M12 15V2.9l3.6 1-3.6 1'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Ccircle cx='22.2' cy='13.8' r='1' fill='%23a8b3f0'/%3E%3Ccircle cx='20.6' cy='11.6' r='.8' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-nager-fond;
+  --ico-anim-trait: ico-nager-trait;
+  --ico-anim-extra: ico-nager-extra;
+  --ico-duree: 720ms;
+  --ico-ex: 87.5%;
+  --ico-ey: 62.5%;
+}
+
+/* univers:monstres — secouer */
+[data-cle="univers:monstres"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M12 5.4c4.2 0 7 3.2 7 7.8V19c0 1-.8 1.6-1.6 1.6H6.6C5.8 20.6 5 20 5 19v-5.8c0-4.6 2.8-7.8 7-7.8ZM12 9a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 1 0 0-4.8Z'/%3E%3Cpath d='M8.6 6.6C7.4 5.6 6.8 4.2 7.2 2.9 8 3.8 9.4 4.6 10.8 5.6L10 8Z'/%3E%3Cpath d='M15.4 6.6c1.2-1 1.8-2.4 1.4-3.7-.8.9-2.2 1.7-3.6 2.7L14 8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5.4c4.2 0 7 3.2 7 7.8V19c0 1-.8 1.6-1.6 1.6H6.6C5.8 20.6 5 20 5 19v-5.8c0-4.6 2.8-7.8 7-7.8Z'/%3E%3Cpath d='M8.6 6.6C7.4 5.6 6.8 4.2 7.2 2.9 8 3.8 9.4 4.6 10.8 5.6M15.4 6.6c1.2-1 1.8-2.4 1.4-3.7-.8.9-2.2 1.7-3.6 2.7'/%3E%3Ccircle cx='12.5' cy='11.6' r='1.1' fill='%23000' stroke='none'/%3E%3Cpath d='M9.4 16.2c1.4 1.5 3.8 1.5 5.2 0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.4 12.4q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.6 11q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23a8b3f0'/%3E%3Cpath d='M12 0.4q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-secouer-fond;
+  --ico-anim-trait: ico-secouer-trait;
+  --ico-anim-extra: ico-secouer-extra;
+  --ico-duree: 520ms;
+}
+
+/* univers:robots — pulser */
+[data-cle="univers:robots"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M7 8.2h10c1.3 0 2.4 1.1 2.4 2.4V18c0 1.3-1.1 2.4-2.4 2.4H7c-1.3 0-2.4-1.1-2.4-2.4v-7.4c0-1.3 1.1-2.4 2.4-2.4ZM9.2 11.6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 1 0 0-3.2ZM14.8 11.6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 1 0 0-3.2Z'/%3E%3Cpath d='M2.9 12.2h1.7v4.2H2.9ZM19.4 12.2h1.7v4.2h-1.7Z'/%3E%3Ccircle cx='12' cy='4.4' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 8.2h10c1.3 0 2.4 1.1 2.4 2.4V18c0 1.3-1.1 2.4-2.4 2.4H7c-1.3 0-2.4-1.1-2.4-2.4v-7.4c0-1.3 1.1-2.4 2.4-2.4Z'/%3E%3Cpath d='M4.6 12.2H2.9v4.2h1.7M19.4 12.2h1.7v4.2h-1.7M12 8.2V5.9M9.6 17.6h4.8'/%3E%3Ccircle cx='12' cy='4.4' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M8.6 2.4c-1 1.2-1 2.8 0 4' stroke='%23a8b3f0'/%3E%3Cpath d='M15.4 2.4c1 1.2 1 2.8 0 4' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-pulser-fond;
+  --ico-anim-trait: ico-pulser-trait;
+  --ico-anim-extra: ico-pulser-extra;
+  --ico-duree: 620ms;
+  --ico-origine: 50% 55%;
+}
+
+/* univers:nature — osciller */
+[data-cle="univers:nature"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M9 14.7A3 3 0 0 1 5.2 11.7 2.8 2.8 0 0 1 5.4 7.2 2.8 2.8 0 0 1 8.9 4.5 3.8 3.8 0 0 1 15.1 4.5 2.8 2.8 0 0 1 18.6 7.2 2.8 2.8 0 0 1 18.8 11.7 3 3 0 0 1 15 14.7L13.6 14.9V19.2q0 1.6 1.8 1.8H8.6q1.8-.2 1.8-1.8V14.9Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 14.7A3 3 0 0 1 5.2 11.7 2.8 2.8 0 0 1 5.4 7.2 2.8 2.8 0 0 1 8.9 4.5 3.8 3.8 0 0 1 15.1 4.5 2.8 2.8 0 0 1 18.6 7.2 2.8 2.8 0 0 1 18.8 11.7 3 3 0 0 1 15 14.7L13.6 14.9V19.2q0 1.6 1.8 1.8H8.6q1.8-.2 1.8-1.8V14.9Z'/%3E%3Cpath d='M9.4 9.4 12 12l2.6-2.6M12 12v2.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M18.4 6.4q1.4-2.4 4-2-1.2 2.6-4 2Z' fill='%23eceae4'/%3E%3Cpath d='M20.6 9.6q1-1.8 2.9-1.5-.9 2-2.9 1.5Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-osciller-fond;
+  --ico-anim-trait: ico-osciller-trait;
+  --ico-anim-extra: ico-osciller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 50% 87.5%;
+  --ico-ex: 79.17%;
+  --ico-ey: 25%;
+}
+
+/* univers:cuisine — sautiller */
+[data-cle="univers:cuisine"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M4.6 13.6C3.8 11.6 5.2 9.8 7.4 10 7.6 8.2 9.6 7.4 12 7.6c2.4-.2 4.4.6 4.6 2.4 2.2-.2 3.6 1.6 2.8 3.6Z'/%3E%3Cpath d='M5.6 13.6h12.8l-1.6 6.6a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8Z'/%3E%3Ccircle cx='12' cy='5.7' r='1.9'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 13.6C3.8 11.6 5.2 9.8 7.4 10 7.6 8.2 9.6 7.4 12 7.6c2.4-.2 4.4.6 4.6 2.4 2.2-.2 3.6 1.6 2.8 3.6Z'/%3E%3Cpath d='M5.6 13.6l1.6 6.6a1 1 0 0 0 1 .8h7.6a1 1 0 0 0 1-.8l1.6-6.6'/%3E%3Cpath d='M10.2 16v3M13.8 16v3'/%3E%3Ccircle cx='12' cy='5.7' r='1.9'/%3E%3Cpath d='M12.6 3.9q.6-.9 1.8-1'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M2 5.4l1.2 1.4' stroke='%23eceae4'/%3E%3Cpath d='M21.4 4.6l-1.4 1' stroke='%23a8b3f0'/%3E%3Cpath d='M1.4 18.4l1.6-.4' stroke='%23eceae4'/%3E%3Cpath d='M22.4 17.6l-1.2-1' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* univers:vehicules — galoper */
+[data-cle="univers:vehicules"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M4 14.2h16a1.2 1.2 0 0 0 1.2-1.2v-1a1.8 1.8 0 0 0-1.5-1.8L16 9.6 13.9 6.4a1.8 1.8 0 0 0-1.5-.8H9.3a1.8 1.8 0 0 0-1.6 1L6.3 9.8l-2 .4a1.8 1.8 0 0 0-1.5 1.8v1A1.2 1.2 0 0 0 4 14.2ZM9.4 7.4h2.7l1.4 2.2H8.3Z'/%3E%3Cpath fill-rule='evenodd' d='M7.2 13a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 1 0 0-5.6ZM7.2 14.65a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3Z'/%3E%3Cpath fill-rule='evenodd' d='M16.8 13a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 1 0 0-5.6ZM16.8 14.65a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.5 14.2h5M19.1 14.2h.9a1.2 1.2 0 0 0 1.2-1.2v-1a1.8 1.8 0 0 0-1.5-1.8L16 9.6 13.9 6.4a1.8 1.8 0 0 0-1.5-.8H9.3a1.8 1.8 0 0 0-1.6 1L6.3 9.8l-2 .4a1.8 1.8 0 0 0-1.5 1.8v1A1.2 1.2 0 0 0 4 14.2h.9'/%3E%3Ccircle cx='7.2' cy='15.8' r='2.8'/%3E%3Ccircle cx='16.8' cy='15.8' r='2.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23eceae4'%3E%3Ccircle cx='2.4' cy='17.4' r='1.1'/%3E%3Ccircle cx='1' cy='15.4' r='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-galoper-fond;
+  --ico-anim-trait: ico-galoper-trait;
+  --ico-anim-extra: ico-galoper-extra;
+  --ico-duree: 660ms;
+  --ico-origine: 50% 90%;
+  --ico-ex: 12.5%;
+  --ico-ey: 66.67%;
+}
+
+/* univers:sport — osciller */
+[data-cle="univers:sport"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M5.4 2.9h4.4L12 7.4l2.2-4.5h4.4L14.6 11H9.4Z'/%3E%3Ccircle cx='12' cy='15.4' r='5.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.3 10.7 5.4 2.9h4.4L12 7.4l2.2-4.5h4.4l-3.9 7.8'/%3E%3Ccircle cx='12' cy='15.4' r='5.4'/%3E%3Ccircle cx='12' cy='15.4' r='2.5'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M20.4 12.4q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M3.4 14.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-osciller-fond;
+  --ico-anim-trait: ico-osciller-trait;
+  --ico-anim-extra: ico-osciller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 50% 12.5%;
+  --ico-ex: 79.17%;
+  --ico-ey: 62.5%;
+}
+
+/* univers:monde — tourner */
+[data-cle="univers:monde"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M13.6 3.8a5.6 5.6 0 1 0 0 11.2 5.6 5.6 0 1 0 0-11.2ZM11.1 6.4c1.2-.6 2.6-.4 2.8.6.2.8-.6 1.2-1.2 1.6-.6.4-.4 1.4-.9 2-.5.5-1.3.2-1.5-.6-.3-1-.8-1.4-.6-2.2.2-.6.8-1.1 1.4-1.4ZM15.5 10c.8-.3 1.8.2 1.8 1 0 .9-.7 1.5-1.4 2-.5.3-1.1 0-1.1-.6 0-.8-.3-1.9.7-2.4Z'/%3E%3Crect x='9.6' y='19.6' width='8' height='1.6' rx='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='13.6' cy='9.4' r='5.6'/%3E%3Cpath d='M7.24 3.04A9 9 0 0 0 13.6 18.4v1.2'/%3E%3Crect x='9.6' y='19.6' width='8' height='1.6' rx='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3 1.4q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 18q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23a8b3f0'/%3E%3Cpath d='M21.6 1.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-tourner-fond;
+  --ico-anim-trait: ico-tourner-trait;
+  --ico-anim-extra: ico-tourner-extra;
+  --ico-duree: 700ms;
+}
+
+/* univers:histoire — scintiller */
+[data-cle="univers:histoire"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M12 3.2l9 5.4v2.2h-1.6v7.4H21V21H3v-2.8h1.6v-7.4H3V8.6ZM8.1 12.2v4.6a1.1 1.1 0 0 0 2.2 0v-4.6a1.1 1.1 0 0 0-2.2 0ZM13.7 12.2v4.6a1.1 1.1 0 0 0 2.2 0v-4.6a1.1 1.1 0 0 0-2.2 0Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.2l9 5.4v2.2h-1.6v7.4H21V21H3v-2.8h1.6v-7.4H3V8.6Z'/%3E%3Cpath d='M3 8.6h18'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.2 1.2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21 2.6q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-scintiller-fond;
+  --ico-anim-trait: ico-scintiller-trait;
+  --ico-anim-extra: ico-scintiller-extra;
+  --ico-duree: 700ms;
+}
+
+/* univers:corps — pulser */
+[data-cle="univers:corps"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 20.3C7.6 17.2 3 13.8 3 9.3 3 6.3 5.2 4.1 7.9 4.1c1.8 0 3.3 1 4.1 2.4.8-1.4 2.3-2.4 4.1-2.4 2.7 0 4.9 2.2 4.9 5.2 0 4.5-4.6 7.9-9 11Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20.3C7.6 17.2 3 13.8 3 9.3 3 6.3 5.2 4.1 7.9 4.1c1.8 0 3.3 1 4.1 2.4.8-1.4 2.3-2.4 4.1-2.4 2.7 0 4.9 2.2 4.9 5.2 0 4.5-4.6 7.9-9 11Z'/%3E%3Cpath d='M6.4 11.6h2.4l1.4-2.8 2.4 5.6 1.6-3.8 1 1h2.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M3 .9v3M1.5 2.4h3' stroke='%23eceae4'/%3E%3Cpath d='M21.2 1.6v2.6M19.9 2.9h2.6' stroke='%23a8b3f0'/%3E%3Cpath d='M21.6 18.2v2.4M20.4 19.4h2.4' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-pulser-fond;
+  --ico-anim-trait: ico-pulser-trait;
+  --ico-anim-extra: ico-pulser-extra;
+  --ico-duree: 620ms;
+  --ico-origine: 50% 55%;
+}
+
+/* univers:ville — scintiller */
+[data-cle="univers:ville"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M3 21V10.2a1 1 0 0 1 1-1h4.8V4.2a1 1 0 0 1 1-1h4.6a1 1 0 0 1 1 1v8h4.6a1 1 0 0 1 1 1V21ZM11 6.2h2.2v2.2H11ZM11 10.8h2.2V13H11ZM4.8 12.2H7v2.2H4.8ZM17.2 15h2.2v2.2h-2.2Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21V10.2a1 1 0 0 1 1-1h4.8V4.2a1 1 0 0 1 1-1h4.6a1 1 0 0 1 1 1v8h4.6a1 1 0 0 1 1 1V21Z'/%3E%3Cpath d='M8.8 9.2V21M15.4 12.2V21'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.6 2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 4.6q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-scintiller-fond;
+  --ico-anim-trait: ico-scintiller-trait;
+  --ico-anim-extra: ico-scintiller-extra;
+  --ico-duree: 700ms;
+}
+
+/* univers:fetes — sautiller */
+[data-cle="univers:fetes"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 8.2C10.8 5.6 7.4 3.8 6.6 5.8c-.6 1.6 1.8 2.4 5.4 2.4ZM12 8.2c1.2-2.6 4.6-4.4 5.4-2.4.6 1.6-1.8 2.4-5.4 2.4Z'/%3E%3Crect x='3.4' y='8.2' width='17.2' height='3.6' rx='1'/%3E%3Cpath d='M4.8 11.8h14.4V20a1 1 0 0 1-1 1H5.8a1 1 0 0 1-1-1Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 8.2C10.8 5.6 7.4 3.8 6.6 5.8c-.6 1.6 1.8 2.4 5.4 2.4ZM12 8.2c1.2-2.6 4.6-4.4 5.4-2.4.6 1.6-1.8 2.4-5.4 2.4Z'/%3E%3Crect x='3.4' y='8.2' width='17.2' height='3.6' rx='1'/%3E%3Cpath d='M4.8 11.8V20a1 1 0 0 0 1 1h12.4a1 1 0 0 0 1-1v-8.2M12 8.2V21'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M1.8 3.2l1 1.6' stroke='%23eceae4'/%3E%3Cpath d='M22.2 3.4l-1.4 1.2' stroke='%23a8b3f0'/%3E%3Cpath d='M1.2 16.2l1.8.2' stroke='%23a8b3f0'/%3E%3Cpath d='M22.6 15.4l-1.6.8' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* univers:contes — scintiller */
+[data-cle="univers:contes"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 6.4C10 4.8 6.6 4.4 3 5.2v13.4c3.6-.8 7-.4 9 1.2 2-1.6 5.4-2 9-1.2V5.2c-3.6-.8-7-.4-9 1.2Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 6.4C10 4.8 6.6 4.4 3 5.2v13.4c3.6-.8 7-.4 9 1.2 2-1.6 5.4-2 9-1.2V5.2c-3.6-.8-7-.4-9 1.2ZM12 6.4v13.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M5.2 .4q0 2 2 2-2 0-2 2 0-2-2-2 2 0 2-2Z' fill='%23eceae4'/%3E%3Cpath d='M18.4 .8q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23a8b3f0'/%3E%3Cpath d='M22 9.4q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-scintiller-fond;
+  --ico-anim-trait: ico-scintiller-trait;
+  --ico-anim-extra: ico-scintiller-extra;
+  --ico-duree: 700ms;
+}
+
+/* univers:abstrait — tourner */
+[data-cle="univers:abstrait"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Crect x='3' y='3' width='8' height='8' rx='.4'/%3E%3Ccircle cx='12.2' cy='12' r='5.2'/%3E%3Cpath d='M16.45 12.4 21.1 21H11.8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.1 11H3V3h8v3.9'/%3E%3Cpath d='M14.04 16.87A5.2 5.2 0 1 1 17.13 13.66'/%3E%3Cpath d='M16.45 12.4 21.1 21H11.8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Ccircle cx='20.4' cy='3.6' r='1.2' fill='%23a8b3f0'/%3E%3Cpath d='M2.6 17.6l1.6 2.8H1Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-tourner-fond;
+  --ico-anim-trait: ico-tourner-trait;
+  --ico-anim-extra: ico-tourner-extra;
+  --ico-duree: 700ms;
+}
+
+/* univers:autre — scintiller */
+[data-cle="univers:autre"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M10.4 5.4Q11.8 11.6 18 13 11.8 14.4 10.4 20.6 9 14.4 2.8 13 9 11.6 10.4 5.4ZM17.4 2.8Q18.1 5.7 21 6.4 18.1 7.1 17.4 10 16.7 7.1 13.8 6.4 16.7 5.7 17.4 2.8ZM18.6 15.9Q19.2 17.8 21.1 18.4 19.2 19 18.6 20.9 18 19 16.1 18.4 18 17.8 18.6 15.9Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.4 5.4Q11.8 11.6 18 13 11.8 14.4 10.4 20.6 9 14.4 2.8 13 9 11.6 10.4 5.4ZM17.4 2.8Q18.1 5.7 21 6.4 18.1 7.1 17.4 10 16.7 7.1 13.8 6.4 16.7 5.7 17.4 2.8ZM18.6 15.9Q19.2 17.8 21.1 18.4 19.2 19 18.6 20.9 18 19 16.1 18.4 18 17.8 18.6 15.9Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Ccircle cx='3.4' cy='3.6' r='1.1' fill='%23eceae4'/%3E%3Ccircle cx='21.6' cy='12.4' r='.9' fill='%23a8b3f0'/%3E%3Ccircle cx='4' cy='21' r='.9' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-scintiller-fond;
+  --ico-anim-trait: ico-scintiller-trait;
+  --ico-anim-extra: ico-scintiller-extra;
+  --ico-duree: 700ms;
+}
+
+/* tendances — pulser */
+#titre-tendances {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 2.5c.8 3.5 5.8 6.1 5.8 12.1 0 3.8-2.6 6.7-5.8 6.7s-5.8-2.7-5.8-6.1c0-2.8 1.6-4.6 2.8-5.8.2 1.6.8 2.8 1.8 3.4 0-3.8.2-7.2 1.2-10.3Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2.5c.8 3.5 5.8 6.1 5.8 12.1 0 3.8-2.6 6.7-5.8 6.7s-5.8-2.7-5.8-6.1c0-2.8 1.6-4.6 2.8-5.8.2 1.6.8 2.8 1.8 3.4 0-3.8.2-7.2 1.2-10.3Z'/%3E%3Cpath d='M12 21.3c-1.6 0-2.6-1.3-2.6-2.8 0-1.9 1.5-2.9 2.6-4.7 1.1 1.8 2.6 2.8 2.6 4.7 0 1.5-1 2.8-2.6 2.8Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: none;
+  --ico-anim-fond: ico-pulser-fond;
+  --ico-anim-trait: ico-pulser-trait;
+  --ico-anim-extra: none;
+  --ico-duree: 620ms;
+  --ico-origine: 50% 55%;
+}
+/* FIN DU BLOC GÉNÉRÉ : icônes */
+
+/* --------------------------------------------------------------------------
+   Icônes : la langue du logo
+   Les icônes ci-dessus ont le trait rond du mot-symbole. Deux détails les
+   relient au logo, en CSS seulement (aucun JavaScript) :
+   - survol (souris) et focus clavier : une petite constellation s'allume
+     autour de l'icône (deux étoiles craie, puis une étincelle) ;
+   - état choisi : une étincelle or, comme le point du i. C'est le seul or
+     des regroupements. app.js recrée les puces et les tuiles à chaque clic :
+     l'étincelle apparaît donc une fois, quand la puce s'affiche choisie.
+   Puces : ::before (zone de toucher, transparente) porte les deux étoiles,
+   ::after l'étincelle ; rien ne sort de la puce (la rangée qui défile le
+   couperait). Tuiles : ::before porte toute la figure (::after est la
+   coche). Coupé si l'appareil demande de réduire les mouvements (la figure
+   apparaît alors sans bouger).
+   -------------------------------------------------------------------------- */
+
+/* Puces : repère = bord gauche de l'icône (rembourrage de la puce). */
+.puce-filtre {
+  --ico-gauche: 8px;
+  --fmg-points: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='37' viewBox='0 0 22 37'%3E%3Ccircle cx='4' cy='10' r='2.3' fill='%23eceae4' fill-opacity='.14'/%3E%3Ccircle cx='4' cy='10' r='1' fill='%23eceae4'/%3E%3Ccircle cx='19' cy='34.5' r='0.85' fill='%23eceae4'/%3E%3C/svg%3E");
+  --fmg-etincelle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23eceae4'/%3E%3C/svg%3E");
+  --fmg-etincelle-or: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23f2d27a' stroke='%230b1020' stroke-width='2.2' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E");
+}
+
+@media (min-width: 720px) {
+  .puce-filtre { --ico-gauche: 4px; }
+}
+
+.puce-filtre::before {
+  background: no-repeat var(--ico-gauche) 0 / 22px 37px;
+}
+
+.puce-filtre::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: calc(var(--ico-gauche) + 12px);
+  width: 9px;
+  height: 9px;
+  background: no-repeat center / contain;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Tuiles : la figure est centrée sur l'icône (24 ou 26 px, centre à 14 px
+   du haut : le contenu remplit toujours la tuile). */
+.tuile {
+  --fmg-constellation: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='30' viewBox='0 0 64 30'%3E%3Cpath transform='translate(10.5 1.5) scale(.5)' d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23eceae4'/%3E%3Ccircle cx='48.5' cy='4.5' r='2.42' fill='%23eceae4' fill-opacity='.14'/%3E%3Ccircle cx='48.5' cy='4.5' r='1.05' fill='%23eceae4'/%3E%3Ccircle cx='51.5' cy='17' r='0.85' fill='%23eceae4'/%3E%3C/svg%3E");
+  --fmg-etincelle-or: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='30' viewBox='0 0 64 30'%3E%3Cpath transform='translate(10.5 1.5) scale(.5)' d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23f2d27a' stroke='%230b1020' stroke-width='2.2' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E");
+}
+
+.tuile::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 64px;
+  height: 30px;
+  margin-left: -32px;
+  background: no-repeat center / 64px 30px;
+  opacity: 0;
+  transform-origin: 50% 47%;
+  pointer-events: none;
+}
+
+/* Survol et focus : la constellation s'allume (les étoiles, puis
+   l'étincelle). Pas sur une puce ou tuile choisie : elle a son étincelle or. */
+@media (hover: hover) {
+  .puce-filtre:hover:not(:disabled):not([aria-pressed="true"])::before {
+    background-image: var(--fmg-points);
+    animation: fmg-allumer .24s ease-out both;
+  }
+  .puce-filtre:hover:not(:disabled):not([aria-pressed="true"])::after {
+    background-image: var(--fmg-etincelle);
+    opacity: 1;
+    animation: fmg-etinceler .5s .12s ease-out both;
+  }
+  .tuile:hover:not(:disabled):not([aria-pressed="true"])::before {
+    background-image: var(--fmg-constellation);
+    opacity: 1;
+    animation: fmg-constellation .5s ease-out both;
+  }
+}
+
+.puce-filtre:focus-visible:not([aria-pressed="true"])::before {
+  background-image: var(--fmg-points);
+  animation: fmg-allumer .24s ease-out both;
+}
+
+.puce-filtre:focus-visible:not([aria-pressed="true"])::after {
+  background-image: var(--fmg-etincelle);
+  opacity: 1;
+  animation: fmg-etinceler .5s .12s ease-out both;
+}
+
+.tuile:focus-visible:not([aria-pressed="true"])::before {
+  background-image: var(--fmg-constellation);
+  opacity: 1;
+  animation: fmg-constellation .5s ease-out both;
+}
+
+/* Choisie : l'étincelle or (cernée de nuit, lisible sur la teinte claire
+   de la puce). */
+.puce-filtre[aria-pressed="true"]::after {
+  background-image: var(--fmg-etincelle-or);
+  opacity: 1;
+  animation: fmg-etinceler .5s .1s ease-out both;
+}
+
+.tuile[aria-pressed="true"]::before {
+  background-image: var(--fmg-etincelle-or);
+  opacity: 1;
+  animation: fmg-constellation .5s ease-out both;
+}
+
+@keyframes fmg-allumer {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* L'étincelle naît petite et tournée, grandit un peu trop, puis se pose. */
+@keyframes fmg-etinceler {
+  0%   { opacity: 0; scale: .2; rotate: -45deg; }
+  60%  { opacity: 1; scale: 1.2; rotate: 8deg; }
+  100% { opacity: 1; scale: 1; rotate: 0deg; }
+}
+
+@keyframes fmg-constellation {
+  0%   { opacity: 0; scale: .85; }
+  100% { opacity: 1; scale: 1; }
+}
+
+/* Contraste élevé : pas de décor. */
+@media (forced-colors: active) {
+  .puce-filtre::before,
+  .puce-filtre::after,
+  .tuile::before { background-image: none !important; }
+}
+
+/* Mouvements réduits : la figure apparaît sans bouger. */
+@media (prefers-reduced-motion: reduce) {
+  .puce-filtre::before,
+  .puce-filtre::after,
+  .tuile::before { animation: none !important; }
 }

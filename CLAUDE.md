@@ -1,4 +1,6 @@
-# Contexte du projet — Site de mini-jeux « Jeux-en-ligne »
+# Contexte du projet — Site de mini-jeux « Free Micro Games »
+
+> Nom du site : **Free Micro Games** (nom court « Micro Games »), domaine **freemicrogames.com**. Anciennement « Jeux-en-ligne » : le dépôt GitHub et quelques identifiants techniques gardent l'ancien nom (ne pas toucher au préfixe de `vote.js`, qui change les empreintes des votants).
 
 > Ce fichier donne à toute IA (Claude Code, Claude, autres agents) le contexte nécessaire pour travailler sur ce dépôt.
 > À placer à la racine du dépôt. Claude Code le lit automatiquement sous le nom `CLAUDE.md` ; pour d'autres IA, une copie nommée `AGENTS.md` peut être ajoutée.
@@ -61,6 +63,7 @@ Jeux-en-ligne/
 ├─ scripts/
 │  ├─ build-catalog.mjs     lit games/*/game.json → public/catalog.json (+ copie des jeux)
 │  ├─ controle-taxonomie.mjs genres et univers des jeux et des idées : listes fermées de public/taxonomie.js
+│  ├─ icones/               icônes des genres, univers, âges et raccourcis : sources/*.svg + generer.mjs (→ bloc de public/style.css)
 │  ├─ idees.mjs             file d'idées de la boucle de nuit (choix, archivage, contrôles)
 │  └─ validate-games.mjs    contrôle qualité des jeux
 ├─ idees.json               idées à fabriquer (« en_attente », « en_cours »)
@@ -308,6 +311,8 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
 - Suivi des parties et Tendances — fait : `public/suivi.js` (durée et erreurs JS, script d'erreurs placé par le lanceur dans tous les jeux), `functions/api/session.js`, `functions/api/tendances.js`, `functions/_commun.js` (dont `jeuExiste`, sorti de `vote.js`), colonne `visiteur` remplie par `vote.js`, section « Tendances » de l'accueil (5 langues), `/api/*` hors du service worker (coquille `v5`), règle dans `CONSIGNES-JEU.md`. Testé en local (Chrome : téléphone et ordinateur ; fonctions sur une base SQLite de test, table `sessions` avec `id` entier ou texte). Reste : vérifier en ligne que les sessions arrivent dans D1 ; pistes : index sur `sessions (debut)` si la table grossit, limite de débit contre les fausses sessions, mention du suivi dans les pages légales.
 
 - Textes du site et mentions légales — fait (branche `textes-coherence`) : textes relus dans les 5 langues autour d'un même message (mini-jeux gratuits ; un jeu ouvert une fois avec Internet s'enregistre sur l'appareil et se rejoue hors ligne) ; toute promesse « sans publicité » retirée (ne jamais la réintroduire) ; vocabulaire unique par langue (hors ligne / offline / sin conexión / offline / offline ; gratuit / free / gratis / grátis / kostenlos) ; page « Mentions légales » (LCEN) en 5 langues, liée depuis le pied de page, gardée hors ligne (coquille `v7`), dans `sitemap.xml` et testée par `check-i18n.js`. Reste : remplir les champs `[À COMPLÉTER]` de `public/mentions-legales.html`, page « Confidentialité ».
+
+- Design « Constellation manette » et nouveau nom — fait (branche `design-free-micro-games`, 22 octobre 2026), remplace le design « Galaxie » ci-dessus. Nom **Free Micro Games** (en-tête, titres, `manifest.webmanifest` avec `short_name` « Micro Games », clés `site.nom`, `meta.titre`, `legal.titreDocument`, `legal.description`, `jeu.titrePage`, `jeu.titreDocument` des 5 langues), domaine `freemicrogames.com` dans les mentions légales. Palette : nuit `#0b1020`, nuit profonde `#070a14`, surface `#161f38`, orbite `#5a6688` (contours), craie `#eceae4`, craie douce `#a3adc2`, lavande `#a8b3f0` (ce qu'on touche), or `#f2d27a` (ce qui brille, rare) ; variables renommées dans `:root` (`--nuit`, `--craie`, `--lavande`…). Logo : manette lavande dont les boutons sont une planète or à anneau et une étoile, mot-symbole dessiné (le nom reste en texte `sr-only`) ; `assets/logo.svg` et icônes PNG refaits. Fond : constellation de manette derrière l'en-tête et petites étoiles « pixel ». Jaquettes sans boîte, titre en bandeau ; teintes OKLCH des genres et univers dans `taxonomie.js` (6 familles de genres). 58 icônes dessinées (genres, univers, âges, raccourcis, titre Tendances) peintes en CSS à partir de `data-cle` (l'emoji de `taxonomie.js` reste en repli), animées au survol, au focus et à l'apparition d'un choix ; sources et générateur dans `scripts/icones/` (`node scripts/icones/generer.mjs` réécrit le bloc généré de `style.css`). Page privée `public/idees/` passée aux nouvelles couleurs. Aucun JavaScript du site modifié (sauf `VERSION` `v8` dans `sw.js`). Reste : régler `SITE_URL` sur `https://freemicrogames.com/` dans Cloudflare, renommer le dépôt GitHub si souhaité (voir la pull request), tester sur téléphone.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 

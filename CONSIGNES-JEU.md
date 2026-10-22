@@ -1,6 +1,6 @@
 # Consignes pour créer un jeu
 
-Règles obligatoires pour toute IA (ou personne) qui ajoute un jeu au site Jeux-en-ligne.
+Règles obligatoires pour toute IA (ou personne) qui ajoute un jeu au site Free Micro Games.
 Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.mjs` en vérifie une partie automatiquement ; la relecture de la section 7 vérifie le reste avant toute publication.
 
 ## 1. Le public
