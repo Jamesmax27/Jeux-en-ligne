@@ -1,4 +1,4 @@
-# Jeux-en-ligne — mise en place de la phase 1
+# Free Micro Games (anciennement Jeux-en-ligne) — mise en place de la phase 1
 
 Ce dossier contient tout le site de la phase 1 : catalogue avec jaquettes, recherche, thèmes, lanceur de jeu et un jeu d'exemple (« Pommes du poney »).
 Votes et mode hors ligne arriveront en phases 2 et 3.
