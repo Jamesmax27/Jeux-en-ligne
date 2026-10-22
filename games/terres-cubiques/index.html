@@ -5031,7 +5031,8 @@ function frame(now){
 
 /* ================= Démarrage ================= */
 let wakeLock=null;
-function wake(){ try{ if(navigator.wakeLock&&!wakeLock) navigator.wakeLock.request('screen').then(l=>{ wakeLock=l; l.addEventListener('release',()=>{ wakeLock=null; }); }).catch(()=>{}); }catch(e){} }
+// Écran toujours allumé, seulement si la page l'autorise (refusé dans le cadre isolé du site : on ne demande pas)
+function wake(){ try{ const pp=document.permissionsPolicy||document.featurePolicy; if(pp&&pp.allowsFeature&&!pp.allowsFeature('screen-wake-lock')) return; if(navigator.wakeLock&&!wakeLock) navigator.wakeLock.request('screen').then(l=>{ wakeLock=l; l.addEventListener('release',()=>{ wakeLock=null; }); }).catch(()=>{}); }catch(e){} }
 function enterPlay(){
   $('#btnFly').hidden=mode!=='creative'; $('#btnFly').setAttribute('aria-pressed',P.fly); syncDownBtn();
   lastHp=-1; renderHotbar(); renderGoal(); renderStatus(); checkSteps(); lastPhase=phaseOf(time); updateClock(); setState('play'); lockPointer(); wake();

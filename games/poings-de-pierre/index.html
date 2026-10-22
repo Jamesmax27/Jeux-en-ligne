@@ -1053,7 +1053,8 @@ const sfx = {
   level() { tone(523, 0.12, 'triangle', 0.12); setTimeout(() => tone(784, 0.2, 'triangle', 0.12), 120); },
   over() { tone(330, 0.5, 'triangle', 0.12, 110); }
 };
-function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+// Pas de vibration pendant la démo du menu (comme pour les sons) : le navigateur la refuse avant le premier toucher.
+function vibrate(ms) { if (G.mode === 'menu') return; try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 
 /* ---------- niveaux ---------- */
 // Nom et explication de chaque coup : traductions coup.<coup> et coupTxt.<coup>

@@ -10,6 +10,7 @@ on:
     paths:
       - "games/**"
       - "scripts/**"
+      - "public/i18n/**"
   workflow_dispatch:
 
 jobs:
@@ -46,3 +47,7 @@ jobs:
 
       - name: Contrôler
         run: node scripts/validate-games.mjs --browser ${{ steps.jeux.outputs.ids }}
+
+      # Traductions (fr, en, es, pt, de) : bloquant. Voir I18N.md.
+      - name: Contrôler les traductions
+        run: node scripts/check-i18n.js ${{ steps.jeux.outputs.ids }}

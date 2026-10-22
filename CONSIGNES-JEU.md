@@ -46,6 +46,25 @@ Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient oblig
 - Aucune erreur dans la console, au démarrage comme pendant la partie.
 - Code lisible et commenté en français.
 
+### Langues (obligatoire)
+
+Le site et chaque jeu existent en **5 langues** : français (langue source), anglais, espagnol (neutre), portugais (Brésil), allemand. Détails et exemples : `I18N.md`.
+
+- **Aucun texte en dur** : tout texte visible (HTML, JavaScript, canvas, messages de fin, `aria-label`, `title`) passe par `t('cle', { variables })` ou par un attribut `data-i18n="cle"` (`data-i18n-html`, `data-i18n-placeholder`, `data-i18n-title`, `data-i18n-aria`).
+- Dans le `<head>`, juste après `<title>` et avant tout autre script :
+  ```html
+  <script type="application/json" id="jel-i18n-textes" data-coin="haut-gauche">{ "fr": {…}, "en": {…}, "es": {…}, "pt": {…}, "de": {…} }</script>
+  <script id="jel-i18n"></script>
+  ```
+  puis `node scripts/i18n-jeu.mjs <id>` remplit le second bloc avec le module commun (`public/i18n/i18n.js`).
+- Les 5 langues ont **exactement les mêmes clés**, aucune valeur vide, les mêmes `{variables}`. Pluriel : `{ "one": "{n} étoile", "other": "{n} étoiles" }` (variable `n`). Nombres : `JEL_I18N.nombre(x)`.
+- Les attributs `data-i18n` sont appliqués au chargement de la page : un élément que le script remplit lui-même au démarrage reste vide dans le HTML, sans `data-i18n`.
+- Si le code utilise déjà `t` comme variable (temps, tour…), prendre l'alias `const traduire = window.JEL_I18N.t;`.
+- **Bouton de langue** : ajouté tout seul dans le coin `data-coin` (`haut-gauche`, `haut-droite`, `bas-gauche`, `bas-droite`) ; ou `data-place="id1 id2"` pour le mettre dans des éléments du jeu (accueil, pause) ; ou `data-coin="aucun"` et `JEL_I18N.creerSelecteur({ conteneur })` pour le placer soi-même. Il ne cache aucune commande.
+- **Ton** : simple, pour enfants, tutoiement (du, tú, você) ; textes courts. L'allemand est environ 30 % plus long : boutons qui peuvent passer à la ligne, pas de largeur fixe. Noms inventés : les adapter s'ils doivent se comprendre ou faire sourire ; noms de marque : jamais traduits.
+- **Touches** : lire `event.code` (position de la touche) ; écrire ZQSD en français, WASD dans les autres langues.
+- Jeu qui repose sur des mots ou des lettres du français : `"non_traduisible": true` dans `game.json` (l'interface reste traduite, le catalogue indique « en français »).
+
 ## 4. La fiche `game.json`
 
 ```json
@@ -53,6 +72,12 @@ Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient oblig
   "id": "nom-du-dossier",
   "title": "Titre du jeu",
   "description": "Une phrase qui donne envie de jouer (10 à 200 caractères).",
+  "i18n": {
+    "en": { "title": "Game title", "description": "One sentence that makes you want to play." },
+    "es": { "title": "…", "description": "…" },
+    "pt": { "title": "…", "description": "…" },
+    "de": { "title": "…", "description": "…" }
+  },
   "genre": "adresse",
   "tags": ["animaux"],
   "ages": "6+",
@@ -63,6 +88,7 @@ Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient oblig
 ```
 
 - `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier.
+- `title` et `description` restent en français ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire).
 - `genre` : **obligatoire**, un seul, choisi dans cette liste fermée (filtres « genre » du catalogue) :
   `adresse`, `action`, `plateforme`, `course`, `sport`, `rythme`, `aventure`, `réflexion`, `stratégie`, `puzzle`, `mémoire`, `observation`, `quiz`, `calcul`, `lecture`, `création`, `simulation`.
   (`action` : jeu rapide où l'on esquive et réagit vite, sans violence ; `observation` : cherche-et-trouve, différences ; `simulation` : soigner un animal, cuisiner, tenir une ferme…)
@@ -75,15 +101,17 @@ Un nouveau jeu doit occuper un enfant **au moins 15 minutes**. Il contient oblig
 ## 5. La jaquette
 
 - Image portrait 600 × 800 px : `cover.webp` (idéal, moins de 100 Ko), sinon `cover.png` ou `cover.jpg` (moins de 300 Ko).
-- La boucle automatique la fabrique elle-même (capture de l'écran d'accueil du jeu) : l'écran d'accueil doit donc être beau et afficher le titre en grand.
+- La boucle automatique la fabrique elle-même (capture de l'écran d'accueil du jeu, **textes masqués**) : la jaquette ne contient **aucun texte**, car le site affiche le titre traduit en bandeau sous l'image. L'écran d'accueil doit donc avoir un beau dessin, pas seulement du texte.
+- Jaquette faite à la main : sans aucun texte, ou `node scripts/jaquette-sans-texte.mjs <id>`.
 
 ## 6. Avant de proposer le jeu
 
 ```text
 node scripts/validate-games.mjs --jouer <id>
+node scripts/check-i18n.js <id> --rapport
 ```
 
-Le robot ouvre le jeu dans un vrai navigateur, le joue 30 secondes au hasard et enregistre des captures d'écran dans `captures/<id>/` : regardez-les. Le résultat doit être « Tout est bon ». Vérifiez ensuite la grille de la section 7, point par point.
+Le robot ouvre le jeu dans un vrai navigateur, le joue 30 secondes au hasard et enregistre des captures d'écran dans `captures/<id>/` : regardez-les. Le résultat doit être « Tout est bon ». La vérification des traductions ouvre le jeu dans les 5 langues : elle doit finir par « tout est bon » ; relisez aussi les textes en dur qu'elle signale. Vérifiez ensuite la grille de la section 7, point par point.
 
 ## 7. Grille de validation
 
@@ -99,6 +127,7 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Hors ligne | le jeu tente un appel réseau, ou ne marche pas avec le navigateur coupé du réseau |
 | Fichiers | `game.json` incomplet ou invalide, jaquette absente ou trop lourde, `index.html` de plus de 2 Mo, fichier en trop |
 | Catalogue | le jeu manque au catalogue construit, ou son genre et ses tags ne sont pas ceux de son idée (`scripts/idees.mjs controler`) |
+| Traductions | `scripts/check-i18n.js` signale une erreur : langue incomplète, clé manquante, titre non traduit, erreur dans une des 5 langues (contrôle des pull requests `validate.yml`) |
 
 ### Relecture (Claude)
 
@@ -115,5 +144,6 @@ Points bloquants, vérifiés dans le code et sur les captures d'écran du robot 
 9. **Effets et bilan** : effets de réussite ; écran de bilan avec score, étoiles, record, « Niveau suivant » et « Rejouer ».
 10. **Écran de téléphone** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page.
 11. **Contenu** : adapté aux enfants, en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
+12. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; jaquette sans texte (section 3, « Langues »).
 
 Conseils (non bloquants, notés dans la relecture) : amusant dès la première minute, variété d'un niveau à l'autre, de quoi jouer 15 minutes.
