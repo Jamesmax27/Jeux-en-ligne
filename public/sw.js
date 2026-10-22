@@ -14,25 +14,31 @@
 //   - cache d'abord : jeux et jaquettes. Leur adresse contient la version
 //     (?v=…) : une nouvelle version est téléchargée et remplace l'ancienne ;
 //   - /api/scores et /api/tendances ne sont pas gardés : sans réseau, le
-//     catalogue trie par nouveautés, sans compteurs de votes ni Tendances.
+//     catalogue trie par nouveautés, sans compteurs de votes ni Tendances ;
+//   - pages générées (accueils /en/…, fiches des jeux /jeux/<id>/…, catégories) :
+//     réseau d'abord, avec une copie des pages visitées (PAGES_GARDEES au plus).
+//     Hors connexion, une fiche jamais visitée mène au lanceur du jeu (le jeu
+//     s'ouvre s'il a déjà été joué), une autre page à l'accueil.
 //
 // VERSION : à augmenter quand la liste COQUILLE change, ou pour obliger tous
 // les appareils à re-télécharger la coquille. Les jeux gardés ne sont pas
 // touchés : ils ont leur propre cache, indépendant de VERSION.
 // ==========================================================================
 
-const VERSION = 'v8';
+const VERSION = 'v9';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
 const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
 const CACHE_JAQUETTES = 'jel-jaquettes-v1'; // jaquettes vues dans le catalogue
+const CACHE_PAGES = 'jel-pages-v1';         // pages générées visitées (fiches, catégories, accueils)
 const LIMITE_JAQUETTES = 300;               // au-delà, les plus anciennes sont effacées
+const PAGES_GARDEES = 60;                   // idem pour les pages générées
 const DELAI_RESEAU = 3000;                  // ms : au-delà, la copie gardée est servie
 
 // Fichiers de la coquille, relatifs au dossier du site.
 // Les textes des 5 langues sont petits : tous gardés, pour changer de langue hors connexion.
 const COQUILLE = [
-  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'suivi.js', 'hors-ligne.js', 'taxonomie.js', 'pub.js',
+  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'suivi.js', 'hors-ligne.js', 'taxonomie.js', 'chemins.js', 'pub.js',
   'mentions-legales.html', 'mentions-legales.js', 'langue.js', 'i18n/i18n.js',
   'i18n/site/fr.json', 'i18n/site/en.json', 'i18n/site/es.json', 'i18n/site/pt.json', 'i18n/site/de.json',
   'manifest.webmanifest', 'assets/logo.svg', 'assets/sans-jaquette.svg',
@@ -48,6 +54,12 @@ const PAGES = new Map([
 const RACINE = new URL('./', self.location).href; // dossier du site, ex. https://exemple.pages.dev/
 const BASE = new URL(RACINE).pathname;            // ex. « / »
 const URL_CATALOGUE = new URL('catalog.json', RACINE).href;
+
+// Pages générées par scripts/pages-seo.mjs (adresses : chemins.js) :
+// accueil d'une langue, fiche d'un jeu, page d'une catégorie.
+const RE_ACCUEIL_LANGUE = /^(?:en|es|pt|de)\/$/;
+const RE_FICHE = /^(?:(en|es|pt|de)\/)?(?:jeux|games|juegos|jogos|spiele)\/([a-z0-9-]+)\/$/;
+const RE_CATEGORIE = /^(?:(?:en|es|pt|de)\/)?(?:genres|generos|spielarten|univers|worlds|mundos|welten|ages|edades|idades|alter)\/[^/]+\/$/;
 
 // --- Installation et mise à jour ---------------------------------------------
 
@@ -81,7 +93,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     // Efface les caches des versions précédentes.
-    const actuels = new Set([CACHE_COQUILLE, CACHE_DONNEES, CACHE_JEUX, CACHE_JAQUETTES]);
+    const actuels = new Set([CACHE_COQUILLE, CACHE_DONNEES, CACHE_JEUX, CACHE_JAQUETTES, CACHE_PAGES]);
     for (const nom of await caches.keys()) {
       if (nom.startsWith('jel-') && !actuels.has(nom)) await caches.delete(nom);
     }
@@ -105,11 +117,41 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(jaquette(event));
   } else if (chemin === 'catalog.json') {
     event.respondWith(reseauDabord(event, CACHE_DONNEES, URL_CATALOGUE));
+  } else if (RE_ACCUEIL_LANGUE.test(chemin) || RE_FICHE.test(chemin) || RE_CATEGORIE.test(chemin)) {
+    event.respondWith(pageGeneree(event, chemin));
   } else {
     const cle = cleCoquille(chemin);
     if (cle) event.respondWith(reseauDabord(event, CACHE_COQUILLE, cle));
   }
 });
+
+// --- Pages générées : réseau d'abord, copie des pages visitées -----------------
+
+async function pageGeneree(event, chemin) {
+  const cle = new URL(chemin, RACINE).href; // sans paramètres
+  const reponse = await reseauDabord(event, CACHE_PAGES, cle, limiterPages);
+  if (reponse.type !== 'error') return reponse;
+  // Hors connexion, page jamais visitée : la fiche mène au lanceur (le jeu
+  // s'ouvre s'il est déjà gardé ; « depuis » : son bouton retour mène alors à
+  // l'accueil, la fiche n'étant pas disponible), une autre page à l'accueil
+  // de sa langue s'il a été visité, sinon à l'accueil de la coquille.
+  const fiche = RE_FICHE.exec(chemin);
+  if (fiche) {
+    const lanceur = new URL('play', RACINE);
+    lanceur.searchParams.set('id', fiche[2]);
+    lanceur.searchParams.set('lang', fiche[1] || 'fr');
+    lanceur.searchParams.set('depuis', 'hors-ligne');
+    return Response.redirect(lanceur.href, 302);
+  }
+  const langue = /^(en|es|pt|de)\//.exec(chemin)?.[1];
+  const accueilLangue = langue && await caches.match(new URL(`${langue}/`, RACINE).href, { cacheName: CACHE_PAGES });
+  return accueilLangue || (await caches.match(new URL('./', RACINE).href, { cacheName: CACHE_COQUILLE })) || reponse;
+}
+
+async function limiterPages(cache) {
+  const cles = await cache.keys();
+  for (const ancienne of cles.slice(0, Math.max(0, cles.length - PAGES_GARDEES))) await cache.delete(ancienne);
+}
 
 function cleCoquille(chemin) {
   if (PAGES.has(chemin)) return new URL(PAGES.get(chemin), RACINE).href;
@@ -119,13 +161,20 @@ function cleCoquille(chemin) {
 
 // --- Réseau d'abord (coquille, catalogue) --------------------------------------
 
-async function reseauDabord(event, nomCache, cle) {
+// apresMiseEnCache(cache) : facultatif, appelé après chaque copie (ex. limiter la place).
+async function reseauDabord(event, nomCache, cle, apresMiseEnCache = null) {
   const cache = await caches.open(nomCache);
   const reseau = fetch(event.request);
 
   // La copie gardée est mise à jour à chaque réponse correcte, même arrivée en retard.
+  // Copie faite tout de suite (la page va lire l'original) ; put remet la clé en fin
+  // de liste : les pages vues il y a le plus longtemps partent d'abord.
   event.waitUntil(reseau.then(async (reponse) => {
-    if (reponse.ok && reponse.type === 'basic') await cache.put(cle, await copiePropre(reponse.clone()));
+    if (reponse.ok && reponse.type === 'basic') {
+      const copie = reponse.clone();
+      await cache.put(cle, await copiePropre(copie));
+      if (apresMiseEnCache) await apresMiseEnCache(cache);
+    }
   }).catch(() => { /* hors connexion : rien à mettre à jour */ }));
 
   // Réseau trop lent ou absent : on sert la copie gardée.

@@ -4,13 +4,15 @@
 //
 //   1. lit chaque dossier games/<id>/ (index.html + jaquette + game.json)
 //   2. vérifie les règles de base ; un jeu invalide est ignoré (avec un
-//      message), il ne bloque jamais la publication des autres
-//   3. copie les jeux valides dans public/games/
+//      message), il ne bloque jamais la publication des autres. Sur
+//      Cloudflare (variable CF_PAGES), un jeu ajouté depuis REGLES_SEO_DEPUIS
+//      dont les textes de référencement ne respectent pas scripts/regles-seo.mjs
+//      n'est pas publié non plus
+//   3. copie les jeux valides dans public/games/ (index.html et jaquette)
 //   4. écrit public/catalog.json (avec les titres et descriptions traduits)
-//   5. écrit public/sitemap.xml (accueil et jeux, une variante ?lang= par
-//      langue) et public/robots.txt. Adresse du site : variable SITE_URL
-//      (réglage Cloudflare Pages, à définir avec le nom de domaine), sinon
-//      ADRESSE_PAR_DEFAUT.
+//   5. écrit les pages HTML du site, le sitemap et robots.txt
+//      (scripts/pages-seo.mjs : accueils, fiches des jeux, catégories, 404).
+//      Adresse du site : variable SITE_URL, sinon https://freemicrogames.com/.
 //
 // Lancé automatiquement par Cloudflare Pages (commande de build),
 // et en local avec :  npm run build   (ou  npm run dev  pour tester).
@@ -22,6 +24,8 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { IDS_GENRES, IDS_UNIVERS, SECONDAIRES_MAX, UNIVERS_MAX } from '../public/taxonomie.js';
+import { genererPages } from './pages-seo.mjs';
+import { problemesChamps, languesDuJeu, REGLES_SEO_DEPUIS } from './regles-seo.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -29,7 +33,7 @@ const DOSSIER_PUBLIC = path.join(RACINE, 'public');
 const SORTIE_JEUX = path.join(DOSSIER_PUBLIC, 'games');
 const SORTIE_CATALOGUE = path.join(DOSSIER_PUBLIC, 'catalog.json');
 const LANGUES = ['fr', 'en', 'es', 'pt', 'de'];          // même liste que public/i18n/i18n.js
-const ADRESSE_PAR_DEFAUT = 'https://jeux-en-ligne.pages.dev/';
+const SUR_CLOUDFLARE = process.env.CF_PAGES === '1';      // posée par Cloudflare Pages pendant ses builds
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DATE_VALIDE = /^\d{4}-\d{2}-\d{2}$/;
@@ -63,7 +67,7 @@ async function lireJeu(nomDossier) {
   if (!existsSync(cheminFiche)) return rejeter(nomDossier, 'game.json manquant');
   let fiche;
   try {
-    fiche = JSON.parse(await readFile(cheminFiche, 'utf8'));
+    fiche = JSON.parse((await readFile(cheminFiche, 'utf8')).replace(/^﻿/, ''));
   } catch (e) {
     return rejeter(nomDossier, `game.json illisible (${e.message})`);
   }
@@ -119,20 +123,30 @@ async function lireJeu(nomDossier) {
     const t = traductions[lang];
     const title = typeof t?.title === 'string' ? t.title.trim().slice(0, 80) : '';
     const description = typeof t?.description === 'string' ? t.description.trim().slice(0, 200) : '';
-    const presentation = typeof t?.presentation === 'string' ? t.presentation.trim().slice(0, 1200) : '';
-    if (title || description) i18n[lang] = { title, description, ...(presentation ? { presentation } : {}) };
+    if (title || description) i18n[lang] = { title, description };
     if (!title || !description) manquantes.push(lang);
   }
   if (manquantes.length) avertir(nomDossier, `titre ou description non traduits (${manquantes.join(', ')}) dans game.json ("i18n") : le français sera affiché`);
-  // Langues dans lesquelles le catalogue propose le jeu (absent = toutes).
-  const langues = Array.isArray(fiche.langues) ? fiche.langues.filter((l) => LANGUES.includes(l)) : [];
+  // Langues dans lesquelles le catalogue propose le jeu (absent = toutes) : même
+  // règle que les pages générées (le français, langue source, en fait toujours partie).
+  const langues = Array.isArray(fiche.langues) && fiche.langues.length ? languesDuJeu(fiche) : [];
 
+  // Textes de référencement (scripts/regles-seo.mjs) : obligatoires pour les jeux
+  // ajoutés depuis REGLES_SEO_DEPUIS. Sur Cloudflare, un tel jeu non conforme
+  // n'est pas publié (le contrôle bloquant a lieu avant, dans la pull request).
+  const erreursSeo = problemesChamps(fiche).filter((p) => p.niveau === 'erreur');
+  if (erreursSeo.length && added >= REGLES_SEO_DEPUIS) {
+    const resume = `textes de référencement non conformes (${erreursSeo.length} erreur(s), voir node scripts/regles-seo.mjs ${fiche.id})`;
+    if (SUR_CLOUDFLARE) return rejeter(nomDossier, `${resume} : jeu non publié`);
+    avertir(nomDossier, `${resume} : il ne serait pas publié sur Cloudflare`);
+  }
+
+  // Les textes longs (présentation, règles…) vont seulement dans la page du jeu
+  // (pages-seo.mjs) : catalog.json garde ce que montrent les cartes.
   return {
     id: fiche.id,
     title: fiche.title.trim().slice(0, 80),
     description: typeof fiche.description === 'string' ? fiche.description.trim().slice(0, 200) : '',
-    // Présentation (quelques phrases) : meta description de la page du jeu ; la carte garde la description courte.
-    ...(typeof fiche.presentation === 'string' && fiche.presentation.trim() ? { presentation: fiche.presentation.trim().slice(0, 1200) } : {}),
     i18n,
     ...(fiche.non_traduisible === true ? { non_traduisible: true } : {}),
     ...(langues.length ? { langues } : {}),
@@ -145,6 +159,8 @@ async function lireJeu(nomDossier) {
     version,
     cover,
     play: `games/${fiche.id}/?v=${version}`,
+    fichierJaquette: fichierJaquette || null,
+    fiche,                                   // game.json complet, pour les pages (retiré du catalogue)
   };
 }
 
@@ -167,11 +183,15 @@ async function main() {
     }
   }
 
-  // Copie des jeux valides vers public/games/ (repart d'un dossier vide).
+  // Copie des jeux valides vers public/games/ (repart d'un dossier vide) : le jeu
+  // et sa jaquette seulement (game.json n'est lu par aucune page du site).
   await rm(SORTIE_JEUX, { recursive: true, force: true });
   await mkdir(SORTIE_JEUX, { recursive: true });
   for (const jeu of jeux) {
-    await cp(path.join(DOSSIER_JEUX, jeu.id), path.join(SORTIE_JEUX, jeu.id), { recursive: true });
+    await mkdir(path.join(SORTIE_JEUX, jeu.id), { recursive: true });
+    for (const fichier of ['index.html', jeu.fichierJaquette].filter(Boolean)) {
+      await cp(path.join(DOSSIER_JEUX, jeu.id, fichier), path.join(SORTIE_JEUX, jeu.id, fichier));
+    }
   }
 
   // Du plus récent au plus ancien (le site refait son propre tri).
@@ -180,53 +200,21 @@ async function main() {
   const catalogue = {
     generatedAt: new Date().toISOString(),
     count: jeux.length,
-    games: jeux,     // listes et ordre des genres et des univers : public/taxonomie.js
+    // listes et ordre des genres et des univers : public/taxonomie.js
+    games: jeux.map(({ fiche, fichierJaquette, ...entree }) => entree),
   };
   await writeFile(SORTIE_CATALOGUE, JSON.stringify(catalogue, null, 2) + '\n', 'utf8');
-  await ecrireSitemap(jeux);
 
+  // Pages HTML (accueils, fiches, catégories, 404), sitemap.xml et robots.txt.
+  const { pages, avertissements: avertissementsPages, fichiers } = await genererPages({ jeux, racine: RACINE, dossierPublic: DOSSIER_PUBLIC });
+  avertissements.push(...avertissementsPages.map((texte) => `  ⚠  ${texte}`));
+
+  const indexees = pages.filter((p) => p.indexable).length;
   console.log(`\nCatalogue : ${jeux.length} jeu(x) publié(s), ${rejets.length} ignoré(s).`);
+  console.log(`Pages : ${pages.length} générée(s), dont ${indexees} dans le sitemap ; ${fichiers} fichiers dans public/.`);
   if (rejets.length) console.log('\nJeux ignorés :\n' + rejets.join('\n'));
   if (avertissements.length) console.log('\nAvertissements :\n' + avertissements.join('\n'));
   console.log('');
-}
-
-// --- Plan du site pour les moteurs de recherche --------------------------------
-
-function adresseDuSite() {
-  const brute = process.env.SITE_URL || ADRESSE_PAR_DEFAUT;
-  try {
-    const u = new URL(brute);
-    return u.href.endsWith('/') ? u.href : `${u.href}/`;
-  } catch {
-    return ADRESSE_PAR_DEFAUT;
-  }
-}
-
-function echapperXml(texte) {
-  return texte.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
-// Une entrée par page et par langue, chacune listant toutes les variantes (hreflang).
-// Un jeu limité à certaines langues (« langues ») n'a que ces variantes.
-async function ecrireSitemap(jeux) {
-  const site = adresseDuSite();
-  const pages = [{ chemin: '', langues: LANGUES }, { chemin: 'mentions-legales.html', langues: LANGUES }];
-  for (const jeu of jeux) pages.push({ chemin: `play.html?id=${encodeURIComponent(jeu.id)}`, langues: jeu.langues || LANGUES });
-
-  const avecLangue = (chemin, lang) => `${site}${chemin}${chemin.includes('?') ? '&' : '?'}lang=${lang}`;
-  const lignes = ['<?xml version="1.0" encoding="UTF-8"?>',
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'];
-  for (const page of pages) {
-    const variantes = page.langues.map((lang) => `    <xhtml:link rel="alternate" hreflang="${lang}" href="${echapperXml(avecLangue(page.chemin, lang))}"/>`);
-    variantes.push(`    <xhtml:link rel="alternate" hreflang="x-default" href="${echapperXml(site + page.chemin)}"/>`);
-    for (const lang of page.langues) {
-      lignes.push('  <url>', `    <loc>${echapperXml(avecLangue(page.chemin, lang))}</loc>`, ...variantes, '  </url>');
-    }
-  }
-  lignes.push('</urlset>');
-  await writeFile(path.join(DOSSIER_PUBLIC, 'sitemap.xml'), lignes.join('\n') + '\n', 'utf8');
-  await writeFile(path.join(DOSSIER_PUBLIC, 'robots.txt'), `User-agent: *\nAllow: /\n\nSitemap: ${site}sitemap.xml\n`, 'utf8');
 }
 
 main().catch((e) => {

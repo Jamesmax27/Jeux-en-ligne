@@ -4,7 +4,9 @@
 // S'appuie sur le module commun i18n/i18n.js (window.JEL_I18N), chargé par
 // une balise <script> avant ce module. Textes : i18n/site/<langue>.json.
 // - demarrerLangue() : charge les textes, crée le sélecteur de l'en-tête.
-// - majSeo() : <title>, meta description et liens hreflang (?lang=…).
+// - majSeo() : <title> et meta description des pages traduites en JavaScript.
+// - accueils pré-rendus (data-prerendu) : changer de langue mène à la page de
+//   cette langue (/en/…), au lieu de traduire sur place.
 // - nomGenre(), nomUnivers(), titreJeu(), descriptionJeu() : noms affichés ;
 //   les identifiants internes (genres, univers, id des jeux) ne changent jamais.
 // ==========================================================================
@@ -15,10 +17,34 @@ export const t = (cle, variables) => I.t(cle, variables);
 export const getLang = () => I.getLang();
 export const LANGUES = I.LANGUES;
 
+// Page pré-rendue dans une langue (accueils /, /en/… générés par
+// scripts/pages-seo.mjs : <html data-prerendu="<code hreflang>">) : son titre, sa
+// description, sa canonical et ses hreflang sont écrits dans le HTML ; changer
+// de langue mène à la page de l'autre langue (lien <link rel="alternate" hreflang>).
+const PRERENDU = document.documentElement.hasAttribute('data-prerendu');
+const LANG_HTML = document.documentElement.dataset.prerendu;   // ex. « pt-BR » (i18n.js écrit « pt » dans lang)
+
+function pageDeLangue(lang) {
+  const lien = [...document.querySelectorAll('link[rel="alternate"][hreflang]')]
+    .find((l) => l.hreflang.toLowerCase().split('-')[0] === lang);
+  return lien ? lien.href : null;
+}
+
 /** Charge les textes du site puis place le sélecteur de langue dans « conteneur ». */
 export async function demarrerLangue(conteneur) {
-  await I.charger('i18n/site/');
-  if (conteneur) I.creerSelecteur({ conteneur, classe: 'selecteur-site' });
+  await I.charger('/i18n/site/');
+  if (PRERENDU) {
+    if (LANG_HTML) document.documentElement.lang = LANG_HTML;
+    // Le lien hreflang est absolu (adresse publique du site) : on n'en garde que le
+    // chemin, pour rester sur le site consulté (serveur local, préversion…).
+    I.surChangement((lang) => {
+      const adresse = pageDeLangue(lang);
+      const chemin = adresse && new URL(adresse).pathname;
+      if (chemin && chemin !== location.pathname) location.assign(chemin);
+    });
+  }
+  // Page pré-rendue : ses liens de langue sont déjà dans le HTML (details.langues).
+  if (conteneur && !conteneur.querySelector('.langues')) I.creerSelecteur({ conteneur, classe: 'selecteur-site' });
 }
 
 /** Appelle f(lang) après chaque changement de langue. */
@@ -67,10 +93,14 @@ export function jeuEnFrancais(jeu) {
 }
 
 /**
- * Référencement : titre, description, et une variante ?lang=xx par langue
- * (plus x-default, l'adresse sans langue). Les autres paramètres (id) sont gardés.
+ * Titre de l'onglet et description des pages traduites en JavaScript (lanceur,
+ * mentions légales). Ces pages ne sont pas indexées (noindex) : les pages
+ * proposées aux moteurs de recherche sont générées dans chaque langue, avec
+ * leurs liens hreflang écrits dans le HTML (scripts/pages-seo.mjs).
+ * Sans effet sur une page pré-rendue : tout y est déjà écrit.
  */
 export function majSeo({ titre, description }) {
+  if (PRERENDU) return;
   document.title = titre;
   let meta = document.querySelector('meta[name="description"]');
   if (!meta) {
@@ -79,22 +109,4 @@ export function majSeo({ titre, description }) {
     document.head.append(meta);
   }
   meta.content = description;
-
-  document.querySelectorAll('link[rel="alternate"][hreflang]').forEach((l) => l.remove());
-  const base = new URL(location.href);
-  base.hash = '';
-  base.searchParams.delete('lang');
-  const ajouter = (hreflang, href) => {
-    const lien = document.createElement('link');
-    lien.rel = 'alternate';
-    lien.hreflang = hreflang;
-    lien.href = href;
-    document.head.append(lien);
-  };
-  for (const lang of LANGUES) {
-    const u = new URL(base);
-    u.searchParams.set('lang', lang);
-    ajouter(lang, u.href);
-  }
-  ajouter('x-default', base.href);
 }
