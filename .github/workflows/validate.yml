@@ -11,6 +11,10 @@ on:
       - "games/**"
       - "scripts/**"
       - "public/i18n/**"
+      - "public/taxonomie.js"
+      - "idees.json"
+      - "idees-archive.json"
+      - ".github/ISSUE_TEMPLATE/**"
   workflow_dispatch:
 
 jobs:
@@ -47,6 +51,10 @@ jobs:
 
       - name: Contrôler
         run: node scripts/validate-games.mjs --browser ${{ steps.jeux.outputs.ids }}
+
+      # Genres et univers : uniquement ceux de public/taxonomie.js (jeux, idées, libellés, formulaire).
+      - name: Contrôler les genres et les univers
+        run: node scripts/controle-taxonomie.mjs ${{ steps.jeux.outputs.ids }}
 
       # Traductions (fr, en, es, pt, de) : bloquant. Voir I18N.md.
       - name: Contrôler les traductions

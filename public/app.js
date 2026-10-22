@@ -8,10 +8,13 @@
 //   Populaires cette semaine, Nouveautés.
 // - Portée : votes du monde entier, ou de mon pays (pays détecté par l'API ;
 //   classement Monde tant que mon pays a moins de PAYS_VOTES_MIN votes).
-// - Regroupements en tuiles (définis dans regroupements.js) : raccourcis
-//   (au hasard, jeux aimés, hors ligne), âge, genres, univers et autres
-//   thèmes. Combinables entre eux, avec le tri et avec la recherche ; chaque
-//   tuile compte ses jeux. Un regroupement encore vide est grisé (« Bientôt »).
+// - Regroupements : tuiles des raccourcis (au hasard, jeux aimés, hors ligne)
+//   et de l'âge, puis petites puces des genres et des univers (listes fermées
+//   de taxonomie.js, dans leur ordre, chacune sur 2 rangées qui défilent si
+//   elles ne tiennent pas). Combinables entre eux, avec le tri et avec la
+//   recherche ; chaque tuile ou puce compte ses jeux. Un genre compte les jeux
+//   dont c'est le genre principal ou secondaire. Un regroupement encore vide
+//   est grisé (« Bientôt »).
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
 // - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
 // - Tendances, en haut : les TENDANCES_NOMBRE jeux les plus joués des 7 derniers
@@ -24,10 +27,10 @@
 
 import { votesEnAttente, envoyerEnAttente, mesVotes } from './votes.js';
 import { activerHorsLigne, jeuxHorsLigne } from './hors-ligne.js';
-import { GENRES_AFFICHAGE, UNIVERS, TRANCHES_AGE } from './regroupements.js';
+import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, TRANCHES_AGE } from './taxonomie.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
-  nomGenre, nomTag, titreJeu, descriptionJeu, jeuDisponible, jeuEnFrancais,
+  nomGenre, nomUnivers, titreJeu, descriptionJeu, jeuDisponible, jeuEnFrancais,
 } from './langue.js';
 
 const NOUVEAU_JOURS = 7;          // un jeu est « nouveau » pendant 7 jours
@@ -49,7 +52,6 @@ const SANS_VOTE = { up: 0, down: 0, score: 0, semaine: 0 };
 const etat = {
   tous: [],               // tout le catalogue (catalog.json)
   jeux: [],               // jeux proposés dans la langue courante
-  genres: [],             // ordre des genres (catalog.json)
   scoresMonde: null,      // { gameId: { up, down, score, semaine } } ; null = API indisponible
   scoresPays: undefined,  // idem pour mon pays : undefined = pas chargé, null = indisponible
   pays: null,             // pays détecté par l'API (ex. « FR »), ou null
@@ -60,9 +62,8 @@ const etat = {
   portee: 'monde',        // 'monde' | 'pays'
   collection: null,       // 'aimes' | 'hors-ligne' | null
   age: null,              // tranche d'âge (TRANCHES_AGE), ou null
-  genre: null,            // genre sélectionné, ou null
+  genre: null,            // genre sélectionné (GENRES), ou null
   univers: null,          // univers sélectionné (UNIVERS), ou null
-  etiquette: null,        // autre thème (tag hors univers), ou null
   texte: '',              // recherche
   erreur: false,          // le catalogue n'a pas pu être chargé
 };
@@ -87,8 +88,6 @@ const el = {
   ages: document.getElementById('ages'),
   genres: document.getElementById('genres'),
   univers: document.getElementById('univers'),
-  autresThemes: document.getElementById('autres-themes'),
-  toutVoir: document.querySelectorAll('.tout-voir'),
   langue: document.getElementById('langue'),
   tendances: document.getElementById('tendances'),
   tendancesListe: document.getElementById('tendances-liste'),
@@ -123,7 +122,6 @@ function nomPays(code) {
   }
 }
 
-const nomUnivers = (u) => t(`univers.${u.id}`);
 const nomAge = (tranche) => t(`age.${tranche.id}`);
 
 // Jeux que j'ai notés 👍 sur cet appareil.
@@ -198,10 +196,9 @@ function trancheAge(ages) {
   return TRANCHES_AGE.find((t) => age >= t.min && age <= t.max)?.id ?? null;
 }
 
-// Univers d'un jeu : ceux dont un tag correspond à son genre ou à l'un de ses tags.
-function universDuJeu(jeu) {
-  const mots = new Set([jeu.genre, ...jeu.tags].map((m) => m.normalize('NFC')));
-  return UNIVERS.filter((u) => u.tags.some((t) => mots.has(t))).map((u) => u.id);
+// Identifiants valides d'une liste du catalogue (taxonomie.js), sans doublon.
+function idsValides(liste, permis) {
+  return Array.isArray(liste) ? [...new Set(liste.filter((x) => permis.includes(x)))] : [];
 }
 
 function dansCollection(jeu, collection) {
@@ -213,11 +210,8 @@ function dansCollection(jeu, collection) {
 function correspond(jeu, recherche, sauf = null) {
   if (sauf !== 'collection' && etat.collection && !dansCollection(jeu, etat.collection)) return false;
   if (sauf !== 'age' && etat.age && jeu.tranche !== etat.age) return false;
-  if (sauf !== 'genre' && etat.genre && jeu.genre !== etat.genre) return false;
-  if (sauf !== 'theme') {
-    if (etat.univers && !jeu.univers.includes(etat.univers)) return false;
-    if (etat.etiquette && !jeu.tags.includes(etat.etiquette)) return false;
-  }
+  if (sauf !== 'genre' && etat.genre && !jeu.genres.includes(etat.genre)) return false;
+  if (sauf !== 'univers' && etat.univers && !jeu.univers.includes(etat.univers)) return false;
   return !recherche || jeu.texte.includes(recherche);
 }
 
@@ -226,7 +220,7 @@ function rechercheNormalisee() {
 }
 
 function filtreActif() {
-  return !!(etat.collection || etat.age || etat.genre || etat.univers || etat.etiquette || rechercheNormalisee());
+  return !!(etat.collection || etat.age || etat.genre || etat.univers || rechercheNormalisee());
 }
 
 // --- Filtrage et tri --------------------------------------------------------
@@ -300,10 +294,10 @@ function creerCarte(jeu, scores) {
 
   const infos = document.createElement('p');
   infos.className = 'carte-infos';
-  const themes = [jeu.genre, ...jeu.tags.filter((t) => t !== jeu.genre)].filter(Boolean).slice(0, 2);
+  // Genre principal et premier univers, en libellés courts.
+  const themes = [jeu.genre && nomGenre(jeu.genre, true), jeu.univers[0] && nomUnivers(jeu.univers[0], true)].filter(Boolean);
   const enFrancais = jeuEnFrancais(jeu) ? `(${t('carte.enFrancais')})` : '';
-  infos.textContent = [themes.map((m, i) => (i === 0 && m === jeu.genre ? nomGenre(m) : nomTag(m))).join(' · '), jeu.ages, enFrancais]
-    .filter(Boolean).join(' — ');
+  infos.textContent = [themes.join(' · '), jeu.ages, enFrancais].filter(Boolean).join(' — ');
   texte.append(infos);
 
   // Compteurs de pouces, seulement quand l'API répond (jamais hors connexion).
@@ -499,12 +493,59 @@ function creerPuce(texte, picto, actif, action, etiquetteAria) {
   return b;
 }
 
+// Petite puce d'un genre ou d'un univers : pictogramme, libellé court et nombre
+// de jeux (selon les autres filtres), sans retour à la ligne ; libellé complet
+// dans la bulle d'aide et pour les lecteurs d'écran. total = 0 : regroupement
+// encore vide, grisé, sans nombre.
+function creerPuceFiltre({ cle, picto, nom, nomComplet, teinte, actif, compte, total, action }) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'puce-filtre';
+  b.dataset.cle = cle;
+  b.style.setProperty('--teinte', teinte);
+
+  const icone = document.createElement('span');
+  icone.className = 'puce-filtre-picto';
+  icone.setAttribute('aria-hidden', 'true');
+  icone.textContent = picto;
+
+  const texte = document.createElement('span');
+  texte.lang = getLang();
+  texte.textContent = nom;
+  b.append(icone, texte);
+  b.setAttribute('aria-pressed', String(actif));
+
+  let etatTexte = nombreDeJeux(compte);
+  if (total === 0) {
+    b.disabled = true;
+    b.classList.add('puce-bientot');
+    etatTexte = t('tuile.bientot').toLocaleLowerCase(getLang());
+  } else {
+    const nombre = document.createElement('span');
+    nombre.className = 'puce-filtre-compte';
+    nombre.setAttribute('aria-hidden', 'true');
+    nombre.textContent = window.JEL_I18N.nombre(compte);
+    b.append(nombre);
+    if (compte === 0 && !actif) b.classList.add('puce-zero');
+  }
+  b.title = t('tuile.aria', { nom: nomComplet, etat: etatTexte });
+  b.setAttribute('aria-label', b.title);
+  b.addEventListener('click', action);
+  return b;
+}
+
+// Répartit les puces sur les 2 rangées du groupe (13 + 13 genres, 12 + 12 univers).
+// Les rangées restent en place : chacune garde sa position de défilement.
+function remplirRangees(groupe, puces) {
+  const [haut, bas] = groupe.querySelectorAll('.rangee');
+  const moitie = Math.ceil(puces.length / 2);
+  haut.replaceChildren(...puces.slice(0, moitie));
+  bas.replaceChildren(...puces.slice(moitie));
+}
+
 // Choisit (ou retire, si déjà choisi) un filtre, puis met tout à jour.
-// Univers et « autres thèmes » s'excluent : un seul thème à la fois.
 function choisir(famille, valeur) {
   etat[famille] = etat[famille] === valeur ? null : valeur;
-  if (famille === 'univers' && etat.univers) etat.etiquette = null;
-  if (famille === 'etiquette' && etat.etiquette) etat.univers = null;
   rafraichir();
   if (etat[famille]) montrerResultats();
 }
@@ -541,12 +582,6 @@ function compter(famille, valeursDuJeu) {
   return { compte: (v) => compte.get(v) || 0, total: (v) => total.get(v) || 0 };
 }
 
-// Les regroupements qui ont des jeux d'abord, les vides (« Bientôt ») ensuite ;
-// à l'intérieur, l'ordre des listes est gardé.
-function pleinsDAbord(liste, total) {
-  return [...liste.filter((x) => total(x) > 0), ...liste.filter((x) => total(x) === 0)];
-}
-
 function afficherRegroupements() {
   // Les tuiles sont recréées : on rend le focus clavier à celle qui l'avait.
   const cleFocus = document.activeElement?.dataset?.cle;
@@ -573,36 +608,20 @@ function afficherRegroupements() {
     action: () => choisir('age', tr.id),
   })));
 
-  // Genres : la liste fermée (catalog.json), plus un genre inconnu éventuel.
-  const presents = new Set(etat.jeux.map((j) => j.genre).filter(Boolean));
-  const genres = compter('genre', (j) => (j.genre ? [j.genre] : []));
-  const listeGenres = [...etat.genres, ...[...presents].filter((g) => !etat.genres.includes(g))];
-  el.genres.replaceChildren(...pleinsDAbord(listeGenres, genres.total).map((genre) => {
-    const affichage = GENRES_AFFICHAGE[genre] || { picto: '🎮', teinte: 230 };
-    return creerTuile({
-      cle: `genre:${genre}`, picto: affichage.picto, nom: nomGenre(genre), teinte: affichage.teinte,
-      actif: etat.genre === genre, compte: genres.compte(genre), total: genres.total(genre),
-      action: () => choisir('genre', genre),
-    });
-  }));
+  // Genres (principal ou secondaire) et univers : listes fermées de taxonomie.js, dans leur ordre.
+  const genres = compter('genre', (j) => j.genres);
+  remplirRangees(el.genres, GENRES.map((g) => creerPuceFiltre({
+    cle: `genre:${g.id}`, picto: g.picto, nom: nomGenre(g.id, true), nomComplet: nomGenre(g.id), teinte: g.teinte,
+    actif: etat.genre === g.id, compte: genres.compte(g.id), total: genres.total(g.id),
+    action: () => choisir('genre', g.id),
+  })));
 
-  // Univers.
-  const univers = compter('theme', (j) => j.univers);
-  el.univers.replaceChildren(...pleinsDAbord(UNIVERS, (u) => univers.total(u.id)).map((u) => creerTuile({
-    cle: `univers:${u.id}`, picto: u.picto, nom: nomUnivers(u), teinte: u.teinte,
+  const univers = compter('univers', (j) => j.univers);
+  remplirRangees(el.univers, UNIVERS.map((u) => creerPuceFiltre({
+    cle: `univers:${u.id}`, picto: u.picto, nom: nomUnivers(u.id, true), nomComplet: nomUnivers(u.id), teinte: u.teinte,
     actif: etat.univers === u.id, compte: univers.compte(u.id), total: univers.total(u.id),
     action: () => choisir('univers', u.id),
   })));
-
-  // Autres thèmes : les tags rangés dans aucun univers (ni genres), en petites puces.
-  const dejaRanges = new Set([...UNIVERS.flatMap((u) => u.tags), ...listeGenres]);
-  const autres = compter('theme', (j) => j.tags.filter((t) => !dejaRanges.has(t.normalize('NFC'))));
-  const tags = [...new Set(etat.jeux.flatMap((j) => j.tags))]
-    .filter((tag) => autres.total(tag) > 0)
-    .sort((a, b) => autres.total(b) - autres.total(a) || nomTag(a).localeCompare(nomTag(b), getLang()));
-  el.autresThemes.replaceChildren(...tags.map((tag) => creerPuce(nomTag(tag), null, etat.etiquette === tag,
-    () => choisir('etiquette', tag), t('tuile.aria', { nom: nomTag(tag), etat: nombreDeJeux(autres.compte(tag)) }))));
-  el.autresThemes.hidden = tags.length === 0;
 
   if (cleFocus) document.querySelector(`[data-cle="${CSS.escape(cleFocus)}"]`)?.focus();
 }
@@ -622,13 +641,13 @@ function afficherFiltresActifs() {
     ajouter(tr.picto, nomAge(tr), () => { etat.age = null; });
   }
   if (etat.genre) {
-    ajouter(GENRES_AFFICHAGE[etat.genre]?.picto || '🎮', nomGenre(etat.genre), () => { etat.genre = null; });
+    const g = GENRES.find((x) => x.id === etat.genre);
+    ajouter(g.picto, nomGenre(g.id), () => { etat.genre = null; });
   }
   if (etat.univers) {
     const u = UNIVERS.find((x) => x.id === etat.univers);
-    ajouter(u.picto, nomUnivers(u), () => { etat.univers = null; });
+    ajouter(u.picto, nomUnivers(u.id), () => { etat.univers = null; });
   }
-  if (etat.etiquette) ajouter('🏷️', nomTag(etat.etiquette), () => { etat.etiquette = null; });
   if (rechercheNormalisee()) {
     ajouter('🔎', t('filtres.recherche', { texte: etat.texte.trim() }), () => { etat.texte = ''; el.recherche.value = ''; });
   }
@@ -636,7 +655,7 @@ function afficherFiltresActifs() {
 
   if (actifs.length > 1) {
     const tout = creerPuce(t('filtres.toutEffacer'), null, null, () => {
-      Object.assign(etat, { collection: null, age: null, genre: null, univers: null, etiquette: null, texte: '' });
+      Object.assign(etat, { collection: null, age: null, genre: null, univers: null, texte: '' });
       el.recherche.value = '';
       rafraichir();
     });
@@ -655,14 +674,6 @@ function rafraichir() {
   afficherGrille();
 }
 
-// « Tout voir » / « Réduire », selon l'état de la bande.
-function afficherToutVoir() {
-  el.toutVoir.forEach((bouton) => {
-    const deplie = bouton.getAttribute('aria-expanded') === 'true';
-    bouton.textContent = deplie ? t('groupe.reduire') : t('groupe.toutVoir');
-  });
-}
-
 // --- Langue -----------------------------------------------------------------
 
 function afficherSeo() {
@@ -671,21 +682,20 @@ function afficherSeo() {
 
 // Jeux proposés dans la langue courante, avec leur texte de recherche
 // (titre et description en français et dans la langue courante, noms affichés
-// du genre, des tags et des univers).
+// des genres et des univers, complets et courts).
 function preparerJeux() {
   etat.jeux = etat.tous.filter(jeuDisponible);
   for (const jeu of etat.jeux) {
-    const nomsUnivers = UNIVERS.filter((u) => jeu.univers.includes(u.id)).map(nomUnivers);
     jeu.texte = normaliser([
       jeu.title, jeu.description, titreJeu(jeu), descriptionJeu(jeu),
-      jeu.genre, nomGenre(jeu.genre), ...jeu.tags, ...jeu.tags.map(nomTag), ...nomsUnivers,
+      ...jeu.genres.flatMap((g) => [nomGenre(g), nomGenre(g, true)]),
+      ...jeu.univers.flatMap((u) => [nomUnivers(u), nomUnivers(u, true)]),
     ].join(' '));
   }
 }
 
 surChangementLangue(() => {
   afficherSeo();
-  afficherToutVoir();
   if (etat.erreur) {
     afficherErreurCatalogue();
     return;
@@ -780,16 +790,6 @@ el.recherche.addEventListener('input', () => {
   rafraichir();
 });
 
-// « Tout voir » : la bande de tuiles qui défile devient une grille complète.
-el.toutVoir.forEach((bouton) => {
-  bouton.addEventListener('click', () => {
-    const tuiles = document.getElementById(bouton.getAttribute('aria-controls'));
-    const deplie = tuiles.classList.toggle('deplie');
-    bouton.setAttribute('aria-expanded', String(deplie));
-    afficherToutVoir();
-  });
-});
-
 // Retour de la connexion : on récupère les votes et les tendances s'ils manquaient.
 addEventListener('online', async () => {
   if (etat.jeux.length === 0) return;
@@ -834,29 +834,28 @@ async function demarrer() {
     const reponse = await fetch('catalog.json', { cache: 'no-cache' });
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
     const catalogue = await reponse.json();
+    // Seuls les identifiants des listes fermées (taxonomie.js) sont gardés.
     etat.tous = (catalogue.games || []).map((j) => {
+      const genre = IDS_GENRES.includes(j.genre) ? j.genre : '';
       const jeu = {
         ...j,
-        genre: typeof j.genre === 'string' ? j.genre : '',
-        tags: Array.isArray(j.tags) ? j.tags.filter((t) => typeof t === 'string') : [],
+        genre,
+        genres: idsValides([genre, ...(Array.isArray(j.genres_secondaires) ? j.genres_secondaires : [])], IDS_GENRES),
+        univers: idsValides(j.univers, IDS_UNIVERS),
       };
       jeu.tranche = trancheAge(jeu.ages);
-      jeu.univers = universDuJeu(jeu);
       return jeu;
     });
-    etat.genres = Array.isArray(catalogue.genres) ? catalogue.genres.filter((g) => typeof g === 'string') : [];
   } catch (erreur) {
     console.error('Impossible de charger le catalogue :', erreur);
     etat.erreur = true;
     await textes;
     afficherSeo();
-    afficherToutVoir();
     afficherErreurCatalogue();
     return;
   }
   await textes;
   afficherSeo();
-  afficherToutVoir();
   preparerJeux();
   const resultat = await scores;
   if (resultat) {

@@ -52,7 +52,8 @@ Pour **chaque jeu** :
 2. Mettez-y le fichier du jeu, **renommé `index.html`**.
 3. Copiez-y le `game.json` de `pommes-du-poney`, puis modifiez-le :
    - `"id"` : exactement le nom du dossier (`"saut-obstacles"`) ;
-   - `"title"`, `"description"`, `"tags"` (thèmes, par ex. `["chevaux", "adresse"]`), `"ages"` ;
+   - `"title"`, `"description"`, `"ages"` ;
+   - `"genre"`, `"genres_secondaires"` et `"univers"` : uniquement des identifiants des listes de `public/taxonomie.js` (par ex. `"arcade"`, `[]`, `["chevaux"]`) ; vérifier avec `npm run taxonomie` ;
    - `"added"` : date d'ajout au format `AAAA-MM-JJ` ;
    - `"version"` : `1` (augmentez-la à chaque modification du jeu).
 4. Ajoutez une jaquette `cover.webp` (portrait 600 × 800 px). En attendant, un `cover.png` ou `cover.jpg` fonctionne aussi. Sans jaquette, une image par défaut s'affiche.
