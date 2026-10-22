@@ -1,6 +1,8 @@
 // ==========================================================================
-// Jeux-en-ligne — lanceur de jeu (play.html?id=<id-du-jeu>)
+// Jeux-en-ligne — lanceur de jeu (play.html?id=<id-du-jeu>, adresse « /play?id=… »)
 // Trouve le jeu dans catalog.json et le charge dans le cadre isolé.
+// On y arrive depuis la fiche du jeu (bouton « Jouer ») ; le lanceur n'est pas
+// indexé (noindex), et son bouton retour ramène à cette fiche.
 // Gère aussi les pouces 👍 / 👎 (voir votes.js) et la langue :
 // - la langue du site est transmise au jeu (window.JEL_LANG, voir i18n/i18n.js),
 //   car le cadre isolé n'a pas accès au stockage du site ;
@@ -13,6 +15,7 @@
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
 import { SCRIPT_ERREURS, suivreJeu, noterErreur } from './suivi.js';
+import { urlJeu, urlAccueil } from './chemins.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
   titreJeu, presentationJeu, jeuEnFrancais, jeuDisponible,
@@ -25,6 +28,7 @@ const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const CSP_JEU = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'";
 
 const el = {
+  retour: document.getElementById('retour'),
   titre: document.getElementById('titre-jeu'),
   cadre: document.getElementById('cadre-jeu'),
   scene: document.getElementById('scene'),
@@ -35,6 +39,7 @@ const el = {
   message: document.getElementById('message'),
   messageTitre: document.getElementById('message-titre'),
   messageTexte: document.getElementById('message-texte'),
+  voirTous: document.querySelector('#message a.bouton'),
 };
 
 let jeuCourant = null;   // fiche du jeu affiché (catalog.json)
@@ -50,8 +55,18 @@ function afficherMessage(titre, texte) {
   el.cadre.hidden = true;
 }
 
-// Textes du lanceur qui dépendent de la langue (titre, plein écran, SEO).
+// Arrivée hors connexion depuis une fiche qui n'était pas gardée (sw.js) : le
+// retour vers cette fiche tournerait en rond, il mène donc à l'accueil.
+const SANS_FICHE = new URLSearchParams(location.search).has('depuis');
+
+// Textes du lanceur qui dépendent de la langue (titre, plein écran, onglet),
+// et bouton retour : vers la fiche du jeu dans la langue choisie (en français
+// si le jeu n'est pas proposé dans cette langue), sinon l'accueil.
 function afficherTextes() {
+  el.retour.href = jeuCourant && !SANS_FICHE
+    ? urlJeu(jeuCourant.id, jeuDisponible(jeuCourant) ? getLang() : 'fr')
+    : urlAccueil(getLang());
+  if (el.voirTous) el.voirTous.href = urlAccueil(getLang());
   if (jeuCourant) {
     const titre = titreJeu(jeuCourant);
     el.titre.textContent = titre;
@@ -153,6 +168,16 @@ async function chargerJeu(jeu) {
   afficherJeu();
 }
 
+// Première visite (arrivée par une fiche, sans service worker encore actif) : le
+// jeu a été lu avant que le service worker ne contrôle la page. On le relit dès
+// qu'il prend la main (clients.claim) : il est alors gardé pour le hors-ligne.
+function garderPourHorsLigne(jeu) {
+  if (!('serviceWorker' in navigator) || navigator.serviceWorker.controller) return;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    fetch(jeu.play).catch(() => { /* hors connexion : tant pis */ });
+  }, { once: true });
+}
+
 // Messages du jeu :
 // - « jel-langue » (bouton de langue) : on enregistre le choix et on relance le jeu ;
 // - « jel-erreur » (SCRIPT_ERREURS) : erreur JavaScript, notée pour le suivi.
@@ -217,6 +242,7 @@ async function demarrer() {
     return;
   }
   suivreJeu(jeu.id);
+  garderPourHorsLigne(jeu);
   activerVotes(jeu.id);
 
   // Jeu dont le contenu (mots, lettres…) reste en français : on le signale.

@@ -11,7 +11,8 @@
 export function activerHorsLigne() {
   if (!('serviceWorker' in navigator)) return;
   const enregistrer = () => {
-    navigator.serviceWorker.register('sw.js').catch((erreur) => {
+    // Adresse depuis la racine : l'accueil existe aussi à /en/, /es/… (portée : tout le site).
+    navigator.serviceWorker.register('/sw.js').catch((erreur) => {
       console.warn('Mode hors connexion indisponible :', erreur);
     });
   };

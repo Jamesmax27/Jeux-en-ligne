@@ -1,29 +1,39 @@
 // ==========================================================================
 // POST /api/idees — idée de jeu envoyée depuis la page privée /idees
 //
-// Corps : { "titre": "...", "genre": "...", "description": "..." }
+// Corps : { "titre": "...", "genre": "...", "ages": "6+", "univers": ["ferme", ...],
+//           "description": "..." }
 //
 // - Réservé aux personnes connectées par Cloudflare Access : le jeton
 //   Cf-Access-Jwt-Assertion est vérifié (signature RS256 avec les clés de
 //   https://<ACCESS_TEAM_DOMAIN>/cdn-cgi/access/certs, audience ACCESS_AUD,
 //   émetteur, dates). Jeton absent ou invalide : 403.
 // - Champs : titre de 3 à 100 caractères, description de 2 000 au plus,
-//   genre : identifiant de la liste fermée (public/taxonomie.js).
+//   genre : identifiant de la liste fermée (public/taxonomie.js) ;
+//   ages (obligatoire) : âge minimum conseillé « N+ », de « 4+ » à « 12+ » ;
+//   univers (facultatif) : 0 à 2 identifiants de la liste fermée, sans
+//   doublon, « autre » seul. Les textes pour les moteurs de recherche ne sont
+//   pas demandés : l'agent créateur les rédige d'après le jeu fini.
 // - Crée une issue « Idée : <titre> » dans GITHUB_REPO (étiquettes
 //   « idee-perso » et le genre). La boucle de nuit (boucle-de-nuit.yml,
 //   étape b) la transforme en idée prioritaire, puis la ferme avec le lien
 //   de la pull request du jeu. Le corps de l'issue suit le format qu'elle lit
-//   (rubriques « ### Genre », « ### Description », « ### Auteur »).
+//   (rubriques « ### Genre », « ### Âge », « ### Univers », « ### Description »,
+//   « ### Auteur », dans cet ordre ; univers : identifiants séparés par
+//   « , », ou « _Aucun univers_ » ; l'âge et les univers passent ensuite par
+//   scripts/idees.mjs importer-perso).
 // - GITHUB_TOKEN (secret) ne sert qu'ici : il n'est jamais renvoyé au navigateur.
 //
 // Réponse : { "ok": true, "numero": n } ou { "erreur": "..." }
 // ==========================================================================
 
 import { json } from '../_commun.js';
-import { IDS_GENRES } from '../../public/taxonomie.js';
+import { IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX } from '../../public/taxonomie.js';
 
 const ETIQUETTE = 'idee-perso';
 const CLES_DUREE = 3600000; // clés publiques d'Access gardées 1 h par instance
+const AGE_MIN = 4;          // âges permis : de « 4+ » à « 12+ » (la page propose ceux du formulaire GitHub)
+const AGE_MAX = 12;
 
 // --- Jeton Cloudflare Access -------------------------------------------------
 
@@ -92,9 +102,12 @@ async function verifierJetonAccess(jeton, env) {
 
 // --- Issue GitHub --------------------------------------------------------------
 
-function corpsIssue(genre, description, auteur) {
+// « Description » doit rester juste avant « Auteur » : la boucle de nuit lit le texte entre les deux.
+function corpsIssue({ genre, ages, univers, description, auteur }) {
   return [
     '### Genre', '', genre, '',
+    '### Âge', '', ages, '',
+    '### Univers', '', univers.length ? univers.join(', ') : '_Aucun univers_', '',
     '### Description', '', description || '_Aucune description_', '',
     '### Auteur', '', auteur, '',
     '---',
@@ -102,7 +115,7 @@ function corpsIssue(genre, description, auteur) {
   ].join('\n');
 }
 
-async function creerIssue(env, titre, genre, description, auteur) {
+async function creerIssue(env, titre, idee) {
   const reponse = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/issues`, {
     method: 'POST',
     headers: {
@@ -114,8 +127,8 @@ async function creerIssue(env, titre, genre, description, auteur) {
     },
     body: JSON.stringify({
       title: `Idée : ${titre}`,
-      body: corpsIssue(genre, description, auteur),
-      labels: [ETIQUETTE, genre],
+      body: corpsIssue(idee),
+      labels: [ETIQUETTE, idee.genre],
     }),
   });
   if (!reponse.ok) {
@@ -155,6 +168,8 @@ export async function onRequest({ request, env }) {
   const titre = typeof corps?.titre === 'string' ? corps.titre.replace(/\s+/g, ' ').trim() : '';
   const genre = typeof corps?.genre === 'string' ? corps.genre.trim() : '';
   const description = typeof corps?.description === 'string' ? corps.description.replace(/\r\n?/g, '\n').trim() : '';
+  const ages = typeof corps?.ages === 'string' ? corps.ages.replace(/\s+/g, '') : '';
+  const univers = corps?.univers ?? [];
 
   if (titre.length < 3 || titre.length > 100) {
     return json({ erreur: 'Le titre doit faire entre 3 et 100 caractères.' }, 400);
@@ -165,6 +180,21 @@ export async function onRequest({ request, env }) {
   if (!IDS_GENRES.includes(genre)) {
     return json({ erreur: 'Genre inconnu.' }, 400);
   }
+  // Âge : « N+ », de AGE_MIN à AGE_MAX (même format que "ages" des idées et de game.json).
+  const age = /^\d{1,2}\+$/.test(ages) ? parseInt(ages, 10) : NaN;
+  if (!(age >= AGE_MIN && age <= AGE_MAX)) {
+    return json({ erreur: `Choisis un âge conseillé, de ${AGE_MIN}+ à ${AGE_MAX}+.` }, 400);
+  }
+  // Univers : identifiants de la liste fermée (public/taxonomie.js), mêmes règles que scripts/controle-taxonomie.mjs.
+  if (!Array.isArray(univers) || univers.some((u) => !IDS_UNIVERS.includes(u))) {
+    return json({ erreur: 'Univers inconnu.' }, 400);
+  }
+  if (new Set(univers).size !== univers.length || univers.length > UNIVERS_MAX) {
+    return json({ erreur: `${UNIVERS_MAX} univers au plus, sans doublon.` }, 400);
+  }
+  if (univers.includes('autre') && univers.length > 1) {
+    return json({ erreur: "L'univers « Autre » ne se combine pas avec un autre univers." }, 400);
+  }
 
   if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
     console.error('GITHUB_TOKEN ou GITHUB_REPO ne sont pas configurés.');
@@ -172,7 +202,7 @@ export async function onRequest({ request, env }) {
   }
 
   const auteur = acces.email || acces.common_name || 'inconnu';
-  const numero = await creerIssue(env, titre, genre, description, auteur);
+  const numero = await creerIssue(env, titre, { genre, ages: `${age}+`, univers, description, auteur });
   if (!numero) {
     return json({ erreur: "L'idée n'a pas pu être enregistrée sur GitHub. Réessaie plus tard." }, 502);
   }

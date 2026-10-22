@@ -126,7 +126,7 @@ async function envoyer() {
     let reponse;
     try {
       const jeton = await jetonTurnstile();
-      reponse = await fetch('api/vote', {
+      reponse = await fetch('/api/vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gameId, value: valeur, voterId: identifiantVotant(), turnstileToken: jeton }),

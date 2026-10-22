@@ -83,6 +83,82 @@
       color: var(--craie-douce);
     }
 
+    .idees-note {
+      margin: 0 0 18px;
+      font-size: 14px;
+      color: var(--craie-douce);
+    }
+
+    /* Âge et univers : cases à toucher (44 px de haut au moins), sur plusieurs lignes. */
+    .choix {
+      min-width: 0;
+      margin: 0 0 18px;
+      padding: 0;
+      border: 0;
+    }
+
+    .choix legend {
+      margin-bottom: 6px;
+      padding: 0;
+      font-weight: 600;
+    }
+
+    .choix legend small {
+      font-weight: 400;
+      color: var(--craie-douce);
+    }
+
+    .choix-liste {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .choix-case {
+      position: relative;
+      display: inline-flex;
+    }
+
+    /* La vraie case reste dans la page (clavier, lecteurs d'écran) mais invisible. */
+    .choix-case input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: 0;
+      opacity: 0;
+    }
+
+    .choix-case span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 44px;
+      padding: 8px 14px;
+      border: 1.5px solid var(--orbite);
+      border-radius: 999px;
+      background: var(--nuit);
+      color: var(--craie);
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    .choix-case input:checked + span {
+      border-color: var(--lavande);
+      background: var(--surface-choisie);
+      font-weight: 600;
+    }
+
+    .choix-case input:focus-visible + span {
+      outline: 2px solid var(--lavande);
+      outline-offset: 2px;
+    }
+
+    .choix-case input:disabled + span {
+      border-style: dashed;
+      color: var(--craie-faible);
+      cursor: default;
+    }
+
     .envoyer {
       width: 100%;
       min-height: 48px;
@@ -147,6 +223,8 @@
     </h1>
 
     <form class="idees-carte" id="formulaire" novalidate>
+      <p class="idees-note">Rien à écrire pour Google : le titre et la description pour les moteurs de recherche, le texte de la page du jeu, les compétences et le texte de la vignette sont rédigés automatiquement d'après le jeu fini.</p>
+
       <div class="champ">
         <label for="titre">Titre</label>
         <input id="titre" name="titre" type="text" required minlength="3" maxlength="100" autocomplete="off" enterkeyhint="next">
@@ -155,14 +233,26 @@
       <div class="champ">
         <label for="genre">Genre</label>
         <select id="genre" name="genre" required>
-          <option value="" disabled selected>Chargement des genres…</option>
+          <option value="" disabled selected>Choisir un genre…</option>
         </select>
       </div>
+
+      <!-- Âges proposés : ceux du formulaire GitHub (.github/ISSUE_TEMPLATE/idee-jeu.yml) ;
+           functions/api/idees.js accepte de « 4+ » à « 12+ ». -->
+      <fieldset class="choix" id="ages">
+        <legend>Âge conseillé</legend>
+        <div class="choix-liste" id="ages-liste"></div>
+      </fieldset>
+
+      <fieldset class="choix" id="univers">
+        <legend>Univers <small>(facultatif, 2 au plus ; rien de coché = choisis par la boucle de nuit)</small></legend>
+        <div class="choix-liste" id="univers-liste"></div>
+      </fieldset>
 
       <div class="champ">
         <label for="description">Description <small>(facultative)</small></label>
         <textarea id="description" name="description" maxlength="2000"
-          placeholder="Principe, ce qu'on fait, ce qui change au fil des niveaux, âge conseillé…"></textarea>
+          placeholder="Principe, ce qu'on fait, ce qui change au fil des niveaux…"></textarea>
         <div class="compteur" id="compteur" aria-live="polite">0 / 2000</div>
       </div>
 
@@ -174,11 +264,17 @@
   <script type="module">
     // Formulaire d'ajout d'idées : POST JSON vers /api/idees (functions/api/idees.js),
     // qui vérifie la connexion Cloudflare Access et crée une issue « idee-perso » sur GitHub.
-    import { GENRES } from '/taxonomie.js';
+    // Genres et univers : les listes fermées complètes de public/taxonomie.js, dans leur ordre.
+    import { GENRES, UNIVERS, UNIVERS_MAX } from '/taxonomie.js';
+
+    // Mêmes âges que le formulaire GitHub (.github/ISSUE_TEMPLATE/idee-jeu.yml).
+    const AGES = ['4+', '5+', '6+', '7+', '8+', '10+', '12+'];
 
     const formulaire = document.getElementById('formulaire');
     const titre = document.getElementById('titre');
     const genre = document.getElementById('genre');
+    const listeAges = document.getElementById('ages-liste');
+    const listeUnivers = document.getElementById('univers-liste');
     const description = document.getElementById('description');
     const compteur = document.getElementById('compteur');
     const bouton = document.getElementById('envoyer');
@@ -189,24 +285,38 @@
       message.className = `message ${type}`;
     }
 
-    // Genres déjà utilisés dans le catalogue, dans l'ordre et avec les libellés de public/taxonomie.js.
-    async function chargerGenres() {
-      try {
-        const reponse = await fetch('/catalog.json', { cache: 'no-cache' });
-        if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
-        const catalogue = await reponse.json();
-        const utilises = new Set((catalogue.games || []).map((j) => j.genre).filter(Boolean));
-        genre.innerHTML = '';
-        genre.append(new Option('Choisir un genre…', '', true, true));
-        genre.options[0].disabled = true;
-        for (const g of GENRES) if (utilises.has(g.id)) genre.append(new Option(`${g.picto} ${g.libelle}`, g.id));
-      } catch (erreur) {
-        console.error('Catalogue illisible :', erreur);
-        genre.options[0].textContent = 'Genres indisponibles';
-        bouton.disabled = true;
-        afficher('Impossible de charger la liste des genres. Recharge la page.', 'erreur');
+    // Une case à toucher : <label><input><span>texte</span></label>.
+    function caseAChoisir(type, nom, valeur, texte) {
+      const etiquette = document.createElement('label');
+      etiquette.className = 'choix-case';
+      const entree = document.createElement('input');
+      entree.type = type;
+      entree.name = nom;
+      entree.value = valeur;
+      const libelle = document.createElement('span');
+      libelle.textContent = texte;
+      etiquette.append(entree, libelle);
+      return etiquette;
+    }
+
+    for (const g of GENRES) genre.append(new Option(`${g.picto} ${g.libelle}`, g.id));
+    for (const a of AGES) listeAges.append(caseAChoisir('radio', 'ages', a, a));
+    for (const u of UNIVERS) listeUnivers.append(caseAChoisir('checkbox', 'univers', u.id, `${u.picto} ${u.libelle}`));
+
+    const casesUnivers = [...listeUnivers.querySelectorAll('input')];
+    const universChoisis = () => casesUnivers.filter((c) => c.checked).map((c) => c.value);
+
+    // 2 univers au plus ; « Autre » ne se combine avec aucun autre (mêmes règles que l'API).
+    function majUnivers() {
+      const choisis = universChoisis();
+      for (const c of casesUnivers) {
+        if (c.checked) { c.disabled = false; continue; }
+        c.disabled = choisis.length >= UNIVERS_MAX
+          || (c.value === 'autre' && choisis.length > 0)
+          || choisis.includes('autre');
       }
     }
+    listeUnivers.addEventListener('change', majUnivers);
 
     description.addEventListener('input', () => {
       compteur.textContent = `${description.value.length} / 2000`;
@@ -217,6 +327,8 @@
       const donnees = {
         titre: titre.value.trim(),
         genre: genre.value,
+        ages: listeAges.querySelector('input:checked')?.value || '',
+        univers: universChoisis(),
         description: description.value.trim(),
       };
       if (donnees.titre.length < 3 || donnees.titre.length > 100) {
@@ -227,6 +339,11 @@
       if (!donnees.genre) {
         afficher('Choisis un genre.', 'erreur');
         genre.focus();
+        return;
+      }
+      if (!donnees.ages) {
+        afficher('Choisis un âge conseillé.', 'erreur');
+        listeAges.querySelector('input').focus();
         return;
       }
 
@@ -243,6 +360,7 @@
         try { corps = await reponse.json(); } catch { /* réponse sans JSON */ }
         if (reponse.ok && corps.ok) {
           formulaire.reset();
+          majUnivers();
           compteur.textContent = '0 / 2000';
           afficher(`Merci ! L'idée « ${donnees.titre} » est enregistrée${corps.numero ? ` (n° ${corps.numero})` : ''}.`, 'ok');
         } else if (reponse.status === 403) {
@@ -258,8 +376,6 @@
         bouton.disabled = false;
       }
     });
-
-    chargerGenres();
   </script>
 </body>
 </html>

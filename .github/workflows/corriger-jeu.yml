@@ -6,8 +6,12 @@
 #  1. Vérifications : pull request ouverte, venant de ce dépôt, qui ne
 #     concerne qu'un seul jeu (games/<id>/).
 #  2. L'agent applique la demande, puis se teste (3 corrections au maximum).
+#     Si le jeu change, il met à jour ses textes de référencement dans les
+#     5 langues (i18n-jeu/<id>/*.json → scripts/i18n-jeu.mjs --meta).
 #  3. Garde-fou : seul games/<id>/ peut changer.
-#  4. Jaquette automatique refaite + contrôle final dans un vrai navigateur.
+#  4. Jaquette automatique refaite + contrôle final dans un vrai navigateur,
+#     traductions et référencement (scripts/verifier-seo.mjs : bloquant pour
+#     un jeu de la boucle ou ajouté depuis REGLES_SEO_DEPUIS, sinon indicatif).
 #  5. Si tout passe : correction poussée sur la branche de la pull request.
 #     Dans tous les cas : réponse en commentaire.
 #  6. Pull request de la boucle (nouveau-jeu/…) : l'étiquette « valide » est
@@ -112,8 +116,8 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           show_full_output: true
           claude_args: |
-            --max-turns 100
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*),Bash(node scripts/check-i18n.js:*)"
+            --max-turns 120
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*),Bash(node scripts/check-i18n.js:*),Bash(node scripts/i18n-jeu.mjs --meta:*),Bash(node scripts/regles-seo.mjs:*),Bash(node scripts/verifier-seo.mjs:*)"
           prompt: |
             Tu es le développeur de jeux du site Free Micro Games. Le propriétaire demande une correction
             du jeu games/${{ needs.preparer.outputs.id }}/ (pull request #${{ github.event.issue.number }}).
@@ -135,16 +139,36 @@ jobs:
                Pour voir le jeu sur téléphone : node scripts/validate-games.mjs --jouer ${{ needs.preparer.outputs.id }}
                (captures dans captures/${{ needs.preparer.outputs.id }}/, à regarder avec Read).
                Avant de terminer, vérifie que le jeu respecte toujours la grille de validation (CONSIGNES-JEU.md, section 7).
-               Langues : tout texte ajouté ou modifié l'est dans les 5 langues du bloc jel-i18n-textes de index.html
-               (fr, en, es, pt, de ; aucun texte en dur), et dans "i18n" de game.json pour le titre, la description et
-               la présentation. Lance : node scripts/check-i18n.js ${{ needs.preparer.outputs.id }} --sans-site
-               jusqu'à « Traductions : tout est bon ».
-            5. Écris dans resume-correction.md (à la racine du dépôt) un résumé en français pour le propriétaire :
+               Langues : tout texte ajouté ou modifié dans le jeu l'est dans les 5 langues du bloc jel-i18n-textes de
+               index.html (fr, en, es, pt, de ; aucun texte en dur). Lance :
+               node scripts/check-i18n.js ${{ needs.preparer.outputs.id }} --sans-site jusqu'à « Traductions : tout est bon ».
+            5. Textes de la fiche et de la page du jeu : title, description et textes de référencement (titre_seo,
+               description_seo, presentation, regles, competences, jaquette_alt ; règles : CONSIGNES-JEU.md et
+               scripts/regles-seo.mjs). Si le jeu change (règles, gestes ou touches, niveaux, univers, écran titre…)
+               ou si la demande les concerne, mets-les à jour dans les 5 langues : ils restent fidèles au code (nombre
+               réel de niveaux, gestes au doigt ET touches du clavier, étoiles, âge de "ages"), sans marque, sans
+               formule passe-partout, sans promesse fausse. Bornes, dans chaque langue : titre_seo 50 à 60 caractères,
+               description_seo 140 à 160, presentation 70 à 150 mots, regles 50 à 130 mots, competences 2 à 4
+               compétences séparées par des virgules (20 à 160 caractères), jaquette_alt 40 à 125 caractères (ce que
+               montre l'écran titre, d'après lequel la jaquette est refaite).
+               - Ne les modifie jamais directement dans game.json : écris les champs à changer dans
+                 i18n-jeu/${{ needs.preparer.outputs.id }}/fr.json, en.json, es.json, pt.json et de.json, sous la forme
+                 {"meta": {"champ": "…"}} (un champ absent ne change pas ; pars des textes actuels de game.json :
+                 français à la racine, traductions dans "i18n").
+               - Puis lance : node scripts/i18n-jeu.mjs --meta ${{ needs.preparer.outputs.id }}
+                 (il les range dans game.json et pose "maj", la date de modification ; index.html n'est pas touché),
+                 puis : node scripts/regles-seo.mjs ${{ needs.preparer.outputs.id }} jusqu'à « Textes SEO : tout est bon »,
+                 et enfin : node scripts/verifier-seo.mjs ${{ needs.preparer.outputs.id }} (il construit le site et
+                 contrôle la page du jeu) jusqu'à « Référencement : tout est bon » ; les lignes « attention » qui ne
+                 concernent pas ce jeu sont à ignorer.
+               Un jeu ancien qui n'a pas encore ces textes : ne les écris que si la demande le prévoit.
+            6. Écris dans resume-correction.md (à la racine du dépôt) un résumé en français pour le propriétaire :
                3 à 6 puces courtes sur ce qui a changé, puis ce qu'il faut vérifier en jouant.
 
-            Interdits : modifier un autre fichier que ceux de games/${{ needs.preparer.outputs.id }}/ et
-            resume-correction.md ; toucher à la jaquette (elle est refaite automatiquement) ; utiliser la
-            moindre ressource Internet dans le jeu ; modifier idees.json, idees-archive.json ou le champ "idee" de game.json.
+            Interdits : modifier un autre fichier que ceux de games/${{ needs.preparer.outputs.id }}/,
+            i18n-jeu/${{ needs.preparer.outputs.id }}/ et resume-correction.md ; toucher à la jaquette (elle est
+            refaite automatiquement) ; utiliser la moindre ressource Internet dans le jeu ; modifier idees.json,
+            idees-archive.json ou le champ "idee" de game.json.
 
       - name: Vérifier ce que l'agent a modifié
         id: garde
@@ -170,10 +194,34 @@ jobs:
           rm -f "games/$ID/cover.jpg"
           if node scripts/validate-games.mjs --browser --covers "$ID" > "$RUNNER_TEMP/rapport.txt" 2>&1 \
              && node scripts/check-i18n.js "$ID" --sans-site >> "$RUNNER_TEMP/rapport.txt" 2>&1; then
-            echo "valide=true" >> "$GITHUB_OUTPUT"
+            valide=true
           else
-            echo "valide=false" >> "$GITHUB_OUTPUT"
+            valide=false
           fi
+          # Référencement : site construit avec ce jeu, puis ses textes et sa page contrôlés (scripts/verifier-seo.mjs).
+          # Le rapport en garde les erreurs, les remarques sur ce jeu et le bilan (les « attention » des autres
+          # jeux, nombreuses, sont laissées de côté).
+          echo "Référencement :" >> "$RUNNER_TEMP/rapport.txt"
+          code=0
+          node scripts/verifier-seo.mjs "$ID" > "$RUNNER_TEMP/seo.txt" 2>&1 || code=$?
+          {
+            grep -E '^ERREUR :' "$RUNNER_TEMP/seo.txt" | head -n 60
+            grep -E '^attention :' "$RUNNER_TEMP/seo.txt" | grep -F -- "$ID" | head -n 20
+            grep -E "^(Panne|Référencement : tout est bon|[0-9]+ erreur\(s\) à corriger)" "$RUNNER_TEMP/seo.txt" | tail -n 3
+          } >> "$RUNNER_TEMP/rapport.txt"
+          # Erreurs bloquantes pour un jeu de la boucle (sa vérification le refuserait) ou ajouté depuis
+          # REGLES_SEO_DEPUIS (scripts/regles-seo.mjs : il ne serait pas publié) ; pour un jeu plus ancien, sa page
+          # reste seulement hors des moteurs de recherche : simple information. Panne de l'outil : jamais bloquante.
+          case "$BRANCHE" in
+            nouveau-jeu/*) soumis=oui ;;
+            *) soumis=$(node --input-type=module -e "import { readFileSync } from 'node:fs'; import { REGLES_SEO_DEPUIS } from './scripts/regles-seo.mjs'; const j = JSON.parse(readFileSync('games/' + process.env.ID + '/game.json', 'utf8').replace(/^﻿/, '')); console.log(String(j.added || '') >= REGLES_SEO_DEPUIS ? 'oui' : 'non');" || echo oui) ;;
+          esac
+          case "$code" in
+            0) seo=ok ;;
+            1) seo=erreurs; if [ "$soumis" = oui ]; then valide=false; else seo=indicatif; fi ;;
+            *) seo=panne ;;
+          esac
+          { echo "valide=$valide"; echo "seo=$seo"; } >> "$GITHUB_OUTPUT"
           cat "$RUNNER_TEMP/rapport.txt"
 
       - name: Pousser la correction sur la branche
@@ -194,6 +242,7 @@ jobs:
         env:
           MODIFIE: ${{ steps.garde.outputs.modifie }}
           VALIDE: ${{ steps.controle.outputs.valide }}
+          SEO: ${{ steps.controle.outputs.seo }}
           RELANCE: ${{ startsWith(needs.preparer.outputs.branche, 'nouveau-jeu/') && steps.controle.outputs.valide == 'true' }}
         run: |
           {
@@ -204,6 +253,11 @@ jobs:
             else
               echo "⚠️ Correction **non ajoutée** : le contrôle qualité échoue encore (rapport ci-dessous). Précise ta demande, ou corrige à la main."
             fi
+            # Référencement non bloquant (jeu ancien) ou contrôle interrompu : signalé à part.
+            case "$SEO" in
+              indicatif) echo; echo "ℹ️ Textes de référencement non conformes (rapport ci-dessous) : sans effet sur la publication de ce jeu ancien, mais sa page reste hors des moteurs de recherche." ;;
+              panne) echo; echo "ℹ️ Contrôle du référencement interrompu (panne de scripts/verifier-seo.mjs) : il n'a pas bloqué la correction." ;;
+            esac
             if [ "$RELANCE" = "true" ]; then
               echo
               echo "🔁 La boucle de nuit revérifiera ce jeu à son prochain passage (ou tout de suite : onglet Actions → « Créer des jeux (boucle de nuit) » → nombre de jeux 0)."

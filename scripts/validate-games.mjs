@@ -15,8 +15,10 @@
 // Jeux faits selon les consignes de 2026 (game.json : "consignes": 2, posé par
 // la boucle de nuit) : au moins 20 niveaux, nombre déclaré dans game.json
 // ("niveaux") ET donné par le jeu lui-même (window.JEL_NIVEAUX, lu dans le
-// navigateur), présentation riche ("presentation", 150 à 1 200 caractères).
-// Les jeux plus anciens, sans ce champ, ne sont pas concernés.
+// navigateur), présentation ("presentation"). Les jeux plus anciens, sans ce
+// champ, ne sont pas concernés. Les textes de référencement de tous les jeux
+// (présentation, règles, titre et description pour Google…) et leurs longueurs
+// sont contrôlés par scripts/regles-seo.mjs et scripts/verifier-seo.mjs.
 //
 // Code de sortie : 0 = tout est bon, 1 = au moins une erreur.
 // Utilisé par l'agent qui crée les jeux, et par GitHub Actions.
@@ -43,7 +45,6 @@ const TAILLE_MAX_JAQUETTE = 300 * 1024;
 const PORT_TEST = 8123;
 // Consignes de 2026 (game.json "consignes": 2) : voir CONSIGNES-JEU.md.
 const NIVEAUX_MIN = 20;
-const PRESENTATION_MIN = 150, PRESENTATION_MAX = 1200;
 const fiches = new Map();        // id → contenu de game.json (pour le test dans le navigateur)
 const consignes2 = (id) => Number(fiches.get(id)?.consignes) >= 2;
 
@@ -89,12 +90,13 @@ async function controlerFiche(id, dossier) {
   if (!Number.isInteger(f.version) || f.version < 1) erreur(id, 'game.json : "version" doit être un entier ≥ 1');
   fiches.set(id, f);
 
-  // Consignes de 2026 : jeu riche (20 niveaux au moins) et présentation de quelques phrases.
+  // Consignes de 2026 : jeu riche (20 niveaux au moins) et présentation (sa
+  // longueur et les autres textes de la page du jeu : scripts/regles-seo.mjs).
   if (f.consignes !== undefined && (!Number.isInteger(f.consignes) || f.consignes < 1)) erreur(id, 'game.json : "consignes" doit être un entier (2 pour les nouveaux jeux)');
   if (Number(f.consignes) >= 2) {
     if (!Number.isInteger(f.niveaux) || f.niveaux < NIVEAUX_MIN) erreur(id, `game.json : "niveaux" doit indiquer le nombre de niveaux du jeu, ${NIVEAUX_MIN} au moins`);
-    if (typeof f.presentation !== 'string' || f.presentation.trim().length < PRESENTATION_MIN || f.presentation.length > PRESENTATION_MAX) {
-      erreur(id, `game.json : "presentation" obligatoire, ${PRESENTATION_MIN} à ${PRESENTATION_MAX} caractères (principe, objectif, ce qui rend le jeu amusant)`);
+    if (typeof f.presentation !== 'string' || !f.presentation.trim()) {
+      erreur(id, 'game.json : "presentation" obligatoire (« À propos du jeu », 70 à 150 mots : voir CONSIGNES-JEU.md)');
     }
   }
 }

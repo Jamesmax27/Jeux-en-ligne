@@ -105,3 +105,11 @@ export const TRANCHES_AGE = [
   { id: '7-8', picto: '🚲', min: 7, max: 8 },
   { id: '9+',  picto: '🛹', min: 9, max: 99 },
 ];
+
+// Tranche d'un jeu d'après son champ "ages" (« 6+ » → « 5-6 ») ; âge illisible → null.
+// Partagée par l'accueil (app.js) et les pages générées (scripts/pages-seo.mjs).
+export function trancheDeAge(ages) {
+  const age = parseInt(ages, 10);
+  if (Number.isNaN(age)) return null;
+  return TRANCHES_AGE.find((t) => age >= t.min && age <= t.max)?.id ?? null;
+}

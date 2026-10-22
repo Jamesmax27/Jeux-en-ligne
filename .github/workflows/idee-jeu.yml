@@ -9,7 +9,11 @@
 #  - Sinon : à la fin de la file (les idées humaines passent toujours avant
 #    celles de l'agent).
 #  - Contrôles (genre et univers dans les listes de public/taxonomie.js,
-#    doublons…) : scripts/idees.mjs ajouter-humain.
+#    âge « 6+ », doublons…) : scripts/idees.mjs ajouter-humain. L'âge est
+#    rangé dans le champ "ages" de l'idée (le jeu publié le reprend) ; les
+#    compétences suggérées (facultatives) vont dans sa description.
+#  - Les textes pour les moteurs de recherche ne sont pas demandés : l'agent
+#    créateur les rédige d'après le jeu fini.
 #  - Seules les issues du propriétaire et des collaborateurs sont traitées :
 #    la file est lue par les agents de nuit.
 # ==========================================================================
@@ -72,9 +76,12 @@ jobs:
               TITRE: issue.title || '',
               PRINCIPE: reponses['Principe du jeu'] || '',
               GENRE: reponses['Genre'] || '',
+              // Âge « 6+ » : rangé dans "ages" (et rappelé dans la description) par idees.mjs.
               AGE: reponses['Âge conseillé'] || '',
               // Univers : choix multiple, rendu « Ferme, Chevaux » (libellés de public/taxonomie.js).
               UNIVERS: reponses['Univers'] || '',
+              // Compétences (facultatives, texte libre court) : ajoutées à la description de l'idée.
+              COMPETENCES: reponses['Compétences travaillées'] || '',
               PRIORITE: /\[x\]/i.test(reponses['Priorité'] || '') ? 'oui' : 'non',
             };
 
@@ -115,6 +122,7 @@ jobs:
             await repondre([
               `✅ Idée ajoutée à [${FICHIER}](${lien}) :`, '',
               `**${r.titre}** — ${r.description}`,
-              `Genre : ${r.genreLibelle} ; univers : ${r.universLibelles.length ? r.universLibelles.join(', ') : "choisis par l'agent"}.`, '',
+              `Genre : ${r.genreLibelle} ; univers : ${r.universLibelles.length ? r.universLibelles.join(', ') : "choisis par l'agent"}.`,
+              "Les textes pour Google (titre, description, page du jeu, compétences, vignette) seront rédigés d'après le jeu fini.", '',
               place,
             ].join('\n'), true);
