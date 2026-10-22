@@ -232,11 +232,12 @@ body::after {
 }
 
 /* --------------------------------------------------------------------------
-   Regroupements : tuiles (raccourcis, âge, genres, univers)
-   Chaque tuile reçoit sa teinte (--teinte, 0 à 360) depuis app.js : un fond
-   sombre légèrement coloré, comme une nébuleuse. La sélection garde l'accent
-   lavande. Sur téléphone, genres et univers forment une bande de deux rangées
-   qui défile (« Tout voir » la déplie) ; sur grand écran, tout est déplié.
+   Regroupements : tuiles (raccourcis, âge) et puces (genres, univers)
+   Chaque tuile ou puce reçoit sa teinte (--teinte, 0 à 360) depuis app.js :
+   un fond sombre légèrement coloré, comme une nébuleuse. La sélection garde
+   l'accent lavande. Genres et univers : 2 rangées de petites puces chacun,
+   sur téléphone comme sur ordinateur ; une rangée qui ne tient pas défile
+   horizontalement (jamais de 3e ligne).
    -------------------------------------------------------------------------- */
 
 .explorer {
@@ -246,8 +247,6 @@ body::after {
 
 .groupe { margin-top: 4px; }
 
-/* Le bouton « Tout voir » garde 44 px de haut : ses marges négatives
-   l'empêchent d'agrandir la ligne de titre. */
 .groupe-tete {
   display: flex;
   align-items: center;
@@ -270,21 +269,6 @@ body::after {
   color: var(--encre-douce);
 }
 
-.tout-voir {
-  flex: none;
-  min-height: 44px;
-  margin: -10px -10px -10px 0;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
 /* Le rembourrage laisse la place au contour de focus et à la coche. */
 .tuiles {
   display: grid;
@@ -299,34 +283,7 @@ body::after {
 
 .tuiles-ages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
-.tuiles-bande {
-  grid-auto-flow: column;
-  grid-template-rows: repeat(2, auto);
-  grid-auto-columns: 80px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scroll-padding-inline: 16px;
-  scrollbar-width: none;
-}
-
-.tuiles-bande::-webkit-scrollbar { display: none; }
-
-.tuiles-bande.deplie {
-  grid-auto-flow: row;
-  grid-template-rows: none;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-  overflow: visible;
-}
-
 @media (min-width: 720px) {
-  .tuiles-bande,
-  .tuiles-bande.deplie {
-    grid-auto-flow: row;
-    grid-template-rows: none;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    overflow: visible;
-  }
-  .tout-voir { display: none; }
   .tuiles-raccourcis { grid-template-columns: repeat(3, minmax(0, 200px)); }
   .tuiles-ages { grid-template-columns: repeat(4, minmax(0, 150px)); }
 }
@@ -423,15 +380,106 @@ body::after {
 .tuile-bientot .tuile-nom { color: var(--encre-douce); }
 .tuile-bientot .tuile-compte { font-style: italic; }
 
-/* Autres thèmes (tags rangés dans aucun univers) : petites puces */
-.autres-themes {
+/* Genres et univers : 2 rangées de petites puces. Chaque rangée reste sur une
+   ligne et défile horizontalement si elle ne tient pas (téléphone, allemand…).
+   Le rembourrage vertical de la rangée laisse la place à la zone de toucher
+   agrandie (::before) et au contour de focus. */
+.rangees { padding-bottom: 2px; }
+
+.rangee {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px 16px 0;
+  gap: 4px;
+  padding: 5px 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
 }
 
-.autres-themes[hidden] { display: none; }
+.rangee + .rangee { padding-top: 0; }
+
+.rangee::-webkit-scrollbar { display: none; }
+
+.puce-filtre {
+  --teinte: 230;
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid hsl(var(--teinte) 35% 45% / .5);
+  border-radius: 999px;
+  background: linear-gradient(160deg, hsl(var(--teinte) 38% 24%), hsl(var(--teinte) 32% 15%));
+  color: var(--encre);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;           /* jamais de retour à la ligne dans une puce */
+  cursor: pointer;
+  transition: border-color .15s ease, opacity .15s ease, transform .15s ease;
+}
+
+/* Zone de toucher de 44 px de haut sans agrandir la puce. */
+.puce-filtre::before {
+  content: "";
+  position: absolute;
+  inset: -5px 0;
+}
+
+.puce-filtre-picto { font-size: 13px; }
+
+/* Nombre de jeux, en petit après le libellé */
+.puce-filtre-compte {
+  margin-left: 2px;
+  font-size: .85em;
+  font-weight: 700;
+  color: var(--encre-douce);
+  font-variant-numeric: tabular-nums;
+}
+
+.puce-filtre[aria-pressed="true"] .puce-filtre-compte { color: inherit; opacity: .75; }
+
+.puce-filtre:active:not(:disabled) { transform: scale(.95); }
+
+.puce-filtre[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-encre);
+}
+
+/* Aucun jeu avec les autres filtres choisis */
+.puce-zero { opacity: .5; }
+
+/* Regroupement encore vide : grisé, en pointillés, pas cliquable */
+.puce-bientot {
+  border-style: dashed;
+  border-color: var(--trait-fort);
+  background: transparent;
+  color: var(--encre-douce);
+  opacity: .7;
+  cursor: default;
+}
+
+.puce-bientot .puce-filtre-picto { filter: grayscale(1); opacity: .5; }
+
+/* Grand écran : puces un peu plus serrées pour que chaque rangée tienne sur
+   la largeur du site (1 200 px), et qui se partagent la place restante. */
+@media (min-width: 720px) {
+  .rangee { gap: 3px; }
+  .puce-filtre {
+    flex: 1 0 auto;
+    gap: 2px;
+    padding: 0 4px;
+    font-size: 11.5px;
+    letter-spacing: -.01em;
+  }
+  .puce-filtre-picto { font-size: 12px; }
+  .puce-filtre-compte { margin-left: 0; }
+}
 
 .puce {
   flex: none;
@@ -906,6 +954,54 @@ main.catalogue {
   padding: 0 16px 32px;
 }
 
+.pied p { margin: 0 0 6px; }
+
+/* Lien « Mentions légales » : zone de toucher de 44 px. */
+.pied a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Page « Mentions légales » (mentions-legales.html)
+   -------------------------------------------------------------------------- */
+
+.marque-lien { text-decoration: none; }
+
+.legal {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 16px 32px;
+}
+
+.legal h1 { font-size: 26px; margin: 8px 0 6px; }
+.legal h2 { font-size: 18px; margin: 28px 0 8px; }
+.legal-intro { color: var(--encre-douce); margin: 0 0 8px; }
+
+.legal dl {
+  display: grid;
+  grid-template-columns: minmax(0, 13em) minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--rayon);
+  background: var(--surface);
+  border: 1px solid var(--liseré);
+}
+
+.legal dt { color: var(--encre-douce); }
+.legal dd { margin: 0; overflow-wrap: anywhere; }
+
+/* Téléphone : intitulé au-dessus de la valeur. */
+@media (max-width: 520px) {
+  .legal dl { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .legal dd + dt { margin-top: 10px; }
+}
+
+.legal-retour { margin: 32px 0 0; text-align: center; }
+
 /* Survol : seulement avec une souris (sur écran tactile, il resterait « collé »). */
 @media (hover: hover) {
   .recherche input:hover:not(:focus),
@@ -922,6 +1018,10 @@ main.catalogue {
   .tuile:hover:not(:disabled) {
     transform: translateY(-2px);
     border-color: hsl(var(--teinte) 45% 60% / .8);
+  }
+
+  .puce-filtre:hover:not(:disabled):not([aria-pressed="true"]) {
+    border-color: hsl(var(--teinte) 45% 65% / .9);
   }
 
   .tuile[aria-pressed="true"]:hover { border-color: var(--accent); }
@@ -1108,6 +1208,7 @@ body.lanceur::after { animation: none; }
   .carte:active,
   .tuile:hover,
   .tuile:active,
+  .puce-filtre:active,
   .bouton-vote:active {
     transform: none;
   }

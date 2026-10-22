@@ -93,8 +93,9 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
     "pt": { "title": "…", "description": "…", "presentation": "…" },
     "de": { "title": "…", "description": "…", "presentation": "…" }
   },
-  "genre": "adresse",
-  "tags": ["animaux"],
+  "genre": "puzzle",
+  "genres_secondaires": ["aventure"],
+  "univers": ["dinosaures"],
   "ages": "6+",
   "author": "Claude (agent)",
   "added": "AAAA-MM-JJ",
@@ -108,14 +109,18 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 - `title`, `description` et `presentation` restent en français ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). `description` : courte phrase de la carte du catalogue ; `presentation` : texte riche et attrayant, utilisé comme description de la page du jeu (référencement).
 - `niveaux` : nombre de niveaux du jeu (20 au moins), égal à `window.JEL_NIVEAUX`.
 - `consignes` : `2` pour les jeux faits selon ces consignes (posé automatiquement par la boucle de nuit) ; le robot applique alors les règles des nouveaux jeux (20 niveaux, présentation). Les jeux plus anciens n'ont pas ce champ.
-- `genre` : **obligatoire**, un seul, choisi dans cette liste fermée (filtres « genre » du catalogue) :
-  `adresse`, `action`, `plateforme`, `course`, `sport`, `rythme`, `aventure`, `réflexion`, `stratégie`, `puzzle`, `mémoire`, `observation`, `quiz`, `calcul`, `lecture`, `création`, `simulation`.
-  (`action` : jeu rapide où l'on esquive et réagit vite, sans violence ; `observation` : cherche-et-trouve, différences ; `simulation` : soigner un animal, cuisiner, tenir une ferme…)
-  La même liste figure dans `scripts/genres.mjs` : modifier les deux ensemble.
-- `tags` : 1 à 5 thèmes, en minuscules. Ils rangent le jeu dans les **univers** du catalogue (liste dans `public/regroupements.js`) : utiliser de préférence un tag déjà prévu, par exemple `chevaux`, `animaux`, `judo`, `nature`, `mer`, `espace`, `géographie`, `lecture`, `calcul`, `sciences`, `formes`, `couleurs`, `cubes`, `labyrinthe`, `musique`, `véhicules`, `dinosaures`, `magie`, `fantastique`, `cuisine`, `histoire`, `métiers`, `noël`, `arcade`. Un tag rangé dans aucun univers apparaît seulement dans « Autres thèmes ».
+- **Genres et univers : listes fermées.** Elles sont dans un seul fichier de référence, `public/taxonomie.js` (identifiant court sans accents, libellé affiché) ; on écrit dans `game.json` les **identifiants**, jamais un libellé ni un mot inventé. **Interdit de créer un genre ou un univers** : seul le propriétaire du site modifie ces listes. « `autre` » seulement si rien ne correspond. Le robot (`scripts/controle-taxonomie.mjs`, `validate-games.mjs`) refuse toute autre valeur.
+- `genre` : **obligatoire**, le genre principal (le cœur du jeu : comment on joue), un seul identifiant parmi les 26 :
+  `puzzle` (Puzzle et logique), `memoire` (Mémoire), `quiz` (Quiz et culture), `mots` (Mots et lettres), `calcul` (Calcul et nombres), `reflexes` (Réflexes et clic rapide), `arcade` (Arcade), `plateforme` (Plateforme), `course` (Course), `sport` (Sport), `tir` (Tir et visée), `combat` (Combat), `labyrinthe` (Labyrinthe), `aventure` (Aventure et exploration), `observation` (Objets cachés et observation), `strategie` (Stratégie), `defense` (Défense de tour), `gestion` (Gestion et tycoon), `simulation` (Simulation et soin), `creation` (Habillage et création), `construction` (Bac à sable et construction), `musique` (Musique et rythme), `societe` (Jeux de société et de cartes), `coloriage` (Coloriage et dessin), `role` (Jeu de rôle et progression), `autre` (Autre).
+  Contenu pour enfants dans tous les genres : `tir` et `combat` sans violence réaliste (viser des cibles, endormir, esquiver).
+- `genres_secondaires` : 0 à 2 autres genres de la même liste, seulement s'ils sont vraiment au cœur du jeu (liste vide `[]` sinon), différents du genre principal ; jamais `autre`. Le filtre d'un genre montre aussi les jeux où il est secondaire.
+- `univers` : **obligatoire**, 1 ou 2 identifiants parmi les 24 (de quoi parle le jeu : son décor, ses personnages) :
+  `ferme` (Ferme), `chevaux` (Chevaux), `compagnie` (Animaux de compagnie), `sauvages` (Animaux sauvages), `dinosaures` (Dinosaures et préhistoire), `ocean` (Océan), `espace` (Espace), `fantasy` (Fantasy et magie), `chevaliers` (Chevaliers et Moyen Âge), `pirates` (Pirates), `monstres` (Monstres et créatures), `robots` (Robots et futur), `nature` (Nature et jardin), `cuisine` (Cuisine et nourriture), `vehicules` (Véhicules), `sport` (Sport), `monde` (Monde et pays), `histoire` (Histoire), `corps` (Corps humain et santé), `ville` (Ville et métiers), `fetes` (Saisons et fêtes), `contes` (Contes et légendes), `abstrait` (Abstrait : formes, couleurs, sans décor figuratif), `autre` (Autre, seul).
+- Le champ `tags` n'existe plus (remplacé par `univers`) : une fiche qui le garde est refusée.
 - `ages` : âge minimum conseillé, au format `"6+"` (tuiles d'âge du catalogue : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et +).
 - `idee` : rempli par la boucle de nuit, `id` de l'idée de `idees.json` réalisée par ce jeu (à la fusion, l'idée passe dans `idees-archive.json`). Ne pas le modifier. Facultatif pour un jeu créé à la main.
-- Jeu de la boucle de nuit : `genre` et `tags` sont ceux de l'idée (si l'idée n'a pas de tags, l'agent les choisit). La vérification refuse un jeu dont l'entrée du catalogue ne correspond pas.
+- Jeu de la boucle de nuit : `genre`, `genres_secondaires` et `univers` sont ceux de l'idée (si l'idée ne donne pas d'univers ou de genres secondaires, l'agent les choisit dans les listes). La vérification refuse un jeu dont l'entrée du catalogue ne correspond pas, ou qui sort des listes.
+- **Idées de jeux** (`idees.json`, agent d'idéation) : mêmes listes, mêmes règles ; privilégier les combinaisons genre × univers encore peu couvertes par les jeux existants (`node scripts/idees.mjs catalogue` les liste). Les idées ajoutées par le propriétaire (source `humain`) restent toujours fabriquées en premier.
 
 ## 5. La jaquette et les images
 
@@ -147,7 +152,8 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Hors ligne | le jeu tente un appel réseau, ou ne marche pas avec le navigateur coupé du réseau |
 | Fichiers | `game.json` incomplet ou invalide, jaquette absente ou trop lourde, `index.html` de plus de 2 Mo, fichier en trop |
 | Niveaux | (jeux `"consignes": 2`) moins de 20 niveaux, `window.JEL_NIVEAUX` absent ou différent de `"niveaux"` dans `game.json`, présentation absente ou trop courte |
-| Catalogue | le jeu manque au catalogue construit, ou son genre et ses tags ne sont pas ceux de son idée (`scripts/idees.mjs controler`) |
+| Catalogue | le jeu manque au catalogue construit, ou son genre et ses univers ne sont pas ceux de son idée (`scripts/idees.mjs controler`) |
+| Genres et univers | un genre, un genre secondaire ou un univers hors des listes fermées de `public/taxonomie.js`, ou l'ancien champ `tags` (`scripts/controle-taxonomie.mjs`) |
 | Traductions | `scripts/check-i18n.js` signale une erreur : langue incomplète, clé manquante, valeur vide, `{variables}` différentes, titre, description ou présentation non traduits, erreur dans une des 5 langues (boucle de nuit et `validate.yml`) |
 
 ### Relecture (Claude)

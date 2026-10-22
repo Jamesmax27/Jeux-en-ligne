@@ -8,7 +8,7 @@
 //   https://<ACCESS_TEAM_DOMAIN>/cdn-cgi/access/certs, audience ACCESS_AUD,
 //   émetteur, dates). Jeton absent ou invalide : 403.
 // - Champs : titre de 3 à 100 caractères, description de 2 000 au plus,
-//   genre dans la liste fermée (scripts/genres.mjs).
+//   genre : identifiant de la liste fermée (public/taxonomie.js).
 // - Crée une issue « Idée : <titre> » dans GITHUB_REPO (étiquettes
 //   « idee-perso » et le genre). La boucle de nuit (boucle-de-nuit.yml,
 //   étape b) la transforme en idée prioritaire, puis la ferme avec le lien
@@ -20,7 +20,7 @@
 // ==========================================================================
 
 import { json } from '../_commun.js';
-import { GENRES } from '../../scripts/genres.mjs';
+import { IDS_GENRES } from '../../public/taxonomie.js';
 
 const ETIQUETTE = 'idee-perso';
 const CLES_DUREE = 3600000; // clés publiques d'Access gardées 1 h par instance
@@ -153,7 +153,7 @@ export async function onRequest({ request, env }) {
     return json({ erreur: 'Requête invalide.' }, 400);
   }
   const titre = typeof corps?.titre === 'string' ? corps.titre.replace(/\s+/g, ' ').trim() : '';
-  const genre = typeof corps?.genre === 'string' ? corps.genre.trim().normalize('NFC') : '';
+  const genre = typeof corps?.genre === 'string' ? corps.genre.trim() : '';
   const description = typeof corps?.description === 'string' ? corps.description.replace(/\r\n?/g, '\n').trim() : '';
 
   if (titre.length < 3 || titre.length > 100) {
@@ -162,7 +162,7 @@ export async function onRequest({ request, env }) {
   if (description.length > 2000) {
     return json({ erreur: 'La description ne doit pas dépasser 2 000 caractères.' }, 400);
   }
-  if (!GENRES.includes(genre)) {
+  if (!IDS_GENRES.includes(genre)) {
     return json({ erreur: 'Genre inconnu.' }, 400);
   }
 

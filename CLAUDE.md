@@ -60,7 +60,7 @@ Jeux-en-ligne/
 │     └─ tendances.js       GET  /api/tendances (jeux les plus joués sur 7 jours)
 ├─ scripts/
 │  ├─ build-catalog.mjs     lit games/*/game.json → public/catalog.json (+ copie des jeux)
-│  ├─ genres.mjs            liste fermée des genres (identique à CONSIGNES-JEU.md)
+│  ├─ controle-taxonomie.mjs genres et univers des jeux et des idées : listes fermées de public/taxonomie.js
 │  ├─ idees.mjs             file d'idées de la boucle de nuit (choix, archivage, contrôles)
 │  └─ validate-games.mjs    contrôle qualité des jeux
 ├─ idees.json               idées à fabriquer (« en_attente », « en_cours »)
@@ -75,7 +75,7 @@ Réglages Cloudflare Pages : build command `node scripts/build-catalog.mjs`, out
 
 Autres fichiers ajoutés en phase 1 :
 - `public/play.js` : script du lanceur ; `public/assets/` : logo et jaquette par défaut.
-- `public/regroupements.js` : univers (thèmes réunissant plusieurs tags), tranches d'âge, pictogrammes et teintes des genres (tuiles du catalogue).
+- `public/taxonomie.js` : **fichier de référence unique** des genres (26) et des univers (24), listes fermées dans l'ordre d'affichage (identifiant court sans accents, libellé, libellé court, pictogramme, teinte), et tranches d'âge. Lu par le site, les scripts et la boucle de nuit.
 - `public/_headers` : en-têtes Cloudflare (dont la règle de sécurité des jeux : aucun accès réseau).
 - `scripts/serve.mjs` : serveur de test local (applique la même règle de sécurité).
 - `package.json` : `npm run build` (construit) et `npm run dev` (construit + serveur sur http://localhost:8080).
@@ -93,6 +93,9 @@ Fichiers ajoutés pour les 5 langues (détails dans `I18N.md`) :
 - `public/i18n/i18n.js` : module commun de traduction (site et jeux, recopié dans chaque jeu) ; `public/i18n/site/{fr,en,es,pt,de}.json` : textes du site ; `public/langue.js` : sélecteur de langue, SEO (`hreflang`), noms traduits du catalogue.
 - `scripts/check-i18n.js` : vérification des traductions (bloquante dans `validate.yml`) ; `scripts/i18n-jeu.mjs` : recopie le module commun dans les jeux ; `scripts/jaquette-sans-texte.mjs` : jaquette sans texte.
 - Le build génère aussi `public/sitemap.xml` et `public/robots.txt` (variable `SITE_URL`).
+
+Fichiers ajoutés pour les mentions légales :
+- `public/mentions-legales.html` (informations de l'éditeur et de l'hébergeur, écrites une seule fois dans la page ; champs `[À COMPLÉTER : …]` à remplir par le propriétaire) et `public/mentions-legales.js` (langue, SEO) ; intitulés traduits : clés `legal.*` de `public/i18n/site/*.json`. Lien dans le pied de page de l'accueil.
 
 Fichiers ajoutés pour le suivi des parties et les Tendances (section 7) :
 - `public/suivi.js` : suivi des parties côté lanceur, et script commun `SCRIPT_ERREURS` placé par le lanceur en tête de chaque jeu.
@@ -124,8 +127,9 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
     "pt": { "title": "…", "description": "…", "presentation": "…" },
     "de": { "title": "…", "description": "…", "presentation": "…" }
   },
-  "genre": "adresse",
-  "tags": ["chevaux"],
+  "genre": "arcade",
+  "genres_secondaires": ["sport"],
+  "univers": ["chevaux"],
   "ages": "6+",
   "author": "Claude",
   "added": "2026-10-03",
@@ -136,8 +140,9 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 ```
 
 - `id` : minuscules, chiffres et tirets uniquement ; identique au nom du dossier ; unique.
-- `genre` : un seul, dans la liste fermée de `CONSIGNES-JEU.md` (reprise dans `scripts/genres.mjs`). Sert aux filtres par genre du catalogue. Une ancienne fiche sans `genre` : le build le déduit des `tags`, avec un avertissement.
-- `tags` : des thèmes, choisis de préférence dans la liste existante (voir `catalog.json`).
+- **Genres et univers : listes fermées de `public/taxonomie.js`** (détail dans `CONSIGNES-JEU.md`, section 4). On écrit les identifiants. **Interdit de créer un genre ou un univers** (décision du propriétaire seulement) ; « `autre` » seulement si rien ne correspond.
+- `genre` : le genre principal, un seul (26 possibles). `genres_secondaires` : 0 à 2 autres genres. Les filtres de genre du catalogue montrent le genre principal et les secondaires.
+- `univers` : 1 ou 2 (24 possibles). L'ancien champ `tags` n'existe plus : il est refusé par le robot.
 - `title`, `description` et `presentation` restent en français ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). `description` : phrase courte de la carte du catalogue ; `presentation` (nouveaux jeux) : quelques phrases riches, description de la page du jeu. Facultatif : `"non_traduisible": true` (jeu de mots ou de lettres en français : seule l'interface est traduite).
 - Nouveaux jeux (`"consignes": 2`, posé par la boucle de nuit) : au moins 20 niveaux, nombre dans `"niveaux"` et donné par le jeu (`window.JEL_NIVEAUX`) ; le robot vérifie les deux. Les jeux plus anciens (10 niveaux) n'ont pas ce champ.
 
@@ -211,12 +216,12 @@ Menu de tri du catalogue (égalités départagées par le score, puis le nombre 
 
 - Portée : **Monde** ou **Mon pays** (pays donné par l'en-tête `X-Pays`). Si mon pays a moins de 20 votes en tout, le classement Monde est affiché, avec une phrase d'explication.
 - **Tendances** tout en haut de l'accueil (sous la recherche) : les 10 jeux les plus joués des 7 derniers jours (`/api/tendances`, réglage `TENDANCES_NOMBRE` dans `public/app.js`), en une bande de cartes qui défile, avec leur rang, le temps total joué, le nombre de parties et le temps moyen. Indépendantes des filtres ; cachées sans API ou tant qu'aucune partie n'est enregistrée.
-- **Regroupements en tuiles** en haut de l'accueil (`public/regroupements.js`), combinables entre eux, avec le tri et la recherche ; chaque tuile compte ses jeux (selon les autres filtres) :
-  - raccourcis : 🎲 **Au hasard** (lance un jeu parmi ceux affichés), 👍 **J'ai aimé** (mes votes 👍 sur l'appareil), 📶 **Hors ligne** (jeux gardés sur l'appareil) ;
-  - **âge** (d'après `ages`) : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et + ;
-  - **genres** (champ `genre`, liste fermée de 17, dont `action`) ;
-  - **univers** (21, chacun réunit plusieurs `tags` et le genre ; un jeu peut en avoir plusieurs), plus « Autres thèmes » en petites puces pour les tags rangés dans aucun univers.
-  - Un regroupement encore vide reste affiché, grisé « Bientôt », après ceux qui ont des jeux. Sur téléphone, genres et univers forment une bande de 2 rangées qui défile (« Tout voir » la déplie) ; sur grand écran, tout est déplié. Les filtres choisis sont rappelés au-dessus des jeux (✕ pour retirer, « Tout effacer »).
+- **Regroupements** en haut de l'accueil (listes dans `public/taxonomie.js`), combinables entre eux, avec le tri et la recherche ; chacun compte ses jeux (selon les autres filtres) :
+  - tuiles des raccourcis : 🎲 **Au hasard** (lance un jeu parmi ceux affichés), 👍 **J'ai aimé** (mes votes 👍 sur l'appareil), 📶 **Hors ligne** (jeux gardés sur l'appareil) ;
+  - tuiles d'**âge** (d'après `ages`) : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et + ;
+  - puces des **genres** (26, liste fermée ; un jeu y figure par son genre principal et ses genres secondaires) : 2 rangées de 13 ;
+  - puces des **univers** (24, liste fermée ; champ `univers`, 1 ou 2 par jeu) : 2 rangées de 12.
+  - Puces compactes (pictogramme, libellé court et nombre de jeux selon les autres filtres, sans retour à la ligne ; libellé complet en bulle d'aide), dans l'ordre de `taxonomie.js`, sur téléphone comme sur ordinateur ; une rangée qui ne tient pas défile horizontalement (téléphone, allemand). Zone de toucher de 44 px de haut. Un regroupement encore vide reste à sa place, grisé en pointillés (« Bientôt »). Les filtres choisis sont rappelés au-dessus des jeux (✕ pour retirer, « Tout effacer »).
 - Chaque jaquette affiche ses compteurs 👍 et 👎 (portée choisie). Sans API : tri par nouveautés, sans compteurs.
 - **Archives** : jeux avec plus de 30 votes et un score inférieur à 0,2 (seuils ajustables, votes du monde entier), affichés en bas.
 
@@ -235,24 +240,24 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 
 ## 10. Ajout de jeux par des IA
 
-**Catalogue de référence** : tous les jeux publiés (y compris ceux d'avant la boucle) sont les dossiers `games/*/` ; leur fiche `game.json` est leur entrée de catalogue (genre et tags obligatoires), et `public/catalog.json` en est tiré au build. Une pull request de jeu ne touche que `games/<id>/` : jamais de conflit sur le catalogue.
+**Catalogue de référence** : tous les jeux publiés (y compris ceux d'avant la boucle) sont les dossiers `games/*/` ; leur fiche `game.json` est leur entrée de catalogue (genre et univers obligatoires, listes fermées de `public/taxonomie.js`), et `public/catalog.json` en est tiré au build. Une pull request de jeu ne touche que `games/<id>/` : jamais de conflit sur le catalogue.
 
 **File d'idées** (`scripts/idees.mjs`, détails en tête du fichier) :
 - `idees.json` : idées `en_attente` ou `en_cours` ; `idees-archive.json` : idées `faite` avec `jeu_id`.
-- Champs : `id`, `titre`, `description`, `genre`, `tags`, `source` (`humain` / `agent`), `date_ajout`, `statut`, `jeu_id` (`null` tant que le jeu n'est pas publié) ; `essais` (facultatif) compte les jeux refusés : à 3, l'idée n'est plus choisie.
-- Ordre de fabrication : idées `humain` dans l'ordre du fichier, puis idées `agent`. Un jeu est relié à son idée par le champ `idee` de son `game.json` (= `id` de l'idée).
+- Champs : `id`, `titre`, `description`, `genre`, `genres_secondaires` (facultatif, 0 à 2), `univers` (0 à 2 ; vide = l'agent créateur choisit), `source` (`humain` / `agent`), `date_ajout`, `statut`, `jeu_id` (`null` tant que le jeu n'est pas publié) ; `essais` (facultatif) compte les jeux refusés : à 3, l'idée n'est plus choisie. Genres et univers : uniquement les identifiants de `public/taxonomie.js` (une idée hors liste arrête la boucle avec un message).
+- Ordre de fabrication : idées `humain` (celles du propriétaire, toujours prioritaires) dans l'ordre du fichier, puis idées `agent`. Un jeu est relié à son idée par le champ `idee` de son `game.json` (= `id` de l'idée).
 - Ajout humain : à la main dans `idees.json`, ou formulaire « Nouvelle idée de jeu » (`idee-jeu.yml`).
 
 **Boucle de nuit** (`.github/workflows/boucle-de-nuit.yml`, 00:00 et 05:00 UTC, ou à la main ; un seul passage à la fois) :
-1. a) **Idéation** : moins de 15 idées en attente → un agent lit `node scripts/idees.mjs catalogue` (titre, genre et tags des jeux, effectifs par genre et univers), `idees.json` et les titres de l'archive, puis propose des idées riches pour les genres et univers sous-représentés (source `agent`). Il n'écrit que `nouvelles-idees.json`.
+1. a) **Idéation** : moins de 15 idées en attente → un agent lit `public/taxonomie.js`, `node scripts/idees.mjs catalogue` (titre, genres et univers des jeux, effectifs par genre et univers, combinaisons genre × univers déjà couvertes), `idees.json` et les titres de l'archive, puis propose des idées riches (source `agent`) : genres et univers choisis **uniquement** dans les listes fermées (interdit d'en créer), en privilégiant les combinaisons genre × univers encore peu couvertes. Il n'écrit que `nouvelles-idees.json` ; une idée hors liste est refusée à l'étape b.
 2. b) **Choix** : idées mises à jour (jeu publié → archive ; `en_cours` sans pull request ouverte → `en_attente`), idées de l'agent ajoutées après contrôle, puis 5 idées `en_cours`. Enregistré sur `main`.
-3. c) **Fabrication** : une tâche par idée, en parallèle (5 au plus) : jeu complet de 20 niveaux au moins, écrit en français avec ses textes dans `i18n-jeu/<id>/fr.json`, puis traduit dans la même session (`en.json`, `es.json`, `pt.json`, `de.json`, d'après `fr.json` seul) ; textes assemblés (`i18n-jeu.mjs --assembler`), traductions contrôlées par `check-i18n.js` (bloquant ; une seule réparation ciblée des fichiers de textes si besoin, sans toucher au code) ; jaquette sans texte, `game.json` avec le genre et les tags de l'idée et `"consignes": 2`, pull request (branche `nouveau-jeu/n<n° du passage>/<id de l'idée>` ; le `n` évite les anciennes branches `nouveau-jeu/2`, `nouveau-jeu/3`…).
-4. d) **Vérification** de chaque pull request de la boucle dont l'idée est `en_cours` (y compris celles restées ouvertes) : robot (`validate-games.mjs --jouer` : chargement, console, téléphone 390 × 844 au toucher, hors ligne, fiche, nombre de niveaux, jaquette, taille ; `check-i18n.js` : 5 langues ; `idees.mjs controler` : entrée du catalogue), puis relecture par Claude avec la grille de `CONSIGNES-JEU.md` (section 7 : jeu complet et non simpliste, jaquette sans texte). Jaquette avec du texte sur un jeu bon : seule la jaquette est refaite (`jaquette-sans-texte.mjs`) et enregistrée sur la branche avant la fusion. Puis, une pull request à la fois : tout est bon → fusion (branche mise à jour si `main` a bougé) ; sinon → commentaire, fermeture, idée remise `en_attente` (+1 essai). Vérification interrompue (limite d'utilisation…) : rien n'est décidé, reprise au passage suivant.
+3. c) **Fabrication** : une tâche par idée, en parallèle (5 au plus) : jeu complet de 20 niveaux au moins, écrit en français avec ses textes dans `i18n-jeu/<id>/fr.json`, puis traduit dans la même session (`en.json`, `es.json`, `pt.json`, `de.json`, d'après `fr.json` seul) ; textes assemblés (`i18n-jeu.mjs --assembler`), traductions contrôlées par `check-i18n.js` (bloquant ; une seule réparation ciblée des fichiers de textes si besoin, sans toucher au code) ; jaquette sans texte, `game.json` avec le genre et les univers de l'idée et `"consignes": 2`, pull request (branche `nouveau-jeu/n<n° du passage>/<id de l'idée>` ; le `n` évite les anciennes branches `nouveau-jeu/2`, `nouveau-jeu/3`…).
+4. d) **Vérification** de chaque pull request de la boucle dont l'idée est `en_cours` (y compris celles restées ouvertes) : robot (`validate-games.mjs --jouer` : chargement, console, téléphone 390 × 844 au toucher, hors ligne, fiche, nombre de niveaux, jaquette, taille ; `check-i18n.js` : 5 langues ; `idees.mjs controler` : entrée du catalogue ; `controle-taxonomie.mjs` : genres et univers dans les listes fermées), puis relecture par Claude avec la grille de `CONSIGNES-JEU.md` (section 7 : jeu complet et non simpliste, jaquette sans texte). Jaquette avec du texte sur un jeu bon : seule la jaquette est refaite (`jaquette-sans-texte.mjs`) et enregistrée sur la branche avant la fusion. Puis, une pull request à la fois : tout est bon → fusion (branche mise à jour si `main` a bougé) ; sinon → commentaire, fermeture, idée remise `en_attente` (+1 essai). Vérification interrompue (limite d'utilisation…) : rien n'est décidé, reprise au passage suivant.
 5. e) **Mise à jour** : idées des jeux fusionnés → `idees-archive.json` (`faite`, `jeu_id`). Enregistré sur `main`. Cloudflare Pages publie à chaque fusion.
 
 Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `idees-archive.json`, jamais les tâches parallèles ; ces enregistrements portent `[CF-Pages-Skip]` (pas de build Cloudflare). Fusion automatique désactivable : variable GitHub `FUSION_AUTO` = `non` (les jeux validés reçoivent l'étiquette `valide` et attendent une fusion à la main). Corrections à la demande : commentaire `@claude` du propriétaire (`corriger-jeu.yml`). Une pull request ouverte ou fusionnée par le robot (jeton `GITHUB_TOKEN`) ne déclenche aucun autre workflow : toute la séquence tient donc dans `boucle-de-nuit.yml`.
 
-**Autre IA ou personne** : lire ce fichier, `CONSIGNES-JEU.md` et `public/catalog.json` (doublons de concept et de titre), créer `games/<id>/` conforme à la section 5 sur une branche dédiée, ouvrir une **pull request** (jamais de push direct sur `main`). `validate.yml` vérifie : présence et format des fichiers, aucune URL `http(s)://` externe, tailles, ouverture sans erreur console dans Playwright, puis les traductions (`check-i18n.js`, bloquant). Fusion à la main.
+**Autre IA ou personne** : lire ce fichier, `CONSIGNES-JEU.md` et `public/catalog.json` (doublons de concept et de titre), créer `games/<id>/` conforme à la section 5 sur une branche dédiée, ouvrir une **pull request** (jamais de push direct sur `main`). `validate.yml` vérifie : présence et format des fichiers, aucune URL `http(s)://` externe, tailles, ouverture sans erreur console dans Playwright, genres et univers (`controle-taxonomie.mjs`), puis les traductions (`check-i18n.js`, bloquant). Fusion à la main.
 
 ## 11. Conventions de code
 
@@ -268,6 +273,7 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
 - Pousser directement sur `main`, fusionner des pull requests autrement que par la vérification de la boucle de nuit (`boucle-de-nuit.yml`), ou supprimer des jeux existants.
 - Écrire dans `idees.json` ou `idees-archive.json` depuis une tâche de fabrication de jeu (réservé aux étapes b et e de la boucle et au formulaire d'idées).
 - Modifier `public/catalog.json` à la main.
+- Créer un genre ou un univers, ou en utiliser un hors des listes de `public/taxonomie.js` (jeux comme idées) : ces listes ne changent que sur décision du propriétaire.
 - Ajouter des traceurs, des comptes utilisateurs ou une collecte de données personnelles (seul existe le suivi anonyme des parties décidé par le propriétaire, section 7 : ne pas l'étendre sans son accord).
 - Mettre de la publicité ailleurs que dans l'emplacement prévu (`public/pub.js`, en bas du catalogue), ou l'activer : c'est une décision du propriétaire (voir `PUBLICITE.md`).
 
@@ -294,12 +300,14 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
 - Jeux plus complets — minimum obligatoire dans `CONSIGNES-JEU.md` (10 niveaux, tutoriel animé, étoiles, record, sons coupables, effets, bilan, mécaniques combinées) ; agent créateur : cahier de conception (description de la pull request), partie au hasard avec captures (`validate-games.mjs --jouer`, captures dans `captures/`, ignoré par git), relecture « 15 minutes », `claude-opus-5-5`, 150 tours. `validate-games.mjs` : premier test au toucher, appels réseau détectés, 2e ouverture du jeu navigateur coupé du réseau.
 - Boucle de nuit et file d'idées JSON — fait : `boucle-de-nuit.yml` (remplace `nouveau-jeu.yml`, `valider-jeu.yml` et `cocher-idee.yml` ; étapes a à e de la section 10, 2 passages par nuit, 5 jeux en parallèle, fusions une par une), `scripts/idees.mjs`, `idees.json` et `idees-archive.json` (migrés depuis l'ancien `IDEES-JEUX.md`, supprimé) ; `idee-jeu.yml` écrit dans `idees.json` (champ « Thèmes » ajouté au formulaire) ; `corriger-jeu.yml` ne sert plus qu'aux commentaires `@claude`. Plus de correction automatique : un jeu refusé est fermé et son idée remise en attente (3 refus au plus). Tous les jeux du catalogue ont un genre et des tags. Reste : premier passage réel (lancement manuel de « Boucle de nuit », 1 jeu), surveiller la consommation de l'abonnement Claude (5 agents en parallèle) et le quota de 500 builds Cloudflare par mois (une publication par jeu fusionné).
 - Consignes — minimum obligatoire complété (écran d'accueil, pause et Rejouer, contrôles tactiles et clavier) et grille de validation (`CONSIGNES-JEU.md`, section 7), commune à l'agent créateur, au correcteur et au relecteur.
-- Genres — 17, dont `action` (ajouté en octobre 2026) ; liste dans `scripts/genres.mjs`, `CONSIGNES-JEU.md`, `public/regroupements.js` (pictogramme, teinte) et le formulaire `.github/ISSUE_TEMPLATE/idee-jeu.yml`.
+- Taxonomie genres et univers — fait (branche `taxonomie`, 22 octobre 2026) : listes fermées de 26 genres et 24 univers dans un seul fichier de référence, `public/taxonomie.js` (remplace `scripts/genres.mjs` et `public/regroupements.js`) ; libellés complets et courts en 5 langues (`genre.<id>`, `genre.<id>.court`, `univers.<id>`…) ; champ `tags` supprimé (remplacé par `univers`), `genres_secondaires` (0 à 2) ajouté ; 32 jeux, 15 idées et l'archive reclassés ; « Autres thèmes » et « Tout voir » retirés ; puces compactes sur 2 rangées (13 + 13 genres, 12 + 12 univers) qui défilent si besoin (coquille `v6`) ; `scripts/controle-taxonomie.mjs` (bloquant dans la boucle de nuit, étape d, et dans `validate.yml`) ; formulaire d'idées avec listes Genre et Univers. Reste : relire le reclassement, tester sur téléphone une fois en ligne.
 - Publicité — préparée, **désactivée** : `public/pub.js` (`PUB_ACTIVE = false`, aucun code de régie), emplacements cachés `#pub` (bas du catalogue) et `#consentement` dans `index.html`, `pub.js` ajouté à la coquille (`VERSION` `v3` dans `sw.js`), `PUBLICITE.md`. Reste : domaine, compte régie, identifiants, outil de consentement, pages légales.
 
 - Internationalisation (5 langues) — fait sur la branche `i18n` : module `public/i18n/i18n.js`, textes du site, sélecteur de langue (en-tête et dans chaque jeu), SEO (`hreflang`, `sitemap.xml`), 29 jeux traduits, jaquettes refaites sans texte (titre traduit affiché en bandeau par le site), `check-i18n.js` bloquant dans `validate.yml`, règles dans `CONSIGNES-JEU.md`. Reste : régler `SITE_URL` avec le nom de domaine. Détails : `I18N.md`.
 - Traduction et qualité dans la boucle de nuit — fait (branche `boucle-traduction-qualite`) : nouveaux jeux de 20 niveaux au moins (`"consignes": 2`, `window.JEL_NIVEAUX` vérifié par le robot), présentation riche dans `game.json` (meta description de la page du jeu), textes écrits dans `i18n-jeu/<id>/*.json` puis assemblés (`i18n-jeu.mjs --assembler`), traduction dans la même session d'après `fr.json` seul, `check-i18n.js` bloquant avec une seule réparation ciblée, jaquette avec texte refaite seule après la relecture. Reste : premier passage réel de la boucle (lancement manuel, 1 jeu) une fois fusionné.
 - Suivi des parties et Tendances — fait : `public/suivi.js` (durée et erreurs JS, script d'erreurs placé par le lanceur dans tous les jeux), `functions/api/session.js`, `functions/api/tendances.js`, `functions/_commun.js` (dont `jeuExiste`, sorti de `vote.js`), colonne `visiteur` remplie par `vote.js`, section « Tendances » de l'accueil (5 langues), `/api/*` hors du service worker (coquille `v5`), règle dans `CONSIGNES-JEU.md`. Testé en local (Chrome : téléphone et ordinateur ; fonctions sur une base SQLite de test, table `sessions` avec `id` entier ou texte). Reste : vérifier en ligne que les sessions arrivent dans D1 ; pistes : index sur `sessions (debut)` si la table grossit, limite de débit contre les fausses sessions, mention du suivi dans les pages légales.
+
+- Textes du site et mentions légales — fait (branche `textes-coherence`) : textes relus dans les 5 langues autour d'un même message (mini-jeux gratuits ; un jeu ouvert une fois avec Internet s'enregistre sur l'appareil et se rejoue hors ligne) ; toute promesse « sans publicité » retirée (ne jamais la réintroduire) ; vocabulaire unique par langue (hors ligne / offline / sin conexión / offline / offline ; gratuit / free / gratis / grátis / kostenlos) ; page « Mentions légales » (LCEN) en 5 langues, liée depuis le pied de page, gardée hors ligne (coquille `v7`), dans `sitemap.xml` et testée par `check-i18n.js`. Reste : remplir les champs `[À COMPLÉTER]` de `public/mentions-legales.html`, page « Confidentialité ».
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 

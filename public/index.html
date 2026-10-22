@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Jeux-en-ligne — mini-jeux à jouer partout</title>
-  <meta name="description" content="Des mini-jeux gratuits, sans publicité, à jouer sur téléphone ou ordinateur.">
+  <title>Jeux-en-ligne — mini-jeux gratuits, même hors ligne</title>
+  <meta name="description" content="Des mini-jeux gratuits à jouer sur téléphone, tablette ou ordinateur. Ouvre un jeu une fois : il s'enregistre sur ton appareil et tu peux y rejouer hors ligne.">
   <meta name="theme-color" content="#0b1020">
   <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
@@ -26,7 +26,7 @@
           <circle cx="38" cy="38.5" r="15" fill="#929ee6" clip-path="url(#logo-planete)"/>
           <path transform="rotate(-18 32 33)" d="M5 33a27 8 0 0 0 54 0" fill="none" stroke="#eceae4" stroke-width="3.2" stroke-linecap="round"/>
         </svg>
-        <span>Jeux-en-ligne<small data-i18n="entete.slogan">Des mini-jeux à jouer partout, sans publicité</small></span>
+        <span>Jeux-en-ligne<small data-i18n="entete.slogan">Des mini-jeux gratuits, même hors ligne</small></span>
       </h1>
       <!-- Sélecteur de langue (créé par app.js avec JEL_I18N.creerSelecteur) -->
       <div class="entete-langue" id="langue"></div>
@@ -48,7 +48,8 @@
     <ol class="tendances-liste" id="tendances-liste"></ol>
   </section>
 
-  <!-- Regroupements : tuiles remplies par app.js (définitions dans regroupements.js) -->
+  <!-- Regroupements : tuiles (raccourcis, âge) et puces (genres, univers) remplies par app.js.
+       Listes et ordre : taxonomie.js. Genres et univers ont chacun 2 rangées qui défilent si besoin. -->
   <section class="explorer" aria-label="Explorer les jeux" data-i18n-aria="explorer.aria">
     <div class="tuiles tuiles-raccourcis" id="raccourcis" role="group" aria-label="Raccourcis" data-i18n-aria="raccourcis.aria"></div>
 
@@ -60,18 +61,21 @@
     <section class="groupe" aria-labelledby="titre-genres">
       <div class="groupe-tete">
         <h2 id="titre-genres"><span data-i18n="groupe.genres">Genres</span> <small data-i18n="groupe.genresAide">comment on joue</small></h2>
-        <button class="tout-voir" type="button" aria-controls="genres" aria-expanded="false">Tout voir</button>
       </div>
-      <div class="tuiles tuiles-bande" id="genres" role="group" aria-labelledby="titre-genres"></div>
+      <div class="rangees" id="genres" role="group" aria-labelledby="titre-genres">
+        <div class="rangee"></div>
+        <div class="rangee"></div>
+      </div>
     </section>
 
     <section class="groupe" aria-labelledby="titre-univers">
       <div class="groupe-tete">
         <h2 id="titre-univers"><span data-i18n="groupe.univers">Univers</span> <small data-i18n="groupe.universAide">de quoi ça parle</small></h2>
-        <button class="tout-voir" type="button" aria-controls="univers" aria-expanded="false">Tout voir</button>
       </div>
-      <div class="tuiles tuiles-bande" id="univers" role="group" aria-labelledby="titre-univers"></div>
-      <div class="autres-themes" id="autres-themes" role="group" aria-label="Autres thèmes" data-i18n-aria="groupe.autresThemes" hidden></div>
+      <div class="rangees" id="univers" role="group" aria-labelledby="titre-univers">
+        <div class="rangee"></div>
+        <div class="rangee"></div>
+      </div>
     </section>
   </section>
 
@@ -115,8 +119,10 @@
     <p class="pub-mention" data-i18n="pub.mention">Publicité</p>
   </aside>
 
-  <footer class="pied" data-i18n="pied.texte">
-    Jeux originaux, gratuits et sans publicité.
+  <footer class="pied">
+    <p data-i18n="pied.texte">Des mini-jeux gratuits et originaux.</p>
+    <p data-i18n="pied.horsLigne">Pour jouer hors ligne : ouvre un jeu une fois avec Internet, il s'enregistre tout seul sur ton appareil.</p>
+    <p><a href="mentions-legales.html" data-i18n="legal.titre">Mentions légales</a></p>
   </footer>
 
   <!-- Bandeau de consentement aux cookies de la publicité : vide et caché tant qu'elle est désactivée. -->

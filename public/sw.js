@@ -21,7 +21,7 @@
 // touchés : ils ont leur propre cache, indépendant de VERSION.
 // ==========================================================================
 
-const VERSION = 'v5';
+const VERSION = 'v7';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
 const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
@@ -32,15 +32,18 @@ const DELAI_RESEAU = 3000;                  // ms : au-delà, la copie gardée e
 // Fichiers de la coquille, relatifs au dossier du site.
 // Les textes des 5 langues sont petits : tous gardés, pour changer de langue hors connexion.
 const COQUILLE = [
-  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'suivi.js', 'hors-ligne.js', 'regroupements.js', 'pub.js',
-  'langue.js', 'i18n/i18n.js',
+  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'suivi.js', 'hors-ligne.js', 'taxonomie.js', 'pub.js',
+  'mentions-legales.html', 'mentions-legales.js', 'langue.js', 'i18n/i18n.js',
   'i18n/site/fr.json', 'i18n/site/en.json', 'i18n/site/es.json', 'i18n/site/pt.json', 'i18n/site/de.json',
   'manifest.webmanifest', 'assets/logo.svg', 'assets/sans-jaquette.svg',
 ];
 
 // Cloudflare Pages sert play.html à l'adresse « play » et l'accueil à « / » :
 // les deux formes d'adresse mènent à la même copie.
-const PAGES = new Map([['', './'], ['index.html', './'], ['play.html', 'play.html'], ['play', 'play.html']]);
+const PAGES = new Map([
+  ['', './'], ['index.html', './'], ['play.html', 'play.html'], ['play', 'play.html'],
+  ['mentions-legales.html', 'mentions-legales.html'], ['mentions-legales', 'mentions-legales.html'],
+]);
 
 const RACINE = new URL('./', self.location).href; // dossier du site, ex. https://exemple.pages.dev/
 const BASE = new URL(RACINE).pathname;            // ex. « / »

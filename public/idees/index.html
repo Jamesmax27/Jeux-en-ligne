@@ -153,6 +153,8 @@
   <script type="module">
     // Formulaire d'ajout d'idées : POST JSON vers /api/idees (functions/api/idees.js),
     // qui vérifie la connexion Cloudflare Access et crée une issue « idee-perso » sur GitHub.
+    import { GENRES } from '/taxonomie.js';
+
     const formulaire = document.getElementById('formulaire');
     const titre = document.getElementById('titre');
     const genre = document.getElementById('genre');
@@ -166,21 +168,17 @@
       message.className = `message ${type}`;
     }
 
-    const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1);
-
-    // Genres déjà utilisés dans le catalogue, dans l'ordre des filtres du site.
+    // Genres déjà utilisés dans le catalogue, dans l'ordre et avec les libellés de public/taxonomie.js.
     async function chargerGenres() {
       try {
         const reponse = await fetch('/catalog.json', { cache: 'no-cache' });
         if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
         const catalogue = await reponse.json();
         const utilises = new Set((catalogue.games || []).map((j) => j.genre).filter(Boolean));
-        const ordre = Array.isArray(catalogue.genres) ? catalogue.genres : [...utilises].sort((a, b) => a.localeCompare(b, 'fr'));
-        const genres = ordre.filter((g) => utilises.has(g));
         genre.innerHTML = '';
         genre.append(new Option('Choisir un genre…', '', true, true));
         genre.options[0].disabled = true;
-        for (const g of genres) genre.append(new Option(majuscule(g), g));
+        for (const g of GENRES) if (utilises.has(g.id)) genre.append(new Option(`${g.picto} ${g.libelle}`, g.id));
       } catch (erreur) {
         console.error('Catalogue illisible :', erreur);
         genre.options[0].textContent = 'Genres indisponibles';

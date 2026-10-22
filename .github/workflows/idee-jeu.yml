@@ -8,7 +8,8 @@
 #    prochain passage de la boucle de nuit (boucle-de-nuit.yml).
 #  - Sinon : à la fin de la file (les idées humaines passent toujours avant
 #    celles de l'agent).
-#  - Contrôles (genre, doublons…) : scripts/idees.mjs ajouter-humain.
+#  - Contrôles (genre et univers dans les listes de public/taxonomie.js,
+#    doublons…) : scripts/idees.mjs ajouter-humain.
 #  - Seules les issues du propriétaire et des collaborateurs sont traitées :
 #    la file est lue par les agents de nuit.
 # ==========================================================================
@@ -72,7 +73,8 @@ jobs:
               PRINCIPE: reponses['Principe du jeu'] || '',
               GENRE: reponses['Genre'] || '',
               AGE: reponses['Âge conseillé'] || '',
-              THEMES: reponses['Thèmes'] || '',
+              // Univers : choix multiple, rendu « Ferme, Chevaux » (libellés de public/taxonomie.js).
+              UNIVERS: reponses['Univers'] || '',
               PRIORITE: /\[x\]/i.test(reponses['Priorité'] || '') ? 'oui' : 'non',
             };
 
@@ -113,6 +115,6 @@ jobs:
             await repondre([
               `✅ Idée ajoutée à [${FICHIER}](${lien}) :`, '',
               `**${r.titre}** — ${r.description}`,
-              `Genre : ${r.genre} ; thèmes : ${r.tags.length ? r.tags.join(', ') : "choisis par l'agent"}.`, '',
+              `Genre : ${r.genreLibelle} ; univers : ${r.universLibelles.length ? r.universLibelles.join(', ') : "choisis par l'agent"}.`, '',
               place,
             ].join('\n'), true);

@@ -4,10 +4,10 @@
 
 Deux fois par nuit (vers 1 h et 6 h du matin à Paris en hiver, 2 h et 7 h en été), GitHub lance la **boucle de nuit**, sans votre ordinateur. Chaque passage suit 5 étapes :
 
-1. **Idées** : s'il reste moins de 15 idées en attente dans `idees.json`, un agent Claude en propose de nouvelles. Il lit un résumé du catalogue (titre, genre et thèmes de chaque jeu) et vise les genres et les univers qui ont peu de jeux. Ces idées ont la source `agent`.
-2. **Choix** : 5 idées passent « en cours » : d'abord les vôtres (source `humain`), dans l'ordre de la liste, puis celles de l'agent.
-3. **Fabrication** : 5 agents créent les 5 jeux en même temps. Chacun écrit un cahier de conception, code le jeu, y joue avec le robot (captures d'écran), se relit, puis ouvre une **pull request**. La fiche du jeu reprend le genre et les thèmes de l'idée. Rien n'est encore en ligne.
-4. **Vérification** : pour chaque pull request, le robot rejoue le jeu (chargement, erreurs, téléphone, toucher, hors ligne, fiche du catalogue), puis Claude le relit avec la grille de `CONSIGNES-JEU.md` (section 7). Le résultat arrive en commentaire.
+1. **Idées** : s'il reste moins de 15 idées en attente dans `idees.json`, un agent Claude en propose de nouvelles. Il lit un résumé du catalogue (titre, genres et univers de chaque jeu) et vise les genres, les univers et surtout les combinaisons genre × univers qui ont peu de jeux. Il choisit uniquement dans les listes fermées de `public/taxonomie.js` : une idée avec un genre ou un univers inventé est refusée. Ces idées ont la source `agent`.
+2. **Choix** : 5 idées passent « en cours » : d'abord les vôtres (source `humain`), dans l'ordre de la liste, puis celles de l'agent. Vos idées restent toujours prioritaires.
+3. **Fabrication** : 5 agents créent les 5 jeux en même temps. Chacun écrit un cahier de conception, code le jeu, y joue avec le robot (captures d'écran), se relit, puis ouvre une **pull request**. La fiche du jeu reprend le genre et les univers de l'idée. Rien n'est encore en ligne.
+4. **Vérification** : pour chaque pull request, le robot rejoue le jeu (chargement, erreurs, téléphone, toucher, hors ligne, fiche du catalogue, genres et univers dans les listes), puis Claude le relit avec la grille de `CONSIGNES-JEU.md` (section 7). Le résultat arrive en commentaire.
    - **Tout est bon** : la pull request est fusionnée. Le jeu est en ligne quelques minutes plus tard.
    - **Sinon** : la pull request est fermée et l'idée revient en attente ; un nouveau jeu sera tenté à un prochain passage. Au 3e jeu refusé pour la même idée, celle-ci est mise de côté.
 5. **Mise à jour** : les idées des jeux publiés passent dans `idees-archive.json` (statut `faite`, avec le nom du jeu).
@@ -32,8 +32,9 @@ Une idée ressemble à ceci :
   "id": "coloriage-magique",
   "titre": "Coloriage magique",
   "description": "Colorie un dessin case par case en suivant les numéros. Âge conseillé : 4+.",
-  "genre": "création",
-  "tags": ["couleurs", "nombres"],
+  "genre": "coloriage",
+  "genres_secondaires": ["calcul"],
+  "univers": ["abstrait"],
   "source": "humain",
   "date_ajout": "2026-10-19",
   "statut": "en_attente",
@@ -42,12 +43,16 @@ Une idée ressemble à ceci :
 ```
 
 - `id` : minuscules sans accents, chiffres et tirets, unique.
-- `genre` : un seul, dans la liste de `CONSIGNES-JEU.md` (section 4).
-- `tags` : 0 à 5 thèmes en minuscules. Liste vide : l'agent les choisit.
+- **Genres et univers : uniquement ceux des listes fermées** de `public/taxonomie.js` (26 genres, 24 univers ; détail dans `CONSIGNES-JEU.md`, section 4). On écrit l'**identifiant** (`coloriage`, `abstrait`…), jamais un mot inventé : sinon la boucle s'arrête avec un message d'erreur. « `autre` » seulement si rien ne correspond.
+- `genre` : le genre principal, un seul.
+- `genres_secondaires` (facultatif) : 0 à 2 autres genres. Absent : l'agent créateur en ajoute s'il le juge utile.
+- `univers` : 0 à 2 univers. Liste vide `[]` : l'agent les choisit.
 - Mettez l'âge conseillé à la fin de la description (« Âge conseillé : 6+. »).
 - `"essais"` (s'il apparaît) : nombre de jeux refusés pour cette idée. À 3, elle n'est plus choisie.
 
-**Modifier la file à la main** : ouvrez `idees.json`, ajoutez, supprimez ou déplacez des idées (l'ordre de la liste est l'ordre de fabrication), puis « Commit to main » et « Push origin » dans GitHub Desktop. Ne touchez pas aux idées `"en_cours"` pendant qu'une boucle tourne. Pour vérifier le fichier sur votre PC : `npm run idees`.
+**Modifier la file à la main** : ouvrez `idees.json`, ajoutez, supprimez ou déplacez des idées (l'ordre de la liste est l'ordre de fabrication), puis « Commit to main » et « Push origin » dans GitHub Desktop. Ne touchez pas aux idées `"en_cours"` pendant qu'une boucle tourne. Pour vérifier le fichier sur votre PC : `npm run idees` (et `npm run taxonomie` pour les genres et univers).
+
+**Changer la liste des genres ou des univers** (décision du propriétaire seulement) : modifier `public/taxonomie.js`, les libellés dans les 5 fichiers `public/i18n/site/*.json` (`genre.<id>` et `genre.<id>.court`, idem `univers.`) et les listes du formulaire `.github/ISSUE_TEMPLATE/idee-jeu.yml`, puis `npm run taxonomie` doit afficher « tout est bon ».
 
 ---
 
@@ -131,7 +136,7 @@ Nom : `idee-jeu`, puis **Create label**. Sans cette étiquette, le formulaire ne
 **À chaque idée :**
 
 1. Sur le téléphone (application GitHub ou navigateur) : dépôt → **Issues** → **New issue** → **Nouvelle idée de jeu**.
-2. Le titre de la demande devient le titre du jeu. Remplissez le principe, le genre, l'âge et, si vous voulez, les thèmes.
+2. Le titre de la demande devient le titre du jeu. Remplissez le principe, le genre, l'âge et, si vous voulez, 1 ou 2 univers (listes déroulantes : rien d'autre n'est possible ; 3 univers cochés = idée refusée avec un message).
 3. Cochez « Le fabriquer cette nuit en priorité » pour la placer en tête de la file ; sinon, elle s'ajoute à la fin des idées humaines (toujours avant celles de l'agent).
 4. Envoyez. Moins d'une minute plus tard, un commentaire confirme l'ajout et la demande se ferme.
 
@@ -182,5 +187,5 @@ Bon à savoir :
 - **Minutes GitHub** : gratuites et illimitées pour un dépôt public ; pour un dépôt privé, le quota mensuel du compte s'applique (Settings → Billing).
 - **Publications Cloudflare** : chaque jeu fusionné déclenche une publication du site (500 par mois avec l'offre gratuite, soit environ 10 par nuit au maximum ici). Les mises à jour de la file d'idées n'en déclenchent pas (`[CF-Pages-Skip]` dans leur message).
 - **Heure** : lignes `cron` de `boucle-de-nuit.yml`, en heure UTC (`0 0` = 1 h à Paris l'hiver). GitHub démarre parfois les tâches planifiées avec un peu de retard.
-- **Sécurité** : l'agent des idées ne peut écrire que sa liste de propositions, contrôlée ensuite (genre, doublons, longueur). Les agents créateurs ne peuvent que lire, écrire des fichiers et lancer le robot : un garde-fou refuse tout ce qui sort du dossier du nouveau jeu. Le relecteur ne peut que lire et écrire son verdict. Seule la boucle fusionne, et seulement une pull request qui ajoute un seul nouveau jeu sans toucher au reste.
+- **Sécurité** : l'agent des idées ne peut écrire que sa liste de propositions, contrôlée ensuite (genre et univers dans les listes fermées, doublons, longueur). Les agents créateurs ne peuvent que lire, écrire des fichiers et lancer le robot : un garde-fou refuse tout ce qui sort du dossier du nouveau jeu. Le relecteur ne peut que lire et écrire son verdict. Seule la boucle fusionne, et seulement une pull request qui ajoute un seul nouveau jeu sans toucher au reste.
 - **Jeton** : il expire au bout d'un an. Refaites alors les étapes 2 et 3 de la mise en place.
