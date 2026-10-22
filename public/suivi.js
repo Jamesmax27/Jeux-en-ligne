@@ -17,7 +17,7 @@
 //   le pays, le type d'appareil et une empreinte anonyme (voir functions/api/session.js).
 // ==========================================================================
 
-const ADRESSE = 'api/session';
+const ADRESSE = '/api/session';
 const DUREE_MIN = 2;          // secondes
 const DUREE_MAX = 3 * 3600;   // 3 heures (limite du serveur)
 const ERREUR_MAX = 500;       // caractères

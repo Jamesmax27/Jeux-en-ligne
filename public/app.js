@@ -22,12 +22,18 @@
 //   Cachées sans API ou tant qu'aucune partie n'est enregistrée.
 // - Textes en 5 langues (langue.js, i18n/site/*.json). Le titre traduit du jeu
 //   est affiché en bandeau sur sa jaquette (les jaquettes n'ont aucun texte).
-//   Changer de langue ne change ni le tri, ni les votes, ni les filtres.
+//   Il y a un accueil par langue (/, /en/…, généré par scripts/pages-seo.mjs) :
+//   changer de langue mène à l'accueil de cette langue.
+// - Une carte mène à la fiche du jeu dans la langue de la page (chemins.js),
+//   d'où le bouton « Jouer » ouvre le lanceur. « Au hasard » lance le jeu.
+// - Adresses depuis la racine du site (/catalog.json, /api/…) : la page peut
+//   être servie à /en/, /es/…
 // ==========================================================================
 
 import { votesEnAttente, envoyerEnAttente, mesVotes } from './votes.js';
 import { activerHorsLigne, jeuxHorsLigne } from './hors-ligne.js';
-import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, TRANCHES_AGE } from './taxonomie.js';
+import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, TRANCHES_AGE, trancheDeAge } from './taxonomie.js';
+import { urlJeu, urlLanceur } from './chemins.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
   nomGenre, nomUnivers, titreJeu, descriptionJeu, jeuDisponible, jeuEnFrancais,
@@ -40,6 +46,7 @@ const ARCHIVE_SCORE_MAX = 0.2;    // … et un score inférieur à 0,2 (votes du
 const PAYS_VOTES_MIN = 20;        // sous 20 votes dans mon pays, classement Monde
 const DELAI_SCORES = 4000;        // au-delà, on affiche sans attendre l'API
 const TENDANCES_NOMBRE = 10;      // jeux montrés dans « Tendances »
+const JAQUETTES_PRIORITAIRES = 4; // premières jaquettes de la grille chargées tout de suite
 
 // Raccourcis du haut : des « collections » propres à l'appareil (noms : clés de traduction).
 const COLLECTIONS = {
@@ -189,13 +196,6 @@ function intercalerNouveautes(liste) {
 
 // --- Regroupements ---------------------------------------------------------
 
-// « 6+ » → tranche « 5-6 » (TRANCHES_AGE) ; âge illisible → null.
-function trancheAge(ages) {
-  const age = parseInt(ages, 10);
-  if (Number.isNaN(age)) return null;
-  return TRANCHES_AGE.find((t) => age >= t.min && age <= t.max)?.id ?? null;
-}
-
 // Identifiants valides d'une liste du catalogue (taxonomie.js), sans doublon.
 function idsValides(liste, permis) {
   return Array.isArray(liste) ? [...new Set(liste.filter((x) => permis.includes(x)))] : [];
@@ -241,18 +241,21 @@ function jeuxVisibles() {
 // --- Affichage --------------------------------------------------------------
 
 // Jaquette d'une carte : image, titre traduit en bandeau, badge « Nouveau ».
-function creerJaquette(jeu) {
+// prioritaire : jaquette visible dès l'arrivée (chargée tout de suite, pas en différé).
+// Texte alternatif : le titre (le lien de la carte a son propre aria-label, plus complet).
+function creerJaquette(jeu, prioritaire = false) {
   const jaquette = document.createElement('div');
   jaquette.className = 'jaquette';
 
   const img = document.createElement('img');
-  img.src = jeu.cover;
-  img.alt = '';
-  img.loading = 'lazy';
+  img.src = `/${jeu.cover}`;
+  img.alt = titreJeu(jeu);
+  if (prioritaire) img.fetchPriority = 'high';
+  else img.loading = 'lazy';
   img.decoding = 'async';
   img.width = 600;
   img.height = 800;
-  img.addEventListener('error', () => { img.src = 'assets/sans-jaquette.svg'; }, { once: true });
+  img.addEventListener('error', () => { img.src = '/assets/sans-jaquette.svg'; }, { once: true });
   jaquette.append(img);
 
   // Titre traduit, en bandeau sur le bas de la jaquette (elle ne contient aucun texte).
@@ -271,15 +274,15 @@ function creerJaquette(jeu) {
   return jaquette;
 }
 
-function creerCarte(jeu, scores) {
+function creerCarte(jeu, scores, prioritaire = false) {
   const li = document.createElement('li');
   const titreAffiche = titreJeu(jeu);
 
   const lien = document.createElement('a');
   lien.className = 'carte';
-  lien.href = `play.html?id=${encodeURIComponent(jeu.id)}`;
+  lien.href = urlJeu(jeu.id, getLang());
 
-  const jaquette = creerJaquette(jeu);
+  const jaquette = creerJaquette(jeu, prioritaire);
 
   const horsLigne = etat.horsLigne.has(jeu.id);
   if (horsLigne) {
@@ -327,7 +330,7 @@ function creerCarte(jeu, scores) {
 function afficherGrille() {
   const scores = scoresAffiches();
   const { principaux: liste, archives } = jeuxVisibles();
-  el.grille.replaceChildren(...liste.map((jeu) => creerCarte(jeu, scores)));
+  el.grille.replaceChildren(...liste.map((jeu, i) => creerCarte(jeu, scores, i < JAQUETTES_PRIORITAIRES)));
   el.grilleArchives.replaceChildren(...archives.map((jeu) => creerCarte(jeu, scores)));
   el.archives.hidden = archives.length === 0;
 
@@ -356,7 +359,7 @@ function creerCarteTendance(jeu, tendance, rang) {
   const li = document.createElement('li');
   const lien = document.createElement('a');
   lien.className = 'carte carte-tendance';
-  lien.href = `play.html?id=${encodeURIComponent(jeu.id)}`;
+  lien.href = urlJeu(jeu.id, getLang());
 
   const jaquette = creerJaquette(jeu);
   const numero = document.createElement('span');
@@ -392,6 +395,12 @@ function afficherTendances() {
     .slice(0, TENDANCES_NOMBRE);
   el.tendancesListe.replaceChildren(...liste.map((x, i) => creerCarteTendance(parId.get(x.id), x, i + 1)));
   el.tendances.hidden = liste.length === 0;
+  // Place gardée à la prochaine visite (script de tête de l'accueil), ou rendue.
+  // Sans réponse de l'API (hors connexion…), on ne change pas ce qui est noté.
+  if (etat.tendances) {
+    try { localStorage.setItem('tendances', liste.length ? '1' : '0'); } catch { /* stockage refusé */ }
+  }
+  if (!liste.length) document.documentElement.classList.remove('avec-tendances');
 }
 
 // Menu de tri : sans API, seules les « Nouveautés » restent possibles.
@@ -562,7 +571,7 @@ function jouerAuHasard() {
   const { principaux } = jeuxVisibles();
   const liste = principaux.length ? principaux : etat.jeux;
   const jeu = liste[Math.floor(Math.random() * liste.length)];
-  if (jeu) location.href = `play.html?id=${encodeURIComponent(jeu.id)}`;
+  if (jeu) location.href = urlLanceur(jeu.id, getLang());
 }
 
 // Nombre de jeux par valeur, en tenant compte des autres filtres (compte)
@@ -726,7 +735,7 @@ async function chargerScores(pays) {
   // Hors connexion : pas de votes, même si le navigateur en garde une copie récente.
   if (navigator.onLine === false) return null;
   try {
-    const adresse = pays ? `api/scores?pays=${encodeURIComponent(pays)}` : 'api/scores';
+    const adresse = pays ? `/api/scores?pays=${encodeURIComponent(pays)}` : '/api/scores';
     const reponse = await fetch(adresse, {
       signal: AbortSignal.timeout ? AbortSignal.timeout(DELAI_SCORES) : undefined,
     });
@@ -746,7 +755,7 @@ async function chargerScores(pays) {
 async function chargerTendances() {
   if (navigator.onLine === false) return null;
   try {
-    const reponse = await fetch('api/tendances', {
+    const reponse = await fetch('/api/tendances', {
       signal: AbortSignal.timeout ? AbortSignal.timeout(DELAI_SCORES) : undefined,
     });
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
@@ -831,7 +840,7 @@ async function demarrer() {
   const horsLigne = jeuxHorsLigne();
   const textes = demarrerLangue(el.langue);
   try {
-    const reponse = await fetch('catalog.json', { cache: 'no-cache' });
+    const reponse = await fetch('/catalog.json', { cache: 'no-cache' });
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
     const catalogue = await reponse.json();
     // Seuls les identifiants des listes fermées (taxonomie.js) sont gardés.
@@ -843,7 +852,7 @@ async function demarrer() {
         genres: idsValides([genre, ...(Array.isArray(j.genres_secondaires) ? j.genres_secondaires : [])], IDS_GENRES),
         univers: idsValides(j.univers, IDS_UNIVERS),
       };
-      jeu.tranche = trancheAge(jeu.ages);
+      jeu.tranche = trancheDeAge(jeu.ages);
       return jeu;
     });
   } catch (erreur) {

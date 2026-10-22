@@ -4,12 +4,15 @@
 //   npm run dev   → construit le catalogue puis ouvre http://localhost:8080
 // Pour tester sur votre téléphone (même Wi-Fi) : utilisez l'adresse
 // « Réseau » affichée au démarrage.
-// Reproduit la règle de sécurité des jeux (aucun accès Internet), comme en ligne.
+// Reproduit la règle de sécurité des jeux (aucun accès Internet), comme en ligne,
+// et les adresses de Cloudflare Pages : « /play » sert play.html, un dossier sert
+// son index.html, une adresse inconnue reçoit 404.html avec le code 404.
 // L'API des votes n'existe pas en local ; celle du suivi des parties répond à vide.
 // ==========================================================================
 
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +36,8 @@ const TYPES = {
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg',
   '.wav': 'audio/wav',
+  '.xml': 'application/xml; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8',
 };
 
 const CSP_JEUX = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'";
@@ -57,7 +62,19 @@ createServer(async (req, res) => {
       chemin = path.join(chemin, 'index.html');
       infos = await stat(chemin).catch(() => null);
     }
-    if (!infos) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Introuvable'); return; }
+    // Adresse sans extension (« /play », « /mentions-legales ») : la page .html du même nom.
+    if (!infos && !path.extname(chemin)) {
+      chemin += '.html';
+      infos = await stat(chemin).catch(() => null);
+    }
+    let statut = 200;
+    if (!infos) {
+      // Page 404 de la langue (/en/404.html…), sinon celle de la racine.
+      const langue = /^\/(en|es|pt|de)\//.exec(url.pathname)?.[1];
+      chemin = [langue && path.join(RACINE, langue, '404.html'), path.join(RACINE, '404.html')].filter(Boolean).find((c) => existsSync(c));
+      if (!chemin) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Introuvable'); return; }
+      statut = 404;
+    }
 
     const entetes = {
       'Content-Type': TYPES[path.extname(chemin).toLowerCase()] || 'application/octet-stream',
@@ -65,7 +82,7 @@ createServer(async (req, res) => {
     };
     if (url.pathname.startsWith('/games/')) entetes['Content-Security-Policy'] = CSP_JEUX;
 
-    res.writeHead(200, entetes).end(await readFile(chemin));
+    res.writeHead(statut, entetes).end(await readFile(chemin));
   } catch (e) {
     res.writeHead(500).end(String(e));
   }

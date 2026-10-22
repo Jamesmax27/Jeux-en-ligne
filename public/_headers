@@ -14,6 +14,28 @@
 /sw.js
   Cache-Control: no-cache
 
+# Référencement : seules les pages générées (accueils, fiches /jeux/<id>/, catégories)
+# sont proposées aux moteurs de recherche. Ne sont pas indexés : le lanceur (/play),
+# le fichier brut de chaque jeu (sa jaquette, elle, reste indexable : image de partage)
+# et les adresses de Cloudflare en *.pages.dev (doublons de freemicrogames.com).
+/play
+  X-Robots-Tag: noindex
+
+/play.html
+  X-Robots-Tag: noindex
+
+/games/:id/
+  X-Robots-Tag: noindex
+
+/games/:id/index.html
+  X-Robots-Tag: noindex
+
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex
+
 # Les jeux : aucun accès à Internet, aucune ressource externe.
 # Tout doit être contenu dans le fichier index.html du jeu (règle du CLAUDE.md, section 5).
 # Le lanceur (play.js, CSP_JEU) applique la même règle aux jeux qu'il affiche : garder les deux identiques.

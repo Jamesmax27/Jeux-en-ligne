@@ -21,8 +21,9 @@
 //     pas à jour ; clé utilisée par le jeu (t('…'), data-i18n…) absente du
 //     français ;
 //   - navigateur (si disponible) : erreur JavaScript, clé manquante ou
-//     <html lang> faux au chargement d'un jeu, du catalogue ou du lanceur,
-//     dans chacune des 5 langues.
+//     <html lang> faux au chargement d'un jeu, de l'accueil, d'une fiche de
+//     jeu, d'une catégorie, du lanceur ou des mentions légales, dans chacune
+//     des 5 langues ; page générée retraduite selon la langue enregistrée.
 // Non bloquant (rapport) : textes en dur restants (recherche heuristique dans
 // le HTML et le JavaScript des jeux), CSS de bouton à
 // largeur fixe ou sans retour à la ligne, textes qui débordent (navigateur,
@@ -184,10 +185,10 @@ async function verifierJeu(id, moduleCommun) {
       if (typeof t?.description !== 'string' || !t.description.trim()) erreur(sujet, `game.json : "i18n.${lang}.description" manquante`);
       else if (t.description.length > 200) erreur(sujet, `game.json : "i18n.${lang}.description" dépasse 200 caractères`);
       if (typeof t?.title === 'string' && t.title.length > 60) erreur(sujet, `game.json : "i18n.${lang}.title" dépasse 60 caractères`);
-      // Présentation (quelques phrases, nouveaux jeux) : traduite dès qu'elle existe en français.
+      // Présentation : traduite dès qu'elle existe en français. Sa longueur et les
+      // autres textes de la page du jeu : scripts/regles-seo.mjs (verifier-seo.mjs).
       if (typeof fiche.presentation === 'string' && fiche.presentation.trim()) {
         if (typeof t?.presentation !== 'string' || !t.presentation.trim()) erreur(sujet, `game.json : "i18n.${lang}.presentation" manquante`);
-        else if (t.presentation.length > 1200) erreur(sujet, `game.json : "i18n.${lang}.presentation" dépasse 1 200 caractères`);
       }
     }
     if (Number(fiche.consignes) >= 2 && (typeof fiche.presentation !== 'string' || !fiche.presentation.trim())) {
@@ -401,37 +402,60 @@ async function attendreServeur(url, essais = 60) {
   throw new Error('le serveur de test ne démarre pas');
 }
 
-// Catalogue et lanceur dans les 5 langues (site construit puis servi en local).
+// Pages du site dans les 5 langues (site construit puis servi en local) :
+// - pages générées (scripts/pages-seo.mjs) : accueil, fiche et catégorie d'un
+//   jeu ; la langue est celle de l'adresse (/en/…), liens hreflang dans le HTML ;
+// - pages traduites en JavaScript (?lang=) : lanceur et mentions légales.
 async function testerSite(navigateur, idExemple) {
   const build = spawnSync(process.execPath, [path.join(RACINE, 'scripts', 'build-catalog.mjs')], { encoding: 'utf8' });
   if (build.status !== 0) { erreur('site', `la construction du catalogue a échoué : ${build.stderr.slice(0, 200)}`); return; }
+  const chemins = await import(pathToFileURL(path.join(RACINE, 'public', 'chemins.js')).href);
+  const catalogue = JSON.parse(await readFile(path.join(RACINE, 'public', 'catalog.json'), 'utf8'));
+  const jeu = (catalogue.games || []).find((j) => j.id === idExemple) || (catalogue.games || [])[0];
   const serveur = spawn(process.execPath, [path.join(RACINE, 'scripts', 'serve.mjs')], { env: { ...process.env, PORT: String(PORT_TEST) }, stdio: 'ignore' });
   const base = `http://localhost:${PORT_TEST}`;
+  const ouvrir = async (contexte, chemin, attente) => {
+    const page = await contexte.newPage();
+    const problemes = [];
+    page.on('pageerror', (e) => problemes.push(`erreur JavaScript : ${e.message}`));
+    page.on('console', (m) => {
+      const texte = m.text();
+      if (/^\[i18n\]/.test(texte)) problemes.push(texte.slice(0, 140));
+      else if (m.type() === 'error' && !/api\/(?:scores|vote)|404|Failed to load resource/i.test(texte)) problemes.push(`erreur console : ${texte.slice(0, 140)}`);
+    });
+    await page.goto(`${base}${chemin}`);
+    await page.waitForTimeout(attente);
+    const infos = await page.evaluate(() => ({
+      chemin: location.pathname,
+      lang: document.documentElement.lang,
+      hreflang: document.querySelectorAll('link[rel="alternate"][hreflang]').length,
+      largeur: document.documentElement.scrollWidth > window.innerWidth + 2,
+    }));
+    return { infos, problemes };
+  };
   try {
     await attendreServeur(`${base}/`);
-    const pages = [['catalogue', '/'], ['mentions légales', '/mentions-legales.html'], ...(idExemple ? [['lanceur', `/play.html?id=${idExemple}`]] : [])];
-    for (const [nom, chemin] of pages) {
-      for (const lang of LANGUES) {
+    for (const lang of LANGUES) {
+      const pages = [
+        ['accueil', chemins.urlAccueil(lang), 'générée', 5000],
+        ...(jeu ? [
+          ['fiche du jeu', chemins.urlJeu(jeu.id, lang), 'générée', 800],
+          ['catégorie', chemins.urlCategorie('genre', jeu.genre, lang), 'générée', 800],
+          ['lanceur', `/play?id=${jeu.id}&lang=${lang}`, 'js', 2500],
+        ] : []),
+        ['mentions légales', `/mentions-legales?lang=${lang}`, 'js', 2500],
+      ];
+      for (const [nom, chemin, sorte, attente] of pages) {
         const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
-        const page = await contexte.newPage();
-        const problemes = [];
-        page.on('pageerror', (e) => problemes.push(`erreur JavaScript : ${e.message}`));
-        page.on('console', (m) => {
-          const texte = m.text();
-          if (/^\[i18n\]/.test(texte)) problemes.push(texte.slice(0, 140));
-          else if (m.type() === 'error' && !/api\/(?:scores|vote)|404|Failed to load resource/i.test(texte)) problemes.push(`erreur console : ${texte.slice(0, 140)}`);
-        });
+        let problemes = [];
         try {
-          await page.goto(`${base}${chemin}${chemin.includes('?') ? '&' : '?'}lang=${lang}`);
-          await page.waitForTimeout(nom === 'catalogue' ? 5000 : 2500);
-          const infos = await page.evaluate(() => ({
-            lang: document.documentElement.lang,
-            hreflang: document.querySelectorAll('link[rel="alternate"][hreflang]').length,
-            largeur: document.documentElement.scrollWidth > window.innerWidth + 2,
-          }));
-          if (infos.lang !== lang) problemes.push(`<html lang> vaut « ${infos.lang} »`);
-          if (infos.hreflang !== LANGUES.length + 1) problemes.push(`${infos.hreflang} liens hreflang au lieu de ${LANGUES.length + 1}`);
-          if (infos.largeur) avertir('site', `${nom} (${lang}) : la page déborde en largeur sur téléphone`);
+          const r = await ouvrir(contexte, chemin, attente);
+          problemes = r.problemes;
+          const langAttendue = sorte === 'générée' ? chemins.HREFLANG[lang] : lang;
+          if (r.infos.lang !== langAttendue) problemes.push(`<html lang> vaut « ${r.infos.lang} » au lieu de « ${langAttendue} »`);
+          if (sorte === 'générée' && r.infos.hreflang < 2) problemes.push(`${r.infos.hreflang} lien hreflang (page générée : un par langue + x-default)`);
+          if (sorte === 'js' && r.infos.hreflang) problemes.push(`${r.infos.hreflang} liens hreflang sur une page non indexée`);
+          if (r.infos.largeur) avertir('site', `${nom} (${lang}) : la page déborde en largeur sur téléphone`);
         } catch (e) {
           problemes.push(`la page ne se charge pas (${e.message.split('\n')[0]})`);
         }
@@ -439,6 +463,18 @@ async function testerSite(navigateur, idExemple) {
         await contexte.close();
       }
     }
+
+    // Langue enregistrée sur l'appareil (« de ») : une page générée garde la langue
+    // de son adresse, et l'accueil « / » mène à l'accueil de la langue choisie.
+    const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+    await contexte.addInitScript(() => { try { localStorage.setItem('lang', 'de'); } catch { /* stockage refusé */ } });
+    const enAnglais = await ouvrir(contexte, chemins.urlAccueil('en'), 3000);
+    if (enAnglais.infos.lang !== 'en' || enAnglais.infos.chemin !== chemins.urlAccueil('en')) {
+      erreur('site', `accueil anglais ouvert avec la langue « de » enregistrée : ${enAnglais.infos.chemin} en « ${enAnglais.infos.lang} » (attendu : ${chemins.urlAccueil('en')} en « en »)`);
+    }
+    const racine = await ouvrir(contexte, '/', 3000);
+    if (racine.infos.chemin !== chemins.urlAccueil('de')) erreur('site', `« / » avec la langue « de » enregistrée mène à ${racine.infos.chemin} (attendu : ${chemins.urlAccueil('de')})`);
+    await contexte.close();
   } finally {
     serveur.kill();
   }

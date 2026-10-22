@@ -3,10 +3,10 @@
 ## État actuel
 
 - **Désactivée** : `PUB_ACTIVE = false` dans `public/pub.js`. Rien n'est chargé ni affiché, aucun cookie n'est déposé.
-- **Emplacements prévus** dans `public/index.html`, cachés pour l'instant :
-  - `#pub` : un seul bloc, en bas du catalogue (après les archives, avant le pied de page), avec la mention « Publicité » ;
+- **Emplacements prévus** dans l'accueil, cachés pour l'instant. Leur source est le gabarit `gabarits/accueil.html` (l'accueil `public/index.html` et ceux des autres langues, `/en/`…, sont générés à partir de lui à chaque build) :
+  - `#pub` : un seul bloc, en bas du catalogue (après les archives, avant les liens « Derniers jeux ajoutés » et le pied de page), avec la mention « Publicité » ;
   - `#consentement` : le bandeau de consentement aux cookies.
-- **Jamais de publicité dans le lanceur (`play.html`) ni dans les jeux.** La règle de sécurité des jeux (aucun accès réseau) l'empêche de toute façon.
+- **Jamais de publicité dans le lanceur (`play.html`), dans les jeux, ni sur les pages des jeux et des catégories.** La règle de sécurité des jeux (aucun accès réseau) l'empêche de toute façon dans les jeux.
 - **Hors connexion** : aucune publicité.
 - Aucun code de régie ni identifiant n'est présent : ils seront ajoutés avec votre compte.
 

@@ -1,7 +1,7 @@
 # Consignes pour créer un jeu
 
 Règles obligatoires pour toute IA (ou personne) qui ajoute un jeu au site Free Micro Games.
-Elles complètent la section 5 de `CLAUDE.md`. Le robot `scripts/validate-games.mjs` en vérifie une partie automatiquement ; la relecture de la section 7 vérifie le reste avant toute publication.
+Elles complètent la section 5 de `CLAUDE.md`. Les robots (`scripts/validate-games.mjs`, `scripts/check-i18n.js`, `scripts/verifier-seo.mjs`…) en vérifient une partie automatiquement ; la relecture de la section 7 vérifie le reste avant toute publication.
 
 ## 1. Le public
 
@@ -28,7 +28,7 @@ Un nouveau jeu est **complet et travaillé, jamais un simple prototype** : il do
 10. **Des sons générés avec Web Audio** (aucun fichier audio) pour les actions, réussites, erreurs et fins de niveau, avec un **bouton pour couper le son**, bien visible, dont le choix est mémorisé. Aucun son avant la première action du joueur.
 11. **Des animations et des retours visuels soignés** : confettis, étoiles qui s'envolent, compteur qui défile, légère secousse… à chaque action, à chaque réussite et à chaque fin de niveau.
 12. **Un écran de victoire et un écran de défaite** : à chaque fin de niveau et en fin de partie, bilan avec score, étoiles gagnées, record battu ou non, et boutons « Niveau suivant » (victoire) ou « Réessayer » (défaite), « Rejouer » et « Niveaux ».
-13. **Une présentation riche** dans `game.json` : quelques phrases (principe, objectif, ce qui rend le jeu amusant), en plus de la description courte de la carte du catalogue (section 4).
+13. **Une page du jeu bien renseignée (référencement)** : en plus du titre et de la description courte de la carte du catalogue, `game.json` donne dans les 5 langues les textes de la page du jeu : titre et description pour les moteurs de recherche, « À propos du jeu », « Comment jouer », compétences travaillées, texte de la jaquette (section 4). Ils sont écrits une fois le jeu terminé, d'après lui seul, et respectent les règles de `scripts/regles-seo.mjs`.
 
 ### Le ressenti
 
@@ -71,13 +71,17 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 **Méthode de la boucle de nuit (recommandée pour tout nouveau jeu)** : les textes sont écrits à part, un fichier par langue, dans `i18n-jeu/<id>/` (dossier ignoré par git) :
 
 ```json
-{ "meta":   { "title": "…", "description": "…", "presentation": "…" },
+{ "meta":   { "title": "…", "description": "…", "titre_seo": "…", "description_seo": "…",
+              "presentation": "…", "regles": "…", "competences": "…", "jaquette_alt": "…" },
   "textes": { "cle": "texte", "etoiles": { "one": "{n} étoile", "other": "{n} étoiles" } } }
 ```
 
-1. Créer le jeu complet en français, avec tous ses textes dans `fr.json`. Après chaque modification : `node scripts/i18n-jeu.mjs --assembler <id>` (range les textes dans `index.html`, crée au besoin le bloc et le module commun, recopie `meta` dans `game.json`).
-2. Le jeu terminé, écrire `en.json`, `es.json`, `pt.json` et `de.json` en lisant **seulement** `fr.json` (pas de relecture du code) : mêmes clés, mêmes `{variables}`, meta comprise. Ton simple et vivant, pas de mot à mot.
-3. `node scripts/i18n-jeu.mjs --assembler <id>` puis `node scripts/check-i18n.js <id> --sans-site` jusqu'à « tout est bon ». Une erreur de traduction se corrige dans les fichiers `.json`, jamais dans le code du jeu.
+1. Créer le jeu complet en français, avec tous ses textes dans `fr.json` (dans `meta`, d'abord `title` et `description`). Après chaque modification : `node scripts/i18n-jeu.mjs --assembler <id>` (range les textes dans `index.html`, crée au besoin le bloc et le module commun, recopie `meta` dans `game.json`).
+2. Le jeu terminé et relu, écrire dans la `meta` de `fr.json` les textes de la page du jeu (`titre_seo`, `description_seo`, `presentation`, `regles`, `competences`, `jaquette_alt` : section 4), d'après le jeu fabriqué et son code. Puis `--assembler` et `node scripts/regles-seo.mjs <id>`, jusqu'à ce qu'il ne reste aucune ligne « ERREUR : <id> : fr : … ».
+3. Écrire `en.json`, `es.json`, `pt.json` et `de.json` en lisant **seulement** `fr.json` (pas de relecture du code) : mêmes clés, mêmes `{variables}`, **toute** la meta traduite, avec les mêmes bornes de longueur dans chaque langue (reformuler, sans couper ni ajouter d'idée). Ton simple et vivant, pas de mot à mot.
+4. `node scripts/i18n-jeu.mjs --assembler <id>`, puis `node scripts/check-i18n.js <id> --sans-site` jusqu'à « tout est bon », `node scripts/regles-seo.mjs <id>` jusqu'à « Textes SEO : tout est bon », et enfin `node scripts/verifier-seo.mjs <id>` jusqu'à « Référencement : tout est bon » (section 6). Une erreur de traduction ou de référencement se corrige dans les fichiers `.json`, jamais dans le code du jeu ni directement dans `game.json`.
+
+**Retoucher seulement les textes de la fiche d'un jeu publié** (le jeu ne change pas) : écrire les champs à changer dans `i18n-jeu/<id>/<langue>.json` sous la forme `{ "meta": { "champ": "…" } }` (un champ absent ne change pas), puis `node scripts/i18n-jeu.mjs --meta <id>` : il range la meta dans `game.json` et pose `"maj"` à la date du jour, sans toucher à `index.html`. Ensuite, mêmes contrôles qu'au point 4.
 
 ## 4. La fiche `game.json`
 
@@ -86,12 +90,17 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
   "id": "nom-du-dossier",
   "title": "Titre du jeu",
   "description": "Une phrase qui donne envie de jouer (10 à 200 caractères).",
-  "presentation": "Trois à six phrases : le principe, l'objectif et ce qui rend le jeu amusant (150 à 1 200 caractères).",
+  "titre_seo": "Titre du jeu : ce qu'est le jeu, pour qui (50 à 60 caractères)",
+  "description_seo": "Ce qu'on fait dans ce jeu et ce qui le rend amusant (140 à 160 caractères).",
+  "presentation": "« À propos du jeu » : principe, univers, ce qui rend le jeu amusant (70 à 150 mots).",
+  "regles": "« Comment jouer » : but, geste au doigt et touches du clavier, étoiles, nombre réel de niveaux (50 à 130 mots).",
+  "competences": "logique, mémoire visuelle, anticipation",
+  "jaquette_alt": "Ce que montre le dessin de la jaquette (40 à 125 caractères).",
   "i18n": {
-    "en": { "title": "Game title", "description": "One sentence that makes you want to play.", "presentation": "…" },
-    "es": { "title": "…", "description": "…", "presentation": "…" },
-    "pt": { "title": "…", "description": "…", "presentation": "…" },
-    "de": { "title": "…", "description": "…", "presentation": "…" }
+    "en": { "title": "…", "description": "…", "titre_seo": "…", "description_seo": "…", "presentation": "…", "regles": "…", "competences": "…", "jaquette_alt": "…" },
+    "es": { "title": "…", "description": "…", "titre_seo": "…", "description_seo": "…", "presentation": "…", "regles": "…", "competences": "…", "jaquette_alt": "…" },
+    "pt": { "title": "…", "description": "…", "titre_seo": "…", "description_seo": "…", "presentation": "…", "regles": "…", "competences": "…", "jaquette_alt": "…" },
+    "de": { "title": "…", "description": "…", "titre_seo": "…", "description_seo": "…", "presentation": "…", "regles": "…", "competences": "…", "jaquette_alt": "…" }
   },
   "genre": "puzzle",
   "genres_secondaires": ["aventure"],
@@ -105,10 +114,12 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 }
 ```
 
-- `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier.
-- `title`, `description` et `presentation` restent en français ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). `description` : courte phrase de la carte du catalogue ; `presentation` : texte riche et attrayant, utilisé comme description de la page du jeu (référencement).
+- `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier. Il ne change jamais : il sert dans l'adresse de la page du jeu (`/jeux/<id>/`, `/en/games/<id>/`…).
+- Les textes restent en français à la racine ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). `title` (60 caractères au plus) : titre de la carte et de la page du jeu. `description` (10 à 200 caractères) : phrase courte de la carte du catalogue, reprise en accroche sous le titre de la page.
 - `niveaux` : nombre de niveaux du jeu (20 au moins), égal à `window.JEL_NIVEAUX`.
-- `consignes` : `2` pour les jeux faits selon ces consignes (posé automatiquement par la boucle de nuit) ; le robot applique alors les règles des nouveaux jeux (20 niveaux, présentation). Les jeux plus anciens n'ont pas ce champ.
+- `consignes` : `2` pour les jeux faits selon ces consignes (posé automatiquement par la boucle de nuit) ; le robot applique alors les règles des nouveaux jeux (20 niveaux, présentation obligatoire). Les jeux plus anciens n'ont pas ce champ.
+- `version` : à augmenter quand `index.html` ou la jaquette changent (le numéro est dans leur adresse : les téléphones reprennent alors la nouvelle copie). Une retouche des seuls textes de `game.json` ne la change pas : elle met à jour `maj`.
+- `maj` (facultatif, racine seulement) : date de la dernière modification du jeu ou de ses textes, `AAAA-MM-JJ`, jamais avant `added` ni dans le futur. Elle sert de date de mise à jour au sitemap (sinon `added`). `node scripts/i18n-jeu.mjs --meta <id>` la pose tout seul ; après une modification du jeu, la mettre à la date du jour.
 - **Genres et univers : listes fermées.** Elles sont dans un seul fichier de référence, `public/taxonomie.js` (identifiant court sans accents, libellé affiché) ; on écrit dans `game.json` les **identifiants**, jamais un libellé ni un mot inventé. **Interdit de créer un genre ou un univers** : seul le propriétaire du site modifie ces listes. « `autre` » seulement si rien ne correspond. Le robot (`scripts/controle-taxonomie.mjs`, `validate-games.mjs`) refuse toute autre valeur.
 - `genre` : **obligatoire**, le genre principal (le cœur du jeu : comment on joue), un seul identifiant parmi les 26 :
   `puzzle` (Puzzle et logique), `memoire` (Mémoire), `quiz` (Quiz et culture), `mots` (Mots et lettres), `calcul` (Calcul et nombres), `reflexes` (Réflexes et clic rapide), `arcade` (Arcade), `plateforme` (Plateforme), `course` (Course), `sport` (Sport), `tir` (Tir et visée), `combat` (Combat), `labyrinthe` (Labyrinthe), `aventure` (Aventure et exploration), `observation` (Objets cachés et observation), `strategie` (Stratégie), `defense` (Défense de tour), `gestion` (Gestion et tycoon), `simulation` (Simulation et soin), `creation` (Habillage et création), `construction` (Bac à sable et construction), `musique` (Musique et rythme), `societe` (Jeux de société et de cartes), `coloriage` (Coloriage et dessin), `role` (Jeu de rôle et progression), `autre` (Autre).
@@ -117,10 +128,31 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 - `univers` : **obligatoire**, 1 ou 2 identifiants parmi les 24 (de quoi parle le jeu : son décor, ses personnages) :
   `ferme` (Ferme), `chevaux` (Chevaux), `compagnie` (Animaux de compagnie), `sauvages` (Animaux sauvages), `dinosaures` (Dinosaures et préhistoire), `ocean` (Océan), `espace` (Espace), `fantasy` (Fantasy et magie), `chevaliers` (Chevaliers et Moyen Âge), `pirates` (Pirates), `monstres` (Monstres et créatures), `robots` (Robots et futur), `nature` (Nature et jardin), `cuisine` (Cuisine et nourriture), `vehicules` (Véhicules), `sport` (Sport), `monde` (Monde et pays), `histoire` (Histoire), `corps` (Corps humain et santé), `ville` (Ville et métiers), `fetes` (Saisons et fêtes), `contes` (Contes et légendes), `abstrait` (Abstrait : formes, couleurs, sans décor figuratif), `autre` (Autre, seul).
 - Le champ `tags` n'existe plus (remplacé par `univers`) : une fiche qui le garde est refusée.
-- `ages` : âge minimum conseillé, au format `"6+"` (tuiles d'âge du catalogue : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et +).
+- `ages` : âge minimum conseillé, au format `"6+"` (tuiles d'âge du catalogue : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et + ; pages d'âge du site ; « Conseillé dès 6 ans » sur la page du jeu). C'est le seul champ d'âge.
 - `idee` : rempli par la boucle de nuit, `id` de l'idée de `idees.json` réalisée par ce jeu (à la fusion, l'idée passe dans `idees-archive.json`). Ne pas le modifier. Facultatif pour un jeu créé à la main.
-- Jeu de la boucle de nuit : `genre`, `genres_secondaires` et `univers` sont ceux de l'idée (si l'idée ne donne pas d'univers ou de genres secondaires, l'agent les choisit dans les listes). La vérification refuse un jeu dont l'entrée du catalogue ne correspond pas, ou qui sort des listes.
-- **Idées de jeux** (`idees.json`, agent d'idéation) : mêmes listes, mêmes règles ; privilégier les combinaisons genre × univers encore peu couvertes par les jeux existants (`node scripts/idees.mjs catalogue` les liste). Les idées ajoutées par le propriétaire (source `humain`) restent toujours fabriquées en premier.
+- Jeu de la boucle de nuit : `genre`, `genres_secondaires`, `univers` et `ages` sont ceux de l'idée (si l'idée ne donne pas d'univers, de genres secondaires ou d'âge, l'agent les choisit). La vérification refuse un jeu dont l'entrée du catalogue ne correspond pas à son idée, ou qui sort des listes.
+- **Idées de jeux** (`idees.json`, agent d'idéation) : mêmes listes, mêmes règles, âge dans le champ `ages` (« 6+ ») ; privilégier les combinaisons genre × univers encore peu couvertes par les jeux existants (`node scripts/idees.mjs catalogue` les liste). Les idées ajoutées par le propriétaire (source `humain`) restent toujours fabriquées en premier.
+
+### Textes de la page du jeu (référencement)
+
+Chaque jeu a sa page, générée au build dans les 5 langues (gabarit unique `gabarits/jeu.html`, adresses `/jeux/<id>/`, `/en/games/<id>/`…) : c'est elle que trouvent les moteurs de recherche, et son bouton « Jouer » ouvre le lanceur. Ses textes viennent de `game.json`, en français à la racine et traduits dans `i18n` :
+
+| Champ | Où il apparaît | Bornes (dans chaque langue) | Ce qu'il dit |
+| --- | --- | --- | --- |
+| `titre_seo` | titre de l'onglet et du résultat de recherche (`<title>`), sans le nom du site | 50 à 60 caractères | commence par le nom du jeu, puis ce qu'il est (genre, univers ou âge) ; différent de `title` |
+| `description_seo` | description du résultat de recherche, du partage sur les réseaux et des données structurées | 140 à 160 caractères | ce qu'on fait dans ce jeu et ce qui le rend amusant |
+| `presentation` | « À propos du jeu » | 70 à 150 mots | principe, univers, ce qui rend le jeu amusant |
+| `regles` | « Comment jouer » | 50 à 130 mots | le but ; le geste au doigt **et** les touches du clavier (ou la souris) ; comment on gagne des étoiles et comment on perd ; le nombre réel de niveaux |
+| `competences` | « Ce que le jeu fait travailler : » | 20 à 160 caractères | 2 à 4 compétences séparées par des virgules, minuscule au début (sauf les noms en allemand), sans point final |
+| `jaquette_alt` | texte de remplacement de la jaquette (lecteurs d'écran, recherche d'images) | 40 à 125 caractères | ce que montre le dessin, sans commencer par « Image de… » ni « Jaquette… » |
+
+- Bloc de texte affiché (présentation + règles + compétences + ligne d'âge) : **150 à 300 mots** dans chaque langue.
+- `titre_seo` et `description_seo` sont **uniques** : aucun autre jeu n'a les mêmes, dans aucune langue.
+- Tout est tiré du jeu réellement fabriqué et de son code : nombre réel de niveaux (`window.JEL_NIVEAUX`), gestes et touches réellement gérés, étoiles telles que le code les calcule, âge de `ages`. Les textes décrivent **ce** jeu, et lui seul.
+- Interdits : marque ou personnage existant, même pour comparer (liste `MARQUES` de `scripts/regles-seo.mjs`) ; formule passe-partout (« plonge dans », « des heures de », « petits et grands », « toute la famille »…) ; promesse fausse (mode, fonction ou contenu absent du jeu) ; chiffre non vérifié dans le code ; phrase reprise d'un autre jeu (dans la présentation, 10 mots identiques à la suite sont refusés ; dans les règles, où les commandes se décrivent souvent pareil, c'est un simple avertissement).
+- Exemples : `titre_seo` « Potager Express : jeu de gestion de ferme gratuit dès 6 ans » ; `competences` « gestion de l'argent, organisation, rapidité de réaction » ; `jaquette_alt` « Carotte, tomate, fraise, potiron, maïs et salade dans six parcelles en bois, avec une poule, un lapin et une vache au soleil ».
+- Règles et bornes : un seul fichier, `scripts/regles-seo.mjs`. En cas de doute, c'est lui qui a raison. `node scripts/regles-seo.mjs <id>` contrôle ces champs ; `node scripts/verifier-seo.mjs <id>` construit le site et contrôle la page du jeu (section 6).
+- Un jeu dont les textes ne sont pas conformes a une page cachée aux moteurs de recherche (`noindex`, hors du sitemap). S'il a été ajouté à partir du 24 octobre 2026 (`REGLES_SEO_DEPUIS` dans `scripts/regles-seo.mjs`), il n'est **pas publié** du tout.
 
 ## 5. La jaquette et les images
 
@@ -128,15 +160,18 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 - La boucle automatique la fabrique elle-même, d'après le jeu terminé (capture de l'écran d'accueil du jeu, **textes masqués** ; une jaquette provisoire faite pendant la fabrication par `--covers` est remplacée) : la jaquette ne contient **aucun texte**, car le site affiche le titre traduit en HTML. L'écran d'accueil doit donc avoir un beau dessin, pas seulement du texte.
 - **Aucune image ne contient de texte** : ni la jaquette, ni les dessins du jeu (SVG, canvas) ; pas de titre, de lettre ni de chiffre dessinés. Les textes sont toujours écrits par `t()` (section 3), pour être traduits.
 - Jaquette faite à la main : sans aucun texte, ou `node scripts/jaquette-sans-texte.mjs <id>`. Si la relecture voit du texte sur la jaquette d'un jeu par ailleurs bon, la boucle refait seulement la jaquette avec ce script.
+- La jaquette sert aussi d'image de partage de la page du jeu (réseaux sociaux) si elle est en `.webp`, `.png` ou `.jpg` ; une jaquette `.svg` est alors remplacée par l'icône du site. Son texte de remplacement est `jaquette_alt` (section 4) : il décrit le dessin de l'écran d'accueil, d'après lequel la jaquette automatique est faite.
 
 ## 6. Avant de proposer le jeu
 
 ```text
 node scripts/validate-games.mjs --jouer <id>      (ajouter --covers si le jeu n'a pas encore de jaquette)
 node scripts/check-i18n.js <id> --rapport
+node scripts/regles-seo.mjs <id>                   (textes de la page du jeu, sans construire le site)
+node scripts/verifier-seo.mjs <id>                 (construit le site, puis contrôle la page du jeu)
 ```
 
-Le robot ouvre le jeu dans un vrai navigateur, le joue 30 secondes au hasard et enregistre des captures d'écran dans `captures/<id>/` : regardez-les. Le résultat doit être « Tout est bon ». La vérification des traductions ouvre le jeu dans les 5 langues : elle doit finir par « tout est bon » ; relisez aussi les textes en dur qu'elle signale. Vérifiez ensuite la grille de la section 7, point par point.
+Le robot ouvre le jeu dans un vrai navigateur, le joue 30 secondes au hasard et enregistre des captures d'écran dans `captures/<id>/` : regardez-les. Le résultat doit être « Tout est bon ». La vérification des traductions ouvre le jeu dans les 5 langues : elle doit finir par « tout est bon » ; relisez aussi les textes en dur qu'elle signale. Les textes de la page du jeu doivent donner « Textes SEO : tout est bon », puis le contrôle du référencement « Référencement : tout est bon » : seules les lignes « ERREUR » qui citent votre jeu bloquent, les lignes « attention » sur d'autres jeux sont à ignorer. Raccourcis : `npm run seo-textes -- <id>` et `npm run seo -- <id>`. Vérifiez ensuite la grille de la section 7, point par point.
 
 ## 7. Grille de validation
 
@@ -151,10 +186,11 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Téléphone | une erreur survient pendant la partie au toucher, sur un écran de 390 × 844 |
 | Hors ligne | le jeu tente un appel réseau, ou ne marche pas avec le navigateur coupé du réseau |
 | Fichiers | `game.json` incomplet ou invalide, jaquette absente ou trop lourde, `index.html` de plus de 2 Mo, fichier en trop |
-| Niveaux | (jeux `"consignes": 2`) moins de 20 niveaux, `window.JEL_NIVEAUX` absent ou différent de `"niveaux"` dans `game.json`, présentation absente ou trop courte |
-| Catalogue | le jeu manque au catalogue construit, ou son genre et ses univers ne sont pas ceux de son idée (`scripts/idees.mjs controler`) |
+| Niveaux | (jeux `"consignes": 2`) moins de 20 niveaux, `window.JEL_NIVEAUX` absent ou différent de `"niveaux"` dans `game.json`, présentation absente |
+| Catalogue | le jeu manque au catalogue construit, ou son genre, ses univers et son âge ne sont pas ceux de son idée (`scripts/idees.mjs controler`) |
 | Genres et univers | un genre, un genre secondaire ou un univers hors des listes fermées de `public/taxonomie.js`, ou l'ancien champ `tags` (`scripts/controle-taxonomie.mjs`) |
 | Traductions | `scripts/check-i18n.js` signale une erreur : langue incomplète, clé manquante, valeur vide, `{variables}` différentes, titre, description ou présentation non traduits, erreur dans une des 5 langues (boucle de nuit et `validate.yml`) |
+| Référencement | `scripts/verifier-seo.mjs <id>` signale une erreur sur ce jeu : texte de la page manquant ou hors bornes dans une des 5 langues (section 4), bloc de texte hors de 150 à 300 mots, marque protégée, titre ou description identique à celui d'un autre jeu, phrase de 10 mots reprise d'un autre jeu, page du jeu mal construite (titre, description, H1, liens, jeux similaires…) (boucle de nuit et `validate.yml`) |
 
 ### Relecture (Claude)
 
@@ -173,7 +209,8 @@ Points bloquants, vérifiés dans le code et sur les captures d'écran du robot 
 11. **Écran de téléphone** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page.
 12. **Contenu** : adapté aux enfants, en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
 13. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; aucune image du jeu avec du texte (sections 3 et 5).
+14. **Page du jeu** : les textes de référencement de `game.json` (`titre_seo`, `description_seo`, `presentation`, `regles`, `competences` ; en français, et au moins les nombres dans les traductions) sont fidèles au code : règles et gestes réels (doigt et clavier), nombre réel de niveaux, étoiles, âge cohérent avec `ages`. Ils décrivent **ce** jeu (pas un texte passe-partout), sans promesse fausse (mode, fonction ou contenu absent du jeu) ni marque ou personnage existant (section 4). Les longueurs sont déjà contrôlées par le robot.
 
 À part, non bloquant pour le jeu : **la jaquette** ne contient aucun texte, aucune lettre, aucun chiffre. Sinon, la boucle refait seulement la jaquette (section 5).
 
-Conseils (non bloquants, notés dans la relecture) : amusant dès la première minute, variété d'un niveau à l'autre, de quoi jouer 15 minutes.
+Conseils (non bloquants, notés dans la relecture) : amusant dès la première minute, variété d'un niveau à l'autre, de quoi jouer 15 minutes ; texte de la jaquette (`jaquette_alt`) qui correspond bien à ce qu'elle montre.
