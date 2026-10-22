@@ -339,7 +339,8 @@ jobs:
                - Dans game.json : "genre" et "tags" = ceux de l'idée ; "idee" = "${{ matrix.idee.id }}" ;
                  "added" = date du jour ; "author" = "Claude (agent)" ; "version" = 1 ; "consignes" = 2 ;
                  "niveaux" = le nombre de niveaux (le même que window.JEL_NIVEAUX).
-            6. Joue au jeu avec le robot : node scripts/validate-games.mjs --jouer <id>
+            6. Joue au jeu avec le robot : node scripts/validate-games.mjs --jouer --covers <id>
+               (--covers crée une jaquette provisoire ; elle est refaite automatiquement d'après le jeu terminé).
                Il ouvre le jeu sur un téléphone simulé, le joue au hasard pendant 30 secondes et enregistre des
                captures d'écran dans captures/<id>/. Regarde chaque capture avec Read : rien ne doit être coupé,
                illisible ou figé. Corrige les erreurs et ce que tu vois, puis relance.
@@ -492,6 +493,9 @@ jobs:
         run: |
           # pipefail : sans lui, « | tee » masquerait l'échec du contrôle et la pull request serait ouverte quand même.
           set -o pipefail
+          # Jaquette toujours tirée du jeu terminé : celle créée pendant la fabrication (--covers) peut montrer
+          # une version ancienne de l'écran titre.
+          rm -f games/"${{ steps.verif.outputs.id }}"/cover.*
           node scripts/validate-games.mjs --browser --covers "${{ steps.verif.outputs.id }}" | tee "$RUNNER_TEMP/rapport.txt"
 
       - name: Préparer la description de la pull request

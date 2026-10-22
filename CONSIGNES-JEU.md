@@ -119,14 +119,14 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 ## 5. La jaquette et les images
 
 - Image portrait 600 × 800 px : `cover.webp` (idéal, moins de 100 Ko), sinon `cover.png` ou `cover.jpg` (moins de 300 Ko).
-- La boucle automatique la fabrique elle-même (capture de l'écran d'accueil du jeu, **textes masqués**) : la jaquette ne contient **aucun texte**, car le site affiche le titre traduit en HTML. L'écran d'accueil doit donc avoir un beau dessin, pas seulement du texte.
+- La boucle automatique la fabrique elle-même, d'après le jeu terminé (capture de l'écran d'accueil du jeu, **textes masqués** ; une jaquette provisoire faite pendant la fabrication par `--covers` est remplacée) : la jaquette ne contient **aucun texte**, car le site affiche le titre traduit en HTML. L'écran d'accueil doit donc avoir un beau dessin, pas seulement du texte.
 - **Aucune image ne contient de texte** : ni la jaquette, ni les dessins du jeu (SVG, canvas) ; pas de titre, de lettre ni de chiffre dessinés. Les textes sont toujours écrits par `t()` (section 3), pour être traduits.
 - Jaquette faite à la main : sans aucun texte, ou `node scripts/jaquette-sans-texte.mjs <id>`. Si la relecture voit du texte sur la jaquette d'un jeu par ailleurs bon, la boucle refait seulement la jaquette avec ce script.
 
 ## 6. Avant de proposer le jeu
 
 ```text
-node scripts/validate-games.mjs --jouer <id>
+node scripts/validate-games.mjs --jouer <id>      (ajouter --covers si le jeu n'a pas encore de jaquette)
 node scripts/check-i18n.js <id> --rapport
 ```
 
