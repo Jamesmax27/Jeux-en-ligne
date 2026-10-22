@@ -614,8 +614,10 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
   lignes.push('</urlset>');
   if (indexables.length > 45000) avertir(`sitemap : ${indexables.length} adresses ; au-delà de 50 000, il faudra un index de sitemaps`);
   await writeFile(path.join(dossierPublic, 'sitemap.xml'), `${lignes.join('\n')}\n`, 'utf8');
+  // /api/ est fermé aux robots (quota d'appels), sauf les deux lectures dont
+  // l'accueil a besoin pour s'afficher normalement quand Google le rend.
   await writeFile(path.join(dossierPublic, 'robots.txt'),
-    `User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /idees/\n\nSitemap: ${adresseDuSite()}sitemap.xml\n`, 'utf8');
+    `User-agent: *\nAllow: /\nAllow: /api/scores\nAllow: /api/tendances\nDisallow: /api/\nDisallow: /idees/\n\nSitemap: ${adresseDuSite()}sitemap.xml\n`, 'utf8');
 
   // --- Nombre de fichiers publiés (limite Cloudflare Pages) -------------------
   const fichiers = await compterFichiers(dossierPublic);
