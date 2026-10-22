@@ -8,6 +8,7 @@
 //                 dans les mêmes conditions que sur le site (cadre isolé),
 //                 au toucher sur téléphone, puis une 2e fois coupé du réseau
 //   … --covers    fabrique cover.jpg par capture d'écran si la jaquette manque
+//                 (textes masqués : la jaquette ne contient aucun texte)
 //   … --jouer     (implique --browser) joue en plus 30 secondes au hasard sur
 //                 téléphone et enregistre des captures d'écran dans captures/<id>/
 //
@@ -18,7 +19,7 @@
 // (ou CHROMIUM_PATH = chemin d'un navigateur Chromium déjà installé, ex. Edge)
 // ==========================================================================
 
-import { readdir, readFile, stat, mkdir, rm } from 'node:fs/promises';
+import { readdir, readFile, stat, mkdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -178,7 +179,7 @@ async function testerNavigateur(ids) {
     for (const id of ids) {
       if (!publies.has(id)) { erreur(id, 'le jeu n\'apparaît pas dans le catalogue construit'); continue; }
 
-      const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+      const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR' });
       const page = await contexte.newPage();
       const problemes = [];
       page.on('pageerror', (e) => problemes.push(`erreur JavaScript : ${e.message}`));
@@ -220,16 +221,14 @@ async function testerNavigateur(ids) {
       await testerHorsLigne(navigateur, id);
       if (avecPartie) await jouerPartie(navigateur, base, id);
 
-      // Jaquette automatique (capture du jeu au démarrage, format portrait 600 × 800).
+      // Jaquette automatique : capture du jeu au démarrage, format portrait 600 × 800,
+      // SANS AUCUN TEXTE (le site affiche le titre traduit par-dessus) : voir jaquette-sans-texte.mjs.
       const dossier = path.join(DOSSIER_JEUX, id);
       if (avecJaquettes && !erreurs.has(id) && !JAQUETTES.some((n) => existsSync(path.join(dossier, n)))) {
-        const ctxJaquette = await navigateur.newContext({ viewport: { width: 600, height: 800 }, deviceScaleFactor: 1 });
-        const pj = await ctxJaquette.newPage();
-        await pj.goto(`${base}/games/${id}/`);
-        await pj.waitForTimeout(1500);
-        await pj.screenshot({ path: path.join(dossier, 'cover.jpg'), type: 'jpeg', quality: 80 });
-        await ctxJaquette.close();
-        console.log(`  🖼  ${id} : jaquette cover.jpg créée automatiquement`);
+        const { capturerSansTexte, convertir } = await import('./jaquette-sans-texte.mjs');
+        const png = await capturerSansTexte(navigateur, `${base}/games/${id}/?lang=fr`);
+        await writeFile(path.join(dossier, 'cover.jpg'), await convertir(navigateur, png, 'jpeg', 80));
+        console.log(`  🖼  ${id} : jaquette cover.jpg (sans texte) créée automatiquement`);
       }
     }
   } finally {
@@ -242,7 +241,7 @@ async function testerNavigateur(ids) {
 // Il doit s'afficher et réagir sans erreur, sans tenter le moindre appel réseau.
 async function testerHorsLigne(navigateur, id) {
   const html = await readFile(path.join(DOSSIER_JEUX, id, 'index.html'), 'utf8');
-  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, offline: true });
+  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR', offline: true });
   const page = await contexte.newPage();
   const problemes = [];
   page.on('pageerror', (e) => problemes.push(`hors ligne : erreur JavaScript : ${e.message}`));
@@ -283,7 +282,7 @@ async function jouerPartie(navigateur, base, id) {
   const capturer = async (page, nom) => { await page.screenshot({ path: path.join(dossier, nom) }); nbCaptures++; };
 
   // Téléphone : accueil, démarrage (tutoriel attendu), puis 100 actions au hasard (≈ 30 s).
-  const tel = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+  const tel = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR' });
   const page = await tel.newPage();
   surveiller(page);
   await page.goto(`${base}/play.html?id=${id}`);
@@ -293,7 +292,7 @@ async function jouerPartie(navigateur, base, id) {
   if (boite) {
     // Démarrer : bouton « Jouer » (ou équivalent) s'il existe, sinon un toucher au centre.
     const cadre = page.frames().find((f) => f.url() === 'about:srcdoc');
-    const bouton = cadre?.getByRole('button', { name: /jouer|commencer|c.est parti|démarrer/i }).first();
+    const bouton = cadre?.getByRole('button', { name: /jouer|commencer|c.est parti|démarrer|play|jugar|jogar|spielen/i }).first();
     if (bouton && await bouton.isVisible().catch(() => false)) await bouton.tap().catch(() => bouton.click());
     else await page.touchscreen.tap(boite.x + boite.width / 2, boite.y + boite.height / 2);
     await page.waitForTimeout(2500);
@@ -321,7 +320,7 @@ async function jouerPartie(navigateur, base, id) {
   await tel.close();
 
   // Ordinateur : la mise en page doit aussi tenir sur grand écran.
-  const pc = await navigateur.newContext({ viewport: { width: 1280, height: 800 } });
+  const pc = await navigateur.newContext({ viewport: { width: 1280, height: 800 }, locale: 'fr-FR' });
   const pagePc = await pc.newPage();
   surveiller(pagePc);
   await pagePc.goto(`${base}/play.html?id=${id}`);

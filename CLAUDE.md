@@ -7,7 +7,7 @@
 
 - **Objectif** : un site web qui héberge une collection de mini-jeux HTML (créés par Claude et, plus tard, par des IA automatiques), présentés sous forme de catalogue avec jaquettes.
 - **Public** : familial, enfants compris (dont des jeux sur les chevaux et le judo). Tout contenu doit être adapté aux enfants.
-- **Langue** : tout le site et tous les jeux sont en **français**.
+- **Langues** : le site et tous les jeux sont écrits en **français** (langue source) et traduits en **anglais, espagnol (neutre), portugais (Brésil) et allemand** (voir `I18N.md`).
 - **Usage principal** : smartphone (Android et iPhone), sans installation d'application. L'ordinateur doit aussi fonctionner.
 - **Ambition** : environ 100 jeux au départ, puis 1 000 à 2 000 jeux ajoutés au fil des mois, en grande partie par des IA.
 
@@ -85,6 +85,11 @@ Fichiers ajoutés pour la validation automatique et la publicité :
 - `.github/workflows/boucle-de-nuit.yml` : boucle de nuit complète (idéation, choix, fabrication, vérification, fusion, archivage des idées) ; voir section 10.
 - `public/pub.js` : publicité préparée mais **désactivée** (`PUB_ACTIVE = false`), un seul emplacement en bas du catalogue, jamais dans les jeux ; `PUBLICITE.md` : ce qu'il faut fournir pour l'activer.
 
+Fichiers ajoutés pour les 5 langues (détails dans `I18N.md`) :
+- `public/i18n/i18n.js` : module commun de traduction (site et jeux, recopié dans chaque jeu) ; `public/i18n/site/{fr,en,es,pt,de}.json` : textes du site ; `public/langue.js` : sélecteur de langue, SEO (`hreflang`), noms traduits du catalogue.
+- `scripts/check-i18n.js` : vérification des traductions (bloquante dans `validate.yml`) ; `scripts/i18n-jeu.mjs` : recopie le module commun dans les jeux ; `scripts/jaquette-sans-texte.mjs` : jaquette sans texte.
+- Le build génère aussi `public/sitemap.xml` et `public/robots.txt` (variable `SITE_URL`).
+
 Le lanceur lit le jeu à l'adresse `games/<id>/?v=<version>` (Cloudflare retire `index.html` des adresses), puis l'affiche dans le cadre via `srcdoc` (voir section 6). Augmenter `version` dans `game.json` à chaque modification d'un jeu.
 
 Le build est tolérant : un jeu invalide est ignoré avec un message, il ne bloque jamais la publication des autres. Les ressources externes détectées dans un jeu produisent un avertissement.
@@ -96,7 +101,7 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 | Fichier | Règles |
 | --- | --- |
 | `index.html` | Jeu complet dans un seul fichier : CSS, JS, images (SVG inline ou base64), sons (base64 ou Web Audio). **Aucune ressource externe** (pas de CDN, pas de police Google, pas d'appel réseau). Moins de 2 Mo. |
-| `cover.webp` | Jaquette portrait 600 × 800 px (ratio 3:4), moins de 100 Ko. Acceptés aussi en dépannage : `cover.png`, `cover.jpg`, `cover.svg`. Sans jaquette, une image par défaut s'affiche. |
+| `cover.webp` | Jaquette portrait 600 × 800 px (ratio 3:4), moins de 100 Ko, **sans aucun texte** (le site affiche le titre traduit en bandeau). Acceptés aussi en dépannage : `cover.png`, `cover.jpg`, `cover.svg`. Sans jaquette, une image par défaut s'affiche. |
 | `game.json` | Fiche du jeu (voir ci-dessous). |
 
 ```json
@@ -104,6 +109,12 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
   "id": "saut-obstacles",
   "title": "Saut d'obstacles",
   "description": "Ton poney galope, tape pour sauter les barres !",
+  "i18n": {
+    "en": { "title": "Show Jumping", "description": "Your pony gallops: tap to jump over the bars!" },
+    "es": { "title": "…", "description": "…" },
+    "pt": { "title": "…", "description": "…" },
+    "de": { "title": "…", "description": "…" }
+  },
   "genre": "adresse",
   "tags": ["chevaux"],
   "ages": "6+",
@@ -116,6 +127,13 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 - `id` : minuscules, chiffres et tirets uniquement ; identique au nom du dossier ; unique.
 - `genre` : un seul, dans la liste fermée de `CONSIGNES-JEU.md` (reprise dans `scripts/genres.mjs`). Sert aux filtres par genre du catalogue. Une ancienne fiche sans `genre` : le build le déduit des `tags`, avec un avertissement.
 - `tags` : des thèmes, choisis de préférence dans la liste existante (voir `catalog.json`).
+- `title` et `description` restent en français ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). Facultatif : `"non_traduisible": true` (jeu de mots ou de lettres en français : seule l'interface est traduite).
+
+**Langues (règle absolue pour tout nouveau jeu, détails dans `CONSIGNES-JEU.md`, section 3) :**
+- Aucun texte en dur : tout texte visible passe par `t('cle', { variables })` (canvas compris) ou `data-i18n="cle"` (`-html`, `-placeholder`, `-title`, `-aria`).
+- Dans le `<head>`, après `<title>` : le bloc `<script type="application/json" id="jel-i18n-textes" data-coin="…">` avec les textes complets en `fr`, `en`, `es`, `pt`, `de` (mêmes clés, mêmes `{variables}`), puis `<script id="jel-i18n"></script>` rempli par `node scripts/i18n-jeu.mjs <id>`.
+- Bouton de langue : `data-coin` (coin de l'écran), `data-place="id…"` (dans des éléments du jeu) ou `data-coin="aucun"` + `JEL_I18N.creerSelecteur()`.
+- Avant la pull request : `node scripts/check-i18n.js <id>` doit afficher « tout est bon ».
 
 **Exigences de jouabilité :**
 - Jouable au doigt (tactile) **et** au clavier/souris.
@@ -132,6 +150,7 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 ## 6. Lanceur de jeu
 
 - `play.js` lit `games/<id>/?v=<version>` puis l'affiche dans une iframe `sandbox="allow-scripts"` (sans `allow-same-origin`) via `srcdoc`, en plaçant en tête la règle de sécurité `CSP_JEU`. Raison : un tel cadre échappe au service worker ; chargé par son adresse, le jeu ne marcherait pas hors ligne.
+- Langue : le lanceur ajoute `window.JEL_LANG` au début du `srcdoc` (le cadre isolé n'a pas de stockage) ; un changement de langue dans le jeu (message `jel-langue`) est enregistré et relance le jeu.
 - Barre supérieure : retour au catalogue, plein écran, 👍, 👎.
 - Vote : toucher le même pouce une 2e fois annule ; toucher l'autre remplace.
 - Au retour au catalogue après ≥ 1 minute de jeu, proposer discrètement de voter.
@@ -207,7 +226,7 @@ Réglages dans `public/app.js` : `NOUVEAUX_EN_TETE` (2 nouveautés placées en 2
 
 Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `idees-archive.json`, jamais les tâches parallèles ; ces enregistrements portent `[CF-Pages-Skip]` (pas de build Cloudflare). Fusion automatique désactivable : variable GitHub `FUSION_AUTO` = `non` (les jeux validés reçoivent l'étiquette `valide` et attendent une fusion à la main). Corrections à la demande : commentaire `@claude` du propriétaire (`corriger-jeu.yml`). Une pull request ouverte ou fusionnée par le robot (jeton `GITHUB_TOKEN`) ne déclenche aucun autre workflow : toute la séquence tient donc dans `boucle-de-nuit.yml`.
 
-**Autre IA ou personne** : lire ce fichier, `CONSIGNES-JEU.md` et `public/catalog.json` (doublons de concept et de titre), créer `games/<id>/` conforme à la section 5 sur une branche dédiée, ouvrir une **pull request** (jamais de push direct sur `main`). `validate.yml` vérifie : présence et format des fichiers, aucune URL `http(s)://` externe, tailles, ouverture sans erreur console dans Playwright. Fusion à la main.
+**Autre IA ou personne** : lire ce fichier, `CONSIGNES-JEU.md` et `public/catalog.json` (doublons de concept et de titre), créer `games/<id>/` conforme à la section 5 sur une branche dédiée, ouvrir une **pull request** (jamais de push direct sur `main`). `validate.yml` vérifie : présence et format des fichiers, aucune URL `http(s)://` externe, tailles, ouverture sans erreur console dans Playwright, puis les traductions (`check-i18n.js`, bloquant). Fusion à la main.
 
 ## 11. Conventions de code
 
@@ -251,6 +270,8 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
 - Consignes — minimum obligatoire complété (écran d'accueil, pause et Rejouer, contrôles tactiles et clavier) et grille de validation (`CONSIGNES-JEU.md`, section 7), commune à l'agent créateur, au correcteur et au relecteur.
 - Genres — 17, dont `action` (ajouté en octobre 2026) ; liste dans `scripts/genres.mjs`, `CONSIGNES-JEU.md`, `public/regroupements.js` (pictogramme, teinte) et le formulaire `.github/ISSUE_TEMPLATE/idee-jeu.yml`.
 - Publicité — préparée, **désactivée** : `public/pub.js` (`PUB_ACTIVE = false`, aucun code de régie), emplacements cachés `#pub` (bas du catalogue) et `#consentement` dans `index.html`, `pub.js` ajouté à la coquille (`VERSION` `v3` dans `sw.js`), `PUBLICITE.md`. Reste : domaine, compte régie, identifiants, outil de consentement, pages légales.
+
+- Internationalisation (5 langues) — fait sur la branche `i18n` : module `public/i18n/i18n.js`, textes du site, sélecteur de langue (en-tête et dans chaque jeu), SEO (`hreflang`, `sitemap.xml`), 29 jeux traduits, jaquettes refaites sans texte (titre traduit affiché en bandeau par le site), `check-i18n.js` bloquant dans `validate.yml`, règles dans `CONSIGNES-JEU.md`. Reste : brancher la traduction dans `boucle-de-nuit.yml` (endroits décrits dans `I18N.md`, section 4), régler `SITE_URL` avec le nom de domaine. Détails : `I18N.md`.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 

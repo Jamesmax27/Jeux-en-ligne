@@ -10,7 +10,11 @@
 // - TRANCHES_AGE : d'après l'âge minimum conseillé (champ "ages").
 //
 // Les teintes (0 à 360) colorent légèrement le fond des tuiles.
-// Pour ajouter un univers : une ligne ici, et ses tags dans CONSIGNES-JEU.md.
+// Les noms affichés sont dans les fichiers de langue public/i18n/site/*.json :
+// « genre.<genre> », « univers.<id> », « age.<id> » et « age.<id>.aide »,
+// « tag.<tag> » (vérifié par scripts/check-i18n.js).
+// Pour ajouter un univers : une ligne ici, son nom dans les 5 fichiers de
+// langue, et ses tags dans CONSIGNES-JEU.md.
 // ==========================================================================
 
 export const GENRES_AFFICHAGE = {
@@ -34,33 +38,33 @@ export const GENRES_AFFICHAGE = {
 };
 
 export const UNIVERS = [
-  { id: 'chevaux',      nom: 'Chevaux',            picto: '🐴', teinte: 30,  tags: ['chevaux', 'cheval', 'poney', 'poneys', 'équitation'] },
-  { id: 'animaux',      nom: 'Animaux',            picto: '🐾', teinte: 45,  tags: ['animaux', 'chevaux', 'oiseau', 'oiseaux', 'ferme', 'chien', 'chiens', 'chat', 'chats', 'insectes'] },
-  { id: 'sports',       nom: 'Judo et sports',     picto: '🥋', teinte: 0,   tags: ['judo', 'sport', 'sports', 'football', 'natation', 'ski'] },
-  { id: 'nature',       nom: 'Nature',             picto: '🌳', teinte: 115, tags: ['nature', 'forêt', 'plantes', 'fleurs', 'jardin', 'arbres'] },
-  { id: 'mer',          nom: 'Mer et océans',      picto: '🐠', teinte: 195, tags: ['mer', 'océan', 'océans', 'poissons', 'plage', 'bateaux'] },
-  { id: 'espace',       nom: 'Espace',             picto: '🚀', teinte: 240, tags: ['espace', 'planètes', 'étoiles', 'astronomie', 'fusées'] },
-  { id: 'monde',        nom: 'Pays du monde',      picto: '🌍', teinte: 175, tags: ['géographie', 'pays', 'drapeaux', 'cartes', 'voyage'] },
-  { id: 'apprendre',    nom: 'Apprendre',          picto: '🎒', teinte: 210, tags: ['lecture', 'calcul', 'lettres', 'mots', 'alphabet', 'nombres', 'maths', 'tables', 'orthographe', 'anglais', 'heure'] },
-  { id: 'sciences',     nom: 'Sciences',           picto: '🔬', teinte: 160, tags: ['sciences', 'corps', 'météo', 'expériences', 'énergie'] },
-  { id: 'formes',       nom: 'Formes et couleurs', picto: '🔷', teinte: 260, tags: ['formes', 'couleurs', 'logique', 'motifs', 'suites'] },
-  { id: 'construction', nom: 'Construire',         picto: '🧱', teinte: 15,  tags: ['cubes', 'construction', 'blocs', 'survie', 'bâtiments'] },
-  { id: 'labyrinthes',  nom: 'Labyrinthes',        picto: '🌀', teinte: 280, tags: ['labyrinthe', 'labyrinthes', 'chemins'] },
-  { id: 'musique',      nom: 'Musique',            picto: '🎵', teinte: 310, tags: ['musique', 'sons', 'chansons', 'instruments', 'notes'] },
-  { id: 'vehicules',    nom: 'Véhicules',          picto: '🚗', teinte: 355, tags: ['véhicules', 'voitures', 'trains', 'avions', 'camions', 'tracteurs'] },
-  { id: 'dinosaures',   nom: 'Dinosaures',         picto: '🦕', teinte: 95,  tags: ['dinosaures', 'préhistoire', 'fossiles'] },
-  { id: 'magie',        nom: 'Magie et contes',    picto: '🧚', teinte: 290, tags: ['magie', 'fantastique', 'contes', 'fées', 'dragons', 'licornes', 'sorcières', 'chevaliers', 'princesses'] },
-  { id: 'cuisine',      nom: 'Cuisine',            picto: '🧁', teinte: 335, tags: ['cuisine', 'gâteaux', 'fruits', 'légumes', 'pâtisserie', 'recettes'] },
-  { id: 'histoire',     nom: 'Histoire',           picto: '🏰', teinte: 35,  tags: ['histoire', 'châteaux', 'égypte', 'pirates', 'romains'] },
-  { id: 'metiers',      nom: 'Métiers',            picto: '🧑‍🚒', teinte: 20,  tags: ['métiers', 'pompiers', 'docteur', 'vétérinaire', 'magasin'] },
-  { id: 'fetes',        nom: 'Fêtes et saisons',   picto: '🎄', teinte: 140, tags: ['fêtes', 'noël', 'halloween', 'pâques', 'anniversaire', 'saisons', 'hiver', 'été'] },
-  { id: 'arcade',       nom: 'Arcade rétro',       picto: '👾', teinte: 250, tags: ['retro', 'rétro', 'arcade', 'pixel', 'pixels'] },
+  { id: 'chevaux',      picto: '🐴', teinte: 30,  tags: ['chevaux', 'cheval', 'poney', 'poneys', 'équitation'] },
+  { id: 'animaux',      picto: '🐾', teinte: 45,  tags: ['animaux', 'chevaux', 'oiseau', 'oiseaux', 'ferme', 'chien', 'chiens', 'chat', 'chats', 'insectes'] },
+  { id: 'sports',       picto: '🥋', teinte: 0,   tags: ['judo', 'sport', 'sports', 'football', 'natation', 'ski'] },
+  { id: 'nature',       picto: '🌳', teinte: 115, tags: ['nature', 'forêt', 'plantes', 'fleurs', 'jardin', 'arbres'] },
+  { id: 'mer',          picto: '🐠', teinte: 195, tags: ['mer', 'océan', 'océans', 'poissons', 'plage', 'bateaux'] },
+  { id: 'espace',       picto: '🚀', teinte: 240, tags: ['espace', 'planètes', 'étoiles', 'astronomie', 'fusées'] },
+  { id: 'monde',        picto: '🌍', teinte: 175, tags: ['géographie', 'pays', 'drapeaux', 'cartes', 'voyage'] },
+  { id: 'apprendre',    picto: '🎒', teinte: 210, tags: ['lecture', 'calcul', 'lettres', 'mots', 'alphabet', 'nombres', 'maths', 'tables', 'orthographe', 'anglais', 'heure'] },
+  { id: 'sciences',     picto: '🔬', teinte: 160, tags: ['sciences', 'corps', 'météo', 'expériences', 'énergie'] },
+  { id: 'formes',       picto: '🔷', teinte: 260, tags: ['formes', 'couleurs', 'logique', 'motifs', 'suites'] },
+  { id: 'construction', picto: '🧱', teinte: 15,  tags: ['cubes', 'construction', 'blocs', 'survie', 'bâtiments'] },
+  { id: 'labyrinthes',  picto: '🌀', teinte: 280, tags: ['labyrinthe', 'labyrinthes', 'chemins'] },
+  { id: 'musique',      picto: '🎵', teinte: 310, tags: ['musique', 'sons', 'chansons', 'instruments', 'notes'] },
+  { id: 'vehicules',    picto: '🚗', teinte: 355, tags: ['véhicules', 'voitures', 'trains', 'avions', 'camions', 'tracteurs'] },
+  { id: 'dinosaures',   picto: '🦕', teinte: 95,  tags: ['dinosaures', 'préhistoire', 'fossiles'] },
+  { id: 'magie',        picto: '🧚', teinte: 290, tags: ['magie', 'fantastique', 'contes', 'fées', 'dragons', 'licornes', 'sorcières', 'chevaliers', 'princesses'] },
+  { id: 'cuisine',      picto: '🧁', teinte: 335, tags: ['cuisine', 'gâteaux', 'fruits', 'légumes', 'pâtisserie', 'recettes'] },
+  { id: 'histoire',     picto: '🏰', teinte: 35,  tags: ['histoire', 'châteaux', 'égypte', 'pirates', 'romains'] },
+  { id: 'metiers',      picto: '🧑‍🚒', teinte: 20,  tags: ['métiers', 'pompiers', 'docteur', 'vétérinaire', 'magasin'] },
+  { id: 'fetes',        picto: '🎄', teinte: 140, tags: ['fêtes', 'noël', 'halloween', 'pâques', 'anniversaire', 'saisons', 'hiver', 'été'] },
+  { id: 'arcade',       picto: '👾', teinte: 250, tags: ['retro', 'rétro', 'arcade', 'pixel', 'pixels'] },
 ];
 
 // min / max : âge minimum conseillé du jeu (« 6+ » → 6), bornes comprises.
 export const TRANCHES_AGE = [
-  { id: '3-4', nom: '3-4 ans',    picto: '🧸', min: 0, max: 4,  aide: 'Jeux conseillés dès 3 ou 4 ans' },
-  { id: '5-6', nom: '5-6 ans',    picto: '🪁', min: 5, max: 6,  aide: 'Jeux conseillés dès 5 ou 6 ans' },
-  { id: '7-8', nom: '7-8 ans',    picto: '🚲', min: 7, max: 8,  aide: 'Jeux conseillés dès 7 ou 8 ans' },
-  { id: '9+',  nom: '9 ans et +', picto: '🛹', min: 9, max: 99, aide: 'Jeux conseillés dès 9 ans' },
+  { id: '3-4', picto: '🧸', min: 0, max: 4 },
+  { id: '5-6', picto: '🪁', min: 5, max: 6 },
+  { id: '7-8', picto: '🚲', min: 7, max: 8 },
+  { id: '9+',  picto: '🛹', min: 9, max: 99 },
 ];

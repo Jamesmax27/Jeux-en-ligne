@@ -1,11 +1,19 @@
 // ==========================================================================
 // Jeux-en-ligne — lanceur de jeu (play.html?id=<id-du-jeu>)
 // Trouve le jeu dans catalog.json et le charge dans le cadre isolé.
-// Gère aussi les pouces 👍 / 👎 (voir votes.js).
+// Gère aussi les pouces 👍 / 👎 (voir votes.js) et la langue :
+// - la langue du site est transmise au jeu (window.JEL_LANG, voir i18n/i18n.js),
+//   car le cadre isolé n'a pas accès au stockage du site ;
+// - le bouton de langue du jeu envoie un message « jel-langue » : le lanceur
+//   enregistre le choix (partagé avec le catalogue) et relance le jeu.
 // ==========================================================================
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
+import {
+  t, getLang, demarrerLangue, surChangementLangue, majSeo,
+  titreJeu, descriptionJeu, jeuEnFrancais, jeuDisponible,
+} from './langue.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -26,12 +34,33 @@ const el = {
   messageTexte: document.getElementById('message-texte'),
 };
 
+let jeuCourant = null;   // fiche du jeu affiché (catalog.json)
+let htmlJeu = null;      // code du jeu, gardé pour le relancer dans une autre langue
+let message = null;      // { titre, texte } : clés du message affiché à la place du jeu
+
 function afficherMessage(titre, texte) {
-  el.titre.textContent = 'Jeux-en-ligne';
-  el.messageTitre.textContent = titre;
-  el.messageTexte.textContent = texte;
+  message = { titre, texte };
+  el.titre.textContent = t('site.nom');
+  el.messageTitre.textContent = t(titre);
+  el.messageTexte.textContent = t(texte);
   el.message.hidden = false;
   el.cadre.hidden = true;
+}
+
+// Textes du lanceur qui dépendent de la langue (titre, plein écran, SEO).
+function afficherTextes() {
+  if (jeuCourant) {
+    const titre = titreJeu(jeuCourant);
+    el.titre.textContent = titre;
+    el.cadre.title = titre;
+    majSeo({ titre: t('jeu.titreDocument', { titre }), description: descriptionJeu(jeuCourant) });
+  } else {
+    el.cadre.title = t('jeu.cadre');
+    majSeo({ titre: t('jeu.titrePage'), description: t('meta.description') });
+    if (message) afficherMessage(message.titre, message.texte);
+    else el.titre.textContent = t('jeu.chargement');
+  }
+  el.pleinEcran.setAttribute('aria-label', document.fullscreenElement ? t('jeu.quitterPleinEcran') : t('jeu.pleinEcran'));
 }
 
 // --- Plein écran (indisponible sur iPhone : le bouton reste alors caché) ----
@@ -47,7 +76,7 @@ if (document.fullscreenEnabled) {
     }
   });
   document.addEventListener('fullscreenchange', () => {
-    el.pleinEcran.setAttribute('aria-label', document.fullscreenElement ? 'Quitter le plein écran' : 'Plein écran');
+    el.pleinEcran.setAttribute('aria-label', document.fullscreenElement ? t('jeu.quitterPleinEcran') : t('jeu.pleinEcran'));
     el.cadre.focus();
   });
 }
@@ -80,15 +109,13 @@ function activerVotes(gameId) {
     const horsConnexion = navigator.onLine === false;
     if (horsConnexion) {
       // Pas d'erreur : le vote est gardé sur l'appareil et partira au retour du réseau.
-      afficherInfoVote(valeur === 0
-        ? "Pas de connexion : l'annulation sera envoyée plus tard"
-        : 'Pas de connexion : ton vote sera envoyé plus tard', 4000);
+      afficherInfoVote(valeur === 0 ? t('vote.annulationPlusTard') : t('vote.plusTard'), 4000);
     } else {
-      afficherInfoVote(valeur === 0 ? 'Vote annulé' : 'Merci pour ton vote !');
+      afficherInfoVote(valeur === 0 ? t('vote.annule') : t('vote.merci'));
     }
     const resultat = await voter(gameId, valeur);
     if (!horsConnexion && resultat === 'en-attente' && monVote(gameId) === valeur) {
-      afficherInfoVote('Vote gardé : il sera envoyé plus tard', 4000);
+      afficherInfoVote(t('vote.garde'), 4000);
     }
     el.cadre.focus(); // le clavier revient au jeu
   };
@@ -103,24 +130,46 @@ function activerVotes(gameId) {
 // Lu ici, il passe par le service worker et reste jouable sans réseau.
 
 // Ajoute la règle de sécurité avant tout le code du jeu (juste après <!doctype>,
-// pour ne pas changer son mode d'affichage).
+// pour ne pas changer son mode d'affichage), puis la langue choisie sur le site.
 function proteger(html) {
   const debut = /^﻿?(?:\s|<!--[\s\S]*?-->)*(?:<!doctype[^>]*>)?/i.exec(html)[0];
-  return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${html.slice(debut.length)}`;
+  const langue = `<script>window.JEL_LANG=${JSON.stringify(getLang())};</script>`;
+  return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${langue}${html.slice(debut.length)}`;
+}
+
+function afficherJeu() {
+  el.cadre.addEventListener('load', () => el.cadre.focus(), { once: true });
+  el.cadre.srcdoc = proteger(htmlJeu);
 }
 
 async function chargerJeu(jeu) {
   const reponse = await fetch(jeu.play); // ex. « games/saut-obstacles/?v=1 »
   if (!reponse.ok) throw Object.assign(new Error(`HTTP ${reponse.status}`), { statut: reponse.status });
-  el.cadre.srcdoc = proteger(await reponse.text());
+  htmlJeu = await reponse.text();
+  afficherJeu();
 }
+
+// Le bouton de langue du jeu : on enregistre le choix et on relance le jeu.
+addEventListener('message', (evenement) => {
+  if (evenement.source !== el.cadre.contentWindow) return;
+  const donnees = evenement.data;
+  if (!donnees || donnees.type !== 'jel-langue' || typeof donnees.lang !== 'string') return;
+  window.JEL_I18N.setLang(donnees.lang).then(() => {
+    if (htmlJeu) afficherJeu();
+  });
+});
+
+surChangementLangue(afficherTextes);
 
 // --- Démarrage --------------------------------------------------------------
 
 async function demarrer() {
+  await demarrerLangue(null);
+  afficherTextes();
+
   const id = new URLSearchParams(location.search).get('id') || '';
   if (!ID_VALIDE.test(id)) {
-    afficherMessage('Jeu introuvable', 'Le lien de ce jeu est incorrect.');
+    afficherMessage('jeu.introuvable', 'jeu.lienIncorrect');
     return;
   }
 
@@ -132,33 +181,35 @@ async function demarrer() {
     jeu = (catalogue.games || []).find((j) => j.id === id);
   } catch (erreur) {
     console.error('Impossible de charger le catalogue :', erreur);
-    afficherMessage('Pas de connexion', 'Vérifie ta connexion, puis recharge la page.');
+    afficherMessage('jeu.pasDeConnexion', 'jeu.verifieConnexion');
     return;
   }
 
   if (!jeu) {
-    afficherMessage('Jeu introuvable', "Ce jeu n'existe pas ou a été retiré.");
+    afficherMessage('jeu.introuvable', 'jeu.introuvableTexte');
     return;
   }
 
-  document.title = `${jeu.title} — Jeux-en-ligne`;
-  el.titre.textContent = jeu.title;
-  el.cadre.title = jeu.title;
-  el.cadre.addEventListener('load', () => el.cadre.focus(), { once: true });
+  jeuCourant = jeu;
+  afficherTextes();
   try {
     await chargerJeu(jeu);
   } catch (erreur) {
     console.error('Impossible de charger le jeu :', erreur);
+    jeuCourant = null;
     if (erreur.statut === 404) {
-      afficherMessage('Jeu introuvable', "Ce jeu n'existe pas ou a été retiré.");
+      afficherMessage('jeu.introuvable', 'jeu.introuvableTexte');
     } else if (navigator.onLine === false) {
-      afficherMessage('Pas encore disponible hors connexion', 'Ouvre ce jeu une fois avec Internet : ensuite, il marchera même sans réseau.');
+      afficherMessage('jeu.pasHorsLigne', 'jeu.pasHorsLigneTexte');
     } else {
-      afficherMessage('Le jeu ne se charge pas', 'Vérifie ta connexion, puis réessaie.');
+      afficherMessage('jeu.neSeChargePas', 'jeu.reessaie');
     }
     return;
   }
   activerVotes(jeu.id);
+
+  // Jeu dont le contenu (mots, lettres…) reste en français : on le signale.
+  if (jeuEnFrancais(jeu) || !jeuDisponible(jeu)) afficherInfoVote(t('jeu.enFrancais'), 4000);
 
   // Votes restés en attente (hors ligne lors d'une visite précédente).
   if (votesEnAttente()) envoyerEnAttente();
