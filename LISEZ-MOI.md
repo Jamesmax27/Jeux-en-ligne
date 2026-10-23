@@ -122,4 +122,5 @@ Le circuit complet :
 | L'ancienne version du jeu s'affiche | Cache du navigateur | Augmentez `"version"` dans `game.json` |
 | Le build Cloudflare échoue | Réglages incorrects | Vérifiez la commande de build et le dossier `public` (étape 5) |
 | Le formulaire public répond « indisponible » | Secret ou liaison manquants | Vérifiez `IP_SALT`, `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `GITHUB_REPO` et la base `DB` dans Cloudflare (étape 7) |
+| « Vérification anti-robot … (code 110200) » sur le formulaire ou votes jamais comptés | Domaine non autorisé pour la clé Turnstile | Cloudflare → Turnstile → le widget → Settings → Hostname Management : ajouter `freemicrogames.com` (garder `jeux-en-ligne.pages.dev`) |
 | Une demande reste « en-attente-ia » | Modération en panne (limite d'utilisation de Claude…) | Lisez le commentaire de l'issue, puis retirez et remettez l'étiquette `en-attente-ia` |
