@@ -18,11 +18,10 @@
 // ==========================================================================
 
 import { ligneScore } from './scores.js';
-import { empreinteVisiteur, jeuExiste } from '../_commun.js';
+import { empreinteVisiteur, jeuExiste, verifierTurnstile } from '../_commun.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VOTANT_VALIDE = /^[A-Za-z0-9-]{16,64}$/;
-const URL_TURNSTILE = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
 function json(donnees, statut = 200) {
   return new Response(JSON.stringify(donnees), {
@@ -36,21 +35,6 @@ async function hacher(texte) {
   const octets = new TextEncoder().encode(`jeux-en-ligne/votant/${texte}`);
   const empreinte = await crypto.subtle.digest('SHA-256', octets);
   return [...new Uint8Array(empreinte)].map((o) => o.toString(16).padStart(2, '0')).join('');
-}
-
-async function verifierTurnstile(secret, jeton, ip) {
-  const formulaire = new FormData();
-  formulaire.append('secret', secret);
-  formulaire.append('response', jeton);
-  if (ip) formulaire.append('remoteip', ip);
-  try {
-    const reponse = await fetch(URL_TURNSTILE, { method: 'POST', body: formulaire });
-    const resultat = await reponse.json();
-    return resultat.success === true && (!resultat.action || resultat.action === 'vote');
-  } catch (erreur) {
-    console.error('Vérification Turnstile impossible :', erreur);
-    return false;
-  }
 }
 
 export async function onRequestPost({ request, env }) {
@@ -84,7 +68,7 @@ export async function onRequestPost({ request, env }) {
   }
 
   const ip = request.headers.get('CF-Connecting-IP');
-  if (!(await verifierTurnstile(env.TURNSTILE_SECRET, turnstileToken, ip))) {
+  if (!(await verifierTurnstile(env.TURNSTILE_SECRET, turnstileToken, ip, 'vote'))) {
     return json({ erreur: 'Vérification anti-robot échouée.' }, 403);
   }
 

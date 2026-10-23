@@ -5,7 +5,7 @@
 Deux fois par nuit (vers 1 h et 6 h du matin à Paris en hiver, 2 h et 7 h en été), GitHub lance la **boucle de nuit**, sans votre ordinateur. Chaque passage suit 5 étapes :
 
 1. **Idées** : s'il reste moins de 15 idées en attente dans `idees.json`, un agent Claude en propose de nouvelles. Il lit un résumé du catalogue (titre, genres et univers de chaque jeu, âges déjà couverts) et vise les genres, les univers et surtout les combinaisons genre × univers qui ont peu de jeux. Il choisit uniquement dans les listes fermées de `public/taxonomie.js` : une idée avec un genre ou un univers inventé est refusée. Il donne aussi l'âge conseillé (champ `ages`, « 6+ »). Ces idées ont la source `agent`.
-2. **Choix** : 5 idées passent « en cours » : d'abord celles de votre page privée `/idees` (la plus ancienne en tête), puis vos autres idées (source `humain`), dans l'ordre de la liste, puis celles de l'agent. Vos idées restent toujours prioritaires.
+2. **Choix** : 5 idées passent « en cours » : d'abord celles de votre page privée `/idees` (la plus ancienne en tête ; y compris les propositions des visiteurs que vous y avez acceptées), puis vos autres idées (source `humain`), dans l'ordre de la liste, puis celles de l'agent. Vos idées restent toujours prioritaires.
 3. **Fabrication** : 5 agents créent les 5 jeux en même temps. Chacun écrit un cahier de conception, code le jeu, y joue avec le robot (captures d'écran), se relit, puis écrit les **textes de la page du jeu** d'après le jeu fini (titre et description pour Google, « À propos du jeu », « Comment jouer », compétences, texte de la jaquette), les traduit avec le reste du jeu, les contrôle (`scripts/regles-seo.mjs`, puis `scripts/verifier-seo.mjs`) et ouvre une **pull request**. La fiche du jeu reprend le genre, les univers et l'âge de l'idée. La description de la pull request indique si le référencement est conforme ; s'il ne l'est pas, elle est ouverte quand même et c'est la vérification qui refusera le jeu. Rien n'est encore en ligne.
 4. **Vérification** : pour chaque pull request, le robot rejoue le jeu (chargement, erreurs, téléphone, toucher, hors ligne, fiche du catalogue, genres et univers dans les listes, traductions, référencement de la page du jeu), puis Claude le relit avec la grille de `CONSIGNES-JEU.md` (section 7), dont le point « Page du jeu » : textes fidèles au jeu, sans promesse fausse ni texte passe-partout. Le résultat arrive en commentaire.
    - **Tout est bon** : la pull request est fusionnée. Le jeu est en ligne quelques minutes plus tard, avec sa page dans les 5 langues.
@@ -157,9 +157,13 @@ Bon à savoir :
 
 La page `/idees` (protégée par Cloudflare Access, absente du catalogue et des moteurs de recherche) envoie aussi une idée : titre, genre, **âge** (obligatoire : 4+, 5+, 6+, 7+, 8+, 10+ ou 12+), **univers** (facultatif, 2 au plus ; « Autre » seul) et description. Elle crée une demande GitHub avec l'étiquette `idee-perso`. Au passage suivant, la boucle l'ajoute à `idees.json` (avec son âge et ses univers) et la fabrique **avant toutes les autres** ; la demande se ferme avec le lien de la pull request du jeu. Une valeur illisible (âge, univers hors liste) est écartée avec un message, l'idée est gardée.
 
+### Idées des visiteurs (formulaire public)
+
+Les visiteurs proposent des jeux avec le formulaire public du site (`/proposer/`). L'IA les modère, puis vous les acceptez ou les refusez dans l'onglet **« Demandes publiques »** de `/idees`. Une proposition acceptée devient une idée perso (étiquette `idee-perso`, avec le genre, l'âge et les univers choisis en l'acceptant) : la boucle la fabrique au même rang que vos idées de `/idees`. Mode d'emploi : `DEMANDES.md`.
+
 ## Faire modifier un jeu déjà publié
 
-Onglet **« Modifier un jeu »** de la page privée `/idees` : choisissez le jeu, décrivez la demande, envoyez. L'IA la classe, modifie le jeu, le vérifie comme la boucle de nuit et le met en ligne si tout est bon. Mode d'emploi : `DEMANDES.md`.
+Onglet **« Modifier un jeu »** de la page privée `/idees` : choisissez le jeu, décrivez la demande, envoyez. L'IA la classe, modifie le jeu, le vérifie comme la boucle de nuit et le met en ligne si tout est bon. Les bugs et modifications signalés par les visiteurs (formulaire public) suivent le même chemin une fois acceptés dans l'onglet « Demandes publiques ». Mode d'emploi : `DEMANDES.md`.
 
 ## Faire corriger un jeu proposé
 

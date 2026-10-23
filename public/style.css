@@ -1695,6 +1695,166 @@ main.catalogue {
 }
 
 /* --------------------------------------------------------------------------
+   Formulaire public de demandes (gabarits/proposer.html, public/proposer.js) :
+   même mise en page que les pages légales ; champs de 16 px au moins (sinon
+   l'iPhone zoome), cases et boutons de 44 px de haut au moins.
+   -------------------------------------------------------------------------- */
+
+.proposer .proposer-prudence {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--or);
+  border-radius: 0 12px 12px 0;
+  background: var(--surface);
+  color: var(--craie-douce);
+  font-size: 14px;
+}
+
+.proposer-carte {
+  padding: 18px 16px;
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-plaque);
+  background: var(--surface);
+}
+
+.proposer .champ { margin: 0 0 18px; }
+
+.proposer .champ label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.proposer .champ label small,
+.proposer .choix legend small {
+  font-weight: 400;
+  color: var(--craie-douce);
+}
+
+.proposer .champ input,
+.proposer .champ select,
+.proposer .champ textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--orbite);
+  border-radius: 12px;
+  background: var(--nuit);
+  color: var(--craie);
+  font: inherit;
+  font-size: 16px;
+}
+
+.proposer .champ textarea {
+  min-height: 160px;
+  resize: vertical;
+}
+
+.proposer .champ input:focus,
+.proposer .champ select:focus,
+.proposer .champ textarea:focus {
+  outline: none;
+  border-color: var(--lavande);
+}
+
+.proposer .compteur {
+  margin-top: 4px;
+  color: var(--craie-douce);
+  font-size: 13px;
+  text-align: right;
+}
+
+.proposer .choix {
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+}
+
+.proposer .choix legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 700;
+}
+
+.proposer .choix-liste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.proposer .choix-case {
+  position: relative;
+  display: inline-flex;
+}
+
+/* La vraie case reste dans la page (clavier, lecteurs d'écran) mais invisible. */
+.proposer .choix-case input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.proposer .choix-case span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 1.5px solid var(--orbite);
+  border-radius: 999px;
+  background: var(--nuit);
+  color: var(--craie);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.proposer .choix-case input:checked + span {
+  border-color: var(--lavande);
+  background: var(--surface-choisie);
+  font-weight: 700;
+}
+
+.proposer .choix-case input:focus-visible + span {
+  outline: 2px solid var(--lavande);
+  outline-offset: 2px;
+}
+
+/* Piège à robots : hors de l'écran (pas display:none, que certains robots repèrent). */
+.proposer-piege {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.proposer-envoyer {
+  justify-content: center;
+  width: 100%;
+  border: 0;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.proposer-envoyer:disabled { opacity: .55; cursor: default; }
+
+.proposer .message {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.proposer .message:empty { display: none; }
+.proposer .message.ok { background: rgba(110, 200, 150, .15); color: #a9e6c2; }
+.proposer .message.erreur { background: rgba(240, 120, 120, .15); color: #f3b2b2; }
+
+/* --------------------------------------------------------------------------
    Pages générées (scripts/pages-seo.mjs, gabarits/) : fiche d'un jeu, page
    d'une catégorie, page 404, et liens écrits dans l'accueil (derniers jeux,
    toutes les catégories). Aucun JavaScript sur la fiche et la catégorie :
@@ -1863,6 +2023,22 @@ main.catalogue {
   margin: 8px 0 12px;
   color: var(--craie-douce);
   font-size: 13px;
+}
+
+/* Lien discret vers le formulaire public (signaler un bug, proposer une idée sur ce jeu). */
+.fiche-signaler { margin: 10px 0 0; font-size: 14px; }
+
+.fiche-signaler a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--craie-douce);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .fiche-signaler a:hover { color: var(--lavande); }
 }
 
 /* Liens vers les catégories : les puces de l'accueil (mêmes icônes, data-cle). */

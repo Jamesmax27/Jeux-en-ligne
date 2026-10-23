@@ -99,6 +99,19 @@ Dans GitHub Desktop :
 2. Testez avec `npm run dev`.
 3. Commit + Push : le site est à jour une à deux minutes plus tard.
 
+## 7. Propositions et signalements des visiteurs (formulaire public)
+
+N'importe quel visiteur, sans compte, peut proposer un nouveau jeu, signaler un bug ou demander une modification depuis le formulaire public (`/proposer/` et ses équivalents dans les 4 autres langues ; liens dans le pied de page, sur la page de chaque jeu et dans la barre du lanceur, avec le jeu déjà choisi).
+
+Le circuit complet :
+
+1. **Envoi** : le site vérifie la demande (champs, champ piège, anti-robot Cloudflare Turnstile, 3 demandes par heure et 10 par jour au plus par adresse IP, adresses bloquées), puis crée une issue privée sur GitHub (étiquettes `demande-publique` et `en-attente-ia`).
+2. **Modération par l'IA** (`.github/workflows/moderation-demande.yml`) : insultes, spam, cohérence avec le jeu choisi, clarté, doublon. Refus → issue fermée (`refuse-ia`), et un abus compté si c'est une insulte ou du spam. Validation → `valide-ia`.
+3. **Votre décision** dans la page privée `/idees`, onglet **« Demandes publiques »** : Accepter, Refuser, ou Refuser et bannir. Un nouveau jeu accepté rejoint vos idées perso, fabriquées en priorité par la boucle de nuit ; un bug ou une modification acceptés sont traités aussitôt par l'IA de modification des jeux.
+4. **Abus** : 3 abus en 24 h bloquent une adresse 7 jours, une récidive la bannit ; la liste des adresses bloquées, avec Débloquer et Bannir, est dans le même onglet.
+
+À faire une fois : créer le secret **`MODERATION_SECRET`** (même valeur dans Cloudflare Pages et dans les secrets GitHub Actions) et vérifier que le jeton `GITHUB_TOKEN` de Cloudflare a le droit « Issues : lecture et écriture ». Les étiquettes GitHub et les tables de la base sont créées automatiquement. Marche à suivre détaillée, liste complète des réglages et tests : **`DEMANDES.md`** (section « Formulaire public »).
+
 ## En cas de problème
 
 | Symptôme | Cause probable | Solution |
@@ -108,3 +121,5 @@ Dans GitHub Desktop :
 | La jaquette ne s'affiche pas | Fichier mal nommé | Nommez-le exactement `cover.webp` (ou `cover.png` / `cover.jpg`) |
 | L'ancienne version du jeu s'affiche | Cache du navigateur | Augmentez `"version"` dans `game.json` |
 | Le build Cloudflare échoue | Réglages incorrects | Vérifiez la commande de build et le dossier `public` (étape 5) |
+| Le formulaire public répond « indisponible » | Secret ou liaison manquants | Vérifiez `IP_SALT`, `TURNSTILE_SECRET`, `GITHUB_TOKEN`, `GITHUB_REPO` et la base `DB` dans Cloudflare (étape 7) |
+| Une demande reste « en-attente-ia » | Modération en panne (limite d'utilisation de Claude…) | Lisez le commentaire de l'issue, puis retirez et remettez l'étiquette `en-attente-ia` |

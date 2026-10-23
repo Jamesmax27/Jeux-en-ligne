@@ -215,6 +215,107 @@
     .message:empty { display: none; }
     .message.ok { background: rgba(110, 200, 150, .15); color: #a9e6c2; }
     .message.erreur { background: rgba(240, 120, 120, .15); color: #f3b2b2; }
+
+    /* Onglet « Demandes publiques » : une carte par demande validée par l'IA. */
+    .publiques-barre {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 14px;
+    }
+
+    .publiques-barre p { margin: 0; color: var(--craie-douce); font-size: 14px; }
+
+    .bouton-second {
+      min-height: 44px;
+      padding: 8px 16px;
+      border: 1.5px solid var(--orbite);
+      border-radius: 999px;
+      background: var(--nuit);
+      color: var(--craie);
+      font: inherit;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    .bouton-second:disabled { opacity: .55; cursor: default; }
+    .bouton-danger { border-color: #c96b6b; color: #f3b2b2; }
+
+    .demande {
+      margin: 0 0 14px;
+      padding: 16px;
+      border: 1px solid var(--trait);
+      border-radius: var(--r-plaque);
+      background: var(--surface);
+    }
+
+    .demande-tete {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      margin: 0 0 6px;
+      color: var(--craie-douce);
+      font-size: 13px;
+    }
+
+    .demande-tete a { color: var(--lavande); }
+
+    .demande-type {
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: var(--surface-choisie);
+      color: var(--craie);
+      font-weight: 700;
+    }
+
+    .demande h2 { margin: 0 0 8px; font-size: 17px; line-height: 1.3; overflow-wrap: anywhere; }
+
+    .demande-texte {
+      margin: 0 0 12px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      font-size: 15px;
+    }
+
+    .demande-ia {
+      margin: 0 0 14px;
+      padding: 10px 12px;
+      border-left: 3px solid var(--lavande);
+      border-radius: 0 12px 12px 0;
+      background: var(--nuit);
+      font-size: 14px;
+    }
+
+    .demande-ia p { margin: 0 0 4px; }
+    .demande-ia p:last-child { margin: 0; }
+
+    .demande-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .demande-actions .envoyer { width: auto; flex: 1 1 140px; }
+
+    .blocages { margin-top: 28px; }
+    .blocages h2 { font-size: 17px; margin: 0 0 10px; }
+
+    .blocage {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 12px;
+      margin: 0 0 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--trait);
+      border-radius: 12px;
+      background: var(--surface);
+      font-size: 14px;
+    }
+
+    .blocage code { font-size: 13px; }
+    .blocage-infos { flex: 1 1 220px; color: var(--craie-douce); }
   </style>
 </head>
 <body>
@@ -253,10 +354,11 @@
       <span id="entete-titre">Nouvelle idée de jeu<small>Elle sera fabriquée en priorité par la boucle de nuit.</small></span>
     </h1>
 
-    <!-- Lien direct vers le 2e onglet : /idees/#demande -->
-    <div class="onglets" role="tablist" aria-label="Que veux-tu envoyer ?">
+    <!-- Liens directs vers les autres onglets : /idees/#demande, /idees/#publiques -->
+    <div class="onglets" role="tablist" aria-label="Que veux-tu faire ?">
       <button type="button" role="tab" id="onglet-idee" aria-controls="formulaire" aria-selected="true">Nouvelle idée</button>
       <button type="button" role="tab" id="onglet-demande" aria-controls="formulaire-demande" aria-selected="false" tabindex="-1">Modifier un jeu</button>
+      <button type="button" role="tab" id="onglet-publiques" aria-controls="panneau-publiques" aria-selected="false" tabindex="-1">Demandes publiques</button>
     </div>
 
     <form class="idees-carte" id="formulaire" role="tabpanel" aria-labelledby="onglet-idee" novalidate>
@@ -317,6 +419,24 @@
       <button class="envoyer" id="demande-envoyer" type="submit">Envoyer la demande</button>
       <p class="message" id="demande-message" role="status" aria-live="polite"></p>
     </form>
+
+    <!-- Demandes du formulaire public (/proposer/), validées par l'IA (moderation-demande.yml) :
+         Accepter → nouveau jeu : idée perso (boucle de nuit) ; bug ou modification :
+         demande-modification.yml. Circuit complet : DEMANDES.md. -->
+    <section id="panneau-publiques" role="tabpanel" aria-labelledby="onglet-publiques" hidden>
+      <div class="publiques-barre">
+        <p id="publiques-resume">Chargement…</p>
+        <button type="button" class="bouton-second" id="publiques-actualiser">Actualiser</button>
+      </div>
+      <p class="message" id="publiques-message" role="status" aria-live="polite"></p>
+      <div id="publiques-liste"></div>
+
+      <div class="blocages">
+        <h2>Adresses bloquées ou bannies</h2>
+        <p class="idees-note">Empreintes d'adresses IP (jamais l'adresse elle-même) : 3 abus en 24 h (piège à robots, anti-robot refusé, insulte ou spam refusés par l'IA) bloquent 7 jours ; un abus après un blocage bannit définitivement.</p>
+        <div id="blocages-liste"></div>
+      </div>
+    </section>
   </main>
 
   <script type="module">
@@ -436,14 +556,18 @@
     });
 
     // --- Onglets --------------------------------------------------------------
-    // Le 2e onglet s'ouvre aussi directement avec l'adresse /idees/#demande.
+    // Les autres onglets s'ouvrent aussi directement : /idees/#demande, /idees/#publiques.
     const onglets = {
       idee: { bouton: document.getElementById('onglet-idee'), panneau: formulaire,
         titre: 'Nouvelle idée de jeu', sous: 'Elle sera fabriquée en priorité par la boucle de nuit.' },
       demande: { bouton: document.getElementById('onglet-demande'), panneau: document.getElementById('formulaire-demande'),
         titre: 'Modifier un jeu', sous: "Demande traitée aussitôt par l'IA, puis vérifiée." },
+      publiques: { bouton: document.getElementById('onglet-publiques'), panneau: document.getElementById('panneau-publiques'),
+        titre: 'Demandes publiques', sous: "Propositions et signalements des visiteurs, déjà validés par l'IA." },
     };
+    const NOMS_ONGLETS = Object.keys(onglets);
     const enteteTitre = document.getElementById('entete-titre');
+    let ongletOuvert = 'idee';
 
     function ouvrirOnglet(nom, focus) {
       for (const [cle, o] of Object.entries(onglets)) {
@@ -452,23 +576,25 @@
         o.bouton.tabIndex = actif ? 0 : -1;
         o.panneau.hidden = !actif;
       }
+      ongletOuvert = nom;
       const o = onglets[nom];
       const sous = document.createElement('small');
       sous.textContent = o.sous;
       enteteTitre.replaceChildren(o.titre, sous);
       document.title = o.titre;
       if (focus) o.bouton.focus();
-      history.replaceState(null, '', nom === 'demande' ? '#demande' : location.pathname);
+      history.replaceState(null, '', nom === 'idee' ? location.pathname : `#${nom}`);
+      if (nom === 'publiques' && !publiquesChargees) chargerPubliques();
     }
-    onglets.idee.bouton.addEventListener('click', () => ouvrirOnglet('idee'));
-    onglets.demande.bouton.addEventListener('click', () => ouvrirOnglet('demande'));
+    for (const nom of NOMS_ONGLETS) onglets[nom].bouton.addEventListener('click', () => ouvrirOnglet(nom));
     // Flèches gauche / droite entre les onglets (comportement attendu d'un role="tablist").
     document.querySelector('.onglets').addEventListener('keydown', (e) => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       e.preventDefault();
-      ouvrirOnglet(onglets.idee.bouton.getAttribute('aria-selected') === 'true' ? 'demande' : 'idee', true);
+      const i = NOMS_ONGLETS.indexOf(ongletOuvert);
+      const suivant = (i + (e.key === 'ArrowRight' ? 1 : NOMS_ONGLETS.length - 1)) % NOMS_ONGLETS.length;
+      ouvrirOnglet(NOMS_ONGLETS[suivant], true);
     });
-    if (location.hash === '#demande') ouvrirOnglet('demande');
 
     // --- Demande de modification d'un jeu ---------------------------------------
     // POST JSON { type: "demande", jeu, texte } vers /api/idees (même accès que les idées),
@@ -550,6 +676,237 @@
         demandeBouton.disabled = false;
       }
     });
+
+    // --- Demandes publiques -------------------------------------------------------
+    // Demandes du formulaire public (/proposer/) validées par l'IA, puis empreintes
+    // bloquées ou bannies. Tout passe par /api/idees (même accès Cloudflare Access) :
+    // { type: "publiques" | "publique-accepter" | "publique-refuser" | "blocages" | "blocage" }.
+    // Les textes des visiteurs ne sont jamais insérés en HTML (textContent seulement).
+    const publiques = {
+      resume: document.getElementById('publiques-resume'),
+      actualiser: document.getElementById('publiques-actualiser'),
+      message: document.getElementById('publiques-message'),
+      liste: document.getElementById('publiques-liste'),
+      blocages: document.getElementById('blocages-liste'),
+    };
+    let publiquesChargees = false;
+    const NOMS_TYPES = { nouveau: 'Nouveau jeu', bug: 'Bug', modification: 'Modification' };
+
+    function afficherPubliques(texte, type) {
+      publiques.message.textContent = texte;
+      publiques.message.className = `message ${type}`;
+    }
+
+    // POST JSON vers /api/idees. Renvoie le corps de la réponse ; lève une erreur lisible sinon.
+    async function appelApi(donnees) {
+      let reponse;
+      try {
+        reponse = await fetch('/api/idees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(donnees),
+        });
+      } catch {
+        throw new Error('Connexion impossible : vérifie ta connexion, ou recharge la page pour te reconnecter.');
+      }
+      let corps = {};
+      try { corps = await reponse.json(); } catch { /* réponse sans JSON */ }
+      if (!reponse.ok || !corps.ok) throw new Error(corps.erreur || `Erreur ${reponse.status}. Réessaie plus tard.`);
+      return corps;
+    }
+
+    const element = (balise, classe, texte) => {
+      const e = document.createElement(balise);
+      if (classe) e.className = classe;
+      if (texte !== undefined) e.textContent = texte;
+      return e;
+    };
+
+    const dateLisible = (valeur) => {
+      const d = new Date(valeur);
+      return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+    };
+
+    // Classement d'un nouveau jeu (genre, âge, univers), proposé par l'IA et modifiable.
+    function choixClassement(numero, avis) {
+      const bloc = element('div');
+      const champGenre = element('div', 'champ');
+      const etiquette = element('label', '', 'Genre');
+      const select = element('select');
+      select.id = `genre-${numero}`;
+      etiquette.htmlFor = select.id;
+      select.append(new Option('Choisir un genre…', ''));
+      for (const g of GENRES) select.append(new Option(`${g.picto} ${g.libelle}`, g.id));
+      if (GENRES.some((g) => g.id === avis?.genre)) select.value = avis.genre;
+      champGenre.append(etiquette, select);
+
+      const champAges = element('fieldset', 'choix');
+      champAges.append(element('legend', '', 'Âge conseillé'));
+      const listeA = element('div', 'choix-liste');
+      for (const a of AGES) {
+        const c = caseAChoisir('radio', `ages-${numero}`, a, a);
+        if (avis?.ages === a) c.querySelector('input').checked = true;
+        listeA.append(c);
+      }
+      champAges.append(listeA);
+
+      const champUnivers = element('fieldset', 'choix');
+      const legende = element('legend', '', 'Univers ');
+      legende.append(element('small', '', `(${UNIVERS_MAX} au plus ; rien de coché = choisis par la boucle de nuit)`));
+      champUnivers.append(legende);
+      const listeU = element('div', 'choix-liste');
+      for (const u of UNIVERS) {
+        const c = caseAChoisir('checkbox', `univers-${numero}`, u.id, `${u.picto} ${u.libelle}`);
+        if (Array.isArray(avis?.univers) && avis.univers.includes(u.id)) c.querySelector('input').checked = true;
+        listeU.append(c);
+      }
+      champUnivers.append(listeU);
+      const cases = [...listeU.querySelectorAll('input')];
+      const majCases = () => {
+        const choisis = cases.filter((c) => c.checked).map((c) => c.value);
+        for (const c of cases) {
+          if (c.checked) { c.disabled = false; continue; }
+          c.disabled = choisis.length >= UNIVERS_MAX || (c.value === 'autre' && choisis.length > 0) || choisis.includes('autre');
+        }
+      };
+      listeU.addEventListener('change', majCases);
+      majCases();
+
+      bloc.append(champGenre, champAges, champUnivers);
+      return {
+        bloc,
+        lire: () => ({
+          genre: select.value,
+          ages: listeA.querySelector('input:checked')?.value || '',
+          univers: cases.filter((c) => c.checked).map((c) => c.value),
+        }),
+      };
+    }
+
+    function carteDemande(d) {
+      const carte = element('article', 'demande');
+      const tete = element('p', 'demande-tete');
+      tete.append(element('span', 'demande-type', NOMS_TYPES[d.type] || d.type || '?'));
+      if (d.jeu) tete.append(element('span', '', `Jeu : ${d.titreJeu || d.jeu}`));
+      tete.append(element('span', '', dateLisible(d.date || d.creee)));
+      const lien = element('a', '', `#${d.numero} sur GitHub`);
+      lien.href = d.url;
+      lien.target = '_blank';
+      lien.rel = 'noopener';
+      tete.append(lien);
+
+      const ia = element('div', 'demande-ia');
+      const avis = d.moderation || {};
+      ia.append(element('p', '', `Avis de l'IA : ${avis.motif || '—'}`));
+      if (avis.resume) ia.append(element('p', '', `Résumé : ${avis.resume}`));
+      if (avis.categorie) ia.append(element('p', '', `Catégorie : ${avis.categorie}`));
+
+      carte.append(tete, element('h2', '', d.titre || '(sans titre)'), element('p', 'demande-texte', d.description), ia);
+
+      const classement = d.type === 'nouveau' ? choixClassement(d.numero, avis) : null;
+      if (classement) carte.append(classement.bloc);
+
+      const actions = element('div', 'demande-actions');
+      const accepter = element('button', 'envoyer', 'Accepter');
+      const refuser = element('button', 'bouton-second', 'Refuser');
+      const bannir = element('button', 'bouton-second bouton-danger', 'Refuser et bannir');
+      for (const b of [accepter, refuser, bannir]) b.type = 'button';
+      actions.append(accepter, refuser, bannir);
+      const message = element('p', 'message');
+      message.setAttribute('role', 'status');
+      carte.append(actions, message);
+
+      const agir = async (donnees, confirmation) => {
+        if (confirmation && !window.confirm(confirmation)) return;
+        for (const b of [accepter, refuser, bannir]) b.disabled = true;
+        message.textContent = 'En cours…';
+        message.className = 'message ok';
+        try {
+          const r = await appelApi(donnees);
+          message.textContent = donnees.type === 'publique-accepter'
+            ? (d.type === 'nouveau' ? 'Acceptée : elle rejoint les idées perso de la boucle de nuit.' : "Acceptée : transmise à l'IA de modification des jeux.")
+            : (r.auteurInconnu ? 'Refusée (auteur inconnu : personne à bannir).' : (r.banni ? 'Refusée, et son auteur est banni.' : 'Refusée.'));
+          if (donnees.bannir) chargerBlocages();
+        } catch (erreur) {
+          message.textContent = erreur.message;
+          message.className = 'message erreur';
+          for (const b of [accepter, refuser, bannir]) b.disabled = false;
+        }
+      };
+      accepter.addEventListener('click', () => {
+        const donnees = { type: 'publique-accepter', numero: d.numero, ...(classement ? classement.lire() : {}) };
+        if (classement && !donnees.genre) { message.textContent = 'Choisis un genre.'; message.className = 'message erreur'; return; }
+        if (classement && !donnees.ages) { message.textContent = 'Choisis un âge conseillé.'; message.className = 'message erreur'; return; }
+        agir(donnees);
+      });
+      refuser.addEventListener('click', () => agir({ type: 'publique-refuser', numero: d.numero, bannir: false }));
+      bannir.addEventListener('click', () => agir({ type: 'publique-refuser', numero: d.numero, bannir: true },
+        "Refuser cette demande et bannir définitivement son auteur (son empreinte d'adresse IP) ?"));
+      return carte;
+    }
+
+    function ligneBlocage(b) {
+      const ligne = element('div', 'blocage');
+      const code = element('code', '', `${b.visiteur.slice(0, 12)}…`);
+      code.title = b.visiteur;
+      const statut = b.statut === 'banni' ? 'Bannie' : `Bloquée jusqu'au ${dateLisible(b.jusqu_a)}`;
+      const infos = element('span', 'blocage-infos',
+        `${statut} · depuis le ${dateLisible(b.debut || b.maj)} · ${b.motif || '—'} · ${b.abus} abus`);
+      ligne.append(code, infos);
+      const agir = async (action, confirmation) => {
+        if (confirmation && !window.confirm(confirmation)) return;
+        try {
+          await appelApi({ type: 'blocage', visiteur: b.visiteur, action });
+          chargerBlocages();
+        } catch (erreur) {
+          afficherPubliques(erreur.message, 'erreur');
+        }
+      };
+      const debloquer = element('button', 'bouton-second', 'Débloquer');
+      debloquer.type = 'button';
+      debloquer.addEventListener('click', () => agir('debloquer'));
+      ligne.append(debloquer);
+      if (b.statut !== 'banni') {
+        const bannir = element('button', 'bouton-second bouton-danger', 'Bannir');
+        bannir.type = 'button';
+        bannir.addEventListener('click', () => agir('bannir', 'Bannir définitivement cette empreinte ?'));
+        ligne.append(bannir);
+      }
+      return ligne;
+    }
+
+    async function chargerBlocages() {
+      try {
+        const { blocages } = await appelApi({ type: 'blocages' });
+        publiques.blocages.replaceChildren(...(blocages.length ? blocages.map(ligneBlocage) : [element('p', 'idees-note', 'Aucune adresse bloquée.')]));
+      } catch (erreur) {
+        publiques.blocages.replaceChildren(element('p', 'message erreur', erreur.message));
+      }
+    }
+
+    async function chargerPubliques() {
+      publiquesChargees = true;
+      publiques.actualiser.disabled = true;
+      afficherPubliques('', '');
+      publiques.resume.textContent = 'Chargement…';
+      try {
+        const { demandes, enModeration } = await appelApi({ type: 'publiques' });
+        const n = demandes.length;
+        publiques.resume.textContent = `${n} demande${n > 1 ? 's' : ''} à décider · ${enModeration} en cours de modération par l'IA`;
+        publiques.liste.replaceChildren(...(n ? demandes.map(carteDemande) : [element('p', 'idees-note', 'Aucune demande en attente.')]));
+      } catch (erreur) {
+        publiques.resume.textContent = '';
+        afficherPubliques(erreur.message, 'erreur');
+      } finally {
+        publiques.actualiser.disabled = false;
+      }
+      chargerBlocages();
+    }
+    publiques.actualiser.addEventListener('click', chargerPubliques);
+
+    if (location.hash === '#demande') ouvrirOnglet('demande');
+    else if (location.hash === '#publiques') ouvrirOnglet('publiques');
   </script>
 </body>
 </html>
