@@ -427,8 +427,8 @@ body::after {
    - avec :has() (Firefox 121, Safari 15.4 et plus récents) :
      - téléphone (dès 360 px) : une petite manette à droite du titre de la
        première ligne (« Nouveautés » seules), calée sur le bas de l'en-tête ;
-       avec les deux moitiés (Nouveautés et Tendances), elle s'efface : le
-       titre des Tendances passerait dessous. En dessous de 360 px, il n'y a
+       avec les deux moitiés (Nouveautés et Tendances), elle s'efface jusqu'à
+       799 px : le titre des Tendances passerait dessous. En dessous de 360 px, il n'y a
        pas de vide : seules les étoiles du fond ;
      - ordinateur de 720 à 1 199 px : la petite manette à droite de la
        bande sous la recherche ; sur les mentions, la grande manette entre
@@ -476,9 +476,11 @@ body::after {
     html:not(.avec-vitrine) .entete:has(+ .vitrine[hidden])::before { background: none; }
   }
 
-  /* Téléphone, première ligne en deux moitiés : le titre des Tendances
-     passerait sous la petite manette, qui s'efface. */
-  @media (max-width: 719px) {
+  /* Téléphone et petite tablette (jusqu'à 799 px, barre de défilement
+     comprise), première ligne en deux moitiés : le titre des Tendances, ou son
+     sous-titre en allemand et en espagnol, passerait sous la petite manette,
+     qui s'efface. */
+  @media (max-width: 799px) {
     html.avec-tendances .entete:has(+ .vitrine)::before { background: none; }
   }
 
@@ -565,10 +567,19 @@ html.avec-tendances .nouveautes .groupe-tete { padding-right: 12px; }
   html.avec-tendances .vitrine .groupe-tete small { display: none; }
 }
 
-/* Étoile or du titre des Nouveautés (comme le badge « Nouveau »). */
+/* Étoile or du titre des Nouveautés (comme le badge « Nouveau »), dans la même
+   boîte que la flamme des Tendances : les deux titres ont la même ligne de base. */
 #titre-nouveautes > span[aria-hidden="true"]:first-child {
+  position: relative;
+  top: -1px;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
   color: var(--or);
   font-size: 17px;
+  line-height: 20px;
+  text-align: center;
+  vertical-align: middle;
 }
 
 /* Accueil : places gardées avant que app.js ne remplisse la page, pour qu'elle
@@ -604,7 +615,8 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::before {
 
 /* Le rembourrage vertical laisse la place au contour de focus (5 px) ; celui
    de droite sort la dernière jaquette du fondu, et le retrait de droite
-   (scroll-padding) y garde la carte amenée au clavier. */
+   (scroll-padding) y garde la carte amenée au clavier (app.js la fait
+   défiler : le navigateur ne déplace pas une carte déjà en partie visible). */
 .vitrine-liste {
   display: grid;
   grid-auto-flow: column;
@@ -669,7 +681,11 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::before {
 @media (min-width: 1200px) {
   .vitrine { --bas-vitrine: 8px; }
   .vitrine-moitie { --droite: 16px; }
-  html.avec-tendances .nouveautes { --droite: 12px; }
+  /* 6 + 6 px entre les moitiés : 12 px comme entre deux jaquettes, qui gardent
+     leur largeur (135,5 px) en 8 comme en 4 + 4 ; le titre garde ses 12 px. */
+  html.avec-tendances .nouveautes { --droite: 6px; }
+  html.avec-tendances .tendances { --gauche: 6px; }
+  html.avec-tendances .tendances .groupe-tete { padding-left: 12px; }
   .vitrine-liste {
     grid-auto-flow: row;
     grid-template-columns: repeat(8, minmax(0, 1fr));

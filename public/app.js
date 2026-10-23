@@ -55,6 +55,9 @@ const NOUVEAUTES_NOMBRE = 4;      // … dont Nouveautés quand les Tendances so
 const TENDANCES_NOMBRE = 4;       // jeux montrés dans « Tendances » (moitié droite)
 const TENDANCES_MIN = 2;          // en dessous, pas de moitié « Tendances »
 const TENDANCES_PAR_GENRE = 2;    // au plus 2 jeux du même genre principal dans « Tendances »
+// Nouveautés : à date égale (la boucle de nuit ajoute plusieurs jeux le même jour),
+// ordre tiré à chaque visite, pour que chacun passe à son tour dans la première ligne.
+const GRAINE_VITRINE = Math.random().toString(36).slice(2);
 const ID_JEU = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const JAQUETTES_PRIORITAIRES = 4; // premières jaquettes de la grille chargées tout de suite
 
@@ -410,8 +413,13 @@ function choisirTendances(exclus) {
 // réservée, invisible) ; sinon les Nouveautés prennent toute la ligne.
 // La classe avec-tendances de <html> suit l'état choisi (style.css).
 function afficherVitrine() {
+  // Ancienne page d'accueil encore gardée par le service worker : pas de première ligne.
+  if (!el.vitrine || !el.nouveautesListe || !el.tendances || !el.tendancesListe) return;
   const racine = document.documentElement;
-  const nouveautes = etat.jeux.filter((jeu) => !estArchive(jeu)).sort(parDate);
+  const ordre = (jeu) => hachage(`${GRAINE_VITRINE}|${jeu.id}`);
+  const nouveautes = etat.jeux
+    .filter((jeu) => !estArchive(jeu))
+    .sort((a, b) => String(b.added).localeCompare(String(a.added)) || ordre(a) - ordre(b) || a.id.localeCompare(b.id));
   const tendances = choisirTendances(new Set(nouveautes.slice(0, NOUVEAUTES_NOMBRE).map((jeu) => jeu.id)));
   const avecTendances = tendances.length >= TENDANCES_MIN;
   const double = avecTendances || (etat.tendances === undefined && racine.classList.contains('avec-tendances'));
@@ -902,14 +910,25 @@ async function demarrer() {
   etat.horsLigne = await horsLigne;
   etat.aimes = jeuxAimes();
   afficher();
+
+  // Votes restés en attente (faits hors ligne) : on retente l'envoi.
+  if (votesEnAttente()) envoyerEnAttente();
+
   afficherVitrine(); // Nouveautés tout de suite ; moitié Tendances réservée si attendue
 
   // Les tendances s'ajoutent dès qu'elles arrivent, sans retarder le catalogue.
   etat.tendances = await tendances;
   afficherVitrine();
+}
 
-  // Votes restés en attente (faits hors ligne) : on retente l'envoi.
-  if (votesEnAttente()) envoyerEnAttente();
+// Première ligne au clavier : la carte atteinte par Tab est amenée en entier
+// dans sa moitié (le navigateur ne fait pas défiler une carte déjà en partie
+// visible). Au doigt ou à la souris, rien : la bande défilerait sous le clic.
+for (const liste of [el.nouveautesListe, el.tendancesListe].filter(Boolean)) {
+  liste.addEventListener('focusin', (evenement) => {
+    try { if (!evenement.target.matches(':focus-visible')) return; } catch { return; }
+    evenement.target.closest('li')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  });
 }
 
 activerHorsLigne();
