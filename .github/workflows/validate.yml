@@ -63,6 +63,11 @@ on:
 
 jobs:
   controle:
+    # Pas pour les pull requests de la boucle de nuit (robot github-actions[bot],
+    # branches nouveau-jeu/…) : la boucle contrôle déjà ces jeux avant de fusionner.
+    # (Le déclencheur pull_request ne sait pas filtrer sur l'auteur ni sur la
+    # branche de la pull request : le tri ne peut se faire qu'ici.)
+    if: ${{ !(github.event.pull_request.user.login == 'github-actions[bot]' && startsWith(github.head_ref, 'nouveau-jeu/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
