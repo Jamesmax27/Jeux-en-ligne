@@ -1,0 +1,3455 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Robot Max</title>
+<script type="application/json" id="jel-i18n-textes" data-coin="aucun" data-place="lang-titre lang-pause">
+{
+ "fr": {
+  "titre": "Robot Max",
+  "accueil.consigne": "Aide Max le robot à rejoindre sa borne de recharge.",
+  "accueil.consigne2": "Glisse le doigt ou touche les flèches, et ramasse les 3 rouages dorés !",
+  "bouton.jouer": "Jouer",
+  "bouton.niveaux": "Niveaux",
+  "bouton.son": "Couper ou remettre le son",
+  "bouton.pause": "Pause",
+  "bouton.reprendre": "Reprendre",
+  "bouton.recommencer": "Recommencer",
+  "bouton.aide": "Revoir l'aide",
+  "bouton.accueil": "Accueil",
+  "bouton.retour": "Retour",
+  "bouton.compris": "J'ai compris !",
+  "bouton.suite": "Montre-moi la suite",
+  "bouton.suivant": "Niveau suivant",
+  "bouton.bilan": "Voir le bilan",
+  "bouton.rejouer": "Rejouer",
+  "bouton.reessayer": "Réessayer",
+  "bouton.haut": "Monter",
+  "bouton.bas": "Descendre",
+  "bouton.gauche": "Aller à gauche",
+  "bouton.droite": "Aller à droite",
+  "bouton.attendre": "Attendre sans bouger",
+  "plateau.aria": "Le labyrinthe de Max",
+  "niveaux.titre": "Choisis un niveau",
+  "niveaux.stats": "Étoiles : {etoiles} sur {max} · Score total : {score}",
+  "niveaux.niveau": "Niveau {n}",
+  "niveaux.ferme": "Niveau {n}, encore fermé",
+  "niveaux.etoiles": {
+   "one": "{n} étoile",
+   "other": "{n} étoiles"
+  },
+  "zone.0": "L'Atelier",
+  "zone.1": "L'Usine",
+  "zone.2": "L'Entrepôt",
+  "zone.3": "La Station",
+  "hud.niveau": "Niveau {n}",
+  "hud.rouages": "Rouages : {n} sur 3",
+  "hud.coeurs": {
+   "one": "{n} cœur",
+   "other": "{n} cœurs"
+  },
+  "hud.energie": "Énergie : {n} sur {max}",
+  "pause.titre": "Pause",
+  "pause.texte": "Tout est arrêté. Max t'attend !",
+  "tuto.titre.deplacer": "Avance case par case",
+  "tuto.deplacer": "Glisse le doigt vers où Max doit aller, ou touche les flèches. Ramasse les rouages, puis va sur la borne !",
+  "tuto.titre.cle": "Les clés",
+  "tuto.cle": "Prends la clé : elle ouvre les portes de sa couleur. La clé bleue va avec le rond, la verte avec le triangle.",
+  "tuto.titre.tapis": "Les tapis roulants",
+  "tuto.tapis": "Un tapis emporte Max dans le sens de ses flèches. Impossible de le remonter !",
+  "tuto.titre.energie": "L'énergie",
+  "tuto.energie": "Chaque pas use un peu d'énergie. Une pile remplit toute la barre. À zéro, Max tombe en panne !",
+  "tuto.titre.drone": "Les drones gardiens",
+  "tuto.drone": "Le drone fait des allers-retours. Le petit rond montre où il va ensuite. Le bouton du milieu fait attendre Max.",
+  "tuto.titre.interrupteur": "L'interrupteur",
+  "tuto.interrupteur": "Marche sur le bouton : les barrières rouges s'ouvrent et les jaunes se ferment. Encore une fois, et c'est l'inverse !",
+  "tuto.titre.teleport": "Les téléporteurs",
+  "tuto.teleport": "Entre dans un téléporteur : Max ressort par l'autre téléporteur de la même couleur.",
+  "tuto.titre.huile": "Les flaques d'huile",
+  "tuto.huile": "Sur l'huile, Max glisse tout droit jusqu'à ce qu'il touche un obstacle.",
+  "tuto.titre.caisse": "Les caisses",
+  "tuto.caisse": "Marche contre une caisse pour la pousser. Attention : coincée contre un mur, elle ne bouge plus !",
+  "tuto.titre.laser": "Les lasers",
+  "tuto.laser": "Un laser allumé fait perdre un cœur. Il s'allume et s'éteint à chaque pas : passe quand il est éteint !",
+  "msg.depart": "Ramasse les rouages et va jusqu'à la borne !",
+  "msg.rouage": {
+   "one": "Un rouage ! Encore {n} à trouver.",
+   "other": "Un rouage ! Encore {n} à trouver."
+  },
+  "msg.tousRouages": "Les 3 rouages ! Vite, à la borne !",
+  "msg.cleB": "La clé bleue ! Elle ouvre les portes rondes.",
+  "msg.cleV": "La clé verte ! Elle ouvre les portes au triangle.",
+  "msg.porte": "La porte s'ouvre !",
+  "msg.porteB": "Porte fermée : il faut la clé bleue.",
+  "msg.porteV": "Porte fermée : il faut la clé verte.",
+  "msg.barriere": "Barrière fermée : cherche l'interrupteur.",
+  "msg.caisse": "La caisse est coincée de ce côté.",
+  "msg.pile": "Une pile ! L'énergie est au maximum.",
+  "msg.energieBasse": "Attention, presque plus d'énergie !",
+  "msg.inter": "Clic ! Les barrières changent.",
+  "msg.tele": "Hop, téléporté !",
+  "msg.drone": "Aïe, le drone ! Max retourne au départ.",
+  "msg.laser": "Aïe, le laser ! Max retourne au départ.",
+  "msg.laserDanger": "Vite, sors du laser : il va s'allumer !",
+  "msg.droneDanger": "Attention, le drone arrive ici : bouge !",
+  "msg.tapis": "Le tapis emporte Max !",
+  "msg.huile": "Ça glisse !",
+  "fin.victoire": "Max est rechargé !",
+  "fin.parfait": "Parfait, tous les rouages !",
+  "fin.score": "Score : {score}",
+  "fin.record": "Nouveau record !",
+  "fin.recordAncien": "Record : {score}",
+  "fin.detail": "Rouages : {r} sur 3 · Cœurs : {c} · Pas : {p}",
+  "fin.etoiles": {
+   "one": "{n} étoile gagnée",
+   "other": "{n} étoiles gagnées"
+  },
+  "defaite.titre": "Oh non !",
+  "defaite.panne": "Max est en panne d'énergie.",
+  "defaite.drone": "Plus de cœurs : un drone a touché Max.",
+  "defaite.laser": "Plus de cœurs : un laser a touché Max.",
+  "defaite.detail": "Rouages ramassés : {r} sur 3. Tu vas y arriver !",
+  "bilan.titre": "Tous les labyrinthes sont finis !",
+  "bilan.texte": "Étoiles : {etoiles} sur {max} · Score total : {score}",
+  "bilan.encore": "Rejoue les niveaux pour ramasser tous les rouages.",
+  "bilan.tout": "Tous les rouages sont à toi : tu es un as du labyrinthe !"
+ },
+ "en": {
+  "titre": "Robot Max",
+  "accueil.consigne": "Help Max the robot get back to his charging station.",
+  "accueil.consigne2": "Swipe your finger or tap the arrows, and collect the 3 golden cogs!",
+  "bouton.jouer": "Play",
+  "bouton.niveaux": "Levels",
+  "bouton.son": "Turn the sound off or on",
+  "bouton.pause": "Pause",
+  "bouton.reprendre": "Resume",
+  "bouton.recommencer": "Start over",
+  "bouton.aide": "See the help again",
+  "bouton.accueil": "Home",
+  "bouton.retour": "Back",
+  "bouton.compris": "Got it!",
+  "bouton.suite": "Show me what's next",
+  "bouton.suivant": "Next level",
+  "bouton.bilan": "See the results",
+  "bouton.rejouer": "Play again",
+  "bouton.reessayer": "Try again",
+  "bouton.haut": "Go up",
+  "bouton.bas": "Go down",
+  "bouton.gauche": "Go left",
+  "bouton.droite": "Go right",
+  "bouton.attendre": "Wait without moving",
+  "plateau.aria": "Max's maze",
+  "niveaux.titre": "Choose a level",
+  "niveaux.stats": "Stars: {etoiles} of {max} · Total score: {score}",
+  "niveaux.niveau": "Level {n}",
+  "niveaux.ferme": "Level {n}, still locked",
+  "niveaux.etoiles": {
+   "one": "{n} star",
+   "other": "{n} stars"
+  },
+  "zone.0": "The Workshop",
+  "zone.1": "The Factory",
+  "zone.2": "The Warehouse",
+  "zone.3": "The Station",
+  "hud.niveau": "Level {n}",
+  "hud.rouages": "Cogs: {n} of 3",
+  "hud.coeurs": {
+   "one": "{n} heart",
+   "other": "{n} hearts"
+  },
+  "hud.energie": "Energy: {n} of {max}",
+  "pause.titre": "Pause",
+  "pause.texte": "Everything has stopped. Max is waiting for you!",
+  "tuto.titre.deplacer": "One square at a time",
+  "tuto.deplacer": "Swipe your finger where Max should go, or tap the arrows. Collect the cogs, then go to the charging station!",
+  "tuto.titre.cle": "Keys",
+  "tuto.cle": "Grab the key: it opens the doors of its color. The blue key goes with the circle, the green one with the triangle.",
+  "tuto.titre.tapis": "Conveyor belts",
+  "tuto.tapis": "A belt carries Max the way its arrows point. You can't go back up it!",
+  "tuto.titre.energie": "Energy",
+  "tuto.energie": "Each step uses a little energy. A battery fills the whole bar. At zero, Max runs out of power!",
+  "tuto.titre.drone": "Guard drones",
+  "tuto.drone": "The drone flies back and forth. The little circle shows where it goes next. The middle button makes Max wait.",
+  "tuto.titre.interrupteur": "The switch",
+  "tuto.interrupteur": "Step on the button: the red gates open and the yellow ones close. Do it again, and it's the other way around!",
+  "tuto.titre.teleport": "Teleporters",
+  "tuto.teleport": "Step into a teleporter: Max comes out of the other teleporter of the same color.",
+  "tuto.titre.huile": "Oil puddles",
+  "tuto.huile": "On oil, Max slides straight ahead until he bumps into something.",
+  "tuto.titre.caisse": "Crates",
+  "tuto.caisse": "Walk into a crate to push it. Careful: once it's stuck against a wall, it won't move anymore!",
+  "tuto.titre.laser": "Lasers",
+  "tuto.laser": "A lit laser takes away a heart. It turns on and off with every step: go through when it's off!",
+  "msg.depart": "Collect the cogs and go to the charging station!",
+  "msg.rouage": {
+   "one": "A cog! {n} more to find.",
+   "other": "A cog! {n} more to find."
+  },
+  "msg.tousRouages": "All 3 cogs! Quick, to the charging station!",
+  "msg.cleB": "The blue key! It opens the round doors.",
+  "msg.cleV": "The green key! It opens the triangle doors.",
+  "msg.porte": "The door opens!",
+  "msg.porteB": "Locked door: you need the blue key.",
+  "msg.porteV": "Locked door: you need the green key.",
+  "msg.barriere": "The gate is closed: look for the switch.",
+  "msg.caisse": "The crate is stuck on that side.",
+  "msg.pile": "A battery! Energy is full.",
+  "msg.energieBasse": "Careful, almost out of energy!",
+  "msg.inter": "Click! The gates switch.",
+  "msg.tele": "Whoosh, teleported!",
+  "msg.drone": "Ouch, the drone! Max goes back to the start.",
+  "msg.laser": "Ouch, the laser! Max goes back to the start.",
+  "msg.laserDanger": "Quick, get out of the laser: it's about to turn on!",
+  "msg.droneDanger": "Watch out, the drone is coming here: move!",
+  "msg.tapis": "The belt carries Max away!",
+  "msg.huile": "Wheee, it's slippery!",
+  "fin.victoire": "Max is recharged!",
+  "fin.parfait": "Perfect, all the cogs!",
+  "fin.score": "Score: {score}",
+  "fin.record": "New record!",
+  "fin.recordAncien": "Record: {score}",
+  "fin.detail": "Cogs: {r} of 3 · Hearts: {c} · Steps: {p}",
+  "fin.etoiles": {
+   "one": "{n} star earned",
+   "other": "{n} stars earned"
+  },
+  "defaite.titre": "Oh no!",
+  "defaite.panne": "Max has run out of energy.",
+  "defaite.drone": "No hearts left: a drone bumped into Max.",
+  "defaite.laser": "No hearts left: a laser hit Max.",
+  "defaite.detail": "Cogs collected: {r} of 3. You can do it!",
+  "bilan.titre": "All the mazes are done!",
+  "bilan.texte": "Stars: {etoiles} of {max} · Total score: {score}",
+  "bilan.encore": "Play the levels again to collect every cog.",
+  "bilan.tout": "All the cogs are yours: you're a maze champion!"
+ },
+ "es": {
+  "titre": "Robot Max",
+  "accueil.consigne": "Ayuda a Max, el robot, a volver a su estación de carga.",
+  "accueil.consigne2": "Desliza el dedo o toca las flechas, ¡y recoge los 3 engranajes dorados!",
+  "bouton.jouer": "Jugar",
+  "bouton.niveaux": "Niveles",
+  "bouton.son": "Quitar o poner el sonido",
+  "bouton.pause": "Pausa",
+  "bouton.reprendre": "Seguir",
+  "bouton.recommencer": "Empezar de nuevo",
+  "bouton.aide": "Ver la ayuda otra vez",
+  "bouton.accueil": "Inicio",
+  "bouton.retour": "Volver",
+  "bouton.compris": "¡Entendido!",
+  "bouton.suite": "Muéstrame lo siguiente",
+  "bouton.suivant": "Siguiente nivel",
+  "bouton.bilan": "Ver el resumen",
+  "bouton.rejouer": "Jugar otra vez",
+  "bouton.reessayer": "Intentar de nuevo",
+  "bouton.haut": "Subir",
+  "bouton.bas": "Bajar",
+  "bouton.gauche": "Ir a la izquierda",
+  "bouton.droite": "Ir a la derecha",
+  "bouton.attendre": "Esperar sin moverse",
+  "plateau.aria": "El laberinto de Max",
+  "niveaux.titre": "Elige un nivel",
+  "niveaux.stats": "Estrellas: {etoiles} de {max} · Puntos en total: {score}",
+  "niveaux.niveau": "Nivel {n}",
+  "niveaux.ferme": "Nivel {n}, todavía cerrado",
+  "niveaux.etoiles": {
+   "one": "{n} estrella",
+   "other": "{n} estrellas"
+  },
+  "zone.0": "El Taller",
+  "zone.1": "La Fábrica",
+  "zone.2": "El Almacén",
+  "zone.3": "La Estación",
+  "hud.niveau": "Nivel {n}",
+  "hud.rouages": "Engranajes: {n} de 3",
+  "hud.coeurs": {
+   "one": "{n} corazón",
+   "other": "{n} corazones"
+  },
+  "hud.energie": "Energía: {n} de {max}",
+  "pause.titre": "Pausa",
+  "pause.texte": "Todo está detenido. ¡Max te espera!",
+  "tuto.titre.deplacer": "Casilla por casilla",
+  "tuto.deplacer": "Desliza el dedo hacia donde debe ir Max, o toca las flechas. Recoge los engranajes y luego ve a la estación de carga.",
+  "tuto.titre.cle": "Las llaves",
+  "tuto.cle": "Toma la llave: abre las puertas de su color. La llave azul va con el círculo, la verde con el triángulo.",
+  "tuto.titre.tapis": "Las cintas transportadoras",
+  "tuto.tapis": "Una cinta lleva a Max hacia donde apuntan sus flechas. ¡No se puede subir al revés!",
+  "tuto.titre.energie": "La energía",
+  "tuto.energie": "Cada paso gasta un poco de energía. Una pila llena toda la barra. ¡En cero, Max se queda sin batería!",
+  "tuto.titre.drone": "Los drones guardianes",
+  "tuto.drone": "El dron va y viene. El circulito muestra adónde irá después. El botón del centro hace esperar a Max.",
+  "tuto.titre.interrupteur": "El interruptor",
+  "tuto.interrupteur": "Pisa el botón: las barreras rojas se abren y las amarillas se cierran. ¡Una vez más, y es al revés!",
+  "tuto.titre.teleport": "Los teletransportadores",
+  "tuto.teleport": "Entra en un teletransportador: Max sale por el otro teletransportador del mismo color.",
+  "tuto.titre.huile": "Los charcos de aceite",
+  "tuto.huile": "Sobre el aceite, Max se desliza en línea recta hasta chocar con un obstáculo.",
+  "tuto.titre.caisse": "Las cajas",
+  "tuto.caisse": "Camina contra una caja para empujarla. Cuidado: si queda atascada contra una pared, ¡ya no se mueve!",
+  "tuto.titre.laser": "Los láseres",
+  "tuto.laser": "Un láser encendido te quita un corazón. Se enciende y se apaga a cada paso: ¡pasa cuando esté apagado!",
+  "msg.depart": "¡Recoge los engranajes y ve a la estación de carga!",
+  "msg.rouage": {
+   "one": "¡Un engranaje! Falta {n} por encontrar.",
+   "other": "¡Un engranaje! Faltan {n} por encontrar."
+  },
+  "msg.tousRouages": "¡Los 3 engranajes! ¡Rápido, a la estación!",
+  "msg.cleB": "¡La llave azul! Abre las puertas redondas.",
+  "msg.cleV": "¡La llave verde! Abre las puertas del triángulo.",
+  "msg.porte": "¡La puerta se abre!",
+  "msg.porteB": "Puerta cerrada: necesitas la llave azul.",
+  "msg.porteV": "Puerta cerrada: necesitas la llave verde.",
+  "msg.barriere": "Barrera cerrada: busca el interruptor.",
+  "msg.caisse": "La caja está atascada por ese lado.",
+  "msg.pile": "¡Una pila! La energía está al máximo.",
+  "msg.energieBasse": "¡Cuidado, casi no queda energía!",
+  "msg.inter": "¡Clic! Las barreras cambian.",
+  "msg.tele": "¡Zas, teletransportado!",
+  "msg.drone": "¡Ay, el dron! Max vuelve a la salida.",
+  "msg.laser": "¡Ay, el láser! Max vuelve a la salida.",
+  "msg.laserDanger": "¡Rápido, sal del láser: se va a encender!",
+  "msg.droneDanger": "¡Cuidado, el dron viene hacia aquí: muévete!",
+  "msg.tapis": "¡La cinta se lleva a Max!",
+  "msg.huile": "¡Cómo resbala!",
+  "fin.victoire": "¡Max está cargado!",
+  "fin.parfait": "¡Perfecto, todos los engranajes!",
+  "fin.score": "Puntos: {score}",
+  "fin.record": "¡Nuevo récord!",
+  "fin.recordAncien": "Récord: {score}",
+  "fin.detail": "Engranajes: {r} de 3 · Corazones: {c} · Pasos: {p}",
+  "fin.etoiles": {
+   "one": "{n} estrella ganada",
+   "other": "{n} estrellas ganadas"
+  },
+  "defaite.titre": "¡Oh, no!",
+  "defaite.panne": "Max se quedó sin energía.",
+  "defaite.drone": "Sin corazones: un dron chocó con Max.",
+  "defaite.laser": "Sin corazones: un láser alcanzó a Max.",
+  "defaite.detail": "Engranajes recogidos: {r} de 3. ¡Tú puedes!",
+  "bilan.titre": "¡Terminaste todos los laberintos!",
+  "bilan.texte": "Estrellas: {etoiles} de {max} · Puntos en total: {score}",
+  "bilan.encore": "Vuelve a jugar los niveles para recoger todos los engranajes.",
+  "bilan.tout": "Todos los engranajes son tuyos: ¡eres un as del laberinto!"
+ },
+ "pt": {
+  "titre": "Robô Max",
+  "accueil.consigne": "Ajude o robô Max a voltar para a estação de recarga.",
+  "accueil.consigne2": "Deslize o dedo ou toque nas setas, e pegue as 3 engrenagens douradas!",
+  "bouton.jouer": "Jogar",
+  "bouton.niveaux": "Níveis",
+  "bouton.son": "Desligar ou ligar o som",
+  "bouton.pause": "Pausa",
+  "bouton.reprendre": "Continuar",
+  "bouton.recommencer": "Recomeçar",
+  "bouton.aide": "Ver a ajuda de novo",
+  "bouton.accueil": "Início",
+  "bouton.retour": "Voltar",
+  "bouton.compris": "Entendi!",
+  "bouton.suite": "Mostre o próximo",
+  "bouton.suivant": "Próximo nível",
+  "bouton.bilan": "Ver o resultado",
+  "bouton.rejouer": "Jogar de novo",
+  "bouton.reessayer": "Tentar de novo",
+  "bouton.haut": "Subir",
+  "bouton.bas": "Descer",
+  "bouton.gauche": "Ir para a esquerda",
+  "bouton.droite": "Ir para a direita",
+  "bouton.attendre": "Esperar sem se mexer",
+  "plateau.aria": "O labirinto de Max",
+  "niveaux.titre": "Escolha um nível",
+  "niveaux.stats": "Estrelas: {etoiles} de {max} · Pontos no total: {score}",
+  "niveaux.niveau": "Nível {n}",
+  "niveaux.ferme": "Nível {n}, ainda fechado",
+  "niveaux.etoiles": {
+   "one": "{n} estrela",
+   "other": "{n} estrelas"
+  },
+  "zone.0": "A Oficina",
+  "zone.1": "A Fábrica",
+  "zone.2": "O Depósito",
+  "zone.3": "A Estação",
+  "hud.niveau": "Nível {n}",
+  "hud.rouages": "Engrenagens: {n} de 3",
+  "hud.coeurs": {
+   "one": "{n} coração",
+   "other": "{n} corações"
+  },
+  "hud.energie": "Energia: {n} de {max}",
+  "pause.titre": "Pausa",
+  "pause.texte": "Tudo parou. Max está esperando você!",
+  "tuto.titre.deplacer": "Uma casa de cada vez",
+  "tuto.deplacer": "Deslize o dedo para onde Max deve ir, ou toque nas setas. Pegue as engrenagens e depois vá até a estação de recarga!",
+  "tuto.titre.cle": "As chaves",
+  "tuto.cle": "Pegue a chave: ela abre as portas da mesma cor. A chave azul combina com o círculo, a verde com o triângulo.",
+  "tuto.titre.tapis": "As esteiras rolantes",
+  "tuto.tapis": "Uma esteira leva Max para onde as setas apontam. Não dá para subir ao contrário!",
+  "tuto.titre.energie": "A energia",
+  "tuto.energie": "Cada passo gasta um pouco de energia. Uma pilha enche a barra toda. No zero, Max fica sem bateria!",
+  "tuto.titre.drone": "Os drones vigias",
+  "tuto.drone": "O drone vai e volta. A bolinha mostra para onde ele vai depois. O botão do meio faz Max esperar.",
+  "tuto.titre.interrupteur": "O interruptor",
+  "tuto.interrupteur": "Pise no botão: as barreiras vermelhas abrem e as amarelas fecham. Mais uma vez, e é o contrário!",
+  "tuto.titre.teleport": "Os teletransportes",
+  "tuto.teleport": "Entre num teletransporte: Max sai pelo outro teletransporte da mesma cor.",
+  "tuto.titre.huile": "As poças de óleo",
+  "tuto.huile": "No óleo, Max escorrega em linha reta até bater num obstáculo.",
+  "tuto.titre.caisse": "As caixas",
+  "tuto.caisse": "Ande contra uma caixa para empurrá-la. Cuidado: se ela ficar presa na parede, não se mexe mais!",
+  "tuto.titre.laser": "Os lasers",
+  "tuto.laser": "Um laser aceso tira um coração. Ele acende e apaga a cada passo: passe quando ele estiver apagado!",
+  "msg.depart": "Pegue as engrenagens e vá até a estação de recarga!",
+  "msg.rouage": {
+   "one": "Uma engrenagem! Falta {n} para achar.",
+   "other": "Uma engrenagem! Faltam {n} para achar."
+  },
+  "msg.tousRouages": "As 3 engrenagens! Rápido, para a estação!",
+  "msg.cleB": "A chave azul! Ela abre as portas redondas.",
+  "msg.cleV": "A chave verde! Ela abre as portas do triângulo.",
+  "msg.porte": "A porta abriu!",
+  "msg.porteB": "Porta fechada: você precisa da chave azul.",
+  "msg.porteV": "Porta fechada: você precisa da chave verde.",
+  "msg.barriere": "Barreira fechada: procure o interruptor.",
+  "msg.caisse": "A caixa está presa desse lado.",
+  "msg.pile": "Uma pilha! A energia está no máximo.",
+  "msg.energieBasse": "Cuidado, a energia está quase no fim!",
+  "msg.inter": "Clique! As barreiras mudam.",
+  "msg.tele": "Zás, teletransportado!",
+  "msg.drone": "Ai, o drone! Max volta para o início.",
+  "msg.laser": "Ai, o laser! Max volta para o início.",
+  "msg.laserDanger": "Rápido, saia do laser: ele vai acender!",
+  "msg.droneDanger": "Cuidado, o drone vem para cá: mexa-se!",
+  "msg.tapis": "A esteira leva Max embora!",
+  "msg.huile": "Que escorregão!",
+  "fin.victoire": "Max está recarregado!",
+  "fin.parfait": "Perfeito, todas as engrenagens!",
+  "fin.score": "Pontos: {score}",
+  "fin.record": "Novo recorde!",
+  "fin.recordAncien": "Recorde: {score}",
+  "fin.detail": "Engrenagens: {r} de 3 · Corações: {c} · Passos: {p}",
+  "fin.etoiles": {
+   "one": "{n} estrela ganha",
+   "other": "{n} estrelas ganhas"
+  },
+  "defaite.titre": "Ah, não!",
+  "defaite.panne": "Max ficou sem energia.",
+  "defaite.drone": "Sem corações: um drone esbarrou em Max.",
+  "defaite.laser": "Sem corações: um laser atingiu Max.",
+  "defaite.detail": "Engrenagens pegas: {r} de 3. Você consegue!",
+  "bilan.titre": "Todos os labirintos terminados!",
+  "bilan.texte": "Estrelas: {etoiles} de {max} · Pontos no total: {score}",
+  "bilan.encore": "Jogue os níveis de novo para pegar todas as engrenagens.",
+  "bilan.tout": "Todas as engrenagens são suas: você é craque em labirintos!"
+ },
+ "de": {
+  "titre": "Roboter Max",
+  "accueil.consigne": "Hilf dem Roboter Max, zu seiner Ladestation zu kommen.",
+  "accueil.consigne2": "Wische mit dem Finger oder tippe auf die Pfeile und sammle die 3 goldenen Zahnräder!",
+  "bouton.jouer": "Spielen",
+  "bouton.niveaux": "Level",
+  "bouton.son": "Ton aus- oder einschalten",
+  "bouton.pause": "Pause",
+  "bouton.reprendre": "Weiter",
+  "bouton.recommencer": "Neu starten",
+  "bouton.aide": "Hilfe noch mal ansehen",
+  "bouton.accueil": "Start",
+  "bouton.retour": "Zurück",
+  "bouton.compris": "Alles klar!",
+  "bouton.suite": "Zeig mir das Nächste",
+  "bouton.suivant": "Nächstes Level",
+  "bouton.bilan": "Ergebnis ansehen",
+  "bouton.rejouer": "Noch mal spielen",
+  "bouton.reessayer": "Noch mal versuchen",
+  "bouton.haut": "Nach oben",
+  "bouton.bas": "Nach unten",
+  "bouton.gauche": "Nach links",
+  "bouton.droite": "Nach rechts",
+  "bouton.attendre": "Warten, ohne sich zu bewegen",
+  "plateau.aria": "Das Labyrinth von Max",
+  "niveaux.titre": "Wähle ein Level",
+  "niveaux.stats": "Sterne: {etoiles} von {max} · Gesamtpunkte: {score}",
+  "niveaux.niveau": "Level {n}",
+  "niveaux.ferme": "Level {n}, noch gesperrt",
+  "niveaux.etoiles": {
+   "one": "{n} Stern",
+   "other": "{n} Sterne"
+  },
+  "zone.0": "Die Werkstatt",
+  "zone.1": "Die Fabrik",
+  "zone.2": "Das Lager",
+  "zone.3": "Die Station",
+  "hud.niveau": "Level {n}",
+  "hud.rouages": "Zahnräder: {n} von 3",
+  "hud.coeurs": {
+   "one": "{n} Herz",
+   "other": "{n} Herzen"
+  },
+  "hud.energie": "Energie: {n} von {max}",
+  "pause.titre": "Pause",
+  "pause.texte": "Alles steht still. Max wartet auf dich!",
+  "tuto.titre.deplacer": "Feld für Feld",
+  "tuto.deplacer": "Wische dorthin, wo Max hin soll, oder tippe auf die Pfeile. Sammle die Zahnräder und geh dann zur Ladestation!",
+  "tuto.titre.cle": "Die Schlüssel",
+  "tuto.cle": "Nimm den Schlüssel: Er öffnet die Türen in seiner Farbe. Der blaue gehört zum Kreis, der grüne zum Dreieck.",
+  "tuto.titre.tapis": "Die Förderbänder",
+  "tuto.tapis": "Ein Förderband trägt Max in Pfeilrichtung. Zurücklaufen geht nicht!",
+  "tuto.titre.energie": "Die Energie",
+  "tuto.energie": "Jeder Schritt kostet ein bisschen Energie. Eine Batterie füllt den ganzen Balken. Bei null ist Max leer!",
+  "tuto.titre.drone": "Die Wächter-Drohnen",
+  "tuto.drone": "Die Drohne fliegt hin und her. Der kleine Kreis zeigt, wohin sie als Nächstes fliegt. Mit der mittleren Taste wartet Max.",
+  "tuto.titre.interrupteur": "Der Schalter",
+  "tuto.interrupteur": "Tritt auf den Knopf: Die roten Schranken gehen auf und die gelben zu. Noch einmal, und es ist umgekehrt!",
+  "tuto.titre.teleport": "Die Teleporter",
+  "tuto.teleport": "Geh in einen Teleporter: Max kommt aus dem anderen Teleporter derselben Farbe heraus.",
+  "tuto.titre.huile": "Die Ölpfützen",
+  "tuto.huile": "Auf Öl rutscht Max geradeaus, bis er gegen ein Hindernis stößt.",
+  "tuto.titre.caisse": "Die Kisten",
+  "tuto.caisse": "Lauf gegen eine Kiste, um sie zu schieben. Vorsicht: Steckt sie an einer Wand fest, bewegt sie sich nicht mehr!",
+  "tuto.titre.laser": "Die Laser",
+  "tuto.laser": "Ein leuchtender Laser kostet ein Herz. Er geht bei jedem Schritt an und aus: Geh durch, wenn er aus ist!",
+  "msg.depart": "Sammle die Zahnräder und geh zur Ladestation!",
+  "msg.rouage": {
+   "one": "Ein Zahnrad! Noch {n} zu finden.",
+   "other": "Ein Zahnrad! Noch {n} zu finden."
+  },
+  "msg.tousRouages": "Alle 3 Zahnräder! Schnell zur Ladestation!",
+  "msg.cleB": "Der blaue Schlüssel! Er öffnet die runden Türen.",
+  "msg.cleV": "Der grüne Schlüssel! Er öffnet die Dreieck-Türen.",
+  "msg.porte": "Die Tür geht auf!",
+  "msg.porteB": "Tür zu: Du brauchst den blauen Schlüssel.",
+  "msg.porteV": "Tür zu: Du brauchst den grünen Schlüssel.",
+  "msg.barriere": "Schranke zu: Such den Schalter.",
+  "msg.caisse": "Die Kiste klemmt auf dieser Seite.",
+  "msg.pile": "Eine Batterie! Die Energie ist voll.",
+  "msg.energieBasse": "Achtung, fast keine Energie mehr!",
+  "msg.inter": "Klick! Die Schranken wechseln.",
+  "msg.tele": "Zack, teleportiert!",
+  "msg.drone": "Autsch, die Drohne! Max muss zurück zum Start.",
+  "msg.laser": "Autsch, der Laser! Max muss zurück zum Start.",
+  "msg.laserDanger": "Schnell, raus aus dem Laser: Gleich geht er an!",
+  "msg.droneDanger": "Achtung, die Drohne kommt hierher: Beweg dich!",
+  "msg.tapis": "Das Band trägt Max davon!",
+  "msg.huile": "Huch, ist das rutschig!",
+  "fin.victoire": "Max ist aufgeladen!",
+  "fin.parfait": "Perfekt, alle Zahnräder!",
+  "fin.score": "Punkte: {score}",
+  "fin.record": "Neuer Rekord!",
+  "fin.recordAncien": "Rekord: {score}",
+  "fin.detail": "Zahnräder: {r} von 3 · Herzen: {c} · Schritte: {p}",
+  "fin.etoiles": {
+   "one": "{n} Stern gewonnen",
+   "other": "{n} Sterne gewonnen"
+  },
+  "defaite.titre": "Oh nein!",
+  "defaite.panne": "Max hat keine Energie mehr.",
+  "defaite.drone": "Keine Herzen mehr: Eine Drohne hat Max erwischt.",
+  "defaite.laser": "Keine Herzen mehr: Ein Laser hat Max getroffen.",
+  "defaite.detail": "Gesammelte Zahnräder: {r} von 3. Du schaffst das!",
+  "bilan.titre": "Alle Labyrinthe geschafft!",
+  "bilan.texte": "Sterne: {etoiles} von {max} · Gesamtpunkte: {score}",
+  "bilan.encore": "Spiel die Level noch mal, um alle Zahnräder zu sammeln.",
+  "bilan.tout": "Alle Zahnräder gehören dir: Du bist ein Labyrinth-Profi!"
+ }
+}
+</script>
+<script id="jel-i18n">
+/* ==========================================================================
+   Jeux-en-ligne — module commun de traduction (site ET jeux)        jel-i18n v1
+   JavaScript pur, sans dépendance, fonctionne hors ligne.
+
+   Langues : fr (source), en, es, pt (Brésil), de. Langue de secours : en.
+   Détection, dans l'ordre :
+     1. paramètre d'adresse ?lang=xx (enregistré comme choix) ;
+     2. choix enregistré : localStorage « lang » (dans un jeu affiché par le
+        site, le lanceur transmet ce choix par window.JEL_LANG, car le cadre
+        isolé n'a pas accès au stockage du site) ;
+     3. navigator.languages (préfixe seul : « pt-BR » → « pt ») ;
+     4. « en ».
+
+   API (window.JEL_I18N, et raccourci global t() s'il est libre) :
+     getLang()            langue courante
+     setLang(code)        change de langue (enregistre, <html lang>, textes)
+     t(cle, variables)    texte traduit ; {variables} remplacées ; pluriels
+                          via Intl.PluralRules si la valeur est un objet
+                          { "one": "…", "other": "…" } (variable n)
+     has(cle)             la clé existe-t-elle (langue courante ou fr) ?
+     nombre(x, options)   nombre formaté selon la langue (Intl.NumberFormat)
+     date(d, options)     date formatée selon la langue (Intl.DateTimeFormat)
+     appliquer(racine)    traduit le DOM : data-i18n (texte), data-i18n-html
+                          (dictionnaire de confiance seulement),
+                          data-i18n-placeholder, data-i18n-title, data-i18n-aria
+     ajouter(lang, dico)  ajoute des textes ; charger(dossier) : site seulement
+     surChangement(f)     appelle f(lang) après chaque changement de langue
+     creerSelecteur(opts) sélecteur de langue (code + nom dans sa langue)
+
+   Clé absente dans la langue choisie : texte français, sinon la clé brute,
+   avec un avertissement dans la console (une seule fois par clé).
+
+   Dans un jeu : ce fichier est recopié tel quel dans index.html, juste après
+   le bloc <script type="application/json" id="jel-i18n-textes"> qui contient
+   { "fr": {…}, "en": {…}, … }. Un petit bouton de langue s'ajoute dans le coin
+   indiqué par data-coin (haut-gauche, haut-droite, bas-gauche, bas-droite ;
+   data-coin-decalage="52px" l'éloigne du bord haut ou bas, ex. sous une barre ;
+   data-place="id1 id2" le met plutôt dans ces éléments du jeu (barre d'outils…) ;
+   data-coin="aucun" pour le placer soi-même avec creerSelecteur). Changer de
+   langue relance le jeu dans la nouvelle langue.
+   Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie ce fichier).
+   ========================================================================== */
+(function () {
+  'use strict';
+  if (window.JEL_I18N) return;
+
+  var LANGUES = ['fr', 'en', 'es', 'pt', 'de'];
+  var NOMS = { fr: 'Français', en: 'English', es: 'Español', pt: 'Português', de: 'Deutsch' };
+  var ETIQUETTE = { fr: 'Langue', en: 'Language', es: 'Idioma', pt: 'Idioma', de: 'Sprache' }; // nom du bouton
+  var SOURCE = 'fr';
+  var SECOURS = 'en';
+  var CLE_STOCKAGE = 'lang';
+
+  var dicos = {};          // { fr: { cle: texte }, en: {…} }
+  var ecouteurs = [];
+  var avertis = {};
+  var dossierSite = null;  // site : dossier des fichiers JSON (charger)
+  var blocJeu = document.getElementById('jel-i18n-textes');
+  var modeJeu = !!blocJeu;
+
+  // --- Outils ---------------------------------------------------------------
+
+  function valide(code) {
+    var c = String(code || '').trim().toLowerCase().split(/[-_]/)[0];
+    return LANGUES.indexOf(c) >= 0 ? c : null;
+  }
+  function lireStockage() { try { return localStorage.getItem(CLE_STOCKAGE); } catch (e) { return null; } }
+  function ecrireStockage(v) { try { localStorage.setItem(CLE_STOCKAGE, v); } catch (e) { /* stockage refusé */ } }
+  function paramAdresse() { try { return new URLSearchParams(location.search).get('lang'); } catch (e) { return null; } }
+
+  function detecter() {
+    var c = valide(paramAdresse());
+    if (c) { ecrireStockage(c); return c; }
+    c = valide(window.JEL_LANG) || valide(lireStockage());
+    if (c) return c;
+    var liste = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+    for (var i = 0; i < liste.length; i++) {
+      c = valide(liste[i]);
+      if (c) return c;
+    }
+    return SECOURS;
+  }
+
+  var langue = detecter();
+  document.documentElement.lang = langue;
+
+  function avertir(texte) {
+    if (avertis[texte]) return;
+    avertis[texte] = true;
+    try { console.warn('[i18n] ' + texte); } catch (e) { /* pas de console */ }
+  }
+
+  function trouver(lang, cle) {
+    var d = dicos[lang];
+    return d && Object.prototype.hasOwnProperty.call(d, cle) ? d[cle] : undefined;
+  }
+
+  function nombre(x, options) {
+    try { return new Intl.NumberFormat(langue, options).format(x); } catch (e) { return String(x); }
+  }
+
+  function date(d, options) {
+    try { return new Intl.DateTimeFormat(langue, options).format(d instanceof Date ? d : new Date(d)); } catch (e) { return String(d); }
+  }
+
+  // Valeur au pluriel : { one, other, … } selon Intl.PluralRules (variable n).
+  function pluriel(valeur, lang, variables) {
+    var n = variables && typeof variables.n === 'number' ? variables.n : 0;
+    var forme = 'other';
+    try { forme = new Intl.PluralRules(lang).select(n); } catch (e) { /* navigateur ancien */ }
+    if (n === 0 && typeof valeur.zero === 'string') return valeur.zero;
+    return typeof valeur[forme] === 'string' ? valeur[forme] : valeur.other;
+  }
+
+  function remplacer(texte, variables) {
+    if (!variables) return texte;
+    return texte.replace(/\{(\w+)\}/g, function (tout, nom) {
+      if (!Object.prototype.hasOwnProperty.call(variables, nom)) return tout;
+      var v = variables[nom];
+      return typeof v === 'number' ? nombre(v) : String(v);
+    });
+  }
+
+  // --- Traduction -----------------------------------------------------------
+
+  function t(cle, variables) {
+    var lang = langue;
+    var valeur = trouver(lang, cle);
+    if (valeur === undefined) {
+      lang = SOURCE;
+      valeur = trouver(SOURCE, cle);
+      if (langue !== SOURCE || valeur === undefined) avertir('clé manquante en ' + langue + ' : ' + cle);
+      if (valeur === undefined) return cle;
+    }
+    if (valeur && typeof valeur === 'object') valeur = pluriel(valeur, lang, variables);
+    return remplacer(String(valeur), variables);
+  }
+
+  function has(cle) {
+    return trouver(langue, cle) !== undefined || trouver(SOURCE, cle) !== undefined;
+  }
+
+  // Traduit tous les éléments marqués sous « racine » (document par défaut).
+  function appliquer(racine) {
+    racine = racine || document;
+    if (!racine.querySelectorAll) return;
+    var regles = [
+      ['data-i18n', function (el, v) { el.textContent = v; }],
+      ['data-i18n-html', function (el, v) { el.innerHTML = v; }],
+      ['data-i18n-placeholder', function (el, v) { el.setAttribute('placeholder', v); }],
+      ['data-i18n-title', function (el, v) { el.setAttribute('title', v); }],
+      ['data-i18n-aria', function (el, v) { el.setAttribute('aria-label', v); }],
+    ];
+    regles.forEach(function (regle) {
+      var liste = racine.querySelectorAll('[' + regle[0] + ']');
+      for (var i = 0; i < liste.length; i++) regle[1](liste[i], t(liste[i].getAttribute(regle[0])));
+    });
+  }
+
+  function ajouter(lang, dico) {
+    var c = valide(lang);
+    if (!c || !dico || typeof dico !== 'object') return;
+    dicos[c] = dicos[c] || {};
+    for (var cle in dico) {
+      if (Object.prototype.hasOwnProperty.call(dico, cle)) dicos[c][cle] = dico[cle];
+    }
+  }
+
+  // Site : charge <dossier><lang>.json (fr toujours, pour le repli).
+  function chargerUne(lang) {
+    if (dicos[lang] || !dossierSite) return Promise.resolve();
+    return fetch(dossierSite + lang + '.json')
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) { ajouter(lang, d); })
+      .catch(function (e) { avertir('textes « ' + lang + ' » indisponibles (' + e.message + ')'); });
+  }
+
+  function charger(dossier) {
+    dossierSite = dossier;
+    return Promise.all([chargerUne(SOURCE), chargerUne(langue)]).then(function () { appliquer(document); });
+  }
+
+  function surChangement(f) { if (typeof f === 'function') ecouteurs.push(f); }
+
+  function prevenir() {
+    for (var i = 0; i < ecouteurs.length; i++) {
+      try { ecouteurs[i](langue); } catch (e) { setTimeout(function () { throw e; }); }
+    }
+  }
+
+  // Changement de langue appliqué sur place (sans recharger la page).
+  function changerSurPlace(c) {
+    langue = c;
+    document.documentElement.lang = c;
+    appliquer(document);
+    majSelecteurs();
+    prevenir();
+  }
+
+  function setLang(code) {
+    var c = valide(code);
+    if (!c) return Promise.resolve(langue);
+    ecrireStockage(c);
+    if (modeJeu) {
+      if (c === langue) return Promise.resolve(langue);
+      // Jeu affiché par le site : le lanceur enregistre le choix et relance le jeu.
+      if (window.parent && window.parent !== window) {
+        try { window.parent.postMessage({ type: 'jel-langue', lang: c }, '*'); } catch (e) { /* cadre isolé */ }
+        // Si personne ne répond (jeu ouvert ailleurs), on change sur place.
+        setTimeout(function () { changerSurPlace(c); }, 700);
+        return Promise.resolve(c);
+      }
+      // Jeu ouvert seul : on le relance dans la nouvelle langue.
+      if (/^https?:$/.test(location.protocol)) {
+        var u = new URL(location.href);
+        u.searchParams.set('lang', c);
+        location.replace(u.href);
+        return Promise.resolve(c);
+      }
+      changerSurPlace(c);
+      return Promise.resolve(c);
+    }
+    // Site : l'adresse suit le choix si elle porte déjà ?lang=.
+    try {
+      var adresse = new URL(location.href);
+      if (adresse.searchParams.has('lang')) {
+        adresse.searchParams.set('lang', c);
+        history.replaceState(history.state, '', adresse.href);
+      }
+    } catch (e) { /* adresse spéciale */ }
+    return chargerUne(c).then(function () { changerSurPlace(c); return c; });
+  }
+
+  // --- Sélecteur de langue ---------------------------------------------------
+  // Bouton (code de la langue) qui ouvre la liste des 5 langues, chacune avec
+  // son code et son nom dans sa propre langue. Pas de drapeaux. Doigt et clavier
+  // (Entrée, Espace, flèches, Échap).
+  // Dans un jeu, il est isolé dans un Shadow DOM (élément <jel-langue>) : le CSS
+  // du jeu (button {…}, * {…}) ne peut pas le déformer, et inversement.
+
+  var CSS_SELECTEUR =
+    '.jel-langue{position:relative;display:inline-block;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif;text-align:left;color:#eceae4}' +
+    '.jel-langue *{box-sizing:border-box}' +
+    '.jel-langue-bouton{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;margin:0;padding:0 10px;border:0;border-radius:999px;background:rgba(11,16,32,.55);color:#eceae4;font:inherit;line-height:1;cursor:pointer;box-shadow:none}' +
+    '.jel-langue-code{font-weight:800;letter-spacing:.04em}' +
+    '.jel-langue-menu{position:absolute;z-index:2147483001;min-width:170px;margin:6px 0 0;padding:6px;list-style:none;border-radius:14px;background:#161f38;box-shadow:0 10px 30px rgba(0,0,0,.45);border:1px solid #434e6b}' +
+    '.jel-langue-menu[hidden]{display:none}' +
+    '.jel-langue-menu li{margin:0;padding:0}' +
+    '.jel-langue-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;margin:0;padding:0 12px;border:0;border-radius:10px;background:none;color:#eceae4;font:inherit;text-align:left;cursor:pointer;box-shadow:none;white-space:nowrap}' +
+    '.jel-langue-menu button b{min-width:2.2em;color:#a8b3f0}' +
+    '.jel-langue-menu button[aria-current="true"]{background:#a8b3f0;color:#0b1020}' +
+    '.jel-langue-menu button[aria-current="true"] b{color:#0b1020}' +
+    '.jel-langue-menu button:hover:not([aria-current="true"]),.jel-langue-menu button:focus-visible{background:#1d2745}' +
+    '.jel-langue :focus-visible{outline:3px solid #a8b3f0;outline-offset:2px}' +
+    // Jeu : petit bouton discret (code seul) ; liste ouverte vers l'intérieur de l'écran.
+    '.jel-langue.compact .jel-langue-bouton{min-width:40px;min-height:40px;padding:0 8px;font-size:12px;background:rgba(11,16,32,.45);border:1px solid rgba(255,255,255,.3)}' +
+    '.jel-langue.compact .jel-langue-nom{display:none}' +
+    '.jel-langue.vers-gauche .jel-langue-menu{right:0}' +
+    '.jel-langue.vers-haut .jel-langue-menu{bottom:100%;margin:0 0 6px}';
+
+  // Place du bouton dans un jeu, selon le coin choisi (data-coin).
+  var COINS = {
+    'haut-gauche': { top: 'max(6px, env(safe-area-inset-top))', left: 'max(6px, env(safe-area-inset-left))' },
+    'haut-droite': { top: 'max(6px, env(safe-area-inset-top))', right: 'max(6px, env(safe-area-inset-right))' },
+    'bas-gauche': { bottom: 'max(6px, env(safe-area-inset-bottom))', left: 'max(6px, env(safe-area-inset-left))' },
+    'bas-droite': { bottom: 'max(6px, env(safe-area-inset-bottom))', right: 'max(6px, env(safe-area-inset-right))' },
+  };
+
+  var selecteurs = [];
+
+  function majSelecteurs() {
+    selecteurs.forEach(function (s) { s.maj(); });
+  }
+
+  // options : { conteneur, classe, coin, decalage, isole } ;
+  // - coin : sélecteur de jeu isolé, fixé dans ce coin, éloigné du bord haut ou bas de
+  //   « decalage » (longueur CSS, ex. « 52px ») s'il est donné ;
+  // - isole : sélecteur de jeu isolé, placé dans « conteneur » (ex. la barre du jeu).
+  function creerSelecteur(options) {
+    options = options || {};
+    var coin = options.coin && COINS[options.coin] ? options.coin : null;
+    var isole = !!(coin || options.isole);
+    var boite = document.createElement('div');
+    boite.className = 'jel-langue' + (options.classe ? ' ' + options.classe : '') +
+      (isole ? ' compact' : '') + (coin && /droite/.test(coin) ? ' vers-gauche' : '') + (coin && /bas/.test(coin) ? ' vers-haut' : '');
+
+    var bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'jel-langue-bouton';
+    bouton.setAttribute('aria-haspopup', 'true');
+    bouton.setAttribute('aria-expanded', 'false');
+    var code = document.createElement('span');
+    code.className = 'jel-langue-code';
+    var nom = document.createElement('span');
+    nom.className = 'jel-langue-nom';
+    bouton.append(code, nom);
+
+    var menu = document.createElement('ul');
+    menu.className = 'jel-langue-menu';
+    menu.hidden = true;
+    var choix = LANGUES.map(function (l) {
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.lang = l;
+      b.dataset.lang = l;
+      var c = document.createElement('b');
+      c.textContent = l.toUpperCase();
+      b.append(c, document.createTextNode(' ' + NOMS[l]));
+      b.addEventListener('click', function () { fermer(true); setLang(l); });
+      li.append(b);
+      menu.append(li);
+      return b;
+    });
+
+    var hote = null; // jeu : élément <jel-langue> (un peu transparent, sauf liste ouverte)
+    function opacite(v) { if (hote) hote.style.setProperty('opacity', v, 'important'); }
+    function ouvrir() {
+      // Dans une barre : la liste s'ouvre vers l'intérieur de l'écran.
+      if (isole && !coin && hote) {
+        var r = hote.getBoundingClientRect();
+        boite.classList.toggle('vers-gauche', r.left > window.innerWidth / 2);
+        boite.classList.toggle('vers-haut', r.top > window.innerHeight / 2);
+      }
+      menu.hidden = false;
+      opacite('1');
+      bouton.setAttribute('aria-expanded', 'true');
+      var actuel = choix[LANGUES.indexOf(langue)] || choix[0];
+      actuel.focus();
+    }
+    function fermer(rendreFocus) {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      opacite('.85');
+      bouton.setAttribute('aria-expanded', 'false');
+      if (rendreFocus) bouton.focus();
+    }
+
+    bouton.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.hidden) ouvrir(); else fermer(false);
+    });
+    menu.addEventListener('keydown', function (e) {
+      var racine = boite.getRootNode();
+      var i = choix.indexOf(racine.activeElement || document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); fermer(true); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); choix[(i + 1) % choix.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); choix[(i - 1 + choix.length) % choix.length].focus(); }
+      else if (e.key === 'Tab') fermer(false);
+      e.stopPropagation(); // les touches du menu ne pilotent pas le jeu
+    });
+    bouton.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' && menu.hidden) { e.preventDefault(); ouvrir(); }
+      e.stopPropagation();
+    });
+    // Un toucher ailleurs referme la liste (sans gêner le jeu).
+    document.addEventListener('pointerdown', function (e) {
+      var chemin = e.composedPath ? e.composedPath() : [e.target];
+      if (chemin.indexOf(boite) < 0) fermer(false);
+    }, true);
+    // Les gestes sur le sélecteur ne doivent pas arriver au jeu.
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click'].forEach(function (type) {
+      boite.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
+    boite.append(bouton, menu);
+
+    // Élément ajouté à la page : la boîte elle-même (site), ou un hôte isolé (jeu).
+    var element = boite;
+    if (isole) {
+      element = hote = document.createElement('jel-langue');
+      element.className = 'jel-langue';
+      var place = coin ? COINS[coin] : {};
+      var style = coin
+        ? { position: 'fixed', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'block' }
+        : { position: 'relative', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'inline-block', 'vertical-align': 'middle', flex: 'none' };
+      for (var p in place) style[p] = options.decalage && /^(top|bottom)$/.test(p) ? 'calc(' + place[p] + ' + ' + options.decalage + ')' : place[p];
+      for (var nomStyle in style) element.style.setProperty(nomStyle, style[nomStyle], 'important');
+      var ombre = element.attachShadow ? element.attachShadow({ mode: 'open' }) : element;
+      var feuille = document.createElement('style');
+      feuille.textContent = CSS_SELECTEUR;
+      ombre.append(feuille, boite);
+    }
+
+    var s = {
+      element: element,
+      maj: function () {
+        code.textContent = langue.toUpperCase();
+        nom.textContent = NOMS[langue];
+        var etiquette = ETIQUETTE[langue] + ' : ' + NOMS[langue];
+        bouton.setAttribute('aria-label', etiquette);
+        bouton.title = etiquette;
+        choix.forEach(function (b) {
+          if (b.dataset.lang === langue) b.setAttribute('aria-current', 'true');
+          else b.removeAttribute('aria-current');
+        });
+      },
+    };
+    s.maj();
+    selecteurs.push(s);
+    if (options.conteneur) options.conteneur.append(element);
+    return element;
+  }
+
+  // Site : style de base du sélecteur dans la page (style.css le complète).
+  function ajouterStyle() {
+    if (document.getElementById('jel-langue-style')) return;
+    var style = document.createElement('style');
+    style.id = 'jel-langue-style';
+    style.textContent = CSS_SELECTEUR;
+    (document.head || document.documentElement).append(style);
+  }
+
+  // --- Démarrage ----------------------------------------------------------------
+
+  if (modeJeu) {
+    try {
+      var textes = JSON.parse(blocJeu.textContent);
+      for (var l in textes) if (Object.prototype.hasOwnProperty.call(textes, l)) ajouter(l, textes[l]);
+    } catch (e) {
+      avertir('textes du jeu illisibles (' + e.message + ')');
+    }
+  }
+
+  window.JEL_I18N = {
+    LANGUES: LANGUES.slice(),
+    NOMS: NOMS,
+    SOURCE: SOURCE,
+    getLang: function () { return langue; },
+    setLang: setLang,
+    t: t,
+    has: has,
+    nombre: nombre,
+    date: date,
+    appliquer: appliquer,
+    ajouter: ajouter,
+    charger: charger,
+    surChangement: surChangement,
+    creerSelecteur: creerSelecteur,
+  };
+  if (!('t' in window)) window.t = t;
+
+  if (!modeJeu) ajouterStyle();
+
+  if (modeJeu) {
+    var demarrer = function () {
+      appliquer(document);
+      // data-place="id1 id2" : bouton(s) dans ces éléments du jeu ; sinon dans le coin data-coin.
+      var places = (blocJeu.getAttribute('data-place') || '').split(/\s+/).map(function (id) { return id && document.getElementById(id); }).filter(Boolean);
+      var coin = blocJeu.getAttribute('data-coin') || 'haut-gauche';
+      if (places.length) places.forEach(function (el) { creerSelecteur({ conteneur: el, isole: true }); });
+      else if (coin !== 'aucun' && document.body) {
+        creerSelecteur({ conteneur: document.body, coin: coin, decalage: blocJeu.getAttribute('data-coin-decalage') || '' });
+      }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
+    else demarrer();
+  }
+})();
+</script>
+<script id="jel-sauvegarde">
+/* ==========================================================================
+   Free Micro Games — module commun de sauvegarde des jeux     jel-sauvegarde v1
+   JavaScript pur, sans dépendance, sans compte ni serveur, hors ligne.
+
+   Garde la progression d'un jeu sur l'appareil, sous la clé « save_<id> »
+   (ex. « save_pommes-du-poney ») du localStorage du site.
+
+   Où sont les données ?
+     - Jeu ouvert seul (adresse /games/<id>/, test local) : localStorage direct.
+     - Jeu affiché par le site (cadre isolé, sans accès au stockage) : le
+       lanceur (public/play.js) donne la sauvegarde au démarrage
+       (window.JEL_SAUVEGARDES = { "save_<id>": "<JSON>" }) et enregistre
+       chaque écriture reçue par le message { type: "jel-sauvegarde", cle,
+       valeur } (valeur null = effacer). Le jeu ne peut écrire que sa clé.
+     - Sans aucun stockage : la sauvegarde vit le temps de la page.
+
+   Données (version de format SAUVEGARDE_VERSION) :
+     { v: 1, niveau: 1, score: 0, options: {}, date: <ms> }
+     niveau  numéro du niveau où reprendre (1 = premier)
+     score   score à ce moment-là
+     options réglages utiles (son coupé, difficulté…)
+     Le jeu peut ajouter ses propres champs (étoiles, record…).
+   Sauvegarde absente, illisible ou d'un format inconnu : valeurs par défaut.
+
+   API (window.JEL_SAVE) :
+     save(jeu, donnees)     enregistre (fusionné avec la sauvegarde actuelle) ;
+                            renvoie true si c'est fait
+     load(jeu)              données (valeurs par défaut si rien d'utilisable)
+     clear(jeu)             efface la sauvegarde
+     existe(jeu)            une sauvegarde utilisable existe-t-elle ?
+     surFermeture(f)        appelle f() quand la page est cachée ou quittée
+                            (visibilitychange, pagehide, beforeunload)
+     reprise(options)       fenêtre « Continuer » / « Nouvelle partie » /
+                            « Effacer la sauvegarde » (voir plus bas)
+     boutonEffacer(options) bouton « Effacer la sauvegarde » seul
+     texte(cle, vars)       textes du module dans la langue du jeu
+
+   Dans un jeu : ce fichier est recopié tel quel dans index.html, dans une
+   balise script d'identifiant « jel-sauvegarde », juste après le module de
+   traduction (jel-i18n). Il ne doit jamais contenir la fermeture de balise
+   script (elle couperait le jeu).
+   Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie aussi ce fichier).
+   Règles d'intégration : CONSIGNES-JEU.md, section « Sauvegarde ».
+   ========================================================================== */
+(function () {
+  'use strict';
+  if (window.JEL_SAVE) return;
+
+  var SAUVEGARDE_VERSION = 1;
+  var PREFIXE = 'save_';
+  var TAILLE_MAX = 100000; // caractères : le lanceur refuse au-delà
+
+  // --- Stockage -------------------------------------------------------------
+
+  var direct = (function () {
+    try {
+      var essai = '__jel_essai__';
+      localStorage.setItem(essai, '1');
+      localStorage.removeItem(essai);
+      return localStorage;
+    } catch (e) { return null; } // cadre isolé du site, stockage refusé
+  })();
+
+  var memoire = {};
+  try {
+    var donnees = window.JEL_SAUVEGARDES;
+    if (donnees && typeof donnees === 'object') {
+      for (var c in donnees) {
+        if (Object.prototype.hasOwnProperty.call(donnees, c) && typeof donnees[c] === 'string') memoire[c] = donnees[c];
+      }
+    }
+  } catch (e) { /* rien reçu du lanceur */ }
+
+  function lire(cle) {
+    if (direct) { try { return direct.getItem(cle); } catch (e) { /* stockage devenu indisponible */ } }
+    return Object.prototype.hasOwnProperty.call(memoire, cle) ? memoire[cle] : null;
+  }
+
+  // valeur null = effacer
+  function ecrire(cle, valeur) {
+    if (valeur === null) delete memoire[cle]; else memoire[cle] = valeur;
+    var ok = false;
+    if (direct) {
+      try {
+        if (valeur === null) direct.removeItem(cle); else direct.setItem(cle, valeur);
+        ok = true;
+      } catch (e) { /* stockage plein ou refusé */ }
+    }
+    if (!ok && window.parent && window.parent !== window) {
+      try { window.parent.postMessage({ type: 'jel-sauvegarde', cle: cle, valeur: valeur }, '*'); ok = true; } catch (e) { /* pas de lanceur */ }
+    }
+    return ok;
+  }
+
+  // --- Données ----------------------------------------------------------------
+
+  function cleDe(jeu) { return PREFIXE + String(jeu || '').trim(); }
+
+  function defauts() { return { v: SAUVEGARDE_VERSION, niveau: 1, score: 0, options: {} }; }
+
+  function objet(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
+
+  // Données relues, ou null si absentes, illisibles ou d'un format inconnu.
+  function lireDonnees(jeu) {
+    var brut = lire(cleDe(jeu));
+    if (typeof brut !== 'string' || !brut) return null;
+    var d;
+    try { d = JSON.parse(brut); } catch (e) { return null; }
+    if (!objet(d) || d.v !== SAUVEGARDE_VERSION) return null;
+    var propre = defauts();
+    for (var k in d) if (Object.prototype.hasOwnProperty.call(d, k)) propre[k] = d[k];
+    var n = Number(propre.niveau);
+    propre.niveau = isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+    var s = Number(propre.score);
+    propre.score = isFinite(s) ? s : 0;
+    if (!objet(propre.options)) propre.options = {};
+    return propre;
+  }
+
+  function load(jeu) { return lireDonnees(jeu) || defauts(); }
+
+  function existe(jeu) { return lireDonnees(jeu) !== null; }
+
+  function save(jeu, donnees) {
+    if (!String(jeu || '').trim()) return false;
+    var tout = load(jeu);
+    if (objet(donnees)) for (var k in donnees) if (Object.prototype.hasOwnProperty.call(donnees, k)) tout[k] = donnees[k];
+    tout.v = SAUVEGARDE_VERSION;
+    tout.date = Date.now();
+    var texte;
+    try { texte = JSON.stringify(tout); } catch (e) { return false; }
+    if (texte.length > TAILLE_MAX) {
+      try { console.warn('[sauvegarde] trop grosse, ignorée (' + texte.length + ' caractères)'); } catch (e) { /* pas de console */ }
+      return false;
+    }
+    return ecrire(cleDe(jeu), texte);
+  }
+
+  function clear(jeu) { return ecrire(cleDe(jeu), null); }
+
+  // --- Fermeture de la page -------------------------------------------------
+
+  function surFermeture(f) {
+    if (typeof f !== 'function') return;
+    var appeler = function () { try { f(); } catch (e) { setTimeout(function () { throw e; }); } };
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') appeler(); });
+    window.addEventListener('pagehide', appeler);
+    window.addEventListener('beforeunload', appeler);
+  }
+
+  // --- Textes (5 langues) -----------------------------------------------------
+
+  var TEXTES = {
+    fr: { titre: 'Une partie est sauvegardée', niveau: 'Niveau {n}', score: 'Score : {n}', continuer: 'Continuer', nouvelle: 'Nouvelle partie', effacer: 'Effacer la sauvegarde', confirmer: 'Toucher encore pour effacer', efface: 'Sauvegarde effacée' },
+    en: { titre: 'You have a saved game', niveau: 'Level {n}', score: 'Score: {n}', continuer: 'Continue', nouvelle: 'New game', effacer: 'Delete saved game', confirmer: 'Tap again to delete', efface: 'Saved game deleted' },
+    es: { titre: 'Tienes una partida guardada', niveau: 'Nivel {n}', score: 'Puntos: {n}', continuer: 'Continuar', nouvelle: 'Nueva partida', effacer: 'Borrar la partida guardada', confirmer: 'Toca otra vez para borrar', efface: 'Partida guardada borrada' },
+    pt: { titre: 'Você tem um jogo salvo', niveau: 'Nível {n}', score: 'Pontos: {n}', continuer: 'Continuar', nouvelle: 'Novo jogo', effacer: 'Apagar o jogo salvo', confirmer: 'Toque de novo para apagar', efface: 'Jogo salvo apagado' },
+    de: { titre: 'Du hast einen gespeicherten Spielstand', niveau: 'Level {n}', score: 'Punkte: {n}', continuer: 'Weiterspielen', nouvelle: 'Neues Spiel', effacer: 'Spielstand löschen', confirmer: 'Zum Löschen noch mal tippen', efface: 'Spielstand gelöscht' },
+  };
+
+  function langue() {
+    var l = '';
+    try { l = window.JEL_I18N ? window.JEL_I18N.getLang() : (window.JEL_LANG || document.documentElement.lang); } catch (e) { /* rien */ }
+    l = String(l || '').toLowerCase().split(/[-_]/)[0];
+    return TEXTES[l] ? l : 'fr';
+  }
+
+  function texte(cle, vars) {
+    var l = langue();
+    var s = TEXTES[l][cle] || TEXTES.fr[cle] || cle;
+    return s.replace(/\{(\w+)\}/g, function (tout, nom) {
+      if (!vars || !Object.prototype.hasOwnProperty.call(vars, nom)) return tout;
+      var v = vars[nom];
+      if (typeof v === 'number') { try { return new Intl.NumberFormat(l).format(v); } catch (e) { return String(v); } }
+      return String(v);
+    });
+  }
+
+  // --- Interface ------------------------------------------------------------------
+  // Isolée dans un Shadow DOM (comme le bouton de langue) : le CSS du jeu ne la
+  // déforme pas. Les gestes et les touches n'arrivent pas au jeu.
+
+  var CSS =
+    ':host{all:initial}' +
+    '*{box-sizing:border-box}' +
+    '.fond{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(7,10,20,.72);font:600 16px/1.3 ui-rounded,"Segoe UI",system-ui,sans-serif;color:#eceae4}' +
+    '.carte{width:min(360px,100%);padding:20px 18px 14px;border-radius:20px;background:#161f38;border:1px solid #5a6688;box-shadow:0 14px 40px rgba(0,0,0,.5);text-align:center}' +
+    'h2{margin:0 0 6px;font-size:19px;line-height:1.25;color:#eceae4}' +
+    'p{margin:0 0 16px;color:#a3adc2;font-size:15px}' +
+    'button{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin:0 0 10px;padding:8px 14px;border-radius:999px;border:2px solid #a8b3f0;background:transparent;color:#eceae4;font:inherit;font-size:17px;line-height:1.2;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}' +
+    'button.principal{background:#a8b3f0;color:#0b1020;border-color:#a8b3f0}' +
+    'button.discret{min-height:44px;margin:4px 0 0;border:0;color:#a3adc2;font-size:14px;text-decoration:underline}' +
+    'button.discret.armer{color:#f2d27a;text-decoration:none}' +
+    'button:focus-visible{outline:3px solid #f2d27a;outline-offset:2px}' +
+    '.seul{display:inline-flex;width:auto;min-height:44px;margin:0;padding:6px 14px;border:1px solid #5a6688;background:rgba(11,16,32,.6);color:#eceae4;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif}' +
+    '.seul.armer{border-color:#f2d27a;color:#f2d27a}';
+
+  function isoler(element) {
+    ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'click', 'keydown', 'keyup', 'wheel'].forEach(function (type) {
+      element.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
+  }
+
+  function creerHote(nom, style) {
+    var hote = document.createElement(nom);
+    for (var p in style) hote.style.setProperty(p, style[p], 'important');
+    var ombre = hote.attachShadow ? hote.attachShadow({ mode: 'open' }) : hote;
+    var feuille = document.createElement('style');
+    feuille.textContent = CSS;
+    ombre.appendChild(feuille);
+    return { hote: hote, ombre: ombre };
+  }
+
+  function bouton(classe, contenu) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    if (classe) b.className = classe;
+    b.textContent = contenu;
+    return b;
+  }
+
+  // Bouton d'effacement en deux temps (les fenêtres du navigateur sont interdites) :
+  // 1er toucher → « Toucher encore pour effacer », 2e toucher dans les 3 s → efface.
+  function armerEffacement(b, jeu, fait) {
+    var minuteur = null;
+    b.addEventListener('click', function () {
+      if (!b.classList.contains('armer')) {
+        b.classList.add('armer');
+        b.textContent = texte('confirmer');
+        clearTimeout(minuteur);
+        minuteur = setTimeout(function () { b.classList.remove('armer'); b.textContent = texte('effacer'); }, 3000);
+        return;
+      }
+      clearTimeout(minuteur);
+      b.classList.remove('armer');
+      clear(jeu);
+      fait();
+    });
+  }
+
+  var ouverte = null; // fenêtre de reprise affichée
+
+  // Fenêtre de reprise. options :
+  //   jeu          identifiant du jeu (obligatoire)
+  //   onContinuer  f(donnees) : reprendre au niveau donnees.niveau
+  //   onNouvelle   f() : partie depuis le début (la sauvegarde reste jusqu'à la
+  //                prochaine écriture du jeu)
+  //   onEffacer    f() facultatif, après effacement (par défaut : onNouvelle)
+  //   sansNiveau   true pour un jeu sans niveaux (partie sans fin) : la fenêtre
+  //                montre seulement le score (rien s'il est nul)
+  // Sans sauvegarde utilisable : rien ne s'affiche, onNouvelle() est appelé
+  // tout de suite. Renvoie true si la fenêtre s'affiche.
+  function reprise(options) {
+    options = options || {};
+    var jeu = options.jeu;
+    var nouvelle = typeof options.onNouvelle === 'function' ? options.onNouvelle : function () {};
+    var continuer = typeof options.onContinuer === 'function' ? options.onContinuer : nouvelle;
+    var effacer = typeof options.onEffacer === 'function' ? options.onEffacer : nouvelle;
+    var d = lireDonnees(jeu);
+    if (!d) { nouvelle(); return false; }
+    if (ouverte) ouverte.fermer();
+
+    var precedent = document.activeElement;
+    var h = creerHote('jel-sauvegarde', { position: 'fixed', inset: '0', 'z-index': '2147483002', display: 'block', margin: '0', padding: '0' });
+    var fond = document.createElement('div');
+    fond.className = 'fond';
+    var carte = document.createElement('div');
+    carte.className = 'carte';
+    carte.setAttribute('role', 'dialog');
+    carte.setAttribute('aria-modal', 'true');
+    var titre = document.createElement('h2');
+    titre.id = 'jel-sauvegarde-titre';
+    titre.textContent = texte('titre');
+    carte.setAttribute('aria-labelledby', titre.id);
+    var detail = document.createElement('p');
+    detail.textContent = options.sansNiveau
+      ? (d.score ? texte('score', { n: d.score }) : '')
+      : texte('niveau', { n: d.niveau }) + (d.score ? ' · ' + texte('score', { n: d.score }) : '');
+    if (!detail.textContent) detail.hidden = true;
+    var bContinuer = bouton('principal', texte('continuer'));
+    var bNouvelle = bouton('', texte('nouvelle'));
+    var bEffacer = bouton('discret', texte('effacer'));
+    carte.append(titre, detail, bContinuer, bNouvelle, bEffacer);
+    fond.appendChild(carte);
+    h.ombre.appendChild(fond);
+    isoler(h.hote);
+
+    var fenetre = {
+      fermer: function () {
+        if (h.hote.parentNode) h.hote.parentNode.removeChild(h.hote);
+        if (ouverte === fenetre) ouverte = null;
+        try { if (precedent && precedent.focus) precedent.focus(); } catch (e) { /* rien */ }
+      },
+    };
+    ouverte = fenetre;
+    var choisir = function (f, arg) { return function () { fenetre.fermer(); f(arg); }; };
+    bContinuer.addEventListener('click', choisir(continuer, d));
+    bNouvelle.addEventListener('click', choisir(nouvelle));
+    armerEffacement(bEffacer, jeu, function () { fenetre.fermer(); effacer(); });
+
+    // Clavier : Tab et les flèches restent dans la fenêtre, Entrée et Espace
+    // activent le bouton choisi. Échap ne ferme pas : le choix doit être explicite.
+    var boutons = [bContinuer, bNouvelle, bEffacer];
+    fond.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      var actif = h.ombre.activeElement || document.activeElement;
+      var i = boutons.indexOf(actif);
+      var recul = e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey);
+      boutons[(i + (recul ? boutons.length - 1 : 1)) % boutons.length].focus();
+    });
+
+    (document.body || document.documentElement).appendChild(h.hote);
+    try { bContinuer.focus(); } catch (e) { /* rien */ }
+    return true;
+  }
+
+  // Bouton « Effacer la sauvegarde » seul (écran titre, menu pause…). options :
+  //   jeu, conteneur (élément où le placer), apres f() facultatif.
+  // Caché tant qu'il n'y a pas de sauvegarde ; appeler .maj() pour le rafraîchir.
+  // Renvoie l'élément ajouté (avec sa méthode maj).
+  function boutonEffacer(options) {
+    options = options || {};
+    var h = creerHote('jel-sauvegarde-effacer', { display: 'inline-block', margin: '0', padding: '0', 'vertical-align': 'middle' });
+    var b = bouton('seul', texte('effacer'));
+    h.ombre.appendChild(b);
+    isoler(h.hote);
+    h.hote.maj = function () {
+      b.classList.remove('armer');
+      b.textContent = texte('effacer');
+      h.hote.style.setProperty('display', existe(options.jeu) ? 'inline-block' : 'none', 'important');
+    };
+    armerEffacement(b, options.jeu, function () {
+      h.hote.maj();
+      if (typeof options.apres === 'function') options.apres();
+    });
+    h.hote.maj();
+    if (options.conteneur) options.conteneur.appendChild(h.hote);
+    return h.hote;
+  }
+
+  window.JEL_SAVE = {
+    VERSION: SAUVEGARDE_VERSION,
+    save: save,
+    load: load,
+    clear: clear,
+    existe: existe,
+    surFermeture: surFermeture,
+    reprise: reprise,
+    boutonEffacer: boutonEffacer,
+    texte: texte,
+  };
+})();
+</script>
+<style>
+  :root {
+    --fond: #13283d;
+    --panneau: #1c3550;
+    --bord: #4d7396;
+    --texte: #f1f5fb;
+    --doux: #b8c8da;
+    --accent: #ffd34d;
+    --bleu: #4ea8ff;
+    --vert: #46c96b;
+    --rouge: #ff5a5f;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--fond); color: var(--texte);
+    font: 600 16px/1.3 ui-rounded, "Segoe UI", system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  button {
+    font: inherit; color: inherit; cursor: pointer;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .ecran { position: fixed; inset: 0; display: none; flex-direction: column; }
+  .ecran.actif { display: flex; }
+  .cache { display: none !important; }
+
+  /* --- Boutons ----------------------------------------------------------- */
+  .btn {
+    min-height: 48px; padding: 10px 20px; border-radius: 999px;
+    border: 3px solid #0b1a2a; background: #e8f1fb; color: #13283d;
+    font-size: 18px; box-shadow: 0 4px 0 #0b1a2a; transition: transform .08s;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #0b1a2a; }
+  .btn.principal { background: var(--accent); }
+  .btn.gros { font-size: 26px; min-height: 64px; padding: 12px 44px; }
+  .rond {
+    width: 48px; height: 48px; border-radius: 50%; border: 2px solid var(--bord);
+    background: rgba(9, 22, 36, .75); display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .rond svg { width: 26px; height: 26px; }
+
+  /* --- Écran titre ------------------------------------------------------- */
+  #ecran-titre { align-items: center; }
+  #dessin-titre { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .barre-titre {
+    position: relative; width: 100%; display: flex; justify-content: space-between; align-items: center;
+    padding: max(10px, env(safe-area-inset-top)) 12px 0;
+  }
+  #lang-titre { min-height: 44px; display: flex; align-items: center; }
+  .texte-titre { position: relative; text-align: center; padding: 4px 16px 0; }
+  .texte-titre h1 {
+    margin: 0; font-size: clamp(44px, 13vw, 76px); line-height: 1; letter-spacing: 1px;
+    color: var(--accent); text-shadow: 0 4px 0 #0b1a2a, 0 0 24px rgba(255, 211, 77, .35);
+  }
+  .bas-titre {
+    position: relative; margin-top: auto; width: 100%; max-width: 520px;
+    padding: 0 18px max(18px, env(safe-area-inset-bottom)); text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .consignes {
+    background: rgba(9, 22, 36, .78); border: 2px solid var(--bord); border-radius: 18px;
+    padding: 10px 14px; font-size: 16px; color: var(--texte);
+  }
+  .consignes p { margin: 2px 0; }
+  .boutons-titre { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; align-items: center; }
+
+  /* --- Écran des niveaux ------------------------------------------------- */
+  #ecran-niveaux { background: linear-gradient(#13283d, #0d1d2e); }
+  .entete {
+    display: flex; align-items: center; gap: 10px;
+    padding: max(10px, env(safe-area-inset-top)) 12px 8px;
+  }
+  .entete h2 { margin: 0; font-size: 22px; flex: 1; }
+  #stats-niveaux { font-size: 15px; color: var(--doux); padding: 0 14px 8px; }
+  .liste-niveaux { flex: 1; overflow-y: auto; padding: 0 12px 20px; -webkit-overflow-scrolling: touch; }
+  .zone-niveaux { margin: 6px auto 14px; max-width: 560px; border-radius: 18px; padding: 10px; border: 2px solid rgba(255,255,255,.12); }
+  .zone-niveaux h3 { margin: 0 0 8px; font-size: 17px; }
+  .grille-niveaux { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  .case-niveau {
+    min-height: 64px; border-radius: 14px; border: 2px solid #0b1a2a; background: #e8f1fb; color: #13283d;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 0; font-size: 20px;
+    box-shadow: 0 3px 0 #0b1a2a;
+  }
+  .case-niveau .mini-etoiles { display: flex; gap: 1px; }
+  .case-niveau .mini-etoiles svg { width: 13px; height: 13px; }
+  .case-niveau.ferme { background: #3b4f66; color: #93a6bb; box-shadow: none; }
+  .case-niveau.ferme svg { width: 22px; height: 22px; }
+  @media (max-width: 380px) { .grille-niveaux { grid-template-columns: repeat(3, 1fr); } }
+
+  /* --- Écran de jeu ------------------------------------------------------ */
+  #ecran-jeu { align-items: center; }
+  .hud {
+    width: 100%; max-width: 620px; display: flex; align-items: center; gap: 6px;
+    padding: max(6px, env(safe-area-inset-top)) 8px 4px;
+  }
+  #hud-niveau { font-size: 17px; white-space: nowrap; }
+  .hud-groupe { display: flex; align-items: center; gap: 1px; }
+  .hud-groupe svg { width: 22px; height: 22px; }
+  .hud .espace { flex: 1; }
+  #barre-energie {
+    width: calc(100% - 24px); max-width: 596px; height: 22px; display: flex; align-items: center; gap: 6px;
+  }
+  #barre-energie svg { width: 22px; height: 22px; flex: none; }
+  .jauge { flex: 1; height: 14px; border-radius: 8px; background: #0b1a2a; border: 2px solid var(--bord); overflow: hidden; }
+  #jauge-remplie { height: 100%; width: 100%; background: linear-gradient(90deg, #46c96b, #9be15d); transition: width .2s, background .2s; }
+  #jauge-remplie.basse { background: linear-gradient(90deg, #ff5a5f, #ff9f43); }
+  #message {
+    min-height: 40px; width: 100%; max-width: 620px; padding: 2px 12px; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-size: 15px; color: var(--texte); transition: opacity .2s;
+  }
+  #zone-plateau { flex: 1; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; touch-action: none; }
+  #plateau { display: block; border-radius: 14px; touch-action: none; }
+  .croix {
+    display: grid; grid-template-columns: repeat(3, 62px); grid-template-rows: repeat(3, 56px); gap: 6px;
+    padding: 8px 0 max(10px, env(safe-area-inset-bottom));
+  }
+  .croix button {
+    border-radius: 16px; border: 2px solid #0b1a2a; background: #e8f1fb; color: #13283d;
+    display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 3px 0 #0b1a2a;
+  }
+  .croix button:active, .croix button.appui { transform: translateY(2px); box-shadow: 0 1px 0 #0b1a2a; background: var(--accent); }
+  .croix svg { width: 30px; height: 30px; }
+  #b-haut { grid-column: 2; grid-row: 1; }
+  #b-gauche { grid-column: 1; grid-row: 2; }
+  #b-attendre { grid-column: 2; grid-row: 2; background: #c9d8e8; }
+  #b-droite { grid-column: 3; grid-row: 2; }
+  #b-bas { grid-column: 2; grid-row: 3; }
+  @media (max-height: 680px) {
+    .croix { grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 46px); gap: 4px; }
+    #message { min-height: 34px; }
+  }
+  @media (min-width: 760px) and (min-height: 560px) and (orientation: landscape) {
+    #ecran-jeu { display: none; }
+    #ecran-jeu.actif { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto auto 1fr; justify-items: center; }
+    #ecran-jeu .hud, #barre-energie, #message { grid-column: 1 / 3; }
+    #zone-plateau { grid-column: 1; grid-row: 4; height: 100%; }
+    .croix { grid-column: 2; grid-row: 4; align-self: center; padding: 0 28px 0 8px; grid-template-columns: repeat(3, 70px); grid-template-rows: repeat(3, 64px); }
+  }
+
+  /* --- Fenêtres ---------------------------------------------------------- */
+  .voile {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center; padding: 14px;
+    background: rgba(6, 14, 24, .72); z-index: 20;
+  }
+  .voile.actif { display: flex; }
+  .carte {
+    width: min(400px, 100%); max-height: 100%; overflow-y: auto; background: var(--panneau); border: 3px solid var(--bord);
+    border-radius: 22px; padding: 18px 16px; text-align: center; box-shadow: 0 16px 40px rgba(0,0,0,.5);
+    animation: arrivee .28s ease-out;
+  }
+  @keyframes arrivee { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
+  .carte h2 { margin: 0 0 8px; font-size: 24px; color: var(--accent); }
+  .carte p { margin: 6px 0; color: var(--texte); }
+  .carte .petit { font-size: 15px; color: var(--doux); }
+  .carte .colonne { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  #lang-pause { display: flex; justify-content: center; min-height: 44px; margin-top: 10px; }
+  #demo { display: block; margin: 6px auto; border-radius: 12px; background: #0b1a2a; }
+  .etoiles-fin { display: flex; justify-content: center; gap: 8px; margin: 6px 0; }
+  .etoiles-fin svg { width: 56px; height: 56px; transform: scale(0); transition: transform .35s cubic-bezier(.3, 1.8, .5, 1); }
+  .etoiles-fin svg.allumee { transform: scale(1); }
+  .etoiles-fin svg.eteinte { transform: scale(.8); }
+  #fin-score { font-size: 28px; color: var(--accent); }
+  #fin-record.battu { color: var(--accent); animation: pulse .8s ease-in-out infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.08); } }
+  #confettis { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 30; }
+  @media (prefers-reduced-motion: reduce) {
+    .carte { animation: none; }
+    #fin-record.battu { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ======================= Écran titre ======================= -->
+<section id="ecran-titre" class="ecran actif">
+  <canvas id="dessin-titre" aria-hidden="true"></canvas>
+  <div class="barre-titre">
+    <div id="lang-titre"></div>
+    <button id="b-son-titre" class="rond" type="button" data-i18n-aria="bouton.son" data-i18n-title="bouton.son"></button>
+  </div>
+  <div class="texte-titre">
+    <h1 data-i18n="titre">Robot Max</h1>
+  </div>
+  <div class="bas-titre">
+    <div class="consignes">
+      <p data-i18n="accueil.consigne"></p>
+      <p data-i18n="accueil.consigne2"></p>
+    </div>
+    <div class="boutons-titre">
+      <button id="b-jouer" class="btn principal gros" type="button" data-i18n="bouton.jouer"></button>
+      <button id="b-niveaux-titre" class="btn" type="button" data-i18n="bouton.niveaux"></button>
+    </div>
+    <div id="effacer-titre"></div>
+  </div>
+</section>
+
+<!-- ======================= Choix des niveaux ======================= -->
+<section id="ecran-niveaux" class="ecran">
+  <div class="entete">
+    <button id="b-niv-retour" class="rond" type="button" data-i18n-aria="bouton.retour" data-i18n-title="bouton.retour"></button>
+    <h2 data-i18n="niveaux.titre"></h2>
+  </div>
+  <div id="stats-niveaux"></div>
+  <div id="liste-niveaux" class="liste-niveaux"></div>
+</section>
+
+<!-- ======================= Jeu ======================= -->
+<section id="ecran-jeu" class="ecran">
+  <div class="hud">
+    <button id="b-pause" class="rond" type="button" data-i18n-aria="bouton.pause" data-i18n-title="bouton.pause"></button>
+    <span id="hud-niveau"></span>
+    <span class="espace"></span>
+    <span id="hud-rouages" class="hud-groupe" role="img"></span>
+    <span id="hud-coeurs" class="hud-groupe" role="img"></span>
+    <button id="b-son-jeu" class="rond" type="button" data-i18n-aria="bouton.son" data-i18n-title="bouton.son"></button>
+  </div>
+  <div id="barre-energie" class="cache" role="img">
+    <span id="icone-energie"></span>
+    <div class="jauge"><div id="jauge-remplie"></div></div>
+  </div>
+  <div id="message" aria-live="polite"></div>
+  <div id="zone-plateau">
+    <canvas id="plateau" role="img" data-i18n-aria="plateau.aria"></canvas>
+  </div>
+  <div class="croix">
+    <button id="b-haut" type="button" data-dir="haut" data-i18n-aria="bouton.haut" data-i18n-title="bouton.haut"></button>
+    <button id="b-gauche" type="button" data-dir="gauche" data-i18n-aria="bouton.gauche" data-i18n-title="bouton.gauche"></button>
+    <button id="b-attendre" type="button" data-dir="attendre" data-i18n-aria="bouton.attendre" data-i18n-title="bouton.attendre"></button>
+    <button id="b-droite" type="button" data-dir="droite" data-i18n-aria="bouton.droite" data-i18n-title="bouton.droite"></button>
+    <button id="b-bas" type="button" data-dir="bas" data-i18n-aria="bouton.bas" data-i18n-title="bouton.bas"></button>
+  </div>
+</section>
+
+<!-- ======================= Fenêtres ======================= -->
+<div id="v-tuto" class="voile">
+  <div class="carte">
+    <h2 id="tuto-titre"></h2>
+    <canvas id="demo" aria-hidden="true"></canvas>
+    <p id="tuto-texte"></p>
+    <div class="colonne">
+      <button id="b-compris" class="btn principal" type="button" data-i18n="bouton.compris"></button>
+    </div>
+  </div>
+</div>
+
+<div id="v-pause" class="voile">
+  <div class="carte">
+    <h2 data-i18n="pause.titre"></h2>
+    <p class="petit" data-i18n="pause.texte"></p>
+    <div class="colonne">
+      <button id="b-reprendre" class="btn principal" type="button" data-i18n="bouton.reprendre"></button>
+      <button id="b-recommencer" class="btn" type="button" data-i18n="bouton.recommencer"></button>
+      <button id="b-aide" class="btn" type="button" data-i18n="bouton.aide"></button>
+      <button id="b-pause-niveaux" class="btn" type="button" data-i18n="bouton.niveaux"></button>
+      <button id="b-pause-accueil" class="btn" type="button" data-i18n="bouton.accueil"></button>
+    </div>
+    <div id="lang-pause"></div>
+  </div>
+</div>
+
+<div id="v-victoire" class="voile">
+  <div class="carte">
+    <h2 id="fin-titre"></h2>
+    <div id="fin-etoiles" class="etoiles-fin"></div>
+    <div id="fin-score"></div>
+    <p id="fin-record" class="petit"></p>
+    <p id="fin-detail" class="petit"></p>
+    <div class="colonne">
+      <button id="b-suivant" class="btn principal" type="button" data-i18n="bouton.suivant"></button>
+      <button id="b-rejouer" class="btn" type="button" data-i18n="bouton.rejouer"></button>
+      <button id="b-vic-niveaux" class="btn" type="button" data-i18n="bouton.niveaux"></button>
+    </div>
+  </div>
+</div>
+
+<div id="v-defaite" class="voile">
+  <div class="carte">
+    <h2 data-i18n="defaite.titre"></h2>
+    <p id="def-raison"></p>
+    <p id="def-detail" class="petit"></p>
+    <p id="def-record" class="petit"></p>
+    <div class="colonne">
+      <button id="b-reessayer" class="btn principal" type="button" data-i18n="bouton.reessayer"></button>
+      <button id="b-def-niveaux" class="btn" type="button" data-i18n="bouton.niveaux"></button>
+      <button id="b-def-accueil" class="btn" type="button" data-i18n="bouton.accueil"></button>
+    </div>
+  </div>
+</div>
+
+<div id="v-bilan" class="voile">
+  <div class="carte">
+    <h2 data-i18n="bilan.titre"></h2>
+    <div id="bilan-etoiles" class="etoiles-fin"></div>
+    <p id="bilan-texte"></p>
+    <p id="bilan-conseil" class="petit"></p>
+    <div class="colonne">
+      <button id="b-bilan-rejouer" class="btn principal" type="button" data-i18n="bouton.rejouer"></button>
+      <button id="b-bilan-niveaux" class="btn" type="button" data-i18n="bouton.niveaux"></button>
+    </div>
+  </div>
+</div>
+
+<canvas id="confettis" aria-hidden="true"></canvas>
+
+<script>
+(function () {
+  'use strict';
+  const I = window.JEL_I18N;
+  const t = (cle, vars) => I.t(cle, vars);
+  const JEU = 'robot-max';
+  const $ = (id) => document.getElementById(id);
+  // ===== MOTEUR (logique pure, sans dessin) =====
+  // Légende des plans :
+  //  #  mur            .  sol           S  départ        E  borne de recharge
+  //  *  rouage         +  pile          k  clé bleue     K  porte bleue (ronde)
+  //  j  clé verte      J  porte verte (triangle)          > < ^ v  tapis roulants
+  //  o  interrupteur   X  barrière rouge (fermée au départ)
+  //  x  barrière jaune (ouverte au départ)
+  //  T  téléporteur violet   U  téléporteur orange (par paires)
+  //  ~  huile          C  caisse
+  //  l  laser (allumé aux tours pairs)   L  laser (allumé aux tours impairs)
+  // Drones : [r1, c1, r2, c2] = aller-retour en ligne droite, une case par action.
+  const DIRS = { haut: [-1, 0], bas: [1, 0], gauche: [0, -1], droite: [0, 1] };
+  const TAPIS = { '>': 'droite', '<': 'gauche', '^': 'haut', 'v': 'bas' };
+  const OBJETS = { '*': 'rouage', '+': 'pile', 'k': 'cleB', 'j': 'cleV' };
+
+  // Analyse un plan : sol, objets, caisses, drones.
+  function analyser(def) {
+    const h = def.plan.length, w = def.plan[0].length;
+    const sol = [], objets = [], caisses = [];
+    let depart = 0, sortie = 0, nbRouages = 0;
+    const tele = { T: [], U: [] };
+    for (let r = 0; r < h; r++) {
+      for (let c = 0; c < w; c++) {
+        const ch = def.plan[r][c] || '#';
+        const i = r * w + c;
+        let base = ch;
+        if (OBJETS[ch]) {
+          objets.push({ i, type: OBJETS[ch], bit: objets.length });
+          if (ch === '*') nbRouages++;
+          base = '.';
+        } else if (ch === 'C') { caisses.push(i); base = '.'; }
+        else if (ch === 'S') { depart = i; base = '.'; }
+        if (ch === 'E') sortie = i;
+        if (ch === 'T' || ch === 'U') tele[ch].push(i);
+        sol.push(base);
+      }
+    }
+    const drones = (def.drones || []).map((d) => {
+      const [r1, c1, r2, c2] = d;
+      const cases = [];
+      const n = Math.max(Math.abs(r2 - r1), Math.abs(c2 - c1));
+      for (let k = 0; k <= n; k++) cases.push((r1 + Math.sign(r2 - r1) * k) * w + (c1 + Math.sign(c2 - c1) * k));
+      return cases;
+    });
+    return { w, h, sol, objets, caisses, depart, sortie, nbRouages, tele, drones, energie: def.energie || 0 };
+  }
+
+  // Position d'un drone au tour t (aller-retour).
+  function posDrone(cases, t) {
+    const n = cases.length;
+    if (n <= 1) return cases[0];
+    const p = 2 * (n - 1);
+    const k = t % p;
+    return cases[k < n ? k : p - k];
+  }
+  function laserAllume(ch, t) { return (ch === 'l' && t % 2 === 0) || (ch === 'L' && t % 2 === 1); }
+
+  function etatInitial(N) {
+    return { pos: N.depart, pris: 0, inter: false, caisses: N.caisses.slice(), t: 0,
+      energie: N.energie, coeurs: 3, fini: null, pas: 0 };
+  }
+  function copier(e) { return Object.assign({}, e, { caisses: e.caisses.slice() }); }
+  function aObjet(N, e, type) { return N.objets.some((o) => o.type === type && (e.pris & (1 << o.bit))); }
+  function objetEn(N, e, i) { return N.objets.find((o) => o.i === i && !(e.pris & (1 << o.bit))); }
+  function rouagesPris(N, e) { return N.objets.filter((o) => o.type === 'rouage' && (e.pris & (1 << o.bit))).length; }
+
+  // Case libre pour Max ? (sans compter les caisses)
+  function franchissable(N, e, i) {
+    const ch = N.sol[i];
+    if (ch === '#') return false;
+    if (ch === 'K') return aObjet(N, e, 'cleB');
+    if (ch === 'J') return aObjet(N, e, 'cleV');
+    if (ch === 'X') return e.inter;
+    if (ch === 'x') return !e.inter;
+    return true;
+  }
+  function voisin(N, i, dir) {
+    const r = Math.floor(i / N.w) + DIRS[dir][0], c = (i % N.w) + DIRS[dir][1];
+    if (r < 0 || c < 0 || r >= N.h || c >= N.w) return -1;
+    return r * N.w + c;
+  }
+
+  // Joue une action (dir = 'haut'…, ou null pour attendre).
+  // Renvoie { etat, ev } ; ev = évènements pour l'animation et les sons.
+  // Si Max est bloqué (mur, porte…), etat = null et rien ne bouge.
+  function jouer(N, e0, dir) {
+    if (e0.fini) return { etat: null, ev: [] };
+    const e = copier(e0);
+    const ev = [];
+    const de = e.pos;
+    if (dir) {
+      const cible = voisin(N, e.pos, dir);
+      if (cible < 0 || !franchissable(N, e, cible)) {
+        return { etat: null, ev: [{ type: 'choc', dir, sur: cible < 0 ? '#' : N.sol[cible] }] };
+      }
+      const ic = e.caisses.indexOf(cible);
+      if (ic >= 0) {
+        const derriere = voisin(N, cible, dir);
+        if (derriere < 0 || N.sol[derriere] !== '.' || derriere === N.depart || e.caisses.includes(derriere) || objetEn(N, e, derriere)) {
+          return { etat: null, ev: [{ type: 'choc', dir, sur: 'C' }] };
+        }
+        e.caisses[ic] = derriere;
+        ev.push({ type: 'caisse', de: cible, a: derriere });
+      }
+      if (N.energie) e.energie = Math.max(0, e.energie - 1);
+      if (N.sol[cible] === 'K' || N.sol[cible] === 'J') ev.push({ type: 'porte', i: cible });
+      e.pos = cible;
+      ev.push({ type: 'pas', de, a: cible, dir });
+      // effets de la case, en chaîne (tapis, huile, téléporteur)
+      let sens = dir, garde = 0, teleporte = false;
+      while (garde++ < 60) {
+        const i = e.pos;
+        const o = objetEn(N, e, i);
+        if (o) {
+          e.pris |= (1 << o.bit);
+          if (o.type === 'pile') e.energie = N.energie;
+          ev.push({ type: o.type, i });
+        }
+        const ch = N.sol[i];
+        if (ch === 'E') break;
+        if (ch === 'o') { e.inter = !e.inter; ev.push({ type: 'inter', etat: e.inter }); }
+        if ((ch === 'T' || ch === 'U') && !teleporte) {
+          const autre = N.tele[ch].find((x) => x !== i);
+          if (autre !== undefined) { e.pos = autre; teleporte = true; ev.push({ type: 'tele', de: i, a: autre }); continue; }
+        }
+        teleporte = false;
+        let glisse = null;
+        if (TAPIS[ch]) glisse = TAPIS[ch];
+        else if (ch === '~') glisse = sens;
+        if (!glisse) break;
+        const n = voisin(N, i, glisse);
+        if (n < 0 || !franchissable(N, e, n) || e.caisses.includes(n)) break;
+        e.pos = n;
+        sens = glisse;
+        ev.push({ type: TAPIS[ch] ? 'tapis' : 'huile', de: i, a: n, dir: glisse });
+      }
+    } else {
+      if (N.energie) e.energie = Math.max(0, e.energie - 1);
+      ev.push({ type: 'attente' });
+    }
+    e.pas++;
+    // arrivé à la borne : gagné
+    if (e.pos === N.sortie) {
+      e.t++;
+      e.fini = 'victoire';
+      ev.push({ type: 'victoire' });
+      return { etat: e, ev };
+    }
+    // les drones et les lasers avancent d'un temps
+    const t0 = e.t;
+    e.t++;
+    let touche = null;
+    N.drones.forEach((cases) => {
+      const avant = posDrone(cases, t0), apres = posDrone(cases, e.t);
+      if (apres === e.pos || (avant === e.pos && apres === de)) touche = 'drone';
+    });
+    if (!touche && laserAllume(N.sol[e.pos], e.t)) touche = 'laser';
+    if (touche) {
+      e.coeurs--;
+      ev.push({ type: 'touche', cause: touche, i: e.pos });
+      if (e.coeurs <= 0) { e.fini = 'defaite'; ev.push({ type: 'defaite', cause: touche }); return { etat: e, ev }; }
+      e.pos = N.depart;
+      ev.push({ type: 'retour', a: N.depart });
+    }
+    if (N.energie && e.energie <= 0) { e.fini = 'defaite'; ev.push({ type: 'defaite', cause: 'panne' }); }
+    return { etat: e, ev };
+  }
+  // ===== FIN MOTEUR =====
+
+  // ===== NIVEAUX =====
+  // zone : 0 Atelier, 1 Usine, 2 Entrepôt, 3 Station ; tuto : mécanique présentée
+  const NIVEAUX = [
+    // 1 — se déplacer
+    { zone: 0, tuto: 'deplacer', plan: [
+      'S.#.*',
+      '.##..',
+      '..*#.',
+      '*#...',
+      '..#.E'] },
+    // 2 — culs-de-sac
+    { zone: 0, plan: [
+      'S..#.*',
+      '##.#..',
+      '*..#.#',
+      '.#....',
+      '.####.',
+      '...*#E'] },
+    // 3 — clé bleue
+    { zone: 0, tuto: 'cle', plan: [
+      'S.#.*.',
+      '.##.#*',
+      '.k#.#.',
+      '..K.#.',
+      '###.#.',
+      '*...#.',
+      '.##..E'] },
+    // 4 — deux clés
+    { zone: 0, plan: [
+      'S..#*..',
+      '.#.#.#.',
+      '.#k#.#*',
+      '.###.#J',
+      '...#.#.',
+      'j#.#K#.',
+      '*#...#E'] },
+    // 5 — tapis roulants
+    { zone: 0, tuto: 'tapis', plan: [
+      'S...#*.',
+      '.##.#..',
+      '.#*.>^v',
+      '.####.v',
+      '...#..v',
+      '.#.#.#v',
+      '*#...#E'] },
+    // 6 — tapis et clé
+    { zone: 0, plan: [
+      'S.#*...',
+      '.v#.##.',
+      '.v#.k#.',
+      '.>>>^#.',
+      '.#####.',
+      '*...#..',
+      '###.#K#',
+      '*...#.E'] },
+    // 7 — énergie
+    { zone: 1, tuto: 'energie', energie: 18, plan: [
+      'S...#.*',
+      '###.#.#',
+      '*...+..',
+      '.#.###.',
+      '.#.....',
+      '.####*.',
+      '......#',
+      '#####.E'] },
+    // 8 — énergie et tapis
+    { zone: 1, energie: 14, plan: [
+      'S..+..*',
+      '.##.#.#',
+      '.#..>>v',
+      '.#.##.v',
+      '*#...#v',
+      '.###.#v',
+      '....+.v',
+      '#*###.E'] },
+    // 9 — drone
+    { zone: 1, tuto: 'drone', drones: [[3, 0, 3, 6]], plan: [
+      'S.#.*#*',
+      '.#..#..',
+      '.##.##.',
+      '.......',
+      '##.##.#',
+      '*..#...',
+      '##.#.#E'] },
+    // 10 — deux drones et clé
+    { zone: 1, drones: [[2, 0, 2, 7], [6, 6, 6, 0]], plan: [
+      'S..#*...',
+      '.#.#.##.',
+      '........',
+      '##.##.#.',
+      'k#.#*.#.',
+      '.#.#.##.',
+      '.......#',
+      '*##.##KE'] },
+    // 11 — interrupteur
+    { zone: 1, tuto: 'interrupteur', plan: [
+      'S..#...',
+      '##.#.#.',
+      'o..X.#*',
+      '##.#.#.',
+      '*.x#...',
+      '#.##.##',
+      '...X..E',
+      '*.#####'] },
+    // 12 — interrupteur, drone, énergie
+    { zone: 1, energie: 19, drones: [[4, 1, 4, 6]], plan: [
+      'S.#*..#',
+      '..#.#.+',
+      '.##.#X#',
+      'o.x....',
+      '#......',
+      '#.##.#.',
+      '*.#+..*',
+      '###.#.#',
+      '...X..E'] },
+    // 13 — téléporteurs
+    { zone: 2, tuto: 'teleport', plan: [
+      'S..#...*',
+      '##.#.##.',
+      'T..#.U#.',
+      '#######.',
+      '*..U#..T',
+      '.##.#.#.',
+      '...*#...',
+      '###.##.E'] },
+    // 14 — téléporteurs, tapis, clés
+    { zone: 2, plan: [
+      'S..#U.k*',
+      '.#.#.#.#',
+      '.#*#....',
+      '.#######',
+      '...>>>v.',
+      '.#####v.',
+      '*U...#vK',
+      '#######E'] },
+    // 15 — huile
+    { zone: 2, tuto: 'huile', plan: [
+      'S.#...*',
+      '.~~~~~.',
+      '.~#~~~.',
+      '.~~~#~.',
+      '*~~~~~.',
+      '#~#~~~.',
+      '..~~*#E'] },
+    // 16 — huile, interrupteur, drone
+    { zone: 2, drones: [[0, 4, 0, 7]], plan: [
+      'S.#.....',
+      '.~~~~~#.',
+      '.~#~~~x*',
+      'o~~~~~##',
+      '#~~#~~#.',
+      '*~~#~~~.',
+      '##.####X',
+      '*..####E'] },
+    // 17 — caisses
+    { zone: 2, tuto: 'caisse', plan: [
+      'S.C.#.*',
+      '.#..#..',
+      '.#.C...',
+      '.#.#.#.',
+      '*..C...',
+      '####.#.',
+      '*....#E'] },
+    // 18 — caisses, clés, énergie
+    { zone: 2, energie: 20, plan: [
+      'S..#*...',
+      '.C.#.##.',
+      '.#.K.C..',
+      '.#.#.#*#',
+      'k..C.#.+',
+      '##.#.#.#',
+      '*..#.C.J',
+      '+.j#...E'] },
+    // 19 — lasers
+    { zone: 3, tuto: 'laser', plan: [
+      'S.#*..#',
+      '.l#.L#.',
+      '.L..l.*',
+      '.##.###',
+      '*.l.L..',
+      '##.##l#',
+      '...l..E'] },
+    // 20 — lasers et drones
+    { zone: 3, drones: [[3, 1, 3, 7]], plan: [
+      'S.#*...#',
+      '.l#.##L.',
+      '.L..#.l.',
+      '........',
+      '#.#l#L#.',
+      '*.#.#.#*',
+      '#.L.l...',
+      '###.##.E'] },
+    // 21 — lasers, téléporteurs, huile
+    { zone: 3, plan: [
+      'S.l.#..*',
+      '.##.#~~.',
+      '.T#.#~~.',
+      '####L~~.',
+      '*~~~~#T.',
+      '.~#~~#l#',
+      '.~~~*#..',
+      '..l.##.E'] },
+    // 22 — caisses, interrupteur, drone
+    { zone: 3, drones: [[4, 0, 4, 7]], plan: [
+      'S.....#*',
+      '####C#..',
+      '*..o..X.',
+      '#.##.###',
+      '..C.....',
+      '.####.#.',
+      '.#*..C..',
+      '.####..E'] },
+    // 23 — énergie, lasers, tapis, clés
+    { zone: 3, energie: 19, drones: [[5, 0, 5, 4]], plan: [
+      'S.l.#..*',
+      '.#.#k#.#',
+      '.#.>>v..',
+      '+#.#.v#.',
+      '.#L#.vL.',
+      '.....v#+',
+      '*#j#.>>.',
+      '##.###K.',
+      '*....JJE'] },
+    // 24 — grande finale
+    { zone: 3, energie: 24, drones: [[2, 4, 2, 8], [9, 0, 9, 4]], plan: [
+      'S.#.*...+',
+      '.#..#.##.',
+      '.k..o....',
+      '###.##X##',
+      'T...#.l..',
+      '.~~~#.#C.',
+      '.~#~x.L..',
+      '.~~~#.#.*',
+      '##+.#T#J#',
+      '.......#.',
+      '*#j.L...E'] },
+  ];
+  // ===== FIN NIVEAUX =====
+  window.JEL_NIVEAUX = NIVEAUX.length;
+
+  // ===== DÉMONSTRATIONS DU TUTORIEL =====
+  // Petit plateau + suite d'actions jouées en boucle (null = attendre).
+  const DEMOS = {
+    deplacer: { plan: ['S.*.E'], actions: ['droite', 'droite', 'droite', 'droite'] },
+    cle: { plan: ['S.kKE'], actions: ['droite', 'droite', 'droite', 'droite'] },
+    tapis: { plan: ['S.>>.E'], actions: ['droite', 'droite', 'droite'] },
+    energie: { plan: ['S.+..E'], energie: 3, actions: ['droite', 'droite', 'droite', 'droite', 'droite'] },
+    drone: { plan: ['###.##', 'S....E', '###.##'], drones: [[0, 3, 2, 3]], actions: ['droite', 'droite', null, 'droite', 'droite', 'droite'] },
+    interrupteur: { plan: ['S.oX.E'], actions: ['droite', 'droite', 'droite', 'droite', 'droite'] },
+    teleport: { plan: ['S.T#T.E'], actions: ['droite', 'droite', 'droite', 'droite'] },
+    huile: { plan: ['S.~~~E'], actions: ['droite', 'droite'] },
+    caisse: { plan: ['..#.E', 'S.C..', '..#..'], actions: ['droite', 'droite', 'droite', 'haut', 'droite'] },
+    laser: { plan: ['S.l.E'], actions: ['droite', null, 'droite', 'droite', 'droite'] },
+  };
+  // Mécaniques présentes dans un niveau (pour « Revoir l'aide »).
+  function mecaniquesDe(def) {
+    const p = def.plan.join('');
+    const m = [];
+    if (/[kKjJ]/.test(p)) m.push('cle');
+    if (/[<>^v]/.test(p)) m.push('tapis');
+    if (def.energie) m.push('energie');
+    if (def.drones && def.drones.length) m.push('drone');
+    if (/o/.test(p)) m.push('interrupteur');
+    if (/[TU]/.test(p)) m.push('teleport');
+    if (/~/.test(p)) m.push('huile');
+    if (/C/.test(p)) m.push('caisse');
+    if (/[lL]/.test(p)) m.push('laser');
+    return m.length ? m.slice(-3) : ['deplacer'];
+  }
+
+  // ===== PROGRESSION =====
+  // Sauvegarde commune (JEL_SAVE, marche aussi dans le site) : niveau où
+  // reprendre, score total, et nos champs : niveaux débloqués, étoiles, records,
+  // tutoriels vus. Le réglage du son reste dans le localStorage du jeu.
+  const progres = { debloque: 1, etoiles: [], records: [], tutos: [] };
+  let sonActif = true;
+  let sonTouche = false; // le joueur a changé le son pendant cette visite
+  function chargerProgres() {
+    progres.debloque = 1; progres.etoiles = []; progres.records = []; progres.tutos = [];
+    try {
+      const d = JEL_SAVE.load(JEU);
+      const p = d.robotMax;
+      if (p && typeof p === 'object') {
+        if (Number.isInteger(p.debloque)) progres.debloque = Math.max(1, Math.min(NIVEAUX.length, p.debloque));
+        if (Array.isArray(p.etoiles)) progres.etoiles = p.etoiles.slice(0, NIVEAUX.length).map((x) => Math.max(0, Math.min(3, Number(x) || 0)));
+        if (Array.isArray(p.records)) progres.records = p.records.slice(0, NIVEAUX.length).map((x) => Math.max(0, Number(x) || 0));
+        if (Array.isArray(p.tutos)) progres.tutos = p.tutos.filter((x) => typeof x === 'string');
+      }
+      if (Number.isInteger(d.niveau)) progres.debloque = Math.max(progres.debloque, Math.min(NIVEAUX.length, d.niveau));
+      if (!sonTouche && d.options && typeof d.options.son === 'boolean') sonActif = d.options.son;
+    } catch (e) { /* sauvegarde illisible : on garde les valeurs par défaut */ }
+    if (!sonTouche) {
+      try { const v = localStorage.getItem('robot-max-son'); if (v) sonActif = v !== 'non'; } catch (e) { /* pas de stockage (cadre du site) */ }
+    }
+  }
+  function scoreTotal() { return progres.records.reduce((a, b) => a + (b || 0), 0); }
+  function etoilesTotal() { return progres.etoiles.reduce((a, b) => a + (b || 0), 0); }
+  function sauverProgres(niveauReprise) {
+    JEL_SAVE.save(JEU, {
+      niveau: niveauReprise,
+      score: scoreTotal(),
+      options: { son: sonActif },
+      robotMax: { debloque: progres.debloque, etoiles: progres.etoiles, records: progres.records, tutos: progres.tutos },
+    });
+  }
+
+  // ===== SONS (Web Audio, aucun avant la première action) =====
+  let audio = null;
+  function preparerAudio() {
+    if (audio) { if (audio.state === 'suspended') audio.resume().catch(() => {}); return; }
+    try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+  }
+  function bip(freq, duree, type, volume, vers, retard) {
+    if (!audio || !sonActif) return;
+    try {
+      const t0 = audio.currentTime + (retard || 0);
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(freq, t0);
+      if (vers) o.frequency.exponentialRampToValueAtTime(vers, t0 + duree);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(volume || 0.12, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + duree);
+      o.connect(g); g.connect(audio.destination);
+      o.start(t0); o.stop(t0 + duree + 0.02);
+    } catch (e) { /* son indisponible */ }
+  }
+  function son(nom) {
+    switch (nom) {
+      case 'pas': bip(330 + Math.random() * 40, 0.06, 'triangle', 0.07); break;
+      case 'choc': bip(140, 0.12, 'square', 0.06, 90); break;
+      case 'rouage': bip(880, 0.1, 'sine', 0.12); bip(1320, 0.16, 'sine', 0.1, null, 0.07); break;
+      case 'cle': bip(660, 0.08, 'triangle', 0.1); bip(990, 0.08, 'triangle', 0.1, null, 0.07); bip(1320, 0.14, 'triangle', 0.1, null, 0.14); break;
+      case 'porte': bip(220, 0.18, 'sawtooth', 0.05, 440); break;
+      case 'tapis': bip(260, 0.07, 'square', 0.04, 300); break;
+      case 'pile': bip(300, 0.3, 'sine', 0.1, 1200); break;
+      case 'touche': bip(500, 0.3, 'square', 0.08, 120); break;
+      case 'inter': bip(1000, 0.04, 'square', 0.06); bip(600, 0.06, 'square', 0.06, null, 0.05); break;
+      case 'tele': bip(400, 0.25, 'sine', 0.1, 1600); bip(1600, 0.2, 'sine', 0.06, 500, 0.2); break;
+      case 'huile': bip(700, 0.22, 'sine', 0.06, 300); break;
+      case 'caisse': bip(110, 0.12, 'triangle', 0.14, 80); break;
+      case 'attente': bip(520, 0.05, 'sine', 0.05); break;
+      case 'etoile': bip(1046, 0.18, 'triangle', 0.1); break;
+      case 'clic': bip(700, 0.04, 'triangle', 0.06); break;
+      case 'victoire': [523, 659, 784, 1046].forEach((f, k) => bip(f, 0.22, 'triangle', 0.12, null, k * 0.11)); break;
+      case 'defaite': [392, 330, 262].forEach((f, k) => bip(f, 0.3, 'sine', 0.1, null, k * 0.16)); break;
+      case 'alerte': bip(880, 0.08, 'square', 0.05); bip(880, 0.08, 'square', 0.05, null, 0.14); break;
+      default: break;
+    }
+  }
+
+  // ===== ICÔNES (SVG, sans texte) =====
+  function cheminRouage(cx, cy, r, dents) {
+    let d = '';
+    const n = dents || 8;
+    for (let k = 0; k < n * 2; k++) {
+      const a0 = (k / (n * 2)) * Math.PI * 2, a1 = ((k + 1) / (n * 2)) * Math.PI * 2;
+      const rr = k % 2 === 0 ? r : r * 0.78;
+      d += (k === 0 ? 'M' : 'L') + (cx + Math.cos(a0) * rr).toFixed(2) + ' ' + (cy + Math.sin(a0) * rr).toFixed(2);
+      d += 'L' + (cx + Math.cos(a1) * rr).toFixed(2) + ' ' + (cy + Math.sin(a1) * rr).toFixed(2);
+    }
+    return d + 'Z';
+  }
+  const ICONES = {
+    rouage: (plein) => `<svg viewBox="0 0 24 24"><path d="${cheminRouage(12, 12, 10.5)}" fill="${plein ? '#ffd34d' : 'none'}" stroke="${plein ? '#a8740a' : '#6f8aa6'}" stroke-width="1.6"/><circle cx="12" cy="12" r="3.4" fill="${plein ? '#a8740a' : 'none'}" stroke="${plein ? '#a8740a' : '#6f8aa6'}" stroke-width="1.6"/></svg>`,
+    coeur: (plein) => `<svg viewBox="0 0 24 24"><path d="M12 21s-8-5.3-8-11.2C4 6.6 6.4 4.5 9 4.5c1.4 0 2.4.7 3 1.6.6-.9 1.6-1.6 3-1.6 2.6 0 5 2.1 5 5.3C20 15.7 12 21 12 21z" fill="${plein ? '#ff5a7a' : 'none'}" stroke="${plein ? '#b3203f' : '#6f8aa6'}" stroke-width="1.6"/></svg>`,
+    etoile: (plein) => `<svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6-4.9-4.6 6.6-.8z" fill="${plein ? '#ffd34d' : '#9db0c4'}" stroke="${plein ? '#a8740a' : '#5d748c'}" stroke-width="1.4" stroke-linejoin="round"/></svg>`,
+    pile: () => '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="16" height="10" rx="2.5" fill="#46c96b" stroke="#1d6b34" stroke-width="1.6"/><rect x="19" y="10" width="2.5" height="4" rx="1" fill="#1d6b34"/><path d="M12 8.5l-3.2 4.2h2.6l-1 3.8 3.4-4.6h-2.6z" fill="#fff"/></svg>',
+    cadenas: () => '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#93a6bb"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#93a6bb" stroke-width="2.4"/><circle cx="12" cy="15.5" r="1.7" fill="#3b4f66"/></svg>',
+    pause: () => '<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.5" fill="#f1f5fb"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.5" fill="#f1f5fb"/></svg>',
+    retour: () => '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="#f1f5fb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    sonOui: () => '<svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="#f1f5fb"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="#f1f5fb" stroke-width="2" stroke-linecap="round"/></svg>',
+    sonNon: () => '<svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="#f1f5fb"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5" stroke="#ff8a8a" stroke-width="2.2" stroke-linecap="round"/></svg>',
+    fleche: (angle) => `<svg viewBox="0 0 24 24"><g transform="rotate(${angle} 12 12)"><path d="M12 4l7.5 8.5h-4.5V20h-6v-7.5H4.5z" fill="#13283d"/></g></svg>`,
+    attendre: () => '<svg viewBox="0 0 24 24"><path d="M7 3.5h10M7 20.5h10M8 3.5c0 5 8 5 8 8.5s-8 3.5-8 8.5M16 3.5c0 5-8 5-8 8.5s8 3.5 8 8.5" fill="none" stroke="#13283d" stroke-width="2" stroke-linecap="round"/><path d="M10 18.5h4l-2-2.5z" fill="#13283d"/></svg>',
+  };
+
+  // ===== DESSIN =====
+  const ZONES = [
+    { fond: '#16324a', sol: '#28506d', sol2: '#2c5776', mur: '#7d94ad', murHaut: '#a9bdd2', murOmbre: '#4b6079', cadre: '#0d2033' },
+    { fond: '#3a2617', sol: '#5b412b', sol2: '#634730', mur: '#a08268', murHaut: '#c9ad93', murOmbre: '#6a513d', cadre: '#24170d' },
+    { fond: '#173628', sol: '#2f5a43', sol2: '#336249', mur: '#7fa48a', murHaut: '#a9cdb3', murOmbre: '#4b6f56', cadre: '#0c2117' },
+    { fond: '#1e1640', sol: '#372b66', sol2: '#3d3070', mur: '#8c84c0', murHaut: '#b6afe2', murOmbre: '#57508a', cadre: '#120c2a' },
+  ];
+  const COULEURS = { bleu: '#4ea8ff', bleuF: '#1f5f9e', vert: '#46c96b', vertF: '#1d6b34', rouge: '#ff5a5f', rougeF: '#9e2328', jaune: '#ffcf3d', jauneF: '#8f6a00', violet: '#b07cff', orange: '#ff9a3d' };
+
+  function rondRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  function dessinerRouage(ctx, x, y, r, angle, couleur, bord) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    const n = 8;
+    for (let k = 0; k < n * 2; k++) {
+      const a0 = (k / (n * 2)) * Math.PI * 2, a1 = ((k + 1) / (n * 2)) * Math.PI * 2;
+      const rr = k % 2 === 0 ? r : r * 0.76;
+      ctx.lineTo(Math.cos(a0) * rr, Math.sin(a0) * rr);
+      ctx.lineTo(Math.cos(a1) * rr, Math.sin(a1) * rr);
+    }
+    ctx.closePath();
+    ctx.fillStyle = couleur || '#ffd34d';
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, r * 0.12);
+    ctx.strokeStyle = bord || '#a8740a';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.32, 0, Math.PI * 2);
+    ctx.fillStyle = bord || '#a8740a';
+    ctx.fill();
+    ctx.restore();
+  }
+  function dessinerEclair(ctx, x, y, s, couleur) {
+    ctx.beginPath();
+    ctx.moveTo(x + s * 0.12, y - s * 0.5);
+    ctx.lineTo(x - s * 0.28, y + s * 0.08);
+    ctx.lineTo(x - s * 0.02, y + s * 0.08);
+    ctx.lineTo(x - s * 0.12, y + s * 0.5);
+    ctx.lineTo(x + s * 0.28, y - s * 0.08);
+    ctx.lineTo(x + s * 0.02, y - s * 0.08);
+    ctx.closePath();
+    ctx.fillStyle = couleur;
+    ctx.fill();
+  }
+  function dessinerTriangle(ctx, x, y, r) {
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r * 0.95, y + r * 0.7);
+    ctx.lineTo(x - r * 0.95, y + r * 0.7);
+    ctx.closePath();
+  }
+  function dessinerCle(ctx, x, y, s, forme) {
+    const coul = forme === 'rond' ? COULEURS.bleu : COULEURS.vert, fonce = forme === 'rond' ? COULEURS.bleuF : COULEURS.vertF;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-0.6);
+    ctx.lineWidth = s * 0.07;
+    ctx.strokeStyle = fonce;
+    ctx.fillStyle = coul;
+    // tige et dents
+    rondRect(ctx, -s * 0.02, -s * 0.06, s * 0.4, s * 0.12, s * 0.04); ctx.fill(); ctx.stroke();
+    ctx.fillRect(s * 0.22, s * 0.04, s * 0.07, s * 0.1);
+    ctx.fillRect(s * 0.31, s * 0.04, s * 0.07, s * 0.07);
+    // tête : rond ou triangle
+    if (forme === 'rond') { ctx.beginPath(); ctx.arc(-s * 0.12, 0, s * 0.16, 0, Math.PI * 2); }
+    else dessinerTriangle(ctx, -s * 0.12, s * 0.02, s * 0.19);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(-s * 0.12, 0.01 * s, s * 0.05, 0, Math.PI * 2); ctx.fillStyle = fonce; ctx.fill();
+    ctx.restore();
+  }
+
+  // Max, le robot : x, y = centre ; s = taille d'une case.
+  function dessinerMax(ctx, x, y, s, o) {
+    o = o || {};
+    const regard = DIRS[o.regard || 'bas'] || [1, 0];
+    const temps = o.temps || 0;
+    ctx.save();
+    ctx.translate(x, y);
+    if (o.alpha !== undefined) ctx.globalAlpha *= o.alpha;
+    const ech = o.echelle || 1;
+    ctx.scale(ech * (o.etire || 1), ech / (o.etire || 1));
+    // ombre
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.38, s * 0.3, s * 0.07, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,.28)';
+    ctx.fill();
+    const saut = o.saut || 0;
+    ctx.translate(0, -saut);
+    // roues
+    ctx.fillStyle = '#2c3e50';
+    rondRect(ctx, -s * 0.27, s * 0.2, s * 0.16, s * 0.16, s * 0.06); ctx.fill();
+    rondRect(ctx, s * 0.11, s * 0.2, s * 0.16, s * 0.16, s * 0.06); ctx.fill();
+    // corps
+    const g = ctx.createLinearGradient(0, -s * 0.4, 0, s * 0.3);
+    g.addColorStop(0, '#9be7f2'); g.addColorStop(1, '#3fb2c9');
+    ctx.fillStyle = g;
+    ctx.strokeStyle = '#17606f';
+    ctx.lineWidth = Math.max(1.2, s * 0.045);
+    rondRect(ctx, -s * 0.33, -s * 0.3, s * 0.66, s * 0.56, s * 0.16); ctx.fill(); ctx.stroke();
+    // antenne
+    ctx.beginPath(); ctx.moveTo(0, -s * 0.3); ctx.lineTo(0, -s * 0.43); ctx.stroke();
+    const lueur = 0.6 + 0.4 * Math.sin(temps / 220);
+    ctx.beginPath(); ctx.arc(0, -s * 0.46, s * 0.065, 0, Math.PI * 2);
+    ctx.fillStyle = o.alarme ? '#ff5a5f' : `rgba(255, 211, 77, ${lueur})`; ctx.fill();
+    // écran du visage
+    ctx.fillStyle = '#0f2a3a';
+    rondRect(ctx, -s * 0.24, -s * 0.21, s * 0.48, s * 0.3, s * 0.1); ctx.fill();
+    // yeux qui regardent dans la direction du mouvement
+    const ox = regard[1] * s * 0.04, oy = regard[0] * s * 0.03;
+    const cligne = (Math.floor(temps / 2600) % 4 === 0 && (temps % 2600) < 140) ? 0.25 : 1;
+    ctx.fillStyle = o.alarme ? '#ffb3b5' : '#6ff2ff';
+    const ry = s * 0.06 * (o.alarme ? 1.25 : cligne);
+    ctx.beginPath(); ctx.ellipse(-s * 0.1 + ox, -s * 0.08 + oy, s * 0.05, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(s * 0.1 + ox, -s * 0.08 + oy, s * 0.05, ry, 0, 0, Math.PI * 2); ctx.fill();
+    // bouche
+    ctx.strokeStyle = o.alarme ? '#ffb3b5' : '#6ff2ff';
+    ctx.lineWidth = Math.max(1, s * 0.03);
+    ctx.beginPath();
+    if (o.alarme) ctx.arc(ox, s * 0.04 + oy, s * 0.04, 0, Math.PI * 2);
+    else ctx.arc(ox, s * 0.0 + oy, s * 0.07, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.stroke();
+    // petit voyant sur le ventre
+    ctx.fillStyle = '#ffd34d';
+    ctx.beginPath(); ctx.arc(0, s * 0.17, s * 0.035, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // Drone gardien (gentil) : x, y = centre.
+  function dessinerDrone(ctx, x, y, s, temps, vers) {
+    ctx.save();
+    ctx.translate(x, y + Math.sin(temps / 180) * s * 0.03);
+    ctx.beginPath(); ctx.ellipse(0, s * 0.36, s * 0.22, s * 0.05, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fill();
+    // hélice
+    const h = Math.abs(Math.cos(temps / 40));
+    ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = Math.max(1, s * 0.04);
+    ctx.beginPath(); ctx.moveTo(0, -s * 0.2); ctx.lineTo(0, -s * 0.3); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, -s * 0.32, s * 0.3 * h + 2, s * 0.04, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(220,235,250,.85)'; ctx.fill();
+    // corps
+    ctx.beginPath(); ctx.arc(0, 0, s * 0.26, 0, Math.PI * 2);
+    const g = ctx.createRadialGradient(-s * 0.08, -s * 0.1, s * 0.03, 0, 0, s * 0.28);
+    g.addColorStop(0, '#ffc2d6'); g.addColorStop(1, '#ff6f9c');
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = '#a3285a'; ctx.lineWidth = Math.max(1, s * 0.04); ctx.stroke();
+    // yeux qui regardent où il va
+    const ox = (vers ? vers[1] : 0) * s * 0.05, oy = (vers ? vers[0] : 0) * s * 0.04;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-s * 0.09 + ox, -s * 0.02 + oy, s * 0.07, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(s * 0.09 + ox, -s * 0.02 + oy, s * 0.07, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3a0d22';
+    ctx.beginPath(); ctx.arc(-s * 0.09 + ox * 1.6, -s * 0.02 + oy * 1.6, s * 0.035, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(s * 0.09 + ox * 1.6, -s * 0.02 + oy * 1.6, s * 0.035, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // --- Scène : un plateau dessiné dans un canvas (jeu ou démonstration) ---
+  function creerScene(canvas) {
+    return { canvas, ctx: canvas.getContext('2d'), def: null, N: null, etat: null, avant: null, anim: null,
+      s: 40, dpr: 1, l: 0, h: 0, particules: [], secousse: 0, regard: 'droite', zone: 0, orient: [], surMarque: null, finAnim: null };
+  }
+  function chargerScene(sc, def) {
+    sc.def = def;
+    sc.N = analyser(def);
+    sc.etat = etatInitial(sc.N);
+    sc.avant = sc.etat;
+    sc.anim = null;
+    sc.particules = [];
+    sc.zone = def.zone || 0;
+    sc.regard = 'droite';
+    // orientation des lasers : le rayon va d'un mur à l'autre
+    const N = sc.N;
+    const bloque = (r, c) => r < 0 || c < 0 || r >= N.h || c >= N.w || N.sol[r * N.w + c] === '#';
+    sc.orient = N.sol.map((ch, i) => {
+      if (ch !== 'l' && ch !== 'L') return null;
+      const r = Math.floor(i / N.w), c = i % N.w;
+      if (bloque(r - 1, c) && bloque(r + 1, c)) return 'v';
+      if (bloque(r, c - 1) && bloque(r, c + 1)) return 'h';
+      return 'v';
+    });
+  }
+  function dimensionnerScene(sc, largeur, hauteur, max) {
+    const N = sc.N;
+    const s = Math.max(12, Math.floor(Math.min(largeur / N.w, hauteur / N.h, max || 72)));
+    sc.s = s;
+    sc.dpr = Math.min(3, window.devicePixelRatio || 1);
+    sc.l = s * N.w; sc.h = s * N.h;
+    sc.canvas.style.width = sc.l + 'px';
+    sc.canvas.style.height = sc.h + 'px';
+    sc.canvas.width = Math.round(sc.l * sc.dpr);
+    sc.canvas.height = Math.round(sc.h * sc.dpr);
+  }
+
+  // Lance l'animation d'une action (évènements du moteur → étapes dans le temps).
+  function animer(sc, ev) {
+    const segs = [], caisses = [], marques = [];
+    let tc = 0;
+    for (const e of ev) {
+      if (e.type === 'pas' || e.type === 'tapis' || e.type === 'huile') {
+        const d = e.type === 'pas' ? 130 : 95;
+        segs.push({ de: e.de, a: e.a, t0: tc, d, type: e.type });
+        marques.push({ temps: tc, ev: e });
+        tc += d;
+      } else if (e.type === 'tele') {
+        segs.push({ de: e.de, a: e.a, t0: tc, d: 320, type: 'tele' });
+        marques.push({ temps: tc, ev: e });
+        tc += 320;
+      } else if (e.type === 'caisse') {
+        caisses.push({ de: e.de, a: e.a, t0: tc, d: 130 });
+        marques.push({ temps: tc, ev: e });
+      } else if (e.type === 'attente') {
+        marques.push({ temps: 0, ev: e });
+        tc += 140;
+      } else if (e.type === 'retour') {
+        tc += 420;
+        marques.push({ temps: tc, ev: e });
+        tc += 120;
+      } else if (e.type === 'touche') {
+        tc = Math.max(tc, 150);
+        marques.push({ temps: tc, ev: e });
+      } else {
+        marques.push({ temps: tc, ev: e });
+      }
+    }
+    sc.anim = { debut: horloge, duree: Math.max(tc, 150), segs, caisses, marques, faits: 0, retour: ev.find((e) => e.type === 'retour') };
+  }
+
+  // Avance l'animation et déclenche les évènements arrivés à leur heure.
+  function majScene(sc) {
+    const a = sc.anim;
+    if (!a) return;
+    const el = horloge - a.debut;
+    while (a.faits < a.marques.length && a.marques[a.faits].temps <= el) {
+      const m = a.marques[a.faits++];
+      if (sc.surMarque) sc.surMarque(sc, m.ev);
+    }
+    if (el >= a.duree) {
+      while (a.faits < a.marques.length) { const m = a.marques[a.faits++]; if (sc.surMarque) sc.surMarque(sc, m.ev); }
+      sc.anim = null;
+      if (sc.finAnim) sc.finAnim(sc);
+    }
+  }
+
+  function caseXY(sc, i) { return [(i % sc.N.w + 0.5) * sc.s, (Math.floor(i / sc.N.w) + 0.5) * sc.s]; }
+
+  // Position de Max (pixels) selon l'animation.
+  function posMax(sc) {
+    const a = sc.anim;
+    if (!a) { const [x, y] = caseXY(sc, sc.etat.pos); return { x, y, alpha: 1, etire: 1, glisse: false }; }
+    const el = horloge - a.debut;
+    let dernier = a.segs.length ? a.segs[a.segs.length - 1].a : sc.avant.pos;
+    if (a.retour) {
+      const tr = a.marques.find((m) => m.ev === a.retour).temps;
+      if (el >= tr) { const [x, y] = caseXY(sc, sc.etat.pos); return { x, y, alpha: Math.min(1, (el - tr) / 120), etire: 1 }; }
+      const [x, y] = caseXY(sc, dernier);
+      return { x, y, alpha: Math.floor(el / 70) % 2 ? 0.35 : 1, etire: 1, alarme: true };
+    }
+    for (const sg of a.segs) {
+      if (el < sg.t0) { const [x, y] = caseXY(sc, sg.de); return { x, y, alpha: 1, etire: 1 }; }
+      if (el < sg.t0 + sg.d) {
+        const k = (el - sg.t0) / sg.d;
+        if (sg.type === 'tele') {
+          const [x0, y0] = caseXY(sc, sg.de), [x1, y1] = caseXY(sc, sg.a);
+          if (k < 0.5) return { x: x0, y: y0, alpha: 1 - k * 2, etire: 1, echelle: 1 - k };
+          return { x: x1, y: y1, alpha: (k - 0.5) * 2, etire: 1, echelle: k };
+        }
+        const [x0, y0] = caseXY(sc, sg.de), [x1, y1] = caseXY(sc, sg.a);
+        const kk = sg.type === 'pas' ? k * k * (3 - 2 * k) : k;
+        return { x: x0 + (x1 - x0) * kk, y: y0 + (y1 - y0) * kk, alpha: 1, etire: sg.type === 'pas' ? 1 + Math.sin(k * Math.PI) * 0.08 : 1, saut: sg.type === 'pas' ? Math.sin(k * Math.PI) * sc.s * 0.06 : 0, glisse: sg.type !== 'pas' };
+      }
+    }
+    const [x, y] = caseXY(sc, dernier);
+    return { x, y, alpha: 1, etire: 1 };
+  }
+
+  // État visible (objets, interrupteur) : ce qui a déjà eu lieu dans l'animation.
+  function visible(sc) {
+    const a = sc.anim;
+    if (!a) return { pris: sc.etat.pris, inter: sc.etat.inter, t: sc.etat.t };
+    let pris = sc.avant.pris, inter = sc.avant.inter;
+    for (let k = 0; k < a.faits; k++) {
+      const e = a.marques[k].ev;
+      if (e.type === 'rouage' || e.type === 'pile' || e.type === 'cleB' || e.type === 'cleV') {
+        const o = sc.N.objets.find((x) => x.i === e.i);
+        if (o) pris |= (1 << o.bit);
+      }
+      if (e.type === 'inter') inter = e.etat;
+    }
+    return { pris, inter, t: sc.etat.t };
+  }
+
+  function dessinerScene(sc) {
+    const { ctx, N, s } = sc;
+    if (!N) return;
+    const Z = ZONES[sc.zone] || ZONES[0];
+    ctx.setTransform(sc.dpr, 0, 0, sc.dpr, 0, 0);
+    ctx.clearRect(0, 0, sc.l, sc.h);
+    ctx.save();
+    if (sc.secousse > 0) ctx.translate((Math.random() - 0.5) * sc.secousse, (Math.random() - 0.5) * sc.secousse);
+    const vis = visible(sc);
+    const e = sc.etat;
+    const aCle = (type) => N.objets.some((o) => o.type === type && (vis.pris & (1 << o.bit)));
+    const tempsAnim = horloge;
+    // fond du plateau
+    ctx.fillStyle = Z.cadre;
+    rondRect(ctx, 0, 0, sc.l, sc.h, Math.min(14, s * 0.3)); ctx.fill();
+    for (let i = 0; i < N.sol.length; i++) {
+      const ch = N.sol[i];
+      const c = i % N.w, r = Math.floor(i / N.w);
+      const x = c * s, y = r * s;
+      if (ch === '#') continue;
+      ctx.fillStyle = (r + c) % 2 ? Z.sol : Z.sol2;
+      ctx.fillRect(x, y, s, s);
+      // petits rivets du sol
+      ctx.fillStyle = 'rgba(255,255,255,.06)';
+      ctx.fillRect(x + s * 0.08, y + s * 0.08, s * 0.06, s * 0.06);
+      ctx.fillRect(x + s * 0.86, y + s * 0.86, s * 0.06, s * 0.06);
+    }
+    // éléments du sol
+    for (let i = 0; i < N.sol.length; i++) {
+      const ch = N.sol[i];
+      const c = i % N.w, r = Math.floor(i / N.w);
+      const x = c * s, y = r * s, cx = x + s / 2, cy = y + s / 2;
+      if (ch === 'E') {
+        const tous = N.objets.filter((o) => o.type === 'rouage').every((o) => vis.pris & (1 << o.bit));
+        const p = 0.5 + 0.5 * Math.sin(tempsAnim / (tous ? 160 : 400));
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.42, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 211, 77, ${0.15 + 0.25 * p})`; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.34, 0, Math.PI * 2);
+        ctx.fillStyle = '#20384f'; ctx.fill();
+        ctx.lineWidth = s * 0.06; ctx.strokeStyle = tous ? '#ffd34d' : '#9fb7cf'; ctx.stroke();
+        dessinerEclair(ctx, cx, cy, s * 0.5, tous ? '#ffd34d' : '#cfe0f0');
+      } else if (TAPIS[ch]) {
+        ctx.fillStyle = '#2b3440';
+        ctx.fillRect(x + 1, y + 1, s - 2, s - 2);
+        ctx.save();
+        ctx.beginPath(); ctx.rect(x + 1, y + 1, s - 2, s - 2); ctx.clip();
+        ctx.translate(cx, cy);
+        ctx.rotate({ droite: 0, bas: Math.PI / 2, gauche: Math.PI, haut: -Math.PI / 2 }[TAPIS[ch]]);
+        const dec = ((tempsAnim / 600) % 1) * s * 0.5;
+        ctx.strokeStyle = '#ffcf3d'; ctx.lineWidth = s * 0.09; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        for (let k = -2; k <= 1; k++) {
+          const px = k * s * 0.5 + dec;
+          ctx.beginPath(); ctx.moveTo(px - s * 0.12, -s * 0.2); ctx.lineTo(px + s * 0.08, 0); ctx.lineTo(px - s * 0.12, s * 0.2); ctx.stroke();
+        }
+        ctx.restore();
+        ctx.strokeStyle = '#11161c'; ctx.lineWidth = 2; ctx.strokeRect(x + 1, y + 1, s - 2, s - 2);
+      } else if (ch === '~') {
+        ctx.fillStyle = '#1a1424';
+        ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.47, s * 0.42, 0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(176, 124, 255, .35)';
+        ctx.beginPath(); ctx.ellipse(cx - s * 0.12, cy - s * 0.12, s * 0.16, s * 0.06, -0.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(120, 220, 255, .25)';
+        ctx.beginPath(); ctx.ellipse(cx + s * 0.14, cy + s * 0.12, s * 0.1, s * 0.04, -0.5, 0, Math.PI * 2); ctx.fill();
+      } else if (ch === 'T' || ch === 'U') {
+        const coul = ch === 'T' ? COULEURS.violet : COULEURS.orange;
+        ctx.save(); ctx.translate(cx, cy);
+        for (let k = 0; k < 3; k++) {
+          ctx.rotate(tempsAnim / (700 + k * 300) + k);
+          ctx.beginPath(); ctx.arc(0, 0, s * (0.38 - k * 0.1), 0.2, Math.PI * 1.5);
+          ctx.strokeStyle = coul; ctx.lineWidth = s * 0.06; ctx.globalAlpha = 1 - k * 0.25; ctx.stroke();
+        }
+        ctx.restore();
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.08, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+      } else if (ch === 'o') {
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.36, 0, Math.PI * 2); ctx.fillStyle = '#56606c'; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.26, 0, Math.PI * 2);
+        ctx.fillStyle = vis.inter ? COULEURS.rouge : COULEURS.jaune; ctx.fill();
+        ctx.lineWidth = s * 0.05; ctx.strokeStyle = vis.inter ? COULEURS.rougeF : COULEURS.jauneF; ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx - s * 0.08, cy - s * 0.08, s * 0.07, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.fill();
+      } else if (ch === 'X' || ch === 'x') {
+        const ferme = ch === 'X' ? !vis.inter : vis.inter;
+        const coul = ch === 'X' ? COULEURS.rouge : COULEURS.jaune;
+        if (ferme) {
+          ctx.save();
+          rondRect(ctx, x + s * 0.06, y + s * 0.06, s * 0.88, s * 0.88, s * 0.12); ctx.clip();
+          ctx.fillStyle = coul; ctx.fillRect(x, y, s, s);
+          ctx.strokeStyle = ch === 'X' ? '#fff' : '#3a2e00'; ctx.lineWidth = s * 0.12;
+          for (let k = -1; k < 3; k++) { ctx.beginPath(); ctx.moveTo(x + k * s * 0.4, y + s); ctx.lineTo(x + k * s * 0.4 + s, y); ctx.stroke(); }
+          ctx.restore();
+          ctx.lineWidth = s * 0.05; ctx.strokeStyle = ch === 'X' ? COULEURS.rougeF : COULEURS.jauneF;
+          rondRect(ctx, x + s * 0.06, y + s * 0.06, s * 0.88, s * 0.88, s * 0.12); ctx.stroke();
+        } else {
+          ctx.setLineDash([s * 0.1, s * 0.08]);
+          ctx.lineWidth = s * 0.05; ctx.strokeStyle = coul;
+          rondRect(ctx, x + s * 0.12, y + s * 0.12, s * 0.76, s * 0.76, s * 0.1); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      } else if (ch === 'K' || ch === 'J') {
+        const ouverte = aCle(ch === 'K' ? 'cleB' : 'cleV');
+        const coul = ch === 'K' ? COULEURS.bleu : COULEURS.vert, fonce = ch === 'K' ? COULEURS.bleuF : COULEURS.vertF;
+        if (!ouverte) {
+          ctx.fillStyle = coul;
+          rondRect(ctx, x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, s * 0.1); ctx.fill();
+          ctx.lineWidth = s * 0.05; ctx.strokeStyle = fonce; ctx.stroke();
+          ctx.fillStyle = fonce;
+          if (ch === 'K') { ctx.beginPath(); ctx.arc(cx, cy, s * 0.17, 0, Math.PI * 2); ctx.fill(); }
+          else { dessinerTriangle(ctx, cx, cy, s * 0.2); ctx.fill(); }
+        } else {
+          ctx.lineWidth = s * 0.05; ctx.strokeStyle = coul; ctx.globalAlpha = 0.6;
+          rondRect(ctx, x + s * 0.08, y + s * 0.08, s * 0.84, s * 0.84, s * 0.1); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+    // murs (en relief)
+    for (let i = 0; i < N.sol.length; i++) {
+      if (N.sol[i] !== '#') continue;
+      const x = (i % N.w) * s, y = Math.floor(i / N.w) * s;
+      ctx.fillStyle = Z.murOmbre;
+      rondRect(ctx, x + 1, y + 1, s - 2, s - 2, s * 0.14); ctx.fill();
+      ctx.fillStyle = Z.mur;
+      rondRect(ctx, x + 1, y + 1, s - 2, s * 0.8, s * 0.14); ctx.fill();
+      ctx.fillStyle = Z.murHaut;
+      rondRect(ctx, x + s * 0.12, y + s * 0.1, s * 0.76, s * 0.14, s * 0.07); ctx.fill();
+      ctx.fillStyle = Z.murOmbre;
+      ctx.beginPath(); ctx.arc(x + s * 0.24, y + s * 0.56, s * 0.05, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + s * 0.76, y + s * 0.56, s * 0.05, 0, Math.PI * 2); ctx.fill();
+    }
+    // objets
+    for (const o of N.objets) {
+      if (vis.pris & (1 << o.bit)) continue;
+      const [cx, cy] = caseXY(sc, o.i);
+      const flotte = Math.sin(tempsAnim / 300 + o.i) * s * 0.04;
+      if (o.type === 'rouage') {
+        ctx.beginPath(); ctx.arc(cx, cy + flotte, s * 0.36, 0, Math.PI * 2); ctx.fillStyle = 'rgba(255, 211, 77, .18)'; ctx.fill();
+        dessinerRouage(ctx, cx, cy + flotte, s * 0.28, tempsAnim / 900);
+      } else if (o.type === 'pile') {
+        ctx.save(); ctx.translate(cx, cy + flotte);
+        ctx.fillStyle = COULEURS.vert; ctx.strokeStyle = COULEURS.vertF; ctx.lineWidth = s * 0.05;
+        rondRect(ctx, -s * 0.18, -s * 0.28, s * 0.36, s * 0.54, s * 0.07); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = COULEURS.vertF; ctx.fillRect(-s * 0.07, -s * 0.34, s * 0.14, s * 0.06);
+        dessinerEclair(ctx, 0, 0, s * 0.34, '#fff');
+        ctx.restore();
+      } else if (o.type === 'cleB') dessinerCle(ctx, cx, cy + flotte, s, 'rond');
+      else if (o.type === 'cleV') dessinerCle(ctx, cx, cy + flotte, s, 'triangle');
+    }
+    // caisses
+    const a = sc.anim;
+    const elA = a ? horloge - a.debut : 0;
+    e.caisses.forEach((ci) => {
+      let [x, y] = caseXY(sc, ci);
+      if (a) {
+        const m = a.caisses.find((k) => k.a === ci);
+        if (m && elA < m.t0 + m.d) {
+          const k = Math.max(0, (elA - m.t0) / m.d);
+          const [x0, y0] = caseXY(sc, m.de);
+          x = x0 + (x - x0) * k; y = y0 + (y - y0) * k;
+        }
+      }
+      ctx.fillStyle = '#c98b4a'; ctx.strokeStyle = '#6e4319'; ctx.lineWidth = s * 0.05;
+      rondRect(ctx, x - s * 0.42, y - s * 0.42, s * 0.84, s * 0.84, s * 0.08); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x - s * 0.34, y - s * 0.34); ctx.lineTo(x + s * 0.34, y + s * 0.34);
+      ctx.moveTo(x + s * 0.34, y - s * 0.34); ctx.lineTo(x - s * 0.34, y + s * 0.34); ctx.stroke();
+      ctx.strokeRect(x - s * 0.3, y - s * 0.3, s * 0.6, s * 0.6);
+    });
+    // lasers : on montre leur état au prochain pas (celui qui compte pour Max)
+    for (let i = 0; i < N.sol.length; i++) {
+      const ch = N.sol[i];
+      if (ch !== 'l' && ch !== 'L') continue;
+      const [cx, cy] = caseXY(sc, i);
+      const vert = sc.orient[i] === 'v';
+      const allume = laserAllume(ch, vis.t + 1);
+      ctx.fillStyle = '#5b1d22';
+      if (vert) { ctx.fillRect(cx - s * 0.16, cy - s * 0.5, s * 0.32, s * 0.1); ctx.fillRect(cx - s * 0.16, cy + s * 0.4, s * 0.32, s * 0.1); }
+      else { ctx.fillRect(cx - s * 0.5, cy - s * 0.16, s * 0.1, s * 0.32); ctx.fillRect(cx + s * 0.4, cy - s * 0.16, s * 0.1, s * 0.32); }
+      if (allume) {
+        const p = 0.8 + 0.2 * Math.sin(tempsAnim / 60);
+        ctx.save();
+        ctx.shadowColor = '#ff2d3d';
+        ctx.shadowBlur = s * 0.35;
+        ctx.fillStyle = `rgba(255, 45, 60, ${0.55 * p})`;
+        if (vert) ctx.fillRect(cx - s * 0.17, cy - s * 0.42, s * 0.34, s * 0.84); else ctx.fillRect(cx - s * 0.42, cy - s * 0.17, s * 0.84, s * 0.34);
+        ctx.fillStyle = '#ff3b4a';
+        if (vert) ctx.fillRect(cx - s * 0.08, cy - s * 0.42, s * 0.16, s * 0.84); else ctx.fillRect(cx - s * 0.42, cy - s * 0.08, s * 0.84, s * 0.16);
+        ctx.restore();
+        ctx.fillStyle = `rgba(255, 235, 235, ${p})`;
+        if (vert) ctx.fillRect(cx - s * 0.03, cy - s * 0.42, s * 0.06, s * 0.84); else ctx.fillRect(cx - s * 0.42, cy - s * 0.03, s * 0.84, s * 0.06);
+      } else {
+        ctx.setLineDash([s * 0.06, s * 0.08]);
+        ctx.strokeStyle = 'rgba(255, 120, 120, .45)'; ctx.lineWidth = s * 0.03;
+        ctx.beginPath();
+        if (vert) { ctx.moveTo(cx, cy - s * 0.4); ctx.lineTo(cx, cy + s * 0.4); } else { ctx.moveTo(cx - s * 0.4, cy); ctx.lineTo(cx + s * 0.4, cy); }
+        ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    // drones (et petit rond : leur prochaine case)
+    N.drones.forEach((cases) => {
+      const tNow = e.t;
+      const p1 = posDrone(cases, tNow), p2 = posDrone(cases, tNow + 1);
+      let [x, y] = caseXY(sc, p1);
+      if (a && elA < 160) {
+        const [x0, y0] = caseXY(sc, posDrone(cases, sc.avant.t));
+        const k = elA / 160;
+        x = x0 + (x - x0) * k; y = y0 + (y - y0) * k;
+      }
+      const [nx, ny] = caseXY(sc, p2);
+      if (p2 !== p1) {
+        ctx.beginPath(); ctx.arc(nx, ny, s * 0.12, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255, 143, 177, .8)'; ctx.lineWidth = s * 0.05; ctx.setLineDash([s * 0.05, s * 0.05]); ctx.stroke(); ctx.setLineDash([]);
+      }
+      const ver = [Math.sign(ny - y), Math.sign(nx - x)];
+      dessinerDrone(ctx, x, y, s, tempsAnim, ver);
+    });
+    // Max
+    const pm = posMax(sc);
+    const surLaser = !a && (N.sol[e.pos] === 'l' || N.sol[e.pos] === 'L') && laserAllume(N.sol[e.pos], e.t + 1);
+    if (surLaser) {
+      // le laser va toucher Max s'il reste là : cercle d'alerte
+      const k = (tempsAnim % 600) / 600;
+      ctx.beginPath(); ctx.arc(pm.x, pm.y, s * (0.4 + 0.25 * k), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 90, 95, ${1 - k})`; ctx.lineWidth = s * 0.07; ctx.stroke();
+    }
+    dessinerMax(ctx, pm.x, pm.y, s, { regard: sc.regard, temps: tempsAnim, alpha: pm.alpha, etire: pm.etire, echelle: pm.echelle, saut: pm.saut || (sc.joie ? Math.abs(Math.sin(tempsAnim / 110)) * s * 0.18 : 0), alarme: pm.alarme || surLaser });
+    if (pm.glisse) {
+      ctx.fillStyle = 'rgba(255,255,255,.35)';
+      ctx.beginPath(); ctx.arc(pm.x - (DIRS[sc.regard][1] * s * 0.4), pm.y - (DIRS[sc.regard][0] * s * 0.4), s * 0.08, 0, Math.PI * 2); ctx.fill();
+    }
+    // particules
+    dessinerParticules(ctx, sc.particules);
+    ctx.restore();
+    // démonstration de l'énergie : petite jauge en haut à droite
+    if (sc.jaugeDemo && N.energie) {
+      for (let k = 0; k < N.energie; k++) {
+        ctx.fillStyle = k < e.energie ? COULEURS.vert : 'rgba(255,255,255,.2)';
+        rondRect(ctx, sc.l - (N.energie - k) * s * 0.3 - 4, 4, s * 0.24, s * 0.16, 3); ctx.fill();
+      }
+    }
+  }
+
+  // --- Particules ---
+  function ajouterParticules(liste, x, y, n, couleur, forme, force) {
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, v = (force || 1) * (0.06 + Math.random() * 0.18);
+      liste.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.05, vie: 1, duree: 500 + Math.random() * 500, couleur, forme: forme || 'point', taille: 2 + Math.random() * 4, rot: Math.random() * 6 });
+    }
+  }
+  function majParticules(liste, dt) {
+    for (let k = liste.length - 1; k >= 0; k--) {
+      const p = liste[k];
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 0.0004 * dt; p.rot += dt * 0.01;
+      p.vie -= dt / p.duree;
+      if (p.vie <= 0) liste.splice(k, 1);
+    }
+  }
+  function dessinerParticules(ctx, liste) {
+    for (const p of liste) {
+      ctx.globalAlpha = Math.max(0, p.vie);
+      ctx.fillStyle = p.couleur;
+      if (p.forme === 'etoile') {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.beginPath();
+        for (let k = 0; k < 10; k++) { const r = k % 2 ? p.taille * 0.45 : p.taille * 1.2; const an = k * Math.PI / 5; ctx.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      } else if (p.forme === 'carre') {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillRect(-p.taille / 2, -p.taille / 4, p.taille, p.taille / 2); ctx.restore();
+      } else {
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.taille / 2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // ===== ÉCRANS =====
+  let ecran = 'titre';
+  let horloge = 0;
+  let enPause = false;
+  let fenetre = null; // 'tuto', 'pause', 'victoire', 'defaite', 'bilan'
+  const sc = creerScene($('plateau'));
+  const scDemo = creerScene($('demo'));
+  scDemo.jaugeDemo = true;
+  let niveauCourant = 0;
+  let tampon = undefined;
+  let enPartie = false;
+
+  function montrerEcran(nom) {
+    ecran = nom;
+    ['titre', 'niveaux', 'jeu'].forEach((n) => $('ecran-' + n).classList.toggle('actif', n === nom));
+    if (nom === 'titre') majTitre();
+    if (nom !== 'jeu') enPartie = false;
+  }
+  function ouvrir(nom) {
+    fermerFenetres();
+    fenetre = nom;
+    $('v-' + nom).classList.add('actif');
+    const b = $('v-' + nom).querySelector('.btn.principal');
+    if (b) setTimeout(() => { try { b.focus({ preventScroll: true }); } catch (e) { /* rien */ } }, 30);
+  }
+  function fermerFenetres() {
+    ['tuto', 'pause', 'victoire', 'defaite', 'bilan'].forEach((n) => $('v-' + n).classList.remove('actif'));
+    fenetre = null;
+  }
+
+  // --- Boutons son ---
+  function majBoutonsSon() {
+    ['b-son-titre', 'b-son-jeu'].forEach((id) => { $(id).innerHTML = sonActif ? ICONES.sonOui() : ICONES.sonNon(); $(id).setAttribute('aria-pressed', sonActif ? 'false' : 'true'); });
+  }
+  function basculerSon() {
+    sonActif = !sonActif;
+    sonTouche = true;
+    try { localStorage.setItem('robot-max-son', sonActif ? 'oui' : 'non'); } catch (e) { /* pas de stockage */ }
+    // dans le site, le choix passe par la sauvegarde commune (seulement pendant une partie)
+    if (ecran === 'jeu' && enPartie) sauverProgres(niveauCourant + 1);
+    majBoutonsSon();
+    preparerAudio();
+    son('clic');
+  }
+
+  // --- Écran titre : grand dessin animé (sert aussi de jaquette) ---
+  const cTitre = $('dessin-titre');
+  const ctxTitre = cTitre.getContext('2d');
+  function majTitre() { dimensionnerTitre(); }
+  function dimensionnerTitre() {
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    cTitre.width = Math.round(innerWidth * dpr);
+    cTitre.height = Math.round(innerHeight * dpr);
+  }
+  function dessinerTitre() {
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const W = innerWidth, H = innerHeight;
+    const ctx = ctxTitre;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#1b3f5e'); g.addColorStop(1, '#0d1f30');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // labyrinthe en fond
+    const s = Math.max(40, Math.min(W, H) / 8);
+    const motif = ['#.#..#.#.#', '...#....#.', '#.#.##.#..', '..#....#.#', '.##.#.##..', '....#....#', '#.##..#.#.', '...#.#....', '.#....##.#', '##.#.#....', '...#...#.#', '#.#..#....'];
+    for (let r = 0; r * s < H + s; r++) {
+      for (let c = 0; c * s < W + s; c++) {
+        const ch = motif[r % motif.length][c % 10];
+        if (ch === '#') {
+          ctx.fillStyle = 'rgba(125, 148, 173, .22)';
+          rondRect(ctx, c * s + 3, r * s + 3, s - 6, s - 6, s * 0.15); ctx.fill();
+        } else {
+          ctx.fillStyle = 'rgba(40, 80, 109, .25)';
+          ctx.fillRect(c * s + 1, r * s + 1, s - 2, s - 2);
+        }
+      }
+    }
+    // borne de recharge, rouages et Max
+    const cx = W / 2, cy = H * 0.47;
+    const taille = Math.min(W * 0.5, H * 0.3, 260);
+    const p = 0.5 + 0.5 * Math.sin(horloge / 300);
+    ctx.beginPath(); ctx.arc(cx, cy + taille * 0.05, taille * (0.75 + 0.05 * p), 0, Math.PI * 2);
+    const halo = ctx.createRadialGradient(cx, cy, taille * 0.1, cx, cy, taille * 0.8);
+    halo.addColorStop(0, 'rgba(255, 211, 77, .35)'); halo.addColorStop(1, 'rgba(255, 211, 77, 0)');
+    ctx.fillStyle = halo; ctx.fill();
+    // socle (borne)
+    ctx.beginPath(); ctx.ellipse(cx, cy + taille * 0.42, taille * 0.5, taille * 0.13, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#20384f'; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = '#ffd34d'; ctx.stroke();
+    // rouages qui tournent autour
+    for (let k = 0; k < 3; k++) {
+      const an = horloge / 1500 + k * (Math.PI * 2 / 3);
+      const rx = cx + Math.cos(an) * taille * 0.85, ry = cy + Math.sin(an) * taille * 0.45 - taille * 0.05;
+      dessinerRouage(ctx, rx, ry, taille * 0.14, horloge / 600 * (k % 2 ? -1 : 1));
+    }
+    // drone qui passe
+    const dx = cx + Math.sin(horloge / 1300) * W * 0.32;
+    dessinerDrone(ctx, dx, cy - taille * 0.85, taille * 0.45, horloge, [0, Math.sign(Math.cos(horloge / 1300))]);
+    // clé et pile (sans sortir de l'écran)
+    const ecart = Math.min(taille * 0.95, W / 2 - taille * 0.22);
+    dessinerCle(ctx, cx - ecart, cy + taille * 0.55, taille * 0.5, 'rond');
+    ctx.save(); ctx.translate(cx + ecart, cy + taille * 0.55);
+    ctx.fillStyle = COULEURS.vert; ctx.strokeStyle = COULEURS.vertF; ctx.lineWidth = 4;
+    rondRect(ctx, -taille * 0.09, -taille * 0.14, taille * 0.18, taille * 0.27, taille * 0.04); ctx.fill(); ctx.stroke();
+    dessinerEclair(ctx, 0, 0, taille * 0.17, '#fff');
+    ctx.restore();
+    dessinerMax(ctx, cx, cy, taille, { regard: 'bas', temps: horloge, saut: Math.abs(Math.sin(horloge / 400)) * taille * 0.05 });
+  }
+
+  // --- Écran des niveaux ---
+  function ouvrirNiveaux() {
+    fermerFenetres();
+    enPause = false;
+    montrerEcran('niveaux');
+    $('stats-niveaux').textContent = t('niveaux.stats', { etoiles: I.nombre(etoilesTotal()), max: I.nombre(NIVEAUX.length * 3), score: I.nombre(scoreTotal()) });
+    const liste = $('liste-niveaux');
+    liste.innerHTML = '';
+    for (let z = 0; z < 4; z++) {
+      const bloc = document.createElement('div');
+      bloc.className = 'zone-niveaux';
+      bloc.style.background = ZONES[z].fond;
+      const h = document.createElement('h3');
+      h.textContent = t('zone.' + z);
+      bloc.appendChild(h);
+      const grille = document.createElement('div');
+      grille.className = 'grille-niveaux';
+      NIVEAUX.forEach((def, i) => {
+        if (def.zone !== z) return;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'case-niveau';
+        if (i + 1 > progres.debloque) {
+          b.classList.add('ferme');
+          b.innerHTML = ICONES.cadenas();
+          b.setAttribute('aria-label', t('niveaux.ferme', { n: I.nombre(i + 1) }));
+          b.addEventListener('click', () => { son('choc'); });
+        } else {
+          const et = progres.etoiles[i] || 0;
+          const num = document.createElement('span');
+          num.textContent = I.nombre(i + 1);
+          b.appendChild(num);
+          const ets = document.createElement('span');
+          ets.className = 'mini-etoiles';
+          ets.innerHTML = [0, 1, 2].map((k) => ICONES.etoile(k < et)).join('');
+          b.appendChild(ets);
+          b.setAttribute('aria-label', t('niveaux.niveau', { n: I.nombre(i + 1) }) + ', ' + t('niveaux.etoiles', { n: et }));
+          b.addEventListener('click', () => { son('clic'); lancerNiveau(i); });
+        }
+        grille.appendChild(b);
+      });
+      bloc.appendChild(grille);
+      liste.appendChild(bloc);
+    }
+    const prochain = liste.querySelectorAll('.case-niveau:not(.ferme)');
+    const cible = prochain[Math.min(prochain.length - 1, progres.debloque - 1)];
+    if (cible) setTimeout(() => { try { cible.scrollIntoView({ block: 'center' }); cible.focus({ preventScroll: true }); } catch (e) { /* rien */ } }, 30);
+  }
+
+  // --- Partie ---
+  function lancerNiveau(i) {
+    fermerFenetres();
+    enPause = false;
+    niveauCourant = Math.max(0, Math.min(NIVEAUX.length - 1, i));
+    const def = NIVEAUX[niveauCourant];
+    chargerScene(sc, def);
+    sc.joie = false;
+    sc.dejaTapis = false;
+    tampon = undefined;
+    montrerEcran('jeu');
+    enPartie = true;
+    document.body.style.background = ZONES[def.zone].fond;
+    $('barre-energie').classList.toggle('cache', !def.energie);
+    redimensionner();
+    majHud();
+    message(t('msg.depart'));
+    // tutoriel : à la première rencontre d'une mécanique
+    if (def.tuto && !progres.tutos.includes(def.tuto)) {
+      progres.tutos.push(def.tuto);
+      ouvrirTuto([def.tuto]);
+    }
+  }
+  function redimensionner() {
+    if (ecran === 'titre') dimensionnerTitre();
+    if (ecran !== 'jeu' || !sc.N) return;
+    const z = $('zone-plateau').getBoundingClientRect();
+    dimensionnerScene(sc, z.width - 12, z.height - 8, 76);
+  }
+
+  let minuterieMessage = null;
+  function message(texte) {
+    const m = $('message');
+    m.textContent = texte;
+    m.style.opacity = '1';
+    clearTimeout(minuterieMessage);
+  }
+
+  function majHud() {
+    const e = sc.etat, N = sc.N;
+    $('hud-niveau').textContent = t('hud.niveau', { n: I.nombre(niveauCourant + 1) });
+    const vis = visible(sc);
+    const r = N.objets.filter((o) => o.type === 'rouage' && (vis.pris & (1 << o.bit))).length;
+    $('hud-rouages').innerHTML = [0, 1, 2].map((k) => ICONES.rouage(k < r)).join('');
+    $('hud-rouages').setAttribute('aria-label', t('hud.rouages', { n: I.nombre(r) }));
+    // un cœur perdu ne disparaît qu'au moment du choc dans l'animation
+    const attendu = sc.anim && sc.anim.marques.slice(sc.anim.faits).some((m) => m.ev.type === 'touche');
+    const coeurs = attendu ? sc.avant.coeurs : e.coeurs;
+    $('hud-coeurs').innerHTML = [0, 1, 2].map((k) => ICONES.coeur(k < coeurs)).join('');
+    $('hud-coeurs').setAttribute('aria-label', t('hud.coeurs', { n: coeurs }));
+    if (N.energie) {
+      const k = e.energie / N.energie;
+      $('jauge-remplie').style.width = (k * 100) + '%';
+      $('jauge-remplie').classList.toggle('basse', e.energie <= 4);
+      $('barre-energie').setAttribute('aria-label', t('hud.energie', { n: I.nombre(e.energie), max: I.nombre(N.energie) }));
+    }
+  }
+
+  // Une action du joueur (direction ou null = attendre).
+  function action(dir) {
+    if (ecran !== 'jeu' || enPause || fenetre || !sc.etat || sc.etat.fini) return;
+    preparerAudio();
+    if (sc.anim) { tampon = dir; return; }
+    jouerAction(dir);
+  }
+  function jouerAction(dir) {
+    const res = jouer(sc.N, sc.etat, dir);
+    if (!res.etat) {
+      const c = res.ev[0];
+      if (c && c.type === 'choc') {
+        son('choc');
+        sc.regard = c.dir;
+        sc.secousse = 3;
+        if (c.sur === 'K') message(t('msg.porteB'));
+        else if (c.sur === 'J') message(t('msg.porteV'));
+        else if (c.sur === 'X' || c.sur === 'x') message(t('msg.barriere'));
+        else if (c.sur === 'C') message(t('msg.caisse'));
+      }
+      return;
+    }
+    sc.avant = sc.etat;
+    sc.etat = res.etat;
+    if (dir) sc.regard = dir;
+    animer(sc, res.ev);
+    majHud();
+  }
+
+  // Évènements de l'animation du jeu : sons, messages, effets.
+  sc.surMarque = (s, e) => {
+    const [x, y] = e.i !== undefined ? caseXY(s, e.i) : caseXY(s, s.etat.pos);
+    switch (e.type) {
+      case 'pas': son('pas'); break;
+      case 'attente': son('attente'); break;
+      case 'tapis': son('tapis'); if (!s.dejaTapis) { message(t('msg.tapis')); } s.dejaTapis = true; break;
+      case 'huile': son('huile'); message(t('msg.huile')); break;
+      case 'tele': son('tele'); message(t('msg.tele')); { const [tx, ty] = caseXY(s, e.a); ajouterParticules(s.particules, tx, ty, 16, COULEURS.violet, 'point', 0.8); } break;
+      case 'caisse': son('caisse'); break;
+      case 'porte': son('porte'); message(t('msg.porte')); { const [px, py] = caseXY(s, e.i); ajouterParticules(s.particules, px, py, 12, '#cfe8ff', 'carre', 0.8); } break;
+      case 'inter': son('inter'); message(t('msg.inter')); s.secousse = 2; break;
+      case 'rouage': {
+        son('rouage');
+        ajouterParticules(s.particules, x, y, 18, '#ffd34d', 'etoile', 1);
+        const vus = s.N.objets.filter((o) => o.type === 'rouage' && (visible(s).pris & (1 << o.bit))).length;
+        const encore = s.N.nbRouages - vus;
+        message(encore > 0 ? t('msg.rouage', { n: encore }) : t('msg.tousRouages'));
+        if (encore === 0) son('etoile');
+        majHud();
+        break;
+      }
+      case 'pile': son('pile'); message(t('msg.pile')); ajouterParticules(s.particules, x, y, 14, COULEURS.vert, 'point', 0.9); break;
+      case 'cleB': son('cle'); message(t('msg.cleB')); ajouterParticules(s.particules, x, y, 14, COULEURS.bleu, 'etoile', 0.9); break;
+      case 'cleV': son('cle'); message(t('msg.cleV')); ajouterParticules(s.particules, x, y, 14, COULEURS.vert, 'etoile', 0.9); break;
+      case 'touche': {
+        son('touche');
+        s.secousse = 9;
+        const [hx, hy] = caseXY(s, e.i);
+        ajouterParticules(s.particules, hx, hy, 20, COULEURS.rouge, 'etoile', 1.2);
+        message(t(e.cause === 'drone' ? 'msg.drone' : 'msg.laser'));
+        majHud();
+        break;
+      }
+      case 'retour': { const [rx, ry] = caseXY(s, s.etat.pos); ajouterParticules(s.particules, rx, ry, 12, '#9be7f2', 'point', 0.7); majHud(); break; }
+      case 'defaite': causeDefaite = e.cause; break;
+      default: break;
+    }
+  };
+  let causeDefaite = 'panne';
+  sc.finAnim = (s) => {
+    majHud();
+    const e = s.etat;
+    if (e.fini === 'victoire') { s.joie = true; enPartie = false; setTimeout(victoire, 450); return; }
+    if (e.fini === 'defaite') { enPartie = false; setTimeout(() => defaite(causeDefaite), 600); return; }
+    if (s.N.energie && e.energie > 0 && e.energie <= 4 && s.avant.energie > 4) { son('alerte'); message(t('msg.energieBasse')); }
+    // danger au prochain pas : laser qui s'allume sous Max, drone qui arrive sur lui
+    const ch = s.N.sol[e.pos];
+    if ((ch === 'l' || ch === 'L') && laserAllume(ch, e.t + 1)) { son('alerte'); message(t('msg.laserDanger')); }
+    else if (s.N.drones.some((cases) => posDrone(cases, e.t + 1) === e.pos)) { son('alerte'); message(t('msg.droneDanger')); }
+    if (tampon !== undefined) { const d = tampon; tampon = undefined; jouerAction(d); }
+  };
+
+  function scoreNiveau() {
+    const e = sc.etat, N = sc.N;
+    return rouagesPris(N, e) * 100 + e.coeurs * 50 + (N.energie ? e.energie * 10 : 0);
+  }
+
+  function victoire() {
+    enPause = false;
+    const i = niveauCourant;
+    const r = rouagesPris(sc.N, sc.etat);
+    const score = scoreNiveau();
+    const ancien = progres.records[i] || 0;
+    const record = score > ancien;
+    progres.etoiles[i] = Math.max(progres.etoiles[i] || 0, r);
+    if (record) progres.records[i] = score;
+    progres.debloque = Math.max(progres.debloque, Math.min(NIVEAUX.length, i + 2));
+    sauverProgres(Math.min(NIVEAUX.length, i + 2));
+    son('victoire');
+    confettis(r === 3 ? 140 : 70);
+    $('fin-titre').textContent = r === 3 ? t('fin.parfait') : t('fin.victoire');
+    const zoneEt = $('fin-etoiles');
+    zoneEt.innerHTML = [0, 1, 2].map((k) => ICONES.etoile(k < r)).join('');
+    zoneEt.setAttribute('role', 'img');
+    zoneEt.setAttribute('aria-label', t('fin.etoiles', { n: r }));
+    const svgs = zoneEt.querySelectorAll('svg');
+    svgs.forEach((el, k) => setTimeout(() => { el.classList.add(k < r ? 'allumee' : 'eteinte'); if (k < r) son('etoile'); }, 350 + k * 330));
+    // le score défile
+    const sp = $('fin-score');
+    const debut = performance.now();
+    const tour = () => {
+      const k = Math.min(1, (performance.now() - debut) / 900);
+      sp.textContent = t('fin.score', { score: I.nombre(Math.round(score * k)) });
+      if (k < 1 && fenetre === 'victoire') requestAnimationFrame(tour);
+    };
+    const rec = $('fin-record');
+    rec.textContent = record ? t('fin.record') : t('fin.recordAncien', { score: I.nombre(ancien) });
+    rec.classList.toggle('battu', record);
+    $('fin-detail').textContent = t('fin.detail', { r: I.nombre(r), c: I.nombre(sc.etat.coeurs), p: I.nombre(sc.etat.pas) });
+    const dernier = i === NIVEAUX.length - 1;
+    $('b-suivant').textContent = dernier ? t('bouton.bilan') : t('bouton.suivant');
+    ouvrir('victoire');
+    requestAnimationFrame(tour);
+  }
+
+  function defaite(cause) {
+    enPause = false;
+    son('defaite');
+    $('def-raison').textContent = t(cause === 'panne' ? 'defaite.panne' : cause === 'drone' ? 'defaite.drone' : 'defaite.laser');
+    $('def-detail').textContent = t('defaite.detail', { r: I.nombre(rouagesPris(sc.N, sc.etat)) });
+    const rec = progres.records[niveauCourant] || 0;
+    $('def-record').textContent = rec ? t('fin.recordAncien', { score: I.nombre(rec) }) : '';
+    ouvrir('defaite');
+  }
+
+  function bilan() {
+    const et = etoilesTotal(), max = NIVEAUX.length * 3;
+    $('bilan-etoiles').innerHTML = [0, 1, 2].map(() => ICONES.etoile(true)).join('');
+    $('bilan-etoiles').querySelectorAll('svg').forEach((el, k) => setTimeout(() => el.classList.add('allumee'), 200 + k * 250));
+    $('bilan-texte').textContent = t('bilan.texte', { etoiles: I.nombre(et), max: I.nombre(max), score: I.nombre(scoreTotal()) });
+    $('bilan-conseil').textContent = et >= max ? t('bilan.tout') : t('bilan.encore');
+    confettis(200);
+    son('victoire');
+    ouvrir('bilan');
+  }
+
+  // --- Pause ---
+  function pause() {
+    if (ecran !== 'jeu' || fenetre || (sc.etat && sc.etat.fini)) return;
+    enPause = true;
+    ouvrir('pause');
+    if (audio && audio.state === 'running') audio.suspend().catch(() => {});
+  }
+  function reprendre() {
+    enPause = false;
+    fermerFenetres();
+    if (audio) audio.resume().catch(() => {});
+  }
+
+  // --- Tutoriel animé ---
+  let tutoListe = [], tutoIndex = 0, demoAttente = 0, demoPas = 0, tutoOuvertA = 0;
+  function ouvrirTuto(liste) {
+    tutoListe = liste.slice();
+    tutoIndex = 0;
+    ouvrir('tuto');
+    montrerTuto();
+  }
+  function montrerTuto() {
+    const nom = tutoListe[tutoIndex];
+    $('tuto-titre').textContent = t('tuto.titre.' + nom);
+    $('tuto-texte').textContent = t('tuto.' + nom);
+    $('b-compris').textContent = tutoIndex < tutoListe.length - 1 ? t('bouton.suite') : t('bouton.compris');
+    const d = DEMOS[nom];
+    chargerScene(scDemo, Object.assign({ zone: NIVEAUX[niveauCourant] ? NIVEAUX[niveauCourant].zone : 0 }, d));
+    const largeur = Math.min(320, innerWidth - 70);
+    dimensionnerScene(scDemo, largeur, 150, 64);
+    demoPas = 0;
+    demoAttente = horloge + 900;
+    tutoOuvertA = horloge;
+  }
+  function suiteTuto() {
+    if (horloge - tutoOuvertA < 250) return;
+    son('clic');
+    if (tutoIndex < tutoListe.length - 1) { tutoIndex++; montrerTuto(); return; }
+    fermerFenetres();
+  }
+  scDemo.surMarque = (s, e) => {
+    const [x, y] = e.i !== undefined ? caseXY(s, e.i) : caseXY(s, s.etat.pos);
+    if (e.type === 'rouage') ajouterParticules(s.particules, x, y, 10, '#ffd34d', 'etoile', 0.6);
+    if (e.type === 'cleB' || e.type === 'cleV' || e.type === 'pile') ajouterParticules(s.particules, x, y, 10, '#cfe8ff', 'etoile', 0.6);
+    if (e.type === 'victoire') s.joie = true;
+  };
+  scDemo.finAnim = () => {};
+  function majDemo() {
+    const s = scDemo;
+    const d = DEMOS[tutoListe[tutoIndex]];
+    if (!d || !s.N) return;
+    majScene(s);
+    if (s.anim || horloge < demoAttente) return;
+    if (s.etat.fini || demoPas >= d.actions.length) {
+      chargerScene(s, Object.assign({ zone: s.zone }, d));
+      s.joie = false;
+      demoPas = 0;
+      demoAttente = horloge + 900;
+      return;
+    }
+    const act = d.actions[demoPas++];
+    const res = jouer(s.N, s.etat, act);
+    if (res.etat) { s.avant = s.etat; s.etat = res.etat; if (act) s.regard = act; animer(s, res.ev); }
+    demoAttente = horloge + (s.etat.fini ? 1300 : 650);
+  }
+  // Main qui montre le geste de la prochaine action.
+  function dessinerMain() {
+    const s = scDemo;
+    const d = DEMOS[tutoListe[tutoIndex]];
+    if (!d || !s.N || s.etat.fini || demoPas >= d.actions.length) return;
+    const act = d.actions[demoPas];
+    const ctx = s.ctx;
+    const [x, y] = caseXY(s, s.etat.pos);
+    const reste = Math.max(0, demoAttente - horloge);
+    const k = 1 - Math.min(1, reste / 650);
+    ctx.save();
+    ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
+    if (act === null) {
+      ctx.beginPath(); ctx.arc(x, y, s.s * (0.45 + 0.2 * k), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 211, 77, ${1 - k})`; ctx.lineWidth = 3; ctx.stroke();
+    } else {
+      const [dr, dc] = DIRS[act];
+      const hx = x + dc * s.s * (0.2 + 0.5 * k), hy = y + dr * s.s * (0.2 + 0.5 * k) + s.s * 0.3;
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#13283d'; ctx.lineWidth = 2;
+      rondRect(ctx, hx - s.s * 0.08, hy - s.s * 0.3, s.s * 0.16, s.s * 0.34, s.s * 0.08); ctx.fill(); ctx.stroke();
+      rondRect(ctx, hx - s.s * 0.17, hy - s.s * 0.04, s.s * 0.34, s.s * 0.3, s.s * 0.1); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255, 211, 77, .9)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x + dc * s.s * 0.15, y + dr * s.s * 0.15); ctx.lineTo(x + dc * s.s * 0.62, y + dr * s.s * 0.62); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // --- Confettis (victoire) ---
+  const cConf = $('confettis');
+  const ctxConf = cConf.getContext('2d');
+  const confs = [];
+  function confettis(n) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cConf.width = innerWidth * dpr; cConf.height = innerHeight * dpr;
+    const couleurs = ['#ffd34d', '#4ea8ff', '#46c96b', '#ff6f9c', '#b07cff', '#ff9a3d'];
+    for (let k = 0; k < n; k++) {
+      confs.push({ x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * 0.4, vx: (Math.random() - 0.5) * 0.12, vy: 0.12 + Math.random() * 0.2,
+        rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.02, coul: couleurs[k % couleurs.length], t: 5 + Math.random() * 6 });
+    }
+  }
+  function majConfettis(dt) {
+    if (!confs.length) return;
+    const dpr = cConf.width / innerWidth || 1;
+    ctxConf.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctxConf.clearRect(0, 0, innerWidth, innerHeight);
+    for (let k = confs.length - 1; k >= 0; k--) {
+      const c = confs[k];
+      c.x += c.vx * dt; c.y += c.vy * dt; c.rot += c.vr * dt;
+      if (c.y > innerHeight + 30) { confs.splice(k, 1); continue; }
+      ctxConf.save(); ctxConf.translate(c.x, c.y); ctxConf.rotate(c.rot);
+      ctxConf.fillStyle = c.coul; ctxConf.fillRect(-c.t / 2, -c.t / 4, c.t, c.t / 2);
+      ctxConf.restore();
+    }
+    if (!confs.length) ctxConf.clearRect(0, 0, innerWidth, innerHeight);
+  }
+
+  // ===== BOUCLE PRINCIPALE =====
+  let avantT = performance.now();
+  function boucle(maintenant) {
+    const dt = Math.min(50, maintenant - avantT);
+    avantT = maintenant;
+    if (!enPause) horloge += dt;
+    if (ecran === 'titre') dessinerTitre();
+    if (ecran === 'jeu' && sc.N) {
+      if (!enPause) {
+        majScene(sc);
+        majParticules(sc.particules, dt);
+        sc.secousse = Math.max(0, sc.secousse - dt * 0.03);
+      }
+      dessinerScene(sc);
+    }
+    if (fenetre === 'tuto') {
+      majDemo();
+      majParticules(scDemo.particules, dt);
+      dessinerScene(scDemo);
+      dessinerMain();
+    }
+    majConfettis(dt);
+    requestAnimationFrame(boucle);
+  }
+
+  // ===== COMMANDES =====
+  // Glisser le doigt (ou la souris) sur le plateau : une case par geste ;
+  // toucher une case : Max va dans sa direction.
+  (function gestes() {
+    const zone = $('zone-plateau');
+    let depart = null, bouge = false;
+    zone.addEventListener('pointerdown', (e) => {
+      preparerAudio();
+      depart = { x: e.clientX, y: e.clientY };
+      bouge = false;
+      try { zone.setPointerCapture(e.pointerId); } catch (er) { /* rien */ }
+    });
+    zone.addEventListener('pointermove', (e) => {
+      if (!depart) return;
+      const dx = e.clientX - depart.x, dy = e.clientY - depart.y;
+      const seuil = Math.max(22, sc.s * 0.55);
+      if (Math.abs(dx) < seuil && Math.abs(dy) < seuil) return;
+      bouge = true;
+      action(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'droite' : 'gauche') : (dy > 0 ? 'bas' : 'haut'));
+      depart = { x: e.clientX, y: e.clientY };
+    });
+    const fin = (e) => {
+      if (depart && !bouge && sc.N) {
+        // toucher : direction depuis Max vers le point touché
+        const r = sc.canvas.getBoundingClientRect();
+        const [mx, my] = caseXY(sc, sc.etat.pos);
+        const dx = e.clientX - r.left - mx, dy = e.clientY - r.top - my;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) > sc.s * 0.45) {
+          action(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'droite' : 'gauche') : (dy > 0 ? 'bas' : 'haut'));
+        }
+      }
+      depart = null;
+    };
+    zone.addEventListener('pointerup', fin);
+    zone.addEventListener('pointercancel', () => { depart = null; });
+  })();
+
+  // Croix de boutons : appui maintenu = Max continue d'avancer.
+  document.querySelectorAll('.croix button').forEach((b) => {
+    const dir = b.dataset.dir === 'attendre' ? null : b.dataset.dir;
+    let rep = null;
+    const stop = () => { clearTimeout(rep); rep = null; b.classList.remove('appui'); };
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      preparerAudio();
+      b.classList.add('appui');
+      action(dir);
+      const repeter = (delai) => { rep = setTimeout(() => { action(dir); repeter(170); }, delai); };
+      if (dir) repeter(320);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((n) => b.addEventListener(n, stop));
+    b.addEventListener('click', (e) => { if (e.detail === 0) action(dir); }); // clavier (Entrée sur le bouton)
+  });
+  $('b-haut').innerHTML = ICONES.fleche(0);
+  $('b-droite').innerHTML = ICONES.fleche(90);
+  $('b-bas').innerHTML = ICONES.fleche(180);
+  $('b-gauche').innerHTML = ICONES.fleche(270);
+  $('b-attendre').innerHTML = ICONES.attendre();
+  $('icone-energie').innerHTML = ICONES.pile();
+  $('b-pause').innerHTML = ICONES.pause();
+  $('b-niv-retour').innerHTML = ICONES.retour();
+
+  // Clavier : flèches, ZQSD / WASD (position des touches), Espace = attendre, Échap ou P = pause.
+  const TOUCHES = { ArrowUp: 'haut', ArrowDown: 'bas', ArrowLeft: 'gauche', ArrowRight: 'droite', KeyW: 'haut', KeyS: 'bas', KeyA: 'gauche', KeyD: 'droite' };
+  document.addEventListener('keydown', (e) => {
+    preparerAudio();
+    if (e.code === 'Escape' || e.code === 'KeyP') {
+      if (fenetre === 'pause') { e.preventDefault(); reprendre(); return; }
+      if (ecran === 'jeu' && !fenetre) { e.preventDefault(); pause(); return; }
+      if (fenetre === 'tuto') { e.preventDefault(); fermerFenetres(); return; }
+    }
+    if (fenetre === 'tuto' && (e.code === 'Enter' || e.code === 'Space')) { e.preventDefault(); suiteTuto(); return; }
+    if (ecran !== 'jeu' || fenetre) return;
+    if (TOUCHES[e.code]) { e.preventDefault(); action(TOUCHES[e.code]); }
+    else if (e.code === 'Space') { e.preventDefault(); action(null); }
+  });
+
+  // Écran caché : pause automatique.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !fenetre) pause();
+  });
+  window.addEventListener('resize', () => { redimensionner(); if (fenetre === 'tuto') montrerTuto(); });
+
+  // --- Boutons ---
+  $('b-son-titre').addEventListener('click', basculerSon);
+  $('b-son-jeu').addEventListener('click', basculerSon);
+  $('b-jouer').addEventListener('click', () => {
+    preparerAudio();
+    son('clic');
+    JEL_SAVE.reprise({
+      jeu: JEU,
+      onContinuer: (d) => {
+        chargerProgres();
+        const n = Math.max(1, Math.min(NIVEAUX.length, d.niveau));
+        progres.debloque = Math.max(progres.debloque, n);
+        lancerNiveau(n - 1);
+      },
+      onNouvelle: () => {
+        chargerProgres();
+        if (progres.debloque <= 1) lancerNiveau(0); else ouvrirNiveaux();      },
+    });
+  });
+  $('b-niveaux-titre').addEventListener('click', () => { preparerAudio(); son('clic'); chargerProgres(); ouvrirNiveaux(); });
+  $('b-niv-retour').addEventListener('click', () => { son('clic'); montrerEcran('titre'); });
+  $('b-pause').addEventListener('click', () => { son('clic'); pause(); });
+  $('b-reprendre').addEventListener('click', () => { son('clic'); reprendre(); });
+  $('b-recommencer').addEventListener('click', () => { reprendre(); son('clic'); lancerNiveau(niveauCourant); });
+  $('b-aide').addEventListener('click', () => { reprendre(); son('clic'); ouvrirTuto(mecaniquesDe(NIVEAUX[niveauCourant])); });
+  $('b-pause-niveaux').addEventListener('click', () => { reprendre(); son('clic'); sauverEnCours(); ouvrirNiveaux(); });
+  $('b-pause-accueil').addEventListener('click', () => { reprendre(); son('clic'); sauverEnCours(); montrerEcran('titre'); });
+  $('b-compris').addEventListener('click', suiteTuto);
+  $('v-tuto').addEventListener('click', (e) => { if (e.target === $('v-tuto')) suiteTuto(); });
+  $('b-suivant').addEventListener('click', () => {
+    son('clic');
+    if (niveauCourant >= NIVEAUX.length - 1) { bilan(); return; }
+    lancerNiveau(niveauCourant + 1);
+  });
+  $('b-rejouer').addEventListener('click', () => { son('clic'); lancerNiveau(niveauCourant); });
+  $('b-vic-niveaux').addEventListener('click', () => { son('clic'); ouvrirNiveaux(); });
+  $('b-reessayer').addEventListener('click', () => { son('clic'); lancerNiveau(niveauCourant); });
+  $('b-def-niveaux').addEventListener('click', () => { son('clic'); ouvrirNiveaux(); });
+  $('b-def-accueil').addEventListener('click', () => { son('clic'); fermerFenetres(); montrerEcran('titre'); });
+  $('b-bilan-rejouer').addEventListener('click', () => { son('clic'); lancerNiveau(0); });
+  $('b-bilan-niveaux').addEventListener('click', () => { son('clic'); ouvrirNiveaux(); });
+
+  // Partie quittée en cours de niveau : on garde ce niveau pour « Continuer ».
+  function sauverEnCours() {
+    if (ecran === 'jeu' && enPartie) sauverProgres(niveauCourant + 1);
+  }
+  JEL_SAVE.surFermeture(() => {
+    if (ecran === 'jeu' && enPartie) sauverProgres(niveauCourant + 1);
+  });
+  JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('effacer-titre') });
+
+  // ===== DÉMARRAGE =====
+  document.title = t('titre');
+  chargerProgres();
+  majBoutonsSon();
+  dimensionnerTitre();
+  requestAnimationFrame(boucle);
+
+})();
+</script>
+</body>
+</html>
