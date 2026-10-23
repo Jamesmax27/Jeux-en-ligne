@@ -7,7 +7,8 @@
    étincelle or. Le reste est un instrument d'observation : fond étoilé
    discret, commandes sombres et nettes, jaquettes sans boîte autour.
    Deux rôles de couleur seulement : la lavande pour ce qu'on touche, l'or
-   pour ce qui brille (rare : marque, « Nouveau », flamme des Tendances,
+   pour ce qui brille (rare : marque, « Nouveau », étoile des Nouveautés et
+   flamme des Tendances,
    étincelle d'une puce ou d'une tuile choisie). La couleur vient des
    jaquettes et des teintes des genres et des univers.
    Les icônes des regroupements parlent la langue du logo : trait rond, et
@@ -31,7 +32,7 @@
   --craie-douce: #a3adc2;       /* texte secondaire, icônes au trait */
   --craie-faible: #8792ab;      /* états « zéro » et « Bientôt » (au lieu d'une opacité) */
   --lavande: #a8b3f0;           /* ce qu'on touche : focus, choix, liens, bouton plein */
-  --or: #f2d27a;                /* ce qui brille : ✦ Nouveau, flamme des Tendances */
+  --or: #f2d27a;                /* ce qui brille : ✦ Nouveau et Nouveautés, flamme des Tendances */
   --jaquette-fond: #111830;     /* jaquette en chargement (= sans-jaquette.svg) */
 
   /* Une seule ombre, pour ce qui flotte au-dessus de la page. */
@@ -91,7 +92,7 @@ body {
 a { color: inherit; }
 
 /* Contour de focus : 4 px hors de l'élément, il tient dans le rembourrage
-   des rangées et des Tendances qui défilent. */
+   des rangées et de la première ligne qui défilent. */
 :focus-visible {
   outline: 2px solid var(--lavande);
   outline-offset: 2px;
@@ -119,7 +120,7 @@ body::after {
 }
 
 /* Étoiles fines, immobiles (dont une lavande). Aucune étoile or : l'or reste
-   réservé à « Nouveau », à la flamme des Tendances et à la marque (planète de
+   réservé à « Nouveau », aux titres des Nouveautés et des Tendances et à la marque (planète de
    l'emblème, point du i). */
 body::before {
   background-image:
@@ -174,7 +175,7 @@ body::after {
    l'en-tête selon la largeur de l'écran, jamais sous un texte (placement à
    la fin de cette section).
    Derrière le contenu (z-index: -1 sans contexte d'empilement sur .entete).
-   Il descend 50 px sous l'en-tête, jusque dans les jaquettes des Tendances
+   Il descend 50 px sous l'en-tête, jusque dans les jaquettes de la première ligne
    (34 px sous l'en-tête), et s'efface sur ses 30 derniers px : la manette,
    calée sur le bas de l'en-tête, suit sa hauteur (slogan sur 1 ou 2
    lignes). À droite il s'arrête au bord de l'en-tête : aucun défilement
@@ -424,15 +425,17 @@ body::after {
      ce vide ; sur les mentions, il n'y a pas de recherche). Aucun besoin de
      :has() : elle s'affiche aussi sur les navigateurs plus anciens ;
    - avec :has() (Firefox 121, Safari 15.4 et plus récents) :
-     - téléphone (dès 360 px) : une petite manette à droite du titre
-       « Tendances », calée sur le bas de l'en-tête. En dessous de 360 px,
-       il n'y a pas de vide : seules les étoiles du fond ;
+     - téléphone (dès 360 px) : une petite manette à droite du titre de la
+       première ligne (« Nouveautés » seules), calée sur le bas de l'en-tête ;
+       avec les deux moitiés (Nouveautés et Tendances), elle s'efface jusqu'à
+       799 px : le titre des Tendances passerait dessous. En dessous de 360 px, il n'y a
+       pas de vide : seules les étoiles du fond ;
      - ordinateur de 720 à 1 199 px : la petite manette à droite de la
        bande sous la recherche ; sur les mentions, la grande manette entre
        la marque et la langue ;
-     - sans Tendances (hors connexion…), les tuiles des raccourcis viennent
-       juste sous la recherche : la petite manette, qui serait cachée
-       derrière, s'efface ; sur les mentions (téléphone), rien non plus. */
+     - sans première ligne (catalogue illisible…), les tuiles des raccourcis
+       viennent juste sous la recherche : la petite manette, qui serait
+       cachée derrière, s'efface ; sur les mentions (téléphone), rien non plus. */
 @media (min-width: 1200px) {
   .entete::before {
     background: var(--ciel-manette) no-repeat right 168px top 0;
@@ -453,20 +456,12 @@ body::after {
     }
   }
 
-  /* Sous-titre des Tendances plus long : il irait jusqu'à la manette.
-     Allemand entre 360 et 389 px, espagnol entre 360 et 374 px (le
-     portugais et le français laissent un vide). lang est posé sur <html>
-     par i18n.js. */
-  @media (min-width: 360px) and (max-width: 389px) {
-    html:lang(de) .entete::before { background: none; }
-  }
-
-  @media (min-width: 360px) and (max-width: 374px) {
-    html:lang(es) .entete::before { background: none; }
-  }
+  /* Titre et sous-titre des Nouveautés seules : 262 px au plus (portugais),
+     la manette commence à 284 px dès 360 px de large ; avec les Tendances,
+     la manette s'efface (plus bas). */
 
   /* Bande sous la recherche (y 57 à 98) : la petite manette à droite (top
-     50 px : son fondu s'achève avant le haut des jaquettes des Tendances). */
+     50 px : son fondu s'achève avant le haut des jaquettes de la première ligne). */
   @media (min-width: 720px) and (max-width: 1199px) {
     .entete::before {
       background: var(--ciel-manette-petite) no-repeat right 20px top 50px;
@@ -478,7 +473,15 @@ body::after {
   }
 
   @media (max-width: 1199px) {
-    .entete:has(+ .tendances[hidden])::before { background: none; }
+    html:not(.avec-vitrine) .entete:has(+ .vitrine[hidden])::before { background: none; }
+  }
+
+  /* Téléphone et petite tablette (jusqu'à 799 px, barre de défilement
+     comprise), première ligne en deux moitiés : le titre des Tendances, ou son
+     sous-titre en allemand et en espagnol, passerait sous la petite manette,
+     qui s'efface. */
+  @media (max-width: 799px) {
+    html.avec-tendances .entete:has(+ .vitrine)::before { background: none; }
   }
 
   @media (max-width: 719px) {
@@ -487,7 +490,7 @@ body::after {
 }
 
 /* --------------------------------------------------------------------------
-   Titres des rubriques (Tendances, âges, genres, univers)
+   Titres des rubriques (Nouveautés, Tendances, âges, genres, univers)
    -------------------------------------------------------------------------- */
 
 .groupe-tete {
@@ -513,35 +516,98 @@ body::after {
 }
 
 /* --------------------------------------------------------------------------
-   Tendances : 8 jeux parmi les plus joués de la semaine, en haut de l'accueil.
-   Jaquettes seules (titre en bandeau, badge « Nouveau ») : ni rang, ni
-   chiffre (app.js). Jusqu'à 1 199 px, une bande qui défile (barre fine avec
-   une souris), fondue sur le bord droit pour montrer qu'elle continue ; dès
-   1 200 px, les 8 jaquettes tiennent sur une ligne.
+   Première ligne (« vitrine »), en haut de l'accueil : Nouveautés à gauche,
+   Tendances à droite (app.js). Jaquettes seules (titre en bandeau, badge
+   « Nouveau ») ; ni rang ni chiffre dans les Tendances. Sans Tendances, les
+   Nouveautés prennent toute la ligne. Classe avec-tendances sur <html> : deux
+   moitiés (posée par le script de tête de l'accueil, puis tenue à jour par
+   app.js). Jusqu'à 1 199 px, chaque moitié est une bande qui défile (barre
+   fine avec une souris), fondue sur son bord droit pour montrer qu'elle
+   continue ; dès 1 200 px, les 8 jaquettes tiennent sur une ligne (4 + 4).
    -------------------------------------------------------------------------- */
 
-.tendances {
-  --l-tendance: 116px;    /* largeur d'une jaquette (bande qui défile) */
-  --bas-tendances: 8px;   /* rembourrage sous la bande (contour de focus) */
+.vitrine {
+  --l-vitrine: 116px;    /* largeur d'une jaquette (bandes qui défilent) */
+  --bas-vitrine: 8px;    /* rembourrage sous les bandes (contour de focus) */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   max-width: 1200px;
   margin: 4px auto 4px;
 }
 
+html.avec-tendances .vitrine { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+
+/* Bords intérieurs de chaque moitié : --gauche (titre et bande), --droite
+   (bande : sort la dernière jaquette du fondu). */
+.vitrine-moitie {
+  --gauche: 16px;
+  --droite: 40px;
+  min-width: 0;
+}
+
+/* Moitié droite : un filet la sépare des Nouveautés. */
+html.avec-tendances .tendances {
+  --gauche: 12px;
+  box-shadow: inset 1px 0 0 var(--lisere);
+}
+
+html.avec-tendances .tendances .groupe-tete { padding-left: var(--gauche); }
+html.avec-tendances .nouveautes .groupe-tete { padding-right: 12px; }
+
+/* Titres sur une seule ligne ; sur téléphone, avec les deux moitiés, sans
+   leur sous-titre (pas la place). */
+.vitrine .groupe-tete h2 {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 719px) {
+  html.avec-tendances .vitrine .groupe-tete small { display: none; }
+}
+
+/* Étoile or du titre des Nouveautés (comme le badge « Nouveau »), dans la même
+   boîte que la flamme des Tendances : les deux titres ont la même ligne de base. */
+#titre-nouveautes > span[aria-hidden="true"]:first-child {
+  position: relative;
+  top: -1px;
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  color: var(--or);
+  font-size: 17px;
+  line-height: 20px;
+  text-align: center;
+  vertical-align: middle;
+}
+
 /* Accueil : places gardées avant que app.js ne remplisse la page, pour qu'elle
-   ne bouge pas pendant le chargement (Tendances vues à la visite précédente,
-   tuiles, rangées de puces). Tendances : la bande vide reçoit une jaquette
-   fantôme (::before) aussi large que les 8 vraies ; elle a donc la hauteur de
-   la bande pleine, barre de défilement comprise (barres classiques des
-   ordinateurs, qui s'ajoutent sous le rembourrage). */
+   ne bouge pas pendant le chargement (première ligne, Tendances vues à la
+   visite précédente, tuiles, rangées de puces). Une bande vide reçoit une
+   jaquette fantôme (::before) aussi large que ses vraies jaquettes ; elle a
+   donc la hauteur de la bande pleine, barre de défilement comprise (barres
+   classiques des ordinateurs, qui s'ajoutent sous le rembourrage). */
+html.avec-vitrine #vitrine[hidden] {
+  display: grid !important;
+  visibility: hidden;
+}
+
 html.avec-tendances #tendances[hidden] {
   display: block !important;
   visibility: hidden;
 }
 
-html.avec-tendances #tendances[hidden] .tendances-liste::before {
+html.avec-vitrine #vitrine[hidden] .vitrine-liste::before,
+html.avec-tendances #tendances[hidden] .vitrine-liste::before {
   content: "";
-  grid-column: span 8;                      /* = TENDANCES_NOMBRE (app.js) */
-  height: calc(var(--l-tendance) * 4 / 3);  /* jaquette 3:4 */
+  grid-column: span 8;                     /* = VITRINE_NOMBRE (app.js) */
+  height: calc(var(--l-vitrine) * 4 / 3);  /* jaquette 3:4 */
+}
+
+html.avec-tendances #vitrine[hidden] .vitrine-liste::before,
+html.avec-tendances #tendances[hidden] .vitrine-liste::before {
+  grid-column: span 4;                     /* = NOUVEAUTES_NOMBRE = TENDANCES_NOMBRE */
 }
 
 .tuiles:empty { min-height: 63px; }
@@ -549,18 +615,19 @@ html.avec-tendances #tendances[hidden] .tendances-liste::before {
 
 /* Le rembourrage vertical laisse la place au contour de focus (5 px) ; celui
    de droite sort la dernière jaquette du fondu, et le retrait de droite
-   (scroll-padding) y garde la carte amenée au clavier. */
-.tendances-liste {
+   (scroll-padding) y garde la carte amenée au clavier (app.js la fait
+   défiler : le navigateur ne déplace pas une carte déjà en partie visible). */
+.vitrine-liste {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: var(--l-tendance);
+  grid-auto-columns: var(--l-vitrine);
   gap: 10px;
   margin: 0;
-  padding: 6px 40px var(--bas-tendances) 16px;
+  padding: 6px var(--droite) var(--bas-vitrine) var(--gauche);
   list-style: none;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scroll-padding-inline: 16px 40px;
+  scroll-padding-inline: var(--gauche) 40px;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
@@ -568,25 +635,25 @@ html.avec-tendances #tendances[hidden] .tendances-liste::before {
 }
 
 /* Carte choisie au clavier : plus de fondu, son contour reste entier. */
-.tendances-liste:has(:focus-visible) {
+.vitrine-liste:has(:focus-visible) {
   -webkit-mask-image: none;
   mask-image: none;
 }
 
-.tendances-liste::-webkit-scrollbar { display: none; }
-.tendances-liste > li { scroll-snap-align: start; }
+.vitrine-liste::-webkit-scrollbar { display: none; }
+.vitrine-liste > li { scroll-snap-align: start; }
 
 @media (hover: hover) and (pointer: fine) {
-  .tendances { --bas-tendances: 12px; }
-  .tendances-liste {
+  .vitrine { --bas-vitrine: 12px; }
+  .vitrine-liste {
     scrollbar-width: thin;
     scrollbar-color: var(--orbite) transparent;
   }
-  .tendances-liste::-webkit-scrollbar { display: block; height: 8px; }
-  .tendances-liste::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--orbite); }
+  .vitrine-liste::-webkit-scrollbar { display: block; height: 8px; }
+  .vitrine-liste::-webkit-scrollbar-thumb { border-radius: 999px; background: var(--orbite); }
 }
 
-.carte-tendance .carte-titre {
+.carte-vitrine .carte-titre {
   padding: 16px 7px 7px;
   background: linear-gradient(rgba(7, 10, 20, 0), rgba(7, 10, 20, .88) 14px);
   font-size: 13px;
@@ -594,33 +661,42 @@ html.avec-tendances #tendances[hidden] .tendances-liste::before {
   line-clamp: 2;
 }
 
-.carte-tendance .badge-nouveau {
+.carte-vitrine .badge-nouveau {
   top: 6px;
   right: 6px;
   padding: 2px 6px;
 }
 
 @media (min-width: 720px) {
-  .tendances { --l-tendance: 140px; }
-  .tendances-liste { gap: 12px; }
-  .carte-tendance .carte-titre { font-size: 14px; }
+  .vitrine { --l-vitrine: 140px; }
+  .vitrine-liste { gap: 12px; }
+  .carte-vitrine .carte-titre { font-size: 14px; }
 }
 
-/* Une ligne de 8 colonnes (= TENDANCES_NOMBRE dans app.js), sans défilement
-   ni fondu. La jaquette fantôme de la place réservée n'occupe qu'une colonne :
-   sa hauteur suit la vraie largeur des colonnes (la barre verticale de la
-   page peut la réduire de quelques pixels). */
+/* Une ligne de 8 colonnes (= VITRINE_NOMBRE dans app.js), ou 4 + 4 avec les
+   Tendances, sans défilement ni fondu. La jaquette fantôme de la place
+   réservée n'occupe qu'une colonne : sa hauteur suit la vraie largeur des
+   colonnes (la barre verticale de la page peut la réduire de quelques
+   pixels). */
 @media (min-width: 1200px) {
-  .tendances { --bas-tendances: 8px; }
-  .tendances-liste {
+  .vitrine { --bas-vitrine: 8px; }
+  .vitrine-moitie { --droite: 16px; }
+  /* 6 + 6 px entre les moitiés : 12 px comme entre deux jaquettes, qui gardent
+     leur largeur (135,5 px) en 8 comme en 4 + 4 ; le titre garde ses 12 px. */
+  html.avec-tendances .nouveautes { --droite: 6px; }
+  html.avec-tendances .tendances { --gauche: 6px; }
+  html.avec-tendances .tendances .groupe-tete { padding-left: 12px; }
+  .vitrine-liste {
     grid-auto-flow: row;
     grid-template-columns: repeat(8, minmax(0, 1fr));
-    padding: 6px 16px var(--bas-tendances);
     overflow: visible;
     -webkit-mask-image: none;
     mask-image: none;
   }
-  html.avec-tendances #tendances[hidden] .tendances-liste::before {
+  html.avec-tendances .vitrine-liste { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  html.avec-vitrine #vitrine[hidden] .vitrine-liste::before,
+  html.avec-tendances #vitrine[hidden] .vitrine-liste::before,
+  html.avec-tendances #tendances[hidden] .vitrine-liste::before {
     grid-column: auto;
     height: auto;
     aspect-ratio: 3 / 4;
