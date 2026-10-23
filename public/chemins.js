@@ -12,6 +12,14 @@
 //   âge         /ages/<slug>/    /en/ages/<slug>/ /es/edades/<slug>/ /pt/idades/<slug>/ /de/alter/<slug>/
 //   lanceur     /play?id=<id>&lang=<langue>  (une seule page, non indexée)
 //
+// Pages légales, en français et en anglais seulement (les autres langues
+// mènent à la version anglaise) :
+//   page             fr                         en (et es, pt, de)
+//   mentions         /mentions-legales/         /en/legal-notice/
+//   confidentialite  /confidentialite/          /en/privacy-policy/
+//   conditions       /conditions-utilisation/   /en/terms-of-use/
+//   cookies          /cookies/                  /en/cookie-policy/
+//
 // Le préfixe de famille (genres, univers…) évite les collisions : « sport » et
 // « autre » sont à la fois un genre et un univers. Les identifiants (jeux,
 // genres, univers) ne changent jamais : une adresse publiée reste valable.
@@ -61,6 +69,27 @@ export function urlCategorie(famille, id, lang) {
   const slug = famille === 'age' ? SLUGS_AGE[id] : id;
   if (!slug) throw new Error(`tranche d'âge inconnue : ${id}`);
   return `/${PREFIXE[l]}${segment}/${encodeURIComponent(slug)}/`;
+}
+
+// Pages légales : langues disponibles, pages (ordre du pied de page) et adresses.
+export const LANGUES_LEGALES = ['fr', 'en'];
+export const PAGES_LEGALES = ['mentions', 'confidentialite', 'conditions', 'cookies'];
+const SEGMENTS_LEGAUX = {
+  mentions: { fr: 'mentions-legales', en: 'legal-notice' },
+  confidentialite: { fr: 'confidentialite', en: 'privacy-policy' },
+  conditions: { fr: 'conditions-utilisation', en: 'terms-of-use' },
+  cookies: { fr: 'cookies', en: 'cookie-policy' },
+};
+
+/** Langue dans laquelle une page légale est lue : le français, sinon l'anglais. */
+export const langueLegale = (lang) => (lang === 'fr' ? 'fr' : 'en');
+
+/** Page légale (« mentions », « confidentialite », « conditions », « cookies ») : « /cookies/ », « /en/cookie-policy/ »… */
+export function urlLegale(page, lang) {
+  const l = langueLegale(lang);
+  const segment = SEGMENTS_LEGAUX[page]?.[l];
+  if (!segment) throw new Error(`page légale inconnue : ${page}`);
+  return `/${PREFIXE[l]}${segment}/`;
 }
 
 /** Lanceur du jeu (plein écran), dans la langue donnée. */

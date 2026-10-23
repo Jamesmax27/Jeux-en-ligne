@@ -11,6 +11,8 @@
 // Et la sauvegarde des jeux (save.js) : gardée par le lanceur sous « save_<id> ».
 // Et le suivi des parties (suivi.js) : temps de jeu et erreurs JavaScript,
 // envoyés à /api/session pour les « Tendances » de l'accueil.
+// Et la mesure d'audience (mesure.js, Google Analytics, avec accord seulement) :
+// évènements « game_start » (lancement du jeu) et « vote ».
 // ==========================================================================
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
@@ -100,6 +102,16 @@ if (document.fullscreenEnabled) {
   });
 }
 
+// --- Mesure d'audience (mesure.js) -------------------------------------------
+// Nom du jeu en français (racine de game.json) : le même dans toutes les langues.
+// Sans accord du visiteur, mesure.js n'envoie rien.
+function mesurer(nom, parametres = {}) {
+  if (!jeuCourant) return;
+  window.FMG_MESURE?.evenement(nom, { game_id: jeuCourant.id, game_name: jeuCourant.title, ...parametres });
+}
+
+const SENS_VOTE = { 1: 'up', '-1': 'down', 0: 'cancel' };
+
 // --- Votes ------------------------------------------------------------------
 
 let minuteurInfo;
@@ -125,6 +137,7 @@ function activerVotes(gameId) {
     // Même pouce une 2e fois = annulation ; l'autre pouce = remplacement.
     const valeur = monVote(gameId) === pouce ? 0 : pouce;
     afficherMonVote(valeur); // l'affichage change tout de suite, même hors ligne
+    mesurer('vote', { vote_direction: SENS_VOTE[valeur] });
     const horsConnexion = navigator.onLine === false;
     if (horsConnexion) {
       // Pas d'erreur : le vote est gardé sur l'appareil et partira au retour du réseau.
@@ -278,6 +291,7 @@ async function demarrer() {
     return;
   }
   suivreJeu(jeu.id);
+  mesurer('game_start');
   garderPourHorsLigne(jeu);
   activerVotes(jeu.id);
 

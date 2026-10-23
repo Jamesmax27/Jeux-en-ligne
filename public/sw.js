@@ -15,7 +15,8 @@
 //     (?v=…) : une nouvelle version est téléchargée et remplace l'ancienne ;
 //   - /api/scores et /api/tendances ne sont pas gardés : sans réseau, le
 //     catalogue trie par nouveautés, sans compteurs de votes ni Tendances ;
-//   - pages générées (accueils /en/…, fiches des jeux /jeux/<id>/…, catégories) :
+//   - pages générées (accueils /en/…, fiches des jeux /jeux/<id>/…, catégories,
+//     pages légales /mentions-legales/, /en/privacy-policy/…) :
 //     réseau d'abord, avec une copie des pages visitées (PAGES_GARDEES au plus).
 //     Hors connexion, une fiche jamais visitée mène au lanceur du jeu (le jeu
 //     s'ouvre s'il a déjà été joué), une autre page à l'accueil.
@@ -25,7 +26,7 @@
 // touchés : ils ont leur propre cache, indépendant de VERSION.
 // ==========================================================================
 
-const VERSION = 'v9';
+const VERSION = 'v11';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
 const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
@@ -39,7 +40,7 @@ const DELAI_RESEAU = 3000;                  // ms : au-delà, la copie gardée e
 // Les textes des 5 langues sont petits : tous gardés, pour changer de langue hors connexion.
 const COQUILLE = [
   './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'suivi.js', 'hors-ligne.js', 'taxonomie.js', 'chemins.js', 'pub.js',
-  'mentions-legales.html', 'mentions-legales.js', 'langue.js', 'i18n/i18n.js',
+  'consentement.js', 'mesure.js', 'langue.js', 'i18n/i18n.js',
   'i18n/site/fr.json', 'i18n/site/en.json', 'i18n/site/es.json', 'i18n/site/pt.json', 'i18n/site/de.json',
   'manifest.webmanifest', 'assets/logo.svg', 'assets/sans-jaquette.svg',
 ];
@@ -48,7 +49,6 @@ const COQUILLE = [
 // les deux formes d'adresse mènent à la même copie.
 const PAGES = new Map([
   ['', './'], ['index.html', './'], ['play.html', 'play.html'], ['play', 'play.html'],
-  ['mentions-legales.html', 'mentions-legales.html'], ['mentions-legales', 'mentions-legales.html'],
 ]);
 
 const RACINE = new URL('./', self.location).href; // dossier du site, ex. https://exemple.pages.dev/
@@ -60,6 +60,8 @@ const URL_CATALOGUE = new URL('catalog.json', RACINE).href;
 const RE_ACCUEIL_LANGUE = /^(?:en|es|pt|de)\/$/;
 const RE_FICHE = /^(?:(en|es|pt|de)\/)?(?:jeux|games|juegos|jogos|spiele)\/([a-z0-9-]+)\/$/;
 const RE_CATEGORIE = /^(?:(?:en|es|pt|de)\/)?(?:genres|generos|spielarten|univers|worlds|mundos|welten|ages|edades|idades|alter)\/[^/]+\/$/;
+// Pages légales (français et anglais) : mêmes règles que les autres pages générées.
+const RE_LEGALE = /^(?:mentions-legales|confidentialite|conditions-utilisation|cookies|en\/(?:legal-notice|privacy-policy|terms-of-use|cookie-policy))\/$/;
 
 // --- Installation et mise à jour ---------------------------------------------
 
@@ -117,7 +119,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(jaquette(event));
   } else if (chemin === 'catalog.json') {
     event.respondWith(reseauDabord(event, CACHE_DONNEES, URL_CATALOGUE));
-  } else if (RE_ACCUEIL_LANGUE.test(chemin) || RE_FICHE.test(chemin) || RE_CATEGORIE.test(chemin)) {
+  } else if (RE_ACCUEIL_LANGUE.test(chemin) || RE_FICHE.test(chemin) || RE_CATEGORIE.test(chemin) || RE_LEGALE.test(chemin)) {
     event.respondWith(pageGeneree(event, chemin));
   } else {
     const cle = cleCoquille(chemin);

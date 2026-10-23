@@ -15,6 +15,10 @@
 //
 // Réponse : 204 sans contenu (sendBeacon ne lit pas la réponse), 400 si les
 // données sont invalides, 503 si la base ne répond pas.
+//
+// Conservation : les parties de plus de 13 mois sont effacées (politique de
+// confidentialité). L'effacement est fait de temps en temps (1 enregistrement
+// sur PURGE_FREQUENCE), après la réponse, sans retarder le joueur.
 // ==========================================================================
 
 import { json, empreinteVisiteur, jeuExiste, lireFormatSessions, valeurDebut } from '../_commun.js';
@@ -24,8 +28,21 @@ const DUREE_MIN = 2;          // secondes (le lanceur n'envoie pas les parties p
 const DUREE_MAX = 3 * 3600;   // 3 heures
 const ERREUR_MAX = 500;       // caractères
 const TAILLE_MAX = 4096;      // octets du corps
+const CONSERVATION_MOIS = 13; // durée annoncée dans la politique de confidentialité
+const PURGE_FREQUENCE = 100;
 
-export async function onRequestPost({ request, env }) {
+/** Efface les parties commencées il y a plus de CONSERVATION_MOIS mois. */
+async function effacerAnciennes(env, format) {
+  const limite = new Date();
+  limite.setUTCMonth(limite.getUTCMonth() - CONSERVATION_MOIS);
+  try {
+    await env.DB.prepare('DELETE FROM sessions WHERE debut < ?').bind(valeurDebut(format, limite.getTime())).run();
+  } catch (e) {
+    console.error('Effacement des anciennes sessions impossible :', e);
+  }
+}
+
+export async function onRequestPost({ request, env, waitUntil }) {
   let corps;
   try {
     // sendBeacon peut envoyer du texte brut : on lit le texte, puis le JSON.
@@ -76,6 +93,10 @@ export async function onRequestPost({ request, env }) {
     await env.DB.prepare(
       `INSERT INTO sessions (${colonnes.join(', ')}) VALUES (${colonnes.map(() => '?').join(', ')})`
     ).bind(...Object.values(valeurs)).run();
+    if (Math.random() < 1 / PURGE_FREQUENCE) {
+      const purge = effacerAnciennes(env, format);
+      if (typeof waitUntil === 'function') waitUntil(purge); else await purge;
+    }
   } catch (e) {
     console.error('Écriture de la session impossible :', e);
     return json({ erreur: 'Session non enregistrée.' }, 503);

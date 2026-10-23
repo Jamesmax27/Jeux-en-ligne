@@ -29,7 +29,7 @@
 //      autre page indexable, et chaque jeu est à 3 clics au plus de l'accueil ;
 //   8. nombre de fichiers publiés (limite de 20 000 de Cloudflare Pages).
 // Pages exclues des contrôles d'indexation (mais leurs liens sont vérifiés) :
-// celles en noindex (lanceur, mentions légales, 404, catégories de moins de
+// celles en noindex (lanceur, 404, catégories de moins de
 // 3 jeux), et la page privée /idees/.
 //
 // Sortie : « ERREUR : <page ou jeu> : <message> », « attention : … », puis un bilan.

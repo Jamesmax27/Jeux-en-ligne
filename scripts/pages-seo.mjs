@@ -10,6 +10,9 @@
 //   - fiches des jeux   /jeux/<id>/, /en/games/<id>/…        (gabarits/jeu.html)
 //   - catégories        /genres/<id>/, /univers/<id>/, /ages/<tranche>/… (gabarits/categorie.html)
 //   - page 404          /404.html, /en/404.html…             (gabarits/introuvable.html)
+//   - pages légales     /mentions-legales/, /en/legal-notice/… (gabarits/legal.html),
+//                       en français et en anglais (textes : gabarits/legal/ et
+//                       gabarits/textes/legal.json)
 //   - sitemap.xml (pages indexables seulement, avec lastmod) et robots.txt
 // Adresses : public/chemins.js. Textes des jeux : game.json (règles :
 // scripts/regles-seo.mjs). Textes des catégories : gabarits/textes/categories.<langue>.json.
@@ -28,7 +31,7 @@ import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { GENRES, UNIVERS, TRANCHES_AGE, IDS_GENRES, IDS_UNIVERS, trancheDeAge } from '../public/taxonomie.js';
-import { LANGUES, HREFLANG, LOCALE_OG, urlAccueil, urlJeu, urlCategorie, urlLanceur } from '../public/chemins.js';
+import { LANGUES, HREFLANG, LOCALE_OG, LANGUES_LEGALES, PAGES_LEGALES, urlAccueil, urlJeu, urlCategorie, urlLanceur, urlLegale, langueLegale } from '../public/chemins.js';
 import { problemesChamps, textesLangue, languesDuJeu, ageMinimum } from './regles-seo.mjs';
 
 export const ADRESSE_PAR_DEFAUT = 'https://freemicrogames.com/';
@@ -43,7 +46,8 @@ export const ALERTE_FICHIERS = 16000;      // limite Cloudflare Pages : 20 000 f
 export const MAX_FICHIERS = 19500;
 
 // Dossiers et fichiers de public/ écrits par ce module (effacés au début de chaque build).
-export const SORTIES = ['index.html', '404.html', 'jeux', 'genres', 'univers', 'ages', 'en', 'es', 'pt', 'de', 'sitemap.xml', 'robots.txt'];
+export const SORTIES = ['index.html', '404.html', 'jeux', 'genres', 'univers', 'ages', 'en', 'es', 'pt', 'de', 'sitemap.xml', 'robots.txt',
+  'mentions-legales', 'confidentialite', 'conditions-utilisation', 'cookies'];
 
 // Images de partage : la jaquette du jeu si elle est en image matricielle, sinon l'icône du site.
 const IMAGE_SITE = 'assets/icone-512.png';
@@ -267,6 +271,11 @@ function tete({ lang, titre, description, canonique, indexable, alternatives, im
     '<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">',
     '<link rel="stylesheet" href="/style.css">',
     ...donnees.map(jsonLd),
+    // Consentement aux cookies (Google Consent Mode v2, tout refusé par défaut) :
+    // placé avant tout autre script de la page, dont la publicité (pub.js) ;
+    // puis la mesure d'audience Google Analytics (chargée seulement après « Accepter »).
+    '<script src="/consentement.js" defer></script>',
+    '<script src="/mesure.js" defer></script>',
     SCRIPT_PAGE,
   );
   return lignes.join('\n  ');
@@ -346,7 +355,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
 
   // Gabarits et morceaux.
   const gabarits = {};
-  for (const nom of ['accueil', 'jeu', 'categorie', 'introuvable']) gabarits[nom] = await readFile(path.join(dossierGabarits, `${nom}.html`), 'utf8');
+  for (const nom of ['accueil', 'jeu', 'categorie', 'introuvable', 'legal']) gabarits[nom] = await readFile(path.join(dossierGabarits, `${nom}.html`), 'utf8');
   const morceauxBruts = {};
   for (const fichier of await readdir(path.join(dossierGabarits, 'morceaux'))) {
     if (fichier.endsWith('.html')) morceauxBruts[fichier.slice(0, -5)] = await readFile(path.join(dossierGabarits, 'morceaux', fichier), 'utf8');
@@ -390,10 +399,21 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
   const categorieIndexable = (c, lang) => c.jeux.length >= SEUIL_INDEXATION_CATEGORIE && c.id !== 'autre' && !!categories[lang][c.cle]?.h1;
   const nomCategorie = (c, t) => categories[c.lang]?.[c.cle]?.h1 || (c.famille === 'age' ? t(`age.${c.id}`) : t(`${c.famille}.${c.id}`));
 
+  // Morceaux d'une langue. Le pied de page et le bandeau des cookies mènent aux
+  // pages légales de la langue (français, sinon anglais) : {{lien:<page>}},
+  // {{langue_legale}} et {{note_langues_legales}} sont remplis ici, une fois.
   const outils = (lang) => {
     const t = creerT(dicos, lang);
+    const ll = langueLegale(lang);
+    const note = lang === ll ? '' : `<p class="pied-note" data-i18n="legal.noteLangues">${echapper(t('legal.noteLangues'))}</p>`;
     const morceaux = {};
-    for (const [nom, brut] of Object.entries(morceauxBruts)) morceaux[nom] = brut;
+    for (const [nom, brut] of Object.entries(morceauxBruts)) {
+      morceaux[nom] = brut
+        .replace(/\{\{lien:([\w-]+)\}\}/g, (_, page) => echapper(urlLegale(page, lang)))
+        .replace(/\{\{langue_legale\}\}/g, HREFLANG[ll])
+        .replace(/\{\{note_langues_legales\}\}/g, note);
+      if (/\{\{lien:/.test(morceaux[nom])) throw new Error(`gabarits/morceaux/${nom}.html : emplacement {{lien:…}} mal écrit`);
+    }
     return { t, morceaux };
   };
 
@@ -605,6 +625,39 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
     const fichier = path.join(dossierPublic, chemin.replace(/^\//, ''));
     await mkdir(path.dirname(fichier), { recursive: true });
     await writeFile(fichier, remplir(gabarits.introuvable, valeurs, t, morceaux, 'gabarits/introuvable.html'), 'utf8');
+  }
+
+  // --- Pages légales (français et anglais) -----------------------------------
+  // Les autres langues y mènent par le pied de page (version anglaise).
+  const legal = await lireJson(path.join(dossierGabarits, 'textes', 'legal.json'));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(legal.maj))) throw new Error('gabarits/textes/legal.json : « maj » doit être une date AAAA-MM-JJ');
+  for (const page of PAGES_LEGALES) {
+    const alternatives = Object.fromEntries(LANGUES_LEGALES.map((l) => [l, absolue(urlLegale(page, l))]));
+    for (const lang of LANGUES_LEGALES) {
+      const { t, morceaux } = outils(lang);
+      const textes = legal.pages?.[page]?.[lang];
+      if (!textes?.h1 || !textes.titre || !textes.description) throw new Error(`gabarits/textes/legal.json : textes de « ${page} » (${lang}) incomplets (h1, titre, description)`);
+      const contenu = await readFile(path.join(dossierGabarits, 'legal', `${page}.${lang}.html`), 'utf8');
+      const chemin = urlLegale(page, lang);
+      const canonique = absolue(chemin);
+      const fil = ariane([{ nom: t('page.accueil'), chemin: urlAccueil(lang) }, { nom: textes.h1, chemin }], t);
+      const date = new Intl.DateTimeFormat(HREFLANG[lang], { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${legal.maj}T12:00:00Z`));
+      const valeurs = {
+        lang: HREFLANG[lang],
+        tete: tete({ lang, titre: textes.titre, description: textes.description, canonique, indexable: true, alternatives, image: absolue(`/${IMAGE_SITE}`), imageAlt: NOM_DU_SITE, donnees: [fil.donnees] }),
+        accueil: urlAccueil(lang),
+        langues: liensLangues(lang, alternatives, t),
+        ariane: fil.html,
+        h1: textes.h1,
+        maj: t('legal.maj', { date }),
+        // Contenu écrit à la main dans gabarits/legal/ (HTML de confiance, versionné).
+        contenu: contenu.trim(),
+        autres: PAGES_LEGALES.filter((p) => p !== page)
+          .map((p) => `<li><a href="${echapper(urlLegale(p, lang))}">${echapper(legal.pages[p][lang].h1)}</a></li>`).join(''),
+      };
+      await ecrire(dossierPublic, chemin, remplir(gabarits.legal, valeurs, t, morceaux, 'gabarits/legal.html'));
+      pages.push({ chemin, lang, type: 'legal', indexable: true, lastmod: legal.maj });
+    }
   }
 
   // --- Sitemap et robots.txt --------------------------------------------------
