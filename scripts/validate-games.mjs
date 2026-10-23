@@ -127,6 +127,32 @@ async function controlerJeu(id, dossier) {
   if (/\b(localStorage|sessionStorage|indexedDB)\b/.test(html) && !/\btry\s*\{/.test(html)) {
     erreur(id, 'stockage local utilisé sans try/catch : le jeu plantera dans le cadre isolé du site');
   }
+  controlerSauvegarde(id, html);
+}
+
+// Sauvegarde de la progression (public/save.js, CONSIGNES-JEU.md « Sauvegarde ») :
+// module commun à jour, chargé avant le code du jeu, et utilisé par le jeu
+// (reprise au dernier niveau, écriture en fin de niveau et à la fermeture).
+const RE_SAUVEGARDE = /<script\b[^>]*\bid=["']jel-sauvegarde["'][^>]*>([\s\S]*?)<\/script>/i;
+const moduleSauvegarde = (await readFile(path.join(RACINE, 'public', 'save.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
+
+function controlerSauvegarde(id, html) {
+  const bloc = RE_SAUVEGARDE.exec(html);
+  if (!bloc) {
+    return erreur(id, 'module de sauvegarde <script id="jel-sauvegarde"> absent : lancer node scripts/i18n-jeu.mjs ' + id + ' (voir CONSIGNES-JEU.md, « Sauvegarde »)');
+  }
+  if (bloc[1].replace(/\r\n/g, '\n').trim() !== moduleSauvegarde) {
+    erreur(id, 'module de sauvegarde pas à jour : lancer node scripts/i18n-jeu.mjs ' + id + ' (recopie public/save.js)');
+  }
+  const premierScript = /<script\b(?![^>]*\bid=["']jel-(?:i18n|i18n-textes|sauvegarde)["'])(?![^>]*type=["']application\/json)[^>]*>/i.exec(html);
+  if (premierScript && premierScript.index < bloc.index) erreur(id, 'le module de sauvegarde jel-sauvegarde doit être chargé avant le code du jeu (juste après jel-i18n)');
+  const code = html.slice(0, bloc.index) + html.slice(bloc.index + bloc[0].length);
+  const usages = [
+    [/\bJEL_SAVE\.reprise\s*\(/, 'JEL_SAVE.reprise(…) (choix « Continuer » / « Nouvelle partie » au lancement)'],
+    [/\bJEL_SAVE\.save\s*\(/, 'JEL_SAVE.save(…) (sauvegarde à chaque fin de niveau)'],
+    [/\bJEL_SAVE\.surFermeture\s*\(/, 'JEL_SAVE.surFermeture(…) (sauvegarde à la fermeture de la page)'],
+  ];
+  for (const [motif, quoi] of usages) if (!motif.test(code)) erreur(id, `sauvegarde : le jeu n'appelle pas ${quoi}`);
 }
 
 async function controlerDossier(id) {

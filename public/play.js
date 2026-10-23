@@ -8,6 +8,7 @@
 //   car le cadre isolé n'a pas accès au stockage du site ;
 // - le bouton de langue du jeu envoie un message « jel-langue » : le lanceur
 //   enregistre le choix (partagé avec le catalogue) et relance le jeu.
+// Et la sauvegarde des jeux (save.js) : gardée par le lanceur sous « save_<id> ».
 // Et le suivi des parties (suivi.js) : temps de jeu et erreurs JavaScript,
 // envoyés à /api/session pour les « Tendances » de l'accueil.
 // ==========================================================================
@@ -147,13 +148,43 @@ function activerVotes(gameId) {
 // worker : chargé par son adresse, le jeu ne pourrait pas marcher hors connexion.
 // Lu ici, il passe par le service worker et reste jouable sans réseau.
 
+// --- Sauvegarde des jeux (save.js) ---------------------------------------------
+// Le cadre isolé n'a pas de stockage : le lanceur garde la sauvegarde du jeu
+// dans le localStorage du site, sous « save_<id> ». Il la donne au jeu au
+// démarrage (window.JEL_SAUVEGARDES) et enregistre les messages
+// « jel-sauvegarde » du jeu, pour sa seule clé.
+const SAUVEGARDE_MAX = 100000; // caractères (même limite que save.js)
+
+function cleSauvegarde() { return jeuCourant ? `save_${jeuCourant.id}` : null; }
+
+function lireSauvegarde() {
+  const cle = cleSauvegarde();
+  if (!cle) return {};
+  try {
+    const valeur = localStorage.getItem(cle);
+    return typeof valeur === 'string' ? { [cle]: valeur } : {};
+  } catch { return {}; } // stockage refusé : le jeu repart de zéro
+}
+
+function enregistrerSauvegarde(cle, valeur) {
+  if (!cle || cle !== cleSauvegarde()) return;
+  try {
+    if (valeur === null) localStorage.removeItem(cle);
+    else if (typeof valeur === 'string' && valeur.length <= SAUVEGARDE_MAX) localStorage.setItem(cle, valeur);
+  } catch (e) {
+    console.warn('Sauvegarde du jeu impossible :', e);
+  }
+}
+
 // Ajoute la règle de sécurité avant tout le code du jeu (juste après <!doctype>,
-// pour ne pas changer son mode d'affichage), puis la langue choisie sur le site
-// et le script qui signale les erreurs du jeu (suivi.js).
+// pour ne pas changer son mode d'affichage), puis la langue choisie sur le site,
+// la sauvegarde du jeu et le script qui signale les erreurs du jeu (suivi.js).
 function proteger(html) {
   const debut = /^﻿?(?:\s|<!--[\s\S]*?-->)*(?:<!doctype[^>]*>)?/i.exec(html)[0];
-  const langue = `<script>window.JEL_LANG=${JSON.stringify(getLang())};</script>`;
-  return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${langue}${SCRIPT_ERREURS}${html.slice(debut.length)}`;
+  // « < » échappé : une sauvegarde ne peut pas fermer la balise <script>.
+  const sauvegardes = JSON.stringify(lireSauvegarde()).replace(/</g, '\\u003c');
+  const reglages = `<script>window.JEL_LANG=${JSON.stringify(getLang())};window.JEL_SAUVEGARDES=${sauvegardes};</script>`;
+  return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${reglages}${SCRIPT_ERREURS}${html.slice(debut.length)}`;
 }
 
 function afficherJeu() {
@@ -180,12 +211,17 @@ function garderPourHorsLigne(jeu) {
 
 // Messages du jeu :
 // - « jel-langue » (bouton de langue) : on enregistre le choix et on relance le jeu ;
-// - « jel-erreur » (SCRIPT_ERREURS) : erreur JavaScript, notée pour le suivi.
+// - « jel-erreur » (SCRIPT_ERREURS) : erreur JavaScript, notée pour le suivi ;
+// - « jel-sauvegarde » (save.js) : progression du jeu à garder sur l'appareil.
 addEventListener('message', (evenement) => {
   if (evenement.source !== el.cadre.contentWindow) return;
   const donnees = evenement.data;
   if (donnees?.type === 'jel-erreur' && typeof donnees.message === 'string') {
     noterErreur(donnees.message);
+    return;
+  }
+  if (donnees?.type === 'jel-sauvegarde' && typeof donnees.cle === 'string') {
+    enregistrerSauvegarde(donnees.cle, donnees.valeur);
     return;
   }
   if (!donnees || donnees.type !== 'jel-langue' || typeof donnees.lang !== 'string') return;

@@ -4,8 +4,8 @@
 # les outils de contrôle (proposée par vous, un autre agent ou une autre IA).
 #
 # Il ne fait que ce qui est utile pour ce qui a changé :
-#   - jeux modifiés          → ces jeux dans le navigateur (validate-games),
-#                              genres et univers, traductions, référencement
+#   - jeux modifiés          → ces jeux dans le navigateur (validate-games,
+#                              tester-sauvegarde), genres et univers, traductions, référencement
 #                              (seules les erreurs de ces jeux bloquent) ;
 #   - outils de contrôle     → TOUS les jeux dans le navigateur (un outil
 #     modifiés                 modifié peut changer le verdict de chaque jeu),
@@ -34,6 +34,7 @@ on:
     paths:
       - "games/**"
       - "public/i18n/**"
+      - "public/save.js"
       - "public/taxonomie.js"
       - "public/style.css"
       - "public/chemins.js"
@@ -53,6 +54,7 @@ on:
       - "scripts/controle-taxonomie.mjs"
       - "scripts/check-i18n.js"
       - "scripts/i18n-jeu.mjs"
+      - "scripts/tester-sauvegarde.mjs"
       - "scripts/jaquette-sans-texte.mjs"
       - "scripts/icones/**"
       - "scripts/build-catalog.mjs"
@@ -63,8 +65,13 @@ on:
 
 jobs:
   controle:
+    # Pas pour les pull requests de la boucle de nuit (robot github-actions[bot],
+    # branches nouveau-jeu/…) : la boucle contrôle déjà ces jeux avant de fusionner.
+    # (Le déclencheur pull_request ne sait pas filtrer sur l'auteur ni sur la
+    # branche de la pull request : le tri ne peut se faire qu'ici.)
+    if: ${{ !(github.event.pull_request.user.login == 'github-actions[bot]' && startsWith(github.head_ref, 'nouveau-jeu/')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       contents: read
 
@@ -96,8 +103,8 @@ jobs:
           ids=$(printf '%s\n' "$fichiers" | { grep '^games/' || true; } | cut -d/ -f2 | sort -u | while read -r id; do if [ -n "$id" ] && [ -d "games/$id" ]; then echo "$id"; fi; done | tr '\n' ' ')
           tous=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then tous=1; fi
-          # Module commun de traduction : recopié dans chaque jeu, donc tous les jeux sont concernés.
-          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|jaquette-sans-texte\.mjs)|public/i18n/i18n\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
+          # Modules communs de traduction et de sauvegarde : recopiés dans chaque jeu, donc tous les jeux sont concernés.
+          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|jaquette-sans-texte\.mjs|tester-sauvegarde\.mjs)|public/i18n/i18n\.js|public/save\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
           # Textes, taxonomie, gabarits (textes des catégories compris), générateur
           # des pages et pages du site : le site est testé avec un seul jeu.
           site=0
@@ -138,6 +145,17 @@ jobs:
             node scripts/validate-games.mjs --browser
           else
             node scripts/validate-games.mjs --browser ${{ steps.quoi.outputs.ids }}
+          fi
+
+      # Sauvegarde (public/save.js) dans le lanceur : écrite à la fermeture,
+      # relue après rechargement (« Continuer »), effacée. Voir CONSIGNES-JEU.md.
+      - name: Contrôler la sauvegarde
+        if: steps.quoi.outputs.ids != '' || steps.quoi.outputs.tous == '1'
+        run: |
+          if [ "${{ steps.quoi.outputs.tous }}" = 1 ]; then
+            node scripts/tester-sauvegarde.mjs
+          else
+            node scripts/tester-sauvegarde.mjs ${{ steps.quoi.outputs.ids }}
           fi
 
       # Genres et univers : uniquement ceux de public/taxonomie.js (jeux, idées, libellés, formulaire).

@@ -23,7 +23,7 @@ Un nouveau jeu est **complet et travaillé, jamais un simple prototype** : il do
 5. **Pause et Rejouer** : un bouton pause toujours visible pendant la partie (et la touche Échap ou P) fige tout (temps, mouvements, sons) et propose « Reprendre », « Recommencer » et « Accueil ». Le jeu se met aussi en pause tout seul quand l'écran est caché (`visibilitychange`). Même un jeu sans chrono a ce menu.
 6. **Des contrôles tactiles et clavier** : tout se joue au doigt (cibles d'au moins 44 px) et aussi au clavier (flèches, Espace, Entrée) ou à la souris.
 7. **Un score ou des étoiles par niveau** : 1 à 3 étoiles selon la réussite (ou médailles, objets à collectionner…).
-8. **Une progression sauvegardée** (niveaux débloqués, étoiles, meilleur score) dans `localStorage`, toujours dans `try { … } catch (e) { … }` : sans stockage, le jeu marche quand même.
+8. **Une progression sauvegardée avec le module commun `save.js`** (section 3, « Sauvegarde ») : reprise au dernier niveau, fenêtre « Continuer » / « Nouvelle partie » au lancement, bouton « Effacer la sauvegarde ». Les autres souvenirs du jeu (niveaux débloqués, étoiles, meilleur score) peuvent aussi aller dans `localStorage`, toujours dans `try { … } catch (e) { … }` : sans stockage, le jeu marche quand même.
 9. **Une sélection des niveaux** : l'écran des niveaux montre ceux qui sont débloqués (avec leurs étoiles) et ceux qui restent fermés ; on peut rejouer n'importe quel niveau débloqué.
 10. **Des sons générés avec Web Audio** (aucun fichier audio) pour les actions, réussites, erreurs et fins de niveau, avec un **bouton pour couper le son**, bien visible, dont le choix est mémorisé. Aucun son avant la première action du joueur.
 11. **Des animations et des retours visuels soignés** : confettis, étoiles qui s'envolent, compteur qui défile, légère secousse… à chaque action, à chaque réussite et à chaque fin de niveau.
@@ -48,6 +48,20 @@ Un nouveau jeu est **complet et travaillé, jamais un simple prototype** : il do
 - Aucune erreur dans la console, au démarrage comme pendant la partie.
 - **Suivi des parties : rien à ajouter dans le jeu.** Le lanceur place lui-même, en tête de chaque jeu (anciens comme nouveaux), le script commun de suivi (`SCRIPT_ERREURS` dans `public/suivi.js`), qui lui signale les erreurs JavaScript ; il mesure aussi le temps de jeu et l'envoie au site (« Tendances » de l'accueil). Le jeu ne contient donc **aucun code réseau** (`fetch`, `sendBeacon`… : bloqués par la règle de sécurité) et ne doit pas empêcher les erreurs d'arriver jusqu'à `window` (pas de `stopImmediatePropagation()` sur l'événement `error`) ; `window.onerror` reste utilisable.
 - Code lisible et commenté en français.
+
+### Sauvegarde (obligatoire)
+
+Tout jeu garde la progression du joueur sur l'appareil, sans compte ni serveur, avec le module commun **`public/save.js`** (`window.JEL_SAVE`). Dans le cadre isolé du site, le jeu n'a pas de stockage : le module passe par le lanceur, qui garde les données dans le `localStorage` du site sous la clé `save_<id>` ; ouvert seul, le jeu utilise directement `localStorage`.
+
+- **Le module** est recopié dans `index.html` (`<script id="jel-sauvegarde">`, juste après le module de traduction `jel-i18n`, avant le code du jeu) par `node scripts/i18n-jeu.mjs --assembler <id>` (ou `node scripts/i18n-jeu.mjs <id>`). Ne jamais l'écrire ni le modifier à la main.
+- **Données** : `{ niveau, score, options }` (+ champs propres au jeu si la reprise en a besoin). `niveau` = numéro, à partir de 1, du niveau où reprendre. Sauvegarde absente, illisible ou d'un autre format : valeurs par défaut.
+- **Dans le code du jeu** (`const JEU = '<id>';`) :
+  1. **Lancement** : le bouton « Jouer » de l'écran titre (et la touche qui fait la même chose) appelle `JEL_SAVE.reprise({ jeu: JEU, onContinuer: (d) => …, onNouvelle: () => … })`. S'il y a une sauvegarde, une fenêtre propose **« Continuer »** (directement au niveau `d.niveau`), **« Nouvelle partie »** (le parcours normal) et **« Effacer la sauvegarde »** (deux touchers) ; ses textes sont déjà traduits dans les 5 langues par le module. Sans sauvegarde, `onNouvelle()` est appelé tout de suite.
+  2. **Fin de niveau** : à chaque niveau N réussi, `JEL_SAVE.save(JEU, { niveau: N + 1, score })`.
+  3. **Fermeture de la page** : `JEL_SAVE.surFermeture(() => { if (<partie en cours>) JEL_SAVE.save(JEU, { niveau: <niveau en cours>, score }); })` (`visibilitychange`, `pagehide`, `beforeunload`). Jamais d'écriture depuis l'écran titre : elle écraserait une sauvegarde plus avancée.
+  4. Jeu sans niveaux (partie sans fin) : `reprise({ …, sansNiveau: true })`, score et état de la partie sauvegardés par paliers et à la fermeture, sauvegarde effacée (`JEL_SAVE.clear(JEU)`) quand la partie est perdue.
+  5. Facultatif : `JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur })` place un bouton « Effacer la sauvegarde » sur l'écran titre (caché sans sauvegarde).
+- **Contrôles** : `validate-games.mjs` vérifie que le module est présent, à jour et appelé (`reprise`, `save`, `surFermeture`) ; `node scripts/tester-sauvegarde.mjs <id> --captures` vérifie dans le lanceur que la sauvegarde est écrite à la fermeture, relue après rechargement (« Continuer » ramène au niveau sauvegardé) et effacée par le bouton.
 
 ### Langues (obligatoire)
 
@@ -167,6 +181,7 @@ Chaque jeu a sa page, générée au build dans les 5 langues (gabarit unique `ga
 ```text
 node scripts/validate-games.mjs --jouer <id>      (ajouter --covers si le jeu n'a pas encore de jaquette)
 node scripts/check-i18n.js <id> --rapport
+node scripts/tester-sauvegarde.mjs <id> --captures (sauvegarde : écriture, reprise, effacement)
 node scripts/regles-seo.mjs <id>                   (textes de la page du jeu, sans construire le site)
 node scripts/verifier-seo.mjs <id>                 (construit le site, puis contrôle la page du jeu)
 ```
@@ -189,6 +204,7 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Niveaux | (jeux `"consignes": 2`) moins de 20 niveaux, `window.JEL_NIVEAUX` absent ou différent de `"niveaux"` dans `game.json`, présentation absente |
 | Catalogue | le jeu manque au catalogue construit, ou son genre, ses univers et son âge ne sont pas ceux de son idée (`scripts/idees.mjs controler`) |
 | Genres et univers | un genre, un genre secondaire ou un univers hors des listes fermées de `public/taxonomie.js`, ou l'ancien champ `tags` (`scripts/controle-taxonomie.mjs`) |
+| Sauvegarde | module `save.js` absent, pas à jour ou pas appelé (`validate-games.mjs`), ou `scripts/tester-sauvegarde.mjs` signale un problème : rien d'écrit à la fermeture, pas de fenêtre « Continuer » avec une sauvegarde, « Continuer » qui ne ramène pas au niveau sauvegardé, effacement sans effet |
 | Traductions | `scripts/check-i18n.js` signale une erreur : langue incomplète, clé manquante, valeur vide, `{variables}` différentes, titre, description ou présentation non traduits, erreur dans une des 5 langues (boucle de nuit et `validate.yml`) |
 | Référencement | `scripts/verifier-seo.mjs <id>` signale une erreur sur ce jeu : texte de la page manquant ou hors bornes dans une des 5 langues (section 4), bloc de texte hors de 150 à 300 mots, marque protégée, titre ou description identique à celui d'un autre jeu, phrase de 10 mots reprise d'un autre jeu, page du jeu mal construite (titre, description, H1, liens, jeux similaires…) (boucle de nuit et `validate.yml`) |
 
@@ -202,7 +218,7 @@ Points bloquants, vérifiés dans le code et sur les captures d'écran du robot 
 4. **Progression** : au moins 20 niveaux réellement différents (lus dans le code, pas seulement annoncés), et la difficulté augmente réellement.
 5. **Mécaniques** : de vraies nouveautés (mécaniques, obstacles, ennemis, objectifs) au fil des niveaux, qui se combinent.
 6. **Jeu complet** : un vrai jeu travaillé et riche, pas un prototype ni un jeu simpliste (niveaux copiés, écrans ou fonctions manquants, contenu maigre).
-7. **Récompenses et progression** : score ou étoiles par niveau, progression et record sauvegardés dans `localStorage` à l'intérieur de `try { … } catch (e) { … }`, sélection des niveaux débloqués.
+7. **Récompenses et progression** : score ou étoiles par niveau, sélection des niveaux débloqués ; sauvegarde avec `save.js` (section 3) : « Continuer » / « Nouvelle partie » au bouton Jouer, sauvegarde à chaque fin de niveau et à la fermeture (seulement pendant une partie) ; record et autres données dans `localStorage` à l'intérieur de `try { … } catch (e) { … }`.
 8. **Contrôles** : jouable entièrement au doigt, et au clavier ou à la souris ; cibles tactiles d'au moins 44 px.
 9. **Son** : sons Web Audio, bouton pour couper le son visible et mémorisé, aucun son avant la première action.
 10. **Effets et fins de niveau** : retours visuels soignés ; écran de victoire et écran de défaite avec score, étoiles, record, « Niveau suivant » ou « Réessayer », et « Rejouer ».
