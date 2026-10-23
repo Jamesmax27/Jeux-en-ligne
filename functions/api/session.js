@@ -10,15 +10,18 @@
 // - erreur : première erreur JavaScript du jeu pendant la partie (500 caractères au plus).
 // - pays : request.cf.country (« XX » si inconnu) ;
 //   appareil : « mobile » ou « desktop », d'après le User-Agent ;
-//   visiteur : empreinte SHA-256 de l'adresse IP + IP_SALT, jamais l'adresse elle-même.
+//   visiteur : empreinte SHA-256 de l'adresse IP + IP_SALT, jamais l'adresse
+//   elle-même ; en IPv6, du réseau /56 (BITS_V6 : une box en reçoit souvent un
+//   entier, voir partieReseau dans functions/_commun.js).
 // - Table « sessions » de la base D1 (voir lireFormatSessions dans functions/_commun.js).
 //
 // Provenance : seul le lanceur du site envoie des parties, en JSON. Un envoi
 // venu d'une autre page (un autre site qui ferait envoyer de fausses parties
 // par les navigateurs de ses visiteurs) est refusé (403). Un programme peut
-// imiter ces en-têtes : c'est le calcul des Tendances (joueurs différents,
-// functions/api/tendances.js) qui l'empêche alors de peser. Sur les aperçus
-// de Cloudflare (<branche>.<projet>.pages.dev), rien n'est enregistré.
+// imiter ces en-têtes : c'est alors le calcul des Tendances (joueurs
+// différents, functions/api/tendances.js) qui limite son poids à une voix par
+// adresse ou par réseau. Sur les aperçus de Cloudflare
+// (<branche>.<projet>.pages.dev), rien n'est enregistré.
 //
 // Réponse : 204 sans contenu (sendBeacon ne lit pas la réponse), 400 si les
 // données sont invalides, 403 si l'envoi vient d'un autre site, 503 si la base
@@ -38,6 +41,7 @@ const ERREUR_MAX = 500;       // caractères
 const TAILLE_MAX = 4096;      // octets du corps
 const CONSERVATION_MOIS = 13; // durée annoncée dans la politique de confidentialité
 const PURGE_FREQUENCE = 100;
+const BITS_V6 = 56;           // préfixe IPv6 de l'empreinte (les votes gardent /64)
 
 /** Efface les parties commencées il y a plus de CONSERVATION_MOIS mois. */
 async function effacerAnciennes(env, format) {
@@ -100,7 +104,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const pays = /^[A-Z][A-Z0-9]$/.test(paysBrut) ? paysBrut : 'XX'; // XX = inconnu
   const agent = request.headers.get('User-Agent') || '';
   const appareil = /Mobi|Android|iPhone|iPad|iPod/i.test(agent) ? 'mobile' : 'desktop';
-  const visiteur = await empreinteVisiteur(request, env);
+  const visiteur = await empreinteVisiteur(request, env, BITS_V6);
 
   try {
     const format = await lireFormatSessions(env);

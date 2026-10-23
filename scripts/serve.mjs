@@ -91,10 +91,12 @@ createServer(async (req, res) => {
       'Cache-Control': 'no-cache',
     };
     if (url.pathname.startsWith('/games/')) entetes['Content-Security-Policy'] = CSP_JEUX;
-    // Lanceur : jamais dans le cadre d'un autre site (comme public/_headers).
+    // Lanceur : jamais dans le cadre d'un autre site, ni piloté par une fenêtre
+    // d'un autre site qui l'aurait ouvert (comme public/_headers).
     if (url.pathname === '/play' || url.pathname === '/play.html') {
       entetes['X-Frame-Options'] = 'SAMEORIGIN';
       entetes['Content-Security-Policy'] = "frame-ancestors 'self'";
+      entetes['Cross-Origin-Opener-Policy'] = 'same-origin';
     }
 
     res.writeHead(statut, entetes).end(await readFile(chemin));
