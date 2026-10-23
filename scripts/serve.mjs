@@ -9,7 +9,7 @@
 // et les adresses de Cloudflare Pages : « /play » sert play.html, un dossier sert
 // son index.html, une adresse inconnue reçoit 404.html avec le code 404.
 // L'API des votes n'existe pas en local ; celle du suivi des parties répond à vide.
-// TENDANCES_EXEMPLE=1 : /api/tendances renvoie les 12 premiers jeux du catalogue
+// TENDANCES_EXEMPLE=1 : /api/tendances renvoie les 24 premiers jeux du catalogue
 // (pour voir la bande « Tendances » ; sans la variable, elle reste cachée).
 //   PowerShell : $env:TENDANCES_EXEMPLE='1'; npm run dev
 //   bash       : TENDANCES_EXEMPLE=1 npm run dev
@@ -58,7 +58,7 @@ createServer(async (req, res) => {
       let jeux = [];
       if (process.env.TENDANCES_EXEMPLE === '1') {
         const catalogue = JSON.parse(await readFile(path.join(RACINE, 'catalog.json'), 'utf8'));
-        jeux = (catalogue.games || []).slice(0, 12).map((j) => ({ id: j.id }));
+        jeux = (catalogue.games || []).slice(0, 24).map((j) => ({ id: j.id }));
       }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify({ jours: 7, jeux }));
       return;
