@@ -11,6 +11,8 @@
 // L'API des votes n'existe pas en local ; celle du suivi des parties répond à vide.
 // TENDANCES_EXEMPLE=1 : /api/tendances renvoie les 12 premiers jeux du catalogue
 // (pour voir la bande « Tendances » ; sans la variable, elle reste cachée).
+//   PowerShell : $env:TENDANCES_EXEMPLE='1'; npm run dev
+//   bash       : TENDANCES_EXEMPLE=1 npm run dev
 // ==========================================================================
 
 import { createServer } from 'node:http';

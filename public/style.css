@@ -19,7 +19,7 @@
 
 :root {
   --nuit: #0b1020;              /* fond de page (= manifeste, theme-color, logo) */
-  --nuit-profonde: #070a14;     /* bandeau du titre, plaques des badges et du rang */
+  --nuit-profonde: #070a14;     /* bandeau du titre, plaques des badges */
   --surface: #161f38;           /* champs, tuiles, menu de langue, fiches */
   --surface-relevee: #1d2745;   /* survol */
   --surface-choisie: #2c3656;   /* tuile, portée, langue choisies */
@@ -521,27 +521,35 @@ body::after {
    -------------------------------------------------------------------------- */
 
 .tendances {
-  --l-tendance: 116px;    /* largeur d'une jaquette */
-  --bas-tendances: 8px;   /* rembourrage sous la bande (barre de défilement) */
+  --l-tendance: 116px;    /* largeur d'une jaquette (bande qui défile) */
+  --bas-tendances: 8px;   /* rembourrage sous la bande (contour de focus) */
   max-width: 1200px;
   margin: 4px auto 4px;
 }
 
 /* Accueil : places gardées avant que app.js ne remplisse la page, pour qu'elle
    ne bouge pas pendant le chargement (Tendances vues à la visite précédente,
-   tuiles, rangées de puces). Tendances : titre (24 px), rembourrage haut
-   (6 px), jaquette (3:4) et rembourrage bas. */
+   tuiles, rangées de puces). Tendances : la bande vide reçoit une jaquette
+   fantôme (::before) aussi large que les 8 vraies ; elle a donc la hauteur de
+   la bande pleine, barre de défilement comprise (barres classiques des
+   ordinateurs, qui s'ajoutent sous le rembourrage). */
 html.avec-tendances #tendances[hidden] {
   display: block !important;
   visibility: hidden;
-  min-height: calc(30px + var(--l-tendance) * 4 / 3 + var(--bas-tendances));
+}
+
+html.avec-tendances #tendances[hidden] .tendances-liste::before {
+  content: "";
+  grid-column: span 8;                      /* = TENDANCES_NOMBRE (app.js) */
+  height: calc(var(--l-tendance) * 4 / 3);  /* jaquette 3:4 */
 }
 
 .tuiles:empty { min-height: 63px; }
 .rangee:empty { min-height: 63px; }
 
 /* Le rembourrage vertical laisse la place au contour de focus (5 px) ; celui
-   de droite sort la dernière jaquette du fondu. */
+   de droite sort la dernière jaquette du fondu, et le retrait de droite
+   (scroll-padding) y garde la carte amenée au clavier. */
 .tendances-liste {
   display: grid;
   grid-auto-flow: column;
@@ -552,11 +560,17 @@ html.avec-tendances #tendances[hidden] {
   list-style: none;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scroll-padding-inline: 16px;
+  scroll-padding-inline: 16px 40px;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
   mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+
+/* Carte choisie au clavier : plus de fondu, son contour reste entier. */
+.tendances-liste:has(:focus-visible) {
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 .tendances-liste::-webkit-scrollbar { display: none; }
@@ -593,10 +607,11 @@ html.avec-tendances #tendances[hidden] {
 }
 
 /* Une ligne de 8 colonnes (= TENDANCES_NOMBRE dans app.js), sans défilement
-   ni fondu. --l-tendance : largeur d'une colonne dans la section de 1 200 px
-   ((1 200 − 2 × 16 − 7 × 12) / 8), pour la place réservée. */
+   ni fondu. La jaquette fantôme de la place réservée n'occupe qu'une colonne :
+   sa hauteur suit la vraie largeur des colonnes (la barre verticale de la
+   page peut la réduire de quelques pixels). */
 @media (min-width: 1200px) {
-  .tendances { --l-tendance: 135.5px; --bas-tendances: 8px; }
+  .tendances { --bas-tendances: 8px; }
   .tendances-liste {
     grid-auto-flow: row;
     grid-template-columns: repeat(8, minmax(0, 1fr));
@@ -604,6 +619,11 @@ html.avec-tendances #tendances[hidden] {
     overflow: visible;
     -webkit-mask-image: none;
     mask-image: none;
+  }
+  html.avec-tendances #tendances[hidden] .tendances-liste::before {
+    grid-column: auto;
+    height: auto;
+    aspect-ratio: 3 / 4;
   }
 }
 
