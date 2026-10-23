@@ -4,7 +4,8 @@
 //   npm run dev   → construit le catalogue puis ouvre http://localhost:8080
 // Pour tester sur votre téléphone (même Wi-Fi) : utilisez l'adresse
 // « Réseau » affichée au démarrage.
-// Reproduit la règle de sécurité des jeux (aucun accès Internet), comme en ligne,
+// Reproduit la règle de sécurité des jeux (aucun accès Internet) et l'interdiction
+// d'afficher le lanceur dans le cadre d'un autre site, comme en ligne,
 // et les adresses de Cloudflare Pages : « /play » sert play.html, un dossier sert
 // son index.html, une adresse inconnue reçoit 404.html avec le code 404.
 // L'API des votes n'existe pas en local ; celle du suivi des parties répond à vide.
@@ -88,6 +89,11 @@ createServer(async (req, res) => {
       'Cache-Control': 'no-cache',
     };
     if (url.pathname.startsWith('/games/')) entetes['Content-Security-Policy'] = CSP_JEUX;
+    // Lanceur : jamais dans le cadre d'un autre site (comme public/_headers).
+    if (url.pathname === '/play' || url.pathname === '/play.html') {
+      entetes['X-Frame-Options'] = 'SAMEORIGIN';
+      entetes['Content-Security-Policy'] = "frame-ancestors 'self'";
+    }
 
     res.writeHead(statut, entetes).end(await readFile(chemin));
   } catch (e) {

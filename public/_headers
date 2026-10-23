@@ -18,11 +18,18 @@
 # sont proposées aux moteurs de recherche. Ne sont pas indexés : le lanceur (/play),
 # le fichier brut de chaque jeu (sa jaquette, elle, reste indexable : image de partage)
 # et les adresses de Cloudflare en *.pages.dev (doublons de freemicrogames.com).
+# Le lanceur ne s'affiche pas dans le cadre d'un autre site : un cadre caché
+# lui ferait compter de fausses parties (Tendances) et pourrait piéger les pouces.
+# Même règle dans scripts/serve.mjs.
 /play
   X-Robots-Tag: noindex
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'
 
 /play.html
   X-Robots-Tag: noindex
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: frame-ancestors 'self'
 
 /games/:id/
   X-Robots-Tag: noindex

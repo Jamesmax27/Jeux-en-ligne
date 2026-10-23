@@ -61,9 +61,10 @@ function commencerPartie() {
   if (jeuId && !debut && document.visibilityState !== 'hidden') debut = Date.now();
 }
 
-// À appeler une fois, quand le jeu est affiché.
+// À appeler une fois, quand le jeu est affiché. Lanceur affiché dans un cadre
+// (un autre site qui le cacherait dans sa page) : aucune partie n'est comptée.
 export function suivreJeu(id) {
-  if (jeuId) return;
+  if (jeuId || window.top !== window) return;
   jeuId = id;
   commencerPartie();
   document.addEventListener('visibilitychange', () => {

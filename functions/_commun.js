@@ -14,11 +14,32 @@ export function json(donnees, statut = 200, entetes = {}) {
 // Empreinte SHA-256 de l'adresse IP + IP_SALT (secret Cloudflare) : permet de
 // compter des visiteurs différents sans jamais enregistrer l'adresse elle-même.
 // null si l'adresse ou le secret manquent (test en local, réglage absent).
+// En IPv6, seul le réseau /64 compte (voir partieReseau).
+
+// Partie de l'adresse qui identifie un visiteur : l'adresse IPv4 entière, ou
+// les 4 premiers groupes d'une adresse IPv6 (réseau /64, celui d'un foyer ou
+// d'un téléphone, qui peut changer à volonté les 4 derniers groupes et
+// fabriquerait sinon autant de « visiteurs » qu'il veut).
+// « ::ffff:192.0.2.1 » (IPv4 écrite en IPv6) est traitée comme « 192.0.2.1 ».
+export function partieReseau(ip) {
+  const adresse = String(ip).trim().toLowerCase().replace(/^\[|\]$/g, '').split('%')[0];
+  const ipv4 = /^(?:::ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/.exec(adresse);
+  if (ipv4) return ipv4[1];
+  if (!adresse.includes(':')) return adresse;
+  // « :: » remplace un ou plusieurs groupes nuls ; une IPv4 en fin d'adresse vaut 2 groupes.
+  const [debut, fin] = adresse.split('::');
+  const groupes = (texte) => (texte ? texte.split(':') : []);
+  const taille = (liste) => liste.reduce((n, g) => n + (g.includes('.') ? 2 : 1), 0);
+  const avant = groupes(debut);
+  const apres = fin === undefined ? [] : groupes(fin);
+  const complets = fin === undefined ? avant : [...avant, ...Array(Math.max(0, 8 - taille(avant) - taille(apres))).fill('0'), ...apres];
+  return `${complets.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '')).join(':')}::/64`;
+}
 
 export async function empreinteVisiteur(request, env) {
   const ip = request.headers.get('CF-Connecting-IP');
   if (!ip || !env.IP_SALT) return null;
-  const octets = new TextEncoder().encode(ip + env.IP_SALT);
+  const octets = new TextEncoder().encode(partieReseau(ip) + env.IP_SALT);
   const empreinte = await crypto.subtle.digest('SHA-256', octets);
   return [...new Uint8Array(empreinte)].map((o) => o.toString(16).padStart(2, '0')).join('');
 }

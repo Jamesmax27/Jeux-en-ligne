@@ -13,8 +13,16 @@
 //   visiteur : empreinte SHA-256 de l'adresse IP + IP_SALT, jamais l'adresse elle-même.
 // - Table « sessions » de la base D1 (voir lireFormatSessions dans functions/_commun.js).
 //
+// Provenance : seul le lanceur du site envoie des parties, en JSON. Un envoi
+// venu d'une autre page (un autre site qui ferait envoyer de fausses parties
+// par les navigateurs de ses visiteurs) est refusé (403). Un programme peut
+// imiter ces en-têtes : c'est le calcul des Tendances (joueurs différents,
+// functions/api/tendances.js) qui l'empêche alors de peser. Sur les aperçus
+// de Cloudflare (<branche>.<projet>.pages.dev), rien n'est enregistré.
+//
 // Réponse : 204 sans contenu (sendBeacon ne lit pas la réponse), 400 si les
-// données sont invalides, 503 si la base ne répond pas.
+// données sont invalides, 403 si l'envoi vient d'un autre site, 503 si la base
+// ne répond pas.
 //
 // Conservation : les parties de plus de 13 mois sont effacées (politique de
 // confidentialité). L'effacement est fait de temps en temps (1 enregistrement
@@ -42,10 +50,27 @@ async function effacerAnciennes(env, format) {
   }
 }
 
+const SANS_CONTENU = { status: 204, headers: { 'Cache-Control': 'no-store' } };
+
 export async function onRequestPost({ request, env, waitUntil }) {
+  const adresse = new URL(request.url);
+  const origine = request.headers.get('Origin');
+  if (origine && origine !== adresse.origin) {
+    return json({ erreur: 'Origine refusée.' }, 403);
+  }
+  const provenance = request.headers.get('Sec-Fetch-Site');
+  if (provenance && provenance !== 'same-origin') {
+    return json({ erreur: 'Origine refusée.' }, 403);
+  }
+  if (!(request.headers.get('Content-Type') || '').toLowerCase().startsWith('application/json')) {
+    return json({ erreur: 'Requête invalide.' }, 400);
+  }
+  // Aperçu d'une branche ou d'un déploiement (<branche>.<projet>.pages.dev) : rien n'est enregistré.
+  if (/^[^.]+\.[^.]+\.pages\.dev$/.test(adresse.hostname)) return new Response(null, SANS_CONTENU);
+
   let corps;
   try {
-    // sendBeacon peut envoyer du texte brut : on lit le texte, puis le JSON.
+    // Le lanceur envoie un Blob JSON (suivi.js) : on lit le texte, puis le JSON.
     const texte = await request.text();
     if (texte.length > TAILLE_MAX) throw new Error('trop long');
     corps = JSON.parse(texte);
@@ -102,5 +127,5 @@ export async function onRequestPost({ request, env, waitUntil }) {
     return json({ erreur: 'Session non enregistrée.' }, 503);
   }
 
-  return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
+  return new Response(null, SANS_CONTENU);
 }
