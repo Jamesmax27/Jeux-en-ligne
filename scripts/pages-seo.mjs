@@ -272,8 +272,10 @@ function tete({ lang, titre, description, canonique, indexable, alternatives, im
     '<link rel="stylesheet" href="/style.css">',
     ...donnees.map(jsonLd),
     // Consentement aux cookies (Google Consent Mode v2, tout refusé par défaut) :
-    // placé avant tout autre script de la page, dont la publicité (pub.js).
+    // placé avant tout autre script de la page, dont la publicité (pub.js) ;
+    // puis la mesure d'audience Google Analytics (chargée seulement après « Accepter »).
     '<script src="/consentement.js" defer></script>',
+    '<script src="/mesure.js" defer></script>',
     SCRIPT_PAGE,
   );
   return lignes.join('\n  ');

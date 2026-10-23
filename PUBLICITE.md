@@ -8,7 +8,7 @@
 - **Hors connexion** : aucune publicité.
 - **Déjà en place** (branche `pages-legales-cookies`) :
   - bandeau de consentement aux cookies sur toutes les pages générées (`public/consentement.js`, `gabarits/morceaux/consentement.html`) : boutons Accepter / Refuser de même taille, lien vers la politique de cookies, choix gardé 6 mois, lien « Réglages des cookies » dans le pied de page ;
-  - **Google Consent Mode v2** : tout refusé par défaut (`ad_storage`, `ad_user_data`, `ad_personalization`, `analytics_storage`) ; accepter n'accorde que `ad_storage` et `ad_user_data` ; `ad_personalization` reste **toujours** refusé ; refuser efface les cookies AdSense du site ;
+  - **Google Consent Mode v2** : tout refusé par défaut (`ad_storage`, `ad_user_data`, `ad_personalization`, `analytics_storage`) ; accepter accorde `ad_storage`, `ad_user_data` et `analytics_storage` (Google Analytics 4, `public/mesure.js`, chargé seulement après l'accord) ; `ad_personalization` reste **toujours** refusé ; refuser efface les cookies AdSense et Google Analytics du site ;
   - code AdSense dans `pub.js` (chargé seulement après le choix du visiteur) : `requestNonPersonalizedAds = 1`, `data-restrict-data-processing="1"` (annonces non personnalisées) et `data-tag-for-age-treatment="1"` (traitement « enfant » ; Google a abandonné `tag_for_child_directed_treatment` au profit de ce réglage, qui lui est équivalent : aide AdSense 3248194 et 9598414) ;
   - pages légales en français et en anglais : mentions légales, confidentialité, conditions d'utilisation, cookies (cookies AdSense `__gads`, `__gpi`, `__eoi` déjà décrits).
 - Aucun identifiant AdSense n'est présent : ils seront ajoutés avec votre compte.

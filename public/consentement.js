@@ -2,14 +2,18 @@
 // Free Micro Games — consentement aux cookies (bandeau + Google Consent Mode v2)
 //
 // Chargé en premier sur toutes les pages générées (pages-seo.mjs, <head>,
-// defer), avant tout script Google (publicité : pub.js, accueil seulement).
+// defer) et dans le lanceur (play.html, sans bandeau : il lit le choix déjà
+// fait), avant tout script Google (mesure d'audience : mesure.js ; publicité :
+// pub.js, accueil seulement).
 //
 // - Google Consent Mode v2 : TOUT est refusé par défaut (ad_storage,
 //   ad_user_data, ad_personalization, analytics_storage).
-// - « Accepter » accorde seulement ad_storage et ad_user_data.
+// - « Accepter » accorde ad_storage, ad_user_data et analytics_storage
+//   (Google Analytics, chargé par mesure.js seulement après cet accord).
 //   ad_personalization reste TOUJOURS refusé (annonces non personnalisées,
-//   public d'enfants) ; analytics_storage aussi (aucune mesure d'audience).
-// - « Refuser » : tout reste refusé et les cookies AdSense du site sont effacés.
+//   public d'enfants).
+// - « Refuser » : tout reste refusé et les cookies AdSense du site sont effacés
+//   (mesure.js efface ceux de Google Analytics).
 // - Choix gardé 6 mois dans localStorage (« fmg-consentement »), puis redemandé.
 //   Sans stockage (navigation privée stricte…) : choix gardé le temps de la page.
 // - Bandeau : #consentement (gabarits/morceaux/consentement.html), rouvert par
@@ -70,7 +74,7 @@
 
   function appliquer(choix) {
     window.gtag('consent', 'update', choix === 'accepte'
-      ? { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied', analytics_storage: 'denied' }
+      ? { ad_storage: 'granted', ad_user_data: 'granted', ad_personalization: 'denied', analytics_storage: 'granted' }
       : TOUT_REFUSE);
   }
 
