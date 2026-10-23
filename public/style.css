@@ -521,9 +521,10 @@ body::after {
    badge « Nouveau ») ; ni rang ni chiffre dans les Tendances. Sans Tendances, les
    Nouveautés prennent toute la ligne. Classe avec-tendances sur <html> : deux
    moitiés (posée par le script de tête de l'accueil, puis tenue à jour par
-   app.js). Jusqu'à 1 199 px, chaque moitié est une bande qui défile (barre
-   fine avec une souris), fondue sur son bord droit pour montrer qu'elle
-   continue ; dès 1 200 px, les 8 jaquettes tiennent sur une ligne (4 + 4).
+   app.js). Chaque moitié est une bande de 16 jeux qui défile (au doigt, à la
+   souris en l'attrapant, barre fine), fondue sur son bord droit tant qu'il
+   reste des jeux à voir (classe suite, app.js) ; dès 1 200 px, 4 jaquettes
+   visibles par moitié (8 sans Tendances).
    -------------------------------------------------------------------------- */
 
 .vitrine {
@@ -585,9 +586,11 @@ html.avec-tendances .nouveautes .groupe-tete { padding-right: 12px; }
 /* Accueil : places gardées avant que app.js ne remplisse la page, pour qu'elle
    ne bouge pas pendant le chargement (première ligne, Tendances vues à la
    visite précédente, tuiles, rangées de puces). Une bande vide reçoit une
-   jaquette fantôme (::before) aussi large que ses vraies jaquettes ; elle a
-   donc la hauteur de la bande pleine, barre de défilement comprise (barres
-   classiques des ordinateurs, qui s'ajoutent sous le rembourrage). */
+   jaquette fantôme (::before, une colonne en 3:4 : la hauteur de la bande) et
+   une ligne fantôme de 12 colonnes (::after) qui la fait déborder comme les
+   vraies : elle a donc la hauteur de la bande pleine, barre de défilement
+   comprise (barres classiques des ordinateurs, qui s'ajoutent sous le
+   rembourrage). */
 html.avec-vitrine #vitrine[hidden] {
   display: grid !important;
   visibility: hidden;
@@ -601,13 +604,13 @@ html.avec-tendances #tendances[hidden] {
 html.avec-vitrine #vitrine[hidden] .vitrine-liste::before,
 html.avec-tendances #tendances[hidden] .vitrine-liste::before {
   content: "";
-  grid-column: span 8;                     /* = VITRINE_NOMBRE (app.js) */
-  height: calc(var(--l-vitrine) * 4 / 3);  /* jaquette 3:4 */
+  aspect-ratio: 3 / 4;
 }
 
-html.avec-tendances #vitrine[hidden] .vitrine-liste::before,
-html.avec-tendances #tendances[hidden] .vitrine-liste::before {
-  grid-column: span 4;                     /* = NOUVEAUTES_NOMBRE = TENDANCES_NOMBRE */
+html.avec-vitrine #vitrine[hidden] .vitrine-liste::after,
+html.avec-tendances #tendances[hidden] .vitrine-liste::after {
+  content: "";
+  grid-column: span 12;
 }
 
 .tuiles:empty { min-height: 63px; }
@@ -630,8 +633,19 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::before {
   scroll-padding-inline: var(--gauche) 40px;
   scroll-snap-type: x proximity;
   scrollbar-width: none;
+}
+
+/* Il reste des jeux à droite : fondu sur le bord droit. */
+.vitrine-liste.suite {
   -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
   mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+
+/* Bande attrapée à la souris : elle suit le pointeur, sans aimantation. */
+.vitrine-liste.glisse {
+  cursor: grabbing;
+  scroll-snap-type: none;
+  user-select: none;
 }
 
 /* Carte choisie au clavier : plus de fondu, son contour reste entier. */
@@ -667,34 +681,19 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::before {
   .carte-vitrine .carte-titre { font-size: 14px; }
 }
 
-/* Une ligne de 8 colonnes (= VITRINE_NOMBRE dans app.js), ou 4 + 4 avec les
-   Tendances, sans défilement ni fondu. La jaquette fantôme de la place
-   réservée n'occupe qu'une colonne : sa hauteur suit la vraie largeur des
-   colonnes (la barre verticale de la page peut la réduire de quelques
-   pixels). */
+/* Dès 1 200 px : 4 jaquettes visibles par moitié (8 sans Tendances), de la
+   largeur qui remplit exactement la bande (135,5 px dans la section de
+   1 200 px) ; les autres arrivent en faisant défiler. */
 @media (min-width: 1200px) {
   .vitrine { --bas-vitrine: 8px; }
   .vitrine-moitie { --droite: 16px; }
   /* 6 + 6 px entre les moitiés : 12 px comme entre deux jaquettes, qui gardent
-     leur largeur (135,5 px) en 8 comme en 4 + 4 ; le titre garde ses 12 px. */
+     leur largeur en 8 comme en 4 + 4 ; le titre garde ses 12 px. */
   html.avec-tendances .nouveautes { --droite: 6px; }
   html.avec-tendances .tendances { --gauche: 6px; }
   html.avec-tendances .tendances .groupe-tete { padding-left: 12px; }
-  .vitrine-liste {
-    grid-auto-flow: row;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    overflow: visible;
-    -webkit-mask-image: none;
-    mask-image: none;
-  }
-  html.avec-tendances .vitrine-liste { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  html.avec-vitrine #vitrine[hidden] .vitrine-liste::before,
-  html.avec-tendances #vitrine[hidden] .vitrine-liste::before,
-  html.avec-tendances #tendances[hidden] .vitrine-liste::before {
-    grid-column: auto;
-    height: auto;
-    aspect-ratio: 3 / 4;
-  }
+  .vitrine-liste { grid-auto-columns: calc((100% - 7 * 12px) / 8); }
+  html.avec-tendances .vitrine-liste { grid-auto-columns: calc((100% - 3 * 12px) / 4); }
 }
 
 /* --------------------------------------------------------------------------

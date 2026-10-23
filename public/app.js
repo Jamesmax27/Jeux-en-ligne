@@ -18,13 +18,17 @@
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
 // - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
 // - Première ligne (« vitrine »), sans tenir compte des filtres, en deux moitiés :
-//   - à gauche, les Nouveautés : les derniers jeux ajoutés (aussi hors connexion) ;
+//   - à gauche, les Nouveautés : les NOUVEAUTES_NOMBRE derniers jeux ajoutés
+//     (aussi hors connexion) ;
 //   - à droite, les Tendances : TENDANCES_NOMBRE jeux parmi les plus joués des
 //     7 derniers jours (/api/tendances, qui ne donne que leurs identifiants : ni
-//     rang, ni chiffre), dans un ordre qui change chaque jour, sans les jeux déjà
-//     dans les Nouveautés ni plus de TENDANCES_PAR_GENRE jeux du même genre.
-//   Ni l'une ni l'autre ne montre de jeu des Archives. Sans API ou sous
-//   TENDANCES_MIN jeux, pas de moitié Tendances : les Nouveautés prennent la ligne.
+//     rang, ni chiffre), dans un ordre qui change chaque jour, sans les
+//     NOUVEAUTES_EXCLUES premières Nouveautés ni plus de TENDANCES_PAR_GENRE jeux
+//     du même genre.
+//   Chaque moitié défile : au doigt, à la souris (on attrape la bande), au
+//   clavier, avec la barre fine. Ni l'une ni l'autre ne montre de jeu des
+//   Archives. Sans API ou sous TENDANCES_MIN jeux, pas de moitié Tendances :
+//   les Nouveautés prennent la ligne.
 // - Textes en 5 langues (langue.js, i18n/site/*.json). Le titre traduit du jeu
 //   est affiché en bandeau sur sa jaquette (les jaquettes n'ont aucun texte).
 //   Il y a un accueil par langue (/, /en/…, généré par scripts/pages-seo.mjs) :
@@ -50,11 +54,11 @@ const ARCHIVE_VOTES_MIN = 30;     // archives : plus de 30 votes…
 const ARCHIVE_SCORE_MAX = 0.2;    // … et un score inférieur à 0,2 (votes du monde entier)
 const PAYS_VOTES_MIN = 20;        // sous 20 votes dans mon pays, classement Monde
 const DELAI_SCORES = 4000;        // au-delà, on affiche sans attendre l'API
-const VITRINE_NOMBRE = 8;         // jaquettes de la première ligne (8 colonnes dès 1 200 px, style.css)
-const NOUVEAUTES_NOMBRE = 4;      // … dont Nouveautés quand les Tendances sont là (sinon VITRINE_NOMBRE)
-const TENDANCES_NOMBRE = 4;       // jeux montrés dans « Tendances » (moitié droite)
+const NOUVEAUTES_NOMBRE = 16;     // jeux de la moitié « Nouveautés » (elle défile ; 4 visibles dès 1 200 px)
+const NOUVEAUTES_EXCLUES = 4;     // les 4 premières Nouveautés ne sont pas répétées dans les Tendances
+const TENDANCES_NOMBRE = 16;      // jeux de la moitié « Tendances » (/api/tendances en donne 24)
 const TENDANCES_MIN = 2;          // en dessous, pas de moitié « Tendances »
-const TENDANCES_PAR_GENRE = 2;    // au plus 2 jeux du même genre principal dans « Tendances »
+const TENDANCES_PAR_GENRE = 4;    // au plus 4 jeux du même genre principal dans « Tendances »
 // Nouveautés : à date égale (la boucle de nuit ajoute plusieurs jeux le même jour),
 // ordre tiré à chaque visite, pour que chacun passe à son tour dans la première ligne.
 const GRAINE_VITRINE = Math.random().toString(36).slice(2);
@@ -422,10 +426,10 @@ function afficherVitrine() {
   const nouveautes = etat.jeux
     .filter((jeu) => !estArchive(jeu))
     .sort((a, b) => String(b.added).localeCompare(String(a.added)) || ordre(a) - ordre(b) || a.id.localeCompare(b.id));
-  const tendances = choisirTendances(new Set(nouveautes.slice(0, NOUVEAUTES_NOMBRE).map((jeu) => jeu.id)));
+  const tendances = choisirTendances(new Set(nouveautes.slice(0, NOUVEAUTES_EXCLUES).map((jeu) => jeu.id)));
   const avecTendances = tendances.length >= TENDANCES_MIN;
   const double = avecTendances || (etat.tendances === undefined && racine.classList.contains('avec-tendances'));
-  const montrees = nouveautes.slice(0, double ? NOUVEAUTES_NOMBRE : VITRINE_NOMBRE);
+  const montrees = nouveautes.slice(0, NOUVEAUTES_NOMBRE);
 
   el.nouveautesListe.replaceChildren(...montrees.map((jeu) => creerCarteVitrine(jeu, 'nouveautes.carteAria')));
   el.tendancesListe.replaceChildren(...(avecTendances ? tendances.map((jeu) => creerCarteVitrine(jeu, 'tendances.carteAria')) : []));
@@ -438,6 +442,50 @@ function afficherVitrine() {
   if (etat.tendances) {
     try { localStorage.setItem('tendances', avecTendances ? '1' : '0'); } catch { /* stockage refusé */ }
   }
+  // La grille change de colonnes avec la classe : on attend la mise en page.
+  requestAnimationFrame(() => [el.nouveautesListe, el.tendancesListe].forEach(majSuite));
+}
+
+// Fondu sur le bord droit d'une moitié seulement s'il reste des jeux à voir (classe suite).
+function majSuite(liste) {
+  liste.classList.toggle('suite', liste.scrollLeft + liste.clientWidth < liste.scrollWidth - 2);
+}
+
+// À la souris, on attrape la bande et on la fait glisser, comme au doigt. Après un
+// glissement, le clic qui suit n'ouvre pas le jeu sous le pointeur.
+function glisserALaSouris(liste) {
+  let depart = null;
+  let bloquerClic = false;
+  liste.addEventListener('dragstart', (evenement) => evenement.preventDefault()); // images et liens
+  liste.addEventListener('pointerdown', (evenement) => {
+    if (evenement.pointerType !== 'mouse' || evenement.button !== 0) return;
+    depart = { x: evenement.clientX, gauche: liste.scrollLeft, id: evenement.pointerId, bouge: false };
+  });
+  liste.addEventListener('pointermove', (evenement) => {
+    if (!depart || evenement.pointerId !== depart.id) return;
+    const ecart = evenement.clientX - depart.x;
+    if (!depart.bouge) {
+      if (Math.abs(ecart) < 6) return;
+      depart.bouge = true;
+      liste.classList.add('glisse');
+      try { liste.setPointerCapture(evenement.pointerId); } catch { /* pointeur déjà relâché */ }
+    }
+    liste.scrollLeft = depart.gauche - ecart;
+  });
+  const finir = () => {
+    if (!depart) return;
+    bloquerClic = depart.bouge;
+    depart = null;
+    liste.classList.remove('glisse');
+    setTimeout(() => { bloquerClic = false; }, 0);
+  };
+  liste.addEventListener('pointerup', finir);
+  liste.addEventListener('pointercancel', finir);
+  liste.addEventListener('click', (evenement) => {
+    if (!bloquerClic) return;
+    evenement.preventDefault();
+    evenement.stopPropagation();
+  }, true);
 }
 
 // Menu de tri : sans API, seules les « Nouveautés » restent possibles.
@@ -931,7 +979,10 @@ for (const liste of [el.nouveautesListe, el.tendancesListe].filter(Boolean)) {
     try { if (!evenement.target.matches(':focus-visible')) return; } catch { return; }
     evenement.target.closest('li')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   });
+  liste.addEventListener('scroll', () => majSuite(liste), { passive: true });
+  glisserALaSouris(liste);
 }
+addEventListener('resize', () => [el.nouveautesListe, el.tendancesListe].filter(Boolean).forEach(majSuite));
 
 activerHorsLigne();
 demarrer();

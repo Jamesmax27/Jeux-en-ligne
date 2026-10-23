@@ -37,9 +37,9 @@
 
 import { json, lireFormatSessions, valeurDebut } from '../_commun.js';
 
-const VERSION_CALCUL = 3;       // à augmenter si le calcul change (nouvelle clé de cache)
+const VERSION_CALCUL = 4;       // à augmenter si le calcul change (nouvelle clé de cache)
 const JOURS = 7;
-const NOMBRE_MAX = 12;          // l'accueil en montre 8 (sans Archives, 2 par genre au plus)
+const NOMBRE_MAX = 24;          // l'accueil en montre 16 (sans Archives, sans ses 4 premières Nouveautés, 4 par genre au plus)
 const PARTIE_MAX = 1800;        // secondes comptées au plus par partie (30 min)
 const JOUR_MAX = 3600;          // secondes comptées au plus par joueur, par jeu et par jour
 const JOUEUR_MIN_S = 60;        // un joueur compte pour un jour s'il a joué au moins 60 s
