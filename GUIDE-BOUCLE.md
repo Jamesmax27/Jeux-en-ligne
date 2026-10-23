@@ -157,6 +157,10 @@ Bon à savoir :
 
 La page `/idees` (protégée par Cloudflare Access, absente du catalogue et des moteurs de recherche) envoie aussi une idée : titre, genre, **âge** (obligatoire : 4+, 5+, 6+, 7+, 8+, 10+ ou 12+), **univers** (facultatif, 2 au plus ; « Autre » seul) et description. Elle crée une demande GitHub avec l'étiquette `idee-perso`. Au passage suivant, la boucle l'ajoute à `idees.json` (avec son âge et ses univers) et la fabrique **avant toutes les autres** ; la demande se ferme avec le lien de la pull request du jeu. Une valeur illisible (âge, univers hors liste) est écartée avec un message, l'idée est gardée.
 
+## Faire modifier un jeu déjà publié
+
+Onglet **« Modifier un jeu »** de la page privée `/idees` : choisissez le jeu, décrivez la demande, envoyez. L'IA la classe, modifie le jeu, le vérifie comme la boucle de nuit et le met en ligne si tout est bon. Mode d'emploi : `DEMANDES.md`.
+
 ## Faire corriger un jeu proposé
 
 Quand une pull request de jeu est ouverte (fusion automatique coupée, vérification interrompue, ou jeu proposé par quelqu'un d'autre), vous pouvez demander une correction en commentaire, même depuis le téléphone.
