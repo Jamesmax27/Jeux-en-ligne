@@ -13,6 +13,8 @@
 //   - pages légales     /mentions-legales/, /en/legal-notice/… (gabarits/legal.html),
 //                       en français et en anglais (textes : gabarits/legal/ et
 //                       gabarits/textes/legal.json)
+//   - formulaire public /proposer/, /en/suggest/…         (gabarits/proposer.html),
+//                       non indexé (textes : clés « proposer.* »)
 //   - sitemap.xml (pages indexables seulement, avec lastmod) et robots.txt
 // Adresses : public/chemins.js. Textes des jeux : game.json (règles :
 // scripts/regles-seo.mjs). Textes des catégories : gabarits/textes/categories.<langue>.json.
@@ -31,7 +33,8 @@ import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { GENRES, UNIVERS, TRANCHES_AGE, IDS_GENRES, IDS_UNIVERS, trancheDeAge } from '../public/taxonomie.js';
-import { LANGUES, HREFLANG, LOCALE_OG, LANGUES_LEGALES, PAGES_LEGALES, urlAccueil, urlJeu, urlCategorie, urlLanceur, urlLegale, langueLegale } from '../public/chemins.js';
+import { LANGUES, HREFLANG, LOCALE_OG, LANGUES_LEGALES, PAGES_LEGALES, urlAccueil, urlJeu, urlCategorie, urlLanceur, urlLegale, urlProposer, langueLegale } from '../public/chemins.js';
+import { TITRE_MIN, TITRE_MAX, DESCRIPTION_MIN, DESCRIPTION_MAX } from '../public/demandes-regles.js';
 import { problemesChamps, textesLangue, languesDuJeu, ageMinimum } from './regles-seo.mjs';
 
 export const ADRESSE_PAR_DEFAUT = 'https://freemicrogames.com/';
@@ -47,7 +50,7 @@ export const MAX_FICHIERS = 19500;
 
 // Dossiers et fichiers de public/ écrits par ce module (effacés au début de chaque build).
 export const SORTIES = ['index.html', '404.html', 'jeux', 'genres', 'univers', 'ages', 'en', 'es', 'pt', 'de', 'sitemap.xml', 'robots.txt',
-  'mentions-legales', 'confidentialite', 'conditions-utilisation', 'cookies'];
+  'mentions-legales', 'confidentialite', 'conditions-utilisation', 'cookies', 'proposer'];
 
 // Images de partage : la jaquette du jeu si elle est en image matricielle, sinon l'icône du site.
 const IMAGE_SITE = 'assets/icone-512.png';
@@ -355,7 +358,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
 
   // Gabarits et morceaux.
   const gabarits = {};
-  for (const nom of ['accueil', 'jeu', 'categorie', 'introuvable', 'legal']) gabarits[nom] = await readFile(path.join(dossierGabarits, `${nom}.html`), 'utf8');
+  for (const nom of ['accueil', 'jeu', 'categorie', 'introuvable', 'legal', 'proposer']) gabarits[nom] = await readFile(path.join(dossierGabarits, `${nom}.html`), 'utf8');
   const morceauxBruts = {};
   for (const fichier of await readdir(path.join(dossierGabarits, 'morceaux'))) {
     if (fichier.endsWith('.html')) morceauxBruts[fichier.slice(0, -5)] = await readFile(path.join(dossierGabarits, 'morceaux', fichier), 'utf8');
@@ -401,7 +404,8 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
 
   // Morceaux d'une langue. Le pied de page et le bandeau des cookies mènent aux
   // pages légales de la langue (français, sinon anglais) : {{lien:<page>}},
-  // {{langue_legale}} et {{note_langues_legales}} sont remplis ici, une fois.
+  // {{langue_legale}} et {{note_langues_legales}} sont remplis ici, une fois ;
+  // {{lien_proposer}} : formulaire public de demandes dans la langue de la page.
   const outils = (lang) => {
     const t = creerT(dicos, lang);
     const ll = langueLegale(lang);
@@ -409,6 +413,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
     const morceaux = {};
     for (const [nom, brut] of Object.entries(morceauxBruts)) {
       morceaux[nom] = brut
+        .replace(/\{\{lien_proposer\}\}/g, echapper(urlProposer(lang)))
         .replace(/\{\{lien:([\w-]+)\}\}/g, (_, page) => echapper(urlLegale(page, lang)))
         .replace(/\{\{langue_legale\}\}/g, HREFLANG[ll])
         .replace(/\{\{note_langues_legales\}\}/g, note);
@@ -497,6 +502,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         jaquette_alt: alt,
         jouer: urlLanceur(jeu.id, lang),
         jouer_aria: t('page.jouerAria', { titre }),
+        signaler: urlProposer(lang, jeu.id),
         puces: puces.join(''),
         presentation: paragraphes(tx.presentation || tx.description || jeu.description),
         regles: tx.regles ? `<h2>${echapper(t('page.commentJouer'))}</h2>\n      ${paragraphes(tx.regles)}` : '',
@@ -660,6 +666,35 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
     }
   }
 
+  // --- Formulaire public de demandes (5 langues, non indexé) -------------------
+  // Proposer un jeu, signaler un bug, demander une modification : public/proposer.js
+  // l'anime et envoie à /api/demandes. Les messages du script (clés « proposer.* »)
+  // sont écrits dans la page, dans sa langue.
+  const alternativesProposer = Object.fromEntries(LANGUES.map((l) => [l, absolue(urlProposer(l))]));
+  for (const lang of LANGUES) {
+    const { t, morceaux } = outils(lang);
+    const chemin = urlProposer(lang);
+    const limites = { min: TITRE_MIN, max: TITRE_MAX };
+    const limitesDescription = { min: DESCRIPTION_MIN, max: DESCRIPTION_MAX };
+    const textes = Object.fromEntries(Object.keys(dicos.fr).filter((cle) => cle.startsWith('proposer.')).map((cle) => [cle, t(cle)]));
+    const fil = ariane([{ nom: t('page.accueil'), chemin: urlAccueil(lang) }, { nom: t('proposer.h1'), chemin }], t);
+    const valeurs = {
+      lang: HREFLANG[lang],
+      code_langue: lang,
+      tete: tete({ lang, titre: t('proposer.titreDocument'), description: t('proposer.meta'), canonique: absolue(chemin), indexable: false, alternatives: alternativesProposer, image: absolue(`/${IMAGE_SITE}`), imageAlt: NOM_DU_SITE }),
+      accueil: urlAccueil(lang),
+      langues: liensLangues(lang, alternativesProposer, t),
+      ariane: fil.html,
+      aide_titre: t('proposer.titreAide', limites),
+      aide_description: t('proposer.descriptionAide', limitesDescription),
+      titre_min: TITRE_MIN,
+      titre_max: TITRE_MAX,
+      description_max: DESCRIPTION_MAX,
+      textes: JSON.stringify(textes).replace(/</g, '\\u003c'),
+    };
+    await ecrire(dossierPublic, chemin, remplir(gabarits.proposer, valeurs, t, morceaux, 'gabarits/proposer.html'));
+  }
+
   // --- Sitemap et robots.txt --------------------------------------------------
   const indexables = pages.filter((p) => p.indexable);
   const lignes = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'];
@@ -671,6 +706,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
   // l'accueil a besoin pour s'afficher normalement quand Google le rend.
   await writeFile(path.join(dossierPublic, 'robots.txt'),
     `User-agent: *\nAllow: /\nAllow: /api/scores\nAllow: /api/tendances\nDisallow: /api/\nDisallow: /idees/\n\nSitemap: ${adresseDuSite()}sitemap.xml\n`, 'utf8');
+  // Le formulaire /proposer/ n'est pas fermé aux robots : son « noindex » doit pouvoir être lu.
 
   // --- Nombre de fichiers publiés (limite Cloudflare Pages) -------------------
   const fichiers = await compterFichiers(dossierPublic);

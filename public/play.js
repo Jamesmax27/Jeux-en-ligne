@@ -13,12 +13,13 @@
 // envoyés à /api/session pour les « Tendances » de l'accueil.
 // Et la mesure d'audience (mesure.js, Google Analytics, avec accord seulement) :
 // évènements « game_start » (lancement du jeu) et « vote ».
+// Et le bouton « Signaler » : formulaire public de demandes (/proposer/), avec ce jeu choisi.
 // ==========================================================================
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
 import { SCRIPT_ERREURS, suivreJeu, noterErreur } from './suivi.js';
-import { urlJeu, urlAccueil } from './chemins.js';
+import { urlJeu, urlAccueil, urlProposer } from './chemins.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
   titreJeu, presentationJeu, jeuEnFrancais, jeuDisponible,
@@ -36,6 +37,7 @@ const el = {
   cadre: document.getElementById('cadre-jeu'),
   scene: document.getElementById('scene'),
   pleinEcran: document.getElementById('plein-ecran'),
+  signaler: document.getElementById('signaler'),
   votePlus: document.getElementById('vote-plus'),
   voteMoins: document.getElementById('vote-moins'),
   infoVote: document.getElementById('info-vote'),
@@ -70,6 +72,11 @@ function afficherTextes() {
     ? urlJeu(jeuCourant.id, jeuDisponible(jeuCourant) ? getLang() : 'fr')
     : urlAccueil(getLang());
   if (el.voirTous) el.voirTous.href = urlAccueil(getLang());
+  // Formulaire public de demandes, avec ce jeu déjà choisi.
+  if (el.signaler) {
+    el.signaler.hidden = !jeuCourant;
+    el.signaler.href = urlProposer(getLang(), jeuCourant?.id);
+  }
   if (jeuCourant) {
     const titre = titreJeu(jeuCourant);
     el.titre.textContent = titre;

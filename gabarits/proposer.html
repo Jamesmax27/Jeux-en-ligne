@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <!-- FICHIER GÉNÉRÉ par scripts/pages-seo.mjs (gabarit du formulaire public de
+       demandes : gabarits/proposer.html ; textes : clés « proposer.* » de
+       public/i18n/site/<langue>.json). Ne pas modifier ici : il est recréé à chaque build. -->
+  {{{tete}}}
+</head>
+<body class="page-proposer">
+  {{> entete}}
+
+  <main class="legal proposer">
+    {{{ariane}}}
+    <h1>{{t:proposer.h1}}</h1>
+    <p class="legal-intro">{{t:proposer.intro}}</p>
+    <p class="proposer-prudence">{{t:proposer.prudence}}</p>
+
+    <!-- Formulaire animé par /proposer.js, envoyé à /api/demandes (functions/api/demandes.js).
+         Limites de longueur : public/demandes-regles.js. -->
+    <form class="proposer-carte" id="formulaire-proposer" data-lang="{{code_langue}}" novalidate>
+      <fieldset class="choix" id="proposer-types">
+        <legend>{{t:proposer.type}}</legend>
+        <div class="choix-liste">
+          <label class="choix-case"><input type="radio" name="type" value="nouveau"><span>{{t:proposer.type.nouveau}}</span></label>
+          <label class="choix-case"><input type="radio" name="type" value="bug"><span>{{t:proposer.type.bug}}</span></label>
+          <label class="choix-case"><input type="radio" name="type" value="modification"><span>{{t:proposer.type.modification}}</span></label>
+        </div>
+      </fieldset>
+
+      <div class="champ" id="proposer-champ-jeu" hidden>
+        <label for="proposer-jeu">{{t:proposer.jeu}}</label>
+        <select id="proposer-jeu" name="jeu">
+          <option value="">{{t:proposer.jeuChargement}}</option>
+        </select>
+      </div>
+
+      <div class="champ">
+        <label for="proposer-titre">{{t:proposer.titre}} <small>{{aide_titre}}</small></label>
+        <input id="proposer-titre" name="titre" type="text" minlength="{{titre_min}}" maxlength="{{titre_max}}" autocomplete="off" enterkeyhint="next">
+      </div>
+
+      <div class="champ">
+        <label for="proposer-description">{{t:proposer.descriptionChamp}} <small>{{aide_description}}</small></label>
+        <textarea id="proposer-description" name="description" maxlength="{{description_max}}" placeholder="{{t:proposer.exemple}}"></textarea>
+        <div class="compteur" id="proposer-compteur" aria-live="polite">0 / {{description_max}}</div>
+      </div>
+
+      <!-- Champ piège : caché aux humains, rempli par les robots (functions/api/demandes.js). -->
+      <div class="proposer-piege" aria-hidden="true">
+        <label for="proposer-site">{{t:proposer.piege}}</label>
+        <input id="proposer-site" name="site" type="text" tabindex="-1" autocomplete="off">
+      </div>
+
+      <button class="bouton proposer-envoyer" id="proposer-envoyer" type="submit">{{t:proposer.envoyer}}</button>
+      <p class="message" id="proposer-message" role="status" aria-live="polite"></p>
+      <noscript><p class="message erreur">{{t:proposer.sansJavascript}}</p></noscript>
+    </form>
+
+    <p class="legal-retour"><a class="bouton" href="{{accueil}}">{{t:jeu.voirTous}}</a></p>
+  </main>
+
+  {{> pied}}
+
+  <script type="application/json" id="proposer-textes">{{{textes}}}</script>
+  <script type="module" src="/proposer.js"></script>
+</body>
+</html>

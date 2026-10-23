@@ -16,7 +16,8 @@
 //   - /api/scores et /api/tendances ne sont pas gardés : sans réseau, le
 //     catalogue trie par nouveautés, sans compteurs de votes ni Tendances ;
 //   - pages générées (accueils /en/…, fiches des jeux /jeux/<id>/…, catégories,
-//     pages légales /mentions-legales/, /en/privacy-policy/…) :
+//     pages légales /mentions-legales/, /en/privacy-policy/…, formulaire
+//     /proposer/, /en/suggest/…) :
 //     réseau d'abord, avec une copie des pages visitées (PAGES_GARDEES au plus).
 //     Hors connexion, une fiche jamais visitée mène au lanceur du jeu (le jeu
 //     s'ouvre s'il a déjà été joué), une autre page à l'accueil.
@@ -26,7 +27,7 @@
 // touchés : ils ont leur propre cache, indépendant de VERSION.
 // ==========================================================================
 
-const VERSION = 'v11';
+const VERSION = 'v12';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
 const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
@@ -39,8 +40,8 @@ const DELAI_RESEAU = 3000;                  // ms : au-delà, la copie gardée e
 // Fichiers de la coquille, relatifs au dossier du site.
 // Les textes des 5 langues sont petits : tous gardés, pour changer de langue hors connexion.
 const COQUILLE = [
-  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'suivi.js', 'hors-ligne.js', 'taxonomie.js', 'chemins.js', 'pub.js',
-  'consentement.js', 'mesure.js', 'langue.js', 'i18n/i18n.js',
+  './', 'play.html', 'style.css', 'app.js', 'play.js', 'votes.js', 'turnstile.js', 'suivi.js', 'hors-ligne.js', 'taxonomie.js', 'chemins.js', 'pub.js',
+  'consentement.js', 'mesure.js', 'langue.js', 'i18n/i18n.js', 'proposer.js', 'demandes-regles.js',
   'i18n/site/fr.json', 'i18n/site/en.json', 'i18n/site/es.json', 'i18n/site/pt.json', 'i18n/site/de.json',
   'manifest.webmanifest', 'assets/logo.svg', 'assets/sans-jaquette.svg',
 ];
@@ -62,6 +63,8 @@ const RE_FICHE = /^(?:(en|es|pt|de)\/)?(?:jeux|games|juegos|jogos|spiele)\/([a-z
 const RE_CATEGORIE = /^(?:(?:en|es|pt|de)\/)?(?:genres|generos|spielarten|univers|worlds|mundos|welten|ages|edades|idades|alter)\/[^/]+\/$/;
 // Pages légales (français et anglais) : mêmes règles que les autres pages générées.
 const RE_LEGALE = /^(?:mentions-legales|confidentialite|conditions-utilisation|cookies|en\/(?:legal-notice|privacy-policy|terms-of-use|cookie-policy))\/$/;
+// Formulaire public de demandes (l'envoi demande une connexion ; la page reste lisible).
+const RE_PROPOSER = /^(?:proposer|en\/suggest|es\/proponer|pt\/sugerir|de\/vorschlagen)\/$/;
 
 // --- Installation et mise à jour ---------------------------------------------
 
@@ -119,7 +122,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(jaquette(event));
   } else if (chemin === 'catalog.json') {
     event.respondWith(reseauDabord(event, CACHE_DONNEES, URL_CATALOGUE));
-  } else if (RE_ACCUEIL_LANGUE.test(chemin) || RE_FICHE.test(chemin) || RE_CATEGORIE.test(chemin) || RE_LEGALE.test(chemin)) {
+  } else if (RE_ACCUEIL_LANGUE.test(chemin) || RE_FICHE.test(chemin) || RE_CATEGORIE.test(chemin) || RE_LEGALE.test(chemin) || RE_PROPOSER.test(chemin)) {
     event.respondWith(pageGeneree(event, chemin));
   } else {
     const cle = cleCoquille(chemin);

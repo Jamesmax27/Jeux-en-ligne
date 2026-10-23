@@ -39,3 +39,29 @@ CREATE INDEX IF NOT EXISTS votes_pays ON votes (country, game_id);
 --     CREATE INDEX IF NOT EXISTS sessions_debut
 --       ON sessions (debut, jeu_id, visiteur, duree_secondes, pays);
 -- --------------------------------------------------------------------------
+
+-- --------------------------------------------------------------------------
+-- Formulaire public de demandes (/proposer/) : limite de débit, abus et
+-- blocages. Rien à faire à la main : ces tables sont créées automatiquement
+-- par les fonctions (preparerTables, functions/_demandes.js) si elles
+-- manquent. Toutes les colonnes « visiteur » sont l'empreinte de l'adresse IP
+-- (comme votes.visiteur, réseau /64 en IPv6), jamais l'adresse elle-même.
+-- --------------------------------------------------------------------------
+
+-- Une ligne par demande transmise à GitHub (3 par heure, 10 par jour) ; effacée après 2 jours.
+CREATE TABLE IF NOT EXISTS demandes_envois (visiteur TEXT NOT NULL, date INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS demandes_envois_visiteur ON demandes_envois (visiteur, date);
+
+-- Issue GitHub ↔ empreinte de son auteur (abus signalé par la modération IA,
+-- « Refuser et bannir ») ; effacée après 13 mois.
+CREATE TABLE IF NOT EXISTS demandes_issues (issue INTEGER PRIMARY KEY, visiteur TEXT NOT NULL, date INTEGER NOT NULL);
+
+-- Un abus par ligne (pot-de-miel, anti-robot, insulte, spam), avec l'issue en cause s'il y en a une ; effacé après 90 jours.
+CREATE TABLE IF NOT EXISTS demandes_abus (visiteur TEXT NOT NULL, date INTEGER NOT NULL, motif TEXT NOT NULL, issue INTEGER);
+CREATE INDEX IF NOT EXISTS demandes_abus_visiteur ON demandes_abus (visiteur, date);
+
+-- État d'une empreinte : « bloque » (jusqu'à jusqu_a), « banni », « libre » (débloquée ou blocage passé).
+CREATE TABLE IF NOT EXISTS demandes_blocages (
+  visiteur TEXT PRIMARY KEY, statut TEXT NOT NULL, debut INTEGER, jusqu_a INTEGER, motif TEXT,
+  abus INTEGER NOT NULL DEFAULT 0, blocages INTEGER NOT NULL DEFAULT 0, maj INTEGER NOT NULL
+);
