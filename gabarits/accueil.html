@@ -24,8 +24,10 @@
         try { voulue = code(localStorage.getItem('lang')); } catch (e) { /* stockage refusé */ }
       }
       if (voulue && voulue !== window.JEL_LANG && Object.prototype.hasOwnProperty.call(accueils, voulue)) location.replace(accueils[voulue]);
-      // Tendances affichées à la visite précédente : leur place est gardée dès le
-      // premier affichage, pour que la page ne bouge pas à leur arrivée (app.js).
+      // Première ligne (Nouveautés, et Tendances si elles étaient là à la visite
+      // précédente) : sa place est gardée dès le premier affichage, pour que la
+      // page ne bouge pas à son arrivée (app.js).
+      document.documentElement.classList.add('avec-vitrine');
       try { if (navigator.onLine !== false && localStorage.getItem('tendances') === '1') document.documentElement.classList.add('avec-tendances'); } catch (e) { /* stockage refusé */ }
     })();
   </script>
@@ -49,15 +51,26 @@
     </label>
   </header>
 
-  <!-- Tendances : 8 jeux parmi les plus joués des 7 derniers jours (app.js, /api/tendances),
-       sans rang ni chiffre, dans un ordre qui change chaque jour.
-       Cachée hors connexion, ou tant qu'il y a moins de 4 jeux à montrer. -->
-  <section class="tendances" id="tendances" aria-labelledby="titre-tendances" hidden>
-    <div class="groupe-tete">
-      <h2 id="titre-tendances"><span aria-hidden="true">🔥</span> <span data-i18n="tendances.titre">{{t:tendances.titre}}</span> <small data-i18n="tendances.aide">{{t:tendances.aide}}</small></h2>
-    </div>
-    <ul class="tendances-liste" id="tendances-liste"></ul>
-  </section>
+  <!-- Première ligne (« vitrine », remplie par app.js), en deux moitiés de même
+       hauteur : à gauche les Nouveautés (derniers jeux ajoutés, aussi hors
+       connexion), à droite les Tendances (parmi les plus joués des 7 derniers
+       jours, /api/tendances, sans rang ni chiffre, ordre qui change chaque jour).
+       Sans Tendances (hors connexion, trop peu de jeux), les Nouveautés prennent
+       toute la ligne. -->
+  <div class="vitrine" id="vitrine" hidden>
+    <section class="vitrine-moitie nouveautes" id="nouveautes" aria-labelledby="titre-nouveautes">
+      <div class="groupe-tete">
+        <h2 id="titre-nouveautes"><span aria-hidden="true">✦</span> <span data-i18n="nouveautes.titre">{{t:nouveautes.titre}}</span> <small data-i18n="nouveautes.aide">{{t:nouveautes.aide}}</small></h2>
+      </div>
+      <ul class="vitrine-liste" id="nouveautes-liste"></ul>
+    </section>
+    <section class="vitrine-moitie tendances" id="tendances" aria-labelledby="titre-tendances" hidden>
+      <div class="groupe-tete">
+        <h2 id="titre-tendances"><span aria-hidden="true">🔥</span> <span data-i18n="tendances.titre">{{t:tendances.titre}}</span> <small data-i18n="tendances.aide">{{t:tendances.aide}}</small></h2>
+      </div>
+      <ul class="vitrine-liste" id="tendances-liste"></ul>
+    </section>
+  </div>
 
   <!-- Regroupements : tuiles (raccourcis, âge) et puces (genres, univers) remplies par app.js.
        Listes et ordre : taxonomie.js. Genres et univers ont chacun 2 rangées qui défilent si besoin. -->

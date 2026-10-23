@@ -17,11 +17,14 @@
 //   est grisé (« Bientôt »).
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
 // - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
-// - Tendances, en haut : TENDANCES_NOMBRE jeux parmi les plus joués des 7 derniers
-//   jours (/api/tendances, qui ne donne que leurs identifiants : ni rang, ni
-//   chiffre), dans un ordre qui change chaque jour, sans tenir compte des filtres.
-//   Ni jeu des Archives, ni plus de TENDANCES_PAR_GENRE jeux du même genre.
-//   Cachées sans API ou sous TENDANCES_MIN jeux.
+// - Première ligne (« vitrine »), sans tenir compte des filtres, en deux moitiés :
+//   - à gauche, les Nouveautés : les derniers jeux ajoutés (aussi hors connexion) ;
+//   - à droite, les Tendances : TENDANCES_NOMBRE jeux parmi les plus joués des
+//     7 derniers jours (/api/tendances, qui ne donne que leurs identifiants : ni
+//     rang, ni chiffre), dans un ordre qui change chaque jour, sans les jeux déjà
+//     dans les Nouveautés ni plus de TENDANCES_PAR_GENRE jeux du même genre.
+//   Ni l'une ni l'autre ne montre de jeu des Archives. Sans API ou sous
+//   TENDANCES_MIN jeux, pas de moitié Tendances : les Nouveautés prennent la ligne.
 // - Textes en 5 langues (langue.js, i18n/site/*.json). Le titre traduit du jeu
 //   est affiché en bandeau sur sa jaquette (les jaquettes n'ont aucun texte).
 //   Il y a un accueil par langue (/, /en/…, généré par scripts/pages-seo.mjs) :
@@ -47,8 +50,10 @@ const ARCHIVE_VOTES_MIN = 30;     // archives : plus de 30 votes…
 const ARCHIVE_SCORE_MAX = 0.2;    // … et un score inférieur à 0,2 (votes du monde entier)
 const PAYS_VOTES_MIN = 20;        // sous 20 votes dans mon pays, classement Monde
 const DELAI_SCORES = 4000;        // au-delà, on affiche sans attendre l'API
-const TENDANCES_NOMBRE = 8;       // jeux montrés dans « Tendances » (8 colonnes dans style.css)
-const TENDANCES_MIN = 4;          // en dessous, la section « Tendances » reste cachée
+const VITRINE_NOMBRE = 8;         // jaquettes de la première ligne (8 colonnes dès 1 200 px, style.css)
+const NOUVEAUTES_NOMBRE = 4;      // … dont Nouveautés quand les Tendances sont là (sinon VITRINE_NOMBRE)
+const TENDANCES_NOMBRE = 4;       // jeux montrés dans « Tendances » (moitié droite)
+const TENDANCES_MIN = 2;          // en dessous, pas de moitié « Tendances »
 const TENDANCES_PAR_GENRE = 2;    // au plus 2 jeux du même genre principal dans « Tendances »
 const ID_JEU = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const JAQUETTES_PRIORITAIRES = 4; // premières jaquettes de la grille chargées tout de suite
@@ -67,7 +72,7 @@ const etat = {
   scoresMonde: null,      // { gameId: { up, down, score, semaine } } ; null = API indisponible
   scoresPays: undefined,  // idem pour mon pays : undefined = pas chargé, null = indisponible
   pays: null,             // pays détecté par l'API (ex. « FR »), ou null
-  tendances: null,        // [{ id }] : jeux des tendances, sans ordre ; null = API indisponible
+  tendances: undefined,   // [{ id }] : jeux des tendances, sans ordre ; undefined = pas encore chargées, null = API indisponible
   horsLigne: new Set(),   // jeux gardés sur l'appareil
   aimes: new Set(),       // jeux que j'ai notés 👍 sur cet appareil
   tri: 'notes',           // 'notes' | 'votes' | 'semaine' | 'nouveautes'
@@ -101,6 +106,8 @@ const el = {
   genres: document.getElementById('genres'),
   univers: document.getElementById('univers'),
   langue: document.getElementById('langue'),
+  vitrine: document.getElementById('vitrine'),
+  nouveautesListe: document.getElementById('nouveautes-liste'),
   tendances: document.getElementById('tendances'),
   tendancesListe: document.getElementById('tendances-liste'),
 };
@@ -347,9 +354,9 @@ function afficherGrille() {
   el.videTexte.textContent = t('vide.texte');
 }
 
-// --- Tendances --------------------------------------------------------------
+// --- Première ligne : Nouveautés et Tendances --------------------------------
 
-// Aucun chiffre ni rang dans la bande : un temps de jeu ou une 1re place
+// Aucun chiffre ni rang dans les Tendances : un temps de jeu ou une 1re place
 // affichés donneraient une cible à qui voudrait fausser le classement.
 
 // Petit hachage (FNV-1a, 32 bits) d'un texte.
@@ -363,30 +370,31 @@ function hachage(texte) {
 }
 
 // Carte compacte : la jaquette seule (titre traduit en bandeau, badge « Nouveau »).
-function creerCarteTendance(jeu) {
+// cleAria : texte lu par les lecteurs d'écran (« …, parmi les nouveautés. »).
+function creerCarteVitrine(jeu, cleAria) {
   const li = document.createElement('li');
   const lien = document.createElement('a');
-  lien.className = 'carte carte-tendance';
+  lien.className = 'carte carte-vitrine';
   lien.href = urlJeu(jeu.id, getLang());
   lien.append(creerJaquette(jeu));
   const enFrancais = jeuEnFrancais(jeu) ? `(${t('carte.enFrancais')})` : '';
-  lien.setAttribute('aria-label', [t('tendances.carteAria', { titre: titreJeu(jeu) }), descriptionJeu(jeu), enFrancais].filter(Boolean).join(' '));
+  lien.setAttribute('aria-label', [t(cleAria, { titre: titreJeu(jeu) }), descriptionJeu(jeu), enFrancais].filter(Boolean).join(' '));
   li.append(lien);
   return li;
 }
 
-// Jeux des tendances proposés dans la langue courante, sans les Archives, rangés
-// dans l'ordre du jour : hachage de « date UTC + id », le même toute la journée
-// pour tout le monde, nouveau chaque jour. Au plus TENDANCES_PAR_GENRE jeux du
-// même genre principal ; section cachée sous TENDANCES_MIN jeux.
-function afficherTendances() {
+// Jeux des tendances proposés dans la langue courante, sans les Archives ni les
+// jeux de exclus (ceux des Nouveautés), rangés dans l'ordre du jour : hachage de
+// « date UTC + id », le même toute la journée pour tout le monde, nouveau chaque
+// jour. Au plus TENDANCES_PAR_GENRE jeux du même genre principal.
+function choisirTendances(exclus) {
   const parId = new Map(etat.jeux.map((jeu) => [jeu.id, jeu]));
   const jour = new Date().toISOString().slice(0, 10);
   const ordre = (jeu) => hachage(`${jour}|${jeu.id}`);
   const parGenre = new Map();
-  const liste = (etat.tendances || [])
+  return (etat.tendances || [])
     .map((x) => parId.get(x.id))
-    .filter((jeu) => jeu && !estArchive(jeu))
+    .filter((jeu) => jeu && !estArchive(jeu) && !exclus.has(jeu.id))
     .sort((a, b) => ordre(a) - ordre(b) || a.id.localeCompare(b.id))
     .filter((jeu) => {
       const n = parGenre.get(jeu.genre) || 0;
@@ -394,15 +402,32 @@ function afficherTendances() {
       return n < TENDANCES_PAR_GENRE;
     })
     .slice(0, TENDANCES_NOMBRE);
-  const visible = liste.length >= TENDANCES_MIN;
-  el.tendancesListe.replaceChildren(...(visible ? liste.map((jeu) => creerCarteTendance(jeu)) : []));
-  el.tendances.hidden = !visible;
-  // Place gardée à la prochaine visite (script de tête de l'accueil), ou rendue.
+}
+
+// Remplit la première ligne. Deux moitiés quand il y a au moins TENDANCES_MIN
+// Tendances, ou tant qu'on attend les Tendances vues à la visite précédente
+// (classe avec-tendances posée par le script de tête : leur moitié reste
+// réservée, invisible) ; sinon les Nouveautés prennent toute la ligne.
+// La classe avec-tendances de <html> suit l'état choisi (style.css).
+function afficherVitrine() {
+  const racine = document.documentElement;
+  const nouveautes = etat.jeux.filter((jeu) => !estArchive(jeu)).sort(parDate);
+  const tendances = choisirTendances(new Set(nouveautes.slice(0, NOUVEAUTES_NOMBRE).map((jeu) => jeu.id)));
+  const avecTendances = tendances.length >= TENDANCES_MIN;
+  const double = avecTendances || (etat.tendances === undefined && racine.classList.contains('avec-tendances'));
+  const montrees = nouveautes.slice(0, double ? NOUVEAUTES_NOMBRE : VITRINE_NOMBRE);
+
+  el.nouveautesListe.replaceChildren(...montrees.map((jeu) => creerCarteVitrine(jeu, 'nouveautes.carteAria')));
+  el.tendancesListe.replaceChildren(...(avecTendances ? tendances.map((jeu) => creerCarteVitrine(jeu, 'tendances.carteAria')) : []));
+  el.tendances.hidden = !avecTendances;
+  el.vitrine.hidden = montrees.length === 0;
+  racine.classList.toggle('avec-tendances', double);
+  if (!montrees.length) racine.classList.remove('avec-vitrine');
+  // Place des Tendances gardée à la prochaine visite (script de tête), ou rendue.
   // Sans réponse de l'API (hors connexion…), on ne change pas ce qui est noté.
   if (etat.tendances) {
-    try { localStorage.setItem('tendances', visible ? '1' : '0'); } catch { /* stockage refusé */ }
+    try { localStorage.setItem('tendances', avecTendances ? '1' : '0'); } catch { /* stockage refusé */ }
   }
-  if (!visible) document.documentElement.classList.remove('avec-tendances');
 }
 
 // Menu de tri : sans API, seules les « Nouveautés » restent possibles.
@@ -713,7 +738,7 @@ surChangementLangue(() => {
   }
   preparerJeux();
   afficher();
-  afficherTendances();
+  afficherVitrine();
 });
 
 // --- Scores -----------------------------------------------------------------
@@ -802,10 +827,10 @@ el.recherche.addEventListener('input', () => {
 // Retour de la connexion : on récupère les votes et les tendances s'ils manquaient.
 addEventListener('online', async () => {
   if (etat.jeux.length === 0) return;
-  if (!etat.tendances) {
+  if (etat.tendances === null) {
     chargerTendances().then((tendances) => {
       etat.tendances = tendances;
-      afficherTendances();
+      afficherVitrine();
     });
   }
   if (etat.scoresMonde) return;
@@ -814,7 +839,7 @@ addEventListener('online', async () => {
   etat.scoresMonde = resultat.scores;
   etat.pays = resultat.pays;
   afficher();
-  afficherTendances(); // les Archives sont maintenant connues
+  afficherVitrine(); // les Archives sont maintenant connues
 });
 
 // Retour avec le bouton « Précédent » : la page réapparaît telle quelle,
@@ -829,6 +854,8 @@ addEventListener('pageshow', async (evenement) => {
 // --- Démarrage --------------------------------------------------------------
 
 function afficherErreurCatalogue() {
+  // Plus de première ligne : sa place gardée est rendue.
+  document.documentElement.classList.remove('avec-vitrine', 'avec-tendances');
   el.compte.textContent = '';
   el.vide.hidden = false;
   el.videTitre.textContent = t('catalogue.erreurTitre');
@@ -875,10 +902,11 @@ async function demarrer() {
   etat.horsLigne = await horsLigne;
   etat.aimes = jeuxAimes();
   afficher();
+  afficherVitrine(); // Nouveautés tout de suite ; moitié Tendances réservée si attendue
 
-  // Les tendances s'ajoutent en haut dès qu'elles arrivent, sans retarder le catalogue.
+  // Les tendances s'ajoutent dès qu'elles arrivent, sans retarder le catalogue.
   etat.tendances = await tendances;
-  afficherTendances();
+  afficherVitrine();
 
   // Votes restés en attente (faits hors ligne) : on retente l'envoi.
   if (votesEnAttente()) envoyerEnAttente();
