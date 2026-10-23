@@ -30,6 +30,7 @@ Lire sur `main`, via le connecteur, sans rien supposer :
 - `public/taxonomie.js` : les 26 genres et les 24 univers (listes fermées, identifiants exacts), les tranches d'âge.
 - `scripts/regles-seo.mjs` : bornes et interdits des textes de référencement. C'est la source unique : si ses valeurs diffèrent du tableau de l'étape 7, le fichier a raison.
 - `public/i18n/i18n.js` : le module commun de traduction, à recopier tel quel dans le jeu.
+- `public/save.js` : le module commun de sauvegarde, à recopier tel quel dans le jeu (`CONSIGNES-JEU.md`, section 3 « Sauvegarde »).
 - La liste des dossiers de `games/`, et un ou deux `game.json` récents comme modèle de forme (sans en reprendre les phrases).
 
 Si un de ces fichiers manque ou contredit cette compétence, le dépôt a raison : le signaler à l'utilisateur et suivre le dépôt.
@@ -76,6 +77,7 @@ Garder le jeu de l'utilisateur : corriger et compléter, sans rien retirer de so
   - bouton de langue : `data-coin` (`haut-gauche`, `haut-droite`, `bas-gauche`, `bas-droite`), ou `data-place="id…"` (dans des éléments du jeu), ou `data-coin="aucun"` puis `JEL_I18N.creerSelecteur()` ; il ne cache aucune commande ;
   - traductions en anglais, espagnol neutre, portugais du Brésil et allemand : ton simple pour enfants, tutoiement (du, tú, você), pas de mot à mot ; l'allemand est environ 30 % plus long (pas de largeur fixe sur les boutons) ; touches lues avec `event.code`, ZQSD écrit en français et WASD dans les autres langues.
 - **Niveaux** : le jeu donne son nombre réel de niveaux, tiré de ses données : `window.JEL_NIVEAUX = NIVEAUX.length;` (même nombre que `"niveaux"` dans `game.json`).
+- **Sauvegarde (obligatoire)** : juste après le module `jel-i18n`, `<script id="jel-sauvegarde">` … `</script>` contenant la **copie exacte et complète** de `public/save.js` lu à l'étape 1. Dans le code du jeu (`const JEU = '<id>';`) : le bouton « Jouer » de l'écran titre appelle `JEL_SAVE.reprise({ jeu: JEU, onContinuer: (d) => <reprise au niveau d.niveau>, onNouvelle: () => <début normal> })` (« Continuer » / « Nouvelle partie » / « Effacer la sauvegarde », textes déjà traduits) ; chaque niveau N réussi appelle `JEL_SAVE.save(JEU, { niveau: N + 1, score })` ; `JEL_SAVE.surFermeture(() => { if (<partie en cours>) JEL_SAVE.save(JEU, { niveau: <niveau en cours>, score }); })`. Le robot vérifie que le module est à jour et que ces trois appels existent.
 
 Si les changements sont importants, montrer le jeu final à l'utilisateur (artefact) avant de le publier.
 
@@ -154,7 +156,7 @@ Depuis le 24 octobre 2026 (`REGLES_SEO_DEPUIS` dans `scripts/regles-seo.mjs`), u
 Avec l'outil d'exécution de code :
 
 1. Recréer un petit dépôt local : `site/scripts/regles-seo.mjs` (copie exacte du fichier du dépôt) et `site/games/<id>/game.json`, puis lancer `node site/scripts/regles-seo.mjs <id>`. Le résultat doit être « Textes SEO : tout est bon » (code de sortie 0) ; corriger les textes et relancer jusque-là. Ce contrôle local ne voit pas les autres jeux : les doublons de `titre_seo` et `description_seo` restent à éviter par la rédaction (étape 7).
-2. Contrôler `index.html` par un petit script : bloc `jel-i18n-textes` lisible en JSON ; 5 langues avec exactement les mêmes clés, aucune valeur vide, mêmes `{variables}` ; toutes les clés utilisées par `t('…')` et `data-i18n*` présentes ; module `jel-i18n` identique à `public/i18n/i18n.js` ; `window.JEL_NIVEAUX` présent et égal à `"niveaux"` ; aucune adresse `http(s)://` hors `www.w3.org` ; ni `alert(`, `confirm(`, `prompt(` ou `window.open(` ; moins de 2 Mo.
+2. Contrôler `index.html` par un petit script : bloc `jel-i18n-textes` lisible en JSON ; 5 langues avec exactement les mêmes clés, aucune valeur vide, mêmes `{variables}` ; toutes les clés utilisées par `t('…')` et `data-i18n*` présentes ; module `jel-i18n` identique à `public/i18n/i18n.js` ; module `jel-sauvegarde` identique à `public/save.js`, placé juste après, et appels `JEL_SAVE.reprise(`, `JEL_SAVE.save(` et `JEL_SAVE.surFermeture(` présents ; `window.JEL_NIVEAUX` présent et égal à `"niveaux"` ; aucune adresse `http(s)://` hors `www.w3.org` ; ni `alert(`, `confirm(`, `prompt(` ou `window.open(` ; moins de 2 Mo.
 
 Comptage, si `regles-seo.mjs` est introuvable (Node) :
 

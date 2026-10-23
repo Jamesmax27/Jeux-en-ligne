@@ -45,7 +45,8 @@
 #  d) verifier : chaque pull request de la boucle dont l'idée est « en_cours »
 #                (y compris celles restées ouvertes d'un passage précédent) :
 #                robot (chargement, console, téléphone, hors ligne, fiche,
-#                nombre de niveaux, traductions, entrée du catalogue, genres
+#                nombre de niveaux, traductions, sauvegarde
+#                (scripts/tester-sauvegarde.mjs), entrée du catalogue, genres
 #                et univers dans les listes fermées, référencement :
 #                scripts/verifier-seo.mjs), puis
 #                relecture par Claude (grille de CONSIGNES-JEU.md, section 7,
@@ -368,7 +369,7 @@ jobs:
           claude_args: |
             --model claude-opus-5-5
             --max-turns 250
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*),Bash(node scripts/idees.mjs catalogue),Bash(node scripts/i18n-jeu.mjs --assembler:*),Bash(node scripts/check-i18n.js:*),Bash(node scripts/regles-seo.mjs:*),Bash(node scripts/verifier-seo.mjs:*)"
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*),Bash(node scripts/idees.mjs catalogue),Bash(node scripts/i18n-jeu.mjs --assembler:*),Bash(node scripts/check-i18n.js:*),Bash(node scripts/regles-seo.mjs:*),Bash(node scripts/verifier-seo.mjs:*),Bash(node scripts/tester-sauvegarde.mjs:*)"
           prompt: |
             Tu es le développeur de jeux du site Free Micro Games. Ta mission : créer UN nouveau mini-jeu complet, riche et
             travaillé (jamais un simple prototype), auquel un enfant a envie de jouer au moins 15 minutes, puis le
@@ -419,6 +420,16 @@ jobs:
                  description, presentation, titre_seo…).
                - Le jeu déclare son nombre réel de niveaux, tiré de ses données de niveaux :
                  window.JEL_NIVEAUX = NIVEAUX.length;  (20 au moins ; le robot le vérifie dans le navigateur).
+               - Sauvegarde OBLIGATOIRE avec le module commun save.js (CONSIGNES-JEU.md, section 3 « Sauvegarde ») :
+                 le module (window.JEL_SAVE, bloc jel-sauvegarde) est placé dans index.html par
+                 i18n-jeu.mjs --assembler ; n'écris jamais ce bloc toi-même. Dans le code du jeu :
+                 const JEU = '<id>'; au bouton « Jouer » de l'écran titre, JEL_SAVE.reprise({ jeu: JEU,
+                 onContinuer: (d) => <reprise au niveau d.niveau>, onNouvelle: () => <début normal> }) (fenêtre
+                 « Continuer » / « Nouvelle partie » / « Effacer la sauvegarde », déjà traduite ; sans sauvegarde, elle
+                 appelle tout de suite onNouvelle) ; à chaque niveau N réussi, JEL_SAVE.save(JEU, { niveau: N + 1,
+                 score }) ; JEL_SAVE.surFermeture(() => { if (<partie en cours>) JEL_SAVE.save(JEU, { niveau:
+                 <niveau en cours>, score }); }). Vérifie avec : node scripts/tester-sauvegarde.mjs <id> --captures
+                 (« Sauvegarde : tout est bon » ; regarde captures/sauvegarde/<id>/).
                - Dans game.json : "genre", "genres_secondaires" (liste, vide possible) et "univers" (1 ou 2) = ceux de
                  l'idée (ou ton choix quand l'idée n'en donne pas), jamais de champ "tags" ; "ages" = l'âge conseillé
                  de l'idée (forme "6+") ; "idee" = "${{ matrix.idee.id }}" ;
@@ -861,6 +872,14 @@ jobs:
           if [ "$etat" != panne ]; then
             echo "Traductions :" >> "$RUNNER_TEMP/rapport.txt"
             if ! node scripts/check-i18n.js "$ID" --sans-site >> "$RUNNER_TEMP/rapport.txt" 2>&1; then etat=erreurs; fi
+          fi
+          # Sauvegarde (save.js) : écrite à la fermeture, reprise au niveau sauvegardé, effacement.
+          if [ "$etat" != panne ]; then
+            echo "Sauvegarde :" >> "$RUNNER_TEMP/rapport.txt"
+            if ! node scripts/tester-sauvegarde.mjs "$ID" > "$RUNNER_TEMP/sauvegarde.txt" 2>&1; then
+              if grep -q "problème(s)" "$RUNNER_TEMP/sauvegarde.txt"; then etat=erreurs; else etat=panne; fi
+            fi
+            cat "$RUNNER_TEMP/sauvegarde.txt" >> "$RUNNER_TEMP/rapport.txt"
           fi
           # Entrée du catalogue : catalogue reconstruit avec ce jeu, genre et univers conformes à l'idée.
           if [ "$etat" != panne ]; then

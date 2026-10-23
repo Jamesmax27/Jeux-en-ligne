@@ -13,10 +13,14 @@
 // suivi de sa propre copie de public/i18n/i18n.js dans
 //   <script id="jel-i18n"> … </script>
 //
-// 1. Recopie du module (sans --assembler) : remplace la copie par la version
-//    actuelle du module (à lancer après chaque modification de
-//    public/i18n/i18n.js, puis augmenter "version" dans game.json des jeux
-//    modifiés). Un jeu sans bloc jel-i18n est ignoré.
+// suivie de sa copie du module de sauvegarde public/save.js dans
+//   <script id="jel-sauvegarde"> … </script>
+//
+// 1. Recopie des modules (sans --assembler) : remplace les copies par la
+//    version actuelle des modules (à lancer après chaque modification de
+//    public/i18n/i18n.js ou de public/save.js, puis augmenter "version" dans
+//    game.json des jeux modifiés) ; ajoute le module de sauvegarde juste après
+//    jel-i18n s'il manque. Un jeu sans bloc jel-i18n est ignoré.
 //
 // 2. Assemblage (--assembler <id>) : pendant la création d'un jeu, ses textes
 //    sont écrits à part, un fichier par langue, dans i18n-jeu/<id>/ (ignoré
@@ -29,6 +33,7 @@
 //    Le script range les "textes" de chaque langue présente dans le bloc
 //    jel-i18n-textes de games/<id>/index.html (créé juste après <title> s'il
 //    manque), met le module commun à jour, et recopie "meta" dans game.json :
+//    (avec le module de sauvegarde), et recopie "meta" dans game.json :
 //    français → à la racine (title, description, textes de référencement) ;
 //    autres langues → "i18n". Les champs de "meta" absents ne changent pas.
 //    Une langue absente est simplement ignorée (le jeu s'affiche alors en
@@ -57,8 +62,14 @@ const LANGUES = ['fr', 'en', 'es', 'pt', 'de'];
 const CHAMPS_META = ['title', 'description', 'titre_seo', 'description_seo', 'presentation', 'regles', 'competences', 'jaquette_alt'];
 const RE_MODULE = /(<script\b[^>]*\bid=["']jel-i18n["'][^>]*>)[\s\S]*?(<\/script>)/i;
 const RE_TEXTES = /(<script\b[^>]*\bid=["']jel-i18n-textes["'][^>]*>)[\s\S]*?(<\/script>)/i;
+const RE_SAUVEGARDE = /(<script\b[^>]*\bid=["']jel-sauvegarde["'][^>]*>)[\s\S]*?(<\/script>)/i;
 
 const module = (await readFile(path.join(RACINE, 'public', 'i18n', 'i18n.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
+const moduleSauvegarde = (await readFile(path.join(RACINE, 'public', 'save.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
+if (/<\/script/i.test(module + moduleSauvegarde)) {
+  console.error('✗ public/i18n/i18n.js ou public/save.js contient « </script » : la copie couperait les jeux.');
+  process.exit(1);
+}
 const args = process.argv.slice(2);
 
 if (args.includes('--assembler')) await assembler();
@@ -81,11 +92,11 @@ async function recopierModule() {
     if (!existsSync(chemin)) continue;
     const html = await readFile(chemin, 'utf8');
     if (!RE_MODULE.test(html)) { console.log(`  –  ${id} : pas de module jel-i18n, ignoré`); continue; }
-    const nouveau = html.replace(RE_MODULE, (_, ouverture, fermeture) => `${ouverture}\n${module}\n${fermeture}`);
+    const nouveau = rangerSauvegarde(html.replace(RE_MODULE, (_, ouverture, fermeture) => `${ouverture}\n${module}\n${fermeture}`));
     if (nouveau !== html) {
       await writeFile(chemin, nouveau, 'utf8');
       modifies++;
-      console.log(`  ✓  ${id} : module mis à jour (pensez à augmenter "version" dans game.json)`);
+      console.log(`  ✓  ${id} : modules mis à jour (pensez à augmenter "version" dans game.json)`);
     }
   }
   console.log(`\n${modifies} jeu(x) mis à jour.`);
@@ -161,7 +172,19 @@ async function rangerTextes(id, cheminHtml, textes) {
   const moduleComplet = `<script id="jel-i18n">\n${module}\n</script>`;
   if (RE_MODULE.test(html)) html = html.replace(RE_MODULE, (_, ouverture, fermeture) => `${ouverture}\n${module}\n${fermeture}`);
   else html = html.replace(RE_TEXTES, (bloc) => `${bloc}\n${moduleComplet}`);
-  await writeFile(cheminHtml, html, 'utf8');
+  await writeFile(cheminHtml, rangerSauvegarde(html), 'utf8');
+}
+
+// Module de sauvegarde (public/save.js) : mis à jour, ou ajouté juste après le
+// module de traduction (avant le code du jeu, qui peut donc l'appeler).
+function rangerSauvegarde(html) {
+  if (RE_SAUVEGARDE.test(html)) {
+    return html.replace(RE_SAUVEGARDE, (_, ouverture, fermeture) => `${ouverture}\n${moduleSauvegarde}\n${fermeture}`);
+  }
+  const m = RE_MODULE.exec(html);
+  if (!m) return html;
+  const fin = m.index + m[0].length;
+  return `${html.slice(0, fin)}\n<script id="jel-sauvegarde">\n${moduleSauvegarde}\n</script>${html.slice(fin)}`;
 }
 
 // game.json : textes de la fiche en français à la racine, traductions dans "i18n".
