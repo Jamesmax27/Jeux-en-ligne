@@ -4,10 +4,15 @@
 //   npm run dev   → construit le catalogue puis ouvre http://localhost:8080
 // Pour tester sur votre téléphone (même Wi-Fi) : utilisez l'adresse
 // « Réseau » affichée au démarrage.
-// Reproduit la règle de sécurité des jeux (aucun accès Internet), comme en ligne,
+// Reproduit la règle de sécurité des jeux (aucun accès Internet) et l'interdiction
+// d'afficher le lanceur dans le cadre d'un autre site, comme en ligne,
 // et les adresses de Cloudflare Pages : « /play » sert play.html, un dossier sert
 // son index.html, une adresse inconnue reçoit 404.html avec le code 404.
 // L'API des votes n'existe pas en local ; celle du suivi des parties répond à vide.
+// TENDANCES_EXEMPLE=1 : /api/tendances renvoie les 12 premiers jeux du catalogue
+// (pour voir la bande « Tendances » ; sans la variable, elle reste cachée).
+//   PowerShell : $env:TENDANCES_EXEMPLE='1'; npm run dev
+//   bash       : TENDANCES_EXEMPLE=1 npm run dev
 // ==========================================================================
 
 import { createServer } from 'node:http';
@@ -47,10 +52,15 @@ createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
     // Suivi des parties (functions/api/) : en local, rien n'est enregistré et
-    // les Tendances sont vides (la section reste cachée).
+    // les Tendances sont vides (la section reste cachée), sauf TENDANCES_EXEMPLE=1.
     if (url.pathname === '/api/session') { res.writeHead(204).end(); return; }
     if (url.pathname === '/api/tendances') {
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }).end('{"jours":7,"jeux":[]}');
+      let jeux = [];
+      if (process.env.TENDANCES_EXEMPLE === '1') {
+        const catalogue = JSON.parse(await readFile(path.join(RACINE, 'catalog.json'), 'utf8'));
+        jeux = (catalogue.games || []).slice(0, 12).map((j) => ({ id: j.id }));
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify({ jours: 7, jeux }));
       return;
     }
 
@@ -81,6 +91,13 @@ createServer(async (req, res) => {
       'Cache-Control': 'no-cache',
     };
     if (url.pathname.startsWith('/games/')) entetes['Content-Security-Policy'] = CSP_JEUX;
+    // Lanceur : jamais dans le cadre d'un autre site, ni piloté par une fenêtre
+    // d'un autre site qui l'aurait ouvert (comme public/_headers).
+    if (url.pathname === '/play' || url.pathname === '/play.html') {
+      entetes['X-Frame-Options'] = 'SAMEORIGIN';
+      entetes['Content-Security-Policy'] = "frame-ancestors 'self'";
+      entetes['Cross-Origin-Opener-Policy'] = 'same-origin';
+    }
 
     res.writeHead(statut, entetes).end(await readFile(chemin));
   } catch (e) {

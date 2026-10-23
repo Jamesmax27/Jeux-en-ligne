@@ -32,4 +32,10 @@ CREATE INDEX IF NOT EXISTS votes_pays ON votes (country, game_id);
 --     appareil       « mobile » ou « desktop »
 --     erreur_js      première erreur JavaScript du jeu, ou NULL
 --     visiteur       même empreinte que votes.visiteur
+--
+--   Index à créer à la main (console D1), pour que /api/tendances ne relise que
+--   7 jours au lieu de toute la table, et pour l'effacement des parties de plus
+--   de 13 mois (session.js) ; il contient toutes les colonnes lues par le calcul :
+--     CREATE INDEX IF NOT EXISTS sessions_debut
+--       ON sessions (debut, jeu_id, visiteur, duree_secondes, pays);
 -- --------------------------------------------------------------------------

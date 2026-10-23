@@ -17,9 +17,11 @@
 //   est grisé (« Bientôt »).
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
 // - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
-// - Tendances, en haut : les TENDANCES_NOMBRE jeux les plus joués des 7 derniers
-//   jours (temps total, /api/tendances), sans tenir compte des filtres.
-//   Cachées sans API ou tant qu'aucune partie n'est enregistrée.
+// - Tendances, en haut : TENDANCES_NOMBRE jeux parmi les plus joués des 7 derniers
+//   jours (/api/tendances, qui ne donne que leurs identifiants : ni rang, ni
+//   chiffre), dans un ordre qui change chaque jour, sans tenir compte des filtres.
+//   Ni jeu des Archives, ni plus de TENDANCES_PAR_GENRE jeux du même genre.
+//   Cachées sans API ou sous TENDANCES_MIN jeux.
 // - Textes en 5 langues (langue.js, i18n/site/*.json). Le titre traduit du jeu
 //   est affiché en bandeau sur sa jaquette (les jaquettes n'ont aucun texte).
 //   Il y a un accueil par langue (/, /en/…, généré par scripts/pages-seo.mjs) :
@@ -45,7 +47,10 @@ const ARCHIVE_VOTES_MIN = 30;     // archives : plus de 30 votes…
 const ARCHIVE_SCORE_MAX = 0.2;    // … et un score inférieur à 0,2 (votes du monde entier)
 const PAYS_VOTES_MIN = 20;        // sous 20 votes dans mon pays, classement Monde
 const DELAI_SCORES = 4000;        // au-delà, on affiche sans attendre l'API
-const TENDANCES_NOMBRE = 10;      // jeux montrés dans « Tendances »
+const TENDANCES_NOMBRE = 8;       // jeux montrés dans « Tendances » (8 colonnes dans style.css)
+const TENDANCES_MIN = 4;          // en dessous, la section « Tendances » reste cachée
+const TENDANCES_PAR_GENRE = 2;    // au plus 2 jeux du même genre principal dans « Tendances »
+const ID_JEU = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const JAQUETTES_PRIORITAIRES = 4; // premières jaquettes de la grille chargées tout de suite
 
 // Raccourcis du haut : des « collections » propres à l'appareil (noms : clés de traduction).
@@ -62,7 +67,7 @@ const etat = {
   scoresMonde: null,      // { gameId: { up, down, score, semaine } } ; null = API indisponible
   scoresPays: undefined,  // idem pour mon pays : undefined = pas chargé, null = indisponible
   pays: null,             // pays détecté par l'API (ex. « FR »), ou null
-  tendances: null,        // [{ id, sessions, tempsTotal, tempsMoyen }] ; null = API indisponible
+  tendances: null,        // [{ id }] : jeux des tendances, sans ordre ; null = API indisponible
   horsLigne: new Set(),   // jeux gardés sur l'appareil
   aimes: new Set(),       // jeux que j'ai notés 👍 sur cet appareil
   tri: 'notes',           // 'notes' | 'votes' | 'semaine' | 'nouveautes'
@@ -344,63 +349,60 @@ function afficherGrille() {
 
 // --- Tendances --------------------------------------------------------------
 
-// 40 → « 40 s » ; 75 → « 1 min » ; 8 100 → « 2 h 15 min »
-function formaterDuree(secondes) {
-  if (secondes < 60) return t('duree.secondes', { n: Math.max(1, Math.round(secondes)) });
-  const minutes = Math.round(secondes / 60);
-  if (minutes < 60) return t('duree.minutes', { n: minutes });
-  const h = Math.floor(minutes / 60);
-  const min = minutes % 60;
-  return min ? t('duree.heuresMinutes', { h, min }) : t('duree.heures', { h });
+// Aucun chiffre ni rang dans la bande : un temps de jeu ou une 1re place
+// affichés donneraient une cible à qui voudrait fausser le classement.
+
+// Petit hachage (FNV-1a, 32 bits) d'un texte.
+function hachage(texte) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < texte.length; i++) {
+    h ^= texte.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
 }
 
-// Carte compacte : jaquette avec son rang, temps total joué, parties et temps moyen.
-function creerCarteTendance(jeu, tendance, rang) {
+// Carte compacte : la jaquette seule (titre traduit en bandeau, badge « Nouveau »).
+function creerCarteTendance(jeu) {
   const li = document.createElement('li');
   const lien = document.createElement('a');
   lien.className = 'carte carte-tendance';
   lien.href = urlJeu(jeu.id, getLang());
-
-  const jaquette = creerJaquette(jeu);
-  const numero = document.createElement('span');
-  numero.className = 'tendance-rang';
-  numero.textContent = String(rang);
-  jaquette.append(numero);
-
-  const total = formaterDuree(tendance.tempsTotal);
-  const parties = t('tendances.parties', { n: tendance.sessions });
-  const moyenne = t('tendances.moyenne', { duree: formaterDuree(tendance.tempsMoyen) });
-
-  const texte = document.createElement('div');
-  texte.className = 'carte-texte';
-  const temps = document.createElement('p');
-  temps.className = 'tendance-temps';
-  temps.textContent = total;
-  const detail = document.createElement('p');
-  detail.className = 'carte-infos';
-  detail.textContent = `${parties} · ${moyenne}`;
-  texte.append(temps, detail);
-
-  lien.append(jaquette, texte);
-  lien.setAttribute('aria-label', t('tendances.carteAria', { titre: titreJeu(jeu), rang, total, parties, moyenne }));
+  lien.append(creerJaquette(jeu));
+  const enFrancais = jeuEnFrancais(jeu) ? `(${t('carte.enFrancais')})` : '';
+  lien.setAttribute('aria-label', [t('tendances.carteAria', { titre: titreJeu(jeu) }), descriptionJeu(jeu), enFrancais].filter(Boolean).join(' '));
   li.append(lien);
   return li;
 }
 
-// Les premiers jeux des tendances proposés dans la langue courante.
+// Jeux des tendances proposés dans la langue courante, sans les Archives, rangés
+// dans l'ordre du jour : hachage de « date UTC + id », le même toute la journée
+// pour tout le monde, nouveau chaque jour. Au plus TENDANCES_PAR_GENRE jeux du
+// même genre principal ; section cachée sous TENDANCES_MIN jeux.
 function afficherTendances() {
   const parId = new Map(etat.jeux.map((jeu) => [jeu.id, jeu]));
+  const jour = new Date().toISOString().slice(0, 10);
+  const ordre = (jeu) => hachage(`${jour}|${jeu.id}`);
+  const parGenre = new Map();
   const liste = (etat.tendances || [])
-    .filter((x) => parId.has(x.id) && x.tempsTotal > 0)
+    .map((x) => parId.get(x.id))
+    .filter((jeu) => jeu && !estArchive(jeu))
+    .sort((a, b) => ordre(a) - ordre(b) || a.id.localeCompare(b.id))
+    .filter((jeu) => {
+      const n = parGenre.get(jeu.genre) || 0;
+      parGenre.set(jeu.genre, n + 1);
+      return n < TENDANCES_PAR_GENRE;
+    })
     .slice(0, TENDANCES_NOMBRE);
-  el.tendancesListe.replaceChildren(...liste.map((x, i) => creerCarteTendance(parId.get(x.id), x, i + 1)));
-  el.tendances.hidden = liste.length === 0;
+  const visible = liste.length >= TENDANCES_MIN;
+  el.tendancesListe.replaceChildren(...(visible ? liste.map((jeu) => creerCarteTendance(jeu)) : []));
+  el.tendances.hidden = !visible;
   // Place gardée à la prochaine visite (script de tête de l'accueil), ou rendue.
   // Sans réponse de l'API (hors connexion…), on ne change pas ce qui est noté.
   if (etat.tendances) {
-    try { localStorage.setItem('tendances', liste.length ? '1' : '0'); } catch { /* stockage refusé */ }
+    try { localStorage.setItem('tendances', visible ? '1' : '0'); } catch { /* stockage refusé */ }
   }
-  if (!liste.length) document.documentElement.classList.remove('avec-tendances');
+  if (!visible) document.documentElement.classList.remove('avec-tendances');
 }
 
 // Menu de tri : sans API, seules les « Nouveautés » restent possibles.
@@ -751,7 +753,9 @@ async function chargerScores(pays) {
   }
 }
 
-// Ne lève jamais d'erreur. Renvoie la liste des tendances, ou null si l'API ne répond pas.
+// Ne lève jamais d'erreur. Renvoie les jeux des tendances ([{ id }]), ou null si
+// l'API ne répond pas. Seuls les identifiants sont lus (une ancienne réponse
+// encore en cache peut porter d'autres champs).
 async function chargerTendances() {
   if (navigator.onLine === false) return null;
   try {
@@ -761,13 +765,9 @@ async function chargerTendances() {
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
     const donnees = await reponse.json();
     return (Array.isArray(donnees?.jeux) ? donnees.jeux : [])
-      .filter((x) => typeof x?.id === 'string')
-      .map((x) => ({
-        id: x.id,
-        sessions: Number(x.sessions) || 0,
-        tempsTotal: Number(x.tempsTotal) || 0,
-        tempsMoyen: Number(x.tempsMoyen) || 0,
-      }));
+      .map((x) => (typeof x === 'string' ? x : x?.id))
+      .filter((id) => typeof id === 'string' && ID_JEU.test(id))
+      .map((id) => ({ id }));
   } catch (erreur) {
     console.warn('Tendances indisponibles :', erreur);
     return null;
@@ -814,6 +814,7 @@ addEventListener('online', async () => {
   etat.scoresMonde = resultat.scores;
   etat.pays = resultat.pays;
   afficher();
+  afficherTendances(); // les Archives sont maintenant connues
 });
 
 // Retour avec le bouton « Précédent » : la page réapparaît telle quelle,
