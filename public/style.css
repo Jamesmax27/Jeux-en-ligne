@@ -1362,9 +1362,8 @@ main.catalogue {
 
 #vide-texte { font-size: 14px; }
 
-/* Publicité (#pub, .pub-mention) et consentement (#consentement) : aucune
-   règle, volontairement. Ils restent cachés (hidden) tant que la publicité
-   est désactivée. */
+/* Publicité (#pub, .pub-mention) : aucune règle, volontairement. Elle reste
+   cachée (hidden) tant que la publicité est désactivée. */
 
 .pied {
   padding: 8px 16px calc(32px + env(safe-area-inset-bottom));
@@ -1375,19 +1374,125 @@ main.catalogue {
 
 .pied p { margin: 0 0 6px; }
 
-/* Lien « Mentions légales » : zone de toucher de 44 px. */
-.pied a {
+/* Liens légaux, contact et « Réglages des cookies » : zone de toucher de 44 px,
+   retour à la ligne entre les liens sur téléphone. */
+.pied-liens ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pied a,
+.pied-liens button {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   padding: 0 8px;
+  border: 0;
+  background: none;
   color: var(--lavande);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.pied-note { color: var(--craie-faible); font-size: 12px; }
+
+/* --------------------------------------------------------------------------
+   Bandeau de consentement aux cookies (#consentement, consentement.js)
+   Fixé en bas de l'écran, sans voile : la page reste utilisable. Les deux
+   boutons ont exactement la même taille et le même style (aucun n'est mis
+   en avant). La page réserve sa hauteur en bas (--hauteur-consentement).
+   -------------------------------------------------------------------------- */
+
+.avec-consentement body { padding-bottom: var(--hauteur-consentement, 0px); }
+
+.consentement {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 60;
+  padding: 0 max(12px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  pointer-events: none;
+}
+
+.consentement[hidden] { display: none; }
+
+.consentement-boite {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 14px 16px 6px;
+  border: 1px solid var(--orbite);
+  border-radius: var(--r-plaque);
+  background: var(--surface);
+  box-shadow: var(--ombre-flottante);
+  color: var(--craie);
+  pointer-events: auto;
+}
+
+.consentement-titre {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.consentement-texte {
+  margin: 0 0 12px;
+  color: var(--craie-douce);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.consentement-boutons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.consentement-bouton {
+  min-height: 48px;
+  padding: 0 12px;
+  border: 2px solid var(--lavande);
+  border-radius: var(--r-commande);
+  background: transparent;
+  color: var(--craie);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.consentement-bouton:focus-visible { outline: 3px solid var(--craie); outline-offset: 2px; }
+
+@media (hover: hover) {
+  .consentement-bouton:hover { background: var(--surface-relevee); }
+}
+
+.consentement-lien {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--lavande);
+  font-size: 14px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
+@media (min-width: 720px) {
+  .consentement { padding-bottom: calc(20px + env(safe-area-inset-bottom)); }
+  .consentement-boite { padding: 18px 20px 8px; }
+}
+
 /* --------------------------------------------------------------------------
-   Page « Mentions légales » (mentions-legales.html)
+   Pages légales (gabarits/legal.html) : mentions légales, confidentialité,
+   conditions d'utilisation, cookies
    -------------------------------------------------------------------------- */
 
 .legal {
@@ -1457,6 +1562,88 @@ main.catalogue {
 }
 
 .legal-retour { margin: 32px 0 0; text-align: center; }
+
+.legal .ariane { margin-bottom: 4px; }
+
+.legal-maj {
+  margin: 0 0 12px;
+  color: var(--craie-faible);
+  font-size: 13px;
+}
+
+.legal h3 {
+  margin: 20px 0 6px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.legal p,
+.legal li {
+  color: var(--craie);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.legal p { margin: 0 0 10px; }
+.legal ul { margin: 0 0 10px; padding-left: 22px; }
+.legal li { margin: 0 0 6px; }
+.legal dl + p { margin-top: 10px; }
+
+/* Tableaux des cookies : trois colonnes sur grand écran ; sur téléphone,
+   chaque ligne devient une fiche (nom, finalité, puis durée). */
+.legal-tableau {
+  margin: 8px 0 12px;
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-plaque);
+  background: var(--surface);
+}
+
+.legal table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+@media (max-width: 560px) {
+  .legal table,
+  .legal tbody,
+  .legal tr,
+  .legal td { display: block; }
+  .legal thead { display: none; }
+  .legal-tableau tr { padding: 10px 0; border-bottom: 1px solid var(--lisere); }
+  .legal-tableau tr:last-child { border-bottom: 0; }
+  .legal .legal-tableau td { padding: 2px 14px; border-bottom: 0; }
+  .legal .legal-tableau td:first-child { color: var(--lavande); }
+  .legal .legal-tableau td:last-child { color: var(--craie-douce); font-size: 13px; }
+}
+
+.legal th,
+.legal td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--lisere);
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal th { color: var(--craie-douce); font-size: 12px; font-weight: 700; }
+.legal tr:last-child td { border-bottom: 0; }
+.legal td:first-child { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; }
+
+.legal-autres {
+  margin-top: 32px;
+  padding-top: 8px;
+  border-top: 1px solid var(--lisere);
+}
+
+.legal-autres ul { padding-left: 0; list-style: none; }
+
+.legal-autres a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
 
 /* --------------------------------------------------------------------------
    Pages générées (scripts/pages-seo.mjs, gabarits/) : fiche d'un jeu, page

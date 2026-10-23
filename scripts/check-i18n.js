@@ -22,8 +22,9 @@
 //     français ;
 //   - navigateur (si disponible) : erreur JavaScript, clé manquante ou
 //     <html lang> faux au chargement d'un jeu, de l'accueil, d'une fiche de
-//     jeu, d'une catégorie, du lanceur ou des mentions légales, dans chacune
-//     des 5 langues ; page générée retraduite selon la langue enregistrée.
+//     jeu, d'une catégorie ou du lanceur, dans chacune des 5 langues, et des
+//     pages légales (français et anglais) ; page générée retraduite selon la
+//     langue enregistrée.
 // Non bloquant (rapport) : textes en dur restants (recherche heuristique dans
 // le HTML et le JavaScript des jeux), CSS de bouton à
 // largeur fixe ou sans retour à la ligne, textes qui débordent (navigateur,
@@ -408,7 +409,8 @@ async function attendreServeur(url, essais = 60) {
 // Pages du site dans les 5 langues (site construit puis servi en local) :
 // - pages générées (scripts/pages-seo.mjs) : accueil, fiche et catégorie d'un
 //   jeu ; la langue est celle de l'adresse (/en/…), liens hreflang dans le HTML ;
-// - pages traduites en JavaScript (?lang=) : lanceur et mentions légales.
+// - pages légales (générées, en français et en anglais) ;
+// - page traduite en JavaScript (?lang=) : le lanceur.
 async function testerSite(navigateur, idExemple) {
   const build = spawnSync(process.execPath, [path.join(RACINE, 'scripts', 'build-catalog.mjs')], { encoding: 'utf8' });
   if (build.status !== 0) { erreur('site', `la construction du catalogue a échoué : ${build.stderr.slice(0, 200)}`); return; }
@@ -446,7 +448,8 @@ async function testerSite(navigateur, idExemple) {
           ['catégorie', chemins.urlCategorie('genre', jeu.genre, lang), 'générée', 800],
           ['lanceur', `/play?id=${jeu.id}&lang=${lang}`, 'js', 2500],
         ] : []),
-        ['mentions légales', `/mentions-legales?lang=${lang}`, 'js', 2500],
+        // Pages légales : en français et en anglais seulement (les autres langues y mènent).
+        ...(chemins.LANGUES_LEGALES.includes(lang) ? chemins.PAGES_LEGALES.map((p) => [`page légale ${p}`, chemins.urlLegale(p, lang), 'générée', 800]) : []),
       ];
       for (const [nom, chemin, sorte, attente] of pages) {
         const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
