@@ -181,6 +181,37 @@
       font-weight: 600;
     }
 
+    /* Onglets : nouvelle idée / demande de modification d'un jeu. */
+    .onglets {
+      display: flex;
+      gap: 8px;
+      margin: 0 0 14px;
+    }
+
+    .onglets button {
+      flex: 1;
+      min-height: 44px;
+      padding: 8px 12px;
+      border: 1.5px solid var(--orbite);
+      border-radius: 999px;
+      background: var(--nuit);
+      color: var(--craie);
+      font: inherit;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    .onglets button[aria-selected="true"] {
+      border-color: var(--lavande);
+      background: var(--surface-choisie);
+      font-weight: 600;
+    }
+
+    .onglets button:focus-visible {
+      outline: 2px solid var(--lavande);
+      outline-offset: 2px;
+    }
+
     .message:empty { display: none; }
     .message.ok { background: rgba(110, 200, 150, .15); color: #a9e6c2; }
     .message.erreur { background: rgba(240, 120, 120, .15); color: #f3b2b2; }
@@ -219,10 +250,16 @@
           <path d="M35.6 31.6a8 2.3 0 0 0 16 0" transform="rotate(-18 43.6 31.6)" fill="none" stroke="#0b1020" stroke-width="1.5" clip-path="url(#fmg-planete)"/>
           </g>
         </svg>
-      <span>Nouvelle idée de jeu<small>Elle sera fabriquée en priorité par la boucle de nuit.</small></span>
+      <span id="entete-titre">Nouvelle idée de jeu<small>Elle sera fabriquée en priorité par la boucle de nuit.</small></span>
     </h1>
 
-    <form class="idees-carte" id="formulaire" novalidate>
+    <!-- Lien direct vers le 2e onglet : /idees/#demande -->
+    <div class="onglets" role="tablist" aria-label="Que veux-tu envoyer ?">
+      <button type="button" role="tab" id="onglet-idee" aria-controls="formulaire" aria-selected="true">Nouvelle idée</button>
+      <button type="button" role="tab" id="onglet-demande" aria-controls="formulaire-demande" aria-selected="false" tabindex="-1">Modifier un jeu</button>
+    </div>
+
+    <form class="idees-carte" id="formulaire" role="tabpanel" aria-labelledby="onglet-idee" novalidate>
       <p class="idees-note">Rien à écrire pour Google : le titre et la description pour les moteurs de recherche, le texte de la page du jeu, les compétences et le texte de la vignette sont rédigés automatiquement d'après le jeu fini.</p>
 
       <div class="champ">
@@ -258,6 +295,27 @@
 
       <button class="envoyer" id="envoyer" type="submit">Envoyer</button>
       <p class="message" id="message" role="status" aria-live="polite"></p>
+    </form>
+
+    <form class="idees-carte" id="formulaire-demande" role="tabpanel" aria-labelledby="onglet-demande" hidden novalidate>
+      <p class="idees-note">Un bug, une amélioration, un changement dans un jeu du site ? Décris-le simplement : l'IA classe la demande, modifie le jeu, le vérifie comme la boucle de nuit et le met en ligne si tout est bon. Le résultat arrive en commentaire de la demande sur GitHub.</p>
+
+      <div class="champ">
+        <label for="demande-jeu">Jeu concerné</label>
+        <select id="demande-jeu" name="jeu" required>
+          <option value="" disabled selected>Chargement des jeux…</option>
+        </select>
+      </div>
+
+      <div class="champ">
+        <label for="demande-texte">Ta demande</label>
+        <textarea id="demande-texte" name="texte" maxlength="2000"
+          placeholder="Ce qui ne va pas ou ce qu'il faut changer, à quel endroit du jeu, et ce que tu voudrais à la place…"></textarea>
+        <div class="compteur" id="demande-compteur" aria-live="polite">0 / 2000</div>
+      </div>
+
+      <button class="envoyer" id="demande-envoyer" type="submit">Envoyer la demande</button>
+      <p class="message" id="demande-message" role="status" aria-live="polite"></p>
     </form>
   </main>
 
@@ -374,6 +432,122 @@
         afficher('Envoi impossible : vérifie ta connexion, ou recharge la page pour te reconnecter.', 'erreur');
       } finally {
         bouton.disabled = false;
+      }
+    });
+
+    // --- Onglets --------------------------------------------------------------
+    // Le 2e onglet s'ouvre aussi directement avec l'adresse /idees/#demande.
+    const onglets = {
+      idee: { bouton: document.getElementById('onglet-idee'), panneau: formulaire,
+        titre: 'Nouvelle idée de jeu', sous: 'Elle sera fabriquée en priorité par la boucle de nuit.' },
+      demande: { bouton: document.getElementById('onglet-demande'), panneau: document.getElementById('formulaire-demande'),
+        titre: 'Modifier un jeu', sous: "Demande traitée aussitôt par l'IA, puis vérifiée." },
+    };
+    const enteteTitre = document.getElementById('entete-titre');
+
+    function ouvrirOnglet(nom, focus) {
+      for (const [cle, o] of Object.entries(onglets)) {
+        const actif = cle === nom;
+        o.bouton.setAttribute('aria-selected', String(actif));
+        o.bouton.tabIndex = actif ? 0 : -1;
+        o.panneau.hidden = !actif;
+      }
+      const o = onglets[nom];
+      const sous = document.createElement('small');
+      sous.textContent = o.sous;
+      enteteTitre.replaceChildren(o.titre, sous);
+      document.title = o.titre;
+      if (focus) o.bouton.focus();
+      history.replaceState(null, '', nom === 'demande' ? '#demande' : location.pathname);
+    }
+    onglets.idee.bouton.addEventListener('click', () => ouvrirOnglet('idee'));
+    onglets.demande.bouton.addEventListener('click', () => ouvrirOnglet('demande'));
+    // Flèches gauche / droite entre les onglets (comportement attendu d'un role="tablist").
+    document.querySelector('.onglets').addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      ouvrirOnglet(onglets.idee.bouton.getAttribute('aria-selected') === 'true' ? 'demande' : 'idee', true);
+    });
+    if (location.hash === '#demande') ouvrirOnglet('demande');
+
+    // --- Demande de modification d'un jeu ---------------------------------------
+    // POST JSON { type: "demande", jeu, texte } vers /api/idees (même accès que les idées),
+    // qui crée une issue « [Demande] <titre du jeu> » (étiquette demande-ia) sur GitHub.
+    const formDemande = onglets.demande.panneau;
+    const demandeJeu = document.getElementById('demande-jeu');
+    const demandeTexte = document.getElementById('demande-texte');
+    const demandeCompteur = document.getElementById('demande-compteur');
+    const demandeBouton = document.getElementById('demande-envoyer');
+    const demandeMessage = document.getElementById('demande-message');
+    const DEMANDE_MIN = 10; // comme functions/api/idees.js
+
+    function afficherDemande(texte, type) {
+      demandeMessage.textContent = texte;
+      demandeMessage.className = `message ${type}`;
+    }
+
+    // Liste des jeux : le catalogue publié (titres français), par ordre alphabétique.
+    async function chargerJeux() {
+      const choixVide = demandeJeu.options[0];
+      try {
+        const reponse = await fetch('/catalog.json', { cache: 'no-cache' });
+        const jeux = (await reponse.json()).games || [];
+        jeux.sort((a, b) => a.title.localeCompare(b.title, 'fr'));
+        for (const j of jeux) demandeJeu.append(new Option(j.title, j.id));
+        choixVide.textContent = 'Choisir un jeu…';
+      } catch (erreur) {
+        console.error('Catalogue illisible :', erreur);
+        choixVide.textContent = 'Jeux indisponibles';
+        afficherDemande('La liste des jeux ne se charge pas : vérifie ta connexion, puis recharge la page.', 'erreur');
+      }
+    }
+    chargerJeux();
+
+    demandeTexte.addEventListener('input', () => {
+      demandeCompteur.textContent = `${demandeTexte.value.length} / 2000`;
+    });
+
+    formDemande.addEventListener('submit', async (evenement) => {
+      evenement.preventDefault();
+      const donnees = { type: 'demande', jeu: demandeJeu.value, texte: demandeTexte.value.trim() };
+      if (!donnees.jeu) {
+        afficherDemande('Choisis le jeu concerné.', 'erreur');
+        demandeJeu.focus();
+        return;
+      }
+      if (donnees.texte.length < DEMANDE_MIN) {
+        afficherDemande(`Décris ta demande en quelques mots (${DEMANDE_MIN} caractères au moins).`, 'erreur');
+        demandeTexte.focus();
+        return;
+      }
+
+      const nomJeu = demandeJeu.selectedOptions[0]?.textContent || donnees.jeu;
+      demandeBouton.disabled = true;
+      afficherDemande('Envoi en cours…', 'ok');
+      try {
+        const reponse = await fetch('/api/idees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(donnees),
+        });
+        let corps = {};
+        try { corps = await reponse.json(); } catch { /* réponse sans JSON */ }
+        if (reponse.ok && corps.ok) {
+          formDemande.reset();
+          demandeCompteur.textContent = '0 / 2000';
+          afficherDemande(`Merci ! Ta demande sur « ${nomJeu} » est enregistrée : n° ${corps.numero}. L'IA s'en occupe tout de suite ; le résultat arrivera en commentaire de la demande sur GitHub.`, 'ok');
+        } else if (reponse.status === 403) {
+          afficherDemande(corps.erreur || 'Accès refusé : recharge la page pour te reconnecter.', 'erreur');
+        } else {
+          afficherDemande(corps.erreur || `Envoi impossible (erreur ${reponse.status}). Réessaie plus tard.`, 'erreur');
+        }
+      } catch (erreur) {
+        // Session Cloudflare Access expirée (redirection vers la connexion) ou pas de réseau.
+        console.error('Envoi impossible :', erreur);
+        afficherDemande('Envoi impossible : vérifie ta connexion, ou recharge la page pour te reconnecter.', 'erreur');
+      } finally {
+        demandeBouton.disabled = false;
       }
     });
   </script>

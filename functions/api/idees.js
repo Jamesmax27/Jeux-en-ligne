@@ -1,5 +1,6 @@
 // ==========================================================================
-// POST /api/idees — idée de jeu envoyée depuis la page privée /idees
+// POST /api/idees — idée de jeu ou demande de modification d'un jeu,
+// envoyée depuis la page privée /idees
 //
 // Corps : { "titre": "...", "genre": "...", "ages": "6+", "univers": ["ferme", ...],
 //           "description": "..." }
@@ -24,13 +25,25 @@
 //   scripts/idees.mjs importer-perso).
 // - GITHUB_TOKEN (secret) ne sert qu'ici : il n'est jamais renvoyé au navigateur.
 //
+// Demande de modification d'un jeu (même page, même accès) :
+//   corps { "type": "demande", "jeu": "<id du jeu>", "texte": "..." }
+// - jeu : identifiant d'un jeu publié (public/catalog.json) ; texte de 10 à
+//   2 000 caractères. Pas de type à choisir : l'IA classe la demande.
+// - Crée une issue « [Demande] <titre du jeu> » (étiquette « demande-ia »),
+//   rubriques « ### Jeu », « ### Demande », « ### Auteur », dans cet ordre.
+//   Elle est traitée aussitôt par .github/workflows/demande-modification.yml
+//   (voir DEMANDES.md).
+//
 // Réponse : { "ok": true, "numero": n } ou { "erreur": "..." }
 // ==========================================================================
 
-import { json } from '../_commun.js';
+import { json, titreJeu, creerIssueGitHub } from '../_commun.js';
 import { IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX } from '../../public/taxonomie.js';
 
 const ETIQUETTE = 'idee-perso';
+const ETIQUETTE_DEMANDE = 'demande-ia';
+const DEMANDE_MIN = 10;     // longueur du texte d'une demande de modification
+const DEMANDE_MAX = 2000;
 const CLES_DUREE = 3600000; // clés publiques d'Access gardées 1 h par instance
 const AGE_MIN = 4;          // âges permis : de « 4+ » à « 12+ » (la page propose ceux du formulaire GitHub)
 const AGE_MAX = 12;
@@ -115,27 +128,43 @@ function corpsIssue({ genre, ages, univers, description, auteur }) {
   ].join('\n');
 }
 
-async function creerIssue(env, titre, idee) {
-  const reponse = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/issues`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'Content-Type': 'application/json',
-      'User-Agent': 'jeux-en-ligne-idees',
-    },
-    body: JSON.stringify({
-      title: `Idée : ${titre}`,
-      body: corpsIssue(idee),
-      labels: [ETIQUETTE, idee.genre],
-    }),
-  });
-  if (!reponse.ok) {
-    console.error(`Création de l'issue impossible : HTTP ${reponse.status}`, (await reponse.text()).slice(0, 500));
-    return null;
+const creerIssue = (env, titre, idee) =>
+  creerIssueGitHub(env, { title: `Idée : ${titre}`, body: corpsIssue(idee), labels: [ETIQUETTE, idee.genre] });
+
+// « Demande » doit rester juste avant « Auteur » : le workflow lit le texte entre les deux.
+function corpsDemande({ jeu, texte, auteur }) {
+  return [
+    '### Jeu', '', jeu, '',
+    '### Demande', '', texte, '',
+    '### Auteur', '', auteur, '',
+    '---',
+    "_Demande envoyée depuis la page privée /idees. L'IA la classe et la traite aussitôt (DEMANDES.md) ; le résultat arrive en commentaire._",
+  ].join('\n');
+}
+
+// Demande de modification d'un jeu publié : issue « [Demande] <titre> », étiquette demande-ia.
+async function traiterDemande(env, request, corps, auteur) {
+  const jeu = typeof corps?.jeu === 'string' ? corps.jeu.trim() : '';
+  const texte = typeof corps?.texte === 'string' ? corps.texte.replace(/\r\n?/g, '\n').trim() : '';
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(jeu)) {
+    return json({ erreur: 'Choisis un jeu.' }, 400);
   }
-  return (await reponse.json()).number;
+  if (texte.length < DEMANDE_MIN || texte.length > DEMANDE_MAX) {
+    return json({ erreur: `La demande doit faire entre ${DEMANDE_MIN} et 2 000 caractères.` }, 400);
+  }
+  const titre = await titreJeu(env, request, jeu);
+  if (!titre) {
+    return json({ erreur: 'Jeu inconnu : recharge la page.' }, 400);
+  }
+  const numero = await creerIssueGitHub(env, {
+    title: `[Demande] ${titre}`,
+    body: corpsDemande({ jeu, texte, auteur }),
+    labels: [ETIQUETTE_DEMANDE],
+  });
+  if (!numero) {
+    return json({ erreur: "La demande n'a pas pu être enregistrée sur GitHub. Réessaie plus tard." }, 502);
+  }
+  return json({ ok: true, numero });
 }
 
 // --- Point d'entrée --------------------------------------------------------------
@@ -165,6 +194,15 @@ export async function onRequest({ request, env }) {
   } catch {
     return json({ erreur: 'Requête invalide.' }, 400);
   }
+
+  if (corps?.type === 'demande') {
+    if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
+      console.error('GITHUB_TOKEN ou GITHUB_REPO ne sont pas configurés.');
+      return json({ erreur: 'Envoi des demandes indisponible pour le moment.' }, 503);
+    }
+    return traiterDemande(env, request, corps, acces.email || acces.common_name || 'inconnu');
+  }
+
   const titre = typeof corps?.titre === 'string' ? corps.titre.replace(/\s+/g, ' ').trim() : '';
   const genre = typeof corps?.genre === 'string' ? corps.genre.trim() : '';
   const description = typeof corps?.description === 'string' ? corps.description.replace(/\r\n?/g, '\n').trim() : '';

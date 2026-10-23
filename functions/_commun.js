@@ -1,5 +1,5 @@
 // ==========================================================================
-// Outils communs aux fonctions de l'API (vote, session, tendances).
+// Outils communs aux fonctions de l'API (vote, session, tendances, idees).
 // Ce fichier n'exporte aucun onRequest… : il ne crée aucune adresse.
 // ==========================================================================
 
@@ -26,23 +26,58 @@ export async function empreinteVisiteur(request, env) {
 // --- Jeux publiés ------------------------------------------------------------
 // Liste des jeux du catalogue, relue au plus toutes les 5 minutes par instance.
 
-let jeuxConnus = null;
+let jeuxConnus = null;   // Map id → titre (français)
 let jeuxConnusLe = 0;
 
-export async function jeuExiste(env, request, gameId) {
+// Map des jeux publiés, ou null si le catalogue est illisible.
+async function lireJeux(env, request) {
   if (!jeuxConnus || Date.now() - jeuxConnusLe > 300000) {
     try {
       const reponse = await env.ASSETS.fetch(new URL('/catalog.json', request.url));
       const catalogue = await reponse.json();
-      jeuxConnus = new Set((catalogue.games || []).map((j) => j.id));
+      jeuxConnus = new Map((catalogue.games || []).map((j) => [j.id, j.title]));
       jeuxConnusLe = Date.now();
     } catch (erreur) {
-      // Catalogue illisible : on ne bloque pas, le format de l'id suffit.
       console.error('Catalogue illisible :', erreur);
-      return true;
+      return null;
     }
   }
-  return jeuxConnus.has(gameId);
+  return jeuxConnus;
+}
+
+export async function jeuExiste(env, request, gameId) {
+  const jeux = await lireJeux(env, request);
+  // Catalogue illisible : on ne bloque pas, le format de l'id suffit.
+  return jeux ? jeux.has(gameId) : true;
+}
+
+// Titre français d'un jeu publié ; null s'il est inconnu ou si le catalogue est illisible.
+export async function titreJeu(env, request, gameId) {
+  const jeux = await lireJeux(env, request);
+  return jeux?.get(gameId) ?? null;
+}
+
+// --- Issue GitHub ----------------------------------------------------------------
+// Crée une issue dans GITHUB_REPO avec GITHUB_TOKEN (secret Cloudflare, jamais
+// renvoyé au navigateur). Renvoie son numéro, ou null en cas d'échec.
+
+export async function creerIssueGitHub(env, { title, body, labels }) {
+  const reponse = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/issues`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json',
+      'User-Agent': 'jeux-en-ligne-idees',
+    },
+    body: JSON.stringify({ title, body, labels }),
+  });
+  if (!reponse.ok) {
+    console.error(`Création de l'issue impossible : HTTP ${reponse.status}`, (await reponse.text()).slice(0, 500));
+    return null;
+  }
+  return (await reponse.json()).number;
 }
 
 // --- Table « sessions » --------------------------------------------------------
