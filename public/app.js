@@ -257,8 +257,9 @@ function jeuxVisibles() {
 
 // Jaquette d'une carte : image, titre traduit en bandeau, badge « Nouveau ».
 // prioritaire : jaquette visible dès l'arrivée (chargée tout de suite, pas en différé).
+// badge : false pour la première ligne (Nouveautés et Tendances), sans badge « Nouveau ».
 // Texte alternatif : le titre (le lien de la carte a son propre aria-label, plus complet).
-function creerJaquette(jeu, prioritaire = false) {
+function creerJaquette(jeu, prioritaire = false, badge = true) {
   const jaquette = document.createElement('div');
   jaquette.className = 'jaquette';
 
@@ -280,11 +281,11 @@ function creerJaquette(jeu, prioritaire = false) {
   titre.textContent = titreJeu(jeu);
   jaquette.append(titre);
 
-  if (estNouveau(jeu)) {
-    const badge = document.createElement('span');
-    badge.className = 'badge-nouveau';
-    badge.textContent = t('carte.nouveau');
-    jaquette.append(badge);
+  if (badge && estNouveau(jeu)) {
+    const nouveau = document.createElement('span');
+    nouveau.className = 'badge-nouveau';
+    nouveau.textContent = t('carte.nouveau');
+    jaquette.append(nouveau);
   }
   return jaquette;
 }
@@ -372,14 +373,15 @@ function hachage(texte) {
   return h >>> 0;
 }
 
-// Carte compacte : la jaquette seule (titre traduit en bandeau, badge « Nouveau »).
+// Carte compacte : la jaquette seule, titre traduit en bandeau, sans badge
+// « Nouveau » (le titre « Nouveautés » le dit déjà).
 // cleAria : texte lu par les lecteurs d'écran (« …, parmi les nouveautés. »).
 function creerCarteVitrine(jeu, cleAria) {
   const li = document.createElement('li');
   const lien = document.createElement('a');
   lien.className = 'carte carte-vitrine';
   lien.href = urlJeu(jeu.id, getLang());
-  lien.append(creerJaquette(jeu));
+  lien.append(creerJaquette(jeu, false, false));
   const enFrancais = jeuEnFrancais(jeu) ? `(${t('carte.enFrancais')})` : '';
   lien.setAttribute('aria-label', [t(cleAria, { titre: titreJeu(jeu) }), descriptionJeu(jeu), enFrancais].filter(Boolean).join(' '));
   li.append(lien);
