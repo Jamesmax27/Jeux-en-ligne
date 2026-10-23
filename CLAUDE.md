@@ -262,7 +262,7 @@ Menu de tri du catalogue (égalités départagées par le score, puis le nombre 
 - **Nouveautés** : tous les jeux, du plus récent au plus ancien (badge « Nouveau » pendant 7 jours).
 
 - Portée : **Monde** ou **Mon pays** (pays donné par l'en-tête `X-Pays`). Si mon pays a moins de 20 votes en tout, le classement Monde est affiché, avec une phrase d'explication.
-- **Première ligne** tout en haut de l'accueil (sous la recherche, `#vitrine`), en deux moitiés de même hauteur, jaquettes seules (titre en bandeau, badge « Nouveau ») :
+- **Première ligne** tout en haut de l'accueil (sous la recherche, `#vitrine`), en deux moitiés de même hauteur, jaquettes seules (titre en bandeau, sans badge « Nouveau », décision du propriétaire : le titre « Nouveautés » le dit déjà ; le badge reste dans le catalogue) :
   - à gauche, **✦ Nouveautés** : les derniers jeux ajoutés (`added`), du plus récent au plus ancien (à date égale, ordre tiré à chaque visite : la boucle de nuit ajoute plusieurs jeux le même jour, chacun passe à son tour), aussi hors connexion ;
   - à droite, **🔥 Tendances** : 4 jeux parmi les plus joués des 7 derniers jours (`/api/tendances`, en joueurs différents : section 7), **sans rang, sans podium, sans aucun chiffre**, dans un ordre qui change chaque jour (hachage de « date UTC + id » : le même toute la journée pour tout le monde), sans les jeux déjà dans les Nouveautés, au plus 2 jeux du même genre principal ;
   - ni l'une ni l'autre ne montre de jeu des Archives ; sans API ou avec moins de 2 Tendances, les Nouveautés prennent toute la ligne (8 jaquettes) ;
