@@ -1719,12 +1719,46 @@ function sauver() {
 }
 
 // Sauvegarde de la progression (module JEL_SAVE) : « Continuer » reprend
-// directement à l'étage sauvegardé (1 à 10). Le score compte par étage ;
-// les Profondeurs (mode sans fin) ne sont pas sauvegardées.
+// directement à l'étage sauvegardé (1 à 10), avec les potions du sac. Le score
+// compte par étage (0 dans la sauvegarde). Dans les Profondeurs, on garde aussi
+// la profondeur, les cœurs, l'arme, les parchemins et le score des profondeurs
+// réussies ; la sauvegarde des Profondeurs est effacée quand le lutin s'épuise.
+// Données : { mode: 'etage' | 'prof', niveau, score, potions, prof: { pv, pvMax, arme, parchemins } | null }
 const JEU = 'caves-de-brumefer';
+const POTIONS_MAX = 9; // potions reprises au plus
 let effacerSauvegarde = null; // bouton de l'écran d'accueil, créé au démarrage
+// Nombre entier borné (sauvegarde absente ou abîmée : valeur par défaut)
+const borne = (v, min, max, defaut) => (Number.isFinite(Number(v)) ? Math.max(min, Math.min(max, Math.floor(Number(v)))) : defaut);
+// Écrit la partie en cours. Profondeurs : niveau = profondeur où reprendre,
+// score = points des profondeurs déjà réussies, pv = cœurs au départ.
+function sauverPartie(niveau, score, pv) {
+  const cleArme = Object.keys(ARMES).find((a) => ARMES[a] === S.arme) || 'baton';
+  JEL_SAVE.save(JEU, S.mode === 'prof'
+    ? { mode: 'prof', niveau, score, potions: S.potions, prof: { pv, pvMax: S.pvMax, arme: cleArme, parchemins: S.parchemins } }
+    : { mode: 'etage', niveau, score: 0, potions: S.potions, prof: null });
+}
+// Reprend la partie sauvegardée (bouton « Continuer »)
+function reprendre(d) {
+  const potions = borne(d.potions, 0, POTIONS_MAX, 0);
+  const p = d.prof;
+  if (d.mode === 'prof' && p && typeof p === 'object') {
+    const pvMax = borne(p.pvMax, 5, 20, 7);
+    const pv = borne(p.pv, 1, pvMax, pvMax);
+    lancer('prof', borne(d.niveau, 1, 999, 1), {
+      pv, pvMax, potions, arme: ARMES[p.arme] || ARMES.baton,
+      parchemins: borne(p.parchemins, 0, POTIONS_MAX, 0), score: borne(d.score, 0, 1e7, 0),
+    });
+    S.pv = pv; // lancer() rend un cœur en changeant de profondeur : pas à la reprise
+  } else {
+    lancer('etage', borne(d.niveau, 1, NB_ETAGES, 1));
+    S.potions = potions;
+  }
+  majHud(true);
+}
 JEL_SAVE.surFermeture(() => {
-  if (S && S.mode === 'etage' && !S.fini && ecranCourant === 'jeu') JEL_SAVE.save(JEU, { niveau: S.n, score: 0 });
+  if (!S || S.fini || ecranCourant !== 'jeu') return;
+  // La cave est refaite à la reprise : on garde le sac, pas les points de l'étage en cours.
+  sauverPartie(S.n, S.mode === 'prof' ? S.scoreAvant : 0, S.pv);
 });
 
 // ---------- 2. Sons (Web Audio, aucun fichier) ----------
@@ -2554,11 +2588,15 @@ function victoire() {
     if (S.n < NB_ETAGES) sauv.debloque = Math.max(sauv.debloque, S.n + 1);
     else sauv.fini = true;
     // Étage réussi : on reprendra au suivant (le 10e reste le dernier).
-    JEL_SAVE.save(JEU, { niveau: Math.min(S.n + 1, NB_ETAGES), score: 0 });
+    // Chaque étage repart sans potion : le sac sauvegardé est vide.
+    JEL_SAVE.save(JEU, { mode: 'etage', niveau: Math.min(S.n + 1, NB_ETAGES), score: 0, potions: 0, prof: null });
   } else {
     const total = S.scoreAvant + S.score;
     if (S.n > sauv.prof) { sauv.prof = S.n; record = true; }
     if (total > sauv.profScore) { sauv.profScore = total; record = true; }
+    // Profondeur réussie : on reprendra à la suivante, comme le bouton « Plus bas »
+    // (cœurs, arme, potions, parchemins et score gardés, un cœur rendu).
+    sauverPartie(S.n + 1, total, Math.min(S.pvMax, S.pv + 1));
   }
   sauver();
   confettis(90);
@@ -2574,6 +2612,8 @@ function defaite() {
   if (S.mode === 'prof') {
     const total = S.scoreAvant + S.score;
     if (total > sauv.profScore) { sauv.profScore = total; record = true; sauver(); }
+    // Lutin épuisé : la descente est finie, sa sauvegarde aussi.
+    if (JEL_SAVE.load(JEU).mode === 'prof') JEL_SAVE.clear(JEU);
   }
   setTimeout(() => montrerBilan(false, 0, 0, record), 1100);
 }
@@ -3143,7 +3183,7 @@ $('bJouer').addEventListener('click', () => {
   SON.clic();
   JEL_SAVE.reprise({
     jeu: JEU,
-    onContinuer: (d) => lancer('etage', Math.max(1, Math.min(d.niveau, NB_ETAGES))),
+    onContinuer: reprendre,
     onNouvelle: () => {
       // Reprend au premier étage pas encore réussi.
       let n = 1;
@@ -3153,7 +3193,12 @@ $('bJouer').addEventListener('click', () => {
   });
 });
 $('bEtages').addEventListener('click', () => { SON.clic(); montrer('etages'); });
-$('bProf').addEventListener('click', () => { SON.clic(); lancer('prof', 1); });
+$('bProf').addEventListener('click', () => {
+  SON.clic();
+  // Une descente sauvegardée : proposer de la continuer.
+  if (JEL_SAVE.load(JEU).mode === 'prof') JEL_SAVE.reprise({ jeu: JEU, onContinuer: reprendre, onNouvelle: () => lancer('prof', 1) });
+  else lancer('prof', 1);
+});
 $('bRetour').addEventListener('click', () => { SON.clic(); montrer('accueil'); });
 
 // Bouton du son (choix mémorisé)
