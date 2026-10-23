@@ -794,7 +794,7 @@
   //                prochaine écriture du jeu)
   //   onEffacer    f() facultatif, après effacement (par défaut : onNouvelle)
   //   sansNiveau   true pour un jeu sans niveaux (partie sans fin) : la fenêtre
-  //                montre seulement le score
+  //                montre seulement le score (rien s'il est nul)
   // Sans sauvegarde utilisable : rien ne s'affiche, onNouvelle() est appelé
   // tout de suite. Renvoie true si la fenêtre s'affiche.
   function reprise(options) {
@@ -821,8 +821,9 @@
     carte.setAttribute('aria-labelledby', titre.id);
     var detail = document.createElement('p');
     detail.textContent = options.sansNiveau
-      ? texte('score', { n: d.score })
+      ? (d.score ? texte('score', { n: d.score }) : '')
       : texte('niveau', { n: d.niveau }) + (d.score ? ' · ' + texte('score', { n: d.score }) : '');
+    if (!detail.textContent) detail.hidden = true;
     var bContinuer = bouton('principal', texte('continuer'));
     var bNouvelle = bouton('', texte('nouvelle'));
     var bEffacer = bouton('discret', texte('effacer'));

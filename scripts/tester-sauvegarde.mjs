@@ -40,7 +40,7 @@ const DOSSIER_JEUX = path.join(RACINE, 'games');
 const BASE = 'http://jel.test';
 const NIVEAU_TEST = 3;
 const SCORE_TEST = 42;
-const BOUTON_JOUER = /jouer|commencer|c.est parti|démarrer|^go|partir|play|start/i;
+const BOUTON_JOUER = /jouer|commencer|c.est parti|démarrer|lancer|^go|partir|play|start/i;
 
 const args = process.argv.slice(2);
 const avecCaptures = args.includes('--captures');
