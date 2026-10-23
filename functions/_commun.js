@@ -1,5 +1,6 @@
 // ==========================================================================
-// Outils communs aux fonctions de l'API (vote, session, tendances, idees).
+// Outils communs aux fonctions de l'API (vote, session, tendances, idees,
+// demandes, moderation).
 // Ce fichier n'exporte aucun onRequest… : il ne crée aucune adresse.
 // ==========================================================================
 
@@ -90,27 +91,138 @@ export async function titreJeu(env, request, gameId) {
   return jeux?.get(gameId) ?? null;
 }
 
-// --- Issue GitHub ----------------------------------------------------------------
-// Crée une issue dans GITHUB_REPO avec GITHUB_TOKEN (secret Cloudflare, jamais
-// renvoyé au navigateur). Renvoie son numéro, ou null en cas d'échec.
+// --- Turnstile (anti-robot) ----------------------------------------------------
+// Vérifie un jeton Cloudflare Turnstile (secret TURNSTILE_SECRET) pour l'action
+// attendue (« vote », « demande »). Faux si le jeton est refusé ou si la
+// vérification est impossible.
 
+const URL_TURNSTILE = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+
+export async function verifierTurnstile(secret, jeton, ip, action) {
+  const formulaire = new FormData();
+  formulaire.append('secret', secret);
+  formulaire.append('response', jeton);
+  if (ip) formulaire.append('remoteip', ip);
+  try {
+    const reponse = await fetch(URL_TURNSTILE, { method: 'POST', body: formulaire });
+    const resultat = await reponse.json();
+    return resultat.success === true && (!resultat.action || resultat.action === action);
+  } catch (erreur) {
+    console.error('Vérification Turnstile impossible :', erreur);
+    return false;
+  }
+}
+
+// --- GitHub ------------------------------------------------------------------------
+// Appels à l'API REST de GitHub sur GITHUB_REPO avec GITHUB_TOKEN (secret
+// Cloudflare, jamais renvoyé au navigateur ; droits nécessaires : Issues en
+// lecture et écriture sur ce seul dépôt).
+
+/**
+ * Appel à https://api.github.com/repos/<GITHUB_REPO><chemin>.
+ * Renvoie { ok, statut, donnees } ; ne lève jamais d'erreur (réseau : statut 0).
+ */
+export async function appelGitHub(env, methode, chemin, corps) {
+  try {
+    const reponse = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}${chemin}`, {
+      method: methode,
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'jeux-en-ligne-idees',
+        ...(corps !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(corps !== undefined ? { body: JSON.stringify(corps) } : {}),
+    });
+    const texte = await reponse.text();
+    let donnees = null;
+    try { donnees = texte ? JSON.parse(texte) : null; } catch { donnees = texte; }
+    if (!reponse.ok) console.error(`GitHub ${methode} ${chemin} : HTTP ${reponse.status}`, String(texte).slice(0, 500));
+    return { ok: reponse.ok, statut: reponse.status, donnees };
+  } catch (erreur) {
+    console.error(`GitHub ${methode} ${chemin} injoignable :`, erreur);
+    return { ok: false, statut: 0, donnees: null };
+  }
+}
+
+// Crée une issue. Renvoie son numéro, ou null en cas d'échec.
 export async function creerIssueGitHub(env, { title, body, labels }) {
-  const reponse = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/issues`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-      'Content-Type': 'application/json',
-      'User-Agent': 'jeux-en-ligne-idees',
-    },
-    body: JSON.stringify({ title, body, labels }),
-  });
-  if (!reponse.ok) {
-    console.error(`Création de l'issue impossible : HTTP ${reponse.status}`, (await reponse.text()).slice(0, 500));
+  const r = await appelGitHub(env, 'POST', '/issues', { title, body, labels });
+  if (!r.ok) {
+    console.error(`Création de l'issue impossible : HTTP ${r.statut}`);
     return null;
   }
-  return (await reponse.json()).number;
+  return r.donnees.number;
+}
+
+// --- Jeton Cloudflare Access (pages privées /idees) ----------------------------
+// Vérifie le jeton Cf-Access-Jwt-Assertion : signature RS256 avec les clés de
+// https://<ACCESS_TEAM_DOMAIN>/cdn-cgi/access/certs, audience ACCESS_AUD,
+// émetteur, dates. Renvoie son contenu s'il est valide, sinon null.
+
+const CLES_DUREE = 3600000; // clés publiques d'Access gardées 1 h par instance
+
+let cles = null;      // Map kid → CryptoKey
+let clesLe = 0;
+let clesDomaine = '';
+
+const domaineEquipe = (env) => String(env.ACCESS_TEAM_DOMAIN || '').trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+
+function base64UrlEnOctets(texte) {
+  const b64 = texte.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(texte.length / 4) * 4, '=');
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+}
+
+const base64UrlEnJson = (texte) => JSON.parse(new TextDecoder().decode(base64UrlEnOctets(texte)));
+
+async function chargerCles(domaine, forcer) {
+  if (!forcer && cles && clesDomaine === domaine && Date.now() - clesLe < CLES_DUREE) return cles;
+  const reponse = await fetch(`https://${domaine}/cdn-cgi/access/certs`);
+  if (!reponse.ok) throw new Error(`clés Access : HTTP ${reponse.status}`);
+  const { keys } = await reponse.json();
+  const nouvelles = new Map();
+  for (const jwk of keys || []) {
+    if (jwk.kty !== 'RSA' || !jwk.kid) continue;
+    nouvelles.set(jwk.kid, await crypto.subtle.importKey(
+      'jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']));
+  }
+  cles = nouvelles;
+  clesLe = Date.now();
+  clesDomaine = domaine;
+  return cles;
+}
+
+export async function verifierJetonAccess(jeton, env) {
+  const domaine = domaineEquipe(env);
+  if (!jeton || !domaine || !env.ACCESS_AUD) return null;
+  const morceaux = jeton.split('.');
+  if (morceaux.length !== 3) return null;
+  try {
+    const entete = base64UrlEnJson(morceaux[0]);
+    const contenu = base64UrlEnJson(morceaux[1]);
+    if (entete.alg !== 'RS256' || !entete.kid) return null;
+
+    // Clé inconnue : Access a peut-être changé ses clés, on les relit une fois.
+    let cle = (await chargerCles(domaine, false)).get(entete.kid);
+    if (!cle) cle = (await chargerCles(domaine, true)).get(entete.kid);
+    if (!cle) return null;
+
+    const signe = new TextEncoder().encode(`${morceaux[0]}.${morceaux[1]}`);
+    const valide = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', cle, base64UrlEnOctets(morceaux[2]), signe);
+    if (!valide) return null;
+
+    const maintenant = Math.floor(Date.now() / 1000);
+    const audiences = Array.isArray(contenu.aud) ? contenu.aud : [contenu.aud];
+    if (!audiences.includes(env.ACCESS_AUD)) return null;
+    if (contenu.iss !== `https://${domaine}`) return null;
+    if (typeof contenu.exp !== 'number' || contenu.exp <= maintenant) return null;
+    if (typeof contenu.nbf === 'number' && contenu.nbf > maintenant + 60) return null;
+    return contenu;
+  } catch (erreur) {
+    console.error('Jeton Access illisible ou clés indisponibles :', erreur);
+    return null;
+  }
 }
 
 // --- Table « sessions » --------------------------------------------------------

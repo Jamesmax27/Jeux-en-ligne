@@ -410,6 +410,7 @@ async function attendreServeur(url, essais = 60) {
 // - pages générées (scripts/pages-seo.mjs) : accueil, fiche et catégorie d'un
 //   jeu ; la langue est celle de l'adresse (/en/…), liens hreflang dans le HTML ;
 // - pages légales (générées, en français et en anglais) ;
+// - formulaire public de demandes (généré, /proposer/?jeu=…) ;
 // - page traduite en JavaScript (?lang=) : le lanceur.
 async function testerSite(navigateur, idExemple) {
   const build = spawnSync(process.execPath, [path.join(RACINE, 'scripts', 'build-catalog.mjs')], { encoding: 'utf8' });
@@ -447,6 +448,8 @@ async function testerSite(navigateur, idExemple) {
           ['fiche du jeu', chemins.urlJeu(jeu.id, lang), 'générée', 800],
           ['catégorie', chemins.urlCategorie('genre', jeu.genre, lang), 'générée', 800],
           ['lanceur', `/play?id=${jeu.id}&lang=${lang}`, 'js', 2500],
+          // Formulaire public de demandes (généré, non indexé), avec le jeu déjà choisi.
+          ['formulaire de demandes', chemins.urlProposer(lang, jeu.id), 'générée', 1500],
         ] : []),
         // Pages légales : en français et en anglais seulement (les autres langues y mènent).
         ...(chemins.LANGUES_LEGALES.includes(lang) ? chemins.PAGES_LEGALES.map((p) => [`page légale ${p}`, chemins.urlLegale(p, lang), 'générée', 800]) : []),

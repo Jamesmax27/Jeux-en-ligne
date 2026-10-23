@@ -1,14 +1,14 @@
 // ==========================================================================
-// POST /api/idees — idée de jeu ou demande de modification d'un jeu,
-// envoyée depuis la page privée /idees
+// POST /api/idees — page privée /idees : idée de jeu, demande de modification
+// d'un jeu, et décisions sur les demandes du formulaire public
 //
 // Corps : { "titre": "...", "genre": "...", "ages": "6+", "univers": ["ferme", ...],
 //           "description": "..." }
 //
 // - Réservé aux personnes connectées par Cloudflare Access : le jeton
-//   Cf-Access-Jwt-Assertion est vérifié (signature RS256 avec les clés de
-//   https://<ACCESS_TEAM_DOMAIN>/cdn-cgi/access/certs, audience ACCESS_AUD,
-//   émetteur, dates). Jeton absent ou invalide : 403.
+//   Cf-Access-Jwt-Assertion est vérifié (verifierJetonAccess, functions/_commun.js :
+//   signature RS256 avec les clés de https://<ACCESS_TEAM_DOMAIN>/cdn-cgi/access/certs,
+//   audience ACCESS_AUD, émetteur, dates). Jeton absent ou invalide : 403.
 // - Champs : titre de 3 à 100 caractères, description de 2 000 au plus,
 //   genre : identifiant de la liste fermée (public/taxonomie.js) ;
 //   ages (obligatoire) : âge minimum conseillé « N+ », de « 4+ » à « 12+ » ;
@@ -19,10 +19,9 @@
 //   « idee-perso » et le genre). La boucle de nuit (boucle-de-nuit.yml,
 //   étape b) la transforme en idée prioritaire, puis la ferme avec le lien
 //   de la pull request du jeu. Le corps de l'issue suit le format qu'elle lit
-//   (rubriques « ### Genre », « ### Âge », « ### Univers », « ### Description »,
-//   « ### Auteur », dans cet ordre ; univers : identifiants séparés par
-//   « , », ou « _Aucun univers_ » ; l'âge et les univers passent ensuite par
-//   scripts/idees.mjs importer-perso).
+//   (corpsIdee, functions/_demandes.js : rubriques « ### Genre », « ### Âge »,
+//   « ### Univers », « ### Description », « ### Auteur », dans cet ordre ;
+//   l'âge et les univers passent ensuite par scripts/idees.mjs importer-perso).
 // - GITHUB_TOKEN (secret) ne sert qu'ici : il n'est jamais renvoyé au navigateur.
 //
 // Demande de modification d'un jeu (même page, même accès) :
@@ -34,102 +33,34 @@
 //   Elle est traitée aussitôt par .github/workflows/demande-modification.yml
 //   (voir DEMANDES.md).
 //
+// Demandes du formulaire public (onglet « Demandes publiques », même accès ;
+// circuit complet : functions/_demandes.js et DEMANDES.md) :
+//   { "type": "publiques" }  → { ok, demandes: [...], enModeration: n }
+//       demandes validées par l'IA (étiquette valide-ia), en attente d'une décision ;
+//   { "type": "publique-accepter", "numero": n, "genre", "ages", "univers" }
+//       (genre, âge et univers : nouveau jeu seulement) ;
+//   { "type": "publique-refuser", "numero": n, "bannir": true | false } ;
+//   { "type": "blocages" }   → { ok, blocages: [...] } empreintes bloquées ou bannies ;
+//   { "type": "blocage", "visiteur": "<empreinte>", "action": "debloquer" | "bannir" }.
+//
 // Réponse : { "ok": true, "numero": n } ou { "erreur": "..." }
 // ==========================================================================
 
-import { json, titreJeu, creerIssueGitHub } from '../_commun.js';
-import { IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX } from '../../public/taxonomie.js';
+import { json, titreJeu, creerIssueGitHub, verifierJetonAccess } from '../_commun.js';
+import {
+  corpsIdee, problemeClassement, listerPubliques, accepterPublique, refuserPublique,
+  preparerTables, listerBlocages, debloquer, bannir,
+} from '../_demandes.js';
 
 const ETIQUETTE = 'idee-perso';
 const ETIQUETTE_DEMANDE = 'demande-ia';
 const DEMANDE_MIN = 10;     // longueur du texte d'une demande de modification
 const DEMANDE_MAX = 2000;
-const CLES_DUREE = 3600000; // clés publiques d'Access gardées 1 h par instance
-const AGE_MIN = 4;          // âges permis : de « 4+ » à « 12+ » (la page propose ceux du formulaire GitHub)
-const AGE_MAX = 12;
-
-// --- Jeton Cloudflare Access -------------------------------------------------
-
-let cles = null;      // Map kid → CryptoKey
-let clesLe = 0;
-let clesDomaine = '';
-
-const domaineEquipe = (env) => String(env.ACCESS_TEAM_DOMAIN || '').trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
-
-function base64UrlEnOctets(texte) {
-  const b64 = texte.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(texte.length / 4) * 4, '=');
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-}
-
-const base64UrlEnJson = (texte) => JSON.parse(new TextDecoder().decode(base64UrlEnOctets(texte)));
-
-async function chargerCles(domaine, forcer) {
-  if (!forcer && cles && clesDomaine === domaine && Date.now() - clesLe < CLES_DUREE) return cles;
-  const reponse = await fetch(`https://${domaine}/cdn-cgi/access/certs`);
-  if (!reponse.ok) throw new Error(`clés Access : HTTP ${reponse.status}`);
-  const { keys } = await reponse.json();
-  const nouvelles = new Map();
-  for (const jwk of keys || []) {
-    if (jwk.kty !== 'RSA' || !jwk.kid) continue;
-    nouvelles.set(jwk.kid, await crypto.subtle.importKey(
-      'jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']));
-  }
-  cles = nouvelles;
-  clesLe = Date.now();
-  clesDomaine = domaine;
-  return cles;
-}
-
-// Renvoie le contenu du jeton s'il est valide, sinon null.
-async function verifierJetonAccess(jeton, env) {
-  const domaine = domaineEquipe(env);
-  if (!jeton || !domaine || !env.ACCESS_AUD) return null;
-  const morceaux = jeton.split('.');
-  if (morceaux.length !== 3) return null;
-  try {
-    const entete = base64UrlEnJson(morceaux[0]);
-    const contenu = base64UrlEnJson(morceaux[1]);
-    if (entete.alg !== 'RS256' || !entete.kid) return null;
-
-    // Clé inconnue : Access a peut-être changé ses clés, on les relit une fois.
-    let cle = (await chargerCles(domaine, false)).get(entete.kid);
-    if (!cle) cle = (await chargerCles(domaine, true)).get(entete.kid);
-    if (!cle) return null;
-
-    const signe = new TextEncoder().encode(`${morceaux[0]}.${morceaux[1]}`);
-    const valide = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', cle, base64UrlEnOctets(morceaux[2]), signe);
-    if (!valide) return null;
-
-    const maintenant = Math.floor(Date.now() / 1000);
-    const audiences = Array.isArray(contenu.aud) ? contenu.aud : [contenu.aud];
-    if (!audiences.includes(env.ACCESS_AUD)) return null;
-    if (contenu.iss !== `https://${domaine}`) return null;
-    if (typeof contenu.exp !== 'number' || contenu.exp <= maintenant) return null;
-    if (typeof contenu.nbf === 'number' && contenu.nbf > maintenant + 60) return null;
-    return contenu;
-  } catch (erreur) {
-    console.error('Jeton Access illisible ou clés indisponibles :', erreur);
-    return null;
-  }
-}
 
 // --- Issue GitHub --------------------------------------------------------------
 
-// « Description » doit rester juste avant « Auteur » : la boucle de nuit lit le texte entre les deux.
-function corpsIssue({ genre, ages, univers, description, auteur }) {
-  return [
-    '### Genre', '', genre, '',
-    '### Âge', '', ages, '',
-    '### Univers', '', univers.length ? univers.join(', ') : '_Aucun univers_', '',
-    '### Description', '', description || '_Aucune description_', '',
-    '### Auteur', '', auteur, '',
-    '---',
-    '_Idée envoyée depuis la page privée /idees. La boucle de nuit la fabrique en priorité, puis ferme cette issue avec le lien de la pull request du jeu._',
-  ].join('\n');
-}
-
 const creerIssue = (env, titre, idee) =>
-  creerIssueGitHub(env, { title: `Idée : ${titre}`, body: corpsIssue(idee), labels: [ETIQUETTE, idee.genre] });
+  creerIssueGitHub(env, { title: `Idée : ${titre}`, body: corpsIdee(idee), labels: [ETIQUETTE, idee.genre] });
 
 // « Demande » doit rester juste avant « Auteur » : le workflow lit le texte entre les deux.
 function corpsDemande({ jeu, texte, auteur }) {
@@ -167,6 +98,48 @@ async function traiterDemande(env, request, corps, auteur) {
   return json({ ok: true, numero });
 }
 
+// --- Demandes du formulaire public --------------------------------------------------
+
+const EMPREINTE = /^[0-9a-f]{64}$/;
+
+async function traiterPublique(env, request, corps, auteur) {
+  const resultat = (r) => (r.erreur ? json({ erreur: r.erreur }, r.statut || 400) : json(r));
+  switch (corps.type) {
+    case 'publiques': {
+      const liste = await listerPubliques(env, (id) => titreJeu(env, request, id));
+      if (!liste) return json({ erreur: 'Liste des demandes indisponible (GitHub ne répond pas). Réessaie plus tard.' }, 502);
+      return json({ ok: true, ...liste });
+    }
+    case 'publique-accepter': {
+      const univers = corps.univers ?? [];
+      const classement = { genre: typeof corps.genre === 'string' ? corps.genre.trim() : '', ages: typeof corps.ages === 'string' ? corps.ages.replace(/\s+/g, '') : '', univers };
+      return resultat(await accepterPublique(env, { numero: Number(corps.numero), classement, auteur }));
+    }
+    case 'publique-refuser': {
+      if (corps.bannir === true && !env.DB) return json({ erreur: 'Base DB non configurée : bannissement impossible.' }, 503);
+      if (corps.bannir === true) await preparerTables(env);
+      return resultat(await refuserPublique(env, { numero: Number(corps.numero), bannir: corps.bannir === true, auteur }));
+    }
+    case 'blocages': {
+      if (!env.DB) return json({ erreur: 'Base DB non configurée.' }, 503);
+      await preparerTables(env);
+      return json({ ok: true, blocages: await listerBlocages(env) });
+    }
+    case 'blocage': {
+      if (!env.DB) return json({ erreur: 'Base DB non configurée.' }, 503);
+      const visiteur = typeof corps.visiteur === 'string' ? corps.visiteur : '';
+      if (!EMPREINTE.test(visiteur)) return json({ erreur: 'Empreinte invalide.' }, 400);
+      await preparerTables(env);
+      if (corps.action === 'debloquer') await debloquer(env, visiteur);
+      else if (corps.action === 'bannir') await bannir(env, visiteur, `banni à la main par ${auteur}`);
+      else return json({ erreur: 'Action inconnue.' }, 400);
+      return json({ ok: true });
+    }
+    default:
+      return null;
+  }
+}
+
 // --- Point d'entrée --------------------------------------------------------------
 
 export async function onRequest({ request, env }) {
@@ -187,6 +160,7 @@ export async function onRequest({ request, env }) {
   if (!acces) {
     return json({ erreur: 'Accès refusé : connexion Cloudflare Access absente ou expirée. Recharge la page.' }, 403);
   }
+  const auteur = acces.email || acces.common_name || 'inconnu';
 
   let corps;
   try {
@@ -195,12 +169,23 @@ export async function onRequest({ request, env }) {
     return json({ erreur: 'Requête invalide.' }, 400);
   }
 
+  if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
+    console.error('GITHUB_TOKEN ou GITHUB_REPO ne sont pas configurés.');
+    return json({ erreur: 'Envoi indisponible pour le moment (GitHub non configuré).' }, 503);
+  }
+
   if (corps?.type === 'demande') {
-    if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
-      console.error('GITHUB_TOKEN ou GITHUB_REPO ne sont pas configurés.');
-      return json({ erreur: 'Envoi des demandes indisponible pour le moment.' }, 503);
+    return traiterDemande(env, request, corps, auteur);
+  }
+  if (typeof corps?.type === 'string') {
+    try {
+      const reponse = await traiterPublique(env, request, corps, auteur);
+      if (reponse) return reponse;
+    } catch (erreur) {
+      console.error('Action sur les demandes publiques impossible :', erreur);
+      return json({ erreur: 'Action impossible pour le moment. Réessaie plus tard.' }, 503);
     }
-    return traiterDemande(env, request, corps, acces.email || acces.common_name || 'inconnu');
+    return json({ erreur: 'Type de requête inconnu.' }, 400);
   }
 
   const titre = typeof corps?.titre === 'string' ? corps.titre.replace(/\s+/g, ' ').trim() : '';
@@ -215,32 +200,14 @@ export async function onRequest({ request, env }) {
   if (description.length > 2000) {
     return json({ erreur: 'La description ne doit pas dépasser 2 000 caractères.' }, 400);
   }
-  if (!IDS_GENRES.includes(genre)) {
-    return json({ erreur: 'Genre inconnu.' }, 400);
-  }
-  // Âge : « N+ », de AGE_MIN à AGE_MAX (même format que "ages" des idées et de game.json).
-  const age = /^\d{1,2}\+$/.test(ages) ? parseInt(ages, 10) : NaN;
-  if (!(age >= AGE_MIN && age <= AGE_MAX)) {
-    return json({ erreur: `Choisis un âge conseillé, de ${AGE_MIN}+ à ${AGE_MAX}+.` }, 400);
-  }
-  // Univers : identifiants de la liste fermée (public/taxonomie.js), mêmes règles que scripts/controle-taxonomie.mjs.
-  if (!Array.isArray(univers) || univers.some((u) => !IDS_UNIVERS.includes(u))) {
-    return json({ erreur: 'Univers inconnu.' }, 400);
-  }
-  if (new Set(univers).size !== univers.length || univers.length > UNIVERS_MAX) {
-    return json({ erreur: `${UNIVERS_MAX} univers au plus, sans doublon.` }, 400);
-  }
-  if (univers.includes('autre') && univers.length > 1) {
-    return json({ erreur: "L'univers « Autre » ne se combine pas avec un autre univers." }, 400);
+  // Genre, âge (« N+ », de 4+ à 12+) et univers : listes fermées de public/taxonomie.js
+  // (mêmes règles que scripts/controle-taxonomie.mjs).
+  const probleme = problemeClassement({ genre, ages, univers });
+  if (probleme) {
+    return json({ erreur: probleme }, 400);
   }
 
-  if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
-    console.error('GITHUB_TOKEN ou GITHUB_REPO ne sont pas configurés.');
-    return json({ erreur: 'Envoi des idées indisponible pour le moment.' }, 503);
-  }
-
-  const auteur = acces.email || acces.common_name || 'inconnu';
-  const numero = await creerIssue(env, titre, { genre, ages: `${age}+`, univers, description, auteur });
+  const numero = await creerIssue(env, titre, { genre, ages: `${parseInt(ages, 10)}+`, univers, description, auteur });
   if (!numero) {
     return json({ erreur: "L'idée n'a pas pu être enregistrée sur GitHub. Réessaie plus tard." }, 502);
   }

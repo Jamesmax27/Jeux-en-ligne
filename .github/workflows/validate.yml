@@ -19,7 +19,10 @@
 #   - règles ou vérificateur → référencement de tout le site (rapide, sans
 #     du référencement         navigateur), sans tester tous les jeux ;
 #   - style.css ou icônes    → seulement le contrôle du bloc d'icônes généré
-#                              (rapide, sans navigateur).
+#                              (rapide, sans navigateur) ;
+#   - fonctions Cloudflare,  → tests des demandes publiques et des votes
+#     formulaire public ou     (scripts/tester-demandes.mjs : rapide, sans
+#     modération IA            navigateur ni réseau).
 # Le reste (documentation, autres fichiers du site…) ne déclenche rien.
 #
 # Navigateur : le Google Chrome déjà installé sur les machines de GitHub
@@ -47,6 +50,11 @@ on:
       - "public/consentement.js"
       - "public/mesure.js"
       - "public/pub.js"
+      - "public/votes.js"
+      - "public/turnstile.js"
+      - "public/proposer.js"
+      - "public/demandes-regles.js"
+      - "functions/**"
       - "gabarits/**"
       - "idees.json"
       - "idees-archive.json"
@@ -63,6 +71,9 @@ on:
       - "scripts/pages-seo.mjs"
       - "scripts/regles-seo.mjs"
       - "scripts/verifier-seo.mjs"
+      - "scripts/moderation.mjs"
+      - "scripts/tester-demandes.mjs"
+      - "schema.sql"
   workflow_dispatch:
 
 jobs:
@@ -110,7 +121,11 @@ jobs:
           # Textes, taxonomie, gabarits (textes des catégories compris), générateur
           # des pages et pages du site : le site est testé avec un seul jeu.
           site=0
-          if printf '%s\n' "$fichiers" | grep -Eq '^(public/i18n/|gabarits/|public/(taxonomie|chemins|app|langue|play|sw|consentement|mesure|pub)\.js$|public/play\.html$|public/_headers$|scripts/(build-catalog|pages-seo)\.mjs$)'; then site=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(public/i18n/|gabarits/|public/(taxonomie|chemins|app|langue|play|sw|consentement|mesure|pub|votes|turnstile|proposer|demandes-regles)\.js$|public/play\.html$|public/_headers$|scripts/(build-catalog|pages-seo)\.mjs$)'; then site=1; fi
+          # Fonctions Cloudflare, formulaire public et modération : tests des demandes (sans navigateur).
+          demandes=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then demandes=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|public/(demandes-regles|taxonomie)\.js$|scripts/(moderation|tester-demandes)\.mjs$|schema\.sql$)'; then demandes=1; fi
           # Référencement de tout le site : tout ce qui précède, plus les règles et
           # le vérificateur du référencement (sans navigateur).
           seo=0
@@ -124,8 +139,9 @@ jobs:
             echo "site=$site"
             echo "seo=$seo"
             echo "navigateur=$navigateur"
+            echo "demandes=$demandes"
           } >> "$GITHUB_OUTPUT"
-          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur"
+          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes"
 
       - name: Préparer le navigateur de test
         if: steps.quoi.outputs.navigateur == '1'
@@ -191,6 +207,13 @@ jobs:
           else
             node scripts/check-i18n.js --statique
           fi
+
+      # Formulaire public de demandes (functions/api/demandes.js, moderation.js,
+      # actions de /idees) et votes : base SQLite en mémoire, faux GitHub et
+      # Turnstile. Voir DEMANDES.md.
+      - name: Contrôler les demandes publiques
+        if: steps.quoi.outputs.demandes == '1'
+        run: node scripts/tester-demandes.mjs
 
       # Icônes des regroupements : le bloc généré de public/style.css doit
       # correspondre aux dessins de scripts/icones/sources (sans navigateur).

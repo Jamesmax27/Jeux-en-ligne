@@ -11,6 +11,8 @@
 //   univers     /univers/<id>/   /en/worlds/<id>/ /es/mundos/<id>/  /pt/mundos/<id>/  /de/welten/<id>/
 //   âge         /ages/<slug>/    /en/ages/<slug>/ /es/edades/<slug>/ /pt/idades/<slug>/ /de/alter/<slug>/
 //   lanceur     /play?id=<id>&lang=<langue>  (une seule page, non indexée)
+//   proposer    /proposer/       /en/suggest/     /es/proponer/     /pt/sugerir/     /de/vorschlagen/
+//               (formulaire public de demandes, non indexé ; ?jeu=<id> choisit le jeu)
 //
 // Pages légales, en français et en anglais seulement (les autres langues
 // mènent à la version anglaise) :
@@ -44,6 +46,9 @@ const SEGMENTS = {
   univers: { fr: 'univers', en: 'worlds', es: 'mundos', pt: 'mundos', de: 'welten' },
   age: { fr: 'ages', en: 'ages', es: 'edades', pt: 'idades', de: 'alter' },
 };
+
+// Formulaire public de demandes (proposer un jeu, signaler un bug, demander une modification).
+const SEGMENTS_PROPOSER = { fr: 'proposer', en: 'suggest', es: 'proponer', pt: 'sugerir', de: 'vorschlagen' };
 
 // Tranches d'âge (TRANCHES_AGE de taxonomie.js) → morceau d'adresse (« + » est interdit).
 export const SLUGS_AGE = { '3-4': '3-4', '5-6': '5-6', '7-8': '7-8', '9+': '9-plus' };
@@ -90,6 +95,12 @@ export function urlLegale(page, lang) {
   const segment = SEGMENTS_LEGAUX[page]?.[l];
   if (!segment) throw new Error(`page légale inconnue : ${page}`);
   return `/${PREFIXE[l]}${segment}/`;
+}
+
+/** Formulaire public de demandes : « /proposer/ », « /en/suggest/ »… ; avec un jeu : « /proposer/?jeu=<id> ». */
+export function urlProposer(lang, idJeu) {
+  const l = langueValide(lang);
+  return `/${PREFIXE[l]}${SEGMENTS_PROPOSER[l]}/${idJeu ? `?jeu=${encodeURIComponent(idJeu)}` : ''}`;
 }
 
 /** Lanceur du jeu (plein écran), dans la langue donnée. */

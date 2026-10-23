@@ -19,7 +19,8 @@
 #                nouvelles-idees.json.
 #  b) choisir  : idées mises à jour (jeu publié → archive ; idée sans pull
 #                request → en attente), idées perso ajoutées (issues ouvertes
-#                « idee-perso » de la page privée /idees), idées de l'agent
+#                « idee-perso » de la page privée /idees, y compris les
+#                propositions du formulaire public acceptées), idées de l'agent
 #                ajoutées, puis 5 idées passées « en_cours » : idées perso
 #                d'abord (issue la plus ancienne en tête), puis humaines,
 #                puis de l'agent. Enregistré sur main. L'issue d'une idée
@@ -246,7 +247,9 @@ jobs:
               .map((p) => (/^nouveau-jeu\/n\d+\/([a-z0-9-]+)$/.exec(p.head.ref) || [])[1]).filter(Boolean);
             core.setOutput('ids', [...new Set(ids)].join(','));
 
-      # Issues créées par la page privée /idees (functions/api/idees.js), de la plus ancienne à la plus récente.
+      # Issues créées par la page privée /idees (functions/api/idees.js), de la plus ancienne à la plus récente,
+      # y compris les propositions du formulaire public acceptées dans /idees (étiquettes demande-publique et
+      # accepte en plus : même format, même priorité ; functions/_demandes.js, accepterPublique).
       # Seules celles du propriétaire et des collaborateurs comptent : la file est lue par les agents de nuit.
       - name: Idées perso (issues ouvertes « idee-perso »)
         uses: actions/github-script@v7
@@ -277,7 +280,9 @@ jobs:
               };
               const premiereLigne = (t) => (t.split('\n').find((l) => l.trim()) || '').trim();
               const genreCorps = premiereLigne(rubrique('Genre'));
-              const genreEtiquette = issue.labels.map((l) => (typeof l === 'string' ? l : l.name)).find((n) => n && n !== ETIQUETTE) || '';
+              // Genre à défaut de rubrique : l'étiquette qui n'est pas une étape d'un circuit.
+              const CIRCUITS = [ETIQUETTE, 'demande-publique', 'accepte', 'valide-ia', 'en-attente-ia'];
+              const genreEtiquette = issue.labels.map((l) => (typeof l === 'string' ? l : l.name)).find((n) => n && !CIRCUITS.includes(n)) || '';
               let description = rubrique('Description');
               if (description === '_Aucune description_') description = '';
               // Âge conseillé (« 6+ », aussi « 6 ans et + ») ; univers : identifiants ou libellés de public/taxonomie.js,

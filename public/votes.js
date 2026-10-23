@@ -4,16 +4,15 @@
 // - Le vote est enregistré tout de suite sur l'appareil, puis envoyé à
 //   /api/vote. Sans réseau (ou si l'API ne répond pas), il reste en attente
 //   et part plus tard : au retour de la connexion ou à la prochaine visite.
-// - Chaque envoi est vérifié par Cloudflare Turnstile, chargé seulement au
-//   moment d'envoyer un vote (jamais au simple affichage d'une page).
+// - Chaque envoi est vérifié par Cloudflare Turnstile (turnstile.js), chargé
+//   seulement au moment d'envoyer un vote (jamais au simple affichage d'une page).
 // - Tout accès au stockage est protégé : sans localStorage, les votes
 //   fonctionnent quand même, le temps de la visite.
 // ==========================================================================
 
-const CLE_TURNSTILE = '0x4AAAAAAFbmqw7otWEol391';
-const SCRIPT_TURNSTILE = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+import { jetonTurnstile } from './turnstile.js';
+
 const DELAI_ENVOI = 10000;      // 10 s pour que l'API réponde
-const DELAI_TURNSTILE = 60000;  // 60 s (le visiteur peut avoir une case à cocher)
 
 const CLES = {
   votant: 'jel-votant',
@@ -125,7 +124,7 @@ async function envoyer() {
   for (const [gameId, valeur] of Object.entries(lire(CLES.attente, {}))) {
     let reponse;
     try {
-      const jeton = await jetonTurnstile();
+      const jeton = await jetonTurnstile('vote');
       reponse = await fetch('/api/vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,70 +149,4 @@ async function envoyer() {
       return;
     }
   }
-}
-
-// --- Turnstile --------------------------------------------------------------
-
-let chargementTurnstile = null;
-
-// Langue de la case à cocher éventuelle : celle du site (portugais du Brésil).
-function langueTurnstile() {
-  const lang = window.JEL_I18N?.getLang() || 'fr';
-  return lang === 'pt' ? 'pt-br' : lang;
-}
-
-function chargerTurnstile() {
-  if (window.turnstile) return Promise.resolve(window.turnstile);
-  if (!chargementTurnstile) {
-    chargementTurnstile = new Promise((resoudre, rejeter) => {
-      const script = document.createElement('script');
-      script.src = SCRIPT_TURNSTILE;
-      script.async = true;
-      script.onload = () => (window.turnstile ? resoudre(window.turnstile) : rejeter(new Error('Turnstile absent')));
-      script.onerror = () => rejeter(new Error('Turnstile injoignable'));
-      document.head.append(script);
-    }).catch((erreur) => {
-      // Permet un nouvel essai plus tard (par exemple au retour du réseau).
-      chargementTurnstile = null;
-      document.querySelector(`script[src="${SCRIPT_TURNSTILE}"]`)?.remove();
-      throw erreur;
-    });
-  }
-  return chargementTurnstile;
-}
-
-// Un jeton Turnstile ne sert qu'une fois : on en demande un nouveau à chaque vote.
-// Le cadre reste invisible, sauf si Cloudflare demande au visiteur de cocher une case.
-async function jetonTurnstile() {
-  const turnstile = await chargerTurnstile();
-
-  let zone = document.getElementById('zone-turnstile');
-  if (!zone) {
-    zone = document.createElement('div');
-    zone.id = 'zone-turnstile';
-    zone.className = 'zone-turnstile';
-    document.body.append(zone);
-  }
-
-  return new Promise((resoudre, rejeter) => {
-    let widget;
-    let fini = false;
-    const finir = (erreur, jeton) => {
-      if (fini) return;
-      fini = true;
-      clearTimeout(minuteur);
-      try { turnstile.remove(widget); } catch { /* déjà retiré */ }
-      if (erreur) rejeter(erreur); else resoudre(jeton);
-    };
-    const minuteur = setTimeout(() => finir(new Error('Turnstile : délai dépassé')), DELAI_TURNSTILE);
-    widget = turnstile.render(zone, {
-      sitekey: CLE_TURNSTILE,
-      action: 'vote',
-      appearance: 'interaction-only',
-      language: langueTurnstile(),
-      callback: (jeton) => finir(null, jeton),
-      'error-callback': () => { finir(new Error('Turnstile : erreur')); return true; },
-      'expired-callback': () => finir(new Error('Turnstile : jeton expiré')),
-    });
-  });
 }
