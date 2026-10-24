@@ -13,6 +13,7 @@ description: Publie sur Free Micro Games, le site de mini-jeux de Jérémy (free
 - Les idées de jeux (`idees.json`, `idees-archive.json`) appartiennent à la boucle de nuit : lecture seule. Après la fusion, la boucle archive elle-même l'idée d'un jeu dont `game.json` porte le champ `"idee"`.
 - Tous les accès au dépôt passent par le connecteur GitHub (lecture de fichiers, création de branche, commit, pull request). Sans connecteur, ou sans droit d'écriture sur le dépôt, le dire et s'arrêter.
 - Si l'outil d'exécution de code est disponible, s'en servir pour compter et contrôler (étapes 7 et 8). Sinon, compter à la main avec une marge et le dire à l'utilisateur.
+- Dans Claude Code, avec le dépôt ouvert sur la machine : suivre plutôt la compétence de projet `.claude/skills/ajouter-jeu-site/SKILL.md` du dépôt (mêmes règles, contrôles du dépôt lancés en local, vraie jaquette `cover.webp`).
 
 ## Entrée
 
