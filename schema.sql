@@ -14,8 +14,9 @@ CREATE TABLE IF NOT EXISTS votes (
   PRIMARY KEY (game_id, voter)
 );
 
--- Accélère /api/scores?pays=FR
-CREATE INDEX IF NOT EXISTS votes_pays ON votes (country, game_id);
+-- L'ancien index votes_pays (country, game_id) servait au classement « Mon pays »,
+-- retiré en octobre 2026 : il ne sert plus à rien et peut être supprimé de la
+-- base en ligne (console D1 : DROP INDEX IF EXISTS votes_pays;).
 
 -- --------------------------------------------------------------------------
 -- Ajouts faits à la main dans la base en ligne (jeux-votes), sans migration

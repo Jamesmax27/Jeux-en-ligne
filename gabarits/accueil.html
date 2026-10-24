@@ -43,12 +43,6 @@
       <!-- Langues : liens vers l'accueil de chaque langue (écrits dans la page, sans JavaScript) -->
       <div class="entete-langue" id="langue">{{{langues}}}</div>
     </div>
-
-    <label class="recherche">
-      <span class="sr-only" data-i18n="recherche.etiquette">{{t:recherche.etiquette}}</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="recherche" type="search" placeholder="{{t:recherche.placeholder}}" data-i18n-placeholder="recherche.placeholder" autocomplete="off" enterkeyhint="search">
-    </label>
   </header>
 
   <!-- Première ligne (« vitrine », remplie par app.js), en deux moitiés de même
@@ -99,25 +93,33 @@
   </section>
 
   <main class="catalogue">
+    <!-- Titre et nombre de jeux, recherche et tri : une ligne sur tablette et
+         ordinateur ; sur téléphone, titre et tri, puis la recherche juste
+         au-dessus des jeux. -->
     <div class="resultats-tete" id="resultats">
       <h2 id="titre-resultats"><span id="titre-texte">{{t:resultats.tous}}</span> <span class="compte" id="compte" aria-live="polite"></span></h2>
+      <form class="recherche" id="form-recherche" role="search">
+        <label class="sr-only" for="recherche" data-i18n="recherche.etiquette">{{t:recherche.etiquette}}</label>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="recherche" type="search" placeholder="{{t:recherche.placeholder}}" data-i18n-placeholder="recherche.placeholder" autocomplete="off" enterkeyhint="search">
+      </form>
       <label class="tri">
         <span class="sr-only" data-i18n="tri.etiquette">{{t:tri.etiquette}}</span>
         <svg class="tri-icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/></svg>
         <select id="tri">
           <option value="notes" data-i18n="tri.notes">{{t:tri.notes}}</option>
           <option value="votes" data-i18n="tri.votes">{{t:tri.votes}}</option>
+          <option value="jour" data-i18n="tri.jour">{{t:tri.jour}}</option>
           <option value="semaine" data-i18n="tri.semaine">{{t:tri.semaine}}</option>
+          <option value="mois" data-i18n="tri.mois">{{t:tri.mois}}</option>
           <option value="nouveautes" data-i18n="tri.nouveautes">{{t:tri.nouveautes}}</option>
+          <option value="alpha" data-i18n="tri.alpha">{{t:tri.alpha}}</option>
+          <option value="age" data-i18n="tri.age">{{t:tri.age}}</option>
         </select>
         <svg class="tri-fleche" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </label>
     </div>
     <div class="filtres-actifs" id="filtres-actifs" role="group" aria-label="{{t:filtres.aria}}" data-i18n-aria="filtres.aria" hidden></div>
-    <div class="portee" id="portee" role="group" aria-label="{{t:portee.aria}}" data-i18n-aria="portee.aria" hidden>
-      <button type="button" data-portee="monde" aria-pressed="true" data-i18n="portee.monde">{{t:portee.monde}}</button>
-      <button type="button" data-portee="pays" aria-pressed="false" data-i18n="portee.pays">{{t:portee.pays}}</button>
-    </div>
     <p class="note-tri" id="note-tri" hidden></p>
     <ul class="grille" id="grille">{{{grille}}}</ul>
     <div class="vide" id="vide" hidden>
