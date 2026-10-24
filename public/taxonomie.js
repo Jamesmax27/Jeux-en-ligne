@@ -20,76 +20,98 @@
 // scripts/controle-taxonomie.mjs).
 //
 // Dans game.json : "genre" (1 genre principal), "genres_secondaires" (0 à 2),
-// "univers" (1 ou 2). « autre » seulement si rien ne correspond.
+// "univers" (1 ou 2). « autre » seulement si rien ne correspond : c'est une
+// valeur de repli, jamais affichée (ni puce, ni page de catégorie).
+//
+// Affichage : une ligne de genres et une ligne d'univers sur l'accueil, triées
+// par nombre de jeux du catalogue entier (ordreAffichage, ci-dessous) ; l'ordre
+// des listes ne sert qu'à départager les égalités, et aux formulaires.
 //
 // Interdit de créer un genre ou un univers depuis un jeu ou une idée : la
 // liste ne change que par une décision du propriétaire du site. Pour changer
-// la liste : ce fichier, les 5 fichiers de langue (libellé et libellé court),
-// et le formulaire .github/ISSUE_TEMPLATE/idee-jeu.yml (mêmes libellés, même
-// ordre) ; puis lancer node scripts/controle-taxonomie.mjs.
+// la liste :
+//   1. ce fichier (et ANCIENS_IDS pour un identifiant retiré ou regroupé) ;
+//   2. les 5 fichiers de langue (libellé et libellé court) ;
+//   3. les textes des pages de catégories, gabarits/textes/categories.<langue>.json ;
+//   4. les icônes, scripts/icones/sources/ (puis node scripts/icones/generer.mjs) ;
+//   5. le formulaire .github/ISSUE_TEMPLATE/idee-jeu.yml (mêmes libellés, même ordre) ;
+//   6. reclasser games/*/game.json, idees.json et idees-archive.json ;
+// puis lancer node scripts/controle-taxonomie.mjs et npm run seo.
 // ==========================================================================
 
-// 26 genres : « comment on joue ». Affichés en 2 rangées de 13 sur l'accueil.
+// Valeur de repli des deux listes : jamais affichée.
+export const ID_AUTRE = 'autre';
+
+// 13 genres (+ « autre ») : « comment on joue ». Une ligne sur l'accueil.
 export const GENRES = [
-  { id: 'puzzle',       libelle: 'Puzzle et logique',            court: 'Puzzle',          picto: '🧩', teinte: 200 },
-  { id: 'memoire',      libelle: 'Mémoire',                      court: 'Mémoire',         picto: '🧠', teinte: 212 },
-  { id: 'quiz',         libelle: 'Quiz et culture',              court: 'Quiz',            picto: '❓', teinte: 224 },
-  { id: 'mots',         libelle: 'Mots et lettres',              court: 'Mots',            picto: '🔤', teinte: 236 },
-  { id: 'calcul',       libelle: 'Calcul et nombres',            court: 'Calcul',          picto: '🔢', teinte: 248 },
-  { id: 'reflexes',     libelle: 'Réflexes et clic rapide',      court: 'Réflexes',        picto: '⚡', teinte: 64 },
-  { id: 'arcade',       libelle: 'Arcade',                       court: 'Arcade',          picto: '🕹️', teinte: 54 },
-  { id: 'plateforme',   libelle: 'Plateforme',                   court: 'Plateforme',      picto: '🦘', teinte: 44 },
-  { id: 'course',       libelle: 'Course',                       court: 'Course',          picto: '🏁', teinte: 34 },
-  { id: 'sport',        libelle: 'Sport',                        court: 'Sport',           picto: '⚽', teinte: 24 },
-  { id: 'tir',          libelle: 'Tir et visée',                 court: 'Visée',           picto: '🎯', teinte: 14 },
-  { id: 'combat',       libelle: 'Combat',                       court: 'Combat',          picto: '🥊', teinte: 4 },
-  { id: 'labyrinthe',   libelle: 'Labyrinthe',                   court: 'Labyrinthe',      picto: '🌀', teinte: 154 },
-  { id: 'aventure',     libelle: 'Aventure et exploration',      court: 'Aventure',        picto: '🗺️', teinte: 142 },
-  { id: 'observation',  libelle: 'Objets cachés et observation', court: 'Objets cachés',   picto: '🔍', teinte: 130 },
-  { id: 'strategie',    libelle: 'Stratégie',                    court: 'Stratégie',       picto: '♟️', teinte: 108 },
-  { id: 'defense',      libelle: 'Défense de tour',              court: 'Défense',         picto: '🛡️', teinte: 96 },
-  { id: 'gestion',      libelle: 'Gestion et tycoon',            court: 'Gestion',         picto: '🏪', teinte: 84 },
-  { id: 'simulation',   libelle: 'Simulation et soin',           court: 'Simulation',      picto: '🩹', teinte: 186 },
-  { id: 'creation',     libelle: 'Habillage et création',        court: 'Habillage',       picto: '👗', teinte: 336 },
-  { id: 'construction', libelle: 'Bac à sable et construction',  court: 'Construction',    picto: '🧱', teinte: 324 },
-  { id: 'musique',      libelle: 'Musique et rythme',            court: 'Musique',         picto: '🎵', teinte: 312 },
-  { id: 'societe',      libelle: 'Jeux de société et de cartes', court: 'Société',         picto: '🃏', teinte: 300 },
-  { id: 'coloriage',    libelle: 'Coloriage et dessin',          court: 'Coloriage',       picto: '🖍️', teinte: 288 },
-  { id: 'role',         libelle: 'Jeu de rôle et progression',   court: 'Jeu de rôle',     picto: '🎭', teinte: 276 },
-  { id: 'autre',        libelle: 'Autre',                        court: 'Autre',           picto: '🎮', teinte: 230 },
+  { id: 'puzzle',       libelle: 'Puzzle, logique et labyrinthes',       court: 'Puzzle',      picto: '🧩', teinte: 200 },
+  { id: 'memoire',      libelle: 'Mémoire et observation',               court: 'Mémoire',     picto: '🧠', teinte: 228 },
+  { id: 'quiz',         libelle: 'Quiz et culture',                      court: 'Quiz',        picto: '❓', teinte: 256 },
+  { id: 'mots',         libelle: 'Mots et lettres',                      court: 'Mots',        picto: '🔤', teinte: 284 },
+  { id: 'calcul',       libelle: 'Calcul et nombres',                    court: 'Calcul',      picto: '🔢', teinte: 312 },
+  { id: 'arcade',       libelle: 'Arcade et réflexes',                   court: 'Arcade',      picto: '🕹️', teinte: 40 },
+  { id: 'plateforme',   libelle: 'Plateforme',                           court: 'Plateforme',  picto: '🦘', teinte: 66 },
+  { id: 'course',       libelle: 'Course',                               court: 'Course',      picto: '🏁', teinte: 12 },
+  { id: 'aventure',     libelle: 'Aventure et jeu de rôle',              court: 'Aventure',    picto: '🗺️', teinte: 146 },
+  { id: 'strategie',    libelle: 'Stratégie, défense et jeux de société', court: 'Stratégie',  picto: '♟️', teinte: 118 },
+  { id: 'simulation',   libelle: 'Simulation, soin et gestion',          court: 'Simulation',  picto: '🩹', teinte: 174 },
+  { id: 'creation',     libelle: 'Habillage, dessin et construction',    court: 'Création',    picto: '👗', teinte: 338 },
+  { id: 'musique',      libelle: 'Musique et rythme',                    court: 'Musique',     picto: '🎵', teinte: 92 },
+  { id: 'autre',        libelle: 'Autre',                                court: 'Autre',       picto: '🎮', teinte: 230 },
 ];
 
-// 24 univers : « de quoi ça parle ». Affichés en 2 rangées de 12 sur l'accueil.
+// 12 univers (+ « autre ») : « de quoi ça parle ». Une ligne sur l'accueil.
+// Libellés sans virgule ni point-virgule : le formulaire d'idées joint les
+// univers cochés par des virgules (scripts/idees.mjs les sépare ainsi).
 export const UNIVERS = [
-  { id: 'ferme',        libelle: 'Ferme',                        court: 'Ferme',           picto: '🐄', teinte: 102 },
-  { id: 'chevaux',      libelle: 'Chevaux',                      court: 'Chevaux',         picto: '🐴', teinte: 74 },
-  { id: 'compagnie',    libelle: 'Animaux de compagnie',         court: 'Compagnons',      picto: '🐶', teinte: 32 },
-  { id: 'sauvages',     libelle: 'Animaux sauvages',             court: 'Sauvages',        picto: '🦁', teinte: 88 },
-  { id: 'dinosaures',   libelle: 'Dinosaures et préhistoire',    court: 'Dinosaures',      picto: '🦕', teinte: 120 },
-  { id: 'ocean',        libelle: 'Océan',                        court: 'Océan',           picto: '🐠', teinte: 214 },
-  { id: 'espace',       libelle: 'Espace',                       court: 'Espace',          picto: '🚀', teinte: 264 },
-  { id: 'fantasy',      libelle: 'Fantasy et magie',             court: 'Magie',           picto: '🧚', teinte: 300 },
-  { id: 'chevaliers',   libelle: 'Chevaliers et Moyen Âge',      court: 'Chevaliers',      picto: '🏰', teinte: 18 },
-  { id: 'pirates',      libelle: 'Pirates',                      court: 'Pirates',         picto: '⚓', teinte: 230 },
-  { id: 'monstres',     libelle: 'Monstres et créatures',        court: 'Monstres',        picto: '👾', teinte: 318 },
-  { id: 'robots',       libelle: 'Robots et futur',              court: 'Robots',          picto: '🤖', teinte: 192 },
-  { id: 'nature',       libelle: 'Nature et jardin',             court: 'Nature',          picto: '🌳', teinte: 150 },
-  { id: 'cuisine',      libelle: 'Cuisine et nourriture',        court: 'Cuisine',         picto: '🧁', teinte: 350 },
-  { id: 'vehicules',    libelle: 'Véhicules',                    court: 'Véhicules',       picto: '🚗', teinte: 46 },
-  { id: 'sport',        libelle: 'Sport',                        court: 'Sport',           picto: '🏅', teinte: 164 },
-  { id: 'monde',        libelle: 'Monde et pays',                court: 'Monde',           picto: '🌍', teinte: 246 },
-  { id: 'histoire',     libelle: 'Histoire',                     court: 'Histoire',        picto: '🏛️', teinte: 60 },
-  { id: 'corps',        libelle: 'Corps humain et santé',        court: 'Corps humain',    picto: '🩺', teinte: 4 },
-  { id: 'ville',        libelle: 'Ville et métiers',             court: 'Métiers',         picto: '🏙️', teinte: 282 },
-  { id: 'fetes',        libelle: 'Saisons et fêtes',             court: 'Fêtes',           picto: '🎄', teinte: 136 },
-  { id: 'contes',       libelle: 'Contes et légendes',           court: 'Contes',          picto: '📖', teinte: 334 },
-  { id: 'abstrait',     libelle: 'Abstrait',                     court: 'Abstrait',        picto: '🔷', teinte: 178 },
-  { id: 'autre',        libelle: 'Autre',                        court: 'Autre',           picto: '✨', teinte: 230 },
+  { id: 'animaux',      libelle: 'Animaux',                    court: 'Animaux',     picto: '🐾', teinte: 100 },
+  { id: 'chevaux',      libelle: 'Chevaux',                    court: 'Chevaux',     picto: '🐴', teinte: 70 },
+  { id: 'dinosaures',   libelle: 'Dinosaures et préhistoire',  court: 'Dinosaures',  picto: '🦕', teinte: 130 },
+  { id: 'ocean',        libelle: 'Océan et pirates',           court: 'Océan',       picto: '🐠', teinte: 220 },
+  { id: 'nature',       libelle: 'Nature et saisons',          court: 'Nature',      picto: '🌳', teinte: 160 },
+  { id: 'fantasy',      libelle: 'Magie et monstres',          court: 'Magie',       picto: '🧚', teinte: 310 },
+  { id: 'espace',       libelle: 'Espace et robots',           court: 'Espace',      picto: '🚀', teinte: 280 },
+  { id: 'monde',        libelle: 'Monde et histoire',          court: 'Monde',       picto: '🌍', teinte: 250 },
+  { id: 'ville',        libelle: 'Ville et métiers',           court: 'Métiers',     picto: '🏙️', teinte: 340 },
+  { id: 'vehicules',    libelle: 'Véhicules',                  court: 'Véhicules',   picto: '🚗', teinte: 40 },
+  { id: 'sport',        libelle: 'Sport',                      court: 'Sport',       picto: '🏅', teinte: 190 },
+  { id: 'cuisine',      libelle: 'Cuisine et nourriture',      court: 'Cuisine',     picto: '🧁', teinte: 10 },
+  { id: 'autre',        libelle: 'Autre',                      court: 'Autre',       picto: '✨', teinte: 230 },
 ];
+
+// Identifiants retirés (regroupement d'octobre 2026) → identifiant qui les a
+// remplacés. Sert aux redirections des anciennes pages de catégorie
+// (public/_redirects, écrit par scripts/pages-seo.mjs) et à reclasser une
+// donnée restée sur un ancien identifiant. Un ancien identifiant n'est jamais
+// accepté dans game.json ni dans idees.json.
+export const ANCIENS_IDS = {
+  genre: {
+    reflexes: 'arcade', tir: 'arcade', labyrinthe: 'puzzle', observation: 'memoire', sport: 'course',
+    combat: 'aventure', role: 'aventure', defense: 'strategie', societe: 'strategie',
+    gestion: 'simulation', construction: 'creation', coloriage: 'creation',
+  },
+  univers: {
+    ferme: 'animaux', sauvages: 'animaux', compagnie: 'animaux', monstres: 'fantasy', contes: 'fantasy',
+    robots: 'espace', pirates: 'ocean', histoire: 'monde', chevaliers: 'monde', corps: 'ville',
+    fetes: 'nature', abstrait: 'autre',
+  },
+};
 
 // Identifiants seuls, pour les contrôles.
 export const IDS_GENRES = GENRES.map((g) => g.id);
 export const IDS_UNIVERS = UNIVERS.map((u) => u.id);
+
+// Ordre d'affichage des genres ou des univers (accueil, pages générées) : du plus
+// grand nombre de jeux au plus petit, à égalité dans l'ordre de la liste ; sans
+// « autre ». nombre(id) : nombre de jeux du catalogue entier (pas selon les
+// filtres choisis : les puces ne bougent pas quand on clique).
+export function ordreAffichage(liste, nombre) {
+  return liste
+    .filter((x) => x.id !== ID_AUTRE)
+    .map((x, rang) => ({ x, rang, n: nombre(x.id) }))
+    .sort((a, b) => b.n - a.n || a.rang - b.rang)
+    .map(({ x }) => x);
+}
 
 // Nombre de genres secondaires et d'univers permis pour un jeu.
 export const SECONDAIRES_MAX = 2;

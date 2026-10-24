@@ -10,11 +10,11 @@
 //   classement Monde tant que mon pays a moins de PAYS_VOTES_MIN votes).
 // - Regroupements : tuiles des raccourcis (au hasard, jeux aimés, hors ligne)
 //   et de l'âge, puis petites puces des genres et des univers (listes fermées
-//   de taxonomie.js, dans leur ordre, chacune sur 2 rangées qui défilent si
-//   elles ne tiennent pas). Combinables entre eux, avec le tri et avec la
-//   recherche ; chaque tuile ou puce compte ses jeux. Un genre compte les jeux
-//   dont c'est le genre principal ou secondaire. Un regroupement encore vide
-//   est grisé (« Bientôt »).
+//   de taxonomie.js, une ligne chacune, du plus grand nombre de jeux au plus
+//   petit, sans « autre » ; la ligne défile si elle ne tient pas). Combinables
+//   entre eux, avec le tri et avec la recherche ; chaque tuile ou puce compte
+//   ses jeux. Un genre compte les jeux dont c'est le genre principal ou
+//   secondaire. Un regroupement encore vide est grisé (« Bientôt »).
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
 // - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
 // - Première ligne (« vitrine »), sans tenir compte des filtres, en deux moitiés :
@@ -41,7 +41,7 @@
 
 import { votesEnAttente, envoyerEnAttente, mesVotes } from './votes.js';
 import { activerHorsLigne, jeuxHorsLigne } from './hors-ligne.js';
-import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, TRANCHES_AGE, trancheDeAge } from './taxonomie.js';
+import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, ID_AUTRE, TRANCHES_AGE, trancheDeAge, ordreAffichage } from './taxonomie.js';
 import { urlJeu, urlLanceur } from './chemins.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
@@ -63,6 +63,8 @@ const TENDANCES_PAR_GENRE = 4;    // au plus 4 jeux du même genre principal dan
 // ordre tiré à chaque visite, pour que chacun passe à son tour dans la première ligne.
 const GRAINE_VITRINE = Math.random().toString(36).slice(2);
 const ID_JEU = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const GENRES_AFFICHES = IDS_GENRES.filter((id) => id !== ID_AUTRE);
+const UNIVERS_AFFICHES = IDS_UNIVERS.filter((id) => id !== ID_AUTRE);
 const JAQUETTES_PRIORITAIRES = 4; // premières jaquettes de la grille chargées tout de suite
 
 // Raccourcis du haut : des « collections » propres à l'appareil (noms : clés de traduction).
@@ -628,13 +630,11 @@ function creerPuceFiltre({ cle, picto, nom, nomComplet, teinte, actif, compte, t
   return b;
 }
 
-// Répartit les puces sur les 2 rangées du groupe (13 + 13 genres, 12 + 12 univers).
-// Les rangées restent en place : chacune garde sa position de défilement.
-function remplirRangees(groupe, puces) {
-  const [haut, bas] = groupe.querySelectorAll('.rangee');
-  const moitie = Math.ceil(puces.length / 2);
-  haut.replaceChildren(...puces.slice(0, moitie));
-  bas.replaceChildren(...puces.slice(moitie));
+// Remplit la ligne de puces d'un groupe. La ligne reste en place : elle garde
+// sa position de défilement ; fondu à droite s'il reste des puces à voir.
+function remplirRangee(rangee, puces) {
+  rangee.replaceChildren(...puces);
+  majSuite(rangee);
 }
 
 // Choisit (ou retire, si déjà choisi) un filtre, puis met tout à jour.
@@ -702,16 +702,18 @@ function afficherRegroupements() {
     action: () => choisir('age', tr.id),
   })));
 
-  // Genres (principal ou secondaire) et univers : listes fermées de taxonomie.js, dans leur ordre.
+  // Genres (principal ou secondaire) et univers : listes fermées de taxonomie.js,
+  // du plus grand nombre de jeux au plus petit (catalogue entier : les puces ne
+  // bougent pas quand on choisit un filtre), sans « autre ».
   const genres = compter('genre', (j) => j.genres);
-  remplirRangees(el.genres, GENRES.map((g) => creerPuceFiltre({
+  remplirRangee(el.genres, ordreAffichage(GENRES, genres.total).map((g) => creerPuceFiltre({
     cle: `genre:${g.id}`, picto: g.picto, nom: nomGenre(g.id, true), nomComplet: nomGenre(g.id), teinte: g.teinte,
     actif: etat.genre === g.id, compte: genres.compte(g.id), total: genres.total(g.id),
     action: () => choisir('genre', g.id),
   })));
 
   const univers = compter('univers', (j) => j.univers);
-  remplirRangees(el.univers, UNIVERS.map((u) => creerPuceFiltre({
+  remplirRangee(el.univers, ordreAffichage(UNIVERS, univers.total).map((u) => creerPuceFiltre({
     cle: `univers:${u.id}`, picto: u.picto, nom: nomUnivers(u.id, true), nomComplet: nomUnivers(u.id), teinte: u.teinte,
     actif: etat.univers === u.id, compte: univers.compte(u.id), total: univers.total(u.id),
     action: () => choisir('univers', u.id),
@@ -929,14 +931,15 @@ async function demarrer() {
     const reponse = await fetch('/catalog.json', { cache: 'no-cache' });
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
     const catalogue = await reponse.json();
-    // Seuls les identifiants des listes fermées (taxonomie.js) sont gardés.
+    // Seuls les identifiants des listes fermées (taxonomie.js) sont gardés, sans
+    // « autre », jamais affiché (ni puce, ni libellé sur la carte, ni recherche).
     etat.tous = (catalogue.games || []).map((j) => {
-      const genre = IDS_GENRES.includes(j.genre) ? j.genre : '';
+      const genre = GENRES_AFFICHES.includes(j.genre) ? j.genre : '';
       const jeu = {
         ...j,
         genre,
-        genres: idsValides([genre, ...(Array.isArray(j.genres_secondaires) ? j.genres_secondaires : [])], IDS_GENRES),
-        univers: idsValides(j.univers, IDS_UNIVERS),
+        genres: idsValides([genre, ...(Array.isArray(j.genres_secondaires) ? j.genres_secondaires : [])], GENRES_AFFICHES),
+        univers: idsValides(j.univers, UNIVERS_AFFICHES),
       };
       jeu.tranche = trancheDeAge(jeu.ages);
       return jeu;
@@ -982,7 +985,13 @@ for (const liste of [el.nouveautesListe, el.tendancesListe].filter(Boolean)) {
   liste.addEventListener('scroll', () => majSuite(liste), { passive: true });
   glisserALaSouris(liste);
 }
-addEventListener('resize', () => [el.nouveautesListe, el.tendancesListe].filter(Boolean).forEach(majSuite));
+// Lignes des genres et des univers : même fondu et même glissement à la souris
+// (leur barre de défilement est cachée).
+for (const rangee of [el.genres, el.univers].filter(Boolean)) {
+  rangee.addEventListener('scroll', () => majSuite(rangee), { passive: true });
+  glisserALaSouris(rangee);
+}
+addEventListener('resize', () => [el.nouveautesListe, el.tendancesListe, el.genres, el.univers].filter(Boolean).forEach(majSuite));
 
 activerHorsLigne();
 demarrer();

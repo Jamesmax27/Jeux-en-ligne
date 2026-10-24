@@ -34,9 +34,9 @@ Une idée ressemble à ceci :
   "id": "coloriage-magique",
   "titre": "Coloriage magique",
   "description": "Colorie un dessin case par case en suivant les numéros. Âge conseillé : 4+.",
-  "genre": "coloriage",
+  "genre": "creation",
   "genres_secondaires": ["calcul"],
-  "univers": ["abstrait"],
+  "univers": ["animaux"],
   "ages": "4+",
   "source": "humain",
   "date_ajout": "2026-10-19",
@@ -46,7 +46,7 @@ Une idée ressemble à ceci :
 ```
 
 - `id` : minuscules sans accents, chiffres et tirets, unique.
-- **Genres et univers : uniquement ceux des listes fermées** de `public/taxonomie.js` (26 genres, 24 univers ; détail dans `CONSIGNES-JEU.md`, section 4). On écrit l'**identifiant** (`coloriage`, `abstrait`…), jamais un mot inventé : sinon la boucle s'arrête avec un message d'erreur. « `autre` » seulement si rien ne correspond.
+- **Genres et univers : uniquement ceux des listes fermées** de `public/taxonomie.js` (13 genres, 12 univers ; détail et contenu de chacun dans `CONSIGNES-JEU.md`, section 4). On écrit l'**identifiant** (`creation`, `animaux`…), jamais un mot inventé ni un identifiant retiré en octobre 2026 (`coloriage`, `ferme`, `abstrait`…) : sinon la boucle s'arrête avec un message d'erreur. « `autre` » seulement si rien ne correspond (il n'est jamais affiché sur le site).
 - `genre` : le genre principal, un seul.
 - `genres_secondaires` (facultatif) : 0 à 2 autres genres. Absent : l'agent créateur en ajoute s'il le juge utile.
 - `univers` : 0 à 2 univers. Liste vide `[]` : l'agent les choisit.
@@ -57,7 +57,7 @@ Une idée ressemble à ceci :
 
 **Modifier la file à la main** : ouvrez `idees.json`, ajoutez, supprimez ou déplacez des idées (l'ordre de la liste est l'ordre de fabrication), puis « Commit to main » et « Push origin » dans GitHub Desktop. Ne touchez pas aux idées `"en_cours"` pendant qu'une boucle tourne. Pour vérifier le fichier sur votre PC : `npm run idees` (et `npm run taxonomie` pour les genres et univers).
 
-**Changer la liste des genres ou des univers** (décision du propriétaire seulement) : modifier `public/taxonomie.js`, les libellés dans les 5 fichiers `public/i18n/site/*.json` (`genre.<id>` et `genre.<id>.court`, idem `univers.`) et les listes du formulaire `.github/ISSUE_TEMPLATE/idee-jeu.yml`, puis `npm run taxonomie` doit afficher « tout est bon ».
+**Changer la liste des genres ou des univers** (décision du propriétaire seulement) : suivre la liste en tête de `public/taxonomie.js` (le fichier lui-même et `ANCIENS_IDS` pour un identifiant retiré, les libellés dans les 5 fichiers `public/i18n/site/*.json`, les textes des pages de catégories `gabarits/textes/categories.*.json`, les icônes `scripts/icones/sources/`, les listes du formulaire `.github/ISSUE_TEMPLATE/idee-jeu.yml`, le reclassement des jeux et des idées), puis `npm run taxonomie` et `npm run seo` doivent afficher « tout est bon ». Les anciennes pages de catégorie sont redirigées toutes seules (`ANCIENS_IDS`).
 
 ---
 

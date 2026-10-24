@@ -13,6 +13,7 @@ description: Publie sur Free Micro Games, le site de mini-jeux de Jérémy (free
 - Les idées de jeux (`idees.json`, `idees-archive.json`) appartiennent à la boucle de nuit : lecture seule. Après la fusion, la boucle archive elle-même l'idée d'un jeu dont `game.json` porte le champ `"idee"`.
 - Tous les accès au dépôt passent par le connecteur GitHub (lecture de fichiers, création de branche, commit, pull request). Sans connecteur, ou sans droit d'écriture sur le dépôt, le dire et s'arrêter.
 - Si l'outil d'exécution de code est disponible, s'en servir pour compter et contrôler (étapes 7 et 8). Sinon, compter à la main avec une marge et le dire à l'utilisateur.
+- Dans Claude Code, avec le dépôt ouvert sur la machine : suivre plutôt la compétence de projet `.claude/skills/ajouter-jeu-site/SKILL.md` du dépôt (mêmes règles, contrôles du dépôt lancés en local, vraie jaquette `cover.webp`).
 
 ## Entrée
 
@@ -27,7 +28,7 @@ Lire sur `main`, via le connecteur, sans rien supposer :
 
 - `CLAUDE.md` : surtout la section 5 (format d'un jeu, langues, jouabilité, interdits de contenu), puis les sections 10 à 12 (ajout par une IA, interdits).
 - `CONSIGNES-JEU.md` en entier : minimum obligatoire (section 2), règles techniques et langues (section 3), fiche `game.json` (section 4), jaquette (section 5), grille de validation (section 7).
-- `public/taxonomie.js` : les 26 genres et les 24 univers (listes fermées, identifiants exacts), les tranches d'âge.
+- `public/taxonomie.js` : les 13 genres et les 12 univers (listes fermées, identifiants exacts ; ce que regroupe chacun : `CONSIGNES-JEU.md`, section 4), les tranches d'âge.
 - `scripts/regles-seo.mjs` : bornes et interdits des textes de référencement. C'est la source unique : si ses valeurs diffèrent du tableau de l'étape 7, le fichier a raison.
 - `public/i18n/i18n.js` : le module commun de traduction, à recopier tel quel dans le jeu.
 - `public/save.js` : le module commun de sauvegarde, à recopier tel quel dans le jeu (`CONSIGNES-JEU.md`, section 3 « Sauvegarde »).
@@ -55,8 +56,8 @@ Lire tout le code : les niveaux (données réelles), les gestes au doigt, les to
 Proposer en une seule question, puis attendre la validation :
 
 - **titre** (60 caractères au plus) et **id** : minuscules sans accents, chiffres et tirets, absent de `games/` (il donne aussi le nom de la branche `jeu-manuel/<id>`) ;
-- **genre** principal : un identifiant parmi les 26 ; **genres_secondaires** : 0 à 2 autres, seulement s'ils sont au cœur du jeu, jamais `autre` ;
-- **univers** : 1 ou 2 identifiants parmi les 24 (`autre` seul, si rien ne correspond) ;
+- **genre** principal : un identifiant parmi les 13 ; **genres_secondaires** : 0 à 2 autres, seulement s'ils sont au cœur du jeu, jamais `autre` ;
+- **univers** : 1 ou 2 identifiants parmi les 12 (`autre` seul, si rien ne correspond : jamais affiché sur le site) ;
 - **ages** : âge minimum conseillé, au format `"6+"` ;
 - `"non_traduisible": true` si le jeu repose sur des mots ou des lettres du français (l'interface reste traduite) ;
 - les **écarts** avec le minimum obligatoire de `CONSIGNES-JEU.md`, section 2 (écran titre, 20 niveaux au moins, tutoriel animé, pause et Rejouer, étoiles, sauvegarde, sélection des niveaux, sons Web Audio avec bouton pour couper, effets, écrans de victoire et de défaite), et la proposition : compléter le jeu, ou le publier tel quel. C'est l'utilisateur qui décide.

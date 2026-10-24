@@ -7,7 +7,8 @@
 // Reproduit la règle de sécurité des jeux (aucun accès Internet) et l'interdiction
 // d'afficher le lanceur dans le cadre d'un autre site, comme en ligne,
 // et les adresses de Cloudflare Pages : « /play » sert play.html, un dossier sert
-// son index.html, une adresse inconnue reçoit 404.html avec le code 404.
+// son index.html, une adresse inconnue reçoit 404.html avec le code 404, et les
+// redirections de public/_redirects (adresses exactes, écrites par le build) s'appliquent.
 // L'API des votes n'existe pas en local ; celle du suivi des parties répond à vide.
 // TENDANCES_EXEMPLE=1 : /api/tendances renvoie les 24 premiers jeux du catalogue
 // (pour voir la bande « Tendances » ; sans la variable, elle reste cachée).
@@ -45,6 +46,16 @@ const TYPES = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
+// Redirections de public/_redirects (« /source /cible 301 », une par ligne, # = commentaire).
+async function redirection(chemin) {
+  const texte = await readFile(path.join(RACINE, '_redirects'), 'utf8').catch(() => '');
+  for (const ligne of texte.split(/\r?\n/)) {
+    const [source, cible, code] = ligne.trim().split(/\s+/);
+    if (source && !source.startsWith('#') && source === chemin && cible) return { cible, code: Number(code) || 302 };
+  }
+  return null;
+}
+
 const CSP_JEUX = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'";
 
 createServer(async (req, res) => {
@@ -63,6 +74,9 @@ createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }).end(JSON.stringify({ jours: 7, jeux }));
       return;
     }
+
+    const redirige = await redirection(url.pathname);
+    if (redirige) { res.writeHead(redirige.code, { Location: redirige.cible }).end(); return; }
 
     let chemin = path.normalize(path.join(RACINE, decodeURIComponent(url.pathname)));
     if (!chemin.startsWith(RACINE)) { res.writeHead(403).end(); return; }

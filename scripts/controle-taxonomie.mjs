@@ -15,7 +15,8 @@
 //     0 à 2 univers, liste vide = l'agent créateur les choisit ; archive : 1 ou 2) ;
 //   - « autre » est combiné avec un autre univers, ou sert de genre secondaire ;
 //   - la taxonomie elle-même est incohérente : identifiant en double ou mal
-//     formé, libellé français des fichiers de langue (genre.<id>, …court)
+//     formé, ancien identifiant (ANCIENS_IDS) encore dans les listes ou qui
+//     mène hors liste, libellé français des fichiers de langue (genre.<id>, …court)
 //     différent de taxonomie.js, formulaire .github/ISSUE_TEMPLATE/idee-jeu.yml
 //     dont les listes Genre et Univers ne reprennent pas les libellés, dans l'ordre.
 //
@@ -29,7 +30,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
-  GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, SECONDAIRES_MAX, UNIVERS_MIN, UNIVERS_MAX,
+  GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, SECONDAIRES_MAX, UNIVERS_MIN, UNIVERS_MAX, ANCIENS_IDS,
 } from '../public/taxonomie.js';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -38,13 +39,20 @@ const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Règles (partagées)
 // --------------------------------------------------------------------------
 
+// Valeur hors liste, avec l'identifiant qui la remplace s'il s'agit d'un ancien
+// identifiant (regroupement d'octobre 2026, ANCIENS_IDS).
+function horsListe(famille, x) {
+  const nouveau = ANCIENS_IDS[famille][x];
+  return nouveau ? `${JSON.stringify(x)} (ancien identifiant : utiliser ${JSON.stringify(nouveau)})` : JSON.stringify(x ?? null);
+}
+
 // Une liste d'identifiants : tableau de textes, tous dans « permis », sans doublon.
-function problemesListe(nom, valeur, permis, min, max) {
+function problemesListe(nom, valeur, famille, permis, min, max) {
   if (!Array.isArray(valeur)) return [`"${nom}" doit être une liste (${min} à ${max})`];
   const p = [];
   if (valeur.length < min || valeur.length > max) p.push(`"${nom}" : ${min === max ? min : `${min} à ${max}`} attendu(s), ${valeur.length} trouvé(s)`);
   const hors = valeur.filter((x) => !permis.includes(x));
-  if (hors.length) p.push(`"${nom}" hors liste : ${hors.map((x) => JSON.stringify(x)).join(', ')}`);
+  if (hors.length) p.push(`"${nom}" hors liste : ${hors.map((x) => horsListe(famille, x)).join(', ')}`);
   if (new Set(valeur).size !== valeur.length) p.push(`"${nom}" : valeur en double`);
   return p;
 }
@@ -52,15 +60,15 @@ function problemesListe(nom, valeur, permis, min, max) {
 // Règles communes aux jeux et aux idées.
 function problemesClassement(f, universMin) {
   const p = [];
-  if (!IDS_GENRES.includes(f.genre)) p.push(`"genre" hors liste (${JSON.stringify(f.genre ?? null)})`);
+  if (!IDS_GENRES.includes(f.genre)) p.push(`"genre" hors liste (${horsListe('genre', f.genre)})`);
   if (f.genres_secondaires !== undefined) {
-    p.push(...problemesListe('genres_secondaires', f.genres_secondaires, IDS_GENRES, 0, SECONDAIRES_MAX));
+    p.push(...problemesListe('genres_secondaires', f.genres_secondaires, 'genre', IDS_GENRES, 0, SECONDAIRES_MAX));
     if (Array.isArray(f.genres_secondaires)) {
       if (f.genres_secondaires.includes(f.genre)) p.push('"genres_secondaires" ne doit pas reprendre le genre principal');
       if (f.genres_secondaires.includes('autre')) p.push('« autre » ne peut pas être un genre secondaire');
     }
   }
-  p.push(...problemesListe('univers', f.univers, IDS_UNIVERS, universMin, UNIVERS_MAX));
+  p.push(...problemesListe('univers', f.univers, 'univers', IDS_UNIVERS, universMin, UNIVERS_MAX));
   if (Array.isArray(f.univers) && f.univers.includes('autre') && f.univers.length > 1) p.push('l\'univers « autre » ne se combine pas avec un autre univers');
   if (f.tags !== undefined) p.push('"tags" n\'existe plus : utiliser "univers" (liste de public/taxonomie.js)');
   return p;
@@ -96,6 +104,15 @@ async function problemesTaxonomie() {
     for (const x of liste) {
       if (!/^[a-z]+$/.test(x.id)) p.push(`taxonomie.js : identifiant « ${x.id} » (minuscules sans accents uniquement)`);
       if (!x.libelle || !x.court || !x.picto || !Number.isFinite(x.teinte)) p.push(`taxonomie.js : « ${x.id} » incomplet (libelle, court, picto, teinte)`);
+      // Le formulaire d'idées joint les univers cochés par des virgules.
+      if (nom === 'UNIVERS' && /[,;]/.test(`${x.libelle}${x.court}`)) p.push(`taxonomie.js : univers « ${x.id} » : pas de virgule ni de point-virgule dans les libellés (formulaire d'idées)`);
+    }
+  }
+  // Anciens identifiants : jamais dans les listes, remplacés par un identifiant des listes.
+  for (const [famille, ids] of [['genre', IDS_GENRES], ['univers', IDS_UNIVERS]]) {
+    for (const [ancien, nouveau] of Object.entries(ANCIENS_IDS[famille])) {
+      if (ids.includes(ancien)) p.push(`taxonomie.js : ANCIENS_IDS.${famille}.${ancien} est encore dans la liste`);
+      if (!ids.includes(nouveau)) p.push(`taxonomie.js : ANCIENS_IDS.${famille}.${ancien} mène à « ${nouveau} », hors liste`);
     }
   }
 

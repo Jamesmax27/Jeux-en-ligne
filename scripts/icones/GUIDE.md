@@ -1,6 +1,6 @@
 # Guide des icônes des regroupements
 
-Ce guide fixe le style, l'outillage et les règles des icônes des regroupements de l'accueil : tuiles des raccourcis et des âges, puces des genres et des univers, titre « Tendances ». Les 58 icônes actuelles (toutes les clés de `public/taxonomie.js`) donnent le niveau attendu ; les 9 premières, qui ont servi de modèles, sont `hasard`, `age:3-4`, `genre:puzzle`, `genre:reflexes`, `genre:musique`, `univers:chevaux`, `univers:ocean`, `univers:espace` et `tendances`.
+Ce guide fixe le style, l'outillage et les règles des icônes des regroupements de l'accueil : tuiles des raccourcis et des âges, puces des genres et des univers, titre « Tendances ». Les 35 icônes actuelles (toutes les clés de `public/taxonomie.js`, après le regroupement d'octobre 2026) donnent le niveau attendu ; parmi les 9 qui ont servi de modèles, il reste `hasard`, `age:3-4`, `genre:puzzle`, `genre:musique`, `univers:chevaux`, `univers:ocean`, `univers:espace` et `tendances` (`genre:reflexes` a été retiré avec son genre).
 
 Toutes les commandes se lancent depuis la racine du dépôt, avec Node 18 ou plus (aucun paquet npm, sauf Playwright pour les captures de la planche).
 
@@ -145,12 +145,11 @@ Un fichier dont le nom ne correspond à aucune clé de `taxonomie.js` est refus�
 |---|---|---|---|
 | Puce de genre | 16 px | `oklch(.72 (--c + .035) --teinte)` : teinte de la puce, un peu plus vive que son nombre | craie `#eceae4` |
 | Puce d'univers | 16 px | idem (le `--c` des univers est plus faible : couleurs plus éteintes) | craie |
-| « Autre » (genre et univers) | 16 px | ardoise neutre (`--c` .02) | craie |
 | Raccourcis (au hasard, j'ai aimé, hors ligne) | 24 px (26 px sur ordinateur) | lavande `#a8b3f0` (ce qu'on touche) | craie |
 | Âges | 24 px (26 px) | une teinte par tranche, du chaud au froid (on grandit), `oklch(.76 .085 h)` : 3-4 ans h 28 (pêche), 5-6 ans h 82 (miel), 7-8 ans h 152 (menthe), 9 ans et + h 236 (ciel) | craie |
 | Titre « Tendances » | 20 px | or `#f2d27a` (ce qui brille) | craie |
 
-L'icône d'une tuile mesure 24 px, mais seuls 20 px comptent dans la hauteur (marge de −2 px). Les tuiles et les puces gardent exactement leur taille : 34 px pour les puces, sur 2 rangées qui défilent.
+L'icône d'une tuile mesure 24 px, mais seuls 20 px comptent dans la hauteur (marge de −2 px). Les tuiles et les puces gardent exactement leur taille : 34 px pour les puces, sur une ligne par groupe qui défile si elle ne tient pas.
 
 ## 9. Bibliothèque d'animations (`data-anim`)
 
@@ -228,55 +227,32 @@ Métaphores prévues au départ pour chaque clé. Une icône a pu s'en écarter 
 | `genre:quiz` | bulle de dialogue ronde avec un « ? » au trait | osciller |
 | `genre:mots` | une grande forme de lettre abstraite (un « A » géométrique) posée sur une ligne d'écriture | sautiller |
 | `genre:calcul` | signes + et − (et ×) en gros, sans chiffres | tourner |
-| `genre:reflexes` | éclair large | secouer |
 | `genre:arcade` | manche à boule sur son socle, un bouton rond | osciller (pivot au socle) |
 | `genre:plateforme` | deux plateformes en escalier et une petite bille en plein saut | sautiller |
 | `genre:course` | drapeau à damier qui flotte | nager |
-| `genre:sport` | ballon rond à motif (générique) | tourner |
-| `genre:tir` | cible à anneaux, une flèche plantée | secouer |
-| `genre:combat` | gant de boxe rond, tourné vers le haut à droite | decoller |
-| `genre:labyrinthe` | labyrinthe rond (anneaux ouverts) et une bille | tourner |
 | `genre:aventure` | carte au trésor roulée aux bouts, chemin en pointillé, croix | osciller |
-| `genre:observation` | loupe | nager |
 | `genre:strategie` | pion d'échecs (silhouette classique) | sautiller |
-| `genre:defense` | bouclier avec une étoile | pulser |
-| `genre:gestion` | échoppe avec auvent rayé | sautiller |
 | `genre:simulation` | pansement en diagonale | emboiter |
 | `genre:creation` | robe sur un cintre (pivot au crochet) | osciller |
-| `genre:construction` | trois blocs de bois empilés (deux cubes et un toit) ; pas de tenons | emboiter |
 | `genre:musique` | deux croches liées | osciller |
-| `genre:societe` | trois cartes à jouer en éventail (cœur, losange ; sans lettres ni chiffres) | osciller |
-| `genre:coloriage` | crayon de couleur qui laisse une vague | nager |
-| `genre:role` | fiole de potion ronde, bouchon | pulser |
 | `genre:autre` | manette générique et simple (croix et deux ronds, aucune forme de console connue) | secouer |
 
 **Univers**
 
 | Clé | Métaphore | Animation |
 |---|---|---|
-| `univers:ferme` | grange : toit, porte en X | sautiller |
+| `univers:animaux` | empreinte de patte : coussinet arrondi et quatre doigts ovales séparés (regroupe la ferme, les animaux sauvages et de compagnie) | sautiller |
 | `univers:chevaux` | tête de profil, crinière en mèches, encolure arrondie (ce n'est pas un cavalier d'échecs) | galoper |
-| `univers:compagnie` | tête de chien aux oreilles tombantes (pas rondes : ce n'est pas le doudou) | sautiller |
-| `univers:sauvages` | tête de lion, crinière en pétales | secouer |
 | `univers:dinosaures` | dinosaure à long cou, de profil | galoper |
 | `univers:ocean` | poisson rond, ouïe, bulles | nager |
 | `univers:espace` | fusée ronde en diagonale, hublot percé, flamme | decoller |
 | `univers:fantasy` | baguette magique à étoile | scintiller |
-| `univers:chevaliers` | château fort : deux tours crénelées, porte, fanion | scintiller |
-| `univers:pirates` | bateau à voile avec fanion, sans tête de mort | nager |
-| `univers:monstres` | petit monstre rond, un œil, deux cornes ; mignon et original | secouer |
-| `univers:robots` | tête de robot carrée, antenne à boule | pulser |
 | `univers:nature` | arbre rond sur son tronc | osciller |
 | `univers:cuisine` | cupcake et sa cerise | sautiller |
 | `univers:vehicules` | petite voiture de profil | galoper |
 | `univers:sport` | médaille et son ruban (pivot en haut) | osciller |
 | `univers:monde` | globe terrestre de bureau, incliné sur son pied (différent du globe au trait du bouton de langue) | tourner |
-| `univers:histoire` | temple à colonnes et fronton | scintiller |
-| `univers:corps` | stéthoscope | osciller |
 | `univers:ville` | trois immeubles à fenêtres | scintiller |
-| `univers:fetes` | paquet-cadeau, ruban et nœud | sautiller |
-| `univers:contes` | livre ouvert | scintiller |
-| `univers:abstrait` | cercle, triangle et carré qui se chevauchent | tourner |
 | `univers:autre` | trois étincelles de tailles différentes | scintiller |
 
 ## 13. Avant de publier

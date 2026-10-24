@@ -16,6 +16,12 @@
 //   - formulaire public /proposer/, /en/suggest/…         (gabarits/proposer.html),
 //                       non indexé (textes : clés « proposer.* »)
 //   - sitemap.xml (pages indexables seulement, avec lastmod) et robots.txt
+//   - _redirects (Cloudflare Pages) : redirections 301 des pages de catégorie
+//                       retirées (ANCIENS_IDS de public/taxonomie.js) vers la
+//                       catégorie qui les a remplacées ; fichier généré, ne
+//                       pas le modifier à la main
+// Genres et univers : du plus grand nombre de jeux au plus petit (ordreAffichage,
+// comme l'accueil) ; « autre » n'a ni page, ni puce, ni libellé sur les cartes.
 // Adresses : public/chemins.js. Textes des jeux : game.json (règles :
 // scripts/regles-seo.mjs). Textes des catégories : gabarits/textes/categories.<langue>.json.
 // Intitulés des pages : clés « page.* » de public/i18n/site/<langue>.json.
@@ -32,7 +38,7 @@
 import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { GENRES, UNIVERS, TRANCHES_AGE, IDS_GENRES, IDS_UNIVERS, trancheDeAge } from '../public/taxonomie.js';
+import { GENRES, UNIVERS, TRANCHES_AGE, IDS_GENRES, IDS_UNIVERS, ID_AUTRE, ANCIENS_IDS, trancheDeAge, ordreAffichage } from '../public/taxonomie.js';
 import { LANGUES, HREFLANG, LOCALE_OG, LANGUES_LEGALES, PAGES_LEGALES, urlAccueil, urlJeu, urlCategorie, urlLanceur, urlLegale, urlProposer, langueLegale } from '../public/chemins.js';
 import { TITRE_MIN, TITRE_MAX, DESCRIPTION_MIN, DESCRIPTION_MAX } from '../public/demandes-regles.js';
 import { problemesChamps, textesLangue, languesDuJeu, ageMinimum } from './regles-seo.mjs';
@@ -49,7 +55,7 @@ export const ALERTE_FICHIERS = 16000;      // limite Cloudflare Pages : 20 000 f
 export const MAX_FICHIERS = 19500;
 
 // Dossiers et fichiers de public/ écrits par ce module (effacés au début de chaque build).
-export const SORTIES = ['index.html', '404.html', 'jeux', 'genres', 'univers', 'ages', 'en', 'es', 'pt', 'de', 'sitemap.xml', 'robots.txt',
+export const SORTIES = ['index.html', '404.html', 'jeux', 'genres', 'univers', 'ages', 'en', 'es', 'pt', 'de', 'sitemap.xml', 'robots.txt', '_redirects',
   'mentions-legales', 'confidentialite', 'conditions-utilisation', 'cookies', 'proposer'];
 
 // Images de partage : la jaquette du jeu si elle est en image matricielle, sinon l'icône du site.
@@ -318,10 +324,10 @@ function ariane(etapes, t) {
   return { html, donnees };
 }
 
-/** Puce-lien vers une catégorie (mêmes classes et icônes que les puces de l'accueil). */
+/** Puce-lien vers une catégorie (mêmes classes et icônes que les puces de l'accueil). « autre » : aucune. */
 function puceCategorie(famille, id, lang, t) {
   const info = famille === 'genre' ? GENRES.find((g) => g.id === id) : famille === 'univers' ? UNIVERS.find((u) => u.id === id) : TRANCHES_AGE.find((a) => a.id === id);
-  if (!info) return '';
+  if (!info || id === ID_AUTRE) return '';
   const nom = famille === 'age' ? t(`age.${id}`) : t(`${famille}.${id}`);
   const teinte = info.teinte !== undefined ? ` style="--teinte: ${info.teinte}"` : '';
   return `<a class="puce-filtre puce-lien" data-cle="${famille}:${echapper(id)}"${teinte} href="${echapper(urlCategorie(famille, id, lang))}"><span class="puce-filtre-picto" aria-hidden="true">${info.picto}</span><span>${echapper(nom)}</span></a>`;
@@ -331,8 +337,11 @@ function puceCategorie(famille, id, lang, t) {
 function carteJeu(jeu, lang, t, { titreNiveau = 'h3', prioritaire = false } = {}) {
   const tx = textesLangue(jeu.fiche, lang);
   const titre = tx.title || jeu.title;
+  // Genre principal et premier univers, en libellés courts (comme app.js), sans « autre ».
+  const genre = jeu.genre !== ID_AUTRE && jeu.genre;
+  const univers = jeu.univers.find((u) => u !== ID_AUTRE);
   const infos = [
-    [jeu.genre && t(`genre.${jeu.genre}.court`), jeu.univers[0] && t(`univers.${jeu.univers[0]}.court`)].filter(Boolean).join(' · '),
+    [genre && t(`genre.${genre}.court`), univers && t(`univers.${univers}.court`)].filter(Boolean).join(' · '),
     jeu.ages,
   ].filter(Boolean).join(' — ');
   const alt = tx.jaquette_alt || titre;
@@ -387,10 +396,13 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
 
   const pages = [];
 
-  // Catégories non vides, par langue : { cle, famille, id, jeux }.
+  // Catégories non vides, par langue : { cle, famille, id, jeux }. Genres et
+  // univers du plus grand nombre de jeux publiés au plus petit (même ordre dans
+  // toutes les langues, comme les puces de l'accueil), sans « autre ».
+  const nombre = (famille) => (id) => jeuxDeCategorie(jeux, famille, id).length;
   const FAMILLES = [
-    ...GENRES.map((g) => ({ famille: 'genre', id: g.id })),
-    ...UNIVERS.map((u) => ({ famille: 'univers', id: u.id })),
+    ...ordreAffichage(GENRES, nombre('genre')).map((g) => ({ famille: 'genre', id: g.id })),
+    ...ordreAffichage(UNIVERS, nombre('univers')).map((u) => ({ famille: 'univers', id: u.id })),
     ...TRANCHES_AGE.map((a) => ({ famille: 'age', id: a.id })),
   ];
   const categoriesDe = {};
@@ -399,7 +411,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
       .filter((c) => c.jeux.length > 0);
   }
   const categorieExiste = (famille, id, lang) => categoriesDe[lang].some((c) => c.famille === famille && c.id === id);
-  const categorieIndexable = (c, lang) => c.jeux.length >= SEUIL_INDEXATION_CATEGORIE && c.id !== 'autre' && !!categories[lang][c.cle]?.h1;
+  const categorieIndexable = (c, lang) => c.jeux.length >= SEUIL_INDEXATION_CATEGORIE && !!categories[lang][c.cle]?.h1;
   const nomCategorie = (c, t) => categories[c.lang]?.[c.cle]?.h1 || (c.famille === 'age' ? t(`age.${c.id}`) : t(`${c.famille}.${c.id}`));
 
   // Morceaux d'une langue. Le pied de page et le bandeau des cookies mènent aux
@@ -476,7 +488,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         image,
         // Langue du jeu : le français pour un jeu de mots ou de lettres (non_traduisible).
         inLanguage: jeu.fiche.non_traduisible === true ? 'fr' : HREFLANG[lang],
-        genre: [jeu.genre, ...jeu.genres_secondaires].filter(Boolean).map((g) => t(`genre.${g}`)),
+        genre: [jeu.genre, ...jeu.genres_secondaires].filter((g) => g && g !== ID_AUTRE).map((g) => t(`genre.${g}`)),
         gamePlatform: 'Web browser',
         applicationCategory: 'GameApplication',
         operatingSystem: 'Android, iOS, Windows, macOS, Linux',
@@ -707,6 +719,23 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
   await writeFile(path.join(dossierPublic, 'robots.txt'),
     `User-agent: *\nAllow: /\nAllow: /api/scores\nAllow: /api/tendances\nDisallow: /api/\nDisallow: /idees/\n\nSitemap: ${adresseDuSite()}sitemap.xml\n`, 'utf8');
   // Le formulaire /proposer/ n'est pas fermé aux robots : son « noindex » doit pouvoir être lu.
+
+  // --- Redirections des catégories retirées (Cloudflare Pages : _redirects) ---
+  // Chaque ancienne page de catégorie, dans chaque langue, avec et sans « / »
+  // final, mène en 301 à la catégorie qui l'a remplacée ; « autre » (jamais
+  // affiché) et une catégorie restée sans jeu mènent à l'accueil de la langue.
+  const redirections = [];
+  for (const [famille, anciens] of Object.entries(ANCIENS_IDS)) {
+    for (const [ancien, nouveau] of [...Object.entries(anciens), [ID_AUTRE, ID_AUTRE]]) {
+      for (const lang of LANGUES) {
+        const cible = nouveau !== ID_AUTRE && categorieExiste(famille, nouveau, lang) ? urlCategorie(famille, nouveau, lang) : urlAccueil(lang);
+        const source = urlCategorie(famille, ancien, lang);
+        redirections.push(`${source} ${cible} 301`, `${source.replace(/\/$/, '')} ${cible} 301`);
+      }
+    }
+  }
+  await writeFile(path.join(dossierPublic, '_redirects'),
+    `# Fichier généré par scripts/pages-seo.mjs (ne pas modifier) : anciennes pages de catégorie.\n${redirections.join('\n')}\n`, 'utf8');
 
   // --- Nombre de fichiers publiés (limite Cloudflare Pages) -------------------
   const fichiers = await compterFichiers(dossierPublic);
