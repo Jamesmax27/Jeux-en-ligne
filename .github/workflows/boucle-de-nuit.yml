@@ -520,6 +520,9 @@ jobs:
         id: verif
         run: |
           set -euo pipefail
+          # Pages générées (dans .gitignore) suivies par git par erreur : le build de l'agent les réécrit. Elles sont
+          # remises comme sur main : ce n'est pas une modification de l'agent (elles ont bloqué la boucle en octobre 2026).
+          git ls-files -ci --exclude-standard -z | xargs -0 -r git checkout --
           git status --porcelain --untracked-files=all > "$RUNNER_TEMP/modifs.txt"
           cat "$RUNNER_TEMP/modifs.txt"
           # Seuls le dossier d'un nouveau jeu, games/<id>/, et le cahier de conception peuvent apparaître.
@@ -599,7 +602,9 @@ jobs:
           ID: ${{ steps.verif.outputs.id }}
         run: |
           set -euo pipefail
-          # La réparation ne touche ni au jeu ni à un autre fichier du dépôt.
+          # La réparation ne touche ni au jeu ni à un autre fichier du dépôt (pages générées suivies par erreur
+          # remises comme sur main, voir « Vérifier ce que l'agent a modifié »).
+          git ls-files -ci --exclude-standard -z | xargs -0 -r git checkout --
           if ! sha256sum --quiet -c "$RUNNER_TEMP/empreintes-jeu.txt"; then
             echo "::error::La réparation des traductions a modifié le code du jeu : refusé."
             exit 1
@@ -994,6 +999,8 @@ jobs:
         env:
           ID: ${{ steps.pr.outputs.id }}
         run: |
+          # Pages générées suivies par erreur, réécrites par le build du robot : remises comme sur main.
+          git ls-files -ci --exclude-standard -z | xargs -0 -r git checkout --
           git status --porcelain --untracked-files=all > "$RUNNER_TEMP/modifs.txt"
           cat "$RUNNER_TEMP/modifs.txt"
           # Seuls le jeu ajouté (inchangé) et les deux fichiers du relecteur peuvent apparaître.
