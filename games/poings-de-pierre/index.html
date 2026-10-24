@@ -1828,6 +1828,11 @@ function update(dt) {
   if (G.mode === 'menu') updateDemo(dt);
   if (G.mode === 'play') {
     G.t += dt; G.levelT += dt; G.levelCalm -= dt;
+    // cœur de mi-niveau : un de plus quand il ne reste qu'un ou deux cœurs
+    if (!G.heartMid && G.levelT >= levelDur(G.level) / 2) {
+      G.heartMid = true;
+      if (G.hearts <= 2 && !G.pickups.length) spawnHeart();
+    }
     if (G.levelT >= levelDur(G.level)) nextLevel();
   }
   for (const g of G.golems) updateGolem(g, dt);
@@ -1852,7 +1857,7 @@ function initDemo() {
 function startGame(r) {
   audio();
   G.mode = 'play'; G.t = r && r.t || 0; G.level = r && r.level || 1; G.levelT = 0; G.levelCalm = 1.0;
-  G.hearts = r && r.hearts || 3; G.cfg = levelCfg(G.level);
+  G.hearts = r && r.hearts || 3; G.cfg = levelCfg(G.level); G.heartMid = false;
   G.player = newPlayer(); G.golems = []; G.rocks = []; G.parts = []; G.decals = []; G.pickups = []; G.texts = [];
   for (let i = 0; i < G.cfg.golems; i++) G.golems.push(newGolem(i));
   joy.id = null;
@@ -1861,7 +1866,7 @@ function startGame(r) {
 }
 function nextLevel() {
   const prev = G.cfg;
-  G.level++; G.levelT = 0; G.cfg = levelCfg(G.level); G.levelCalm = 1.4;
+  G.level++; G.levelT = 0; G.cfg = levelCfg(G.level); G.levelCalm = 1.4; G.heartMid = false;
   sauvegarder();   // niveau tenu : on reprendra au suivant
   let text = '';
   if (G.cfg.golems > prev.golems) {
@@ -1872,7 +1877,7 @@ function nextLevel() {
   if (!text) text = t(added ? 'nouveauCoup' : 'plusVite');
   banner(t('niveauN', { n: G.level }), text, added ? t('coupNouveau', { nom: INFO[added][0], desc: INFO[added][1] }) : '');
   for (const g of G.golems) if (g.state === 'walk') g.cd = Math.max(g.cd, 1.4);
-  if (G.hearts < G.maxHearts && (G.level % 2 === 0 || G.hearts === 1)) spawnHeart();
+  if (G.hearts < G.maxHearts) spawnHeart();   // un cœur à chaque niveau s'il en manque un
   sfx.level(); renderLevel();
 }
 function gameOver() {
