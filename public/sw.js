@@ -10,7 +10,8 @@
 //
 // Stratégies :
 //   - réseau d'abord, copie gardée en secours : coquille et catalog.json.
-//     En ligne, on a donc toujours la dernière version ;
+//     En ligne, on a donc toujours la dernière version (scripts et styles
+//     revérifiés à chaque fois, malgré le cache de 4 h du navigateur) ;
 //   - cache d'abord : jeux et jaquettes. Leur adresse contient la version
 //     (?v=…) : une nouvelle version est téléchargée et remplace l'ancienne ;
 //   - /api/scores et /api/tendances ne sont pas gardés : sans réseau, le
@@ -27,7 +28,7 @@
 // touchés : ils ont leur propre cache, indépendant de VERSION.
 // ==========================================================================
 
-const VERSION = 'v13';
+const VERSION = 'v14';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
 const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
@@ -167,9 +168,17 @@ function cleCoquille(chemin) {
 // --- Réseau d'abord (coquille, catalogue) --------------------------------------
 
 // apresMiseEnCache(cache) : facultatif, appelé après chaque copie (ex. limiter la place).
+// Scripts, styles et images de la coquille : toujours revérifiés auprès du serveur
+// (cache: 'no-cache' ; réponse 304, légère, s'ils n'ont pas changé). Cloudflare les
+// fait garder 4 heures par le navigateur (réglage « Browser Cache TTL » du domaine,
+// qui l'emporte sur public/_headers) alors que les pages sont toujours fraîches :
+// sans cela, après une mise en ligne, une page neuve tournait avec l'ancien app.js
+// ou l'ancien style.css, et la mise en page cassait. Les pages (navigations) sont
+// déjà servies fraîches.
 async function reseauDabord(event, nomCache, cle, apresMiseEnCache = null) {
   const cache = await caches.open(nomCache);
-  const reseau = fetch(event.request);
+  const requete = event.request.mode === 'navigate' ? event.request : new Request(event.request, { cache: 'no-cache' });
+  const reseau = fetch(requete);
 
   // La copie gardée est mise à jour à chaque réponse correcte, même arrivée en retard.
   // Copie faite tout de suite (la page va lire l'original) ; put remet la clé en fin
