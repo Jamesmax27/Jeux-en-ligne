@@ -2333,14 +2333,20 @@ body.lanceur::after { animation: none; }
   pointer-events: none;
 }
 
-/* Vérification anti-robot : invisible, sauf si Cloudflare demande de cocher une case */
+/* Vérification anti-robot : invisible, sauf si Cloudflare demande de cocher une case.
+   Toujours visible et touchable : posée au-dessus du bandeau des cookies quand il
+   est ouvert (sa hauteur : --hauteur-consentement, consentement.js), et devant lui
+   (z-index 70 > 60) si l'écran est trop petit pour les deux. Sans place vide
+   (taille nulle) tant que Cloudflare ne demande rien : elle ne gêne aucun clic. */
 .zone-turnstile {
   position: fixed;
   left: 50%;
   bottom: calc(16px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  z-index: 50;
+  z-index: 70;
 }
+
+.avec-consentement .zone-turnstile { bottom: calc(var(--hauteur-consentement, 0px) + 8px); }
 
 /* Bouton plein : le seul aplat lavande hors votes et coches. */
 .bouton {

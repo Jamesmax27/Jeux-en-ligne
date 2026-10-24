@@ -94,7 +94,10 @@ export async function titreJeu(env, request, gameId) {
 // --- Turnstile (anti-robot) ----------------------------------------------------
 // Vérifie un jeton Cloudflare Turnstile (secret TURNSTILE_SECRET) pour l'action
 // attendue (« vote », « demande »). Faux si le jeton est refusé ou si la
-// vérification est impossible.
+// vérification est impossible. Un refus est écrit dans les journaux de la
+// fonction (Cloudflare Pages → Functions → journaux en direct) avec les codes
+// de Cloudflare (ex. invalid-input-secret, timeout-or-duplicate), l'action et
+// le nom d'hôte du jeton : jamais le jeton lui-même.
 
 const URL_TURNSTILE = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
@@ -106,7 +109,11 @@ export async function verifierTurnstile(secret, jeton, ip, action) {
   try {
     const reponse = await fetch(URL_TURNSTILE, { method: 'POST', body: formulaire });
     const resultat = await reponse.json();
-    return resultat.success === true && (!resultat.action || resultat.action === action);
+    const valide = resultat.success === true && (!resultat.action || resultat.action === action);
+    if (!valide) {
+      console.warn(`Turnstile refusé (action attendue « ${action} ») : codes ${JSON.stringify(resultat['error-codes'] || [])}, action « ${resultat.action ?? '?'} », hôte « ${resultat.hostname ?? '?'} »`);
+    }
+    return valide;
   } catch (erreur) {
     console.error('Vérification Turnstile impossible :', erreur);
     return false;

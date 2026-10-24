@@ -134,8 +134,10 @@ if (formulaire) {
       try {
         jeton = await jetonTurnstile('demande', lang);
       } catch (erreur) {
+        // Code de l'erreur (public/turnstile.js) : dans la console et dans le message,
+        // pour qu'un visiteur puisse le signaler (ex. 110200 : domaine non autorisé).
         console.warn('Vérification anti-robot impossible :', erreur);
-        afficher(t('proposer.erreur.robot'), 'erreur');
+        afficher(t('proposer.erreur.robotCode', { code: erreur?.code || 'inconnu' }), 'erreur');
         return;
       }
       const reponse = await fetch('/api/demandes', {
