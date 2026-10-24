@@ -5,9 +5,11 @@
 // en HTML brut : tout passe par textContent (sécurité).
 //
 // - Tri : Mieux notés (score de Wilson), Plus populaires (nombre de votes),
-//   Populaires cette semaine, Nouveautés.
-// - Portée : votes du monde entier, ou de mon pays (pays détecté par l'API ;
-//   classement Monde tant que mon pays a moins de PAYS_VOTES_MIN votes).
+//   Populaires aujourd'hui, cette semaine, ce mois-ci (votes des dernières
+//   24 h, des 7 et des 30 derniers jours), Nouveautés, De A à Z, Par âge.
+//   Votes du monde entier.
+// - Recherche juste au-dessus des jeux : les résultats s'affichent pendant la
+//   frappe ; « Rechercher » (touche Entrée) ferme le clavier du téléphone.
 // - Regroupements : tuiles des raccourcis (au hasard, jeux aimés, hors ligne)
 //   et de l'âge, puis petites puces des genres et des univers (listes fermées
 //   de taxonomie.js, une ligne chacune, du plus grand nombre de jeux au plus
@@ -52,7 +54,6 @@ const NOUVEAU_JOURS = 7;          // un jeu est « nouveau » pendant 7 jours
 const NOUVEAUX_EN_TETE = 2;       // nouveautés intercalées en haut du tri « Mieux notés »
 const ARCHIVE_VOTES_MIN = 30;     // archives : plus de 30 votes…
 const ARCHIVE_SCORE_MAX = 0.2;    // … et un score inférieur à 0,2 (votes du monde entier)
-const PAYS_VOTES_MIN = 20;        // sous 20 votes dans mon pays, classement Monde
 const DELAI_SCORES = 4000;        // au-delà, on affiche sans attendre l'API
 const NOUVEAUTES_NOMBRE = 16;     // jeux de la moitié « Nouveautés » (elle défile ; 4 visibles dès 1 200 px)
 const NOUVEAUTES_EXCLUES = 4;     // les 4 premières Nouveautés ne sont pas répétées dans les Tendances
@@ -73,19 +74,20 @@ const COLLECTIONS = {
   'hors-ligne': { nom: 'collection.horsLigne', picto: '📶', teinte: 200, vide: 'collection.horsLigneVide' },
 };
 
-const SANS_VOTE = { up: 0, down: 0, score: 0, semaine: 0 };
+const SANS_VOTE = { up: 0, down: 0, score: 0, jour: 0, semaine: 0, mois: 0 };
+
+// Tris possibles sans les votes (hors connexion, API en panne) ; les autres
+// reviennent aux Nouveautés.
+const TRIS_SANS_VOTES = ['nouveautes', 'alpha', 'age'];
 
 const etat = {
   tous: [],               // tout le catalogue (catalog.json)
   jeux: [],               // jeux proposés dans la langue courante
-  scoresMonde: null,      // { gameId: { up, down, score, semaine } } ; null = API indisponible
-  scoresPays: undefined,  // idem pour mon pays : undefined = pas chargé, null = indisponible
-  pays: null,             // pays détecté par l'API (ex. « FR »), ou null
+  scores: null,           // { gameId: { up, down, score, jour, semaine, mois } } ; null = API indisponible
   tendances: undefined,   // [{ id }] : jeux des tendances, sans ordre ; undefined = pas encore chargées, null = API indisponible
   horsLigne: new Set(),   // jeux gardés sur l'appareil
   aimes: new Set(),       // jeux que j'ai notés 👍 sur cet appareil
-  tri: 'notes',           // 'notes' | 'votes' | 'semaine' | 'nouveautes'
-  portee: 'monde',        // 'monde' | 'pays'
+  tri: 'notes',           // 'notes' | 'votes' | 'jour' | 'semaine' | 'mois' | 'nouveautes' | 'alpha' | 'age'
   collection: null,       // 'aimes' | 'hors-ligne' | null
   age: null,              // tranche d'âge (TRANCHES_AGE), ou null
   genre: null,            // genre sélectionné (GENRES), ou null
@@ -104,9 +106,8 @@ const el = {
   videTitre: document.getElementById('vide-titre'),
   videTexte: document.getElementById('vide-texte'),
   recherche: document.getElementById('recherche'),
+  formRecherche: document.getElementById('form-recherche'),
   tri: document.getElementById('tri'),
-  portee: document.getElementById('portee'),
-  porteeChoix: document.querySelectorAll('#portee button'),
   resultats: document.getElementById('resultats'),
   titre: document.getElementById('titre-texte'),
   actifs: document.getElementById('filtres-actifs'),
@@ -141,15 +142,6 @@ function estNouveau(jeu) {
   return joursDepuis(jeu.added) < NOUVEAU_JOURS;
 }
 
-// « FR » → « France » (nom du pays dans la langue du site).
-function nomPays(code) {
-  try {
-    return new Intl.DisplayNames([getLang()], { type: 'region' }).of(code) || code;
-  } catch {
-    return code;
-  }
-}
-
 const nomAge = (tranche) => t(`age.${tranche.id}`);
 
 // Jeux que j'ai notés 👍 sur cet appareil.
@@ -157,30 +149,16 @@ function jeuxAimes() {
   return new Set(Object.entries(mesVotes()).filter(([, v]) => v === 1).map(([id]) => id));
 }
 
-function totalVotes(scores) {
-  return Object.values(scores).reduce((n, s) => n + s.up + s.down, 0);
-}
-
 // --- Scores pris en compte --------------------------------------------------
 
-// Mon pays seulement s'il a assez de votes ; sinon le monde entier.
-function paysRetenu() {
-  return etat.portee === 'pays' && etat.scoresPays && totalVotes(etat.scoresPays) >= PAYS_VOTES_MIN;
-}
-
-// Scores du tri et des compteurs (null = API indisponible).
-function scoresAffiches() {
-  return paysRetenu() ? etat.scoresPays : etat.scoresMonde;
-}
-
-// Sans API, seul le tri par nouveautés a un sens.
+// Sans API, seuls les tris qui n'utilisent pas les votes gardent leur sens ;
+// les autres reviennent aux Nouveautés.
 function triEffectif() {
-  return etat.scoresMonde ? etat.tri : 'nouveautes';
+  return etat.scores || TRIS_SANS_VOTES.includes(etat.tri) ? etat.tri : 'nouveautes';
 }
 
-// Les archives se décident sur les votes du monde entier.
 function estArchive(jeu) {
-  const s = etat.scoresMonde?.[jeu.id];
+  const s = etat.scores?.[jeu.id];
   return !!s && s.up + s.down > ARCHIVE_VOTES_MIN && s.score < ARCHIVE_SCORE_MAX;
 }
 
@@ -191,17 +169,33 @@ function parDate(a, b) {
   return String(b.added).localeCompare(String(a.added)) || a.title.localeCompare(b.title, 'fr');
 }
 
+// Âge minimum conseillé (« 6+ » → 6) ; illisible : en dernier.
+function ageDuJeu(jeu) {
+  const age = parseInt(jeu.ages, 10);
+  return Number.isNaN(age) ? Infinity : age;
+}
+
 // En cas d'égalité, on départage par le score, puis le nombre de votes, puis la date.
 function comparateur(tri, scores) {
   const s = (jeu) => scores?.[jeu.id] || SANS_VOTE;
   const total = (jeu) => s(jeu).up + s(jeu).down;
+  const parPeriode = (champ) => (a, b) => s(b)[champ] - s(a)[champ] || s(b).score - s(a).score || total(b) - total(a) || parDate(a, b);
   switch (tri) {
     case 'notes':
       return (a, b) => s(b).score - s(a).score || total(b) - total(a) || parDate(a, b);
     case 'votes':
       return (a, b) => total(b) - total(a) || s(b).score - s(a).score || parDate(a, b);
+    case 'jour':
     case 'semaine':
-      return (a, b) => s(b).semaine - s(a).semaine || s(b).score - s(a).score || total(b) - total(a) || parDate(a, b);
+    case 'mois':
+      return parPeriode(tri);
+    case 'alpha': {
+      // Titre affiché, dans la langue de la page (« É » rangé avec « E »).
+      const ordre = new Intl.Collator(getLang(), { sensitivity: 'base', numeric: true });
+      return (a, b) => ordre.compare(titreJeu(a), titreJeu(b)) || parDate(a, b);
+    }
+    case 'age':
+      return (a, b) => ageDuJeu(a) - ageDuJeu(b) || s(b).score - s(a).score || parDate(a, b);
     default:
       return parDate;
   }
@@ -252,7 +246,7 @@ function jeuxVisibles() {
   const liste = etat.jeux.filter((j) => correspond(j, recherche));
 
   const tri = triEffectif();
-  const comparer = comparateur(tri, scoresAffiches());
+  const comparer = comparateur(tri, etat.scores);
   const archives = liste.filter(estArchive).sort(comparer);
   let principaux = liste.filter((j) => !estArchive(j)).sort(comparer);
   if (tri === 'notes') principaux = intercalerNouveautes(principaux);
@@ -350,7 +344,7 @@ function creerCarte(jeu, scores, prioritaire = false) {
 }
 
 function afficherGrille() {
-  const scores = scoresAffiches();
+  const { scores } = etat;
   const { principaux: liste, archives } = jeuxVisibles();
   el.grille.replaceChildren(...liste.map((jeu, i) => creerCarte(jeu, scores, i < JAQUETTES_PRIORITAIRES)));
   el.grilleArchives.replaceChildren(...archives.map((jeu) => creerCarte(jeu, scores)));
@@ -358,7 +352,7 @@ function afficherGrille() {
 
   const total = liste.length + archives.length;
   el.titre.textContent = filtreActif() ? t('resultats.trouves') : t('resultats.tous');
-  el.compte.textContent = `· ${nombreDeJeux(total)}`;
+  el.compte.textContent = nombreDeJeux(total); // « · » devant : style.css (ordinateur seulement)
   el.vide.hidden = total > 0;
   el.videTitre.textContent = t('vide.titre');
   el.videTexte.textContent = t('vide.texte');
@@ -490,38 +484,25 @@ function glisserALaSouris(liste) {
   }, true);
 }
 
-// Menu de tri : sans API, seules les « Nouveautés » restent possibles.
+// Menu de tri : sans API, seuls les tris qui n'utilisent pas les votes restent possibles.
 function afficherTri() {
-  const avecVotes = !!etat.scoresMonde;
-  for (const option of el.tri.options) option.disabled = !avecVotes && option.value !== 'nouveautes';
+  const avecVotes = !!etat.scores;
+  for (const option of el.tri.options) option.disabled = !avecVotes && !TRIS_SANS_VOTES.includes(option.value);
   el.tri.value = triEffectif();
 }
 
-// Choix Monde / Mon pays : seulement si l'API répond et que le pays est connu.
-function afficherPortee() {
-  el.portee.hidden = !(etat.scoresMonde && etat.pays);
-  el.porteeChoix.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.portee === etat.portee)));
-}
-
-// Petite phrase sous le nombre de jeux, quand le classement mérite une explication.
+// Petite phrase sous le nombre de jeux, quand le tri choisi a dû céder la place
+// aux Nouveautés faute de votes (hors connexion, API en panne).
 function afficherNote() {
-  let note = '';
-  if (!etat.scoresMonde) {
-    note = navigator.onLine === false ? t('note.horsConnexion') : t('note.votesIndisponibles');
-  } else if (etat.portee === 'pays' && etat.pays) {
-    const pays = nomPays(etat.pays);
-    if (etat.scoresPays === undefined) note = t('note.chargementPays', { pays });
-    else if (etat.scoresPays === null) note = t('note.paysIndisponible');
-    else if (!paysRetenu()) note = t('note.paysPeuDeVotes', { min: PAYS_VOTES_MIN, pays });
-    else note = t('note.paysSeul', { pays });
-  }
+  const note = !etat.scores && !TRIS_SANS_VOTES.includes(etat.tri)
+    ? t(navigator.onLine === false ? 'note.horsConnexion' : 'note.votesIndisponibles')
+    : '';
   el.note.textContent = note;
   el.note.hidden = !note;
 }
 
 function afficher() {
   afficherTri();
-  afficherPortee();
   afficherNote();
   rafraichir();
 }
@@ -811,27 +792,24 @@ function scoresValides(donnees) {
       up: Number(s?.up) || 0,
       down: Number(s?.down) || 0,
       score: Number(s?.score) || 0,
+      jour: Number(s?.jour) || 0,
       semaine: Number(s?.semaine) || 0,
+      mois: Number(s?.mois) || 0,
     };
   }
   return scores;
 }
 
-// Ne lève jamais d'erreur. Renvoie { scores, pays }, ou null si l'API ne répond pas.
-async function chargerScores(pays) {
+// Ne lève jamais d'erreur. Renvoie les scores, ou null si l'API ne répond pas.
+async function chargerScores() {
   // Hors connexion : pas de votes, même si le navigateur en garde une copie récente.
   if (navigator.onLine === false) return null;
   try {
-    const adresse = pays ? `/api/scores?pays=${encodeURIComponent(pays)}` : '/api/scores';
-    const reponse = await fetch(adresse, {
+    const reponse = await fetch('/api/scores', {
       signal: AbortSignal.timeout ? AbortSignal.timeout(DELAI_SCORES) : undefined,
     });
     if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
-    const paysDetecte = reponse.headers.get('X-Pays') || '';
-    return {
-      scores: scoresValides(await reponse.json()),
-      pays: /^[A-Z]{2}$/.test(paysDetecte) ? paysDetecte : null,
-    };
+    return scoresValides(await reponse.json());
   } catch (erreur) {
     console.warn('Scores indisponibles :', erreur);
     return null;
@@ -866,22 +844,19 @@ el.tri.addEventListener('change', () => {
   afficher();
 });
 
-el.porteeChoix.forEach((bouton) => {
-  bouton.addEventListener('click', async () => {
-    etat.portee = bouton.dataset.portee;
-    afficher();
-    // Votes de mon pays : chargés à la première demande seulement.
-    if (etat.portee === 'pays' && etat.scoresPays === undefined) {
-      const resultat = await chargerScores(etat.pays);
-      etat.scoresPays = resultat ? resultat.scores : null;
-      afficher();
-    }
-  });
-});
-
 el.recherche.addEventListener('input', () => {
   etat.texte = el.recherche.value;
   rafraichir();
+});
+
+// « Rechercher » (touche Entrée du clavier du téléphone) : les résultats sont
+// déjà affichés ; on referme le clavier pour les montrer en entier. Au doigt
+// seulement : au clavier d'un ordinateur, le champ garde le focus.
+el.formRecherche.addEventListener('submit', (evenement) => {
+  evenement.preventDefault();
+  etat.texte = el.recherche.value;
+  rafraichir();
+  if (matchMedia('(pointer: coarse)').matches) el.recherche.blur();
 });
 
 // Retour de la connexion : on récupère les votes et les tendances s'ils manquaient.
@@ -893,11 +868,10 @@ addEventListener('online', async () => {
       afficherVitrine();
     });
   }
-  if (etat.scoresMonde) return;
-  const resultat = await chargerScores();
-  if (!resultat) return;
-  etat.scoresMonde = resultat.scores;
-  etat.pays = resultat.pays;
+  if (etat.scores) return;
+  const scores = await chargerScores();
+  if (!scores) return;
+  etat.scores = scores;
   afficher();
   afficherVitrine(); // les Archives sont maintenant connues
 });
@@ -955,11 +929,7 @@ async function demarrer() {
   await textes;
   afficherSeo();
   preparerJeux();
-  const resultat = await scores;
-  if (resultat) {
-    etat.scoresMonde = resultat.scores;
-    etat.pays = resultat.pays;
-  }
+  etat.scores = await scores;
   etat.horsLigne = await horsLigne;
   etat.aimes = jeuxAimes();
   afficher();

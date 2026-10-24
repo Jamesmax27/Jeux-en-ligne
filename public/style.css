@@ -157,7 +157,7 @@ body::after {
    En-tête : marque, langue, recherche, et les constellations derrière
    -------------------------------------------------------------------------- */
 
-/* Accueil compact : l'en-tête tient en 116 px sur téléphone. --deborde laisse
+/* En-tête compact : marque et langue, environ 72 px sur téléphone. --deborde laisse
    le ciel aller jusqu'au bord gauche de l'écran quand le site est plus étroit
    que la fenêtre. */
 .entete {
@@ -392,7 +392,8 @@ body::after {
   cursor: pointer;
 }
 
-/* Ordinateur : marque, recherche et langue sur une seule ligne. */
+/* Ordinateur : marque et langue sur une seule ligne (la recherche de l'accueil
+   est juste au-dessus des jeux, dans .resultats-tete). */
 @media (min-width: 720px) {
   .entete {
     display: grid;
@@ -404,7 +405,6 @@ body::after {
   .marque { grid-column: 1; grid-row: 1; gap: 12px; }
   .marque-logo { width: 53px; height: 36px; }
   .marque-mot { height: 26px; }
-  .recherche { grid-column: 2; grid-row: 1; max-width: 520px; }
   .entete-langue { grid-column: 3; grid-row: 1; }
 }
 
@@ -420,30 +420,39 @@ body::after {
    artistique). L'étoile bonus et le cœur des premiers essais sont retirés :
    près du nom, l'étoile bonus faisait concurrence à l'étincelle or du i ;
    au milieu de l'ordinateur, elle flottait sans appui.
-   - ordinateur (dès 1 200 px) : la grande manette entre la recherche et la
-     langue, sur toutes les pages (la recherche s'arrête à 520 px et laisse
-     ce vide ; sur les mentions, il n'y a pas de recherche). Aucun besoin de
-     :has() : elle s'affiche aussi sur les navigateurs plus anciens ;
-   - avec :has() (Firefox 121, Safari 15.4 et plus récents) :
-     - téléphone (dès 360 px) : une petite manette à droite du titre de la
-       première ligne (« Nouveautés » seules), calée sur le bas de l'en-tête ;
-       avec les deux moitiés (Nouveautés et Tendances), elle s'efface jusqu'à
-       799 px : le titre des Tendances passerait dessous. En dessous de 360 px, il n'y a
-       pas de vide : seules les étoiles du fond ;
-     - ordinateur de 720 à 1 199 px : la petite manette à droite de la
-       bande sous la recherche ; sur les mentions, la grande manette entre
-       la marque et la langue ;
-     - sans première ligne (catalogue illisible…), les tuiles des raccourcis
-       viennent juste sous la recherche : la petite manette, qui serait
-       cachée derrière, s'efface ; sur les mentions (téléphone), rien non plus. */
+   L'en-tête n'a que la marque et la langue (la recherche de l'accueil est
+   au-dessus des jeux) : la manette se met dans le vide entre les deux.
+   - ordinateur (dès 1 200 px) : la grande manette, sur toutes les pages ;
+   - ordinateur de 720 à 1 199 px : la grande manette sur les autres pages
+     (.entete-page) ; sur l'accueil, la petite, qui reste dans l'en-tête (la
+     grande descendrait sur le titre des Tendances) ;
+   - avec :has() (Firefox 121, Safari 15.4 et plus récents), téléphone (dès
+     360 px), accueil seulement : une petite manette à droite du titre de la
+     première ligne (« Nouveautés » seules), calée sur le bas de l'en-tête ;
+     avec les deux moitiés (Nouveautés et Tendances), elle s'efface : le
+     titre des Tendances passerait dessous. Sans première ligne (catalogue
+     illisible…), les tuiles des raccourcis viendraient sur elle : elle
+     s'efface aussi. En dessous de 360 px, il n'y a pas de vide : seules les
+     étoiles du fond. Aucune manette sur les autres pages au téléphone. */
 @media (min-width: 1200px) {
   .entete::before {
     background: var(--ciel-manette) no-repeat right 168px top 0;
   }
 }
 
+@media (min-width: 720px) and (max-width: 1199px) {
+  .entete::before {
+    background: var(--ciel-manette-petite) no-repeat right 168px top 10px;
+  }
+  .entete-page::before {
+    background: var(--ciel-manette) no-repeat right 168px top 0;
+  }
+}
+
 @supports selector(:has(*)) {
-  /* 360 à 389 px : une manette plus petite, pour rester à droite du titre. */
+  /* 360 à 389 px : une manette plus petite, pour rester à droite du titre.
+     Titre et sous-titre des Nouveautés seules : 262 px au plus (portugais),
+     la manette commence à 284 px dès 360 px de large. */
   @media (min-width: 360px) and (max-width: 719px) {
     .entete::before {
       background: var(--ciel-manette-mini) no-repeat right 10px bottom 16px;
@@ -456,36 +465,10 @@ body::after {
     }
   }
 
-  /* Titre et sous-titre des Nouveautés seules : 262 px au plus (portugais),
-     la manette commence à 284 px dès 360 px de large ; avec les Tendances,
-     la manette s'efface (plus bas). */
-
-  /* Bande sous la recherche (y 57 à 98) : la petite manette à droite (top
-     50 px : son fondu s'achève avant le haut des jaquettes de la première ligne). */
-  @media (min-width: 720px) and (max-width: 1199px) {
-    .entete::before {
-      background: var(--ciel-manette-petite) no-repeat right 20px top 50px;
-    }
-    /* Mentions légales : rien entre la marque et la langue, la grande manette s'y met. */
-    .entete:not(:has(.recherche))::before {
-      background: var(--ciel-manette) no-repeat right 168px top 0;
-    }
-  }
-
-  @media (max-width: 1199px) {
-    html:not(.avec-vitrine) .entete:has(+ .vitrine[hidden])::before { background: none; }
-  }
-
-  /* Téléphone et petite tablette (jusqu'à 799 px, barre de défilement
-     comprise), première ligne en deux moitiés : le titre des Tendances, ou son
-     sous-titre en allemand et en espagnol, passerait sous la petite manette,
-     qui s'efface. */
-  @media (max-width: 799px) {
-    html.avec-tendances .entete:has(+ .vitrine)::before { background: none; }
-  }
-
   @media (max-width: 719px) {
-    .entete:not(:has(.recherche))::before { background: none; }
+    html:not(.avec-vitrine) .entete:has(+ .vitrine[hidden])::before,
+    html.avec-tendances .entete:has(+ .vitrine)::before,
+    .entete-page::before { background: none; }
   }
 }
 
@@ -996,7 +979,7 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
 }
 
 /* --------------------------------------------------------------------------
-   En-tête des jeux : horizon, titre, nombre, tri, filtres choisis, portée
+   En-tête des jeux : horizon, titre, nombre, recherche, tri, filtres choisis
    -------------------------------------------------------------------------- */
 
 main.catalogue {
@@ -1005,16 +988,37 @@ main.catalogue {
   padding: 8px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left));
 }
 
+/* Titre et nombre de jeux, recherche, tri. Téléphone : titre et tri sur la
+   première ligne, la recherche en dessous, sur toute la largeur, juste
+   au-dessus des jeux (on voit qu'elle cherche dans ce catalogue). Tablette et
+   ordinateur : les trois sur une ligne (plus bas). */
 .resultats-tete {
   position: relative;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "titre tri" "recherche recherche";
   align-items: center;
-  justify-content: space-between;
-  gap: 6px 12px;
-  margin: 0 0 8px;
+  gap: 10px 12px;
+  margin: 0 0 12px;
   padding-top: 12px;
   scroll-margin-top: 8px;
+}
+
+#titre-resultats { grid-area: titre; }
+.resultats-tete .recherche { grid-area: recherche; }
+.resultats-tete .tri { grid-area: tri; }
+
+@media (min-width: 720px) {
+  .resultats-tete {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "titre recherche tri";
+    gap: 10px 20px;
+  }
+  .resultats-tete .recherche {
+    justify-self: end;
+    width: 100%;
+    max-width: 440px;
+  }
 }
 
 /* L'« horizon » : un arc de planète très fin, fondu aux deux bouts, au lieu
@@ -1046,22 +1050,36 @@ main.catalogue {
   font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* Menu de tri : une liste déroulante native (sélecteur du téléphone) */
+/* Nombre de jeux de l'accueil : sous le titre sur téléphone (le tri est à
+   côté), à sa suite (« · 53 jeux ») dès 720 px. */
+#compte { display: block; font-size: 13px; }
+
+@media (min-width: 720px) {
+  #compte { display: inline; font-size: 14px; }
+  #compte:not(:empty)::before { content: "· "; }
+}
+
+/* Menu de tri : une liste déroulante native (sélecteur du téléphone). Sa
+   largeur est celle du plus long choix : sur téléphone, elle est limitée et
+   le choix affiché finit par « … » s'il est trop long, sans icône à gauche ;
+   sur ordinateur, limitée aussi, pour laisser sa place à la recherche. */
 .tri {
   position: relative;
   display: inline-block;
-  max-width: 100%;
+  max-width: min(52vw, 100%);
+  min-width: 0;
   color: var(--craie-douce);  /* couleur des deux icônes */
 }
 
 .tri select {
   -webkit-appearance: none;
   appearance: none;
-  max-width: 100%;
+  width: 100%;
   min-height: 44px;
-  padding: 0 38px 0 40px;     /* texte à 16 px : en dessous, l'iPhone zoome */
+  padding: 0 34px 0 14px;     /* texte à 16 px : en dessous, l'iPhone zoome */
   border: 1.5px solid var(--orbite);
   border-radius: var(--r-commande);
   background: var(--surface);
@@ -1090,8 +1108,15 @@ main.catalogue {
   pointer-events: none;
 }
 
-.tri-icone { left: 15px; }
-.tri-fleche { right: 14px; }
+.tri-icone { left: 15px; display: none; }
+.tri-fleche { right: 12px; }
+
+@media (min-width: 720px) {
+  .tri { max-width: 280px; }
+  .tri select { padding: 0 38px 0 40px; }
+  .tri-icone { display: block; }
+  .tri-fleche { right: 14px; }
+}
 
 .filtres-actifs {
   display: flex;
@@ -1139,38 +1164,7 @@ main.catalogue {
   text-underline-offset: 3px;
 }
 
-/* Choix Monde / Mon pays : interrupteur à deux segments */
-.portee {
-  display: inline-flex;
-  flex: none;
-  margin: 0 0 10px;
-  padding: 2px;
-  border: 1.5px solid var(--orbite);
-  border-radius: var(--r-commande);
-  background: var(--surface);
-}
-
-.portee button {
-  min-height: 44px;
-  padding: 0 15px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--craie-douce);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background-color .15s ease, color .15s ease;
-}
-
-.portee button[aria-pressed="true"] {
-  background: var(--surface-choisie);
-  color: var(--craie);
-  box-shadow: inset 0 0 0 1.5px var(--lavande);
-}
-
-/* Explication du classement (hors connexion, pays avec peu de votes…) */
+/* Explication du classement (hors connexion, votes indisponibles) */
 .note-tri {
   margin: 0 0 8px;
   color: var(--craie-douce);
