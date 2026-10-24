@@ -345,6 +345,9 @@ jobs:
         if: steps.branche.outputs.ok == 'true'
         run: |
           set -euo pipefail
+          # Pages générées (dans .gitignore) suivies par git par erreur, réécrites par le build de Claude : remises
+          # comme sur main, ce n'est pas une modification de Claude.
+          git ls-files -ci --exclude-standard -z | xargs -0 -r git checkout --
           git status --porcelain --untracked-files=all > "$RUNNER_TEMP/modifs.txt"
           cat "$RUNNER_TEMP/modifs.txt"
           # Seuls games/<id>/ et le résumé de Claude peuvent changer.
@@ -461,7 +464,9 @@ jobs:
           cp "$RUNNER_TEMP/rapport.txt" "captures/$ID/rapport.txt"
           if [ -f "$RUNNER_TEMP/resume.md" ]; then cp "$RUNNER_TEMP/resume.md" "captures/$ID/resume.md"; fi
           git diff HEAD -- "games/$ID" > "captures/$ID/modifications.diff"
-          # État avant la relecture, pour vérifier qu'elle ne modifie rien.
+          # État avant la relecture, pour vérifier qu'elle ne modifie rien (pages générées suivies par erreur, réécrites
+          # par les builds ci-dessus, remises comme sur main).
+          git ls-files -ci --exclude-standard -z | xargs -0 -r git checkout --
           git status --porcelain --untracked-files=all > "$RUNNER_TEMP/avant-relecture.txt"
           sha256sum games/"$ID"/* > "$RUNNER_TEMP/empreintes.txt"
 
