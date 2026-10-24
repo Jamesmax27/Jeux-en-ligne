@@ -377,22 +377,22 @@ await test('texte piégé : ni fausse rubrique, ni faux avis de l\'IA, ni mentio
 await test('/idees : accepter un nouveau jeu → idée perso lisible par la boucle de nuit', async () => {
   await envoyer({ ...DEMANDE, titre: 'La ferme des nuages' }, '192.0.2.70');
   const numero = github.suivant - 1;
-  validerParIa(numero, { decision: 'valide', categorie: 'nouveau-jeu', motif: 'Idée claire.', resume: 'Une ferme dans les nuages.', genre: 'gestion', univers: ['ferme'], ages: '5+' });
+  validerParIa(numero, { decision: 'valide', categorie: 'nouveau-jeu', motif: 'Idée claire.', resume: 'Une ferme dans les nuages.', genre: 'simulation', univers: ['animaux'], ages: '5+' });
   const liste = await D.listerPubliques(env, async () => null);
-  attendu(liste.demandes.some((d) => d.numero === numero && d.moderation?.genre === 'gestion'), 'demande absente de la liste');
+  attendu(liste.demandes.some((d) => d.numero === numero && d.moderation?.genre === 'simulation'), 'demande absente de la liste');
   egal((await D.accepterPublique(env, { numero, classement: { genre: 'inconnu', ages: '5+', univers: [] }, auteur: 'moi' })).statut, 400, 'genre hors liste');
-  const r = await D.accepterPublique(env, { numero, classement: { genre: 'gestion', ages: '5+', univers: ['ferme'] }, auteur: 'moi' });
+  const r = await D.accepterPublique(env, { numero, classement: { genre: 'simulation', ages: '5+', univers: ['animaux'] }, auteur: 'moi' });
   egal(r.ok, true, 'acceptée');
   const issue = github.issues.get(numero);
   const etiquettes = issue.labels.map((l) => l.name);
-  attendu(etiquettes.includes('idee-perso') && etiquettes.includes('gestion') && etiquettes.includes('accepte') && !etiquettes.includes('valide-ia'), `étiquettes : ${etiquettes}`);
+  attendu(etiquettes.includes('idee-perso') && etiquettes.includes('simulation') && etiquettes.includes('accepte') && !etiquettes.includes('valide-ia'), `étiquettes : ${etiquettes}`);
   const idee = lireCommeBoucleDeNuit(issue);
   egal(idee.titre, 'Idée : La ferme des nuages', 'titre');
-  egal(idee.genre, 'gestion', 'genre');
+  egal(idee.genre, 'simulation', 'genre');
   egal(idee.ages, '5+', 'âge');
-  egal(idee.univers.join(','), 'ferme', 'univers');
+  egal(idee.univers.join(','), 'animaux', 'univers');
   attendu(idee.description.includes('attraper les bons ingrédients'), `description : ${idee.description}`);
-  egal((await D.accepterPublique(env, { numero, classement: { genre: 'gestion', ages: '5+', univers: [] }, auteur: 'moi' })).statut, 409, 'deuxième décision');
+  egal((await D.accepterPublique(env, { numero, classement: { genre: 'simulation', ages: '5+', univers: [] }, auteur: 'moi' })).statut, 409, 'deuxième décision');
 });
 
 await test('/idees : accepter un bug → étiquette demande-ia (demande-modification.yml)', async () => {

@@ -585,7 +585,7 @@ html.avec-tendances .nouveautes .groupe-tete { padding-right: 12px; }
 
 /* Accueil : places gardées avant que app.js ne remplisse la page, pour qu'elle
    ne bouge pas pendant le chargement (première ligne, Tendances vues à la
-   visite précédente, tuiles, rangées de puces). Une bande vide reçoit une
+   visite précédente, tuiles, lignes de puces). Une bande vide reçoit une
    jaquette fantôme (::before, une colonne en 3:4 : la hauteur de la bande) et
    une ligne fantôme de 12 colonnes (::after) qui la fait déborder comme les
    vraies : elle a donc la hauteur de la bande pleine, barre de défilement
@@ -614,7 +614,7 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
 }
 
 .tuiles:empty { min-height: 63px; }
-.rangee:empty { min-height: 63px; }
+.rangee:empty { min-height: 64px; }   /* puce de 52 px + 2 × 6 px (68 px dès 720 px, plus bas) */
 
 /* Le rembourrage vertical laisse la place au contour de focus (5 px) ; celui
    de droite sort la dernière jaquette du fondu, et le retrait de droite
@@ -703,8 +703,9 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
    de leur genre ou de leur univers dans leur contour et leur nombre de jeux
    (--teinte, posée par app.js depuis taxonomie.js : un angle OKLCH, pour que
    toutes les teintes aient la même clarté). La sélection garde la lavande.
-   Genres et univers : 2 rangées de petites puces chacun ; une rangée qui ne
-   tient pas défile horizontalement (jamais de 3e ligne).
+   Genres et univers : une ligne de petites puces chacun (13 et 12, du plus
+   grand nombre de jeux au plus petit) ; une ligne qui ne tient pas défile
+   horizontalement (jamais de 2e ligne).
    -------------------------------------------------------------------------- */
 
 .explorer {
@@ -853,24 +854,40 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   line-height: 1;
 }
 
-/* Genres et univers : 2 rangées de puces. Le rembourrage vertical de la
-   rangée laisse la place au contour de focus. Rien ne dépasse des puces (ni
-   halo, ni ombre, ni déplacement) : la rangée qui défile le couperait.
-   Entre les deux rangées, 5 px de chaque côté : le contour de focus (4 px)
-   n'est jamais rogné. */
+/* Genres et univers : une ligne de puces chacun. Le rembourrage vertical de
+   la ligne (6 px) laisse la place au contour de focus (4 px), jamais rogné.
+   Rien ne dépasse des puces (ni halo, ni ombre, ni déplacement) : la ligne
+   qui défile le couperait. */
 .rangee {
   display: flex;
   gap: 4px;
-  padding: 6px 16px 5px;
+  padding: 6px 16px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  scroll-padding-inline: 16px;
+  scroll-padding-inline: 16px 40px;
   scrollbar-width: none;
 }
 
-.rangee + .rangee { padding: 5px 16px 6px; }
-
 .rangee::-webkit-scrollbar { display: none; }
+
+/* Il reste des puces à droite : fondu sur le bord droit (classe posée par
+   app.js, comme pour la première ligne). Plus de fondu quand une puce a le
+   focus clavier : son contour reste entier. */
+.rangee.suite {
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+
+.rangee:has(:focus-visible) {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/* Ligne attrapée à la souris : elle suit le pointeur. */
+.rangee.glisse {
+  cursor: grabbing;
+  user-select: none;
+}
 
 /* Couleur d'une puce : fond de nuit à peine teinté, contour et nombre dans la
    teinte, à clarté égale pour toutes (OKLCH). --c : chroma du contour et du
@@ -909,14 +926,6 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   --c: .055;
   --c-fond: .015;
   --l-contour: .50;
-}
-
-/* « Autre » : ardoise neutre. Spécificité (1,1,0), placée après la règle des
-   univers pour l'emporter sur elle. */
-#genres [data-cle="genre:autre"],
-#univers [data-cle="univers:autre"] {
-  --c: .02;
-  --c-fond: .012;
 }
 
 /* Icône sur toute la largeur de la puce (au-dessus du libellé et du nombre).
@@ -972,9 +981,11 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
 .puce-filtre[aria-pressed="true"] .puce-filtre-compte { color: var(--nuit); opacity: .75; }
 
 /* Grand écran : puces qui se partagent la largeur du site (1 200 px) ; l'icône
-   n'étant plus à côté du libellé, chaque rangée tient sur une ligne. */
+   étant au-dessus du libellé, les 13 genres et les 12 univers tiennent chacun
+   sur une ligne (en dessous, ou dans une langue aux mots longs, elle défile). */
 @media (min-width: 720px) {
   .rangee { gap: 4px; }
+  .rangee:empty { min-height: 68px; }
   .puce-filtre {
     flex: 1 0 auto;
     column-gap: 2px;
@@ -2537,50 +2548,27 @@ body.lanceur::after { animation: none; }
     [data-cle="genre:quiz"],
     [data-cle="genre:mots"],
     [data-cle="genre:calcul"],
-    [data-cle="genre:reflexes"],
     [data-cle="genre:arcade"],
     [data-cle="genre:plateforme"],
     [data-cle="genre:course"],
-    [data-cle="genre:sport"],
-    [data-cle="genre:tir"],
-    [data-cle="genre:combat"],
-    [data-cle="genre:labyrinthe"],
     [data-cle="genre:aventure"],
-    [data-cle="genre:observation"],
     [data-cle="genre:strategie"],
-    [data-cle="genre:defense"],
-    [data-cle="genre:gestion"],
     [data-cle="genre:simulation"],
     [data-cle="genre:creation"],
-    [data-cle="genre:construction"],
     [data-cle="genre:musique"],
-    [data-cle="genre:societe"],
-    [data-cle="genre:coloriage"],
-    [data-cle="genre:role"],
     [data-cle="genre:autre"],
-    [data-cle="univers:ferme"],
+    [data-cle="univers:animaux"],
     [data-cle="univers:chevaux"],
-    [data-cle="univers:compagnie"],
-    [data-cle="univers:sauvages"],
     [data-cle="univers:dinosaures"],
     [data-cle="univers:ocean"],
-    [data-cle="univers:espace"],
-    [data-cle="univers:fantasy"],
-    [data-cle="univers:chevaliers"],
-    [data-cle="univers:pirates"],
-    [data-cle="univers:monstres"],
-    [data-cle="univers:robots"],
     [data-cle="univers:nature"],
-    [data-cle="univers:cuisine"],
+    [data-cle="univers:fantasy"],
+    [data-cle="univers:espace"],
+    [data-cle="univers:monde"],
+    [data-cle="univers:ville"],
     [data-cle="univers:vehicules"],
     [data-cle="univers:sport"],
-    [data-cle="univers:monde"],
-    [data-cle="univers:histoire"],
-    [data-cle="univers:corps"],
-    [data-cle="univers:ville"],
-    [data-cle="univers:fetes"],
-    [data-cle="univers:contes"],
-    [data-cle="univers:abstrait"],
+    [data-cle="univers:cuisine"],
     [data-cle="univers:autre"]
   ) > :is(.tuile-picto, .puce-filtre-picto),
   #titre-tendances > span[aria-hidden="true"]:first-child {
@@ -2924,7 +2912,7 @@ body.lanceur::after { animation: none; }
   100% { background-size: 0 0; }
 }
 
-/* --- 4. Une règle par icône (58) -----------------------------------
+/* --- 4. Une règle par icône (35) -----------------------------------
    Clés sans icône (emoji gardé) : aucune. */
 
 /* hasard — tourner */
@@ -3076,17 +3064,6 @@ body.lanceur::after { animation: none; }
   --ico-duree: 700ms;
 }
 
-/* genre:reflexes — secouer */
-[data-cle="genre:reflexes"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M14.6 2 5 13.6h6.4L9.6 22l9.6-12.2h-6.4Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.6 2 5 13.6h6.4L9.6 22l9.6-12.2h-6.4Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M4.2 16.4q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M19.8 2.6q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M20.6 15q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-secouer-fond;
-  --ico-anim-trait: ico-secouer-trait;
-  --ico-anim-extra: ico-secouer-extra;
-  --ico-duree: 520ms;
-}
-
 /* genre:arcade — osciller */
 [data-cle="genre:arcade"] {
   --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M5.4 15.6h13.2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2H5.4a2 2 0 0 1-2-2v-1a2 2 0 0 1 2-2Z'/%3E%3Ccircle cx='10.4' cy='6.2' r='3.3'/%3E%3Cpath d='M14.6 15.6a2.2 2 0 0 1 4.4 0Z'/%3E%3C/g%3E%3C/svg%3E");
@@ -3126,53 +3103,6 @@ body.lanceur::after { animation: none; }
   --ico-ey: 66.67%;
 }
 
-/* genre:sport — tourner */
-[data-cle="genre:sport"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M12 3.4a8.6 8.6 0 1 0 0 17.2 8.6 8.6 0 1 0 0-17.2ZM12 9l2.9 2.1-1.1 3.4h-3.6l-1.1-3.4ZM12 3.5a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7ZM18.4 8.1a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7ZM15.9 15.6a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7ZM8.1 15.6a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7ZM5.6 8.1a1.85 1.85 0 1 0 0 3.7 1.85 1.85 0 1 0 0-3.7Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.6'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.2 1.8q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M21 19.1q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3Cpath d='M21.2 2.5q0 1.1 1.1 1.1-1.1 0-1.1 1.1 0-1.1-1.1-1.1 1.1 0 1.1-1.1Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-tourner-fond;
-  --ico-anim-trait: ico-tourner-trait;
-  --ico-anim-extra: ico-tourner-extra;
-  --ico-duree: 700ms;
-}
-
-/* genre:tir — secouer */
-[data-cle="genre:tir"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M10.6 5.8a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 1 0 0-15.2ZM10.6 11.7a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 1 0 0-3.4Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10.6' cy='13.4' r='7.6'/%3E%3Ccircle cx='10.6' cy='13.4' r='4.2'/%3E%3Cpath d='M10.6 13.4l9.8-9.8M17.4 3.6v3h3'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.6 2.9q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M21.2 12.2q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3Cpath d='M19.8 19.8q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-secouer-fond;
-  --ico-anim-trait: ico-secouer-trait;
-  --ico-anim-extra: ico-secouer-extra;
-  --ico-duree: 520ms;
-}
-
-/* genre:combat — decoller */
-[data-cle="genre:combat"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cg transform='rotate(-30 12 12)'%3E%3Cpath d='M4.4 9h3.4c.8-3.4 4.4-5 7.6-4.6 4 .6 5.8 4.2 5.4 8-.4 4-3.2 6.8-7.2 6.8-2.8 0-4.8-.6-5.8-1.8H4.4a1.2 1.2 0 0 1-1.2-1.2v-6A1.2 1.2 0 0 1 4.4 9Z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='rotate(-30 12 12)'%3E%3Cpath d='M4.4 9h3.4c.8-3.4 4.4-5 7.6-4.6 4 .6 5.8 4.2 5.4 8-.4 4-3.2 6.8-7.2 6.8-2.8 0-4.8-.6-5.8-1.8H4.4a1.2 1.2 0 0 1-1.2-1.2v-6A1.2 1.2 0 0 1 4.4 9Z'/%3E%3Cpath d='M7.8 9v8.4M8.6 13.8c2.6-1.8 6.8-1.6 8 .8.6 1.2-.2 2.4-1.6 2.6'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-30 12 12)' fill='none' stroke='%23eceae4' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M.2 11h1.8M.6 15.4h1.4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-decoller-fond;
-  --ico-anim-trait: ico-decoller-trait;
-  --ico-anim-extra: ico-decoller-extra;
-  --ico-duree: 720ms;
-  --ico-origine: 50% 70%;
-  --ico-ex: 12.5%;
-  --ico-ey: 76.67%;
-}
-
-/* genre:labyrinthe — tourner */
-[data-cle="genre:labyrinthe"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Crect x='3.4' y='3.4' width='17.2' height='17.2' rx='2.2'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.7 3.4H5.6a2.2 2.2 0 0 0-2.2 2.2v12.8a2.2 2.2 0 0 0 2.2 2.2H12M12 3.4h6.4a2.2 2.2 0 0 1 2.2 2.2v12.8a2.2 2.2 0 0 1-2.2 2.2h-2.1'/%3E%3Cpath d='M12 3.4v4.3h4.3M3.4 12h4.3V7.7M20.6 12H12v4.3M7.7 20.6v-4.3'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M1.9 .4q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M22.1 20.8q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3Cpath d='M22.4 1q0 1.1 1.1 1.1-1.1 0-1.1 1.1 0-1.1-1.1-1.1 1.1 0 1.1-1.1Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-tourner-fond;
-  --ico-anim-trait: ico-tourner-trait;
-  --ico-anim-extra: ico-tourner-extra;
-  --ico-duree: 700ms;
-}
-
 /* genre:aventure — osciller */
 [data-cle="genre:aventure"] {
   --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M6 5.6c2 .8 4 .8 6 0s4-.8 6 0v12.8c-2-.8-4-.8-6 0s-4 .8-6 0Z'/%3E%3Crect x='3' y='4.4' width='3.2' height='15.2' rx='1.6'/%3E%3Crect x='17.8' y='4.4' width='3.2' height='15.2' rx='1.6'/%3E%3C/g%3E%3C/svg%3E");
@@ -3187,48 +3117,11 @@ body.lanceur::after { animation: none; }
   --ico-ey: 20.83%;
 }
 
-/* genre:observation — nager */
-[data-cle="genre:observation"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Ccircle cx='9.8' cy='9.8' r='6.4'/%3E%3Cpath d='M12.9 15.4 18.5 21.1A1.8 1.8 0 0 0 21.1 18.5L15.4 12.9Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9.8' cy='9.8' r='6.4'/%3E%3Cpath d='M12.9 15.4 18.5 21.1A1.8 1.8 0 0 0 21.1 18.5L15.4 12.9'/%3E%3Cpath d='M6.6 9A3.3 3.3 0 0 1 9 6.6'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M19.6 2.6q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M22.2 7.4q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-nager-fond;
-  --ico-anim-trait: ico-nager-trait;
-  --ico-anim-extra: ico-nager-extra;
-  --ico-duree: 720ms;
-  --ico-ex: 81.25%;
-  --ico-ey: 25%;
-}
-
 /* genre:strategie — sautiller */
 [data-cle="genre:strategie"] {
   --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M7 20.8H17a1.5 1.5 0 0 0 1.5-1.5v-.4a1.5 1.5 0 0 0-1.5-1.5h-.6C14.7 15.9 14.2 13.4 14.2 10.9H15a1.1 1.1 0 0 0 0-2.2h-.8A3.3 3.3 0 1 0 9.8 8.7H9a1.1 1.1 0 0 0 0 2.2h.8c0 2.5-.5 5-2.2 6.5H7a1.5 1.5 0 0 0-1.5 1.5v.4A1.5 1.5 0 0 0 7 20.8Z'/%3E%3C/g%3E%3C/svg%3E");
   --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 20.8H17a1.5 1.5 0 0 0 1.5-1.5v-.4a1.5 1.5 0 0 0-1.5-1.5h-.6C14.7 15.9 14.2 13.4 14.2 10.9H15a1.1 1.1 0 0 0 0-2.2h-.8A3.3 3.3 0 1 0 9.8 8.7H9a1.1 1.1 0 0 0 0 2.2h.8c0 2.5-.5 5-2.2 6.5H7a1.5 1.5 0 0 0-1.5 1.5v.4A1.5 1.5 0 0 0 7 20.8Z'/%3E%3Cpath d='M7.6 17.4h8.8'/%3E%3C/g%3E%3C/svg%3E");
   --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.4 2.2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 2.6q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3Cpath d='M21.6 12.4q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-sautiller-fond;
-  --ico-anim-trait: ico-sautiller-trait;
-  --ico-anim-extra: ico-sautiller-extra;
-  --ico-duree: 560ms;
-  --ico-origine: 50% 92%;
-}
-
-/* genre:defense — pulser */
-[data-cle="genre:defense"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 3c2.6 1.5 5.2 2.2 7.6 2.2v6c0 4.8-3.1 8-7.6 9.9-4.5-1.9-7.6-5.1-7.6-9.9v-6c2.4 0 5-.7 7.6-2.2Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3c2.6 1.5 5.2 2.2 7.6 2.2v6c0 4.8-3.1 8-7.6 9.9-4.5-1.9-7.6-5.1-7.6-9.9v-6c2.4 0 5-.7 7.6-2.2Z'/%3E%3Cpath fill='%23000' d='M12 8.6 12.8 10.6 15 10.8 13.3 12.2 13.8 14.4 12 13.2 10.2 14.4 10.7 12.2 9 10.8 11.2 10.6Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.6 2.2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 2.4q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 16.4q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-pulser-fond;
-  --ico-anim-trait: ico-pulser-trait;
-  --ico-anim-extra: ico-pulser-extra;
-  --ico-duree: 620ms;
-  --ico-origine: 50% 55%;
-}
-
-/* genre:gestion — sautiller */
-[data-cle="genre:gestion"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M5.2 8H18.8V20.6H5.2ZM10.2 20.6V16a1.8 1.8 0 0 1 3.6 0v4.6Z'/%3E%3Cpath d='M5 4.2H19l1.6 4.2a2.9 2 0 0 1-5.7 0 2.9 2 0 0 1-5.8 0 2.9 2 0 0 1-5.7 0Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 4.2H19l1.6 4.2a2.9 2 0 0 1-5.7 0 2.9 2 0 0 1-5.8 0 2.9 2 0 0 1-5.7 0Z'/%3E%3Cpath d='M9.7 4.2 9.1 8.4M14.3 4.2l.6 4.2'/%3E%3Cpath d='M5.2 10.3V20.6H18.8V10.3M10.2 20.6V16a1.8 1.8 0 0 1 3.6 0v4.6'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Ccircle cx='2.2' cy='15.6' r='1.5' fill='%23eceae4'/%3E%3Ccircle cx='21.9' cy='14' r='1.2' fill='%23eceae4'/%3E%3Cpath d='M3.2 1.2q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
   --ico-anim-fond: ico-sautiller-fond;
   --ico-anim-trait: ico-sautiller-trait;
   --ico-anim-extra: ico-sautiller-extra;
@@ -3261,17 +3154,6 @@ body.lanceur::after { animation: none; }
   --ico-ey: 62.5%;
 }
 
-/* genre:construction — emboiter */
-[data-cle="genre:construction"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M3.8 13H20.2V20.8H3.8Z'/%3E%3Crect x='8.7' y='4.9' width='7.4' height='7.4' rx='.6' transform='rotate(-10 12.4 8.6)'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.8 13H20.2V20.8H3.8ZM12 13v7.8'/%3E%3Crect x='8.7' y='4.9' width='7.4' height='7.4' rx='.6' transform='rotate(-10 12.4 8.6)'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M3.4 8.6 2.2 7.8M5 6.6l-.4-1.3' stroke='%23eceae4'/%3E%3Cpath d='M20.6 8.6l1.2-.8M19 6.6l.4-1.3' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-emboiter-fond;
-  --ico-anim-trait: ico-emboiter-trait;
-  --ico-anim-extra: ico-emboiter-extra;
-  --ico-duree: 640ms;
-}
-
 /* genre:musique — osciller */
 [data-cle="genre:musique"] {
   --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cellipse cx='7.2' cy='17.6' rx='3' ry='2.3' transform='rotate(-20 7.2 17.6)'/%3E%3Cellipse cx='16.2' cy='15.6' rx='3' ry='2.3' transform='rotate(-20 16.2 15.6)'/%3E%3Cpath d='M10 5.6 19 3.6v3.4L10 9Z'/%3E%3C/g%3E%3C/svg%3E");
@@ -3282,45 +3164,6 @@ body.lanceur::after { animation: none; }
   --ico-anim-extra: ico-osciller-extra;
   --ico-duree: 720ms;
   --ico-origine: 50% 87.5%;
-}
-
-/* genre:societe — osciller */
-[data-cle="genre:societe"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M11.5 17.8 8.7 18.9A1.4 1.4 0 0 1 6.9 18.1L3.3 9.2A1.4 1.4 0 0 1 4.1 7.4L8.5 5.6A1.4 1.4 0 0 1 9.1 5.5L9 17.8Z'/%3E%3Cpath d='M14.9 5.5A1.4 1.4 0 0 1 15.5 5.6L19.9 7.4A1.4 1.4 0 0 1 20.7 9.2L17.1 18.1A1.4 1.4 0 0 1 15.3 18.9L12.5 17.8H15Z'/%3E%3Cpath fill-rule='evenodd' d='M9.6 5.4h4.8a1.4 1.4 0 0 1 1.4 1.4v9.6a1.4 1.4 0 0 1-1.4 1.4H9.6a1.4 1.4 0 0 1-1.4-1.4V6.8a1.4 1.4 0 0 1 1.4-1.4ZM12 14.6c-1.8-1.2-2.6-2.3-2.6-3.4 0-.9.7-1.6 1.5-1.6.5 0 .9.3 1.1.7.2-.4.6-.7 1.1-.7.8 0 1.5.7 1.5 1.6 0 1.1-.8 2.2-2.6 3.4Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.6 5.4h4.8a1.4 1.4 0 0 1 1.4 1.4v9.6a1.4 1.4 0 0 1-1.4 1.4H9.6a1.4 1.4 0 0 1-1.4-1.4V6.8a1.4 1.4 0 0 1 1.4-1.4Z'/%3E%3Cpath d='M11.5 17.8 8.7 18.9A1.4 1.4 0 0 1 6.9 18.1L3.3 9.2A1.4 1.4 0 0 1 4.1 7.4L8.5 5.6A1.4 1.4 0 0 1 9.1 5.5'/%3E%3Cpath d='M14.9 5.5A1.4 1.4 0 0 1 15.5 5.6L19.9 7.4A1.4 1.4 0 0 1 20.7 9.2L17.1 18.1A1.4 1.4 0 0 1 15.3 18.9L12.5 17.8'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.8 5.4c-1.2-.8-1.8-1.6-1.8-2.3 0-.6.5-1.1 1-1.1.4 0 .6.2.8.5.2-.3.4-.5.8-.5.5 0 1 .5 1 1.1 0 .7-.6 1.5-1.8 2.3Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 1.4l1.4 2-1.4 2-1.4-2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-osciller-fond;
-  --ico-anim-trait: ico-osciller-trait;
-  --ico-anim-extra: ico-osciller-extra;
-  --ico-duree: 720ms;
-  --ico-origine: 50% 83.33%;
-  --ico-ex: 50%;
-  --ico-ey: 25%;
-}
-
-/* genre:coloriage — nager */
-[data-cle="genre:coloriage"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M7.6 18c1.4 1.5 2.8 1.5 4.2 0s2.8-1.5 4.2 0 2.8 1.5 4.2 0' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath transform='rotate(45 12 12)' d='M9.4 3.4h5.2v10.4l-1.6 4.4h-2l-1.6-4.4Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath transform='rotate(45 12 12)' d='M9.4 3.4h5.2v10.4l-1.6 4.4h-2l-1.6-4.4ZM9.4 13.8h5.2M9.4 6.6h5.2'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3 9.4q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M7 4.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-nager-fond;
-  --ico-anim-trait: ico-nager-trait;
-  --ico-anim-extra: ico-nager-extra;
-  --ico-duree: 720ms;
-  --ico-ex: 20.83%;
-  --ico-ey: 50%;
-}
-
-/* genre:role — pulser */
-[data-cle="genre:role"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M10.4 6.6V9.6A5.8 5.8 0 1 0 13.6 9.6V6.6ZM13.6 16.4a1.4 1.4 0 1 0 0 2.8 1.4 1.4 0 1 0 0-2.8Z'/%3E%3Crect x='9.8' y='3' width='4.4' height='3.6' rx='1.1'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.4 6.6V9.6A5.8 5.8 0 1 0 13.6 9.6V6.6'/%3E%3Crect x='9.8' y='3' width='4.4' height='3.6' rx='1.1'/%3E%3Cpath d='M6.3 14.2c1.9-1 3.8 1 5.7 0s3.8-1 5.7 0'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.6 3.2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 2.6q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23a8b3f0'/%3E%3Cpath d='M21.2 15.4q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-pulser-fond;
-  --ico-anim-trait: ico-pulser-trait;
-  --ico-anim-extra: ico-pulser-extra;
-  --ico-duree: 620ms;
-  --ico-origine: 50% 55%;
 }
 
 /* genre:autre — secouer */
@@ -3334,11 +3177,11 @@ body.lanceur::after { animation: none; }
   --ico-duree: 520ms;
 }
 
-/* univers:ferme — sautiller */
-[data-cle="univers:ferme"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M3.6 21V11.2l2.2-4.6L12 3l6.2 3.6 2.2 4.6V21ZM12 6.9a1.5 1.5 0 1 0 0 3 1.5 1.5 0 1 0 0-3Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.6 21V11.2l2.2-4.6L12 3l6.2 3.6 2.2 4.6V21Z'/%3E%3Cpath d='M8.2 21v-7.6h7.6V21M8.2 13.4l7.6 7.6M15.8 13.4 8.2 21'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.4 2.6q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.6 2.4q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+/* univers:animaux — sautiller */
+[data-cle="univers:animaux"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 11.9c2.6 0 5 2.6 5 5.2 0 2-1.4 3.4-3 3.4-.9 0-1.4-.4-2-.4s-1.1.4-2 .4c-1.6 0-3-1.4-3-3.4 0-2.6 2.4-5.2 5-5.2Z'/%3E%3Cellipse cx='8.6' cy='5.8' rx='1.6' ry='2.2'/%3E%3Cellipse cx='15.4' cy='5.8' rx='1.6' ry='2.2'/%3E%3Cellipse cx='4.6' cy='10.8' rx='1.6' ry='2'/%3E%3Cellipse cx='19.4' cy='10.8' rx='1.6' ry='2'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 11.9c2.6 0 5 2.6 5 5.2 0 2-1.4 3.4-3 3.4-.9 0-1.4-.4-2-.4s-1.1.4-2 .4c-1.6 0-3-1.4-3-3.4 0-2.6 2.4-5.2 5-5.2Z'/%3E%3Cellipse cx='8.6' cy='5.8' rx='1.6' ry='2.2'/%3E%3Cellipse cx='15.4' cy='5.8' rx='1.6' ry='2.2'/%3E%3Cellipse cx='4.6' cy='10.8' rx='1.6' ry='2'/%3E%3Cellipse cx='19.4' cy='10.8' rx='1.6' ry='2'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M20.4 18.2c.5-1 2.2-.8 2.2.5 0 1-1.2 1.8-2.2 2.6-1-.8-2.2-1.6-2.2-2.6 0-1.3 1.7-1.5 2.2-.5Z' fill='%23a8b3f0'/%3E%3Cpath d='M3 18q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
   --ico-anim-fond: ico-sautiller-fond;
   --ico-anim-trait: ico-sautiller-trait;
   --ico-anim-extra: ico-sautiller-extra;
@@ -3356,29 +3199,6 @@ body.lanceur::after { animation: none; }
   --ico-anim-extra: ico-galoper-extra;
   --ico-duree: 660ms;
   --ico-origine: 50% 90%;
-}
-
-/* univers:compagnie — sautiller */
-[data-cle="univers:compagnie"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M12 5.6c3.6 0 6 2.6 6 6.6 0 4.6-2.6 8.2-6 8.2s-6-3.6-6-8.2c0-4 2.4-6.6 6-6.6ZM10.5 10.3a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 1 0 0-2.2ZM13.5 10.3a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 1 0 0-2.2ZM12 13.9c-1 0-1.8.5-1.8 1.2s.8 1.3 1.8 1.3 1.8-.6 1.8-1.3-.8-1.2-1.8-1.2Z'/%3E%3Cpath d='M9 6.2C6.4 5.8 4 7.4 3.6 10.6c-.4 2.8.2 5.6 1.8 6 1.4.4 2.2-1.6 2.4-4.4.2-2 .5-4 1.2-6Z'/%3E%3Cpath d='M15 6.2c2.6-.4 5 1.2 5.4 4.4.4 2.8-.2 5.6-1.8 6-1.4.4-2.2-1.6-2.4-4.4-.2-2-.5-4-1.2-6Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5.6c3.6 0 6 2.6 6 6.6 0 4.6-2.6 8.2-6 8.2s-6-3.6-6-8.2c0-4 2.4-6.6 6-6.6Z'/%3E%3Cpath d='M9 6.2C6.4 5.8 4 7.4 3.6 10.6c-.4 2.8.2 5.6 1.8 6 1.4.4 2.2-1.6 2.4-4.4.2-2 .5-4 1.2-6Z'/%3E%3Cpath d='M15 6.2c2.6-.4 5 1.2 5.4 4.4.4 2.8-.2 5.6-1.8 6-1.4.4-2.2-1.6-2.4-4.4-.2-2-.5-4-1.2-6Z'/%3E%3Cpath fill='%23000' stroke='none' d='M10.9 17.2h2.2v1a1.1 1.1 0 0 1-2.2 0Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M20.4 18.2c.5-1 2.2-.8 2.2.5 0 1-1.2 1.8-2.2 2.6-1-.8-2.2-1.6-2.2-2.6 0-1.3 1.7-1.5 2.2-.5Z' fill='%23a8b3f0'/%3E%3Cpath d='M3 18q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-sautiller-fond;
-  --ico-anim-trait: ico-sautiller-trait;
-  --ico-anim-extra: ico-sautiller-extra;
-  --ico-duree: 560ms;
-  --ico-origine: 50% 92%;
-}
-
-/* univers:sauvages — secouer */
-[data-cle="univers:sauvages"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M6.4 20.4C4.6 18.4 3.6 15.4 3.8 12 4 7.2 7.4 4 11.8 4 16 4 18.4 7 18.4 10.8V15.6Q18.4 17.4 19.6 17.4L20.2 16.8A1 1 0 0 1 21.1 17.6C21.1 19.8 19.4 21 17.4 21 15.6 21 14.8 19.8 14.8 17.6V16C13.6 17 11.4 17.8 9.6 18.2Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.4 20.4C4.6 18.4 3.6 15.4 3.8 12 4 7.2 7.4 4 11.8 4 16 4 18.4 7 18.4 10.8V15.6Q18.4 17.4 19.6 17.4L20.2 16.8A1 1 0 0 1 21.1 17.6C21.1 19.8 19.4 21 17.4 21 15.6 21 14.8 19.8 14.8 17.6V16C13.6 17 11.4 17.8 9.6 18.2Z'/%3E%3Cpath d='M9.8 6.6C7 6.8 6 9.4 6.4 12.2c.4 2.4 2 3.4 4.4 3.2'/%3E%3Ccircle cx='14.6' cy='9.4' r='1' fill='%23000' stroke='none'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M22.4 13.6l1.2-1.2M22.8 16.4H24' stroke='%23eceae4'/%3E%3Cpath d='M20.6 2.2l1.2-1.2M22.6 5.2l1.2-.6' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-secouer-fond;
-  --ico-anim-trait: ico-secouer-trait;
-  --ico-anim-extra: ico-secouer-extra;
-  --ico-duree: 520ms;
 }
 
 /* univers:dinosaures — galoper */
@@ -3408,78 +3228,6 @@ body.lanceur::after { animation: none; }
   --ico-ey: 41.67%;
 }
 
-/* univers:espace — decoller */
-[data-cle="univers:espace"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cg transform='translate(-.2 .2) rotate(45 12 12)'%3E%3Cpath fill-rule='evenodd' d='M12 2.2c3.6 2.3 4.4 6.2 4.2 13.2H7.8c-.2-7 .6-10.9 4.2-13.2ZM12 6.7a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 1 0 0-3.4Z'/%3E%3Cpath d='M7.9 10.6 4.6 13.8v3.6l3.2-2ZM16.1 10.6l3.3 3.2v3.6l-3.2-2Z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='translate(-.2 .2) rotate(45 12 12)'%3E%3Cpath d='M12 2.2c3.6 2.3 4.4 6.2 4.2 13.2H7.8c-.2-7 .6-10.9 4.2-13.2Z'/%3E%3Ccircle cx='12' cy='8.4' r='1.7'/%3E%3Cpath d='M7.9 10.6 4.6 13.8v3.6l3.2-2M16.1 10.6l3.3 3.2v3.6l-3.2-2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(-.2 .2) rotate(45 12 12)'%3E%3Cpath d='M9.6 15.8c0 2.6 1 4.6 2.4 6.4 1.4-1.8 2.4-3.8 2.4-6.4Z' fill='%23eceae4'/%3E%3Cpath d='M10.9 15.8c0 1.5.4 2.8 1.1 3.9.7-1.1 1.1-2.4 1.1-3.9Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-decoller-fond;
-  --ico-anim-trait: ico-decoller-trait;
-  --ico-anim-extra: ico-decoller-extra;
-  --ico-duree: 720ms;
-  --ico-origine: 50% 70%;
-  --ico-ex: 39.17%;
-  --ico-ey: 60.83%;
-}
-
-/* univers:fantasy — scintiller */
-[data-cle="univers:fantasy"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M19.3 4.7 17.9 8.9 20.5 12.4 16.1 12.3 13.6 15.9 12.3 11.7 8.1 10.4 11.7 7.9 11.6 3.5 15.1 6.1Z'/%3E%3Cpath d='M13.5 12.9 5.8 20.6A1.7 1.7 0 0 1 3.4 18.2L11.1 10.5Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19.3 4.7 17.9 8.9 20.5 12.4 16.1 12.3 13.6 15.9 12.3 11.7 8.1 10.4 11.7 7.9 11.6 3.5 15.1 6.1Z'/%3E%3Cpath d='M12.8 13.6 5.8 20.6A1.7 1.7 0 0 1 3.4 18.2L10.4 11.2M6.2 15.4l2.4 2.4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M4.4 2.6q0 2 2 2-2 0-2 2 0-2-2-2 2 0 2-2Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 15.8q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23a8b3f0'/%3E%3Cpath d='M21.6 0.8q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-scintiller-fond;
-  --ico-anim-trait: ico-scintiller-trait;
-  --ico-anim-extra: ico-scintiller-extra;
-  --ico-duree: 700ms;
-}
-
-/* univers:chevaliers — scintiller */
-[data-cle="univers:chevaliers"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M3 21V5.6h1v2.2h3.4V5.6h1V11h3V9h1.2v2h3V5.6h1v2.2H20V5.6h1V21h-7.2v-4.6a1.8 1.8 0 0 0-3.6 0V21Z'/%3E%3Cpath d='M12 2.9l2.8 1-2.8 1Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21V5.6h1v2.2h3.4V5.6h1V11h3V9h1.2v2h3V5.6h1v2.2H20V5.6h1V21h-7.2v-4.6a1.8 1.8 0 0 0-3.6 0V21Z'/%3E%3Cpath d='M12 9V2.9l2.8 1-2.8 1'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.6 0.8q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3Cpath d='M21.2 0.6q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M7.4 1.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-scintiller-fond;
-  --ico-anim-trait: ico-scintiller-trait;
-  --ico-anim-extra: ico-scintiller-extra;
-  --ico-duree: 700ms;
-}
-
-/* univers:pirates — nager */
-[data-cle="univers:pirates"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M2.9 13.6Q4 15 6 15H18Q19.8 15 21.1 13.4L19 19.4Q18.6 20.6 17.2 20.6H6.8Q5.6 20.6 5.2 19.6ZM9.4 16.6a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3ZM14.6 16.6a1.15 1.15 0 1 0 0 2.3 1.15 1.15 0 1 0 0-2.3Z'/%3E%3Cpath d='M6.6 7.2h10.8c1 1.6 1 3.2 0 4.8H6.6c1-1.6 1-3.2 0-4.8Z'/%3E%3Cpath d='M12 2.9l3.6 1-3.6 1Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.9 13.6Q4 15 6 15H18Q19.8 15 21.1 13.4L19 19.4Q18.6 20.6 17.2 20.6H6.8Q5.6 20.6 5.2 19.6Z'/%3E%3Cpath d='M6.6 7.2h10.8c1 1.6 1 3.2 0 4.8H6.6c1-1.6 1-3.2 0-4.8Z'/%3E%3Cpath d='M12 15V2.9l3.6 1-3.6 1'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Ccircle cx='22.2' cy='13.8' r='1' fill='%23a8b3f0'/%3E%3Ccircle cx='20.6' cy='11.6' r='.8' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-nager-fond;
-  --ico-anim-trait: ico-nager-trait;
-  --ico-anim-extra: ico-nager-extra;
-  --ico-duree: 720ms;
-  --ico-ex: 87.5%;
-  --ico-ey: 62.5%;
-}
-
-/* univers:monstres — secouer */
-[data-cle="univers:monstres"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M12 5.4c4.2 0 7 3.2 7 7.8V19c0 1-.8 1.6-1.6 1.6H6.6C5.8 20.6 5 20 5 19v-5.8c0-4.6 2.8-7.8 7-7.8ZM12 9a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 1 0 0-4.8Z'/%3E%3Cpath d='M8.6 6.6C7.4 5.6 6.8 4.2 7.2 2.9 8 3.8 9.4 4.6 10.8 5.6L10 8Z'/%3E%3Cpath d='M15.4 6.6c1.2-1 1.8-2.4 1.4-3.7-.8.9-2.2 1.7-3.6 2.7L14 8Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5.4c4.2 0 7 3.2 7 7.8V19c0 1-.8 1.6-1.6 1.6H6.6C5.8 20.6 5 20 5 19v-5.8c0-4.6 2.8-7.8 7-7.8Z'/%3E%3Cpath d='M8.6 6.6C7.4 5.6 6.8 4.2 7.2 2.9 8 3.8 9.4 4.6 10.8 5.6M15.4 6.6c1.2-1 1.8-2.4 1.4-3.7-.8.9-2.2 1.7-3.6 2.7'/%3E%3Ccircle cx='12.5' cy='11.6' r='1.1' fill='%23000' stroke='none'/%3E%3Cpath d='M9.4 16.2c1.4 1.5 3.8 1.5 5.2 0'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M2.4 12.4q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.6 11q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23a8b3f0'/%3E%3Cpath d='M12 0.4q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-secouer-fond;
-  --ico-anim-trait: ico-secouer-trait;
-  --ico-anim-extra: ico-secouer-extra;
-  --ico-duree: 520ms;
-}
-
-/* univers:robots — pulser */
-[data-cle="univers:robots"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M7 8.2h10c1.3 0 2.4 1.1 2.4 2.4V18c0 1.3-1.1 2.4-2.4 2.4H7c-1.3 0-2.4-1.1-2.4-2.4v-7.4c0-1.3 1.1-2.4 2.4-2.4ZM9.2 11.6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 1 0 0-3.2ZM14.8 11.6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 1 0 0-3.2Z'/%3E%3Cpath d='M2.9 12.2h1.7v4.2H2.9ZM19.4 12.2h1.7v4.2h-1.7Z'/%3E%3Ccircle cx='12' cy='4.4' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 8.2h10c1.3 0 2.4 1.1 2.4 2.4V18c0 1.3-1.1 2.4-2.4 2.4H7c-1.3 0-2.4-1.1-2.4-2.4v-7.4c0-1.3 1.1-2.4 2.4-2.4Z'/%3E%3Cpath d='M4.6 12.2H2.9v4.2h1.7M19.4 12.2h1.7v4.2h-1.7M12 8.2V5.9M9.6 17.6h4.8'/%3E%3Ccircle cx='12' cy='4.4' r='1.5'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.2' stroke-linecap='round'%3E%3Cpath d='M8.6 2.4c-1 1.2-1 2.8 0 4' stroke='%23a8b3f0'/%3E%3Cpath d='M15.4 2.4c1 1.2 1 2.8 0 4' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-pulser-fond;
-  --ico-anim-trait: ico-pulser-trait;
-  --ico-anim-extra: ico-pulser-extra;
-  --ico-duree: 620ms;
-  --ico-origine: 50% 55%;
-}
-
 /* univers:nature — osciller */
 [data-cle="univers:nature"] {
   --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M9 14.7A3 3 0 0 1 5.2 11.7 2.8 2.8 0 0 1 5.4 7.2 2.8 2.8 0 0 1 8.9 4.5 3.8 3.8 0 0 1 15.1 4.5 2.8 2.8 0 0 1 18.6 7.2 2.8 2.8 0 0 1 18.8 11.7 3 3 0 0 1 15 14.7L13.6 14.9V19.2q0 1.6 1.8 1.8H8.6q1.8-.2 1.8-1.8V14.9Z'/%3E%3C/g%3E%3C/svg%3E");
@@ -3494,16 +3242,51 @@ body.lanceur::after { animation: none; }
   --ico-ey: 25%;
 }
 
-/* univers:cuisine — sautiller */
-[data-cle="univers:cuisine"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M4.6 13.6C3.8 11.6 5.2 9.8 7.4 10 7.6 8.2 9.6 7.4 12 7.6c2.4-.2 4.4.6 4.6 2.4 2.2-.2 3.6 1.6 2.8 3.6Z'/%3E%3Cpath d='M5.6 13.6h12.8l-1.6 6.6a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8Z'/%3E%3Ccircle cx='12' cy='5.7' r='1.9'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 13.6C3.8 11.6 5.2 9.8 7.4 10 7.6 8.2 9.6 7.4 12 7.6c2.4-.2 4.4.6 4.6 2.4 2.2-.2 3.6 1.6 2.8 3.6Z'/%3E%3Cpath d='M5.6 13.6l1.6 6.6a1 1 0 0 0 1 .8h7.6a1 1 0 0 0 1-.8l1.6-6.6'/%3E%3Cpath d='M10.2 16v3M13.8 16v3'/%3E%3Ccircle cx='12' cy='5.7' r='1.9'/%3E%3Cpath d='M12.6 3.9q.6-.9 1.8-1'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M2 5.4l1.2 1.4' stroke='%23eceae4'/%3E%3Cpath d='M21.4 4.6l-1.4 1' stroke='%23a8b3f0'/%3E%3Cpath d='M1.4 18.4l1.6-.4' stroke='%23eceae4'/%3E%3Cpath d='M22.4 17.6l-1.2-1' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-sautiller-fond;
-  --ico-anim-trait: ico-sautiller-trait;
-  --ico-anim-extra: ico-sautiller-extra;
-  --ico-duree: 560ms;
-  --ico-origine: 50% 92%;
+/* univers:fantasy — scintiller */
+[data-cle="univers:fantasy"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M19.3 4.7 17.9 8.9 20.5 12.4 16.1 12.3 13.6 15.9 12.3 11.7 8.1 10.4 11.7 7.9 11.6 3.5 15.1 6.1Z'/%3E%3Cpath d='M13.5 12.9 5.8 20.6A1.7 1.7 0 0 1 3.4 18.2L11.1 10.5Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19.3 4.7 17.9 8.9 20.5 12.4 16.1 12.3 13.6 15.9 12.3 11.7 8.1 10.4 11.7 7.9 11.6 3.5 15.1 6.1Z'/%3E%3Cpath d='M12.8 13.6 5.8 20.6A1.7 1.7 0 0 1 3.4 18.2L10.4 11.2M6.2 15.4l2.4 2.4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M4.4 2.6q0 2 2 2-2 0-2 2 0-2-2-2 2 0 2-2Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 15.8q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23a8b3f0'/%3E%3Cpath d='M21.6 0.8q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-scintiller-fond;
+  --ico-anim-trait: ico-scintiller-trait;
+  --ico-anim-extra: ico-scintiller-extra;
+  --ico-duree: 700ms;
+}
+
+/* univers:espace — decoller */
+[data-cle="univers:espace"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cg transform='translate(-.2 .2) rotate(45 12 12)'%3E%3Cpath fill-rule='evenodd' d='M12 2.2c3.6 2.3 4.4 6.2 4.2 13.2H7.8c-.2-7 .6-10.9 4.2-13.2ZM12 6.7a1.7 1.7 0 1 0 0 3.4 1.7 1.7 0 1 0 0-3.4Z'/%3E%3Cpath d='M7.9 10.6 4.6 13.8v3.6l3.2-2ZM16.1 10.6l3.3 3.2v3.6l-3.2-2Z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg transform='translate(-.2 .2) rotate(45 12 12)'%3E%3Cpath d='M12 2.2c3.6 2.3 4.4 6.2 4.2 13.2H7.8c-.2-7 .6-10.9 4.2-13.2Z'/%3E%3Ccircle cx='12' cy='8.4' r='1.7'/%3E%3Cpath d='M7.9 10.6 4.6 13.8v3.6l3.2-2M16.1 10.6l3.3 3.2v3.6l-3.2-2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='translate(-.2 .2) rotate(45 12 12)'%3E%3Cpath d='M9.6 15.8c0 2.6 1 4.6 2.4 6.4 1.4-1.8 2.4-3.8 2.4-6.4Z' fill='%23eceae4'/%3E%3Cpath d='M10.9 15.8c0 1.5.4 2.8 1.1 3.9.7-1.1 1.1-2.4 1.1-3.9Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-decoller-fond;
+  --ico-anim-trait: ico-decoller-trait;
+  --ico-anim-extra: ico-decoller-extra;
+  --ico-duree: 720ms;
+  --ico-origine: 50% 70%;
+  --ico-ex: 39.17%;
+  --ico-ey: 60.83%;
+}
+
+/* univers:monde — tourner */
+[data-cle="univers:monde"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M13.6 3.8a5.6 5.6 0 1 0 0 11.2 5.6 5.6 0 1 0 0-11.2ZM11.1 6.4c1.2-.6 2.6-.4 2.8.6.2.8-.6 1.2-1.2 1.6-.6.4-.4 1.4-.9 2-.5.5-1.3.2-1.5-.6-.3-1-.8-1.4-.6-2.2.2-.6.8-1.1 1.4-1.4ZM15.5 10c.8-.3 1.8.2 1.8 1 0 .9-.7 1.5-1.4 2-.5.3-1.1 0-1.1-.6 0-.8-.3-1.9.7-2.4Z'/%3E%3Crect x='9.6' y='19.6' width='8' height='1.6' rx='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='13.6' cy='9.4' r='5.6'/%3E%3Cpath d='M7.24 3.04A9 9 0 0 0 13.6 18.4v1.2'/%3E%3Crect x='9.6' y='19.6' width='8' height='1.6' rx='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3 1.4q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 18q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23a8b3f0'/%3E%3Cpath d='M21.6 1.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-tourner-fond;
+  --ico-anim-trait: ico-tourner-trait;
+  --ico-anim-extra: ico-tourner-extra;
+  --ico-duree: 700ms;
+}
+
+/* univers:ville — scintiller */
+[data-cle="univers:ville"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M3 21V10.2a1 1 0 0 1 1-1h4.8V4.2a1 1 0 0 1 1-1h4.6a1 1 0 0 1 1 1v8h4.6a1 1 0 0 1 1 1V21ZM11 6.2h2.2v2.2H11ZM11 10.8h2.2V13H11ZM4.8 12.2H7v2.2H4.8ZM17.2 15h2.2v2.2h-2.2Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21V10.2a1 1 0 0 1 1-1h4.8V4.2a1 1 0 0 1 1-1h4.6a1 1 0 0 1 1 1v8h4.6a1 1 0 0 1 1 1V21Z'/%3E%3Cpath d='M8.8 9.2V21M15.4 12.2V21'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.6 2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 4.6q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-scintiller-fond;
+  --ico-anim-trait: ico-scintiller-trait;
+  --ico-anim-extra: ico-scintiller-extra;
+  --ico-duree: 700ms;
 }
 
 /* univers:vehicules — galoper */
@@ -3534,83 +3317,16 @@ body.lanceur::after { animation: none; }
   --ico-ey: 62.5%;
 }
 
-/* univers:monde — tourner */
-[data-cle="univers:monde"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M13.6 3.8a5.6 5.6 0 1 0 0 11.2 5.6 5.6 0 1 0 0-11.2ZM11.1 6.4c1.2-.6 2.6-.4 2.8.6.2.8-.6 1.2-1.2 1.6-.6.4-.4 1.4-.9 2-.5.5-1.3.2-1.5-.6-.3-1-.8-1.4-.6-2.2.2-.6.8-1.1 1.4-1.4ZM15.5 10c.8-.3 1.8.2 1.8 1 0 .9-.7 1.5-1.4 2-.5.3-1.1 0-1.1-.6 0-.8-.3-1.9.7-2.4Z'/%3E%3Crect x='9.6' y='19.6' width='8' height='1.6' rx='.8'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='13.6' cy='9.4' r='5.6'/%3E%3Cpath d='M7.24 3.04A9 9 0 0 0 13.6 18.4v1.2'/%3E%3Crect x='9.6' y='19.6' width='8' height='1.6' rx='.8'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3 1.4q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21.4 18q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23a8b3f0'/%3E%3Cpath d='M21.6 1.6q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-tourner-fond;
-  --ico-anim-trait: ico-tourner-trait;
-  --ico-anim-extra: ico-tourner-extra;
-  --ico-duree: 700ms;
-}
-
-/* univers:histoire — scintiller */
-[data-cle="univers:histoire"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M12 3.2l9 5.4v2.2h-1.6v7.4H21V21H3v-2.8h1.6v-7.4H3V8.6ZM8.1 12.2v4.6a1.1 1.1 0 0 0 2.2 0v-4.6a1.1 1.1 0 0 0-2.2 0ZM13.7 12.2v4.6a1.1 1.1 0 0 0 2.2 0v-4.6a1.1 1.1 0 0 0-2.2 0Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.2l9 5.4v2.2h-1.6v7.4H21V21H3v-2.8h1.6v-7.4H3V8.6Z'/%3E%3Cpath d='M3 8.6h18'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.2 1.2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M21 2.6q0 1.4 1.4 1.4-1.4 0-1.4 1.4 0-1.4-1.4-1.4 1.4 0 1.4-1.4Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-scintiller-fond;
-  --ico-anim-trait: ico-scintiller-trait;
-  --ico-anim-extra: ico-scintiller-extra;
-  --ico-duree: 700ms;
-}
-
-/* univers:corps — pulser */
-[data-cle="univers:corps"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 20.3C7.6 17.2 3 13.8 3 9.3 3 6.3 5.2 4.1 7.9 4.1c1.8 0 3.3 1 4.1 2.4.8-1.4 2.3-2.4 4.1-2.4 2.7 0 4.9 2.2 4.9 5.2 0 4.5-4.6 7.9-9 11Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 20.3C7.6 17.2 3 13.8 3 9.3 3 6.3 5.2 4.1 7.9 4.1c1.8 0 3.3 1 4.1 2.4.8-1.4 2.3-2.4 4.1-2.4 2.7 0 4.9 2.2 4.9 5.2 0 4.5-4.6 7.9-9 11Z'/%3E%3Cpath d='M6.4 11.6h2.4l1.4-2.8 2.4 5.6 1.6-3.8 1 1h2.4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M3 .9v3M1.5 2.4h3' stroke='%23eceae4'/%3E%3Cpath d='M21.2 1.6v2.6M19.9 2.9h2.6' stroke='%23a8b3f0'/%3E%3Cpath d='M21.6 18.2v2.4M20.4 19.4h2.4' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-pulser-fond;
-  --ico-anim-trait: ico-pulser-trait;
-  --ico-anim-extra: ico-pulser-extra;
-  --ico-duree: 620ms;
-  --ico-origine: 50% 55%;
-}
-
-/* univers:ville — scintiller */
-[data-cle="univers:ville"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath fill-rule='evenodd' d='M3 21V10.2a1 1 0 0 1 1-1h4.8V4.2a1 1 0 0 1 1-1h4.6a1 1 0 0 1 1 1v8h4.6a1 1 0 0 1 1 1V21ZM11 6.2h2.2v2.2H11ZM11 10.8h2.2V13H11ZM4.8 12.2H7v2.2H4.8ZM17.2 15h2.2v2.2h-2.2Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 21V10.2a1 1 0 0 1 1-1h4.8V4.2a1 1 0 0 1 1-1h4.6a1 1 0 0 1 1 1v8h4.6a1 1 0 0 1 1 1V21Z'/%3E%3Cpath d='M8.8 9.2V21M15.4 12.2V21'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.6 2q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M20.4 4.6q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-scintiller-fond;
-  --ico-anim-trait: ico-scintiller-trait;
-  --ico-anim-extra: ico-scintiller-extra;
-  --ico-duree: 700ms;
-}
-
-/* univers:fetes — sautiller */
-[data-cle="univers:fetes"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 8.2C10.8 5.6 7.4 3.8 6.6 5.8c-.6 1.6 1.8 2.4 5.4 2.4ZM12 8.2c1.2-2.6 4.6-4.4 5.4-2.4.6 1.6-1.8 2.4-5.4 2.4Z'/%3E%3Crect x='3.4' y='8.2' width='17.2' height='3.6' rx='1'/%3E%3Cpath d='M4.8 11.8h14.4V20a1 1 0 0 1-1 1H5.8a1 1 0 0 1-1-1Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 8.2C10.8 5.6 7.4 3.8 6.6 5.8c-.6 1.6 1.8 2.4 5.4 2.4ZM12 8.2c1.2-2.6 4.6-4.4 5.4-2.4.6 1.6-1.8 2.4-5.4 2.4Z'/%3E%3Crect x='3.4' y='8.2' width='17.2' height='3.6' rx='1'/%3E%3Cpath d='M4.8 11.8V20a1 1 0 0 0 1 1h12.4a1 1 0 0 0 1-1v-8.2M12 8.2V21'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M1.8 3.2l1 1.6' stroke='%23eceae4'/%3E%3Cpath d='M22.2 3.4l-1.4 1.2' stroke='%23a8b3f0'/%3E%3Cpath d='M1.2 16.2l1.8.2' stroke='%23a8b3f0'/%3E%3Cpath d='M22.6 15.4l-1.6.8' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
+/* univers:cuisine — sautiller */
+[data-cle="univers:cuisine"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M4.6 13.6C3.8 11.6 5.2 9.8 7.4 10 7.6 8.2 9.6 7.4 12 7.6c2.4-.2 4.4.6 4.6 2.4 2.2-.2 3.6 1.6 2.8 3.6Z'/%3E%3Cpath d='M5.6 13.6h12.8l-1.6 6.6a1 1 0 0 1-1 .8H8.2a1 1 0 0 1-1-.8Z'/%3E%3Ccircle cx='12' cy='5.7' r='1.9'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4.6 13.6C3.8 11.6 5.2 9.8 7.4 10 7.6 8.2 9.6 7.4 12 7.6c2.4-.2 4.4.6 4.6 2.4 2.2-.2 3.6 1.6 2.8 3.6Z'/%3E%3Cpath d='M5.6 13.6l1.6 6.6a1 1 0 0 0 1 .8h7.6a1 1 0 0 0 1-.8l1.6-6.6'/%3E%3Cpath d='M10.2 16v3M13.8 16v3'/%3E%3Ccircle cx='12' cy='5.7' r='1.9'/%3E%3Cpath d='M12.6 3.9q.6-.9 1.8-1'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke-width='1.3' stroke-linecap='round'%3E%3Cpath d='M2 5.4l1.2 1.4' stroke='%23eceae4'/%3E%3Cpath d='M21.4 4.6l-1.4 1' stroke='%23a8b3f0'/%3E%3Cpath d='M1.4 18.4l1.6-.4' stroke='%23eceae4'/%3E%3Cpath d='M22.4 17.6l-1.2-1' stroke='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
   --ico-anim-fond: ico-sautiller-fond;
   --ico-anim-trait: ico-sautiller-trait;
   --ico-anim-extra: ico-sautiller-extra;
   --ico-duree: 560ms;
   --ico-origine: 50% 92%;
-}
-
-/* univers:contes — scintiller */
-[data-cle="univers:contes"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Cpath d='M12 6.4C10 4.8 6.6 4.4 3 5.2v13.4c3.6-.8 7-.4 9 1.2 2-1.6 5.4-2 9-1.2V5.2c-3.6-.8-7-.4-9 1.2Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 6.4C10 4.8 6.6 4.4 3 5.2v13.4c3.6-.8 7-.4 9 1.2 2-1.6 5.4-2 9-1.2V5.2c-3.6-.8-7-.4-9 1.2ZM12 6.4v13.4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M5.2 .4q0 2 2 2-2 0-2 2 0-2-2-2 2 0 2-2Z' fill='%23eceae4'/%3E%3Cpath d='M18.4 .8q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23a8b3f0'/%3E%3Cpath d='M22 9.4q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-scintiller-fond;
-  --ico-anim-trait: ico-scintiller-trait;
-  --ico-anim-extra: ico-scintiller-extra;
-  --ico-duree: 700ms;
-}
-
-/* univers:abstrait — tourner */
-[data-cle="univers:abstrait"] {
-  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Crect x='3' y='3' width='8' height='8' rx='.4'/%3E%3Ccircle cx='12.2' cy='12' r='5.2'/%3E%3Cpath d='M16.45 12.4 21.1 21H11.8Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7.1 11H3V3h8v3.9'/%3E%3Cpath d='M14.04 16.87A5.2 5.2 0 1 1 17.13 13.66'/%3E%3Cpath d='M16.45 12.4 21.1 21H11.8Z'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Ccircle cx='20.4' cy='3.6' r='1.2' fill='%23a8b3f0'/%3E%3Cpath d='M2.6 17.6l1.6 2.8H1Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
-  --ico-anim-fond: ico-tourner-fond;
-  --ico-anim-trait: ico-tourner-trait;
-  --ico-anim-extra: ico-tourner-extra;
-  --ico-duree: 700ms;
 }
 
 /* univers:autre — scintiller */

@@ -21,8 +21,8 @@
 // 150 à 300 mots dans chaque langue.
 //
 // Pages de catégories (genres, univers, âges) : leurs textes sont écrits une
-// seule fois, pour les 54 catégories des listes fermées (même vides), dans
-// gabarits/textes/categories.<langue>.json :
+// seule fois, pour les 29 catégories des listes fermées (même vides, sauf
+// « autre », qui n'a pas de page), dans gabarits/textes/categories.<langue>.json :
 //   { "genre.puzzle": { "h1": "…", "titre_seo": "…", "description_seo": "…", "intro": "…" },
 //     "univers.chevaux": {…}, "age.3-4": {…}, … }
 //   h1 10 à 70 caractères, titre_seo 50 à 60, description_seo 140 à 160, intro 80 à 150 mots
@@ -254,11 +254,14 @@ export const BORNES_CATEGORIE = {
   intro: [80, 150, 'mots'],
 };
 
-/** Clés des 54 catégories : « genre.<id> », « univers.<id> », « age.<id de tranche> ». */
-export function clesCategories({ IDS_GENRES, IDS_UNIVERS, TRANCHES_AGE }) {
+/**
+ * Clés des 29 catégories : « genre.<id> », « univers.<id> », « age.<id de tranche> ».
+ * « autre » n'en fait pas partie : il n'a ni page ni puce (public/taxonomie.js).
+ */
+export function clesCategories({ IDS_GENRES, IDS_UNIVERS, TRANCHES_AGE, ID_AUTRE = 'autre' }) {
   return [
-    ...IDS_GENRES.map((id) => `genre.${id}`),
-    ...IDS_UNIVERS.map((id) => `univers.${id}`),
+    ...IDS_GENRES.filter((id) => id !== ID_AUTRE).map((id) => `genre.${id}`),
+    ...IDS_UNIVERS.filter((id) => id !== ID_AUTRE).map((id) => `univers.${id}`),
     ...TRANCHES_AGE.map((t) => `age.${t.id}`),
   ];
 }

@@ -324,9 +324,10 @@ async function principal() {
       Object.assign(p, { type: 'jeu', jeu: id, lang });
     }
   }
+  // « autre » n'a jamais de page (public/taxonomie.js) : une page à son adresse serait une erreur.
   const FAMILLES = [
-    ...taxonomie.IDS_GENRES.map((id) => ['genre', id]),
-    ...taxonomie.IDS_UNIVERS.map((id) => ['univers', id]),
+    ...taxonomie.IDS_GENRES.filter((id) => id !== taxonomie.ID_AUTRE).map((id) => ['genre', id]),
+    ...taxonomie.IDS_UNIVERS.filter((id) => id !== taxonomie.ID_AUTRE).map((id) => ['univers', id]),
     ...taxonomie.TRANCHES_AGE.map((t) => ['age', t.id]),
   ];
   for (const lang of LANGUES) {
@@ -343,6 +344,12 @@ async function principal() {
   }
   for (const p of pages.values()) {
     if (p.type === 'autre' && /^\/(?:en\/|es\/|pt\/|de\/)?(?:jeux|games|juegos|jogos|spiele)\//.test(p.adresse)) erreur(p.adresse, 'page d\'un jeu qui n\'est pas (ou plus) au catalogue');
+  }
+  for (const lang of LANGUES) {
+    for (const famille of ['genre', 'univers']) {
+      const adresse = chemins.urlCategorie(famille, taxonomie.ID_AUTRE, lang);
+      if (pages.has(adresse)) erreur(adresse, '« autre » ne doit pas avoir de page de catégorie');
+    }
   }
 
   // Contrôles de chaque page.

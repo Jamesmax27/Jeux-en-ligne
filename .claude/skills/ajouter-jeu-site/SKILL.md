@@ -26,7 +26,7 @@ Version de la compétence pour Claude Code, avec le dépôt ouvert sur la machin
 
 - `git status` : copie de travail pas propre, ou pas sur `main` → demander à l'utilisateur avant de continuer (ne rien jeter).
 - Comparer le dernier commit de `main` en local à celui de GitHub (connecteur, `list_commits` sur `main`). Si `main` local est en retard sur autre chose que `idees.json` et `idees-archive.json`, demander à l'utilisateur de faire « Pull origin » dans GitHub Desktop.
-- Lire `CONSIGNES-JEU.md` en entier (minimum obligatoire, section 2 ; règles techniques, sauvegarde et langues, section 3 ; fiche, section 4 ; jaquette, section 5 ; contrôles, section 6 ; grille de validation, section 7), `public/taxonomie.js` (26 genres, 24 univers, tranches d'âge) et l'en-tête de `scripts/regles-seo.mjs` (`BORNES`, `BLOC_MOTS`, `MARQUES`).
+- Lire `CONSIGNES-JEU.md` en entier (minimum obligatoire, section 2 ; règles techniques, sauvegarde et langues, section 3 ; fiche, section 4 ; jaquette, section 5 ; contrôles, section 6 ; grille de validation, section 7), `public/taxonomie.js` (13 genres, 12 univers, tranches d'âge ; ce que regroupe chacun : `CONSIGNES-JEU.md`, section 4) et l'en-tête de `scripts/regles-seo.mjs` (`BORNES`, `BLOC_MOTS`, `MARQUES`).
 
 ### 2. Récupérer et lire le jeu
 
@@ -45,7 +45,7 @@ Prendre le code HTML complet et final (plusieurs versions : la dernière, à con
 Proposer en une seule question, puis attendre la réponse :
 
 - **titre** (60 caractères au plus) et **id** : minuscules sans accents, chiffres et tirets, absent de `games/`. Il ne changera plus : il est dans l'adresse de la page du jeu ;
-- **genre** principal (un parmi les 26) ; **genres_secondaires** : 0 à 2 autres, seulement s'ils sont au cœur du jeu, jamais `autre` ; **univers** : 1 ou 2 parmi les 24 (`autre` seul si rien ne correspond) ; **ages** : âge minimum, au format `"6+"`. Uniquement les identifiants de `public/taxonomie.js` : interdit d'en créer, et le champ `tags` n'existe plus ;
+- **genre** principal (un parmi les 13) ; **genres_secondaires** : 0 à 2 autres, seulement s'ils sont au cœur du jeu, jamais `autre` ; **univers** : 1 ou 2 parmi les 12 (`autre` seul si rien ne correspond : jamais affiché sur le site) ; **ages** : âge minimum, au format `"6+"`. Uniquement les identifiants de `public/taxonomie.js` : interdit d'en créer, et le champ `tags` n'existe plus ;
 - `"non_traduisible": true` si le jeu repose sur des mots ou des lettres du français (l'interface reste traduite) ;
 - les **écarts** avec le minimum obligatoire de `CONSIGNES-JEU.md`, section 2 : écran titre, 20 niveaux au moins, nouveautés au fil des niveaux, tutoriel animé, pause et Rejouer, tactile et clavier, étoiles, sauvegarde `save.js`, sélection des niveaux, sons Web Audio avec bouton pour couper, effets, écrans de victoire et de défaite. Proposer de compléter le jeu (conseillé) ou de le publier tel quel : c'est l'utilisateur qui décide. `"consignes": 2` seulement si tout le minimum est respecté.
 

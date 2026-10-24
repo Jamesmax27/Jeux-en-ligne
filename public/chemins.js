@@ -22,9 +22,11 @@
 //   conditions       /conditions-utilisation/   /en/terms-of-use/
 //   cookies          /cookies/                  /en/cookie-policy/
 //
-// Le préfixe de famille (genres, univers…) évite les collisions : « sport » et
-// « autre » sont à la fois un genre et un univers. Les identifiants (jeux,
-// genres, univers) ne changent jamais : une adresse publiée reste valable.
+// Le préfixe de famille (genres, univers…) évite les collisions entre un genre
+// et un univers de même identifiant. Les identifiants (jeux, genres, univers) ne
+// changent pas : une adresse publiée reste valable ; celle d'un genre ou d'un
+// univers retiré mène en 301 à la catégorie qui l'a remplacé (ANCIENS_IDS de
+// taxonomie.js, fichier _redirects écrit par scripts/pages-seo.mjs).
 // Toutes les adresses partent de la racine du site et finissent par « / »
 // (forme servie par Cloudflare Pages sans redirection).
 // ==========================================================================
