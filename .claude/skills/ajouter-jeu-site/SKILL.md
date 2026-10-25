@@ -38,7 +38,7 @@ Prendre le code HTML complet et final (plusieurs versions : la dernière, à con
 - Chercher dans `idees.json` l'idée qui correspond au jeu, ou celle que l'utilisateur désigne :
   - trouvée : son `id` ira dans `"idee"`. Le genre, les genres secondaires, les univers et l'âge sont repris de l'idée : `ages`, sinon « Âge conseillé : N+ » à la fin de sa description (`idees.mjs controler` le vérifie) ;
   - statut `en_cours` : une tâche de la boucle de nuit fabrique déjà ce jeu → prévenir et demander ;
-  - statut `en_attente` : prévenir que la boucle (00:00 et 05:00 UTC) peut choisir cette idée si la pull request n'est pas fusionnée avant son prochain passage.
+  - statut `en_attente` : prévenir que la boucle (00:17 et 05:17 UTC) peut choisir cette idée si la pull request n'est pas fusionnée avant son prochain passage.
 
 ### 4. Classement et écarts : une seule question
 

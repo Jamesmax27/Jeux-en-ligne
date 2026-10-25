@@ -3,8 +3,9 @@
 # d'idées (idees.json), les vérifie, publie ceux qui sont bons et met les
 # idées à jour. Deux passages par nuit, sans votre ordinateur.
 #
-#  - Automatique : 00:00 et 05:00 UTC (1 h et 6 h à Paris l'hiver, 2 h et
-#    7 h l'été).
+#  - Automatique : 00:17 et 05:17 UTC (1 h 17 et 6 h 17 à Paris l'hiver,
+#    2 h 17 et 7 h 17 l'été). GitHub ne garantit pas l'heure : un départ
+#    retardé est possible les nuits chargées.
 #  - À la main : onglet Actions → « Créer des jeux (boucle de nuit) » → « Run workflow ».
 #    0 jeu = seulement vérifier les pull requests en attente et mettre les
 #    idées à jour.
@@ -81,9 +82,11 @@
 name: Créer des jeux (boucle de nuit)
 
 on:
+  # Jamais à l'heure pile : GitHub retarde de plusieurs heures, ou saute, les passages programmés au début
+  # des heures chargées (00:00 UTC surtout : départs vers 04:10 UTC constatés en octobre 2026).
   schedule:
-    - cron: "0 0 * * *"
-    - cron: "0 5 * * *"
+    - cron: "17 0 * * *"
+    - cron: "17 5 * * *"
   workflow_dispatch:
     inputs:
       nombre:
@@ -789,9 +792,12 @@ jobs:
       - name: Lister les pull requests de la boucle
         id: liste
         uses: actions/github-script@v7
+        env:
+          FUSION_AUTO: ${{ vars.FUSION_AUTO }}
         with:
           script: |
             const fs = require('fs');
+            const fusionAuto = (process.env.FUSION_AUTO || '').trim().toLowerCase() !== 'non';
             const enCours = new Set(JSON.parse(fs.readFileSync('idees.json', 'utf8').replace(/^﻿/, ''))
               .filter((i) => i.statut === 'en_cours').map((i) => i.id));
             const prs = await github.paginate(github.rest.pulls.list, { ...context.repo, state: 'open', per_page: 100 });
@@ -800,7 +806,9 @@ jobs:
               const m = /^nouveau-jeu\/n\d+\/([a-z0-9-]+)$/.exec(pr.head.ref);
               if (!m || pr.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) continue;
               if (!enCours.has(m[1])) { core.info(`PR #${pr.number} : idée « ${m[1]} » pas en cours dans idees.json, ignorée.`); continue; }
-              if (pr.labels.some((l) => l.name === 'valide')) { core.info(`PR #${pr.number} : déjà validée, attend une fusion à la main.`); continue; }
+              // Validée mais pas fusionnée : avec la fusion automatique (refus passager de GitHub), elle est revérifiée
+              // puis fusionnée ; sans elle (FUSION_AUTO = non), elle attend une fusion à la main.
+              if (!fusionAuto && pr.labels.some((l) => l.name === 'valide')) { core.info(`PR #${pr.number} : déjà validée, attend une fusion à la main.`); continue; }
               aVerifier.push({ pr: pr.number, idee: m[1] });
             }
             core.info(`À vérifier : ${aVerifier.map((v) => `#${v.pr}`).join(', ') || 'aucune'}`);
@@ -1295,17 +1303,35 @@ jobs:
               return ` — ${choisies.map((c) => echapper(c.length > 220 ? `${c.slice(0, 219)}…` : c)).join(' ; ')}${reste > 0 ? ` (+ ${reste} autre(s))` : ''}`;
             };
 
+            // Après un commit du robot (jaquette, humanizer), GitHub met quelques secondes à mettre à jour la pull
+            // request : fusionner tout de suite renvoyait 409 (« branche modifiée ») et le jeu restait ouvert
+            // (octobre 2026). On attend donc que la pull request pointe sur ce commit et que GitHub ait calculé
+            // si elle peut être fusionnée (2 min au plus). Faux : la branche pointe sur un autre commit.
+            async function attendreTete(numero, sha) {
+              for (let i = 0; i < 24; i++) {
+                const { data } = await github.rest.pulls.get({ ...context.repo, pull_number: numero });
+                if (data.head.sha === sha && data.mergeable !== null) return true;
+                await attendre(5000);
+              }
+              const { data } = await github.rest.pulls.get({ ...context.repo, pull_number: numero });
+              return data.head.sha === sha;
+            }
+
             // Fusion. Si main a bougé (jeux fusionnés juste avant) et que GitHub l'exige, la branche est mise à
             // jour avec main, puis fusionnée : le dossier du jeu vérifié, lui, ne change pas.
             async function fusionner(numero, sha, id) {
               const essayer = async (s) => {
-                try { await github.rest.pulls.merge({ ...context.repo, pull_number: numero, sha: s, merge_method: 'merge' }); return 'ok'; }
-                catch (e) {
-                  if (e.status === 409) return 'modifiee'; // la branche a changé depuis la vérification
-                  if (e.status === 405) return 'bloquee';  // conflit, ou branche en retard sur main
-                  throw e;
+                for (let essai = 1; ; essai++) {
+                  try { await github.rest.pulls.merge({ ...context.repo, pull_number: numero, sha: s, merge_method: 'merge' }); return 'ok'; }
+                  catch (e) {
+                    // 409 : la pull request ne pointe pas (encore) sur ce commit. Si elle finit par y pointer, nouvel essai.
+                    if (e.status === 409) { if (essai < 3 && await attendreTete(numero, s)) continue; return 'modifiee'; }
+                    if (e.status === 405) return 'bloquee';  // conflit, ou branche en retard sur main
+                    throw e;
+                  }
                 }
               };
+              if (!(await attendreTete(numero, sha))) return 'modifiee';
               const r = await essayer(sha);
               if (r !== 'bloquee') return r;
               try { await github.rest.pulls.updateBranch({ ...context.repo, pull_number: numero, expected_head_sha: sha }); }
