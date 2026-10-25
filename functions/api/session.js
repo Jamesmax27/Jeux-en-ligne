@@ -43,7 +43,8 @@
 // sur PURGE_FREQUENCE, après la réponse) si la tâche ne passe pas.
 // ==========================================================================
 
-import { json, empreinteVisiteur, jeuExiste, lireFormatSessions, valeurDebut, CONSERVATION_SESSIONS_JOURS } from '../_commun.js';
+import { json, empreinteVisiteur, jeuExiste, lireFormatSessions, valeurDebut } from '../_commun.js';
+import { effacerSessionsAnciennes } from '../_stats.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -54,13 +55,13 @@ const NIVEAU_MAX = 1e9;
 const ERREUR_MAX = 500;         // caractères
 const TAILLE_MAX = 4096;        // octets du corps
 const PURGE_FREQUENCE = 100;
+const PURGE_MAX = 1000;         // lignes effacées au plus par passage
 const BITS_V6 = 56;             // préfixe IPv6 de l'empreinte (les votes gardent /64)
 
-/** Efface les parties commencées il y a plus de CONSERVATION_SESSIONS_JOURS jours. */
-async function effacerAnciennes(env, format) {
-  const limite = Date.now() - CONSERVATION_SESSIONS_JOURS * 86400000;
+/** Efface des parties de plus de 60 jours (PURGE_MAX au plus, voir functions/_stats.js). */
+async function effacerAnciennes(env) {
   try {
-    await env.DB.prepare('DELETE FROM sessions WHERE debut < ?').bind(valeurDebut(format, limite)).run();
+    await effacerSessionsAnciennes(env, Date.now(), PURGE_MAX);
   } catch (e) {
     console.error('Effacement des anciennes sessions impossible :', e);
   }
@@ -157,7 +158,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
       `INSERT INTO sessions (${colonnes.join(', ')}) VALUES (${colonnes.map(() => '?').join(', ')})`
     ).bind(...Object.values(valeurs)).run();
     if (Math.random() < 1 / PURGE_FREQUENCE) {
-      const purge = effacerAnciennes(env, format);
+      const purge = effacerAnciennes(env);
       if (typeof waitUntil === 'function') waitUntil(purge); else await purge;
     }
   } catch (e) {

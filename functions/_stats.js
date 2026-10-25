@@ -209,11 +209,18 @@ export async function calculerJoursManquants(env, { max = RATTRAPAGE_JOURS, main
   return calcules;
 }
 
-/** Efface les sessions brutes de plus de CONSERVATION_SESSIONS_JOURS jours. Renvoie le nombre de lignes effacées. */
-export async function effacerSessionsAnciennes(env, maintenant = Date.now()) {
+/**
+ * Efface les sessions brutes de plus de CONSERVATION_SESSIONS_JOURS jours, EFFACEMENT_MAX lignes
+ * au plus par passage (chaque ligne effacée compte comme une écriture D1 : un retard
+ * exceptionnel est rattrapé sur plusieurs jours sans épuiser la limite quotidienne).
+ * Renvoie le nombre de lignes effacées.
+ */
+export const EFFACEMENT_MAX = 10000;
+
+export async function effacerSessionsAnciennes(env, maintenant = Date.now(), max = EFFACEMENT_MAX) {
   const format = await lireFormatSessions(env);
-  const r = await env.DB.prepare('DELETE FROM sessions WHERE debut < ?')
-    .bind(valeurDebut(format, maintenant - CONSERVATION_SESSIONS_JOURS * JOUR_MS)).run();
+  const r = await env.DB.prepare('DELETE FROM sessions WHERE rowid IN (SELECT rowid FROM sessions WHERE debut < ? LIMIT ?)')
+    .bind(valeurDebut(format, maintenant - CONSERVATION_SESSIONS_JOURS * JOUR_MS), max).run();
   return r?.meta?.changes ?? 0;
 }
 
