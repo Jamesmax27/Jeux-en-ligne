@@ -3021,6 +3021,7 @@ let sautVu = 0;
 let bilan = null;
 function gagner() {
   etoileAllumee = true; etat = 'gagne'; minuteurGagne = 0; partieEnCours = false;
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: N + 1 });
   son('etoile');
   for (let q = 0; q < 50; q++) particules.push(part(def.etoile[0], def.etoile[1], q % 2 ? '#f2d27a' : '#ffffff', 220, 1.4, 3.5, 'etoile'));
   ondes.push({ x: def.etoile[0], y: def.etoile[1], r: 20, vie: 1, c: '242,210,122' });
@@ -3044,6 +3045,7 @@ function majGagne(dt) {
 }
 function perdre() {
   etat = 'fin'; son('defaite');
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: N + 1 });
   bilan = { gagne: false, n: pousPrises.filter(Boolean).length, score: 100 * pousPrises.filter(Boolean).length };
   afficherFin();
 }

@@ -2907,6 +2907,7 @@ function nouvellesRecompenses(avant, apres) {
 
 function victoire() {
   if (ecran !== 'partie' || !etat || !etat.fini) return;
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: courant + 1 });
   const i = courant;
   const puces = etat.puces;
   const etoiles = Math.max(1, puces);
@@ -2952,6 +2953,7 @@ function victoire() {
 
 function ouvrirDefaite() {
   if (ecran !== 'partie' || !etat || !etat.perdu) return;
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: courant + 1 });
   el('titre-fin').textContent = tr('fin.oups');
   el('texte-fin').textContent = tr('fin.balai');
   jetonScore++;

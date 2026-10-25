@@ -2560,6 +2560,7 @@ function finNiveau(reussi) {
   const total = J.L.cibles.length, tout = J.trouves === total;
   const pctAir = Math.max(0, J.air / J.L.air);
   let etoiles = tout ? (J.indices === 0 ? 3 : 2) : (J.trouves >= Math.ceil(total / 2) ? 1 : 0);
+  if (window.FMG) window.FMG.reportEnd({ completed: etoiles >= 1, level: J.n + 1 });
   let score = J.trouves * 100 + (tout ? Math.round(pctAir * 200) : 0) + (tout && J.indices === 0 ? 100 : 0) - J.erreurs * 20;
   score = Math.max(0, score);
   const ancien = sauvegarde.records[J.n] || 0;

@@ -3974,6 +3974,7 @@
 
   function victoire() {
     ecran = 'fin'; enJeu = false; fermerFiche();
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: N });
     const etoiles = mois <= L.p ? 3 : (mois <= L.p + Math.ceil((L.m - L.p) / 2) ? 2 : 1);
     const score = scoreNiveau();
     const ancien = progression.records[N - 1] || 0;
@@ -3993,6 +3994,7 @@
 
   function defaite(raison) {
     ecran = 'fin'; enJeu = false; fermerFiche();
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: N });
     const score = scoreNiveau();
     $('fin-titre').textContent = t('fin.' + raison);
     const manque = Object.keys(L.o).filter((k) => !avancement(k).ok).map((k) => t('obj.' + k, { n: nb(k === 'reserve' ? (L.res || []).length : L.o[k]) }));

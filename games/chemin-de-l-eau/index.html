@@ -1803,6 +1803,7 @@ function finirNiveau(reussi) {
   if (modeDemo) { setTimeout(() => { if (modeDemo) chargerNiveau(niv, true); }, 1200); return; }
   majInterface();
   if (!reussi) {
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: niv + 1 });
     echecs++;
     const manque = verres.reduce((s, v) => s + Math.max(0, v.besoin - v.compte), 0);
     document.getElementById('texte-echec').textContent = t('manque', { n: manque });
@@ -1816,6 +1817,7 @@ function finirNiveau(reussi) {
     return;
   }
   // Réussite : étoiles, score, record.
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: niv + 1 });
   const part = encreUtilisee / N.encre;
   let etoiles = 1 + (part <= 0.75 ? 1 : 0) + (part <= 0.5 ? 1 : 0);
   if (indiceUtilise) etoiles = Math.min(2, etoiles);

@@ -3756,6 +3756,7 @@ button.puce { min-height: 44px; }
     var carte = $('#carte-fin'); carte.innerHTML = '';
     var etoilesAvant = totalEtoiles();
     if (gagne) {
+      if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
       var et = 1;
       if (etat.erreurs <= 2) et = 2;
       if (etat.erreurs === 0 && etat.temps <= cfg.tCible) et = 3;
@@ -3807,6 +3808,7 @@ button.puce { min-height: 44px; }
       })();
       var premier = col.querySelector('button'); setTimeout(function () { try { premier.focus(); } catch (e) { /* rien */ } }, 60);
     } else {
+      if (window.FMG) window.FMG.reportEnd({ completed: false, level: i + 1 });
       carte.appendChild(el('div', 'grand-ic', '🍂'));
       carte.appendChild(el('h2', null, t('fin.titreDefaite')));
       carte.appendChild(el('p', null, t('fin.defaite')));

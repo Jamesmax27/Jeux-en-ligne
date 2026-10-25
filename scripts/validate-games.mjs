@@ -16,7 +16,9 @@
 // la boucle de nuit) : au moins 20 niveaux, nombre déclaré dans game.json
 // ("niveaux") ET donné par le jeu lui-même (window.JEL_NIVEAUX, lu dans le
 // navigateur), présentation ("presentation"). Les jeux plus anciens, sans ce
-// champ, ne sont pas concernés. Les textes de référencement de tous les jeux
+// champ, ne sont pas concernés. Tous les jeux appellent window.FMG.reportEnd
+// (statistiques de fin de partie), avec une garde (controlerFinDePartie) ; dans
+// le navigateur, le lanceur doit fournir window.FMG. Les textes de référencement de tous les jeux
 // (présentation, règles, titre et description pour Google…) et leurs longueurs
 // sont contrôlés par scripts/regles-seo.mjs et scripts/verifier-seo.mjs.
 //
@@ -128,6 +130,25 @@ async function controlerJeu(id, dossier) {
     erreur(id, 'stockage local utilisé sans try/catch : le jeu plantera dans le cadre isolé du site');
   }
   controlerSauvegarde(id, html);
+  controlerFinDePartie(id, html);
+}
+
+// Statistiques de fin de partie (CONSIGNES-JEU.md, section 3 « Fin de partie ») :
+// le jeu appelle window.FMG.reportEnd({ completed, level }) à ses écrans de
+// victoire et de défaite. FMG est fourni par le lanceur (SCRIPT_SUIVI de
+// public/suivi.js) : ouvert seul, le jeu ne l'a pas, d'où la garde obligatoire
+// sur la même ligne (if (window.FMG) …, window.FMG && …, window.FMG?.…).
+const RE_BLOCS_GENERES = /<script\b[^>]*\bid=["']jel-(?:i18n|i18n-textes|sauvegarde)["'][^>]*>[\s\S]*?<\/script>/gi;
+
+function controlerFinDePartie(id, html) {
+  const lignes = html.replace(RE_BLOCS_GENERES, '').split('\n').filter((l) => /\bFMG\.reportEnd\s*\(/.test(l));
+  if (!lignes.length) {
+    return erreur(id, 'fin de partie : le jeu n\'appelle pas window.FMG.reportEnd({ completed, level }) à ses écrans de victoire et de défaite (voir CONSIGNES-JEU.md, « Fin de partie »)');
+  }
+  const sansGarde = lignes.filter((l) => !/\bwindow\.FMG\s*(?:\)|&&|\?\.)/.test(l));
+  if (sansGarde.length) {
+    erreur(id, `fin de partie : appel à FMG.reportEnd sans garde (écrire « if (window.FMG) window.FMG.reportEnd(…) ») : ${sansGarde[0].trim().slice(0, 100)}`);
+  }
 }
 
 // Sauvegarde de la progression (public/save.js, CONSIGNES-JEU.md « Sauvegarde ») :
@@ -251,6 +272,10 @@ async function testerNavigateur(ids) {
         erreur(id, 'le jeu ne se charge pas dans le lanceur');
       } else {
         if (!(await ecranVisible(cadre))) erreur(id, 'écran vide au démarrage');
+        // Script commun de suivi placé par le lanceur (public/suivi.js, SCRIPT_SUIVI).
+        if (!(await cadre.evaluate(() => typeof window.FMG?.reportEnd === 'function').catch(() => false))) {
+          erreur(id, 'window.FMG.reportEnd absent dans le lanceur : le script commun de suivi (SCRIPT_SUIVI, public/suivi.js) n\'est pas chargé');
+        }
 
         // Consignes de 2026 : le jeu donne lui-même son nombre réel de niveaux.
         if (consignes2(id)) {

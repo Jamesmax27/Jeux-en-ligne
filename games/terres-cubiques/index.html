@@ -4560,7 +4560,9 @@ function renderGoal(){ const g=$('#goal');
   if(step>=STEPS.length){ $('#goalStep').textContent=traduire('toutAccompli'); $('#goalTxt').textContent=traduire('bravoMonde'); g.classList.add('done'); return; }
   g.classList.remove('done'); $('#goalStep').textContent=traduire('etapeN',{n:step+1,total:STEPS.length}); $('#goalTxt').textContent=STEPS[step].t; }
 function checkSteps(){ if(mode!=='survival') return; const before=step; while(step<STEPS.length&&STEPS[step].ok()) step++;
-  if(step!==before){ renderGoal(); $('#goal').classList.remove('mini'); sfx('step'); note(step>=STEPS.length?traduire('bravoTout'):(before<10&&step>=10)?traduire('diamantTrouve'):traduire('etapeReussie'),2000); saveDirty=true; jelSauver(); } }
+  if(step!==before){
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: step });
+  renderGoal(); $('#goal').classList.remove('mini'); sfx('step'); note(step>=STEPS.length?traduire('bravoTout'):(before<10&&step>=10)?traduire('diamantTrouve'):traduire('etapeReussie'),2000); saveDirty=true; jelSauver(); } }
 
 /* ---------- sac et fabrication ---------- */
 let bagTab='craft', bagCat='tout', bagOnly=false;
@@ -4717,7 +4719,9 @@ function hurtPlayer(amt,sx,sz,cause){ if(mode!=='survival'||state==='dead'||invu
   P.hp-=amt; invul=.5; const v=$('#vign'); v.classList.add('on'); setTimeout(()=>v.classList.remove('on'),60); sfx('hurt');
   if(sx!==null&&sx!==undefined){ const dx=P.x-sx, dz=P.z-sz, l=Math.hypot(dx,dz)||1; P.vx=dx/l*6; P.vz=dz/l*6; if(!P.inWater) P.vy=4.5; }
   renderStatus(); if(P.hp<=0) die(cause); }
-function die(cause){ if(P.riding) dismount(); P.hp=0; renderStatus(); $('#dCause').textContent=CAUSES[cause]||traduire('sante'); setState('dead'); saveNow(); }
+function die(cause){
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: step + 1 });
+  if(P.riding) dismount(); P.hp=0; renderStatus(); $('#dCause').textContent=CAUSES[cause]||traduire('sante'); setState('dead'); saveNow(); }
 function respawn(){ P.hp=20; P.food=20; let sp=spawnPos; if(bedSpawn){ if(getB(Math.floor(bedSpawn[0]),Math.floor(bedSpawn[1])-1,Math.floor(bedSpawn[2]))===BED) sp=bedSpawn; else { bedSpawn=null; note(traduire('litDisparu'),2600); } } P.x=sp[0]; P.y=sp[1]; P.z=sp[2]; P.vx=P.vy=P.vz=0; fallTop=null; invul=2; lastHp=-1; renderStatus(); setState('play'); lockPointer(); saveDirty=true; }
 function overlapsId(px,py,pz,r,h,id){ for(let y=Math.floor(py);y<=Math.floor(py+h);y++) for(let z=Math.floor(pz-r);z<=Math.floor(pz+r);z++) for(let x=Math.floor(px-r);x<=Math.floor(px+r);x++) if(getB(x,y,z)===id) return true; return false; }
 function updateHealth(dt,moving){

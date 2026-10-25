@@ -27,7 +27,7 @@ Un nouveau jeu est **complet et travaillé, jamais un simple prototype** : il do
 9. **Une sélection des niveaux** : l'écran des niveaux montre ceux qui sont débloqués (avec leurs étoiles) et ceux qui restent fermés ; on peut rejouer n'importe quel niveau débloqué.
 10. **Des sons générés avec Web Audio** (aucun fichier audio) pour les actions, réussites, erreurs et fins de niveau, avec un **bouton pour couper le son**, bien visible, dont le choix est mémorisé. Aucun son avant la première action du joueur.
 11. **Des animations et des retours visuels soignés** : confettis, étoiles qui s'envolent, compteur qui défile, légère secousse… à chaque action, à chaque réussite et à chaque fin de niveau.
-12. **Un écran de victoire et un écran de défaite** : à chaque fin de niveau et en fin de partie, bilan avec score, étoiles gagnées, record battu ou non, et boutons « Niveau suivant » (victoire) ou « Réessayer » (défaite), « Rejouer » et « Niveaux ».
+12. **Un écran de victoire et un écran de défaite** : à chaque fin de niveau et en fin de partie, bilan avec score, étoiles gagnées, record battu ou non, et boutons « Niveau suivant » (victoire) ou « Réessayer » (défaite), « Rejouer » et « Niveaux ». Chacun signale la fin au site avec `window.FMG.reportEnd` (section 3, « Fin de partie »).
 13. **Une page du jeu bien renseignée (référencement)** : en plus du titre et de la description courte de la carte du catalogue, `game.json` donne dans les 5 langues les textes de la page du jeu : titre et description pour les moteurs de recherche, « À propos du jeu », « Comment jouer », compétences travaillées, texte de la jaquette (section 4). Ils sont écrits une fois le jeu terminé, d'après lui seul, et respectent les règles de `scripts/regles-seo.mjs`.
 
 ### Le ressenti
@@ -46,8 +46,24 @@ Un nouveau jeu est **complet et travaillé, jamais un simple prototype** : il do
 - Le jeu tourne dans un **cadre isolé** : `localStorage` peut être refusé. Tout accès au stockage est entouré de `try { … } catch (e) { … }`, et le jeu fonctionne sans sauvegarde.
 - Interdits : `alert()`, `confirm()`, `prompt()`, `window.open()`, formulaires, fenêtres pop-up.
 - Aucune erreur dans la console, au démarrage comme pendant la partie.
-- **Suivi des parties : rien à ajouter dans le jeu.** Le lanceur place lui-même, en tête de chaque jeu (anciens comme nouveaux), le script commun de suivi (`SCRIPT_ERREURS` dans `public/suivi.js`), qui lui signale les erreurs JavaScript ; il mesure aussi le temps de jeu et l'envoie au site (« Tendances » de l'accueil). Le jeu ne contient donc **aucun code réseau** (`fetch`, `sendBeacon`… : bloqués par la règle de sécurité) et ne doit pas empêcher les erreurs d'arriver jusqu'à `window` (pas de `stopImmediatePropagation()` sur l'événement `error`) ; `window.onerror` reste utilisable.
+- **Suivi des parties : seulement `FMG.reportEnd` dans le jeu** (ci-dessous). Le lanceur place lui-même, en tête de chaque jeu (anciens comme nouveaux), le script commun de suivi (`SCRIPT_SUIVI` dans `public/suivi.js`), qui lui signale les erreurs JavaScript et fournit `window.FMG.reportEnd` ; il mesure aussi le temps de jeu et envoie le tout au site (« Tendances » de l'accueil, onglet « Stats » de la page privée). Le jeu ne contient donc **aucun code réseau** (`fetch`, `sendBeacon`… : bloqués par la règle de sécurité) et ne doit pas empêcher les erreurs d'arriver jusqu'à `window` (pas de `stopImmediatePropagation()` sur l'événement `error`) ; `window.onerror` reste utilisable.
 - Code lisible et commenté en français.
+
+### Fin de partie (obligatoire)
+
+Le site compte, pour chaque jeu, les parties gagnées et le niveau atteint, afin de savoir quels jeux plaisent et lesquels sont trop durs. Le jeu le signale en **une ligne** à chaque écran de fin :
+
+```js
+if (window.FMG) window.FMG.reportEnd({ completed: true, level: niveau });   // écran de victoire
+if (window.FMG) window.FMG.reportEnd({ completed: false, level: niveau });  // écran de défaite
+```
+
+- **Où** : dans la fonction qui fait passer le jeu à l'écran de victoire (niveau réussi, partie gagnée) ou de défaite (niveau raté, plus de vies, temps écoulé), **une fois** par fin, jamais dans une fonction de dessin appelée à chaque image. Un écran qui sert aux deux issues peut passer un booléen du jeu : `completed: gagne`.
+- **`completed`** : `true` pour une réussite, `false` pour un échec. **`level`** : le numéro du niveau joué, à partir de 1 tel que le joueur le voit (`index + 1` si le code compte à partir de 0) ; jeu sans niveaux : le score ; rien de pertinent : `null`.
+- **Jeu sans fin** (bac à sable, coloriage, partie infinie sans game over) : `completed: false, level: <score>` chaque fois que le score augmente (le lanceur garde la plus haute valeur), ou `completed: true, level: null` quand le joueur termine une création ou un objectif.
+- Le récapitulatif final qui suit la victoire du dernier niveau ne fait pas de 2e appel. Appels répétés sans risque : le lanceur garde « terminé » dès une victoire et le plus haut niveau.
+- **La garde `if (window.FMG)` est obligatoire, sur la même ligne** : ouvert seul (hors du lanceur), le jeu n'a pas `FMG`. Rien d'autre à écrire : pas de script à recopier, le lanceur fournit `FMG` à tous les jeux.
+- **Contrôles** : `validate-games.mjs` vérifie qu'il y a au moins un appel, avec sa garde, et que le lanceur fournit `window.FMG` dans le jeu ; la relecture (section 7) vérifie qu'il est au bon endroit (victoire et défaite).
 
 ### Sauvegarde (obligatoire)
 
@@ -205,6 +221,7 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Catalogue | le jeu manque au catalogue construit, ou son genre, ses univers et son âge ne sont pas ceux de son idée (`scripts/idees.mjs controler`) |
 | Genres et univers | un genre, un genre secondaire ou un univers hors des listes fermées de `public/taxonomie.js`, ou l'ancien champ `tags` (`scripts/controle-taxonomie.mjs`) |
 | Sauvegarde | module `save.js` absent, pas à jour ou pas appelé (`validate-games.mjs`), ou `scripts/tester-sauvegarde.mjs` signale un problème : rien d'écrit à la fermeture, pas de fenêtre « Continuer » avec une sauvegarde, « Continuer » qui ne ramène pas au niveau sauvegardé, effacement sans effet |
+| Fin de partie | aucun appel à `window.FMG.reportEnd`, ou un appel sans la garde `if (window.FMG)` sur la même ligne (`validate-games.mjs`, section 3 « Fin de partie ») |
 | Traductions | `scripts/check-i18n.js` signale une erreur : langue incomplète, clé manquante, valeur vide, `{variables}` différentes, titre, description ou présentation non traduits, erreur dans une des 5 langues (boucle de nuit et `validate.yml`) |
 | Référencement | `scripts/verifier-seo.mjs <id>` signale une erreur sur ce jeu : texte de la page manquant ou hors bornes dans une des 5 langues (section 4), bloc de texte hors de 150 à 300 mots, marque protégée, titre ou description identique à celui d'un autre jeu, phrase de 10 mots reprise d'un autre jeu, page du jeu mal construite (titre, description, H1, liens, jeux similaires…) (boucle de nuit et `validate.yml`) |
 
@@ -221,7 +238,7 @@ Points bloquants, vérifiés dans le code et sur les captures d'écran du robot 
 7. **Récompenses et progression** : score ou étoiles par niveau, sélection des niveaux débloqués ; sauvegarde avec `save.js` (section 3) : « Continuer » / « Nouvelle partie » au bouton Jouer, sauvegarde à chaque fin de niveau et à la fermeture (seulement pendant une partie) ; record et autres données dans `localStorage` à l'intérieur de `try { … } catch (e) { … }`.
 8. **Contrôles** : jouable entièrement au doigt, et au clavier ou à la souris ; cibles tactiles d'au moins 44 px.
 9. **Son** : sons Web Audio, bouton pour couper le son visible et mémorisé, aucun son avant la première action.
-10. **Effets et fins de niveau** : retours visuels soignés ; écran de victoire et écran de défaite avec score, étoiles, record, « Niveau suivant » ou « Réessayer », et « Rejouer ».
+10. **Effets et fins de niveau** : retours visuels soignés ; écran de victoire et écran de défaite avec score, étoiles, record, « Niveau suivant » ou « Réessayer », et « Rejouer ». Chaque écran de fin appelle `window.FMG.reportEnd` (section 3, « Fin de partie ») au bon endroit, une fois par fin : `completed: true` à la victoire, `false` à la défaite, `level` = numéro du niveau joué (à partir de 1) ou score.
 11. **Écran de téléphone** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page.
 12. **Contenu** : adapté aux enfants, en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
 13. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; aucune image du jeu avec du texte (sections 3 et 5).

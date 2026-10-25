@@ -1319,6 +1319,7 @@ function finVague(victoire) {
   etat.phase = "pause";
   $("vitesse").hidden = true; etat.vitesse = 1; $("vitesse").textContent = "×1";
   if (victoire) {
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: etat.vague });
     const prime = 10 + 2 * etat.vague;
     etat.pieces += prime; etat.gagne += prime;
     if (etat.vague > record) { record = etat.vague; try { localStorage.setItem("gribouilles-record", String(record)); } catch (e) { /* sans sauvegarde */ } }
@@ -1333,6 +1334,7 @@ function finVague(victoire) {
       montrerPrep(t("bilanGagne", { n: etat.gagne }));
     }, 1400);
   } else {
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: etat.vague });
     $("message").textContent = t("sommeil");
     setTimeout(() => montrerPrep(t("pasGrave", { n: etat.gagne })), 1700);
   }

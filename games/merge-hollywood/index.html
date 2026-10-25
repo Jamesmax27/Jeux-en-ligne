@@ -3618,12 +3618,14 @@ function terminer(fin) {
   const record = score > ancienRecord;
   let etoiles = 0;
   if (fin === 'victoire') {
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: n });
     etoiles = etoilesDe(p);
     profil.etoiles[n - 1] = Math.max(profil.etoiles[n - 1] || 0, etoiles);
     if (record) profil.records[n - 1] = score;
     profil.debloque = Math.max(profil.debloque, Math.min(n + 1, NIVEAUX.length));
     sauver(n + 1, score);
   } else {
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: n });
     sauver(n, score);
   }
   for (let k = 0; k < NIVEAUX.length; k++) if (profil.etoiles[k] === undefined) profil.etoiles[k] = 0;

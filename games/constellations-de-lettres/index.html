@@ -2879,6 +2879,7 @@ function victoire() {
   enJeu = false;
   etat.termine = true;
   const i = etat.i;
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
   // Bonus d'aube : ce qu'il restait de nuit
   if (etat.def.aube) gagner(Math.round((1 - Math.min(1, etat.aube)) * 100));
   const e = calculerEtoiles();
@@ -2902,6 +2903,7 @@ function victoire() {
 }
 function defaite(raison) {
   if (!etat || etat.termine) return;
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: etat.i + 1 });
   enJeu = false;
   etat.termine = true;
   etat.actif = false;

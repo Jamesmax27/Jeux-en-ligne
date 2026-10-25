@@ -2484,6 +2484,7 @@
   // ---------- Fin de niveau ----------
   function victoire() {
     const i = jeu.i, L = jeu.L;
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
     const ecoOk = jeu.bulles >= L.eco, dentsOk = jeu.ternies === 0;
     const etoiles = 1 + (ecoOk ? 1 : 0) + (dentsOk ? 1 : 0);
     const bonusBulles = jeu.bulles * 50, bonusDents = dentsOk ? 300 : 0;
@@ -2513,6 +2514,7 @@
   function finPartie(gagne, raison) {
     if (jeu.fini) return;
     jeu.fini = true;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: jeu.i + 1 });
     jouerSon('defaite');
     montrerFin(false, { raison, score: jeu.score, ancienRecord: prog.records[jeu.i] });
   }

@@ -2569,6 +2569,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--or-vif
 
   function victoire() {
     var i = partie.index, niv = partie.niveau;
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
     partie.phase = 'fin';
     var etoiles = 3 - Math.min(2, partie.erreurs);
     partie.score += partie.plumes * 50 + (partie.erreurs === 0 ? 200 : 0);
@@ -2609,6 +2610,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--or-vif
 
   function defaite() {
     var i = partie.index;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: i + 1 });
     partie.phase = 'fin';
     var ancien = sauve.records[i] || 0;
     Son.defaite();

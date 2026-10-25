@@ -3411,6 +3411,7 @@ window.JEL_NIVEAUX = NIVEAUX.length;
     $('fin-bonus').classList.add('cache');
     var boutons = $('fin-boutons'); boutons.innerHTML = '';
     if (gagne) {
+      if (window.FMG) window.FMG.reportEnd({ completed: true, level: idx + 1 });
       var e = etoilesPour(niv, cout);
       var ancienTotal = totalEtoiles();
       var record = !prog.records[idx] || cout < prog.records[idx];
@@ -3443,6 +3444,7 @@ window.JEL_NIVEAUX = NIVEAUX.length;
       ajouterBouton(boutons, 'bouton.rejouer', '', function () { demarrerNiveau(idx, false); });
       ajouterBouton(boutons, 'bouton.niveaux', '', function () { partieEnCours = false; ouvrirNiveaux(); });
     } else {
+      if (window.FMG) window.FMG.reportEnd({ completed: false, level: idx + 1 });
       son('defaite');
       $('t-fin').textContent = tr('fin.rate');
       $('fin-etoiles').innerHTML = svgEtoile(false, 54) + svgEtoile(false, 54) + svgEtoile(false, 54);

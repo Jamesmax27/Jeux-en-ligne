@@ -4308,6 +4308,7 @@ function switchWeather() {
 }
 function arrive() { G.state = 'arrive'; G.endT = 1.5; sfx.win(); floatText(t('fxNid'), bird.x + 60, bird.y - 40, '#1f4f93'); G.cap = null; }
 function levelWon() {
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: G.level });
   const stars = G.hits === 0 ? 3 : G.hits === 1 ? 2 : 1;
   addScore(50 * Math.min(G.level, 60) + 25 * stars);
   starsMap[G.level] = Math.max(starsMap[G.level] || 0, stars); store.set('stars', starsMap);
@@ -4329,6 +4330,7 @@ function levelWon() {
   G.state = 'win'; setHud(false); show('win');
 }
 function gameOver() {
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: G.level });
   const pct = Math.round(progress() * 100);
   const rec = G.score > best; if (rec) { best = G.score; store.set('best', best); }
   $('overEyebrow').textContent = t('niveauPoint', { n: G.level, nom: G.def.name });

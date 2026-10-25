@@ -2743,6 +2743,7 @@ function confettis(el) {
 /* ---------- Fins de concert ---------- */
 function victoire() {
   E.enConcert = false; E.fini = true; E.question = null; majEcouter();
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: E.niveau });
   const n = E.niveau, et = etoilesEnJeu();
   const ancienRecord = progres.records[n - 1] || 0, record = E.score > ancienRecord;
   const avantPartitions = partitions();
@@ -2779,6 +2780,7 @@ function victoire() {
 }
 function defaite() {
   E.enConcert = false; E.question = null; majEcouter();
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: E.niveau });
   const n = E.niveau, ancienRecord = progres.records[n - 1] || 0;
   sons.defaite();
   afficherFin({
