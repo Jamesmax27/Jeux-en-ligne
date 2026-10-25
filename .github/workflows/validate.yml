@@ -28,6 +28,13 @@
 #     (suivi.js, play.js)      lanceur dans le navigateur si suivi.js ou play.js changent).
 # Le reste (documentation, autres fichiers du site…) ne déclenche rien.
 #
+# Trois jobs : « quoi » (ce qui a changé), « jeux » (les jeux dans le
+# navigateur, partagés entre 4 machines au plus qui travaillent en même temps :
+# robot, sauvegarde, traductions des jeux ; un jeu prend environ 50 s, d'où
+# environ 15 min au lieu d'une heure quand tous les jeux sont contrôlés), puis
+# « controle » (site, référencement, fonctions) qui donne le verdict
+# d'ensemble : c'est lui qu'il faut rendre obligatoire dans la protection de main.
+#
 # Navigateur : le Google Chrome déjà installé sur les machines de GitHub
 # (CHROMIUM_PATH), sans télécharger Chromium à chaque fois ; Chromium de
 # Playwright seulement si Chrome est absent.
@@ -84,33 +91,40 @@ on:
   workflow_dispatch:
 
 jobs:
-  controle:
+  # 1. Ce qui a changé, et donc ce qu'il faut contrôler (quelques secondes).
+  quoi:
     # Pas pour les pull requests de la boucle de nuit (robot github-actions[bot],
     # branches nouveau-jeu/…) : la boucle contrôle déjà ces jeux avant de fusionner.
     # (Le déclencheur pull_request ne sait pas filtrer sur l'auteur ni sur la
     # branche de la pull request : le tri ne peut se faire qu'ici.)
     if: ${{ !(github.event.pull_request.user.login == 'github-actions[bot]' && startsWith(github.head_ref, 'nouveau-jeu/')) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 5
     permissions:
       contents: read
-
+    outputs:
+      ids: ${{ steps.quoi.outputs.ids }}
+      tous: ${{ steps.quoi.outputs.tous }}
+      site: ${{ steps.quoi.outputs.site }}
+      seo: ${{ steps.quoi.outputs.seo }}
+      navigateur: ${{ steps.quoi.outputs.navigateur }}
+      demandes: ${{ steps.quoi.outputs.demandes }}
+      stats: ${{ steps.quoi.outputs.stats }}
+      jeux: ${{ steps.quoi.outputs.jeux }}
+      lots: ${{ steps.quoi.outputs.lots }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      # Ce qui a changé, et donc ce qu'il faut contrôler.
       #   ids        jeux modifiés (vide : aucun) ;
       #   tous       1 = tous les jeux dans le navigateur (outils modifiés, ou lancement à la main) ;
       #   site       1 = textes du site, taxonomie, gabarits, générateur des pages
       #                  (pages-seo, build-catalog) ou pages du site modifiés ;
       #   seo        1 = référencement de tout le site (0 : seulement celui des jeux modifiés) ;
-      #   navigateur 1 = un test dans le navigateur est utile.
+      #   navigateur 1 = un test du site dans le navigateur est utile (job « controle ») ;
+      #   jeux       jeux à tester dans le navigateur (tous, ou les jeux modifiés) ;
+      #   lots       machines qui se partagent ces jeux, en JSON (« [0,1,2,3] », « [] » : aucune).
       - name: Voir ce qui a changé
         id: quoi
         run: |
@@ -146,6 +160,17 @@ jobs:
           if printf '%s\n' "$fichiers" | grep -Eq '^scripts/(regles-seo|verifier-seo)\.mjs$'; then seo=1; fi
           navigateur=0
           if [ -n "$ids" ] || [ "$tous" = 1 ] || [ "$site" = 1 ] || [ "$stats" = 2 ]; then navigateur=1; fi
+          # Jeux à tester dans le navigateur, partagés entre LOTS_MAX machines au plus
+          # (un jeu prend environ 50 s : robot, sauvegarde, 5 langues).
+          if [ "$tous" = 1 ]; then
+            jeux=$(find games -mindepth 1 -maxdepth 1 -type d ! -name '.*' ! -name '_*' -printf '%f\n' | sort | tr '\n' ' ')
+          else
+            jeux="$ids"
+          fi
+          nb=$(printf '%s\n' $jeux | { grep -c . || true; })
+          LOTS_MAX=4
+          lots=$(( nb < LOTS_MAX ? nb : LOTS_MAX ))
+          if [ "$lots" -gt 0 ]; then lots_json="[$(seq -s, 0 $((lots - 1)))]"; else lots_json="[]"; fi
           {
             echo "ids=$ids"
             echo "tous=$tous"
@@ -154,11 +179,33 @@ jobs:
             echo "navigateur=$navigateur"
             echo "demandes=$demandes"
             echo "stats=$stats"
+            echo "jeux=$jeux"
+            echo "lots=$lots_json"
           } >> "$GITHUB_OUTPUT"
-          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats"
+          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats | jeux à tester : $nb sur $lots machine(s)"
+
+  # 2. Les jeux dans le navigateur, partagés entre plusieurs machines en même
+  #    temps (un jeu sur LOTS_MAX chacune) : robot, sauvegarde, traductions.
+  jeux:
+    needs: quoi
+    if: ${{ needs.quoi.outputs.lots != '[]' }}
+    name: Jeux (lot ${{ matrix.lot }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        lot: ${{ fromJSON(needs.quoi.outputs.lots) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Préparer le navigateur de test
-        if: steps.quoi.outputs.navigateur == '1'
         run: |
           npm install --no-save --no-package-lock playwright
           chrome=$(command -v google-chrome || command -v google-chrome-stable || true)
@@ -170,53 +217,93 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
-      - name: Contrôler les jeux
-        if: steps.quoi.outputs.ids != '' || steps.quoi.outputs.tous == '1'
+      - name: Choisir les jeux de ce lot
+        id: lot
+        env:
+          JEUX: ${{ needs.quoi.outputs.jeux }}
+          LOTS: ${{ needs.quoi.outputs.lots }}
+          LOT: ${{ matrix.lot }}
         run: |
-          if [ "${{ steps.quoi.outputs.tous }}" = 1 ]; then
-            node scripts/validate-games.mjs --browser
-          else
-            node scripts/validate-games.mjs --browser ${{ steps.quoi.outputs.ids }}
-          fi
+          nb_lots=$(printf '%s' "$LOTS" | tr -cd ',' | wc -c)
+          nb_lots=$((nb_lots + 1))
+          liste=$(printf '%s\n' $JEUX | awk -v n="$nb_lots" -v k="$LOT" 'NF && (NR - 1) % n == k' | tr '\n' ' ')
+          echo "liste=$liste" >> "$GITHUB_OUTPUT"
+          echo "Lot $LOT sur $nb_lots : $liste"
+
+      - name: Contrôler les jeux
+        run: node scripts/validate-games.mjs --browser ${{ steps.lot.outputs.liste }}
 
       # Sauvegarde (public/save.js) dans le lanceur : écrite à la fermeture,
       # relue après rechargement (« Continuer »), effacée. Voir CONSIGNES-JEU.md.
       - name: Contrôler la sauvegarde
-        if: steps.quoi.outputs.ids != '' || steps.quoi.outputs.tous == '1'
+        if: ${{ !cancelled() }}
+        run: node scripts/tester-sauvegarde.mjs ${{ steps.lot.outputs.liste }}
+
+      # Traductions des jeux (5 langues), sans les pages du site (job « controle »).
+      - name: Contrôler les traductions des jeux
+        if: ${{ !cancelled() }}
+        run: node scripts/check-i18n.js ${{ steps.lot.outputs.liste }} --sans-site
+
+  # 3. Le reste (site, référencement, fonctions), puis le verdict d'ensemble :
+  #    « controle » est le contrôle à rendre obligatoire dans la protection de main.
+  controle:
+    needs: [quoi, jeux]
+    if: ${{ always() && needs.quoi.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Résultat des jeux
         run: |
-          if [ "${{ steps.quoi.outputs.tous }}" = 1 ]; then
-            node scripts/tester-sauvegarde.mjs
+          echo "Jeux dans le navigateur : ${{ needs.jeux.result }}"
+          if [ "${{ needs.jeux.result }}" != "success" ] && [ "${{ needs.jeux.result }}" != "skipped" ]; then
+            echo "::error::Au moins un lot de jeux a échoué (voir les jobs « Jeux (lot …) »)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Préparer le navigateur de test
+        if: needs.quoi.outputs.navigateur == '1'
+        run: |
+          npm install --no-save --no-package-lock playwright
+          chrome=$(command -v google-chrome || command -v google-chrome-stable || true)
+          if [ -n "$chrome" ]; then
+            echo "Navigateur déjà installé : $chrome"
+            echo "CHROMIUM_PATH=$chrome" >> "$GITHUB_ENV"
           else
-            node scripts/tester-sauvegarde.mjs ${{ steps.quoi.outputs.ids }}
+            echo "Pas de Chrome sur la machine : installation de Chromium (Playwright)."
+            npx playwright install --with-deps chromium
           fi
 
       # Genres et univers : uniquement ceux de public/taxonomie.js (jeux, idées, libellés, formulaire).
       - name: Contrôler les genres et les univers
-        run: node scripts/controle-taxonomie.mjs ${{ steps.quoi.outputs.ids }}
+        run: node scripts/controle-taxonomie.mjs ${{ needs.quoi.outputs.ids }}
 
       # Référencement (pages générées dans les 5 langues, sitemap.xml, robots.txt,
       # liens internes) : bloquant, rapide, sans navigateur. Voir scripts/verifier-seo.mjs.
       # Jeux modifiés seulement : seules les erreurs de ces jeux bloquent (les
       # autres sont affichées en « attention ») ; sinon tout le site est contrôlé.
       - name: Contrôler le référencement
-        if: steps.quoi.outputs.ids != '' || steps.quoi.outputs.seo == '1'
+        if: needs.quoi.outputs.ids != '' || needs.quoi.outputs.seo == '1'
         run: |
-          if [ "${{ steps.quoi.outputs.seo }}" = 1 ]; then
+          if [ "${{ needs.quoi.outputs.seo }}" = 1 ]; then
             node scripts/verifier-seo.mjs
           else
-            node scripts/verifier-seo.mjs ${{ steps.quoi.outputs.ids }}
+            node scripts/verifier-seo.mjs ${{ needs.quoi.outputs.ids }}
           fi
 
-      # Traductions (fr, en, es, pt, de) : bloquant. Voir I18N.md.
-      # Sans jeu modifié, l'accueil, les fiches, les catégories et le lanceur
-      # sont testés avec un seul jeu.
-      - name: Contrôler les traductions
+      # Traductions du site (fr, en, es, pt, de) : bloquant. Voir I18N.md.
+      # L'accueil, les fiches, les catégories, les pages légales et le lanceur
+      # sont testés avec un seul jeu (les jeux eux-mêmes : job « jeux »).
+      - name: Contrôler les traductions du site
         run: |
-          if [ "${{ steps.quoi.outputs.tous }}" = 1 ]; then
-            node scripts/check-i18n.js
-          elif [ -n "${{ steps.quoi.outputs.ids }}" ]; then
-            node scripts/check-i18n.js ${{ steps.quoi.outputs.ids }}
-          elif [ "${{ steps.quoi.outputs.site }}" = 1 ]; then
+          if [ "${{ needs.quoi.outputs.navigateur }}" = 1 ]; then
             node scripts/check-i18n.js pommes-du-poney
           else
             node scripts/check-i18n.js --statique
@@ -226,16 +313,16 @@ jobs:
       # actions de /idees) et votes : base SQLite en mémoire, faux GitHub et
       # Turnstile. Voir DEMANDES.md.
       - name: Contrôler les demandes publiques
-        if: steps.quoi.outputs.demandes == '1'
+        if: needs.quoi.outputs.demandes == '1'
         run: node scripts/tester-demandes.mjs
 
       # Statistiques de jeu (sessions, calcul par jour, onglet « Stats ») : base
       # SQLite en mémoire ; avec le lanceur dans le navigateur (window.FMG.reportEnd
       # présent dans le jeu, un seul envoi par session) si le suivi a changé.
       - name: Contrôler les statistiques de jeu
-        if: steps.quoi.outputs.stats != '0'
+        if: needs.quoi.outputs.stats != '0'
         run: |
-          if [ "${{ steps.quoi.outputs.stats }}" = 2 ]; then
+          if [ "${{ needs.quoi.outputs.stats }}" = 2 ]; then
             node scripts/tester-stats.mjs --navigateur
           else
             node scripts/tester-stats.mjs
