@@ -1,13 +1,24 @@
 // ==========================================================================
 // POST /api/session — enregistre une partie (temps passé sur un jeu)
 //
-// Corps : { "jeuId": "...", "duree": secondes, "erreur": "..." | null }
+// Corps : { "jeuId": "...", "duree": secondes, "erreur": "..." | null,
+//           "visitorId": "<uuid>", "startedAt": ms, "completed": true | false,
+//           "level": n | null, "replay": true | false }
 // Envoyé par le lanceur (public/suivi.js, navigator.sendBeacon) quand la page
-// du jeu est cachée ou quittée.
+// du jeu est cachée ou quittée : une seule écriture par session. Si le joueur
+// revient sur la page peu après, le temps joué ensuite arrive dans une 2e ligne
+// avec les mêmes visitorId et startedAt (regroupées par functions/_stats.js).
 //
-// - duree : nombre entier de secondes, de 2 s à 3 h ; au-delà, refusée.
+// - duree : nombre entier de secondes, de 2 s à 3 h ; plafonnée à 2 h
+//   (DUREE_PLAFOND) à l'enregistrement.
 // - debut : calculé ici (maintenant − durée), avec l'horloge du serveur.
 // - erreur : première erreur JavaScript du jeu pendant la partie (500 caractères au plus).
+// - Statistiques de jeu (facultatives : un ancien lanceur gardé en cache ne
+//   les envoie pas, sa ligne est alors ignorée par les statistiques) :
+//   visitor_id (identifiant anonyme tiré au hasard par l'appareil), started_at
+//   (lancement, horloge de l'appareil), game_completed (victoire signalée par
+//   le jeu, FMG.reportEnd), max_level (plus haut niveau ou score signalé),
+//   is_replay (même jeu lancé moins de 30 min plus tôt sur l'appareil).
 // - pays : request.cf.country (« XX » si inconnu) ;
 //   appareil : « mobile » ou « desktop », d'après le User-Agent ;
 //   visiteur : empreinte SHA-256 de l'adresse IP + IP_SALT, jamais l'adresse
@@ -27,34 +38,51 @@
 // données sont invalides, 403 si l'envoi vient d'un autre site, 503 si la base
 // ne répond pas.
 //
-// Conservation : les parties de plus de 13 mois sont effacées (politique de
-// confidentialité). L'effacement est fait de temps en temps (1 enregistrement
-// sur PURGE_FREQUENCE), après la réponse, sans retarder le joueur.
+// Conservation : les parties de plus de 60 jours sont effacées chaque jour par
+// /api/stats-jour (tâche planifiée), et ici de temps en temps (1 enregistrement
+// sur PURGE_FREQUENCE, après la réponse) si la tâche ne passe pas.
 // ==========================================================================
 
-import { json, empreinteVisiteur, jeuExiste, lireFormatSessions, valeurDebut } from '../_commun.js';
+import { json, empreinteVisiteur, jeuExiste, lireFormatSessions, valeurDebut, CONSERVATION_SESSIONS_JOURS } from '../_commun.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const DUREE_MIN = 2;          // secondes (le lanceur n'envoie pas les parties plus courtes)
-const DUREE_MAX = 3 * 3600;   // 3 heures
-const ERREUR_MAX = 500;       // caractères
-const TAILLE_MAX = 4096;      // octets du corps
-const CONSERVATION_MOIS = 13; // durée annoncée dans la politique de confidentialité
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const DUREE_MIN = 2;            // secondes (le lanceur n'envoie pas les parties plus courtes)
+const DUREE_MAX = 3 * 3600;     // 3 heures : au-delà, refusée
+const DUREE_PLAFOND = 2 * 3600; // durée enregistrée au plus (2 heures)
+const NIVEAU_MAX = 1e9;
+const ERREUR_MAX = 500;         // caractères
+const TAILLE_MAX = 4096;        // octets du corps
 const PURGE_FREQUENCE = 100;
-const BITS_V6 = 56;           // préfixe IPv6 de l'empreinte (les votes gardent /64)
+const BITS_V6 = 56;             // préfixe IPv6 de l'empreinte (les votes gardent /64)
 
-/** Efface les parties commencées il y a plus de CONSERVATION_MOIS mois. */
+/** Efface les parties commencées il y a plus de CONSERVATION_SESSIONS_JOURS jours. */
 async function effacerAnciennes(env, format) {
-  const limite = new Date();
-  limite.setUTCMonth(limite.getUTCMonth() - CONSERVATION_MOIS);
+  const limite = Date.now() - CONSERVATION_SESSIONS_JOURS * 86400000;
   try {
-    await env.DB.prepare('DELETE FROM sessions WHERE debut < ?').bind(valeurDebut(format, limite.getTime())).run();
+    await env.DB.prepare('DELETE FROM sessions WHERE debut < ?').bind(valeurDebut(format, limite)).run();
   } catch (e) {
     console.error('Effacement des anciennes sessions impossible :', e);
   }
 }
 
 const SANS_CONTENU = { status: 204, headers: { 'Cache-Control': 'no-store' } };
+
+// Statistiques de jeu envoyées par le lanceur ; null si absentes (ancien lanceur), false si invalides.
+function lireStats(corps) {
+  const { visitorId, startedAt, completed, level, replay } = corps;
+  if (visitorId === undefined) return null;
+  if (typeof visitorId !== 'string' || !UUID.test(visitorId)) return false;
+  if (!Number.isSafeInteger(startedAt) || startedAt <= 0) return false;
+  if (level != null && (typeof level !== 'number' || !Number.isFinite(level))) return false;
+  return {
+    visitor_id: visitorId,
+    started_at: startedAt,
+    game_completed: completed === true ? 1 : 0,
+    max_level: level == null ? null : Math.max(0, Math.min(NIVEAU_MAX, Math.round(level))),
+    is_replay: replay === true ? 1 : 0,
+  };
+}
 
 export async function onRequestPost({ request, env, waitUntil }) {
   const adresse = new URL(request.url);
@@ -92,6 +120,10 @@ export async function onRequestPost({ request, env, waitUntil }) {
   if (erreur != null && typeof erreur !== 'string') {
     return json({ erreur: 'Erreur JavaScript invalide.' }, 400);
   }
+  const stats = lireStats(corps);
+  if (stats === false) {
+    return json({ erreur: 'Statistiques invalides.' }, 400);
+  }
   if (!env.DB) {
     console.error('La base DB n\'est pas configurée.');
     return json({ erreur: 'Suivi indisponible pour le moment.' }, 503);
@@ -105,17 +137,19 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const agent = request.headers.get('User-Agent') || '';
   const appareil = /Mobi|Android|iPhone|iPad|iPod/i.test(agent) ? 'mobile' : 'desktop';
   const visiteur = await empreinteVisiteur(request, env, BITS_V6);
+  const dureeGardee = Math.min(duree, DUREE_PLAFOND);
 
   try {
     const format = await lireFormatSessions(env);
     const valeurs = {
       jeu_id: jeuId,
-      debut: valeurDebut(format, Date.now() - duree * 1000),
-      duree_secondes: duree,
+      debut: valeurDebut(format, Date.now() - dureeGardee * 1000),
+      duree_secondes: dureeGardee,
       pays,
       appareil,
       erreur_js: erreur ? erreur.slice(0, ERREUR_MAX) : null,
       visiteur,
+      ...(format.stats && stats ? stats : {}),
     };
     if (format.idAFournir) valeurs.id = crypto.randomUUID();
     const colonnes = Object.keys(valeurs);

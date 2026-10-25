@@ -316,6 +316,133 @@
 
     .blocage code { font-size: 13px; }
     .blocage-infos { flex: 1 1 220px; color: var(--craie-douce); }
+
+    /* Onglet « Stats » : la page s'élargit pour le tableau des jeux. */
+    .idees.idees-large { max-width: 1100px; }
+    .idees-large .onglets, .idees-large .marque { max-width: 560px; }
+
+    .onglets { flex-wrap: wrap; }
+    .onglets button { flex: 1 1 120px; }
+
+    .stats-barre {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 8px;
+    }
+
+    .stats-periodes { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .stats-periodes button {
+      min-height: 44px;
+      padding: 8px 16px;
+      border: 1.5px solid var(--orbite);
+      border-radius: 999px;
+      background: var(--nuit);
+      color: var(--craie);
+      font: inherit;
+      font-size: 15px;
+      cursor: pointer;
+    }
+
+    .stats-periodes button[aria-pressed="true"] {
+      border-color: var(--lavande);
+      background: var(--surface-choisie);
+      font-weight: 600;
+    }
+
+    .stats-periodes button:focus-visible,
+    .stats-tableau th button:focus-visible,
+    .stats-courbe svg:focus-visible {
+      outline: 2px solid var(--lavande);
+      outline-offset: 2px;
+    }
+
+    .stats-tuiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin: 0 0 18px;
+    }
+
+    .stats-tuile {
+      padding: 14px;
+      border: 1px solid var(--trait);
+      border-radius: var(--r-plaque);
+      background: var(--surface);
+    }
+
+    .stats-tuile h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--craie-douce); }
+    .stats-tuile .valeur { margin: 0; font-size: 26px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+    .stats-tuile .evolution { margin: 6px 0 0; font-size: 13px; color: var(--craie-douce); font-variant-numeric: tabular-nums; }
+
+    .stats-courbe {
+      position: relative;
+      margin: 0 0 18px;
+      padding: 14px 14px 8px;
+      border: 1px solid var(--trait);
+      border-radius: var(--r-plaque);
+      background: var(--surface);
+    }
+
+    .stats-courbe figcaption { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+    .stats-courbe svg { display: block; width: 100%; height: auto; overflow: visible; }
+    .stats-courbe .grille { stroke: var(--trait); stroke-width: 1; }
+    .stats-courbe .axe { fill: var(--craie-douce); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .stats-courbe .ligne { fill: none; stroke: var(--lavande); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+    .stats-courbe .repere { stroke: var(--craie-douce); stroke-width: 1; }
+    .stats-courbe .point { fill: var(--lavande); stroke: var(--surface); stroke-width: 2; }
+
+    .stats-bulle {
+      position: absolute;
+      z-index: 2;
+      padding: 6px 10px;
+      border: 1px solid var(--orbite);
+      border-radius: 10px;
+      background: var(--nuit);
+      color: var(--craie);
+      font-size: 13px;
+      white-space: nowrap;
+      pointer-events: none;
+      transform: translate(-50%, calc(-100% - 10px));
+    }
+
+    .stats-bulle strong { font-variant-numeric: tabular-nums; }
+
+    /* Tableau : défile en largeur sur téléphone, la page ne défile jamais. */
+    .stats-tableau-cadre {
+      overflow-x: auto;
+      margin: 0 0 14px;
+      border: 1px solid var(--trait);
+      border-radius: var(--r-plaque);
+      background: var(--surface);
+    }
+
+    .stats-tableau { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+    .stats-tableau th, .stats-tableau td { padding: 6px 10px; border-bottom: 1px solid var(--trait); text-align: right; white-space: nowrap; }
+    .stats-tableau th:first-child, .stats-tableau td:first-child { text-align: left; white-space: normal; min-width: 160px; }
+    .stats-tableau tbody tr:last-child td { border-bottom: 0; }
+    .stats-tableau td.inactif { color: var(--craie-faible); }
+
+    .stats-tableau th { padding: 0; font-weight: 600; color: var(--craie-douce); }
+
+    .stats-tableau th button {
+      width: 100%;
+      min-height: 44px;
+      padding: 6px 10px;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-align: inherit;
+      cursor: pointer;
+    }
+
+    .stats-tableau th[aria-sort] button { color: var(--craie); }
+    .stats-tableau th[aria-sort="ascending"] button::after { content: " ▲"; }
+    .stats-tableau th[aria-sort="descending"] button::after { content: " ▼"; }
   </style>
 </head>
 <body>
@@ -354,11 +481,12 @@
       <span id="entete-titre">Nouvelle idée de jeu<small>Elle sera fabriquée en priorité par la boucle de nuit.</small></span>
     </h1>
 
-    <!-- Liens directs vers les autres onglets : /idees/#demande, /idees/#publiques -->
+    <!-- Liens directs vers les autres onglets : /idees/#demande, /idees/#publiques, /idees/#stats -->
     <div class="onglets" role="tablist" aria-label="Que veux-tu faire ?">
       <button type="button" role="tab" id="onglet-idee" aria-controls="formulaire" aria-selected="true">Nouvelle idée</button>
       <button type="button" role="tab" id="onglet-demande" aria-controls="formulaire-demande" aria-selected="false" tabindex="-1">Modifier un jeu</button>
       <button type="button" role="tab" id="onglet-publiques" aria-controls="panneau-publiques" aria-selected="false" tabindex="-1">Demandes publiques</button>
+      <button type="button" role="tab" id="onglet-stats" aria-controls="panneau-stats" aria-selected="false" tabindex="-1">Stats</button>
     </div>
 
     <form class="idees-carte" id="formulaire" role="tabpanel" aria-labelledby="onglet-idee" novalidate>
@@ -436,6 +564,35 @@
         <p class="idees-note">Empreintes d'adresses IP (jamais l'adresse elle-même) : 3 abus en 24 h (piège à robots, anti-robot refusé, insulte ou spam refusés par l'IA) bloquent 7 jours ; un abus après un blocage bannit définitivement.</p>
         <div id="blocages-liste"></div>
       </div>
+    </section>
+
+    <!-- Statistiques propres aux jeux (ce que Google Analytics ne mesure pas) :
+         POST { type: "stats", periode } vers /api/idees (functions/_stats.js).
+         24 h : parties brutes ; 7 et 30 jours : statistiques calculées chaque jour. -->
+    <section id="panneau-stats" role="tabpanel" aria-labelledby="onglet-stats" hidden>
+      <div class="stats-barre">
+        <div class="stats-periodes" role="group" aria-label="Période">
+          <button type="button" data-periode="24h" aria-pressed="false">24 heures</button>
+          <button type="button" data-periode="7j" aria-pressed="true">7 jours</button>
+          <button type="button" data-periode="30j" aria-pressed="false">30 jours</button>
+        </div>
+        <button type="button" class="bouton-second" id="stats-actualiser">Actualiser</button>
+      </div>
+      <p class="idees-note" id="stats-resume">Chargement…</p>
+      <p class="message" id="stats-message" role="status" aria-live="polite"></p>
+      <div class="stats-tuiles" id="stats-tuiles"></div>
+      <figure class="stats-courbe" id="stats-courbe-cadre">
+        <figcaption id="stats-courbe-titre">Lancements par jour</figcaption>
+        <div id="stats-courbe"></div>
+      </figure>
+      <div class="stats-tableau-cadre">
+        <table class="stats-tableau" id="stats-tableau">
+          <caption class="sr-only">Statistiques par jeu (cliquer sur un titre de colonne pour trier)</caption>
+          <thead><tr></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="idees-note">Lancement : une ouverture du jeu (un retour sur la page moins de 30 min après compte dans la même session). Durée médiane : la moitié des sessions dure moins. Abandon rapide : session de moins de 10 s (moins de 2 s : jamais comptée). Relance : même jeu relancé sur le même appareil moins de 30 min après. Terminées : le jeu a signalé au moins une victoire (niveau ou partie gagnés). 👍 / lancements : pouces en l'air donnés pendant la période, rapportés aux lancements. Sur 7 et 30 jours, jours UTC complets jusqu'à la veille ; la durée médiane est estimée à partir des médianes de chaque jour. Évolution : par rapport à la période précédente de même durée ; en points pour les taux.</p>
     </section>
   </main>
 
@@ -564,6 +721,8 @@
         titre: 'Modifier un jeu', sous: "Demande traitée aussitôt par l'IA, puis vérifiée." },
       publiques: { bouton: document.getElementById('onglet-publiques'), panneau: document.getElementById('panneau-publiques'),
         titre: 'Demandes publiques', sous: "Propositions et signalements des visiteurs, déjà validés par l'IA." },
+      stats: { bouton: document.getElementById('onglet-stats'), panneau: document.getElementById('panneau-stats'),
+        titre: 'Stats des jeux', sous: 'Lancements, durée, abandons, relances et parties terminées.' },
     };
     const NOMS_ONGLETS = Object.keys(onglets);
     const enteteTitre = document.getElementById('entete-titre');
@@ -584,7 +743,9 @@
       document.title = o.titre;
       if (focus) o.bouton.focus();
       history.replaceState(null, '', nom === 'idee' ? location.pathname : `#${nom}`);
+      document.querySelector('main.idees').classList.toggle('idees-large', nom === 'stats');
       if (nom === 'publiques' && !publiquesChargees) chargerPubliques();
+      if (nom === 'stats' && !statsChargees) chargerStats();
     }
     for (const nom of NOMS_ONGLETS) onglets[nom].bouton.addEventListener('click', () => ouvrirOnglet(nom));
     // Flèches gauche / droite entre les onglets (comportement attendu d'un role="tablist").
@@ -612,12 +773,14 @@
       demandeMessage.className = `message ${type}`;
     }
 
-    // Liste des jeux : le catalogue publié (titres français), par ordre alphabétique.
+    // Catalogue publié (titres français) : liste des jeux de la demande et de l'onglet « Stats ».
+    const catalogue = fetch('/catalog.json', { cache: 'no-cache' }).then((r) => r.json()).then((c) => c.games || []);
+
+    // Liste des jeux de la demande, par ordre alphabétique.
     async function chargerJeux() {
       const choixVide = demandeJeu.options[0];
       try {
-        const reponse = await fetch('/catalog.json', { cache: 'no-cache' });
-        const jeux = (await reponse.json()).games || [];
+        const jeux = [...await catalogue];
         jeux.sort((a, b) => a.title.localeCompare(b.title, 'fr'));
         for (const j of jeux) demandeJeu.append(new Option(j.title, j.id));
         choixVide.textContent = 'Choisir un jeu…';
@@ -905,8 +1068,276 @@
     }
     publiques.actualiser.addEventListener('click', chargerPubliques);
 
+    // --- Stats des jeux ------------------------------------------------------------
+    // POST { type: "stats", periode: "24h" | "7j" | "30j" } vers /api/idees.
+    // Le serveur renvoie des compteurs ; les taux et les évolutions sont calculés ici.
+    const stats = {
+      resume: document.getElementById('stats-resume'),
+      message: document.getElementById('stats-message'),
+      tuiles: document.getElementById('stats-tuiles'),
+      courbe: document.getElementById('stats-courbe'),
+      courbeTitre: document.getElementById('stats-courbe-titre'),
+      tableau: document.getElementById('stats-tableau'),
+      actualiser: document.getElementById('stats-actualiser'),
+      periodes: [...document.querySelectorAll('.stats-periodes button')],
+    };
+    let statsChargees = false;
+    let periodeStats = '7j';
+    let donneesStats = null;
+    let triStats = { cle: 'launches', sens: -1 };
+    const PERIODES_PRECEDENTES = { '24h': 'les 24 heures précédentes', '7j': 'les 7 jours précédents', '30j': 'les 30 jours précédents' };
+
+    const nombre = (n) => (n == null ? '—' : Math.round(n).toLocaleString('fr-FR'));
+    const taux = (n, total) => (total > 0 ? n / total : null);
+    const pourcent = (t) => (t == null ? '—' : `${(t * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`);
+
+    function duree(s) {
+      if (s == null) return '—';
+      s = Math.round(s);
+      if (s < 60) return `${s} s`;
+      if (s < 3600) return `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')}`;
+      return `${Math.floor(s / 3600)} h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`;
+    }
+
+    // Évolution d'un nombre (en %) ou d'un taux (en points), par rapport à la période précédente.
+    function evolution(actuel, precedent, enPoints) {
+      if (actuel == null || precedent == null) return '';
+      if (enPoints) {
+        const d = (actuel - precedent) * 100;
+        if (Math.abs(d) < 0.05) return '= stable';
+        return `${d > 0 ? '▲ +' : '▼ −'}${Math.abs(d).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} pts`;
+      }
+      if (precedent === 0) return actuel > 0 ? '▲ nouveau' : '= stable';
+      const d = Math.round(((actuel - precedent) / precedent) * 100);
+      if (d === 0) return '= stable';
+      return `${d > 0 ? '▲ +' : '▼ −'}${Math.abs(d)} %`;
+    }
+
+    // Indicateurs d'un ensemble de compteurs (global ou un jeu).
+    const indicateurs = (c) => c && {
+      launches: c.launches,
+      median_duration: c.median_duration,
+      quick: taux(c.quick_quit_count, c.launches),
+      replay: taux(c.replay_count, c.launches),
+      completed: taux(c.completed_count, c.launches),
+      up: taux(c.thumbs_up, c.launches),
+    };
+
+    function afficherTuiles(d) {
+      const a = indicateurs(d.global);
+      const p = indicateurs(d.precedent);
+      const comparaison = d.precedent ? `par rapport à ${PERIODES_PRECEDENTES[d.periode]}` : 'pas de période précédente comparable';
+      const liste = [
+        ['Lancements', nombre(a.launches), p && evolution(a.launches, p.launches)],
+        ['Durée médiane', duree(a.median_duration), p && evolution(a.median_duration, p.median_duration)],
+        ['Abandon rapide (< 10 s)', pourcent(a.quick), p && evolution(a.quick, p.quick, true)],
+        ['Relance (< 30 min)', pourcent(a.replay), p && evolution(a.replay, p.replay, true)],
+        ['Parties terminées', pourcent(a.completed), p && evolution(a.completed, p.completed, true)],
+      ];
+      stats.tuiles.replaceChildren(...liste.map(([titre, valeur, evo]) => {
+        const tuile = element('div', 'stats-tuile');
+        tuile.append(element('h3', '', titre), element('p', 'valeur', valeur),
+          element('p', 'evolution', evo ? `${evo} ${comparaison}` : (p ? `— ${comparaison}` : comparaison)));
+        return tuile;
+      }));
+    }
+
+    // Courbe des lancements (SVG maison, une seule série) : par heure sur 24 h, par jour sinon.
+    // Jour pas encore calculé : trou dans la ligne. Survol, doigt ou flèches du clavier : valeur du point.
+    function afficherCourbe(d) {
+      const points = d.courbe || [];
+      const parHeure = d.periode === '24h';
+      stats.courbeTitre.textContent = parHeure ? 'Lancements par heure (24 dernières heures)' : 'Lancements par jour';
+      // Dessinée à la largeur réelle du cadre : le texte garde sa taille sur téléphone comme sur ordinateur.
+      const L = Math.max(280, Math.round(stats.courbe.clientWidth) || 640), H = 200, g = 36, dr = 8, h = 12, b = 26;
+      const max = Math.max(1, ...points.map((p) => p.launches || 0));
+      const pas = Math.pow(10, Math.floor(Math.log10(max)));
+      const haut = Math.ceil(max / pas) * pas;
+      const x = (i) => g + (points.length > 1 ? (i * (L - g - dr)) / (points.length - 1) : (L - g - dr) / 2);
+      const y = (v) => H - b - (v / haut) * (H - b - h);
+      const ns = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(ns, 'svg');
+      svg.setAttribute('viewBox', `0 0 ${L} ${H}`);
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('tabindex', '0');
+      svg.setAttribute('aria-label', `${stats.courbeTitre.textContent} : ${points.map((p) => `${etiquette(p.x, parHeure)} ${p.launches ?? 'non calculé'}`).join(', ')}`);
+      const ajouter = (nom, attributs, texte) => {
+        const e = document.createElementNS(ns, nom);
+        for (const [k, v] of Object.entries(attributs)) e.setAttribute(k, v);
+        if (texte !== undefined) e.textContent = texte;
+        svg.append(e);
+        return e;
+      };
+      for (const v of [0, haut / 2, haut]) {
+        ajouter('line', { class: 'grille', x1: g, x2: L - dr, y1: y(v), y2: y(v) });
+        ajouter('text', { class: 'axe', x: g - 6, y: y(v) + 4, 'text-anchor': 'end' }, nombre(v));
+      }
+      const reperes = [...new Set([0, Math.floor((points.length - 1) / 2), points.length - 1])].filter((i) => i >= 0);
+      for (const i of reperes) {
+        ajouter('text', { class: 'axe', x: x(i), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle' }, etiquette(points[i].x, parHeure));
+      }
+      let trace = '';
+      points.forEach((p, i) => {
+        if (p.launches == null) return;
+        const debut = i === 0 || points[i - 1].launches == null;
+        trace += `${debut ? 'M' : 'L'}${x(i).toFixed(1)},${y(p.launches).toFixed(1)}`;
+      });
+      ajouter('path', { class: 'ligne', d: trace });
+      const repere = ajouter('line', { class: 'repere', y1: h, y2: H - b, visibility: 'hidden' });
+      const point = ajouter('circle', { class: 'point', r: 5, visibility: 'hidden' });
+      const bulle = element('div', 'stats-bulle');
+      bulle.hidden = true;
+      let actif = -1;
+      const montrer = (i) => {
+        actif = Math.max(0, Math.min(points.length - 1, i));
+        const p = points[actif];
+        repere.setAttribute('x1', x(actif)); repere.setAttribute('x2', x(actif));
+        repere.setAttribute('visibility', 'visible');
+        if (p.launches != null) {
+          point.setAttribute('cx', x(actif)); point.setAttribute('cy', y(p.launches));
+          point.setAttribute('visibility', 'visible');
+        } else point.setAttribute('visibility', 'hidden');
+        const fort = element('strong', '', p.launches == null ? 'non calculé' : `${nombre(p.launches)} lancement${p.launches > 1 ? 's' : ''}`);
+        bulle.replaceChildren(`${etiquette(p.x, parHeure)} · `, fort);
+        const boite = svg.getBoundingClientRect();
+        const cadre = stats.courbe.getBoundingClientRect();
+        const px = (x(actif) / L) * boite.width + boite.left - cadre.left;
+        const py = (y(p.launches || 0) / H) * boite.height + boite.top - cadre.top;
+        bulle.style.left = `${Math.max(60, Math.min(cadre.width - 60, px)) + 14}px`;
+        bulle.style.top = `${py + 14}px`;
+        bulle.hidden = false;
+      };
+      const cacher = () => {
+        actif = -1;
+        repere.setAttribute('visibility', 'hidden');
+        point.setAttribute('visibility', 'hidden');
+        bulle.hidden = true;
+      };
+      svg.addEventListener('pointermove', (e) => {
+        const boite = svg.getBoundingClientRect();
+        const vx = ((e.clientX - boite.left) / boite.width) * L;
+        montrer(points.length > 1 ? Math.round(((vx - g) / (L - g - dr)) * (points.length - 1)) : 0);
+      });
+      svg.addEventListener('pointerleave', cacher);
+      svg.addEventListener('blur', cacher);
+      svg.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        montrer(actif < 0 ? points.length - 1 : actif + (e.key === 'ArrowRight' ? 1 : -1));
+      });
+      stats.courbe.replaceChildren(svg, bulle);
+    }
+
+    function etiquette(valeur, parHeure) {
+      const date = new Date(parHeure ? valeur : `${valeur}T12:00:00Z`);
+      return parHeure
+        ? date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        : date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+    }
+
+    // Tableau par jeu : tous les jeux du catalogue (un jeu jamais lancé reste visible), triable.
+    const COLONNES_STATS = [
+      { cle: 'titre', nom: 'Jeu', texte: (l) => l.titre },
+      { cle: 'launches', nom: 'Lancements', texte: (l) => nombre(l.launches), titre: (l) => (l.precedent == null ? '' : `Période précédente : ${nombre(l.precedent)}`) },
+      { cle: 'median_duration', nom: 'Durée médiane', texte: (l) => duree(l.median_duration) },
+      { cle: 'quick', nom: 'Abandon rapide', texte: (l) => pourcent(l.quick) },
+      { cle: 'replay', nom: 'Relance', texte: (l) => pourcent(l.replay) },
+      { cle: 'completed', nom: 'Terminées', texte: (l) => pourcent(l.completed) },
+      { cle: 'up', nom: '👍 / lancements', texte: (l) => pourcent(l.up), titre: (l) => `${nombre(l.thumbs_up)} 👍 · ${nombre(l.thumbs_down)} 👎` },
+    ];
+
+    async function lignesStats(d) {
+      let jeux = [];
+      try { jeux = await catalogue; } catch { /* catalogue illisible : identifiants seuls */ }
+      const titres = new Map(jeux.map((j) => [j.id, j.title]));
+      const ids = new Set([...titres.keys(), ...Object.keys(d.jeux || {})]);
+      return [...ids].map((id) => {
+        const c = d.jeux?.[id] || { launches: 0, quick_quit_count: 0, replay_count: 0, completed_count: 0, thumbs_up: 0, thumbs_down: 0, median_duration: null };
+        return { id, titre: titres.get(id) || id, ...indicateurs(c), thumbs_up: c.thumbs_up, thumbs_down: c.thumbs_down, precedent: d.precedent ? c.precedent_launches ?? 0 : null };
+      });
+    }
+
+    function afficherTableau(lignes) {
+      const { cle, sens } = triStats;
+      lignes.sort((a, b) => {
+        if (cle === 'titre') return sens * a.titre.localeCompare(b.titre, 'fr');
+        // Valeur absente (jeu jamais lancé) : toujours en bas, quel que soit le sens.
+        if (a[cle] == null || b[cle] == null) return (a[cle] == null) - (b[cle] == null) || a.titre.localeCompare(b.titre, 'fr');
+        return sens * (a[cle] - b[cle]) || a.titre.localeCompare(b.titre, 'fr');
+      });
+      const tete = stats.tableau.tHead.rows[0];
+      tete.replaceChildren(...COLONNES_STATS.map((c) => {
+        const th = element('th');
+        th.scope = 'col';
+        if (c.cle === cle) th.setAttribute('aria-sort', sens > 0 ? 'ascending' : 'descending');
+        const bouton = element('button', '', c.nom);
+        bouton.type = 'button';
+        bouton.addEventListener('click', () => {
+          triStats = { cle: c.cle, sens: c.cle === cle ? -sens : (c.cle === 'titre' ? 1 : -1) };
+          afficherTableau(lignes);
+          stats.tableau.querySelector(`th[aria-sort] button`)?.focus();
+        });
+        th.append(bouton);
+        return th;
+      }));
+      stats.tableau.tBodies[0].replaceChildren(...lignes.map((l) => {
+        const tr = element('tr');
+        for (const c of COLONNES_STATS) {
+          const td = element(c.cle === 'titre' ? 'th' : 'td', !l.launches && c.cle !== 'titre' ? 'inactif' : '', c.texte(l));
+          if (c.cle === 'titre') td.scope = 'row';
+          const t = c.titre?.(l);
+          if (t) td.title = t;
+          tr.append(td);
+        }
+        return tr;
+      }));
+    }
+
+    async function afficherStats(d) {
+      const dateCourte = (v) => (d.periode === '24h' ? dateLisible(v) : new Date(`${v}T12:00:00Z`).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }));
+      let resume = d.periode === '24h' ? `Du ${dateCourte(d.du)} au ${dateCourte(d.au)}.` : `Du ${dateCourte(d.du)} au ${dateCourte(d.au)} (jours UTC complets).`;
+      if (d.jours && d.jours.calcules < d.jours.attendus) resume += ` Données partielles : ${d.jours.calcules} jour(s) calculé(s) sur ${d.jours.attendus} (statistiques commencées récemment).`;
+      stats.resume.textContent = resume;
+      afficherTuiles(d);
+      afficherCourbe(d);
+      afficherTableau(await lignesStats(d));
+    }
+
+    async function chargerStats() {
+      statsChargees = true;
+      stats.actualiser.disabled = true;
+      stats.message.textContent = '';
+      stats.message.className = 'message';
+      stats.resume.textContent = 'Chargement…';
+      try {
+        donneesStats = await appelApi({ type: 'stats', periode: periodeStats });
+        await afficherStats(donneesStats);
+      } catch (erreur) {
+        stats.resume.textContent = '';
+        stats.message.textContent = erreur.message;
+        stats.message.className = 'message erreur';
+      } finally {
+        stats.actualiser.disabled = false;
+      }
+    }
+
+    for (const b of stats.periodes) {
+      b.addEventListener('click', () => {
+        periodeStats = b.dataset.periode;
+        for (const autre of stats.periodes) autre.setAttribute('aria-pressed', String(autre === b));
+        chargerStats();
+      });
+    }
+    stats.actualiser.addEventListener('click', chargerStats);
+    let minuteurCourbe;
+    addEventListener('resize', () => {
+      clearTimeout(minuteurCourbe);
+      minuteurCourbe = setTimeout(() => { if (donneesStats && !onglets.stats.panneau.hidden) afficherCourbe(donneesStats); }, 150);
+    });
+
     if (location.hash === '#demande') ouvrirOnglet('demande');
     else if (location.hash === '#publiques') ouvrirOnglet('publiques');
+    else if (location.hash === '#stats') ouvrirOnglet('stats');
   </script>
 </body>
 </html>

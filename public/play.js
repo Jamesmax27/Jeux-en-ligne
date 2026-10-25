@@ -9,8 +9,9 @@
 // - le bouton de langue du jeu envoie un message « jel-langue » : le lanceur
 //   enregistre le choix (partagé avec le catalogue) et relance le jeu.
 // Et la sauvegarde des jeux (save.js) : gardée par le lanceur sous « save_<id> ».
-// Et le suivi des parties (suivi.js) : temps de jeu et erreurs JavaScript,
-// envoyés à /api/session pour les « Tendances » de l'accueil.
+// Et le suivi des parties (suivi.js) : temps de jeu, erreurs JavaScript et fins
+// de partie (window.FMG.reportEnd dans le jeu), envoyés à /api/session pour les
+// « Tendances » de l'accueil et l'onglet « Stats » de /idees.
 // Et la mesure d'audience (mesure.js, Google Analytics, avec accord seulement) :
 // évènements « game_start » (lancement du jeu) et « vote ».
 // Et le bouton « Signaler » : formulaire public de demandes (/proposer/), avec ce jeu choisi.
@@ -18,7 +19,7 @@
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
-import { SCRIPT_ERREURS, suivreJeu, noterErreur } from './suivi.js';
+import { SCRIPT_SUIVI, suivreJeu, noterErreur, noterFin } from './suivi.js';
 import { urlJeu, urlAccueil, urlProposer } from './chemins.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
@@ -198,13 +199,14 @@ function enregistrerSauvegarde(cle, valeur) {
 
 // Ajoute la règle de sécurité avant tout le code du jeu (juste après <!doctype>,
 // pour ne pas changer son mode d'affichage), puis la langue choisie sur le site,
-// la sauvegarde du jeu et le script qui signale les erreurs du jeu (suivi.js).
+// la sauvegarde du jeu et le script commun de suivi (suivi.js : erreurs du jeu
+// et window.FMG.reportEnd).
 function proteger(html) {
   const debut = /^﻿?(?:\s|<!--[\s\S]*?-->)*(?:<!doctype[^>]*>)?/i.exec(html)[0];
   // « < » échappé : une sauvegarde ne peut pas fermer la balise <script>.
   const sauvegardes = JSON.stringify(lireSauvegarde()).replace(/</g, '\\u003c');
   const reglages = `<script>window.JEL_LANG=${JSON.stringify(getLang())};window.JEL_SAUVEGARDES=${sauvegardes};</script>`;
-  return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${reglages}${SCRIPT_ERREURS}${html.slice(debut.length)}`;
+  return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${reglages}${SCRIPT_SUIVI}${html.slice(debut.length)}`;
 }
 
 function afficherJeu() {
@@ -231,13 +233,18 @@ function garderPourHorsLigne(jeu) {
 
 // Messages du jeu :
 // - « jel-langue » (bouton de langue) : on enregistre le choix et on relance le jeu ;
-// - « jel-erreur » (SCRIPT_ERREURS) : erreur JavaScript, notée pour le suivi ;
+// - « jel-erreur » (SCRIPT_SUIVI) : erreur JavaScript, notée pour le suivi ;
+// - « jel-fin » (SCRIPT_SUIVI, FMG.reportEnd) : victoire ou défaite, avec le niveau ;
 // - « jel-sauvegarde » (save.js) : progression du jeu à garder sur l'appareil.
 addEventListener('message', (evenement) => {
   if (evenement.source !== el.cadre.contentWindow) return;
   const donnees = evenement.data;
   if (donnees?.type === 'jel-erreur' && typeof donnees.message === 'string') {
     noterErreur(donnees.message);
+    return;
+  }
+  if (donnees?.type === 'jel-fin') {
+    noterFin({ completed: donnees.completed === true, level: donnees.level });
     return;
   }
   if (donnees?.type === 'jel-sauvegarde' && typeof donnees.cle === 'string') {

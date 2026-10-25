@@ -22,7 +22,10 @@
 #                              (rapide, sans navigateur) ;
 #   - fonctions Cloudflare,  → tests des demandes publiques et des votes
 #     formulaire public ou     (scripts/tester-demandes.mjs : rapide, sans
-#     modération IA            navigateur ni réseau).
+#     modération IA            navigateur ni réseau) ;
+#   - fonctions Cloudflare,  → tests des statistiques de jeu (scripts/tester-stats.mjs :
+#     suivi des parties        collecte, calcul par jour, onglet « Stats » ; avec le
+#     (suivi.js, play.js)      lanceur dans le navigateur si suivi.js ou play.js changent).
 # Le reste (documentation, autres fichiers du site…) ne déclenche rien.
 #
 # Navigateur : le Google Chrome déjà installé sur les machines de GitHub
@@ -45,6 +48,8 @@ on:
       - "public/langue.js"
       - "public/play.html"
       - "public/play.js"
+      - "public/suivi.js"
+      - "public/idees/**"
       - "public/sw.js"
       - "public/_headers"
       - "public/consentement.js"
@@ -73,7 +78,9 @@ on:
       - "scripts/verifier-seo.mjs"
       - "scripts/moderation.mjs"
       - "scripts/tester-demandes.mjs"
+      - "scripts/tester-stats.mjs"
       - "schema.sql"
+      - "migrations/**"
   workflow_dispatch:
 
 jobs:
@@ -121,7 +128,13 @@ jobs:
           # Textes, taxonomie, gabarits (textes des catégories compris), générateur
           # des pages et pages du site : le site est testé avec un seul jeu.
           site=0
-          if printf '%s\n' "$fichiers" | grep -Eq '^(public/i18n/|gabarits/|public/(taxonomie|chemins|app|langue|play|sw|consentement|mesure|pub|votes|turnstile|proposer|demandes-regles)\.js$|public/play\.html$|public/_headers$|scripts/(build-catalog|pages-seo)\.mjs$)'; then site=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(public/i18n/|gabarits/|public/(taxonomie|chemins|app|langue|play|suivi|sw|consentement|mesure|pub|votes|turnstile|proposer|demandes-regles)\.js$|public/play\.html$|public/_headers$|scripts/(build-catalog|pages-seo)\.mjs$)'; then site=1; fi
+          # Statistiques de jeu : fonctions Cloudflare, migration, tests (sans navigateur) ;
+          # suivi des parties du lanceur : aussi dans le navigateur.
+          stats=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then stats=2; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/idees/|scripts/tester-stats\.mjs$)'; then stats=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(public/(suivi|play|consentement)\.js$|scripts/tester-stats\.mjs$)'; then stats=2; fi
           # Fonctions Cloudflare, formulaire public et modération : tests des demandes (sans navigateur).
           demandes=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then demandes=1; fi
@@ -132,7 +145,7 @@ jobs:
           if [ "$tous" = 1 ] || [ "$site" = 1 ]; then seo=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^scripts/(regles-seo|verifier-seo)\.mjs$'; then seo=1; fi
           navigateur=0
-          if [ -n "$ids" ] || [ "$tous" = 1 ] || [ "$site" = 1 ]; then navigateur=1; fi
+          if [ -n "$ids" ] || [ "$tous" = 1 ] || [ "$site" = 1 ] || [ "$stats" = 2 ]; then navigateur=1; fi
           {
             echo "ids=$ids"
             echo "tous=$tous"
@@ -140,8 +153,9 @@ jobs:
             echo "seo=$seo"
             echo "navigateur=$navigateur"
             echo "demandes=$demandes"
+            echo "stats=$stats"
           } >> "$GITHUB_OUTPUT"
-          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes"
+          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats"
 
       - name: Préparer le navigateur de test
         if: steps.quoi.outputs.navigateur == '1'
@@ -214,6 +228,18 @@ jobs:
       - name: Contrôler les demandes publiques
         if: steps.quoi.outputs.demandes == '1'
         run: node scripts/tester-demandes.mjs
+
+      # Statistiques de jeu (sessions, calcul par jour, onglet « Stats ») : base
+      # SQLite en mémoire ; avec le lanceur dans le navigateur (window.FMG.reportEnd
+      # présent dans le jeu, un seul envoi par session) si le suivi a changé.
+      - name: Contrôler les statistiques de jeu
+        if: steps.quoi.outputs.stats != '0'
+        run: |
+          if [ "${{ steps.quoi.outputs.stats }}" = 2 ]; then
+            node scripts/tester-stats.mjs --navigateur
+          else
+            node scripts/tester-stats.mjs
+          fi
 
       # Icônes des regroupements : le bloc généré de public/style.css doit
       # correspondre aux dessins de scripts/icones/sources (sans navigateur).

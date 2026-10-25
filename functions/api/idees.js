@@ -43,6 +43,12 @@
 //   { "type": "blocages" }   → { ok, blocages: [...] } empreintes bloquées ou bannies ;
 //   { "type": "blocage", "visiteur": "<empreinte>", "action": "debloquer" | "bannir" }.
 //
+// Statistiques des jeux (onglet « Stats », même accès ; calcul : functions/_stats.js) :
+//   { "type": "stats", "periode": "24h" | "7j" | "30j" }
+//   → { ok, periode, du, au, global, precedent, jeux: { <id>: {...} }, courbe, jours, rattrapes }
+//   24 h : sessions brutes ; 7 et 30 jours : statistiques par jour (game_stats_daily).
+//   Ne demande pas GitHub, seulement la base DB.
+//
 // Réponse : { "ok": true, "numero": n } ou { "erreur": "..." }
 // ==========================================================================
 
@@ -51,6 +57,7 @@ import {
   corpsIdee, problemeClassement, listerPubliques, accepterPublique, refuserPublique,
   preparerTables, listerBlocages, debloquer, bannir,
 } from '../_demandes.js';
+import { lireStats, PERIODES } from '../_stats.js';
 
 const ETIQUETTE = 'idee-perso';
 const ETIQUETTE_DEMANDE = 'demande-ia';
@@ -167,6 +174,17 @@ export async function onRequest({ request, env }) {
     corps = await request.json();
   } catch {
     return json({ erreur: 'Requête invalide.' }, 400);
+  }
+
+  if (corps?.type === 'stats') {
+    if (!Object.hasOwn(PERIODES, corps.periode)) return json({ erreur: 'Période inconnue.' }, 400);
+    if (!env.DB) return json({ erreur: 'Base DB non configurée.' }, 503);
+    try {
+      return json({ ok: true, ...(await lireStats(env, corps.periode)) });
+    } catch (erreur) {
+      console.error('Lecture des statistiques impossible :', erreur);
+      return json({ erreur: 'Statistiques indisponibles pour le moment. Réessaie plus tard.' }, 503);
+    }
   }
 
   if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) {
