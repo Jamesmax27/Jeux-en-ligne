@@ -1,6 +1,6 @@
 ---
 name: ajouter-jeu-site
-description: Ajoute un jeu HTML à Free Micro Games (freemicrogames.com) depuis Claude Code, dans le dépôt local Jeux-en-ligne. Le jeu est mis aux règles (5 langues, sauvegarde save.js, 20 niveaux), reçoit une jaquette cover.webp sans texte et un game.json complet (genre, univers, âge, textes de référencement dans les 5 langues), passe tous les contrôles du dépôt sur la machine, puis part sur une branche jeu-manuel/<id> avec une pull request, sans jamais fusionner. À utiliser dès que l'utilisateur dit « ajoute ce jeu au site », « publie ce jeu », « pousse ce jeu sur mon site » ou équivalent dans Claude Code. Dans Claude Code, cette version passe avant la compétence claude.ai du même nom (anthropic-skills:ajouter-jeu-site).
+description: Ajoute un jeu HTML à Free Micro Games (freemicrogames.com) depuis Claude Code, dans le dépôt local Jeux-en-ligne. Le jeu est mis aux règles (5 langues, sauvegarde save.js, 20 niveaux), reçoit une jaquette cover.webp sans texte et un game.json complet (genre, univers, âge, textes de référencement dans les 5 langues), passe tous les contrôles du dépôt sur la machine, puis part sur une branche jeu-manuel/<id> avec une pull request, que Claude fusionne une fois tous les contrôles verts (CLAUDE.md, section 12). À utiliser dès que l'utilisateur dit « ajoute ce jeu au site », « publie ce jeu », « pousse ce jeu sur mon site » ou équivalent dans Claude Code. Dans Claude Code, cette version passe avant la compétence claude.ai du même nom (anthropic-skills:ajouter-jeu-site).
 ---
 
 # Ajouter un jeu à Free Micro Games (Claude Code, dépôt local)
@@ -188,11 +188,11 @@ Tout doit être bon. Puis `git status` : seuls `games/<id>/index.html`, `games/<
    - … (points incertains)
 
    ### Avant la fusion
-   Le contrôle **« Contrôle des jeux »** (`validate.yml`) doit être **vert**. La fusion est faite à la main par le propriétaire.
+   Le contrôle **« Contrôle des jeux »** (`validate.yml`) doit être **vert**. Claude fusionne ensuite la pull request (CLAUDE.md, section 12).
    La page du jeu dans les 5 langues, les pages de catégories, les jeux similaires et le sitemap sont générés au build : cette pull request ne touche que `games/<id>/`.
    ```
 
-4. Ne pas fusionner. Donner le lien de la pull request à l'utilisateur, lui rappeler d'attendre que « Contrôle des jeux » soit vert, puis revenir sur `main` (`git checkout main`).
+4. Donner le lien de la pull request à l'utilisateur. Suivre les contrôles avec le connecteur (`pull_request_read`, `get_check_runs`). Quand tous sont terminés et verts (« Contrôle des jeux » compris), et qu'aucune pull request de la boucle de nuit n'est ouverte, fusionner la pull request avec le connecteur (`merge_pull_request`, sans redemander : autorisation du propriétaire, CLAUDE.md section 12) et le dire à l'utilisateur. Si l'utilisateur a demandé de ne pas fusionner, s'arrêter là. Revenir ensuite sur `main` (`git checkout main`).
 
 Contrôle rouge : lire le rapport avec le connecteur, revenir sur `jeu-manuel/<id>`, corriger seulement `games/<id>/` par un nouveau commit, puis demander à l'utilisateur de cliquer « Push origin ».
 
@@ -207,7 +207,7 @@ Même méthode, sur une branche `jeu-manuel/<id>`. Ne changer ni `id` ni `added`
 ## Interdits
 
 - Créer ou modifier autre chose que `games/<id>/` (`index.html`, `cover.*`, `game.json`) : jamais `public/` (dont `catalog.json` et les pages générées), `gabarits/`, `scripts/`, les workflows, `idees.json`, `idees-archive.json`, `CLAUDE.md`, ni les autres jeux.
-- Pousser sur `main`, fusionner une pull request (même avec un contrôle vert) ou la fermer sans accord.
+- Pousser sur `main` ; fusionner une pull request dont un contrôle est rouge ou pas terminé, ou qui n'est pas celle de ce jeu ; fermer une pull request sans accord.
 - Créer un genre ou un univers, utiliser un champ `tags`.
 - Toucher aux réglages Cloudflare, aux secrets, aux clés Turnstile, au nom de domaine, aux votes ou à la base D1.
 - Mettre dans un jeu de la publicité, un traceur, un lien externe, un achat ou une collecte de données.

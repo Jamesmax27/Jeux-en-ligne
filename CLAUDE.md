@@ -375,7 +375,13 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
 ## 12. Ce que les IA ne doivent pas faire
 
 - Modifier les réglages Cloudflare, les secrets, les clés Turnstile ou le nom de domaine.
-- Pousser directement sur `main`, fusionner des pull requests autrement que par la vérification de la boucle de nuit (`boucle-de-nuit.yml`) ou des demandes de modification (`demande-modification.yml`), ou supprimer des jeux existants.
+- Pousser directement sur `main`, ou supprimer des jeux existants.
+- Fusionner des pull requests, sauf dans trois cas :
+  - la vérification de la boucle de nuit (`boucle-de-nuit.yml`) ;
+  - les demandes de modification (`demande-modification.yml`) ;
+  - Claude, dans une session de travail avec le propriétaire (Claude Code ; autorisation du propriétaire du 25 octobre 2026). Il fusionne lui-même, sans redemander, les pull requests qu'il a préparées pour la demande en cours. Conditions : tous les contrôles sont terminés et verts (« Contrôle des jeux » compris), et les pull requests liées sont fusionnées dans l'ordre. Une pull request qui touche aux jeux attend qu'aucune pull request de la boucle de nuit ne soit ouverte.
+
+  Jamais : une pull request dont un contrôle échoue ou n'est pas terminé, celle d'une autre IA ou d'une personne, ni depuis un workflow automatique. Si le propriétaire demande de ne pas fusionner, Claude ne fusionne pas.
 - Écrire dans `idees.json` ou `idees-archive.json` depuis une tâche de fabrication de jeu (réservé aux étapes b et e de la boucle et au formulaire d'idées).
 - Modifier `public/catalog.json` à la main.
 - Créer un genre ou un univers, ou en utiliser un hors des listes de `public/taxonomie.js` (jeux comme idées) : ces listes ne changent que sur décision du propriétaire.
