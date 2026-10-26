@@ -24,19 +24,31 @@ CREATE TABLE IF NOT EXISTS votes (
 --
 --   votes.visiteur : empreinte SHA-256 de l'adresse IP + IP_SALT (jamais l'IP).
 --
---   sessions (une ligne par partie, remplie par /api/session, lue par /api/tendances) :
+--   sessions (une ligne par partie, remplie par /api/session, lue par /api/tendances
+--   et par les statistiques des jeux, functions/_stats.js ; gardée 60 jours) :
 --     id             identifiant (laissé à la base s'il est entier, sinon UUID)
 --     jeu_id         id du jeu
 --     debut          début de la partie (millisecondes si colonne numérique, sinon date ISO)
---     duree_secondes durée, de 2 s à 3 h
+--     duree_secondes durée, de 2 s à 2 h
 --     pays           request.cf.country, « XX » si inconnu
 --     appareil       « mobile » ou « desktop »
 --     erreur_js      première erreur JavaScript du jeu, ou NULL
 --     visiteur       même empreinte que votes.visiteur
+--   Colonnes des statistiques (migrations/0001_statistiques-jeux.sql, ajoutées
+--   automatiquement par functions/_commun.js ; NULL ou 0 dans les anciennes lignes) :
+--     visitor_id     identifiant anonyme tiré au hasard par l'appareil (suivi.js)
+--     started_at     lancement de la session, horloge de l'appareil (ms)
+--     game_completed 1 si le jeu a signalé une victoire (FMG.reportEnd), sinon 0
+--     max_level      plus haut niveau (ou score) signalé, ou NULL
+--     is_replay      1 si le même jeu a été lancé moins de 30 min plus tôt, sinon 0
 --
---   Index à créer à la main (console D1), pour que /api/tendances ne relise que
---   7 jours au lieu de toute la table, et pour l'effacement des parties de plus
---   de 13 mois (session.js) ; il contient toutes les colonnes lues par le calcul :
+--   game_stats_daily, game_stats_days : statistiques par jeu et par jour, créées
+--   automatiquement (functions/_stats.js ; structure : migrations/0001_statistiques-jeux.sql).
+--
+--   Index à créer à la main (console D1), pour que /api/tendances et le calcul
+--   des statistiques ne relisent que les jours utiles au lieu de toute la table,
+--   et pour l'effacement des parties de plus de 60 jours ; il contient toutes les
+--   colonnes lues par les Tendances (précautions : migrations/0001_statistiques-jeux.sql) :
 --     CREATE INDEX IF NOT EXISTS sessions_debut
 --       ON sessions (debut, jeu_id, visiteur, duree_secondes, pays);
 -- --------------------------------------------------------------------------

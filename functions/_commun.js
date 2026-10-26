@@ -11,6 +11,21 @@ export function json(donnees, statut = 200, entetes = {}) {
   });
 }
 
+// --- Secret partagé ----------------------------------------------------------
+// En-tête « Authorization: Bearer <secret> » comparé au secret attendu, en
+// temps constant (le temps de réponse ne dit rien du secret). Faux si l'un des
+// deux manque.
+export async function bonSecret(request, attendu) {
+  const recu = /^Bearer\s+(.+)$/i.exec(request.headers.get('Authorization') || '')?.[1] || '';
+  if (!recu || !attendu) return false;
+  const [ea, eb] = await Promise.all([recu, attendu].map((x) => crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(x)))));
+  const va = new Uint8Array(ea);
+  const vb = new Uint8Array(eb);
+  let difference = 0;
+  for (let i = 0; i < va.length; i++) difference |= va[i] ^ vb[i];
+  return difference === 0;
+}
+
 // --- Visiteur ----------------------------------------------------------------
 // Empreinte SHA-256 de l'adresse IP + IP_SALT (secret Cloudflare) : permet de
 // compter des visiteurs différents sans jamais enregistrer l'adresse elle-même.
@@ -240,17 +255,57 @@ export async function verifierJetonAccess(jeton, env) {
 //     valeur par défaut), sinon un UUID est fourni ;
 //   - debut : en millisecondes (comme votes.created_at) si la colonne est
 //     numérique, sinon en date ISO (« 2026-10-22T08:00:00.000Z »).
+// Colonnes des statistiques de jeu (octobre 2026, migrations/0001_statistiques-jeux.sql) :
+// ajoutées ici automatiquement si elles manquent (ALTER TABLE … ADD COLUMN, qui
+// ne réécrit aucune ligne) ; les anciennes lignes prennent les valeurs par
+// défaut (NULL ou 0) et restent lues telles quelles par les Tendances. Si
+// l'ajout est impossible, les parties sont enregistrées sans ces colonnes
+// (format.stats faux).
+
+export const COLONNES_STATS = [
+  ['visitor_id', 'TEXT'],                           // identifiant anonyme tiré au hasard par l'appareil (suivi.js)
+  ['started_at', 'INTEGER'],                        // lancement de la session, horloge de l'appareil (ms)
+  ['game_completed', 'INTEGER NOT NULL DEFAULT 0'], // 1 si le jeu a signalé une victoire (FMG.reportEnd)
+  ['max_level', 'INTEGER'],                         // plus haut niveau (ou score) signalé, NULL sinon
+  ['is_replay', 'INTEGER NOT NULL DEFAULT 0'],      // 1 si le même jeu a été lancé moins de 30 min plus tôt
+];
+
+// Parties brutes gardées 60 jours (politique de confidentialité) ; les
+// statistiques par jour (game_stats_daily) sont gardées sans limite.
+export const CONSERVATION_SESSIONS_JOURS = 60;
 
 let formatSessions = null;
 
+async function ajouterColonnesStats(env, presentes) {
+  for (const [nom, type] of COLONNES_STATS) {
+    if (presentes.has(nom)) continue;
+    try {
+      await env.DB.prepare(`ALTER TABLE sessions ADD COLUMN ${nom} ${type}`).run();
+    } catch (erreur) {
+      // Une autre instance l'a peut-être ajoutée au même moment.
+      if (!/duplicate column/i.test(String(erreur?.message || erreur))) throw erreur;
+    }
+    presentes.add(nom);
+  }
+}
+
 export function lireFormatSessions(env) {
   if (!formatSessions) {
-    formatSessions = env.DB.prepare('PRAGMA table_info(sessions)').all().then(({ results }) => {
+    formatSessions = env.DB.prepare('PRAGMA table_info(sessions)').all().then(async ({ results }) => {
       const colonne = (nom) => (results || []).find((c) => c.name === nom) || {};
       const id = colonne('id');
+      const presentes = new Set((results || []).map((c) => c.name));
+      let stats = true;
+      try {
+        await ajouterColonnesStats(env, presentes);
+      } catch (erreur) {
+        console.error('Colonnes des statistiques impossibles à ajouter à la table sessions :', erreur);
+        stats = false;
+      }
       return {
         idAFournir: !!id.name && !(/INT/i.test(id.type || '') && id.pk) && id.dflt_value == null,
         debutNombre: /INT|REAL|NUM/i.test(colonne('debut').type || ''),
+        stats,
       };
     }).catch((erreur) => {
       formatSessions = null; // nouvel essai à la prochaine requête

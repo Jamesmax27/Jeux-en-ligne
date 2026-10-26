@@ -16,18 +16,8 @@
 //           { "ok": true, "deja": true } si cet abus est déjà compté.
 // ==========================================================================
 
-import { json } from '../_commun.js';
+import { json, bonSecret } from '../_commun.js';
 import { MOTIFS_IA, preparerTables, auteurIssue, abusDejaNote, noterAbus } from '../_demandes.js';
-
-// Comparaison en temps constant (le temps de réponse ne dit rien du secret).
-async function egaux(a, b) {
-  const [ea, eb] = await Promise.all([a, b].map((x) => crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(x)))));
-  const va = new Uint8Array(ea);
-  const vb = new Uint8Array(eb);
-  let difference = 0;
-  for (let i = 0; i < va.length; i++) difference |= va[i] ^ vb[i];
-  return difference === 0;
-}
 
 export async function onRequest({ request, env }) {
   if (request.method !== 'POST') return json({ erreur: 'Méthode non autorisée.' }, 405, { Allow: 'POST' });
@@ -35,9 +25,7 @@ export async function onRequest({ request, env }) {
     console.error('MODERATION_SECRET ou la base DB ne sont pas configurés.');
     return json({ erreur: 'Indisponible.' }, 503);
   }
-  const entete = request.headers.get('Authorization') || '';
-  const secret = /^Bearer\s+(.+)$/i.exec(entete)?.[1] || '';
-  if (!secret || !(await egaux(secret, env.MODERATION_SECRET))) return json({ erreur: 'Accès refusé.' }, 401);
+  if (!(await bonSecret(request, env.MODERATION_SECRET))) return json({ erreur: 'Accès refusé.' }, 401);
 
   let corps;
   try {

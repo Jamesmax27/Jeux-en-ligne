@@ -1,0 +1,52 @@
+# ==========================================================================
+# Statistiques des jeux : calcul quotidien (onglet « Stats » de /idees).
+#
+# Une fois par jour, appelle POST /api/stats-jour (functions/api/stats-jour.js) :
+#   1. calcule game_stats_daily pour la veille (et les jours sautés si un
+#      passage a manqué ; une session peut se prolonger quelques heures après
+#      minuit, d'où le passage à 06:37 UTC) ;
+#   2. efface les sessions brutes de plus de 60 jours.
+# Rien n'est écrit dans le dépôt. Si ce workflow ne passe pas, l'onglet
+# « Stats » rattrape lui-même les jours manquants à son ouverture, et
+# /api/session efface de temps en temps les sessions trop anciennes.
+#
+# Secret : STATS_SECRET (même valeur dans Cloudflare Pages → Settings →
+# Variables and Secrets, et dans les secrets GitHub du dépôt). Variable
+# facultative SITE_URL (adresse du site, https://freemicrogames.com par défaut).
+# Jamais à l'heure pile : GitHub retarde ces passages de plusieurs heures.
+# ==========================================================================
+
+name: Statistiques des jeux
+
+on:
+  schedule:
+    - cron: "37 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: stats-jour
+  cancel-in-progress: false
+
+jobs:
+  calcul:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Calculer les statistiques de la veille
+        env:
+          STATS_SECRET: ${{ secrets.STATS_SECRET }}
+          SITE_URL: ${{ vars.SITE_URL }}
+        run: |
+          if [ -z "$STATS_SECRET" ]; then
+            echo "::warning::Secret STATS_SECRET absent : rien n'est calculé (l'onglet « Stats » rattrape les jours manquants à son ouverture)."
+            exit 0
+          fi
+          site="${SITE_URL:-https://freemicrogames.com}"
+          site="${site%/}"
+          curl -fsS --max-time 120 --retry 2 --retry-delay 30 -X POST "$site/api/stats-jour" \
+            -H "Authorization: Bearer $STATS_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{}'
+          echo
