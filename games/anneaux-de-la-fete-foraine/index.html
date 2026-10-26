@@ -1,0 +1,3783 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title data-i18n="titre">Les anneaux de la fête foraine</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1033; color: #fff8ec;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; touch-action: none; overscroll-behavior: none; }
+  #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+  .gros { min-height: 56px; padding: 12px 26px; border: 0; border-radius: 999px; font-size: 22px; font-weight: 800;
+    background: linear-gradient(180deg, #ffd166, #ff9f43); color: #4a1d00; box-shadow: 0 5px 0 #b35a00, 0 8px 18px rgba(0,0,0,.35); }
+  .gros:active { transform: translateY(3px); box-shadow: 0 2px 0 #b35a00; }
+  .moyen { min-height: 48px; padding: 10px 18px; border: 0; border-radius: 999px; font-size: 17px; font-weight: 700;
+    background: #3b2a6b; color: #fff8ec; box-shadow: 0 4px 0 #22164a; }
+  .moyen:active { transform: translateY(2px); box-shadow: 0 2px 0 #22164a; }
+  .rond { width: 48px; height: 48px; min-width: 48px; border: 0; border-radius: 50%; background: rgba(27,16,51,.72);
+    display: inline-flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+  .rond svg { width: 26px; height: 26px; fill: #fff8ec; }
+  button:focus-visible { outline: 3px solid #a8f0ff; outline-offset: 3px; }
+
+  .ecran { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 16px; z-index: 10; text-align: center; }
+  .ecran[hidden] { display: none !important; }
+  .voile { background: rgba(20,10,40,.62); }
+  .carte { background: #fff6e6; color: #3a2350; border-radius: 26px; padding: 20px 20px 22px; width: min(92vw, 430px);
+    max-height: 92vh; overflow: auto; box-shadow: 0 12px 40px rgba(0,0,0,.45); border: 4px solid #ffcf6e; }
+  .carte h2 { margin: 0 0 8px; font-size: 26px; color: #c2185b; }
+  .carte p { margin: 6px 0; font-size: 17px; line-height: 1.35; }
+  .boutons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 14px; }
+  .carte .moyen { background: #5b3fa0; }
+
+  /* Écran titre */
+  #titre { justify-content: flex-start; padding: 14px 14px 22px; }
+  #titre .bas { margin-top: auto; }
+  #titre .haut { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+  #titre .bloc { margin-top: 2vh; }
+  #titre h1 { margin: 0; font-size: clamp(30px, 9vw, 52px); line-height: 1.05; color: #fff3c4;
+    text-shadow: 0 3px 0 #c2185b, 0 6px 16px rgba(0,0,0,.5); }
+  #titre .consigne { margin: 10px auto 0; max-width: 420px; font-size: 18px; line-height: 1.35; font-weight: 600;
+    background: rgba(27,16,51,.66); border-radius: 18px; padding: 10px 14px; }
+  #titre .bas { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  #titre .bas .ligne { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #titre .gros { font-size: 26px; padding: 14px 44px; }
+  #langue-titre, #langue-pause { min-width: 48px; min-height: 48px; display: flex; align-items: center; justify-content: center; }
+
+  /* Interface de jeu */
+  #hud { position: fixed; left: 0; right: 0; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; padding: 8px 10px; pointer-events: none; }
+  #hud > * { pointer-events: auto; }
+  #hud[hidden], #infos[hidden] { display: none; }
+  #hud-titre { flex: 1; text-align: center; font-weight: 800; font-size: 16px; line-height: 1.15;
+    background: rgba(27,16,51,.72); border-radius: 16px; padding: 6px 10px; pointer-events: none; }
+  #hud-titre small { display: block; font-weight: 600; font-size: 12px; color: #ffd98a; }
+  #infos { position: fixed; top: 66px; left: 0; right: 0; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    pointer-events: none; padding: 0 10px; }
+  #objectif { background: rgba(255,246,230,.94); color: #3a2350; font-weight: 800; border-radius: 999px; padding: 5px 14px; font-size: 16px;
+    box-shadow: 0 3px 8px rgba(0,0,0,.25); }
+  #objectif.bump { animation: bump .4s; }
+  @keyframes bump { 40% { transform: scale(1.18); } }
+  #ordre { display: flex; align-items: center; gap: 8px; background: #fff6e6; color: #3a2350; border-radius: 18px; padding: 6px 10px;
+    box-shadow: 0 3px 10px rgba(0,0,0,.3); border: 3px solid #ffcf6e; max-width: 96vw; }
+  #ordre[hidden] { display: none; }
+  #ordre svg.forain { width: 38px; height: 38px; flex: none; }
+  #ordre .txt { font-weight: 800; font-size: 15px; text-align: left; line-height: 1.15; }
+  #ordre .pastilles { display: flex; gap: 4px; margin-top: 3px; }
+  #ordre.oups { animation: oups .45s; }
+  @keyframes oups { 25% { transform: translateX(-6px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+  .pastille { width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    border: 2px solid #3a2350; background: #fff; position: relative; }
+  .pastille svg { width: 18px; height: 18px; }
+  .pastille.faite::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 3px solid #28b463;
+    background: rgba(40,180,99,.35); }
+
+  /* Carte d'introduction d'un stand */
+  #intro { justify-content: flex-start; padding-top: 70px; pointer-events: auto; }
+  #intro .carte { width: min(92vw, 400px); padding: 14px 16px; background: rgba(255,246,230,.96); }
+  #intro h2 { font-size: 21px; margin-bottom: 4px; }
+  #intro .allee { font-size: 13px; font-weight: 700; color: #7b4dbb; text-transform: uppercase; letter-spacing: .04em; }
+  #intro ol { text-align: left; margin: 6px 0 4px; padding-left: 22px; font-size: 16px; line-height: 1.35; }
+  #intro .but { font-weight: 800; color: #c2185b; }
+  #intro .touche { margin-top: 8px; font-size: 14px; font-weight: 700; color: #7b4dbb; animation: clign 1.4s infinite; }
+  @keyframes clign { 50% { opacity: .45; } }
+
+  /* Stands */
+  #niveaux .carte { width: min(94vw, 520px); }
+  .allee-t { margin: 12px 0 6px; font-weight: 800; color: #7b4dbb; font-size: 16px; text-align: left; }
+  .grille { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .case { min-height: 64px; border: 0; border-radius: 16px; background: #ffd98a; color: #4a1d00; font-weight: 900; font-size: 20px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4px 2px; box-shadow: 0 3px 0 #c98a1e; }
+  .case .et { font-size: 12px; letter-spacing: 1px; color: #c2185b; }
+  .case[disabled] { background: #d9d2e6; color: #8b80a3; box-shadow: none; cursor: default; }
+  .case svg { width: 20px; height: 20px; fill: #8b80a3; }
+
+  /* Victoire / défaite */
+  .etoiles { font-size: 46px; letter-spacing: 6px; margin: 4px 0; min-height: 56px; }
+  .etoiles span { display: inline-block; color: #d9d2e6; transform: scale(.6); transition: transform .35s, color .35s; }
+  .etoiles span.on { color: #ffb400; transform: scale(1.1); text-shadow: 0 2px 0 #c97a00; }
+  .score-g { font-size: 30px; font-weight: 900; color: #3a2350; }
+  .record { font-weight: 800; color: #28b463; }
+  .gain { display: flex; align-items: center; justify-content: center; gap: 10px; background: #ffeec8; border-radius: 16px; padding: 6px 10px; margin-top: 8px; }
+  .gain canvas { width: 70px; height: 70px; }
+  .gain p { margin: 0; font-weight: 700; text-align: left; }
+
+  /* Étagère */
+  #etagere .carte { width: min(94vw, 520px); }
+  #canvas-etagere { width: 100%; height: auto; aspect-ratio: 5 / 4.4; display: block; border-radius: 16px; }
+  .skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-top: 10px; }
+  .skin { min-height: 72px; border: 3px solid transparent; border-radius: 16px; background: #efe4ff; color: #3a2350; font-size: 12px; font-weight: 700;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px; }
+  .skin.choisi { border-color: #c2185b; background: #ffe0ef; }
+  .skin[disabled] { opacity: .55; cursor: default; }
+  .skin canvas { width: 44px; height: 30px; }
+</style>
+<script type="application/json" id="jel-i18n-textes" data-place="langue-titre langue-pause">
+{
+ "fr": {
+  "titre": "Les anneaux de la fête foraine",
+  "consigne": "Tire ton doigt vers l'arrière pour viser, puis lâche : l'anneau doit tomber autour d'un goulot. Gagne des peluches dans les 20 stands !",
+  "bouton.jouer": "Jouer",
+  "bouton.stands": "Stands",
+  "bouton.etagere": "Mon étagère",
+  "bouton.accueil": "Accueil",
+  "bouton.reprendre": "Reprendre",
+  "bouton.recommencer": "Recommencer",
+  "bouton.rejouer": "Rejouer",
+  "bouton.reessayer": "Réessayer",
+  "bouton.retour": "Retour",
+  "bouton.suivant": "Stand suivant",
+  "bouton.bilan": "Voir le bilan",
+  "aria.pause": "Pause",
+  "aria.son": "Son",
+  "aria.sonCouper": "Couper le son",
+  "aria.sonRemettre": "Remettre le son",
+  "aria.etoiles": {
+   "one": "{n} étoile gagnée",
+   "other": "{n} étoiles gagnées"
+  },
+  "aria.standCase": "Stand {n}, {e} sur 3 étoiles",
+  "aria.standFerme": "Stand {n}, encore fermé",
+  "tuto.etape1": "Pose ton doigt sur l'écran.",
+  "tuto.etape2": "Tire vers l'arrière : plus tu tires, plus l'anneau va loin.",
+  "tuto.etape3": "Lâche ! L'anneau vole et doit tomber autour du goulot.",
+  "intro.touche": "Touche l'écran pour commencer",
+  "intro.1": "Bienvenue à la fête ! Regarde la main, puis lance tes anneaux sur les bouteilles.",
+  "intro.2": "Nouveau : les cônes ! Ils sont plus fins, vise bien au milieu. Certains sont tout au fond.",
+  "intro.3": "Nouveau : les canards en bois ! Ils sont plus petits : l'anneau doit passer autour de leur cou.",
+  "intro.4": "Nouveau : le tapis roulant ! Les cibles avancent : lance un peu devant elles.",
+  "intro.5": "Deux tapis roulants qui vont dans deux sens différents. Regarde bien où va chaque cible !",
+  "intro.6": "Nouveau : la rivière ! Les canards flottent, avancent et dansent sur les vagues.",
+  "intro.7": "La rivière coule de l'autre côté, et des bouteilles t'attendent tout au fond.",
+  "intro.8": "Nouveau : le vent ! Regarde le fanion en haut : l'anneau part du côté où il flotte. Vise un peu de l'autre côté.",
+  "intro.9": "Attention, le vent change après chaque lancer ! Regarde le fanion avant de tirer.",
+  "intro.10": "La rivière et le vent en même temps. Prends ton temps pour viser.",
+  "intro.11": "Nouveau : les plots en caoutchouc ! L'anneau rebondit dessus. Un anneau réussi après un rebond vaut plus de points.",
+  "intro.12": "Une rangée de plots devant le tapis roulant : passe entre eux ou fais un rebond.",
+  "intro.13": "Nouveau : le manège ! Ses chevaux de bois passent devant les cibles. Lance quand un trou s'ouvre.",
+  "intro.14": "Le manège tourne plus vite, et le vent souffle. Deux cônes t'attendent sur les côtés.",
+  "intro.15": "Manège, rivière et plots : la grande allée de la grande roue se termine ici !",
+  "intro.16": "Nouveau : les commandes du forain ! Lis sa bulle et réussis les cibles qu'il demande, dans l'ordre.",
+  "intro.17": "Trois commandes avec le tapis roulant. Pour « d'affilée », une erreur fait tout recommencer !",
+  "intro.18": "Trois commandes sur la rivière, avec le vent. Le forain compte sur toi !",
+  "intro.19": "Le manège, les plots et trois commandes. Tu deviens un vrai champion de la fête !",
+  "intro.20": "La grande finale sous le feu d'artifice : tout ce que tu as appris, avec quatre commandes !",
+  "stands.titre": "Les stands",
+  "stands.aide": "Gagne au moins une étoile pour ouvrir le stand suivant.",
+  "pause.titre": "Pause",
+  "pause.texte": "Le manège attend que tu reviennes.",
+  "defaite.titre": "Plus d'anneaux !",
+  "defaite.conseil": "Regarde bien les pointillés et prends ton temps. Tu vas y arriver !",
+  "defaite.detail": {
+   "one": "Tu as réussi {n} anneau sur {total}.",
+   "other": "Tu as réussi {n} anneaux sur {total}."
+  },
+  "defaite.detailCommandes": {
+   "one": "Tu as rempli {n} commande sur {total}.",
+   "other": "Tu as rempli {n} commandes sur {total}."
+  },
+  "bilan.titre": "Champion de la fête foraine !",
+  "bilan.texte": "Tu as gagné les 20 stands de la fête. Bravo !",
+  "bilan.etoiles": {
+   "one": "{n} étoile sur {total}",
+   "other": "{n} étoiles sur {total}"
+  },
+  "bilan.peluches": {
+   "one": "{n} peluche sur {total} rangée sur ton étagère",
+   "other": "{n} peluches sur {total} rangées sur ton étagère"
+  },
+  "bilan.score": "Total de tes records : {n} points",
+  "etagere.titre": "L'étagère de ma chambre",
+  "etagere.anneaux": "Mes anneaux à paillettes",
+  "etagere.compte": {
+   "one": "{n} peluche sur {total}. Chaque stand gagné t'en offre une !",
+   "other": "{n} peluches sur {total}. Chaque stand gagné t'en offre une !"
+  },
+  "etagere.seuil": {
+   "one": "{n} étoile",
+   "other": "{n} étoiles"
+  },
+  "popup.boing": "Boing !",
+  "popup.bonk": "Bonk !",
+  "popup.presque": "Presque !",
+  "popup.bravo": "Bravo !",
+  "popup.rebond": "Rebond !",
+  "popup.serie": "Série de {n} !",
+  "popup.commande": "Commande réussie !",
+  "popup.recommence": "On recommence la commande !",
+  "popup.pasCa": "Ce n'est pas ça !",
+  "ordre.fini": "Merci, tout est prêt !",
+  "ordre.troisRouges": "Trois rouges d'affilée !",
+  "ordre.deuxBleus": "Deux bleus d'affilée !",
+  "ordre.troisJaunes": "Trois jaunes d'affilée !",
+  "ordre.troisVerts": "Trois verts d'affilée !",
+  "ordre.bouteilleConeCanard": "Une bouteille, puis un cône, puis un canard !",
+  "ordre.canardPuisBouteille": "Un canard, puis une bouteille !",
+  "ordre.rougeBleuJaune": "Un rouge, puis un bleu, puis un jaune !",
+  "ordre.deuxCanards": "Deux canards d'affilée !",
+  "ordre.deuxCones": "Deux cônes d'affilée !",
+  "ordre.vertPuisRouge": "Un vert, puis un rouge !",
+  "ordre.troisBouteilles": "Trois bouteilles d'affilée !",
+  "stand.1": "Les bouteilles du village",
+  "stand.2": "Les cônes rayés",
+  "stand.3": "Les canards en bois",
+  "stand.4": "Le tapis roulant",
+  "stand.5": "Les deux tapis",
+  "stand.6": "La petite rivière",
+  "stand.7": "Le courant à l'envers",
+  "stand.8": "Le fanion qui flotte",
+  "stand.9": "Le vent farceur",
+  "stand.10": "Le pont des canards",
+  "stand.11": "Les plots qui rebondissent",
+  "stand.12": "Le tapis des plots",
+  "stand.13": "Le petit manège",
+  "stand.14": "Le manège dans le vent",
+  "stand.15": "La grande roue",
+  "stand.16": "Les commandes du forain",
+  "stand.17": "Le tapis des commandes",
+  "stand.18": "La rivière des commandes",
+  "stand.19": "Le manège des champions",
+  "stand.20": "La grande finale",
+  "allee.0": "Allée des fanions",
+  "allee.1": "Allée des lampions",
+  "allee.2": "Allée de la grande roue",
+  "allee.3": "Allée du feu d'artifice",
+  "hud.stand": "Stand {n} sur {total}",
+  "hud.anneaux": {
+   "one": "{n} anneau",
+   "other": "{n} anneaux"
+  },
+  "hud.commandes": "Commandes : {n} / {total}",
+  "hud.cibles": "Réussis : {n} / {total}",
+  "but.commandes": "But : remplir {n} commandes avec {a} anneaux.",
+  "but.cibles": "But : réussir {n} anneaux avec {a} anneaux.",
+  "victoire.titre": "Bravo !",
+  "victoire.titre3": "Parfait !",
+  "victoire.detail": {
+   "one": "Il te restait {n} anneau : +{points} points.",
+   "other": "Il te restait {n} anneaux : +{points} points."
+  },
+  "victoire.record": "Nouveau record !",
+  "victoire.recordActuel": "Record : {n} points",
+  "victoire.score": {
+   "one": "{n} point",
+   "other": "{n} points"
+  },
+  "victoire.peluche": "Tu gagnes une peluche : {nom} ! Elle est rangée sur ton étagère.",
+  "victoire.skin": "Nouvel anneau à paillettes : {nom} !",
+  "peluche.ourson": "l'ourson",
+  "peluche.lapin": "le lapin",
+  "peluche.chat": "le chat",
+  "peluche.panda": "le panda",
+  "peluche.grenouille": "la grenouille",
+  "peluche.cochon": "le cochon",
+  "peluche.renard": "le renard",
+  "peluche.chouette": "la chouette",
+  "peluche.pingouin": "le pingouin",
+  "peluche.elephant": "l'éléphant",
+  "peluche.souris": "la souris",
+  "peluche.lion": "le lion",
+  "peluche.koala": "le koala",
+  "peluche.poussin": "le poussin",
+  "peluche.licorne": "la licorne",
+  "peluche.dinosaure": "le dinosaure",
+  "peluche.chien": "le chien",
+  "peluche.singe": "le singe",
+  "peluche.mouton": "le mouton",
+  "peluche.tigre": "le tigre",
+  "skin.classique": "Classique",
+  "skin.or": "Paillettes d'or",
+  "skin.arcenciel": "Arc-en-ciel",
+  "skin.argent": "Paillettes d'argent",
+  "skin.rose": "Paillettes roses",
+  "skin.menthe": "Paillettes menthe",
+  "skin.nuit": "Ciel étoilé"
+ },
+ "en": {
+  "titre": "Fairground Ring Toss",
+  "consigne": "Pull your finger back to aim, then let go: the ring must land around a bottle neck. Win cuddly toys at all 20 stalls!",
+  "bouton.jouer": "Play",
+  "bouton.stands": "Stalls",
+  "bouton.etagere": "My shelf",
+  "bouton.accueil": "Home",
+  "bouton.reprendre": "Resume",
+  "bouton.recommencer": "Restart",
+  "bouton.rejouer": "Play again",
+  "bouton.reessayer": "Try again",
+  "bouton.retour": "Back",
+  "bouton.suivant": "Next stall",
+  "bouton.bilan": "See your results",
+  "aria.pause": "Pause",
+  "aria.son": "Sound",
+  "aria.sonCouper": "Turn sound off",
+  "aria.sonRemettre": "Turn sound on",
+  "aria.etoiles": {
+   "one": "{n} star earned",
+   "other": "{n} stars earned"
+  },
+  "aria.standCase": "Stall {n}, {e} out of 3 stars",
+  "aria.standFerme": "Stall {n}, still closed",
+  "tuto.etape1": "Put your finger on the screen.",
+  "tuto.etape2": "Pull back: the more you pull, the further the ring goes.",
+  "tuto.etape3": "Let go! The ring flies and must land around the neck.",
+  "intro.touche": "Tap the screen to start",
+  "intro.1": "Welcome to the fair! Watch the hand, then throw your rings onto the bottles.",
+  "intro.2": "New: cones! They're thinner, so aim right at the middle. Some are right at the back.",
+  "intro.3": "New: wooden ducks! They're smaller: the ring has to go around their neck.",
+  "intro.4": "New: the conveyor belt! The targets move along: throw a little ahead of them.",
+  "intro.5": "Two conveyor belts going in two different directions. Watch where each target goes!",
+  "intro.6": "New: the river! The ducks float, move along and dance on the waves.",
+  "intro.7": "The river flows the other way, and some bottles are waiting right at the back.",
+  "intro.8": "New: the wind! Look at the flag at the top: the ring drifts the way it flutters. Aim a little to the other side.",
+  "intro.9": "Careful, the wind changes after every throw! Check the flag before you pull.",
+  "intro.10": "The river and the wind at the same time. Take your time to aim.",
+  "intro.11": "New: rubber posts! The ring bounces off them. A ring that lands after a bounce is worth more points.",
+  "intro.12": "A row of posts in front of the conveyor belt: throw between them or try a bounce.",
+  "intro.13": "New: the merry-go-round! Its wooden horses pass in front of the targets. Throw when a gap opens.",
+  "intro.14": "The merry-go-round spins faster, and the wind is blowing. Two cones are waiting at the sides.",
+  "intro.15": "Merry-go-round, river and posts: the big wheel lane ends here!",
+  "intro.16": "New: the stallholder's orders! Read his speech bubble and hit the targets he asks for, in order.",
+  "intro.17": "Three orders with the conveyor belt. For \"in a row\", one mistake means starting over!",
+  "intro.18": "Three orders on the river, with the wind. The stallholder is counting on you!",
+  "intro.19": "The merry-go-round, the posts and three orders. You're becoming a real fair champion!",
+  "intro.20": "The grand final under the fireworks: everything you've learned, with four orders!",
+  "stands.titre": "The stalls",
+  "stands.aide": "Earn at least one star to open the next stall.",
+  "pause.titre": "Pause",
+  "pause.texte": "The merry-go-round is waiting for you to come back.",
+  "defaite.titre": "No rings left!",
+  "defaite.conseil": "Look closely at the dotted line and take your time. You can do it!",
+  "defaite.detail": {
+   "one": "You landed {n} ring out of {total}.",
+   "other": "You landed {n} rings out of {total}."
+  },
+  "defaite.detailCommandes": {
+   "one": "You completed {n} order out of {total}.",
+   "other": "You completed {n} orders out of {total}."
+  },
+  "bilan.titre": "Fairground champion!",
+  "bilan.texte": "You won all 20 stalls at the fair. Well done!",
+  "bilan.etoiles": {
+   "one": "{n} star out of {total}",
+   "other": "{n} stars out of {total}"
+  },
+  "bilan.peluches": {
+   "one": "{n} cuddly toy out of {total} on your shelf",
+   "other": "{n} cuddly toys out of {total} on your shelf"
+  },
+  "bilan.score": "All your best scores added up: {n} points",
+  "etagere.titre": "My bedroom shelf",
+  "etagere.anneaux": "My glitter rings",
+  "etagere.compte": {
+   "one": "{n} cuddly toy out of {total}. Every stall you win gives you one!",
+   "other": "{n} cuddly toys out of {total}. Every stall you win gives you one!"
+  },
+  "etagere.seuil": {
+   "one": "{n} star",
+   "other": "{n} stars"
+  },
+  "popup.boing": "Boing!",
+  "popup.bonk": "Bonk!",
+  "popup.presque": "So close!",
+  "popup.bravo": "Well done!",
+  "popup.rebond": "Bounce!",
+  "popup.serie": "{n} in a row!",
+  "popup.commande": "Order complete!",
+  "popup.recommence": "Start the order again!",
+  "popup.pasCa": "That's not it!",
+  "ordre.fini": "Thanks, all done!",
+  "ordre.troisRouges": "Three reds in a row!",
+  "ordre.deuxBleus": "Two blues in a row!",
+  "ordre.troisJaunes": "Three yellows in a row!",
+  "ordre.troisVerts": "Three greens in a row!",
+  "ordre.bouteilleConeCanard": "A bottle, then a cone, then a duck!",
+  "ordre.canardPuisBouteille": "A duck, then a bottle!",
+  "ordre.rougeBleuJaune": "A red, then a blue, then a yellow!",
+  "ordre.deuxCanards": "Two ducks in a row!",
+  "ordre.deuxCones": "Two cones in a row!",
+  "ordre.vertPuisRouge": "A green, then a red!",
+  "ordre.troisBouteilles": "Three bottles in a row!",
+  "stand.1": "The village bottles",
+  "stand.2": "The striped cones",
+  "stand.3": "The wooden ducks",
+  "stand.4": "The conveyor belt",
+  "stand.5": "The two belts",
+  "stand.6": "The little river",
+  "stand.7": "The backwards current",
+  "stand.8": "The fluttering flag",
+  "stand.9": "The tricky wind",
+  "stand.10": "The duck bridge",
+  "stand.11": "The bouncy posts",
+  "stand.12": "The belt of posts",
+  "stand.13": "The little merry-go-round",
+  "stand.14": "The windy merry-go-round",
+  "stand.15": "The big wheel",
+  "stand.16": "The stallholder's orders",
+  "stand.17": "The order belt",
+  "stand.18": "The order river",
+  "stand.19": "The champions' merry-go-round",
+  "stand.20": "The grand final",
+  "allee.0": "Bunting lane",
+  "allee.1": "Lantern lane",
+  "allee.2": "Big wheel lane",
+  "allee.3": "Fireworks lane",
+  "hud.stand": "Stall {n} of {total}",
+  "hud.anneaux": {
+   "one": "{n} ring",
+   "other": "{n} rings"
+  },
+  "hud.commandes": "Orders: {n} / {total}",
+  "hud.cibles": "Landed: {n} / {total}",
+  "but.commandes": "Goal: complete {n} orders with {a} rings.",
+  "but.cibles": "Goal: land {n} rings with {a} rings.",
+  "victoire.titre": "Well done!",
+  "victoire.titre3": "Perfect!",
+  "victoire.detail": {
+   "one": "You had {n} ring left: +{points} points.",
+   "other": "You had {n} rings left: +{points} points."
+  },
+  "victoire.record": "New best score!",
+  "victoire.recordActuel": "Best score: {n} points",
+  "victoire.score": {
+   "one": "{n} point",
+   "other": "{n} points"
+  },
+  "victoire.peluche": "You win a cuddly toy: {nom}! It's waiting on your shelf.",
+  "victoire.skin": "New glitter ring: {nom}!",
+  "peluche.ourson": "the teddy bear",
+  "peluche.lapin": "the bunny",
+  "peluche.chat": "the cat",
+  "peluche.panda": "the panda",
+  "peluche.grenouille": "the frog",
+  "peluche.cochon": "the pig",
+  "peluche.renard": "the fox",
+  "peluche.chouette": "the owl",
+  "peluche.pingouin": "the penguin",
+  "peluche.elephant": "the elephant",
+  "peluche.souris": "the mouse",
+  "peluche.lion": "the lion",
+  "peluche.koala": "the koala",
+  "peluche.poussin": "the chick",
+  "peluche.licorne": "the unicorn",
+  "peluche.dinosaure": "the dinosaur",
+  "peluche.chien": "the dog",
+  "peluche.singe": "the monkey",
+  "peluche.mouton": "the sheep",
+  "peluche.tigre": "the tiger",
+  "skin.classique": "Classic",
+  "skin.or": "Gold glitter",
+  "skin.arcenciel": "Rainbow",
+  "skin.argent": "Silver glitter",
+  "skin.rose": "Pink glitter",
+  "skin.menthe": "Mint glitter",
+  "skin.nuit": "Starry sky"
+ },
+ "es": {
+  "titre": "Los aros de la feria",
+  "consigne": "Estira el dedo hacia atrás para apuntar y suelta: el aro debe caer alrededor de un cuello de botella. ¡Gana peluches en los 20 puestos!",
+  "bouton.jouer": "Jugar",
+  "bouton.stands": "Puestos",
+  "bouton.etagere": "Mi repisa",
+  "bouton.accueil": "Inicio",
+  "bouton.reprendre": "Seguir",
+  "bouton.recommencer": "Empezar de nuevo",
+  "bouton.rejouer": "Volver a jugar",
+  "bouton.reessayer": "Intentar de nuevo",
+  "bouton.retour": "Volver",
+  "bouton.suivant": "Siguiente puesto",
+  "bouton.bilan": "Ver el resumen",
+  "aria.pause": "Pausa",
+  "aria.son": "Sonido",
+  "aria.sonCouper": "Quitar el sonido",
+  "aria.sonRemettre": "Poner el sonido",
+  "aria.etoiles": {
+   "one": "{n} estrella ganada",
+   "other": "{n} estrellas ganadas"
+  },
+  "aria.standCase": "Puesto {n}, {e} de 3 estrellas",
+  "aria.standFerme": "Puesto {n}, todavía cerrado",
+  "tuto.etape1": "Pon el dedo en la pantalla.",
+  "tuto.etape2": "Estira hacia atrás: cuanto más estiras, más lejos va el aro.",
+  "tuto.etape3": "¡Suelta! El aro vuela y debe caer alrededor del cuello.",
+  "intro.touche": "Toca la pantalla para empezar",
+  "intro.1": "¡Bienvenido a la feria! Mira la mano y luego lanza tus aros a las botellas.",
+  "intro.2": "Nuevo: ¡los conos! Son más finos, apunta bien al centro. Algunos están al fondo del todo.",
+  "intro.3": "Nuevo: ¡los patos de madera! Son más pequeños: el aro tiene que rodear su cuello.",
+  "intro.4": "Nuevo: ¡la cinta transportadora! Los blancos avanzan: lanza un poco por delante de ellos.",
+  "intro.5": "Dos cintas que van en dos sentidos distintos. ¡Mira bien hacia dónde va cada blanco!",
+  "intro.6": "Nuevo: ¡el río! Los patos flotan, avanzan y bailan sobre las olas.",
+  "intro.7": "El río corre hacia el otro lado, y al fondo del todo te esperan unas botellas.",
+  "intro.8": "Nuevo: ¡el viento! Mira el banderín de arriba: el aro se va hacia donde ondea. Apunta un poco hacia el otro lado.",
+  "intro.9": "¡Cuidado, el viento cambia después de cada lanzamiento! Mira el banderín antes de estirar.",
+  "intro.10": "El río y el viento a la vez. Tómate tu tiempo para apuntar.",
+  "intro.11": "Nuevo: ¡los postes de goma! El aro rebota en ellos. Un aro que entra después de un rebote vale más puntos.",
+  "intro.12": "Una fila de postes delante de la cinta: lanza entre ellos o prueba un rebote.",
+  "intro.13": "Nuevo: ¡el carrusel! Sus caballitos de madera pasan por delante de los blancos. Lanza cuando se abra un hueco.",
+  "intro.14": "El carrusel gira más rápido y sopla el viento. Dos conos te esperan a los lados.",
+  "intro.15": "Carrusel, río y postes: ¡aquí termina la calle de la noria!",
+  "intro.16": "Nuevo: ¡los pedidos del feriante! Lee su globo y acierta los blancos que pide, en orden.",
+  "intro.17": "Tres pedidos con la cinta transportadora. Con «seguidos», ¡un error y vuelves a empezar!",
+  "intro.18": "Tres pedidos en el río, con viento. ¡El feriante cuenta contigo!",
+  "intro.19": "El carrusel, los postes y tres pedidos. ¡Te estás convirtiendo en un campeón de la feria!",
+  "intro.20": "La gran final bajo los fuegos artificiales: ¡todo lo que aprendiste, con cuatro pedidos!",
+  "stands.titre": "Los puestos",
+  "stands.aide": "Gana al menos una estrella para abrir el siguiente puesto.",
+  "pause.titre": "Pausa",
+  "pause.texte": "El carrusel espera a que vuelvas.",
+  "defaite.titre": "¡No quedan aros!",
+  "defaite.conseil": "Mira bien la línea de puntos y tómate tu tiempo. ¡Lo vas a lograr!",
+  "defaite.detail": {
+   "one": "Encestaste {n} aro de {total}.",
+   "other": "Encestaste {n} aros de {total}."
+  },
+  "defaite.detailCommandes": {
+   "one": "Completaste {n} pedido de {total}.",
+   "other": "Completaste {n} pedidos de {total}."
+  },
+  "bilan.titre": "¡Campeón de la feria!",
+  "bilan.texte": "Ganaste los 20 puestos de la feria. ¡Muy bien!",
+  "bilan.etoiles": {
+   "one": "{n} estrella de {total}",
+   "other": "{n} estrellas de {total}"
+  },
+  "bilan.peluches": {
+   "one": "{n} peluche de {total} en tu repisa",
+   "other": "{n} peluches de {total} en tu repisa"
+  },
+  "bilan.score": "Suma de tus récords: {n} puntos",
+  "etagere.titre": "La repisa de mi habitación",
+  "etagere.anneaux": "Mis aros con brillantina",
+  "etagere.compte": {
+   "one": "{n} peluche de {total}. ¡Cada puesto que ganas te regala uno!",
+   "other": "{n} peluches de {total}. ¡Cada puesto que ganas te regala uno!"
+  },
+  "etagere.seuil": {
+   "one": "{n} estrella",
+   "other": "{n} estrellas"
+  },
+  "popup.boing": "¡Boing!",
+  "popup.bonk": "¡Bonk!",
+  "popup.presque": "¡Casi!",
+  "popup.bravo": "¡Muy bien!",
+  "popup.rebond": "¡Rebote!",
+  "popup.serie": "¡{n} seguidos!",
+  "popup.commande": "¡Pedido completo!",
+  "popup.recommence": "¡Volvemos a empezar el pedido!",
+  "popup.pasCa": "¡Ese no es!",
+  "ordre.fini": "¡Gracias, todo listo!",
+  "ordre.troisRouges": "¡Tres rojos seguidos!",
+  "ordre.deuxBleus": "¡Dos azules seguidos!",
+  "ordre.troisJaunes": "¡Tres amarillos seguidos!",
+  "ordre.troisVerts": "¡Tres verdes seguidos!",
+  "ordre.bouteilleConeCanard": "¡Una botella, luego un cono y luego un pato!",
+  "ordre.canardPuisBouteille": "¡Un pato y luego una botella!",
+  "ordre.rougeBleuJaune": "¡Un rojo, luego un azul y luego un amarillo!",
+  "ordre.deuxCanards": "¡Dos patos seguidos!",
+  "ordre.deuxCones": "¡Dos conos seguidos!",
+  "ordre.vertPuisRouge": "¡Un verde y luego un rojo!",
+  "ordre.troisBouteilles": "¡Tres botellas seguidas!",
+  "stand.1": "Las botellas del pueblo",
+  "stand.2": "Los conos de rayas",
+  "stand.3": "Los patos de madera",
+  "stand.4": "La cinta transportadora",
+  "stand.5": "Las dos cintas",
+  "stand.6": "El riachuelo",
+  "stand.7": "La corriente al revés",
+  "stand.8": "El banderín que ondea",
+  "stand.9": "El viento travieso",
+  "stand.10": "El puente de los patos",
+  "stand.11": "Los postes que rebotan",
+  "stand.12": "La cinta de los postes",
+  "stand.13": "El pequeño carrusel",
+  "stand.14": "El carrusel en el viento",
+  "stand.15": "La noria",
+  "stand.16": "Los pedidos del feriante",
+  "stand.17": "La cinta de los pedidos",
+  "stand.18": "El río de los pedidos",
+  "stand.19": "El carrusel de los campeones",
+  "stand.20": "La gran final",
+  "allee.0": "Calle de los banderines",
+  "allee.1": "Calle de los farolillos",
+  "allee.2": "Calle de la noria",
+  "allee.3": "Calle de los fuegos artificiales",
+  "hud.stand": "Puesto {n} de {total}",
+  "hud.anneaux": {
+   "one": "{n} aro",
+   "other": "{n} aros"
+  },
+  "hud.commandes": "Pedidos: {n} / {total}",
+  "hud.cibles": "Aciertos: {n} / {total}",
+  "but.commandes": "Meta: completar {n} pedidos con {a} aros.",
+  "but.cibles": "Meta: encestar {n} aros con {a} aros.",
+  "victoire.titre": "¡Muy bien!",
+  "victoire.titre3": "¡Perfecto!",
+  "victoire.detail": {
+   "one": "Te quedaba {n} aro: +{points} puntos.",
+   "other": "Te quedaban {n} aros: +{points} puntos."
+  },
+  "victoire.record": "¡Nuevo récord!",
+  "victoire.recordActuel": "Récord: {n} puntos",
+  "victoire.score": {
+   "one": "{n} punto",
+   "other": "{n} puntos"
+  },
+  "victoire.peluche": "Ganas un peluche: ¡{nom}! Ya está en tu repisa.",
+  "victoire.skin": "Nuevo aro con brillantina: ¡{nom}!",
+  "peluche.ourson": "el osito",
+  "peluche.lapin": "el conejo",
+  "peluche.chat": "el gato",
+  "peluche.panda": "el panda",
+  "peluche.grenouille": "la rana",
+  "peluche.cochon": "el cerdito",
+  "peluche.renard": "el zorro",
+  "peluche.chouette": "el búho",
+  "peluche.pingouin": "el pingüino",
+  "peluche.elephant": "el elefante",
+  "peluche.souris": "el ratón",
+  "peluche.lion": "el león",
+  "peluche.koala": "el koala",
+  "peluche.poussin": "el pollito",
+  "peluche.licorne": "el unicornio",
+  "peluche.dinosaure": "el dinosaurio",
+  "peluche.chien": "el perro",
+  "peluche.singe": "el mono",
+  "peluche.mouton": "la oveja",
+  "peluche.tigre": "el tigre",
+  "skin.classique": "Clásico",
+  "skin.or": "Brillantina dorada",
+  "skin.arcenciel": "Arcoíris",
+  "skin.argent": "Brillantina plateada",
+  "skin.rose": "Brillantina rosa",
+  "skin.menthe": "Brillantina menta",
+  "skin.nuit": "Cielo estrellado"
+ },
+ "pt": {
+  "titre": "Argolas no parque de diversões",
+  "consigne": "Puxe o dedo para trás para mirar e solte: a argola precisa cair em volta de um gargalo. Ganhe bichinhos de pelúcia nas 20 barracas!",
+  "bouton.jouer": "Jogar",
+  "bouton.stands": "Barracas",
+  "bouton.etagere": "Minha prateleira",
+  "bouton.accueil": "Início",
+  "bouton.reprendre": "Continuar",
+  "bouton.recommencer": "Recomeçar",
+  "bouton.rejouer": "Jogar de novo",
+  "bouton.reessayer": "Tentar de novo",
+  "bouton.retour": "Voltar",
+  "bouton.suivant": "Próxima barraca",
+  "bouton.bilan": "Ver o resumo",
+  "aria.pause": "Pausa",
+  "aria.son": "Som",
+  "aria.sonCouper": "Desligar o som",
+  "aria.sonRemettre": "Ligar o som",
+  "aria.etoiles": {
+   "one": "{n} estrela ganha",
+   "other": "{n} estrelas ganhas"
+  },
+  "aria.standCase": "Barraca {n}, {e} de 3 estrelas",
+  "aria.standFerme": "Barraca {n}, ainda fechada",
+  "tuto.etape1": "Coloque o dedo na tela.",
+  "tuto.etape2": "Puxe para trás: quanto mais você puxa, mais longe a argola vai.",
+  "tuto.etape3": "Solte! A argola voa e precisa cair em volta do gargalo.",
+  "intro.touche": "Toque na tela para começar",
+  "intro.1": "Bem-vindo ao parque! Olhe a mão e depois jogue suas argolas nas garrafas.",
+  "intro.2": "Novidade: os cones! Eles são mais finos, mire bem no meio. Alguns estão lá no fundo.",
+  "intro.3": "Novidade: os patos de madeira! Eles são menores: a argola precisa passar em volta do pescoço deles.",
+  "intro.4": "Novidade: a esteira rolante! Os alvos andam: jogue um pouco na frente deles.",
+  "intro.5": "Duas esteiras indo para lados diferentes. Veja bem para onde vai cada alvo!",
+  "intro.6": "Novidade: o rio! Os patos boiam, andam e dançam nas ondas.",
+  "intro.7": "O rio corre para o outro lado, e algumas garrafas esperam lá no fundo.",
+  "intro.8": "Novidade: o vento! Olhe a bandeirinha lá em cima: a argola vai para o lado em que ela balança. Mire um pouco para o outro lado.",
+  "intro.9": "Atenção, o vento muda depois de cada lançamento! Olhe a bandeirinha antes de puxar.",
+  "intro.10": "O rio e o vento ao mesmo tempo. Mire com calma.",
+  "intro.11": "Novidade: os postes de borracha! A argola quica neles. Uma argola certa depois de quicar vale mais pontos.",
+  "intro.12": "Uma fila de postes na frente da esteira: jogue entre eles ou tente quicar.",
+  "intro.13": "Novidade: o carrossel! Os cavalinhos de madeira passam na frente dos alvos. Jogue quando abrir um espaço.",
+  "intro.14": "O carrossel gira mais rápido, e o vento está soprando. Dois cones esperam nos lados.",
+  "intro.15": "Carrossel, rio e postes: a alameda da roda-gigante termina aqui!",
+  "intro.16": "Novidade: os pedidos do dono da barraca! Leia o balão dele e acerte os alvos que ele pede, na ordem.",
+  "intro.17": "Três pedidos com a esteira rolante. Quando é \"seguidos\", um erro faz recomeçar tudo!",
+  "intro.18": "Três pedidos no rio, com vento. O dono da barraca conta com você!",
+  "intro.19": "O carrossel, os postes e três pedidos. Você está virando um campeão do parque!",
+  "intro.20": "A grande final debaixo dos fogos: tudo o que você aprendeu, com quatro pedidos!",
+  "stands.titre": "As barracas",
+  "stands.aide": "Ganhe pelo menos uma estrela para abrir a próxima barraca.",
+  "pause.titre": "Pausa",
+  "pause.texte": "O carrossel está esperando você voltar.",
+  "defaite.titre": "Acabaram as argolas!",
+  "defaite.conseil": "Olhe bem a linha pontilhada e vá com calma. Você vai conseguir!",
+  "defaite.detail": {
+   "one": "Você acertou {n} argola de {total}.",
+   "other": "Você acertou {n} argolas de {total}."
+  },
+  "defaite.detailCommandes": {
+   "one": "Você completou {n} pedido de {total}.",
+   "other": "Você completou {n} pedidos de {total}."
+  },
+  "bilan.titre": "Campeão do parque de diversões!",
+  "bilan.texte": "Você venceu as 20 barracas do parque. Parabéns!",
+  "bilan.etoiles": {
+   "one": "{n} estrela de {total}",
+   "other": "{n} estrelas de {total}"
+  },
+  "bilan.peluches": {
+   "one": "{n} bichinho de pelúcia de {total} na sua prateleira",
+   "other": "{n} bichinhos de pelúcia de {total} na sua prateleira"
+  },
+  "bilan.score": "Soma dos seus recordes: {n} pontos",
+  "etagere.titre": "A prateleira do meu quarto",
+  "etagere.anneaux": "Minhas argolas com glitter",
+  "etagere.compte": {
+   "one": "{n} bichinho de pelúcia de {total}. Cada barraca vencida dá um a você!",
+   "other": "{n} bichinhos de pelúcia de {total}. Cada barraca vencida dá um a você!"
+  },
+  "etagere.seuil": {
+   "one": "{n} estrela",
+   "other": "{n} estrelas"
+  },
+  "popup.boing": "Boing!",
+  "popup.bonk": "Bonk!",
+  "popup.presque": "Quase!",
+  "popup.bravo": "Muito bem!",
+  "popup.rebond": "Quicou!",
+  "popup.serie": "{n} seguidas!",
+  "popup.commande": "Pedido completo!",
+  "popup.recommence": "Recomeçando o pedido!",
+  "popup.pasCa": "Não é esse!",
+  "ordre.fini": "Obrigado, está tudo pronto!",
+  "ordre.troisRouges": "Três vermelhos seguidos!",
+  "ordre.deuxBleus": "Dois azuis seguidos!",
+  "ordre.troisJaunes": "Três amarelos seguidos!",
+  "ordre.troisVerts": "Três verdes seguidos!",
+  "ordre.bouteilleConeCanard": "Uma garrafa, depois um cone, depois um pato!",
+  "ordre.canardPuisBouteille": "Um pato, depois uma garrafa!",
+  "ordre.rougeBleuJaune": "Um vermelho, depois um azul, depois um amarelo!",
+  "ordre.deuxCanards": "Dois patos seguidos!",
+  "ordre.deuxCones": "Dois cones seguidos!",
+  "ordre.vertPuisRouge": "Um verde, depois um vermelho!",
+  "ordre.troisBouteilles": "Três garrafas seguidas!",
+  "stand.1": "As garrafas da cidadezinha",
+  "stand.2": "Os cones listrados",
+  "stand.3": "Os patos de madeira",
+  "stand.4": "A esteira rolante",
+  "stand.5": "As duas esteiras",
+  "stand.6": "O riozinho",
+  "stand.7": "A correnteza ao contrário",
+  "stand.8": "A bandeirinha ao vento",
+  "stand.9": "O vento brincalhão",
+  "stand.10": "A ponte dos patos",
+  "stand.11": "Os postes que quicam",
+  "stand.12": "A esteira dos postes",
+  "stand.13": "O carrossel pequeno",
+  "stand.14": "O carrossel ao vento",
+  "stand.15": "A roda-gigante",
+  "stand.16": "Os pedidos do dono da barraca",
+  "stand.17": "A esteira dos pedidos",
+  "stand.18": "O rio dos pedidos",
+  "stand.19": "O carrossel dos campeões",
+  "stand.20": "A grande final",
+  "allee.0": "Alameda das bandeirinhas",
+  "allee.1": "Alameda das lanternas",
+  "allee.2": "Alameda da roda-gigante",
+  "allee.3": "Alameda dos fogos de artifício",
+  "hud.stand": "Barraca {n} de {total}",
+  "hud.anneaux": {
+   "one": "{n} argola",
+   "other": "{n} argolas"
+  },
+  "hud.commandes": "Pedidos: {n} / {total}",
+  "hud.cibles": "Acertos: {n} / {total}",
+  "but.commandes": "Meta: completar {n} pedidos com {a} argolas.",
+  "but.cibles": "Meta: acertar {n} argolas com {a} argolas.",
+  "victoire.titre": "Muito bem!",
+  "victoire.titre3": "Perfeito!",
+  "victoire.detail": {
+   "one": "Sobrou {n} argola: +{points} pontos.",
+   "other": "Sobraram {n} argolas: +{points} pontos."
+  },
+  "victoire.record": "Novo recorde!",
+  "victoire.recordActuel": "Recorde: {n} pontos",
+  "victoire.score": {
+   "one": "{n} ponto",
+   "other": "{n} pontos"
+  },
+  "victoire.peluche": "Você ganhou um bichinho de pelúcia: {nom}! Ele já está na sua prateleira.",
+  "victoire.skin": "Nova argola com glitter: {nom}!",
+  "peluche.ourson": "o ursinho",
+  "peluche.lapin": "o coelho",
+  "peluche.chat": "o gato",
+  "peluche.panda": "o panda",
+  "peluche.grenouille": "o sapinho",
+  "peluche.cochon": "o porquinho",
+  "peluche.renard": "a raposa",
+  "peluche.chouette": "a coruja",
+  "peluche.pingouin": "o pinguim",
+  "peluche.elephant": "o elefante",
+  "peluche.souris": "o ratinho",
+  "peluche.lion": "o leão",
+  "peluche.koala": "o coala",
+  "peluche.poussin": "o pintinho",
+  "peluche.licorne": "o unicórnio",
+  "peluche.dinosaure": "o dinossauro",
+  "peluche.chien": "o cachorro",
+  "peluche.singe": "o macaco",
+  "peluche.mouton": "a ovelha",
+  "peluche.tigre": "o tigre",
+  "skin.classique": "Clássica",
+  "skin.or": "Glitter dourado",
+  "skin.arcenciel": "Arco-íris",
+  "skin.argent": "Glitter prateado",
+  "skin.rose": "Glitter rosa",
+  "skin.menthe": "Glitter menta",
+  "skin.nuit": "Céu estrelado"
+ },
+ "de": {
+  "titre": "Ringe werfen auf dem Jahrmarkt",
+  "consigne": "Zieh den Finger nach hinten, um zu zielen, und lass los: Der Ring muss um einen Flaschenhals fallen. Gewinne Kuscheltiere an allen 20 Buden!",
+  "bouton.jouer": "Spielen",
+  "bouton.stands": "Buden",
+  "bouton.etagere": "Mein Regal",
+  "bouton.accueil": "Startseite",
+  "bouton.reprendre": "Weiter",
+  "bouton.recommencer": "Neu starten",
+  "bouton.rejouer": "Noch mal spielen",
+  "bouton.reessayer": "Noch mal versuchen",
+  "bouton.retour": "Zurück",
+  "bouton.suivant": "Nächste Bude",
+  "bouton.bilan": "Zur Bilanz",
+  "aria.pause": "Pause",
+  "aria.son": "Ton",
+  "aria.sonCouper": "Ton aus",
+  "aria.sonRemettre": "Ton an",
+  "aria.etoiles": {
+   "one": "{n} Stern gewonnen",
+   "other": "{n} Sterne gewonnen"
+  },
+  "aria.standCase": "Bude {n}, {e} von 3 Sternen",
+  "aria.standFerme": "Bude {n}, noch geschlossen",
+  "tuto.etape1": "Leg den Finger auf den Bildschirm.",
+  "tuto.etape2": "Zieh nach hinten: Je weiter du ziehst, desto weiter fliegt der Ring.",
+  "tuto.etape3": "Lass los! Der Ring fliegt und muss um den Hals fallen.",
+  "intro.touche": "Tippe auf den Bildschirm, um anzufangen",
+  "intro.1": "Willkommen auf dem Jahrmarkt! Schau dir die Hand an und wirf dann deine Ringe auf die Flaschen.",
+  "intro.2": "Neu: Kegel! Sie sind schmaler, also ziel genau auf die Mitte. Manche stehen ganz hinten.",
+  "intro.3": "Neu: Holzenten! Sie sind kleiner: Der Ring muss um ihren Hals fallen.",
+  "intro.4": "Neu: das Förderband! Die Ziele fahren weiter: Wirf ein Stück vor sie.",
+  "intro.5": "Zwei Förderbänder, die in verschiedene Richtungen laufen. Schau genau, wohin jedes Ziel fährt!",
+  "intro.6": "Neu: der Fluss! Die Enten schwimmen, treiben weiter und tanzen auf den Wellen.",
+  "intro.7": "Der Fluss fließt jetzt andersherum, und ganz hinten warten Flaschen auf dich.",
+  "intro.8": "Neu: der Wind! Schau auf das Fähnchen oben: Der Ring treibt dahin, wohin es weht. Ziel ein bisschen zur anderen Seite.",
+  "intro.9": "Achtung, der Wind dreht sich nach jedem Wurf! Schau aufs Fähnchen, bevor du ziehst.",
+  "intro.10": "Fluss und Wind gleichzeitig. Lass dir Zeit beim Zielen.",
+  "intro.11": "Neu: Gummipfosten! Der Ring prallt daran ab. Ein Treffer nach dem Abprallen bringt mehr Punkte.",
+  "intro.12": "Eine Reihe Pfosten vor dem Förderband: Wirf dazwischen hindurch oder versuch einen Abpraller.",
+  "intro.13": "Neu: das Karussell! Seine Holzpferde fahren vor den Zielen vorbei. Wirf, wenn sich eine Lücke öffnet.",
+  "intro.14": "Das Karussell dreht sich schneller, und der Wind weht. Zwei Kegel warten an den Seiten.",
+  "intro.15": "Karussell, Fluss und Pfosten: Hier endet die Riesenrad-Gasse!",
+  "intro.16": "Neu: die Bestellungen des Budenbesitzers! Lies seine Sprechblase und triff die Ziele, die er will, in der richtigen Reihenfolge.",
+  "intro.17": "Drei Bestellungen mit dem Förderband. Bei „hintereinander“ heißt ein Fehler: alles von vorn!",
+  "intro.18": "Drei Bestellungen auf dem Fluss, mit Wind. Der Budenbesitzer zählt auf dich!",
+  "intro.19": "Das Karussell, die Pfosten und drei Bestellungen. Du wirst ein echter Jahrmarkt-Champion!",
+  "intro.20": "Das große Finale unter dem Feuerwerk: alles, was du gelernt hast, mit vier Bestellungen!",
+  "stands.titre": "Die Buden",
+  "stands.aide": "Hol dir mindestens einen Stern, um die nächste Bude zu öffnen.",
+  "pause.titre": "Pause",
+  "pause.texte": "Das Karussell wartet, bis du wiederkommst.",
+  "defaite.titre": "Keine Ringe mehr!",
+  "defaite.conseil": "Schau dir die gepunktete Linie genau an und lass dir Zeit. Du schaffst das!",
+  "defaite.detail": {
+   "one": "Du hast {n} von {total} Ringen getroffen.",
+   "other": "Du hast {n} von {total} Ringen getroffen."
+  },
+  "defaite.detailCommandes": {
+   "one": "Du hast {n} von {total} Bestellungen erfüllt.",
+   "other": "Du hast {n} von {total} Bestellungen erfüllt."
+  },
+  "bilan.titre": "Jahrmarkt-Champion!",
+  "bilan.texte": "Du hast alle 20 Buden auf dem Jahrmarkt gewonnen. Super!",
+  "bilan.etoiles": {
+   "one": "{n} von {total} Sternen",
+   "other": "{n} von {total} Sternen"
+  },
+  "bilan.peluches": {
+   "one": "{n} von {total} Kuscheltieren in deinem Regal",
+   "other": "{n} von {total} Kuscheltieren in deinem Regal"
+  },
+  "bilan.score": "Alle deine Rekorde zusammen: {n} Punkte",
+  "etagere.titre": "Das Regal in meinem Zimmer",
+  "etagere.anneaux": "Meine Glitzerringe",
+  "etagere.compte": {
+   "one": "{n} von {total} Kuscheltieren. Jede gewonnene Bude schenkt dir eins!",
+   "other": "{n} von {total} Kuscheltieren. Jede gewonnene Bude schenkt dir eins!"
+  },
+  "etagere.seuil": {
+   "one": "{n} Stern",
+   "other": "{n} Sterne"
+  },
+  "popup.boing": "Boing!",
+  "popup.bonk": "Bonk!",
+  "popup.presque": "Fast!",
+  "popup.bravo": "Super!",
+  "popup.rebond": "Abpraller!",
+  "popup.serie": "{n} hintereinander!",
+  "popup.commande": "Bestellung erfüllt!",
+  "popup.recommence": "Die Bestellung geht von vorn los!",
+  "popup.pasCa": "Das war's nicht!",
+  "ordre.fini": "Danke, alles fertig!",
+  "ordre.troisRouges": "Drei Rote hintereinander!",
+  "ordre.deuxBleus": "Zwei Blaue hintereinander!",
+  "ordre.troisJaunes": "Drei Gelbe hintereinander!",
+  "ordre.troisVerts": "Drei Grüne hintereinander!",
+  "ordre.bouteilleConeCanard": "Eine Flasche, dann ein Kegel, dann eine Ente!",
+  "ordre.canardPuisBouteille": "Eine Ente, dann eine Flasche!",
+  "ordre.rougeBleuJaune": "Ein Rotes, dann ein Blaues, dann ein Gelbes!",
+  "ordre.deuxCanards": "Zwei Enten hintereinander!",
+  "ordre.deuxCones": "Zwei Kegel hintereinander!",
+  "ordre.vertPuisRouge": "Ein Grünes, dann ein Rotes!",
+  "ordre.troisBouteilles": "Drei Flaschen hintereinander!",
+  "stand.1": "Die Dorfflaschen",
+  "stand.2": "Die gestreiften Kegel",
+  "stand.3": "Die Holzenten",
+  "stand.4": "Das Förderband",
+  "stand.5": "Die zwei Bänder",
+  "stand.6": "Der kleine Fluss",
+  "stand.7": "Die verkehrte Strömung",
+  "stand.8": "Das flatternde Fähnchen",
+  "stand.9": "Der freche Wind",
+  "stand.10": "Die Entenbrücke",
+  "stand.11": "Die Hüpfpfosten",
+  "stand.12": "Das Pfostenband",
+  "stand.13": "Das kleine Karussell",
+  "stand.14": "Das Karussell im Wind",
+  "stand.15": "Das Riesenrad",
+  "stand.16": "Die Bestellungen des Budenbesitzers",
+  "stand.17": "Das Bestellband",
+  "stand.18": "Der Bestellfluss",
+  "stand.19": "Das Karussell der Champions",
+  "stand.20": "Das große Finale",
+  "allee.0": "Wimpelgasse",
+  "allee.1": "Lampiongasse",
+  "allee.2": "Riesenrad-Gasse",
+  "allee.3": "Feuerwerksgasse",
+  "hud.stand": "Bude {n} von {total}",
+  "hud.anneaux": {
+   "one": "{n} Ring",
+   "other": "{n} Ringe"
+  },
+  "hud.commandes": "Bestellungen: {n} / {total}",
+  "hud.cibles": "Treffer: {n} / {total}",
+  "but.commandes": "Ziel: {n} Bestellungen mit {a} Ringen erfüllen.",
+  "but.cibles": "Ziel: {n} Treffer mit {a} Ringen.",
+  "victoire.titre": "Super!",
+  "victoire.titre3": "Perfekt!",
+  "victoire.detail": {
+   "one": "Du hattest noch {n} Ring übrig: +{points} Punkte.",
+   "other": "Du hattest noch {n} Ringe übrig: +{points} Punkte."
+  },
+  "victoire.record": "Neuer Rekord!",
+  "victoire.recordActuel": "Rekord: {n} Punkte",
+  "victoire.score": {
+   "one": "{n} Punkt",
+   "other": "{n} Punkte"
+  },
+  "victoire.peluche": "Du gewinnst ein Kuscheltier: {nom}! Es sitzt schon in deinem Regal.",
+  "victoire.skin": "Neuer Glitzerring: {nom}!",
+  "peluche.ourson": "den Teddybären",
+  "peluche.lapin": "den Hasen",
+  "peluche.chat": "die Katze",
+  "peluche.panda": "den Panda",
+  "peluche.grenouille": "den Frosch",
+  "peluche.cochon": "das Schweinchen",
+  "peluche.renard": "den Fuchs",
+  "peluche.chouette": "die Eule",
+  "peluche.pingouin": "den Pinguin",
+  "peluche.elephant": "den Elefanten",
+  "peluche.souris": "die Maus",
+  "peluche.lion": "den Löwen",
+  "peluche.koala": "den Koala",
+  "peluche.poussin": "das Küken",
+  "peluche.licorne": "das Einhorn",
+  "peluche.dinosaure": "den Dino",
+  "peluche.chien": "den Hund",
+  "peluche.singe": "den Affen",
+  "peluche.mouton": "das Schaf",
+  "peluche.tigre": "den Tiger",
+  "skin.classique": "Klassisch",
+  "skin.or": "Goldglitzer",
+  "skin.arcenciel": "Regenbogen",
+  "skin.argent": "Silberglitzer",
+  "skin.rose": "Rosaglitzer",
+  "skin.menthe": "Mintglitzer",
+  "skin.nuit": "Sternenhimmel"
+ }
+}
+</script>
+<script id="jel-i18n">
+/* ==========================================================================
+   Jeux-en-ligne — module commun de traduction (site ET jeux)        jel-i18n v1
+   JavaScript pur, sans dépendance, fonctionne hors ligne.
+
+   Langues : fr (source), en, es, pt (Brésil), de. Langue de secours : en.
+   Détection, dans l'ordre :
+     1. paramètre d'adresse ?lang=xx (enregistré comme choix) ;
+     2. choix enregistré : localStorage « lang » (dans un jeu affiché par le
+        site, le lanceur transmet ce choix par window.JEL_LANG, car le cadre
+        isolé n'a pas accès au stockage du site) ;
+     3. navigator.languages (préfixe seul : « pt-BR » → « pt ») ;
+     4. « en ».
+
+   API (window.JEL_I18N, et raccourci global t() s'il est libre) :
+     getLang()            langue courante
+     setLang(code)        change de langue (enregistre, <html lang>, textes)
+     t(cle, variables)    texte traduit ; {variables} remplacées ; pluriels
+                          via Intl.PluralRules si la valeur est un objet
+                          { "one": "…", "other": "…" } (variable n)
+     has(cle)             la clé existe-t-elle (langue courante ou fr) ?
+     nombre(x, options)   nombre formaté selon la langue (Intl.NumberFormat)
+     date(d, options)     date formatée selon la langue (Intl.DateTimeFormat)
+     appliquer(racine)    traduit le DOM : data-i18n (texte), data-i18n-html
+                          (dictionnaire de confiance seulement),
+                          data-i18n-placeholder, data-i18n-title, data-i18n-aria
+     ajouter(lang, dico)  ajoute des textes ; charger(dossier) : site seulement
+     surChangement(f)     appelle f(lang) après chaque changement de langue
+     creerSelecteur(opts) sélecteur de langue (code + nom dans sa langue)
+
+   Clé absente dans la langue choisie : texte français, sinon la clé brute,
+   avec un avertissement dans la console (une seule fois par clé).
+
+   Dans un jeu : ce fichier est recopié tel quel dans index.html, juste après
+   le bloc <script type="application/json" id="jel-i18n-textes"> qui contient
+   { "fr": {…}, "en": {…}, … }. Un petit bouton de langue s'ajoute dans le coin
+   indiqué par data-coin (haut-gauche, haut-droite, bas-gauche, bas-droite ;
+   data-coin-decalage="52px" l'éloigne du bord haut ou bas, ex. sous une barre ;
+   data-place="id1 id2" le met plutôt dans ces éléments du jeu (barre d'outils…) ;
+   data-coin="aucun" pour le placer soi-même avec creerSelecteur). Changer de
+   langue relance le jeu dans la nouvelle langue.
+   Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie ce fichier).
+   ========================================================================== */
+(function () {
+  'use strict';
+  if (window.JEL_I18N) return;
+
+  var LANGUES = ['fr', 'en', 'es', 'pt', 'de'];
+  var NOMS = { fr: 'Français', en: 'English', es: 'Español', pt: 'Português', de: 'Deutsch' };
+  var ETIQUETTE = { fr: 'Langue', en: 'Language', es: 'Idioma', pt: 'Idioma', de: 'Sprache' }; // nom du bouton
+  var SOURCE = 'fr';
+  var SECOURS = 'en';
+  var CLE_STOCKAGE = 'lang';
+
+  var dicos = {};          // { fr: { cle: texte }, en: {…} }
+  var ecouteurs = [];
+  var avertis = {};
+  var dossierSite = null;  // site : dossier des fichiers JSON (charger)
+  var blocJeu = document.getElementById('jel-i18n-textes');
+  var modeJeu = !!blocJeu;
+
+  // --- Outils ---------------------------------------------------------------
+
+  function valide(code) {
+    var c = String(code || '').trim().toLowerCase().split(/[-_]/)[0];
+    return LANGUES.indexOf(c) >= 0 ? c : null;
+  }
+  function lireStockage() { try { return localStorage.getItem(CLE_STOCKAGE); } catch (e) { return null; } }
+  function ecrireStockage(v) { try { localStorage.setItem(CLE_STOCKAGE, v); } catch (e) { /* stockage refusé */ } }
+  function paramAdresse() { try { return new URLSearchParams(location.search).get('lang'); } catch (e) { return null; } }
+
+  function detecter() {
+    var c = valide(paramAdresse());
+    if (c) { ecrireStockage(c); return c; }
+    c = valide(window.JEL_LANG) || valide(lireStockage());
+    if (c) return c;
+    var liste = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+    for (var i = 0; i < liste.length; i++) {
+      c = valide(liste[i]);
+      if (c) return c;
+    }
+    return SECOURS;
+  }
+
+  var langue = detecter();
+  document.documentElement.lang = langue;
+
+  function avertir(texte) {
+    if (avertis[texte]) return;
+    avertis[texte] = true;
+    try { console.warn('[i18n] ' + texte); } catch (e) { /* pas de console */ }
+  }
+
+  function trouver(lang, cle) {
+    var d = dicos[lang];
+    return d && Object.prototype.hasOwnProperty.call(d, cle) ? d[cle] : undefined;
+  }
+
+  function nombre(x, options) {
+    try { return new Intl.NumberFormat(langue, options).format(x); } catch (e) { return String(x); }
+  }
+
+  function date(d, options) {
+    try { return new Intl.DateTimeFormat(langue, options).format(d instanceof Date ? d : new Date(d)); } catch (e) { return String(d); }
+  }
+
+  // Valeur au pluriel : { one, other, … } selon Intl.PluralRules (variable n).
+  function pluriel(valeur, lang, variables) {
+    var n = variables && typeof variables.n === 'number' ? variables.n : 0;
+    var forme = 'other';
+    try { forme = new Intl.PluralRules(lang).select(n); } catch (e) { /* navigateur ancien */ }
+    if (n === 0 && typeof valeur.zero === 'string') return valeur.zero;
+    return typeof valeur[forme] === 'string' ? valeur[forme] : valeur.other;
+  }
+
+  function remplacer(texte, variables) {
+    if (!variables) return texte;
+    return texte.replace(/\{(\w+)\}/g, function (tout, nom) {
+      if (!Object.prototype.hasOwnProperty.call(variables, nom)) return tout;
+      var v = variables[nom];
+      return typeof v === 'number' ? nombre(v) : String(v);
+    });
+  }
+
+  // --- Traduction -----------------------------------------------------------
+
+  function t(cle, variables) {
+    var lang = langue;
+    var valeur = trouver(lang, cle);
+    if (valeur === undefined) {
+      lang = SOURCE;
+      valeur = trouver(SOURCE, cle);
+      if (langue !== SOURCE || valeur === undefined) avertir('clé manquante en ' + langue + ' : ' + cle);
+      if (valeur === undefined) return cle;
+    }
+    if (valeur && typeof valeur === 'object') valeur = pluriel(valeur, lang, variables);
+    return remplacer(String(valeur), variables);
+  }
+
+  function has(cle) {
+    return trouver(langue, cle) !== undefined || trouver(SOURCE, cle) !== undefined;
+  }
+
+  // Traduit tous les éléments marqués sous « racine » (document par défaut).
+  function appliquer(racine) {
+    racine = racine || document;
+    if (!racine.querySelectorAll) return;
+    var regles = [
+      ['data-i18n', function (el, v) { el.textContent = v; }],
+      ['data-i18n-html', function (el, v) { el.innerHTML = v; }],
+      ['data-i18n-placeholder', function (el, v) { el.setAttribute('placeholder', v); }],
+      ['data-i18n-title', function (el, v) { el.setAttribute('title', v); }],
+      ['data-i18n-aria', function (el, v) { el.setAttribute('aria-label', v); }],
+    ];
+    regles.forEach(function (regle) {
+      var liste = racine.querySelectorAll('[' + regle[0] + ']');
+      for (var i = 0; i < liste.length; i++) regle[1](liste[i], t(liste[i].getAttribute(regle[0])));
+    });
+  }
+
+  function ajouter(lang, dico) {
+    var c = valide(lang);
+    if (!c || !dico || typeof dico !== 'object') return;
+    dicos[c] = dicos[c] || {};
+    for (var cle in dico) {
+      if (Object.prototype.hasOwnProperty.call(dico, cle)) dicos[c][cle] = dico[cle];
+    }
+  }
+
+  // Site : charge <dossier><lang>.json (fr toujours, pour le repli).
+  function chargerUne(lang) {
+    if (dicos[lang] || !dossierSite) return Promise.resolve();
+    return fetch(dossierSite + lang + '.json')
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) { ajouter(lang, d); })
+      .catch(function (e) { avertir('textes « ' + lang + ' » indisponibles (' + e.message + ')'); });
+  }
+
+  function charger(dossier) {
+    dossierSite = dossier;
+    return Promise.all([chargerUne(SOURCE), chargerUne(langue)]).then(function () { appliquer(document); });
+  }
+
+  function surChangement(f) { if (typeof f === 'function') ecouteurs.push(f); }
+
+  function prevenir() {
+    for (var i = 0; i < ecouteurs.length; i++) {
+      try { ecouteurs[i](langue); } catch (e) { setTimeout(function () { throw e; }); }
+    }
+  }
+
+  // Changement de langue appliqué sur place (sans recharger la page).
+  function changerSurPlace(c) {
+    langue = c;
+    document.documentElement.lang = c;
+    appliquer(document);
+    majSelecteurs();
+    prevenir();
+  }
+
+  function setLang(code) {
+    var c = valide(code);
+    if (!c) return Promise.resolve(langue);
+    ecrireStockage(c);
+    if (modeJeu) {
+      if (c === langue) return Promise.resolve(langue);
+      // Jeu affiché par le site : le lanceur enregistre le choix et relance le jeu.
+      if (window.parent && window.parent !== window) {
+        try { window.parent.postMessage({ type: 'jel-langue', lang: c }, '*'); } catch (e) { /* cadre isolé */ }
+        // Si personne ne répond (jeu ouvert ailleurs), on change sur place.
+        setTimeout(function () { changerSurPlace(c); }, 700);
+        return Promise.resolve(c);
+      }
+      // Jeu ouvert seul : on le relance dans la nouvelle langue.
+      if (/^https?:$/.test(location.protocol)) {
+        var u = new URL(location.href);
+        u.searchParams.set('lang', c);
+        location.replace(u.href);
+        return Promise.resolve(c);
+      }
+      changerSurPlace(c);
+      return Promise.resolve(c);
+    }
+    // Site : l'adresse suit le choix si elle porte déjà ?lang=.
+    try {
+      var adresse = new URL(location.href);
+      if (adresse.searchParams.has('lang')) {
+        adresse.searchParams.set('lang', c);
+        history.replaceState(history.state, '', adresse.href);
+      }
+    } catch (e) { /* adresse spéciale */ }
+    return chargerUne(c).then(function () { changerSurPlace(c); return c; });
+  }
+
+  // --- Sélecteur de langue ---------------------------------------------------
+  // Bouton (code de la langue) qui ouvre la liste des 5 langues, chacune avec
+  // son code et son nom dans sa propre langue. Pas de drapeaux. Doigt et clavier
+  // (Entrée, Espace, flèches, Échap).
+  // Dans un jeu, il est isolé dans un Shadow DOM (élément <jel-langue>) : le CSS
+  // du jeu (button {…}, * {…}) ne peut pas le déformer, et inversement.
+
+  var CSS_SELECTEUR =
+    '.jel-langue{position:relative;display:inline-block;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif;text-align:left;color:#eceae4}' +
+    '.jel-langue *{box-sizing:border-box}' +
+    '.jel-langue-bouton{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;margin:0;padding:0 10px;border:0;border-radius:999px;background:rgba(11,16,32,.55);color:#eceae4;font:inherit;line-height:1;cursor:pointer;box-shadow:none}' +
+    '.jel-langue-code{font-weight:800;letter-spacing:.04em}' +
+    '.jel-langue-menu{position:absolute;z-index:2147483001;min-width:170px;margin:6px 0 0;padding:6px;list-style:none;border-radius:14px;background:#161f38;box-shadow:0 10px 30px rgba(0,0,0,.45);border:1px solid #434e6b}' +
+    '.jel-langue-menu[hidden]{display:none}' +
+    '.jel-langue-menu li{margin:0;padding:0}' +
+    '.jel-langue-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;margin:0;padding:0 12px;border:0;border-radius:10px;background:none;color:#eceae4;font:inherit;text-align:left;cursor:pointer;box-shadow:none;white-space:nowrap}' +
+    '.jel-langue-menu button b{min-width:2.2em;color:#a8b3f0}' +
+    '.jel-langue-menu button[aria-current="true"]{background:#a8b3f0;color:#0b1020}' +
+    '.jel-langue-menu button[aria-current="true"] b{color:#0b1020}' +
+    '.jel-langue-menu button:hover:not([aria-current="true"]),.jel-langue-menu button:focus-visible{background:#1d2745}' +
+    '.jel-langue :focus-visible{outline:3px solid #a8b3f0;outline-offset:2px}' +
+    // Jeu : petit bouton discret (code seul) ; liste ouverte vers l'intérieur de l'écran.
+    '.jel-langue.compact .jel-langue-bouton{min-width:40px;min-height:40px;padding:0 8px;font-size:12px;background:rgba(11,16,32,.45);border:1px solid rgba(255,255,255,.3)}' +
+    '.jel-langue.compact .jel-langue-nom{display:none}' +
+    '.jel-langue.vers-gauche .jel-langue-menu{right:0}' +
+    '.jel-langue.vers-haut .jel-langue-menu{bottom:100%;margin:0 0 6px}';
+
+  // Place du bouton dans un jeu, selon le coin choisi (data-coin).
+  var COINS = {
+    'haut-gauche': { top: 'max(6px, env(safe-area-inset-top))', left: 'max(6px, env(safe-area-inset-left))' },
+    'haut-droite': { top: 'max(6px, env(safe-area-inset-top))', right: 'max(6px, env(safe-area-inset-right))' },
+    'bas-gauche': { bottom: 'max(6px, env(safe-area-inset-bottom))', left: 'max(6px, env(safe-area-inset-left))' },
+    'bas-droite': { bottom: 'max(6px, env(safe-area-inset-bottom))', right: 'max(6px, env(safe-area-inset-right))' },
+  };
+
+  var selecteurs = [];
+
+  function majSelecteurs() {
+    selecteurs.forEach(function (s) { s.maj(); });
+  }
+
+  // options : { conteneur, classe, coin, decalage, isole } ;
+  // - coin : sélecteur de jeu isolé, fixé dans ce coin, éloigné du bord haut ou bas de
+  //   « decalage » (longueur CSS, ex. « 52px ») s'il est donné ;
+  // - isole : sélecteur de jeu isolé, placé dans « conteneur » (ex. la barre du jeu).
+  function creerSelecteur(options) {
+    options = options || {};
+    var coin = options.coin && COINS[options.coin] ? options.coin : null;
+    var isole = !!(coin || options.isole);
+    var boite = document.createElement('div');
+    boite.className = 'jel-langue' + (options.classe ? ' ' + options.classe : '') +
+      (isole ? ' compact' : '') + (coin && /droite/.test(coin) ? ' vers-gauche' : '') + (coin && /bas/.test(coin) ? ' vers-haut' : '');
+
+    var bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'jel-langue-bouton';
+    bouton.setAttribute('aria-haspopup', 'true');
+    bouton.setAttribute('aria-expanded', 'false');
+    var code = document.createElement('span');
+    code.className = 'jel-langue-code';
+    var nom = document.createElement('span');
+    nom.className = 'jel-langue-nom';
+    bouton.append(code, nom);
+
+    var menu = document.createElement('ul');
+    menu.className = 'jel-langue-menu';
+    menu.hidden = true;
+    var choix = LANGUES.map(function (l) {
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.lang = l;
+      b.dataset.lang = l;
+      var c = document.createElement('b');
+      c.textContent = l.toUpperCase();
+      b.append(c, document.createTextNode(' ' + NOMS[l]));
+      b.addEventListener('click', function () { fermer(true); setLang(l); });
+      li.append(b);
+      menu.append(li);
+      return b;
+    });
+
+    var hote = null; // jeu : élément <jel-langue> (un peu transparent, sauf liste ouverte)
+    function opacite(v) { if (hote) hote.style.setProperty('opacity', v, 'important'); }
+    function ouvrir() {
+      // Dans une barre : la liste s'ouvre vers l'intérieur de l'écran.
+      if (isole && !coin && hote) {
+        var r = hote.getBoundingClientRect();
+        boite.classList.toggle('vers-gauche', r.left > window.innerWidth / 2);
+        boite.classList.toggle('vers-haut', r.top > window.innerHeight / 2);
+      }
+      menu.hidden = false;
+      opacite('1');
+      bouton.setAttribute('aria-expanded', 'true');
+      var actuel = choix[LANGUES.indexOf(langue)] || choix[0];
+      actuel.focus();
+    }
+    function fermer(rendreFocus) {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      opacite('.85');
+      bouton.setAttribute('aria-expanded', 'false');
+      if (rendreFocus) bouton.focus();
+    }
+
+    bouton.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.hidden) ouvrir(); else fermer(false);
+    });
+    menu.addEventListener('keydown', function (e) {
+      var racine = boite.getRootNode();
+      var i = choix.indexOf(racine.activeElement || document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); fermer(true); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); choix[(i + 1) % choix.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); choix[(i - 1 + choix.length) % choix.length].focus(); }
+      else if (e.key === 'Tab') fermer(false);
+      e.stopPropagation(); // les touches du menu ne pilotent pas le jeu
+    });
+    bouton.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' && menu.hidden) { e.preventDefault(); ouvrir(); }
+      e.stopPropagation();
+    });
+    // Un toucher ailleurs referme la liste (sans gêner le jeu).
+    document.addEventListener('pointerdown', function (e) {
+      var chemin = e.composedPath ? e.composedPath() : [e.target];
+      if (chemin.indexOf(boite) < 0) fermer(false);
+    }, true);
+    // Les gestes sur le sélecteur ne doivent pas arriver au jeu.
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click'].forEach(function (type) {
+      boite.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
+    boite.append(bouton, menu);
+
+    // Élément ajouté à la page : la boîte elle-même (site), ou un hôte isolé (jeu).
+    var element = boite;
+    if (isole) {
+      element = hote = document.createElement('jel-langue');
+      element.className = 'jel-langue';
+      var place = coin ? COINS[coin] : {};
+      var style = coin
+        ? { position: 'fixed', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'block' }
+        : { position: 'relative', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'inline-block', 'vertical-align': 'middle', flex: 'none' };
+      for (var p in place) style[p] = options.decalage && /^(top|bottom)$/.test(p) ? 'calc(' + place[p] + ' + ' + options.decalage + ')' : place[p];
+      for (var nomStyle in style) element.style.setProperty(nomStyle, style[nomStyle], 'important');
+      var ombre = element.attachShadow ? element.attachShadow({ mode: 'open' }) : element;
+      var feuille = document.createElement('style');
+      feuille.textContent = CSS_SELECTEUR;
+      ombre.append(feuille, boite);
+    }
+
+    var s = {
+      element: element,
+      maj: function () {
+        code.textContent = langue.toUpperCase();
+        nom.textContent = NOMS[langue];
+        var etiquette = ETIQUETTE[langue] + ' : ' + NOMS[langue];
+        bouton.setAttribute('aria-label', etiquette);
+        bouton.title = etiquette;
+        choix.forEach(function (b) {
+          if (b.dataset.lang === langue) b.setAttribute('aria-current', 'true');
+          else b.removeAttribute('aria-current');
+        });
+      },
+    };
+    s.maj();
+    selecteurs.push(s);
+    if (options.conteneur) options.conteneur.append(element);
+    return element;
+  }
+
+  // Site : style de base du sélecteur dans la page (style.css le complète).
+  function ajouterStyle() {
+    if (document.getElementById('jel-langue-style')) return;
+    var style = document.createElement('style');
+    style.id = 'jel-langue-style';
+    style.textContent = CSS_SELECTEUR;
+    (document.head || document.documentElement).append(style);
+  }
+
+  // --- Démarrage ----------------------------------------------------------------
+
+  if (modeJeu) {
+    try {
+      var textes = JSON.parse(blocJeu.textContent);
+      for (var l in textes) if (Object.prototype.hasOwnProperty.call(textes, l)) ajouter(l, textes[l]);
+    } catch (e) {
+      avertir('textes du jeu illisibles (' + e.message + ')');
+    }
+  }
+
+  window.JEL_I18N = {
+    LANGUES: LANGUES.slice(),
+    NOMS: NOMS,
+    SOURCE: SOURCE,
+    getLang: function () { return langue; },
+    setLang: setLang,
+    t: t,
+    has: has,
+    nombre: nombre,
+    date: date,
+    appliquer: appliquer,
+    ajouter: ajouter,
+    charger: charger,
+    surChangement: surChangement,
+    creerSelecteur: creerSelecteur,
+  };
+  if (!('t' in window)) window.t = t;
+
+  if (!modeJeu) ajouterStyle();
+
+  if (modeJeu) {
+    var demarrer = function () {
+      appliquer(document);
+      // data-place="id1 id2" : bouton(s) dans ces éléments du jeu ; sinon dans le coin data-coin.
+      var places = (blocJeu.getAttribute('data-place') || '').split(/\s+/).map(function (id) { return id && document.getElementById(id); }).filter(Boolean);
+      var coin = blocJeu.getAttribute('data-coin') || 'haut-gauche';
+      if (places.length) places.forEach(function (el) { creerSelecteur({ conteneur: el, isole: true }); });
+      else if (coin !== 'aucun' && document.body) {
+        creerSelecteur({ conteneur: document.body, coin: coin, decalage: blocJeu.getAttribute('data-coin-decalage') || '' });
+      }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
+    else demarrer();
+  }
+})();
+</script>
+<script id="jel-sauvegarde">
+/* ==========================================================================
+   Free Micro Games — module commun de sauvegarde des jeux     jel-sauvegarde v1
+   JavaScript pur, sans dépendance, sans compte ni serveur, hors ligne.
+
+   Garde la progression d'un jeu sur l'appareil, sous la clé « save_<id> »
+   (ex. « save_pommes-du-poney ») du localStorage du site.
+
+   Où sont les données ?
+     - Jeu ouvert seul (adresse /games/<id>/, test local) : localStorage direct.
+     - Jeu affiché par le site (cadre isolé, sans accès au stockage) : le
+       lanceur (public/play.js) donne la sauvegarde au démarrage
+       (window.JEL_SAUVEGARDES = { "save_<id>": "<JSON>" }) et enregistre
+       chaque écriture reçue par le message { type: "jel-sauvegarde", cle,
+       valeur } (valeur null = effacer). Le jeu ne peut écrire que sa clé.
+     - Sans aucun stockage : la sauvegarde vit le temps de la page.
+
+   Données (version de format SAUVEGARDE_VERSION) :
+     { v: 1, niveau: 1, score: 0, options: {}, date: <ms> }
+     niveau  numéro du niveau où reprendre (1 = premier)
+     score   score à ce moment-là
+     options réglages utiles (son coupé, difficulté…)
+     Le jeu peut ajouter ses propres champs (étoiles, record…).
+   Sauvegarde absente, illisible ou d'un format inconnu : valeurs par défaut.
+
+   API (window.JEL_SAVE) :
+     save(jeu, donnees)     enregistre (fusionné avec la sauvegarde actuelle) ;
+                            renvoie true si c'est fait
+     load(jeu)              données (valeurs par défaut si rien d'utilisable)
+     clear(jeu)             efface la sauvegarde
+     existe(jeu)            une sauvegarde utilisable existe-t-elle ?
+     surFermeture(f)        appelle f() quand la page est cachée ou quittée
+                            (visibilitychange, pagehide, beforeunload)
+     reprise(options)       fenêtre « Continuer » / « Nouvelle partie » /
+                            « Effacer la sauvegarde » (voir plus bas)
+     boutonEffacer(options) bouton « Effacer la sauvegarde » seul
+     texte(cle, vars)       textes du module dans la langue du jeu
+
+   Dans un jeu : ce fichier est recopié tel quel dans index.html, dans une
+   balise script d'identifiant « jel-sauvegarde », juste après le module de
+   traduction (jel-i18n). Il ne doit jamais contenir la fermeture de balise
+   script (elle couperait le jeu).
+   Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie aussi ce fichier).
+   Règles d'intégration : CONSIGNES-JEU.md, section « Sauvegarde ».
+   ========================================================================== */
+(function () {
+  'use strict';
+  if (window.JEL_SAVE) return;
+
+  var SAUVEGARDE_VERSION = 1;
+  var PREFIXE = 'save_';
+  var TAILLE_MAX = 100000; // caractères : le lanceur refuse au-delà
+
+  // --- Stockage -------------------------------------------------------------
+
+  var direct = (function () {
+    try {
+      var essai = '__jel_essai__';
+      localStorage.setItem(essai, '1');
+      localStorage.removeItem(essai);
+      return localStorage;
+    } catch (e) { return null; } // cadre isolé du site, stockage refusé
+  })();
+
+  var memoire = {};
+  try {
+    var donnees = window.JEL_SAUVEGARDES;
+    if (donnees && typeof donnees === 'object') {
+      for (var c in donnees) {
+        if (Object.prototype.hasOwnProperty.call(donnees, c) && typeof donnees[c] === 'string') memoire[c] = donnees[c];
+      }
+    }
+  } catch (e) { /* rien reçu du lanceur */ }
+
+  function lire(cle) {
+    if (direct) { try { return direct.getItem(cle); } catch (e) { /* stockage devenu indisponible */ } }
+    return Object.prototype.hasOwnProperty.call(memoire, cle) ? memoire[cle] : null;
+  }
+
+  // valeur null = effacer
+  function ecrire(cle, valeur) {
+    if (valeur === null) delete memoire[cle]; else memoire[cle] = valeur;
+    var ok = false;
+    if (direct) {
+      try {
+        if (valeur === null) direct.removeItem(cle); else direct.setItem(cle, valeur);
+        ok = true;
+      } catch (e) { /* stockage plein ou refusé */ }
+    }
+    if (!ok && window.parent && window.parent !== window) {
+      try { window.parent.postMessage({ type: 'jel-sauvegarde', cle: cle, valeur: valeur }, '*'); ok = true; } catch (e) { /* pas de lanceur */ }
+    }
+    return ok;
+  }
+
+  // --- Données ----------------------------------------------------------------
+
+  function cleDe(jeu) { return PREFIXE + String(jeu || '').trim(); }
+
+  function defauts() { return { v: SAUVEGARDE_VERSION, niveau: 1, score: 0, options: {} }; }
+
+  function objet(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
+
+  // Données relues, ou null si absentes, illisibles ou d'un format inconnu.
+  function lireDonnees(jeu) {
+    var brut = lire(cleDe(jeu));
+    if (typeof brut !== 'string' || !brut) return null;
+    var d;
+    try { d = JSON.parse(brut); } catch (e) { return null; }
+    if (!objet(d) || d.v !== SAUVEGARDE_VERSION) return null;
+    var propre = defauts();
+    for (var k in d) if (Object.prototype.hasOwnProperty.call(d, k)) propre[k] = d[k];
+    var n = Number(propre.niveau);
+    propre.niveau = isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+    var s = Number(propre.score);
+    propre.score = isFinite(s) ? s : 0;
+    if (!objet(propre.options)) propre.options = {};
+    return propre;
+  }
+
+  function load(jeu) { return lireDonnees(jeu) || defauts(); }
+
+  function existe(jeu) { return lireDonnees(jeu) !== null; }
+
+  function save(jeu, donnees) {
+    if (!String(jeu || '').trim()) return false;
+    var tout = load(jeu);
+    if (objet(donnees)) for (var k in donnees) if (Object.prototype.hasOwnProperty.call(donnees, k)) tout[k] = donnees[k];
+    tout.v = SAUVEGARDE_VERSION;
+    tout.date = Date.now();
+    var texte;
+    try { texte = JSON.stringify(tout); } catch (e) { return false; }
+    if (texte.length > TAILLE_MAX) {
+      try { console.warn('[sauvegarde] trop grosse, ignorée (' + texte.length + ' caractères)'); } catch (e) { /* pas de console */ }
+      return false;
+    }
+    return ecrire(cleDe(jeu), texte);
+  }
+
+  function clear(jeu) { return ecrire(cleDe(jeu), null); }
+
+  // --- Fermeture de la page -------------------------------------------------
+
+  function surFermeture(f) {
+    if (typeof f !== 'function') return;
+    var appeler = function () { try { f(); } catch (e) { setTimeout(function () { throw e; }); } };
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') appeler(); });
+    window.addEventListener('pagehide', appeler);
+    window.addEventListener('beforeunload', appeler);
+  }
+
+  // --- Textes (5 langues) -----------------------------------------------------
+
+  var TEXTES = {
+    fr: { titre: 'Une partie est sauvegardée', niveau: 'Niveau {n}', score: 'Score : {n}', continuer: 'Continuer', nouvelle: 'Nouvelle partie', effacer: 'Effacer la sauvegarde', confirmer: 'Toucher encore pour effacer', efface: 'Sauvegarde effacée' },
+    en: { titre: 'You have a saved game', niveau: 'Level {n}', score: 'Score: {n}', continuer: 'Continue', nouvelle: 'New game', effacer: 'Delete saved game', confirmer: 'Tap again to delete', efface: 'Saved game deleted' },
+    es: { titre: 'Tienes una partida guardada', niveau: 'Nivel {n}', score: 'Puntos: {n}', continuer: 'Continuar', nouvelle: 'Nueva partida', effacer: 'Borrar la partida guardada', confirmer: 'Toca otra vez para borrar', efface: 'Partida guardada borrada' },
+    pt: { titre: 'Você tem um jogo salvo', niveau: 'Nível {n}', score: 'Pontos: {n}', continuer: 'Continuar', nouvelle: 'Novo jogo', effacer: 'Apagar o jogo salvo', confirmer: 'Toque de novo para apagar', efface: 'Jogo salvo apagado' },
+    de: { titre: 'Du hast einen gespeicherten Spielstand', niveau: 'Level {n}', score: 'Punkte: {n}', continuer: 'Weiterspielen', nouvelle: 'Neues Spiel', effacer: 'Spielstand löschen', confirmer: 'Zum Löschen noch mal tippen', efface: 'Spielstand gelöscht' },
+  };
+
+  function langue() {
+    var l = '';
+    try { l = window.JEL_I18N ? window.JEL_I18N.getLang() : (window.JEL_LANG || document.documentElement.lang); } catch (e) { /* rien */ }
+    l = String(l || '').toLowerCase().split(/[-_]/)[0];
+    return TEXTES[l] ? l : 'fr';
+  }
+
+  function texte(cle, vars) {
+    var l = langue();
+    var s = TEXTES[l][cle] || TEXTES.fr[cle] || cle;
+    return s.replace(/\{(\w+)\}/g, function (tout, nom) {
+      if (!vars || !Object.prototype.hasOwnProperty.call(vars, nom)) return tout;
+      var v = vars[nom];
+      if (typeof v === 'number') { try { return new Intl.NumberFormat(l).format(v); } catch (e) { return String(v); } }
+      return String(v);
+    });
+  }
+
+  // --- Interface ------------------------------------------------------------------
+  // Isolée dans un Shadow DOM (comme le bouton de langue) : le CSS du jeu ne la
+  // déforme pas. Les gestes et les touches n'arrivent pas au jeu.
+
+  var CSS =
+    ':host{all:initial}' +
+    '*{box-sizing:border-box}' +
+    '.fond{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(7,10,20,.72);font:600 16px/1.3 ui-rounded,"Segoe UI",system-ui,sans-serif;color:#eceae4}' +
+    '.carte{width:min(360px,100%);padding:20px 18px 14px;border-radius:20px;background:#161f38;border:1px solid #5a6688;box-shadow:0 14px 40px rgba(0,0,0,.5);text-align:center}' +
+    'h2{margin:0 0 6px;font-size:19px;line-height:1.25;color:#eceae4}' +
+    'p{margin:0 0 16px;color:#a3adc2;font-size:15px}' +
+    'button{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin:0 0 10px;padding:8px 14px;border-radius:999px;border:2px solid #a8b3f0;background:transparent;color:#eceae4;font:inherit;font-size:17px;line-height:1.2;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}' +
+    'button.principal{background:#a8b3f0;color:#0b1020;border-color:#a8b3f0}' +
+    'button.discret{min-height:44px;margin:4px 0 0;border:0;color:#a3adc2;font-size:14px;text-decoration:underline}' +
+    'button.discret.armer{color:#f2d27a;text-decoration:none}' +
+    'button:focus-visible{outline:3px solid #f2d27a;outline-offset:2px}' +
+    '.seul{display:inline-flex;width:auto;min-height:44px;margin:0;padding:6px 14px;border:1px solid #5a6688;background:rgba(11,16,32,.6);color:#eceae4;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif}' +
+    '.seul.armer{border-color:#f2d27a;color:#f2d27a}';
+
+  function isoler(element) {
+    ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'click', 'keydown', 'keyup', 'wheel'].forEach(function (type) {
+      element.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
+  }
+
+  function creerHote(nom, style) {
+    var hote = document.createElement(nom);
+    for (var p in style) hote.style.setProperty(p, style[p], 'important');
+    var ombre = hote.attachShadow ? hote.attachShadow({ mode: 'open' }) : hote;
+    var feuille = document.createElement('style');
+    feuille.textContent = CSS;
+    ombre.appendChild(feuille);
+    return { hote: hote, ombre: ombre };
+  }
+
+  function bouton(classe, contenu) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    if (classe) b.className = classe;
+    b.textContent = contenu;
+    return b;
+  }
+
+  // Bouton d'effacement en deux temps (les fenêtres du navigateur sont interdites) :
+  // 1er toucher → « Toucher encore pour effacer », 2e toucher dans les 3 s → efface.
+  function armerEffacement(b, jeu, fait) {
+    var minuteur = null;
+    b.addEventListener('click', function () {
+      if (!b.classList.contains('armer')) {
+        b.classList.add('armer');
+        b.textContent = texte('confirmer');
+        clearTimeout(minuteur);
+        minuteur = setTimeout(function () { b.classList.remove('armer'); b.textContent = texte('effacer'); }, 3000);
+        return;
+      }
+      clearTimeout(minuteur);
+      b.classList.remove('armer');
+      clear(jeu);
+      fait();
+    });
+  }
+
+  var ouverte = null; // fenêtre de reprise affichée
+
+  // Fenêtre de reprise. options :
+  //   jeu          identifiant du jeu (obligatoire)
+  //   onContinuer  f(donnees) : reprendre au niveau donnees.niveau
+  //   onNouvelle   f() : partie depuis le début (la sauvegarde reste jusqu'à la
+  //                prochaine écriture du jeu)
+  //   onEffacer    f() facultatif, après effacement (par défaut : onNouvelle)
+  //   sansNiveau   true pour un jeu sans niveaux (partie sans fin) : la fenêtre
+  //                montre seulement le score (rien s'il est nul)
+  // Sans sauvegarde utilisable : rien ne s'affiche, onNouvelle() est appelé
+  // tout de suite. Renvoie true si la fenêtre s'affiche.
+  function reprise(options) {
+    options = options || {};
+    var jeu = options.jeu;
+    var nouvelle = typeof options.onNouvelle === 'function' ? options.onNouvelle : function () {};
+    var continuer = typeof options.onContinuer === 'function' ? options.onContinuer : nouvelle;
+    var effacer = typeof options.onEffacer === 'function' ? options.onEffacer : nouvelle;
+    var d = lireDonnees(jeu);
+    if (!d) { nouvelle(); return false; }
+    if (ouverte) ouverte.fermer();
+
+    var precedent = document.activeElement;
+    var h = creerHote('jel-sauvegarde', { position: 'fixed', inset: '0', 'z-index': '2147483002', display: 'block', margin: '0', padding: '0' });
+    var fond = document.createElement('div');
+    fond.className = 'fond';
+    var carte = document.createElement('div');
+    carte.className = 'carte';
+    carte.setAttribute('role', 'dialog');
+    carte.setAttribute('aria-modal', 'true');
+    var titre = document.createElement('h2');
+    titre.id = 'jel-sauvegarde-titre';
+    titre.textContent = texte('titre');
+    carte.setAttribute('aria-labelledby', titre.id);
+    var detail = document.createElement('p');
+    detail.textContent = options.sansNiveau
+      ? (d.score ? texte('score', { n: d.score }) : '')
+      : texte('niveau', { n: d.niveau }) + (d.score ? ' · ' + texte('score', { n: d.score }) : '');
+    if (!detail.textContent) detail.hidden = true;
+    var bContinuer = bouton('principal', texte('continuer'));
+    var bNouvelle = bouton('', texte('nouvelle'));
+    var bEffacer = bouton('discret', texte('effacer'));
+    carte.append(titre, detail, bContinuer, bNouvelle, bEffacer);
+    fond.appendChild(carte);
+    h.ombre.appendChild(fond);
+    isoler(h.hote);
+
+    var fenetre = {
+      fermer: function () {
+        if (h.hote.parentNode) h.hote.parentNode.removeChild(h.hote);
+        if (ouverte === fenetre) ouverte = null;
+        try { if (precedent && precedent.focus) precedent.focus(); } catch (e) { /* rien */ }
+      },
+    };
+    ouverte = fenetre;
+    var choisir = function (f, arg) { return function () { fenetre.fermer(); f(arg); }; };
+    bContinuer.addEventListener('click', choisir(continuer, d));
+    bNouvelle.addEventListener('click', choisir(nouvelle));
+    armerEffacement(bEffacer, jeu, function () { fenetre.fermer(); effacer(); });
+
+    // Clavier : Tab et les flèches restent dans la fenêtre, Entrée et Espace
+    // activent le bouton choisi. Échap ne ferme pas : le choix doit être explicite.
+    var boutons = [bContinuer, bNouvelle, bEffacer];
+    fond.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      var actif = h.ombre.activeElement || document.activeElement;
+      var i = boutons.indexOf(actif);
+      var recul = e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey);
+      boutons[(i + (recul ? boutons.length - 1 : 1)) % boutons.length].focus();
+    });
+
+    (document.body || document.documentElement).appendChild(h.hote);
+    try { bContinuer.focus(); } catch (e) { /* rien */ }
+    return true;
+  }
+
+  // Bouton « Effacer la sauvegarde » seul (écran titre, menu pause…). options :
+  //   jeu, conteneur (élément où le placer), apres f() facultatif.
+  // Caché tant qu'il n'y a pas de sauvegarde ; appeler .maj() pour le rafraîchir.
+  // Renvoie l'élément ajouté (avec sa méthode maj).
+  function boutonEffacer(options) {
+    options = options || {};
+    var h = creerHote('jel-sauvegarde-effacer', { display: 'inline-block', margin: '0', padding: '0', 'vertical-align': 'middle' });
+    var b = bouton('seul', texte('effacer'));
+    h.ombre.appendChild(b);
+    isoler(h.hote);
+    h.hote.maj = function () {
+      b.classList.remove('armer');
+      b.textContent = texte('effacer');
+      h.hote.style.setProperty('display', existe(options.jeu) ? 'inline-block' : 'none', 'important');
+    };
+    armerEffacement(b, options.jeu, function () {
+      h.hote.maj();
+      if (typeof options.apres === 'function') options.apres();
+    });
+    h.hote.maj();
+    if (options.conteneur) options.conteneur.appendChild(h.hote);
+    return h.hote;
+  }
+
+  window.JEL_SAVE = {
+    VERSION: SAUVEGARDE_VERSION,
+    save: save,
+    load: load,
+    clear: clear,
+    existe: existe,
+    surFermeture: surFermeture,
+    reprise: reprise,
+    boutonEffacer: boutonEffacer,
+    texte: texte,
+  };
+})();
+</script>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<!-- Interface pendant un stand -->
+<div id="hud" hidden>
+  <button class="rond" id="b-pause" data-i18n-aria="aria.pause"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg></button>
+  <div id="hud-titre"></div>
+  <button class="rond b-son" data-i18n-aria="aria.son"></button>
+</div>
+<div id="infos" hidden>
+  <div id="objectif"></div>
+  <div id="ordre" hidden>
+    <svg class="forain" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="23" r="13" fill="#ffd2b0"/><rect x="8" y="6" width="24" height="9" rx="3" fill="#c2185b"/><rect x="5" y="13" width="30" height="4" rx="2" fill="#8e1046"/><circle cx="15" cy="22" r="2" fill="#3a2350"/><circle cx="25" cy="22" r="2" fill="#3a2350"/><path d="M12 28 q4 -3 8 0 q4 -3 8 0 q-4 4 -8 1 q-4 3 -8 -1z" fill="#6b3a1f"/></svg>
+    <div><div class="txt" id="ordre-txt"></div><div class="pastilles" id="ordre-pastilles"></div></div>
+  </div>
+</div>
+
+<!-- Écran titre -->
+<div id="titre" class="ecran">
+  <div class="haut">
+    <div id="langue-titre"></div>
+    <button class="rond b-son" data-i18n-aria="aria.son"></button>
+  </div>
+  <div class="bloc">
+    <h1 data-i18n="titre"></h1>
+    <p class="consigne" data-i18n="consigne"></p>
+  </div>
+  <div class="bas">
+    <button class="gros" id="b-jouer" data-i18n="bouton.jouer"></button>
+    <div class="ligne">
+      <button class="moyen" id="b-stands" data-i18n="bouton.stands"></button>
+      <button class="moyen" id="b-etagere" data-i18n="bouton.etagere"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Carte d'introduction (tutoriel et nouveautés) -->
+<div id="intro" class="ecran" hidden>
+  <div class="carte">
+    <div class="allee" id="intro-allee"></div>
+    <h2 id="intro-titre"></h2>
+    <p id="intro-texte"></p>
+    <ol id="intro-etapes" hidden>
+      <li data-i18n="tuto.etape1"></li>
+      <li data-i18n="tuto.etape2"></li>
+      <li data-i18n="tuto.etape3"></li>
+    </ol>
+    <p class="but" id="intro-but"></p>
+    <p class="touche" data-i18n="intro.touche"></p>
+  </div>
+</div>
+
+<!-- Sélection des stands -->
+<div id="niveaux" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 data-i18n="stands.titre"></h2>
+    <p data-i18n="stands.aide"></p>
+    <div id="liste-stands"></div>
+    <div class="boutons"><button class="moyen" id="b-niveaux-retour" data-i18n="bouton.accueil"></button></div>
+  </div>
+</div>
+
+<!-- Pause -->
+<div id="pause" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 data-i18n="pause.titre"></h2>
+    <p data-i18n="pause.texte"></p>
+    <div class="boutons" style="flex-direction:column;align-items:center">
+      <button class="gros" id="b-reprendre" data-i18n="bouton.reprendre"></button>
+      <button class="moyen" id="b-recommencer" data-i18n="bouton.recommencer"></button>
+      <button class="moyen" id="b-pause-accueil" data-i18n="bouton.accueil"></button>
+      <div style="display:flex;gap:10px;align-items:center"><div id="langue-pause"></div><button class="rond b-son" data-i18n-aria="aria.son" style="background:#5b3fa0"></button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Victoire -->
+<div id="victoire" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 id="v-titre"></h2>
+    <div class="etoiles" id="v-etoiles"><span>★</span><span>★</span><span>★</span></div>
+    <div class="score-g" id="v-score"></div>
+    <p id="v-detail"></p>
+    <p class="record" id="v-record"></p>
+    <div class="gain" id="v-peluche" hidden><canvas width="140" height="140"></canvas><p></p></div>
+    <div class="gain" id="v-skin" hidden><canvas width="88" height="60" style="width:44px;height:30px"></canvas><p></p></div>
+    <div class="boutons">
+      <button class="gros" id="b-suivant"></button>
+      <button class="moyen" id="b-v-rejouer" data-i18n="bouton.rejouer"></button>
+      <button class="moyen" id="b-v-stands" data-i18n="bouton.stands"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Défaite -->
+<div id="defaite" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 data-i18n="defaite.titre"></h2>
+    <p id="d-detail"></p>
+    <div class="score-g" id="d-score"></div>
+    <p class="record" id="d-record"></p>
+    <p data-i18n="defaite.conseil"></p>
+    <div class="boutons">
+      <button class="gros" id="b-reessayer" data-i18n="bouton.reessayer"></button>
+      <button class="moyen" id="b-d-stands" data-i18n="bouton.stands"></button>
+      <button class="moyen" id="b-d-accueil" data-i18n="bouton.accueil"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Bilan final -->
+<div id="bilan" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 data-i18n="bilan.titre"></h2>
+    <p data-i18n="bilan.texte"></p>
+    <div class="score-g" id="b-etoiles"></div>
+    <p id="b-peluches"></p>
+    <p id="b-score"></p>
+    <div class="boutons">
+      <button class="gros" id="b-bilan-etagere" data-i18n="bouton.etagere"></button>
+      <button class="moyen" id="b-bilan-rejouer" data-i18n="bouton.rejouer"></button>
+      <button class="moyen" id="b-bilan-accueil" data-i18n="bouton.accueil"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Étagère de la chambre -->
+<div id="etagere" class="ecran voile" hidden>
+  <div class="carte">
+    <h2 data-i18n="etagere.titre"></h2>
+    <p id="etagere-compte"></p>
+    <canvas id="canvas-etagere" width="1000" height="880"></canvas>
+    <p style="font-weight:800;margin-top:12px" data-i18n="etagere.anneaux"></p>
+    <div class="skins" id="liste-skins"></div>
+    <div class="boutons"><button class="moyen" id="b-etagere-retour" data-i18n="bouton.retour"></button></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ==========================================================================
+   Les anneaux de la fête foraine — Free Micro Games
+   Lancer d'anneaux en lance-pierre : on tire le doigt vers l'arrière pour
+   viser (direction et force), on relâche, l'anneau vole en cloche et doit
+   retomber autour du goulot d'une bouteille, d'un cône ou d'un canard.
+   Monde en « 2,5 D » : x (gauche-droite, -1 à 1), z (profondeur, 0 devant,
+   1 au fond du stand), h (hauteur). proj() les place à l'écran.
+   ========================================================================== */
+const JEU = 'anneaux-de-la-fete-foraine';
+const tr = (cle, vars) => window.JEL_I18N.t(cle, vars);
+const nombre = (x) => window.JEL_I18N.nombre(x);
+
+// ---------------------------------------------------------------------------
+// Données : cibles, couleurs, peluches, anneaux à paillettes
+// ---------------------------------------------------------------------------
+const COULEURS = {
+  r: { id: 'rouge', fond: '#e5484d', clair: '#ff8a8e', sombre: '#9e1f25' },
+  b: { id: 'bleu', fond: '#3b82f6', clair: '#8fb9ff', sombre: '#1d4fa8' },
+  j: { id: 'jaune', fond: '#f5c518', clair: '#ffe680', sombre: '#a87f00' },
+  v: { id: 'vert', fond: '#2fb36b', clair: '#86e3ad', sombre: '#167043' },
+};
+const CLES_COULEURS = ['r', 'b', 'j', 'v'];
+
+// haut : hauteur du goulot (là où l'anneau doit passer) ; tol : écart permis
+// autour du goulot ; corps : rayon du corps (un anneau un peu trop loin tape le bord).
+const TYPES = {
+  bouteille: { haut: 0.33, tol: 0.085, corps: 0.065 },
+  cone: { haut: 0.28, tol: 0.068, corps: 0.07 },
+  canard: { haut: 0.19, tol: 0.076, corps: 0.08 },
+};
+const LISTE_TYPES = ['bouteille', 'cone', 'canard'];
+
+const PELUCHES = [
+  { id: 'ourson', c: '#b5835a', c2: '#ecd0ad', o: 'rond' },
+  { id: 'lapin', c: '#f3e9ee', c2: '#f7b6c8', o: 'long' },
+  { id: 'chat', c: '#f0a35e', c2: '#fff1dc', o: 'pointu', moust: true },
+  { id: 'panda', c: '#f7f7f7', c2: '#2b2b2b', o: 'rond', panda: true },
+  { id: 'grenouille', c: '#6cc46c', c2: '#d8f5c8', o: 'yeux' },
+  { id: 'cochon', c: '#f7a9b8', c2: '#f37f97', o: 'pointu', groin: true },
+  { id: 'renard', c: '#e8743b', c2: '#fff6ec', o: 'pointu' },
+  { id: 'chouette', c: '#9b7653', c2: '#f3dfbf', o: 'plumes', bec: true },
+  { id: 'pingouin', c: '#2f3e5c', c2: '#ffffff', o: 'aucune', bec: true },
+  { id: 'elephant', c: '#a8b4c8', c2: '#d6dded', o: 'grandes', trompe: true },
+  { id: 'souris', c: '#b9b9c6', c2: '#f6c6d0', o: 'grandes' },
+  { id: 'lion', c: '#f2c14e', c2: '#c9772b', o: 'criniere' },
+  { id: 'koala', c: '#9aa3ad', c2: '#e9edf1', o: 'grandes', grosNez: true },
+  { id: 'poussin', c: '#ffd84d', c2: '#ff9f1c', o: 'aucune', bec: true },
+  { id: 'licorne', c: '#ffffff', c2: '#c9a7ff', o: 'pointu', corne: true },
+  { id: 'dinosaure', c: '#7bc67e', c2: '#f3e08a', o: 'pics' },
+  { id: 'chien', c: '#d9b38c', c2: '#7a5233', o: 'tombantes' },
+  { id: 'singe', c: '#8a5a3c', c2: '#e8c39e', o: 'cotes' },
+  { id: 'mouton', c: '#fbf7ee', c2: '#4a4a4a', o: 'tombantes', laine: true },
+  { id: 'tigre', c: '#f39a3d', c2: '#ffffff', o: 'rond', rayures: true },
+];
+
+const ANNEAUX = [
+  { id: 'classique', seuil: 0, a: '#ff5a5f', b: '#ffd166' },
+  { id: 'or', seuil: 6, a: '#f2b705', b: '#fff3b0', p: true },
+  { id: 'arcenciel', seuil: 12, arc: true, p: true },
+  { id: 'argent', seuil: 20, a: '#aab6c8', b: '#ffffff', p: true },
+  { id: 'rose', seuil: 30, a: '#ff6fbf', b: '#ffd1ec', p: true },
+  { id: 'menthe', seuil: 42, a: '#2fd3a0', b: '#c9fff0', p: true },
+  { id: 'nuit', seuil: 54, a: '#6a5cff', b: '#e0dbff', p: true },
+];
+
+// Commandes du forain : suite d'éléments (couleur et/ou type) à réussir.
+// affilee : une erreur fait recommencer la commande depuis le début.
+const COMMANDES = {
+  troisRouges: { items: [{ c: 'r' }, { c: 'r' }, { c: 'r' }], affilee: true },
+  deuxBleus: { items: [{ c: 'b' }, { c: 'b' }], affilee: true },
+  troisJaunes: { items: [{ c: 'j' }, { c: 'j' }, { c: 'j' }], affilee: true },
+  troisVerts: { items: [{ c: 'v' }, { c: 'v' }, { c: 'v' }], affilee: true },
+  bouteilleConeCanard: { items: [{ t: 'bouteille' }, { t: 'cone' }, { t: 'canard' }], affilee: false },
+  canardPuisBouteille: { items: [{ t: 'canard' }, { t: 'bouteille' }], affilee: false },
+  rougeBleuJaune: { items: [{ c: 'r' }, { c: 'b' }, { c: 'j' }], affilee: false },
+  deuxCanards: { items: [{ t: 'canard' }, { t: 'canard' }], affilee: true },
+  deuxCones: { items: [{ t: 'cone' }, { t: 'cone' }], affilee: true },
+  vertPuisRouge: { items: [{ c: 'v' }, { c: 'r' }], affilee: false },
+  troisBouteilles: { items: [{ t: 'bouteille' }, { t: 'bouteille' }, { t: 'bouteille' }], affilee: true },
+};
+
+// ---------------------------------------------------------------------------
+// Les 20 stands. allee : 0 fanions, 1 lampions, 2 grande roue, 3 feu d'artifice.
+// cibles : cibles posées ; tapis : cibles qui défilent ; riviere : canards qui
+// flottent ; vent : {f} fixe ou {min,max} qui change à chaque lancer ;
+// plots : plots en caoutchouc ; manege : chevaux de bois qui tournent ;
+// ordres : commandes du forain (l'objectif devient le nombre de commandes) ;
+// tol : facteur de tolérance autour des goulots ; visee : part de la
+// trajectoire montrée en pointillés (1 = toute, avec la marque d'arrivée) ;
+// demo : nouveauté montrée par l'anneau fantôme de la carte d'introduction.
+// ---------------------------------------------------------------------------
+const B = (x, z, c) => ({ t: 'bouteille', x, z, c });
+const C = (x, z, c) => ({ t: 'cone', x, z, c });
+const K = (x, z, c) => ({ t: 'canard', x, z, c });
+
+const NIVEAUX = [
+  { allee: 0, anneaux: 8, objectif: 3, tol: 1.4, visee: 1, demo: 'base',
+    cibles: [B(-0.4, 0.3, 'r'), B(0, 0.3, 'b'), B(0.4, 0.3, 'j'), B(-0.2, 0.52, 'v'), B(0.2, 0.52, 'r')] },
+  { allee: 0, anneaux: 9, objectif: 4, tol: 1.3, visee: 1, demo: 'cone',
+    cibles: [B(-0.5, 0.3, 'b'), C(0, 0.36, 'r'), B(0.5, 0.3, 'v'), C(-0.3, 0.62, 'j'), B(0.3, 0.62, 'r'), C(0, 0.85, 'b')] },
+  { allee: 0, anneaux: 9, objectif: 4, tol: 1.25, visee: 1, demo: 'canard',
+    cibles: [K(-0.45, 0.35, 'j'), B(0, 0.42, 'r'), K(0.45, 0.35, 'b'), C(-0.25, 0.72, 'v'), K(0.25, 0.72, 'r'), B(0, 0.93, 'j')] },
+  { allee: 0, anneaux: 9, objectif: 4, tol: 1.2, visee: 0.7, demo: 'tapis',
+    cibles: [B(-0.45, 0.25, 'v'), B(0.45, 0.25, 'b')],
+    tapis: [{ z: 0.58, v: 0.24, n: 4, types: ['bouteille', 'canard'] }] },
+  { allee: 0, anneaux: 10, objectif: 5, tol: 1.15, visee: 0.7, demo: 'deuxTapis',
+    cibles: [C(0, 0.97, 'r')],
+    tapis: [{ z: 0.42, v: 0.28, n: 3, types: ['bouteille', 'cone'] }, { z: 0.76, v: -0.3, n: 3, types: ['bouteille', 'canard'] }] },
+  { allee: 1, anneaux: 9, objectif: 4, tol: 1.15, visee: 0.7, demo: 'riviere',
+    cibles: [B(-0.45, 0.3, 'r'), B(0.45, 0.3, 'j')],
+    riviere: { z: 0.64, v: 0.18, n: 4 } },
+  { allee: 1, anneaux: 10, objectif: 5, tol: 1.1, visee: 0.7, demo: null,
+    cibles: [K(-0.2, 0.25, 'v'), K(0.2, 0.25, 'b'), B(-0.5, 0.92, 'r'), C(0, 0.97, 'j'), B(0.5, 0.92, 'b')],
+    riviere: { z: 0.55, v: -0.24, n: 4 } },
+  { allee: 1, anneaux: 10, objectif: 5, tol: 1.1, visee: 0.7, demo: 'vent', vent: { f: 0.32 },
+    cibles: [B(-0.5, 0.3, 'r'), C(0, 0.35, 'b'), B(0.5, 0.3, 'v'), K(-0.3, 0.65, 'j'), B(0.3, 0.65, 'b'), C(0, 0.9, 'r')] },
+  { allee: 1, anneaux: 10, objectif: 5, tol: 1.08, visee: 0.7, demo: 'ventChange', vent: { min: -0.45, max: 0.45 },
+    cibles: [B(-0.42, 0.28, 'j'), B(0.42, 0.28, 'r')],
+    tapis: [{ z: 0.62, v: 0.26, n: 4, types: ['bouteille', 'cone', 'canard'] }] },
+  { allee: 1, anneaux: 11, objectif: 6, tol: 1.05, visee: 0.7, demo: null, vent: { min: -0.4, max: 0.4 },
+    cibles: [C(-0.5, 0.92, 'v'), B(0, 0.97, 'r'), C(0.5, 0.92, 'b'), B(0, 0.28, 'j')],
+    riviere: { z: 0.56, v: 0.25, n: 4 } },
+  { allee: 2, anneaux: 10, objectif: 5, tol: 1.08, visee: 0.55, demo: 'plots',
+    plots: [{ x: -0.3, z: 0.47 }, { x: 0.3, z: 0.47 }, { x: 0, z: 0.68 }],
+    cibles: [B(-0.58, 0.6, 'r'), C(0, 0.88, 'b'), B(0.58, 0.6, 'j'), K(-0.3, 0.86, 'v'), K(0.3, 0.86, 'r'), B(0, 0.3, 'b')] },
+  { allee: 2, anneaux: 11, objectif: 6, tol: 1.05, visee: 0.55, demo: null,
+    plots: [{ x: -0.5, z: 0.45 }, { x: 0, z: 0.45 }, { x: 0.5, z: 0.45 }],
+    cibles: [B(-0.25, 0.25, 'v'), B(0.25, 0.25, 'r')],
+    tapis: [{ z: 0.72, v: 0.3, n: 4, types: ['bouteille', 'cone', 'canard'] }] },
+  { allee: 2, anneaux: 9, objectif: 4, tol: 1.08, visee: 0.55, demo: 'manege',
+    manege: { x: 0, z: 0.6, r: 0.42, n: 4, w: 0.7 },
+    cibles: [B(-0.45, 0.96, 'r'), C(-0.15, 1.0, 'j'), B(0.15, 1.0, 'b'), K(0.45, 0.96, 'v')] },
+  { allee: 2, anneaux: 10, objectif: 5, tol: 1.04, visee: 0.55, demo: null, vent: { f: -0.3 },
+    manege: { x: 0, z: 0.62, r: 0.42, n: 5, w: 0.9 },
+    cibles: [B(-0.4, 0.98, 'b'), B(0, 1.0, 'r'), B(0.4, 0.98, 'j'), C(-0.72, 0.38, 'v'), C(0.72, 0.38, 'r')] },
+  { allee: 2, anneaux: 11, objectif: 6, tol: 1.02, visee: 0.55, demo: null,
+    manege: { x: 0, z: 0.74, r: 0.36, n: 4, w: 1.0 },
+    plots: [{ x: -0.72, z: 0.62 }, { x: 0.72, z: 0.62 }],
+    cibles: [B(-0.3, 1.04, 'r'), C(0, 1.06, 'b'), B(0.3, 1.04, 'v')],
+    riviere: { z: 0.42, v: 0.22, n: 3 } },
+  { allee: 3, anneaux: 11, tol: 1.12, visee: 0.55, demo: 'ordres', ordres: ['troisRouges', 'bouteilleConeCanard'],
+    cibles: [B(-0.5, 0.3, 'r'), C(-0.17, 0.33, 'b'), K(0.17, 0.33, 'r'), B(0.5, 0.3, 'j'), C(-0.35, 0.68, 'r'), K(0, 0.72, 'v'), B(0.35, 0.68, 'r')] },
+  { allee: 3, anneaux: 13, tol: 1.06, visee: 0.55, demo: null, ordres: ['deuxBleus', 'troisJaunes', 'canardPuisBouteille'],
+    cibles: [B(-0.42, 0.27, 'b'), K(0.42, 0.27, 'j')],
+    tapis: [{ z: 0.6, v: 0.26, n: 5, types: ['bouteille', 'cone', 'canard'] }] },
+  { allee: 3, anneaux: 13, tol: 1.04, visee: 0.55, demo: null, vent: { min: -0.35, max: 0.35 },
+    ordres: ['troisVerts', 'rougeBleuJaune', 'deuxCanards'],
+    cibles: [B(-0.45, 0.28, 'v'), C(0, 0.3, 'r'), B(0.45, 0.28, 'b'), B(-0.4, 0.92, 'j'), C(0.4, 0.92, 'v')],
+    riviere: { z: 0.6, v: 0.22, n: 4 } },
+  { allee: 3, anneaux: 14, tol: 1.0, visee: 0.55, demo: null, ordres: ['troisRouges', 'deuxCones', 'vertPuisRouge'],
+    manege: { x: 0, z: 0.66, r: 0.38, n: 4, w: 0.95 },
+    plots: [{ x: -0.55, z: 0.42 }, { x: 0.55, z: 0.42 }],
+    cibles: [B(-0.3, 1.02, 'r'), C(0, 1.04, 'v'), B(0.3, 1.02, 'r'), C(-0.78, 0.3, 'r'), C(0.78, 0.3, 'v'), B(0, 0.27, 'b')] },
+  { allee: 3, anneaux: 16, tol: 0.98, visee: 0.55, demo: null, vent: { min: -0.3, max: 0.3 },
+    ordres: ['rougeBleuJaune', 'troisBouteilles', 'deuxCanards', 'troisJaunes'],
+    manege: { x: 0, z: 0.78, r: 0.3, n: 4, w: 1.1 },
+    plots: [{ x: -0.62, z: 0.62 }, { x: 0.62, z: 0.62 }],
+    cibles: [B(-0.2, 1.06, 'j'), K(0.2, 1.06, 'r'), B(-0.75, 0.82, 'b'), K(0.75, 0.82, 'j')],
+    tapis: [{ z: 0.38, v: 0.3, n: 4, types: ['bouteille', 'cone', 'canard'] }] },
+];
+window.JEL_NIVEAUX = NIVEAUX.length;
+NIVEAUX.forEach((d) => { if (d.ordres) d.objectif = d.ordres.length; });
+const TOTAL_ETOILES = NIVEAUX.length * 3;
+
+// Constantes du lancer
+const X0 = 0, Z0 = -0.15, H0 = 0.12;     // point de départ de l'anneau (le comptoir)
+const H_VISEE = 0.28;                       // hauteur de l'anneau au point visé
+const R_ANNEAU = 0.1;                       // rayon de l'anneau pour les chocs (unités de x)
+const R_VISU = 0.125;                       // rayon de l'anneau dessiné
+const PLOT_H = 0.5, PLOT_R = 0.075;         // plots en caoutchouc
+const CHEVAL_H = 0.95, CHEVAL_R = 0.08;     // chevaux de bois du manège (avec leur mât)
+const ANGLE_MAX = 0.78;                     // angle de visée maximal (radians)
+
+// ---------------------------------------------------------------------------
+// Progression (étoiles, records, peluches, anneau choisi, son)
+// Gardée dans le localStorage du jeu (try/catch) ET dans les options de la
+// sauvegarde commune (save.js), qui marche aussi dans le cadre isolé du site.
+// ---------------------------------------------------------------------------
+const CLE_LOCALE = 'fmg-anneaux-foraine';
+let P = { etoiles: [], records: [], peluches: [], skin: 'classique', son: true };
+
+function chargerProgression() {
+  const sources = [];
+  try { const brut = localStorage.getItem(CLE_LOCALE); if (brut) sources.push(JSON.parse(brut)); } catch (e) { /* pas de stockage */ }
+  try { const d = window.JEL_SAVE.load(JEU); if (d && d.options && d.options.etoiles) sources.push(d.options); } catch (e) { /* rien */ }
+  for (const s of sources) {
+    if (!s || typeof s !== 'object') continue;
+    for (let i = 0; i < NIVEAUX.length; i++) {
+      const e = Number(s.etoiles && s.etoiles[i]) || 0;
+      const r = Number(s.records && s.records[i]) || 0;
+      P.etoiles[i] = Math.max(P.etoiles[i] || 0, Math.min(3, e));
+      P.records[i] = Math.max(P.records[i] || 0, r);
+      P.peluches[i] = !!(P.peluches[i] || (s.peluches && s.peluches[i]));
+    }
+    if (typeof s.skin === 'string') P.skin = s.skin;
+    if (typeof s.son === 'boolean') P.son = s.son;
+  }
+  for (let i = 0; i < NIVEAUX.length; i++) {
+    P.etoiles[i] = P.etoiles[i] || 0; P.records[i] = P.records[i] || 0; P.peluches[i] = !!P.peluches[i];
+  }
+  if (!ANNEAUX.some((a) => a.id === P.skin) || !skinDebloque(ANNEAUX.find((a) => a.id === P.skin))) P.skin = 'classique';
+}
+function garderLocal() {
+  try { localStorage.setItem(CLE_LOCALE, JSON.stringify(P)); } catch (e) { /* pas de stockage */ }
+}
+function totalEtoiles() { return P.etoiles.reduce((a, b) => a + (b || 0), 0); }
+function totalScore() { return P.records.reduce((a, b) => a + (b || 0), 0); }
+function nbPeluches() { return P.peluches.filter(Boolean).length; }
+function skinDebloque(s) { return !!s && totalEtoiles() >= s.seuil; }
+function skinActuel() { return ANNEAUX.find((a) => a.id === P.skin) || ANNEAUX[0]; }
+// Un stand est ouvert si le précédent a au moins une étoile.
+function standOuvert(i) { return i === 0 || (P.etoiles[i - 1] || 0) > 0 || i < niveauOuvertSauvegarde; }
+let niveauOuvertSauvegarde = 1;
+
+// ---------------------------------------------------------------------------
+// Sons (Web Audio, rien avant la première action)
+// ---------------------------------------------------------------------------
+let AC = null;
+function audio() {
+  if (!P.son) return null;
+  try {
+    if (!AC) { const A = window.AudioContext || window.webkitAudioContext; if (!A) return null; AC = new A(); }
+    if (AC.state === 'suspended') AC.resume();
+  } catch (e) { return null; }
+  return AC;
+}
+function note(freq, duree, type, vol, glisse, delai) {
+  const a = audio(); if (!a) return;
+  try {
+    const t0 = a.currentTime + (delai || 0);
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t0);
+    if (glisse) o.frequency.exponentialRampToValueAtTime(Math.max(30, glisse), t0 + duree);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + duree);
+    o.connect(g); g.connect(a.destination);
+    o.start(t0); o.stop(t0 + duree + 0.05);
+  } catch (e) { /* rien */ }
+}
+function bruit(duree, vol, filtre, delai) {
+  const a = audio(); if (!a) return;
+  try {
+    const t0 = a.currentTime + (delai || 0);
+    const n = Math.floor(a.sampleRate * duree);
+    const buf = a.createBuffer(1, n, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = a.createBufferSource(); s.buffer = buf;
+    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = filtre || 1200; f.Q.value = 0.8;
+    const g = a.createGain(); g.gain.value = vol || 0.15;
+    s.connect(f); f.connect(g); g.connect(a.destination);
+    s.start(t0);
+  } catch (e) { /* rien */ }
+}
+const SONS = {
+  clic() { note(660, 0.07, 'triangle', 0.12); },
+  tendre() { note(220, 0.08, 'triangle', 0.05, 260); },
+  lancer() { bruit(0.28, 0.18, 900); note(500, 0.25, 'sine', 0.06, 900); },
+  ding(serie) { const b = 784 * Math.pow(1.122, Math.min(serie, 6)); note(b, 0.4, 'triangle', 0.2); note(b * 1.5, 0.5, 'sine', 0.12, null, 0.06); },
+  toc() { note(140, 0.12, 'square', 0.08, 70); bruit(0.08, 0.1, 400); },
+  tink() { note(1650, 0.12, 'sine', 0.12); note(2100, 0.1, 'sine', 0.06, null, 0.03); },
+  boing() { note(180, 0.35, 'sine', 0.22, 520); },
+  bonk() { note(260, 0.12, 'square', 0.08, 120); bruit(0.06, 0.12, 700); },
+  vent() { bruit(0.6, 0.06, 500); },
+  etoile(i) { note(880 + i * 220, 0.25, 'triangle', 0.16); },
+  victoire() { [523, 659, 784, 1047].forEach((f, i) => note(f, 0.28, 'triangle', 0.18, null, i * 0.12)); },
+  defaite() { note(392, 0.35, 'sine', 0.15, 330); note(330, 0.5, 'sine', 0.15, 262, 0.32); },
+  commande() { [659, 880, 1175].forEach((f, i) => note(f, 0.22, 'square', 0.08, null, i * 0.08)); },
+  oups() { note(300, 0.18, 'sine', 0.12, 220); },
+};
+function majBoutonsSon() {
+  const svgOn = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="#fff8ec" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+  const svgOff = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9l6 6M22 9l-6 6" stroke="#fff8ec" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>';
+  document.querySelectorAll('.b-son').forEach((b) => {
+    b.innerHTML = P.son ? svgOn : svgOff;
+    b.setAttribute('aria-pressed', P.son ? 'false' : 'true');
+    b.setAttribute('aria-label', tr(P.son ? 'aria.sonCouper' : 'aria.sonRemettre'));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Canvas et projection
+// ---------------------------------------------------------------------------
+const cv = document.getElementById('scene');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+const L = {};
+function redim() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  const pw = Math.min(W, H * 0.72);
+  L.pw = pw; L.ox = (W - pw) / 2; L.cx = W / 2;
+  L.demi = pw * 0.47;
+  L.yNear = H * 0.8; L.yFar = H * 0.42;
+  L.hEch = H * 0.31;
+  L.dMax = Math.max(90, Math.min(H * 0.24, 190));
+}
+window.addEventListener('resize', redim);
+redim();
+
+function echelle(z) { return 1 - 0.42 * z; }
+function proj(x, z, h) {
+  const s = echelle(z);
+  return { x: L.cx + x * L.demi * s, y: L.yNear - (L.yNear - L.yFar) * z - (h || 0) * L.hEch * s, s };
+}
+
+// ---------------------------------------------------------------------------
+// État de la partie
+// ---------------------------------------------------------------------------
+let ecran = 'titre';   // titre, intro, jeu, pause, fin
+let S = null;          // stand en cours
+let temps = 0;         // temps global (décor)
+let enPause = false;
+const decor = { feux: [], confettis: [] };
+function hasard() { return Math.random(); }
+function choisir(liste) { return liste[Math.floor(hasard() * liste.length)]; }
+
+function nouvelleCible(type, x, z, c, mob) {
+  return { type, x, z, c, mob: mob || null, prise: 0, apparition: 0, bob: 0, prisePar: null };
+}
+
+function demarrerStand(n) {
+  const def = NIVEAUX[n - 1];
+  S = {
+    n, def, anneaux: def.anneaux, reussis: 0, score: 0, serie: 0,
+    cibles: [], plots: (def.plots || []).map((p) => ({ x: p.x, z: p.z, boing: 0 })),
+    manege: def.manege ? { ...def.manege, a: 0 } : null,
+    vent: 0, anneau: null, auSol: [], autour: [], parts: [], popups: [], aRenaitre: [],
+    ordre: def.ordres ? { i: 0, prog: 0 } : null,
+    actif: true, fini: false, secousse: 0, finDans: 0, nbLances: 0,
+  };
+  for (const c of def.cibles || []) S.cibles.push(nouvelleCible(c.t, c.x, c.z, c.c, { kind: 'fixe', x: c.x, z: c.z }));
+  for (const tp of def.tapis || []) {
+    for (let i = 0; i < tp.n; i++) {
+      const x = -1.25 + (i + 0.5) * (2.5 / tp.n);
+      S.cibles.push(nouvelleCible(choisir(tp.types), x, tp.z, choisirCouleur(), { kind: 'tapis', v: tp.v, z: tp.z, types: tp.types }));
+    }
+  }
+  if (def.riviere) {
+    const rv = def.riviere;
+    for (let i = 0; i < rv.n; i++) {
+      const x = -1.25 + (i + 0.5) * (2.5 / rv.n);
+      S.cibles.push(nouvelleCible('canard', x, rv.z, choisirCouleur(), { kind: 'riviere', v: rv.v, z: rv.z, phase: i * 1.7 }));
+    }
+  }
+  S.cibles.forEach((c) => { c.apparition = 1; });
+  tirerVent();
+  clavier.ang = 0; clavier.p = 0.45; clavier.actif = false;
+  visee.actif = false;
+  majHud();
+  montrerIntro();
+}
+
+function choisirCouleur() {
+  // Dans un stand à commandes, une cible sur deux a la couleur (ou le type) attendu.
+  if (S && S.ordre) {
+    const besoin = besoinActuel();
+    if (besoin && besoin.c && hasard() < 0.5) return besoin.c;
+  }
+  return choisir(CLES_COULEURS);
+}
+function besoinActuel() {
+  if (!S || !S.ordre) return null;
+  const cmd = COMMANDES[S.def.ordres[S.ordre.i]];
+  return cmd ? cmd.items[S.ordre.prog] : null;
+}
+function tirerVent() {
+  const v = S.def.vent;
+  if (!v) { S.vent = 0; return; }
+  if (typeof v.f === 'number') S.vent = v.f;
+  else {
+    let w = v.min + hasard() * (v.max - v.min);
+    if (Math.abs(w) < 0.12) w = w < 0 ? -0.15 : 0.15;
+    S.vent = w;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Visée : doigt / souris (lance-pierre) et clavier
+// ---------------------------------------------------------------------------
+const visee = { actif: false, id: null, x0: 0, y0: 0, dx: 0, dy: 0 };
+const clavier = { ang: 0, p: 0.45, actif: false };
+
+function viseeDepuisGlisse(dx, dy) {
+  const D = Math.hypot(dx, dy);
+  if (dy < 6 || D < 12) return null;
+  const p = Math.min(1, D / L.dMax);
+  let ang = Math.atan2(-dx, dy);
+  ang = Math.max(-ANGLE_MAX, Math.min(ANGLE_MAX, ang));
+  return { ang, p };
+}
+function pointVise(v) {
+  const zL = 0.05 + v.p * 1.04;
+  let xL = Math.tan(v.ang) * (zL - Z0) * 1.15;
+  xL = Math.max(-1.08, Math.min(1.08, xL));
+  return { xL, zL };
+}
+function viseeActuelle() {
+  if (visee.actif) return viseeDepuisGlisse(visee.dx, visee.dy);
+  if (clavier.actif) return { ang: clavier.ang, p: clavier.p };
+  return null;
+}
+// Trajectoire : vole en cloche et passe à H_VISEE au-dessus du point visé.
+function preparerVol(v) {
+  const { xL, zL } = pointVise(v);
+  const T = 0.75 + 0.45 * zL;
+  const Hpk = 0.5 + 0.45 * zL;
+  const g = 8 * Hpk / (T * T);
+  return { x: X0, z: Z0, h: H0, vx: (xL - X0) / T, vz: (zL - Z0) / T, vh: (H_VISEE - H0) / T + g * T / 2, g, T, t: 0, rot: 0, rebond: false, tape: new Set(), xL, zL };
+}
+
+function peutLancer() { return ecran === 'jeu' && S && S.actif && !S.fini && !S.anneau && S.anneaux > 0 && !enPause; }
+
+function lancer(v, fantome) {
+  const vol = preparerVol(v);
+  if (fantome) return vol;
+  S.anneau = vol;
+  S.anneaux--;
+  S.nbLances++;
+  SONS.lancer();
+  if (S.def.vent && Math.abs(S.vent) > 0.2) SONS.vent();
+  majHud();
+  return vol;
+}
+
+function coordsPointeur(e) { return { x: e.clientX, y: e.clientY }; }
+cv.addEventListener('pointerdown', (e) => {
+  audio();
+  if (ecran !== 'jeu' || enPause || !S || S.fini) return;
+  e.preventDefault();
+  const p = coordsPointeur(e);
+  visee.actif = true; visee.id = e.pointerId; visee.x0 = p.x; visee.y0 = p.y; visee.dx = 0; visee.dy = 0;
+  clavier.actif = false;
+  try { cv.setPointerCapture(e.pointerId); } catch (err) { /* rien */ }
+});
+cv.addEventListener('pointermove', (e) => {
+  if (!visee.actif || e.pointerId !== visee.id) return;
+  const p = coordsPointeur(e);
+  const avant = viseeDepuisGlisse(visee.dx, visee.dy);
+  visee.dx = p.x - visee.x0; visee.dy = p.y - visee.y0;
+  const apres = viseeDepuisGlisse(visee.dx, visee.dy);
+  if (apres && (!avant || Math.floor(apres.p * 6) !== Math.floor(avant.p * 6))) SONS.tendre();
+});
+function finGlisse(e) {
+  if (!visee.actif || e.pointerId !== visee.id) return;
+  const v = viseeDepuisGlisse(visee.dx, visee.dy);
+  visee.actif = false;
+  if (v && v.p > 0.08 && peutLancer()) lancer(v);
+}
+cv.addEventListener('pointerup', finGlisse);
+cv.addEventListener('pointercancel', (e) => { if (e.pointerId === visee.id) visee.actif = false; });
+
+document.addEventListener('keydown', (e) => {
+  const code = e.code;
+  if (ecran === 'jeu' && (code === 'Escape' || code === 'KeyP')) { e.preventDefault(); if (enPause) reprendre(); else pauser(); return; }
+  if (ecran === 'pause' && (code === 'Escape' || code === 'KeyP')) { e.preventDefault(); reprendre(); return; }
+  if (ecran === 'intro' && (code === 'Space' || code === 'Enter')) { e.preventDefault(); fermerIntro(); return; }
+  if (ecran === 'titre' && (code === 'Enter' || code === 'Space') && document.activeElement === document.body) { e.preventDefault(); boutonJouer(); return; }
+  if (ecran !== 'jeu' || enPause || !S || S.fini) return;
+  if (code === 'ArrowLeft' || code === 'KeyA' || code === 'KeyQ') { clavier.ang = Math.max(-ANGLE_MAX, clavier.ang - 0.035); clavier.actif = true; e.preventDefault(); }
+  else if (code === 'ArrowRight' || code === 'KeyD') { clavier.ang = Math.min(ANGLE_MAX, clavier.ang + 0.035); clavier.actif = true; e.preventDefault(); }
+  else if (code === 'ArrowUp' || code === 'KeyW' || code === 'KeyZ') { clavier.p = Math.min(1, clavier.p + 0.025); clavier.actif = true; e.preventDefault(); }
+  else if (code === 'ArrowDown' || code === 'KeyS') { clavier.p = Math.max(0.1, clavier.p - 0.025); clavier.actif = true; e.preventDefault(); }
+  else if (code === 'Space' || code === 'Enter') {
+    e.preventDefault();
+    audio();
+    if (!clavier.actif) { clavier.actif = true; return; }
+    if (peutLancer()) lancer({ ang: clavier.ang, p: clavier.p });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Physique de l'anneau
+// ---------------------------------------------------------------------------
+function hauteurCible(c) { return TYPES[c.type].haut + (c.bob || 0); }
+
+// Avance un anneau de dt secondes. Renvoie 'vol', 'pris', 'sol'.
+// fantome : anneau de démonstration (ne touche à rien).
+function avancerAnneau(r, dt, fantome) {
+  r.t += dt;
+  r.rot += dt * 9;
+  r.vx += (S.vent || 0) * dt;
+  const hAvant = r.h;
+  r.x += r.vx * dt; r.z += r.vz * dt; r.h += r.vh * dt; r.vh -= r.g * dt;
+  // Fond du stand et côtés
+  if (r.z > 1.18) { r.z = 1.18; r.vz = -Math.abs(r.vz) * 0.25; r.vx *= 0.5; if (!fantome) SONS.toc(); }
+  if (r.z < -0.3) { r.z = -0.3; r.vz = Math.abs(r.vz) * 0.3; }
+  if (Math.abs(r.x) > 1.14) { r.x = Math.sign(r.x) * 1.14; r.vx = -r.vx * 0.4; }
+  // Plots en caoutchouc : rebond élastique
+  for (const p of S.plots) {
+    if (r.h > PLOT_H) continue;
+    const dx = r.x - p.x, dz = r.z - p.z, d = Math.hypot(dx, dz) || 0.001;
+    if (d < PLOT_R + R_ANNEAU * 0.55) {
+      const nx = dx / d, nz = dz / d, vn = r.vx * nx + r.vz * nz;
+      r.x = p.x + nx * (PLOT_R + R_ANNEAU * 0.56); r.z = p.z + nz * (PLOT_R + R_ANNEAU * 0.56);
+      if (vn < 0) { r.vx -= 2 * vn * nx; r.vz -= 2 * vn * nz; }
+      r.vx *= 0.85; r.vz *= 0.85;
+      r.vh = Math.max(r.vh, 1.5);
+      r.rebond = true;
+      if (!fantome) { p.boing = 1; SONS.boing(); popup(tr('popup.boing'), r.x, r.z, 0.6, '#ff8fd0'); }
+    }
+  }
+  // Manège : les chevaux et le mât arrêtent l'anneau
+  if (S.manege) {
+    for (const o of obstaclesManege()) {
+      if (r.h > o.h) continue;
+      const dx = r.x - o.x, dz = r.z - o.z, d = Math.hypot(dx, dz) || 0.001;
+      if (d < o.r + R_ANNEAU * 0.5) {
+        const nx = dx / d, nz = dz / d;
+        r.x = o.x + nx * (o.r + R_ANNEAU * 0.52); r.z = o.z + nz * (o.r + R_ANNEAU * 0.52);
+        r.vx = nx * 0.35 + r.vx * 0.15; r.vz = -Math.abs(r.vz) * 0.25 + nz * 0.2;
+        r.vh = Math.min(r.vh, 0.2);
+        if (!fantome && !r.bonk) { r.bonk = true; SONS.bonk(); popup(tr('popup.bonk'), r.x, r.z, 0.7, '#ffd166'); }
+      }
+    }
+  }
+  // Goulots : l'anneau passe-t-il autour en descendant ?
+  if (r.vh < 0) {
+    for (const c of S.cibles) {
+      if (c.prise || c.apparition < 0.9 || r.tape.has(c)) continue;
+      const top = hauteurCible(c);
+      if (hAvant > top && r.h <= top) {
+        const dx = r.x - c.x, dz = (r.z - c.z) * 1.1, d = Math.hypot(dx, dz);
+        const tol = TYPES[c.type].tol * S.def.tol;
+        if (d < tol) {
+          if (fantome) { r.pris = c; return 'pris'; }
+          attraper(r, c);
+          return 'pris';
+        } else if (d < tol + TYPES[c.type].corps) {
+          // Touche le bord : petit rebond de côté
+          const nx = dx / (d || 1), nz = dz / (d || 1);
+          r.vx = nx * 0.75 + r.vx * 0.25; r.vz = nz * 0.6 + r.vz * 0.2; r.vh = 0.8;
+          r.tape.add(c);
+          if (!fantome) { SONS.tink(); popup(tr('popup.presque'), c.x, c.z, 0.55, '#a8f0ff'); }
+        }
+      }
+    }
+  }
+  if (r.h <= 0) { r.h = 0; return 'sol'; }
+  return 'vol';
+}
+
+function obstaclesManege() {
+  const m = S.manege; const liste = [{ x: m.x, z: m.z, r: 0.045, h: 1.2 }];
+  for (let i = 0; i < m.n; i++) {
+    const a = m.a + i * Math.PI * 2 / m.n;
+    liste.push({ x: m.x + Math.cos(a) * m.r, z: m.z + Math.sin(a) * m.r * 0.45, r: CHEVAL_R, h: CHEVAL_H, a, i });
+  }
+  return liste;
+}
+
+function attraper(r, c) {
+  c.prise = 0.0001;
+  c.prisePar = skinActuel();
+  S.anneau = null;
+  S.serie++;
+  const enMouvement = c.mob && c.mob.kind !== 'fixe';
+  let points = 100;
+  if (enMouvement) points += 50;
+  if (r.rebond) points += 100;
+  if (S.serie >= 3) points += 50;
+  S.score += points;
+  SONS.ding(S.serie);
+  etincelles(c.x, c.z, hauteurCible(c), 22);
+  let texte = tr('popup.bravo');
+  if (r.rebond) texte = tr('popup.rebond');
+  else if (S.serie >= 3) texte = tr('popup.serie', { n: S.serie });
+  let bon = true;
+  if (S.ordre) bon = gererCommande(c);
+  else { S.reussis++; bumpObjectif(); }
+  if (bon) popup(texte, c.x, c.z, 0.7, '#fff3c4');
+  popup('+' + nombre(points), c.x, c.z, 0.45, '#ffd166');
+  majHud();
+  verifierFin();
+}
+
+function gererCommande(c) {
+  const nom = S.def.ordres[S.ordre.i];
+  const cmd = COMMANDES[nom];
+  if (!cmd) return true;
+  const besoin = cmd.items[S.ordre.prog];
+  const ok = (it) => (!it.c || it.c === c.c) && (!it.t || it.t === c.type);
+  const el = document.getElementById('ordre');
+  const bon = ok(besoin);
+  if (bon) {
+    S.ordre.prog++;
+    if (S.ordre.prog >= cmd.items.length) {
+      S.reussis++;
+      S.score += 200;
+      SONS.commande();
+      popup(tr('popup.commande'), 0, 0.5, 1.0, '#7dffb0');
+      confettis(30);
+      S.ordre.i++; S.ordre.prog = 0;
+      bumpObjectif();
+    }
+  } else {
+    SONS.oups();
+    if (cmd.affilee && S.ordre.prog > 0) {
+      S.ordre.prog = ok(cmd.items[0]) ? 1 : 0;
+      popup(tr('popup.recommence'), 0, 0.5, 1.0, '#ffb3b3');
+    } else {
+      popup(tr('popup.pasCa'), 0, 0.5, 1.0, '#ffb3b3');
+    }
+    el.classList.remove('oups'); void el.offsetWidth; el.classList.add('oups');
+  }
+  dessinerCommande();
+  return bon;
+}
+
+function rate(r) {
+  S.anneau = null;
+  S.serie = 0;
+  S.auSol.push({ x: r.x, z: r.z, vie: 1.4, skin: skinActuel() });
+  SONS.toc();
+  S.secousse = 0.18;
+  verifierFin();
+}
+
+function verifierFin() {
+  if (S.fini) return;
+  if (S.reussis >= S.def.objectif) { S.fini = true; S.gagne = true; S.finDans = 1.1; }
+  else if (S.anneaux <= 0 && !S.anneau) { S.fini = true; S.gagne = false; S.finDans = 1.0; }
+}
+
+// ---------------------------------------------------------------------------
+// Mise à jour du monde
+// ---------------------------------------------------------------------------
+function majCibles(dt) {
+  for (const c of S.cibles) {
+    if (c.apparition < 1) c.apparition = Math.min(1, c.apparition + dt * 2.5);
+    const m = c.mob;
+    if (m && (m.kind === 'tapis' || m.kind === 'riviere')) {
+      c.x += m.v * dt;
+      if (m.v > 0 && c.x > 1.25) c.x -= 2.5;
+      if (m.v < 0 && c.x < -1.25) c.x += 2.5;
+    }
+    if (m && m.kind === 'riviere') {
+      c.z = m.z + 0.035 * Math.sin(temps * 1.6 + m.phase);
+      c.bob = 0.018 * Math.sin(temps * 2.4 + m.phase * 1.3);
+    }
+    if (c.prise) c.prise += dt;
+  }
+  // Les cibles prises remontent puis sont remplacées
+  for (let i = S.cibles.length - 1; i >= 0; i--) {
+    const c = S.cibles[i];
+    if (c.prise > 1.0) {
+      S.cibles.splice(i, 1);
+      S.aRenaitre.push({ dans: 0.6, m: c.mob, x: c.x, type: c.type });
+    }
+  }
+  for (let i = S.aRenaitre.length - 1; i >= 0; i--) {
+    const a = S.aRenaitre[i];
+    a.dans -= dt;
+    if (a.dans > 0) continue;
+    S.aRenaitre.splice(i, 1);
+    const m = a.m;
+    let type = a.type, x = a.x;
+    if (m.kind === 'tapis') { type = choisirType(m.types); x = a.x - 2.5 * Math.sign(m.v); }
+    else if (m.kind === 'riviere') { x = a.x - 2.5 * Math.sign(m.v); }
+    else type = choisirType(['bouteille', 'cone', 'canard'], type);
+    const n = nouvelleCible(type, x, m.kind === 'fixe' ? m.z : m.z, choisirCouleur(), m);
+    n.apparition = m.kind === 'fixe' ? 0 : 1;
+    S.cibles.push(n);
+  }
+  for (const p of S.plots) if (p.boing > 0) p.boing = Math.max(0, p.boing - dt * 2.5);
+  if (S.manege) S.manege.a += S.manege.w * dt;
+}
+function choisirType(types, garde) {
+  if (S && S.ordre) {
+    const b = besoinActuel();
+    if (b && b.t && types.includes(b.t) && hasard() < 0.5) return b.t;
+  }
+  if (garde && !(S && S.ordre)) return garde;
+  return choisir(types);
+}
+
+function majStand(dt) {
+  majCibles(dt);
+  // Anneau en vol (sous-pas pour des collisions sûres)
+  if (S.anneau) {
+    const pas = 1 / 240;
+    let reste = dt;
+    while (reste > 0 && S.anneau) {
+      const d = Math.min(pas, reste); reste -= d;
+      const res = avancerAnneau(S.anneau, d);
+      if (res === 'sol') { rate(S.anneau); break; }
+    }
+    if (!S.anneau) tirerVent();
+  }
+  for (let i = S.auSol.length - 1; i >= 0; i--) { S.auSol[i].vie -= dt; if (S.auSol[i].vie <= 0) S.auSol.splice(i, 1); }
+  if (S.secousse > 0) S.secousse = Math.max(0, S.secousse - dt);
+  if (S.fini && S.actif) {
+    S.finDans -= dt;
+    if (S.finDans <= 0) { S.actif = false; if (S.gagne) victoire(); else defaite(); }
+  }
+}
+
+// Particules et messages flottants
+function etincelles(x, z, h, n) {
+  const p = proj(x, z, h);
+  for (let i = 0; i < n; i++) {
+    const a = hasard() * Math.PI * 2, v = 60 + hasard() * 160;
+    S.parts.push({ x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, vie: 0.7 + hasard() * 0.4, c: choisir(['#fff3c4', '#ffd166', '#ff8fd0', '#a8f0ff']), t: 3 + hasard() * 3 });
+  }
+}
+function confettis(n) {
+  for (let i = 0; i < n; i++) decor.confettis.push({ x: hasard() * W, y: -20 - hasard() * H * 0.3, vx: (hasard() - 0.5) * 60, vy: 120 + hasard() * 160, r: hasard() * 6, vr: (hasard() - 0.5) * 10, c: choisir(['#ff5a5f', '#ffd166', '#3b82f6', '#2fb36b', '#ff8fd0', '#fff']), vie: 4 });
+}
+function popup(texte, x, z, h, couleur) {
+  if (!S) return;
+  const p = proj(x, z, h);
+  S.popups.push({ texte, x: p.x, y: p.y, vie: 1.2, c: couleur });
+}
+
+// ---------------------------------------------------------------------------
+// Dessin du décor (une allée tous les 5 stands)
+// ---------------------------------------------------------------------------
+const CIELS = [
+  ['#7fd3ff', '#ffe6b3'],          // fanions : jour
+  ['#ff9a5a', '#7b3f8f'],          // lampions : soir
+  ['#5a3d8f', '#1f2457'],          // grande roue : crépuscule
+  ['#0c0f2e', '#1b1340'],          // feu d'artifice : nuit
+];
+function dessinerCiel(allee) {
+  const g = ctx.createLinearGradient(0, 0, 0, L.yFar);
+  g.addColorStop(0, CIELS[allee][1]); g.addColorStop(1, CIELS[allee][0]);
+  if (allee === 0) { g.addColorStop(0, CIELS[0][0]); g.addColorStop(1, CIELS[0][1]); }
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, L.yFar + 2);
+  if (allee >= 2) { // étoiles
+    ctx.fillStyle = '#fff';
+    for (let i = 0; i < 50; i++) {
+      const x = (i * 137.5) % W, y = (i * 61.3) % (L.yFar * 0.8);
+      ctx.globalAlpha = 0.3 + 0.5 * Math.abs(Math.sin(temps * 0.8 + i));
+      ctx.fillRect(x, y, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+  }
+  if (allee === 0) { // nuages
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    for (let i = 0; i < 4; i++) {
+      const x = ((i * 0.31 + temps * 0.01) % 1.2 - 0.1) * W, y = H * (0.08 + 0.05 * (i % 2));
+      nuage(x, y, H * 0.03);
+    }
+  }
+  // Tentes au loin
+  for (let i = 0; i < 7; i++) {
+    const x = (i / 6) * W, w = W * 0.2, y = L.yFar - H * 0.02;
+    const c = i % 2 ? '#e94e77' : '#f6d55c';
+    ctx.fillStyle = allee >= 2 ? assombrir(c, 0.45) : c;
+    ctx.beginPath(); ctx.moveTo(x - w / 2, y); ctx.lineTo(x, y - H * 0.07); ctx.lineTo(x + w / 2, y); ctx.fill();
+    ctx.fillStyle = allee >= 2 ? '#2a2050' : '#ffffff';
+    ctx.fillRect(x - w * 0.4, y, w * 0.8, H * 0.02);
+  }
+  if (allee === 2 || allee === 3) grandeRoue(L.ox + L.pw * 0.12, L.yFar - H * 0.12, H * 0.14, allee === 3 ? 0.55 : 1);
+  if (allee === 3) feuxArtifice();
+  // Guirlande : fanions ou lampions
+  guirlande(allee, H * 0.165);
+}
+function nuage(x, y, r) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.arc(x + r, y - r * 0.4, r * 1.2, 0, Math.PI * 2); ctx.arc(x + r * 2.2, y, r, 0, Math.PI * 2); ctx.fill();
+}
+function assombrir(hex, f) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.round(((n >> 16) & 255) * f), g = Math.round(((n >> 8) & 255) * f), b = Math.round((n & 255) * f);
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+function grandeRoue(x, y, r, alpha) {
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(x - r * 0.5, y + r * 1.4); ctx.lineTo(x, y); ctx.lineTo(x + r * 0.5, y + r * 1.4); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+  const a0 = temps * 0.25;
+  for (let i = 0; i < 10; i++) {
+    const a = a0 + i * Math.PI / 5, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+    ctx.strokeStyle = 'rgba(255,233,168,.7)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(px, py); ctx.stroke();
+    ctx.fillStyle = ['#ff5a5f', '#ffd166', '#3b82f6', '#2fb36b', '#ff8fd0'][i % 5];
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(px - r * 0.11, py, r * 0.22, r * 0.18, 4) : ctx.rect(px - r * 0.11, py, r * 0.22, r * 0.18); ctx.fill();
+    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+}
+function feuxArtifice() {
+  if (hasard() < 0.02 && decor.feux.length < 6) {
+    const x = L.ox + L.pw * (0.3 + hasard() * 0.65), y = H * (0.07 + hasard() * 0.15), c = choisir(['#ff5a5f', '#ffd166', '#7dffb0', '#a8f0ff', '#ff8fd0']);
+    const bouquet = { x, y, c, vie: 1.6, eclats: [] };
+    for (let i = 0; i < 26; i++) { const a = i / 26 * Math.PI * 2; bouquet.eclats.push({ a, v: 0.6 + hasard() * 0.4 }); }
+    decor.feux.push(bouquet);
+  }
+  for (const f of decor.feux) {
+    const k = 1.6 - f.vie, R = H * 0.09 * Math.min(1, k * 1.6);
+    ctx.globalAlpha = Math.max(0, f.vie / 1.6);
+    ctx.fillStyle = f.c;
+    for (const e of f.eclats) ctx.fillRect(f.x + Math.cos(e.a) * R * e.v, f.y + Math.sin(e.a) * R * e.v + k * k * 12, 3, 3);
+  }
+  ctx.globalAlpha = 1;
+}
+function guirlande(allee, y) {
+  const n = 9, x0 = L.ox - 10, x1 = L.ox + L.pw + 10;
+  ctx.strokeStyle = allee === 0 ? '#6b4b2a' : '#3a2a20'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i <= 40; i++) { const u = i / 40, x = x0 + (x1 - x0) * u, yy = y + Math.sin(u * Math.PI * 3) * H * 0.012 + H * 0.01; i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); }
+  ctx.stroke();
+  const couleurs = ['#ff5a5f', '#ffd166', '#3b82f6', '#2fb36b', '#ff8fd0'];
+  for (let i = 0; i < n * 2; i++) {
+    const u = (i + 0.5) / (n * 2), x = x0 + (x1 - x0) * u, yy = y + Math.sin(u * Math.PI * 3) * H * 0.012 + H * 0.01;
+    const c = couleurs[i % couleurs.length];
+    if (allee === 0) {
+      ctx.fillStyle = c;
+      const bat = Math.sin(temps * 3 + i) * 2;
+      ctx.beginPath(); ctx.moveTo(x - 8, yy); ctx.lineTo(x + 8, yy); ctx.lineTo(x + bat, yy + 16); ctx.fill();
+    } else {
+      const lueur = 0.6 + 0.4 * Math.sin(temps * 2 + i * 1.3);
+      ctx.fillStyle = c; ctx.globalAlpha = 0.25 * lueur;
+      ctx.beginPath(); ctx.arc(x, yy + 9, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.ellipse(x, yy + 9, 7, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a2a20'; ctx.fillRect(x - 4, yy, 8, 2); ctx.fillRect(x - 4, yy + 17, 8, 2);
+    }
+  }
+}
+
+// Stand : sol en planches, rideau du fond, poteaux, auvent, comptoir
+function dessinerStand(allee) {
+  const a = proj(-1.2, 1.2), b = proj(1.2, 1.2), c = proj(1.25, -0.05), d = proj(-1.25, -0.05);
+  // Allée pavée de la fête, autour du stand
+  const SOLS = [['#e8d3a6', '#c9a86f'], ['#b88a72', '#7d5a52'], ['#6a5a8a', '#3d3360'], ['#3a3463', '#221d40']];
+  const gs = ctx.createLinearGradient(0, L.yFar - H * 0.01, 0, H);
+  gs.addColorStop(0, SOLS[allee][0]); gs.addColorStop(1, SOLS[allee][1]);
+  ctx.fillStyle = gs; ctx.fillRect(0, L.yFar - H * 0.01, W, H);
+  ctx.fillStyle = 'rgba(255,255,255,.12)';
+  for (let i = 0; i < 40; i++) { const x = (i * 97.3) % W, y = L.yFar + ((i * 53.7) % (H - L.yFar)); ctx.fillRect(x, y, 14, 3); }
+  // Rideau du fond (rayures)
+  const hr = H * 0.07;
+  const n = 12;
+  for (let i = 0; i < n; i++) {
+    const x = a.x + (b.x - a.x) * i / n;
+    ctx.fillStyle = i % 2 ? '#fff4e0' : (allee === 3 ? '#7b2cbf' : '#d7263d');
+    ctx.fillRect(x, a.y - hr, (b.x - a.x) / n + 1, hr);
+  }
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(a.x, a.y - 6, b.x - a.x, 6);
+  // Sol
+  const g = ctx.createLinearGradient(0, a.y, 0, c.y);
+  g.addColorStop(0, '#9c6b3f'); g.addColorStop(1, '#d39b62');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(90,50,20,.35)'; ctx.lineWidth = 1.5;
+  for (let i = 1; i < 10; i++) {
+    const u = i / 10, p = proj(-1.2 + 2.4 * u, 1.2), q = proj(-1.25 + 2.5 * u, -0.05);
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+  }
+  // Poteaux
+  for (const sx of [-1, 1]) {
+    const p = proj(sx * 1.2, 1.2), q = proj(sx * 1.25, -0.05);
+    ctx.fillStyle = '#7a4a26';
+    ctx.fillRect(p.x - 5, H * 0.16, 10, p.y - H * 0.16);
+    ctx.fillStyle = '#8f5a30';
+    ctx.fillRect(q.x - (sx > 0 ? 4 : 10), H * 0.16, 14, q.y - H * 0.16);
+  }
+  // Peluches suspendues aux poteaux (décor)
+  const pl = proj(-1.2, 1.2), pr = proj(1.2, 1.2);
+  const tp = Math.min(W * 0.09, 46);
+  [[pl.x - tp * 0.75, 0], [pl.x - tp * 0.75, 3], [pr.x + tp * 0.75, 13], [pr.x + tp * 0.75, 1]].forEach(([x, idx], k) => {
+    const y = H * 0.24 + (k % 2) * tp * 1.25;
+    ctx.strokeStyle = '#6b4b2a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, H * 0.16); ctx.lineTo(x, y - tp * 0.45); ctx.stroke();
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(temps * 1.5 + k) * 0.08);
+    dessinerPeluche(ctx, 0, 0, tp, PELUCHES[idx], true);
+    ctx.restore();
+  });
+  // Auvent festonné
+  const ya = H * 0.12, hb = H * 0.05, nb = 10;
+  for (let i = 0; i < nb; i++) {
+    const x = L.ox - 6 + (L.pw + 12) * i / nb, w = (L.pw + 12) / nb;
+    ctx.fillStyle = i % 2 ? '#fff4e0' : (allee === 3 ? '#7b2cbf' : '#d7263d');
+    ctx.fillRect(x, 0, w + 1, ya);
+    ctx.beginPath(); ctx.moveTo(x, ya); ctx.lineTo(x + w + 1, ya); ctx.arc(x + w / 2, ya, w / 2, 0, Math.PI); ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(L.ox - 6, ya - 4, L.pw + 12, 4);
+  void hb;
+}
+function dessinerComptoir() {
+  const p = proj(-1.3, -0.04), q = proj(1.3, -0.04);
+  const y = p.y;
+  const g = ctx.createLinearGradient(0, y, 0, H);
+  g.addColorStop(0, '#c0392b'); g.addColorStop(0.08, '#e85a4f'); g.addColorStop(0.1, '#8e3b1f'); g.addColorStop(1, '#5e2512');
+  ctx.fillStyle = g;
+  ctx.fillRect(Math.min(p.x, 0), y, Math.max(q.x, W) - Math.min(p.x, 0), H - y);
+  ctx.fillStyle = '#f6c453';
+  for (let i = 0; i < 14; i++) { const x = L.ox + L.pw * (i + 0.5) / 14; ctx.beginPath(); ctx.arc(x, y + H * 0.1, 4, 0, Math.PI * 2); ctx.fill(); }
+  // Anneaux qui restent, posés sur le comptoir
+  if (S) {
+    const sk = skinActuel();
+    const n = Math.max(0, S.anneaux - (S.anneau ? 0 : 1));
+    const r = Math.min(16, L.pw * 0.035);
+    for (let i = 0; i < n; i++) {
+      const x = L.ox + 18 + (i % 8) * r * 1.5, yy = y + H * 0.045 + Math.floor(i / 8) * r * 0.9;
+      dessinerAnneau(ctx, x, yy, r, r * 0.4, sk, 0);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dessin des éléments du stand
+// ---------------------------------------------------------------------------
+function symbole(c, x, y, r, col) {
+  // Petit motif peint, différent pour chaque couleur (aide à les distinguer)
+  ctx.fillStyle = col || '#fff';
+  ctx.beginPath();
+  if (c === 'r') { // cœur
+    ctx.moveTo(x, y + r * 0.8);
+    ctx.bezierCurveTo(x - r * 1.4, y - r * 0.2, x - r * 0.6, y - r * 1.2, x, y - r * 0.35);
+    ctx.bezierCurveTo(x + r * 0.6, y - r * 1.2, x + r * 1.4, y - r * 0.2, x, y + r * 0.8);
+  } else if (c === 'b') { // losange
+    ctx.moveTo(x, y - r); ctx.lineTo(x + r * 0.75, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r * 0.75, y); ctx.closePath();
+  } else if (c === 'j') { // étoile
+    for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    ctx.closePath();
+  } else { // rond
+    ctx.arc(x, y, r * 0.7, 0, Math.PI * 2);
+  }
+  ctx.fill();
+}
+
+function dessinerCible(c) {
+  const base = proj(c.x, c.z, c.bob || 0);
+  const s = base.s;
+  const u = L.hEch * s, lx = L.demi * s;
+  const col = COULEURS[c.c];
+  let monte = 0;
+  if (c.prise) monte = Math.max(0, c.prise - 0.45) * 1.6;   // la cible prise remonte
+  const k = c.apparition < 1 ? (1 - Math.pow(1 - c.apparition, 3)) : 1;
+  ctx.save();
+  ctx.translate(base.x, base.y - monte * u);
+  ctx.scale(k, k);
+  if (c.prise) ctx.globalAlpha = Math.max(0, 1 - Math.max(0, c.prise - 0.6) * 2.5);
+  // Ombre
+  if (!(c.mob && c.mob.kind === 'riviere')) { ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(0, 0, lx * 0.085, lx * 0.03, 0, 0, Math.PI * 2); ctx.fill(); }
+  if (c.type === 'bouteille') {
+    const w = lx * 0.075, hc = u * 0.2, hn = u * 0.33;
+    const g = ctx.createLinearGradient(-w, 0, w, 0);
+    g.addColorStop(0, col.sombre); g.addColorStop(0.35, col.clair); g.addColorStop(1, col.fond);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-w, 0); ctx.lineTo(-w, -hc); ctx.quadraticCurveTo(-w, -hc - u * 0.06, -w * 0.38, -hc - u * 0.08);
+    ctx.lineTo(-w * 0.38, -hn); ctx.lineTo(w * 0.38, -hn); ctx.lineTo(w * 0.38, -hc - u * 0.08);
+    ctx.quadraticCurveTo(w, -hc - u * 0.06, w, -hc); ctx.lineTo(w, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff6e6'; ctx.fillRect(-w, -hc * 0.75, w * 2, hc * 0.45);
+    symbole(c.c, 0, -hc * 0.52, w * 0.4, col.fond);
+    ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.fillRect(-w * 0.6, -hc * 0.95, w * 0.22, hc * 0.18);
+    ctx.fillStyle = '#ffd166'; ctx.fillRect(-w * 0.45, -hn - u * 0.02, w * 0.9, u * 0.03);
+  } else if (c.type === 'cone') {
+    const w = lx * 0.09, h = u * 0.28;
+    ctx.fillStyle = '#5b4636'; ctx.fillRect(-w * 1.15, -u * 0.02, w * 2.3, u * 0.025);
+    ctx.fillStyle = col.fond;
+    ctx.beginPath(); ctx.moveTo(-w, -u * 0.02); ctx.lineTo(-w * 0.22, -h); ctx.lineTo(w * 0.22, -h); ctx.lineTo(w, -u * 0.02); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff6e6';
+    ctx.beginPath(); ctx.moveTo(-w * 0.72, -h * 0.3); ctx.lineTo(-w * 0.55, -h * 0.5); ctx.lineTo(w * 0.55, -h * 0.5); ctx.lineTo(w * 0.72, -h * 0.3); ctx.closePath(); ctx.fill();
+    symbole(c.c, 0, -h * 0.4, w * 0.18, col.fond);
+    ctx.fillStyle = 'rgba(255,255,255,.35)';
+    ctx.beginPath(); ctx.moveTo(-w * 0.6, -u * 0.03); ctx.lineTo(-w * 0.18, -h * 0.95); ctx.lineTo(-w * 0.05, -h * 0.95); ctx.lineTo(-w * 0.35, -u * 0.03); ctx.fill();
+  } else {
+    // Canard en bois peint, avec son cou-piquet
+    const w = lx * 0.12, dir = (c.mob && c.mob.v < 0) ? -1 : 1;
+    ctx.scale(dir, 1);
+    // corps rond posé sur un socle, tête juste au-dessus (le cou est le goulot)
+    const hc = TYPES.canard.haut * u;   // haut de la tête
+    ctx.fillStyle = '#7a4a26'; ctx.fillRect(-w * 0.8, -u * 0.015, w * 1.6, u * 0.015);
+    ctx.fillStyle = col.fond;
+    ctx.beginPath(); ctx.ellipse(0, -hc * 0.3, w, hc * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-w * 0.9, -hc * 0.35); ctx.lineTo(-w * 1.3, -hc * 0.62); ctx.lineTo(-w * 0.6, -hc * 0.5); ctx.fill();
+    ctx.fillStyle = col.clair;
+    ctx.beginPath(); ctx.ellipse(-w * 0.15, -hc * 0.34, w * 0.5, hc * 0.13, -0.15, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = col.fond; ctx.fillRect(w * 0.3, -hc * 0.8, w * 0.32, hc * 0.35);
+    ctx.beginPath(); ctx.arc(w * 0.46, -hc + w * 0.36, w * 0.36, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff9f1c'; ctx.beginPath(); ctx.ellipse(w * 0.92, -hc + w * 0.42, w * 0.24, w * 0.1, 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(w * 0.56, -hc + w * 0.3, w * 0.11, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a1a3a'; ctx.beginPath(); ctx.arc(w * 0.59, -hc + w * 0.3, w * 0.055, 0, Math.PI * 2); ctx.fill();
+    ctx.scale(dir, 1);
+    symbole(c.c, -w * 0.2 * dir, -hc * 0.32, w * 0.22, '#fff6e6');
+  }
+  ctx.restore();
+  // Anneau gagné qui glisse autour du goulot
+  if (c.prise) {
+    const top = hauteurCible(c);
+    const desc = Math.min(1, c.prise / 0.35);
+    const h = top - desc * top * 0.45;
+    const p = proj(c.x, c.z, h + (c.bob || 0));
+    ctx.save();
+    if (c.prise > 0.6) ctx.globalAlpha = Math.max(0, 1 - (c.prise - 0.6) * 2.5);
+    const yy = p.y - monte * u;
+    dessinerAnneau(ctx, p.x, yy, R_VISU * L.demi * s, R_VISU * L.demi * s * 0.36, c.prisePar || skinActuel(), temps);
+    ctx.restore();
+  }
+}
+
+function dessinerAnneau(g, x, y, rx, ry, sk, t) {
+  const ep = Math.max(2.5, rx * 0.3);
+  g.save();
+  g.lineWidth = ep;
+  if (sk.arc) {
+    const cols = ['#ff5a5f', '#ff9f1c', '#ffd166', '#2fb36b', '#3b82f6', '#8e5cff'];
+    for (let i = 0; i < 6; i++) {
+      g.strokeStyle = cols[i];
+      g.beginPath(); g.ellipse(x, y, rx, ry, 0, i * Math.PI / 3, (i + 1) * Math.PI / 3 + 0.05); g.stroke();
+    }
+  } else {
+    g.strokeStyle = sk.a;
+    g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.stroke();
+    // bandes peintes
+    g.strokeStyle = sk.b; g.lineWidth = ep * 0.55;
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 + (t || 0) * 0.3;
+      g.beginPath(); g.ellipse(x, y, rx, ry, 0, a, a + 0.45); g.stroke();
+    }
+  }
+  g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = Math.max(1, ep * 0.22);
+  g.beginPath(); g.ellipse(x, y - ep * 0.15, rx * 0.95, ry * 0.92, 0, Math.PI * 1.1, Math.PI * 1.65); g.stroke();
+  if (sk.p) {
+    g.fillStyle = '#fff';
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.05 + (t || 0) * 1.7;
+      const tw = 0.5 + 0.5 * Math.sin((t || 0) * 6 + i * 2);
+      g.globalAlpha = 0.4 + 0.6 * tw;
+      const px = x + Math.cos(a) * rx, py = y + Math.sin(a) * ry, r = ep * 0.28 * (0.6 + tw);
+      g.beginPath(); g.moveTo(px, py - r * 2); g.lineTo(px + r * 0.5, py); g.lineTo(px, py + r * 2); g.lineTo(px - r * 0.5, py); g.closePath(); g.fill();
+      g.beginPath(); g.moveTo(px - r * 2, py); g.lineTo(px, py + r * 0.5); g.lineTo(px + r * 2, py); g.lineTo(px, py - r * 0.5); g.closePath(); g.fill();
+    }
+  }
+  g.restore();
+}
+
+function dessinerAnneauMonde(r, alpha) {
+  const p = proj(r.x, r.z, r.h), sol = proj(r.x, r.z, 0);
+  const rx = R_VISU * L.demi * p.s;
+  ctx.save();
+  ctx.globalAlpha = 0.25 * (alpha == null ? 1 : alpha);
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.ellipse(sol.x, sol.y, rx * 0.9, rx * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  const tilt = 0.32 + 0.12 * Math.sin(r.rot || 0);
+  dessinerAnneau(ctx, p.x, p.y, rx, rx * tilt, r.skin || skinActuel(), temps);
+  ctx.restore();
+}
+
+function dessinerPlot(p) {
+  const b = proj(p.x, p.z, 0), s = b.s, lx = L.demi * s, u = L.hEch * s;
+  const ecr = 1 - 0.25 * Math.sin(p.boing * Math.PI * 3) * p.boing;
+  const w = PLOT_R * lx * (2 - ecr), h = PLOT_H * u * ecr;
+  ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.beginPath(); ctx.ellipse(b.x, b.y, w * 1.2, w * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+  const g = ctx.createLinearGradient(b.x - w, 0, b.x + w, 0);
+  g.addColorStop(0, '#b0125b'); g.addColorStop(0.4, '#ff6fb5'); g.addColorStop(1, '#c2185b');
+  ctx.fillStyle = g;
+  ctx.fillRect(b.x - w, b.y - h, w * 2, h);
+  ctx.beginPath(); ctx.ellipse(b.x, b.y, w, w * 0.35, 0, 0, Math.PI); ctx.fill();
+  ctx.fillStyle = '#ff9fd0'; ctx.beginPath(); ctx.ellipse(b.x, b.y - h, w, w * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff6e6'; ctx.fillRect(b.x - w, b.y - h * 0.6, w * 2, h * 0.14);
+}
+
+function dessinerManegeSol() {
+  // Plateau rond vu en perspective : même ellipse que le chemin des chevaux
+  const m = S.manege, c = proj(m.x, m.z, 0), R = m.r + 0.11;
+  const pt = (a, h) => proj(m.x + Math.cos(a) * R, m.z + Math.sin(a) * R * 0.45, h || 0);
+  const tour = (h) => { ctx.beginPath(); for (let i = 0; i <= 40; i++) { const p = pt(i / 40 * Math.PI * 2, h); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); } ctx.closePath(); };
+  ctx.fillStyle = '#7a3e9d'; tour(-0.03); ctx.fill();
+  ctx.fillStyle = '#c084fc'; tour(0); ctx.fill();
+  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+  for (let i = 0; i < 12; i++) {
+    const p = pt(m.a + i * Math.PI / 6);
+    ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+  }
+  ctx.fillStyle = '#ffd166';
+  for (let i = 0; i < 16; i++) { const p = pt(m.a + i * Math.PI / 8, -0.015); ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2); ctx.fill(); }
+}
+function dessinerCheval(o) {
+  const b = proj(o.x, o.z, 0), s = b.s, u = L.hEch * s, lx = L.demi * s;
+  const saut = Math.sin(temps * 3 + o.i * 1.6) * 0.04;
+  // mât doré
+  ctx.fillStyle = '#ffd166'; ctx.fillRect(b.x - 2.5, b.y - CHEVAL_H * u * 1.1, 5, CHEVAL_H * u * 1.1);
+  const y = b.y - (0.55 + saut) * u;
+  const dir = Math.sin(o.a) > 0 ? -1 : 1; // sens du mouvement à l'écran
+  // Cheval de bois vu de profil (e : unité de dessin)
+  const e = lx * 0.15;
+  const cols = ['#ffffff', '#ffd6e8', '#d6ecff', '#fff1c1', '#e2ffd6'];
+  const robe = cols[o.i % cols.length];
+  ctx.save(); ctx.translate(b.x, y); ctx.scale(dir, 1);
+  ctx.strokeStyle = '#7a3e9d'; ctx.lineWidth = Math.max(1.2, e * 0.06); ctx.lineCap = 'round';
+  // pattes : celles de devant repliées, celles de derrière tendues
+  ctx.lineWidth = e * 0.16; ctx.strokeStyle = robe;
+  ctx.beginPath(); ctx.moveTo(-e * 0.55, e * 0.15); ctx.lineTo(-e * 0.8, e * 0.6); ctx.moveTo(-e * 0.35, e * 0.15); ctx.lineTo(-e * 0.45, e * 0.62);
+  ctx.moveTo(e * 0.5, e * 0.12); ctx.lineTo(e * 0.75, e * 0.35); ctx.lineTo(e * 0.62, e * 0.55);
+  ctx.moveTo(e * 0.3, e * 0.15); ctx.lineTo(e * 0.5, e * 0.42); ctx.lineTo(e * 0.38, e * 0.6); ctx.stroke();
+  // queue
+  ctx.strokeStyle = '#ff5a5f'; ctx.lineWidth = e * 0.14;
+  ctx.beginPath(); ctx.moveTo(-e * 0.85, -e * 0.08); ctx.quadraticCurveTo(-e * 1.25, 0, -e * 1.15, e * 0.45); ctx.stroke();
+  ctx.lineWidth = Math.max(1.2, e * 0.06); ctx.strokeStyle = '#7a3e9d';
+  // corps
+  ctx.fillStyle = robe;
+  ctx.beginPath(); ctx.ellipse(0, 0, e * 0.9, e * 0.32, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  // cou et tête
+  ctx.beginPath(); ctx.moveTo(e * 0.45, -e * 0.15); ctx.lineTo(e * 0.75, -e * 0.85); ctx.lineTo(e * 1.05, -e * 0.85); ctx.lineTo(e * 0.95, -e * 0.1); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(e * 1.12, -e * 0.72, e * 0.38, e * 0.18, 0.55, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(e * 0.82, -e * 0.95); ctx.lineTo(e * 0.86, -e * 1.15); ctx.lineTo(e * 0.98, -e * 0.95); ctx.fill(); ctx.stroke();
+  // crinière
+  ctx.fillStyle = '#ff5a5f';
+  ctx.beginPath(); ctx.moveTo(e * 0.75, -e * 0.95); ctx.quadraticCurveTo(e * 0.4, -e * 0.6, e * 0.42, -e * 0.15); ctx.lineTo(e * 0.6, -e * 0.25); ctx.quadraticCurveTo(e * 0.62, -e * 0.6, e * 0.85, -e * 0.85); ctx.closePath(); ctx.fill();
+  // œil, selle
+  ctx.fillStyle = '#2a1a3a'; ctx.beginPath(); ctx.arc(e * 1.08, -e * 0.8, Math.max(1.5, e * 0.06), 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3b82f6'; ctx.beginPath(); ctx.ellipse(-e * 0.1, -e * 0.28, e * 0.35, e * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ffd166'; ctx.fillRect(-e * 0.15, -e * 0.2, e * 0.1, e * 0.45);
+  ctx.lineCap = 'butt';
+  ctx.restore();
+}
+function dessinerMat() {
+  const m = S.manege, b = proj(m.x, m.z, 0), s = b.s, u = L.hEch * s;
+  ctx.fillStyle = '#ffd166'; ctx.fillRect(b.x - 5, b.y - 1.2 * u, 10, 1.2 * u);
+  ctx.fillStyle = '#ff5a5f';
+  ctx.beginPath(); ctx.moveTo(b.x - 26 * s, b.y - 1.2 * u); ctx.lineTo(b.x, b.y - 1.38 * u); ctx.lineTo(b.x + 26 * s, b.y - 1.2 * u); ctx.closePath(); ctx.fill();
+}
+
+function dessinerTapis(tp) {
+  const a = proj(-1.25, tp.z + 0.06), b = proj(1.25, tp.z + 0.06), c = proj(1.25, tp.z - 0.06), d = proj(-1.25, tp.z - 0.06);
+  ctx.fillStyle = '#3d3b4f';
+  ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#26243a'; ctx.fillRect(d.x, d.y, c.x - d.x, 6);
+  ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 2;
+  const pas = 0.18, dec = ((temps * tp.v) % pas + pas) % pas;
+  for (let x = -1.25 + dec; x < 1.25; x += pas) {
+    const p = proj(x, tp.z + 0.03), q = proj(x + 0.04 * Math.sign(tp.v), tp.z), r2 = proj(x, tp.z - 0.03);
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.lineTo(r2.x, r2.y); ctx.stroke();
+  }
+}
+function dessinerRiviere(rv) {
+  const z1 = rv.z + 0.1, z2 = rv.z - 0.1;
+  ctx.fillStyle = '#2f80c9';
+  ctx.beginPath();
+  for (let i = 0; i <= 30; i++) { const x = -1.25 + 2.5 * i / 30; const p = proj(x, z1 + 0.012 * Math.sin(temps * 2 + x * 6)); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+  for (let i = 30; i >= 0; i--) { const x = -1.25 + 2.5 * i / 30; const p = proj(x, z2 + 0.012 * Math.sin(temps * 2.2 + x * 5)); ctx.lineTo(p.x, p.y); }
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(200,240,255,.7)'; ctx.lineWidth = 2;
+  for (let k = 0; k < 3; k++) {
+    const z = rv.z - 0.06 + k * 0.06;
+    ctx.beginPath();
+    for (let i = 0; i <= 24; i++) { const x = -1.2 + 2.4 * i / 24; const p = proj(x, z + 0.015 * Math.sin(temps * 1.6 + x * 8 + k)); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+    ctx.globalAlpha = 0.5; ctx.stroke(); ctx.globalAlpha = 1;
+  }
+}
+function dessinerFanion() {
+  if (!S.def.vent) return;
+  const base = { x: L.ox + L.pw - 28, y: H * 0.36 }, haut = H * 0.12;
+  ctx.fillStyle = '#6b4b2a'; ctx.fillRect(base.x - 2, base.y - haut, 4, haut);
+  const w = S.vent, long = 18 + Math.abs(w) * 70, dir = Math.sign(w) || 1;
+  const y0 = base.y - haut;
+  ctx.fillStyle = '#ffd166';
+  ctx.beginPath(); ctx.moveTo(base.x, y0);
+  for (let i = 0; i <= 8; i++) { const u = i / 8; ctx.lineTo(base.x + dir * long * u, y0 + 10 * u * 0.5 + Math.sin(temps * 10 + u * 6) * 3 * u); }
+  for (let i = 8; i >= 0; i--) { const u = i / 8; ctx.lineTo(base.x + dir * long * u, y0 + 20 - 10 * u * 0.5 + Math.sin(temps * 10 + u * 6) * 3 * u); }
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#c97a00'; ctx.lineWidth = 1.5; ctx.stroke();
+  // traînées de vent
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2;
+  for (let i = 0; i < 5; i++) {
+    const ph = (temps * Math.abs(w) * 1.6 + i * 0.23) % 1;
+    const x = L.ox + L.pw * (dir > 0 ? ph : 1 - ph), y = H * (0.28 + i * 0.06);
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - dir * (20 + Math.abs(w) * 40), y); ctx.stroke();
+  }
+}
+
+// Pointillés de visée
+function dessinerVisee(v, frac) {
+  const vol = preparerVol(v);
+  const dt = 1 / 30;
+  const fin = vol.T * frac;
+  ctx.fillStyle = 'rgba(255,255,255,.95)';
+  let t = 0, x = vol.x, z = vol.z, h = vol.h, vh = vol.vh, i = 0;
+  while (t < fin) {
+    t += dt; x += vol.vx * dt; z += vol.vz * dt; h += vh * dt; vh -= vol.g * dt; i++;
+    const p = proj(x, z, h);
+    ctx.globalAlpha = 0.95 - 0.6 * (t / Math.max(fin, 0.01));
+    ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2.5, 5 * p.s), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  if (frac >= 1) {
+    const p = proj(vol.xL, vol.zL, 0), rx = R_VISU * L.demi * p.s;
+    ctx.setLineDash([5, 4]); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, rx, rx * 0.35, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// Anneau au départ (sur le comptoir) et élastique
+function dessinerDepart(v, decal) {
+  const o = proj(X0, Z0, H0);
+  let x = o.x, y = o.y;
+  if (decal) { x += decal.x; y += decal.y; }
+  const rx = R_VISU * L.demi * o.s;
+  if (decal) {
+    ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(o.x - rx * 1.8, o.y); ctx.lineTo(x, y); ctx.lineTo(o.x + rx * 1.8, o.y); ctx.stroke();
+  }
+  dessinerAnneau(ctx, x, y, rx, rx * 0.38, skinActuel(), temps);
+  void v;
+}
+
+// Main animée du tutoriel
+function dessinerMain(x, y, appuie) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(appuie ? 0.92 : 1, appuie ? 0.92 : 1);
+  ctx.fillStyle = '#ffe0c2'; ctx.strokeStyle = '#7a4a26'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-4, 0); ctx.lineTo(-4, -34); ctx.quadraticCurveTo(0, -42, 4, -34); ctx.lineTo(4, -12);
+  ctx.quadraticCurveTo(10, -18, 14, -10); ctx.quadraticCurveTo(20, -14, 22, -6); ctx.quadraticCurveTo(28, -8, 28, 2);
+  ctx.lineTo(26, 22); ctx.quadraticCurveTo(14, 34, -2, 26); ctx.lineTo(-14, 6); ctx.quadraticCurveTo(-16, -2, -8, 0); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  if (appuie) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, -38, 12, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Démonstration (carte d'introduction) : main + anneau fantôme
+// ---------------------------------------------------------------------------
+const demo = { t: 0, vol: null, v: null, fini: 0 };
+function choisirCibleDemo() {
+  const def = S.def;
+  let liste = S.cibles.filter((c) => !c.prise);
+  if (def.demo === 'tapis' || def.demo === 'deuxTapis') liste = liste.filter((c) => c.mob.kind === 'tapis' && c.x > -0.9 && c.x < 0.3);
+  else if (def.demo === 'riviere') liste = liste.filter((c) => c.mob.kind === 'riviere' && c.x > -0.9 && c.x < 0.4);
+  else if (def.demo === 'canard') liste = liste.filter((c) => c.type === 'canard');
+  else if (def.demo === 'cone') liste = liste.filter((c) => c.type === 'cone');
+  else if (def.demo === 'manege') liste = liste.filter((c) => c.z > 0.9);
+  else if (def.demo === 'plots') return { x: 0.28, z: 0.62, cible: null };
+  if (!liste.length) liste = S.cibles.filter((c) => !c.prise);
+  liste.sort((a, b) => a.z - b.z);
+  const c = liste[0];
+  if (!c) return { x: 0, z: 0.5, cible: null };
+  // anticipe le mouvement de la cible pendant le vol (sauf pour le vent : on montre la dérive)
+  let x = c.x;
+  if (c.mob && c.mob.v) x += c.mob.v * (0.75 + 0.45 * c.z + 1.0);
+  return { x, z: c.z, cible: c };
+}
+function viseePour(x, z) {
+  const p = Math.max(0.1, Math.min(1, (z - 0.05) / 1.04));
+  const zL = 0.05 + p * 1.04;
+  const ang = Math.atan(x / ((zL - Z0) * 1.15));
+  return { ang, p };
+}
+function majDemo(dt) {
+  demo.t += dt;
+  if (!demo.v || demo.t > 4.6) {
+    demo.t = 0; demo.vol = null;
+    const c = choisirCibleDemo();
+    demo.v = viseePour(c.x, c.z);
+  }
+  if (demo.t >= 2.0 && !demo.vol) demo.vol = lancer(demo.v, true);
+  if (demo.vol && !demo.vol.fin) {
+    let reste = dt;
+    while (reste > 0) {
+      const d = Math.min(1 / 240, reste); reste -= d;
+      const res = avancerAnneau(demo.vol, d, true);
+      if (res !== 'vol') { demo.vol.fin = res; break; }
+    }
+  }
+}
+function dessinerDemo() {
+  if (!demo.v) { dessinerDepart(null, null); return; }
+  const o = proj(X0, Z0, H0);
+  const D = demo.v.p * L.dMax;
+  const fx = -Math.sin(demo.v.ang) * D, fy = Math.cos(demo.v.ang) * D;
+  let k = 0, appuie = false;
+  if (demo.t < 0.6) { k = 0; appuie = false; }
+  else if (demo.t < 0.9) { k = 0; appuie = true; }
+  else if (demo.t < 1.9) { k = Math.min(1, (demo.t - 0.9) / 0.8); appuie = true; }
+  else { k = 1; appuie = false; }
+  if (demo.t >= 0.9 && demo.t < 2.0) {
+    dessinerVisee(demo.v, 1);
+    dessinerDepart(null, { x: fx * k * 0.45, y: fy * k * 0.45 });
+  } else if (demo.t < 0.9) dessinerDepart(null, null);
+  if (demo.vol) {
+    ctx.save(); ctx.globalAlpha = 0.85;
+    if (!demo.vol.fin || demo.vol.fin === 'vol') dessinerAnneauMonde(demo.vol, 0.85);
+    else if (demo.vol.fin === 'pris') {
+      const c = demo.vol.pris, p = proj(c.x, c.z, hauteurCible(c) * 0.6);
+      dessinerAnneau(ctx, p.x, p.y, R_VISU * L.demi * p.s, R_VISU * L.demi * p.s * 0.36, skinActuel(), temps);
+      ctx.fillStyle = '#fff3c4';
+      for (let i = 0; i < 6; i++) { const a = temps * 3 + i; ctx.fillRect(p.x + Math.cos(a) * 26, p.y + Math.sin(a) * 14 - 10, 4, 4); }
+    } else dessinerAnneauMonde(demo.vol, 0.6);
+    ctx.restore();
+  }
+  const mx = o.x + fx * k * 0.9 + 10, my = o.y + fy * k * 0.9 + 30;
+  if (demo.t < 2.6) {
+    const entree = Math.min(1, demo.t / 0.5);
+    dessinerMain(mx + (1 - entree) * 80, my + (1 - entree) * 60, appuie);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rendu d'une image
+// ---------------------------------------------------------------------------
+function dessinerMonde() {
+  const allee = S ? S.def.allee : 3;
+  dessinerCiel(allee);
+  dessinerStand(allee);
+  if (!S) return;
+  const def = S.def;
+  for (const tp of def.tapis || []) dessinerTapis(tp);
+  if (def.riviere) dessinerRiviere(def.riviere);
+  if (S.manege) dessinerManegeSol();
+  // Objets triés du fond vers le devant
+  const objets = [];
+  for (const c of S.cibles) objets.push({ z: c.z, f: () => dessinerCible(c) });
+  for (const p of S.plots) objets.push({ z: p.z, f: () => dessinerPlot(p) });
+  if (S.manege) {
+    for (const o of obstaclesManege()) {
+      if (o.i === undefined) objets.push({ z: o.z, f: dessinerMat });
+      else objets.push({ z: o.z, f: () => dessinerCheval(o) });
+    }
+  }
+  for (const a of S.auSol) objets.push({ z: a.z, f: () => dessinerAnneauMonde({ x: a.x, z: a.z, h: 0, rot: 0, skin: a.skin }, Math.min(1, a.vie)) });
+  if (S.anneau) objets.push({ z: S.anneau.z - 0.03, f: () => dessinerAnneauMonde(S.anneau) });
+  objets.sort((a, b) => b.z - a.z);
+  for (const o of objets) o.f();
+  dessinerFanion();
+  dessinerComptoir();
+  // Visée et anneau de départ
+  if (ecran === 'intro' && def.demo) dessinerDemo();
+  else if (ecran === 'jeu' || ecran === 'pause') {
+    const v = viseeActuelle();
+    if (v && !S.anneau && S.anneaux > 0 && !S.fini) {
+      dessinerVisee(v, def.visee);
+      const D = v.p * L.dMax;
+      dessinerDepart(v, { x: -Math.sin(v.ang) * D * 0.45, y: Math.cos(v.ang) * D * 0.45 });
+    } else if (!S.anneau && S.anneaux > 0 && !S.fini) {
+      dessinerDepart(null, null);
+      // petite flèche qui invite à tirer vers le bas
+      if (S.nbLances === 0) {
+        const o = proj(X0, Z0, H0), k = (temps * 1.2) % 1;
+        ctx.globalAlpha = 1 - k; ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.moveTo(o.x - 12, o.y + 30 + k * 30); ctx.lineTo(o.x + 12, o.y + 30 + k * 30); ctx.lineTo(o.x, o.y + 46 + k * 30); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+  // Particules
+  for (const p of S.parts) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.vie * 1.5)); ctx.fillStyle = p.c;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.t, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const p of S.popups) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.vie * 2));
+    ctx.font = '900 ' + Math.round(Math.min(28, W * 0.065)) + 'px system-ui, sans-serif';
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(40,15,60,.85)'; ctx.strokeText(p.texte, p.x, p.y);
+    ctx.fillStyle = p.c; ctx.fillText(p.texte, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Écran titre : un stand de démonstration qui vit tout seul
+function preparerTitre() { S = null; }
+function dessinerTitre() {
+  dessinerCiel(1);
+  dessinerStand(1);
+  // Bouteilles, cônes et canards en pyramide
+  const fauxS = S;
+  const liste = [
+    nouvelleCible('bouteille', -0.36, 0.75, 'r'), nouvelleCible('bouteille', -0.12, 0.75, 'j'), nouvelleCible('bouteille', 0.12, 0.75, 'b'), nouvelleCible('bouteille', 0.36, 0.75, 'v'),
+    nouvelleCible('cone', -0.6, 0.5, 'b'), nouvelleCible('canard', -0.24, 0.45, 'j'), nouvelleCible('canard', 0.24, 0.45, 'r'), nouvelleCible('cone', 0.6, 0.5, 'r'),
+    nouvelleCible('bouteille', 0, 0.3, 'r'),
+  ];
+  liste.forEach((c) => { c.apparition = 1; });
+  liste.sort((a, b) => b.z - a.z).forEach((c) => dessinerCible(c));
+  // Anneau qui vole en boucle vers la bouteille du milieu
+  const k = (temps * 0.45) % 1;
+  const x = 0.36 * (1 - k) * 0 + 0.12 * k, z = -0.1 + 0.85 * k, h = 0.15 + 1.3 * k * (1 - k) + 0.3 * k;
+  const p = proj(x, z, h);
+  dessinerAnneau(ctx, p.x, p.y, R_VISU * L.demi * p.s * 1.2, R_VISU * L.demi * p.s * 0.45, skinActuel(), temps);
+  dessinerComptoir();
+  // Peluches sur le comptoir
+  const y = proj(0, -0.04).y + H * 0.08, tp = Math.min(W * 0.12, 62);
+  [[L.cx - tp * 1.6, 0], [L.cx, 14], [L.cx + tp * 1.6, 11]].forEach(([xx, i], j) => {
+    ctx.save(); ctx.translate(xx, y + Math.sin(temps * 2 + j) * 3); dessinerPeluche(ctx, 0, 0, tp, PELUCHES[i], true); ctx.restore();
+  });
+  void fauxS;
+}
+
+function boucle(ts) {
+  const now = ts / 1000;
+  let dt = boucle.dernier ? now - boucle.dernier : 0;
+  boucle.dernier = now;
+  dt = Math.min(0.05, Math.max(0, dt));
+  if (!enPause) temps += dt;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (S && !enPause) {
+    if (ecran === 'jeu') majStand(dt);
+    else if (ecran === 'intro') { majCibles(dt); if (S.def.demo) majDemo(dt); }
+    for (let i = S.parts.length - 1; i >= 0; i--) { const p = S.parts[i]; p.vie -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 300 * dt; if (p.vie <= 0) S.parts.splice(i, 1); }
+    for (let i = S.popups.length - 1; i >= 0; i--) { const p = S.popups[i]; p.vie -= dt; p.y -= 40 * dt; if (p.vie <= 0) S.popups.splice(i, 1); }
+  }
+  if (!enPause) {
+    for (let i = decor.feux.length - 1; i >= 0; i--) { decor.feux[i].vie -= dt; if (decor.feux[i].vie <= 0) decor.feux.splice(i, 1); }
+    for (let i = decor.confettis.length - 1; i >= 0; i--) { const c = decor.confettis[i]; c.vie -= dt; c.x += c.vx * dt; c.y += c.vy * dt; c.r += c.vr * dt; if (c.vie <= 0 || c.y > H + 20) decor.confettis.splice(i, 1); }
+  }
+  ctx.save();
+  if (S && S.secousse > 0) ctx.translate((Math.random() - 0.5) * 10 * S.secousse / 0.18, (Math.random() - 0.5) * 6 * S.secousse / 0.18);
+  if (S) dessinerMonde(); else dessinerTitre();
+  ctx.restore();
+  for (const c of decor.confettis) {
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.r); ctx.fillStyle = c.c; ctx.fillRect(-4, -2, 8, 4); ctx.restore();
+  }
+  requestAnimationFrame(boucle);
+}
+
+// ---------------------------------------------------------------------------
+// Peluches (dessin paramétré)
+// ---------------------------------------------------------------------------
+function dessinerPeluche(g, x, y, t, d, gagnee) {
+  const gris = '#4a4266', gris2 = '#5a5278';
+  const c = gagnee ? d.c : gris, c2 = gagnee ? d.c2 : gris2;
+  const r = t * 0.3;
+  g.save(); g.translate(x, y);
+  g.lineWidth = Math.max(1, t * 0.025); g.strokeStyle = gagnee ? 'rgba(60,30,40,.45)' : 'rgba(0,0,0,.25)';
+  const rond = (cx, cy, rr, col) => { g.fillStyle = col; g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.fill(); g.stroke(); };
+  const ovale = (cx, cy, rx, ry, col, a) => { g.fillStyle = col; g.beginPath(); g.ellipse(cx, cy, rx, ry, a || 0, 0, Math.PI * 2); g.fill(); g.stroke(); };
+  // corps, pattes
+  if (d.laine) for (let i = 0; i < 7; i++) rond(Math.cos(i) * r * 0.6, r * 1.15 + Math.sin(i) * r * 0.4, r * 0.38, c);
+  ovale(0, r * 1.15, r * 0.78, r * 0.72, c);
+  ovale(0, r * 1.25, r * 0.45, r * 0.42, c2);
+  ovale(-r * 0.75, r * 1.0, r * 0.22, r * 0.38, c, 0.5);
+  ovale(r * 0.75, r * 1.0, r * 0.22, r * 0.38, c, -0.5);
+  ovale(-r * 0.4, r * 1.75, r * 0.3, r * 0.2, c);
+  ovale(r * 0.4, r * 1.75, r * 0.3, r * 0.2, c);
+  // oreilles derrière la tête
+  const o = d.o;
+  if (o === 'rond') { rond(-r * 0.72, -r * 0.7, r * 0.3, c); rond(r * 0.72, -r * 0.7, r * 0.3, c); if (gagnee) { rond(-r * 0.72, -r * 0.7, r * 0.15, d.panda ? c2 : c2); rond(r * 0.72, -r * 0.7, r * 0.15, d.panda ? c2 : c2); } }
+  else if (o === 'long') { ovale(-r * 0.38, -r * 1.25, r * 0.2, r * 0.6, c, -0.12); ovale(r * 0.38, -r * 1.25, r * 0.2, r * 0.6, c, 0.12); if (gagnee) { ovale(-r * 0.38, -r * 1.25, r * 0.1, r * 0.42, c2, -0.12); ovale(r * 0.38, -r * 1.25, r * 0.1, r * 0.42, c2, 0.12); } }
+  else if (o === 'pointu') {
+    g.fillStyle = c;
+    for (const s of [-1, 1]) { g.beginPath(); g.moveTo(s * r * 0.85, -r * 0.2); g.lineTo(s * r * 0.7, -r * 1.15); g.lineTo(s * r * 0.15, -r * 0.75); g.closePath(); g.fill(); g.stroke(); }
+  } else if (o === 'grandes') { rond(-r * 0.95, -r * 0.35, r * 0.5, c); rond(r * 0.95, -r * 0.35, r * 0.5, c); if (gagnee) { rond(-r * 0.95, -r * 0.35, r * 0.3, c2); rond(r * 0.95, -r * 0.35, r * 0.3, c2); } }
+  else if (o === 'tombantes') { ovale(-r * 0.95, -r * 0.05, r * 0.25, r * 0.55, c2, 0.3); ovale(r * 0.95, -r * 0.05, r * 0.25, r * 0.55, c2, -0.3); }
+  else if (o === 'criniere') { for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; rond(Math.cos(a) * r * 0.95, Math.sin(a) * r * 0.95, r * 0.32, c2); } }
+  else if (o === 'plumes') { g.fillStyle = c; for (const s of [-1, 1]) { g.beginPath(); g.moveTo(s * r * 0.8, -r * 0.4); g.lineTo(s * r * 0.75, -r * 1.05); g.lineTo(s * r * 0.3, -r * 0.8); g.closePath(); g.fill(); g.stroke(); } }
+  else if (o === 'pics') { g.fillStyle = c2; for (let i = 0; i < 4; i++) { const xx = -r * 0.45 + i * r * 0.3; g.beginPath(); g.moveTo(xx - r * 0.14, -r * 0.82); g.lineTo(xx, -r * 1.2); g.lineTo(xx + r * 0.14, -r * 0.82); g.closePath(); g.fill(); g.stroke(); } }
+  else if (o === 'cotes') { rond(-r * 0.95, 0, r * 0.3, c); rond(r * 0.95, 0, r * 0.3, c); if (gagnee) { rond(-r * 0.95, 0, r * 0.17, c2); rond(r * 0.95, 0, r * 0.17, c2); } }
+  else if (o === 'yeux') { rond(-r * 0.42, -r * 0.82, r * 0.3, c); rond(r * 0.42, -r * 0.82, r * 0.3, c); }
+  // tête
+  rond(0, 0, r, c);
+  if (d.laine && gagnee) for (let i = 0; i < 5; i++) rond(-r * 0.5 + i * r * 0.25, -r * 0.85, r * 0.22, c);
+  if (!gagnee) { g.restore(); return; }
+  if (d.rayures) { g.strokeStyle = '#3a2a20'; g.lineWidth = r * 0.1; for (const s of [-1, 1]) { g.beginPath(); g.moveTo(s * r * 0.95, -r * 0.2); g.lineTo(s * r * 0.6, -r * 0.1); g.stroke(); } g.beginPath(); g.moveTo(0, -r); g.lineTo(0, -r * 0.65); g.stroke(); g.lineWidth = Math.max(1, t * 0.025); g.strokeStyle = 'rgba(60,30,40,.45)'; }
+  if (d.corne) { g.fillStyle = '#ffd166'; g.beginPath(); g.moveTo(-r * 0.15, -r * 0.85); g.lineTo(0, -r * 1.6); g.lineTo(r * 0.15, -r * 0.85); g.closePath(); g.fill(); g.stroke(); }
+  // museau / visage
+  if (d.panda) { ovale(-r * 0.36, -r * 0.05, r * 0.22, r * 0.28, c2, 0.4); ovale(r * 0.36, -r * 0.05, r * 0.22, r * 0.28, c2, -0.4); }
+  if (!d.bec && !d.trompe && !d.groin) ovale(0, r * 0.35, r * 0.42, r * 0.3, d.panda ? '#ffffff' : c2);
+  const yeuxY = d.o === 'yeux' ? -r * 0.82 : -r * 0.08;
+  const yeuxX = d.o === 'yeux' ? r * 0.42 : r * 0.36;
+  if (d.o === 'yeux' || d.bec && d.id === 'chouette') { rond(-yeuxX, yeuxY, r * 0.2, '#fff'); rond(yeuxX, yeuxY, r * 0.2, '#fff'); }
+  g.fillStyle = '#2a1a3a';
+  g.beginPath(); g.arc(-yeuxX, yeuxY, r * 0.1, 0, Math.PI * 2); g.arc(yeuxX, yeuxY, r * 0.1, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#fff';
+  g.beginPath(); g.arc(-yeuxX + r * 0.04, yeuxY - r * 0.04, r * 0.035, 0, Math.PI * 2); g.arc(yeuxX + r * 0.04, yeuxY - r * 0.04, r * 0.035, 0, Math.PI * 2); g.fill();
+  if (d.bec) { g.fillStyle = '#ff9f1c'; g.beginPath(); g.moveTo(-r * 0.2, r * 0.18); g.lineTo(r * 0.2, r * 0.18); g.lineTo(0, r * 0.48); g.closePath(); g.fill(); g.stroke(); }
+  else if (d.trompe) { g.strokeStyle = c; g.lineWidth = r * 0.28; g.lineCap = 'round'; g.beginPath(); g.moveTo(0, r * 0.2); g.quadraticCurveTo(r * 0.05, r * 0.85, r * 0.45, r * 0.75); g.stroke(); g.lineCap = 'butt'; }
+  else if (d.groin) { ovale(0, r * 0.32, r * 0.32, r * 0.22, c2); g.fillStyle = '#9e3b54'; g.beginPath(); g.arc(-r * 0.1, r * 0.32, r * 0.06, 0, Math.PI * 2); g.arc(r * 0.1, r * 0.32, r * 0.06, 0, Math.PI * 2); g.fill(); }
+  else {
+    g.fillStyle = '#3a2230'; g.beginPath(); g.ellipse(0, r * (d.grosNez ? 0.25 : 0.22), r * (d.grosNez ? 0.2 : 0.1), r * (d.grosNez ? 0.15 : 0.07), 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#3a2230'; g.lineWidth = Math.max(1, r * 0.06);
+    g.beginPath(); g.arc(-r * 0.09, r * 0.36, r * 0.09, 0.1, Math.PI - 0.3); g.arc(r * 0.09, r * 0.36, r * 0.09, 0.3, Math.PI - 0.1); g.stroke();
+  }
+  if (d.moust) { g.strokeStyle = '#3a2230'; g.lineWidth = 1; for (const s of [-1, 1]) for (const k of [-1, 1]) { g.beginPath(); g.moveTo(s * r * 0.2, r * 0.3); g.lineTo(s * r * 0.75, r * 0.3 + k * r * 0.12); g.stroke(); } }
+  // joues
+  g.fillStyle = 'rgba(255,120,150,.35)'; g.beginPath(); g.arc(-r * 0.6, r * 0.2, r * 0.12, 0, Math.PI * 2); g.arc(r * 0.6, r * 0.2, r * 0.12, 0, Math.PI * 2); g.fill();
+  g.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Interface (écrans DOM)
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const ECRANS = ['titre', 'intro', 'niveaux', 'pause', 'victoire', 'defaite', 'bilan', 'etagere'];
+function montrer(id) {
+  for (const e of ECRANS) $(e).hidden = e !== id;
+  const enStand = ['intro', 'jeu', 'pause'].includes(id) || id === null;
+  $('hud').hidden = !enStand;
+  $('infos').hidden = !(id === null || id === 'pause');
+}
+function nomStand(n) { return tr('stand.' + n); }
+function majHud() {
+  if (!S) return;
+  $('hud-titre').innerHTML = '';
+  const t1 = document.createElement('span'); t1.textContent = tr('hud.stand', { n: S.n, total: NIVEAUX.length });
+  const t2 = document.createElement('small'); t2.textContent = nomStand(S.n);
+  $('hud-titre').append(t1, t2);
+  const reste = tr('hud.anneaux', { n: S.anneaux });
+  $('objectif').textContent = (S.ordre ? tr('hud.commandes', { n: S.reussis, total: S.def.objectif }) : tr('hud.cibles', { n: S.reussis, total: S.def.objectif })) + ' · ' + reste;
+  $('ordre').hidden = !S.ordre;
+  if (S.ordre) dessinerCommande();
+}
+function bumpObjectif() { const o = $('objectif'); o.classList.remove('bump'); void o.offsetWidth; o.classList.add('bump'); }
+
+function iconeType(t, couleur) {
+  const f = couleur || '#3a2350';
+  if (t === 'bouteille') return '<svg viewBox="0 0 20 20"><path d="M8 1h4v5l2 3v10H6V9l2-3z" fill="' + f + '"/></svg>';
+  if (t === 'cone') return '<svg viewBox="0 0 20 20"><path d="M8.5 2h3L16 18H4z" fill="' + f + '"/><rect x="2" y="17" width="16" height="2" fill="' + f + '"/></svg>';
+  return '<svg viewBox="0 0 20 20"><ellipse cx="9" cy="13" rx="8" ry="5" fill="' + f + '"/><circle cx="13" cy="6" r="4" fill="' + f + '"/><path d="M16 6l4 1-4 1z" fill="#ff9f1c"/></svg>';
+}
+function iconeCouleur(c) {
+  const col = COULEURS[c];
+  const formes = {
+    r: '<path d="M10 17C2 11 3 4 7 4c1.8 0 2.6 1.3 3 2 .4-.7 1.2-2 3-2 4 0 5 7-3 13z" fill="#fff"/>',
+    b: '<path d="M10 3l5 7-5 7-5-7z" fill="#fff"/>',
+    j: '<path d="M10 2l2.3 5 5.4.4-4.1 3.6 1.3 5.3L10 13.5 5.1 16.3l1.3-5.3L2.3 7.4 7.7 7z" fill="#fff"/>',
+    v: '<circle cx="10" cy="10" r="5" fill="#fff"/>',
+  };
+  void col;
+  return '<svg viewBox="0 0 20 20">' + formes[c] + '</svg>';
+}
+function dessinerCommande() {
+  if (!S || !S.ordre) return;
+  const nom = S.def.ordres[S.ordre.i];
+  const box = $('ordre-pastilles');
+  box.innerHTML = '';
+  if (!nom) { $('ordre-txt').textContent = tr('ordre.fini'); return; }
+  const cmd = COMMANDES[nom];
+  $('ordre-txt').textContent = tr('ordre.' + nom);
+  cmd.items.forEach((it, i) => {
+    const s = document.createElement('span');
+    s.className = 'pastille' + (i < S.ordre.prog ? ' faite' : '');
+    if (it.c) { s.style.background = COULEURS[it.c].fond; s.innerHTML = it.t ? iconeType(it.t, '#fff') : iconeCouleur(it.c); }
+    else s.innerHTML = iconeType(it.t);
+    box.appendChild(s);
+  });
+}
+
+// Carte d'introduction
+function montrerIntro() {
+  ecran = 'intro';
+  enPause = false;
+  const n = S.n, def = S.def;
+  $('intro-allee').textContent = tr('allee.' + def.allee);
+  $('intro-titre').textContent = tr('hud.stand', { n, total: NIVEAUX.length }) + ' · ' + nomStand(n);
+  $('intro-texte').textContent = tr('intro.' + n);
+  $('intro-etapes').hidden = n !== 1;
+  $('intro-but').textContent = def.ordres
+    ? tr('but.commandes', { n: def.objectif, a: def.anneaux })
+    : tr('but.cibles', { n: def.objectif, a: def.anneaux });
+  demo.t = 0; demo.vol = null; demo.v = null;
+  montrer('intro');
+  $('infos').hidden = false;
+  majHud();
+}
+function fermerIntro() {
+  if (ecran !== 'intro') return;
+  SONS.clic();
+  ecran = 'jeu';
+  montrer(null);
+}
+$('intro').addEventListener('pointerdown', (e) => { e.preventDefault(); audio(); fermerIntro(); });
+
+// Pause
+function pauser() {
+  if (ecran !== 'jeu' || !S || !S.actif) return;
+  enPause = true; ecran = 'pause'; visee.actif = false;
+  try { if (AC) AC.suspend(); } catch (e) { /* rien */ }
+  montrer('pause');
+  try { $('b-reprendre').focus(); } catch (e) { /* rien */ }
+}
+function reprendre() {
+  enPause = false; ecran = 'jeu';
+  try { if (AC && P.son) AC.resume(); } catch (e) { /* rien */ }
+  montrer(null);
+}
+$('b-pause').addEventListener('click', () => { SONS.clic(); if (ecran === 'intro') { fermerIntro(); } pauser(); });
+$('b-reprendre').addEventListener('click', () => { reprendre(); SONS.clic(); });
+$('b-recommencer').addEventListener('click', () => { reprendre(); SONS.clic(); demarrerStand(S.n); });
+$('b-pause-accueil').addEventListener('click', () => { enPause = false; allerAccueil(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && ecran === 'jeu') pauser(); });
+
+document.querySelectorAll('.b-son').forEach((b) => b.addEventListener('click', () => {
+  P.son = !P.son; garderLocal(); majBoutonsSon();
+  if (P.son) SONS.clic();
+}));
+
+// Étoiles gagnées selon les anneaux économisés
+function calculerEtoiles(def, reste) {
+  const extra = def.anneaux - def.objectif;
+  if (reste >= Math.ceil(extra * 0.5)) return 3;
+  if (reste >= Math.ceil(extra * 0.2)) return 2;
+  return 1;
+}
+
+function sauverPartie(niveau) {
+  try { JEL_SAVE.save(JEU, { niveau, score: totalScore(), options: P }); } catch (e) { /* rien */ }
+}
+
+function victoire() {
+  ecran = 'fin';
+  const i = S.n - 1, def = S.def;
+  const bonusReste = S.anneaux * 30;
+  const score = S.score + bonusReste;
+  const etoiles = calculerEtoiles(def, S.anneaux);
+  const ancienRecord = P.records[i] || 0;
+  const record = score > ancienRecord;
+  const avantEtoiles = totalEtoiles();
+  const nouvellePeluche = !P.peluches[i];
+  P.etoiles[i] = Math.max(P.etoiles[i] || 0, etoiles);
+  P.records[i] = Math.max(ancienRecord, score);
+  P.peluches[i] = true;
+  garderLocal();
+  sauverPartie(S.n + 1);
+  niveauOuvertSauvegarde = Math.max(niveauOuvertSauvegarde, S.n + 1);
+  const debloque = ANNEAUX.find((a) => a.seuil > avantEtoiles && a.seuil <= totalEtoiles());
+
+  $('v-titre').textContent = tr(etoiles === 3 ? 'victoire.titre3' : 'victoire.titre');
+  $('v-detail').textContent = tr('victoire.detail', { n: S.anneaux, points: bonusReste });
+  $('v-record').textContent = record ? tr('victoire.record') : tr('victoire.recordActuel', { n: ancienRecord });
+  const spans = $('v-etoiles').querySelectorAll('span');
+  spans.forEach((s) => s.classList.remove('on'));
+  $('v-etoiles').setAttribute('aria-label', tr('aria.etoiles', { n: etoiles }));
+  for (let k = 0; k < etoiles; k++) setTimeout(() => { spans[k].classList.add('on'); SONS.etoile(k); }, 500 + k * 380);
+  // Score qui défile
+  const el = $('v-score'); let v = 0; const pas = Math.max(1, Math.round(score / 40));
+  const anim = () => { v = Math.min(score, v + pas); el.textContent = tr('victoire.score', { n: v }); if (v < score && ecran === 'fin') requestAnimationFrame(anim); };
+  anim();
+  // Peluche gagnée
+  const zp = $('v-peluche');
+  zp.hidden = !nouvellePeluche;
+  if (nouvellePeluche) {
+    const c = zp.querySelector('canvas'), g = c.getContext('2d');
+    g.clearRect(0, 0, 140, 140); g.save(); dessinerPeluche(g, 70, 52, 120, PELUCHES[i], true); g.restore();
+    zp.querySelector('p').textContent = tr('victoire.peluche', { nom: tr('peluche.' + PELUCHES[i].id) });
+  }
+  const zs = $('v-skin');
+  zs.hidden = !debloque;
+  if (debloque) {
+    const c = zs.querySelector('canvas'), g = c.getContext('2d');
+    g.clearRect(0, 0, 88, 60); dessinerAnneau(g, 44, 30, 30, 13, debloque, 1);
+    zs.querySelector('p').textContent = tr('victoire.skin', { nom: tr('skin.' + debloque.id) });
+  }
+  $('b-suivant').textContent = S.n < NIVEAUX.length ? tr('bouton.suivant') : tr('bouton.bilan');
+  SONS.victoire();
+  confettis(70);
+  montrer('victoire');
+}
+function defaite() {
+  ecran = 'fin';
+  const i = S.n - 1;
+  $('d-detail').textContent = S.ordre
+    ? tr('defaite.detailCommandes', { n: S.reussis, total: S.def.objectif })
+    : tr('defaite.detail', { n: S.reussis, total: S.def.objectif });
+  $('d-score').textContent = tr('victoire.score', { n: S.score });
+  $('d-record').textContent = P.records[i] ? tr('victoire.recordActuel', { n: P.records[i] }) : '';
+  SONS.defaite();
+  montrer('defaite');
+}
+$('b-suivant').addEventListener('click', () => {
+  SONS.clic();
+  if (S.n < NIVEAUX.length) demarrerStand(S.n + 1);
+  else montrerBilan();
+});
+$('b-v-rejouer').addEventListener('click', () => { SONS.clic(); demarrerStand(S.n); });
+$('b-v-stands').addEventListener('click', () => { SONS.clic(); ouvrirStands(); });
+$('b-reessayer').addEventListener('click', () => { SONS.clic(); demarrerStand(S.n); });
+$('b-d-stands').addEventListener('click', () => { SONS.clic(); ouvrirStands(); });
+$('b-d-accueil').addEventListener('click', () => { SONS.clic(); allerAccueil(); });
+
+function montrerBilan() {
+  ecran = 'fin';
+  $('b-etoiles').textContent = tr('bilan.etoiles', { n: totalEtoiles(), total: TOTAL_ETOILES });
+  $('b-peluches').textContent = tr('bilan.peluches', { n: nbPeluches(), total: PELUCHES.length });
+  $('b-score').textContent = tr('bilan.score', { n: totalScore() });
+  confettis(90);
+  SONS.victoire();
+  montrer('bilan');
+}
+$('b-bilan-etagere').addEventListener('click', () => { SONS.clic(); ouvrirEtagere('bilan'); });
+$('b-bilan-rejouer').addEventListener('click', () => { SONS.clic(); demarrerStand(1); });
+$('b-bilan-accueil').addEventListener('click', () => { SONS.clic(); allerAccueil(); });
+
+// Accueil
+function allerAccueil() {
+  S = null; ecran = 'titre'; enPause = false;
+  try { if (AC && P.son) AC.resume(); } catch (e) { /* rien */ }
+  montrer('titre');
+}
+
+// Sélection des stands
+let retourStands = 'titre';
+function ouvrirStands() {
+  retourStands = S ? 'stand' : 'titre';
+  S = null; ecran = 'niveaux';
+  const box = $('liste-stands'); box.innerHTML = '';
+  for (let a = 0; a < 4; a++) {
+    const t = document.createElement('div'); t.className = 'allee-t'; t.textContent = tr('allee.' + a);
+    const g = document.createElement('div'); g.className = 'grille';
+    for (let k = 0; k < 5; k++) {
+      const i = a * 5 + k, n = i + 1;
+      const b = document.createElement('button'); b.className = 'case';
+      const ouvert = standOuvert(i);
+      if (ouvert) {
+        const num = document.createElement('span'); num.textContent = nombre(n);
+        const et = document.createElement('span'); et.className = 'et'; et.textContent = '★'.repeat(P.etoiles[i]) + '☆'.repeat(3 - P.etoiles[i]);
+        b.append(num, et);
+        b.setAttribute('aria-label', tr('aria.standCase', { n, e: P.etoiles[i] }));
+        b.addEventListener('click', () => { SONS.clic(); demarrerStand(n); });
+      } else {
+        b.disabled = true;
+        b.innerHTML = '<svg viewBox="0 0 24 24"><path d="M7 10V7a5 5 0 0 1 10 0v3h1v11H6V10zm2 0h6V7a3 3 0 0 0-6 0z"/></svg>';
+        b.setAttribute('aria-label', tr('aria.standFerme', { n }));
+      }
+      g.appendChild(b);
+    }
+    box.append(t, g);
+  }
+  montrer('niveaux');
+}
+$('b-stands').addEventListener('click', () => { audio(); SONS.clic(); ouvrirStands(); });
+$('b-niveaux-retour').addEventListener('click', () => { SONS.clic(); allerAccueil(); });
+
+// Étagère de la chambre
+let retourEtagere = 'titre';
+function ouvrirEtagere(depuis) {
+  retourEtagere = depuis || 'titre';
+  S = null; ecran = 'etagere';
+  $('etagere-compte').textContent = tr('etagere.compte', { n: nbPeluches(), total: PELUCHES.length });
+  dessinerEtagere();
+  const box = $('liste-skins'); box.innerHTML = '';
+  for (const sk of ANNEAUX) {
+    const b = document.createElement('button'); b.className = 'skin' + (sk.id === P.skin ? ' choisi' : '');
+    const c = document.createElement('canvas'); c.width = 88; c.height = 60;
+    const g = c.getContext('2d'); dessinerAnneau(g, 44, 30, 30, 13, sk, 1);
+    const nomS = document.createElement('span');
+    const ok = skinDebloque(sk);
+    nomS.textContent = ok ? tr('skin.' + sk.id) : tr('etagere.seuil', { n: sk.seuil });
+    b.append(c, nomS);
+    b.setAttribute('aria-pressed', sk.id === P.skin ? 'true' : 'false');
+    if (!ok) { b.disabled = true; b.setAttribute('aria-label', tr('skin.' + sk.id) + ' · ' + tr('etagere.seuil', { n: sk.seuil })); }
+    else b.addEventListener('click', () => { SONS.tink(); P.skin = sk.id; garderLocal(); ouvrirEtagere(retourEtagere); });
+    box.appendChild(b);
+  }
+  montrer('etagere');
+}
+function dessinerEtagere() {
+  const c = $('canvas-etagere'), g = c.getContext('2d');
+  const w = c.width, h = c.height;
+  // mur de la chambre
+  const fond = g.createLinearGradient(0, 0, 0, h);
+  fond.addColorStop(0, '#ffe7f1'); fond.addColorStop(1, '#ffd3e5');
+  g.fillStyle = fond; g.fillRect(0, 0, w, h);
+  g.fillStyle = 'rgba(255,255,255,.6)';
+  for (let y = 30; y < h; y += 90) for (let x = (y / 90 % 2) * 45 + 20; x < w; x += 90) { g.beginPath(); g.arc(x, y, 7, 0, Math.PI * 2); g.fill(); }
+  const rangs = 4, cols = 5, hr = h / rangs;
+  for (let r = 0; r < rangs; r++) {
+    const yb = (r + 1) * hr - 18;
+    g.fillStyle = '#b07a4a'; g.fillRect(14, yb, w - 28, 18);
+    g.fillStyle = '#8a5a30'; g.fillRect(14, yb + 18, w - 28, 8);
+    for (let k = 0; k < cols; k++) {
+      const i = r * cols + k;
+      const x = 14 + (w - 28) * (k + 0.5) / cols;
+      dessinerPeluche(g, x, yb - hr * 0.56, hr * 0.62, PELUCHES[i], !!P.peluches[i]);
+    }
+  }
+}
+$('b-etagere').addEventListener('click', () => { audio(); SONS.clic(); ouvrirEtagere('titre'); });
+$('b-etagere-retour').addEventListener('click', () => {
+  SONS.clic();
+  if (retourEtagere === 'bilan') montrerBilan(); else allerAccueil();
+});
+
+// Bouton Jouer : reprise avec save.js
+function boutonJouer() {
+  audio(); SONS.clic();
+  JEL_SAVE.reprise({
+    jeu: JEU,
+    onContinuer: (d) => {
+      const n = Math.max(1, Math.min(NIVEAUX.length, Number(d.niveau) || 1));
+      niveauOuvertSauvegarde = Math.max(niveauOuvertSauvegarde, n);
+      demarrerStand(n);
+    },
+    onNouvelle: () => demarrerStand(1),
+    onEffacer: () => {
+      P = { etoiles: [], records: [], peluches: [], skin: 'classique', son: P.son };
+      for (let i = 0; i < NIVEAUX.length; i++) { P.etoiles[i] = 0; P.records[i] = 0; P.peluches[i] = false; }
+      niveauOuvertSauvegarde = 1;
+      garderLocal();
+      demarrerStand(1);
+    },
+  });
+}
+$('b-jouer').addEventListener('click', boutonJouer);
+
+// Sauvegarde à la fermeture, seulement pendant un stand
+JEL_SAVE.surFermeture(() => {
+  if (S && (ecran === 'jeu' || ecran === 'intro' || ecran === 'pause')) sauverPartie(S.n);
+});
+
+// Démarrage
+chargerProgression();
+try { const d = JEL_SAVE.load(JEU); if (JEL_SAVE.existe(JEU)) niveauOuvertSauvegarde = Math.max(1, Math.min(NIVEAUX.length, Number(d.niveau) || 1)); } catch (e) { /* rien */ }
+majBoutonsSon();
+preparerTitre();
+montrer('titre');
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
