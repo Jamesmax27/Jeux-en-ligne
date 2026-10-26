@@ -3090,6 +3090,7 @@ h1 {
     const i = etat.niveau, n = niv();
     etat.fini = true;
     etat.verrou = true;
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
     const etoiles = etat.aides === 0 && etat.erreurs <= 1 ? 3 : etat.erreurs + etat.aides <= 3 ? 2 : 1;
     const ancien = sauve.records[i] || 0;
     const record = etat.score > ancien;
@@ -3147,6 +3148,7 @@ h1 {
   function defaite() {
     etat.fini = true;
     etat.verrou = true;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: etat.niveau + 1 });
     const ancien = sauve.records[etat.niveau] || 0;
     const c = $('#fin-contenu');
     c.innerHTML = '';

@@ -1,6 +1,6 @@
 ---
 name: ajouter-jeu-site
-description: Ajoute un jeu HTML à Free Micro Games (freemicrogames.com) depuis Claude Code, dans le dépôt local Jeux-en-ligne. Le jeu est mis aux règles (5 langues, sauvegarde save.js, 20 niveaux), reçoit une jaquette cover.webp sans texte et un game.json complet (genre, univers, âge, textes de référencement dans les 5 langues), passe tous les contrôles du dépôt sur la machine, puis part sur une branche jeu-manuel/<id> avec une pull request, sans jamais fusionner. À utiliser dès que l'utilisateur dit « ajoute ce jeu au site », « publie ce jeu », « pousse ce jeu sur mon site » ou équivalent dans Claude Code. Dans Claude Code, cette version passe avant la compétence claude.ai du même nom (anthropic-skills:ajouter-jeu-site).
+description: Ajoute un jeu HTML à Free Micro Games (freemicrogames.com) depuis Claude Code, dans le dépôt local Jeux-en-ligne. Le jeu est mis aux règles (5 langues, sauvegarde save.js, 20 niveaux), reçoit une jaquette cover.webp sans texte et un game.json complet (genre, univers, âge, textes de référencement dans les 5 langues), passe tous les contrôles du dépôt sur la machine, puis part sur une branche jeu-manuel/<id> avec une pull request, que Claude fusionne une fois tous les contrôles verts (CLAUDE.md, section 12). À utiliser dès que l'utilisateur dit « ajoute ce jeu au site », « publie ce jeu », « pousse ce jeu sur mon site » ou équivalent dans Claude Code. Dans Claude Code, cette version passe avant la compétence claude.ai du même nom (anthropic-skills:ajouter-jeu-site).
 ---
 
 # Ajouter un jeu à Free Micro Games (Claude Code, dépôt local)
@@ -77,12 +77,13 @@ Garder le jeu de l'utilisateur : corriger et compléter, sans rien retirer de so
 
    `added` = date du jour (heure de Paris) ; `author` = `"Claude"` ou le nom donné par l'utilisateur ; `niveaux` = nombre réel de niveaux ; `consignes` et `idee` seulement si les étapes 4 et 3 les justifient ; `"non_traduisible": true` si besoin. Jamais `tags`, pas de `maj` pour un nouveau jeu.
 2. **`games/<id>/index.html`** :
-   - **Technique** : un seul fichier de moins de 2 Mo, `<html lang="fr">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`, un `<title>`. Aucune adresse `http(s)://` (seuls les espaces de noms `http://www.w3.org/…` sont tolérés) ni `//…` : pas de CDN, de police ou d'image en ligne, ni de `fetch`, `XMLHttpRequest`, `sendBeacon` ou `WebSocket`. Pas d'`alert()`, `confirm()`, `prompt()`, `window.open()` ni de `<form>`. Tout accès à `localStorage` (ou `sessionStorage`, `indexedDB`) dans `try { … } catch (e) { … }`. Aucun code de suivi : le lanceur s'en charge (pas de `stopImmediatePropagation()` sur l'événement `error`).
+   - **Technique** : un seul fichier de moins de 2 Mo, `<html lang="fr">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`, un `<title>`. Aucune adresse `http(s)://` (seuls les espaces de noms `http://www.w3.org/…` sont tolérés) ni `//…` : pas de CDN, de police ou d'image en ligne, ni de `fetch`, `XMLHttpRequest`, `sendBeacon` ou `WebSocket`. Pas d'`alert()`, `confirm()`, `prompt()`, `window.open()` ni de `<form>`. Tout accès à `localStorage` (ou `sessionStorage`, `indexedDB`) dans `try { … } catch (e) { … }`. Aucun code de suivi en dehors de `FMG.reportEnd` (ci-dessous) : le lanceur s'en charge (pas de `stopImmediatePropagation()` sur l'événement `error`).
    - **Jouabilité** : tout au doigt (cibles d'au moins 44 px) et au clavier ou à la souris ; pensé pour un téléphone en portrait (360 à 430 px de large) ; pas de défilement de la page pendant le jeu ; règles expliquées à l'écran au démarrage.
    - **Contenu** : adapté aux enfants, création originale (aucun personnage, nom, logo ou univers protégé), ni publicité, ni achat, ni lien, ni collecte de données. Aucune image avec du texte : ni lettre ni chiffre dessinés en SVG ou en canvas.
    - **Langues** : aucun texte visible en dur (HTML, JavaScript, canvas, messages, `aria-label`, `title`) : `t('cle', { variables })` (si `t` est déjà une variable du jeu : `const traduire = window.JEL_I18N.t;`) ou `data-i18n="cle"` (`data-i18n-html`, `data-i18n-placeholder`, `data-i18n-title`, `data-i18n-aria`). Nombres avec `JEL_I18N.nombre(x)`, touches lues avec `event.code`. Pas de largeur fixe sur les boutons (l'allemand est environ 30 % plus long).
    - **Niveaux** : `window.JEL_NIVEAUX = NIVEAUX.length;`, tiré des données des niveaux (même nombre que `"niveaux"`).
    - **Sauvegarde** : `const JEU = '<id>';`. Le bouton « Jouer » de l'écran titre appelle `JEL_SAVE.reprise({ jeu: JEU, onContinuer: (d) => <reprise au niveau d.niveau>, onNouvelle: () => <début normal> })`. Chaque niveau N réussi appelle `JEL_SAVE.save(JEU, { niveau: N + 1, score })`. Et `JEL_SAVE.surFermeture(() => { if (<partie en cours>) JEL_SAVE.save(JEU, { niveau: <niveau en cours>, score }); })`. Jamais d'écriture depuis l'écran titre (jeu sans niveaux : `CONSIGNES-JEU.md`, « Sauvegarde »).
+   - **Fin de partie** : dans la fonction qui passe à l'écran de victoire, `if (window.FMG) window.FMG.reportEnd({ completed: true, level: <numéro du niveau, à partir de 1> });` ; dans celle de l'écran de défaite, la même avec `completed: false`. Une fois par fin (pas dans une fonction de dessin appelée à chaque image), garde `if (window.FMG)` sur la même ligne ; jeu sans niveaux ou sans fin : `CONSIGNES-JEU.md`, « Fin de partie ». Le lanceur fournit `FMG` : rien à recopier.
 3. **`i18n-jeu/<id>/fr.json`** : `{ "meta": { "title": "…", "description": "…" }, "textes": { "cle": "texte", "etoiles": { "one": "{n} étoile", "other": "{n} étoiles" } } }`. `description` = phrase courte et vivante de la carte du catalogue (10 à 200 caractères). Les autres champs de `meta` s'écrivent à l'étape 9.
 4. `node scripts/i18n-jeu.mjs --assembler <id>` après chaque modification de `fr.json`. Le bloc créé porte `data-coin="haut-gauche"` (bouton de langue) : le changer si le bouton cache une commande (`haut-droite`, `bas-gauche`, `bas-droite`, `data-place="id…"`, ou `data-coin="aucun"` puis `JEL_I18N.creerSelecteur()`).
 
@@ -187,11 +188,11 @@ Tout doit être bon. Puis `git status` : seuls `games/<id>/index.html`, `games/<
    - … (points incertains)
 
    ### Avant la fusion
-   Le contrôle **« Contrôle des jeux »** (`validate.yml`) doit être **vert**. La fusion est faite à la main par le propriétaire.
+   Le contrôle **« Contrôle des jeux »** (`validate.yml`) doit être **vert**. Claude fusionne ensuite la pull request (CLAUDE.md, section 12).
    La page du jeu dans les 5 langues, les pages de catégories, les jeux similaires et le sitemap sont générés au build : cette pull request ne touche que `games/<id>/`.
    ```
 
-4. Ne pas fusionner. Donner le lien de la pull request à l'utilisateur, lui rappeler d'attendre que « Contrôle des jeux » soit vert, puis revenir sur `main` (`git checkout main`).
+4. Donner le lien de la pull request à l'utilisateur. Suivre les contrôles avec le connecteur (`pull_request_read`, `get_check_runs`). Quand tous sont terminés et verts (« Contrôle des jeux » compris), et qu'aucune pull request de la boucle de nuit n'est ouverte, fusionner la pull request avec le connecteur (`merge_pull_request`, sans redemander : autorisation du propriétaire, CLAUDE.md section 12) et le dire à l'utilisateur. Si l'utilisateur a demandé de ne pas fusionner, s'arrêter là. Revenir ensuite sur `main` (`git checkout main`).
 
 Contrôle rouge : lire le rapport avec le connecteur, revenir sur `jeu-manuel/<id>`, corriger seulement `games/<id>/` par un nouveau commit, puis demander à l'utilisateur de cliquer « Push origin ».
 
@@ -206,7 +207,7 @@ Même méthode, sur une branche `jeu-manuel/<id>`. Ne changer ni `id` ni `added`
 ## Interdits
 
 - Créer ou modifier autre chose que `games/<id>/` (`index.html`, `cover.*`, `game.json`) : jamais `public/` (dont `catalog.json` et les pages générées), `gabarits/`, `scripts/`, les workflows, `idees.json`, `idees-archive.json`, `CLAUDE.md`, ni les autres jeux.
-- Pousser sur `main`, fusionner une pull request (même avec un contrôle vert) ou la fermer sans accord.
+- Pousser sur `main` ; fusionner une pull request dont un contrôle est rouge ou pas terminé, ou qui n'est pas celle de ce jeu ; fermer une pull request sans accord.
 - Créer un genre ou un univers, utiliser un champ `tags`.
 - Toucher aux réglages Cloudflare, aux secrets, aux clés Turnstile, au nom de domaine, aux votes ou à la base D1.
 - Mettre dans un jeu de la publicité, un traceur, un lien externe, un achat ou une collecte de données.

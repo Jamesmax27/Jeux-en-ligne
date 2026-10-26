@@ -3335,7 +3335,9 @@ function quitterRencontre(){if(!X||!X.r)return;X.r=null;montrer('carte');majHudC
   journal(pick([t('j.suite1'),t('j.suite2')]));verifierObjectif()}
 
 /* ---------- fin d'expédition ---------- */
-function reussir(){if(!X||X.fini)return;X.fini=true;X.reussi=true;const n=X.n;const etoiles=1+(X.blessuresRecues===0?1:0)+(X.pas<=X.niv.par?1:0);
+function reussir(){if(!X||X.fini)return;
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: X.n });
+  X.fini=true;X.reussi=true;const n=X.n;const etoiles=1+(X.blessuresRecues===0?1:0)+(X.pas<=X.niv.par?1:0);
   const avant=S.etoiles[n]||0;S.etoiles[n]=Math.max(avant,etoiles);S.debloque=Math.max(S.debloque,Math.min(NIVEAUX.length,n+1));if(n===NIVEAUX.length)S.fini=true;
   sauver(Math.min(NIVEAUX.length,n+1));sfx('victoire');
   const nbEsp=Object.keys(X.notesExp).length;const fiches=LISTE_ESPECES.filter(e=>fiche(e.id).notes>=NOTES_MAX).length;
@@ -3346,7 +3348,9 @@ function reussir(){if(!X||X.fini)return;X.fini=true;X.reussi=true;const n=X.n;co
    ${etoiles>avant&&avant>0?`<p class="record">${esc(t('bilan.record'))}</p>`:''}<p>${esc(t('bilan.total',{n:totalEtoiles(),max:NIVEAUX.length*3}))}</p>
    <div class="rangee">${n<NIVEAUX.length?`<button class="btn principal" data-a="suivant">${esc(t('bilan.suivant'))}</button>`:''}<button class="btn" data-a="rejouer">${esc(t('bilan.rejouer'))}</button><button class="btn" data-a="niveaux">${esc(t('bilan.niveaux'))}</button></div>`;
   afficherBilan(html,true)}
-function echouer(){if(!X||X.fini)return;X.fini=true;sauver(X.n);sfx('defaite');const n=X.n;
+function echouer(){if(!X||X.fini)return;
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: X.n });
+  X.fini=true;sauver(X.n);sfx('defaite');const n=X.n;
   const html=`<span class="etiquette">${esc(t('bilan.echec'))}</span><h2>${esc(nomNiveau(n))}</h2><p>${esc(t('bilan.echecTexte'))}</p>
    <div class="stats"><div><span>${esc(t('bilan.pas'))}</span><b>${NB(X.pas)}</b></div><div><span>${esc(t('bilan.especes'))}</span><b>${NB(Object.keys(X.notesExp).length)}</b></div></div>
    <div class="rangee"><button class="btn principal" data-a="rejouer">${esc(t('bilan.reessayer'))}</button><button class="btn" data-a="niveaux">${esc(t('bilan.niveaux'))}</button></div>`;

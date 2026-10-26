@@ -2205,6 +2205,7 @@ async function talk(n){
 }
 async function afterTrainerWin(n){
   if(n.trainer.leader!=null){const gi=n.trainer.leader;const g=GYMS[gi];if(!S.badges[gi]){S.badges[gi]=1;sfx('fanfare');await say(T('e.badge.get',{badge:g.badge,champion:g.leader}));
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: S.badges.filter(Boolean).length });
     await badgeScreen(gi);const tm=[['superPotion',3],['superCapsule',5],['hyperPotion',3],['rappel',2],['hyperCapsule',5],['bonbon',2],['potionMax',2],['etoileCapsule',1]][gi];
     addItem(tm[0],tm[1]);await say(T('e.badge.gift',{champion:g.leader,n:tm[1],objet:ITEMS[tm[0]].n}),{name:n.name});await addTXP(80,T('e.badge.txp'));
     const nb=S.badges.filter(Boolean).length;if(nb<8)await say(T('e.badge.count',{n:nb}));else await say(T('e.badge.all'))}}
@@ -2385,6 +2386,7 @@ async function battle(opt){
 }
 async function afterBattle(result){
   if(result==='lose'){await say(T('b.lose.all'));const lost=Math.floor(S.money*0.1);S.money-=lost;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: S.badges.filter(Boolean).length + 1 });
     await say(T('b.lose.money',{n:lost,argent:fmt(lost)}));
     for(const m of S.team){m.hp=m.st.hp;m.status=null;for(const mv of m.moves)mv.pp=MOVES[mv.id].pp}
     const rs=S.respawn;setMap(rs.map,rs.x,rs.y,0);await fade(false);saveGame(true);return}
@@ -2896,6 +2898,7 @@ function quizGame(){return new Promise(async res=>{let score=0;const N=5;
 
 /* ================= PANTHÉON ================= */
 function hallOfFame(){return new Promise(res=>{sfx('fanfare');playMusic('evo');
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: S.badges.filter(Boolean).length + 1 });
   const el=openScreen('hof',`<div class="panel"><h2>${T('ui.hof.title')}</h2><p>${T('ui.hof.congrats',{name:esc(S.name)})}</p><div class="hof-team"></div>
   <p class="small">${T('ui.hof.next')}</p><button data-back>${T('ui.hof.continue')}</button></div>`);
   const t=el.querySelector('.hof-team');S.team.forEach(m=>{const d=document.createElement('div');d.className='hof-mon';d.appendChild(monCanvas(m.sp,90,m.shiny));d.insertAdjacentHTML('beforeend',`<b>${esc(monName(m))}</b><small>${T('ui.lvl',{n:m.lvl})}</small>`);t.appendChild(d)});

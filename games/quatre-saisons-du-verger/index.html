@@ -3644,6 +3644,7 @@
   /* ---------- Victoire, défaite, fin ---------- */
   function victoire() {
     if (!jeu) return;
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: jeu.i + 1 });
     etat = 'victoire';
     const i = jeu.i, L = jeu.L;
     const penal = jeu.erreurs + jeu.indicesUtilises;
@@ -3680,6 +3681,7 @@
   }
   function defaite(raison) {
     if (!jeu) return;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: jeu.i + 1 });
     etat = 'defaite';
     $('def-titre').textContent = tr(raison === 'temps' ? 'defaite.temps' : 'defaite.feuilles');
     $('def-texte').textContent = tr('defaite.texte', { n: jeu.trouvees, total: jeu.tab.cibles.length });

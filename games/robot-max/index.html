@@ -3105,6 +3105,7 @@
   function victoire() {
     enPause = false;
     const i = niveauCourant;
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
     const r = rouagesPris(sc.N, sc.etat);
     const score = scoreNiveau();
     const ancien = progres.records[i] || 0;
@@ -3142,6 +3143,7 @@
 
   function defaite(cause) {
     enPause = false;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: niveauCourant + 1 });
     son('defaite');
     $('def-raison').textContent = t(cause === 'panne' ? 'defaite.panne' : cause === 'drone' ? 'defaite.drone' : 'defaite.laser');
     $('def-detail').textContent = t('defaite.detail', { r: I.nombre(rouagesPris(sc.N, sc.etat)) });

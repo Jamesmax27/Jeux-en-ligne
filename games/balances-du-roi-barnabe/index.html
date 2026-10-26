@@ -3495,6 +3495,7 @@
   function victoire() {
     var M = etat.M;
     etat.fini = true; etat.actif = false; etat.verrou = true;
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: etat.defi ? null : etat.niv + 1 });
     M.objets.forEach(function (o) { if (o.cache) etat.revele[o.k] = true; });
     majObjets();
     SON.droite();
@@ -3536,6 +3537,7 @@
   }
   function defaite() {
     etat.fini = true; etat.actif = false; etat.verrou = true;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: etat.defi ? null : etat.niv + 1 });
     SON.defaite();
     var ancien = etat.defi ? P.defi.record : (P.records[etat.niv] || 0);
     montrerFin(false, { etoiles: 0, score: 0, ancien: ancien, record: false, gains: [] });

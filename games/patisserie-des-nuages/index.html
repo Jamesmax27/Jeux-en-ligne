@@ -4707,6 +4707,7 @@
       b.addEventListener('click', function () { jouer('clic'); fn(); }); boutons.appendChild(b);
     }
     if (gagne) {
+      if (window.FMG) window.FMG.reportEnd({ completed: true, level: idx + 1 });
       if (dernier) bouton('btn.bilan', '', function () { ouvrirBilan(); });
       else bouton('btn.suivant', '', function () { ouvrirIntro(idx + 1); });
       bouton('btn.rejouer', 'bleu', function () { lancerNiveau(idx); });
@@ -4714,6 +4715,7 @@
       jouer('victoire');
       for (var c2 = 0; c2 < 4; c2++) setTimeout(function () { eclats(hasard(W * 0.2, W * 0.8), H * 0.3, 30, ['#ff6f9c', '#ffcf3d', '#5cc9a7', '#8fd3ff', '#b59bff'], 'confetti', 220); }, c2 * 250);
     } else {
+      if (window.FMG) window.FMG.reportEnd({ completed: false, level: idx + 1 });
       bouton('btn.reessayer', '', function () { lancerNiveau(idx); });
       bouton('btn.niveaux', 'bleu', allerNiveaux);
       bouton('btn.accueil', 'creme', allerAccueil);

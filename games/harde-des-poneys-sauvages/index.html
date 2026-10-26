@@ -3319,6 +3319,7 @@ function lancerConfettis() {
 // ---------- Fins de niveau ----------
 function victoire() {
   jeu.fini = true;
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: jeu.n + 1 });
   var n = jeu.n, b = Logique.bilan(jeu.etat);
   var avantEtoiles = totalEtoiles();
   var ancienRecord = progres.records[n];
@@ -3349,6 +3350,7 @@ function victoire() {
 }
 function defaite(raison) {
   jeu.fini = true;
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: jeu.n + 1 });
   Son.defaite();
   ouvrirFin({
     titre: tr(raison === 'orage' ? 'fin.orage' : 'fin.nuit'),

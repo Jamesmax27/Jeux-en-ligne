@@ -2094,6 +2094,7 @@ function terminer() {
   attente = null;
   const total = partie.questions.length, pts = partie.points, n = partie.niv, cont = partie.cont;
   const gagne = pts >= Math.ceil(REUSSITE * total) && partie.vies !== 0;
+  if (window.FMG) window.FMG.reportEnd({ completed: gagne, level: n });
   const e = !gagne ? 0 : partie.erreurs === 0 ? 3 : pts / total >= .8 ? 2 : 1;
   const p = pc(cont), ancien = p.n[n-1] || { e: 0, s: 0 };
   const record = pts > (ancien.s || 0) && (ancien.s || 0) > 0;

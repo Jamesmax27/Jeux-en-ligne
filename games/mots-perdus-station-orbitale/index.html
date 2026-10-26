@@ -3065,6 +3065,7 @@ function calculerScore(etoiles) {
 function victoire() {
   jeu.fini = true;
   const i = jeu.index;
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
   const etoiles = calculerEtoiles();
   const score = calculerScore(etoiles);
   const premiere = prog.etoiles[i] === 0;
@@ -3092,6 +3093,7 @@ function victoire() {
 }
 function defaite() {
   jeu.fini = true;
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: jeu.index + 1 });
   SON.defaite();
   secousse = 0.5;
   const i = jeu.index;

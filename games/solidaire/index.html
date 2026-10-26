@@ -3299,6 +3299,7 @@
     var bonusTemps = Math.max(0, Math.round(J.L.total * 6 - J.temps));
     var score = J.score + 100 * etoiles + bonusTemps;
     var i = J.n;
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
     var avantDos = SEUILS_DOS.map(function (s, j) { return dosOuvert(j); });
     var ancien = P.records[i] || 0;
     var record = score > ancien;
@@ -3316,6 +3317,7 @@
   }
   function defaite(raison) {
     if (!J || J.fini) return;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: J.n + 1 });
     J.fini = true; J.actif = false;
     effacerIndice();
     SON.defaite();

@@ -4552,6 +4552,7 @@ function verifierVictoire() {
    ===================================================================== */
 async function victoire() {
   const type = C.type, niv = C.niv, nv = NIVEAUX[niv - 1];
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: niv });
   S.pv = Math.max(1, C.j.pv);
   const perdus = C.pvDebut - S.pv, tours = C.tour;
   if (aRel('fiole')) soigner(5);
@@ -4639,6 +4640,7 @@ function recompenses(type, nv, or) {
 }
 async function defaite() {
   C.fini = true; C.occupe = true;
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: C.niv });
   son('defaite');
   await pause(700);
   const niveau = C.type === 'niveau';

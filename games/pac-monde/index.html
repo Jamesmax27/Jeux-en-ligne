@@ -1661,10 +1661,12 @@ function screen(kind){
     el.msg.innerHTML = t('regleHtml');
     el.go.textContent = t('commencer');
   } else if (kind==='over'){
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: S.active.id });
     el.title.innerHTML = t('perdu') + '<span>' + t('regionsOuvertes', { n: S.order.length }) + '</span>';
     el.msg.innerHTML = t('finPerdu', { score: S.score });
     el.go.textContent = t('rejouer');
   } else if (kind==='win'){
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: S.active.id });
     el.title.innerHTML = t('mondeComplet') + '<span>' + t('toutesRegions', { total: MAX_LEVELS }) + '</span>';
     el.msg.innerHTML = t('finGagne', { score: S.score });
     el.go.textContent = t('nouveauMonde');

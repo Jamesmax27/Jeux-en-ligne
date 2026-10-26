@@ -3835,6 +3835,7 @@
     const etoilesSpans = $('fin-etoiles').children;
     for (const s of etoilesSpans) s.classList.remove('gagnee');
     if (res.gagne) {
+      if (window.FMG) window.FMG.reportEnd({ completed: true, level: N });
       const defis = [okTemps, okVoy, okPass].filter(Boolean).length;
       etoiles = 1 + (defis >= 2 ? 1 : 0) + (defis === 3 ? 1 : 0);
       score = m.voy * 10 + m.ok * 25 + Math.max(0, Math.round((calc.objectif - m.t) * 5)) + (m.arretParfait ? 50 : 0) + etoiles * 100;
@@ -3870,6 +3871,7 @@
       for (let i = 0; i < etoiles; i++) setTimeout(() => { etoilesSpans[i].classList.add('gagnee'); Son.jouer('etoile'); }, 350 + i * 350);
       confettis(etoiles * 40 + 30);
     } else {
+      if (window.FMG) window.FMG.reportEnd({ completed: false, level: N });
       $('fin-titre').textContent = traduire('fin.perdu');
       $('fin-raison').textContent = traduire(res.raison === 'rival' ? 'fin.raison.rival' : 'fin.raison.incidents');
       $('fin-raison').style.color = '#9b2a17';

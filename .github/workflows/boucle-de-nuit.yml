@@ -47,7 +47,7 @@
 #  d) verifier : chaque pull request de la boucle dont l'idée est « en_cours »
 #                (y compris celles restées ouvertes d'un passage précédent) :
 #                robot (chargement, console, téléphone, hors ligne, fiche,
-#                nombre de niveaux, traductions, sauvegarde
+#                nombre de niveaux, fin de partie (FMG.reportEnd), traductions, sauvegarde
 #                (scripts/tester-sauvegarde.mjs), entrée du catalogue, genres
 #                et univers dans les listes fermées, référencement :
 #                scripts/verifier-seo.mjs), puis
@@ -448,6 +448,12 @@ jobs:
                  score }) ; JEL_SAVE.surFermeture(() => { if (<partie en cours>) JEL_SAVE.save(JEU, { niveau:
                  <niveau en cours>, score }); }). Vérifie avec : node scripts/tester-sauvegarde.mjs <id> --captures
                  (« Sauvegarde : tout est bon » ; regarde captures/sauvegarde/<id>/).
+               - Fin de partie OBLIGATOIRE (CONSIGNES-JEU.md, section 3 « Fin de partie ») : le lanceur fournit
+                 window.FMG à tous les jeux, rien à recopier. Dans la fonction qui passe à l'écran de victoire, une
+                 ligne : if (window.FMG) window.FMG.reportEnd({ completed: true, level: <numéro du niveau, à partir
+                 de 1> }); dans celle qui passe à l'écran de défaite, la même avec completed: false. Une fois par fin,
+                 jamais dans une fonction de dessin appelée à chaque image ; garde if (window.FMG) sur la même ligne.
+                 Le robot (validate-games.mjs) refuse un jeu sans appel ou sans garde.
                - Dans game.json : "genre", "genres_secondaires" (liste, vide possible) et "univers" (1 ou 2) = ceux de
                  l'idée (ou ton choix quand l'idée n'en donne pas), jamais de champ "tags" ; "ages" = l'âge conseillé
                  de l'idée (forme "6+") ; "idee" = "${{ matrix.idee.id }}" ;
@@ -989,6 +995,12 @@ jobs:
                existant. Sinon NON.
                Le texte alternatif de la jaquette (jaquette_alt) se compare à la jaquette que tu as regardée : s'il ne
                lui correspond pas, c'est un conseil (section « Conseils » de revue.md), jamais un NON.
+               Fin de partie (point « Effets et fins de niveau » de la grille, bloquant) : cherche chaque appel
+               window.FMG.reportEnd (le robot a vérifié qu'il en existe au moins un, avec sa garde). Il doit être dans
+               la fonction qui passe à l'écran de victoire (completed true) ET dans celle de l'écran de défaite
+               (completed false) s'il y en a une, partir une seule fois par fin (pas dans une fonction de dessin
+               appelée à chaque image), et level doit être le numéro du niveau joué à partir de 1 (ou le score d'un
+               jeu sans niveaux). Sinon NON, avec la correction à faire.
             6. Écris revue.md, en français, court, pour le propriétaire du site :
                - un tableau « | Point | Résultat | Remarque | » avec chaque point bloquant de la relecture, « Page du
                  jeu » compris (✅ ou ❌) ;

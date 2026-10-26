@@ -1863,6 +1863,7 @@ function newGame(){
   addFeed('sys',t('appli'),t('feed.debut',{quartier:district(1).name,n:cfg.need}));
 }
 function levelDone(){
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: S.level });
   const bonus=250+S.lives*50;S.score+=bonus;
   const done=district(S.level).name, healed=S.lives<3;
   S.level++;S.lives=Math.min(3,S.lives+1);saveBest();
@@ -1872,6 +1873,7 @@ function levelDone(){
   showOverlay('next',{done,bonus,healed});
 }
 function gameOver(reason){
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: S.level });
   JEL_SAVE.clear(JEU);  // partie perdue : plus rien à reprendre
   setPhase('over');
   const prev=getBest(), nb=saveBest();

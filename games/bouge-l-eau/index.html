@@ -1919,6 +1919,7 @@ function finirNiveau(reussi) {
   const seuil = N.seuil || 0.6;
   let etoiles = 0, score = 0;
   if (reussi) {
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: niv + 1 });
     etoiles = 1;
     if (part >= seuil) etoiles = 2;
     if (part >= seuil && encrePic <= N.encre * 0.6) etoiles = 3;
@@ -1947,6 +1948,7 @@ function finirNiveau(reussi) {
     $('record').textContent = record ? (ancienScore ? t('nouveauRecord', { n: ancienScore }) : t('premierRecord')) : t('recordNiveau', { n: ancienScore });
     $('record').className = record ? 'battu' : '';
   } else {
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: niv + 1 });
     const raison = verres.some((v) => v.trouble) ? t('raisonCouleur') : t('raisonEau');
     $('detail').textContent = raison + ' ' + t('autreChemin');
     $('record').textContent = ancienScore ? t('recordNiveau', { n: ancienScore }) : '';

@@ -3361,6 +3361,7 @@
     const total = C.temps + C.ratees * PEN;
     const res = { gagne, total, brut: C.temps, ratees: C.ratees, chutes: C.chutes, flocons: C.flocons, etoiles: 0 };
     if (gagne) {
+      if (window.FMG) window.FMG.reportEnd({ completed: true, level: n + 1 });
       SONS.arrivee(); lancerConfettis(90);
       res.etoiles = 1;
       if (total <= P.argent) res.etoiles = 2;
@@ -3382,6 +3383,7 @@
       sauver();
       JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, n + 2) });
     } else {
+      if (window.FMG) window.FMG.reportEnd({ completed: false, level: n + 1 });
       SONS.defaite(); secousse = 8;
       C.chute = 0.9; C.rot = 0;
     }

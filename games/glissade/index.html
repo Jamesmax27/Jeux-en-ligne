@@ -3229,6 +3229,7 @@
     const coupeAvant = coupe(def.ligue);
     let nouveauRecord = false;
     if (qualifie) {
+      if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
       prog.etoiles[i] = Math.max(prog.etoiles[i], etoiles);
       if (score > prog.records[i]) { prog.records[i] = score; nouveauRecord = true; }
       prog.debloque = Math.max(prog.debloque, Math.min(NIVEAUX.length, i + 2));
@@ -3261,6 +3262,7 @@
       else if (i % 4 === 3) msg.textContent = tr(coupeAvant ? 'fin_coupe_deja' : 'fin_coupe', { ligue: tr('ligue_' + LIGUES[def.ligue + 1]) }) + (coupeAvant ? '' : ' ' + tr('fin_bouee'));
       else msg.textContent = tr('fin_bravo');
     } else {
+      if (window.FMG) window.FMG.reportEnd({ completed: false, level: i + 1 });
       msg.className = 'conseil';
       const conseil = m.stats.bords > 14 ? 'conseil_bords' : (def.turbo && m.stats.jaugePleine > 6) ? 'conseil_turbo' : m.stats.chocs > 3 ? 'conseil_obstacles' : 'conseil_fleches';
       msg.textContent = tr('objectif_rate', { n: def.qualif }) + ' ' + tr(conseil);

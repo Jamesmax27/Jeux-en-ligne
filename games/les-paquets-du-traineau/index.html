@@ -3166,6 +3166,7 @@
   let resultat = null;
   function victoire() {
     N.fini = true;
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: N.index + 1 });
     const e = etoilesDuNiveau(), i = N.index;
     const avant = sauve.etoiles[i] || 0, gain = Math.max(0, e - avant);
     const ancienRecord = sauve.records[i];
@@ -3185,6 +3186,7 @@
   }
   function defaite(raison) {
     N.fini = true; N.defaite = raison;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: N.index + 1 });
     resultat = { gagne: false, raison };
     son('defaite');
     if (drag) { const d = drag; drag = null; versEtabli(d.p); }

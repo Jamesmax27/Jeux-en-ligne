@@ -3497,6 +3497,7 @@
   // FIN DU NIVEAU
   // ==========================================================================
   function defaite(iNoye) {
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: S.n + 1 });
     S.phase = 'fin'; S.issue = 'defaite'; S.finA = S.horloge + 1400; S.iNoye = iNoye;
     majActions();
     SON.eclabousse(); S.tremble = S.horloge;
@@ -3516,6 +3517,7 @@
     var ancienRecord = SAUVE.records[n] || 0, record = gagne && score > ancienRecord;
     var avantTotal = totalEtoiles();
     if (gagne) {
+      if (window.FMG) window.FMG.reportEnd({ completed: true, level: n + 1 });
       SAUVE.etoiles[n] = Math.max(SAUVE.etoiles[n] || 0, etoiles);
       if (record) SAUVE.records[n] = score;
       SAUVE.debloque = Math.max(SAUVE.debloque, Math.min(NIVEAUX.length, n + 2));

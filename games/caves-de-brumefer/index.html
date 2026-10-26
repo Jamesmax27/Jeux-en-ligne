@@ -2575,6 +2575,7 @@ const coeursToleres = () => (S.cfg.boss ? 3 : 1);
 function etoilesGagnees() { return 1 + (S.gemmes >= S.gemmesTot ? 1 : 0) + (S.perdu <= coeursToleres() ? 1 : 0); }
 function victoire() {
   S.fini = true;
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: S.n });
   SON.victoire();
   const bonusCoeurs = S.pv * 10;
   S.score += 50 + bonusCoeurs;
@@ -2605,6 +2606,7 @@ function victoire() {
 function defaite() {
   if (S.fini) return;
   S.fini = true; S.pv = 0;
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: S.n });
   majHud();
   SON.epuise();
   bulles(S.h.x, S.h.y, '#ffb38a');

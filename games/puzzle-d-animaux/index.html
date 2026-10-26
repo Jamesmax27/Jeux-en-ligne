@@ -2758,6 +2758,7 @@
     $('fin-detail').textContent = tr('detail', { temps: formatTemps(J.temps), erreurs: tr('erreurs', { n: J.erreurs }) });
     let score = 0, etoiles = 0;
     if (gagne) {
+      if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
       fx2.drawImage(imageAnimal(N.a, 120 * dpr), 0, 0);
       etoiles = calculEtoiles();
       score = Math.max(nPieces * 10, nPieces * 50 + Math.max(0, Math.round(tempsRef(N) - J.temps)) * 5 - J.erreurs * 10);
@@ -2781,6 +2782,7 @@
       $('b-suivant').classList.remove('cache');
       $('b-rejouer').textContent = tr('rejouer');
     } else {
+      if (window.FMG) window.FMG.reportEnd({ completed: false, level: i + 1 });
       // Défaite : le dessin incomplet (pièces posées seulement).
       fx2.fillStyle = '#efe8f7'; fx2.fillRect(0, 0, fc.width, fc.height);
       const k = 120 * dpr / D.B;
