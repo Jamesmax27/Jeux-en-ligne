@@ -3024,6 +3024,7 @@ body.en-pause *, body.en-pause *::before, body.en-pause *::after { animation-pla
   // ---------- Fin de page ----------
   function victoire() {
     if (!etat) return;
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: etat.idx + 1 });
     const i = etat.idx;
     const perte = Math.max(etat.gaspi, etat.used - etat.min);
     const etoiles = etoilesPour(perte);
@@ -3044,6 +3045,7 @@ body.en-pause *, body.en-pause *::before, body.en-pause *::after { animation-pla
   }
   function defaite() {
     if (!etat) return;
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: etat.idx + 1 });
     jouer('defaite');
     afficherFin(false, {});
   }

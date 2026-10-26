@@ -3726,6 +3726,7 @@
   function victoire() {
     if (S.fin) return;
     S.fin = true; S.phase = 'fini';
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: S.n + 1 });
     const fl = fleursIntactes();
     const etoiles = etoilesPour(fl);
     S.score = S.gouttes + fl * 30;
@@ -3751,6 +3752,7 @@
   function defaite() {
     if (S.fin) return;
     S.fin = true; S.phase = 'fini';
+    if (window.FMG) window.FMG.reportEnd({ completed: false, level: S.n + 1 });
     S.score = S.gouttes;
     son('defaite');
     setTimeout(() => afficherFin(false, {}), 700);

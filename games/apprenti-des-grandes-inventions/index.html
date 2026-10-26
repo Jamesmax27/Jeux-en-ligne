@@ -3924,6 +3924,7 @@ function ouvrirEtabli() {
 /* Fin de mission. */
 function victoire() {
   if (!G) return;
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: G.n + 1 });
   const n = G.n;
   const et = etoilesPour(G.niv, G.coups, G.indice);
   const avant = P.etoiles[n];
@@ -3987,6 +3988,7 @@ function victoire() {
 }
 function defaite() {
   G.fini = true;
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: G.n + 1 });
   son('defaite');
   $('fin-titre').textContent = tr('defaite');
   const etz = $('fin-etoiles');
