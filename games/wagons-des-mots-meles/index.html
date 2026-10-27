@@ -1,0 +1,3288 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Les wagons des mots mêlés</title>
+<script type="application/json" id="jel-i18n-textes" data-place="langue-titre langue-pause">
+{
+ "fr": {
+  "titre": "Les wagons des mots mêlés",
+  "consigne": "Les wagons-lettres sont garés dans le désordre. Fais glisser le wagon du bout de chaque voie pour reformer le mot du dessin !",
+  "clavier": "Clavier : flèches pour choisir une voie, Entrée pour prendre et poser, C pour couper, H pour un indice, Échap pour la pause.",
+  "jouer": "Jouer",
+  "niveaux": "Niveaux",
+  "depot": "Dépôt",
+  "accueil": "Accueil",
+  "retour": "Retour",
+  "reprendre": "Reprendre",
+  "recommencer": "Recommencer",
+  "pause": "Pause",
+  "pauseTitre": "Le train attend en gare",
+  "sonCouper": "Couper le son",
+  "sonRemettre": "Remettre le son",
+  "indice": "Indice",
+  "chargement": "Le train arrive en gare…",
+  "sceneAria": "Gare de triage : voies, wagons-lettres et train à quai",
+  "hud.niveau": "Niveau {n}",
+  "hud.vapeur": "Vapeur restante : {n}",
+  "hud.temps": "Temps restant : {n} secondes",
+  "gare.campagne": "Gare de la campagne",
+  "gare.montagne": "Gare de la montagne",
+  "gare.port": "Gare du port",
+  "gare.ville": "Gare de la ville, la nuit",
+  "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  "mot.velo": "VÉLO",
+  "mot.lapin": "LAPIN",
+  "mot.pomme": "POMME",
+  "mot.canard": "CANARD",
+  "mot.maison": "MAISON",
+  "mot.sapin": "SAPIN",
+  "mot.nuage": "NUAGE",
+  "mot.etoile": "ÉTOILE",
+  "mot.escargot": "ESCARGOT",
+  "mot.chateau": "CHÂTEAU",
+  "mot.ancre": "ANCRE",
+  "mot.mouette": "MOUETTE",
+  "mot.bateau": "BATEAU",
+  "mot.poisson": "POISSON",
+  "mot.guitare": "GUITARE",
+  "mot.crabe": "CRABE",
+  "mot.vague": "VAGUE",
+  "mot.fusee": "FUSÉE",
+  "mot.camion": "CAMION",
+  "mot.lanterne": "LANTERNE",
+  "mot.hibou": "HIBOU",
+  "mot.lune": "LUNE",
+  "mot.parapluie": "PARAPLUIE",
+  "tuto.1": "Fais glisser le wagon du bout de la voie jusqu'au train : il porte la première lettre du mot !",
+  "tuto.2": "La lettre qu'il faut est coincée ? Déplace d'abord le wagon qui la bloque vers une autre voie.",
+  "tuto.4": "Nouveau : la voie de garage, avec son butoir rayé. Gare-y un wagon en attendant.",
+  "tuto.6": "Attention, des wagons en trop ! Leurs lettres ne sont pas dans le mot : laisse-les sur le côté.",
+  "tuto.8": "Le tunnel cache ses wagons : seul celui du bout est éclairé. Souviens-toi de ce que tu y ranges !",
+  "tuto.11": "Deux dessins, deux trains ! Chaque train part dès que son mot est complet.",
+  "tuto.13": "Wagon à double lettre : accroche-le d'un coup s'il porte les deux lettres suivantes, sinon coupe-le avec les ciseaux (touche C).",
+  "tuto.16": "La cloche du chef de gare sonne le départ : finis le mot avant la fin du temps !",
+  "msg.refus": "Ce n'est pas la lettre suivante du mot !",
+  "msg.doubleNon": "Ce wagon porte deux lettres : coupe-le avec les ciseaux.",
+  "msg.plein": "Cette voie est pleine.",
+  "msg.coupePlace": "Pour couper ce wagon, il faut une place libre sur sa voie.",
+  "msg.indice": "Regarde la main : voilà le meilleur déplacement. (2 étoiles au plus)",
+  "msg.bloque": "Cette gare est bloquée : recommence le niveau.",
+  "msg.parti": "Tchou ! Le train du mot {mot} est parti.",
+  "msg.cloche": "Dépêche-toi, la cloche va sonner !",
+  "msg.vide": "Il n'y a pas de wagon sur cette voie.",
+  "fin.bravo": "Bravo, le train part en sifflant !",
+  "fin.perduVapeur": "Plus de vapeur !",
+  "fin.perduCloche": "La cloche a sonné avant le départ…",
+  "fin.astuce": "Astuce : avant de bouger, cherche où se cache la lettre suivante.",
+  "fin.deplacements": "Déplacements : {n}",
+  "fin.meilleur": "Meilleur possible : {n}",
+  "fin.vapeur": "Vapeur restante : {n}",
+  "fin.temps": "Temps restant : {n} s",
+  "fin.score": "Score : {n}",
+  "fin.record": "Nouveau record !",
+  "fin.recordAncien": "Record : {n}",
+  "fin.debloque": "Débloqué au dépôt : {nom}",
+  "fin.indiceUtilise": "Avec un indice, 2 étoiles au plus.",
+  "fin.final": "Toutes les gares sont desservies !",
+  "fin.total": "Étoiles : {n} sur {max} · Score total : {s}",
+  "fin.etoilesAria": {
+   "one": "{n} étoile sur 3",
+   "other": "{n} étoiles sur 3"
+  },
+  "suivant": "Niveau suivant",
+  "reessayer": "Réessayer",
+  "rejouer": "Rejouer",
+  "niveaux.titre": "Choisis ton train",
+  "niveaux.etoiles": "Étoiles : {n} sur {max}",
+  "niveau.aria": "Niveau {n}",
+  "niveau.ferme": "Niveau {n}, encore fermé",
+  "depot.titre": "Le dépôt des locomotives",
+  "depot.aide": "Chaque mot réussi débloque une locomotive ou une couleur de wagons.",
+  "depot.locos": "Locomotives",
+  "depot.couleurs": "Couleurs des wagons",
+  "depot.verrou": "Niveau {n}",
+  "depot.choisi": "Choisi",
+  "loco.0": "Vapeur rouge",
+  "loco.1": "Vapeur verte",
+  "loco.2": "Diesel jaune",
+  "loco.3": "Diesel orange",
+  "loco.4": "Électrique bleue",
+  "loco.5": "Électrique violette",
+  "loco.6": "Grande vitesse",
+  "loco.7": "Vapeur dorée",
+  "palette.0": "Bois",
+  "palette.1": "Arc-en-ciel",
+  "palette.2": "Cerise",
+  "palette.3": "Menthe",
+  "palette.4": "Océan",
+  "palette.5": "Lavande",
+  "palette.6": "Soleil",
+  "palette.7": "Bonbon",
+  "palette.8": "Forêt",
+  "palette.9": "Nuit étoilée",
+  "palette.10": "Glace",
+  "palette.11": "Corail",
+  "palette.12": "Ardoise",
+  "palette.13": "Or"
+ },
+ "en": {
+  "titre": "The Mixed-Up Word Wagons",
+  "consigne": "The letter wagons are parked in a jumble. Drag the wagon at the end of each track to rebuild the word in the picture!",
+  "clavier": "Keyboard: arrows to pick a track, Enter to pick up and drop, C to split, H for a hint, Escape to pause.",
+  "jouer": "Play",
+  "niveaux": "Levels",
+  "depot": "Depot",
+  "accueil": "Home",
+  "retour": "Back",
+  "reprendre": "Resume",
+  "recommencer": "Restart",
+  "pause": "Pause",
+  "pauseTitre": "The train is waiting at the station",
+  "sonCouper": "Turn sound off",
+  "sonRemettre": "Turn sound on",
+  "indice": "Hint",
+  "chargement": "The train is pulling in…",
+  "sceneAria": "Rail yard: tracks, letter wagons and a train at the platform",
+  "hud.niveau": "Level {n}",
+  "hud.vapeur": "Steam left: {n}",
+  "hud.temps": "Time left: {n} seconds",
+  "gare.campagne": "Countryside station",
+  "gare.montagne": "Mountain station",
+  "gare.port": "Harbor station",
+  "gare.ville": "City station, at night",
+  "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  "mot.velo": "BIKE",
+  "mot.lapin": "RABBIT",
+  "mot.pomme": "APPLE",
+  "mot.canard": "DUCK",
+  "mot.maison": "HOUSE",
+  "mot.sapin": "TREE",
+  "mot.nuage": "CLOUD",
+  "mot.etoile": "STAR",
+  "mot.escargot": "SNAIL",
+  "mot.chateau": "CASTLE",
+  "mot.ancre": "ANCHOR",
+  "mot.mouette": "SEAGULL",
+  "mot.bateau": "BOAT",
+  "mot.poisson": "FISH",
+  "mot.guitare": "GUITAR",
+  "mot.crabe": "CRAB",
+  "mot.vague": "WAVE",
+  "mot.fusee": "ROCKET",
+  "mot.camion": "TRUCK",
+  "mot.lanterne": "LANTERN",
+  "mot.hibou": "OWL",
+  "mot.lune": "MOON",
+  "mot.parapluie": "UMBRELLA",
+  "tuto.1": "Drag the wagon at the end of the track to the train: it carries the first letter of the word!",
+  "tuto.2": "Is the letter you need stuck? First move the wagon blocking it to another track.",
+  "tuto.4": "New: the siding, with its striped buffer. Park a wagon there for a while.",
+  "tuto.6": "Watch out, extra wagons! Their letters are not in the word: leave them on the side.",
+  "tuto.8": "The tunnel hides its wagons: only the one at the end is lit. Remember what you park in there!",
+  "tuto.11": "Two pictures, two trains! Each train leaves as soon as its word is complete.",
+  "tuto.13": "Double-letter wagon: hook it in one go if it carries the next two letters, otherwise split it with the scissors (C key).",
+  "tuto.16": "The stationmaster's bell rings for departure: finish the word before time runs out!",
+  "msg.refus": "That's not the next letter of the word!",
+  "msg.doubleNon": "This wagon carries two letters: split it with the scissors.",
+  "msg.plein": "This track is full.",
+  "msg.coupePlace": "To split this wagon, its track needs a free space.",
+  "msg.indice": "Look at the hand: that's the best move. (2 stars at most)",
+  "msg.bloque": "This yard is stuck: restart the level.",
+  "msg.parti": "Choo choo! The {mot} train has left.",
+  "msg.cloche": "Hurry up, the bell is about to ring!",
+  "msg.vide": "There is no wagon on this track.",
+  "fin.bravo": "Well done, the train leaves with a whistle!",
+  "fin.perduVapeur": "Out of steam!",
+  "fin.perduCloche": "The bell rang before departure…",
+  "fin.astuce": "Tip: before moving, look for where the next letter is hiding.",
+  "fin.deplacements": "Moves: {n}",
+  "fin.meilleur": "Best possible: {n}",
+  "fin.vapeur": "Steam left: {n}",
+  "fin.temps": "Time left: {n} s",
+  "fin.score": "Score: {n}",
+  "fin.record": "New record!",
+  "fin.recordAncien": "Record: {n}",
+  "fin.debloque": "Unlocked at the depot: {nom}",
+  "fin.indiceUtilise": "With a hint, 2 stars at most.",
+  "fin.final": "Every station has its train!",
+  "fin.total": "Stars: {n} of {max} · Total score: {s}",
+  "fin.etoilesAria": {
+   "one": "{n} star out of 3",
+   "other": "{n} stars out of 3"
+  },
+  "suivant": "Next level",
+  "reessayer": "Try again",
+  "rejouer": "Play again",
+  "niveaux.titre": "Pick your train",
+  "niveaux.etoiles": "Stars: {n} of {max}",
+  "niveau.aria": "Level {n}",
+  "niveau.ferme": "Level {n}, still locked",
+  "depot.titre": "The locomotive depot",
+  "depot.aide": "Every word you complete unlocks a locomotive or a wagon color.",
+  "depot.locos": "Locomotives",
+  "depot.couleurs": "Wagon colors",
+  "depot.verrou": "Level {n}",
+  "depot.choisi": "Chosen",
+  "loco.0": "Red steam",
+  "loco.1": "Green steam",
+  "loco.2": "Yellow diesel",
+  "loco.3": "Orange diesel",
+  "loco.4": "Blue electric",
+  "loco.5": "Purple electric",
+  "loco.6": "High speed",
+  "loco.7": "Golden steam",
+  "palette.0": "Wood",
+  "palette.1": "Rainbow",
+  "palette.2": "Cherry",
+  "palette.3": "Mint",
+  "palette.4": "Ocean",
+  "palette.5": "Lavender",
+  "palette.6": "Sunshine",
+  "palette.7": "Candy",
+  "palette.8": "Forest",
+  "palette.9": "Starry night",
+  "palette.10": "Ice",
+  "palette.11": "Coral",
+  "palette.12": "Slate",
+  "palette.13": "Gold"
+ },
+ "es": {
+  "titre": "Los vagones de las letras revueltas",
+  "consigne": "Los vagones con letras están revueltos. Arrastra el vagón del extremo de cada vía para formar la palabra del dibujo.",
+  "clavier": "Teclado: flechas para elegir una vía, Enter para tomar y soltar, C para cortar, H para una pista, Escape para la pausa.",
+  "jouer": "Jugar",
+  "niveaux": "Niveles",
+  "depot": "Depósito",
+  "accueil": "Inicio",
+  "retour": "Volver",
+  "reprendre": "Seguir",
+  "recommencer": "Empezar de nuevo",
+  "pause": "Pausa",
+  "pauseTitre": "El tren espera en la estación",
+  "sonCouper": "Quitar el sonido",
+  "sonRemettre": "Poner el sonido",
+  "indice": "Pista",
+  "chargement": "El tren está llegando…",
+  "sceneAria": "Estación de maniobras: vías, vagones con letras y tren en el andén",
+  "hud.niveau": "Nivel {n}",
+  "hud.vapeur": "Vapor que queda: {n}",
+  "hud.temps": "Tiempo que queda: {n} segundos",
+  "gare.campagne": "Estación del campo",
+  "gare.montagne": "Estación de la montaña",
+  "gare.port": "Estación del puerto",
+  "gare.ville": "Estación de la ciudad, de noche",
+  "alphabet": "ABCDEFGHIJKLMNÑOPQRSTUVWXYZ",
+  "mot.velo": "BICI",
+  "mot.lapin": "CONEJO",
+  "mot.pomme": "MANZANA",
+  "mot.canard": "PATO",
+  "mot.maison": "CASA",
+  "mot.sapin": "ÁRBOL",
+  "mot.nuage": "NUBE",
+  "mot.etoile": "ESTRELLA",
+  "mot.escargot": "CARACOL",
+  "mot.chateau": "CASTILLO",
+  "mot.ancre": "ANCLA",
+  "mot.mouette": "GAVIOTA",
+  "mot.bateau": "BARCO",
+  "mot.poisson": "PEZ",
+  "mot.guitare": "GUITARRA",
+  "mot.crabe": "CANGREJO",
+  "mot.vague": "OLA",
+  "mot.fusee": "COHETE",
+  "mot.camion": "CAMIÓN",
+  "mot.lanterne": "FAROL",
+  "mot.hibou": "BÚHO",
+  "mot.lune": "LUNA",
+  "mot.parapluie": "PARAGUAS",
+  "tuto.1": "Arrastra el vagón del extremo de la vía hasta el tren: ¡lleva la primera letra de la palabra!",
+  "tuto.2": "¿La letra que necesitas está atrapada? Primero mueve a otra vía el vagón que la bloquea.",
+  "tuto.4": "Novedad: la vía muerta, con su tope a rayas. Deja ahí un vagón mientras tanto.",
+  "tuto.6": "¡Cuidado, vagones que sobran! Sus letras no están en la palabra: déjalos a un lado.",
+  "tuto.8": "El túnel esconde sus vagones: solo se ve el del extremo. ¡Recuerda lo que guardas ahí!",
+  "tuto.11": "¡Dos dibujos, dos trenes! Cada tren sale en cuanto su palabra está completa.",
+  "tuto.13": "Vagón de doble letra: engánchalo de una vez si lleva las dos letras siguientes; si no, córtalo con las tijeras (tecla C).",
+  "tuto.16": "La campana del jefe de estación anuncia la salida: ¡termina la palabra antes de que se acabe el tiempo!",
+  "msg.refus": "¡Esa no es la letra siguiente de la palabra!",
+  "msg.doubleNon": "Este vagón lleva dos letras: córtalo con las tijeras.",
+  "msg.plein": "Esta vía está llena.",
+  "msg.coupePlace": "Para cortar este vagón, su vía necesita un sitio libre.",
+  "msg.indice": "Mira la mano: ese es el mejor movimiento. (2 estrellas como máximo)",
+  "msg.bloque": "Esta estación está bloqueada: empieza el nivel de nuevo.",
+  "msg.parti": "¡Chucuchú! Salió el tren de la palabra {mot}.",
+  "msg.cloche": "¡Date prisa, la campana va a sonar!",
+  "msg.vide": "No hay ningún vagón en esta vía.",
+  "fin.bravo": "¡Muy bien, el tren sale silbando!",
+  "fin.perduVapeur": "¡Se acabó el vapor!",
+  "fin.perduCloche": "La campana sonó antes de la salida…",
+  "fin.astuce": "Consejo: antes de mover, busca dónde se esconde la letra siguiente.",
+  "fin.deplacements": "Movimientos: {n}",
+  "fin.meilleur": "Lo mejor posible: {n}",
+  "fin.vapeur": "Vapor que queda: {n}",
+  "fin.temps": "Tiempo que queda: {n} s",
+  "fin.score": "Puntos: {n}",
+  "fin.record": "¡Nuevo récord!",
+  "fin.recordAncien": "Récord: {n}",
+  "fin.debloque": "Desbloqueado en el depósito: {nom}",
+  "fin.indiceUtilise": "Con una pista, 2 estrellas como máximo.",
+  "fin.final": "¡Todas las estaciones tienen su tren!",
+  "fin.total": "Estrellas: {n} de {max} · Puntos en total: {s}",
+  "fin.etoilesAria": {
+   "one": "{n} estrella de 3",
+   "other": "{n} estrellas de 3"
+  },
+  "suivant": "Siguiente nivel",
+  "reessayer": "Intentar de nuevo",
+  "rejouer": "Volver a jugar",
+  "niveaux.titre": "Elige tu tren",
+  "niveaux.etoiles": "Estrellas: {n} de {max}",
+  "niveau.aria": "Nivel {n}",
+  "niveau.ferme": "Nivel {n}, todavía cerrado",
+  "depot.titre": "El depósito de locomotoras",
+  "depot.aide": "Cada palabra completa desbloquea una locomotora o un color de vagones.",
+  "depot.locos": "Locomotoras",
+  "depot.couleurs": "Colores de los vagones",
+  "depot.verrou": "Nivel {n}",
+  "depot.choisi": "Elegido",
+  "loco.0": "Vapor roja",
+  "loco.1": "Vapor verde",
+  "loco.2": "Diésel amarilla",
+  "loco.3": "Diésel naranja",
+  "loco.4": "Eléctrica azul",
+  "loco.5": "Eléctrica morada",
+  "loco.6": "Alta velocidad",
+  "loco.7": "Vapor dorada",
+  "palette.0": "Madera",
+  "palette.1": "Arcoíris",
+  "palette.2": "Cereza",
+  "palette.3": "Menta",
+  "palette.4": "Océano",
+  "palette.5": "Lavanda",
+  "palette.6": "Sol",
+  "palette.7": "Caramelo",
+  "palette.8": "Bosque",
+  "palette.9": "Noche estrellada",
+  "palette.10": "Hielo",
+  "palette.11": "Coral",
+  "palette.12": "Pizarra",
+  "palette.13": "Oro"
+ },
+ "pt": {
+  "titre": "Os vagões das letras embaralhadas",
+  "consigne": "Os vagões com letras estão embaralhados. Arraste o vagão da ponta de cada trilho para formar a palavra do desenho!",
+  "clavier": "Teclado: setas para escolher um trilho, Enter para pegar e soltar, C para cortar, H para uma dica, Esc para pausar.",
+  "jouer": "Jogar",
+  "niveaux": "Níveis",
+  "depot": "Garagem",
+  "accueil": "Início",
+  "retour": "Voltar",
+  "reprendre": "Continuar",
+  "recommencer": "Recomeçar",
+  "pause": "Pausa",
+  "pauseTitre": "O trem está esperando na estação",
+  "sonCouper": "Desligar o som",
+  "sonRemettre": "Ligar o som",
+  "indice": "Dica",
+  "chargement": "O trem está chegando…",
+  "sceneAria": "Pátio de manobras: trilhos, vagões com letras e trem na plataforma",
+  "hud.niveau": "Nível {n}",
+  "hud.vapeur": "Vapor restante: {n}",
+  "hud.temps": "Tempo restante: {n} segundos",
+  "gare.campagne": "Estação do campo",
+  "gare.montagne": "Estação da montanha",
+  "gare.port": "Estação do porto",
+  "gare.ville": "Estação da cidade, à noite",
+  "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  "mot.velo": "BIKE",
+  "mot.lapin": "COELHO",
+  "mot.pomme": "MAÇÃ",
+  "mot.canard": "PATO",
+  "mot.maison": "CASA",
+  "mot.sapin": "ÁRVORE",
+  "mot.nuage": "NUVEM",
+  "mot.etoile": "ESTRELA",
+  "mot.escargot": "CARACOL",
+  "mot.chateau": "CASTELO",
+  "mot.ancre": "ÂNCORA",
+  "mot.mouette": "GAIVOTA",
+  "mot.bateau": "BARCO",
+  "mot.poisson": "PEIXE",
+  "mot.guitare": "VIOLÃO",
+  "mot.crabe": "SIRI",
+  "mot.vague": "ONDA",
+  "mot.fusee": "FOGUETE",
+  "mot.camion": "CAMINHÃO",
+  "mot.lanterne": "LANTERNA",
+  "mot.hibou": "CORUJA",
+  "mot.lune": "LUA",
+  "mot.parapluie": "SOMBRINHA",
+  "tuto.1": "Arraste o vagão da ponta do trilho até o trem: ele tem a primeira letra da palavra!",
+  "tuto.2": "A letra que você precisa está presa? Primeiro leve para outro trilho o vagão que bloqueia.",
+  "tuto.4": "Novidade: o desvio, com seu para-choque listrado. Guarde um vagão lá por um tempo.",
+  "tuto.6": "Cuidado, vagões sobrando! As letras deles não estão na palavra: deixe-os de lado.",
+  "tuto.8": "O túnel esconde os vagões: só o da ponta fica iluminado. Lembre o que você guardou lá!",
+  "tuto.11": "Dois desenhos, dois trens! Cada trem parte assim que a palavra dele fica completa.",
+  "tuto.13": "Vagão de letra dupla: engate de uma vez se ele tiver as duas próximas letras; se não, corte com a tesoura (tecla C).",
+  "tuto.16": "O sino do chefe da estação anuncia a partida: termine a palavra antes que o tempo acabe!",
+  "msg.refus": "Essa não é a próxima letra da palavra!",
+  "msg.doubleNon": "Este vagão tem duas letras: corte com a tesoura.",
+  "msg.plein": "Este trilho está cheio.",
+  "msg.coupePlace": "Para cortar este vagão, o trilho dele precisa de um lugar livre.",
+  "msg.indice": "Olhe a mão: esse é o melhor movimento. (no máximo 2 estrelas)",
+  "msg.bloque": "Este pátio travou: recomece o nível.",
+  "msg.parti": "Piuí! O trem da palavra {mot} partiu.",
+  "msg.cloche": "Depressa, o sino vai tocar!",
+  "msg.vide": "Não tem nenhum vagão neste trilho.",
+  "fin.bravo": "Muito bem, o trem parte apitando!",
+  "fin.perduVapeur": "Acabou o vapor!",
+  "fin.perduCloche": "O sino tocou antes da partida…",
+  "fin.astuce": "Dica: antes de mexer, procure onde está a próxima letra.",
+  "fin.deplacements": "Movimentos: {n}",
+  "fin.meilleur": "Melhor possível: {n}",
+  "fin.vapeur": "Vapor restante: {n}",
+  "fin.temps": "Tempo restante: {n} s",
+  "fin.score": "Pontos: {n}",
+  "fin.record": "Novo recorde!",
+  "fin.recordAncien": "Recorde: {n}",
+  "fin.debloque": "Liberado na garagem: {nom}",
+  "fin.indiceUtilise": "Com uma dica, no máximo 2 estrelas.",
+  "fin.final": "Todas as estações têm seu trem!",
+  "fin.total": "Estrelas: {n} de {max} · Pontos no total: {s}",
+  "fin.etoilesAria": {
+   "one": "{n} estrela de 3",
+   "other": "{n} estrelas de 3"
+  },
+  "suivant": "Próximo nível",
+  "reessayer": "Tentar de novo",
+  "rejouer": "Jogar de novo",
+  "niveaux.titre": "Escolha seu trem",
+  "niveaux.etoiles": "Estrelas: {n} de {max}",
+  "niveau.aria": "Nível {n}",
+  "niveau.ferme": "Nível {n}, ainda fechado",
+  "depot.titre": "A garagem das locomotivas",
+  "depot.aide": "Cada palavra completa libera uma locomotiva ou uma cor de vagões.",
+  "depot.locos": "Locomotivas",
+  "depot.couleurs": "Cores dos vagões",
+  "depot.verrou": "Nível {n}",
+  "depot.choisi": "Escolhido",
+  "loco.0": "Vapor vermelha",
+  "loco.1": "Vapor verde",
+  "loco.2": "Diesel amarela",
+  "loco.3": "Diesel laranja",
+  "loco.4": "Elétrica azul",
+  "loco.5": "Elétrica roxa",
+  "loco.6": "Alta velocidade",
+  "loco.7": "Vapor dourada",
+  "palette.0": "Madeira",
+  "palette.1": "Arco-íris",
+  "palette.2": "Cereja",
+  "palette.3": "Hortelã",
+  "palette.4": "Oceano",
+  "palette.5": "Lavanda",
+  "palette.6": "Sol",
+  "palette.7": "Bala",
+  "palette.8": "Floresta",
+  "palette.9": "Noite estrelada",
+  "palette.10": "Gelo",
+  "palette.11": "Coral",
+  "palette.12": "Ardósia",
+  "palette.13": "Ouro"
+ },
+ "de": {
+  "titre": "Das Wörter-Wirrwarr der Waggons",
+  "consigne": "Die Buchstabenwaggons stehen durcheinander. Zieh den Waggon am Ende jedes Gleises und bilde das Wort zum Bild!",
+  "clavier": "Tastatur: Pfeiltasten wählen ein Gleis, Enter nimmt und setzt ab, C teilt, H gibt einen Hinweis, Esc pausiert.",
+  "jouer": "Spielen",
+  "niveaux": "Level",
+  "depot": "Lokschuppen",
+  "accueil": "Start",
+  "retour": "Zurück",
+  "reprendre": "Weiter",
+  "recommencer": "Neu starten",
+  "pause": "Pause",
+  "pauseTitre": "Der Zug wartet im Bahnhof",
+  "sonCouper": "Ton aus",
+  "sonRemettre": "Ton an",
+  "indice": "Hinweis",
+  "chargement": "Der Zug fährt ein…",
+  "sceneAria": "Rangierbahnhof: Gleise, Buchstabenwaggons und ein Zug am Bahnsteig",
+  "hud.niveau": "Level {n}",
+  "hud.vapeur": "Dampf übrig: {n}",
+  "hud.temps": "Zeit übrig: {n} Sekunden",
+  "gare.campagne": "Bahnhof auf dem Land",
+  "gare.montagne": "Bahnhof in den Bergen",
+  "gare.port": "Bahnhof am Hafen",
+  "gare.ville": "Stadtbahnhof bei Nacht",
+  "alphabet": "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜ",
+  "mot.velo": "RAD",
+  "mot.lapin": "HASE",
+  "mot.pomme": "APFEL",
+  "mot.canard": "ENTE",
+  "mot.maison": "HAUS",
+  "mot.sapin": "TANNE",
+  "mot.nuage": "WOLKE",
+  "mot.etoile": "STERN",
+  "mot.escargot": "SCHNECKE",
+  "mot.chateau": "BURG",
+  "mot.ancre": "ANKER",
+  "mot.mouette": "MÖWE",
+  "mot.bateau": "BOOT",
+  "mot.poisson": "FISCH",
+  "mot.guitare": "GITARRE",
+  "mot.crabe": "KRABBE",
+  "mot.vague": "WELLE",
+  "mot.fusee": "RAKETE",
+  "mot.camion": "LASTER",
+  "mot.lanterne": "LATERNE",
+  "mot.hibou": "EULE",
+  "mot.lune": "MOND",
+  "mot.parapluie": "SCHIRM",
+  "tuto.1": "Zieh den Waggon am Ende des Gleises zum Zug: Er trägt den ersten Buchstaben des Wortes!",
+  "tuto.2": "Steckt der Buchstabe fest, den du brauchst? Stell zuerst den Waggon davor auf ein anderes Gleis.",
+  "tuto.4": "Neu: das Abstellgleis mit dem gestreiften Prellbock. Stell dort einen Waggon ab, bis du ihn brauchst.",
+  "tuto.6": "Achtung, überzählige Waggons! Ihre Buchstaben gehören nicht zum Wort: Lass sie stehen.",
+  "tuto.8": "Der Tunnel versteckt seine Waggons: Nur der vorderste ist beleuchtet. Merk dir, was du dort abstellst!",
+  "tuto.11": "Zwei Bilder, zwei Züge! Jeder Zug fährt los, sobald sein Wort fertig ist.",
+  "tuto.13": "Doppelbuchstaben-Waggon: Häng ihn auf einmal an, wenn er die nächsten zwei Buchstaben trägt, sonst teil ihn mit der Schere (Taste C).",
+  "tuto.16": "Die Glocke des Bahnhofsvorstehers läutet zur Abfahrt: Mach das Wort fertig, bevor die Zeit um ist!",
+  "msg.refus": "Das ist nicht der nächste Buchstabe des Wortes!",
+  "msg.doubleNon": "Dieser Waggon trägt zwei Buchstaben: Teil ihn mit der Schere.",
+  "msg.plein": "Dieses Gleis ist voll.",
+  "msg.coupePlace": "Zum Teilen braucht das Gleis dieses Waggons einen freien Platz.",
+  "msg.indice": "Schau auf die Hand: Das ist der beste Zug. (höchstens 2 Sterne)",
+  "msg.bloque": "Hier geht nichts mehr: Starte das Level neu.",
+  "msg.parti": "Tschu-tschu! Der Zug mit dem Wort {mot} ist abgefahren.",
+  "msg.cloche": "Beeil dich, gleich läutet die Glocke!",
+  "msg.vide": "Auf diesem Gleis steht kein Waggon.",
+  "fin.bravo": "Super, der Zug fährt pfeifend los!",
+  "fin.perduVapeur": "Kein Dampf mehr!",
+  "fin.perduCloche": "Die Glocke hat vor der Abfahrt geläutet…",
+  "fin.astuce": "Tipp: Schau vor jedem Zug, wo sich der nächste Buchstabe versteckt.",
+  "fin.deplacements": "Züge: {n}",
+  "fin.meilleur": "Bestmöglich: {n}",
+  "fin.vapeur": "Dampf übrig: {n}",
+  "fin.temps": "Zeit übrig: {n} s",
+  "fin.score": "Punkte: {n}",
+  "fin.record": "Neuer Rekord!",
+  "fin.recordAncien": "Rekord: {n}",
+  "fin.debloque": "Neu im Lokschuppen: {nom}",
+  "fin.indiceUtilise": "Mit Hinweis höchstens 2 Sterne.",
+  "fin.final": "Jeder Bahnhof hat seinen Zug!",
+  "fin.total": "Sterne: {n} von {max} · Punkte insgesamt: {s}",
+  "fin.etoilesAria": {
+   "one": "{n} Stern von 3",
+   "other": "{n} Sterne von 3"
+  },
+  "suivant": "Nächstes Level",
+  "reessayer": "Noch mal versuchen",
+  "rejouer": "Noch mal spielen",
+  "niveaux.titre": "Wähl deinen Zug",
+  "niveaux.etoiles": "Sterne: {n} von {max}",
+  "niveau.aria": "Level {n}",
+  "niveau.ferme": "Level {n}, noch gesperrt",
+  "depot.titre": "Der Lokschuppen",
+  "depot.aide": "Jedes fertige Wort schaltet eine Lok oder eine Waggonfarbe frei.",
+  "depot.locos": "Loks",
+  "depot.couleurs": "Waggonfarben",
+  "depot.verrou": "Level {n}",
+  "depot.choisi": "Gewählt",
+  "loco.0": "Rote Dampflok",
+  "loco.1": "Grüne Dampflok",
+  "loco.2": "Gelbe Diesellok",
+  "loco.3": "Orange Diesellok",
+  "loco.4": "Blaue E-Lok",
+  "loco.5": "Lila E-Lok",
+  "loco.6": "Schnellzug",
+  "loco.7": "Goldene Dampflok",
+  "palette.0": "Holz",
+  "palette.1": "Regenbogen",
+  "palette.2": "Kirsche",
+  "palette.3": "Minze",
+  "palette.4": "Ozean",
+  "palette.5": "Lavendel",
+  "palette.6": "Sonne",
+  "palette.7": "Bonbon",
+  "palette.8": "Wald",
+  "palette.9": "Sternennacht",
+  "palette.10": "Eis",
+  "palette.11": "Koralle",
+  "palette.12": "Schiefer",
+  "palette.13": "Gold"
+ }
+}
+</script>
+<script id="jel-i18n">
+/* ==========================================================================
+   Jeux-en-ligne — module commun de traduction (site ET jeux)        jel-i18n v1
+   JavaScript pur, sans dépendance, fonctionne hors ligne.
+
+   Langues : fr (source), en, es, pt (Brésil), de. Langue de secours : en.
+   Détection, dans l'ordre :
+     1. paramètre d'adresse ?lang=xx (enregistré comme choix) ;
+     2. choix enregistré : localStorage « lang » (dans un jeu affiché par le
+        site, le lanceur transmet ce choix par window.JEL_LANG, car le cadre
+        isolé n'a pas accès au stockage du site) ;
+     3. navigator.languages (préfixe seul : « pt-BR » → « pt ») ;
+     4. « en ».
+
+   API (window.JEL_I18N, et raccourci global t() s'il est libre) :
+     getLang()            langue courante
+     setLang(code)        change de langue (enregistre, <html lang>, textes)
+     t(cle, variables)    texte traduit ; {variables} remplacées ; pluriels
+                          via Intl.PluralRules si la valeur est un objet
+                          { "one": "…", "other": "…" } (variable n)
+     has(cle)             la clé existe-t-elle (langue courante ou fr) ?
+     nombre(x, options)   nombre formaté selon la langue (Intl.NumberFormat)
+     date(d, options)     date formatée selon la langue (Intl.DateTimeFormat)
+     appliquer(racine)    traduit le DOM : data-i18n (texte), data-i18n-html
+                          (dictionnaire de confiance seulement),
+                          data-i18n-placeholder, data-i18n-title, data-i18n-aria
+     ajouter(lang, dico)  ajoute des textes ; charger(dossier) : site seulement
+     surChangement(f)     appelle f(lang) après chaque changement de langue
+     creerSelecteur(opts) sélecteur de langue (code + nom dans sa langue)
+
+   Clé absente dans la langue choisie : texte français, sinon la clé brute,
+   avec un avertissement dans la console (une seule fois par clé).
+
+   Dans un jeu : ce fichier est recopié tel quel dans index.html, juste après
+   le bloc <script type="application/json" id="jel-i18n-textes"> qui contient
+   { "fr": {…}, "en": {…}, … }. Un petit bouton de langue s'ajoute dans le coin
+   indiqué par data-coin (haut-gauche, haut-droite, bas-gauche, bas-droite ;
+   data-coin-decalage="52px" l'éloigne du bord haut ou bas, ex. sous une barre ;
+   data-place="id1 id2" le met plutôt dans ces éléments du jeu (barre d'outils…) ;
+   data-coin="aucun" pour le placer soi-même avec creerSelecteur). Changer de
+   langue relance le jeu dans la nouvelle langue.
+   Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie ce fichier).
+   ========================================================================== */
+(function () {
+  'use strict';
+  if (window.JEL_I18N) return;
+
+  var LANGUES = ['fr', 'en', 'es', 'pt', 'de'];
+  var NOMS = { fr: 'Français', en: 'English', es: 'Español', pt: 'Português', de: 'Deutsch' };
+  var ETIQUETTE = { fr: 'Langue', en: 'Language', es: 'Idioma', pt: 'Idioma', de: 'Sprache' }; // nom du bouton
+  var SOURCE = 'fr';
+  var SECOURS = 'en';
+  var CLE_STOCKAGE = 'lang';
+
+  var dicos = {};          // { fr: { cle: texte }, en: {…} }
+  var ecouteurs = [];
+  var avertis = {};
+  var dossierSite = null;  // site : dossier des fichiers JSON (charger)
+  var blocJeu = document.getElementById('jel-i18n-textes');
+  var modeJeu = !!blocJeu;
+
+  // --- Outils ---------------------------------------------------------------
+
+  function valide(code) {
+    var c = String(code || '').trim().toLowerCase().split(/[-_]/)[0];
+    return LANGUES.indexOf(c) >= 0 ? c : null;
+  }
+  function lireStockage() { try { return localStorage.getItem(CLE_STOCKAGE); } catch (e) { return null; } }
+  function ecrireStockage(v) { try { localStorage.setItem(CLE_STOCKAGE, v); } catch (e) { /* stockage refusé */ } }
+  function paramAdresse() { try { return new URLSearchParams(location.search).get('lang'); } catch (e) { return null; } }
+
+  function detecter() {
+    var c = valide(paramAdresse());
+    if (c) { ecrireStockage(c); return c; }
+    c = valide(window.JEL_LANG) || valide(lireStockage());
+    if (c) return c;
+    var liste = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+    for (var i = 0; i < liste.length; i++) {
+      c = valide(liste[i]);
+      if (c) return c;
+    }
+    return SECOURS;
+  }
+
+  var langue = detecter();
+  document.documentElement.lang = langue;
+
+  function avertir(texte) {
+    if (avertis[texte]) return;
+    avertis[texte] = true;
+    try { console.warn('[i18n] ' + texte); } catch (e) { /* pas de console */ }
+  }
+
+  function trouver(lang, cle) {
+    var d = dicos[lang];
+    return d && Object.prototype.hasOwnProperty.call(d, cle) ? d[cle] : undefined;
+  }
+
+  function nombre(x, options) {
+    try { return new Intl.NumberFormat(langue, options).format(x); } catch (e) { return String(x); }
+  }
+
+  function date(d, options) {
+    try { return new Intl.DateTimeFormat(langue, options).format(d instanceof Date ? d : new Date(d)); } catch (e) { return String(d); }
+  }
+
+  // Valeur au pluriel : { one, other, … } selon Intl.PluralRules (variable n).
+  function pluriel(valeur, lang, variables) {
+    var n = variables && typeof variables.n === 'number' ? variables.n : 0;
+    var forme = 'other';
+    try { forme = new Intl.PluralRules(lang).select(n); } catch (e) { /* navigateur ancien */ }
+    if (n === 0 && typeof valeur.zero === 'string') return valeur.zero;
+    return typeof valeur[forme] === 'string' ? valeur[forme] : valeur.other;
+  }
+
+  function remplacer(texte, variables) {
+    if (!variables) return texte;
+    return texte.replace(/\{(\w+)\}/g, function (tout, nom) {
+      if (!Object.prototype.hasOwnProperty.call(variables, nom)) return tout;
+      var v = variables[nom];
+      return typeof v === 'number' ? nombre(v) : String(v);
+    });
+  }
+
+  // --- Traduction -----------------------------------------------------------
+
+  function t(cle, variables) {
+    var lang = langue;
+    var valeur = trouver(lang, cle);
+    if (valeur === undefined) {
+      lang = SOURCE;
+      valeur = trouver(SOURCE, cle);
+      if (langue !== SOURCE || valeur === undefined) avertir('clé manquante en ' + langue + ' : ' + cle);
+      if (valeur === undefined) return cle;
+    }
+    if (valeur && typeof valeur === 'object') valeur = pluriel(valeur, lang, variables);
+    return remplacer(String(valeur), variables);
+  }
+
+  function has(cle) {
+    return trouver(langue, cle) !== undefined || trouver(SOURCE, cle) !== undefined;
+  }
+
+  // Traduit tous les éléments marqués sous « racine » (document par défaut).
+  function appliquer(racine) {
+    racine = racine || document;
+    if (!racine.querySelectorAll) return;
+    var regles = [
+      ['data-i18n', function (el, v) { el.textContent = v; }],
+      ['data-i18n-html', function (el, v) { el.innerHTML = v; }],
+      ['data-i18n-placeholder', function (el, v) { el.setAttribute('placeholder', v); }],
+      ['data-i18n-title', function (el, v) { el.setAttribute('title', v); }],
+      ['data-i18n-aria', function (el, v) { el.setAttribute('aria-label', v); }],
+    ];
+    regles.forEach(function (regle) {
+      var liste = racine.querySelectorAll('[' + regle[0] + ']');
+      for (var i = 0; i < liste.length; i++) regle[1](liste[i], t(liste[i].getAttribute(regle[0])));
+    });
+  }
+
+  function ajouter(lang, dico) {
+    var c = valide(lang);
+    if (!c || !dico || typeof dico !== 'object') return;
+    dicos[c] = dicos[c] || {};
+    for (var cle in dico) {
+      if (Object.prototype.hasOwnProperty.call(dico, cle)) dicos[c][cle] = dico[cle];
+    }
+  }
+
+  // Site : charge <dossier><lang>.json (fr toujours, pour le repli).
+  function chargerUne(lang) {
+    if (dicos[lang] || !dossierSite) return Promise.resolve();
+    return fetch(dossierSite + lang + '.json')
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) { ajouter(lang, d); })
+      .catch(function (e) { avertir('textes « ' + lang + ' » indisponibles (' + e.message + ')'); });
+  }
+
+  function charger(dossier) {
+    dossierSite = dossier;
+    return Promise.all([chargerUne(SOURCE), chargerUne(langue)]).then(function () { appliquer(document); });
+  }
+
+  function surChangement(f) { if (typeof f === 'function') ecouteurs.push(f); }
+
+  function prevenir() {
+    for (var i = 0; i < ecouteurs.length; i++) {
+      try { ecouteurs[i](langue); } catch (e) { setTimeout(function () { throw e; }); }
+    }
+  }
+
+  // Changement de langue appliqué sur place (sans recharger la page).
+  function changerSurPlace(c) {
+    langue = c;
+    document.documentElement.lang = c;
+    appliquer(document);
+    majSelecteurs();
+    prevenir();
+  }
+
+  function setLang(code) {
+    var c = valide(code);
+    if (!c) return Promise.resolve(langue);
+    ecrireStockage(c);
+    if (modeJeu) {
+      if (c === langue) return Promise.resolve(langue);
+      // Jeu affiché par le site : le lanceur enregistre le choix et relance le jeu.
+      if (window.parent && window.parent !== window) {
+        try { window.parent.postMessage({ type: 'jel-langue', lang: c }, '*'); } catch (e) { /* cadre isolé */ }
+        // Si personne ne répond (jeu ouvert ailleurs), on change sur place.
+        setTimeout(function () { changerSurPlace(c); }, 700);
+        return Promise.resolve(c);
+      }
+      // Jeu ouvert seul : on le relance dans la nouvelle langue.
+      if (/^https?:$/.test(location.protocol)) {
+        var u = new URL(location.href);
+        u.searchParams.set('lang', c);
+        location.replace(u.href);
+        return Promise.resolve(c);
+      }
+      changerSurPlace(c);
+      return Promise.resolve(c);
+    }
+    // Site : l'adresse suit le choix si elle porte déjà ?lang=.
+    try {
+      var adresse = new URL(location.href);
+      if (adresse.searchParams.has('lang')) {
+        adresse.searchParams.set('lang', c);
+        history.replaceState(history.state, '', adresse.href);
+      }
+    } catch (e) { /* adresse spéciale */ }
+    return chargerUne(c).then(function () { changerSurPlace(c); return c; });
+  }
+
+  // --- Sélecteur de langue ---------------------------------------------------
+  // Bouton (code de la langue) qui ouvre la liste des 5 langues, chacune avec
+  // son code et son nom dans sa propre langue. Pas de drapeaux. Doigt et clavier
+  // (Entrée, Espace, flèches, Échap).
+  // Dans un jeu, il est isolé dans un Shadow DOM (élément <jel-langue>) : le CSS
+  // du jeu (button {…}, * {…}) ne peut pas le déformer, et inversement.
+
+  var CSS_SELECTEUR =
+    '.jel-langue{position:relative;display:inline-block;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif;text-align:left;color:#eceae4}' +
+    '.jel-langue *{box-sizing:border-box}' +
+    '.jel-langue-bouton{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;margin:0;padding:0 10px;border:0;border-radius:999px;background:rgba(11,16,32,.55);color:#eceae4;font:inherit;line-height:1;cursor:pointer;box-shadow:none}' +
+    '.jel-langue-code{font-weight:800;letter-spacing:.04em}' +
+    '.jel-langue-menu{position:absolute;z-index:2147483001;min-width:170px;margin:6px 0 0;padding:6px;list-style:none;border-radius:14px;background:#161f38;box-shadow:0 10px 30px rgba(0,0,0,.45);border:1px solid #434e6b}' +
+    '.jel-langue-menu[hidden]{display:none}' +
+    '.jel-langue-menu li{margin:0;padding:0}' +
+    '.jel-langue-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;margin:0;padding:0 12px;border:0;border-radius:10px;background:none;color:#eceae4;font:inherit;text-align:left;cursor:pointer;box-shadow:none;white-space:nowrap}' +
+    '.jel-langue-menu button b{min-width:2.2em;color:#a8b3f0}' +
+    '.jel-langue-menu button[aria-current="true"]{background:#a8b3f0;color:#0b1020}' +
+    '.jel-langue-menu button[aria-current="true"] b{color:#0b1020}' +
+    '.jel-langue-menu button:hover:not([aria-current="true"]),.jel-langue-menu button:focus-visible{background:#1d2745}' +
+    '.jel-langue :focus-visible{outline:3px solid #a8b3f0;outline-offset:2px}' +
+    // Jeu : petit bouton discret (code seul) ; liste ouverte vers l'intérieur de l'écran.
+    '.jel-langue.compact .jel-langue-bouton{min-width:40px;min-height:40px;padding:0 8px;font-size:12px;background:rgba(11,16,32,.45);border:1px solid rgba(255,255,255,.3)}' +
+    '.jel-langue.compact .jel-langue-nom{display:none}' +
+    '.jel-langue.vers-gauche .jel-langue-menu{right:0}' +
+    '.jel-langue.vers-haut .jel-langue-menu{bottom:100%;margin:0 0 6px}';
+
+  // Place du bouton dans un jeu, selon le coin choisi (data-coin).
+  var COINS = {
+    'haut-gauche': { top: 'max(6px, env(safe-area-inset-top))', left: 'max(6px, env(safe-area-inset-left))' },
+    'haut-droite': { top: 'max(6px, env(safe-area-inset-top))', right: 'max(6px, env(safe-area-inset-right))' },
+    'bas-gauche': { bottom: 'max(6px, env(safe-area-inset-bottom))', left: 'max(6px, env(safe-area-inset-left))' },
+    'bas-droite': { bottom: 'max(6px, env(safe-area-inset-bottom))', right: 'max(6px, env(safe-area-inset-right))' },
+  };
+
+  var selecteurs = [];
+
+  function majSelecteurs() {
+    selecteurs.forEach(function (s) { s.maj(); });
+  }
+
+  // options : { conteneur, classe, coin, decalage, isole } ;
+  // - coin : sélecteur de jeu isolé, fixé dans ce coin, éloigné du bord haut ou bas de
+  //   « decalage » (longueur CSS, ex. « 52px ») s'il est donné ;
+  // - isole : sélecteur de jeu isolé, placé dans « conteneur » (ex. la barre du jeu).
+  function creerSelecteur(options) {
+    options = options || {};
+    var coin = options.coin && COINS[options.coin] ? options.coin : null;
+    var isole = !!(coin || options.isole);
+    var boite = document.createElement('div');
+    boite.className = 'jel-langue' + (options.classe ? ' ' + options.classe : '') +
+      (isole ? ' compact' : '') + (coin && /droite/.test(coin) ? ' vers-gauche' : '') + (coin && /bas/.test(coin) ? ' vers-haut' : '');
+
+    var bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'jel-langue-bouton';
+    bouton.setAttribute('aria-haspopup', 'true');
+    bouton.setAttribute('aria-expanded', 'false');
+    var code = document.createElement('span');
+    code.className = 'jel-langue-code';
+    var nom = document.createElement('span');
+    nom.className = 'jel-langue-nom';
+    bouton.append(code, nom);
+
+    var menu = document.createElement('ul');
+    menu.className = 'jel-langue-menu';
+    menu.hidden = true;
+    var choix = LANGUES.map(function (l) {
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.lang = l;
+      b.dataset.lang = l;
+      var c = document.createElement('b');
+      c.textContent = l.toUpperCase();
+      b.append(c, document.createTextNode(' ' + NOMS[l]));
+      b.addEventListener('click', function () { fermer(true); setLang(l); });
+      li.append(b);
+      menu.append(li);
+      return b;
+    });
+
+    var hote = null; // jeu : élément <jel-langue> (un peu transparent, sauf liste ouverte)
+    function opacite(v) { if (hote) hote.style.setProperty('opacity', v, 'important'); }
+    function ouvrir() {
+      // Dans une barre : la liste s'ouvre vers l'intérieur de l'écran.
+      if (isole && !coin && hote) {
+        var r = hote.getBoundingClientRect();
+        boite.classList.toggle('vers-gauche', r.left > window.innerWidth / 2);
+        boite.classList.toggle('vers-haut', r.top > window.innerHeight / 2);
+      }
+      menu.hidden = false;
+      opacite('1');
+      bouton.setAttribute('aria-expanded', 'true');
+      var actuel = choix[LANGUES.indexOf(langue)] || choix[0];
+      actuel.focus();
+    }
+    function fermer(rendreFocus) {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      opacite('.85');
+      bouton.setAttribute('aria-expanded', 'false');
+      if (rendreFocus) bouton.focus();
+    }
+
+    bouton.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.hidden) ouvrir(); else fermer(false);
+    });
+    menu.addEventListener('keydown', function (e) {
+      var racine = boite.getRootNode();
+      var i = choix.indexOf(racine.activeElement || document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); fermer(true); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); choix[(i + 1) % choix.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); choix[(i - 1 + choix.length) % choix.length].focus(); }
+      else if (e.key === 'Tab') fermer(false);
+      e.stopPropagation(); // les touches du menu ne pilotent pas le jeu
+    });
+    bouton.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' && menu.hidden) { e.preventDefault(); ouvrir(); }
+      e.stopPropagation();
+    });
+    // Un toucher ailleurs referme la liste (sans gêner le jeu).
+    document.addEventListener('pointerdown', function (e) {
+      var chemin = e.composedPath ? e.composedPath() : [e.target];
+      if (chemin.indexOf(boite) < 0) fermer(false);
+    }, true);
+    // Les gestes sur le sélecteur ne doivent pas arriver au jeu.
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click'].forEach(function (type) {
+      boite.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
+    boite.append(bouton, menu);
+
+    // Élément ajouté à la page : la boîte elle-même (site), ou un hôte isolé (jeu).
+    var element = boite;
+    if (isole) {
+      element = hote = document.createElement('jel-langue');
+      element.className = 'jel-langue';
+      var place = coin ? COINS[coin] : {};
+      var style = coin
+        ? { position: 'fixed', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'block' }
+        : { position: 'relative', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'inline-block', 'vertical-align': 'middle', flex: 'none' };
+      for (var p in place) style[p] = options.decalage && /^(top|bottom)$/.test(p) ? 'calc(' + place[p] + ' + ' + options.decalage + ')' : place[p];
+      for (var nomStyle in style) element.style.setProperty(nomStyle, style[nomStyle], 'important');
+      var ombre = element.attachShadow ? element.attachShadow({ mode: 'open' }) : element;
+      var feuille = document.createElement('style');
+      feuille.textContent = CSS_SELECTEUR;
+      ombre.append(feuille, boite);
+    }
+
+    var s = {
+      element: element,
+      maj: function () {
+        code.textContent = langue.toUpperCase();
+        nom.textContent = NOMS[langue];
+        var etiquette = ETIQUETTE[langue] + ' : ' + NOMS[langue];
+        bouton.setAttribute('aria-label', etiquette);
+        bouton.title = etiquette;
+        choix.forEach(function (b) {
+          if (b.dataset.lang === langue) b.setAttribute('aria-current', 'true');
+          else b.removeAttribute('aria-current');
+        });
+      },
+    };
+    s.maj();
+    selecteurs.push(s);
+    if (options.conteneur) options.conteneur.append(element);
+    return element;
+  }
+
+  // Site : style de base du sélecteur dans la page (style.css le complète).
+  function ajouterStyle() {
+    if (document.getElementById('jel-langue-style')) return;
+    var style = document.createElement('style');
+    style.id = 'jel-langue-style';
+    style.textContent = CSS_SELECTEUR;
+    (document.head || document.documentElement).append(style);
+  }
+
+  // --- Démarrage ----------------------------------------------------------------
+
+  if (modeJeu) {
+    try {
+      var textes = JSON.parse(blocJeu.textContent);
+      for (var l in textes) if (Object.prototype.hasOwnProperty.call(textes, l)) ajouter(l, textes[l]);
+    } catch (e) {
+      avertir('textes du jeu illisibles (' + e.message + ')');
+    }
+  }
+
+  window.JEL_I18N = {
+    LANGUES: LANGUES.slice(),
+    NOMS: NOMS,
+    SOURCE: SOURCE,
+    getLang: function () { return langue; },
+    setLang: setLang,
+    t: t,
+    has: has,
+    nombre: nombre,
+    date: date,
+    appliquer: appliquer,
+    ajouter: ajouter,
+    charger: charger,
+    surChangement: surChangement,
+    creerSelecteur: creerSelecteur,
+  };
+  if (!('t' in window)) window.t = t;
+
+  if (!modeJeu) ajouterStyle();
+
+  if (modeJeu) {
+    var demarrer = function () {
+      appliquer(document);
+      // data-place="id1 id2" : bouton(s) dans ces éléments du jeu ; sinon dans le coin data-coin.
+      var places = (blocJeu.getAttribute('data-place') || '').split(/\s+/).map(function (id) { return id && document.getElementById(id); }).filter(Boolean);
+      var coin = blocJeu.getAttribute('data-coin') || 'haut-gauche';
+      if (places.length) places.forEach(function (el) { creerSelecteur({ conteneur: el, isole: true }); });
+      else if (coin !== 'aucun' && document.body) {
+        creerSelecteur({ conteneur: document.body, coin: coin, decalage: blocJeu.getAttribute('data-coin-decalage') || '' });
+      }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
+    else demarrer();
+  }
+})();
+</script>
+<script id="jel-sauvegarde">
+/* ==========================================================================
+   Free Micro Games — module commun de sauvegarde des jeux     jel-sauvegarde v1
+   JavaScript pur, sans dépendance, sans compte ni serveur, hors ligne.
+
+   Garde la progression d'un jeu sur l'appareil, sous la clé « save_<id> »
+   (ex. « save_pommes-du-poney ») du localStorage du site.
+
+   Où sont les données ?
+     - Jeu ouvert seul (adresse /games/<id>/, test local) : localStorage direct.
+     - Jeu affiché par le site (cadre isolé, sans accès au stockage) : le
+       lanceur (public/play.js) donne la sauvegarde au démarrage
+       (window.JEL_SAUVEGARDES = { "save_<id>": "<JSON>" }) et enregistre
+       chaque écriture reçue par le message { type: "jel-sauvegarde", cle,
+       valeur } (valeur null = effacer). Le jeu ne peut écrire que sa clé.
+     - Sans aucun stockage : la sauvegarde vit le temps de la page.
+
+   Données (version de format SAUVEGARDE_VERSION) :
+     { v: 1, niveau: 1, score: 0, options: {}, date: <ms> }
+     niveau  numéro du niveau où reprendre (1 = premier)
+     score   score à ce moment-là
+     options réglages utiles (son coupé, difficulté…)
+     Le jeu peut ajouter ses propres champs (étoiles, record…).
+   Sauvegarde absente, illisible ou d'un format inconnu : valeurs par défaut.
+
+   API (window.JEL_SAVE) :
+     save(jeu, donnees)     enregistre (fusionné avec la sauvegarde actuelle) ;
+                            renvoie true si c'est fait
+     load(jeu)              données (valeurs par défaut si rien d'utilisable)
+     clear(jeu)             efface la sauvegarde
+     existe(jeu)            une sauvegarde utilisable existe-t-elle ?
+     surFermeture(f)        appelle f() quand la page est cachée ou quittée
+                            (visibilitychange, pagehide, beforeunload)
+     reprise(options)       fenêtre « Continuer » / « Nouvelle partie » /
+                            « Effacer la sauvegarde » (voir plus bas)
+     boutonEffacer(options) bouton « Effacer la sauvegarde » seul
+     texte(cle, vars)       textes du module dans la langue du jeu
+
+   Dans un jeu : ce fichier est recopié tel quel dans index.html, dans une
+   balise script d'identifiant « jel-sauvegarde », juste après le module de
+   traduction (jel-i18n). Il ne doit jamais contenir la fermeture de balise
+   script (elle couperait le jeu).
+   Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie aussi ce fichier).
+   Règles d'intégration : CONSIGNES-JEU.md, section « Sauvegarde ».
+   ========================================================================== */
+(function () {
+  'use strict';
+  if (window.JEL_SAVE) return;
+
+  var SAUVEGARDE_VERSION = 1;
+  var PREFIXE = 'save_';
+  var TAILLE_MAX = 100000; // caractères : le lanceur refuse au-delà
+
+  // --- Stockage -------------------------------------------------------------
+
+  var direct = (function () {
+    try {
+      var essai = '__jel_essai__';
+      localStorage.setItem(essai, '1');
+      localStorage.removeItem(essai);
+      return localStorage;
+    } catch (e) { return null; } // cadre isolé du site, stockage refusé
+  })();
+
+  var memoire = {};
+  try {
+    var donnees = window.JEL_SAUVEGARDES;
+    if (donnees && typeof donnees === 'object') {
+      for (var c in donnees) {
+        if (Object.prototype.hasOwnProperty.call(donnees, c) && typeof donnees[c] === 'string') memoire[c] = donnees[c];
+      }
+    }
+  } catch (e) { /* rien reçu du lanceur */ }
+
+  function lire(cle) {
+    if (direct) { try { return direct.getItem(cle); } catch (e) { /* stockage devenu indisponible */ } }
+    return Object.prototype.hasOwnProperty.call(memoire, cle) ? memoire[cle] : null;
+  }
+
+  // valeur null = effacer
+  function ecrire(cle, valeur) {
+    if (valeur === null) delete memoire[cle]; else memoire[cle] = valeur;
+    var ok = false;
+    if (direct) {
+      try {
+        if (valeur === null) direct.removeItem(cle); else direct.setItem(cle, valeur);
+        ok = true;
+      } catch (e) { /* stockage plein ou refusé */ }
+    }
+    if (!ok && window.parent && window.parent !== window) {
+      try { window.parent.postMessage({ type: 'jel-sauvegarde', cle: cle, valeur: valeur }, '*'); ok = true; } catch (e) { /* pas de lanceur */ }
+    }
+    return ok;
+  }
+
+  // --- Données ----------------------------------------------------------------
+
+  function cleDe(jeu) { return PREFIXE + String(jeu || '').trim(); }
+
+  function defauts() { return { v: SAUVEGARDE_VERSION, niveau: 1, score: 0, options: {} }; }
+
+  function objet(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
+
+  // Données relues, ou null si absentes, illisibles ou d'un format inconnu.
+  function lireDonnees(jeu) {
+    var brut = lire(cleDe(jeu));
+    if (typeof brut !== 'string' || !brut) return null;
+    var d;
+    try { d = JSON.parse(brut); } catch (e) { return null; }
+    if (!objet(d) || d.v !== SAUVEGARDE_VERSION) return null;
+    var propre = defauts();
+    for (var k in d) if (Object.prototype.hasOwnProperty.call(d, k)) propre[k] = d[k];
+    var n = Number(propre.niveau);
+    propre.niveau = isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+    var s = Number(propre.score);
+    propre.score = isFinite(s) ? s : 0;
+    if (!objet(propre.options)) propre.options = {};
+    return propre;
+  }
+
+  function load(jeu) { return lireDonnees(jeu) || defauts(); }
+
+  function existe(jeu) { return lireDonnees(jeu) !== null; }
+
+  function save(jeu, donnees) {
+    if (!String(jeu || '').trim()) return false;
+    var tout = load(jeu);
+    if (objet(donnees)) for (var k in donnees) if (Object.prototype.hasOwnProperty.call(donnees, k)) tout[k] = donnees[k];
+    tout.v = SAUVEGARDE_VERSION;
+    tout.date = Date.now();
+    var texte;
+    try { texte = JSON.stringify(tout); } catch (e) { return false; }
+    if (texte.length > TAILLE_MAX) {
+      try { console.warn('[sauvegarde] trop grosse, ignorée (' + texte.length + ' caractères)'); } catch (e) { /* pas de console */ }
+      return false;
+    }
+    return ecrire(cleDe(jeu), texte);
+  }
+
+  function clear(jeu) { return ecrire(cleDe(jeu), null); }
+
+  // --- Fermeture de la page -------------------------------------------------
+
+  function surFermeture(f) {
+    if (typeof f !== 'function') return;
+    var appeler = function () { try { f(); } catch (e) { setTimeout(function () { throw e; }); } };
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') appeler(); });
+    window.addEventListener('pagehide', appeler);
+    window.addEventListener('beforeunload', appeler);
+  }
+
+  // --- Textes (5 langues) -----------------------------------------------------
+
+  var TEXTES = {
+    fr: { titre: 'Une partie est sauvegardée', niveau: 'Niveau {n}', score: 'Score : {n}', continuer: 'Continuer', nouvelle: 'Nouvelle partie', effacer: 'Effacer la sauvegarde', confirmer: 'Toucher encore pour effacer', efface: 'Sauvegarde effacée' },
+    en: { titre: 'You have a saved game', niveau: 'Level {n}', score: 'Score: {n}', continuer: 'Continue', nouvelle: 'New game', effacer: 'Delete saved game', confirmer: 'Tap again to delete', efface: 'Saved game deleted' },
+    es: { titre: 'Tienes una partida guardada', niveau: 'Nivel {n}', score: 'Puntos: {n}', continuer: 'Continuar', nouvelle: 'Nueva partida', effacer: 'Borrar la partida guardada', confirmer: 'Toca otra vez para borrar', efface: 'Partida guardada borrada' },
+    pt: { titre: 'Você tem um jogo salvo', niveau: 'Nível {n}', score: 'Pontos: {n}', continuer: 'Continuar', nouvelle: 'Novo jogo', effacer: 'Apagar o jogo salvo', confirmer: 'Toque de novo para apagar', efface: 'Jogo salvo apagado' },
+    de: { titre: 'Du hast einen gespeicherten Spielstand', niveau: 'Level {n}', score: 'Punkte: {n}', continuer: 'Weiterspielen', nouvelle: 'Neues Spiel', effacer: 'Spielstand löschen', confirmer: 'Zum Löschen noch mal tippen', efface: 'Spielstand gelöscht' },
+  };
+
+  function langue() {
+    var l = '';
+    try { l = window.JEL_I18N ? window.JEL_I18N.getLang() : (window.JEL_LANG || document.documentElement.lang); } catch (e) { /* rien */ }
+    l = String(l || '').toLowerCase().split(/[-_]/)[0];
+    return TEXTES[l] ? l : 'fr';
+  }
+
+  function texte(cle, vars) {
+    var l = langue();
+    var s = TEXTES[l][cle] || TEXTES.fr[cle] || cle;
+    return s.replace(/\{(\w+)\}/g, function (tout, nom) {
+      if (!vars || !Object.prototype.hasOwnProperty.call(vars, nom)) return tout;
+      var v = vars[nom];
+      if (typeof v === 'number') { try { return new Intl.NumberFormat(l).format(v); } catch (e) { return String(v); } }
+      return String(v);
+    });
+  }
+
+  // --- Interface ------------------------------------------------------------------
+  // Isolée dans un Shadow DOM (comme le bouton de langue) : le CSS du jeu ne la
+  // déforme pas. Les gestes et les touches n'arrivent pas au jeu.
+
+  var CSS =
+    ':host{all:initial}' +
+    '*{box-sizing:border-box}' +
+    '.fond{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(7,10,20,.72);font:600 16px/1.3 ui-rounded,"Segoe UI",system-ui,sans-serif;color:#eceae4}' +
+    '.carte{width:min(360px,100%);padding:20px 18px 14px;border-radius:20px;background:#161f38;border:1px solid #5a6688;box-shadow:0 14px 40px rgba(0,0,0,.5);text-align:center}' +
+    'h2{margin:0 0 6px;font-size:19px;line-height:1.25;color:#eceae4}' +
+    'p{margin:0 0 16px;color:#a3adc2;font-size:15px}' +
+    'button{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin:0 0 10px;padding:8px 14px;border-radius:999px;border:2px solid #a8b3f0;background:transparent;color:#eceae4;font:inherit;font-size:17px;line-height:1.2;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}' +
+    'button.principal{background:#a8b3f0;color:#0b1020;border-color:#a8b3f0}' +
+    'button.discret{min-height:44px;margin:4px 0 0;border:0;color:#a3adc2;font-size:14px;text-decoration:underline}' +
+    'button.discret.armer{color:#f2d27a;text-decoration:none}' +
+    'button:focus-visible{outline:3px solid #f2d27a;outline-offset:2px}' +
+    '.seul{display:inline-flex;width:auto;min-height:44px;margin:0;padding:6px 14px;border:1px solid #5a6688;background:rgba(11,16,32,.6);color:#eceae4;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif}' +
+    '.seul.armer{border-color:#f2d27a;color:#f2d27a}';
+
+  function isoler(element) {
+    ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'click', 'keydown', 'keyup', 'wheel'].forEach(function (type) {
+      element.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
+  }
+
+  function creerHote(nom, style) {
+    var hote = document.createElement(nom);
+    for (var p in style) hote.style.setProperty(p, style[p], 'important');
+    var ombre = hote.attachShadow ? hote.attachShadow({ mode: 'open' }) : hote;
+    var feuille = document.createElement('style');
+    feuille.textContent = CSS;
+    ombre.appendChild(feuille);
+    return { hote: hote, ombre: ombre };
+  }
+
+  function bouton(classe, contenu) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    if (classe) b.className = classe;
+    b.textContent = contenu;
+    return b;
+  }
+
+  // Bouton d'effacement en deux temps (les fenêtres du navigateur sont interdites) :
+  // 1er toucher → « Toucher encore pour effacer », 2e toucher dans les 3 s → efface.
+  function armerEffacement(b, jeu, fait) {
+    var minuteur = null;
+    b.addEventListener('click', function () {
+      if (!b.classList.contains('armer')) {
+        b.classList.add('armer');
+        b.textContent = texte('confirmer');
+        clearTimeout(minuteur);
+        minuteur = setTimeout(function () { b.classList.remove('armer'); b.textContent = texte('effacer'); }, 3000);
+        return;
+      }
+      clearTimeout(minuteur);
+      b.classList.remove('armer');
+      clear(jeu);
+      fait();
+    });
+  }
+
+  var ouverte = null; // fenêtre de reprise affichée
+
+  // Fenêtre de reprise. options :
+  //   jeu          identifiant du jeu (obligatoire)
+  //   onContinuer  f(donnees) : reprendre au niveau donnees.niveau
+  //   onNouvelle   f() : partie depuis le début (la sauvegarde reste jusqu'à la
+  //                prochaine écriture du jeu)
+  //   onEffacer    f() facultatif, après effacement (par défaut : onNouvelle)
+  //   sansNiveau   true pour un jeu sans niveaux (partie sans fin) : la fenêtre
+  //                montre seulement le score (rien s'il est nul)
+  // Sans sauvegarde utilisable : rien ne s'affiche, onNouvelle() est appelé
+  // tout de suite. Renvoie true si la fenêtre s'affiche.
+  function reprise(options) {
+    options = options || {};
+    var jeu = options.jeu;
+    var nouvelle = typeof options.onNouvelle === 'function' ? options.onNouvelle : function () {};
+    var continuer = typeof options.onContinuer === 'function' ? options.onContinuer : nouvelle;
+    var effacer = typeof options.onEffacer === 'function' ? options.onEffacer : nouvelle;
+    var d = lireDonnees(jeu);
+    if (!d) { nouvelle(); return false; }
+    if (ouverte) ouverte.fermer();
+
+    var precedent = document.activeElement;
+    var h = creerHote('jel-sauvegarde', { position: 'fixed', inset: '0', 'z-index': '2147483002', display: 'block', margin: '0', padding: '0' });
+    var fond = document.createElement('div');
+    fond.className = 'fond';
+    var carte = document.createElement('div');
+    carte.className = 'carte';
+    carte.setAttribute('role', 'dialog');
+    carte.setAttribute('aria-modal', 'true');
+    var titre = document.createElement('h2');
+    titre.id = 'jel-sauvegarde-titre';
+    titre.textContent = texte('titre');
+    carte.setAttribute('aria-labelledby', titre.id);
+    var detail = document.createElement('p');
+    detail.textContent = options.sansNiveau
+      ? (d.score ? texte('score', { n: d.score }) : '')
+      : texte('niveau', { n: d.niveau }) + (d.score ? ' · ' + texte('score', { n: d.score }) : '');
+    if (!detail.textContent) detail.hidden = true;
+    var bContinuer = bouton('principal', texte('continuer'));
+    var bNouvelle = bouton('', texte('nouvelle'));
+    var bEffacer = bouton('discret', texte('effacer'));
+    carte.append(titre, detail, bContinuer, bNouvelle, bEffacer);
+    fond.appendChild(carte);
+    h.ombre.appendChild(fond);
+    isoler(h.hote);
+
+    var fenetre = {
+      fermer: function () {
+        if (h.hote.parentNode) h.hote.parentNode.removeChild(h.hote);
+        if (ouverte === fenetre) ouverte = null;
+        try { if (precedent && precedent.focus) precedent.focus(); } catch (e) { /* rien */ }
+      },
+    };
+    ouverte = fenetre;
+    var choisir = function (f, arg) { return function () { fenetre.fermer(); f(arg); }; };
+    bContinuer.addEventListener('click', choisir(continuer, d));
+    bNouvelle.addEventListener('click', choisir(nouvelle));
+    armerEffacement(bEffacer, jeu, function () { fenetre.fermer(); effacer(); });
+
+    // Clavier : Tab et les flèches restent dans la fenêtre, Entrée et Espace
+    // activent le bouton choisi. Échap ne ferme pas : le choix doit être explicite.
+    var boutons = [bContinuer, bNouvelle, bEffacer];
+    fond.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      var actif = h.ombre.activeElement || document.activeElement;
+      var i = boutons.indexOf(actif);
+      var recul = e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey);
+      boutons[(i + (recul ? boutons.length - 1 : 1)) % boutons.length].focus();
+    });
+
+    (document.body || document.documentElement).appendChild(h.hote);
+    try { bContinuer.focus(); } catch (e) { /* rien */ }
+    return true;
+  }
+
+  // Bouton « Effacer la sauvegarde » seul (écran titre, menu pause…). options :
+  //   jeu, conteneur (élément où le placer), apres f() facultatif.
+  // Caché tant qu'il n'y a pas de sauvegarde ; appeler .maj() pour le rafraîchir.
+  // Renvoie l'élément ajouté (avec sa méthode maj).
+  function boutonEffacer(options) {
+    options = options || {};
+    var h = creerHote('jel-sauvegarde-effacer', { display: 'inline-block', margin: '0', padding: '0', 'vertical-align': 'middle' });
+    var b = bouton('seul', texte('effacer'));
+    h.ombre.appendChild(b);
+    isoler(h.hote);
+    h.hote.maj = function () {
+      b.classList.remove('armer');
+      b.textContent = texte('effacer');
+      h.hote.style.setProperty('display', existe(options.jeu) ? 'inline-block' : 'none', 'important');
+    };
+    armerEffacement(b, options.jeu, function () {
+      h.hote.maj();
+      if (typeof options.apres === 'function') options.apres();
+    });
+    h.hote.maj();
+    if (options.conteneur) options.conteneur.appendChild(h.hote);
+    return h.hote;
+  }
+
+  window.JEL_SAVE = {
+    VERSION: SAUVEGARDE_VERSION,
+    save: save,
+    load: load,
+    clear: clear,
+    existe: existe,
+    surFermeture: surFermeture,
+    reprise: reprise,
+    boutonEffacer: boutonEffacer,
+    texte: texte,
+  };
+})();
+</script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1020; color: #fdf6e3;
+    font-family: ui-rounded, "Segoe UI", system-ui, sans-serif; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+  canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+  [hidden] { display: none !important; }
+  button { font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  button:focus-visible { outline: 3px solid #f2d27a; outline-offset: 2px; }
+  svg { pointer-events: none; }
+
+  /* Boutons */
+  .btn { min-height: 48px; min-width: 48px; padding: 10px 22px; border-radius: 999px; border: 3px solid #3b2a17;
+    background: #fdf6e3; color: #3b2a17; font-weight: 800; font-size: 17px; line-height: 1.15;
+    box-shadow: 0 4px 0 #3b2a17; transition: transform .08s; }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #3b2a17; }
+  .btn.principal { background: #f2b632; font-size: 22px; padding: 14px 36px; }
+  .btn.vert { background: #7ccf6a; }
+  .rond { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,.55);
+    background: rgba(20,24,40,.62); color: #fff; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .rond svg { width: 24px; height: 24px; }
+
+  /* Écrans */
+  .ecran { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; overflow-y: auto;
+    padding: max(14px, env(safe-area-inset-top)) 14px 18px; }
+  #ecran-titre { justify-content: flex-start; background: linear-gradient(rgba(11,16,32,.0), rgba(11,16,32,0)); }
+  .carte-titre { margin-top: 3vh; width: min(460px, 100%); text-align: center; padding: 16px 16px 18px;
+    background: rgba(253,246,227,.92); color: #3b2a17; border-radius: 26px; border: 4px solid #3b2a17;
+    box-shadow: 0 8px 0 rgba(59,42,23,.6); }
+  .carte-titre h1 { margin: 2px 0 8px; font-size: clamp(27px, 8vw, 40px); line-height: 1.05; color: #b8322f;
+    text-shadow: 0 3px 0 #f2d27a; letter-spacing: .5px; }
+  .carte-titre p { margin: 0 0 12px; font-size: 16px; line-height: 1.35; font-weight: 600; }
+  .carte-titre .petit { font-size: 13px; color: #6b5640; margin: 10px 0 0; }
+  .rangee { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+  .coin-titre { position: fixed; top: max(10px, env(safe-area-inset-top)); right: 10px; display: flex; gap: 8px; align-items: center; }
+  #langue-titre { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 10px; }
+
+  .panneau { width: min(560px, 100%); background: rgba(253,246,227,.96); color: #3b2a17; border-radius: 24px;
+    border: 4px solid #3b2a17; padding: 14px 14px 18px; margin: 8px 0 12px; }
+  .panneau h2 { margin: 2px 0 6px; text-align: center; font-size: 24px; color: #b8322f; }
+  .panneau h3 { margin: 14px 0 6px; font-size: 17px; }
+  .panneau .aide { text-align: center; margin: 0 0 6px; font-size: 15px; }
+  .grille-niveaux { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .niv { min-height: 64px; border-radius: 14px; border: 3px solid #3b2a17; background: #fff; color: #3b2a17;
+    font-weight: 800; font-size: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 0; }
+  .niv.ferme { background: #d9d2c0; color: #8a7d66; }
+  .niv .et { display: flex; gap: 1px; }
+  .niv .et svg { width: 14px; height: 14px; }
+  .niv.gare-campagne { background: #e5f6d8; } .niv.gare-montagne { background: #e3ecf6; }
+  .niv.gare-port { background: #d9f0fb; } .niv.gare-ville { background: #dcdcf5; }
+  .grille-depot { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+  .objet { border-radius: 14px; border: 3px solid #3b2a17; background: #fff; padding: 6px 4px; color: #3b2a17;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 14px; font-weight: 700; min-height: 96px; }
+  .objet canvas { width: 108px; height: 50px; }
+  .objet.choisi { background: #fff1c2; border-color: #c98a00; box-shadow: 0 0 0 3px #f2b632; }
+  .objet.ferme { background: #e4ddcb; color: #8a7d66; }
+  .objet.ferme canvas { filter: grayscale(1) brightness(.6); }
+  .objet .etat { font-size: 12px; font-weight: 600; }
+
+  /* Barre de jeu */
+  #hud { position: fixed; left: 0; right: 0; top: 0; height: 56px; padding: 6px 8px; display: flex; align-items: center; gap: 6px;
+    background: linear-gradient(rgba(11,16,32,.75), rgba(11,16,32,.35)); padding-top: max(6px, env(safe-area-inset-top)); }
+  #hud .titre-niv { flex: 1; min-width: 0; font-weight: 800; font-size: 16px; line-height: 1.1; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.5);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hud .titre-niv small { display: block; font-size: 12px; font-weight: 600; opacity: .85; overflow: hidden; text-overflow: ellipsis; }
+  .jauge { display: inline-flex; align-items: center; gap: 2px; height: 40px; padding: 0 8px 0 4px; border-radius: 999px;
+    background: rgba(20,24,40,.7); border: 2px solid rgba(255,255,255,.4); font-weight: 800; font-size: 17px; color: #fff; flex-shrink: 0; }
+  .jauge svg { width: 22px; height: 22px; }
+  #hud .rond { flex-shrink: 0; }
+  @media (max-width: 400px) { #hud { gap: 4px; padding-left: 6px; padding-right: 6px; } #hud .titre-niv { font-size: 15px; } }
+  .jauge.bas { border-color: #ff8a65; color: #ffccbc; animation: clignote .8s infinite; }
+  @keyframes clignote { 50% { opacity: .55; } }
+  #cloche.bas { border-color: #ff5252; }
+
+  /* Bulle de tutoriel et messages */
+  #bulle, #message { position: fixed; left: 50%; transform: translateX(-50%); bottom: max(10px, env(safe-area-inset-bottom));
+    width: min(520px, calc(100% - 20px)); padding: 10px 14px; border-radius: 18px; font-weight: 700; font-size: 15px; line-height: 1.3;
+    text-align: center; pointer-events: none; }
+  #bulle { background: #fdf6e3; color: #3b2a17; border: 3px solid #3b2a17; box-shadow: 0 4px 0 rgba(59,42,23,.6); animation: entre .3s; }
+  #message { background: rgba(20,24,40,.9); color: #fff; border: 2px solid #f2d27a; animation: entre .2s; }
+  @keyframes entre { from { opacity: 0; transform: translate(-50%, 12px); } }
+  #chargement { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px;
+    color: #fff; text-shadow: 0 2px 0 #000; background: rgba(11,16,32,.45); }
+
+  /* Fenêtres (pause, fin) */
+  .voile { position: fixed; inset: 0; background: rgba(7,10,20,.6); display: flex; align-items: center; justify-content: center; padding: 14px; overflow-y: auto; }
+  .boite { width: min(400px, 100%); background: #fdf6e3; color: #3b2a17; border-radius: 24px; border: 4px solid #3b2a17;
+    padding: 16px 16px 18px; text-align: center; box-shadow: 0 10px 0 rgba(0,0,0,.35); animation: pop .35s cubic-bezier(.3,1.6,.6,1); margin: auto; }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } }
+  .boite h2 { margin: 0 0 8px; font-size: 24px; color: #b8322f; line-height: 1.15; }
+  .boite .col { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .boite .ligne { margin: 3px 0; font-weight: 700; font-size: 16px; }
+  .boite .note { margin: 6px 0; font-size: 14px; color: #6b5640; }
+  .boite .record { color: #c46a00; font-weight: 800; animation: clignote 1s 3; }
+  .boite .debloque { margin: 8px auto 0; padding: 6px 10px; border-radius: 12px; background: #fff1c2; border: 2px dashed #c98a00; font-weight: 800; }
+  .etoiles { display: flex; justify-content: center; gap: 8px; margin: 4px 0 8px; }
+  .etoiles svg { width: 52px; height: 52px; }
+  .etoiles .on { animation: vole .6s cubic-bezier(.3,1.6,.6,1) backwards; }
+  @keyframes vole { from { transform: translateY(-60px) scale(.2) rotate(-90deg); opacity: 0; } }
+  #pause .langue { display: flex; justify-content: center; margin-top: 12px; }
+  .score-anim { font-size: 22px; font-weight: 900; color: #b8322f; }
+</style>
+</head>
+<body>
+<canvas id="scene" role="img" data-i18n-aria="sceneAria"></canvas>
+
+<!-- Écran titre -->
+<section id="ecran-titre" class="ecran">
+  <div id="langue-titre"></div>
+  <div class="coin-titre">
+    <button class="rond bouton-son" type="button"></button>
+  </div>
+  <div class="carte-titre">
+    <h1 data-i18n="titre"></h1>
+    <p data-i18n="consigne"></p>
+    <div class="rangee">
+      <button id="b-jouer" class="btn principal" type="button" data-i18n="jouer"></button>
+    </div>
+    <div class="rangee" style="margin-top:12px">
+      <button id="b-niveaux" class="btn" type="button" data-i18n="niveaux"></button>
+      <button id="b-depot" class="btn vert" type="button" data-i18n="depot"></button>
+    </div>
+    <div class="rangee" id="effacer-titre" style="margin-top:8px"></div>
+    <p class="petit" data-i18n="clavier"></p>
+  </div>
+</section>
+
+<!-- Choix des niveaux -->
+<section id="ecran-niveaux" class="ecran" hidden>
+  <div class="panneau">
+    <h2 data-i18n="niveaux.titre"></h2>
+    <p class="aide" id="total-etoiles"></p>
+    <div id="liste-niveaux"></div>
+    <div class="rangee" style="margin-top:14px">
+      <button class="btn b-accueil" type="button" data-i18n="retour"></button>
+    </div>
+  </div>
+</section>
+
+<!-- Dépôt : locomotives et couleurs -->
+<section id="ecran-depot" class="ecran" hidden>
+  <div class="panneau">
+    <h2 data-i18n="depot.titre"></h2>
+    <p class="aide" data-i18n="depot.aide"></p>
+    <h3 data-i18n="depot.locos"></h3>
+    <div class="grille-depot" id="liste-locos"></div>
+    <h3 data-i18n="depot.couleurs"></h3>
+    <div class="grille-depot" id="liste-palettes"></div>
+    <div class="rangee" style="margin-top:14px">
+      <button class="btn b-accueil" type="button" data-i18n="retour"></button>
+    </div>
+  </div>
+</section>
+
+<!-- Barre du jeu -->
+<div id="hud" hidden>
+  <button id="b-pause" class="rond" type="button" data-i18n-aria="pause" data-i18n-title="pause">
+    <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="#fff"/><rect x="14" y="5" width="4" height="14" rx="1" fill="#fff"/></svg>
+  </button>
+  <div class="titre-niv"><span id="hud-niveau"></span><small id="hud-gare"></small></div>
+  <div class="jauge" id="vapeur">
+    <svg viewBox="0 0 24 24"><circle cx="8" cy="14" r="5" fill="#e8eef5"/><circle cx="14" cy="10" r="6" fill="#fff"/><circle cx="18" cy="15" r="4" fill="#dfe6ee"/></svg>
+    <span id="vapeur-n"></span>
+  </div>
+  <div class="jauge" id="cloche" hidden>
+    <svg viewBox="0 0 24 24"><path d="M12 3c-4 0-6 3-6 7v4l-2 3h16l-2-3v-4c0-4-2-7-6-7z" fill="#f2d27a"/><circle cx="12" cy="19.5" r="2" fill="#f2d27a"/></svg>
+    <span id="cloche-n"></span>
+  </div>
+  <button id="b-indice" class="rond" type="button" data-i18n-aria="indice" data-i18n-title="indice">
+    <svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z" fill="#ffe082"/><rect x="9" y="17" width="6" height="2" rx="1" fill="#fff"/><rect x="10" y="20" width="4" height="2" rx="1" fill="#fff"/></svg>
+  </button>
+  <button class="rond bouton-son" type="button"></button>
+</div>
+
+<div id="bulle" hidden></div>
+<div id="message" hidden></div>
+<div id="chargement" hidden><span data-i18n="chargement"></span></div>
+
+<!-- Pause -->
+<div id="pause" class="voile" hidden>
+  <div class="boite" role="dialog" aria-modal="true">
+    <h2 data-i18n="pauseTitre"></h2>
+    <div class="col">
+      <button id="b-reprendre" class="btn principal" type="button" data-i18n="reprendre"></button>
+      <button id="b-recommencer" class="btn" type="button" data-i18n="recommencer"></button>
+      <button id="b-pause-niveaux" class="btn" type="button" data-i18n="niveaux"></button>
+      <button id="b-pause-accueil" class="btn" type="button" data-i18n="accueil"></button>
+    </div>
+    <div class="rangee" style="margin-top:12px">
+      <button class="rond bouton-son" type="button" style="background:#3b2a17"></button>
+      <div id="langue-pause" class="langue"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Fin de niveau -->
+<div id="fin" class="voile" hidden>
+  <div class="boite" role="dialog" aria-modal="true">
+    <h2 id="fin-titre"></h2>
+    <div class="etoiles" id="fin-etoiles"></div>
+    <div id="fin-lignes"></div>
+    <div class="col" id="fin-boutons"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+// =====================================================================
+// Les wagons des mots mêlés — jeu de mots et de manœuvres ferroviaires.
+// Une gare de triage : chaque voie est une impasse, seul le wagon du bout
+// (côté aiguillage, à droite) peut partir. On l'accroche au train à quai
+// s'il porte la lettre suivante du mot, ou on le range sur une autre voie.
+// Un solveur (A*) calcule le nombre minimal de déplacements de chaque
+// gare : il sert aux étoiles, aux indices et au tutoriel.
+// =====================================================================
+
+const I18N = window.JEL_I18N;
+const t = (cle, vars) => I18N.t(cle, vars);
+const JEU = 'wagons-des-mots-meles';
+
+// ----- Les 20 niveaux --------------------------------------------------
+// voies : [type, places] ; type « tri » (voie de triage), « tunnel »
+// (wagons cachés sauf celui du bout), « garage » (voie de garage, vide au départ).
+// trop : wagons en trop ; doubles : wagons à double lettre ; det : fourchette
+// de détours (déplacements en plus des accrochages) ; marge : vapeur en plus
+// du meilleur possible ; cloche : départ chronométré ; tuto : bulle d'aide.
+const NIVEAUX = [
+  { gare: 'campagne', mots: ['velo'],    voies: [['tri', 4], ['tri', 4]], trop: 0, doubles: 0, det: [0, 1], marge: 8, tuto: 1 },
+  { gare: 'campagne', mots: ['lapin'],   voies: [['tri', 4], ['tri', 4]], trop: 0, doubles: 0, det: [1, 2], marge: 8, tuto: 2 },
+  { gare: 'campagne', mots: ['pomme'],   voies: [['tri', 3], ['tri', 3], ['tri', 3]], trop: 0, doubles: 0, det: [2, 3], marge: 7 },
+  { gare: 'campagne', mots: ['canard'],  voies: [['tri', 4], ['tri', 4], ['garage', 1]], trop: 0, doubles: 0, det: [2, 4], marge: 7, tuto: 4 },
+  { gare: 'campagne', mots: ['maison'],  voies: [['tri', 3], ['tri', 3], ['tri', 3], ['garage', 1]], trop: 0, doubles: 0, det: [3, 5], marge: 7 },
+  { gare: 'montagne', mots: ['sapin'],   voies: [['tri', 4], ['tri', 4], ['garage', 2]], trop: 1, doubles: 0, det: [2, 4], marge: 7, tuto: 6 },
+  { gare: 'montagne', mots: ['nuage'],   voies: [['tri', 3], ['tri', 3], ['tri', 3], ['garage', 1]], trop: 2, doubles: 0, det: [3, 5], marge: 6 },
+  { gare: 'montagne', mots: ['etoile'],  voies: [['tunnel', 4], ['tri', 4], ['garage', 1]], trop: 1, doubles: 0, det: [3, 5], marge: 6, tuto: 8 },
+  { gare: 'montagne', mots: ['escargot'], voies: [['tunnel', 4], ['tri', 4], ['tri', 3], ['garage', 1]], trop: 1, doubles: 0, det: [4, 6], marge: 6 },
+  { gare: 'montagne', mots: ['chateau'], voies: [['tunnel', 4], ['tunnel', 3], ['tri', 3], ['garage', 2]], trop: 2, doubles: 0, det: [5, 7], marge: 5 },
+  { gare: 'port',     mots: ['ancre', 'crabe'], voies: [['tri', 4], ['tri', 4], ['tri', 3], ['garage', 1]], trop: 0, doubles: 0, det: [2, 4], marge: 6, tuto: 11 },
+  { gare: 'port',     mots: ['bateau'],  voies: [['tunnel', 3], ['tri', 4], ['tri', 3], ['garage', 1]], trop: 2, doubles: 0, det: [4, 6], marge: 6 },
+  { gare: 'port',     mots: ['poisson'], voies: [['tri', 3], ['tri', 3], ['tri', 3], ['garage', 1]], trop: 0, doubles: 2, det: [2, 5], marge: 6, tuto: 13 },
+  { gare: 'port',     mots: ['guitare'], voies: [['tunnel', 3], ['tri', 3], ['tri', 3], ['garage', 2]], trop: 1, doubles: 2, det: [4, 6], marge: 5 },
+  { gare: 'port',     mots: ['vague', 'mouette'], voies: [['tri', 4], ['tri', 4], ['tri', 3], ['garage', 1]], trop: 0, doubles: 2, det: [3, 5], marge: 5 },
+  { gare: 'ville',    mots: ['fusee'],   voies: [['tri', 3], ['tri', 3], ['garage', 1]], trop: 1, doubles: 0, det: [2, 4], marge: 6, cloche: true, tuto: 16 },
+  { gare: 'ville',    mots: ['camion'],  voies: [['tri', 4], ['tri', 3], ['tri', 3], ['garage', 1]], trop: 2, doubles: 1, det: [3, 5], marge: 5, cloche: true },
+  { gare: 'ville',    mots: ['lanterne'], voies: [['tunnel', 4], ['tri', 4], ['tri', 3], ['garage', 1]], trop: 1, doubles: 2, det: [4, 6], marge: 5, cloche: true },
+  { gare: 'ville',    mots: ['hibou', 'lune'], voies: [['tri', 4], ['tri', 4], ['tri', 3], ['garage', 1]], trop: 1, doubles: 1, det: [3, 5], marge: 4, cloche: true },
+  { gare: 'ville',    mots: ['parapluie'], voies: [['tunnel', 4], ['tri', 4], ['tri', 3], ['garage', 2]], trop: 2, doubles: 2, det: [6, 8], marge: 4, cloche: true },
+];
+window.JEL_NIVEAUX = NIVEAUX.length;
+const NB = NIVEAUX.length;
+
+// ----- Locomotives, couleurs et récompenses ----------------------------
+const LOCOS = [
+  { forme: 'vapeur', c: '#c9343a' }, { forme: 'vapeur', c: '#2f8f4e' }, { forme: 'diesel', c: '#f0c330' },
+  { forme: 'diesel', c: '#ee7d2f' }, { forme: 'elec', c: '#3471c9' }, { forme: 'elec', c: '#7b4fc9' },
+  { forme: 'tgv', c: '#f4f4f4' }, { forme: 'vapeur', c: '#d6a93a' },
+];
+const PALETTES = [
+  ['#a0673a', '#8a5530', '#b57a45', '#7d4a2a', '#c08850'],
+  ['#e5534b', '#f39c34', '#e8c22e', '#4cb963', '#4a8fe0', '#8e6be0'],
+  ['#c0304a', '#e0566a', '#a3203a', '#d84a5e'],
+  ['#2f9f8a', '#45b89f', '#24806f', '#5cc4ad'],
+  ['#2f6fb5', '#3d8bd8', '#22548c', '#4c98d8'],
+  ['#8274cf', '#9a8ce6', '#6a5cb8', '#a497ea'],
+  ['#e0a01c', '#eab330', '#d08a10', '#ecbd45'],
+  ['#e86aa4', '#47b9de', '#86c94e', '#eba63b'],
+  ['#3f7d3a', '#5a9a3f', '#2f6230', '#6f9e42'],
+  ['#27305a', '#3a4480', '#1e2548', '#4b56a0'],
+  ['#5fb3d9', '#7cc4e6', '#469fca', '#8acde9'],
+  ['#e8694c', '#ef8669', '#d65438', '#f19a81'],
+  ['#5d6b7e', '#74839a', '#4a5668', '#8593a8'],
+  ['#c99a22', '#ddb43c', '#b0850f', '#e3c056'],
+];
+// Objet débloqué par le premier succès de chaque niveau.
+const RECOMPENSES = [
+  ['loco', 1], ['pal', 1], ['pal', 2], ['loco', 2], ['pal', 3],
+  ['loco', 3], ['pal', 4], ['pal', 5], ['loco', 4], ['pal', 6],
+  ['loco', 5], ['pal', 7], ['pal', 8], ['loco', 6], ['pal', 9],
+  ['loco', 7], ['pal', 10], ['pal', 11], ['pal', 12], ['pal', 13],
+];
+const COULEURS_TRAINS = ['#f2b632', '#4fc3f7'];
+
+// ----- Progression sauvegardée ------------------------------------------
+const prog = { etoiles: new Array(NB).fill(0), records: new Array(NB).fill(0), debloque: 1, loco: 0, palette: 0, son: true };
+
+function entier(x, min, max, defaut) {
+  const n = Number(x);
+  return Number.isFinite(n) ? Math.max(min, Math.min(max, Math.floor(n))) : defaut;
+}
+const CLE_SON = 'wagons-des-mots-meles-son';
+function chargerProg() {
+  try { const s = localStorage.getItem(CLE_SON); if (s === '0' || s === '1') prog.son = s === '1'; } catch (e) { /* stockage refusé */ }
+  try {
+    const d = window.JEL_SAVE.load(JEU);
+    if (Array.isArray(d.etoiles)) d.etoiles.slice(0, NB).forEach((e, i) => { prog.etoiles[i] = entier(e, 0, 3, 0); });
+    if (Array.isArray(d.records)) d.records.slice(0, NB).forEach((e, i) => { prog.records[i] = entier(e, 0, 99999, 0); });
+    let gagnes = 0;
+    prog.etoiles.forEach((e, i) => { if (e > 0) gagnes = i + 2; });
+    prog.debloque = Math.max(1, Math.min(NB, Math.max(entier(d.debloque, 1, NB, 1), entier(d.niveau, 1, NB, 1), gagnes)));
+    const o = d.options || {};
+    if (typeof o.son === 'boolean') prog.son = o.son;
+    prog.loco = entier(o.loco, 0, LOCOS.length - 1, 0);
+    prog.palette = entier(o.palette, 0, PALETTES.length - 1, 0);
+    if (!estDebloque('loco', prog.loco)) prog.loco = 0;
+    if (!estDebloque('pal', prog.palette)) prog.palette = 0;
+  } catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
+}
+function scoreTotal() { return prog.records.reduce((a, b) => a + b, 0); }
+function optionsSauvegarde() { return { son: prog.son, loco: prog.loco, palette: prog.palette }; }
+function donnees(niveau) {
+  return { niveau, score: scoreTotal(), etoiles: prog.etoiles.slice(), records: prog.records.slice(), debloque: prog.debloque, options: optionsSauvegarde() };
+}
+// Réglage changé hors partie : on ne touche qu'aux options d'une sauvegarde existante.
+function sauverOptions() {
+  try { if (window.JEL_SAVE.existe(JEU)) window.JEL_SAVE.save(JEU, { options: optionsSauvegarde() }); } catch (e) { /* rien */ }
+}
+function niveauDeblocage(type, i) {
+  if (i === 0) return 0;
+  return RECOMPENSES.findIndex((r) => r[0] === type && r[1] === i);
+}
+function estDebloque(type, i) {
+  if (i === 0) return true;
+  const n = niveauDeblocage(type, i);
+  return n >= 0 && prog.etoiles[n] > 0;
+}
+
+// ----- Sons (Web Audio, créés au premier geste) ---------------------------
+let ac = null;
+function audio() {
+  if (!prog.son) return null;
+  if (!ac) {
+    try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  }
+  if (ac.state === 'suspended' && !enPause) ac.resume().catch(() => {});
+  return ac;
+}
+function note(f, d, type = 'sine', vol = 0.15, f2 = null, delai = 0) {
+  const a = audio(); if (!a) return;
+  const t0 = a.currentTime + delai;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t0);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + d);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  o.connect(g).connect(a.destination);
+  o.start(t0); o.stop(t0 + d + 0.05);
+}
+function bruit(d, freq, vol = 0.2, delai = 0) {
+  const a = audio(); if (!a) return;
+  const t0 = a.currentTime + delai;
+  const n = Math.max(1, Math.floor(a.sampleRate * d));
+  const buf = a.createBuffer(1, n, a.sampleRate), data = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = a.createBufferSource(); s.buffer = buf;
+  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 1.2;
+  const g = a.createGain(); g.gain.value = vol;
+  s.connect(f).connect(g).connect(a.destination);
+  s.start(t0);
+}
+const SON = {
+  prise() { note(520, 0.07, 'triangle', 0.1, 640); },
+  pose() { bruit(0.06, 1800, 0.3); note(150, 0.09, 'square', 0.06); },
+  attelage() { bruit(0.06, 1400, 0.35); note(880, 0.14, 'sine', 0.13, null, 0.05); note(1320, 0.18, 'sine', 0.09, null, 0.11); },
+  refus() { note(200, 0.2, 'sawtooth', 0.08, 120); },
+  coupe() { bruit(0.04, 4200, 0.3); bruit(0.05, 5200, 0.3, 0.08); note(1500, 0.05, 'square', 0.04, null, 0.08); },
+  sifflet() { note(740, 0.55, 'sine', 0.12, 760); note(932, 0.55, 'sine', 0.09, 950); note(740, 0.35, 'sine', 0.1, 740, 0.62); note(932, 0.35, 'sine', 0.07, 932, 0.62); },
+  tchou() { for (let i = 0; i < 5; i++) bruit(0.13, 700, 0.22 - i * 0.03, 0.2 + i * 0.2); },
+  cloche() { [1, 2.76, 5.4].forEach((m, i) => note(620 * m, 1.3, 'sine', 0.12 / (i + 1))); },
+  tic() { note(1250, 0.035, 'square', 0.05); },
+  etoile(i) { note(660 + i * 220, 0.18, 'triangle', 0.12, null, 0); },
+  victoire() { [523, 659, 784, 1047].forEach((f, i) => note(f, 0.22, 'triangle', 0.12, null, i * 0.12)); },
+  defaite() { [392, 330, 262].forEach((f, i) => note(f, 0.3, 'triangle', 0.11, null, i * 0.2)); },
+  debloque() { [784, 988, 1175, 1568].forEach((f, i) => note(f, 0.16, 'sine', 0.1, null, 0.6 + i * 0.08)); },
+  indice() { note(988, 0.2, 'sine', 0.1); note(1319, 0.25, 'sine', 0.08, null, 0.12); },
+};
+
+// ----- Hasard reproductible -----------------------------------------------
+function hacher(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function hasard(graine) {
+  let a = graine >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let x = a;
+    x = Math.imul(x ^ (x >>> 15), x | 1);
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function melanger(tab, r) {
+  for (let i = tab.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [tab[i], tab[j]] = [tab[j], tab[i]]; }
+  return tab;
+}
+function lettresDe(cle) {
+  return Array.from(String(t('mot.' + cle)).toLocaleUpperCase().replace(/[^\p{L}]/gu, ''));
+}
+
+// ----- Solveur des manœuvres (A*) -------------------------------------------
+// État : piles (une par voie, le dernier élément est le wagon du bout) et
+// avancement de chaque train. Un wagon est une chaîne d'une ou deux lettres.
+function creerSolveur(caps, mots) {
+  const utiles = new Set(mots.flat());
+  const estTrop = (w) => !Array.from(w).some((c) => utiles.has(c));
+  const cle = (piles, av) => piles.map((p) => p.join('.')).join('|') + '#' + av.join(',');
+  const fini = (av) => av.every((a, k) => a === mots[k].length);
+  const accroche = (w, av, k) => {
+    const l = Array.from(w), m = mots[k];
+    for (let j = 0; j < l.length; j++) if (m[av[k] + j] !== l[j]) return false;
+    return true;
+  };
+  function heuristique(piles) {
+    let h = 0;
+    for (const p of piles) {
+      let utileDessous = false;
+      for (let j = 0; j < p.length; j++) {
+        if (!estTrop(p[j])) { h++; utileDessous = true; } else if (utileDessous) h++;
+      }
+    }
+    return h;
+  }
+  function coups(piles, av) {
+    const acc = [];
+    for (let i = 0; i < piles.length; i++) {
+      const p = piles[i]; if (!p.length) continue;
+      const w = p[p.length - 1];
+      for (let k = 0; k < mots.length; k++) if (accroche(w, av, k)) acc.push({ type: 'train', de: i, k });
+    }
+    if (acc.length) return acc; // accrocher tout de suite n'est jamais un mauvais choix
+    const res = [];
+    for (let i = 0; i < piles.length; i++) {
+      const p = piles[i]; if (!p.length) continue;
+      const w = p[p.length - 1];
+      if (w.length > 1 && Array.from(w).length > 1 && p.length < caps[i]) res.push({ type: 'coupe', de: i });
+      for (let j = 0; j < piles.length; j++) if (j !== i && piles[j].length < caps[j]) res.push({ type: 'voie', de: i, vers: j });
+    }
+    return res;
+  }
+  function jouer(piles, av, c) {
+    const np = piles.slice(), na = av.slice();
+    const src = np[c.de] = piles[c.de].slice();
+    const w = src.pop();
+    if (c.type === 'train') na[c.k] += Array.from(w).length;
+    else if (c.type === 'voie') { np[c.vers] = piles[c.vers].slice(); np[c.vers].push(w); }
+    else { const l = Array.from(w); src.push(l[0], l[1]); }
+    return [np, na];
+  }
+  // Renvoie { cout, premier } (premier coup d'un chemin le plus court) ou null.
+  function resoudre(piles, av, limite = 120000) {
+    if (fini(av)) return { cout: 0, premier: null };
+    const tas = []; // file de priorité (tas binaire) sur f
+    const pousser = (n) => {
+      tas.push(n); let i = tas.length - 1;
+      while (i > 0) { const pa = (i - 1) >> 1; if (tas[pa].f <= n.f) break; tas[i] = tas[pa]; i = pa; }
+      tas[i] = n;
+    };
+    const tirer = () => {
+      const haut = tas[0], dernier = tas.pop();
+      const n = tas.length;
+      if (n) {
+        let i = 0;
+        for (;;) {
+          const g = 2 * i + 1, d = g + 1;
+          let m = i, fm = dernier.f;
+          if (g < n && tas[g].f < fm) { m = g; fm = tas[g].f; }
+          if (d < n && tas[d].f < fm) m = d;
+          if (m === i) break;
+          tas[i] = tas[m]; i = m;
+        }
+        tas[i] = dernier;
+      }
+      return haut;
+    };
+    const vus = new Map();
+    pousser({ piles, av, g: 0, f: heuristique(piles), premier: null });
+    vus.set(cle(piles, av), 0);
+    let n = 0;
+    while (tas.length) {
+      const e = tirer();
+      if (fini(e.av)) return { cout: e.g, premier: e.premier };
+      if (++n > limite) return null;
+      for (const c of coups(e.piles, e.av)) {
+        const [np, na] = jouer(e.piles, e.av, c);
+        const k = cle(np, na), g = e.g + 1;
+        const ancien = vus.get(k);
+        if (ancien !== undefined && ancien <= g) continue;
+        vus.set(k, g);
+        pousser({ piles: np, av: na, g, f: g + heuristique(np), premier: e.premier || c });
+      }
+    }
+    return null;
+  }
+  return { resoudre, estTrop };
+}
+
+// ----- Fabrication d'une gare --------------------------------------------
+const cacheGares = {};
+function fabriquerGare(index) {
+  const lang = I18N.getLang();
+  const cleCache = lang + ':' + index;
+  if (cacheGares[cleCache]) return cacheGares[cleCache];
+  const def = NIVEAUX[index];
+  const mots = def.mots.map(lettresDe);
+  const toutes = new Set(mots.flat());
+  const alphabet = Array.from(String(t('alphabet')).toLocaleUpperCase()).filter((c) => !toutes.has(c) && /\p{L}/u.test(c));
+  let meilleur = null;
+  for (let essai = 0; essai < 50; essai++) {
+    const r = hasard(hacher(cleCache + ':' + essai));
+    // Unités : lettres seules ou paires (wagons à double lettre).
+    const unites = [];
+    const prises = mots.map((m) => new Array(m.length).fill(false));
+    for (let d = 0; d < def.doubles; d++) {
+      const k = Math.floor(r() * mots.length), m = mots[k];
+      const libres = [];
+      for (let i = 0; i < m.length; i++) if (!prises[k][i]) libres.push(i);
+      if (libres.length < 2) continue;
+      let i, j;
+      if (d % 2 === 0) { // double à couper : deux lettres non voisines
+        const paires = [];
+        for (const a of libres) for (const b of libres) if (b > a + 1) paires.push([a, b]);
+        if (!paires.length) continue;
+        [i, j] = paires[Math.floor(r() * paires.length)];
+      } else { // double à accrocher d'un coup : deux lettres voisines
+        const paires = [];
+        for (const a of libres) if (libres.includes(a + 1)) paires.push([a, a + 1]);
+        if (!paires.length) continue;
+        [i, j] = paires[Math.floor(r() * paires.length)];
+      }
+      prises[k][i] = prises[k][j] = true;
+      unites.push(m[i] + m[j]);
+    }
+    mots.forEach((m, k) => m.forEach((c, i) => { if (!prises[k][i]) unites.push(c); }));
+    for (let x = 0; x < def.trop && alphabet.length; x++) unites.push(alphabet[Math.floor(r() * alphabet.length)]);
+    // Voies : places agrandies si le mot est long (selon la langue).
+    const voies = def.voies.map(([type, cap]) => ({ type, cap }));
+    const triage = voies.filter((v) => v.type !== 'garage');
+    let placesTri = triage.reduce((s, v) => s + v.cap, 0);
+    while (placesTri < unites.length + 2) {
+      const v = triage.reduce((a, b) => (b.cap < a.cap ? b : a));
+      v.cap++; placesTri++;
+    }
+    // Répartition au hasard sur les voies de triage (et tunnels).
+    const piles = voies.map(() => []);
+    melanger(unites, r);
+    for (const w of unites) {
+      const libres = voies.map((v, i) => i).filter((i) => voies[i].type !== 'garage' && piles[i].length < voies[i].cap);
+      piles[libres[Math.floor(r() * libres.length)]].push(w);
+    }
+    const solveur = creerSolveur(voies.map((v) => v.cap), mots);
+    const res = solveur.resoudre(piles, mots.map(() => 0), 60000);
+    if (!res) continue;
+    // Coût de base : 1 par wagon utile, 3 pour un double à couper.
+    let base = 0;
+    for (const w of unites) {
+      if (solveur.estTrop(w)) continue;
+      if (Array.from(w).length === 1) base++;
+      else base += mots.some((m) => m.join('').includes(w)) ? 1 : 3;
+    }
+    const det = res.cout - base;
+    const ecart = det < def.det[0] ? def.det[0] - det : det > def.det[1] ? det - def.det[1] : 0;
+    if (!meilleur || ecart < meilleur.ecart) meilleur = { ecart, voies, piles, mots, par: res.cout, premier: res.premier };
+    if (ecart === 0) break;
+  }
+  cacheGares[cleCache] = meilleur;
+  return meilleur;
+}
+
+// ----- Éléments de la page ----------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const canvas = $('scene');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+let ecran = 'titre';
+let enPause = false;
+let partie = null;
+let horloge = 0;          // temps du jeu (s), arrêté pendant la pause
+let L = null;             // disposition de la gare
+let decor = null;         // décor dessiné d'avance (canvas)
+let particules = [];
+let idWagon = 0;
+let minuteurMessage = null;
+
+const ICONE_SON = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#fff"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+const ICONE_MUET = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#fff"/><path d="M16 9l6 6M22 9l-6 6" stroke="#ff8a80" stroke-width="2.4" stroke-linecap="round"/></svg>';
+const SVG_ETOILE = (on) => `<svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.5L12 17.2 6.1 20.4l1.3-6.5L2.5 9.3l6.6-.8z" fill="${on ? '#f6c945' : '#d9d2c0'}" stroke="${on ? '#b8860b' : '#a59a82'}" stroke-width="1.4" stroke-linejoin="round"/></svg>`;
+const SVG_CADENAS = '<svg viewBox="0 0 24 24" width="22" height="22"><rect x="5" y="11" width="14" height="10" rx="2" fill="#8a7d66"/><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="#8a7d66" stroke-width="2.5" fill="none"/></svg>';
+
+function majBoutonsSon() {
+  document.querySelectorAll('.bouton-son').forEach((b) => {
+    b.innerHTML = prog.son ? ICONE_SON : ICONE_MUET;
+    const lib = prog.son ? t('sonCouper') : t('sonRemettre');
+    b.setAttribute('aria-label', lib); b.title = lib;
+  });
+}
+document.querySelectorAll('.bouton-son').forEach((b) => b.addEventListener('click', () => {
+  prog.son = !prog.son;
+  try { localStorage.setItem(CLE_SON, prog.son ? '1' : '0'); } catch (e) { /* stockage refusé */ }
+  if (!prog.son && ac) { try { ac.suspend(); } catch (e) { /* rien */ } }
+  majBoutonsSon();
+  if (prog.son) SON.prise();
+  if (ecran === 'jeu' && partie) { /* sauvé avec la partie */ } else sauverOptions();
+}));
+
+function message(cle, vars) {
+  const m = $('message');
+  m.textContent = t(cle, vars);
+  m.hidden = false;
+  $('bulle').hidden = true;
+  m.style.animation = 'none'; void m.offsetWidth; m.style.animation = '';
+  clearTimeout(minuteurMessage);
+  minuteurMessage = setTimeout(() => { m.hidden = true; }, 2600);
+}
+
+function montrer(nom) {
+  ecran = nom;
+  $('ecran-titre').hidden = nom !== 'titre';
+  $('ecran-niveaux').hidden = nom !== 'niveaux';
+  $('ecran-depot').hidden = nom !== 'depot';
+  $('hud').hidden = nom !== 'jeu';
+  if (nom !== 'jeu') { niveauCourant = null; $('bulle').hidden = true; $('message').hidden = true; $('fin').hidden = true; $('pause').hidden = true; enPause = false; }
+  if (nom === 'niveaux') construireNiveaux();
+  if (nom === 'depot') construireDepot();
+  if (nom === 'titre' && effacerTitre) effacerTitre.maj();
+  redimensionner();
+}
+
+// ----- Écran des niveaux ---------------------------------------------------
+const GARES = ['campagne', 'montagne', 'port', 'ville'];
+function construireNiveaux() {
+  const liste = $('liste-niveaux');
+  liste.textContent = '';
+  const total = prog.etoiles.reduce((a, b) => a + b, 0);
+  $('total-etoiles').textContent = t('niveaux.etoiles', { n: total, max: NB * 3 });
+  GARES.forEach((g) => {
+    const h = document.createElement('h3'); h.textContent = t('gare.' + g); liste.appendChild(h);
+    const grille = document.createElement('div'); grille.className = 'grille-niveaux';
+    NIVEAUX.forEach((def, i) => {
+      if (def.gare !== g) return;
+      const b = document.createElement('button');
+      b.type = 'button';
+      const ouvert = i < prog.debloque;
+      b.className = 'niv gare-' + g + (ouvert ? '' : ' ferme');
+      const num = document.createElement('span'); num.textContent = String(i + 1); b.appendChild(num);
+      const et = document.createElement('span'); et.className = 'et';
+      if (ouvert) { for (let s = 0; s < 3; s++) et.insertAdjacentHTML('beforeend', SVG_ETOILE(s < prog.etoiles[i])); }
+      else et.innerHTML = SVG_CADENAS;
+      b.appendChild(et);
+      b.setAttribute('aria-label', ouvert ? t('niveau.aria', { n: i + 1 }) + ' · ' + t('fin.etoilesAria', { n: prog.etoiles[i] }) : t('niveau.ferme', { n: i + 1 }));
+      if (ouvert) b.addEventListener('click', () => lancerNiveau(i));
+      else b.disabled = true;
+      grille.appendChild(b);
+    });
+    liste.appendChild(grille);
+  });
+}
+
+// ----- Dépôt ------------------------------------------------------------------
+function construireDepot() {
+  const remplir = (conteneur, type, nombre, dessiner) => {
+    conteneur.textContent = '';
+    for (let i = 0; i < nombre; i++) {
+      const ok = estDebloque(type, i);
+      const choisi = type === 'loco' ? prog.loco === i : prog.palette === i;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'objet' + (choisi ? ' choisi' : '') + (ok ? '' : ' ferme');
+      const c = document.createElement('canvas'); c.width = 216; c.height = 100;
+      const g = c.getContext('2d'); g.scale(2, 2); dessiner(g, i);
+      const nom = document.createElement('span'); nom.textContent = t((type === 'loco' ? 'loco.' : 'palette.') + i);
+      const etat = document.createElement('span'); etat.className = 'etat';
+      etat.textContent = choisi ? t('depot.choisi') : ok ? '' : t('depot.verrou', { n: niveauDeblocage(type, i) + 1 });
+      b.append(c, nom, etat);
+      if (ok) b.addEventListener('click', () => {
+        if (type === 'loco') prog.loco = i; else prog.palette = i;
+        SON.attelage(); sauverOptions(); construireDepot();
+      });
+      else b.disabled = true;
+      conteneur.appendChild(b);
+    }
+  };
+  remplir($('liste-locos'), 'loco', LOCOS.length, (g, i) => {
+    dessinerRails(g, 4, 104, 42);
+    dessinerLoco(g, 18, 26, 72, 34, i, false, 0);
+  });
+  remplir($('liste-palettes'), 'pal', PALETTES.length, (g, i) => {
+    dessinerRails(g, 4, 104, 42);
+    for (let k = 0; k < 3; k++) dessinerWagon(g, 22 + k * 32, 28, 30, 30, '', PALETTES[i][k % PALETTES[i].length], {});
+  });
+}
+
+// ----- Disposition de la gare ------------------------------------------------
+function redimensionner() {
+  DPR = Math.min(2.5, window.devicePixelRatio || 1);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  disposer();
+}
+function disposer() {
+  const cw = Math.min(W, 560), x0 = (W - cw) / 2;
+  if (ecran !== 'jeu' || !partie) {
+    L = { cw, x0, titre: true };
+    decor = dessinerDecor('campagne', { sol: H * 0.66, quai: false });
+    return;
+  }
+  const hud = 56, bas = 78;
+  const nT = partie.trains.length, nV = partie.voies.length;
+  const trainH = Math.max(50, Math.min(64, H * 0.075));
+  let dz = Math.max(92, Math.min(186, H * 0.2));
+  let rowH = (H - hud - dz - nT * trainH - 16 - bas) / nV;
+  if (rowH < 52) { dz = Math.max(70, dz - (52 - rowH) * nV); rowH = (H - hud - dz - nT * trainH - 16 - bas) / nV; }
+  const libre = rowH;
+  rowH = Math.max(40, Math.min(98, rowH));
+  // place restante : un plus grand panneau, puis la gare de triage centrée
+  let surplus = Math.max(0, (libre - rowH) * nV);
+  const bonus = Math.min(surplus / 2, 70, Math.max(0, 250 - dz));
+  dz += bonus; surplus -= bonus;
+  const trainTop = hud + dz;
+  const yardTop = trainTop + nT * trainH + 16 + Math.min(50, surplus / 2);
+  const capMax = Math.max(...partie.voies.map((v) => v.cap));
+  const aiguillage = 46, butoir = 16;
+  const ww = Math.max(34, Math.min(74, (cw - 16 - aiguillage - butoir) / capMax));
+  const wh = Math.max(34, Math.min(rowH * 0.72, ww * 0.92, 66));
+  const locoW = trainH * 1.35;
+  const sw = partie.trains.map((tr) => Math.min(ww * 0.92, (cw - 20 - locoW - 6) / tr.mot.length));
+  L = { cw, x0, hud, bas, dz, trainH, trainTop, yardTop, rowH, ww, wh, locoW, sw,
+    trackLeft: x0 + 8, butoir, aiguillageX: x0 + cw - 8 - aiguillage / 2 };
+  decor = dessinerDecor(partie.def.gare, { sol: trainTop - 8, quai: true });
+}
+const voieY = (i) => L.yardTop + i * L.rowH + L.rowH / 2;
+const slotX = (j) => L.trackLeft + L.butoir + j * L.ww + L.ww / 2;
+const trainY = (k) => L.trainTop + k * L.trainH + L.trainH / 2;
+const trainSlotX = (k, s) => L.x0 + 10 + L.locoW + 4 + s * L.sw[k] + L.sw[k] / 2;
+function panneau(k) {
+  const n = partie.trains.length;
+  const s = Math.max(48, Math.min(L.dz - 18, 168, (L.cw - 30) / n - 14));
+  const cx = n === 1 ? L.x0 + L.cw / 2 : L.x0 + L.cw * (k === 0 ? 0.28 : 0.72);
+  return { cx, cy: L.hud + (L.dz - 6) / 2 + 2, s };
+}
+
+// ----- Dessin : outils ----------------------------------------------------------
+function rr(c, x, y, w, h, r, f, s, lw) {
+  c.beginPath();
+  if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h);
+  if (f) { c.fillStyle = f; c.fill(); }
+  if (s) { c.strokeStyle = s; c.lineWidth = lw || 2; c.stroke(); }
+}
+function cer(c, x, y, r, f, s, lw) {
+  c.beginPath(); c.arc(x, y, Math.max(0.1, r), 0, Math.PI * 2);
+  if (f) { c.fillStyle = f; c.fill(); }
+  if (s) { c.strokeStyle = s; c.lineWidth = lw || 2; c.stroke(); }
+}
+function ell(c, x, y, rx, ry, f, s, lw, rot = 0) {
+  c.beginPath(); c.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), rot, 0, Math.PI * 2);
+  if (f) { c.fillStyle = f; c.fill(); }
+  if (s) { c.strokeStyle = s; c.lineWidth = lw || 2; c.stroke(); }
+}
+function poly(c, pts, f, s, lw) {
+  c.beginPath(); c.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]);
+  c.closePath();
+  if (f) { c.fillStyle = f; c.fill(); }
+  if (s) { c.strokeStyle = s; c.lineWidth = lw || 2; c.lineJoin = 'round'; c.stroke(); }
+}
+function trait(c, pts, s, lw) {
+  c.beginPath(); c.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]);
+  c.strokeStyle = s; c.lineWidth = lw || 2; c.lineCap = 'round'; c.lineJoin = 'round'; c.stroke();
+}
+function etoilePath(c, x, y, R, r, n = 5, rot = -Math.PI / 2) {
+  c.beginPath();
+  for (let i = 0; i < n * 2; i++) {
+    const a = rot + (i * Math.PI) / n, rr2 = i % 2 ? r : R;
+    c.lineTo(x + Math.cos(a) * rr2, y + Math.sin(a) * rr2);
+  }
+  c.closePath();
+}
+function assombrir(hex, k) {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (v) => Math.max(0, Math.min(255, Math.round(v * k)));
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
+
+// ----- Dessin : décors des gares (dessinés une fois) ----------------------------
+const SOLS = { campagne: '#bda57e', montagne: '#9b9a96', port: '#b3a88f', ville: '#3a3f58' };
+function dessinerDecor(gare, opt) {
+  const c0 = document.createElement('canvas');
+  c0.width = Math.max(1, Math.round(W * DPR)); c0.height = Math.max(1, Math.round(H * DPR));
+  const c = c0.getContext('2d');
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const r = hasard(hacher(gare));
+  const sol = opt.sol;
+  const ciel = { campagne: ['#7cc6f2', '#d9f1fb'], montagne: ['#9fc2e6', '#eef4fa'], port: ['#6cb8e8', '#d4ecf8'], ville: ['#070b26', '#29336a'] }[gare];
+  const gr = c.createLinearGradient(0, 0, 0, sol);
+  gr.addColorStop(0, ciel[0]); gr.addColorStop(1, ciel[1]);
+  c.fillStyle = gr; c.fillRect(0, 0, W, sol + 2);
+  if (gare === 'campagne') {
+    cer(c, W * 0.86, sol * 0.25, Math.min(34, sol * 0.12), '#ffe27a');
+    for (let i = 0; i < 3; i++) nuageDecor(c, W * (0.15 + i * 0.3) + r() * 30, sol * (0.18 + r() * 0.2), 0.7 + r() * 0.5);
+    ell(c, W * 0.2, sol + 20, W * 0.45, sol * 0.35, '#8ccf6e');
+    ell(c, W * 0.8, sol + 30, W * 0.5, sol * 0.3, '#74bd5d');
+    for (let i = 0; i < 7; i++) arbre(c, r() * W, sol - 4 - r() * sol * 0.12, 10 + r() * 10, '#3f8f3a');
+    for (let x = 6; x < W; x += 16) trait(c, [x, sol - 2, x, sol - 14], '#fff8e6', 3);
+    trait(c, [0, sol - 10, W, sol - 10], '#fff8e6', 2);
+  } else if (gare === 'montagne') {
+    for (let i = -1; i < 5; i++) {
+      const x = W * (i * 0.26) + r() * 30, h = sol * (0.55 + r() * 0.35), l = W * 0.24 + 50;
+      poly(c, [x - l / 2, sol, x, sol - h, x + l / 2, sol], i % 2 ? '#7f8ea3' : '#94a2b6');
+      poly(c, [x - l * 0.13, sol - h * 0.74, x, sol - h, x + l * 0.13, sol - h * 0.74, x + l * 0.05, sol - h * 0.68, x - l * 0.04, sol - h * 0.72], '#f7fbff');
+    }
+    for (let i = 0; i < 12; i++) arbre(c, r() * W, sol - r() * 10, 12 + r() * 10, '#2d6b45', true);
+  } else if (gare === 'port') {
+    cer(c, W * 0.12, sol * 0.25, Math.min(28, sol * 0.1), '#fff1a8');
+    nuageDecor(c, W * 0.55, sol * 0.2, 0.8); nuageDecor(c, W * 0.85, sol * 0.32, 0.6);
+    c.fillStyle = '#2f86d0'; c.fillRect(0, sol * 0.6, W, sol * 0.4 + 2);
+    for (let i = 0; i < 26; i++) { const x = r() * W, y = sol * (0.64 + r() * 0.32); trait(c, [x, y, x + 10, y - 3, x + 20, y], '#bfe3fb', 2); }
+    // phare au loin
+    poly(c, [W * 0.08, sol * 0.62, W * 0.08 + 18, sol * 0.62, W * 0.08 + 14, sol * 0.3, W * 0.08 + 4, sol * 0.3], '#fff');
+    rr(c, W * 0.08 + 2, sol * 0.4, 14, 6, 0, '#e04848'); rr(c, W * 0.08 + 1, sol * 0.52, 16, 6, 0, '#e04848');
+    cer(c, W * 0.08 + 9, sol * 0.27, 6, '#ffe36b');
+    // grue et bateau
+    trait(c, [W * 0.9, sol * 0.62, W * 0.9, sol * 0.15, W * 0.72, sol * 0.15], '#e8a33a', 4);
+    trait(c, [W * 0.76, sol * 0.15, W * 0.76, sol * 0.38], '#555', 1.5);
+    rr(c, W * 0.73, sol * 0.38, 18, 12, 2, '#d9534f');
+    poly(c, [W * 0.4, sol * 0.6, W * 0.58, sol * 0.6, W * 0.55, sol * 0.68, W * 0.43, sol * 0.68], '#c0392b');
+    rr(c, W * 0.44, sol * 0.52, 18, 8, 1, '#fff'); rr(c, W * 0.5, sol * 0.5, 6, 10, 1, '#555');
+  } else {
+    for (let i = 0; i < 70; i++) cer(c, r() * W, r() * sol * 0.7, r() * 1.4 + 0.4, `rgba(255,255,240,${0.4 + r() * 0.6})`);
+    cer(c, W * 0.84, sol * 0.22, Math.min(26, sol * 0.1), '#fff3c4');
+    cer(c, W * 0.84 + 9, sol * 0.22 - 5, Math.min(24, sol * 0.095), ciel[0]);
+    for (let x = -10; x < W; x += 30 + r() * 30) {
+      const bw = 30 + r() * 34, bh = sol * (0.25 + r() * 0.45);
+      rr(c, x, sol - bh, bw, bh + 2, 2, r() < 0.5 ? '#1b2142' : '#232a50');
+      for (let wy = sol - bh + 8; wy < sol - 10; wy += 12) for (let wx = x + 5; wx < x + bw - 7; wx += 10) if (r() < 0.45) rr(c, wx, wy, 5, 6, 1, '#ffd36b');
+    }
+  }
+  // sol de la gare
+  c.fillStyle = SOLS[gare]; c.fillRect(0, sol, W, H - sol);
+  for (let i = 0; i < W * H / 260; i++) {
+    c.fillStyle = `rgba(${gare === 'ville' ? '200,200,230' : '60,45,30'},${0.08 + r() * 0.12})`;
+    c.fillRect(r() * W, sol + r() * (H - sol), 2, 2);
+  }
+  if (opt.quai && partie) {
+    // quai de pierre sous les trains
+    const q0 = L.trainTop - 8, q1 = L.trainTop + partie.trains.length * L.trainH + 4;
+    c.fillStyle = gare === 'ville' ? '#5b6080' : '#cfc6b4'; c.fillRect(0, q0, W, q1 - q0);
+    c.fillStyle = '#f2c94c'; c.fillRect(0, q0, W, 4);
+    for (let k = 0; k < partie.trains.length; k++) dessinerRails(c, 0, W, trainY(k) + L.trainH * 0.36);
+    // voies de la gare de triage
+    partie.voies.forEach((v, i) => dessinerVoie(c, v, i, gare));
+    // aiguillage : la voie qui remonte vers le quai
+    const xA = L.aiguillageX, yb = voieY(partie.voies.length - 1) + L.wh * 0.5;
+    trait(c, [xA, yb, xA, L.trainTop + partie.trains.length * L.trainH - 6], '#5d5d5d', 5);
+    trait(c, [xA + 7, yb, xA + 7, L.trainTop + partie.trains.length * L.trainH - 6], '#5d5d5d', 3);
+  } else if (!opt.quai) {
+    dessinerRails(c, 0, W, H * 0.74 + Math.min(70, H * 0.09) * 0.48 + 2);
+  }
+  return c0;
+}
+function nuageDecor(c, x, y, k) {
+  cer(c, x, y, 14 * k, '#fff'); cer(c, x + 16 * k, y - 6 * k, 18 * k, '#fff'); cer(c, x + 34 * k, y, 13 * k, '#fff');
+  rr(c, x - 2 * k, y, 40 * k, 12 * k, 6 * k, '#fff');
+}
+function arbre(c, x, y, s, coul, sapin) {
+  if (sapin) { poly(c, [x - s * 0.6, y, x, y - s * 1.8, x + s * 0.6, y], coul); rr(c, x - 2, y, 4, 5, 0, '#5b3a1e'); }
+  else { rr(c, x - 2, y - s * 0.5, 4, s * 0.6, 0, '#6b4423'); cer(c, x, y - s * 0.9, s * 0.6, coul); }
+}
+function dessinerRails(c, x1, x2, y) {
+  for (let x = x1 + 4; x < x2; x += 12) rr(c, x, y - 3, 6, 9, 1, '#7a5534');
+  c.fillStyle = '#6a6a6a'; c.fillRect(x1, y - 2, x2 - x1, 3); c.fillRect(x1, y + 4, x2 - x1, 3);
+}
+function dessinerVoie(c, v, i, gare) {
+  const y = voieY(i), yr = y + L.wh * 0.47 + 1;
+  const debut = L.trackLeft, finVoie = slotX(v.cap - 1) + L.ww / 2 + 2;
+  // bande de la voie
+  rr(c, debut - 2, y - L.wh * 0.62, finVoie - debut + 4, L.wh * 1.18, 10,
+    v.type === 'garage' ? 'rgba(242,201,76,.22)' : v.type === 'tunnel' ? 'rgba(20,20,30,.28)' : 'rgba(255,255,255,.12)');
+  dessinerRails(c, debut, L.aiguillageX, yr);
+  // emplacements (traverses marquées)
+  for (let j = 0; j < v.cap; j++) rr(c, slotX(j) - L.ww * 0.42, yr - 7, L.ww * 0.84, 3, 1, 'rgba(255,255,255,.35)');
+  // butoir
+  if (v.type === 'garage') {
+    for (let k = 0; k < 4; k++) rr(c, debut + 1, y - L.wh * 0.35 + k * L.wh * 0.2, 11, L.wh * 0.2, 0, k % 2 ? '#222' : '#f2c94c');
+  } else if (v.type === 'tunnel') {
+    // entrée du tunnel (rochers) à gauche
+    c.beginPath();
+    c.moveTo(debut - 8, yr + 8); c.lineTo(debut - 8, y - L.wh * 0.8);
+    c.quadraticCurveTo(debut + 14, y - L.wh * 1.0, debut + 22, y - L.wh * 0.4);
+    c.lineTo(debut + 22, yr + 8); c.closePath();
+    c.fillStyle = gare === 'ville' ? '#4a4f6a' : '#7a7266'; c.fill();
+    c.beginPath(); c.arc(debut + 14, yr + 6, L.wh * 0.62, Math.PI, Math.PI * 1.5); c.lineTo(debut + 14, yr + 6); c.closePath();
+    c.fillStyle = '#16141a'; c.fill();
+  } else {
+    rr(c, debut + 1, y - L.wh * 0.3, 10, L.wh * 0.66, 2, '#c0392b');
+  }
+  // levier d'aiguillage
+  cer(c, L.aiguillageX, yr, 6, '#444'); trait(c, [L.aiguillageX, yr, L.aiguillageX + 8, yr - 12], '#c0392b', 3);
+}
+
+// ----- Dessin : wagons et locomotives ------------------------------------------------
+function dessinerWagon(c, x, y, w, h, lettres, coul, o) {
+  const bw = w * 0.9, bh = h * 0.74;
+  const x0 = x - bw / 2, y0 = y - h / 2;
+  if (o.lueur) { c.save(); c.shadowColor = o.lueur; c.shadowBlur = 16; rr(c, x0, y0, bw, bh, 7, o.lueur); c.restore(); }
+  const corps = o.cache ? '#2b2833' : coul;
+  rr(c, x0, y0, bw, bh, 7, corps, '#2a1a0e', 2);
+  rr(c, x0 + 3, y0 + 3, bw - 6, bh * 0.2, 4, 'rgba(255,255,255,.22)');
+  // roues et attelage
+  const ry = y0 + bh + h * 0.1;
+  cer(c, x - bw * 0.27, ry, h * 0.12, '#2d2d2d', '#111', 1);
+  cer(c, x + bw * 0.27, ry, h * 0.12, '#2d2d2d', '#111', 1);
+  rr(c, x0 - w * 0.06, y0 + bh * 0.62, w * 0.06, 4, 1, '#333');
+  rr(c, x0 + bw, y0 + bh * 0.62, w * 0.06, 4, 1, '#333');
+  if (o.cache || !lettres) return;
+  const l = Array.from(lettres);
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.lineJoin = 'round';
+  if (l.length === 1) {
+    const fs = Math.min(bh * 0.78, bw * 0.75);
+    c.font = `900 ${fs}px ui-rounded, "Segoe UI", system-ui, sans-serif`;
+    c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = '#1d140b'; c.strokeText(l[0], x, y0 + bh * 0.56);
+    c.fillStyle = '#fffdf5'; c.fillText(l[0], x, y0 + bh * 0.56);
+  } else {
+    const fs = Math.min(bh * 0.62, bw * 0.42);
+    c.font = `900 ${fs}px ui-rounded, "Segoe UI", system-ui, sans-serif`;
+    c.lineWidth = Math.max(3, fs * 0.16); c.strokeStyle = '#1d140b';
+    c.strokeText(l[0], x - bw * 0.22, y0 + bh * 0.56); c.strokeText(l[1], x + bw * 0.22, y0 + bh * 0.56);
+    c.fillStyle = '#fffdf5';
+    c.fillText(l[0], x - bw * 0.22, y0 + bh * 0.56); c.fillText(l[1], x + bw * 0.22, y0 + bh * 0.56);
+    c.setLineDash([3, 3]); trait(c, [x, y0 + 4, x, y0 + bh - 4], 'rgba(255,255,255,.8)', 2); c.setLineDash([]);
+  }
+}
+// Locomotive : x, y = coin haut-gauche de la zone, w × h ; versGauche : tournée vers la gauche.
+function dessinerLoco(c, x, y, w, h, idx, versGauche, drapeau) {
+  const L0 = LOCOS[idx] || LOCOS[0], col = L0.c, fonce = assombrir(col.startsWith('#') ? col : '#888888', 0.7);
+  c.save();
+  if (versGauche) { c.translate(x + w, y); c.scale(-1, 1); } else c.translate(x, y);
+  const roue = (rx, rr2) => { cer(c, rx, h * 0.84, rr2, '#2b2b2b', '#111', 1); cer(c, rx, h * 0.84, rr2 * 0.35, '#c0392b'); };
+  if (L0.forme === 'vapeur') {
+    rr(c, 0, h * 0.08, w * 0.34, h * 0.66, 4, col, '#2a1a0e', 2);
+    rr(c, w * 0.06, h * 0.16, w * 0.2, h * 0.22, 3, '#bfe7ff');
+    rr(c, -2, h * 0.02, w * 0.38, h * 0.1, 3, fonce);
+    rr(c, w * 0.32, h * 0.32, w * 0.6, h * 0.42, h * 0.2, col, '#2a1a0e', 2);
+    rr(c, w * 0.68, h * 0.06, w * 0.1, h * 0.3, 2, '#2b2b2b');
+    rr(c, w * 0.65, h * 0.02, w * 0.16, h * 0.08, 2, '#2b2b2b');
+    cer(c, w * 0.5, h * 0.3, h * 0.08, '#e8c547');
+    poly(c, [w * 0.9, h * 0.66, w * 1.02, h * 0.92, w * 0.84, h * 0.92], '#c0392b');
+    cer(c, w * 0.93, h * 0.5, h * 0.07, '#fff6b0');
+    roue(w * 0.2, h * 0.14); roue(w * 0.48, h * 0.14); roue(w * 0.72, h * 0.14);
+  } else if (L0.forme === 'diesel' || L0.forme === 'elec') {
+    rr(c, 0, h * 0.14, w * 0.98, h * 0.6, h * 0.14, col, '#2a1a0e', 2);
+    rr(c, 2, h * 0.5, w * 0.94, h * 0.08, 0, 'rgba(255,255,255,.75)');
+    rr(c, w * 0.78, h * 0.2, w * 0.15, h * 0.22, 3, '#bfe7ff');
+    rr(c, w * 0.08, h * 0.2, w * 0.15, h * 0.22, 3, '#bfe7ff');
+    for (let k = 0; k < 3; k++) rr(c, w * (0.32 + k * 0.13), h * 0.22, w * 0.08, h * 0.16, 2, fonce);
+    if (L0.forme === 'elec') {
+      trait(c, [w * 0.35, h * 0.14, w * 0.45, -h * 0.08, w * 0.55, h * 0.14], '#333', 2);
+      trait(c, [w * 0.38, -h * 0.08, w * 0.52, -h * 0.08], '#333', 2);
+    }
+    cer(c, w * 0.95, h * 0.62, h * 0.06, '#fff6b0');
+    roue(w * 0.15, h * 0.12); roue(w * 0.32, h * 0.12); roue(w * 0.68, h * 0.12); roue(w * 0.85, h * 0.12);
+  } else {
+    c.beginPath(); c.moveTo(0, h * 0.16); c.lineTo(w * 0.55, h * 0.16);
+    c.quadraticCurveTo(w * 0.95, h * 0.2, w * 1.02, h * 0.72); c.lineTo(0, h * 0.74); c.closePath();
+    c.fillStyle = col; c.fill(); c.strokeStyle = '#2a1a0e'; c.lineWidth = 2; c.stroke();
+    c.beginPath(); c.moveTo(w * 0.6, h * 0.24); c.quadraticCurveTo(w * 0.86, h * 0.3, w * 0.92, h * 0.46); c.lineTo(w * 0.6, h * 0.46); c.closePath();
+    c.fillStyle = '#26324a'; c.fill();
+    rr(c, 0, h * 0.54, w * 0.98, h * 0.07, 0, '#d63031');
+    for (let k = 0; k < 3; k++) rr(c, w * (0.06 + k * 0.15), h * 0.26, w * 0.1, h * 0.16, 2, '#26324a');
+    roue(w * 0.18, h * 0.11); roue(w * 0.36, h * 0.11); roue(w * 0.72, h * 0.11);
+  }
+  if (drapeau) { trait(c, [w * 0.1, h * 0.08, w * 0.1, -h * 0.25], '#333', 2); poly(c, [w * 0.1, -h * 0.25, w * 0.3, -h * 0.17, w * 0.1, -h * 0.09], drapeau, '#333', 1); }
+  c.restore();
+}
+function chemineeLoco(x, y, w, h, idx, versGauche) {
+  const L0 = LOCOS[idx] || LOCOS[0];
+  if (L0.forme !== 'vapeur') return null;
+  const lx = w * 0.73;
+  return { x: versGauche ? x + w - lx : x + lx, y: y + h * 0.02 };
+}
+
+// ----- Dessin : les dessins des mots (dans un carré de 100 × 100) -----------------------
+const TRAIT = '#3b2a17';
+const DESSINS = {
+  velo(c) {
+    cer(c, 26, 66, 17, null, '#333', 5); cer(c, 74, 66, 17, null, '#333', 5);
+    cer(c, 26, 66, 3, '#999'); cer(c, 74, 66, 3, '#999');
+    trait(c, [26, 66, 48, 66, 40, 40, 26, 66], '#d63031', 5); trait(c, [40, 40, 66, 40, 48, 66], '#d63031', 5);
+    trait(c, [66, 40, 74, 66], '#d63031', 5); trait(c, [66, 40, 62, 28, 72, 26], '#333', 4);
+    rr(c, 32, 33, 16, 6, 3, '#333');
+  },
+  lapin(c) {
+    ell(c, 56, 68, 24, 18, '#f4f1ec', TRAIT, 3);
+    ell(c, 30, 22, 6, 17, '#f4f1ec', TRAIT, 3, -0.2); ell(c, 44, 20, 6, 17, '#f4f1ec', TRAIT, 3, 0.2);
+    ell(c, 30, 22, 2.5, 11, '#f7b6c8', null, 0, -0.2); ell(c, 44, 20, 2.5, 11, '#f7b6c8', null, 0, 0.2);
+    cer(c, 36, 48, 15, '#f4f1ec', TRAIT, 3); cer(c, 32, 46, 2.5, '#222'); cer(c, 23, 51, 2.5, '#f06292');
+    cer(c, 80, 62, 6, '#fff', TRAIT, 2); ell(c, 44, 84, 8, 4, '#f4f1ec', TRAIT, 2);
+  },
+  pomme(c) {
+    ell(c, 50, 60, 30, 28, '#e2383f', '#7a1a1a', 3);
+    ell(c, 39, 50, 6, 10, 'rgba(255,255,255,.5)');
+    trait(c, [50, 34, 54, 18], '#6b4423', 5);
+    ell(c, 64, 22, 10, 5, '#4caf50', '#2e7d32', 2, -0.5);
+  },
+  canard(c) {
+    c.fillStyle = '#7cc4ec'; c.fillRect(4, 74, 92, 20);
+    trait(c, [8, 80, 22, 77, 36, 80], '#e6f5fd', 2); trait(c, [62, 86, 76, 83, 90, 86], '#e6f5fd', 2);
+    c.beginPath(); c.moveTo(20, 62); c.quadraticCurveTo(24, 86, 56, 84); c.quadraticCurveTo(84, 84, 88, 56);
+    c.quadraticCurveTo(76, 64, 66, 58); c.quadraticCurveTo(44, 52, 20, 62); c.closePath();
+    c.fillStyle = '#f6c945'; c.fill(); c.strokeStyle = TRAIT; c.lineWidth = 3; c.stroke();
+    ell(c, 56, 70, 16, 8, '#e0a91c', TRAIT, 2, -0.15);
+    cer(c, 30, 42, 14, '#f6c945', TRAIT, 3);
+    poly(c, [14, 42, 2, 47, 14, 51], '#f08a24', TRAIT, 2);
+    cer(c, 27, 38, 2.6, '#222');
+  },
+  maison(c) {
+    rr(c, 24, 46, 52, 42, 2, '#f4e1c1', TRAIT, 3);
+    rr(c, 62, 22, 8, 18, 1, '#a33', TRAIT, 2);
+    poly(c, [16, 50, 50, 18, 84, 50], '#d9534f', TRAIT, 3);
+    rr(c, 44, 62, 13, 26, 2, '#8b5a2b', TRAIT, 2);
+    rr(c, 29, 55, 11, 11, 1, '#9fd3f0', TRAIT, 2); rr(c, 61, 55, 11, 11, 1, '#9fd3f0', TRAIT, 2);
+  },
+  sapin(c) {
+    rr(c, 44, 76, 12, 14, 1, '#7a4b25', TRAIT, 2);
+    poly(c, [50, 42, 84, 78, 16, 78], '#2e7d32', TRAIT, 3);
+    poly(c, [50, 26, 76, 58, 24, 58], '#388e3c', TRAIT, 3);
+    poly(c, [50, 12, 68, 40, 32, 40], '#43a047', TRAIT, 3);
+    cer(c, 40, 66, 3, '#e53935'); cer(c, 60, 70, 3, '#fdd835'); cer(c, 54, 50, 3, '#e53935'); cer(c, 44, 34, 3, '#fdd835');
+  },
+  nuage(c) {
+    const f = (col, d) => { cer(c, 32, 58, 16 + d, col); cer(c, 52, 46, 21 + d, col); cer(c, 70, 58, 15 + d, col); rr(c, 26 - d, 56 - d, 52 + 2 * d, 18 + 2 * d, 9, col); };
+    f(TRAIT, 3); f('#ffffff', 0);
+    trait(c, [34, 82, 30, 92], '#4fa3e0', 3); trait(c, [52, 82, 48, 92], '#4fa3e0', 3); trait(c, [70, 82, 66, 92], '#4fa3e0', 3);
+  },
+  etoile(c) {
+    etoilePath(c, 50, 54, 40, 17); c.fillStyle = '#f6c945'; c.fill(); c.strokeStyle = '#b8860b'; c.lineWidth = 3; c.stroke();
+    cer(c, 43, 52, 3, '#3b2a17'); cer(c, 57, 52, 3, '#3b2a17');
+    c.beginPath(); c.arc(50, 58, 6, 0.2, Math.PI - 0.2); c.strokeStyle = '#3b2a17'; c.lineWidth = 2.5; c.stroke();
+  },
+  escargot(c) {
+    ell(c, 50, 78, 36, 9, '#c5dc7a', TRAIT, 3);
+    ell(c, 20, 66, 8, 15, '#c5dc7a', TRAIT, 3, -0.3);
+    trait(c, [16, 54, 10, 40], TRAIT, 2); trait(c, [22, 53, 24, 38], TRAIT, 2); cer(c, 10, 40, 3, TRAIT); cer(c, 24, 38, 3, TRAIT);
+    cer(c, 58, 54, 23, '#d98c3a', '#7a4a1a', 3);
+    c.beginPath();
+    for (let a = 0; a < Math.PI * 4.2; a += 0.15) { const rs = 2 + a * 1.55; c.lineTo(58 + Math.cos(a) * rs, 54 + Math.sin(a) * rs); }
+    c.strokeStyle = '#7a4a1a'; c.lineWidth = 2.5; c.stroke();
+  },
+  chateau(c) {
+    rr(c, 30, 46, 40, 42, 0, '#c3c7cf', TRAIT, 3);
+    rr(c, 14, 32, 20, 56, 0, '#b0b5bd', TRAIT, 3); rr(c, 66, 32, 20, 56, 0, '#b0b5bd', TRAIT, 3);
+    for (const x of [14, 26, 66, 78]) rr(c, x, 25, 8, 8, 0, '#b0b5bd', TRAIT, 2);
+    for (const x of [32, 46, 60]) rr(c, x, 40, 8, 7, 0, '#c3c7cf', TRAIT, 2);
+    c.beginPath(); c.moveTo(42, 88); c.lineTo(42, 70); c.arc(50, 70, 8, Math.PI, 0); c.lineTo(58, 88); c.closePath();
+    c.fillStyle = '#8b5a2b'; c.fill(); c.strokeStyle = TRAIT; c.lineWidth = 2; c.stroke();
+    trait(c, [24, 25, 24, 8], TRAIT, 2); poly(c, [24, 8, 36, 12, 24, 16], '#e53935');
+    trait(c, [76, 25, 76, 8], TRAIT, 2); poly(c, [76, 8, 88, 12, 76, 16], '#1e88e5');
+    rr(c, 20, 48, 6, 10, 2, '#3b4a6b'); rr(c, 72, 48, 6, 10, 2, '#3b4a6b');
+  },
+  ancre(c) {
+    cer(c, 50, 16, 7, null, '#455a64', 6);
+    trait(c, [50, 23, 50, 84], '#455a64', 7); trait(c, [34, 34, 66, 34], '#455a64', 7);
+    c.beginPath(); c.arc(50, 56, 30, 0.25, Math.PI - 0.25); c.strokeStyle = '#455a64'; c.lineWidth = 7; c.stroke();
+    poly(c, [76, 58, 88, 54, 82, 68], '#455a64'); poly(c, [24, 58, 12, 54, 18, 68], '#455a64');
+  },
+  mouette(c) {
+    rr(c, 40, 72, 16, 24, 2, '#8b5a2b', TRAIT, 2);
+    trait(c, [46, 64, 44, 73], '#f08a24', 3); trait(c, [54, 64, 54, 73], '#f08a24', 3);
+    poly(c, [70, 50, 94, 42, 90, 56], '#ffffff', TRAIT, 2);
+    ell(c, 52, 54, 26, 13, '#ffffff', TRAIT, 3);
+    poly(c, [44, 50, 66, 30, 82, 52], '#9aa7b4', TRAIT, 2.5);
+    poly(c, [70, 37, 66, 30, 75, 35], '#2b2b2b');
+    cer(c, 28, 40, 12, '#ffffff', TRAIT, 3);
+    poly(c, [16, 40, 2, 44, 16, 46], '#f6c945', TRAIT, 1.5);
+    cer(c, 25, 37, 2.4, '#222');
+  },
+  bateau(c) {
+    c.fillStyle = '#4fa3e0'; c.fillRect(4, 78, 92, 16);
+    for (let x = 6; x < 92; x += 16) trait(c, [x, 80, x + 8, 76, x + 16, 80], '#bfe3fb', 2);
+    poly(c, [14, 62, 86, 62, 74, 80, 26, 80], '#c0392b', TRAIT, 3);
+    trait(c, [50, 62, 50, 12], '#6b4423', 4);
+    poly(c, [53, 16, 53, 56, 82, 56], '#fff', TRAIT, 2);
+    poly(c, [47, 22, 47, 56, 24, 56], '#fdf0c8', TRAIT, 2);
+    poly(c, [50, 12, 62, 15, 50, 18], '#f2b632');
+    cer(c, 36, 70, 3, '#fff'); cer(c, 50, 70, 3, '#fff'); cer(c, 64, 70, 3, '#fff');
+  },
+  poisson(c) {
+    poly(c, [70, 50, 92, 32, 88, 50, 92, 68], '#f39c12', '#a35f00', 3);
+    ell(c, 46, 50, 30, 20, '#f5a623', '#a35f00', 3);
+    poly(c, [40, 31, 54, 22, 58, 33], '#f39c12', '#a35f00', 2);
+    cer(c, 30, 45, 5, '#fff', TRAIT, 1.5); cer(c, 29, 45, 2.4, '#222');
+    c.beginPath(); c.arc(50, 50, 12, -1, 1); c.strokeStyle = '#d4801a'; c.lineWidth = 2.5; c.stroke();
+    c.beginPath(); c.arc(60, 50, 10, -1, 1); c.stroke();
+    cer(c, 14, 30, 4, null, '#4fa3e0', 2); cer(c, 8, 18, 3, null, '#4fa3e0', 2);
+  },
+  guitare(c) {
+    rr(c, 46, 10, 8, 44, 2, '#6b4423', TRAIT, 2);
+    rr(c, 43, 4, 14, 12, 3, '#4a2a10');
+    cer(c, 50, 56, 16, '#d98c3a', TRAIT, 3); cer(c, 50, 76, 21, '#d98c3a', TRAIT, 3);
+    ell(c, 50, 64, 14, 10, '#d98c3a');
+    cer(c, 50, 64, 6, '#4a2a10'); rr(c, 41, 80, 18, 4, 1, '#4a2a10');
+    for (const x of [47, 50, 53]) trait(c, [x, 8, x, 82], '#f4f1ec', 1);
+  },
+  crabe(c) {
+    for (const s of [-1, 1]) {
+      for (let k = 0; k < 3; k++) trait(c, [50 + s * 20, 62 + k * 5, 50 + s * 36, 70 + k * 7], '#c0392b', 3);
+      trait(c, [50 + s * 22, 54, 50 + s * 30, 40], '#c0392b', 4);
+      cer(c, 50 + s * 32, 32, 10, '#e74c3c', '#962d22', 2);
+      poly(c, [50 + s * 32, 30, 50 + s * 42, 22, 50 + s * 42, 30], '#fdf6e3');
+      trait(c, [50 + s * 8, 50, 50 + s * 10, 38], '#962d22', 3);
+      cer(c, 50 + s * 10, 36, 5, '#fff', TRAIT, 1.5); cer(c, 50 + s * 10, 36, 2.2, '#222');
+    }
+    ell(c, 50, 60, 26, 16, '#e74c3c', '#962d22', 3);
+    c.beginPath(); c.arc(50, 60, 8, 0.3, Math.PI - 0.3); c.strokeStyle = '#7a1f16'; c.lineWidth = 2.5; c.stroke();
+  },
+  vague(c) {
+    c.beginPath(); c.moveTo(6, 90); c.lineTo(6, 64);
+    c.bezierCurveTo(20, 30, 58, 14, 80, 32); c.bezierCurveTo(92, 44, 80, 60, 66, 54);
+    c.bezierCurveTo(58, 50, 60, 40, 68, 40); c.bezierCurveTo(54, 34, 34, 50, 40, 74); c.lineTo(94, 74); c.lineTo(94, 90); c.closePath();
+    c.fillStyle = '#2e86de'; c.fill(); c.strokeStyle = '#1b4f8a'; c.lineWidth = 3; c.stroke();
+    cer(c, 80, 32, 5, '#fff'); cer(c, 70, 27, 4, '#fff'); cer(c, 86, 40, 4, '#fff');
+    trait(c, [10, 82, 24, 78, 38, 82, 52, 78, 66, 82, 80, 78, 92, 82], '#bfe3fb', 3);
+  },
+  fusee(c) {
+    poly(c, [40, 70, 50, 96, 60, 70], '#ffa726'); poly(c, [45, 70, 50, 88, 55, 70], '#ffeb3b');
+    poly(c, [36, 54, 22, 76, 36, 72], '#e53935', TRAIT, 2); poly(c, [64, 54, 78, 76, 64, 72], '#e53935', TRAIT, 2);
+    c.beginPath(); c.moveTo(50, 6); c.quadraticCurveTo(70, 26, 66, 72); c.lineTo(34, 72); c.quadraticCurveTo(30, 26, 50, 6); c.closePath();
+    c.fillStyle = '#eceff1'; c.fill(); c.strokeStyle = TRAIT; c.lineWidth = 3; c.stroke();
+    c.beginPath(); c.moveTo(50, 6); c.quadraticCurveTo(60, 15, 63, 24); c.lineTo(37, 24); c.quadraticCurveTo(40, 15, 50, 6); c.closePath();
+    c.fillStyle = '#e53935'; c.fill();
+    cer(c, 50, 42, 8, '#4fc3f7', '#455a64', 3);
+  },
+  camion(c) {
+    rr(c, 8, 30, 54, 38, 3, '#3498db', TRAIT, 3);
+    rr(c, 62, 42, 28, 26, 4, '#e74c3c', TRAIT, 3);
+    rr(c, 68, 46, 14, 11, 2, '#bfe9ff', TRAIT, 2);
+    rr(c, 8, 64, 82, 6, 2, '#555');
+    cer(c, 26, 74, 9, '#333', '#111', 2); cer(c, 74, 74, 9, '#333', '#111', 2);
+    cer(c, 26, 74, 3, '#bbb'); cer(c, 74, 74, 3, '#bbb');
+    rr(c, 16, 38, 38, 4, 2, 'rgba(255,255,255,.5)');
+  },
+  lanterne(c) {
+    c.save(); c.shadowColor = '#ffd54f'; c.shadowBlur = 18; rr(c, 34, 30, 32, 44, 4, '#ffd54f'); c.restore();
+    c.beginPath(); c.arc(50, 18, 10, Math.PI, 0); c.strokeStyle = TRAIT; c.lineWidth = 3; c.stroke();
+    poly(c, [30, 30, 50, 18, 70, 30], '#37474f', TRAIT, 2);
+    rr(c, 34, 30, 32, 44, 3, null, '#37474f', 4);
+    trait(c, [50, 30, 50, 74], '#37474f', 3);
+    ell(c, 50, 56, 5, 9, '#ff9800'); ell(c, 50, 58, 2.5, 5, '#fff59d');
+    rr(c, 30, 74, 40, 8, 2, '#37474f');
+  },
+  hibou(c) {
+    rr(c, 10, 86, 80, 6, 3, '#6b4423');
+    poly(c, [28, 30, 30, 14, 40, 26], '#8d6e63', TRAIT, 2); poly(c, [72, 30, 70, 14, 60, 26], '#8d6e63', TRAIT, 2);
+    ell(c, 50, 56, 26, 32, '#8d6e63', TRAIT, 3);
+    ell(c, 50, 66, 16, 18, '#d7ccc8');
+    cer(c, 40, 44, 10, '#fff', TRAIT, 2); cer(c, 60, 44, 10, '#fff', TRAIT, 2);
+    cer(c, 40, 44, 4.5, '#222'); cer(c, 60, 44, 4.5, '#222');
+    poly(c, [46, 52, 54, 52, 50, 60], '#ffb300', TRAIT, 1.5);
+    trait(c, [42, 86, 42, 82], '#ffb300', 3); trait(c, [58, 86, 58, 82], '#ffb300', 3);
+  },
+  lune(c) {
+    cer(c, 48, 52, 34, '#ffe082', '#c9a227', 3);
+    cer(c, 64, 42, 30, '#fdf6e3');
+    cer(c, 30, 62, 4, '#f5d061'); cer(c, 36, 76, 3, '#f5d061');
+    c.fillStyle = '#f6c945'; etoilePath(c, 78, 76, 7, 3); c.fill(); etoilePath(c, 84, 18, 5, 2); c.fill();
+  },
+  parapluie(c) {
+    c.beginPath(); c.arc(50, 50, 38, Math.PI, 0);
+    for (let k = 0; k < 4; k++) c.arc(78.5 - k * 19, 50, 9.5, 0, Math.PI, true);
+    c.closePath();
+    c.fillStyle = '#8e44ad'; c.fill(); c.strokeStyle = TRAIT; c.lineWidth = 3; c.stroke();
+    c.beginPath(); c.moveTo(50, 12); c.quadraticCurveTo(40, 30, 40.5, 50); c.lineTo(59.5, 50); c.quadraticCurveTo(60, 30, 50, 12); c.closePath();
+    c.fillStyle = '#f2b632'; c.fill();
+    trait(c, [50, 50, 50, 84], TRAIT, 4);
+    c.beginPath(); c.arc(43, 84, 7, 0, Math.PI); c.strokeStyle = TRAIT; c.lineWidth = 4; c.stroke();
+    trait(c, [50, 12, 50, 6], TRAIT, 3);
+  },
+};
+function dessinerPanneau(k, temps) {
+  const p = panneau(k), s = p.s;
+  const x = p.cx - s / 2, y = p.cy - s / 2;
+  // poteaux
+  const hp = Math.max(0, L.trainTop - 8 - (y + s - 4));
+  if (hp > 0) {
+    rr(ctx, p.cx - s * 0.3, y + s - 4, 6, hp, 0, '#5b3a1e');
+    rr(ctx, p.cx + s * 0.3 - 6, y + s - 4, 6, hp, 0, '#5b3a1e');
+  }
+  const tr = partie.trains[k];
+  const fini = tr.prog >= tr.mot.length;
+  rr(ctx, x, y, s, s, 14, '#fdf6e3', partie.trains.length > 1 ? COULEURS_TRAINS[k] : '#7a4a1a', 6);
+  ctx.save();
+  ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x + 4, y + 4, s - 8, s - 8, 10); else ctx.rect(x + 4, y + 4, s - 8, s - 8); ctx.clip();
+  const bounce = fini ? Math.sin(temps * 8) * 0.04 : 0;
+  ctx.translate(p.cx, p.cy); ctx.scale((s - 12) / 100 * (1 + bounce), (s - 12) / 100 * (1 + bounce)); ctx.translate(-50, -50);
+  const f = DESSINS[partie.def.mots[k]]; if (f) f(ctx);
+  ctx.restore();
+  if (fini) { ctx.save(); ctx.globalAlpha = 0.9; cer(ctx, x + s - 8, y + 8, 13, '#4caf50', '#fff', 3); trait(ctx, [x + s - 14, y + 8, x + s - 9, y + 13, x + s - 2, y + 3], '#fff', 3); ctx.restore(); }
+}
+
+// ----- Partie ---------------------------------------------------------------------------
+let niveauCourant = null; // niveau lancé (même pendant le calcul de la gare)
+function lancerNiveau(index) {
+  index = Math.max(0, Math.min(NB - 1, index));
+  niveauCourant = index;
+  $('fin').hidden = true; $('pause').hidden = true; enPause = false;
+  $('chargement').hidden = false;
+  montrer('jeu');
+  partie = null;
+  // laisse le message « Le train arrive » s'afficher avant le calcul
+  setTimeout(() => {
+    const g = fabriquerGare(index);
+    $('chargement').hidden = true;
+    if (!g) { montrer('niveaux'); return; }
+    const def = NIVEAUX[index];
+    partie = {
+      index, def,
+      voies: g.voies.map((v, i) => ({ type: v.type, cap: v.cap, wagons: g.piles[i].map((l) => ({ id: ++idWagon, l })) })),
+      trains: g.mots.map((m, k) => ({ mot: m, prog: 0, wagons: [], depart: null, secousse: -9, couleur: COULEURS_TRAINS[k] })),
+      solveur: creerSolveur(g.voies.map((v) => v.cap), g.mots),
+      par: g.par, budget: g.par + def.marge, deplacements: 0,
+      limite: def.cloche ? 25 + g.par * 5 : 0, reste: def.cloche ? 25 + g.par * 5 : 0, dernierTic: 99,
+      indiceUtilise: false, fini: null, tFin: 0, selection: null, drag: null, curseur: 0, clavier: false,
+      main: null, mainTuto: false, demarre: false, fumee: 0,
+    };
+    partie.curseur = partie.trains.length;
+    $('hud-niveau').textContent = t('hud.niveau', { n: index + 1 });
+    $('hud-gare').textContent = t('gare.' + def.gare);
+    $('cloche').hidden = !def.cloche;
+    majHud();
+    disposer();
+    if (def.tuto) {
+      $('bulle').textContent = t('tuto.' + def.tuto);
+      $('bulle').hidden = false;
+      if (g.premier) { partie.main = g.premier; partie.mainTuto = true; }
+      // Niveau des ciseaux : la main montre d'abord la coupe d'un wagon à double lettre.
+      if (def.tuto === 13) {
+        const i = partie.voies.findIndex((v) => v.wagons.length && v.wagons.length < v.cap && Array.from(v.wagons[v.wagons.length - 1].l).length > 1);
+        if (i >= 0) { partie.main = { type: 'coupe', de: i }; partie.mainTuto = true; }
+      }
+    }
+    else if (def.cloche) message('msg.cloche');
+  }, 30);
+}
+function etatSolveur() {
+  return {
+    piles: partie.voies.map((v) => v.wagons.map((w) => w.l)),
+    av: partie.trains.map((tr) => tr.prog),
+  };
+}
+function majHud() {
+  if (!partie) return;
+  const reste = Math.max(0, partie.budget - partie.deplacements);
+  $('vapeur-n').textContent = String(reste);
+  $('vapeur').setAttribute('aria-label', t('hud.vapeur', { n: reste }));
+  $('vapeur').classList.toggle('bas', reste <= 3 && !partie.fini);
+  if (partie.def.cloche) {
+    const s = Math.ceil(Math.max(0, partie.reste));
+    $('cloche-n').textContent = String(s);
+    $('cloche').setAttribute('aria-label', t('hud.temps', { n: s }));
+    $('cloche').classList.toggle('bas', s <= 10);
+  }
+}
+function premierGeste() {
+  if (!partie) return;
+  if (!partie.demarre) { partie.demarre = true; if (partie.def.cloche) SON.cloche(); }
+  $('bulle').hidden = true;
+  if (partie.mainTuto) { partie.main = null; partie.mainTuto = false; }
+}
+function marquerPosition(w) { w.ax = w.px; w.ay = w.py; w.at = horloge; }
+
+// Déplace le wagon du bout de la voie « de » vers une cible ({type:'voie', i} ou {type:'train', k}).
+function deplacer(de, cible) {
+  if (!partie || partie.fini) return false;
+  const v = partie.voies[de];
+  if (!v || !v.wagons.length) { message('msg.vide'); return false; }
+  const w = v.wagons[v.wagons.length - 1];
+  if (cible.type === 'voie') {
+    if (cible.i === de) return false;
+    const d = partie.voies[cible.i];
+    if (d.wagons.length >= d.cap) { message('msg.plein'); SON.refus(); marquerPosition(w); return false; }
+    marquerPosition(w);
+    v.wagons.pop(); d.wagons.push(w);
+    SON.pose();
+    etincelles(slotX(d.wagons.length - 1), voieY(cible.i) + L.wh * 0.4, '#ffd36b', 6);
+    compterDeplacement();
+    return true;
+  }
+  const tr = partie.trains[cible.k];
+  const l = Array.from(w.l);
+  let ok = tr.prog < tr.mot.length && !tr.depart;
+  for (let j = 0; ok && j < l.length; j++) if (tr.mot[tr.prog + j] !== l[j]) ok = false;
+  if (!ok) {
+    message(l.length > 1 && tr.mot[tr.prog] === l[0] ? 'msg.doubleNon' : 'msg.refus');
+    tr.secousse = horloge; SON.refus(); marquerPosition(w);
+    return false;
+  }
+  marquerPosition(w);
+  v.wagons.pop(); tr.wagons.push(w); tr.prog += l.length;
+  SON.attelage();
+  etincelles(trainSlotX(cible.k, tr.prog - 1), trainY(cible.k), '#fff3a0', 12);
+  if (tr.prog >= tr.mot.length) trainComplet(cible.k);
+  compterDeplacement();
+  return true;
+}
+function couper(i) {
+  if (!partie || partie.fini) return;
+  const v = partie.voies[i];
+  if (!v || !v.wagons.length) return;
+  const w = v.wagons[v.wagons.length - 1];
+  const l = Array.from(w.l);
+  if (l.length < 2) return;
+  if (v.wagons.length >= v.cap) { message('msg.coupePlace'); SON.refus(); return; }
+  v.wagons.pop();
+  const a = { id: ++idWagon, l: l[0], px: w.px - L.ww * 0.2, py: w.py }, b = { id: ++idWagon, l: l[1], px: w.px + L.ww * 0.2, py: w.py };
+  marquerPosition(a); marquerPosition(b);
+  v.wagons.push(a, b);
+  SON.coupe();
+  etincelles(w.px, w.py, '#ffffff', 14);
+  compterDeplacement();
+}
+function compterDeplacement() {
+  partie.deplacements++;
+  partie.selection = null;
+  if (!partie.mainTuto) partie.main = null;
+  majHud();
+  if (partie.trains.every((tr) => tr.prog >= tr.mot.length)) {
+    partie.fini = 'gagne'; partie.tFin = horloge;
+    return;
+  }
+  if (partie.deplacements >= partie.budget) perdre('vapeur');
+}
+function trainComplet(k) {
+  const tr = partie.trains[k];
+  tr.depart = horloge;
+  SON.sifflet(); SON.tchou();
+  message('msg.parti', { mot: tr.mot.join('') });
+  confettis(trainSlotX(k, Math.floor(tr.mot.length / 2)), trainY(k), 40);
+}
+function indice() {
+  if (!partie || partie.fini || enPause) return;
+  premierGeste();
+  const e = etatSolveur();
+  const r = partie.solveur.resoudre(e.piles, e.av, 80000);
+  if (!r || !r.premier) { message('msg.bloque'); SON.refus(); return; }
+  partie.main = r.premier; partie.mainTuto = false;
+  partie.indiceUtilise = true;
+  SON.indice();
+  message('msg.indice');
+}
+function recommencer() { if (partie) lancerNiveau(partie.index); }
+
+function perdre(raison) {
+  if (!partie || partie.fini) return;
+  partie.fini = 'perdu'; partie.raison = raison;
+  partie.tFin = horloge;
+  SON.defaite();
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: partie.index + 1 });
+  setTimeout(() => afficherDefaite(), 700);
+}
+function afficherDefaite() {
+  if (!partie || partie.fini !== 'perdu' || ecran !== 'jeu') return;
+  $('fin-titre').textContent = t(partie.raison === 'cloche' ? 'fin.perduCloche' : 'fin.perduVapeur');
+  const et = $('fin-etoiles'); et.innerHTML = SVG_ETOILE(false) + SVG_ETOILE(false) + SVG_ETOILE(false);
+  et.setAttribute('aria-label', t('fin.etoilesAria', { n: 0 }));
+  const lignes = $('fin-lignes'); lignes.textContent = '';
+  const ajouter = (txt, cl) => { const p = document.createElement('p'); p.className = cl || 'ligne'; p.textContent = txt; lignes.appendChild(p); };
+  ajouter(t('fin.deplacements', { n: partie.deplacements }));
+  ajouter(t('fin.meilleur', { n: partie.par }));
+  ajouter(t('fin.astuce'), 'note');
+  if (prog.records[partie.index]) ajouter(t('fin.recordAncien', { n: prog.records[partie.index] }), 'note');
+  boutonsFin([['reessayer', 'principal', recommencer], ['niveaux', '', () => montrer('niveaux')], ['accueil', '', allerAccueil]]);
+  $('fin').hidden = false;
+  focusPremier();
+}
+function gagner() {
+  const p = partie;
+  if (!p || p.fini !== 'gagne' || p.ecranFin) return;
+  p.ecranFin = true;
+  const i = p.index;
+  const marge2 = Math.ceil(p.def.marge / 2);
+  let etoiles = p.deplacements <= p.par ? 3 : p.deplacements <= p.par + marge2 ? 2 : 1;
+  if (p.indiceUtilise) etoiles = Math.min(2, etoiles);
+  const vapeur = Math.max(0, p.budget - p.deplacements);
+  const secondes = p.def.cloche ? Math.max(0, Math.floor(p.reste)) : 0;
+  const score = etoiles * 100 + vapeur * 10 + secondes * 2;
+  const ancienRecord = prog.records[i];
+  const premiere = prog.etoiles[i] === 0;
+  const record = score > ancienRecord;
+  prog.etoiles[i] = Math.max(prog.etoiles[i], etoiles);
+  if (record) prog.records[i] = score;
+  prog.debloque = Math.max(prog.debloque, Math.min(NB, i + 2));
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
+  try { window.JEL_SAVE.save(JEU, donnees(i + 2)); } catch (e) { /* rien */ }
+  SON.victoire();
+  // Écran de victoire
+  const dernier = i === NB - 1;
+  $('fin-titre').textContent = dernier ? t('fin.final') : t('fin.bravo');
+  const et = $('fin-etoiles'); et.innerHTML = '';
+  for (let s = 0; s < 3; s++) {
+    et.insertAdjacentHTML('beforeend', SVG_ETOILE(s < etoiles));
+    const el = et.lastElementChild;
+    if (s < etoiles) { el.classList.add('on'); el.style.animationDelay = (0.25 + s * 0.3) + 's'; setTimeout(() => SON.etoile(s), 250 + s * 300); }
+  }
+  et.setAttribute('aria-label', t('fin.etoilesAria', { n: etoiles }));
+  const lignes = $('fin-lignes'); lignes.textContent = '';
+  const ajouter = (txt, cl) => { const q = document.createElement('p'); q.className = cl || 'ligne'; q.textContent = txt; lignes.appendChild(q); return q; };
+  const ligneScore = ajouter('', 'ligne score-anim');
+  ajouter(t('fin.deplacements', { n: p.deplacements }) + ' · ' + t('fin.meilleur', { n: p.par }));
+  ajouter(t('fin.vapeur', { n: vapeur }));
+  if (p.def.cloche) ajouter(t('fin.temps', { n: secondes }));
+  if (p.indiceUtilise) ajouter(t('fin.indiceUtilise'), 'note');
+  ajouter(record ? t('fin.record') : t('fin.recordAncien', { n: ancienRecord }), record ? 'ligne record' : 'note');
+  if (premiere) {
+    const [type, n] = RECOMPENSES[i];
+    ajouter(t('fin.debloque', { nom: t((type === 'loco' ? 'loco.' : 'palette.') + n) }), 'debloque');
+    SON.debloque();
+  }
+  if (dernier) {
+    const tot = prog.etoiles.reduce((a, b) => a + b, 0);
+    ajouter(t('fin.total', { n: tot, max: NB * 3, s: scoreTotal() }), 'ligne');
+  }
+  // compteur de score qui défile
+  const debut = performance.now();
+  const compter = (maintenant) => {
+    const k = Math.min(1, (maintenant - debut) / 900);
+    ligneScore.textContent = t('fin.score', { n: Math.round(score * (1 - Math.pow(1 - k, 3))) });
+    if (k < 1 && !$('fin').hidden) requestAnimationFrame(compter);
+  };
+  requestAnimationFrame(compter);
+  const boutons = [];
+  if (!dernier) boutons.push(['suivant', 'principal', () => lancerNiveau(i + 1)]);
+  boutons.push(['rejouer', dernier ? 'principal' : '', () => lancerNiveau(i)]);
+  boutons.push(['niveaux', '', () => montrer('niveaux')]);
+  if (dernier) boutons.push(['accueil', '', allerAccueil]);
+  boutonsFin(boutons);
+  $('fin').hidden = false;
+  confettis(W / 2, H * 0.3, 80);
+  focusPremier();
+}
+function boutonsFin(liste) {
+  const zone = $('fin-boutons'); zone.textContent = '';
+  for (const [cle, cl, f] of liste) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn ' + cl; b.textContent = t(cle);
+    b.addEventListener('click', f);
+    zone.appendChild(b);
+  }
+}
+function focusPremier() { const b = document.querySelector('#fin-boutons button'); if (b) try { b.focus({ preventScroll: true }); } catch (e) { /* rien */ } }
+function allerAccueil() { partie = null; montrer('titre'); }
+
+function mettreEnPause(oui) {
+  if (ecran !== 'jeu' || !partie) return;
+  if (oui && (partie.fini || enPause)) return;
+  enPause = oui;
+  $('pause').hidden = !oui;
+  if (partie) partie.drag = null;
+  if (ac) { try { oui ? ac.suspend() : (prog.son && ac.resume()); } catch (e) { /* rien */ } }
+  if (oui) { const b = $('b-reprendre'); try { b.focus({ preventScroll: true }); } catch (e) { /* rien */ } }
+}
+
+// ----- Effets -------------------------------------------------------------------------------
+function etincelles(x, y, coul, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = 60 + Math.random() * 160;
+    particules.push({ type: 'etincelle', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, vie: 0, max: 0.4 + Math.random() * 0.3, coul, taille: 2 + Math.random() * 2.5 });
+  }
+}
+function confettis(x, y, n) {
+  const cs = ['#e5534b', '#f2b632', '#4cb963', '#4a8fe0', '#8e6be0', '#ef7fb2'];
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, v = 160 + Math.random() * 300;
+    particules.push({ type: 'confetti', x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, vie: 0, max: 1.6 + Math.random(), coul: cs[i % cs.length], taille: 5 + Math.random() * 4, rot: Math.random() * 6 });
+  }
+}
+function fumee(x, y, k = 1) {
+  particules.push({ type: 'fumee', x, y, vx: 10 + Math.random() * 20, vy: -30 - Math.random() * 20, vie: 0, max: 1.4, coul: '#fff', taille: (5 + Math.random() * 4) * k });
+}
+function majParticules(dt) {
+  for (const p of particules) {
+    p.vie += dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.type === 'confetti') { p.vy += 380 * dt; p.vx *= 0.99; p.rot += dt * 8; }
+    else if (p.type === 'etincelle') { p.vy += 300 * dt; }
+    else { p.taille += dt * 8; p.vx *= 0.98; }
+  }
+  particules = particules.filter((p) => p.vie < p.max);
+  if (particules.length > 400) particules.splice(0, particules.length - 400);
+}
+function dessinerParticules() {
+  for (const p of particules) {
+    const a = 1 - p.vie / p.max;
+    ctx.globalAlpha = Math.max(0, p.type === 'fumee' ? a * 0.7 : a);
+    if (p.type === 'confetti') {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.coul; ctx.fillRect(-p.taille / 2, -p.taille / 4, p.taille, p.taille / 2); ctx.restore();
+    } else cer(ctx, p.x, p.y, p.taille, p.coul);
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ----- Dessin de la gare ---------------------------------------------------------------------
+function pos(w, tx, ty) {
+  let x = tx, y = ty;
+  if (w.at !== undefined && w.ax !== undefined) {
+    const k = Math.min(1, (horloge - w.at) / 0.24);
+    const e = 1 - Math.pow(1 - k, 3);
+    x = w.ax + (tx - w.ax) * e; y = w.ay + (ty - w.ay) * e - Math.sin(k * Math.PI) * 16;
+    if (k >= 1) w.at = undefined;
+  }
+  w.px = x; w.py = y;
+  return [x, y];
+}
+function couleurWagon(w) { const pal = PALETTES[prog.palette] || PALETTES[0]; return pal[w.id % pal.length]; }
+
+function dessinerJeu() {
+  ctx.drawImage(decor, 0, 0, W, H);
+  const p = partie;
+  // panneaux des dessins
+  for (let k = 0; k < p.trains.length; k++) dessinerPanneau(k, horloge);
+  // surbrillance des destinations possibles
+  const tenu = p.drag ? p.drag.voie : p.selection;
+  if (tenu !== null && tenu !== undefined) {
+    p.voies.forEach((v, i) => {
+      if (i === tenu || v.wagons.length >= v.cap) return;
+      rr(ctx, L.trackLeft - 4, voieY(i) - L.rowH / 2 + 2, L.cw - 8, L.rowH - 4, 12, 'rgba(255,255,255,.14)', 'rgba(255,255,255,.55)', 2);
+    });
+    p.trains.forEach((tr, k) => { if (!tr.depart) rr(ctx, L.x0 + 4, L.trainTop + k * L.trainH + 2, L.cw - 8, L.trainH - 4, 12, 'rgba(255,243,160,.12)', 'rgba(255,243,160,.7)', 2); });
+  }
+  // curseur du clavier
+  if (p.clavier && !p.fini) {
+    const r = rangees()[p.curseur];
+    if (r) {
+      const y0 = r.type === 'train' ? L.trainTop + r.k * L.trainH : L.yardTop + r.i * L.rowH;
+      const h0 = r.type === 'train' ? L.trainH : L.rowH;
+      ctx.setLineDash([8, 6]); rr(ctx, L.x0 + 2, y0 + 1, L.cw - 4, h0 - 2, 12, null, '#f2d27a', 3); ctx.setLineDash([]);
+    }
+  }
+  // trains à quai
+  p.trains.forEach((tr, k) => {
+    let dx = 0;
+    if (tr.depart !== null) { const e = horloge - tr.depart - 0.5; if (e > 0) dx = -e * e * 420; }
+    if (horloge - tr.secousse < 0.35) dx += Math.sin((horloge - tr.secousse) * 60) * 5;
+    const y = trainY(k), lh = L.trainH * 0.86;
+    const lx = L.x0 + 10 + dx, ly = y - lh / 2 - L.trainH * 0.06;
+    // emplacements vides
+    for (let s = tr.prog; s < tr.mot.length; s++) {
+      if (tr.depart !== null) break;
+      ctx.setLineDash([5, 4]);
+      rr(ctx, trainSlotX(k, s) - L.sw[k] * 0.44, y - L.wh * 0.42, L.sw[k] * 0.88, L.wh * 0.74, 6, 'rgba(255,255,255,.18)', p.trains.length > 1 ? tr.couleur : 'rgba(80,60,40,.6)', 2);
+      ctx.setLineDash([]);
+    }
+    let s = 0;
+    for (const w of tr.wagons) {
+      const n = Array.from(w.l).length;
+      const tx = (trainSlotX(k, s) + trainSlotX(k, s + n - 1)) / 2 + dx;
+      const hw = Math.min(L.wh, L.trainH * 0.8);
+      const [x, yy] = pos(w, tx, y + L.trainH * 0.36 - hw * 0.44);
+      dessinerWagon(ctx, x, yy, L.sw[k] * n, hw, w.l, couleurWagon(w), {});
+      s += n;
+    }
+    dessinerLoco(ctx, lx, ly, L.locoW, lh, prog.loco, true, p.trains.length > 1 ? tr.couleur : null);
+    const ch = chemineeLoco(lx, ly, L.locoW, lh, prog.loco, true);
+    if (ch && Math.random() < (tr.depart !== null ? 0.5 : 0.04)) fumee(ch.x, ch.y, tr.depart !== null ? 1.4 : 0.8);
+  });
+  // wagons de la gare de triage
+  let tenuW = null;
+  p.voies.forEach((v, i) => {
+    const y = voieY(i);
+    v.wagons.forEach((w, j) => {
+      const bout = j === v.wagons.length - 1;
+      if (p.drag && p.drag.voie === i && bout && p.drag.bouge) { tenuW = w; return; }
+      const leve = bout && (p.selection === i || (p.drag && p.drag.voie === i)) ? -8 : 0;
+      const [x, yy] = pos(w, slotX(j), y + leve);
+      const cache = v.type === 'tunnel' && !bout;
+      dessinerWagon(ctx, x, yy, L.ww, L.wh, w.l, couleurWagon(w), { cache, lueur: leve ? 'rgba(255,240,150,.9)' : null });
+    });
+    // ciseaux au-dessus d'un wagon à double lettre
+    const front = v.wagons[v.wagons.length - 1];
+    if (front && Array.from(front.l).length > 1 && !(p.drag && p.drag.bouge && p.drag.voie === i)) {
+      const c = ciseaux(i);
+      dessinerCiseaux(c.x, c.y, v.wagons.length < v.cap);
+    }
+  });
+  // main du tutoriel ou de l'indice
+  if (p.main && !p.fini) dessinerMain(p.main);
+  // wagon tenu au doigt
+  if (tenuW) {
+    tenuW.px = p.drag.x; tenuW.py = p.drag.y - 10;
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 8;
+    dessinerWagon(ctx, tenuW.px, tenuW.py, L.ww * 1.08, L.wh * 1.08, tenuW.l, couleurWagon(tenuW), {});
+    ctx.restore();
+  }
+  dessinerParticules();
+}
+function ciseaux(i) {
+  const v = partie.voies[i];
+  const j = v.wagons.length - 1;
+  const x = Math.min(slotX(j) + L.ww * 0.5 + 20, L.aiguillageX - 4);
+  return { x, y: voieY(i) - L.wh * 0.1 };
+}
+function dessinerCiseaux(x, y, actif) {
+  const pul = 1 + Math.sin(horloge * 5) * 0.06;
+  cer(ctx, x, y, 19 * pul, actif ? '#fff' : '#ccc', '#3b2a17', 3);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(-0.6);
+  cer(ctx, -7, 6, 4, null, '#c0392b', 2.5); cer(ctx, 7, 6, 4, null, '#c0392b', 2.5);
+  trait(ctx, [-5, 3, 6, -11], '#555', 3); trait(ctx, [5, 3, -6, -11], '#555', 3);
+  ctx.restore();
+}
+// Point de départ et d'arrivée d'un coup (pour la main animée).
+function pointsDuCoup(c) {
+  const v = partie.voies[c.de];
+  if (!v || !v.wagons.length) return null;
+  const de = { x: slotX(v.wagons.length - 1), y: voieY(c.de) };
+  if (c.type === 'coupe') { const s = ciseaux(c.de); return { de: s, vers: s, tape: true }; }
+  if (c.type === 'voie') { const d = partie.voies[c.vers]; return { de, vers: { x: slotX(Math.min(d.cap - 1, d.wagons.length)), y: voieY(c.vers) } }; }
+  const tr = partie.trains[c.k];
+  return { de, vers: { x: trainSlotX(c.k, Math.min(tr.mot.length - 1, tr.prog)), y: trainY(c.k) } };
+}
+function dessinerMain(c) {
+  const pts = pointsDuCoup(c);
+  if (!pts) return;
+  const ph = (horloge % 1.8) / 1.8;
+  let x, y, appui = false, alpha = 1;
+  if (pts.tape) { x = pts.de.x; y = pts.de.y; appui = ph % 0.5 < 0.2; }
+  else if (ph < 0.18) { x = pts.de.x; y = pts.de.y; appui = ph > 0.08; alpha = ph / 0.18; }
+  else if (ph < 0.75) { const k = (ph - 0.18) / 0.57, e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; x = pts.de.x + (pts.vers.x - pts.de.x) * e; y = pts.de.y + (pts.vers.y - pts.de.y) * e; appui = true; }
+  else { x = pts.vers.x; y = pts.vers.y; alpha = 1 - (ph - 0.75) / 0.25; }
+  if (!pts.tape) {
+    ctx.save(); ctx.globalAlpha = 0.5; ctx.setLineDash([6, 6]);
+    trait(ctx, [pts.de.x, pts.de.y, pts.vers.x, pts.vers.y], '#fff', 3); ctx.setLineDash([]); ctx.restore();
+  }
+  ctx.save(); ctx.globalAlpha = Math.max(0, alpha); ctx.translate(x + 6, y + 8); const s = appui ? 0.9 : 1; ctx.scale(s, s);
+  if (appui) cer(ctx, -6, -8, 16, 'rgba(255,255,255,.35)');
+  rr(ctx, -4, -14, 9, 22, 4.5, '#fff', '#3b2a17', 2.5);
+  rr(ctx, -6, 2, 24, 22, 8, '#fff', '#3b2a17', 2.5);
+  trait(ctx, [5, 4, 5, 10], '#3b2a17', 2); trait(ctx, [11, 5, 11, 11], '#3b2a17', 2);
+  ctx.restore();
+}
+
+// Écran titre : une gare de campagne et un train sans lettres.
+function dessinerTitre() {
+  ctx.drawImage(decor, 0, 0, W, H);
+  const y = H * 0.74, h = Math.min(70, H * 0.09), lw = h * 1.45;
+  const n = Math.max(4, Math.min(7, Math.floor((W - lw) / (h * 1.05)) - 1));
+  const largeur = lw + n * h * 1.05;
+  const x0 = (W - largeur) / 2 + Math.sin(horloge * 0.6) * 4;
+  dessinerLoco(ctx, x0, y - h * 0.5, lw, h, prog.loco, true, null);
+  const pal = PALETTES[prog.palette] || PALETTES[0];
+  for (let k = 0; k < n; k++) {
+    const x = x0 + lw + 4 + k * h * 1.05 + h * 0.52;
+    const yw = y + h * 0.06 + Math.sin(horloge * 3 + k) * 1.2;
+    dessinerWagon(ctx, x, yw, h * 1.05, h * 0.9, '', pal[k % pal.length], {});
+    // une petite étoile dorée sur chaque wagon (pas de lettre : c'est la jaquette)
+    ctx.fillStyle = '#ffe27a'; etoilePath(ctx, x - h * 0.02, yw - h * 0.1, h * 0.17, h * 0.075); ctx.fill();
+  }
+  const ch = chemineeLoco(x0, y - h * 0.5, lw, h, prog.loco, true);
+  if (ch && Math.random() < 0.08) fumee(ch.x, ch.y, 1.3);
+  dessinerParticules();
+}
+
+// ----- Boucle -----------------------------------------------------------------------------
+let avant = performance.now();
+function boucle(maintenant) {
+  const dt = Math.min(0.05, (maintenant - avant) / 1000);
+  avant = maintenant;
+  if (!enPause) {
+    horloge += dt;
+    majParticules(dt);
+    if (partie && ecran === 'jeu') {
+      if (partie.def.cloche && partie.demarre && !partie.fini) {
+        partie.reste -= dt;
+        const s = Math.ceil(partie.reste);
+        if (s !== partie.dernierTic) {
+          partie.dernierTic = s;
+          majHud();
+          if (s <= 10 && s > 0) { SON.tic(); if (s === 10) SON.cloche(); }
+        }
+        if (partie.reste <= 0) { partie.reste = 0; majHud(); SON.cloche(); perdre('cloche'); }
+      }
+      if (partie.fini === 'gagne' && !partie.ecranFin && horloge - partie.tFin > 1.9) gagner();
+    }
+  }
+  if (W > 0 && H > 0) {
+    if (ecran === 'jeu' && partie && L && !L.titre) dessinerJeu();
+    else if (decor) dessinerTitre();
+  }
+  requestAnimationFrame(boucle);
+}
+
+// ----- Commandes : doigt et souris --------------------------------------------------------------
+function point(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+function rangeeSous(p) {
+  for (let k = 0; k < partie.trains.length; k++) {
+    const top = L.trainTop + k * L.trainH;
+    if (p.y >= top && p.y < top + L.trainH) return { type: 'train', k };
+    const pa = panneau(k);
+    if (Math.abs(p.x - pa.cx) <= pa.s / 2 && Math.abs(p.y - pa.cy) <= pa.s / 2) return { type: 'train', k };
+  }
+  for (let i = 0; i < partie.voies.length; i++) {
+    const top = L.yardTop + i * L.rowH;
+    if (p.y >= top - 4 && p.y < top + L.rowH + 4) return { type: 'voie', i };
+  }
+  return null;
+}
+function ciseauxSous(p) {
+  for (let i = 0; i < partie.voies.length; i++) {
+    const v = partie.voies[i], f = v.wagons[v.wagons.length - 1];
+    if (!f || Array.from(f.l).length < 2) continue;
+    const c = ciseaux(i);
+    if (Math.hypot(p.x - c.x, p.y - c.y) <= 25) return i;
+  }
+  return null;
+}
+canvas.addEventListener('pointerdown', (e) => {
+  if (ecran !== 'jeu' || !partie || enPause || partie.fini) return;
+  e.preventDefault();
+  premierGeste();
+  partie.clavier = false;
+  const p = point(e);
+  const c = ciseauxSous(p);
+  if (c !== null) { couper(c); return; }
+  const cible = rangeeSous(p);
+  if (partie.selection !== null) {
+    const de = partie.selection;
+    partie.selection = null;
+    if (!cible || (cible.type === 'voie' && cible.i === de)) return;
+    deplacer(de, cible);
+    return;
+  }
+  if (!cible) return;
+  if (cible.type === 'voie') {
+    if (!partie.voies[cible.i].wagons.length) { message('msg.vide'); return; }
+    partie.drag = { voie: cible.i, x: p.x, y: p.y, x0: p.x, y0: p.y, bouge: false };
+    try { canvas.setPointerCapture(e.pointerId); } catch (er) { /* rien */ }
+    SON.prise();
+  }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!partie || !partie.drag) return;
+  const p = point(e);
+  partie.drag.x = p.x; partie.drag.y = p.y;
+  if (Math.hypot(p.x - partie.drag.x0, p.y - partie.drag.y0) > 10) partie.drag.bouge = true;
+});
+function finGlisser(e, annule) {
+  if (!partie || !partie.drag) return;
+  const d = partie.drag;
+  partie.drag = null;
+  if (annule || enPause || partie.fini) return;
+  if (!d.bouge) { partie.selection = d.voie; return; }
+  const cible = rangeeSous(point(e));
+  if (cible && !(cible.type === 'voie' && cible.i === d.voie)) deplacer(d.voie, cible);
+  else { const v = partie.voies[d.voie], w = v.wagons[v.wagons.length - 1]; if (w) marquerPosition(w); }
+}
+canvas.addEventListener('pointerup', (e) => finGlisser(e, false));
+canvas.addEventListener('pointercancel', (e) => finGlisser(e, true));
+
+// ----- Commandes : clavier -------------------------------------------------------------------------
+function rangees() {
+  const r = [];
+  partie.trains.forEach((tr, k) => r.push({ type: 'train', k }));
+  partie.voies.forEach((v, i) => r.push({ type: 'voie', i }));
+  return r;
+}
+document.addEventListener('keydown', (e) => {
+  if (ecran !== 'jeu' || !partie) return;
+  if (!$('fin').hidden) return;
+  if (e.code === 'Escape' || e.code === 'KeyP') {
+    e.preventDefault();
+    if (enPause) { mettreEnPause(false); return; }
+    if (e.code === 'Escape' && partie.selection !== null) { partie.selection = null; return; }
+    mettreEnPause(true);
+    return;
+  }
+  if (enPause || partie.fini) return;
+  const r = rangees();
+  if (e.code === 'ArrowUp' || e.code === 'ArrowLeft') { e.preventDefault(); premierGeste(); partie.clavier = true; partie.curseur = (partie.curseur + r.length - 1) % r.length; }
+  else if (e.code === 'ArrowDown' || e.code === 'ArrowRight') { e.preventDefault(); premierGeste(); partie.clavier = true; partie.curseur = (partie.curseur + 1) % r.length; }
+  else if (e.code === 'Enter' || e.code === 'Space' || e.code === 'NumpadEnter') {
+    if (document.activeElement && document.activeElement.tagName === 'BUTTON' && document.activeElement.closest('#hud')) return;
+    e.preventDefault(); premierGeste(); partie.clavier = true;
+    const cible = r[partie.curseur];
+    if (!cible) return;
+    if (partie.selection === null) {
+      if (cible.type !== 'voie') return;
+      if (!partie.voies[cible.i].wagons.length) { message('msg.vide'); return; }
+      partie.selection = cible.i; SON.prise();
+      partie.curseur = 0; // on propose d'abord le train
+    } else {
+      const de = partie.selection;
+      partie.selection = null;
+      if (cible.type === 'voie' && cible.i === de) return;
+      deplacer(de, cible);
+    }
+  } else if (e.code === 'KeyC') {
+    premierGeste();
+    const c = r[partie.curseur];
+    const i = partie.selection !== null ? partie.selection : c && c.type === 'voie' ? c.i : null;
+    if (i !== null) { partie.selection = null; couper(i); }
+  } else if (e.code === 'KeyH') indice();
+  else if (e.code === 'KeyR') recommencer();
+});
+
+// ----- Boutons des écrans ------------------------------------------------------------------------
+function jouer() {
+  window.JEL_SAVE.reprise({
+    jeu: JEU,
+    onContinuer: (d) => {
+      const n = entier(d.niveau, 1, NB + 1, 1);
+      if (n > NB) { montrer('niveaux'); return; }
+      prog.debloque = Math.max(prog.debloque, n);
+      lancerNiveau(n - 1);
+    },
+    onNouvelle: () => lancerNiveau(0),
+    onEffacer: () => { remiseAZero(); lancerNiveau(0); },
+  });
+}
+function remiseAZero() {
+  prog.etoiles.fill(0); prog.records.fill(0); prog.debloque = 1; prog.loco = 0; prog.palette = 0;
+}
+$('b-jouer').addEventListener('click', jouer);
+$('b-niveaux').addEventListener('click', () => montrer('niveaux'));
+$('b-depot').addEventListener('click', () => montrer('depot'));
+document.querySelectorAll('.b-accueil').forEach((b) => b.addEventListener('click', () => montrer('titre')));
+$('b-pause').addEventListener('click', () => mettreEnPause(true));
+$('b-indice').addEventListener('click', indice);
+$('b-reprendre').addEventListener('click', () => mettreEnPause(false));
+$('b-recommencer').addEventListener('click', () => { mettreEnPause(false); recommencer(); });
+$('b-pause-niveaux').addEventListener('click', () => { mettreEnPause(false); partie = null; montrer('niveaux'); });
+$('b-pause-accueil').addEventListener('click', () => { mettreEnPause(false); allerAccueil(); });
+let effacerTitre = null;
+try {
+  effacerTitre = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('effacer-titre'), apres: () => { remiseAZero(); } });
+} catch (e) { /* rien */ }
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && ecran === 'jeu' && partie && !partie.fini) mettreEnPause(true);
+});
+window.addEventListener('resize', () => redimensionner());
+
+// Sauvegarde à la fermeture, seulement pendant une partie.
+window.JEL_SAVE.surFermeture(() => {
+  if (ecran === 'jeu' && niveauCourant !== null && !(partie && partie.fini)) window.JEL_SAVE.save(JEU, donnees(niveauCourant + 1));
+});
+
+// ----- Démarrage -------------------------------------------------------------------------------
+document.title = t('titre');
+chargerProg();
+majBoutonsSon();
+redimensionner();
+requestAnimationFrame(boucle);
+})();
+</script>
+</body>
+</html>
