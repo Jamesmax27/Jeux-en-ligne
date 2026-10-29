@@ -29,15 +29,12 @@ import { readFile, writeFile, mkdir, readdir, appendFile } from 'node:fs/promise
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX } from '../public/taxonomie.js';
+import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX, AGES } from '../public/taxonomie.js';
 import { TYPES_DEMANDE, TYPES_AVEC_JEU } from '../public/demandes-regles.js';
 import { lireDemandePublique, MOTIFS_IA, AGE_MIN, AGE_MAX } from '../functions/_demandes.js';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER = path.join(RACINE, '.moderation');
-
-// Âges proposés (mêmes que la page /idees et le formulaire GitHub).
-export const AGES = ['4+', '5+', '6+', '7+', '8+', '10+', '12+'];
 
 // Catégories d'un refus et d'une validation.
 export const CATEGORIES_REFUS = ['insulte', 'spam', 'inadapte', 'hors-sujet', 'incomprehensible', 'doublon', 'jeu-incoherent'];

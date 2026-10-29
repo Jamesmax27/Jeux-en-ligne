@@ -18,7 +18,9 @@
 //     formé, ancien identifiant (ANCIENS_IDS) encore dans les listes ou qui
 //     mène hors liste, libellé français des fichiers de langue (genre.<id>, …court)
 //     différent de taxonomie.js, formulaire .github/ISSUE_TEMPLATE/idee-jeu.yml
-//     dont les listes Genre et Univers ne reprennent pas les libellés, dans l'ordre.
+//     dont les listes Genre et Univers ne reprennent pas les libellés, dans l'ordre,
+//     ou dont la liste Âge n'est pas AGES ; tranches d'âge avec un trou, sans
+//     adresse (SLUGS_AGE de chemins.js), ancienne tranche qui mène hors liste.
 //
 // Branché dans la boucle de nuit (étape d, vérification de chaque jeu) et dans
 // validate.yml. Les fonctions problemesClassementJeu et problemesClassementIdee
@@ -31,7 +33,9 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, SECONDAIRES_MAX, UNIVERS_MIN, UNIVERS_MAX, ANCIENS_IDS,
+  TRANCHES_AGE, ANCIENNES_TRANCHES, AGES, AGE_ADOS, trancheDeAge,
 } from '../public/taxonomie.js';
+import { SLUGS_AGE } from '../public/chemins.js';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -147,6 +151,31 @@ async function problemesTaxonomie() {
         p.push(`idee-jeu.yml : la liste « ${id} » doit reprendre exactement, dans l'ordre, les libellés de taxonomie.js (${attendu.join(', ')})`);
       }
     }
+    // Âge conseillé : liste en ligne « options: ["4+", …] » = AGES.
+    const ages = /\n\s*id: age\n[\s\S]*?options:\s*(\[[^\]]*\])/.exec(texte);
+    let options = [];
+    try { options = ages ? JSON.parse(ages[1]) : []; } catch { /* liste illisible : signalée ci-dessous */ }
+    if (options.join('|') !== AGES.join('|')) p.push(`idee-jeu.yml : la liste « age » doit reprendre exactement AGES de taxonomie.js (${AGES.join(', ')})`);
+  }
+
+  // Tranches d'âge : bornes qui se suivent sans trou depuis 0, adresse et icône ; anciennes tranches vers une tranche existante.
+  const tranches = TRANCHES_AGE.map((t) => t.id);
+  TRANCHES_AGE.forEach((t, i) => {
+    const attenduMin = i === 0 ? 0 : TRANCHES_AGE[i - 1].max + 1;
+    if (t.min !== attenduMin || !(t.max >= t.min)) p.push(`taxonomie.js : tranche « ${t.id} » : bornes ${t.min}-${t.max} (attendu : de ${attenduMin}, sans trou ni chevauchement)`);
+    if (!SLUGS_AGE[t.id]) p.push(`chemins.js : tranche « ${t.id} » sans adresse (SLUGS_AGE)`);
+  });
+  for (const [ancienne, nouvelle] of Object.entries(ANCIENNES_TRANCHES)) {
+    if (tranches.includes(ancienne)) p.push(`taxonomie.js : ANCIENNES_TRANCHES.${ancienne} est encore une tranche`);
+    if (!tranches.includes(nouvelle)) p.push(`taxonomie.js : ANCIENNES_TRANCHES.${ancienne} mène à « ${nouvelle} », hors liste`);
+    if (!SLUGS_AGE[ancienne]) p.push(`chemins.js : ancienne tranche « ${ancienne} » sans adresse (SLUGS_AGE) : sa redirection serait perdue`);
+  }
+  // Âges proposés : « N+ », croissants, chacun dans une tranche.
+  const nombres = AGES.map((a) => (/^\d{1,2}\+$/.test(a) ? parseInt(a, 10) : NaN));
+  if (nombres.some((n, i) => Number.isNaN(n) || (i > 0 && n <= nombres[i - 1]))) p.push(`taxonomie.js : AGES doit être une liste croissante de « N+ » (${AGES.join(', ')})`);
+  for (const a of AGES) if (!trancheDeAge(a)) p.push(`taxonomie.js : âge « ${a} » hors des tranches d'âge`);
+  if (trancheDeAge(`${AGE_ADOS}+`) !== TRANCHES_AGE[TRANCHES_AGE.length - 1].id || trancheDeAge(`${AGE_ADOS - 1}+`) === trancheDeAge(`${AGE_ADOS}+`)) {
+    p.push(`taxonomie.js : AGE_ADOS (${AGE_ADOS}) doit être le début de la dernière tranche d'âge`);
   }
   return p;
 }

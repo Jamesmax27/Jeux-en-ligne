@@ -1,6 +1,6 @@
 # Guide des icônes des regroupements
 
-Ce guide fixe le style, l'outillage et les règles des icônes des regroupements de l'accueil : tuiles des raccourcis et des âges, puces des genres et des univers, titre « Tendances ». Les 35 icônes actuelles (toutes les clés de `public/taxonomie.js`, après le regroupement d'octobre 2026) donnent le niveau attendu ; parmi les 9 qui ont servi de modèles, il reste `hasard`, `age:3-4`, `genre:puzzle`, `genre:musique`, `univers:chevaux`, `univers:ocean`, `univers:espace` et `tendances` (`genre:reflexes` a été retiré avec son genre).
+Ce guide fixe le style, l'outillage et les règles des icônes des regroupements de l'accueil : tuiles des raccourcis et des âges, puces des genres et des univers, titre « Tendances ». Les 36 icônes actuelles (toutes les clés de `public/taxonomie.js`, après le regroupement d'octobre 2026 et les nouvelles tranches d'âge) donnent le niveau attendu ; parmi les 9 qui ont servi de modèles, il reste `hasard`, `age:4-6` (l'ancien `age:3-4`), `genre:puzzle`, `genre:musique`, `univers:chevaux`, `univers:ocean`, `univers:espace` et `tendances` (`genre:reflexes` a été retiré avec son genre).
 
 Toutes les commandes se lancent depuis la racine du dépôt, avec Node 18 ou plus (aucun paquet npm, sauf Playwright pour les captures de la planche).
 
@@ -30,7 +30,7 @@ La section « Icônes : la langue du logo », juste après le bloc dans `style.c
 **Nom du fichier** (slug) : c'est la clé `data-cle` posée par `app.js`, avec « : » remplacé par « -- » et « + » par « plus ». Par exemple :
 - `genre--memoire.svg`
 - `univers--ville.svg`
-- `age--9plus.svg`
+- `age--13plus.svg`
 - `collection--hors-ligne.svg`
 - `hasard.svg`
 - `tendances.svg` (titre « Tendances »)
@@ -136,7 +136,7 @@ Un fichier dont le nom ne correspond à aucune clé de `taxonomie.js` est refus�
   - « Mots » : une forme de lettre abstraite ;
   - « Calcul » : les signes + − × ;
   - « Quiz » : le signe ?.
-  Les âges se disent avec des objets (doudou, cerf-volant, vélo, planche à roulettes).
+  Les âges se disent avec des objets (doudou, vélo, planche à roulettes, lampe torche).
 - **Deux icônes ne se ressemblent jamais** : voir le tableau des métaphores (section 12) avant de dessiner.
 
 ## 8. Couleurs (posées par le CSS, jamais dans les sources)
@@ -146,7 +146,7 @@ Un fichier dont le nom ne correspond à aucune clé de `taxonomie.js` est refus�
 | Puce de genre | 16 px | `oklch(.72 (--c + .035) --teinte)` : teinte de la puce, un peu plus vive que son nombre | craie `#eceae4` |
 | Puce d'univers | 16 px | idem (le `--c` des univers est plus faible : couleurs plus éteintes) | craie |
 | Raccourcis (au hasard, j'ai aimé, hors ligne) | 24 px (26 px sur ordinateur) | lavande `#a8b3f0` (ce qu'on touche) | craie |
-| Âges | 24 px (26 px) | une teinte par tranche, du chaud au froid (on grandit), `oklch(.76 .085 h)` : 3-4 ans h 28 (pêche), 5-6 ans h 82 (miel), 7-8 ans h 152 (menthe), 9 ans et + h 236 (ciel) | craie |
+| Âges | 24 px (26 px) | une teinte par tranche, du chaud au froid (on grandit), `oklch(.76 .085 h)` : 4-6 ans h 28 (pêche), 7-9 ans h 82 (miel), 10-12 ans h 152 (menthe), 13 ans et + h 236 (ciel) | craie |
 | Titre « Tendances » | 20 px | or `#f2d27a` (ce qui brille) | craie |
 
 L'icône d'une tuile mesure 24 px, mais seuls 20 px comptent dans la hauteur (marge de −2 px). Les tuiles et les puces gardent exactement leur taille : 34 px pour les puces, sur une ligne par groupe qui défile si elle ne tient pas.
@@ -214,10 +214,10 @@ Métaphores prévues au départ pour chaque clé. Une icône a pu s'en écarter 
 | `collection:aimes` | pouce levé, même dessin que le pouce de vote du lanceur | pulser |
 | `collection:hors-ligne` | téléphone avec une flèche qui descend dedans (jeu gardé sur l'appareil) ; jamais de signal barré | sautiller |
 | `collection:multi` | deux petits joueurs côte à côte (tête ronde, épaules) ; ni manette ni écran | sautiller |
-| `age:3-4` | doudou ours : yeux et truffe percés, museau craie | sautiller |
-| `age:5-6` | cerf-volant en losange, queue à nœuds (pivot en bas de la ficelle) | osciller |
-| `age:7-8` | vélo de profil, deux roues | galoper |
-| `age:9+` | planche à roulettes de profil, nez relevé | decoller |
+| `age:4-6` | doudou ours : yeux et truffe percés, museau craie | sautiller |
+| `age:7-9` | vélo de profil, deux roues | galoper |
+| `age:10-12` | planche à roulettes de profil, nez relevé | decoller |
+| `age:13+` | lampe torche tournée vers la droite : long manche à bouton craie, tête à peine évasée, cône de lumière plein fermé par un arc (jamais des ondes : ce n'est pas un mégaphone) ; balaie autour du manche, deux étincelles montent | osciller (pivot au manche) |
 
 **Genres**
 

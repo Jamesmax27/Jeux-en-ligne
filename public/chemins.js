@@ -26,7 +26,8 @@
 // et un univers de même identifiant. Les identifiants (jeux, genres, univers) ne
 // changent pas : une adresse publiée reste valable ; celle d'un genre ou d'un
 // univers retiré mène en 301 à la catégorie qui l'a remplacé (ANCIENS_IDS de
-// taxonomie.js, fichier _redirects écrit par scripts/pages-seo.mjs).
+// taxonomie.js, fichier _redirects écrit par scripts/pages-seo.mjs), comme
+// celle d'une tranche d'âge retirée (ANCIENNES_TRANCHES).
 // Toutes les adresses partent de la racine du site et finissent par « / »
 // (forme servie par Cloudflare Pages sans redirection).
 // ==========================================================================
@@ -53,7 +54,12 @@ const SEGMENTS = {
 const SEGMENTS_PROPOSER = { fr: 'proposer', en: 'suggest', es: 'proponer', pt: 'sugerir', de: 'vorschlagen' };
 
 // Tranches d'âge (TRANCHES_AGE de taxonomie.js) → morceau d'adresse (« + » est interdit).
-export const SLUGS_AGE = { '3-4': '3-4', '5-6': '5-6', '7-8': '7-8', '9+': '9-plus' };
+// Les tranches retirées (ANCIENNES_TRANCHES) gardent le leur : leurs anciennes
+// adresses mènent en 301 à la nouvelle tranche (_redirects).
+export const SLUGS_AGE = {
+  '4-6': '4-6', '7-9': '7-9', '10-12': '10-12', '13+': '13-plus',
+  '3-4': '3-4', '5-6': '5-6', '7-8': '7-8', '9+': '9-plus',
+};
 
 const langueValide = (lang) => (LANGUES.includes(lang) ? lang : 'fr');
 
@@ -68,7 +74,7 @@ export function urlJeu(id, lang) {
   return `/${PREFIXE[l]}${SEGMENTS.jeu[l]}/${encodeURIComponent(id)}/`;
 }
 
-/** Page d'une catégorie : famille « genre », « univers » ou « age » (id de tranche, ex. « 9+ »). */
+/** Page d'une catégorie : famille « genre », « univers » ou « age » (id de tranche, ex. « 13+ »). */
 export function urlCategorie(famille, id, lang) {
   const l = langueValide(lang);
   const segment = SEGMENTS[famille]?.[l];
