@@ -1,9 +1,12 @@
 // ==========================================================================
 // Partie : un Durable Object par partie (nom donné par l'accueil). C'est
 // l'arbitre : il fait jouer les robots, reçoit les actions des vrais joueurs,
-// les contrôle et les renvoie à tous (Arbitre de moteur.js). Aucun joueur
-// n'est l'hôte : le départ de l'un d'eux (fermeture de la page, réseau perdu)
-// rend sa place à un robot, et la partie continue.
+// les contrôle et les renvoie à tous (Arbitre de moteur.js). Avant chaque
+// manche, un salon d'attente : les arrivants prennent la place de robots, et
+// le chef (premier joueur arrivé encore présent) lance la manche, sinon elle
+// part seule au bout de attenteSalon. Le chef n'est pas un hôte : le départ de
+// n'importe quel joueur (fermeture de la page, réseau perdu) rend sa place à
+// un robot, le suivant devient chef, et la partie continue.
 //
 // Économie du quota gratuit (docs/multijoueur.md) :
 // - API WebSocket « hibernation » : entre deux messages, l'objet peut quitter
@@ -39,7 +42,8 @@ export class Partie {
 
   creer(jeu, nom) {
     this.infos = { jeu, nom };
-    this.arbitre = new Arbitre(JEUX[jeu].regles, { envoyer: (cle, m) => this.diffuser(cle, m) });
+    // salon : avant chaque manche, salon d'attente ; le chef (premier arrivé) lance la manche.
+    this.arbitre = new Arbitre(JEUX[jeu].regles, { salon: true, envoyer: (cle, m) => this.diffuser(cle, m) });
   }
 
   // Arbitre relu dans le stockage après un réveil. false : aucune partie gardée.

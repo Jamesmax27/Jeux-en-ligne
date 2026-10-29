@@ -432,7 +432,7 @@ jobs:
                Genres et univers : uniquement les identifiants des listes fermées de public/taxonomie.js (interdit d'en
                créer) ; le robot refuse toute autre valeur.
                D'autres agents créent d'autres jeux en même temps : réalise uniquement cette idée.
-               ${{ matrix.idee.multijoueur && format('JEU MULTIJOUEUR ({0} places) : lis docs/multijoueur.md EN ENTIER avant d''écrire le cahier de conception, et suis ses sections 3 et 4 (blocs jel-multi et jel-regles, règles pures au tour par tour, JEL_MULTI.creer, bouton « Avec d''autres joueurs » avec data-multi="jouer", robots crédibles et battables, 20 niveaux solo contre des robots). Le cahier de conception a en plus une section « Multijoueur » (règles au tour par tour, robots, ce que voit chaque joueur, arrivée et départ d''un vrai joueur). Dans game.json : "multijoueur": true et "places" (le même nombre que places dans les règles). Contrôle obligatoire en plus de ceux des étapes 6 et 7 : node scripts/tester-multijoueur.mjs <id> --navigateur, jusqu''à « Multijoueur : tout est bon », puis regarde avec Read les captures de captures/multijoueur/<id>/ (table pleine : tout doit rester lisible sur téléphone).', matrix.idee.places || 'de 2 à 10, à choisir selon le jeu') || 'Jeu solo : ni "multijoueur" ni "places" dans game.json.' }}
+               ${{ matrix.idee.multijoueur && format('JEU MULTIJOUEUR ({0} places) : lis docs/multijoueur.md EN ENTIER avant d''écrire le cahier de conception, et suis ses sections 3 et 4 (blocs jel-multi et jel-regles, règles pures au tour par tour, JEL_MULTI.creer, bouton « Avec d''autres joueurs » avec data-multi="jouer", salon d''attente où le premier joueur arrivé lance la partie avec le bouton data-multi="lancer" (partie.lancerManche()), robots crédibles et battables, 20 niveaux solo contre des robots ; le jeu pilote games/enclos-de-la-ferme/ est le modèle à suivre). Le cahier de conception a en plus une section « Multijoueur » (règles au tour par tour, robots, ce que voit chaque joueur, arrivée et départ d''un vrai joueur). Dans game.json : "multijoueur": true et "places" (le même nombre que places dans les règles). Contrôle obligatoire en plus de ceux des étapes 6 et 7 : node scripts/tester-multijoueur.mjs <id> --navigateur, jusqu''à « Multijoueur : tout est bon », puis regarde avec Read les captures de captures/multijoueur/<id>/ (table pleine : tout doit rester lisible sur téléphone).', matrix.idee.places || 'de 2 à 10, à choisir selon le jeu') || 'Jeu solo : ni "multijoueur" ni "places" dans game.json.' }}
             4. Avant d'écrire la moindre ligne de code, écris le cahier de conception dans conception.md (à la racine
                du dépôt). Il deviendra la description de la pull request. En français :
                - Principe : le but du jeu et le geste de base, en 2 phrases ;
@@ -1036,9 +1036,10 @@ jobs:
                appelée à chaque image), et level doit être le numéro du niveau joué à partir de 1 (ou le score d'un
                jeu sans niveaux). Sinon NON, avec la correction à faire.
                Jeu multijoueur (game.json : "multijoueur": true) : lis aussi docs/multijoueur.md (sections 3, 4, 5 et
-               9) et regarde avec Read les captures de captures/multijoueur/${{ steps.pr.outputs.id }}/ (en ligne, table
-               pleine, partie, après la coupure du réseau). Ajoute au tableau le point bloquant « Multijoueur » : règles au tour par tour dans
-               jel-regles (le robot a vérifié qu'elles sont pures et identiques partout) ; robots crédibles (coups
+               9) et regarde avec Read les captures de captures/multijoueur/${{ steps.pr.outputs.id }}/ (salon, salon plein,
+               table pleine, partie, après la coupure du réseau). Ajoute au tableau le point bloquant « Multijoueur » : règles au tour par tour dans
+               jel-regles (le robot a vérifié qu'elles sont pures et identiques partout) ; salon d'attente clair (places,
+               chef, compte à rebours, bouton « Lancer la partie » du chef) ; robots crédibles (coups
                sensés, pas toujours les mêmes) et battables ; places montrées avec « Toi », robot ou vrai joueur, sans
                aucun nom tapé ni message libre ; arrivée et départ d'un vrai joueur visibles ; messages traduits
                (recherche de joueurs, robots locaux, connexion perdue) ; lisible et fluide sur téléphone avec toutes

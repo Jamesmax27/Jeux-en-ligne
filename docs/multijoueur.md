@@ -5,7 +5,7 @@ Ce document décrit le multijoueur du site : architecture, Worker Cloudflare com
 ## 1. En bref
 
 - Un jeu multijoueur est un jeu du site comme les autres : un seul `index.html` dans `games/<id>/`, hébergé sur Cloudflare Pages, jouable **entièrement hors ligne contre des robots**.
-- En ligne, il se joue à plusieurs **sans compte ni pseudo ni discussion** : de vrais joueurs remplacent des robots. Toutes les places vides sont tenues par des robots ; une partie démarre donc tout de suite, même seul.
+- En ligne, il se joue à plusieurs **sans compte ni pseudo ni discussion** : de vrais joueurs remplacent des robots. Les joueurs se retrouvent d'abord dans un **salon d'attente** où toutes les places vides sont tenues par des robots ; le premier arrivé (le « chef ») lance la partie quand il veut, avec 1 à N vrais joueurs (sur 4 places : 1 joueur et 3 robots, 2 et 2, 3 et 1, ou 4 joueurs). Sans lancement, elle part seule au bout de 90 s.
 - Le serveur est **un seul Worker Cloudflare commun** à tous les jeux multijoueurs (`multijoueur/`), sur le même compte que le site et la base des votes (pas de Firebase). Il fait tourner **un Durable Object par partie** : c'est l'arbitre. Joueurs et serveur se parlent par WebSocket.
 - Seules les **actions** des joueurs circulent (« je pose la clôture n° 12 »), jamais l'état complet du jeu en continu. Le même code de règles tourne sur le serveur et sur chaque appareil. Ils arrivent donc tous au même état.
 - Jeux **au tour par tour** (ou par manches) : c'est ce qui tient dans le plan gratuit de Cloudflare (section 7).
@@ -74,7 +74,8 @@ window.JEL_REGLES = {
   places: 4,              // PLACES : nombre de places de la partie, 2 à 10 — la seule constante
   delaiBot: 700,          // ms entre deux coups affichés (200 à 3000)
   delaiJoueur: 20000,     // ms laissées à un vrai joueur avant que son robot joue (5000 à 60000)
-  pauseManche: 6000,      // ms entre deux manches en ligne (2000 à 30000)
+  pauseManche: 6000,      // ms entre deux manches en solo, ou après une coupure du réseau (2000 à 30000)
+  attenteSalon: 90000,    // ms avant que le salon d'attente lance seul la manche (20000 à 300000)
   remplacement: 'tour',   // 'tour' : un arrivant prend la place d'un robot tout de suite ; 'manche' : à la manche suivante
   forceEnLigne: 0.6,      // force des robots en ligne (0 à 1)
   depart(alea, places, options) { … return etat; },   // état de départ d'une manche
@@ -108,25 +109,26 @@ const partie = JEL_MULTI.creer({
 partie.lancer();
 ```
 
-- **Événements** (`e.type`) : `mode` (`connexion` → « Recherche de joueurs… », `en-ligne`, `solo` avec `e.raison`) ; `debut` (arrivée dans une partie : `partie.etat` peut être `null` jusqu'à la manche) ; `manche` (nouvelle manche) ; `action` (`e.siege`, `e.action`, `e.avant`, `e.apres`, `e.moi`, `e.auto` : robot qui a joué à la place d'un joueur trop long) ; `fin` (`e.resultat` de `fin`) ; `sieges` (un vrai joueur arrive ou part) ; `refus`.
-- **Lecture** : `partie.etat`, `partie.siege` (place du joueur de l'appareil, −1 s'il attend), `partie.sieges()` (`[{ humain, moi }]`), `partie.mode`, `partie.phase` (`attente`, `jeu`, `pause`), `partie.monTour()`.
-- **Commandes** : `partie.jouer(action)` (seulement quand `monTour()` ; l'action est jouée à son retour, comme celles des autres), `partie.pause(true|false)`, `partie.recommencer(options)` (solo : niveau suivant, rejouer), `partie.quitter()`.
+- **Événements** (`e.type`) : `mode` (`connexion` → « Recherche de joueurs… », `en-ligne`, `solo` avec `e.raison`) ; `debut` (arrivée dans une partie, le plus souvent dans le salon : `partie.etat` peut être `null`) ; `salon` (salon d'attente, avant la 1re manche et après chacune ; `e.reste` : ms avant le lancement automatique) ; `manche` (nouvelle manche) ; `action` (`e.siege`, `e.action`, `e.avant`, `e.apres`, `e.moi`, `e.auto` : robot qui a joué à la place d'un joueur trop long) ; `fin` (`e.resultat` de `fin`) ; `sieges` (un vrai joueur arrive ou part, ou le chef change) ; `refus`.
+- **Lecture** : `partie.etat`, `partie.siege` (place du joueur de l'appareil, −1 s'il attend), `partie.sieges()` (`[{ humain, moi, chef }]`), `partie.chef` (place du chef), `partie.estChef()`, `partie.mode`, `partie.phase` (`attente`, `salon`, `jeu`, `pause`), `partie.monTour()`.
+- **Commandes** : `partie.jouer(action)` (seulement quand `monTour()` ; l'action est jouée à son retour, comme celles des autres), `partie.lancerManche()` (le chef, dans le salon), `partie.pause(true|false)`, `partie.recommencer(options)` (solo : niveau suivant, rejouer), `partie.quitter()`.
 - Les coups des autres arrivent **un par un, espacés de `delaiBot`** : le jeu anime chaque événement `action`.
 - En solo, les mêmes événements arrivent, produits par un arbitre sur l'appareil.
 
 ### Écrans et contenu
 
-- **Écran titre** : le bouton « Jouer » (le premier de l'écran, avec `JEL_SAVE.reprise`) lance le parcours solo de **20 niveaux au moins** contre des robots de plus en plus forts (règles de `CONSIGNES-JEU.md` : niveaux, étoiles, sauvegarde, tutoriel). Un second bouton, **« Avec d'autres joueurs »**, porte `data-multi="jouer"` (repère du robot de contrôle) et lance la partie en ligne : manches qui s'enchaînent, terrains variés tirés par l'arbitre.
+- **Écran titre** : le bouton « Jouer » (le premier de l'écran, avec `JEL_SAVE.reprise`) lance le parcours solo de **20 niveaux au moins** contre des robots de plus en plus forts (règles de `CONSIGNES-JEU.md` : niveaux, étoiles, sauvegarde, tutoriel). Un second bouton, **« Avec d'autres joueurs »**, porte `data-multi="jouer"` (repère du robot de contrôle) et mène au salon d'attente de la partie en ligne (terrains variés tirés par l'arbitre).
+- **Salon d'attente** (en ligne) : les places (vrais joueurs et robots), le chef bien repéré, les arrivées et départs en direct, le compte à rebours du lancement automatique ; pour le chef, un gros bouton **« Lancer la partie »** avec `data-multi="lancer"` qui appelle `partie.lancerManche()` ; pour les autres, « le premier joueur arrivé lance la partie ». Après chaque manche : classement, puis le salon (« Lancer la manche suivante » pour le chef).
 - **Places** : chacune est montrée par une couleur ou un animal dessiné, avec un petit pictogramme « robot » ou « joueur » et « Toi » pour le joueur de l'appareil. **Aucun nom tapé, aucune discussion, aucun message libre** : les joueurs ne peuvent rien s'écrire.
-- Messages traduits (5 langues) pour : recherche de joueurs ; « Personne n'est disponible : tu joues contre des robots » ; « Connexion perdue : la partie continue contre des robots » ; un joueur arrive ou part ; robot qui a joué à la place d'un joueur trop long ; prochaine manche dans N s.
+- Messages traduits (5 langues) pour : recherche de joueurs ; salon (chef ou non, lancement automatique dans N s) ; « Personne n'est disponible : tu joues contre des robots » ; « Connexion perdue : la partie continue contre des robots » ; un joueur arrive ou part ; robot qui a joué à la place d'un joueur trop long.
 - **Lisible et fluide sur téléphone avec toutes les places occupées** (390 × 844) : tour en cours bien visible, scores de chaque place, rien de coupé.
 - **Pause** : en solo, elle fige tout ; en ligne, la partie continue sur le serveur (après `delaiJoueur`, le robot joue pour le joueur) : le menu le dit.
 - `FMG.reportEnd` à chaque fin de manche (en ligne aussi) : `completed: true` si le joueur gagne la manche, `false` sinon ; `level` = niveau ou terrain.
 
 ## 4. Les robots
 
-- **Toutes les places vides sont des robots** : la partie démarre tout de suite.
-- Un vrai joueur qui arrive **prend la place d'un robot** : tout de suite (`remplacement: 'tour'`, entre deux coups : l'arbitre ne s'arrête jamais au milieu d'un coup), ou à la manche suivante (`'manche'`, si une arrivée en cours de manche casserait le jeu). Il reprend le score de la place.
+- **Toutes les places vides sont des robots**, dès le salon d'attente : le chef peut lancer à tout moment, même seul.
+- Un vrai joueur qui arrive **prend la place d'un robot** : dans le salon, tout de suite ; pendant une manche, tout de suite aussi (`remplacement: 'tour'`, entre deux coups : l'arbitre ne s'arrête jamais au milieu d'un coup) ou à la manche suivante (`'manche'`, si une arrivée en cours de manche casserait le jeu). Il reprend le score de la place.
 - Un vrai joueur qui part (page fermée, réseau perdu, page cachée plus d'une minute) **rend sa place à un robot**, qui continue.
 - **Crédibles** : ils jouent des coups sensés, pas toujours les mêmes (le hasard `alea` les fait varier), avec un temps de réflexion affiché (`delaiBot`). **Battables** : `force` (0 à 1) dose leurs erreurs ; à `forceEnLigne`, un joueur attentif gagne souvent. En solo, la force grandit avec les niveaux.
 - Le robot de contrôle vérifie qu'un joueur qui joue au mieux gagne au moins une manche sur 10, et que les robots ne jouent pas toujours pareil.
@@ -134,15 +136,16 @@ partie.lancer();
 ## 5. L'arbitre
 
 - **Le Durable Object de la partie est l'arbitre** (`Arbitre` de `moteur.js`, utilisé par `partie.js`) : il fait jouer les robots, reçoit les actions des joueurs, les contrôle (`valide`, tour du joueur, numéro du coup) et les renvoie à tous, avec la graine du hasard du coup.
-- **Aucun joueur n'est l'hôte** : le départ de n'importe qui n'interrompt jamais la partie.
-- **Pas de boucle** : dès que c'est aux robots, l'arbitre calcule tous leurs coups d'un coup, jusqu'au tour d'un vrai joueur. Les appareils les affichent ensuite un par un, espacés de `delaiBot`. La seule minuterie est une alarme : temps laissé à un vrai joueur (`delaiJoueur`, puis son robot joue, coup marqué `auto`), pause entre deux manches (`pauseManche`), ou veille de 15 min. Les robots ne font donc jamais plus de quelques mises à jour par seconde à l'écran, et aucune sur le serveur entre deux messages.
-- **Manches** : en ligne, elles s'enchaînent seules après `pauseManche`.
+- **Salon et chef** : avant chaque manche, l'arbitre ouvre un salon d'attente. Le chef est le premier vrai joueur arrivé encore présent : lui seul peut lancer la manche (message `lancer`). S'il part, le joueur arrivé juste après lui devient chef. Sans lancement, la manche part seule au bout de `attenteSalon` (90 s), pour qu'un chef parti ne bloque personne.
+- **Aucun joueur n'est l'hôte** : le chef ne fait que lancer ; le départ de n'importe qui n'interrompt jamais la partie.
+- **Pas de boucle** : dès que c'est aux robots, l'arbitre calcule tous leurs coups d'un coup, jusqu'au tour d'un vrai joueur. Les appareils les affichent ensuite un par un, espacés de `delaiBot`. La seule minuterie est une alarme : temps laissé à un vrai joueur (`delaiJoueur`, puis son robot joue, coup marqué `auto`), lancement automatique du salon (`attenteSalon`), ou veille de 15 min. Les robots ne font donc jamais plus de quelques mises à jour par seconde à l'écran, et aucune sur le serveur entre deux messages.
+- **Manches** : en ligne, chaque manche finie ramène au salon ; en solo, elles suivent les niveaux (ou s'enchaînent après `pauseManche` quand le serveur ne répond pas).
 - **Table pleine** : quand toutes les places sont prises par de vrais joueurs, le joueur suivant ouvre automatiquement une nouvelle partie (l'accueil la crée).
 - **Fin** : plus aucun vrai joueur connecté → l'alarme et le stockage de la partie sont effacés (`deleteAll`), le Durable Object est libéré, l'accueil oublie la partie.
 
-## 6. Messages (protocole 1)
+## 6. Messages (protocole 2)
 
-Serveur → joueurs : `bienvenue` (une fois, à l'arrivée : place, places des vrais joueurs, état complet), `manche` (graine et options), `action` (place, action, graine, `auto`), `sieges`, `place` (place attribuée à un joueur qui attendait), `refus`. Joueur → serveur : `action` (numéro du coup attendu, action) et `resync` (état redemandé après un message perdu). `ping` reçoit `pong` sans réveiller le Durable Object. Un changement de format augmente `PROTOCOLE` dans `moteur.js` (le serveur refuse alors les anciennes copies : robots locaux).
+Serveur → joueurs : `bienvenue` (une fois, à l'arrivée : place, places des vrais joueurs, chef, état complet), `salon` (chef, temps avant le lancement automatique), `manche` (graine et options), `action` (place, action, graine, `auto`), `sieges` (avec la place du chef), `place` (place attribuée à un joueur qui attendait), `refus`. Joueur → serveur : `action` (numéro du coup attendu, action), `lancer` (le chef, dans le salon) et `resync` (état redemandé après un message perdu). `ping` reçoit `pong` sans réveiller le Durable Object. Un changement de format augmente `PROTOCOLE` dans `moteur.js` (le serveur refuse alors les anciennes copies : robots locaux).
 
 ## 7. Quota gratuit de Cloudflare
 
@@ -178,12 +181,13 @@ Ce que le multijoueur fait pour rester dedans :
 | 2 à 10 places | `places` des règles, égal à `"places"` de `game.json` |
 | Règles pures et identiques partout | mots interdits, état refait sur un « appareil » à partir des seuls messages = état du serveur |
 | Remplacement robot ↔ joueur dans les deux sens | arrivée d'un 2e joueur, table pleine, départs |
+| Salon d'attente | pas de manche avant le lancement, seul le chef lance, retour au salon après la manche, nouveau chef au départ du premier, lancement automatique ; dans le navigateur : salon à l'arrivée, salon plein, bouton `data-multi="lancer"` du chef |
 | Le départ de n'importe quel joueur n'interrompt pas la partie | départs pendant la manche, robot à la place d'un joueur trop long |
 | Robots crédibles et battables | victoires d'un joueur fort, variété des coups |
 | Lisible et fluide sur téléphone avec toutes les places occupées | `--navigateur` : faux serveur, table remplie de vrais joueurs, captures dans `captures/multijoueur/<id>/`, coupure du réseau (le jeu doit continuer en solo) ; puis relecture des captures |
 | Worker | sites permis, règles et protocole identiques, répartition, `MAX_JOUEURS`, partie libérée |
 
-`validate-games.mjs` vérifie aussi `"multijoueur"` et `"places"`, le moteur `jel-multi` à jour, les règles `jel-regles` avant le code du jeu, `JEL_MULTI.creer` et le bouton `data-multi="jouer"`.
+`validate-games.mjs` vérifie aussi `"multijoueur"` et `"places"`, le moteur `jel-multi` à jour, les règles `jel-regles` avant le code du jeu, `JEL_MULTI.creer`, le bouton `data-multi="jouer"` et le bouton du chef `data-multi="lancer"` (`partie.lancerManche()`).
 
 ## 10. Déploiement du Worker
 

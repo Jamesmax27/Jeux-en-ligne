@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Free Micro Games — moteur commun des jeux multijoueurs          jel-multi v1
+   Free Micro Games — moteur commun des jeux multijoueurs          jel-multi v2
    JavaScript pur, sans dépendance. Détails : docs/multijoueur.md.
 
    Le même fichier sert à trois endroits :
@@ -22,24 +22,34 @@
    Facultatifs : remplacement ('tour' : un vrai joueur prend la place d'un
    robot tout de suite ; 'manche' : à la manche suivante), delaiBot (ms entre
    deux coups affichés), delaiJoueur (ms laissées à un vrai joueur avant que
-   son robot joue), pauseManche (ms entre deux manches), forceEnLigne.
+   son robot joue), pauseManche (ms entre deux manches, solo), attenteSalon
+   (ms avant que le salon lance seul la manche), forceEnLigne.
 
    Arbitre : fait tourner une partie (places, robots, coups, manches). En ligne,
    c'est le Durable Object de la partie qui l'utilise ; en solo, le jeu en crée
    un sur l'appareil. Il n'a ni minuterie ni boucle : les coups des robots sont
    calculés d'un coup, dès que c'est à eux (le jeu les affiche ensuite un par
    un, espacés de delaiBot), et seul un réveil (alarme) est programmé pour le
-   temps laissé à un vrai joueur ou la pause entre deux manches.
+   temps laissé à un vrai joueur, la pause entre deux manches ou le salon.
+
+   Salon (en ligne : réglage salon) : avant chaque manche, les joueurs se
+   retrouvent dans un salon d'attente ; les places vides y sont des robots, et
+   chaque joueur qui arrive prend la place d'un robot. Le « chef » (le premier
+   joueur arrivé encore présent) lance la manche ; s'il part, le suivant devient
+   chef. Sans lancement, la manche part seule après attenteSalon. Pendant une
+   manche, un arrivant remplace un robot selon « remplacement ».
 
    Messages de l'arbitre (seules les actions circulent, jamais l'état complet
    en continu ; l'état n'est envoyé qu'une fois, à l'arrivée d'un joueur) :
-     { t: 'bienvenue', proto, siege, sieges, n, manche, phase, etat, o, reste }
+     { t: 'bienvenue', proto, siege, sieges, chef, n, manche, phase, etat, o, reste }
+     { t: 'salon', chef, reste }        salon d'attente (reste : ms avant le lancement automatique)
      { t: 'manche', n, manche, g, o }   nouvelle manche (graine g, options o)
      { t: 'action', n, s, a, g, auto }  action a de la place s (graine g)
-     { t: 'sieges', sieges }            vrais joueurs (true) et robots (false)
+     { t: 'sieges', sieges, chef }      vrais joueurs (true) et robots (false), place du chef
      { t: 'place', siege }              place enfin attribuée (spectateur)
      { t: 'refus', n }                  action refusée
-   Messages d'un joueur : { t: 'action', n, a } et { t: 'resync' }.
+   Messages d'un joueur : { t: 'action', n, a }, { t: 'lancer' } (chef, dans le
+   salon) et { t: 'resync' }.
 
    API pour le jeu (window.JEL_MULTI) :
      creer({ regles, surEvenement, enLigne, force, options, enchainer })
@@ -51,13 +61,13 @@
   'use strict';
   if (racine.JEL_MULTI) return;
 
-  var PROTOCOLE = 1;               // à augmenter si les messages changent
+  var PROTOCOLE = 2;               // à augmenter si les messages changent (2 : salon d'attente)
   var TOURS_MAX = 5000;            // coups de robots enchaînés au plus (règles en boucle)
   var DELAI_CONNEXION = 6000;      // ms : sans réponse du serveur, partie contre des robots locaux
   var DELAI_MOI = 120;             // ms après son propre coup, avant le coup suivant affiché
   var DELAI_RATTRAPAGE = 80;       // ms entre deux coups rejoués après une pause en ligne
 
-  var DEFAUTS = { remplacement: 'tour', delaiBot: 700, delaiJoueur: 20000, pauseManche: 6000, forceEnLigne: 0.6 };
+  var DEFAUTS = { remplacement: 'tour', delaiBot: 700, delaiJoueur: 20000, pauseManche: 6000, attenteSalon: 90000, forceEnLigne: 0.6 };
   var FONCTIONS = ['depart', 'aQui', 'valide', 'jouer', 'bot', 'fin'];
 
   // --- Outils ---------------------------------------------------------------
@@ -86,7 +96,7 @@
     if (!Number.isInteger(r.places) || r.places < 2 || r.places > 10) p.push('"places" doit être un nombre entier de 2 à 10');
     FONCTIONS.forEach(function (f) { if (typeof r[f] !== 'function') p.push('fonction "' + f + '" absente'); });
     if (r.remplacement !== undefined && r.remplacement !== 'tour' && r.remplacement !== 'manche') p.push('"remplacement" : "tour" ou "manche"');
-    var bornes = { delaiBot: [200, 3000], delaiJoueur: [5000, 60000], pauseManche: [2000, 30000], forceEnLigne: [0, 1] };
+    var bornes = { delaiBot: [200, 3000], delaiJoueur: [5000, 60000], pauseManche: [2000, 30000], attenteSalon: [20000, 300000], forceEnLigne: [0, 1] };
     Object.keys(bornes).forEach(function (k) {
       if (r[k] !== undefined && !(typeof r[k] === 'number' && r[k] >= bornes[k][0] && r[k] <= bornes[k][1])) {
         p.push('"' + k + '" : nombre de ' + bornes[k][0] + ' à ' + bornes[k][1]);
@@ -108,6 +118,7 @@
   //   envoyer(cle, message)  cle = un joueur, ou null pour tous
   //   maintenant()           heure en ms (Date.now par défaut)
   //   alea()                 hasard du serveur (Math.random par défaut)
+  //   salon                  true (en ligne) : salon d'attente avant chaque manche, lancée par le chef
   //   enchainer              false : pas de nouvelle manche automatique (solo à niveaux)
   //   delaiJoueur            remplace celui des règles (Infinity : jamais de robot à sa place)
   //   force                  force des robots (forceEnLigne des règles par défaut)
@@ -121,11 +132,13 @@
     this.sieges = [];                       // cle du vrai joueur de chaque place, null = robot
     for (var s = 0; s < this.places; s++) this.sieges.push(null);
     this.attente = [];                      // joueurs qui attendent une place (remplacement 'manche')
+    this.arrivees = [];                     // vrais joueurs présents, dans l'ordre d'arrivée (le 1er est le chef)
     this.etat = null;
     this.n = 0;                             // numéro du dernier message de jeu (manche ou action)
     this.manche = 0;
-    this.phase = 'attente';                 // 'attente' (rien commencé), 'jeu', 'pause' (entre deux manches)
+    this.phase = 'attente';                 // 'attente' (rien commencé), 'salon', 'jeu', 'pause' (entre deux manches, solo)
     this.finManche = 0;                     // fin de la pause entre deux manches (ms)
+    this.salonDepuis = 0;                   // ouverture du salon (ms), pour son lancement automatique
     this.echeance = null;                   // { siege, quand } : temps laissé à un vrai joueur
     this.options = null;                    // options de la manche en cours
   }
@@ -145,8 +158,9 @@
   // État à garder (stockage du Durable Object entre deux réveils).
   Arbitre.prototype.donnees = function () {
     return {
-      v: PROTOCOLE, sieges: this.sieges, attente: this.attente, etat: this.etat, n: this.n, manche: this.manche,
-      phase: this.phase, finManche: this.finManche, echeance: this.echeance, options: this.options,
+      v: PROTOCOLE, sieges: this.sieges, attente: this.attente, arrivees: this.arrivees, etat: this.etat, n: this.n,
+      manche: this.manche, phase: this.phase, finManche: this.finManche, salonDepuis: this.salonDepuis,
+      echeance: this.echeance, options: this.options,
     };
   };
 
@@ -154,6 +168,9 @@
     if (!d || d.v !== PROTOCOLE || !Array.isArray(d.sieges) || d.sieges.length !== this.places) return false;
     this.sieges = d.sieges.slice();
     this.attente = Array.isArray(d.attente) ? d.attente.slice() : [];
+    var presents = this.sieges.concat(this.attente).filter(function (c) { return c !== null; });
+    this.arrivees = Array.isArray(d.arrivees) ? d.arrivees.filter(function (c) { return presents.indexOf(c) >= 0; }) : presents;
+    this.salonDepuis = d.salonDepuis || 0;
     this.etat = d.etat;
     this.n = d.n;
     this.manche = d.manche;
@@ -165,13 +182,27 @@
   };
 
   Arbitre.prototype.flagsSieges = function () { return this.sieges.map(function (c) { return c !== null; }); };
-  Arbitre.prototype.envoyerSieges = function () { this.envoyer(null, { t: 'sieges', sieges: this.flagsSieges() }); };
+
+  // Le chef : le premier vrai joueur arrivé encore présent ; sa place (-1 s'il n'en a pas encore).
+  Arbitre.prototype.chef = function () { return this.arrivees.length ? this.arrivees[0] : null; };
+  Arbitre.prototype.siegeChef = function () { var c = this.chef(); return c === null ? -1 : this.sieges.indexOf(c); };
+
+  Arbitre.prototype.envoyerSieges = function () {
+    this.envoyer(null, { t: 'sieges', sieges: this.flagsSieges(), chef: this.siegeChef() });
+  };
+
+  // Temps restant avant la fin de la pause (solo) ou le lancement automatique du salon.
+  Arbitre.prototype.reste = function () {
+    var t = this.maintenant();
+    if (this.phase === 'pause') return Math.max(0, this.finManche - t);
+    if (this.phase === 'salon') return Math.max(0, this.salonDepuis + this.r.attenteSalon - t);
+    return 0;
+  };
 
   Arbitre.prototype.bienvenue = function (cle, siege) {
     this.envoyer(cle, {
-      t: 'bienvenue', proto: PROTOCOLE, siege: siege, sieges: this.flagsSieges(), n: this.n, manche: this.manche,
-      phase: this.phase, etat: this.etat, o: this.options,
-      reste: this.phase === 'pause' ? Math.max(0, this.finManche - this.maintenant()) : 0,
+      t: 'bienvenue', proto: PROTOCOLE, siege: siege, sieges: this.flagsSieges(), chef: this.siegeChef(),
+      n: this.n, manche: this.manche, phase: this.phase, etat: this.etat, o: this.options, reste: this.reste(),
     });
   };
 
@@ -187,9 +218,23 @@
     return choix;
   };
 
-  // Première manche, une fois le premier joueur arrivé.
+  // Une fois le premier joueur arrivé : salon d'attente (en ligne), sinon première manche.
   Arbitre.prototype.demarrer = function () {
-    if (this.phase === 'attente') this.nouvelleManche();
+    if (this.phase !== 'attente') return;
+    if (this.reglages.salon) this.ouvrirSalon(0);
+    else this.nouvelleManche();
+  };
+
+  // Salon d'attente : les arrivants prennent la place de robots ; le chef lance la
+  // manche (message 'lancer'), sinon elle part seule après attenteSalon.
+  // delai : temps d'affichage des derniers coups de la manche précédente.
+  Arbitre.prototype.ouvrirSalon = function (delai) {
+    this.phase = 'salon';
+    this.echeance = null;
+    this.salonDepuis = this.maintenant() + delai;
+    this.placerAttente();
+    // reste : compté à partir du moment où l'appareil lit le message (après l'affichage des coups).
+    this.envoyer(null, { t: 'salon', chef: this.siegeChef(), reste: this.r.attenteSalon });
   };
 
   Arbitre.prototype.nouvelleManche = function () {
@@ -231,15 +276,19 @@
     if (this.estPleine()) return null;
     var s = this.r.remplacement === 'manche' && this.phase === 'jeu' ? -1 : this.siegeRobot();
     if (s >= 0) this.sieges[s] = cle; else this.attente.push(cle);
+    this.arrivees.push(cle);
     this.bienvenue(cle, s);
     if (s >= 0) this.envoyerSieges();
     return s;
   };
 
-  // Un vrai joueur s'en va : un robot reprend sa place, la partie continue.
+  // Un vrai joueur s'en va : un robot reprend sa place, la partie continue ;
+  // si c'était le chef, le joueur arrivé juste après lui le devient.
   Arbitre.prototype.quitter = function (cle) {
+    var k = this.arrivees.indexOf(cle);
+    if (k >= 0) this.arrivees.splice(k, 1);
     var i = this.attente.indexOf(cle);
-    if (i >= 0) { this.attente.splice(i, 1); return; }
+    if (i >= 0) { this.attente.splice(i, 1); if (k === 0) this.envoyerSieges(); return; }
     var s = this.sieges.indexOf(cle);
     if (s < 0) return;
     this.sieges[s] = null;
@@ -296,6 +345,7 @@
   };
 
   Arbitre.prototype.finirManche = function (delai) {
+    if (this.reglages.salon) { this.ouvrirSalon(delai); return; }
     this.phase = 'pause';
     this.echeance = null;
     this.finManche = this.maintenant() + delai + this.r.pauseManche;
@@ -306,6 +356,11 @@
     if (!m || typeof m !== 'object') return;
     var s = this.sieges.indexOf(cle);
     if (m.t === 'resync') { this.bienvenue(cle, s); return; }
+    // Le chef lance la manche depuis le salon (les autres attendent).
+    if (m.t === 'lancer') {
+      if (this.phase === 'salon' && cle === this.chef()) this.nouvelleManche();
+      return;
+    }
     if (m.t !== 'action') return;
     if (s < 0 || this.phase !== 'jeu' || m.n !== this.n || this.r.aQui(this.etat) !== s || !this.valide(s, m.a)) {
       this.envoyer(cle, { t: 'refus', n: this.n });
@@ -319,14 +374,19 @@
   // Heure du prochain réveil utile (ms), ou null.
   Arbitre.prototype.prochainReveil = function () {
     if (this.phase === 'pause' && this.reglages.enchainer !== false) return this.finManche;
+    if (this.phase === 'salon') return this.salonDepuis + this.r.attenteSalon;
     if (this.phase === 'jeu' && this.echeance) return this.echeance.quand;
     return null;
   };
 
-  // Réveil (alarme) : nouvelle manche après la pause, ou robot qui joue à la
-  // place d'un vrai joueur resté trop longtemps sans jouer.
+  // Réveil (alarme) : nouvelle manche après la pause ou au bout du salon, ou
+  // robot qui joue à la place d'un vrai joueur resté trop longtemps sans jouer.
   Arbitre.prototype.reveil = function () {
     var t = this.maintenant();
+    if (this.phase === 'salon' && t >= this.salonDepuis + this.r.attenteSalon) {
+      if (!this.estVide()) this.nouvelleManche();
+      return;
+    }
     if (this.phase === 'pause' && this.reglages.enchainer !== false && t >= this.finManche) {
       if (!this.estVide()) this.nouvelleManche();
       return;
@@ -342,11 +402,14 @@
   // o : {
   //   regles        window.JEL_REGLES
   //   surEvenement  function (e) : { type: 'mode', mode, raison } ('connexion', 'en-ligne', 'solo') ;
-  //                 { type: 'debut' } (arrivée dans une partie : etat, siege, sieges) ;
+  //                 { type: 'debut', reste } (arrivée dans une partie : etat, siege, sieges,
+  //                 phase : 'salon' le plus souvent) ;
+  //                 { type: 'salon', reste } (salon d'attente, en ligne : avant la 1re manche et
+  //                 après chacune ; le chef peut lancer, sinon lancement seul dans reste ms) ;
   //                 { type: 'manche' } (nouvelle manche, etat de départ) ;
   //                 { type: 'action', siege, action, avant, apres, auto, moi } ;
   //                 { type: 'fin', resultat } (fin(etat) des règles) ;
-  //                 { type: 'sieges' } (un vrai joueur arrive ou part) ; { type: 'refus' }
+  //                 { type: 'sieges' } (un vrai joueur arrive ou part, ou le chef change) ; { type: 'refus' }
   //   enLigne       false : directement contre des robots sur l'appareil (sinon : en ligne
   //                 si le lanceur du site le permet, robots locaux à défaut)
   //   force         force des robots locaux (0 à 1)
@@ -354,8 +417,9 @@
   //   enchainer     false : pas de nouvelle manche automatique en solo (jeu à niveaux)
   // }
   // Lecture : partie.mode, partie.etat, partie.siege (place du joueur, -1 en attente),
-  // partie.phase ('attente', 'jeu', 'pause'), partie.sieges() ([{ humain, moi }]),
-  // partie.monTour(). Commandes : lancer(), jouer(action), pause(oui), recommencer(options)
+  // partie.phase ('attente', 'salon', 'jeu', 'pause'), partie.sieges() ([{ humain, moi, chef }]),
+  // partie.chef (place du chef), partie.estChef(), partie.monTour(). Commandes : lancer(),
+  // lancerManche() (le chef, dans le salon), jouer(action), pause(oui), recommencer(options)
   // (solo), quitter(). La dernière partie lancée est aussi dans JEL_MULTI.derniere.
 
   function dansLanceur() {
@@ -372,6 +436,7 @@
     this.phase = 'attente';
     this.siege = -1;
     this.humains = [];
+    this.chef = -1;            // place du chef du salon (en ligne)
     this.options = null;
     this.file = [];            // messages reçus, joués un par un
     this.libreA = 0;           // heure à partir de laquelle le message suivant peut être joué
@@ -479,7 +544,8 @@
   // l'appareil, au même point, les autres places tenues par des robots locaux.
   Partie.prototype.basculer = function () {
     racine.removeEventListener('message', this.ecoute);
-    if (this.siege < 0 || !this.etat) { this.passerSolo('coupe'); return; }
+    // Coupure dans le salon (ou sans place) : une nouvelle manche commence contre des robots.
+    if (this.siege < 0 || !this.etat || this.phase === 'salon') { this.passerSolo('coupe'); return; }
     var a = this.creerArbitreLocal();
     var sieges = [];
     for (var s = 0; s < this.r.places; s++) sieges.push(s === this.siege ? 'moi' : null);
@@ -538,6 +604,7 @@
       case 'bienvenue':
         this.siege = m.siege;
         this.humains = m.sieges || [];
+        this.chef = typeof m.chef === 'number' ? m.chef : -1;
         this.n = m.n;
         this.manche = m.manche;
         this.options = m.o || null;
@@ -573,7 +640,14 @@
       }
       case 'sieges':
         this.humains = m.sieges || [];
+        if (typeof m.chef === 'number') this.chef = m.chef;
         this.signaler({ type: 'sieges' });
+        return 0;
+      case 'salon':
+        this.phase = 'salon';
+        if (typeof m.chef === 'number') this.chef = m.chef;
+        this.attendEcho = false;
+        this.signaler({ type: 'salon', reste: m.reste || 0 });
         return 0;
       case 'place':
         this.siege = m.siege;
@@ -598,8 +672,22 @@
 
   Partie.prototype.sieges = function () {
     var liste = [];
-    for (var s = 0; s < this.r.places; s++) liste.push({ humain: this.humains[s] === true, moi: s === this.siege });
+    for (var s = 0; s < this.r.places; s++) {
+      liste.push({ humain: this.humains[s] === true, moi: s === this.siege, chef: this.mode === 'en-ligne' && s === this.chef });
+    }
     return liste;
+  };
+
+  // Le joueur de l'appareil peut-il lancer la manche ? (en ligne, dans le salon, s'il est le chef)
+  Partie.prototype.estChef = function () {
+    return this.mode === 'en-ligne' && this.phase === 'salon' && this.siege >= 0 && this.siege === this.chef;
+  };
+
+  // Le chef lance la manche depuis le salon. Renvoie true si la demande part.
+  Partie.prototype.lancerManche = function () {
+    if (!this.estChef() || this.file.length) return false;
+    try { racine.parent.postMessage({ type: 'jel-multi', op: 'envoyer', m: { t: 'lancer' } }, '*'); } catch (e) { return false; }
+    return true;
   };
 
   Partie.prototype.monTour = function () {
