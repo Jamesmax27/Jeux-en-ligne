@@ -1,0 +1,115 @@
+# ==========================================================================
+# Déploiement du Worker multijoueur (multijoueur/, docs/multijoueur.md).
+#
+# Le site est publié par Cloudflare Pages à chaque envoi sur main ; le Worker
+# commun des jeux multijoueurs suit le même chemin : à chaque envoi sur main
+# qui touche le Worker, le moteur, les jeux ou ces scripts, et à la main
+# (onglet Actions → « Déployer le Worker multijoueur » → « Run workflow »).
+# La boucle de nuit le relance après ses fusions (une fusion faite par le robot
+# ne déclenche pas les autres workflows).
+#
+#  1. Règles des jeux multijoueurs recopiées dans le Worker (scripts/multijoueur.mjs).
+#  2. Contrôle du moteur, du Worker et des jeux (scripts/tester-multijoueur.mjs) :
+#     rien n'est déployé s'il échoue.
+#  3. Version comparée à celle en ligne (https://multi.freemicrogames.com/etat) :
+#     déploiement seulement si elle a changé. Un déploiement coupe les parties
+#     en cours (elles continuent alors sur les appareils, contre des robots).
+#  4. wrangler deploy.
+#
+# Secrets GitHub (Settings → Secrets and variables → Actions) :
+#   CLOUDFLARE_API_TOKEN   jeton Cloudflare (modèle « Edit Cloudflare Workers »)
+#   CLOUDFLARE_ACCOUNT_ID  identifiant du compte Cloudflare
+# Sans eux : avertissement, rien n'est déployé (pas d'échec).
+# ==========================================================================
+
+name: Déployer le Worker multijoueur
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "multijoueur/**"
+      - "public/multijoueur/**"
+      - "games/**"
+      - "scripts/multijoueur.mjs"
+      - "scripts/tester-multijoueur.mjs"
+      - ".github/workflows/multijoueur.yml"
+  workflow_dispatch:
+    inputs:
+      forcer:
+        description: "Déployer même si la version en ligne est la même"
+        type: boolean
+        default: false
+
+concurrency:
+  group: worker-multijoueur
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deployer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Secrets Cloudflare présents ?
+        id: secrets
+        env:
+          JETON: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          COMPTE: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$JETON" ] || [ -z "$COMPTE" ]; then
+            echo "::warning::Secrets CLOUDFLARE_API_TOKEN et CLOUDFLARE_ACCOUNT_ID absents : le Worker multijoueur n'est pas déployé (voir docs/multijoueur.md, section 10)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Règles des jeux multijoueurs
+        if: steps.secrets.outputs.ok == 'true'
+        run: node scripts/multijoueur.mjs
+
+      - name: Contrôle du moteur, du Worker et des jeux
+        if: steps.secrets.outputs.ok == 'true'
+        run: node scripts/tester-multijoueur.mjs
+
+      - name: Version déjà en ligne ?
+        id: version
+        if: steps.secrets.outputs.ok == 'true'
+        env:
+          FORCER: ${{ inputs.forcer }}
+        run: |
+          nouvelle=$(node scripts/multijoueur.mjs --version)
+          en_ligne=$(curl -fsS --max-time 10 https://multi.freemicrogames.com/etat | node -e 'let s="";process.stdin.on("data",(d)=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).version||"")}catch{console.log("")}})' || true)
+          echo "Version du dépôt : $nouvelle ; en ligne : ${en_ligne:-aucune}"
+          if [ "$nouvelle" = "$en_ligne" ] && [ "$FORCER" != "true" ]; then
+            echo "Le Worker en ligne est déjà à jour : rien à déployer."
+            echo "deployer=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "deployer=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Déployer (wrangler)
+        if: steps.version.outputs.deployer == 'true'
+        working-directory: multijoueur
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4.155.0 deploy
+
+      - name: Vérifier l'adresse du Worker
+        if: steps.version.outputs.deployer == 'true'
+        run: |
+          # Le domaine multi.freemicrogames.com peut mettre quelques minutes à répondre après le premier déploiement.
+          for essai in 1 2 3 4 5 6; do
+            if curl -fsS --max-time 10 https://multi.freemicrogames.com/etat; then echo; exit 0; fi
+            sleep 20
+          done
+          echo "::warning::https://multi.freemicrogames.com/etat ne répond pas encore (domaine en cours de création ?). Réessayer plus tard."

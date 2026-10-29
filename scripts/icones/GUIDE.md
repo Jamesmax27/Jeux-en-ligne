@@ -213,6 +213,7 @@ Métaphores prévues au départ pour chaque clé. Une icône a pu s'en écarter 
 | `hasard` | dé en perspective, points percés (1 dessus, 2 à gauche, 3 à droite) | tourner |
 | `collection:aimes` | pouce levé, même dessin que le pouce de vote du lanceur | pulser |
 | `collection:hors-ligne` | téléphone avec une flèche qui descend dedans (jeu gardé sur l'appareil) ; jamais de signal barré | sautiller |
+| `collection:multi` | deux petits joueurs côte à côte (tête ronde, épaules) ; ni manette ni écran | sautiller |
 | `age:3-4` | doudou ours : yeux et truffe percés, museau craie | sautiller |
 | `age:5-6` | cerf-volant en losange, queue à nœuds (pivot en bas de la ficelle) | osciller |
 | `age:7-8` | vélo de profil, deux roues | galoper |

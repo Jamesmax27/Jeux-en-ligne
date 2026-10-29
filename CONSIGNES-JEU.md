@@ -98,6 +98,16 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 - **Touches** : lire `event.code` (position de la touche) ; écrire ZQSD en français, WASD dans les autres langues.
 - Jeu qui repose sur des mots ou des lettres du français : `"non_traduisible": true` dans `game.json` (l'interface reste traduite, le catalogue indique « en français »).
 
+### Jeux multijoueurs
+
+Un jeu multijoueur (à plusieurs en ligne, robots aux places vides) suit **toutes** les règles de ce document, plus celles de **`docs/multijoueur.md`**, à lire en entier avant d'écrire le cahier de conception. L'essentiel :
+
+- `game.json` : `"multijoueur": true` et `"places"` (2 à 10, le même nombre que `places` dans les règles du jeu).
+- Règles du jeu dans `<script id="jel-regles">` (`window.JEL_REGLES` : fonctions pures, au tour par tour, sans `Date` ni `Math.random`, hasard par `alea`), après le moteur commun `<script id="jel-multi">` (recopié par `node scripts/i18n-jeu.mjs --assembler <id>`, jamais à la main) et avant le code du jeu. Le jeu n'a toujours **aucun code réseau** : c'est le lanceur qui se connecte au serveur.
+- Écran titre : « Jouer » (le premier bouton : 20 niveaux solo contre des robots, sauvegarde) et « Avec d'autres joueurs » (`data-multi="jouer"`, partie en ligne créée par `JEL_MULTI.creer`). Jouable entièrement hors ligne contre les robots.
+- Robots crédibles et battables ; places montrées par une couleur ou un animal avec « Toi », robot ou vrai joueur ; **aucun nom tapé, aucun message entre joueurs**.
+- Contrôle : `node scripts/tester-multijoueur.mjs <id> --navigateur` jusqu'à « Multijoueur : tout est bon », et regarder les captures de `captures/multijoueur/<id>/`.
+
 **Méthode de la boucle de nuit (recommandée pour tout nouveau jeu)** : les textes sont écrits à part, un fichier par langue, dans `i18n-jeu/<id>/` (dossier ignoré par git) :
 
 ```json
@@ -147,6 +157,7 @@ Le site et chaque jeu existent en **5 langues** : français (langue source), ang
 - `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier. Il ne change jamais : il sert dans l'adresse de la page du jeu (`/jeux/<id>/`, `/en/games/<id>/`…).
 - Les textes restent en français à la racine ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). `title` (60 caractères au plus) : titre de la carte et de la page du jeu. `description` (10 à 200 caractères) : phrase courte de la carte du catalogue, reprise en accroche sous le titre de la page.
 - `niveaux` : nombre de niveaux du jeu (20 au moins), égal à `window.JEL_NIVEAUX`.
+- `multijoueur` et `places` (jeu multijoueur seulement, section 3 « Jeux multijoueurs ») : `true` et le nombre fixe de places, de 2 à 10. Ils donnent l'étiquette « Multi » de la jaquette et la rubrique « Multijoueur » du catalogue. Un jeu de la boucle de nuit est multijoueur si et seulement si son idée l'est.
 - `consignes` : `2` pour les jeux faits selon ces consignes (posé automatiquement par la boucle de nuit) ; le robot applique alors les règles des nouveaux jeux (20 niveaux, présentation obligatoire). Les jeux plus anciens n'ont pas ce champ.
 - `version` : à augmenter quand `index.html` ou la jaquette changent (le numéro est dans leur adresse : les téléphones reprennent alors la nouvelle copie). Une retouche des seuls textes de `game.json` ne la change pas : elle met à jour `maj`.
 - `maj` (facultatif, racine seulement) : date de la dernière modification du jeu ou de ses textes, `AAAA-MM-JJ`, jamais avant `added` ni dans le futur. Elle sert de date de mise à jour au sitemap (sinon `added`). `node scripts/i18n-jeu.mjs --meta <id>` la pose tout seul ; après une modification du jeu, la mettre à la date du jour.
@@ -200,6 +211,7 @@ node scripts/check-i18n.js <id> --rapport
 node scripts/tester-sauvegarde.mjs <id> --captures (sauvegarde : écriture, reprise, effacement)
 node scripts/regles-seo.mjs <id>                   (textes de la page du jeu, sans construire le site)
 node scripts/verifier-seo.mjs <id>                 (construit le site, puis contrôle la page du jeu)
+node scripts/tester-multijoueur.mjs <id> --navigateur  (jeu multijoueur seulement : docs/multijoueur.md)
 ```
 
 Le robot ouvre le jeu dans un vrai navigateur, le joue 30 secondes au hasard et enregistre des captures d'écran dans `captures/<id>/` : regardez-les. Le résultat doit être « Tout est bon ». La vérification des traductions ouvre le jeu dans les 5 langues : elle doit finir par « tout est bon » ; relisez aussi les textes en dur qu'elle signale. Les textes de la page du jeu doivent donner « Textes SEO : tout est bon », puis le contrôle du référencement « Référencement : tout est bon » : seules les lignes « ERREUR » qui citent votre jeu bloquent, les lignes « attention » sur d'autres jeux sont à ignorer. Raccourcis : `npm run seo-textes -- <id>` et `npm run seo -- <id>`. Vérifiez ensuite la grille de la section 7, point par point.
@@ -223,6 +235,7 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Sauvegarde | module `save.js` absent, pas à jour ou pas appelé (`validate-games.mjs`), ou `scripts/tester-sauvegarde.mjs` signale un problème : rien d'écrit à la fermeture, pas de fenêtre « Continuer » avec une sauvegarde, « Continuer » qui ne ramène pas au niveau sauvegardé, effacement sans effet |
 | Fin de partie | aucun appel à `window.FMG.reportEnd`, ou un appel sans la garde `if (window.FMG)` sur la même ligne (`validate-games.mjs`, section 3 « Fin de partie ») |
 | Traductions | `scripts/check-i18n.js` signale une erreur : langue incomplète, clé manquante, valeur vide, `{variables}` différentes, titre, description ou présentation non traduits, erreur dans une des 5 langues (boucle de nuit et `validate.yml`) |
+| Multijoueur | (jeu `"multijoueur": true`) `"places"` absent ou hors de 2 à 10, moteur `jel-multi` absent ou pas à jour, règles `jel-regles` absentes, impures (réseau, page, `Date`, `Math.random`…) ou différentes d'un appareil à l'autre, manche sans fin, remplacement robot / joueur ou départ d'un joueur qui casse la partie, robots imbattables ou toujours pareils, Worker qui refuse le jeu, jeu qui ne passe pas en ligne avec le faux serveur ou ne continue pas après une coupure (`scripts/tester-multijoueur.mjs <id> --navigateur`, `validate-games.mjs`) ; ou jeu multijoueur alors que son idée ne l'est pas, ou l'inverse (`scripts/idees.mjs controler`) |
 | Référencement | `scripts/verifier-seo.mjs <id>` signale une erreur sur ce jeu : texte de la page manquant ou hors bornes dans une des 5 langues (section 4), bloc de texte hors de 150 à 300 mots, marque protégée, titre ou description identique à celui d'un autre jeu, phrase de 10 mots reprise d'un autre jeu, page du jeu mal construite (titre, description, H1, liens, jeux similaires…) (boucle de nuit et `validate.yml`) |
 
 ### Relecture (Claude)
@@ -243,6 +256,7 @@ Points bloquants, vérifiés dans le code et sur les captures d'écran du robot 
 12. **Contenu** : adapté aux enfants, en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
 13. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; aucune image du jeu avec du texte (sections 3 et 5).
 14. **Page du jeu** : les textes de référencement de `game.json` (`titre_seo`, `description_seo`, `presentation`, `regles`, `competences` ; en français, et au moins les nombres dans les traductions) sont fidèles au code : règles et gestes réels (doigt et clavier), nombre réel de niveaux, étoiles, âge cohérent avec `ages`. Ils décrivent **ce** jeu (pas un texte passe-partout), sans promesse fausse (mode, fonction ou contenu absent du jeu) ni marque ou personnage existant (section 4). Les longueurs sont déjà contrôlées par le robot.
+15. **Multijoueur** (jeu `"multijoueur": true`, `docs/multijoueur.md` section 9, captures de `captures/multijoueur/<id>/`) : au tour par tour ; robots crédibles et battables ; places montrées avec « Toi », robot ou vrai joueur, sans nom tapé ni message libre ; arrivée et départ d'un vrai joueur visibles ; messages traduits (recherche de joueurs, robots locaux, connexion perdue) ; lisible et fluide sur téléphone avec toutes les places occupées ; 20 niveaux solo jouables hors ligne.
 
 À part, non bloquant pour le jeu : **la jaquette** ne contient aucun texte, aucune lettre, aucun chiffre. Sinon, la boucle refait seulement la jaquette (section 5).
 

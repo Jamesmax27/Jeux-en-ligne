@@ -394,7 +394,7 @@ export async function clesConnues() {
   };
   const ids = (nom) => [...bloc(nom).matchAll(/\bid:\s*'([^']+)'/g)].map((m) => m[1]);
   return [
-    'hasard', 'collection:aimes', 'collection:hors-ligne',
+    'hasard', 'collection:aimes', 'collection:hors-ligne', 'collection:multi',
     ...ids('TRANCHES_AGE').map((id) => `age:${id}`),
     ...ids('GENRES').map((id) => `genre:${id}`),
     ...ids('UNIVERS').map((id) => `univers:${id}`),

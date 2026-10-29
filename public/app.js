@@ -10,15 +10,16 @@
 //   Votes du monde entier.
 // - Recherche juste au-dessus des jeux : les résultats s'affichent pendant la
 //   frappe ; « Rechercher » (touche Entrée) ferme le clavier du téléphone.
-// - Regroupements : tuiles des raccourcis (au hasard, jeux aimés, hors ligne)
-//   et de l'âge, puis petites puces des genres et des univers (listes fermées
+// - Regroupements : tuiles des raccourcis (au hasard, jeux aimés, hors ligne,
+//   multijoueur) et de l'âge, puis petites puces des genres et des univers (listes fermées
 //   de taxonomie.js, une ligne chacune, du plus grand nombre de jeux au plus
 //   petit, sans « autre » ; la ligne défile si elle ne tient pas). Combinables
 //   entre eux, avec le tri et avec la recherche ; chaque tuile ou puce compte
 //   ses jeux. Un genre compte les jeux dont c'est le genre principal ou
 //   secondaire. Un regroupement encore vide est grisé (« Bientôt »).
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
-// - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne ».
+// - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne » ;
+//   les jeux multijoueurs, l'étiquette « Multi » (en haut à gauche de la jaquette).
 // - Première ligne (« vitrine »), sans tenir compte des filtres, en deux moitiés :
 //   - à gauche, les Nouveautés : les NOUVEAUTES_NOMBRE derniers jeux ajoutés
 //     (aussi hors connexion) ;
@@ -68,10 +69,13 @@ const GENRES_AFFICHES = IDS_GENRES.filter((id) => id !== ID_AUTRE);
 const UNIVERS_AFFICHES = IDS_UNIVERS.filter((id) => id !== ID_AUTRE);
 const JAQUETTES_PRIORITAIRES = 4; // premières jaquettes de la grille chargées tout de suite
 
-// Raccourcis du haut : des « collections » propres à l'appareil (noms : clés de traduction).
+// Raccourcis du haut : des « collections » (noms : clés de traduction). « J'ai aimé » et
+// « Hors ligne » sont propres à l'appareil ; « Multijoueur » regroupe les jeux marqués
+// "multijoueur" dans le catalogue (docs/multijoueur.md), juste à droite de « Hors ligne ».
 const COLLECTIONS = {
   aimes: { nom: 'collection.aimes', picto: '👍', teinte: 230, vide: 'collection.aimesVide' },
   'hors-ligne': { nom: 'collection.horsLigne', picto: '📶', teinte: 200, vide: 'collection.horsLigneVide' },
+  multi: { nom: 'collection.multi', picto: '👥', teinte: 290, vide: 'collection.multiVide' },
 };
 
 const SANS_VOTE = { up: 0, down: 0, score: 0, jour: 0, semaine: 0, mois: 0 };
@@ -88,7 +92,7 @@ const etat = {
   horsLigne: new Set(),   // jeux gardés sur l'appareil
   aimes: new Set(),       // jeux que j'ai notés 👍 sur cet appareil
   tri: 'notes',           // 'notes' | 'votes' | 'jour' | 'semaine' | 'mois' | 'nouveautes' | 'alpha' | 'age'
-  collection: null,       // 'aimes' | 'hors-ligne' | null
+  collection: null,       // 'aimes' | 'hors-ligne' | 'multi' | null
   age: null,              // tranche d'âge (TRANCHES_AGE), ou null
   genre: null,            // genre sélectionné (GENRES), ou null
   univers: null,          // univers sélectionné (UNIVERS), ou null
@@ -217,7 +221,9 @@ function idsValides(liste, permis) {
 }
 
 function dansCollection(jeu, collection) {
-  return collection === 'aimes' ? etat.aimes.has(jeu.id) : etat.horsLigne.has(jeu.id);
+  if (collection === 'aimes') return etat.aimes.has(jeu.id);
+  if (collection === 'multi') return jeu.multijoueur === true;
+  return etat.horsLigne.has(jeu.id);
 }
 
 // Le jeu passe-t-il tous les filtres choisis, sauf celui de la famille « sauf » ?
@@ -255,9 +261,10 @@ function jeuxVisibles() {
 
 // --- Affichage --------------------------------------------------------------
 
-// Jaquette d'une carte : image, titre traduit en bandeau, badge « Nouveau ».
+// Jaquette d'une carte : image, titre traduit en bandeau, badges « Nouveau » (en haut à
+// droite) et « Multi » (jeu multijoueur, en haut à gauche, sur le même modèle).
 // prioritaire : jaquette visible dès l'arrivée (chargée tout de suite, pas en différé).
-// badge : false pour la première ligne (Nouveautés et Tendances), sans badge « Nouveau ».
+// badge : false pour la première ligne (Nouveautés et Tendances), jaquettes seules sans badge.
 // Texte alternatif : le titre (le lien de la carte a son propre aria-label, plus complet).
 function creerJaquette(jeu, prioritaire = false, badge = true) {
   const jaquette = document.createElement('div');
@@ -286,6 +293,12 @@ function creerJaquette(jeu, prioritaire = false, badge = true) {
     nouveau.className = 'badge-nouveau';
     nouveau.textContent = t('carte.nouveau');
     jaquette.append(nouveau);
+  }
+  if (badge && jeu.multijoueur === true) {
+    const multi = document.createElement('span');
+    multi.className = 'badge-multi';
+    multi.textContent = t('carte.multi');
+    jaquette.append(multi);
   }
   return jaquette;
 }
@@ -338,7 +351,9 @@ function creerCarte(jeu, scores, prioritaire = false) {
   }
 
   lien.append(jaquette, texte);
-  lien.setAttribute('aria-label', [`${titreAffiche}.`, descriptionJeu(jeu), enFrancais, votes, horsLigne && t('carte.horsLigneAria')].filter(Boolean).join(' '));
+  lien.setAttribute('aria-label', [
+    `${titreAffiche}.`, jeu.multijoueur === true && t('carte.multiAria'), descriptionJeu(jeu), enFrancais, votes, horsLigne && t('carte.horsLigneAria'),
+  ].filter(Boolean).join(' '));
   li.append(lien);
   return li;
 }
@@ -661,7 +676,7 @@ function afficherRegroupements() {
   // Les tuiles sont recréées : on rend le focus clavier à celle qui l'avait.
   const cleFocus = document.activeElement?.dataset?.cle;
 
-  // Raccourcis : au hasard, jeux aimés, jeux hors ligne.
+  // Raccourcis : au hasard, jeux aimés, jeux hors ligne, jeux multijoueurs.
   const collections = compter('collection', (j) => Object.keys(COLLECTIONS).filter((c) => dansCollection(j, c)));
   el.raccourcis.replaceChildren(
     creerTuile({

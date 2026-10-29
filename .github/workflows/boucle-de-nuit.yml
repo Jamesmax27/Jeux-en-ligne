@@ -72,6 +72,15 @@
 #                l'idée n'est plus choisie). Enregistré sur main. Cloudflare
 #                Pages publie le site à chaque fusion.
 #
+# Jeux multijoueurs (docs/multijoueur.md) : avec la variable GitHub
+# MULTI_BOUCLE = « oui » (à poser une fois le jeu pilote validé par le
+# propriétaire), 2 jeux sur 5 de chaque passage sont multijoueurs : l'idéation
+# en propose (champ "multijoueur" des idées), l'étape b en choisit 2
+# (idees.mjs choisir 5 --multi 2), la fabrication suit docs/multijoueur.md et
+# la vérification lance scripts/tester-multijoueur.mjs (bloquant). Après des
+# fusions, le déploiement du Worker multijoueur est relancé (multijoueur.yml).
+# Sans MULTI_BOUCLE, rien ne change : la boucle ne fabrique que des jeux solo.
+#
 # Seules les étapes b et e écrivent dans idees.json et idees-archive.json,
 # jamais les tâches parallèles. Leurs enregistrements portent [CF-Pages-Skip] :
 # Cloudflare Pages ne reconstruit pas le site pour eux.
@@ -138,14 +147,21 @@ jobs:
         env:
           OUVERTES: ${{ steps.ouvertes.outputs.ids }}
           NOMBRE_MANUEL: ${{ inputs.nombre }}
+          MULTI_BOUCLE: ${{ vars.MULTI_BOUCLE }}
         run: |
           # Même mise à jour qu'à l'étape b, sans l'enregistrer : l'agent voit la file à jour.
           node scripts/idees.mjs reconcilier --ouvertes "$OUVERTES"
           manque=$(node scripts/idees.mjs manque)
+          # Jeux multijoueurs (MULTI_BOUCLE = oui) : idées multijoueurs à ajouter, même file pleine.
+          multi=0
+          if [ "$(printf '%s' "$MULTI_BOUCLE" | tr '[:upper:]' '[:lower:]')" = "oui" ]; then multi=$(node scripts/idees.mjs manque-multi); fi
           # Lancement à la main avec 0 jeu : pas d'idéation.
-          if [ "${NOMBRE_MANUEL:-5}" = "0" ]; then manque=0; fi
-          echo "Idées à ajouter : $manque"
-          echo "manque=$manque" >> "$GITHUB_OUTPUT"
+          if [ "${NOMBRE_MANUEL:-5}" = "0" ]; then manque=0; multi=0; fi
+          total=$(( manque > multi ? manque : multi ))
+          echo "Idées à ajouter : $total (dont multijoueurs : $multi)"
+          echo "manque=$total" >> "$GITHUB_OUTPUT"
+          echo "multi=$multi" >> "$GITHUB_OUTPUT"
+          echo "multi_actif=$( [ "$(printf '%s' "$MULTI_BOUCLE" | tr '[:upper:]' '[:lower:]')" = "oui" ] && echo oui || echo non )" >> "$GITHUB_OUTPUT"
           sha256sum idees.json idees-archive.json > "$RUNNER_TEMP/empreintes.txt"
 
       - name: L'agent propose de nouvelles idées
@@ -188,6 +204,7 @@ jobs:
                seul fichier HTML (canvas ou SVG, sons Web Audio, sans Internet) et se jouer au doigt, téléphone en portrait.
             7. Contenu adapté aux enfants : ni violence réaliste, ni peur ; créations originales uniquement (aucun
                personnage, nom ou univers existant).
+            8. ${{ steps.compte.outputs.multi_actif == 'oui' && format('Jeux multijoueurs : lis docs/multijoueur.md (sections 1, 3, 4 et 7). Dans ton lot, propose au moins {0} idée(s) de jeux multijoueurs, et en tout environ 2 idées multijoueurs sur 5. Une idée multijoueur se joue AU TOUR PAR TOUR (jamais en temps réel ni à choix simultanés), de 2 à 10 places selon le jeu, avec des robots qui tiennent les places vides et que de vrais joueurs remplacent : elle doit être amusante seul contre des robots comme à plusieurs, sans aucun texte échangé entre joueurs. Elle garde le reste des règles (20 niveaux solo, mécaniques qui se combinent). Ajoute à ces idées "multijoueur": true et "places": N. Les autres idées n''ont ni l''un ni l''autre.', steps.compte.outputs.multi) || 'Toutes tes idées sont des jeux solo (pas de champ "multijoueur").' }}
 
             Écris le fichier nouvelles-idees.json à la racine du dépôt : une liste JSON de ${{ steps.compte.outputs.manque }} idées,
             chacune sous la forme {"titre": "…", "description": "…", "genre": "…", "genres_secondaires": ["…"], "univers": ["…"], "ages": "6+"} :
@@ -197,7 +214,8 @@ jobs:
             - genre : le genre principal, un seul identifiant de la liste GENRES de public/taxonomie.js (ex. "puzzle") ;
             - genres_secondaires : 0 à 2 autres identifiants de GENRES, seulement s'ils sont vraiment au cœur du jeu ;
             - univers : 1 ou 2 identifiants de la liste UNIVERS de public/taxonomie.js (ex. "ocean") ;
-            - ages : l'âge minimum conseillé, un nombre suivi de « + », de "4+" à "10+" (ex. "6+").
+            - ages : l'âge minimum conseillé, un nombre suivi de « + », de "4+" à "10+" (ex. "6+") ;
+            - (idée multijoueur seulement) "multijoueur": true et "places" : nombre de places, de 2 à 10.
             Interdit de créer un genre ou un univers : uniquement les identifiants des deux listes, écrits exactement.
             « autre » seulement si rien ne correspond (il n'est jamais affiché sur le site). Une idée hors liste, ou avec
             un identifiant retiré (ANCIENS_IDS de public/taxonomie.js), est refusée automatiquement.
@@ -317,8 +335,13 @@ jobs:
           OUVERTES: ${{ steps.ouvertes.outputs.ids }}
           NOUVELLES: ${{ needs.idees.outputs.nouvelles }}
           NOMBRE_MANUEL: ${{ inputs.nombre }}
+          MULTI_BOUCLE: ${{ vars.MULTI_BOUCLE }}
         run: |
           nombre="${NOMBRE_MANUEL:-5}"
+          # Jeux multijoueurs (MULTI_BOUCLE = oui, docs/multijoueur.md) : 2 sur 5 (1 pour 2 ou 3 jeux, aucun pour 1).
+          # Sans la variable, les idées multijoueurs attendent dans la file.
+          choix_multi=""
+          if [ "$(printf '%s' "$MULTI_BOUCLE" | tr '[:upper:]' '[:lower:]')" = "oui" ]; then choix_multi="--multi $(( (nombre * 2 + 2) / 5 ))"; fi
           if [ -n "$NOUVELLES" ]; then printf '%s' "$NOUVELLES" > "$RUNNER_TEMP/nouvelles-idees.json"; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -330,7 +353,7 @@ jobs:
             # Idées perso (déjà importées : ignorées), choisies avant toutes les autres.
             if [ -s "$RUNNER_TEMP/idees-perso.json" ]; then node scripts/idees.mjs importer-perso "$RUNNER_TEMP/idees-perso.json"; fi
             if [ -s "$RUNNER_TEMP/nouvelles-idees.json" ]; then node scripts/idees.mjs ajouter "$RUNNER_TEMP/nouvelles-idees.json"; fi
-            node scripts/idees.mjs choisir "$nombre" > "$RUNNER_TEMP/jeux.json"
+            node scripts/idees.mjs choisir "$nombre" $choix_multi > "$RUNNER_TEMP/jeux.json"
             if ! git diff --quiet -- idees.json idees-archive.json; then
               git commit -q -m "Boucle de nuit : idées choisies [CF-Pages-Skip]" -- idees.json idees-archive.json
               if ! git push origin HEAD:main; then echo "main a bougé : nouvel essai."; continue; fi
@@ -387,7 +410,7 @@ jobs:
           claude_args: |
             --model claude-opus-5-5
             --max-turns 250
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*),Bash(node scripts/idees.mjs catalogue),Bash(node scripts/i18n-jeu.mjs --assembler:*),Bash(node scripts/check-i18n.js:*),Bash(node scripts/regles-seo.mjs:*),Bash(node scripts/verifier-seo.mjs:*),Bash(node scripts/tester-sauvegarde.mjs:*)"
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*),Bash(node scripts/idees.mjs catalogue),Bash(node scripts/i18n-jeu.mjs --assembler:*),Bash(node scripts/check-i18n.js:*),Bash(node scripts/regles-seo.mjs:*),Bash(node scripts/verifier-seo.mjs:*),Bash(node scripts/tester-sauvegarde.mjs:*),Bash(node scripts/tester-multijoueur.mjs:*)"
           prompt: |
             Tu es le développeur de jeux du site Free Micro Games. Ta mission : créer UN nouveau mini-jeu complet, riche et
             travaillé (jamais un simple prototype), auquel un enfant a envie de jouer au moins 15 minutes, puis le
@@ -409,6 +432,7 @@ jobs:
                Genres et univers : uniquement les identifiants des listes fermées de public/taxonomie.js (interdit d'en
                créer) ; le robot refuse toute autre valeur.
                D'autres agents créent d'autres jeux en même temps : réalise uniquement cette idée.
+               ${{ matrix.idee.multijoueur && format('JEU MULTIJOUEUR ({0} places) : lis docs/multijoueur.md EN ENTIER avant d''écrire le cahier de conception, et suis ses sections 3 et 4 (blocs jel-multi et jel-regles, règles pures au tour par tour, JEL_MULTI.creer, bouton « Avec d''autres joueurs » avec data-multi="jouer", robots crédibles et battables, 20 niveaux solo contre des robots). Le cahier de conception a en plus une section « Multijoueur » (règles au tour par tour, robots, ce que voit chaque joueur, arrivée et départ d''un vrai joueur). Dans game.json : "multijoueur": true et "places" (le même nombre que places dans les règles). Contrôle obligatoire en plus de ceux des étapes 6 et 7 : node scripts/tester-multijoueur.mjs <id> --navigateur, jusqu''à « Multijoueur : tout est bon », puis regarde avec Read les captures de captures/multijoueur/<id>/ (table pleine : tout doit rester lisible sur téléphone).', matrix.idee.places || 'de 2 à 10, à choisir selon le jeu') || 'Jeu solo : ni "multijoueur" ni "places" dans game.json.' }}
             4. Avant d'écrire la moindre ligne de code, écris le cahier de conception dans conception.md (à la racine
                du dépôt). Il deviendra la description de la pull request. En français :
                - Principe : le but du jeu et le geste de base, en 2 phrases ;
@@ -915,6 +939,16 @@ jobs:
             fi
             cat "$RUNNER_TEMP/sauvegarde.txt" >> "$RUNNER_TEMP/rapport.txt"
           fi
+          # Jeu multijoueur (docs/multijoueur.md) : règles pures, parties simulées, remplacement robot / joueur,
+          # départs, robots battables, Worker, puis dans le lanceur avec un faux serveur (captures pour la relecture).
+          # Code 1 : problèmes ; code 2 : panne de l'outil (rien n'est décidé).
+          if [ "$etat" != panne ] && grep -q '"multijoueur": *true' "games/$ID/game.json"; then
+            echo "Multijoueur :" >> "$RUNNER_TEMP/rapport.txt"
+            code=0
+            node scripts/tester-multijoueur.mjs "$ID" --navigateur > "$RUNNER_TEMP/multi.txt" 2>&1 || code=$?
+            cat "$RUNNER_TEMP/multi.txt" >> "$RUNNER_TEMP/rapport.txt"
+            if [ "$code" = 1 ]; then etat=erreurs; elif [ "$code" != 0 ]; then etat=panne; fi
+          fi
           # Entrée du catalogue : catalogue reconstruit avec ce jeu, genre et univers conformes à l'idée.
           if [ "$etat" != panne ]; then
             echo "Entrée du catalogue :" >> "$RUNNER_TEMP/rapport.txt"
@@ -1001,6 +1035,14 @@ jobs:
                (completed false) s'il y en a une, partir une seule fois par fin (pas dans une fonction de dessin
                appelée à chaque image), et level doit être le numéro du niveau joué à partir de 1 (ou le score d'un
                jeu sans niveaux). Sinon NON, avec la correction à faire.
+               Jeu multijoueur (game.json : "multijoueur": true) : lis aussi docs/multijoueur.md (sections 3, 4, 5 et
+               9) et regarde avec Read les captures de captures/multijoueur/${{ steps.pr.outputs.id }}/ (en ligne, table
+               pleine, partie, après la coupure du réseau). Ajoute au tableau le point bloquant « Multijoueur » : règles au tour par tour dans
+               jel-regles (le robot a vérifié qu'elles sont pures et identiques partout) ; robots crédibles (coups
+               sensés, pas toujours les mêmes) et battables ; places montrées avec « Toi », robot ou vrai joueur, sans
+               aucun nom tapé ni message libre ; arrivée et départ d'un vrai joueur visibles ; messages traduits
+               (recherche de joueurs, robots locaux, connexion perdue) ; lisible et fluide sur téléphone avec toutes
+               les places occupées ; jouable seul hors ligne (20 niveaux solo). Sinon NON.
             6. Écris revue.md, en français, court, pour le propriétaire du site :
                - un tableau « | Point | Résultat | Remarque | » avec chaque point bloquant de la relecture, « Page du
                  jeu » compris (✅ ou ❌) ;
@@ -1235,6 +1277,7 @@ jobs:
       contents: write        # fusion, branches, idees.json
       pull-requests: write
       issues: write          # commentaires et étiquette « valide »
+      actions: write         # relance du déploiement du Worker multijoueur (multijoueur.yml)
 
     steps:
       - name: Récupérer main
@@ -1367,6 +1410,7 @@ jobs:
 
             const echecs = [];
             const bilan = [];
+            const fusionnees = [];   // jeux fusionnés : le Worker multijoueur est ensuite redéployé si besoin
             for (const { pr: numero, idee } of [...aVerifier].sort((a, b) => a.pr - b.pr)) {
               const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: numero });
               if (pr.state !== 'open') { bilan.push(`#${numero} : fermée pendant la vérification`); continue; }
@@ -1429,6 +1473,7 @@ jobs:
                   await commenter(numero, [...entete('## ✅ Vérification : tout est bon', v),
                     'Le jeu est fusionné : il sera en ligne dans quelques minutes, et son idée est archivée.', ...rapport(v)]);
                   bilan.push(`#${numero} : fusionnée (${v.jeu})`);
+                  fusionnees.push(v.jeu);
                 } else if (f === 'modifiee') {
                   await commenter(numero, [...entete('## ⚠️ Vérification : tout est bon, mais la branche a changé', v),
                     'La pull request a été modifiée pendant la vérification : elle reste ouverte et sera revérifiée au prochain passage de la boucle.']);
@@ -1468,6 +1513,7 @@ jobs:
               .map((p) => (/^nouveau-jeu\/n\d+\/([a-z0-9-]+)$/.exec(p.head.ref) || [])[1]).filter(Boolean);
             core.setOutput('ouvertes', [...new Set(ouvertes)].join(','));
             core.setOutput('echecs', echecs.join(','));
+            core.setOutput('fusionnees', fusionnees.join(','));
             await core.summary.addHeading('Boucle de nuit', 2).addList(bilan.length ? bilan : ['Aucune pull request à conclure.']).write();
 
       - name: e) Mettre à jour les idées et enregistrer sur main
@@ -1490,3 +1536,13 @@ jobs:
           done
           echo "::error::Impossible d'enregistrer la mise à jour des idées sur main."
           exit 1
+
+      # Une fusion faite par le robot ne déclenche pas les autres workflows : le déploiement du Worker
+      # multijoueur (docs/multijoueur.md, section 10) est relancé ici. Il ne redéploie que si la version
+      # des règles a changé (un jeu multijoueur fusionné) : sans effet pour les jeux solo.
+      - name: Relancer le déploiement du Worker multijoueur
+        if: ${{ !cancelled() && steps.fusions.outputs.fusionnees != '' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run multijoueur.yml --repo "$GITHUB_REPOSITORY" --ref main

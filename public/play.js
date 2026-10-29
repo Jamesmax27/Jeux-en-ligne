@@ -15,11 +15,14 @@
 // Et la mesure d'audience (mesure.js, Google Analytics, avec accord seulement) :
 // évènements « game_start » (lancement du jeu) et « vote ».
 // Et le bouton « Signaler » : formulaire public de demandes (/proposer/), avec ce jeu choisi.
+// Et le multijoueur (multijoueur/lanceur.js) : pour un jeu "multijoueur", la
+// connexion au Worker commun, ouverte quand le jeu la demande (message « jel-multi »).
 // ==========================================================================
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
 import { SCRIPT_SUIVI, suivreJeu, noterErreur, noterFin } from './suivi.js';
+import { brancherMultijoueur } from './multijoueur/lanceur.js';
 import { urlJeu, urlAccueil, urlProposer } from './chemins.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
@@ -51,6 +54,7 @@ const el = {
 let jeuCourant = null;   // fiche du jeu affiché (catalog.json)
 let htmlJeu = null;      // code du jeu, gardé pour le relancer dans une autre langue
 let message = null;      // { titre, texte } : clés du message affiché à la place du jeu
+let multi = null;        // connexion multijoueur du jeu affiché (jeux "multijoueur" seulement)
 
 function afficherMessage(titre, texte) {
   message = { titre, texte };
@@ -210,6 +214,7 @@ function proteger(html) {
 }
 
 function afficherJeu() {
+  multi?.fermer(); // jeu relancé (autre langue) : il redemandera sa partie en ligne
   el.cadre.addEventListener('load', () => el.cadre.focus(), { once: true });
   el.cadre.srcdoc = proteger(htmlJeu);
 }
@@ -218,6 +223,7 @@ async function chargerJeu(jeu) {
   const reponse = await fetch(jeu.play); // ex. « games/saut-obstacles/?v=1 »
   if (!reponse.ok) throw Object.assign(new Error(`HTTP ${reponse.status}`), { statut: reponse.status });
   htmlJeu = await reponse.text();
+  if (jeu.multijoueur) multi = brancherMultijoueur({ jeu, html: htmlJeu, cadre: el.cadre });
   afficherJeu();
 }
 
@@ -235,10 +241,16 @@ function garderPourHorsLigne(jeu) {
 // - « jel-langue » (bouton de langue) : on enregistre le choix et on relance le jeu ;
 // - « jel-erreur » (SCRIPT_SUIVI) : erreur JavaScript, notée pour le suivi ;
 // - « jel-fin » (SCRIPT_SUIVI, FMG.reportEnd) : victoire ou défaite, avec le niveau ;
-// - « jel-sauvegarde » (save.js) : progression du jeu à garder sur l'appareil.
+// - « jel-sauvegarde » (save.js) : progression du jeu à garder sur l'appareil ;
+// - « jel-multi » (multijoueur/moteur.js) : partie en ligne d'un jeu multijoueur.
 addEventListener('message', (evenement) => {
   if (evenement.source !== el.cadre.contentWindow) return;
   const donnees = evenement.data;
+  if (donnees?.type === 'jel-multi' && typeof donnees.op === 'string') {
+    if (multi) multi.recevoir(donnees);
+    else el.cadre.contentWindow.postMessage({ type: 'jel-multi', etat: 'solo', raison: 'jeu' }, '*');
+    return;
+  }
   if (donnees?.type === 'jel-erreur' && typeof donnees.message === 'string') {
     noterErreur(donnees.message);
     return;
