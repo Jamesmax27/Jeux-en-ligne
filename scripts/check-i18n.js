@@ -159,10 +159,12 @@ const RE_BLOC_MODULE = /<script\b[^>]*\bid=["']jel-i18n["'][^>]*>([\s\S]*?)<\/sc
 // Module de sauvegarde (public/save.js, contrôlé par validate-games.mjs) : ses
 // textes en 5 langues sont dans le module lui-même.
 const RE_BLOC_SAUVEGARDE = /<script\b[^>]*\bid=["']jel-sauvegarde["'][^>]*>([\s\S]*?)<\/script>/i;
+// Moteur multijoueur (public/multijoueur/moteur.js, contrôlé par validate-games.mjs) : aucun texte affiché.
+const RE_BLOC_MULTI = /<script\b[^>]*\bid=["']jel-multi["'][^>]*>([\s\S]*?)<\/script>/i;
 
 // Code du jeu sans le bloc de textes ni les modules communs.
 function codeDuJeu(html) {
-  return html.replace(RE_BLOC_TEXTES, '').replace(RE_BLOC_MODULE, '').replace(RE_BLOC_SAUVEGARDE, '');
+  return html.replace(RE_BLOC_TEXTES, '').replace(RE_BLOC_MODULE, '').replace(RE_BLOC_SAUVEGARDE, '').replace(RE_BLOC_MULTI, '');
 }
 
 // Clés écrites en toutes lettres dans le code : t('…'), JEL_I18N.t('…'), traduire('…')

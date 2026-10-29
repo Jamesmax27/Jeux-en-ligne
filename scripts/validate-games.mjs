@@ -18,7 +18,9 @@
 // navigateur), présentation ("presentation"). Les jeux plus anciens, sans ce
 // champ, ne sont pas concernés. Tous les jeux appellent window.FMG.reportEnd
 // (statistiques de fin de partie), avec une garde (controlerFinDePartie) ; dans
-// le navigateur, le lanceur doit fournir window.FMG. Les textes de référencement de tous les jeux
+// le navigateur, le lanceur doit fournir window.FMG. Jeux multijoueurs ("multijoueur": true) :
+// "places", moteur jel-multi à jour, règles jel-regles, bouton data-multi="jouer"
+// (controlerMultijoueur ; parties simulées : scripts/tester-multijoueur.mjs). Les textes de référencement de tous les jeux
 // (présentation, règles, titre et description pour Google…) et leurs longueurs
 // sont contrôlés par scripts/regles-seo.mjs et scripts/verifier-seo.mjs.
 //
@@ -90,6 +92,10 @@ async function controlerFiche(id, dossier) {
   if (!dateValide(f.added)) erreur(id, 'game.json : "added" doit être une date AAAA-MM-JJ');
   else if (Date.parse(f.added) > Date.now() + 86400000) erreur(id, 'game.json : "added" est dans le futur');
   if (!Number.isInteger(f.version) || f.version < 1) erreur(id, 'game.json : "version" doit être un entier ≥ 1');
+  // Jeu multijoueur (docs/multijoueur.md) : nombre fixe de places, de 2 à 10.
+  if (f.multijoueur !== undefined && typeof f.multijoueur !== 'boolean') erreur(id, 'game.json : "multijoueur" doit valoir true ou false');
+  if (f.multijoueur === true && !(Number.isInteger(f.places) && f.places >= 2 && f.places <= 10)) erreur(id, 'game.json : "places" (jeu multijoueur) doit être un nombre entier de 2 à 10, le même que dans les règles');
+  if (f.multijoueur !== true && f.places !== undefined) erreur(id, 'game.json : "places" n\'existe que pour un jeu multijoueur ("multijoueur": true)');
   fiches.set(id, f);
 
   // Consignes de 2026 : jeu riche (20 niveaux au moins) et présentation (sa
@@ -131,6 +137,35 @@ async function controlerJeu(id, dossier) {
   }
   controlerSauvegarde(id, html);
   controlerFinDePartie(id, html);
+  if (fiches.get(id)?.multijoueur === true) controlerMultijoueur(id, html);
+  else if (/<script\b[^>]*\bid=["']jel-(?:multi|regles)["']/i.test(html)) erreur(id, 'blocs jel-multi ou jel-regles présents : ajouter "multijoueur": true et "places" dans game.json (ou retirer ces blocs)');
+}
+
+// Jeu multijoueur (docs/multijoueur.md) : moteur commun à jour (public/multijoueur/moteur.js,
+// recopié par i18n-jeu.mjs), règles dans <script id="jel-regles">, les deux avant le code du
+// jeu ; partie créée avec JEL_MULTI.creer ; bouton de la partie en ligne repérable par
+// data-multi="jouer". Les règles elles-mêmes : scripts/tester-multijoueur.mjs.
+const RE_MULTI = /<script\b[^>]*\bid=["']jel-multi["'][^>]*>([\s\S]*?)<\/script>/i;
+const RE_REGLES = /<script\b[^>]*\bid=["']jel-regles["'][^>]*>([\s\S]*?)<\/script>/i;
+const moduleMulti = (await readFile(path.join(RACINE, 'public', 'multijoueur', 'moteur.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
+
+function controlerMultijoueur(id, html) {
+  const moteur = RE_MULTI.exec(html);
+  const regles = RE_REGLES.exec(html);
+  if (!moteur) erreur(id, 'multijoueur : moteur <script id="jel-multi"> absent : lancer node scripts/i18n-jeu.mjs ' + id);
+  else if (moteur[1].replace(/\r\n/g, '\n').trim() !== moduleMulti) erreur(id, 'multijoueur : moteur jel-multi pas à jour : lancer node scripts/i18n-jeu.mjs ' + id + ' (recopie public/multijoueur/moteur.js)');
+  if (!regles) erreur(id, 'multijoueur : règles <script id="jel-regles"> absentes (window.JEL_REGLES, voir docs/multijoueur.md)');
+  else if (!/\bwindow\.JEL_REGLES\s*=/.test(regles[1])) erreur(id, 'multijoueur : le bloc jel-regles doit définir window.JEL_REGLES = { … }');
+  const premierScript = /<script\b(?![^>]*\bid=["']jel-(?:i18n|i18n-textes|sauvegarde|multi|regles)["'])(?![^>]*type=["']application\/json)[^>]*>/i.exec(html);
+  for (const [bloc, nom] of [[moteur, 'jel-multi'], [regles, 'jel-regles']]) {
+    if (bloc && premierScript && premierScript.index < bloc.index) erreur(id, `multijoueur : le bloc ${nom} doit être chargé avant le code du jeu`);
+  }
+  if (moteur && regles && regles.index < moteur.index) erreur(id, 'multijoueur : le bloc jel-regles se place après le moteur jel-multi');
+  // Code écrit pour le jeu : sans les modules recopiés (i18n.js charge les textes du site avec fetch).
+  const code = html.replace(RE_BLOCS_GENERES, '').replace(RE_REGLES, '');
+  if (!/\bJEL_MULTI\.creer\s*\(/.test(code)) erreur(id, 'multijoueur : le jeu ne crée pas sa partie avec JEL_MULTI.creer({ regles: window.JEL_REGLES, … })');
+  if (!/\bdata-multi\s*=\s*["']jouer["']/.test(code)) erreur(id, 'multijoueur : le bouton qui lance la partie en ligne doit porter data-multi="jouer" (écran titre)');
+  if (/\bnew\s+WebSocket\b|\bfetch\s*\(/.test(code)) erreur(id, 'multijoueur : aucun accès réseau dans le jeu (c\'est le lanceur qui se connecte, voir docs/multijoueur.md)');
 }
 
 // Statistiques de fin de partie (CONSIGNES-JEU.md, section 3 « Fin de partie ») :
@@ -138,7 +173,7 @@ async function controlerJeu(id, dossier) {
 // victoire et de défaite. FMG est fourni par le lanceur (SCRIPT_SUIVI de
 // public/suivi.js) : ouvert seul, le jeu ne l'a pas, d'où la garde obligatoire
 // sur la même ligne (if (window.FMG) …, window.FMG && …, window.FMG?.…).
-const RE_BLOCS_GENERES = /<script\b[^>]*\bid=["']jel-(?:i18n|i18n-textes|sauvegarde)["'][^>]*>[\s\S]*?<\/script>/gi;
+const RE_BLOCS_GENERES = /<script\b[^>]*\bid=["']jel-(?:i18n|i18n-textes|sauvegarde|multi)["'][^>]*>[\s\S]*?<\/script>/gi;
 
 function controlerFinDePartie(id, html) {
   const lignes = html.replace(RE_BLOCS_GENERES, '').split('\n').filter((l) => /\bFMG\.reportEnd\s*\(/.test(l));

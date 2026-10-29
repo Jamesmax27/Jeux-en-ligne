@@ -1,0 +1,40 @@
+# Worker multijoueur commun à tous les jeux multijoueurs de Free Micro Games.
+# Explications : docs/multijoueur.md. Déploiement : .github/workflows/multijoueur.yml
+# (node scripts/multijoueur.mjs écrit d'abord src/jeux.js, les règles des jeux).
+# Même compte Cloudflare que le site et la base des votes ; plan Workers Free.
+
+name = "fmg-multijoueur"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Adresse : domaine personnalisé (créé par le premier déploiement, sur la zone
+# freemicrogames.com du même compte). L'adresse workers.dev reste active pour
+# les essais (https://fmg-multijoueur.<sous-domaine>.workers.dev/etat).
+workers_dev = true
+routes = [
+  { pattern = "multi.freemicrogames.com", custom_domain = true }
+]
+
+[vars]
+# Vrais joueurs connectés en même temps, toutes parties confondues. Au-delà,
+# les nouveaux venus jouent contre des robots sur leur appareil.
+MAX_JOUEURS = "80"
+# Sites permis : tirés de public/multijoueur/config.js (SITES_MULTI). Pour les
+# remplacer (essais), décommenter : ORIGINES = "https://freemicrogames.com,http://localhost:8080"
+
+# Un Durable Object par partie (l'arbitre), plus l'accueil (répartition des
+# joueurs, limite globale). Stockage SQLite : le seul du plan gratuit.
+[[durable_objects.bindings]]
+name = "PARTIE"
+class_name = "Partie"
+
+[[durable_objects.bindings]]
+name = "ACCUEIL"
+class_name = "Accueil"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Partie", "Accueil"]
+
+[observability]
+enabled = true

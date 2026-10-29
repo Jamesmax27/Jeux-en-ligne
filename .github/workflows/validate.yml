@@ -26,6 +26,10 @@
 #   - fonctions Cloudflare,  → tests des statistiques de jeu (scripts/tester-stats.mjs :
 #     suivi des parties        collecte, calcul par jour, onglet « Stats » ; avec le
 #     (suivi.js, play.js)      lanceur dans le navigateur si suivi.js ou play.js changent).
+#   - multijoueur (Worker,   → parties simulées, Worker avec de faux Durable Objects et jeux
+#     moteur, lanceur ou jeu   multijoueurs dans le lanceur (scripts/tester-multijoueur.mjs
+#     multijoueur)             --navigateur, docs/multijoueur.md) ; moteur modifié : les jeux
+#                              multijoueurs passent aussi au robot.
 # Le reste (documentation, autres fichiers du site…) ne déclenche rien.
 #
 # Trois jobs : « quoi » (ce qui a changé), « jeux » (les jeux dans le
@@ -66,6 +70,8 @@ on:
       - "public/turnstile.js"
       - "public/proposer.js"
       - "public/demandes-regles.js"
+      - "public/multijoueur/**"
+      - "multijoueur/**"
       - "functions/**"
       - "gabarits/**"
       - "idees.json"
@@ -86,6 +92,8 @@ on:
       - "scripts/moderation.mjs"
       - "scripts/tester-demandes.mjs"
       - "scripts/tester-stats.mjs"
+      - "scripts/multijoueur.mjs"
+      - "scripts/tester-multijoueur.mjs"
       - "schema.sql"
       - "migrations/**"
   workflow_dispatch:
@@ -110,6 +118,7 @@ jobs:
       navigateur: ${{ steps.quoi.outputs.navigateur }}
       demandes: ${{ steps.quoi.outputs.demandes }}
       stats: ${{ steps.quoi.outputs.stats }}
+      multi: ${{ steps.quoi.outputs.multi }}
       jeux: ${{ steps.quoi.outputs.jeux }}
       lots: ${{ steps.quoi.outputs.lots }}
     steps:
@@ -135,6 +144,15 @@ jobs:
           fi
           # (bash de GitHub : -e et pipefail ; d'où « || true » et les « if » plutôt que « && ».)
           ids=$(printf '%s\n' "$fichiers" | { grep '^games/' || true; } | cut -d/ -f2 | sort -u | while read -r id; do if [ -n "$id" ] && [ -d "games/$id" ]; then echo "$id"; fi; done | tr '\n' ' ')
+          # Moteur multijoueur (recopié dans chaque jeu multijoueur) : ces jeux passent aussi au robot.
+          if printf '%s\n' "$fichiers" | grep -q '^public/multijoueur/moteur\.js$'; then
+            ids=$(printf '%s\n' $ids $( (grep -l '"multijoueur": *true' games/*/game.json || true) | cut -d/ -f2) | sort -u | tr '\n' ' ')
+          fi
+          # Multijoueur : Worker, moteur, lanceur, outils, ou un jeu multijoueur modifié.
+          multi=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then multi=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(public/multijoueur/|multijoueur/|scripts/(multijoueur|tester-multijoueur)\.mjs$|public/play\.js$)'; then multi=1; fi
+          for id in $ids; do if grep -q '"multijoueur": *true' "games/$id/game.json" 2>/dev/null; then multi=1; fi; done
           tous=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then tous=1; fi
           # Modules communs de traduction et de sauvegarde : recopiés dans chaque jeu, donc tous les jeux sont concernés.
@@ -159,7 +177,7 @@ jobs:
           if [ "$tous" = 1 ] || [ "$site" = 1 ]; then seo=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^scripts/(regles-seo|verifier-seo)\.mjs$'; then seo=1; fi
           navigateur=0
-          if [ -n "$ids" ] || [ "$tous" = 1 ] || [ "$site" = 1 ] || [ "$stats" = 2 ]; then navigateur=1; fi
+          if [ -n "$ids" ] || [ "$tous" = 1 ] || [ "$site" = 1 ] || [ "$stats" = 2 ] || [ "$multi" = 1 ]; then navigateur=1; fi
           # Jeux à tester dans le navigateur, partagés entre LOTS_MAX machines au plus
           # (un jeu prend environ 50 s : robot, sauvegarde, 5 langues).
           if [ "$tous" = 1 ]; then
@@ -179,10 +197,11 @@ jobs:
             echo "navigateur=$navigateur"
             echo "demandes=$demandes"
             echo "stats=$stats"
+            echo "multi=$multi"
             echo "jeux=$jeux"
             echo "lots=$lots_json"
           } >> "$GITHUB_OUTPUT"
-          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats | jeux à tester : $nb sur $lots machine(s)"
+          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats | multijoueur : $multi | jeux à tester : $nb sur $lots machine(s)"
 
   # 2. Les jeux dans le navigateur, partagés entre plusieurs machines en même
   #    temps (un jeu sur LOTS_MAX chacune) : robot, sauvegarde, traductions.
@@ -327,6 +346,13 @@ jobs:
           else
             node scripts/tester-stats.mjs
           fi
+
+      # Multijoueur (docs/multijoueur.md) : moteur et Worker (faux Durable Objects),
+      # parties simulées de chaque jeu multijoueur, puis chacun dans le lanceur avec un
+      # faux serveur (table pleine, départs, coupure du réseau). Sans réseau ni Cloudflare.
+      - name: Contrôler le multijoueur
+        if: needs.quoi.outputs.multi == '1'
+        run: node scripts/tester-multijoueur.mjs --navigateur
 
       # Icônes des regroupements : le bloc généré de public/style.css doit
       # correspondre aux dessins de scripts/icones/sources (sans navigateur).

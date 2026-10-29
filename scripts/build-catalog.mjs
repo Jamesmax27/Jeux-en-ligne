@@ -150,6 +150,8 @@ async function lireJeu(nomDossier) {
     i18n,
     ...(fiche.non_traduisible === true ? { non_traduisible: true } : {}),
     ...(langues.length ? { langues } : {}),
+    // Jeu multijoueur (docs/multijoueur.md) : rubrique « Multijoueur » et étiquette « Multi » du catalogue.
+    ...(fiche.multijoueur === true ? { multijoueur: true, places: Number.isInteger(fiche.places) ? fiche.places : null } : {}),
     genre,
     genres_secondaires: genresSecondaires,
     univers,

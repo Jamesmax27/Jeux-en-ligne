@@ -705,15 +705,18 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   padding: 4px 16px;
 }
 
+/* Raccourcis : Au hasard, J'ai aimé, Hors ligne, Multijoueur. Dès 720 px, les
+   quatre tiennent dans la largeur qu'occupaient les trois premiers : sur grand
+   écran, ils restent dans la moitié gauche, à côté des âges. */
 .tuiles-raccourcis {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 2px;
 }
 
 .tuiles-ages { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 @media (min-width: 720px) {
-  .tuiles-raccourcis { grid-template-columns: repeat(3, minmax(0, 170px)); }
+  .tuiles-raccourcis { grid-template-columns: repeat(4, minmax(0, 124px)); }
   .tuiles-ages { grid-template-columns: repeat(4, minmax(0, 130px)); }
 }
 
@@ -737,7 +740,7 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   gap: 0;
   min-width: 0;
   min-height: 54px;
-  padding: 3px 2px;              /* « Ouvre un jeu une fois » tient sur une ligne à 390 px */
+  padding: 3px 2px;              /* 4 raccourcis sur 390 px : les petits textes passent sur 2 lignes */
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
   background: var(--surface);
@@ -1273,6 +1276,7 @@ main.catalogue {
 
 /* Badges : petites plaques sombres, sans majuscules forcées. */
 .badge-nouveau,
+.badge-multi,
 .badge-hors-ligne {
   padding: 3px 7px;
   border: 1px solid rgba(236, 234, 228, .14);
@@ -1296,6 +1300,23 @@ main.catalogue {
 .badge-nouveau::before {
   content: "✦";
   color: var(--or);
+}
+
+/* Jeu multijoueur : même plaque que « Nouveau », en haut à gauche (les deux
+   peuvent être là ensemble) ; deux points lavande, comme deux joueurs. */
+.badge-multi {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.badge-multi::before {
+  content: "••";
+  color: var(--lavande);
+  letter-spacing: -1px;
 }
 
 /* Jeu déjà gardé sur l'appareil : badge posé juste au-dessus du bandeau, en
@@ -2533,6 +2554,7 @@ body.lanceur::after { animation: none; }
     [data-cle="hasard"],
     [data-cle="collection:aimes"],
     [data-cle="collection:hors-ligne"],
+    [data-cle="collection:multi"],
     [data-cle="age:3-4"],
     [data-cle="age:5-6"],
     [data-cle="age:7-8"],
@@ -2906,7 +2928,7 @@ body.lanceur::after { animation: none; }
   100% { background-size: 0 0; }
 }
 
-/* --- 4. Une règle par icône (35) -----------------------------------
+/* --- 4. Une règle par icône (36) -----------------------------------
    Clés sans icône (emoji gardé) : aucune. */
 
 /* hasard — tourner */
@@ -2937,6 +2959,18 @@ body.lanceur::after { animation: none; }
   --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Crect x='6.4' y='2.8' width='11.2' height='18.4' rx='2.6'/%3E%3C/g%3E%3C/svg%3E");
   --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='6.4' y='2.8' width='11.2' height='18.4' rx='2.6'/%3E%3Cpath d='M12 6.6v6.8M9.2 10.6l2.8 2.8 2.8-2.8M9.6 17.2h4.8'/%3E%3C/g%3E%3C/svg%3E");
   --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M3.2 3q0 1.8 1.8 1.8-1.8 0-1.8 1.8 0-1.8-1.8-1.8 1.8 0 1.8-1.8Z' fill='%23eceae4'/%3E%3Cpath d='M20.8 15.2q0 1.5 1.5 1.5-1.5 0-1.5 1.5 0-1.5-1.5-1.5 1.5 0 1.5-1.5Z' fill='%23eceae4'/%3E%3Cpath d='M21 2.2q0 1.2 1.2 1.2-1.2 0-1.2 1.2 0-1.2-1.2-1.2 1.2 0 1.2-1.2Z' fill='%23a8b3f0'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-anim-fond: ico-sautiller-fond;
+  --ico-anim-trait: ico-sautiller-trait;
+  --ico-anim-extra: ico-sautiller-extra;
+  --ico-duree: 560ms;
+  --ico-origine: 50% 92%;
+}
+
+/* collection:multi — sautiller */
+[data-cle="collection:multi"] {
+  --ico-fond: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='%23000'%3E%3Ccircle cx='7' cy='8.4' r='2.7'/%3E%3Ccircle cx='17' cy='8.4' r='2.7'/%3E%3Cpath d='M2.9 19.4v-1a4.05 4.05 0 0 1 8.1 0v1Z'/%3E%3Cpath d='M13 19.4v-1a4.05 4.05 0 0 1 8.1 0v1Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-trait: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='7' cy='8.4' r='2.7'/%3E%3Ccircle cx='17' cy='8.4' r='2.7'/%3E%3Cpath d='M2.9 19.4v-1a4.05 4.05 0 0 1 8.1 0v1Z'/%3E%3Cpath d='M13 19.4v-1a4.05 4.05 0 0 1 8.1 0v1Z'/%3E%3C/g%3E%3C/svg%3E");
+  --ico-extra: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg%3E%3Cpath d='M12 2.2q0 1.6 1.6 1.6-1.6 0-1.6 1.6 0-1.6-1.6-1.6 1.6 0 1.6-1.6Z' fill='%23a8b3f0'/%3E%3Cpath d='M1.8 11.2q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3Cpath d='M22.2 11.2q0 1.3 1.3 1.3-1.3 0-1.3 1.3 0-1.3-1.3-1.3 1.3 0 1.3-1.3Z' fill='%23eceae4'/%3E%3C/g%3E%3C/svg%3E");
   --ico-anim-fond: ico-sautiller-fond;
   --ico-anim-trait: ico-sautiller-trait;
   --ico-anim-extra: ico-sautiller-extra;
