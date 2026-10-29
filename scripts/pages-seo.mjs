@@ -38,7 +38,10 @@
 import { readFile, writeFile, mkdir, rm, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { GENRES, UNIVERS, TRANCHES_AGE, IDS_GENRES, IDS_UNIVERS, ID_AUTRE, ANCIENS_IDS, trancheDeAge, ordreAffichage } from '../public/taxonomie.js';
+import {
+  GENRES, UNIVERS, TRANCHES_AGE, IDS_GENRES, IDS_UNIVERS, ID_AUTRE, ANCIENS_IDS, ANCIENNES_TRANCHES, AGE_ADOS,
+  trancheDeAge, pourAdos, ordreAffichage,
+} from '../public/taxonomie.js';
 import { LANGUES, HREFLANG, LOCALE_OG, LANGUES_LEGALES, PAGES_LEGALES, urlAccueil, urlJeu, urlCategorie, urlLanceur, urlLegale, urlProposer, langueLegale } from '../public/chemins.js';
 import { TITRE_MIN, TITRE_MAX, DESCRIPTION_MIN, DESCRIPTION_MAX } from '../public/demandes-regles.js';
 import { problemesChamps, textesLangue, languesDuJeu, ageMinimum } from './regles-seo.mjs';
@@ -192,13 +195,15 @@ function jeuxDeCategorie(jeux, famille, id) {
  * genre commun, 5 par univers commun, 1 si même tranche d'âge, 4 de moins si les
  * âges conseillés diffèrent de 3 ans ou plus. Candidats d'au moins 3 points (un
  * genre ou un univers partagé), puis complément par la même tranche d'âge (qui
- * est aussi une catégorie) jusqu'à NB_SIMILAIRES.
+ * est aussi une catégorie) jusqu'à NB_SIMILAIRES. Jamais de jeu pour adolescents
+ * (pourAdos) parmi ceux d'un jeu conseillé avant 10 ans (ou sans âge lisible).
  */
 export function jeuxSimilaires(jeu, jeux, nombre = NB_SIMILAIRES) {
   const genresDe = (j) => [j.genre, ...j.genres_secondaires].filter(Boolean);
   const mesGenres = genresDe(jeu);
   const maTranche = trancheDeAge(jeu.ages);
   const monAge = ageMinimum(jeu.ages);
+  const pourPetits = monAge === null || monAge < AGE_ADOS - 3;
   const score = (autre) => {
     let s = 0;
     if (jeu.genre && autre.genre === jeu.genre) s += 8;
@@ -213,7 +218,7 @@ export function jeuxSimilaires(jeu, jeux, nombre = NB_SIMILAIRES) {
     return s;
   };
   const ordre = (a, b) => b.score - a.score || String(b.jeu.added).localeCompare(String(a.jeu.added)) || a.jeu.id.localeCompare(b.jeu.id);
-  const autres = jeux.filter((j) => j.id !== jeu.id).map((j) => ({ jeu: j, score: score(j) }));
+  const autres = jeux.filter((j) => j.id !== jeu.id && !(pourPetits && pourAdos(j.ages))).map((j) => ({ jeu: j, score: score(j) }));
   const proches = autres.filter((x) => x.score >= 3).sort(ordre).slice(0, nombre);
   if (proches.length < nombre && maTranche) {
     const complement = autres.filter((x) => x.score < 3 && trancheDeAge(x.jeu.ages) === maTranche).sort(ordre);
@@ -591,7 +596,8 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
     const { t, morceaux } = outils(lang);
     const chemin = urlAccueil(lang);
     const liste = jeuxDe(lang);
-    const derniers = [...liste].sort(parDate).slice(0, NB_DERNIERS_JEUX);
+    // Derniers jeux ajoutés (et premières cartes de la grille) : sans les jeux pour adolescents.
+    const derniers = liste.filter((j) => !pourAdos(j.ages)).sort(parDate).slice(0, NB_DERNIERS_JEUX);
     const groupe = (famille, titreCle) => {
       const liens = categoriesDe[lang].filter((c) => c.famille === famille)
         .map((c) => puceCategorie(c.famille, c.id, lang, t).replace('</a>', `<span class="puce-filtre-compte" aria-hidden="true">${new Intl.NumberFormat(lang).format(c.jeux.length)}</span></a>`));
@@ -724,9 +730,14 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
   // Chaque ancienne page de catégorie, dans chaque langue, avec et sans « / »
   // final, mène en 301 à la catégorie qui l'a remplacée ; « autre » (jamais
   // affiché) et une catégorie restée sans jeu mènent à l'accueil de la langue.
+  // Les tranches d'âge retirées (ANCIENNES_TRANCHES) aussi.
   const redirections = [];
-  for (const [famille, anciens] of Object.entries(ANCIENS_IDS)) {
-    for (const [ancien, nouveau] of [...Object.entries(anciens), [ID_AUTRE, ID_AUTRE]]) {
+  const retirees = [
+    ...Object.entries(ANCIENS_IDS).map(([famille, anciens]) => [famille, [...Object.entries(anciens), [ID_AUTRE, ID_AUTRE]]]),
+    ['age', Object.entries(ANCIENNES_TRANCHES)],
+  ];
+  for (const [famille, paires] of retirees) {
+    for (const [ancien, nouveau] of paires) {
       for (const lang of LANGUES) {
         const cible = nouveau !== ID_AUTRE && categorieExiste(famille, nouveau, lang) ? urlCategorie(famille, nouveau, lang) : urlAccueil(lang);
         const source = urlCategorie(famille, ancien, lang);

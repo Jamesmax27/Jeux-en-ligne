@@ -5,10 +5,22 @@ Elles complètent la section 5 de `CLAUDE.md`. Les robots (`scripts/validate-gam
 
 ## 1. Le public
 
-- Enfants et familles, à partir de 4 ans selon le jeu. Jeux **éducatifs ou d'adresse**, toujours bienveillants.
+- Enfants et familles, à partir de 4 ans selon le jeu. Jeux **éducatifs ou d'adresse**, toujours bienveillants. Les jeux pour adolescents (« 13+ ») suivent leurs propres règles, ci-dessous.
 - Tout le texte est écrit d'abord en **français**, simple et sans faute (phrases courtes pour les jeunes lecteurs), puis traduit en anglais, espagnol, portugais (Brésil) et allemand (section 3, « Langues »).
-- Interdit : violence réaliste, peur, moquerie, compétition humiliante, publicité, achat, lien externe, chat, collecte de données.
+- Interdit dans les jeux de moins de 13 ans : violence réaliste, peur, moquerie, compétition humiliante.
+- Interdit dans tous les jeux : publicité, achat, lien externe, chat, collecte de données.
 - Interdit : personnages, noms, logos ou univers existants (Pokémon, Mario, Disney…). Créations originales uniquement.
+
+### Jeux pour adolescents (« 13+ »)
+
+Un jeu dont `ages` vaut `"13+"` (tuile « 13 ans et + », décision du propriétaire d'octobre 2026) s'adresse aux adolescents et aux adultes. **Tout y est permis**, et ni la relecture, ni la modération, ni l'agent d'idéation ne le refusent pour son ton ou ses thèmes : horreur, peur intense, sursauts, ambiance sombre, monstres effrayants, violence et sang (même réalistes), mort, thèmes durs, humour noir, difficulté élevée. Seules restent les limites qui ne dépendent pas de l'âge :
+
+- les interdits de tous les jeux, ci-dessus (publicité, achat, lien, chat, collecte de données, personnages et univers existants) ;
+- ni contenu sexuel ni nudité (13+ n'est pas « adultes ») ;
+- ni haine ou discrimination visant des personnes réelles ou des groupes, ni incitation à se faire du mal ou à des actes dangereux dans la vraie vie ;
+- la **jaquette**, visible par tous dans le catalogue, intrigue sans choquer : ni sang, ni gore, ni visage terrifiant en gros plan. Le jeu lui-même n'a pas cette limite.
+
+Le jeu affiche « Conseillé dès 13 ans » sur son écran titre (texte traduit, jamais dans une image) : « Au hasard » peut le proposer à tout le monde. Ton adolescent (le tutoiement reste). Sur l'accueil, il est dans le catalogue, la recherche, sa tuile d'âge et « Au hasard », mais jamais dans les Nouveautés, les Tendances, les nouveautés intercalées de « Mieux notés », les « Derniers jeux ajoutés », ni dans les jeux similaires d'un jeu conseillé avant 10 ans (`pourAdos`, `public/taxonomie.js`). Univers : l'horreur va dans `fantasy` (« Magie et monstres »), sinon dans l'univers de son décor.
 
 ## 2. Le contenu et la qualité attendus
 
@@ -165,12 +177,12 @@ Un jeu multijoueur (à plusieurs en ligne, robots aux places vides) suit **toute
 - **Genres et univers : listes fermées.** Elles sont dans un seul fichier de référence, `public/taxonomie.js` (identifiant court sans accents, libellé affiché) ; on écrit dans `game.json` les **identifiants**, jamais un libellé ni un mot inventé. **Interdit de créer un genre ou un univers** : seul le propriétaire du site modifie ces listes. « `autre` » seulement si rien ne correspond : il n'est jamais affiché sur le site (ni filtre, ni page), le jeu reste trouvable par ses autres genres et univers. Le robot (`scripts/controle-taxonomie.mjs`, `validate-games.mjs`) refuse toute autre valeur, et les anciens identifiants retirés en octobre 2026 (`reflexes`, `tir`, `ferme`, `abstrait`…, table `ANCIENS_IDS` de `taxonomie.js`).
 - `genre` : **obligatoire**, le genre principal (le cœur du jeu : comment on joue), un seul identifiant parmi les 13 (entre parenthèses, ce que chacun regroupe) :
   `puzzle` (puzzles, casse-tête, logique, labyrinthes), `memoire` (mémoire, paires, objets cachés, différences, observation), `quiz` (quiz et culture), `mots` (mots et lettres), `calcul` (calcul et nombres), `arcade` (arcade, réflexes, clic rapide, visée et tir sur cible), `plateforme` (plateforme), `course` (course, glisse, épreuves de vitesse), `aventure` (aventure, exploration, jeu de rôle et progression, combats d'adresse), `strategie` (stratégie, défense de tour, jeux de société et de cartes), `simulation` (simulation, soin, gestion et tycoon), `creation` (habillage, coloriage, dessin, bac à sable et construction), `musique` (musique et rythme), `autre` (rien d'autre ne correspond).
-  Contenu pour enfants dans tous les genres : visée et duels sans violence réaliste (viser des cibles, endormir, esquiver).
+  Contenu pour enfants dans tous les genres : visée et duels sans violence réaliste (viser des cibles, endormir, esquiver) ; un jeu « 13+ » n'a pas cette limite (section 1).
 - `genres_secondaires` : 0 à 2 autres genres de la même liste, seulement s'ils sont vraiment au cœur du jeu (liste vide `[]` sinon), différents du genre principal ; jamais `autre`. Le filtre d'un genre montre aussi les jeux où il est secondaire.
 - `univers` : **obligatoire**, 1 ou 2 identifiants parmi les 12 (de quoi parle le jeu : son décor, ses personnages) :
   `animaux` (animaux de la ferme, sauvages, de compagnie ; pas les chevaux), `chevaux` (chevaux et poneys), `dinosaures` (dinosaures et préhistoire), `ocean` (océan, mer, plage, pirates), `nature` (nature, jardin, insectes, saisons et fêtes du calendrier), `fantasy` (magie, fées, dragons, monstres, contes et légendes), `espace` (espace, robots, futur), `monde` (pays, drapeaux, histoire, chevaliers et Moyen Âge), `ville` (ville et métiers, dont les métiers de la santé et le corps humain), `vehicules` (véhicules), `sport` (sport), `cuisine` (cuisine et nourriture), `autre` (seul : jeu sans décor figuratif, formes et couleurs).
 - Le champ `tags` n'existe plus (remplacé par `univers`) : une fiche qui le garde est refusée.
-- `ages` : âge minimum conseillé, au format `"6+"` (tuiles d'âge du catalogue : 3-4 ans, 5-6 ans, 7-8 ans, 9 ans et + ; pages d'âge du site ; « Conseillé dès 6 ans » sur la page du jeu). C'est le seul champ d'âge.
+- `ages` : âge minimum conseillé, au format `"6+"` (tuiles d'âge du catalogue : 4-6 ans, 7-9 ans, 10-12 ans, 13 ans et + ; pages d'âge du site ; « Conseillé dès 6 ans » sur la page du jeu). C'est le seul champ d'âge. Âges proposés par les formulaires : `AGES` de `public/taxonomie.js` (4+ à 10+, 12+, 13+). `"13+"` = jeu pour adolescents (section 1).
 - `idee` : rempli par la boucle de nuit, `id` de l'idée de `idees.json` réalisée par ce jeu (à la fusion, l'idée passe dans `idees-archive.json`). Ne pas le modifier. Facultatif pour un jeu créé à la main.
 - Jeu de la boucle de nuit : `genre`, `genres_secondaires`, `univers` et `ages` sont ceux de l'idée (si l'idée ne donne pas d'univers, de genres secondaires ou d'âge, l'agent les choisit). La vérification refuse un jeu dont l'entrée du catalogue ne correspond pas à son idée, ou qui sort des listes.
 - **Idées de jeux** (`idees.json`, agent d'idéation) : mêmes listes, mêmes règles, âge dans le champ `ages` (« 6+ ») ; privilégier les combinaisons genre × univers encore peu couvertes par les jeux existants (`node scripts/idees.mjs catalogue` les liste). Les idées ajoutées par le propriétaire (source `humain`) restent toujours fabriquées en premier.
@@ -254,11 +266,11 @@ Points bloquants, vérifiés dans le code et sur les captures d'écran du robot 
 9. **Son** : sons Web Audio, bouton pour couper le son visible et mémorisé, aucun son avant la première action.
 10. **Effets et fins de niveau** : retours visuels soignés ; écran de victoire et écran de défaite avec score, étoiles, record, « Niveau suivant » ou « Réessayer », et « Rejouer ». Chaque écran de fin appelle `window.FMG.reportEnd` (section 3, « Fin de partie ») au bon endroit, une fois par fin : `completed: true` à la victoire, `false` à la défaite, `level` = numéro du niveau joué (à partir de 1) ou score.
 11. **Écran de téléphone** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page.
-12. **Contenu** : adapté aux enfants, en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
-13. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; aucune image du jeu avec du texte (sections 3 et 5).
+12. **Contenu** : adapté à l'âge de `ages` (enfants ; jeu « 13+ » : tout est permis sauf les limites de la section 1, « Jeux pour adolescents », et l'écran titre dit « Conseillé dès 13 ans »), en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
+13. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant (adolescent pour un jeu « 13+ ») ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; aucune image du jeu avec du texte (sections 3 et 5).
 14. **Page du jeu** : les textes de référencement de `game.json` (`titre_seo`, `description_seo`, `presentation`, `regles`, `competences` ; en français, et au moins les nombres dans les traductions) sont fidèles au code : règles et gestes réels (doigt et clavier), nombre réel de niveaux, étoiles, âge cohérent avec `ages`. Ils décrivent **ce** jeu (pas un texte passe-partout), sans promesse fausse (mode, fonction ou contenu absent du jeu) ni marque ou personnage existant (section 4). Les longueurs sont déjà contrôlées par le robot.
 15. **Multijoueur** (jeu `"multijoueur": true`, `docs/multijoueur.md` section 9, captures de `captures/multijoueur/<id>/`) : au tour par tour ; salon d'attente clair (places, chef, compte à rebours, bouton « Lancer la partie » du chef) ; robots crédibles et battables ; places montrées avec « Toi », robot ou vrai joueur, sans nom tapé ni message libre ; arrivée et départ d'un vrai joueur visibles ; messages traduits (recherche de joueurs, robots locaux, connexion perdue) ; lisible et fluide sur téléphone avec toutes les places occupées ; 20 niveaux solo jouables hors ligne.
 
-À part, non bloquant pour le jeu : **la jaquette** ne contient aucun texte, aucune lettre, aucun chiffre. Sinon, la boucle refait seulement la jaquette (section 5).
+À part, non bloquant pour le jeu : **la jaquette** ne contient aucun texte, aucune lettre, aucun chiffre (et, pour un jeu « 13+ », ni sang ni gore : section 1). Sinon, la boucle refait seulement la jaquette (section 5).
 
 Conseils (non bloquants, notés dans la relecture) : amusant dès la première minute, variété d'un niveau à l'autre, de quoi jouer 15 minutes ; texte de la jaquette (`jaquette_alt`) qui correspond bien à ce qu'elle montre.

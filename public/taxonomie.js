@@ -120,15 +120,44 @@ export const UNIVERS_MAX = 2;
 
 // Tranches d'âge de l'accueil, d'après l'âge minimum conseillé du jeu
 // (champ "ages" : « 6+ » → 6), bornes comprises. Noms : « age.<id> » et
-// « age.<id>.aide » dans les fichiers de langue.
+// « age.<id>.aide » dans les fichiers de langue ; adresses : SLUGS_AGE de
+// chemins.js. Pour changer les tranches : ce fichier (et ANCIENNES_TRANCHES),
+// chemins.js, les 5 fichiers de langue, gabarits/textes/categories.<langue>.json,
+// les icônes age:* (scripts/icones/), et les âges permis (AGES ci-dessous).
+// « 13+ » : jeux pour adolescents (frissons, suspense), règles dans
+// CONSIGNES-JEU.md, section 1 ; tenus à l'écart des petits sur l'accueil
+// (AGE_ADOS, public/app.js) et dans les jeux similaires (scripts/pages-seo.mjs).
 export const TRANCHES_AGE = [
-  { id: '3-4', picto: '🧸', min: 0, max: 4 },
-  { id: '5-6', picto: '🪁', min: 5, max: 6 },
-  { id: '7-8', picto: '🚲', min: 7, max: 8 },
-  { id: '9+',  picto: '🛹', min: 9, max: 99 },
+  { id: '4-6',   picto: '🧸', min: 0, max: 6 },
+  { id: '7-9',   picto: '🚲', min: 7, max: 9 },
+  { id: '10-12', picto: '🛹', min: 10, max: 12 },
+  { id: '13+',   picto: '🔦', min: 13, max: 99 },
 ];
 
-// Tranche d'un jeu d'après son champ "ages" (« 6+ » → « 5-6 ») ; âge illisible → null.
+// Tranches retirées (octobre 2026) → tranche qui les a remplacées : leurs
+// anciennes pages mènent en 301 à la nouvelle (public/_redirects, écrit par
+// scripts/pages-seo.mjs).
+export const ANCIENNES_TRANCHES = { '3-4': '4-6', '5-6': '4-6', '7-8': '7-9', '9+': '10-12' };
+
+// Âge minimum des jeux pour adolescents (tranche « 13+ »).
+export const AGE_ADOS = 13;
+
+// Jeu pour adolescents d'après son champ "ages" (« 13+ » → vrai). Ces jeux sont
+// dans le catalogue, la recherche, leur tuile d'âge et « Au hasard », mais ni
+// dans la première ligne (Nouveautés, Tendances), ni dans les nouveautés
+// intercalées de « Mieux notés », ni dans les « Derniers jeux ajoutés » de
+// l'accueil, ni dans les jeux similaires d'un jeu conseillé avant 10 ans.
+export function pourAdos(ages) {
+  const age = parseInt(ages, 10);
+  return !Number.isNaN(age) && age >= AGE_ADOS;
+}
+
+// Âges conseillés proposés par les formulaires d'idées (page privée /idees,
+// formulaire GitHub idee-jeu.yml, modération des demandes publiques) : mêmes
+// valeurs partout. Le champ "ages" d'un jeu accepte tout âge « N+ ».
+export const AGES = ['4+', '5+', '6+', '7+', '8+', '9+', '10+', '12+', '13+'];
+
+// Tranche d'un jeu d'après son champ "ages" (« 6+ » → « 4-6 ») ; âge illisible → null.
 // Partagée par l'accueil (app.js) et les pages générées (scripts/pages-seo.mjs).
 export function trancheDeAge(ages) {
   const age = parseInt(ages, 10);

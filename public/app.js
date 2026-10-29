@@ -44,7 +44,7 @@
 
 import { votesEnAttente, envoyerEnAttente, mesVotes } from './votes.js';
 import { activerHorsLigne, jeuxHorsLigne } from './hors-ligne.js';
-import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, ID_AUTRE, TRANCHES_AGE, trancheDeAge, ordreAffichage } from './taxonomie.js';
+import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, ID_AUTRE, TRANCHES_AGE, trancheDeAge, pourAdos, ordreAffichage } from './taxonomie.js';
 import { urlJeu, urlLanceur } from './chemins.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
@@ -205,9 +205,10 @@ function comparateur(tri, scores) {
   }
 }
 
-// Quelques nouveautés remontées en 2e et 4e position, pour récolter leurs premiers votes.
+// Quelques nouveautés remontées en 2e et 4e position, pour récolter leurs premiers votes
+// (jamais un jeu pour adolescents : il reste à sa place dans le tri).
 function intercalerNouveautes(liste) {
-  const nouveaux = liste.filter(estNouveau).sort(parDate).slice(0, NOUVEAUX_EN_TETE);
+  const nouveaux = liste.filter((jeu) => estNouveau(jeu) && !pourAdos(jeu.ages)).sort(parDate).slice(0, NOUVEAUX_EN_TETE);
   const resultat = liste.filter((j) => !nouveaux.includes(j));
   nouveaux.forEach((jeu, i) => resultat.splice(Math.min(1 + i * 2, resultat.length), 0, jeu));
   return resultat;
@@ -403,8 +404,8 @@ function creerCarteVitrine(jeu, cleAria) {
   return li;
 }
 
-// Jeux des tendances proposés dans la langue courante, sans les Archives ni les
-// jeux de exclus (ceux des Nouveautés), rangés dans l'ordre du jour : hachage de
+// Jeux des tendances proposés dans la langue courante, sans les Archives, les jeux
+// pour adolescents ni les jeux de exclus (ceux des Nouveautés), rangés dans l'ordre du jour : hachage de
 // « date UTC + id », le même toute la journée pour tout le monde, nouveau chaque
 // jour. Au plus TENDANCES_PAR_GENRE jeux du même genre principal.
 function choisirTendances(exclus) {
@@ -414,7 +415,7 @@ function choisirTendances(exclus) {
   const parGenre = new Map();
   return (etat.tendances || [])
     .map((x) => parId.get(x.id))
-    .filter((jeu) => jeu && !estArchive(jeu) && !exclus.has(jeu.id))
+    .filter((jeu) => jeu && !estArchive(jeu) && !pourAdos(jeu.ages) && !exclus.has(jeu.id))
     .sort((a, b) => ordre(a) - ordre(b) || a.id.localeCompare(b.id))
     .filter((jeu) => {
       const n = parGenre.get(jeu.genre) || 0;
@@ -435,7 +436,7 @@ function afficherVitrine() {
   const racine = document.documentElement;
   const ordre = (jeu) => hachage(`${GRAINE_VITRINE}|${jeu.id}`);
   const nouveautes = etat.jeux
-    .filter((jeu) => !estArchive(jeu))
+    .filter((jeu) => !estArchive(jeu) && !pourAdos(jeu.ages))
     .sort((a, b) => String(b.added).localeCompare(String(a.added)) || ordre(a) - ordre(b) || a.id.localeCompare(b.id));
   const tendances = choisirTendances(new Set(nouveautes.slice(0, NOUVEAUTES_EXCLUES).map((jeu) => jeu.id)));
   const avecTendances = tendances.length >= TENDANCES_MIN;

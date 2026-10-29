@@ -26,7 +26,7 @@
 //   1. écrire scripts/icones/sources/<nom>.svg, où <nom> = la clé data-cle
 //      posée par app.js, avec « : » → « -- » et « + » → « plus » :
 //        genre:puzzle → genre--puzzle.svg     univers:ocean → univers--ocean.svg
-//        age:9+ → age--9plus.svg     collection:hors-ligne → collection--hors-ligne.svg
+//        age:13+ → age--13plus.svg   collection:hors-ligne → collection--hors-ligne.svg
 //        hasard → hasard.svg     titre « Tendances » → tendances.svg
 //      (format, style, animations : scripts/icones/GUIDE.md) ;
 //   2. lancer node scripts/icones/generer.mjs, puis la planche pour regarder.
@@ -608,10 +608,10 @@ function cssGeneral(cles) {
 }
 
 .tuile[data-cle^="age:"] { --ico-couleur-fond: oklch(.76 .085 var(--ico-teinte-age, 250)); }
-[data-cle="age:3-4"] { --ico-teinte-age: 28; }
-[data-cle="age:5-6"] { --ico-teinte-age: 82; }
-[data-cle="age:7-8"] { --ico-teinte-age: 152; }
-[data-cle="age:9+"]  { --ico-teinte-age: 236; }
+[data-cle="age:4-6"]   { --ico-teinte-age: 28; }
+[data-cle="age:7-9"]   { --ico-teinte-age: 82; }
+[data-cle="age:10-12"] { --ico-teinte-age: 152; }
+[data-cle="age:13+"]   { --ico-teinte-age: 236; }
 
 #titre-tendances {
   --ico-taille: 20px;

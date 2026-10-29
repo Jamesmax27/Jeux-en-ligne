@@ -31,7 +31,7 @@
 // ==========================================================================
 
 import { appelGitHub } from './_commun.js';
-import { IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX } from '../public/taxonomie.js';
+import { IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX, AGES } from '../public/taxonomie.js';
 import { nettoyerTitre, nettoyerDescription, TYPES_AVEC_JEU } from '../public/demandes-regles.js';
 
 // --- Réglages ------------------------------------------------------------------
@@ -65,9 +65,10 @@ export const ETIQUETTES = {
   demandeIa: 'demande-ia',        // demande-modification.yml
 };
 
-// Âges permis pour une idée (mêmes bornes que functions/api/idees.js et le formulaire GitHub).
-export const AGE_MIN = 4;
-export const AGE_MAX = 12;
+// Âges permis pour une idée : bornes de la liste AGES de public/taxonomie.js
+// (mêmes valeurs que la page /idees et le formulaire GitHub), de 4+ à 13+.
+export const AGE_MIN = parseInt(AGES[0], 10);
+export const AGE_MAX = parseInt(AGES[AGES.length - 1], 10);
 
 // --- Tables D1 -------------------------------------------------------------------
 
