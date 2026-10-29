@@ -144,7 +144,8 @@ async function controlerJeu(id, dossier) {
 // Jeu multijoueur (docs/multijoueur.md) : moteur commun à jour (public/multijoueur/moteur.js,
 // recopié par i18n-jeu.mjs), règles dans <script id="jel-regles">, les deux avant le code du
 // jeu ; partie créée avec JEL_MULTI.creer ; bouton de la partie en ligne repérable par
-// data-multi="jouer". Les règles elles-mêmes : scripts/tester-multijoueur.mjs.
+// data-multi="jouer" ; bouton du chef dans le salon d'attente, data-multi="lancer"
+// (partie.lancerManche). Les règles elles-mêmes : scripts/tester-multijoueur.mjs.
 const RE_MULTI = /<script\b[^>]*\bid=["']jel-multi["'][^>]*>([\s\S]*?)<\/script>/i;
 const RE_REGLES = /<script\b[^>]*\bid=["']jel-regles["'][^>]*>([\s\S]*?)<\/script>/i;
 const moduleMulti = (await readFile(path.join(RACINE, 'public', 'multijoueur', 'moteur.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
@@ -165,6 +166,9 @@ function controlerMultijoueur(id, html) {
   const code = html.replace(RE_BLOCS_GENERES, '').replace(RE_REGLES, '');
   if (!/\bJEL_MULTI\.creer\s*\(/.test(code)) erreur(id, 'multijoueur : le jeu ne crée pas sa partie avec JEL_MULTI.creer({ regles: window.JEL_REGLES, … })');
   if (!/\bdata-multi\s*=\s*["']jouer["']/.test(code)) erreur(id, 'multijoueur : le bouton qui lance la partie en ligne doit porter data-multi="jouer" (écran titre)');
+  if (!/\bdata-multi\s*=\s*["']lancer["']/.test(code) || !/\.lancerManche\s*\(/.test(code)) {
+    erreur(id, 'multijoueur : le salon d\'attente doit avoir le bouton du chef « Lancer la partie » (data-multi="lancer", partie.lancerManche())');
+  }
   if (/\bnew\s+WebSocket\b|\bfetch\s*\(/.test(code)) erreur(id, 'multijoueur : aucun accès réseau dans le jeu (c\'est le lanceur qui se connecte, voir docs/multijoueur.md)');
 }
 

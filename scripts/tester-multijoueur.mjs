@@ -5,8 +5,9 @@
 //   node scripts/tester-multijoueur.mjs                moteur, Worker et tous les jeux multijoueurs
 //   node scripts/tester-multijoueur.mjs <id>…          … seulement ces jeux
 //   … --navigateur   en plus, chaque jeu dans le lanceur (Playwright) avec un
-//                    faux serveur : partie en ligne, arrivée de vrais joueurs
-//                    jusqu'à la table pleine, départs, coupure du réseau
+//                    faux serveur : salon d'attente, arrivée de vrais joueurs
+//                    jusqu'à la table pleine, lancement par le chef (bouton
+//                    data-multi="lancer"), départs, coupure du réseau
 //                    (le jeu doit continuer contre des robots locaux) ;
 //                    captures dans captures/multijoueur/<id>/
 //   … --moteur       seulement le moteur et le Worker (jeu d'essai intégré)
@@ -272,6 +273,35 @@ function testerArbitre(r, sujet) {
     noter(sujet, `table pleine à ${places} vrais joueurs ; robot à la place d'un joueur après ${regles.delaiJoueur / 1000} s`);
   }
 
+  // f) Salon d'attente (en ligne) : pas de manche avant le lancement par le chef, arrivées dans le
+  //    salon, seul le chef lance, retour au salon après la manche, chef remplacé à son départ,
+  //    lancement automatique au bout de attenteSalon.
+  {
+    const b = banc(r, { graine: 41, salon: true });
+    const a = b.arbitre;
+    const sA = a.rejoindre('A');
+    a.demarrer();
+    if (a.phase !== 'salon' || b.tous.some((m) => m.t === 'manche')) probleme(sujet, 'salon : la manche commence sans attendre le lancement');
+    if (!b.tous.some((m) => m.t === 'salon')) probleme(sujet, 'salon : message « salon » absent');
+    const sB = a.rejoindre('B');
+    if (!(Number.isInteger(sB) && sB >= 0) || a.sieges[sB] !== 'B') probleme(sujet, 'salon : un arrivant ne prend pas la place d\'un robot');
+    if (a.siegeChef() !== sA) probleme(sujet, 'salon : le premier arrivé n\'est pas le chef');
+    a.recevoir('B', { t: 'lancer' });
+    if (a.phase !== 'salon') probleme(sujet, 'salon : un joueur qui n\'est pas le chef a pu lancer la manche');
+    a.recevoir('A', { t: 'lancer' });
+    if (a.phase !== 'jeu') probleme(sujet, 'salon : le chef ne peut pas lancer la manche');
+    if (!jouerManche(b, r, ['A', 'B'])) probleme(sujet, 'salon : la manche ne se termine pas');
+    else if (a.phase !== 'salon') probleme(sujet, 'salon : après la manche, retour au salon attendu');
+    a.quitter('A');
+    if (a.siegeChef() !== sB) probleme(sujet, 'salon : au départ du chef, le joueur suivant ne devient pas chef');
+    const derniers = b.tous.filter((m) => m.t === 'sieges');
+    if (derniers[derniers.length - 1]?.chef !== sB) probleme(sujet, 'salon : le nouveau chef n\'est pas annoncé');
+    b.avancerHorloge(globalThis.JEL_MULTI.completer(r).attenteSalon + 1);
+    a.reveil();
+    if (a.phase !== 'jeu') probleme(sujet, 'salon : la manche ne part pas seule au bout de l\'attente');
+    noter(sujet, 'salon : arrivées, lancement par le chef seul, retour au salon, nouveau chef, lancement automatique');
+  }
+
   // e) Robots : on peut les battre, et ils varient.
   {
     let victoiresFort = 0, total = 0;
@@ -408,19 +438,27 @@ async function testerWorker(sujet, jeuxDuWorker) {
   if (parties.length !== Math.ceil(5 / places)) probleme(sujet, `Worker : 5 joueurs pour des parties de ${places} places devraient ouvrir ${Math.ceil(5 / places)} partie(s) (${parties.length})`);
   const premier = clients[0];
   if (!premier?.recus.some((m) => m.t === 'bienvenue')) probleme(sujet, 'Worker : pas de message de bienvenue');
-  if (!premier?.recus.some((m) => m.t === 'manche')) probleme(sujet, 'Worker : la partie ne commence pas tout de suite (robots aux places vides)');
+  if (!premier?.recus.some((m) => m.t === 'salon')) probleme(sujet, 'Worker : pas de salon d\'attente à l\'arrivée');
+  if (premier?.recus.some((m) => m.t === 'manche')) probleme(sujet, 'Worker : la manche commence avant le lancement par le chef');
 
   // Limite globale : MAX_JOUEURS = 5.
   if (clients.length === 5 && (await connexion()).status !== 503) probleme(sujet, 'Worker : la limite MAX_JOUEURS n\'est pas respectée');
 
-  // Un coup d'un vrai joueur parvient à tous ceux de sa partie.
+  // Le chef (premier arrivé) lance la manche : places vides tenues par des robots.
   const nomPartie = parties[0];
   const partie = objets.PARTIE.get(nomPartie);
+  const socketDe = (cle) => etats.get(`PARTIE:${nomPartie}`).sockets.find((x) => x.tags.includes(cle));
+  const chef = partie.arbitre?.chef();
+  if (chef) await partie.webSocketMessage(socketDe(chef), JSON.stringify({ t: 'lancer' }));
+  if (partie.arbitre?.phase !== 'jeu' && partie.arbitre?.phase !== 'salon') probleme(sujet, 'Worker : phase inattendue après le lancement');
+  if (!premier?.recus.some((m) => m.t === 'manche')) probleme(sujet, 'Worker : le chef ne peut pas lancer la manche');
+
+  // Un coup d'un vrai joueur parvient à tous ceux de sa partie.
   const a = partie.arbitre;
   if (a && a.phase === 'jeu') {
     const s = fiche.regles.aQui(a.etat);
     const cle = a.sieges[s];
-    const ws = etats.get(`PARTIE:${nomPartie}`).sockets.find((x) => x.tags.includes(cle));
+    const ws = socketDe(cle);
     if (ws) {
       const action = fiche.regles.bot(copie(a.etat), s, hasard(3), 0.5);
       const avant = a.n;
@@ -443,7 +481,7 @@ async function testerWorker(sujet, jeuxDuWorker) {
   if (etatPartie.storage.taille() !== 0 || etatPartie.alarme !== null) probleme(sujet, 'Worker : partie sans joueur pas libérée (stockage ou alarme restants)');
   const accueil = objets.ACCUEIL.get('accueil');
   if (accueil?.parties?.[nomPartie]) probleme(sujet, 'Worker : l\'accueil garde une partie vide');
-  noter(sujet, 'Worker : sites permis, règles et protocole contrôlés, répartition entre parties, limite globale, coups transmis, alarme, partie libérée');
+  noter(sujet, 'Worker : sites permis, règles et protocole contrôlés, répartition entre parties, limite globale, salon et lancement par le chef, coups transmis, alarme, partie libérée');
 }
 
 // --------------------------------------------------------------------------
@@ -477,6 +515,7 @@ async function testerNavigateur(jeux) {
       let route = null;
       const faux = new Set();          // faux joueurs ajoutés par le test
       const arbitre = new Arbitre(r, {
+        salon: true,
         delaiJoueur: 4000,
         envoyer: (cle, m) => {
           if ((cle === null || cle === 'page') && route) { try { route.send(JSON.stringify(m)); } catch { /* fermée */ } }
@@ -527,21 +566,30 @@ async function testerNavigateur(jeux) {
         await attendre(3000);
         let e = await etatJeu(cadre);
         if (e?.mode !== 'en-ligne') probleme(sujet, `navigateur : la partie ne passe pas en ligne avec le serveur (mode : ${e?.mode ?? 'aucune partie JEL_MULTI'})`);
-        await capturer('1-en-ligne.png');
+        if (e?.phase !== 'salon') probleme(sujet, `navigateur : pas de salon d'attente à l'arrivée (phase : ${e?.phase})`);
+        await capturer('1-salon.png');
 
-        // La table se remplit de vrais joueurs (nombre maximum de joueurs), puis ils repartent.
+        // Le salon se remplit de vrais joueurs (nombre maximum de joueurs), puis le chef (la page) lance.
         for (let k = 2; k <= r.places; k++) { faux.add(`faux-${k}`); arbitre.rejoindre(`faux-${k}`); }
         await attendre(1000);
         await attendreFile(cadre);
         e = await etatJeu(cadre);
         const humains = e?.sieges?.filter((x) => x.humain).length ?? 0;
-        if (globalThis.JEL_MULTI.completer(r).remplacement === 'tour' && humains !== r.places) probleme(sujet, `navigateur : ${r.places} vrais joueurs à la table, le jeu en montre ${humains}`);
-        await capturer('2-table-pleine.png');
+        if (humains !== r.places) probleme(sujet, `navigateur : ${r.places} vrais joueurs dans le salon, le jeu en montre ${humains}`);
+        await capturer('2-salon-plein.png');
+        const lancer = cadre.locator('[data-multi="lancer"]').first();
+        if (!(await lancer.isVisible().catch(() => false))) probleme(sujet, 'navigateur : le chef ne voit pas de bouton data-multi="lancer" dans le salon');
+        else await lancer.tap().catch(() => lancer.click());
+        await attendre(1500);
+        await attendreFile(cadre);
+        e = await etatJeu(cadre);
+        if (e?.phase !== 'jeu' && arbitre.phase === 'salon') probleme(sujet, 'navigateur : le bouton du chef ne lance pas la manche');
+        await capturer('3-table-pleine.png');
         const nAvant = e?.n ?? 0;
         await attendre(6000);
         e = await etatJeu(cadre);
         if ((e?.n ?? 0) <= nAvant && e?.phase === 'jeu') probleme(sujet, 'navigateur : la partie n\'avance pas avec tous les joueurs (coups des autres non affichés ?)');
-        await capturer('3-partie.png');
+        await capturer('4-partie.png');
         for (const cle of faux) arbitre.quitter(cle);
         faux.clear();
         await attendre(500);
@@ -558,7 +606,7 @@ async function testerNavigateur(jeux) {
         // Le joueur de l'appareil laisse passer son tour : en solo, rien ne joue à sa place, on vérifie
         // donc seulement que la partie a gardé son état et qu'elle répond.
         if (!e || e.n < nCoupe) probleme(sujet, 'navigateur : la partie repart de zéro après la coupure');
-        await capturer('4-apres-coupure.png');
+        await capturer('5-apres-coupure.png');
       } catch (err) {
         probleme(sujet, `navigateur : ${err.message.split('\n')[0]}`);
       } finally {
