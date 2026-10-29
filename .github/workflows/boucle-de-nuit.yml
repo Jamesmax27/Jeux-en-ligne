@@ -72,14 +72,16 @@
 #                l'idée n'est plus choisie). Enregistré sur main. Cloudflare
 #                Pages publie le site à chaque fusion.
 #
-# Jeux multijoueurs (docs/multijoueur.md) : avec la variable GitHub
-# MULTI_BOUCLE = « oui » (à poser une fois le jeu pilote validé par le
-# propriétaire), 2 jeux sur 5 de chaque passage sont multijoueurs : l'idéation
-# en propose (champ "multijoueur" des idées), l'étape b en choisit 2
-# (idees.mjs choisir 5 --multi 2), la fabrication suit docs/multijoueur.md et
-# la vérification lance scripts/tester-multijoueur.mjs (bloquant). Après des
-# fusions, le déploiement du Worker multijoueur est relancé (multijoueur.yml).
-# Sans MULTI_BOUCLE, rien ne change : la boucle ne fabrique que des jeux solo.
+# Jeux multijoueurs (docs/multijoueur.md) : la variable GitHub MULTI_BOUCLE
+# donne le nombre de jeux multijoueurs par passage de 5 jeux (ex. 2 ; à poser
+# une fois le jeu pilote validé par le propriétaire, modifiable à tout moment :
+# Settings → Secrets and variables → Actions → Variables). L'idéation en
+# propose (champ "multijoueur" des idées), l'étape b en choisit autant
+# (idees.mjs choisir 5 --multi 2 ; passage lancé à la main avec moins de 5 jeux :
+# en proportion), la fabrication suit docs/multijoueur.md et la vérification
+# lance scripts/tester-multijoueur.mjs (bloquant). Après des fusions, le
+# déploiement du Worker multijoueur est relancé (multijoueur.yml).
+# MULTI_BOUCLE absente, 0 ou illisible : la boucle ne fabrique que des jeux solo.
 #
 # Seules les étapes b et e écrivent dans idees.json et idees-archive.json,
 # jamais les tâches parallèles. Leurs enregistrements portent [CF-Pages-Skip] :
@@ -152,16 +154,20 @@ jobs:
           # Même mise à jour qu'à l'étape b, sans l'enregistrer : l'agent voit la file à jour.
           node scripts/idees.mjs reconcilier --ouvertes "$OUVERTES"
           manque=$(node scripts/idees.mjs manque)
-          # Jeux multijoueurs (MULTI_BOUCLE = oui) : idées multijoueurs à ajouter, même file pleine.
+          # Jeux multijoueurs : MULTI_BOUCLE = nombre par passage de 5 (0 à 5 ; absente ou illisible : 0).
+          par_passage=$(printf '%s' "$MULTI_BOUCLE" | tr -cd '0-9')
+          par_passage=${par_passage:-0}
+          if [ "$par_passage" -gt 5 ]; then par_passage=5; fi
+          # Idées multijoueurs à ajouter (de quoi faire 3 passages), même file pleine.
           multi=0
-          if [ "$(printf '%s' "$MULTI_BOUCLE" | tr '[:upper:]' '[:lower:]')" = "oui" ]; then multi=$(node scripts/idees.mjs manque-multi); fi
+          if [ "$par_passage" -gt 0 ]; then multi=$(node scripts/idees.mjs manque-multi "$par_passage"); fi
           # Lancement à la main avec 0 jeu : pas d'idéation.
           if [ "${NOMBRE_MANUEL:-5}" = "0" ]; then manque=0; multi=0; fi
           total=$(( manque > multi ? manque : multi ))
-          echo "Idées à ajouter : $total (dont multijoueurs : $multi)"
+          echo "Idées à ajouter : $total (dont multijoueurs : $multi ; jeux multijoueurs par passage : $par_passage)"
           echo "manque=$total" >> "$GITHUB_OUTPUT"
           echo "multi=$multi" >> "$GITHUB_OUTPUT"
-          echo "multi_actif=$( [ "$(printf '%s' "$MULTI_BOUCLE" | tr '[:upper:]' '[:lower:]')" = "oui" ] && echo oui || echo non )" >> "$GITHUB_OUTPUT"
+          echo "par_passage=$par_passage" >> "$GITHUB_OUTPUT"
           sha256sum idees.json idees-archive.json > "$RUNNER_TEMP/empreintes.txt"
 
       - name: L'agent propose de nouvelles idées
@@ -204,7 +210,7 @@ jobs:
                seul fichier HTML (canvas ou SVG, sons Web Audio, sans Internet) et se jouer au doigt, téléphone en portrait.
             7. Contenu adapté aux enfants : ni violence réaliste, ni peur ; créations originales uniquement (aucun
                personnage, nom ou univers existant).
-            8. ${{ steps.compte.outputs.multi_actif == 'oui' && format('Jeux multijoueurs : lis docs/multijoueur.md (sections 1, 3, 4 et 7). Dans ton lot, propose au moins {0} idée(s) de jeux multijoueurs, et en tout environ 2 idées multijoueurs sur 5. Une idée multijoueur se joue AU TOUR PAR TOUR (jamais en temps réel ni à choix simultanés), de 2 à 10 places selon le jeu, avec des robots qui tiennent les places vides et que de vrais joueurs remplacent : elle doit être amusante seul contre des robots comme à plusieurs, sans aucun texte échangé entre joueurs. Elle garde le reste des règles (20 niveaux solo, mécaniques qui se combinent). Ajoute à ces idées "multijoueur": true et "places": N. Les autres idées n''ont ni l''un ni l''autre.', steps.compte.outputs.multi) || 'Toutes tes idées sont des jeux solo (pas de champ "multijoueur").' }}
+            8. ${{ steps.compte.outputs.par_passage != '0' && format('Jeux multijoueurs : lis docs/multijoueur.md (sections 1, 3, 4 et 7). Dans ton lot, propose au moins {0} idée(s) de jeux multijoueurs, et en tout environ {1} idée(s) multijoueur(s) sur 5. Une idée multijoueur se joue AU TOUR PAR TOUR (jamais en temps réel ni à choix simultanés), de 2 à 10 places selon le jeu, avec des robots qui tiennent les places vides et que de vrais joueurs remplacent : elle doit être amusante seul contre des robots comme à plusieurs, sans aucun texte échangé entre joueurs. Elle garde le reste des règles (20 niveaux solo, mécaniques qui se combinent). Ajoute à ces idées "multijoueur": true et "places": N. Les autres idées n''ont ni l''un ni l''autre.', steps.compte.outputs.multi, steps.compte.outputs.par_passage) || 'Toutes tes idées sont des jeux solo (pas de champ "multijoueur").' }}
 
             Écris le fichier nouvelles-idees.json à la racine du dépôt : une liste JSON de ${{ steps.compte.outputs.manque }} idées,
             chacune sous la forme {"titre": "…", "description": "…", "genre": "…", "genres_secondaires": ["…"], "univers": ["…"], "ages": "6+"} :
@@ -338,10 +344,19 @@ jobs:
           MULTI_BOUCLE: ${{ vars.MULTI_BOUCLE }}
         run: |
           nombre="${NOMBRE_MANUEL:-5}"
-          # Jeux multijoueurs (MULTI_BOUCLE = oui, docs/multijoueur.md) : 2 sur 5 (1 pour 2 ou 3 jeux, aucun pour 1).
-          # Sans la variable, les idées multijoueurs attendent dans la file.
+          # Jeux multijoueurs (docs/multijoueur.md) : MULTI_BOUCLE = nombre par passage de 5 jeux (0 à 5).
+          # Passage lancé à la main avec moins de 5 jeux : en proportion, arrondi (ex. 2 sur 5 → 1 sur 3).
+          # Variable absente, 0 ou illisible : les idées multijoueurs attendent dans la file.
+          par_passage=$(printf '%s' "$MULTI_BOUCLE" | tr -cd '0-9')
+          par_passage=${par_passage:-0}
+          if [ "$par_passage" -gt 5 ]; then par_passage=5; fi
           choix_multi=""
-          if [ "$(printf '%s' "$MULTI_BOUCLE" | tr '[:upper:]' '[:lower:]')" = "oui" ]; then choix_multi="--multi $(( (nombre * 2 + 2) / 5 ))"; fi
+          ajout_multi=""
+          if [ "$par_passage" -gt 0 ]; then
+            choix_multi="--multi $(( (nombre * par_passage + 2) / 5 ))"
+            ajout_multi="--multi $par_passage"
+          fi
+          echo "Jeux multijoueurs par passage de 5 : $par_passage ; pour ce passage de $nombre jeu(x) : ${choix_multi:-aucun}"
           if [ -n "$NOUVELLES" ]; then printf '%s' "$NOUVELLES" > "$RUNNER_TEMP/nouvelles-idees.json"; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -352,7 +367,7 @@ jobs:
             node scripts/idees.mjs reconcilier --ouvertes "$OUVERTES"
             # Idées perso (déjà importées : ignorées), choisies avant toutes les autres.
             if [ -s "$RUNNER_TEMP/idees-perso.json" ]; then node scripts/idees.mjs importer-perso "$RUNNER_TEMP/idees-perso.json"; fi
-            if [ -s "$RUNNER_TEMP/nouvelles-idees.json" ]; then node scripts/idees.mjs ajouter "$RUNNER_TEMP/nouvelles-idees.json"; fi
+            if [ -s "$RUNNER_TEMP/nouvelles-idees.json" ]; then node scripts/idees.mjs ajouter "$RUNNER_TEMP/nouvelles-idees.json" $ajout_multi; fi
             node scripts/idees.mjs choisir "$nombre" $choix_multi > "$RUNNER_TEMP/jeux.json"
             if ! git diff --quiet -- idees.json idees-archive.json; then
               git commit -q -m "Boucle de nuit : idées choisies [CF-Pages-Skip]" -- idees.json idees-archive.json

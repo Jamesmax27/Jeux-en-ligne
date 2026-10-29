@@ -27,9 +27,10 @@
 // Champs facultatifs "multijoueur" (true : jeu multijoueur, docs/multijoueur.md)
 // et "places" (2 à 10, nombre de places suggéré ; l'agent créateur le fixe sinon).
 // Le jeu publié doit être multijoueur si et seulement si son idée l'est (vérifié
-// par « controler »). Avec la variable GitHub MULTI_BOUCLE = oui (une fois le jeu
-// pilote validé par le propriétaire), la boucle choisit 2 idées multijoueurs sur
-// 5 (« choisir 5 --multi 2 ») et l'idéation en garde IDEES_MULTI_VISEES en attente.
+// par « controler »). La variable GitHub MULTI_BOUCLE donne le nombre de jeux
+// multijoueurs par passage de 5 jeux (ex. 2 ; absente ou 0 : aucun) : la boucle
+// en choisit autant (« choisir 5 --multi 2 ») et l'idéation en garde
+// PASSAGES_D_AVANCE fois plus en attente (« manque-multi 2 », « ajouter … --multi 2 »).
 //
 // Les textes pour les moteurs de recherche (titre_seo, description_seo,
 // presentation, regles, competences, jaquette_alt de game.json) ne sont pas
@@ -53,9 +54,11 @@
 //                          genre × univers déjà couvertes (jeux et idées)
 //   archive                titres des idées déjà réalisées
 //   manque                 nombre d'idées à ajouter pour en avoir 15 en attente
-//   manque-multi           nombre d'idées multijoueurs à ajouter pour en avoir
-//                          IDEES_MULTI_VISEES en attente (accueillies même au-delà de 15)
-//   ajouter <fichier>      ajoute les idées proposées par l'agent d'idéation
+//   manque-multi <k>       nombre d'idées multijoueurs à ajouter pour en avoir
+//                          PASSAGES_D_AVANCE × k en attente (k : jeux multijoueurs
+//                          par passage ; accueillies même au-delà de 15)
+//   ajouter <fichier> [--multi <k>]
+//                          ajoute les idées proposées par l'agent d'idéation
 //                          (liste JSON [{ titre, description, genre,
 //                          genres_secondaires, univers, ages, multijoueur,
 //                          places }] ; "multijoueur" et "places" facultatifs ; "ages"
@@ -106,7 +109,10 @@ const DOSSIER_JEUX = path.join(RACINE, 'games');
 const CATALOGUE_CONSTRUIT = path.join(RACINE, 'public', 'catalog.json');
 
 const IDEES_VISEES = 15;   // idées "en_attente" que l'idéation maintient
-const IDEES_MULTI_VISEES = 6;  // dont idées multijoueurs (MULTI_BOUCLE = oui) : 2 par passage, 3 passages d'avance
+const PASSAGES_D_AVANCE = 3;   // idées multijoueurs gardées en attente : de quoi faire 3 passages
+// Idées multijoueurs à garder en attente, pour k jeux multijoueurs par passage (--multi k).
+const multiVisees = (k) => PASSAGES_D_AVANCE * Math.max(0, Math.min(CHOIX_MAX, parseInt(k, 10) || 0));
+const optionMulti = (args) => { const i = args.indexOf('--multi'); return i >= 0 ? args[i + 1] : 0; };
 const ESSAIS_MAX = 3;      // jeux refusés au-delà desquels une idée n'est plus choisie
 const CHOIX_MAX = 5;       // idées choisies par passage (une tâche de fabrication chacune)
 const PLACES_MIN = 2, PLACES_MAX = 10;   // places d'un jeu multijoueur (docs/multijoueur.md)
@@ -393,13 +399,13 @@ async function manque() {
   console.log(Math.max(0, IDEES_VISEES - choisissables(idees).length));
 }
 
-async function manqueMulti() {
+async function manqueMulti(k) {
   const { idees } = await charger();
-  console.log(Math.max(0, IDEES_MULTI_VISEES - choisissables(idees).filter(estMulti).length));
+  console.log(Math.max(0, multiVisees(k) - choisissables(idees).filter(estMulti).length));
 }
 
 // Idées proposées par l'agent d'idéation : contrôlées une à une, ajoutées jusqu'à 15 en attente.
-async function ajouter(fichier) {
+async function ajouter(fichier, k = 0) {
   if (!fichier) throw new Error('fichier des idées proposées manquant : node scripts/idees.mjs ajouter <fichier>');
   const { idees, archive } = await charger();
   let propositions;
@@ -411,8 +417,8 @@ async function ajouter(fichier) {
   const titresPris = new Set([...jeux.map((j) => j.titre), ...idees.map((i) => i.titre), ...archive.map((i) => i.titre)].map(cle));
   const ids = new Set([...idees, ...archive].map((i) => i.id));
   let place = Math.max(0, IDEES_VISEES - choisissables(idees).length);
-  // Idées multijoueurs : accueillies même file pleine, jusqu'à IDEES_MULTI_VISEES en attente.
-  let placeMulti = Math.max(0, IDEES_MULTI_VISEES - choisissables(idees).filter(estMulti).length);
+  // Idées multijoueurs : accueillies même file pleine, jusqu'à multiVisees(k) en attente.
+  let placeMulti = Math.max(0, multiVisees(k) - choisissables(idees).filter(estMulti).length);
   let ajoutees = 0;
 
   for (const p of propositions) {
@@ -579,7 +585,7 @@ async function choisir(n, args = []) {
   const ordre = ordreDeFabrication(idees);
   let choix;
   if (i < 0) {
-    // Sans --multi (MULTI_BOUCLE pas encore à « oui ») : les idées multijoueurs attendent.
+    // Sans --multi (MULTI_BOUCLE absente ou 0) : les idées multijoueurs attendent.
     choix = ordre.filter((x) => !estMulti(x)).slice(0, nombre);
   } else {
     const multis = ordre.filter(estMulti), solos = ordre.filter((x) => !estMulti(x));
@@ -702,8 +708,8 @@ const COMMANDES = {
   catalogue,
   archive: titresArchive,
   manque,
-  'manque-multi': manqueMulti,
-  ajouter: () => ajouter(args[0]),
+  'manque-multi': () => manqueMulti(args[0]),
+  ajouter: () => ajouter(args[0], optionMulti(args)),
   'ajouter-humain': ajouterHumain,
   'importer-perso': () => importerPerso(args[0]),
   choisir: () => choisir(args[0], args.slice(1)),
