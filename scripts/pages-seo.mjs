@@ -314,12 +314,17 @@ function liensLangues(lang, alternatives, t) {
       </details>`;
 }
 
+/** Maison dessinée devant « Accueil » dans le fil d'Ariane : les joueurs voient d'un coup d'œil comment revenir au catalogue. */
+const ICONE_MAISON = '<svg class="ariane-maison" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 /** Fil d'Ariane visible (le dernier élément est la page elle-même) et son équivalent JSON-LD. */
 function ariane(etapes, t) {
   const html = `<nav class="ariane" aria-label="${echapper(t('page.ariane'))}">
       <ol>${etapes.map((e, i) => (i === etapes.length - 1
     ? `<li><span aria-current="page">${echapper(e.nom)}</span></li>`
-    : `<li><a href="${echapper(e.chemin)}">${echapper(e.nom)}</a></li>`)).join('')}</ol>
+    : i === 0
+      ? `<li><a class="ariane-accueil" href="${echapper(e.chemin)}">${ICONE_MAISON}${echapper(e.nom)}</a></li>`
+      : `<li><a href="${echapper(e.chemin)}">${echapper(e.nom)}</a></li>`)).join('')}</ol>
     </nav>`;
   const donnees = {
     '@context': 'https://schema.org',
