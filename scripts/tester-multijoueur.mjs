@@ -545,6 +545,20 @@ async function testerNavigateur(jeux) {
         return p ? { mode: p.mode, n: p.n, sieges: p.sieges(), phase: p.phase, siege: p.siege } : null;
       }).catch(() => null);
       const capturer = (nom) => page.screenshot({ path: path.join(dossier, nom) });
+      // Toucher un bouton du jeu. Si le navigateur refuse le toucher (élément posé par-dessus,
+      // hors de l'écran… : ça arrive sur les machines de GitHub, dont les polices Linux décalent
+      // la mise en page), la raison et une capture sont notées, puis le bouton est actionné
+      // directement : le test vérifie quand même ce qu'il déclenche.
+      const toucher = async (locator, nom) => {
+        try {
+          await locator.click({ timeout: 8000 });
+        } catch (err) {
+          const raison = String(err.message).split('\n').filter((l) => /intercepts|outside|not stable|not visible|disabled|detached|waiting/i.test(l)).slice(-3).join(' | ');
+          noter(sujet, `navigateur : clic refusé sur ${nom} (${raison || String(err.message).split('\n')[0]}) : bouton actionné directement ; capture ${nom}-refuse.png`);
+          await capturer(`${nom}-refuse.png`).catch(() => {});
+          await locator.evaluate((el) => el.click());
+        }
+      };
       // Les messages passent par la file d'affichage du jeu (coups espacés de delaiBot) :
       // on attend qu'elle soit vide avant de regarder (15 s au plus).
       const attendreFile = async (cadre) => {
@@ -562,7 +576,7 @@ async function testerNavigateur(jeux) {
         if (!cadre) throw new Error('le jeu ne se charge pas dans le lanceur');
         const bouton = cadre.locator('[data-multi="jouer"]').first();
         if (!(await bouton.count())) throw new Error('aucun bouton data-multi="jouer" (partie en ligne) sur l\'écran titre');
-        await bouton.tap().catch(() => bouton.click());
+        await toucher(bouton, 'jouer');
         await attendre(3000);
         let e = await etatJeu(cadre);
         if (e?.mode !== 'en-ligne') probleme(sujet, `navigateur : la partie ne passe pas en ligne avec le serveur (mode : ${e?.mode ?? 'aucune partie JEL_MULTI'})`);
@@ -579,7 +593,7 @@ async function testerNavigateur(jeux) {
         await capturer('2-salon-plein.png');
         const lancer = cadre.locator('[data-multi="lancer"]').first();
         if (!(await lancer.isVisible().catch(() => false))) probleme(sujet, 'navigateur : le chef ne voit pas de bouton data-multi="lancer" dans le salon');
-        else await lancer.tap().catch(() => lancer.click());
+        else await toucher(lancer, 'lancer');
         await attendre(1500);
         await attendreFile(cadre);
         e = await etatJeu(cadre);

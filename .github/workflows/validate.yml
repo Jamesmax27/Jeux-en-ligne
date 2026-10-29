@@ -354,6 +354,18 @@ jobs:
         if: needs.quoi.outputs.multi == '1'
         run: node scripts/tester-multijoueur.mjs --navigateur
 
+      # Captures du contrôle multijoueur (salon, table pleine, coupure…), à télécharger
+      # depuis la page du passage (« Artifacts ») quand quelque chose ne va pas.
+      - name: Garder les captures du multijoueur
+        if: ${{ !cancelled() && needs.quoi.outputs.multi == '1' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-multijoueur
+          path: captures/multijoueur/
+          retention-days: 7
+          if-no-files-found: ignore
+
       # Icônes des regroupements : le bloc généré de public/style.css doit
       # correspondre aux dessins de scripts/icones/sources (sans navigateur).
       - name: Contrôler les icônes
