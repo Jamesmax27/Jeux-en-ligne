@@ -2755,27 +2755,187 @@
     bon: () => { note(784, 0.14, { type: 'triangle' }); note(988, 0.14, { type: 'triangle', delai: 0.1 }); note(1318, 0.3, { type: 'triangle', delai: 0.2 }); },
     faux: () => { note(260, 0.3, { type: 'triangle', vers: 170, vol: 0.16 }); },
     auto: () => note(480, 0.14, { vers: 1000, vol: 0.14 }),
-    etoile: (i) => note(1046 + i * 262, 0.22, { type: 'triangle', vol: 0.14 }),
-    victoire: () => [523, 659, 784, 1046].forEach((f, i) => note(f, 0.22, { type: 'triangle', delai: i * 0.13 })),
+    // Fin de niveau : petit carillon doux, plus discret que les chants.
+    etoile: (i) => note([784, 988, 1175][i] || 1175, 0.3, { vol: 0.05, attaque: 0.02 }),
+    victoire: () => [392, 494, 587].forEach((f, i) => note(f, 0.5, { delai: i * 0.14, vol: 0.06, attaque: 0.03 })),
     defaite: () => [523, 440, 349].forEach((f, i) => note(f, 0.3, { type: 'triangle', delai: i * 0.18, vol: 0.14 })),
     vague: () => bruit(0.9, { freq: 600, vol: 0.12, attaque: 0.3 }),
     pile: () => note(1200, 0.07, { type: 'square', vol: 0.05 }),
     page: () => bruit(0.18, { passe: 'highpass', freq: 2500, vol: 0.08 }),
     jumelles: () => { note(1500, 0.08, { vol: 0.08 }); note(2000, 0.12, { vol: 0.08, delai: 0.09 }); }
   };
-  // Chants des animaux : chacun reconnaissable.
+  // Bruit blanc partagé (2 s), pour le souffle des cris.
+  let tamponBruit = null;
+  function bruitBlanc(a) {
+    if (!tamponBruit || tamponBruit.sampleRate !== a.sampleRate) {
+      const n = a.sampleRate * 2; tamponBruit = a.createBuffer(1, n, a.sampleRate);
+      const d = tamponBruit.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return tamponBruit;
+  }
+  // Sortie des chants : écho court de plein air et compresseur doux (volumes réguliers d'un animal à l'autre).
+  let busChants = null;
+  function sortieChants(a) {
+    if (busChants && busChants.ctx === a) return busChants.entree;
+    const entree = a.createGain();
+    const comp = a.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
+    const rev = a.createConvolver(); const n = Math.floor(a.sampleRate * 1.3);
+    const ir = a.createBuffer(2, n, a.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 4); }
+    rev.buffer = ir;
+    const mouille = a.createGain(); mouille.gain.value = 0.2;
+    entree.connect(comp); entree.connect(rev); rev.connect(mouille); mouille.connect(comp); comp.connect(a.destination);
+    busChants = { ctx: a, entree };
+    return entree;
+  }
+  // Courbe d'un paramètre : points [instant de 0 à 1, valeur × k] sur la durée d.
+  function courbe(param, pts, t0, d, k) {
+    param.setValueAtTime(pts[0][1] * k, t0 + pts[0][0] * d);
+    for (let i = 1; i < pts.length; i++) param.linearRampToValueAtTime(pts[i][1] * k, t0 + pts[i][0] * d);
+  }
+  // Une syllabe de cri : hauteur et volume suivent des courbes ; harmoniques (harm), formants du bec ou
+  // de la gorge (formants), trémolo (trem, coassement), modulation rapide (fm, voix rauque) et souffle.
+  function voix(o) {
+    const a = audio(); if (!a) return;
+    const t0 = a.currentTime + (o.delai || 0), d = o.duree, fin = t0 + d + 0.05;
+    const env = a.createGain();
+    courbe(env.gain, o.vol || [[0, 0], [0.1, 1], [0.8, 0.8], [1, 0]], t0, d, o.niveau || 0.2);
+    let sortie = env;
+    if (o.trem) {
+      const prof = o.tremProf || 1;
+      const am = a.createGain(); am.gain.value = 1 - prof / 2;
+      const lfo = a.createOscillator(); lfo.type = o.tremType || 'sine'; lfo.frequency.value = o.trem;
+      const lg = a.createGain(); lg.gain.value = prof / 2;
+      lfo.connect(lg); lg.connect(am.gain); lfo.start(t0); lfo.stop(fin);
+      env.connect(am); sortie = am;
+    }
+    sortie.connect(sortieChants(a));
+    const melange = a.createGain();
+    if (o.formants) {
+      o.formants.forEach(([f, q, v]) => {
+        const fi = a.createBiquadFilter(); fi.type = 'bandpass'; fi.frequency.value = f; fi.Q.value = q;
+        const gv = a.createGain(); gv.gain.value = v * 3;
+        melange.connect(fi); fi.connect(gv); gv.connect(env);
+      });
+    } else melange.connect(env);
+    let mod = null;
+    if (o.fm) {
+      const m = a.createOscillator(); m.frequency.value = o.fm;
+      mod = a.createGain(); mod.gain.value = o.fmProf || 20;
+      m.connect(mod); m.start(t0); m.stop(fin);
+    }
+    (o.harm || [[1, 1]]).forEach(([r, v]) => {
+      const osc = a.createOscillator(); osc.type = o.type || 'sine';
+      courbe(osc.frequency, o.freq, t0, d, r);
+      if (mod) mod.connect(osc.frequency);
+      const gh = a.createGain(); gh.gain.value = v;
+      osc.connect(gh); gh.connect(melange); osc.start(t0); osc.stop(fin);
+    });
+    if (o.souffle) {
+      const src = a.createBufferSource(); src.buffer = bruitBlanc(a);
+      const fi = a.createBiquadFilter(); fi.type = 'bandpass'; fi.frequency.value = o.souffleF || o.freq[0][1]; fi.Q.value = o.souffleQ || 1.5;
+      const gs = a.createGain(); gs.gain.value = o.souffle;
+      src.connect(fi); fi.connect(gs); gs.connect(env);
+      src.start(t0, Math.random() * 1.5); src.stop(fin);
+    }
+  }
+  // Chants des animaux : chacun imite le vrai cri (rythme, hauteur, timbre) pour rester reconnaissable.
   const CHANTS_SONS = {
-    pic: () => { for (let i = 0; i < 18; i++) bruit(0.03, { passe: 'bandpass', freq: 1300, q: 3, vol: 0.35, delai: i * 0.045, attaque: 0.002 }); },
-    coucou: () => { for (let r = 0; r < 2; r++) { note(660, 0.28, { delai: r * 0.9, vol: 0.2, vers: 640 }); note(540, 0.4, { delai: r * 0.9 + 0.32, vol: 0.2, vers: 520 }); } },
-    mesange: () => { for (let i = 0; i < 8; i++) note(i % 2 ? 2900 : 4100, 0.1, { delai: i * 0.14, vol: 0.12 }); },
-    grenouille: () => { for (let i = 0; i < 3; i++) note(120, 0.32, { type: 'square', delai: i * 0.45, vol: 0.1, vibrato: 32, profondeur: 50, filtre: 900 }); },
-    canard: () => { for (let i = 0; i < 4; i++) note(330, 0.18, { type: 'sawtooth', vers: 230, delai: i * 0.24, vol: 0.12, filtre: 1400 }); },
-    marmotte: () => { note(2900, 0.4, { vers: 2400, vol: 0.18 }); note(2900, 0.3, { vers: 2500, vol: 0.14, delai: 0.6 }); },
-    aigle: () => { for (let i = 0; i < 2; i++) note(2100, 0.6, { vers: 1300, delai: i * 0.75, vol: 0.13, vibrato: 18, profondeur: 60 }); },
-    chouette: () => { note(430, 0.45, { delai: 0, vol: 0.2, vers: 410 }); note(430, 0.9, { delai: 0.85, vol: 0.18, vibrato: 9, profondeur: 25, vers: 390 }); },
-    grillon: () => { for (let g = 0; g < 4; g++) for (let i = 0; i < 3; i++) note(4300, 0.05, { delai: g * 0.42 + i * 0.07, vol: 0.08 }); },
-    goeland: () => { for (let i = 0; i < 6; i++) note(1250 - i * 70, 0.13, { type: 'triangle', delai: i * 0.17, vers: 950 - i * 60, vol: 0.14 }); },
-    huitrier: () => { for (let i = 0; i < 9; i++) note(2600, 0.06, { type: 'square', delai: i * 0.11, vol: 0.05, filtre: 3500, vers: 2300 }); }
+    // Pic : deux tambourinages de coups secs sur le bois, qui accélèrent puis s'éteignent.
+    pic: () => {
+      for (let r = 0; r < 2; r++) {
+        let t = r * 1.15;
+        for (let i = 0; i < 20; i++) {
+          voix({ delai: t, duree: 0.04, freq: [[0, 1150], [1, 650]], harm: [[1, 1], [2.6, 0.35]],
+            vol: [[0, 0], [0.04, 1], [0.3, 0.3], [1, 0]], niveau: 0.3 * (1 - i / 26), souffle: 0.9, souffleF: 1900 });
+          t += 0.052 - i * 0.0008;
+        }
+      }
+    },
+    // Coucou : « cou-cou », note haute puis tierce plus basse, voix ronde et douce.
+    coucou: () => {
+      for (let r = 0; r < 3; r++) {
+        const t = r * 0.9;
+        voix({ delai: t, duree: 0.22, freq: [[0, 700], [0.4, 690], [1, 660]], harm: [[1, 1], [2, 0.1], [3, 0.03]],
+          vol: [[0, 0], [0.2, 1], [0.65, 0.85], [1, 0]], niveau: 0.22, souffle: 0.04 });
+        voix({ delai: t + 0.29, duree: 0.34, freq: [[0, 575], [0.3, 565], [1, 535]], harm: [[1, 1], [2, 0.1], [3, 0.03]],
+          vol: [[0, 0], [0.15, 1], [0.6, 0.8], [1, 0]], niveau: 0.2, souffle: 0.04 });
+      }
+    },
+    // Mésange charbonnière : « ti-tu, ti-tu… », une note aiguë qui glisse puis une plus grave.
+    mesange: () => {
+      for (let i = 0; i < 5; i++) {
+        const t = i * 0.27;
+        voix({ delai: t, duree: 0.08, freq: [[0, 5400], [1, 4700]], harm: [[1, 1], [2, 0.04]],
+          vol: [[0, 0], [0.15, 1], [0.7, 0.7], [1, 0]], niveau: 0.12 });
+        voix({ delai: t + 0.11, duree: 0.1, freq: [[0, 3500], [0.5, 3400], [1, 3200]], harm: [[1, 1], [2, 0.05]],
+          vol: [[0, 0], [0.2, 1], [0.7, 0.8], [1, 0]], niveau: 0.11 });
+      }
+    },
+    // Grenouille : « rrê… rrê… rrê », un son grave fait de petites pulsations rapides.
+    grenouille: () => {
+      for (let i = 0; i < 4; i++) {
+        voix({ delai: i * 0.42, duree: 0.24, type: 'sawtooth', freq: [[0, 165], [0.5, 190], [1, 150]],
+          trem: 34, tremType: 'square', tremProf: 0.95, formants: [[650, 3, 1], [1450, 4, 0.55]],
+          vol: [[0, 0], [0.1, 1], [0.75, 0.9], [1, 0]], niveau: 0.32, souffle: 0.08, souffleF: 800 });
+      }
+    },
+    // Cane : « coin-coin » nasillards, de plus en plus faibles et rapprochés.
+    canard: () => {
+      let t = 0;
+      for (let i = 0; i < 5; i++) {
+        voix({ delai: t, duree: 0.2 - i * 0.015, type: 'sawtooth', freq: [[0, 250], [0.25, 300], [1, 215]],
+          formants: [[950, 5, 1], [1900, 6, 0.8], [2800, 7, 0.35]], fm: 55, fmProf: 12,
+          vol: [[0, 0], [0.08, 1], [0.5, 0.8], [1, 0]], niveau: 0.34 * (1 - i * 0.13), souffle: 0.06, souffleF: 1600 });
+        t += 0.3 - i * 0.03;
+      }
+    },
+    // Marmotte : sifflements très aigus et secs, comme une alarme.
+    marmotte: () => {
+      [0, 0.5, 1.25].forEach((t) => voix({ delai: t, duree: 0.17, freq: [[0, 2550], [0.25, 3100], [1, 2700]],
+        harm: [[1, 1], [2, 0.06]], vol: [[0, 0], [0.08, 1], [0.7, 0.85], [1, 0]], niveau: 0.15, souffle: 0.07, souffleF: 3000 }));
+    },
+    // Aigle : long cri perçant qui monte puis redescend, un peu rauque.
+    aigle: () => {
+      for (let i = 0; i < 2; i++) {
+        voix({ delai: i * 1.05, duree: 0.7, freq: [[0, 1800], [0.15, 2300], [1, 1450]], harm: [[1, 1], [2, 0.22], [3, 0.07]],
+          fm: 95, fmProf: 60, vol: [[0, 0], [0.1, 1], [0.6, 0.65], [1, 0]], niveau: 0.13, souffle: 0.1, souffleF: 2200 });
+      }
+    },
+    // Chouette hulotte : « hou-ou… hou… hou-ou-ou-ou », voix douce, soufflée et tremblante.
+    chouette: () => {
+      const rond = { harm: [[1, 1], [2, 0.07]], souffle: 0.12, souffleF: 450, souffleQ: 2 };
+      voix(Object.assign({ delai: 0, duree: 0.6, freq: [[0, 400], [0.2, 440], [1, 405]], vol: [[0, 0], [0.2, 1], [0.7, 0.8], [1, 0]], niveau: 0.22 }, rond));
+      voix(Object.assign({ delai: 1.25, duree: 0.16, freq: [[0, 385], [1, 375]], vol: [[0, 0], [0.3, 1], [1, 0]], niveau: 0.16 }, rond));
+      voix(Object.assign({ delai: 1.6, duree: 1.0, freq: [[0, 395], [0.3, 430], [1, 380]], trem: 9, tremProf: 0.7,
+        vol: [[0, 0], [0.1, 1], [0.7, 0.75], [1, 0]], niveau: 0.22 }, rond));
+    },
+    // Grillon : « cri-cri-cri », chaque cri fait de trois frottements très rapides.
+    grillon: () => {
+      for (let g = 0; g < 6; g++) for (let i = 0; i < 3; i++) {
+        voix({ delai: g * 0.34 + i * 0.034, duree: 0.022, freq: [[0, 4700], [1, 4600]], harm: [[1, 1], [2, 0.03]],
+          vol: [[0, 0], [0.2, 1], [0.8, 1], [1, 0]], niveau: 0.08 });
+      }
+    },
+    // Goéland : un long « kiiaou » puis une série de « ha-ha-ha » qui ressemble à un éclat de rire.
+    goeland: () => {
+      const gorge = { type: 'sawtooth', formants: [[1300, 3, 1], [2600, 4, 0.45]], fm: 45, fmProf: 25, souffle: 0.05, souffleF: 1500 };
+      voix(Object.assign({ delai: 0, duree: 0.45, freq: [[0, 700], [0.3, 1300], [1, 900]], vol: [[0, 0], [0.15, 1], [0.7, 0.8], [1, 0]], niveau: 0.24 }, gorge));
+      for (let i = 0; i < 6; i++) {
+        voix(Object.assign({ delai: 0.62 + i * 0.17, duree: 0.13, freq: [[0, 920 - i * 25], [0.3, 1200 - i * 30], [1, 860 - i * 25]],
+          vol: [[0, 0], [0.12, 1], [0.6, 0.8], [1, 0]], niveau: 0.22 * (1 - i * 0.07) }, gorge));
+      }
+    },
+    // Huîtrier pie : « kip, kip, kip… » aigus et perçants, de plus en plus rapides.
+    huitrier: () => {
+      let t = 0;
+      for (let i = 0; i < 11; i++) {
+        voix({ delai: t, duree: 0.07, freq: [[0, 3300], [0.3, 3100], [1, 2550]], harm: [[1, 1], [2, 0.15]],
+          vol: [[0, 0], [0.1, 1], [0.5, 0.7], [1, 0]], niveau: 0.13, souffle: 0.04, souffleF: 3000 });
+        t += 0.15 - i * 0.006;
+      }
+    }
   };
   const jouer = (cle, arg) => { if (SONS[cle]) SONS[cle](arg); };
   const chanter = (rep) => { if (CHANTS_SONS[rep]) CHANTS_SONS[rep](); };
