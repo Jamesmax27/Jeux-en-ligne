@@ -84,6 +84,14 @@
 # déploiement du Worker multijoueur est relancé (multijoueur.yml).
 # MULTI_BOUCLE absente, 0 ou illisible : la boucle ne fabrique que des jeux solo.
 #
+# Jeux pour adolescents (« ages » 13+) : la variable GitHub ADOS_BOUCLE donne
+# leur nombre par passage de 5 jeux (0 à 5, modifiable à tout moment, même
+# endroit). L'idéation en garde 3 fois plus en attente, l'étape b en choisit
+# autant (idees.mjs choisir 5 --ados 2 ; à la main avec moins de 5 jeux : en
+# proportion) ; s'il en manque, d'autres idées complètent. 0 : aucune idée 13+
+# de l'agent. Absente ou illisible : aucun quota (un 13+ de temps en temps).
+# Les idées 13+ du propriétaire passent toujours, et comptent dans le quota.
+#
 # Seules les étapes b et e écrivent dans idees.json et idees-archive.json,
 # jamais les tâches parallèles. Leurs enregistrements portent [CF-Pages-Skip] :
 # Cloudflare Pages ne reconstruit pas le site pour eux.
@@ -151,6 +159,7 @@ jobs:
           OUVERTES: ${{ steps.ouvertes.outputs.ids }}
           NOMBRE_MANUEL: ${{ inputs.nombre }}
           MULTI_BOUCLE: ${{ vars.MULTI_BOUCLE }}
+          ADOS_BOUCLE: ${{ vars.ADOS_BOUCLE }}
         run: |
           # Même mise à jour qu'à l'étape b, sans l'enregistrer : l'agent voit la file à jour.
           node scripts/idees.mjs reconcilier --ouvertes "$OUVERTES"
@@ -162,13 +171,21 @@ jobs:
           # Idées multijoueurs à ajouter (de quoi faire 3 passages), même file pleine.
           multi=0
           if [ "$par_passage" -gt 0 ]; then multi=$(node scripts/idees.mjs manque-multi "$par_passage"); fi
+          # Jeux 13+ : ADOS_BOUCLE = nombre par passage de 5 (0 à 5) ; absente ou illisible : "" (aucun quota).
+          ados_passage=$(printf '%s' "$ADOS_BOUCLE" | tr -cd '0-9' | cut -c1-2)
+          if [ -n "$ados_passage" ]; then ados_passage=$(( 10#$ados_passage > 5 ? 5 : 10#$ados_passage )); fi
+          ados=0
+          if [ -n "$ados_passage" ] && [ "$ados_passage" -gt 0 ]; then ados=$(node scripts/idees.mjs manque-ados "$ados_passage"); fi
           # Lancement à la main avec 0 jeu : pas d'idéation.
-          if [ "${NOMBRE_MANUEL:-5}" = "0" ]; then manque=0; multi=0; fi
+          if [ "${NOMBRE_MANUEL:-5}" = "0" ]; then manque=0; multi=0; ados=0; fi
           total=$(( manque > multi ? manque : multi ))
-          echo "Idées à ajouter : $total (dont multijoueurs : $multi ; jeux multijoueurs par passage : $par_passage)"
+          total=$(( total > ados ? total : ados ))
+          echo "Idées à ajouter : $total (dont multijoueurs : $multi, 13+ : $ados ; par passage : $par_passage multijoueur(s), ${ados_passage:-sans quota de} 13+)"
           echo "manque=$total" >> "$GITHUB_OUTPUT"
           echo "multi=$multi" >> "$GITHUB_OUTPUT"
           echo "par_passage=$par_passage" >> "$GITHUB_OUTPUT"
+          echo "ados=$ados" >> "$GITHUB_OUTPUT"
+          echo "ados_passage=$ados_passage" >> "$GITHUB_OUTPUT"
           sha256sum idees.json idees-archive.json > "$RUNNER_TEMP/empreintes.txt"
 
       - name: L'agent propose de nouvelles idées
@@ -201,8 +218,8 @@ jobs:
             4. Vise d'abord ce qui manque : les genres et les univers qui ont peu ou pas de jeux ni d'idées (un univers vide
                s'affiche grisé « Bientôt » sur l'accueil), et surtout les combinaisons genre × univers encore libres
                (absentes de la liste « déjà couvertes »). Deux idées d'un même lot n'ont jamais la même combinaison.
-               Varie aussi les âges, de 4+ à 13+ : la tuile « 13 ans et + » (jeux pour adolescents) est encore presque vide,
-               propose donc de temps en temps une idée "13+" (horreur, frissons, suspense, défis corsés…). Les idées du propriétaire (source « humain ») restent toujours
+               ${{ steps.compte.outputs.ados_passage == '' && 'Varie aussi les âges, de 4+ à 13+ : la tuile « 13 ans et + » (jeux pour adolescents) est encore presque vide, propose donc de temps en temps une idée "13+" (horreur, frissons, suspense, défis corsés…).' || steps.compte.outputs.ados_passage == '0' && 'Varie aussi les âges, de 4+ à 12+ : aucune idée "13+" (jeux pour adolescents) pour l''instant, elle serait refusée.' || format('Âges : dans ton lot, propose au moins {0} idée(s) "13+" (jeux pour adolescents : horreur, frissons, suspense, défis corsés…), et en tout environ {1} idée(s) "13+" sur 5 ; varie les âges des autres, de 4+ à 12+. Une idée multijoueur "13+" compte dans les deux.', steps.compte.outputs.ados, steps.compte.outputs.ados_passage) }}
+               Les idées du propriétaire (source « humain ») restent toujours
                fabriquées avant les tiennes : ne les recopie pas et ne cherche pas à les remplacer.
             5. Aucun doublon : ni le même titre, ni le même principe qu'un jeu publié, une idée prévue ou une idée réalisée.
             6. Pas de jeu basique. Chaque idée décrit : le geste de base ; 3 ou 4 mécaniques (obstacles, ennemis, objets,
@@ -346,6 +363,7 @@ jobs:
           NOUVELLES: ${{ needs.idees.outputs.nouvelles }}
           NOMBRE_MANUEL: ${{ inputs.nombre }}
           MULTI_BOUCLE: ${{ vars.MULTI_BOUCLE }}
+          ADOS_BOUCLE: ${{ vars.ADOS_BOUCLE }}
         run: |
           nombre="${NOMBRE_MANUEL:-5}"
           # Jeux multijoueurs (docs/multijoueur.md) : MULTI_BOUCLE = nombre par passage de 5 jeux (0 à 5).
@@ -361,6 +379,18 @@ jobs:
             ajout_multi="--multi $par_passage"
           fi
           echo "Jeux multijoueurs par passage de 5 : $par_passage ; pour ce passage de $nombre jeu(x) : ${choix_multi:-aucun}"
+          # Jeux 13+ : ADOS_BOUCLE = nombre par passage de 5 jeux (0 à 5), en proportion comme ci-dessus.
+          # 0 : les idées 13+ de l'agent attendent ; absente ou illisible : aucun quota (ordre habituel).
+          # Les idées 13+ du propriétaire passent toujours (scripts/idees.mjs, choisir).
+          ados_passage=$(printf '%s' "$ADOS_BOUCLE" | tr -cd '0-9' | cut -c1-2)
+          choix_ados=""
+          ajout_ados=""
+          if [ -n "$ados_passage" ]; then
+            ados_passage=$(( 10#$ados_passage > 5 ? 5 : 10#$ados_passage ))
+            choix_ados="--ados $(( (nombre * ados_passage + 2) / 5 ))"
+            ajout_ados="--ados $ados_passage"
+          fi
+          echo "Jeux 13+ par passage de 5 : ${ados_passage:-sans quota} ; pour ce passage de $nombre jeu(x) : ${choix_ados:-sans quota}"
           if [ -n "$NOUVELLES" ]; then printf '%s' "$NOUVELLES" > "$RUNNER_TEMP/nouvelles-idees.json"; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -371,8 +401,8 @@ jobs:
             node scripts/idees.mjs reconcilier --ouvertes "$OUVERTES"
             # Idées perso (déjà importées : ignorées), choisies avant toutes les autres.
             if [ -s "$RUNNER_TEMP/idees-perso.json" ]; then node scripts/idees.mjs importer-perso "$RUNNER_TEMP/idees-perso.json"; fi
-            if [ -s "$RUNNER_TEMP/nouvelles-idees.json" ]; then node scripts/idees.mjs ajouter "$RUNNER_TEMP/nouvelles-idees.json" $ajout_multi; fi
-            node scripts/idees.mjs choisir "$nombre" $choix_multi > "$RUNNER_TEMP/jeux.json"
+            if [ -s "$RUNNER_TEMP/nouvelles-idees.json" ]; then node scripts/idees.mjs ajouter "$RUNNER_TEMP/nouvelles-idees.json" $ajout_multi $ajout_ados; fi
+            node scripts/idees.mjs choisir "$nombre" $choix_multi $choix_ados > "$RUNNER_TEMP/jeux.json"
             if ! git diff --quiet -- idees.json idees-archive.json; then
               git commit -q -m "Boucle de nuit : idées choisies [CF-Pages-Skip]" -- idees.json idees-archive.json
               if ! git push origin HEAD:main; then echo "main a bougé : nouvel essai."; continue; fi

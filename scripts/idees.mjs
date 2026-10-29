@@ -32,6 +32,16 @@
 // en choisit autant (« choisir 5 --multi 2 ») et l'idéation en garde
 // PASSAGES_D_AVANCE fois plus en attente (« manque-multi 2 », « ajouter … --multi 2 »).
 //
+// Jeux pour adolescents (« ages » 13+, pourAdos de public/taxonomie.js) : la
+// variable GitHub ADOS_BOUCLE donne leur nombre par passage de 5 jeux (0 à 5).
+// La boucle en choisit autant (« choisir 5 --ados 2 ») et l'idéation en garde
+// PASSAGES_D_AVANCE fois plus en attente (« manque-ados 2 », « ajouter … --ados 2 »).
+// --ados 0 : les idées 13+ de l'agent attendent et l'idéation n'en ajoute plus.
+// Les idées 13+ du propriétaire (source « humain » ou idée perso) ne sont
+// jamais retenues par ce quota : elles passent à leur rang et y comptent.
+// Sans --ados (variable absente ou illisible) : aucun quota, ordre habituel.
+// Une idée multijoueur 13+ compte dans les deux quotas.
+//
 // Les textes pour les moteurs de recherche (titre_seo, description_seo,
 // presentation, regles, competences, jaquette_alt de game.json) ne sont pas
 // dans l'idée : l'agent créateur les rédige d'après le jeu fini. Les
@@ -57,13 +67,15 @@
 //   manque-multi <k>       nombre d'idées multijoueurs à ajouter pour en avoir
 //                          PASSAGES_D_AVANCE × k en attente (k : jeux multijoueurs
 //                          par passage ; accueillies même au-delà de 15)
-//   ajouter <fichier> [--multi <k>]
+//   manque-ados <k>        idem pour les idées 13+ (k : jeux 13+ par passage)
+//   ajouter <fichier> [--multi <k>] [--ados <k>]
 //                          ajoute les idées proposées par l'agent d'idéation
 //                          (liste JSON [{ titre, description, genre,
 //                          genres_secondaires, univers, ages, multijoueur,
 //                          places }] ; "multijoueur" et "places" facultatifs ; "ages"
 //                          facultatif : à défaut, lu dans la description ;
-//                          un âge illisible refuse l'idée)
+//                          un âge illisible refuse l'idée ; --ados 0 refuse
+//                          les idées 13+)
 //   ajouter-humain         ajoute l'idée du formulaire (variables TITRE,
 //                          PRINCIPE, GENRE, AGE, UNIVERS, COMPETENCES,
 //                          PRIORITE ; genre et univers : identifiants ou
@@ -78,7 +90,7 @@
 //                          identifiants ou libellés ; ages et univers
 //                          facultatifs, une valeur illisible est écartée)
 //                          qui ne sont pas déjà dans idees.json ou l'archive
-//   choisir <n> [--multi <k>]
+//   choisir <n> [--multi <k>] [--ados <k>]
 //                          passe n idées "en_cours" et écrit leur liste (JSON :
 //                          id, titre, description, genre, genres_secondaires,
 //                          univers, ages — « 6+ », ou "" quand l'idée n'en
@@ -87,6 +99,9 @@
 //                          n − k autres, chacune dans l'ordre de fabrication ;
 //                          s'il en manque d'un type, l'autre complète. Sans
 //                          --multi, les idées multijoueurs ne sont pas choisies.
+//                          --ados k : k idées 13+ (celles du propriétaire en
+//                          plus si besoin), complétées de même ; --ados 0 :
+//                          aucune idée 13+ de l'agent.
 //   reconcilier [--ouvertes id,…] [--echecs id,…]
 //                          idée dont le jeu est sur main → archive ; idée
 //                          "en_cours" sans pull request ouverte → "en_attente"
@@ -99,7 +114,7 @@ import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX } from '../public/taxonomie.js';
+import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX, pourAdos } from '../public/taxonomie.js';
 import { problemesClassementIdee, RAPPEL_LISTES } from './controle-taxonomie.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -109,10 +124,15 @@ const DOSSIER_JEUX = path.join(RACINE, 'games');
 const CATALOGUE_CONSTRUIT = path.join(RACINE, 'public', 'catalog.json');
 
 const IDEES_VISEES = 15;   // idées "en_attente" que l'idéation maintient
-const PASSAGES_D_AVANCE = 3;   // idées multijoueurs gardées en attente : de quoi faire 3 passages
-// Idées multijoueurs à garder en attente, pour k jeux multijoueurs par passage (--multi k).
+const PASSAGES_D_AVANCE = 3;   // idées multijoueurs ou 13+ gardées en attente : de quoi faire 3 passages
+// Idées multijoueurs (ou 13+) à garder en attente, pour k jeux de ce type par passage (--multi k, --ados k).
 const multiVisees = (k) => PASSAGES_D_AVANCE * Math.max(0, Math.min(CHOIX_MAX, parseInt(k, 10) || 0));
 const optionMulti = (args) => { const i = args.indexOf('--multi'); return i >= 0 ? args[i + 1] : 0; };
+// --ados k : nombre de 0 à n ; null sans l'option (aucun quota).
+const optionAdos = (args, n = CHOIX_MAX) => {
+  const i = args.indexOf('--ados');
+  return i >= 0 ? Math.max(0, Math.min(n, parseInt(args[i + 1], 10) || 0)) : null;
+};
 const ESSAIS_MAX = 3;      // jeux refusés au-delà desquels une idée n'est plus choisie
 const CHOIX_MAX = 5;       // idées choisies par passage (une tâche de fabrication chacune)
 const PLACES_MIN = 2, PLACES_MAX = 10;   // places d'un jeu multijoueur (docs/multijoueur.md)
@@ -124,6 +144,8 @@ const AGE_DANS_DESCRIPTION = /Âge\s+conseillé\s*:\s*(\d{1,2})\s*\+/i;
 const ORDRE_CHAMPS = ['id', 'titre', 'description', 'genre', 'genres_secondaires', 'univers', 'ages', 'multijoueur', 'places', 'source', 'date_ajout', 'statut', 'jeu_id', 'issue', 'essais'];
 const placesValides = (n) => Number.isInteger(n) && n >= PLACES_MIN && n <= PLACES_MAX;
 const estMulti = (i) => i?.multijoueur === true;
+// Idée pour adolescents : âge conseillé 13+ (champ "ages" ou phrase de la description).
+const estAdos = (i) => pourAdos(ageDeIdee(i));
 
 // --------------------------------------------------------------------------
 // Outils
@@ -196,6 +218,7 @@ function universDonnes(valeur) {
 // (ordre du fichier).
 const choisissables = (idees) => idees.filter((i) => i.statut === 'en_attente' && (i.essais || 0) < ESSAIS_MAX);
 const estPerso = (i) => Number.isInteger(i.issue);
+const duProprietaire = (i) => estPerso(i) || i.source === 'humain';
 const ordreDeFabrication = (idees) => {
   const libres = choisissables(idees);
   const perso = libres.filter(estPerso).sort((a, b) => a.issue - b.issue);
@@ -404,8 +427,14 @@ async function manqueMulti(k) {
   console.log(Math.max(0, multiVisees(k) - choisissables(idees).filter(estMulti).length));
 }
 
+async function manqueAdos(k) {
+  const { idees } = await charger();
+  console.log(Math.max(0, multiVisees(k) - choisissables(idees).filter(estAdos).length));
+}
+
 // Idées proposées par l'agent d'idéation : contrôlées une à une, ajoutées jusqu'à 15 en attente.
-async function ajouter(fichier, k = 0) {
+// ados : jeux 13+ par passage (null : aucun quota ; 0 : idées 13+ refusées).
+async function ajouter(fichier, k = 0, ados = null) {
   if (!fichier) throw new Error('fichier des idées proposées manquant : node scripts/idees.mjs ajouter <fichier>');
   const { idees, archive } = await charger();
   let propositions;
@@ -419,6 +448,8 @@ async function ajouter(fichier, k = 0) {
   let place = Math.max(0, IDEES_VISEES - choisissables(idees).length);
   // Idées multijoueurs : accueillies même file pleine, jusqu'à multiVisees(k) en attente.
   let placeMulti = Math.max(0, multiVisees(k) - choisissables(idees).filter(estMulti).length);
+  // Idées 13+ : de même, jusqu'à multiVisees(ados) en attente.
+  let placeAdos = Math.max(0, multiVisees(ados) - choisissables(idees).filter(estAdos).length);
   let ajoutees = 0;
 
   for (const p of propositions) {
@@ -436,8 +467,10 @@ async function ajouter(fichier, k = 0) {
     const ages = ageDonne ? normaliserAge(p.ages) : ageDeIdee({ description });
     const multijoueur = p?.multijoueur === true;
     const places = p?.places === undefined || p?.places === null || p?.places === '' ? undefined : Number(p.places);
+    const ados13 = pourAdos(ages);
     let refus = '';
-    if (place === 0 && !(multijoueur && placeMulti > 0)) refus = `déjà ${IDEES_VISEES} idées en attente`;
+    if (ados13 && ados === 0) refus = 'idée 13+ alors que ADOS_BOUCLE vaut 0';
+    else if (place === 0 && !(multijoueur && placeMulti > 0) && !(ados13 && placeAdos > 0)) refus = `déjà ${IDEES_VISEES} idées en attente`;
     else if (p?.multijoueur !== undefined && typeof p.multijoueur !== 'boolean') refus = '"multijoueur" : true ou false';
     else if (places !== undefined && !(multijoueur && placesValides(places))) refus = `"places" : nombre entier de ${PLACES_MIN} à ${PLACES_MAX}, pour une idée multijoueur`;
     else if (titre.length < 2) refus = 'titre manquant';
@@ -459,6 +492,7 @@ async function ajouter(fichier, k = 0) {
     ids.add(id); titresPris.add(cle(titre)); ajoutees++;
     place = Math.max(0, place - 1);
     if (multijoueur) placeMulti = Math.max(0, placeMulti - 1);
+    if (ados13) placeAdos = Math.max(0, placeAdos - 1);
     const sec = genres_secondaires.length ? ` + ${genres_secondaires.join(', ')}` : '';
     const multi = multijoueur ? ` ; multijoueur${places !== undefined ? `, ${places} places` : ''}` : '';
     console.log(`Ajoutée : ${titre} (${genre}${sec} ; ${univers.join(', ')} ; âge ${ages || 'non précisé'}${multi})`);
@@ -581,23 +615,32 @@ async function choisir(n, args = []) {
   const nombre = Math.max(0, Math.min(CHOIX_MAX, parseInt(n, 10) || 0));
   const i = args.indexOf('--multi');
   const voulus = i >= 0 ? Math.max(0, Math.min(nombre, parseInt(args[i + 1], 10) || 0)) : 0;
+  const ados = optionAdos(args, nombre);   // null : aucun quota de jeux 13+
   const { idees } = await charger();
-  const ordre = ordreDeFabrication(idees);
-  let choix;
-  if (i < 0) {
-    // Sans --multi (MULTI_BOUCLE absente ou 0) : les idées multijoueurs attendent.
-    choix = ordre.filter((x) => !estMulti(x)).slice(0, nombre);
-  } else {
-    const multis = ordre.filter(estMulti), solos = ordre.filter((x) => !estMulti(x));
-    const nbMulti = Math.min(voulus, multis.length);
-    const nbSolo = Math.min(nombre - nbMulti, solos.length);
-    // S'il manque des idées solo, d'autres idées multijoueurs complètent (et inversement).
-    const pris = [...multis.slice(0, nbMulti + Math.max(0, nombre - nbMulti - nbSolo)), ...solos.slice(0, nbSolo)];
-    choix = ordre.filter((x) => pris.includes(x)).slice(0, nombre);
-  }
+  // Sans --multi (MULTI_BOUCLE absente ou 0) : les idées multijoueurs attendent.
+  // --ados 0 : les idées 13+ de l'agent attendent (celles du propriétaire passent).
+  const ordre = ordreDeFabrication(idees)
+    .filter((x) => (i >= 0 || !estMulti(x)) && !(ados === 0 && estAdos(x) && !duProprietaire(x)));
+  const pris = new Set();
+  const nbAdos = () => [...pris].filter(estAdos).length;
+  // Une idée 13+ de l'agent n'entre dans les quotas que s'il reste de la place dans celui des jeux 13+.
+  const adosPermis = (x) => ados === null || !estAdos(x) || duProprietaire(x) || nbAdos() < ados;
+  // Prend, dans l'ordre de fabrication, au plus max idées qui passent le filtre (n au total).
+  const prendre = (filtre, max) => {
+    for (const x of ordre) {
+      if (pris.size >= nombre || max <= 0) return;
+      if (!pris.has(x) && filtre(x)) { pris.add(x); max--; }
+    }
+  };
+  prendre((x) => estMulti(x) && adosPermis(x), voulus);                                   // 1. multijoueurs
+  if (ados !== null) prendre((x) => !estMulti(x) && estAdos(x) && adosPermis(x), ados - nbAdos());   // 2. 13+
+  prendre((x) => !estMulti(x) && (ados === null || !estAdos(x) || duProprietaire(x)), nombre);       // 3. autres
+  // 4. S'il manque des idées d'un type, les autres complètent (multijoueurs ou 13+ en plus du quota).
+  prendre(() => true, nombre);
+  const choix = ordre.filter((x) => pris.has(x));
   for (const x of choix) x.statut = 'en_cours';
   await ecrire(FICHIER_IDEES, idees);
-  for (const x of choix) console.error(`Choisie : ${x.titre} (${x.source}${estMulti(x) ? ', multijoueur' : ''})`);
+  for (const x of choix) console.error(`Choisie : ${x.titre} (${x.source}${estMulti(x) ? ', multijoueur' : ''}${estAdos(x) ? ', 13+' : ''})`);
   if (!choix.length) console.error('Aucune idée choisie.');
   // "ages" : toujours présent, « 6+ » ou "" (idée sans âge : l'agent créateur le choisit) ; il va
   // jusqu'à l'agent et à l'étape « Fiche du jeu ».
@@ -709,7 +752,8 @@ const COMMANDES = {
   archive: titresArchive,
   manque,
   'manque-multi': () => manqueMulti(args[0]),
-  ajouter: () => ajouter(args[0], optionMulti(args)),
+  'manque-ados': () => manqueAdos(args[0]),
+  ajouter: () => ajouter(args[0], optionMulti(args), optionAdos(args)),
   'ajouter-humain': ajouterHumain,
   'importer-perso': () => importerPerso(args[0]),
   choisir: () => choisir(args[0], args.slice(1)),

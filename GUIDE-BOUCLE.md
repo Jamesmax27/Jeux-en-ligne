@@ -131,6 +131,19 @@ Les jeux validés reçoivent alors l'étiquette `valide` et restent ouverts : à
 
 Si une règle de protection de `main` exige une relecture humaine, la boucle ne peut pas fusionner : les jeux validés reçoivent l'étiquette `valide` et un commentaire vous demande de cliquer « Merge ».
 
+## Choisir le nombre de jeux pour adolescents (13 ans et +)
+
+Par défaut, l'agent d'idées propose un jeu « 13+ » de temps en temps, au hasard. Pour en fixer le nombre :
+
+1. Sur github.com, dépôt → **Settings** → **Secrets and variables** → **Actions** → onglet **Variables**.
+2. **New repository variable** : nom `ADOS_BOUCLE`, valeur de `0` à `5` (le nombre de jeux 13+ sur les 5 jeux d'un passage), puis **Add variable**. Pour la changer : crayon à côté de la variable.
+
+- `2` par exemple : chaque passage fabrique 2 jeux 13+ et 3 jeux pour les plus jeunes. L'agent garde d'avance des idées 13+ pour 3 passages. S'il en manque, d'autres idées complètent : un passage fait toujours 5 jeux.
+- `0` : plus aucun jeu 13+ proposé par l'agent.
+- Variable supprimée : retour au hasard.
+- Vos propres idées 13+ (page `/idees`, formulaire) passent toujours à leur tour, même avec `0`, et comptent dans le nombre.
+- Un passage lancé à la main avec moins de 5 jeux garde la même proportion (2 sur 5 → 1 sur 3).
+
 ## Proposer une idée depuis mon téléphone
 
 Un formulaire GitHub ajoute l'idée à `idees.json` tout seul, sans ordinateur.
@@ -196,6 +209,7 @@ Bon à savoir :
 | Revérifier les pull requests en attente | Actions → Créer des jeux (boucle de nuit) → Run workflow → 0 jeu |
 | Faire corriger un jeu proposé | Commentaire « @claude … » dans sa pull request |
 | Couper la fusion automatique | Variable `FUSION_AUTO` = `non` (voir plus haut) |
+| Fixer le nombre de jeux 13+ par passage | Variable `ADOS_BOUCLE` = `0` à `5` (voir plus haut) |
 | Mettre la boucle en pause | Actions → Créer des jeux (boucle de nuit) → menu « … » → **Disable workflow** |
 | Comprendre un échec | Actions → cliquer sur le passage en rouge → lire l'étape en échec |
 | Vérifier `idees.json` sur mon PC | `npm run idees` |
