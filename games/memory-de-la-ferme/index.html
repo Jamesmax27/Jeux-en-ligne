@@ -1010,6 +1010,12 @@
   // (à partir de 1), écrit à chaque niveau réussi et à la fermeture de la page.
   var JEU = "memory-de-la-ferme";
   var enJeu = false;
+  // Meilleures étoiles de chaque niveau, gardées aussi dans la sauvegarde du site
+  var etoilesNiv = [];
+  try {
+    var etSave = JEL_SAVE.load(JEU).etoiles;
+    for (var k = 0; k < NIVEAUX.length; k++) etoilesNiv.push(Array.isArray(etSave) ? Math.min(3, Math.max(0, parseInt(etSave[k], 10) || 0)) : 0);
+  } catch (e) { etoilesNiv = NIVEAUX.map(function () { return 0; }); }
   JEL_SAVE.surFermeture(function () {
     if (enJeu) JEL_SAVE.save(JEU, { niveau: niveau + 1, score: 0 });
   });
@@ -1073,8 +1079,14 @@
     }
     var dernier = niveau === NIVEAUX.length - 1;
     enJeu = false;
-    // Dernier niveau réussi : la ferme est terminée, plus rien à reprendre.
-    if (dernier) JEL_SAVE.clear(JEU); else JEL_SAVE.save(JEU, { niveau: niveau + 2, score: 0 });
+    etoilesNiv[niveau] = Math.max(etoilesNiv[niveau] || 0, etoiles);
+    // Dernier niveau réussi : la ferme est terminée, on reprendra au début (les étoiles restent gardées).
+    JEL_SAVE.save(JEU, { niveau: dernier ? 1 : niveau + 2, score: 0, etoiles: etoilesNiv });
+    // Jeu terminé (dernier niveau gagné, ou tous les niveaux déjà gagnés) : total des meilleures étoiles.
+    if (dernier || etoilesNiv.every(function (x) { return x > 0; })) {
+      var totalEt = etoilesNiv.reduce(function (a, b) { return a + b; }, 0);
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEt, maxStars: NIVEAUX.length * 3 });
+    }
     el("fin-etoiles").textContent = "⭐".repeat(etoiles) + "☆".repeat(3 - etoiles);
     el("fin-titre").textContent = dernier ? t("champion") : t("bravo");
     el("fin-img").textContent = dernier ? "🏆" : "🎉";

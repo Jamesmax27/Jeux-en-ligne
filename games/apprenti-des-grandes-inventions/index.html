@@ -3941,6 +3941,10 @@ function victoire() {
   P.niveauMax = Math.max(P.niveauMax, Math.min(NIVEAUX.length, n + 2));
   sauverLocal();
   sauverPartie(n + 2);
+  // Jeu terminé (toutes les missions gagnées, maintenant ou avant) : total des meilleures étoiles.
+  if (P.etoiles.every((e) => e > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+  }
   const totApres = totalEtoiles();
   const nouvelleTenue = CHAPEAUX_ETOILES.some((s) => s > totAvant && s <= totApres) || TABLIERS_ETOILES.some((s) => s > totAvant && s <= totApres);
   const gradeApres = gradeDe(P.xp);

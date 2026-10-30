@@ -1583,6 +1583,17 @@ let niveauGagne = false;   // niveau en cours réussi (la suite est déjà enreg
 JEL_SAVE.surFermeture(() => {
   if (!modeDemo && !niveauGagne) JEL_SAVE.save(JEU, { niveau: niv + 1 });
 });
+// Étoiles par niveau gardées aussi dans JEL_SAVE (seul stockage dans le cadre du
+// site) : on garde la meilleure valeur (les niveaux gagnés restent ouverts).
+try {
+  const etoilesSauvees = JEL_SAVE.load(JEU).etoiles;
+  if (!Array.isArray(sauvegarde.etoiles)) sauvegarde.etoiles = [];
+  if (Array.isArray(etoilesSauvees)) NIVEAUX.forEach((n, i) => {
+    const v = Math.floor(Number(etoilesSauvees[i]));
+    if (v >= 1 && v <= 3) sauvegarde.etoiles[i] = Math.max(sauvegarde.etoiles[i] || 0, v);
+  });
+} catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
+const etoilesParNiveau = () => NIVEAUX.map((n, i) => Math.min(3, Number(sauvegarde.etoiles[i]) || 0));
 
 // ==========================================================================
 // Construction d'un niveau
@@ -1830,7 +1841,11 @@ function finirNiveau(reussi) {
   sauver();
   // Progression : on reprendra au niveau suivant (le dernier reste le dernier)
   niveauGagne = true;
-  JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, niv + 2), score });
+  JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, niv + 2), score, etoiles: etoilesParNiveau() });
+  // Jeu terminé (tous les niveaux gagnés au moins une fois) : total des meilleures étoiles.
+  if (etoilesParNiveau().every((e) => e > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: etoilesParNiveau().reduce((a, b) => a + b, 0), maxStars: NIVEAUX.length * 3 });
+  }
   derniersResultats = { etoiles, score, record, ancien, part, surplus };
   sons.reussite();
   for (let k = 0; k < 90; k++) effets.push({ type: 'confetti', x: Math.random() * W, y: -10 - Math.random() * 120, vx: (Math.random() - 0.5) * 80, vy: 80 + Math.random() * 120, rot: Math.random() * 6, c: `hsl(${Math.random() * 360},90%,60%)`, t: 0 });

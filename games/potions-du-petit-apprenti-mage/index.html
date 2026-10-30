@@ -3405,6 +3405,10 @@ function victoire() {
   ecrireProg();
   window.JEL_SAVE.save(JEU, donneesSauvegarde(i + 2));
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
+  // Jeu terminé (dernière potion réussie, maintenant ou avant) : total des meilleures étoiles.
+  if (prog.etoiles[NIVEAUX.length - 1] > 0) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+  }
   SON.victoire();
   const scene = $('#scene-jeu');
   scene.style.setProperty('--liquide', TEINTES_POTIONS[i]);

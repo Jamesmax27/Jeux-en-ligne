@@ -3775,6 +3775,10 @@
         prog.etoiles[i] = Math.max(prog.etoiles[i], etoiles);
         if (niveau < NIVEAUX.length && prog.debloque < niveau + 1) { prog.debloque = niveau + 1; debloque = true; }
         sauver(Math.min(niveau + 1, NIVEAUX.length), pts);
+        // Parcours solo terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+        if (prog.etoiles.every((x) => x > 0)) {
+          if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+        }
       }
       $('fin-titre').textContent = gagne ? tr(egalite ? 'fin.egalite' : 'fin.gagne') : tr('fin.perdu');
       const zone = $('fin-etoiles');

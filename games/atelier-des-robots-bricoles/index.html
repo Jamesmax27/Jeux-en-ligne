@@ -3511,6 +3511,10 @@
     etat.niveauReprise = Math.min(n + 2, NIVEAUX.length);
     sauver(etat.niveauReprise);
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: n + 1 });
+    // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+    if (PROG.etoiles.every((e) => e > 0)) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
     son('victoire');
     confettis();
 

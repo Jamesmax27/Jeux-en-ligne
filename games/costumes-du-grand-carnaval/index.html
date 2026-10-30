@@ -2977,6 +2977,10 @@ body.fige *, body.fige *::before, body.fige *::after { animation-play-state: pau
       try {
         window.JEL_SAVE.save(JEU, { niveau: Math.min(NB, etat.niv + 2), score: totalPoints(), etoiles: progres.etoiles, records: progres.records, max: progres.max, options: { son: Son.actif } });
       } catch (e) { /* sauvegarde impossible : le jeu continue */ }
+      // Jeu terminé (tous les niveaux gagnés, maintenant ou avant : étoiles sauvegardées) : total des meilleures étoiles.
+      if (progres.etoiles.every(function (e) { return e > 0; })) {
+        if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NB * 3 });
+      }
     }
     var apresTotal = totalEtoiles();
     var nouveaux = TRESORS.filter(function (t) { return t.etoiles > avantTotal && t.etoiles <= apresTotal; });

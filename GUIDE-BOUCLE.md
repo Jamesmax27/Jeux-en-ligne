@@ -141,7 +141,8 @@ Par défaut, l'agent d'idées propose un jeu « 13+ » de temps en temps, au has
 - `2` par exemple : chaque passage fabrique 2 jeux 13+ et 3 jeux pour les plus jeunes. L'agent garde d'avance des idées 13+ pour 3 passages. S'il en manque, d'autres idées complètent : un passage fait toujours 5 jeux.
 - `0` : plus aucun jeu 13+ proposé par l'agent.
 - Variable supprimée : retour au hasard.
-- Vos propres idées 13+ (page `/idees`, formulaire) passent toujours à leur tour, même avec `0`, et comptent dans le nombre.
+- Vos propres idées (page `/idees`, formulaire) passent toujours en premier, quels que soient `ADOS_BOUCLE` et `MULTI_BOUCLE`, même avec `0`, et comptent dans le nombre ; les jeux 13+ et multijoueurs de l'agent prennent les places restantes. Exemple : 2 idées à vous en attente, `MULTI_BOUCLE` = 3 → vos 2 jeux + 3 multijoueurs.
+- Un jeu multijoueur 13+ compte à la fois comme multijoueur et comme 13+.
 - Un passage lancé à la main avec moins de 5 jeux garde la même proportion (2 sur 5 → 1 sur 3).
 
 ## Proposer une idée depuis mon téléphone

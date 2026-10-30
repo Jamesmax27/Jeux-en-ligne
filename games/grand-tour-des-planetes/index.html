@@ -2297,6 +2297,17 @@ function afficherAccueil() {
 // « Jouer » propose de reprendre au niveau sauvegardé ; un niveau réussi
 // enregistre le suivant ; quitter la page pendant un niveau le garde.
 const JEU = 'grand-tour-des-planetes';
+// Meilleures étoiles par niveau, gardées aussi par JEL_SAVE (le cadre du site n'a
+// pas de localStorage) : on garde le meilleur des deux.
+try {
+  const d = JEL_SAVE.load(JEU);
+  if (d && Array.isArray(d.etoiles)) {
+    d.etoiles.slice(0, NIVEAUX.length).forEach((v, i) => {
+      sauve.etoiles[i] = Math.max(sauve.etoiles[i], Math.min(3, Math.max(0, v | 0)));
+      if (sauve.etoiles[i] > 0) sauve.debloque = Math.max(sauve.debloque, Math.min(NIVEAUX.length - 1, i + 1));
+    });
+  }
+} catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
 const boutonEffacer = JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('ligne-boutons') });
 function jouer() {
   JEL_SAVE.reprise({
@@ -2852,9 +2863,13 @@ function finNiveau() {
   if (n + 1 < NIVEAUX.length) sauve.debloque = Math.max(sauve.debloque, n + 1);
   enregistrer();
   // Progression du site : niveau réussi → on reprendra au suivant (le dernier reste jouable).
-  JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, n + 2), score: total });
+  JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, n + 2), score: total, etoiles: sauve.etoiles });
 
   const dernier = n === NIVEAUX.length - 1;
+  // Jeu terminé (dernier niveau gagné, maintenant ou avant) : total des meilleures étoiles.
+  if (dernier || sauve.etoiles[NIVEAUX.length - 1] > 0) {
+    if (window.FMG) window.FMG.reportComplete({ stars: sauve.etoiles.reduce((a, b) => a + b, 0), maxStars: NIVEAUX.length * 3 });
+  }
   $('bilan-titre').textContent = dernier ? t('grandTourFini') : t('niveauReussi', { n: n + 1 });
   const lignes = [t('erreurs', { n: etat.erreurs })];
   if (cfg.chrono) lignes.push(etat.cometePassee ? t('cometeAvant') : t('plusRapide', { n: bonus }));

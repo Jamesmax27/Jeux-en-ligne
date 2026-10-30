@@ -4562,6 +4562,8 @@ function renderGoal(){ const g=$('#goal');
 function checkSteps(){ if(mode!=='survival') return; const before=step; while(step<STEPS.length&&STEPS[step].ok()) step++;
   if(step!==before){
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: step });
+  // Jeu terminé : toutes les étapes de la Survie accomplies (pas d'étoiles).
+  if (step>=STEPS.length) { if (window.FMG) window.FMG.reportComplete({}); }
   renderGoal(); $('#goal').classList.remove('mini'); sfx('step'); note(step>=STEPS.length?traduire('bravoTout'):(before<10&&step>=10)?traduire('diamantTrouve'):traduire('etapeReussie'),2000); saveDirty=true; jelSauver(); } }
 
 /* ---------- sac et fabrication ---------- */

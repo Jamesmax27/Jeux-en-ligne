@@ -3740,6 +3740,10 @@
     // Sauvegarde : on reprendra au niveau suivant.
     try { localStorage.setItem(CLE_LOCALE, JSON.stringify(PROG)); } catch (e) { /* stockage refusé */ }
     JEL_SAVE.save(JEU, { niveau: Math.min(S.n + 2, NIVEAUX.length), score: totalScore(), options: { prog: copieProg() } });
+    // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+    if (PROG.etoiles.every((e) => e > 0)) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
     const deblocages = [];
     COULEURS.forEach((c, i) => { if (!couleursAvant[i] && couleurOuverte(i)) deblocages.push(t('fin.nouvelleCouleur', { nom: t(c.cle) })); });
     FLEURS.forEach((f, i) => { if (!fleursAvant[i] && fleurOuverte(i)) deblocages.push(t('fin.nouvelleFleur', { nom: t(f.cle) })); });

@@ -2394,6 +2394,15 @@
     var lu = JSON.parse(localStorage.getItem(CLE) || 'null');
     if (lu && typeof lu === 'object') Object.keys(SAUVE).forEach(function (k) { if (lu[k] !== undefined) SAUVE[k] = lu[k]; });
   } catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+  // Meilleures étoiles par marée aussi relues dans JEL_SAVE (seul stockage qui marche sur le site).
+  if (!Array.isArray(SAUVE.etoiles)) SAUVE.etoiles = [];
+  try {
+    var luJel = window.JEL_SAVE && JEL_SAVE.existe('chateaux-de-sable-contre-la-maree') ? JEL_SAVE.load('chateaux-de-sable-contre-la-maree') : null;
+    if (luJel && Array.isArray(luJel.etoiles)) luJel.etoiles.forEach(function (e, i) {
+      if (i < NIVEAUX.length && typeof e === 'number' && isFinite(e)) SAUVE.etoiles[i] = Math.max(SAUVE.etoiles[i] || 0, Math.max(0, Math.min(3, Math.round(e))));
+    });
+    for (var iJel = 0; iJel < NIVEAUX.length; iJel++) if (SAUVE.etoiles[iJel] > 0) SAUVE.debloque = Math.max(SAUVE.debloque || 1, Math.min(NIVEAUX.length, iJel + 2));
+  } catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
   function sauver() { try { localStorage.setItem(CLE, JSON.stringify(SAUVE)); } catch (e) { /* ignoré */ } }
   function totalEtoiles() { return SAUVE.etoiles.reduce(function (s, e) { return s + (e || 0); }, 0); }
   function palette() { return PALETTES[SAUVE.plage] || PALETTES[0]; }
@@ -3523,6 +3532,8 @@
       SAUVE.debloque = Math.max(SAUVE.debloque, Math.min(NIVEAUX.length, n + 2));
       sauver();
       sauverVictoire(n, score);
+      // Jeu terminé (toutes les marées gagnées au moins une fois) : total des meilleures étoiles.
+      if (NIVEAUX.every(function (_, i) { return SAUVE.etoiles[i] > 0; })) { if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 }); }
     }
     var apresTotal = totalEtoiles();
     $('fin-titre').textContent = gagne ? T(etoiles === 3 ? 'victoire_titre_3' : 'victoire_titre') : T('defaite_titre');
@@ -3813,11 +3824,11 @@
   // ==========================================================================
   var JEU = 'chateaux-de-sable-contre-la-maree';
   var scorePartie = 0;
-  // Marée gagnée (n à partir de 0) : on reprendra à la suivante ; après la dernière, plus rien à continuer.
+  // Marée gagnée (n à partir de 0) : on reprendra à la suivante (la dernière après la fin du jeu).
+  // Les meilleures étoiles par marée y sont gardées (jeu terminé, profil du joueur).
   function sauverVictoire(n, points) {
     scorePartie += points;
-    if (n >= NIVEAUX.length - 1) JEL_SAVE.clear(JEU);
-    else JEL_SAVE.save(JEU, { niveau: n + 2, score: scorePartie });
+    JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, n + 2), score: scorePartie, etoiles: SAUVE.etoiles.slice(0, NIVEAUX.length) });
   }
   // Fermeture de la page : seulement pendant une marée (pas sur l'accueil ni le choix des niveaux).
   JEL_SAVE.surFermeture(function () {

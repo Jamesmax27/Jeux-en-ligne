@@ -2038,6 +2038,11 @@ body.en-pause #ov-pause *, body.en-pause #ov-pause { animation-play-state: runni
         if (d.vus && typeof d.vus === 'object') p.vus = d.vus;
       }
     } catch (e) { /* stockage refusé ou illisible : progression neuve */ }
+    // Meilleures étoiles aussi gardées dans la sauvegarde du site (localStorage refusé dans le cadre isolé).
+    try {
+      const s = window.JEL_SAVE.load(JEU);
+      if (s && Array.isArray(s.etoiles)) s.etoiles.forEach((v, i) => { if (i < p.etoiles.length) p.etoiles[i] = Math.max(p.etoiles[i], Math.max(0, Math.min(3, v | 0))); });
+    } catch (e) { /* sauvegarde illisible : étoiles du stockage local seulement */ }
     return p;
   }
   function sauverProgres() {
@@ -2991,7 +2996,11 @@ body.en-pause #ov-pause *, body.en-pause #ov-pause { animation-play-state: runni
     sauverProgres();
     const nouveauxObjets = objetsDebloques(totalEtoiles()) - objetsDebloques(avant);
     etat.niveauReprise = Math.min(i + 2, NIVEAUX.length);
-    window.JEL_SAVE.save(JEU, { niveau: etat.niveauReprise, score: etat.scoreTotal });
+    window.JEL_SAVE.save(JEU, { niveau: etat.niveauReprise, score: etat.scoreTotal, etoiles: progres.etoiles.slice() });
+    // Jeu terminé (dernière tournée gagnée, maintenant ou avant) : total des meilleures étoiles.
+    if (progres.etoiles[NIVEAUX.length - 1] > 0) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
 
     son.victoire();
     confettis(i === NIVEAUX.length - 1 ? 90 : 40);

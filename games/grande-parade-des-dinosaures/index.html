@@ -2907,6 +2907,10 @@
       const avant = chapeauxDebloques(fossilesAvant), apres = chapeauxDebloques(totalFossiles());
       chapeauNouveau = apres.find((c) => !avant.includes(c)) || null;
       JEL_SAVE.save(JEU, donneesSauvegarde(Math.min(NB, niveau + 2)));
+      // Jeu terminé (dernier niveau gagné, maintenant ou avant) : total des meilleures étoiles.
+      if (progres.etoiles[NB - 1] > 0) {
+        if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NB * 3 });
+      }
       Son.victoire();
       for (let i = 0; i < 90; i++) confettis.push({ x: Math.random() * W, y: -Math.random() * H * 0.6, vx: (Math.random() - 0.5) * 40, vy: 80 + Math.random() * 120, r: Math.random() * 6, c: ['#ffd84d', '#ff7aa8', '#7fe07a', '#5fc7ff', '#c08bff'][i % 5], rot: Math.random() * 6 });
     } else Son.defaite();

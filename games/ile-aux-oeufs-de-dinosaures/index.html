@@ -1951,6 +1951,16 @@ try {
 ['etoiles', 'meilleurs', 'tutos'].forEach((k) => { if (!Array.isArray(sauve[k])) sauve[k] = []; });
 if (!Number.isInteger(sauve.debloque) || sauve.debloque < 1) sauve.debloque = 1;
 sauve.debloque = Math.min(sauve.debloque, 11);
+// Meilleures étoiles aussi gardées dans JEL_SAVE (sur le site, localStorage ne marche pas).
+try {
+  const lues = JEL_SAVE.load('ile-aux-oeufs-de-dinosaures').etoiles;
+  if (Array.isArray(lues)) for (let i = 0; i < NIVEAUX.length; i++) {
+    const v = Math.max(0, Math.min(3, Math.floor(Number(lues[i]) || 0)));
+    if (v > (sauve.etoiles[i] || 0)) sauve.etoiles[i] = v;
+    if (v > 0) sauve.debloque = Math.max(sauve.debloque, Math.min(11, i + 2));
+  }
+} catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
+function etoilesNiveaux() { return NIVEAUX.map((_, i) => sauve.etoiles[i] || 0); }
 function enregistrer() { try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* rien */ } }
 function totalEtoiles() { return sauve.etoiles.reduce((s, v) => s + (v || 0), 0); }
 function totalScore() { return sauve.meilleurs.reduce((s, v) => s + (v || 0), 0); }
@@ -2722,7 +2732,11 @@ function montrerBilan() {
   sauve.debloque = Math.max(sauve.debloque, niv + 2);
   enregistrer();
   // Progression du site : zone réussie → on reprendra à la suivante (la dernière reste jouable).
-  JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, niv + 2), score });
+  JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, niv + 2), score, etoiles: etoilesNiveaux() });
+  // Jeu terminé (toutes les zones réussies, maintenant ou avant) : total des meilleures étoiles.
+  if (etoilesNiveaux().every((e) => e > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: Math.min(NIVEAUX.length * 3, totalEtoiles()), maxStars: NIVEAUX.length * 3 });
+  }
 
   const b = BEBES[niv];
   $('bilanTitre').textContent = traduire(niv === 9 ? 'sommet' : 'zoneReussie');

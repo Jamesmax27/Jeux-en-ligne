@@ -3087,15 +3087,24 @@
   // =====================================================================
   const JEU = 'les-paquets-du-traineau';
   // Niveau réussi (index à partir de 0) : on reprendra au suivant ; après le dernier, plus rien à continuer.
+  // Meilleures étoiles par niveau, gardées aussi par JEL_SAVE (le localStorage du jeu ne marche pas sur le site).
+  const etoilesSauvees = () => NIVEAUX.map((_, k) => sauve.etoiles[k] || 0);
+  (function () {
+    const d = JEL_SAVE.load(JEU);
+    if (Array.isArray(d.etoiles)) NIVEAUX.forEach((_, k) => {
+      const e = Math.min(3, Math.max(0, Math.floor(Number(d.etoiles[k])) || 0));
+      if (e > (sauve.etoiles[k] || 0)) { sauve.etoiles[k] = e; sauve.debloque = Math.max(sauve.debloque, Math.min(NIVEAUX.length, k + 2)); }
+    });
+  })();
+  // Après le dernier niveau, on garde la sauvegarde (étoiles) en reprenant au dernier niveau.
   function sauverVictoire(i) {
-    if (i + 1 >= NIVEAUX.length) JEL_SAVE.clear(JEU);
-    else JEL_SAVE.save(JEU, { niveau: i + 2, score: sauve.grelots });
+    JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, i + 2), score: sauve.grelots, etoiles: etoilesSauvees() });
   }
   // Fermeture de la page : seulement pendant un niveau (pas sur le titre, les niveaux ni la finale).
   JEL_SAVE.surFermeture(() => {
     if (!N || !['jeu', 'vol', 'bonus', 'fin'].includes(etat)) return;
     if (N.fini && resultat && resultat.gagne) { if (N.index + 1 < NIVEAUX.length) sauverVictoire(N.index); return; }
-    JEL_SAVE.save(JEU, { niveau: N.index + 1, score: sauve.grelots });
+    JEL_SAVE.save(JEU, { niveau: N.index + 1, score: sauve.grelots, etoiles: etoilesSauvees() });
   });
   const effacerTitre = JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: document.querySelector('#ecran-titre .bas-titre') });
 
@@ -3177,6 +3186,8 @@
     sauve.grelots += gain;
     enregistrer();
     sauverVictoire(i);
+    // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+    if (NIVEAUX.every((_, k) => sauve.etoiles[k] > 0)) { if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: MAX_ETOILES }); }
     resultat = { gagne: true, etoiles: e, gain, livres: 0, nouveauRecord, record: sauve.records[i], premier: ancienRecord == null };
     son('plein');
     const cs = GEO.cs;

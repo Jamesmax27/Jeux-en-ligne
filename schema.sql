@@ -78,3 +78,12 @@ CREATE TABLE IF NOT EXISTS demandes_blocages (
   visiteur TEXT PRIMARY KEY, statut TEXT NOT NULL, debut INTEGER, jusqu_a INTEGER, motif TEXT,
   abus INTEGER NOT NULL DEFAULT 0, blocages INTEGER NOT NULL DEFAULT 0, maj INTEGER NOT NULL
 );
+
+-- --------------------------------------------------------------------------
+-- Profil joueur (fidélisation, docs/cadrage-fidelisation.md) : tables profils,
+-- profils_appareils, profils_jeux, profils_gains, profils_jours,
+-- multi_resultats, profils_limites, profils_blocages, profils_signalements,
+-- profils_evenements, fidelisation_jour. Rien à faire à la main : créées
+-- automatiquement par les fonctions (preparerTablesProfil, functions/_profil.js) ;
+-- structure commentée : migrations/0002_profils.sql.
+-- --------------------------------------------------------------------------

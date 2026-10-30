@@ -3615,6 +3615,10 @@
       COLLERETTES.forEach((co, k) => { if (avant < co.e && apres >= co.e) deblocages.push(t('deblocage.collerette', { nom: t('collerette.' + k) })); });
       try { JEL_SAVE.save(JEU, { niveau: Math.min(NB, iNiv + 2), score: progres.records.reduce((a, b) => a + b, 0), options: options() }); } catch (e) { /* pas de sauvegarde */ }
       try { localStorage.setItem('tdt-progres', JSON.stringify(progres)); } catch (e) { /* pas de stockage */ }
+      // Jeu terminé (tous les combats gagnés, maintenant ou avant) : total des meilleures étoiles.
+      if (progres.etoiles.every((e) => e > 0)) {
+        if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NB * 3 });
+      }
       SON.victoire();
       for (let k = 0; k < 80; k++) confetti(W / 2 + hasard(-60, 60), H * 0.3);
     } else {

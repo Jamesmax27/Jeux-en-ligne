@@ -48,7 +48,8 @@
 #  d) verifier : chaque pull request de la boucle dont l'idée est « en_cours »
 #                (y compris celles restées ouvertes d'un passage précédent) :
 #                robot (chargement, console, téléphone, hors ligne, fiche,
-#                nombre de niveaux, fin de partie (FMG.reportEnd), traductions, sauvegarde
+#                nombre de niveaux, fin de partie (FMG.reportEnd), jeu terminé (FMG.reportComplete,
+#                "etoiles"), traductions, sauvegarde
 #                (scripts/tester-sauvegarde.mjs), entrée du catalogue, genres
 #                et univers dans les listes fermées, référencement :
 #                scripts/verifier-seo.mjs), puis
@@ -90,7 +91,8 @@
 # autant (idees.mjs choisir 5 --ados 2 ; à la main avec moins de 5 jeux : en
 # proportion) ; s'il en manque, d'autres idées complètent. 0 : aucune idée 13+
 # de l'agent. Absente ou illisible : aucun quota (un 13+ de temps en temps).
-# Les idées 13+ du propriétaire passent toujours, et comptent dans le quota.
+# Les idées du propriétaire passent toujours en premier (quotas multijoueur et
+# 13+ compris) et y comptent ; les quotas se remplissent sur les places restantes.
 #
 # Seules les étapes b et e écrivent dans idees.json et idees-archive.json,
 # jamais les tâches parallèles. Leurs enregistrements portent [CF-Pages-Skip] :
@@ -106,7 +108,7 @@ on:
   # des heures chargées (00:00 UTC surtout : départs vers 04:10 UTC constatés en octobre 2026).
   schedule:
     - cron: "17 0 * * *"
-    - cron: "17 5 * * *"
+  #  - cron: "17 5 * * *"
   workflow_dispatch:
     inputs:
       nombre:
@@ -381,7 +383,7 @@ jobs:
           echo "Jeux multijoueurs par passage de 5 : $par_passage ; pour ce passage de $nombre jeu(x) : ${choix_multi:-aucun}"
           # Jeux 13+ : ADOS_BOUCLE = nombre par passage de 5 jeux (0 à 5), en proportion comme ci-dessus.
           # 0 : les idées 13+ de l'agent attendent ; absente ou illisible : aucun quota (ordre habituel).
-          # Les idées 13+ du propriétaire passent toujours (scripts/idees.mjs, choisir).
+          # Les idées du propriétaire passent toujours en premier (scripts/idees.mjs, choisir).
           ados_passage=$(printf '%s' "$ADOS_BOUCLE" | tr -cd '0-9' | cut -c1-2)
           choix_ados=""
           ajout_ados=""
@@ -530,6 +532,13 @@ jobs:
                  de 1> }); dans celle qui passe à l'écran de défaite, la même avec completed: false. Une fois par fin,
                  jamais dans une fonction de dessin appelée à chaque image ; garde if (window.FMG) sur la même ligne.
                  Le robot (validate-games.mjs) refuse un jeu sans appel ou sans garde.
+               - Jeu terminé et étoiles OBLIGATOIRE (CONSIGNES-JEU.md, section 3 « Jeu terminé et étoiles » ; profil
+                 joueur du site) : 1 à 3 étoiles par niveau, meilleures étoiles de chaque niveau gardées dans les données
+                 de JEL_SAVE (pas seulement en mémoire). À l'écran de victoire d'un niveau, si TOUS les niveaux ont été
+                 gagnés au moins une fois (le dernier vient de l'être, ou l'a déjà été), une ligne :
+                 if (window.FMG) window.FMG.reportComplete({ stars: <somme des meilleures étoiles>, maxStars: <niveaux × 3> });
+                 Puis node scripts/etoiles-jeu.mjs <id> <maxStars> (écrit "etoiles" dans game.json, même nombre). Le
+                 robot refuse un jeu sans cet appel, sans sa garde, ou dont "etoiles" ne correspond pas.
                - Dans game.json : "genre", "genres_secondaires" (liste, vide possible) et "univers" (1 ou 2) = ceux de
                  l'idée (ou ton choix quand l'idée n'en donne pas), jamais de champ "tags" ; "ages" = l'âge conseillé
                  de l'idée (forme "6+") ; "idee" = "${{ matrix.idee.id }}" ;
@@ -1089,6 +1098,11 @@ jobs:
                (completed false) s'il y en a une, partir une seule fois par fin (pas dans une fonction de dessin
                appelée à chaque image), et level doit être le numéro du niveau joué à partir de 1 (ou le score d'un
                jeu sans niveaux). Sinon NON, avec la correction à faire.
+               Jeu terminé (même point, bloquant) : l'appel window.FMG.reportComplete({ stars, maxStars }) part
+               seulement quand tous les niveaux ont été gagnés au moins une fois (pas à chaque victoire avant), stars =
+               somme des meilleures étoiles de chaque niveau lues dans la sauvegarde JEL_SAVE (un joueur qui reprend au
+               niveau 15 avec « Continuer » doit garder les étoiles des niveaux 1 à 14), maxStars = "etoiles" de
+               game.json = étoiles réellement possibles. Sinon NON, avec la correction à faire.
                Jeu multijoueur (game.json : "multijoueur": true) : lis aussi docs/multijoueur.md (sections 3, 4, 5 et
                9) et regarde avec Read les captures de captures/multijoueur/${{ steps.pr.outputs.id }}/ (salon, salon plein,
                table pleine, partie, après la coupure du réseau). Ajoute au tableau le point bloquant « Multijoueur » : règles au tour par tour dans

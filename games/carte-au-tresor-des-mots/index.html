@@ -2099,6 +2099,18 @@ h1 {
   // Progression gardée par le site (module jel-sauvegarde) : niveau où
   // reprendre (à partir de 1) et score cumulé de la partie.
   const JEU = 'carte-au-tresor-des-mots';
+  // Meilleures étoiles par niveau aussi gardées par le site (le cadre du site n'a pas de localStorage).
+  try {
+    const d = JEL_SAVE.load(JEU);
+    if (d && Array.isArray(d.etoiles)) {
+      if (!Array.isArray(sauve.etoiles)) sauve.etoiles = [];
+      for (let k = 0; k < NIVEAUX.length; k++) {
+        const e = Math.max(0, Math.min(3, Math.floor(Number(d.etoiles[k]) || 0)));
+        if (e > (sauve.etoiles[k] || 0)) sauve.etoiles[k] = e;
+        if (e > 0 && k + 2 > sauve.debloque) sauve.debloque = Math.min(NIVEAUX.length, k + 2);
+      }
+    }
+  } catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
   let reprendreA = 0;  // niveau à reprendre pendant cette visite (0 = aucune partie lancée)
   let scorePartie = 0;
   JEL_SAVE.surFermeture(() => {
@@ -3103,7 +3115,11 @@ h1 {
     // Niveau réussi : on reprendra au suivant (au dernier si tout est fini).
     scorePartie += etat.score;
     reprendreA = Math.min(NIVEAUX.length, i + 2);
-    JEL_SAVE.save(JEU, { niveau: reprendreA, score: scorePartie });
+    JEL_SAVE.save(JEU, { niveau: reprendreA, score: scorePartie, etoiles: NIVEAUX.map((_, k) => sauve.etoiles[k] || 0) });
+    // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+    if (NIVEAUX.every((_, k) => (sauve.etoiles[k] || 0) > 0)) {
+      if (window.FMG) window.FMG.reportComplete({ stars: NIVEAUX.reduce((s, _, k) => s + Math.min(3, sauve.etoiles[k] || 0), 0), maxStars: NIVEAUX.length * 3 });
+    }
     const pieces = nbPieces();
     const deco = nouvelleIle && pieces % 2 === 0 && pieces > piecesAvant ? pieces / 2 : 0;
 

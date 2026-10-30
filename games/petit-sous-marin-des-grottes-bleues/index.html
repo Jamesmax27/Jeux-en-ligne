@@ -3252,6 +3252,10 @@ function victoire() {
   prog.debloque = Math.max(prog.debloque, Math.min(NIVEAUX.length, p.n + 2));
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: p.n + 1 });
   JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, p.n + 2), score: scoreTotal(), prog: copieProg(), options: { son: sonActif } });
+  // Jeu terminé (dernière grotte gagnée, maintenant ou avant) : total des meilleures étoiles.
+  if (prog.etoiles[NIVEAUX.length - 1] > 0) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+  }
   son('victoire');
   p.joie = 1.4;
   for (let i = 0; i < 60; i++) bulle(p, p.tortue.x + (Math.random() - 0.5) * 4, p.tortue.y + Math.random() * 2, 0.06 + Math.random() * 0.12, -(1 + Math.random() * 2));

@@ -2908,6 +2908,10 @@ button:focus-visible { outline: 3px solid #ffe27a; outline-offset: 3px; }
     prog.etoiles[niv] = Math.max(prog.etoiles[niv], etoiles);
     prog.niveauMax = Math.max(prog.niveauMax, Math.min(NIVEAUX.length, niv + 2));
     sauver(Math.min(NIVEAUX.length, niv + 2));
+    // Jeu terminé (dernier niveau gagné, maintenant ou avant) : total des meilleures étoiles.
+    if (prog.etoiles[NIVEAUX.length - 1] > 0) {
+      if (window.FMG) window.FMG.reportComplete({ stars: prog.etoiles.reduce((a, b) => a + b, 0), maxStars: NIVEAUX.length * 3 });
+    }
 
     $('finTitre').textContent = traduire('victoire.titre');
     $('finTexte').textContent = traduire('victoire.chansons', { n: etat.reussies });

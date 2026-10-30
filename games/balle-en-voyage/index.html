@@ -1111,6 +1111,10 @@ function winLevel() {
   // niveau réussi : on reprendra au suivant (dernier niveau : partie finie)
   if (last) JEL_SAVE.clear(JEU);
   else JEL_SAVE.save(JEU, { niveau: level + 2, score });
+  // Jeu terminé (dernier niveau gagné : les niveaux se jouent dans l'ordre), jeu sans étoiles.
+  if (last) {
+    if (window.FMG) window.FMG.reportComplete({});
+  }
   document.getElementById('oT').textContent = last ? t('champion') : t('reussi');
   document.getElementById('oP').innerHTML = last
     ? t('finTout', { g: score, c: falls })

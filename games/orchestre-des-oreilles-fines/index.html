@@ -2755,6 +2755,10 @@ function victoire() {
   if (n < NIVEAUX.length) progres.debloque = Math.max(progres.debloque, n + 1);
   ecrireProgres();
   try { JEL_SAVE.save(JEU, { niveau: Math.min(n + 1, NIVEAUX.length), score: E.score, progres }); } catch (e) { /* rien */ }
+  // Jeu terminé (tous les concerts gagnés au moins une fois) : total des meilleures étoiles.
+  if (NIVEAUX.every((x, k) => (progres.etoiles[k] || 0) > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: Math.min(NIVEAUX.length * 3, totalEtoiles()), maxStars: NIVEAUX.length * 3 });
+  }
   // Tous les musiciens saluent.
   document.querySelectorAll('#scene-jeu .musicien').forEach((m) => m.classList.add('salue'));
   const chef = $('chef'); if (chef) chef.classList.add('dirige');

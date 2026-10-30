@@ -3961,6 +3961,10 @@
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: n + 1 });
     JEL_SAVE.save(JEU, Object.assign(donneesProgres(), { niveau: Math.min(n + 2, NIVEAUX.length), score: p.score }));
     garderLocal();
+    // Jeu terminé (dernière balade gagnée, maintenant ou avant) : total des meilleures étoiles.
+    if (progres.etoiles[NIVEAUX.length - 1] > 0) {
+      if (window.FMG) window.FMG.reportComplete({ stars: progres.etoiles.reduce((a, b) => a + (b || 0), 0), maxStars: NIVEAUX.length * 3 });
+    }
     jouer('victoire');
     afficherFin(true, { etoiles, base, bonus, record, ancienRecord, objet, final: n === NIVEAUX.length - 1 });
   }

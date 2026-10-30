@@ -3556,6 +3556,10 @@ function finNiveau(gagne) {
     try {
       JEL_SAVE.save(JEU, { niveau: Math.min(i + 2, NIVEAUX.length), score: totalScore(), etoiles: progres.etoiles, records: progres.records, garniture: progres.garniture, atteint: progres.atteint, options: { son: sonActif } });
     } catch (e) { /* rien */ }
+    // Jeu terminé (dernier niveau gagné, maintenant ou avant) : total des meilleures étoiles (3 au plus par niveau).
+    if (i === NIVEAUX.length - 1 || progres.etoiles[NIVEAUX.length - 1] > 0) {
+      if (window.FMG) window.FMG.reportComplete({ stars: progres.etoiles.reduce((a, b) => a + Math.min(3, b || 0), 0), maxStars: NIVEAUX.length * 3 });
+    }
   }
   const nouvelleGarn = GARNITURES.find((g) => g.etoiles > avantTotal && g.etoiles <= totalEtoiles());
   partieEnCours = gagne ? false : true;

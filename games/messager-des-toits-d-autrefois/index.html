@@ -3347,6 +3347,8 @@ function gagner() {
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: N + 1 });
   try { JEL_SAVE.save(JEU, { niveau: Math.min(N + 2, NIVEAUX.length), score: totalScore(), ...donneesProg() }); } catch (e2) { /* rien */ }
   garderLocal();
+  // Jeu terminé (toutes les livraisons réussies au moins une fois) : total des meilleures étoiles.
+  if (prog.etoiles.every((x) => x > 0)) { if (window.FMG) window.FMG.reportComplete({ stars: Math.min(totalEtoiles(), NIVEAUX.length * 3), maxStars: NIVEAUX.length * 3 }); }
   son('victoire');
   // Confettis de parchemin
   for (let k = 0; k < 60; k++) particules.push({ x: J.x + (Math.random() - 0.5) * 6, y: J.y - 2 - Math.random() * 3, vx: (Math.random() - 0.5) * 6, vy: -Math.random() * 6, vie: 2, max: 2, c: ['#f2c14e', '#e0574a', '#fff3d0', '#4aa3d8'][k % 4], t: 3, rot: Math.random() * 6 });

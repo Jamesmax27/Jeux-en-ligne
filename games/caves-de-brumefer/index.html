@@ -1713,7 +1713,22 @@ function charger() {
     const t = localStorage.getItem(CLE_SAUVE);
     if (t) Object.assign(sauv, JSON.parse(t));
   } catch (e) { /* stockage indisponible : on joue sans sauvegarde */ }
+  // Meilleures étoiles par étage, gardées aussi par JEL_SAVE (le cadre du site n'a
+  // pas de localStorage) : on garde le meilleur des deux, et les étages qu'elles ouvrent.
+  if (!Array.isArray(sauv.etoiles)) sauv.etoiles = [];
+  try {
+    const d = JEL_SAVE.load(JEU);
+    if (d && Array.isArray(d.etoiles)) {
+      for (let k = 0; k < NB_ETAGES; k++) {
+        const e = borne(d.etoiles[k], 0, 3, 0);
+        if (e > (Number(sauv.etoiles[k]) || 0)) sauv.etoiles[k] = e;
+        if (e > 0) sauv.debloque = Math.max(Number(sauv.debloque) || 1, Math.min(k + 2, NB_ETAGES));
+      }
+    }
+  } catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
 }
+// Total des meilleures étoiles des étages (3 au plus par étage)
+const etoilesEtages = () => sauv.etoiles.slice(0, NB_ETAGES).reduce((a, b) => a + Math.min(3, Number(b) || 0), 0);
 function sauver() {
   try { localStorage.setItem(CLE_SAUVE, JSON.stringify(sauv)); } catch (e) { /* pas grave */ }
 }
@@ -2590,7 +2605,13 @@ function victoire() {
     else sauv.fini = true;
     // Étage réussi : on reprendra au suivant (le 10e reste le dernier).
     // Chaque étage repart sans potion : le sac sauvegardé est vide.
-    JEL_SAVE.save(JEU, { mode: 'etage', niveau: Math.min(S.n + 1, NB_ETAGES), score: 0, potions: 0, prof: null });
+    JEL_SAVE.save(JEU, { mode: 'etage', niveau: Math.min(S.n + 1, NB_ETAGES), score: 0, potions: 0, prof: null, etoiles: sauv.etoiles.slice(0, NB_ETAGES) });
+    // Jeu terminé (les 10 étages gagnés au moins une fois) : total des meilleures étoiles.
+    let tousGagnes = true;
+    for (let j = 0; j < NB_ETAGES; j++) if (!(sauv.etoiles[j] > 0)) tousGagnes = false;
+    if (tousGagnes) {
+      if (window.FMG) window.FMG.reportComplete({ stars: etoilesEtages(), maxStars: NB_ETAGES * 3 });
+    }
   } else {
     const total = S.scoreAvant + S.score;
     if (S.n > sauv.prof) { sauv.prof = S.n; record = true; }
@@ -2615,7 +2636,15 @@ function defaite() {
     const total = S.scoreAvant + S.score;
     if (total > sauv.profScore) { sauv.profScore = total; record = true; sauver(); }
     // Lutin épuisé : la descente est finie, sa sauvegarde aussi.
-    if (JEL_SAVE.load(JEU).mode === 'prof') JEL_SAVE.clear(JEU);
+    if (JEL_SAVE.load(JEU).mode === 'prof') {
+      JEL_SAVE.clear(JEU);
+      // Les étoiles des étages restent gardées : reprise au premier étage pas encore réussi.
+      if (sauv.etoiles.some((e) => e > 0)) {
+        let n = 1;
+        while (n < NB_ETAGES && sauv.etoiles[n - 1] > 0) n++;
+        JEL_SAVE.save(JEU, { mode: 'etage', niveau: n, score: 0, potions: 0, prof: null, etoiles: sauv.etoiles.slice(0, NB_ETAGES) });
+      }
+    }
   }
   setTimeout(() => montrerBilan(false, 0, 0, record), 1100);
 }

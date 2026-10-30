@@ -1326,7 +1326,11 @@ function finVague(victoire) {
     majHaut();
     $("message").textContent = t("vagueGagnee");
     // vague gagnée : on reprendra à la suivante (dernière vague : partie finie)
-    if (etat.vague >= VAGUES) JEL_SAVE.clear(JEU);
+    if (etat.vague >= VAGUES) {
+      // Jeu terminé : la dernière vague est gagnée (jeu sans étoiles)
+      if (window.FMG) window.FMG.reportComplete({});
+      JEL_SAVE.clear(JEU);
+    }
     else sauvegarder(etat.vague + 1, etat.pieces);
     setTimeout(() => {
       if (etat.vague >= VAGUES) { terminer(); return; }

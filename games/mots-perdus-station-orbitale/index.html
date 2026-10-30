@@ -3076,6 +3076,10 @@ function victoire() {
   if (record) prog.records[i] = score;
   ecrireLocal();
   try { window.JEL_SAVE.save(JEU, { niveau: i + 2, score: scoreTotal(), prog, options: { son: prog.son } }); } catch (e) { /* rien */ }
+  // Jeu terminé (tous les niveaux gagnés au moins une fois) : total des meilleures étoiles.
+  if (prog.etoiles.every((x) => x > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: prog.etoiles.reduce((a, b) => a + b, 0), maxStars: NIVEAUX.length * 3 });
+  }
   SON.victoire();
   confettis();
   const fin = {

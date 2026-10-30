@@ -4515,6 +4515,10 @@
         prog.etoiles[i] = Math.max(prog.etoiles[i], etoiles);
         if (niveau < NIVEAUX.length && prog.debloque < niveau + 1) { prog.debloque = niveau + 1; debloque = true; }
         sauver(Math.min(niveau + 1, NIVEAUX.length), pts);
+        // Jeu terminé (toutes les nuits solo gagnées, maintenant ou avant) : total des meilleures étoiles.
+        if (prog.etoiles.every((x) => x > 0)) {
+          if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+        }
       }
       let titre = 'fin.perdu';
       if (gagne) titre = dame ? 'fin.gagneDame' : (egalite ? 'fin.egalite' : 'fin.gagne');

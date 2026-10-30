@@ -2530,6 +2530,10 @@ function gagner() {
   ecrireProgLocale();
   JEL_SAVE.save(JEU, donneesSauvegarde(Math.min(N + 2, NIVEAUX.length)));
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: N + 1 });
+  // Jeu terminé (toutes les grilles gagnées, maintenant ou avant) : total des meilleures étoiles.
+  if (prog.etoiles.every((e) => e > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: Math.floor(totalEtoiles()), maxStars: NIVEAUX.length * 3 });
+  }
   son('victoire');
   // les chevaux sautent de joie, en vague
   cases.forEach((b, i) => setTimeout(() => { b.classList.remove('saute'); void b.offsetWidth; b.classList.add('saute'); }, (i % G.n + ((i / G.n) | 0)) * 40));
