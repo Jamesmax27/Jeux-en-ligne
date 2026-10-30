@@ -1517,6 +1517,14 @@ const niveauOuvert = (i) => i === 0 || (sauve.etoiles[i - 1] || 0) > 0;
 // Sauvegarde de la progression (module JEL_SAVE) : « niveau » compte à partir de 1.
 // À la fermeture de la page pendant un niveau, on reprendra ce niveau.
 const JEU = 'bouge-l-eau';
+// Meilleures étoiles aussi gardées dans la sauvegarde du site (localStorage refusé dans le cadre isolé).
+try {
+  const d = JEL_SAVE.load(JEU);
+  if (d && Array.isArray(d.etoiles)) d.etoiles.forEach((v, i) => {
+    const e = Math.max(0, Math.min(3, Math.floor(Number(v)) || 0));
+    if (i < NIVEAUX.length && e > (sauve.etoiles[i] || 0)) sauve.etoiles[i] = e;
+  });
+} catch (e) { /* sauvegarde illisible : étoiles du stockage local seulement */ }
 JEL_SAVE.surFermeture(() => {
   if (etat === 'intro' || etat === 'jeu' || etat === 'victoire' || etat === 'pause') JEL_SAVE.save(JEU, { niveau: niv + 1 });
 });
@@ -1933,7 +1941,11 @@ function finirNiveau(reussi) {
     sauve.scores[niv] = Math.max(ancienScore, score);
     enregistrer();
     // Progression : on reprendra au niveau suivant (le dernier reste le dernier)
-    JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, niv + 2), score });
+    JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, niv + 2), score, etoiles: sauve.etoiles.slice(0, NIVEAUX.length) });
+    // Jeu terminé (dernier niveau gagné, maintenant ou avant) : total des meilleures étoiles.
+    if ((sauve.etoiles[NIVEAUX.length - 1] || 0) > 0) {
+      if (window.FMG) window.FMG.reportComplete({ stars: NIVEAUX.reduce((a, _, i) => a + Math.min(3, Math.max(0, Math.floor(Number(sauve.etoiles[i])) || 0)), 0), maxStars: NIVEAUX.length * 3 });
+    }
   }
   // Remplissage de l'écran bilan
   const fini = reussi && niv === NIVEAUX.length - 1;

@@ -3114,6 +3114,10 @@
     if (record) progres.records[i] = score;
     progres.debloque = Math.max(progres.debloque, Math.min(NIVEAUX.length, i + 2));
     sauverProgres(Math.min(NIVEAUX.length, i + 2));
+    // Jeu terminé (dernier niveau gagné, maintenant ou avant) : total des meilleures étoiles.
+    if (i === NIVEAUX.length - 1 || progres.records[NIVEAUX.length - 1] > 0) {
+      if (window.FMG) window.FMG.reportComplete({ stars: etoilesTotal(), maxStars: NIVEAUX.length * 3 });
+    }
     son('victoire');
     confettis(r === 3 ? 140 : 70);
     $('fin-titre').textContent = r === 3 ? t('fin.parfait') : t('fin.victoire');

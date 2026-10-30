@@ -3867,6 +3867,8 @@
       }
       verifierGarage(); ecrireLocal();
       try { JEL_SAVE.save(JEU, donnees(Math.min(N + 1, NB))); } catch (e) { /* rien */ }
+      // Jeu terminé (tous les niveaux gagnés au moins une fois) : total des meilleures étoiles.
+      if (prog.etoiles.every((e) => e > 0)) { if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NB * 3 }); }
       Son.jouer('victoire');
       for (let i = 0; i < etoiles; i++) setTimeout(() => { etoilesSpans[i].classList.add('gagnee'); Son.jouer('etoile'); }, 350 + i * 350);
       confettis(etoiles * 40 + 30);

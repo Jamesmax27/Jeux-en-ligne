@@ -3578,6 +3578,8 @@
     prog.niveauMax = Math.max(prog.niveauMax, Math.min(NIVEAUX.length, n + 1));
     enregistrer(Math.min(NIVEAUX.length, n + 1));
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: n });
+    // Jeu terminé (toutes les courses gagnées au moins une fois) : total des meilleures étoiles.
+    if (prog.etoiles.every(function (x) { return x > 0; })) { if (window.FMG) window.FMG.reportComplete({ stars: rosettes(), maxStars: NIVEAUX.length * 3 }); }
     var nouveaux = DEBLOCAGES.filter(function (d) { return d.seuil > avant && d.seuil <= apres; });
     afficherFin({ gagne: true, e: e, temps: temps, place: place, score: score, record: record, ancienRecord: ancienRecord, gain: apres - avant, nouveaux: nouveaux });
   }

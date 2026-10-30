@@ -3658,6 +3658,10 @@
     const j = suivant(i);
     prog.niveau = Math.max(prog.niveau, j >= 0 ? j + 1 : i + 1);
     sauver(prog.niveau);
+    // Jeu terminé (tous les tableaux gagnés, secrets compris) : total des meilleures étoiles.
+    if (prog.etoiles.every((e) => e > 0)) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: N * 3 });
+    }
     const secretNouveau = NIVEAUX.findIndex((n, k) => n.secret && !secretsAvant[k] && estDebloque(k));
     // fenêtre
     const box = $('vic-etoiles'); box.innerHTML = [0, 1, 2].map((k) => svgEtoile(k < et)).join('');

@@ -3340,6 +3340,10 @@ function reussir(){if(!X||X.fini)return;
   X.fini=true;X.reussi=true;const n=X.n;const etoiles=1+(X.blessuresRecues===0?1:0)+(X.pas<=X.niv.par?1:0);
   const avant=S.etoiles[n]||0;S.etoiles[n]=Math.max(avant,etoiles);S.debloque=Math.max(S.debloque,Math.min(NIVEAUX.length,n+1));if(n===NIVEAUX.length)S.fini=true;
   sauver(Math.min(NIVEAUX.length,n+1));sfx('victoire');
+  // Jeu terminé (dernière expédition gagnée, maintenant ou avant : S.fini est sauvegardé) : total des meilleures étoiles.
+  if(S.fini){
+    if (window.FMG) window.FMG.reportComplete({ stars: Math.min(NIVEAUX.length*3, totalEtoiles()), maxStars: NIVEAUX.length * 3 });
+  }
   const nbEsp=Object.keys(X.notesExp).length;const fiches=LISTE_ESPECES.filter(e=>fiche(e.id).notes>=NOTES_MAX).length;
   const html=`<span class="etiquette">${esc(t('bilan.reussite'))}</span><h2>${esc(nomNiveau(n))}</h2>
    <div class="grosses-etoiles">${[1,2,3].map(i=>`<span class="${i<=etoiles?'':'vide'}">★</span>`).join('')}</div>

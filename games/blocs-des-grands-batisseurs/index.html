@@ -2946,6 +2946,8 @@ function terminer(gagne, raison) {
     sauver(Math.min(NIVEAUX.length, i + 2));
     jeu.anim.avanceVue = Math.max(jeu.anim.avanceVue, 0.6);
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
+    // Jeu terminé (tous les chantiers gagnés au moins une fois) : total des meilleures étoiles.
+    if (NIVEAUX.every((_, k) => prog.etoiles[k] > 0)) { if (window.FMG) window.FMG.reportComplete({ stars: NIVEAUX.reduce((s, _, k) => s + Math.min(3, prog.etoiles[k] || 0), 0), maxStars: NIVEAUX.length * 3 }); }
   } else {
     sauver(i + 1);
     jeu.anim.secousse = 0.4;

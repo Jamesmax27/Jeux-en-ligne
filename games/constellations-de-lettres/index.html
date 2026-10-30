@@ -2888,6 +2888,8 @@ function victoire() {
   progres.etoiles[i] = Math.max(progres.etoiles[i] || 0, e);
   if (record) progres.records[i] = etat.score;
   enregistrer(Math.max(i + 2, progres.niveauMax)); // niveau suivant (N + 1, en numéros à partir de 1)
+  // Jeu terminé (toutes les constellations réussies au moins une fois) : total des meilleures étoiles.
+  if (NIVEAUX.every((_, k) => (progres.etoiles[k] || 0) > 0)) { if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 }); }
   SONS.victoire();
   const dernier = i === NIVEAUX.length - 1;
   afficherFin({

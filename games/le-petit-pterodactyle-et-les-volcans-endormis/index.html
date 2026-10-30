@@ -2857,6 +2857,10 @@
     try { window.JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, n + 1), score: totalScore(), progres: prog, options: { son: prog.son } }); } catch (e) { /* rien */ }
     enPartie = false;
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: n });
+    // Jeu terminé (tous les niveaux gagnés au moins une fois) : total des meilleures étoiles.
+    if (NIVEAUX.every((x, k) => prog.etoiles[k] > 0)) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
 
     etat = 'fin';
     montrer('ecran-fin');

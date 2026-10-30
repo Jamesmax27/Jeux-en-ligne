@@ -3500,6 +3500,10 @@ function victoire() {
   garderProg();
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: N + 1 });
   JEL_SAVE.save(JEU, { niveau: Math.min(N + 2, NIVEAUX.length), score: totalPieces(), prog });
+  // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+  if (prog.etoiles.every((x) => x > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: MAX_ETOILES });
+  }
 
   $('fin-titre').textContent = tr(N === NIVEAUX.length - 1 ? 'fin.galaxies' : (N % 5 === 4 ? 'fin.galaxie' : 'fin.bravo'));
   $('fin-sous').textContent = N === NIVEAUX.length - 1 ? tr('fin.toutFini', { n: nb(apresTotal), max: nb(MAX_ETOILES) }) : tr('fin.niveau', { n: nb(N + 1) });

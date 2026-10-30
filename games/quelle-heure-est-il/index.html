@@ -1070,6 +1070,8 @@ function fin() {
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: score });
   montrer("fin");
   var e = score >= 9 ? 3 : score >= 6 ? 2 : 1;
+  // Jeu terminé (une seule série de questions) : étoiles de cette série (le site garde le meilleur).
+  if (window.FMG) window.FMG.reportComplete({ stars: e, maxStars: 3 });
   $("etoiles").textContent = "⭐⭐⭐".slice(0, e) + "☆☆☆".slice(0, 3 - e);
   $("titreFin").textContent = score >= 9 ? t("champion") : score >= 6 ? t("tresBien") : t("bienEssaye");
   $("texteFin").textContent = t("bilan", { n: score, total: TOTAL });

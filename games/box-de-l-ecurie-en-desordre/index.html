@@ -3459,6 +3459,10 @@
     prog.niveauMax = Math.max(prog.niveauMax, Math.min(NIVEAUX.length, n + 1));
     enregistrer(Math.min(NIVEAUX.length, n + 1));
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: n });
+    // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+    if (prog.etoiles.every(function (x) { return x > 0; })) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
     son('victoire');
     confettis();
     $('fin-titre').textContent = traduire('fin.gagne');

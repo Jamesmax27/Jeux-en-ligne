@@ -2698,6 +2698,11 @@ let unlocked = Math.max(1, parseInt(store.get('unlocked', 1), 10) || 1);
 let best = parseInt(store.get('best', 0), 10) || 0;
 let starsMap = store.get('stars', {});
 if (!starsMap || typeof starsMap !== 'object') starsMap = {};
+// Meilleures étoiles aussi gardées dans la sauvegarde JEL_SAVE (le cadre du site n'a pas de localStorage)
+try {
+  const etSave = JEL_SAVE.load('envol-de-plume').etoiles;
+  if (etSave && typeof etSave === 'object') for (const k in etSave) { const v = Math.min(3, parseInt(etSave[k], 10) || 0); if (v > (starsMap[k] || 0)) starsMap[k] = v; }
+} catch (e) {}
 let muted = !!store.get('muted', false);
 
 /* ================= Sons (synthétisés) ================= */
@@ -4313,7 +4318,12 @@ function levelWon() {
   addScore(50 * Math.min(G.level, 60) + 25 * stars);
   starsMap[G.level] = Math.max(starsMap[G.level] || 0, stars); store.set('stars', starsMap);
   unlocked = Math.max(unlocked, G.level + 1); store.set('unlocked', unlocked);
-  JEL_SAVE.save(JEU, { niveau: G.level + 1, score: G.score });
+  JEL_SAVE.save(JEU, { niveau: G.level + 1, score: G.score, etoiles: starsMap });
+  // Jeu terminé (niveau 50 gagné, maintenant ou avant) : total des meilleures étoiles des 50 niveaux.
+  if (G.level >= 50 || (starsMap[50] || 0) > 0) {
+    let totEt = 0; for (let k = 1; k <= 50; k++) totEt += Math.min(3, starsMap[k] || 0);
+    if (window.FMG) window.FMG.reportComplete({ stars: totEt, maxStars: 150 });
+  }
   const rec = G.score > best; if (rec) { best = G.score; store.set('best', best); }
   const final = G.level === 50;
   $('winEyebrow').textContent = t('niveauReussi', { n: G.level });

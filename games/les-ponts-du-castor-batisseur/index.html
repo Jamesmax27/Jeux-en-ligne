@@ -3423,6 +3423,8 @@ window.JEL_NIVEAUX = NIVEAUX.length;
       prog.debloque = Math.max(prog.debloque, Math.min(NIVEAUX.length, idx + 2));
       ed.gagne = true;
       sauver(idx + 2);
+      // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+      if (prog.etoiles.every(function (x) { return x > 0; })) { if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 }); }
       var decos = decosDebloquees(ancienTotal, totalEtoiles());
       $('t-fin').textContent = tr('fin.bravo');
       var html = '';

@@ -3024,6 +3024,10 @@
     const suivant = Math.min(NIVEAUX.length, N + 2);
     prog.niveau = Math.max(prog.niveau, suivant);
     try { JEL_SAVE.save(JEU, donneesSauvegarde(N + 2 > NIVEAUX.length ? NIVEAUX.length : N + 2)); } catch (er) { /* sauvegarde indisponible */ }
+    // Jeu terminé (dernier match gagné, maintenant ou avant) : total des meilleures étoiles.
+    if (N === NIVEAUX.length - 1 || prog.etoiles[NIVEAUX.length - 1] > 0) {
+      if (window.FMG) window.FMG.reportComplete({ stars: prog.etoiles.reduce((s, x) => s + Math.max(0, Math.min(3, Number(x) || 0)), 0), maxStars: NIVEAUX.length * 3 });
+    }
     setTimeout(() => {
       $('titre-fin').textContent = t('victoire.titre');
       const zoneE = $('fin-etoiles');

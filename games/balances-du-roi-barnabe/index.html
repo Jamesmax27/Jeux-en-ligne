@@ -3515,6 +3515,10 @@
       P.debloque = Math.max(P.debloque, Math.min(NIVEAUX.length, i + 2));
       garderLocal();
       sauverPartie(Math.min(NIVEAUX.length, i + 2));
+      // Jeu terminé (tous les niveaux gagnés, maintenant ou avant : P est sauvegardé) : total des meilleures étoiles.
+      if (P.etoiles.every(function (e) { return e > 0; })) {
+        if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+      }
     } else {
       var jour = dateDuJour();
       if (P.defi.date !== jour) P.defi = { date: jour, etoiles: 0, record: 0 };

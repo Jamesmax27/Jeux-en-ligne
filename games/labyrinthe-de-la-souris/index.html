@@ -1067,6 +1067,8 @@ function gagne(){
   var dernier = niveau >= NB_NIVEAUX;
   // niveau réussi : on reprendra au suivant (dernier niveau : partie finie)
   if(dernier) JEL_SAVE.clear(JEU); else JEL_SAVE.save(JEU, { niveau: niveau + 1, score: 0 });
+  // Jeu terminé (dernier labyrinthe gagné, sans étoiles) : annoncé au site.
+  if(dernier){ if (window.FMG) window.FMG.reportComplete({}); }
   document.getElementById('bt').textContent = dernier ? t('champion') : t('bravo');
   document.getElementById('bp').textContent = dernier
     ? t('finTout', { total: NB_NIVEAUX })

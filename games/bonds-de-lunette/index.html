@@ -2028,6 +2028,17 @@ function lireProg() {
       }
     }
   } catch (e) { /* stockage indisponible : on joue sans souvenir */ }
+  // Meilleures étoiles aussi gardées par le site (le cadre du jeu n'a pas de localStorage)
+  try {
+    const et = JEL_SAVE.load(JEU).etoiles;
+    if (Array.isArray(et)) et.slice(0, NIVEAUX.length).forEach((x, i) => {
+      const v = borner(parseInt(x, 10) || 0, 0, 3);
+      if (!v) return;
+      const n = p.niv[i] || { e: 0, s: 0, p: 0 };
+      p.niv[i] = { e: Math.max(n.e, v), s: n.s, p: n.p };
+      if (i + 2 > p.debloque && i + 1 < NIVEAUX.length) p.debloque = i + 2;
+    });
+  } catch (e) { /* sauvegarde illisible : rien */ }
   return p;
 }
 let prog = lireProg();
@@ -3035,8 +3046,13 @@ function gagner() {
   const totalApres = totalPoussieres();
   const nouvelle = TENUES.some((x) => x.seuil > totalAvant && x.seuil <= totalApres) || CASQUES.some((x) => x.seuil > totalAvant && x.seuil <= totalApres);
   ecrireProg();
-  try { JEL_SAVE.save(JEU, { niveau: Math.min(N + 2, NIVEAUX.length), score: totalScore() }); } catch (e) { /* rien */ }
-  bilan = { gagne: true, etoiles, n, score, record, ancien: avant.s, nouvelle };
+  const etoilesSave = NIVEAUX.map((_, i) => infoNiv(i).e);
+  try { JEL_SAVE.save(JEU, { niveau: Math.min(N + 2, NIVEAUX.length), score: totalScore(), etoiles: etoilesSave }); } catch (e) { /* rien */ }
+  // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+  if (etoilesSave.every((x) => x > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+  }
+  bilan ={ gagne: true, etoiles, n, score, record, ancien: avant.s, nouvelle };
 }
 function majGagne(dt) {
   minuteurGagne += dt;
