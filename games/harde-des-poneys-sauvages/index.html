@@ -3330,6 +3330,10 @@ function victoire() {
   if (suivant > progres.atteint) progres.atteint = suivant;
   jeu.reprise = suivant;
   enregistrer(suivant);
+  // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+  if (progres.etoiles.every(function (e) { return e > 0; })) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: MAX_ETOILES });
+  }
   Son.victoire();
   lancerConfettis();
   var gagnes = recompensesEntre(avantEtoiles, totalEtoiles());

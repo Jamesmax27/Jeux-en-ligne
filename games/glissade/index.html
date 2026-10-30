@@ -3236,6 +3236,8 @@
       niveauReprise = Math.min(NIVEAUX.length, i + 2);
       enregistrerLocal();
       sauver(niveauReprise);
+      // Jeu terminé (toutes les courses gagnées, maintenant ou avant) : total des meilleures étoiles.
+      if (prog.etoiles.every(function (x) { return x > 0; })) { if (window.FMG) window.FMG.reportComplete({ stars: etoilesTotal(), maxStars: NIVEAUX.length * 3 }); }
     }
     $('hud').hidden = true;
     $('fin-titre').textContent = tr(qualifie ? (i === NIVEAUX.length - 1 ? 'fin_champion_titre' : 'fin_qualifie') : 'fin_non');

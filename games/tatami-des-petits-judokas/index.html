@@ -2300,6 +2300,15 @@ for (const k of ['etoiles', 'records', 'prises']) {
 sauve.niveauMax = borne(sauve.niveauMax | 0, 1, 10);
 sauve.gi = borne(sauve.gi | 0, 0, GIS.length - 1);
 sauve.ecusson = borne(sauve.ecusson | 0, 0, ECUSSONS.length - 1);
+// Meilleures étoiles aussi gardées dans JEL_SAVE (sur le site, localStorage ne marche pas).
+try {
+  const lues = JEL_SAVE.load('tatami-des-petits-judokas').etoiles;
+  if (Array.isArray(lues)) for (let k = 0; k < 10; k++) {
+    const v = borne(Math.floor(Number(lues[k]) || 0), 0, 3);
+    if (v > sauve.etoiles[k]) sauve.etoiles[k] = v;
+    if (v > 0) sauve.niveauMax = Math.max(sauve.niveauMax, Math.min(10, k + 2));
+  }
+} catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
 function enregistrer() {
   try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* tant pis */ }
 }
@@ -2907,7 +2916,11 @@ function finNiveau() {
   if (et > 0) sauve.niveauMax = Math.max(sauve.niveauMax, Math.min(10, i + 2));
   enregistrer();
   // Ceinture gagnée : on reprendra à la suivante (la dernière reste la 10e).
-  if (et > 0) JEL_SAVE.save(JEU, { niveau: Math.min(i + 2, NIVEAUX.length), score: 0 });
+  if (et > 0) JEL_SAVE.save(JEU, { niveau: Math.min(i + 2, NIVEAUX.length), score: 0, etoiles: sauve.etoiles.slice() });
+  // Jeu terminé (toutes les ceintures gagnées, maintenant ou avant) : total des meilleures étoiles.
+  if (et > 0 && sauve.etoiles.every((e) => e > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+  }
   const total = totalEtoiles();
   const min = (s) => (window.JEL_I18N.getLang() === 'de' ? s : s.toLowerCase());   // noms communs en minuscules (sauf allemand)
   const debloques = [...GIS.map((g) => t('neufKimono', { n: min(g.nom) })), ...ECUSSONS.map((x) => t('neufEcusson', { n: min(x.nom) }))]

@@ -2980,6 +2980,10 @@ function finVictoire() {
   garderLocal();
   try { JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, n + 1), score: scoreTotal(), options: optionsSauvegarde() }); } catch (e) { /* rien */ }
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: n });
+  // Jeu terminé (dernier match gagné, maintenant ou avant) : total des meilleures étoiles.
+  if (n === NIVEAUX.length || P.etoiles[NIVEAUX.length - 1] > 0) {
+    if (window.FMG) window.FMG.reportComplete({ stars: P.etoiles.reduce((a, b) => a + b, 0), maxStars: NIVEAUX.length * 3 });
+  }
 
   const titres = ['victoire.titre1', 'victoire.titre2', 'victoire.titre3'];
   $('v-titre').textContent = tr(titres[i % 3]);

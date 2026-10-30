@@ -2921,6 +2921,10 @@ function victoire() {
   const recompenses = nouvellesRecompenses(avant, totalEtoiles());
   try { localStorage.setItem(CLE_PROG, JSON.stringify(prog)); } catch (e) { /* pas de stockage */ }
   JEL_SAVE.save(JEU, { niveau: Math.min(NB, i + 2), score: totalScore(), prog });
+  // Jeu terminé (dernière salle gagnée, maintenant ou avant) : total des meilleures étoiles.
+  if (prog.etoiles[NB - 1] > 0) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NB * 3 });
+  }
 
   el('titre-fin').textContent = tr(i === NB - 1 ? 'fin.derniere' : 'fin.bravo');
   el('texte-fin').textContent = tr('fin.puces', { n: puces });

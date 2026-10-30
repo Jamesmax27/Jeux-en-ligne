@@ -124,6 +124,7 @@ partie.lancer();
 - **Lisible et fluide sur téléphone avec toutes les places occupées** (390 × 844) : tour en cours bien visible, scores de chaque place, rien de coupé.
 - **Pause** : en solo, elle fige tout ; en ligne, la partie continue sur le serveur (après `delaiJoueur`, le robot joue pour le joueur) : le menu le dit.
 - `FMG.reportEnd` à chaque fin de manche (en ligne aussi) : `completed: true` si le joueur gagne la manche, `false` sinon ; `level` = niveau ou terrain.
+- `FMG.reportComplete({ stars, maxStars })` (« jeu terminé », `CONSIGNES-JEU.md`) : seulement pour le parcours solo, quand ses 20 niveaux ont tous été gagnés ; jamais pour une manche en ligne (c'est le serveur qui crédite les manches en ligne au profil, section 12).
 
 ## 4. Les robots
 
@@ -209,6 +210,7 @@ Ce que le multijoueur fait pour rester dedans :
 ## 12. Données personnelles
 
 - Aucune donnée personnelle : ni compte, ni pseudo, ni message entre joueurs. Le lanceur envoie l'identifiant du jeu, l'empreinte de ses règles et les coups joués.
+- **Profil joueur** (`docs/cadrage-fidelisation.md`, section 8) : si le joueur a un profil, le lanceur demande au site un **ticket** (`POST /api/profil` `ticket`, après Turnstile, action `multi`) et l'envoie en premier message (`{ t: 'profil', ticket }`), sans attendre (la partie commence de toute façon). Le ticket, signé avec le secret `MULTI_SECRET` (`multijoueur/src/ticket.js`), contient le numéro du profil, le jeu et une expiration (30 min) ; `partie.js` le vérifie et range le numéro avec la connexion. Ce message n'est jamais transmis à l'arbitre : le protocole du moteur ne change pas. À la fin de chaque manche (retour au salon), `partie.js` calcule le résultat de chaque vrai joueur assis relié à un profil (`multijoueur/src/profil.js` : victoire = 1re place du classement des règles, nombre de vrais joueurs, durée, coups joués soi-même) et l'envoie au site (`POST https://freemicrogames.com/api/profil-multi`, `Authorization: Bearer <MULTI_SECRET>`, adresse : variable `SITE_API` de `wrangler.toml`), qui l'enregistre une seule fois par manche et par joueur. Manche de moins de 45 s ou moins de 3 coups joués soi-même : ignorée. Sans `MULTI_SECRET` (secret à poser dans Cloudflare Pages et dans le Worker : `npx wrangler secret put MULTI_SECRET`), les parties marchent comme avant, sans rien créditer.
 - Le Worker ne garde que l'état de la partie en cours (places, coups), effacé dès que le dernier joueur part. L'accueil ne garde que le nombre de joueurs par partie. Aucune adresse IP n'est enregistrée par le site (Cloudflare la voit, comme pour toute page).
 - Rien n'est écrit sur l'appareil pour le multijoueur. Politiques de confidentialité et de cookies : paragraphe « Parties à plusieurs ».
 

@@ -4053,6 +4053,10 @@ function finNiveau(gagne) {
     progres.debloque = Math.max(progres.debloque, Math.min(NIVEAUX.length, n + 1));
     ecrireProgres();
     try { JEL_SAVE.save(JEU, { niveau: Math.min(n + 1, NIVEAUX.length), score: E.score, progres }); } catch (e) { /* rien */ }
+    // Jeu terminé (dernier chapitre gagné, maintenant ou avant) : total des meilleures étoiles.
+    if (n === NIVEAUX.length || cartesGagnees() === NIVEAUX.length) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
   }
   const v = $('voile-fin');
   $('mochi-fin').innerHTML = gagne ? svgMochi(etoiles === 3 ? 'wow' : 'bravo') : (E.duel ? svgTaro('rire') : svgMochi('oups'));

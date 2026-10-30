@@ -1101,12 +1101,17 @@ function choisit(perle, bouton) {
     if (suivant === perles.length) {
       bloque = true;
       if (window.FMG) window.FMG.reportEnd({ completed: true, level: manche + 1 });
-      points += erreurs === 0 ? 3 : (erreurs === 1 ? 2 : 1);
+      const gagnees = erreurs === 0 ? 3 : (erreurs === 1 ? 2 : 1);
+      points += gagnees;
+      etoilesManches[manche] = Math.max(etoilesManches[manche], gagnees);
       $('pts').textContent = '⭐ ' + points;
       $('consigne').textContent = erreurs === 0 ? t('parfait') : t('bienJoue');
-      // manche réussie : on reprendra à la suivante (dernière manche : partie finie)
-      if (manche + 1 >= NB_MANCHES) JEL_SAVE.clear(JEU);
-      else JEL_SAVE.save(JEU, { niveau: manche + 2, score: points });
+      // manche réussie : on reprendra à la suivante (dernière manche : partie finie,
+      // on repartira de la 1re en gardant les meilleures étoiles de chaque manche)
+      if (manche + 1 >= NB_MANCHES) JEL_SAVE.save(JEU, { niveau: 1, score: 0, etoiles: etoilesManches.slice() });
+      else JEL_SAVE.save(JEU, { niveau: manche + 2, score: points, etoiles: etoilesManches.slice() });
+      // Jeu terminé (dernière manche gagnée, ou toutes déjà gagnées) : total des meilleures étoiles.
+      if (manche + 1 >= NB_MANCHES || etoilesManches.every(e => e > 0)) { if (window.FMG) window.FMG.reportComplete({ stars: etoilesManches.reduce((a, b) => a + b, 0), maxStars: NB_MANCHES * 3 }); }
       setTimeout(() => { manche++; if (manche >= NB_MANCHES) fin(); else nouvelleManche(); }, 1100);
     }
   } else {
@@ -1129,6 +1134,12 @@ function fin() {
 // Sauvegarde de la progression (module JEL_SAVE) : une manche = un niveau.
 // « Jouer » propose de reprendre à la manche sauvegardée.
 const JEU = 'collier-magique';
+// Meilleures étoiles de chaque manche (1 à 3), relues dans la sauvegarde (valeurs sûres).
+const etoilesManches = new Array(NB_MANCHES).fill(0);
+(() => {
+  const d = JEL_SAVE.load(JEU);
+  if (Array.isArray(d.etoiles)) for (let i = 0; i < NB_MANCHES; i++) etoilesManches[i] = Math.min(3, Math.max(0, Math.floor(Number(d.etoiles[i])) || 0));
+})();
 function jouer() {
   JEL_SAVE.reprise({
     jeu: JEU,

@@ -3624,6 +3624,10 @@ function terminer(fin) {
     if (record) profil.records[n - 1] = score;
     profil.debloque = Math.max(profil.debloque, Math.min(n + 1, NIVEAUX.length));
     sauver(n + 1, score);
+    // Jeu terminé (tous les tournages gagnés au moins une fois) : total des meilleures étoiles.
+    if (NIVEAUX.every((x, k) => (profil.etoiles[k] || 0) > 0)) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
   } else {
     if (window.FMG) window.FMG.reportEnd({ completed: false, level: n });
     sauver(n, score);

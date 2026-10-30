@@ -2899,6 +2899,8 @@ function quizGame(){return new Promise(async res=>{let score=0;const N=5;
 /* ================= PANTHÉON ================= */
 function hallOfFame(){return new Promise(res=>{sfx('fanfare');playMusic('evo');
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: S.badges.filter(Boolean).length + 1 });
+  // Jeu terminé (Ligue battue, sans étoiles) : annoncé au site.
+  if (window.FMG) window.FMG.reportComplete({});
   const el=openScreen('hof',`<div class="panel"><h2>${T('ui.hof.title')}</h2><p>${T('ui.hof.congrats',{name:esc(S.name)})}</p><div class="hof-team"></div>
   <p class="small">${T('ui.hof.next')}</p><button data-back>${T('ui.hof.continue')}</button></div>`);
   const t=el.querySelector('.hof-team');S.team.forEach(m=>{const d=document.createElement('div');d.className='hof-mon';d.appendChild(monCanvas(m.sp,90,m.shiny));d.insertAdjacentHTML('beforeend',`<b>${esc(monName(m))}</b><small>${T('ui.lvl',{n:m.lvl})}</small>`);t.appendChild(d)});

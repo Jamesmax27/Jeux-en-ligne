@@ -3587,7 +3587,11 @@ function victoire() {
   garderLocal();
   sauverPartie(S.n + 1);
   niveauOuvertSauvegarde = Math.max(niveauOuvertSauvegarde, S.n + 1);
-  const debloque = ANNEAUX.find((a) => a.seuil > avantEtoiles && a.seuil <= totalEtoiles());
+  // Jeu terminé (tous les niveaux gagnés au moins une fois) : total des meilleures étoiles.
+  if (NIVEAUX.every((x, k) => (P.etoiles[k] || 0) > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+  }
+  const debloque =ANNEAUX.find((a) => a.seuil > avantEtoiles && a.seuil <= totalEtoiles());
 
   $('v-titre').textContent = tr(etoiles === 3 ? 'victoire.titre3' : 'victoire.titre');
   $('v-detail').textContent = tr('victoire.detail', { n: S.anneaux, points: bonusReste });

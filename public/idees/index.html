@@ -593,6 +593,20 @@
         </table>
       </div>
       <p class="idees-note">Lancement : une ouverture du jeu (un retour sur la page moins de 30 min après compte dans la même session). Durée médiane : la moitié des sessions dure moins. Abandon rapide : session de moins de 10 s (moins de 2 s : jamais comptée). Relance : même jeu relancé sur le même appareil moins de 30 min après. Terminées : le jeu a signalé au moins une victoire (niveau ou partie gagnés). 👍 / lancements : pouces en l'air donnés pendant la période, rapportés aux lancements. Sur 7 et 30 jours, jours UTC complets jusqu'à la veille ; la durée médiane est estimée à partir des médianes de chaque jour. Évolution : par rapport à la période précédente de même durée ; en points pour les taux.</p>
+
+      <!-- Indicateurs de fidélisation (profil joueur, docs/cadrage-fidelisation.md, section 10) :
+           calculés chaque jour par /api/stats-jour (fidelisation_jour), lus par /api/idees { type: 'fidelisation' }. -->
+      <h2 class="stats-titre-fidelisation">Fidélisation (profils joueurs)</h2>
+      <p class="idees-note" id="fidelisation-resume">Chargement…</p>
+      <div class="stats-tuiles" id="fidelisation-tuiles"></div>
+      <div class="stats-tableau-cadre">
+        <table class="stats-tableau" id="fidelisation-tableau">
+          <caption class="sr-only">Indicateurs de fidélisation par jour</caption>
+          <thead><tr><th>Jour (UTC)</th><th>Actifs</th><th>Nouveaux</th><th>Retour J+1</th><th>Retour à 7 j</th><th>Retour à 30 j</th><th>Série moy.</th><th>Niveau moy.</th><th>Codes créés</th><th>Restaurations</th><th>Manches en ligne</th><th>dont robots seuls</th><th>Classés (semaine)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="idees-note">Actifs : profils venus ce jour-là (jour de leur appareil). Retour J+1 : part des profils créés la veille revenus ce jour. Retour à 7 j (à 30 j) : part des profils créés 7 (30) jours plus tôt revenus au moins une fois depuis. Série moy. : jours consécutifs des actifs. Niveau moy. : profils venus dans les 30 derniers jours. Classés : profils présents dans le classement général de la semaine (niveau 2 au moins). Calcul quotidien avec les statistiques des jeux (06:37 UTC) ; même base et mêmes jours UTC, pour les rapprocher.</p>
     </section>
   </main>
 
@@ -1316,6 +1330,52 @@
         stats.message.className = 'message erreur';
       } finally {
         stats.actualiser.disabled = false;
+      }
+      chargerFidelisation();
+    }
+
+    // --- Fidélisation (profils joueurs) ---------------------------------------
+    async function chargerFidelisation() {
+      const resume = document.getElementById('fidelisation-resume');
+      const tuiles = document.getElementById('fidelisation-tuiles');
+      const corps = document.querySelector('#fidelisation-tableau tbody');
+      try {
+        const d = await appelApi({ type: 'fidelisation' });
+        const taux = (c) => (c && c.taille ? `${Math.round((100 * c.revenus) / c.taille)} % (${c.revenus}/${c.taille})` : '—');
+        const dernier = d.jours[0];
+        resume.textContent = dernier
+          ? `${d.profils} profil(s) en tout. Dernier jour calculé : ${dernier.jour}.`
+          : `${d.profils} profil(s) en tout. Pas encore de jour calculé (calcul quotidien par /api/stats-jour).`;
+        tuiles.replaceChildren(...(dernier ? [
+          ['Actifs (dernier jour)', dernier.actifs],
+          ['Retour J+1', taux(dernier.retour.j1)],
+          ['Retour à 7 jours', taux(dernier.retour.j7)],
+          ['Retour à 30 jours', taux(dernier.retour.j30)],
+          ['Niveau moyen (30 j)', dernier.niveauMoyen.toFixed(1)],
+          ['Jeux terminés par joueur (30 j)', dernier.termines.parJoueur.toFixed(2)],
+        ] : []).map(([nom, valeur]) => {
+          const div = document.createElement('div');
+          div.className = 'stats-tuile';
+          const h = document.createElement('h3');
+          h.textContent = nom;
+          const p = document.createElement('p');
+          p.className = 'valeur';
+          p.textContent = String(valeur);
+          div.append(h, p);
+          return div;
+        }));
+        corps.replaceChildren(...d.jours.map((j) => {
+          const tr = document.createElement('tr');
+          for (const v of [j.jour, j.actifs, j.nouveaux, taux(j.retour.j1), taux(j.retour.j7), taux(j.retour.j30), j.serieMoyenne.toFixed(1), j.niveauMoyen.toFixed(1),
+            j.codes.crees, j.codes.restaurations, j.multi.manches, j.multi.contreRobots, j.classement.presentsSemaine]) {
+            const td = document.createElement('td');
+            td.textContent = String(v);
+            tr.append(td);
+          }
+          return tr;
+        }));
+      } catch (erreur) {
+        resume.textContent = erreur.message;
       }
     }
 

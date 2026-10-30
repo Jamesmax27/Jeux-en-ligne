@@ -3124,6 +3124,8 @@
       progres.debloque = Math.max(progres.debloque, Math.min(NB, niveau + 1));
       if (progres.etoiles.every((e) => e > 0) && totalEtoiles() >= CASQUE_ETOILES) progres.casque = true;
       try { window.JEL_SAVE.save(JEU, { niveau: niveau + 1, score: monde.score, progres, options: { son: sonActif } }); } catch (e) { /* rien */ }
+      // Jeu terminé (toutes les missions gagnées au moins une fois) : total des meilleures étoiles.
+      if (progres.etoiles.every((e) => e > 0)) { if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NB * 3 }); }
       Son.victoire();
       for (let k = 0; k < 70; k++) monde.particules.push({ type: 'confetti', x: hasard(0, 400), y: hasard(-40, 100), vx: hasard(-60, 60), vy: hasard(0, 120), vie: hasard(1.5, 3), max: 3, r: 3, c: ['#ff5a4a', '#ffd84a', '#4fb0ff', '#5cbf6a', '#ff9ad5'][k % 5] });
     } else {

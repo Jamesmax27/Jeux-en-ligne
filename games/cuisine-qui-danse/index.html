@@ -3086,6 +3086,10 @@
       progres.debloque = Math.max(progres.debloque, Math.min(NB, niveau + 2));
       enregistrer();
       JEL_SAVE.save(JEU, donneesSauvegarde(Math.min(NB, niveau + 2)));
+      // Jeu terminé (toutes les recettes gagnées, maintenant ou avant : progres est sauvegardé) : total des meilleures étoiles.
+      if (progres.etoiles.every((e) => e > 0)) {
+        if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NB * 3 });
+      }
       Son.victoire();
       for (let k = 0; k < 110; k++) particules.push({ x: Math.random() * W, y: -Math.random() * H * 0.5, vx: (Math.random() - 0.5) * 60, vy: 90 + Math.random() * 140, r: 3 + Math.random() * 5, c: ['#ffc93c', '#ff6b6b', '#7bd389', '#5fc7ff', '#c08bff'][k % 5], vie: 4, rot: Math.random() * 6, confetti: true });
       humeurChef = { nom: 'fete', jusqua: performance.now() + 4000 };

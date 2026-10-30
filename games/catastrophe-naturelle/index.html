@@ -2835,6 +2835,27 @@ window.JEL_NIVEAUX = CN.NIVEAUX.length;
     if (!partieLancee) return;
     JEL_SAVE.save(JEU, { niveau: (jeu && !jeu.fin) ? jeu.n : niveauSauve, score: scoreSauve });
   });
+  // Meilleures étoiles par niveau, aussi gardées dans JEL_SAVE (champ « etoiles ») :
+  // sur le site, le localStorage du jeu ne marche pas. Relues ici (valeurs sûres).
+  (function () {
+    var lues = JEL_SAVE.load(JEU).etoiles;
+    if (!Array.isArray(lues)) return;
+    for (var i = 0; i < NIVEAUX.length && i < lues.length; i++) {
+      var e = Math.max(0, Math.min(3, Math.floor(Number(lues[i]) || 0)));
+      if (!e) continue;
+      var info = infoNiveau(i);
+      sauve.niv[i] = { e: Math.max(info.e || 0, e), r: info.r || 0 };
+      sauve.debloque = Math.max(sauve.debloque, Math.min(NIVEAUX.length, i + 2));
+    }
+  })();
+  function etoilesNiveaux() {
+    var l = [];
+    for (var i = 0; i < NIVEAUX.length; i++) l.push(infoNiveau(i).e || 0);
+    return l;
+  }
+  // Tous les niveaux gagnés au moins une fois (une victoire donne toujours ≥ 1 étoile).
+  function toutGagne() { return etoilesNiveaux().every(function (e) { return e > 0; }); }
+  function etoilesTotal() { return etoilesNiveaux().reduce(function (s, e) { return s + e; }, 0); }
 
   // Nom d'un villageois (choisi par le joueur, sinon nom proposé dans la langue).
   function nomDe(type) {
@@ -3780,9 +3801,14 @@ window.JEL_NIVEAUX = CN.NIVEAUX.length;
       sauve.niv[j.n - 1] = { e: Math.max(info.e || 0, etoiles), r: Math.max(info.r || 0, sc) };
       sauve.debloque = Math.max(sauve.debloque, Math.min(NIVEAUX.length, j.n + 1));
       enregistrer();
-      // Niveau suivant à reprendre ; après le dernier, plus rien à continuer.
-      if (j.n < NIVEAUX.length) { niveauSauve = j.n + 1; scoreSauve = sc; JEL_SAVE.save(JEU, { niveau: niveauSauve, score: sc }); }
-      else { partieLancee = false; JEL_SAVE.clear(JEU); }
+      // Niveau suivant à reprendre ; après le dernier, on garde la sauvegarde
+      // (dernier niveau) pour ne pas perdre les étoiles.
+      if (j.n < NIVEAUX.length) { niveauSauve = j.n + 1; scoreSauve = sc; JEL_SAVE.save(JEU, { niveau: niveauSauve, score: sc, etoiles: etoilesNiveaux() }); }
+      else { partieLancee = false; JEL_SAVE.save(JEU, { niveau: NIVEAUX.length, score: sc, etoiles: etoilesNiveaux() }); }
+      // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
+      if (toutGagne()) {
+        if (window.FMG) window.FMG.reportComplete({ stars: etoilesTotal(), maxStars: NIVEAUX.length * 3 });
+      }
       for (var k = 0; k < 70; k++) particule(Math.random() * W, -20 - Math.random() * 100, (Math.random() - 0.5) * 80, 60 + Math.random() * 120, 3, 'confetti', ['#ff8a3d', '#ffd54a', '#4cb050', '#3d7fd1', '#d9534f'][k % 5], 6);
     }
     setTimeout(function () { montrerBilan(tient, sc, etoiles, record, info.r || 0); }, tient ? 1200 : 1500);

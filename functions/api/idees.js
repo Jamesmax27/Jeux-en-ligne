@@ -48,6 +48,9 @@
 //   → { ok, periode, du, au, global, precedent, jeux: { <id>: {...} }, courbe, jours, rattrapes }
 //   24 h : sessions brutes ; 7 et 30 jours : statistiques par jour (game_stats_daily).
 //   Ne demande pas GitHub, seulement la base DB.
+// Indicateurs de fidélisation (profil joueur, même onglet ; calcul quotidien
+// par /api/stats-jour, functions/_profil.js) :
+//   { "type": "fidelisation" } → { ok, profils, jours: [{ jour, actifs, nouveaux, retour, series, … }] }
 //
 // Réponse : { "ok": true, "numero": n } ou { "erreur": "..." }
 // ==========================================================================
@@ -58,6 +61,7 @@ import {
   preparerTables, listerBlocages, debloquer, bannir,
 } from '../_demandes.js';
 import { lireStats, PERIODES } from '../_stats.js';
+import { preparerTablesProfil } from '../_profil.js';
 
 const ETIQUETTE = 'idee-perso';
 const ETIQUETTE_DEMANDE = 'demande-ia';
@@ -184,6 +188,20 @@ export async function onRequest({ request, env }) {
     } catch (erreur) {
       console.error('Lecture des statistiques impossible :', erreur);
       return json({ erreur: 'Statistiques indisponibles pour le moment. Réessaie plus tard.' }, 503);
+    }
+  }
+
+  if (corps?.type === 'fidelisation') {
+    if (!env.DB) return json({ erreur: 'Base DB non configurée.' }, 503);
+    try {
+      await preparerTablesProfil(env);
+      const { results } = await env.DB.prepare('SELECT jour, donnees FROM fidelisation_jour ORDER BY jour DESC LIMIT 60').all();
+      const jours = (results || []).map((l) => ({ jour: l.jour, ...JSON.parse(l.donnees) }));
+      const total = await env.DB.prepare('SELECT COUNT(*) AS n FROM profils').first();
+      return json({ ok: true, jours, profils: total?.n || 0 });
+    } catch (erreur) {
+      console.error('Lecture des indicateurs de fidélisation impossible :', erreur);
+      return json({ erreur: 'Indicateurs indisponibles pour le moment.' }, 503);
     }
   }
 

@@ -3103,6 +3103,10 @@ function finJournee(gagne) {
     if (record) prog.records[N] = M.score;
     prog.debloque = Math.max(prog.debloque, Math.min(NIVEAUX.length, N + 2));
     JEL_SAVE.save(JEU, Object.assign({ niveau: Math.min(N + 2, NIVEAUX.length), score: M.score }, donneesProg()));
+    // Jeu terminé (toutes les journées gagnées, maintenant ou avant : étoiles sauvegardées) : total des meilleures étoiles.
+    if (NIVEAUX.every((_, i) => prog.etoiles[i] > 0)) {
+      if (window.FMG) window.FMG.reportComplete({ stars: Math.min(NIVEAUX.length * 3, totalEtoiles()), maxStars: NIVEAUX.length * 3 });
+    }
     son('victoire');
   } else {
     if (window.FMG) window.FMG.reportEnd({ completed: false, level: N + 1 });

@@ -2744,6 +2744,18 @@ button.puce { min-height: 44px; }
   var journeeGagnee = -1;   // dernière journée réussie (fin affichée)
   var effacerTitre = null;  // bouton « Effacer la sauvegarde » de l'écran titre
   function majEffacerTitre() { if (effacerTitre) effacerTitre.maj(); }
+  // Meilleures étoiles par journée, gardées aussi par JEL_SAVE (le cadre du site
+  // n'a pas de localStorage) : on garde le meilleur des deux.
+  try {
+    var luSave = JEL_SAVE.load(JEU);
+    if (!Array.isArray(sauve.etoiles)) sauve.etoiles = [];
+    if (luSave && Array.isArray(luSave.etoiles)) {
+      for (var ie = 0; ie < NIVEAUX.length; ie++) {
+        var ve = Math.max(0, Math.min(3, Math.floor(Number(luSave.etoiles[ie]) || 0)));
+        if (ve > (Number(sauve.etoiles[ie]) || 0)) sauve.etoiles[ie] = ve;
+      }
+    }
+  } catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
   JEL_SAVE.surFermeture(function () {
     if (ecranCourant !== 'jeu') return;
     if (etat.phase === 'fin' && journeeGagnee === etat.niv) return; // déjà enregistrée
@@ -3768,8 +3780,12 @@ button.puce { min-height: 44px; }
       if (i + 2 > sauve.debloque) sauve.debloque = Math.min(NIVEAUX.length, i + 2);
       sauver();
       journeeGagnee = i;
-      JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, i + 2), score: etat.score });
+      JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, i + 2), score: etat.score, etoiles: sauve.etoiles });
       var derniere = i === NIVEAUX.length - 1;
+      // Jeu terminé (dernière journée gagnée, maintenant ou avant) : total des meilleures étoiles.
+      if (derniere || (sauve.etoiles[NIVEAUX.length - 1] || 0) > 0) {
+        if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+      }
       carte.appendChild(el('div', 'grand-ic', derniere ? '🏆' : '🎉'));
       carte.appendChild(el('h2', null, t(derniere ? 'fin.titreFinale' : 'fin.titreVictoire')));
       if (derniere) carte.appendChild(el('p', null, t('fin.finale', { n: totalEtoiles(), max: NIVEAUX.length * 3 })));

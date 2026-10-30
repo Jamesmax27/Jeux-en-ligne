@@ -3984,6 +3984,10 @@
     progression.debloque = Math.max(progression.debloque, Math.min(NB, N + 1));
     for (let i = 0; i < NB; i++) { if (progression.etoiles[i] == null) progression.etoiles[i] = 0; if (progression.records[i] == null) progression.records[i] = 0; }
     try { window.JEL_SAVE.save(JEU, donneesSauvegarde(Math.min(N + 1, NB), score)); } catch (e) { /* rien */ }
+    // Jeu terminé (dernier niveau gagné, maintenant ou avant) : total des meilleures étoiles.
+    if (N === NB || progression.etoiles[NB - 1] > 0) {
+      if (window.FMG) window.FMG.reportComplete({ stars: progression.etoiles.reduce((a, b) => a + (b || 0), 0), maxStars: NB * 3 });
+    }
     $('fin-titre').textContent = t(N === NB ? 'fin.bravoFinal' : 'fin.victoire');
     $('fin-texte').textContent = N === NB ? t('fin.texteFinal', { n: progression.etoiles.reduce((a, b) => a + (b || 0), 0), max: NB * 3 }) : t('fin.texteVictoire', { nom: t('niv.' + N + '.nom') });
     afficherFin(etoiles, score, record, ancien, true);

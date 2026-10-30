@@ -3782,6 +3782,10 @@ button:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
       if (gagnerCarte(RECOMPENSES[niv])) carteGagnee = RECOMPENSES[niv];
       P.niveauMax = Math.min(NIVEAUX.length, Math.max(P.niveauMax, niv + 2));
       try { JEL_SAVE.save(JEU, donneesSauvegarde(Math.min(NIVEAUX.length, niv + 2))); } catch (er) { /* sauvegarde indisponible */ }
+      // Jeu terminé (tous les duels gagnés, maintenant ou avant) : total des meilleures étoiles.
+      if (P.etoiles.every((x) => x > 0)) {
+        if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+      }
     }
     const totalApres = totalEtoiles();
     const debloques = [];

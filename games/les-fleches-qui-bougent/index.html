@@ -2607,6 +2607,14 @@
     ecrireLocal();
     JEL_SAVE.save(JEU, donneesSauvegarde(Math.min(NB_NIVEAUX, i + 2)));
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
+    // Jeu terminé (tous les niveaux gagnés au moins une fois) : total des meilleures étoiles.
+    let toutGagne = true;
+    for (let k = 0; k < NB_NIVEAUX; k++) if (!(prog.etoiles[k] > 0)) toutGagne = false;
+    if (toutGagne) {
+      let total = 0;
+      for (let k = 0; k < NB_NIVEAUX; k++) total += Math.min(3, prog.etoiles[k]);
+      if (window.FMG) window.FMG.reportComplete({ stars: total, maxStars: NB_NIVEAUX * 3 });
+    }
     SON.victoire(); confettis();
     setTimeout(() => afficherFin(true, { et, nouveauRecord, record: prog.records[i], bonusTemps }), 900);
   }

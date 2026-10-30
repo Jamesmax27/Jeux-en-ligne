@@ -2844,6 +2844,10 @@
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: i + 1 });
     window.JEL_SAVE.save(JEU, { niveau: Math.min(NIVEAUX.length, i + 2), score: totalScore(), etoiles: progres.etoiles, records: progres.records, max: progres.max, tutos: progres.tutos, options: { son: progres.son } });
     garderLocal();
+    // Jeu terminé (dernier niveau gagné, maintenant ou avant) : total des meilleures étoiles.
+    if (progres.etoiles[NIVEAUX.length - 1] > 0) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
     Son.victoire();
     pluieConfettis();
     afficherFin(true, etoiles, nouveau, ancien);

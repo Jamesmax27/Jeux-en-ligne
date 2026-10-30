@@ -17,7 +17,9 @@
 // ("niveaux") ET donné par le jeu lui-même (window.JEL_NIVEAUX, lu dans le
 // navigateur), présentation ("presentation"). Les jeux plus anciens, sans ce
 // champ, ne sont pas concernés. Tous les jeux appellent window.FMG.reportEnd
-// (statistiques de fin de partie), avec une garde (controlerFinDePartie) ; dans
+// (statistiques de fin de partie), avec une garde (controlerFinDePartie), et
+// window.FMG.reportComplete quand tout le jeu est terminé (profil joueur,
+// "etoiles" ou "sans_fin" de game.json : controlerJeuTermine) ; dans
 // le navigateur, le lanceur doit fournir window.FMG. Jeux multijoueurs ("multijoueur": true) :
 // "places", moteur jel-multi à jour, règles jel-regles, bouton data-multi="jouer"
 // (controlerMultijoueur ; parties simulées : scripts/tester-multijoueur.mjs). Les textes de référencement de tous les jeux
@@ -96,6 +98,10 @@ async function controlerFiche(id, dossier) {
   if (f.multijoueur !== undefined && typeof f.multijoueur !== 'boolean') erreur(id, 'game.json : "multijoueur" doit valoir true ou false');
   if (f.multijoueur === true && !(Number.isInteger(f.places) && f.places >= 2 && f.places <= 10)) erreur(id, 'game.json : "places" (jeu multijoueur) doit être un nombre entier de 2 à 10, le même que dans les règles');
   if (f.multijoueur !== true && f.places !== undefined) erreur(id, 'game.json : "places" n\'existe que pour un jeu multijoueur ("multijoueur": true)');
+  // Profil joueur (CONSIGNES-JEU.md, « Jeu terminé et étoiles ») : étoiles possibles, ou jeu sans fin.
+  if (f.etoiles !== undefined && !(Number.isInteger(f.etoiles) && f.etoiles >= 1 && f.etoiles <= 1500)) erreur(id, 'game.json : "etoiles" (étoiles possibles dans tout le jeu) doit être un entier de 1 à 1500');
+  if (f.sans_fin !== undefined && f.sans_fin !== true) erreur(id, 'game.json : "sans_fin" vaut true (jeu qui ne se termine jamais) ou est absent');
+  if (f.sans_fin === true && f.etoiles !== undefined) erreur(id, 'game.json : un jeu "sans_fin" n\'a pas d\'"etoiles" (il n\'envoie jamais « jeu terminé »)');
   fiches.set(id, f);
 
   // Consignes de 2026 : jeu riche (20 niveaux au moins) et présentation (sa
@@ -137,6 +143,7 @@ async function controlerJeu(id, dossier) {
   }
   controlerSauvegarde(id, html);
   controlerFinDePartie(id, html);
+  controlerJeuTermine(id, html);
   if (fiches.get(id)?.multijoueur === true) controlerMultijoueur(id, html);
   else if (/<script\b[^>]*\bid=["']jel-(?:multi|regles)["']/i.test(html)) erreur(id, 'blocs jel-multi ou jel-regles présents : ajouter "multijoueur": true et "places" dans game.json (ou retirer ces blocs)');
 }
@@ -188,6 +195,29 @@ function controlerFinDePartie(id, html) {
   if (sansGarde.length) {
     erreur(id, `fin de partie : appel à FMG.reportEnd sans garde (écrire « if (window.FMG) window.FMG.reportEnd(…) ») : ${sansGarde[0].trim().slice(0, 100)}`);
   }
+}
+
+// Message « jeu terminé » du profil joueur (CONSIGNES-JEU.md, section 3 « Jeu
+// terminé et étoiles », docs/cadrage-fidelisation.md) : quand tous les niveaux
+// sont gagnés, le jeu appelle window.FMG.reportComplete({ stars, maxStars })
+// (ou reportComplete({}) sans étoiles), avec la même garde que reportEnd. Un
+// jeu qui déclare "etoiles" dans game.json envoie maxStars, et inversement.
+// Jeu "sans_fin" (aucune fin possible) : pas de message.
+function controlerJeuTermine(id, html) {
+  const f = fiches.get(id) || {};
+  const lignes = html.replace(RE_BLOCS_GENERES, '').split('\n').filter((l) => /\bFMG\.reportComplete\s*\(/.test(l));
+  if (f.sans_fin === true) {
+    if (lignes.length) erreur(id, 'jeu terminé : un jeu "sans_fin" n\'appelle pas FMG.reportComplete (retirer "sans_fin" de game.json s\'il a une fin)');
+    return;
+  }
+  if (!lignes.length) {
+    return erreur(id, 'jeu terminé : le jeu n\'appelle pas window.FMG.reportComplete({ stars, maxStars }) quand tous ses niveaux sont gagnés (voir CONSIGNES-JEU.md, « Jeu terminé et étoiles » ; jeu qui ne finit jamais : "sans_fin": true dans game.json)');
+  }
+  const sansGarde = lignes.filter((l) => !/\bwindow\.FMG\s*(?:\)|&&|\?\.)/.test(l));
+  if (sansGarde.length) erreur(id, `jeu terminé : appel à FMG.reportComplete sans garde (écrire « if (window.FMG) window.FMG.reportComplete(…) ») : ${sansGarde[0].trim().slice(0, 100)}`);
+  const avecEtoiles = lignes.some((l) => /\bmaxStars\b/.test(l));
+  if (Number.isInteger(f.etoiles) && !avecEtoiles) erreur(id, 'jeu terminé : game.json déclare "etoiles" mais FMG.reportComplete n\'envoie pas { stars, maxStars }');
+  if (!Number.isInteger(f.etoiles) && avecEtoiles) erreur(id, 'jeu terminé : FMG.reportComplete envoie des étoiles : indiquer leur nombre possible dans game.json ("etoiles", ex. 60 pour 20 niveaux × 3)');
 }
 
 // Sauvegarde de la progression (public/save.js, CONSIGNES-JEU.md « Sauvegarde ») :
@@ -312,8 +342,8 @@ async function testerNavigateur(ids) {
       } else {
         if (!(await ecranVisible(cadre))) erreur(id, 'écran vide au démarrage');
         // Script commun de suivi placé par le lanceur (public/suivi.js, SCRIPT_SUIVI).
-        if (!(await cadre.evaluate(() => typeof window.FMG?.reportEnd === 'function').catch(() => false))) {
-          erreur(id, 'window.FMG.reportEnd absent dans le lanceur : le script commun de suivi (SCRIPT_SUIVI, public/suivi.js) n\'est pas chargé');
+        if (!(await cadre.evaluate(() => typeof window.FMG?.reportEnd === 'function' && typeof window.FMG?.reportComplete === 'function').catch(() => false))) {
+          erreur(id, 'window.FMG.reportEnd ou reportComplete absent dans le lanceur : le script commun de suivi (SCRIPT_SUIVI, public/suivi.js) n\'est pas chargé');
         }
 
         // Consignes de 2026 : le jeu donne lui-même son nombre réel de niveaux.

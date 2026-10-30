@@ -20,6 +20,9 @@
 // - Sans API des scores (hors connexion…) : tri par nouveautés, sans compteurs.
 // - Les jeux déjà gardés sur l'appareil portent un badge « Disponible hors ligne » ;
 //   les jeux multijoueurs, l'étiquette « Multi » (en haut à gauche de la jaquette).
+//   Les jeux terminés reçoivent un check vert (profil joueur, liste lue sur
+//   l'appareil) : posé sur toute carte « a.carte » de la page par
+//   profil-pastille.js (marquerTermines de profil.js), y compris celles créées ici.
 // - Première ligne (« vitrine »), sans tenir compte des filtres, en deux moitiés :
 //   - à gauche, les Nouveautés : les NOUVEAUTES_NOMBRE derniers jeux ajoutés
 //     (aussi hors connexion) ;

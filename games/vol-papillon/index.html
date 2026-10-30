@@ -3708,6 +3708,10 @@ function finNiveau() {
     niveauReprise = Math.min(NIVEAUX.length, n + 1);
     garderProgres();
     try { JEL_SAVE.save(JEU, { niveau: niveauReprise, score: totalScore(), options: optionsSauvegarde() }); } catch (e) { /* rien */ }
+    // Jeu terminé (tous les niveaux gagnés au moins une fois) : total des meilleures étoiles.
+    if (progres.etoiles.every((x) => x > 0)) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
   }
   if (victoire && n === NIVEAUX.length) { afficherBilan(); return; }
   montrer('fin');

@@ -17,11 +17,20 @@
 //   entre deux manches, ou veille de 15 min), avancée seulement si besoin ;
 // - une écriture de stockage par message reçu (état de l'arbitre) ;
 // - plus aucun vrai joueur : alarme et stockage effacés, l'objet est libéré.
+//
+// Profil joueur (docs/cadrage-fidelisation.md, section 8) : le lanceur envoie
+// d'abord { t: 'profil', ticket } (ticket signé par le site après Turnstile,
+// src/ticket.js) ; le numéro de profil est rangé avec la connexion. À la fin
+// de chaque manche, les résultats des joueurs reliés à un profil et assez
+// présents (durée, coups joués soi-même) partent vers le site (src/profil.js).
+// Ce message n'est pas transmis à l'arbitre : le protocole du moteur ne change pas.
 // ==========================================================================
 
 import { Arbitre } from './moteur.js';
 import { JEUX } from './jeux.js';
 import { appelerAccueil } from './accueil.js';
+import { verifierTicket } from './ticket.js';
+import { nouveauSuivi, resultatsManche, envoyerResultats } from './profil.js';
 
 const MESSAGE_MAX = 4000;        // caractères d'un message de joueur
 const DEBIT_MAX = 30;            // messages par joueur et par fenêtre de 10 s, au-delà : déconnecté
@@ -35,6 +44,8 @@ export class Partie {
     this.arbitre = null;
     this.infos = null;           // { jeu, nom }
     this.debits = new Map();     // cle → { debut, nombre } (en mémoire seulement)
+    this.suivi = null;           // manche en cours : début, coups joués par chaque vrai joueur (profil)
+    this.aEnvoyer = [];          // résultats de manche à envoyer au site (profil)
     if (typeof WebSocketRequestResponsePair !== 'undefined') {
       state.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
     }
@@ -53,10 +64,43 @@ export class Partie {
     if (!d || !Object.prototype.hasOwnProperty.call(JEUX, d.jeu)) return false;
     this.creer(d.jeu, d.nom);
     if (!this.arbitre.restaurer(d.arbitre)) { this.arbitre = null; return false; }
+    this.suivi = d.suivi || null;
     return true;
   }
 
+  // Profil relié à une connexion (ticket présenté), ou null.
+  profilDe(cle) {
+    for (const ws of this.state.getWebSockets(cle)) {
+      try { const p = ws.deserializeAttachment()?.profil; if (p) return p; } catch { /* connexion fermée */ }
+    }
+    return null;
+  }
+
+  // Observe ce que l'arbitre annonce : début de manche, coups des vrais joueurs,
+  // retour au salon = fin de la manche (résultats pour les profils).
+  suivre(message) {
+    if (!this.arbitre || !this.infos) return;
+    if (message.t === 'manche') this.suivi = nouveauSuivi(message.manche, Date.now());
+    else if (message.t === 'action' && !message.auto && this.suivi) {
+      const cle = this.arbitre.sieges[message.s];
+      if (cle) this.suivi.actions[cle] = (this.suivi.actions[cle] || 0) + 1;
+    } else if (message.t === 'salon' && this.suivi && !this.suivi.rapportee) {
+      this.aEnvoyer.push(...resultatsManche({
+        regles: JEUX[this.infos.jeu].regles, etat: this.arbitre.etat, sieges: this.arbitre.sieges,
+        profils: (cle) => this.profilDe(cle), suivi: this.suivi, nom: this.infos.nom, jeu: this.infos.jeu, maintenant: Date.now(),
+      }));
+      this.suivi.rapportee = true;
+    }
+  }
+
+  async envoyerProfils() {
+    if (!this.aEnvoyer.length) return;
+    const liste = this.aEnvoyer.splice(0);
+    await envoyerResultats(this.env, liste);
+  }
+
   diffuser(cle, message) {
+    if (!cle) this.suivre(message);
     const texte = JSON.stringify(message);
     for (const ws of cle ? this.state.getWebSockets(cle) : this.state.getWebSockets()) {
       try { ws.send(texte); } catch { /* connexion en train de se fermer */ }
@@ -71,7 +115,8 @@ export class Partie {
   // doit sonner plus tôt : une alarme en avance ne fait rien d'autre que se reprogrammer,
   // ce qui écrit moins souvent qu'une alarme recalée à chaque coup.
   async sauver() {
-    await this.state.storage.put('partie', { ...this.infos, arbitre: this.arbitre.donnees() });
+    await this.state.storage.put('partie', { ...this.infos, arbitre: this.arbitre.donnees(), suivi: this.suivi });
+    await this.envoyerProfils();
     const t = this.arbitre.prochainReveil();
     const voulue = t !== null && isFinite(t) ? Math.max(t, Date.now() + 50) : Date.now() + VEILLE_MS;
     const actuelle = await this.state.storage.getAlarm();
@@ -81,6 +126,7 @@ export class Partie {
   // Plus aucun vrai joueur : la partie est libérée (alarme et stockage effacés).
   async liberer() {
     this.arbitre = null;
+    this.suivi = null;
     await this.state.storage.deleteAlarm();
     await this.state.storage.deleteAll();
   }
@@ -130,6 +176,12 @@ export class Partie {
     if (!(await this.charger())) { ws.close(1011, 'partie terminée'); return; }
     let m;
     try { m = JSON.parse(message); } catch { return; }
+    // Ticket du profil joueur (envoyé par le lanceur, pas par le jeu).
+    if (m?.t === 'profil') {
+      const ticket = await verifierTicket(this.env.MULTI_SECRET, m.ticket, this.infos.jeu);
+      if (ticket) ws.serializeAttachment({ cle, profil: ticket.profil });
+      return;
+    }
     this.arbitre.recevoir(cle, m);
     await this.sauver();
   }

@@ -11,11 +11,18 @@
 // 2. Efface les sessions brutes de plus de 60 jours (politique de
 //    confidentialité) ; les statistiques par jour sont gardées sans limite.
 //
-// Réponse : { "ok": true, "jours": ["AAAA-MM-JJ", …], "effacees": n }
+// 3. Profil joueur : indicateurs de fidélisation des jours manquants
+//    (fidelisation_jour) et effacement de ce qui a dépassé sa durée de
+//    conservation (gains, jours de visite, profils inactifs depuis 2 ans…),
+//    voir tacheQuotidienneProfil dans functions/_profil.js. Une erreur ici
+//    n'empêche pas les statistiques des jeux.
+//
+// Réponse : { "ok": true, "jours": ["AAAA-MM-JJ", …], "effacees": n, "fidelisation": [jours] | null }
 // ==========================================================================
 
 import { json, bonSecret } from '../_commun.js';
 import { calculerJoursManquants, effacerSessionsAnciennes } from '../_stats.js';
+import { tacheQuotidienneProfil } from '../_profil.js';
 
 export async function onRequest({ request, env }) {
   if (request.method !== 'POST') return json({ erreur: 'Méthode non autorisée.' }, 405, { Allow: 'POST' });
@@ -28,7 +35,13 @@ export async function onRequest({ request, env }) {
   try {
     const jours = await calculerJoursManquants(env);
     const effacees = await effacerSessionsAnciennes(env);
-    return json({ ok: true, jours, effacees });
+    let fidelisation = null;
+    try {
+      fidelisation = await tacheQuotidienneProfil(env, Date.now());
+    } catch (erreur) {
+      console.error('Indicateurs de fidélisation impossibles :', erreur);
+    }
+    return json({ ok: true, jours, effacees, fidelisation });
   } catch (erreur) {
     console.error('Calcul des statistiques impossible :', erreur);
     return json({ erreur: 'Calcul impossible pour le moment.' }, 503);

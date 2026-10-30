@@ -13,6 +13,9 @@
 //   lanceur     /play?id=<id>&lang=<langue>  (une seule page, non indexée)
 //   proposer    /proposer/       /en/suggest/     /es/proponer/     /pt/sugerir/     /de/vorschlagen/
 //               (formulaire public de demandes, non indexé ; ?jeu=<id> choisit le jeu)
+//   profil      /profil/         /en/profile/     /es/perfil/       /pt/perfil/      /de/profil/
+//   classement  /classement/     /en/leaderboard/ /es/clasificacion/ /pt/classificacao/ /de/rangliste/
+//               (profil joueur et classement, non indexés : docs/cadrage-fidelisation.md)
 //
 // Pages légales, en français et en anglais seulement (les autres langues
 // mènent à la version anglaise) :
@@ -52,6 +55,10 @@ const SEGMENTS = {
 
 // Formulaire public de demandes (proposer un jeu, signaler un bug, demander une modification).
 const SEGMENTS_PROPOSER = { fr: 'proposer', en: 'suggest', es: 'proponer', pt: 'sugerir', de: 'vorschlagen' };
+
+// Profil joueur et classement (pages non indexées).
+const SEGMENTS_PROFIL = { fr: 'profil', en: 'profile', es: 'perfil', pt: 'perfil', de: 'profil' };
+const SEGMENTS_CLASSEMENT = { fr: 'classement', en: 'leaderboard', es: 'clasificacion', pt: 'classificacao', de: 'rangliste' };
 
 // Tranches d'âge (TRANCHES_AGE de taxonomie.js) → morceau d'adresse (« + » est interdit).
 // Les tranches retirées (ANCIENNES_TRANCHES) gardent le leur : leurs anciennes
@@ -109,6 +116,18 @@ export function urlLegale(page, lang) {
 export function urlProposer(lang, idJeu) {
   const l = langueValide(lang);
   return `/${PREFIXE[l]}${SEGMENTS_PROPOSER[l]}/${idJeu ? `?jeu=${encodeURIComponent(idJeu)}` : ''}`;
+}
+
+/** Page de profil du joueur : « /profil/ », « /en/profile/ »… */
+export function urlProfil(lang) {
+  const l = langueValide(lang);
+  return `/${PREFIXE[l]}${SEGMENTS_PROFIL[l]}/`;
+}
+
+/** Classement des joueurs : « /classement/ », « /en/leaderboard/ »… */
+export function urlClassement(lang) {
+  const l = langueValide(lang);
+  return `/${PREFIXE[l]}${SEGMENTS_CLASSEMENT[l]}/`;
 }
 
 /** Lanceur du jeu (plein écran), dans la langue donnée. */

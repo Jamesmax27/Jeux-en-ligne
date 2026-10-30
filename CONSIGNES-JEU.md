@@ -77,6 +77,21 @@ if (window.FMG) window.FMG.reportEnd({ completed: false, level: niveau });  // �
 - **La garde `if (window.FMG)` est obligatoire, sur la même ligne** : ouvert seul (hors du lanceur), le jeu n'a pas `FMG`. Rien d'autre à écrire : pas de script à recopier, le lanceur fournit `FMG` à tous les jeux.
 - **Contrôles** : `validate-games.mjs` vérifie qu'il y a au moins un appel, avec sa garde, et que le lanceur fournit `window.FMG` dans le jeu ; la relecture (section 7) vérifie qu'il est au bon endroit (victoire et défaite).
 
+### Jeu terminé et étoiles (obligatoire)
+
+Le site donne à chaque joueur un profil (expérience, niveaux, badges, étoiles ; `docs/cadrage-fidelisation.md`). Quand **tout le jeu** est terminé, le jeu l'annonce en **une ligne** — c'est le seul autre message du jeu au site :
+
+```js
+if (window.FMG) window.FMG.reportComplete({ stars: etoilesTotal(), maxStars: NIVEAUX.length * 3 });
+```
+
+- **Quand** : à l'écran de victoire d'un niveau, **si tous les niveaux ont été gagnés au moins une fois** (le dernier niveau vient d'être gagné, ou il l'a déjà été : le jeu le garde dans sa sauvegarde `JEL_SAVE`). La première fois, c'est la fin du jeu ; ensuite, chaque nouvelle victoire d'un jeu déjà terminé renvoie le total à jour (le site garde le meilleur résultat, sans cumul, et ne redonne jamais le bonus de fin). Jamais avant que tout soit gagné, jamais dans une fonction de dessin.
+- **`stars`** : étoiles obtenues dans tout le jeu = somme du **meilleur** résultat de chaque niveau (gardé dans la sauvegarde `JEL_SAVE`, pas seulement en mémoire : le joueur peut avoir repris au niveau 15 avec « Continuer »). **`maxStars`** : étoiles possibles dans tout le jeu (ex. 20 niveaux × 3 = 60). Nombres entiers, `stars` ≤ `maxStars`.
+- **`game.json`** : `"etoiles": <maxStars>` (même nombre), posé par `node scripts/etoiles-jeu.mjs <id> <maxStars>` ; le serveur refuse un message qui annonce un autre nombre.
+- **Jeu sans étoiles** : `if (window.FMG) window.FMG.reportComplete({});` et pas de champ `"etoiles"` (`node scripts/etoiles-jeu.mjs <id> --sans-etoiles`). **Jeu qui ne se termine jamais** (bac à sable, partie infinie) : aucun appel et `"sans_fin": true` (`--sans-fin`).
+- La garde `if (window.FMG)` est obligatoire, sur la même ligne (comme `reportEnd`). Le lanceur fournit `FMG.reportComplete` à tous les jeux (`SCRIPT_SUIVI`) ; il transmet le message au profil (`public/profil.js`), qui l'envoie à la base. Le temps de jeu, lui, est mesuré par le site : rien d'autre à écrire.
+- **Contrôles** : `validate-games.mjs` vérifie l'appel, sa garde, et l'accord avec `"etoiles"` / `"sans_fin"` de `game.json` ; la relecture (section 7, point 10) vérifie le bon endroit et le calcul des étoiles.
+
 ### Sauvegarde (obligatoire)
 
 Tout jeu garde la progression du joueur sur l'appareil, sans compte ni serveur, avec le module commun **`public/save.js`** (`window.JEL_SAVE`). Dans le cadre isolé du site, le jeu n'a pas de stockage : le module passe par le lanceur, qui garde les données dans le `localStorage` du site sous la clé `save_<id>` ; ouvert seul, le jeu utilise directement `localStorage`.
@@ -163,6 +178,7 @@ Un jeu multijoueur (à plusieurs en ligne, robots aux places vides) suit **toute
   "added": "AAAA-MM-JJ",
   "version": 1,
   "niveaux": 20,
+  "etoiles": 60,
   "consignes": 2
 }
 ```
@@ -170,6 +186,7 @@ Un jeu multijoueur (à plusieurs en ligne, robots aux places vides) suit **toute
 - `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier. Il ne change jamais : il sert dans l'adresse de la page du jeu (`/jeux/<id>/`, `/en/games/<id>/`…).
 - Les textes restent en français à la racine ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). `title` (60 caractères au plus) : titre de la carte et de la page du jeu. `description` (10 à 200 caractères) : phrase courte de la carte du catalogue, reprise en accroche sous le titre de la page.
 - `niveaux` : nombre de niveaux du jeu (20 au moins), égal à `window.JEL_NIVEAUX`.
+- `etoiles` : étoiles possibles dans tout le jeu (ex. 20 niveaux × 3 = 60), le même nombre que `maxStars` du message « jeu terminé » (section 3, « Jeu terminé et étoiles ») ; absent pour un jeu sans étoiles. `sans_fin` : `true` pour un jeu qui ne se termine jamais (pas de message « jeu terminé »). Posés par `node scripts/etoiles-jeu.mjs`.
 - `multijoueur` et `places` (jeu multijoueur seulement, section 3 « Jeux multijoueurs ») : `true` et le nombre fixe de places, de 2 à 10. Ils donnent l'étiquette « Multi » de la jaquette et la rubrique « Multijoueur » du catalogue. Un jeu de la boucle de nuit est multijoueur si et seulement si son idée l'est.
 - `consignes` : `2` pour les jeux faits selon ces consignes (posé automatiquement par la boucle de nuit) ; le robot applique alors les règles des nouveaux jeux (20 niveaux, présentation obligatoire). Les jeux plus anciens n'ont pas ce champ.
 - `version` : à augmenter quand `index.html` ou la jaquette changent (le numéro est dans leur adresse : les téléphones reprennent alors la nouvelle copie). Une retouche des seuls textes de `game.json` ne la change pas : elle met à jour `maj`.
@@ -247,6 +264,7 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Genres et univers | un genre, un genre secondaire ou un univers hors des listes fermées de `public/taxonomie.js`, ou l'ancien champ `tags` (`scripts/controle-taxonomie.mjs`) |
 | Sauvegarde | module `save.js` absent, pas à jour ou pas appelé (`validate-games.mjs`), ou `scripts/tester-sauvegarde.mjs` signale un problème : rien d'écrit à la fermeture, pas de fenêtre « Continuer » avec une sauvegarde, « Continuer » qui ne ramène pas au niveau sauvegardé, effacement sans effet |
 | Fin de partie | aucun appel à `window.FMG.reportEnd`, ou un appel sans la garde `if (window.FMG)` sur la même ligne (`validate-games.mjs`, section 3 « Fin de partie ») |
+| Jeu terminé | aucun appel à `window.FMG.reportComplete` (sauf jeu `"sans_fin": true`), appel sans garde, étoiles envoyées sans `"etoiles"` dans `game.json` ou l'inverse (`validate-games.mjs`, section 3 « Jeu terminé et étoiles ») |
 | Traductions | `scripts/check-i18n.js` signale une erreur : langue incomplète, clé manquante, valeur vide, `{variables}` différentes, titre, description ou présentation non traduits, erreur dans une des 5 langues (boucle de nuit et `validate.yml`) |
 | Multijoueur | (jeu `"multijoueur": true`) `"places"` absent ou hors de 2 à 10, moteur `jel-multi` absent ou pas à jour, règles `jel-regles` absentes, impures (réseau, page, `Date`, `Math.random`…) ou différentes d'un appareil à l'autre, manche sans fin, remplacement robot / joueur ou départ d'un joueur qui casse la partie, robots imbattables ou toujours pareils, Worker qui refuse le jeu, jeu qui ne passe pas en ligne avec le faux serveur ou ne continue pas après une coupure (`scripts/tester-multijoueur.mjs <id> --navigateur`, `validate-games.mjs`) ; ou jeu multijoueur alors que son idée ne l'est pas, ou l'inverse (`scripts/idees.mjs controler`) |
 | Référencement | `scripts/verifier-seo.mjs <id>` signale une erreur sur ce jeu : texte de la page manquant ou hors bornes dans une des 5 langues (section 4), bloc de texte hors de 150 à 300 mots, marque protégée, titre ou description identique à celui d'un autre jeu, phrase de 10 mots reprise d'un autre jeu, page du jeu mal construite (titre, description, H1, liens, jeux similaires…) (boucle de nuit et `validate.yml`) |
@@ -264,7 +282,7 @@ Points bloquants, vérifiés dans le code et sur les captures d'écran du robot 
 7. **Récompenses et progression** : score ou étoiles par niveau, sélection des niveaux débloqués ; sauvegarde avec `save.js` (section 3) : « Continuer » / « Nouvelle partie » au bouton Jouer, sauvegarde à chaque fin de niveau et à la fermeture (seulement pendant une partie) ; record et autres données dans `localStorage` à l'intérieur de `try { … } catch (e) { … }`.
 8. **Contrôles** : jouable entièrement au doigt, et au clavier ou à la souris ; cibles tactiles d'au moins 44 px.
 9. **Son** : sons Web Audio, bouton pour couper le son visible et mémorisé, aucun son avant la première action.
-10. **Effets et fins de niveau** : retours visuels soignés ; écran de victoire et écran de défaite avec score, étoiles, record, « Niveau suivant » ou « Réessayer », et « Rejouer ». Chaque écran de fin appelle `window.FMG.reportEnd` (section 3, « Fin de partie ») au bon endroit, une fois par fin : `completed: true` à la victoire, `false` à la défaite, `level` = numéro du niveau joué (à partir de 1) ou score.
+10. **Effets et fins de niveau** : retours visuels soignés ; écran de victoire et écran de défaite avec score, étoiles, record, « Niveau suivant » ou « Réessayer », et « Rejouer ». Chaque écran de fin appelle `window.FMG.reportEnd` (section 3, « Fin de partie ») au bon endroit, une fois par fin : `completed: true` à la victoire, `false` à la défaite, `level` = numéro du niveau joué (à partir de 1) ou score. Le message « jeu terminé » `window.FMG.reportComplete({ stars, maxStars })` (section 3, « Jeu terminé et étoiles ») part seulement quand tous les niveaux ont été gagnés, avec la somme des meilleures étoiles **gardées dans la sauvegarde** et le nombre possible égal à `"etoiles"` de `game.json`.
 11. **Écran de téléphone** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page.
 12. **Contenu** : adapté à l'âge de `ages` (enfants ; jeu « 13+ » : tout est permis sauf les limites de la section 1, « Jeux pour adolescents », et l'écran titre dit « Conseillé dès 13 ans »), en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
 13. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant (adolescent pour un jeu « 13+ ») ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; aucune image du jeu avec du texte (sections 3 et 5).

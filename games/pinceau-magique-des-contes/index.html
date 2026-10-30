@@ -3037,6 +3037,8 @@ body.en-pause *, body.en-pause *::before, body.en-pause *::after { animation-pla
     if (nouveauRecord) prog.records[i] = points;
     prog.debloque = Math.min(NIVEAUX.length, Math.max(prog.debloque, i + 2));
     sauver(Math.min(NIVEAUX.length, i + 2));
+    // Jeu terminé (toutes les pages réussies au moins une fois) : total des meilleures étoiles.
+    if (prog.etoiles.every((v) => v > 0)) { if (window.FMG) window.FMG.reportComplete({ stars: etoilesTotal(), maxStars: NIVEAUX.length * 3 }); }
     const nouveaux = TRESORS.filter((t) => tresorOuvert(t) && !tresorsAvant.includes(t.id));
     etat.svg.classList.add('fini');
     jouer('victoire');

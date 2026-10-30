@@ -4574,6 +4574,10 @@ async function victoire() {
   if (type !== 'niveau') retenirReprise({ ...clone(S), etape: 'combat' });
   else if (niv < 12) retenirReprise({ ...clone(S), niv: niv + 1, essais: 0, etape: 'choix' });
   else { JEL_SAVE.clear(JEU); pointReprise = null; } // dernier sceau : l'aventure est finie
+  // Jeu terminé (12e niveau gagné) : étoiles de toute l'aventure (le site garde le meilleur total).
+  if (type === 'niveau' && niv === 12) {
+    if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+  }
   C = null;
   if (type === 'niveau' && nv.sceau) await animSceau(nv.sceau);
   const recomp = () => recompenses(type, nv, or);
