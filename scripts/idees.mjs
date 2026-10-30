@@ -37,8 +37,9 @@
 // La boucle en choisit autant (« choisir 5 --ados 2 ») et l'idéation en garde
 // PASSAGES_D_AVANCE fois plus en attente (« manque-ados 2 », « ajouter … --ados 2 »).
 // --ados 0 : les idées 13+ de l'agent attendent et l'idéation n'en ajoute plus.
-// Les idées 13+ du propriétaire (source « humain » ou idée perso) ne sont
-// jamais retenues par ce quota : elles passent à leur rang et y comptent.
+// Les idées du propriétaire (source « humain » ou idée perso) ne sont jamais
+// retenues par les quotas : elles passent d'abord et y comptent ; les quotas
+// se remplissent sur les places restantes (multijoueurs, puis 13+).
 // Sans --ados (variable absente ou illisible) : aucun quota, ordre habituel.
 // Une idée multijoueur 13+ compte dans les deux quotas.
 //
@@ -95,13 +96,16 @@
 //                          id, titre, description, genre, genres_secondaires,
 //                          univers, ages — « 6+ », ou "" quand l'idée n'en
 //                          donne pas —, multijoueur, places, et issue pour une
-//                          idée perso). --multi k : k idées multijoueurs et
-//                          n − k autres, chacune dans l'ordre de fabrication ;
-//                          s'il en manque d'un type, l'autre complète. Sans
-//                          --multi, les idées multijoueurs ne sont pas choisies.
-//                          --ados k : k idées 13+ (celles du propriétaire en
-//                          plus si besoin), complétées de même ; --ados 0 :
-//                          aucune idée 13+ de l'agent.
+//                          idée perso). Les idées du propriétaire (perso, puis
+//                          humaines) passent d'abord, quels que soient les
+//                          quotas, et y comptent. --multi k : k idées
+//                          multijoueurs en tout, puis les autres, chacune dans
+//                          l'ordre de fabrication ; s'il en manque d'un type,
+//                          l'autre complète. Sans --multi, les idées
+//                          multijoueurs ne sont pas choisies (même celles du
+//                          propriétaire). --ados k : k idées 13+ en tout,
+//                          complétées de même ; --ados 0 : aucune idée 13+
+//                          de l'agent.
 //   reconcilier [--ouvertes id,…] [--echecs id,…]
 //                          idée dont le jeu est sur main → archive ; idée
 //                          "en_cours" sans pull request ouverte → "en_attente"
@@ -622,6 +626,7 @@ async function choisir(n, args = []) {
   const ordre = ordreDeFabrication(idees)
     .filter((x) => (i >= 0 || !estMulti(x)) && !(ados === 0 && estAdos(x) && !duProprietaire(x)));
   const pris = new Set();
+  const nbMulti = () => [...pris].filter(estMulti).length;
   const nbAdos = () => [...pris].filter(estAdos).length;
   // Une idée 13+ de l'agent n'entre dans les quotas que s'il reste de la place dans celui des jeux 13+.
   const adosPermis = (x) => ados === null || !estAdos(x) || duProprietaire(x) || nbAdos() < ados;
@@ -632,7 +637,10 @@ async function choisir(n, args = []) {
       if (!pris.has(x) && filtre(x)) { pris.add(x); max--; }
     }
   };
-  prendre((x) => estMulti(x) && adosPermis(x), voulus);                                   // 1. multijoueurs
+  // 0. Idées du propriétaire (perso, puis humaines) d'abord, quels que soient les quotas ;
+  //    elles comptent dans les quotas, qui se remplissent ensuite sur les places restantes.
+  prendre(duProprietaire, nombre);
+  prendre((x) => estMulti(x) && adosPermis(x), voulus - nbMulti());                       // 1. multijoueurs
   if (ados !== null) prendre((x) => !estMulti(x) && estAdos(x) && adosPermis(x), ados - nbAdos());   // 2. 13+
   prendre((x) => !estMulti(x) && (ados === null || !estAdos(x) || duProprietaire(x)), nombre);       // 3. autres
   // 4. S'il manque des idées d'un type, les autres complètent (multijoueurs ou 13+ en plus du quota).

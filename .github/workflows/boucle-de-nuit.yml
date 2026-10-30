@@ -90,7 +90,8 @@
 # autant (idees.mjs choisir 5 --ados 2 ; à la main avec moins de 5 jeux : en
 # proportion) ; s'il en manque, d'autres idées complètent. 0 : aucune idée 13+
 # de l'agent. Absente ou illisible : aucun quota (un 13+ de temps en temps).
-# Les idées 13+ du propriétaire passent toujours, et comptent dans le quota.
+# Les idées du propriétaire passent toujours en premier (quotas multijoueur et
+# 13+ compris) et y comptent ; les quotas se remplissent sur les places restantes.
 #
 # Seules les étapes b et e écrivent dans idees.json et idees-archive.json,
 # jamais les tâches parallèles. Leurs enregistrements portent [CF-Pages-Skip] :
@@ -106,7 +107,7 @@ on:
   # des heures chargées (00:00 UTC surtout : départs vers 04:10 UTC constatés en octobre 2026).
   schedule:
     - cron: "17 0 * * *"
-    - cron: "17 5 * * *"
+  #  - cron: "17 5 * * *"
   workflow_dispatch:
     inputs:
       nombre:
@@ -381,7 +382,7 @@ jobs:
           echo "Jeux multijoueurs par passage de 5 : $par_passage ; pour ce passage de $nombre jeu(x) : ${choix_multi:-aucun}"
           # Jeux 13+ : ADOS_BOUCLE = nombre par passage de 5 jeux (0 à 5), en proportion comme ci-dessus.
           # 0 : les idées 13+ de l'agent attendent ; absente ou illisible : aucun quota (ordre habituel).
-          # Les idées 13+ du propriétaire passent toujours (scripts/idees.mjs, choisir).
+          # Les idées du propriétaire passent toujours en premier (scripts/idees.mjs, choisir).
           ados_passage=$(printf '%s' "$ADOS_BOUCLE" | tr -cd '0-9' | cut -c1-2)
           choix_ados=""
           ajout_ados=""
