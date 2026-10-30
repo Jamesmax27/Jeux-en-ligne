@@ -15,6 +15,9 @@
 //                       gabarits/textes/legal.json)
 //   - formulaire public /proposer/, /en/suggest/…         (gabarits/proposer.html),
 //                       non indexé (textes : clés « proposer.* »)
+//   - profil joueur /profil/, /en/profile/… et classement /classement/,
+//                       /en/leaderboard/… (gabarits/profil.html, classement.html),
+//                       non indexés (docs/cadrage-fidelisation.md)
 //   - sitemap.xml (pages indexables seulement, avec lastmod) et robots.txt
 //   - _redirects (Cloudflare Pages) : redirections 301 des pages de catégorie
 //                       retirées (ANCIENS_IDS de public/taxonomie.js) vers la
@@ -42,7 +45,7 @@ import {
   GENRES, UNIVERS, TRANCHES_AGE, IDS_GENRES, IDS_UNIVERS, ID_AUTRE, ANCIENS_IDS, ANCIENNES_TRANCHES, AGE_ADOS,
   trancheDeAge, pourAdos, ordreAffichage,
 } from '../public/taxonomie.js';
-import { LANGUES, HREFLANG, LOCALE_OG, LANGUES_LEGALES, PAGES_LEGALES, urlAccueil, urlJeu, urlCategorie, urlLanceur, urlLegale, urlProposer, langueLegale } from '../public/chemins.js';
+import { LANGUES, HREFLANG, LOCALE_OG, LANGUES_LEGALES, PAGES_LEGALES, urlAccueil, urlJeu, urlCategorie, urlLanceur, urlLegale, urlProposer, urlProfil, urlClassement, langueLegale } from '../public/chemins.js';
 import { TITRE_MIN, TITRE_MAX, DESCRIPTION_MIN, DESCRIPTION_MAX } from '../public/demandes-regles.js';
 import { problemesChamps, textesLangue, languesDuJeu, ageMinimum } from './regles-seo.mjs';
 
@@ -59,7 +62,7 @@ export const MAX_FICHIERS = 19500;
 
 // Dossiers et fichiers de public/ écrits par ce module (effacés au début de chaque build).
 export const SORTIES = ['index.html', '404.html', 'jeux', 'genres', 'univers', 'ages', 'en', 'es', 'pt', 'de', 'sitemap.xml', 'robots.txt', '_redirects',
-  'mentions-legales', 'confidentialite', 'conditions-utilisation', 'cookies', 'proposer'];
+  'mentions-legales', 'confidentialite', 'conditions-utilisation', 'cookies', 'proposer', 'profil', 'classement'];
 
 // Images de partage : la jaquette du jeu si elle est en image matricielle, sinon l'icône du site.
 const IMAGE_SITE = 'assets/icone-512.png';
@@ -290,6 +293,9 @@ function tete({ lang, titre, description, canonique, indexable, alternatives, im
     // puis la mesure d'audience Google Analytics (chargée seulement après « Accepter »).
     '<script src="/consentement.js" defer></script>',
     '<script src="/mesure.js" defer></script>',
+    // Pastille du profil joueur (coin de l'en-tête) : profil créé dès la première
+    // visite, check vert des jeux terminés (docs/cadrage-fidelisation.md).
+    '<script type="module" src="/profil-pastille.js"></script>',
     SCRIPT_PAGE,
   );
   return lignes.join('\n  ');
@@ -377,7 +383,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
 
   // Gabarits et morceaux.
   const gabarits = {};
-  for (const nom of ['accueil', 'jeu', 'categorie', 'introuvable', 'legal', 'proposer']) gabarits[nom] = await readFile(path.join(dossierGabarits, `${nom}.html`), 'utf8');
+  for (const nom of ['accueil', 'jeu', 'categorie', 'introuvable', 'legal', 'proposer', 'profil', 'classement']) gabarits[nom] = await readFile(path.join(dossierGabarits, `${nom}.html`), 'utf8');
   const morceauxBruts = {};
   for (const fichier of await readdir(path.join(dossierGabarits, 'morceaux'))) {
     if (fichier.endsWith('.html')) morceauxBruts[fichier.slice(0, -5)] = await readFile(path.join(dossierGabarits, 'morceaux', fichier), 'utf8');
@@ -716,6 +722,29 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
       textes: JSON.stringify(textes).replace(/</g, '\\u003c'),
     };
     await ecrire(dossierPublic, chemin, remplir(gabarits.proposer, valeurs, t, morceaux, 'gabarits/proposer.html'));
+  }
+
+  // --- Profil joueur et classement (5 langues, non indexés) -------------------
+  // Pages remplies dans le navigateur (public/profil-page.js, public/classement.js)
+  // d'après le profil gardé sur l'appareil et l'API ; docs/cadrage-fidelisation.md.
+  for (const [nomPage, url, cleTitre] of [['profil', urlProfil, 'profil.h1'], ['classement', urlClassement, 'classement.titre']]) {
+    const alternativesPage = Object.fromEntries(LANGUES.map((l) => [l, absolue(url(l))]));
+    for (const lang of LANGUES) {
+      const { t, morceaux } = outils(lang);
+      const chemin = url(lang);
+      const fil = ariane([{ nom: t('page.accueil'), chemin: urlAccueil(lang) }, { nom: t(cleTitre), chemin }], t);
+      const valeurs = {
+        lang: HREFLANG[lang],
+        code_langue: lang,
+        tete: tete({ lang, titre: t(`${nomPage}.titreDocument`), description: t(`${nomPage}.meta`), canonique: absolue(chemin), indexable: false, alternatives: alternativesPage, image: absolue(`/${IMAGE_SITE}`), imageAlt: NOM_DU_SITE }),
+        accueil: urlAccueil(lang),
+        profil: urlProfil(lang),
+        classement: urlClassement(lang),
+        langues: liensLangues(lang, alternativesPage, t),
+        ariane: fil.html,
+      };
+      await ecrire(dossierPublic, chemin, remplir(gabarits[nomPage], valeurs, t, morceaux, `gabarits/${nomPage}.html`));
+    }
   }
 
   // --- Sitemap et robots.txt --------------------------------------------------

@@ -75,16 +75,16 @@ export async function empreinteVisiteur(request, env, bitsV6 = 64) {
 // --- Jeux publiés ------------------------------------------------------------
 // Liste des jeux du catalogue, relue au plus toutes les 5 minutes par instance.
 
-let jeuxConnus = null;   // Map id → titre (français)
+let jeuxConnus = null;   // Map id → entrée du catalogue (title, etoiles, sans_fin, multijoueur…)
 let jeuxConnusLe = 0;
 
 // Map des jeux publiés, ou null si le catalogue est illisible.
-async function lireJeux(env, request) {
+export async function lireJeux(env, request) {
   if (!jeuxConnus || Date.now() - jeuxConnusLe > 300000) {
     try {
       const reponse = await env.ASSETS.fetch(new URL('/catalog.json', request.url));
       const catalogue = await reponse.json();
-      jeuxConnus = new Map((catalogue.games || []).map((j) => [j.id, j.title]));
+      jeuxConnus = new Map((catalogue.games || []).map((j) => [j.id, j]));
       jeuxConnusLe = Date.now();
     } catch (erreur) {
       console.error('Catalogue illisible :', erreur);
@@ -103,7 +103,7 @@ export async function jeuExiste(env, request, gameId) {
 // Titre français d'un jeu publié ; null s'il est inconnu ou si le catalogue est illisible.
 export async function titreJeu(env, request, gameId) {
   const jeux = await lireJeux(env, request);
-  return jeux?.get(gameId) ?? null;
+  return jeux?.get(gameId)?.title ?? null;
 }
 
 // --- Turnstile (anti-robot) ----------------------------------------------------

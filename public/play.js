@@ -17,11 +17,16 @@
 // Et le bouton « Signaler » : formulaire public de demandes (/proposer/), avec ce jeu choisi.
 // Et le multijoueur (multijoueur/lanceur.js) : pour un jeu "multijoueur", la
 // connexion au Worker commun, ouverte quand le jeu la demande (message « jel-multi »).
+// Et le profil joueur (profil.js, docs/cadrage-fidelisation.md) : temps de jeu
+// visible (expérience), message « jeu terminé » du jeu (FMG.reportComplete,
+// message « jel-termine ») et ticket d'entrée des parties en ligne ; la
+// pastille du profil est dans la barre du haut (profil-pastille.js).
 // ==========================================================================
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
 import { SCRIPT_SUIVI, suivreJeu, noterErreur, noterFin } from './suivi.js';
+import { suivreTemps, noterTermine, ticketMulti } from './profil.js';
 import { brancherMultijoueur } from './multijoueur/lanceur.js';
 import { urlJeu, urlAccueil, urlProposer } from './chemins.js';
 import {
@@ -223,7 +228,7 @@ async function chargerJeu(jeu) {
   const reponse = await fetch(jeu.play); // ex. « games/saut-obstacles/?v=1 »
   if (!reponse.ok) throw Object.assign(new Error(`HTTP ${reponse.status}`), { statut: reponse.status });
   htmlJeu = await reponse.text();
-  if (jeu.multijoueur) multi = brancherMultijoueur({ jeu, html: htmlJeu, cadre: el.cadre });
+  if (jeu.multijoueur) multi = brancherMultijoueur({ jeu, html: htmlJeu, cadre: el.cadre, ticket: () => ticketMulti(jeu.id) });
   afficherJeu();
 }
 
@@ -241,6 +246,7 @@ function garderPourHorsLigne(jeu) {
 // - « jel-langue » (bouton de langue) : on enregistre le choix et on relance le jeu ;
 // - « jel-erreur » (SCRIPT_SUIVI) : erreur JavaScript, notée pour le suivi ;
 // - « jel-fin » (SCRIPT_SUIVI, FMG.reportEnd) : victoire ou défaite, avec le niveau ;
+// - « jel-termine » (SCRIPT_SUIVI, FMG.reportComplete) : tout le jeu est terminé, avec ses étoiles (profil.js) ;
 // - « jel-sauvegarde » (save.js) : progression du jeu à garder sur l'appareil ;
 // - « jel-multi » (multijoueur/moteur.js) : partie en ligne d'un jeu multijoueur.
 addEventListener('message', (evenement) => {
@@ -257,6 +263,10 @@ addEventListener('message', (evenement) => {
   }
   if (donnees?.type === 'jel-fin') {
     noterFin({ completed: donnees.completed === true, level: donnees.level });
+    return;
+  }
+  if (donnees?.type === 'jel-termine') {
+    if (jeuCourant) noterTermine(jeuCourant.id, donnees.stars, donnees.maxStars);
     return;
   }
   if (donnees?.type === 'jel-sauvegarde' && typeof donnees.cle === 'string') {
@@ -317,6 +327,7 @@ async function demarrer() {
     return;
   }
   suivreJeu(jeu.id);
+  suivreTemps(jeu.id);
   mesurer('game_start');
   garderPourHorsLigne(jeu);
   activerVotes(jeu.id);

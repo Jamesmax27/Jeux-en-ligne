@@ -26,6 +26,9 @@
 #   - fonctions Cloudflare,  → tests des statistiques de jeu (scripts/tester-stats.mjs :
 #     suivi des parties        collecte, calcul par jour, onglet « Stats » ; avec le
 #     (suivi.js, play.js)      lanceur dans le navigateur si suivi.js ou play.js changent).
+#   - profil joueur          → tests du profil (scripts/tester-profil.mjs : code de
+#     (fonctions, réglages,    sauvegarde, expérience, étoiles, anti-triche, classement ;
+#     Worker)                  sans navigateur ni réseau) ;
 #   - multijoueur (Worker,   → parties simulées, Worker avec de faux Durable Objects et jeux
 #     moteur, lanceur ou jeu   multijoueurs dans le lanceur (scripts/tester-multijoueur.mjs
 #     multijoueur)             --navigateur, docs/multijoueur.md) ; moteur modifié : les jeux
@@ -92,6 +95,11 @@ on:
       - "scripts/moderation.mjs"
       - "scripts/tester-demandes.mjs"
       - "scripts/tester-stats.mjs"
+      - "scripts/tester-profil.mjs"
+      - "scripts/d1-local.mjs"
+      - "scripts/etoiles-jeu.mjs"
+      - "public/profil*.js"
+      - "public/classement.js"
       - "scripts/multijoueur.mjs"
       - "scripts/tester-multijoueur.mjs"
       - "schema.sql"
@@ -119,6 +127,7 @@ jobs:
       demandes: ${{ steps.quoi.outputs.demandes }}
       stats: ${{ steps.quoi.outputs.stats }}
       multi: ${{ steps.quoi.outputs.multi }}
+      profil: ${{ steps.quoi.outputs.profil }}
       jeux: ${{ steps.quoi.outputs.jeux }}
       lots: ${{ steps.quoi.outputs.lots }}
     steps:
@@ -160,7 +169,7 @@ jobs:
           # Textes, taxonomie, gabarits (textes des catégories compris), générateur
           # des pages et pages du site : le site est testé avec un seul jeu.
           site=0
-          if printf '%s\n' "$fichiers" | grep -Eq '^(public/i18n/|gabarits/|public/(taxonomie|chemins|app|langue|play|suivi|sw|consentement|mesure|pub|votes|turnstile|proposer|demandes-regles)\.js$|public/play\.html$|public/_headers$|scripts/(build-catalog|pages-seo)\.mjs$)'; then site=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(public/i18n/|gabarits/|public/(taxonomie|chemins|app|langue|play|suivi|sw|consentement|mesure|pub|votes|turnstile|proposer|demandes-regles|profil[a-z-]*|classement)\.js$|public/play\.html$|public/_headers$|scripts/(build-catalog|pages-seo)\.mjs$)'; then site=1; fi
           # Statistiques de jeu : fonctions Cloudflare, migration, tests (sans navigateur) ;
           # suivi des parties du lanceur : aussi dans le navigateur.
           stats=0
@@ -171,6 +180,11 @@ jobs:
           demandes=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then demandes=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|public/(demandes-regles|taxonomie)\.js$|scripts/(moderation|tester-demandes)\.mjs$|schema\.sql$)'; then demandes=1; fi
+          # Profil joueur (docs/cadrage-fidelisation.md) : fonctions, réglages, code de
+          # sauvegarde, Worker multijoueur (ticket, résultats) : tests sans navigateur.
+          profil=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then profil=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/profil[a-z-]*\.js$|multijoueur/src/|scripts/(tester-profil|d1-local)\.mjs$)'; then profil=1; fi
           # Référencement de tout le site : tout ce qui précède, plus les règles et
           # le vérificateur du référencement (sans navigateur).
           seo=0
@@ -198,10 +212,11 @@ jobs:
             echo "demandes=$demandes"
             echo "stats=$stats"
             echo "multi=$multi"
+            echo "profil=$profil"
             echo "jeux=$jeux"
             echo "lots=$lots_json"
           } >> "$GITHUB_OUTPUT"
-          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats | multijoueur : $multi | jeux à tester : $nb sur $lots machine(s)"
+          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats | multijoueur : $multi | profil : $profil | jeux à tester : $nb sur $lots machine(s)"
 
   # 2. Les jeux dans le navigateur, partagés entre plusieurs machines en même
   #    temps (un jeu sur LOTS_MAX chacune) : robot, sauvegarde, traductions.
@@ -346,6 +361,14 @@ jobs:
           else
             node scripts/tester-stats.mjs
           fi
+
+      # Profil joueur (functions/api/profil.js, classement.js, profil-multi.js,
+      # functions/_profil.js, Worker : ticket et résultats) : code de sauvegarde,
+      # expérience, séries, étoiles, anti-triche multijoueur, classement,
+      # indicateurs ; base SQLite en mémoire, faux Turnstile. Voir docs/cadrage-fidelisation.md.
+      - name: Contrôler le profil joueur
+        if: needs.quoi.outputs.profil == '1'
+        run: node scripts/tester-profil.mjs
 
       # Multijoueur (docs/multijoueur.md) : moteur et Worker (faux Durable Objects),
       # parties simulées de chaque jeu multijoueur, puis chacun dans le lanceur avec un

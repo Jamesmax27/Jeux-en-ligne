@@ -152,6 +152,10 @@ async function lireJeu(nomDossier) {
     ...(langues.length ? { langues } : {}),
     // Jeu multijoueur (docs/multijoueur.md) : rubrique « Multijoueur » et étiquette « Multi » du catalogue.
     ...(fiche.multijoueur === true ? { multijoueur: true, places: Number.isInteger(fiche.places) ? fiche.places : null } : {}),
+    // Profil joueur (docs/cadrage-fidelisation.md) : étoiles possibles du jeu (le serveur
+    // refuse un message « jeu terminé » qui en annonce un autre nombre) ; jeu sans fin.
+    ...(Number.isInteger(fiche.etoiles) && fiche.etoiles > 0 ? { etoiles: fiche.etoiles } : {}),
+    ...(fiche.sans_fin === true ? { sans_fin: true } : {}),
     genre,
     genres_secondaires: genresSecondaires,
     univers,

@@ -58,9 +58,49 @@ async function redirection(chemin) {
 
 const CSP_JEUX = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; worker-src blob:; connect-src 'none'; form-action 'none'; base-uri 'none'";
 
+// Profil joueur et classement (functions/api/profil.js, classement.js) : en
+// local, les vraies fonctions tournent avec une base SQLite en mémoire
+// (scripts/d1-local.mjs), vidée à l'arrêt du serveur. Sans TURNSTILE_SECRET ni
+// MULTI_SECRET : code de sauvegarde à retrouver et ticket multijoueur
+// indisponibles (503), le reste marche ; sans adresse IP : pas de limite par
+// adresse (créations de profils, de codes…).
+let apiLocale = null;
+async function appelerApiLocale(req, res, url) {
+  if (!apiLocale) {
+    apiLocale = (async () => {
+      const { baseD1 } = await import('./d1-local.mjs');
+      const fonctions = path.join(RACINE, '..', 'functions', 'api');
+      const charger = async (nom) => (await import(new URL(`file:///${path.join(fonctions, nom).replace(/\\/g, '/')}`).href)).onRequestPost;
+      return {
+        env: {
+          DB: baseD1(),
+          IP_SALT: 'sel-local',
+          ASSETS: { fetch: async () => new Response(await readFile(path.join(RACINE, 'catalog.json'))) },
+        },
+        '/api/profil': await charger('profil.js'),
+        '/api/classement': await charger('classement.js'),
+      };
+    })();
+  }
+  const api = await apiLocale;
+  const corps = await new Promise((ok) => { const morceaux = []; req.on('data', (m) => morceaux.push(m)); req.on('end', () => ok(Buffer.concat(morceaux))); });
+  // Sans adresse IP (pas d'en-tête CF-Connecting-IP en local) : pas d'empreinte, donc
+  // pas de limite par adresse (le robot ouvre chaque jeu dans un navigateur neuf).
+  const entetes = { ...req.headers };
+  const requete = new Request(new URL(url.pathname, `http://${req.headers.host}`), { method: req.method, headers: entetes, body: req.method === 'POST' ? corps : undefined });
+  const reponse = await api[url.pathname]({ request: requete, env: api.env, waitUntil: () => {} });
+  res.writeHead(reponse.status, Object.fromEntries(reponse.headers)).end(Buffer.from(await reponse.arrayBuffer()));
+}
+
 createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+
+    if (url.pathname === '/api/profil' || url.pathname === '/api/classement') {
+      if (req.method !== 'POST') { res.writeHead(405).end(); return; }
+      await appelerApiLocale(req, res, url);
+      return;
+    }
 
     // Suivi des parties (functions/api/) : en local, rien n'est enregistré et
     // les Tendances sont vides (la section reste cachée), sauf TENDANCES_EXEMPLE=1.

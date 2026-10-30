@@ -18,7 +18,12 @@
 // le serveur refuse une version qu'il ne connaît pas (jeu mis à jour avant le
 // Worker), et le jeu se joue alors contre des robots locaux.
 // Rien de personnel n'est envoyé : l'identifiant du jeu, l'empreinte de ses
-// règles et les coups joués.
+// règles, les coups joués et, si le joueur a un profil, un ticket d'entrée
+// signé par le site après Turnstile (numéro du profil, jeu, expiration) :
+// envoyé par le lanceur dès l'ouverture ({ t: 'profil', ticket }), il permet
+// au serveur de créditer ce profil à la fin de chaque manche
+// (docs/cadrage-fidelisation.md, section 8). Sans ticket, la partie se joue
+// de la même façon, sans gain pour le profil.
 // ==========================================================================
 
 import { ADRESSE_MULTI, SITES_MULTI } from './config.js';
@@ -55,8 +60,9 @@ function adresseServeur() {
 }
 
 // À appeler une fois le jeu chargé. jeu : fiche du catalogue ; html : code du
-// jeu ; cadre : l'iframe. Renvoie { recevoir(message du jeu), fermer() }.
-export function brancherMultijoueur({ jeu, html, cadre }) {
+// jeu ; cadre : l'iframe ; ticket : fonction facultative qui renvoie (promesse)
+// le ticket du profil joueur ou null. Renvoie { recevoir(message du jeu), fermer() }.
+export function brancherMultijoueur({ jeu, html, cadre, ticket }) {
   let ws = null;
   let ping = 0;
   let cacheeDepuis = 0;
@@ -94,9 +100,16 @@ export function brancherMultijoueur({ jeu, html, cadre }) {
     }
     ws = socket;
     let ouverte = false;
+    // Ticket du profil, demandé en même temps que la connexion (Turnstile peut prendre quelques secondes) ;
+    // seulement avec le vrai serveur (pas avec un serveur de test local, où Turnstile refuse le site).
+    const avecTicket = typeof ticket === 'function' && adresse === ADRESSE_MULTI;
+    const attenteTicket = avecTicket ? Promise.resolve().then(ticket).catch(() => null) : Promise.resolve(null);
     socket.onopen = () => {
       ouverte = true;
       ping = setInterval(() => { try { socket.send('ping'); } catch { /* fermée */ } }, PING_MS);
+      attenteTicket.then((t) => {
+        if (t && socket === ws && socket.readyState === 1) socket.send(JSON.stringify({ t: 'profil', ticket: t }));
+      });
     };
     socket.onmessage = (e) => {
       if (socket !== ws || typeof e.data !== 'string' || e.data.length > RECU_MAX || e.data === 'pong') return;

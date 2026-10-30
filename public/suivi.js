@@ -52,6 +52,15 @@ const VISITEUR_DUREE_MS = 395 * 86400000;  // 13 mois, puis un nouvel identifian
 //   niveau joué (ou le score d'un jeu sans niveaux). Il peut être appelé
 //   plusieurs fois : le lanceur garde le plus haut niveau et « terminé » dès
 //   qu'une victoire est signalée. Ne lève jamais d'erreur.
+// - fournit window.FMG.reportComplete({ stars, maxStars }) : message « jeu
+//   terminé » du profil joueur (docs/cadrage-fidelisation.md, section 5),
+//   envoyé seulement quand TOUT le jeu est terminé (tous ses niveaux gagnés
+//   au moins une fois) ; stars = étoiles obtenues au total (meilleur résultat
+//   de chaque niveau), maxStars = étoiles possibles ; un jeu sans étoiles
+//   appelle reportComplete({}). Rappelé après une nouvelle victoire d'un jeu
+//   déjà terminé, il transmet le nouveau total (le site garde le meilleur).
+//   Message « jel-termine » vers le lanceur (public/profil.js) ; un même
+//   total n'est envoyé qu'une fois.
 export const SCRIPT_SUIVI = `<script>(function () {
   var envoyees = 0;
   function signaler(texte) {
@@ -76,6 +85,19 @@ export const SCRIPT_SUIVI = `<script>(function () {
       if (cle === derniere) return;
       derniere = cle;
       parent.postMessage(fin, '*');
+    } catch (e) {}
+  };
+  var dejaTermine = '';
+  window.FMG.reportComplete = function (r) {
+    try {
+      r = r || {};
+      var s = Number(r.stars), m = Number(r.maxStars);
+      var avec = r.maxStars != null && isFinite(m) && isFinite(s);
+      var msg = { type: 'jel-termine', stars: avec ? Math.round(s) : null, maxStars: avec ? Math.round(m) : null };
+      var cle = msg.stars + '/' + msg.maxStars;
+      if (cle === dejaTermine) return;
+      dejaTermine = cle;
+      parent.postMessage(msg, '*');
     } catch (e) {}
   };
 })();</script>`;
