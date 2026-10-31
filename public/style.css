@@ -742,8 +742,12 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   grid-column: span 12;
 }
 
-.tuiles:empty { min-height: 69px; }  /* tuile de 60 px (planète comprise) + 2 × 4 px */
-.rangee:empty { min-height: 64px; }   /* puce de 52 px + 2 × 6 px (68 px dès 720 px, plus bas) */
+.tuiles:empty { min-height: 74px; }  /* tuile de 66 px (planète comprise) + 2 × 4 px ; 76 px dès 720 px */
+
+@media (min-width: 720px) {
+  .tuiles:empty { min-height: 76px; }
+}
+.rangee:empty { min-height: 68px; }   /* puce de 56 px + 2 × 6 px (72 px dès 720 px, plus bas) */
 
 /* Le rembourrage vertical laisse la place au contour de focus (5 px) ; celui
    de droite sort la dernière jaquette du fondu, et le retrait de droite
@@ -886,8 +890,8 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   justify-content: center;
   gap: 0;
   min-width: 0;
-  min-height: 60px;
-  padding: 4px 2px;              /* 4 raccourcis sur 390 px : les petits textes passent sur 2 lignes */
+  min-height: 64px;
+  padding: 6px 2px 5px;          /* 4 raccourcis sur 390 px : les petits textes passent sur 2 lignes */
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
   background: var(--verre);
@@ -1040,8 +1044,8 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   align-items: baseline;
   column-gap: 3px;
   row-gap: 3px;
-  min-height: 52px;              /* zone de toucher de 44 px au moins */
-  padding: 4px 9px 5px;
+  min-height: 56px;              /* zone de toucher de 44 px au moins */
+  padding: 5px 9px;              /* même écart au-dessus de la planète et sous le texte */
   border: 1px solid oklch(var(--l-contour) var(--c) var(--teinte));
   border-radius: var(--r-commande);
   background: oklch(.25 var(--c-fond) var(--teinte) / .74);   /* verre teinté */
@@ -1120,12 +1124,12 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
    sur une ligne (en dessous, ou dans une langue aux mots longs, elle défile). */
 @media (min-width: 720px) {
   .rangee { gap: 4px; }
-  .rangee:empty { min-height: 68px; }
+  .rangee:empty { min-height: 72px; }
   .puce-filtre {
     flex: 1 0 auto;
     column-gap: 2px;
-    min-height: 56px;
-    padding: 4px 5px 5px;
+    min-height: 60px;
+    padding: 5px 5px;
   }
   .puce-filtre-picto { font-size: 24px; }
 }
@@ -4228,8 +4232,8 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
   pointer-events: none;
 }
 
-/* Tuiles : la figure est centrée sur l'icône (24 ou 26 px, centre à 14 px
-   du haut : le contenu remplit toujours la tuile). */
+/* Tuiles : la figure est centrée sur l'icône (planète de 26 ou 28 px, centre
+   à 20 px du haut : le contenu remplit toujours la tuile). */
 .tuile {
   --fmg-constellation: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='30' viewBox='0 0 64 30'%3E%3Cpath transform='translate(10.5 1.5) scale(.5)' d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23f2effa'/%3E%3Ccircle cx='48.5' cy='4.5' r='2.42' fill='%23f2effa' fill-opacity='.14'/%3E%3Ccircle cx='48.5' cy='4.5' r='1.05' fill='%23f2effa'/%3E%3Ccircle cx='51.5' cy='17' r='0.85' fill='%23f2effa'/%3E%3C/svg%3E");
   --fmg-etincelle-or: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='30' viewBox='0 0 64 30'%3E%3Cpath transform='translate(10.5 1.5) scale(.5)' d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23ffd88a' stroke='%230e0c24' stroke-width='2.2' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E");
@@ -4238,7 +4242,7 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 .tuile::before {
   content: "";
   position: absolute;
-  top: 0;
+  top: 5px;
   left: 50%;
   width: 64px;
   height: 30px;
@@ -4340,9 +4344,12 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
    changent pas ; seules leurs couleurs sont reprises ici (masse sombre de
    la même teinte, trait craie). L'image du détail « extra » (fond du span,
    seulement pendant l'animation) passe devant la planète.
-   Tailles : puces 28 px (30 px dès 720 px), comme avant ; tuiles 28 px
-   (30 px), dont 26 px comptent dans la hauteur (les tuiles grandissent de
-   6 px, place gardée : .tuiles:empty).
+   Tailles : puces 28 px (30 px dès 720 px), tuiles 26 px (28 px). La
+   planète compte entièrement dans la hauteur (marge nulle, au lieu des
+   marges négatives du bloc généré) : elle ne touche jamais le bord du haut,
+   et l'écart au-dessus d'elle vaut celui sous le texte. Puces de 56 px
+   (60 px), tuiles de 64 px au moins ; places gardées : .rangee:empty et
+   .tuiles:empty.
    -------------------------------------------------------------------------- */
 
 @supports ((-webkit-mask-image: none) or (mask-image: none)) {
@@ -4365,6 +4372,7 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
    claire, la planète garde ses couleurs (elle se détache, un peu plus
    soutenue). */
 .puce-filtre {
+  --ico-marge: 0px;
   --planete: oklch(.7 calc(var(--c) + .06) var(--teinte));
   --ico-couleur-fond: oklch(.46 calc(var(--c) + .07) var(--teinte));
   --ico-couleur-trait: var(--craie);
@@ -4379,8 +4387,8 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 /* Raccourcis : planètes lilas (ce qu'on touche). Âges : une teinte par
    tranche, du chaud au froid (--ico-teinte-age, bloc généré). */
 .tuile {
-  --ico-taille: 28px;
-  --ico-marge: -1px;
+  --ico-taille: 26px;
+  --ico-marge: 0px;
   --planete: #a897f5;
   --ico-couleur-fond: #5845c2;
   --ico-couleur-trait: var(--craie);
@@ -4392,7 +4400,8 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 }
 
 @media (min-width: 720px) {
-  .tuile { --ico-taille: 30px; --ico-marge: -2px; }
+  .puce-filtre { --ico-marge: 0px; }
+  .tuile { --ico-taille: 28px; --ico-marge: 0px; }
 }
 
 /* « 0 jeu » : planète éteinte. « Bientôt » : planète ardoise, immobile ;
