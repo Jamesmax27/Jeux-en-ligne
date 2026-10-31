@@ -1,0 +1,3342 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le bus des passagers à compter</title>
+<script type="application/json" id="jel-i18n-textes" data-place="langue-titre langue-pause">
+{
+ "fr": {
+  "titre": "Le bus des passagers à compter",
+  "consigne": "Regarde les passagers monter et descendre, puis dis combien il y en a à bord avant de repartir !",
+  "jouer": "Jouer",
+  "lignes": "Lignes",
+  "album": "Album et garage",
+  "retour": "Retour",
+  "son.couper": "Couper le son",
+  "son.remettre": "Remettre le son",
+  "pause.aria": "Pause",
+  "klaxon.aria": "Klaxonner",
+  "pause.titre": "Pause",
+  "reprendre": "Reprendre",
+  "recommencer": "Recommencer",
+  "accueil": "Accueil",
+  "lignes.titre": "Choisis ta ligne",
+  "ligne": "Ligne {n}",
+  "ligneAria": "Ligne {n}, {etoiles}",
+  "ligneFermee": "Ligne {n} : fermée",
+  "etoilesN": {
+   "one": "{n} étoile",
+   "other": "{n} étoiles"
+  },
+  "vehicule.bus": "Petit bus",
+  "vehicule.minibus": "Minibus",
+  "vehicule.etage": "Bus à étage",
+  "vehicule.tram": "Tramway",
+  "vehicule.car": "Car de montagne",
+  "hud.arret": "Arrêt {n} / {total}",
+  "hud.abord": "À bord : {n}",
+  "hud.haut": "En haut : {n}",
+  "hud.places": "Places : {n}",
+  "hud.tickets": "Tickets : {n}",
+  "hud.chances": "Chances : {n}",
+  "obs.arrivee": "Le bus arrive à l'arrêt… Regarde bien !",
+  "obs.descente": "Des passagers descendent…",
+  "obs.montee": "Des passagers montent…",
+  "obs.depart": "En route !",
+  "obs.deuxieme": "Un deuxième bus arrive pour les autres !",
+  "obs.terminus": "Terminus ! Tout le monde descend.",
+  "obs.corresp": "Correspondance : le train attend à la gare !",
+  "obs.monnaie": "Un passager achète son ticket.",
+  "q.total": "Combien de passagers à bord maintenant ?",
+  "q.haut": "Combien de passagers à l'étage du haut ?",
+  "q.places": "Tout le monde pourra-t-il monter, ou faut-il un deuxième bus ?",
+  "q.trottoir": "Combien de passagers vont rester sur le trottoir ?",
+  "q.monnaie": "Le ticket coûte {prix}. {nom} donne {donne}. Combien de pièces rends-tu ?",
+  "q.change": "Combien de voyageurs ont changé de véhicule en tout ?",
+  "pieces": {
+   "one": "{n} pièce",
+   "other": "{n} pièces"
+  },
+  "noms": "Zoé,Malo,Inès,Hugo,Lila,Nour,Timéo,Jade",
+  "r.oui": "Il faut un 2e bus",
+  "r.non": "Tout le monde rentre",
+  "valider": "Valider",
+  "plus": "Un de plus",
+  "moins": "Un de moins",
+  "compteur": "Ton nombre : {n}",
+  "bravo1": "Bravo !",
+  "bravo2": "Exact !",
+  "bravo3": "Bien compté !",
+  "bravo4": "Super chauffeur !",
+  "ticketGagne": "+1 ticket",
+  "oups": "Oups ! C'était {n}.",
+  "oupsOui": "Oups ! Il fallait un deuxième bus.",
+  "oupsNon": "Oups ! Tout le monde pouvait monter.",
+  "calc.total": "{depart} + {montes} − {descendus} = {total}",
+  "calc.plus": "{depart} + {montes} = {total}",
+  "calc.change": "{descendus} + {montes} = {total}",
+  "calc.trottoir": "{attente} − {libres} = {reste}",
+  "calc.monnaie": "{donne} − {prix} = {rendu}",
+  "calc.places": "Passagers qui attendent : {attente} · Places libres : {libres}",
+  "tuto.titre": "Comment jouer",
+  "nouveau": "Nouveau !",
+  "compris": "J'ai compris !",
+  "tuto.passer": "Touche l'écran pour passer",
+  "tuto.base1": "Le bus s'arrête : regarde bien les passagers.",
+  "tuto.base2": "Compte ceux qui montent dans le bus.",
+  "tuto.base3": "Touche le bon nombre pour repartir !",
+  "m.descente": "Maintenant, des passagers descendent aussi : enlève-les du compte !",
+  "m.compteur": "Règle le compteur avec les flèches, puis touche la coche verte pour valider.",
+  "m.portes": "Vitres teintées ! Tu ne vois plus l'intérieur : pars du nombre « À bord » et calcule de tête.",
+  "m.vehicule": "Nouveau véhicule : {nom} !",
+  "m.groupes2": "Des familles montent par 2 en se tenant la main : compte de 2 en 2 !",
+  "m.groupes5": "Une classe en sortie : 5 enfants d'un coup ! Compte de 5 en 5.",
+  "m.places": "Le minibus n'a que {n} places. Regarde les sièges libres : faut-il un deuxième bus ?",
+  "m.trottoir": "Plus de monde que de places ! Combien vont rester sur le trottoir ?",
+  "m.etage": "Compte en haut, compte en bas, puis additionne !",
+  "m.haut": "L'étage du haut est caché : surveille l'escalier pour savoir qui monte et qui descend.",
+  "m.monnaie": "Un passager paie son ticket avec trop de pièces : rends-lui la monnaie !",
+  "m.deuxPortes": "Le tramway a deux portes : surveille les deux en même temps !",
+  "m.corresp": "À la gare, des voyageurs passent du car au train, et du train au car.",
+  "fin.victoire": "Terminus ! Ligne {n} réussie",
+  "fin.defaite": "Le bus rentre au dépôt",
+  "fin.defaiteTexte": "Trois erreurs : on réessaie cette ligne ?",
+  "fin.tickets": "Tickets gagnés : {n} sur {max}",
+  "fin.record": "Nouveau record !",
+  "fin.recordAncien": "Record : {n}",
+  "fin.debloque": "Nouveau dans le garage : {liste}",
+  "fin.jeuFini": "Bravo ! Tu as conduit les {lignes} lignes ! Étoiles : {n} sur {max}",
+  "suivant": "Ligne suivante",
+  "rejouer": "Rejouer",
+  "reessayer": "Réessayer",
+  "album.tickets": "Tickets collectionnés : {n}",
+  "album.lignes": "Mes tickets, ligne par ligne",
+  "album.couleurs": "Couleurs du bus",
+  "album.klaxons": "Klaxons",
+  "album.casquettes": "Casquettes du chauffeur",
+  "album.bloque": {
+   "one": "Encore {n} ticket",
+   "other": "Encore {n} tickets"
+  },
+  "album.choisi": "Choisi",
+  "album.ligneTickets": "{t} sur {max}",
+  "couleur.jaune": "Jaune soleil",
+  "couleur.rouge": "Rouge pompier",
+  "couleur.bleu": "Bleu ciel",
+  "couleur.vert": "Vert pomme",
+  "couleur.violet": "Violet prune",
+  "couleur.rose": "Rose bonbon",
+  "couleur.orange": "Orange vif",
+  "klaxon.tut": "Tut-tut",
+  "klaxon.pouet": "Pouet-pouet",
+  "klaxon.trompette": "Trompette",
+  "klaxon.sifflet": "Sifflet",
+  "klaxon.cloche": "Clochette",
+  "klaxon.corne": "Corne des montagnes",
+  "casquette.marine": "Casquette marine",
+  "casquette.rouge": "Casquette rouge",
+  "casquette.etoile": "Casquette étoilée",
+  "casquette.carreaux": "Casquette à carreaux",
+  "casquette.helice": "Casquette à hélice",
+  "casquette.montagne": "Chapeau de montagne"
+ },
+ "en": {
+  "titre": "Count the Bus Passengers",
+  "consigne": "Watch the passengers get on and off, then say how many are on board before you drive away!",
+  "jouer": "Play",
+  "lignes": "Routes",
+  "album": "Album and garage",
+  "retour": "Back",
+  "son.couper": "Mute sound",
+  "son.remettre": "Turn sound on",
+  "pause.aria": "Pause",
+  "klaxon.aria": "Honk the horn",
+  "pause.titre": "Pause",
+  "reprendre": "Resume",
+  "recommencer": "Restart",
+  "accueil": "Home",
+  "lignes.titre": "Choose your route",
+  "ligne": "Route {n}",
+  "ligneAria": "Route {n}, {etoiles}",
+  "ligneFermee": "Route {n}: locked",
+  "etoilesN": {
+   "one": "{n} star",
+   "other": "{n} stars"
+  },
+  "vehicule.bus": "Little bus",
+  "vehicule.minibus": "Minibus",
+  "vehicule.etage": "Double-decker",
+  "vehicule.tram": "Tram",
+  "vehicule.car": "Mountain coach",
+  "hud.arret": "Stop {n} / {total}",
+  "hud.abord": "On board: {n}",
+  "hud.haut": "Upstairs: {n}",
+  "hud.places": "Seats: {n}",
+  "hud.tickets": "Tickets: {n}",
+  "hud.chances": "Chances: {n}",
+  "obs.arrivee": "The bus pulls into the stop… Watch closely!",
+  "obs.descente": "Some passengers are getting off…",
+  "obs.montee": "Some passengers are getting on…",
+  "obs.depart": "Off we go!",
+  "obs.deuxieme": "A second bus is coming for the others!",
+  "obs.terminus": "Last stop! Everybody off.",
+  "obs.corresp": "Connection: the train is waiting at the station!",
+  "obs.monnaie": "A passenger is buying a ticket.",
+  "q.total": "How many passengers are on board now?",
+  "q.haut": "How many passengers are upstairs?",
+  "q.places": "Can everyone get on, or do we need a second bus?",
+  "q.trottoir": "How many passengers will stay on the sidewalk?",
+  "q.monnaie": "The ticket costs {prix}. {nom} gives {donne}. How many coins do you give back?",
+  "q.change": "How many travelers changed vehicles in all?",
+  "pieces": {
+   "one": "{n} coin",
+   "other": "{n} coins"
+  },
+  "noms": "Zoe,Milo,Ines,Hugo,Lila,Noor,Theo,Jade",
+  "r.oui": "We need a 2nd bus",
+  "r.non": "Everyone fits",
+  "valider": "Check",
+  "plus": "One more",
+  "moins": "One less",
+  "compteur": "Your number: {n}",
+  "bravo1": "Well done!",
+  "bravo2": "Exactly!",
+  "bravo3": "Great counting!",
+  "bravo4": "Super driver!",
+  "ticketGagne": "+1 ticket",
+  "oups": "Oops! It was {n}.",
+  "oupsOui": "Oops! A second bus was needed.",
+  "oupsNon": "Oops! Everyone could get on.",
+  "calc.total": "{depart} + {montes} − {descendus} = {total}",
+  "calc.plus": "{depart} + {montes} = {total}",
+  "calc.change": "{descendus} + {montes} = {total}",
+  "calc.trottoir": "{attente} − {libres} = {reste}",
+  "calc.monnaie": "{donne} − {prix} = {rendu}",
+  "calc.places": "Passengers waiting: {attente} · Free seats: {libres}",
+  "tuto.titre": "How to play",
+  "nouveau": "New!",
+  "compris": "Got it!",
+  "tuto.passer": "Tap the screen to skip",
+  "tuto.base1": "The bus stops: watch the passengers closely.",
+  "tuto.base2": "Count the ones who get on the bus.",
+  "tuto.base3": "Tap the right number to drive on!",
+  "m.descente": "Now some passengers get off too: take them away from your count!",
+  "m.compteur": "Set the counter with the arrows, then tap the green tick to check.",
+  "m.portes": "Tinted windows! You can't see inside anymore: start from the “On board” number and work it out in your head.",
+  "m.vehicule": "New vehicle: {nom}!",
+  "m.groupes2": "Families get on in pairs, holding hands: count by 2s!",
+  "m.groupes5": "A school trip: 5 children at once! Count by 5s.",
+  "m.places": "The minibus has only {n} seats. Look at the free seats: do we need a second bus?",
+  "m.trottoir": "More people than seats! How many will stay on the sidewalk?",
+  "m.etage": "Count upstairs, count downstairs, then add them up!",
+  "m.haut": "The top deck is hidden: watch the stairs to see who goes up and who comes down.",
+  "m.monnaie": "A passenger pays for a ticket with too many coins: give back the change!",
+  "m.deuxPortes": "The tram has two doors: watch both at the same time!",
+  "m.corresp": "At the station, travelers switch from the coach to the train, and from the train to the coach.",
+  "fin.victoire": "Last stop! Route {n} complete",
+  "fin.defaite": "The bus goes back to the depot",
+  "fin.defaiteTexte": "Three mistakes: shall we try this route again?",
+  "fin.tickets": "Tickets earned: {n} out of {max}",
+  "fin.record": "New record!",
+  "fin.recordAncien": "Record: {n}",
+  "fin.debloque": "New in the garage: {liste}",
+  "fin.jeuFini": "Well done! You drove all {lignes} routes! Stars: {n} out of {max}",
+  "suivant": "Next route",
+  "rejouer": "Play again",
+  "reessayer": "Try again",
+  "album.tickets": "Tickets collected: {n}",
+  "album.lignes": "My tickets, route by route",
+  "album.couleurs": "Bus colors",
+  "album.klaxons": "Horns",
+  "album.casquettes": "Driver caps",
+  "album.bloque": {
+   "one": "{n} more ticket",
+   "other": "{n} more tickets"
+  },
+  "album.choisi": "Chosen",
+  "album.ligneTickets": "{t} out of {max}",
+  "couleur.jaune": "Sunny yellow",
+  "couleur.rouge": "Fire-engine red",
+  "couleur.bleu": "Sky blue",
+  "couleur.vert": "Apple green",
+  "couleur.violet": "Plum purple",
+  "couleur.rose": "Candy pink",
+  "couleur.orange": "Bright orange",
+  "klaxon.tut": "Toot-toot",
+  "klaxon.pouet": "Honk-honk",
+  "klaxon.trompette": "Trumpet",
+  "klaxon.sifflet": "Whistle",
+  "klaxon.cloche": "Little bell",
+  "klaxon.corne": "Mountain horn",
+  "casquette.marine": "Navy cap",
+  "casquette.rouge": "Red cap",
+  "casquette.etoile": "Star cap",
+  "casquette.carreaux": "Checkered cap",
+  "casquette.helice": "Propeller cap",
+  "casquette.montagne": "Mountain hat"
+ },
+ "es": {
+  "titre": "Cuenta los pasajeros del autobús",
+  "consigne": "Mira a los pasajeros subir y bajar, y luego di cuántos van a bordo antes de arrancar.",
+  "jouer": "Jugar",
+  "lignes": "Líneas",
+  "album": "Álbum y garaje",
+  "retour": "Volver",
+  "son.couper": "Quitar el sonido",
+  "son.remettre": "Poner el sonido",
+  "pause.aria": "Pausa",
+  "klaxon.aria": "Tocar la bocina",
+  "pause.titre": "Pausa",
+  "reprendre": "Seguir",
+  "recommencer": "Empezar de nuevo",
+  "accueil": "Inicio",
+  "lignes.titre": "Elige tu línea",
+  "ligne": "Línea {n}",
+  "ligneAria": "Línea {n}, {etoiles}",
+  "ligneFermee": "Línea {n}: cerrada",
+  "etoilesN": {
+   "one": "{n} estrella",
+   "other": "{n} estrellas"
+  },
+  "vehicule.bus": "Autobús pequeño",
+  "vehicule.minibus": "Minibús",
+  "vehicule.etage": "Autobús de dos pisos",
+  "vehicule.tram": "Tranvía",
+  "vehicule.car": "Autocar de montaña",
+  "hud.arret": "Parada {n} / {total}",
+  "hud.abord": "A bordo: {n}",
+  "hud.haut": "Arriba: {n}",
+  "hud.places": "Asientos: {n}",
+  "hud.tickets": "Boletos: {n}",
+  "hud.chances": "Oportunidades: {n}",
+  "obs.arrivee": "El autobús llega a la parada… ¡Mira bien!",
+  "obs.descente": "Unos pasajeros bajan…",
+  "obs.montee": "Unos pasajeros suben…",
+  "obs.depart": "¡En marcha!",
+  "obs.deuxieme": "¡Llega un segundo autobús para los demás!",
+  "obs.terminus": "¡Última parada! Todos abajo.",
+  "obs.corresp": "Transbordo: ¡el tren espera en la estación!",
+  "obs.monnaie": "Un pasajero compra su boleto.",
+  "q.total": "¿Cuántos pasajeros hay a bordo ahora?",
+  "q.haut": "¿Cuántos pasajeros hay en el piso de arriba?",
+  "q.places": "¿Podrán subir todos o hace falta un segundo autobús?",
+  "q.trottoir": "¿Cuántos pasajeros se quedarán en la acera?",
+  "q.monnaie": "El boleto cuesta {prix}. {nom} da {donne}. ¿Cuántas monedas devuelves?",
+  "q.change": "¿Cuántos viajeros cambiaron de vehículo en total?",
+  "pieces": {
+   "one": "{n} moneda",
+   "other": "{n} monedas"
+  },
+  "noms": "Zoe,Mateo,Inés,Hugo,Lila,Nur,Tomás,Jade",
+  "r.oui": "Hace falta otro autobús",
+  "r.non": "Caben todos",
+  "valider": "Comprobar",
+  "plus": "Uno más",
+  "moins": "Uno menos",
+  "compteur": "Tu número: {n}",
+  "bravo1": "¡Bravo!",
+  "bravo2": "¡Exacto!",
+  "bravo3": "¡Bien contado!",
+  "bravo4": "¡Súper conductor!",
+  "ticketGagne": "+1 boleto",
+  "oups": "¡Uy! Eran {n}.",
+  "oupsOui": "¡Uy! Hacía falta un segundo autobús.",
+  "oupsNon": "¡Uy! Todos podían subir.",
+  "calc.total": "{depart} + {montes} − {descendus} = {total}",
+  "calc.plus": "{depart} + {montes} = {total}",
+  "calc.change": "{descendus} + {montes} = {total}",
+  "calc.trottoir": "{attente} − {libres} = {reste}",
+  "calc.monnaie": "{donne} − {prix} = {rendu}",
+  "calc.places": "Pasajeros esperando: {attente} · Asientos libres: {libres}",
+  "tuto.titre": "Cómo jugar",
+  "nouveau": "¡Nuevo!",
+  "compris": "¡Entendido!",
+  "tuto.passer": "Toca la pantalla para saltar",
+  "tuto.base1": "El autobús se detiene: mira bien a los pasajeros.",
+  "tuto.base2": "Cuenta los que suben al autobús.",
+  "tuto.base3": "¡Toca el número correcto para seguir!",
+  "m.descente": "Ahora también bajan pasajeros: ¡réstalos de la cuenta!",
+  "m.compteur": "Ajusta el contador con las flechas y luego toca la marca verde para comprobar.",
+  "m.portes": "¡Ventanas oscuras! Ya no ves el interior: parte del número «A bordo» y calcula de memoria.",
+  "m.vehicule": "Nuevo vehículo: ¡{nom}!",
+  "m.groupes2": "Las familias suben de 2 en 2, de la mano: ¡cuenta de 2 en 2!",
+  "m.groupes5": "Una clase de excursión: ¡5 niños a la vez! Cuenta de 5 en 5.",
+  "m.places": "El minibús solo tiene {n} asientos. Mira los asientos libres: ¿hace falta un segundo autobús?",
+  "m.trottoir": "¡Hay más gente que asientos! ¿Cuántos se quedarán en la acera?",
+  "m.etage": "Cuenta arriba, cuenta abajo y luego suma.",
+  "m.haut": "El piso de arriba está oculto: vigila la escalera para saber quién sube y quién baja.",
+  "m.monnaie": "Un pasajero paga su boleto con demasiadas monedas: ¡dale el cambio!",
+  "m.deuxPortes": "El tranvía tiene dos puertas: ¡vigila las dos a la vez!",
+  "m.corresp": "En la estación, los viajeros pasan del autocar al tren y del tren al autocar.",
+  "fin.victoire": "¡Última parada! Línea {n} superada",
+  "fin.defaite": "El autobús vuelve a la cochera",
+  "fin.defaiteTexte": "Tres errores: ¿probamos esta línea otra vez?",
+  "fin.tickets": "Boletos ganados: {n} de {max}",
+  "fin.record": "¡Nuevo récord!",
+  "fin.recordAncien": "Récord: {n}",
+  "fin.debloque": "Nuevo en el garaje: {liste}",
+  "fin.jeuFini": "¡Bravo! ¡Has conducido las {lignes} líneas! Estrellas: {n} de {max}",
+  "suivant": "Línea siguiente",
+  "rejouer": "Jugar otra vez",
+  "reessayer": "Reintentar",
+  "album.tickets": "Boletos coleccionados: {n}",
+  "album.lignes": "Mis boletos, línea por línea",
+  "album.couleurs": "Colores del autobús",
+  "album.klaxons": "Bocinas",
+  "album.casquettes": "Gorras del conductor",
+  "album.bloque": {
+   "one": "Falta {n} boleto",
+   "other": "Faltan {n} boletos"
+  },
+  "album.choisi": "Elegido",
+  "album.ligneTickets": "{t} de {max}",
+  "couleur.jaune": "Amarillo sol",
+  "couleur.rouge": "Rojo bombero",
+  "couleur.bleu": "Azul cielo",
+  "couleur.vert": "Verde manzana",
+  "couleur.violet": "Morado ciruela",
+  "couleur.rose": "Rosa chicle",
+  "couleur.orange": "Naranja vivo",
+  "klaxon.tut": "Tut-tut",
+  "klaxon.pouet": "Pu-pu",
+  "klaxon.trompette": "Trompeta",
+  "klaxon.sifflet": "Silbato",
+  "klaxon.cloche": "Campanita",
+  "klaxon.corne": "Cuerno de montaña",
+  "casquette.marine": "Gorra azul marino",
+  "casquette.rouge": "Gorra roja",
+  "casquette.etoile": "Gorra con estrella",
+  "casquette.carreaux": "Gorra a cuadros",
+  "casquette.helice": "Gorra con hélice",
+  "casquette.montagne": "Sombrero de montaña"
+ },
+ "pt": {
+  "titre": "Conte os passageiros do ônibus",
+  "consigne": "Veja os passageiros subindo e descendo e diga quantos estão a bordo antes de partir!",
+  "jouer": "Jogar",
+  "lignes": "Linhas",
+  "album": "Álbum e garagem",
+  "retour": "Voltar",
+  "son.couper": "Desligar o som",
+  "son.remettre": "Ligar o som",
+  "pause.aria": "Pausa",
+  "klaxon.aria": "Buzinar",
+  "pause.titre": "Pausa",
+  "reprendre": "Continuar",
+  "recommencer": "Recomeçar",
+  "accueil": "Início",
+  "lignes.titre": "Escolha sua linha",
+  "ligne": "Linha {n}",
+  "ligneAria": "Linha {n}, {etoiles}",
+  "ligneFermee": "Linha {n}: fechada",
+  "etoilesN": {
+   "one": "{n} estrela",
+   "other": "{n} estrelas"
+  },
+  "vehicule.bus": "Ônibus pequeno",
+  "vehicule.minibus": "Micro-ônibus",
+  "vehicule.etage": "Ônibus de dois andares",
+  "vehicule.tram": "Bonde",
+  "vehicule.car": "Ônibus de montanha",
+  "hud.arret": "Ponto {n} / {total}",
+  "hud.abord": "A bordo: {n}",
+  "hud.haut": "Em cima: {n}",
+  "hud.places": "Lugares: {n}",
+  "hud.tickets": "Passagens: {n}",
+  "hud.chances": "Chances: {n}",
+  "obs.arrivee": "O ônibus chega ao ponto… Preste atenção!",
+  "obs.descente": "Alguns passageiros descem…",
+  "obs.montee": "Alguns passageiros sobem…",
+  "obs.depart": "Vamos lá!",
+  "obs.deuxieme": "Um segundo ônibus chega para os outros!",
+  "obs.terminus": "Ponto final! Todo mundo desce.",
+  "obs.corresp": "Baldeação: o trem está esperando na estação!",
+  "obs.monnaie": "Um passageiro compra a passagem.",
+  "q.total": "Quantos passageiros estão a bordo agora?",
+  "q.haut": "Quantos passageiros estão no andar de cima?",
+  "q.places": "Todo mundo vai conseguir subir ou precisa de um segundo ônibus?",
+  "q.trottoir": "Quantos passageiros vão ficar na calçada?",
+  "q.monnaie": "A passagem custa {prix}. {nom} dá {donne}. Quantas moedas você devolve?",
+  "q.change": "Quantos viajantes trocaram de veículo no total?",
+  "pieces": {
+   "one": "{n} moeda",
+   "other": "{n} moedas"
+  },
+  "noms": "Zoe,Davi,Inês,Hugo,Lila,Nur,Théo,Jade",
+  "r.oui": "Precisa de outro ônibus",
+  "r.non": "Cabe todo mundo",
+  "valider": "Confirmar",
+  "plus": "Mais um",
+  "moins": "Menos um",
+  "compteur": "Seu número: {n}",
+  "bravo1": "Muito bem!",
+  "bravo2": "Isso mesmo!",
+  "bravo3": "Contou certinho!",
+  "bravo4": "Supermotorista!",
+  "ticketGagne": "+1 passagem",
+  "oups": "Ops! Eram {n}.",
+  "oupsOui": "Ops! Precisava de um segundo ônibus.",
+  "oupsNon": "Ops! Todo mundo podia subir.",
+  "calc.total": "{depart} + {montes} − {descendus} = {total}",
+  "calc.plus": "{depart} + {montes} = {total}",
+  "calc.change": "{descendus} + {montes} = {total}",
+  "calc.trottoir": "{attente} − {libres} = {reste}",
+  "calc.monnaie": "{donne} − {prix} = {rendu}",
+  "calc.places": "Passageiros esperando: {attente} · Lugares livres: {libres}",
+  "tuto.titre": "Como jogar",
+  "nouveau": "Novidade!",
+  "compris": "Entendi!",
+  "tuto.passer": "Toque na tela para pular",
+  "tuto.base1": "O ônibus para: observe bem os passageiros.",
+  "tuto.base2": "Conte os que sobem no ônibus.",
+  "tuto.base3": "Toque no número certo para seguir viagem!",
+  "m.descente": "Agora alguns passageiros também descem: tire-os da conta!",
+  "m.compteur": "Ajuste o contador com as setas e toque no sinal verde para confirmar.",
+  "m.portes": "Janelas escuras! Você não vê mais o lado de dentro: comece pelo número “A bordo” e faça a conta de cabeça.",
+  "m.vehicule": "Novo veículo: {nom}!",
+  "m.groupes2": "Famílias sobem de 2 em 2, de mãos dadas: conte de 2 em 2!",
+  "m.groupes5": "Uma turma em passeio: 5 crianças de uma vez! Conte de 5 em 5.",
+  "m.places": "O micro-ônibus só tem {n} lugares. Olhe os bancos livres: precisa de um segundo ônibus?",
+  "m.trottoir": "Mais gente do que lugares! Quantos vão ficar na calçada?",
+  "m.etage": "Conte em cima, conte embaixo e depois some!",
+  "m.haut": "O andar de cima está escondido: fique de olho na escada para saber quem sobe e quem desce.",
+  "m.monnaie": "Um passageiro paga a passagem com moedas demais: devolva o troco!",
+  "m.deuxPortes": "O bonde tem duas portas: fique de olho nas duas ao mesmo tempo!",
+  "m.corresp": "Na estação, os viajantes passam do ônibus para o trem e do trem para o ônibus.",
+  "fin.victoire": "Ponto final! Linha {n} concluída",
+  "fin.defaite": "O ônibus volta para a garagem",
+  "fin.defaiteTexte": "Três erros: vamos tentar esta linha de novo?",
+  "fin.tickets": "Passagens ganhas: {n} de {max}",
+  "fin.record": "Novo recorde!",
+  "fin.recordAncien": "Recorde: {n}",
+  "fin.debloque": "Novidade na garagem: {liste}",
+  "fin.jeuFini": "Muito bem! Você dirigiu as {lignes} linhas! Estrelas: {n} de {max}",
+  "suivant": "Próxima linha",
+  "rejouer": "Jogar de novo",
+  "reessayer": "Tentar de novo",
+  "album.tickets": "Passagens colecionadas: {n}",
+  "album.lignes": "Minhas passagens, linha por linha",
+  "album.couleurs": "Cores do ônibus",
+  "album.klaxons": "Buzinas",
+  "album.casquettes": "Bonés do motorista",
+  "album.bloque": {
+   "one": "Falta {n} passagem",
+   "other": "Faltam {n} passagens"
+  },
+  "album.choisi": "Escolhido",
+  "album.ligneTickets": "{t} de {max}",
+  "couleur.jaune": "Amarelo sol",
+  "couleur.rouge": "Vermelho bombeiro",
+  "couleur.bleu": "Azul céu",
+  "couleur.vert": "Verde maçã",
+  "couleur.violet": "Roxo ameixa",
+  "couleur.rose": "Rosa chiclete",
+  "couleur.orange": "Laranja vivo",
+  "klaxon.tut": "Bi-bi",
+  "klaxon.pouet": "Fon-fon",
+  "klaxon.trompette": "Trompete",
+  "klaxon.sifflet": "Apito",
+  "klaxon.cloche": "Sininho",
+  "klaxon.corne": "Corneta da montanha",
+  "casquette.marine": "Boné azul-marinho",
+  "casquette.rouge": "Boné vermelho",
+  "casquette.etoile": "Boné com estrela",
+  "casquette.carreaux": "Boné xadrez",
+  "casquette.helice": "Boné com hélice",
+  "casquette.montagne": "Chapéu de montanha"
+ },
+ "de": {
+  "titre": "Zähl die Fahrgäste im Bus",
+  "consigne": "Schau zu, wie Fahrgäste ein- und aussteigen, und sag, wie viele an Bord sind, bevor du losfährst!",
+  "jouer": "Spielen",
+  "lignes": "Linien",
+  "album": "Album und Garage",
+  "retour": "Zurück",
+  "son.couper": "Ton aus",
+  "son.remettre": "Ton an",
+  "pause.aria": "Pause",
+  "klaxon.aria": "Hupen",
+  "pause.titre": "Pause",
+  "reprendre": "Weiter",
+  "recommencer": "Neu starten",
+  "accueil": "Start",
+  "lignes.titre": "Wähl deine Linie",
+  "ligne": "Linie {n}",
+  "ligneAria": "Linie {n}, {etoiles}",
+  "ligneFermee": "Linie {n}: gesperrt",
+  "etoilesN": {
+   "one": "{n} Stern",
+   "other": "{n} Sterne"
+  },
+  "vehicule.bus": "Kleiner Bus",
+  "vehicule.minibus": "Kleinbus",
+  "vehicule.etage": "Doppeldecker",
+  "vehicule.tram": "Straßenbahn",
+  "vehicule.car": "Bergbus",
+  "hud.arret": "Halt {n} / {total}",
+  "hud.abord": "An Bord: {n}",
+  "hud.haut": "Oben: {n}",
+  "hud.places": "Plätze: {n}",
+  "hud.tickets": "Fahrkarten: {n}",
+  "hud.chances": "Versuche: {n}",
+  "obs.arrivee": "Der Bus fährt an die Haltestelle … Schau genau hin!",
+  "obs.descente": "Fahrgäste steigen aus …",
+  "obs.montee": "Fahrgäste steigen ein …",
+  "obs.depart": "Los geht's!",
+  "obs.deuxieme": "Ein zweiter Bus kommt für die anderen!",
+  "obs.terminus": "Endstation! Alle aussteigen.",
+  "obs.corresp": "Anschluss: Der Zug wartet am Bahnhof!",
+  "obs.monnaie": "Ein Fahrgast kauft eine Fahrkarte.",
+  "q.total": "Wie viele Fahrgäste sind jetzt an Bord?",
+  "q.haut": "Wie viele Fahrgäste sind oben?",
+  "q.places": "Passen alle hinein, oder brauchen wir einen zweiten Bus?",
+  "q.trottoir": "Wie viele Fahrgäste bleiben auf dem Gehweg?",
+  "q.monnaie": "Die Fahrkarte kostet {prix}. {nom} gibt dir {donne}. Wie viele Münzen gibst du zurück?",
+  "q.change": "Wie viele Reisende haben insgesamt das Fahrzeug gewechselt?",
+  "pieces": {
+   "one": "{n} Münze",
+   "other": "{n} Münzen"
+  },
+  "noms": "Zoe,Max,Ines,Hugo,Lila,Nur,Theo,Jade",
+  "r.oui": "Ein 2. Bus muss her",
+  "r.non": "Alle passen rein",
+  "valider": "Prüfen",
+  "plus": "Einer mehr",
+  "moins": "Einer weniger",
+  "compteur": "Deine Zahl: {n}",
+  "bravo1": "Super!",
+  "bravo2": "Genau!",
+  "bravo3": "Gut gezählt!",
+  "bravo4": "Toller Fahrer!",
+  "ticketGagne": "+1 Fahrkarte",
+  "oups": "Hoppla! Es waren {n}.",
+  "oupsOui": "Hoppla! Es brauchte einen zweiten Bus.",
+  "oupsNon": "Hoppla! Alle konnten einsteigen.",
+  "calc.total": "{depart} + {montes} − {descendus} = {total}",
+  "calc.plus": "{depart} + {montes} = {total}",
+  "calc.change": "{descendus} + {montes} = {total}",
+  "calc.trottoir": "{attente} − {libres} = {reste}",
+  "calc.monnaie": "{donne} − {prix} = {rendu}",
+  "calc.places": "Wartende Fahrgäste: {attente} · Freie Plätze: {libres}",
+  "tuto.titre": "So wird gespielt",
+  "nouveau": "Neu!",
+  "compris": "Verstanden!",
+  "tuto.passer": "Tipp auf den Bildschirm zum Überspringen",
+  "tuto.base1": "Der Bus hält: Schau dir die Fahrgäste genau an.",
+  "tuto.base2": "Zähl alle, die in den Bus einsteigen.",
+  "tuto.base3": "Tipp auf die richtige Zahl, um weiterzufahren!",
+  "m.descente": "Jetzt steigen auch Fahrgäste aus: Zieh sie von deiner Zahl ab!",
+  "m.compteur": "Stell den Zähler mit den Pfeilen ein und tipp dann auf den grünen Haken.",
+  "m.portes": "Dunkle Scheiben! Du siehst nicht mehr hinein: Geh von der Zahl „An Bord“ aus und rechne im Kopf.",
+  "m.vehicule": "Neues Fahrzeug: {nom}!",
+  "m.groupes2": "Familien steigen zu zweit ein und halten sich an der Hand: Zähl in Zweierschritten!",
+  "m.groupes5": "Eine Schulklasse auf Ausflug: 5 Kinder auf einmal! Zähl in Fünferschritten.",
+  "m.places": "Der Kleinbus hat nur {n} Plätze. Schau dir die freien Sitze an: Brauchen wir einen zweiten Bus?",
+  "m.trottoir": "Mehr Leute als Plätze! Wie viele bleiben auf dem Gehweg?",
+  "m.etage": "Zähl oben, zähl unten und rechne dann zusammen!",
+  "m.haut": "Das obere Deck ist verdeckt: Behalte die Treppe im Blick, um zu sehen, wer hoch- und wer runtergeht.",
+  "m.monnaie": "Ein Fahrgast bezahlt seine Fahrkarte mit zu vielen Münzen: Gib ihm das Wechselgeld!",
+  "m.deuxPortes": "Die Straßenbahn hat zwei Türen: Behalte beide gleichzeitig im Blick!",
+  "m.corresp": "Am Bahnhof steigen Reisende vom Bus in den Zug und vom Zug in den Bus um.",
+  "fin.victoire": "Endstation! Linie {n} geschafft",
+  "fin.defaite": "Der Bus fährt zurück ins Depot",
+  "fin.defaiteTexte": "Drei Fehler: Versuchen wir diese Linie noch einmal?",
+  "fin.tickets": "Gewonnene Fahrkarten: {n} von {max}",
+  "fin.record": "Neuer Rekord!",
+  "fin.recordAncien": "Rekord: {n}",
+  "fin.debloque": "Neu in der Garage: {liste}",
+  "fin.jeuFini": "Super! Du bist alle {lignes} Linien gefahren! Sterne: {n} von {max}",
+  "suivant": "Nächste Linie",
+  "rejouer": "Nochmal spielen",
+  "reessayer": "Nochmal versuchen",
+  "album.tickets": "Gesammelte Fahrkarten: {n}",
+  "album.lignes": "Meine Fahrkarten, Linie für Linie",
+  "album.couleurs": "Busfarben",
+  "album.klaxons": "Hupen",
+  "album.casquettes": "Fahrermützen",
+  "album.bloque": {
+   "one": "Noch {n} Fahrkarte",
+   "other": "Noch {n} Fahrkarten"
+  },
+  "album.choisi": "Gewählt",
+  "album.ligneTickets": "{t} von {max}",
+  "couleur.jaune": "Sonnengelb",
+  "couleur.rouge": "Feuerwehrrot",
+  "couleur.bleu": "Himmelblau",
+  "couleur.vert": "Apfelgrün",
+  "couleur.violet": "Pflaumenlila",
+  "couleur.rose": "Bonbonrosa",
+  "couleur.orange": "Knallorange",
+  "klaxon.tut": "Tut-tut",
+  "klaxon.pouet": "Tröt-tröt",
+  "klaxon.trompette": "Trompete",
+  "klaxon.sifflet": "Pfeife",
+  "klaxon.cloche": "Glöckchen",
+  "klaxon.corne": "Berghorn",
+  "casquette.marine": "Marineblaue Mütze",
+  "casquette.rouge": "Rote Mütze",
+  "casquette.etoile": "Sternmütze",
+  "casquette.carreaux": "Karierte Mütze",
+  "casquette.helice": "Propellermütze",
+  "casquette.montagne": "Berghut"
+ }
+}
+</script>
+<script id="jel-i18n">
+/* ==========================================================================
+   Jeux-en-ligne — module commun de traduction (site ET jeux)        jel-i18n v1
+   JavaScript pur, sans dépendance, fonctionne hors ligne.
+
+   Langues : fr (source), en, es, pt (Brésil), de. Langue de secours : en.
+   Détection, dans l'ordre :
+     1. paramètre d'adresse ?lang=xx (enregistré comme choix) ;
+     2. choix enregistré : localStorage « lang » (dans un jeu affiché par le
+        site, le lanceur transmet ce choix par window.JEL_LANG, car le cadre
+        isolé n'a pas accès au stockage du site) ;
+     3. navigator.languages (préfixe seul : « pt-BR » → « pt ») ;
+     4. « en ».
+
+   API (window.JEL_I18N, et raccourci global t() s'il est libre) :
+     getLang()            langue courante
+     setLang(code)        change de langue (enregistre, <html lang>, textes)
+     t(cle, variables)    texte traduit ; {variables} remplacées ; pluriels
+                          via Intl.PluralRules si la valeur est un objet
+                          { "one": "…", "other": "…" } (variable n)
+     has(cle)             la clé existe-t-elle (langue courante ou fr) ?
+     nombre(x, options)   nombre formaté selon la langue (Intl.NumberFormat)
+     date(d, options)     date formatée selon la langue (Intl.DateTimeFormat)
+     appliquer(racine)    traduit le DOM : data-i18n (texte), data-i18n-html
+                          (dictionnaire de confiance seulement),
+                          data-i18n-placeholder, data-i18n-title, data-i18n-aria
+     ajouter(lang, dico)  ajoute des textes ; charger(dossier) : site seulement
+     surChangement(f)     appelle f(lang) après chaque changement de langue
+     creerSelecteur(opts) sélecteur de langue (code + nom dans sa langue)
+
+   Clé absente dans la langue choisie : texte français, sinon la clé brute,
+   avec un avertissement dans la console (une seule fois par clé).
+
+   Dans un jeu : ce fichier est recopié tel quel dans index.html, juste après
+   le bloc <script type="application/json" id="jel-i18n-textes"> qui contient
+   { "fr": {…}, "en": {…}, … }. Un petit bouton de langue s'ajoute dans le coin
+   indiqué par data-coin (haut-gauche, haut-droite, bas-gauche, bas-droite ;
+   data-coin-decalage="52px" l'éloigne du bord haut ou bas, ex. sous une barre ;
+   data-place="id1 id2" le met plutôt dans ces éléments du jeu (barre d'outils…) ;
+   data-coin="aucun" pour le placer soi-même avec creerSelecteur). Changer de
+   langue relance le jeu dans la nouvelle langue.
+   Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie ce fichier).
+   ========================================================================== */
+(function () {
+  'use strict';
+  if (window.JEL_I18N) return;
+
+  var LANGUES = ['fr', 'en', 'es', 'pt', 'de'];
+  var NOMS = { fr: 'Français', en: 'English', es: 'Español', pt: 'Português', de: 'Deutsch' };
+  var ETIQUETTE = { fr: 'Langue', en: 'Language', es: 'Idioma', pt: 'Idioma', de: 'Sprache' }; // nom du bouton
+  var SOURCE = 'fr';
+  var SECOURS = 'en';
+  var CLE_STOCKAGE = 'lang';
+
+  var dicos = {};          // { fr: { cle: texte }, en: {…} }
+  var ecouteurs = [];
+  var avertis = {};
+  var dossierSite = null;  // site : dossier des fichiers JSON (charger)
+  var blocJeu = document.getElementById('jel-i18n-textes');
+  var modeJeu = !!blocJeu;
+
+  // --- Outils ---------------------------------------------------------------
+
+  function valide(code) {
+    var c = String(code || '').trim().toLowerCase().split(/[-_]/)[0];
+    return LANGUES.indexOf(c) >= 0 ? c : null;
+  }
+  function lireStockage() { try { return localStorage.getItem(CLE_STOCKAGE); } catch (e) { return null; } }
+  function ecrireStockage(v) { try { localStorage.setItem(CLE_STOCKAGE, v); } catch (e) { /* stockage refusé */ } }
+  function paramAdresse() { try { return new URLSearchParams(location.search).get('lang'); } catch (e) { return null; } }
+
+  function detecter() {
+    var c = valide(paramAdresse());
+    if (c) { ecrireStockage(c); return c; }
+    c = valide(window.JEL_LANG) || valide(lireStockage());
+    if (c) return c;
+    var liste = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+    for (var i = 0; i < liste.length; i++) {
+      c = valide(liste[i]);
+      if (c) return c;
+    }
+    return SECOURS;
+  }
+
+  var langue = detecter();
+  document.documentElement.lang = langue;
+
+  function avertir(texte) {
+    if (avertis[texte]) return;
+    avertis[texte] = true;
+    try { console.warn('[i18n] ' + texte); } catch (e) { /* pas de console */ }
+  }
+
+  function trouver(lang, cle) {
+    var d = dicos[lang];
+    return d && Object.prototype.hasOwnProperty.call(d, cle) ? d[cle] : undefined;
+  }
+
+  function nombre(x, options) {
+    try { return new Intl.NumberFormat(langue, options).format(x); } catch (e) { return String(x); }
+  }
+
+  function date(d, options) {
+    try { return new Intl.DateTimeFormat(langue, options).format(d instanceof Date ? d : new Date(d)); } catch (e) { return String(d); }
+  }
+
+  // Valeur au pluriel : { one, other, … } selon Intl.PluralRules (variable n).
+  function pluriel(valeur, lang, variables) {
+    var n = variables && typeof variables.n === 'number' ? variables.n : 0;
+    var forme = 'other';
+    try { forme = new Intl.PluralRules(lang).select(n); } catch (e) { /* navigateur ancien */ }
+    if (n === 0 && typeof valeur.zero === 'string') return valeur.zero;
+    return typeof valeur[forme] === 'string' ? valeur[forme] : valeur.other;
+  }
+
+  function remplacer(texte, variables) {
+    if (!variables) return texte;
+    return texte.replace(/\{(\w+)\}/g, function (tout, nom) {
+      if (!Object.prototype.hasOwnProperty.call(variables, nom)) return tout;
+      var v = variables[nom];
+      return typeof v === 'number' ? nombre(v) : String(v);
+    });
+  }
+
+  // --- Traduction -----------------------------------------------------------
+
+  function t(cle, variables) {
+    var lang = langue;
+    var valeur = trouver(lang, cle);
+    if (valeur === undefined) {
+      lang = SOURCE;
+      valeur = trouver(SOURCE, cle);
+      if (langue !== SOURCE || valeur === undefined) avertir('clé manquante en ' + langue + ' : ' + cle);
+      if (valeur === undefined) return cle;
+    }
+    if (valeur && typeof valeur === 'object') valeur = pluriel(valeur, lang, variables);
+    return remplacer(String(valeur), variables);
+  }
+
+  function has(cle) {
+    return trouver(langue, cle) !== undefined || trouver(SOURCE, cle) !== undefined;
+  }
+
+  // Traduit tous les éléments marqués sous « racine » (document par défaut).
+  function appliquer(racine) {
+    racine = racine || document;
+    if (!racine.querySelectorAll) return;
+    var regles = [
+      ['data-i18n', function (el, v) { el.textContent = v; }],
+      ['data-i18n-html', function (el, v) { el.innerHTML = v; }],
+      ['data-i18n-placeholder', function (el, v) { el.setAttribute('placeholder', v); }],
+      ['data-i18n-title', function (el, v) { el.setAttribute('title', v); }],
+      ['data-i18n-aria', function (el, v) { el.setAttribute('aria-label', v); }],
+    ];
+    regles.forEach(function (regle) {
+      var liste = racine.querySelectorAll('[' + regle[0] + ']');
+      for (var i = 0; i < liste.length; i++) regle[1](liste[i], t(liste[i].getAttribute(regle[0])));
+    });
+  }
+
+  function ajouter(lang, dico) {
+    var c = valide(lang);
+    if (!c || !dico || typeof dico !== 'object') return;
+    dicos[c] = dicos[c] || {};
+    for (var cle in dico) {
+      if (Object.prototype.hasOwnProperty.call(dico, cle)) dicos[c][cle] = dico[cle];
+    }
+  }
+
+  // Site : charge <dossier><lang>.json (fr toujours, pour le repli).
+  function chargerUne(lang) {
+    if (dicos[lang] || !dossierSite) return Promise.resolve();
+    return fetch(dossierSite + lang + '.json')
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) { ajouter(lang, d); })
+      .catch(function (e) { avertir('textes « ' + lang + ' » indisponibles (' + e.message + ')'); });
+  }
+
+  function charger(dossier) {
+    dossierSite = dossier;
+    return Promise.all([chargerUne(SOURCE), chargerUne(langue)]).then(function () { appliquer(document); });
+  }
+
+  function surChangement(f) { if (typeof f === 'function') ecouteurs.push(f); }
+
+  function prevenir() {
+    for (var i = 0; i < ecouteurs.length; i++) {
+      try { ecouteurs[i](langue); } catch (e) { setTimeout(function () { throw e; }); }
+    }
+  }
+
+  // Changement de langue appliqué sur place (sans recharger la page).
+  function changerSurPlace(c) {
+    langue = c;
+    document.documentElement.lang = c;
+    appliquer(document);
+    majSelecteurs();
+    prevenir();
+  }
+
+  function setLang(code) {
+    var c = valide(code);
+    if (!c) return Promise.resolve(langue);
+    ecrireStockage(c);
+    if (modeJeu) {
+      if (c === langue) return Promise.resolve(langue);
+      // Jeu affiché par le site : le lanceur enregistre le choix et relance le jeu.
+      if (window.parent && window.parent !== window) {
+        try { window.parent.postMessage({ type: 'jel-langue', lang: c }, '*'); } catch (e) { /* cadre isolé */ }
+        // Si personne ne répond (jeu ouvert ailleurs), on change sur place.
+        setTimeout(function () { changerSurPlace(c); }, 700);
+        return Promise.resolve(c);
+      }
+      // Jeu ouvert seul : on le relance dans la nouvelle langue.
+      if (/^https?:$/.test(location.protocol)) {
+        var u = new URL(location.href);
+        u.searchParams.set('lang', c);
+        location.replace(u.href);
+        return Promise.resolve(c);
+      }
+      changerSurPlace(c);
+      return Promise.resolve(c);
+    }
+    // Site : l'adresse suit le choix si elle porte déjà ?lang=.
+    try {
+      var adresse = new URL(location.href);
+      if (adresse.searchParams.has('lang')) {
+        adresse.searchParams.set('lang', c);
+        history.replaceState(history.state, '', adresse.href);
+      }
+    } catch (e) { /* adresse spéciale */ }
+    return chargerUne(c).then(function () { changerSurPlace(c); return c; });
+  }
+
+  // --- Sélecteur de langue ---------------------------------------------------
+  // Bouton (code de la langue) qui ouvre la liste des 5 langues, chacune avec
+  // son code et son nom dans sa propre langue. Pas de drapeaux. Doigt et clavier
+  // (Entrée, Espace, flèches, Échap).
+  // Dans un jeu, il est isolé dans un Shadow DOM (élément <jel-langue>) : le CSS
+  // du jeu (button {…}, * {…}) ne peut pas le déformer, et inversement.
+
+  var CSS_SELECTEUR =
+    '.jel-langue{position:relative;display:inline-block;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif;text-align:left;color:#eceae4}' +
+    '.jel-langue *{box-sizing:border-box}' +
+    '.jel-langue-bouton{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:44px;min-height:44px;margin:0;padding:0 10px;border:0;border-radius:999px;background:rgba(11,16,32,.55);color:#eceae4;font:inherit;line-height:1;cursor:pointer;box-shadow:none}' +
+    '.jel-langue-code{font-weight:800;letter-spacing:.04em}' +
+    '.jel-langue-menu{position:absolute;z-index:2147483001;min-width:170px;margin:6px 0 0;padding:6px;list-style:none;border-radius:14px;background:#161f38;box-shadow:0 10px 30px rgba(0,0,0,.45);border:1px solid #434e6b}' +
+    '.jel-langue-menu[hidden]{display:none}' +
+    '.jel-langue-menu li{margin:0;padding:0}' +
+    '.jel-langue-menu button{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;margin:0;padding:0 12px;border:0;border-radius:10px;background:none;color:#eceae4;font:inherit;text-align:left;cursor:pointer;box-shadow:none;white-space:nowrap}' +
+    '.jel-langue-menu button b{min-width:2.2em;color:#a8b3f0}' +
+    '.jel-langue-menu button[aria-current="true"]{background:#a8b3f0;color:#0b1020}' +
+    '.jel-langue-menu button[aria-current="true"] b{color:#0b1020}' +
+    '.jel-langue-menu button:hover:not([aria-current="true"]),.jel-langue-menu button:focus-visible{background:#1d2745}' +
+    '.jel-langue :focus-visible{outline:3px solid #a8b3f0;outline-offset:2px}' +
+    // Jeu : petit bouton discret (code seul) ; liste ouverte vers l'intérieur de l'écran.
+    '.jel-langue.compact .jel-langue-bouton{min-width:40px;min-height:40px;padding:0 8px;font-size:12px;background:rgba(11,16,32,.45);border:1px solid rgba(255,255,255,.3)}' +
+    '.jel-langue.compact .jel-langue-nom{display:none}' +
+    '.jel-langue.vers-gauche .jel-langue-menu{right:0}' +
+    '.jel-langue.vers-haut .jel-langue-menu{bottom:100%;margin:0 0 6px}';
+
+  // Place du bouton dans un jeu, selon le coin choisi (data-coin).
+  var COINS = {
+    'haut-gauche': { top: 'max(6px, env(safe-area-inset-top))', left: 'max(6px, env(safe-area-inset-left))' },
+    'haut-droite': { top: 'max(6px, env(safe-area-inset-top))', right: 'max(6px, env(safe-area-inset-right))' },
+    'bas-gauche': { bottom: 'max(6px, env(safe-area-inset-bottom))', left: 'max(6px, env(safe-area-inset-left))' },
+    'bas-droite': { bottom: 'max(6px, env(safe-area-inset-bottom))', right: 'max(6px, env(safe-area-inset-right))' },
+  };
+
+  var selecteurs = [];
+
+  function majSelecteurs() {
+    selecteurs.forEach(function (s) { s.maj(); });
+  }
+
+  // options : { conteneur, classe, coin, decalage, isole } ;
+  // - coin : sélecteur de jeu isolé, fixé dans ce coin, éloigné du bord haut ou bas de
+  //   « decalage » (longueur CSS, ex. « 52px ») s'il est donné ;
+  // - isole : sélecteur de jeu isolé, placé dans « conteneur » (ex. la barre du jeu).
+  function creerSelecteur(options) {
+    options = options || {};
+    var coin = options.coin && COINS[options.coin] ? options.coin : null;
+    var isole = !!(coin || options.isole);
+    var boite = document.createElement('div');
+    boite.className = 'jel-langue' + (options.classe ? ' ' + options.classe : '') +
+      (isole ? ' compact' : '') + (coin && /droite/.test(coin) ? ' vers-gauche' : '') + (coin && /bas/.test(coin) ? ' vers-haut' : '');
+
+    var bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'jel-langue-bouton';
+    bouton.setAttribute('aria-haspopup', 'true');
+    bouton.setAttribute('aria-expanded', 'false');
+    var code = document.createElement('span');
+    code.className = 'jel-langue-code';
+    var nom = document.createElement('span');
+    nom.className = 'jel-langue-nom';
+    bouton.append(code, nom);
+
+    var menu = document.createElement('ul');
+    menu.className = 'jel-langue-menu';
+    menu.hidden = true;
+    var choix = LANGUES.map(function (l) {
+      var li = document.createElement('li');
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.lang = l;
+      b.dataset.lang = l;
+      var c = document.createElement('b');
+      c.textContent = l.toUpperCase();
+      b.append(c, document.createTextNode(' ' + NOMS[l]));
+      b.addEventListener('click', function () { fermer(true); setLang(l); });
+      li.append(b);
+      menu.append(li);
+      return b;
+    });
+
+    var hote = null; // jeu : élément <jel-langue> (un peu transparent, sauf liste ouverte)
+    function opacite(v) { if (hote) hote.style.setProperty('opacity', v, 'important'); }
+    function ouvrir() {
+      // Dans une barre : la liste s'ouvre vers l'intérieur de l'écran.
+      if (isole && !coin && hote) {
+        var r = hote.getBoundingClientRect();
+        boite.classList.toggle('vers-gauche', r.left > window.innerWidth / 2);
+        boite.classList.toggle('vers-haut', r.top > window.innerHeight / 2);
+      }
+      menu.hidden = false;
+      opacite('1');
+      bouton.setAttribute('aria-expanded', 'true');
+      var actuel = choix[LANGUES.indexOf(langue)] || choix[0];
+      actuel.focus();
+    }
+    function fermer(rendreFocus) {
+      if (menu.hidden) return;
+      menu.hidden = true;
+      opacite('.85');
+      bouton.setAttribute('aria-expanded', 'false');
+      if (rendreFocus) bouton.focus();
+    }
+
+    bouton.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (menu.hidden) ouvrir(); else fermer(false);
+    });
+    menu.addEventListener('keydown', function (e) {
+      var racine = boite.getRootNode();
+      var i = choix.indexOf(racine.activeElement || document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); fermer(true); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); choix[(i + 1) % choix.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); choix[(i - 1 + choix.length) % choix.length].focus(); }
+      else if (e.key === 'Tab') fermer(false);
+      e.stopPropagation(); // les touches du menu ne pilotent pas le jeu
+    });
+    bouton.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' && menu.hidden) { e.preventDefault(); ouvrir(); }
+      e.stopPropagation();
+    });
+    // Un toucher ailleurs referme la liste (sans gêner le jeu).
+    document.addEventListener('pointerdown', function (e) {
+      var chemin = e.composedPath ? e.composedPath() : [e.target];
+      if (chemin.indexOf(boite) < 0) fermer(false);
+    }, true);
+    // Les gestes sur le sélecteur ne doivent pas arriver au jeu.
+    ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'click'].forEach(function (type) {
+      boite.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
+    boite.append(bouton, menu);
+
+    // Élément ajouté à la page : la boîte elle-même (site), ou un hôte isolé (jeu).
+    var element = boite;
+    if (isole) {
+      element = hote = document.createElement('jel-langue');
+      element.className = 'jel-langue';
+      var place = coin ? COINS[coin] : {};
+      var style = coin
+        ? { position: 'fixed', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'block' }
+        : { position: 'relative', 'z-index': '2147483000', opacity: '.85', margin: '0', padding: '0', display: 'inline-block', 'vertical-align': 'middle', flex: 'none' };
+      for (var p in place) style[p] = options.decalage && /^(top|bottom)$/.test(p) ? 'calc(' + place[p] + ' + ' + options.decalage + ')' : place[p];
+      for (var nomStyle in style) element.style.setProperty(nomStyle, style[nomStyle], 'important');
+      var ombre = element.attachShadow ? element.attachShadow({ mode: 'open' }) : element;
+      var feuille = document.createElement('style');
+      feuille.textContent = CSS_SELECTEUR;
+      ombre.append(feuille, boite);
+    }
+
+    var s = {
+      element: element,
+      maj: function () {
+        code.textContent = langue.toUpperCase();
+        nom.textContent = NOMS[langue];
+        var etiquette = ETIQUETTE[langue] + ' : ' + NOMS[langue];
+        bouton.setAttribute('aria-label', etiquette);
+        bouton.title = etiquette;
+        choix.forEach(function (b) {
+          if (b.dataset.lang === langue) b.setAttribute('aria-current', 'true');
+          else b.removeAttribute('aria-current');
+        });
+      },
+    };
+    s.maj();
+    selecteurs.push(s);
+    if (options.conteneur) options.conteneur.append(element);
+    return element;
+  }
+
+  // Site : style de base du sélecteur dans la page (style.css le complète).
+  function ajouterStyle() {
+    if (document.getElementById('jel-langue-style')) return;
+    var style = document.createElement('style');
+    style.id = 'jel-langue-style';
+    style.textContent = CSS_SELECTEUR;
+    (document.head || document.documentElement).append(style);
+  }
+
+  // --- Démarrage ----------------------------------------------------------------
+
+  if (modeJeu) {
+    try {
+      var textes = JSON.parse(blocJeu.textContent);
+      for (var l in textes) if (Object.prototype.hasOwnProperty.call(textes, l)) ajouter(l, textes[l]);
+    } catch (e) {
+      avertir('textes du jeu illisibles (' + e.message + ')');
+    }
+  }
+
+  window.JEL_I18N = {
+    LANGUES: LANGUES.slice(),
+    NOMS: NOMS,
+    SOURCE: SOURCE,
+    getLang: function () { return langue; },
+    setLang: setLang,
+    t: t,
+    has: has,
+    nombre: nombre,
+    date: date,
+    appliquer: appliquer,
+    ajouter: ajouter,
+    charger: charger,
+    surChangement: surChangement,
+    creerSelecteur: creerSelecteur,
+  };
+  if (!('t' in window)) window.t = t;
+
+  if (!modeJeu) ajouterStyle();
+
+  if (modeJeu) {
+    var demarrer = function () {
+      appliquer(document);
+      // data-place="id1 id2" : bouton(s) dans ces éléments du jeu ; sinon dans le coin data-coin.
+      var places = (blocJeu.getAttribute('data-place') || '').split(/\s+/).map(function (id) { return id && document.getElementById(id); }).filter(Boolean);
+      var coin = blocJeu.getAttribute('data-coin') || 'haut-gauche';
+      if (places.length) places.forEach(function (el) { creerSelecteur({ conteneur: el, isole: true }); });
+      else if (coin !== 'aucun' && document.body) {
+        creerSelecteur({ conteneur: document.body, coin: coin, decalage: blocJeu.getAttribute('data-coin-decalage') || '' });
+      }
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', demarrer);
+    else demarrer();
+  }
+})();
+</script>
+<script id="jel-sauvegarde">
+/* ==========================================================================
+   Free Micro Games — module commun de sauvegarde des jeux     jel-sauvegarde v1
+   JavaScript pur, sans dépendance, sans compte ni serveur, hors ligne.
+
+   Garde la progression d'un jeu sur l'appareil, sous la clé « save_<id> »
+   (ex. « save_pommes-du-poney ») du localStorage du site.
+
+   Où sont les données ?
+     - Jeu ouvert seul (adresse /games/<id>/, test local) : localStorage direct.
+     - Jeu affiché par le site (cadre isolé, sans accès au stockage) : le
+       lanceur (public/play.js) donne la sauvegarde au démarrage
+       (window.JEL_SAUVEGARDES = { "save_<id>": "<JSON>" }) et enregistre
+       chaque écriture reçue par le message { type: "jel-sauvegarde", cle,
+       valeur } (valeur null = effacer). Le jeu ne peut écrire que sa clé.
+     - Sans aucun stockage : la sauvegarde vit le temps de la page.
+
+   Données (version de format SAUVEGARDE_VERSION) :
+     { v: 1, niveau: 1, score: 0, options: {}, date: <ms> }
+     niveau  numéro du niveau où reprendre (1 = premier)
+     score   score à ce moment-là
+     options réglages utiles (son coupé, difficulté…)
+     Le jeu peut ajouter ses propres champs (étoiles, record…).
+   Sauvegarde absente, illisible ou d'un format inconnu : valeurs par défaut.
+
+   API (window.JEL_SAVE) :
+     save(jeu, donnees)     enregistre (fusionné avec la sauvegarde actuelle) ;
+                            renvoie true si c'est fait
+     load(jeu)              données (valeurs par défaut si rien d'utilisable)
+     clear(jeu)             efface la sauvegarde
+     existe(jeu)            une sauvegarde utilisable existe-t-elle ?
+     surFermeture(f)        appelle f() quand la page est cachée ou quittée
+                            (visibilitychange, pagehide, beforeunload)
+     reprise(options)       fenêtre « Continuer » / « Nouvelle partie » /
+                            « Effacer la sauvegarde » (voir plus bas)
+     boutonEffacer(options) bouton « Effacer la sauvegarde » seul
+     texte(cle, vars)       textes du module dans la langue du jeu
+
+   Dans un jeu : ce fichier est recopié tel quel dans index.html, dans une
+   balise script d'identifiant « jel-sauvegarde », juste après le module de
+   traduction (jel-i18n). Il ne doit jamais contenir la fermeture de balise
+   script (elle couperait le jeu).
+   Mise à jour des jeux : node scripts/i18n-jeu.mjs (recopie aussi ce fichier).
+   Règles d'intégration : CONSIGNES-JEU.md, section « Sauvegarde ».
+   ========================================================================== */
+(function () {
+  'use strict';
+  if (window.JEL_SAVE) return;
+
+  var SAUVEGARDE_VERSION = 1;
+  var PREFIXE = 'save_';
+  var TAILLE_MAX = 100000; // caractères : le lanceur refuse au-delà
+
+  // --- Stockage -------------------------------------------------------------
+
+  var direct = (function () {
+    try {
+      var essai = '__jel_essai__';
+      localStorage.setItem(essai, '1');
+      localStorage.removeItem(essai);
+      return localStorage;
+    } catch (e) { return null; } // cadre isolé du site, stockage refusé
+  })();
+
+  var memoire = {};
+  try {
+    var donnees = window.JEL_SAUVEGARDES;
+    if (donnees && typeof donnees === 'object') {
+      for (var c in donnees) {
+        if (Object.prototype.hasOwnProperty.call(donnees, c) && typeof donnees[c] === 'string') memoire[c] = donnees[c];
+      }
+    }
+  } catch (e) { /* rien reçu du lanceur */ }
+
+  function lire(cle) {
+    if (direct) { try { return direct.getItem(cle); } catch (e) { /* stockage devenu indisponible */ } }
+    return Object.prototype.hasOwnProperty.call(memoire, cle) ? memoire[cle] : null;
+  }
+
+  // valeur null = effacer
+  function ecrire(cle, valeur) {
+    if (valeur === null) delete memoire[cle]; else memoire[cle] = valeur;
+    var ok = false;
+    if (direct) {
+      try {
+        if (valeur === null) direct.removeItem(cle); else direct.setItem(cle, valeur);
+        ok = true;
+      } catch (e) { /* stockage plein ou refusé */ }
+    }
+    if (!ok && window.parent && window.parent !== window) {
+      try { window.parent.postMessage({ type: 'jel-sauvegarde', cle: cle, valeur: valeur }, '*'); ok = true; } catch (e) { /* pas de lanceur */ }
+    }
+    return ok;
+  }
+
+  // --- Données ----------------------------------------------------------------
+
+  function cleDe(jeu) { return PREFIXE + String(jeu || '').trim(); }
+
+  function defauts() { return { v: SAUVEGARDE_VERSION, niveau: 1, score: 0, options: {} }; }
+
+  function objet(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
+
+  // Données relues, ou null si absentes, illisibles ou d'un format inconnu.
+  function lireDonnees(jeu) {
+    var brut = lire(cleDe(jeu));
+    if (typeof brut !== 'string' || !brut) return null;
+    var d;
+    try { d = JSON.parse(brut); } catch (e) { return null; }
+    if (!objet(d) || d.v !== SAUVEGARDE_VERSION) return null;
+    var propre = defauts();
+    for (var k in d) if (Object.prototype.hasOwnProperty.call(d, k)) propre[k] = d[k];
+    var n = Number(propre.niveau);
+    propre.niveau = isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+    var s = Number(propre.score);
+    propre.score = isFinite(s) ? s : 0;
+    if (!objet(propre.options)) propre.options = {};
+    return propre;
+  }
+
+  function load(jeu) { return lireDonnees(jeu) || defauts(); }
+
+  function existe(jeu) { return lireDonnees(jeu) !== null; }
+
+  function save(jeu, donnees) {
+    if (!String(jeu || '').trim()) return false;
+    var tout = load(jeu);
+    if (objet(donnees)) for (var k in donnees) if (Object.prototype.hasOwnProperty.call(donnees, k)) tout[k] = donnees[k];
+    tout.v = SAUVEGARDE_VERSION;
+    tout.date = Date.now();
+    var texte;
+    try { texte = JSON.stringify(tout); } catch (e) { return false; }
+    if (texte.length > TAILLE_MAX) {
+      try { console.warn('[sauvegarde] trop grosse, ignorée (' + texte.length + ' caractères)'); } catch (e) { /* pas de console */ }
+      return false;
+    }
+    return ecrire(cleDe(jeu), texte);
+  }
+
+  function clear(jeu) { return ecrire(cleDe(jeu), null); }
+
+  // --- Fermeture de la page -------------------------------------------------
+
+  function surFermeture(f) {
+    if (typeof f !== 'function') return;
+    var appeler = function () { try { f(); } catch (e) { setTimeout(function () { throw e; }); } };
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') appeler(); });
+    window.addEventListener('pagehide', appeler);
+    window.addEventListener('beforeunload', appeler);
+  }
+
+  // --- Textes (5 langues) -----------------------------------------------------
+
+  var TEXTES = {
+    fr: { titre: 'Une partie est sauvegardée', niveau: 'Niveau {n}', score: 'Score : {n}', continuer: 'Continuer', nouvelle: 'Nouvelle partie', effacer: 'Effacer la sauvegarde', confirmer: 'Toucher encore pour effacer', efface: 'Sauvegarde effacée' },
+    en: { titre: 'You have a saved game', niveau: 'Level {n}', score: 'Score: {n}', continuer: 'Continue', nouvelle: 'New game', effacer: 'Delete saved game', confirmer: 'Tap again to delete', efface: 'Saved game deleted' },
+    es: { titre: 'Tienes una partida guardada', niveau: 'Nivel {n}', score: 'Puntos: {n}', continuer: 'Continuar', nouvelle: 'Nueva partida', effacer: 'Borrar la partida guardada', confirmer: 'Toca otra vez para borrar', efface: 'Partida guardada borrada' },
+    pt: { titre: 'Você tem um jogo salvo', niveau: 'Nível {n}', score: 'Pontos: {n}', continuer: 'Continuar', nouvelle: 'Novo jogo', effacer: 'Apagar o jogo salvo', confirmer: 'Toque de novo para apagar', efface: 'Jogo salvo apagado' },
+    de: { titre: 'Du hast einen gespeicherten Spielstand', niveau: 'Level {n}', score: 'Punkte: {n}', continuer: 'Weiterspielen', nouvelle: 'Neues Spiel', effacer: 'Spielstand löschen', confirmer: 'Zum Löschen noch mal tippen', efface: 'Spielstand gelöscht' },
+  };
+
+  function langue() {
+    var l = '';
+    try { l = window.JEL_I18N ? window.JEL_I18N.getLang() : (window.JEL_LANG || document.documentElement.lang); } catch (e) { /* rien */ }
+    l = String(l || '').toLowerCase().split(/[-_]/)[0];
+    return TEXTES[l] ? l : 'fr';
+  }
+
+  function texte(cle, vars) {
+    var l = langue();
+    var s = TEXTES[l][cle] || TEXTES.fr[cle] || cle;
+    return s.replace(/\{(\w+)\}/g, function (tout, nom) {
+      if (!vars || !Object.prototype.hasOwnProperty.call(vars, nom)) return tout;
+      var v = vars[nom];
+      if (typeof v === 'number') { try { return new Intl.NumberFormat(l).format(v); } catch (e) { return String(v); } }
+      return String(v);
+    });
+  }
+
+  // --- Interface ------------------------------------------------------------------
+  // Isolée dans un Shadow DOM (comme le bouton de langue) : le CSS du jeu ne la
+  // déforme pas. Les gestes et les touches n'arrivent pas au jeu.
+
+  var CSS =
+    ':host{all:initial}' +
+    '*{box-sizing:border-box}' +
+    '.fond{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(7,10,20,.72);font:600 16px/1.3 ui-rounded,"Segoe UI",system-ui,sans-serif;color:#eceae4}' +
+    '.carte{width:min(360px,100%);padding:20px 18px 14px;border-radius:20px;background:#161f38;border:1px solid #5a6688;box-shadow:0 14px 40px rgba(0,0,0,.5);text-align:center}' +
+    'h2{margin:0 0 6px;font-size:19px;line-height:1.25;color:#eceae4}' +
+    'p{margin:0 0 16px;color:#a3adc2;font-size:15px}' +
+    'button{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin:0 0 10px;padding:8px 14px;border-radius:999px;border:2px solid #a8b3f0;background:transparent;color:#eceae4;font:inherit;font-size:17px;line-height:1.2;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}' +
+    'button.principal{background:#a8b3f0;color:#0b1020;border-color:#a8b3f0}' +
+    'button.discret{min-height:44px;margin:4px 0 0;border:0;color:#a3adc2;font-size:14px;text-decoration:underline}' +
+    'button.discret.armer{color:#f2d27a;text-decoration:none}' +
+    'button:focus-visible{outline:3px solid #f2d27a;outline-offset:2px}' +
+    '.seul{display:inline-flex;width:auto;min-height:44px;margin:0;padding:6px 14px;border:1px solid #5a6688;background:rgba(11,16,32,.6);color:#eceae4;font:600 14px/1.2 ui-rounded,"Segoe UI",system-ui,sans-serif}' +
+    '.seul.armer{border-color:#f2d27a;color:#f2d27a}';
+
+  function isoler(element) {
+    ['pointerdown', 'pointerup', 'pointermove', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'touchmove', 'click', 'keydown', 'keyup', 'wheel'].forEach(function (type) {
+      element.addEventListener(type, function (e) { e.stopPropagation(); });
+    });
+  }
+
+  function creerHote(nom, style) {
+    var hote = document.createElement(nom);
+    for (var p in style) hote.style.setProperty(p, style[p], 'important');
+    var ombre = hote.attachShadow ? hote.attachShadow({ mode: 'open' }) : hote;
+    var feuille = document.createElement('style');
+    feuille.textContent = CSS;
+    ombre.appendChild(feuille);
+    return { hote: hote, ombre: ombre };
+  }
+
+  function bouton(classe, contenu) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    if (classe) b.className = classe;
+    b.textContent = contenu;
+    return b;
+  }
+
+  // Bouton d'effacement en deux temps (les fenêtres du navigateur sont interdites) :
+  // 1er toucher → « Toucher encore pour effacer », 2e toucher dans les 3 s → efface.
+  function armerEffacement(b, jeu, fait) {
+    var minuteur = null;
+    b.addEventListener('click', function () {
+      if (!b.classList.contains('armer')) {
+        b.classList.add('armer');
+        b.textContent = texte('confirmer');
+        clearTimeout(minuteur);
+        minuteur = setTimeout(function () { b.classList.remove('armer'); b.textContent = texte('effacer'); }, 3000);
+        return;
+      }
+      clearTimeout(minuteur);
+      b.classList.remove('armer');
+      clear(jeu);
+      fait();
+    });
+  }
+
+  var ouverte = null; // fenêtre de reprise affichée
+
+  // Fenêtre de reprise. options :
+  //   jeu          identifiant du jeu (obligatoire)
+  //   onContinuer  f(donnees) : reprendre au niveau donnees.niveau
+  //   onNouvelle   f() : partie depuis le début (la sauvegarde reste jusqu'à la
+  //                prochaine écriture du jeu)
+  //   onEffacer    f() facultatif, après effacement (par défaut : onNouvelle)
+  //   sansNiveau   true pour un jeu sans niveaux (partie sans fin) : la fenêtre
+  //                montre seulement le score (rien s'il est nul)
+  // Sans sauvegarde utilisable : rien ne s'affiche, onNouvelle() est appelé
+  // tout de suite. Renvoie true si la fenêtre s'affiche.
+  function reprise(options) {
+    options = options || {};
+    var jeu = options.jeu;
+    var nouvelle = typeof options.onNouvelle === 'function' ? options.onNouvelle : function () {};
+    var continuer = typeof options.onContinuer === 'function' ? options.onContinuer : nouvelle;
+    var effacer = typeof options.onEffacer === 'function' ? options.onEffacer : nouvelle;
+    var d = lireDonnees(jeu);
+    if (!d) { nouvelle(); return false; }
+    if (ouverte) ouverte.fermer();
+
+    var precedent = document.activeElement;
+    var h = creerHote('jel-sauvegarde', { position: 'fixed', inset: '0', 'z-index': '2147483002', display: 'block', margin: '0', padding: '0' });
+    var fond = document.createElement('div');
+    fond.className = 'fond';
+    var carte = document.createElement('div');
+    carte.className = 'carte';
+    carte.setAttribute('role', 'dialog');
+    carte.setAttribute('aria-modal', 'true');
+    var titre = document.createElement('h2');
+    titre.id = 'jel-sauvegarde-titre';
+    titre.textContent = texte('titre');
+    carte.setAttribute('aria-labelledby', titre.id);
+    var detail = document.createElement('p');
+    detail.textContent = options.sansNiveau
+      ? (d.score ? texte('score', { n: d.score }) : '')
+      : texte('niveau', { n: d.niveau }) + (d.score ? ' · ' + texte('score', { n: d.score }) : '');
+    if (!detail.textContent) detail.hidden = true;
+    var bContinuer = bouton('principal', texte('continuer'));
+    var bNouvelle = bouton('', texte('nouvelle'));
+    var bEffacer = bouton('discret', texte('effacer'));
+    carte.append(titre, detail, bContinuer, bNouvelle, bEffacer);
+    fond.appendChild(carte);
+    h.ombre.appendChild(fond);
+    isoler(h.hote);
+
+    var fenetre = {
+      fermer: function () {
+        if (h.hote.parentNode) h.hote.parentNode.removeChild(h.hote);
+        if (ouverte === fenetre) ouverte = null;
+        try { if (precedent && precedent.focus) precedent.focus(); } catch (e) { /* rien */ }
+      },
+    };
+    ouverte = fenetre;
+    var choisir = function (f, arg) { return function () { fenetre.fermer(); f(arg); }; };
+    bContinuer.addEventListener('click', choisir(continuer, d));
+    bNouvelle.addEventListener('click', choisir(nouvelle));
+    armerEffacement(bEffacer, jeu, function () { fenetre.fermer(); effacer(); });
+
+    // Clavier : Tab et les flèches restent dans la fenêtre, Entrée et Espace
+    // activent le bouton choisi. Échap ne ferme pas : le choix doit être explicite.
+    var boutons = [bContinuer, bNouvelle, bEffacer];
+    fond.addEventListener('keydown', function (e) {
+      if (e.key !== 'Tab' && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      var actif = h.ombre.activeElement || document.activeElement;
+      var i = boutons.indexOf(actif);
+      var recul = e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey);
+      boutons[(i + (recul ? boutons.length - 1 : 1)) % boutons.length].focus();
+    });
+
+    (document.body || document.documentElement).appendChild(h.hote);
+    try { bContinuer.focus(); } catch (e) { /* rien */ }
+    return true;
+  }
+
+  // Bouton « Effacer la sauvegarde » seul (écran titre, menu pause…). options :
+  //   jeu, conteneur (élément où le placer), apres f() facultatif.
+  // Caché tant qu'il n'y a pas de sauvegarde ; appeler .maj() pour le rafraîchir.
+  // Renvoie l'élément ajouté (avec sa méthode maj).
+  function boutonEffacer(options) {
+    options = options || {};
+    var h = creerHote('jel-sauvegarde-effacer', { display: 'inline-block', margin: '0', padding: '0', 'vertical-align': 'middle' });
+    var b = bouton('seul', texte('effacer'));
+    h.ombre.appendChild(b);
+    isoler(h.hote);
+    h.hote.maj = function () {
+      b.classList.remove('armer');
+      b.textContent = texte('effacer');
+      h.hote.style.setProperty('display', existe(options.jeu) ? 'inline-block' : 'none', 'important');
+    };
+    armerEffacement(b, options.jeu, function () {
+      h.hote.maj();
+      if (typeof options.apres === 'function') options.apres();
+    });
+    h.hote.maj();
+    if (options.conteneur) options.conteneur.appendChild(h.hote);
+    return h.hote;
+  }
+
+  window.JEL_SAVE = {
+    VERSION: SAUVEGARDE_VERSION,
+    save: save,
+    load: load,
+    clear: clear,
+    existe: existe,
+    surFermeture: surFermeture,
+    reprise: reprise,
+    boutonEffacer: boutonEffacer,
+    texte: texte,
+  };
+})();
+</script>
+<style>
+  :root {
+    --ciel: #bfe6fb;
+    --encre: #1f2a44;
+    --carte: #fffaf0;
+    --jaune: #f6c026;
+    --orange: #f2862b;
+    --vert: #2fa866;
+    --rouge: #e5533d;
+    --bleu: #2f6fd6;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #8fd0f2; color: var(--encre);
+    font-family: ui-rounded, "Segoe UI Rounded", "Nunito", system-ui, sans-serif; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible { outline: 3px solid #1f2a44; outline-offset: 2px; }
+  #app { position: relative; height: 100%; max-width: 560px; margin: 0 auto; background: var(--ciel); overflow: hidden; }
+  .ecran { position: absolute; inset: 0; display: none; flex-direction: column; }
+  .ecran.actif { display: flex; }
+
+  /* Boutons */
+  .gros { min-height: 58px; padding: 10px 28px; border: 0; border-radius: 999px; background: var(--orange); color: #fff;
+    font-size: 1.45rem; font-weight: 800; box-shadow: 0 5px 0 #b65a12; letter-spacing: .02em; }
+  .gros:active { transform: translateY(3px); box-shadow: 0 2px 0 #b65a12; }
+  .moyen { min-height: 48px; padding: 8px 18px; border: 0; border-radius: 999px; background: #fff; color: var(--encre);
+    font-size: 1.05rem; font-weight: 700; box-shadow: 0 4px 0 #9fb3c8; }
+  .moyen:active { transform: translateY(2px); box-shadow: 0 2px 0 #9fb3c8; }
+  .rond { width: 46px; height: 46px; min-width: 46px; border: 0; border-radius: 50%; background: #fff; display: inline-flex;
+    align-items: center; justify-content: center; box-shadow: 0 3px 0 #9fb3c8; padding: 0; }
+  .rond svg { width: 26px; height: 26px; }
+  .rang { display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; }
+
+  /* Écran titre */
+  #toile-titre { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .titre-haut { position: relative; padding: 5vh 18px 0; text-align: center; }
+  .titre-haut h1 { margin: 0; font-size: clamp(1.9rem, 8.5vw, 2.9rem); line-height: 1.05; color: #fff;
+    text-shadow: 0 3px 0 #1f5f8f, 0 0 18px rgba(31,95,143,.5); }
+  .consigne { margin: 12px auto 0; max-width: 26em; font-size: 1.05rem; font-weight: 700; background: rgba(255,255,255,.85);
+    padding: 8px 14px; border-radius: 16px; }
+  .titre-bas { position: absolute; left: 0; right: 0; bottom: 3vh; display: flex; flex-direction: column; gap: 12px; align-items: center; padding: 0 14px; }
+
+  /* En-têtes des écrans secondaires */
+  .entete { display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+  .entete h2 { margin: 0; font-size: 1.4rem; }
+  .defile { flex: 1; overflow-y: auto; padding: 0 14px 20px; -webkit-overflow-scrolling: touch; }
+
+  /* Lignes */
+  #grille { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 6px 14px 20px; align-content: start; }
+  .case { position: relative; min-height: 86px; border: 0; border-radius: 16px; background: #fff; box-shadow: 0 4px 0 #9fb3c8;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 6px 2px; }
+  .case .num { font-size: 1.35rem; font-weight: 800; }
+  .case svg.veh { width: 38px; height: 20px; }
+  .case .et { display: flex; gap: 1px; }
+  .case .et svg { width: 14px; height: 14px; }
+  .case.fermee { background: #dfe7ef; box-shadow: 0 4px 0 #b9c6d3; color: #8293a8; }
+  .case.fermee svg.cad { width: 24px; height: 24px; }
+
+  /* Album */
+  #album-total { font-size: 1.2rem; font-weight: 800; display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
+  #album-total svg { width: 40px; height: 26px; }
+  .defile h3 { margin: 16px 0 8px; font-size: 1.1rem; }
+  .liste-objets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .objet { min-height: 96px; border: 3px solid transparent; border-radius: 14px; background: #fff; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px; padding: 6px 4px; font-size: .85rem; font-weight: 700; text-align: center; box-shadow: 0 3px 0 #9fb3c8; }
+  .objet.choisi { border-color: var(--vert); }
+  .objet.bloque { background: #e7edf3; color: #7c8ca0; }
+  .objet canvas { width: 64px; height: 40px; }
+  .ligne-album { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: #fff; border-radius: 12px; margin-bottom: 6px; font-weight: 700; }
+  .ligne-album .nom { min-width: 5.5em; }
+  .ligne-album .tk { display: flex; flex-wrap: wrap; gap: 2px; flex: 1; }
+  .ligne-album .tk svg { width: 20px; height: 13px; }
+
+  /* Jeu */
+  .hud { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #23406b; color: #fff; }
+  .hud-textes { flex: 1; display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+  .hud-textes strong { font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud-textes span { font-size: .9rem; opacity: .9; }
+  .chances { display: flex; gap: 2px; }
+  .chances svg { width: 20px; height: 20px; }
+  .tickets { display: flex; align-items: center; gap: 4px; font-weight: 800; font-size: 1.05rem; }
+  .tickets svg { width: 28px; height: 18px; }
+  .tickets.saute { animation: saute .45s; }
+  @keyframes saute { 40% { transform: scale(1.35); } }
+  .scene { position: relative; width: 100%; aspect-ratio: 420 / 300; max-height: calc(100% - 290px); min-height: 170px; flex: none; background: #9fd8f5; }
+  .scene canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .scene.secoue { animation: secoue .4s; }
+  @keyframes secoue { 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+  .puces { position: absolute; left: 6px; top: 6px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; pointer-events: none; }
+  .puce { background: rgba(255,255,255,.92); border-radius: 999px; padding: 3px 10px; font-weight: 800; font-size: .95rem; box-shadow: 0 2px 0 rgba(0,0,0,.15); }
+  .puce:empty { display: none; }
+  .puce.roule { animation: saute .45s; }
+  .klaxon { position: absolute; right: 6px; top: 6px; background: #ffe27a; box-shadow: 0 3px 0 #c9a227; }
+  .panneau { flex: 1; min-height: 230px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 10px 12px 12px; background: #fff7e6; min-height: 0; }
+  #msg { margin: 0; min-height: 2.6em; font-size: 1.15rem; font-weight: 800; text-align: center; display: flex; align-items: center; }
+  #explication { margin: 0; min-height: 1.3em; font-size: 1.05rem; font-weight: 700; text-align: center; color: #5a3b00; }
+  #reponses { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; min-height: 76px; }
+  .rep { min-width: 76px; min-height: 68px; padding: 6px 14px; border: 0; border-radius: 20px; background: #fff; font-size: 1.8rem; font-weight: 800;
+    box-shadow: 0 5px 0 #c7b37f; border: 3px solid #e9d7a5; }
+  .rep.texte { font-size: 1.05rem; min-width: 130px; max-width: 46%; }
+  .rep:active { transform: translateY(3px); box-shadow: 0 2px 0 #c7b37f; }
+  .rep.bon { background: #c9f2d5; border-color: var(--vert); }
+  .rep.faux { background: #ffd2c9; border-color: var(--rouge); }
+  .rep:disabled { cursor: default; }
+  .compteur { display: flex; align-items: center; gap: 10px; }
+  .compteur .val { min-width: 84px; text-align: center; font-size: 2.3rem; font-weight: 800; background: #fff; border-radius: 16px; padding: 2px 8px; border: 3px solid #e9d7a5; }
+  .compteur .fl { width: 58px; height: 58px; border: 0; border-radius: 16px; background: #ffe27a; box-shadow: 0 4px 0 #c9a227; display: flex; align-items: center; justify-content: center; }
+  .compteur .fl svg { width: 30px; height: 30px; }
+  .compteur .ok { background: #8fe0a8; box-shadow: 0 4px 0 #3c9a5d; }
+  #pieces { display: flex; gap: 14px; align-items: center; justify-content: center; flex-wrap: wrap; }
+  #pieces:empty { display: none; }
+  .tas { display: flex; align-items: center; gap: 3px; background: #fff; border-radius: 12px; padding: 4px 8px; }
+  .tas svg.ic { width: 30px; height: 20px; margin-right: 4px; }
+  .piece { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff3b0, #f2b41c 60%, #b77f06); border: 1px solid #9a6a05; }
+  .piece.vide { background: none; border: 2px dashed #c79a2b; }
+
+  /* Fenêtres */
+  .voile { position: absolute; inset: 0; background: rgba(20,32,60,.6); display: flex; align-items: center; justify-content: center; padding: 14px; z-index: 10; }
+  .voile[hidden] { display: none; }
+  .carte { background: var(--carte); border-radius: 22px; padding: 18px 16px; width: 100%; max-width: 400px; display: flex; flex-direction: column;
+    gap: 10px; align-items: center; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.3); max-height: 100%; overflow-y: auto; }
+  .carte h2 { margin: 0; font-size: 1.5rem; }
+  .carte p { margin: 0; font-weight: 700; }
+  .nouveau { color: #fff; background: var(--rouge); padding: 4px 14px; border-radius: 999px; font-weight: 800; }
+  #toile-tuto { width: 100%; max-width: 340px; aspect-ratio: 420 / 270; border-radius: 14px; background: #9fd8f5; }
+  #tuto-texte { font-size: 1.1rem; min-height: 2.8em; }
+  #tuto-points { display: flex; gap: 6px; }
+  #tuto-points i { width: 10px; height: 10px; border-radius: 50%; background: #c9d3de; }
+  #tuto-points i.on { background: var(--orange); }
+  .passer { font-size: .85rem; opacity: .7; }
+  #fin-etoiles { display: flex; gap: 6px; }
+  #fin-etoiles svg { width: 54px; height: 54px; opacity: 0; transform: scale(.3); }
+  #fin-etoiles svg.vue { animation: etoile .5s forwards; }
+  @keyframes etoile { 60% { opacity: 1; transform: scale(1.25) rotate(12deg); } 100% { opacity: 1; transform: scale(1); } }
+  #fin-record { color: #b5480f; }
+  #fin-debloque { color: #20734a; }
+  @media (prefers-reduced-motion: reduce) { .scene.secoue, .tickets.saute, .puce.roule { animation: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- Écran titre -->
+  <section id="ecran-titre" class="ecran actif">
+    <canvas id="toile-titre" aria-hidden="true"></canvas>
+    <div class="titre-haut">
+      <h1 data-i18n="titre"></h1>
+      <p class="consigne" data-i18n="consigne"></p>
+    </div>
+    <div class="titre-bas">
+      <button id="b-jouer" class="gros" data-i18n="jouer"></button>
+      <div class="rang">
+        <button id="b-lignes" class="moyen" data-i18n="lignes"></button>
+        <button id="b-album" class="moyen" data-i18n="album"></button>
+      </div>
+      <div class="rang">
+        <button id="b-son-titre" class="rond son"></button>
+        <span id="langue-titre"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Choix de la ligne -->
+  <section id="ecran-lignes" class="ecran">
+    <div class="entete">
+      <button class="rond retour" data-i18n-aria="retour"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="#1f2a44" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <h2 data-i18n="lignes.titre"></h2>
+    </div>
+    <div id="grille"></div>
+  </section>
+
+  <!-- Album et garage -->
+  <section id="ecran-album" class="ecran">
+    <div class="entete">
+      <button class="rond retour" data-i18n-aria="retour"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="#1f2a44" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <h2 data-i18n="album"></h2>
+    </div>
+    <div class="defile">
+      <p id="album-total"></p>
+      <h3 data-i18n="album.couleurs"></h3>
+      <div id="liste-couleurs" class="liste-objets"></div>
+      <h3 data-i18n="album.klaxons"></h3>
+      <div id="liste-klaxons" class="liste-objets"></div>
+      <h3 data-i18n="album.casquettes"></h3>
+      <div id="liste-casquettes" class="liste-objets"></div>
+      <h3 data-i18n="album.lignes"></h3>
+      <div id="album-lignes"></div>
+    </div>
+  </section>
+
+  <!-- Partie -->
+  <section id="ecran-jeu" class="ecran">
+    <div class="hud">
+      <button id="b-pause" class="rond" data-i18n-aria="pause.aria"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1.5" fill="#1f2a44"/><rect x="14" y="5" width="4" height="14" rx="1.5" fill="#1f2a44"/></svg></button>
+      <div class="hud-textes"><strong id="hud-ligne"></strong><span id="hud-arret"></span></div>
+      <div id="hud-chances" class="chances"></div>
+      <div id="hud-tickets" class="tickets"><svg viewBox="0 0 30 20"><use href="#ic-ticket"/></svg><span id="hud-tickets-n"></span></div>
+      <button id="b-son" class="rond son"></button>
+    </div>
+    <div class="scene" id="scene">
+      <canvas id="toile"></canvas>
+      <div class="puces"><span id="puce-abord" class="puce"></span><span id="puce-haut" class="puce"></span><span id="puce-places" class="puce"></span></div>
+      <button id="b-klaxon" class="rond klaxon" data-i18n-aria="klaxon.aria"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="5" fill="#e5533d" stroke="#1f2a44" stroke-width="1.4"/><path d="M10.5 10.5h3l8-6v15l-8-6h-3z" fill="#1f2a44"/></svg></button>
+    </div>
+    <div class="panneau">
+      <p id="msg" aria-live="polite"></p>
+      <div id="pieces"></div>
+      <div id="reponses"></div>
+      <p id="explication" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- Pause -->
+  <div id="voile-pause" class="voile" hidden>
+    <div class="carte" role="dialog" aria-modal="true">
+      <h2 data-i18n="pause.titre"></h2>
+      <button id="b-reprendre" class="gros" data-i18n="reprendre"></button>
+      <button id="b-recommencer" class="moyen" data-i18n="recommencer"></button>
+      <button id="b-accueil" class="moyen" data-i18n="accueil"></button>
+      <div class="rang"><button id="b-son-pause" class="rond son"></button><span id="langue-pause"></span></div>
+    </div>
+  </div>
+
+  <!-- Tutoriel et nouveautés -->
+  <div id="voile-tuto" class="voile" hidden>
+    <div class="carte" role="dialog" aria-modal="true">
+      <p id="tuto-titre" class="nouveau"></p>
+      <canvas id="toile-tuto" aria-hidden="true"></canvas>
+      <p id="tuto-texte"></p>
+      <div id="tuto-points"></div>
+      <button id="b-compris" class="gros" data-i18n="compris"></button>
+      <p class="passer" data-i18n="tuto.passer"></p>
+    </div>
+  </div>
+
+  <!-- Fin de ligne -->
+  <div id="voile-fin" class="voile" hidden>
+    <div class="carte" role="dialog" aria-modal="true">
+      <h2 id="fin-titre"></h2>
+      <div id="fin-etoiles"></div>
+      <p id="fin-texte"></p>
+      <p id="fin-tickets"></p>
+      <p id="fin-record"></p>
+      <p id="fin-debloque"></p>
+      <p id="fin-bilan"></p>
+      <button id="b-fin-1" class="gros"></button>
+      <div class="rang">
+        <button id="b-fin-2" class="moyen"></button>
+        <button id="b-fin-3" class="moyen"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Icônes communes (aucun texte) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="ic-ticket" viewBox="0 0 30 20"><path d="M2 3h26v5a2 2 0 0 0 0 4v5H2v-5a2 2 0 0 0 0-4z" fill="#ffb347" stroke="#b5641a" stroke-width="1.5"/><path d="M20 4v12" stroke="#b5641a" stroke-width="1.2" stroke-dasharray="2 2"/><circle cx="11" cy="10" r="3" fill="#fff3d6"/></symbol>
+    <symbol id="ic-ticket-gris" viewBox="0 0 30 20"><path d="M2 3h26v5a2 2 0 0 0 0 4v5H2v-5a2 2 0 0 0 0-4z" fill="#e3e8ee" stroke="#b9c3cf" stroke-width="1.5"/></symbol>
+    <symbol id="ic-etoile" viewBox="0 0 24 24"><path d="M12 2l3 6.5 7 .8-5.2 4.8 1.5 7-6.3-3.6-6.3 3.6 1.5-7L2 9.3l7-.8z" fill="#ffc83d" stroke="#c48a00" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="ic-etoile-vide" viewBox="0 0 24 24"><path d="M12 2l3 6.5 7 .8-5.2 4.8 1.5 7-6.3-3.6-6.3 3.6 1.5-7L2 9.3l7-.8z" fill="#dfe5ec" stroke="#aab6c4" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+    <symbol id="ic-coeur" viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" fill="#ff5d73" stroke="#fff" stroke-width="1.5"/></symbol>
+    <symbol id="ic-coeur-vide" viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z" fill="#5b6f8f" stroke="#8ea2c0" stroke-width="1.5"/></symbol>
+    <symbol id="ic-cadenas" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2.5" fill="#8293a8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" fill="none" stroke="#8293a8" stroke-width="2.5"/></symbol>
+    <symbol id="ic-main" viewBox="0 0 24 24"><path d="M9 21c-2-2-4-5-4-7 0-1 1-1.6 2-1l2 2V4.5a1.5 1.5 0 0 1 3 0V11h1V9.5a1.5 1.5 0 0 1 3 0V12h.5v-1a1.5 1.5 0 0 1 3 0V16c0 3-2 5-4 5z" fill="#fff" stroke="#1f2a44" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<script>
+/* =========================================================================
+   Le bus des passagers à compter — Free Micro Games
+   On conduit le bus de la ligne 7 : à chaque arrêt, des passagers montent et
+   descendent ; avant de repartir, on donne le nombre de passagers à bord.
+   Tout le texte passe par t() (5 langues) ; aucun dessin ne contient de texte.
+   ========================================================================= */
+'use strict';
+
+const JEU = 'bus-des-passagers-a-compter';
+const tr = (cle, vars) => (window.JEL_I18N ? window.JEL_I18N.t(cle, vars) : cle);
+const nb = (x) => (window.JEL_I18N ? window.JEL_I18N.nombre(x) : String(x));
+
+/* ---------- Outils ---------- */
+const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const randR = (r) => rand(r[0], r[1]);
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const melanger = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const lerp = (a, b, p) => a + (b - a) * p;
+const doux = (p) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
+const borne = (x, a, b) => Math.max(a, Math.min(b, x));
+const $ = (id) => document.getElementById(id);
+
+function teinte(hex, f) { // f > 0 éclaircit, f < 0 assombrit
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const cible = f > 0 ? 255 : 0, k = Math.abs(f);
+  r = Math.round(r + (cible - r) * k); g = Math.round(g + (cible - g) * k); b = Math.round(b + (cible - b) * k);
+  return 'rgb(' + r + ',' + g + ',' + b + ')';
+}
+
+/* ---------- Véhicules ----------
+   motif : W = pare-brise (avant, à gauche), D = porte, F = fenêtre à 2 places.
+   Le nombre de places est celui des sièges dessinés. */
+const VEH = {
+  bus:     { long: 300, haut: 112, motif: 'WDFFFFFF',   rangs: 1, decor: 'ville' },
+  minibus: { long: 220, haut: 100, motif: 'WDFFFF',     rangs: 1, decor: 'quartier' },
+  etage:   { long: 300, haut: 178, motif: 'WDFFFFFF',   rangs: 2, decor: 'avenue' },
+  tram:    { long: 352, haut: 112, motif: 'WDFFFFDFFF', rangs: 1, decor: 'centre', tram: true },
+  car:     { long: 300, haut: 120, motif: 'WDFFFFFF',   rangs: 1, decor: 'montagne', car: true },
+};
+for (const k in VEH) {
+  const v = VEH[k];
+  v.parRang = (v.motif.split('F').length - 1) * 2;
+  v.cap = v.parRang * v.rangs;
+}
+
+/* ---------- Les 20 lignes ----------
+   dep : passagers au départ ; m / d : passagers qui montent / descendent ;
+   g : tailles des familles possibles (pg : part des familles) ;
+   cpt : part des arrêts au compteur à flèches ;
+   cache : 'non', 'portes' (vitres teintées), 'haut' (étage du haut teinté), 'tout' ;
+   cacheDes : arrêt (à partir de 0) où les vitres deviennent teintées ;
+   sp : arrêts spéciaux (places, trottoir, monnaie, corresp) ;
+   qHaut : part des questions « combien en haut ? » (bus à étage) ;
+   vit : vitesse des passagers ; nouv : nouveautés présentées au début. */
+const NIVEAUX = [
+  { v: 'bus',     arrets: 3, dep: [0, 1], m: [1, 3], d: [0, 0], g: [],     pg: 0,   cpt: 0,   cache: 'non', sp: {}, vit: 0.9,  nouv: ['base'] },
+  { v: 'bus',     arrets: 4, dep: [2, 3], m: [1, 3], d: [1, 2], g: [],     pg: 0,   cpt: 0,   cache: 'non', sp: {}, vit: 0.95, nouv: ['descente'] },
+  { v: 'bus',     arrets: 4, dep: [2, 4], m: [1, 4], d: [1, 3], g: [],     pg: 0,   cpt: 0.5, cache: 'non', sp: {}, vit: 1,    nouv: ['compteur'] },
+  { v: 'bus',     arrets: 5, dep: [3, 5], m: [1, 4], d: [1, 3], g: [],     pg: 0,   cpt: 0.4, cache: 'portes', cacheDes: 1, sp: {}, vit: 1, nouv: ['portes'] },
+  { v: 'minibus', arrets: 5, dep: [1, 2], m: [2, 4], d: [0, 2], g: [2],    pg: 0.7, cpt: 0.4, cache: 'non', sp: {}, vit: 1.05, nouv: ['minibus', 'groupes2'] },
+  { v: 'minibus', arrets: 5, dep: [0, 1], m: [2, 6], d: [1, 3], g: [2, 5], pg: 0.7, cpt: 0.4, cache: 'non', sp: {}, vit: 1.05, nouv: ['groupes5'] },
+  { v: 'minibus', arrets: 5, dep: [3, 5], m: [1, 4], d: [1, 3], g: [2],    pg: 0.5, cpt: 0.3, cache: 'non', sp: { places: 2 }, vit: 1.05, nouv: ['places'] },
+  { v: 'minibus', arrets: 6, dep: [3, 5], m: [1, 4], d: [1, 3], g: [2, 5], pg: 0.5, cpt: 0.5, cache: 'portes', cacheDes: 3, sp: { places: 1, trottoir: 2 }, vit: 1.1, nouv: ['trottoir'] },
+  { v: 'etage',   arrets: 5, dep: [4, 6], m: [2, 5], d: [1, 3], g: [],     pg: 0,   cpt: 0.3, cache: 'non', sp: {}, vit: 1.05, nouv: ['etage'] },
+  { v: 'etage',   arrets: 5, dep: [4, 6], m: [2, 5], d: [1, 3], g: [2],    pg: 0.4, cpt: 0.4, cache: 'haut', cacheDes: 0, qHaut: 0.5, sp: {}, vit: 1.1, nouv: ['haut'] },
+  { v: 'etage',   arrets: 6, dep: [6, 8], m: [2, 6], d: [2, 4], g: [2, 5], pg: 0.5, cpt: 0.6, cache: 'haut', cacheDes: 2, qHaut: 0.3, sp: {}, vit: 1.1, nouv: [] },
+  { v: 'etage',   arrets: 6, dep: [6, 9], m: [2, 6], d: [2, 5], g: [2, 5], pg: 0.5, cpt: 0.6, cache: 'tout', cacheDes: 1, qHaut: 0.3, sp: {}, vit: 1.15, nouv: [] },
+  { v: 'tram',    arrets: 5, dep: [3, 5], m: [1, 4], d: [1, 3], g: [],     pg: 0,   cpt: 0.4, cache: 'non', sp: { monnaie: 2 }, prix: [1, 3], vit: 1.1, nouv: ['tram', 'monnaie'] },
+  { v: 'tram',    arrets: 6, dep: [4, 6], m: [2, 5], d: [1, 4], g: [2],    pg: 0.4, cpt: 0.5, cache: 'non', deuxPortes: true, sp: { monnaie: 1 }, prix: [1, 4], vit: 1.15, nouv: ['deuxPortes'] },
+  { v: 'tram',    arrets: 6, dep: [4, 6], m: [2, 5], d: [1, 4], g: [2, 5], pg: 0.5, cpt: 0.5, cache: 'portes', cacheDes: 2, deuxPortes: true, sp: { monnaie: 2 }, prix: [2, 5], vit: 1.15, nouv: [] },
+  { v: 'tram',    arrets: 6, dep: [6, 9], m: [2, 6], d: [1, 4], g: [2, 5], pg: 0.5, cpt: 0.6, cache: 'non', deuxPortes: true, sp: { trottoir: 2, places: 1 }, vit: 1.2, nouv: [] },
+  { v: 'car',     arrets: 6, dep: [4, 6], m: [2, 5], d: [1, 4], g: [2],    pg: 0.4, cpt: 0.5, cache: 'non', sp: { corresp: 2 }, vit: 1.15, nouv: ['car', 'corresp'] },
+  { v: 'car',     arrets: 6, dep: [5, 7], m: [2, 6], d: [2, 5], g: [2, 5], pg: 0.6, cpt: 0.6, cache: 'portes', cacheDes: 3, sp: { corresp: 2, monnaie: 1 }, prix: [2, 5], vit: 1.2, nouv: [] },
+  { v: 'car',     arrets: 7, dep: [5, 7], m: [2, 6], d: [2, 5], g: [2, 5], pg: 0.6, cpt: 1,   cache: 'portes', cacheDes: 2, sp: { corresp: 2, trottoir: 1, monnaie: 1 }, prix: [2, 6], vit: 1.3, nouv: [] },
+  { v: 'car',     arrets: 8, dep: [5, 8], m: [2, 6], d: [2, 5], g: [2, 5], pg: 0.6, cpt: 0.8, cache: 'portes', cacheDes: 4, sp: { corresp: 2, trottoir: 1, places: 1, monnaie: 1 }, prix: [2, 6], vit: 1.3, nouv: [] },
+];
+window.JEL_NIVEAUX = NIVEAUX.length;
+
+/* ---------- Récompenses du garage (seuils en tickets cumulés) ---------- */
+const COULEURS = [
+  { id: 'jaune', c: '#f6c026', prix: 0 }, { id: 'rouge', c: '#e5533d', prix: 8 }, { id: 'bleu', c: '#3b7fe0', prix: 18 },
+  { id: 'vert', c: '#34a866', prix: 30 }, { id: 'violet', c: '#8d5fd3', prix: 45 }, { id: 'rose', c: '#ee77ab', prix: 62 },
+  { id: 'orange', c: '#f2862b', prix: 80 },
+];
+const KLAXONS = [
+  { id: 'tut', prix: 0 }, { id: 'pouet', prix: 12 }, { id: 'trompette', prix: 26 },
+  { id: 'sifflet', prix: 40 }, { id: 'cloche', prix: 56 }, { id: 'corne', prix: 75 },
+];
+const CASQUETTES = [
+  { id: 'marine', prix: 0 }, { id: 'rouge', prix: 5 }, { id: 'etoile', prix: 22 },
+  { id: 'carreaux', prix: 36 }, { id: 'helice', prix: 52 }, { id: 'montagne', prix: 70 },
+];
+
+/* ---------- Progression (sauvegardée par JEL_SAVE) ---------- */
+function defautP() {
+  return { etoiles: Array(NIVEAUX.length).fill(0), records: Array(NIVEAUX.length).fill(0), debloque: 1, tickets: 0,
+    couleur: 'jaune', klaxon: 'tut', casquette: 'marine', son: true, vus: [] };
+}
+let P = defautP();
+function chargerP() {
+  const p = defautP();
+  try {
+    const d = window.JEL_SAVE ? JEL_SAVE.load(JEU) : null;
+    const o = d && d.options;
+    if (o && typeof o === 'object') {
+      if (Array.isArray(o.etoiles)) o.etoiles.forEach((v, i) => { if (i < p.etoiles.length) p.etoiles[i] = borne(Math.round(Number(v) || 0), 0, 3); });
+      if (Array.isArray(o.records)) o.records.forEach((v, i) => { if (i < p.records.length) p.records[i] = Math.max(0, Math.round(Number(v) || 0)); });
+      p.debloque = borne(Math.round(Number(o.debloque) || 1), 1, NIVEAUX.length);
+      p.tickets = Math.max(0, Math.round(Number(o.tickets) || 0));
+      if (COULEURS.some((c) => c.id === o.couleur)) p.couleur = o.couleur;
+      if (KLAXONS.some((c) => c.id === o.klaxon)) p.klaxon = o.klaxon;
+      if (CASQUETTES.some((c) => c.id === o.casquette)) p.casquette = o.casquette;
+      p.son = o.son !== false;
+      if (Array.isArray(o.vus)) p.vus = o.vus.filter((x) => typeof x === 'string').slice(0, 40);
+    }
+    if (d && d.niveau) p.debloque = Math.max(p.debloque, borne(Math.round(Number(d.niveau) || 1), 1, NIVEAUX.length));
+    if (!(o && typeof o === 'object')) { const son = localStorage.getItem('bus-ligne-7-son'); if (son === '0') p.son = false; }
+  } catch (e) { /* sauvegarde illisible ou stockage refusé : valeurs par défaut */ }
+  return p;
+}
+function enregistrer(niveau) {
+  try { JEL_SAVE.save(JEU, { niveau: borne(niveau, 1, NIVEAUX.length), score: P.tickets, options: JSON.parse(JSON.stringify(P)) }); } catch (e) { /* stockage indisponible */ }
+}
+// Choix du garage ou du son : on les garde seulement si une sauvegarde existe
+// déjà (on ne touche jamais au niveau sauvegardé depuis les menus).
+function enregistrerReglages() {
+  try { if (JEL_SAVE.existe(JEU)) enregistrer(JEL_SAVE.load(JEU).niveau || 1); } catch (e) { /* rien */ }
+}
+const etoilesTotal = () => P.etoiles.reduce((a, b) => a + b, 0);
+
+/* =========================================================================
+   SONS (Web Audio, créés au premier toucher seulement)
+   ========================================================================= */
+let AC = null;
+function audio() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+  if (AC && AC.state === 'suspended') { try { AC.resume(); } catch (e) { /* rien */ } }
+  return AC;
+}
+function note(f, d, o) {
+  o = o || {};
+  if (!P.son) return;
+  const a = audio(); if (!a) return;
+  const t0 = a.currentTime + (o.delai || 0);
+  const osc = a.createOscillator(), g = a.createGain();
+  osc.type = o.type || 'sine';
+  osc.frequency.setValueAtTime(f, t0);
+  if (o.vers) osc.frequency.exponentialRampToValueAtTime(o.vers, t0 + d);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(o.vol || 0.16, t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  osc.connect(g); g.connect(a.destination);
+  osc.start(t0); osc.stop(t0 + d + 0.05);
+}
+function souffle(d, o) {
+  o = o || {};
+  if (!P.son) return;
+  const a = audio(); if (!a) return;
+  const t0 = a.currentTime + (o.delai || 0);
+  const tampon = a.createBuffer(1, Math.floor(a.sampleRate * d), a.sampleRate);
+  const data = tampon.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+  const src = a.createBufferSource(); src.buffer = tampon;
+  const filtre = a.createBiquadFilter(); filtre.type = 'bandpass'; filtre.frequency.value = o.freq || 1500;
+  const g = a.createGain(); g.gain.value = o.vol || 0.15;
+  src.connect(filtre); filtre.connect(g); g.connect(a.destination);
+  src.start(t0);
+}
+const SONS = {
+  clic: () => note(660, 0.06, { type: 'square', vol: 0.06 }),
+  pas: () => note(260 + Math.random() * 80, 0.05, { type: 'triangle', vol: 0.08 }),
+  porte: () => souffle(0.35, { freq: 1900, vol: 0.12 }),
+  moteur: () => { note(70, 1.1, { type: 'sawtooth', vol: 0.05, vers: 120 }); note(52, 1.1, { type: 'square', vol: 0.03, vers: 90 }); },
+  bon: () => { note(523, 0.12, { type: 'triangle' }); note(659, 0.12, { type: 'triangle', delai: 0.1 }); note(784, 0.25, { type: 'triangle', delai: 0.2 }); },
+  erreur: () => note(220, 0.35, { type: 'square', vol: 0.08, vers: 130 }),
+  ticket: () => { note(1046, 0.08, { vol: 0.1 }); note(1318, 0.12, { vol: 0.1, delai: 0.07 }); },
+  fleche: (haut) => note(haut ? 880 : 620, 0.05, { type: 'square', vol: 0.05 }),
+  pieces: () => { for (let i = 0; i < 3; i++) note(1800 + i * 300, 0.07, { type: 'triangle', vol: 0.07, delai: i * 0.07 }); },
+  victoire: () => { [523, 659, 784, 1046].forEach((f, i) => note(f, 0.18, { type: 'triangle', delai: i * 0.12 })); note(784, 0.6, { type: 'sine', delai: 0.5, vol: 0.12 }); note(1046, 0.6, { type: 'sine', delai: 0.5, vol: 0.12 }); },
+  defaite: () => { [392, 330, 262].forEach((f, i) => note(f, 0.3, { type: 'triangle', delai: i * 0.22 })); },
+};
+const SONS_KLAXON = {
+  tut: () => { for (const dl of [0, 0.22]) { note(440, 0.16, { type: 'square', vol: 0.08, delai: dl }); note(554, 0.16, { type: 'square', vol: 0.06, delai: dl }); } },
+  pouet: () => { for (const dl of [0, 0.25]) note(380, 0.2, { type: 'sawtooth', vol: 0.08, vers: 260, delai: dl }); },
+  trompette: () => { [523, 659, 784].forEach((f, i) => note(f, 0.16, { type: 'sawtooth', vol: 0.06, delai: i * 0.13 })); },
+  sifflet: () => { note(900, 0.25, { vol: 0.1, vers: 1600 }); note(1600, 0.25, { vol: 0.1, vers: 900, delai: 0.25 }); },
+  cloche: () => { for (const dl of [0, 0.3]) { note(1318, 0.5, { vol: 0.1, delai: dl }); note(2637, 0.3, { vol: 0.04, delai: dl }); } },
+  corne: () => { note(196, 0.9, { type: 'sawtooth', vol: 0.06 }); note(247, 0.9, { type: 'sawtooth', vol: 0.05 }); },
+};
+const klaxonner = (id) => (SONS_KLAXON[id || P.klaxon] || SONS_KLAXON.tut)();
+
+/* =========================================================================
+   ANIMATIONS (figées pendant la pause)
+   ========================================================================= */
+const S = {
+  ecran: 'titre', niv: 0, pause: false, jeton: 0, enJeu: false, plan: null, arret: 0,
+  abord: 0, haut: 0, erreurs: 0, tickets: 0, ticketsDebut: 0,
+  decor: null, bus: null, bus2: null, acteurs: [], train: false, particules: [], attente: null, question: null,
+};
+let taches = [];
+function anim(duree, f) {
+  return new Promise((res) => { taches.push({ t: 0, duree: Math.max(1, duree), f, res, jeton: S.jeton }); if (f) f(0); });
+}
+const attendre = (ms) => anim(ms, null);
+function majTaches(dt) {
+  const liste = taches.slice();
+  for (const k of liste) {
+    k.t += dt;
+    const p = Math.min(1, k.t / k.duree);
+    if (k.f) k.f(p);
+    if (p >= 1) { taches.splice(taches.indexOf(k), 1); if (k.jeton === S.jeton) k.res(); }
+  }
+}
+function annulerTout() { S.jeton++; taches = []; S.attente = null; }
+
+/* =========================================================================
+   DESSIN
+   ========================================================================= */
+const PEAUX = ['#f6d3b3', '#e8b98f', '#c98d5e', '#9a6640', '#6e4528', '#f2c7a0'];
+const CHEVEUX = ['#3b2414', '#6b3e1e', '#1c1c1c', '#c98b32', '#e6c25a', '#8a8a8a', '#a8432b'];
+const HABITS = ['#e5533d', '#3b7fe0', '#34a866', '#8d5fd3', '#f2862b', '#ee77ab', '#2a9d8f', '#ffcc33', '#6d7f99'];
+
+function nouvellePersonne(o) {
+  o = o || {};
+  return { x: 0, y: 250, a: 1, peau: pick(PEAUX), cheveux: pick(CHEVEUX), habit: o.habit || pick(HABITS),
+    taille: o.taille || (Math.random() < 0.3 ? 0.82 : 1), chapeau: o.chapeau || null, sac: Math.random() < 0.25,
+    phase: Math.random() * 6, marche: false, lien: null };
+}
+
+function rr(c, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+/* Décor de chaque arrêt (tiré au hasard) */
+function nouveauDecor(type, corresp) {
+  const d = { type, corresp, bat: [], nuages: [], sapins: [], monts: [] };
+  for (let i = 0; i < 6; i++) d.nuages.push({ x: rand(-300, 700), y: rand(10, 70), s: 0.6 + Math.random() * 0.7 });
+  if (type === 'montagne') {
+    for (let x = -420; x < 840; x += rand(90, 150)) d.monts.push({ x, l: rand(140, 220), h: rand(70, 120) });
+    for (let x = -420; x < 840; x += rand(18, 40)) d.sapins.push({ x, h: rand(18, 34) });
+    return d;
+  }
+  const palettes = {
+    ville: ['#f4a259', '#bc4b51', '#8cb369', '#5b8e7d', '#f4e285', '#9fb1bc'],
+    quartier: ['#ffb4a2', '#cdb4db', '#a2d2ff', '#ffd6a5', '#caffbf', '#fdffb6'],
+    avenue: ['#8ecae6', '#e9c46a', '#e76f51', '#90be6d', '#cdb4db', '#f4a261'],
+    centre: ['#d4a373', '#ccd5ae', '#e9edc9', '#faedcd', '#a3b18a', '#b5838d'],
+  }[type] || ['#f4a259', '#8cb369'];
+  for (let x = -420; x < 840;) {
+    const w = rand(46, 80), h = type === 'quartier' ? rand(44, 70) : rand(60, 130);
+    d.bat.push({ x, w, h, c: pick(palettes), toit: type === 'quartier' });
+    x += w + rand(0, 6);
+  }
+  return d;
+}
+
+function dessinerDecor(c, d, temps) {
+  // Ciel
+  const ciel = c.createLinearGradient(0, -200, 0, 170);
+  ciel.addColorStop(0, d.type === 'montagne' ? '#6ec3f0' : '#7fcdf2'); ciel.addColorStop(1, '#d9f2fd');
+  c.fillStyle = ciel; c.fillRect(-500, -2000, 1420, 2170);
+  c.fillStyle = '#ffe680'; c.beginPath(); c.arc(360, 38, 18, 0, Math.PI * 2); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.9)';
+  for (const n of d.nuages) {
+    const x = ((n.x + temps * 0.006 * n.s + 500) % 1300) - 500;
+    c.beginPath(); c.ellipse(x, n.y, 26 * n.s, 10 * n.s, 0, 0, Math.PI * 2); c.ellipse(x + 16 * n.s, n.y - 6 * n.s, 16 * n.s, 10 * n.s, 0, 0, Math.PI * 2); c.fill();
+  }
+  if (d.type === 'montagne') {
+    for (const m of d.monts) {
+      c.fillStyle = '#7d8fb3'; c.beginPath(); c.moveTo(m.x, 165); c.lineTo(m.x + m.l / 2, 165 - m.h); c.lineTo(m.x + m.l, 165); c.fill();
+      c.fillStyle = '#fff'; c.beginPath(); c.moveTo(m.x + m.l / 2 - 18, 165 - m.h + 22); c.lineTo(m.x + m.l / 2, 165 - m.h); c.lineTo(m.x + m.l / 2 + 18, 165 - m.h + 22);
+      c.lineTo(m.x + m.l / 2 + 6, 165 - m.h + 16); c.lineTo(m.x + m.l / 2 - 4, 165 - m.h + 24); c.fill();
+    }
+    c.fillStyle = '#8fc36a'; c.fillRect(-500, 140, 1420, 25);
+    for (const s of d.sapins) {
+      c.fillStyle = '#5a3a22'; c.fillRect(s.x - 1.5, 158, 3, 6);
+      c.fillStyle = '#2f7d4a'; c.beginPath(); c.moveTo(s.x - s.h / 3, 160); c.lineTo(s.x, 160 - s.h); c.lineTo(s.x + s.h / 3, 160); c.fill();
+    }
+  } else {
+    for (const b of d.bat) {
+      const y = 162 - b.h;
+      c.fillStyle = b.c; c.fillRect(b.x, y, b.w, b.h);
+      if (b.toit) { c.fillStyle = teinte(b.c.length === 7 ? b.c : '#cccccc', -0.35); c.beginPath(); c.moveTo(b.x - 4, y); c.lineTo(b.x + b.w / 2, y - 20); c.lineTo(b.x + b.w + 4, y); c.fill(); }
+      c.fillStyle = 'rgba(255,255,255,.75)';
+      for (let wy = y + 8; wy < 150; wy += 18) for (let wx = b.x + 7; wx < b.x + b.w - 12; wx += 16) c.fillRect(wx, wy, 9, 10);
+    }
+    if (d.type === 'centre') { // fils du tramway
+      c.strokeStyle = '#44506a'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-500, 62); c.lineTo(920, 62); c.stroke();
+      for (let x = -400; x < 900; x += 160) { c.fillStyle = '#5c6a85'; c.fillRect(x, 58, 3, 104); }
+    }
+  }
+  // Route
+  c.fillStyle = '#59616e'; c.fillRect(-500, 160, 1420, 64);
+  c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 3; c.setLineDash([22, 18]);
+  c.beginPath(); c.moveTo(-500, 176); c.lineTo(920, 176); c.stroke(); c.setLineDash([]);
+  if (d.type === 'centre') { c.strokeStyle = '#2f343c'; c.lineWidth = 2; for (const y of [212, 218]) { c.beginPath(); c.moveTo(-500, y); c.lineTo(920, y); c.stroke(); } }
+  // Trottoir
+  c.fillStyle = d.corresp ? '#cfc7d8' : '#ddd2bf'; c.fillRect(-500, 224, 1420, 1500);
+  c.fillStyle = '#b8ab98'; c.fillRect(-500, 222, 1420, 5);
+  c.strokeStyle = 'rgba(0,0,0,.07)'; c.lineWidth = 1;
+  for (let x = -500; x < 920; x += 28) { c.beginPath(); c.moveTo(x, 227); c.lineTo(x - 10, 400); c.stroke(); }
+}
+
+function dessinerPoteau(c, x) {
+  c.fillStyle = '#56607a'; c.fillRect(x - 2, 168, 4, 84);
+  c.fillStyle = '#2f6fd6'; c.beginPath(); c.arc(x, 166, 13, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = '#fff'; c.lineWidth = 2; c.stroke();
+  // pictogramme de bus (sans texte)
+  c.fillStyle = '#fff'; rr(c, x - 7, 160, 14, 10, 2); c.fill();
+  c.fillStyle = '#2f6fd6'; c.fillRect(x - 5, 162, 4, 3); c.fillRect(x + 1, 162, 4, 3);
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(x - 4, 171, 1.8, 0, 7); c.arc(x + 4, 171, 1.8, 0, 7); c.fill();
+}
+
+/* Géométrie d'un véhicule placé en x (avant à gauche) */
+function geo(type, x) {
+  const V = VEH[type]; const bas = 206; const top = bas - V.haut;
+  const n = V.motif.length; const segW = (V.long - 14) / n;
+  const rangY = V.rangs === 2 ? [top + 14, top + 96] : [top + 18];
+  const yBas = rangY[rangY.length - 1];
+  const segs = [];
+  for (let k = 0; k < n; k++) segs.push({ t: V.motif[k], x: x + 8 + k * segW, w: segW });
+  const portes = segs.filter((s) => s.t === 'D').map((s) => ({ x: s.x + 3, w: s.w - 6, cx: s.x + s.w / 2, y0: yBas - 6, y1: bas - 3, seg: s }));
+  const sieges = { bas: [], haut: [] };
+  for (const s of segs) if (s.t === 'F') for (const sl of [0.3, 0.7]) {
+    sieges.bas.push({ x: s.x + 3 + (s.w - 6) * sl, y: yBas + 22 });
+    if (V.rangs === 2) sieges.haut.push({ x: s.x + 3 + (s.w - 6) * sl, y: rangY[0] + 22 });
+  }
+  return { V, x, top, bas, segW, segs, rangY, yBas, portes, sieges };
+}
+
+function nouveauBus(type) {
+  const g = geo(type, 0);
+  return { type, x: 460, portes: [0, 0], bas: Array(g.sieges.bas.length).fill(null), haut: Array(g.sieges.haut.length).fill(null),
+    teinteBas: false, teinteHaut: false, escalier: [], couleur: null, casquette: null, payeur: null };
+}
+
+function couleurBus(id) { return (COULEURS.find((c) => c.id === id) || COULEURS[0]).c; }
+
+function dessinerTete(c, x, y, r, p, versGauche) {
+  c.fillStyle = p.habit; rr(c, x - r * 1.15, y + r * 0.8, r * 2.3, r * 2.4, r * 0.7); c.fill();
+  c.fillStyle = p.peau; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+  c.fillStyle = p.cheveux; c.beginPath(); c.arc(x, y - r * 0.15, r * 1.02, Math.PI * 1.05, Math.PI * 1.95); c.fill();
+  c.fillStyle = '#1f2a44';
+  const dx = versGauche ? -r * 0.35 : r * 0.35;
+  c.beginPath(); c.arc(x + dx - r * 0.25, y + r * 0.05, r * 0.13, 0, 7); c.arc(x + dx + r * 0.25, y + r * 0.05, r * 0.13, 0, 7); c.fill();
+  if (p.chapeau) { c.fillStyle = p.chapeau; c.beginPath(); c.arc(x, y - r * 0.3, r * 0.95, Math.PI, 0); c.fill(); c.fillRect(x - r * 1.5, y - r * 0.35, r * 1.2, r * 0.3); }
+}
+
+function dessinerCasquette(c, x, y, r, id, temps) {
+  const coul = { marine: '#22356b', rouge: '#d23a2a', etoile: '#2f8f55', carreaux: '#e05a3a', helice: '#3b7fe0', montagne: '#7a5230' }[id] || '#22356b';
+  if (id === 'montagne') {
+    c.fillStyle = coul; c.beginPath(); c.ellipse(x, y - r * 0.55, r * 1.6, r * 0.35, 0, 0, 7); c.fill();
+    rr(c, x - r * 0.9, y - r * 1.55, r * 1.8, r * 1.05, r * 0.4); c.fill();
+    c.fillStyle = '#e94f37'; c.fillRect(x - r * 0.9, y - r * 0.85, r * 1.8, r * 0.22);
+    c.strokeStyle = '#3aa35b'; c.lineWidth = r * 0.2; c.beginPath(); c.moveTo(x + r * 0.6, y - r * 0.9); c.quadraticCurveTo(x + r * 1.5, y - r * 1.8, x + r * 1.2, y - r * 2.2); c.stroke();
+    return;
+  }
+  c.fillStyle = coul; c.beginPath(); c.arc(x, y - r * 0.25, r * 1.02, Math.PI, 0); c.fill();
+  c.fillRect(x - r * 1.75, y - r * 0.32, r * 1.1, r * 0.3); // visière vers l'avant (gauche)
+  if (id === 'etoile') { c.fillStyle = '#ffd23f'; c.beginPath(); c.arc(x + r * 0.1, y - r * 0.75, r * 0.28, 0, 7); c.fill(); }
+  if (id === 'carreaux') {
+    c.save(); c.beginPath(); c.arc(x, y - r * 0.25, r * 1.02, Math.PI, 0); c.clip();
+    c.fillStyle = '#fff4d6'; const q = r * 0.5;
+    for (let i = -3; i < 3; i++) for (let j = -3; j < 1; j++) if ((i + j) % 2 === 0) c.fillRect(x + i * q, y - r * 0.25 + j * q, q, q);
+    c.restore();
+  }
+  if (id === 'helice') {
+    c.fillStyle = '#ffd23f'; c.beginPath(); c.arc(x, y - r * 0.25, r * 0.5, Math.PI, 0); c.fill();
+    c.strokeStyle = '#555'; c.lineWidth = 1; c.beginPath(); c.moveTo(x, y - r * 1.25); c.lineTo(x, y - r * 1.65); c.stroke();
+    const a = (temps || 0) * 0.02, l = r * 1.2 * Math.abs(Math.cos(a));
+    c.fillStyle = '#e5533d'; c.beginPath(); c.ellipse(x - l / 2, y - r * 1.7, l / 2, r * 0.2, 0, 0, 7); c.fill();
+    c.fillStyle = '#34a866'; c.beginPath(); c.ellipse(x + l / 2, y - r * 1.7, l / 2, r * 0.2, 0, 0, 7); c.fill();
+  }
+}
+
+const CHAUFFEUR = { peau: '#e8b98f', cheveux: '#3b2414', habit: '#2f4f7f' };
+
+function dessinerVehicule(c, b, temps) {
+  const g = geo(b.type, b.x), V = g.V, x = g.x, top = g.top, bas = g.bas, L = V.long;
+  const col = b.couleur || couleurBus(P.couleur);
+  // Ombre
+  c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(x + L / 2, bas + 12, L / 2, 6, 0, 0, 7); c.fill();
+  // Galerie à bagages du car / perche du tramway
+  if (V.car) {
+    c.fillStyle = '#56607a'; c.fillRect(x + 50, top - 12, L - 90, 4); c.fillRect(x + 54, top - 12, 3, 12); c.fillRect(x + L - 46, top - 12, 3, 12);
+    c.fillStyle = '#c0392b'; rr(c, x + 70, top - 24, 34, 13, 3); c.fill();
+    c.fillStyle = '#2a9d8f'; rr(c, x + 112, top - 22, 26, 11, 3); c.fill();
+    c.fillStyle = '#e9c46a'; rr(c, x + 150, top - 26, 40, 15, 4); c.fill();
+    c.fillStyle = '#f1f1f1'; c.beginPath(); c.ellipse(x + 225, top - 16, 18, 7, 0, 0, 7); c.fill(); // skis roulés
+  }
+  if (V.tram) {
+    c.strokeStyle = '#3b4357'; c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(x + L * 0.45, top); c.lineTo(x + L * 0.45 + 18, top - 22); c.lineTo(x + L * 0.45 - 6, top - 34); c.stroke();
+    c.beginPath(); c.moveTo(x + L * 0.45 - 26, top - 34); c.lineTo(x + L * 0.45 + 16, top - 34); c.stroke();
+  }
+  // Caisse
+  c.fillStyle = col; rr(c, x, top, L, bas - top, V.tram ? 26 : 16); c.fill();
+  c.save(); rr(c, x, top, L, bas - top, V.tram ? 26 : 16); c.clip();
+  c.fillStyle = teinte(col.startsWith('#') ? col : '#f6c026', -0.22); c.fillRect(x, bas - 20, L, 20);
+  c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(x, top, L, 6);
+  c.fillStyle = '#fff'; c.fillRect(x, g.yBas + 44, L, 6);
+  if (V.tram) { c.fillStyle = 'rgba(0,0,0,.15)'; c.fillRect(x + L * 0.6, top, 3, bas - top); }
+  c.restore();
+  // Panneau lumineux (sans texte)
+  c.fillStyle = '#2b2b2b'; rr(c, x + 14, top + 3, 44, 10, 3); c.fill();
+  c.fillStyle = '#ffb703'; for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(x + 20 + i * 6.5, top + 8, 1.6, 0, 7); c.fill(); }
+
+  // Fenêtres de chaque rang
+  for (let r = 0; r < V.rangs; r++) {
+    const ry = g.rangY[r];
+    const estHaut = V.rangs === 2 && r === 0;
+    const teinteRang = estHaut ? b.teinteHaut : b.teinteBas;
+    const sieges = estHaut ? b.haut : b.bas;
+    const places = estHaut ? g.sieges.haut : g.sieges.bas;
+    let j = 0;
+    for (const s of g.segs) {
+      const wx = s.x + 3, ww = s.w - 6;
+      if (s.t === 'W') {
+        if (!estHaut) { // pare-brise et chauffeur
+          c.fillStyle = '#bfe6f7'; rr(c, s.x - 2, ry - 8, s.w + 2, 50, 8); c.fill();
+          const hx = s.x + s.w * 0.55, hy = ry + 20;
+          dessinerTete(c, hx, hy, 7, CHAUFFEUR, true);
+          dessinerCasquette(c, hx, hy, 7, b.casquette || P.casquette, temps);
+          c.strokeStyle = '#333'; c.lineWidth = 2; c.beginPath(); c.arc(hx - 9, hy + 13, 6, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+          c.fillStyle = 'rgba(255,255,255,.4)'; c.beginPath(); c.moveTo(s.x + 2, ry - 4); c.lineTo(s.x + 10, ry - 4); c.lineTo(s.x + 2, ry + 10); c.fill();
+        } else { c.fillStyle = '#bfe6f7'; rr(c, wx - 4, ry, ww + 4, 38, 8); c.fill(); }
+      } else if (s.t === 'D') {
+        if (estHaut) { // fenêtre de l'escalier (toujours claire)
+          c.fillStyle = '#e4f5fc'; rr(c, wx, ry, ww, 70, 6); c.fill();
+          c.strokeStyle = '#9fb3c8'; c.lineWidth = 2;
+          for (let k = 0; k < 6; k++) { const sx = wx + 3 + k * (ww - 6) / 6, sy = ry + 66 - k * 11; c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + (ww - 6) / 6, sy); c.stroke(); }
+          c.save(); rr(c, wx, ry, ww, 70, 6); c.clip();
+          for (const e of b.escalier) dessinerTete(c, wx + 6 + (ww - 12) * e.p, ry + 58 - 44 * e.p, 5.5, e.pers, false);
+          c.restore();
+        }
+      } else if (s.t === 'F') {
+        rr(c, wx, ry, ww, 38, 6);
+        if (teinteRang) {
+          const gr = c.createLinearGradient(wx, ry, wx + ww, ry + 38); gr.addColorStop(0, '#1d2b45'); gr.addColorStop(1, '#33476d');
+          c.fillStyle = gr; c.fill();
+          c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.moveTo(wx + ww * 0.25, ry); c.lineTo(wx + ww * 0.45, ry); c.lineTo(wx + ww * 0.15, ry + 38); c.lineTo(wx, ry + 38); c.lineTo(wx, ry + 20); c.fill();
+          j += 2;
+        } else {
+          c.fillStyle = '#d6eef8'; c.fill();
+          c.save(); rr(c, wx, ry, ww, 38, 6); c.clip();
+          for (let k = 0; k < 2; k++, j++) {
+            const pl = places[j];
+            c.fillStyle = '#5b6fa8'; rr(c, pl.x - 6, pl.y - 4, 12, 22, 3); c.fill();
+            if (sieges[j]) dessinerTete(c, pl.x, pl.y - 6, 6, sieges[j], true);
+          }
+          c.restore();
+          c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(wx + 2, ry + 2, 4, 14);
+        }
+      }
+    }
+  }
+  // Portes (en bas)
+  g.portes.forEach((d, i) => {
+    const p = b.portes[i] || 0, h = d.y1 - d.y0;
+    c.fillStyle = '#2a3446'; rr(c, d.x, d.y0, d.w, h, 4); c.fill();
+    c.save(); rr(c, d.x, d.y0, d.w, h, 4); c.clip();
+    const demi = d.w / 2, dec = p * (demi - 3);
+    for (const [lx, sens] of [[d.x - dec, -1], [d.x + demi + dec, 1]]) {
+      c.fillStyle = teinte(col.startsWith('#') ? col : '#f6c026', 0.2); c.fillRect(lx, d.y0, demi, h);
+      c.fillStyle = '#cfeaf6'; c.fillRect(lx + 2, d.y0 + 4, demi - 4, h * 0.55);
+      c.fillStyle = '#555'; c.fillRect(sens < 0 ? lx + demi - 2 : lx, d.y0, 2, h);
+    }
+    c.restore();
+    if (b.payeur && i === 0) { // pièces du passager qui paie
+      c.fillStyle = '#f2b41c'; for (let k = 0; k < 3; k++) { c.beginPath(); c.arc(d.cx + 6 + k * 3, d.y1 - 30 - k * 3 - Math.sin(temps * 0.01 + k) * 2, 3, 0, 7); c.fill(); }
+    }
+  });
+  // Roues
+  const roues = V.long > 320 ? [0.15, 0.5, 0.85] : [0.18, 0.8];
+  for (const f of roues) {
+    const rx = x + L * f;
+    c.fillStyle = '#222'; c.beginPath(); c.arc(rx, bas + 2, 13, 0, 7); c.fill();
+    c.fillStyle = '#b8c1cc'; c.beginPath(); c.arc(rx, bas + 2, 5.5, 0, 7); c.fill();
+  }
+  // Phares
+  c.fillStyle = '#fff6a8'; c.beginPath(); c.ellipse(x + 4, bas - 26, 3, 5, 0, 0, 7); c.fill();
+  c.fillStyle = '#e5533d'; c.fillRect(x + L - 5, bas - 30, 4, 9);
+}
+
+function dessinerTrain(c, x) {
+  c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(x + 70, 218, 80, 6, 0, 0, 7); c.fill();
+  c.fillStyle = '#2a9d8f'; rr(c, x, 92, 200, 114, 30); c.fill();
+  c.fillStyle = '#fff'; c.fillRect(x, 178, 200, 6);
+  c.fillStyle = '#bfe6f7'; rr(c, x + 6, 104, 22, 40, 8); c.fill();
+  c.fillStyle = '#2a3446'; rr(c, x + 34, 112, 30, 92, 4); c.fill(); // porte ouverte
+  c.fillStyle = '#d6eef8'; for (let i = 0; i < 3; i++) { rr(c, x + 72 + i * 40, 112, 32, 38, 6); c.fill(); }
+  c.fillStyle = '#222'; for (const f of [40, 130]) { c.beginPath(); c.arc(x + f, 208, 10, 0, 7); c.fill(); }
+  c.fillStyle = '#fff6a8'; c.beginPath(); c.ellipse(x + 5, 182, 3, 5, 0, 0, 7); c.fill();
+}
+const TRAIN_X = 330, TRAIN_PORTE = TRAIN_X + 49;
+
+function dessinerPersonne(c, a) {
+  if (a.a <= 0.01) return;
+  c.save(); c.globalAlpha = a.a;
+  const s = a.taille, x = a.x, y = a.y;
+  const sw = a.marche ? Math.sin(a.phase) * 4 * s : 0;
+  const saut = a.marche ? Math.abs(Math.sin(a.phase)) * 1.5 : 0;
+  c.strokeStyle = '#33405a'; c.lineWidth = 3.4 * s; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(x - 2.5 * s, y - 14 * s - saut); c.lineTo(x - 2.5 * s + sw, y); c.moveTo(x + 2.5 * s, y - 14 * s - saut); c.lineTo(x + 2.5 * s - sw, y); c.stroke();
+  if (a.sac) { c.fillStyle = '#8a5a3b'; rr(c, x + 4 * s, y - 29 * s - saut, 6 * s, 11 * s, 2); c.fill(); }
+  c.fillStyle = a.habit; rr(c, x - 6.5 * s, y - 31 * s - saut, 13 * s, 18 * s, 4 * s); c.fill();
+  c.strokeStyle = a.peau; c.lineWidth = 2.6 * s;
+  c.beginPath(); c.moveTo(x - 6 * s, y - 28 * s - saut); c.lineTo(x - 8 * s - sw * 0.5, y - 18 * s - saut); c.moveTo(x + 6 * s, y - 28 * s - saut); c.lineTo(x + 8 * s + sw * 0.5, y - 18 * s - saut); c.stroke();
+  c.fillStyle = a.peau; c.beginPath(); c.arc(x, y - 38 * s - saut, 6.5 * s, 0, 7); c.fill();
+  c.fillStyle = a.cheveux; c.beginPath(); c.arc(x, y - 39 * s - saut, 6.7 * s, Math.PI * 1.05, Math.PI * 1.95); c.fill();
+  c.fillStyle = '#1f2a44'; c.beginPath(); c.arc(x - 2.2 * s, y - 37.5 * s - saut, 0.9 * s, 0, 7); c.arc(x + 2.2 * s, y - 37.5 * s - saut, 0.9 * s, 0, 7); c.fill();
+  if (a.chapeau) { c.fillStyle = a.chapeau; c.beginPath(); c.arc(x, y - 40 * s - saut, 6.6 * s, Math.PI, 0); c.fill(); c.fillRect(x - 9 * s, y - 41 * s - saut, 5 * s, 2 * s); }
+  c.restore();
+}
+
+function dessinerLiens(c, acteurs) {
+  c.strokeStyle = '#33405a'; c.lineWidth = 2.2; c.lineCap = 'round';
+  for (const a of acteurs) {
+    const b = a.lien;
+    if (!b || a.a < 0.6 || b.a < 0.6 || Math.abs(a.x - b.x) > 24) continue;
+    c.beginPath(); c.moveTo(a.x + (b.x > a.x ? 7 : -7) * a.taille, a.y - 18 * a.taille); c.lineTo(b.x + (b.x > a.x ? -7 : 7) * b.taille, b.y - 18 * b.taille); c.stroke();
+  }
+}
+
+function dessinerMain(c, x, y, appui) {
+  c.save(); c.translate(x, y); const s = appui ? 0.88 : 1; c.scale(s, s);
+  c.fillStyle = '#fff'; c.strokeStyle = '#1f2a44'; c.lineWidth = 2;
+  rr(c, -4, -2, 8, 18, 4); c.fill(); c.stroke();
+  rr(c, -10, 10, 22, 20, 8); c.fill(); c.stroke();
+  c.restore();
+  if (appui) { c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2; c.beginPath(); c.arc(x, y - 4, 10, 0, 7); c.stroke(); }
+}
+
+function dessinerParticules(c, liste) {
+  for (const p of liste) {
+    c.save(); c.globalAlpha = Math.min(1, p.vie / 300); c.translate(p.x, p.y); c.rotate(p.rot);
+    if (p.forme === 'ticket') {
+      c.fillStyle = '#ffb347'; c.strokeStyle = '#b5641a'; c.lineWidth = 1.2; rr(c, -11, -7, 22, 14, 3); c.fill(); c.stroke();
+      c.fillStyle = '#fff3d6'; c.beginPath(); c.arc(-3, 0, 2.5, 0, 7); c.fill();
+    } else if (p.forme === 'etoile') {
+      c.fillStyle = '#ffd23f'; c.beginPath();
+      for (let i = 0; i < 10; i++) { const r = i % 2 ? 3 : 7, an = i * Math.PI / 5; c.lineTo(Math.cos(an) * r, Math.sin(an) * r); }
+      c.fill();
+    } else { c.fillStyle = p.couleur; c.fillRect(-3, -2, 6, 4); }
+    c.restore();
+  }
+}
+
+function dessinerScene(c, e, temps) {
+  dessinerDecor(c, e.decor, temps);
+  if (e.poteau !== null && e.poteau !== undefined) dessinerPoteau(c, e.poteau);
+  if (e.train) dessinerTrain(c, TRAIN_X);
+  if (e.bus2) dessinerVehicule(c, e.bus2, temps);
+  if (e.bus) dessinerVehicule(c, e.bus, temps);
+  const tries = e.acteurs.slice().sort((a, b) => a.y - b.y);
+  dessinerLiens(c, tries);
+  for (const a of tries) dessinerPersonne(c, a);
+  if (e.particules) dessinerParticules(c, e.particules);
+}
+
+/* ---------- Toiles et mise à l'échelle ---------- */
+const toile = $('toile'), toileTitre = $('toile-titre'), toileTuto = $('toile-tuto');
+const ctx = toile.getContext('2d'), ctxTitre = toileTitre.getContext('2d'), ctxTuto = toileTuto.getContext('2d');
+function ajuster(cv) {
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return { w, h };
+}
+function monde(c, cv) { // 420 × 270 unités dans la toile, posées en bas (le ciel remplit le haut)
+  const { w, h } = ajuster(cv);
+  const s = Math.min(w / 384, h / 270); // on voit x de 18 à 402
+  c.setTransform(s, 0, 0, s, w / 2 - 210 * s, h - 270 * s);
+}
+
+/* Écran titre : grand dessin (sert aussi de jaquette) */
+const TITRE = { decor: nouveauDecor('ville', false), bus: null, acteurs: [] };
+function preparerTitre() {
+  TITRE.bus = nouveauBus('bus'); TITRE.bus.x = 40; TITRE.bus.portes = [1, 0];
+  [0, 2, 3, 6, 7, 9, 10].forEach((i) => { TITRE.bus.bas[i] = nouvellePersonne(); });
+  TITRE.acteurs = [];
+  const g = geo('bus', 40);
+  const fam = [nouvellePersonne({ taille: 1 }), nouvellePersonne({ taille: 0.8 })];
+  fam[0].lien = fam[1];
+  const file = [nouvellePersonne({ taille: 1 }), ...fam, nouvellePersonne({ taille: 0.82, chapeau: '#ffd23f' }), nouvellePersonne({ taille: 1 })];
+  file.forEach((a, i) => { a.x = g.portes[0].cx + 22 + i * 17; a.y = 250 + (i % 2) * 6; TITRE.acteurs.push(a); });
+}
+function dessinerTitre(temps) {
+  const { w, h } = ajuster(toileTitre);
+  const c = ctxTitre;
+  const s = Math.min(w / 330, (h * 0.42) / 270);
+  c.setTransform(s, 0, 0, s, w / 2 - 205 * s, h * 0.56 - 170 * s);
+  TITRE.acteurs.forEach((a, i) => { a.y = 250 + (i % 2) * 6 - Math.abs(Math.sin(temps * 0.004 + i)) * 2; });
+  dessinerScene(c, { decor: TITRE.decor, poteau: geo('bus', 40).portes[0].cx - 26, bus: TITRE.bus, acteurs: TITRE.acteurs }, temps);
+}
+
+/* =========================================================================
+   GÉNÉRATION D'UNE LIGNE (tout est tiré d'avance : les réponses du joueur
+   ne changent pas le trajet)
+   ========================================================================= */
+function composer(n, N) { // découpe n personnes en familles (2 ou 5) et passagers seuls
+  const unites = [];
+  let reste = n;
+  while (reste > 0) {
+    const tailles = (N.g || []).filter((t) => t <= reste);
+    if (tailles.length && Math.random() < (N.pg || 0)) { const t = pick(tailles); unites.push(t); reste -= t; }
+    else { unites.push(1); reste -= 1; }
+  }
+  return melanger(unites);
+}
+
+function genererPlan(N) {
+  const V = VEH[N.v], cap = V.cap, etage = V.rangs === 2, parRang = V.parRang;
+  let tot = Math.min(cap, randR(N.dep)), haut = etage ? Math.floor(tot / 2) : 0;
+  const plan = { depart: { tot, haut }, liste: [] };
+  const types = Array(N.arrets).fill('normal');
+  const places = melanger(Array.from({ length: N.arrets - 1 }, (_, i) => i + 1));
+  let k = 0;
+  for (const sp of Object.keys(N.sp || {})) for (let j = 0; j < N.sp[sp]; j++) if (k < places.length) types[places[k++]] = sp;
+  const deuxPortes = !!N.deuxPortes && geo(N.v, 0).portes.length > 1;
+  const noms = String(tr('noms')).split(',').map((x) => x.trim()).filter(Boolean);
+
+  for (let i = 0; i < N.arrets; i++) {
+    const type = types[i];
+    const st = { type, avant: { tot, haut }, deuxPortes };
+    const cacheActif = i >= (N.cacheDes || 0);
+    st.cacheBas = (N.cache === 'portes' || N.cache === 'tout') && cacheActif;
+    st.cacheHaut = etage && (N.cache === 'haut' || N.cache === 'tout' || N.cache === 'portes') && cacheActif;
+
+    // --- Descente
+    let d = Math.min(randR(N.d), tot);
+    if (type === 'places' || type === 'trottoir') {
+      let libres = cap - tot + d;
+      if (libres > 4) d = Math.max(0, d - (libres - 4));
+      libres = cap - tot + d;
+      if (libres < 1) d = Math.min(tot, d + (1 - libres));
+    }
+    if ((type === 'monnaie' || type === 'normal' || type === 'corresp') && cap - tot + d < 1) d = Math.min(tot, d + 1);
+    let dHaut = 0;
+    const descMembres = [];
+    let h = haut, b = tot - haut;
+    for (let m = 0; m < d; m++) {
+      const enHaut = etage && h > 0 && (b === 0 || Math.random() < h / (h + b));
+      if (enHaut) { h--; dHaut++; } else b--;
+      descMembres.push(enHaut ? 'haut' : 'bas');
+    }
+    st.desc = [];
+    let pos = 0;
+    for (const t of composer(d, N)) { st.desc.push({ membres: descMembres.slice(pos, pos + t) }); pos += t; }
+    tot -= d; haut -= dHaut;
+    st.d = d;
+
+    // --- Montée
+    const libres = cap - tot;
+    let attente, monteurs;
+    if (type === 'places') {
+      const oui = Math.random() < 0.5;
+      attente = oui ? libres + rand(1, 3) : rand(Math.max(1, libres - 3), libres);
+      monteurs = Math.min(attente, libres);
+      st.reponse = oui ? 'oui' : 'non';
+    } else if (type === 'trottoir') {
+      attente = libres + rand(1, 4); monteurs = libres;
+      st.reponse = attente - libres;
+    } else {
+      attente = Math.min(randR(N.m), libres);
+      if (attente < 1 && libres > 0) attente = 1;
+      if (type === 'monnaie') attente = Math.max(1, attente);
+      monteurs = attente;
+    }
+    st.libres = libres; st.attente = attente; st.m = monteurs;
+    // Familles (le passager qui paie est seul et passe en dernier)
+    let tailles = type === 'monnaie' ? composer(attente - 1, N).concat([1]) : composer(attente, N);
+    let hLibre = parRang - haut, bLibre = (etage ? parRang : cap) - (tot - haut);
+    let mHaut = 0, compte = 0;
+    st.mont = []; st.restants = [];
+    tailles.forEach((t, ui) => {
+      const u = { membres: [], porte: deuxPortes ? ui % 2 : 0 };
+      const reste = { membres: [], porte: u.porte };
+      for (let m = 0; m < t; m++) {
+        if (compte < monteurs) {
+          let et = 'bas';
+          if (etage) { et = hLibre > 0 && (bLibre === 0 || Math.random() < 0.5) ? 'haut' : 'bas'; if (et === 'haut') { hLibre--; mHaut++; } else bLibre--; }
+          u.membres.push(et); compte++;
+        } else reste.membres.push('bas');
+      }
+      if (u.membres.length) st.mont.push(u);
+      if (reste.membres.length) st.restants.push(reste);
+    });
+    tot += monteurs; haut += mHaut;
+    st.apres = { tot, haut };
+
+    // --- Question
+    const modeNum = Math.random() < (N.cpt || 0) ? 'compteur' : 'choix';
+    if (type === 'places') { st.q = 'places'; st.mode = 'ouinon'; }
+    else if (type === 'trottoir') { st.q = 'trottoir'; st.mode = modeNum; }
+    else if (type === 'monnaie') {
+      st.q = 'monnaie'; st.mode = modeNum;
+      st.prix = randR(N.prix || [1, 3]);
+      st.donne = st.prix + rand(1, Math.max(1, Math.min(5, 10 - st.prix)));
+      st.reponse = st.donne - st.prix; st.nom = noms.length ? pick(noms) : '';
+    } else if (type === 'corresp') {
+      st.q = Math.random() < 0.5 ? 'change' : 'total'; st.mode = modeNum;
+      st.reponse = st.q === 'change' ? d + monteurs : tot;
+    } else {
+      st.q = etage && N.qHaut && Math.random() < N.qHaut ? 'haut' : 'total'; st.mode = modeNum;
+      st.reponse = st.q === 'haut' ? haut : tot;
+    }
+    plan.liste.push(st);
+  }
+  return plan;
+}
+
+/* =========================================================================
+   ÉCRANS
+   ========================================================================= */
+function afficherEcran(nom) {
+  S.ecran = nom;
+  document.querySelectorAll('.ecran').forEach((e) => e.classList.toggle('actif', e.id === 'ecran-' + nom));
+  if (nom === 'titre') preparerTitre();
+  if (nom === 'lignes') construireLignes();
+  if (nom === 'album') construireAlbum();
+}
+
+const SVG_ETOILE = (pleine) => '<svg viewBox="0 0 24 24"><use href="#ic-etoile' + (pleine ? '' : '-vide') + '"/></svg>';
+
+function iconeVehicule(type) {
+  const coul = couleurBus(P.couleur);
+  if (type === 'etage') return '<svg class="veh" viewBox="0 0 40 22"><rect x="2" y="1" width="36" height="17" rx="4" fill="' + coul + '"/><rect x="6" y="3" width="28" height="5" rx="1" fill="#d6eef8"/><rect x="6" y="10" width="28" height="5" rx="1" fill="#d6eef8"/><circle cx="10" cy="19" r="3" fill="#222"/><circle cx="31" cy="19" r="3" fill="#222"/></svg>';
+  if (type === 'tram') return '<svg class="veh" viewBox="0 0 40 22"><path d="M18 5l4-4M14 1h12" stroke="#3b4357" stroke-width="1.5"/><rect x="1" y="6" width="38" height="12" rx="6" fill="' + coul + '"/><rect x="6" y="8" width="28" height="5" rx="1" fill="#d6eef8"/><circle cx="9" cy="19" r="2.5" fill="#222"/><circle cx="31" cy="19" r="2.5" fill="#222"/></svg>';
+  if (type === 'car') return '<svg class="veh" viewBox="0 0 40 22"><rect x="8" y="2" width="22" height="3" fill="#c0392b"/><rect x="2" y="5" width="36" height="13" rx="4" fill="' + coul + '"/><rect x="6" y="7" width="28" height="5" rx="1" fill="#d6eef8"/><circle cx="10" cy="19" r="3" fill="#222"/><circle cx="31" cy="19" r="3" fill="#222"/></svg>';
+  const l = type === 'minibus' ? 28 : 36;
+  return '<svg class="veh" viewBox="0 0 40 22"><rect x="' + (40 - l) / 2 + '" y="5" width="' + l + '" height="13" rx="4" fill="' + coul + '"/><rect x="' + ((40 - l) / 2 + 4) + '" y="7" width="' + (l - 8) + '" height="5" rx="1" fill="#d6eef8"/><circle cx="' + ((40 - l) / 2 + 7) + '" cy="19" r="3" fill="#222"/><circle cx="' + (40 - (40 - l) / 2 - 7) + '" cy="19" r="3" fill="#222"/></svg>';
+}
+
+function construireLignes() {
+  const g = $('grille'); g.innerHTML = '';
+  NIVEAUX.forEach((N, i) => {
+    const b = document.createElement('button');
+    const ouverte = i < P.debloque;
+    b.className = 'case' + (ouverte ? '' : ' fermee');
+    if (ouverte) {
+      b.innerHTML = '<span class="num"></span>' + iconeVehicule(N.v) + '<span class="et">' + [0, 1, 2].map((k) => SVG_ETOILE(k < P.etoiles[i])).join('') + '</span>';
+      b.querySelector('.num').textContent = nb(i + 1);
+      b.setAttribute('aria-label', tr('ligneAria', { n: i + 1, etoiles: tr('etoilesN', { n: P.etoiles[i] }) }));
+      b.addEventListener('click', () => { SONS.clic(); lancerNiveau(i); });
+    } else {
+      b.innerHTML = '<svg class="cad" viewBox="0 0 24 24"><use href="#ic-cadenas"/></svg><span class="num"></span>';
+      b.querySelector('.num').textContent = nb(i + 1);
+      b.setAttribute('aria-label', tr('ligneFermee', { n: i + 1 }));
+      b.disabled = false;
+      b.addEventListener('click', () => { SONS.erreur(); });
+    }
+    g.appendChild(b);
+  });
+}
+
+function dessinerApercuCasquette(cv, id) {
+  const c = cv.getContext('2d'); cv.width = 128; cv.height = 80;
+  c.setTransform(4, 0, 0, 4, 0, 0);
+  dessinerTete(c, 16, 11, 6, CHAUFFEUR, true);
+  dessinerCasquette(c, 16, 11, 6, id, 0);
+}
+function dessinerApercuCouleur(cv, coul) {
+  const c = cv.getContext('2d'); cv.width = 128; cv.height = 80;
+  c.setTransform(0.36, 0, 0, 0.36, 4, -10);
+  const b = nouveauBus('minibus'); b.x = 10; b.couleur = coul;
+  [0, 3, 5].forEach((k) => { b.bas[k] = nouvellePersonne(); });
+  dessinerVehicule(c, b, 0);
+}
+
+function construireAlbum() {
+  $('album-total').innerHTML = '<svg viewBox="0 0 30 20"><use href="#ic-ticket"/></svg><span></span>';
+  $('album-total').querySelector('span').textContent = tr('album.tickets', { n: P.tickets });
+  const remplir = (id, liste, cle, actuel, choisir, apercu) => {
+    const z = $(id); z.innerHTML = '';
+    liste.forEach((o) => {
+      const b = document.createElement('button');
+      const ok = P.tickets >= o.prix;
+      b.className = 'objet' + (ok ? '' : ' bloque') + (actuel === o.id ? ' choisi' : '');
+      const cv = document.createElement('canvas'); apercu(cv, o); b.appendChild(cv);
+      const nom = document.createElement('span'); nom.textContent = tr(cle + '.' + o.id); b.appendChild(nom);
+      const etat = document.createElement('span');
+      etat.textContent = ok ? (actuel === o.id ? tr('album.choisi') : '') : tr('album.bloque', { n: o.prix - P.tickets });
+      if (etat.textContent) b.appendChild(etat);
+      b.setAttribute('aria-pressed', actuel === o.id ? 'true' : 'false');
+      b.addEventListener('click', () => { if (!ok) { SONS.erreur(); return; } choisir(o); enregistrerReglages(); construireAlbum(); });
+      z.appendChild(b);
+    });
+  };
+  remplir('liste-couleurs', COULEURS, 'couleur', P.couleur, (o) => { P.couleur = o.id; SONS.clic(); }, (cv, o) => dessinerApercuCouleur(cv, o.c));
+  remplir('liste-klaxons', KLAXONS, 'klaxon', P.klaxon, (o) => { P.klaxon = o.id; klaxonner(o.id); }, (cv) => {
+    const c = cv.getContext('2d'); cv.width = 128; cv.height = 80; c.setTransform(2, 0, 0, 2, 0, 0);
+    // Klaxon à poire : poire rouge et pavillon
+    c.fillStyle = '#ffe27a'; c.beginPath(); c.arc(32, 20, 18, 0, 7); c.fill();
+    c.fillStyle = '#e5533d'; c.strokeStyle = '#1f2a44'; c.lineWidth = 1.4; c.beginPath(); c.arc(22, 20, 6.5, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = '#1f2a44'; c.beginPath(); c.moveTo(28, 18); c.lineTo(32, 18); c.lineTo(44, 10); c.lineTo(44, 30); c.lineTo(32, 22); c.lineTo(28, 22); c.fill();
+  });
+  remplir('liste-casquettes', CASQUETTES, 'casquette', P.casquette, (o) => { P.casquette = o.id; SONS.clic(); }, (cv, o) => dessinerApercuCasquette(cv, o.id));
+  const zl = $('album-lignes'); zl.innerHTML = '';
+  NIVEAUX.forEach((N, i) => {
+    const row = document.createElement('div'); row.className = 'ligne-album';
+    const nom = document.createElement('span'); nom.className = 'nom'; nom.textContent = tr('ligne', { n: i + 1 });
+    const tk = document.createElement('span'); tk.className = 'tk';
+    let html = '';
+    for (let k = 0; k < N.arrets; k++) html += '<svg viewBox="0 0 30 20"><use href="#ic-ticket' + (k < P.records[i] ? '' : '-gris') + '"/></svg>';
+    tk.innerHTML = html;
+    tk.setAttribute('aria-label', tr('album.ligneTickets', { t: P.records[i], max: N.arrets }));
+    row.append(nom, tk); zl.appendChild(row);
+  });
+}
+
+/* ---------- Son ---------- */
+const SVG_SON = '<svg viewBox="0 0 24 24"><path d="M3 9h4l6-5v16l-6-5H3z" fill="#1f2a44"/><path d="M16 8c1.6 1.6 1.6 6.4 0 8M18.5 5.5c3 3 3 10 0 13" fill="none" stroke="#1f2a44" stroke-width="2" stroke-linecap="round"/></svg>';
+const SVG_MUET = '<svg viewBox="0 0 24 24"><path d="M3 9h4l6-5v16l-6-5H3z" fill="#1f2a44"/><path d="M16 9l6 6M22 9l-6 6" stroke="#e5533d" stroke-width="2.4" stroke-linecap="round"/></svg>';
+function majSon() {
+  document.querySelectorAll('.son').forEach((b) => { b.innerHTML = P.son ? SVG_SON : SVG_MUET; b.setAttribute('aria-label', tr(P.son ? 'son.couper' : 'son.remettre')); });
+}
+function basculerSon() {
+  P.son = !P.son; majSon(); if (P.son) SONS.clic();
+  enregistrerReglages();
+  try { localStorage.setItem('bus-ligne-7-son', P.son ? '1' : '0'); } catch (e) { /* stockage refusé */ }
+}
+
+/* ---------- HUD ---------- */
+function majHud() {
+  const N = NIVEAUX[S.niv], V = VEH[N.v];
+  $('hud-ligne').textContent = tr('ligne', { n: S.niv + 1 });
+  $('hud-arret').textContent = tr('hud.arret', { n: Math.min(S.arret + 1, N.arrets), total: N.arrets });
+  const ch = $('hud-chances'); let html = '';
+  for (let i = 0; i < 3; i++) html += '<svg viewBox="0 0 24 24"><use href="#ic-coeur' + (i < 3 - S.erreurs ? '' : '-vide') + '"/></svg>';
+  ch.innerHTML = html; ch.setAttribute('aria-label', tr('hud.chances', { n: 3 - S.erreurs }));
+  $('hud-tickets-n').textContent = nb(S.tickets);
+  $('hud-tickets').setAttribute('aria-label', tr('hud.tickets', { n: S.tickets }));
+  $('puce-abord').textContent = tr('hud.abord', { n: S.abord });
+  $('puce-haut').textContent = V.rangs === 2 ? tr('hud.haut', { n: S.haut }) : '';
+  const avecPlaces = N.sp && (N.sp.places || N.sp.trottoir);
+  $('puce-places').textContent = avecPlaces ? tr('hud.places', { n: V.cap }) : '';
+}
+function roulerPuce(versTot, versHaut) {
+  const deTot = S.abord, deHaut = S.haut;
+  if (deTot === versTot && deHaut === versHaut) return Promise.resolve();
+  $('puce-abord').classList.remove('roule'); void $('puce-abord').offsetWidth; $('puce-abord').classList.add('roule');
+  return anim(500, (p) => { S.abord = Math.round(lerp(deTot, versTot, p)); S.haut = Math.round(lerp(deHaut, versHaut, p)); majHud(); });
+}
+function message(cle, vars) { $('msg').textContent = cle ? tr(cle, vars) : ''; }
+
+/* =========================================================================
+   PARTIE
+   ========================================================================= */
+function vitesse() { return NIVEAUX[S.niv].vit || 1; }
+
+function lancerNiveau(n) {
+  annulerTout();
+  fermerVoiles();
+  jouerNiveau(n);
+}
+
+async function jouerNiveau(n) {
+  const tok = S.jeton;
+  const N = NIVEAUX[n];
+  S.niv = n; S.erreurs = 0; S.tickets = 0; S.ticketsDebut = P.tickets; S.enJeu = true; S.pause = false; S.arret = 0;
+  P.debloque = Math.max(P.debloque, n + 1);
+  S.plan = genererPlan(N);
+  S.abord = S.plan.depart.tot; S.haut = S.plan.depart.haut;
+  S.bus = nouveauBus(N.v); S.bus2 = null; S.acteurs = []; S.particules = []; S.train = false;
+  // Passagers déjà assis au départ
+  for (let k = 0; k < S.plan.depart.haut; k++) asseoir(S.bus, 'haut', nouvellePersonne());
+  for (let k = 0; k < S.plan.depart.tot - S.plan.depart.haut; k++) asseoir(S.bus, 'bas', nouvellePersonne());
+  S.decor = nouveauDecor(N.v === 'car' ? 'montagne' : VEH[N.v].decor, false);
+  S.poteau = null;
+  afficherEcran('jeu');
+  $('reponses').innerHTML = ''; $('pieces').innerHTML = ''; $('explication').textContent = '';
+  message('obs.depart');
+  majHud();
+  requestAnimationFrame(() => ajuster(toile));
+  // Présentation des nouveautés de cette ligne
+  for (const k of N.nouv) {
+    if (P.vus.includes(k)) continue;
+    await montrerTuto(k);
+    if (tok !== S.jeton) return;
+    if (!P.vus.includes(k)) P.vus.push(k);
+  }
+  for (let i = 0; i < N.arrets; i++) {
+    S.arret = i; majHud();
+    await jouerArret(S.plan.liste[i], tok);
+    if (tok !== S.jeton) return;
+    if (S.erreurs >= 3) { finDefaite(); return; }
+  }
+  message('obs.terminus');
+  klaxonner();
+  await attendre(700);
+  if (tok !== S.jeton) return;
+  finVictoire();
+}
+
+function asseoir(bus, etage, pers) {
+  const liste = etage === 'haut' ? bus.haut : bus.bas;
+  const libres = []; liste.forEach((p, i) => { if (!p) libres.push(i); });
+  if (!libres.length) return false;
+  liste[pick(libres)] = pers; return true;
+}
+function lever(bus, etage) {
+  const liste = etage === 'haut' ? bus.haut : bus.bas;
+  const occ = []; liste.forEach((p, i) => { if (p) occ.push(i); });
+  if (!occ.length) return nouvellePersonne();
+  const i = pick(occ); const p = liste[i]; liste[i] = null; return p;
+}
+
+/* Prépare la file d'attente sur le trottoir (ou sur le quai du train) */
+function placerFile(st, g, corresp) {
+  const files = [[], []];
+  const curseur = corresp ? [TRAIN_PORTE - 4, TRAIN_PORTE - 4] : g.portes.map((p) => p.cx + 20);
+  const sens = corresp ? -1 : 1;
+  const unites = st.mont.map((u) => ({ ...u, restant: false })).concat(st.restants.map((u) => ({ ...u, restant: true })));
+  for (const u of unites) {
+    const porte = corresp ? 0 : Math.min(u.porte, g.portes.length - 1);
+    const taille = u.membres.length;
+    // Classe en sortie (5 enfants, casquettes jaunes) ou famille (un adulte, un enfant)
+    const style = (k) => (taille === 5 ? { taille: 0.8, chapeau: '#ffd23f', habit: '#3b7fe0' } : (taille === 2 ? { taille: k === 0 ? 1 : 0.8 } : null));
+    if (sens < 0) curseur[porte] -= taille * 13 + 9;
+    const base = curseur[porte];
+    u.acteurs = u.membres.map((et, k) => {
+      const a = nouvellePersonne(style(k));
+      a.etage = et;
+      a.x = base + k * 13; // le premier membre est toujours le plus à gauche
+      a.y = 248 + ((files[porte].length + k) % 2) * 5;
+      S.acteurs.push(a);
+      return a;
+    });
+    for (let k = 0; k + 1 < u.acteurs.length; k++) u.acteurs[k].lien = u.acteurs[k + 1];
+    if (sens > 0) curseur[porte] += taille * 13 + 9;
+    files[porte].push(u);
+  }
+  return unites;
+}
+
+async function porte(bus, ouvert, tok) {
+  if (ouvert) SONS.porte();
+  const de = bus.portes.slice();
+  await anim(300, (p) => { bus.portes = de.map((d) => lerp(d, ouvert ? 1 : 0, p)); });
+  return tok === S.jeton;
+}
+
+async function marcher(acteurs, dx, vit, cibleX) {
+  const departs = acteurs.map((a) => a.x);
+  const dist = Math.abs(cibleX - departs[0]);
+  const duree = Math.max(200, (dist / (110 * vit)) * 1000);
+  acteurs.forEach((a) => { a.marche = true; });
+  await anim(duree, (p) => { acteurs.forEach((a, k) => { a.x = departs[k] + (cibleX - departs[0]) * p; }); });
+  acteurs.forEach((a) => { a.marche = false; });
+  void dx;
+}
+
+async function entrer(bus, a, g, porteIdx) {
+  const d = g.portes[porteIdx] || g.portes[0];
+  a.marche = true;
+  const x0 = a.x;
+  await anim(Math.max(120, Math.abs(d.cx - x0) * 7), (p) => { a.x = lerp(x0, d.cx, p); });
+  await anim(170, (p) => { a.a = 1 - p; a.y = 248 - 10 * p; });
+  a.marche = false;
+  SONS.pas();
+  const pers = { peau: a.peau, cheveux: a.cheveux, habit: a.habit, chapeau: a.chapeau };
+  if (a.etage === 'haut') {
+    const e = { p: 0, pers }; bus.escalier.push(e);
+    await anim(480, (p) => { e.p = p; });
+    bus.escalier.splice(bus.escalier.indexOf(e), 1);
+    asseoir(bus, 'haut', pers);
+  } else asseoir(bus, 'bas', pers);
+}
+
+async function sortir(bus, etage, g, porteIdx, versX, vit) {
+  const pers = lever(bus, etage);
+  if (etage === 'haut') {
+    const e = { p: 1, pers }; bus.escalier.push(e);
+    await anim(420, (p) => { e.p = 1 - p; });
+    bus.escalier.splice(bus.escalier.indexOf(e), 1);
+  }
+  const d = g.portes[porteIdx] || g.portes[0];
+  const a = nouvellePersonne({ habit: pers.habit }); a.peau = pers.peau; a.cheveux = pers.cheveux; a.chapeau = pers.chapeau || null;
+  a.x = d.cx; a.y = 236; a.a = 0;
+  S.acteurs.push(a);
+  SONS.pas();
+  await anim(170, (p) => { a.a = p; a.y = 236 + 24 * p; });
+  return a;
+}
+
+async function descendre(st, g, tok, corresp) {
+  const vit = vitesse();
+  const sorties = [];
+  for (let i = 0; i < st.desc.length; i++) {
+    const u = st.desc[i];
+    const porteIdx = corresp ? 0 : (st.deuxPortes ? i % 2 : 0);
+    const groupe = [];
+    for (const et of u.membres) {
+      const a = await sortir(S.bus, et, g, porteIdx, 0, vit);
+      if (tok !== S.jeton) return;
+      groupe.push(a);
+      if (groupe.length > 1) groupe[groupe.length - 2].lien = a;
+      await attendre(90 / vit);
+    }
+    // Le groupe s'en va : vers la gauche, ou vers le train pour une correspondance
+    const cible = corresp ? TRAIN_PORTE : -60 - groupe.length * 14;
+    sorties.push((async () => {
+      await marcher(groupe, 0, vit, cible);
+      if (corresp) await anim(170, (p) => groupe.forEach((a) => { a.a = 1 - p; }));
+      groupe.forEach((a) => { a.a = 0; });
+    })());
+    // Avec deux portes, deux groupes sortent presque en même temps
+    await attendre((st.deuxPortes && i % 2 === 0 ? 90 : 260) / vit);
+  }
+  await Promise.all(sorties);
+  S.acteurs = S.acteurs.filter((a) => a.a > 0.01);
+}
+
+async function monter(unites, bus, g, tok) {
+  const vit = vitesse();
+  const groupes = unites.map((u, i) => (async () => {
+    await attendre(i * 330 / vit);
+    if (tok !== S.jeton) return;
+    const d = g.portes[Math.min(u.porte, g.portes.length - 1)] || g.portes[0];
+    await marcher(u.acteurs, 0, vit, d.cx + 14);
+    for (const a of u.acteurs) {
+      await entrer(bus, a, g, Math.min(u.porte, g.portes.length - 1));
+      if (tok !== S.jeton) return;
+    }
+  })());
+  await Promise.all(groupes);
+  S.acteurs = S.acteurs.filter((a) => a.a > 0.01);
+}
+
+async function jouerArret(st, tok) {
+  const N = NIVEAUX[S.niv];
+  const corresp = st.type === 'corresp';
+  S.decor = nouveauDecor(N.v === 'car' ? 'montagne' : VEH[N.v].decor, corresp);
+  S.train = corresp;
+  S.acteurs = []; S.bus2 = null;
+  S.bus.teinteBas = st.cacheBas; S.bus.teinteHaut = st.cacheHaut; S.bus.payeur = null;
+  const cible = corresp ? 22 : Math.round((420 - VEH[N.v].long) / 2);
+  const g = geo(N.v, cible);
+  S.poteau = corresp ? null : g.portes[0].cx - 26;
+  const unites = placerFile(st, g, corresp);
+  $('reponses').innerHTML = ''; $('pieces').innerHTML = ''; $('explication').textContent = '';
+  message(corresp ? 'obs.corresp' : 'obs.arrivee');
+  // Arrivée
+  S.bus.x = 460; S.bus.portes = [0, 0];
+  SONS.moteur();
+  await anim(1300 / vitesse(), (p) => { S.bus.x = lerp(460, cible, 1 - Math.pow(1 - p, 3)); });
+  if (tok !== S.jeton) return;
+  if (!(await porte(S.bus, true, tok))) return;
+  // Descente
+  if (st.d > 0) {
+    message('obs.descente');
+    await descendre(st, g, tok, corresp);
+    if (tok !== S.jeton) return;
+  }
+  // Questions posées avant la montée
+  if (st.q === 'places' || st.q === 'trottoir') {
+    await poserQuestion(st, tok);
+    if (tok !== S.jeton) return;
+  }
+  // Montée
+  const montants = unites.filter((u) => !u.restant);
+  const payeur = st.type === 'monnaie' ? montants.pop() : null;
+  if (montants.length) {
+    message('obs.montee');
+    await monter(montants, S.bus, g, tok);
+    if (tok !== S.jeton) return;
+  }
+  if (payeur) {
+    message('obs.monnaie');
+    const d = g.portes[0];
+    await marcher(payeur.acteurs, 0, vitesse(), d.cx + 16);
+    if (tok !== S.jeton) return;
+    S.bus.payeur = payeur.acteurs[0];
+    await poserQuestion(st, tok);
+    if (tok !== S.jeton) return;
+    SONS.pieces();
+    S.bus.payeur = null;
+    await entrer(S.bus, payeur.acteurs[0], g, 0);
+    if (tok !== S.jeton) return;
+  }
+  if (!(await porte(S.bus, false, tok))) return;
+  // Question posée après la montée
+  if (st.q !== 'places' && st.q !== 'trottoir' && st.q !== 'monnaie') {
+    await poserQuestion(st, tok);
+    if (tok !== S.jeton) return;
+  }
+  if (S.erreurs >= 3) return;
+  await roulerPuce(st.apres.tot, st.apres.haut);
+  if (tok !== S.jeton) return;
+  const restants = unites.filter((u) => u.restant);
+  // Dernier arrêt sans deuxième bus : le véhicule reste au terminus
+  if (st === S.plan.liste[S.plan.liste.length - 1] && !restants.length) return;
+  // Départ
+  message('obs.depart');
+  klaxonner();
+  SONS.moteur();
+  const x0 = S.bus.x;
+  await anim(1000 / vitesse(), (p) => { S.bus.x = lerp(x0, -VEH[N.v].long - 30, p * p); });
+  if (tok !== S.jeton) return;
+  // Deuxième bus pour ceux qui restent
+  if (restants.length) {
+    message('obs.deuxieme');
+    S.bus2 = nouveauBus(N.v); S.bus2.couleur = '#9fb3c8'; S.bus2.casquette = 'marine';
+    SONS.moteur();
+    await anim(1100 / vitesse(), (p) => { S.bus2.x = lerp(460, cible, 1 - Math.pow(1 - p, 3)); });
+    if (!(await porte(S.bus2, true, tok))) return;
+    restants.forEach((u) => u.acteurs.forEach((a) => { a.etage = 'bas'; }));
+    await monter(restants, S.bus2, g, tok);
+    if (!(await porte(S.bus2, false, tok))) return;
+    klaxonner('pouet');
+    const x2 = S.bus2.x;
+    await anim(900 / vitesse(), (p) => { S.bus2.x = lerp(x2, -VEH[N.v].long - 30, p * p); });
+    S.bus2 = null;
+  }
+}
+
+/* ---------- Questions et réponses ---------- */
+function texteQuestion(st) {
+  switch (st.q) {
+    case 'haut': return tr('q.haut');
+    case 'places': return tr('q.places');
+    case 'trottoir': return tr('q.trottoir');
+    case 'change': return tr('q.change');
+    case 'monnaie': return tr('q.monnaie', { prix: tr('pieces', { n: st.prix }), nom: st.nom, donne: tr('pieces', { n: st.donne }) });
+    default: return tr('q.total');
+  }
+}
+
+function propositions(rep, st) {
+  const N = NIVEAUX[S.niv];
+  const ecarts = [1, -1, 2, -2];
+  if ((N.g || []).includes(2)) ecarts.push(2, -2);
+  if ((N.g || []).includes(5)) ecarts.push(5, -5);
+  if (st.q === 'total' || st.q === 'haut') { ecarts.push(st.d || 1, -(st.m || 1)); }
+  const choix = new Set([rep]);
+  const essais = melanger(ecarts.slice());
+  for (const e of essais) { if (choix.size >= 3) break; const v = rep + e; if (v >= 0 && e !== 0) choix.add(v); }
+  for (let v = rep + 1; choix.size < 3; v++) choix.add(v);
+  return melanger([...choix]);
+}
+
+function attendreReponse(st) {
+  return new Promise((resoudre) => {
+    const z = $('reponses'); z.innerHTML = '';
+    const repondre = (v) => {
+      if (S.pause || !S.attente) return;
+      S.attente = null;
+      z.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+      resoudre(v);
+    };
+    S.attente = { st, repondre };
+    if (st.mode === 'ouinon') {
+      for (const [v, cle] of [['oui', 'r.oui'], ['non', 'r.non']]) {
+        const b = document.createElement('button'); b.className = 'rep texte'; b.textContent = tr(cle); b.dataset.v = v;
+        b.addEventListener('click', () => { SONS.clic(); repondre(v); }); z.appendChild(b);
+      }
+    } else if (st.mode === 'compteur') {
+      let val = st.q === 'total' ? S.abord : (st.q === 'haut' ? S.haut : 0);
+      const boite = document.createElement('div'); boite.className = 'compteur';
+      const moins = document.createElement('button'); moins.className = 'fl'; moins.setAttribute('aria-label', tr('moins'));
+      moins.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 9l7 8 7-8z" fill="#1f2a44"/></svg>';
+      const aff = document.createElement('span'); aff.className = 'val'; aff.setAttribute('role', 'status');
+      const plus = document.createElement('button'); plus.className = 'fl'; plus.setAttribute('aria-label', tr('plus'));
+      plus.innerHTML = '<svg viewBox="0 0 24 24"><path d="M5 15l7-8 7 8z" fill="#1f2a44"/></svg>';
+      const ok = document.createElement('button'); ok.className = 'fl ok'; ok.setAttribute('aria-label', tr('valider'));
+      ok.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 12l5 5 11-11" fill="none" stroke="#1f2a44" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      const maj = () => { aff.textContent = nb(val); aff.setAttribute('aria-label', tr('compteur', { n: val })); };
+      const changer = (dv) => { if (S.pause || !S.attente) return; val = borne(val + dv, 0, 60); SONS.fleche(dv > 0); maj(); };
+      moins.addEventListener('click', () => changer(-1));
+      plus.addEventListener('click', () => changer(1));
+      ok.addEventListener('click', () => { SONS.clic(); repondre(val); });
+      maj();
+      boite.append(moins, aff, plus, ok); z.appendChild(boite);
+      S.attente.changer = changer; S.attente.valider = () => { SONS.clic(); repondre(val); };
+    } else {
+      propositions(st.reponse, st).forEach((v) => {
+        const b = document.createElement('button'); b.className = 'rep'; b.textContent = nb(v); b.dataset.v = String(v);
+        b.addEventListener('click', () => { SONS.clic(); repondre(v); }); z.appendChild(b);
+      });
+    }
+    // Pièces dessinées pour la monnaie
+    if (st.q === 'monnaie') {
+      const p = $('pieces'); p.innerHTML = '';
+      const tasPrix = document.createElement('div'); tasPrix.className = 'tas';
+      tasPrix.innerHTML = '<svg class="ic" viewBox="0 0 30 20"><use href="#ic-ticket"/></svg>' + '<i class="piece vide"></i>'.repeat(st.prix);
+      const tasDonne = document.createElement('div'); tasDonne.className = 'tas';
+      tasDonne.innerHTML = '<svg class="ic" viewBox="0 0 24 24"><use href="#ic-main"/></svg>' + '<i class="piece"></i>'.repeat(st.donne);
+      p.append(tasPrix, tasDonne);
+    }
+  });
+}
+
+function explication(st) {
+  switch (st.q) {
+    case 'places': return tr('calc.places', { attente: st.attente, libres: st.libres });
+    case 'trottoir': return tr('calc.trottoir', { attente: st.attente, libres: st.libres, reste: st.reponse });
+    case 'monnaie': return tr('calc.monnaie', { donne: st.donne, prix: st.prix, rendu: st.reponse });
+    case 'change': return tr('calc.change', { descendus: st.d, montes: st.m, total: st.reponse });
+    case 'haut': {
+      const montesHaut = st.apres.haut - st.avant.haut + st.desc.reduce((s, u) => s + u.membres.filter((m) => m === 'haut').length, 0);
+      const descHaut = st.desc.reduce((s, u) => s + u.membres.filter((m) => m === 'haut').length, 0);
+      return tr(descHaut ? 'calc.total' : 'calc.plus', { depart: st.avant.haut, montes: montesHaut, descendus: descHaut, total: st.reponse });
+    }
+    default: return tr(st.d ? 'calc.total' : 'calc.plus', { depart: st.avant.tot, montes: st.m, descendus: st.d, total: st.reponse });
+  }
+}
+
+async function poserQuestion(st, tok) {
+  $('msg').textContent = texteQuestion(st);
+  $('explication').textContent = '';
+  const choix = await attendreReponse(st);
+  if (tok !== S.jeton) return;
+  const bon = choix === st.reponse;
+  // Bouton juste en vert, mauvais choix en rouge
+  $('reponses').querySelectorAll('.rep').forEach((b) => {
+    if (b.dataset.v === String(st.reponse)) b.classList.add('bon');
+    else if (b.dataset.v === String(choix)) b.classList.add('faux');
+  });
+  if (bon) {
+    S.tickets++; P.tickets++;
+    $('msg').textContent = tr('bravo' + rand(1, 4)) + ' ' + tr('ticketGagne');
+    SONS.bon(); setTimeout(() => SONS.ticket(), 250);
+    confettis();
+    const t = $('hud-tickets'); t.classList.remove('saute'); void t.offsetWidth; t.classList.add('saute');
+  } else {
+    S.erreurs++;
+    if (st.q === 'places') $('msg').textContent = tr(st.reponse === 'oui' ? 'oupsOui' : 'oupsNon');
+    else $('msg').textContent = tr('oups', { n: st.reponse });
+    SONS.erreur();
+    const sc = $('scene'); sc.classList.remove('secoue'); void sc.offsetWidth; sc.classList.add('secoue');
+  }
+  $('explication').textContent = explication(st);
+  majHud();
+  await attendre(bon ? 1300 : 2900);
+  if (tok !== S.jeton) return;
+  $('reponses').innerHTML = ''; $('pieces').innerHTML = ''; $('explication').textContent = '';
+}
+
+function confettis() {
+  const coul = ['#e5533d', '#3b7fe0', '#34a866', '#ffd23f', '#ee77ab', '#8d5fd3'];
+  for (let i = 0; i < 26; i++) S.particules.push({ x: 210 + rand(-60, 60), y: 90, vx: (Math.random() - 0.5) * 0.3, vy: -0.15 - Math.random() * 0.2, vie: 1100, couleur: pick(coul), rot: Math.random() * 6, forme: i % 6 === 0 ? 'etoile' : 'conf' });
+  S.particules.push({ x: 210, y: 120, vx: 0.18, vy: -0.22, vie: 900, rot: 0, forme: 'ticket', cible: true });
+}
+function majParticules(dt) {
+  for (const p of S.particules) {
+    p.vie -= dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.forme === 'ticket') { p.x = lerp(p.x, 410, 0.04); p.y = lerp(p.y, -10, 0.04); p.rot += 0.004 * dt; }
+    else { p.vy += 0.0006 * dt; p.rot += 0.01 * dt; }
+  }
+  S.particules = S.particules.filter((p) => p.vie > 0);
+}
+
+/* ---------- Fins de ligne ---------- */
+function objetsDebloques(avant, apres) {
+  const liste = [];
+  for (const [l, cle] of [[COULEURS, 'couleur'], [KLAXONS, 'klaxon'], [CASQUETTES, 'casquette']]) {
+    for (const o of l) if (o.prix > avant && o.prix <= apres) liste.push(tr(cle + '.' + o.id));
+  }
+  return liste;
+}
+
+function finVictoire() {
+  const n = S.niv, N = NIVEAUX[n];
+  S.enJeu = false;
+  const etoiles = Math.max(1, 3 - S.erreurs);
+  P.etoiles[n] = Math.max(P.etoiles[n], etoiles);
+  const ancienRecord = P.records[n];
+  const record = S.tickets > ancienRecord;
+  P.records[n] = Math.max(P.records[n], S.tickets);
+  P.debloque = Math.min(NIVEAUX.length, Math.max(P.debloque, n + 2));
+  enregistrer(Math.min(NIVEAUX.length, n + 2));
+  if (window.FMG) window.FMG.reportEnd({ completed: true, level: n + 1 });
+  const toutFini = P.etoiles.every((e) => e > 0);
+  if (toutFini) { if (window.FMG) window.FMG.reportComplete({ stars: etoilesTotal(), maxStars: NIVEAUX.length * 3 }); }
+  SONS.victoire();
+  confettis(); confettis();
+  ouvrirFin(true, { etoiles, record, ancienRecord, nouveaux: objetsDebloques(S.ticketsDebut, P.tickets), dernier: n === NIVEAUX.length - 1, toutFini, arrets: N.arrets });
+}
+
+function finDefaite() {
+  const n = S.niv;
+  S.enJeu = false;
+  enregistrer(n + 1);
+  if (window.FMG) window.FMG.reportEnd({ completed: false, level: n + 1 });
+  SONS.defaite();
+  ouvrirFin(false, { nouveaux: objetsDebloques(S.ticketsDebut, P.tickets), arrets: NIVEAUX[n].arrets, ancienRecord: P.records[n] });
+}
+
+function ouvrirFin(gagne, info) {
+  const n = S.niv;
+  $('fin-titre').textContent = gagne ? tr('fin.victoire', { n: n + 1 }) : tr('fin.defaite');
+  $('fin-texte').textContent = gagne ? '' : tr('fin.defaiteTexte');
+  const et = $('fin-etoiles'); et.innerHTML = '';
+  if (gagne) {
+    for (let i = 0; i < 3; i++) { et.insertAdjacentHTML('beforeend', SVG_ETOILE(i < info.etoiles)); }
+    et.setAttribute('aria-label', tr('etoilesN', { n: info.etoiles }));
+    et.querySelectorAll('svg').forEach((s, i) => setTimeout(() => { s.classList.add('vue'); if (i < info.etoiles) note(660 + i * 220, 0.15, { type: 'triangle', vol: 0.1 }); }, 300 + i * 350));
+  }
+  $('fin-tickets').textContent = tr('fin.tickets', { n: S.tickets, max: info.arrets });
+  $('fin-record').textContent = gagne && info.record ? tr('fin.record') : tr('fin.recordAncien', { n: Math.max(info.ancienRecord, gagne ? S.tickets : 0) });
+  $('fin-debloque').textContent = info.nouveaux.length ? tr('fin.debloque', { liste: info.nouveaux.join(', ') }) : '';
+  $('fin-bilan').textContent = gagne && info.dernier ? tr('fin.jeuFini', { lignes: NIVEAUX.length, n: etoilesTotal(), max: NIVEAUX.length * 3 }) : '';
+  const b1 = $('b-fin-1'), b2 = $('b-fin-2'), b3 = $('b-fin-3');
+  if (gagne) {
+    if (info.dernier) { b1.textContent = tr('album'); b1.onclick = () => { SONS.clic(); fermerVoiles(); afficherEcran('album'); }; }
+    else { b1.textContent = tr('suivant'); b1.onclick = () => { SONS.clic(); lancerNiveau(n + 1); }; }
+    b2.textContent = tr('rejouer'); b2.onclick = () => { SONS.clic(); lancerNiveau(n); };
+    b3.textContent = tr('lignes'); b3.onclick = () => { SONS.clic(); fermerVoiles(); afficherEcran('lignes'); };
+  } else {
+    b1.textContent = tr('reessayer'); b1.onclick = () => { SONS.clic(); lancerNiveau(n); };
+    b2.textContent = tr('lignes'); b2.onclick = () => { SONS.clic(); fermerVoiles(); afficherEcran('lignes'); };
+    b3.textContent = tr('accueil'); b3.onclick = () => { SONS.clic(); fermerVoiles(); afficherEcran('titre'); };
+  }
+  $('voile-fin').hidden = false;
+  setTimeout(() => { try { b1.focus(); } catch (e) { /* rien */ } }, 50);
+}
+
+function fermerVoiles() { ['voile-fin', 'voile-pause', 'voile-tuto'].forEach((id) => { $(id).hidden = true; }); S.pause = false; }
+
+/* ---------- Pause ---------- */
+function pauser() {
+  if (S.ecran !== 'jeu' || !S.enJeu || S.pause || S.tutoOuvert || !$('voile-fin').hidden) return;
+  S.pause = true; $('voile-pause').hidden = false;
+  setTimeout(() => { try { $('b-reprendre').focus(); } catch (e) { /* rien */ } }, 30);
+}
+function reprendre() { S.pause = false; $('voile-pause').hidden = true; }
+
+/* =========================================================================
+   TUTORIELS ANIMÉS (mini-scènes dessinées + main)
+   ========================================================================= */
+const TUTOS = {
+  base:       { v: 'bus', assis: 2, etapes: ['tuto.base1', 'tuto.base2', 'tuto.base3'], flux: [{ t: 'monte', n: 3 }], main: 'suivre' },
+  descente:   { v: 'bus', assis: 6, etapes: ['m.descente'], flux: [{ t: 'descend', n: 2 }], main: 'porte' },
+  compteur:   { v: 'bus', assis: 4, etapes: ['m.compteur'], flux: [], main: 'fleches' },
+  portes:     { v: 'bus', assis: 4, teinte: true, etapes: ['m.portes'], flux: [{ t: 'monte', n: 2 }], main: 'porte' },
+  minibus:    { v: 'minibus', assis: 3, etapes: ['m.vehicule'], vehicule: 'minibus', flux: [{ t: 'monte', n: 1 }], main: 'porte' },
+  groupes2:   { v: 'minibus', assis: 2, etapes: ['m.groupes2'], flux: [{ t: 'monte', n: 2, groupe: true }, { t: 'monte', n: 2, groupe: true }], main: 'suivre' },
+  groupes5:   { v: 'minibus', assis: 1, etapes: ['m.groupes5'], flux: [{ t: 'monte', n: 5, groupe: true, classe: true }], main: 'suivre' },
+  places:     { v: 'minibus', assis: 6, etapes: ['m.places'], flux: [{ t: 'attend', n: 4 }], main: 'sieges', deuxieme: true },
+  trottoir:   { v: 'minibus', assis: 6, etapes: ['m.trottoir'], flux: [{ t: 'monte', n: 2 }, { t: 'attend', n: 2 }], main: 'file' },
+  etage:      { v: 'etage', assis: 4, assisHaut: 5, etapes: ['m.vehicule', 'm.etage'], vehicule: 'etage', flux: [{ t: 'monte', n: 2, haut: true }], main: 'etages' },
+  haut:       { v: 'etage', assis: 4, assisHaut: 4, teinteHaut: true, etapes: ['m.haut'], flux: [{ t: 'monte', n: 2, haut: true }], main: 'escalier' },
+  tram:       { v: 'tram', assis: 5, etapes: ['m.vehicule'], vehicule: 'tram', flux: [{ t: 'monte', n: 2 }], main: 'porte' },
+  monnaie:    { v: 'tram', assis: 5, etapes: ['m.monnaie'], flux: [{ t: 'paie', n: 1 }], main: 'pieces' },
+  deuxPortes: { v: 'tram', assis: 5, etapes: ['m.deuxPortes'], flux: [{ t: 'monte', n: 2, porte: 0 }, { t: 'monte', n: 2, porte: 1 }], main: 'deuxportes' },
+  car:        { v: 'car', assis: 5, etapes: ['m.vehicule'], vehicule: 'car', flux: [{ t: 'monte', n: 1 }], main: 'porte' },
+  corresp:    { v: 'car', assis: 6, etapes: ['m.corresp'], train: true, flux: [{ t: 'versTrain', n: 2 }, { t: 'depuisTrain', n: 2 }], main: 'train' },
+};
+const TUTO = { cle: null, etat: null, etape: 0, debut: 0, fin: null, minuteur: null };
+
+function preparerDemo(cle) {
+  const d = TUTOS[cle];
+  const train = !!d.train;
+  const bus = nouveauBus(d.v); bus.x = train ? 22 : Math.round((420 - VEH[d.v].long) / 2); bus.portes = [1, 1];
+  bus.teinteBas = !!d.teinte; bus.teinteHaut = !!(d.teinte || d.teinteHaut);
+  for (let k = 0; k < (d.assis || 0); k++) asseoir(bus, 'bas', nouvellePersonne());
+  for (let k = 0; k < (d.assisHaut || 0); k++) asseoir(bus, 'haut', nouvellePersonne());
+  const g = geo(d.v, bus.x);
+  const acteurs = [];
+  const flux = [];
+  d.flux.forEach((f, fi) => {
+    const membres = [];
+    for (let k = 0; k < f.n; k++) {
+      const a = nouvellePersonne(f.classe ? { taille: 0.8, chapeau: '#ffd23f', habit: '#3b7fe0' } : (f.groupe ? { taille: k % 2 ? 0.8 : 1 } : null));
+      membres.push(a); acteurs.push(a);
+    }
+    if (f.groupe) for (let k = 0; k + 1 < membres.length; k++) membres[k].lien = membres[k + 1];
+    flux.push({ ...f, membres, fi });
+  });
+  return { d, bus, g, acteurs, flux, decor: nouveauDecor(d.v === 'car' ? 'montagne' : VEH[d.v].decor, train), train };
+}
+
+function animerDemo(e, ms) {
+  const T = 3600, t = ms % T, p = t / T;
+  const g = e.g, d0 = g.portes[0], d1 = g.portes[1] || g.portes[0];
+  let main = null;
+  e.bus.escalier = [];
+  e.bus2 = null;
+  e.flux.forEach((f) => {
+    f.membres.forEach((a, k) => {
+      a.a = 1; a.marche = false;
+      const porteF = f.porte === 1 ? d1 : d0;
+      const debut = 0.08 + k * 0.1 + f.fi * 0.15;
+      const q = borne((p - debut) / 0.35, 0, 1);
+      if (f.t === 'monte' || f.t === 'paie') {
+        const x0 = porteF.cx + 24 + k * 14 + f.fi * (f.porte !== undefined ? 0 : 30);
+        a.x = lerp(x0, porteF.cx, q); a.y = 248; a.marche = q > 0 && q < 1;
+        if (f.t === 'paie') { a.x = lerp(x0, porteF.cx + 16, q); }
+        if (q >= 1 && f.t === 'monte') {
+          const r = borne((p - debut - 0.35) / 0.08, 0, 1); a.a = 1 - r; a.y = 248 - 10 * r;
+          if (f.haut && r >= 1) { const sp = borne((p - debut - 0.43) / 0.15, 0, 1); if (sp < 1) e.bus.escalier.push({ p: sp, pers: a }); }
+        }
+      } else if (f.t === 'descend') {
+        a.x = lerp(d0.cx, -40, q); a.y = 260; a.marche = q > 0 && q < 1; a.a = q > 0 ? 1 : 0;
+      } else if (f.t === 'versTrain') {
+        a.x = lerp(d0.cx, TRAIN_PORTE, q); a.y = 262; a.marche = q > 0 && q < 1; a.a = q > 0 && q < 1 ? 1 : 0;
+      } else if (f.t === 'depuisTrain') {
+        a.x = lerp(TRAIN_PORTE - 4, d0.cx, q); a.y = 248; a.marche = q > 0 && q < 1; a.a = q < 1 ? 1 : 0;
+      } else if (f.t === 'attend') {
+        a.x = d0.cx + 24 + k * 14 + f.fi * 30; a.y = 248;
+      }
+    });
+  });
+  if (e.d.deuxieme && p > 0.55) { // deuxième minibus qui arrive
+    e.bus2 = e.bus2Obj || (e.bus2Obj = nouveauBus(e.d.v));
+    e.bus2.couleur = '#9fb3c8'; e.bus2.portes = [1, 0];
+    e.bus2.x = lerp(460, 220, borne((p - 0.55) / 0.3, 0, 1));
+  }
+  const tap = Math.sin(ms * 0.012) > 0.3;
+  const premier = e.flux[0] && e.flux[0].membres[0];
+  switch (e.d.main) {
+    case 'suivre': { const v = e.acteurs.find((a) => a.a > 0.5 && a.x > 0) || premier; if (v) main = { x: v.x + 6, y: v.y - 54, appui: tap }; break; }
+    case 'porte': main = { x: d0.cx + 4, y: d0.y0 - 10, appui: tap }; break;
+    case 'deuxportes': main = { x: (p < 0.5 ? d0 : d1).cx + 4, y: d0.y0 - 10, appui: tap }; break;
+    case 'sieges': main = { x: g.sieges.bas[(Math.floor(ms / 500) % 2) + 6].x, y: g.yBas + 26, appui: tap }; break;
+    case 'file': main = { x: d0.cx + 30 + 14 * 3, y: 196, appui: tap }; break;
+    case 'etages': main = { x: g.sieges.haut[4].x, y: (Math.floor(ms / 900) % 2 ? g.rangY[1] : g.rangY[0]) + 26, appui: tap }; break;
+    case 'escalier': { const s = g.segs.find((x) => x.t === 'D'); main = { x: s.x + s.w / 2, y: g.rangY[0] + 40, appui: tap }; break; }
+    case 'pieces': main = { x: d0.cx + 20, y: d0.y1 - 30, appui: tap }; break;
+    case 'train': main = { x: (p < 0.5 ? TRAIN_PORTE : d0.cx) + 4, y: 170, appui: tap }; break;
+    case 'fleches': main = { x: 210 + (p < 0.5 ? 34 : -34), y: 236, appui: tap, fleches: true }; break;
+    default: break;
+  }
+  e.main = main;
+  e.payeur = e.d.main === 'pieces' && e.flux[0] && borne((p - 0.08) / 0.35, 0, 1) >= 1;
+}
+
+function dessinerTuto(ms) {
+  const e = TUTO.etat; if (!e) return;
+  animerDemo(e, ms - TUTO.debut);
+  monde(ctxTuto, toileTuto);
+  e.bus.payeur = e.payeur ? {} : null;
+  dessinerScene(ctxTuto, { decor: e.decor, poteau: e.train ? null : e.g.portes[0].cx - 26, train: e.train, bus: e.bus, bus2: e.bus2, acteurs: e.acteurs }, ms);
+  const c = ctxTuto;
+  if (e.main && e.main.fleches) { // compteur dessiné (sans chiffre)
+    c.fillStyle = 'rgba(255,255,255,.92)'; rr(c, 130, 214, 160, 44, 12); c.fill();
+    c.fillStyle = '#ffe27a'; rr(c, 140, 219, 34, 34, 8); c.fill(); rr(c, 246, 219, 34, 34, 8); c.fill();
+    c.fillStyle = '#1f2a44';
+    c.beginPath(); c.moveTo(148, 230); c.lineTo(166, 230); c.lineTo(157, 244); c.fill();
+    c.beginPath(); c.moveTo(254, 244); c.lineTo(272, 244); c.lineTo(263, 230); c.fill();
+    const n = 3 + Math.floor(((ms - TUTO.debut) % 3600) / 900);
+    for (let i = 0; i < n; i++) { c.beginPath(); c.arc(190 + (i % 4) * 11, 230 + Math.floor(i / 4) * 11, 4, 0, 7); c.fill(); }
+  }
+  if (e.main) dessinerMain(c, e.main.x, e.main.y, e.main.appui);
+}
+
+function montrerTuto(cle) {
+  return new Promise((resoudre) => {
+    const d = TUTOS[cle];
+    TUTO.cle = cle; TUTO.etat = preparerDemo(cle); TUTO.etape = 0; TUTO.debut = performance.now();
+    $('tuto-titre').textContent = cle === 'base' ? tr('tuto.titre') : tr('nouveau');
+    const majEtape = () => {
+      const k = d.etapes[TUTO.etape];
+      $('tuto-texte').textContent = tr(k, { nom: tr('vehicule.' + (d.vehicule || d.v)), n: VEH[d.v].cap });
+      $('tuto-points').innerHTML = d.etapes.length > 1 ? d.etapes.map((_, i) => '<i class="' + (i === TUTO.etape ? 'on' : '') + '"></i>').join('') : '';
+    };
+    majEtape();
+    clearInterval(TUTO.minuteur);
+    TUTO.minuteur = setInterval(() => { if (S.pause) return; if (TUTO.etape < d.etapes.length - 1) { TUTO.etape++; majEtape(); } }, 2400);
+    $('voile-tuto').hidden = false;
+    S.tutoOuvert = true;
+    TUTO.fin = () => {
+      clearInterval(TUTO.minuteur); TUTO.etat = null; TUTO.fin = null; S.tutoOuvert = false;
+      $('voile-tuto').hidden = true; resoudre();
+    };
+    setTimeout(() => { try { $('b-compris').focus(); } catch (e) { /* rien */ } }, 30);
+  });
+}
+function fermerTuto() { if (TUTO.fin) { SONS.clic(); TUTO.fin(); } }
+
+/* =========================================================================
+   BOUCLE D'AFFICHAGE
+   ========================================================================= */
+let derniere = 0;
+function boucle(ms) {
+  const dt = Math.min(50, ms - (derniere || ms)); derniere = ms;
+  if (S.ecran === 'jeu' && !S.pause && !S.tutoOuvert) {
+    majTaches(dt);
+    majParticules(dt);
+    for (const a of S.acteurs) if (a.marche) a.phase += dt * 0.018 * vitesse();
+  }
+  for (const a of TITRE.acteurs) a.phase += dt * 0.004;
+  if (S.ecran === 'jeu') {
+    monde(ctx, toile);
+    dessinerScene(ctx, { decor: S.decor, poteau: S.poteau, train: S.train, bus: S.bus, bus2: S.bus2, acteurs: S.acteurs, particules: S.particules }, ms);
+  } else if (S.ecran === 'titre') dessinerTitre(ms);
+  if (TUTO.etat && !$('voile-tuto').hidden) {
+    if (TUTO.etat.acteurs) for (const a of TUTO.etat.acteurs) if (a.marche) a.phase += dt * 0.018;
+    dessinerTuto(ms);
+  }
+  requestAnimationFrame(boucle);
+}
+
+/* =========================================================================
+   COMMANDES
+   ========================================================================= */
+function jouer() {
+  SONS.clic();
+  JEL_SAVE.reprise({
+    jeu: JEU,
+    onContinuer: (d) => {
+      const n = borne(Math.round(Number(d && d.niveau) || 1), 1, NIVEAUX.length);
+      P.debloque = Math.max(P.debloque, n);
+      lancerNiveau(n - 1);
+    },
+    onNouvelle: () => lancerNiveau(0),
+    onEffacer: () => { const son = P.son; P = defautP(); P.son = son; majSon(); lancerNiveau(0); },
+  });
+}
+
+$('b-jouer').addEventListener('click', jouer);
+$('b-lignes').addEventListener('click', () => { SONS.clic(); afficherEcran('lignes'); });
+$('b-album').addEventListener('click', () => { SONS.clic(); afficherEcran('album'); });
+document.querySelectorAll('.retour').forEach((b) => b.addEventListener('click', () => { SONS.clic(); afficherEcran('titre'); }));
+document.querySelectorAll('.son').forEach((b) => b.addEventListener('click', basculerSon));
+$('b-pause').addEventListener('click', () => { SONS.clic(); pauser(); });
+$('b-reprendre').addEventListener('click', () => { SONS.clic(); reprendre(); });
+$('b-recommencer').addEventListener('click', () => { SONS.clic(); lancerNiveau(S.niv); });
+$('b-accueil').addEventListener('click', () => {
+  SONS.clic();
+  if (S.enJeu) enregistrer(S.niv + 1);
+  S.enJeu = false; annulerTout(); fermerVoiles(); afficherEcran('titre');
+});
+$('b-klaxon').addEventListener('click', () => { if (!S.pause) klaxonner(); });
+$('b-compris').addEventListener('click', (e) => { e.stopPropagation(); fermerTuto(); });
+$('voile-tuto').addEventListener('click', fermerTuto);
+
+document.addEventListener('keydown', (e) => {
+  const code = e.code;
+  if (!$('voile-tuto').hidden) { if (code === 'Enter' || code === 'Space' || code === 'Escape') { e.preventDefault(); fermerTuto(); } return; }
+  if (S.ecran === 'jeu') {
+    if (code === 'Escape' || code === 'KeyP') { e.preventDefault(); if (S.pause) reprendre(); else pauser(); return; }
+    if (S.pause || !$('voile-fin').hidden) return;
+    if (code === 'KeyK') { klaxonner(); return; }
+    const at = S.attente;
+    if (!at) return;
+    if (at.st.mode === 'compteur') {
+      if (code === 'ArrowUp' || code === 'ArrowRight') { e.preventDefault(); at.changer(1); }
+      else if (code === 'ArrowDown' || code === 'ArrowLeft') { e.preventDefault(); at.changer(-1); }
+      else if (code === 'Enter' || code === 'NumpadEnter') { e.preventDefault(); at.valider(); }
+    } else {
+      const boutons = [...$('reponses').querySelectorAll('button')];
+      const m = /^(Digit|Numpad)([1-3])$/.exec(code);
+      if (m && boutons[Number(m[2]) - 1]) { e.preventDefault(); boutons[Number(m[2]) - 1].click(); return; }
+      if (code === 'ArrowLeft' || code === 'ArrowRight') {
+        e.preventDefault();
+        const i = boutons.indexOf(document.activeElement);
+        const j = i < 0 ? 0 : (i + (code === 'ArrowRight' ? 1 : boutons.length - 1)) % boutons.length;
+        boutons[j].focus();
+      }
+    }
+  } else if (S.ecran === 'titre' && (code === 'Enter' || code === 'Space') && document.activeElement === document.body) {
+    e.preventDefault(); jouer();
+  }
+});
+
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') pauser(); });
+
+JEL_SAVE.surFermeture(() => { if (S.enJeu) enregistrer(S.niv + 1); });
+
+if (window.JEL_I18N && window.JEL_I18N.surChangement) window.JEL_I18N.surChangement(() => { majSon(); if (S.ecran === 'jeu') majHud(); if (S.ecran === 'lignes') construireLignes(); if (S.ecran === 'album') construireAlbum(); });
+
+/* Démarrage */
+P = chargerP();
+majSon();
+preparerTitre();
+window.addEventListener('resize', () => { ajuster(toile); ajuster(toileTitre); });
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
