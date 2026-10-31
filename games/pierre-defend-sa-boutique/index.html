@@ -1734,14 +1734,14 @@
   let monde = null;
   let horloge = 0;
   let tuto = null;
-  const pierre = { x: 200, cible: 200, coup: 0 };
+  const pierre = { x: 200, cible: 200, coup: 0, joie: 0, pas: 0, vit: 0 };
 
   function nouveauMonde() {
     return {
       temps: 0, stock: L.stock, score: 0, coups: 0, clients: 0, serie: 0,
       gens: [], objets: [], bulles: [], particules: [], textes: [],
       rideaux: [{ f: 0, t: 0, rech: 0 }, { f: 0, t: 0, rech: 0 }],
-      prochain: 1.2, prochainClient: 4, prochainBonus: 6, vagues: [0.5, 0.8],
+      prochain: 1.2, prochainClient: 4, prochainBonus: 6, vagues: [0.5, 0.8], vagueGens: [],
       bonus: null, chariot: 0, balai: 0, voisine: 0, voisineTic: 0,
       secousse: 0, flash: 0, panneT: 0, noir: 0, dosAnnonce: 0, fini: false, fin: 0,
       police: -1, dernierCoup: { x: 200, y: 400, t: -9 }, demo: false,
@@ -2235,7 +2235,12 @@
       annoncer(tr('annonce.vague'));
       Son.vague();
       const n = L.g[1] + 1;
-      for (let j = 0; j < n; j++) if (nbHostiles() < L.m + 2) apparaitre(typeAuHasard());
+      for (let j = 0; j < n; j++) if (nbHostiles() < L.m + 2) { const p = apparaitre(typeAuHasard()); if (p) m.vagueGens.push(p); }
+    }
+    // Vague repoussée (tous ses pilleurs sont partis ou en fuite) : Pierre lève le poing
+    if (m.vagueGens.length && m.vagueGens.every((p) => p.etat === 'fuite' || p.etat === 'sort' || !m.gens.includes(p))) {
+      m.vagueGens = [];
+      pierre.joie = 1.8;
     }
     // Clients
     if (L.cl) {
@@ -2318,8 +2323,13 @@
     m.textes = m.textes.filter((tx) => tx.t > 0);
     if (m.secousse > 0) m.secousse -= dt;
     if (m.flash > 0) m.flash -= dt;
+    const avantX = pierre.x;
     pierre.x += (pierre.cible - pierre.x) * Math.min(1, dt * 10);
+    // vitesse lissée (balancement de la manette quand Pierre court)
+    pierre.vit += ((dt > 0 ? (pierre.x - avantX) / dt : 0) - pierre.vit) * Math.min(1, dt * 8);
+    pierre.pas += dt * (4 + Math.min(14, Math.abs(pierre.vit) / 25));
     if (pierre.coup > 0) pierre.coup -= dt;
+    if (pierre.joie > 0) pierre.joie -= dt;
   }
 
   // ---------------------------------------------------------------------------
@@ -2331,6 +2341,7 @@
     monde.police = 0;
     annoncer(tr('annonce.police'));
     Son.sirene();
+    pierre.joie = 99;
     for (const p of monde.gens) {
       if (p.lieu === 'v' && p.etat === 'tire') { p.r = 0; }
       if (p.porte > 0) { lacher(p.x, p.y - 20, p.porte); p.porte = 0; }
@@ -2406,7 +2417,7 @@
     niveau = bornee(n, 1, NB);
     L = NIVEAUX[niveau - 1];
     monde = nouveauMonde();
-    pierre.x = pierre.cible = 200; pierre.y = 0; pierre.pose = false;
+    pierre.x = pierre.cible = 200; pierre.y = 0; pierre.pose = false; pierre.joie = 0; pierre.vit = 0;
     montrer(null);
     $('hud').classList.remove('cache');
     majHud(); majBonus();
@@ -2783,39 +2794,138 @@
   }
 
   // Pierre, le gérant, avec son plumeau
+  // Look : barbe rousse fournie, cheveux courts roux, tenue noire, lunettes
+  // noires, manette de jeu (sans marque) accrochée à la ceinture.
+  // Humeurs : déterminé (par défaut pendant la défense), joie avec le poing
+  // levé (vague repoussée, arrivée de la police), panique (stock bas).
+  const PIERRE = { peau: '#f2c9a0', roux: '#d2551f', rouxClair: '#ee7a35', rouxFonce: '#9e3a12', noir: '#17171d', lisere: '#5d5d78', manette: '#cfd5e2' };
+  function dessinerManettePierre(x, y, ang) {
+    // sangle accrochée à la ceinture, puis manette qui pend et se balance
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.strokeStyle = '#3a3a48'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 9); ctx.stroke();
+    ctx.translate(0, 15);
+    ctx.fillStyle = PIERRE.manette; ctx.strokeStyle = '#2a2a36'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.ellipse(-6, 2, 5, 6, 0.4, 0, 7); ctx.ellipse(6, 2, 5, 6, -0.4, 0, 7); ctx.fill();
+    rr(-9, -5, 18, 9, 4); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#2a2a36'; ctx.fillRect(-7.5, -1.5, 5, 1.6); ctx.fillRect(-5.8, -3.2, 1.6, 5);
+    ctx.fillStyle = '#ff5d6c'; ctx.beginPath(); ctx.arc(4.5, -2, 1.5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#3ec7ff'; ctx.beginPath(); ctx.arc(7, 0.5, 1.5, 0, 7); ctx.fill();
+    ctx.restore();
+  }
   function dessinerPierre() {
-    const x = pierre.x, y = pierre.y || G.pierreY, coup = pierre.coup > 0 || pierre.pose;
+    const m = monde;
+    const x0 = pierre.x, y = pierre.y || G.pierreY, coup = pierre.coup > 0 || pierre.pose;
+    const joie = pierre.joie > 0;
+    const panique = !joie && m && !m.demoTitre && !m.fini && m.stock <= Math.ceil(L.stock * 0.25);
+    const x = x0 + (panique ? Math.sin(horloge * 45) * 1.2 : 0);
+    const court = Math.min(1, Math.abs(pierre.vit) / 120);
+    const pas = Math.sin(pierre.pas) * court;
+    const saut = joie ? Math.abs(Math.sin(horloge * 9)) * 3 : 0;
+    const P = PIERRE;
     ctx.save();
-    ctx.fillStyle = '#00000033'; ctx.beginPath(); ctx.ellipse(x, y, 18, 5, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#2d3550'; ctx.lineWidth = 8; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(x - 7, y - 26); ctx.lineTo(x - 8, y - 2); ctx.moveTo(x + 7, y - 26); ctx.lineTo(x + 8, y - 2); ctx.stroke();
-    // corps : chemise et tablier vert
-    ctx.fillStyle = '#e9edf5'; rr(x - 17, y - 62, 34, 40, 10); ctx.fill();
-    ctx.fillStyle = '#2f8a57'; rr(x - 13, y - 52, 26, 32, 5); ctx.fill();
-    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(x, y - 40, 4, 0, 7); ctx.fill();
-    // bras gauche
-    ctx.strokeStyle = '#e9edf5'; ctx.lineWidth = 8;
-    ctx.beginPath(); ctx.moveTo(x - 16, y - 56); ctx.lineTo(x - 22, y - 34); ctx.stroke();
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.fillStyle = '#00000033'; ctx.beginPath(); ctx.ellipse(x0, y, 18, 5, 0, 0, 7); ctx.fill();
+    ctx.translate(0, -saut);
+    // jambes (pantalon noir) et chaussures
+    ctx.strokeStyle = P.lisere; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.moveTo(x - 7, y - 26); ctx.lineTo(x - 8 + pas * 5, y - 3); ctx.moveTo(x + 7, y - 26); ctx.lineTo(x + 8 - pas * 5, y - 3); ctx.stroke();
+    ctx.strokeStyle = P.noir; ctx.lineWidth = 8; ctx.stroke();
+    ctx.fillStyle = '#2c2c38'; ctx.beginPath(); ctx.ellipse(x - 9 + pas * 5, y - 2, 6, 3.5, 0, 0, 7); ctx.ellipse(x + 9 - pas * 5, y - 2, 6, 3.5, 0, 0, 7); ctx.fill();
+    // corps : tee-shirt noir à liseré clair (lisible sur le fond sombre)
+    ctx.fillStyle = P.noir; ctx.strokeStyle = P.lisere; ctx.lineWidth = 2;
+    rr(x - 17, y - 62, 34, 40, 11); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#2c2c38'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 6, y - 60); ctx.quadraticCurveTo(x, y - 55, x + 6, y - 60); ctx.stroke();
+    // ceinture et boucle
+    ctx.fillStyle = '#2c2c38'; ctx.fillRect(x - 16, y - 29, 32, 5);
+    ctx.fillStyle = '#b9bfcc'; ctx.fillRect(x - 3, y - 29.5, 6, 6); ctx.fillStyle = '#2c2c38'; ctx.fillRect(x - 1.2, y - 28, 2.4, 3);
+    // manette accrochée à la ceinture : elle se balance quand Pierre court
+    const balance = Math.sin(pierre.pas * 1.1) * (0.12 + court * 0.55) - bornee(pierre.vit / 600, -0.4, 0.4) + (panique ? Math.sin(horloge * 30) * 0.15 : 0);
+    dessinerManettePierre(x - 11, y - 25, balance);
+    // bras gauche : le long du corps, levé (poing) dans la joie, en l'air dans la panique
+    ctx.lineWidth = 9;
+    let gx, gy;
+    if (joie) { gx = x - 22 + Math.sin(horloge * 10) * 2; gy = y - 98; }
+    else if (panique) { gx = x - 30 + Math.sin(horloge * 18) * 3; gy = y - 74; }
+    else { gx = x - 23 - pas * 3; gy = y - 34; }
+    ctx.strokeStyle = P.lisere; ctx.beginPath(); ctx.moveTo(x - 15, y - 56); ctx.lineTo(gx, gy); ctx.stroke();
+    ctx.strokeStyle = P.noir; ctx.lineWidth = 7; ctx.stroke();
+    ctx.fillStyle = P.peau; ctx.beginPath(); ctx.arc(gx, gy, joie ? 6.5 : 5, 0, 7); ctx.fill();
+    if (joie) {
+      // poing fermé : jointures
+      ctx.strokeStyle = '#c99a72'; ctx.lineWidth = 1.2; ctx.beginPath();
+      for (let k = -1; k <= 1; k++) { ctx.moveTo(gx + k * 2.6, gy - 5.5); ctx.lineTo(gx + k * 2.6, gy - 2); }
+      ctx.stroke();
+      // petits traits d'éclat autour du poing
+      ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2;
+      for (const a of [-2.6, -1.57, -0.55]) { ctx.beginPath(); ctx.moveTo(gx + Math.cos(a) * 10, gy + Math.sin(a) * 10); ctx.lineTo(gx + Math.cos(a) * 15, gy + Math.sin(a) * 15); ctx.stroke(); }
+    }
     // bras droit avec le plumeau
-    const ang = coup ? -2.3 : -0.9 + Math.sin(horloge * 3) * 0.1;
+    const ang = coup ? -2.3 : (panique ? -1.4 + Math.sin(horloge * 16) * 0.35 : -0.9 + Math.sin(horloge * 3) * 0.1);
     const bx = x + 16, by = y - 56;
     const mx = bx + Math.cos(ang) * 22, my = by + Math.sin(ang) * 22 + 10;
-    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my); ctx.stroke();
-    ctx.fillStyle = '#f2c9a0'; ctx.beginPath(); ctx.arc(mx, my, 5, 0, 7); ctx.fill();
+    ctx.lineWidth = 9; ctx.strokeStyle = P.lisere; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(mx, my); ctx.stroke();
+    ctx.strokeStyle = P.noir; ctx.lineWidth = 7; ctx.stroke();
+    ctx.fillStyle = P.peau; ctx.beginPath(); ctx.arc(mx, my, 5, 0, 7); ctx.fill();
     const px = mx + Math.cos(ang - 0.3) * 30, py = my + Math.sin(ang - 0.3) * 30;
     ctx.strokeStyle = '#8a5a34'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(px, py); ctx.stroke();
     ctx.fillStyle = '#ff9ad5'; for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.arc(px + Math.cos(k) * 6, py + Math.sin(k) * 6, 6, 0, 7); ctx.fill(); }
-    // tête, casquette et grosse moustache
-    ctx.fillStyle = '#f2c9a0'; ctx.beginPath(); ctx.arc(x, y - 76, 14, 0, 7); ctx.fill();
-    ctx.fillStyle = '#2f6bff'; ctx.beginPath(); ctx.arc(x, y - 80, 14.5, Math.PI, 0); ctx.fill(); ctx.fillRect(x - 2, y - 84, 22, 5);
-    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y - 88, 3, 0, 7); ctx.fill();
-    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 5, y - 76, 2, 0, 7); ctx.arc(x + 5, y - 76, 2, 0, 7); ctx.fill();
-    ctx.fillStyle = '#5a3a20'; ctx.beginPath(); ctx.ellipse(x - 5, y - 69, 7, 3.5, 0.2, 0, 7); ctx.ellipse(x + 5, y - 69, 7, 3.5, -0.2, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#3a1a1a'; ctx.lineWidth = 1.6; ctx.beginPath();
-    if (coup) ctx.arc(x, y - 64, 3, 0, Math.PI); else ctx.arc(x, y - 64, 3, 0.2, Math.PI - 0.2);
+    // tête
+    const hy = y - 77;
+    ctx.fillStyle = P.peau; ctx.beginPath(); ctx.arc(x, hy, 14, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(x - 14, hy + 1, 3.5, 0, 7); ctx.arc(x + 14, hy + 1, 3.5, 0, 7); ctx.fill();
+    // cheveux courts roux, en petites mèches
+    ctx.fillStyle = P.roux; ctx.beginPath(); ctx.arc(x, hy - 3, 14.5, Math.PI * 1.02, Math.PI * 1.98); ctx.fill();
+    ctx.beginPath();
+    for (let k = 0; k < 6; k++) { const a = Math.PI * (1.08 + k * 0.17); ctx.moveTo(x + Math.cos(a) * 12, hy - 3 + Math.sin(a) * 12); ctx.arc(x + Math.cos(a) * 12.5, hy - 3 + Math.sin(a) * 12.5, 4, 0, 7); }
+    ctx.fill();
+    ctx.fillStyle = P.rouxClair; ctx.beginPath(); ctx.ellipse(x - 4, hy - 14, 5, 2, -0.3, 0, 7); ctx.fill();
+    // barbe rousse fournie (des tempes au menton)
+    ctx.fillStyle = P.roux; ctx.beginPath();
+    ctx.moveTo(x - 14, hy - 2);
+    ctx.quadraticCurveTo(x - 17, hy + 14, x - 6, hy + 21);
+    ctx.quadraticCurveTo(x, hy + 25, x + 6, hy + 21);
+    ctx.quadraticCurveTo(x + 17, hy + 14, x + 14, hy - 2);
+    ctx.quadraticCurveTo(x + 9, hy + 6, x, hy + 6);
+    ctx.quadraticCurveTo(x - 9, hy + 6, x - 14, hy - 2);
+    ctx.fill();
+    ctx.strokeStyle = P.rouxFonce; ctx.lineWidth = 1.2; ctx.beginPath();
+    for (const [a, b] of [[-9, 10], [-4, 15], [4, 15], [9, 10]]) { ctx.moveTo(x + a, hy + b); ctx.lineTo(x + a * 0.9, hy + b + 4); }
     ctx.stroke();
-    // sourcils froncés pendant le coup
-    if (coup) { ctx.strokeStyle = '#3a2a1c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 9, y - 82); ctx.lineTo(x - 2, y - 79); ctx.moveTo(x + 9, y - 82); ctx.lineTo(x + 2, y - 79); ctx.stroke(); }
+    // moustache
+    ctx.fillStyle = P.rouxFonce; ctx.beginPath(); ctx.ellipse(x - 4.5, hy + 6.5, 5.5, 2.6, 0.25, 0, 7); ctx.ellipse(x + 4.5, hy + 6.5, 5.5, 2.6, -0.25, 0, 7); ctx.fill();
+    // bouche (dans la barbe)
+    ctx.fillStyle = '#4a1414';
+    if (joie) { ctx.beginPath(); ctx.arc(x, hy + 9.5, 5, 0, Math.PI); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 4, hy + 9.5, 8, 1.8); }
+    else if (panique) { ctx.beginPath(); ctx.ellipse(x, hy + 12, 3.2, 4.2 + Math.sin(horloge * 12) * 0.6, 0, 0, 7); ctx.fill(); }
+    else if (coup) { ctx.beginPath(); ctx.ellipse(x, hy + 11, 4, 3, 0, 0, 7); ctx.fill(); }
+    else { ctx.strokeStyle = '#4a1414'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 4, hy + 11); ctx.quadraticCurveTo(x, hy + 9.5, x + 4, hy + 11); ctx.stroke(); }
+    // lunettes noires (elles glissent sur le nez dans la panique : yeux ronds)
+    const ly = hy - 2 + (panique ? 3 : 0);
+    if (panique) {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 5, ly - 5, 3.4, 0, 7); ctx.arc(x + 5, ly - 5, 3.4, 0, 7); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(x - 5, ly - 5, 1.3, 0, 7); ctx.arc(x + 5, ly - 5, 1.3, 0, 7); ctx.fill();
+    }
+    ctx.fillStyle = '#0b0b10'; rr(x - 11.5, ly - 3, 10, 7, 3); ctx.fill(); rr(x + 1.5, ly - 3, 10, 7, 3); ctx.fill();
+    ctx.fillRect(x - 2, ly - 2, 4, 1.6); ctx.fillRect(x - 14, ly - 2.5, 3, 1.6); ctx.fillRect(x + 11, ly - 2.5, 3, 1.6);
+    ctx.fillStyle = '#ffffff66'; ctx.beginPath(); ctx.ellipse(x - 8.5, ly - 1, 2, 1, -0.5, 0, 7); ctx.ellipse(x + 4.5, ly - 1, 2, 1, -0.5, 0, 7); ctx.fill();
+    // sourcils roux : froncés (déterminé), hauts (joie), relevés au milieu (panique)
+    ctx.strokeStyle = P.rouxFonce; ctx.lineWidth = 2.6; ctx.beginPath();
+    const sy = (panique ? ly - 10 : ly - 5);
+    if (joie) { ctx.moveTo(x - 11, sy - 3); ctx.quadraticCurveTo(x - 7, sy - 6, x - 3, sy - 3); ctx.moveTo(x + 3, sy - 3); ctx.quadraticCurveTo(x + 7, sy - 6, x + 11, sy - 3); }
+    else if (panique) { ctx.moveTo(x - 11, sy + 1); ctx.lineTo(x - 3, sy - 3); ctx.moveTo(x + 11, sy + 1); ctx.lineTo(x + 3, sy - 3); }
+    else { const f = coup ? 4 : 2.5; ctx.moveTo(x - 11, sy - f); ctx.lineTo(x - 2.5, sy); ctx.moveTo(x + 11, sy - f); ctx.lineTo(x + 2.5, sy); }
+    ctx.stroke();
+    // gouttes de sueur dans la panique
+    if (panique) {
+      ctx.fillStyle = '#9fe8ff';
+      for (let k = 0; k < 2; k++) {
+        const t = (horloge * 1.6 + k * 0.5) % 1;
+        const gx2 = x + (k ? -17 : 17), gy2 = hy - 10 + t * 14;
+        ctx.globalAlpha = 1 - t;
+        ctx.beginPath(); ctx.moveTo(gx2, gy2 - 5); ctx.quadraticCurveTo(gx2 + 3.5, gy2, gx2, gy2 + 2.5); ctx.quadraticCurveTo(gx2 - 3.5, gy2, gx2, gy2 - 5); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
   }
 
@@ -2959,7 +3069,7 @@
     const c = nouveauPerso('rapide'); c.lieu = 'p'; c.x = 282; c.y = G.FL + 70; c.dedans = true; c.demo = true; c.etat = 'marche'; c.etoilesTete = 9999;
     monde.gens.push(a, b, c);
     // Pierre, plumeau levé, au milieu de la boutique (visible entre les panneaux du titre)
-    pierre.x = pierre.cible = 170; pierre.coup = 0; pierre.pose = true;
+    pierre.x = pierre.cible = 170; pierre.coup = 0; pierre.pose = true; pierre.joie = 0;
     pierre.y = Math.min(G.FL + 150, G.pierreY);
   }
 
