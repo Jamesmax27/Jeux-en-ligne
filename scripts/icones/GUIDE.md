@@ -14,7 +14,9 @@ Toutes les commandes se lancent depuis la racine du dépôt, avec Node 18 ou plu
 - **L'extra** est un petit détail en craie ou lavande : étincelles, notes, bulles, flamme, traits de vitesse. Il n'existe que pendant l'animation et naît derrière l'icône. (L'or est accepté dans les sources mais le générateur le peint en craie : sur le site, l'or des regroupements est réservé à l'étincelle d'une puce ou d'une tuile choisie.)
 - **Au survol, au focus ou au choix**, l'icône fait un geste court (0,5 à 0,7 s). La couleur suit le trait avec un léger retard, et ce décalage donne de la souplesse. C'est la signature de toute la série.
 
-Sobre au repos, vivante quand on la touche. Pas de dégradé, pas d'ombre, pas de lueur.
+Sobre au repos, vivante quand on la touche. Pas de dégradé, pas d'ombre, pas de lueur dans les sources.
+
+**Sur le site (thème « Planètes », 31 octobre 2026)**, chaque icône est posée sur une petite planète de sa couleur, éclairée d'en haut à gauche : la boîte de l'icône devient un disque, et la masse et le trait sont dessinés à 72 % au milieu (section « Icônes : les planètes » de `public/style.css`, écrite à la main après le bloc généré). Les sources ne changent pas : on dessine toujours une icône à deux couches, sans planète. La planète vient du CSS.
 
 ## 2. Fichiers et commandes
 
@@ -150,6 +152,19 @@ Un fichier dont le nom ne correspond à aucune clé de `taxonomie.js` est refus�
 | Titre « Tendances » | 20 px | or `#f2d27a` (ce qui brille) | craie |
 
 L'icône d'une tuile mesure 24 px, mais seuls 20 px comptent dans la hauteur (marge de −2 px). Les tuiles et les puces gardent exactement leur taille : 34 px pour les puces, sur une ligne par groupe qui défile si elle ne tient pas.
+
+Ce tableau est celui du bloc généré. Le thème « Planètes » le remplace sur le site (section « Icônes : les planètes » de `public/style.css`, après le bloc) :
+
+| Contexte | Planète (disque) | Masse (`fond`) | Trait |
+|---|---|---|---|
+| Puce de genre ou d'univers | `oklch(.7 (--c + .06) --teinte)` | `oklch(.46 (--c + .07) --teinte)` | craie |
+| Puce choisie | `oklch(.64 (--c + .08) --teinte)` sur la puce remplie de sa teinte claire | `oklch(.42 (--c + .08) --teinte)` | craie |
+| Raccourcis | lilas `#a897f5` | `#5845c2` | craie |
+| Âges | `oklch(.76 .1 h)` (h de la tranche) | `oklch(.49 .1 h)` | craie |
+| « 0 jeu » | `oklch(.42 .035 h)` | `oklch(.31 .035 h)` | craie douce |
+| Bientôt | ardoise `#2e2955` | `#3d3768` | craie faible |
+
+Tailles sur le site : puces 28 px (30 px dès 720 px) ; tuiles 28 px (30 px), dont 26 px comptent dans la hauteur. Le titre « Tendances » garde son icône or, sans planète.
 
 ## 9. Bibliothèque d'animations (`data-anim`)
 

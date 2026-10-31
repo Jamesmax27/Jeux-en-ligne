@@ -1,16 +1,26 @@
 /* ==========================================================================
    Free Micro Games — feuille de style commune (catalogue, lanceur, mentions)
-   Thème « Constellation manette » : un ciel de nuit calme, semé de petites
-   croix de pixels, où une constellation dessine une manette (sa croix et
-   ses deux boutons), derrière l'en-tête seulement. L'emblème est une
-   manette dont les boutons sont une planète or et une étoile ; le nom est un mot-symbole dessiné, le point du i est une
-   étincelle or. Le reste est un instrument d'observation : fond étoilé
-   discret, commandes sombres et nettes, jaquettes sans boîte autour.
-   Deux rôles de couleur seulement : la lavande pour ce qu'on touche, l'or
-   pour ce qui brille (rare : marque, « Nouveau », étoile des Nouveautés et
-   flamme des Tendances,
-   étincelle d'une puce ou d'une tuile choisie). La couleur vient des
-   jaquettes et des teintes des genres et des univers.
+   Thème « Planètes » (31 octobre 2026, suite de « Galaxie feutrée ») : un
+   ciel indigo, calme, avec une grande planète lointaine en haut à droite,
+   une lueur violette en bas, trois plans d'étoiles et de petites croix de
+   pixels ; une constellation dessine une manette (sa croix et ses deux
+   boutons), derrière l'en-tête seulement. Chaque genre, univers, âge et
+   raccourci est une petite planète de sa couleur, éclairée d'en haut à
+   gauche, avec son dessin en trait blanc ; les cadres d'avatar sont des
+   orbites avec leur lune. L'emblème est une manette dont les boutons sont
+   une planète or et une étoile ; le nom est un mot-symbole dessiné, le
+   point du i est une étincelle or. Commandes et plaques en verre sombre, à
+   peine translucide (on devine le ciel derrière), avec un liseré de
+   lumière en haut ; le flou d'arrière-plan est réservé à ce qui flotte
+   (menus, bandeaux, annonces). Coins ronds ; jaquettes sans boîte autour,
+   qui flottent un peu et s'allument d'un halo au survol.
+   Polices : Fredoka (titres, ronde et douce) et Nunito (texte), hébergées
+   dans assets/polices/ ; sans elles (hors ligne), la police du système.
+   Deux rôles de couleur seulement : le lilas (--lavande) pour ce qu'on
+   touche, l'or pour ce qui brille (rare : marque, « Nouveau », étoile des
+   Nouveautés et flamme des Tendances, étincelle d'une puce ou d'une tuile
+   choisie, lune du cadre or). La couleur vient des jaquettes et des
+   planètes des genres et des univers.
    Les icônes des regroupements parlent la langue du logo : trait rond, et
    au survol une petite constellation s'allume autour d'elles.
    Pensée téléphone d'abord. Animations courtes et rares (5 étoiles qui
@@ -18,37 +28,81 @@
    demande de réduire les mouvements.
    ========================================================================== */
 
-:root {
-  --nuit: #0b1020;              /* fond de page (= manifeste, theme-color, logo) */
-  --nuit-profonde: #070a14;     /* bandeau du titre, plaques des badges */
-  --surface: #161f38;           /* champs, tuiles, menu de langue, fiches */
-  --surface-relevee: #1d2745;   /* survol */
-  --surface-choisie: #2c3656;   /* tuile, portée, langue choisies */
-  --trait: #2c3650;             /* contour des puces « zéro », filets secondaires */
-  --orbite: #5a6688;            /* contours des commandes (3,3:1 sur la nuit) */
-  --lisere: rgba(236, 234, 228, .12);          /* liseré des tuiles, fiches, menu */
-  --lisere-jaquette: rgba(236, 234, 228, .13); /* cadre intérieur des jaquettes */
-  --craie: #eceae4;             /* texte principal */
-  --craie-douce: #a3adc2;       /* texte secondaire, icônes au trait */
-  --craie-faible: #8792ab;      /* états « zéro » et « Bientôt » (au lieu d'une opacité) */
-  --lavande: #a8b3f0;           /* ce qu'on touche : focus, choix, liens, bouton plein */
-  --or: #f2d27a;                /* ce qui brille : ✦ Nouveau et Nouveautés, flamme des Tendances */
-  --jaquette-fond: #111830;     /* jaquette en chargement (= sans-jaquette.svg) */
+/* Polices du site, hébergées ici (aucun appel à un autre site) : variables,
+   alphabet latin seulement (français, anglais, espagnol, portugais, allemand),
+   licence SIL OFL 1.1 (assets/polices/OFL-*.txt). Le texte s'affiche tout de
+   suite dans la police du système, puis passe à la leur dès qu'elles
+   arrivent (swap) ; hors ligne, la police du système reste. */
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url("/assets/polices/nunito.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
-  /* Une seule ombre, pour ce qui flotte au-dessus de la page. */
-  --ombre-flottante: 0 10px 30px rgba(0, 0, 0, .45);
+/* Fredoka déclarée de 300 à 600 seulement : les titres demandés en 700 ou
+   800 sont dessinés en 600 (ronde mais pas trop lourde), sans gras imité
+   (font-synthesis des titres). */
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 300 600;
+  font-display: swap;
+  src: url("/assets/polices/fredoka.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --nuit: #0e0c24;              /* fond de page : indigo profond */
+  --nuit-profonde: #08071a;     /* plaques des badges, champs du profil */
+  --surface: #1a1638;           /* champs, tuiles, menu de langue, fiches */
+  --surface-relevee: #241f4a;   /* survol */
+  --surface-choisie: #30295f;   /* tuile, langue choisies */
+  --trait: #2c2753;             /* contour des puces « zéro », filets secondaires */
+  --orbite: #6a62a3;            /* contours des commandes (3,5:1 sur la nuit) */
+  --lisere: rgba(242, 239, 250, .11);          /* liseré des tuiles, fiches, menu */
+  --lisere-jaquette: rgba(242, 239, 250, .13); /* cadre intérieur des jaquettes */
+  --craie: #f2effa;             /* texte principal : blanc lait (17:1) */
+  --craie-douce: #b3add0;       /* texte secondaire, icônes au trait (9:1) */
+  --craie-faible: #8e88b0;      /* états « zéro » et « Bientôt » (5,7:1, au lieu d'une opacité) */
+  --lavande: #c4b5fd;           /* lilas, ce qu'on touche : focus, choix, liens, bouton plein (10:1) */
+  --lavande-claire: #d8ceff;    /* haut du bouton plein, survols */
+  --or: #ffd88a;                /* ce qui brille : ✦ Nouveau et Nouveautés, flamme des Tendances */
+  --jaquette-fond: #16132f;     /* jaquette en chargement */
+
+  /* Verre sombre : les plaques et commandes laissent deviner le ciel. Plein
+     (--surface) sous ce qui flotte au-dessus de la page, avec un flou. */
+  --verre: rgba(25, 21, 54, .74);
+  --verre-flottant: rgba(25, 21, 54, .9);
+  --flou: blur(14px) saturate(140%);
+  /* Liseré de lumière sur le haut d'une plaque, comme un reflet d'étoile. */
+  --reflet: inset 0 1px 0 rgba(242, 239, 250, .07);
+
+  /* Ombres : ce qui flotte au-dessus de la page ; halo lilas de ce qui
+     s'allume (jaquette survolée, bouton plein, tuile choisie) ; jaquettes
+     posées un peu au-dessus du ciel (ombre teintée d'indigo). */
+  --ombre-flottante: 0 12px 34px rgba(4, 2, 16, .6);
+  --ombre-jaquette: 0 12px 22px -12px rgba(30, 14, 100, .9);
+  --halo: 0 12px 30px -10px rgba(160, 130, 255, .6);
 
   /* Rayons hiérarchisés : plaques > commandes > étiquettes ; pilule réservée
      aux puces et aux filtres actifs, cercle aux boutons ronds et à la coche. */
-  --r-plaque: 14px;
-  --r-commande: 12px;
-  --r-etiquette: 7px;
+  --r-plaque: 20px;
+  --r-commande: 16px;
+  --r-etiquette: 10px;
 
-  /* Polices système seulement (aucun fichier à charger) : arrondie sur Apple. */
-  --police: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
+  /* Texte : Nunito (ronde, très lisible, bons accents) ; titres : Fredoka
+     (ronde et douce, 600 au plus pour rester légère). Repli : polices du
+     système, arrondie sur Apple. */
+  --police: "Nunito", ui-rounded, "SF Pro Rounded", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
+  --police-titre: "Fredoka", "Nunito", ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, Roboto, "Noto Sans", sans-serif;
 
   /* Pouce au trait (compteurs des jaquettes), utilisé comme masque. */
   --icone-pouce: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 10.5v9.5M7 10.5l3.4-6.2a1.9 1.9 0 0 1 3.6.9V9h4.4a2 2 0 0 1 2 2.4l-1.3 6.7a2.3 2.3 0 0 1-2.3 1.9H4.8A1.8 1.8 0 0 1 3 18.2v-5.9a1.8 1.8 0 0 1 1.8-1.8z'/%3E%3C/svg%3E");
+  /* Même pouce, plein (mon vote) : la paume pleine, la manchette séparée par un jour. */
+  --icone-pouce-plein: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8.6 10.5l3.4-6.2a1.9 1.9 0 0 1 3.6.9V9h3.9a2 2 0 0 1 2 2.4l-1.3 6.7a2.3 2.3 0 0 1-2.3 1.9H8.6zM2.2 12.3a1.8 1.8 0 0 1 1.8-1.8h2.6V20H4a1.8 1.8 0 0 1-1.8-1.8z'/%3E%3C/svg%3E");
   /* Globe au trait (bouton de langue) */
   --icone-globe: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z'/%3E%3C/svg%3E");
   /* Croix au trait (effacer la recherche) */
@@ -60,11 +114,11 @@
   /* Constellation de l'en-tête (v2-outils/dessins.mjs) : une manette, en
      trois tailles. Étoiles craie, traits lavande qui s'arrêtent avant chaque
      étoile. Traits à 34 %, 42 % pour les deux petites (téléphone). */
-  --ciel-manette: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='136' height='78.8' viewBox='0 0 136 78.8'%3E%3Cg fill='none' stroke='%23a8b3f0' stroke-opacity='0.34' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M26.98 11.17L64.82 15.63M71.18 15.63L109.02 11.17M113.81 13.56L128.79 39.24M129.26 44.99L121.14 66.31M117.34 67.52L91.46 50.28M85.6 48.5L50.4 48.5M44.54 50.28L18.66 67.52M14.86 66.31L6.74 44.99M7.21 39.24L22.19 13.56M34.2 29.7L34.2 23.8M37.4 32.9L43.3 32.9M34.2 36.1L34.2 42M31 32.9L25.1 32.9'/%3E%3Ccircle cx='94' cy='38.1' r='5.46'/%3E%3Ccircle cx='107' cy='26.4' r='5.46'/%3E%3C/g%3E%3Cg fill='%23eceae4'%3E%3Ccircle cx='23.8' cy='10.8' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='23.8' cy='10.8' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='68' cy='16' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='112.2' cy='10.8' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='112.2' cy='10.8' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='130.4' cy='42' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='120' cy='69.3' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='120' cy='69.3' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='88.8' cy='48.5' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='47.2' cy='48.5' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='16' cy='69.3' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='16' cy='69.3' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='5.6' cy='42' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='34.2' cy='32.9' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='94' cy='38.1' r='1.3' fill-opacity='.75'/%3E%3Ccircle cx='107' cy='26.4' r='1.3' fill-opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
-  --ciel-manette-petite: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='42.96' viewBox='0 0 72 42.96'%3E%3Cg fill='none' stroke='%23a8b3f0' stroke-opacity='0.42' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M16.74 7.33L32.82 9.23M39.18 9.23L55.26 7.33M60.05 9.72L66.07 20.04M66.54 25.79L63.54 33.67M59.74 34.88L49.22 27.88M43.36 26.1L28.64 26.1M22.78 27.88L12.26 34.88M8.46 33.67L5.46 25.79M5.93 20.04L11.95 9.72M18.84 14.98L18.84 13.56M22.04 18.18L23.46 18.18M18.84 21.38L18.84 22.8M15.64 18.18L14.22 18.18'/%3E%3Ccircle cx='49.2' cy='20.82' r='3.36'/%3E%3Ccircle cx='55.8' cy='14.88' r='3.36'/%3E%3C/g%3E%3Cg fill='%23eceae4'%3E%3Ccircle cx='13.56' cy='6.96' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='13.56' cy='6.96' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='36' cy='9.6' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='58.44' cy='6.96' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='58.44' cy='6.96' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='67.68' cy='22.8' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='62.4' cy='36.66' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='62.4' cy='36.66' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='46.56' cy='26.1' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='25.44' cy='26.1' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='9.6' cy='36.66' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='9.6' cy='36.66' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='4.32' cy='22.8' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='18.84' cy='18.18' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='49.2' cy='20.82' r='1.3' fill-opacity='.75'/%3E%3Ccircle cx='55.8' cy='14.88' r='1.3' fill-opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
-  --ciel-manette-mini: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='66' height='39.6' viewBox='0 0 66 39.6'%3E%3Cg fill='none' stroke='%23a8b3f0' stroke-opacity='0.42' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M15.78 6.97L29.82 8.63M36.18 8.63L50.22 6.97M55.01 9.36L60.19 18.24M60.66 23.99L58.14 30.61M54.34 31.82L45.26 25.78M39.4 24L26.6 24M20.74 25.78L11.66 31.82M7.86 30.61L5.34 23.99M5.81 18.24L10.99 9.36'/%3E%3Ccircle cx='45' cy='19.2' r='3.36'/%3E%3Ccircle cx='51' cy='13.8' r='3.36'/%3E%3C/g%3E%3Cg fill='%23eceae4'%3E%3Ccircle cx='12.6' cy='6.6' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='12.6' cy='6.6' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='33' cy='9' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='53.4' cy='6.6' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='53.4' cy='6.6' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='61.8' cy='21' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='57' cy='33.6' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='57' cy='33.6' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='42.6' cy='24' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='23.4' cy='24' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='9' cy='33.6' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='9' cy='33.6' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='4.2' cy='21' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='17.4' cy='16.8' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='45' cy='19.2' r='1.3' fill-opacity='.75'/%3E%3Ccircle cx='51' cy='13.8' r='1.3' fill-opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
+  --ciel-manette: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='136' height='78.8' viewBox='0 0 136 78.8'%3E%3Cg fill='none' stroke='%23c4b5fd' stroke-opacity='0.34' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M26.98 11.17L64.82 15.63M71.18 15.63L109.02 11.17M113.81 13.56L128.79 39.24M129.26 44.99L121.14 66.31M117.34 67.52L91.46 50.28M85.6 48.5L50.4 48.5M44.54 50.28L18.66 67.52M14.86 66.31L6.74 44.99M7.21 39.24L22.19 13.56M34.2 29.7L34.2 23.8M37.4 32.9L43.3 32.9M34.2 36.1L34.2 42M31 32.9L25.1 32.9'/%3E%3Ccircle cx='94' cy='38.1' r='5.46'/%3E%3Ccircle cx='107' cy='26.4' r='5.46'/%3E%3C/g%3E%3Cg fill='%23f2effa'%3E%3Ccircle cx='23.8' cy='10.8' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='23.8' cy='10.8' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='68' cy='16' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='112.2' cy='10.8' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='112.2' cy='10.8' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='130.4' cy='42' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='120' cy='69.3' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='120' cy='69.3' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='88.8' cy='48.5' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='47.2' cy='48.5' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='16' cy='69.3' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='16' cy='69.3' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='5.6' cy='42' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='34.2' cy='32.9' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='94' cy='38.1' r='1.3' fill-opacity='.75'/%3E%3Ccircle cx='107' cy='26.4' r='1.3' fill-opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
+  --ciel-manette-petite: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='42.96' viewBox='0 0 72 42.96'%3E%3Cg fill='none' stroke='%23c4b5fd' stroke-opacity='0.42' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M16.74 7.33L32.82 9.23M39.18 9.23L55.26 7.33M60.05 9.72L66.07 20.04M66.54 25.79L63.54 33.67M59.74 34.88L49.22 27.88M43.36 26.1L28.64 26.1M22.78 27.88L12.26 34.88M8.46 33.67L5.46 25.79M5.93 20.04L11.95 9.72M18.84 14.98L18.84 13.56M22.04 18.18L23.46 18.18M18.84 21.38L18.84 22.8M15.64 18.18L14.22 18.18'/%3E%3Ccircle cx='49.2' cy='20.82' r='3.36'/%3E%3Ccircle cx='55.8' cy='14.88' r='3.36'/%3E%3C/g%3E%3Cg fill='%23f2effa'%3E%3Ccircle cx='13.56' cy='6.96' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='13.56' cy='6.96' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='36' cy='9.6' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='58.44' cy='6.96' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='58.44' cy='6.96' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='67.68' cy='22.8' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='62.4' cy='36.66' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='62.4' cy='36.66' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='46.56' cy='26.1' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='25.44' cy='26.1' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='9.6' cy='36.66' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='9.6' cy='36.66' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='4.32' cy='22.8' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='18.84' cy='18.18' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='49.2' cy='20.82' r='1.3' fill-opacity='.75'/%3E%3Ccircle cx='55.8' cy='14.88' r='1.3' fill-opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
+  --ciel-manette-mini: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='66' height='39.6' viewBox='0 0 66 39.6'%3E%3Cg fill='none' stroke='%23c4b5fd' stroke-opacity='0.42' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M15.78 6.97L29.82 8.63M36.18 8.63L50.22 6.97M55.01 9.36L60.19 18.24M60.66 23.99L58.14 30.61M54.34 31.82L45.26 25.78M39.4 24L26.6 24M20.74 25.78L11.66 31.82M7.86 30.61L5.34 23.99M5.81 18.24L10.99 9.36'/%3E%3Ccircle cx='45' cy='19.2' r='3.36'/%3E%3Ccircle cx='51' cy='13.8' r='3.36'/%3E%3C/g%3E%3Cg fill='%23f2effa'%3E%3Ccircle cx='12.6' cy='6.6' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='12.6' cy='6.6' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='33' cy='9' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='53.4' cy='6.6' r='3.52' fill-opacity='.1'/%3E%3Ccircle cx='53.4' cy='6.6' r='1.6' fill-opacity='.95'/%3E%3Ccircle cx='61.8' cy='21' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='57' cy='33.6' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='57' cy='33.6' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='42.6' cy='24' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='23.4' cy='24' r='1.1' fill-opacity='.75'/%3E%3Ccircle cx='9' cy='33.6' r='3.3' fill-opacity='.1'/%3E%3Ccircle cx='9' cy='33.6' r='1.5' fill-opacity='.95'/%3E%3Ccircle cx='4.2' cy='21' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='17.4' cy='16.8' r='1.2' fill-opacity='.75'/%3E%3Ccircle cx='45' cy='19.2' r='1.3' fill-opacity='.75'/%3E%3Ccircle cx='51' cy='13.8' r='1.3' fill-opacity='.75'/%3E%3C/g%3E%3C/svg%3E");
   /* Étoiles de jeu vidéo : 5 petites croix de pixels (motif 509 × 433). */
-  --etoiles-jeu: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='509' height='433' shape-rendering='crispEdges'%3E%3Cpath d='M62 88.5h2M65 88.5h2M64.5 86v2M64.5 89v2' stroke='%23eceae4' stroke-opacity='0.33'/%3E%3Crect x='64' y='88' width='1' height='1' fill='%23eceae4' fill-opacity='0.9'/%3E%3Cpath d='M310 43.5h2M313 43.5h2M312.5 41v2M312.5 44v2' stroke='%23eceae4' stroke-opacity='0.28'/%3E%3Crect x='312' y='43' width='1' height='1' fill='%23eceae4' fill-opacity='0.8'/%3E%3Cpath d='M199 276.5h2M202 276.5h2M201.5 274v2M201.5 277v2' stroke='%23eceae4' stroke-opacity='0.3'/%3E%3Crect x='201' y='276' width='1' height='1' fill='%23eceae4' fill-opacity='0.85'/%3E%3Cpath d='M419 190.5h2M422 190.5h2M421.5 188v2M421.5 191v2' stroke='%23a8b3f0' stroke-opacity='0.33'/%3E%3Crect x='421' y='190' width='1' height='1' fill='%23a8b3f0' fill-opacity='0.9'/%3E%3Cpath d='M128 371.5h2M131 371.5h2M130.5 369v2M130.5 372v2' stroke='%23eceae4' stroke-opacity='0.25'/%3E%3Crect x='130' y='371' width='1' height='1' fill='%23eceae4' fill-opacity='0.75'/%3E%3C/svg%3E");
+  --etoiles-jeu: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='509' height='433' shape-rendering='crispEdges'%3E%3Cpath d='M62 88.5h2M65 88.5h2M64.5 86v2M64.5 89v2' stroke='%23f2effa' stroke-opacity='0.33'/%3E%3Crect x='64' y='88' width='1' height='1' fill='%23f2effa' fill-opacity='0.9'/%3E%3Cpath d='M310 43.5h2M313 43.5h2M312.5 41v2M312.5 44v2' stroke='%23f2effa' stroke-opacity='0.28'/%3E%3Crect x='312' y='43' width='1' height='1' fill='%23f2effa' fill-opacity='0.8'/%3E%3Cpath d='M199 276.5h2M202 276.5h2M201.5 274v2M201.5 277v2' stroke='%23f2effa' stroke-opacity='0.3'/%3E%3Crect x='201' y='276' width='1' height='1' fill='%23f2effa' fill-opacity='0.85'/%3E%3Cpath d='M419 190.5h2M422 190.5h2M421.5 188v2M421.5 191v2' stroke='%23c4b5fd' stroke-opacity='0.33'/%3E%3Crect x='421' y='190' width='1' height='1' fill='%23c4b5fd' fill-opacity='0.9'/%3E%3Cpath d='M128 371.5h2M131 371.5h2M130.5 369v2M130.5 372v2' stroke='%23f2effa' stroke-opacity='0.25'/%3E%3Crect x='130' y='371' width='1' height='1' fill='%23f2effa' fill-opacity='0.75'/%3E%3C/svg%3E");
 
   color-scheme: dark;
 }
@@ -91,6 +145,18 @@ body {
 
 a { color: inherit; }
 
+/* Titres : Fredoka, ronde et douce (600 au plus, voir @font-face ; jamais de
+   gras imité). Même police pour le titre des jaquettes. */
+h1, h2, h3,
+.carte-titre,
+.vide strong,
+.message-jeu strong,
+.consentement-titre {
+  font-family: var(--police-titre);
+  font-synthesis: none;
+  letter-spacing: 0;
+}
+
 /* Contour de focus : 4 px hors de l'élément, il tient dans le rembourrage
    des rangées et de la première ligne qui défilent. */
 :focus-visible {
@@ -104,11 +170,26 @@ a { color: inherit; }
 }
 
 /* --------------------------------------------------------------------------
-   Champ d'étoiles fixe (CSS seul)
-   Deux motifs de tailles premières entre elles (211 et 347 px) pour que la
-   répétition ne se voie pas, environ 60 étoiles par écran. Seul le second
-   calque scintille, très lentement (opacité seulement).
+   Ciel fixe (CSS seul) : la planète lointaine, les nébuleuses et trois plans
+   d'étoiles
+   En haut à droite, une grande planète sombre dont on ne voit qu'un arc,
+   bordée d'un liseré lilas et d'une lueur (premier calque : elle passe
+   devant les étoiles). Au fond, trois nébuleuses très diffuses (violette en
+   haut à gauche, indigo à droite, violette en bas), étirées avec l'écran.
+   Par-dessus, des étoiles fines sur deux motifs de tailles premières entre
+   elles (211 et 347 px) pour que la répétition ne se voie pas, environ 60
+   par écran, puis quelques étoiles plus vives entourées d'un léger halo
+   (motif de 523 px). Seul le second calque scintille, très lentement
+   (opacité seulement).
    -------------------------------------------------------------------------- */
+
+body {
+  --planete-r: 190px;     /* rayon de la planète lointaine */
+}
+
+@media (min-width: 720px) {
+  body { --planete-r: 300px; }
+}
 
 body::before,
 body::after {
@@ -119,25 +200,38 @@ body::after {
   pointer-events: none;
 }
 
-/* Étoiles fines, immobiles (dont une lavande). Aucune étoile or : l'or reste
+/* Étoiles fines, immobiles (dont une lilas). Aucune étoile or : l'or reste
    réservé à « Nouveau », aux titres des Nouveautés et des Tendances et à la marque (planète de
    l'emblème, point du i). */
 body::before {
   background-image:
-    radial-gradient(1px 1px at 23px 41px, rgba(236, 234, 228, .5), transparent),
-    radial-gradient(1px 1px at 97px 152px, rgba(236, 234, 228, .35), transparent),
-    radial-gradient(1.2px 1.2px at 151px 22px, rgba(236, 234, 228, .55), transparent),
-    radial-gradient(1px 1px at 188px 183px, rgba(236, 234, 228, .3), transparent),
-    radial-gradient(1px 1px at 52px 118px, rgba(168, 179, 240, .45), transparent),
-    radial-gradient(1px 1px at 41px 233px, rgba(236, 234, 228, .4), transparent),
-    radial-gradient(1.3px 1.3px at 262px 97px, rgba(236, 234, 228, .55), transparent),
-    radial-gradient(1px 1px at 176px 301px, rgba(236, 234, 228, .3), transparent),
-    radial-gradient(1px 1px at 309px 203px, rgba(236, 234, 228, .35), transparent),
-    radial-gradient(1px 1px at 118px 61px, rgba(236, 234, 228, .45), transparent),
-    radial-gradient(1.4px 1.4px at 221px 166px, rgba(236, 234, 228, .5), transparent);
+    radial-gradient(circle at calc(100% + var(--planete-r) * .38) calc(var(--planete-r) * -.32),
+      #1d1750 0, #251d5e calc(var(--planete-r) - 30px), #2f2672 calc(var(--planete-r) - 2px),
+      rgba(196, 181, 253, .55) calc(var(--planete-r) - 1px), rgba(196, 181, 253, .55) var(--planete-r),
+      rgba(150, 120, 245, .16) calc(var(--planete-r) + 3px), transparent calc(var(--planete-r) + 46px)),
+    radial-gradient(3.5px 3.5px at 77px 311px, rgba(242, 239, 250, .9), rgba(196, 181, 253, .16) 1.3px, transparent),
+    radial-gradient(3px 3px at 402px 96px, rgba(242, 239, 250, .8), rgba(196, 181, 253, .14) 1.2px, transparent),
+    radial-gradient(3px 3px at 289px 467px, rgba(242, 239, 250, .75), rgba(196, 181, 253, .12) 1.2px, transparent),
+    radial-gradient(1px 1px at 23px 41px, rgba(242, 239, 250, .5), transparent),
+    radial-gradient(1px 1px at 97px 152px, rgba(242, 239, 250, .35), transparent),
+    radial-gradient(1.2px 1.2px at 151px 22px, rgba(242, 239, 250, .55), transparent),
+    radial-gradient(1px 1px at 188px 183px, rgba(242, 239, 250, .3), transparent),
+    radial-gradient(1px 1px at 52px 118px, rgba(196, 181, 253, .45), transparent),
+    radial-gradient(1px 1px at 41px 233px, rgba(242, 239, 250, .4), transparent),
+    radial-gradient(1.3px 1.3px at 262px 97px, rgba(242, 239, 250, .55), transparent),
+    radial-gradient(1px 1px at 176px 301px, rgba(242, 239, 250, .3), transparent),
+    radial-gradient(1px 1px at 309px 203px, rgba(242, 239, 250, .35), transparent),
+    radial-gradient(1px 1px at 118px 61px, rgba(242, 239, 250, .45), transparent),
+    radial-gradient(1.4px 1.4px at 221px 166px, rgba(242, 239, 250, .5), transparent),
+    radial-gradient(60% 42% at 8% 6%, rgba(118, 92, 224, .26), transparent 72%),
+    radial-gradient(48% 38% at 96% 42%, rgba(70, 70, 210, .14), transparent 72%),
+    radial-gradient(80% 44% at 30% 106%, rgba(128, 92, 236, .2), transparent 72%);
   background-size:
+    100% 100%,
+    523px 523px, 523px 523px, 523px 523px,
     211px 211px, 211px 211px, 211px 211px, 211px 211px, 211px 211px,
-    347px 347px, 347px 347px, 347px 347px, 347px 347px, 347px 347px, 347px 347px;
+    347px 347px, 347px 347px, 347px 347px, 347px 347px, 347px 347px, 347px 347px,
+    100% 100%, 100% 100%, 100% 100%;
 }
 
 /* Cinq étoiles de jeu vidéo, un peu plus visibles, qui scintillent : de
@@ -221,6 +315,14 @@ body::after {
   height: 30px;
 }
 
+/* Corps de la manette passé au lilas du thème (haut éclairé, corps, ombre
+   du bas) ; les couleurs du dessin (gabarits/morceaux/logo.html) restent
+   celles de assets/logo.svg et des icônes de l'application. */
+.marque-logo use[fill="#ccd3f8"] { fill: #e4dcff; }
+.marque-logo use[fill="#a8b3f0"] { fill: var(--lavande); }
+.marque-logo circle[fill="#8e9ae2"] { fill: #a694f2; }
+.marque-logo path[stroke="#0b1020"] { stroke: var(--nuit); }
+
 /* Mot-symbole « Free Micro Games » : lettres dessinées (aucune police à
    charger, même dessin sur tous les appareils), couleur du texte, point du i
    en étoile or. Le nom reste un vrai texte pour les lecteurs d'écran
@@ -233,10 +335,25 @@ body::after {
   overflow: visible;
 }
 
+/* Le bloc du nom et du slogan rétrécit avec la place laissée par la pastille
+   du profil et le bouton de langue (sinon la pastille recouvrait le nom sur
+   téléphone) : le mot-symbole garde ses proportions, 21 px de haut au plus. */
+.marque > span:last-child {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.marque-mot {
+  width: 100%;
+  max-width: calc(21px * 296.5 / 32);
+  height: auto;
+}
+
 .marque small {
   display: block;
   margin-top: 4px;
   color: var(--craie-douce);
+  font-family: var(--police);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
@@ -255,7 +372,15 @@ body::after {
 @media (max-width: 359px) {
   .marque { gap: 8px; }
   .marque-logo { width: 38px; height: 26px; }
-  .marque-mot { height: 17px; }
+  .marque-mot { max-width: calc(17px * 296.5 / 32); }
+}
+
+/* Téléphone, avec la pastille du profil : emblème un peu plus petit, slogan
+   plus serré, pour que le nom reste lisible entre l'emblème et la pastille. */
+@media (max-width: 719px) {
+  .entete-haut:has(.pastille-profil) .marque { gap: 8px; }
+  .entete-haut:has(.pastille-profil) .marque-logo { width: 36px; height: 25px; }
+  .entete-haut:has(.pastille-profil) .marque small { font-size: 11px; line-height: 1.25; }
 }
 
 /* Sélecteur de langue (créé par i18n/i18n.js, dont le CSS est injecté après
@@ -274,7 +399,8 @@ body::after {
   padding: 0 12px;
   border: 1.5px solid var(--orbite);
   border-radius: var(--r-commande);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
   color: var(--craie);
   font-family: inherit;
   font-size: 14px;
@@ -301,10 +427,12 @@ body::after {
 .selecteur-site .jel-langue-menu {
   right: 0;
   padding: 6px;
-  border: 1px solid rgba(236, 234, 228, .12);
+  border: 1px solid var(--lisere);
   border-radius: var(--r-commande);
-  background: var(--surface);
-  box-shadow: var(--ombre-flottante);
+  background: var(--verre-flottant);
+  -webkit-backdrop-filter: var(--flou);
+  backdrop-filter: var(--flou);
+  box-shadow: var(--ombre-flottante), var(--reflet);
   font-family: inherit;
 }
 
@@ -361,7 +489,8 @@ body::after {
   padding: 0 14px 0 42px;
   border: 1.5px solid var(--orbite);
   border-radius: var(--r-commande);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
   color: var(--craie);
   font: inherit;
   font-size: 16px;
@@ -377,7 +506,8 @@ body::after {
 .recherche input:focus {
   outline: none;
   border-color: var(--lavande);
-  box-shadow: 0 0 0 1px var(--lavande);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--lavande), 0 0 22px -6px rgba(160, 130, 255, .6);
 }
 
 /* Bouton d'effacement (WebKit, Blink) : la même croix au trait que nos icônes. */
@@ -404,7 +534,7 @@ body::after {
   .entete-haut { display: contents; }
   .marque { grid-column: 1; grid-row: 1; gap: 12px; }
   .marque-logo { width: 53px; height: 36px; }
-  .marque-mot { height: 26px; }
+  .marque-mot { max-width: calc(26px * 296.5 / 32); }
   /* Sa propre colonne (pas la 2e, celle du ciel de la manette) : sans elle,
      la pastille se plaçait automatiquement dans le vide du milieu et
      recouvrait la manette (relecture du propriétaire, 31 octobre 2026). */
@@ -491,15 +621,27 @@ body::after {
 .groupe-tete h2 {
   margin: 0;
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.2;
 }
 
 .groupe-tete h2 small {
   margin-left: 6px;
   color: var(--craie-douce);
+  font-family: var(--police);
   font-size: 12px;
   font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* Après le titre, une traînée d'étoile : un filet lilas qui s'efface vers
+   la droite (il cède sa place au titre quand la ligne est courte). */
+.groupe-tete::after {
+  content: "";
+  flex: 1 1 0;
+  min-width: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(196, 181, 253, .32), rgba(196, 181, 253, 0));
 }
 
 /* --------------------------------------------------------------------------
@@ -600,7 +742,7 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   grid-column: span 12;
 }
 
-.tuiles:empty { min-height: 63px; }
+.tuiles:empty { min-height: 69px; }  /* tuile de 60 px (planète comprise) + 2 × 4 px */
 .rangee:empty { min-height: 64px; }   /* puce de 52 px + 2 × 6 px (68 px dès 720 px, plus bas) */
 
 /* Le rembourrage vertical laisse la place au contour de focus (5 px) ; celui
@@ -655,8 +797,9 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
 }
 
 .carte-vitrine .carte-titre {
-  padding: 16px 7px 7px;
-  background: linear-gradient(rgba(7, 10, 20, 0), rgba(7, 10, 20, .88) 14px);
+  padding: 16px 7px 0;
+  border-bottom-width: 7px;
+  background: linear-gradient(rgba(14, 12, 36, 0), rgba(14, 12, 36, .9) 14px) border-box;
   font-size: 13px;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -743,11 +886,12 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   justify-content: center;
   gap: 0;
   min-width: 0;
-  min-height: 54px;
-  padding: 3px 2px;              /* 4 raccourcis sur 390 px : les petits textes passent sur 2 lignes */
+  min-height: 60px;
+  padding: 4px 2px;              /* 4 raccourcis sur 390 px : les petits textes passent sur 2 lignes */
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
   color: var(--craie);
   font: inherit;
   text-align: center;
@@ -806,7 +950,7 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
    jouant »), pas une panne. Même allure qu'une tuile normale. */
 [data-cle^="collection:"].tuile-bientot {
   border: 1px solid var(--lisere);
-  background: var(--surface);
+  background: var(--verre);
   cursor: default;
 }
 
@@ -818,11 +962,11 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
 [data-cle^="collection:"].tuile-bientot .tuile-nom { color: var(--craie); }
 [data-cle^="collection:"].tuile-bientot .tuile-compte { color: var(--craie-douce); }
 
-/* Tuile choisie : surface plus claire, anneau lavande et coche. */
+/* Tuile choisie : surface plus claire, anneau lilas, halo et coche. */
 .tuile[aria-pressed="true"] {
   border-color: var(--lavande);
   background: var(--surface-choisie);
-  box-shadow: 0 0 0 1px var(--lavande);
+  box-shadow: 0 0 0 1px var(--lavande), 0 0 18px -6px rgba(160, 130, 255, .7), var(--reflet);
 }
 
 .tuile[aria-pressed="true"] .tuile-compte { color: var(--craie); }
@@ -900,7 +1044,8 @@ html.avec-tendances #tendances[hidden] .vitrine-liste::after {
   padding: 4px 9px 5px;
   border: 1px solid oklch(var(--l-contour) var(--c) var(--teinte));
   border-radius: var(--r-commande);
-  background: oklch(.25 var(--c-fond) var(--teinte));
+  background: oklch(.25 var(--c-fond) var(--teinte) / .74);   /* verre teinté */
+  box-shadow: var(--reflet);     /* à l'intérieur : rien ne dépasse */
   color: var(--craie);
   font: inherit;
   font-size: 12px;
@@ -1038,8 +1183,9 @@ main.catalogue {
   left: 0;
   right: 0;
   height: 10px;
-  border-top: 1px solid rgba(236, 234, 228, .16);
+  border-top: 1px solid rgba(196, 181, 253, .3);
   border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  box-shadow: inset 0 7px 8px -7px rgba(196, 181, 253, .28);   /* lueur sous l'arc */
   -webkit-mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
   mask: linear-gradient(90deg, transparent, #000 18%, #000 82%, transparent);
   pointer-events: none;
@@ -1048,12 +1194,14 @@ main.catalogue {
 #titre-resultats {
   margin: 0;
   font-size: 18px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.4;
 }
 
 .compte {
   color: var(--craie-douce);
+  font-family: var(--police);
+  letter-spacing: 0;
   font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -1089,7 +1237,8 @@ main.catalogue {
   padding: 0 34px 0 14px;     /* texte à 16 px : en dessous, l'iPhone zoome */
   border: 1.5px solid var(--orbite);
   border-radius: var(--r-commande);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
   color: var(--craie);
   font: inherit;
   font-size: 16px;
@@ -1141,9 +1290,10 @@ main.catalogue {
   max-width: 100%;
   min-height: 44px;
   padding: 0 12px 0 14px;
-  border: 1.5px solid rgba(168, 179, 240, .55);
+  border: 1.5px solid rgba(196, 181, 253, .55);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
   color: var(--craie);
   font: inherit;
   font-size: 14px;
@@ -1239,7 +1389,8 @@ main.catalogue {
   overflow: hidden;
   border-radius: var(--r-plaque);
   background: var(--jaquette-fond);
-  transition: transform .15s ease;
+  box-shadow: var(--ombre-jaquette);   /* elle flotte un peu au-dessus du ciel */
+  transition: transform .2s ease, box-shadow .2s ease;
 }
 
 .jaquette img {
@@ -1258,21 +1409,26 @@ main.catalogue {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 0 0 0 1px var(--lisere-jaquette), inset 0 1px 0 rgba(255, 255, 255, .1);
+  box-shadow: inset 0 0 0 1px var(--lisere-jaquette), inset 0 1px 0 rgba(255, 255, 255, .12);
   pointer-events: none;
+  transition: box-shadow .2s ease;
 }
 
 /* Titre du jeu, dans la langue choisie, en bandeau sur le bas de la jaquette
    (les jaquettes ne contiennent aucun texte). Fondu court de 16 px puis nuit
    profonde à .88 : le texte est toujours sur la partie pleine, lisible sur
    les ciels les plus clairs. Jusqu'à 3 lignes, mots longs coupés.
-   position: relative pour passer devant l'image (positionnée). */
+   position: relative pour passer devant l'image (positionnée).
+   L'espace du bas est une bordure transparente et non un rembourrage : le
+   texte coupé ne déborde que dans le rembourrage, on y voyait le haut de la
+   ligne suivante. Le fondu part du bord de la bordure (background-origin). */
 .carte-titre {
   position: relative;
   flex: none;
   margin: 0;
-  padding: 18px 10px 9px;
-  background: linear-gradient(rgba(7, 10, 20, 0), rgba(7, 10, 20, .88) 16px);
+  padding: 18px 10px 0;
+  border-bottom: 9px solid transparent;
+  background: linear-gradient(rgba(14, 12, 36, 0), rgba(14, 12, 36, .9) 16px) border-box;
   color: var(--craie);
   font-size: 15px;
   font-weight: 700;
@@ -1288,17 +1444,19 @@ main.catalogue {
 }
 
 @media (max-width: 380px) {
-  .carte-titre { padding: 16px 8px 8px; font-size: 14px; }
+  .carte-titre { padding: 16px 8px 0; border-bottom-width: 8px; font-size: 14px; }
 }
 
-/* Badges : petites plaques sombres, sans majuscules forcées. */
+/* Badges : petites pilules de verre sombre, sans majuscules forcées. */
 .badge-nouveau,
 .badge-multi,
 .badge-hors-ligne {
-  padding: 3px 7px;
-  border: 1px solid rgba(236, 234, 228, .14);
-  border-radius: var(--r-etiquette);
-  background: rgba(7, 10, 20, .8);
+  padding: 3px 8px;
+  border: 1px solid rgba(242, 239, 250, .16);
+  border-radius: 999px;
+  background: rgba(10, 8, 26, .72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   color: var(--craie);
   font-size: 11px;
   font-weight: 700;
@@ -1389,7 +1547,7 @@ main.catalogue {
   padding: 0 10px;
   border: 1px solid var(--orbite);
   border-radius: 999px;
-  background: rgba(236, 234, 228, .06);
+  background: rgba(242, 239, 250, .06);
   color: var(--craie-douce);
   font: inherit;
   font-size: 12px;
@@ -1418,11 +1576,17 @@ main.catalogue {
 
 .pouce-bouton:active { transform: scale(.94); }
 
-/* Mon vote : rempli, comme dans le lanceur (.bouton-vote). */
+/* Mon vote : rempli, comme dans le lanceur (.bouton-vote) : pilule lilas,
+   pouce plein couleur nuit. */
 .pouce-bouton[aria-pressed="true"] {
   border-color: var(--lavande);
   background: var(--lavande);
   color: var(--nuit);
+}
+
+.pouce-bouton[aria-pressed="true"]::before {
+  -webkit-mask-image: var(--icone-pouce-plein);
+  mask-image: var(--icone-pouce-plein);
 }
 
 /* Archives : les jaquettes ternies (couleurs éteintes), textes intacts. */
@@ -1479,8 +1643,10 @@ main.catalogue {
 /* Publicité (#pub, .pub-mention) : aucune règle, volontairement. Elle reste
    cachée (hidden) tant que la publicité est désactivée. */
 
+/* Pied de page : un filet de lumière en haut, plus intense au milieu. */
 .pied {
   padding: 8px 16px calc(32px + env(safe-area-inset-bottom));
+  background: linear-gradient(90deg, rgba(196, 181, 253, 0), rgba(196, 181, 253, .22), rgba(196, 181, 253, 0)) top center / min(100%, 720px) 1px no-repeat;
   color: var(--craie-douce);
   font-size: 13px;
   text-align: center;
@@ -1545,16 +1711,18 @@ main.catalogue {
   padding: 14px 16px 6px;
   border: 1px solid var(--orbite);
   border-radius: var(--r-plaque);
-  background: var(--surface);
-  box-shadow: var(--ombre-flottante);
+  background: var(--verre-flottant);
+  -webkit-backdrop-filter: var(--flou);
+  backdrop-filter: var(--flou);
+  box-shadow: var(--ombre-flottante), var(--reflet);
   color: var(--craie);
   pointer-events: auto;
 }
 
 .consentement-titre {
   margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .consentement-texte {
@@ -1642,7 +1810,8 @@ main.catalogue {
   padding: 14px 16px;
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
 }
 
 .legal dt {
@@ -1710,7 +1879,8 @@ main.catalogue {
   margin: 8px 0 12px;
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
 }
 
 .legal table {
@@ -1770,7 +1940,7 @@ main.catalogue {
   padding: 10px 14px;
   border-left: 3px solid var(--or);
   border-radius: 0 12px 12px 0;
-  background: var(--surface);
+  background: var(--verre);
   color: var(--craie-douce);
   font-size: 14px;
 }
@@ -1779,7 +1949,8 @@ main.catalogue {
   padding: 18px 16px;
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
 }
 
 .proposer .champ { margin: 0 0 18px; }
@@ -1821,6 +1992,7 @@ main.catalogue {
 .proposer .champ textarea:focus {
   outline: none;
   border-color: var(--lavande);
+  box-shadow: 0 0 0 1px var(--lavande), 0 0 22px -6px rgba(160, 130, 255, .6);
 }
 
 .proposer .compteur {
@@ -1951,7 +2123,8 @@ main.catalogue {
   padding: 0 12px;
   border: 1px solid var(--orbite);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
   color: var(--craie);
   font-size: 14px;
   font-weight: 700;
@@ -1983,8 +2156,10 @@ main.catalogue {
   list-style: none;
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
-  background: var(--surface);
-  box-shadow: var(--ombre-flottante);
+  background: var(--verre-flottant);
+  -webkit-backdrop-filter: var(--flou);
+  backdrop-filter: var(--flou);
+  box-shadow: var(--ombre-flottante), var(--reflet);
 }
 
 .langues a {
@@ -2040,7 +2215,8 @@ main.catalogue {
   padding: 0 14px 0 12px;
   border: 1px solid var(--orbite);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
   color: var(--lavande);
   font-weight: 600;
   text-decoration: none;
@@ -2070,6 +2246,7 @@ main.catalogue {
   object-fit: cover;
   border-radius: var(--r-plaque);
   background: var(--jaquette-fond);
+  box-shadow: 0 0 0 1px var(--lisere-jaquette), 0 18px 40px -16px rgba(130, 105, 240, .45);
 }
 
 .fiche-infos h1 {
@@ -2249,7 +2426,7 @@ main.catalogue {
 
   .portee button:hover:not([aria-pressed="true"]) { color: var(--craie); }
 
-  .tuile:hover:not(:disabled) { border-color: rgba(236, 234, 228, .28); }
+  .tuile:hover:not(:disabled) { border-color: rgba(242, 239, 250, .28); }
 
   .tuile[aria-pressed="true"]:hover { border-color: var(--lavande); }
 
@@ -2259,8 +2436,12 @@ main.catalogue {
 
   .carte:hover .jaquette { transform: translateY(-2px); }
 
+  /* Halo lilas sous la jaquette survolée (pas dans les bandes de la
+     première ligne : elles le couperaient net en bas). */
+  .carte:not(.carte-vitrine):hover .jaquette { box-shadow: var(--halo); }
+
   .carte:hover .jaquette::after {
-    box-shadow: inset 0 0 0 1px rgba(168, 179, 240, .45), inset 0 1px 0 rgba(255, 255, 255, .1);
+    box-shadow: inset 0 0 0 1px rgba(196, 181, 253, .55), inset 0 1px 0 rgba(255, 255, 255, .14);
   }
 
   .archives .carte:hover .jaquette img { filter: none; }
@@ -2291,8 +2472,9 @@ body.lanceur::after { animation: none; }
   height: 56px;
   padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
   box-sizing: content-box;
-  border-bottom: 1px solid rgba(168, 179, 240, .18);
-  background: var(--nuit);
+  border-bottom: 1px solid rgba(196, 181, 253, .2);
+  background: linear-gradient(var(--surface), var(--nuit));
+  box-shadow: 0 6px 18px -10px rgba(2, 4, 12, .9);
   color: var(--craie);
 }
 
@@ -2315,7 +2497,7 @@ body.lanceur::after { animation: none; }
   height: 44px;
   border: 1px solid var(--orbite);
   border-radius: 50%;
-  background: rgba(236, 234, 228, .06);
+  background: rgba(242, 239, 250, .06);
   color: inherit;
   cursor: pointer;
   text-decoration: none;
@@ -2408,14 +2590,16 @@ body.lanceur::after { animation: none; }
   max-width: calc(100% - 24px);
   margin: 0;
   padding: 8px 16px;
-  border: 1px solid rgba(168, 179, 240, .35);
+  border: 1px solid rgba(196, 181, 253, .35);
   border-radius: var(--r-plaque);
-  background: rgba(22, 31, 56, .96);
+  background: var(--verre-flottant);
+  -webkit-backdrop-filter: var(--flou);
+  backdrop-filter: var(--flou);
   color: var(--craie);
   font-size: 15px;
   font-weight: 700;
   text-align: center;
-  box-shadow: var(--ombre-flottante);
+  box-shadow: var(--ombre-flottante), var(--reflet);
   pointer-events: none;
 }
 
@@ -2434,25 +2618,27 @@ body.lanceur::after { animation: none; }
 
 .avec-consentement .zone-turnstile { bottom: calc(var(--hauteur-consentement, 0px) + 8px); }
 
-/* Bouton plein : le seul aplat lavande hors votes et coches. */
+/* Bouton plein : le seul aplat lilas hors votes et coches, éclairé en biais
+   (plus clair en haut) et entouré d'un halo. Texte nuit : 8:1 au moins. */
 .bouton {
   display: inline-flex;
   align-items: center;
   min-height: 48px;
   padding: 0 22px;
   border-radius: var(--r-commande);
-  background: var(--lavande);
+  background: linear-gradient(135deg, var(--lavande-claire), #b3a2fb);
+  box-shadow: var(--halo), inset 0 1px 0 rgba(255, 255, 255, .35);
   color: var(--nuit);
   font-size: 16px;
   font-weight: 700;
   text-decoration: none;
-  transition: background-color .15s ease;
+  transition: filter .15s ease, box-shadow .15s ease;
 }
 
 .bouton:focus-visible { outline-color: var(--craie); }
 
 @media (hover: hover) {
-  .bouton:hover { background: #b8c1f3; }
+  .bouton:hover { filter: brightness(1.06); box-shadow: 0 12px 34px -10px rgba(160, 130, 255, .75), inset 0 1px 0 rgba(255, 255, 255, .35); }
 }
 
 /* --------------------------------------------------------------------------
@@ -2465,11 +2651,11 @@ body.lanceur::after { animation: none; }
 :root {
   --vert-termine: #3ccf7a;
   --cadre-aucun: var(--orbite);
-  --cadre-bronze: #c98a52;
-  --cadre-argent: #c9d1de;
+  --cadre-bronze: #d39a66;
+  --cadre-argent: #d7deea;
   --cadre-or: var(--or);
-  --cadre-etoile: #f7e7a6;
-  --cadre-diamant: #8fe3f5;
+  --cadre-etoile: #fff0c2;
+  --cadre-diamant: #9fe8f7;
 }
 
 /* Contour de l'avatar selon le cadre choisi (pastille, profil, classement). */
@@ -2499,7 +2685,7 @@ body.lanceur::after { animation: none; }
   padding: 0 10px 0 3px;
   border: 1px solid var(--orbite);
   border-radius: 22px;
-  background: rgba(236, 234, 228, .06);
+  background: rgba(242, 239, 250, .06);
   color: var(--craie);
   font: inherit;
   font-weight: 800;
@@ -2528,9 +2714,61 @@ body.lanceur::after { animation: none; }
 .profil-avatar[data-cadre="arc-en-ciel"],
 .classement-avatar[data-cadre="arc-en-ciel"],
 .profil-choix-bouton[data-cadre="arc-en-ciel"] {
+  --cadre: #8fd3f5;   /* sa lune */
   border-color: transparent;
   background: linear-gradient(var(--surface), var(--surface)) padding-box,
-    conic-gradient(#ff6b6b, #ffd166, #06d6a0, #4cc9f0, #b39ddb, #ff6b6b) border-box;
+    conic-gradient(#ff9a9a, #ffd88a, #8fe3b0, #8fd3f5, #c4b5fd, #ff9a9a) border-box;
+}
+
+/* Cadres en orbites : l'anneau (bordure, couleur du cadre) entouré d'une
+   lueur de la même couleur, et sa petite lune en haut à droite, cernée de
+   nuit. Étoile : la lune est une étincelle, avec un halo doré. Diamant : une
+   lune taillée (losange). Sans cadre : ni lueur ni lune. */
+:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre] {
+  --halo-cadre: 3px;
+  position: relative;
+  box-shadow: 0 0 0 var(--halo-cadre) color-mix(in oklab, var(--cadre) 20%, transparent);
+}
+
+.profil-avatar[data-cadre] { --halo-cadre: 6px; }
+
+:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre]::after {
+  content: "";
+  position: absolute;
+  top: -4%;
+  right: -8%;
+  width: 26%;
+  height: 26%;
+  border-radius: 50%;
+  background: var(--cadre);
+  box-shadow: 0 0 0 2px var(--nuit);
+  pointer-events: none;
+}
+
+:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="aucun"] { box-shadow: none; }
+:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="aucun"]::after { content: none; }
+
+:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="etoile"] {
+  box-shadow: 0 0 0 var(--halo-cadre) rgba(255, 216, 138, .22), 0 0 14px rgba(255, 216, 138, .45);
+}
+
+:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="etoile"]::after {
+  top: -10%;
+  right: -12%;
+  width: 34%;
+  height: 34%;
+  border-radius: 0;
+  box-shadow: none;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+
+:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="diamant"]::after {
+  border-radius: 2px;
+  transform: rotate(45deg) scale(.86);
+}
+
+@media (forced-colors: active) {
+  :is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre]::after { content: none; }
 }
 
 .pastille-niveau { min-width: 1.2em; text-align: center; }
@@ -2546,8 +2784,10 @@ body.lanceur::after { animation: none; }
   padding: 6px;
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
-  background: var(--surface);
-  box-shadow: var(--ombre-flottante);
+  background: var(--verre-flottant);
+  -webkit-backdrop-filter: var(--flou);
+  backdrop-filter: var(--flou);
+  box-shadow: var(--ombre-flottante), var(--reflet);
 }
 
 .pastille-menu[hidden] { display: none; }
@@ -2584,9 +2824,11 @@ body.lanceur::after { animation: none; }
 .profil-toast {
   margin: 0;
   padding: 10px 18px;
-  border: 1px solid rgba(242, 210, 122, .55);
+  border: 1px solid rgba(255, 216, 138, .55);
   border-radius: var(--r-plaque);
-  background: rgba(22, 31, 56, .97);
+  background: var(--verre-flottant);
+  -webkit-backdrop-filter: var(--flou);
+  backdrop-filter: var(--flou);
   color: var(--craie);
   font-size: 15px;
   font-weight: 800;
@@ -2606,9 +2848,10 @@ body.lanceur::after { animation: none; }
   max-width: 1200px;
   margin: 8px auto 12px;
   padding: 14px 52px 14px 16px;
-  border: 1px solid rgba(242, 210, 122, .4);
+  border: 1px solid rgba(255, 216, 138, .4);
   border-radius: var(--r-plaque);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet), 0 0 30px -14px rgba(255, 216, 138, .35);
   color: var(--craie);
 }
 
@@ -2674,12 +2917,13 @@ body.lanceur::after { animation: none; }
 /* Boutons secondaires et liens-boutons des pages du profil. */
 .bouton-secondaire {
   border: 1px solid var(--orbite);
-  background: transparent;
+  background: var(--verre);
+  box-shadow: var(--reflet);
   color: var(--craie);
 }
 
 @media (hover: hover) {
-  .bouton-secondaire:hover { background: var(--surface-relevee); }
+  .bouton-secondaire:hover { filter: none; background: var(--surface-relevee); box-shadow: var(--reflet); }
 }
 
 button.bouton { border: 0; font: inherit; font-weight: 700; cursor: pointer; }
@@ -2707,7 +2951,8 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
   padding: 16px;
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
 }
 
 .profil-avatar {
@@ -2730,15 +2975,17 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 .profil-xp, .profil-rang { margin: 6px 0 0; color: var(--craie-douce); font-size: 15px; }
 .profil-aide { color: var(--craie-douce); font-size: 14px; }
 
+/* Piste visible même vide (0 XP) : un fond lilas très léger et un contour. */
 .profil-barre {
   height: 12px;
   overflow: hidden;
   border-radius: 6px;
-  background: var(--nuit-profonde);
+  background: rgba(196, 181, 253, .1);
+  box-shadow: inset 0 0 0 1px rgba(196, 181, 253, .28);
 }
 
-.profil-barre span { display: block; height: 100%; width: 0; border-radius: 6px; background: var(--lavande); transition: width .4s ease; }
-.profil-barre.etoiles span { background: var(--or); }
+.profil-barre span { display: block; height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, #a897f5, var(--lavande-claire)); box-shadow: 0 0 10px rgba(160, 130, 255, .55); transition: width .4s ease; }
+.profil-barre.etoiles span { background: linear-gradient(90deg, #f1c46e, var(--or)); box-shadow: 0 0 10px rgba(255, 216, 138, .45); }
 
 .profil-bloc { margin: 24px 0; }
 .profil-bloc h2 { margin: 0 0 8px; }
@@ -2801,7 +3048,7 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
   text-align: center;
 }
 
-.profil-badge.obtenu { border: 1px solid rgba(242, 210, 122, .5); background: var(--surface); color: var(--craie); }
+.profil-badge.obtenu { border: 1px solid rgba(255, 216, 138, .5); background: var(--verre); box-shadow: var(--reflet), 0 0 24px -12px rgba(255, 216, 138, .45); color: var(--craie); }
 .profil-badge-picto { font-size: 28px; filter: grayscale(1); opacity: .45; }
 .profil-badge.obtenu .profil-badge-picto { filter: none; opacity: 1; }
 .profil-badge-nom { font-weight: 800; font-size: 14px; }
@@ -2862,7 +3109,8 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
   padding: 0 10px;
   border: 1px solid var(--orbite);
   border-radius: var(--r-commande);
-  background: var(--surface);
+  background: var(--verre);
+  box-shadow: var(--reflet);
   color: var(--craie);
   font: inherit;
   font-size: 16px;
@@ -2988,6 +3236,15 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
   .bouton-vote:active,
   .pouce-bouton:active {
     transform: none;
+  }
+}
+
+/* Transparence réduite (réglage de l'appareil) : verre plein, sans flou. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --verre: var(--surface);
+    --verre-flottant: var(--surface);
+    --flou: none;
   }
 }
 
@@ -3946,9 +4203,9 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 /* Puces : repère = bord gauche de l'icône (rembourrage de la puce). */
 .puce-filtre {
   --ico-gauche: 8px;
-  --fmg-points: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='37' viewBox='0 0 22 37'%3E%3Ccircle cx='4' cy='10' r='2.3' fill='%23eceae4' fill-opacity='.14'/%3E%3Ccircle cx='4' cy='10' r='1' fill='%23eceae4'/%3E%3Ccircle cx='19' cy='34.5' r='0.85' fill='%23eceae4'/%3E%3C/svg%3E");
-  --fmg-etincelle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23eceae4'/%3E%3C/svg%3E");
-  --fmg-etincelle-or: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23f2d27a' stroke='%230b1020' stroke-width='2.2' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E");
+  --fmg-points: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='37' viewBox='0 0 22 37'%3E%3Ccircle cx='4' cy='10' r='2.3' fill='%23f2effa' fill-opacity='.14'/%3E%3Ccircle cx='4' cy='10' r='1' fill='%23f2effa'/%3E%3Ccircle cx='19' cy='34.5' r='0.85' fill='%23f2effa'/%3E%3C/svg%3E");
+  --fmg-etincelle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23f2effa'/%3E%3C/svg%3E");
+  --fmg-etincelle-or: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23ffd88a' stroke='%230e0c24' stroke-width='2.2' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E");
 }
 
 @media (min-width: 720px) {
@@ -3974,8 +4231,8 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 /* Tuiles : la figure est centrée sur l'icône (24 ou 26 px, centre à 14 px
    du haut : le contenu remplit toujours la tuile). */
 .tuile {
-  --fmg-constellation: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='30' viewBox='0 0 64 30'%3E%3Cpath transform='translate(10.5 1.5) scale(.5)' d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23eceae4'/%3E%3Ccircle cx='48.5' cy='4.5' r='2.42' fill='%23eceae4' fill-opacity='.14'/%3E%3Ccircle cx='48.5' cy='4.5' r='1.05' fill='%23eceae4'/%3E%3Ccircle cx='51.5' cy='17' r='0.85' fill='%23eceae4'/%3E%3C/svg%3E");
-  --fmg-etincelle-or: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='30' viewBox='0 0 64 30'%3E%3Cpath transform='translate(10.5 1.5) scale(.5)' d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23f2d27a' stroke='%230b1020' stroke-width='2.2' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E");
+  --fmg-constellation: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='30' viewBox='0 0 64 30'%3E%3Cpath transform='translate(10.5 1.5) scale(.5)' d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23f2effa'/%3E%3Ccircle cx='48.5' cy='4.5' r='2.42' fill='%23f2effa' fill-opacity='.14'/%3E%3Ccircle cx='48.5' cy='4.5' r='1.05' fill='%23f2effa'/%3E%3Ccircle cx='51.5' cy='17' r='0.85' fill='%23f2effa'/%3E%3C/svg%3E");
+  --fmg-etincelle-or: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='30' viewBox='0 0 64 30'%3E%3Cpath transform='translate(10.5 1.5) scale(.5)' d='M9 1.4Q11.28 6.72 16.6 9Q11.28 11.28 9 16.6Q6.72 11.28 1.4 9Q6.72 6.72 9 1.4Z' fill='%23ffd88a' stroke='%230e0c24' stroke-width='2.2' stroke-linejoin='round' paint-order='stroke'/%3E%3C/svg%3E");
 }
 
 .tuile::before {
@@ -4071,4 +4328,109 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
   .puce-filtre::before,
   .puce-filtre::after,
   .tuile::before { animation: none !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Icônes : les planètes (thème « Planètes »)
+   Chaque icône des regroupements est posée sur une petite planète de sa
+   couleur, éclairée d'en haut à gauche : la boîte de l'icône (le span,
+   --ico-taille) devient un disque (couleur de fond et deux ombres
+   intérieures), et ses deux calques (masse et trait, bloc généré) sont
+   dessinés plus petits au milieu. Les dessins (scripts/icones/sources) ne
+   changent pas ; seules leurs couleurs sont reprises ici (masse sombre de
+   la même teinte, trait craie). L'image du détail « extra » (fond du span,
+   seulement pendant l'animation) passe devant la planète.
+   Tailles : puces 28 px (30 px dès 720 px), comme avant ; tuiles 28 px
+   (30 px), dont 26 px comptent dans la hauteur (les tuiles grandissent de
+   6 px, place gardée : .tuiles:empty).
+   -------------------------------------------------------------------------- */
+
+@supports ((-webkit-mask-image: none) or (mask-image: none)) {
+  :is(.tuile, .puce-filtre)[data-cle] > :is(.tuile-picto, .puce-filtre-picto) {
+    border-radius: 50%;
+    background-color: var(--planete);
+    box-shadow:
+      inset -3px -4px 6px -2px rgba(10, 4, 40, .55),
+      inset 2px 2px 3px -1px rgba(255, 255, 255, .42);
+  }
+
+  :is(.tuile, .puce-filtre)[data-cle] > :is(.tuile-picto, .puce-filtre-picto)::before,
+  :is(.tuile, .puce-filtre)[data-cle] > :is(.tuile-picto, .puce-filtre-picto)::after {
+    inset: 14%;
+  }
+}
+
+/* Couleurs : la planète dans la teinte du genre ou de l'univers, la masse
+   plus sombre, le trait craie. Choisie : la puce se remplit de sa teinte
+   claire, la planète garde ses couleurs (elle se détache, un peu plus
+   soutenue). */
+.puce-filtre {
+  --planete: oklch(.7 calc(var(--c) + .06) var(--teinte));
+  --ico-couleur-fond: oklch(.46 calc(var(--c) + .07) var(--teinte));
+  --ico-couleur-trait: var(--craie);
+}
+
+.puce-filtre[aria-pressed="true"] {
+  --planete: oklch(.64 calc(var(--c) + .08) var(--teinte));
+  --ico-couleur-fond: oklch(.42 calc(var(--c) + .08) var(--teinte));
+  --ico-couleur-trait: var(--craie);
+}
+
+/* Raccourcis : planètes lilas (ce qu'on touche). Âges : une teinte par
+   tranche, du chaud au froid (--ico-teinte-age, bloc généré). */
+.tuile {
+  --ico-taille: 28px;
+  --ico-marge: -1px;
+  --planete: #a897f5;
+  --ico-couleur-fond: #5845c2;
+  --ico-couleur-trait: var(--craie);
+}
+
+.tuile[data-cle^="age:"] {
+  --planete: oklch(.76 .1 var(--ico-teinte-age, 250));
+  --ico-couleur-fond: oklch(.49 .1 var(--ico-teinte-age, 250));
+}
+
+@media (min-width: 720px) {
+  .tuile { --ico-taille: 30px; --ico-marge: -2px; }
+}
+
+/* « 0 jeu » : planète éteinte. « Bientôt » : planète ardoise, immobile ;
+   « J'ai aimé » et « Hors ligne » vides restent normaux (une invitation). */
+.puce-filtre.puce-zero,
+.tuile.tuile-zero {
+  --planete: oklch(.42 .035 var(--teinte, 285));
+  --ico-couleur-fond: oklch(.31 .035 var(--teinte, 285));
+  --ico-couleur-trait: var(--craie-douce);
+  --ico-opacite-fond: 1;
+}
+
+.tuile.tuile-zero[data-cle^="age:"] { --teinte: var(--ico-teinte-age); }
+
+.puce-filtre.puce-bientot,
+.tuile.tuile-bientot {
+  --planete: #2e2955;
+  --ico-couleur-fond: #3d3768;
+  --ico-couleur-trait: var(--craie-faible);
+}
+
+.tuile.tuile-bientot[data-cle^="collection:"] {
+  --planete: #a897f5;
+  --ico-couleur-fond: #5845c2;
+  --ico-couleur-trait: var(--craie);
+}
+
+/* Navigateurs sans OKLCH : planètes lilas, masse sombre. */
+@supports not (color: oklch(0 0 0)) {
+  .puce-filtre,
+  .puce-filtre[aria-pressed="true"],
+  .tuile[data-cle^="age:"] { --planete: #a897f5; --ico-couleur-fond: #5845c2; }
+}
+
+/* Contraste élevé : pas de planète, l'icône seule (couleurs du système). */
+@media (forced-colors: active) {
+  :is(.tuile, .puce-filtre)[data-cle] > :is(.tuile-picto, .puce-filtre-picto) {
+    background-color: transparent;
+    box-shadow: none;
+  }
 }
