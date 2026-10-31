@@ -45,7 +45,7 @@
 //   être servie à /en/, /es/…
 // ==========================================================================
 
-import { votesEnAttente, envoyerEnAttente, mesVotes } from './votes.js';
+import { votesEnAttente, envoyerEnAttente, mesVotes, monVote, voter } from './votes.js';
 import { activerHorsLigne, jeuxHorsLigne } from './hors-ligne.js';
 import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, ID_AUTRE, TRANCHES_AGE, trancheDeAge, pourAdos, ordreAffichage } from './taxonomie.js';
 import { urlJeu, urlLanceur } from './chemins.js';
@@ -307,8 +307,50 @@ function creerJaquette(jeu, prioritaire = false, badge = true) {
   return jaquette;
 }
 
+// Pouce cliquable d'une jaquette : vote sans ouvrir le jeu. Même règle que le
+// lanceur (play.js, activerVotes) : toucher le même pouce une 2e fois annule,
+// toucher l'autre remplace. Hors du lien de la carte (ci-dessous), pour
+// rester un vrai bouton (imbriquer un bouton dans un lien n'est pas permis).
+function creerBoutonVote(gameId, pouce, libelle) {
+  const bouton = document.createElement('button');
+  bouton.type = 'button';
+  bouton.className = pouce === 1 ? 'pouce-bouton pouce-haut' : 'pouce-bouton pouce-bas';
+  bouton.setAttribute('aria-label', libelle);
+  bouton.setAttribute('aria-pressed', String(monVote(gameId) === pouce));
+  bouton.addEventListener('click', (evenement) => {
+    evenement.preventDefault();
+    const valeur = monVote(gameId) === pouce ? 0 : pouce;
+    voterDepuisCarte(gameId, valeur);
+  });
+  return bouton;
+}
+
+// Après un clic, met à jour tous les exemplaires de cette carte (grille et
+// archives peuvent montrer le même jeu) : pouces enfoncés et compteurs.
+function voterDepuisCarte(gameId, valeur) {
+  const avant = monVote(gameId);
+  if (avant === valeur) return; // déjà en cours (2 clics très rapprochés)
+  const scores = { ...(etat.scores?.[gameId] || SANS_VOTE) };
+  if (avant === 1) scores.up -= 1;
+  if (avant === -1) scores.down -= 1;
+  if (valeur === 1) scores.up += 1;
+  if (valeur === -1) scores.down += 1;
+  if (etat.scores) etat.scores = { ...etat.scores, [gameId]: scores };
+
+  for (const pouces of document.querySelectorAll(`.carte-pouces[data-pouces="${gameId}"]`)) {
+    const haut = pouces.querySelector('.pouce-haut');
+    const bas = pouces.querySelector('.pouce-bas');
+    haut.setAttribute('aria-pressed', String(valeur === 1));
+    bas.setAttribute('aria-pressed', String(valeur === -1));
+    haut.textContent = String(scores.up);
+    bas.textContent = String(scores.down);
+  }
+  voter(gameId, valeur); // envoi en arrière-plan (file d'attente hors connexion : votes.js)
+}
+
 function creerCarte(jeu, scores, prioritaire = false) {
   const li = document.createElement('li');
+  li.className = 'carte-item';
   const titreAffiche = titreJeu(jeu);
 
   const lien = document.createElement('a');
@@ -336,29 +378,29 @@ function creerCarte(jeu, scores, prioritaire = false) {
   infos.textContent = [themes.join(' · '), jeu.ages, enFrancais].filter(Boolean).join(' — ');
   texte.append(infos);
 
-  // Compteurs de pouces, seulement quand l'API répond (jamais hors connexion).
-  // Le pouce lui-même est dessiné par style.css (.pouce-haut, .pouce-bas).
-  let votes = '';
-  if (scores) {
-    const { up, down } = scores[jeu.id] || SANS_VOTE;
-    const pouces = document.createElement('p');
-    pouces.className = 'carte-pouces';
-    const haut = document.createElement('span');
-    haut.className = 'pouce-haut';
-    haut.textContent = String(up);
-    const bas = document.createElement('span');
-    bas.className = 'pouce-bas';
-    bas.textContent = String(down);
-    pouces.append(haut, bas);
-    texte.append(pouces);
-    votes = t('carte.votesAria', { up, down });
-  }
-
   lien.append(jaquette, texte);
+  let votes = '';
+  if (scores) votes = t('carte.votesAria', scores[jeu.id] || SANS_VOTE);
   lien.setAttribute('aria-label', [
     `${titreAffiche}.`, jeu.multijoueur === true && t('carte.multiAria'), descriptionJeu(jeu), enFrancais, votes, horsLigne && t('carte.horsLigneAria'),
   ].filter(Boolean).join(' '));
   li.append(lien);
+
+  // Pouces cliquables, seulement quand l'API répond (jamais hors connexion).
+  if (scores) {
+    const { up, down } = scores[jeu.id] || SANS_VOTE;
+    const pouces = document.createElement('div');
+    pouces.className = 'carte-pouces';
+    pouces.dataset.pouces = jeu.id;
+    pouces.setAttribute('role', 'group');
+    pouces.setAttribute('aria-label', titreAffiche);
+    const haut = creerBoutonVote(jeu.id, 1, t('jeu.jaime'));
+    haut.textContent = String(up);
+    const bas = creerBoutonVote(jeu.id, -1, t('jeu.jaimePas'));
+    bas.textContent = String(down);
+    pouces.append(haut, bas);
+    li.append(pouces);
+  }
   return li;
 }
 

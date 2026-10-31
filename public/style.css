@@ -397,7 +397,7 @@ body::after {
 @media (min-width: 720px) {
   .entete {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 12px 24px;
   }
@@ -405,7 +405,11 @@ body::after {
   .marque { grid-column: 1; grid-row: 1; gap: 12px; }
   .marque-logo { width: 53px; height: 36px; }
   .marque-mot { height: 26px; }
-  .entete-langue { grid-column: 3; grid-row: 1; }
+  /* Sa propre colonne (pas la 2e, celle du ciel de la manette) : sans elle,
+     la pastille se plaçait automatiquement dans le vide du milieu et
+     recouvrait la manette (relecture du propriétaire, 31 octobre 2026). */
+  .entete-haut .pastille-profil { grid-column: 3; grid-row: 1; margin: 0; }
+  .entete-langue { grid-column: 4; grid-row: 1; }
 }
 
 /* Contraste élevé (couleurs forcées) : le corps du mot-symbole suit déjà la
@@ -436,16 +440,16 @@ body::after {
      étoiles du fond. Aucune manette sur les autres pages au téléphone. */
 @media (min-width: 1200px) {
   .entete::before {
-    background: var(--ciel-manette) no-repeat right 168px top 0;
+    background: var(--ciel-manette) no-repeat right 260px top 0;
   }
 }
 
 @media (min-width: 720px) and (max-width: 1199px) {
   .entete::before {
-    background: var(--ciel-manette-petite) no-repeat right 168px top 10px;
+    background: var(--ciel-manette-petite) no-repeat right 260px top 10px;
   }
   .entete-page::before {
-    background: var(--ciel-manette) no-repeat right 168px top 0;
+    background: var(--ciel-manette) no-repeat right 260px top 0;
   }
 }
 
@@ -1195,11 +1199,24 @@ main.catalogue {
 @media (min-width: 900px)  { .grille { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (min-width: 1150px) { .grille { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 
-/* Toute la carte est un lien ; le rayon donne sa forme au contour de focus. */
-.carte {
+/* Un item de la grille = le lien vers le jeu (jaquette, titre, infos) et,
+   en dessous, les pouces de vote (hors du lien : un bouton ne peut pas être
+   imbriqué dans un autre élément cliquable). Le lien grandit pour occuper le
+   reste de la hauteur de la carte : les pouces restent calés en bas, alignés
+   d'une carte à l'autre dans la rangée, comme avant qu'ils y soient entrés. */
+.carte-item {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+/* La jaquette, le titre et les infos sont un lien ; le rayon donne sa forme
+   au contour de focus. */
+.carte {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   border-radius: 16px;
   color: inherit;
   text-decoration: none;
@@ -1354,25 +1371,35 @@ main.catalogue {
   overflow-wrap: break-word;
 }
 
-/* Compteurs de pouces : le nombre seul, le pouce est dessiné ici. Poussés en
-   bas de la carte pour s'aligner d'une carte à l'autre dans la rangée. */
+/* Pouces de vote : de vrais boutons (on vote sans ouvrir le jeu ; demande du
+   propriétaire, 31 octobre 2026 — ils ressemblaient à des boutons mais ne
+   l'étaient pas). Hors du lien de la carte (ci-dessus), calés en bas par
+   .carte-item. Au moins 44 px de haut (règle du site). */
 .carte-pouces {
   display: flex;
-  gap: 12px;
-  margin: auto 0 0;
-  padding-top: 6px;
+  gap: 8px;
+  margin: 8px 2px 0;
+}
+
+.pouce-bouton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--orbite);
+  border-radius: 999px;
+  background: rgba(236, 234, 228, .06);
+  color: var(--craie-douce);
+  font: inherit;
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .12s ease;
 }
 
-.carte-pouces span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.carte-pouces span::before {
+.pouce-bouton::before {
   content: "";
   flex: none;
   width: 14px;
@@ -1382,9 +1409,21 @@ main.catalogue {
   mask: var(--icone-pouce) center / contain no-repeat;
 }
 
-.carte-pouces .pouce-haut { color: var(--craie); }
-.carte-pouces .pouce-bas { color: var(--craie-douce); }
-.carte-pouces .pouce-bas::before { transform: rotate(180deg); }
+.pouce-haut { color: var(--craie); }
+.pouce-bas::before { transform: rotate(180deg); }
+
+@media (hover: hover) {
+  .pouce-bouton:hover { border-color: var(--craie-douce); background: var(--surface-relevee); }
+}
+
+.pouce-bouton:active { transform: scale(.94); }
+
+/* Mon vote : rempli, comme dans le lanceur (.bouton-vote). */
+.pouce-bouton[aria-pressed="true"] {
+  border-color: var(--lavande);
+  background: var(--lavande);
+  color: var(--nuit);
+}
 
 /* Archives : les jaquettes ternies (couleurs éteintes), textes intacts. */
 .archives {
@@ -2946,7 +2985,8 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
   .carte:hover .jaquette,
   .tuile:active:not(:disabled),
   .puce-filtre:active:not(:disabled),
-  .bouton-vote:active {
+  .bouton-vote:active,
+  .pouce-bouton:active {
     transform: none;
   }
 }
