@@ -244,11 +244,33 @@ const NOMS_TYPES = { nouveau: 'Nouveau jeu', bug: 'Bug', modification: 'Modifica
 export const titreIssuePublique = (type, titre) => `[Public] ${NOMS_TYPES[type]} : ${nettoyerTitre(titre)}`;
 
 /**
+ * Ligne « Auteur » d'une demande publique. auteur : profil joueur de l'appareil
+ * lu dans la base par functions/api/demandes.js ({ profil, pseudo, numero,
+ * niveau }), ou null (pas de profil) → visiteur anonyme. Le pseudo (lettres,
+ * chiffres, espaces, « _ » et « - » : controlerPseudo de functions/_profil.js)
+ * est entre accents graves : GitHub ne l'interprète pas. Relue par lireAuteur.
+ */
+export function ligneAuteur(auteur, precision = 'formulaire public') {
+  if (!auteur) return `Visiteur anonyme (${precision})`;
+  const nom = auteur.pseudo ? `Joueur \`${auteur.pseudo}\`` : `Joueur sans pseudo (« Joueur ${auteur.numero} »)`;
+  return `${nom} · niveau ${auteur.niveau} · profil n° ${auteur.profil} (${precision})`;
+}
+
+const RE_AUTEUR = /^Joueur (?:`([^`\n]+)`|sans pseudo \(« Joueur (\d+) »\)) · niveau (\d+) · profil n° (\d+)/;
+
+/** Auteur relu depuis la rubrique « Auteur » ({ profil, pseudo, numero, niveau }), ou null. */
+export function lireAuteur(texte) {
+  const m = RE_AUTEUR.exec(String(texte ?? '').trim());
+  if (!m) return null;
+  return { profil: Number(m[4]), pseudo: m[1] || null, numero: m[2] ? Number(m[2]) : null, niveau: Number(m[3]) };
+}
+
+/**
  * Corps de l'issue d'une demande publique. « Demande » doit rester juste avant
  * « Auteur » : demande-modification.yml lit le texte entre les deux, et
  * l'identifiant du jeu sur la première ligne de « Jeu ».
  */
-export function corpsDemandePublique({ type, jeu, titre, description, date }) {
+export function corpsDemandePublique({ type, jeu, titre, description, date, auteur = null }) {
   const t = neutraliser(nettoyerTitre(titre));
   return [
     '### Type', '', type, '',
@@ -256,7 +278,7 @@ export function corpsDemandePublique({ type, jeu, titre, description, date }) {
     '### Titre', '', t, '',
     '### Date', '', new Date(date).toISOString().replace(/\.\d{3}Z$/, 'Z'), '',
     '### Demande', '', `**${t}**`, '', neutraliser(nettoyerDescription(description)), '',
-    '### Auteur', '', 'Visiteur anonyme (formulaire public)', '',
+    '### Auteur', '', ligneAuteur(auteur), '',
     '---',
     "_Demande envoyée depuis le formulaire public du site. L'IA la modère (moderation-demande.yml), puis elle attend une validation dans la page privée /idees (onglet « Demandes publiques »)._",
   ].join('\n');
@@ -311,6 +333,7 @@ export function lireDemandePublique(corps) {
     titre: retablir(titre),
     description: retablir(description),
     date: premiere(rubrique('Date')),
+    auteur: lireAuteur(premiere(rubrique('Auteur'))),
     moderation: lireModeration(texte),
   };
 }
@@ -417,7 +440,7 @@ export async function accepterPublique(env, { numero, classement, auteur }) {
       genre, ages, univers,
       // Le texte du visiteur reste neutralisé (il est relu par les agents de nuit).
       description: neutraliser(d.description),
-      auteur: `Visiteur anonyme (formulaire public, demande acceptée par ${auteur})`,
+      auteur: ligneAuteur(d.auteur, `formulaire public, demande acceptée par ${auteur}`),
       pied: "_Proposition du formulaire public, acceptée dans /idees. La boucle de nuit la fabrique en priorité, comme les idées perso, puis ferme cette issue avec le lien de la pull request du jeu._",
     });
     const avis = d.moderation ? `\n${blocModeration(d.moderation)}` : '';
