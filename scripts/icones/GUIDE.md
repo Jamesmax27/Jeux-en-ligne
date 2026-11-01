@@ -164,7 +164,7 @@ Ce tableau est celui du bloc généré. Le thème « Planètes » le remplace su
 | « 0 jeu » | `oklch(.42 .035 h)` | `oklch(.31 .035 h)` | craie douce |
 | Bientôt | ardoise `#2e2955` | `#3d3768` | craie faible |
 
-Tailles sur le site : puces 28 px (30 px dès 720 px) ; tuiles 28 px (30 px), dont 26 px comptent dans la hauteur. Le titre « Tendances » garde son icône or, sans planète.
+Tailles sur le site : puces 28 px (30 px dès 720 px) ; tuiles 26 px (28 px). La planète compte entièrement dans la hauteur (marge nulle) : même écart au-dessus d'elle que sous le texte, jamais collée au bord du haut. Le titre « Tendances » garde son icône or, sans planète.
 
 ## 9. Bibliothèque d'animations (`data-anim`)
 
