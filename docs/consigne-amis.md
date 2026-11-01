@@ -120,7 +120,7 @@ Référence pour toute évolution des amis : la garder à jour si un choix chang
 
 **Pseudos** : le ticket d'entrée signé par le site contient maintenant le pseudo (et le nombre du pseudo par défaut). `partie.js` envoie à chaque changement `{ t: 'noms', noms }` ; le lanceur traduit « Joueur 4821 » ; le moteur expose `partie.sieges()[s].nom`. Un ancien moteur ignore ces messages : `PROTOCOLE` reste 2.
 
-**Jeux adaptés** (1er novembre 2026) — « Rejoindre » (même partie) : `enclos-de-la-ferme`, `parking-des-voitures-cachees`. Pseudos des autres joueurs : les 13 jeux multijoueurs (les deux précédents et `concours-des-pizzaiolos`, `la-course-des-bebes-dinos`, `la-course-du-puits-noir`, `la-fuite-du-bois-pendu`, `la-veillee-des-portraits-maudits`, `le-casse-de-la-tour-opaline`, `le-choeur-de-la-crypte`, `le-radeau-des-rations`, `les-derniers-jours-du-cratere`, `marche-aux-devinettes`, `station-hades-oxygene-compte`). **Reste à faire pour « Rejoindre »** : les 11 autres (deux lignes chacun : `"rejoindre": true`, appel à `JEL_MULTI.invitation()`). D'ici là, leur bouton ouvre le jeu et le dit. Nouveaux jeux : `"rejoindre": true` obligatoire depuis `REJOINDRE_DEPUIS` (`validate-games.mjs`), consignes de la boucle de nuit, relecture et compétence `ajouter-jeu-site` mises à jour.
+**Jeux adaptés** (1er novembre 2026) — pseudos des autres joueurs et « Rejoindre » (même partie) : les 13 jeux multijoueurs. Ordre : `enclos-de-la-ferme` et `parking-des-voitures-cachees` d'abord (validation du mécanisme), puis les 11 autres le même jour, après la mise en ligne : `concours-des-pizzaiolos`, `la-course-des-bebes-dinos`, `la-course-du-puits-noir`, `la-fuite-du-bois-pendu`, `la-veillee-des-portraits-maudits`, `le-casse-de-la-tour-opaline`, `le-choeur-de-la-crypte`, `le-radeau-des-rations`, `les-derniers-jours-du-cratere`, `marche-aux-devinettes`, `station-hades-oxygene-compte` (`"rejoindre": true`, appel à `JEL_MULTI.invitation()` à la fin de l'initialisation). Un jeu multijoueur sans `"rejoindre"` ouvre simplement le jeu, et la page Amis le dit. Nouveaux jeux : `"rejoindre": true` obligatoire depuis `REJOINDRE_DEPUIS` (`validate-games.mjs`), consignes de la boucle de nuit, relecture et compétence `ajouter-jeu-site` mises à jour.
 
 ### 8.4 Requêtes et quotas (offre gratuite)
 
@@ -142,7 +142,6 @@ Hypothèses : un « joueur actif » a au moins un ami (les autres n'envoient auc
 
 ### 8.5 Laissé de côté (volontairement)
 
-- Adaptation « Rejoindre » des 11 autres jeux multijoueurs (déploiement progressif, section 3) ; les pseudos, eux, sont faits partout.
 - Turnstile à l'envoi d'une demande (prêt, coupé : `AMIS_TURNSTILE`).
 - Notification hors du site (aucune notification du téléphone, aucun e-mail) ; pas de message entre amis, pas d'invitation envoyée à un ami (on le rejoint, il ne nous appelle pas).
 - Signal « hors ligne » à la fermeture de la page (un ami paraît encore en ligne jusqu'à 5 minutes) : il coûterait une requête par page quittée.

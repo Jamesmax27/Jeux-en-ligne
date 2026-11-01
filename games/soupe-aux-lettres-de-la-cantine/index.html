@@ -2403,6 +2403,11 @@
     prog.niveau = Math.max(prog.niveau, Math.min(NIVEAUX.length, n + 2));
     sauver(Math.min(NIVEAUX.length, n + 2));
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: n + 1 });
+    // Jeu terminé (tous les niveaux gagnés au moins une fois, maintenant ou avant) :
+    // total des meilleures étoiles de chaque niveau, gardées dans la sauvegarde.
+    if (prog.etoiles.every((x) => x > 0)) {
+      if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
+    }
     // Trésors nouvellement débloqués
     const apres = totalEtoiles(), nouveaux = [];
     Object.keys(TRESORS).forEach((cat) => TRESORS[cat].forEach((s, i) => { if (s > avantEtoiles && s <= apres) nouveaux.push(t(cat + '.' + i)); }));

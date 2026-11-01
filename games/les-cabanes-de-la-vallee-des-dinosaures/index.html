@@ -3304,6 +3304,11 @@ function victoire() {
   if (dernier) prog.dejaFini = true;
   sauver(Math.min(NIVEAUX.length, idx + 2));
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: idx + 1 });
+  // Jeu terminé (tous les niveaux gagnés au moins une fois, maintenant ou avant) :
+  // total des meilleures étoiles de chaque niveau, gardées dans la sauvegarde.
+  if (prog.etoiles.every((x) => x > 0)) {
+    if (window.FMG) window.FMG.reportComplete({ stars: prog.etoiles.reduce((a, b) => a + b, 0), maxStars: NIVEAUX.length * 3 });
+  }
   derniereFin = { gagne: true, et, utilisees, score, record };
   son('victoire');
   confettis();
