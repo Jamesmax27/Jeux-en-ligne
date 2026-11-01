@@ -2185,7 +2185,8 @@ button:focus-visible, .case:focus-visible { outline: 3px solid #fff; outline-off
 }
 .badge-express svg { width: 16px; height: 16px; }
 .commande.vide { background: rgba(255,255,255,.06); border: 2px dashed rgba(255,255,255,.15); }
-#zone-grille { flex: 1 1 auto; width: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; }
+/* La zone prend exactement la place qui reste (base 0) : la grille s'y ajuste (ajuster()). */
+#zone-grille { flex: 1 1 0; width: 100%; min-height: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
 #grille {
   display: grid; grid-template-columns: repeat(6, var(--case)); grid-template-rows: repeat(7, var(--case));
   gap: 3px; padding: 5px; background: rgba(0,0,0,.38); border-radius: 16px;
@@ -2330,6 +2331,38 @@ body.clavier .case.curseur::after {
 body.en-pause *, body.en-pause *::before, body.en-pause *::after { animation-play-state: paused !important; }
 @media (prefers-reduced-motion: reduce) {
   .faisceau, .etoiles-anim .pulse, .case.choisi > svg { animation: none; }
+}
+/* Écrans peu hauts (petit téléphone, barre du navigateur et du site) : tout se resserre
+   pour que la barre du bas (Vendre, Générer, Boutique) reste toujours visible. */
+@media (max-height: 700px) {
+  #ecran-jeu { padding: 4px 8px 6px; gap: 4px; }
+  #xp { font-size: 12px; }
+  #xp-barre { height: 10px; }
+  #commandes { height: 70px; }
+  .commande .visage { width: 28px; height: 28px; }
+  .commande .objet { width: 30px; height: 30px; }
+  .commande .nom { font-size: 10px; }
+  #info { min-height: 30px; font-size: 13px; }
+  #info svg { width: 22px; height: 22px; }
+  #barre button { min-height: 50px; font-size: 12px; }
+  #barre svg { width: 24px; height: 24px; }
+  #dessin-titre { min-height: 120px; }
+}
+@media (max-height: 560px) {
+  #ecran-jeu { gap: 3px; }
+  .compteur { min-height: 30px; font-size: 14px; }
+  .compteur svg { width: 22px; height: 22px; }
+  #xp svg { width: 16px; height: 16px; }
+  #commandes { height: 58px; }
+  .commande .nom { display: none; }
+  .commande .visage { width: 24px; height: 24px; }
+  .commande .objet { width: 28px; height: 28px; }
+  #info { min-height: 24px; font-size: 12px; line-height: 1.1; }
+  #barre button { min-height: 44px; flex-direction: row; gap: 4px; }
+  #barre svg { width: 22px; height: 22px; }
+  #ecran-titre { gap: 5px; padding-top: 6px; }
+  #dessin-titre { min-height: 90px; }
+  #b-jouer { min-height: 50px; font-size: 22px; padding: 8px 32px; }
 }
 @media (min-width: 700px) {
   #ecran-titre { padding-top: 18px; }
@@ -2512,6 +2545,10 @@ function rangNominal(n) {
   RANGS.forEach((x, i) => { if (n >= x.des) r = i; });
   return r;
 }
+// Bobines du générateur au départ d'un tournage : « bob » plus une réserve de 50 %,
+// pour ne pas rester bloqué faute d'objets (les 3 étoiles se jouent toujours sur « par »).
+const RESERVE_BOBINES = 0.5;
+function bobinesDepart(def) { return def.bob + Math.ceil(def.bob * RESERVE_BOBINES); }
 function xpCommandes(def) { return def.cmd.reduce((s, c) => s + XP_COMMANDE[c[2]] * (c[3] || 1), 0); }
 // Seuils d'expérience des rangs : 90 % de l'expérience des commandes des tournages
 // précédents, que gagne forcément quiconque les a réussis.
@@ -2554,7 +2591,7 @@ function creerPartie(n, rangJoueur, alea) {
   const commandes = def.cmd.map(([p, c, rg, q, x], k) => ({ k, p, c, n: rg, q: q || 1, reste: q || 1, x: x || 0, fait: false }));
   return {
     n, def, rang, cases, commandes,
-    bobines: def.bob, utilisees: 0, pieces: def.pieces || 0, xp: 0, piecesGagnees: 0,
+    bobines: bobinesDepart(def), utilisees: 0, pieces: def.pieces || 0, xp: 0, piecesGagnees: 0,
     ameli: 0, achatsBobines: 0, fin: null, alea: alea || Math.random,
   };
 }
@@ -2565,11 +2602,27 @@ function casesLibres(p) { let n = 0; for (let i = 0; i < p.cases.length; i++) if
 function visibles(p) { return p.commandes.filter((x) => !x.fait).slice(0, 3); }
 function cadenasRestants(p) { return p.cases.filter((k) => k.v).length; }
 
-// Chaîne d'un nouvel objet : 3 fois sur 4, une chaîne demandée par les commandes visibles.
+// Chaîne d'un nouvel objet. Le générateur aide le joueur pour qu'il ne reste pas bloqué :
+// - 9 fois sur 10, une chaîne demandée par les commandes visibles, et de préférence
+//   celle d'un objet de rang 1 resté seul (le nouvel objet lui fait une paire) ;
+// - sinon, une chaîne encore demandée par une commande à venir ;
+// - jamais une chaîne que plus aucune commande ne demande (sauf s'il n'y en a plus).
 function choisirChaine(p) {
-  const voulues = [...new Set(visibles(p).map((x) => x.c))].filter((c) => p.def.ch.includes(c));
-  if (voulues.length && p.alea() < 0.75) return voulues[Math.floor(p.alea() * voulues.length)];
-  return p.def.ch[Math.floor(p.alea() * p.def.ch.length)];
+  const auHasard = (l) => l[Math.floor(p.alea() * l.length)];
+  const demandees = (liste) => [...new Set(liste.map((x) => x.c))].filter((c) => p.def.ch.includes(c));
+  const voulues = demandees(visibles(p));
+  const restantes = demandees(p.commandes.filter((x) => !x.fait));
+  if (voulues.length && p.alea() < 0.9) {
+    const seules = voulues.filter((c) => {
+      let n = 0;
+      for (let i = 0; i < p.cases.length; i++) { const o = mobile(p, i) && p.cases[i].o; if (o && o.c === c && o.n === 1) n++; }
+      return n % 2 === 1;
+    });
+    if (seules.length && p.alea() < 0.6) return auHasard(seules);
+    return auHasard(voulues);
+  }
+  if (restantes.length) return auHasard(restantes);
+  return auHasard(p.def.ch);
 }
 function poserAuHasard(p, obj) {
   const l = [];
@@ -2740,7 +2793,7 @@ function etoilesDe(p) {
   if (p.utilisees <= Math.ceil(p.def.par * 1.35)) return 2;
   return 1;
 }
-function scoreDe(p) { return p.xp + p.piecesGagnees + 10 * Math.max(0, p.def.bob - p.utilisees); }
+function scoreDe(p) { return p.xp + p.piecesGagnees + 10 * Math.max(0, p.def.bob - p.utilisees); }  // bonus calculé sur « bob » : les records restent comparables
 // </logique>
 
 window.JEL_NIVEAUX = NIVEAUX.length;
@@ -3235,8 +3288,10 @@ function construireGrille() {
 function ajuster() {
   const z = $('zone-grille');
   if (!z || ecran !== 'jeu') return;
-  const w = z.clientWidth - 16, h = z.clientHeight - 16;
-  const taille = Math.max(40, Math.floor(Math.min((w - 5 * 3) / COLS, (h - 6 * 3) / ROWS)));
+  // Place prise autour des cases : marge intérieure (2 × 5 px), bordure (2 × 2 px), écarts de 3 px.
+  // La grille suit la hauteur réelle de l'écran : elle ne déborde jamais sur la barre du bas.
+  const w = z.clientWidth - 14 - (COLS - 1) * 3, h = z.clientHeight - 14 - (ROWS - 1) * 3;
+  const taille = Math.max(22, Math.floor(Math.min(w / COLS, h / ROWS)));
   document.documentElement.style.setProperty('--case', Math.min(taille, 78) + 'px');
 }
 
@@ -3424,7 +3479,7 @@ function montrerObjectif() {
   $('but-nom').textContent = t('niv.' + p.n);
   $('but-liste').innerHTML = def.cmd.map(([pe, c, rg, q]) => `<li>${dessinVisage(pe)}${dessinObjet({ c, n: rg })}${(q || 1) > 1 ? t('cmd.fois', { n: nombre(q) }) : ''}</li>`).join('');
   $('but-liberer').style.display = def.lib ? '' : 'none';
-  $('but-bobines').innerHTML = `${ICONES.bobine}<span>${t('but.bobines', { n: nombre(def.bob) })}</span>`;
+  $('but-bobines').innerHTML = `${ICONES.bobine}<span>${t('but.bobines', { n: nombre(bobinesDepart(def)) })}</span>`;
   $('but-etoiles').innerHTML = `${ICONES.etoile(true)}${ICONES.etoile(true)}${ICONES.etoile(true)}<span>${t('but.etoiles', { n: def.par })}</span>`;
   const nv = $('but-nouveau');
   nv.innerHTML = `<b>${t('but.nouveau')}</b> ${t('nouv.' + def.nouv)}`;
@@ -4065,6 +4120,8 @@ function init() {
   window.addEventListener('touchstart', () => document.body.classList.add('souris'), { capture: true, passive: true });
   window.addEventListener('keydown', (e) => { document.body.classList.remove('souris'); surTouche(e); });
   window.addEventListener('resize', () => { ajuster(); if (tutoOuvert) montrerEtape(); });
+  // La zone de la grille peut changer de taille sans « resize » (barre du navigateur, commandes…).
+  if (window.ResizeObserver) new ResizeObserver(() => ajuster()).observe($('zone-grille'));
   document.addEventListener('contextmenu', (e) => { if (ecran === 'jeu') e.preventDefault(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') ouvrirPause(); });
 
