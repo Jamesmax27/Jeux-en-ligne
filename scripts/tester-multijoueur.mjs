@@ -26,7 +26,11 @@
 //     sur 10) et qui ne jouent pas toujours pareil ;
 //   - Worker : sites permis, règles et protocole identiques, répartition
 //     entre parties, limite globale MAX_JOUEURS, partie libérée au départ du
-//     dernier joueur.
+//     dernier joueur ;
+//   - amis (docs/consigne-amis.md) : nom de la partie donné au lanceur,
+//     pseudos des places (noms), partie d'un ami rejointe ou pleine, /partie ;
+//     --navigateur : pseudos reçus par le jeu, et pour un jeu "rejoindre",
+//     salon de la partie de l'ami ouvert tout seul, partie pleine → message.
 // Code de sortie : 0 = tout est bon, 1 = problème(s), 2 = panne de l'outil.
 // Le mode --navigateur nécessite Playwright (ou CHROMIUM_PATH, ex. Edge).
 // ==========================================================================
@@ -386,7 +390,8 @@ function fauxEtat() {
   };
 }
 
-async function testerWorker(sujet, jeuxDuWorker) {
+// Worker monté avec de faux Durable Objects (un jeu d'essai, MAX_JOUEURS = 5).
+async function monterWorker(jeuxDuWorker, envPlus = {}) {
   globalThis.Response = FausseReponse;
   globalThis.Request = FausseRequete;
   globalThis.WebSocketPair = function () { const c = new FausseSocket(), s = new FausseSocket(); c.autre = s; s.autre = c; this[0] = c; this[1] = s; };
@@ -399,7 +404,7 @@ async function testerWorker(sujet, jeuxDuWorker) {
 
   const objets = { PARTIE: new Map(), ACCUEIL: new Map() };
   const etats = new Map();
-  const env = { MAX_JOUEURS: '5' };
+  const env = { MAX_JOUEURS: '5', ...envPlus };
   for (const [nom, Classe] of [['PARTIE', Partie], ['ACCUEIL', Accueil]]) {
     env[nom] = {
       idFromName: (n) => n,
@@ -415,9 +420,56 @@ async function testerWorker(sujet, jeuxDuWorker) {
   const [id, fiche] = Object.entries(jeuxDuWorker)[0];
   const origine = 'https://freemicrogames.com';
   const connexion = (entetes = {}, params = {}) => worker.fetch(new FausseRequete(
-    `https://multi.freemicrogames.com/ws?jeu=${params.jeu ?? id}&regles=${params.regles ?? fiche.empreinte}&proto=${params.proto ?? PROTOCOLE}`,
+    `https://multi.freemicrogames.com/ws?jeu=${params.jeu ?? id}&regles=${params.regles ?? fiche.empreinte}&proto=${params.proto ?? PROTOCOLE}${params.partie ? `&partie=${params.partie}` : ''}`,
     { headers: { Upgrade: 'websocket', Origin: origine, ...entetes } },
   ), env);
+  return { worker, env, objets, etats, id, fiche, origine, connexion };
+}
+
+// Amis (docs/consigne-amis.md) : nom de la partie donné au lanceur, pseudos des
+// joueurs (ticket signé), partie d'un ami rejointe (« Rejoindre »), /partie.
+async function testerWorkerAmis(sujet, jeuxDuWorker) {
+  const { worker, env, objets, etats, id, fiche, origine, connexion } = await monterWorker(jeuxDuWorker, { MULTI_SECRET: 'secret-test', MAX_JOUEURS: '20' });
+  const { signerTicket } = await import(pathToFileURL(path.join(RACINE, 'multijoueur', 'src', 'ticket.js')).href);
+  const places = fiche.regles.places;
+  const etatPartie = async (nom) => (await (await worker.fetch(new FausseRequete(`https://multi.freemicrogames.com/partie?jeu=${id}&nom=${nom}`, { headers: { Origin: origine } }), env)).json?.()) ?? null;
+
+  const a = (await connexion()).webSocket;
+  const nomA = [...objets.PARTIE.keys()][0];
+  if (!a?.recus.some((m) => m.t === 'fmg-partie' && m.nom === nomA)) probleme(sujet, 'Worker : le lanceur ne reçoit pas le nom de sa partie ({ t: "fmg-partie" })');
+  const sockets = () => etats.get(`PARTIE:${nomA}`).sockets;
+  const serveurDe = (client) => sockets().find((x) => x.autre === client);
+  const ticket = await signerTicket('secret-test', { profil: 7, jeu: id, expiration: Date.now() + 60000, pseudo: 'Léa', numero: 4821 });
+  const partieA = objets.PARTIE.get(nomA);
+  await partieA.webSocketMessage(serveurDe(a), JSON.stringify({ t: 'profil', ticket }));
+  const siegeA = partieA.arbitre.sieges.indexOf(serveurDe(a).tags[0]);
+  const noms = [...a.recus].reverse().find((m) => m.t === 'noms');
+  if (!noms || noms.noms?.[siegeA]?.p !== 'Léa' || noms.noms[siegeA].u !== 4821) probleme(sujet, `Worker : pseudo du joueur (ticket) pas envoyé aux appareils ({ t: "noms" }) : ${JSON.stringify(noms)}`);
+
+  // Une autre partie se crée à côté (table pleine), puis un ami demande la partie A précise.
+  const etat1 = await etatPartie(nomA);
+  if (etat1?.etat !== 'ouverte') probleme(sujet, `Worker : /partie d'une partie avec des places : ${JSON.stringify(etat1)} au lieu de « ouverte »`);
+  const b = (await connexion({}, { partie: nomA })).webSocket;
+  if (!b?.recus.some((m) => m.t === 'fmg-partie' && m.nom === nomA)) probleme(sujet, 'Worker : « Rejoindre » ne mène pas dans la partie de l\'ami');
+  if (!b?.recus.some((m) => m.t === 'noms' && m.noms?.[siegeA]?.p === 'Léa')) probleme(sujet, 'Worker : l\'arrivant ne reçoit pas les pseudos des joueurs déjà là');
+  for (let k = 2; k < places; k++) await connexion({}, { partie: nomA });
+  const etat2 = await etatPartie(nomA);
+  if (etat2?.etat !== 'pleine') probleme(sujet, `Worker : /partie d'une partie pleine : ${JSON.stringify(etat2)} au lieu de « pleine »`);
+  const c = (await connexion({}, { partie: nomA })).webSocket;
+  const nomC = c?.recus.find((m) => m.t === 'fmg-partie')?.nom;
+  if (!nomC || nomC === nomA) probleme(sujet, 'Worker : partie de l\'ami pleine : le joueur devrait aller dans une autre partie (et le lanceur le voir)');
+  const inconnue = await etatPartie(`${id}.00000000-0000-4000-8000-000000000000`);
+  if (inconnue?.etat !== 'introuvable') probleme(sujet, `Worker : /partie d'une partie inconnue : ${JSON.stringify(inconnue)}`);
+  // Départ du joueur au pseudo : les autres reçoivent la liste à jour.
+  serveurDe(a).fermee = true;
+  await partieA.webSocketClose(serveurDe(a) || sockets()[0], 1001);
+  const apres = [...b.recus].reverse().find((m) => m.t === 'noms');
+  if (apres?.noms?.some((x) => x?.p === 'Léa')) probleme(sujet, 'Worker : après le départ d\'un joueur, son pseudo reste affiché');
+  noter(sujet, 'Worker (amis) : nom de la partie au lanceur, pseudos des joueurs, partie d\'un ami rejointe, partie pleine → autre partie, /partie');
+}
+
+async function testerWorker(sujet, jeuxDuWorker) {
+  const { worker, env, objets, etats, fiche, connexion } = await monterWorker(jeuxDuWorker);
 
   const etatRep = await worker.fetch(new FausseRequete('https://multi.freemicrogames.com/etat'), env);
   if (etatRep.status !== 200 || !(await etatRep.json()).version) probleme(sujet, 'Worker : /etat ne répond pas');
@@ -585,11 +637,16 @@ async function testerNavigateur(jeux) {
 
         // Le salon se remplit de vrais joueurs (nombre maximum de joueurs), puis le chef (la page) lance.
         for (let k = 2; k <= r.places; k++) { faux.add(`faux-${k}`); arbitre.rejoindre(`faux-${k}`); }
+        // Pseudos des vrais joueurs (comme partie.js : pseudo choisi, ou nombre du pseudo par défaut).
+        const PSEUDOS = ['Léa', 'Tom Pouce', null, 'Zoé', 'Malik', 'Inès', 'Hugo', 'Sacha', 'Lou'];
+        route?.send(JSON.stringify({ t: 'noms', noms: arbitre.sieges.map((c, s) => (c === null || c === 'page' ? null : PSEUDOS[s % PSEUDOS.length] ? { p: PSEUDOS[s % PSEUDOS.length] } : { u: 4821 })) }));
         await attendre(1000);
         await attendreFile(cadre);
         e = await etatJeu(cadre);
         const humains = e?.sieges?.filter((x) => x.humain).length ?? 0;
         if (humains !== r.places) probleme(sujet, `navigateur : ${r.places} vrais joueurs dans le salon, le jeu en montre ${humains}`);
+        const nommes = e?.sieges?.filter((x) => x.humain && !x.moi && x.nom).length ?? 0;
+        if (nommes !== r.places - 1) probleme(sujet, `navigateur : pseudos des autres joueurs non reçus par le jeu (${nommes} sur ${r.places - 1})`);
         await capturer('2-salon-plein.png');
         const lancer = cadre.locator('[data-multi="lancer"]').first();
         if (!(await lancer.isVisible().catch(() => false))) probleme(sujet, 'navigateur : le chef ne voit pas de bouton data-multi="lancer" dans le salon');
@@ -630,11 +687,60 @@ async function testerNavigateur(jeux) {
       for (const m of [...new Set(erreurs)].slice(0, 5)) probleme(sujet, `navigateur : ${m}`);
       noter(sujet, `navigateur : captures dans captures/multijoueur/${id}/`);
       await contexte.close();
+      if (fiches.get(id)?.rejoindre === true) await testerRejoindre(navigateur, base, id, r, dossier, sujet);
     }
   } finally {
     await navigateur.close();
     serveur.kill();
   }
+}
+
+// Bouton « Rejoindre » d'un ami (docs/consigne-amis.md, section 3) : le lanceur vérifie
+// la partie (GET /partie), puis le jeu va tout seul dans son salon, en la demandant au
+// serveur (&partie=…) ; partie pleine : message clair et « Ouvrir le jeu quand même ».
+const fiches = new Map();
+async function testerRejoindre(navigateur, base, id, r, dossier, sujet) {
+  const attendre = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  const nom = `${id}.0123abcd-0123-4567-89ab-0123456789ab`;
+  for (const etatPartie of ['ouverte', 'pleine']) {
+    const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR' });
+    const page = await contexte.newPage();
+    let adresseWs = null;
+    await page.route(/\/multi\/partie\?/, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ etat: etatPartie }) }));
+    const arbitre = new Arbitre(r, { salon: true, envoyer: (cle, m) => { if ((cle === null || cle === 'page') && ws) { try { ws.send(JSON.stringify(m)); } catch { /* fermée */ } } } });
+    let ws = null;
+    await page.routeWebSocket(/\/multi\/ws\?/, (w) => {
+      ws = w;
+      adresseWs = w.url();
+      w.onMessage((texte) => { if (texte === 'ping') w.send('pong'); else { try { arbitre.recevoir('page', JSON.parse(texte)); } catch { /* illisible */ } } });
+      arbitre.rejoindre('page');
+      arbitre.demarrer();
+    });
+    try {
+      await page.goto(`${base}/play.html?id=${id}&multi=ws://localhost:${PORT_TEST}/multi&rejoindre=${nom}`);
+      await attendre(4500);
+      const cadre = page.frames().find((f) => f.url() === 'about:srcdoc');
+      if (etatPartie === 'ouverte') {
+        const e = await cadre?.evaluate(() => { const p = window.JEL_MULTI?.derniere; return p ? { mode: p.mode, phase: p.phase } : null; }).catch(() => null);
+        if (e?.mode !== 'en-ligne' || e.phase !== 'salon') probleme(sujet, `navigateur (Rejoindre) : le jeu ne va pas tout seul dans le salon de la partie de l'ami (${JSON.stringify(e)})`);
+        if (!adresseWs || !adresseWs.includes(`partie=${encodeURIComponent(nom)}`)) probleme(sujet, `navigateur (Rejoindre) : la partie de l'ami n'est pas demandée au serveur (${adresseWs})`);
+        await page.screenshot({ path: path.join(dossier, '6-rejoindre.png') });
+      } else {
+        const visible = await page.locator('#rejoindre').isVisible().catch(() => false);
+        if (!visible) probleme(sujet, 'navigateur (Rejoindre) : partie de l\'ami pleine, pas de message clair dans le lanceur');
+        await page.screenshot({ path: path.join(dossier, '7-rejoindre-pleine.png') });
+        await page.locator('#rejoindre-ouvrir').click({ timeout: 5000 }).catch(() => {});
+        await attendre(2500);
+        const cadre2 = page.frames().find((f) => f.url() === 'about:srcdoc');
+        const e = await cadre2?.evaluate(() => (window.JEL_MULTI?.derniere ? window.JEL_MULTI.derniere.mode : 'aucune')).catch(() => null);
+        if (!cadre2 || adresseWs) probleme(sujet, `navigateur (Rejoindre) : « Ouvrir le jeu quand même » n'ouvre pas le jeu normalement (partie : ${e}, connexion : ${adresseWs})`);
+      }
+    } catch (err) {
+      probleme(sujet, `navigateur (Rejoindre) : ${err.message.split('\n')[0]}`);
+    }
+    await contexte.close();
+  }
+  noter(sujet, 'navigateur : Rejoindre (salon de la partie de l\'ami, partie pleine → message et « Ouvrir le jeu quand même »)');
 }
 
 // --------------------------------------------------------------------------
@@ -645,12 +751,28 @@ async function main() {
   // Moteur et Worker, avec le jeu d'essai.
   const essai = lireRegles(REGLES_ESSAI, 'moteur');
   if (essai) testerArbitre(essai, 'moteur');
+  // Amis (docs/consigne-amis.md) : pseudos des places et invitation « Rejoindre », côté jeu.
+  if (essai) {
+    const p = globalThis.JEL_MULTI.creer({ regles: essai });
+    p.mode = 'en-ligne';
+    p.humains = [true, false, true];
+    p.traiter({ t: 'noms', noms: ['Léa', 'Robot ?', 42] });
+    const s = p.sieges();
+    if (s[0].nom !== 'Léa' || s[1].nom !== null || s[2].nom !== null) probleme('moteur', `pseudos des places mal lus (sieges()[k].nom) : ${JSON.stringify(s)}`);
+    globalThis.JEL_REJOINDRE = { partie: 'jeu-d-essai.0123abcd-0123-4567-89ab-0123456789ab' };
+    if (globalThis.JEL_MULTI.invitation()?.partie !== globalThis.JEL_REJOINDRE.partie) probleme('moteur', 'JEL_MULTI.invitation() ne lit pas l\'invitation du lanceur');
+    globalThis.JEL_REJOINDRE = { partie: 'pas une partie' };
+    if (globalThis.JEL_MULTI.invitation() !== null) probleme('moteur', 'JEL_MULTI.invitation() accepte un nom de partie invalide');
+    delete globalThis.JEL_REJOINDRE;
+    noter('moteur', 'amis : pseudos des places (noms), invitation « Rejoindre »');
+  }
 
   // Fichier des règles du Worker à jour (ignoré par git), comme au déploiement.
   const tous = await jeuxMultijoueurs();
   const { texte } = await contenuWorker(tous);
   await writeFile(path.join(RACINE, 'multijoueur', 'src', 'jeux.js'), texte, 'utf8');
   if (essai) await testerWorker('worker', { 'jeu-d-essai': { empreinte: 'e'.repeat(64), regles: essai } });
+  if (essai) await testerWorkerAmis('worker', { 'jeu-d-essai-amis': { empreinte: 'f'.repeat(64), regles: essai } });
 
   const jeux = [];
   if (!moteurSeul) {
@@ -662,6 +784,7 @@ async function main() {
       const r = lireRegles(j.texte, j.id);
       if (!r) continue;
       if (j.fiche.places !== r.places) probleme(j.id, `"places" : ${j.fiche.places} dans game.json, ${r.places} dans les règles (une seule valeur, de 2 à 10)`);
+      fiches.set(j.id, j.fiche);
       testerArbitre(r, j.id);
       jeux.push({ id: j.id, regles: r });
     }

@@ -2,9 +2,14 @@
 // Free Micro Games — pastille du profil joueur (toutes les pages du site)
 //
 // Petite pastille dans le coin haut de l'écran (en-tête des pages, barre du
-// lanceur) : avatar et niveau du joueur. Un toucher ouvre un petit menu à deux
-// entrées : « Mon profil » et « Classement » (docs/cadrage-fidelisation.md,
-// sections 2 et 8).
+// lanceur) : avatar et niveau du joueur. Un toucher ouvre un petit menu à trois
+// entrées : « Mon profil », « Classement » et « Amis » (docs/cadrage-fidelisation.md,
+// sections 2 et 8 ; docs/consigne-amis.md, section 2). Un point doré sur la
+// pastille signale une demande d'ami en attente ; une annonce le dit aussi,
+// une fois, quand une nouvelle demande arrive.
+// Sur les pages du site (pas le lanceur, qui le fait lui-même), elle annonce la
+// présence « en ligne » aux amis (amis.js : seulement avec au moins un ami,
+// page visible).
 // Elle crée aussi le profil dès la première visite, envoie ce qui attend
 // (profil.js), affiche les gains (niveau, badges, jeu terminé), le message de
 // bienvenue au retour d'un jour à l'autre (accueil) et le check vert des jeux
@@ -16,7 +21,8 @@ import {
   etat, rafraichir, surChangement, marquerTermines, nomAffiche, pictoAvatar, derniereVisite, noterVisite,
 } from './profil.js';
 import { chargerTextes, t, langue, surChangementLangue } from './profil-textes.js';
-import { urlProfil, urlClassement, urlJeu } from './chemins.js';
+import { urlProfil, urlClassement, urlAmis, urlJeu } from './chemins.js';
+import { annoncer as annoncerPresence } from './amis.js';
 
 const DUREE_TOAST = 4500;
 let bouton = null;
@@ -30,10 +36,12 @@ function creerPastille() {
   boite.innerHTML = `
     <button type="button" class="pastille-bouton" aria-haspopup="true" aria-expanded="false">
       <span class="pastille-avatar" aria-hidden="true"></span><span class="pastille-niveau" aria-hidden="true"></span>
+      <span class="pastille-demande" aria-hidden="true" hidden></span>
     </button>
     <div class="pastille-menu" role="menu" hidden>
       <a role="menuitem" class="pastille-lien" data-lien="profil"></a>
       <a role="menuitem" class="pastille-lien" data-lien="classement"></a>
+      <a role="menuitem" class="pastille-lien" data-lien="amis"></a>
     </div>`;
   if (lanceur) {
     boite.classList.add('dans-lanceur');
@@ -65,14 +73,31 @@ function afficher() {
   avatar.textContent = pictoAvatar(e?.avatar);
   avatar.dataset.cadre = e?.cadre || 'aucun';
   bouton.querySelector('.pastille-niveau').textContent = e ? String(e.niveau) : '·';
-  bouton.setAttribute('aria-label', e ? t('profil.pastilleAria', { nom: nomAffiche(e, t), n: e.niveau }) : t('profil.pastille'));
+  // Demandes d'ami en attente : point doré sur la pastille, nombre dans le menu.
+  const demandes = e?.amis?.recues || 0;
+  bouton.querySelector('.pastille-demande').hidden = !demandes;
+  const aria = e ? t('profil.pastilleAria', { nom: nomAffiche(e, t), n: e.niveau }) : t('profil.pastille');
+  bouton.setAttribute('aria-label', demandes ? `${aria} · ${t('amis.pastilleDemandes', { n: demandes })}` : aria);
   bouton.title = bouton.getAttribute('aria-label');
-  const [profil, classement] = menu.querySelectorAll('a');
+  const [profil, classement, amis] = menu.querySelectorAll('a');
   profil.href = urlProfil(lang);
   profil.textContent = t('profil.monProfil');
   classement.href = urlClassement(lang);
   classement.textContent = t('classement.titre');
+  amis.href = urlAmis(lang);
+  amis.textContent = demandes ? t('amis.menuDemandes', { n: demandes }) : t('amis.menu');
+  amis.classList.toggle('avec-demande', !!demandes);
   marquerTermines(document, t('profil.termine'));
+  signalerDemandes(demandes);
+}
+
+// Annonce d'une nouvelle demande d'ami : une fois par hausse du nombre (pas à chaque page).
+const CLE_DEMANDES = 'fmg-amis-vues';
+function signalerDemandes(n) {
+  let vues = 0;
+  try { vues = Number(localStorage.getItem(CLE_DEMANDES)) || 0; } catch { /* stockage refusé */ }
+  if (n > vues && !document.body.classList.contains('page-amis')) toast(t('amis.toast.demandes', { n }));
+  if (n !== vues) { try { localStorage.setItem(CLE_DEMANDES, String(n)); } catch { /* tant pis */ } }
 }
 
 // --- Annonces (niveau, badges, jeu terminé) ----------------------------------------
@@ -173,7 +198,9 @@ async function demarrer() {
     requestAnimationFrame(() => { prevu = false; marquerTermines(document, t('profil.termine')); });
   }).observe(document.body, { childList: true, subtree: true });
   if (!derniereVisite()) noterVisite(new Date().toISOString().slice(0, 10));
-  rafraichir();
+  await rafraichir();
+  // Présence « en ligne » pour les amis (le lanceur annonce lui-même « en jeu »).
+  if (!document.querySelector('.barre-jeu')) annoncerPresence({ etat: 'site' });
 }
 
 demarrer();

@@ -150,7 +150,8 @@ export async function onRequestPost({ request, env }) {
       const jetonTurnstile = corps.turnstileToken;
       if (typeof jetonTurnstile !== 'string' || !jetonTurnstile || jetonTurnstile.length > 2048) return json({ erreur: 'Vérification anti-robot manquante.' }, 403);
       if (!(await verifierTurnstile(env.TURNSTILE_SECRET, jetonTurnstile, ip, 'multi'))) return json({ erreur: 'Vérification anti-robot échouée.' }, 403);
-      const ticket = await signerTicket(env.MULTI_SECRET, { profil: profil.id, jeu, expiration: maintenant + R.MULTI_TICKET_MINUTES * 60000 });
+      // Avec le pseudo affiché aux autres joueurs de la partie (docs/consigne-amis.md, section 3).
+      const ticket = await signerTicket(env.MULTI_SECRET, { profil: profil.id, jeu, expiration: maintenant + R.MULTI_TICKET_MINUTES * 60000, pseudo: profil.pseudo, numero: profil.numero });
       return json({ ticket });
     }
 

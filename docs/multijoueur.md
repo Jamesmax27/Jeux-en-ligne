@@ -5,7 +5,7 @@ Ce document décrit le multijoueur du site : architecture, Worker Cloudflare com
 ## 1. En bref
 
 - Un jeu multijoueur est un jeu du site comme les autres : un seul `index.html` dans `games/<id>/`, hébergé sur Cloudflare Pages, jouable **entièrement hors ligne contre des robots**.
-- En ligne, il se joue à plusieurs **sans compte ni pseudo ni discussion** : de vrais joueurs remplacent des robots. Les joueurs se retrouvent d'abord dans un **salon d'attente** où toutes les places vides sont tenues par des robots ; le premier arrivé (le « chef ») lance la partie quand il veut, avec 1 à N vrais joueurs (sur 4 places : 1 joueur et 3 robots, 2 et 2, 3 et 1, ou 4 joueurs). Sans lancement, elle part seule au bout de 90 s.
+- En ligne, il se joue à plusieurs **sans compte ni discussion** : de vrais joueurs remplacent des robots ; chacun voit le **pseudo** des autres (celui du profil joueur, filtré par le site, section 3 « Amis »). Les joueurs se retrouvent d'abord dans un **salon d'attente** où toutes les places vides sont tenues par des robots ; le premier arrivé (le « chef ») lance la partie quand il veut, avec 1 à N vrais joueurs (sur 4 places : 1 joueur et 3 robots, 2 et 2, 3 et 1, ou 4 joueurs). Sans lancement, elle part seule au bout de 90 s.
 - Le serveur est **un seul Worker Cloudflare commun** à tous les jeux multijoueurs (`multijoueur/`), sur le même compte que le site et la base des votes (pas de Firebase). Il fait tourner **un Durable Object par partie** : c'est l'arbitre. Joueurs et serveur se parlent par WebSocket.
 - Seules les **actions** des joueurs circulent (« je pose la clôture n° 12 »), jamais l'état complet du jeu en continu. Le même code de règles tourne sur le serveur et sur chaque appareil. Ils arrivent donc tous au même état.
 - Jeux **au tour par tour** (ou par manches) : c'est ce qui tient dans le plan gratuit de Cloudflare (section 7).
@@ -119,12 +119,17 @@ partie.lancer();
 
 - **Écran titre** : le bouton « Jouer » (le premier de l'écran, avec `JEL_SAVE.reprise`) lance le parcours solo de **20 niveaux au moins** contre des robots de plus en plus forts (règles de `CONSIGNES-JEU.md` : niveaux, étoiles, sauvegarde, tutoriel). Un second bouton, **« Avec d'autres joueurs »**, porte `data-multi="jouer"` (repère du robot de contrôle) et mène au salon d'attente de la partie en ligne (terrains variés tirés par l'arbitre).
 - **Salon d'attente** (en ligne) : les places (vrais joueurs et robots), le chef bien repéré, les arrivées et départs en direct, le compte à rebours du lancement automatique ; pour le chef, un gros bouton **« Lancer la partie »** avec `data-multi="lancer"` qui appelle `partie.lancerManche()` ; pour les autres, « le premier joueur arrivé lance la partie ». Après chaque manche : classement, puis le salon (« Lancer la manche suivante » pour le chef).
-- **Places** : chacune est montrée par une couleur ou un animal dessiné, avec un petit pictogramme « robot » ou « joueur » et « Toi » pour le joueur de l'appareil. **Aucun nom tapé, aucune discussion, aucun message libre** : les joueurs ne peuvent rien s'écrire.
+- **Places** : chacune est montrée par une couleur ou un animal dessiné, avec un petit pictogramme « robot » ou « joueur » et « Toi » pour le joueur de l'appareil ; un autre vrai joueur est nommé par son **pseudo** (ci-dessous, « Amis »). **Aucun nom tapé dans le jeu, aucune discussion, aucun message libre** : les joueurs ne peuvent rien s'écrire.
 - Messages traduits (5 langues) pour : recherche de joueurs ; salon (chef ou non, lancement automatique dans N s) ; « Personne n'est disponible : tu joues contre des robots » ; « Connexion perdue : la partie continue contre des robots » ; un joueur arrive ou part ; robot qui a joué à la place d'un joueur trop long.
 - **Lisible et fluide sur téléphone avec toutes les places occupées** (390 × 844) : tour en cours bien visible, scores de chaque place, rien de coupé.
 - **Pause** : en solo, elle fige tout ; en ligne, la partie continue sur le serveur (après `delaiJoueur`, le robot joue pour le joueur) : le menu le dit.
 - `FMG.reportEnd` à chaque fin de manche (en ligne aussi) : `completed: true` si le joueur gagne la manche, `false` sinon ; `level` = niveau ou terrain.
 - `FMG.reportComplete({ stars, maxStars })` (« jeu terminé », `CONSIGNES-JEU.md`) : seulement pour le parcours solo, quand ses 20 niveaux ont tous été gagnés ; jamais pour une manche en ligne (c'est le serveur qui crédite les manches en ligne au profil, section 12).
+
+### Amis : pseudos et bouton « Rejoindre » (obligatoires, `docs/consigne-amis.md`)
+
+- **Pseudos** : `partie.sieges()[s].nom` (ou `partie.nom(s)`) donne le pseudo du vrai joueur de la place `s` en ligne (pseudo choisi dans son profil, sinon « Joueur 4821 » déjà traduit par le lanceur), ou `null` (robot, joueur sans profil, sa propre place, solo). Le jeu l'affiche **à la place du libellé générique** (« Joueur », un numéro) : places et salon d'attente, tour en cours (« Au tour de Léa… »), classement et message de fin de manche ; « Toi » et « Robot » ne changent pas. Règle : `info.nom || libellé habituel`, en `textContent` (jamais `innerHTML`), tronqué proprement sur un canvas. Un événement `sieges` arrive quand les pseudos changent. `validate-games.mjs` vérifie que le code lit `sieges()` et `.nom`.
+- **Rejoindre** : la page Amis et le classement entre amis ouvrent `/play?id=<jeu>&rejoindre=<nom de la partie de l'ami>`. Le lanceur vérifie que la partie a une place (`GET /partie` du Worker), puis donne l'invitation au jeu (`window.JEL_REJOINDRE`). Le jeu, **à la fin de son initialisation** : `if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();` (la fonction du bouton `data-multi="jouer"`) ; le moteur demande alors la partie de l'ami au serveur à la première partie en ligne. Partie pleine, terminée ou serveur injoignable : le lanceur l'explique et propose « Ouvrir le jeu quand même » ; partie remplie entre-temps : le serveur en ouvre une autre et le lanceur le dit. Le jeu déclare `"rejoindre": true` dans `game.json` (obligatoire pour un jeu multijoueur ajouté depuis `REJOINDRE_DEPUIS`, `public/profil-reglages.js`) ; sans lui, le bouton ouvre simplement le jeu, et la page Amis le dit.
 
 ## 4. Les robots
 
@@ -148,6 +153,8 @@ partie.lancer();
 
 Serveur → joueurs : `bienvenue` (une fois, à l'arrivée : place, places des vrais joueurs, chef, état complet), `salon` (chef, temps avant le lancement automatique), `manche` (graine et options), `action` (place, action, graine, `auto`), `sieges` (avec la place du chef), `place` (place attribuée à un joueur qui attendait), `refus`. Joueur → serveur : `action` (numéro du coup attendu, action), `lancer` (le chef, dans le salon) et `resync` (état redemandé après un message perdu). `ping` reçoit `pong` sans réveiller le Durable Object. Un changement de format augmente `PROTOCOLE` dans `moteur.js` (le serveur refuse alors les anciennes copies : robots locaux).
 
+Ajoutés par `partie.js` autour de l'arbitre (amis, `docs/consigne-amis.md` ; un ancien moteur les ignore, `PROTOCOLE` ne change pas) : `fmg-partie` (au lanceur seulement, à l'arrivée : nom de la partie, identifiant de session montré aux amis), `noms` (pseudo de chaque place, `{ p, u }` ou `null`, tiré du ticket signé ; traduit par le lanceur puis passé au jeu). Adresse de connexion : `&partie=<nom>` en plus pour rejoindre la partie d'un ami (accueil : `prefere`). `GET /partie?jeu=&nom=` (lecture seule à l'accueil) : `ouverte`, `pleine`, `introuvable` ou `complet`.
+
 ## 7. Quota gratuit de Cloudflare
 
 Chiffres du plan Workers Free, lus dans la documentation Cloudflare le 29 octobre 2026 (pages « Durable Objects : Pricing » et « Limits ») :
@@ -164,6 +171,7 @@ Ce que le multijoueur fait pour rester dedans :
 - Par connexion : environ 4 requêtes (accueil, partie, deux comptes à l'accueil). Par coup d'un vrai joueur : 1/20 de requête et 1 ligne écrite (état de l'arbitre). Par partie en cours : environ 3 alarmes par minute au plus (1 requête et 1 ligne chacune). Les coups des robots ne coûtent rien de plus.
 - **Limite globale de vrais joueurs connectés** : `MAX_JOUEURS` dans `multijoueur/wrangler.toml` (80 par défaut). Au-delà, le jeu se joue contre des robots locaux.
 - **Plan gratuit** : une limite dépassée ne coûte rien. Les appels échouent jusqu'à minuit UTC, et les jeux passent alors aux robots locaux.
+- **Présence des amis** (`src/presence.js`, Durable Object unique « Presence », même Worker) : un signal par joueur qui a au moins un ami, toutes les 2 minutes de page visible (1 requête Worker et 1 requête Durable Object), une lecture par actualisation de la page Amis (2 requêtes Worker : le site, puis le Worker ; 1 requête Durable Object) ; état gardé en mémoire et recopié dans le stockage au plus toutes les 30 s (2 880 lignes par jour au plus). Estimations détaillées : `docs/consigne-amis.md`, section 8.
 - Ordre de grandeur : 300 parties d'un quart d'heure par jour, avec 10 coups de vrai joueur par minute, font 45 000 coups, soit environ 60 000 lignes écrites et 17 000 requêtes. **Les lignes écrites sont la limite la plus proche** (100 000 par jour) : de l'ordre de 500 parties d'un quart d'heure par jour. Au-delà, il faudra écrire l'état moins souvent (piste : seulement aux fins de manche et aux arrivées) ou passer au plan payant (décision du propriétaire).
 
 ## 8. Étiquette « Multi » et rubrique « Multijoueur »
@@ -187,6 +195,8 @@ Ce que le multijoueur fait pour rester dedans :
 | Robots crédibles et battables | victoires d'un joueur fort, variété des coups |
 | Lisible et fluide sur téléphone avec toutes les places occupées | `--navigateur` : faux serveur, table remplie de vrais joueurs, captures dans `captures/multijoueur/<id>/`, coupure du réseau (le jeu doit continuer en solo) ; puis relecture des captures |
 | Worker | sites permis, règles et protocole identiques, répartition, `MAX_JOUEURS`, partie libérée |
+| Pseudos des autres joueurs | Worker : `noms` à chaque arrivée et départ ; `--navigateur` : pseudos reçus par le jeu (`sieges()[s].nom`), capture du salon plein à relire (pseudos à la place de « Joueur ») |
+| Rejoindre un ami (`"rejoindre": true`) | Worker : partie demandée donnée si elle a une place, sinon une autre, `/partie` ; `--navigateur` : salon de la partie de l'ami ouvert tout seul, partie pleine → message et « Ouvrir le jeu quand même » |
 
 `validate-games.mjs` vérifie aussi `"multijoueur"` et `"places"`, le moteur `jel-multi` à jour, les règles `jel-regles` avant le code du jeu, `JEL_MULTI.creer`, le bouton `data-multi="jouer"` et le bouton du chef `data-multi="lancer"` (`partie.lancerManche()`).
 
@@ -209,7 +219,7 @@ Ce que le multijoueur fait pour rester dedans :
 
 ## 12. Données personnelles
 
-- Aucune donnée personnelle : ni compte, ni pseudo, ni message entre joueurs. Le lanceur envoie l'identifiant du jeu, l'empreinte de ses règles et les coups joués.
+- Aucune donnée personnelle : ni compte, ni message entre joueurs. Le lanceur envoie l'identifiant du jeu, l'empreinte de ses règles et les coups joués. Les autres joueurs de la partie voient le pseudo du profil (déjà public dans le classement, filtré par le site), jamais rien d'autre.
 - **Profil joueur** (`docs/cadrage-fidelisation.md`, section 8) : si le joueur a un profil, le lanceur demande au site un **ticket** (`POST /api/profil` `ticket`, après Turnstile, action `multi`) et l'envoie en premier message (`{ t: 'profil', ticket }`), sans attendre (la partie commence de toute façon). Le ticket, signé avec le secret `MULTI_SECRET` (`multijoueur/src/ticket.js`), contient le numéro du profil, le jeu et une expiration (30 min) ; `partie.js` le vérifie et range le numéro avec la connexion. Ce message n'est jamais transmis à l'arbitre : le protocole du moteur ne change pas. À la fin de chaque manche (retour au salon), `partie.js` calcule le résultat de chaque vrai joueur assis relié à un profil (`multijoueur/src/profil.js` : victoire = 1re place du classement des règles, nombre de vrais joueurs, durée, coups joués soi-même) et l'envoie au site (`POST https://freemicrogames.com/api/profil-multi`, `Authorization: Bearer <MULTI_SECRET>`, adresse : variable `SITE_API` de `wrangler.toml`), qui l'enregistre une seule fois par manche et par joueur. Manche de moins de 45 s ou moins de 3 coups joués soi-même : ignorée. Sans `MULTI_SECRET` (secret à poser dans Cloudflare Pages et dans le Worker : `npx wrangler secret put MULTI_SECRET`), les parties marchent comme avant, sans rien créditer.
 - Le Worker ne garde que l'état de la partie en cours (places, coups), effacé dès que le dernier joueur part. L'accueil ne garde que le nombre de joueurs par partie. Aucune adresse IP n'est enregistrée par le site (Cloudflare la voit, comme pour toute page).
 - Rien n'est écrit sur l'appareil pour le multijoueur. Politiques de confidentialité et de cookies : paragraphe « Parties à plusieurs ».
@@ -217,6 +227,6 @@ Ce que le multijoueur fait pour rester dedans :
 ## 13. Limites et pistes
 
 - Jeux au tour par tour seulement (temps réel : boucle sur le serveur, hors quota gratuit).
-- Pas de choix de partie ni d'invitation d'un ami (pas de code de partie) : les joueurs d'un même jeu se retrouvent au hasard.
+- Pas de choix de partie ni de code de partie : les joueurs d'un même jeu se retrouvent au hasard, sauf avec le bouton « Rejoindre » de la page Amis (partie d'un ami, `docs/consigne-amis.md`).
 - Pas de limite par adresse IP (un abus remplirait au pire `MAX_JOUEURS`, puis tout le monde jouerait contre des robots locaux) ; piste : règle de limite de débit de Cloudflare sur `multi.freemicrogames.com/ws`.
 - Un déploiement du Worker coupe les parties en cours (elles continuent sur l'appareil).

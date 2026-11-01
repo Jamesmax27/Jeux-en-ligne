@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Free Micro Games — moteur commun des jeux multijoueurs          jel-multi v2
+   Free Micro Games — moteur commun des jeux multijoueurs          jel-multi v3
    JavaScript pur, sans dépendance. Détails : docs/multijoueur.md.
 
    Le même fichier sert à trois endroits :
@@ -50,10 +50,18 @@
      { t: 'refus', n }                  action refusée
    Messages d'un joueur : { t: 'action', n, a }, { t: 'lancer' } (chef, dans le
    salon) et { t: 'resync' }.
+   Ajoutés par le serveur du site autour de l'arbitre (multijoueur/src/partie.js,
+   docs/consigne-amis.md ; un ancien moteur les ignore, le protocole ne change pas) :
+     { t: 'noms', noms }                pseudo des vrais joueurs, un texte (ou null) par place
+                                        (déjà traduit par le lanceur pour « Joueur 4821 »)
 
    API pour le jeu (window.JEL_MULTI) :
      creer({ regles, surEvenement, enLigne, force, options, enchainer })
                        partie (voir Partie plus bas) ; lancer() la démarre
+     invitation()      { partie } quand le jeu a été ouvert par le bouton « Rejoindre »
+                       d'un ami (window.JEL_REJOINDRE, posé par le lanceur), sinon null :
+                       le jeu ouvre alors tout de suite sa partie en ligne (salon),
+                       et la première partie en ligne lancée rejoint celle de l'ami
    Ce fichier ne doit contenir aucune balise script, ni ouverture ni fermeture
    (recopié dans le jeu, il tromperait la recherche des blocs jel-regles…).
    ========================================================================== */
@@ -69,6 +77,8 @@
 
   var DEFAUTS = { remplacement: 'tour', delaiBot: 700, delaiJoueur: 20000, pauseManche: 6000, attenteSalon: 90000, forceEnLigne: 0.6 };
   var FONCTIONS = ['depart', 'aQui', 'valide', 'jouer', 'bot', 'fin'];
+  var RE_PARTIE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  var NOM_MAX = 40;                // caractères d'un pseudo affiché
 
   // --- Outils ---------------------------------------------------------------
 
@@ -417,13 +427,23 @@
   //   enchainer     false : pas de nouvelle manche automatique en solo (jeu à niveaux)
   // }
   // Lecture : partie.mode, partie.etat, partie.siege (place du joueur, -1 en attente),
-  // partie.phase ('attente', 'salon', 'jeu', 'pause'), partie.sieges() ([{ humain, moi, chef }]),
+  // partie.phase ('attente', 'salon', 'jeu', 'pause'), partie.sieges() ([{ humain, moi, chef, nom }] ;
+  // nom : pseudo d'un vrai joueur en ligne, ou null — robot, ou joueur sans profil : libellé du jeu),
   // partie.chef (place du chef), partie.estChef(), partie.monTour(). Commandes : lancer(),
   // lancerManche() (le chef, dans le salon), jouer(action), pause(oui), recommencer(options)
   // (solo), quitter(). La dernière partie lancée est aussi dans JEL_MULTI.derniere.
 
   function dansLanceur() {
     try { return racine.parent && racine.parent !== racine; } catch (e) { return false; }
+  }
+
+  // Invitation du bouton « Rejoindre » (window.JEL_REJOINDRE = { partie }, posé par le
+  // lanceur) : { partie } ou null. Elle ne sert qu'une fois (première partie en ligne).
+  var invitationUtilisee = false;
+  function invitation() {
+    if (invitationUtilisee) return null;
+    var i = racine.JEL_REJOINDRE;
+    return i && typeof i.partie === 'string' && RE_PARTIE.test(i.partie) ? { partie: i.partie } : null;
   }
 
   function Partie(o) {
@@ -436,6 +456,7 @@
     this.phase = 'attente';
     this.siege = -1;
     this.humains = [];
+    this.noms = [];            // pseudo des vrais joueurs par place (en ligne), ou null
     this.chef = -1;            // place du chef du salon (en ligne)
     this.options = null;
     this.file = [];            // messages reçus, joués un par un
@@ -470,7 +491,10 @@
     if (this.o.enLigne !== false && dansLanceur()) {
       this.changerMode('connexion');
       racine.addEventListener('message', this.ecoute);
-      try { racine.parent.postMessage({ type: 'jel-multi', op: 'rejoindre', proto: PROTOCOLE }, '*'); } catch (e) { /* pas de lanceur */ }
+      var demande = { type: 'jel-multi', op: 'rejoindre', proto: PROTOCOLE };
+      var inv = invitation();
+      if (inv) { demande.partie = inv.partie; invitationUtilisee = true; }   // partie d'un ami (« Rejoindre »)
+      try { racine.parent.postMessage(demande, '*'); } catch (e) { /* pas de lanceur */ }
       var moi = this;
       this.minuteurConnexion = setTimeout(function () { moi.passerSolo('delai'); }, DELAI_CONNEXION);
     } else {
@@ -491,6 +515,7 @@
     this.local = null;
     this.versSolo = false;
     this.attendEcho = false;
+    this.noms = [];
     this.mode = 'arret';
   };
 
@@ -555,6 +580,7 @@
     });
     this.local = a;
     this.attendEcho = false;
+    this.noms = [];
     this.humains = a.flagsSieges();
     this.changerMode('solo', 'coupe');
     this.signaler({ type: 'sieges' });
@@ -653,6 +679,14 @@
         this.siege = m.siege;
         this.signaler({ type: 'sieges' });
         return 0;
+      case 'noms':
+        this.noms = [];
+        for (var k = 0; k < r.places; k++) {
+          var x = Array.isArray(m.noms) ? m.noms[k] : null;
+          this.noms.push(typeof x === 'string' && x ? x.slice(0, NOM_MAX) : null);
+        }
+        this.signaler({ type: 'sieges' });
+        return 0;
       case 'refus':
         this.attendEcho = false;
         this.signaler({ type: 'refus' });
@@ -673,9 +707,17 @@
   Partie.prototype.sieges = function () {
     var liste = [];
     for (var s = 0; s < this.r.places; s++) {
-      liste.push({ humain: this.humains[s] === true, moi: s === this.siege, chef: this.mode === 'en-ligne' && s === this.chef });
+      var humain = this.humains[s] === true;
+      var nom = this.mode === 'en-ligne' && humain && typeof this.noms[s] === 'string' ? this.noms[s] : null;
+      liste.push({ humain: humain, moi: s === this.siege, chef: this.mode === 'en-ligne' && s === this.chef, nom: nom });
     }
     return liste;
+  };
+
+  // Pseudo du vrai joueur de la place s (en ligne), ou null.
+  Partie.prototype.nom = function (s) {
+    var info = this.sieges()[s];
+    return info ? info.nom : null;
   };
 
   // Le joueur de l'appareil peut-il lancer la manche ? (en ligne, dans le salon, s'il est le chef)
@@ -753,5 +795,6 @@
     Arbitre: Arbitre,
     Partie: Partie,
     creer: function (o) { return new Partie(o); },
+    invitation: invitation,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

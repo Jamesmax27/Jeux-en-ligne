@@ -9,7 +9,8 @@
 // et les adresses de Cloudflare Pages : « /play » sert play.html, un dossier sert
 // son index.html, une adresse inconnue reçoit 404.html avec le code 404, et les
 // redirections de public/_redirects (adresses exactes, écrites par le build) s'appliquent.
-// L'API des votes n'existe pas en local ; celle du suivi des parties répond à vide.
+// L'API des votes n'existe pas en local ; celle du suivi des parties répond à vide ;
+// celles du profil, du classement et des amis tournent pour de vrai (base en mémoire).
 // TENDANCES_EXEMPLE=1 : /api/tendances renvoie les 24 premiers jeux du catalogue
 // (pour voir la bande « Tendances » ; sans la variable, elle reste cachée).
 //   PowerShell : $env:TENDANCES_EXEMPLE='1'; npm run dev
@@ -64,21 +65,55 @@ const CSP_JEUX = "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' b
 // MULTI_SECRET : code de sauvegarde à retrouver et ticket multijoueur
 // indisponibles (503), le reste marche ; sans adresse IP : pas de limite par
 // adresse (créations de profils, de codes…).
+// Amis (functions/api/amis.js, docs/consigne-amis.md) : même base ; la présence
+// des amis tourne ici aussi, avec le vrai code du Worker (multijoueur/src/presence.js)
+// et un faux stockage en mémoire, à l'adresse /multi/presence (MULTI_SECRET local).
 let apiLocale = null;
+let presenceLocale = null;
+const importer = (fichier) => import(new URL(`file:///${fichier.replace(/\\/g, '/')}`).href);
+
+function serveurPresenceLocal() {
+  if (!presenceLocale) {
+    presenceLocale = (async () => {
+      const { Presence, routePresence } = await importer(path.join(RACINE, '..', 'multijoueur', 'src', 'presence.js'));
+      const donnees = new Map();
+      const objet = new Presence({ storage: { get: async (k) => donnees.get(k), put: async (k, v) => { donnees.set(k, v); } } });
+      const env = {
+        MULTI_SECRET: 'secret-local',
+        PRESENCE: { idFromName: (n) => n, get: () => ({ fetch: (adresse, init) => objet.fetch(new Request(adresse, init)) }) },
+      };
+      return { routePresence, env };
+    })();
+  }
+  return presenceLocale;
+}
+
+async function appelerPresenceLocale(req, res, url) {
+  const { routePresence, env } = await serveurPresenceLocal();
+  const corps = await new Promise((ok) => { const morceaux = []; req.on('data', (m) => morceaux.push(m)); req.on('end', () => ok(Buffer.concat(morceaux))); });
+  const requete = new Request(new URL(url.pathname, `http://${req.headers.host}`), { method: req.method, headers: { ...req.headers }, body: req.method === 'POST' ? corps : undefined });
+  const origines = [`http://${req.headers.host}`, `http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+  const reponse = (await routePresence(requete, env, url.pathname.replace(/^\/multi/, ''), origines)) || new Response('Introuvable', { status: 404 });
+  res.writeHead(reponse.status, Object.fromEntries(reponse.headers)).end(Buffer.from(await reponse.arrayBuffer()));
+}
+
 async function appelerApiLocale(req, res, url) {
   if (!apiLocale) {
     apiLocale = (async () => {
       const { baseD1 } = await import('./d1-local.mjs');
       const fonctions = path.join(RACINE, '..', 'functions', 'api');
-      const charger = async (nom) => (await import(new URL(`file:///${path.join(fonctions, nom).replace(/\\/g, '/')}`).href)).onRequestPost;
+      const charger = async (nom) => (await importer(path.join(fonctions, nom))).onRequestPost;
       return {
         env: {
           DB: baseD1(),
           IP_SALT: 'sel-local',
+          MULTI_SECRET: 'secret-local',
+          MULTI_API: `http://localhost:${PORT}/multi`,
           ASSETS: { fetch: async () => new Response(await readFile(path.join(RACINE, 'catalog.json'))) },
         },
         '/api/profil': await charger('profil.js'),
         '/api/classement': await charger('classement.js'),
+        '/api/amis': await charger('amis.js'),
       };
     })();
   }
@@ -96,9 +131,13 @@ createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
 
-    if (url.pathname === '/api/profil' || url.pathname === '/api/classement') {
+    if (url.pathname === '/api/profil' || url.pathname === '/api/classement' || url.pathname === '/api/amis') {
       if (req.method !== 'POST') { res.writeHead(405).end(); return; }
       await appelerApiLocale(req, res, url);
+      return;
+    }
+    if (url.pathname === '/multi/presence' || url.pathname === '/multi/presence/lire') {
+      await appelerPresenceLocale(req, res, url);
       return;
     }
 

@@ -21,7 +21,9 @@
 // window.FMG.reportComplete quand tout le jeu est terminé (profil joueur,
 // "etoiles" ou "sans_fin" de game.json : controlerJeuTermine) ; dans
 // le navigateur, le lanceur doit fournir window.FMG. Jeux multijoueurs ("multijoueur": true) :
-// "places", moteur jel-multi à jour, règles jel-regles, bouton data-multi="jouer"
+// "places", moteur jel-multi à jour, règles jel-regles, bouton data-multi="jouer",
+// pseudos des autres joueurs affichés, "rejoindre" (bouton « Rejoindre » d'un ami,
+// obligatoire depuis REJOINDRE_DEPUIS : public/profil-reglages.js) et JEL_MULTI.invitation()
 // (controlerMultijoueur ; parties simulées : scripts/tester-multijoueur.mjs). Les textes de référencement de tous les jeux
 // (présentation, règles, titre et description pour Google…) et leurs longueurs
 // sont contrôlés par scripts/regles-seo.mjs et scripts/verifier-seo.mjs.
@@ -39,6 +41,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { problemesClassementJeu, RAPPEL_LISTES } from './controle-taxonomie.mjs';
+import { REJOINDRE_DEPUIS } from '../public/profil-reglages.js';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -98,6 +101,11 @@ async function controlerFiche(id, dossier) {
   if (f.multijoueur !== undefined && typeof f.multijoueur !== 'boolean') erreur(id, 'game.json : "multijoueur" doit valoir true ou false');
   if (f.multijoueur === true && !(Number.isInteger(f.places) && f.places >= 2 && f.places <= 10)) erreur(id, 'game.json : "places" (jeu multijoueur) doit être un nombre entier de 2 à 10, le même que dans les règles');
   if (f.multijoueur !== true && f.places !== undefined) erreur(id, 'game.json : "places" n\'existe que pour un jeu multijoueur ("multijoueur": true)');
+  // Bouton « Rejoindre » d'un ami (docs/consigne-amis.md, section 3) : obligatoire pour les nouveaux jeux multijoueurs.
+  if (f.rejoindre !== undefined && (f.rejoindre !== true || f.multijoueur !== true)) erreur(id, 'game.json : "rejoindre" vaut true, et seulement pour un jeu multijoueur (le jeu sait ouvrir la partie d\'un ami)');
+  if (f.multijoueur === true && f.rejoindre !== true && dateValide(f.added) && f.added >= REJOINDRE_DEPUIS) {
+    erreur(id, 'game.json : un nouveau jeu multijoueur doit accepter le bouton « Rejoindre » d\'un ami : "rejoindre": true, et JEL_MULTI.invitation() lue à l\'ouverture (docs/multijoueur.md, section 3)');
+  }
   // Profil joueur (CONSIGNES-JEU.md, « Jeu terminé et étoiles ») : étoiles possibles, ou jeu sans fin.
   if (f.etoiles !== undefined && !(Number.isInteger(f.etoiles) && f.etoiles >= 1 && f.etoiles <= 1500)) erreur(id, 'game.json : "etoiles" (étoiles possibles dans tout le jeu) doit être un entier de 1 à 1500');
   if (f.sans_fin !== undefined && f.sans_fin !== true) erreur(id, 'game.json : "sans_fin" vaut true (jeu qui ne se termine jamais) ou est absent');
@@ -177,6 +185,14 @@ function controlerMultijoueur(id, html) {
     erreur(id, 'multijoueur : le salon d\'attente doit avoir le bouton du chef « Lancer la partie » (data-multi="lancer", partie.lancerManche())');
   }
   if (/\bnew\s+WebSocket\b|\bfetch\s*\(/.test(code)) erreur(id, 'multijoueur : aucun accès réseau dans le jeu (c\'est le lanceur qui se connecte, voir docs/multijoueur.md)');
+  // Amis (docs/consigne-amis.md, section 3) : pseudos des autres joueurs à la place de « Joueur »,
+  // et, avec "rejoindre": true, ouverture directe de la partie d'un ami.
+  if (!/\.nom\b/.test(code) || !/\bsieges\s*\(\s*\)/.test(code)) {
+    erreur(id, 'multijoueur : le jeu doit afficher le pseudo des autres joueurs (partie.sieges()[s].nom, ou partie.nom(s)) à la place du libellé « Joueur » (places, salon, classement de fin)');
+  }
+  if (fiches.get(id)?.rejoindre === true && !/\bJEL_MULTI\.invitation\s*\(\s*\)/.test(code)) {
+    erreur(id, 'multijoueur : "rejoindre": true, mais le jeu ne lit pas JEL_MULTI.invitation() à l\'ouverture (il doit alors aller tout de suite dans la partie en ligne)');
+  }
 }
 
 // Statistiques de fin de partie (CONSIGNES-JEU.md, section 3 « Fin de partie ») :

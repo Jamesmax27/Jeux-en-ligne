@@ -5,8 +5,9 @@
 // le relit : avatar, pseudo (modifiable), niveau et expérience, rang de la
 // semaine, série de jours consécutifs, étoiles, jeux joués (derniers d'abord,
 // avec temps passé, étoiles, check vert et bouton « Rejouer »), badges,
-// parties en ligne, choix de l'avatar et du cadre, code de sauvegarde
-// (afficher, copier, ou relier cet appareil à un autre profil).
+// parties en ligne, amis (nombre, rang parmi eux cette semaine, mode
+// invisible : docs/consigne-amis.md), choix de l'avatar et du cadre, code de
+// sauvegarde (afficher, copier, ou relier cet appareil à un autre profil).
 // Page générée par scripts/pages-seo.mjs (gabarits/profil.html), non indexée.
 // ==========================================================================
 
@@ -18,6 +19,7 @@ import {
 } from './profil.js';
 import { chargerTextes, t, langue, date } from './profil-textes.js';
 import { urlJeu, urlLanceur, urlClassement } from './chemins.js';
+import { classementAmis, changerInvisible } from './amis.js';
 
 const $ = (id) => document.getElementById(id);
 let catalogue = new Map();
@@ -146,6 +148,11 @@ function afficher() {
     listeBadges.append(li);
   }
 
+  // Amis : nombre, mode invisible (le rang parmi les amis : afficherRangAmis).
+  const amis = e.amis || { amis: 0, recues: 0, invisible: false };
+  $('profil-amis-compte').textContent = t('profil.amis.compte', { n: amis.amis });
+  $('profil-invisible').checked = amis.invisible;
+
   // Parties en ligne.
   $('profil-multi').textContent = e.multi.parties
     ? t('profil.multi.resume', { n: e.multi.parties, v: e.multi.victoires, h: e.multi.humains })
@@ -196,6 +203,35 @@ async function afficherRang() {
   a.href = urlClassement(langue());
   a.textContent = t('profil.rang', { n: r.moi.rang });
   p.append(a);
+}
+
+// Rang parmi les amis cette semaine (classement entre amis, sans présence), avec un lien.
+async function afficherRangAmis() {
+  const p = $('profil-amis-rang');
+  if (!etat()?.amis?.amis) { p.hidden = true; return; }
+  const r = await classementAmis('general', 'semaine', false);
+  const moi = r.ok ? r.donnees.lignes?.find((l) => l.id === r.donnees.moi) : null;
+  if (!moi) { p.hidden = true; return; }
+  p.hidden = false;
+  p.textContent = '';
+  const a = document.createElement('a');
+  a.href = `${urlClassement(langue())}?portee=amis`;
+  a.textContent = t('profil.amis.rang', { n: moi.rang });
+  p.append(a);
+}
+
+function brancherInvisible() {
+  $('profil-invisible').addEventListener('change', async (ev) => {
+    const voulu = ev.target.checked;
+    $('profil-amis-message').textContent = t('profil.envoi');
+    const r = await changerInvisible(voulu);
+    if (!r.ok) {
+      ev.target.checked = !voulu;
+      $('profil-amis-message').textContent = t(r.hors ? 'profil.horsLigne' : 'profil.erreur');
+      return;
+    }
+    $('profil-amis-message').textContent = '';
+  });
 }
 
 // --- Pseudo ------------------------------------------------------------------------------
@@ -294,11 +330,13 @@ async function demarrer() {
   } catch { /* hors connexion : identifiants à la place des titres */ }
   brancherPseudo();
   brancherCode();
+  brancherInvisible();
   afficher();
   surChangement(() => afficher());
   await rafraichir();
   afficher();
   afficherRang();
+  afficherRangAmis();
 }
 
 demarrer();

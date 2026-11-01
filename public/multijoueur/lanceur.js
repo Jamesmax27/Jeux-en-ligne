@@ -24,11 +24,23 @@
 // au serveur de créditer ce profil à la fin de chaque manche
 // (docs/cadrage-fidelisation.md, section 8). Sans ticket, la partie se joue
 // de la même façon, sans gain pour le profil.
+//
+// Amis (docs/consigne-amis.md, section 3) :
+//   - « Rejoindre » : op 'rejoindre' avec partie (nom de la partie d'un ami,
+//     donné au jeu par window.JEL_REJOINDRE) → &partie=<nom> dans l'adresse ;
+//     verifierPartie(nom) dit avant d'ouvrir le jeu si elle a encore une place ;
+//   - le serveur dit au lanceur dans quelle partie il est ({ t: 'fmg-partie' },
+//     gardé ici, jamais transmis au jeu) : surPartie(nom, demandee) prévient
+//     play.js (présence des amis, message si la partie de l'ami était pleine) ;
+//   - pseudos des autres joueurs ({ t: 'noms' }) : traduits ici (nommer, pour
+//     « Joueur 4821 ») avant d'être transmis au jeu.
 // ==========================================================================
 
 import { ADRESSE_MULTI, SITES_MULTI } from './config.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export const RE_PARTIE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const DELAI_VERIFICATION = 5000;   // ms pour savoir si la partie d'un ami a une place
 const RE_REGLES = /<script\b[^>]*\bid=["']jel-regles["'][^>]*>([\s\S]*?)<\/script>/i;
 const MESSAGE_MAX = 4000;          // caractères d'un message du jeu vers le serveur
 const RECU_MAX = 200000;           // caractères d'un message du serveur (état complet à l'arrivée)
@@ -59,14 +71,50 @@ function adresseServeur() {
   return SITES_MULTI.includes(location.hostname) ? ADRESSE_MULTI : null;
 }
 
+/**
+ * La partie « nom » (d'un ami) du jeu peut-elle être rejointe ? Une lecture au
+ * Worker (GET /partie). Renvoie 'ouverte', 'pleine', 'introuvable' (terminée),
+ * 'complet' (serveur plein) ou 'indisponible' (pas de serveur ici, hors connexion, panne).
+ */
+export async function verifierPartie(jeuId, nom) {
+  const adresse = adresseServeur();
+  if (!adresse || !RE_PARTIE.test(nom || '') || !nom.startsWith(`${jeuId}.`) || navigator.onLine === false) return 'indisponible';
+  try {
+    const http = adresse.replace(/^ws/, 'http');
+    const r = await fetch(`${http}/partie?jeu=${encodeURIComponent(jeuId)}&nom=${encodeURIComponent(nom)}`, {
+      signal: AbortSignal.timeout ? AbortSignal.timeout(DELAI_VERIFICATION) : undefined,
+    });
+    const d = r.ok ? await r.json() : null;
+    return ['ouverte', 'pleine', 'introuvable', 'complet'].includes(d?.etat) ? d.etat : 'indisponible';
+  } catch {
+    return 'indisponible';
+  }
+}
+
 // À appeler une fois le jeu chargé. jeu : fiche du catalogue ; html : code du
 // jeu ; cadre : l'iframe ; ticket : fonction facultative qui renvoie (promesse)
-// le ticket du profil joueur ou null. Renvoie { recevoir(message du jeu), fermer() }.
-export function brancherMultijoueur({ jeu, html, cadre, ticket }) {
+// le ticket du profil joueur ou null ; nommer(n) : « Joueur <n> » dans la langue
+// affichée ; surPartie(nom | null, demandee | null) : partie en ligne rejointe
+// ou quittée. Renvoie { recevoir(message du jeu), fermer() }.
+export function brancherMultijoueur({ jeu, html, cadre, ticket, nommer, surPartie }) {
   let ws = null;
   let ping = 0;
   let cacheeDepuis = 0;
   let minuteurCache = 0;
+  let partieEnCours = null;           // nom de la partie en ligne (« fmg-partie » du serveur)
+
+  const annoncerPartie = (nom, demandee) => {
+    if (nom === partieEnCours) return;
+    partieEnCours = nom;
+    try { surPartie?.(nom, demandee); } catch (e) { console.warn(e); }
+  };
+
+  // Pseudos reçus du serveur → textes affichés par le jeu (pseudo choisi, sinon « Joueur <nombre> »).
+  const textesNoms = (noms) => (Array.isArray(noms) ? noms : []).slice(0, 10).map((x) => {
+    if (!x || typeof x !== 'object') return null;
+    if (typeof x.p === 'string' && x.p) return x.p.slice(0, 40);
+    return Number.isSafeInteger(x.u) && typeof nommer === 'function' ? nommer(x.u) : null;
+  });
 
   const versJeu = (message) => {
     try { cadre.contentWindow?.postMessage({ type: 'jel-multi', ...message }, '*'); } catch { /* cadre rechargé */ }
@@ -80,9 +128,10 @@ export function brancherMultijoueur({ jeu, html, cadre, ticket }) {
       socket.onopen = socket.onmessage = socket.onclose = socket.onerror = null;
       try { socket.close(1000, 'fin'); } catch { /* déjà fermée */ }
     }
+    annoncerPartie(null, null);
   }
 
-  async function rejoindre(proto) {
+  async function rejoindre(proto, partie) {
     fermer();
     const adresse = adresseServeur();
     // Lanceur caché dans le cadre d'un autre site, ou piloté par une autre fenêtre : pas de partie en ligne.
@@ -92,9 +141,11 @@ export function brancherMultijoueur({ jeu, html, cadre, ticket }) {
     const regles = await empreinte(texteRegles(html));
     if (!regles) return versJeu({ etat: 'solo', raison: 'regles' });
 
+    // Partie d'un ami (« Rejoindre ») : demandée au serveur, qui la donne si elle a encore une place.
+    const demandee = typeof partie === 'string' && RE_PARTIE.test(partie) && partie.startsWith(`${jeu.id}.`) ? partie : null;
     let socket;
     try {
-      socket = new WebSocket(`${adresse}/ws?jeu=${encodeURIComponent(jeu.id)}&regles=${regles}&proto=${proto}`);
+      socket = new WebSocket(`${adresse}/ws?jeu=${encodeURIComponent(jeu.id)}&regles=${regles}&proto=${proto}${demandee ? `&partie=${encodeURIComponent(demandee)}` : ''}`);
     } catch {
       return versJeu({ etat: 'solo', raison: 'reseau' });
     }
@@ -115,7 +166,14 @@ export function brancherMultijoueur({ jeu, html, cadre, ticket }) {
       if (socket !== ws || typeof e.data !== 'string' || e.data.length > RECU_MAX || e.data === 'pong') return;
       let m;
       try { m = JSON.parse(e.data); } catch { return; }
-      if (m && typeof m === 'object') versJeu({ m });
+      if (!m || typeof m !== 'object') return;
+      // Nom de la partie : pour le lanceur seulement (présence des amis), jamais pour le jeu.
+      if (m.t === 'fmg-partie') {
+        if (typeof m.nom === 'string' && RE_PARTIE.test(m.nom)) annoncerPartie(m.nom, demandee);
+        return;
+      }
+      if (m.t === 'noms') { versJeu({ m: { t: 'noms', noms: textesNoms(m.noms) } }); return; }
+      versJeu({ m });
     };
     socket.onclose = socket.onerror = () => {
       if (socket !== ws) return;
@@ -141,7 +199,7 @@ export function brancherMultijoueur({ jeu, html, cadre, ticket }) {
 
   return {
     recevoir(donnees) {
-      if (donnees.op === 'rejoindre') rejoindre(donnees.proto);
+      if (donnees.op === 'rejoindre') rejoindre(donnees.proto, donnees.partie);
       else if (donnees.op === 'quitter') fermer();
       else if (donnees.op === 'envoyer' && ws?.readyState === 1) {
         let texte;

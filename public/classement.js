@@ -8,12 +8,21 @@
 // d'abord sa propre position ; en la touchant, il ouvre le top 100.
 // Chaque pseudo peut être signalé (🚩) : après plusieurs signalements de
 // joueurs différents, il redevient « Joueur <nombre> » (functions/api/profil.js).
+// Troisième choix, « Parmi » : tous les joueurs, ou mes amis (docs/consigne-amis.md,
+// section 4) : moi et mes amis acceptés, même calcul, avec le statut de chacun
+// et le bouton « Rejoindre » ; actualisé toutes les 30 s tant que la page est
+// visible, « Actualiser » au plus toutes les 10 s (amis.js). ?portee=amis l'ouvre.
 // Page générée par scripts/pages-seo.mjs (gabarits/classement.html), non indexée.
 // ==========================================================================
 
 import * as R from './profil-reglages.js';
 import { classement, etat, rafraichir, pictoAvatar, signaler } from './profil.js';
 import { chargerTextes, t, langue, date } from './profil-textes.js';
+import { classementAmis, actualisation, elementsPresence, annoncer } from './amis.js';
+
+let catalogue = new Map();
+let suiviAmis = null;     // actualisation du classement entre amis (amis.js)
+const titreJeu = (fiche) => (fiche ? fiche.i18n?.[langue()]?.title || fiche.title : '');
 
 const $ = (id) => document.getElementById(id);
 const MEDAILLES = { 1: 'or', 2: 'argent', 3: 'bronze' };
@@ -26,7 +35,7 @@ function points(perimetre, n) {
   return t(perimetre === 'etoiles' ? 'classement.pointsEtoiles' : 'classement.pointsXp', { n });
 }
 
-function ligneHtml(ligne, perimetre, moiId) {
+function ligneHtml(ligne, perimetre, moiId, { sansSignaler = false } = {}) {
   const li = document.createElement('li');
   li.className = 'classement-ligne';
   if (MEDAILLES[ligne.rang]) li.classList.add(`medaille-${MEDAILLES[ligne.rang]}`);
@@ -40,7 +49,7 @@ function ligneHtml(ligne, perimetre, moiId) {
   li.querySelector('.classement-nom').textContent = nom(ligne) + (ligne.id === moiId ? ` (${t('classement.toi')})` : '');
   li.querySelector('.classement-niveau').textContent = t('classement.niveau', { n: ligne.niveau });
   li.querySelector('.classement-points').textContent = points(perimetre, ligne.points);
-  if (ligne.id !== moiId) {
+  if (ligne.id !== moiId && !sansSignaler) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'classement-signaler';
@@ -58,7 +67,52 @@ function ligneHtml(ligne, perimetre, moiId) {
   return li;
 }
 
+// Classement entre amis : moi et mes amis, avec leur statut et « Rejoindre ».
+async function chargerAmis() {
+  const perimetre = $('classement-perimetre').value;
+  const periode = $('classement-periode').value;
+  const liste = $('classement-liste');
+  const r = await classementAmis(perimetre, periode, true);
+  if (r.hors) { $('classement-etat').textContent = t('amis.horsLigne'); return {}; }
+  if (!r.ok) { $('classement-etat').textContent = t('amis.erreur'); return r.statut >= 500 ? { arreter: true } : {}; }
+  const d = r.donnees;
+  $('classement-etat').textContent = '';
+  $('classement-aide').textContent = t(periode === 'mois' ? 'classement.depuisMois' : 'classement.depuisSemaine', { date: date(Date.parse(`${d.debut}T00:00:00Z`), { day: 'numeric', month: 'long' }) });
+  $('classement-amis-vide').hidden = d.lignes.some((l) => l.ami);
+  $('classement-presence').hidden = d.presence !== 'indisponible';
+  liste.hidden = false;
+  liste.textContent = '';
+  for (const ligne of d.lignes) {
+    const li = ligneHtml(ligne, perimetre, d.moi, { sansSignaler: true });
+    if (ligne.ami) {
+      const el = elementsPresence({ ...ligne, nom: nom(ligne) }, { t, lang: langue(), catalogue, titre: titreJeu, presence: d.presence });
+      const bloc = document.createElement('span');
+      bloc.className = 'classement-presence';
+      bloc.append(el.statut);
+      if (el.bouton) bloc.append(el.bouton);
+      li.classList.add('avec-presence');
+      li.append(bloc);
+    }
+    liste.append(li);
+  }
+  if (d.presence === 'ok') $('classement-maj').textContent = t('amis.majLe', { heure: date(Date.now(), { hour: '2-digit', minute: '2-digit', second: '2-digit' }) });
+  return d.presence === 'trop-tot' ? { attendre: d.attendre } : {};
+}
+
 async function charger() {
+  const amis = $('classement-portee').value === 'amis';
+  $('classement-amis-barre').hidden = !amis;
+  $('classement-moi').hidden = true;
+  $('classement-amis-vide').hidden = true;
+  $('classement-presence').hidden = true;
+  if (amis) {
+    $('classement-etat').textContent = t('profil.chargement');
+    $('classement-liste').textContent = '';
+    if (suiviAmis) suiviAmis.forcer();
+    else suiviAmis = actualisation(chargerAmis, { bouton: $('classement-actualiser'), t });
+    return;
+  }
+  suiviAmis?.arreter();
   const perimetre = $('classement-perimetre').value;
   const periode = $('classement-periode').value;
   const liste = $('classement-liste');
@@ -97,9 +151,11 @@ async function charger() {
 async function demarrer() {
   await chargerTextes();
   // Un choix par jeu multijoueur du catalogue.
+  annoncer({ etat: 'site' });
   try {
     const c = await (await fetch('/catalog.json')).json();
     const lang = langue();
+    catalogue = new Map((c.games || []).map((j) => [j.id, j]));
     for (const jeu of (c.games || []).filter((j) => j.multijoueur === true)) {
       const option = document.createElement('option');
       option.value = `multi:${jeu.id}`;
@@ -109,8 +165,10 @@ async function demarrer() {
   } catch { /* hors connexion */ }
   const demande = new URLSearchParams(location.search).get('jeu');
   if (demande && [...$('classement-perimetre').options].some((o) => o.value === `multi:${demande}`)) $('classement-perimetre').value = `multi:${demande}`;
+  if (new URLSearchParams(location.search).get('portee') === 'amis') $('classement-portee').value = 'amis';
   $('classement-perimetre').addEventListener('change', charger);
   $('classement-periode').addEventListener('change', charger);
+  $('classement-portee').addEventListener('change', charger);
   await rafraichir();
   charger();
 }

@@ -24,6 +24,14 @@
 // de chaque manche, les résultats des joueurs reliés à un profil et assez
 // présents (durée, coups joués soi-même) partent vers le site (src/profil.js).
 // Ce message n'est pas transmis à l'arbitre : le protocole du moteur ne change pas.
+//
+// Amis (docs/consigne-amis.md) : à l'arrivée, le lanceur reçoit le nom de la
+// partie ({ t: 'fmg-partie', nom }, gardé par le lanceur : c'est l'identifiant
+// de session que la présence montre aux amis pour le bouton « Rejoindre ») ;
+// et chaque appareil reçoit le pseudo des vrais joueurs assis
+// ({ t: 'noms', noms: [{ p: pseudo, u: nombre du pseudo par défaut } | null
+// par place] }), tiré de leur ticket (vérifié par le site), à chaque changement.
+// Un ancien moteur ignore ces deux messages.
 // ==========================================================================
 
 import { Arbitre } from './moteur.js';
@@ -46,6 +54,7 @@ export class Partie {
     this.debits = new Map();     // cle → { debut, nombre } (en mémoire seulement)
     this.suivi = null;           // manche en cours : début, coups joués par chaque vrai joueur (profil)
     this.aEnvoyer = [];          // résultats de manche à envoyer au site (profil)
+    this.nomsEnvoyes = null;     // derniers pseudos envoyés (texte JSON, mémoire seulement)
     if (typeof WebSocketRequestResponsePair !== 'undefined') {
       state.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
     }
@@ -74,6 +83,26 @@ export class Partie {
       try { const p = ws.deserializeAttachment()?.profil; if (p) return p; } catch { /* connexion fermée */ }
     }
     return null;
+  }
+
+  // Pseudo d'un vrai joueur (ticket présenté), ou null.
+  nomDe(cle) {
+    for (const ws of this.state.getWebSockets(cle)) {
+      try { const n = ws.deserializeAttachment()?.nom; if (n) return n; } catch { /* connexion fermée */ }
+    }
+    return null;
+  }
+
+  // Pseudos des places (null : robot, ou joueur sans profil), envoyés à tous quand
+  // ils changent, et à un arrivant (cle) dans tous les cas.
+  envoyerNoms(cle = null) {
+    if (!this.arbitre) return;
+    const noms = this.arbitre.sieges.map((c) => (c === null ? null : this.nomDe(c)));
+    const texte = JSON.stringify(noms);
+    if (texte === this.nomsEnvoyes && !cle) return;
+    const message = { t: 'noms', noms };
+    if (texte !== this.nomsEnvoyes) { this.nomsEnvoyes = texte; this.diffuser(null, message); }
+    else this.diffuser(cle, message);
   }
 
   // Observe ce que l'arbitre annonce : début de manche, coups des vrais joueurs,
@@ -156,6 +185,9 @@ export class Partie {
       return new Response('Partie pleine', { status: 409 });
     }
     this.arbitre.demarrer();
+    // Pour le lanceur : nom de la partie (présence des amis, « Rejoindre ») ; puis les pseudos.
+    this.diffuser(cle, { t: 'fmg-partie', nom: this.infos.nom });
+    this.envoyerNoms(cle);
     await this.sauver();
     await this.signaler();
     return new Response(null, { status: 101, webSocket: client });
@@ -179,10 +211,14 @@ export class Partie {
     // Ticket du profil joueur (envoyé par le lanceur, pas par le jeu).
     if (m?.t === 'profil') {
       const ticket = await verifierTicket(this.env.MULTI_SECRET, m.ticket, this.infos.jeu);
-      if (ticket) ws.serializeAttachment({ cle, profil: ticket.profil });
+      if (ticket) {
+        ws.serializeAttachment({ cle, profil: ticket.profil, nom: { p: ticket.pseudo, u: ticket.numero } });
+        this.envoyerNoms();
+      }
       return;
     }
     this.arbitre.recevoir(cle, m);
+    this.envoyerNoms();
     await this.sauver();
   }
 
@@ -202,7 +238,7 @@ export class Partie {
     if (!cle || !(await this.charger())) return;
     this.arbitre.quitter(cle);
     if (this.arbitre.estVide()) await this.liberer();
-    else await this.sauver();
+    else { this.envoyerNoms(); await this.sauver(); }
     await this.signaler();
   }
 
@@ -220,6 +256,7 @@ export class Partie {
       return;
     }
     this.arbitre.reveil();
+    this.envoyerNoms();
     await this.sauver();
   }
 }

@@ -150,8 +150,10 @@
   "msg.arriveToast": "Tu passes la ligne : {rang} !",
   "msg.aspireToast": "Aspiré ! Regarde la fin de la course.",
   "msg.arriveAutre": "Capsule {pilote} : ligne franchie, {rang}",
+  "msg.arriveNom": "{nom} : ligne franchie, {rang}",
   "tour.toi": "À toi de piloter !",
   "tour.autre": "Capsule {pilote} pilote…",
+  "tour.nom": "{nom} pilote…",
   "tour.attends": "Attends ton tour",
   "jeu.niveau": "Circuit {n}/{total}",
   "jeu.enLigne": "En ligne · course {n}",
@@ -345,8 +347,10 @@
   "msg.arriveToast": "You cross the line: {rang}!",
   "msg.aspireToast": "Sucked in! Watch the end of the race.",
   "msg.arriveAutre": "{pilote} capsule: line crossed, {rang}",
+  "msg.arriveNom": "{nom}: line crossed, {rang}",
   "tour.toi": "Your turn to pilot!",
   "tour.autre": "{pilote} capsule is piloting…",
+  "tour.nom": "{nom} is piloting…",
   "tour.attends": "Wait for your turn",
   "jeu.niveau": "Circuit {n}/{total}",
   "jeu.enLigne": "Online · race {n}",
@@ -540,8 +544,10 @@
   "msg.arriveToast": "Cruzas la meta: ¡{rang}!",
   "msg.aspireToast": "¡Tragado! Mira el final de la carrera.",
   "msg.arriveAutre": "Cápsula {pilote}: meta cruzada, {rang}",
+  "msg.arriveNom": "{nom}: meta cruzada, {rang}",
   "tour.toi": "¡Te toca pilotar!",
   "tour.autre": "La cápsula {pilote} pilota…",
+  "tour.nom": "{nom} pilota…",
   "tour.attends": "Espera tu turno",
   "jeu.niveau": "Circuito {n}/{total}",
   "jeu.enLigne": "En línea · carrera {n}",
@@ -735,8 +741,10 @@
   "msg.arriveToast": "Você cruza a chegada: {rang}!",
   "msg.aspireToast": "Sugado! Veja o fim da corrida.",
   "msg.arriveAutre": "Cápsula {pilote}: chegada cruzada, {rang}",
+  "msg.arriveNom": "{nom}: chegada cruzada, {rang}",
   "tour.toi": "Sua vez de pilotar!",
   "tour.autre": "A cápsula {pilote} está pilotando…",
+  "tour.nom": "{nom} está pilotando…",
   "tour.attends": "Espere a sua vez",
   "jeu.niveau": "Circuito {n}/{total}",
   "jeu.enLigne": "On-line · corrida {n}",
@@ -930,8 +938,10 @@
   "msg.arriveToast": "Du bist im Ziel: {rang} Platz!",
   "msg.aspireToast": "Eingesaugt! Schau dir das Ende des Rennens an.",
   "msg.arriveAutre": "Kapsel {pilote} ist im Ziel: {rang} Platz",
+  "msg.arriveNom": "{nom} ist im Ziel: {rang} Platz",
   "tour.toi": "Du bist dran!",
   "tour.autre": "Kapsel {pilote} steuert…",
+  "tour.nom": "{nom} steuert…",
   "tour.attends": "Warte, bis du dran bist",
   "jeu.niveau": "Strecke {n}/{total}",
   "jeu.enLigne": "Online · Rennen {n}",
@@ -1800,7 +1810,7 @@
 </script>
 <script id="jel-multi">
 /* ==========================================================================
-   Free Micro Games — moteur commun des jeux multijoueurs          jel-multi v2
+   Free Micro Games — moteur commun des jeux multijoueurs          jel-multi v3
    JavaScript pur, sans dépendance. Détails : docs/multijoueur.md.
 
    Le même fichier sert à trois endroits :
@@ -1851,10 +1861,18 @@
      { t: 'refus', n }                  action refusée
    Messages d'un joueur : { t: 'action', n, a }, { t: 'lancer' } (chef, dans le
    salon) et { t: 'resync' }.
+   Ajoutés par le serveur du site autour de l'arbitre (multijoueur/src/partie.js,
+   docs/consigne-amis.md ; un ancien moteur les ignore, le protocole ne change pas) :
+     { t: 'noms', noms }                pseudo des vrais joueurs, un texte (ou null) par place
+                                        (déjà traduit par le lanceur pour « Joueur 4821 »)
 
    API pour le jeu (window.JEL_MULTI) :
      creer({ regles, surEvenement, enLigne, force, options, enchainer })
                        partie (voir Partie plus bas) ; lancer() la démarre
+     invitation()      { partie } quand le jeu a été ouvert par le bouton « Rejoindre »
+                       d'un ami (window.JEL_REJOINDRE, posé par le lanceur), sinon null :
+                       le jeu ouvre alors tout de suite sa partie en ligne (salon),
+                       et la première partie en ligne lancée rejoint celle de l'ami
    Ce fichier ne doit contenir aucune balise script, ni ouverture ni fermeture
    (recopié dans le jeu, il tromperait la recherche des blocs jel-regles…).
    ========================================================================== */
@@ -1870,6 +1888,8 @@
 
   var DEFAUTS = { remplacement: 'tour', delaiBot: 700, delaiJoueur: 20000, pauseManche: 6000, attenteSalon: 90000, forceEnLigne: 0.6 };
   var FONCTIONS = ['depart', 'aQui', 'valide', 'jouer', 'bot', 'fin'];
+  var RE_PARTIE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  var NOM_MAX = 40;                // caractères d'un pseudo affiché
 
   // --- Outils ---------------------------------------------------------------
 
@@ -2218,13 +2238,23 @@
   //   enchainer     false : pas de nouvelle manche automatique en solo (jeu à niveaux)
   // }
   // Lecture : partie.mode, partie.etat, partie.siege (place du joueur, -1 en attente),
-  // partie.phase ('attente', 'salon', 'jeu', 'pause'), partie.sieges() ([{ humain, moi, chef }]),
+  // partie.phase ('attente', 'salon', 'jeu', 'pause'), partie.sieges() ([{ humain, moi, chef, nom }] ;
+  // nom : pseudo d'un vrai joueur en ligne, ou null — robot, ou joueur sans profil : libellé du jeu),
   // partie.chef (place du chef), partie.estChef(), partie.monTour(). Commandes : lancer(),
   // lancerManche() (le chef, dans le salon), jouer(action), pause(oui), recommencer(options)
   // (solo), quitter(). La dernière partie lancée est aussi dans JEL_MULTI.derniere.
 
   function dansLanceur() {
     try { return racine.parent && racine.parent !== racine; } catch (e) { return false; }
+  }
+
+  // Invitation du bouton « Rejoindre » (window.JEL_REJOINDRE = { partie }, posé par le
+  // lanceur) : { partie } ou null. Elle ne sert qu'une fois (première partie en ligne).
+  var invitationUtilisee = false;
+  function invitation() {
+    if (invitationUtilisee) return null;
+    var i = racine.JEL_REJOINDRE;
+    return i && typeof i.partie === 'string' && RE_PARTIE.test(i.partie) ? { partie: i.partie } : null;
   }
 
   function Partie(o) {
@@ -2237,6 +2267,7 @@
     this.phase = 'attente';
     this.siege = -1;
     this.humains = [];
+    this.noms = [];            // pseudo des vrais joueurs par place (en ligne), ou null
     this.chef = -1;            // place du chef du salon (en ligne)
     this.options = null;
     this.file = [];            // messages reçus, joués un par un
@@ -2271,7 +2302,10 @@
     if (this.o.enLigne !== false && dansLanceur()) {
       this.changerMode('connexion');
       racine.addEventListener('message', this.ecoute);
-      try { racine.parent.postMessage({ type: 'jel-multi', op: 'rejoindre', proto: PROTOCOLE }, '*'); } catch (e) { /* pas de lanceur */ }
+      var demande = { type: 'jel-multi', op: 'rejoindre', proto: PROTOCOLE };
+      var inv = invitation();
+      if (inv) { demande.partie = inv.partie; invitationUtilisee = true; }   // partie d'un ami (« Rejoindre »)
+      try { racine.parent.postMessage(demande, '*'); } catch (e) { /* pas de lanceur */ }
       var moi = this;
       this.minuteurConnexion = setTimeout(function () { moi.passerSolo('delai'); }, DELAI_CONNEXION);
     } else {
@@ -2292,6 +2326,7 @@
     this.local = null;
     this.versSolo = false;
     this.attendEcho = false;
+    this.noms = [];
     this.mode = 'arret';
   };
 
@@ -2356,6 +2391,7 @@
     });
     this.local = a;
     this.attendEcho = false;
+    this.noms = [];
     this.humains = a.flagsSieges();
     this.changerMode('solo', 'coupe');
     this.signaler({ type: 'sieges' });
@@ -2454,6 +2490,14 @@
         this.siege = m.siege;
         this.signaler({ type: 'sieges' });
         return 0;
+      case 'noms':
+        this.noms = [];
+        for (var k = 0; k < r.places; k++) {
+          var x = Array.isArray(m.noms) ? m.noms[k] : null;
+          this.noms.push(typeof x === 'string' && x ? x.slice(0, NOM_MAX) : null);
+        }
+        this.signaler({ type: 'sieges' });
+        return 0;
       case 'refus':
         this.attendEcho = false;
         this.signaler({ type: 'refus' });
@@ -2474,9 +2518,17 @@
   Partie.prototype.sieges = function () {
     var liste = [];
     for (var s = 0; s < this.r.places; s++) {
-      liste.push({ humain: this.humains[s] === true, moi: s === this.siege, chef: this.mode === 'en-ligne' && s === this.chef });
+      var humain = this.humains[s] === true;
+      var nom = this.mode === 'en-ligne' && humain && typeof this.noms[s] === 'string' ? this.noms[s] : null;
+      liste.push({ humain: humain, moi: s === this.siege, chef: this.mode === 'en-ligne' && s === this.chef, nom: nom });
     }
     return liste;
+  };
+
+  // Pseudo du vrai joueur de la place s (en ligne), ou null.
+  Partie.prototype.nom = function (s) {
+    var info = this.sieges()[s];
+    return info ? info.nom : null;
   };
 
   // Le joueur de l'appareil peut-il lancer la manche ? (en ligne, dans le salon, s'il est le chef)
@@ -2554,6 +2606,7 @@
     Arbitre: Arbitre,
     Partie: Partie,
     creer: function (o) { return new Partie(o); },
+    invitation: invitation,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -3154,6 +3207,7 @@
   .salon-place.moi { border-color: #ffc23d; background: #ffc23d1c; }
   .salon-place .tag { font-size: .74rem; font-weight: 800; display: inline-flex; gap: 3px; align-items: center; padding: 1px 6px; border-radius: 8px; background: #ffffff14; min-height: 20px; max-width: 100%; }
   .salon-place .tag svg { width: 13px; height: 13px; flex: none; }
+  .salon-place .tag span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .salon-place.moi .tag { background: #ffe27a; color: #2a1d00; }
   .salon-place.arrive { animation: arrivee .45s ease-out; }
   #salon-message { font-weight: 700; line-height: 1.3; }
@@ -4041,12 +4095,22 @@
   }
 
   function roleDe(info) { return info.moi ? 'toi' : (info.humain ? 'joueur' : 'robot'); }
-  function remplirTag(tag, role) {
-    if (tag.dataset.role === role) return;
+  // Nom affiché d'une place : le pseudo d'un vrai joueur en ligne (donné par le
+  // serveur, partie.sieges()[s].nom), sinon « Toi », « Joueur » ou « Robot ».
+  function nomPlace(info, role) { return role === 'joueur' && info.nom ? info.nom : tr('place.' + role); }
+  // Pseudo d'un autre vrai joueur (null pour soi, un robot ou en solo).
+  function pseudoDe(s) {
+    const info = siegesActuels()[s];
+    return info && info.humain && !info.moi && info.nom ? info.nom : null;
+  }
+  function remplirTag(tag, role, nom) {
+    const texte = nom || tr('place.' + role);
+    if (tag.dataset.role === role && tag.dataset.nom === texte) return;
     tag.dataset.role = role;
+    tag.dataset.nom = texte;
     tag.innerHTML = (role === 'toi' ? ICONE_TOI : role === 'joueur' ? ICONE_JOUEUR : ICONE_ROBOT);
     const txt = document.createElement('span');
-    txt.textContent = tr('place.' + role);
+    txt.textContent = texte;
     tag.appendChild(txt);
   }
 
@@ -4092,8 +4156,9 @@
       d.classList.toggle('arrivee', !!c && c.st === 1);
       d.classList.toggle('aspiree', !!c && c.st === 2);
       const role = roleDe(info);
-      remplirTag(d.querySelector('.tag'), role);
+      remplirTag(d.querySelector('.tag'), role, nomPlace(info, role));
       let aria = tr('place.aria.' + role, { pilote: tr('pilote.' + s) });
+      if (role === 'joueur' && info.nom) aria += ' · ' + info.nom;
       if (c) aria += ' · ' + (c.st === 2 ? tr('place.aspiree') : tr('rang.' + rang)) + ' · ' + tr('place.carburant', { n: c.f });
       if (info.chef) aria += ' · ' + tr('salon.chefMarque');
       if (d.getAttribute('aria-label') !== aria) d.setAttribute('aria-label', aria);
@@ -4112,7 +4177,8 @@
     if (!e.q.length) return '';
     const s = R.aQui(e);
     if (s === partie.siege) return tr('tour.toi');
-    return tr('tour.autre', { pilote: tr('pilote.' + s) });
+    const nom = pseudoDe(s);
+    return nom ? tr('tour.nom', { nom: nom }) : tr('tour.autre', { pilote: tr('pilote.' + s) });
   }
 
   function majInfos() {
@@ -4610,7 +4676,7 @@
     const enSalon = partie.phase === 'salon' && partie.mode === 'en-ligne';
     for (let s = 0; s < PLACES; s++) {
       const d = $('salon-place-' + s), info = sieges[s] || { humain: false, moi: false, chef: false };
-      const role = roleDe(info), cle = role + (info.chef ? '+chef' : '') + ':' + designDe(s);
+      const role = roleDe(info), nom = nomPlace(info, role), cle = role + (info.chef ? '+chef' : '') + ':' + designDe(s) + '|' + nom;
       if (d.dataset.etat !== cle) {
         if (d.dataset.etat && role !== 'robot' && d.dataset.etat.indexOf('robot') === 0) { d.classList.remove('arrive'); void d.offsetWidth; d.classList.add('arrive'); }
         d.dataset.etat = cle;
@@ -4618,16 +4684,17 @@
         c.clearRect(0, 0, 104, 104);
         medaillon(c, s, 52, 58, 42, designDe(s));
         if (info.chef) couronne(c, 52, 22, 24);
-        remplirTag(d.querySelector('.tag'), role);
-        d.setAttribute('aria-label', tr('salon.place.' + role, { pilote: tr('pilote.' + s) }) + (info.chef ? ' · ' + tr('salon.chefMarque') : ''));
+        remplirTag(d.querySelector('.tag'), role, nom);
+        d.setAttribute('aria-label', tr('salon.place.' + role, { pilote: tr('pilote.' + s) }) + (role === 'joueur' && info.nom ? ' · ' + info.nom : '') + (info.chef ? ' · ' + tr('salon.chefMarque') : ''));
       }
       d.classList.toggle('moi', !!info.moi);
     }
     let message = '';
     if (enSalon) {
+      const nomChef = partie.chef >= 0 ? (sieges[partie.chef] || {}).nom : null;
       if (partie.siege < 0) message = tr('multi.attente');
       else if (partie.estChef()) message = tr('salon.chef');
-      else if (partie.chef >= 0) message = tr('salon.attente', { pilote: tr('pilote.' + partie.chef) });
+      else if (partie.chef >= 0) message = tr('salon.attente', { pilote: nomChef ? tr('pilote.' + partie.chef) + ' · ' + nomChef : tr('pilote.' + partie.chef) });
     }
     if ($('salon-message').textContent !== message) $('salon-message').textContent = message;
     const bouton = $('btn-lancer');
@@ -4704,7 +4771,9 @@
     ev.apres.ev.forEach((x) => {
       if (x.t === 'arrivee' && x.s !== moi && session === 'ligne') {
         const j = jeton;
-        setTimeout(() => { if (j === jeton) toast(tr('msg.arriveAutre', { pilote: tr('pilote.' + x.s), rang: tr('rang.' + x.rang) }), 1800); }, Math.max(0, anim.fin - performance.now()));
+        const nomx = pseudoDe(x.s);
+        const texte = nomx ? tr('msg.arriveNom', { nom: nomx, rang: tr('rang.' + x.rang) }) : tr('msg.arriveAutre', { pilote: tr('pilote.' + x.s), rang: tr('rang.' + x.rang) });
+        setTimeout(() => { if (j === jeton) toast(texte, 1800); }, Math.max(0, anim.fin - performance.now()));
       }
     });
     const carte = $('place-' + ev.siege);
@@ -4781,7 +4850,7 @@
       const info = sieges[s] || {};
       const role = s === moi ? 'toi' : (info.humain ? 'joueur' : 'robot');
       qui.innerHTML = role === 'toi' ? ICONE_TOI : role === 'joueur' ? ICONE_JOUEUR : ICONE_ROBOT;
-      const nom = document.createElement('span'); nom.textContent = tr('pilote.' + s) + ' · ' + tr('place.' + role);
+      const nom = document.createElement('span'); nom.textContent = tr('pilote.' + s) + ' · ' + nomPlace(info, role);
       qui.appendChild(nom);
       const n = document.createElement('span'); n.className = 'nb';
       n.textContent = c.st === 1 ? tr('fin.arrive') : c.st === 2 ? tr('fin.aspire') : tr('fin.distance', { n: c.d, total: e.L });

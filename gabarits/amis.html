@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <!-- FICHIER GÉNÉRÉ par scripts/pages-seo.mjs (gabarit de la page des amis :
+       gabarits/amis.html ; textes : clés « amis.* » de public/i18n/site/<langue>.json ;
+       docs/consigne-amis.md). Ne pas modifier ici : il est recréé à chaque build. -->
+  {{{tete}}}
+</head>
+<body class="page-amis">
+  {{> entete}}
+
+  <main class="legal amis">
+    {{{ariane}}}
+    <h1>{{t:amis.h1}}</h1>
+    <p class="legal-intro">{{t:amis.intro}}</p>
+
+    <!-- Rempli par /amis-page.js (POST /api/amis) : tout de suite, puis toutes les
+         30 s tant que la page est visible ; « Actualiser » au plus toutes les 10 s. -->
+    <div class="amis-barre">
+      <button type="button" class="bouton bouton-secondaire amis-actualiser" id="amis-actualiser">{{t:amis.actualiser}}</button>
+      <p class="profil-aide" id="amis-maj" aria-live="off"></p>
+    </div>
+    <p class="message" id="amis-etat" role="status" aria-live="polite">{{t:amis.chargement}}</p>
+    <p class="amis-note" id="amis-invisible" hidden>{{t:amis.invisibleActif}} <a href="{{profil}}#bloc-amis">{{t:amis.lienProfil}}</a></p>
+
+    <section class="profil-bloc amis-ajouter" aria-labelledby="titre-ajouter">
+      <h2 id="titre-ajouter">{{t:amis.ajouter.titre}}</h2>
+      <p class="amis-note" id="amis-pseudo-requis" hidden>{{t:amis.ajouter.pseudoRequis}} <a href="{{profil}}">{{t:amis.ajouter.lienPseudo}}</a></p>
+      <form class="profil-restaurer" id="amis-form" novalidate>
+        <label for="amis-pseudo">{{t:amis.ajouter.label}}</label>
+        <p class="profil-aide">{{t:amis.ajouter.aide}}</p>
+        <div class="profil-ligne">
+          <input id="amis-pseudo" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="send" maxlength="32">
+          <button type="submit" class="bouton">{{t:amis.ajouter.envoyer}}</button>
+        </div>
+        <p class="message" id="amis-form-message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="profil-bloc" aria-labelledby="titre-recues" id="bloc-recues" hidden>
+      <h2 id="titre-recues">{{t:amis.recues.titre}}</h2>
+      <ul class="amis-liste" id="amis-recues"></ul>
+    </section>
+
+    <section class="profil-bloc" aria-labelledby="titre-amis">
+      <h2 id="titre-amis">{{t:amis.liste.titre}}</h2>
+      <p class="profil-aide" id="amis-compte"></p>
+      <p class="message" id="amis-presence" hidden>{{t:amis.presenceIndisponible}}</p>
+      <ul class="amis-liste" id="amis-liste"></ul>
+    </section>
+
+    <section class="profil-bloc" aria-labelledby="titre-envoyees" id="bloc-envoyees" hidden>
+      <h2 id="titre-envoyees">{{t:amis.envoyees.titre}}</h2>
+      <ul class="amis-liste" id="amis-envoyees"></ul>
+    </section>
+
+    <section class="profil-bloc" aria-labelledby="titre-bloques" id="bloc-bloques" hidden>
+      <h2 id="titre-bloques">{{t:amis.bloques.titre}}</h2>
+      <p class="profil-aide">{{t:amis.bloques.aide}}</p>
+      <ul class="amis-liste" id="amis-bloques"></ul>
+    </section>
+
+    <p class="profil-aide amis-confidentialite">{{t:amis.confidentialite}}</p>
+    <p class="legal-retour"><a class="bouton" href="{{classement}}?portee=amis">{{t:classement.voir}}</a> <a class="bouton bouton-secondaire" href="{{profil}}">{{t:profil.monProfil}}</a></p>
+    <noscript><p class="message erreur">{{t:profil.sansJavascript}}</p></noscript>
+  </main>
+
+  {{> pied}}
+
+  <script type="module" src="/amis-page.js"></script>
+</body>
+</html>

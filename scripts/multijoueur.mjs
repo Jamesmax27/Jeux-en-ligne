@@ -35,7 +35,11 @@ import { SITES_MULTI } from '../public/multijoueur/config.js';
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
 const SORTIE = path.join(RACINE, 'multijoueur', 'src', 'jeux.js');
-const SOURCES_WORKER = ['index.js', 'partie.js', 'accueil.js', 'moteur.js'].map((f) => path.join(RACINE, 'multijoueur', 'src', f));
+const SOURCES_WORKER = [
+  ...['index.js', 'partie.js', 'accueil.js', 'moteur.js', 'presence.js', 'ticket.js', 'profil.js'].map((f) => path.join(RACINE, 'multijoueur', 'src', f)),
+  path.join(RACINE, 'multijoueur', 'wrangler.toml'),          // un nouveau Durable Object (présence des amis) demande aussi un déploiement
+  path.join(RACINE, 'public', 'profil-reglages.js'),          // réglages lus par le Worker (manches, présence)
+];
 const MOTEUR = path.join(RACINE, 'public', 'multijoueur', 'moteur.js');
 // Noms masqués pour le code des règles dans le Worker.
 const MASQUES = ['self', 'globalThis', 'fetch', 'XMLHttpRequest', 'WebSocket', 'importScripts', 'caches', 'navigator', 'location', 'document', 'localStorage', 'indexedDB'];
