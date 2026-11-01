@@ -87,6 +87,7 @@
   "tour.toi": "À toi ! Choisis une carte.",
   "tour.toiDanger": "À toi ! La Bête est tout près…",
   "tour.autre": "La cape {nom} joue…",
+  "tour.nom": "{nom} joue…",
   "tour.attends": "Attends ton tour !",
   "tour.sorti": "Te voilà hors du bois !",
   "tour.devore": "La Bête a fini par te rattraper…",
@@ -190,6 +191,7 @@
   "salon.chefMarque": "lance la partie",
   "salon.chef": "C'est toi qui lances la partie, quand tu veux. Les places libres seront jouées par des robots.",
   "salon.attente": "En attente : le premier joueur arrivé (cape {nom}, avec la couronne) lance la partie.",
+  "salon.attenteNom": "En attente : le premier joueur arrivé ({nom}, cape {cape}, avec la couronne) lance la partie.",
   "salon.lancer": "Lancer la partie",
   "salon.lancerSuivante": "Lancer la manche suivante",
   "salon.auto": "La partie commence toute seule dans {n} s"
@@ -275,6 +277,7 @@
   "tour.toi": "Your turn! Pick a card.",
   "tour.toiDanger": "Your turn! The Beast is very close…",
   "tour.autre": "The {nom} cloak is playing…",
+  "tour.nom": "{nom} is playing…",
   "tour.attends": "Wait for your turn!",
   "tour.sorti": "You made it out of the woods!",
   "tour.devore": "The Beast caught up with you…",
@@ -378,6 +381,7 @@
   "salon.chefMarque": "starts the game",
   "salon.chef": "You start the game whenever you like. Robots will play the empty seats.",
   "salon.attente": "Waiting: the first player who arrived ({nom} cloak, with the crown) starts the game.",
+  "salon.attenteNom": "Waiting: the first player who arrived ({nom}, {cape} cloak, with the crown) starts the game.",
   "salon.lancer": "Start the game",
   "salon.lancerSuivante": "Start the next round",
   "salon.auto": "The game starts on its own in {n} s"
@@ -463,6 +467,7 @@
   "tour.toi": "¡Tu turno! Elige una carta.",
   "tour.toiDanger": "¡Tu turno! La Bestia está muy cerca…",
   "tour.autre": "Juega la capa {nom}…",
+  "tour.nom": "Juega {nom}…",
   "tour.attends": "¡Espera tu turno!",
   "tour.sorti": "¡Saliste del bosque!",
   "tour.devore": "La Bestia terminó por alcanzarte…",
@@ -566,6 +571,7 @@
   "salon.chefMarque": "lanza la partida",
   "salon.chef": "Tú lanzas la partida cuando quieras. Los robots jugarán en los lugares libres.",
   "salon.attente": "En espera: el primer jugador en llegar (capa {nom}, con la corona) lanza la partida.",
+  "salon.attenteNom": "En espera: el primer jugador en llegar ({nom}, capa {cape}, con la corona) lanza la partida.",
   "salon.lancer": "Lanzar la partida",
   "salon.lancerSuivante": "Lanzar la ronda siguiente",
   "salon.auto": "La partida empieza sola en {n} s"
@@ -651,6 +657,7 @@
   "tour.toi": "Sua vez! Escolha uma carta.",
   "tour.toiDanger": "Sua vez! A Fera está bem perto…",
   "tour.autre": "A capa {nom} está jogando…",
+  "tour.nom": "{nom} está jogando…",
   "tour.attends": "Espere a sua vez!",
   "tour.sorti": "Você saiu do bosque!",
   "tour.devore": "A Fera acabou te alcançando…",
@@ -754,6 +761,7 @@
   "salon.chefMarque": "começa a partida",
   "salon.chef": "Você começa a partida quando quiser. Os lugares livres serão jogados por robôs.",
   "salon.attente": "Esperando: o primeiro jogador a chegar (capa {nom}, com a coroa) começa a partida.",
+  "salon.attenteNom": "Esperando: o primeiro jogador a chegar ({nom}, capa {cape}, com a coroa) começa a partida.",
   "salon.lancer": "Começar a partida",
   "salon.lancerSuivante": "Começar a próxima rodada",
   "salon.auto": "A partida começa sozinha em {n} s"
@@ -839,6 +847,7 @@
   "tour.toi": "Du bist dran! Wähl eine Karte.",
   "tour.toiDanger": "Du bist dran! Die Bestie ist ganz nah…",
   "tour.autre": "Umhang {nom} ist dran…",
+  "tour.nom": "{nom} ist dran…",
   "tour.attends": "Warte, bis du dran bist!",
   "tour.sorti": "Du bist aus dem Wald raus!",
   "tour.devore": "Die Bestie hat dich am Ende eingeholt…",
@@ -942,6 +951,7 @@
   "salon.chefMarque": "startet das Spiel",
   "salon.chef": "Du startest das Spiel, wann du willst. Freie Plätze übernehmen Roboter.",
   "salon.attente": "Warten: Wer zuerst da war (Umhang {nom}, mit der Krone), startet das Spiel.",
+  "salon.attenteNom": "Warten: Wer zuerst da war ({nom}, Umhang {cape}, mit der Krone), startet das Spiel.",
   "salon.lancer": "Spiel starten",
   "salon.lancerSuivante": "Nächste Runde starten",
   "salon.auto": "Das Spiel startet von selbst in {n} s"
@@ -1765,7 +1775,7 @@
 </script>
 <script id="jel-multi">
 /* ==========================================================================
-   Free Micro Games — moteur commun des jeux multijoueurs          jel-multi v2
+   Free Micro Games — moteur commun des jeux multijoueurs          jel-multi v3
    JavaScript pur, sans dépendance. Détails : docs/multijoueur.md.
 
    Le même fichier sert à trois endroits :
@@ -1816,10 +1826,18 @@
      { t: 'refus', n }                  action refusée
    Messages d'un joueur : { t: 'action', n, a }, { t: 'lancer' } (chef, dans le
    salon) et { t: 'resync' }.
+   Ajoutés par le serveur du site autour de l'arbitre (multijoueur/src/partie.js,
+   docs/consigne-amis.md ; un ancien moteur les ignore, le protocole ne change pas) :
+     { t: 'noms', noms }                pseudo des vrais joueurs, un texte (ou null) par place
+                                        (déjà traduit par le lanceur pour « Joueur 4821 »)
 
    API pour le jeu (window.JEL_MULTI) :
      creer({ regles, surEvenement, enLigne, force, options, enchainer })
                        partie (voir Partie plus bas) ; lancer() la démarre
+     invitation()      { partie } quand le jeu a été ouvert par le bouton « Rejoindre »
+                       d'un ami (window.JEL_REJOINDRE, posé par le lanceur), sinon null :
+                       le jeu ouvre alors tout de suite sa partie en ligne (salon),
+                       et la première partie en ligne lancée rejoint celle de l'ami
    Ce fichier ne doit contenir aucune balise script, ni ouverture ni fermeture
    (recopié dans le jeu, il tromperait la recherche des blocs jel-regles…).
    ========================================================================== */
@@ -1835,6 +1853,8 @@
 
   var DEFAUTS = { remplacement: 'tour', delaiBot: 700, delaiJoueur: 20000, pauseManche: 6000, attenteSalon: 90000, forceEnLigne: 0.6 };
   var FONCTIONS = ['depart', 'aQui', 'valide', 'jouer', 'bot', 'fin'];
+  var RE_PARTIE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  var NOM_MAX = 40;                // caractères d'un pseudo affiché
 
   // --- Outils ---------------------------------------------------------------
 
@@ -2183,13 +2203,23 @@
   //   enchainer     false : pas de nouvelle manche automatique en solo (jeu à niveaux)
   // }
   // Lecture : partie.mode, partie.etat, partie.siege (place du joueur, -1 en attente),
-  // partie.phase ('attente', 'salon', 'jeu', 'pause'), partie.sieges() ([{ humain, moi, chef }]),
+  // partie.phase ('attente', 'salon', 'jeu', 'pause'), partie.sieges() ([{ humain, moi, chef, nom }] ;
+  // nom : pseudo d'un vrai joueur en ligne, ou null — robot, ou joueur sans profil : libellé du jeu),
   // partie.chef (place du chef), partie.estChef(), partie.monTour(). Commandes : lancer(),
   // lancerManche() (le chef, dans le salon), jouer(action), pause(oui), recommencer(options)
   // (solo), quitter(). La dernière partie lancée est aussi dans JEL_MULTI.derniere.
 
   function dansLanceur() {
     try { return racine.parent && racine.parent !== racine; } catch (e) { return false; }
+  }
+
+  // Invitation du bouton « Rejoindre » (window.JEL_REJOINDRE = { partie }, posé par le
+  // lanceur) : { partie } ou null. Elle ne sert qu'une fois (première partie en ligne).
+  var invitationUtilisee = false;
+  function invitation() {
+    if (invitationUtilisee) return null;
+    var i = racine.JEL_REJOINDRE;
+    return i && typeof i.partie === 'string' && RE_PARTIE.test(i.partie) ? { partie: i.partie } : null;
   }
 
   function Partie(o) {
@@ -2202,6 +2232,7 @@
     this.phase = 'attente';
     this.siege = -1;
     this.humains = [];
+    this.noms = [];            // pseudo des vrais joueurs par place (en ligne), ou null
     this.chef = -1;            // place du chef du salon (en ligne)
     this.options = null;
     this.file = [];            // messages reçus, joués un par un
@@ -2236,7 +2267,10 @@
     if (this.o.enLigne !== false && dansLanceur()) {
       this.changerMode('connexion');
       racine.addEventListener('message', this.ecoute);
-      try { racine.parent.postMessage({ type: 'jel-multi', op: 'rejoindre', proto: PROTOCOLE }, '*'); } catch (e) { /* pas de lanceur */ }
+      var demande = { type: 'jel-multi', op: 'rejoindre', proto: PROTOCOLE };
+      var inv = invitation();
+      if (inv) { demande.partie = inv.partie; invitationUtilisee = true; }   // partie d'un ami (« Rejoindre »)
+      try { racine.parent.postMessage(demande, '*'); } catch (e) { /* pas de lanceur */ }
       var moi = this;
       this.minuteurConnexion = setTimeout(function () { moi.passerSolo('delai'); }, DELAI_CONNEXION);
     } else {
@@ -2257,6 +2291,7 @@
     this.local = null;
     this.versSolo = false;
     this.attendEcho = false;
+    this.noms = [];
     this.mode = 'arret';
   };
 
@@ -2321,6 +2356,7 @@
     });
     this.local = a;
     this.attendEcho = false;
+    this.noms = [];
     this.humains = a.flagsSieges();
     this.changerMode('solo', 'coupe');
     this.signaler({ type: 'sieges' });
@@ -2419,6 +2455,14 @@
         this.siege = m.siege;
         this.signaler({ type: 'sieges' });
         return 0;
+      case 'noms':
+        this.noms = [];
+        for (var k = 0; k < r.places; k++) {
+          var x = Array.isArray(m.noms) ? m.noms[k] : null;
+          this.noms.push(typeof x === 'string' && x ? x.slice(0, NOM_MAX) : null);
+        }
+        this.signaler({ type: 'sieges' });
+        return 0;
       case 'refus':
         this.attendEcho = false;
         this.signaler({ type: 'refus' });
@@ -2439,9 +2483,17 @@
   Partie.prototype.sieges = function () {
     var liste = [];
     for (var s = 0; s < this.r.places; s++) {
-      liste.push({ humain: this.humains[s] === true, moi: s === this.siege, chef: this.mode === 'en-ligne' && s === this.chef });
+      var humain = this.humains[s] === true;
+      var nom = this.mode === 'en-ligne' && humain && typeof this.noms[s] === 'string' ? this.noms[s] : null;
+      liste.push({ humain: humain, moi: s === this.siege, chef: this.mode === 'en-ligne' && s === this.chef, nom: nom });
     }
     return liste;
+  };
+
+  // Pseudo du vrai joueur de la place s (en ligne), ou null.
+  Partie.prototype.nom = function (s) {
+    var info = this.sieges()[s];
+    return info ? info.nom : null;
   };
 
   // Le joueur de l'appareil peut-il lancer la manche ? (en ligne, dans le salon, s'il est le chef)
@@ -2519,6 +2571,7 @@
     Arbitre: Arbitre,
     Partie: Partie,
     creer: function (o) { return new Partie(o); },
+    invitation: invitation,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -2984,6 +3037,7 @@
   .place canvas { width: 38px; height: 38px; display: block; }
   .place .tag { font-size: .7rem; font-weight: 800; display: inline-flex; gap: 2px; align-items: center; justify-content: center; padding: 1px 4px; border-radius: 8px; background: #ffffff14; min-height: 18px; max-width: 100%; overflow: hidden; white-space: nowrap; }
   .place .tag svg { width: 14px; height: 14px; flex: none; }
+  .place .tag span, .salon-place .tag span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .place.moi .tag { background: #ffd27a; color: #2b1600; }
   .place.actif { transform: translateY(-2px) scale(1.06); border-color: var(--c); box-shadow: 0 0 0 2px var(--c), 0 0 14px var(--c); z-index: 1; }
   .place.hors { opacity: .55; }
@@ -4058,14 +4112,18 @@
 
   // Le rôle d'une place : toi, un vrai joueur ou un robot.
   function roleDe(info) { return info.moi ? 'toi' : (info.humain ? 'joueur' : 'robot'); }
-  function remplirTag(tag, role, court) {
-    const cle = role + (court ? '-c' : '');
+  // Étiquette d'une place. pseudo : celui d'un vrai joueur en ligne (donné par le
+  // serveur, partie.sieges()[s].nom), affiché même sur les petites cartes ;
+  // sinon « Toi », « Joueur » ou « Robot » (sur les petites cartes : l'icône seule).
+  function remplirTag(tag, role, court, pseudo) {
+    const nom = role === 'joueur' && pseudo ? pseudo : '';
+    const cle = role + (court ? '-c' : '') + '|' + nom;
     if (tag.dataset.role === cle) return;
     tag.dataset.role = cle;
     tag.innerHTML = (role === 'toi' ? ICONE_TOI : role === 'joueur' ? ICONE_JOUEUR : ICONE_ROBOT);
-    if (!court || role === 'toi') {
+    if (!court || role === 'toi' || nom) {
       const txt = document.createElement('span');
-      txt.textContent = tr('place.' + role);
+      txt.textContent = nom || tr('place.' + role);
       tag.appendChild(txt);
     }
   }
@@ -4073,6 +4131,17 @@
   function siegesActuels() {
     if (!partie) return [];
     try { return partie.sieges(); } catch (e) { return []; }
+  }
+
+  // Pseudo d'un autre vrai joueur à une place (null : toi, un robot, ou pas de profil).
+  function pseudoDe(s, sieges) {
+    const info = (sieges || siegesActuels())[s] || {};
+    return info.humain && !info.moi && info.nom ? info.nom : null;
+  }
+  // Nom d'une cape dans les messages : « Rubis », ou « Rubis (pseudo) » pour un vrai joueur.
+  function nomCape(s) {
+    const pseudo = pseudoDe(s);
+    return pseudo ? nomPlace(s) + ' (' + pseudo + ')' : nomPlace(s);
   }
 
   function dernierEnDanger(e) {
@@ -4106,9 +4175,10 @@
       d.classList.toggle('hors', etat !== 0);
       d.classList.toggle('danger', s === menace);
       const role = roleDe(info);
-      remplirTag(d.querySelector('.tag'), role, true);
+      const pseudo = pseudoDe(s, sieges);
+      remplirTag(d.querySelector('.tag'), role, true, pseudo);
       const statut = etat === 1 ? tr('statut.sorti') : etat === 2 ? tr('statut.devore') : tr('statut.case', { n: pl ? pl.p : 0, total: e ? e.L : 0 });
-      d.setAttribute('aria-label', tr('place.aria.' + role, { nom: nomPlace(s) }) + ' · ' + statut + (info.chef ? ' · ' + tr('salon.chefMarque') : ''));
+      d.setAttribute('aria-label', tr('place.aria.' + role, { nom: nomPlace(s) }) + (pseudo ? ' · ' + pseudo : '') + ' · ' + statut + (info.chef ? ' · ' + tr('salon.chefMarque') : ''));
     }
   }
 
@@ -4124,7 +4194,8 @@
     if (O.courseFinie(e)) return '';
     const s = R.aQui(e);
     if (s === partie.siege) return dernierEnDanger(e) === s ? tr('tour.toiDanger') : tr('tour.toi');
-    return tr('tour.autre', { nom: nomPlace(s) });
+    const pseudo = pseudoDe(s);
+    return pseudo ? tr('tour.nom', { nom: pseudo }) : tr('tour.autre', { nom: nomPlace(s) });
   }
 
   function majInfos() {
@@ -4357,7 +4428,7 @@
     anims.pions[s] = { chemin, debut: t, fin: t + duree, b: action && (action.b === 0 || action.b === 1) ? action.b : -1, chute, saut };
     if (O.PAS[ev.c]) sons.pas(chemin.length - 1);
     const moi = s === moiSiege();
-    const nom = nomPlace(s);
+    const nom = nomCape(s);
     plusTard(duree, () => {
       if (x.indexOf('ronce') >= 0) { sons.ronce(); if (moi) toast(tr('evt.ronceToi')); }
       if (x.indexOf('lanterne') >= 0) { sons.lanterne(); anims.eclats.push({ type: 'lumiere', c: ev.rc ? ev.rc[1] : fin, debut: performance.now(), fin: performance.now() + 700 }); if (moi) toast(tr('evt.lanterneToi')); }
@@ -4404,7 +4475,7 @@
     anims.eclats.push({ type: 'devore', c: Math.max(0, c), debut: performance.now(), fin: performance.now() + 900 });
     const z = $('zone'); z.classList.remove('secousse'); void z.offsetWidth; z.classList.add('secousse');
     const fl = $('flash'); fl.classList.add('actif'); setTimeout(() => fl.classList.remove('actif'), 60);
-    toast(s === moiSiege() ? tr('evt.devoreToi') : tr('evt.devore', { nom: nomPlace(s) }), 2400);
+    toast(s === moiSiege() ? tr('evt.devoreToi') : tr('evt.devore', { nom: nomCape(s) }), 2400);
     majPlaces();
   }
 
@@ -4497,7 +4568,7 @@
     const enSalon = partie.phase === 'salon' && partie.mode === 'en-ligne';
     for (let s = 0; s < PLACES; s++) {
       const d = $('salon-place-' + s), info = sieges[s] || { humain: false, moi: false, chef: false };
-      const role = roleDe(info), cle = role + (info.chef ? '+chef' : '');
+      const role = roleDe(info), pseudo = pseudoDe(s, sieges), cle = role + (info.chef ? '+chef' : '') + '|' + (pseudo || '');
       if (d.dataset.etat !== cle) {
         if (d.dataset.etat && role !== 'robot' && d.dataset.etat.indexOf('robot') === 0) { d.classList.remove('arrive'); void d.offsetWidth; d.classList.add('arrive'); }
         d.dataset.etat = cle;
@@ -4505,8 +4576,8 @@
         c.clearRect(0, 0, 100, 100);
         medaillon(c, s, 50, 56, 40, 0);
         if (info.chef) couronne(c, 50, 22, 24);
-        remplirTag(d.querySelector('.tag'), role, false);
-        d.setAttribute('aria-label', tr('salon.place.' + role, { nom: nomPlace(s) }) + (info.chef ? ' · ' + tr('salon.chefMarque') : ''));
+        remplirTag(d.querySelector('.tag'), role, false, pseudo);
+        d.setAttribute('aria-label', tr('salon.place.' + role, { nom: nomPlace(s) }) + (pseudo ? ' · ' + pseudo : '') + (info.chef ? ' · ' + tr('salon.chefMarque') : ''));
       }
       d.classList.toggle('moi', !!info.moi);
     }
@@ -4514,7 +4585,10 @@
     if (enSalon) {
       if (partie.siege < 0) message = tr('multi.attente');
       else if (partie.estChef()) message = tr('salon.chef');
-      else if (partie.chef >= 0) message = tr('salon.attente', { nom: nomPlace(partie.chef) });
+      else if (partie.chef >= 0) {
+        const pseudoChef = pseudoDe(partie.chef, sieges);
+        message = pseudoChef ? tr('salon.attenteNom', { nom: pseudoChef, cape: nomPlace(partie.chef) }) : tr('salon.attente', { nom: nomPlace(partie.chef) });
+      }
     }
     if ($('salon-message').textContent !== message) $('salon-message').textContent = message;
     const bouton = $('btn-lancer');
@@ -4635,7 +4709,8 @@
       const info = sieges[s] || {};
       const role = s === moi ? 'toi' : (info.humain ? 'joueur' : 'robot');
       qui.innerHTML = role === 'toi' ? ICONE_TOI : role === 'joueur' ? ICONE_JOUEUR : ICONE_ROBOT;
-      const nom = document.createElement('span'); nom.textContent = nomPlace(s) + ' · ' + tr('place.' + role);
+      const pseudo = role === 'joueur' ? pseudoDe(s, sieges) : null;
+      const nom = document.createElement('span'); nom.textContent = nomPlace(s) + ' · ' + (pseudo || tr('place.' + role));
       qui.appendChild(nom);
       const n = document.createElement('span');
       n.className = 'nb' + (pl.st === 1 ? ' sorti' : pl.st === 2 ? ' devore' : '');

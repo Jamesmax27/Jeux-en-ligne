@@ -3189,6 +3189,113 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 }
 
 /* --------------------------------------------------------------------------
+   Amis (docs/consigne-amis.md) : page Amis, classement entre amis, pastille.
+   Mêmes plaques, avatars et boutons que le profil et le classement.
+   Statut : vert « en ligne », or « en jeu » (ce qui brille), gris « hors ligne ».
+   -------------------------------------------------------------------------- */
+
+.pastille-bouton { position: relative; }
+.pastille-demande {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--nuit);
+  border-radius: 50%;
+  background: var(--or);
+  box-shadow: 0 0 8px rgba(255, 216, 138, .7);
+}
+.pastille-lien.avec-demande { color: var(--or); }
+
+.amis-barre { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 8px 0; }
+.amis-barre .profil-aide { margin: 0; }
+.amis-actualiser { min-height: 44px; padding: 0 16px; }
+.amis-actualiser:disabled { cursor: default; opacity: .6; }
+
+.amis-note {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 216, 138, .4);
+  border-radius: var(--r-plaque);
+  background: var(--verre);
+  color: var(--craie);
+  font-size: 15px;
+}
+
+.amis-liste { margin: 0; padding: 0; list-style: none; }
+
+.amis-ligne {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 6px 12px;
+  align-items: center;
+  min-height: 60px;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--lisere);
+}
+
+.amis-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.amis-nom { margin: 0; overflow: hidden; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.amis-niveau { color: var(--craie-douce); font-size: 14px; font-weight: 700; }
+.amis-boutons { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.amis-action { min-height: 44px; padding: 0 12px; font-size: 15px; }
+.amis-discret { border-color: var(--trait); color: var(--craie-douce); }
+
+.amis-statut {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--craie-douce);
+  font-size: 14px;
+}
+
+.amis-statut::before {
+  content: "";
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--craie-faible);
+}
+
+.amis-statut[data-etat="site"]::before { background: var(--vert-termine); box-shadow: 0 0 6px rgba(60, 207, 122, .6); }
+.amis-statut[data-etat="jeu"] { color: var(--or); font-weight: 700; }
+.amis-statut[data-etat="jeu"]::before { background: var(--or); box-shadow: 0 0 8px rgba(255, 216, 138, .7); }
+.amis-statut[data-etat="inconnu"]::before { background: none; border: 1px dashed var(--craie-faible); }
+
+.amis-aide-rejoindre { color: var(--craie-faible); font-size: 13px; }
+.amis-rejoindre { min-height: 44px; padding: 0 16px; font-weight: 800; }
+
+/* Hors ligne : la ligne s'efface un peu (les amis en ligne d'abord). */
+.amis-ligne[data-etat="hors"] .classement-avatar { opacity: .6; }
+
+.amis-interrupteur { display: flex; gap: 10px; align-items: center; min-height: 44px; margin: 8px 0 0; font-weight: 700; }
+.amis-interrupteur input { width: 24px; height: 24px; accent-color: var(--lavande); }
+
+.amis-confidentialite { margin-top: 24px; }
+
+/* Classement entre amis : statut et « Rejoindre » sous le nom. */
+.classement-ligne.avec-presence { grid-template-rows: auto auto; }
+.classement-presence {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 3 / -1;
+  gap: 6px 12px;
+  align-items: center;
+  padding: 0 0 6px;
+}
+
+@media (max-width: 520px) {
+  .amis-ligne { grid-template-columns: 40px 1fr; }
+  .amis-boutons { grid-column: 1 / -1; justify-content: flex-start; padding-left: 52px; }
+  .classement-presence { grid-column: 2 / -1; }
+}
+
+/* Lanceur : la partie d'un ami est pleine ou terminée (deux choix). */
+.message-jeu-boutons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+/* --------------------------------------------------------------------------
    Navigateurs sans OKLCH (Safari < 15.4, Chrome < 111, Firefox < 113) :
    puces neutres, sélection lavande. Bloc @supports et non double déclaration :
    une déclaration avec var() l'emporte toujours sur la précédente, même

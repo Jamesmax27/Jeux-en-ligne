@@ -21,14 +21,20 @@
 // visible (expérience), message « jeu terminé » du jeu (FMG.reportComplete,
 // message « jel-termine ») et ticket d'entrée des parties en ligne ; la
 // pastille du profil est dans la barre du haut (profil-pastille.js).
+// Et les amis (amis.js, docs/consigne-amis.md) : présence « en jeu » (jeu
+// affiché, partie en ligne en cours) ; bouton « Rejoindre » d'un ami
+// (&rejoindre=<nom de sa partie>) : pour un jeu "rejoindre", on vérifie que sa
+// partie a une place, puis le jeu l'ouvre directement (window.JEL_REJOINDRE) ;
+// sinon, un message clair et « Ouvrir le jeu quand même ».
 // ==========================================================================
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
 import { SCRIPT_SUIVI, suivreJeu, noterErreur, noterFin } from './suivi.js';
 import { suivreTemps, noterTermine, ticketMulti } from './profil.js';
-import { brancherMultijoueur } from './multijoueur/lanceur.js';
-import { urlJeu, urlAccueil, urlProposer } from './chemins.js';
+import { brancherMultijoueur, verifierPartie, RE_PARTIE } from './multijoueur/lanceur.js';
+import { annoncer } from './amis.js';
+import { urlJeu, urlAccueil, urlProposer, urlAmis } from './chemins.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
   titreJeu, presentationJeu, jeuEnFrancais, jeuDisponible,
@@ -54,12 +60,24 @@ const el = {
   messageTitre: document.getElementById('message-titre'),
   messageTexte: document.getElementById('message-texte'),
   voirTous: document.querySelector('#message a.bouton'),
+  rejoindre: document.getElementById('rejoindre'),
+  rejoindreTitre: document.getElementById('rejoindre-titre'),
+  rejoindreTexte: document.getElementById('rejoindre-texte'),
+  rejoindreOuvrir: document.getElementById('rejoindre-ouvrir'),
+  rejoindreRetour: document.getElementById('rejoindre-retour'),
 };
 
 let jeuCourant = null;   // fiche du jeu affiché (catalog.json)
 let htmlJeu = null;      // code du jeu, gardé pour le relancer dans une autre langue
 let message = null;      // { titre, texte } : clés du message affiché à la place du jeu
 let multi = null;        // connexion multijoueur du jeu affiché (jeux "multijoueur" seulement)
+let invitation = null;   // { partie } : partie d'un ami à rejoindre (bouton « Rejoindre »), une seule fois
+
+// Bouton « Rejoindre » d'un ami (page Amis, classement entre amis) : nom de sa partie en ligne.
+const PARTIE_AMI = (() => {
+  const nom = new URLSearchParams(location.search).get('rejoindre') || '';
+  return RE_PARTIE.test(nom) ? nom : null;
+})();
 
 function afficherMessage(titre, texte) {
   message = { titre, texte };
@@ -214,7 +232,10 @@ function proteger(html) {
   const debut = /^﻿?(?:\s|<!--[\s\S]*?-->)*(?:<!doctype[^>]*>)?/i.exec(html)[0];
   // « < » échappé : une sauvegarde ne peut pas fermer la balise <script>.
   const sauvegardes = JSON.stringify(lireSauvegarde()).replace(/</g, '\\u003c');
-  const reglages = `<script>window.JEL_LANG=${JSON.stringify(getLang())};window.JEL_SAUVEGARDES=${sauvegardes};</script>`;
+  // Invitation « Rejoindre » (une seule fois : un jeu relancé dans une autre langue n'y retourne pas).
+  const rejoindre = invitation ? `window.JEL_REJOINDRE=${JSON.stringify(invitation)};` : '';
+  invitation = null;
+  const reglages = `<script>window.JEL_LANG=${JSON.stringify(getLang())};window.JEL_SAUVEGARDES=${sauvegardes};${rejoindre}</script>`;
   return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${reglages}${SCRIPT_SUIVI}${html.slice(debut.length)}`;
 }
 
@@ -224,11 +245,48 @@ function afficherJeu() {
   el.cadre.srcdoc = proteger(htmlJeu);
 }
 
+// Partie d'un ami pleine, terminée ou impossible à joindre : message clair, puis
+// « Ouvrir le jeu quand même » (sans invitation) ou retour à la page Amis.
+function proposerQuandMeme(etat) {
+  return new Promise((ok) => {
+    const cle = { pleine: 'pleine', complet: 'pleine', introuvable: 'terminee' }[etat] || 'indisponible';
+    el.rejoindreTitre.textContent = t(`amis.lanceur.${cle}.titre`);
+    el.rejoindreTexte.textContent = t(`amis.lanceur.${cle}.texte`);
+    el.rejoindreRetour.href = urlAmis(getLang());
+    el.rejoindre.hidden = false;
+    el.cadre.hidden = true;
+    el.rejoindreOuvrir.focus();
+    el.rejoindreOuvrir.addEventListener('click', () => { el.rejoindre.hidden = true; el.cadre.hidden = false; ok(); }, { once: true });
+  });
+}
+
 async function chargerJeu(jeu) {
   const reponse = await fetch(jeu.play); // ex. « games/saut-obstacles/?v=1 »
   if (!reponse.ok) throw Object.assign(new Error(`HTTP ${reponse.status}`), { statut: reponse.status });
   htmlJeu = await reponse.text();
-  if (jeu.multijoueur) multi = brancherMultijoueur({ jeu, html: htmlJeu, cadre: el.cadre, ticket: () => ticketMulti(jeu.id) });
+  if (jeu.multijoueur) {
+    multi = brancherMultijoueur({
+      jeu, html: htmlJeu, cadre: el.cadre, ticket: () => ticketMulti(jeu.id),
+      nommer: (n) => t('profil.pseudoDefaut', { n }),
+      // Partie en ligne rejointe ou quittée : présence des amis (bouton « Rejoindre » chez eux).
+      surPartie: (nom, demandee) => {
+        annoncer({ etat: 'jeu', jeu: jeu.id, partie: nom });
+        if (nom && demandee && nom !== demandee) afficherInfoVote(t('amis.lanceur.autrePartie'), 6000);
+      },
+    });
+    // Bouton « Rejoindre » d'un ami : la même partie, si ce jeu sait l'ouvrir et qu'elle a une place.
+    if (PARTIE_AMI && PARTIE_AMI.startsWith(`${jeu.id}.`)) {
+      if (jeu.rejoindre === true) {
+        el.titre.textContent = t('amis.lanceur.verification');
+        const etat = await verifierPartie(jeu.id, PARTIE_AMI);
+        el.titre.textContent = titreJeu(jeu);
+        if (etat === 'ouverte') invitation = { partie: PARTIE_AMI };
+        else await proposerQuandMeme(etat);
+      } else {
+        setTimeout(() => afficherInfoVote(t('amis.lanceur.pasAdapte'), 7000), 1500);
+      }
+    }
+  }
   afficherJeu();
 }
 
@@ -328,6 +386,7 @@ async function demarrer() {
   }
   suivreJeu(jeu.id);
   suivreTemps(jeu.id);
+  if (window.top === window && !window.opener) annoncer({ etat: 'jeu', jeu: jeu.id });   // présence : « en jeu » pour les amis
   mesurer('game_start');
   garderPourHorsLigne(jeu);
   activerVotes(jeu.id);

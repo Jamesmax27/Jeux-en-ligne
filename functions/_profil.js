@@ -26,6 +26,8 @@
 //   profils_signalements signalements de pseudos
 //   profils_evenements   compteurs par jour (codes créés, restaurations, profils créés)
 //   fidelisation_jour    indicateurs de fidélisation, un calcul par jour
+//   amis, amis_reglages  amitiés, demandes, blocages, mode invisible (functions/_amis.js,
+//                        docs/consigne-amis.md ; migrations/0003_amis.sql)
 // ==========================================================================
 
 import * as R from '../public/profil-reglages.js';
@@ -78,6 +80,12 @@ export function preparerTablesProfil(env) {
       env.DB.prepare(`CREATE TABLE IF NOT EXISTS profils_evenements (
         jour TEXT NOT NULL, type TEXT NOT NULL, nombre INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (jour, type)) WITHOUT ROWID`),
       env.DB.prepare('CREATE TABLE IF NOT EXISTS fidelisation_jour (jour TEXT PRIMARY KEY, donnees TEXT NOT NULL, calcule_le INTEGER NOT NULL) WITHOUT ROWID'),
+      // Amis (functions/_amis.js, docs/consigne-amis.md) : une ligne par profil et par autre profil.
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS amis (
+        profil INTEGER NOT NULL, autre INTEGER NOT NULL, etat TEXT NOT NULL, cree_le INTEGER NOT NULL, maj_le INTEGER NOT NULL,
+        PRIMARY KEY (profil, autre)) WITHOUT ROWID`),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS amis_etat ON amis (etat, maj_le)'),
+      env.DB.prepare('CREATE TABLE IF NOT EXISTS amis_reglages (profil INTEGER PRIMARY KEY, invisible INTEGER NOT NULL DEFAULT 0, maj_le INTEGER NOT NULL) WITHOUT ROWID'),
     ]).catch((erreur) => {
       tablesPretes = null; // nouvel essai à la prochaine requête
       throw erreur;
@@ -148,8 +156,21 @@ function lireJson(texte, defaut) {
 const lireBadges = (profil) => (Array.isArray(lireJson(profil.badges, [])) ? lireJson(profil.badges, []) : []);
 const lireMulti = (profil) => ({ parties: 0, victoires: 0, humains: 0, robots: 0, serie: 0, serieMax: 0, ...lireJson(profil.multi, {}) });
 
+/**
+ * Résumé des amis d'un profil, gardé avec l'état sur l'appareil : nombre
+ * d'amis (la présence n'est envoyée que s'il y en a au moins un), demandes
+ * reçues sans réponse (pastille), mode invisible. Une seule lecture.
+ */
+export async function resumeAmis(env, id) {
+  const l = await env.DB.prepare(`SELECT
+      (SELECT COUNT(*) FROM amis WHERE profil = ?1 AND etat = 'ami') AS amis,
+      (SELECT COUNT(*) FROM amis WHERE profil = ?1 AND etat = 'recue') AS recues,
+      (SELECT invisible FROM amis_reglages WHERE profil = ?1) AS invisible`).bind(id).first();
+  return { amis: l?.amis || 0, recues: l?.recues || 0, invisible: l?.invisible === 1 };
+}
+
 /** État public du profil, renvoyé au navigateur (public/profil.js le garde en cache). */
-export function etatPublic(profil, jeux, gains) {
+export function etatPublic(profil, jeux, gains, amis = null) {
   const niveau = R.niveauPourXp(profil.xp);
   return {
     id: profil.id,
@@ -171,13 +192,14 @@ export function etatPublic(profil, jeux, gains) {
       .sort((a, b) => b.derniere - a.derniere)
       .map((j) => ({ id: j.jeu, secondes: j.secondes, premiere: j.premiere, derniere: j.derniere, termine: j.termine || null, etoiles: j.etoiles ?? null, max: j.etoiles_max ?? null })),
     aujourdhui: { jour: gains.jour || null, secondes: gains.secondes, xp: gains.xp, multiXp: gains.multi_xp, termines: gains.termines },
+    amis: amis || { amis: 0, recues: 0, invisible: false },
   };
 }
 
 export async function etatComplet(env, profil, maintenant) {
   const jour = jourUTC(maintenant);
-  const [jeux, gains] = await Promise.all([jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jour)]);
-  return etatPublic(profil, jeux, { ...gains, jour });
+  const [jeux, gains, amis] = await Promise.all([jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jour), resumeAmis(env, profil.id)]);
+  return etatPublic(profil, jeux, { ...gains, jour }, amis);
 }
 
 // --- Badges --------------------------------------------------------------------------
@@ -314,7 +336,7 @@ function entier(v, min, max) {
  */
 export async function synchroniser(env, profil, corps, catalogue, maintenant) {
   const jourU = jourUTC(maintenant);
-  const [jeux, gainsJour] = await Promise.all([jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jourU)]);
+  const [jeux, gainsJour, amis] = await Promise.all([jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jourU), resumeAmis(env, profil.id)]);
   const ajout = { secondes: 0, xp: 0, etoiles: 0, termines: 0, multi_xp: 0 };
   const modifies = new Set();
   const p = { ...profil };
@@ -418,7 +440,7 @@ export async function synchroniser(env, profil, corps, catalogue, maintenant) {
 
   const total = { ...gainsJour, jour: jourU };
   for (const k of Object.keys(ajout)) total[k] = (total[k] || 0) + ajout[k];
-  return { etat: etatPublic(p, jeux, total), gains };
+  return { etat: etatPublic(p, jeux, total, amis), gains };
 }
 
 // --- Apparence, pseudo -------------------------------------------------------------------------
@@ -550,7 +572,7 @@ export async function appliquerResultatMulti(env, r, catalogue, maintenant) {
  * 'etoiles' (étoiles gagnées) ou 'multi:<id du jeu>' (XP des manches en ligne de ce jeu).
  * Renvoie { sql, valeurs } d'une sous-requête (profil, points).
  */
-function requetePoints(perimetre, debut) {
+export function requetePoints(perimetre, debut) {
   if (perimetre === 'general') return { sql: 'SELECT profil, SUM(xp) AS points FROM profils_gains WHERE jour >= ? GROUP BY profil', valeurs: [debut] };
   if (perimetre === 'etoiles') return { sql: 'SELECT profil, SUM(etoiles) AS points FROM profils_gains WHERE jour >= ? GROUP BY profil', valeurs: [debut] };
   const jeu = perimetre.slice('multi:'.length);
@@ -623,6 +645,11 @@ export async function calculerFidelisation(env, jour) {
   const classement = await lire(`SELECT COUNT(*) AS n FROM (SELECT profil, SUM(xp) AS s FROM profils_gains WHERE jour >= ? AND jour <= ? GROUP BY profil) g
     JOIN profils p ON p.id = g.profil WHERE g.s > 0 AND p.niveau >= ?`, semaine, jour, R.CLASSEMENT_NIVEAU_MIN);
   const joueurs30 = termines?.joueurs || 0;
+  // Amis (docs/consigne-amis.md) : profils venus dans les 30 derniers jours, nombre d'amis de chacun.
+  const amis = await lire(`SELECT COUNT(*) AS joueurs, SUM(n > 0) AS avecAmi, SUM(n) AS amis FROM (
+      SELECT p.id, (SELECT COUNT(*) FROM amis a WHERE a.profil = p.id AND a.etat = 'ami') AS n FROM profils p
+      WHERE EXISTS (SELECT 1 FROM profils_jours j WHERE j.profil = p.id AND j.jour >= ? AND j.jour <= ?))`, debutMois, jour);
+  const joueursAmis = amis?.joueurs || 0;
   const donnees = {
     actifs: actifs?.n || 0,
     nouveaux: nouveaux?.n || 0,
@@ -635,6 +662,15 @@ export async function calculerFidelisation(env, jour) {
     codes: { crees: evenements.code || 0, restaurations: evenements.restauration || 0, profilsCrees: evenements.profil || 0 },
     multi: { manches: multi?.manches || 0, contreRobots: multi?.robots || 0, joueurs: multi?.joueurs || 0 },
     classement: { presentsSemaine: classement?.n || 0 },
+    amis: {
+      avecAmi: amis?.avecAmi || 0,                                        // profils des 30 derniers jours qui ont au moins un ami
+      part: joueursAmis ? (amis.avecAmi || 0) / joueursAmis : 0,           // … rapportés à tous les profils des 30 derniers jours
+      parJoueur: joueursAmis ? (amis.amis || 0) / joueursAmis : 0,         // nombre moyen d'amis par profil (30 derniers jours)
+      demandes: evenements['ami-demande'] || 0,                           // demandes envoyées ce jour
+      acceptees: evenements['ami-accepte'] || 0,                          // demandes acceptées ce jour
+      rejoindre: evenements.rejoindre || 0,                               // boutons « Rejoindre » touchés ce jour (tous jeux)
+      rejoindrePartie: evenements['rejoindre-partie'] || 0,               // … dont vers la partie en ligne d'un ami
+    },
   };
   await env.DB.prepare(`INSERT INTO fidelisation_jour (jour, donnees, calcule_le) VALUES (?, ?, ?)
     ON CONFLICT (jour) DO UPDATE SET donnees = excluded.donnees, calcule_le = excluded.calcule_le`).bind(jour, JSON.stringify(donnees), Date.now()).run();
@@ -671,6 +707,10 @@ export async function tacheQuotidienneProfil(env, maintenant) {
     env.DB.prepare(`DELETE FROM multi_resultats WHERE profil IN (${anciens})`).bind(inactif),
     env.DB.prepare(`DELETE FROM profils_appareils WHERE profil IN (${anciens})`).bind(inactif),
     env.DB.prepare(`DELETE FROM profils_signalements WHERE profil IN (${anciens}) OR auteur IN (${anciens})`).bind(inactif, inactif),
+    // Amis : demandes restées sans réponse, puis relations et réglages des profils effacés.
+    env.DB.prepare("DELETE FROM amis WHERE etat IN ('envoyee', 'recue') AND maj_le < ?").bind(maintenant - R.AMIS_DEMANDE_JOURS * JOUR_MS),
+    env.DB.prepare(`DELETE FROM amis WHERE profil IN (${anciens}) OR autre IN (${anciens})`).bind(inactif, inactif),
+    env.DB.prepare(`DELETE FROM amis_reglages WHERE profil IN (${anciens})`).bind(inactif),
     env.DB.prepare('DELETE FROM profils WHERE vu_le < ?').bind(inactif),
   ]);
   return jours;

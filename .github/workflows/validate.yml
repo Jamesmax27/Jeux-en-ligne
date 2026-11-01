@@ -28,7 +28,8 @@
 #     (suivi.js, play.js)      lanceur dans le navigateur si suivi.js ou play.js changent).
 #   - profil joueur          → tests du profil (scripts/tester-profil.mjs : code de
 #     (fonctions, réglages,    sauvegarde, expérience, étoiles, anti-triche, classement ;
-#     Worker)                  sans navigateur ni réseau) ;
+#     Worker, amis)            sans navigateur ni réseau) et des amis (scripts/tester-amis.mjs :
+#                              amitiés, présence, classement entre amis, docs/consigne-amis.md) ;
 #   - multijoueur (Worker,   → parties simulées, Worker avec de faux Durable Objects et jeux
 #     moteur, lanceur ou jeu   multijoueurs dans le lanceur (scripts/tester-multijoueur.mjs
 #     multijoueur)             --navigateur, docs/multijoueur.md) ; moteur modifié : les jeux
@@ -96,10 +97,12 @@ on:
       - "scripts/tester-demandes.mjs"
       - "scripts/tester-stats.mjs"
       - "scripts/tester-profil.mjs"
+      - "scripts/tester-amis.mjs"
       - "scripts/d1-local.mjs"
       - "scripts/etoiles-jeu.mjs"
       - "public/profil*.js"
       - "public/classement.js"
+      - "public/amis*.js"
       - "scripts/multijoueur.mjs"
       - "scripts/tester-multijoueur.mjs"
       - "schema.sql"
@@ -184,7 +187,7 @@ jobs:
           # sauvegarde, Worker multijoueur (ticket, résultats) : tests sans navigateur.
           profil=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then profil=1; fi
-          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/profil[a-z-]*\.js$|multijoueur/src/|scripts/(tester-profil|d1-local)\.mjs$)'; then profil=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/(profil|amis)[a-z-]*\.js$|multijoueur/src/|scripts/(tester-profil|tester-amis|d1-local)\.mjs$)'; then profil=1; fi
           # Référencement de tout le site : tout ce qui précède, plus les règles et
           # le vérificateur du référencement (sans navigateur).
           seo=0
@@ -369,6 +372,14 @@ jobs:
       - name: Contrôler le profil joueur
         if: needs.quoi.outputs.profil == '1'
         run: node scripts/tester-profil.mjs
+
+      # Amis (functions/api/amis.js, functions/_amis.js, Worker : présence) : demandes,
+      # acceptation, blocage, limites, présence (ticket, amis seulement, invisible,
+      # délai, lecture toutes les 10 s au plus), classement entre amis, indicateurs.
+      # Voir docs/consigne-amis.md.
+      - name: Contrôler les amis
+        if: needs.quoi.outputs.profil == '1'
+        run: node scripts/tester-amis.mjs
 
       # Multijoueur (docs/multijoueur.md) : moteur et Worker (faux Durable Objects),
       # parties simulées de chaque jeu multijoueur, puis chacun dans le lanceur avec un

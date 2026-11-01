@@ -28,7 +28,7 @@
 // touchés : ils ont leur propre cache, indépendant de VERSION.
 // ==========================================================================
 
-const VERSION = 'v16';
+const VERSION = 'v17';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
 const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
@@ -45,6 +45,7 @@ const COQUILLE = [
   'consentement.js', 'mesure.js', 'langue.js', 'i18n/i18n.js', 'proposer.js', 'demandes-regles.js',
   'multijoueur/lanceur.js', 'multijoueur/config.js',
   'profil.js', 'profil-pastille.js', 'profil-textes.js', 'profil-reglages.js', 'profil-page.js', 'profil-code.js', 'profil-mots.js', 'classement.js',
+  'amis.js', 'amis-page.js',
   'i18n/site/fr.json', 'i18n/site/en.json', 'i18n/site/es.json', 'i18n/site/pt.json', 'i18n/site/de.json',
   'manifest.webmanifest', 'assets/logo.svg', 'assets/sans-jaquette.svg',
 ];
@@ -68,8 +69,8 @@ const RE_CATEGORIE = /^(?:(?:en|es|pt|de)\/)?(?:genres|generos|spielarten|univer
 const RE_LEGALE = /^(?:mentions-legales|confidentialite|conditions-utilisation|cookies|en\/(?:legal-notice|privacy-policy|terms-of-use|cookie-policy))\/$/;
 // Formulaire public de demandes (l'envoi demande une connexion ; la page reste lisible).
 const RE_PROPOSER = /^(?:proposer|en\/suggest|es\/proponer|pt\/sugerir|de\/vorschlagen)\/$/;
-// Profil joueur et classement (copie du profil sur l'appareil ; le classement demande une connexion).
-const RE_PROFIL = /^(?:(?:en|es|pt|de)\/)?(?:profil|profile|perfil|classement|leaderboard|clasificacion|classificacao|rangliste)\/$/;
+// Profil joueur, classement et amis (copie du profil sur l'appareil ; classement et amis demandent une connexion).
+const RE_PROFIL = /^(?:(?:en|es|pt|de)\/)?(?:profil|profile|perfil|classement|leaderboard|clasificacion|classificacao|rangliste|amis|friends|amigos|freunde)\/$/;
 
 // --- Installation et mise à jour ---------------------------------------------
 

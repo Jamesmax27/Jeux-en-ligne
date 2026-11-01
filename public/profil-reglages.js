@@ -9,11 +9,12 @@
 //
 // Lu par :
 //   - le navigateur (public/profil.js, profil-pastille.js, profil-page.js,
-//     classement.js) : affichage, estimation du niveau avant l'envoi ;
-//   - le serveur (functions/_profil.js, functions/api/profil*.js,
-//     functions/api/classement.js) : c'est lui qui calcule et qui décide ;
-//   - le Worker multijoueur (multijoueur/src/profil.js) : durée minimale et
-//     minimum d'actions d'une manche ;
+//     classement.js, amis.js, amis-page.js) : affichage, estimation du niveau
+//     avant l'envoi, rythme des signaux de présence ;
+//   - le serveur (functions/_profil.js, _amis.js, functions/api/profil*.js,
+//     functions/api/classement.js, amis.js) : c'est lui qui calcule et qui décide ;
+//   - le Worker multijoueur (multijoueur/src/profil.js, presence.js) : durée
+//     minimale et minimum d'actions d'une manche, présence des amis ;
 //   - les tests (scripts/tester-profil.mjs).
 // Un changement de valeur vaut pour les prochains gains : rien n'est recalculé
 // en arrière (l'expérience déjà gagnée reste acquise). Seuls la courbe des
@@ -105,6 +106,29 @@ export const SIGNALEMENTS_MAX = 3;            // signalements de joueurs différ
 export const SIGNALER_NIVEAU_MIN = 3;         // niveau minimal pour signaler un pseudo
 export const NUMERO_MIN = 1000;               // nombre du pseudo par défaut (« Joueur 4821 ») : de…
 export const NUMERO_MAX = 99999;              // … à
+
+// --- Amis, présence, rejoindre (docs/consigne-amis.md) ---------------------------
+// Une amitié relie deux profils anonymes ; on ajoute un ami par son pseudo
+// exact (pas de recherche), il accepte ou refuse. Tout est décidé par le serveur.
+export const AMIS_MAX = 50;                   // amis acceptés au plus par profil
+export const AMIS_ATTENTE_MAX = 20;           // demandes envoyées encore sans réponse, au plus
+export const AMIS_RECUES_MAX = 50;            // demandes reçues sans réponse au plus : au-delà, les nouvelles sont refusées (sans le dire à l'envoyeur)
+export const AMIS_ESSAIS_HEURE = 10;          // demandes tentées par profil et par heure (pseudo inconnu compris : pas de parcours des pseudos)
+export const AMIS_ESSAIS_HEURE_ADRESSE = 30;  // … et par adresse et par heure (une école partage souvent une adresse)
+export const AMIS_NIVEAU_MIN = 2;             // niveau minimal pour envoyer une demande (écarte les profils créés par des robots)
+export const AMIS_TURNSTILE = false;          // true : contrôle anti-robot (Turnstile, action « ami ») à chaque demande envoyée, si les limites ne suffisent plus
+export const AMIS_DEMANDE_JOURS = 30;         // demande sans réponse effacée au bout de 30 jours
+export const PRESENCE_ACTIVE = true;          // false : présence et « Rejoindre » coupés partout (la liste d'amis et le classement restent)
+export const PRESENCE_INTERVALLE_S = 120;     // signal de présence toutes les 2 minutes, seulement tant que la page est visible
+export const PRESENCE_ECART_MIN_S = 10;       // jamais deux signaux à moins de 10 s (changements d'état rapprochés : regroupés)
+export const PRESENCE_HORS_LIGNE_S = 300;     // sans signal depuis 5 minutes : hors ligne
+export const PRESENCE_TICKET_HEURES = 12;     // validité du ticket de présence (signé par le site) que le navigateur présente au serveur de présence
+export const PRESENCE_ECRITURE_S = 30;        // le serveur de présence recopie son état en mémoire dans son stockage au plus toutes les 30 s (jamais dans D1)
+export const PRESENCE_PAUSE_ERREUR_MIN = 15;  // serveur de présence en panne ou quota atteint : plus de signal pendant 15 minutes (mode dégradé)
+export const AMIS_ACTUALISER_S = 30;          // page Amis et classement entre amis : actualisés toutes les 30 s tant que la page est visible
+export const AMIS_ACTUALISER_MIN_S = 10;      // bouton « Actualiser » : une fois toutes les 10 s au plus (navigateur, et serveur par profil)
+export const AMIS_CLASSEMENT_CACHE_S = 180;   // classement entre amis gardé 3 minutes dans le cache de Cloudflare (la présence, elle, est relue)
+export const REJOINDRE_DEPUIS = '2026-11-03'; // jeu multijoueur ajouté depuis cette date : "rejoindre": true obligatoire (validate-games.mjs ; les plus anciens sont adaptés peu à peu)
 
 // --- Conservation ------------------------------------------------------------------
 export const GAINS_JOURS_GARDES = 400;        // gains par jour (classements) gardés 13 mois, puis effacés

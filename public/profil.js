@@ -19,8 +19,9 @@
 //
 // Utilisé par le lanceur (play.js : temps de jeu, jeu terminé, ticket
 // multijoueur), la pastille (profil-pastille.js, toutes les pages), la page
-// de profil (profil-page.js), le classement (classement.js) et le catalogue
-// (app.js : check vert des jeux terminés).
+// de profil (profil-page.js), le classement (classement.js), les amis
+// (amis.js : jeton, résumé des amis dans l'état) et le catalogue (app.js :
+// check vert des jeux terminés).
 // ==========================================================================
 
 import * as R from './profil-reglages.js';
@@ -80,6 +81,23 @@ export function etat() { return lire().etat; }
 
 /** Le profil existe-t-il sur cet appareil ? */
 export function aUnProfil() { return !!lire().jeton; }
+
+/** Jeton secret de l'appareil (pour les appels de amis.js), ou null. */
+export function jetonAppareil() { return lire().jeton; }
+
+/**
+ * Résumé des amis renvoyé par /api/amis ({ amis, recues, invisible }) : rangé
+ * avec la copie du profil (pastille, présence), sans attendre le prochain envoi.
+ */
+export function majResumeAmis(resume) {
+  lire();
+  if (!memoire.etat || !resume || typeof resume !== 'object') return;
+  const avant = JSON.stringify(memoire.etat.amis || null);
+  memoire.etat.amis = { amis: resume.amis || 0, recues: resume.recues || 0, invisible: resume.invisible === true };
+  if (JSON.stringify(memoire.etat.amis) === avant) return;
+  ecrire();
+  prevenir(null);
+}
 
 /** Identifiants des jeux terminés (copie locale). */
 export function jeuxTermines() {

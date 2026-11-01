@@ -16,6 +16,8 @@
 //   profil      /profil/         /en/profile/     /es/perfil/       /pt/perfil/      /de/profil/
 //   classement  /classement/     /en/leaderboard/ /es/clasificacion/ /pt/classificacao/ /de/rangliste/
 //               (profil joueur et classement, non indexés : docs/cadrage-fidelisation.md)
+//   amis        /amis/           /en/friends/     /es/amigos/       /pt/amigos/      /de/freunde/
+//               (amis et présence, non indexée : docs/consigne-amis.md)
 //
 // Pages légales, en français et en anglais seulement (les autres langues
 // mènent à la version anglaise) :
@@ -59,6 +61,7 @@ const SEGMENTS_PROPOSER = { fr: 'proposer', en: 'suggest', es: 'proponer', pt: '
 // Profil joueur et classement (pages non indexées).
 const SEGMENTS_PROFIL = { fr: 'profil', en: 'profile', es: 'perfil', pt: 'perfil', de: 'profil' };
 const SEGMENTS_CLASSEMENT = { fr: 'classement', en: 'leaderboard', es: 'clasificacion', pt: 'classificacao', de: 'rangliste' };
+const SEGMENTS_AMIS = { fr: 'amis', en: 'friends', es: 'amigos', pt: 'amigos', de: 'freunde' };
 
 // Tranches d'âge (TRANCHES_AGE de taxonomie.js) → morceau d'adresse (« + » est interdit).
 // Les tranches retirées (ANCIENNES_TRANCHES) gardent le leur : leurs anciennes
@@ -128,6 +131,12 @@ export function urlProfil(lang) {
 export function urlClassement(lang) {
   const l = langueValide(lang);
   return `/${PREFIXE[l]}${SEGMENTS_CLASSEMENT[l]}/`;
+}
+
+/** Page des amis : « /amis/ », « /en/friends/ »… */
+export function urlAmis(lang) {
+  const l = langueValide(lang);
+  return `/${PREFIXE[l]}${SEGMENTS_AMIS[l]}/`;
 }
 
 /** Lanceur du jeu (plein écran), dans la langue donnée. */

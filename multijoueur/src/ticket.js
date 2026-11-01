@@ -8,7 +8,12 @@
 // jeton secret de l'appareil.
 //
 // Forme : <données en base64url>.<signature HMAC-SHA256 en base64url>
-//   données : { p: numéro du profil, j: id du jeu, e: expiration (ms) }
+//   données : { p: numéro du profil, j: id du jeu, e: expiration (ms),
+//               n: pseudo choisi (ou absent), u: nombre du pseudo par défaut }
+// n et u : le pseudo affiché aux autres joueurs de la partie (docs/consigne-amis.md),
+// vérifié par le site (filtre des pseudos) avant d'être signé.
+// Même forme pour le ticket de présence des amis (j = '@presence',
+// functions/_amis.js et src/presence.js), qui ne vaut pour aucun jeu.
 // Clé : secret MULTI_SECRET, le même dans Cloudflare Pages et dans le Worker.
 // ==========================================================================
 
@@ -29,14 +34,17 @@ function cle(secret) {
   return crypto.subtle.importKey('raw', encodeur.encode(String(secret)), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
 }
 
-/** Ticket signé pour le profil `profil` et le jeu `jeu`, valable jusqu'à `expiration` (ms). */
-export async function signerTicket(secret, { profil, jeu, expiration }) {
-  const donnees = base64url(encodeur.encode(JSON.stringify({ p: profil, j: jeu, e: expiration })));
+/** Ticket signé pour le profil `profil` et le jeu `jeu`, valable jusqu'à `expiration` (ms) ; pseudo et numero facultatifs. */
+export async function signerTicket(secret, { profil, jeu, expiration, pseudo, numero }) {
+  const contenu = { p: profil, j: jeu, e: expiration };
+  if (typeof pseudo === 'string' && pseudo) contenu.n = pseudo;
+  if (Number.isSafeInteger(numero)) contenu.u = numero;
+  const donnees = base64url(encodeur.encode(JSON.stringify(contenu)));
   const signature = await crypto.subtle.sign('HMAC', await cle(secret), encodeur.encode(donnees));
   return `${donnees}.${base64url(signature)}`;
 }
 
-/** { profil, jeu } si le ticket est bien signé, pour ce jeu et pas expiré ; sinon null. */
+/** { profil, jeu, pseudo, numero } si le ticket est bien signé, pour ce jeu et pas expiré ; sinon null. */
 export async function verifierTicket(secret, ticket, jeu, maintenant = Date.now()) {
   if (!secret || typeof ticket !== 'string' || ticket.length > 600) return null;
   const [donnees, signature, reste] = ticket.split('.');
@@ -46,7 +54,12 @@ export async function verifierTicket(secret, ticket, jeu, maintenant = Date.now(
     if (!ok) return null;
     const d = JSON.parse(new TextDecoder().decode(depuisBase64url(donnees)));
     if (!Number.isSafeInteger(d.p) || d.p <= 0 || d.j !== jeu || !(d.e > maintenant)) return null;
-    return { profil: d.p, jeu: d.j };
+    return {
+      profil: d.p,
+      jeu: d.j,
+      pseudo: typeof d.n === 'string' && d.n.length <= 64 ? d.n : null,
+      numero: Number.isSafeInteger(d.u) ? d.u : null,
+    };
   } catch {
     return null;
   }

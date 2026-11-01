@@ -611,11 +611,11 @@
       <div class="stats-tableau-cadre">
         <table class="stats-tableau" id="fidelisation-tableau">
           <caption class="sr-only">Indicateurs de fidélisation par jour</caption>
-          <thead><tr><th>Jour (UTC)</th><th>Actifs</th><th>Nouveaux</th><th>Retour J+1</th><th>Retour à 7 j</th><th>Retour à 30 j</th><th>Série moy.</th><th>Niveau moy.</th><th>Codes créés</th><th>Restaurations</th><th>Manches en ligne</th><th>dont robots seuls</th><th>Classés (semaine)</th></tr></thead>
+          <thead><tr><th>Jour (UTC)</th><th>Actifs</th><th>Nouveaux</th><th>Retour J+1</th><th>Retour à 7 j</th><th>Retour à 30 j</th><th>Série moy.</th><th>Niveau moy.</th><th>Codes créés</th><th>Restaurations</th><th>Manches en ligne</th><th>dont robots seuls</th><th>Classés (semaine)</th><th>Avec un ami (30 j)</th><th>Amis par joueur</th><th>Demandes d'ami</th><th>Acceptées</th><th>« Rejoindre »</th><th>dont même partie</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
-      <p class="idees-note">Actifs : profils venus ce jour-là (jour de leur appareil). Retour J+1 : part des profils créés la veille revenus ce jour. Retour à 7 j (à 30 j) : part des profils créés 7 (30) jours plus tôt revenus au moins une fois depuis. Série moy. : jours consécutifs des actifs. Niveau moy. : profils venus dans les 30 derniers jours. Classés : profils présents dans le classement général de la semaine (niveau 2 au moins). Calcul quotidien avec les statistiques des jeux (06:37 UTC) ; même base et mêmes jours UTC, pour les rapprocher.</p>
+      <p class="idees-note">Actifs : profils venus ce jour-là (jour de leur appareil). Retour J+1 : part des profils créés la veille revenus ce jour. Retour à 7 j (à 30 j) : part des profils créés 7 (30) jours plus tôt revenus au moins une fois depuis. Série moy. : jours consécutifs des actifs. Niveau moy. : profils venus dans les 30 derniers jours. Classés : profils présents dans le classement général de la semaine (niveau 2 au moins). Calcul quotidien avec les statistiques des jeux (06:37 UTC) ; même base et mêmes jours UTC, pour les rapprocher. Amis (docs/consigne-amis.md) : profils des 30 derniers jours qui ont au moins un ami (et leur part), amis par profil, demandes envoyées et acceptées ce jour, boutons « Rejoindre » touchés ce jour (dont vers la partie en ligne d'un ami).</p>
     </section>
   </main>
 
@@ -1362,6 +1362,7 @@
           ['Retour à 30 jours', taux(dernier.retour.j30)],
           ['Niveau moyen (30 j)', dernier.niveauMoyen.toFixed(1)],
           ['Jeux terminés par joueur (30 j)', dernier.termines.parJoueur.toFixed(2)],
+          ...(dernier.amis ? [['Joueurs avec au moins un ami (30 j)', `${Math.round(100 * dernier.amis.part)} %`]] : []),
         ] : []).map(([nom, valeur]) => {
           const div = document.createElement('div');
           div.className = 'stats-tuile';
@@ -1376,7 +1377,10 @@
         corps.replaceChildren(...d.jours.map((j) => {
           const tr = document.createElement('tr');
           for (const v of [j.jour, j.actifs, j.nouveaux, taux(j.retour.j1), taux(j.retour.j7), taux(j.retour.j30), j.serieMoyenne.toFixed(1), j.niveauMoyen.toFixed(1),
-            j.codes.crees, j.codes.restaurations, j.multi.manches, j.multi.contreRobots, j.classement.presentsSemaine]) {
+            j.codes.crees, j.codes.restaurations, j.multi.manches, j.multi.contreRobots, j.classement.presentsSemaine,
+            // Amis : absents des jours calculés avant leur mise en ligne.
+            j.amis ? `${j.amis.avecAmi} (${Math.round(100 * j.amis.part)} %)` : '—', j.amis ? j.amis.parJoueur.toFixed(2) : '—',
+            j.amis?.demandes ?? '—', j.amis?.acceptees ?? '—', j.amis?.rejoindre ?? '—', j.amis?.rejoindrePartie ?? '—']) {
             const td = document.createElement('td');
             td.textContent = String(v);
             tr.append(td);
