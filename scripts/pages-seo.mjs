@@ -623,6 +623,20 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
       ${groupe('genre', 'groupe.genres')}
       ${groupe('univers', 'groupe.univers')}
   </nav>`;
+    // Présentation du site : les mots {profil}, {classement} et {amis} des
+    // textes deviennent des liens vers ces pages (non indexées).
+    const lien = (nom, href) => `<a href="${echapper(href)}">${echapper(t(`apropos.lien.${nom}`))}</a>`;
+    const avecLiens = (cle) => echapper(t(cle, { profil: '%profil%', classement: '%classement%', amis: '%amis%' }))
+      .replace('%profil%', lien('profil', urlProfil(lang)))
+      .replace('%classement%', lien('classement', urlClassement(lang)))
+      .replace('%amis%', lien('amis', urlAmis(lang)));
+    const apropos = `<section class="a-propos" aria-labelledby="titre-a-propos">
+    <h2 id="titre-a-propos">${echapper(t('apropos.titre'))}</h2>
+    <p>${echapper(t('apropos.gratuit'))}</p>
+    <p>${echapper(t('apropos.multi'))}</p>
+    <p>${avecLiens('apropos.profil')}</p>
+    <p>${echapper(t('apropos.horsLigne'))}</p>
+  </section>`;
     const donneesSite = {
       '@context': 'https://schema.org',
       '@type': 'WebSite',
@@ -641,6 +655,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
       // Premières cartes écrites dans la page : la grille a sa hauteur et ses
       // images dès le premier affichage ; app.js les remplace ensuite (même boîte).
       grille: derniers.map((j, i) => carteJeu(j, lang, t, { titreNiveau: 'h2', prioritaire: i < 2 })).join(''),
+      apropos,
       plan,
     };
     await ecrire(dossierPublic, chemin, remplir(gabarits.accueil, valeurs, t, morceaux, 'gabarits/accueil.html'));
