@@ -28,7 +28,7 @@
 // touchés : ils ont leur propre cache, indépendant de VERSION.
 // ==========================================================================
 
-const VERSION = 'v17';
+const VERSION = 'v18';
 const CACHE_COQUILLE = `jel-coquille-${VERSION}`;
 const CACHE_DONNEES = 'jel-donnees-v2';     // catalog.json (v1 gardait aussi les scores)
 const CACHE_JEUX = 'jel-jeux-v1';           // jeux ouverts + leur jaquette (lu par hors-ligne.js)
@@ -45,6 +45,7 @@ const COQUILLE = [
   'consentement.js', 'mesure.js', 'langue.js', 'i18n/i18n.js', 'proposer.js', 'demandes-regles.js',
   'multijoueur/lanceur.js', 'multijoueur/config.js',
   'profil.js', 'profil-pastille.js', 'profil-textes.js', 'profil-reglages.js', 'profil-page.js', 'profil-code.js', 'profil-mots.js', 'classement.js',
+  'avatars.js', 'avatars-dessins.js',
   'amis.js', 'amis-page.js',
   'i18n/site/fr.json', 'i18n/site/en.json', 'i18n/site/es.json', 'i18n/site/pt.json', 'i18n/site/de.json',
   'manifest.webmanifest', 'assets/logo.svg', 'assets/sans-jaquette.svg',

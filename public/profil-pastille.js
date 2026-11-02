@@ -17,9 +17,11 @@
 // Chargée par toutes les pages générées (scripts/pages-seo.mjs) et par le lanceur.
 // ==========================================================================
 
+import * as R from './profil-reglages.js';
 import {
-  etat, rafraichir, surChangement, marquerTermines, nomAffiche, pictoAvatar, derniereVisite, noterVisite,
+  etat, rafraichir, surChangement, marquerTermines, nomAffiche, derniereVisite, noterVisite,
 } from './profil.js';
+import { peindreAvatar } from './avatars.js';
 import { chargerTextes, t, langue, surChangementLangue } from './profil-textes.js';
 import { urlProfil, urlClassement, urlAmis, urlJeu } from './chemins.js';
 import { annoncer as annoncerPresence } from './amis.js';
@@ -69,14 +71,16 @@ function afficher() {
   if (!bouton) return;
   const e = etat();
   const lang = langue();
-  const avatar = bouton.querySelector('.pastille-avatar');
-  avatar.textContent = pictoAvatar(e?.avatar);
-  avatar.dataset.cadre = e?.cadre || 'aucun';
+  peindreAvatar(bouton.querySelector('.pastille-avatar'), {
+    avatar: e?.avatar, cadre: e?.cadre || 'aucun', niveau: e ? e.niveau : null, anime: true,
+  });
   bouton.querySelector('.pastille-niveau').textContent = e ? String(e.niveau) : '·';
   // Demandes d'ami en attente : point doré sur la pastille, nombre dans le menu.
   const demandes = e?.amis?.recues || 0;
   bouton.querySelector('.pastille-demande').hidden = !demandes;
-  const aria = e ? t('profil.pastilleAria', { nom: nomAffiche(e, t), n: e.niveau }) : t('profil.pastille');
+  const aria = e
+    ? t('profil.pastilleAria', { nom: nomAffiche(e, t), n: e.niveau, rang: t(`rang.${R.rangPourNiveau(e.niveau).id}`) })
+    : t('profil.pastille');
   bouton.setAttribute('aria-label', demandes ? `${aria} · ${t('amis.pastilleDemandes', { n: demandes })}` : aria);
   bouton.title = bouton.getAttribute('aria-label');
   const [profil, classement, amis] = menu.querySelectorAll('a');
@@ -103,7 +107,8 @@ function signalerDemandes(n) {
 // --- Annonces (niveau, badges, jeu terminé) ----------------------------------------
 
 let zoneToasts = null;
-function toast(texte) {
+// dessin (facultatif) : avatar montré dans l'annonce ({ avatar, cadre, niveau } de peindreAvatar).
+function toast(texte, dessin = null) {
   if (!zoneToasts) {
     zoneToasts = document.createElement('div');
     zoneToasts.className = 'profil-toasts';
@@ -113,10 +118,35 @@ function toast(texte) {
   }
   const p = document.createElement('p');
   p.className = 'profil-toast';
-  p.textContent = texte;
+  if (dessin) {
+    p.classList.add('avec-avatar');
+    const image = document.createElement('span');
+    image.setAttribute('aria-hidden', 'true');
+    peindreAvatar(image, { ...dessin, anime: true });
+    const mots = document.createElement('span');
+    mots.textContent = texte;
+    p.append(image, mots);
+  } else {
+    p.textContent = texte;
+  }
   zoneToasts.append(p);
   setTimeout(() => p.classList.add('part'), DUREE_TOAST);
   setTimeout(() => p.remove(), DUREE_TOAST + 600);
+}
+
+// Nouveau rang, avatars et cadres débloqués par un passage de niveau ou un badge.
+function annoncerDeblocages(gains) {
+  const e = etat();
+  const moi = { avatar: e?.avatar, cadre: e?.cadre || 'aucun', niveau: gains.niveau };
+  const avant = gains.niveauAvant || 1;
+  const nouveaux = new Set(gains.badges || []);
+  const debloque = (x) => (x.badge ? nouveaux.has(x.badge) : x.niveau > avant && x.niveau <= gains.niveau);
+  if (gains.niveau > avant) {
+    const rang = R.rangPourNiveau(gains.niveau);
+    if (rang.id !== R.rangPourNiveau(avant).id) toast(t('profil.toast.rang', { rang: t(`rang.${rang.id}`) }), { ...moi, aura: true });
+  }
+  for (const a of R.AVATARS.filter(debloque)) toast(t('profil.toast.avatar', { nom: t(`avatar.${a.id}`) }), { avatar: a.id, cadre: null });
+  for (const c of R.CADRES.filter(debloque)) toast(t('profil.toast.cadre', { nom: t(`cadre.${c.id}`) }), { ...moi, cadre: c.id, niveau: null });
 }
 
 function annoncer(gains) {
@@ -127,6 +157,7 @@ function annoncer(gains) {
   }
   if (gains.niveau > gains.niveauAvant) toast(t('profil.toast.niveau', { n: gains.niveau }));
   for (const b of gains.badges || []) toast(t('profil.toast.badge', { badge: t(`badge.${b}`) }));
+  if (gains.niveau) annoncerDeblocages(gains);
   if (gains.bienvenue) bienvenue(gains.bienvenue);
 }
 

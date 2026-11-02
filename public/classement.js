@@ -16,7 +16,8 @@
 // ==========================================================================
 
 import * as R from './profil-reglages.js';
-import { classement, etat, rafraichir, pictoAvatar, signaler } from './profil.js';
+import { classement, etat, rafraichir, signaler } from './profil.js';
+import { peindreAvatar } from './avatars.js';
 import { chargerTextes, t, langue, date } from './profil-textes.js';
 import { classementAmis, actualisation, elementsPresence, annoncer } from './amis.js';
 
@@ -43,9 +44,7 @@ function ligneHtml(ligne, perimetre, moiId, { sansSignaler = false } = {}) {
   li.innerHTML = `<span class="classement-rang"></span><span class="classement-avatar" aria-hidden="true"></span>
     <span class="classement-nom"></span><span class="classement-niveau"></span><span class="classement-points"></span>`;
   li.querySelector('.classement-rang').textContent = t('classement.rang', { n: ligne.rang });
-  const avatar = li.querySelector('.classement-avatar');
-  avatar.textContent = pictoAvatar(ligne.avatar);
-  avatar.dataset.cadre = ligne.cadre;
+  peindreAvatar(li.querySelector('.classement-avatar'), { avatar: ligne.avatar, cadre: ligne.cadre, niveau: ligne.niveau });
   li.querySelector('.classement-nom').textContent = nom(ligne) + (ligne.id === moiId ? ` (${t('classement.toi')})` : '');
   li.querySelector('.classement-niveau').textContent = t('classement.niveau', { n: ligne.niveau });
   li.querySelector('.classement-points').textContent = points(perimetre, ligne.points);

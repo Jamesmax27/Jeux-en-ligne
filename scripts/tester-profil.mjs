@@ -132,6 +132,36 @@ verifier(R.seuilNiveau(5) / R.XP_PAR_MINUTE <= 20, 'les 5 premiers niveaux en un
 verifier(R.seuilNiveau(20) > R.MINUTES_MAX_JOUR * R.XP_PAR_MINUTE * 5, 'le niveau 20 demande de revenir plusieurs jours');
 
 // ==========================================================================
+console.log('Avatars, cadres et rangs');
+{
+  const { DESSINS } = await import('../public/avatars-dessins.js');
+  const { CADRES_DESSINES, RANGS_DESSINES } = await import('../public/avatars.js');
+  const textes = Object.fromEntries(await Promise.all(['fr', 'en', 'es', 'pt', 'de'].map(async (l) => {
+    const { readFile } = await import('node:fs/promises');
+    return [l, JSON.parse(await readFile(new URL(`../public/i18n/site/${l}.json`, import.meta.url), 'utf8'))];
+  })));
+  const sansTexte = (cles) => Object.entries(textes).flatMap(([l, d]) => cles.filter((k) => typeof d[k] !== 'string').map((k) => `${l}:${k}`));
+  const ids = (liste) => liste.map((x) => x.id);
+  verifier(new Set(ids(R.AVATARS)).size === R.AVATARS.length && new Set(ids(R.CADRES)).size === R.CADRES.length, 'identifiants des avatars et des cadres uniques');
+  verifier(R.AVATARS[0].id === 'chat' && R.AVATARS[0].niveau === 1, 'avatar par défaut : chat, niveau 1');
+  verifier(R.AVATARS.every((a) => (a.badge ? R.listeBadges().some((b) => b.id === a.badge) : a.niveau >= 1 && a.niveau <= R.NIVEAU_MAX))
+    && R.CADRES.every((c) => (c.badge ? R.listeBadges().some((b) => b.id === c.badge) : c.niveau >= 1 && c.niveau <= R.NIVEAU_MAX)), 'déblocages : niveau possible ou badge existant');
+  const niveaux = R.AVATARS.filter((a) => !a.badge).map((a) => a.niveau);
+  verifier(niveaux.every((n, i) => i === 0 || n >= niveaux[i - 1]), 'avatars rangés par niveau croissant (badges à la fin)');
+  const manquants = R.AVATARS.filter((a) => !DESSINS[a.id]).map((a) => a.id);
+  verifier(!manquants.length, 'chaque avatar a son dessin', manquants);
+  const interdit = /\bid=|url\(|href|<script|<text|<image|<use|<foreignObject|\son\w+=|style=|class=|Gradient|clipPath|<mask|<filter|javascript:/i;
+  const fautifs = Object.entries(DESSINS).filter(([, svg]) => interdit.test(svg) || !/^<circle cx="50" cy="50" r="50" fill="#[0-9a-f]{3,6}"\/>/i.test(svg) || svg.length > 4000).map(([id]) => id);
+  verifier(!fautifs.length, 'dessins sûrs : fond rond d\'abord, ni identifiant, ni adresse, ni script, ni texte, 4 000 caractères au plus', fautifs);
+  verifier(Object.keys(DESSINS).every((id) => R.AVATARS.some((a) => a.id === id)), 'aucun dessin sans avatar dans les réglages');
+  verifier(R.CADRES.every((c) => CADRES_DESSINES.includes(c.id)), 'chaque cadre est dessiné', R.CADRES.filter((c) => !CADRES_DESSINES.includes(c.id)).map((c) => c.id));
+  verifier(R.RANGS[0].niveau === 1 && R.RANGS.every((r, i) => i === 0 || r.niveau > R.RANGS[i - 1].niveau) && R.RANGS.every((r) => RANGS_DESSINES.includes(r.id)), 'rangs croissants depuis le niveau 1, chacun avec son aura');
+  verifier(R.rangPourNiveau(1).id === 'apprenti' && R.rangPourNiveau(9).id === 'apprenti' && R.rangPourNiveau(10).id === 'explorateur' && R.rangPourNiveau(52).id === 'legende' && R.rangPourNiveau(100).id === 'cosmique', 'rang d\'un niveau (1, 9, 10, 52, 100)');
+  const cles = [...R.AVATARS.map((a) => `avatar.${a.id}`), ...R.CADRES.map((x) => `cadre.${x.id}`), ...R.RANGS.map((r) => `rang.${r.id}`)];
+  verifier(!sansTexte(cles).length, 'noms des avatars, cadres et rangs dans les 5 langues', sansTexte(cles));
+}
+
+// ==========================================================================
 console.log('Création et temps de jeu');
 const refuse = await profil({ action: 'creer', jour: jourLocal() }, { entetes: { Origin: 'https://autre-site.example' } });
 verifier(refuse.statut === 403, 'envoi depuis un autre site refusé', refuse.statut);
