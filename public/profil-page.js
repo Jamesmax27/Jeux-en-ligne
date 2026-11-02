@@ -262,6 +262,20 @@ function brancherInvisible() {
   });
 }
 
+// « Changer mon avatar » : défile en douceur jusqu'au choix des avatars (sans
+// JavaScript, le lien y mène quand même).
+function brancherChangerAvatar() {
+  $('profil-changer-avatar').addEventListener('click', (ev) => {
+    const cible = $('titre-apparence');
+    if (!cible) return;
+    ev.preventDefault();
+    const doux = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    cible.scrollIntoView({ behavior: doux ? 'smooth' : 'auto', block: 'start' });
+    cible.setAttribute('tabindex', '-1');
+    cible.focus({ preventScroll: true });
+  });
+}
+
 // --- Pseudo ------------------------------------------------------------------------------
 
 function brancherPseudo() {
@@ -357,6 +371,7 @@ async function demarrer() {
     catalogue = new Map((c.games || []).map((j) => [j.id, j]));
   } catch { /* hors connexion : identifiants à la place des titres */ }
   brancherPseudo();
+  brancherChangerAvatar();
   brancherCode();
   brancherInvisible();
   afficher();
