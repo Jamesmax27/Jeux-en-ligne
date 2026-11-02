@@ -103,6 +103,7 @@ on:
       - "scripts/d1-local.mjs"
       - "scripts/etoiles-jeu.mjs"
       - "public/profil*.js"
+      - "public/avatars*.js"
       - "public/classement.js"
       - "public/amis*.js"
       - "scripts/multijoueur.mjs"
@@ -179,7 +180,7 @@ jobs:
           # Textes, taxonomie, gabarits (textes des catégories compris), générateur
           # des pages et pages du site : le site est testé avec un seul jeu.
           site=0
-          if printf '%s\n' "$fichiers" | grep -Eq '^(public/i18n/|gabarits/|public/(taxonomie|chemins|app|langue|play|suivi|sw|consentement|mesure|pub|votes|turnstile|proposer|demandes-regles|profil[a-z-]*|classement)\.js$|public/play\.html$|public/_headers$|scripts/(build-catalog|pages-seo)\.mjs$)'; then site=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(public/i18n/|gabarits/|public/(taxonomie|chemins|app|langue|play|suivi|sw|consentement|mesure|pub|votes|turnstile|proposer|demandes-regles|profil[a-z-]*|avatars[a-z-]*|classement)\.js$|public/play\.html$|public/_headers$|scripts/(build-catalog|pages-seo)\.mjs$)'; then site=1; fi
           # Statistiques de jeu : fonctions Cloudflare, migration, tests (sans navigateur) ;
           # suivi des parties du lanceur : aussi dans le navigateur.
           stats=0
@@ -194,7 +195,7 @@ jobs:
           # sauvegarde, Worker multijoueur (ticket, résultats) : tests sans navigateur.
           profil=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then profil=1; fi
-          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/(profil|amis)[a-z-]*\.js$|multijoueur/src/|scripts/(tester-profil|tester-amis|d1-local)\.mjs$)'; then profil=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/(profil|amis|avatars)[a-z-]*\.js$|multijoueur/src/|scripts/(tester-profil|tester-amis|d1-local)\.mjs$)'; then profil=1; fi
           # Saisons et tendances de la boucle de nuit (file d'idées, calendrier) : tests sans navigateur.
           inspirations=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then inspirations=1; fi
