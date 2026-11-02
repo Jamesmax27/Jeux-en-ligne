@@ -6,7 +6,10 @@
 // Corps : { "type": "nouveau" | "bug" | "modification", "jeu": "<id>" (bug et
 //           modification), "titre": "...", "description": "...",
 //           "site": "" (champ piège, toujours vide pour un humain),
-//           "turnstileToken": "..." }
+//           "turnstileToken": "...", "jeton": "<jeton du profil de l'appareil>" (facultatif) }
+// Le jeton relie la demande au profil joueur : pseudo, niveau et numéro du
+// profil sont lus dans la base (jamais pris dans la demande) et écrits dans
+// la rubrique « Auteur » de l'issue. Sans profil : « Visiteur anonyme ».
 // Limites de longueur : public/demandes-regles.js (les mêmes que la page).
 //
 // Contrôles, dans cet ordre :
@@ -33,8 +36,23 @@ import {
   ETIQUETTES, ENVOIS_HEURE, ENVOIS_JOUR, preparerTables, etatBlocage, noterAbus,
   compterEnvois, noterEnvoi, purger, titreIssuePublique, corpsDemandePublique,
 } from '../_demandes.js';
+import { profilParJeton } from '../_profil.js';
+import { niveauPourXp } from '../../public/profil-reglages.js';
 
 const PURGE_PROBABILITE = 0.05; // une demande sur 20 efface les vieilles lignes
+
+// Profil joueur de l'appareil ({ profil, pseudo, numero, niveau }), ou null :
+// jeton absent ou inconnu, base du profil indisponible. Ne bloque jamais la demande.
+async function auteurDemande(env, jeton) {
+  if (typeof jeton !== 'string' || !jeton) return null;
+  try {
+    const p = await profilParJeton(env, jeton);
+    return p ? { profil: p.id, pseudo: p.pseudo || null, numero: p.numero, niveau: niveauPourXp(p.xp) } : null;
+  } catch (erreur) {
+    console.error('Demande publique : profil illisible.', erreur);
+    return null;
+  }
+}
 
 export async function onRequest({ request, env, waitUntil }) {
   if (request.method !== 'POST') {
@@ -114,6 +132,7 @@ export async function onRequest({ request, env, waitUntil }) {
         titre: nettoyerTitre(demande.titre),
         description: nettoyerDescription(demande.description),
         date: maintenant,
+        auteur: await auteurDemande(env, corps.jeton),
       }),
       labels: [ETIQUETTES.publique, ETIQUETTES.attenteIa],
     });

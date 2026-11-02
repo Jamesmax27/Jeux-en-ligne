@@ -706,7 +706,8 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
     const chemin = urlProposer(lang);
     const limites = { min: TITRE_MIN, max: TITRE_MAX };
     const limitesDescription = { min: DESCRIPTION_MIN, max: DESCRIPTION_MAX };
-    const textes = Object.fromEntries(Object.keys(dicos.fr).filter((cle) => cle.startsWith('proposer.')).map((cle) => [cle, t(cle)]));
+    // « profil.pseudoDefaut » : nom d'un joueur sans pseudo dans la ligne « Envoyé en tant que … ».
+    const textes = Object.fromEntries(Object.keys(dicos.fr).filter((cle) => cle.startsWith('proposer.') || cle === 'profil.pseudoDefaut').map((cle) => [cle, t(cle)]));
     const fil = ariane([{ nom: t('page.accueil'), chemin: urlAccueil(lang) }, { nom: t('proposer.h1'), chemin }], t);
     const valeurs = {
       lang: HREFLANG[lang],
