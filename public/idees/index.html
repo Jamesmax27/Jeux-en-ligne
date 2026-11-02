@@ -974,6 +974,11 @@
       tete.append(element('span', 'demande-type', NOMS_TYPES[d.type] || d.type || '?'));
       if (d.jeu) tete.append(element('span', '', `Jeu : ${d.titreJeu || d.jeu}`));
       tete.append(element('span', '', dateLisible(d.date || d.creee)));
+      // Auteur : profil joueur joint à la demande (functions/api/demandes.js), sinon visiteur anonyme.
+      const a = d.auteur;
+      tete.append(element('span', '', a
+        ? `Par ${a.pseudo || `Joueur ${a.numero} (sans pseudo)`} · niveau ${a.niveau} · profil n° ${a.profil}`
+        : 'Par un visiteur anonyme'));
       const lien = element('a', '', `#${d.numero} sur GitHub`);
       lien.href = d.url;
       lien.target = '_blank';

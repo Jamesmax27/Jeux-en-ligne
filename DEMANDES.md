@@ -45,6 +45,7 @@ N'importe quel visiteur, sans compte, peut **proposer un nouveau jeu**, **signal
 - Adresses : `/proposer/`, `/en/suggest/`, `/es/proponer/`, `/pt/sugerir/`, `/de/vorschlagen/` (pages générées par `scripts/pages-seo.mjs` avec `gabarits/proposer.html`, non indexées ; textes : clés `proposer.*` de `public/i18n/site/*.json`).
 - Liens : pied de page de toutes les pages ; page de chaque jeu (« Un bug ou une idée pour ce jeu ? ») ; bouton 🚩 de la barre du lanceur. Depuis un jeu, l'adresse porte `?jeu=<id>` : le jeu est déjà choisi. Aucun type de demande n'est choisi d'avance.
 - Champs : type (obligatoire), jeu (obligatoire pour un bug ou une modification, caché pour un nouveau jeu), titre (5 à 100 caractères), description (30 à 2 000 caractères). Ces limites sont dans **`public/demandes-regles.js`**, lu par la page et par le serveur.
+- Auteur : si l'appareil a un profil joueur, la page envoie son jeton (`public/profil.js`) et affiche « Envoyé en tant que <pseudo> · niveau N » au-dessus du bouton. Le serveur lit le **pseudo, le niveau et le numéro du profil dans la base** (jamais ce qu'envoie la page) et les écrit dans la rubrique `### Auteur` : ``Joueur `Lune` · niveau 12 · profil n° 77 (formulaire public)`` (sans pseudo : `Joueur sans pseudo (« Joueur 4821 »)`). Le numéro de profil ne change jamais, contrairement au pseudo. Sans profil, ou profil illisible : « Visiteur anonyme », la demande part quand même.
 
 ### Le circuit complet
 
@@ -61,7 +62,7 @@ N'importe quel visiteur, sans compte, peut **proposer un nouveau jeu**, **signal
    - **Refus** : commentaire avec le motif, étiquette `refuse-ia`, issue fermée. Insulte ou spam : **abus signalé au site** (`POST /api/moderation`, secret partagé `MODERATION_SECRET`).
    - **Validation** : commentaire avec la conclusion et le résumé, étiquette `valide-ia` (l'avis est aussi gardé, invisible, en fin d'issue).
    - Panne ou limite d'utilisation : l'issue garde `en-attente-ia`, avec un commentaire. Retirer puis remettre `en-attente-ia` relance la modération.
-3. **Votre décision** : page privée `/idees`, onglet **« Demandes publiques »** (lien direct `/idees/#publiques`). Pour chaque demande validée par l'IA : type, jeu, titre, description d'origine, avis et résumé de l'IA, date, lien vers l'issue.
+3. **Votre décision** : page privée `/idees`, onglet **« Demandes publiques »** (lien direct `/idees/#publiques`). Pour chaque demande validée par l'IA : type, jeu, titre, description d'origine, avis et résumé de l'IA, date, auteur (pseudo, niveau et numéro de profil, ou visiteur anonyme), lien vers l'issue.
    - **Accepter un nouveau jeu** : choisissez le genre, l'âge et les univers (pré-remplis par l'IA). L'issue devient une **idée perso** (`idee-perso`, étiquette du genre) : la boucle de nuit la fabrique **en priorité, comme vos propres idées**, puis ferme l'issue avec le lien du jeu.
    - **Accepter un bug ou une modification** : l'étiquette `demande-ia` est ajoutée, et `demande-modification.yml` la traite aussitôt comme vos demandes (section précédente).
    - **Refuser** : étiquette `refuse-humain`, issue fermée. **Refuser et bannir** : en plus, son auteur ne peut plus rien envoyer.

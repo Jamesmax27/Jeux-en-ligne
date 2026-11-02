@@ -13,6 +13,9 @@
 //   Turnstile (action « demande ») et envoi à /api/demandes
 //   (functions/api/demandes.js), qui crée l'issue GitHub modérée par l'IA.
 // - Le champ « site » est un piège à robots, caché aux humains : jamais rempli ici.
+// - Profil joueur (public/profil.js) : le jeton de l'appareil part avec la
+//   demande ; le serveur en tire le pseudo et le niveau de l'auteur. La ligne
+//   « Envoyé en tant que … » le dit au joueur (cachée sans profil).
 // ==========================================================================
 
 import {
@@ -20,6 +23,7 @@ import {
   champInvalide, nettoyerTitre, nettoyerDescription,
 } from '/demandes-regles.js';
 import { jetonTurnstile } from '/turnstile.js';
+import { etat, jetonAppareil, surChangement, nomAffiche } from '/profil.js';
 
 const DELAI_ENVOI = 15000;
 
@@ -44,6 +48,7 @@ if (formulaire) {
     description: document.getElementById('proposer-description'),
     compteur: document.getElementById('proposer-compteur'),
     piege: document.getElementById('proposer-site'),
+    auteur: document.getElementById('proposer-auteur'),
     bouton: document.getElementById('proposer-envoyer'),
     message: document.getElementById('proposer-message'),
   };
@@ -64,6 +69,14 @@ if (formulaire) {
     el.description.placeholder = t(type ? `proposer.exemple.${type}` : 'proposer.exemple');
   }
   for (const r of el.types) r.addEventListener('change', majType);
+
+  // « Envoyé en tant que <pseudo> · niveau N » : la demande est signée par le profil.
+  function majAuteur() {
+    const e = jetonAppareil() ? etat() : null;
+    el.auteur.hidden = !e;
+    if (e) el.auteur.textContent = t('proposer.auteur', { nom: nomAffiche(e, t), niveau: e.niveau });
+  }
+  surChangement(majAuteur);
 
   el.description.addEventListener('input', () => {
     el.compteur.textContent = `${el.description.value.length} / ${DESCRIPTION_MAX}`;
@@ -143,7 +156,7 @@ if (formulaire) {
       const reponse = await fetch('/api/demandes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...demande, site: el.piege.value, turnstileToken: jeton }),
+        body: JSON.stringify({ ...demande, site: el.piege.value, turnstileToken: jeton, jeton: jetonAppareil() || undefined }),
         signal: AbortSignal.timeout ? AbortSignal.timeout(DELAI_ENVOI) : undefined,
       });
       let corps = {};
@@ -168,5 +181,6 @@ if (formulaire) {
   });
 
   majType();
+  majAuteur();
   chargerJeux();
 }

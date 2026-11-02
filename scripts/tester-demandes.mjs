@@ -238,6 +238,37 @@ await test('demande valide (nouveau jeu) : issue créée, étiquettes et rubriqu
   egal(lu.titre, DEMANDE.titre, 'titre relu');
   egal(lu.description, DEMANDE.description, 'description relue');
   attendu(!issue.body.includes('192.0.2.10'), "l'adresse IP ne doit jamais apparaître");
+  egal(lu.auteur, null, 'sans jeton : visiteur anonyme');
+  attendu(issue.body.includes('Visiteur anonyme (formulaire public)'), 'ligne Auteur anonyme');
+});
+
+await test('demande avec le jeton du profil : pseudo, niveau et numéro lus dans la base', async () => {
+  const P = await import('../functions/_profil.js');
+  const R = await import('../public/profil-reglages.js');
+  await P.preparerTablesProfil(env);
+  const { jeton, profil } = await P.creerProfil(env, { jour: null }, Date.now());
+  const xp = R.seuilNiveau(7);
+  DB.sqlite.prepare('UPDATE profils SET pseudo = ?, xp = ? WHERE id = ?').run('Lune_Bleue-3', xp, profil.id);
+  // Pseudo et niveau envoyés par la page : ignorés, seul le jeton compte.
+  egal((await envoyer({ ...DEMANDE, jeton, pseudo: 'Faux', niveau: 100 }, '192.0.2.15')).statut, 200, 'envoi');
+  const issue = derniereIssue();
+  attendu(issue.body.includes(`Joueur \`Lune_Bleue-3\` · niveau 7 · profil n° ${profil.id} (formulaire public)`), `ligne Auteur : ${issue.body}`);
+  attendu(!issue.body.includes(jeton), 'le jeton ne doit jamais apparaître');
+  const lu = D.lireDemandePublique(issue.body);
+  egal(JSON.stringify(lu.auteur), JSON.stringify({ profil: profil.id, pseudo: 'Lune_Bleue-3', numero: null, niveau: 7 }), 'auteur relu');
+
+  // Sans pseudo choisi : « Joueur <numéro> ».
+  DB.sqlite.prepare('UPDATE profils SET pseudo = NULL WHERE id = ?').run(profil.id);
+  await envoyer({ ...DEMANDE, type: 'bug', jeu: 'pommes-du-poney', jeton }, '192.0.2.15');
+  const lu2 = D.lireDemandePublique(derniereIssue().body);
+  egal(JSON.stringify(lu2.auteur), JSON.stringify({ profil: profil.id, pseudo: null, numero: profil.numero, niveau: 7 }), 'auteur sans pseudo relu');
+  egal(lireCommeDemandeModification(derniereIssue().body).texte.includes('Joueur'), false, 'auteur hors du texte lu par demande-modification.yml');
+
+  // Jeton inconnu ou mal formé : la demande part quand même, en anonyme.
+  egal((await envoyer({ ...DEMANDE, jeton: 'x'.repeat(40) }, '192.0.2.15')).statut, 200, 'jeton inconnu');
+  egal(D.lireDemandePublique(derniereIssue().body).auteur, null, 'jeton inconnu : anonyme');
+  egal((await envoyer({ ...DEMANDE, jeton: { pas: 'texte' } }, '192.0.2.16')).statut, 200, 'jeton mal formé');
+  egal(D.lireDemandePublique(derniereIssue().body).auteur, null, 'jeton mal formé : anonyme');
 });
 
 await test('demande valide (bug) : lisible par demande-modification.yml', async () => {
