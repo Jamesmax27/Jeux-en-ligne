@@ -2680,27 +2680,83 @@ body.lanceur::after { animation: none; }
 /* --------------------------------------------------------------------------
    Profil joueur (docs/cadrage-fidelisation.md) : pastille de l'en-tête et du
    lanceur, annonces, bienvenue, check vert des jeux terminés, page de profil
-   et classement. Couleurs des cadres d'avatar : --cadre-<id> (CADRES de
-   public/profil-reglages.js).
+   et classement. Avatars dessinés, auras et cadres : bloc « Avatars » ci-dessous
+   (dessins : public/avatars.js et avatars-dessins.js). Couleurs des médailles du
+   classement : --cadre-<id>.
    -------------------------------------------------------------------------- */
 
 :root {
   --vert-termine: #3ccf7a;
-  --cadre-aucun: var(--orbite);
   --cadre-bronze: #d39a66;
   --cadre-argent: #d7deea;
   --cadre-or: var(--or);
-  --cadre-etoile: #fff0c2;
-  --cadre-diamant: #9fe8f7;
 }
 
-/* Contour de l'avatar selon le cadre choisi (pastille, profil, classement). */
-[data-cadre] { --cadre: var(--cadre-aucun); }
-[data-cadre="bronze"] { --cadre: var(--cadre-bronze); }
-[data-cadre="argent"] { --cadre: var(--cadre-argent); }
-[data-cadre="or"] { --cadre: var(--cadre-or); }
-[data-cadre="etoile"] { --cadre: var(--cadre-etoile); }
-[data-cadre="diamant"] { --cadre: var(--cadre-diamant); }
+/* --- Avatars (public/avatars.js, peindreAvatar) ------------------------------
+   Un élément .avatar (sa taille = celle du disque) contient trois SVG :
+   l'aura du rang (170 %, derrière, page de profil seulement), le dessin
+   (découpé en disque) et le cadre (132 %, par-dessus). --trait-cadre : épaisseur
+   de l'anneau en unités du dessin (100 = diamètre) : plus épais en petit pour
+   rester visible. Petite lueur de la couleur du rang autour des avatars sans aura. */
+.avatar {
+  --trait-cadre: 4px;
+  position: relative;
+  display: inline-block;
+  flex: none;
+  border-radius: 50%;
+  isolation: isolate;
+  vertical-align: middle;
+}
+
+.avatar-dessin { display: block; width: 100%; height: 100%; clip-path: circle(50%); }
+.avatar-cadre, .avatar-aura { position: absolute; overflow: visible; pointer-events: none; }
+.avatar-cadre { left: -16%; top: -16%; width: 132%; height: 132%; }
+.avatar-aura { left: -35%; top: -35%; width: 170%; height: 170%; z-index: -1; }
+.avatar-picto { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; background: var(--surface); font-size: 1.4em; line-height: 1; }
+.avatar-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+.avatar .av-trait { stroke-width: var(--trait-cadre); }
+.avatar .av-fin { stroke-width: calc(var(--trait-cadre) / 2); }
+.avatar .av-gras { stroke-width: calc(var(--trait-cadre) * 1.25); }
+.avatar .av-epais { stroke-width: calc(var(--trait-cadre) * 1.75); }
+.avatar .av-lune { stroke: var(--nuit); stroke-width: 1.5px; paint-order: stroke; }
+
+.avatar:not(.avec-aura)[data-rang="explorateur"],
+.avatar:not(.avec-aura)[data-rang="aventurier"] { box-shadow: 0 0 10px rgba(196, 181, 253, .45); }
+.avatar:not(.avec-aura)[data-rang="heros"],
+.avatar:not(.avec-aura)[data-rang="legende"] { box-shadow: 0 0 12px rgba(255, 216, 138, .5); }
+.avatar:not(.avec-aura)[data-rang="champion"] { box-shadow: 0 0 12px rgba(196, 181, 253, .55), 0 0 4px rgba(255, 216, 138, .4); }
+.avatar:not(.avec-aura)[data-rang="titan"],
+.avatar:not(.avec-aura)[data-rang="cosmique"] { box-shadow: 0 0 14px rgba(255, 154, 213, .5), 0 0 6px rgba(127, 227, 245, .45); }
+
+/* Mouvements : orbites, pulsation et scintillement, seulement sur un .avatar.anime. */
+@keyframes av-tourne { to { transform: rotate(360deg); } }
+@keyframes av-pulse { 0%, 100% { opacity: .55; transform: scale(.97); } 50% { opacity: 1; transform: scale(1.03); } }
+@keyframes av-scint { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+.avatar .av-tourne, .avatar .av-pulse { transform-box: fill-box; transform-origin: 50% 50%; }
+.avatar.anime .av-tourne { animation: av-tourne 14s linear infinite; }
+.avatar.anime .av-vite { animation-duration: 7s; }
+.avatar.anime .av-lent { animation-duration: 28s; }
+.avatar.anime .av-inverse { animation-direction: reverse; }
+.avatar.anime .av-pulse { animation: av-pulse 2.8s ease-in-out infinite; }
+.avatar.anime .av-scint { animation: av-scint 1.9s ease-in-out infinite; }
+.avatar.anime .av-d1 { animation-delay: -.6s; }
+.avatar.anime .av-d2 { animation-delay: -1.2s; }
+.avatar.anime .av-d3 { animation-delay: -.3s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar.anime :is(.av-tourne, .av-pulse, .av-scint) { animation: none; }
+}
+
+@media (forced-colors: active) {
+  .avatar-aura { display: none; }
+}
+
+/* Avatar pas encore débloqué : silhouette claire sur un disque sombre, à
+   découvrir (le fond du dessin, son premier cercle, est retiré). */
+.avatar.silhouette { background: var(--surface); box-shadow: inset 0 0 0 1px var(--lisere); }
+.avatar.silhouette .avatar-dessin { filter: brightness(0) invert(1) opacity(.26); }
+.avatar.silhouette .avatar-dessin > :first-child { visibility: hidden; }
 
 .pastille-profil {
   position: relative;
@@ -2733,79 +2789,8 @@ body.lanceur::after { animation: none; }
   .pastille-bouton:hover { border-color: var(--craie-douce); background: var(--surface-relevee); }
 }
 
-.pastille-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 2px solid var(--cadre);
-  border-radius: 50%;
-  background: var(--surface);
-  font-size: 21px;
-  line-height: 1;
-}
-
-.pastille-avatar[data-cadre="arc-en-ciel"],
-.profil-avatar[data-cadre="arc-en-ciel"],
-.classement-avatar[data-cadre="arc-en-ciel"],
-.profil-choix-bouton[data-cadre="arc-en-ciel"] {
-  --cadre: #8fd3f5;   /* sa lune */
-  border-color: transparent;
-  background: linear-gradient(var(--surface), var(--surface)) padding-box,
-    conic-gradient(#ff9a9a, #ffd88a, #8fe3b0, #8fd3f5, #c4b5fd, #ff9a9a) border-box;
-}
-
-/* Cadres en orbites : l'anneau (bordure, couleur du cadre) entouré d'une
-   lueur de la même couleur, et sa petite lune en haut à droite, cernée de
-   nuit. Étoile : la lune est une étincelle, avec un halo doré. Diamant : une
-   lune taillée (losange). Sans cadre : ni lueur ni lune. */
-:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre] {
-  --halo-cadre: 3px;
-  position: relative;
-  box-shadow: 0 0 0 var(--halo-cadre) color-mix(in oklab, var(--cadre) 20%, transparent);
-}
-
-.profil-avatar[data-cadre] { --halo-cadre: 6px; }
-
-:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre]::after {
-  content: "";
-  position: absolute;
-  top: -4%;
-  right: -8%;
-  width: 26%;
-  height: 26%;
-  border-radius: 50%;
-  background: var(--cadre);
-  box-shadow: 0 0 0 2px var(--nuit);
-  pointer-events: none;
-}
-
-:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="aucun"] { box-shadow: none; }
-:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="aucun"]::after { content: none; }
-
-:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="etoile"] {
-  box-shadow: 0 0 0 var(--halo-cadre) rgba(255, 216, 138, .22), 0 0 14px rgba(255, 216, 138, .45);
-}
-
-:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="etoile"]::after {
-  top: -10%;
-  right: -12%;
-  width: 34%;
-  height: 34%;
-  border-radius: 0;
-  box-shadow: none;
-  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
-}
-
-:is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre="diamant"]::after {
-  border-radius: 2px;
-  transform: rotate(45deg) scale(.86);
-}
-
-@media (forced-colors: active) {
-  :is(.pastille-avatar, .profil-avatar, .classement-avatar, .profil-choix-bouton.cadre)[data-cadre]::after { content: none; }
-}
+/* Le cadre déborde de 16 % : disque de 32 px pour rester dans la pastille de 44 px. */
+.pastille-avatar { --trait-cadre: 6px; width: 32px; height: 32px; margin: 0 3px; font-size: 19px; }
 
 .pastille-niveau { min-width: 1.2em; text-align: center; }
 
@@ -2991,19 +2976,9 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
   box-shadow: var(--reflet);
 }
 
-.profil-avatar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 88px;
-  height: 88px;
-  border: 4px solid var(--cadre);
-  border-radius: 50%;
-  background: var(--nuit);
-  font-size: 50px;
-  line-height: 1;
-}
+/* Grand avatar du profil, avec l'aura de son rang (qui déborde de 35 %). */
+.profil-avatar { width: 92px; height: 92px; margin: 16px 26px 16px 20px; font-size: 50px; }
+.profil-carte .profil-identite { flex-basis: 150px; }
 
 .profil-identite { flex: 1 1 220px; min-width: 0; }
 .profil-nom { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; font-size: 20px; overflow-wrap: anywhere; }
@@ -3090,23 +3065,63 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 .profil-badge-nom { font-weight: 800; font-size: 14px; }
 .profil-badge-aide { font-size: 12px; }
 
-.profil-choix { display: flex; flex-wrap: wrap; gap: 8px; }
+.profil-choix { display: flex; flex-wrap: wrap; gap: 10px; }
 
+/* Boutons de choix : l'avatar dessiné (56 px) ; pour les cadres, l'avatar du
+   joueur en plus petit, pour laisser la place au cadre. */
 .profil-choix-bouton {
   position: relative;
-  width: 52px;
-  height: 52px;
-  border: 2px solid var(--orbite);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
-  background: var(--surface);
+  background: none;
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
 }
 
-.profil-choix-bouton.cadre { border: 4px solid var(--cadre); }
+.profil-choix-bouton .avatar { width: 56px; height: 56px; }
+.profil-choix-bouton.cadre .avatar { --trait-cadre: 5px; width: 44px; height: 44px; }
 .profil-choix-bouton[aria-pressed="true"] { outline: 3px solid var(--lavande); outline-offset: 2px; }
-.profil-choix-bouton:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .5; }
+.profil-choix-bouton:disabled { cursor: not-allowed; }
+.profil-choix-bouton.cadre:disabled .avatar { filter: grayscale(1); opacity: .5; }
+
+@media (hover: hover) {
+  .profil-choix-bouton:not(:disabled):hover .avatar { transform: scale(1.06); }
+}
+
+/* Prochain avatar à débloquer : sa silhouette, son niveau et la distance. */
+.profil-prochain {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-plaque);
+  background: var(--verre);
+  box-shadow: var(--reflet);
+}
+
+.profil-prochain[hidden] { display: none; }
+.profil-prochain .avatar { width: 72px; height: 72px; }
+.profil-prochain-texte { flex: 1; min-width: 0; }
+.profil-prochain-texte p { margin: 0; color: var(--craie-douce); font-size: 14px; }
+.profil-prochain-texte strong { display: block; margin: 2px 0 8px; font-size: 18px; }
+.profil-prochain-texte .profil-barre { margin-bottom: 6px; }
+
+/* Rang à côté du niveau (« Niveau 52 · Légende »), couleur du rang. */
+.profil-rang-nom[data-rang="legende"], .profil-rang-nom[data-rang="titan"] { color: var(--or); }
+.profil-rang-nom[data-rang="cosmique"] { color: #ff9ad5; }
+
+/* Annonce d'un avatar ou d'un cadre débloqué : avec son dessin. */
+.profil-toast.avec-avatar { display: flex; align-items: center; gap: 12px; }
+.profil-toast .avatar { width: 40px; height: 40px; --trait-cadre: 5px; }
 
 .profil-verrou {
   position: absolute;
@@ -3189,17 +3204,7 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 .classement-ligne.medaille-argent .classement-rang::before { content: "🥈 "; }
 .classement-ligne.medaille-bronze .classement-rang::before { content: "🥉 "; }
 
-.classement-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 2px solid var(--cadre);
-  border-radius: 50%;
-  background: var(--surface);
-  font-size: 20px;
-}
+.classement-avatar { --trait-cadre: 6px; width: 32px; height: 32px; margin: 0 4px; font-size: 18px; }
 
 .classement-nom { min-width: 0; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .classement-niveau, .classement-points { color: var(--craie-douce); font-size: 14px; white-space: nowrap; }

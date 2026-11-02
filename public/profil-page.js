@@ -14,9 +14,10 @@
 import * as R from './profil-reglages.js';
 import { lireCode } from './profil-code.js';
 import {
-  etat, rafraichir, surChangement, nomAffiche, pictoAvatar, demanderCode, restaurer, changerPseudo,
+  etat, rafraichir, surChangement, nomAffiche, demanderCode, restaurer, changerPseudo,
   changerApparence, classement, marquerTermines,
 } from './profil.js';
+import { peindreAvatar } from './avatars.js';
 import { chargerTextes, t, langue, date } from './profil-textes.js';
 import { urlJeu, urlLanceur, urlClassement } from './chemins.js';
 import { classementAmis, changerInvisible } from './amis.js';
@@ -52,11 +53,17 @@ function afficher() {
   $('profil-etat').textContent = '';
   const badges = new Set(e.badges.map((b) => b.id));
 
-  // Carte : avatar, nom, niveau, expérience.
-  $('profil-avatar').textContent = pictoAvatar(e.avatar);
-  $('profil-avatar').dataset.cadre = e.cadre;
+  // Carte : avatar avec l'aura de son rang, nom, niveau et rang, expérience.
+  const rang = R.rangPourNiveau(e.niveau);
+  peindreAvatar($('profil-avatar'), { avatar: e.avatar, cadre: e.cadre, niveau: e.niveau, aura: true, anime: true });
   $('profil-nom').textContent = nomAffiche(e, t);
-  $('profil-niveau').textContent = t('profil.niveau', { n: e.niveau });
+  const niveau = $('profil-niveau');
+  niveau.textContent = `${t('profil.niveau', { n: e.niveau })} · `;
+  const nomRang = document.createElement('span');
+  nomRang.className = 'profil-rang-nom';
+  nomRang.dataset.rang = rang.id;
+  nomRang.textContent = t(`rang.${rang.id}`);
+  niveau.append(nomRang);
   if (e.suivant) {
     barre($('profil-barre-xp'), e.xp - e.seuil, e.suivant - e.seuil);
     $('profil-barre-xp').setAttribute('aria-label', t('profil.xpAria'));
@@ -158,7 +165,22 @@ function afficher() {
     ? t('profil.multi.resume', { n: e.multi.parties, v: e.multi.victoires, h: e.multi.humains })
     : t('profil.multi.aucune');
 
-  // Avatars et cadres : débloqués ou non.
+  // Prochain avatar à débloquer par le niveau : silhouette, niveau, distance.
+  const prochain = R.AVATARS.find((a) => !a.badge && a.niveau > e.niveau);
+  $('profil-prochain').hidden = !prochain;
+  if (prochain) {
+    const image = $('profil-prochain-avatar');
+    peindreAvatar(image, { avatar: prochain.id, cadre: null });
+    image.classList.add('silhouette');
+    $('profil-prochain-niveau').textContent = t('profil.prochain.niveau', { n: prochain.niveau });
+    $('profil-prochain-nom').textContent = t(`avatar.${prochain.id}`);
+    const depart = Math.max(1, ...R.AVATARS.filter((a) => !a.badge && a.niveau <= e.niveau).map((a) => a.niveau));
+    barre($('profil-prochain-barre'), e.niveau - depart, prochain.niveau - depart);
+    $('profil-prochain-barre').setAttribute('aria-label', t('profil.prochain.titre'));
+    $('profil-prochain-reste').textContent = t('profil.prochain.reste', { n: prochain.niveau - e.niveau });
+  }
+
+  // Avatars et cadres : débloqués ou non (avatar pas encore débloqué : silhouette).
   const choix = (conteneur, liste, actuel, champ) => {
     conteneur.textContent = '';
     for (const x of liste) {
@@ -172,9 +194,15 @@ function afficher() {
       const nom = t(`${champ}.${x.id}`);
       const condition = x.badge ? t('profil.apparence.badge', { badge: t(`badge.${x.badge}`) }) : t('profil.apparence.niveau', { n: x.niveau });
       b.setAttribute('aria-label', libre ? nom : `${nom} — ${condition}`);
-      b.title = libre ? nom : condition;
-      if (champ === 'avatar') b.textContent = x.picto;
-      else { b.dataset.cadre = x.id; b.textContent = pictoAvatar(e.avatar); }
+      b.title = libre ? nom : `${nom} — ${condition}`;
+      const image = document.createElement('span');
+      if (champ === 'avatar') {
+        peindreAvatar(image, { avatar: x.id, cadre: null });
+        image.classList.toggle('silhouette', !libre);
+      } else {
+        peindreAvatar(image, { avatar: e.avatar, cadre: x.id, anime: libre });
+      }
+      b.append(image);
       if (!libre) {
         const verrou = document.createElement('span');
         verrou.className = 'profil-verrou';

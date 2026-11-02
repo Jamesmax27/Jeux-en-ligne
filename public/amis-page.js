@@ -11,7 +11,8 @@
 // ==========================================================================
 
 import * as R from './profil-reglages.js';
-import { etat, rafraichir, pictoAvatar } from './profil.js';
+import { etat, rafraichir } from './profil.js';
+import { peindreAvatar } from './avatars.js';
 import { liste, demander, repondre, actualisation, elementsPresence, annoncer } from './amis.js';
 import { chargerTextes, t, langue, date } from './profil-textes.js';
 
@@ -46,8 +47,7 @@ function ligne(p, { presence, actions = [], note = null }) {
   const avatar = document.createElement('span');
   avatar.className = 'classement-avatar';
   avatar.setAttribute('aria-hidden', 'true');
-  avatar.textContent = pictoAvatar(p.avatar);
-  avatar.dataset.cadre = p.cadre;
+  peindreAvatar(avatar, { avatar: p.avatar, cadre: p.cadre, niveau: p.niveau });
   const texte = document.createElement('div');
   texte.className = 'amis-texte';
   const n = document.createElement('p');

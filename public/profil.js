@@ -432,11 +432,6 @@ export function nomAffiche(e, t) {
   return e.pseudo || t('profil.pseudoDefaut', { n: e.numero });
 }
 
-/** Picto de l'avatar (réglages), ou celui par défaut. */
-export function pictoAvatar(id) {
-  return (R.AVATARS.find((a) => a.id === id) || R.AVATARS[0]).picto;
-}
-
 const RE_FICHE = /^\/(?:(?:en|es|pt|de)\/)?(?:jeux|games|juegos|jogos|spiele)\/([a-z0-9-]+)\/$/;
 
 /**
