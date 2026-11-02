@@ -1,0 +1,64 @@
+# ==========================================================================
+# Relevé des tendances Google pour l'idéation de la boucle de nuit
+# (scripts/inspirations.mjs collecter).
+#
+# Le flux « Tendances du moment » de Google Trends ne donne qu'une dizaine de
+# recherches par pays à chaque lecture : un relevé toutes les 6 heures (plus
+# celui de l'idéation) en garde de quoi choisir. Les relevés sont gardés
+# 14 jours dans le cache de GitHub Actions (clé « inspirations-… »), lu par
+# l'étape a de boucle-de-nuit.yml. Rien n'est écrit dans le dépôt.
+#
+# Seulement quand la variable GitHub TENDANCES_BOUCLE vaut 1 à 5 (lancement à
+# la main : toujours). Aucun agent, aucun secret, quelques secondes.
+# ==========================================================================
+
+name: Relevé des tendances Google
+
+on:
+  schedule:
+    # Jamais à l'heure pile (voir boucle-de-nuit.yml).
+    - cron: "41 2,8,14,20 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: inspirations
+  cancel-in-progress: false
+
+jobs:
+  relever:
+    if: ${{ github.event_name == 'workflow_dispatch' || (vars.TENDANCES_BOUCLE != '' && vars.TENDANCES_BOUCLE != '0') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Récupérer les scripts
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            scripts
+            public
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Relevés précédents
+        uses: actions/cache/restore@v4
+        with:
+          path: .inspirations/historique.json
+          key: inspirations-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: inspirations-
+
+      - name: Lire les tendances Google
+        run: node scripts/inspirations.mjs collecter
+
+      - name: Garder les relevés
+        if: hashFiles('.inspirations/historique.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .inspirations/historique.json
+          key: inspirations-${{ github.run_id }}-${{ github.run_attempt }}

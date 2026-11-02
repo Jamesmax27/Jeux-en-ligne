@@ -158,6 +158,8 @@ async function lireJeu(nomDossier) {
     // refuse un message « jeu terminé » qui en annonce un autre nombre) ; jeu sans fin.
     ...(Number.isInteger(fiche.etoiles) && fiche.etoiles > 0 ? { etoiles: fiche.etoiles } : {}),
     ...(fiche.sans_fin === true ? { sans_fin: true } : {}),
+    // Saison ou tendance de l'idée (scripts/inspirations.mjs) : colonne de l'onglet « Stats » de /idees.
+    ...(typeof fiche.inspiration === 'string' && /^(saison|tendance):[a-z0-9-]{1,72}$/.test(fiche.inspiration) ? { inspiration: fiche.inspiration } : {}),
     genre,
     genres_secondaires: genresSecondaires,
     univers,
