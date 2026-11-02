@@ -7,7 +7,10 @@
 // boutons de choix) avec trois couches :
 //   1. l'aura du rang (seulement si aura : true, page de profil) : lueur,
 //      lunes en orbite, anneau de planète… de plus en plus riche avec le rang ;
-//   2. le dessin de l'avatar (public/avatars-dessins.js), découpé en disque ;
+//   2. le dessin de l'avatar (public/avatars-dessins.js), découpé en disque,
+//      sur le même fond pour tous : une petite planète lilas éclairée en haut
+//      à gauche (choix du propriétaire, novembre 2026 ; le fond sombre propre
+//      à chaque dessin est remplacé à l'affichage) ;
 //   3. le cadre (anneau et sa petite lune), par-dessus.
 // Couches 1 et 3 : SVG débordant de l'élément (170 % et 132 % de sa taille),
 // placés par public/style.css (bloc « Avatars »). Les mouvements (orbites,
@@ -30,6 +33,7 @@ const DEFS = `<defs>
 <linearGradient id="fmg-l-nebuleuse" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#6d7cff"/><stop offset=".5" stop-color="#c084fc"/><stop offset="1" stop-color="#ff9ad5"/></linearGradient>
 <linearGradient id="fmg-l-nova" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff6dc"/><stop offset=".5" stop-color="#ffd88a"/><stop offset="1" stop-color="#ffb347"/></linearGradient>
 <linearGradient id="fmg-l-cosmique" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7fe3f5"/><stop offset=".35" stop-color="#c4b5fd"/><stop offset=".7" stop-color="#ff9ad5"/><stop offset="1" stop-color="#ffd88a"/></linearGradient>
+<radialGradient id="fmg-planete" cx="35%" cy="30%" r="80%"><stop offset="0" stop-color="#b3a6f5"/><stop offset=".55" stop-color="#7d6fd0"/><stop offset="1" stop-color="#5546a8"/></radialGradient>
 <symbol id="fmg-eclat" viewBox="-10 -10 20 20"><path d="M0 -10 Q1.2 -1.2 10 0 Q1.2 1.2 0 10 Q-1.2 1.2 -10 0 Q-1.2 -1.2 0 -10 Z"/></symbol>
 </defs>`;
 
@@ -124,6 +128,11 @@ function poserDefs() {
   document.body.prepend(svg);
 }
 
+// Fond de chaque dessin (son premier cercle) remplacé par la planète lilas commune.
+const FOND = /^<circle cx="50" cy="50" r="50" fill="#[0-9a-f]{3,6}"\/>/i;
+const PLANETE = '<circle cx="50" cy="50" r="50" fill="url(#fmg-planete)"/>';
+const dessin = (id) => DESSINS[id].replace(FOND, PLANETE);
+
 const svg = (classe, vue, contenu) => `<svg class="${classe}" viewBox="${vue}" aria-hidden="true" focusable="false">${contenu}</svg>`;
 
 /** L'avatar a-t-il un dessin ? (sinon : son emoji, en secours). */
@@ -151,7 +160,7 @@ export function peindreAvatar(element, { avatar, cadre = 'aucun', niveau = null,
   const couches = [];
   if (aura && rang && AURAS[rang.id]) couches.push(svg('avatar-aura', '-35 -35 170 170', AURAS[rang.id]));
   couches.push(aUnDessin(fiche.id)
-    ? svg('avatar-dessin', '0 0 100 100', DESSINS[fiche.id])
+    ? svg('avatar-dessin', '0 0 100 100', dessin(fiche.id))
     : `<span class="avatar-picto">${fiche.picto}</span>`);
   if (cadre) couches.push(svg('avatar-cadre', '-16 -16 132 132', CADRES[cadre] || CADRES.aucun));
   element.innerHTML = couches.join('');
