@@ -135,9 +135,26 @@ export const GAINS_JOURS_GARDES = 400;        // gains par jour (classements) ga
 export const PROFIL_INACTIF_JOURS = 730;      // profil sans aucune visite depuis 2 ans : effacé avec tout ce qui s'y rattache
 export const LIMITES_JOURS_GARDES = 2;        // traces des limites anti-robots (créations, essais) gardées 2 jours
 
+// --- Rangs ------------------------------------------------------------------------------
+// Nom donné à une tranche de niveaux (« Niveau 52 · Légende ») ; chaque rang a
+// son aura autour de l'avatar sur la page de profil (dessin : public/avatars.js).
+// niveau : premier niveau du rang. L'identifiant sert aux textes (rang.<id>).
+export const RANGS = [
+  { id: 'apprenti', niveau: 1 },
+  { id: 'explorateur', niveau: 10 },
+  { id: 'aventurier', niveau: 20 },
+  { id: 'heros', niveau: 30 },
+  { id: 'champion', niveau: 40 },
+  { id: 'legende', niveau: 50 },
+  { id: 'titan', niveau: 70 },
+  { id: 'cosmique', niveau: 90 },
+];
+
 // --- Avatars et cadres (déblocages) --------------------------------------------------
 // avatar : { id, picto, niveau } (niveau requis) ou { id, picto, badge } (badge requis).
-// L'identifiant ne change jamais (il est gardé dans la base) ; le picto peut changer.
+// L'identifiant ne change jamais (il est gardé dans la base) ; le picto (emoji)
+// ne sert plus qu'en secours : le dessin de chaque avatar est dans public/avatars-dessins.js.
+// Ordre de la liste : ordre d'affichage sur la page de profil (le premier est l'avatar par défaut).
 export const AVATARS = [
   { id: 'chat', picto: '🐱', niveau: 1 },
   { id: 'chien', picto: '🐶', niveau: 1 },
@@ -152,16 +169,52 @@ export const AVATARS = [
   { id: 'hibou', picto: '🦉', niveau: 6 },
   { id: 'koala', picto: '🐨', niveau: 7 },
   { id: 'pingouin', picto: '🐧', niveau: 8 },
+  { id: 'hamster', picto: '🐹', niveau: 9 },
   { id: 'tigre', picto: '🐯', niveau: 10 },
+  { id: 'pirate', picto: '🏴‍☠️', niveau: 11 },
   { id: 'dauphin', picto: '🐬', niveau: 12 },
+  { id: 'cavaliere', picto: '🏇', niveau: 13 },
   { id: 'robot', picto: '🤖', niveau: 14 },
+  { id: 'astronaute', picto: '🧑‍🚀', niveau: 15 },
   { id: 'lion', picto: '🦁', niveau: 16 },
+  { id: 'plongeuse', picto: '🤿', niveau: 17 },
   { id: 'fusee', picto: '🚀', niveau: 18 },
+  { id: 'magicien', picto: '🧙', niveau: 19 },
   { id: 'dinosaure', picto: '🦖', niveau: 20 },
+  { id: 'ninja', picto: '🥷', niveau: 20 },
+  { id: 'archere', picto: '🏹', niveau: 22 },
+  { id: 'pilote', picto: '🏎️', niveau: 23 },
   { id: 'licorne', picto: '🦄', niveau: 25 },
+  { id: 'ceinture-noire', picto: '🥋', niveau: 25 },
+  { id: 'sorciere', picto: '🧙‍♀️', niveau: 27 },
+  { id: 'yeti', picto: '❄️', niveau: 28 },
   { id: 'dragon', picto: '🐉', niveau: 30 },
+  { id: 'super-heros', picto: '🦸', niveau: 30 },
+  { id: 'gardien-glace', picto: '🧊', niveau: 33 },
+  { id: 'heroine-eclair', picto: '⚡', niveau: 35 },
+  { id: 'chevalier', picto: '🛡️', niveau: 37 },
+  { id: 'gardienne-foret', picto: '🌿', niveau: 39 },
   { id: 'extraterrestre', picto: '👽', niveau: 40 },
+  { id: 'robot-geant', picto: '🦾', niveau: 40 },
+  { id: 'samourai', picto: '🏯', niveau: 42 },
+  { id: 'pilote-spatial', picto: '🛸', niveau: 44 },
+  { id: 'cyber-ninja', picto: '🕶️', niveau: 45 },
+  { id: 'golem', picto: '🪨', niveau: 47 },
+  { id: 'loup-etoile', picto: '🐺', niveau: 48 },
   { id: 'couronne', picto: '👑', niveau: 50 },
+  { id: 'chevalier-or', picto: '⚜️', niveau: 50 },
+  { id: 'reine-glace', picto: '💎', niveau: 53 },
+  { id: 'griffon', picto: '🦅', niveau: 56 },
+  { id: 'dragon-feu', picto: '🔥', niveau: 60 },
+  { id: 'sorcier-supreme', picto: '🔮', niveau: 64 },
+  { id: 'roi-des-mers', picto: '🐙', niveau: 67 },
+  { id: 'sentinelle', picto: '🌌', niveau: 70 },
+  { id: 'titan-solaire', picto: '☀️', niveau: 75 },
+  { id: 'dragon-glace', picto: '🐲', niveau: 80 },
+  { id: 'gardienne-lunaire', picto: '🌙', niveau: 85 },
+  { id: 'phenix', picto: '🐦‍🔥', niveau: 90 },
+  { id: 'dragon-cosmique', picto: '🪐', niveau: 95 },
+  { id: 'mascotte', picto: '🎮', niveau: 100 },
   { id: 'arc-en-ciel', picto: '🌈', badge: 'serie-7' },
   { id: 'soleil', picto: '🌞', badge: 'serie-30' },
   { id: 'etoile', picto: '🌟', badge: 'etoiles-parfait' },
@@ -170,16 +223,22 @@ export const AVATARS = [
   { id: 'medaille', picto: '🏅', badge: 'multi-humains-5' },
 ];
 
-// cadre (contour de l'avatar dans la pastille et le classement) : mêmes règles.
-// couleur : contour dessiné (variables CSS de public/style.css, --cadre-<id>).
+// cadre (contour de l'avatar dans la pastille, le profil et le classement) :
+// mêmes règles. Dessin de chaque cadre : public/avatars.js.
 export const CADRES = [
   { id: 'aucun', niveau: 1 },
   { id: 'bronze', niveau: 5 },
   { id: 'argent', niveau: 15 },
   { id: 'or', niveau: 30 },
+  { id: 'braise', niveau: 40 },
+  { id: 'eclair', niveau: 50 },
+  { id: 'diamant', niveau: 60 },
+  { id: 'plasma', niveau: 70 },
+  { id: 'nebuleuse', niveau: 80 },
+  { id: 'supernova', niveau: 90 },
+  { id: 'cosmique', niveau: 100 },
   { id: 'arc-en-ciel', badge: 'serie-14' },
   { id: 'etoile', badge: 'etoiles-500' },
-  { id: 'diamant', niveau: 60 },
 ];
 
 // ==========================================================================
@@ -205,6 +264,13 @@ export function niveauPourXp(xp) {
   let n = 1;
   while (n < NIVEAU_MAX && seuilNiveau(n + 1) <= xp) n++;
   return n;
+}
+
+/** Rang d'un niveau : { id, niveau } (le dernier rang dont le premier niveau est atteint). */
+export function rangPourNiveau(n) {
+  let rang = RANGS[0];
+  for (const r of RANGS) if (n >= r.niveau) rang = r;
+  return rang;
 }
 
 /** Badges rares possibles, dans l'ordre d'affichage : [{ id, famille, seuil? }]. */
