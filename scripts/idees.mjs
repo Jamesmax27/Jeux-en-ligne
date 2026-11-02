@@ -43,6 +43,23 @@
 // Sans --ados (variable absente ou illisible) : aucun quota, ordre habituel.
 // Une idée multijoueur 13+ compte dans les deux quotas.
 //
+// Saisons et tendances (scripts/inspirations.mjs) : champs facultatifs
+// "inspiration" (« saison:<id de calendrier-saisons.json> » ou
+// « tendance:<id d'une recherche Google> ») et "pour_le" (AAAA-MM-JJ : date de
+// la fête, ou fin de la fraîcheur de la tendance), posés par « ajouter », jamais
+// par l'agent. La variable GitHub TENDANCES_BOUCLE donne le nombre d'idées
+// inspirées par passage de 5 jeux (0 à 5 ; absente ou 0 : aucune) : la boucle
+// en choisit autant (« choisir 5 --tendances 1 ») et l'idéation en garde
+// PASSAGES_D_AVANCE fois plus en vue (« manque-tendances 1 », « ajouter …
+// --tendances 1 »). Une idée inspirée « active » (fête dans sa fenêtre de
+// fabrication, tendance encore fraîche) passe devant les autres idées de
+// l'agent, la fête la plus proche d'abord. Une idée de saison hors de sa
+// fenêtre n'est jamais choisie : fenêtre passée, « reconcilier » la reporte à
+// la fête de l'année suivante. Une tendance qui n'est plus fraîche devient une
+// idée ordinaire. Sans --tendances (ou 0) : les idées inspirées actives de
+// l'agent attendent. Une idée à la fois multijoueur, 13+ et inspirée compte
+// dans chacun des quotas.
+//
 // Les textes pour les moteurs de recherche (titre_seo, description_seo,
 // presentation, regles, competences, jaquette_alt de game.json) ne sont pas
 // dans l'idée : l'agent créateur les rédige d'après le jeu fini. Les
@@ -69,14 +86,19 @@
 //                          PASSAGES_D_AVANCE × k en attente (k : jeux multijoueurs
 //                          par passage ; accueillies même au-delà de 15)
 //   manque-ados <k>        idem pour les idées 13+ (k : jeux 13+ par passage)
-//   ajouter <fichier> [--multi <k>] [--ados <k>]
+//   manque-tendances <k>   idem pour les idées inspirées (actives, ou fête dont
+//                          la fenêtre ouvre dans moins de 3 semaines)
+//   ajouter <fichier> [--multi <k>] [--ados <k>] [--tendances <k>]
 //                          ajoute les idées proposées par l'agent d'idéation
 //                          (liste JSON [{ titre, description, genre,
 //                          genres_secondaires, univers, ages, multijoueur,
-//                          places }] ; "multijoueur" et "places" facultatifs ; "ages"
+//                          places, inspiration }] ; "multijoueur", "places" et
+//                          "inspiration" facultatifs ; "ages"
 //                          facultatif : à défaut, lu dans la description ;
 //                          un âge illisible refuse l'idée ; --ados 0 refuse
-//                          les idées 13+)
+//                          les idées 13+ ; sans --tendances, les idées
+//                          inspirées sont refusées ; une 2e idée de la même
+//                          fête ou de la même tendance aussi)
 //   ajouter-humain         ajoute l'idée du formulaire (variables TITRE,
 //                          PRINCIPE, GENRE, AGE, UNIVERS, COMPETENCES,
 //                          PRIORITE ; genre et univers : identifiants ou
@@ -91,12 +113,15 @@
 //                          identifiants ou libellés ; ages et univers
 //                          facultatifs, une valeur illisible est écartée)
 //                          qui ne sont pas déjà dans idees.json ou l'archive
-//   choisir <n> [--multi <k>] [--ados <k>]
+//   choisir <n> [--multi <k>] [--ados <k>] [--tendances <k>]
 //                          passe n idées "en_cours" et écrit leur liste (JSON :
 //                          id, titre, description, genre, genres_secondaires,
 //                          univers, ages — « 6+ », ou "" quand l'idée n'en
-//                          donne pas —, multijoueur, places, et issue pour une
-//                          idée perso). Les idées du propriétaire (perso, puis
+//                          donne pas —, multijoueur, places, inspiration et
+//                          saison — « Noël (25 décembre) », ou "" —, et issue
+//                          pour une idée perso). --tendances k : k idées
+//                          inspirées actives, complétées comme les autres
+//                          quotas. Les idées du propriétaire (perso, puis
 //                          humaines) passent d'abord, quels que soient les
 //                          quotas, et y comptent. --multi k : k idées
 //                          multijoueurs en tout, puis les autres, chacune dans
@@ -109,9 +134,12 @@
 //   reconcilier [--ouvertes id,…] [--echecs id,…]
 //                          idée dont le jeu est sur main → archive ; idée
 //                          "en_cours" sans pull request ouverte → "en_attente"
-//                          (+1 essai pour celles de --echecs)
+//                          (+1 essai pour celles de --echecs) ; idée de saison
+//                          en attente dont la fenêtre est passée → fête de
+//                          l'année suivante
 //   controler <jeu-id>     entrée de public/catalog.json conforme à l'idée
-//                          (genre, univers, genres secondaires, âge, multijoueur)
+//                          (genre, univers, genres secondaires, âge,
+//                          multijoueur, inspiration)
 // ==========================================================================
 
 import { readFile, writeFile, readdir } from 'node:fs/promises';
@@ -120,6 +148,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX, pourAdos } from '../public/taxonomie.js';
 import { problemesClassementIdee, RAPPEL_LISTES } from './controle-taxonomie.mjs';
+import {
+  aujourdhui, ajouterJours, chargerCalendrier, prochaineFete, fenetreOuverte, jeuRecentDeLaFete,
+  INSPIRATION_VALIDE, FRAICHEUR_TENDANCE, AVANCE_IDEATION,
+} from './inspirations.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FICHIER_IDEES = path.join(RACINE, 'idees.json');
@@ -137,6 +169,11 @@ const optionAdos = (args, n = CHOIX_MAX) => {
   const i = args.indexOf('--ados');
   return i >= 0 ? Math.max(0, Math.min(n, parseInt(args[i + 1], 10) || 0)) : null;
 };
+// --tendances k : nombre de 0 à n ; 0 sans l'option (TENDANCES_BOUCLE absente : aucune idée inspirée).
+const optionTendances = (args, n = CHOIX_MAX) => {
+  const i = args.indexOf('--tendances');
+  return i >= 0 ? Math.max(0, Math.min(n, parseInt(args[i + 1], 10) || 0)) : 0;
+};
 const ESSAIS_MAX = 3;      // jeux refusés au-delà desquels une idée n'est plus choisie
 const CHOIX_MAX = 5;       // idées choisies par passage (une tâche de fabrication chacune)
 const PLACES_MIN = 2, PLACES_MAX = 10;   // places d'un jeu multijoueur (docs/multijoueur.md)
@@ -145,17 +182,37 @@ const DATE_VALIDE = /^\d{4}-\d{2}-\d{2}$/;
 const AGE_VALIDE = /^\d{1,2}\+$/;   // « 6+ » : même format que "ages" de game.json (validate-games.mjs)
 // Repli des idées sans "ages" : la phrase « Âge conseillé : 6+. » de la description.
 const AGE_DANS_DESCRIPTION = /Âge\s+conseillé\s*:\s*(\d{1,2})\s*\+/i;
-const ORDRE_CHAMPS = ['id', 'titre', 'description', 'genre', 'genres_secondaires', 'univers', 'ages', 'multijoueur', 'places', 'source', 'date_ajout', 'statut', 'jeu_id', 'issue', 'essais'];
+const ORDRE_CHAMPS = ['id', 'titre', 'description', 'genre', 'genres_secondaires', 'univers', 'ages', 'multijoueur', 'places', 'inspiration', 'pour_le', 'source', 'date_ajout', 'statut', 'jeu_id', 'issue', 'essais'];
 const placesValides = (n) => Number.isInteger(n) && n >= PLACES_MIN && n <= PLACES_MAX;
 const estMulti = (i) => i?.multijoueur === true;
 // Idée pour adolescents : âge conseillé 13+ (champ "ages" ou phrase de la description).
 const estAdos = (i) => pourAdos(ageDeIdee(i));
 
+// Saisons et tendances (scripts/inspirations.mjs). Calendrier lu seulement quand une idée de saison existe.
+const inspirationDe = (i) => (typeof i?.inspiration === 'string' ? i.inspiration : '');
+const estSaison = (i) => inspirationDe(i).startsWith('saison:');
+const estTendance = (i) => inspirationDe(i).startsWith('tendance:');
+const fenetre = () => chargerCalendrier().fenetre;
+const feteDe = (i) => chargerCalendrier().evenements.find((e) => `saison:${e.id}` === inspirationDe(i));
+// Idée de saison hors de sa fenêtre de fabrication (trop tôt, ou fête passée) : jamais choisie.
+const horsSaison = (i, jour = aujourdhui()) => estSaison(i) && !fenetreOuverte(i.pour_le, jour, fenetre());
+// Idée inspirée active : fête dans sa fenêtre, ou tendance encore fraîche (prioritaire, comptée dans le quota).
+const estInspiree = (i, jour = aujourdhui()) => (estSaison(i) && !horsSaison(i, jour))
+  || (estTendance(i) && DATE_VALIDE.test(i.pour_le || '') && jour <= i.pour_le);
+// Idée inspirée en vue (manque-tendances) : active, ou fête dont la fenêtre ouvre dans moins de AVANCE_IDEATION jours.
+const enVue = (i, jour = aujourdhui()) => estInspiree(i, jour) || (estSaison(i) && DATE_VALIDE.test(i.pour_le || '')
+  && ajouterJours(i.pour_le, -fenetre().avant - AVANCE_IDEATION) <= jour && jour <= ajouterJours(i.pour_le, -fenetre().fin));
+// « Noël (25 décembre) » : rappel donné à l'agent créateur.
+function libelleSaison(i) {
+  const e = feteDe(i);
+  if (!e || !DATE_VALIDE.test(i.pour_le || '')) return '';
+  return `${e.nom} (${new Date(`${i.pour_le}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' })})`;
+}
+
 // --------------------------------------------------------------------------
 // Outils
 // --------------------------------------------------------------------------
 
-const aujourdhui = () => new Date().toISOString().slice(0, 10);
 const nfc = (t) => String(t ?? '').normalize('NFC');
 const uneLigne = (t, max) => nfc(t).replace(/\s+/g, ' ').trim().slice(0, max);
 const sansAccents = (t) => nfc(t).normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -218,8 +275,8 @@ function universDonnes(valeur) {
   return { bruts, univers: [...new Set(bruts.map((u) => identifiant(u, UNIVERS)))] };
 }
 
-// Ordre de fabrication : idées perso (issue la plus ancienne d'abord), idées humaines, puis idées de l'agent
-// (ordre du fichier).
+// Ordre de fabrication : idées perso (issue la plus ancienne d'abord), idées humaines, puis idées de l'agent :
+// les idées inspirées actives d'abord (la date la plus proche en tête), puis les autres, dans l'ordre du fichier.
 const choisissables = (idees) => idees.filter((i) => i.statut === 'en_attente' && (i.essais || 0) < ESSAIS_MAX);
 const estPerso = (i) => Number.isInteger(i.issue);
 const duProprietaire = (i) => estPerso(i) || i.source === 'humain';
@@ -227,7 +284,9 @@ const ordreDeFabrication = (idees) => {
   const libres = choisissables(idees);
   const perso = libres.filter(estPerso).sort((a, b) => a.issue - b.issue);
   const autres = libres.filter((i) => !estPerso(i));
-  return [...perso, ...autres.filter((i) => i.source === 'humain'), ...autres.filter((i) => i.source !== 'humain')];
+  const agent = autres.filter((i) => i.source !== 'humain');
+  const inspirees = agent.filter((i) => estInspiree(i)).sort((a, b) => a.pour_le.localeCompare(b.pour_le));
+  return [...perso, ...autres.filter((i) => i.source === 'humain'), ...inspirees, ...agent.filter((i) => !estInspiree(i))];
 };
 
 // --------------------------------------------------------------------------
@@ -259,6 +318,14 @@ function problemesIdee(idee, fichier, statutsPermis) {
   if (idee.places !== undefined && !(estMulti(idee) && placesValides(idee.places))) {
     p.push(`"places" (facultatif, idée multijoueur seulement) : nombre entier de ${PLACES_MIN} à ${PLACES_MAX}`);
   }
+  // Saisons et tendances : posés par « ajouter » (scripts/inspirations.mjs).
+  if (idee.inspiration !== undefined && !(typeof idee.inspiration === 'string' && INSPIRATION_VALIDE.test(idee.inspiration))) {
+    p.push('"inspiration" (facultatif) : « saison:<id de calendrier-saisons.json> » ou « tendance:<id> »');
+  }
+  if ((idee.inspiration !== undefined || idee.pour_le !== undefined) && !(typeof idee.pour_le === 'string' && DATE_VALIDE.test(idee.pour_le))) {
+    p.push('"pour_le" : date AAAA-MM-JJ, avec "inspiration" seulement');
+  }
+  if (idee.pour_le !== undefined && idee.inspiration === undefined) p.push('"pour_le" sans "inspiration"');
   return p.map((x) => `${fichier}, idée ${JSON.stringify(idee.id ?? idee.titre ?? '?')} : ${x}`);
 }
 
@@ -340,6 +407,8 @@ async function lireCatalogue() {
       idee: typeof f.idee === 'string' ? f.idee.trim() : '',
       multijoueur: f.multijoueur === true,
       places: f.multijoueur === true && placesValides(f.places) ? f.places : null,
+      inspiration: typeof f.inspiration === 'string' ? f.inspiration : '',
+      added: typeof f.added === 'string' ? f.added : '',
     });
   }
   return jeux;
@@ -436,9 +505,16 @@ async function manqueAdos(k) {
   console.log(Math.max(0, multiVisees(k) - choisissables(idees).filter(estAdos).length));
 }
 
+async function manqueTendances(k) {
+  const { idees } = await charger();
+  console.log(Math.max(0, multiVisees(k) - choisissables(idees).filter((i) => enVue(i)).length));
+}
+
 // Idées proposées par l'agent d'idéation : contrôlées une à une, ajoutées jusqu'à 15 en attente.
 // ados : jeux 13+ par passage (null : aucun quota ; 0 : idées 13+ refusées).
-async function ajouter(fichier, k = 0, ados = null) {
+// tendances : idées inspirées par passage (0 : refusées) ; "inspiration" déjà contrôlée par
+// scripts/inspirations.mjs controler-idees (étape a), "pour_le" calculé ici.
+async function ajouter(fichier, k = 0, ados = null, tendances = 0) {
   if (!fichier) throw new Error('fichier des idées proposées manquant : node scripts/idees.mjs ajouter <fichier>');
   const { idees, archive } = await charger();
   let propositions;
@@ -454,6 +530,9 @@ async function ajouter(fichier, k = 0, ados = null) {
   let placeMulti = Math.max(0, multiVisees(k) - choisissables(idees).filter(estMulti).length);
   // Idées 13+ : de même, jusqu'à multiVisees(ados) en attente.
   let placeAdos = Math.max(0, multiVisees(ados) - choisissables(idees).filter(estAdos).length);
+  // Idées inspirées : de même, jusqu'à multiVisees(tendances) en vue.
+  let placeTendances = Math.max(0, multiVisees(tendances) - choisissables(idees).filter((i) => enVue(i)).length);
+  const jour = aujourdhui();
   let ajoutees = 0;
 
   for (const p of propositions) {
@@ -472,9 +551,30 @@ async function ajouter(fichier, k = 0, ados = null) {
     const multijoueur = p?.multijoueur === true;
     const places = p?.places === undefined || p?.places === null || p?.places === '' ? undefined : Number(p.places);
     const ados13 = pourAdos(ages);
+    // Saison ou tendance : fête du calendrier (une idée par fête, pas deux jeux de la même fête dans
+    // l'année) ou recherche Google (une idée par recherche) ; "pour_le" calculé ici, jamais par l'agent.
+    const inspiration = p?.inspiration === undefined || p?.inspiration === null || p?.inspiration === '' ? '' : String(p.inspiration).trim().toLowerCase();
+    const memeInspiration = (x) => inspirationDe(x) === inspiration;
+    let pour_le = '';
+    let refusInspiration = '';
+    if (inspiration) {
+      if (tendances === 0) refusInspiration = 'idée inspirée (saison ou tendance) alors que TENDANCES_BOUCLE vaut 0 ou est absente';
+      else if (!INSPIRATION_VALIDE.test(inspiration)) refusInspiration = '"inspiration" : « saison:<id> » ou « tendance:<id> »';
+      else if (idees.some(memeInspiration)) refusInspiration = `${inspiration} déjà prévue dans idees.json`;
+      else if (inspiration.startsWith('tendance:') && jeux.some(memeInspiration)) refusInspiration = `${inspiration} : un jeu en est déjà tiré`;
+      else if (inspiration.startsWith('saison:')) {
+        const fete = chargerCalendrier().evenements.find((e) => `saison:${e.id}` === inspiration);
+        const jeuRecent = fete ? jeuRecentDeLaFete(jeux, inspiration, jour) : '';
+        pour_le = fete ? prochaineFete(fete, jour, fenetre()) : '';
+        if (!fete) refusInspiration = `${inspiration} absente de calendrier-saisons.json`;
+        else if (jeuRecent) refusInspiration = `un jeu de cette fête est déjà publié cette année (${jeuRecent})`;
+        else if (!pour_le) refusInspiration = `${inspiration} : fête passée, sans date à venir`;
+      } else pour_le = ajouterJours(jour, FRAICHEUR_TENDANCE);
+    }
     let refus = '';
     if (ados13 && ados === 0) refus = 'idée 13+ alors que ADOS_BOUCLE vaut 0';
-    else if (place === 0 && !(multijoueur && placeMulti > 0) && !(ados13 && placeAdos > 0)) refus = `déjà ${IDEES_VISEES} idées en attente`;
+    else if (refusInspiration) refus = refusInspiration;
+    else if (place === 0 && !(multijoueur && placeMulti > 0) && !(ados13 && placeAdos > 0) && !(inspiration && placeTendances > 0)) refus = `déjà ${IDEES_VISEES} idées en attente`;
     else if (p?.multijoueur !== undefined && typeof p.multijoueur !== 'boolean') refus = '"multijoueur" : true ou false';
     else if (places !== undefined && !(multijoueur && placesValides(places))) refus = `"places" : nombre entier de ${PLACES_MIN} à ${PLACES_MAX}, pour une idée multijoueur`;
     else if (titre.length < 2) refus = 'titre manquant';
@@ -491,15 +591,18 @@ async function ajouter(fichier, k = 0, ados = null) {
     idees.push({
       id, titre, description, genre, genres_secondaires, univers, ...(ages ? { ages } : {}),
       ...(multijoueur ? { multijoueur: true, ...(places !== undefined ? { places } : {}) } : {}),
-      source: 'agent', date_ajout: aujourdhui(), statut: 'en_attente', jeu_id: null,
+      ...(inspiration ? { inspiration, pour_le } : {}),
+      source: 'agent', date_ajout: jour, statut: 'en_attente', jeu_id: null,
     });
     ids.add(id); titresPris.add(cle(titre)); ajoutees++;
     place = Math.max(0, place - 1);
     if (multijoueur) placeMulti = Math.max(0, placeMulti - 1);
     if (ados13) placeAdos = Math.max(0, placeAdos - 1);
+    if (inspiration) placeTendances = Math.max(0, placeTendances - 1);
     const sec = genres_secondaires.length ? ` + ${genres_secondaires.join(', ')}` : '';
     const multi = multijoueur ? ` ; multijoueur${places !== undefined ? `, ${places} places` : ''}` : '';
-    console.log(`Ajoutée : ${titre} (${genre}${sec} ; ${univers.join(', ')} ; âge ${ages || 'non précisé'}${multi})`);
+    const insp = inspiration ? ` ; ${inspiration}, pour le ${pour_le}` : '';
+    console.log(`Ajoutée : ${titre} (${genre}${sec} ; ${univers.join(', ')} ; âge ${ages || 'non précisé'}${multi}${insp})`);
   }
   await ecrire(FICHIER_IDEES, idees);
   console.log(`${ajoutees} idée(s) ajoutée(s) ; ${choisissables(idees).length} en attente.`);
@@ -620,16 +723,23 @@ async function choisir(n, args = []) {
   const i = args.indexOf('--multi');
   const voulus = i >= 0 ? Math.max(0, Math.min(nombre, parseInt(args[i + 1], 10) || 0)) : 0;
   const ados = optionAdos(args, nombre);   // null : aucun quota de jeux 13+
+  const tendances = optionTendances(args, nombre);   // 0 : aucune idée inspirée
   const { idees } = await charger();
   // Sans --multi (MULTI_BOUCLE absente ou 0) : les idées multijoueurs attendent.
   // --ados 0 : les idées 13+ de l'agent attendent (celles du propriétaire passent).
+  // Idée de saison hors de sa fenêtre : attend toujours. Sans --tendances : les idées inspirées actives
+  // de l'agent attendent (une tendance qui n'est plus fraîche redevient une idée ordinaire).
   const ordre = ordreDeFabrication(idees)
-    .filter((x) => (i >= 0 || !estMulti(x)) && !(ados === 0 && estAdos(x) && !duProprietaire(x)));
+    .filter((x) => (i >= 0 || !estMulti(x)) && !(ados === 0 && estAdos(x) && !duProprietaire(x))
+      && !horsSaison(x) && !(tendances === 0 && estInspiree(x) && !duProprietaire(x)));
   const pris = new Set();
   const nbMulti = () => [...pris].filter(estMulti).length;
   const nbAdos = () => [...pris].filter(estAdos).length;
+  const nbInspirees = () => [...pris].filter((x) => estInspiree(x)).length;
   // Une idée 13+ de l'agent n'entre dans les quotas que s'il reste de la place dans celui des jeux 13+.
   const adosPermis = (x) => ados === null || !estAdos(x) || duProprietaire(x) || nbAdos() < ados;
+  // De même, une idée inspirée de l'agent, dans celui des saisons et tendances.
+  const inspireePermise = (x) => !estInspiree(x) || duProprietaire(x) || nbInspirees() < tendances;
   // Prend, dans l'ordre de fabrication, au plus max idées qui passent le filtre (n au total).
   const prendre = (filtre, max) => {
     for (const x of ordre) {
@@ -640,25 +750,29 @@ async function choisir(n, args = []) {
   // 0. Idées du propriétaire (perso, puis humaines) d'abord, quels que soient les quotas ;
   //    elles comptent dans les quotas, qui se remplissent ensuite sur les places restantes.
   prendre(duProprietaire, nombre);
-  prendre((x) => estMulti(x) && adosPermis(x), voulus - nbMulti());                       // 1. multijoueurs
-  if (ados !== null) prendre((x) => !estMulti(x) && estAdos(x) && adosPermis(x), ados - nbAdos());   // 2. 13+
-  prendre((x) => !estMulti(x) && (ados === null || !estAdos(x) || duProprietaire(x)), nombre);       // 3. autres
-  // 4. S'il manque des idées d'un type, les autres complètent (multijoueurs ou 13+ en plus du quota).
+  prendre((x) => estMulti(x) && adosPermis(x) && inspireePermise(x), voulus - nbMulti());                       // 1. multijoueurs
+  if (ados !== null) prendre((x) => !estMulti(x) && estAdos(x) && adosPermis(x) && inspireePermise(x), ados - nbAdos());   // 2. 13+
+  prendre((x) => !estMulti(x) && estInspiree(x) && adosPermis(x) && inspireePermise(x), tendances - nbInspirees());  // 3. saisons et tendances
+  prendre((x) => !estMulti(x) && (ados === null || !estAdos(x) || duProprietaire(x))
+    && (!estInspiree(x) || duProprietaire(x)), nombre);                                                        // 4. autres
+  // 5. S'il manque des idées d'un type, les autres complètent (multijoueurs, 13+ ou inspirées en plus du quota).
   prendre(() => true, nombre);
   const choix = ordre.filter((x) => pris.has(x));
   for (const x of choix) x.statut = 'en_cours';
   await ecrire(FICHIER_IDEES, idees);
-  for (const x of choix) console.error(`Choisie : ${x.titre} (${x.source}${estMulti(x) ? ', multijoueur' : ''}${estAdos(x) ? ', 13+' : ''})`);
+  for (const x of choix) console.error(`Choisie : ${x.titre} (${x.source}${estMulti(x) ? ', multijoueur' : ''}${estAdos(x) ? ', 13+' : ''}${estInspiree(x) ? `, ${x.inspiration}` : ''})`);
   if (!choix.length) console.error('Aucune idée choisie.');
   // "ages" : toujours présent, « 6+ » ou "" (idée sans âge : l'agent créateur le choisit) ; il va
   // jusqu'à l'agent et à l'étape « Fiche du jeu ».
   // "issue" (idées perso) : la tâche de fabrication ferme l'issue une fois la pull request ouverte.
   // "multijoueur" et "places" toujours présents (false / null pour un jeu solo) : l'étape de
   // fabrication s'en sert pour donner les consignes multijoueurs (docs/multijoueur.md).
+  // "inspiration" (recopiée dans game.json) et "saison" (rappel pour l'agent créateur) : "" sans inspiration.
   console.log(JSON.stringify(choix.map((x) => ({
     id: x.id, titre: x.titre, description: x.description, genre: x.genre,
     genres_secondaires: x.genres_secondaires || [], univers: x.univers || [], ages: ageDeIdee(x),
     multijoueur: estMulti(x), places: estMulti(x) && placesValides(x.places) ? x.places : null,
+    inspiration: inspirationDe(x), saison: estSaison(x) ? libelleSaison(x) : '',
     ...(estPerso(x) ? { issue: x.issue } : {}),
   }))));
 }
@@ -696,6 +810,20 @@ async function reconcilier(args) {
         console.log(`Jeu refusé (${i.essais} sur ${ESSAIS_MAX}) : ${i.titre}${i.essais >= ESSAIS_MAX ? ' — idée mise de côté' : ' — remise en attente'}`);
       } else {
         console.log(`Remise en attente (aucune pull request ouverte) : ${i.titre}`);
+      }
+    }
+    // Idée de saison dont la fenêtre est passée sans jeu : elle attend la fête de l'année suivante.
+    // Fête retirée du calendrier (ou sans date à venir) : l'idée devient ordinaire.
+    if (i.statut === 'en_attente' && estSaison(i) && DATE_VALIDE.test(i.pour_le || '') && aujourdhui() > ajouterJours(i.pour_le, -fenetre().fin)) {
+      const fete = feteDe(i);
+      const suivante = fete ? prochaineFete(fete, aujourdhui(), fenetre()) : '';
+      if (suivante) {
+        i.pour_le = suivante;
+        console.log(`Fête passée, reportée au ${suivante} : ${i.titre}`);
+      } else {
+        delete i.inspiration;
+        delete i.pour_le;
+        console.log(`Fête absente du calendrier (ou sans date à venir), idée devenue ordinaire : ${i.titre}`);
       }
     }
     restent.push(i);
@@ -740,6 +868,10 @@ async function controler(jeuId) {
     if (estMulti(idee) && fiche.multijoueur !== true) erreurs.push('game.json : l\'idée est un jeu multijoueur : "multijoueur": true et "places" attendus (docs/multijoueur.md)');
     if (!estMulti(idee) && fiche.multijoueur === true) erreurs.push('game.json : "multijoueur": true alors que l\'idée est un jeu solo');
     if (estMulti(idee) && idee.places !== undefined && fiche.places !== idee.places) erreurs.push(`game.json : "places" doit être celui de l'idée (${idee.places})`);
+    // Saison ou tendance (scripts/inspirations.mjs) : recopiée de l'idée, pour l'onglet « Stats » de /idees.
+    if ((fiche.inspiration ?? '') !== inspirationDe(idee)) {
+      erreurs.push(inspirationDe(idee) ? `game.json : "inspiration" doit être celle de l'idée (« ${idee.inspiration} »)` : 'game.json : "inspiration" alors que l\'idée n\'en a pas');
+    }
   }
   for (const e of erreurs) console.log(`    ERREUR : ${e}`);
   if (!erreurs.length) {
@@ -761,7 +893,8 @@ const COMMANDES = {
   manque,
   'manque-multi': () => manqueMulti(args[0]),
   'manque-ados': () => manqueAdos(args[0]),
-  ajouter: () => ajouter(args[0], optionMulti(args), optionAdos(args)),
+  'manque-tendances': () => manqueTendances(args[0]),
+  ajouter: () => ajouter(args[0], optionMulti(args), optionAdos(args), optionTendances(args)),
   'ajouter-humain': ajouterHumain,
   'importer-perso': () => importerPerso(args[0]),
   choisir: () => choisir(args[0], args.slice(1)),

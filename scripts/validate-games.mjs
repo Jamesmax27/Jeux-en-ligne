@@ -110,6 +110,10 @@ async function controlerFiche(id, dossier) {
   if (f.etoiles !== undefined && !(Number.isInteger(f.etoiles) && f.etoiles >= 1 && f.etoiles <= 1500)) erreur(id, 'game.json : "etoiles" (étoiles possibles dans tout le jeu) doit être un entier de 1 à 1500');
   if (f.sans_fin !== undefined && f.sans_fin !== true) erreur(id, 'game.json : "sans_fin" vaut true (jeu qui ne se termine jamais) ou est absent');
   if (f.sans_fin === true && f.etoiles !== undefined) erreur(id, 'game.json : un jeu "sans_fin" n\'a pas d\'"etoiles" (il n\'envoie jamais « jeu terminé »)');
+  // Saison ou tendance de l'idée (scripts/inspirations.mjs), posée par la boucle de nuit.
+  if (f.inspiration !== undefined && !(typeof f.inspiration === 'string' && f.inspiration.length <= 80 && /^(saison|tendance):[a-z0-9]+(?:-[a-z0-9]+)*$/.test(f.inspiration))) {
+    erreur(id, 'game.json : "inspiration" (facultatif) vaut « saison:<id> » ou « tendance:<id> » (scripts/inspirations.mjs)');
+  }
   fiches.set(id, f);
 
   // Consignes de 2026 : jeu riche (20 niveaux au moins) et présentation (sa

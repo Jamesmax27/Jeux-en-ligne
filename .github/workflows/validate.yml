@@ -34,6 +34,8 @@
 #     moteur, lanceur ou jeu   multijoueurs dans le lanceur (scripts/tester-multijoueur.mjs
 #     multijoueur)             --navigateur, docs/multijoueur.md) ; moteur modifié : les jeux
 #                              multijoueurs passent aussi au robot.
+#   - file d'idées, saisons  → tests des saisons et tendances de la boucle de nuit
+#     et tendances             (scripts/tester-inspirations.mjs : sans navigateur ni réseau).
 # Le reste (documentation, autres fichiers du site…) ne déclenche rien.
 #
 # Trois jobs : « quoi » (ce qui a changé), « jeux » (les jeux dans le
@@ -105,6 +107,10 @@ on:
       - "public/amis*.js"
       - "scripts/multijoueur.mjs"
       - "scripts/tester-multijoueur.mjs"
+      - "scripts/idees.mjs"
+      - "scripts/inspirations.mjs"
+      - "scripts/tester-inspirations.mjs"
+      - "calendrier-saisons.json"
       - "schema.sql"
       - "migrations/**"
   workflow_dispatch:
@@ -131,6 +137,7 @@ jobs:
       stats: ${{ steps.quoi.outputs.stats }}
       multi: ${{ steps.quoi.outputs.multi }}
       profil: ${{ steps.quoi.outputs.profil }}
+      inspirations: ${{ steps.quoi.outputs.inspirations }}
       jeux: ${{ steps.quoi.outputs.jeux }}
       lots: ${{ steps.quoi.outputs.lots }}
     steps:
@@ -188,6 +195,10 @@ jobs:
           profil=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then profil=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/(profil|amis)[a-z-]*\.js$|multijoueur/src/|scripts/(tester-profil|tester-amis|d1-local)\.mjs$)'; then profil=1; fi
+          # Saisons et tendances de la boucle de nuit (file d'idées, calendrier) : tests sans navigateur.
+          inspirations=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then inspirations=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(idees|inspirations|tester-inspirations)\.mjs|calendrier-saisons\.json|public/taxonomie\.js)$'; then inspirations=1; fi
           # Référencement de tout le site : tout ce qui précède, plus les règles et
           # le vérificateur du référencement (sans navigateur).
           seo=0
@@ -216,10 +227,11 @@ jobs:
             echo "stats=$stats"
             echo "multi=$multi"
             echo "profil=$profil"
+            echo "inspirations=$inspirations"
             echo "jeux=$jeux"
             echo "lots=$lots_json"
           } >> "$GITHUB_OUTPUT"
-          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats | multijoueur : $multi | profil : $profil | jeux à tester : $nb sur $lots machine(s)"
+          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats | multijoueur : $multi | profil : $profil | saisons et tendances : $inspirations | jeux à tester : $nb sur $lots machine(s)"
 
   # 2. Les jeux dans le navigateur, partagés entre plusieurs machines en même
   #    temps (un jeu sur LOTS_MAX chacune) : robot, sauvegarde, traductions.
@@ -399,6 +411,12 @@ jobs:
           path: captures/multijoueur/
           retention-days: 7
           if-no-files-found: ignore
+
+      # Saisons et tendances de la boucle de nuit (scripts/inspirations.mjs, scripts/idees.mjs) :
+      # dates des fêtes, calendrier, flux Google Trends (exemple), filtre, choix des idées.
+      - name: Contrôler les saisons et tendances
+        if: needs.quoi.outputs.inspirations == '1'
+        run: node scripts/tester-inspirations.mjs
 
       # Icônes des regroupements : le bloc généré de public/style.css doit
       # correspondre aux dessins de scripts/icones/sources (sans navigateur).

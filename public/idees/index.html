@@ -1270,23 +1270,42 @@
       { cle: 'replay', nom: 'Relance', texte: (l) => pourcent(l.replay) },
       { cle: 'completed', nom: 'Terminées', texte: (l) => pourcent(l.completed) },
       { cle: 'up', nom: '👍 / lancements', texte: (l) => pourcent(l.up), titre: (l) => `${nombre(l.thumbs_up)} 👍 · ${nombre(l.thumbs_down)} 👎` },
+      // Saison ou tendance d'où vient l'idée du jeu (boucle de nuit, scripts/inspirations.mjs) : « — » sinon.
+      { cle: 'inspiration', nom: 'Inspiration', texte: (l) => l.inspiration || '—' },
     ];
+
+    // « saison:noel » → « Saison : noel » ; « tendance:eclipse-lune » → « Tendance : eclipse lune ».
+    const inspirationLisible = (v) => {
+      const m = /^(saison|tendance):(.+)$/.exec(v || '');
+      return m ? `${m[1] === 'saison' ? 'Saison' : 'Tendance'} : ${m[2].replace(/-/g, ' ')}` : '';
+    };
 
     async function lignesStats(d) {
       let jeux = [];
       try { jeux = await catalogue; } catch { /* catalogue illisible : identifiants seuls */ }
       const titres = new Map(jeux.map((j) => [j.id, j.title]));
+      const inspirations = new Map(jeux.map((j) => [j.id, inspirationLisible(j.inspiration)]));
       const ids = new Set([...titres.keys(), ...Object.keys(d.jeux || {})]);
       return [...ids].map((id) => {
         const c = d.jeux?.[id] || { launches: 0, quick_quit_count: 0, replay_count: 0, completed_count: 0, thumbs_up: 0, thumbs_down: 0, median_duration: null };
-        return { id, titre: titres.get(id) || id, ...indicateurs(c), thumbs_up: c.thumbs_up, thumbs_down: c.thumbs_down, precedent: d.precedent ? c.precedent_launches ?? 0 : null };
+        return { id, titre: titres.get(id) || id, inspiration: inspirations.get(id) || '', ...indicateurs(c), thumbs_up: c.thumbs_up, thumbs_down: c.thumbs_down, precedent: d.precedent ? c.precedent_launches ?? 0 : null };
       });
+    }
+
+    // Jeux inspirés (saison ou tendance) et autres jeux lancés sur la période : lancements moyens par jeu.
+    function resumeInspirations(lignes) {
+      const moyenne = (l) => (l.length ? Math.round(l.reduce((s, x) => s + (x.launches || 0), 0) / l.length) : 0);
+      const lances = lignes.filter((l) => l.launches);
+      const inspires = lances.filter((l) => l.inspiration), autres = lances.filter((l) => !l.inspiration);
+      return inspires.length ? ` Jeux de saison ou de tendance lancés : ${inspires.length}, ${nombre(moyenne(inspires))} lancements en moyenne (autres jeux : ${nombre(moyenne(autres))}).` : '';
     }
 
     function afficherTableau(lignes) {
       const { cle, sens } = triStats;
       lignes.sort((a, b) => {
         if (cle === 'titre') return sens * a.titre.localeCompare(b.titre, 'fr');
+        // Inspiration : texte ; jeu sans inspiration toujours en bas.
+        if (cle === 'inspiration') return (!a.inspiration - !b.inspiration) || sens * a.inspiration.localeCompare(b.inspiration, 'fr') || a.titre.localeCompare(b.titre, 'fr');
         // Valeur absente (jeu jamais lancé) : toujours en bas, quel que soit le sens.
         if (a[cle] == null || b[cle] == null) return (a[cle] == null) - (b[cle] == null) || a.titre.localeCompare(b.titre, 'fr');
         return sens * (a[cle] - b[cle]) || a.titre.localeCompare(b.titre, 'fr');
@@ -1323,10 +1342,11 @@
       const dateCourte = (v) => (d.periode === '24h' ? dateLisible(v) : new Date(`${v}T12:00:00Z`).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }));
       let resume = d.periode === '24h' ? `Du ${dateCourte(d.du)} au ${dateCourte(d.au)}.` : `Du ${dateCourte(d.du)} au ${dateCourte(d.au)} (jours UTC complets).`;
       if (d.jours && d.jours.calcules < d.jours.attendus) resume += ` Données partielles : ${d.jours.calcules} jour(s) calculé(s) sur ${d.jours.attendus} (statistiques commencées récemment).`;
-      stats.resume.textContent = resume;
+      const lignes = await lignesStats(d);
+      stats.resume.textContent = resume + resumeInspirations(lignes);
       afficherTuiles(d);
       afficherCourbe(d);
-      afficherTableau(await lignesStats(d));
+      afficherTableau(lignes);
     }
 
     async function chargerStats() {
