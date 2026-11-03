@@ -532,6 +532,10 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         jouer: urlLanceur(jeu.id, lang),
         jouer_aria: t('page.jouerAria', { titre }),
         signaler: urlProposer(lang, jeu.id),
+        // Partage (public/partage.js) : l'adresse officielle de la page, lue par
+        // WhatsApp et Facebook pour l'aperçu (balises og:* de la tête).
+        partage_url: canonique,
+        partage_texte: t('partage.message', { titre }),
         puces: puces.join(''),
         presentation: paragraphes(tx.presentation || tx.description || jeu.description),
         regles: tx.regles ? `<h2>${echapper(t('page.commentJouer'))}</h2>\n      ${paragraphes(tx.regles)}` : '',

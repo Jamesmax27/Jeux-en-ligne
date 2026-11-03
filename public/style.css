@@ -2301,6 +2301,63 @@ main.catalogue {
   font-size: 13px;
 }
 
+/* Partage du jeu (public/partage.js) : petits ronds au trait, discrets. La rangée
+   garde sa hauteur avant l'arrivée du script : rien ne bouge ; le message
+   « Lien copié. » flotte dessous, sans pousser la page. */
+.partage {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 44px;
+  margin: 12px 0 0;
+}
+
+.partage-bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--trait);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--craie-douce);
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.partage-bouton svg { width: 20px; height: 20px; }
+
+.partage-message {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 2;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--surface-choisie);
+  color: var(--craie);
+  font-size: 13px;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, .6);
+  pointer-events: none;
+}
+
+.partage-message:empty { display: none; }
+
+/* Dès 720 px, la place ne manque pas : message à droite des boutons, sur leur ligne. */
+@media (min-width: 720px) {
+  .partage { width: fit-content; }
+  .partage-message { top: 6px; left: calc(100% + 8px); }
+}
+
+@media (hover: hover) {
+  .partage-bouton:hover { color: var(--lavande); border-color: var(--orbite); }
+}
+
 /* Lien discret vers le formulaire public (signaler un bug, proposer une idée sur ce jeu). */
 .fiche-signaler { margin: 10px 0 0; font-size: 14px; }
 

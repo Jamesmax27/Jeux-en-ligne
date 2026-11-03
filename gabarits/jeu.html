@@ -21,6 +21,25 @@
           <a class="bouton bouton-jouer" href="{{jouer}}" aria-label="{{jouer_aria}}">{{t:page.jouer}}</a>
           <p class="fiche-gratuit">{{t:page.gratuit}}</p>
           <p class="puces-liens">{{{puces}}}</p>
+          <!-- Partage (public/partage.js) : boutons cachés tant que le script n'est pas
+               passé, rangée gardée à sa hauteur (rien ne bouge à l'arrivée du script).
+               Les liens WhatsApp et Facebook sont posés par le script : la page ne
+               contient aucun lien vers un autre site (verifier-seo.mjs). -->
+          <div class="partage" role="group" aria-label="{{t:partage.titre}}" data-url="{{partage_url}}" data-titre="{{titre}}" data-texte="{{partage_texte}}" data-copie="{{t:partage.copie}}" data-echec="{{t:partage.echec}}">
+            <button type="button" class="partage-bouton" data-partage="natif" title="{{t:partage.natif}}" aria-label="{{t:partage.natif}}" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 15V3.5M7.5 8 12 3.5 16.5 8M5 12.5V19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <a class="partage-bouton" data-partage="whatsapp" title="{{t:partage.whatsapp}}" aria-label="{{t:partage.whatsapp}}" target="_blank" rel="noopener noreferrer" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20l1.2-3.9A8.3 8.3 0 1 1 8.1 19z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.1 7.6c.3-.3.8-.3 1 .1l.8 1.8c.1.3 0 .5-.2.7l-.6.6c.6 1.3 1.6 2.3 2.9 2.9l.6-.6c.2-.2.5-.3.7-.2l1.8.8c.4.2.4.7.1 1-.7.8-1.6 1.1-2.6.8-2.3-.7-4.3-2.7-5-5-.3-1 0-1.9.5-2.9z" fill="currentColor"/></svg>
+            </a>
+            <a class="partage-bouton" data-partage="facebook" title="{{t:partage.facebook}}" aria-label="{{t:partage.facebook}}" target="_blank" rel="noopener noreferrer" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.4 21v-7.6h2.6l.4-3h-3V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.2H7.8v3h2.6V21z" fill="currentColor"/></svg>
+            </a>
+            <button type="button" class="partage-bouton" data-partage="copier" title="{{t:partage.copier}}" aria-label="{{t:partage.copier}}" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10 14a4.2 4.2 0 0 0 6 0l3-3a4.2 4.2 0 0 0-6-6l-1 1M14 10a4.2 4.2 0 0 0-6 0l-3 3a4.2 4.2 0 0 0 6 6l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="partage-message" role="status"></span>
+          </div>
           <!-- Formulaire public, avec ce jeu déjà choisi (hors du bloc de texte compté par regles-seo.mjs). -->
           <p class="fiche-signaler"><a href="{{signaler}}">{{t:proposer.lienJeu}}</a></p>
         </div>
@@ -42,5 +61,6 @@
   </main>
 
   {{> pied}}
+  <script src="/partage.js" defer></script>
 </body>
 </html>
