@@ -29,6 +29,14 @@
       // page ne bouge pas à son arrivée (app.js).
       document.documentElement.classList.add('avec-vitrine');
       try { if (navigator.onLine !== false && localStorage.getItem('tendances') === '1') document.documentElement.classList.add('avec-tendances'); } catch (e) { /* stockage refusé */ }
+      // Bannière « Installer l'appli » (installer.js) : sa place est gardée si elle
+      // était montrée à la visite précédente et que rien ne la cache aujourd'hui
+      // (fermée il y a moins de 3 jours, appli installée, site ouvert depuis l'appli).
+      try {
+        var appli = (window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui), (display-mode: window-controls-overlay)').matches) || navigator.standalone === true;
+        var inst = JSON.parse(localStorage.getItem('fmg-installer') || 'null');
+        if (!appli && inst && inst.montree && !inst.installee && !(inst.masqueeJusqua > Date.now())) document.documentElement.classList.add('avec-installer');
+      } catch (e) { /* stockage refusé */ }
     })();
   </script>
   <!-- Traductions : i18n/i18n.js (module commun), textes dans i18n/site/<langue>.json -->
@@ -44,6 +52,19 @@
       <div class="entete-langue" id="langue">{{{langues}}}</div>
     </div>
   </header>
+
+  <!-- Bannière « Installer l'appli » (public/installer.js) : cachée tant que le
+       script n'a pas vu que l'appareil peut installer le site et que rien ne
+       l'interdit ; ✕ la cache 3 jours, puis elle revient. -->
+  <aside class="installer-banniere" id="installer-banniere" aria-labelledby="installer-banniere-titre" hidden>
+    <img src="/assets/icone-192.png" width="40" height="40" alt="Micro Games">
+    <div class="installer-banniere-texte">
+      <strong id="installer-banniere-titre" data-i18n="installer.banniere.titre">{{t:installer.banniere.titre}}</strong>
+      <span data-i18n="installer.banniere.texte">{{t:installer.banniere.texte}}</span>
+    </div>
+    <button type="button" class="installer-banniere-bouton" data-installer="banniere" data-i18n="installer.bouton">{{t:installer.bouton}}</button>
+    <button type="button" class="installer-croix" data-installer="masquer" aria-label="{{t:installer.fermer}}" data-i18n-aria="installer.fermer">✕</button>
+  </aside>
 
   <!-- Première ligne (« vitrine », remplie par app.js), en deux moitiés de même
        hauteur : à gauche les Nouveautés (derniers jeux ajoutés, aussi hors
