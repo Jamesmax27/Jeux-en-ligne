@@ -245,8 +245,11 @@ function infosImage(image) {
 
 // Petit script de toutes les pages générées : enregistre le service worker (hors
 // ligne dès la première visite, même arrivé par une fiche) et note le choix
-// de langue fait avec les liens de langue (utilisé par l'accueil « / »).
+// de langue fait avec les liens de langue (utilisé par l'accueil « / »), et
+// garde l'offre d'installation du navigateur (beforeinstallprompt, Chrome, Edge)
+// même si elle arrive avant installer.js.
 const SCRIPT_PAGE = `<script>
+    addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.FMG_INSTALLATION = e; });
     if ('serviceWorker' in navigator) addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
     document.addEventListener('click', function (e) {
       var a = e.target.closest && e.target.closest('.langues a[hreflang]');
@@ -297,6 +300,8 @@ function tete({ lang, titre, description, canonique, indexable, alternatives, im
     // Pastille du profil joueur (coin de l'en-tête) : profil créé dès la première
     // visite, check vert des jeux terminés (docs/cadrage-fidelisation.md).
     '<script type="module" src="/profil-pastille.js"></script>',
+    // « Installer l'appli » : bannière de l'accueil, lien du pied, fenêtre d'explication.
+    '<script src="/installer.js" defer></script>',
     SCRIPT_PAGE,
   );
   return lignes.join('\n  ');

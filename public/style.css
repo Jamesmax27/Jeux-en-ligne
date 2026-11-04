@@ -4650,3 +4650,169 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
     box-shadow: none;
   }
 }
+
+/* --------------------------------------------------------------------------
+   « Installer l'appli » (public/installer.js) : bannière en haut de l'accueil,
+   lien du pied de page, fenêtre d'explication (gabarits/morceaux/installer.html).
+   -------------------------------------------------------------------------- */
+
+/* Bannière : une ligne sous l'en-tête, avant la première ligne de jeux.
+   html.avec-installer (script de tête de l'accueil) garde sa place pendant le
+   chargement quand elle était là à la visite précédente : rien ne bouge. */
+.installer-banniere {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  max-width: calc(1200px - 32px);
+  min-height: 64px;
+  margin: 6px max(16px, env(safe-area-inset-right)) 8px max(16px, env(safe-area-inset-left));
+  padding: 8px 4px 8px 10px;
+  border: 1px solid rgba(196, 181, 253, .35);
+  border-radius: var(--r-plaque);
+  background: var(--verre-flottant);
+  box-shadow: var(--halo), var(--reflet);
+  color: var(--craie);
+}
+@media (min-width: 1232px) {
+  .installer-banniere { margin-left: auto; margin-right: auto; }
+}
+html.avec-installer .installer-banniere[hidden] { display: flex !important; visibility: hidden; }
+
+.installer-banniere img { flex: none; border-radius: 10px; }
+
+.installer-banniere-texte {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.installer-banniere-texte strong { font-family: var(--police-titre); font-size: 15px; font-weight: 600; }
+.installer-banniere-texte span { color: var(--craie-douce); font-size: 13px; }
+
+.installer-banniere-bouton,
+.installer-principal {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--r-commande);
+  background: linear-gradient(var(--lavande-claire), var(--lavande));
+  color: var(--nuit);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.installer-banniere-bouton:hover,
+.installer-principal:hover { background: var(--lavande-claire); }
+
+.installer-croix {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--craie-douce);
+  font: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+.installer-croix:hover { background: var(--surface-relevee); color: var(--craie); }
+
+/* Lien du pied de page : en gras, il reste discret. */
+.pied-installer button { font-weight: 800; }
+
+/* Fenêtre : en bas de l'écran sur téléphone (près du pouce), au centre ailleurs. */
+.installer-fenetre {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  margin: auto auto max(12px, env(safe-area-inset-bottom));
+  padding: 18px 18px 8px;
+  overflow-y: auto;
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-plaque);
+  background: var(--surface);
+  box-shadow: var(--ombre-flottante);
+  color: var(--craie);
+}
+@media (min-width: 720px) {
+  .installer-fenetre { margin: auto; }
+}
+.installer-fenetre::backdrop { background: rgba(4, 2, 16, .7); }
+
+.installer-tete { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.installer-tete img { flex: none; border-radius: 12px; }
+.installer-tete > div { flex: 1; min-width: 0; }
+.installer-tete h2 { margin: 0; font-family: var(--police-titre); font-size: 20px; font-weight: 600; }
+.installer-tete p { margin: 0; color: var(--craie-douce); font-size: 13px; }
+
+.installer-intro,
+.installer-manuel { margin: 0 0 12px; color: var(--craie-douce); font-size: 15px; line-height: 1.4; }
+.installer-reussi { margin: 4px 0 14px; color: var(--craie); font-size: 16px; font-weight: 700; }
+
+.installer-principal { width: 100%; min-height: 52px; font-size: 17px; }
+
+.installer-cas { margin: 0 0 8px; }
+.installer-cas > p { margin: 0 0 8px; font-size: 15px; line-height: 1.4; }
+.installer-cas h3 { margin: 14px 0 8px; color: var(--lavande); font-size: 15px; }
+.installer-fenetre:not(.installer-tous) .installer-cas h3 { display: none; }
+
+.installer-etapes { margin: 0; padding: 0; list-style: none; counter-reset: etape; }
+.installer-etapes li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 15px;
+  line-height: 1.35;
+  counter-increment: etape;
+}
+.installer-etapes li::before {
+  content: counter(etape);
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface-choisie);
+  color: var(--lavande);
+  font-weight: 800;
+}
+.installer-etapes svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--lavande);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.installer-secondaire {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+  border: 1px solid var(--orbite);
+  border-radius: var(--r-commande);
+  background: none;
+  color: var(--craie);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.installer-secondaire:hover { background: var(--surface-relevee); }
+
+.installer-autre { margin: 6px 0 0; text-align: center; }
+
+/* Téléphone : sans l'icône, bouton plus serré, pour tenir sur environ 3 lignes. */
+@media (max-width: 479px) {
+  .installer-banniere { gap: 8px; padding-left: 12px; }
+  .installer-banniere img { display: none; }
+  .installer-banniere-bouton { padding: 0 12px; }
+  .installer-banniere .installer-croix { width: 40px; }
+}
