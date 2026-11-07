@@ -397,8 +397,9 @@ verifier(h.statut === 200 && h.periodes.length === 1 && h.periodes[0].debut === 
 verifier((await appeler(apiClassement, { type: 'historique', periode: 'mois' })).periodes.length === 0, 'historique des mois vide tant qu\'aucun mois n\'est terminé');
 verifier((await appeler(apiClassement, { type: 'historique', periode: 'semaine', avant: 'pas-une-date' })).statut === 400, 'historique : date « avant » invalide refusée');
 const clc = await appeler(apiClassement, { perimetre: 'general', periode: 'semaine' });
-verifier(clc.champions?.length === 1 && clc.champions[0] === premierId, 'couronne : 1er de la semaine précédente', clc.champions);
-verifier((await appeler(apiClassement, { perimetre: 'etoiles', periode: 'semaine' })).champions.length === 0, 'pas de couronne hors du classement général');
+verifier(clc.couronnes?.length === podium.length && clc.couronnes.every((x, i) => x.id === podium[i].profil && x.rang === podium[i].rang) && clc.couronnes[0].id === premierId,
+  'couronnes or, argent, bronze : podium de la semaine précédente', clc.couronnes);
+verifier((await appeler(apiClassement, { perimetre: 'etoiles', periode: 'semaine' })).couronnes.length === 0, 'pas de couronne hors du classement général');
 
 // ==========================================================================
 console.log('Indicateurs de fidélisation et effacements');

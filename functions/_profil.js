@@ -727,12 +727,12 @@ export async function assurerPodiums(env, maintenant) {
   podiumsVerifies = cle;
 }
 
-/** 1ers de la période précédente (couronne du classement général) : [id de profil]. */
-export async function championsPrecedents(env, periode, maintenant) {
+/** Podium de la période précédente (couronnes or, argent, bronze du classement général) : [{ id, rang }]. */
+export async function couronnesPrecedentes(env, periode, maintenant) {
   const debut = periodePrecedente(periode, debutPeriode(periode, maintenant));
-  const { results } = await env.DB.prepare('SELECT profil FROM podiums WHERE periode = ? AND debut = ? AND rang = 1 AND profil IS NOT NULL')
+  const { results } = await env.DB.prepare('SELECT profil, rang FROM podiums WHERE periode = ? AND debut = ? AND profil IS NOT NULL ORDER BY place')
     .bind(periode, debut).all();
-  return (results || []).map((r) => r.profil);
+  return (results || []).map((r) => ({ id: r.profil, rang: r.rang }));
 }
 
 /**
