@@ -68,6 +68,30 @@ export function date(ms, options = { day: 'numeric', month: 'short', year: 'nume
   try { return new Intl.DateTimeFormat(actuels.lang, options).format(new Date(ms)); } catch { return new Date(ms).toISOString().slice(0, 10); }
 }
 
+/** Numéro de la semaine (ISO 8601 : la semaine du classement commence le lundi) d'un jour « AAAA-MM-JJ ». */
+export function numeroSemaine(jour) {
+  const d = new Date(`${jour}T00:00:00Z`);
+  const jeudi = new Date(d.getTime() + (4 - (d.getUTCDay() || 7)) * 86400000);
+  return Math.ceil(((jeudi - Date.UTC(jeudi.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7);
+}
+
+/**
+ * Nom d'une période du classement (podiums) : « Semaine 45 · du 2 nov. au 8 nov. 2026 »
+ * ou « Novembre 2026 ». debut : premier jour (« AAAA-MM-JJ », UTC) ; semaine : 7 jours.
+ */
+export function titrePeriode(periode, debut) {
+  const ms = Date.parse(`${debut}T00:00:00Z`);
+  if (periode === 'mois') {
+    const texte = date(ms, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    return texte.charAt(0).toUpperCase() + texte.slice(1);
+  }
+  return t('classement.historique.semaineTitre', {
+    n: numeroSemaine(debut),
+    debut: date(ms, { day: 'numeric', month: 'short', timeZone: 'UTC' }),
+    fin: date(ms + 6 * 86400000, { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }),
+  });
+}
+
 /** f() après un changement de langue (lanceur, accueil). */
 export function surChangementLangue(f) {
   ecouteurs.add(f);

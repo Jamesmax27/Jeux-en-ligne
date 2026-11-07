@@ -4,7 +4,8 @@
 // Affiche le profil gardé sur l'appareil (copie de la base, profil.js) puis
 // le relit : avatar, pseudo (modifiable), niveau et expérience, rang de la
 // semaine, série de jours consécutifs, étoiles, jeux joués (derniers d'abord,
-// avec temps passé, étoiles, check vert et bouton « Rejouer »), badges,
+// avec temps passé, étoiles, check vert et bouton « Rejouer »), trophées
+// (podiums du classement général : docs/cadrage-fidelisation.md, 14.9), badges,
 // parties en ligne, amis (nombre, rang parmi eux cette semaine, mode
 // invisible : docs/consigne-amis.md), choix de l'avatar et du cadre, code de
 // sauvegarde (afficher, copier, ou relier cet appareil à un autre profil).
@@ -18,12 +19,60 @@ import {
   changerApparence, classement, marquerTermines,
 } from './profil.js';
 import { peindreAvatar } from './avatars.js';
-import { chargerTextes, t, langue, date } from './profil-textes.js';
+import { chargerTextes, t, langue, date, titrePeriode } from './profil-textes.js';
 import { urlJeu, urlLanceur, urlClassement } from './chemins.js';
 import { classementAmis, changerInvisible } from './amis.js';
 
 const $ = (id) => document.getElementById(id);
 let catalogue = new Map();
+let tousLesTrophees = false;   // « Voir plus » touché : toute la liste des trophées
+const TROPHEES_VISIBLES = 10;  // trophées listés avant « Voir plus »
+const MEDAILLE = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+// Vitrine des trophées : par période (semaines, mois), le nombre de 1res, 2es et 3es places,
+// puis la liste des périodes, plus récentes d'abord.
+function afficherTrophees(e) {
+  const trophees = Array.isArray(e.trophees) ? e.trophees : [];
+  $('profil-trophees-resume').textContent = trophees.length ? t('profil.trophees.resume', { n: trophees.length }) : t('profil.trophees.vide');
+  const vitrine = $('profil-trophees');
+  vitrine.textContent = '';
+  vitrine.hidden = !trophees.length;
+  for (const periode of ['semaine', 'mois']) {
+    const groupe = document.createElement('div');
+    groupe.className = 'profil-trophees-groupe';
+    const h = document.createElement('h3');
+    h.textContent = t(periode === 'mois' ? 'profil.trophees.mois' : 'profil.trophees.semaines');
+    const cases = document.createElement('ul');
+    cases.className = 'profil-trophees-cases';
+    for (const rang of [1, 2, 3]) {
+      const n = trophees.filter((x) => x.periode === periode && x.rang === rang).length;
+      const li = document.createElement('li');
+      li.className = `profil-trophee-case${n ? '' : ' sans-trophee'}`;
+      li.setAttribute('aria-label', t('profil.trophees.compteAria', { place: t(`classement.place.${rang}`), n }));
+      li.innerHTML = '<span class="picto" aria-hidden="true"></span><span aria-hidden="true"></span>';
+      li.firstChild.textContent = MEDAILLE[rang];
+      li.lastChild.textContent = String(n);
+      cases.append(li);
+    }
+    groupe.append(h, cases);
+    vitrine.append(groupe);
+  }
+  const liste = $('profil-trophees-liste');
+  liste.textContent = '';
+  const montres = tousLesTrophees ? trophees : trophees.slice(0, TROPHEES_VISIBLES);
+  for (const x of montres) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="picto" aria-hidden="true"></span><span class="sr-only"></span><span></span><span class="points"></span>';
+    li.children[0].textContent = MEDAILLE[x.rang] || '';
+    li.children[1].textContent = `${t(`classement.place.${x.rang}`)} : `;
+    li.children[2].textContent = titrePeriode(x.periode, x.debut);
+    li.children[3].textContent = t('classement.pointsXp', { n: x.points });
+    liste.append(li);
+  }
+  const plus = $('profil-trophees-plus');
+  plus.hidden = montres.length >= trophees.length;
+  plus.onclick = () => { tousLesTrophees = true; afficherTrophees(e); };
+}
 
 function titre(jeu, id) {
   if (!jeu) return id;
@@ -139,6 +188,8 @@ function afficher() {
   }
   marquerTermines(liste, t('profil.termine'));
 
+  afficherTrophees(e);
+
   // Badges : rares (débloqués en couleur, les autres grisés avec leur condition).
   const listeBadges = $('profil-badges');
   listeBadges.textContent = '';
@@ -149,7 +200,7 @@ function afficher() {
     const obtenu = badges.has(b.id);
     li.className = `profil-badge famille-${b.famille}${obtenu ? ' obtenu' : ''}`;
     li.innerHTML = '<span class="profil-badge-picto" aria-hidden="true"></span><span class="profil-badge-nom"></span><span class="profil-badge-aide"></span>';
-    li.querySelector('.profil-badge-picto').textContent = { collection: '🏆', etoiles: '⭐', serie: '🔥', niveau: '🎖️', multi: '🎮' }[b.famille];
+    li.querySelector('.profil-badge-picto').textContent = { collection: '🏆', etoiles: '⭐', serie: '🔥', niveau: '🎖️', multi: '🎮', podium: '🏅' }[b.famille];
     li.querySelector('.profil-badge-nom').textContent = t(`badge.${b.id}`);
     li.querySelector('.profil-badge-aide').textContent = obtenu ? t('profil.badges.obtenu') : t(`badge.${b.id}.aide`);
     listeBadges.append(li);
