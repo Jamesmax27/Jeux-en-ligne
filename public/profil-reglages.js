@@ -98,6 +98,20 @@ export const CLASSEMENT_CACHE_S = 300;        // le top est recalculé au plus t
 export const CLASSEMENT_ETOILES = 'brut';     // classement « Étoiles » : étoiles gagnées sur la période ('brut'), pas un pourcentage
 export const CLASSEMENT_NIVEAU_MIN = 2;       // niveau minimal pour apparaître dans un classement (écarte les profils créés par des robots)
 
+// --- Podiums : historique des 3 premiers du classement général -------------------
+// À la fin de chaque semaine et de chaque mois, les 3 premiers du classement
+// général (XP de la période) sont enregistrés pour toujours (table podiums) :
+// historique sous le classement, trophées du profil, badges ci-dessous.
+// Égalité de points : même place (deux 1ers, puis un 3e, comme le classement).
+export const PODIUM_PLACES = 3;               // places gardées : 1er, 2e et 3e
+export const PODIUM_LIGNES_MAX = 10;          // joueurs gardés au plus par période (s'il y a beaucoup d'égalités)
+export const PALIERS_PODIUMS = [3, 10, 25];   // podiums au total (semaines et mois, toutes places) : badges podiums-3, podiums-10…
+export const PALIERS_PODIUM_VICTOIRES = [3, 10]; // 1res places au total (semaines et mois) : badges podium-victoires-3…
+// Badges de première fois : podium-semaine-1 (1er d'une semaine), -2, -3, et podium-mois-1, -2, -3.
+export const HISTORIQUE_PAR_PAGE = 8;         // périodes montrées sous le classement, puis « Voir plus »
+export const HISTORIQUE_CACHE_S = 3600;       // historique gardé 1 heure dans le cache de Cloudflare
+export const COURONNE_CHAMPION = true;        // couronne à côté du pseudo du 1er de la période précédente, dans le classement général
+
 // --- Pseudos ---------------------------------------------------------------------
 export const PSEUDO_MIN = 3;                  // caractères au moins
 export const PSEUDO_MAX = 16;                 // caractères au plus
@@ -239,6 +253,7 @@ export const CADRES = [
   { id: 'cosmique', niveau: 100 },
   { id: 'arc-en-ciel', badge: 'serie-14' },
   { id: 'etoile', badge: 'etoiles-500' },
+  { id: 'couronne', badge: 'podium-mois-1' },  // 1er du classement général d'un mois
 ];
 
 // ==========================================================================
@@ -286,6 +301,9 @@ export function listeBadges() {
     ...PALIERS_MULTI_HUMAINS.map((s) => ({ id: `multi-humains-${s}`, famille: 'multi', seuil: s })),
     { id: 'multi-robot', famille: 'multi' },
     { id: 'multi-serie', famille: 'multi', seuil: SERIE_MULTI_VICTOIRES },
+    ...['semaine', 'mois'].flatMap((periode) => [1, 2, 3].map((place) => ({ id: `podium-${periode}-${place}`, famille: 'podium' }))),
+    ...PALIERS_PODIUMS.map((s) => ({ id: `podiums-${s}`, famille: 'podium', seuil: s })),
+    ...PALIERS_PODIUM_VICTOIRES.map((s) => ({ id: `podium-victoires-${s}`, famille: 'podium', seuil: s })),
   ];
 }
 

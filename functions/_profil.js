@@ -28,6 +28,10 @@
 //   fidelisation_jour    indicateurs de fidélisation, un calcul par jour
 //   amis, amis_reglages  amitiés, demandes, blocages, mode invisible (functions/_amis.js,
 //                        docs/consigne-amis.md ; migrations/0003_amis.sql)
+//   podiums              3 premiers du classement général de chaque semaine et de
+//                        chaque mois terminés, gardés sans limite (historique, trophées)
+//   podiums_periodes     périodes déjà enregistrées (même sans joueur classé)
+//                        (migrations/0004_podiums.sql ; docs/cadrage-fidelisation.md, 14.9)
 // ==========================================================================
 
 import * as R from '../public/profil-reglages.js';
@@ -86,6 +90,14 @@ export function preparerTablesProfil(env) {
         PRIMARY KEY (profil, autre)) WITHOUT ROWID`),
       env.DB.prepare('CREATE INDEX IF NOT EXISTS amis_etat ON amis (etat, maj_le)'),
       env.DB.prepare('CREATE TABLE IF NOT EXISTS amis_reglages (profil INTEGER PRIMARY KEY, invisible INTEGER NOT NULL DEFAULT 0, maj_le INTEGER NOT NULL) WITHOUT ROWID'),
+      // Podiums : place = ordre dans la période (1, 2, 3… égalités comprises), rang = place du
+      // classement (1 à 3). profil devient NULL quand le profil est effacé (« Ancien joueur »).
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS podiums (
+        periode TEXT NOT NULL, debut TEXT NOT NULL, place INTEGER NOT NULL, rang INTEGER NOT NULL,
+        profil INTEGER, points INTEGER NOT NULL, PRIMARY KEY (periode, debut, place)) WITHOUT ROWID`),
+      env.DB.prepare('CREATE INDEX IF NOT EXISTS podiums_profil ON podiums (profil)'),
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS podiums_periodes (
+        periode TEXT NOT NULL, debut TEXT NOT NULL, calcule_le INTEGER NOT NULL, PRIMARY KEY (periode, debut)) WITHOUT ROWID`),
     ]).catch((erreur) => {
       tablesPretes = null; // nouvel essai à la prochaine requête
       throw erreur;
@@ -169,8 +181,15 @@ export async function resumeAmis(env, id) {
   return { amis: l?.amis || 0, recues: l?.recues || 0, invisible: l?.invisible === 1 };
 }
 
+/** Trophées du profil (podiums du classement général), plus récents d'abord : [{ periode, debut, rang, points }]. */
+export async function tropheesDuProfil(env, id) {
+  const { results } = await env.DB.prepare('SELECT periode, debut, rang, points FROM podiums WHERE profil = ? ORDER BY debut DESC, periode')
+    .bind(id).all();
+  return results || [];
+}
+
 /** État public du profil, renvoyé au navigateur (public/profil.js le garde en cache). */
-export function etatPublic(profil, jeux, gains, amis = null) {
+export function etatPublic(profil, jeux, gains, amis = null, trophees = []) {
   const niveau = R.niveauPourXp(profil.xp);
   return {
     id: profil.id,
@@ -193,20 +212,28 @@ export function etatPublic(profil, jeux, gains, amis = null) {
       .map((j) => ({ id: j.jeu, secondes: j.secondes, premiere: j.premiere, derniere: j.derniere, termine: j.termine || null, etoiles: j.etoiles ?? null, max: j.etoiles_max ?? null })),
     aujourdhui: { jour: gains.jour || null, secondes: gains.secondes, xp: gains.xp, multiXp: gains.multi_xp, termines: gains.termines },
     amis: amis || { amis: 0, recues: 0, invisible: false },
+    trophees: trophees.map((x) => ({ periode: x.periode, debut: x.debut, rang: x.rang, points: x.points })),
   };
 }
 
 export async function etatComplet(env, profil, maintenant) {
   const jour = jourUTC(maintenant);
-  const [jeux, gains, amis] = await Promise.all([jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jour), resumeAmis(env, profil.id)]);
-  return etatPublic(profil, jeux, { ...gains, jour }, amis);
+  const [jeux, gains, amis, trophees] = await Promise.all([
+    jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jour), resumeAmis(env, profil.id), tropheesDuProfil(env, profil.id),
+  ]);
+  return etatPublic(profil, jeux, { ...gains, jour }, amis, trophees);
 }
 
 // --- Badges --------------------------------------------------------------------------
 
 /** Badges mérités d'après les compteurs (ensemble d'id), voir listeBadges() des réglages. */
-export function badgesMerites({ termines, etoiles, parfait, serieRecord, niveau, multi }) {
+export function badgesMerites({ termines, etoiles, parfait, serieRecord, niveau, multi, trophees = [] }) {
   const ids = new Set();
+  // Podiums du classement général (table podiums) : première fois à chaque place, puis paliers.
+  for (const x of trophees) if (x.rang >= 1 && x.rang <= R.PODIUM_PLACES) ids.add(`podium-${x.periode}-${x.rang}`);
+  for (const s of R.PALIERS_PODIUMS) if (trophees.length >= s) ids.add(`podiums-${s}`);
+  const victoires = trophees.filter((x) => x.rang === 1).length;
+  for (const s of R.PALIERS_PODIUM_VICTOIRES) if (victoires >= s) ids.add(`podium-victoires-${s}`);
   for (const s of R.PALIERS_TERMINES) if (termines >= s) ids.add(`collection-${s}`);
   if (parfait) ids.add('etoiles-parfait');
   for (const s of R.PALIERS_ETOILES) if (etoiles >= s) ids.add(`etoiles-${s}`);
@@ -336,7 +363,9 @@ function entier(v, min, max) {
  */
 export async function synchroniser(env, profil, corps, catalogue, maintenant) {
   const jourU = jourUTC(maintenant);
-  const [jeux, gainsJour, amis] = await Promise.all([jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jourU), resumeAmis(env, profil.id)]);
+  const [jeux, gainsJour, amis, trophees] = await Promise.all([
+    jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jourU), resumeAmis(env, profil.id), tropheesDuProfil(env, profil.id),
+  ]);
   const ajout = { secondes: 0, xp: 0, etoiles: 0, termines: 0, multi_xp: 0 };
   const modifies = new Set();
   const p = { ...profil };
@@ -418,10 +447,10 @@ export async function synchroniser(env, profil, corps, catalogue, maintenant) {
     ajout.xp += resultat.xp;
   }
 
-  // 4. Niveau et badges.
+  // 4. Niveau et badges (les badges des podiums arrivent ici, au premier envoi après l'enregistrement du podium).
   p.xp = profil.xp + ajout.xp;
   p.niveau = R.niveauPourXp(p.xp);
-  const merites = badgesMerites({ ...compteursJeux(jeux), serieRecord: p.serie_record, niveau: p.niveau, multi: lireMulti(p) });
+  const merites = badgesMerites({ ...compteursJeux(jeux), serieRecord: p.serie_record, niveau: p.niveau, multi: lireMulti(p), trophees });
   const badges = majBadges(p, merites, maintenant);
   p.badges = badges.liste;
   gains.xp = ajout.xp;
@@ -440,7 +469,7 @@ export async function synchroniser(env, profil, corps, catalogue, maintenant) {
 
   const total = { ...gainsJour, jour: jourU };
   for (const k of Object.keys(ajout)) total[k] = (total[k] || 0) + ajout[k];
-  return { etat: etatPublic(p, jeux, total, amis), gains };
+  return { etat: etatPublic(p, jeux, total, amis, trophees), gains };
 }
 
 // --- Apparence, pseudo -------------------------------------------------------------------------
@@ -552,8 +581,8 @@ export async function appliquerResultatMulti(env, r, catalogue, maintenant) {
   }
   const p = { ...profil, xp: profil.xp + xp, multi: JSON.stringify(multi) };
   p.niveau = R.niveauPourXp(p.xp);
-  const jeux = await jeuxDuProfil(env, profil.id);
-  const merites = badgesMerites({ ...compteursJeux(jeux), serieRecord: p.serie_record, niveau: p.niveau, multi });
+  const [jeux, trophees] = await Promise.all([jeuxDuProfil(env, profil.id), tropheesDuProfil(env, profil.id)]);
+  const merites = badgesMerites({ ...compteursJeux(jeux), serieRecord: p.serie_record, niveau: p.niveau, multi, trophees });
   p.badges = majBadges(p, merites, maintenant).liste;
 
   await env.DB.batch([
@@ -571,8 +600,11 @@ export async function appliquerResultatMulti(env, r, catalogue, maintenant) {
  * Points de la période par profil. perimetre : 'general' (XP gagnée),
  * 'etoiles' (étoiles gagnées) ou 'multi:<id du jeu>' (XP des manches en ligne de ce jeu).
  * Renvoie { sql, valeurs } d'une sous-requête (profil, points).
+ * fin (facultatif, « AAAA-MM-JJ » compris) : seulement pour le classement général
+ * d'une période terminée (podiums).
  */
-export function requetePoints(perimetre, debut) {
+export function requetePoints(perimetre, debut, fin = null) {
+  if (perimetre === 'general' && fin) return { sql: 'SELECT profil, SUM(xp) AS points FROM profils_gains WHERE jour >= ? AND jour <= ? GROUP BY profil', valeurs: [debut, fin] };
   if (perimetre === 'general') return { sql: 'SELECT profil, SUM(xp) AS points FROM profils_gains WHERE jour >= ? GROUP BY profil', valeurs: [debut] };
   if (perimetre === 'etoiles') return { sql: 'SELECT profil, SUM(etoiles) AS points FROM profils_gains WHERE jour >= ? GROUP BY profil', valeurs: [debut] };
   const jeu = perimetre.slice('multi:'.length);
@@ -609,6 +641,125 @@ export async function rangDe(env, perimetre, debut, profil) {
   const devant = await env.DB.prepare(`SELECT COUNT(*) AS n FROM (${sql}) g JOIN profils p ON p.id = g.profil WHERE g.points > ? AND p.niveau >= ?`)
     .bind(...valeurs, points, R.CLASSEMENT_NIVEAU_MIN).first();
   return { rang: (devant?.n || 0) + 1, points };
+}
+
+// --- Podiums : historique des 3 premiers du classement général -----------------------------------------
+// À la fin de chaque semaine et de chaque mois, les 3 premiers du classement
+// général sont enregistrés une fois pour toutes (podiums). Fait par la tâche
+// quotidienne (/api/stats-jour), et aussi par /api/classement si elle n'est pas
+// passée. Calcul identique d'une fois à l'autre (points, puis numéro de profil) :
+// deux calculs en même temps écrivent les mêmes lignes (INSERT OR IGNORE).
+// Docs : docs/cadrage-fidelisation.md, section 14.9.
+
+const PERIODES_PODIUM = ['semaine', 'mois'];
+const jourPlus = (jour, n) => jourUTC(Date.parse(`${jour}T00:00:00Z`) + n * JOUR_MS);
+
+/** Dernier jour (compris) d'une période qui commence le jour debut. */
+export function finPeriode(periode, debut) {
+  if (periode === 'semaine') return jourPlus(debut, 6);
+  const d = new Date(`${debut}T00:00:00Z`);
+  return jourUTC(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1) - JOUR_MS);
+}
+
+/** Début de la période qui précède celle qui commence le jour debut. */
+export function periodePrecedente(periode, debut) {
+  return debutPeriode(periode, Date.parse(`${debut}T00:00:00Z`) - JOUR_MS);
+}
+
+/** Podium d'une période terminée : [{ place, rang, profil, points }] (rang 1 à 3, égalités comprises). */
+export async function calculerPodium(env, periode, debut) {
+  const { sql, valeurs } = requetePoints('general', debut, finPeriode(periode, debut));
+  const { results } = await env.DB.prepare(`SELECT p.id, g.points FROM (${sql}) g JOIN profils p ON p.id = g.profil
+    WHERE g.points > 0 AND p.niveau >= ? ORDER BY g.points DESC, p.id LIMIT ?`).bind(...valeurs, R.CLASSEMENT_NIVEAU_MIN, R.PODIUM_LIGNES_MAX).all();
+  const podium = [];
+  let rang = 0;
+  let precedent = null;
+  for (const [i, l] of (results || []).entries()) {
+    if (l.points !== precedent) { rang = i + 1; precedent = l.points; }
+    if (rang > R.PODIUM_PLACES) break;
+    podium.push({ place: i + 1, rang, profil: l.id, points: l.points });
+  }
+  return podium;
+}
+
+/**
+ * Enregistre les podiums des périodes terminées qui manquent (au plus 60 par
+ * type, en remontant jusqu'au premier jour de gains encore gardé). Renvoie
+ * [« semaine:AAAA-MM-JJ », …] (périodes enregistrées).
+ */
+export async function archiverPodiums(env, maintenant) {
+  await preparerTablesProfil(env);
+  const premier = (await env.DB.prepare('SELECT MIN(jour) AS jour FROM profils_gains').first())?.jour;
+  if (!premier) return [];
+  const limite = jourUTC(maintenant - R.GAINS_JOURS_GARDES * JOUR_MS); // avant : gains déjà effacés en partie
+  const faites = [];
+  for (const periode of PERIODES_PODIUM) {
+    const { results } = await env.DB.prepare('SELECT debut FROM podiums_periodes WHERE periode = ?').bind(periode).all();
+    const deja = new Set((results || []).map((r) => r.debut));
+    let debut = periodePrecedente(periode, debutPeriode(periode, maintenant));
+    for (let n = 0; n < 60 && !deja.has(debut) && finPeriode(periode, debut) >= premier && debut >= limite; n++) {
+      const podium = await calculerPodium(env, periode, debut);
+      await env.DB.batch([
+        ...podium.map((x) => env.DB.prepare('INSERT OR IGNORE INTO podiums (periode, debut, place, rang, profil, points) VALUES (?, ?, ?, ?, ?, ?)')
+          .bind(periode, debut, x.place, x.rang, x.profil, x.points)),
+        env.DB.prepare('INSERT OR IGNORE INTO podiums_periodes (periode, debut, calcule_le) VALUES (?, ?, ?)').bind(periode, debut, maintenant),
+      ]);
+      faites.push(`${periode}:${debut}`);
+      debut = periodePrecedente(periode, debut);
+    }
+  }
+  return faites;
+}
+
+// Périodes déjà vérifiées par cette instance (évite une lecture à chaque appel de /api/classement).
+let podiumsVerifies = '';
+
+/** Vérifie (une fois par instance et par période) que les derniers podiums sont enregistrés, sinon les enregistre. */
+export async function assurerPodiums(env, maintenant) {
+  const cle = PERIODES_PODIUM.map((p) => periodePrecedente(p, debutPeriode(p, maintenant))).join('|');
+  if (podiumsVerifies === cle) return;
+  await preparerTablesProfil(env);
+  const [semaine, mois] = cle.split('|');
+  const l = await env.DB.prepare(`SELECT
+      (SELECT COUNT(*) FROM podiums_periodes WHERE periode = 'semaine' AND debut = ?) +
+      (SELECT COUNT(*) FROM podiums_periodes WHERE periode = 'mois' AND debut = ?) AS n`).bind(semaine, mois).first();
+  if ((l?.n || 0) < 2) await archiverPodiums(env, maintenant);
+  podiumsVerifies = cle;
+}
+
+/** 1ers de la période précédente (couronne du classement général) : [id de profil]. */
+export async function championsPrecedents(env, periode, maintenant) {
+  const debut = periodePrecedente(periode, debutPeriode(periode, maintenant));
+  const { results } = await env.DB.prepare('SELECT profil FROM podiums WHERE periode = ? AND debut = ? AND rang = 1 AND profil IS NOT NULL')
+    .bind(periode, debut).all();
+  return (results || []).map((r) => r.profil);
+}
+
+/**
+ * Historique des podiums, plus récents d'abord, HISTORIQUE_PAR_PAGE périodes à
+ * partir de avant (début exclu, facultatif). Les périodes sans joueur classé
+ * n'apparaissent pas. Pseudo et avatar : ceux d'aujourd'hui (un pseudo
+ * signalé disparaît aussi de l'historique) ; profil effacé : id null.
+ * Renvoie { periodes: [{ debut, fin, podium: [{ rang, id, pseudo, numero, avatar, cadre, niveau, points }] }], suite }.
+ */
+export async function historiquePodiums(env, periode, avant = null) {
+  const n = R.HISTORIQUE_PAR_PAGE;
+  const { results: debuts } = await env.DB.prepare(`SELECT DISTINCT debut FROM podiums WHERE periode = ?1 AND (?2 IS NULL OR debut < ?2)
+    ORDER BY debut DESC LIMIT ?3`).bind(periode, avant, n + 1).all();
+  const liste = (debuts || []).map((d) => d.debut);
+  const suite = liste.length > n ? liste[n - 1] : null;
+  const pages = liste.slice(0, n);
+  if (!pages.length) return { periodes: [], suite: null };
+  const { results } = await env.DB.prepare(`SELECT po.debut, po.place, po.rang, po.points, p.id, p.pseudo, p.numero, p.avatar, p.cadre, p.xp
+    FROM podiums po LEFT JOIN profils p ON p.id = po.profil
+    WHERE po.periode = ? AND po.debut >= ? AND po.debut <= ? ORDER BY po.debut DESC, po.place`).bind(periode, pages[pages.length - 1], pages[0]).all();
+  const parDebut = new Map(pages.map((d) => [d, []]));
+  for (const l of results || []) {
+    parDebut.get(l.debut)?.push(l.id
+      ? { rang: l.rang, id: l.id, pseudo: l.pseudo || null, numero: l.numero, avatar: l.avatar, cadre: l.cadre, niveau: R.niveauPourXp(l.xp), points: l.points }
+      : { rang: l.rang, id: null, points: l.points });
+  }
+  return { periodes: pages.map((debut) => ({ debut, fin: finPeriode(periode, debut), podium: parDebut.get(debut) })), suite };
 }
 
 // --- Indicateurs de fidélisation (calcul quotidien, /api/stats-jour) -------------------------------------
@@ -692,10 +843,19 @@ export async function tacheQuotidienneProfil(env, maintenant) {
     jours.push(jour);
     jour = jourUTC(Date.parse(`${jour}T00:00:00Z`) + JOUR_MS);
   }
+  // Podiums des semaines et mois terminés, avant d'effacer les gains les plus anciens.
+  try {
+    await archiverPodiums(env, maintenant);
+  } catch (erreur) {
+    console.error('Podiums impossibles à enregistrer :', erreur);
+  }
   const limiteGains = jourUTC(maintenant - R.GAINS_JOURS_GARDES * JOUR_MS);
   const inactif = maintenant - R.PROFIL_INACTIF_JOURS * JOUR_MS;
   const anciens = 'SELECT id FROM profils WHERE vu_le < ?';
   await env.DB.batch([
+    // Podiums gardés sans limite, mais sans lien vers un profil effacé (« Ancien joueur ») :
+    // un nouveau profil qui reprendrait le même numéro n'hérite d'aucun trophée.
+    env.DB.prepare(`UPDATE podiums SET profil = NULL WHERE profil IN (${anciens})`).bind(inactif),
     env.DB.prepare('DELETE FROM profils_gains WHERE jour < ?').bind(limiteGains),
     env.DB.prepare('DELETE FROM profils_jours WHERE jour < ?').bind(limiteGains),
     env.DB.prepare('DELETE FROM multi_resultats WHERE jour < ?').bind(limiteGains),

@@ -83,7 +83,7 @@ const env = {
 const { onRequestPost: apiProfil } = await import('../functions/api/profil.js');
 const { onRequestPost: apiClassement } = await import('../functions/api/classement.js');
 const { onRequestPost: apiMulti } = await import('../functions/api/profil-multi.js');
-const { tacheQuotidienneProfil } = await import('../functions/_profil.js');
+const { tacheQuotidienneProfil, archiverPodiums, finPeriode, periodePrecedente, badgesMerites } = await import('../functions/_profil.js');
 
 let ipCourante = '203.0.113.1';
 async function appeler(fonction, corps, { ip = ipCourante, entetes = {} } = {}) {
@@ -369,6 +369,38 @@ const ce = await appeler(apiClassement, { perimetre: 'etoiles', periode: 'mois',
 verifier(ce.top[0]?.id === b.etat.id && ce.top[0].points === 72, 'classement des étoiles (brutes)', ce.top[0]);
 
 // ==========================================================================
+console.log('Podiums (historique des 3 premiers, trophées, badges)');
+verifier(finPeriode('semaine', '2026-11-02') === '2026-11-08' && finPeriode('mois', '2026-02-01') === '2026-02-28' && finPeriode('mois', '2026-12-01') === '2026-12-31', 'fin d\'une semaine et d\'un mois');
+verifier(periodePrecedente('semaine', '2026-11-02') === '2026-10-26' && periodePrecedente('mois', '2026-01-01') === '2025-12-01', 'période précédente (semaine, mois, changement d\'année)');
+const merPodium = badgesMerites({ termines: 0, etoiles: 0, parfait: false, serieRecord: 0, niveau: 1, multi: { parties: 0, victoires: 0, humains: 0, robots: 0, serieMax: 0 },
+  trophees: [{ periode: 'semaine', rang: 1 }, { periode: 'semaine', rang: 1 }, { periode: 'mois', rang: 3 }] });
+verifier(merPodium.has('podium-semaine-1') && merPodium.has('podium-mois-3') && !merPodium.has('podium-semaine-2') && merPodium.has('podiums-3') && !merPodium.has('podium-victoires-3'),
+  'badges des podiums : première fois à chaque place, paliers', [...merPodium]);
+const attendu = (await DB.prepare(`SELECT g.profil, SUM(g.xp) AS points FROM profils_gains g JOIN profils p ON p.id = g.profil
+  WHERE g.jour >= '2026-11-02' AND g.jour <= '2026-11-08' AND p.niveau >= ? GROUP BY g.profil HAVING points > 0 ORDER BY points DESC, g.profil LIMIT 3`).bind(R.CLASSEMENT_NIVEAU_MIN).all()).results;
+// Déjà fait au passage par /api/classement (couronne) : la tâche quotidienne n'est pas indispensable.
+await archiverPodiums(env, maintenant);
+const periodesFaites = (await DB.prepare('SELECT periode, debut FROM podiums_periodes ORDER BY periode, debut').all()).results.map((x) => `${x.periode}:${x.debut}`);
+verifier(periodesFaites.join() === 'semaine:2026-11-02', 'semaine terminée enregistrée (par /api/classement) ; aucun mois terminé avec des gains', periodesFaites);
+verifier((await archiverPodiums(env, maintenant)).length === 0, 'une période n\'est enregistrée qu\'une fois');
+const podium = (await DB.prepare("SELECT * FROM podiums WHERE periode = 'semaine' AND debut = '2026-11-02' ORDER BY place").all()).results;
+verifier(attendu.length > 0 && podium.length === attendu.length && podium.every((x, i) => x.profil === attendu[i].profil && x.points === attendu[i].points && x.rang <= 3),
+  'podium = 3 premiers du classement général de la semaine', { podium, attendu });
+const premierId = podium[0].profil;
+const jetonPremier = premierId === idA ? jetonA : jetonB;
+s = await profil({ action: 'sync', jeton: jetonPremier, jour: jourLocal() });
+verifier(s.gains?.badges?.includes('podium-semaine-1') && s.etat.trophees?.[0]?.debut === '2026-11-02' && s.etat.trophees[0].rang === 1 && s.etat.trophees[0].periode === 'semaine',
+  'le 1er reçoit son badge et son trophée au prochain envoi', { badges: s.gains?.badges, trophees: s.etat.trophees });
+let h = await appeler(apiClassement, { type: 'historique', periode: 'semaine' });
+verifier(h.statut === 200 && h.periodes.length === 1 && h.periodes[0].debut === '2026-11-02' && h.periodes[0].fin === '2026-11-08' && h.periodes[0].podium[0].id === premierId && h.suite === null,
+  'historique des semaines : période, dates, podium', h);
+verifier((await appeler(apiClassement, { type: 'historique', periode: 'mois' })).periodes.length === 0, 'historique des mois vide tant qu\'aucun mois n\'est terminé');
+verifier((await appeler(apiClassement, { type: 'historique', periode: 'semaine', avant: 'pas-une-date' })).statut === 400, 'historique : date « avant » invalide refusée');
+const clc = await appeler(apiClassement, { perimetre: 'general', periode: 'semaine' });
+verifier(clc.champions?.length === 1 && clc.champions[0] === premierId, 'couronne : 1er de la semaine précédente', clc.champions);
+verifier((await appeler(apiClassement, { perimetre: 'etoiles', periode: 'semaine' })).champions.length === 0, 'pas de couronne hors du classement général');
+
+// ==========================================================================
 console.log('Indicateurs de fidélisation et effacements');
 maintenant = Date.UTC(2026, 10, 10, 7, 0);
 const jours = await tacheQuotidienneProfil(env, maintenant);
@@ -379,10 +411,26 @@ const ind9 = JSON.parse((await DB.prepare("SELECT donnees FROM fidelisation_jour
 verifier(ind9.retour.j7.jour === '2026-11-02' && ind9.retour.j7.revenus === 1, 'retour à 7 jours', ind9.retour.j7);
 verifier(ind9.multi.manches > 0 && ind9.multi.contreRobots >= 1, 'parties en ligne comptées', ind9.multi);
 verifier(ind9.codes.crees >= 1 && ind9.codes.restaurations === 1 && ind9.codes.profilsCrees >= 2, 'codes créés et restaurations comptés', ind9.codes);
+// Mois terminé : podium du mois, cadre « Couronne » pour le 1er.
+maintenant = Date.UTC(2026, 11, 2, 7, 0); // 2 décembre 2026
+const faitesMois = await archiverPodiums(env, maintenant);
+verifier(faitesMois.includes('mois:2026-11-01') && faitesMois.includes('semaine:2026-11-23'), 'mois de novembre et semaines suivantes enregistrés', faitesMois);
+const premierMois = (await DB.prepare("SELECT profil FROM podiums WHERE periode = 'mois' AND debut = '2026-11-01' AND rang = 1").first())?.profil;
+const jetonMois = premierMois === idA ? jetonA : jetonB;
+verifier((await profil({ action: 'apparence', jeton: jetonMois, cadre: 'couronne' })).statut === 400, 'cadre « Couronne » refusé avant le badge');
+s = await profil({ action: 'sync', jeton: jetonMois, jour: jourLocal() });
+verifier(s.gains?.badges?.includes('podium-mois-1'), 'badge du 1er du mois', s.gains?.badges);
+verifier((await profil({ action: 'apparence', jeton: jetonMois, cadre: 'couronne' })).etat?.cadre === 'couronne', 'cadre « Couronne » débloqué par le 1er du mois');
+h = await appeler(apiClassement, { type: 'historique', periode: 'semaine' });
+verifier(h.periodes.map((x) => x.debut).join() === '2026-11-09,2026-11-02', "semaines sans joueur classé (16 et 23 novembre) : absentes de l'historique", h.periodes.map((x) => x.debut));
 maintenant += (R.PROFIL_INACTIF_JOURS + 1) * JOUR;
 await tacheQuotidienneProfil(env, maintenant);
 const restants = await DB.prepare('SELECT (SELECT COUNT(*) FROM profils) AS p, (SELECT COUNT(*) FROM profils_jeux) AS j, (SELECT COUNT(*) FROM profils_appareils) AS a').first();
 verifier(restants.p === 0 && restants.j === 0 && restants.a === 0, 'profils inactifs depuis 2 ans effacés avec leurs données', restants);
+const podiumsRestants = (await DB.prepare('SELECT COUNT(*) AS n, COUNT(profil) AS lies FROM podiums').first());
+verifier(podiumsRestants.n > 0 && podiumsRestants.lies === 0, 'podiums gardés, sans lien vers les profils effacés', podiumsRestants);
+h = await appeler(apiClassement, { type: 'historique', periode: 'mois' });
+verifier(h.periodes[0]?.podium.every((x) => x.id === null && x.pseudo === undefined), 'historique : profil effacé → « Ancien joueur »', h.periodes[0]);
 
 Date.now = vraiNow;
 console.log(echecs ? `\n${echecs} test(s) en échec.` : '\nProfil joueur : tout est bon.');

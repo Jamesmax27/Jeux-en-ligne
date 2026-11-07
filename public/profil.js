@@ -424,6 +424,23 @@ export async function classement(perimetre, periode) {
   }
 }
 
+/** Historique des podiums du classement général (semaine ou mois), plus récents d'abord ; avant : suite de la page précédente. */
+export async function historiquePodiums(periode, avant = null) {
+  if (navigator.onLine === false) return { erreur: 'hors' };
+  try {
+    const reponse = await fetch('/api/classement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'historique', periode, avant: avant || undefined }),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(DELAI) : undefined,
+    });
+    if (!reponse.ok) return { erreur: 'serveur' };
+    return await reponse.json();
+  } catch {
+    return { erreur: 'hors' };
+  }
+}
+
 // --- Affichage commun -----------------------------------------------------------------------
 
 /** Pseudo affiché : le pseudo choisi, sinon « Joueur <nombre> » dans la langue de la page. */

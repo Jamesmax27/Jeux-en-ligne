@@ -12,13 +12,17 @@
 // section 4) : moi et mes amis acceptés, même calcul, avec le statut de chacun
 // et le bouton « Rejoindre » ; actualisé toutes les 30 s tant que la page est
 // visible, « Actualiser » au plus toutes les 10 s (amis.js). ?portee=amis l'ouvre.
+// Classement général : couronne à côté du pseudo du 1er de la période précédente,
+// et sous la liste l'historique des podiums (3 premiers de chaque semaine ou de
+// chaque mois terminés, selon la période choisie ; « Voir plus » pour les plus
+// anciens). Docs : docs/cadrage-fidelisation.md, section 14.9.
 // Page générée par scripts/pages-seo.mjs (gabarits/classement.html), non indexée.
 // ==========================================================================
 
 import * as R from './profil-reglages.js';
-import { classement, etat, rafraichir, signaler } from './profil.js';
-import { peindreAvatar } from './avatars.js';
-import { chargerTextes, t, langue, date } from './profil-textes.js';
+import { classement, etat, rafraichir, signaler, historiquePodiums } from './profil.js';
+import { peindreAvatar, COURONNE_SVG } from './avatars.js';
+import { chargerTextes, t, langue, date, titrePeriode } from './profil-textes.js';
 import { classementAmis, actualisation, elementsPresence, annoncer } from './amis.js';
 
 let catalogue = new Map();
@@ -36,7 +40,21 @@ function points(perimetre, n) {
   return t(perimetre === 'etoiles' ? 'classement.pointsEtoiles' : 'classement.pointsXp', { n });
 }
 
-function ligneHtml(ligne, perimetre, moiId, { sansSignaler = false } = {}) {
+// Petite couronne dorée (1er de la période précédente), avec son texte pour les lecteurs d'écran.
+function couronne(periode) {
+  const span = document.createElement('span');
+  span.className = 'classement-couronne';
+  span.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${COURONNE_SVG}</svg>`;
+  const texte = t(periode === 'mois' ? 'classement.champion.mois' : 'classement.champion.semaine');
+  span.title = texte;
+  const lu = document.createElement('span');
+  lu.className = 'sr-only';
+  lu.textContent = texte;
+  span.append(lu);
+  return span;
+}
+
+function ligneHtml(ligne, perimetre, moiId, { sansSignaler = false, champions = null, periode = 'semaine' } = {}) {
   const li = document.createElement('li');
   li.className = 'classement-ligne';
   if (MEDAILLES[ligne.rang]) li.classList.add(`medaille-${MEDAILLES[ligne.rang]}`);
@@ -46,6 +64,7 @@ function ligneHtml(ligne, perimetre, moiId, { sansSignaler = false } = {}) {
   li.querySelector('.classement-rang').textContent = t('classement.rang', { n: ligne.rang });
   peindreAvatar(li.querySelector('.classement-avatar'), { avatar: ligne.avatar, cadre: ligne.cadre, niveau: ligne.niveau });
   li.querySelector('.classement-nom').textContent = nom(ligne) + (ligne.id === moiId ? ` (${t('classement.toi')})` : '');
+  if (champions?.has(ligne.id)) li.querySelector('.classement-nom').prepend(couronne(periode));
   li.querySelector('.classement-niveau').textContent = t('classement.niveau', { n: ligne.niveau });
   li.querySelector('.classement-points').textContent = points(perimetre, ligne.points);
   if (ligne.id !== moiId && !sansSignaler) {
@@ -81,8 +100,9 @@ async function chargerAmis() {
   $('classement-presence').hidden = d.presence !== 'indisponible';
   liste.hidden = false;
   liste.textContent = '';
+  const champions = new Set(d.champions || []);
   for (const ligne of d.lignes) {
-    const li = ligneHtml(ligne, perimetre, d.moi, { sansSignaler: true });
+    const li = ligneHtml(ligne, perimetre, d.moi, { sansSignaler: true, champions, periode });
     if (ligne.ami) {
       const el = elementsPresence({ ...ligne, nom: nom(ligne) }, { t, lang: langue(), catalogue, titre: titreJeu, presence: d.presence });
       const bloc = document.createElement('span');
@@ -98,7 +118,64 @@ async function chargerAmis() {
   return d.presence === 'trop-tot' ? { attendre: d.attendre } : {};
 }
 
+// --- Historique des podiums (classement général) -------------------------------------
+
+let historiqueDemande = 0; // dernier chargement demandé (une réponse plus ancienne est ignorée)
+
+function periodeHtml(periode, p, moiId) {
+  const li = document.createElement('li');
+  li.className = 'historique-periode';
+  const h = document.createElement('h3');
+  h.textContent = titrePeriode(periode, p.debut);
+  const podium = document.createElement('ol');
+  podium.className = 'historique-podium';
+  for (const x of p.podium) {
+    const place = document.createElement('li');
+    place.className = `historique-place medaille-${MEDAILLES[x.rang]}`;
+    if (x.id !== null && x.id === moiId) place.classList.add('moi');
+    place.innerHTML = `<span class="historique-medaille" aria-hidden="true"></span><span class="sr-only historique-place-texte"></span>
+      <span class="classement-avatar" aria-hidden="true"></span><span class="classement-nom"></span><span class="classement-points"></span>`;
+    place.querySelector('.historique-medaille').textContent = { 1: '🥇', 2: '🥈', 3: '🥉' }[x.rang];
+    place.querySelector('.historique-place-texte').textContent = `${t(`classement.place.${x.rang}`)} : `;
+    if (x.id === null) {
+      place.classList.add('ancien');
+      peindreAvatar(place.querySelector('.classement-avatar'), { avatar: 'chat', cadre: 'aucun' });
+      place.querySelector('.classement-nom').textContent = t('classement.historique.ancien');
+    } else {
+      peindreAvatar(place.querySelector('.classement-avatar'), { avatar: x.avatar, cadre: x.cadre, niveau: x.niveau });
+      place.querySelector('.classement-nom').textContent = nom(x) + (x.id === moiId ? ` (${t('classement.toi')})` : '');
+    }
+    place.querySelector('.classement-points').textContent = points('general', x.points);
+    podium.append(place);
+  }
+  li.append(h, podium);
+  return li;
+}
+
+async function chargerHistorique({ suite = null } = {}) {
+  const bloc = $('classement-historique');
+  const general = $('classement-perimetre').value === 'general';
+  bloc.hidden = !general;
+  if (!general) return;
+  const periode = $('classement-periode').value;
+  const liste = $('historique-liste');
+  const plus = $('historique-plus');
+  const demande = ++historiqueDemande;
+  $('titre-historique').textContent = t(periode === 'mois' ? 'classement.historique.mois' : 'classement.historique.semaine');
+  if (!suite) { liste.textContent = ''; $('historique-etat').textContent = t('profil.chargement'); }
+  plus.hidden = true;
+  const r = await historiquePodiums(periode, suite);
+  if (demande !== historiqueDemande) return; // choix changé entre-temps
+  if (r.erreur) { $('historique-etat').textContent = t(r.erreur === 'hors' ? 'profil.horsLigne' : 'profil.erreur'); return; }
+  const moiId = etat()?.id ?? null;
+  for (const p of r.periodes) liste.append(periodeHtml(periode, p, moiId));
+  $('historique-etat').textContent = liste.children.length ? '' : t('classement.historique.vide');
+  plus.hidden = !r.suite;
+  plus.onclick = () => chargerHistorique({ suite: r.suite });
+}
+
 async function charger() {
+  chargerHistorique();
   const amis = $('classement-portee').value === 'amis';
   $('classement-amis-barre').hidden = !amis;
   $('classement-moi').hidden = true;
@@ -124,7 +201,8 @@ async function charger() {
   $('classement-aide').textContent = t(periode === 'mois' ? 'classement.depuisMois' : 'classement.depuisSemaine', { date: date(Date.parse(`${r.debut}T00:00:00Z`), { day: 'numeric', month: 'long' }) });
   $('classement-etat').textContent = r.top.length ? '' : t('classement.vide');
   const moiId = r.moi?.id ?? etat()?.id;
-  for (const ligne of r.top) liste.append(ligneHtml(ligne, perimetre, moiId));
+  const champions = new Set(r.champions || []);
+  for (const ligne of r.top) liste.append(ligneHtml(ligne, perimetre, moiId, { champions, periode }));
   const dansTop = r.top.some((l) => l.id === moiId);
   if (r.moi && !dansTop) {
     // Hors du top 100 : sa propre position d'abord ; le top s'ouvre en la touchant.

@@ -112,7 +112,16 @@ const CADRES = {
   'arc-en-ciel': ARC_EN_CIEL.map((c, i) => `<circle cx="50" cy="50" r="51" fill="none" stroke="${c}" class="av-trait" stroke-dasharray="53.4 266.9" stroke-dashoffset="${(-i * 53.4).toFixed(1)}" transform="rotate(-90 50 50)"/>`).join('')
     + lune('#8fd3f5'),
   etoile: '<circle cx="50" cy="50" r="55" fill="none" stroke="#ffd88a" stroke-opacity=".25" stroke-width="6"/>' + anneau('#fff0c2') + eclat(77, 5, 18, '#ffd88a', 'av-lune'),
+  // 1er du classement général d'un mois : anneau d'or et couronne posée en haut.
+  couronne: '<circle cx="50" cy="50" r="55" fill="none" stroke="#ffd88a" stroke-opacity=".3" stroke-width="5"/>' + anneau('#ffd88a')
+    + '<path d="M35 7 L31 -9 L42 -1 L50 -15 L58 -1 L69 -9 L65 7 Z" fill="#ffd88a" stroke="#fff0c2" stroke-width="1.2" stroke-linejoin="round"/>'
+    + '<path d="M35 3 L65 3 L65 7 L35 7 Z" fill="#e9b44c"/>'
+    + '<circle cx="31" cy="-9" r="2.4" fill="#fff6dc"/><circle cx="50" cy="-15" r="2.8" fill="#fff6dc"/><circle cx="69" cy="-9" r="2.4" fill="#fff6dc"/>'
+    + eclat(72, -18, 9, '#fff', 'av-scint'),
 };
+
+/** Petite couronne (champion de la période précédente, classement) : contenu d'un <svg viewBox="0 0 24 24">. */
+export const COURONNE_SVG = '<path d="M4 18 L2.5 7 L8 11.5 L12 4 L16 11.5 L21.5 7 L20 18 Z" fill="currentColor"/><rect x="4" y="18.5" width="16" height="2.5" rx="1" fill="currentColor"/>';
 
 let defsPoses = false;
 function poserDefs() {
