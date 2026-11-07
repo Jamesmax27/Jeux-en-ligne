@@ -31,7 +31,7 @@
 // ==========================================================================
 
 import { json, empreinteVisiteur, lireJeux, verifierTurnstile } from '../_commun.js';
-import { preparerTablesProfil, profilParJeton, perimetreValide, resumeAmis, compterEvenement, assurerPodiums, championsPrecedents } from '../_profil.js';
+import { preparerTablesProfil, profilParJeton, perimetreValide, resumeAmis, compterEvenement, assurerPodiums, couronnesPrecedentes } from '../_profil.js';
 import {
   relations, demander, accepter, effacer, bloquer, debloquer, changerInvisible, ticketPresence,
   ajouterPresence, classementAmis, empreinteGroupe, debutPeriode,
@@ -146,17 +146,17 @@ export async function onRequestPost({ request, env, waitUntil }) {
       for (const l of lignes) if (l.ami) l.invisible = invisibles.has(l.id);
       let presence = { presence: 'non-demandee' };
       if (corps.presence) presence = await ajouterPresence(env, moi.id, lignes.filter((l) => l.ami), catalogue);
-      // Couronne des 1ers de la période précédente (classement général, comme /api/classement).
-      let champions = [];
+      // Couronnes du podium de la période précédente (classement général, comme /api/classement).
+      let couronnes = [];
       if (perimetre === 'general' && R.COURONNE_CHAMPION) {
         try {
           await assurerPodiums(env, maintenant);
-          champions = await championsPrecedents(env, periode, maintenant);
+          couronnes = await couronnesPrecedentes(env, periode, maintenant);
         } catch (erreur) {
           console.error('Podiums indisponibles :', erreur);
         }
       }
-      return json({ perimetre, periode, debut, moi: moi.id, lignes: sansReglage(lignes), champions, ...presence });
+      return json({ perimetre, periode, debut, moi: moi.id, lignes: sansReglage(lignes), couronnes, ...presence });
     }
 
     if (action === 'rejoindre') {

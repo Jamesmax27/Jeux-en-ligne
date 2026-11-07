@@ -12,7 +12,8 @@
 // section 4) : moi et mes amis acceptés, même calcul, avec le statut de chacun
 // et le bouton « Rejoindre » ; actualisé toutes les 30 s tant que la page est
 // visible, « Actualiser » au plus toutes les 10 s (amis.js). ?portee=amis l'ouvre.
-// Classement général : couronne à côté du pseudo du 1er de la période précédente,
+// Classement général : couronne or, argent ou bronze à côté du pseudo des 3
+// premiers de la période précédente,
 // et sous la liste l'historique des podiums (3 premiers de chaque semaine ou de
 // chaque mois terminés, selon la période choisie ; « Voir plus » pour les plus
 // anciens). Docs : docs/cadrage-fidelisation.md, section 14.9.
@@ -40,12 +41,12 @@ function points(perimetre, n) {
   return t(perimetre === 'etoiles' ? 'classement.pointsEtoiles' : 'classement.pointsXp', { n });
 }
 
-// Petite couronne dorée (1er de la période précédente), avec son texte pour les lecteurs d'écran.
-function couronne(periode) {
+// Petite couronne (or, argent, bronze : place de la période précédente), avec son texte pour les lecteurs d'écran.
+function couronne(periode, rang) {
   const span = document.createElement('span');
-  span.className = 'classement-couronne';
+  span.className = `classement-couronne couronne-${MEDAILLES[rang]}`;
   span.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${COURONNE_SVG}</svg>`;
-  const texte = t(periode === 'mois' ? 'classement.champion.mois' : 'classement.champion.semaine');
+  const texte = t(periode === 'mois' ? 'classement.couronne.mois' : 'classement.couronne.semaine', { place: t(`classement.place.${rang}`) });
   span.title = texte;
   const lu = document.createElement('span');
   lu.className = 'sr-only';
@@ -54,7 +55,14 @@ function couronne(periode) {
   return span;
 }
 
-function ligneHtml(ligne, perimetre, moiId, { sansSignaler = false, champions = null, periode = 'semaine' } = {}) {
+// Podium de la période précédente : Map id → rang (1 à 3), meilleure place si un joueur apparaît deux fois.
+function lireCouronnes(liste) {
+  const m = new Map();
+  for (const x of Array.isArray(liste) ? liste : []) if (MEDAILLES[x.rang] && !(m.get(x.id) <= x.rang)) m.set(x.id, x.rang);
+  return m;
+}
+
+function ligneHtml(ligne, perimetre, moiId, { sansSignaler = false, couronnes = null, periode = 'semaine' } = {}) {
   const li = document.createElement('li');
   li.className = 'classement-ligne';
   if (MEDAILLES[ligne.rang]) li.classList.add(`medaille-${MEDAILLES[ligne.rang]}`);
@@ -64,7 +72,7 @@ function ligneHtml(ligne, perimetre, moiId, { sansSignaler = false, champions = 
   li.querySelector('.classement-rang').textContent = t('classement.rang', { n: ligne.rang });
   peindreAvatar(li.querySelector('.classement-avatar'), { avatar: ligne.avatar, cadre: ligne.cadre, niveau: ligne.niveau });
   li.querySelector('.classement-nom').textContent = nom(ligne) + (ligne.id === moiId ? ` (${t('classement.toi')})` : '');
-  if (champions?.has(ligne.id)) li.querySelector('.classement-nom').prepend(couronne(periode));
+  if (couronnes?.has(ligne.id)) li.querySelector('.classement-nom').prepend(couronne(periode, couronnes.get(ligne.id)));
   li.querySelector('.classement-niveau').textContent = t('classement.niveau', { n: ligne.niveau });
   li.querySelector('.classement-points').textContent = points(perimetre, ligne.points);
   if (ligne.id !== moiId && !sansSignaler) {
@@ -100,9 +108,9 @@ async function chargerAmis() {
   $('classement-presence').hidden = d.presence !== 'indisponible';
   liste.hidden = false;
   liste.textContent = '';
-  const champions = new Set(d.champions || []);
+  const couronnes = lireCouronnes(d.couronnes);
   for (const ligne of d.lignes) {
-    const li = ligneHtml(ligne, perimetre, d.moi, { sansSignaler: true, champions, periode });
+    const li = ligneHtml(ligne, perimetre, d.moi, { sansSignaler: true, couronnes, periode });
     if (ligne.ami) {
       const el = elementsPresence({ ...ligne, nom: nom(ligne) }, { t, lang: langue(), catalogue, titre: titreJeu, presence: d.presence });
       const bloc = document.createElement('span');
@@ -201,8 +209,8 @@ async function charger() {
   $('classement-aide').textContent = t(periode === 'mois' ? 'classement.depuisMois' : 'classement.depuisSemaine', { date: date(Date.parse(`${r.debut}T00:00:00Z`), { day: 'numeric', month: 'long' }) });
   $('classement-etat').textContent = r.top.length ? '' : t('classement.vide');
   const moiId = r.moi?.id ?? etat()?.id;
-  const champions = new Set(r.champions || []);
-  for (const ligne of r.top) liste.append(ligneHtml(ligne, perimetre, moiId, { champions, periode }));
+  const couronnes = lireCouronnes(r.couronnes);
+  for (const ligne of r.top) liste.append(ligneHtml(ligne, perimetre, moiId, { couronnes, periode }));
   const dansTop = r.top.some((l) => l.id === moiId);
   if (r.moi && !dansTop) {
     // Hors du top 100 : sa propre position d'abord ; le top s'ouvre en la touchant.

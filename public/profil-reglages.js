@@ -110,7 +110,7 @@ export const PALIERS_PODIUM_VICTOIRES = [3, 10]; // 1res places au total (semain
 // Badges de première fois : podium-semaine-1 (1er d'une semaine), -2, -3, et podium-mois-1, -2, -3.
 export const HISTORIQUE_PAR_PAGE = 8;         // périodes montrées sous le classement, puis « Voir plus »
 export const HISTORIQUE_CACHE_S = 3600;       // historique gardé 1 heure dans le cache de Cloudflare
-export const COURONNE_CHAMPION = true;        // couronne à côté du pseudo du 1er de la période précédente, dans le classement général
+export const COURONNE_CHAMPION = true;        // couronne or, argent ou bronze à côté du pseudo des 3 premiers de la période précédente, dans le classement général
 
 // --- Pseudos ---------------------------------------------------------------------
 export const PSEUDO_MIN = 3;                  // caractères au moins

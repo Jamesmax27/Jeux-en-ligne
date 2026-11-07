@@ -11,8 +11,8 @@
 //
 // Réponse : { perimetre, periode, debut, top: [{ rang, id, pseudo, numero,
 //   avatar, cadre, niveau, points }], moi: { id, rang, points } | null }
-//   + champions: [id] pour le classement général : 1ers de la période précédente
-//   (couronne à côté de leur pseudo, COURONNE_CHAMPION).
+//   + couronnes: [{ id, rang }] pour le classement général : podium de la période
+//   précédente (couronne or, argent ou bronze à côté du pseudo, COURONNE_CHAMPION).
 // Le top (100 joueurs) est gardé 5 minutes dans le cache de Cloudflare ; la
 // position du joueur (avec son jeton) est calculée à chaque demande.
 // Profils de niveau inférieur à CLASSEMENT_NIVEAU_MIN : absents (robots).
@@ -29,7 +29,7 @@
 import { json, lireJeux } from '../_commun.js';
 import {
   preparerTablesProfil, profilParJeton, perimetreValide, debutPeriode, topClassement, rangDe,
-  assurerPodiums, championsPrecedents, historiquePodiums, periodePrecedente,
+  assurerPodiums, couronnesPrecedentes, historiquePodiums, periodePrecedente,
 } from '../_profil.js';
 import * as R from '../../public/profil-reglages.js';
 
@@ -69,16 +69,16 @@ export async function onRequestPost({ request, env, waitUntil }) {
     let moi = null;
     const profil = corps?.jeton ? await profilParJeton(env, corps.jeton) : null;
     if (profil) moi = { id: profil.id, ...(await rangDe(env, perimetre, debut, profil)) };
-    let champions = [];
+    let couronnes = [];
     if (perimetre === 'general' && R.COURONNE_CHAMPION) {
       try {
         await assurerPodiums(env, maintenant);
-        champions = await championsPrecedents(env, periode, maintenant);
+        couronnes = await couronnesPrecedentes(env, periode, maintenant);
       } catch (erreur) {
         console.error('Podiums indisponibles :', erreur); // le classement s'affiche quand même, sans couronne
       }
     }
-    return json({ perimetre, periode, debut, top, moi, champions });
+    return json({ perimetre, periode, debut, top, moi, couronnes });
   } catch (erreur) {
     console.error('Classement impossible :', erreur);
     return json({ erreur: 'Classement indisponible pour le moment.' }, 503);

@@ -36,6 +36,12 @@ const SITE = 'https://freemicrogames.com';
 const JOUR = 86400000;
 const args = process.argv.slice(2);
 
+// /api/session efface au hasard (un envoi sur 100, Math.random) les sessions de plus de
+// 60 jours : si ce tirage tombait pendant les envois du test, la session ancienne était
+// déjà effacée avant /api/stats-jour, et « sessions de plus de 60 jours effacées »
+// échouait de temps en temps. Tirage neutralisé ici (jamais d'effacement au hasard).
+Math.random = () => 0.5;
+
 let echecs = 0;
 function verifier(condition, message, detail) {
   if (condition) console.log(`  ✓ ${message}`);
