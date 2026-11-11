@@ -548,9 +548,12 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         gamePlatform: 'Web browser',
         applicationCategory: 'GameApplication',
         operatingSystem: 'Android, iOS, Windows, macOS, Linux',
-        playMode: 'https://schema.org/SinglePlayer',
+        // Jeu multijoueur : en ligne à plusieurs, et seul contre des robots (docs/multijoueur.md).
+        playMode: jeu.fiche.multijoueur === true ? ['https://schema.org/SinglePlayer', 'https://schema.org/MultiPlayer'] : 'https://schema.org/SinglePlayer',
+        ...(jeu.fiche.multijoueur === true && Number.isInteger(jeu.fiche.places) ? { numberOfPlayers: { '@type': 'QuantitativeValue', minValue: 1, maxValue: jeu.fiche.places } } : {}),
         isAccessibleForFree: true,
-        isFamilyFriendly: true,
+        // Jeux pour adolescents (13+ : frissons, horreur) : pas « pour toute la famille ».
+        isFamilyFriendly: !pourAdos(jeu.ages),
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
         datePublished: jeu.added,
         dateModified: jeu.lastmod,
