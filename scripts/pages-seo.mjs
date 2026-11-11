@@ -65,6 +65,16 @@ export const MAX_FICHIERS = 19500;
 export const SORTIES = ['index.html', '404.html', 'jeux', 'genres', 'univers', 'ages', 'en', 'es', 'pt', 'de', 'sitemap.xml', 'robots.txt', '_redirects',
   'mentions-legales', 'confidentialite', 'conditions-utilisation', 'cookies', 'proposer', 'profil', 'classement', 'amis'];
 
+// Anciennes catégories dont la page la plus proche est dans une autre famille
+// que le remplaçant de ANCIENS_IDS (qui reste celui des données) : redirections
+// seulement (choix du propriétaire, novembre 2026).
+//   genre « sport » → univers « sport » (le genre « course » ne parle que de course) ;
+//   univers « abstrait » → genre « puzzle » (jeux de formes et de logique).
+export const DESTINATIONS_ANCIENNES = {
+  'genre:sport': ['univers', 'sport'],
+  'univers:abstrait': ['genre', 'puzzle'],
+};
+
 // Images de partage : la jaquette du jeu si elle est en image matricielle, sinon l'icône du site.
 const IMAGE_SITE = 'assets/icone-512.png';
 const IMAGE_PAR_DEFAUT_JAQUETTE = 'assets/sans-jaquette.svg';
@@ -790,18 +800,28 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
 
   // --- Redirections des catégories retirées (Cloudflare Pages : _redirects) ---
   // Chaque ancienne page de catégorie, dans chaque langue, avec et sans « / »
-  // final, mène en 301 à la catégorie qui l'a remplacée ; « autre » (jamais
-  // affiché) et une catégorie restée sans jeu mènent à l'accueil de la langue.
-  // Les tranches d'âge retirées (ANCIENNES_TRANCHES) aussi.
+  // final, mène en 301, en un seul saut, à la catégorie la plus proche dans la
+  // même langue (jamais à l'accueil : Google y voit une 404 déguisée).
+  // Destination : DESTINATIONS_ANCIENNES s'il y en a une (autre famille), sinon
+  // le remplaçant de ANCIENS_IDS ; « autre » n'a jamais eu de page : aucune
+  // règle. Les tranches d'âge retirées (ANCIENNES_TRANCHES) aussi. Une
+  // destination absente dans une langue (catégorie sans jeu) : pas de règle,
+  // avec un avertissement.
   const redirections = [];
   const retirees = [
-    ...Object.entries(ANCIENS_IDS).map(([famille, anciens]) => [famille, [...Object.entries(anciens), [ID_AUTRE, ID_AUTRE]]]),
+    ...Object.entries(ANCIENS_IDS).map(([famille, anciens]) => [famille, Object.entries(anciens)]),
     ['age', Object.entries(ANCIENNES_TRANCHES)],
   ];
   for (const [famille, paires] of retirees) {
     for (const [ancien, nouveau] of paires) {
+      const [familleCible, idCible] = DESTINATIONS_ANCIENNES[`${famille}:${ancien}`] || [famille, nouveau];
+      if (idCible === ID_AUTRE) continue;
       for (const lang of LANGUES) {
-        const cible = nouveau !== ID_AUTRE && categorieExiste(famille, nouveau, lang) ? urlCategorie(famille, nouveau, lang) : urlAccueil(lang);
+        if (!categorieExiste(familleCible, idCible, lang)) {
+          avertir(`redirection de l'ancienne catégorie ${famille}:${ancien} (${lang}) : ${familleCible}:${idCible} n'a pas de page, règle non écrite`);
+          continue;
+        }
+        const cible = urlCategorie(familleCible, idCible, lang);
         const source = urlCategorie(famille, ancien, lang);
         redirections.push(`${source} ${cible} 301`, `${source.replace(/\/$/, '')} ${cible} 301`);
       }
