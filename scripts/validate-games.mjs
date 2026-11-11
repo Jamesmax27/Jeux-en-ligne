@@ -43,6 +43,7 @@ import { fileURLToPath } from 'node:url';
 import { problemesClassementJeu, RAPPEL_LISTES } from './controle-taxonomie.mjs';
 import { REJOINDRE_DEPUIS } from '../public/profil-reglages.js';
 import { problemesSlugs } from './slugs-jeux.mjs';
+import { problemesClasses } from './classes-jeu.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -132,6 +133,8 @@ async function controlerFiche(id, dossier) {
   // Slugs traduits de la fiche (adresses /en/games/<slug>/… : scripts/slugs-jeux.mjs) :
   // présents, bien écrits, uniques dans leur langue parmi tous les jeux de games/.
   for (const p of problemesSlugs(await toutesLesFiches(id, f)).filter((x) => x.id === id)) erreur(id, `game.json : ${p.message}`);
+  // Classes de l'école (facultatives, pages école : scripts/classes-jeu.mjs).
+  for (const p of problemesClasses(f)) erreur(id, `game.json : ${p}`);
   fiches.set(id, f);
 
   // Consignes de 2026 : jeu riche (20 niveaux au moins) et présentation (sa

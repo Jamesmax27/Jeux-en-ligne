@@ -44,9 +44,9 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import {
   GENRES, UNIVERS, TRANCHES_AGE, IDS_GENRES, IDS_UNIVERS, ID_AUTRE, ANCIENS_IDS, ANCIENNES_TRANCHES, AGE_ADOS,
-  trancheDeAge, pourAdos, ordreAffichage,
+  trancheDeAge, pourAdos, ordreAffichage, CLASSES_PAR_LANGUE,
 } from '../public/taxonomie.js';
-import { LANGUES, HREFLANG, LOCALE_OG, LANGUES_LEGALES, PAGES_LEGALES, urlAccueil, urlJeu, urlCategorie, urlLanceur, urlLegale, urlProposer, urlProfil, urlClassement, urlAmis, langueLegale } from '../public/chemins.js';
+import { LANGUES, HREFLANG, LOCALE_OG, LANGUES_LEGALES, PAGES_LEGALES, urlAccueil, urlJeu, urlCategorie, urlLanceur, urlLegale, urlProposer, urlProfil, urlClassement, urlAmis, urlEcole, langueLegale } from '../public/chemins.js';
 import { TITRE_MIN, TITRE_MAX, DESCRIPTION_MIN, DESCRIPTION_MAX } from '../public/demandes-regles.js';
 import { problemesChamps, textesLangue, languesDuJeu, ageMinimum } from './regles-seo.mjs';
 
@@ -65,7 +65,7 @@ export const ALERTE_REDIRECTIONS = 1800;
 
 // Dossiers et fichiers de public/ écrits par ce module (effacés au début de chaque build).
 export const SORTIES = ['index.html', '404.html', 'jeux', 'genres', 'univers', 'ages', 'en', 'es', 'pt', 'de', 'sitemap.xml', 'robots.txt', '_redirects',
-  'mentions-legales', 'confidentialite', 'conditions-utilisation', 'cookies', 'proposer', 'profil', 'classement', 'amis'];
+  'mentions-legales', 'confidentialite', 'conditions-utilisation', 'cookies', 'proposer', 'profil', 'classement', 'amis', 'ecole'];
 
 // Anciennes catégories dont la page la plus proche est dans une autre famille
 // que le remplaçant de ANCIENS_IDS (qui reste celui des données) : redirections
@@ -412,9 +412,11 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
   // Textes du site (intitulés) et des catégories, par langue.
   const dicos = {};
   const categories = {};
+  const ecoles = {};
   for (const lang of LANGUES) {
     dicos[lang] = await lireJson(path.join(racine, 'public', 'i18n', 'site', `${lang}.json`));
     categories[lang] = await lireJson(path.join(dossierGabarits, 'textes', `categories.${lang}.json`), {});
+    ecoles[lang] = await lireJson(path.join(dossierGabarits, 'textes', `ecole.${lang}.json`), {});
   }
 
   // Effacer les anciennes sorties.
@@ -449,6 +451,22 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
   const categorieExiste = (famille, id, lang) => categoriesDe[lang].some((c) => c.famille === famille && c.id === id);
   const categorieIndexable = (c, lang) => c.jeux.length >= SEUIL_INDEXATION_CATEGORIE && !!categories[lang][c.cle]?.h1;
   const nomCategorie = (c, t) => categories[c.lang]?.[c.cle]?.h1 || (c.famille === 'age' ? t(`age.${c.id}`) : t(`${c.famille}.${c.id}`));
+
+  // Pages école (CLASSES de public/taxonomie.js, adresses urlEcole) : jeux dont
+  // "classes" contient la classe (sans les jeux en français seul hors du site
+  // français) ; seulement avec leurs textes (gabarits/textes/ecole.<langue>.json :
+  // nom, h1, titre_seo, description_seo, intro, faq) et au moins
+  // SEUIL_INDEXATION_CATEGORIE jeux : jamais de page école vide ou sans texte.
+  const ecolesDe = {};
+  for (const lang of LANGUES) {
+    ecolesDe[lang] = (CLASSES_PAR_LANGUE[lang] || []).map((id) => ({
+      famille: 'ecole', id, cle: `ecole.${id}`,
+      jeux: jeuxDe(lang).filter((j) => Array.isArray(j.fiche.classes) && j.fiche.classes.includes(id) && !(lang !== 'fr' && j.fiche.non_traduisible === true)).sort(parDate),
+    })).filter((c) => c.jeux.length >= SEUIL_INDEXATION_CATEGORIE && ecoles[lang][c.cle]?.h1 && ecoles[lang][c.cle]?.nom);
+  }
+  const ecoleExiste = (id, lang) => ecolesDe[lang].some((c) => c.id === id);
+  // Puce-lien vers une page école (cartable : la classe n'a pas d'icône dessinée).
+  const puceEcole = (id, lang) => `<a class="puce-filtre puce-lien" data-cle="ecole:${echapper(id)}" href="${echapper(urlEcole(id, lang))}"><span class="puce-filtre-picto" aria-hidden="true">🎒</span><span>${echapper(ecoles[lang][`ecole.${id}`].nom)}</span></a>`;
 
   // Morceaux d'une langue. Le pied de page et le bandeau des cookies mènent aux
   // pages légales de la langue (français, sinon anglais) : {{lien:<page>}},
@@ -510,6 +528,8 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         jeu.genre && puceCategorie('genre', jeu.genre, lang, t),
         ...jeu.genres_secondaires.map((g) => puceCategorie('genre', g, lang, t)),
         ...jeu.univers.map((u) => puceCategorie('univers', u, lang, t)),
+        // Pages école du jeu (classes de game.json) qui existent dans cette langue.
+        ...(Array.isArray(jeu.fiche.classes) ? jeu.fiche.classes : []).filter((id) => ecoleExiste(id, lang)).map((id) => puceEcole(id, lang)),
       ].filter(Boolean);
 
       // Données structurées : elles décrivent le jeu pour les moteurs de recherche.
@@ -573,21 +593,26 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
     }
   }
 
-  // --- Catégories -----------------------------------------------------------
+  // --- Catégories et pages école ---------------------------------------------
+  // Même gabarit ; une page école (famille « ecole ») n'existe qu'avec ses textes
+  // et au moins SEUIL_INDEXATION_CATEGORIE jeux (ecolesDe).
   for (const lang of LANGUES) {
     const { t, morceaux } = outils(lang);
-    for (const c of categoriesDe[lang]) {
-      const textes = categories[lang][c.cle];
+    for (const c of [...categoriesDe[lang], ...ecolesDe[lang]]) {
+      const estEcole = c.famille === 'ecole';
+      const textes = estEcole ? ecoles[lang][c.cle] : categories[lang][c.cle];
       if (!textes) avertir(`catégorie ${c.cle} : textes absents de gabarits/textes/categories.${lang}.json (page en noindex)`);
-      const chemin = urlCategorie(c.famille, c.id, lang);
+      const cheminDe = (l) => (estEcole ? urlEcole(c.id, l) : urlCategorie(c.famille, c.id, l));
+      const chemin = cheminDe(lang);
       const canonique = absolue(chemin);
-      const h1 = nomCategorie({ ...c, lang }, t);
-      const indexable = categorieIndexable(c, lang);
-      const alternatives = Object.fromEntries(LANGUES.filter((l) => categorieExiste(c.famille, c.id, l)).map((l) => [l, absolue(urlCategorie(c.famille, c.id, l))]));
+      const h1 = estEcole ? textes.h1 : nomCategorie({ ...c, lang }, t);
+      const indexable = estEcole || categorieIndexable(c, lang);
+      const alternatives = Object.fromEntries(LANGUES.filter((l) => (estEcole ? ecoleExiste(c.id, l) : categorieExiste(c.famille, c.id, l))).map((l) => [l, absolue(cheminDe(l))]));
       const fil = ariane([{ nom: t('page.accueil'), chemin: urlAccueil(lang) }, { nom: h1, chemin }], t);
       const description = textes?.description_seo || t('meta.description');
-      const soeurs = categoriesDe[lang].filter((x) => x.famille === c.famille && x.id !== c.id);
-      const titreSoeurs = { genre: 'page.autresGenres', univers: 'page.autresUnivers', age: 'page.autresAges' }[c.famille];
+      const soeurs = [...categoriesDe[lang], ...ecolesDe[lang]].filter((x) => x.famille === c.famille && x.id !== c.id);
+      const titreSoeurs = { genre: 'page.autresGenres', univers: 'page.autresUnivers', age: 'page.autresAges', ecole: 'page.autresClasses' }[c.famille];
+      const puce = (s) => (estEcole ? puceEcole(s.id, lang) : puceCategorie(s.famille, s.id, lang, t));
       const donneesListe = {
         '@context': 'https://schema.org',
         '@type': 'CollectionPage',
@@ -631,7 +656,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         autres: soeurs.length
           ? `<nav class="autres-categories" aria-labelledby="titre-autres">
       <h2 id="titre-autres">${echapper(t(titreSoeurs))}</h2>
-      <p class="puces-liens">${soeurs.map((s) => puceCategorie(s.famille, s.id, lang, t)).join('')}</p>
+      <p class="puces-liens">${soeurs.map(puce).join('')}</p>
     </nav>`
           : '',
       };
@@ -639,7 +664,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
       // lastmod : jeu le plus récemment ajouté ou modifié, ou dernière retouche des textes (« maj »).
       const majTextes = typeof textes?.maj === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(textes.maj) ? textes.maj : '0000-00-00';
       const lastmodJeux = lastmodMax(c.jeux);
-      pages.push({ chemin, lang, type: 'categorie', indexable, lastmod: majTextes > lastmodJeux ? majTextes : lastmodJeux });
+      pages.push({ chemin, lang, type: estEcole ? 'ecole' : 'categorie', indexable, lastmod: majTextes > lastmodJeux ? majTextes : lastmodJeux });
     }
   }
 
@@ -663,6 +688,8 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
       ${groupe('age', 'groupe.ages')}
       ${groupe('genre', 'groupe.genres')}
       ${groupe('univers', 'groupe.univers')}
+      ${ecolesDe[lang].length ? `<h3>${echapper(t('groupe.ecole'))}</h3>
+      <p class="puces-liens">${ecolesDe[lang].map((c) => puceEcole(c.id, lang)).join('')}</p>` : ''}
   </nav>`;
     // Présentation du site : les mots {profil}, {classement} et {amis} des
     // textes deviennent des liens vers ces pages (non indexées).

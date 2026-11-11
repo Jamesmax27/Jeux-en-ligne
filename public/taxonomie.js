@@ -164,3 +164,23 @@ export function trancheDeAge(ages) {
   if (Number.isNaN(age)) return null;
   return TRANCHES_AGE.find((t) => age >= t.min && age <= t.max)?.id ?? null;
 }
+
+// Classes de l'école élémentaire (pages école, docs/seo-mots-cles.md, section 5) :
+// identifiant français, âge habituel des élèves. Champ facultatif "classes" de
+// game.json (ex. ["ce1", "ce2"]) : le jeu figure sur ces pages. Équivalents :
+// Grade 1 à 5 en anglais (États-Unis), Klasse 1 à 4 en allemand (Grundschule) ;
+// pas de pages école en espagnol ni en portugais (pages d'âge seulement).
+// Adresses : urlEcole de chemins.js.
+export const CLASSES = [
+  { id: 'cp', age: 6 },
+  { id: 'ce1', age: 7 },
+  { id: 'ce2', age: 8 },
+  { id: 'cm1', age: 9 },
+  { id: 'cm2', age: 10 },
+];
+export const IDS_CLASSES = CLASSES.map((c) => c.id);
+export const CLASSES_PAR_LANGUE = {
+  fr: ['cp', 'ce1', 'ce2', 'cm1', 'cm2'],
+  en: ['cp', 'ce1', 'ce2', 'cm1', 'cm2'],
+  de: ['cp', 'ce1', 'ce2', 'cm1'],
+};

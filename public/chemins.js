@@ -158,6 +158,23 @@ export function urlCategorie(famille, id, lang, { ancienne = false } = {}) {
   return `/${PREFIXE[l]}${segment}/${encodeURIComponent(slug)}/`;
 }
 
+// Pages école (classes de CLASSES, public/taxonomie.js) : français, anglais
+// (Grade 1 à 5) et allemand (Klasse 1 à 4) seulement.
+//   fr /ecole/ce1/   en /en/school/2nd-grade/   de /de/schule/klasse-2/
+const SEGMENTS_ECOLE = { fr: 'ecole', en: 'school', de: 'schule' };
+export const SLUGS_ECOLE = {
+  fr: { cp: 'cp', ce1: 'ce1', ce2: 'ce2', cm1: 'cm1', cm2: 'cm2' },
+  en: { cp: '1st-grade', ce1: '2nd-grade', ce2: '3rd-grade', cm1: '4th-grade', cm2: '5th-grade' },
+  de: { cp: 'klasse-1', ce1: 'klasse-2', ce2: 'klasse-3', cm1: 'klasse-4' },
+};
+
+/** Page école d'une classe (« ce1 »…) dans une langue, ou null si la langue n'en a pas. */
+export function urlEcole(classe, lang) {
+  const l = langueValide(lang);
+  const slug = SLUGS_ECOLE[l]?.[classe];
+  return slug ? `/${PREFIXE[l]}${SEGMENTS_ECOLE[l]}/${slug}/` : null;
+}
+
 // Pages légales : langues disponibles, pages (ordre du pied de page) et adresses.
 export const LANGUES_LEGALES = ['fr', 'en'];
 export const PAGES_LEGALES = ['mentions', 'confidentialite', 'conditions', 'cookies'];

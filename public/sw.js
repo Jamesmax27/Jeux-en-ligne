@@ -65,7 +65,7 @@ const URL_CATALOGUE = new URL('catalog.json', RACINE).href;
 // accueil d'une langue, fiche d'un jeu, page d'une catégorie.
 const RE_ACCUEIL_LANGUE = /^(?:en|es|pt|de)\/$/;
 const RE_FICHE = /^(?:(en|es|pt|de)\/)?(?:jeux|games|juegos|jogos|spiele)\/([a-z0-9-]+)\/$/;
-const RE_CATEGORIE = /^(?:(?:en|es|pt|de)\/)?(?:genres|generos|spielarten|univers|worlds|mundos|welten|ages|edades|idades|alter)\/[^/]+\/$/;
+const RE_CATEGORIE = /^(?:(?:en|es|pt|de)\/)?(?:genres|generos|spielarten|univers|worlds|mundos|welten|ages|edades|idades|alter|ecole|school|schule)\/[^/]+\/$/;
 // Pages légales (français et anglais) : mêmes règles que les autres pages générées.
 const RE_LEGALE = /^(?:mentions-legales|confidentialite|conditions-utilisation|cookies|en\/(?:legal-notice|privacy-policy|terms-of-use|cookie-policy))\/$/;
 // Formulaire public de demandes (l'envoi demande une connexion ; la page reste lisible).

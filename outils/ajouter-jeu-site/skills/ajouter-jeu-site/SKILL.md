@@ -130,6 +130,7 @@ Fiche complète, JSON indenté de 2 espaces, champs dans cet ordre :
 - `idee` seulement si le jeu vient d'une idée de `idees.json` (étape 3). `"non_traduisible": true` seulement si besoin (étape 4).
 - Jamais de `tags`. Pas de `maj` pour un nouveau jeu.
 - `slugs` = morceau d'adresse de la page du jeu dans chaque autre langue (`/en/games/<slug>/`…), tiré du **titre traduit** : minuscules, accents retirés (`ä` → `ae`, `ö` → `oe`, `ü` → `ue`, `ß` → `ss`, `ç` → `c`…), apostrophe supprimée en anglais (« Pony's » → `ponys`) et remplacée par un tiret ailleurs, tout autre signe remplacé par un tiret, 80 caractères au plus. Unique dans sa langue parmi les jeux de `games/` (sinon ajouter `-2`) et jamais égal à l'identifiant d'un autre jeu. Règle complète : `scripts/slugs-jeux.mjs` (le robot le vérifie).
+- `classes` (facultatif, pages école) : pour un jeu de calcul ou de mots, d'après l'âge : 4+ et 5+ → `["cp"]`, 6+ → `["cp", "ce1"]`, 7+ → `["ce1", "ce2"]`, 8+ → `["ce2", "cm1"]`, 9+ → `["cm1", "cm2"]`, 10+ → `["cm2"]` ; rien au-delà ni pour un jeu 13+. Règle : `scripts/classes-jeu.mjs`. Ne pas confondre avec `niveaux` (nombre de niveaux).
 
 **Textes** : français à la racine, traductions dans `i18n.en`, `i18n.es`, `i18n.pt` et `i18n.de`. Mêmes bornes dans **chaque** langue :
 
