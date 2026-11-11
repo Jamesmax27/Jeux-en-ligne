@@ -185,7 +185,8 @@ Un jeu multijoueur (à plusieurs en ligne, robots aux places vides) suit **toute
 }
 ```
 
-- `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier. Il ne change jamais : il sert dans l'adresse de la page du jeu (`/jeux/<id>/`, `/en/games/<id>/`…).
+- `id` : minuscules sans accents, chiffres et tirets ; identique au nom du dossier. Il ne change jamais : il sert dans l'adresse française de la page du jeu (`/jeux/<id>/`), les votes, le profil et le lanceur (`/play?id=<id>`).
+- `slugs` : morceau d'adresse de la page du jeu dans les 4 autres langues (`/en/games/<slug>/`, `/es/juegos/<slug>/`, `/pt/jogos/<slug>/`, `/de/spiele/<slug>/`), tiré du titre traduit (minuscules sans accents, chiffres, tirets) : `{ "en": "pony-apples", "es": "…", "pt": "…", "de": "…" }`. **Posés automatiquement** par `node scripts/i18n-jeu.mjs --assembler <id>` (ou `node scripts/slugs-jeux.mjs <id>`), uniques dans leur langue, contrôlés par le robot. Ne jamais les écrire ni les changer à la main : une adresse publiée reste valable. S'il faut vraiment en changer un, garder l'ancien dans `"anciens_slugs": { "en": ["ancien"] }` (redirection 301).
 - Les textes restent en français à la racine ; `i18n` donne leur traduction dans les 4 autres langues (obligatoire). `title` (60 caractères au plus) : titre de la carte et de la page du jeu. `description` (10 à 200 caractères) : phrase courte de la carte du catalogue, reprise en accroche sous le titre de la page.
 - `niveaux` : nombre de niveaux du jeu (20 au moins), égal à `window.JEL_NIVEAUX`.
 - `etoiles` : étoiles possibles dans tout le jeu (ex. 20 niveaux × 3 = 60), le même nombre que `maxStars` du message « jeu terminé » (section 3, « Jeu terminé et étoiles ») ; absent pour un jeu sans étoiles. `sans_fin` : `true` pour un jeu qui ne se termine jamais (pas de message « jeu terminé »). Posés par `node scripts/etoiles-jeu.mjs`.

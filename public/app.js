@@ -355,7 +355,8 @@ function creerCarte(jeu, scores, prioritaire = false) {
 
   const lien = document.createElement('a');
   lien.className = 'carte';
-  lien.href = urlJeu(jeu.id, getLang());
+  lien.href = urlJeu(jeu, getLang());
+  lien.dataset.jeu = jeu.id; // check vert « terminé » (profil.js) : l'adresse est traduite
 
   const jaquette = creerJaquette(jeu, prioritaire);
 
@@ -441,7 +442,8 @@ function creerCarteVitrine(jeu, cleAria) {
   const li = document.createElement('li');
   const lien = document.createElement('a');
   lien.className = 'carte carte-vitrine';
-  lien.href = urlJeu(jeu.id, getLang());
+  lien.href = urlJeu(jeu, getLang());
+  lien.dataset.jeu = jeu.id; // check vert « terminé » (profil.js) : l'adresse est traduite
   lien.append(creerJaquette(jeu, false, false));
   const enFrancais = jeuEnFrancais(jeu) ? `(${t('carte.enFrancais')})` : '';
   lien.setAttribute('aria-label', [t(cleAria, { titre: titreJeu(jeu) }), descriptionJeu(jeu), enFrancais].filter(Boolean).join(' '));

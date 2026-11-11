@@ -60,6 +60,8 @@ export const NB_DERNIERS_JEUX = 12;
 export const JAQUETTES_PRIORITAIRES = 4;   // premières jaquettes chargées tout de suite (les autres en lazy)
 export const ALERTE_FICHIERS = 16000;      // limite Cloudflare Pages : 20 000 fichiers par site
 export const MAX_FICHIERS = 19500;
+export const MAX_REDIRECTIONS = 2000;      // limite Cloudflare Pages : 2 000 redirections fixes
+export const ALERTE_REDIRECTIONS = 1800;
 
 // Dossiers et fichiers de public/ écrits par ce module (effacés au début de chaque build).
 export const SORTIES = ['index.html', '404.html', 'jeux', 'genres', 'univers', 'ages', 'en', 'es', 'pt', 'de', 'sitemap.xml', 'robots.txt', '_redirects',
@@ -378,7 +380,9 @@ function carteJeu(jeu, lang, t, { titreNiveau = 'h3', prioritaire = false } = {}
   ].filter(Boolean).join(' — ');
   const alt = tx.jaquette_alt || titre;
   const chargement = prioritaire ? 'fetchpriority="high"' : 'loading="lazy"';
-  return `<li><a class="carte" href="${echapper(urlJeu(jeu.id, lang))}">
+  // data-jeu : identifiant du jeu (le check vert « terminé » de profil.js ne peut
+  // plus le lire dans l'adresse, traduite dans les autres langues).
+  return `<li><a class="carte" data-jeu="${echapper(jeu.id)}" href="${echapper(urlJeu(jeu, lang))}">
           <div class="jaquette"><img src="/${echapper(jeu.cover)}" alt="${echapper(alt)}" width="600" height="800" ${chargement} decoding="async"><${titreNiveau} class="carte-titre" lang="${HREFLANG[lang]}">${echapper(titre)}</${titreNiveau}></div>
           <div class="carte-texte"><p class="carte-infos">${echapper(infos)}</p></div>
         </a></li>`;
@@ -469,12 +473,12 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
   // --- Fiches des jeux ------------------------------------------------------
   for (const jeu of jeux) {
     const langues = languesDuJeu(jeu.fiche);
-    const alternatives = Object.fromEntries(langues.map((l) => [l, absolue(urlJeu(jeu.id, l))]));
+    const alternatives = Object.fromEntries(langues.map((l) => [l, absolue(urlJeu(jeu, l))]));
     for (const lang of langues) {
       const { t, morceaux } = outils(lang);
       const tx = textesLangue(jeu.fiche, lang);
       const titre = tx.title || jeu.title;
-      const chemin = urlJeu(jeu.id, lang);
+      const chemin = urlJeu(jeu, lang);
       const canonique = absolue(chemin);
       const indexable = jeu.conforme;
 
@@ -595,7 +599,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         mainEntity: {
           '@type': 'ItemList',
           numberOfItems: c.jeux.length,
-          itemListElement: c.jeux.map((j, i) => ({ '@type': 'ListItem', position: i + 1, url: absolue(urlJeu(j.id, lang)), name: textesLangue(j.fiche, lang).title || j.title })),
+          itemListElement: c.jeux.map((j, i) => ({ '@type': 'ListItem', position: i + 1, url: absolue(urlJeu(j, lang)), name: textesLangue(j.fiche, lang).title || j.title })),
         },
       };
       const valeurs = {
@@ -639,7 +643,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
     };
     const plan = `<nav class="plan" aria-labelledby="titre-derniers">
     <h2 id="titre-derniers">${echapper(t('page.derniersJeux'))}</h2>
-    <ul class="plan-derniers">${derniers.map((j) => `<li><a href="${echapper(urlJeu(j.id, lang))}">${echapper(textesLangue(j.fiche, lang).title || j.title)}</a></li>`).join('')}</ul>
+    <ul class="plan-derniers">${derniers.map((j) => `<li><a href="${echapper(urlJeu(j, lang))}">${echapper(textesLangue(j.fiche, lang).title || j.title)}</a></li>`).join('')}</ul>
     <h2>${echapper(t('page.toutesCategories'))}</h2>
       ${groupe('age', 'groupe.ages')}
       ${groupe('genre', 'groupe.genres')}
@@ -829,13 +833,42 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
           continue;
         }
         const cible = urlCategorie(familleCible, idCible, lang);
-        const source = urlCategorie(famille, ancien, lang);
+        const source = urlCategorie(famille, ancien, lang, { ancienne: true });
         redirections.push(`${source} ${cible} 301`, `${source.replace(/\/$/, '')} ${cible} 301`);
       }
     }
   }
+
+  // Catégories actuelles dont l'adresse a changé avec les slugs traduits
+  // (/en/worlds/animaux/ → /en/worlds/animals/), avec et sans « / » final.
+  for (const lang of LANGUES) {
+    for (const c of categoriesDe[lang]) {
+      const avant = urlCategorie(c.famille, c.id, lang, { ancienne: true });
+      const apres = urlCategorie(c.famille, c.id, lang);
+      if (avant !== apres) redirections.push(`${avant} ${apres} 301`, `${avant.replace(/\/$/, '')} ${apres} 301`);
+    }
+  }
+
+  // Fiches des jeux : ancienne adresse avec l'identifiant (/en/games/<id>/) et
+  // anciens slugs ("anciens_slugs" de game.json) → adresse du slug actuel. Forme
+  // avec « / » seulement : c'est la seule que les pages et le sitemap ont publiée
+  // (2 000 règles fixes au plus sur Cloudflare Pages).
+  const pagesPubliees = new Set(pages.map((p) => p.chemin));
+  for (const jeu of jeux) {
+    for (const lang of languesDuJeu(jeu.fiche).filter((l) => l !== 'fr')) {
+      const apres = urlJeu(jeu, lang);
+      const anciens = Array.isArray(jeu.fiche.anciens_slugs?.[lang]) ? jeu.fiche.anciens_slugs[lang] : [];
+      for (const avant of new Set([urlJeu(jeu.id, lang), ...anciens.map((s) => urlJeu(String(s), lang))])) {
+        if (avant === apres) continue;
+        if (pagesPubliees.has(avant)) { avertir(`${jeu.id} : l'ancienne adresse ${avant} est la page d'un autre jeu, pas de redirection`); continue; }
+        redirections.push(`${avant} ${apres} 301`);
+      }
+    }
+  }
+  if (redirections.length > MAX_REDIRECTIONS) throw new Error(`_redirects : ${redirections.length} règles (Cloudflare Pages en accepte ${MAX_REDIRECTIONS}) : passer à des règles par motif ou à des « Bulk Redirects » Cloudflare`);
+  if (redirections.length > ALERTE_REDIRECTIONS) avertir(`_redirects : ${redirections.length} règles sur ${MAX_REDIRECTIONS} permises par Cloudflare Pages`);
   await writeFile(path.join(dossierPublic, '_redirects'),
-    `# Fichier généré par scripts/pages-seo.mjs (ne pas modifier) : anciennes pages de catégorie.\n${redirections.join('\n')}\n`, 'utf8');
+    `# Fichier généré par scripts/pages-seo.mjs (ne pas modifier) : anciennes adresses des catégories et des fiches.\n${redirections.join('\n')}\n`, 'utf8');
 
   // --- Nombre de fichiers publiés (limite Cloudflare Pages) -------------------
   const fichiers = await compterFichiers(dossierPublic);

@@ -111,6 +111,7 @@ Fiche complète, JSON indenté de 2 espaces, champs dans cet ordre :
     "pt": { "…": "les mêmes 8 champs" },
     "de": { "…": "les mêmes 8 champs" }
   },
+  "slugs": { "en": "titre-anglais", "es": "titulo-espanol", "pt": "titulo-portugues", "de": "deutscher-titel" },
   "genre": "puzzle",
   "genres_secondaires": [],
   "univers": ["dinosaures"],
@@ -128,6 +129,7 @@ Fiche complète, JSON indenté de 2 espaces, champs dans cet ordre :
 - `niveaux` = nombre réel de niveaux (`window.JEL_NIVEAUX`). `"consignes": 2` **seulement** si le jeu respecte tout le minimum de `CONSIGNES-JEU.md` (section 2), dont 20 niveaux au moins : le robot l'exige alors. Sinon, pas de champ `consignes`.
 - `idee` seulement si le jeu vient d'une idée de `idees.json` (étape 3). `"non_traduisible": true` seulement si besoin (étape 4).
 - Jamais de `tags`. Pas de `maj` pour un nouveau jeu.
+- `slugs` = morceau d'adresse de la page du jeu dans chaque autre langue (`/en/games/<slug>/`…), tiré du **titre traduit** : minuscules, accents retirés (`ä` → `ae`, `ö` → `oe`, `ü` → `ue`, `ß` → `ss`, `ç` → `c`…), apostrophe supprimée en anglais (« Pony's » → `ponys`) et remplacée par un tiret ailleurs, tout autre signe remplacé par un tiret, 80 caractères au plus. Unique dans sa langue parmi les jeux de `games/` (sinon ajouter `-2`) et jamais égal à l'identifiant d'un autre jeu. Règle complète : `scripts/slugs-jeux.mjs` (le robot le vérifie).
 
 **Textes** : français à la racine, traductions dans `i18n.en`, `i18n.es`, `i18n.pt` et `i18n.de`. Mêmes bornes dans **chaque** langue :
 

@@ -4,12 +4,17 @@
 // Fichier partagé par le navigateur (app.js, play.js) et par les scripts Node
 // (build-catalog.mjs, pages-seo.mjs, verifier-seo.mjs) : une seule table.
 //
-//   page        fr               en               es                pt               de
-//   accueil     /                /en/             /es/              /pt/             /de/
-//   jeu         /jeux/<id>/      /en/games/<id>/  /es/juegos/<id>/  /pt/jogos/<id>/  /de/spiele/<id>/
-//   genre       /genres/<id>/    /en/genres/<id>/ /es/generos/<id>/ /pt/generos/<id>/ /de/spielarten/<id>/
-//   univers     /univers/<id>/   /en/worlds/<id>/ /es/mundos/<id>/  /pt/mundos/<id>/  /de/welten/<id>/
-//   âge         /ages/<slug>/    /en/ages/<slug>/ /es/edades/<slug>/ /pt/idades/<slug>/ /de/alter/<slug>/
+//   page        fr               en                 es                  pt                 de
+//   accueil     /                /en/               /es/                /pt/               /de/
+//   jeu         /jeux/<id>/      /en/games/<slug>/  /es/juegos/<slug>/  /pt/jogos/<slug>/  /de/spiele/<slug>/
+//   genre       /genres/<id>/    /en/genres/<slug>/ /es/generos/<slug>/ /pt/generos/<slug>/ /de/spielarten/<slug>/
+//   univers     /univers/<id>/   /en/worlds/<slug>/ /es/mundos/<slug>/  /pt/mundos/<slug>/  /de/welten/<slug>/
+//   âge         /ages/<slug>/    /en/ages/<slug>/   /es/edades/<slug>/  /pt/idades/<slug>/  /de/alter/<slug>/
+//   Slugs traduits (novembre 2026) : d'un jeu, "slugs" de son game.json (recopié
+//   dans catalog.json ; scripts/slugs-jeux.mjs) ; d'une catégorie, SLUGS_CATEGORIES
+//   ci-dessous. En français, le slug est l'identifiant. Les anciennes adresses
+//   (identifiant français dans les autres langues) mènent en 301 aux nouvelles
+//   (_redirects, écrit par scripts/pages-seo.mjs).
 //   lanceur     /play?id=<id>&lang=<langue>  (une seule page, non indexée)
 //   proposer    /proposer/       /en/suggest/     /es/proponer/     /pt/sugerir/     /de/vorschlagen/
 //               (formulaire public de demandes, non indexé ; ?jeu=<id> choisit le jeu)
@@ -28,8 +33,8 @@
 //   cookies          /cookies/                  /en/cookie-policy/
 //
 // Le préfixe de famille (genres, univers…) évite les collisions entre un genre
-// et un univers de même identifiant. Les identifiants (jeux, genres, univers) ne
-// changent pas : une adresse publiée reste valable ; celle d'un genre ou d'un
+// et un univers de même identifiant. Les identifiants (jeux, genres, univers) et
+// les slugs ne changent pas : une adresse publiée reste valable ; celle d'un genre ou d'un
 // univers retiré mène en 301 à la catégorie qui l'a remplacé (ANCIENS_IDS de
 // taxonomie.js, fichier _redirects écrit par scripts/pages-seo.mjs), comme
 // celle d'une tranche d'âge retirée (ANCIENNES_TRANCHES).
@@ -71,6 +76,48 @@ export const SLUGS_AGE = {
   '3-4': '3-4', '5-6': '5-6', '7-8': '7-8', '9+': '9-plus',
 };
 
+// Slugs traduits des catégories (en, es, pt, de) ; en français, et pour une
+// langue absente d'ici : l'identifiant (genres, univers) ou SLUGS_AGE (âges).
+// Ne jamais changer un slug publié (son adresse est dans les moteurs de
+// recherche) ; un genre ou un univers ajouté reçoit les siens ici.
+export const SLUGS_CATEGORIES = {
+  genre: {
+    arcade: { en: 'arcade', es: 'arcade', pt: 'arcade', de: 'arcade' },
+    puzzle: { en: 'puzzle', es: 'puzles', pt: 'logica', de: 'logik' },
+    memoire: { en: 'memory', es: 'memoria', pt: 'memoria', de: 'gedaechtnis' },
+    quiz: { en: 'quiz', es: 'preguntas', pt: 'quiz', de: 'quiz' },
+    mots: { en: 'words', es: 'palabras', pt: 'palavras', de: 'woerter' },
+    calcul: { en: 'math', es: 'calculo', pt: 'matematica', de: 'rechnen' },
+    plateforme: { en: 'platformer', es: 'plataformas', pt: 'plataforma', de: 'jump-and-run' },
+    course: { en: 'racing', es: 'carreras', pt: 'corrida', de: 'rennen' },
+    aventure: { en: 'adventure', es: 'aventura', pt: 'aventura', de: 'abenteuer' },
+    strategie: { en: 'strategy', es: 'estrategia', pt: 'estrategia', de: 'strategie' },
+    simulation: { en: 'simulation', es: 'simulacion', pt: 'simulacao', de: 'simulation' },
+    creation: { en: 'creative', es: 'creatividad', pt: 'criatividade', de: 'kreativ' },
+    musique: { en: 'music', es: 'musica', pt: 'musica', de: 'musik' },
+  },
+  univers: {
+    animaux: { en: 'animals', es: 'animales', pt: 'animais', de: 'tiere' },
+    chevaux: { en: 'horses', es: 'caballos', pt: 'cavalos', de: 'pferde' },
+    dinosaures: { en: 'dinosaurs', es: 'dinosaurios', pt: 'dinossauros', de: 'dinosaurier' },
+    ocean: { en: 'ocean', es: 'oceano', pt: 'oceano', de: 'ozean' },
+    nature: { en: 'nature', es: 'naturaleza', pt: 'natureza', de: 'natur' },
+    fantasy: { en: 'magic', es: 'magia', pt: 'magia', de: 'magie' },
+    espace: { en: 'space', es: 'espacio', pt: 'espaco', de: 'weltall' },
+    monde: { en: 'world', es: 'mundo', pt: 'mundo', de: 'welt' },
+    ville: { en: 'jobs', es: 'oficios', pt: 'profissoes', de: 'berufe' },
+    vehicules: { en: 'vehicles', es: 'vehiculos', pt: 'veiculos', de: 'fahrzeuge' },
+    sport: { en: 'sports', es: 'deportes', pt: 'esportes', de: 'sport' },
+    cuisine: { en: 'cooking', es: 'cocina', pt: 'cozinha', de: 'kochen' },
+  },
+  age: {
+    '13+': { es: '13-mas', pt: '13-mais', de: 'ab-13' },
+  },
+};
+
+// Morceau d'adresse d'un jeu : minuscules sans accents, chiffres et tirets.
+const RE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 const langueValide = (lang) => (LANGUES.includes(lang) ? lang : 'fr');
 
 /** Accueil d'une langue : « / », « /en/ »… */
@@ -78,19 +125,36 @@ export function urlAccueil(lang) {
   return `/${PREFIXE[langueValide(lang)]}`;
 }
 
-/** Fiche d'un jeu : « /jeux/<id>/ », « /en/games/<id>/ »… */
-export function urlJeu(id, lang) {
+/**
+ * Slug de la fiche d'un jeu dans une langue. jeu : entrée du catalogue ou
+ * game.json ({ id, slugs }) ; un identifiant seul donne l'identifiant (adresse
+ * française, ou ancienne adresse des autres langues).
+ */
+export function slugJeu(jeu, lang) {
   const l = langueValide(lang);
-  return `/${PREFIXE[l]}${SEGMENTS.jeu[l]}/${encodeURIComponent(id)}/`;
+  if (typeof jeu === 'string') return jeu;
+  const s = l === 'fr' ? null : jeu?.slugs?.[l];
+  return typeof s === 'string' && RE_SLUG.test(s) ? s : jeu?.id;
 }
 
-/** Page d'une catégorie : famille « genre », « univers » ou « age » (id de tranche, ex. « 13+ »). */
-export function urlCategorie(famille, id, lang) {
+/** Fiche d'un jeu : « /jeux/<id>/ », « /en/games/<slug>/ »… (jeu : entrée du catalogue, voir slugJeu). */
+export function urlJeu(jeu, lang) {
+  const l = langueValide(lang);
+  return `/${PREFIXE[l]}${SEGMENTS.jeu[l]}/${encodeURIComponent(slugJeu(jeu, l))}/`;
+}
+
+/**
+ * Page d'une catégorie : famille « genre », « univers » ou « age » (id de tranche, ex. « 13+ »).
+ * ancienne : adresse d'avant les slugs traduits (identifiant ou SLUGS_AGE dans
+ * toutes les langues), pour les redirections.
+ */
+export function urlCategorie(famille, id, lang, { ancienne = false } = {}) {
   const l = langueValide(lang);
   const segment = SEGMENTS[famille]?.[l];
   if (!segment) throw new Error(`famille de catégorie inconnue : ${famille}`);
-  const slug = famille === 'age' ? SLUGS_AGE[id] : id;
-  if (!slug) throw new Error(`tranche d'âge inconnue : ${id}`);
+  const base = famille === 'age' ? SLUGS_AGE[id] : id;
+  if (!base) throw new Error(`tranche d'âge inconnue : ${id}`);
+  const slug = (!ancienne && l !== 'fr' && SLUGS_CATEGORIES[famille]?.[id]?.[l]) || base;
   return `/${PREFIXE[l]}${segment}/${encodeURIComponent(slug)}/`;
 }
 

@@ -97,7 +97,7 @@ const SANS_FICHE = new URLSearchParams(location.search).has('depuis');
 // si le jeu n'est pas proposé dans cette langue), sinon l'accueil.
 function afficherTextes() {
   el.retour.href = jeuCourant && !SANS_FICHE
-    ? urlJeu(jeuCourant.id, jeuDisponible(jeuCourant) ? getLang() : 'fr')
+    ? urlJeu(jeuCourant, jeuDisponible(jeuCourant) ? getLang() : 'fr')
     : urlAccueil(getLang());
   if (el.voirTous) el.voirTous.href = urlAccueil(getLang());
   // Formulaire public de demandes, avec ce jeu déjà choisi.

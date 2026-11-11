@@ -319,8 +319,8 @@ async function principal() {
   for (const [id, jeu] of jeuxPublies) {
     const langues = regles.languesDuJeu(ficheDe.get(id) || jeu);
     for (const lang of langues) {
-      const p = pages.get(chemins.urlJeu(id, lang));
-      if (!p) { erreur(chemins.urlJeu(id, lang), `page du jeu absente (${lang})`, id); continue; }
+      const p = pages.get(chemins.urlJeu(jeu, lang));
+      if (!p) { erreur(chemins.urlJeu(jeu, lang), `page du jeu absente (${lang})`, id); continue; }
       Object.assign(p, { type: 'jeu', jeu: id, lang });
     }
   }

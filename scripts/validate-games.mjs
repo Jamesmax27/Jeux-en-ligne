@@ -42,6 +42,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { problemesClassementJeu, RAPPEL_LISTES } from './controle-taxonomie.mjs';
 import { REJOINDRE_DEPUIS } from '../public/profil-reglages.js';
+import { problemesSlugs } from './slugs-jeux.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -76,6 +77,20 @@ function dateValide(texte) {
   if (typeof texte !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(texte)) return false;
   const t = Date.parse(texte + 'T00:00:00Z');
   return !Number.isNaN(t) && new Date(t).toISOString().slice(0, 10) === texte;
+}
+
+// Toutes les fiches de games/ (pour l'unicité des slugs), lues une fois ; celle
+// du jeu contrôlé est remplacée par la version qu'on vient de lire.
+let fichesDuDepot = null;
+async function toutesLesFiches(id, f) {
+  if (!fichesDuDepot) {
+    fichesDuDepot = [];
+    for (const e of await readdir(DOSSIER_JEUX, { withFileTypes: true })) {
+      if (!e.isDirectory() || /^[._]/.test(e.name)) continue;
+      try { fichesDuDepot.push({ id: e.name, ...JSON.parse((await readFile(path.join(DOSSIER_JEUX, e.name, 'game.json'), 'utf8')).replace(/^﻿/, '')) }); } catch { /* signalé par son propre contrôle */ }
+    }
+  }
+  return [...fichesDuDepot.filter((x) => x.id !== id), { ...f, id }];
 }
 
 async function controlerFiche(id, dossier) {
@@ -114,6 +129,9 @@ async function controlerFiche(id, dossier) {
   if (f.inspiration !== undefined && !(typeof f.inspiration === 'string' && f.inspiration.length <= 80 && /^(saison|tendance):[a-z0-9]+(?:-[a-z0-9]+)*$/.test(f.inspiration))) {
     erreur(id, 'game.json : "inspiration" (facultatif) vaut « saison:<id> » ou « tendance:<id> » (scripts/inspirations.mjs)');
   }
+  // Slugs traduits de la fiche (adresses /en/games/<slug>/… : scripts/slugs-jeux.mjs) :
+  // présents, bien écrits, uniques dans leur langue parmi tous les jeux de games/.
+  for (const p of problemesSlugs(await toutesLesFiches(id, f)).filter((x) => x.id === id)) erreur(id, `game.json : ${p.message}`);
   fiches.set(id, f);
 
   // Consignes de 2026 : jeu riche (20 niveaux au moins) et présentation (sa

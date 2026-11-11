@@ -139,6 +139,18 @@ self.addEventListener('fetch', (event) => {
 
 // --- Pages générées : réseau d'abord, copie des pages visitées -----------------
 
+// Identifiant du jeu d'une fiche d'après son slug (public/chemins.js : "slugs" du catalogue).
+async function idDuSlug(slug, lang) {
+  if (lang === 'fr') return slug;
+  try {
+    const reponse = await caches.match(URL_CATALOGUE, { cacheName: CACHE_DONNEES });
+    const jeux = reponse ? (await reponse.json()).games || [] : [];
+    const jeu = jeux.find((j) => j.slugs?.[lang] === slug) || jeux.find((j) => j.id === slug);
+    if (jeu) return jeu.id;
+  } catch (e) { /* catalogue absent ou illisible */ }
+  return slug;
+}
+
 async function pageGeneree(event, chemin) {
   const cle = new URL(chemin, RACINE).href; // sans paramètres
   const reponse = await reseauDabord(event, CACHE_PAGES, cle, limiterPages);
@@ -150,7 +162,9 @@ async function pageGeneree(event, chemin) {
   const fiche = RE_FICHE.exec(chemin);
   if (fiche) {
     const lanceur = new URL('play', RACINE);
-    lanceur.searchParams.set('id', fiche[2]);
+    // Le morceau d'adresse est un slug traduit (en, es, pt, de) : identifiant
+    // du jeu retrouvé dans le catalogue gardé ; à défaut, l'adresse elle-même.
+    lanceur.searchParams.set('id', await idDuSlug(fiche[2], fiche[1] || 'fr'));
     lanceur.searchParams.set('lang', fiche[1] || 'fr');
     lanceur.searchParams.set('depuis', 'hors-ligne');
     return Response.redirect(lanceur.href, 302);

@@ -57,6 +57,7 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { completerSlugsDuJeu, ordonnerSlugs } from './slugs-jeux.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -246,7 +247,13 @@ async function rangerMeta(cheminFiche, metas, { maj = false } = {}) {
     if (k === 'added' && fiche.maj !== undefined) ordonnee.maj = fiche.maj;
   }
   if (fiche.maj !== undefined && !('maj' in ordonnee)) ordonnee.maj = fiche.maj;
-  await writeFile(cheminFiche, enJson(ordonnee), 'utf8');
+  await writeFile(cheminFiche, enJson(ordonnerSlugs(ordonnee)), 'utf8');
+  // Slugs traduits de la fiche (adresses /en/games/<slug>/…), tirés des titres
+  // qu'on vient de ranger : posés une fois, jamais changés (scripts/slugs-jeux.mjs).
+  if (fiche.id) {
+    const ajoutees = await completerSlugsDuJeu(fiche.id);
+    if (ajoutees.length) console.log(`  slugs ajoutés (${ajoutees.join(', ')}) : voir "slugs" dans game.json`);
+  }
 }
 
 function rangerChamps(m) {

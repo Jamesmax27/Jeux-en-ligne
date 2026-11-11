@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { IDS_GENRES, IDS_UNIVERS, SECONDAIRES_MAX, UNIVERS_MAX } from '../public/taxonomie.js';
 import { genererPages } from './pages-seo.mjs';
 import { problemesChamps, languesDuJeu, REGLES_SEO_DEPUIS } from './regles-seo.mjs';
+import { RE_SLUG } from './slugs-jeux.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -127,6 +128,15 @@ async function lireJeu(nomDossier) {
     if (!title || !description) manquantes.push(lang);
   }
   if (manquantes.length) avertir(nomDossier, `titre ou description non traduits (${manquantes.join(', ')}) dans game.json ("i18n") : le français sera affiché`);
+  // Slugs traduits (scripts/slugs-jeux.mjs) : un slug mal écrit est ignoré (adresse
+  // avec l'identifiant), avec un avertissement ; le robot, lui, le refuse.
+  let slugs = null;
+  if (fiche.slugs && typeof fiche.slugs === 'object') {
+    slugs = Object.fromEntries(LANGUES.filter((l) => l !== 'fr' && typeof fiche.slugs[l] === 'string' && RE_SLUG.test(fiche.slugs[l])).map((l) => [l, fiche.slugs[l]]));
+    const ignores = Object.keys(fiche.slugs).filter((l) => !(l in slugs));
+    if (ignores.length) avertir(nomDossier, `"slugs" mal écrits ou inconnus ignorés : ${ignores.join(', ')}`);
+    if (!Object.keys(slugs).length) slugs = null;
+  }
   // Langues dans lesquelles le catalogue propose le jeu (absent = toutes) : même
   // règle que les pages générées (le français, langue source, en fait toujours partie).
   const langues = Array.isArray(fiche.langues) && fiche.langues.length ? languesDuJeu(fiche) : [];
@@ -148,6 +158,9 @@ async function lireJeu(nomDossier) {
     title: fiche.title.trim().slice(0, 80),
     description: typeof fiche.description === 'string' ? fiche.description.trim().slice(0, 200) : '',
     i18n,
+    // Morceaux d'adresse traduits de la fiche (public/chemins.js, scripts/slugs-jeux.mjs) :
+    // le site construit les liens avec, comme les pages générées.
+    ...(slugs ? { slugs } : {}),
     ...(fiche.non_traduisible === true ? { non_traduisible: true } : {}),
     ...(langues.length ? { langues } : {}),
     // Jeu multijoueur (docs/multijoueur.md) : rubrique « Multijoueur » et étiquette « Multi » du catalogue.

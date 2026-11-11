@@ -149,7 +149,7 @@ function afficher() {
     li.dataset.jeu = j.id;
     const lien = document.createElement('a');
     lien.className = 'profil-jeu-lien';
-    lien.href = urlJeu(j.id, langue());
+    lien.href = urlJeu(fiche || j.id, langue()); // slugs traduits du catalogue
     const jaquette = document.createElement('div');
     jaquette.className = 'jaquette';
     const img = document.createElement('img');

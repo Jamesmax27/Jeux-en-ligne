@@ -585,6 +585,8 @@ jobs:
                  description, presentation, titre_seo…).
                - Le jeu déclare son nombre réel de niveaux, tiré de ses données de niveaux :
                  window.JEL_NIVEAUX = NIVEAUX.length;  (20 au moins ; le robot le vérifie dans le navigateur).
+               - "slugs" de game.json (adresses traduites de la page du jeu, /en/games/<slug>/…) : posés par
+                 i18n-jeu.mjs --assembler d'après les titres traduits ; ne les écris ni ne les modifie jamais.
                - Sauvegarde OBLIGATOIRE avec le module commun save.js (CONSIGNES-JEU.md, section 3 « Sauvegarde ») :
                  le module (window.JEL_SAVE, bloc jel-sauvegarde) est placé dans index.html par
                  i18n-jeu.mjs --assembler ; n'écris jamais ce bloc toi-même. Dans le code du jeu :
@@ -816,6 +818,9 @@ jobs:
             fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
             console.log(`Fiche : idée ${j.idee}, genre ${j.genre} (+ ${j.genres_secondaires.join(", ") || "aucun"}), univers ${(j.univers || []).join(", ")}, âge ${j.ages || "?"}`);
           '
+          # Slugs traduits de la fiche (/en/games/<slug>/…), tirés des titres traduits : déjà posés par
+          # i18n-jeu.mjs --assembler ; complétés ici s'il en manque (jamais changés une fois posés).
+          node scripts/slugs-jeux.mjs "$ID"
 
       - name: Contrôle qualité final + jaquette
         id: qualite

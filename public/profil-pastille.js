@@ -202,7 +202,7 @@ async function bienvenue({ serie, bonus }) {
     for (const j of nouveaux.slice(0, 6)) {
       const li = document.createElement('li');
       const a = document.createElement('a');
-      a.href = urlJeu(j.id, lang);
+      a.href = urlJeu(j, lang);
       a.innerHTML = `<img src="/${j.cover}" alt="" width="600" height="800" loading="lazy" decoding="async"><span></span>`;
       a.querySelector('span').textContent = titre(j);
       li.append(a);

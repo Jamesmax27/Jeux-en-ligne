@@ -86,3 +86,25 @@ Exceptions de famille : `DESTINATIONS_ANCIENNES` de `pages-seo.mjs`.
 Google traite 308 comme 301. Le contrôle (`verifier-seo.mjs`) refuse tout lien
 interne, canonical, hreflang, `og:url` ou adresse du sitemap qui mène à une
 adresse redirigée.
+
+## 4. Slugs traduits (tâche 5)
+
+- Fiches : `/jeux/<id>/` en français (inchangé), `/en/games/<slug>/`,
+  `/es/juegos/<slug>/`, `/pt/jogos/<slug>/`, `/de/spiele/<slug>/` ; slugs dans
+  `"slugs"` de `game.json`, recopiés dans `catalog.json`, tirés du titre traduit
+  par `scripts/slugs-jeux.mjs` (appelé par `i18n-jeu.mjs --assembler` et `--meta`,
+  et par la boucle de nuit), posés une fois et jamais changés ; contrôlés par
+  `validate-games.mjs` (présents, bien écrits, uniques).
+- Catégories : `SLUGS_CATEGORIES` de `public/chemins.js` (`/en/worlds/animals/`,
+  `/de/spielarten/logik/`, `/es/edades/13-mas/`…) ; en français, l'identifiant.
+- L'identifiant du jeu (dossier, D1, profil, `/play?id=`) ne change pas.
+- Anciennes adresses → 301 vers la nouvelle, en un saut (`_redirects`) :
+  fiches (forme avec « / », la seule publiée), catégories (avec et sans « / »).
+  `anciens_slugs` (facultatif) garde la redirection d'un slug changé.
+- Navigateur : les liens viennent de `urlJeu(jeu, lang)` (entrée du catalogue) ;
+  les cartes portent `data-jeu` (check vert « terminé » de `profil.js`) ; hors
+  ligne, `sw.js` retrouve l'identifiant d'un slug dans le catalogue gardé.
+- Limite Cloudflare Pages : 2 000 redirections fixes ; le build s'arrête au-delà
+  et prévient à partir de 1 800 (`MAX_REDIRECTIONS` de `pages-seo.mjs`).
+  Novembre 2026 : 1 066 règles (628 de fiches, le reste pour les catégories) ;
+  un nouveau jeu n'en ajoute aucune.
