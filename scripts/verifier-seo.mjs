@@ -47,6 +47,7 @@ const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(RACINE, 'public');
 
 const BORNES_TITRE = [50, 60];
+const BORNES_TITRE_CATEGORIE = [30, 60];
 const BORNES_DESCRIPTION = [140, 160];
 const BLOC_MOTS = [150, 300];
 const SIMILAIRES = [4, 6];
@@ -388,7 +389,9 @@ async function principal() {
     if (titres.length !== 1) erreur(sujet, `${titres.length} balise(s) <title> (une seule attendue)`, jeu);
     p.titre = titres[0] || '';
     const n = longueur(p.titre);
-    if (n < BORNES_TITRE[0] || n > BORNES_TITRE[1]) erreur(sujet, `<title> de ${n} caractères (attendu : ${BORNES_TITRE[0]} à ${BORNES_TITRE[1]}) : « ${p.titre} »`, jeu);
+    // Catégories et pages école : titres plus courts (« Jeux de <thème> gratuits | Free Micro Games »).
+    const bornesTitre = ['categorie', 'ecole'].includes(p.type) ? BORNES_TITRE_CATEGORIE : BORNES_TITRE;
+    if (n < bornesTitre[0] || n > bornesTitre[1]) erreur(sujet, `<title> de ${n} caractères (attendu : ${bornesTitre[0]} à ${bornesTitre[1]}) : « ${p.titre} »`, jeu);
     const descriptions = p.metas.filter((m) => m.name === 'description');
     if (descriptions.length !== 1) erreur(sujet, `${descriptions.length} meta description (une seule attendue)`, jeu);
     p.description = (descriptions[0]?.content || '').trim();

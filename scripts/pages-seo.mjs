@@ -602,9 +602,24 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
           itemListElement: c.jeux.map((j, i) => ({ '@type': 'ListItem', position: i + 1, url: absolue(urlJeu(j, lang)), name: textesLangue(j.fiche, lang).title || j.title })),
         },
       };
+      // Questions fréquentes (« faq » des textes de la catégorie, facultatives) :
+      // visibles en bas de page et décrites en JSON-LD FAQPage (mêmes textes).
+      const faq = Array.isArray(textes?.faq) ? textes.faq.filter((x) => typeof x?.q === 'string' && typeof x?.r === 'string' && x.q.trim() && x.r.trim()) : [];
+      const donneesFaq = faq.length ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        inLanguage: HREFLANG[lang],
+        mainEntity: faq.map((x) => ({ '@type': 'Question', name: x.q.trim(), acceptedAnswer: { '@type': 'Answer', text: x.r.trim() } })),
+      } : null;
       const valeurs = {
         lang: HREFLANG[lang],
-        tete: tete({ lang, titre: textes?.titre_seo || `${h1} — ${NOM_DU_SITE}`, description, canonique, indexable, alternatives, image: absolue(`/${IMAGE_SITE}`), imageAlt: NOM_DU_SITE, donnees: [donneesListe, fil.donnees] }),
+        tete: tete({ lang, titre: textes?.titre_seo || `${h1} — ${NOM_DU_SITE}`, description, canonique, indexable, alternatives, image: absolue(`/${IMAGE_SITE}`), imageAlt: NOM_DU_SITE, donnees: [donneesListe, fil.donnees, ...(donneesFaq ? [donneesFaq] : [])] }),
+        faq: faq.length
+          ? `<section class="faq" aria-labelledby="titre-faq">
+      <h2 id="titre-faq">${echapper(t('page.faq'))}</h2>
+      <dl>${faq.map((x) => `<dt>${echapper(x.q.trim())}</dt><dd>${echapper(x.r.trim())}</dd>`).join('')}</dl>
+    </section>`
+          : '',
         accueil: urlAccueil(lang),
         langues: liensLangues(lang, alternatives, t),
         ariane: fil.html,

@@ -247,12 +247,19 @@ export function doublonsEntreJeux(fiches, ids = null) {
 // Textes des pages de catégories
 // --------------------------------------------------------------------------
 
+// Titre : 30 à 60 caractères (forme « Jeux de <thème> gratuits | Free Micro Games »,
+// choix du propriétaire de novembre 2026, plus courte que celle des fiches).
+// Introduction : 80 à 150 mots ; passera à 120-200 avec les textes réécrits
+// d'après docs/seo-mots-cles.md.
 export const BORNES_CATEGORIE = {
   h1: [10, 70, 'car'],
-  titre_seo: [50, 60, 'car'],
+  titre_seo: [30, 60, 'car'],
   description_seo: [140, 160, 'car'],
   intro: [80, 150, 'mots'],
 };
+export const FAQ_NOMBRE = [3, 5];
+export const FAQ_QUESTION = [10, 120];
+export const FAQ_REPONSE = [20, 400];
 
 /**
  * Clés des 29 catégories : « genre.<id> », « univers.<id> », « age.<id de tranche> ».
@@ -286,6 +293,22 @@ export function problemesCategories(textes, lang, cles) {
       if (m) ajouter('erreur', cle, `"${champ}" : marque protégée « ${m[0]} »`);
       const formule = FORMULES.find((f) => texte.toLowerCase().includes(f));
       if (formule) ajouter('attention', cle, `"${champ}" : formule toute faite « ${formule} »`);
+    }
+    // Questions fréquentes (facultatives) : 3 à 5, question et réponse courtes, sans doublon.
+    if (c.faq !== undefined) {
+      if (!Array.isArray(c.faq) || c.faq.length < FAQ_NOMBRE[0] || c.faq.length > FAQ_NOMBRE[1]) ajouter('erreur', cle, `"faq" : liste de ${FAQ_NOMBRE[0]} à ${FAQ_NOMBRE[1]} questions { "q": …, "r": … }`);
+      else {
+        const vues = new Set();
+        c.faq.forEach((x, i) => {
+          const q = typeof x?.q === 'string' ? x.q.trim() : '';
+          const r = typeof x?.r === 'string' ? x.r.trim() : '';
+          if (longueur(q) < FAQ_QUESTION[0] || longueur(q) > FAQ_QUESTION[1]) ajouter('erreur', cle, `"faq" n° ${i + 1} : question de ${FAQ_QUESTION[0]} à ${FAQ_QUESTION[1]} caractères`);
+          if (longueur(r) < FAQ_REPONSE[0] || longueur(r) > FAQ_REPONSE[1]) ajouter('erreur', cle, `"faq" n° ${i + 1} : réponse de ${FAQ_REPONSE[0]} à ${FAQ_REPONSE[1]} caractères`);
+          if (vues.has(q.toLowerCase())) ajouter('erreur', cle, `"faq" n° ${i + 1} : question en double`);
+          vues.add(q.toLowerCase());
+          if (RE_MARQUES.exec(`${q} ${r}`)) ajouter('erreur', cle, `"faq" n° ${i + 1} : marque protégée`);
+        });
+      }
     }
     // Date de la dernière retouche des textes (facultative) : lastmod du sitemap.
     if (c.maj !== undefined && !(typeof c.maj === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.maj))) ajouter('erreur', cle, '"maj" : date AAAA-MM-JJ attendue');
