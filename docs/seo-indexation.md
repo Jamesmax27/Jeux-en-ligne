@@ -106,7 +106,7 @@ adresse redirigée.
   ligne, `sw.js` retrouve l'identifiant d'un slug dans le catalogue gardé.
 - Limite Cloudflare Pages : 2 000 redirections fixes ; le build s'arrête au-delà
   et prévient à partir de 1 800 (`MAX_REDIRECTIONS` de `pages-seo.mjs`).
-  Novembre 2026 : 1 066 règles (628 de fiches, le reste pour les catégories) ;
+  Novembre 2026 : 1 066 règles (608 de fiches, 458 de catégories) ;
   un nouveau jeu n'en ajoute aucune.
 
 ## 5. Contrôles automatiques (tâche 9)
