@@ -1,0 +1,53 @@
+# ==========================================================================
+# Contrôle quotidien du référencement du site EN LIGNE (freemicrogames.com)
+#
+# Complète le contrôle des pull requests (validate.yml, boucle de nuit : fichiers
+# construits, avant la mise en ligne) par ce que seul le site publié montre :
+# pages du sitemap en 200, sans noindex (en-tête ou meta), avec leur canonical ;
+# chaque redirection de _redirects telle que Cloudflare la sert (301, un saut,
+# cible en 200) ; autres hôtes (http, www, freemicro.games) et adresse
+# *.pages.dev en noindex. Script : scripts/verifier-seo.mjs --en-ligne.
+#
+# Ne bloque rien : en cas de problème, le passage échoue (GitHub prévient le
+# propriétaire par e-mail) et le rapport est dans le résumé du passage.
+# Aucune écriture, aucun secret.
+# ==========================================================================
+
+name: Contrôle SEO du site en ligne
+
+on:
+  schedule:
+    # Tous les jours à 07:43 UTC (jamais à l'heure pile, que GitHub retarde),
+    # après la publication des jeux de la boucle de nuit.
+    - cron: "43 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seo-en-ligne
+  cancel-in-progress: true
+
+jobs:
+  controle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Contrôler le site publié
+        run: node scripts/verifier-seo.mjs --en-ligne --rapport captures/seo-en-ligne.md
+
+      - name: Garder le rapport
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-seo-en-ligne
+          path: captures/seo-en-ligne.md
+          if-no-files-found: ignore
+          retention-days: 14

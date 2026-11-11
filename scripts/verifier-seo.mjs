@@ -12,6 +12,20 @@
 //                            SITE_URL ou https://freemicrogames.com/)
 //     --echantillon N        en ligne : N adresses du sitemap au plus (défaut : toutes)
 //     --json <fichier>       écrit aussi le rapport en JSON (ex. dans captures/)
+//     --rapport <fichier>    écrit aussi un rapport lisible en Markdown (et, sur
+//                            GitHub Actions, toujours dans le résumé de l'étape)
+//
+// En plus (chantier « seo-indexation », novembre 2026 : docs/seo-indexation.md) :
+//   - hreflang complets (toutes les versions de la page, x-default = français)
+//     et og:locale:alternate = les autres langues ;
+//   - JSON-LD : VideoGame complet (genre, inLanguage, plateforme, offre, âge,
+//     isFamilyFriendly, playMode), ItemList = jeux affichés, FAQPage = questions affichées ;
+//   - _redirects : 301, un seul saut, cible publiée, même langue, jamais un
+//     accueil, 2 000 règles au plus ; aucun lien, sitemap ou hreflang vers une
+//     ancienne adresse redirigée ;
+//   - en ligne : pages du sitemap en 200 sans noindex (en-tête ou meta) avec
+//     leur canonical, chaque redirection telle que servie, autres hôtes
+//     (http, www, freemicro.games) et aperçus *.pages.dev en noindex.
 //
 // Ce qui est contrôlé (HTML tel qu'il est publié, sans exécuter de JavaScript) :
 //   1. textes des jeux (scripts/regles-seo.mjs) et des catégories ;
@@ -73,7 +87,34 @@ const EN_LIGNE = args.includes('--en-ligne');
 const ADRESSE_EN_LIGNE = /^https?:\/\//i.test(valeurOption('--en-ligne') || '') ? valeurOption('--en-ligne') : null;
 const ECHANTILLON = Number(valeurOption('--echantillon')) || 0;
 const FICHIER_JSON = valeurOption('--json');
-const valeursOptions = new Set([ADRESSE_EN_LIGNE, valeurOption('--echantillon'), FICHIER_JSON].filter(Boolean));
+const FICHIER_RAPPORT = valeurOption('--rapport');
+const valeursOptions = new Set([ADRESSE_EN_LIGNE, valeurOption('--echantillon'), FICHIER_JSON, FICHIER_RAPPORT].filter(Boolean));
+
+/** Rapport lisible : verdict, chiffres, puis les problèmes regroupés par page ou fichier. */
+function rapportMarkdown({ erreurs, attentions, chiffres, site, enLigne }) {
+  const cellule = (t) => String(t).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  const tableau = (liste, max) => {
+    if (!liste.length) return '_Aucune._\n';
+    const lignes = liste.slice(0, max).map((r) => `| ${cellule(r.sujet)} | ${cellule(r.message)} |`);
+    return `| Page ou fichier | Problème |\n| --- | --- |\n${lignes.join('\n')}\n${liste.length > max ? `\n… et ${liste.length - max} de plus (voir le journal).\n` : ''}`;
+  };
+  return [
+    `## Contrôle du référencement ${erreurs.length ? '❌' : '✅'}`,
+    '',
+    `Site : ${site}${enLigne ? ' (avec les contrôles du site en ligne)' : ''}`,
+    '',
+    erreurs.length ? `**${erreurs.length} erreur(s) à corriger**, ${attentions.length} attention(s).` : `**Tout est bon**${attentions.length ? `, ${attentions.length} attention(s)` : ''}.`,
+    '',
+    `Chiffres : ${chiffres}.`,
+    '',
+    '### Erreurs',
+    '',
+    tableau(erreurs, 200),
+    '### Attentions',
+    '',
+    tableau(attentions, 100),
+  ].join('\n');
+}
 const IDS = args.filter((a) => !a.startsWith('--') && !valeursOptions.has(a));
 
 // --------------------------------------------------------------------------
@@ -343,14 +384,52 @@ async function principal() {
       if (!membres.length && p) erreur(p.adresse, 'page de catégorie sans aucun jeu');
     }
   }
+  // Pages école (CLASSES_PAR_LANGUE de taxonomie.js, adresses urlEcole).
+  for (const lang of LANGUES) {
+    for (const id of taxonomie.CLASSES_PAR_LANGUE?.[lang] || []) {
+      const p = pages.get(chemins.urlEcole(id, lang));
+      if (p) Object.assign(p, { type: 'ecole', idCategorie: id, lang });
+    }
+  }
   for (const p of pages.values()) {
-    if (p.type === 'autre' && /^\/(?:en\/|es\/|pt\/|de\/)?(?:jeux|games|juegos|jogos|spiele)\//.test(p.adresse)) erreur(p.adresse, 'page d\'un jeu qui n\'est pas (ou plus) au catalogue');
+    if (p.type === 'autre' &&/^\/(?:en\/|es\/|pt\/|de\/)?(?:jeux|games|juegos|jogos|spiele)\//.test(p.adresse)) erreur(p.adresse, 'page d\'un jeu qui n\'est pas (ou plus) au catalogue');
   }
   for (const lang of LANGUES) {
     for (const famille of ['genre', 'univers']) {
       const adresse = chemins.urlCategorie(famille, taxonomie.ID_AUTRE, lang);
       if (pages.has(adresse)) erreur(adresse, '« autre » ne doit pas avoir de page de catégorie');
     }
+  }
+
+  // Versions linguistiques attendues d'une page ({ langue: adresse depuis la
+  // racine }, seulement celles qui sont publiées), ou null (page sans équivalent).
+  const legales = new Map();
+  for (const page of chemins.PAGES_LEGALES) for (const l of chemins.LANGUES_LEGALES) legales.set(chemins.urlLegale(page, l), page);
+  const versionsDe = (p) => {
+    const de = (f) => Object.fromEntries(LANGUES.map((l) => [l, f(l)]).filter(([, c]) => c && pages.has(c)));
+    if (p.type === 'accueil') return de((l) => chemins.urlAccueil(l));
+    if (p.type === 'jeu') {
+      const j = jeuxPublies.get(p.jeu);
+      const langues = regles.languesDuJeu(ficheDe.get(p.jeu) || j);
+      return de((l) => (langues.includes(l) ? chemins.urlJeu(j, l) : null));
+    }
+    if (p.type === 'categorie') return de((l) => chemins.urlCategorie(p.famille, p.idCategorie, l));
+    if (p.type === 'ecole') return de((l) => chemins.urlEcole(p.idCategorie, l));
+    if (legales.has(p.adresse)) {
+      const page = legales.get(p.adresse);
+      return Object.fromEntries(chemins.LANGUES_LEGALES.map((l) => [l, chemins.urlLegale(page, l)]));
+    }
+    return null;
+  };
+
+  // Redirections publiées (public/_redirects) : source → { cible, code }.
+  const redirections = new Map();
+  const texteRedirections = existsSync(path.join(PUBLIC, '_redirects')) ? await readFile(path.join(PUBLIC, '_redirects'), 'utf8') : '';
+  for (const ligne of texteRedirections.split(/\r?\n/)) {
+    const [source, cible, code] = ligne.trim().split(/\s+/);
+    if (!source || source.startsWith('#')) continue;
+    if (redirections.has(source)) erreur('_redirects', `règle en double pour ${source}`);
+    redirections.set(source, { cible, code: Number(code) || 302 });
   }
 
   // Contrôles de chaque page.
@@ -418,6 +497,24 @@ async function principal() {
       if (!codes.includes('x-default')) erreur(sujet, 'hreflang x-default absent', jeu);
       if (!codes.includes(langAttendue)) erreur(sujet, `hreflang de la page elle-même (${langAttendue}) absent`, jeu);
     }
+    // hreflang complets : toutes les versions de la page (accueil : 5 langues ;
+    // fiche : langues du jeu ; catégorie, page école : langues où elle existe ;
+    // page légale : français et anglais), adresses absolues exactes, x-default
+    // vers la version française ; og:locale:alternate : les autres langues.
+    const versions = versionsDe(p);
+    if (versions && Object.keys(versions).length > 1) {
+      for (const [l, chemin] of Object.entries(versions)) {
+        const lien = p.alternatives.find((a) => a.hreflang === HREFLANG[l]);
+        if (!lien) erreur(sujet, `hreflang ${HREFLANG[l]} manquant (${chemin})`, jeu);
+        else if (lien.href !== new URL(chemin.replace(/^\//, ''), SITE).href) erreur(sujet, `hreflang ${HREFLANG[l]} « ${lien.href} » (attendu : ${new URL(chemin.replace(/^\//, ''), SITE).href})`, jeu);
+      }
+      const xDefaut = p.alternatives.find((a) => a.hreflang === 'x-default');
+      if (versions.fr && xDefaut && xDefaut.href !== new URL(versions.fr.replace(/^\//, ''), SITE).href) erreur(sujet, 'hreflang x-default ne mène pas à la version française', jeu);
+      for (const a of p.alternatives) if (a.hreflang !== 'x-default' && !Object.keys(versions).some((l) => HREFLANG[l] === a.hreflang)) erreur(sujet, `hreflang ${a.hreflang} en trop`, jeu);
+      const ogAlt = p.metas.filter((m) => m.property === 'og:locale:alternate').map((m) => m.content).sort();
+      const ogAttendus = Object.keys(versions).filter((l) => HREFLANG[l] !== langAttendue).map((l) => chemins.LOCALE_OG[l]).sort();
+      if (ogAlt.join() !== ogAttendus.join()) erreur(sujet, `og:locale:alternate : ${ogAlt.join(', ') || 'aucune'} (attendu : ${ogAttendus.join(', ')})`, jeu);
+    }
 
     // Open Graph.
     const og = (prop) => p.metas.find((m) => m.property === prop)?.content;
@@ -462,7 +559,13 @@ async function principal() {
       const vg = blocs.find((b) => b['@type'] === 'VideoGame');
       if (!vg) erreur(sujet, 'JSON-LD VideoGame absent', jeu);
       else {
-        for (const champ of ['name', 'description', 'image', 'url']) if (!vg[champ]) erreur(sujet, `JSON-LD VideoGame : « ${champ} » absent`, jeu);
+        for (const champ of ['name', 'description', 'image', 'url', 'inLanguage', 'gamePlatform', 'applicationCategory', 'offers']) if (!vg[champ]) erreur(sujet, `JSON-LD VideoGame : « ${champ} » absent`, jeu);
+        const genres = [fiche.genre, ...(fiche.genres_secondaires || [])].filter((g) => g && g !== taxonomie.ID_AUTRE);
+        if (genres.length && !(Array.isArray(vg.genre) && vg.genre.length === genres.length)) erreur(sujet, 'JSON-LD VideoGame : « genre » ne reprend pas les genres du jeu', jeu);
+        if (regles.ageMinimum(fiche.ages) !== null && !/^\d+-\d*$/.test(String(vg.typicalAgeRange || ''))) erreur(sujet, 'JSON-LD VideoGame : « typicalAgeRange » absent ou mal écrit (ex. « 6- »)', jeu);
+        if (vg.isFamilyFriendly !== !taxonomie.pourAdos(fiche.ages)) erreur(sujet, `JSON-LD VideoGame : isFamilyFriendly doit valoir ${!taxonomie.pourAdos(fiche.ages)} (jeu ${fiche.ages})`, jeu);
+        const multi = [].concat(vg.playMode || []).some((m) => /MultiPlayer$/.test(m));
+        if (multi !== (fiche.multijoueur === true)) erreur(sujet, 'JSON-LD VideoGame : playMode MultiPlayer seulement (et toujours) pour un jeu multijoueur', jeu);
         if (vg.url !== attendue) erreur(sujet, 'JSON-LD VideoGame : url différente de la canonical', jeu);
         if (vg.isAccessibleForFree !== true || String(vg.offers?.price) !== '0') erreur(sujet, 'JSON-LD VideoGame : gratuité (isAccessibleForFree, offers.price 0) absente', jeu);
         const age = regles.ageMinimum(fiche.ages);
@@ -479,11 +582,22 @@ async function principal() {
       const liensSim = [...new Set(balises(similaires, 'a').map((a) => a.href))];
       if (liensSim.length < SIMILAIRES[0] || liensSim.length > SIMILAIRES[1]) erreur(sujet, `${liensSim.length} jeu(x) similaire(s) (attendu : ${SIMILAIRES[0]} à ${SIMILAIRES[1]})`, jeu);
       if (liensSim.includes(p.adresse)) erreur(sujet, 'le jeu figure dans ses propres jeux similaires', jeu);
-    } else if (p.type === 'categorie') {
+    } else if (p.type === 'categorie' || p.type === 'ecole') {
       const intro = (/<div class="categorie-intro">([\s\S]*?)<\/div>/.exec(p.html) || [])[1] || '';
       const n2 = compterMots(texteDe(intro), p.lang);
       if (n2 < INTRO_MOTS_MIN) erreur(sujet, `introduction de ${n2} mots (${INTRO_MOTS_MIN} au moins)`);
       if (!types.includes('CollectionPage')) erreur(sujet, 'JSON-LD CollectionPage absent');
+      if (!fil) erreur(sujet, 'JSON-LD BreadcrumbList absent');
+      // ItemList : les mêmes jeux que la grille, dans le même ordre.
+      const liste = blocs.find((b) => b['@type'] === 'CollectionPage')?.mainEntity;
+      const grille = [...new Set(balises((/<ul class="grille">[\s\S]*?<\/ul>/.exec(p.html) || [''])[0], 'a').map((a) => a.href))];
+      if (liste?.['@type'] !== 'ItemList') erreur(sujet, 'JSON-LD ItemList absent (mainEntity de CollectionPage)');
+      else if ((liste.itemListElement || []).map((e) => absolueVersChemin(e.url)).join() !== grille.join()) erreur(sujet, 'JSON-LD ItemList différent des jeux affichés');
+      // Questions fréquentes : FAQPage = questions visibles.
+      const faq = blocs.find((b) => b['@type'] === 'FAQPage');
+      const questionsVisibles = contenus((/<section class="faq"[\s\S]*?<\/section>/.exec(p.html) || [''])[0], 'dt').map(texteDe);
+      if (faq && (faq.mainEntity || []).map((q) => q.name).join('|') !== questionsVisibles.join('|')) erreur(sujet, 'JSON-LD FAQPage différent des questions affichées');
+      if (!faq && questionsVisibles.length) erreur(sujet, 'questions fréquentes affichées sans JSON-LD FAQPage');
     } else if (p.type === 'accueil') {
       if (!types.includes('WebSite')) erreur(sujet, 'JSON-LD WebSite absent');
     }
@@ -530,7 +644,8 @@ async function principal() {
         continue;
       }
       const r = resoudre(u.pathname);
-      if (!r) erreur(p.adresse, `${nature} cassé : ${u.pathname} n'existe pas (404)`, p.jeu);
+      if (!r && redirections.has(u.pathname)) erreur(p.adresse, `${nature} vers une ancienne adresse redirigée (${u.pathname} → ${redirections.get(u.pathname).cible})`, p.jeu);
+      else if (!r) erreur(p.adresse, `${nature} cassé : ${u.pathname} n'existe pas (404)`, p.jeu);
       else if (r.redirige) erreur(p.adresse, `${nature} vers une adresse redirigée (${u.pathname} → ${r.redirige})`, p.jeu);
       if (u.pathname === '/play' || u.pathname === '/play.html') {
         const id = u.searchParams.get('id');
@@ -568,6 +683,24 @@ async function principal() {
   for (const m of robots.matchAll(/^Disallow:\s*(\S+)/gm)) {
     if (/^\/(?:$|jeux|games|genres|univers|ages|en|es|pt|de|assets|style\.css)/.test(m[1])) erreur('robots.txt', `« Disallow: ${m[1]} » empêche l'exploration de pages ou de ressources du site`);
   }
+
+  // 6 bis. Redirections (public/_redirects, écrit par pages-seo.mjs) : 301, un
+  // seul saut, vers une page publiée de la même langue, jamais vers un accueil
+  // (Google y voit une 404 déguisée) ; limite de Cloudflare Pages.
+  if (redirections.size > pagesSeo.MAX_REDIRECTIONS) erreur('_redirects', `${redirections.size} règles (Cloudflare Pages en accepte ${pagesSeo.MAX_REDIRECTIONS})`);
+  else if (redirections.size > pagesSeo.ALERTE_REDIRECTIONS) attention('_redirects', `${redirections.size} règles sur ${pagesSeo.MAX_REDIRECTIONS} permises`);
+  const accueils = new Set(LANGUES.map((l) => chemins.urlAccueil(l)));
+  const langueDe = (c) => /^\/(en|es|pt|de)\//.exec(c)?.[1] || 'fr';
+  for (const [source, { cible, code }] of redirections) {
+    if (code !== 301) erreur('_redirects', `${source} : code ${code} (301 attendu)`);
+    if (!cible || /^https?:/i.test(cible)) { erreur('_redirects', `${source} : cible absente ou hors du site (${cible})`); continue; }
+    if (resoudre(source)?.fichier) erreur('_redirects', `${source} : c'est une page publiée (la règle ne s'appliquerait pas)`);
+    if (redirections.has(cible)) erreur('_redirects', `${source} → ${cible} → ${redirections.get(cible).cible} : plus d'un saut`);
+    else if (!resoudre(cible)?.fichier || resoudre(cible)?.redirige) erreur('_redirects', `${source} → ${cible} : la cible n'est pas une page publiée en 200`);
+    if (accueils.has(cible)) erreur('_redirects', `${source} → ${cible} : vers un accueil (mener à la page la plus proche)`);
+    if (langueDe(source) !== langueDe(cible)) erreur('_redirects', `${source} → ${cible} : change de langue`);
+  }
+  for (const c of dansSitemap) if (redirections.has(c)) erreur('sitemap.xml', `adresse redirigée (${c} → ${redirections.get(c).cible})`);
 
   // 7. Pages orphelines et profondeur (liens <a> du HTML, depuis l'accueil « / »).
   const entrants = new Map();
@@ -609,16 +742,26 @@ async function principal() {
   if (/pages\.dev/.test(SITE)) erreur('adresse du site', `${SITE} : canonical et sitemap visent pages.dev (en noindex) au lieu du domaine`);
 
   // Contrôles en ligne (facultatifs).
-  if (EN_LIGNE) await controlerEnLigne({ entrees, jeuxPublies, chemins, SITE });
+  if (EN_LIGNE) await controlerEnLigne({ entrees, jeuxPublies, chemins, SITE, redirections });
 
   // Bilan.
   const erreurs = rapport.filter((r) => r.niveau === 'erreur');
   const attentions = rapport.filter((r) => r.niveau === 'attention');
   for (const r of rapport) console.log(`${r.niveau === 'erreur' ? 'ERREUR' : 'attention'} : ${r.sujet} : ${r.message}`);
   const indexables = [...pages.values()].filter((p) => p.indexable).length;
+  const chiffres = `${pages.size} pages, dont ${indexables} indexables ; ${jeuxPublies.size} jeux ; ${entrees.length} adresses dans le sitemap ; ${redirections.size} redirections`;
   console.log(erreurs.length
-    ? `\n${erreurs.length} erreur(s) à corriger${attentions.length ? `, ${attentions.length} attention(s)` : ''}.`
-    : `\nRéférencement : tout est bon (${pages.size} pages, dont ${indexables} indexables ; ${jeuxPublies.size} jeux ; ${entrees.length} adresses dans le sitemap${attentions.length ? ` ; ${attentions.length} attention(s)` : ''}).`);
+    ? `\n${erreurs.length} erreur(s) à corriger${attentions.length ? `, ${attentions.length} attention(s)` : ''} (${chiffres}).`
+    : `\nRéférencement : tout est bon (${chiffres}${attentions.length ? ` ; ${attentions.length} attention(s)` : ''}).`);
+  // Rapport lisible en Markdown (--rapport <fichier>, et résumé de l'étape sur GitHub Actions).
+  if (FICHIER_RAPPORT || process.env.GITHUB_STEP_SUMMARY) {
+    const md = rapportMarkdown({ erreurs, attentions, chiffres, site: SITE, enLigne: EN_LIGNE });
+    if (FICHIER_RAPPORT) {
+      await mkdir(path.dirname(path.resolve(FICHIER_RAPPORT)), { recursive: true });
+      await writeFile(FICHIER_RAPPORT, md, 'utf8');
+    }
+    if (process.env.GITHUB_STEP_SUMMARY) await writeFile(process.env.GITHUB_STEP_SUMMARY, md, { encoding: 'utf8', flag: 'a' });
+  }
   if (FICHIER_JSON) {
     await mkdir(path.dirname(path.resolve(FICHIER_JSON)), { recursive: true });
     await writeFile(FICHIER_JSON, JSON.stringify({ site: SITE, ids: IDS, pages: pages.size, indexables, sitemap: entrees.length, fichiers: nbFichiers, problemes: rapport }, null, 2), 'utf8');
@@ -631,7 +774,7 @@ async function principal() {
 // vérifier dans le dépôt : statut de 404.html, en-têtes de _headers, « / » final)
 // --------------------------------------------------------------------------
 
-async function controlerEnLigne({ entrees, jeuxPublies, chemins, SITE }) {
+async function controlerEnLigne({ entrees, jeuxPublies, chemins, SITE, redirections }) {
   const base = ADRESSE_EN_LIGNE ? (ADRESSE_EN_LIGNE.endsWith('/') ? ADRESSE_EN_LIGNE : `${ADRESSE_EN_LIGNE}/`) : SITE;
   const sujet = (c) => `en ligne ${c}`;
   const demander = async (chemin, methode = 'GET') => {
@@ -651,6 +794,7 @@ async function controlerEnLigne({ entrees, jeuxPublies, chemins, SITE }) {
       const canonique = (/<link rel="canonical" href="([^"]+)"/.exec(html) || [])[1];
       if (canonique !== e.loc) erreur(sujet(chemin), `canonical servie « ${canonique} » différente du sitemap`);
       if (/noindex/i.test(r.headers.get('x-robots-tag') || '')) erreur(sujet(chemin), 'en-tête X-Robots-Tag: noindex sur une page du sitemap');
+      if (/<meta name="robots" content="[^"]*noindex/i.test(html)) erreur(sujet(chemin), 'meta robots noindex sur une page du sitemap');
     }));
   }
   const inconnue = await demander(`/page-introuvable-${Date.now()}/`);
@@ -668,6 +812,39 @@ async function controlerEnLigne({ entrees, jeuxPublies, chemins, SITE }) {
   }
   const robots = await demander('/robots.txt');
   if (robots.status !== 200 || !(await robots.text()).includes(`${SITE}sitemap.xml`)) erreur(sujet('/robots.txt'), 'robots.txt absent ou sans le sitemap du domaine');
+
+  // Redirections de _redirects, telles que Cloudflare les sert : 301 vers la cible
+  // prévue (un seul saut), cible en 200. Avec --echantillon N : N règles au plus.
+  const regles = [...redirections].slice(0, ECHANTILLON || undefined);
+  const ciblesVues = new Map();
+  for (let i = 0; i < regles.length; i += 8) {
+    await Promise.all(regles.slice(i, i + 8).map(async ([source, { cible }]) => {
+      const r = await demander(source);
+      const location = r.headers.get('location') || '';
+      let arrivee = '';
+      try { arrivee = new URL(location, base).pathname; } catch { /* illisible */ }
+      if (r.status !== 301) erreur(sujet(source), `statut ${r.status || r.erreur} (301 attendu vers ${cible})`);
+      else if (arrivee !== cible) erreur(sujet(source), `301 vers « ${location} » (attendu : ${cible})`);
+      if (!ciblesVues.has(cible)) ciblesVues.set(cible, (await demander(cible)).status);
+      if (ciblesVues.get(cible) !== 200) erreur(sujet(source), `la cible ${cible} répond ${ciblesVues.get(cible)} (200 attendu, sans redirection)`);
+    }));
+  }
+
+  // Autres adresses du site (réglages Cloudflare du propriétaire) : une seule
+  // redirection 301 ou 308 vers le domaine en https ; aperçus *.pages.dev en noindex.
+  const domaine = new URL(SITE);
+  const autres = [`http://${domaine.host}/`, `https://www.${domaine.host}/`, 'https://freemicro.games/', 'https://www.freemicro.games/'];
+  for (const adresse of autres) {
+    let r;
+    try { r = await fetch(adresse, { redirect: 'manual', signal: AbortSignal.timeout(15000) }); } catch (e) { attention(`en ligne ${adresse}`, `injoignable (${e.cause?.code || e.message}) : nom absent du DNS ? (réglage Cloudflare du propriétaire)`); continue; }
+    const vers = r.headers.get('location') || '';
+    if (![301, 308].includes(r.status)) attention(`en ligne ${adresse}`, `statut ${r.status} (301 attendu vers ${SITE})`);
+    else if (!vers.startsWith(SITE)) attention(`en ligne ${adresse}`, `redirigé vers « ${vers} » au lieu de ${SITE}`);
+  }
+  try {
+    const apercu = await fetch('https://jeux-en-ligne.pages.dev/', { redirect: 'manual', signal: AbortSignal.timeout(15000) });
+    if (apercu.status === 200 && !/noindex/i.test(apercu.headers.get('x-robots-tag') || '')) erreur('en ligne jeux-en-ligne.pages.dev', 'servi en 200 sans X-Robots-Tag: noindex (doublon indexable du site)');
+  } catch { /* adresse Cloudflare injoignable : rien à indexer */ }
 }
 
 principal().catch((e) => panne(e.stack || e.message));

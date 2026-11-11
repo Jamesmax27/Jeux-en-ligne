@@ -108,3 +108,49 @@ adresse redirigée.
   et prévient à partir de 1 800 (`MAX_REDIRECTIONS` de `pages-seo.mjs`).
   Novembre 2026 : 1 066 règles (628 de fiches, le reste pour les catégories) ;
   un nouveau jeu n'en ajoute aucune.
+
+## 5. Contrôles automatiques (tâche 9)
+
+`scripts/verifier-seo.mjs` (bloquant dans `validate.yml` et à l'étape d de la
+boucle de nuit) échoue notamment si : une adresse du sitemap n'a pas de page,
+est en noindex, est redirigée ou a une canonical différente d'elle-même ; des
+hreflang manquent, sont en trop ou ne sont pas réciproques ; `og:locale:alternate`
+ne liste pas les autres langues ; un `<title>` ou une meta description est
+absent, hors bornes ou en double ; une fiche a moins de 150 mots ; un lien
+interne mène à une 404 ou à une adresse redirigée ; une règle de `_redirects`
+n'est pas une 301 en un saut vers une page publiée de la même langue, ou mène à
+un accueil ; le JSON-LD est incomplet (VideoGame, BreadcrumbList, ItemList,
+FAQPage). Rapport lisible : `--rapport <fichier.md>` et résumé de l'étape sur
+GitHub Actions.
+Chaque jour, `.github/workflows/seo-en-ligne.yml` refait les contrôles sur le
+site publié (`--en-ligne` : codes HTTP réels, redirections servies, autres
+hôtes) ; il ne bloque rien et prévient par e-mail en cas d'échec.
+
+## 6. À faire par le propriétaire
+
+### Cloudflare (réglages du domaine)
+
+1. DNS : ajouter `www` (enregistrement proxifié) et une redirection 301
+   `www.freemicrogames.com/*` → `https://freemicrogames.com/$1` (Rules →
+   Redirect Rules), de même pour `www.freemicro.games` si on le garde.
+2. Facultatif : « Bulk Redirect » `jeux-en-ligne.pages.dev` → `freemicrogames.com`
+   (aujourd'hui en noindex, ce qui suffit pour Google).
+3. Facultatif : Redirect Rule « paramètre `lang` présent sur `/`, `/en/`… →
+   même adresse sans paramètre, 301 » (aujourd'hui : redirection JavaScript et
+   canonical, ce que Google comprend aussi).
+
+### Google Search Console (après la mise en ligne)
+
+1. Sitemaps : renvoyer `https://freemicrogames.com/sitemap.xml` (il contient
+   maintenant les jaquettes et les nouvelles adresses).
+2. Inspection d'URL : demander l'indexation des 5 accueils et de quelques
+   fiches anglaises, espagnoles, portugaises et allemandes (nouvelles adresses).
+3. Pages → « Page avec redirection » : ce rapport va d'abord grossir (les
+   anciennes adresses `/en/games/<id>/` sont maintenant des 301) puis se
+   stabiliser ; c'est attendu. Lancer « Valider la correction » sur « Introuvable
+   (404) » et « Autre page avec balise canonique correcte » une fois la mise en
+   ligne faite.
+4. Ne rien faire pour les pages en noindex (lanceur, formulaire, profil…) :
+   c'est voulu.
+5. Bing Webmaster Tools : importer le site depuis Search Console, soumettre le
+   sitemap ; IndexNow prévient déjà Bing des nouveaux jeux.
