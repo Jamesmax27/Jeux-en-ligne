@@ -1700,3 +1700,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run multijoueur.yml --repo "$GITHUB_REPOSITORY" --ref main
+
+      # Bing et les autres moteurs IndexNow (scripts/indexnow.mjs) : fiches des jeux fusionnés (5 langues)
+      # et accueils, envoyées dès que Cloudflare les publie. Jamais bloquant.
+      - name: Prévenir Bing des nouveaux jeux (IndexNow)
+        if: ${{ !cancelled() && steps.fusions.outputs.fusionnees != '' }}
+        continue-on-error: true
+        timeout-minutes: 20
+        env:
+          FUSIONNEES: ${{ steps.fusions.outputs.fusionnees }}
+        run: node scripts/indexnow.mjs --attendre $(printf '%s' "$FUSIONNEES" | tr ',' ' ')
