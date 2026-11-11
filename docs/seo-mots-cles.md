@@ -1,8 +1,10 @@
-# Mots-clés visés par les pages de catégorie et d'école — À VALIDER
+# Mots-clés visés par les pages de catégorie et d'école
 
-> **Statut : proposition, en attente de validation du propriétaire.** Les textes
-> (titre, H1, description, introduction, questions-réponses) ne seront rédigés
-> qu'après validation de ce fichier.
+> **Statut : validé par le propriétaire le 11 novembre 2026.** Textes écrits le
+> même jour dans `gabarits/textes/categories.<langue>.json` et
+> `gabarits/textes/ecole.<fr|en|de>.json` (contrôle : `node scripts/regles-seo.mjs --categories`).
+> Dans l'introduction et les réponses, `{n}` est remplacé au build par le nombre
+> de jeux de la page (jamais un nombre écrit en dur : la boucle de nuit en ajoute chaque nuit).
 >
 > **Aucun mot-clé n'a de donnée de volume** (ni Search Console, ni outil de
 > mots-clés consulté) : **tous sont des hypothèses**, tirées du vocabulaire courant
@@ -126,7 +128,7 @@ CE1 / Grade 2 / Klasse 2 = 7 ans, CE2 / Grade 3 / Klasse 3 = 8 ans,
 CM1 / Grade 4 / Klasse 4 = 9 ans, CM2 / Grade 5 = 10 ans. Une page école n'est
 publiée (et indexée) qu'avec au moins 3 jeux et ses textes validés.
 
-## 6. Ce que je te demande de valider
+## 6. Points validés
 
 1. Les mots-clés principaux (en gras) de chaque page, et les adaptations par langue.
 2. Les formes de titre par langue (section 1) et celles des âges (section 4).

@@ -297,6 +297,14 @@ async function principal() {
     let textes = null;
     try { textes = JSON.parse((await readFile(path.join(RACINE, 'gabarits', 'textes', `categories.${lang}.json`), 'utf8')).replace(/^﻿/, '')); } catch { /* signalé ci-dessous */ }
     for (const p of regles.problemesCategories(textes, lang, clesCat)) signaler(p.niveau, `catégories ${lang}`, `${p.cle} : ${p.message}`);
+    // Pages école (gabarits/textes/ecole.<langue>.json, facultatif) et textes recopiés d'une page à l'autre.
+    const ecoles = await regles.lireTextesEcole(RACINE, lang);
+    const clesE = regles.clesEcoles(taxonomie, lang);
+    if (ecoles !== null) {
+      if (!clesE.length) erreur(`ecole.${lang}.json`, 'pas de pages école dans cette langue (CLASSES_PAR_LANGUE de taxonomie.js)');
+      else for (const p of regles.problemesEcoles(ecoles, lang, clesE)) signaler(p.niveau, `pages école ${lang}`, `${p.cle} : ${p.message}`);
+    }
+    for (const p of regles.suitesCommunesCategories({ ...(textes || {}), ...(ecoles || {}) }, lang)) signaler(p.niveau, `catégories ${lang}`, `${p.cle} : ${p.message}`);
   }
 
   // Phrases recopiées d'un jeu à l'autre, langue par langue. On ne compte que les

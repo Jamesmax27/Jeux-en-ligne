@@ -249,17 +249,61 @@ export function doublonsEntreJeux(fiches, ids = null) {
 
 // Titre : 30 à 60 caractères (forme « Jeux de <thème> gratuits | Free Micro Games »,
 // choix du propriétaire de novembre 2026, plus courte que celle des fiches).
-// Introduction : 80 à 150 mots ; passera à 120-200 avec les textes réécrits
-// d'après docs/seo-mots-cles.md.
+// Introduction : 120 à 200 mots (docs/seo-mots-cles.md). Mêmes règles pour les
+// pages école (gabarits/textes/ecole.<langue>.json), avec en plus "nom" (libellé
+// court de la puce : « CE1 », « 2nd grade »…).
 export const BORNES_CATEGORIE = {
   h1: [10, 70, 'car'],
   titre_seo: [30, 60, 'car'],
   description_seo: [140, 160, 'car'],
-  intro: [80, 150, 'mots'],
+  intro: [120, 200, 'mots'],
 };
 export const FAQ_NOMBRE = [3, 5];
 export const FAQ_QUESTION = [10, 120];
 export const FAQ_REPONSE = [20, 400];
+export const NOM_ECOLE = [2, 24];
+// Suite de mots identiques entre deux pages d'une même langue : texte recopié.
+export const SUITE_CATEGORIES = 10;
+
+/** Clés des pages école d'une langue : « ecole.<classe> » (CLASSES_PAR_LANGUE de taxonomie.js). */
+export function clesEcoles({ CLASSES_PAR_LANGUE = {} }, lang) {
+  return (CLASSES_PAR_LANGUE[lang] || []).map((id) => `ecole.${id}`);
+}
+
+/** Problèmes des textes des pages école d'une langue (mêmes règles que les catégories, plus "nom"). */
+export function problemesEcoles(textes, lang, cles) {
+  const problemes = problemesCategories(textes, lang, cles);
+  for (const cle of cles) {
+    const nom = typeof textes?.[cle]?.nom === 'string' ? textes[cle].nom.trim() : '';
+    if (longueur(nom) < NOM_ECOLE[0] || longueur(nom) > NOM_ECOLE[1]) problemes.push({ niveau: 'erreur', lang, cle, message: `"nom" (libellé court de la puce) : ${NOM_ECOLE[0]} à ${NOM_ECOLE[1]} caractères` });
+  }
+  return problemes;
+}
+
+/**
+ * Introductions et réponses recopiées d'une page à l'autre dans une langue :
+ * une suite de SUITE_CATEGORIES mots identiques (mots de 3 lettres ou plus).
+ * textes : { cle: { intro, faq } } (catégories et pages école réunies).
+ */
+export function suitesCommunesCategories(textes, lang) {
+  const motsDe = (t) => {
+    try { return [...new Intl.Segmenter(lang, { granularity: 'word' }).segment(String(t).toLowerCase())].filter((x) => x.isWordLike).map((x) => x.segment).filter((m) => m.length >= 3); } catch { return String(t).toLowerCase().split(/\W+/).filter((m) => m.length >= 3); }
+  };
+  const vues = new Map();
+  const problemes = [];
+  for (const [cle, c] of Object.entries(textes || {})) {
+    const m = motsDe([c?.intro, ...(Array.isArray(c?.faq) ? c.faq.map((x) => x?.r) : [])].filter(Boolean).join(' '));
+    const ici = new Set();
+    for (let i = 0; i + SUITE_CATEGORIES <= m.length; i++) {
+      const suite = m.slice(i, i + SUITE_CATEGORIES).join(' ');
+      if (ici.has(suite)) continue;
+      ici.add(suite);
+      if (vues.has(suite) && vues.get(suite) !== cle) { problemes.push({ niveau: 'erreur', lang, cle, message: `texte commun avec ${vues.get(suite)} (« ${suite}… ») : chaque page a son propre texte` }); break; }
+      vues.set(suite, cle);
+    }
+  }
+  return problemes;
+}
 
 /**
  * Clés des 29 catégories : « genre.<id> », « univers.<id> », « age.<id de tranche> ».
@@ -286,6 +330,8 @@ export function problemesCategories(textes, lang, cles) {
     if (!c || typeof c !== 'object') { ajouter('erreur', cle, 'textes manquants'); continue; }
     for (const [champ, [min, max, unite]] of Object.entries(BORNES_CATEGORIE)) {
       const texte = typeof c[champ] === 'string' ? c[champ].trim() : '';
+      // « {n} » (nombre de jeux, remplacé au build) : seulement dans l'introduction et les réponses.
+      if (champ !== 'intro' && texte.includes('{n}')) ajouter('erreur', cle, `"${champ}" : « {n} » seulement dans "intro" et "faq" (longueur fixe)`);
       if (!texte) { ajouter('erreur', cle, `"${champ}" manquant`); continue; }
       const n = unite === 'mots' ? compterMots(texte, lang) : longueur(texte);
       if (n < min || n > max) ajouter('erreur', cle, `"${champ}" : ${n} ${unite === 'mots' ? 'mots' : 'caractères'} (attendu : ${min} à ${max})`);
@@ -330,6 +376,13 @@ export function problemesCategories(textes, lang, cles) {
 // Ligne de commande
 // --------------------------------------------------------------------------
 
+/** Textes des pages école d'une langue, ou null si le fichier n'existe pas. */
+export async function lireTextesEcole(racine, lang) {
+  let brut;
+  try { brut = await readFile(path.join(racine, 'gabarits', 'textes', `ecole.${lang}.json`), 'utf8'); } catch { return null; }
+  try { return JSON.parse(brut.replace(/^\uFEFF/, '')); } catch { return {}; }
+}
+
 async function controlerCategories(racine) {
   const taxonomie = await import(pathToFileURL(path.join(racine, 'public', 'taxonomie.js')).href);
   const cles = clesCategories(taxonomie);
@@ -340,7 +393,15 @@ async function controlerCategories(racine) {
     try {
       textes = JSON.parse((await readFile(path.join(racine, 'gabarits', 'textes', `categories.${lang}.json`), 'utf8')).replace(/^﻿/, ''));
     } catch { /* signalé ci-dessous */ }
-    for (const p of problemesCategories(textes, lang, cles)) {
+    // Pages école (fichier facultatif : sans lui, pas de page école dans la langue).
+    const ecoles = await lireTextesEcole(racine, lang);
+    const clesE = clesEcoles(taxonomie, lang);
+    const problemes = [
+      ...problemesCategories(textes, lang, cles),
+      ...(ecoles === null ? [] : clesE.length ? problemesEcoles(ecoles, lang, clesE) : [{ niveau: 'erreur', lang, cle: '*', message: `gabarits/textes/ecole.${lang}.json : pas de pages école dans cette langue (CLASSES_PAR_LANGUE)` }]),
+      ...suitesCommunesCategories({ ...(textes || {}), ...(ecoles || {}) }, lang),
+    ];
+    for (const p of problemes) {
       console.log(`${p.niveau === 'erreur' ? 'ERREUR' : 'attention'} : catégories ${lang} : ${p.cle} : ${p.message}`);
       if (p.niveau === 'erreur') erreurs++; else attentions++;
     }
