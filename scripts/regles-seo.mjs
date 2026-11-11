@@ -287,6 +287,8 @@ export function problemesCategories(textes, lang, cles) {
       const formule = FORMULES.find((f) => texte.toLowerCase().includes(f));
       if (formule) ajouter('attention', cle, `"${champ}" : formule toute faite « ${formule} »`);
     }
+    // Date de la dernière retouche des textes (facultative) : lastmod du sitemap.
+    if (c.maj !== undefined && !(typeof c.maj === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(c.maj))) ajouter('erreur', cle, '"maj" : date AAAA-MM-JJ attendue');
   }
   for (const cle of Object.keys(textes)) if (!cles.includes(cle)) ajouter('erreur', cle, 'catégorie inconnue (listes fermées de public/taxonomie.js)');
   for (const champ of ['h1', 'titre_seo', 'description_seo']) {

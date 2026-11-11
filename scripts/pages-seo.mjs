@@ -565,7 +565,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
           : '',
       };
       await ecrire(dossierPublic, chemin, remplir(gabarits.jeu, valeurs, t, morceaux, 'gabarits/jeu.html'));
-      pages.push({ chemin, lang, type: 'jeu', id: jeu.id, indexable, lastmod: jeu.lastmod });
+      pages.push({ chemin, lang, type: 'jeu', id: jeu.id, indexable, lastmod: jeu.lastmod, image: imageMatricielle ? image : null });
     }
   }
 
@@ -617,7 +617,10 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
           : '',
       };
       await ecrire(dossierPublic, chemin, remplir(gabarits.categorie, valeurs, t, morceaux, 'gabarits/categorie.html'));
-      pages.push({ chemin, lang, type: 'categorie', indexable, lastmod: lastmodMax(c.jeux) });
+      // lastmod : jeu le plus récemment ajouté ou modifié, ou dernière retouche des textes (« maj »).
+      const majTextes = typeof textes?.maj === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(textes.maj) ? textes.maj : '0000-00-00';
+      const lastmodJeux = lastmodMax(c.jeux);
+      pages.push({ chemin, lang, type: 'categorie', indexable, lastmod: majTextes > lastmodJeux ? majTextes : lastmodJeux });
     }
   }
 
@@ -787,8 +790,12 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
 
   // --- Sitemap et robots.txt --------------------------------------------------
   const indexables = pages.filter((p) => p.indexable);
-  const lignes = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'];
-  for (const p of indexables) lignes.push(`  <url><loc>${echapper(absolue(p.chemin))}</loc><lastmod>${p.lastmod}</lastmod></url>`);
+  // Fiches des jeux : leur jaquette (Google Images) quand c'est une image matricielle.
+  const lignes = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'];
+  for (const p of indexables) {
+    const image = p.image ? `<image:image><image:loc>${echapper(p.image)}</image:loc></image:image>` : '';
+    lignes.push(`  <url><loc>${echapper(absolue(p.chemin))}</loc><lastmod>${p.lastmod}</lastmod>${image}</url>`);
+  }
   lignes.push('</urlset>');
   if (indexables.length > 45000) avertir(`sitemap : ${indexables.length} adresses ; au-delà de 50 000, il faudra un index de sitemaps`);
   await writeFile(path.join(dossierPublic, 'sitemap.xml'), `${lignes.join('\n')}\n`, 'utf8');
