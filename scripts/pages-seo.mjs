@@ -632,7 +632,11 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
       };
       // Questions fréquentes (« faq » des textes de la catégorie, facultatives) :
       // visibles en bas de page et décrites en JSON-LD FAQPage (mêmes textes).
-      const faq = Array.isArray(textes?.faq) ? textes.faq.filter((x) => typeof x?.q === 'string' && typeof x?.r === 'string' && x.q.trim() && x.r.trim()) : [];
+      // « {n} » dans l'introduction et les questions-réponses : nombre de jeux de la
+      // page au moment du build (les textes ne vieillissent pas quand la boucle de
+      // nuit ajoute des jeux). Jamais dans le titre ni la description (longueur fixe).
+      const avecNombre = (texte) => String(texte).replace(/\{n\}/g, () => new Intl.NumberFormat(HREFLANG[lang]).format(c.jeux.length));
+      const faq = Array.isArray(textes?.faq) ? textes.faq.filter((x) => typeof x?.q === 'string' && typeof x?.r === 'string' && x.q.trim() && x.r.trim()).map((x) => ({ q: avecNombre(x.q), r: avecNombre(x.r) })) : [];
       const donneesFaq = faq.length ? {
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
@@ -652,7 +656,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         langues: liensLangues(lang, alternatives, t),
         ariane: fil.html,
         h1,
-        intro: paragraphes(textes?.intro || ''),
+        intro: paragraphes(avecNombre(textes?.intro || '')),
         titre_jeux: t('page.lesJeux'),
         nombre: t('nombre.jeux', { n: c.jeux.length }),
         jeux: c.jeux.map((j, i) => carteJeu(j, lang, t, { titreNiveau: 'h3', prioritaire: i < JAQUETTES_PRIORITAIRES })).join(''),
