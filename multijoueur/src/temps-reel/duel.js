@@ -35,6 +35,7 @@ import { appelerBudget, GO_PAR_OBJET } from './budget.js';
 import { JEUX_TR } from '../jeux.js';
 
 export const ABSENCE_MS = 10000;          // sans nouvelles d'un joueur : son camp passe au robot
+const RESEAU_MS = 7000;                  // sans nouvelles d'un joueur : l'autre est prévenu (bandeau)
 export const DUREE_MAX_MS = 20 * 60000;   // durée maximale d'une partie relayée
 const ATTENTE_ADVERSAIRE_MS = 8000;      // un seul joueur arrivé au Duel : il joue contre le robot
 const INACTIF_MS = 2 * 60000;            // Duel abandonné avant la fin du choix du mode
@@ -61,6 +62,7 @@ export class Duel {
     this.kDebut = 0;
     this.dernier = [0, 0];       // dernière nouvelle de chaque camp (ms)
     this.robot = [false, false]; // camp passé au robot pour absence
+    this.signale = [false, false]; // problème de réseau d'un joueur annoncé à l'autre
     this.debutRelais = 0;
     this.attenteSnap = 0;        // secours : instantané attendu jusqu'à cette heure
     this.debits = new Map();
@@ -159,7 +161,12 @@ export class Duel {
         await this.sauver();
         return;
       case 'relais':
-        if (!d.mode) await this.passerRelais('relais');
+        // Les deux joueurs le demandent souvent en même temps : un seul passage au relais, et celui
+        // qui arrive après l'annonce (il n'était pas encore connecté) reçoit le mode.
+        if (!d.mode && !this.passage) {
+          this.passage = true;
+          try { await this.passerRelais('relais'); } finally { this.passage = false; }
+        } else if (d.mode === 'relais' && !d.secours) this.envoyer(camp, { t: 'mode', mode: 'relais' });
         return;
       case 'pret':
         d.pret[camp] = true;
@@ -181,6 +188,7 @@ export class Duel {
         return;
       case 'reprise':
         if (this.sim) { this.mesure.reprises += 1; this.envoyer(camp, { t: 'snap', snap: this.sim.instantane() }); }
+        else if (this.attenteSnap) this.envoyer(camp, { t: 'demande-snap' });   // secours en cours : son état peut servir
         return;
       case 'secours':
         if (d.mode === 'p2p' && !this.minuteur && !this.attenteSnap) await this.passerRelais('secours');
@@ -261,10 +269,16 @@ export class Duel {
       this.sim.avancer(paquet.o);
       this.mesure.ticks += 1;
     }
-    // Absences : le camp d'un joueur sans nouvelles passe au robot ; personne : la partie s'arrête.
+    // Absences : l'autre joueur est prévenu (bandeau), puis le camp passe au robot ; personne : la partie s'arrête.
     let presents = 0;
     for (let c = 0; c < 2; c++) {
       const connecte = this.socketsDe(c).length > 0;
+      const probleme = !connecte || maintenant - this.dernier[c] > RESEAU_MS;
+      if (probleme !== this.signale[c]) {
+        this.signale[c] = probleme;
+        console.log('[temps réel] réseau', JSON.stringify({ camp: c, ok: !probleme, connecte, silence: maintenant - this.dernier[c], destinataires: this.socketsDe(1 - c).length }));
+        this.envoyer(1 - c, { t: 'reseau', camp: c, ok: !probleme });
+      }
       const absent = !connecte || maintenant - this.dernier[c] > ABSENCE_MS;
       if (!absent) presents += 1;
       if (absent && !this.robot[c] && this.sim.etat.ctl[c] === 0) { this.cad.controle(c, NIVEAU_RELAIS); this.robot[c] = true; }
