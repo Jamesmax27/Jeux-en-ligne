@@ -155,7 +155,85 @@ function testerSimulation(jeu) {
     total += fait;
   }
   ok(`${sujet} : déterminisme vérifié sur ${total} ticks (journaux d'ordres rejoués deux fois et depuis un instantané)`);
+  testerModes(sim, sujet);
   return RAPIDE ? sim : robots(sim, sujet);
+}
+
+// Modes à plusieurs (sim.modes) : configuration des places, partie où chaque vrai joueur donne des
+// ordres (un joueur part en cours de route : robot), rejeu et reprise depuis un instantané ; puis,
+// sauf --rapide, une partie entre robots jusqu'au bout dans chaque mode (elle finit, gagnant valide).
+function testerModes(sim, sujet) {
+  if (!sim.modes) return;
+  const lignes = [];
+  const cartes = Array.isArray(sim.cartes) ? sim.cartes : [];
+  for (const [i, id] of Object.keys(sim.modes).entries()) {
+    const m = sim.modes[id], robots = m.robots || [];
+    const places = TR.placesHumaines(sim, id);
+    const graine = (0x5EED + i * 7919) >>> 0;
+    const cfg = TR.configMode(sim, { mode: id, carte: cartes[i % Math.max(1, cartes.length)], niveau: 2 }, places.length, graine);
+    if (cfg.mode !== id || cfg.camps !== m.equipes.length || cfg.ctl.length !== m.equipes.length) { probleme(sujet, `mode ${id} : configuration ${JSON.stringify(cfg)}`); continue; }
+    if (robots.some((c) => cfg.ctl[c] === 0) || places.some((c) => cfg.ctl[c] !== 0)) probleme(sujet, `mode ${id} : places des robots et des joueurs mal réparties (${cfg.ctl})`);
+    if (cartes.length && cfg.carte !== cartes[i % cartes.length]) probleme(sujet, `mode ${id} : carte choisie non gardée (${cfg.carte})`);
+    const seul = TR.configMode(sim, { mode: id, niveau: 3 }, 1, graine);
+    if (seul.ctl[0] !== 0 || seul.ctl.filter((x) => x === 0).length !== 1 || (cartes.length && !cartes.includes(seul.carte))) probleme(sujet, `mode ${id} : partie seul contre les robots mal configurée (${JSON.stringify(seul)})`);
+    const deux = TR.configMode(sim, { mode: id, niveau: 1 }, 2, graine);
+    if (deux.ctl.filter((x) => x === 0).length !== 2 || deux.ctl[places[1]] !== 0) probleme(sujet, `mode ${id} : partie à deux joueurs mal configurée (${deux.ctl})`);
+    const s = new TR.Simulation(sim, graine, cfg);
+    if (s.etat.ctl.length !== m.equipes.length) { probleme(sujet, `mode ${id} : ${s.etat.ctl.length} camps dans l'état (${m.equipes.length} attendus)`); continue; }
+    const cad = new TR.Cadenceur({ camps: cfg.camps, systeme: sim.camps, delai: s.r.delaiEntree, depart: 0, envoyer: () => {} });
+    const journal = [], seqs = {};
+    let ms = 0;
+    const N = RAPIDE ? 600 : 2400;
+    for (let k = 0; k < N && !s.resultat; k++) {
+      if (k % 7 === 0) for (const c of places) for (const o of ordresHumains(sim, s.etat, c, Math.random)) cad.recevoir(c, (seqs[c] = (seqs[c] || 0) + 1), o);
+      if (k === 300 && places.length > 1) cad.controle(places[1], 2);     // un joueur part : le robot prend sa place
+      const p = cad.pas();
+      journal.push([p.k, p.o]);
+      const t0 = performance.now();
+      s.avancer(p.o);
+      ms += performance.now() - t0;
+    }
+    if (places.length > 1 && s.etat.ctl[places[1]] !== 2) probleme(sujet, `mode ${id} : le camp du joueur parti n'est pas passé au robot`);
+    const a = TR.rejouer(sim, graine, cfg, journal);
+    if (a.hachage() !== s.hachage()) { probleme(sujet, `mode ${id} : rejeu différent`); continue; }
+    const milieu = Math.floor(journal.length / 2);
+    const c = TR.rejouer(sim, graine, cfg, journal.slice(0, milieu));
+    const d = new TR.Simulation(sim, 1, cfg);
+    d.restaurer(JSON.parse(JSON.stringify(c.instantane())));
+    for (const [, o] of journal.slice(milieu)) d.avancer(o);
+    if (d.hachage() !== s.hachage()) { probleme(sujet, `mode ${id} : reprise depuis un instantané différente`); continue; }
+    const taille = JSON.stringify(s.instantane()).length;
+    lignes.push(`${id} (${m.equipes.length} camps, ${places.length} joueurs) ${journal.length} ticks à ${(ms / journal.length).toFixed(2)} ms, instantané ${Math.round(taille / 1000)} Ko`);
+  }
+  ok(`${sujet} : modes — ${lignes.join(' ; ')} ; rejeu et reprise identiques`);
+  // Plusieurs parties dans la même mémoire (un Durable Object, ou des parties voisines sur le même
+  // serveur) : deux modes joués en alternance, tick par tick, donnent le même état que joués seuls.
+  const ids = Object.keys(sim.modes);
+  const [m1, m2] = [ids[0], ids.find((k) => sim.modes[k].equipes.length !== sim.modes[ids[0]].equipes.length) || ids[1]];
+  const cfg1 = TR.configMode(sim, { mode: m1, niveau: 2 }, 1, 111), cfg2 = TR.configMode(sim, { mode: m2, niveau: 2 }, 1, 222);
+  cfg1.ctl = cfg1.ctl.map(() => 2); cfg2.ctl = cfg2.ctl.map(() => 3);
+  const seule = (cfg, g) => { const s = new TR.Simulation(sim, g, cfg); for (let k = 0; k < 600 && !s.resultat; k++) s.avancer([]); return s.hachage(); };
+  const h1 = seule(cfg1, 111), h2 = seule(cfg2, 222);
+  const a = new TR.Simulation(sim, 111, cfg1), b = new TR.Simulation(sim, 222, cfg2);
+  for (let k = 0; k < 600; k++) { if (!a.resultat) a.avancer([]); if (!b.resultat) b.avancer([]); }
+  if (a.hachage() !== h1 || b.hachage() !== h2) probleme(sujet, `deux parties (${m1}, ${m2}) jouées en alternance dans la même mémoire ne donnent pas le même état que seules (état partagé entre parties dans jel-sim ?)`);
+  else ok(`${sujet} : deux parties de modes différents (${m1}, ${m2}) jouées en alternance dans la même mémoire : mêmes états que seules`);
+  if (RAPIDE) return;
+  const fins = [];
+  for (const [i, id] of Object.keys(sim.modes).entries()) {
+    const m = sim.modes[id];
+    const cfg = TR.configMode(sim, { mode: id, niveau: 2 }, 1, 4000 + i);
+    cfg.ctl = cfg.ctl.map(() => 2);
+    const s = new TR.Simulation(sim, 4000 + i, cfg);
+    const t0 = performance.now();
+    while (!s.resultat && s.k() < 20000) s.avancer([]);
+    const r = s.resultat;
+    if (!r) { probleme(sujet, `mode ${id} : la partie entre robots ne finit pas (${s.k()} ticks)`); continue; }
+    if (r.gagnant !== -1 && !m.equipes.includes(r.gagnant)) probleme(sujet, `mode ${id} : gagnant ${r.gagnant} (équipes ${m.equipes})`);
+    if (Array.isArray(r.scores) && r.scores.length !== m.equipes.length) probleme(sujet, `mode ${id} : ${r.scores.length} scores pour ${m.equipes.length} camps`);
+    fins.push(`${id} ${Math.round(s.k() / 10)} s (${r.raison || 'fin'}, équipe ${r.gagnant}, ${Math.round(performance.now() - t0)} ms de calcul)`);
+  }
+  ok(`${sujet} : parties entre robots jusqu'au bout — ${fins.join(' ; ')}`);
 }
 
 // Une partie dont le journal est rejoué deux fois et depuis un instantané. Renvoie son nombre de ticks.
@@ -251,7 +329,7 @@ class ClientSimule {
     this.modes = []; this.refus = null; this.fin = null; this.snaps = 0; this.attendSnap = false;
     this.ordres = 0; this.hasard = Math.random; this.ctl = []; this.reseau = [];
   }
-  trouve(m) { this.camp = m.camp; this.graine = m.graine; this.config = m.config; this.s = new TR.Simulation(this.sim, m.graine, { ...m.config, ctl: [0, 0] }); }
+  trouve(m) { this.camp = m.camp; this.graine = m.graine; this.config = m.config; this.humains = m.humains; this.s = new TR.Simulation(this.sim, m.graine, m.config); }
   recevoir(m) {
     if (m.t === 'mode') this.modes.push(m.mode);
     else if (m.t === 'reseau') this.reseau.push(m);
@@ -269,7 +347,7 @@ class ClientSimule {
       const h = this.s.avancer(p.o);
       this.ctl = this.s.etat.ctl.slice();
       if (h) { this.hashes.set(p.k, h); this.envoyer({ t: 'h', k: p.k, h }); }
-      if (p.k % 9 === this.camp * 4 && !this.s.resultat && this.s.etat.ctl[this.camp] === 0) {
+      if (p.k % 9 === (this.camp * 4) % 9 && !this.s.resultat && this.s.etat.ctl[this.camp] === 0) {
         for (const o of ordresHumains(this.sim, this.s.etat, this.camp, this.hasard, this.paisible)) { this.ordres++; this.envoyer({ t: 'o', seq: ++this.seq, o }); }
       }
     }
@@ -315,7 +393,8 @@ class FausseSocket {
   send(texte) {
     if (this.fermee) throw new Error('fermée');
     const autre = this.autre;
-    if (autre.objet) queueMicrotask(() => { if (!autre.fermee) autre.objet.webSocketMessage(autre, texte); });
+    // Comme un vrai WebSocket, un message envoyé juste avant la fermeture arrive quand même.
+    if (autre.objet) queueMicrotask(() => autre.objet.webSocketMessage(autre, texte));
     else queueMicrotask(() => { if (autre.ecoute) autre.ecoute(texte); else autre.enAttente.push(texte); });
   }
   close() {
@@ -388,16 +467,17 @@ async function monterWorker(jeuxTR, envPlus = {}) {
 }
 
 // Un appareil de test : recherche puis duel, en relais (aucun WebRTC dans Node).
-async function appareil(W, jeu, empreinteSim, sim, { mode = 'relais' } = {}) {
+async function appareil(W, jeu, empreinteSim, sim, { mode = 'relais', choix = {} } = {}) {
   const client = new ClientSimule({ sim, envoyer: (m) => client.duel && !client.duel.fermee && client.duel.send(JSON.stringify(m)) });
   client.attentes = [];
-  const r = await W.ouvrir(`/tr/ws?jeu=${jeu}&sim=${empreinteSim}&proto=${TR.PROTOCOLE}`);
+  const params = Object.entries(choix).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
+  const r = await W.ouvrir(`/tr/ws?jeu=${jeu}&sim=${empreinteSim}&proto=${TR.PROTOCOLE}${params}`);
   if (r.statut !== 101) throw new Error(`recherche refusée (${r.statut})`);
   client.recherche = r.ws;
   client.trouvee = new Promise((ok) => {
     r.ws.surMessage = (t) => {
       const m = JSON.parse(t);
-      if (m.t === 'attente') client.attentes.push(m.n);
+      if (m.t === 'attente') { client.attentes.push(m.n); client.max = m.max; }
       if (m.t === 'trouve') { client.infos = m; ok(m); }
       if (m.t === 'refus') ok(null);
     };
@@ -490,13 +570,14 @@ async function testerWorker(jeux) {
   let recu = null;
   const ancien = d.duel.surMessage;
   d.duel.surMessage = (t) => { const m = JSON.parse(t); if (m.t === 'sdp') recu = m; else ancien(t); };
-  c.duel.send(JSON.stringify({ t: 'sdp', d: { type: 'offer', sdp: 'v=0' } }));
+  const versAutre = c.infos.camp === 0 ? d.infos.camp : 0;
+  c.duel.send(JSON.stringify({ t: 'sdp', d: { type: 'offer', sdp: 'v=0' }, vers: versAutre }));
   await attendre(20);
   if (!recu || recu.d.type !== 'offer') probleme(sujet, 'signalisation : l\'offre WebRTC n\'est pas transmise à l\'autre joueur');
   else ok('signalisation WebRTC : offres et candidats transmis d\'un joueur à l\'autre');
   d.duel.surMessage = ancien;
   // Secours : le pair-à-pair coupe, le serveur reprend la partie depuis l'instantané d'un appareil.
-  c.duel.surMessage = (t) => { const m = JSON.parse(t); if (m.t === 'demande-snap') c.duel.send(JSON.stringify({ t: 'snap', snap: (() => { const s = new TR.Simulation(sim, c.graine, { ...c.config, ctl: [0, 0] }); for (let i = 0; i < 120; i++) s.avancer([]); return s.instantane(); })() })); else c.recevoir(m); };
+  c.duel.surMessage = (t) => { const m = JSON.parse(t); if (m.t === 'demande-snap') c.duel.send(JSON.stringify({ t: 'snap', snap: (() => { const s = new TR.Simulation(sim, c.graine, c.config); for (let i = 0; i < 120; i++) s.avancer([]); return s.instantane(); })() })); else c.recevoir(m); };
   c.duel.send(JSON.stringify({ t: 'secours', k: 120 }));
   await attendre(1500);
   if (!duelP2P.minuteur || c.snaps < 1 || d.snaps < 1 || c.k() < 125) probleme(sujet, `secours : le serveur n'a pas repris la partie (${c.snaps}, ${d.snaps}, tick ${c.k()})`);
@@ -515,6 +596,99 @@ async function testerWorker(jeux) {
   if (!refus.includes('budget')) probleme(sujet, `budget : aucun refus au-delà de 80 % (${refus})`);
   else ok(`budget : au-delà de 80 % du budget du jour, nouvelle partie relayée refusée (« budget » : jeu contre le robot) ; ${refus.filter((r) => r === 'budget').length} refus sur 3`);
   await attendre(11000);
+  for (const o of W.objets.DUEL.values()) clearInterval(o.minuteur);
+  if (sim.modes) await testerWorkerModes(fiches, id);
+}
+
+// Modes à plusieurs : groupes par mode et par carte, partie lancée avant d'être complète, relais à
+// quatre, signalisation en étoile, départ volontaire, dernier joueur restant.
+async function testerWorkerModes(fiches, id) {
+  const sujet = 'Worker, modes à plusieurs';
+  const { empreinte, sim } = fiches[id];
+  const W = await monterWorker(fiches, { BUDGET_RELAIS_GOS: '100000' });
+  const modes = Object.keys(sim.modes);
+  const quatre = modes.find((k) => sim.modes[k].equipes.length === 4 && !(sim.modes[k].robots || []).length);
+  const avecRobots = modes.find((k) => (sim.modes[k].robots || []).length);
+  const cartes = sim.cartes || [];
+  if (!quatre) { probleme(sujet, 'aucun mode à 4 vrais joueurs pour ce test'); return; }
+
+  // Cartes : deux cartes différentes ne se mélangent pas ; « au hasard » rejoint une carte choisie.
+  const x = await appareil(W, id, empreinte, sim, { choix: { mode: quatre, carte: cartes[0] } });
+  const y = await appareil(W, id, empreinte, sim, { choix: { mode: quatre, carte: cartes[1] } });
+  await attendre(20);
+  const z = await appareil(W, id, empreinte, sim, { choix: { mode: quatre, carte: '*' } });
+  await attendre(20);
+  if (x.attentes.at(-1) !== 2 || y.attentes.at(-1) !== 1 || z.attentes.at(-1) !== 2 || x.max !== 4) probleme(sujet, `groupes par carte : ${x.attentes.at(-1)} / ${y.attentes.at(-1)} / ${z.attentes.at(-1)} (2 / 1 / 2 attendus, max ${x.max})`);
+  else ok(`recherche par carte : deux cartes différentes ne sont pas mélangées, « au hasard » rejoint la carte choisie (groupes de 2 et 1, sur 4 places)`);
+  // Lancer avant d'être au complet : 2 joueurs + 2 robots ; seul : refus « personne ».
+  y.recherche.send(JSON.stringify({ t: 'lancer' }));
+  z.recherche.send(JSON.stringify({ t: 'lancer' }));
+  const [mx, my, mz] = await Promise.all([x.trouvee, y.trouvee, z.trouvee]);
+  if (my !== null) probleme(sujet, 'seul dans son groupe, « lancer » devrait répondre « personne »');
+  if (!mx || !mz || mx.duel !== mz.duel || mx.camp !== 0 || mz.camp !== 1 || mx.config.carte !== cartes[0] || mx.config.ctl.filter((v) => v > 0).length !== 2) probleme(sujet, `partie lancée à deux sur ${quatre} : ${JSON.stringify(mx && { camp: mx.camp, config: mx.config })}`);
+  else ok(`« lancer » : partie à 2 joueurs sur la carte choisie (${mx.config.carte}), robots aux 2 places libres (${mx.config.ctl}) ; seul : « personne » (robots sur l'appareil)`);
+
+  // Groupe complet de 4 : la partie commence d'elle-même ; relais à quatre, mêmes hachages partout.
+  const joueurs = [];
+  for (let i = 0; i < 4; i++) { joueurs.push(await appareil(W, id, empreinte, sim, { choix: { mode: quatre } })); await attendre(5); }
+  const infos = await Promise.all(joueurs.map((j) => j.trouvee));
+  const camps = infos.map((m) => m && m.camp).sort();
+  if (infos.some((m) => !m || m.duel !== infos[0].duel) || camps.join() !== '0,1,2,3' || infos[0].config.ctl.some((v) => v !== 0)) { probleme(sujet, `groupe de 4 : ${JSON.stringify(infos.map((m) => m && [m.camp, m.duel.slice(-6)]))}`); return; }
+  ok(`groupe complet de 4 joueurs : la partie commence d'elle-même, camps 0 à 3, aucun robot`);
+  const parCamp = [];
+  for (const j of joueurs) parCamp[j.infos.camp] = j;
+  await Promise.all(joueurs.map((j) => j.lier()));
+  await attendre(7000);
+  const duel = W.objets.DUEL.get(infos[0].duel);
+  const e = [1, 2, 3].map((c) => ecarts(parCamp[0], parCamp[c]));
+  if (Math.min(...joueurs.map((j) => j.k())) < 25) probleme(sujet, `relais à quatre : trop peu de ticks (${joueurs.map((j) => j.k())})`);
+  else if (e.some((x) => x.diff || !x.communs) || duel.mesure.desync) probleme(sujet, `relais à quatre : écarts ${JSON.stringify(e)}, serveur ${duel.mesure.desync}`);
+  else ok(`relais à quatre : ${parCamp[0].k()} ticks, ${joueurs.reduce((n, j) => n + j.ordres, 0)} ordres, mêmes hachages sur les 4 appareils et le serveur`);
+  // Départ volontaire du camp 3 : robot tout de suite (pas 10 s), les autres continuent.
+  parCamp[3].envoyer({ t: 'quitte' });
+  parCamp[3].duel.close();
+  await attendre(800);
+  if (parCamp[0].ctl[3] !== 2 || !duel.minuteur) probleme(sujet, `départ volontaire : camp 3 = ${parCamp[0].ctl[3]}, partie ${duel.minuteur ? 'en cours' : 'arrêtée'}`);
+  else ok('départ volontaire en pleine partie : un robot prend la place tout de suite, la partie continue pour les 3 autres');
+  // Les camps 1 et 2 partent aussi : le dernier joueur est prévenu (il continue sur son appareil) et le relais s'arrête.
+  for (const c of [1, 2]) { parCamp[c].envoyer({ t: 'quitte' }); parCamp[c].duel.close(); await attendre(50); }
+  await attendre(300);
+  if (parCamp[0].refus !== 'adversaire' || duel.minuteur) probleme(sujet, `dernier joueur restant : refus ${parCamp[0].refus}, relais ${duel.minuteur ? 'toujours en cours' : 'arrêté'}`);
+  else ok('dernier joueur restant : il continue contre les robots sur son appareil, le relais s\'arrête (plus de durée facturée)');
+  parCamp[0].duel.close();
+
+  // Pair-à-pair en étoile : tous annoncent p2p → mode p2p ; le camp 0 parle au camp 2, le camp 1 ne peut pas.
+  const etoile = [];
+  for (let i = 0; i < 4; i++) { etoile.push(await appareil(W, id, empreinte, sim, { mode: 'p2p', choix: { mode: quatre } })); await attendre(5); }
+  await Promise.all(etoile.map((j) => j.lier()));
+  await attendre(50);
+  const pc = [];
+  for (const j of etoile) pc[j.infos.camp] = j;
+  const recus = [];
+  for (const j of etoile) { const avant = j.duel.surMessage; j.duel.surMessage = (t) => { const m = JSON.parse(t); if (m.t === 'sdp') recus.push([j.infos.camp, m.de]); else avant(t); }; }
+  pc[0].duel.send(JSON.stringify({ t: 'sdp', d: { type: 'offer', sdp: 'v=0' }, vers: 2 }));
+  pc[2].duel.send(JSON.stringify({ t: 'sdp', d: { type: 'answer', sdp: 'v=0' }, vers: 0 }));
+  pc[1].duel.send(JSON.stringify({ t: 'sdp', d: { type: 'offer', sdp: 'v=0' }, vers: 2 }));
+  await attendre(30);
+  const duelEtoile = W.objets.DUEL.get(etoile[0].infos.duel);
+  if (!etoile.every((j) => j.modes.includes('p2p')) || duelEtoile.minuteur) probleme(sujet, 'pair-à-pair à quatre : mode non annoncé à tous, ou minuterie lancée');
+  else if (JSON.stringify(recus.sort()) !== JSON.stringify([[0, 2], [2, 0]])) probleme(sujet, `signalisation en étoile : ${JSON.stringify(recus)}`);
+  else ok('pair-à-pair à quatre : mode annoncé à tous quand chacun a son lien ; signalisation en étoile (le camp 0 parle à chacun, les autres seulement à lui)');
+  for (const j of etoile) j.duel.close();
+
+  // Mode avec robots adverses : le niveau des robots fait partie de la recherche.
+  if (avecRobots) {
+    const a = await appareil(W, id, empreinte, sim, { choix: { mode: avecRobots, niveau: 3 } });
+    const b = await appareil(W, id, empreinte, sim, { choix: { mode: avecRobots, niveau: 1 } });
+    await attendre(20);
+    const c = await appareil(W, id, empreinte, sim, { choix: { mode: avecRobots, niveau: 3 } });
+    const [ma, mc] = await Promise.all([a.trouvee, c.trouvee]);
+    const robotsMode = sim.modes[avecRobots].robots;
+    if (!ma || !mc || ma.duel !== mc.duel || b.infos || robotsMode.some((r) => ma.config.ctl[r] !== 3)) probleme(sujet, `${avecRobots} : niveau des robots adverses non respecté (${JSON.stringify(ma && ma.config)})`);
+    else ok(`${avecRobots} : deux joueurs du même niveau réunis aussitôt, robots adverses au niveau choisi (${ma.config.ctl}) ; un joueur d'un autre niveau attend`);
+    b.recherche.close();
+  }
+  await attendre(200);
   for (const o of W.objets.DUEL.values()) clearInterval(o.minuteur);
 }
 
@@ -578,7 +752,7 @@ function arreterProcessus(enfant, port) {
 }
 
 // Un appareil relié au vrai Worker local, à travers un lien simulé.
-function appareilReseau(port, jeu, empreinteSim, sim, { latence = 0, gigue = 0, pertes = 0, nom, paisible = false }) {
+function appareilReseau(port, jeu, empreinteSim, sim, { latence = 0, gigue = 0, pertes = 0, nom, paisible = false, choix = {} }) {
   const montant = new Lien(latence, gigue), descendant = new Lien(latence, gigue);
   const origine = 'http://localhost:8080';
   const c = new ClientSimule({ sim, nom, paisible, envoyer: (m) => {
@@ -596,7 +770,8 @@ function appareilReseau(port, jeu, empreinteSim, sim, { latence = 0, gigue = 0, 
   });
   c.chercher = async () => {
     const trouve = await new Promise((ok, ko) => {
-      ouvrir(`ws://127.0.0.1:${port}/tr/ws?jeu=${jeu}&sim=${empreinteSim}&proto=${TR.PROTOCOLE}`, (m) => { if (m.t === 'trouve') ok(m); if (m.t === 'refus') ko(new Error(m.raison)); }).catch(ko);
+      const params = Object.entries(choix).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
+      ouvrir(`ws://127.0.0.1:${port}/tr/ws?jeu=${jeu}&sim=${empreinteSim}&proto=${TR.PROTOCOLE}${params}`, (m) => { if (m.t === 'trouve') ok(m); if (m.t === 'refus') ko(new Error(m.raison)); }).catch(ko);
     });
     c.infos = trouve;
     c.trouve(trouve);
@@ -646,6 +821,17 @@ async function testerWrangler(jeux) {
       await Promise.all([pa, b.chercher()]);
       duels.push({ cond, a, b, debut: Date.now() });
     }
+    // Test 4 à quatre : une partie relayée d'un mode à 4 vrais joueurs (latence 150 ms, pertes).
+    const quatre = sim.modes && Object.keys(sim.modes).find((k) => sim.modes[k].equipes.length === 4 && !(sim.modes[k].robots || []).length);
+    let groupe = null;
+    if (quatre) {
+      const cond = { nom: `${quatre}, 4 joueurs, latence 150 ms, pertes`, latence: 150, gigue: 60, pertes: 0.5, paisible: true, choix: { mode: quatre } };
+      const js = [0, 1, 2, 3].map(() => appareilReseau(port, jeu.id, empreinte, sim, cond));
+      const attentes = [];
+      for (const j of js) { attentes.push(j.chercher()); await attendre(300); }
+      await Promise.all(attentes);
+      groupe = { cond, js };
+    }
     // Test 5 : un joueur coupé plus de 10 s → robot, puis retour.
     const x = appareilReseau(port, jeu.id, empreinte, sim, { nom: 'déconnexion' }), y = appareilReseau(port, jeu.id, empreinte, sim, { nom: 'déconnexion' });
     const px = x.chercher(); await attendre(300); await Promise.all([px, y.chercher()]);
@@ -666,7 +852,17 @@ async function testerWrangler(jeux) {
 
     // Attente de la fin des parties (ticks voulus).
     const finVoulue = Date.now() + (TICKS_WRANGLER * 100) + 30000;
-    while (Date.now() < finVoulue && duels.some((d) => Math.min(d.a.k(), d.b.k()) < TICKS_WRANGLER && !d.a.fin)) await attendre(2000);
+    while (Date.now() < finVoulue && (duels.some((d) => Math.min(d.a.k(), d.b.k()) < TICKS_WRANGLER && !d.a.fin) || (groupe && Math.min(...groupe.js.map((j) => j.k())) < TICKS_WRANGLER && !groupe.js[0].fin))) await attendre(2000);
+    if (groupe) {
+      const [a, ...autres] = groupe.js;
+      const e = autres.map((b) => ecarts(a, b));
+      const ticks = Math.min(...groupe.js.map((j) => j.k()));
+      const sujet = `test 4 (${groupe.cond.nom})`;
+      if (ticks < TICKS_WRANGLER && !a.fin) probleme(sujet, `seulement ${ticks} ticks joués`);
+      else if (e.some((x) => x.diff)) probleme(sujet, `écarts de hachage : ${JSON.stringify(e)}`);
+      else ok(`${sujet} : ${ticks} ticks${a.fin ? ' (partie finie)' : ''}, ${groupe.js.reduce((n, j) => n + j.ordres, 0)} ordres, ${groupe.js.reduce((n, j) => n + j.coupures, 0)} coupure(s), aucun écart sur les 4 appareils`);
+      for (const j of groupe.js) j.fermer();
+    }
     for (const d of duels) {
       const e = ecarts(d.a, d.b);
       const ticks = Math.min(d.a.k(), d.b.k());
@@ -740,8 +936,10 @@ async function testerNavigateur(jeux) {
       return { page, cadre, journal };
     };
     const etatPartie = (cadre) => cadre.evaluate(() => { const p = window.JEL_TR.derniere; return p ? { mode: p.mode, connexion: p.connexion, k: p.etat ? p.etat.k : 0, h: p.s ? p.s.hachage() : null, ctl: p.etat ? p.etat.ctl.slice() : null } : null; });
-    const cliquerJouer = async (cadre) => {
+    const cliquerJouer = async (cadre, mode) => {
       await cadre.click('[data-tr="jouer"]', { timeout: 15000 });
+      // Mode à plusieurs (écran du jeu : boutons data-act="trMode") : choisi avant la recherche.
+      if (mode) await cadre.click(`[data-act="trMode"][data-v="${mode}"]`, { timeout: 5000 });
       // Le jeu peut demander le niveau du robot de secours avant de chercher : on prend le choix proposé.
       for (let i = 0; i < 4; i++) {
         const p = await etatPartie(cadre);
@@ -813,6 +1011,69 @@ async function testerNavigateur(jeux) {
       else ok(`test 3 (${nom}) : partie en ligne en mode ${attendu}, ${Math.min(p1.k, p2.k)} ticks, même état sur les deux appareils (tick ${kCommun})`);
       await c1.close(); await c2.close();
       await attendre(500);
+    }
+
+    // Test 7 : modes à plusieurs (sim.modes) — 3 joueurs en étoile (pair-à-pair, puis relais forcé),
+    // et une partie à 4 places lancée à 2 (bouton « Lancer » : robots aux places libres).
+    const sim = chargerSim(jeu.texte);
+    const modes = sim.modes ? Object.keys(sim.modes) : [];
+    const trois = modes.find((k) => sim.modes[k].equipes.length === 3 && !(sim.modes[k].robots || []).length);
+    const quatre = modes.find((k) => sim.modes[k].equipes.length === 4 && !(sim.modes[k].robots || []).length);
+    const memeEtatTous = async (js) => {
+      const ps = await Promise.all(js.map((j) => etatPartie(j.cadre)));
+      const k = Math.floor((Math.min(...ps.map((x) => x.k)) - 5) / 50) * 50;
+      const hs = await Promise.all(js.map((j) => j.cadre.evaluate((x) => window.JEL_TR.derniere.s.hashDe(x), k)));
+      return { ok: !!hs[0] && hs.every((h) => h === hs[0]), k, ps };
+    };
+    for (const [nom, suffixe, attendu] of SEULEMENT_COUPURES || !trois ? [] : [['pair-à-pair en étoile', '', 'p2p'], ['relais forcé', '&p2p=non', 'relais']]) {
+      const ctx = [], js = [];
+      try {
+        for (let i = 0; i < 3; i++) { ctx.push(await navigateur.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })); js.push(await ouvrirJeu(ctx[i], `&multi=ws://localhost:${portWorker}${suffixe}`)); }
+        for (const j of js) { await cliquerJouer(j.cadre, trois); await attendre(400); }
+        await Promise.all(js.map((j) => j.cadre.waitForFunction(() => window.JEL_TR.derniere && window.JEL_TR.derniere.mode === 'en-ligne', null, { timeout: 30000 })));
+        await attendre(12000);
+        const m = await memeEtatTous(js);
+        const liens = await Promise.all(js.map((j) => j.page.evaluate(() => window.__fmgTempsReel.etat())));
+        await js[0].page.screenshot({ path: path.join(dossierCaptures, `${trois}-${attendu}-joueur1.png`) });
+        const sujet = `test 7 (${trois}, ${nom})`;
+        if (m.ps.some((x) => x.connexion !== attendu)) probleme(sujet, `mode ${m.ps.map((x) => x.connexion)} (${attendu} attendu)`);
+        else if (m.ps.some((x) => x.ctl.length !== 3 || x.ctl.some((v) => v !== 0))) probleme(sujet, `camps ${JSON.stringify(m.ps.map((x) => x.ctl))}`);
+        else if (attendu === 'p2p' && liens.find((l) => l.camp === 0).liens !== 2) probleme(sujet, `le pair horloge devrait avoir 2 liens directs (${JSON.stringify(liens)})`);
+        else if (!m.ok) probleme(sujet, `états différents au tick ${m.k} (${m.ps.map((x) => x.k)})`);
+        else ok(`${sujet} : 3 joueurs en ligne (${attendu}${attendu === 'p2p' ? ', 2 liens directs depuis le pair horloge' : ''}), même état sur les 3 appareils au tick ${m.k}`);
+      } catch (e) {
+        probleme(`test 7 (${trois}, ${nom})`, e.message);
+        for (const j of js) console.log(`    journal : ${j.journal.filter((l) => l.includes('[temps réel]')).slice(-10).join(' | ')}`);
+      } finally {
+        for (const c of ctx) await c.close();
+        await attendre(500);
+      }
+    }
+    if (!SEULEMENT_COUPURES && quatre) {
+      const ctx = [], js = [];
+      const sujet = `test 7 (${quatre} lancé à 2)`;
+      try {
+        for (let i = 0; i < 2; i++) { ctx.push(await navigateur.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })); js.push(await ouvrirJeu(ctx[i], `&multi=ws://localhost:${portWorker}`)); }
+        for (const j of js) { await cliquerJouer(j.cadre, quatre); await attendre(400); }
+        // Le bouton « Lancer avec 2 joueurs » apparaît chez les deux ; l'un d'eux le touche.
+        await js[1].cadre.waitForSelector('#trLancer:not(.hidden)', { timeout: 8000 });
+        await js[0].page.screenshot({ path: path.join(dossierCaptures, `${quatre}-recherche.png`) });
+        await js[1].cadre.click('#trLancer');
+        await Promise.all(js.map((j) => j.cadre.waitForFunction(() => window.JEL_TR.derniere && window.JEL_TR.derniere.mode === 'en-ligne', null, { timeout: 20000 })));
+        await attendre(9000);
+        const m = await memeEtatTous(js);
+        await js[0].page.screenshot({ path: path.join(dossierCaptures, `${quatre}-lance-a-deux.png`) });
+        const ctl = m.ps[0].ctl;
+        if (ctl.length !== 4 || ctl.filter((v) => v === 0).length !== 2 || ctl[0] !== 0 || ctl[1] !== 0) probleme(sujet, `camps ${ctl} (2 joueurs, 2 robots attendus)`);
+        else if (!m.ok) probleme(sujet, `états différents au tick ${m.k}`);
+        else ok(`${sujet} : bouton « Lancer » → partie en ligne à 2 joueurs et 2 robots (${ctl}), même état sur les deux appareils au tick ${m.k} (${m.ps[0].connexion})`);
+      } catch (e) {
+        probleme(sujet, e.message);
+        for (const j of js) console.log(`    journal : ${j.journal.filter((l) => l.includes('[temps réel]')).slice(-10).join(' | ')}`);
+      } finally {
+        for (const c of ctx) await c.close();
+        await attendre(500);
+      }
     }
 
     // Test 6 : coupures réseau (crochet __fmgTempsReel du lanceur, actif seulement en local).

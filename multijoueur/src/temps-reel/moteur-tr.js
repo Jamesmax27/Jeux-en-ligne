@@ -4,4 +4,4 @@
 // téléphones. Il se range dans globalThis.JEL_TR.
 import '../../../public/temps-reel/moteur.js';
 
-export const { Simulation, Cadenceur, PROTOCOLE: PROTOCOLE_TR, REGLAGES, hacher } = globalThis.JEL_TR;
+export const { Simulation, Cadenceur, PROTOCOLE: PROTOCOLE_TR, REGLAGES, hacher, configMode, modeDe, placesHumaines, campsDe } = globalThis.JEL_TR;

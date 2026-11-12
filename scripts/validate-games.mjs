@@ -116,8 +116,10 @@ async function controlerFiche(id, dossier) {
   // Jeu multijoueur (docs/multijoueur.md) : nombre fixe de places, de 2 à 10.
   if (f.multijoueur !== undefined && typeof f.multijoueur !== 'boolean') erreur(id, 'game.json : "multijoueur" doit valoir true ou false');
   if (f.multijoueur === true && !(Number.isInteger(f.places) && f.places >= 2 && f.places <= 10)) erreur(id, 'game.json : "places" (jeu multijoueur) doit être un nombre entier de 2 à 10, le même que dans les règles');
-  if (f.multijoueur !== true && f.places !== undefined) erreur(id, 'game.json : "places" n\'existe que pour un jeu multijoueur ("multijoueur": true)');
-  // Jeu en temps réel 1 contre 1 (docs/cadrage-temps-reel.md) : son propre moteur (jel-tr), jamais avec "multijoueur".
+  if (f.multijoueur !== true && f.temps_reel !== true && f.places !== undefined) erreur(id, 'game.json : "places" n\'existe que pour un jeu multijoueur ("multijoueur": true) ou en temps réel');
+  // Jeu en temps réel (docs/cadrage-temps-reel.md) : son propre moteur (jel-tr), jamais avec "multijoueur" ;
+  // "places" (facultatif) : joueurs d'une partie en ligne au plus (2 par défaut).
+  if (f.temps_reel === true && f.places !== undefined && !(Number.isInteger(f.places) && f.places >= 2 && f.places <= 8)) erreur(id, 'game.json : "places" (jeu en temps réel, facultatif) : joueurs d\'une partie en ligne au plus, entier de 2 à 8');
   if (f.temps_reel !== undefined && f.temps_reel !== true) erreur(id, 'game.json : "temps_reel" vaut true (jeu en temps réel), ou est absent');
   if (f.temps_reel === true && f.multijoueur !== undefined) erreur(id, 'game.json : un jeu "temps_reel" n\'a pas de champ "multijoueur" (le catalogue l\'ajoute de lui-même)');
   // Bouton « Rejoindre » d'un ami (docs/consigne-amis.md, section 3) : obligatoire pour les nouveaux jeux multijoueurs.

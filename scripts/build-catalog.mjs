@@ -167,7 +167,7 @@ async function lireJeu(nomDossier) {
     ...(fiche.multijoueur === true ? { multijoueur: true, places: Number.isInteger(fiche.places) ? fiche.places : null } : {}),
     // Jeu en temps réel 1 contre 1 (docs/cadrage-temps-reel.md) : multijoueur aux yeux du site
     // (étiquette, rubrique), avec son propre lanceur (public/temps-reel/lanceur.js).
-    ...(fiche.temps_reel === true && fiche.multijoueur !== true ? { multijoueur: true, temps_reel: true, places: 2 } : {}),
+    ...(fiche.temps_reel === true && fiche.multijoueur !== true ? { multijoueur: true, temps_reel: true, places: Number.isInteger(fiche.places) ? fiche.places : 2 } : {}),
     // Bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : le jeu sait ouvrir la même partie en ligne.
     ...(fiche.multijoueur === true && fiche.rejoindre === true ? { rejoindre: true } : {}),
     // Profil joueur (docs/cadrage-fidelisation.md) : étoiles possibles du jeu (le serveur

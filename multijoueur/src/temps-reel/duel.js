@@ -1,16 +1,21 @@
 // ==========================================================================
-// Duel : un Durable Object par partie temps réel 1 contre 1 (nom donné par la
-// Rencontre, rencontre.js). Détails : docs/cadrage-temps-reel.md, sections 6 et 7.
+// Duel : un Durable Object par partie temps réel, de 2 à 8 camps dont au moins
+// 2 vrais joueurs (nom donné par la Rencontre, rencontre.js ; les autres camps
+// sont des robots, joués par la simulation elle-même). Détails :
+// docs/cadrage-temps-reel.md, sections 6, 7 et 16.
 //
-// 1. Signalisation : il fait passer les offres et candidats WebRTC entre les
-//    deux lanceurs (messages sdp, ice), puis décide du mode :
-//      - les deux lanceurs annoncent { t: 'p2p' } (DataChannel ouvert) → mode
+// 1. Signalisation : il fait passer les offres et candidats WebRTC entre le
+//    pair horloge (camp 0) et chacun des autres joueurs (messages sdp, ice, avec
+//    { vers } à l'aller et { de } au retour : pair-à-pair « en étoile »), puis
+//    décide du mode :
+//      - tous les lanceurs annoncent { t: 'p2p' } (le pair horloge quand tous
+//        ses liens sont ouverts, chaque autre joueur quand le sien l'est) → mode
 //        pair-à-pair : l'objet n'a plus rien à faire et HIBERNE (connexions
 //        gardées pour la bascule, « ping » automatique gratuit) ;
 //      - un lanceur annonce { t: 'relais' } (pas de DataChannel au bout de
 //        5 s) → mode relayé, si le Budget le permet (budget.js), sinon refus :
 //        chacun joue contre le robot sur son appareil.
-// 2. Relais : quand les deux joueurs sont prêts, l'objet fait tourner le
+// 2. Relais : quand tous les joueurs sont prêts, l'objet fait tourner le
 //    CADENCEUR (horloge à tick fixe, ordres datés tick + délai d'entrée, un
 //    paquet par tick même vide) et la SIMULATION (moteur jel-tr et bloc jel-sim
 //    du jeu, recopiés par scripts/multijoueur.mjs) : il est l'arbitre en cas
@@ -60,9 +65,9 @@ export class Duel {
     this.minuteur = 0;
     this.t0 = 0;
     this.kDebut = 0;
-    this.dernier = [0, 0];       // dernière nouvelle de chaque camp (ms)
-    this.robot = [false, false]; // camp passé au robot pour absence
-    this.signale = [false, false]; // problème de réseau d'un joueur annoncé à l'autre
+    this.dernier = [];           // dernière nouvelle de chaque camp (ms)
+    this.robot = [];             // camp passé au robot pour absence
+    this.signale = [];           // problème de réseau d'un joueur annoncé aux autres
     this.debutRelais = 0;
     this.attenteSnap = 0;        // secours : instantané attendu jusqu'à cette heure
     this.debits = new Map();
@@ -76,6 +81,15 @@ export class Duel {
     if (!this.d) this.d = (await this.state.storage.get('duel')) || null;
     return this.d;
   }
+
+  // Camps tenus par de vrais joueurs (les autres sont des robots dès le départ).
+  humains() { return this.d && Array.isArray(this.d.humains) ? this.d.humains : [0, 1]; }
+  // Joueurs encore dans la partie (ceux qui l'ont quittée exprès n'y reviennent pas).
+  restants() { const partis = (this.d && this.d.partis) || []; return this.humains().filter((c) => !partis[c]); }
+  tousLes(cle) { const d = this.d; return this.humains().every((c) => d[cle][c]); }
+
+  // Envoie à tous les joueurs sauf un camp.
+  envoyerSauf(camp, message) { for (const c of this.humains()) if (c !== camp) this.envoyer(c, message); }
 
   async sauver() { if (this.d) await this.state.storage.put('duel', this.d); }
 
@@ -97,10 +111,14 @@ export class Duel {
     if (url.pathname === '/creer') {
       let corps;
       try { corps = await request.json(); } catch { return texte('Invalide', 400); }
-      if (!corps || !Object.prototype.hasOwnProperty.call(JEUX_TR, corps.jeu) || !Array.isArray(corps.jetons) || corps.jetons.length !== 2) return texte('Invalide', 400);
+      const n = Array.isArray(corps && corps.jetons) ? corps.jetons.length : 0;
+      const humains = Array.isArray(corps && corps.humains) ? corps.humains.filter((c) => Number.isInteger(c) && c >= 0 && c < n && corps.jetons[c]) : [];
+      if (!corps || !Object.prototype.hasOwnProperty.call(JEUX_TR, corps.jeu) || n < 2 || humains.length < 2 || humains[0] !== 0) return texte('Invalide', 400);
+      const faux = () => corps.jetons.map(() => false);
       this.d = {
-        jeu: corps.jeu, nom: corps.nom, graine: corps.graine >>> 0, config: corps.config || {}, jetons: corps.jetons,
-        mode: null, p2p: [false, false], pret: [false, false], vus: [false, false], cree: Date.now(), fini: false,
+        jeu: corps.jeu, nom: corps.nom, graine: corps.graine >>> 0, config: corps.config || {}, jetons: corps.jetons, humains,
+        systeme: Number.isInteger(corps.systeme) ? corps.systeme : JEUX_TR[corps.jeu].sim.camps,
+        mode: null, p2p: faux(), pret: faux(), vus: faux(), cree: Date.now(), fini: false,
       };
       await this.sauver();
       await this.state.storage.setAlarm(Date.now() + ATTENTE_ADVERSAIRE_MS);
@@ -109,8 +127,9 @@ export class Duel {
     if (url.pathname !== '/ws') return texte('Introuvable', 404);
     const d = await this.charger();
     if (!d || d.fini) return texte('Partie terminée', 410);
-    const camp = d.jetons.indexOf(url.searchParams.get('jeton') || '');
-    if (camp < 0) return texte('Jeton inconnu', 403);
+    const jeton = url.searchParams.get('jeton') || '';
+    const camp = jeton ? d.jetons.indexOf(jeton) : -1;
+    if (camp < 0 || !this.humains().includes(camp)) return texte('Jeton inconnu', 403);
     // Reconnexion : l'ancienne connexion du même camp est remplacée.
     for (const ancien of this.socketsDe(camp)) { try { ancien.close(1000, 'remplacee'); } catch { /* fermée */ } }
     const [client, serveur] = Object.values(new WebSocketPair());
@@ -119,6 +138,9 @@ export class Duel {
     this.dernier[camp] = Date.now();
     if (!d.vus[camp]) { d.vus[camp] = true; await this.sauver(); }
     try { serveur.send(JSON.stringify({ t: 'bienvenue', camp, mode: d.mode, k: this.cad ? this.cad.k : null })); } catch { /* fermée */ }
+    // Offres et candidats WebRTC arrivés avant ce joueur (le pair horloge a pu être plus rapide).
+    const signaux = this.signaux && this.signaux[camp];
+    if (signaux) { delete this.signaux[camp]; for (const t of signaux) { try { serveur.send(t); } catch { /* fermée */ } } }
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -142,17 +164,26 @@ export class Duel {
     const d = await this.charger();
     if (!d) { ws.close(1011, 'partie inconnue'); return; }
     this.dernier[camp] = Date.now();
-    if (this.robot[camp] && this.cad && m.t !== 'snap') this.rendreLaMain(camp);
-    const autre = 1 - camp;
+    if (this.robot[camp] && this.cad && m.t !== 'snap' && m.t !== 'quitte' && !(d.partis && d.partis[camp])) this.rendreLaMain(camp);
 
     switch (m.t) {
       case 'sdp':
-      case 'ice':
-        if (d.mode !== 'relais') this.envoyer(autre, { t: m.t, d: m.d });
+      case 'ice': {
+        // Étoile : le pair horloge (camp 0) parle à chacun, les autres seulement à lui.
+        const vers = Number.isInteger(m.vers) ? m.vers : camp === 0 ? -1 : 0;
+        if (d.mode === 'relais' || vers === camp || !this.humains().includes(vers) || (camp !== 0 && vers !== 0)) return;
+        if (this.socketsDe(vers).length) this.envoyer(vers, { t: m.t, d: m.d, de: camp });
+        else {
+          // Pas encore arrivé : gardé en mémoire (l'objet est éveillé pendant la signalisation), remis à sa connexion.
+          this.signaux = this.signaux || {};
+          const l = (this.signaux[vers] = this.signaux[vers] || []);
+          if (l.length < 60) l.push(JSON.stringify({ t: m.t, d: m.d, de: camp }));
+        }
         return;
+      }
       case 'p2p':
         d.p2p[camp] = true;
-        if (!d.mode && d.p2p[0] && d.p2p[1]) {
+        if (!d.mode && this.tousLes('p2p')) {
           d.mode = 'p2p';
           this.envoyer(null, { t: 'mode', mode: 'p2p' });
           await appelerBudget(this.env, 'noter', { type: 'p2p' });
@@ -171,7 +202,7 @@ export class Duel {
       case 'pret':
         d.pret[camp] = true;
         await this.sauver();
-        if (d.mode === 'relais' && !d.secours && d.pret[0] && d.pret[1] && !this.minuteur) this.demarrer(0, null);
+        if (d.mode === 'relais' && !d.secours && this.tousLes('pret') && !this.minuteur) this.demarrer(0, null);
         return;
       case 'o':
         if (this.cad && Array.isArray(m.o)) this.cad.recevoir(camp, m.seq, m.o);
@@ -191,7 +222,28 @@ export class Duel {
         else if (this.attenteSnap) this.envoyer(camp, { t: 'demande-snap' });   // secours en cours : son état peut servir
         return;
       case 'secours':
-        if (d.mode === 'p2p' && !this.minuteur && !this.attenteSnap) await this.passerRelais('secours');
+        // Moins de deux joueurs encore là : pas de relais (le dernier continue contre les robots sur son appareil).
+        if (d.mode === 'p2p' && !this.minuteur && !this.attenteSnap) {
+          if (this.restants().filter((c) => this.socketsDe(c).length > 0).length < 2) { this.envoyer(camp, { t: 'refus', raison: 'adversaire' }); return; }
+          await this.passerRelais('secours');
+        }
+        return;
+      case 'quitte':
+        // Départ volontaire en pleine partie : un robot prend la place tout de suite.
+        d.partis = d.partis || [];
+        if (d.partis[camp]) return;
+        d.partis[camp] = true;
+        await this.sauver();
+        if (this.cad && this.sim && !this.sim.resultat) {
+          if (this.sim.etat.ctl[camp] === 0) this.cad.controle(camp, NIVEAU_RELAIS);
+          this.robot[camp] = true;
+          // Un seul joueur restant : il continue contre les robots sur son appareil (plus de relais à payer).
+          const restants = this.restants();
+          if (restants.length < 2) {
+            for (const c of restants) this.envoyer(c, { t: 'refus', raison: 'adversaire' });
+            this.arreter('seul');
+          }
+        }
         return;
       case 'snap':
         if (this.attenteSnap && m.snap && Number.isInteger(m.snap.k) && m.snap.etat) {
@@ -234,8 +286,8 @@ export class Duel {
       this.attenteSnap = Date.now() + SECOURS_MS;
       this.envoyer(null, { t: 'demande-snap' });
       await this.state.storage.setAlarm(this.attenteSnap);
-    } else if (d.pret[0] && d.pret[1] && !this.minuteur) {
-      this.demarrer(0, null);     // les deux joueurs étaient déjà prêts
+    } else if (this.tousLes('pret') && !this.minuteur) {
+      this.demarrer(0, null);     // tous les joueurs étaient déjà prêts
     }
     return true;
   }
@@ -244,18 +296,21 @@ export class Duel {
   demarrer(k, snap) {
     const d = this.d;
     const fiche = JEUX_TR[d.jeu];
-    this.sim = new Simulation(fiche.sim, d.graine, { ...d.config, ctl: [0, 0] });
+    this.sim = new Simulation(fiche.sim, d.graine, d.config);
     if (snap) this.sim.restaurer(snap);
     const tickMs = (fiche.sim.reglages && fiche.sim.reglages.tickMs) || REGLAGES.tickMs;
     this.cad = new Cadenceur({
-      camps: fiche.sim.camps, delai: this.sim.r.delaiEntree, depart: this.sim.k(),
+      camps: this.sim.etat.ctl.length, systeme: d.systeme, delai: this.sim.r.delaiEntree, depart: this.sim.k(),
       envoyer: (paquet) => this.envoyer(null, paquet),
     });
     this.tickMs = tickMs;
     this.t0 = Date.now();
     this.kDebut = this.sim.k();
     this.debutRelais = this.debutRelais || Date.now();
-    this.dernier = [Date.now(), Date.now()];
+    this.dernier = [];
+    for (const c of this.humains()) this.dernier[c] = Date.now();
+    // Un joueur parti avant la reprise par le serveur (pair horloge parti, puis secours) : robot à sa place.
+    for (const c of this.humains()) if (d.partis && d.partis[c] && this.sim.etat.ctl[c] === 0) { this.cad.controle(c, NIVEAU_RELAIS); this.robot[c] = true; }
     clearInterval(this.minuteur);
     this.minuteur = setInterval(() => this.battre(), Math.max(20, tickMs >> 1));
   }
@@ -269,22 +324,22 @@ export class Duel {
       this.sim.avancer(paquet.o);
       this.mesure.ticks += 1;
     }
-    // Absences : l'autre joueur est prévenu (bandeau), puis le camp passe au robot ; personne : la partie s'arrête.
+    // Absences : les autres joueurs sont prévenus (bandeau), puis le camp passe au robot ; personne : la partie s'arrête.
     let presents = 0;
-    for (let c = 0; c < 2; c++) {
+    for (const c of this.restants()) {
       const connecte = this.socketsDe(c).length > 0;
       const probleme = !connecte || maintenant - this.dernier[c] > RESEAU_MS;
-      if (probleme !== this.signale[c]) {
+      if (probleme !== !!this.signale[c]) {
         this.signale[c] = probleme;
-        console.log('[temps réel] réseau', JSON.stringify({ camp: c, ok: !probleme, connecte, silence: maintenant - this.dernier[c], destinataires: this.socketsDe(1 - c).length }));
-        this.envoyer(1 - c, { t: 'reseau', camp: c, ok: !probleme });
+        console.log('[temps réel] réseau', JSON.stringify({ camp: c, ok: !probleme, connecte, silence: maintenant - this.dernier[c] }));
+        this.envoyerSauf(c, { t: 'reseau', camp: c, ok: !probleme });
       }
       const absent = !connecte || maintenant - this.dernier[c] > ABSENCE_MS;
       if (!absent) presents += 1;
       if (absent && !this.robot[c] && this.sim.etat.ctl[c] === 0) { this.cad.controle(c, NIVEAU_RELAIS); this.robot[c] = true; }
     }
     if (this.sim.resultat) { this.envoyer(null, { t: 'fin', resultat: this.sim.resultat }); this.arreter('fin'); return; }
-    if (presents === 0 && maintenant - Math.max(...this.dernier) > ABSENCE_MS) { this.arreter('abandon'); return; }
+    if (presents === 0 && maintenant - Math.max(...this.humains().map((c) => this.dernier[c] || 0)) > ABSENCE_MS) { this.arreter('abandon'); return; }
     if (maintenant - this.debutRelais > DUREE_MAX_MS) { this.envoyer(null, { t: 'fin', resultat: null }); this.arreter('duree'); }
   }
 
@@ -334,8 +389,8 @@ export class Duel {
       d.fini = true;
     }
     const age = Date.now() - d.cree;
-    if (!d.fini && !d.mode && !(d.vus[0] && d.vus[1])) {
-      // Un seul joueur est arrivé : il joue contre le robot.
+    if (!d.fini && !d.mode && !this.tousLes('vus')) {
+      // Un joueur n'est jamais arrivé : les autres jouent contre le robot.
       this.envoyer(null, { t: 'refus', raison: 'adversaire' });
       await appelerBudget(this.env, 'noter', { type: 'echec' });
       d.fini = true;

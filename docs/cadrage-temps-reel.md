@@ -4,6 +4,8 @@
 > À lire avec `docs/multijoueur.md` (multijoueur tour par tour, qui doit continuer à marcher sans régression) et `CLAUDE.md`.
 > Coûts mesurés : `docs/couts-temps-reel.md`, rédigé à l'étape 6 (section 12), une fois une vraie partie de 15 minutes mesurée.
 >
+> **Modes à plusieurs (12 novembre 2026, demande du propriétaire)** : de 2 à 8 camps par partie (2 à 4 vrais joueurs dans Nova Dominion), chacun pour soi, équipes, joueurs contre des robots, choix de la carte : **section 16**.
+>
 > **Décisions du propriétaire (12 novembre 2026)** : pair-à-pair accepté, avec l'adresse IP visible par l'autre joueur et un paragraphe dans la politique de confidentialité (section 11, point 1) ; prototype « Petites planètes » (vaisseaux-graines qui colonisent des planètes et leurs lunes, univers `espace`, genre `strategie`, 7+) ; jeu publié dans le catalogue dès la fusion (section 11, point 7).
 
 ## 1. Le multijoueur existant, en résumé
@@ -312,5 +314,61 @@ Rien n'est changé maintenant (ni l'idéation, ni la fabrication, ni la vérific
 ## 15. Hors périmètre
 
 - Jeux de tir et d'action rapide (latence, prédiction et correction : architecture différente, à cadrer plus tard).
-- Plus de 2 joueurs, spectateurs, parties entre amis par le bouton « Rejoindre » (possible plus tard avec le même Duel).
+- Spectateurs, parties entre amis par le bouton « Rejoindre » (possible plus tard avec le même Duel). Plus de 2 joueurs : fait (section 16).
+
+## 16. Modes à plusieurs joueurs et choix de la carte (12 novembre 2026)
+
+Demande du propriétaire, après l'essai réussi du 1 contre 1 sur deux téléphones : chacun pour soi à 3 et à 4, à deux contre des robots, choix de la carte. Appliqué à **Nova Dominion** ; Les Petites Planètes reste en 1 contre 1 (sa simulation n'a pas de modes) et marche exactement comme avant.
+
+### Contrat (facultatif) de la simulation
+
+- `camps` devient le **nombre de camps au plus** (2 à 8) ; une partie en a `config.camps` (`etat.ctl` a cette longueur). Le camp « système » des ordres de contrôle reste `camps` (le maximum) : rien ne change pour un jeu à 2 camps.
+- `modes` : `{ <id>: { equipes: [équipe de chaque camp], robots: [camps toujours tenus par un robot] } }` ; le premier est le mode par défaut ; le camp 0 est toujours un vrai joueur (le premier arrivé, pair horloge). `cartes` : identifiants des cartes qu'on peut choisir.
+- `JEL_TR.configMode(sim, { mode, carte, niveau }, humains, graine)` donne la configuration d'une partie : `{ ligne: 1, mode, carte, niveau, camps, ctl }` ; les vrais joueurs prennent les places humaines du mode dans l'ordre d'arrivée, les autres places sont des robots du niveau choisi ; carte au hasard (`'*'`) tirée de la graine. **Le même calcul** sert dans le jeu (partie contre les robots, `humains` = 1) et dans la Rencontre (partie en ligne).
+- `fin(etat)` renvoie `gagnant` = l'**équipe** gagnante (−1 : égalité), `scores` (un par camp) et `equipes`.
+
+### Nova Dominion
+
+| Mode | Camps (équipes) | Vrais joueurs | Carte |
+| --- | --- | --- | --- |
+| `1v1` 1 contre 1 | 2 (0, 1) | 2 | 64 cases |
+| `ffa3` chacun pour soi à 3 | 3 (0, 1, 2) | 2 ou 3 | 80 cases |
+| `ffa4` chacun pour soi à 4 | 4 (0, 1, 2, 3) | 2 à 4 | 80 cases |
+| `2v2` 2 contre 2 | 4 (0, 1, 0, 1 : les joueurs arrivés alternent les équipes) | 2 à 4 | 80 cases |
+| `equipe2` à deux contre 2 robots | 4 (0, 0, 1, 1) | 2 | 80 cases |
+| `equipe1` à deux contre 1 robot (1 200 cristaux au lieu de 600) | 3 (0, 0, 1) | 2 | 64 cases |
+
+Cartes : les 5 thèmes du jeu (Mars, Europa, Io, Séléné, Titan) ou « au hasard ». Une place sans joueur est tenue par l'IA du jeu au niveau choisi. Fin : une seule équipe a encore des forces ; au bout de 15 minutes, la meilleure équipe encore en jeu aux points (somme de ses camps). Un joueur éliminé alors que la partie continue voit « Tu es éliminé » : **Regarder la suite** (carte dévoilée) ou **Quitter la partie**. Bilan : score de chaque camp, points de mon équipe contre la meilleure autre au temps.
+
+### Recherche (Rencontre)
+
+- `/tr/ws?…&mode=&carte=&niveau=` ; les joueurs d'un même mode sont réunis en **groupes, par ordre d'arrivée** : cartes compatibles (même carte, ou l'un des deux « au hasard » : le groupe prend la première carte choisie) ; pour un mode avec des robots adverses (`equipe1`, `equipe2`), même niveau de robots aussi. Le premier arrivé (camp 0) fixe le niveau des robots des places libres.
+- Groupe complet → la partie commence aussitôt. Sinon, `{ t: 'lancer' }` (bouton « Lancer avec n joueurs », visible dès 2 joueurs réunis, ou fin des 15 s de l'un d'eux) commence avec les présents, robots aux places libres ; seul → `refus` « personne » : partie contre les robots sur l'appareil, dans le même mode et sur la même carte.
+- `attente { n, max }` : taille du groupe et places humaines du mode. `trouve` ajoute `humains` (camps des vrais joueurs) et `systeme`.
+
+### Pair-à-pair en étoile, relais, départs
+
+- Le **camp 0 est le pair horloge, relié directement à chacun des autres** ; les autres ne sont reliés qu'à lui (`sdp`/`ice` avec `vers` à l'aller, `de` au retour ; le Duel refuse tout autre chemin). Le mode p2p est décidé quand **tous** les liens sont ouverts ; sinon, au bout de 5 s, **toute la partie** passe au relais (un seul Durable Object, quel que soit le nombre de joueurs). Entre réseaux mobiles, le lien direct échoue plus souvent qu'à deux : à 3 ou 4, le relais sera plus fréquent.
+- Pair horloge : ordres, hachages, signes de vie et absence **par joueur** ; un joueur muet → bandeau « Un autre joueur a un problème de réseau… » chez tous (le pair horloge prévient les autres), puis robot au bout de 10 s ; il reprend la main à son retour.
+- **Départ volontaire** (Quitter la partie) : `{ t: 'quitte' }` au pair horloge et au Duel → robot à sa place tout de suite (pas 10 s plus tard), sans bandeau. Plus qu'un seul vrai joueur : il continue contre les robots sur son appareil (`refus` « adversaire » ; le relais s'arrête, plus de durée facturée) ; un secours n'est accordé qu'avec au moins deux joueurs encore là.
+- Le Duel ne termine plus la partie quand un joueur la quitte (avant : message `fin`) : seule une vraie fin de partie l'arrête.
+
+### Messages ajoutés (protocole temps réel 2)
+
+| Sens | Message |
+| --- | --- |
+| client → Rencontre | paramètres `mode`, `carte`, `niveau` ; `{ t: 'lancer' }` |
+| Rencontre → client | `attente { n, max }`, `trouve { …, humains, systeme }`, `refus { raison: 'personne' }` |
+| client ↔ Duel | `sdp`, `ice` avec `vers` / `de` ; `quitte` |
+| pair ↔ pair | `quitte` (joueur → horloge), `reseau { camp, ok }` (horloge → joueurs) |
+| jeu → lanceur | `chercher { proto, config: { mode, carte, niveau } }`, `lancer` |
+| lanceur → jeu | `attente { n, max }`, `trouve { …, humains }`, `reseau { …, camp }` |
+
+`PROTOCOLE` (moteur jel-tr) passe à 2 : un jeu gardé sur l'appareil avec l'ancien moteur joue contre le robot jusqu'à sa mise à jour.
+
+### Contrôles (`tester-temps-reel.mjs`)
+
+- Simulation : pour chaque mode, configuration des places, partie où chaque vrai joueur donne des ordres (un joueur part en route : robot), rejeu et reprise depuis un instantané identiques ; partie entre robots jusqu'au bout (elle finit, gagnant valide). Mesuré le 12 novembre 2026 : 0,16 à 0,39 ms de calcul par tick du moteur, instantanés de 36 à 82 Ko à 4 minutes ; parties entre robots de 5 à 15 minutes. Deux parties de modes différents jouées en alternance dans la même mémoire donnent le même état que seules : un Durable Object (et plusieurs Duel voisins) partagent les variables du bloc jel-sim ; Nova Dominion gardait ses tableaux de recherche de chemin à la taille de la dernière carte créée (64 ou 80 cases), et le serveur divergeait dès le premier contrôle (trouvé par le test 4 à quatre joueurs) : ils sont refaits quand la taille change. **Règle : rien de ce que lit la simulation ne doit vivre hors de l'état**, sauf des caches qui ne dépendent que de leurs paramètres.
+- Worker (faux Durable Objects) : groupes par carte, « lancer » à 2 sur 4 places, groupe complet de 4, relais à quatre sans écart, signalisation en étoile, départ volontaire, dernier joueur restant, niveau des robots adverses.
+- `--wrangler` : test 4 à quatre joueurs (latence 150 ms, coupures). `--navigateur` : test 7, trois joueurs en étoile (pair-à-pair, puis relais forcé) et partie à 4 places lancée à 2 par le bouton.
 - Serveur TURN payant.

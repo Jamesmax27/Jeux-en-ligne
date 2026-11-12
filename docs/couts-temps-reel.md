@@ -66,6 +66,8 @@ La durée domine tout : une partie relayée de 15 min coûte autant de durée qu
 
 **Nova Dominion** (jeu de stratégie, 12 novembre 2026) : mêmes ordres de grandeur. Une partie en ligne dure 15 minutes au plus (112,5 Go-s si elle est relayée) ; le Duel y fait tourner une simulation plus lourde, mais la durée facturée ne dépend pas du calcul (0,28 ms par tick mesurés dans Node, soit environ 3 ms de calcul par seconde de partie, loin des limites). Un ordre porte la liste des unités choisies : quelques centaines d'octets, toujours une seule requête facturée pour 20 messages reçus. Les instantanés (50 à 110 Ko) ne partent qu'à une reprise ou à un secours : la sortie ne coûte rien.
 
+**Parties à 3 ou 4 joueurs** (modes de Nova Dominion, 12 novembre 2026, `docs/cadrage-temps-reel.md` section 16) : une partie relayée reste **un seul Durable Object**, donc la même durée facturée (112,5 Go-s pour 15 minutes) quel que soit le nombre de joueurs ; seuls les messages reçus augmentent (ordres et hachages de chaque joueur : environ deux fois plus de requêtes à 4 qu'à 2, toujours quelques centaines par partie). Le calcul par tick reste faible (0,4 ms au plus mesuré à 4 camps). Ce qui change le budget : le pair-à-pair en étoile ne tient que si **chaque** joueur peut se relier au premier arrivé ; à 3 ou 4 sur des réseaux mobiles, la partie passera plus souvent par le relais. Le seuil de 80 % du Budget reste le garde-fou (au-delà, partie contre les robots). Un joueur seul restant continue sur son appareil : le relais s'arrête aussitôt.
+
 ## 4. Estimé : parties possibles par jour
 
 **Plan gratuit** (13 000 Go-s et 100 000 requêtes Durable Objects par jour, pour tout le compte) :
