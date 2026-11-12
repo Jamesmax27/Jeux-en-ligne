@@ -573,7 +573,7 @@ async function principal() {
         if (regles.ageMinimum(fiche.ages) !== null && !/^\d+-\d*$/.test(String(vg.typicalAgeRange || ''))) erreur(sujet, 'JSON-LD VideoGame : « typicalAgeRange » absent ou mal écrit (ex. « 6- »)', jeu);
         if (vg.isFamilyFriendly !== !taxonomie.pourAdos(fiche.ages)) erreur(sujet, `JSON-LD VideoGame : isFamilyFriendly doit valoir ${!taxonomie.pourAdos(fiche.ages)} (jeu ${fiche.ages})`, jeu);
         const multi = [].concat(vg.playMode || []).some((m) => /MultiPlayer$/.test(m));
-        if (multi !== (fiche.multijoueur === true)) erreur(sujet, 'JSON-LD VideoGame : playMode MultiPlayer seulement (et toujours) pour un jeu multijoueur', jeu);
+        if (multi !== (fiche.multijoueur === true || fiche.temps_reel === true)) erreur(sujet, 'JSON-LD VideoGame : playMode MultiPlayer seulement (et toujours) pour un jeu multijoueur', jeu);
         if (vg.url !== attendue) erreur(sujet, 'JSON-LD VideoGame : url différente de la canonical', jeu);
         if (vg.isAccessibleForFree !== true || String(vg.offers?.price) !== '0') erreur(sujet, 'JSON-LD VideoGame : gratuité (isAccessibleForFree, offers.price 0) absente', jeu);
         const age = regles.ageMinimum(fiche.ages);

@@ -241,7 +241,7 @@ async function demarrer() {
     const c = await (await fetch('/catalog.json')).json();
     const lang = langue();
     catalogue = new Map((c.games || []).map((j) => [j.id, j]));
-    for (const jeu of (c.games || []).filter((j) => j.multijoueur === true)) {
+    for (const jeu of (c.games || []).filter((j) => j.multijoueur === true && j.temps_reel !== true)) {
       const option = document.createElement('option');
       option.value = `multi:${jeu.id}`;
       option.textContent = t('classement.jeuMulti', { titre: jeu.i18n?.[lang]?.title || jeu.title });

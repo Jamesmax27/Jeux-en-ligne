@@ -33,6 +33,8 @@ import { activerHorsLigne } from './hors-ligne.js';
 import { SCRIPT_SUIVI, suivreJeu, noterErreur, noterFin } from './suivi.js';
 import { suivreTemps, noterTermine, ticketMulti } from './profil.js';
 import { brancherMultijoueur, verifierPartie, RE_PARTIE } from './multijoueur/lanceur.js';
+// Jeux en temps réel 1 contre 1 (docs/cadrage-temps-reel.md) : recherche, WebRTC, relais.
+import { brancherTempsReel } from './temps-reel/lanceur.js';
 import { annoncer } from './amis.js';
 import { urlJeu, urlAccueil, urlProposer, urlAmis } from './chemins.js';
 import {
@@ -71,6 +73,7 @@ let jeuCourant = null;   // fiche du jeu affiché (catalog.json)
 let htmlJeu = null;      // code du jeu, gardé pour le relancer dans une autre langue
 let message = null;      // { titre, texte } : clés du message affiché à la place du jeu
 let multi = null;        // connexion multijoueur du jeu affiché (jeux "multijoueur" seulement)
+let tempsReel = null;    // connexions d'un jeu en temps réel ("temps_reel" seulement)
 let invitation = null;   // { partie } : partie d'un ami à rejoindre (bouton « Rejoindre »), une seule fois
 
 // Bouton « Rejoindre » d'un ami (page Amis, classement entre amis) : nom de sa partie en ligne.
@@ -241,6 +244,7 @@ function proteger(html) {
 
 function afficherJeu() {
   multi?.fermer(); // jeu relancé (autre langue) : il redemandera sa partie en ligne
+  tempsReel?.fermer();
   el.cadre.addEventListener('load', () => el.cadre.focus(), { once: true });
   el.cadre.srcdoc = proteger(htmlJeu);
 }
@@ -264,7 +268,11 @@ async function chargerJeu(jeu) {
   const reponse = await fetch(jeu.play); // ex. « games/saut-obstacles/?v=1 »
   if (!reponse.ok) throw Object.assign(new Error(`HTTP ${reponse.status}`), { statut: reponse.status });
   htmlJeu = await reponse.text();
-  if (jeu.multijoueur) {
+  if (jeu.temps_reel) {
+    // Jeu en temps réel : son propre lanceur (le jeu ne parle pas le protocole du tour par tour).
+    tempsReel = brancherTempsReel({ jeu, html: htmlJeu, cadre: el.cadre });
+    addEventListener('pagehide', () => tempsReel?.fermer());
+  } else if (jeu.multijoueur) {
     multi = brancherMultijoueur({
       jeu, html: htmlJeu, cadre: el.cadre, ticket: () => ticketMulti(jeu.id),
       nommer: (n) => t('profil.pseudoDefaut', { n }),
@@ -306,10 +314,16 @@ function garderPourHorsLigne(jeu) {
 // - « jel-fin » (SCRIPT_SUIVI, FMG.reportEnd) : victoire ou défaite, avec le niveau ;
 // - « jel-termine » (SCRIPT_SUIVI, FMG.reportComplete) : tout le jeu est terminé, avec ses étoiles (profil.js) ;
 // - « jel-sauvegarde » (save.js) : progression du jeu à garder sur l'appareil ;
-// - « jel-multi » (multijoueur/moteur.js) : partie en ligne d'un jeu multijoueur.
+// - « jel-multi » (multijoueur/moteur.js) : partie en ligne d'un jeu multijoueur ;
+// - « jel-tr » (temps-reel/moteur.js) : partie en ligne d'un jeu en temps réel.
 addEventListener('message', (evenement) => {
   if (evenement.source !== el.cadre.contentWindow) return;
   const donnees = evenement.data;
+  if (donnees?.type === 'jel-tr' && typeof donnees.op === 'string') {
+    if (tempsReel) tempsReel.recevoir(donnees);
+    else el.cadre.contentWindow.postMessage({ type: 'jel-tr', etat: 'solo', raison: 'jeu' }, '*');
+    return;
+  }
   if (donnees?.type === 'jel-multi' && typeof donnees.op === 'string') {
     if (multi) multi.recevoir(donnees);
     else el.cadre.contentWindow.postMessage({ type: 'jel-multi', etat: 'solo', raison: 'jeu' }, '*');

@@ -117,6 +117,9 @@ async function controlerFiche(id, dossier) {
   if (f.multijoueur !== undefined && typeof f.multijoueur !== 'boolean') erreur(id, 'game.json : "multijoueur" doit valoir true ou false');
   if (f.multijoueur === true && !(Number.isInteger(f.places) && f.places >= 2 && f.places <= 10)) erreur(id, 'game.json : "places" (jeu multijoueur) doit être un nombre entier de 2 à 10, le même que dans les règles');
   if (f.multijoueur !== true && f.places !== undefined) erreur(id, 'game.json : "places" n\'existe que pour un jeu multijoueur ("multijoueur": true)');
+  // Jeu en temps réel 1 contre 1 (docs/cadrage-temps-reel.md) : son propre moteur (jel-tr), jamais avec "multijoueur".
+  if (f.temps_reel !== undefined && f.temps_reel !== true) erreur(id, 'game.json : "temps_reel" vaut true (jeu en temps réel), ou est absent');
+  if (f.temps_reel === true && f.multijoueur !== undefined) erreur(id, 'game.json : un jeu "temps_reel" n\'a pas de champ "multijoueur" (le catalogue l\'ajoute de lui-même)');
   // Bouton « Rejoindre » d'un ami (docs/consigne-amis.md, section 3) : obligatoire pour les nouveaux jeux multijoueurs.
   if (f.rejoindre !== undefined && (f.rejoindre !== true || f.multijoueur !== true)) erreur(id, 'game.json : "rejoindre" vaut true, et seulement pour un jeu multijoueur (le jeu sait ouvrir la partie d\'un ami)');
   if (f.multijoueur === true && f.rejoindre !== true && dateValide(f.added) && f.added >= REJOINDRE_DEPUIS) {
@@ -179,6 +182,36 @@ async function controlerJeu(id, dossier) {
   controlerJeuTermine(id, html);
   if (fiches.get(id)?.multijoueur === true) controlerMultijoueur(id, html);
   else if (/<script\b[^>]*\bid=["']jel-(?:multi|regles)["']/i.test(html)) erreur(id, 'blocs jel-multi ou jel-regles présents : ajouter "multijoueur": true et "places" dans game.json (ou retirer ces blocs)');
+  if (fiches.get(id)?.temps_reel === true) controlerTempsReel(id, html);
+  else if (/<script\b[^>]*\bid=["']jel-(?:tr|sim)["']/i.test(html)) erreur(id, 'blocs jel-tr ou jel-sim présents : ajouter "temps_reel": true dans game.json (ou retirer ces blocs)');
+}
+
+// Jeu en temps réel (docs/cadrage-temps-reel.md) : moteur commun à jour (public/temps-reel/moteur.js,
+// recopié par i18n-jeu.mjs), simulation dans <script id="jel-sim"> (window.JEL_SIM), les deux avant
+// le code du jeu ; partie créée avec JEL_TR.creer ; bouton de la partie en ligne data-tr="jouer" et
+// bouton « Jouer contre un robot maintenant » data-tr="robot". La simulation elle-même (entiers,
+// déterminisme, robots) : scripts/tester-temps-reel.mjs.
+const RE_TR = /<script\b[^>]*\bid=["']jel-tr["'][^>]*>([\s\S]*?)<\/script>/i;
+const RE_SIM = /<script\b[^>]*\bid=["']jel-sim["'][^>]*>([\s\S]*?)<\/script>/i;
+const moduleTR = (await readFile(path.join(RACINE, 'public', 'temps-reel', 'moteur.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
+
+function controlerTempsReel(id, html) {
+  const moteur = RE_TR.exec(html);
+  const sim = RE_SIM.exec(html);
+  if (!moteur) erreur(id, 'temps réel : moteur <script id="jel-tr"> absent : lancer node scripts/i18n-jeu.mjs ' + id);
+  else if (moteur[1].replace(/\r\n/g, '\n').trim() !== moduleTR) erreur(id, 'temps réel : moteur jel-tr pas à jour : lancer node scripts/i18n-jeu.mjs ' + id + ' (recopie public/temps-reel/moteur.js)');
+  if (!sim) erreur(id, 'temps réel : simulation <script id="jel-sim"> absente (window.JEL_SIM, voir docs/cadrage-temps-reel.md)');
+  else if (!/\bwindow\.JEL_SIM\s*=/.test(sim[1])) erreur(id, 'temps réel : le bloc jel-sim doit définir window.JEL_SIM = { … }');
+  const premierScript = /<script\b(?![^>]*\bid=["']jel-(?:i18n|i18n-textes|sauvegarde|tr|sim)["'])(?![^>]*type=["']application\/json)[^>]*>/i.exec(html);
+  for (const [bloc, nom] of [[moteur, 'jel-tr'], [sim, 'jel-sim']]) {
+    if (bloc && premierScript && premierScript.index < bloc.index) erreur(id, `temps réel : le bloc ${nom} doit être chargé avant le code du jeu`);
+  }
+  if (moteur && sim && sim.index < moteur.index) erreur(id, 'temps réel : le bloc jel-sim se place après le moteur jel-tr');
+  const code = html.replace(RE_BLOCS_GENERES, '').replace(RE_SIM, '');
+  if (!/\bJEL_TR\.creer\s*\(/.test(code)) erreur(id, 'temps réel : le jeu ne crée pas sa partie avec JEL_TR.creer({ sim: window.JEL_SIM, … })');
+  if (!/\bdata-tr\s*=\s*["']jouer["']/.test(code)) erreur(id, 'temps réel : le bouton « Jouer en ligne » doit porter data-tr="jouer" (écran titre)');
+  if (!/\bdata-tr\s*=\s*["']robot["']/.test(code) || !/\.jouerRobot\s*\(/.test(code)) erreur(id, 'temps réel : l\'écran de recherche doit avoir le bouton « Jouer contre un robot maintenant » (data-tr="robot", partie.jouerRobot())');
+  if (/\bnew\s+(?:WebSocket|RTCPeerConnection)\b|\bfetch\s*\(/.test(code)) erreur(id, 'temps réel : aucun accès réseau dans le jeu (c\'est le lanceur qui se connecte)');
 }
 
 // Jeu multijoueur (docs/multijoueur.md) : moteur commun à jour (public/multijoueur/moteur.js,
@@ -225,7 +258,7 @@ function controlerMultijoueur(id, html) {
 // victoire et de défaite. FMG est fourni par le lanceur (SCRIPT_SUIVI de
 // public/suivi.js) : ouvert seul, le jeu ne l'a pas, d'où la garde obligatoire
 // sur la même ligne (if (window.FMG) …, window.FMG && …, window.FMG?.…).
-const RE_BLOCS_GENERES = /<script\b[^>]*\bid=["']jel-(?:i18n|i18n-textes|sauvegarde|multi)["'][^>]*>[\s\S]*?<\/script>/gi;
+const RE_BLOCS_GENERES = /<script\b[^>]*\bid=["']jel-(?:i18n|i18n-textes|sauvegarde|multi|tr)["'][^>]*>[\s\S]*?<\/script>/gi;
 
 function controlerFinDePartie(id, html) {
   const lignes = html.replace(RE_BLOCS_GENERES, '').split('\n').filter((l) => /\bFMG\.reportEnd\s*\(/.test(l));

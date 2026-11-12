@@ -226,7 +226,7 @@ Ce que le multijoueur fait pour rester dedans :
 
 ## 13. Limites et pistes
 
-- Jeux au tour par tour seulement (temps réel : boucle sur le serveur, hors quota gratuit).
+- Jeux au tour par tour seulement. Le **temps réel 1 contre 1** a son propre moteur, ses propres adresses (`/tr/…`) et ses propres Durable Objects dans le même Worker : `docs/cadrage-temps-reel.md` (prototype « Les Petites Planètes », `"temps_reel": true`). Rien de ce document ne change pour lui, et il ne change rien au tour par tour.
 - Pas de choix de partie ni de code de partie : les joueurs d'un même jeu se retrouvent au hasard, sauf avec le bouton « Rejoindre » de la page Amis (partie d'un ami, `docs/consigne-amis.md`).
 - Pas de limite par adresse IP (un abus remplirait au pire `MAX_JOUEURS`, puis tout le monde jouerait contre des robots locaux) ; piste : règle de limite de débit de Cloudflare sur `multi.freemicrogames.com/ws`.
 - Un déploiement du Worker coupe les parties en cours (elles continuent sur l'appareil).

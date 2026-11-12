@@ -138,6 +138,16 @@ Un jeu multijoueur (à plusieurs en ligne, robots aux places vides) suit **toute
 - **Rejoindre un ami** : `"rejoindre": true` dans `game.json`, et à la fin de l'initialisation `if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();` (ouverture directe du salon de la partie de l'ami ; `docs/multijoueur.md`, section 3 « Amis »).
 - Contrôle : `node scripts/tester-multijoueur.mjs <id> --navigateur` jusqu'à « Multijoueur : tout est bon », et regarder les captures de `captures/multijoueur/<id>/` (dont le salon plein avec les pseudos, et « Rejoindre »).
 
+### Jeux en temps réel (1 contre 1)
+
+Prototype seulement pour l'instant (`games/petites-planetes/`, validé par le propriétaire) : la boucle de nuit n'en fabrique pas encore (`docs/cadrage-temps-reel.md`, section 14). Un jeu en temps réel suit toutes les règles de ce document, plus celles du cadrage, à lire en entier :
+
+- `game.json` : `"temps_reel": true`, sans `"multijoueur"` ni `"places"` (le catalogue les ajoute).
+- Simulation dans `<script id="jel-sim">` (`window.JEL_SIM` : fonctions pures sur un état **entièrement entier**, sans `Math.random`, `Date`, `performance`, minuterie ni fonction mathématique comme `Math.sin` ou `Math.sqrt` ; hasard par `alea`, tiré de l'état ; robot de 3 niveaux dans la simulation), après le moteur `<script id="jel-tr">` (recopié par `node scripts/i18n-jeu.mjs --assembler <id>`) et avant le code du jeu. Aucun code réseau dans le jeu.
+- Écran titre : « Jouer » (parcours solo de 20 niveaux contre le robot) et « Jouer en ligne » (`data-tr="jouer"`) ; recherche de 15 s au plus avec compte à rebours et bouton « Jouer contre un robot maintenant » (`data-tr="robot"`, `partie.jouerRobot()`) ; partie contre le robot sans adversaire, hors connexion comme en ligne.
+- Rendu en `requestAnimationFrame`, interpolé entre deux ticks (`partie.prec`, `partie.etat`, `partie.alpha()`), retour visuel immédiat de chaque ordre ; portrait et paysage.
+- Contrôle : `node scripts/tester-temps-reel.mjs <id>` jusqu'à « Temps réel : tout est bon » (`--wrangler` et `--navigateur` pour les essais réseau).
+
 **Méthode de la boucle de nuit (recommandée pour tout nouveau jeu)** : les textes sont écrits à part, un fichier par langue, dans `i18n-jeu/<id>/` (dossier ignoré par git) :
 
 ```json

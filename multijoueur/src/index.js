@@ -12,6 +12,8 @@
 //   GET /partie?jeu=<id>&nom=<nom>   la partie d'un ami peut-elle être
 //               rejointe ? { etat: 'ouverte' | 'pleine' | 'introuvable' | 'complet' }
 //   POST /presence, /presence/lire   présence des amis (src/presence.js)
+//   /tr/…       jeux en temps réel 1 contre 1 (src/temps-reel/routes.js,
+//               docs/cadrage-temps-reel.md) : recherche, partie, compteurs
 // Le préfixe /multi est aussi accepté (/multi/ws…), pour une route sur le
 // domaine du site.
 //
@@ -29,10 +31,14 @@ import { JEUX, ORIGINES, VERSION } from './jeux.js';
 import { PROTOCOLE } from './moteur.js';
 import { appelerAccueil } from './accueil.js';
 import { routePresence } from './presence.js';
+import { routeTempsReel, infosTempsReel } from './temps-reel/routes.js';
 
 export { Partie } from './partie.js';
 export { Accueil } from './accueil.js';
 export { Presence } from './presence.js';
+export { Rencontre } from './temps-reel/rencontre.js';
+export { Duel } from './temps-reel/duel.js';
+export { Budget } from './temps-reel/budget.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RE_PARTIE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -59,7 +65,7 @@ export default {
     const chemin = url.pathname.replace(/^\/multi(?=\/|$)/, '') || '/';
 
     if (chemin === '/etat') {
-      return new Response(JSON.stringify({ version: VERSION, protocole: PROTOCOLE, jeux: Object.keys(JEUX).sort() }), {
+      return new Response(JSON.stringify({ version: VERSION, protocole: PROTOCOLE, jeux: Object.keys(JEUX).sort(), tempsReel: infosTempsReel() }), {
         headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' },
       });
     }
@@ -68,6 +74,10 @@ export default {
 
     const presence = await routePresence(request, env, chemin, origines);
     if (presence) return presence;
+
+    // Jeux en temps réel (recherche, partie, compteurs) : adresses séparées, le tour par tour n'y passe pas.
+    const tempsReel = await routeTempsReel(request, env, chemin, origines);
+    if (tempsReel) return tempsReel;
 
     // La partie d'un ami (bouton « Rejoindre ») a-t-elle encore une place ? Lecture
     // seule à l'accueil ; réponse lisible par le site (CORS).
