@@ -30,7 +30,11 @@
 //   - amis (docs/consigne-amis.md) : nom de la partie donné au lanceur,
 //     pseudos des places (noms), partie d'un ami rejointe ou pleine, /partie ;
 //     --navigateur : pseudos reçus par le jeu, et pour un jeu "rejoindre",
-//     salon de la partie de l'ami ouvert tout seul, partie pleine → message.
+//     salon de la partie de l'ami ouvert tout seul, partie pleine → message ;
+//   - --navigateur : pseudos lisibles en entier dans le salon plein et à table
+//     pleine (pseudo de 16 caractères, ni ellipse, ni débordement caché, ni
+//     raccourci par le jeu) ; bloquant pour un jeu ajouté depuis
+//     PSEUDOS_ENTIERS_DEPUIS, avertissement pour les plus anciens.
 // Code de sortie : 0 = tout est bon, 1 = problème(s), 2 = panne de l'outil.
 // Le mode --navigateur nécessite Playwright (ou CHROMIUM_PATH, ex. Edge).
 // ==========================================================================
@@ -46,6 +50,10 @@ const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT_TEST = 8126;
 const MANCHES = 12;                 // manches simulées par contrôle
 const ACTIONS_MAX = 3000;           // actions au plus par manche
+// Pseudos coupés (salon plein, table pleine) : bloquant pour les jeux ajoutés à partir de
+// cette date ("added" de game.json) ; simple avertissement pour les plus anciens, publiés
+// avant ce contrôle (décision du propriétaire, 12 novembre 2026 : à corriger à part).
+const PSEUDOS_ENTIERS_DEPUIS = '2026-11-13';
 
 const args = process.argv.slice(2);
 const avecNavigateur = args.includes('--navigateur');
@@ -597,6 +605,47 @@ async function testerNavigateur(jeux) {
         return p ? { mode: p.mode, n: p.n, sieges: p.sieges(), phase: p.phase, siege: p.siege } : null;
       }).catch(() => null);
       const capturer = (nom) => page.screenshot({ path: path.join(dossier, nom) });
+      // Pseudos coupés (docs/multijoueur.md, section 3, « Amis ») : chaque texte de la page qui
+      // contient un pseudo des faux joueurs doit se lire en entier. Coupé = raccourci par le code
+      // du jeu (début du pseudo suivi de « … »), ellipse (le texte déborde d'un élément en
+      // text-overflow: ellipsis) ou texte qui sort d'un parent en overflow hidden/clip.
+      // Les pseudos dessinés sur un canvas ne sont pas vus ici (relecture des captures).
+      const pseudosCoupes = (cadre, noms) => cadre.evaluate((noms) => {
+        const coupes = [];
+        const sansBlancs = (t) => String(t).replace(/[\s  ]/g, '');
+        const marcheur = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = marcheur.nextNode(); n; n = marcheur.nextNode()) {
+          const el = n.parentElement;
+          if (!el || /^(SCRIPT|STYLE|TEMPLATE)$/.test(el.tagName)) continue;
+          if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue;
+          const texte = sansBlancs(n.textContent);
+          const raccourci = noms.find((x) => {
+            const nx = sansBlancs(x);
+            if (texte.includes(nx)) return false;
+            for (let k = nx.length - 1; k >= 2; k--) if (texte.includes(nx.slice(0, k) + '…') || texte.includes(nx.slice(0, k) + '...')) return true;
+            return false;
+          });
+          if (raccourci) { coupes.push(`« ${raccourci} » (raccourci par le jeu : « ${n.textContent.trim().slice(0, 40)} »)`); continue; }
+          const nom = noms.find((x) => texte.includes(sansBlancs(x)));
+          if (!nom) continue;
+          const plage = document.createRange();
+          plage.selectNodeContents(n);
+          const rt = plage.getBoundingClientRect();
+          if (!rt.width || !rt.height) continue;
+          for (let a = el; a && a !== document.body && a !== document.documentElement; a = a.parentElement) {
+            const s = getComputedStyle(a);
+            if (s.textOverflow === 'ellipsis' && a.scrollWidth > a.clientWidth + 1) { coupes.push(`« ${nom} » (ellipse sur ${a.tagName.toLowerCase()}${a.className ? '.' + String(a.className).trim().split(/\s+/).join('.') : ''})`); break; }
+            const cx = /hidden|clip/.test(s.overflowX), cy = /hidden|clip/.test(s.overflowY);
+            if (!cx && !cy) continue;
+            const ra = a.getBoundingClientRect();
+            if ((cx && (rt.left < ra.left - 1 || rt.right > ra.right + 1)) || (cy && (rt.top < ra.top - 1 || rt.bottom > ra.bottom + 1))) {
+              coupes.push(`« ${nom} » (déborde de ${a.tagName.toLowerCase()}${a.className ? '.' + String(a.className).trim().split(/\s+/).join('.') : ''}, overflow hidden)`);
+              break;
+            }
+          }
+        }
+        return [...new Set(coupes)];
+      }, noms).catch(() => []);
       // Toucher un bouton du jeu. Si le navigateur refuse le toucher (élément posé par-dessus,
       // hors de l'écran… : ça arrive sur les machines de GitHub, dont les polices Linux décalent
       // la mise en page), la raison et une capture sont notées, puis le bouton est actionné
@@ -638,7 +687,8 @@ async function testerNavigateur(jeux) {
         // Le salon se remplit de vrais joueurs (nombre maximum de joueurs), puis le chef (la page) lance.
         for (let k = 2; k <= r.places; k++) { faux.add(`faux-${k}`); arbitre.rejoindre(`faux-${k}`); }
         // Pseudos des vrais joueurs (comme partie.js : pseudo choisi, ou nombre du pseudo par défaut).
-        const PSEUDOS = ['Léa', 'Tom Pouce', null, 'Zoé', 'Malik', 'Inès', 'Hugo', 'Sacha', 'Lou'];
+        // « Capitaine Comète » : 16 caractères, la longueur maximale d'un pseudo (PSEUDO_MAX).
+        const PSEUDOS = ['Léa', 'Tom Pouce', null, 'Capitaine Comète', 'Malik', 'Inès', 'Hugo', 'Sacha', 'Lou'];
         route?.send(JSON.stringify({ t: 'noms', noms: arbitre.sieges.map((c, s) => (c === null || c === 'page' ? null : PSEUDOS[s % PSEUDOS.length] ? { p: PSEUDOS[s % PSEUDOS.length] } : { u: 4821 })) }));
         await attendre(1000);
         await attendreFile(cadre);
@@ -646,8 +696,17 @@ async function testerNavigateur(jeux) {
         const humains = e?.sieges?.filter((x) => x.humain).length ?? 0;
         if (humains !== r.places) probleme(sujet, `navigateur : ${r.places} vrais joueurs dans le salon, le jeu en montre ${humains}`);
         const nommes = e?.sieges?.filter((x) => x.humain && !x.moi && x.nom).length ?? 0;
+        // Pseudos tels que le jeu les a reçus (« Joueur 4 821 », traduit par le lanceur, compris).
+        const nomsAttendus = [...new Set((e?.sieges || []).filter((x) => x.humain && !x.moi && x.nom).map((x) => String(x.nom)))];
+        // Bloquant pour un jeu récent, avertissement pour un jeu publié avant le contrôle.
+        const ajoute = String(fiches.get(id)?.added || '');
+        const signalerCoupes = (m) => (ajoute && ajoute < PSEUDOS_ENTIERS_DEPUIS
+          ? noter(sujet, `attention (jeu ajouté le ${ajoute}, avant le ${PSEUDOS_ENTIERS_DEPUIS} : non bloquant) : ${m}`)
+          : probleme(sujet, m));
         if (nommes !== r.places - 1) probleme(sujet, `navigateur : pseudos des autres joueurs non reçus par le jeu (${nommes} sur ${r.places - 1})`);
         await capturer('2-salon-plein.png');
+        const coupesSalon = await pseudosCoupes(cadre, nomsAttendus);
+        if (coupesSalon.length) signalerCoupes(`navigateur : pseudos coupés dans le salon plein (capture 2-salon-plein.png) : ${coupesSalon.join(' ; ')}. Un pseudo (16 caractères au plus) doit se lire en entier sur 390 px : pas de white-space: nowrap + text-overflow: ellipsis sur le nom, le laisser passer à la ligne (white-space: normal; overflow-wrap: anywhere), police plus petite ou nom sous l'avatar`);
         const lancer = cadre.locator('[data-multi="lancer"]').first();
         if (!(await lancer.isVisible().catch(() => false))) probleme(sujet, 'navigateur : le chef ne voit pas de bouton data-multi="lancer" dans le salon');
         else await toucher(lancer, 'lancer');
@@ -656,6 +715,8 @@ async function testerNavigateur(jeux) {
         e = await etatJeu(cadre);
         if (e?.phase !== 'jeu' && arbitre.phase === 'salon') probleme(sujet, 'navigateur : le bouton du chef ne lance pas la manche');
         await capturer('3-table-pleine.png');
+        const coupesTable = await pseudosCoupes(cadre, nomsAttendus);
+        if (coupesTable.length) signalerCoupes(`navigateur : pseudos coupés à table pleine (capture 3-table-pleine.png) : ${coupesTable.join(' ; ')}. Un pseudo (16 caractères au plus) doit se lire en entier sur 390 px dans les places, le tour en cours et le classement : le laisser passer à la ligne (white-space: normal; overflow-wrap: anywhere) ou réduire la police, jamais d'ellipse`);
         const nAvant = e?.n ?? 0;
         await attendre(6000);
         e = await etatJeu(cadre);
