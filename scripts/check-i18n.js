@@ -161,10 +161,12 @@ const RE_BLOC_MODULE = /<script\b[^>]*\bid=["']jel-i18n["'][^>]*>([\s\S]*?)<\/sc
 const RE_BLOC_SAUVEGARDE = /<script\b[^>]*\bid=["']jel-sauvegarde["'][^>]*>([\s\S]*?)<\/script>/i;
 // Moteur multijoueur (public/multijoueur/moteur.js, contrôlé par validate-games.mjs) : aucun texte affiché.
 const RE_BLOC_MULTI = /<script\b[^>]*\bid=["']jel-multi["'][^>]*>([\s\S]*?)<\/script>/i;
+// Moteur temps réel (public/temps-reel/moteur.js) et simulation (jel-sim) : aucun texte affiché.
+const RE_BLOC_TR = /<script\b[^>]*\bid=["']jel-(?:tr|sim)["'][^>]*>([\s\S]*?)<\/script>/gi;
 
 // Code du jeu sans le bloc de textes ni les modules communs.
 function codeDuJeu(html) {
-  return html.replace(RE_BLOC_TEXTES, '').replace(RE_BLOC_MODULE, '').replace(RE_BLOC_SAUVEGARDE, '').replace(RE_BLOC_MULTI, '');
+  return html.replace(RE_BLOC_TEXTES, '').replace(RE_BLOC_MODULE, '').replace(RE_BLOC_SAUVEGARDE, '').replace(RE_BLOC_MULTI, '').replace(RE_BLOC_TR, '');
 }
 
 // Clés écrites en toutes lettres dans le code : t('…'), JEL_I18N.t('…'), traduire('…')

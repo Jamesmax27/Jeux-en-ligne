@@ -30,9 +30,11 @@ on:
     paths:
       - "multijoueur/**"
       - "public/multijoueur/**"
+      - "public/temps-reel/**"
       - "games/**"
       - "scripts/multijoueur.mjs"
       - "scripts/tester-multijoueur.mjs"
+      - "scripts/tester-temps-reel.mjs"
       - "public/profil-reglages.js"
       - ".github/workflows/multijoueur.yml"
   workflow_dispatch:
@@ -80,6 +82,11 @@ jobs:
       - name: Contrôle du moteur, du Worker et des jeux
         if: steps.secrets.outputs.ok == 'true'
         run: node scripts/tester-multijoueur.mjs
+
+      # Jeux en temps réel (docs/cadrage-temps-reel.md) : simulations, Rencontre, Duel, Budget.
+      - name: Contrôle du temps réel
+        if: steps.secrets.outputs.ok == 'true'
+        run: node scripts/tester-temps-reel.mjs
 
       - name: Version déjà en ligne ?
         id: version

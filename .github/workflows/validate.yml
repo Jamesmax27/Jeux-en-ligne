@@ -34,6 +34,11 @@
 #     moteur, lanceur ou jeu   multijoueurs dans le lanceur (scripts/tester-multijoueur.mjs
 #     multijoueur)             --navigateur, docs/multijoueur.md) ; moteur modifié : les jeux
 #                              multijoueurs passent aussi au robot.
+#   - temps réel (moteur,    → simulation (entiers, rejeu identique, robots) et Worker avec de
+#     lanceur, Worker ou jeu   faux Durable Objects (scripts/tester-temps-reel.mjs, sans navigateur
+#     "temps_reel")            ni réseau, docs/cadrage-temps-reel.md) ; moteur modifié : les jeux
+#                              temps réel passent aussi au robot. Les essais contre « wrangler dev »
+#                              et dans le navigateur (--wrangler, --navigateur) se lancent à la main.
 #   - file d'idées, saisons  → tests des saisons et tendances de la boucle de nuit
 #     et tendances             (scripts/tester-inspirations.mjs : sans navigateur ni réseau).
 # Le reste (documentation, autres fichiers du site…) ne déclenche rien.
@@ -110,6 +115,8 @@ on:
       - "public/amis*.js"
       - "scripts/multijoueur.mjs"
       - "scripts/tester-multijoueur.mjs"
+      - "public/temps-reel/**"
+      - "scripts/tester-temps-reel.mjs"
       - "scripts/idees.mjs"
       - "scripts/inspirations.mjs"
       - "scripts/tester-inspirations.mjs"
@@ -139,6 +146,7 @@ jobs:
       demandes: ${{ steps.quoi.outputs.demandes }}
       stats: ${{ steps.quoi.outputs.stats }}
       multi: ${{ steps.quoi.outputs.multi }}
+      tr: ${{ steps.quoi.outputs.tr }}
       profil: ${{ steps.quoi.outputs.profil }}
       inspirations: ${{ steps.quoi.outputs.inspirations }}
       jeux: ${{ steps.quoi.outputs.jeux }}
@@ -175,6 +183,14 @@ jobs:
           if [ "${{ github.event_name }}" != "pull_request" ]; then multi=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^(public/multijoueur/|multijoueur/|scripts/(multijoueur|tester-multijoueur)\.mjs$|public/play\.js$)'; then multi=1; fi
           for id in $ids; do if grep -q '"multijoueur": *true' "games/$id/game.json" 2>/dev/null; then multi=1; fi; done
+          # Temps réel (docs/cadrage-temps-reel.md) : moteur, lanceur, Worker, outils, ou un jeu temps réel modifié.
+          if printf '%s\n' "$fichiers" | grep -q '^public/temps-reel/moteur\.js$'; then
+            ids=$(printf '%s\n' $ids $( (grep -l '"temps_reel": *true' games/*/game.json || true) | cut -d/ -f2) | sort -u | tr '\n' ' ')
+          fi
+          tr=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then tr=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(public/temps-reel/|multijoueur/|scripts/(multijoueur|tester-temps-reel)\.mjs$|public/play\.js$)'; then tr=1; fi
+          for id in $ids; do if grep -q '"temps_reel": *true' "games/$id/game.json" 2>/dev/null; then tr=1; fi; done
           tous=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then tous=1; fi
           # Modules communs de traduction et de sauvegarde : recopiés dans chaque jeu, donc tous les jeux sont concernés.
@@ -229,12 +245,13 @@ jobs:
             echo "demandes=$demandes"
             echo "stats=$stats"
             echo "multi=$multi"
+            echo "tr=$tr"
             echo "profil=$profil"
             echo "inspirations=$inspirations"
             echo "jeux=$jeux"
             echo "lots=$lots_json"
           } >> "$GITHUB_OUTPUT"
-          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats | multijoueur : $multi | profil : $profil | saisons et tendances : $inspirations | jeux à tester : $nb sur $lots machine(s)"
+          echo "Jeux modifiés : ${ids:-aucun} | tous les jeux : $tous | site : $site | référencement du site : $seo | navigateur : $navigateur | demandes : $demandes | statistiques : $stats | multijoueur : $multi | temps réel : $tr | profil : $profil | saisons et tendances : $inspirations | jeux à tester : $nb sur $lots machine(s)"
 
   # 2. Les jeux dans le navigateur, partagés entre plusieurs machines en même
   #    temps (un jeu sur LOTS_MAX chacune) : robot, sauvegarde, traductions.
@@ -414,6 +431,13 @@ jobs:
           path: captures/multijoueur/
           retention-days: 7
           if-no-files-found: ignore
+
+      # Temps réel (docs/cadrage-temps-reel.md) : simulation de chaque jeu temps réel (entiers,
+      # journal rejoué identique, instantané, robots) et Worker avec de faux Durable Objects
+      # (recherche, relais, absence, reprise, secours, budget). Sans réseau ni Cloudflare.
+      - name: Contrôler le temps réel
+        if: needs.quoi.outputs.tr == '1'
+        run: node scripts/tester-temps-reel.mjs
 
       # Saisons et tendances de la boucle de nuit (scripts/inspirations.mjs, scripts/idees.mjs) :
       # dates des fêtes, calendrier, flux Google Trends (exemple), filtre, choix des idées.

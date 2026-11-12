@@ -25,6 +25,13 @@ MAX_JOUEURS = "80"
 #   npx wrangler secret put MULTI_SECRET
 # Sans lui, les parties marchent comme avant, sans rien créditer aux profils.
 SITE_API = "https://freemicrogames.com"
+# Jeux en temps réel (docs/cadrage-temps-reel.md, section 9) : Go-s par jour UTC
+# laissés aux parties relayées (une partie relayée de 15 min ≈ 112 Go-s). Plus de
+# nouvelle partie relayée au-delà de 80 % (src/temps-reel/budget.js). Valeur
+# prudente, à régler par le propriétaire d'après la consommation relevée dans le
+# tableau de bord Cloudflare (le plan gratuit donne 13 000 Go-s par jour à tout
+# le compte, tour par tour et présence des amis compris).
+BUDGET_RELAIS_GOS = "6000"
 # Sites permis : tirés de public/multijoueur/config.js (SITES_MULTI). Pour les
 # remplacer (essais), décommenter : ORIGINES = "https://freemicrogames.com,http://localhost:8080"
 
@@ -45,6 +52,22 @@ class_name = "Accueil"
 name = "PRESENCE"
 class_name = "Presence"
 
+# Jeux en temps réel 1 contre 1 (docs/cadrage-temps-reel.md, src/temps-reel/) :
+# Rencontre (un par jeu : recherche et appariement), Duel (un par partie :
+# signalisation WebRTC, relais à tick fixe), Budget (un seul : consommation
+# du jour des parties relayées, refus au-delà de 80 % de BUDGET_RELAIS_GOS).
+[[durable_objects.bindings]]
+name = "RENCONTRE"
+class_name = "Rencontre"
+
+[[durable_objects.bindings]]
+name = "DUEL"
+class_name = "Duel"
+
+[[durable_objects.bindings]]
+name = "BUDGET"
+class_name = "Budget"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Partie", "Accueil"]
@@ -52,6 +75,10 @@ new_sqlite_classes = ["Partie", "Accueil"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Presence"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["Rencontre", "Duel", "Budget"]
 
 [observability]
 enabled = true

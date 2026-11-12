@@ -18,6 +18,9 @@
 // et, pour un jeu multijoueur (game.json : "multijoueur": true), de sa copie
 // du moteur commun public/multijoueur/moteur.js dans
 //   <script id="jel-multi"> … </script>   (docs/multijoueur.md)
+// et, pour un jeu en temps réel (game.json : "temps_reel": true), de sa copie
+// du moteur public/temps-reel/moteur.js dans
+//   <script id="jel-tr"> … </script>      (docs/cadrage-temps-reel.md)
 //
 // 1. Recopie des modules (sans --assembler) : remplace les copies par la
 //    version actuelle des modules (à lancer après chaque modification de
@@ -72,8 +75,14 @@ const RE_MULTI = /(<script\b[^>]*\bid=["']jel-multi["'][^>]*>)[\s\S]*?(<\/script
 const module = (await readFile(path.join(RACINE, 'public', 'i18n', 'i18n.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
 const moduleSauvegarde = (await readFile(path.join(RACINE, 'public', 'save.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
 const moduleMulti = (await readFile(path.join(RACINE, 'public', 'multijoueur', 'moteur.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
-if (/<\/script/i.test(module + moduleSauvegarde + moduleMulti)) {
-  console.error('✗ public/i18n/i18n.js, public/save.js ou public/multijoueur/moteur.js contient « </script » : la copie couperait les jeux.');
+const moduleTR = (await readFile(path.join(RACINE, 'public', 'temps-reel', 'moteur.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
+const RE_TR = /(<script\b[^>]*\bid=["']jel-tr["'][^>]*>)[\s\S]*?(<\/script>)/i;
+if (/<\/script/i.test(module + moduleSauvegarde + moduleMulti + moduleTR)) {
+  console.error('✗ public/i18n/i18n.js, public/save.js, public/multijoueur/moteur.js ou public/temps-reel/moteur.js contient « </script » : la copie couperait les jeux.');
+  process.exit(1);
+}
+if (/<script\b/i.test(moduleTR)) {
+  console.error('✗ public/temps-reel/moteur.js contient « <script » : la recherche du bloc jel-sim se tromperait.');
   process.exit(1);
 }
 // Le moteur est recopié avant le bloc jel-regles : une balise script écrite dans ses
@@ -105,7 +114,8 @@ async function recopierModule() {
     const html = await readFile(chemin, 'utf8');
     if (!RE_MODULE.test(html)) { console.log(`  –  ${id} : pas de module jel-i18n, ignoré`); continue; }
     const multi = await estMultijoueur(path.join(DOSSIER_JEUX, id, 'game.json'));
-    const nouveau = rangerMulti(rangerSauvegarde(html.replace(RE_MODULE, (_, ouverture, fermeture) => `${ouverture}\n${module}\n${fermeture}`)), multi);
+    const tr = await estTempsReel(path.join(DOSSIER_JEUX, id, 'game.json'));
+    const nouveau = rangerTempsReel(rangerMulti(rangerSauvegarde(html.replace(RE_MODULE, (_, ouverture, fermeture) => `${ouverture}\n${module}\n${fermeture}`)), multi), tr);
     if (nouveau !== html) {
       await writeFile(chemin, nouveau, 'utf8');
       modifies++;
@@ -153,7 +163,7 @@ async function assembler({ metaSeule = false } = {}) {
     metas[lang] = objet(contenu.meta) ? contenu.meta : {};
   }
 
-  if (!metaSeule) await rangerTextes(id, cheminHtml, textes, await estMultijoueur(cheminFiche));
+  if (!metaSeule) await rangerTextes(id, cheminHtml, textes, await estMultijoueur(cheminFiche), await estTempsReel(cheminFiche));
   await rangerMeta(cheminFiche, metas, { maj: metaSeule });
 
   if (metaSeule) {
@@ -167,7 +177,7 @@ async function assembler({ metaSeule = false } = {}) {
 }
 
 // index.html : bloc de textes (créé s'il manque) puis module commun juste après.
-async function rangerTextes(id, cheminHtml, textes, multi) {
+async function rangerTextes(id, cheminHtml, textes, multi, tr = false) {
   let html = (await readFile(cheminHtml, 'utf8')).replace(/\r\n/g, '\n');
   const json = JSON.stringify(textes, null, 1).replace(/</g, '\\u003c');
   if (RE_TEXTES.test(html)) {
@@ -185,11 +195,26 @@ async function rangerTextes(id, cheminHtml, textes, multi) {
   const moduleComplet = `<script id="jel-i18n">\n${module}\n</script>`;
   if (RE_MODULE.test(html)) html = html.replace(RE_MODULE, (_, ouverture, fermeture) => `${ouverture}\n${module}\n${fermeture}`);
   else html = html.replace(RE_TEXTES, (bloc) => `${bloc}\n${moduleComplet}`);
-  await writeFile(cheminHtml, rangerMulti(rangerSauvegarde(html), multi), 'utf8');
+  await writeFile(cheminHtml, rangerTempsReel(rangerMulti(rangerSauvegarde(html), multi), tr), 'utf8');
 }
 
 async function estMultijoueur(cheminFiche) {
   try { return JSON.parse((await readFile(cheminFiche, 'utf8')).replace(/^﻿/, '')).multijoueur === true; } catch { return false; }
+}
+
+async function estTempsReel(cheminFiche) {
+  try { return JSON.parse((await readFile(cheminFiche, 'utf8')).replace(/^﻿/, '')).temps_reel === true; } catch { return false; }
+}
+
+// Moteur temps réel (public/temps-reel/moteur.js) : mis à jour s'il est déjà là,
+// ajouté juste après le module de sauvegarde pour un jeu temps réel (avant jel-sim).
+function rangerTempsReel(html, tr) {
+  if (RE_TR.test(html)) return html.replace(RE_TR, (_, ouverture, fermeture) => `${ouverture}\n${moduleTR}\n${fermeture}`);
+  if (!tr) return html;
+  const m = RE_SAUVEGARDE.exec(html);
+  if (!m) return html;
+  const fin = m.index + m[0].length;
+  return `${html.slice(0, fin)}\n<script id="jel-tr">\n${moduleTR}\n</script>${html.slice(fin)}`;
 }
 
 // Moteur multijoueur (public/multijoueur/moteur.js) : mis à jour s'il est déjà
