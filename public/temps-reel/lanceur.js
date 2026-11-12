@@ -72,8 +72,9 @@ const GEL_MS = 8000;                // partie figée faute de réseau : elle con
 const RECONNEXION_MAX_MS = 180000;  // on cherche à se reconnecter pendant 3 minutes au plus
 const DELAIS_RECONNEXION = [300, 1000, 2000, 3000];
 const RECENTS_MAX = 600;            // paquets gardés par le pair horloge (60 s), pour la reprise du pair
-const MESSAGE_MAX = 1000;
-const RECU_MAX = 200000;
+const MESSAGE_MAX = 2500;            // un ordre (un jeu de stratégie envoie la liste des unités choisies)
+const RECU_MAX = 1000000;           // un message reçu (instantané d'un jeu de stratégie : 100 à 300 Ko)
+const MORCEAU = 16000;              // lien direct : un message plus long part en morceaux (Safari : 64 Ko au plus)
 const NIVEAU_RELAIS = 2;            // robot moyen à la place d'un pair absent
 
 // Texte de la simulation d'un jeu (bloc jel-sim), tel que le Worker l'empreinte
@@ -179,7 +180,25 @@ export function brancherTempsReel({ jeu, html, cadre }) {
   const envoyerPair = (m) => {
     const dc = p?.dc;
     if (!dc || dc.readyState !== 'open' || muet()) return false;
-    try { dc.send(JSON.stringify(m)); return true; } catch { return false; }
+    try {
+      const t = JSON.stringify(m);
+      if (t.length <= MORCEAU) { dc.send(t); return true; }
+      // Long message (instantané) : en morceaux numérotés, recollés à l'arrivée.
+      const id = (p.morceauId = (p.morceauId || 0) + 1), n = Math.ceil(t.length / MORCEAU);
+      for (let i = 0; i < n; i++) dc.send(JSON.stringify({ t: 'morceau', id, i, n, d: t.slice(i * MORCEAU, (i + 1) * MORCEAU) }));
+      return true;
+    } catch { return false; }
+  };
+  // Morceaux reçus du pair : le message entier, une fois tous arrivés (sinon null).
+  const recoller = (m) => {
+    if (!Number.isInteger(m.id) || !Number.isInteger(m.i) || !Number.isInteger(m.n) || m.n < 1 || m.n > Math.ceil(RECU_MAX / MORCEAU) || typeof m.d !== 'string') return null;
+    if (!p.morceaux || p.morceaux.id !== m.id) p.morceaux = { id: m.id, n: m.n, parts: [], recus: 0 };
+    const r = p.morceaux;
+    if (m.i < 0 || m.i >= r.n || r.parts[m.i] !== undefined) return null;
+    r.parts[m.i] = m.d; r.recus += 1;
+    if (r.recus < r.n) return null;
+    p.morceaux = null;
+    try { return JSON.parse(r.parts.join('')); } catch { return null; }
   };
   // La connexion au Duel répond-elle encore ?
   const duelVivant = () => !!p && wsOuvert(p.wsD) && maintenant() - p.vuD < MUET_MS;
@@ -525,6 +544,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     dc.onmessage = (e) => {
       if (p !== q || typeof e.data !== 'string' || e.data.length > RECU_MAX || muet()) return;
       let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m && m.t === 'morceau') { m = recoller(m); if (!m) { q.dernierPair = maintenant(); return; } }
       surPair(m);
     };
     dc.onclose = () => {

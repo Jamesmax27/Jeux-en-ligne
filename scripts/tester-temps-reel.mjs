@@ -43,6 +43,7 @@ const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const TOUT = args.includes('--tout');
 const SEULEMENT_COUPURES = args.includes('--coupures');   // mise au point : seulement le test 6 du navigateur
+const RAPIDE = args.includes('--rapide');                 // mise au point : sans les parties entre robots (forces, équité)
 const AVEC_WRANGLER = TOUT || args.includes('--wrangler');
 const AVEC_NAVIGATEUR = TOUT || args.includes('--navigateur') || SEULEMENT_COUPURES;
 const iTicks = args.indexOf('--ticks');
@@ -99,7 +100,8 @@ function chargerSim(texte) {
 const INTERDITS = [
   [/\bMath\.random\b/, 'Math.random'], [/\bDate\b/, 'Date'], [/\bperformance\b/, 'performance'],
   [/\bset(?:Timeout|Interval)\b/, 'minuterie'], [/\brequestAnimationFrame\b/, 'requestAnimationFrame'],
-  [/\bMath\.(?:sin|cos|tan|asin|acos|atan2?|exp|expm1|log\w*|pow|hypot|sqrt|cbrt|sinh|cosh|tanh|fround)\b/, 'fonction mathématique non garantie (Math.sin, sqrt, pow…)'],
+  [/\bMath\.(?:sin|cos|tan|asin|acos|atan2?|exp|expm1|log\w*|pow|hypot|sqrt|cbrt|sinh|cosh|tanh|fround)\b/, 'fonction mathématique non garantie (Math.sin, sqrt, pow… : JEL_TR.flottant)'],
+  [/\*\*/, 'puissance ** (non garantie : multiplier, ou JEL_TR.flottant.carre)'],
   [/\b(?:document|localStorage|sessionStorage|indexedDB|fetch|XMLHttpRequest|WebSocket|RTCPeerConnection|parent|top)\b/, 'accès à la page ou au réseau'],
   [/\beval\b|\bnew\s+Function\b/, 'eval'], [/\bfor\s*\([^)]*\bin\b/, 'boucle for…in (ordre non garanti)'],
   [/\bJEL_SAVE\b|\bFMG\b/, 'module du site'],
@@ -107,10 +109,14 @@ const INTERDITS = [
 
 // Ordres « humains » plausibles : ceux d'un robot moyen, tirés d'un hasard à part (jamais celui de l'état).
 // paisible : seulement vers des planètes neutres ou à soi (la partie ne finit pas par une conquête :
-// le test 4 dure ainsi ses 2 000 ticks).
+// le test 4 dure ainsi ses 2 000 ticks). Un jeu dont les robots jouent dans le pas (bot() vide) donne
+// ses propres ordres d'essai : sim.essais.ordres(etat, camp, alea, paisible), qui ne modifie pas l'état.
 function ordresHumains(sim, etat, camp, hasard, paisible = false) {
-  const e = copie(etat);
   const alea = (n) => (n > 1 ? Math.floor(hasard() * n) : 0);
+  if (sim.essais && typeof sim.essais.ordres === 'function') {
+    try { return sim.essais.ordres(etat, camp, alea, paisible) || []; } catch { return []; }
+  }
+  const e = copie(etat);
   let o = [];
   try { o = (sim.bot(e, camp, 2, alea) || []).slice(0, 2); } catch { o = []; }
   if (paisible && Array.isArray(etat.pl)) {
@@ -122,6 +128,14 @@ function ordresHumains(sim, etat, camp, hasard, paisible = false) {
 }
 
 function hasardGraine(g) { return TR.aleaDe({ a: g >>> 0 }); }
+
+// Chemin du premier nombre non fini (NaN, infini) d'un objet JSON, ou null (état en nombres à virgule).
+function premierNonFini(x, chemin = 'etat') {
+  if (typeof x === 'number') return Number.isFinite(x) ? null : `${chemin} = ${x}`;
+  if (!x || typeof x !== 'object') return null;
+  for (const [k, v] of Object.entries(x)) { const p = premierNonFini(v, `${chemin}.${k}`); if (p) return p; }
+  return null;
+}
 
 function testerSimulation(jeu) {
   const sujet = jeu.id;
@@ -141,7 +155,7 @@ function testerSimulation(jeu) {
     total += fait;
   }
   ok(`${sujet} : déterminisme vérifié sur ${total} ticks (journaux d'ordres rejoués deux fois et depuis un instantané)`);
-  return robots(sim, sujet);
+  return RAPIDE ? sim : robots(sim, sujet);
 }
 
 // Une partie dont le journal est rejoué deux fois et depuis un instantané. Renvoie son nombre de ticks.
@@ -158,12 +172,21 @@ function partieJournal(sim, sujet, graine, config) {
     const paquet = cad.pas();
     journal.push([paquet.k, paquet.o]);
     s.avancer(paquet.o);
-    if (!flottant) flottant = TR.premierFlottant(s.etat);
+    if (!flottant && (!sim.flottants || k % 500 === 0)) flottant = sim.flottants ? premierNonFini(s.instantane().etat) : TR.premierFlottant(s.etat);
   }
-  if (flottant) probleme(sujet, `état non entier : ${flottant}`);
+  if (flottant) probleme(sujet, sim.flottants ? `nombre non fini dans l'état : ${flottant}` : `état non entier : ${flottant}`);
+  if (sim.exporter) {
+    const exp = s.instantane().etat;
+    if (Array.isArray(exp.inconnus) && exp.inconnus.length) probleme(sujet, `instantané : champs de l'état non exportés (${exp.inconnus.join(', ')})`);
+    const texte = JSON.stringify(s.instantane());
+    const t = new TR.Simulation(sim, 1, config);
+    t.restaurer(JSON.parse(texte));
+    if (JSON.stringify(t.instantane()) !== texte) probleme(sujet, 'instantané : exporter(importer(x)) ne redonne pas x');
+    else if (t.hachage() !== s.hachage()) probleme(sujet, 'instantané : l\'état rebâti n\'a pas la même empreinte');
+  }
   const ordres = journal.reduce((n, x) => n + x[1].length, 0);
   const a = TR.rejouer(sim, graine, config, journal), b = TR.rejouer(sim, graine, config, journal);
-  const ha = TR.hacher(a.etat), hb = TR.hacher(b.etat), hs = TR.hacher(s.etat);
+  const ha = a.hachage(), hb = b.hachage(), hs = s.hachage();
   if (ha !== hb || ha !== hs) probleme(sujet, `déterminisme : rejeu différent (${hs} / ${ha} / ${hb})`);
   else ok(`${sujet} : ${journal.length} ticks, ${ordres} ordres, rejoué deux fois → hachage final identique ${ha}`);
   const controles = a.hashes.every(([k, h]) => b.hashDe(k) === h);
@@ -175,7 +198,7 @@ function partieJournal(sim, sujet, graine, config) {
   const d = new TR.Simulation(sim, 1, config);
   d.restaurer(JSON.parse(JSON.stringify(snap)));
   for (const [, o] of journal.slice(milieu)) d.avancer(o);
-  if (TR.hacher(d.etat) !== ha) probleme(sujet, 'reprise : rejouer depuis un instantané ne donne pas le même état');
+  if (d.hachage() !== ha) probleme(sujet, 'reprise : rejouer depuis un instantané ne donne pas le même état');
   else ok(`${sujet} : reprise depuis l'instantané du tick ${snap.k} → même état final`);
   return journal.length;
 }
@@ -192,13 +215,15 @@ function robots(sim, sujet) {
     }
     return { taux: gagne / (2 * parties), duree: duree / (2 * parties) / 10 };
   };
-  const d31 = duel(3, 1, 40), d21 = duel(2, 1, 40), d32 = duel(3, 2, 40);
+  // Un jeu long (stratégie) réduit le nombre de parties : sim.essais.parties, sim.essais.equite.
+  const P = (sim.essais && sim.essais.parties) || 40;
+  const d31 = duel(3, 1, P), d21 = duel(2, 1, P), d32 = duel(3, 2, P);
   if (d31.taux < 0.8) probleme(sujet, `robots : le difficile ne bat le facile que ${Math.round(d31.taux * 100)} % du temps (80 % attendus)`);
   if (d21.taux < 0.65) probleme(sujet, `robots : le moyen ne bat le facile que ${Math.round(d21.taux * 100)} % du temps (65 % attendus)`);
   if (d32.taux < 0.5) probleme(sujet, `robots : le difficile perd plus souvent qu'il ne gagne contre le moyen (${Math.round(d32.taux * 100)} %)`);
   ok(`${sujet} : robots — difficile contre facile ${Math.round(d31.taux * 100)} %, moyen contre facile ${Math.round(d21.taux * 100)} %, difficile contre moyen ${Math.round(d32.taux * 100)} % (parties de ${Math.round(d31.duree)} à ${Math.round(d32.duree)} s)`);
   let c0 = 0;
-  const N = 100;
+  const N = (sim.essais && sim.essais.equite) || 100;
   for (let g = 1; g <= N; g++) { const sm = new TR.Simulation(sim, g * 7 + 1, { ligne: 1, ctl: [2, 2] }); while (!sm.resultat) sm.avancer([]); if (sm.resultat.gagnant === 0) c0++; }
   if (c0 < N * 0.35 || c0 > N * 0.65) probleme(sujet, `équité : le camp 0 gagne ${c0} parties sur ${N} entre robots égaux`);
   else ok(`${sujet} : équité des camps — le camp 0 gagne ${c0} parties sur ${N} entre deux robots moyens`);
@@ -206,7 +231,7 @@ function robots(sim, sujet) {
   for (let g = 1; g <= 6; g++) {
     const sm = new TR.Simulation(sim, g * 104729, { ligne: 1, ctl: [3, 3] });
     for (let k = 0; k < 600 && !sm.resultat; k++) sm.avancer([]);
-    empreintes.add(TR.hacher(sm.etat.f.map((f) => [f.c, f.a])) + sm.etat.pl.length);
+    empreintes.add(sim.essais && typeof sim.essais.variete === 'function' ? TR.hacher(sim.essais.variete(sm.etat)) : TR.hacher(sm.etat.f.map((f) => [f.c, f.a])) + sm.etat.pl.length);
   }
   if (empreintes.size < 5) probleme(sujet, 'robots : les parties se ressemblent trop (cartes ou coups identiques)');
   else ok(`${sujet} : variété — ${empreintes.size} débuts de partie différents sur 6 graines`);
@@ -471,7 +496,7 @@ async function testerWorker(jeux) {
   else ok('signalisation WebRTC : offres et candidats transmis d\'un joueur à l\'autre');
   d.duel.surMessage = ancien;
   // Secours : le pair-à-pair coupe, le serveur reprend la partie depuis l'instantané d'un appareil.
-  c.duel.surMessage = (t) => { const m = JSON.parse(t); if (m.t === 'demande-snap') c.duel.send(JSON.stringify({ t: 'snap', snap: { k: 120, etat: (() => { const s = new TR.Simulation(sim, c.graine, { ...c.config, ctl: [0, 0] }); for (let i = 0; i < 120; i++) s.avancer([]); return s.etat; })() } })); else c.recevoir(m); };
+  c.duel.surMessage = (t) => { const m = JSON.parse(t); if (m.t === 'demande-snap') c.duel.send(JSON.stringify({ t: 'snap', snap: (() => { const s = new TR.Simulation(sim, c.graine, { ...c.config, ctl: [0, 0] }); for (let i = 0; i < 120; i++) s.avancer([]); return s.instantane(); })() })); else c.recevoir(m); };
   c.duel.send(JSON.stringify({ t: 'secours', k: 120 }));
   await attendre(1500);
   if (!duelP2P.minuteur || c.snaps < 1 || d.snaps < 1 || c.k() < 125) probleme(sujet, `secours : le serveur n'a pas repris la partie (${c.snaps}, ${d.snaps}, tick ${c.k()})`);
@@ -714,7 +739,7 @@ async function testerNavigateur(jeux) {
       await cadre.waitForFunction(() => !!window.JEL_TR, null, { timeout: 20000 });
       return { page, cadre, journal };
     };
-    const etatPartie = (cadre) => cadre.evaluate(() => { const p = window.JEL_TR.derniere; return p ? { mode: p.mode, connexion: p.connexion, k: p.etat ? p.etat.k : 0, h: p.etat ? window.JEL_TR.hacher(p.etat) : null, ctl: p.etat ? p.etat.ctl : null } : null; });
+    const etatPartie = (cadre) => cadre.evaluate(() => { const p = window.JEL_TR.derniere; return p ? { mode: p.mode, connexion: p.connexion, k: p.etat ? p.etat.k : 0, h: p.s ? p.s.hachage() : null, ctl: p.etat ? p.etat.ctl.slice() : null } : null; });
     const cliquerJouer = async (cadre) => {
       await cadre.click('[data-tr="jouer"]', { timeout: 15000 });
       // Le jeu peut demander le niveau du robot de secours avant de chercher : on prend le choix proposé.

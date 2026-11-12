@@ -64,6 +64,8 @@ Hypothèses : partie de 15 min (le jeu en ligne s'arrête au plus tard à 10 min
 
 La durée domine tout : une partie relayée de 15 min coûte autant de durée que 40 à 100 parties en pair-à-pair. Les messages reçus pèsent peu (environ 70 requêtes), et les messages envoyés ne coûtent rien.
 
+**Nova Dominion** (jeu de stratégie, 12 novembre 2026) : mêmes ordres de grandeur. Une partie en ligne dure 15 minutes au plus (112,5 Go-s si elle est relayée) ; le Duel y fait tourner une simulation plus lourde, mais la durée facturée ne dépend pas du calcul (0,28 ms par tick mesurés dans Node, soit environ 3 ms de calcul par seconde de partie, loin des limites). Un ordre porte la liste des unités choisies : quelques centaines d'octets, toujours une seule requête facturée pour 20 messages reçus. Les instantanés (50 à 110 Ko) ne partent qu'à une reprise ou à un secours : la sortie ne coûte rien.
+
 ## 4. Estimé : parties possibles par jour
 
 **Plan gratuit** (13 000 Go-s et 100 000 requêtes Durable Objects par jour, pour tout le compte) :
