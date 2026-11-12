@@ -130,7 +130,19 @@ Le moteur, pas le jeu, fait la boucle (`Simulation.avancer`). Chaque tick, dans 
 
 ### Ordres
 
-Le joueur envoie `[type, a, b, c]` (4 entiers au plus, `type ≥ 1`, ex. `[1, 3, 7, 50]` : envoyer la moitié des vaisseaux de la planète 3 vers la 7 ; `[2, 4, 1]` : construire une usine sur la 4) avec son numéro de séquence ; le cadenceur en fait `[camp, seq, type, a, b, c]`. Le type 0 est réservé aux ordres de contrôle du camp système (`[camps, n, 0, camp, niveau]` : camp passé au robot `niveau`, ou rendu à l'humain avec 0). Taille d'un message : quelques dizaines d'octets.
+Le joueur envoie `[type, a, b, …]` (`ORDRE_MAX` = 200 entiers au plus, `type ≥ 1`, ex. `[1, 3, 7, 50]` : envoyer la moitié des vaisseaux de la planète 3 vers la 7 ; `[2, 4, 1]` : construire une usine sur la 4) avec son numéro de séquence ; le cadenceur en fait `[camp, seq, type, a, b, c]`. Le type 0 est réservé aux ordres de contrôle du camp système (`[camps, n, 0, camp, niveau]` : camp passé au robot `niveau`, ou rendu à l'humain avec 0). Taille d'un message : quelques dizaines d'octets (un ordre de Nova Dominion porte la liste des unités choisies : quelques centaines d'octets au plus, 2 500 caractères permis par le lanceur et le Duel).
+
+### Jeu existant converti : nombres à virgule garantis (Nova Dominion, 12 novembre 2026)
+
+Demande du propriétaire : appliquer le temps réel à **Nova Dominion**, jeu de stratégie de 7 700 lignes écrit en nombres à virgule (positions, angles, A*, IA). Le réécrire en entiers revenait à réécrire le jeu ; il garde donc ses nombres à virgule, avec une règle qui donne le même résultat sur tous les appareils :
+
+- **Seulement + − × ÷** sur les nombres à virgule : la norme IEEE 754, imposée par JavaScript, donne exactement le même résultat partout (Android, iPhone, serveur). Ce qui n'est qu'« approché » par la norme (`Math.sin`, `cos`, `atan2`, `sqrt`, `hypot`, `pow`, `**`) est remplacé par **`JEL_TR.flottant`** (`sin`, `cos`, `atan2`, `sqrt`, `hypot`, `carre`) : séries et pas de Newton écrits avec les quatre opérations (précision 1e-15). `Float32Array` (tas de l'A*, bruit de la carte) est permis : l'arrondi en 32 bits est exact lui aussi. Le robot de contrôle refuse toujours `Math.sin`… et `**` dans `jel-sim`.
+- **Contrat étendu** (facultatif, pour un état qui n'est pas un simple objet JSON : grilles typées, index, références) : `flottants: true`, `exporter(etat)` (instantané JSON : grilles compressées en suites « valeur, longueur », projectiles avec la clé de leur arme), `importer(donnees)` (état rebâti : carte régénérée depuis la graine, gardée en cache), `empreinte(etat)` (ce qui est haché : toutes les entités, joueurs, projectiles, file des chemins). Le hachage du moteur prend les 64 bits exacts des nombres à virgule (−0 et 0 confondus, champs `undefined` ignorés). `Simulation` ne garde plus d'« état précédent » pour ces jeux : le jeu interpole lui-même (positions `px`, `py`).
+- **Un tick du moteur (100 ms) = deux pas de la simulation du jeu** (50 ms) ; `bot()` ne renvoie rien : l'IA du jeu (facile, normal, difficile = niveaux 1, 2, 3) joue dans le pas, d'après `etat.ctl`.
+- **Partie en ligne** : carte de 64 cases (thème tiré de la graine), 600 cristaux, QG et 5 drones chacun, **15 minutes au plus** ; un camp qui n'a plus rien perd ; au temps, le plus gros score gagne (coût de l'armée et des bâtiments debout, plus les cristaux récoltés).
+- **Instantanés** : 50 à 110 Ko (300 à 600 entités) au lieu de 2 Ko. Limites relevées : 1 Mo reçu par le lanceur, 900 000 caractères envoyés au Duel ; sur le lien direct, un message de plus de 16 000 caractères part en morceaux recollés à l'arrivée (Safari n'accepte que 64 Ko par message).
+- **Mesures** (Node, 12 novembre 2026) : 0,28 ms de calcul par tick du moteur ; robot difficile contre facile 100 %, moyen contre facile 100 %, difficile contre moyen 90 % ; deux robots moyens : 12 victoires sur 20 pour le camp 0 ; parties entre robots de 6 à 12 minutes.
+- `sim.essais` (robot de contrôle seulement) : moins de parties entre robots (`parties`, `equite`), ordres d'un « humain » d'essai (`ordres`, lecture seule de l'état), `variete`.
 
 ## 6. Le cadenceur et le réseau
 
@@ -180,7 +192,7 @@ Les clients jouent le tick `k` dès qu'ils ont reçu le paquet `k` (avec une pet
 | jeu → lanceur | `jel-tr`, `op` : `chercher`, `pret`, `ordre { seq, o }`, `hash { k, h }`, `snap`, `reprise { depuis }`, `fin`, `quitter`, `attente` | passage dans le cadre isolé |
 | lanceur → jeu | `jel-tr` : `etat` (`attente`, `trouve`, `mode`, `solo`, `coupe`), `paquet`, `snap`, `demande: 'snap'` | |
 
-Limites (Duel et Rencontre) : 1 000 caractères par message de joueur (un instantané envoyé par le pair horloge : 64 Ko), 60 messages par 10 s, au-delà la connexion est fermée ; ordres invalides ignorés par `valide`. Le protocole a son propre numéro (`PROTOCOLE_TR`), indépendant du `PROTOCOLE` du tour par tour.
+Limites (Duel et Rencontre) : 2 500 caractères par message de joueur (un instantané envoyé par un appareil : 900 000 caractères ; lanceur : 1 Mo reçu au plus), 150 messages par 10 s (les clics rapides d'un jeu de stratégie), au-delà la connexion est fermée ; ordres invalides ignorés par `valide`. Le protocole a son propre numéro (`PROTOCOLE_TR`), indépendant du `PROTOCOLE` du tour par tour.
 
 ## 7. Désynchronisation, déconnexion, reprise
 

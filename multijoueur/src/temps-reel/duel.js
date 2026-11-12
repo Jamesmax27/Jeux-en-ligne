@@ -40,9 +40,9 @@ export const DUREE_MAX_MS = 20 * 60000;   // durée maximale d'une partie relay�
 const ATTENTE_ADVERSAIRE_MS = 8000;      // un seul joueur arrivé au Duel : il joue contre le robot
 const INACTIF_MS = 2 * 60000;            // Duel abandonné avant la fin du choix du mode
 const SECOURS_MS = 4000;                 // délai pour recevoir l'instantané d'un appareil
-const MESSAGE_MAX = 1000;                // caractères d'un message de joueur
-const SNAP_MAX = 65536;                  // caractères d'un instantané envoyé par un appareil
-const DEBIT_MAX = 60;                    // messages par joueur et par fenêtre de 10 s
+const MESSAGE_MAX = 2500;                // caractères d'un message de joueur (ordre : liste des unités choisies)
+const SNAP_MAX = 900000;                 // caractères d'un instantané envoyé par un appareil (jeu de stratégie : 100 à 300 Ko)
+const DEBIT_MAX = 150;                   // messages par joueur et par fenêtre de 10 s (jeu de stratégie : clics rapides)
 const DEBIT_FENETRE_MS = 10000;
 const NIVEAU_RELAIS = 2;                 // robot moyen à la place d'un joueur absent
 
