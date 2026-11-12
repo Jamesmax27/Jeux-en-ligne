@@ -23,14 +23,18 @@
 //    la main). Mesures des parties (durée, messages) dans captures/temps-reel/.
 // 4. --navigateur : tests 2 et 3 (partie contre le robot en moins de 16 s, sans
 //    aucune requête pendant la partie ; pair-à-pair réussi ; pair-à-pair forcé
-//    en échec et bascule sur le relais).
+//    en échec et bascule sur le relais) ; test 6 : coupures réseau (réseau muet
+//    quelques secondes, comme un écran en veille ou un passage du wifi à la 4G) :
+//    bandeau chez soi et chez l'adversaire, reconnexion dès le retour du réseau,
+//    robot en attendant après une longue coupure puis retour dans la vraie partie,
+//    en relais et en pair-à-pair (coupure de chacun des deux pairs).
 // Sans réseau Internet pour 1 et 2 ; 3 et 4 ne touchent que la machine locale
 // (le premier lancement de wrangler le télécharge).
 // ==========================================================================
 
 import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -38,8 +42,9 @@ import { createHash } from 'node:crypto';
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const TOUT = args.includes('--tout');
+const SEULEMENT_COUPURES = args.includes('--coupures');   // mise au point : seulement le test 6 du navigateur
 const AVEC_WRANGLER = TOUT || args.includes('--wrangler');
-const AVEC_NAVIGATEUR = TOUT || args.includes('--navigateur');
+const AVEC_NAVIGATEUR = TOUT || args.includes('--navigateur') || SEULEMENT_COUPURES;
 const iTicks = args.indexOf('--ticks');
 const TICKS_WRANGLER = iTicks >= 0 ? Number(args[iTicks + 1]) : 2000;
 const iEssai = args.indexOf('--essai');
@@ -219,11 +224,12 @@ class ClientSimule {
     this.sim = sim; this.envoyer = envoyer; this.nom = nom; this.paisible = paisible;
     this.s = null; this.camp = 0; this.seq = 0; this.file = []; this.hashes = new Map();
     this.modes = []; this.refus = null; this.fin = null; this.snaps = 0; this.attendSnap = false;
-    this.ordres = 0; this.hasard = Math.random; this.ctl = [];
+    this.ordres = 0; this.hasard = Math.random; this.ctl = []; this.reseau = [];
   }
   trouve(m) { this.camp = m.camp; this.graine = m.graine; this.config = m.config; this.s = new TR.Simulation(this.sim, m.graine, { ...m.config, ctl: [0, 0] }); }
   recevoir(m) {
     if (m.t === 'mode') this.modes.push(m.mode);
+    else if (m.t === 'reseau') this.reseau.push(m);
     else if (m.t === 'refus') this.refus = m.raison;
     else if (m.t === 'fin') this.fin = m.resultat || 'duree';
     else if (m.t === 'snap') { this.snaps++; this.s.restaurer(m.snap); this.attendSnap = false; this.file = this.file.filter((p) => p.k > m.snap.k); this.jouer(); }
@@ -429,6 +435,7 @@ async function testerWorker(jeux) {
   // Absence : l'appareil b se tait et ferme → robot après 10 s ; retour → la main lui revient.
   b.duel.close();
   await attendre(11500);
+  if (!a.reseau.some((m) => m.camp === mb.camp && m.ok === false)) probleme(sujet, `absence : l'autre joueur n'a pas été prévenu du problème de réseau (${JSON.stringify(a.reseau)})`);
   if (a.ctl[mb.camp] !== 2) probleme(sujet, `absence : le camp du joueur parti n'est pas passé au robot (${a.ctl})`);
   else ok('déconnexion de plus de 10 s : le camp du joueur parti passe au robot, la partie continue');
   const retour = await W.ouvrir(`/tr/duel?nom=${encodeURIComponent(mb.duel)}&jeton=${mb.jeton}`);
@@ -436,6 +443,7 @@ async function testerWorker(jeux) {
   retour.ws.surMessage = (t) => b.recevoir(JSON.parse(t));
   b.envoyer({ t: 'reprise', depuis: b.k() });
   await attendre(1500);
+  if (!a.reseau.some((m) => m.camp === mb.camp && m.ok === true)) probleme(sujet, `retour : l'autre joueur n'a pas été prévenu que le réseau est revenu (${JSON.stringify(a.reseau)})`);
   if (b.snaps < 1 || a.ctl[mb.camp] !== 0) probleme(sujet, `reprise : pas d'instantané (${b.snaps}) ou main pas rendue (${a.ctl})`);
   else if (Math.abs(a.k() - b.k()) > 3) probleme(sujet, `reprise : l'appareil revenu n'a pas rattrapé (${a.k()} / ${b.k()})`);
   else ok(`reconnexion : instantané + ticks suivants, le joueur reprend la main (ticks ${a.k()} / ${b.k()})`);
@@ -500,6 +508,9 @@ class Lien {
 }
 
 async function demarrerWrangler(port) {
+  // Un ancien wrangler dev encore ouvert sur ce port répondrait à la place du nouveau (avec l'ancien code).
+  try { const r = await fetch(`http://127.0.0.1:${port}/etat`); if (r) throw new Error('occupé'); }
+  catch (e) { if (e.message === 'occupé') throw new Error(`le port ${port} est déjà pris (ancien wrangler dev ?) : arrêtez-le avant le test`); }
   const dossier = path.join(RACINE, 'multijoueur');
   const persist = path.join(RACINE, 'captures', 'temps-reel', 'wrangler-etat');
   const enfant = spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', [
@@ -524,13 +535,21 @@ async function demarrerWrangler(port) {
     if (enfant.exitCode !== null) break;
     await attendre(1000);
   }
-  enfant.kill();
+  arreterProcessus(enfant, port);
   throw new Error(`wrangler dev n'a pas démarré :\n${journal.slice(-20).join('\n')}`);
 }
 
-function arreterProcessus(enfant) {
-  if (process.platform === 'win32') spawn('taskkill', ['/pid', String(enfant.pid), '/T', '/F']);
-  else enfant.kill('SIGTERM');
+// Arrêt de wrangler dev : l'arbre de processus, puis (Windows) tout ce qui écoute encore sur son port
+// ou porte « --port <port> » (npx lance wrangler, qui lance workerd : taskkill seul en laisse filer).
+function arreterProcessus(enfant, port) {
+  if (process.platform !== 'win32') { enfant.kill('SIGTERM'); return; }
+  spawnSync('taskkill', ['/pid', String(enfant.pid), '/T', '/F'], { stdio: 'ignore' });
+  if (port) {
+    spawnSync('powershell', ['-NoProfile', '-Command',
+      `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'wrangler.*--port ${port} ' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }; ` +
+      `Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }`,
+    ], { stdio: 'ignore' });
+  }
 }
 
 // Un appareil relié au vrai Worker local, à travers un lien simulé.
@@ -611,6 +630,8 @@ async function testerWrangler(jeux) {
     y.ws.close(); y.ws = null;
     await attendre(12500);
     const robot = x.ctl[campY] === 2;
+    const prevenu = x.reseau.some((m) => m.camp === campY && m.ok === false);
+    if (!prevenu) probleme('test 5', `l'autre joueur n'a pas été prévenu du problème de réseau (${JSON.stringify(x.reseau)})`);
     await y.rejoindre(); y.attendSnap = true; y.envoyer({ t: 'reprise', depuis: y.k() });
     await attendre(3000);
     const rendue = x.ctl[campY] === 0 && Math.abs(x.k() - y.k()) <= 5;
@@ -646,7 +667,7 @@ async function testerWrangler(jeux) {
       };
       try { fouiller(JSON.parse(texte)); } catch { journal.push(texte); }
     } catch (e) { journal.push(`[observabilité] ${e.message}`); }
-    await new Promise((ok) => { enfant.once('exit', ok); arreterProcessus(enfant); setTimeout(ok, 8000); });
+    await new Promise((ok) => { enfant.once('exit', ok); arreterProcessus(enfant, port); setTimeout(ok, 8000); });
     for (const l of journal) {
       const i = l.indexOf('[temps réel] mesure');
       if (i >= 0) {
@@ -661,7 +682,7 @@ async function testerWrangler(jeux) {
     await writeFile(path.join(RACINE, 'captures', 'temps-reel', 'mesures-wrangler.json'), JSON.stringify({ date: new Date().toISOString(), ticks: TICKS_WRANGLER, mesures }, null, 2));
     if (mesures.length) ok(`mesures du serveur (captures/temps-reel/mesures-wrangler.json) : ${mesures.map((m) => `${m.secondes} s, ${m.recus} messages reçus, ${m.envoyes} envoyés, ${m.ticks} ticks, ${m.desync} écart(s)`).join(' ; ')}`);
   } finally {
-    arreterProcessus(enfant);
+    arreterProcessus(enfant, port);
   }
 }
 
@@ -707,11 +728,12 @@ async function testerNavigateur(jeux) {
     };
 
     // Test 2 : personne d'autre → partie contre le robot en moins de 16 s, aucune requête pendant la partie.
-    {
+    if (!SEULEMENT_COUPURES) {
       const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
       const { page, cadre } = await ouvrirJeu(contexte, `&multi=ws://localhost:${portWorker}`);
-      const t0 = Date.now();
       await cliquerJouer(cadre);
+      // Délai compté depuis le début de la recherche (le joueur a pu prendre son temps pour choisir le robot).
+      const t0 = Date.now() - await cadre.evaluate(() => { const p = window.JEL_TR.derniere; return p && p.mode === 'recherche' ? Math.max(0, p.r.rechercheMs - (p.finRecherche - performance.now())) : 0; });
       await cadre.waitForFunction(() => window.JEL_TR.derniere && window.JEL_TR.derniere.mode === 'local', null, { timeout: 17000 });
       const delai = (Date.now() - t0) / 1000;
       const requetes = [];
@@ -727,7 +749,7 @@ async function testerNavigateur(jeux) {
       await contexte.close();
     }
     // Test 2 bis : hors ligne → partie contre le robot tout de suite.
-    {
+    if (!SEULEMENT_COUPURES) {
       const contexte = await navigateur.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true });
       const { page, cadre } = await ouvrirJeu(contexte, `&multi=ws://localhost:${portWorker}`);
       await contexte.setOffline(true);
@@ -742,7 +764,7 @@ async function testerNavigateur(jeux) {
       await contexte.close();
     }
     // Test 3 : deux joueurs → pair-à-pair ; puis pair-à-pair forcé en échec → relais.
-    for (const [nom, suffixe, attendu] of [['pair-à-pair', '', 'p2p'], ['pair-à-pair forcé en échec', '&p2p=non', 'relais']]) {
+    for (const [nom, suffixe, attendu] of SEULEMENT_COUPURES ? [] : [['pair-à-pair', '', 'p2p'], ['pair-à-pair forcé en échec', '&p2p=non', 'relais']]) {
       const c1 = await navigateur.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
       const c2 = await navigateur.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
       const j1 = await ouvrirJeu(c1, `&multi=ws://localhost:${portWorker}${suffixe}`);
@@ -767,9 +789,98 @@ async function testerNavigateur(jeux) {
       await c1.close(); await c2.close();
       await attendre(500);
     }
+
+    // Test 6 : coupures réseau (crochet __fmgTempsReel du lanceur, actif seulement en local).
+    const duo = async (suffixe) => {
+      const c1 = await navigateur.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+      const c2 = await navigateur.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+      const a = await ouvrirJeu(c1, `&multi=ws://localhost:${portWorker}${suffixe}`);
+      const b = await ouvrirJeu(c2, `&multi=ws://localhost:${portWorker}${suffixe}`);
+      await cliquerJouer(a.cadre); await attendre(500); await cliquerJouer(b.cadre);
+      // 40 s : la toute première connexion réveille wrangler dev (démarrage à froid).
+      const enLigne = (c) => c.waitForFunction(() => window.JEL_TR.derniere && window.JEL_TR.derniere.mode === 'en-ligne', null, { timeout: 40000 });
+      await Promise.all([enLigne(a.cadre), enLigne(b.cadre)]);
+      a.contexte = c1; b.contexte = c2;
+      return [a, b];
+    };
+    const bandeau = (c) => c.evaluate(() => { const el = document.getElementById('reseau'); return el && !el.classList.contains('cache') ? document.getElementById('reseauTexte').textContent : ''; });
+    const camp = (j) => j.page.evaluate(() => window.__fmgTempsReel.etat().camp);
+    // Même état sur les deux appareils, au tick de contrôle commun le plus récent (on attend qu'il soit joué des deux côtés).
+    const memeEtat = async (a, b) => {
+      await attendre(6500);
+      const [p1, p2] = await Promise.all([etatPartie(a.cadre), etatPartie(b.cadre)]);
+      const k = Math.floor((Math.min(p1.k, p2.k) - 5) / 50) * 50;
+      const [h1, h2] = await Promise.all([a.cadre, b.cadre].map((c) => c.evaluate((x) => window.JEL_TR.derniere.s.hashDe(x), k)));
+      return { ok: !!h1 && h1 === h2, k, p1, p2 };
+    };
+    const scenarios = [
+      { nom: 'relais, coupure de 9 s', suffixe: '&p2p=non', qui: 'b', ms: 9000, adversaire: true },
+      { nom: 'relais, coupure de 16 s (robot en attendant)', suffixe: '&p2p=non', qui: 'b', ms: 16000, long: true },
+      { nom: 'pair-à-pair, coupure du pair non horloge (6 s)', suffixe: '', qui: 'camp1', ms: 6000 },
+      { nom: 'pair-à-pair, coupure du pair horloge (6 s)', suffixe: '', qui: 'camp0', ms: 6000 },
+    ];
+    const choix = process.env.SCENARIO ? [scenarios[Number(process.env.SCENARIO)]] : scenarios;
+    for (const sc of choix) {
+      let a, b;
+      try {
+        [a, b] = await duo(sc.suffixe);
+        await attendre(3000);
+        // coupe : l'appareil coupé ; autre : l'autre.
+        let coupe = b, autre = a;
+        if (sc.qui === 'camp0' || sc.qui === 'camp1') {
+          const ca = await camp(a);
+          if ((sc.qui === 'camp0') === (ca === 0)) { coupe = a; autre = b; }
+        }
+        const t0 = Date.now();
+        await coupe.page.evaluate((ms) => window.__fmgTempsReel.couper(ms), sc.ms);
+        await attendre(6000);
+        const bandeauMoi = await bandeau(coupe.cadre);
+        const nomCapture = sc.nom.replace(/[^a-z0-9]+/gi, '-');
+        await coupe.page.screenshot({ path: path.join(dossierCaptures, `bandeau-moi-${nomCapture}.png`) });
+        let bandeauAutre = '';
+        if (sc.adversaire) {
+          await attendre(Math.max(0, t0 + 8500 - Date.now()));
+          bandeauAutre = await bandeau(autre.cadre);
+          await autre.page.screenshot({ path: path.join(dossierCaptures, `bandeau-adversaire-${nomCapture}.png`) });
+        }
+        let modeLong = null, robotChezAutre = false;
+        if (sc.long) {
+          await attendre(Math.max(0, t0 + 13500 - Date.now()));
+          modeLong = (await etatPartie(coupe.cadre)).mode;
+          robotChezAutre = (await etatPartie(autre.cadre)).ctl.some((x, i) => x > 0);
+        }
+        await attendre(Math.max(0, t0 + sc.ms + 4000 - Date.now()));
+        const apres = await etatPartie(coupe.cadre);
+        const bandeauApres = await bandeau(coupe.cadre);
+        const m = await memeEtat(a, b);
+        await coupe.page.screenshot({ path: path.join(dossierCaptures, `coupure-${sc.nom.replace(/[^a-z0-9]+/gi, '-')}.png`) });
+        const sujet = `test 6 (${sc.nom})`;
+        if (!bandeauMoi) probleme(sujet, 'pas de bandeau « connexion perdue » sur l\'appareil coupé');
+        else if (sc.adversaire && !bandeauAutre) probleme(sujet, 'pas de bandeau « problème de réseau » chez l\'adversaire');
+        else if (sc.long && modeLong !== 'local') probleme(sujet, `après 13,5 s de coupure, la partie devrait continuer contre le robot (mode ${modeLong})`);
+        else if (sc.long && !robotChezAutre) probleme(sujet, 'chez l\'adversaire, le robot n\'a pas pris la place du joueur coupé');
+        else if (apres.mode !== 'en-ligne') probleme(sujet, `pas de retour dans la partie en ligne après la coupure (mode ${apres.mode})`);
+        else if (bandeauApres) probleme(sujet, `le bandeau reste affiché après le retour du réseau (« ${bandeauApres} »)`);
+        else if (!m.ok) probleme(sujet, `états différents après la reprise (tick ${m.k} ; ${m.p1.k} / ${m.p2.k})`);
+        else ok(`${sujet} : bandeau « ${bandeauMoi} »${sc.adversaire ? ` ; chez l'adversaire : « ${bandeauAutre} »` : ''}${sc.long ? ' ; robot en attendant des deux côtés' : ''} ; retour en ligne aussitôt le réseau revenu, même état au tick ${m.k} (mode ${m.p1.connexion} / ${m.p2.connexion})`);
+      } catch (e) {
+        probleme(`test 6 (${sc.nom})`, e.message);
+      } finally {
+        if (problemes && (a || b)) for (const j of [a, b]) if (j) console.log(`    journal : ${j.journal.filter((l) => l.includes('[temps réel]')).slice(process.env.SCENARIO ? -60 : -12).join(' | ')}`);
+        if (problemes && process.env.SCENARIO) {
+          try {
+            const r = await fetch(`http://127.0.0.1:${portWorker}/cdn-cgi/local/explorer/api/local/observability/query`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sql: "SELECT ts_ms, message FROM logs WHERE CAST(message AS TEXT) LIKE '%temps réel%' ORDER BY ts_ms DESC LIMIT 40" }) });
+            await writeFile(path.join(dossierCaptures, 'observabilite.json'), await r.text());
+            console.log('    serveur : captures/temps-reel/observabilite.json');
+          } catch (e) { console.log('    serveur :', e.message); }
+        }
+        await a?.contexte.close(); await b?.contexte.close();
+        await attendre(500);
+      }
+    }
   } finally {
     await navigateur.close();
-    arreterProcessus(worker);
+    arreterProcessus(worker, portWorker);
     site.kill();
   }
 }

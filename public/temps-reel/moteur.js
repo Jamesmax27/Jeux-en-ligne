@@ -327,7 +327,11 @@
   //                   { type: 'debut', mode, camp, raison } partie commencée : mode 'local' (robot) ou 'p2p' / 'relais'
   //                   { type: 'controle', camp, niveau }   un camp passe au robot (niveau ≥ 1) ou revient à l'humain (0)
   //                   { type: 'fin', resultat }            partie finie (fin(etat) de la simulation)
-  //                   { type: 'info', code }               'budget', 'coupe', 'reprise', 'desync', 'hors-ligne'…
+  //                   { type: 'info', code }               'coupe' (avec raison ; retour : reconnexion encore tentée),
+  //                                                        'reprise', 'reconnecte'…
+  //                   { type: 'reseau', qui, ok, fin }     problème de réseau : qui = 'moi' (cet appareil) ou
+  //                                                        'adversaire' ; ok = true quand il est réglé ; fin = true
+  //                                                        quand on renonce à se reconnecter (la partie reste contre le robot)
   //                   { type: 'attente', n }               réponse à partie.attente() : joueurs qui cherchent
   //   reglages      remplace des valeurs de REGLAGES
   // }
@@ -363,6 +367,7 @@
     this.nRecherche = null;
     this.enPause = false;
     this.attendSnap = false;
+    this.retour = false;           // partie continuée contre le robot après une coupure, retour en ligne possible
     this.repli = null;             // { graine, config } de la partie contre le robot si personne n'est trouvé
     this.ecoute = this.recevoirLanceur.bind(this);
     this.battement = this.boucle.bind(this);
@@ -394,12 +399,13 @@
     clearTimeout(this.minuteur);
     clearInterval(this.minuteurRecherche);
     racine.removeEventListener('message', this.ecoute);
-    if (this.mode === 'recherche' || this.mode === 'connexion' || this.mode === 'en-ligne') this.versLanceur({ op: 'quitter' });
+    if (this.mode === 'recherche' || this.mode === 'connexion' || this.mode === 'en-ligne' || (this.mode === 'local' && this.retour)) this.versLanceur({ op: 'quitter' });
     this.mode = 'arret';
     this.file = [];
     this.cad = null;
     this.connexion = null;
     this.attendSnap = false;
+    this.retour = false;
   };
 
   Partie.prototype.quitter = function () { this.arreter(); };
@@ -498,12 +504,22 @@
     }
     if (d.etat === 'mode') { this.connexion = d.mode === 'p2p' ? 'p2p' : 'relais'; return; }
     if (d.etat === 'info') { this.signaler({ type: 'info', code: String(d.code || '') }); return; }
-    if (d.etat === 'coupe') { this.continuerSeul(d.raison || 'coupe'); return; }
+    if (d.etat === 'reseau') {
+      if (d.fin) this.retour = false;
+      this.signaler({ type: 'reseau', qui: d.qui === 'adversaire' ? 'adversaire' : 'moi', ok: d.ok === true, fin: d.fin === true });
+      return;
+    }
+    if (d.etat === 'coupe') { this.continuerSeul(d.raison || 'coupe', d.retour === true); return; }
     if (d.demande === 'snap') {
       if (this.s) this.versLanceur({ op: 'snap', snap: this.s.instantane() });
       return;
     }
-    if (d.snap) { this.recevoirSnap(d.snap); return; }
+    if (d.snap) {
+      // Coupure longue : la partie continuait contre le robot ; le réseau revient → retour en ligne.
+      if (this.mode === 'local' && this.retour) this.revenirEnLigne(d.snap);
+      else if (this.mode === 'en-ligne' || this.mode === 'connexion') this.recevoirSnap(d.snap);
+      return;
+    }
     if (d.paquet) {
       if (this.mode !== 'connexion' && this.mode !== 'en-ligne') return;
       this.file.push(d.paquet);
@@ -517,25 +533,27 @@
     }
   };
 
-  // Instantané reçu (désynchronisation, reprise) : l'état est remplacé, les paquets
-  // suivants reprennent derrière.
+  // Instantané reçu (désynchronisation, reprise, secours) : l'état est remplacé. Les paquets
+  // déjà en file sont jetés : ceux qui suivent l'instantané arrivent toujours après lui (même
+  // canal), et ceux d'avant peuvent venir d'une autre horloge (secours).
   Partie.prototype.recevoirSnap = function (snap) {
     if (!this.s || !snap || !Number.isInteger(snap.k)) return;
     this.s.restaurer(snap);
     this.attendSnap = false;
-    var k = snap.k;
-    this.file = this.file.filter(function (p) { return p.k > k; });
+    this.file = [];
     this.tDernier = horloge();
     this.signaler({ type: 'info', code: 'reprise' });
   };
 
-  // Plus de réseau du tout : la partie continue sur l'appareil, au même tick, l'autre
-  // camp tenu par le robot (niveau moyen).
-  Partie.prototype.continuerSeul = function (raison) {
+  // Plus de réseau : la partie continue sur l'appareil, au même tick, l'autre camp tenu par
+  // le robot (niveau moyen). retour : le lanceur essaie encore de se reconnecter ; s'il y
+  // arrive, l'état de la vraie partie arrive (instantané) et on y revient (revenirEnLigne).
+  Partie.prototype.continuerSeul = function (raison, retour) {
     if (this.mode === 'recherche' || this.mode === 'connexion') { this.basculerLocal(raison); return; }
     if (this.mode !== 'en-ligne' || !this.s) return;
     clearTimeout(this.minuteur);
-    racine.removeEventListener('message', this.ecoute);
+    this.retour = !!retour;
+    if (!this.retour) racine.removeEventListener('message', this.ecoute);
     var moi = this;
     // Les paquets déjà reçus sont joués d'abord (dans l'ordre), puis l'horloge locale prend la suite.
     while (this.file.length && this.file[0].k === this.s.k() + 1) this.jouerPaquet(this.file.shift());
@@ -543,10 +561,29 @@
     this.cad = new Cadenceur({ camps: this.sim.camps, delai: this.r.delaiEntree, depart: this.s.k(), envoyer: function (p) { moi.jouerPaquet(p); } });
     for (var c = 0; c < this.sim.camps; c++) if (c !== this.camp && this.s.etat.ctl[c] === 0) this.cad.controle(c, 2);
     this.mode = 'local';
+    this.connexionAvant = this.connexion;
     this.connexion = null;
     this.tDernier = horloge();
-    this.signaler({ type: 'info', code: raison });
+    this.signaler({ type: 'info', code: 'coupe', raison: raison, retour: this.retour });
     this.minuteur = setTimeout(this.battement, 16);
+  };
+
+  // Retour dans la partie en ligne après une coupure : l'état de la vraie partie remplace
+  // celui joué contre le robot pendant l'absence.
+  Partie.prototype.revenirEnLigne = function (snap) {
+    if (!this.s || !snap || !Number.isInteger(snap.k)) return;
+    clearTimeout(this.minuteur);
+    this.cad = null;
+    this.retour = false;
+    this.mode = 'en-ligne';
+    this.connexion = this.connexion || this.connexionAvant || 'relais';
+    this.enPause = false;
+    this.file = [];
+    this.s.restaurer(snap);
+    this.attendSnap = false;
+    this.tDernier = horloge();
+    this.signaler({ type: 'info', code: 'reconnecte' });
+    this.minuteur = setTimeout(this.battement, 0);
   };
 
   // Ordre du joueur de l'appareil : [type, a, b, c]. Renvoie true s'il part.
@@ -600,7 +637,15 @@
     if (!s || (this.mode !== 'local' && this.mode !== 'en-ligne')) return;
     var maintenant = horloge(), tick = this.r.tickMs, joues = 0;
     if (this.mode === 'local') {
-      if (this.enPause || s.resultat) { this.tDernier = maintenant; if (s.resultat) { this.mode = 'fin'; return; } }
+      if (this.enPause || s.resultat) {
+        this.tDernier = maintenant;
+        if (s.resultat) {
+          // Partie finie pendant une coupure : le lanceur arrête de chercher à se reconnecter.
+          if (this.retour) { this.retour = false; this.versLanceur({ op: 'quitter' }); }
+          this.mode = 'fin';
+          return;
+        }
+      }
       else {
         var dus = Math.floor((maintenant - this.tDernier) / tick);
         // Contre le robot, un long retard (appareil endormi) n'est pas rattrapé : la partie reprend où elle était.
@@ -611,10 +656,13 @@
       // En ligne : on suit l'horloge distante, avec une petite réserve pour lisser le réseau.
       this.file.sort(function (a, b) { return a.k - b.k; });
       while (this.file.length && this.file[0].k <= s.k()) this.file.shift();
-      if (this.file.length && this.file[0].k !== s.k() + 1 && !this.attendSnap) {
-        this.attendSnap = true;      // paquet manquant : on redemande l'état
+      if (this.file.length && this.file[0].k !== s.k() + 1 && !this.attendSnap && maintenant - (this.repriseA || 0) > 1000) {
+        this.attendSnap = true;      // paquet manquant : on redemande l'état (une fois par seconde au plus)
+        this.repriseA = maintenant;
         this.versLanceur({ op: 'reprise', depuis: s.k() });
       }
+      // Demande restée sans réponse (message perdu pendant une coupure) : on pourra redemander.
+      if (this.attendSnap && maintenant - (this.repriseA || 0) > 3000) this.attendSnap = false;
       var aJouer = Math.floor((maintenant - this.tDernier) / tick);
       if (this.file.length > this.r.reserve) aJouer = Math.max(aJouer, this.file.length - this.r.reserve);
       aJouer = Math.min(aJouer, this.r.rattrapageMax);
