@@ -1,12 +1,14 @@
 // ==========================================================================
 // Adresses temps réel du Worker multijoueur (docs/cadrage-temps-reel.md) :
 //
-//   GET /tr/ws?jeu=<id>&sim=<empreinte>&proto=<n>    WebSocket : recherche d'un
-//              adversaire (Rencontre du jeu). Ouvert par le lanceur du site au
-//              clic sur « Jouer en ligne », jamais à l'ouverture du site.
+//   GET /tr/ws?jeu=<id>&sim=<empreinte>&proto=<n>[&mode=&carte=&niveau=]
+//              WebSocket : recherche d'une partie (Rencontre du jeu) dans un mode
+//              du jeu, sur une carte (ou au hasard), avec un niveau de robots.
+//              Ouvert par le lanceur du site au clic sur « Jouer en ligne »,
+//              jamais à l'ouverture du site.
 //   GET /tr/duel?nom=<partie>&jeton=<jeton>          WebSocket : la partie
 //              (Duel) ; signalisation WebRTC, puis relais si besoin.
-//   GET /tr/attente?jeu=<id>    { enRecherche: n } (fin d'une partie contre le robot)
+//   GET /tr/attente?jeu=<id>[&mode=]    { enRecherche: n } (fin d'une partie contre le robot)
 //   GET /tr/etat                compteurs du jour du Budget (parties relayées,
 //              pair-à-pair réussis, échecs, refus) : aucune donnée personnelle
 //
@@ -47,7 +49,8 @@ export async function routeTempsReel(request, env, chemin, origines) {
     const jeu = url.searchParams.get('jeu') || '';
     if (!jeuConnu(jeu) || !env.RENCONTRE) return json({ enRecherche: 0 }, cors);
     try {
-      const r = await env.RENCONTRE.get(env.RENCONTRE.idFromName(`rencontre:${jeu}`)).fetch('https://rencontre/compter');
+      const mode = url.searchParams.get('mode') || '';
+      const r = await env.RENCONTRE.get(env.RENCONTRE.idFromName(`rencontre:${jeu}`)).fetch(`https://rencontre/compter${/^[a-z0-9]{1,12}$/.test(mode) ? `?mode=${mode}` : ''}`);
       const d = r.ok ? await r.json() : null;
       return json({ enRecherche: Number.isInteger(d?.n) ? d.n : 0 }, cors);
     } catch {
@@ -72,6 +75,10 @@ export async function routeTempsReel(request, env, chemin, origines) {
     if (Number(url.searchParams.get('proto')) !== PROTOCOLE_TR) return texte('Protocole différent', 409);
     const cible = new URL('https://rencontre/ws');
     cible.searchParams.set('jeu', jeu);
+    for (const cle of ['mode', 'carte', 'niveau']) {
+      const v = url.searchParams.get(cle);
+      if (v && /^[a-z0-9*]{1,16}$/.test(v)) cible.searchParams.set(cle, v);
+    }
     return env.RENCONTRE.get(env.RENCONTRE.idFromName(`rencontre:${jeu}`)).fetch(new Request(cible, request));
   }
 

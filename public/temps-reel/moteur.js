@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Free Micro Games — moteur commun des jeux en temps réel          jel-tr v1
+   Free Micro Games — moteur commun des jeux en temps réel          jel-tr v2
    JavaScript pur, sans dépendance. Cadrage : docs/cadrage-temps-reel.md.
 
    Le même fichier sert à quatre endroits :
@@ -15,7 +15,8 @@
    La simulation d'un jeu (bloc jel-sim, objet window.JEL_SIM) est faite de
    fonctions pures sur un état entièrement entier (ou, avec flottants: true, en
    nombres à virgule calculés seulement avec + − × ÷ et JEL_TR.flottant) :
-     camps          nombre de camps (2)
+     camps          nombre de camps, au plus (2 à 8) ; une partie peut en avoir
+                    moins (config.camps) ; le camp « système » vaut toujours camps
      periodeBot     un robot réfléchit tous les periodeBot ticks
      depart(graine, config)          état de départ (graine : entier 32 bits)
      valide(etat, camp, ordre)       ordre permis ? (ordre : [type, a, b, …], entiers, type ≥ 1, ORDRE_MAX au plus)
@@ -28,6 +29,11 @@
      exporter(etat)                  objet JSON de l'état (instantané : envoyé, gardé, rejoué)
      importer(donnees)               état rebâti depuis exporter(etat)
      empreinte(etat)                 ce qui est haché pour comparer deux appareils
+     modes                           modes de partie en ligne (plus de 2 joueurs, équipes) :
+                                     { <id>: { equipes: [équipe de chaque camp], robots: [camps
+                                     toujours tenus par un robot] } } ; le premier est le mode par
+                                     défaut ; sans modes : 1 contre 1 (configMode)
+     cartes                          cartes qu'un joueur peut choisir en ligne (identifiants)
    alea(n) donne un entier de 0 à n − 1 tiré du hasard gardé DANS l'état
    (etat.a) : deux appareils partis du même état tirent la même suite.
    Le moteur gère lui-même etat.k (numéro du tick) et etat.ctl (qui tient
@@ -54,7 +60,8 @@
   'use strict';
   if (racine.JEL_TR) return;
 
-  var PROTOCOLE = 1;
+  var PROTOCOLE = 2;                 // 2 : modes à plusieurs joueurs (recherche, pair-à-pair en étoile)
+  var CAMPS_MAX = 8;
   var T_CONTROLE = 0;                // type réservé aux ordres de contrôle (camp système)
   var ORDRE_MAX = 200;               // nombres d'un ordre, au plus (type compris : unités choisies d'un jeu de stratégie)
 
@@ -68,6 +75,7 @@
     reserve: 2,                      // paquets gardés d'avance pour lisser le réseau
     rechercheMs: 15000,              // recherche d'un adversaire, au plus
     connexionMs: 12000,              // adversaire trouvé, mais aucune partie au bout de ce délai : robot
+    lancementMs: 4000,               // partie à plus de 2 lancée : réponse du serveur attendue au plus ce délai
   };
 
   // --- Outils entiers --------------------------------------------------------
@@ -245,10 +253,59 @@
   function problemesSim(s) {
     if (!s || typeof s !== 'object') return ['window.JEL_SIM absent ou qui n\'est pas un objet'];
     var p = [];
-    if (s.camps !== 2) p.push('"camps" doit valoir 2 (prototype 1 contre 1)');
+    if (!(Number.isInteger(s.camps) && s.camps >= 2 && s.camps <= CAMPS_MAX)) p.push('"camps" : entier de 2 à ' + CAMPS_MAX);
     if (!(Number.isInteger(s.periodeBot) && s.periodeBot >= 1 && s.periodeBot <= 50)) p.push('"periodeBot" : entier de 1 à 50');
     ['depart', 'valide', 'ordre', 'pas', 'bot', 'fin'].forEach(function (f) { if (typeof s[f] !== 'function') p.push('fonction "' + f + '" absente'); });
+    if (s.modes !== undefined) {
+      var ids = s.modes && typeof s.modes === 'object' ? Object.keys(s.modes) : [];
+      if (!ids.length) p.push('"modes" : objet non vide { id: { equipes, robots } }');
+      ids.forEach(function (id) {
+        var m = s.modes[id];
+        if (!/^[a-z0-9]{1,12}$/.test(id)) p.push('mode "' + id + '" : identifiant de 1 à 12 lettres minuscules ou chiffres');
+        if (!m || !Array.isArray(m.equipes) || m.equipes.length < 2 || m.equipes.length > s.camps || !m.equipes.every(function (e) { return Number.isInteger(e) && e >= 0 && e < s.camps; })) { p.push('mode "' + id + '" : "equipes" (une équipe de 0 à camps − 1 par camp, 2 à camps camps)'); return; }
+        var robots = m.robots || [];
+        if (!Array.isArray(robots) || !robots.every(function (c) { return Number.isInteger(c) && c >= 0 && c < m.equipes.length; })) p.push('mode "' + id + '" : "robots" (numéros de camps)');
+        else if (m.equipes.length - robots.length < 2) p.push('mode "' + id + '" : il faut au moins 2 places pour de vrais joueurs');
+        else if (robots.indexOf(0) >= 0) p.push('mode "' + id + '" : le camp 0 est toujours un vrai joueur (le premier arrivé)');
+      });
+    }
+    if (s.cartes !== undefined && !(Array.isArray(s.cartes) && s.cartes.length && s.cartes.every(function (c) { return typeof c === 'string' && /^[a-z0-9]{1,16}$/.test(c); }))) p.push('"cartes" : liste d\'identifiants (lettres minuscules et chiffres)');
     return p;
+  }
+
+  // --- Modes de partie (plus de 2 joueurs, équipes, robots) ------------------
+  // Mode d'une simulation, ou celui par défaut (sans modes : 1 contre 1).
+  function modeDe(sim, id) {
+    if (!sim.modes) return { id: '1v1', equipes: [0, 1], robots: [] };
+    var ids = Object.keys(sim.modes);
+    var cle = Object.prototype.hasOwnProperty.call(sim.modes, id) ? id : ids[0];
+    var m = sim.modes[cle];
+    return { id: cle, equipes: m.equipes.slice(), robots: (m.robots || []).slice() };
+  }
+
+  // Places des vrais joueurs d'un mode, dans l'ordre d'arrivée (le premier arrivé a le camp 0).
+  function placesHumaines(sim, id) {
+    var m = modeDe(sim, id), l = [];
+    for (var c = 0; c < m.equipes.length; c++) if (m.robots.indexOf(c) < 0) l.push(c);
+    return l;
+  }
+
+  // Configuration d'une partie d'après les choix des joueurs (le même calcul dans le jeu, pour la
+  // partie contre les robots, et dans le Worker, pour la partie en ligne).
+  //   choix   : { mode, carte ('*' ou absente : au hasard), niveau (robots : 1 à 3) }
+  //   humains : nombre de vrais joueurs (1 : partie contre les robots sur l'appareil) ; ils prennent
+  //             les places humaines du mode dans l'ordre, les places restantes sont des robots
+  // Renvoie { ligne: 1, mode, carte, niveau, camps, ctl } (sans modes : { ligne: 1, ctl }).
+  function configMode(sim, choix, humains, graine) {
+    choix = choix || {};
+    var niveau = Number.isInteger(choix.niveau) && choix.niveau >= 1 && choix.niveau <= 3 ? choix.niveau : 2;
+    var m = modeDe(sim, choix.mode), places = placesHumaines(sim, m.id), n = Math.max(1, Math.min(humains | 0, places.length));
+    var ctl = [];
+    for (var c = 0; c < m.equipes.length; c++) ctl.push(places.indexOf(c) >= 0 && places.indexOf(c) < n ? 0 : niveau);
+    if (!sim.modes) return { ligne: 1, ctl: ctl };
+    var cartes = Array.isArray(sim.cartes) ? sim.cartes : [];
+    var carte = cartes.indexOf(choix.carte) >= 0 ? choix.carte : cartes.length ? cartes[(graine >>> 0) % cartes.length] : null;
+    return { ligne: 1, mode: m.id, carte: carte, niveau: niveau, camps: m.equipes.length, ctl: ctl };
   }
 
   // --- Simulation : état, ticks, journal, instantanés -----------------------
@@ -258,7 +315,12 @@
   function empreinte(sim, etat) { return hacher(typeof sim.empreinte === 'function' ? sim.empreinte(etat) : etat); }
   // État précédent (interpolation du rendu) : seulement pour un état JSON simple.
   function precedent(sim, etat) { return typeof sim.exporter === 'function' ? null : copie(etat); }
-  // config : { ctl: [0 | 1..3 par camp], … (propre au jeu : carte, niveau…) }
+  // config : { camps (nombre de camps de cette partie, sim.camps par défaut), ctl: [0 | 1..3 par
+  // camp], … (propre au jeu : mode, carte, niveau…) }
+  function campsDe(sim, config) {
+    var n = config && config.camps;
+    return Number.isInteger(n) && n >= 2 && n <= sim.camps ? n : sim.camps;
+  }
 
   function Simulation(sim, graine, config, reglages) {
     this.sim = sim;
@@ -268,7 +330,7 @@
     etat.k = 0;
     if (!Number.isInteger(etat.a)) etat.a = graine >>> 0;
     etat.ctl = [];
-    for (var c = 0; c < sim.camps; c++) etat.ctl.push(Array.isArray(this.config.ctl) && Number.isInteger(this.config.ctl[c]) ? this.config.ctl[c] : 0);
+    for (var c = 0; c < campsDe(sim, this.config); c++) etat.ctl.push(Array.isArray(this.config.ctl) && Number.isInteger(this.config.ctl[c]) && this.config.ctl[c] >= 0 && this.config.ctl[c] <= 3 ? this.config.ctl[c] : 0);
     this.etat = etat;
     this.prec = precedent(sim, etat);
     this.resultat = sim.fin(etat);
@@ -281,7 +343,8 @@
 
   // Joue le tick suivant avec ses ordres. Renvoie le hachage si c'est un tick de contrôle.
   Simulation.prototype.avancer = function (ordres) {
-    var sim = this.sim, etat = this.etat, camps = sim.camps;
+    // systeme : camp des ordres de contrôle (toujours sim.camps) ; camps : ceux de cette partie.
+    var sim = this.sim, etat = this.etat, systeme = sim.camps, camps = etat.ctl.length;
     var k = etat.k + 1;
     this.prec = precedent(sim, etat);
     var liste = trierOrdres(Array.isArray(ordres) ? ordres : []);
@@ -290,7 +353,7 @@
     // 1. contrôles
     for (i = 0; i < liste.length; i++) {
       o = liste[i];
-      if (o[0] === camps && o[2] === T_CONTROLE && Number.isInteger(o[3]) && o[3] >= 0 && o[3] < camps && Number.isInteger(o[4]) && o[4] >= 0 && o[4] <= 3) etat.ctl[o[3]] = o[4];
+      if (o[0] === systeme && o[2] === T_CONTROLE && Number.isInteger(o[3]) && o[3] >= 0 && o[3] < camps && Number.isInteger(o[4]) && o[4] >= 0 && o[4] <= 3) etat.ctl[o[3]] = o[4];
     }
     // 2. humains
     for (i = 0; i < liste.length; i++) {
@@ -364,10 +427,12 @@
   }
 
   // --- Cadenceur : l'horloge d'une partie -----------------------------------
-  // o : { camps, delai, depart (dernier tick déjà joué), envoyer(paquet) }
+  // o : { camps (de la partie), systeme (camp des ordres de contrôle : sim.camps ; camps par
+  //       défaut), delai, depart (dernier tick déjà joué), envoyer(paquet) }
 
   function Cadenceur(o) {
     this.camps = o.camps;
+    this.systeme = Number.isInteger(o.systeme) ? o.systeme : o.camps;
     this.delai = Number.isInteger(o.delai) ? o.delai : REGLAGES.delaiEntree;
     this.k = Number.isInteger(o.depart) ? o.depart : 0;
     this.envoyer = o.envoyer || function () {};
@@ -390,7 +455,7 @@
   // Le camp passe à un robot (niveau 1 à 3) ou revient à un humain (0), au tick suivant.
   Cadenceur.prototype.controle = function (camp, niveau) {
     this.seqSys += 1;
-    this.attente.push([this.k + 1, [this.camps, this.seqSys, T_CONTROLE, camp, niveau]]);
+    this.attente.push([this.k + 1, [this.systeme, this.seqSys, T_CONTROLE, camp, niveau]]);
   };
 
   // Tick suivant : paquet des ordres arrivés à échéance, diffusé (même vide).
@@ -410,20 +475,22 @@
   // o : {
   //   sim           window.JEL_SIM
   //   surEvenement  function (e) :
-  //                   { type: 'recherche', reste, n }      recherche en cours (reste : ms ; n : joueurs qui cherchent, ou null)
+  //                   { type: 'recherche', reste, n, max } recherche en cours (reste : ms ; n : joueurs réunis pour
+  //                                                        cette partie, ou null ; max : vrais joueurs au plus)
   //                   { type: 'connexion' }                adversaire trouvé, connexion en cours
   //                   { type: 'debut', mode, camp, raison } partie commencée : mode 'local' (robot) ou 'p2p' / 'relais'
   //                   { type: 'controle', camp, niveau }   un camp passe au robot (niveau ≥ 1) ou revient à l'humain (0)
   //                   { type: 'fin', resultat }            partie finie (fin(etat) de la simulation)
   //                   { type: 'info', code }               'coupe' (avec raison ; retour : reconnexion encore tentée),
   //                                                        'reprise', 'reconnecte'…
-  //                   { type: 'reseau', qui, ok, fin }     problème de réseau : qui = 'moi' (cet appareil) ou
-  //                                                        'adversaire' ; ok = true quand il est réglé ; fin = true
+  //                   { type: 'reseau', qui, camp, ok, fin } problème de réseau : qui = 'moi' (cet appareil) ou
+  //                                                        'adversaire' (un autre joueur : camp) ; ok = true quand il est réglé ; fin = true
   //                                                        quand on renonce à se reconnecter (la partie reste contre le robot)
   //                   { type: 'attente', n }               réponse à partie.attente() : joueurs qui cherchent
   //   reglages      remplace des valeurs de REGLAGES
   // }
-  // Commandes : local({ graine, config, camp }), chercher({ config, repli }), jouerRobot(),
+  // Commandes : local({ graine, config, camp }), chercher({ config, repli }), lancer() (partie à plus
+  // de 2 : commencer tout de suite avec les joueurs déjà réunis, robots aux places libres), jouerRobot(),
   // ordre([type, a, b, c]), pause(oui), quitter(), attente().
   // Lecture : mode ('arret', 'recherche', 'connexion', 'local', 'en-ligne', 'fin'), camp, etat (tick
   // courant), prec (tick précédent), alpha() (0 à 1, pour l'interpolation du rendu), resultat,
@@ -508,7 +575,7 @@
     this.s = new Simulation(this.sim, (p.graine >>> 0) || 1, p.config || {}, this.r);
     this.seq = 0;
     var moi = this;
-    this.cad = new Cadenceur({ camps: this.sim.camps, delai: this.r.delaiEntree, depart: 0, envoyer: function (paquet) { moi.jouerPaquet(paquet); } });
+    this.cad = new Cadenceur({ camps: this.s.etat.ctl.length, systeme: this.sim.camps, delai: this.r.delaiEntree, depart: 0, envoyer: function (paquet) { moi.jouerPaquet(paquet); } });
     this.mode = 'local';
     this.enPause = false;
     this.tDernier = horloge();
@@ -516,8 +583,10 @@
     this.minuteur = setTimeout(this.battement, 16);
   };
 
-  // Recherche d'un adversaire en ligne (par le lanceur), robot si personne n'est trouvé
-  // dans rechercheMs. p : { config (partie en ligne), repli: { graine, config, camp } }.
+  // Recherche d'adversaires en ligne (par le lanceur), robot si personne n'est trouvé dans
+  // rechercheMs. p : { config ({ mode, carte, niveau } : choix du joueur, voir configMode),
+  // repli: { graine, config, camp } }. Partie à plus de 2 : au bout de rechercheMs, si au moins
+  // deux joueurs sont réunis, la partie commence avec eux (robots aux places libres).
   Partie.prototype.chercher = function (p) {
     this.arreter();
     racine.JEL_TR.derniere = this;
@@ -526,18 +595,33 @@
     if (!dansLanceur()) { this.local(this.repli, 'seul'); return; }
     this.mode = 'recherche';
     this.nRecherche = null;
+    this.maxRecherche = null;
+    this.lance = false;
     this.finRecherche = horloge() + this.r.rechercheMs;
     racine.addEventListener('message', this.ecoute);
     this.versLanceur({ op: 'chercher', proto: PROTOCOLE, config: copie(p.config || {}) });
     var moi = this;
     var annoncer = function () {
       if (moi.mode !== 'recherche') return;
-      var reste = Math.max(0, moi.finRecherche - horloge());
-      moi.signaler({ type: 'recherche', reste: reste, n: moi.nRecherche });
-      if (reste <= 0) moi.basculerLocal('personne');
+      var brut = moi.finRecherche - horloge(), reste = Math.max(0, brut);
+      moi.signaler({ type: 'recherche', reste: reste, n: moi.nRecherche, max: moi.maxRecherche });
+      if (reste > 0) return;
+      // Délai écoulé : avec au moins un autre joueur, la partie commence (sinon, robots sur l'appareil).
+      if (moi.nRecherche >= 2 && !moi.lance) moi.lancer();
+      else if (!moi.lance || brut <= -moi.r.lancementMs) moi.basculerLocal('personne');
     };
     this.minuteurRecherche = setInterval(annoncer, 250);
     annoncer();
+  };
+
+  // Partie à plus de 2 joueurs : commencer tout de suite avec les joueurs déjà réunis (bouton
+  // « Lancer la partie », ou fin de la recherche). Le serveur répond « trouve », ou « solo ».
+  Partie.prototype.lancer = function () {
+    if (this.mode !== 'recherche' || this.lance) return false;
+    this.lance = true;
+    this.finRecherche = Math.min(this.finRecherche, horloge());
+    this.versLanceur({ op: 'lancer' });
+    return true;
   };
 
   // Bouton « Jouer contre un robot maintenant » (ou délai écoulé).
@@ -565,7 +649,7 @@
     var d = e.data;
     if (!d || d.type !== 'jel-tr') return;
     if (d.etat === 'attente') {
-      if (this.mode === 'recherche') { this.nRecherche = Number.isInteger(d.n) ? d.n : null; }
+      if (this.mode === 'recherche') { this.nRecherche = Number.isInteger(d.n) ? d.n : null; this.maxRecherche = Number.isInteger(d.max) ? d.max : null; }
       else this.signaler({ type: 'attente', n: Number.isInteger(d.n) ? d.n : 0 });
       return;
     }
@@ -577,9 +661,10 @@
       if (this.mode !== 'recherche') return;
       clearInterval(this.minuteurRecherche);
       this.mode = 'connexion';
-      this.camp = d.camp === 1 ? 1 : 0;
       var cfg = copie(d.config || {});
-      cfg.ctl = [0, 0];
+      var n = campsDe(this.sim, cfg);
+      this.camp = Number.isInteger(d.camp) && d.camp >= 0 && d.camp < n ? d.camp : 0;
+      if (!Array.isArray(cfg.ctl) || cfg.ctl.length !== n) { cfg.ctl = []; for (var c = 0; c < n; c++) cfg.ctl.push(0); }
       this.s = new Simulation(this.sim, d.graine >>> 0, cfg, this.r);
       this.seq = 0;
       this.file = [];
@@ -594,7 +679,7 @@
     if (d.etat === 'info') { this.signaler({ type: 'info', code: String(d.code || '') }); return; }
     if (d.etat === 'reseau') {
       if (d.fin) this.retour = false;
-      this.signaler({ type: 'reseau', qui: d.qui === 'adversaire' ? 'adversaire' : 'moi', ok: d.ok === true, fin: d.fin === true });
+      this.signaler({ type: 'reseau', qui: d.qui === 'adversaire' ? 'adversaire' : 'moi', camp: Number.isInteger(d.camp) ? d.camp : null, ok: d.ok === true, fin: d.fin === true });
       return;
     }
     if (d.etat === 'coupe') { this.continuerSeul(d.raison || 'coupe', d.retour === true); return; }
@@ -633,8 +718,8 @@
     this.signaler({ type: 'info', code: 'reprise' });
   };
 
-  // Plus de réseau : la partie continue sur l'appareil, au même tick, l'autre camp tenu par
-  // le robot (niveau moyen). retour : le lanceur essaie encore de se reconnecter ; s'il y
+  // Plus de réseau : la partie continue sur l'appareil, au même tick, les autres camps tenus
+  // par le robot (niveau moyen). retour : le lanceur essaie encore de se reconnecter ; s'il y
   // arrive, l'état de la vraie partie arrive (instantané) et on y revient (revenirEnLigne).
   Partie.prototype.continuerSeul = function (raison, retour) {
     if (this.mode === 'recherche' || this.mode === 'connexion') { this.basculerLocal(raison); return; }
@@ -646,8 +731,9 @@
     // Les paquets déjà reçus sont joués d'abord (dans l'ordre), puis l'horloge locale prend la suite.
     while (this.file.length && this.file[0].k === this.s.k() + 1) this.jouerPaquet(this.file.shift());
     this.file = [];
-    this.cad = new Cadenceur({ camps: this.sim.camps, delai: this.r.delaiEntree, depart: this.s.k(), envoyer: function (p) { moi.jouerPaquet(p); } });
-    for (var c = 0; c < this.sim.camps; c++) if (c !== this.camp && this.s.etat.ctl[c] === 0) this.cad.controle(c, 2);
+    var camps = this.s.etat.ctl.length;
+    this.cad = new Cadenceur({ camps: camps, systeme: this.sim.camps, delai: this.r.delaiEntree, depart: this.s.k(), envoyer: function (p) { moi.jouerPaquet(p); } });
+    for (var c = 0; c < camps; c++) if (c !== this.camp && this.s.etat.ctl[c] === 0) this.cad.controle(c, 2);
     this.mode = 'local';
     this.connexionAvant = this.connexion;
     this.connexion = null;
@@ -767,6 +853,11 @@
 
   racine.JEL_TR = {
     PROTOCOLE: PROTOCOLE,
+    CAMPS_MAX: CAMPS_MAX,
+    modeDe: modeDe,
+    placesHumaines: placesHumaines,
+    configMode: configMode,
+    campsDe: campsDe,
     T_CONTROLE: T_CONTROLE,
     ORDRE_MAX: ORDRE_MAX,
     flottant: flottant,

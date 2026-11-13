@@ -6,26 +6,31 @@
 // Son moteur (public/temps-reel/moteur.js, window.JEL_TR) parle au lanceur par
 // postMessage (type 'jel-tr') ; c'est le lanceur qui fait tout le réseau :
 //
-//   jeu → lanceur : op 'chercher' (recherche d'un adversaire), 'pret' (jeu prêt
+//   jeu → lanceur : op 'chercher' { proto, config: { mode, carte, niveau } } (recherche),
+//                   'lancer' (partie à plus de 2 : commencer avec les joueurs réunis), 'pret' (jeu prêt
 //                   à jouer la partie trouvée), 'ordre' { seq, o }, 'hash' { k, h },
 //                   'snap' { snap } (réponse à une demande), 'reprise' { depuis }
 //                   (paquet manquant), 'fin', 'quitter', 'attente' (joueurs en recherche)
-//   lanceur → jeu : { etat: 'attente', n }, { etat: 'trouve', camp, graine, config },
+//   lanceur → jeu : { etat: 'attente', n, max }, { etat: 'trouve', camp, graine, config, humains },
 //                   { etat: 'mode', mode }, { etat: 'solo', raison } (pas de partie en
 //                   ligne : robot), { etat: 'coupe', raison, retour } (plus de réseau en
 //                   pleine partie : robot ; retour = on essaie encore de se reconnecter),
-//                   { etat: 'reseau', qui: 'moi' | 'adversaire', ok, fin } (bandeau),
+//                   { etat: 'reseau', qui: 'moi' | 'adversaire', camp, ok, fin } (bandeau),
 //                   { paquet }, { snap }, { demande: 'snap' }
 //
 // Déroulé (en ligne seulement : freemicrogames.com, SITES_MULTI de config.js) :
-//  1. Recherche : WebSocket vers la Rencontre du jeu (/tr/ws), 15 s au plus (le
-//     compte à rebours est dans le jeu). Rien n'est ouvert à l'ouverture du site.
-//  2. Adversaire trouvé : WebSocket vers le Duel (/tr/duel), qui fait passer
-//     l'offre et les candidats WebRTC (STUN public, pas de TURN). DataChannel
-//     ouvert → pair-à-pair ; sinon, au bout de 5 s → relais par le Duel.
-//  3. Pair-à-pair : le camp 0 est le PAIR HORLOGE (cadenceur du moteur) ; l'autre
-//     ne lui envoie que ses ordres (et un signe de vie chaque seconde). Hachages
-//     comparés entre les pairs ; écart → instantané du pair horloge.
+//  1. Recherche : WebSocket vers la Rencontre du jeu (/tr/ws), dans le mode, sur
+//     la carte et avec le niveau de robots choisis ; 15 s au plus (le compte à
+//     rebours est dans le jeu). Rien n'est ouvert à l'ouverture du site.
+//  2. Partie trouvée (2 à 8 vrais joueurs) : WebSocket vers le Duel (/tr/duel),
+//     qui fait passer les offres et candidats WebRTC (STUN public, pas de TURN).
+//     Tous les DataChannel ouverts → pair-à-pair ; sinon, au bout de 5 s →
+//     relais par le Duel, pour tout le monde.
+//  3. Pair-à-pair EN ÉTOILE : le camp 0 (premier arrivé) est le PAIR HORLOGE
+//     (cadenceur du moteur), relié à chacun des autres ; les autres ne sont
+//     reliés qu'à lui et ne lui envoient que leurs ordres (et un signe de vie
+//     chaque seconde). Hachages comparés par le pair horloge ; écart →
+//     instantané du pair horloge.
 //  4. Coupures (écran en veille, passage du wifi à la 4G, réseau perdu) :
 //     - la connexion au Duel est surveillée (battement toutes les 4 s, et en
 //       relais un paquet tous les 100 ms) : une connexion muette est fermée et
@@ -76,6 +81,7 @@ const MESSAGE_MAX = 2500;            // un ordre (un jeu de stratégie envoie la
 const RECU_MAX = 1000000;           // un message reçu (instantané d'un jeu de stratégie : 100 à 300 Ko)
 const MORCEAU = 16000;              // lien direct : un message plus long part en morceaux (Safari : 64 Ko au plus)
 const NIVEAU_RELAIS = 2;            // robot moyen à la place d'un pair absent
+const RE_CHOIX = /^[a-z0-9*]{1,16}$/;
 
 // Texte de la simulation d'un jeu (bloc jel-sim), tel que le Worker l'empreinte
 // (scripts/multijoueur.mjs) : fins de ligne en \n, sans espaces autour.
@@ -120,21 +126,34 @@ export function brancherTempsReel({ jeu, html, cadre }) {
   function nouvelle() {
     return {
       phase: 'recherche',             // recherche | duel | jeu | secours
-      wsR: null, wsD: null, pc: null, dc: null, dcOuvert: false,
-      camp: 0, duel: null, jeton: null, graine: 0, config: null,
+      wsR: null, wsD: null,
+      liens: new Map(),               // pair-à-pair : camp → lien (pair horloge : un par joueur ; sinon : le camp 0)
+      camp: 0, duel: null, jeton: null, graine: 0, config: null, humains: [0, 1], systeme: 2,
       mode: null, cad: null, minuteurCad: 0, t0: 0, kDebut: 0,
-      jeuPret: false, pairPret: false, demarre: false, fini: false,
-      dernierK: 0, recents: [], hashesMoi: new Map(), hashesPair: new Map(),
-      dernierPair: 0, robotPair: false, attenteSnapPair: false, attenteSnapDuel: false,
+      jeuPret: false, demarre: false, fini: false,
+      dernierK: 0, recents: [], hashesMoi: new Map(),
+      attenteSnapPairs: new Set(), attenteSnapDuel: false,
+      autresEnPanne: new Set(),       // camps dont le problème de réseau est affiché dans le jeu (bandeau)
       vuD: 0,                         // dernier message (ou battement) reçu du Duel
       panne: 0,                       // début du problème de réseau de cet appareil (0 : aucun)
       coupe: false,                   // le jeu continue contre le robot en attendant la reconnexion
-      pairMuet: false,                // bandeau « adversaire » affiché (pair-à-pair)
       besoinSecours: false,           // lien pair-à-pair mort : secours à demander dès la reconnexion
       debutReco: 0, essai: 0, minuteurReco: 0, minuteurGel: 0,
-      minuteurs: [], icesEnAttente: [],
+      minuteurs: [],
     };
   }
+
+  // Lien direct avec un autre appareil (pair-à-pair).
+  function nouveauLien(camp) {
+    return { camp, pc: null, dc: null, ouvert: false, ices: [], pret: false, pretEnvoye: false, dernier: 0, robot: false, hashes: new Map(), morceaux: null, muet: false, debut: 0 };
+  }
+  const liensDe = (q) => [...q.liens.values()];
+  const lienOuvert = (q) => liensDe(q).some((l) => l.ouvert);
+  const tousOuverts = (q) => q.liens.size > 0 && liensDe(q).every((l) => l.ouvert);
+  const fermerLiens = (q) => {
+    for (const l of liensDe(q)) { try { l.dc?.close(); } catch { /* fermé */ } try { l.pc?.close(); } catch { /* fermée */ } }
+    q.liens.clear();
+  };
 
   function minuterie(f, ms, repete = false) {
     const id = repete ? setInterval(f, ms) : setTimeout(f, ms);
@@ -155,8 +174,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
       ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null;
       try { ws.close(1000, 'fin'); } catch { /* fermée */ }
     }
-    try { q.dc?.close(); } catch { /* fermé */ }
-    try { q.pc?.close(); } catch { /* fermée */ }
+    fermerLiens(q);
   }
 
   // Plus de partie en ligne : avant la partie → robot ; pendant → le jeu continue seul, sans retour.
@@ -177,8 +195,9 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     if (!wsOuvert(ws) || muet()) return false;
     try { ws.send(JSON.stringify(m)); return true; } catch { return false; }
   };
-  const envoyerPair = (m) => {
-    const dc = p?.dc;
+  // Un message à un autre appareil (lien direct).
+  const envoyerLien = (lien, m) => {
+    const dc = lien?.dc;
     if (!dc || dc.readyState !== 'open' || muet()) return false;
     try {
       const t = JSON.stringify(m);
@@ -189,15 +208,21 @@ export function brancherTempsReel({ jeu, html, cadre }) {
       return true;
     } catch { return false; }
   };
-  // Morceaux reçus du pair : le message entier, une fois tous arrivés (sinon null).
-  const recoller = (m) => {
+  // Pair horloge : à tous les autres appareils ; sinon : au pair horloge.
+  const envoyerPair = (m) => {
+    let ok = false;
+    for (const l of liensDe(p)) if (envoyerLien(l, m)) ok = true;
+    return ok;
+  };
+  // Morceaux reçus d'un appareil : le message entier, une fois tous arrivés (sinon null).
+  const recoller = (lien, m) => {
     if (!Number.isInteger(m.id) || !Number.isInteger(m.i) || !Number.isInteger(m.n) || m.n < 1 || m.n > Math.ceil(RECU_MAX / MORCEAU) || typeof m.d !== 'string') return null;
-    if (!p.morceaux || p.morceaux.id !== m.id) p.morceaux = { id: m.id, n: m.n, parts: [], recus: 0 };
-    const r = p.morceaux;
+    if (!lien.morceaux || lien.morceaux.id !== m.id) lien.morceaux = { id: m.id, n: m.n, parts: [], recus: 0 };
+    const r = lien.morceaux;
     if (m.i < 0 || m.i >= r.n || r.parts[m.i] !== undefined) return null;
     r.parts[m.i] = m.d; r.recus += 1;
     if (r.recus < r.n) return null;
-    p.morceaux = null;
+    lien.morceaux = null;
     try { return JSON.parse(r.parts.join('')); } catch { return null; }
   };
   // La connexion au Duel répond-elle encore ?
@@ -205,31 +230,44 @@ export function brancherTempsReel({ jeu, html, cadre }) {
 
   // --- 1. Recherche ---------------------------------------------------------
 
-  async function chercher() {
+  let derniersChoix = {};             // mode, carte et niveau de la dernière recherche (« Un joueur est disponible »)
+
+  async function chercher(d) {
     fermer();
     const adresse = adresseServeur();
     if (!adresse || window.top !== window || window.opener) return versJeu({ etat: 'solo', raison: 'site' });
     if (navigator.onLine === false) return versJeu({ etat: 'solo', raison: 'hors-ligne' });
     if (!jeu.temps_reel || !ID_VALIDE.test(jeu.id)) return versJeu({ etat: 'solo', raison: 'jeu' });
+    // Un jeu gardé sur l'appareil avec un ancien moteur : partie contre le robot (il sera mis à jour).
+    if (d && d.proto !== undefined && d.proto !== TR.PROTOCOLE) return versJeu({ etat: 'solo', raison: 'jeu' });
     const sim = await empreinte(texteSim(html));
     if (!sim) return versJeu({ etat: 'solo', raison: 'jeu' });
+    const choix = d && d.config && typeof d.config === 'object' ? d.config : {};
+    derniersChoix = {};
+    let params = '';
+    for (const cle of ['mode', 'carte', 'niveau']) {
+      const v = String(choix[cle] ?? '');
+      if (RE_CHOIX.test(v)) { derniersChoix[cle] = v; params += `&${cle}=${encodeURIComponent(v)}`; }
+    }
     p = nouvelle();
     const q = p;
     let ws;
-    try { ws = new WebSocket(`${adresse}/tr/ws?jeu=${encodeURIComponent(jeu.id)}&sim=${sim}&proto=${TR.PROTOCOLE}`); }
+    try { ws = new WebSocket(`${adresse}/tr/ws?jeu=${encodeURIComponent(jeu.id)}&sim=${sim}&proto=${TR.PROTOCOLE}${params}`); }
     catch { abandonner('reseau'); return; }
     q.wsR = ws;
     q.adresse = adresse;
     ws.onmessage = (e) => {
       if (p !== q || typeof e.data !== 'string' || e.data === 'pong' || e.data.length > RECU_MAX) return;
       let m; try { m = JSON.parse(e.data); } catch { return; }
-      if (m.t === 'attente') versJeu({ etat: 'attente', n: Number.isInteger(m.n) ? m.n : 0 });
+      if (m.t === 'attente') versJeu({ etat: 'attente', n: Number.isInteger(m.n) ? m.n : 0, max: Number.isInteger(m.max) ? m.max : 2 });
       else if (m.t === 'trouve' && typeof m.duel === 'string' && RE_UUID.test(String(m.jeton))) {
-        Object.assign(q, { camp: m.camp === 1 ? 1 : 0, duel: m.duel, jeton: m.jeton, graine: m.graine >>> 0, config: m.config || {} });
+        const humains = Array.isArray(m.humains) && m.humains.length >= 2 && m.humains.every((c) => Number.isInteger(c) && c >= 0 && c < TR.CAMPS_MAX) ? m.humains : [0, 1];
+        const camp = humains.includes(m.camp) ? m.camp : 0;
+        Object.assign(q, { camp, humains, systeme: Number.isInteger(m.systeme) ? m.systeme : 2, duel: m.duel, jeton: m.jeton, graine: m.graine >>> 0, config: m.config || {} });
         ws.onclose = ws.onerror = null;
         try { ws.close(1000, 'trouve'); } catch { /* fermée */ }
         q.wsR = null;
-        journal('adversaire trouvé', `camp ${q.camp}`);
+        journal('partie trouvée', `camp ${q.camp} sur ${humains.length} joueurs`);
         ouvrirDuel(false);
         minuterie(surveiller, 500, true);
       } else if (m.t === 'refus') abandonner(m.raison || 'refus');
@@ -253,7 +291,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
       q.vuD = maintenant();
       if (!q.ping) q.ping = minuterie(() => { try { if (wsOuvert(q.wsD) && !muet()) q.wsD.send('ping'); } catch { /* fermée */ } }, PING_MS, true);
       if (reprise) return;            // la suite dépend de l'état du Duel (message « bienvenue »)
-      versJeu({ etat: 'trouve', camp: q.camp, graine: q.graine, config: q.config });
+      versJeu({ etat: 'trouve', camp: q.camp, graine: q.graine, config: q.config, humains: q.humains });
       if (p2pPermis() && typeof RTCPeerConnection === 'function') demarrerP2P();
       else { journal('pair-à-pair non tenté'); envoyerD({ t: 'relais' }); }
     };
@@ -273,7 +311,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
       journal(`connexion au serveur perdue (${q.derniereFermeture}) : reconnexion`);
       // Relais : la partie est figée tant que la connexion manque. Pair-à-pair : elle continue
       // tant que le lien direct tient (la connexion au Duel ne sert qu'aux secours).
-      if (q.mode === 'relais' || !q.dcOuvert) panneMoi();
+      if (q.mode === 'relais' || !lienOuvert(q)) panneMoi();
       planifierReconnexion();
     };
   }
@@ -313,7 +351,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     q.panne = maintenant();
     versJeu({ etat: 'reseau', qui: 'moi', ok: false });
     // Le pair horloge n'est jamais figé : il est l'horloge (le camp absent passe au robot).
-    const fige = q.mode === 'relais' || q.camp === 1 || !q.demarre;
+    const fige = q.mode === 'relais' || q.camp !== 0 || !q.demarre;
     if (!fige) return;
     clearTimeout(q.minuteurGel);
     q.minuteurGel = setTimeout(() => {
@@ -357,21 +395,45 @@ export function brancherTempsReel({ jeu, html, cadre }) {
       minuterie(() => { if (p === q && q.phase === 'secours') panneMoi(); }, SECOURS_MAX_MS);
     }
     if (q.mode === 'p2p' && q.demarre && q.phase === 'jeu') {
-      const silence = t - q.dernierPair > SILENCE_PAIR_MS;
-      if (!silence) q.sonde = 0;
-      else if (!q.pairMuet && !q.sonde) {
-        // L'autre appareil se tait : est-ce lui, ou nous ? Battement immédiat vers le serveur.
+      const muets = liensDe(q).filter((l) => !l.muet && !l.parti && t - l.dernier > SILENCE_PAIR_MS);
+      const vivant = liensDe(q).some((l) => t - l.dernier <= SILENCE_PAIR_MS);
+      if (!muets.length) q.sonde = 0;
+      else if (vivant) {
+        // Pair horloge : un autre appareil répond encore, c'est donc ce joueur-là qui a un problème.
+        for (const l of muets) signalerMuet(l);
+      } else if (!q.sonde) {
+        // Plus aucun appareil ne répond : est-ce eux, ou nous ? Battement immédiat vers le serveur.
         q.sonde = t;
         try { if (wsOuvert(q.wsD) && !muet()) q.wsD.send('ping'); } catch { /* fermée */ }
-      } else if (!q.pairMuet && t - q.sonde > 1500) {
-        q.pairMuet = true;
+      } else if (t - q.sonde > 1500) {
         const nousRepondons = wsOuvert(q.wsD) && q.vuD > q.sonde;
         q.sonde = 0;
-        if (nousRepondons) versJeu({ etat: 'reseau', qui: 'adversaire', ok: false });
-        else panneMoi();
-        if (q.camp === 1) surPerteP2P('silence');          // le pair horloge ne répond plus : secours
+        if (nousRepondons) for (const l of muets) signalerMuet(l);
+        else { for (const l of muets) l.muet = true; panneMoi(); }
+        if (q.camp !== 0) surPerteP2P('silence');          // le pair horloge ne répond plus : secours
       }
     }
+  }
+
+  // Un autre appareil se tait : bandeau ; le pair horloge prévient aussi les autres joueurs.
+  function signalerMuet(lien) {
+    const q = p;
+    lien.muet = true;
+    annoncerAutre(lien.camp, false);
+    if (q.camp === 0) for (const l of liensDe(q)) if (l !== lien) envoyerLien(l, { t: 'reseau', camp: lien.camp, ok: false });
+  }
+
+  // Bandeau « un autre joueur a un problème de réseau » : on garde la liste, pour l'effacer quand le
+  // serveur reprend la partie (il annonce lui-même ensuite les problèmes qu'il voit).
+  function annoncerAutre(camp, ok) {
+    const q = p;
+    if (!q) return;
+    if (ok) { if (!q.autresEnPanne.delete(camp)) return; } else q.autresEnPanne.add(camp);
+    versJeu({ etat: 'reseau', qui: 'adversaire', camp, ok });
+  }
+  function oublierAutres() {
+    const q = p;
+    for (const camp of [...q.autresEnPanne]) annoncerAutre(camp, true);
   }
 
   // Écran rallumé, réseau revenu : on vérifie tout de suite.
@@ -393,18 +455,16 @@ export function brancherTempsReel({ jeu, html, cadre }) {
         setTimeout(() => dispatchEvent(new Event('online')), ms + 20);
         return true;
       },
-      etat: () => (p ? { mode: p.mode, phase: p.phase, camp: p.camp, panne: !!p.panne, coupe: p.coupe, dcOuvert: p.dcOuvert, ws: wsOuvert(p.wsD) } : null),
+      etat: () => (p ? { mode: p.mode, phase: p.phase, camp: p.camp, humains: p.humains, panne: !!p.panne, coupe: p.coupe, dcOuvert: lienOuvert(p), liens: p.liens.size, ws: wsOuvert(p.wsD) } : null),
     };
   }
 
-  // Le Duel a repris la partie (relais) : ce lanceur n'est plus l'horloge et ferme le lien direct.
+  // Le Duel a repris la partie (relais) : ce lanceur n'est plus l'horloge et ferme les liens directs.
   function adopterRelais() {
     const q = p;
     clearInterval(q.minuteurCad);
     q.cad = null;
-    try { q.dc?.close(); } catch { /* fermé */ }
-    try { q.pc?.close(); } catch { /* fermée */ }
-    q.dc = null; q.pc = null; q.dcOuvert = false;
+    fermerLiens(q);
     q.mode = 'relais';
     q.pretEnvoye = true;
     versJeu({ etat: 'mode', mode: 'relais' });
@@ -423,16 +483,18 @@ export function brancherTempsReel({ jeu, html, cadre }) {
           // Instantané et ordres manqués (ou, si le serveur attend un état, il nous le demande).
           envoyerD({ t: 'reprise', depuis: q.dernierK });
         } else if (m.mode === 'p2p') {
-          if (!q.dcOuvert || q.besoinSecours) { q.besoinSecours = false; q.phase = 'secours'; envoyerD({ t: 'secours', k: q.dernierK }); }
+          if ((q.camp !== 0 && !lienOuvert(q)) || q.besoinSecours) { q.besoinSecours = false; q.phase = 'secours'; envoyerD({ t: 'secours', k: q.dernierK }); }
           else finPanne();
         } else if (m.mode === 'refus') abandonner('refus');
         return;
-      case 'sdp': surSdp(m.d); return;
-      case 'ice':
-        if (!q.pc || !m.d) return;
-        if (q.pc.remoteDescription) q.pc.addIceCandidate(m.d).catch(() => {});
-        else q.icesEnAttente.push(m.d);
+      case 'sdp': surSdp(q.liens.get(q.camp === 0 ? m.de : 0), m.d); return;
+      case 'ice': {
+        const lien = q.liens.get(q.camp === 0 ? m.de : 0);
+        if (!lien?.pc || !m.d) return;
+        if (lien.pc.remoteDescription) lien.pc.addIceCandidate(m.d).catch(() => {});
+        else lien.ices.push(m.d);
         return;
+      }
       case 'mode':
         if (m.mode === 'p2p') {
           if (q.mode === 'p2p') return;
@@ -443,8 +505,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
           else {
             q.mode = 'relais';
             journal('mode relayé (pair-à-pair non établi)');
-            try { q.dc?.close(); } catch { /* */ } try { q.pc?.close(); } catch { /* */ }
-            q.dc = null; q.pc = null; q.dcOuvert = false;
+            fermerLiens(q);
             versJeu({ etat: 'mode', mode: 'relais' });
           }
           if (m.secours) q.phase = 'secours';
@@ -471,7 +532,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
           q.demarre = true;
           q.coupe = false;            // le jeu revient dans la vraie partie (moteur : revenirEnLigne)
           finPanne();
-          if (q.pairMuet) { q.pairMuet = false; versJeu({ etat: 'reseau', qui: 'adversaire', ok: true }); }
+          oublierAutres();
           versJeu({ snap: m.snap });
         }
         return;
@@ -483,8 +544,8 @@ export function brancherTempsReel({ jeu, html, cadre }) {
         return;
       case 'reseau':
         if (Number.isInteger(m.camp) && m.camp !== q.camp) {
-          journal(m.ok ? 'réseau de l\'adversaire revenu' : 'problème de réseau chez l\'adversaire');
-          versJeu({ etat: 'reseau', qui: 'adversaire', ok: m.ok === true });
+          journal(m.ok ? `réseau du camp ${m.camp} revenu` : `problème de réseau chez le camp ${m.camp}`);
+          annoncerAutre(m.camp, m.ok === true);
         }
         return;
       default:
@@ -494,82 +555,89 @@ export function brancherTempsReel({ jeu, html, cadre }) {
 
   // --- WebRTC -----------------------------------------------------------------
 
+  // Pair horloge (camp 0) : un lien vers chacun des autres joueurs ; les autres : un lien vers lui.
   async function demarrerP2P() {
     const q = p;
-    let pc;
-    try { pc = new RTCPeerConnection({ iceServers: ICE }); } catch { envoyerD({ t: 'relais' }); return; }
-    q.pc = pc;
     q.debutP2P = maintenant();
-    pc.onicecandidate = (e) => { if (e.candidate && p === q) envoyerD({ t: 'ice', d: e.candidate.toJSON() }); };
     minuterie(() => {
-      if (p !== q || q.dcOuvert || q.mode) return;
-      journal('pair-à-pair non établi en 5 s : relais demandé');
+      if (p !== q || tousOuverts(q) || q.mode) return;
+      journal(`pair-à-pair non établi en 5 s (${liensDe(q).filter((l) => l.ouvert).length} lien(s) ouvert(s) sur ${q.liens.size}) : relais demandé`);
       envoyerD({ t: 'relais' });
     }, DELAI_P2P_MS);
-    if (q.camp === 0) {
-      brancherDC(pc.createDataChannel('fmg', { ordered: true }));
-      try {
-        await pc.setLocalDescription(await pc.createOffer());
-        envoyerD({ t: 'sdp', d: pc.localDescription.toJSON() });
-      } catch { envoyerD({ t: 'relais' }); }
-    } else {
-      pc.ondatachannel = (e) => brancherDC(e.channel);
+    const autres = q.camp === 0 ? q.humains.filter((c) => c !== 0) : [0];
+    for (const camp of autres) {
+      const lien = nouveauLien(camp);
+      q.liens.set(camp, lien);
+      let pc;
+      try { pc = new RTCPeerConnection({ iceServers: ICE }); } catch { envoyerD({ t: 'relais' }); return; }
+      lien.pc = pc;
+      pc.onicecandidate = (e) => { if (e.candidate && p === q) envoyerD({ t: 'ice', d: e.candidate.toJSON(), vers: camp }); };
+      if (q.camp === 0) {
+        brancherDC(lien, pc.createDataChannel('fmg', { ordered: true }));
+        try {
+          await pc.setLocalDescription(await pc.createOffer());
+          envoyerD({ t: 'sdp', d: pc.localDescription.toJSON(), vers: camp });
+        } catch { envoyerD({ t: 'relais' }); }
+      } else {
+        pc.ondatachannel = (e) => brancherDC(lien, e.channel);
+      }
     }
   }
 
-  async function surSdp(desc) {
-    const q = p;
-    if (!q?.pc || !desc) return;
+  async function surSdp(lien, desc) {
+    if (!lien?.pc || !desc) return;
     try {
-      await q.pc.setRemoteDescription(desc);
-      for (const c of q.icesEnAttente.splice(0)) q.pc.addIceCandidate(c).catch(() => {});
+      await lien.pc.setRemoteDescription(desc);
+      for (const c of lien.ices.splice(0)) lien.pc.addIceCandidate(c).catch(() => {});
       if (desc.type === 'offer') {
-        await q.pc.setLocalDescription(await q.pc.createAnswer());
-        envoyerD({ t: 'sdp', d: q.pc.localDescription.toJSON() });
+        await lien.pc.setLocalDescription(await lien.pc.createAnswer());
+        envoyerD({ t: 'sdp', d: lien.pc.localDescription.toJSON(), vers: lien.camp });
       }
     } catch { envoyerD({ t: 'relais' }); }
   }
 
-  function brancherDC(dc) {
+  function brancherDC(lien, dc) {
     const q = p;
-    q.dc = dc;
+    lien.dc = dc;
     dc.onopen = () => {
-      if (p !== q) return;
-      q.dcOuvert = true;
-      q.dernierPair = maintenant();
-      journal(`DataChannel ouvert en ${Math.round(maintenant() - q.debutP2P)} ms`);
-      envoyerD({ t: 'p2p' });
+      if (p !== q || q.liens.get(lien.camp) !== lien) return;
+      lien.ouvert = true;
+      lien.dernier = maintenant();
+      journal(`DataChannel ouvert avec le camp ${lien.camp} en ${Math.round(maintenant() - q.debutP2P)} ms`);
+      if (tousOuverts(q)) envoyerD({ t: 'p2p' });
       signalerPret();
     };
     dc.onmessage = (e) => {
       if (p !== q || typeof e.data !== 'string' || e.data.length > RECU_MAX || muet()) return;
       let m; try { m = JSON.parse(e.data); } catch { return; }
-      if (m && m.t === 'morceau') { m = recoller(m); if (!m) { q.dernierPair = maintenant(); return; } }
-      surPair(m);
+      if (m && m.t === 'morceau') { m = recoller(lien, m); if (!m) { lien.dernier = maintenant(); return; } }
+      if (m) surPair(lien, m);
     };
     dc.onclose = () => {
-      if (p !== q || q.dc !== dc || !q.dcOuvert) return;
-      q.dcOuvert = false;
-      journal('lien direct fermé');
-      // Le pair non horloge demande le secours ; le pair horloge continue (son camp adverse passe
-      // au robot) et attend que le Duel reprenne la partie quand l'autre revient.
-      if (q.camp === 1) surPerteP2P('fermé');
+      if (p !== q || lien.dc !== dc || !lien.ouvert) return;
+      lien.ouvert = false;
+      if (lien.parti) return;                              // ce joueur est parti : rien à faire
+      journal(`lien direct avec le camp ${lien.camp} fermé`);
+      // Un joueur qui perd le pair horloge demande le secours ; le pair horloge continue (le camp
+      // de l'absent passe au robot) et attend que le Duel reprenne la partie quand l'autre revient.
+      if (q.camp !== 0) surPerteP2P('fermé');
     };
   }
 
   // --- 3. Partie --------------------------------------------------------------
 
-  // Prêt à jouer : relais → au Duel ; pair-à-pair → au pair horloge (ou départ de l'horloge).
+  // Prêt à jouer : relais → au Duel ; pair-à-pair → au pair horloge (ou départ de l'horloge quand tous sont prêts).
   function signalerPret() {
     const q = p;
     if (!q || !q.jeuPret || !q.mode || q.phase === 'secours') return;
     if (q.mode === 'relais') { if (!q.pretEnvoye) { q.pretEnvoye = envoyerD({ t: 'pret' }); } return; }
-    if (q.mode === 'p2p' && q.dcOuvert) {
-      if (q.camp === 1) {
-        if (!q.pretEnvoye) q.pretEnvoye = envoyerPair({ t: 'pret' });
+    if (q.mode === 'p2p' && tousOuverts(q)) {
+      if (q.camp !== 0) {
+        const lien = q.liens.get(0);
+        if (!lien.pretEnvoye) lien.pretEnvoye = envoyerLien(lien, { t: 'pret' });
         if (!q.vie) q.vie = minuterie(() => envoyerPair({ t: 'vie' }), VIE_MS, true);
-        q.dernierPair = maintenant();
-      } else if (q.pairPret) demarrerHorloge(0);
+        lien.dernier = maintenant();
+      } else if (liensDe(q).every((l) => l.pret)) demarrerHorloge(0);
     }
   }
 
@@ -578,8 +646,9 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     const q = p;
     if (q.demarre) return;
     q.demarre = true;
+    const camps = Array.isArray(q.config && q.config.ctl) ? q.config.ctl.length : 2;
     q.cad = new TR.Cadenceur({
-      camps: 2, delai: TR.REGLAGES.delaiEntree, depart,
+      camps, systeme: q.systeme, delai: TR.REGLAGES.delaiEntree, depart,
       envoyer: (paquet) => {
         q.recents.push(paquet);
         if (q.recents.length > RECENTS_MAX) q.recents.shift();
@@ -590,8 +659,8 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     });
     q.t0 = maintenant();
     q.kDebut = depart;
-    q.dernierPair = maintenant();
-    journal('horloge démarrée (pair horloge)');
+    for (const l of liensDe(q)) l.dernier = maintenant();
+    journal(`horloge démarrée (pair horloge, ${q.liens.size + 1} joueurs)`);
     q.minuteurCad = setInterval(battre, 25);
   }
 
@@ -604,31 +673,41 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     // (appareil endormi), l'horloge repart d'ici plutôt que d'envoyer une avalanche de paquets.
     if (dus > 600) { q.t0 = t - (q.cad.k - q.kDebut) * tick; dus = 1; }
     while (dus-- > 0) q.cad.pas();
-    if (!q.robotPair && t - q.dernierPair > ABSENCE_MS) {
-      journal('pair silencieux : son camp passe au robot');
-      q.cad.controle(1, NIVEAU_RELAIS);
-      q.robotPair = true;
+    for (const l of liensDe(q)) {
+      if (!l.robot && t - l.dernier > ABSENCE_MS) {
+        journal(`camp ${l.camp} silencieux : il passe au robot`);
+        q.cad.controle(l.camp, NIVEAU_RELAIS);
+        l.robot = true;
+      }
     }
   }
 
-  function surPair(m) {
+  function surPair(lien, m) {
     const q = p;
-    q.dernierPair = maintenant();
-    if (q.pairMuet) {
-      q.pairMuet = false;
-      versJeu({ etat: 'reseau', qui: 'adversaire', ok: true });
+    lien.dernier = maintenant();
+    if (lien.muet) {
+      lien.muet = false;
+      annoncerAutre(lien.camp, true);
+      if (q.camp === 0) for (const l of liensDe(q)) if (l !== lien) envoyerLien(l, { t: 'reseau', camp: lien.camp, ok: true });
       finPanne();
     }
     if (q.camp === 0) {
-      if (q.robotPair && q.cad && m.t !== 'pret') { q.cad.controle(1, 0); q.robotPair = false; journal('pair revenu : il reprend la main'); }
-      if (m.t === 'pret') { q.pairPret = true; signalerPret(); }
-      else if (m.t === 'o' && q.cad && Array.isArray(m.o)) q.cad.recevoir(1, m.seq, m.o);
-      else if (m.t === 'h' && Number.isInteger(m.k)) { q.hashesPair.set(m.k, m.h); comparer(m.k); }
-      else if (m.t === 'reprise') envoyerSnapAuPair();
+      if (lien.robot && !lien.parti && q.cad && m.t !== 'pret') { q.cad.controle(lien.camp, 0); lien.robot = false; journal(`camp ${lien.camp} revenu : il reprend la main`); }
+      if (m.t === 'quitte') {
+        lien.parti = true;
+        if (q.cad && !lien.robot) { q.cad.controle(lien.camp, NIVEAU_RELAIS); lien.robot = true; }
+        journal(`camp ${lien.camp} a quitté la partie : le robot prend sa place`);
+        return;
+      }
+      if (m.t === 'pret') { lien.pret = true; signalerPret(); }
+      else if (m.t === 'o' && q.cad && Array.isArray(m.o)) q.cad.recevoir(lien.camp, m.seq, m.o);
+      else if (m.t === 'h' && Number.isInteger(m.k)) { lien.hashes.set(m.k, m.h); comparer(lien, m.k); }
+      else if (m.t === 'reprise') envoyerSnapAuPair(lien);
     } else {
       if (m.t === 'k') { q.demarre = true; recevoirPaquet(m); }
       else if (m.t === 'snap' && m.snap) { q.dernierK = m.snap.k; versJeu({ snap: m.snap }); }
       else if (m.t === 'journal' && Array.isArray(m.paquets)) for (const x of m.paquets) recevoirPaquet(x);
+      else if (m.t === 'reseau' && Number.isInteger(m.camp) && m.camp !== q.camp) annoncerAutre(m.camp, m.ok === true);
     }
   }
 
@@ -638,19 +717,20 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     versJeu({ paquet: { t: 'k', k: paquet.k, o: paquet.o } });
   }
 
-  function comparer(k) {
+  // Pair horloge : hachage d'un joueur comparé au sien (au même tick).
+  function comparer(lien, k) {
     const q = p;
-    const a = q.hashesMoi.get(k), b = q.hashesPair.get(k);
+    const a = q.hashesMoi.get(k), b = lien.hashes.get(k);
     if (!a || !b) return;
-    q.hashesMoi.delete(k); q.hashesPair.delete(k);
+    lien.hashes.delete(k);
     if (a !== b) {
-      console.warn('[temps réel] désynchronisation', JSON.stringify({ k, horloge: a, pair: b, ordres: q.recents.slice(-50) }));
-      envoyerSnapAuPair();
+      console.warn('[temps réel] désynchronisation', JSON.stringify({ k, camp: lien.camp, horloge: a, pair: b, ordres: q.recents.slice(-50) }));
+      envoyerSnapAuPair(lien);
     }
   }
 
-  function envoyerSnapAuPair() {
-    p.attenteSnapPair = true;
+  function envoyerSnapAuPair(lien) {
+    p.attenteSnapPairs.add(lien.camp);
     versJeu({ demande: 'snap' });
   }
 
@@ -662,22 +742,22 @@ export function brancherTempsReel({ jeu, html, cadre }) {
       q.attenteSnapDuel = false;
       if (!q.coupe) envoyerD({ t: 'snap', snap });
     }
-    if (q.attenteSnapPair) {
-      q.attenteSnapPair = false;
-      envoyerPair({ t: 'snap', snap });
-      envoyerPair({ t: 'journal', paquets: q.recents.filter((x) => x.k > snap.k) });
+    for (const camp of q.attenteSnapPairs) {
+      const lien = q.liens.get(camp);
+      envoyerLien(lien, { t: 'snap', snap });
+      envoyerLien(lien, { t: 'journal', paquets: q.recents.filter((x) => x.k > snap.k) });
     }
+    q.attenteSnapPairs.clear();
   }
 
-  // --- 4. Pair-à-pair coupé (pair non horloge) : secours par le Duel ----------
+  // --- 4. Pair-à-pair coupé (un joueur perd le pair horloge) : secours par le Duel
 
   function surPerteP2P(raison) {
     const q = p;
-    if (!q || q.mode !== 'p2p' || q.phase === 'secours' || q.fini || q.camp !== 1) return;
+    if (!q || q.mode !== 'p2p' || q.phase === 'secours' || q.fini || q.camp === 0) return;
     journal(`lien direct perdu (${raison}) : secours demandé au serveur`);
     q.phase = 'secours';
-    try { q.dc?.close(); } catch { /* fermé */ }
-    q.dcOuvert = false;
+    fermerLiens(q);
     if (!envoyerD({ t: 'secours', k: q.dernierK })) {
       // Pas de connexion au serveur non plus : le secours partira à la reconnexion.
       q.besoinSecours = true;
@@ -691,13 +771,21 @@ export function brancherTempsReel({ jeu, html, cadre }) {
   return {
     recevoir(d) {
       switch (d.op) {
-        case 'chercher': chercher(); return;
+        case 'chercher': chercher(d); return;
+        case 'lancer':
+          // Partie à plus de 2 : la Rencontre commence avec les joueurs réunis (ou répond « personne »).
+          if (p?.phase === 'recherche' && wsOuvert(p.wsR)) { try { p.wsR.send(JSON.stringify({ t: 'lancer' })); } catch { /* fermée */ } }
+          return;
         case 'attente': compter(); return;
         case 'quitter': {
           // Partie finie : on laisse 3 s à l'autre pour recevoir les derniers paquets avant de fermer.
           const q = p;
           if (q?.fini) { q.cad = null; clearInterval(q.minuteurCad); setTimeout(() => { if (p === q) fermer(); }, 3000); return; }
-          if (q?.mode === 'p2p' && q.demarre) envoyerD({ t: 'fin' });
+          if (q && q.demarre && !q.coupe) {
+            // Départ en pleine partie : les autres continuent, un robot prend la place tout de suite.
+            if (q.mode === 'p2p' && q.camp !== 0) envoyerPair({ t: 'quitte' });
+            envoyerD({ t: 'quitte' });
+          }
           fermer();
           return;
         }
@@ -708,14 +796,18 @@ export function brancherTempsReel({ jeu, html, cadre }) {
           const q = p;
           if (!q || q.coupe || !Number.isInteger(d.seq) || !TR.ordreBienForme(d.o)) return;
           if (q.mode === 'p2p' && q.camp === 0 && q.cad) q.cad.recevoir(0, d.seq, d.o);
-          else if (q.mode === 'p2p' && q.camp === 1) envoyerPair({ t: 'o', seq: d.seq, o: d.o });
+          else if (q.mode === 'p2p' && q.camp !== 0) envoyerPair({ t: 'o', seq: d.seq, o: d.o });
           else if (q.mode === 'relais' && JSON.stringify(d.o).length < MESSAGE_MAX) envoyerD({ t: 'o', seq: d.seq, o: d.o });
           return;
         }
         case 'hash': {
           const q = p;
           if (!q || q.coupe || !Number.isInteger(d.k) || typeof d.h !== 'string') return;
-          if (q.mode === 'p2p' && q.camp === 0) { q.hashesMoi.set(d.k, d.h); comparer(d.k); }
+          if (q.mode === 'p2p' && q.camp === 0) {
+            q.hashesMoi.set(d.k, d.h);
+            if (q.hashesMoi.size > 40) q.hashesMoi.delete(q.hashesMoi.keys().next().value);
+            for (const l of liensDe(q)) comparer(l, d.k);
+          }
           else if (q.mode === 'p2p') envoyerPair({ t: 'h', k: d.k, h: d.h });
           else if (q.mode === 'relais') envoyerD({ t: 'h', k: d.k, h: d.h });
           return;
@@ -723,7 +815,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
         case 'snap': snapDuJeu(d.snap); return;
         case 'reprise':
           if (p?.mode === 'relais') envoyerD({ t: 'reprise', depuis: d.depuis });
-          else if (p?.mode === 'p2p' && p.camp === 1) envoyerPair({ t: 'reprise', depuis: d.depuis });
+          else if (p?.mode === 'p2p' && p.camp !== 0) envoyerPair({ t: 'reprise', depuis: d.depuis });
           return;
         case 'fin':
           if (!p) return;
@@ -741,7 +833,8 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     const adresse = adresseServeur();
     if (!adresse || navigator.onLine === false) return versJeu({ etat: 'attente', n: 0 });
     try {
-      const r = await fetch(`${adresse.replace(/^ws/, 'http')}/tr/attente?jeu=${encodeURIComponent(jeu.id)}`, {
+      const mode = derniersChoix.mode ? `&mode=${encodeURIComponent(derniersChoix.mode)}` : '';
+      const r = await fetch(`${adresse.replace(/^ws/, 'http')}/tr/attente?jeu=${encodeURIComponent(jeu.id)}${mode}`, {
         signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined,
       });
       const x = r.ok ? await r.json() : null;
