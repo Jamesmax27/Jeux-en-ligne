@@ -28,6 +28,18 @@
 //    bandeau chez soi et chez l'adversaire, reconnexion dès le retour du réseau,
 //    robot en attendant après une longue coupure puis retour dans la vraie partie,
 //    en relais et en pair-à-pair (coupure de chacun des deux pairs).
+// Jeu COOPÉRATIF (tous les joueurs dans la même équipe contre la simulation :
+// sim.essais.cooperatif = true, ex. le-dernier-sas) : pas de duel entre robots.
+// À la place : parties à 1, 2, 3 et 4 vrais joueurs rejouées à l'identique (un
+// joueur part puis revient), partie entre robots qui finit par une défaite, des
+// robots de niveau 3 qui vont plus loin que ceux de niveau 1, variété ; Worker :
+// partie rapide lancée à 2 et à 3 (robots aux places libres), groupe complet de
+// 4, ordres groupés, partie privée par code de salon, départ d'un joueur ;
+// --wrangler et --navigateur : les mêmes parcours avec le vrai Worker local et
+// le jeu dans le lanceur (boutons data-tr="rapide", "creer", "rejoindre",
+// touches data-touche, code affiché dans #trCode, bouton #trLancer).
+// Les tests du Worker, de wrangler et du navigateur portent sur le premier jeu
+// d'affrontement de la liste, puis sur le premier jeu coopératif.
 // Sans réseau Internet pour 1 et 2 ; 3 et 4 ne touchent que la machine locale
 // (le premier lancement de wrangler le télécharge).
 // ==========================================================================
@@ -145,6 +157,7 @@ function testerSimulation(jeu) {
   try { sim = chargerSim(jeu.texte); } catch (e) { probleme(sujet, `simulation illisible : ${e.message}`); return null; }
   const p = TR.problemesSim(sim);
   if (p.length) { for (const x of p) probleme(sujet, x); return null; }
+  if (estCooperatif(sim)) return testerCooperatif(sim, sujet);
 
   // Parties robot contre « humain » scripté, avec des ordres réels dans le journal, jusqu'à 6 000 ticks en tout.
   let total = 0;
@@ -157,6 +170,69 @@ function testerSimulation(jeu) {
   ok(`${sujet} : déterminisme vérifié sur ${total} ticks (journaux d'ordres rejoués deux fois et depuis un instantané)`);
   testerModes(sim, sujet);
   return RAPIDE ? sim : robots(sim, sujet);
+}
+
+const estCooperatif = (sim) => !!(sim && sim.essais && sim.essais.cooperatif === true);
+
+// Jeu coopératif : parties à 4, 2, 1 et 3 vrais joueurs (les autres camps tenus par des robots), avec
+// de vrais ordres dans le journal ; un joueur part puis revient ; rejeu et reprise identiques.
+function testerCooperatif(sim, sujet) {
+  if (!sim.modes) { probleme(sujet, 'jeu coopératif : "modes" attendu (un mode où tous les camps sont dans la même équipe)'); return null; }
+  const mode = Object.keys(sim.modes)[0], m = sim.modes[mode];
+  if (m.equipes.some((e) => e !== m.equipes[0])) probleme(sujet, `jeu coopératif : le mode ${mode} doit mettre tous les camps dans la même équipe (${m.equipes})`);
+  const places = TR.placesHumaines(sim, mode).length;
+  let total = 0;
+  for (const [graine, humains, niveau] of [[0xC0FFEE, places, 2], [12345, 2, 3], [777, 1, 1], [4242, Math.min(3, places), 2], [9001, 2, 1], [31337, places, 3], [2718, 1, 3], [1618, 2, 2]]) {
+    if (total >= 6000) break;
+    const fait = partieJournal(sim, sujet, graine, TR.configMode(sim, { mode, niveau }, humains, graine), true);
+    if (!fait) return null;
+    total += fait;
+  }
+  ok(`${sujet} : déterminisme vérifié sur ${total} ticks (parties en coopération à 1, 2, 3 et ${places} joueurs, journaux rejoués deux fois et depuis un instantané)`);
+  testerModes(sim, sujet);
+  return RAPIDE ? sim : robotsCooperatifs(sim, sujet, mode);
+}
+
+// Robots d'un jeu coopératif : la partie entre robots finit par une défaite (jamais d'équipe
+// gagnante), les robots de niveau 3 vont plus loin que ceux de niveau 1, les débuts de partie varient.
+function robotsCooperatifs(sim, sujet, mode) {
+  const P = (sim.essais && sim.essais.parties) || 4;
+  const limite = (sim.essais && sim.essais.ticksFin) || 60000;
+  const tickMs = (sim.reglages && sim.reglages.tickMs) || TR.REGLAGES.tickMs;
+  const mesurer = (niveau) => {
+    let score = 0, ticks = 0, vagues = 0, finies = 0;
+    for (let g = 1; g <= P; g++) {
+      const cfg = TR.configMode(sim, { mode, niveau }, 1, g);
+      cfg.ctl = cfg.ctl.map(() => niveau);
+      const s = new TR.Simulation(sim, (g * 2654435761) >>> 0, cfg);
+      while (!s.resultat && s.k() < limite) s.avancer([]);
+      const r = s.resultat;
+      if (!r) { probleme(sujet, `robots de niveau ${niveau} : la partie ne finit pas (${s.k()} ticks)`); continue; }
+      if (r.gagnant !== -1) probleme(sujet, `robots de niveau ${niveau} : jeu coopératif, la partie doit finir par une défaite sans équipe gagnante (gagnant ${r.gagnant})`);
+      if (!Array.isArray(r.scores) || r.scores.length !== cfg.ctl.length) probleme(sujet, `robots de niveau ${niveau} : un score par camp attendu (${JSON.stringify(r.scores)})`);
+      const nonFini = premierNonFini(s.instantane().etat);
+      if (nonFini) probleme(sujet, `robots de niveau ${niveau} : nombre non fini dans l'état à la fin (${nonFini})`);
+      finies++; ticks += s.k(); vagues += Number.isFinite(r.vague) ? r.vague : 0;
+      score += (r.scores || []).reduce((a, b) => a + b, 0);
+    }
+    return { score: finies ? score / finies : 0, secondes: finies ? ticks / finies * tickMs / 1000 : 0, vague: finies ? vagues / finies : 0 };
+  };
+  const n1 = mesurer(1), n2 = mesurer(2), n3 = mesurer(3);
+  if (!(n3.score > n1.score)) probleme(sujet, `robots : ceux de niveau 3 ne vont pas plus loin que ceux de niveau 1 (scores ${Math.round(n3.score)} / ${Math.round(n1.score)})`);
+  if (!(n2.score >= n1.score)) probleme(sujet, `robots : ceux de niveau 2 font moins bien que ceux de niveau 1 (scores ${Math.round(n2.score)} / ${Math.round(n1.score)})`);
+  const texte = (n) => `${Math.round(n.score)} points${n.vague ? `, vague ${n.vague.toFixed(1)}` : ''}, ${Math.round(n.secondes)} s`;
+  ok(`${sujet} : robots coéquipiers — la partie entre robots finit par une défaite ; niveau 1 : ${texte(n1)} ; niveau 2 : ${texte(n2)} ; niveau 3 : ${texte(n3)} (moyennes de ${P} parties)`);
+  const empreintes = new Set();
+  for (let g = 1; g <= 6; g++) {
+    const cfg = TR.configMode(sim, { mode, niveau: 3 }, 1, g);
+    cfg.ctl = cfg.ctl.map(() => 3);
+    const sm = new TR.Simulation(sim, g * 104729, cfg);
+    for (let k = 0; k < 600 && !sm.resultat; k++) sm.avancer([]);
+    empreintes.add(TR.hacher(typeof sim.essais.variete === 'function' ? sim.essais.variete(sm.etat) : sm.instantane().etat));
+  }
+  if (empreintes.size < 5) probleme(sujet, 'robots : les parties se ressemblent trop (débuts identiques)');
+  else ok(`${sujet} : variété — ${empreintes.size} débuts de partie différents sur 6 graines`);
+  return sim;
 }
 
 // Modes à plusieurs (sim.modes) : configuration des places, partie où chaque vrai joueur donne des
@@ -209,7 +285,7 @@ function testerModes(sim, sujet) {
   // Plusieurs parties dans la même mémoire (un Durable Object, ou des parties voisines sur le même
   // serveur) : deux modes joués en alternance, tick par tick, donnent le même état que joués seuls.
   const ids = Object.keys(sim.modes);
-  const [m1, m2] = [ids[0], ids.find((k) => sim.modes[k].equipes.length !== sim.modes[ids[0]].equipes.length) || ids[1]];
+  const [m1, m2] = [ids[0], ids.find((k) => sim.modes[k].equipes.length !== sim.modes[ids[0]].equipes.length) || ids[1] || ids[0]];
   const cfg1 = TR.configMode(sim, { mode: m1, niveau: 2 }, 1, 111), cfg2 = TR.configMode(sim, { mode: m2, niveau: 2 }, 1, 222);
   cfg1.ctl = cfg1.ctl.map(() => 2); cfg2.ctl = cfg2.ctl.map(() => 3);
   const seule = (cfg, g) => { const s = new TR.Simulation(sim, g, cfg); for (let k = 0; k < 600 && !s.resultat; k++) s.avancer([]); return s.hachage(); };
@@ -226,26 +302,32 @@ function testerModes(sim, sujet) {
     cfg.ctl = cfg.ctl.map(() => 2);
     const s = new TR.Simulation(sim, 4000 + i, cfg);
     const t0 = performance.now();
-    while (!s.resultat && s.k() < 20000) s.avancer([]);
+    while (!s.resultat && s.k() < ((sim.essais && sim.essais.ticksFin) || 20000)) s.avancer([]);
     const r = s.resultat;
     if (!r) { probleme(sujet, `mode ${id} : la partie entre robots ne finit pas (${s.k()} ticks)`); continue; }
     if (r.gagnant !== -1 && !m.equipes.includes(r.gagnant)) probleme(sujet, `mode ${id} : gagnant ${r.gagnant} (équipes ${m.equipes})`);
     if (Array.isArray(r.scores) && r.scores.length !== m.equipes.length) probleme(sujet, `mode ${id} : ${r.scores.length} scores pour ${m.equipes.length} camps`);
-    fins.push(`${id} ${Math.round(s.k() / 10)} s (${r.raison || 'fin'}, équipe ${r.gagnant}, ${Math.round(performance.now() - t0)} ms de calcul)`);
+    fins.push(`${id} ${Math.round(s.k() * ((sim.reglages && sim.reglages.tickMs) || 100) / 1000)} s (${r.raison || 'fin'}, équipe ${r.gagnant}, ${Math.round(performance.now() - t0)} ms de calcul)`);
   }
   ok(`${sujet} : parties entre robots jusqu'au bout — ${fins.join(' ; ')}`);
 }
 
 // Une partie dont le journal est rejoué deux fois et depuis un instantané. Renvoie son nombre de ticks.
-function partieJournal(sim, sujet, graine, config) {
+// coop : jeu coopératif — tous les vrais joueurs de la configuration donnent des ordres ; l'un d'eux
+// part au tick 1 500 (robot à sa place) et revient au tick 2 500.
+function partieJournal(sim, sujet, graine, config, coop = false) {
   const s = new TR.Simulation(sim, graine, config);
-  const cad = new TR.Cadenceur({ camps: sim.camps, delai: s.r.delaiEntree, depart: 0, envoyer: () => {} });
+  const cad = new TR.Cadenceur({ camps: coop ? s.etat.ctl.length : sim.camps, systeme: sim.camps, delai: s.r.delaiEntree, depart: 0, envoyer: () => {} });
   const alea = Math.random;
   let seq = 0, flottant = null;
   const journal = [];
+  const humains = coop ? s.etat.ctl.map((v, c) => (v === 0 ? c : -1)).filter((c) => c >= 0) : [0];
+  const partant = coop ? humains.at(-1) : 1;
   for (let k = 0; k < 6000 && !s.resultat; k++) {
-    if (k % 7 === 0) for (const o of ordresHumains(sim, s.etat, 0, alea)) cad.recevoir(0, ++seq, o);
-    if (k === 1500) cad.controle(1, 3);              // le camp 1 change de robot en cours de partie
+    if (k % 7 === 0) for (const c of humains) { if (s.etat.ctl[c] === 0) for (const o of ordresHumains(sim, s.etat, c, alea)) cad.recevoir(c, ++seq, o); }
+    if (k === 1500 && !coop) cad.controle(1, 3);     // le camp 1 change de robot en cours de partie
+    if (k === 1500 && coop && humains.length > 1) cad.controle(partant, 2);   // un joueur part : robot à sa place
+    if (k === 2500 && coop && humains.length > 1) cad.controle(partant, 0);   // il revient
     if (k % 13 === 0) cad.recevoir(0, ++seq, [9, 9999, 0, 0]); // ordre invalide : ignoré
     const paquet = cad.pas();
     journal.push([paquet.k, paquet.o]);
@@ -479,7 +561,7 @@ async function appareil(W, jeu, empreinteSim, sim, { mode = 'relais', choix = {}
       const m = JSON.parse(t);
       if (m.t === 'attente') { client.attentes.push(m.n); client.max = m.max; }
       if (m.t === 'trouve') { client.infos = m; ok(m); }
-      if (m.t === 'refus') ok(null);
+      if (m.t === 'refus') { client.refusRecherche = m.raison; ok(null); }
     };
   });
   client.lier = async () => {
@@ -499,11 +581,16 @@ async function appareil(W, jeu, empreinteSim, sim, { mode = 'relais', choix = {}
   return client;
 }
 
-async function testerWorker(jeux) {
-  const sujet = 'Worker (faux Durable Objects)';
+// Fiches des jeux pour le faux Worker (comme multijoueur/src/jeux.js).
+function fichesDe(jeux) {
   const fiches = {};
   for (const j of jeux) fiches[j.id] = { empreinte: createHash('sha256').update(j.texte).digest('hex'), sim: chargerSim(j.texte) };
-  const [id] = Object.keys(fiches);
+  return fiches;
+}
+
+async function testerWorker(jeux, id) {
+  const sujet = `Worker (faux Durable Objects, ${id})`;
+  const fiches = fichesDe(jeux);
   const { empreinte, sim } = fiches[id];
   const W = await monterWorker(fiches, { BUDGET_RELAIS_GOS: '600' });
 
@@ -692,6 +779,116 @@ async function testerWorkerModes(fiches, id) {
   for (const o of W.objets.DUEL.values()) clearInterval(o.minuteur);
 }
 
+// Jeu coopératif : partie rapide lancée à 2 puis à 3 (robots aux places libres), groupe complet de 4
+// (relais sans écart, ordres groupés, départ d'un joueur), partie privée par code de salon.
+async function testerWorkerCooperatif(jeux, id) {
+  const sujet = `Worker, jeu coopératif (${id})`;
+  const fiches = fichesDe(jeux);
+  const { empreinte, sim } = fiches[id];
+  const W = await monterWorker(fiches, { BUDGET_RELAIS_GOS: '100000' });
+  const mode = Object.keys(sim.modes)[0];
+  const max = TR.placesHumaines(sim, mode).length;
+  const tickMs = (sim.reglages && sim.reglages.tickMs) || TR.REGLAGES.tickMs;
+  const camps = sim.modes[mode].equipes.length;
+
+  // Partie rapide à 2 : personne ne part tout seul ; « lancer » → 2 joueurs, robots aux places libres ; relais.
+  const a = await appareil(W, id, empreinte, sim), b = await appareil(W, id, empreinte, sim);
+  await attendre(30);
+  if (a.attentes.at(-1) !== 2 || b.attentes.at(-1) !== 2 || a.max !== max || a.infos) probleme(sujet, `partie rapide : groupe de ${a.attentes.at(-1)} sur ${a.max} (2 sur ${max} attendus, sans départ automatique)`);
+  b.recherche.send(JSON.stringify({ t: 'lancer' }));
+  const [ma, mb] = await Promise.all([a.trouvee, b.trouvee]);
+  if (!ma || !mb || ma.duel !== mb.duel || ma.camp !== 0 || mb.camp !== 1 || ma.config.camps !== camps || ma.config.ctl.filter((v) => v === 0).length !== 2 || ma.config.ctl[0] !== 0 || ma.config.ctl[1] !== 0) { probleme(sujet, `partie rapide lancée à 2 : ${JSON.stringify(ma && { camp: ma.camp, config: ma.config })}`); return; }
+  await Promise.all([a.lier(), b.lier()]);
+  await attendre(6000);
+  const duel2 = W.objets.DUEL.get(ma.duel);
+  const e2 = ecarts(a, b);
+  if (a.k() < 3000 / tickMs) probleme(sujet, `relais à 2 : trop peu de ticks (${a.k()}, ${b.k()})`);
+  else if (e2.diff || !e2.communs || duel2.mesure.desync) probleme(sujet, `relais à 2 : ${e2.diff} écart(s) sur ${e2.communs}, serveur ${duel2.mesure.desync}`);
+  else ok(`partie rapide lancée à 2 : robots aux ${camps - 2} places libres (${ma.config.ctl}) ; relais : ${a.k()} ticks en 6 s, ${a.ordres + b.ordres} ordres, mêmes hachages sur les deux appareils et le serveur`);
+  // Ordres groupés (« ol ») : tous reçus par le cadenceur, dans l'ordre.
+  // (numéros de séquence pris loin devant ceux des ordres que l'appareil continue d'envoyer)
+  const lot = ordresHumains(sim, a.s.etat, a.camp, Math.random, true).slice(0, 3);
+  while (lot.length < 3) lot.push(lot[0] || [1, 0, 0, 0, 0]);
+  const seqLot = a.seq + 1000;
+  a.seq = seqLot + 2;
+  a.envoyer({ t: 'ol', l: lot.map((o, i) => [seqLot + i, o]) });
+  await attendre(300);
+  const e2b = ecarts(a, b);
+  if (!(duel2.cad.seqs[a.camp] >= seqLot + 2)) probleme(sujet, `ordres groupés : le serveur en est au numéro ${duel2.cad.seqs[a.camp]} (${seqLot + 2} au moins attendu)`);
+  else if (e2b.diff || duel2.mesure.desync) probleme(sujet, 'ordres groupés : écart de hachage');
+  else ok('ordres groupés d\'un jeu d\'action : un seul message pour trois ordres, tous joués, sans écart');
+  a.duel.close(); b.duel.close();
+
+  // Partie rapide à 3 : « lancer » → 3 joueurs et 1 robot.
+  if (max >= 4) {
+    const t3 = [];
+    for (let i = 0; i < 3; i++) { t3.push(await appareil(W, id, empreinte, sim)); await attendre(5); }
+    await attendre(20);
+    t3[0].recherche.send(JSON.stringify({ t: 'lancer' }));
+    const m3 = await Promise.all(t3.map((j) => j.trouvee));
+    if (m3.some((m) => !m || m.duel !== m3[0].duel) || m3.map((m) => m && m.camp).join() !== '0,1,2' || m3[0].config.ctl.filter((v) => v === 0).length !== 3) probleme(sujet, `partie rapide lancée à 3 : ${JSON.stringify(m3.map((m) => m && [m.camp, m.config.ctl]))}`);
+    else ok(`partie rapide lancée à 3 : camps 0, 1, 2 et un robot (${m3[0].config.ctl})`);
+    for (const j of t3) j.recherche.close();
+  }
+
+  // Groupe complet : la partie commence d'elle-même ; relais sans écart ; départ d'un joueur.
+  const joueurs = [];
+  for (let i = 0; i < max; i++) { joueurs.push(await appareil(W, id, empreinte, sim)); await attendre(5); }
+  const infos = await Promise.all(joueurs.map((j) => j.trouvee));
+  if (infos.some((m) => !m || m.duel !== infos[0].duel) || infos[0].config.ctl.some((v) => v !== 0)) { probleme(sujet, `groupe complet de ${max} : ${JSON.stringify(infos.map((m) => m && [m.camp, m.config.ctl]))}`); return; }
+  const parCamp = [];
+  for (const j of joueurs) parCamp[j.infos.camp] = j;
+  await Promise.all(joueurs.map((j) => j.lier()));
+  await attendre(6000);
+  const duel = W.objets.DUEL.get(infos[0].duel);
+  const e = parCamp.slice(1).map((j) => ecarts(parCamp[0], j));
+  if (Math.min(...joueurs.map((j) => j.k())) < 3000 / tickMs) probleme(sujet, `relais à ${max} : trop peu de ticks (${joueurs.map((j) => j.k())})`);
+  else if (e.some((x) => x.diff || !x.communs) || duel.mesure.desync) probleme(sujet, `relais à ${max} : écarts ${JSON.stringify(e)}, serveur ${duel.mesure.desync}`);
+  else ok(`groupe complet de ${max} joueurs : la partie commence d'elle-même, sans robot ; relais : ${parCamp[0].k()} ticks, ${joueurs.reduce((n, j) => n + j.ordres, 0)} ordres, mêmes hachages sur les ${max} appareils et le serveur`);
+  const dernier = max - 1;
+  parCamp[dernier].envoyer({ t: 'quitte' });
+  parCamp[dernier].duel.close();
+  await attendre(800);
+  if (parCamp[0].ctl[dernier] !== 2 || !duel.minuteur) probleme(sujet, `départ d'un joueur : camp ${dernier} = ${parCamp[0].ctl[dernier]}, partie ${duel.minuteur ? 'en cours' : 'arrêtée'}`);
+  else ok('départ d\'un joueur en pleine partie : un robot coéquipier prend sa place tout de suite, la partie continue pour les autres');
+  await attendre(1500);
+  const e3 = parCamp.slice(1, dernier).map((j) => ecarts(parCamp[0], j));
+  if (e3.some((x) => x.diff) || duel.mesure.desync) probleme(sujet, `après le départ : écarts ${JSON.stringify(e3)}`);
+  for (const j of joueurs) j.duel.close();
+
+  // Partie privée : seuls les joueurs du même code sont réunis.
+  const code = 'K7QP', autre = 'ZZ99';
+  if ((await W.ouvrir(`/tr/ws?jeu=${id}&sim=${empreinte}&proto=${TR.PROTOCOLE}&salon=abcd`)).statut !== 400 || (await W.ouvrir(`/tr/ws?jeu=${id}&sim=${empreinte}&proto=${TR.PROTOCOLE}&salon=AB1O&creer=1`)).statut !== 400) probleme(sujet, 'partie privée : un code mal formé (minuscules, 1, O…) devrait être refusé (400)');
+  if (!TR.salonValide(TR.codeSalon()) || !TR.salonValide(code) || TR.salonValide('ABC') || TR.salonValide('ABCDE')) probleme(sujet, 'partie privée : codeSalon() et salonValide() du moteur ne s\'accordent pas');
+  const hote = await appareil(W, id, empreinte, sim, { choix: { salon: code, creer: 1 } });
+  await attendre(20);
+  const passant = await appareil(W, id, empreinte, sim);                                   // partie rapide : jamais mêlé au salon
+  const inconnu = await appareil(W, id, empreinte, sim, { choix: { salon: autre } });      // code que personne n'a ouvert
+  const doublon = await appareil(W, id, empreinte, sim, { choix: { salon: code, creer: 1 } });   // code déjà pris
+  await attendre(30);
+  const [mi, md] = await Promise.all([inconnu.trouvee, doublon.trouvee]);
+  if (mi !== null || inconnu.refusRecherche !== 'salon-inconnu') probleme(sujet, `partie privée : code inconnu → ${inconnu.refusRecherche} (« salon-inconnu » attendu)`);
+  if (md !== null || doublon.refusRecherche !== 'salon-pris') probleme(sujet, `partie privée : code déjà pris → ${doublon.refusRecherche} (« salon-pris » attendu)`);
+  const ami1 = await appareil(W, id, empreinte, sim, { choix: { salon: code } });
+  const ami2 = await appareil(W, id, empreinte, sim, { choix: { salon: code } });
+  await attendre(30);
+  const compte = await (await W.worker.fetch(new FausseRequete(`https://multi.freemicrogames.com/tr/attente?jeu=${id}`), W.env)).json();
+  if (hote.attentes.at(-1) !== 3 || ami2.attentes.at(-1) !== 3 || passant.attentes.at(-1) !== 1 || compte.enRecherche !== 1) probleme(sujet, `partie privée : salon de ${hote.attentes.at(-1)} (3 attendus), partie rapide de ${passant.attentes.at(-1)} (1), « joueurs disponibles » ${compte.enRecherche} (1 : le salon n'est pas compté)`);
+  // Un salon attend plus longtemps qu'une recherche : connexions vieillies d'une minute.
+  const rencontre = W.objets.RENCONTRE.get(`rencontre:${id}`);
+  for (const ws of rencontre.etatFaux.sockets) if (!ws.fermee && ws.attache) ws.attache.depuis -= 60000;
+  await W.worker.fetch(new FausseRequete(`https://multi.freemicrogames.com/tr/attente?jeu=${id}`), W.env);
+  await attendre(20);
+  const ouverts = rencontre.etatFaux.sockets.filter((ws) => !ws.fermee && ws.attache && !ws.attache.pris);
+  if (ouverts.length !== 3 || ouverts.some((ws) => ws.attache.salon !== code)) probleme(sujet, `partie privée : après une minute d'attente, ${ouverts.length} connexion(s) gardée(s) (les 3 du salon attendues, pas la recherche automatique)`);
+  ami1.recherche.send(JSON.stringify({ t: 'lancer' }));
+  const ms = await Promise.all([hote.trouvee, ami1.trouvee, ami2.trouvee]);
+  if (ms.some((m) => !m || m.duel !== ms[0].duel) || ms.map((m) => m && m.camp).join() !== '0,1,2' || passant.infos || JSON.stringify(ms[0].config).includes(code)) probleme(sujet, `partie privée lancée à 3 : ${JSON.stringify(ms.map((m) => m && [m.camp, m.config.ctl]))}`);
+  else ok(`partie privée (code de salon) : 3 joueurs du même code réunis et lancés par l'un d'eux (${ms[0].config.ctl}) ; code inconnu et code déjà pris refusés, code mal formé refusé ; un joueur de la partie rapide n'y entre jamais ; le salon attend plus de 25 s`);
+  await attendre(200);
+  for (const o of W.objets.DUEL.values()) clearInterval(o.minuteur);
+}
+
 // --------------------------------------------------------------------------
 // 3. Vrai Worker local (wrangler dev) : tests 4 et 5
 // --------------------------------------------------------------------------
@@ -771,7 +968,8 @@ function appareilReseau(port, jeu, empreinteSim, sim, { latence = 0, gigue = 0, 
   c.chercher = async () => {
     const trouve = await new Promise((ok, ko) => {
       const params = Object.entries(choix).map(([k, v]) => `&${k}=${encodeURIComponent(v)}`).join('');
-      ouvrir(`ws://127.0.0.1:${port}/tr/ws?jeu=${jeu}&sim=${empreinteSim}&proto=${TR.PROTOCOLE}${params}`, (m) => { if (m.t === 'trouve') ok(m); if (m.t === 'refus') ko(new Error(m.raison)); }).catch(ko);
+      c.recherche = ouvrir(`ws://127.0.0.1:${port}/tr/ws?jeu=${jeu}&sim=${empreinteSim}&proto=${TR.PROTOCOLE}${params}`, (m) => { if (m.t === 'trouve') ok(m); if (m.t === 'refus') ko(new Error(m.raison)); });
+      c.recherche.catch(ko);
     });
     c.infos = trouve;
     c.trouve(trouve);
@@ -779,6 +977,8 @@ function appareilReseau(port, jeu, empreinteSim, sim, { latence = 0, gigue = 0, 
     c.envoyer({ t: 'relais' });
     c.envoyer({ t: 'pret' });
   };
+  // Partie à plus de 2 (ou jeu coopératif) : commencer avec les joueurs déjà réunis.
+  c.lancer = async () => { const ws = await c.recherche; ws.send(JSON.stringify({ t: 'lancer' })); };
   c.rejoindre = async () => {
     c.ws = await ouvrir(`ws://127.0.0.1:${port}/tr/duel?nom=${encodeURIComponent(c.infos.duel)}&jeton=${c.infos.jeton}`, (m) => c.recevoir(m));
     c.ws.onclose = () => { c.ws = null; };
@@ -801,7 +1001,16 @@ async function testerWrangler(jeux) {
   const jeu = jeux[0];
   const empreinte = createHash('sha256').update(jeu.texte).digest('hex');
   const sim = chargerSim(jeu.texte);
-  console.log(`\n— wrangler dev (${WRANGLER}, port ${port}) : démarrage…`);
+  // Jeu coopératif : deux joueurs ne partent pas d'eux-mêmes (4 places), le second lance la partie.
+  const coop = estCooperatif(sim);
+  const tickMs = (sim.reglages && sim.reglages.tickMs) || TR.REGLAGES.tickMs;
+  const reunir = async (js) => {
+    const attentes = [];
+    for (const j of js) { attentes.push(j.chercher()); await attendre(300); }
+    if (coop) await js.at(-1).lancer();
+    await Promise.all(attentes);
+  };
+  console.log(`\n— wrangler dev (${WRANGLER}, port ${port}, ${jeu.id}) : démarrage…`);
   const { enfant, journal } = await demarrerWrangler(port);
   const mesures = [];
   // Base d'observabilité locale vidée : seules les parties de ce test y seront.
@@ -816,9 +1025,7 @@ async function testerWrangler(jeux) {
     for (const cond of conditions) {
       const a = appareilReseau(port, jeu.id, empreinte, sim, cond), b = appareilReseau(port, jeu.id, empreinte, sim, cond);
       // Appariés deux par deux : le second arrive pendant que le premier cherche.
-      const pa = a.chercher();
-      await attendre(300);
-      await Promise.all([pa, b.chercher()]);
+      await reunir([a, b]);
       duels.push({ cond, a, b, debut: Date.now() });
     }
     // Test 4 à quatre : une partie relayée d'un mode à 4 vrais joueurs (latence 150 ms, pertes).
@@ -832,10 +1039,19 @@ async function testerWrangler(jeux) {
       await Promise.all(attentes);
       groupe = { cond, js };
     }
+    // Jeu coopératif : partie privée à trois par code de salon (latence 150 ms), lancée par le dernier arrivé.
+    let salon = null;
+    if (coop) {
+      const code = TR.codeSalon();
+      const cond = { nom: `partie privée à 3 (code de salon), latence 150 ms`, latence: 150, gigue: 60, pertes: 0, paisible: true };
+      const js = [0, 1, 2].map((i) => appareilReseau(port, jeu.id, empreinte, sim, { ...cond, choix: i === 0 ? { salon: code, creer: 1 } : { salon: code } }));
+      await reunir(js);
+      salon = { cond, js };
+    }
     // Test 5 : un joueur coupé plus de 10 s → robot, puis retour.
     const x = appareilReseau(port, jeu.id, empreinte, sim, { nom: 'déconnexion' }), y = appareilReseau(port, jeu.id, empreinte, sim, { nom: 'déconnexion' });
-    const px = x.chercher(); await attendre(300); await Promise.all([px, y.chercher()]);
-    console.log(`  …  ${duels.length + 1} parties relayées en cours (${TICKS_WRANGLER} ticks, environ ${Math.round(TICKS_WRANGLER / 10)} s)`);
+    await reunir([x, y]);
+    console.log(`  …  ${duels.length + 1 + (groupe ? 1 : 0) + (salon ? 1 : 0)} parties relayées en cours (${TICKS_WRANGLER} ticks, environ ${Math.round(TICKS_WRANGLER * tickMs / 1000)} s)`);
     await attendre(20000);
     const campY = y.camp;
     y.ws.close(); y.ws = null;
@@ -852,7 +1068,18 @@ async function testerWrangler(jeux) {
 
     // Attente de la fin des parties (ticks voulus).
     const finVoulue = Date.now() + (TICKS_WRANGLER * 100) + 30000;
-    while (Date.now() < finVoulue && (duels.some((d) => Math.min(d.a.k(), d.b.k()) < TICKS_WRANGLER && !d.a.fin) || (groupe && Math.min(...groupe.js.map((j) => j.k())) < TICKS_WRANGLER && !groupe.js[0].fin))) await attendre(2000);
+    while (Date.now() < finVoulue && (duels.some((d) => Math.min(d.a.k(), d.b.k()) < TICKS_WRANGLER && !d.a.fin) || (groupe && Math.min(...groupe.js.map((j) => j.k())) < TICKS_WRANGLER && !groupe.js[0].fin) || (salon && Math.min(...salon.js.map((j) => j.k())) < TICKS_WRANGLER && !salon.js[0].fin))) await attendre(2000);
+    if (salon) {
+      const [a, ...autres] = salon.js;
+      const e = autres.map((b) => ecarts(a, b));
+      const ticks = Math.min(...salon.js.map((j) => j.k()));
+      const sujet = `test 4 (${salon.cond.nom})`;
+      if (ticks < TICKS_WRANGLER && !a.fin) probleme(sujet, `seulement ${ticks} ticks joués`);
+      else if (e.some((x) => x.diff || !x.communs)) probleme(sujet, `écarts de hachage : ${JSON.stringify(e)}`);
+      else if (a.ctl.filter((v) => v === 0).length !== 3) probleme(sujet, `camps ${a.ctl} (3 joueurs et un robot attendus)`);
+      else ok(`${sujet} : ${ticks} ticks, ${salon.js.reduce((n, j) => n + j.ordres, 0)} ordres, 3 joueurs et un robot (${a.ctl}), aucun écart sur les 3 appareils`);
+      for (const j of salon.js) j.fermer();
+    }
     if (groupe) {
       const [a, ...autres] = groupe.js;
       const e = autres.map((b) => ecarts(a, b));
@@ -914,6 +1141,9 @@ async function testerWrangler(jeux) {
 async function testerNavigateur(jeux) {
   const { chromium } = await import('playwright');
   const jeu = jeux[0];
+  // Jeu coopératif : « Jouer en ligne » ouvre un choix (partie rapide, partie privée) ; deux joueurs
+  // réunis ne partent pas d'eux-mêmes (4 places) : l'un d'eux touche « Lancer ».
+  const coop = estCooperatif(chargerSim(jeu.texte));
   const portSite = 8080, portWorker = 8798;
   const executable = process.env.CHROMIUM_PATH || undefined;
   console.log('\n— navigateur : construction du site et serveurs locaux…');
@@ -938,6 +1168,7 @@ async function testerNavigateur(jeux) {
     const etatPartie = (cadre) => cadre.evaluate(() => { const p = window.JEL_TR.derniere; return p ? { mode: p.mode, connexion: p.connexion, k: p.etat ? p.etat.k : 0, h: p.s ? p.s.hachage() : null, ctl: p.etat ? p.etat.ctl.slice() : null } : null; });
     const cliquerJouer = async (cadre, mode) => {
       await cadre.click('[data-tr="jouer"]', { timeout: 15000 });
+      if (coop) { await cadre.click('[data-tr="rapide"]', { timeout: 5000 }); return; }
       // Mode à plusieurs (écran du jeu : boutons data-act="trMode") : choisi avant la recherche.
       if (mode) await cadre.click(`[data-act="trMode"][data-v="${mode}"]`, { timeout: 5000 });
       // Le jeu peut demander le niveau du robot de secours avant de chercher : on prend le choix proposé.
@@ -948,6 +1179,12 @@ async function testerNavigateur(jeux) {
         if (suite) await suite.click();
         await attendre(300);
       }
+    };
+
+    // Bouton « Lancer avec n joueurs » de l'écran de recherche (dès 2 joueurs réunis).
+    const lancer = async (cadre) => {
+      await cadre.waitForSelector('#trLancer:not(.hidden)', { timeout: 10000 });
+      await cadre.click('#trLancer');
     };
 
     // Test 2 : personne d'autre → partie contre le robot en moins de 16 s, aucune requête pendant la partie.
@@ -995,6 +1232,7 @@ async function testerNavigateur(jeux) {
       await cliquerJouer(j1.cadre);
       await attendre(500);
       await cliquerJouer(j2.cadre);
+      if (coop) await lancer(j2.cadre);
       const enLigne = (c) => c.waitForFunction(() => window.JEL_TR.derniere && window.JEL_TR.derniere.mode === 'en-ligne', null, { timeout: 20000 });
       try { await Promise.all([enLigne(j1.cadre), enLigne(j2.cadre)]); } catch { /* vérifié ci-dessous */ }
       await attendre(12000);
@@ -1076,6 +1314,66 @@ async function testerNavigateur(jeux) {
       }
     }
 
+    // Test 8 (jeu coopératif) : partie privée à trois par code de salon (touches à l'écran), code
+    // inconnu refusé, puis départ d'un joueur par le menu : un robot prend sa place chez les autres.
+    if (coop && !SEULEMENT_COUPURES) {
+      const ctx = [], js = [];
+      const sujet = 'test 8 (partie privée à 3 par code de salon)';
+      try {
+        for (let i = 0; i < 3; i++) { ctx.push(await navigateur.newContext({ viewport: i === 2 ? { width: 844, height: 390 } : { width: 390, height: 844 }, hasTouch: true, isMobile: true })); js.push(await ouvrirJeu(ctx[i], `&multi=ws://localhost:${portWorker}`)); }
+        const taper = async (cadre, code) => { for (const lettre of code) await cadre.click(`[data-touche="${lettre}"]`); };
+        await js[0].cadre.click('[data-tr="jouer"]');
+        await js[0].cadre.click('[data-tr="creer"]');
+        await js[0].cadre.waitForFunction(() => { const el = document.getElementById('trCode'); return el && /^[A-Z2-9]{4}$/.test(el.textContent.trim()); }, null, { timeout: 8000 });
+        const code = (await js[0].cadre.evaluate(() => document.getElementById('trCode').textContent)).trim();
+        await js[0].page.screenshot({ path: path.join(dossierCaptures, 'salon-prive-hote.png') });
+        // Un code que personne n'a ouvert : message, pas de partie.
+        const faux = code[0] === 'Z' ? `Y${code.slice(1)}` : `Z${code.slice(1)}`;
+        await js[1].cadre.click('[data-tr="jouer"]');
+        await js[1].cadre.click('[data-tr="rejoindre"]');
+        await js[1].page.screenshot({ path: path.join(dossierCaptures, 'salon-prive-pave.png') });
+        await taper(js[1].cadre, faux);
+        await js[1].cadre.waitForFunction(() => { const el = document.getElementById('trCodeMessage'); return el && el.textContent.trim().length > 0; }, null, { timeout: 8000 });
+        const refuse = await etatPartie(js[1].cadre);
+        await js[1].page.screenshot({ path: path.join(dossierCaptures, 'salon-prive-code-inconnu.png') });
+        if (refuse && refuse.mode !== 'arret') probleme(sujet, `code inconnu : une partie a commencé (mode ${refuse.mode})`);
+        await taper(js[1].cadre, code);
+        await js[2].cadre.click('[data-tr="jouer"]');
+        await js[2].cadre.click('[data-tr="rejoindre"]');
+        await js[2].page.screenshot({ path: path.join(dossierCaptures, 'salon-prive-pave-paysage.png') });
+        await taper(js[2].cadre, code);
+        await js[0].cadre.waitForFunction(() => { const el = document.getElementById('trJoueurs'); return el && /3/.test(el.textContent); }, null, { timeout: 8000 });
+        await js[0].page.screenshot({ path: path.join(dossierCaptures, 'salon-prive-3-joueurs.png') });
+        await js[2].page.screenshot({ path: path.join(dossierCaptures, 'salon-prive-invite-paysage.png') });
+        await lancer(js[0].cadre);
+        await Promise.all(js.map((j) => j.cadre.waitForFunction(() => window.JEL_TR.derniere && window.JEL_TR.derniere.mode === 'en-ligne', null, { timeout: 30000 })));
+        await attendre(9000);
+        const m = await memeEtatTous(js);
+        await js[0].page.screenshot({ path: path.join(dossierCaptures, 'salon-prive-partie.png') });
+        await js[2].page.screenshot({ path: path.join(dossierCaptures, 'salon-prive-partie-paysage.png') });
+        const ctl = m.ps[0].ctl;
+        if (ctl.filter((v) => v === 0).length !== 3) probleme(sujet, `camps ${ctl} (3 joueurs et un robot attendus)`);
+        else if (!m.ok) probleme(sujet, `états différents au tick ${m.k} (${m.ps.map((x) => x.k)})`);
+        else ok(`${sujet} : code ${code} saisi au pavé de touches par deux invités, partie lancée par l'hôte, 3 joueurs et un robot (${ctl}), même état sur les 3 appareils au tick ${m.k} (${m.ps[0].connexion}) ; code inconnu refusé avec un message`);
+        // Départ du troisième joueur par le menu : robot à sa place chez les deux autres, qui continuent.
+        const campParti = await js[2].page.evaluate(() => window.__fmgTempsReel.etat().camp);
+        await js[2].cadre.click('#b-pause');
+        await js[2].cadre.click('#b-accueil');
+        await attendre(2500);
+        const apres = await Promise.all([etatPartie(js[0].cadre), etatPartie(js[1].cadre)]);
+        const m2 = await memeEtatTous(js.slice(0, 2));
+        if (apres.some((x) => x.mode !== 'en-ligne' || x.ctl[campParti] === 0)) probleme('test 8 (départ d\'un joueur)', `camp ${campParti} : ${JSON.stringify(apres.map((x) => [x.mode, x.ctl]))}`);
+        else if (!m2.ok) probleme('test 8 (départ d\'un joueur)', `états différents au tick ${m2.k}`);
+        else ok(`test 8 : un joueur quitte la partie par le menu → un robot tient son camp (${apres[0].ctl}) chez les deux autres, qui continuent en ligne avec le même état`);
+      } catch (e) {
+        probleme(sujet, e.message);
+        for (const j of js) console.log(`    journal : ${j.journal.filter((l) => l.includes('[temps réel]')).slice(-10).join(' | ')}`);
+      } finally {
+        for (const c of ctx) await c.close();
+        await attendre(500);
+      }
+    }
+
     // Test 6 : coupures réseau (crochet __fmgTempsReel du lanceur, actif seulement en local).
     const duo = async (suffixe) => {
       const c1 = await navigateur.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -1083,6 +1381,7 @@ async function testerNavigateur(jeux) {
       const a = await ouvrirJeu(c1, `&multi=ws://localhost:${portWorker}${suffixe}`);
       const b = await ouvrirJeu(c2, `&multi=ws://localhost:${portWorker}${suffixe}`);
       await cliquerJouer(a.cadre); await attendre(500); await cliquerJouer(b.cadre);
+      if (coop) await lancer(b.cadre);
       // 40 s : la toute première connexion réveille wrangler dev (démarrage à froid).
       const enLigne = (c) => c.waitForFunction(() => window.JEL_TR.derniere && window.JEL_TR.derniere.mode === 'en-ligne', null, { timeout: 40000 });
       await Promise.all([enLigne(a.cadre), enLigne(b.cadre)]);
@@ -1187,9 +1486,16 @@ if (valides.length) {
     texteJeux += `\nJEUX_TR["essai-tr"] = {\n  empreinte: ${JSON.stringify(createHash('sha256').update(j.texte).digest('hex'))},\n  sim: (function (window, ${MASQUES.join(', ')}) {\n${j.texte}\n    return window.JEL_SIM;\n  })({ JEL_TR: globalThis.JEL_TR }),\n};\n`;
   }
   await writeFile(path.join(RACINE, 'multijoueur', 'src', 'jeux.js'), texteJeux, 'utf8');
-  try { await testerWorker(valides); } catch (e) { probleme('Worker', e.stack || e.message); }
-  if (AVEC_WRANGLER) { try { await testerWrangler(valides); } catch (e) { probleme('wrangler dev', e.stack || e.message); } }
-  if (AVEC_NAVIGATEUR) { try { await testerNavigateur(valides); } catch (e) { probleme('navigateur', e.stack || e.message); } }
+  // Worker, wrangler et navigateur : le premier jeu d'affrontement (comme avant), puis le premier jeu coopératif.
+  const coops = new Set(valides.filter((j) => estCooperatif(chargerSim(j.texte))).map((j) => j.id));
+  const duel = valides.find((j) => !coops.has(j.id)), coop = valides.find((j) => coops.has(j.id));
+  if (duel) { try { await testerWorker(valides, duel.id); } catch (e) { probleme('Worker', e.stack || e.message); } }
+  if (coop) { try { await testerWorkerCooperatif(valides, coop.id); } catch (e) { probleme('Worker (jeu coopératif)', e.stack || e.message); } }
+  for (const jeu of [duel, coop]) {
+    if (!jeu) continue;
+    if (AVEC_WRANGLER) { try { await testerWrangler([jeu]); } catch (e) { probleme(`wrangler dev (${jeu.id})`, e.stack || e.message); } }
+    if (AVEC_NAVIGATEUR) { try { await testerNavigateur([jeu]); } catch (e) { probleme(`navigateur (${jeu.id})`, e.stack || e.message); } }
+  }
 }
 console.log(problemes ? `\nTemps réel : ${problemes} problème(s).` : '\nTemps réel : tout est bon.');
 process.exit(problemes ? 1 : 0);
