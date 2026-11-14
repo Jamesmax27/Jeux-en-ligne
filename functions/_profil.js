@@ -62,7 +62,7 @@ export function preparerTablesProfil(env) {
       env.DB.prepare(`CREATE TABLE IF NOT EXISTS profils_jeux (
         profil INTEGER NOT NULL, jeu TEXT NOT NULL, secondes INTEGER NOT NULL DEFAULT 0,
         premiere INTEGER NOT NULL, derniere INTEGER NOT NULL, termine INTEGER, etoiles INTEGER, etoiles_max INTEGER,
-        PRIMARY KEY (profil, jeu)) WITHOUT ROWID`),
+        etoiles_le INTEGER, PRIMARY KEY (profil, jeu)) WITHOUT ROWID`),
       env.DB.prepare(`CREATE TABLE IF NOT EXISTS profils_gains (
         profil INTEGER NOT NULL, jour TEXT NOT NULL, secondes INTEGER NOT NULL DEFAULT 0, xp INTEGER NOT NULL DEFAULT 0,
         etoiles INTEGER NOT NULL DEFAULT 0, termines INTEGER NOT NULL DEFAULT 0, multi_xp INTEGER NOT NULL DEFAULT 0,
@@ -98,12 +98,35 @@ export function preparerTablesProfil(env) {
       env.DB.prepare('CREATE INDEX IF NOT EXISTS podiums_profil ON podiums (profil)'),
       env.DB.prepare(`CREATE TABLE IF NOT EXISTS podiums_periodes (
         periode TEXT NOT NULL, debut TEXT NOT NULL, calcule_le INTEGER NOT NULL, PRIMARY KEY (periode, debut)) WITHOUT ROWID`),
-    ]).catch((erreur) => {
+    ]).then(() => preparerClassementJeu(env)).catch((erreur) => {
       tablesPretes = null; // nouvel essai à la prochaine requête
       throw erreur;
     });
   }
   return tablesPretes;
+}
+
+// Classement des étoiles par jeu (docs/cadrage-fidelisation.md, section 14.10) :
+// colonne etoiles_le (date du meilleur nombre d'étoiles, pour départager les
+// égalités), ajoutée si elle manque (ALTER TABLE … ADD COLUMN ne réécrit aucune
+// ligne), et index du classement. Les étoiles gagnées avant la colonne prennent
+// une fois la date de fin du jeu (seule l'instance qui a ajouté la colonne le fait).
+// Index partiel (lignes avec des étoiles seulement), dans l'ordre du classement :
+// le top 100 d'un jeu se lit sans tri, en ne touchant qu'une centaine de lignes.
+async function preparerClassementJeu(env) {
+  const { results } = await env.DB.prepare('PRAGMA table_info(profils_jeux)').all();
+  if (!(results || []).some((c) => c.name === 'etoiles_le')) {
+    let ajoutee = false;
+    try {
+      await env.DB.prepare('ALTER TABLE profils_jeux ADD COLUMN etoiles_le INTEGER').run();
+      ajoutee = true;
+    } catch (erreur) {
+      // Une autre instance l'a peut-être ajoutée au même moment.
+      if (!/duplicate column/i.test(String(erreur?.message || erreur))) throw erreur;
+    }
+    if (ajoutee) await env.DB.prepare('UPDATE profils_jeux SET etoiles_le = termine WHERE etoiles > 0 AND etoiles_le IS NULL AND termine IS NOT NULL').run();
+  }
+  await env.DB.prepare('CREATE INDEX IF NOT EXISTS profils_jeux_etoiles ON profils_jeux (jeu, etoiles DESC, etoiles_le, profil) WHERE etoiles > 0').run();
 }
 
 // --- Dates ---------------------------------------------------------------------
@@ -281,10 +304,10 @@ function ecrireGains(env, id, jour, g) {
 }
 
 function ecrireJeu(env, id, j) {
-  return env.DB.prepare(`INSERT INTO profils_jeux (profil, jeu, secondes, premiere, derniere, termine, etoiles, etoiles_max) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  return env.DB.prepare(`INSERT INTO profils_jeux (profil, jeu, secondes, premiere, derniere, termine, etoiles, etoiles_max, etoiles_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (profil, jeu) DO UPDATE SET secondes = excluded.secondes, derniere = excluded.derniere, termine = excluded.termine,
-      etoiles = excluded.etoiles, etoiles_max = excluded.etoiles_max`)
-    .bind(id, j.jeu, j.secondes, j.premiere, j.derniere, j.termine ?? null, j.etoiles ?? null, j.etoiles_max ?? null);
+      etoiles = excluded.etoiles, etoiles_max = excluded.etoiles_max, etoiles_le = excluded.etoiles_le`)
+    .bind(id, j.jeu, j.secondes, j.premiere, j.derniere, j.termine ?? null, j.etoiles ?? null, j.etoiles_max ?? null, j.etoiles_le ?? null);
 }
 
 export function compterEvenement(env, type, maintenant, nombre = 1) {
@@ -438,6 +461,7 @@ export async function synchroniser(env, profil, corps, catalogue, maintenant) {
       const avant = Math.min(j.etoiles || 0, max);
       const gain = Math.max(0, etoiles - avant);
       j.etoiles = Math.max(avant, etoiles);
+      if (gain > 0) j.etoiles_le = maintenant;                   // date du meilleur score : départage du classement du jeu
       ajout.etoiles += gain;
       resultat.xp += gain * R.XP_PAR_ETOILE;
     }
@@ -640,6 +664,49 @@ export async function rangDe(env, perimetre, debut, profil) {
   if (points <= 0 || R.niveauPourXp(profil.xp) < R.CLASSEMENT_NIVEAU_MIN) return { rang: null, points };
   const devant = await env.DB.prepare(`SELECT COUNT(*) AS n FROM (${sql}) g JOIN profils p ON p.id = g.profil WHERE g.points > ? AND p.niveau >= ?`)
     .bind(...valeurs, points, R.CLASSEMENT_NIVEAU_MIN).first();
+  return { rang: (devant?.n || 0) + 1, points };
+}
+
+// --- Classement des étoiles d'un jeu (page du jeu) --------------------------------------------------------
+// Meilleur nombre d'étoiles de chaque joueur dans ce jeu (profils_jeux), sans
+// période ni remise à zéro. Ordre : étoiles décroissantes ; à égalité, le
+// joueur arrivé le premier à ce score (etoiles_le ; sans date = avant le
+// classement, donc devant), puis le numéro de profil. Chaque joueur a donc sa
+// propre place, la même à chaque calcul. Docs : docs/cadrage-fidelisation.md, section 14.10.
+
+/** Jeu du périmètre « jeu:<id> » s'il a des étoiles : { id, max }, sinon null. */
+export function jeuAEtoiles(perimetre, catalogue) {
+  if (typeof perimetre !== 'string' || !perimetre.startsWith('jeu:')) return null;
+  const id = perimetre.slice('jeu:'.length);
+  const fiche = ID_JEU.test(id) ? catalogue?.get(id) : null;
+  if (!fiche || fiche.sans_fin === true || !Number.isInteger(fiche.etoiles) || fiche.etoiles <= 0) return null;
+  return { id, max: fiche.etoiles };
+}
+
+/** Top du jeu : [{ rang, id, pseudo, numero, avatar, cadre, niveau, points }] ; points jamais au-dessus de max. */
+export async function topClassementJeu(env, jeu, max) {
+  const { results } = await env.DB.prepare(`SELECT p.id, p.pseudo, p.numero, p.avatar, p.cadre, p.xp, j.etoiles
+    FROM profils_jeux j JOIN profils p ON p.id = j.profil
+    WHERE j.jeu = ? AND j.etoiles > 0 AND p.niveau >= ? ORDER BY j.etoiles DESC, j.etoiles_le, j.profil LIMIT ?`)
+    .bind(jeu, R.CLASSEMENT_NIVEAU_MIN, R.CLASSEMENT_TAILLE).all();
+  return (results || []).map((l, i) => ({
+    rang: i + 1, id: l.id, pseudo: l.pseudo || null, numero: l.numero, avatar: l.avatar, cadre: l.cadre,
+    niveau: R.niveauPourXp(l.xp), points: Math.min(l.etoiles, max),
+  }));
+}
+
+/** Position du profil dans le jeu : { rang, points } (rang null sans étoiles ou sans le niveau). */
+export async function rangJeu(env, jeu, max, profil) {
+  const mien = await env.DB.prepare('SELECT etoiles, etoiles_le FROM profils_jeux WHERE profil = ? AND jeu = ?').bind(profil.id, jeu).first();
+  const etoiles = mien?.etoiles || 0;
+  const points = Math.min(etoiles, max);
+  if (etoiles <= 0 || R.niveauPourXp(profil.xp) < R.CLASSEMENT_NIVEAU_MIN) return { rang: null, points };
+  // Deux comptages qui suivent l'index : les joueurs avec plus d'étoiles, puis ceux à égalité arrivés avant.
+  const source = 'FROM profils_jeux j JOIN profils p ON p.id = j.profil WHERE j.jeu = ? AND j.etoiles > 0 AND p.niveau >= ?';
+  const le = mien.etoiles_le || 0;
+  const devant = await env.DB.prepare(`SELECT (SELECT COUNT(*) ${source} AND j.etoiles > ?)
+    + (SELECT COUNT(*) ${source} AND j.etoiles = ? AND (COALESCE(j.etoiles_le, 0) < ? OR (COALESCE(j.etoiles_le, 0) = ? AND j.profil < ?))) AS n`)
+    .bind(jeu, R.CLASSEMENT_NIVEAU_MIN, etoiles, jeu, R.CLASSEMENT_NIVEAU_MIN, etoiles, le, le, profil.id).first();
   return { rang: (devant?.n || 0) + 1, points };
 }
 

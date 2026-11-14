@@ -25,6 +25,9 @@
   },
   "finPerdu": "Score final \u003cb>{score}\u003c/b>. Le monde s'arrête de grandir ici.",
   "rejouer": "REJOUER",
+  "continuerRegion": "CONTINUER · RÉGION {n}",
+  "nouvellePartie": "NOUVELLE PARTIE",
+  "finPerduReprise": "Score \u003cb>{score}\u003c/b>. Ta progression est gardée : reprends la région \u003cb>{n}\u003c/b> avec \u003cb>{vies}\u003c/b> vies tout neuves.",
   "mondeComplet": "MONDE COMPLET",
   "toutesRegions": "{total} / {total} RÉGIONS",
   "finGagne": "Score final \u003cb>{score}\u003c/b>. Tu as tout avalé, jusqu'au dernier couloir.",
@@ -63,6 +66,9 @@
   },
   "finPerdu": "Final score \u003cb>{score}\u003c/b>. The world stops growing here.",
   "rejouer": "PLAY AGAIN",
+  "continuerRegion": "CONTINUE · REGION {n}",
+  "nouvellePartie": "NEW GAME",
+  "finPerduReprise": "Score \u003cb>{score}\u003c/b>. Your progress is saved: pick up region \u003cb>{n}\u003c/b> again with \u003cb>{vies}\u003c/b> brand-new lives.",
   "mondeComplet": "WORLD COMPLETE",
   "toutesRegions": "{total} / {total} REGIONS",
   "finGagne": "Final score \u003cb>{score}\u003c/b>. You ate everything, right down to the last corridor.",
@@ -101,6 +107,9 @@
   },
   "finPerdu": "Puntuación final \u003cb>{score}\u003c/b>. El mundo deja de crecer aquí.",
   "rejouer": "JUGAR OTRA VEZ",
+  "continuerRegion": "CONTINUAR · REGIÓN {n}",
+  "nouvellePartie": "NUEVA PARTIDA",
+  "finPerduReprise": "Puntuación \u003cb>{score}\u003c/b>. Tu progreso está guardado: vuelve a la región \u003cb>{n}\u003c/b> con \u003cb>{vies}\u003c/b> vidas nuevas.",
   "mondeComplet": "MUNDO COMPLETO",
   "toutesRegions": "{total} / {total} REGIONES",
   "finGagne": "Puntuación final \u003cb>{score}\u003c/b>. Te lo comiste todo, hasta el último pasillo.",
@@ -139,6 +148,9 @@
   },
   "finPerdu": "Pontuação final \u003cb>{score}\u003c/b>. O mundo para de crescer aqui.",
   "rejouer": "JOGAR DE NOVO",
+  "continuerRegion": "CONTINUAR · REGIÃO {n}",
+  "nouvellePartie": "NOVO JOGO",
+  "finPerduReprise": "Pontuação \u003cb>{score}\u003c/b>. Seu progresso está salvo: volte à região \u003cb>{n}\u003c/b> com \u003cb>{vies}\u003c/b> vidas novinhas.",
   "mondeComplet": "MUNDO COMPLETO",
   "toutesRegions": "{total} / {total} REGIÕES",
   "finGagne": "Pontuação final \u003cb>{score}\u003c/b>. Você comeu tudo, até o último corredor.",
@@ -177,6 +189,9 @@
   },
   "finPerdu": "Endstand \u003cb>{score}\u003c/b>. Hier hört die Welt auf zu wachsen.",
   "rejouer": "NOCHMAL",
+  "continuerRegion": "WEITER · REGION {n}",
+  "nouvellePartie": "NEUES SPIEL",
+  "finPerduReprise": "Punktestand \u003cb>{score}\u003c/b>. Dein Fortschritt ist gespeichert: Spiel Region \u003cb>{n}\u003c/b> noch einmal mit \u003cb>{vies}\u003c/b> neuen Leben.",
   "mondeComplet": "WELT KOMPLETT",
   "toutesRegions": "{total} / {total} REGIONEN",
   "finGagne": "Endstand \u003cb>{score}\u003c/b>. Du hast alles gefressen, bis zum letzten Gang.",
@@ -1092,6 +1107,11 @@ html,body{height:100%;overflow:hidden;overscroll-behavior:none;background:var(--
   padding:13px 30px;border-radius:3px;border:1px solid var(--gold);color:var(--void);background:var(--gold)
 }
 #go:active{transform:translateY(1px)}
+#go2{
+  display:block;margin:12px auto 0;min-height:44px;font-family:var(--disp);font-weight:700;font-size:13px;letter-spacing:.12em;
+  padding:10px 24px;border-radius:3px;border:1px solid var(--gold);color:var(--gold);background:transparent
+}
+#go2[hidden]{display:none}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}}
 </style>
 </head>
@@ -1122,6 +1142,7 @@ html,body{height:100%;overflow:hidden;overscroll-behavior:none;background:var(--
       <h1 id="title"></h1>
       <p id="msg"></p>
       <button id="go"></button>
+      <button id="go2" hidden></button>
     </div>
   </div>
 </div>
@@ -1155,6 +1176,7 @@ const el = {
   title: document.getElementById('title'),
   msg:   document.getElementById('msg'),
   go:    document.getElementById('go'),
+  go2:   document.getElementById('go2'),
   pad:   document.getElementById('pad'),
   pause: document.getElementById('btnpause'),
 };
@@ -1663,8 +1685,16 @@ function screen(kind){
   } else if (kind==='over'){
     if (window.FMG) window.FMG.reportEnd({ completed: false, level: S.active.id });
     el.title.innerHTML = t('perdu') + '<span>' + t('regionsOuvertes', { n: S.order.length }) + '</span>';
-    el.msg.innerHTML = t('finPerdu', { score: S.score });
-    el.go.textContent = t('rejouer');
+    if (S.active.id > 1){
+      // Progression gardée : on reprend la région perdue avec 3 vies neuves.
+      el.msg.innerHTML = t('finPerduReprise', { score: S.score, n: S.active.id, vies: VIES_DEPART });
+      el.go.textContent = t('continuerRegion', { n: S.active.id });
+      el.go2.textContent = t('nouvellePartie');
+      el.go2.hidden = false;
+    } else {
+      el.msg.innerHTML = t('finPerdu', { score: S.score });
+      el.go.textContent = t('rejouer');
+    }
   } else if (kind==='win'){
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: S.active.id });
     // Jeu terminé : toutes les régions du monde vidées (jeu sans étoiles).
@@ -1678,7 +1708,13 @@ function screen(kind){
     el.go.textContent = t('reprendre');
   }
 }
-function finish(kind){ S.status = kind; screen(kind); }
+function finish(kind){
+  S.status = kind;
+  // Partie perdue après la région 1 : la sauvegarde garde la région perdue,
+  // avec 3 vies neuves (aussi pour « Continuer » de l'écran titre).
+  if (kind==='over' && S.active && S.active.id > 1) sauverReprise();
+  screen(kind);
+}
 
 /* ---------- sauvegarde du site (JEL_SAVE) ---------- */
 // niveau = région où reprendre, score et vies au début de cette région.
@@ -1691,6 +1727,14 @@ function sauvegarder(){
     JEL_SAVE.save(JEU, { niveau: S.active.id, score: scoreRegion, vies: S.lives });
 }
 JEL_SAVE.surFermeture(sauvegarder);
+const VIES_DEPART = 3;
+function sauverReprise(){
+  JEL_SAVE.save(JEU, { niveau: S.active.id, score: scoreRegion, vies: VIES_DEPART });
+}
+// « Continuer » après une défaite : région perdue, score du début de la région, 3 vies.
+function continuerApresDefaite(){
+  start({ niveau: S.active.id, score: scoreRegion, vies: VIES_DEPART });
+}
 function jouer(){
   JEL_SAVE.reprise({ jeu: JEU, onContinuer: d => start(d), onNouvelle: () => start() });
 }
@@ -1699,7 +1743,7 @@ function jouer(){
 
 function start(reprise){
   S.levels.clear(); S.order.length = 0;
-  S.score = 0; S.lives = 3; S.fright = 0; S.invuln = 1.2;
+  S.score = 0; S.lives = VIES_DEPART; S.fright = 0; S.invuln = 1.2;
   S.fruit = null; S.fruitTimer = 12; S.combo = 1;
   let lv = createLevel(1, 0, 0);
   S.active = lv;
@@ -1719,6 +1763,7 @@ function start(reprise){
   S.cam.x = S.player.x; S.cam.y = S.player.y;
   S.status = 'play';
   el.overlay.classList.add('off');
+  el.go2.hidden = true;
   zoneEffacer.hidden = true;
   hud();
   toast(t('region', { n: lv.id }), t('trouvePorte'), `hsl(${lv.hue} 90% 68%)`);
@@ -1775,8 +1820,10 @@ el.pause.addEventListener('click', togglePause);
 el.go.addEventListener('click', () => {
   if (S.status==='pause'){ S.status='play'; el.overlay.classList.add('off'); }
   else if (S.status==='menu') jouer();
+  else if (S.status==='over' && S.active && S.active.id > 1) continuerApresDefaite();
   else start();
 });
+el.go2.addEventListener('click', () => { if (S.status==='over') start(); });
 // Bouton « Effacer la sauvegarde » sous Commencer (écran d'accueil seulement).
 const zoneEffacer = document.createElement('div');
 zoneEffacer.style.marginTop = '14px';
