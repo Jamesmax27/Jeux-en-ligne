@@ -21,21 +21,17 @@
 // ==========================================================================
 
 import * as R from './profil-reglages.js';
-import { classement, etat, rafraichir, signaler, historiquePodiums } from './profil.js';
+import { classement, etat, rafraichir, historiquePodiums } from './profil.js';
 import { peindreAvatar, COURONNE_SVG } from './avatars.js';
 import { chargerTextes, t, langue, date, titrePeriode } from './profil-textes.js';
 import { classementAmis, actualisation, elementsPresence, annoncer } from './amis.js';
+import { MEDAILLES, nom, ligneClassement } from './classement-ligne.js';
 
 let catalogue = new Map();
 let suiviAmis = null;     // actualisation du classement entre amis (amis.js)
 const titreJeu = (fiche) => (fiche ? fiche.i18n?.[langue()]?.title || fiche.title : '');
 
 const $ = (id) => document.getElementById(id);
-const MEDAILLES = { 1: 'or', 2: 'argent', 3: 'bronze' };
-
-function nom(ligne) {
-  return ligne.pseudo || t('profil.pseudoDefaut', { n: ligne.numero });
-}
 
 function points(perimetre, n) {
   return t(perimetre === 'etoiles' ? 'classement.pointsEtoiles' : 'classement.pointsXp', { n });
@@ -63,34 +59,10 @@ function lireCouronnes(liste) {
 }
 
 function ligneHtml(ligne, perimetre, moiId, { sansSignaler = false, couronnes = null, periode = 'semaine' } = {}) {
-  const li = document.createElement('li');
-  li.className = 'classement-ligne';
-  if (MEDAILLES[ligne.rang]) li.classList.add(`medaille-${MEDAILLES[ligne.rang]}`);
-  if (ligne.id === moiId) { li.classList.add('moi'); li.id = 'classement-ma-ligne'; }
-  li.innerHTML = `<span class="classement-rang"></span><span class="classement-avatar" aria-hidden="true"></span>
-    <span class="classement-nom"></span><span class="classement-niveau"></span><span class="classement-points"></span>`;
-  li.querySelector('.classement-rang').textContent = t('classement.rang', { n: ligne.rang });
-  peindreAvatar(li.querySelector('.classement-avatar'), { avatar: ligne.avatar, cadre: ligne.cadre, niveau: ligne.niveau });
-  li.querySelector('.classement-nom').textContent = nom(ligne) + (ligne.id === moiId ? ` (${t('classement.toi')})` : '');
-  if (couronnes?.has(ligne.id)) li.querySelector('.classement-nom').prepend(couronne(periode, couronnes.get(ligne.id)));
-  li.querySelector('.classement-niveau').textContent = t('classement.niveau', { n: ligne.niveau });
-  li.querySelector('.classement-points').textContent = points(perimetre, ligne.points);
-  if (ligne.id !== moiId && !sansSignaler) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'classement-signaler';
-    b.textContent = '🚩';
-    b.setAttribute('aria-label', t('classement.signalerAria', { nom: nom(ligne) }));
-    b.title = t('classement.signaler');
-    b.addEventListener('click', async () => {
-      if (b.dataset.confirme !== '1') { b.dataset.confirme = '1'; b.textContent = t('classement.signalerConfirmer'); return; }
-      b.disabled = true;
-      const r = await signaler(ligne.id);
-      b.textContent = r.ok ? t('classement.signale') : t(r.erreur === 'niveau' ? 'classement.signalerNiveau' : 'profil.erreur', { n: R.SIGNALER_NIVEAU_MIN });
-    });
-    li.append(b);
-  }
-  return li;
+  return ligneClassement(ligne, {
+    points: points(perimetre, ligne.points), moiId, sansSignaler,
+    avantNom: couronnes?.has(ligne.id) ? couronne(periode, couronnes.get(ligne.id)) : null,
+  });
 }
 
 // Classement entre amis : moi et mes amis, avec leur statut et « Rejoindre ».

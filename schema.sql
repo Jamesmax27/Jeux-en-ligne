@@ -85,5 +85,6 @@ CREATE TABLE IF NOT EXISTS demandes_blocages (
 -- multi_resultats, profils_limites, profils_blocages, profils_signalements,
 -- profils_evenements, fidelisation_jour, podiums, podiums_periodes. Rien à faire à la main : créées
 -- automatiquement par les fonctions (preparerTablesProfil, functions/_profil.js) ;
--- structure commentée : migrations/0002_profils.sql (podiums : migrations/0004_podiums.sql).
+-- structure commentée : migrations/0002_profils.sql (podiums : migrations/0004_podiums.sql ;
+-- classement des étoiles par jeu, colonne etoiles_le et index de profils_jeux : migrations/0005_classement-etoiles-jeu.sql).
 -- --------------------------------------------------------------------------
