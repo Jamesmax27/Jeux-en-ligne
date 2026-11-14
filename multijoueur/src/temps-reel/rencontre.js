@@ -27,13 +27,23 @@
 //   ({ t: 'attente', n, max } : message sortant, non facturé) ; /compter donne
 //   au site le nombre de joueurs qui cherchent ce mode (fin d'une partie contre
 //   le robot : « Un joueur est disponible »).
+// - PARTIE PRIVÉE (paramètre salon : code de 4 caractères tiré sur l'appareil de
+//   celui qui l'ouvre, creer=1) : seuls les joueurs du même code (et du même
+//   mode) sont réunis, jamais avec ceux de la recherche automatique. Un code
+//   inconnu ({ t: 'refus', raison: 'salon-inconnu' }) ou déjà pris par un autre
+//   salon ('salon-pris') est refusé. L'attente peut durer SALON_MAX_MS (les
+//   connexions hibernent : aucun coût) ; n'importe quel membre lance la partie
+//   ({ t: 'lancer' }, dès 2 joueurs) ; salon complet : elle commence aussitôt.
+//   Ces joueurs ne sont pas comptés par /compter. Le code n'est gardé que dans
+//   la connexion, le temps de l'attente.
 // Rien n'est écrit dans le stockage.
 // ==========================================================================
 
 import { JEUX_TR } from '../jeux.js';
-import { configMode, modeDe, placesHumaines } from './moteur-tr.js';
+import { configMode, modeDe, placesHumaines, salonValide } from './moteur-tr.js';
 
 const RECHERCHE_MAX_MS = 25000;
+const SALON_MAX_MS = 15 * 60000;          // partie privée : attente des amis, au plus (10 min côté appareil)
 const RE_CHOIX = /^[a-z0-9*]{1,16}$/;
 
 function json(x, status = 200) {
@@ -51,12 +61,14 @@ export function choixValides(sim, p) {
   const carte = cartes.includes(p.carte) ? p.carte : '*';
   const n = Number(p.niveau);
   const niveau = Number.isInteger(n) && n >= 1 && n <= 3 ? n : 2;
-  return { mode, carte, niveau };
+  const salon = salonValide(p.salon) ? p.salon : null;
+  return salon ? { mode, carte, niveau, salon, creer: p.creer === '1' || p.creer === 1 } : { mode, carte, niveau };
 }
 
 // Clé de la file : le mode, et le niveau des robots quand le mode a des robots adverses
 // (« 2 joueurs contre 1 robot difficile » : on ne se retrouve pas contre un robot facile).
 function cleDe(sim, a) {
+  if (a.salon) return `salon:${a.salon}:${a.mode}`;      // partie privée : le code d'abord
   return modeDe(sim, a.mode).robots.length ? `${a.mode}:${a.niveau}` : a.mode;
 }
 
@@ -78,7 +90,7 @@ export class Rencontre {
     for (const ws of this.state.getWebSockets('attente')) {
       const a = lire(ws);
       if (a.pris) continue;
-      if (!(t - a.depuis < RECHERCHE_MAX_MS)) { try { ws.close(1000, 'trop long'); } catch { /* fermée */ } continue; }
+      if (!(t - a.depuis < (a.salon ? SALON_MAX_MS : RECHERCHE_MAX_MS))) { try { ws.close(1000, 'trop long'); } catch { /* fermée */ } continue; }
       liste.push({ ws, a });
     }
     return liste.sort((x, y) => x.a.depuis - y.a.depuis || x.a.n - y.a.n);
@@ -111,7 +123,7 @@ export class Rencontre {
     const url = new URL(request.url);
     if (url.pathname === '/compter') {
       const mode = url.searchParams.get('mode');
-      const n = this.enAttente().filter((x) => !mode || x.a.mode === mode).length;
+      const n = this.enAttente().filter((x) => !x.a.salon && (!mode || x.a.mode === mode)).length;
       return json({ n });
     }
     if (url.pathname !== '/ws') return new Response('Introuvable', { status: 404 });
@@ -127,6 +139,12 @@ export class Rencontre {
     const groupes = this.groupes();
     // Les connexions sont reconnues par leur identifiant (getWebSockets peut rendre d'autres objets).
     const sien = groupes.find((g) => g.ids.includes(id));
+    // Partie privée : on ne rejoint qu'un salon qui attend ; on n'ouvre qu'un salon au code libre.
+    if (choix.salon && sien && (choix.creer ? sien.membres.length > 1 : sien.membres.length < 2)) {
+      serveur.serializeAttachment({ ...lire(serveur), pris: true });
+      try { serveur.send(JSON.stringify({ t: 'refus', raison: choix.creer ? 'salon-pris' : 'salon-inconnu' })); serveur.close(1000, 'salon'); } catch { /* fermée */ }
+      return new Response(null, { status: 101, webSocket: client });
+    }
     if (sien && sien.membres.length >= sien.max) await this.apparier(sien);
     else this.annoncer(groupes);
     return new Response(null, { status: 101, webSocket: client });

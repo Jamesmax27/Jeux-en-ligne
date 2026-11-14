@@ -3192,6 +3192,7 @@
     rechercheMs: 15000,              // recherche d'un adversaire, au plus
     connexionMs: 12000,              // adversaire trouvé, mais aucune partie au bout de ce délai : robot
     lancementMs: 4000,               // partie à plus de 2 lancée : réponse du serveur attendue au plus ce délai
+    salonMs: 600000,                 // partie privée (code de salon) : attente des amis, au plus
   };
 
   // --- Outils entiers --------------------------------------------------------
@@ -3424,6 +3425,19 @@
     return { ligne: 1, mode: m.id, carte: carte, niveau: niveau, camps: m.equipes.length, ctl: ctl };
   }
 
+  // --- Partie privée : code de salon ------------------------------------------
+  // 4 caractères parmi 31 lettres et chiffres qu'on ne confond pas (ni I, L, O, ni 0, 1), tirés sur
+  // l'appareil de celui qui ouvre le salon et donnés de vive voix à ses amis.
+  var ALPHABET_SALON = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  var RE_SALON = /^[A-HJKMNP-Z2-9]{4}$/;
+  function salonValide(code) { return typeof code === 'string' && RE_SALON.test(code); }
+  // hasard() : nombre de 0 à 1 (Math.random par défaut ; jamais dans une simulation).
+  function codeSalon(hasard) {
+    var h = typeof hasard === 'function' ? hasard : Math.random, code = '';
+    for (var i = 0; i < 4; i++) code += ALPHABET_SALON.charAt(Math.min(ALPHABET_SALON.length - 1, Math.floor(h() * ALPHABET_SALON.length)));
+    return code;
+  }
+
   // --- Simulation : état, ticks, journal, instantanés -----------------------
   // Instantané, rebâti et empreinte d'un état (crochets facultatifs de la simulation).
   function exporterEtat(sim, etat) { return typeof sim.exporter === 'function' ? sim.exporter(etat) : copie(etat); }
@@ -3605,7 +3619,10 @@
   //                   { type: 'attente', n }               réponse à partie.attente() : joueurs qui cherchent
   //   reglages      remplace des valeurs de REGLAGES
   // }
-  // Commandes : local({ graine, config, camp }), chercher({ config, repli }), lancer() (partie à plus
+  //                   { type: 'salon', raison }            partie privée refusée : 'inconnu' (aucune partie n'attend avec ce
+  //                                                        code) ou 'pris' (code déjà utilisé : en tirer un autre) ; la
+  //                                                        recherche est arrêtée, sans partie contre le robot
+  // Commandes : local({ graine, config, camp, snap }), chercher({ config, repli }), lancer() (partie à plus
   // de 2 : commencer tout de suite avec les joueurs déjà réunis, robots aux places libres), jouerRobot(),
   // ordre([type, a, b, c]), pause(oui), quitter(), attente().
   // Lecture : mode ('arret', 'recherche', 'connexion', 'local', 'en-ligne', 'fin'), camp, etat (tick
@@ -3682,16 +3699,18 @@
   Partie.prototype.quitter = function () { this.arreter(); };
 
   // Partie contre le robot, entièrement sur l'appareil (aucune requête réseau).
-  // p : { graine, config (ctl compris), camp }.
+  // p : { graine, config (ctl compris), camp, snap (facultatif : instantané { k, etat } d'une partie
+  // gardée, donné par partie.s.instantane() : la partie reprend à ce tick) }.
   Partie.prototype.local = function (p, raison) {
     this.arreter();
     racine.JEL_TR.derniere = this;       // pour le robot de contrôle (scripts/tester-temps-reel.mjs)
     p = p || {};
     this.camp = Number.isInteger(p.camp) ? p.camp : 0;
     this.s = new Simulation(this.sim, (p.graine >>> 0) || 1, p.config || {}, this.r);
+    if (p.snap) this.s.restaurer(copie(p.snap));
     this.seq = 0;
     var moi = this;
-    this.cad = new Cadenceur({ camps: this.s.etat.ctl.length, systeme: this.sim.camps, delai: this.r.delaiEntree, depart: 0, envoyer: function (paquet) { moi.jouerPaquet(paquet); } });
+    this.cad = new Cadenceur({ camps: this.s.etat.ctl.length, systeme: this.sim.camps, delai: this.r.delaiEntree, depart: this.s.k(), envoyer: function (paquet) { moi.jouerPaquet(paquet); } });
     this.mode = 'local';
     this.enPause = false;
     this.tDernier = horloge();
@@ -3703,6 +3722,8 @@
   // rechercheMs. p : { config ({ mode, carte, niveau } : choix du joueur, voir configMode),
   // repli: { graine, config, camp } }. Partie à plus de 2 : au bout de rechercheMs, si au moins
   // deux joueurs sont réunis, la partie commence avec eux (robots aux places libres).
+  // Partie privée : config.salon (code de 4 caractères, voir codeSalon) réunit seulement les joueurs
+  // qui ont le même code ; config.creer = 1 pour celui qui ouvre le salon ; l'attente dure salonMs.
   Partie.prototype.chercher = function (p) {
     this.arreter();
     racine.JEL_TR.derniere = this;
@@ -3713,9 +3734,10 @@
     this.nRecherche = null;
     this.maxRecherche = null;
     this.lance = false;
-    this.finRecherche = horloge() + this.r.rechercheMs;
+    this.finRecherche = horloge() + (p.config && p.config.salon ? this.r.salonMs : this.r.rechercheMs);
     racine.addEventListener('message', this.ecoute);
-    this.versLanceur({ op: 'chercher', proto: PROTOCOLE, config: copie(p.config || {}) });
+    // tickMs et delai : l'horloge du pair horloge (lanceur) bat au rythme de cette simulation.
+    this.versLanceur({ op: 'chercher', proto: PROTOCOLE, config: copie(p.config || {}), tickMs: this.r.tickMs, delai: this.r.delaiEntree });
     var moi = this;
     var annoncer = function () {
       if (moi.mode !== 'recherche') return;
@@ -3770,6 +3792,12 @@
       return;
     }
     if (d.etat === 'solo') {
+      // Partie privée refusée (code inconnu, ou déjà pris) : au jeu de le dire, sans partie contre le robot.
+      if (this.mode === 'recherche' && (d.raison === 'salon-inconnu' || d.raison === 'salon-pris')) {
+        this.arreter();
+        this.signaler({ type: 'salon', raison: d.raison === 'salon-pris' ? 'pris' : 'inconnu' });
+        return;
+      }
       if (this.mode === 'recherche' || this.mode === 'connexion') this.basculerLocal(d.raison || 'reseau');
       return;
     }
@@ -3974,6 +4002,9 @@
     placesHumaines: placesHumaines,
     configMode: configMode,
     campsDe: campsDe,
+    ALPHABET_SALON: ALPHABET_SALON,
+    salonValide: salonValide,
+    codeSalon: codeSalon,
     T_CONTROLE: T_CONTROLE,
     ORDRE_MAX: ORDRE_MAX,
     flottant: flottant,

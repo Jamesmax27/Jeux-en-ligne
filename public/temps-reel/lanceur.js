@@ -6,14 +6,16 @@
 // Son moteur (public/temps-reel/moteur.js, window.JEL_TR) parle au lanceur par
 // postMessage (type 'jel-tr') ; c'est le lanceur qui fait tout le réseau :
 //
-//   jeu → lanceur : op 'chercher' { proto, config: { mode, carte, niveau } } (recherche),
+//   jeu → lanceur : op 'chercher' { proto, config: { mode, carte, niveau, salon, creer }, tickMs, delai } (recherche ;
+//                   salon : code d'une partie privée, creer : 1 pour celui qui l'ouvre ; tickMs et delai : rythme
+//                   de la simulation, pour l'horloge du pair horloge),
 //                   'lancer' (partie à plus de 2 : commencer avec les joueurs réunis), 'pret' (jeu prêt
 //                   à jouer la partie trouvée), 'ordre' { seq, o }, 'hash' { k, h },
 //                   'snap' { snap } (réponse à une demande), 'reprise' { depuis }
 //                   (paquet manquant), 'fin', 'quitter', 'attente' (joueurs en recherche)
 //   lanceur → jeu : { etat: 'attente', n, max }, { etat: 'trouve', camp, graine, config, humains },
 //                   { etat: 'mode', mode }, { etat: 'solo', raison } (pas de partie en
-//                   ligne : robot), { etat: 'coupe', raison, retour } (plus de réseau en
+//                   ligne : robot ; raison 'salon-inconnu' ou 'salon-pris' : partie privée refusée), { etat: 'coupe', raison, retour } (plus de réseau en
 //                   pleine partie : robot ; retour = on essaie encore de se reconnecter),
 //                   { etat: 'reseau', qui: 'moi' | 'adversaire', camp, ok, fin } (bandeau),
 //                   { paquet }, { snap }, { demande: 'snap' }
@@ -22,6 +24,9 @@
 //  1. Recherche : WebSocket vers la Rencontre du jeu (/tr/ws), dans le mode, sur
 //     la carte et avec le niveau de robots choisis ; 15 s au plus (le compte à
 //     rebours est dans le jeu). Rien n'est ouvert à l'ouverture du site.
+//     Partie privée (code de salon de 4 caractères) : seuls les joueurs du même
+//     code sont réunis, l'attente peut durer plusieurs minutes (battement toutes
+//     les 20 s, réponse automatique et gratuite, pour garder la connexion).
 //  2. Partie trouvée (2 à 8 vrais joueurs) : WebSocket vers le Duel (/tr/duel),
 //     qui fait passer les offres et candidats WebRTC (STUN public, pas de TURN).
 //     Tous les DataChannel ouverts → pair-à-pair ; sinon, au bout de 5 s →
@@ -82,6 +87,10 @@ const RECU_MAX = 1000000;           // un message reçu (instantané d'un jeu de
 const MORCEAU = 16000;              // lien direct : un message plus long part en morceaux (Safari : 64 Ko au plus)
 const NIVEAU_RELAIS = 2;            // robot moyen à la place d'un pair absent
 const RE_CHOIX = /^[a-z0-9*]{1,16}$/;
+const PING_RECHERCHE_MS = 20000;    // battement de la connexion de recherche (salon privé : attente de plusieurs minutes)
+const LOT_MS = 100;                 // relais : les ordres d'un joueur partent groupés, un message toutes les 100 ms au plus
+const LOT_MAX = 2000;               // caractères d'un lot d'ordres (le Duel refuse un message de plus de 2 500)
+const LOT_ORDRES = 50;              // ordres d'un lot, au plus (le Duel en lit 60)
 
 // Texte de la simulation d'un jeu (bloc jel-sim), tel que le Worker l'empreinte
 // (scripts/multijoueur.mjs) : fins de ligne en \n, sans espaces autour.
@@ -129,6 +138,8 @@ export function brancherTempsReel({ jeu, html, cadre }) {
       wsR: null, wsD: null,
       liens: new Map(),               // pair-à-pair : camp → lien (pair horloge : un par joueur ; sinon : le camp 0)
       camp: 0, duel: null, jeton: null, graine: 0, config: null, humains: [0, 1], systeme: 2,
+      tickMs: TR.REGLAGES.tickMs, delai: TR.REGLAGES.delaiEntree,   // rythme de la simulation du jeu (op « chercher »)
+      lots: false, lot: [], lotTaille: 0, minuteurLot: 0,           // ordres groupés (relais, si le Duel les accepte)
       mode: null, cad: null, minuteurCad: 0, t0: 0, kDebut: 0,
       jeuPret: false, demarre: false, fini: false,
       dernierK: 0, recents: [], hashesMoi: new Map(),
@@ -169,6 +180,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     clearInterval(q.minuteurCad);
     clearTimeout(q.minuteurReco);
     clearTimeout(q.minuteurGel);
+    clearTimeout(q.minuteurLot);
     for (const ws of [q.wsR, q.wsD]) {
       if (!ws) continue;
       ws.onopen = ws.onmessage = ws.onclose = ws.onerror = null;
@@ -249,13 +261,21 @@ export function brancherTempsReel({ jeu, html, cadre }) {
       const v = String(choix[cle] ?? '');
       if (RE_CHOIX.test(v)) { derniersChoix[cle] = v; params += `&${cle}=${encodeURIComponent(v)}`; }
     }
+    // Partie privée : code de salon (jamais gardé pour « Un joueur est disponible »).
+    if (choix.salon !== undefined) {
+      if (!TR.salonValide(choix.salon)) return versJeu({ etat: 'solo', raison: 'salon-inconnu' });
+      params += `&salon=${choix.salon}${choix.creer ? '&creer=1' : ''}`;
+    }
     p = nouvelle();
     const q = p;
+    if (Number.isInteger(d && d.tickMs) && d.tickMs >= 20 && d.tickMs <= 1000) q.tickMs = d.tickMs;
+    if (Number.isInteger(d && d.delai) && d.delai >= 0 && d.delai <= 20) q.delai = d.delai;
     let ws;
     try { ws = new WebSocket(`${adresse}/tr/ws?jeu=${encodeURIComponent(jeu.id)}&sim=${sim}&proto=${TR.PROTOCOLE}${params}`); }
     catch { abandonner('reseau'); return; }
     q.wsR = ws;
     q.adresse = adresse;
+    minuterie(() => { try { if (p === q && q.phase === 'recherche' && wsOuvert(q.wsR)) q.wsR.send('ping'); } catch { /* fermée */ } }, PING_RECHERCHE_MS, true);
     ws.onmessage = (e) => {
       if (p !== q || typeof e.data !== 'string' || e.data === 'pong' || e.data.length > RECU_MAX) return;
       let m; try { m = JSON.parse(e.data); } catch { return; }
@@ -474,6 +494,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     const q = p;
     switch (m.t) {
       case 'bienvenue':
+        q.lots = m.lots === true;      // ce serveur accepte les ordres groupés (message « ol »)
         // Première connexion : le relais a pu être décidé avant notre arrivée (annonce manquée).
         if (!reprise) { if (m.mode === 'relais' && !q.mode) surDuel({ t: 'mode', mode: 'relais' }, false); return; }
         journal('reconnecté au serveur', `(mode ${m.mode || 'aucun'})`);
@@ -648,7 +669,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     q.demarre = true;
     const camps = Array.isArray(q.config && q.config.ctl) ? q.config.ctl.length : 2;
     q.cad = new TR.Cadenceur({
-      camps, systeme: q.systeme, delai: TR.REGLAGES.delaiEntree, depart,
+      camps, systeme: q.systeme, delai: q.delai, depart,
       envoyer: (paquet) => {
         q.recents.push(paquet);
         if (q.recents.length > RECENTS_MAX) q.recents.shift();
@@ -667,7 +688,7 @@ export function brancherTempsReel({ jeu, html, cadre }) {
   function battre() {
     const q = p;
     if (!q?.cad) return;
-    const tick = TR.REGLAGES.tickMs, t = maintenant();
+    const tick = q.tickMs, t = maintenant();
     let dus = q.kDebut + Math.floor((t - q.t0) / tick) - q.cad.k;
     // Onglet en arrière-plan (minuteries ralenties) : on rattrape les ticks dus ; au-delà de 60 s
     // (appareil endormi), l'horloge repart d'ici plutôt que d'envoyer une avalanche de paquets.
@@ -750,6 +771,29 @@ export function brancherTempsReel({ jeu, html, cadre }) {
     q.attenteSnapPairs.clear();
   }
 
+  // Relais : les ordres partent groupés ({ t: 'ol', l: [[seq, ordre], …] }), un message toutes les
+  // LOT_MS au plus. Un jeu d'action envoie des dizaines d'ordres par seconde (position, tirs) : sans
+  // cela, chaque ordre serait un message facturé (1/20 de requête) et le Duel fermerait la connexion
+  // (150 messages par 10 s au plus). Le serveur dit s'il les accepte (« bienvenue », lots). Seulement
+  // pour un jeu dont le tick fait moins de 100 ms : les jeux de stratégie envoient leurs ordres un par un.
+  function ajouterAuLot(seq, o) {
+    const q = p;
+    const taille = JSON.stringify(o).length + 12;
+    if (q.lot.length && (q.lotTaille + taille > LOT_MAX || q.lot.length >= LOT_ORDRES)) viderLot();
+    q.lot.push([seq, o]);
+    q.lotTaille += taille;
+    if (!q.minuteurLot) q.minuteurLot = setTimeout(() => { if (p === q) viderLot(); }, LOT_MS);
+  }
+  function viderLot() {
+    const q = p;
+    clearTimeout(q.minuteurLot);
+    q.minuteurLot = 0;
+    if (!q.lot.length) return;
+    const l = q.lot;
+    q.lot = []; q.lotTaille = 0;
+    if (q.mode === 'relais' && !q.coupe) envoyerD(l.length === 1 ? { t: 'o', seq: l[0][0], o: l[0][1] } : { t: 'ol', l });
+  }
+
   // --- 4. Pair-à-pair coupé (un joueur perd le pair horloge) : secours par le Duel
 
   function surPerteP2P(raison) {
@@ -797,7 +841,10 @@ export function brancherTempsReel({ jeu, html, cadre }) {
           if (!q || q.coupe || !Number.isInteger(d.seq) || !TR.ordreBienForme(d.o)) return;
           if (q.mode === 'p2p' && q.camp === 0 && q.cad) q.cad.recevoir(0, d.seq, d.o);
           else if (q.mode === 'p2p' && q.camp !== 0) envoyerPair({ t: 'o', seq: d.seq, o: d.o });
-          else if (q.mode === 'relais' && JSON.stringify(d.o).length < MESSAGE_MAX) envoyerD({ t: 'o', seq: d.seq, o: d.o });
+          else if (q.mode === 'relais' && JSON.stringify(d.o).length < MESSAGE_MAX) {
+            // Jeu d'action (tick de moins de 100 ms) : ordres groupés ; les autres jeux : un par un, comme avant.
+            if (q.lots && q.tickMs < 100) ajouterAuLot(d.seq, d.o); else envoyerD({ t: 'o', seq: d.seq, o: d.o });
+          }
           return;
         }
         case 'hash': {

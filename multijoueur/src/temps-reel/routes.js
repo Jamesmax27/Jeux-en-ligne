@@ -1,9 +1,11 @@
 // ==========================================================================
 // Adresses temps réel du Worker multijoueur (docs/cadrage-temps-reel.md) :
 //
-//   GET /tr/ws?jeu=<id>&sim=<empreinte>&proto=<n>[&mode=&carte=&niveau=]
+//   GET /tr/ws?jeu=<id>&sim=<empreinte>&proto=<n>[&mode=&carte=&niveau=][&salon=<code>[&creer=1]]
 //              WebSocket : recherche d'une partie (Rencontre du jeu) dans un mode
 //              du jeu, sur une carte (ou au hasard), avec un niveau de robots.
+//              salon : partie privée (code de 4 caractères, seuls les joueurs du
+//              même code sont réunis) ; creer=1 : c'est ce joueur qui l'ouvre.
 //              Ouvert par le lanceur du site au clic sur « Jouer en ligne »,
 //              jamais à l'ouverture du site.
 //   GET /tr/duel?nom=<partie>&jeton=<jeton>          WebSocket : la partie
@@ -18,7 +20,7 @@
 // ==========================================================================
 
 import { JEUX_TR } from '../jeux.js';
-import { PROTOCOLE_TR } from './moteur-tr.js';
+import { PROTOCOLE_TR, salonValide } from './moteur-tr.js';
 import { appelerBudget } from './budget.js';
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -78,6 +80,13 @@ export async function routeTempsReel(request, env, chemin, origines) {
     for (const cle of ['mode', 'carte', 'niveau']) {
       const v = url.searchParams.get(cle);
       if (v && /^[a-z0-9*]{1,16}$/.test(v)) cible.searchParams.set(cle, v);
+    }
+    // Partie privée : le code est contrôlé ici (4 caractères de l'alphabet sans ambiguïté du moteur).
+    const salon = url.searchParams.get('salon');
+    if (salon !== null) {
+      if (!salonValide(salon)) return texte('Code de salon invalide', 400);
+      cible.searchParams.set('salon', salon);
+      if (url.searchParams.get('creer') === '1') cible.searchParams.set('creer', '1');
     }
     return env.RENCONTRE.get(env.RENCONTRE.idFromName(`rencontre:${jeu}`)).fetch(new Request(cible, request));
   }

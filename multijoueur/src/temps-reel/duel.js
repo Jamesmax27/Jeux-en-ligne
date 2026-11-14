@@ -50,6 +50,7 @@ const SNAP_MAX = 900000;                 // caractères d'un instantané envoyé
 const DEBIT_MAX = 150;                   // messages par joueur et par fenêtre de 10 s (jeu de stratégie : clics rapides)
 const DEBIT_FENETRE_MS = 10000;
 const NIVEAU_RELAIS = 2;                 // robot moyen à la place d'un joueur absent
+const LOT_ORDRES_MAX = 60;               // ordres d'un message groupé « ol », au plus
 
 function texte(contenu, status) {
   return new Response(contenu, { status, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
@@ -137,7 +138,8 @@ export class Duel {
     serveur.serializeAttachment({ camp });
     this.dernier[camp] = Date.now();
     if (!d.vus[camp]) { d.vus[camp] = true; await this.sauver(); }
-    try { serveur.send(JSON.stringify({ t: 'bienvenue', camp, mode: d.mode, k: this.cad ? this.cad.k : null })); } catch { /* fermée */ }
+    // lots : ce serveur accepte les ordres groupés (message « ol », voir plus bas).
+    try { serveur.send(JSON.stringify({ t: 'bienvenue', camp, mode: d.mode, k: this.cad ? this.cad.k : null, lots: true })); } catch { /* fermée */ }
     // Offres et candidats WebRTC arrivés avant ce joueur (le pair horloge a pu être plus rapide).
     const signaux = this.signaux && this.signaux[camp];
     if (signaux) { delete this.signaux[camp]; for (const t of signaux) { try { serveur.send(t); } catch { /* fermée */ } } }
@@ -206,6 +208,16 @@ export class Duel {
         return;
       case 'o':
         if (this.cad && Array.isArray(m.o)) this.cad.recevoir(camp, m.seq, m.o);
+        return;
+      case 'ol':
+        // Ordres groupés d'un jeu d'action (position, tirs : des dizaines par seconde) : un seul
+        // message reçu (1/20 de requête) pour tous les ordres de 100 ms. l : [[seq, ordre], …].
+        if (this.cad && Array.isArray(m.l)) {
+          for (let i = 0; i < m.l.length && i < LOT_ORDRES_MAX; i++) {
+            const x = m.l[i];
+            if (Array.isArray(x) && Array.isArray(x[1])) this.cad.recevoir(camp, x[0], x[1]);
+          }
+        }
         return;
       case 'h':
         if (this.sim && Number.isInteger(m.k)) {
