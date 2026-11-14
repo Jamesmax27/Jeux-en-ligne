@@ -2199,6 +2199,58 @@ body:not(.tactile) .d-main { display: none; }
   #aide-scene { height: 96px; }
 }
 @media (prefers-reduced-motion: reduce) { #annonce, #touche.oui { animation: none; } }
+
+/* --- Téléphone : affichage et boutons plus gros (demande du propriétaire) ---------------- */
+body.tactile .rond { width: 58px; height: 58px; }
+body.tactile .rond svg { width: 30px; height: 30px; }
+body.tactile .rond.gros { width: 106px; height: 106px; }
+body.tactile .rond.gros svg { width: 52px; height: 52px; }
+body.tactile #b-tir { right: 16px; bottom: calc(92px + env(safe-area-inset-bottom)); }
+body.tactile #b-recharge { right: 134px; bottom: calc(98px + env(safe-area-inset-bottom)); }
+body.tactile #b-grenade { right: 124px; bottom: calc(170px + env(safe-area-inset-bottom)); }
+body.tactile #b-arme { right: 34px; bottom: calc(210px + env(safe-area-inset-bottom)); }
+body.tactile #b-mine { right: 104px; bottom: calc(240px + env(safe-area-inset-bottom)); }
+body.tactile #b-kit { right: 34px; bottom: calc(278px + env(safe-area-inset-bottom)); }
+body.tactile #manette { width: 150px; height: 150px; margin: -75px 0 0 -75px; }
+body.tactile #manette i { width: 66px; height: 66px; margin: -33px 0 0 -33px; }
+body.tactile #vague-nom { font-size: 1.35rem; }
+body.tactile #vague-reste, body.tactile #bloc-sas { font-size: 1.15rem; }
+body.tactile #bloc-sas svg, body.tactile #vague-reste svg, body.tactile .ligne svg { width: 1.5em; height: 1.5em; }
+body.tactile .jauge { height: 16px; border-radius: 8px; }
+body.tactile #bloc-sas { max-width: 340px; }
+body.tactile #radar { width: 124px; height: 124px; }
+body.tactile #bloc-capacites { top: 146px; gap: 8px; }
+body.tactile .capacite { width: 56px; height: 56px; }
+body.tactile .capacite svg { width: 30px; height: 30px; }
+body.tactile #bloc-vie { width: min(52%, 300px); gap: 7px; }
+body.tactile .ligne { font-size: 1.25rem; }
+body.tactile .ligne.petits { font-size: 1.12rem; gap: 12px; }
+body.tactile #arme-nom { font-size: 1rem; }
+body.tactile #arme-munitions b { font-size: 2.4rem; }
+body.tactile #arme-munitions span { font-size: 1.2rem; }
+body.tactile #arme-liste i { width: 18px; height: 7px; }
+body.tactile #fil { top: 150px; font-size: 1.05rem; }
+body.tactile #invite { font-size: 1.1rem; padding: 12px 16px; }
+body.tactile #prep { width: min(480px, 96%); padding: 12px 14px; gap: 8px; bottom: calc(176px + env(safe-area-inset-bottom)); }
+body.tactile #prep-titre { font-size: 1.2rem; }
+body.tactile #prep-compte, body.tactile #prep-aliens { font-size: 1.02rem; }
+body.tactile #prep .bouton { min-height: 58px; font-size: 1.12rem; }
+body.tactile #annonce-detail { font-size: 1.2rem; }
+body.tactile #viseur i:nth-child(1), body.tactile #viseur i:nth-child(2) { width: 3px; height: 12px; left: -1.5px; }
+body.tactile #viseur i:nth-child(1) { top: calc(-12px - var(--ecart, 6px)); }
+body.tactile #viseur i:nth-child(3), body.tactile #viseur i:nth-child(4) { height: 3px; width: 12px; top: -1.5px; }
+body.tactile #viseur i:nth-child(3) { left: calc(-12px - var(--ecart, 6px)); }
+/* Téléphone couché : le panneau de préparation se range à gauche, hors des boutons. */
+@media (max-height: 520px) {
+  body.tactile #prep { left: 12px; transform: none; bottom: calc(84px + env(safe-area-inset-bottom)); width: min(400px, 52%); }
+  body.tactile #b-tir { bottom: calc(70px + env(safe-area-inset-bottom)); right: 22px; }
+  body.tactile #b-recharge { bottom: calc(74px + env(safe-area-inset-bottom)); right: 142px; }
+  body.tactile #b-grenade { bottom: calc(146px + env(safe-area-inset-bottom)); right: 132px; }
+  body.tactile #b-arme { bottom: calc(188px + env(safe-area-inset-bottom)); right: 40px; }
+  body.tactile #b-mine { bottom: calc(146px + env(safe-area-inset-bottom)); right: 202px; }
+  body.tactile #b-kit { bottom: calc(74px + env(safe-area-inset-bottom)); right: 212px; }
+  body.tactile #bloc-capacites { flex-direction: row; top: 8px; right: 146px; }
+}
 </style>
 </head>
 <body>
@@ -8527,7 +8579,7 @@ void main() {
     if (suite) { suite(); return; }
     if (retourAide === 'pause') { etatJeu = 'pause'; montrerEcran('pause'); } else { etatJeu = 'titre'; montrerEcran('titre'); }
   }
-  $('b-aide-ok').addEventListener('click', () => { SON.demarrer(); SON.jouer('clic'); fermerAide(); });
+  $('b-aide-ok').addEventListener('click', () => { pleinEcran(); SON.demarrer(); SON.jouer('clic'); fermerAide(); });
   $('aide-scene').addEventListener('click', () => montrerEtapeAide(aideEtape % 3 + 1));
 
   // ------------------------------------------------------------------------
@@ -8604,7 +8656,7 @@ void main() {
   let recommencerArme = false;
   function desarmerRecommencer() { recommencerArme = false; $('b-recommencer').textContent = t('pause.recommencer'); }
   $('b-pause').addEventListener('click', ouvrirPause);
-  $('b-reprendre').addEventListener('click', reprendre);
+  $('b-reprendre').addEventListener('click', () => { pleinEcran(); reprendre(); });
   $('b-recommencer').addEventListener('click', () => {
     // Deux touchers : la partie en cours est perdue.
     if (!recommencerArme) { recommencerArme = true; $('b-recommencer').textContent = t('pause.confirmer'); return; }
@@ -8685,7 +8737,7 @@ void main() {
     $('fin-debloque').textContent = debloque;
     montrerEcran('fin');
   }
-  $('b-rejouer').addEventListener('click', () => { SON.demarrer(); nouvellePartie(1, null, 0); });
+  $('b-rejouer').addEventListener('click', () => { pleinEcran(); SON.demarrer(); nouvellePartie(1, null, 0); });
   $('b-fin-accueil').addEventListener('click', allerAccueil);
 
   // ==========================================================================
@@ -8702,6 +8754,20 @@ void main() {
     if (etatJeu !== 'titre' && !modeDemo) { $('tactile').hidden = false; construireCapacites(); cacheTextes.clear(); }
     if (etatJeu === 'aide') montrerEtapeAide(aideEtape);
     redimensionner();
+  }
+
+  // Sur téléphone, la partie se joue en plein écran (rien du site autour, pas de retour en arrière par mégarde).
+  // Le navigateur ne l'accorde que dans un geste du joueur ; s'il refuse (iPhone), le jeu continue tel quel.
+  function pleinEcran() {
+    if (!TACTILE) return;
+    try {
+      const el = document.documentElement;
+      if (document.fullscreenElement || document.webkitFullscreenElement) return;
+      const f = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (!f) return;
+      const p = f.call(el, { navigationUI: 'hide' });
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) { /* refusé */ }
   }
 
   function partieEnCours() { return !!partie && !modeDemo && partie.mode !== 'arret' && etatJeu !== 'titre' && etatJeu !== 'fin'; }
@@ -8876,6 +8942,7 @@ void main() {
     redimensionner();
 
     $('b-jouer').addEventListener('click', () => {
+      pleinEcran();
       SON.demarrer();
       SON.jouer('clic');
       let d = null;
