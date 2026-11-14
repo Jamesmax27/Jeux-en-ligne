@@ -5927,7 +5927,7 @@ const CONFIG = {
   kickSortie: 3.6,           // élan vers le haut en quittant la piste (m/s)
   decollageBosse: 13,        // vitesse à partir de laquelle une bosse fait décoller (m/s)
   sortieVitesse: 0.88,       // part de la vitesse de référence qu'il faut pour quitter un tremplin
-  tremplinVitesseMax: 1.2,   // au-delà (× vitesse de référence), le tremplin absorbe presque tout l'excès : on ne dépasse pas la piste d'atterrissage
+  tremplinVitesseMax: 1.1,   // au-delà (× vitesse de référence), le tremplin absorbe presque tout l'excès : on ne dépasse pas la piste d'atterrissage
 
   // --- Vol ---
   graviteVol: 14,
@@ -6048,7 +6048,7 @@ function definirNiveau(i) {
     raccourcis: i < 10 ? 1 : i < 14 ? 2 : 3,
     raccourciSpirale: i >= 10,
     flaques: i >= 12,
-    atterrissage: i >= 14 ? 30 : 42,       // longueur de la piste d'atterrissage (m)
+    atterrissage: i >= 14 ? 34 : 42,       // longueur de la piste d'atterrissage (m)
     vRef: melange(22, 26, k),            // vitesse pour laquelle les raccourcis sont réglés
     botsAdresse: adresse,
     botsVitesse: [0, 1, 2].map((j) => melange(CONFIG.botsVitesse.debut[j], CONFIG.botsVitesse.fin[j], k)),
@@ -6555,7 +6555,7 @@ function decoller(co, c, i, mode) {
   if (mode === 'bord' && P.zone[i] >= 0) {
     // tremplin : l'excès de vitesse est presque tout absorbé, pour retomber sur la piste d'atterrissage
     const plafond = co.def.vRef * CONFIG.tremplinVitesseMax;
-    if (c.v > plafond) c.v = plafond + (c.v - plafond) * 0.25;
+    if (c.v > plafond) c.v = plafond + (c.v - plafond) * 0.15;
   }
   // direction « le long de la paroi » : cos·droite + sin·normale
   const wx = cs * P.rx[i] + sn * P.nx[i], wy = sn * P.ny[i], wz = cs * P.rz[i] + sn * P.nz[i];
