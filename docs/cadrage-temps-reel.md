@@ -6,6 +6,8 @@
 >
 > **Modes à plusieurs (12 novembre 2026, demande du propriétaire)** : de 2 à 8 camps par partie (2 à 4 vrais joueurs dans Nova Dominion), chacun pour soi, équipes, joueurs contre des robots, choix de la carte : **section 16**.
 >
+> **Jeu coopératif et partie privée (14 novembre 2026, demande du propriétaire)** : « Le Dernier Sas », jeu de tir en coopération à 2, 3 ou 4 contre la simulation ; partie privée par code de salon ; ordres groupés d'un jeu d'action : **section 17**.
+>
 > **Décisions du propriétaire (12 novembre 2026)** : pair-à-pair accepté, avec l'adresse IP visible par l'autre joueur et un paragraphe dans la politique de confidentialité (section 11, point 1) ; prototype « Petites planètes » (vaisseaux-graines qui colonisent des planètes et leurs lunes, univers `espace`, genre `strategie`, 7+) ; jeu publié dans le catalogue dès la fusion (section 11, point 7).
 
 ## 1. Le multijoueur existant, en résumé
@@ -313,7 +315,7 @@ Rien n'est changé maintenant (ni l'idéation, ni la fabrication, ni la vérific
 
 ## 15. Hors périmètre
 
-- Jeux de tir et d'action rapide (latence, prédiction et correction : architecture différente, à cadrer plus tard).
+- Jeux de tir **entre joueurs** et d'action rapide où un joueur vise un autre joueur (latence, prédiction et correction : architecture différente, à cadrer plus tard). Un jeu de tir en coopération contre des aliens tenus par la simulation est possible : section 17.
 - Spectateurs, parties entre amis par le bouton « Rejoindre » (possible plus tard avec le même Duel). Plus de 2 joueurs : fait (section 16).
 
 ## 16. Modes à plusieurs joueurs et choix de la carte (12 novembre 2026)
@@ -372,3 +374,76 @@ Cartes : les 5 thèmes du jeu (Mars, Europa, Io, Séléné, Titan) ou « au hasa
 - Worker (faux Durable Objects) : groupes par carte, « lancer » à 2 sur 4 places, groupe complet de 4, relais à quatre sans écart, signalisation en étoile, départ volontaire, dernier joueur restant, niveau des robots adverses.
 - `--wrangler` : test 4 à quatre joueurs (latence 150 ms, coupures). `--navigateur` : test 7, trois joueurs en étoile (pair-à-pair, puis relais forcé) et partie à 4 places lancée à 2 par le bouton.
 - Serveur TURN payant.
+
+## 17. Jeu coopératif, partie privée, jeu d'action (14 novembre 2026)
+
+Demande du propriétaire : un vrai mode coopératif en ligne pour **Le Dernier Sas** (`games/le-dernier-sas/`, jeu de tir en vue subjective, 13 ans et +, `docs/cadrage-dernier-sas.md`) : 2, 3 ou 4 joueurs dans la même équipe contre les vagues d'aliens, « Partie rapide » et « Partie privée » avec un code de salon. Le jeu se branche sur le moteur des sections 5 à 16 : aucune nouvelle couche réseau. Les Petites Planètes et Nova Dominion marchent comme avant (`PROTOCOLE` reste à 2 : ce qui est ajouté est facultatif, un jeu gardé sur un appareil avec l'ancien moteur joue encore en ligne).
+
+### Un jeu coopératif dans le contrat de la simulation
+
+- Un seul mode, `modes: { coop: { equipes: [0, 0, 0, 0], robots: [] } }` : quatre camps dans la même équipe, de 1 à 4 vrais joueurs ; **une place libre est un robot coéquipier** (`ctl` 1 à 3, niveau 2 par défaut), un joueur parti ou absent aussi. « Partie rapide » lancée à 2 : 2 joueurs et 2 robots.
+- `depart(graine, config)` lit `config.camps` et `config.ctl` (donnés par `JEL_TR.configMode`, le même calcul dans le jeu et dans la Rencontre). L'échelle des vagues est **fixée au départ** (`etat.ech` : un joueur compte 1, un robot 0,5) et ne change plus quand un joueur part ou revient : nombre d'aliens, points de vie du sas, prime de fin de vague (partagée à parts égales).
+- `fin(etat)` : il n'y a pas d'équipe gagnante. `{ gagnant: -1, scores (un par camp de la partie), equipes, tues, raison, vague }` à la défaite (sas détruit, ou toute l'équipe à terre), `null` avant.
+- Le robot (`bot`) est un coéquipier : il garde le sas, achète de quoi se battre pendant la préparation (fusil, munitions ; niveau 2 : une tourelle à son poste et des soins ; niveau 3 : amélioration, grenades), tire sur l'alien le plus proche (précision et coups au point faible selon le niveau), va relever un coéquipier à terre et va chercher les derniers aliens d'une vague. Il ne modifie pas l'état : il sert aussi d'« humain » d'essai au robot de contrôle.
+- **Jeu de tir dans un moteur à ticks** (`docs/cadrage-dernier-sas.md`, section 5) : le joueur est maître de sa position (ordre `BOUGER`, 10 fois par seconde au plus), le tireur dit qui il touche (ordre `TIRER`), tout le reste est dans la simulation. Tick de 50 ms, délai d'entrée d'un tick, hachage tous les 50 ticks, état en nombres à virgule (`flottants: true`, + − × ÷ et `JEL_TR.flottant`), sans `exporter` (l'état est un simple objet JSON de quelques Ko : instantané de 6 Ko à 4 joueurs).
+- **Solo et en ligne par le même moteur** : la partie du bouton « Jouer » est une partie `local()` à un seul personnage (`config.joueurs`), gardée par la sauvegarde (`partie.s.instantane()`) et reprise par `local({ …, snap })` ; la démonstration de l'écran titre est une autre `Partie` (`ctl: [3]`), jamais `JEL_TR.derniere`.
+
+### Ce qui a changé dans le moteur commun (sans changer le protocole)
+
+| Fichier | Ajout |
+| --- | --- |
+| `public/temps-reel/moteur.js` | `local({ …, snap })` : reprise d'une partie gardée ; `chercher` envoie le rythme de la simulation (`tickMs`, `delai`) et, pour une partie privée, `config.salon` et `config.creer` (attente `salonMs` : 10 min, au lieu des 15 s de `rechercheMs`) ; événement `{ type: 'salon', raison: 'inconnu' | 'pris' }` ; `codeSalon()`, `salonValide()`, `ALPHABET_SALON` |
+| `public/temps-reel/lanceur.js` | paramètres `salon` et `creer` de la recherche ; battement toutes les 20 s de la connexion de recherche (réponse automatique, gratuite) ; **horloge du pair horloge au rythme de la simulation** (avant : toujours 100 ms et 2 ticks de délai, un jeu à 50 ms aurait tourné deux fois trop lentement en pair-à-pair) ; **ordres groupés** en relais |
+| `multijoueur/src/temps-reel/routes.js` | `/tr/ws?…&salon=<code>[&creer=1]` : code contrôlé (400 s'il est mal formé) |
+| `multijoueur/src/temps-reel/rencontre.js` | groupes par code de salon ; refus `salon-inconnu` et `salon-pris` ; attente de 15 min pour un salon ; les joueurs d'un salon ne sont pas comptés par `/tr/attente` |
+| `multijoueur/src/temps-reel/duel.js` | message `ol` (ordres groupés) ; `bienvenue` annonce `lots: true` |
+
+### Partie privée (code de salon)
+
+- Le code a **4 caractères parmi 31** lettres et chiffres qu'on ne confond pas (ni I, L, O, ni 0, 1 : `ABCDEFGHJKMNPQRSTUVWXYZ23456789`, un peu moins d'un million de codes). Il est **tiré sur l'appareil de celui qui crée la partie** et affiché en très gros ; ses amis le saisissent avec des **touches à l'écran** (ou au clavier d'un ordinateur) : aucun champ de texte, aucun message entre joueurs (règle du site).
+- Recherche : `/tr/ws?…&salon=K7QP&creer=1` pour celui qui ouvre le salon, `&salon=K7QP` pour ceux qui le rejoignent. La Rencontre réunit seulement les joueurs du même code (et du même mode), jamais avec ceux de la partie rapide. Un code que personne n'a ouvert : `{ t: 'refus', raison: 'salon-inconnu' }` (le jeu revient au pavé de touches avec « Aucune partie n'attend avec ce code. ») ; un code déjà pris par un autre salon : `'salon-pris'` (le jeu en tire un autre, sans rien dire).
+- Attente : 10 minutes au plus côté appareil (`salonMs`), 15 côté serveur (`SALON_MAX_MS`) ; les connexions hibernent (aucun coût), un battement toutes les 20 s garde la connexion ouverte. **N'importe quel membre** lance la partie (`lancer`, dès 2 joueurs) ; salon complet (4) : elle commence aussitôt ; au bout des 10 minutes, elle commence avec ceux qui sont là (seul : robots sur l'appareil).
+- Le code n'est gardé que dans la connexion de recherche, le temps de l'attente : ni dans le stockage, ni dans la configuration de la partie, ni dans les journaux. Politique de confidentialité (fr, en) complétée.
+- Si la connexion de recherche se ferme pendant l'attente (réseau perdu), la partie commence sur l'appareil avec des robots : il faut recréer ou rejoindre le salon (pas de reconnexion automatique au salon : limite connue).
+
+### Ordres groupés d'un jeu d'action (relais)
+
+Un jeu d'action envoie des dizaines d'ordres par seconde (position 10 fois par seconde, un ordre par tir). En relais, chaque ordre était un message reçu par le Duel (1/20 de requête) et le Duel ferme la connexion au-delà de 150 messages par 10 s. Le lanceur groupe donc les ordres : `{ t: 'ol', l: [[seq, ordre], …] }`, **un message toutes les 100 ms au plus** (2 000 caractères au plus, 60 ordres au plus lus par le Duel). Il ne le fait que pour un jeu dont le tick fait moins de 100 ms (Les Petites Planètes et Nova Dominion envoient toujours leurs ordres un par un, comme avant) et si le Duel l'annonce (`bienvenue` avec `lots: true`) : pendant une mise en ligne où le site et le Worker n'ont pas la même version, les ordres partent un par un comme avant. En pair-à-pair, rien ne change (les messages entre appareils ne coûtent rien).
+
+Coût estimé d'une partie relayée à 4 joueurs qui bougent et tirent sans arrêt : 10 messages par seconde et par joueur, soit 2 400 requêtes pour 20 minutes (le quota gratuit est de 100 000 par jour) ; la durée facturée ne change pas (un seul Durable Object, 150 Go-s pour 20 minutes, comptés par le Budget). **Le Budget ne compte toujours que la durée**, pas ces requêtes : à surveiller si le jeu est beaucoup joué en relais (`docs/couts-temps-reel.md`).
+
+### Messages ajoutés (protocole temps réel 2, inchangé)
+
+| Sens | Message |
+| --- | --- |
+| client → Rencontre | paramètres `salon`, `creer` |
+| Rencontre → client | `refus { raison: 'salon-inconnu' | 'salon-pris' }` |
+| Duel → client | `bienvenue { …, lots: true }` |
+| client → Duel | `ol { l: [[seq, ordre], …] }` |
+| jeu → lanceur | `chercher { proto, config: { mode, niveau, salon, creer }, tickMs, delai }` |
+| lanceur → jeu | `solo { raison: 'salon-inconnu' | 'salon-pris' }` (événement `salon` du moteur) |
+
+### Dans le jeu
+
+- Écran titre : « Jouer » (seul, inchangé), « Jouer en ligne » (`data-tr="jouer"`) → « Partie rapide » (`data-tr="rapide"`), « Créer une partie privée » (`data-tr="creer"`), « Rejoindre avec un code » (`data-tr="rejoindre"`, pavé de touches `data-touche`). Écran de recherche ou de salon : code en très gros (`#trCode`), joueurs réunis sur 4 (`#trJoueurs`), compte à rebours de la partie rapide, « Lancer avec n joueurs » (`#trLancer`, dès 2), « Jouer avec des robots maintenant » (`data-tr="robot"`), « Annuler ».
+- Hors connexion, site de test, serveur absent ou personne : la même partie sur l'appareil avec trois robots coéquipiers, tout de suite ou au bout des 15 s (jamais d'écran bloqué). Le temps s'arrête alors dans la boutique et le menu, comme seul.
+- En ligne : coéquipiers visibles (couleur, étiquette « Joueur 2 », « Robot 3 » : aucun pseudo), leurs tirs, leur vie, points verts du radar ; un coéquipier à terre a un anneau rouge et une étiquette ; on le relève en restant 3 s près de lui (jauge) ; pas de pause (le menu s'ouvre, la partie continue) ; boutique sans arrêt du temps (compte à rebours, « prêts » de chacun) ; « Quitter la partie » : un robot prend la place ; bandeau de réseau (`#reseau`) ; bilan par joueur à la fin ; expérience et grade comme seul. Une partie en ligne n'est jamais gardée pour « Continuer ».
+- **Durée** : une partie relayée s'arrête sur le serveur au bout de 20 minutes (`DUREE_MAX_MS`), une partie en pair-à-pair perd son Duel à 21 minutes ; chaque joueur continue alors sur son appareil avec des robots (« Partie en ligne terminée : tu continues avec des robots »). Une survie sans fin peut durer plus : limite connue, liée au Budget (décision du propriétaire).
+
+### Contrôles (`tester-temps-reel.mjs`)
+
+Un jeu coopératif s'annonce par `essais: { cooperatif: true, ordres, variete, parties }` dans `JEL_SIM`. Le robot de contrôle remplace alors les duels entre robots (taux de victoire, équité des camps) par ce qui a un sens :
+
+- **Simulation** : parties à 4, 2, 1 et 3 vrais joueurs (ordres d'essai de `essais.ordres`), un joueur part au tick 1 500 et revient au tick 2 500 ; journaux rejoués deux fois et depuis un instantané ; aucun nombre non fini ; modes (configuration des places, rejeu, reprise) ; deux parties jouées en alternance dans la même mémoire ; **la partie entre robots finit par une défaite** (jamais d'équipe gagnante, un score par camp) ; **les robots de niveau 3 vont plus loin que ceux de niveau 1** (score moyen) ; variété des débuts de partie.
+- **Worker** (faux Durable Objects) : partie rapide lancée à 2 puis à 3 (robots aux places libres), groupe complet de 4 (relais sans écart), ordres groupés, départ d'un joueur (robot tout de suite), partie privée (3 joueurs du même code ; code inconnu, code pris, code mal formé refusés ; un joueur de la partie rapide n'y entre jamais ; `/tr/attente` ne compte pas le salon ; le salon attend plus de 25 s).
+- **`--wrangler`** : test 4 à 2 (lancé), à 4 et en partie privée à 3 ; test 5 (coupure de 12,5 s).
+- **`--navigateur`** : joueur seul (robots en moins de 16 s, aucune requête), hors ligne, pair-à-pair et relais forcé à 2 (lancés par le bouton), partie à 4 places lancée à 2, **test 8** (partie privée à 3 par le pavé de touches, code inconnu, départ d'un joueur par le menu), test 6 (coupures).
+- Quand plusieurs jeux sont contrôlés, les tests du Worker, de wrangler et du navigateur portent sur le premier jeu d'affrontement (comme avant), puis sur le premier jeu coopératif.
+
+Mesuré le 14 novembre 2026 (Node, machine de développement) : 0,05 ms de calcul par tick ; quatre robots de niveau 1 tiennent en moyenne jusqu'à la vague 4, de niveau 2 jusqu'à la vague 7, de niveau 3 jusqu'à la vague 8.
+
+### Ce qui reste
+
+- Essai sur de vrais téléphones (2 à 4), en wifi et en 4G.
+- Requêtes d'une partie relayée non comptées par le Budget ; durée maximale de 20 minutes d'une partie en ligne.
+- Pas de reconnexion automatique à un salon privé pendant l'attente ; pas de bouton « Rejoindre » d'un ami, pas de pseudo, pas de crédit d'expérience du profil du site pour les parties en ligne.
