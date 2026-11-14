@@ -7985,6 +7985,31 @@ void main() {
   }
   let eclairBouche = 0;
 
+  // Aide à la visée au doigt : le viseur est doucement attiré par l'alien le plus proche de lui
+  // (dans un cône de 10°, à portée de l'arme). Plus légère pendant que le joueur déplace son regard.
+  const AIDE_CONE = 0.175, AIDE_FORCE = 4.2;
+  function aideVisee(dt) {
+    if (!TACTILE || monEtat().at !== 0) return;
+    const E = partie.etat, portee = ARMES[moi.arme].portee;
+    let mieux = 1e9, mLacet = 0, mTangage = 0, mRayon = 0;
+    for (let i = 0; i < E.e.length; i++) {
+      const e = E.e[i];
+      if (e.mo) continue;
+      const v = vues.get(e.i), A = ALIENS[e.t], ech = v ? v.echelle : 1;
+      const dx = (v ? v.x : e.x) - moi.x, dy = (v ? v.z : e.y) - moi.y;
+      const d = Math.hypot(dx, dy);
+      if (d > portee || d < 0.5) continue;
+      const lacet = ecartAngle(moi.lacet, Math.atan2(dx, dy));
+      const tangage = Math.atan2(A.hauteur * ech * 0.55 - cam.y, d) - moi.tangage;
+      const angle = Math.hypot(lacet * Math.cos(moi.tangage), tangage);
+      if (angle < AIDE_CONE && angle < mieux) { mieux = angle; mLacet = lacet; mTangage = tangage; mRayon = Math.atan2(A.rayon * ech, d); }
+    }
+    if (mieux > 1e8 || mieux < mRayon * 0.35) return;      // rien à portée du viseur, ou déjà dessus
+    const k = Math.min(1, dt * AIDE_FORCE * (regard.id >= 0 || tirId >= 0 ? 0.45 : 1));
+    moi.lacet += mLacet * k;
+    moi.tangage = borner(moi.tangage + mTangage * k, -1.2, 1.2);
+  }
+
   function majArmes(dt) {
     const J = monEtat(), a = moi.arme, A = ARMES[a];
     // Recalage sur la simulation quand rien ne s'est passé depuis un moment.
@@ -8003,6 +8028,7 @@ void main() {
     moi.rafale = Math.max(0, moi.rafale - dt * 1.4);
     if (eclairBouche > 0) eclairBouche = Math.max(0, eclairBouche - dt * 14);
 
+    aideVisee(dt);
     // Alien sous le viseur (viseur orange, tir automatique).
     const R = rayonDuRegard(0, 0);
     const portee = A.portee;
