@@ -23,6 +23,8 @@
 //     présence réelle (durée, coups), un seul enregistrement par manche,
 //     secret obligatoire, plafond du jour, badges ;
 //   - classement : ordre, niveau minimal, position hors du top, périmètre ;
+//   - classement des étoiles d'un jeu : ordre et égalités, top 100, position hors
+//     du top, maximum du jeu, lecture par l'index, ancienne base mise à jour ;
 //   - indicateurs de fidélisation et effacements quotidiens ;
 //   - provenance (autre site refusé).
 // Code de sortie 1 si un test échoue.
@@ -64,6 +66,7 @@ globalThis.fetch = async (url, options) => {
 const CATALOGUE = {
   games: [
     { id: 'robot-max', title: 'Robot Max', etoiles: 72 },
+    { id: 'grimpe', title: 'Grimpe', etoiles: 60 },
     { id: 'glissade', title: 'Glissade' },
     { id: 'sans-fin', title: 'Sans fin', sans_fin: true },
     { id: 'enclos-de-la-ferme', title: 'Enclos', multijoueur: true },
@@ -367,6 +370,94 @@ verifier(cm.top.length === 1 && cm.top[0].id === idA && cm.top[0].points === R.M
 verifier((await appeler(apiClassement, { perimetre: 'multi:robot-max', periode: 'semaine' })).statut === 400, 'périmètre d\'un jeu non multijoueur : refusé');
 const ce = await appeler(apiClassement, { perimetre: 'etoiles', periode: 'mois', jeton: jetonB });
 verifier(ce.top[0]?.id === b.etat.id && ce.top[0].points === 72, 'classement des étoiles (brutes)', ce.top[0]);
+
+// ==========================================================================
+console.log('Classement des étoiles d\'un jeu');
+const cj = (jeu, jeton) => appeler(apiClassement, { perimetre: `jeu:${jeu}`, jeton });
+const ligneB = await DB.prepare("SELECT etoiles, etoiles_le, termine FROM profils_jeux WHERE profil = ? AND jeu = 'robot-max'").bind(b.etat.id).first();
+verifier(ligneB.etoiles === 72 && Number.isInteger(ligneB.etoiles_le) && ligneB.etoiles_le >= ligneB.termine, 'date du meilleur nombre d\'étoiles enregistrée', ligneB);
+await profil({ action: 'sync', jeton: jetonB, jour: jourLocal(), termines: [{ jeu: 'robot-max', etoiles: 10, max: 72 }] });
+verifier((await DB.prepare("SELECT etoiles_le FROM profils_jeux WHERE profil = ? AND jeu = 'robot-max'").bind(b.etat.id).first()).etoiles_le === ligneB.etoiles_le, 'résultat moins bon : la date ne bouge pas');
+let rj = await cj('robot-max', jetonB);
+verifier(rj.statut === 200 && rj.max === 72 && rj.top[0]?.id === b.etat.id && rj.top[0].points === 72 && rj.top[0].rang === 1, 'jeu à étoiles : top avec le maximum du jeu', rj.top?.[0]);
+verifier(rj.moi?.id === b.etat.id && rj.moi.rang === 1 && rj.moi.points === 72, 'joueur dans le top : sa position est celle de sa ligne', rj.moi);
+verifier((await cj('robot-max')).moi === null, 'sans jeton : pas de position');
+verifier((await cj('glissade')).statut === 400 && (await cj('sans-fin')).statut === 400 && (await cj('inconnu')).statut === 400 && (await cj('Robot Max')).statut === 400,
+  'jeu sans étoiles, sans fin ou inconnu : refusé');
+
+// 130 joueurs dans « grimpe » (60 étoiles possibles), écrits directement dans la base.
+const T0 = Date.UTC(2026, 9, 1);
+const joueursJeu = [];
+const ajouterJoueur = async (id, etoiles, le, niveau = 5) => {
+  await DB.prepare('INSERT INTO profils (id, numero, xp, niveau, cree_le, vu_le, sync_le) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, id, R.seuilNiveau(niveau), niveau, T0, maintenant, T0).run();
+  await DB.prepare("INSERT INTO profils_jeux (profil, jeu, secondes, premiere, derniere, termine, etoiles, etoiles_max, etoiles_le) VALUES (?, 'grimpe', 300, ?, ?, ?, ?, 60, ?)")
+    .bind(id, T0, T0, T0, etoiles, le).run();
+  if (niveau >= R.CLASSEMENT_NIVEAU_MIN && etoiles > 0) joueursJeu.push({ id, etoiles, le });
+};
+await ajouterJoueur(5001, 60, T0 + 5000);          // 60 étoiles, arrivé après 5002 et 5003
+await ajouterJoueur(5002, 60, T0 + 1000);          // même date que 5003 : le plus petit numéro devant
+await ajouterJoueur(5003, 60, T0 + 1000);
+await ajouterJoueur(5004, 60, null);               // étoiles d'avant le classement (sans date) : devant
+await ajouterJoueur(5005, 75, T0 + 9000);          // plus que le maximum (jeu raccourci depuis) : affiché 60
+await ajouterJoueur(5006, 60, T0, 1);              // niveau 1 : absent
+await ajouterJoueur(5007, 0, T0);                  // aucune étoile : absent
+for (let i = 0; i < 125; i++) await ajouterJoueur(5100 + i, 59 - (i % 50), T0 + ((i * 7919) % 1000) * 1000);
+const attenduJeu = [...joueursJeu].sort((x, y) => y.etoiles - x.etoiles || (x.le || 0) - (y.le || 0) || x.id - y.id);
+rj = await cj('grimpe');
+verifier(rj.top.length === R.CLASSEMENT_TAILLE && rj.max === 60, 'top limité à 100 joueurs', rj.top.length);
+verifier(rj.top.map((l) => l.id).join() === attenduJeu.slice(0, 100).map((x) => x.id).join(), 'ordre : étoiles, puis premier arrivé, puis numéro de profil', rj.top.slice(0, 6).map((l) => l.id));
+verifier(rj.top.slice(0, 5).map((l) => l.id).join() === '5005,5004,5002,5003,5001', 'égalités départagées (sans date, date, numéro)', rj.top.slice(0, 5).map((l) => l.id));
+verifier(rj.top.every((l, i) => l.rang === i + 1), 'une place par joueur, de 1 à 100');
+verifier(rj.top.every((l) => l.points >= 1 && l.points <= 60) && rj.top[0].points === 60, 'jamais plus d\'étoiles que le maximum du jeu', rj.top[0]);
+verifier(!rj.top.some((l) => l.id === 5006 || l.id === 5007), 'niveau 1 et joueur sans étoile : absents');
+verifier(JSON.stringify((await cj('grimpe')).top) === JSON.stringify(rj.top), 'même classement à chaque calcul');
+// Position hors du top : joueur A, à égalité avec d'autres, arrivé entre eux.
+const ajouterLigne = (id, etoiles, le) => DB.prepare("INSERT INTO profils_jeux (profil, jeu, secondes, premiere, derniere, termine, etoiles, etoiles_max, etoiles_le) VALUES (?, 'grimpe', 300, ?, ?, ?, ?, 60, ?)")
+  .bind(id, T0, T0, T0, etoiles, le).run();
+await ajouterLigne(idA, 12, T0 + 500000);
+const rangAttendu = (id, etoiles, le) => attenduJeu.filter((x) => x.etoiles > etoiles || (x.etoiles === etoiles && ((x.le || 0) < le || ((x.le || 0) === le && x.id < id)))).length + 1;
+rj = await cj('grimpe', jetonA);
+verifier(rj.moi?.id === idA && rj.moi.rang === rangAttendu(idA, 12, T0 + 500000) && rj.moi.rang > 100 && rj.moi.points === 12 && !rj.top.some((l) => l.id === idA),
+  'joueur hors du top 100 : sa position et ses étoiles', rj.moi);
+await ajouterLigne(b.etat.id, 60, T0 + 2000);
+rj = await cj('grimpe', jetonB);
+verifier(rj.moi?.rang === 5 && rj.top[4].id === b.etat.id, 'joueur à égalité dans le top : placé d\'après sa date', rj.moi);
+await ajouterLigne(novice.etat.id, 60, T0);
+rj = await cj('grimpe', novice.jeton);
+verifier(rj.moi?.rang === null && rj.moi.points === 60, `étoiles sans le niveau ${R.CLASSEMENT_NIVEAU_MIN} : pas de place`, rj.moi);
+const sansEtoiles = await profil({ action: 'creer', jour: jourLocal() }, { ip: '203.0.113.77' });
+rj = await cj('grimpe', sansEtoiles.jeton);
+verifier(rj.statut === 200 && rj.moi?.rang === null && rj.moi.points === 0, 'joueur sans étoiles dans ce jeu : pas de place', rj.moi);
+// Lecture économe : le top et les deux comptages suivent l'index, sans tri.
+const planSql = (sql) => DB.sqlite.prepare(`EXPLAIN QUERY PLAN ${sql}`).all().map((l) => l.detail).join(' | ');
+const planTop = planSql("SELECT p.id, j.etoiles FROM profils_jeux j JOIN profils p ON p.id = j.profil WHERE j.jeu = 'grimpe' AND j.etoiles > 0 AND p.niveau >= 2 ORDER BY j.etoiles DESC, j.etoiles_le, j.profil LIMIT 100");
+verifier(/profils_jeux_etoiles/.test(planTop) && !/TEMP B-TREE/.test(planTop), 'top lu dans l\'ordre de l\'index, sans tri', planTop);
+const planRang = planSql("SELECT COUNT(*) FROM profils_jeux j JOIN profils p ON p.id = j.profil WHERE j.jeu = 'grimpe' AND j.etoiles > 0 AND p.niveau >= 2 AND j.etoiles > 12");
+verifier(/profils_jeux_etoiles \(jeu=\? AND etoiles>\?/.test(planRang), 'position : seuls les joueurs devant sont lus', planRang);
+// Les autres classements ne changent pas.
+verifier((await appeler(apiClassement, { perimetre: 'jeu:grimpe', periode: 'mois' })).top.length === 100 && (await appeler(apiClassement, { perimetre: 'etoiles', periode: 'mois' })).top[0]?.points === 72,
+  'classement « Étoiles gagnées » de la période inchangé');
+await DB.prepare("DELETE FROM profils_jeux WHERE jeu = 'grimpe'").run();
+await DB.prepare('DELETE FROM profils WHERE id >= 5001 AND id < 5300').run();
+await DB.prepare('DELETE FROM profils_appareils WHERE profil = ?').bind(sansEtoiles.etat.id).run();
+await DB.prepare('DELETE FROM profils WHERE id = ?').bind(sansEtoiles.etat.id).run();
+// Base d'avant le classement par jeu : colonne ajoutée, date reprise de la fin du jeu, index créé.
+{
+  const ancienne = baseD1();
+  ancienne.sqlite.exec(`CREATE TABLE profils_jeux (profil INTEGER NOT NULL, jeu TEXT NOT NULL, secondes INTEGER NOT NULL DEFAULT 0,
+    premiere INTEGER NOT NULL, derniere INTEGER NOT NULL, termine INTEGER, etoiles INTEGER, etoiles_max INTEGER, PRIMARY KEY (profil, jeu)) WITHOUT ROWID;
+    INSERT INTO profils_jeux VALUES (1, 'grimpe', 100, 5, 9, 7, 40, 60), (2, 'grimpe', 100, 5, 9, NULL, NULL, NULL), (3, 'glissade', 100, 5, 9, 8, NULL, NULL);`);
+  const neuf = await import('../functions/_profil.js?migration');
+  await neuf.preparerTablesProfil({ DB: ancienne });
+  const lignes = ancienne.sqlite.prepare('SELECT profil, etoiles_le FROM profils_jeux ORDER BY profil').all();
+  const index = ancienne.sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'profils_jeux_etoiles'").get();
+  verifier(lignes.map((l) => l.etoiles_le).join() === '7,,' && !!index, 'ancienne base : colonne et index ajoutés, date = fin du jeu', lignes);
+  const encore = await import('../functions/_profil.js?migration2');
+  let erreurMigration = null;
+  try { await encore.preparerTablesProfil({ DB: ancienne }); } catch (e) { erreurMigration = String(e); }
+  verifier(erreurMigration === null, 'préparation relancée sur une base à jour : rien à faire', erreurMigration);
+}
 
 // ==========================================================================
 console.log('Podiums (historique des 3 premiers, trophées, badges)');

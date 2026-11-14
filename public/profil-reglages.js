@@ -97,6 +97,9 @@ export const CLASSEMENT_TAILLE = 100;         // joueurs affichés (top 100)
 export const CLASSEMENT_CACHE_S = 300;        // le top est recalculé au plus toutes les 5 minutes
 export const CLASSEMENT_ETOILES = 'brut';     // classement « Étoiles » : étoiles gagnées sur la période ('brut'), pas un pourcentage
 export const CLASSEMENT_NIVEAU_MIN = 2;       // niveau minimal pour apparaître dans un classement (écarte les profils créés par des robots)
+// Classement des étoiles d'un jeu (page du jeu) : top CLASSEMENT_TAILLE, sans période.
+export const CLASSEMENT_JEU_CACHE_S = 300;    // top d'un jeu, et position d'un joueur hors du top : recalculés au plus toutes les 5 minutes
+export const CLASSEMENT_JEU_PAR_PAGE = 10;    // joueurs montrés par page (les pages se tournent sans nouvelle requête)
 
 // --- Podiums : historique des 3 premiers du classement général -------------------
 // À la fin de chaque semaine et de chaque mois, les 3 premiers du classement

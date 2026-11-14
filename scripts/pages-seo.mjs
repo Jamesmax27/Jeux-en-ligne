@@ -586,6 +586,10 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         age: age !== null ? t('page.ageConseille', { n: age }) : '',
         competences: tx.competences ? `<p><strong>${echapper(t('page.competences'))}</strong> ${echapper(tx.competences)}</p>` : '',
         note_langue: lang !== 'fr' && jeu.fiche.non_traduisible === true ? `<p class="fiche-note-langue">${echapper(t('page.enFrancais'))}</p>` : '',
+        // Classement des étoiles (public/classement-jeu.js) : jeux à étoiles seulement.
+        classement_etoiles: Number.isInteger(jeu.fiche.etoiles) && jeu.fiche.etoiles > 0 && jeu.fiche.sans_fin !== true
+          ? remplir(morceaux['classement-jeu'], { jeu_id: jeu.id, etoiles_max: jeu.fiche.etoiles }, t, morceaux, 'gabarits/morceaux/classement-jeu.html').trim()
+          : '',
         similaires: similaires.length
           ? `<section class="similaires" aria-labelledby="titre-similaires">
       <h2 id="titre-similaires">${echapper(t('page.similaires'))}</h2>
