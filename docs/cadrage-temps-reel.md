@@ -8,6 +8,8 @@
 >
 > **Jeu coopératif et partie privée (14 novembre 2026, demande du propriétaire)** : « Le Dernier Sas », jeu de tir en coopération à 2, 3 ou 4 contre la simulation ; partie privée par code de salon ; ordres groupés d'un jeu d'action : **section 17**.
 >
+> **Jeu de course (15 novembre 2026, demande du propriétaire)** : « Toboggan Turbo », course de bouées en 3D à 2 ou 4 joueurs, les autres bouées tenues par des robots : **section 18**.
+>
 > **Décisions du propriétaire (12 novembre 2026)** : pair-à-pair accepté, avec l'adresse IP visible par l'autre joueur et un paragraphe dans la politique de confidentialité (section 11, point 1) ; prototype « Petites planètes » (vaisseaux-graines qui colonisent des planètes et leurs lunes, univers `espace`, genre `strategie`, 7+) ; jeu publié dans le catalogue dès la fusion (section 11, point 7).
 
 ## 1. Le multijoueur existant, en résumé
@@ -447,3 +449,32 @@ Mesuré le 14 novembre 2026 (Node, machine de développement) : 0,05 ms de calcu
 - Essai sur de vrais téléphones (2 à 4), en wifi et en 4G.
 - Requêtes d'une partie relayée non comptées par le Budget ; durée maximale de 20 minutes d'une partie en ligne.
 - Pas de reconnexion automatique à un salon privé pendant l'attente ; pas de bouton « Rejoindre » d'un ami, pas de pseudo, pas de crédit d'expérience du profil du site pour les parties en ligne.
+
+## 18. Jeu de course : Toboggan Turbo (15 novembre 2026)
+
+Demande du propriétaire : pouvoir jouer à **Toboggan Turbo** (`games/toboggan-turbo/`, course de bouées en 3D, 8 concurrents, 7 ans et +) avec d'autres joueurs. Le jeu se branche sur le moteur des sections 5 à 17, sans rien y changer (`PROTOCOLE` reste à 2, aucun fichier du moteur, du lanceur ni du Worker n'est modifié).
+
+### La course dans le contrat de la simulation
+
+- **Toute la course est dans `jel-sim`** : réglages (`CONFIG`), génération du parc, physique, robots, objets. Le bloc n'utilise plus Three.js : la courbe de la piste (Catmull-Rom centripète, tranches d'un mètre) est écrite avec les quatre opérations et `JEL_TR.flottant` (`sin`, `cos`, `atan2`, `sqrt`), le hasard est gardé dans l'état (`etat.g`), `exp(−x)` est remplacé par une fraction. Le même parc et la même course, au chiffre près, sur tous les appareils et sur le serveur.
+- **Rien de lourd dans l'état** : la piste (tableaux typés, grille, table des sauts, pièces, boîtes et plaques posées) est refaite d'après le numéro du parc et gardée dans un cache indexé par ce numéro ; l'état ne contient que les 8 bouées, les délais de retour des pièces et des boîtes, les flaques et les canards (instantané de 9 Ko). `flottants: true`, sans `exporter` : le moteur garde l'état précédent, le jeu dessine une position intermédiaire (`vueCourse`).
+- **Places** : `camps: 4`. Deux modes, `duel` (2 places, mode par défaut) et `course` (4 places) ; les autres bouées (6 ou 4) sont toujours des robots du parc, conduits dans `pas` (`bot()` ne renvoie rien). Une place de joueur tenue par un robot (place libre, joueur parti ou absent) roule au niveau donné par `etat.ctl` (adresse et vitesse : `CONFIG.robotsPlace`). Grille de départ tirée de la graine (équité des camps).
+- **Cartes** : quatre parcs (`lagon`, `crique`, `jungle`, `nuit` : les niveaux solo 3, 8, 13 et 18) ou « au hasard ».
+- **Ordres** : `[1, mode, valeur]` (commande : volant direct de −100 à 100, ou position visée sur la paroi en millièmes de radian pour le doigt qui glisse), `[2]` (utiliser l'objet), `[3, bouée]` (dessin de sa bouée, avant le départ : en ligne, toutes les bouées ont les mêmes forces). Le jeu n'envoie la commande que lorsqu'elle change, un ordre par tick au plus (ordres groupés en relais : tick de 50 ms).
+- **Rythme** : tick de 50 ms, délai d'entrée d'un tick, trois pas de physique d'un soixantième de seconde par tick (la même physique qu'en solo).
+- **Fin** : quand toutes les places de joueurs sont arrivées (10 secondes de plus pour les autres bouées), ou au bout de 5 minutes ; `gagnant` = la place la mieux classée, un score par place.
+- **Sons et effets** : liste `sorties` du bloc, hors de l'état (jamais lue par la simulation, vidée par le jeu ; sur le serveur, elle est vidée dès qu'elle dépasse 400 entrées).
+- **Le solo ne passe pas par le moteur** : les 20 niveaux gardent leur boucle à 60 images par seconde, avec les mêmes fonctions (`creerCourse`, `majCourse`) ; les améliorations et les forces des bouées ne comptent qu'en solo.
+
+### Dans le jeu
+
+Écran titre : « Jouer » (solo, inchangé) et « Jouer en ligne » (`data-tr="jouer"`) → choix du mode (`data-act="trMode"`), du parc, puis « Partie rapide » (`data-tr="chercher"`), « Créer une partie privée » (`data-tr="creer"`) ou « Rejoindre avec un code » (`data-tr="rejoindre"`, pavé de touches `data-touche`). Salon : code en gros (`#trCode`), joueurs réunis (`#trJoueurs`), « Lancer avec n joueurs » (`#trLancer`), « Jouer contre des robots maintenant » (`data-tr="robot"`). En course : les autres joueurs s'appellent « Joueur 2 », « Joueur 3 » (aucun pseudo), le menu de pause n'arrête pas la course, bandeau de réseau (`#reseau`), bilan avec le classement des 8 bouées ; une course en ligne donne des pièces, mais ni étoiles, ni record, ni niveau débloqué. Hors connexion, site de test ou personne : la même course contre des robots, sur l'appareil.
+
+### Contrôles
+
+`node scripts/tester-temps-reel.mjs toboggan-turbo` (15 novembre 2026) : rejeu et reprise identiques, modes, robots (difficile contre facile 95 %, moyen contre facile 90 %, difficile contre moyen 85 %, équité 22 sur 40), Worker avec de faux Durable Objects (relais à 2 et à 4, absence, reprise, pair-à-pair, cartes, « lancer »). 0,18 ms de calcul par tick.
+
+### Ce qui reste
+
+- Essai sur de vrais téléphones (2 à 4), en wifi et en 4G : le délai entre le geste et la bouée (un tick, plus le trajet réseau) n'a été jugé que sur un ordinateur.
+- Une course ne dure qu'une à deux minutes : pas de reprise d'une course en ligne après sa fin, pas de revanche automatique (on relance une recherche).
