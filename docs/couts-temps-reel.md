@@ -26,6 +26,8 @@ Pages lues le 12 novembre 2026 (date de mise à jour affichée par chaque page) 
 
 Ce qui commande les coûts : **`setTimeout` et `setInterval` empêchent l'hibernation**, et un objet qui ne peut pas hiberner paie sa durée. La boucle des ticks d'une partie relayée garde donc son Durable Object éveillé toute la partie : **une partie relayée paie toute sa durée**. Une partie en pair-à-pair ou contre le robot ne paie presque rien.
 
+> **Jeu d'action (Le Dernier Sas, 14 novembre 2026)** : un joueur y envoie des dizaines d'ordres par seconde. En relais, le lanceur les groupe (un message toutes les 100 ms au plus) : **estimé**, 10 messages reçus par seconde et par joueur qui bouge et tire sans arrêt, soit environ 2 400 requêtes pour une partie relayée de 20 minutes à 4 joueurs (contre environ 100 pour un jeu de stratégie) ; durée facturée inchangée. Le Budget ne compte que la durée : `docs/cadrage-temps-reel.md`, section 17.
+
 ## 2. Mesuré (wrangler dev, 12 novembre 2026)
 
 Le Duel écrit à la fin de chaque partie une ligne « `[temps réel] mesure` » dans les journaux du Worker : durée, messages reçus et envoyés, octets, ticks, écarts de hachage, reprises. `node scripts/tester-temps-reel.mjs --wrangler` les recopie dans `captures/temps-reel/mesures-wrangler.json`.

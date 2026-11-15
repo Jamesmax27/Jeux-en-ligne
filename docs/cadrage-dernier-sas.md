@@ -1,6 +1,6 @@
 # « Le Dernier Sas » — cadrage (jeu de tir en vue subjective, solo puis coopération à 4)
 
-> État : décisions du propriétaire prises le 12 novembre 2026 (cahier des charges « Défense du bunker » et réponses ci-dessous). Développement en trois pull requests (section 9).
+> État : décisions du propriétaire prises le 12 novembre 2026 (cahier des charges « Défense du bunker » et réponses ci-dessous). Jeu solo publié le 13 novembre 2026 ; **coopération en ligne à 2, 3 ou 4 faite le 14 novembre 2026** (section 7).
 > À lire avec `docs/cadrage-temps-reel.md` (moteur temps réel), `CONSIGNES-JEU.md` et `CLAUDE.md`.
 
 ## 1. Ce que veut le propriétaire
@@ -21,7 +21,7 @@ Décisions du propriétaire (12 novembre 2026) :
 
 Choix de Claude (annoncés au propriétaire) : le moteur temps réel existant est étendu de 2 à 4 joueurs, sans nouvelle couche réseau ; commandes tactiles dès le départ (règle du site) ; V1 à V3 du cahier des charges (solo, coopération, boss, capacités, déblocages permanents), les PNJ alliés (V4) viendront plus tard.
 
-Hors périmètre pour l'instant : PNJ alliés recrutables, plusieurs zones du bunker, bouton « Rejoindre » d'un ami, classement par jeu, crédit d'expérience des manches en ligne.
+Hors périmètre pour l'instant : PNJ alliés recrutables, plusieurs zones du bunker, bouton « Rejoindre » d'un ami, classement par jeu, crédit d'expérience des manches en ligne, pseudos des joueurs.
 
 ## 2. Contraintes du site
 
@@ -75,15 +75,16 @@ Cibles : le sas d'abord, les tourelles et barricades sur le chemin, les joueurs 
 ```text
 index.html
 ├─ jel-i18n-textes, jel-i18n, jel-sauvegarde     (modules communs, posés par i18n-jeu.mjs)
+├─ jel-tr           moteur temps réel du site (recopié par i18n-jeu.mjs, depuis la version coopérative)
 ├─ sas-modeles      modèles 3D convertis (JSON + base64)
-├─ sas-sim          la simulation : fonctions pures (contrat jel-sim), données d'équilibrage en tête
+├─ jel-sim          la simulation : fonctions pures (contrat jel-sim), données d'équilibrage en tête
 ├─ sas-gl           moteur de rendu WebGL2 (instances, particules, ciel, sol)
 ├─ sas-creatures    modèles des aliens fabriqués par le code
 ├─ sas-son          sons Web Audio
 └─ script du jeu    commandes, caméra, interface, boutique, effets, sauvegarde
 ```
 
-**La simulation suit dès la version solo le contrat `jel-sim`** du moteur temps réel (`depart`, `valide`, `ordre`, `pas`, `bot`, `fin`, hasard tiré de l'état, aucune horloge, aucun accès à la page) : la version coopérative ne réécrit rien, elle branche la même simulation sur `JEL_TR`. En version solo, le bloc s'appelle `sas-sim` et un petit pilote local (même interface que `JEL_TR.Partie`) le fait tourner ; il devient `jel-sim` à la version coopérative.
+**La simulation suit dès la version solo le contrat `jel-sim`** du moteur temps réel (`depart`, `valide`, `ordre`, `pas`, `bot`, `fin`, hasard tiré de l'état, aucune horloge, aucun accès à la page) : la version coopérative ne réécrit rien, elle branche la même simulation sur `JEL_TR`. En version solo (versions 1 et 2 du jeu), le bloc s'appelait `sas-sim` et un petit pilote local (même interface que `JEL_TR.Partie`) le faisait tourner ; depuis la version 3, c'est le bloc `jel-sim` et le moteur `JEL_TR` le fait tourner, seul comme en ligne.
 
 - Tick de 50 ms (20 par seconde), délai d'entrée d'un tick ; rendu interpolé entre deux ticks.
 - Nombres à virgule avec seulement + − × ÷ et les fonctions garanties (`JEL_TR.flottant`), comme Nova Dominion.
@@ -106,19 +107,25 @@ Robot d'un camp (`ctl` ≠ 0, joueur absent en ligne) : le personnage se replie 
 - **Ordinateur** : déplacement ZQSD / WASD (lu par `event.code`) ou flèches, souris pour viser (pointeur verrouillé), clic pour tirer, R recharger, 1 à 5 armes (ou molette), G grenade, T mine, H kit de soins, C V F X capacités, Maj sprint, B boutique, Entrée lancer la vague, Échap ou P pause.
 - **Tactile** : manette virtuelle à gauche, glisser à droite pour viser, bouton de tir (tir automatique quand le viseur est sur un alien, réglable), boutons recharger, arme suivante, grenade, kit, capacités. Portrait et paysage.
 
-## 7. Coopération (pull requests 2 et 3)
+## 7. Coopération en ligne (fait le 14 novembre 2026)
 
-Principe : le moteur `jel-tr` et le Worker passent de 2 camps à 2–4, **sans changer le protocole des jeux à 2 joueurs** (Petites Planètes et Nova Dominion ne bougent pas).
+Le moteur temps réel du site savait déjà réunir 2 à 8 camps, relier les joueurs en étoile, mettre un robot à une place libre et faire repartir une partie (`docs/cadrage-temps-reel.md`, section 16) : l'ancienne « pull request 2 » n'a pas été nécessaire. Le jeu s'y branche ; le détail du moteur (code de salon, ordres groupés, contrôles) est dans `docs/cadrage-temps-reel.md`, **section 17**.
 
-- **Moteur** (`public/temps-reel/moteur.js`) : `camps` de 2 à 4 ; `Partie` connaît son camp parmi N et le nombre de joueurs ; un camp sans joueur est inactif (ni humain ni robot) ; après une coupure, la partie continue sur l'appareil avec des robots à la place des coéquipiers.
-- **Rencontre** (`rencontre.js`) : pour un jeu à plus de 2 camps, groupe de 2 à 4 joueurs. Partie rapide : départ dès 4 joueurs, ou quand le premier arrivé atteint la fin de ses 15 s (message `partir`) avec ceux qui sont là ; seul : partie solo. Partie privée : `salon=<code>` (4 caractères sans ambiguïté, tiré par le serveur), le créateur lance (`lancer`) ; les connexions d'un salon hibernent (aucun coût en attendant).
-- **Duel** (`duel.js`) : N jetons ; signalisation WebRTC en étoile (chaque joueur vers le camp 0, pair horloge) ; relais avec N connexions ; ordres groupés par message ; absence, robot et reprise par camp ; si un seul lien direct échoue, toute la partie passe par le relais.
-- **Lanceur** (`public/temps-reel/lanceur.js`) : pair horloge avec 1 à 3 canaux ; les autres n'ont qu'un canal, vers lui.
-- **Budget** : une partie relayée à 4 reçoit environ 10 messages par seconde et par joueur ; le Budget compte aussi les requêtes prévues, pas seulement la durée.
-- **Jeu** : menu « Partie rapide », « Créer une partie privée », « Rejoindre avec un code » (4 touches, aucun texte libre), salon avec les places, réanimation d'un coéquipier à terre (rester près de lui 3 s), marqueurs des coéquipiers, statistiques par joueur à la fin, vagues mises à l'échelle.
-- **Tests** : `tester-temps-reel.mjs` étendu (4 clients, latence, coupure du pair horloge, salon privé) ; non-régression des deux jeux à 2 joueurs.
+**Ce que voit le joueur**
 
-Le détail (messages, limites, coûts) sera écrit dans `docs/cadrage-temps-reel.md` avec la pull request 2.
+- Écran titre : « Jouer » (seul, inchangé, partie gardée) et « Jouer en ligne » : **Partie rapide** (recherche de 15 s), **Créer une partie privée** (un code de 4 caractères s'affiche en très gros), **Rejoindre avec un code** (pavé de touches à l'écran : aucun texte libre).
+- Salon : joueurs réunis sur 4, « Lancer avec n joueurs » dès 2 (n'importe quel membre), « Jouer avec des robots maintenant », « Annuler ». À 4, la partie commence d'elle-même.
+- Quatre personnages dans toutes les parties en ligne : les places libres sont tenues par des **robots coéquipiers** (niveau moyen), qui gardent le sas, achètent un fusil et une tourelle, tirent, relèvent un joueur à terre. Hors connexion ou sans personne : la partie se joue sur l'appareil avec trois robots.
+- En partie : coéquipiers de couleur avec leur étiquette (« Joueur 2 », « Robot 3 »), liste de l'équipe et de sa vie, tirs visibles, radar ; **réanimation** : rester 3 s près d'un coéquipier à terre (anneau rouge au sol, jauge) ; à terre, on attend 40 s au plus d'être relevé, sinon on revient à la vague suivante ; la partie est perdue quand le sas tombe ou que plus personne n'est debout.
+- **Économie mixte** : chacun sa bourse (crédits des aliens qu'il tue) ; la prime de fin de vague grandit avec l'équipe et se partage à parts égales ; chacun achète pour lui (armes, objets) ou pour tous (tourelles, barricades, réparation du sas).
+- Pas de pause en ligne : le menu s'ouvre, la partie continue ; « Quitter la partie » laisse la place à un robot. Dans la boutique, le compte à rebours continue ; la vague part quand tout le monde est prêt.
+- Fin : bilan par joueur (score, aliens abattus), expérience et grade comme seul. Le record de l'écran titre reste celui des parties jouées seul. Une partie en ligne n'est pas gardée pour « Continuer ».
+
+**Dans la simulation** (`jel-sim`) : mode `coop` (4 camps, une seule équipe), `depart` lit `config.camps` et `config.ctl`, échelle des vagues fixée au départ (`etat.ech` : joueur 1, robot 0,5 ; aliens × (1 + 0,6 × (échelle − 1)), sas et gros aliens plus solides, prime plus grosse), seconde chance réservée au jeu seul, robot coéquipier (achats, réanimation, grenades au niveau 3, chasse aux derniers aliens), `fin` sans équipe gagnante, `essais` pour le robot de contrôle. Correction au passage : un gros alien pouvait rester coincé derrière un rocher (il glisse maintenant du côté qui le rapproche de sa cible).
+
+**Dans le jeu** : la classe `PartieLocale` a disparu ; deux parties `JEL_TR` (celle du joueur, la démonstration de l'écran titre) ; `ordonner()` applique tout de suite un ordre quand le temps est arrêté (boutique d'une partie sur l'appareil) ; sauvegarde par l'instantané du moteur (`VERSION_ETAT` 2 : une partie gardée par la version 2 du jeu reprend au début de sa vague).
+
+**Limites connues** : une partie en ligne s'arrête sur le serveur au bout de 20 minutes (chacun continue avec des robots) ; pas de pseudo ; pas de reconnexion automatique à un salon privé pendant l'attente ; essai sur de vrais téléphones à faire.
 
 ## 8. Critères d'acceptation
 
@@ -127,6 +134,6 @@ Le détail (messages, limites, coûts) sera écrit dans `docs/cadrage-temps-reel
 
 ## 9. Découpage
 
-1. **Pull request 1 — jeu solo** (`dernier-sas-solo`) : `games/le-dernier-sas/`, ce document, `CLAUDE.md`. Publié dès les contrôles verts.
-2. **Pull request 2 — moteur à 4 joueurs** : `jel-tr`, Rencontre, Duel, Budget, lanceur, tests, documentation ; jeux à 2 joueurs recopiés sans changement de comportement.
-3. **Pull request 3 — coopération dans le jeu** : `"temps_reel": true`, blocs `jel-tr` et `jel-sim`, menus et salon, réanimation, textes, politique de confidentialité si besoin.
+1. **Pull request 1 — jeu solo** (`dernier-sas-solo`, fusionnée le 13 novembre 2026) : `games/le-dernier-sas/`, ce document, `CLAUDE.md`.
+2. **Interface tactile** (`dernier-sas-mobile`, 14 novembre 2026) : boutons agrandis, plein écran, aide à la visée ; version 2.
+3. **Coopération** (`dernier-sas-coop`, 14 novembre 2026, par-dessus la précédente) : `"temps_reel": true`, blocs `jel-tr` et `jel-sim`, menus et salon, code de salon dans le moteur, réanimation, textes, robot de contrôle, politique de confidentialité ; version 3. Le moteur à 4 joueurs prévu en pull request à part existait déjà (modes à plusieurs du 12 novembre).
