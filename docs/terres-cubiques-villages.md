@@ -54,19 +54,39 @@ Le mode test ne donne aucun avantage au joueur. Une partie jouée en mode test g
   - inventaire, humeur (0 à 100) et mémoire (`souvenir`).
 - Nom de village : syllabes tirées de la graine (`villageNom`).
 
-## 6. Étapes
+## 6. Métiers, stocks et décisions (étape 3)
+
+Tout est dans la section « Vie des villages » du code. Les réglages sont dans `DURABLE`, `CIBLES`, `REPAS`, `CHAINES`, `METIERS_ORDRE` et `LOOK`.
+
+- **Stock commun** (`vie.stock`, sauvegarde `vv`) et sac de chaque villageois (`fiche.inv`). Un villageois livre au stock quand son sac est plein. Les anciens compteurs de la demande #347 (bois et repas) passent par ce stock.
+- **Métiers** : un village donne les métiers dans l'ordre de `METIERS_ORDRE`. Le pêcheur n'existe que s'il y a de l'eau. Un enfant devenu adulte prend le premier métier manquant. Il y a 8 tenues (`LOOK`).
+- **Décisions** (`candidats`, `choisirAction`) : toutes les 0,5 à 1 s, chaque action reçoit un score, et le villageois prend la meilleure. Le score tient compte du métier et du besoin du village (stock sous sa cible). La gestion durable passe avant le reste. Un métier dont le village n'a pas besoin se repose (« promener »). Le mode test affiche l'action, le score et la ressource qui manque.
+- **Actions** : livrer, couper, cueillir et replanter, semer et récolter, miner, nourrir, abattre, tondre, pêcher, transformer, construire (chantier de la demande #347), patrouiller (les gardes aussi la nuit), service, attendre, promener.
+- **Chaînes** (`CHAINES`) : farine, pain, fer, outils, charbon de bois, pierre taillée, tissu, poterie. Elles se font pour l'instant à l'atelier de la place ; les bâtiments prévus viendront aux étapes 4 et 7.
+- **Chemins** : A* sur le terrain (marches d'un bloc, chutes de 3 au plus, ni eau ni porte fermée), `SIM.chemins` calculs par image au plus, mis en cache 20 s. Un villageois coincé passe la marche. En fin de travail, il revient au village par un chemin (`vieRetour`).
+- **Gestion durable** (consigne, section 6 bis) :
+  - **bois** : jamais sous `DURABLE.arbres` arbres adultes autour du village, en comptant les coupes en cours. Tout arbre abattu donne des pousses, replantées aussitôt dans la zone forestière (`foret`). Une pousse devient un arbre en un jour du jeu (`POUSSES`, `pousser`), même pendant l'absence du joueur. Le joueur trouve aussi des pousses dans les feuilles.
+  - **cultures** : chaque récolte est ressemée aussitôt, et `DURABLE.graines` graines restent toujours en réserve.
+  - **animaux** : le couple de chaque espèce n'est jamais abattu. L'éleveur nourrit les animaux avec du blé du stock pour qu'ils se reproduisent.
+  - **pierre et minerais** : une mine en escalier puis en galerie (`planMine`). Elle ne creuse jamais vers l'eau, ni dans un bloc d'un joueur, ni sous une maison.
+  - **charbon** : le charbon de bois remplace le charbon de mine.
+  - **impasse** : si rien n'avance pendant `DURABLE.impasse` s, le village passe en « rétablissement » (scores de plantation et de récolte relevés) et le journal le note.
+  - **consommation** : un repas par habitant et par jour, sinon l'humeur baisse. Une naissance demande aussi des réserves de nourriture.
+- **Blocs du joueur** : un villageois ne coupe, ne mine et ne récolte jamais un bloc d'origine `joueur`, même un arbre né d'une pousse plantée par le joueur.
+
+## 7. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
 | 1 | Analyse et rapport | fait (16/11) |
 | 2 | Carte agrandie, 5 emplacements, mode test, proximité et modèle de données | fait (16/11, branche `terres-cubiques-monde-infini`) |
-| 3 | Métiers, récolte, stocks, décisions (IA utilitaire), gestion durable des ressources | à faire |
+| 3 | Métiers, récolte, stocks, décisions (IA utilitaire), gestion durable des ressources | fait (16/11, branche `terres-cubiques-etape-3`) |
 | 4 | Construction autonome (5 bâtiments) avec progression visible | à faire |
 | 5 | Synchronisation multijoueur | hors périmètre (choix du 16/11) |
 | 6 à 12 | Échanges, 25 autres bâtiments, naissances et nouveaux villages, dialogues, interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
 
-## 7. Essais
+## 8. Essais
 
-- `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test.
+- `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts).
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
 - Contrôles habituels : `validate-games.mjs --jouer`, `tester-sauvegarde.mjs`, `check-i18n.js`, `verifier-seo.mjs`.
