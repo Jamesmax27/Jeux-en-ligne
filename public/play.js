@@ -36,6 +36,8 @@ import { brancherMultijoueur, verifierPartie, RE_PARTIE } from './multijoueur/la
 // Jeux en temps réel 1 contre 1 (docs/cadrage-temps-reel.md) : recherche, WebRTC, relais.
 import { brancherTempsReel } from './temps-reel/lanceur.js';
 import { annoncer } from './amis.js';
+// Grosses données des jeux (stockage.js : mondes, plusieurs parties, fichiers exportés) : IndexedDB du site.
+import { traiterStockage } from './stockage-lanceur.js';
 import { urlJeu, urlAccueil, urlProposer, urlAmis } from './chemins.js';
 import {
   t, getLang, demarrerLangue, surChangementLangue, majSeo,
@@ -238,7 +240,8 @@ function proteger(html) {
   // Invitation « Rejoindre » (une seule fois : un jeu relancé dans une autre langue n'y retourne pas).
   const rejoindre = invitation ? `window.JEL_REJOINDRE=${JSON.stringify(invitation)};` : '';
   invitation = null;
-  const reglages = `<script>window.JEL_LANG=${JSON.stringify(getLang())};window.JEL_SAUVEGARDES=${sauvegardes};${rejoindre}</script>`;
+  // JEL_STOCKAGE : le lanceur garde les grosses données du jeu (stockage.js) dans l'IndexedDB du site.
+  const reglages = `<script>window.JEL_LANG=${JSON.stringify(getLang())};window.JEL_SAUVEGARDES=${sauvegardes};window.JEL_STOCKAGE=1;${rejoindre}</script>`;
   return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${reglages}${SCRIPT_SUIVI}${html.slice(debut.length)}`;
 }
 
@@ -314,6 +317,7 @@ function garderPourHorsLigne(jeu) {
 // - « jel-fin » (SCRIPT_SUIVI, FMG.reportEnd) : victoire ou défaite, avec le niveau ;
 // - « jel-termine » (SCRIPT_SUIVI, FMG.reportComplete) : tout le jeu est terminé, avec ses étoiles (profil.js) ;
 // - « jel-sauvegarde » (save.js) : progression du jeu à garder sur l'appareil ;
+// - « jel-stockage » (stockage.js) : grosses données du jeu (IndexedDB du site), fichier à exporter ;
 // - « jel-multi » (multijoueur/moteur.js) : partie en ligne d'un jeu multijoueur ;
 // - « jel-tr » (temps-reel/moteur.js) : partie en ligne d'un jeu en temps réel.
 addEventListener('message', (evenement) => {
@@ -343,6 +347,14 @@ addEventListener('message', (evenement) => {
   }
   if (donnees?.type === 'jel-sauvegarde' && typeof donnees.cle === 'string') {
     enregistrerSauvegarde(donnees.cle, donnees.valeur);
+    return;
+  }
+  if (donnees?.type === 'jel-stockage' && Number.isInteger(donnees.id) && typeof donnees.op === 'string') {
+    const fenetre = evenement.source, jeuId = jeuCourant?.id;
+    traiterStockage(donnees, jeuId).then((reponse) => {
+      // le jeu a pu être relancé entre-temps (autre langue) : la réponse ne va qu'à la fenêtre qui a demandé
+      try { fenetre.postMessage({ type: 'jel-stockage', id: donnees.id, ...reponse }, '*'); } catch { /* fenêtre fermée */ }
+    });
     return;
   }
   if (!donnees || donnees.type !== 'jel-langue' || typeof donnees.lang !== 'string') return;

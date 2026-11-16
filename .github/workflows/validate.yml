@@ -63,6 +63,8 @@ on:
       - "games/**"
       - "public/i18n/**"
       - "public/save.js"
+      - "public/stockage.js"
+      - "public/stockage-lanceur.js"
       - "public/taxonomie.js"
       - "public/style.css"
       - "public/chemins.js"
@@ -94,6 +96,7 @@ on:
       - "scripts/check-i18n.js"
       - "scripts/i18n-jeu.mjs"
       - "scripts/tester-sauvegarde.mjs"
+      - "scripts/tester-stockage.mjs"
       - "scripts/jaquette-sans-texte.mjs"
       - "scripts/icones/**"
       - "scripts/build-catalog.mjs"
@@ -194,7 +197,7 @@ jobs:
           tous=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then tous=1; fi
           # Modules communs de traduction et de sauvegarde : recopiés dans chaque jeu, donc tous les jeux sont concernés.
-          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|slugs-jeux\.mjs|classes-jeu\.mjs|jaquette-sans-texte\.mjs|tester-sauvegarde\.mjs)|public/i18n/i18n\.js|public/save\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|slugs-jeux\.mjs|classes-jeu\.mjs|jaquette-sans-texte\.mjs|tester-sauvegarde\.mjs|tester-stockage\.mjs)|public/i18n/i18n\.js|public/save\.js|public/stockage(-lanceur)?\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
           # Textes, taxonomie, gabarits (textes des catégories compris), générateur
           # des pages et pages du site : le site est testé avec un seul jeu.
           site=0
@@ -307,6 +310,12 @@ jobs:
       - name: Contrôler la sauvegarde
         if: ${{ !cancelled() }}
         run: node scripts/tester-sauvegarde.mjs ${{ steps.lot.outputs.liste }}
+
+      # Stockage des grosses données (public/stockage.js, facultatif) dans le lanceur :
+      # IndexedDB du site, isolement entre jeux, rechargement, export (jeux qui ont le bloc jel-stockage).
+      - name: Contrôler le stockage
+        if: ${{ !cancelled() }}
+        run: node scripts/tester-stockage.mjs --seulement ${{ steps.lot.outputs.liste }}
 
       # Traductions des jeux (5 langues), sans les pages du site (job « controle »).
       - name: Contrôler les traductions des jeux
