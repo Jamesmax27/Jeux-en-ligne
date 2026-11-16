@@ -21,6 +21,10 @@
 // et, pour un jeu en temps réel (game.json : "temps_reel": true), de sa copie
 // du moteur public/temps-reel/moteur.js dans
 //   <script id="jel-tr"> … </script>      (docs/cadrage-temps-reel.md)
+// et, pour un jeu qui garde de grosses données (facultatif, bloc ajouté à la
+// main la première fois, juste après jel-sauvegarde), de sa copie du module
+// public/stockage.js dans
+//   <script id="jel-stockage"> … </script>   (mis à jour s'il est présent)
 //
 // 1. Recopie des modules (sans --assembler) : remplace les copies par la
 //    version actuelle des modules (à lancer après chaque modification de
@@ -77,8 +81,10 @@ const moduleSauvegarde = (await readFile(path.join(RACINE, 'public', 'save.js'),
 const moduleMulti = (await readFile(path.join(RACINE, 'public', 'multijoueur', 'moteur.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
 const moduleTR = (await readFile(path.join(RACINE, 'public', 'temps-reel', 'moteur.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
 const RE_TR = /(<script\b[^>]*\bid=["']jel-tr["'][^>]*>)[\s\S]*?(<\/script>)/i;
-if (/<\/script/i.test(module + moduleSauvegarde + moduleMulti + moduleTR)) {
-  console.error('✗ public/i18n/i18n.js, public/save.js, public/multijoueur/moteur.js ou public/temps-reel/moteur.js contient « </script » : la copie couperait les jeux.');
+const moduleStockage = (await readFile(path.join(RACINE, 'public', 'stockage.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
+const RE_STOCKAGE = /(<script\b[^>]*\bid=["']jel-stockage["'][^>]*>)[\s\S]*?(<\/script>)/i;
+if (/<\/script/i.test(module + moduleSauvegarde + moduleMulti + moduleTR + moduleStockage)) {
+  console.error('✗ public/i18n/i18n.js, public/save.js, public/stockage.js, public/multijoueur/moteur.js ou public/temps-reel/moteur.js contient « </script » : la copie couperait les jeux.');
   process.exit(1);
 }
 if (/<script\b/i.test(moduleTR)) {
@@ -115,7 +121,7 @@ async function recopierModule() {
     if (!RE_MODULE.test(html)) { console.log(`  –  ${id} : pas de module jel-i18n, ignoré`); continue; }
     const multi = await estMultijoueur(path.join(DOSSIER_JEUX, id, 'game.json'));
     const tr = await estTempsReel(path.join(DOSSIER_JEUX, id, 'game.json'));
-    const nouveau = rangerTempsReel(rangerMulti(rangerSauvegarde(html.replace(RE_MODULE, (_, ouverture, fermeture) => `${ouverture}\n${module}\n${fermeture}`)), multi), tr);
+    const nouveau = rangerStockage(rangerTempsReel(rangerMulti(rangerSauvegarde(html.replace(RE_MODULE, (_, ouverture, fermeture) => `${ouverture}\n${module}\n${fermeture}`)), multi), tr));
     if (nouveau !== html) {
       await writeFile(chemin, nouveau, 'utf8');
       modifies++;
@@ -195,7 +201,7 @@ async function rangerTextes(id, cheminHtml, textes, multi, tr = false) {
   const moduleComplet = `<script id="jel-i18n">\n${module}\n</script>`;
   if (RE_MODULE.test(html)) html = html.replace(RE_MODULE, (_, ouverture, fermeture) => `${ouverture}\n${module}\n${fermeture}`);
   else html = html.replace(RE_TEXTES, (bloc) => `${bloc}\n${moduleComplet}`);
-  await writeFile(cheminHtml, rangerTempsReel(rangerMulti(rangerSauvegarde(html), multi), tr), 'utf8');
+  await writeFile(cheminHtml, rangerStockage(rangerTempsReel(rangerMulti(rangerSauvegarde(html), multi), tr)), 'utf8');
 }
 
 async function estMultijoueur(cheminFiche) {
@@ -226,6 +232,11 @@ function rangerMulti(html, multi) {
   if (!m) return html;
   const fin = m.index + m[0].length;
   return `${html.slice(0, fin)}\n<script id="jel-multi">\n${moduleMulti}\n</script>${html.slice(fin)}`;
+}
+
+// Module de stockage (public/stockage.js) : facultatif, mis à jour s'il est déjà là.
+function rangerStockage(html) {
+  return RE_STOCKAGE.test(html) ? html.replace(RE_STOCKAGE, (_, ouverture, fermeture) => `${ouverture}\n${moduleStockage}\n${fermeture}`) : html;
 }
 
 // Module de sauvegarde (public/save.js) : mis à jour, ou ajouté juste après le
