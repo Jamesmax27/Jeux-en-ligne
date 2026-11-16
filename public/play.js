@@ -96,6 +96,9 @@ function afficherMessage(titre, texte) {
 // Arrivée hors connexion depuis une fiche qui n'était pas gardée (sw.js) : le
 // retour vers cette fiche tournerait en rond, il mène donc à l'accueil.
 const SANS_FICHE = new URLSearchParams(location.search).has('depuis');
+// « ?debug=1 » tapé à la main dans l'adresse : mode test du jeu (le cadre isolé ne voit pas l'adresse).
+// Rien d'autre ne l'active ; un jeu qui n'a pas de mode test l'ignore.
+const MODE_TEST = new URLSearchParams(location.search).get('debug') === '1';
 
 // Textes du lanceur qui dépendent de la langue (titre, plein écran, onglet),
 // et bouton retour : vers la fiche du jeu dans la langue choisie (en français
@@ -241,7 +244,7 @@ function proteger(html) {
   const rejoindre = invitation ? `window.JEL_REJOINDRE=${JSON.stringify(invitation)};` : '';
   invitation = null;
   // JEL_STOCKAGE : le lanceur garde les grosses données du jeu (stockage.js) dans l'IndexedDB du site.
-  const reglages = `<script>window.JEL_LANG=${JSON.stringify(getLang())};window.JEL_SAUVEGARDES=${sauvegardes};window.JEL_STOCKAGE=1;${rejoindre}</script>`;
+  const reglages = `<script>window.JEL_LANG=${JSON.stringify(getLang())};window.JEL_SAUVEGARDES=${sauvegardes};window.JEL_STOCKAGE=1;${MODE_TEST ? 'window.JEL_DEBUG=1;' : ''}${rejoindre}</script>`;
   return `${debut}<meta http-equiv="Content-Security-Policy" content="${CSP_JEU}">${reglages}${SCRIPT_SUIVI}${html.slice(debut.length)}`;
 }
 

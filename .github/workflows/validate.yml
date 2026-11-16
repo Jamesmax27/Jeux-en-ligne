@@ -97,6 +97,8 @@ on:
       - "scripts/i18n-jeu.mjs"
       - "scripts/tester-sauvegarde.mjs"
       - "scripts/tester-stockage.mjs"
+      - "scripts/tester-terres-cubiques.mjs"
+      - "scripts/terres-cubiques/**"
       - "scripts/jaquette-sans-texte.mjs"
       - "scripts/icones/**"
       - "scripts/build-catalog.mjs"
@@ -177,6 +179,10 @@ jobs:
           fi
           # (bash de GitHub : -e et pipefail ; d'où « || true » et les « if » plutôt que « && ».)
           ids=$(printf '%s\n' "$fichiers" | { grep '^games/' || true; } | cut -d/ -f2 | sort -u | while read -r id; do if [ -n "$id" ] && [ -d "games/$id" ]; then echo "$id"; fi; done | tr '\n' ' ')
+          # Essais de Terres Cubiques modifiés : ce jeu passe aussi au robot (et à ses essais).
+          if printf '%s\n' "$fichiers" | grep -Eq '^scripts/(tester-terres-cubiques\.mjs|terres-cubiques/)'; then
+            ids=$(printf '%s\n' $ids terres-cubiques | sort -u | tr '\n' ' ')
+          fi
           # Moteur multijoueur (recopié dans chaque jeu multijoueur) : ces jeux passent aussi au robot.
           if printf '%s\n' "$fichiers" | grep -q '^public/multijoueur/moteur\.js$'; then
             ids=$(printf '%s\n' $ids $( (grep -l '"multijoueur": *true' games/*/game.json || true) | cut -d/ -f2) | sort -u | tr '\n' ' ')
@@ -316,6 +322,12 @@ jobs:
       - name: Contrôler le stockage
         if: ${{ !cancelled() }}
         run: node scripts/tester-stockage.mjs --seulement ${{ steps.lot.outputs.liste }}
+
+      # Terres Cubiques (docs/terres-cubiques-villages.md) : ancienne partie gardée à l'identique,
+      # monde par morceaux, emplacements, villages par proximité, mode test (si ce jeu est dans le lot).
+      - name: Essayer Terres Cubiques
+        if: ${{ !cancelled() }}
+        run: node scripts/tester-terres-cubiques.mjs --seulement ${{ steps.lot.outputs.liste }}
 
       # Traductions des jeux (5 langues), sans les pages du site (job « controle »).
       - name: Contrôler les traductions des jeux
