@@ -87,7 +87,20 @@ Tout est dans la section « Construction autonome » du code (après « Vie des 
 - **Blocs** : chaque bloc posé a l'origine `village`. Un bloc du joueur n'est jamais remplacé (le chantier le contourne).
 - **Sauvegarde** : le chantier en cours (type, sol, variante, avancement, matériaux déjà apportés) et les bâtiments finis (`vie.bats`, parcelles des fermes `vie.champs`, que les fermiers sèment et récoltent).
 
-## 8. Étapes
+## 8. Échanges et marché (étape 6)
+
+Tout est dans la section « Échanges et marché » du code. Les réglages sont dans `VALEURS_TROC` et `ECHANGE`. Le `TROC` d'avant, celui des échanges avec le joueur (demande #347), ne change pas.
+
+- **Table de troc** (`VALEURS_TROC`) : une valeur fixe en « parts » pour chaque ressource. Par exemple, le bois et le blé valent 1, le pain 2, la farine 3, le fer 6 et les outils 14.
+- **Échange entre villageois** (`pisteTroc`, `trocAction`) : une ressource manque au travail d'un villageois (entrée d'une de ses chaînes ou matériau du chantier), et le stock n'en a plus. Il va alors voir le villageois le plus proche qui en porte dans son sac, c'est-à-dire le producteur avant sa livraison (40 blocs au plus). Le porteur s'arrête et l'attend. Les bulles montrent la demande, puis l'accord ou le refus, puis le remerciement, avec le nom de la ressource.
+- **Paiement** (`payer`) : en marchandises du sac de même valeur, sauf ce que le payeur vient de recevoir et ce dont ses chaînes ont besoin. Ce qui reste devient une dette (`fiche.dettes`), rendue sur la production suivante (`reglerDettes` après une transformation) ou à la livraison suivante.
+- **Refus** (`refusTroc`) : le porteur refuse s'il en a besoin lui-même (entrée de ses chaînes, matériaux du bâtisseur), si son humeur est sous `ECHANGE.humeurMin`, ou si le demandeur lui doit déjà `ECHANGE.detteMax` parts. Le demandeur refusé perd un peu d'humeur et attend `ECHANGE.attente` s avant de redemander. Un échange réussi rend les deux plus contents.
+- **Marché** (gabarit `marche` : deux étals sous une toile rayée, comptoirs et coffres) : le planificateur le bâtit quand le village a 3 métiers différents (`ECHANGE.metiers`). Un adulte devient alors marchand s'il n'y en a pas (`nommerMarchand` : un métier en double, sinon le moins urgent). Le marchand range sur les étals (`vie.etal`) ce que le stock a au-delà de 2 fois sa cible. Il ramène au stock ce dont le village manque, et le reste du temps il tient son étal.
+- **Achat au marché** : quand personne ne porte la ressource qui manque, le villageois va au marché. Il la prend sur l'étal en payant en marchandises, et le marché fait crédit du reste. Il attend le marchand s'il n'est pas à son étal.
+- Les échanges avec le joueur et les caravanes (étape 10) passeront par ces étals et cette table.
+- **Sauvegarde** : étals et compteurs des échanges (`vie.etal`, `vie.troc`), dettes de chaque villageois (13ᵉ champ de la fiche). Le mode test affiche les étals et les compteurs (échanges, refus, achats au marché), et le journal note chaque échange.
+
+## 9. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
@@ -96,10 +109,11 @@ Tout est dans la section « Construction autonome » du code (après « Vie des 
 | 3 | Métiers, récolte, stocks, décisions (IA utilitaire), gestion durable des ressources | fait (16/11, branche `terres-cubiques-etape-3`) |
 | 4 | Construction autonome (5 bâtiments) avec progression visible | fait (16/11, branche `terres-cubiques-etape-4`) |
 | 5 | Synchronisation multijoueur | hors périmètre (choix du 16/11) |
-| 6 à 12 | Échanges, 25 autres bâtiments, naissances et nouveaux villages, dialogues, interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
+| 6 | Échanges et marché | fait (16/11, branche `terres-cubiques-etape-6`) |
+| 7 à 12 | 25 autres bâtiments, naissances et nouveaux villages, dialogues, interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
 
-## 9. Essais
+## 10. Essais
 
-- `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement).
+- `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture).
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
 - Contrôles habituels : `validate-games.mjs --jouer`, `tester-sauvegarde.mjs`, `check-i18n.js`, `verifier-seo.mjs`.
