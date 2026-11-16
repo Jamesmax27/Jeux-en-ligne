@@ -44,7 +44,7 @@ Le mode test ne donne aucun avantage au joueur. Une partie jouée en mode test g
 
 ## 5. Villages par proximité et fiches (étape 2)
 
-- `SIM` : rayon de simulation 48 blocs, décisions toutes les 0,5 à 1 s, 4 calculs de chemin par tick au plus, 20 villageois actifs par village, mémoire de 10 événements.
+- `SIM` : rayon de simulation 48 blocs, mesuré depuis le bord du village (centre moins son rayon R de 14 ou 18 blocs : ses chantiers et sa forêt dépassent le plateau ; depuis l'étape 4), décisions toutes les 0,5 à 1 s, 4 calculs de chemin par tick au plus, 20 villageois actifs par village, mémoire de 10 événements.
 - Hors du rayon, le village est **figé** (aucun calcul). Au retour d'un joueur, chacun est remis à sa place de l'heure (`vilRattrapage`, premier rattrapage). Les villageois apparaissent à moins de 112 blocs et sont rangés au-delà de 160 (`ACTIVATION`).
 - Fiche de chaque villageois (`village.pop`, sauvegarde `vp`) :
   - prénom (liste `PRENOMS`, plus de 100) ;
@@ -74,19 +74,32 @@ Tout est dans la section « Vie des villages » du code. Les réglages sont dans
   - **consommation** : un repas par habitant et par jour, sinon l'humeur baisse. Une naissance demande aussi des réserves de nourriture.
 - **Blocs du joueur** : un villageois ne coupe, ne mine et ne récolte jamais un bloc d'origine `joueur`, même un arbre né d'une pousse plantée par le joueur.
 
-## 7. Étapes
+## 7. Construction autonome (étape 4)
+
+Tout est dans la section « Construction autonome » du code (après « Vie des villages »).
+
+- **Gabarits** (`GABARITS`) : 5 bâtiments décrits couche par couche, avec une lettre par sorte de bloc. Ce sont la maison (2 lits), le puits, la cabane de bûcheron (porte, coffre), la ferme (parcelles) et l'entrepôt. Les murs, le toit et le sol prennent les matériaux du biome du village, avec 3 variantes (`styleBat`). Les 25 autres bâtiments viendront à l'étape 7.
+- **Emplacement** (`siteBat`) : autour du village, hors des maisons, des routes, du champ, de l'eau et des blocs du joueur. Le terrain doit être presque plat (2 blocs d'écart au plus). Il est aplani avant les murs, et un chemin relie la porte à la place.
+- **Planificateur** (`planifier`, toutes les 30 s de simulation, un chantier à la fois) : par ordre de priorité, le logement (plus d'habitants que de lits, `PLAFOND_MAISONS` maisons au plus), la nourriture (une ferme si les repas manquent), la production (une cabane s'il y a un bûcheron, un entrepôt quand le stock dépasse 160), puis les services (un puits). Un bâtiment qui n'a pas d'emplacement laisse sa place au suivant. Une maison se bâtit sur le plateau du village s'il reste de la place, sinon autour.
+- **Bâtisseur** (`construire`) : il va chercher au stock commun les matériaux des 40 blocs suivants (24 unités au plus, `coutBloc` : un demi de bois ou une pierre par bloc), puis pose un bloc toutes les 0,6 s. Il travaille de devant la porte, ou à côté du bloc, et ne se laisse jamais enfermer. Un villageois qui gêne est poussé dehors, mais un joueur est attendu. Dans un village sans bâtisseur, les autres adultes (sauf les gardes) bâtissent à sa place.
+- **Pause** : s'il manque un matériau, le chantier s'arrête et l'étiquette le dit. Le besoin de ce matériau devient maximal, ce qui envoie le bûcheron ou le mineur le chercher. Le chantier reprend dès la livraison.
+- **Progression visible** : un contour doré au sol et une étiquette au-dessus du chantier (« Cabane de bûcheron · 42 % », en rouge pendant une pause). Elle n'apparaît qu'à moins de 40 blocs, et seulement si le chantier est dans le champ de la caméra. Un message s'affiche près du village au début et à la fin du chantier, et le journal du mode test les note.
+- **Blocs** : chaque bloc posé a l'origine `village`. Un bloc du joueur n'est jamais remplacé (le chantier le contourne).
+- **Sauvegarde** : le chantier en cours (type, sol, variante, avancement, matériaux déjà apportés) et les bâtiments finis (`vie.bats`, parcelles des fermes `vie.champs`, que les fermiers sèment et récoltent).
+
+## 8. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
 | 1 | Analyse et rapport | fait (16/11) |
 | 2 | Carte agrandie, 5 emplacements, mode test, proximité et modèle de données | fait (16/11, branche `terres-cubiques-monde-infini`) |
 | 3 | Métiers, récolte, stocks, décisions (IA utilitaire), gestion durable des ressources | fait (16/11, branche `terres-cubiques-etape-3`) |
-| 4 | Construction autonome (5 bâtiments) avec progression visible | à faire |
+| 4 | Construction autonome (5 bâtiments) avec progression visible | fait (16/11, branche `terres-cubiques-etape-4`) |
 | 5 | Synchronisation multijoueur | hors périmètre (choix du 16/11) |
 | 6 à 12 | Échanges, 25 autres bâtiments, naissances et nouveaux villages, dialogues, interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
 
-## 8. Essais
+## 9. Essais
 
-- `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts).
+- `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement).
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
 - Contrôles habituels : `validate-games.mjs --jouer`, `tester-sauvegarde.mjs`, `check-i18n.js`, `verifier-seo.mjs`.
