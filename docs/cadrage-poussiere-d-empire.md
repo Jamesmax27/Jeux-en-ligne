@@ -1,6 +1,6 @@
 # « Poussière d'Empire » — cadrage (conquête spatiale à cinq échelles, campagne solo contre des robots)
 
-> État : proposition à valider par le propriétaire (16 novembre 2026). Aucun code n'est écrit avant sa validation.
+> État : **validé par le propriétaire le 16 novembre 2026** (réponses : 10 ans et +, badge donné pour l'acte 1, dézoom du lot 1 vers la silhouette ; les autres choix par défaut de la section 16 sont retenus). Lot 1 en cours sur la branche `poussiere-lot1`.
 > À lire avec `docs/cadrage-temps-reel.md` (section 5 : contrat `jel-sim`), `docs/cadrage-dernier-sas.md` (section 4 : simulation solo au contrat `jel-sim` avec un pilote local), `docs/cadrage-fidelisation.md` (profil joueur), `CONSIGNES-JEU.md` et `CLAUDE.md`.
 > Ce document sera versionné sous `docs/cadrage-poussiere-d-empire.md` (pull request 0, document seul). Les tailles et temps donnés ici sont des estimations ; chaque pull request de lot publiera les mesures.
 
