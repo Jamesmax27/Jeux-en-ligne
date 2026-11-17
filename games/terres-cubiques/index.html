@@ -9798,7 +9798,7 @@ function rattraperVillage(v){ const w=vie(v), now=maintenant();
   w.rattrapage=bilan; w.prog=w.t; saveDirty=true;
   journal('rattrapage',{village:villageNom(v),j:bilan.j.toFixed(2),r:Object.entries(bilan.recolte).map(([r,n])=>nomRes(r)+' ×'+n).join(', ')||'—',b:bilan.blocs});
   return bilan; }
-function etapeChantier(v){ const eco=vilEco(v), S=eco.s, ys=new Set(); if(!S) return {n:0,couches:0}; if(!S.plan) planChantier(v,S); if(!S.credit) S.credit={};
+function etapeChantier(v){ const eco=vilEco(v), S=eco.s, ys=new Set(); if(!S) return {n:0,couches:0}; if(!S.plan) planChantier(v,S); if(!S.credit) S.credit={}; S.bloque=null;
   const pret=it=>{ const y=it[1]<0?surfaceY(it[0],it[2]):it[1], cur=getB(it[0],y,it[2]); return cur===it[3]||(blocJoueur(it[0],y,it[2])&&!(S.t==='reparation'&&cur===AIR))||(it[4]===2&&!vilGround(cur)); };
   while(S.p<S.plan.length&&pret(S.plan[S.p])) S.p++;
   if(S.p>=S.plan.length){ chantierFini(v,S,null); return {n:0,couches:0}; }
@@ -9808,7 +9808,9 @@ function etapeChantier(v){ const eco=vilEco(v), S=eco.s, ys=new Set(); if(!S) re
     if(pret(it)){ S.p++; continue; }
     const cout=coutBlocV(v,it[3]);
     if(cout&&(S.credit[cout[0]]||0)<cout[1]){ const r=cout[0], k=Math.min(stockDe(v,r),24); if(k<=0||(S.credit[r]||0)+k<cout[1]){ S.manque=r; S.pauseR=r; break; } ajouter(v,r,-k); S.credit[r]=(S.credit[r]||0)+k; }
-    if(!poserBat(v,S,it)) break; // un villageois ou un animal dans le passage : le bâtisseur s'en chargera
+    if(!poserBat(v,S,it)){ // un villageois ou un animal dans le passage : poussé devant la porte, comme le fait le bâtisseur
+      const O=S.g&&S.g.O; if(O) for(const o of ents) if(!o.puppet&&P.riding!==o&&!(o.dead>0)&&Math.abs(o.x-(it[0]+.5))<1.2&&Math.abs(o.z-(it[2]+.5))<1.2){ o.x=O[0]+.5; o.z=O[1]+.5; o.y=surfaceY(O[0],O[1])+1.05; o.vx=o.vz=0; }
+      if(!poserBat(v,S,it)){ S.bloque='passage'; break; } } // le joueur dans le passage : on s'arrête là
     if(cout) S.credit[cout[0]]-=cout[1]; S.p++; n++; ys.add(it[1]); S.manque=null; }
   if(S.p>=S.plan.length) chantierFini(v,S,null);
   return {n,couches:ys.size}; }

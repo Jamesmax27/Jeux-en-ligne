@@ -317,7 +317,9 @@ try {
   ok(ef.lits === ef.attendus && ef.lits > 0, `lits des logements comptés (${ef.lits})`);
   ok((!ef.ecurie || ef.anim === 4) && (!ef.scierie || ef.planche === .25) && (!ef.carriere || ef.pierre === .5), 'écurie (+4 animaux), scierie (planches à moitié prix), carrière (bonus de pierre)');
   const meu = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); if(!pointBat(v,'moulin')) return null; const ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)), A=ad.find(o=>vilWant(o)==='work')||ad[0]; ficheDe(A).metier='meunier'; ficheDe(A).inv={}; vie(v).stock.ble=30; A.act=null; A.decT=0; A.trocT=0; return A.vslot; })()`);
-  const meuOk = meu === null || await attendreVillage(c, v6.id, 900, `(()=>{ const v=VILLAGES.get(${v6.id}), A=VILS.find(o=>o.vil===v.id&&o.vslot===${meu}), O=pointBat(v,'moulin'); return !!A&&!!A.act&&A.act.k==='transformer'&&Math.hypot(A.x-O[0]-.5,A.z-O[1]-.5)<2; })()`, 180000);
+  // à ×10, une mouture dure 0,6 s : le jeu surveille la condition à chaque image (un relevé par seconde la manquait)
+  if (meu !== null) await T(c, `(()=>{ window.__meu=0; const f=()=>{ const v=VILLAGES.get(${v6.id}), A=VILS.find(o=>o.vil===v.id&&o.vslot===${meu}), O=pointBat(v,'moulin'); if(A&&A.act&&A.act.k==='transformer'&&Math.hypot(A.x-O[0]-.5,A.z-O[1]-.5)<2) window.__meu=1; else requestAnimationFrame(f); }; requestAnimationFrame(f); })()`);
+  const meuOk = meu === null || await attendreVillage(c, v6.id, 900, `window.__meu===1`, 180000);
   ok(meuOk, 'le meunier moud devant le moulin' + (meuOk ? '' : ' — ' + await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), A=VILS.find(o=>o.vil===v.id&&o.vslot===${meu}), O=pointBat(v,'moulin'); return A?('action '+(A.act&&A.act.k)+(A.act&&A.act.sansBat?' (atelier inaccessible)':'')+' · '+vilWant(A)+' · à '+Math.round(Math.hypot(A.x-O[0],A.z-O[1]))+' blocs du moulin · blé '+stockDe(v,'ble')+' · métier '+metierDe(A)):'absent'; })()`)));
   ok(await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), b=v.vie.bats; v.vie.bats=b.filter(x=>x.t!=='tour'); v.vie.attaque=1; const ok=souhaits(v).includes('tour'); v.vie.bats=b; return ok; })()`), 'après une attaque, le planificateur veut une tour de guet');
   const car = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); v.vie.bats=v.vie.bats.filter(b=>b.t!=='carriere'); vie(v).stock.pierre=200; vie(v).stock.bois=100;
@@ -593,12 +595,12 @@ try {
     let b; try { b=rattraperVillage(v); } finally { chercherChemin=orig; }
     const trop=Object.keys(CIBLES).filter(r=>stockDe(v,r)>cap[r]);
     const metiers=fichesVivantes(v).filter(([,f])=>f.age==='adulte'&&RATTRAPAGE.recolte[f.metier]&&moyensRecolte(v,f.metier)).map(([,f])=>f.metier);
-    return {b,chemins,trop,metiers,st0,st1:JSON.stringify(w.stock),rep:w.rel.rep,chantier:S?[S.t,p0,S.p,S.manque||null]:null}; })()`);
+    return {b,chemins,trop,metiers,st0,st1:JSON.stringify(w.stock),rep:w.rel.rep,chantier:S?[S.t,p0,S.p,S.manque||null,S.bloque||null]:null}; })()`);
   ok(!ra.err && ra.b && Math.abs(ra.b.j - 2) < 0.05, ra.err || (ra.b ? `deux jours rattrapés d'un coup (${ra.b.j} j)` : 'aucun rattrapage'));
   if (ra.b) {
     ok(ra.metiers.length === 0 || Object.keys(ra.b.recolte).length > 0, `récolte des ${ra.metiers.length} récoltants : ${JSON.stringify(ra.b.recolte)}`);
     ok(ra.trop.length === 0, 'aucune réserve au-delà du plafond' + (ra.trop.length ? ' — ' + ra.trop.join(', ') : ''));
-    ok(ra.chantier === null || (ra.b.blocs <= 24 && ra.b.couches <= 1 && (ra.b.blocs > 0 || !!ra.chantier[3])), ra.chantier ? `chantier « ${ra.chantier[0]} » : une étape au plus (${ra.b.blocs} blocs sur ${ra.b.couches} couche, ${ra.chantier[1]} → ${ra.chantier[2]}${ra.chantier[3] ? ', attend ' + ra.chantier[3] : ''})` : 'pas de chantier (étape non essayée)');
+    ok(ra.chantier === null || (ra.b.blocs <= 24 && ra.b.couches <= 1 && (ra.b.blocs > 0 || !!ra.chantier[3] || !!ra.chantier[4])), ra.chantier ? `chantier « ${ra.chantier[0]} » : une étape au plus (${ra.b.blocs} blocs sur ${ra.b.couches} couche, ${ra.chantier[1]} → ${ra.chantier[2]}${ra.chantier[3] ? ', attend ' + ra.chantier[3] : ''}${ra.chantier[4] ? ', passage pris' : ''})` : 'pas de chantier (étape non essayée)');
     ok(ra.chemins === 0, `aucune recherche de chemin pendant le rattrapage (${ra.chemins})`);
     ok(ra.rep === -16, `réputation remontée d'un jour manqué (−20 → ${ra.rep})`);
   }
