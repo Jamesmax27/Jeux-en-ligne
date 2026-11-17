@@ -8150,7 +8150,7 @@ function aideChantier(v){ if(batisseurPresent(v)) return null; let best=null, bi
 // où trouver la ressource r : le porteur le plus proche, sinon les étals du marché ; null s'il faut attendre
 function pisteTroc(e,v,f,r,n){ const w=echg(v); if(!r||(e.trocT||0)>w.t) return null; n=Math.max(1,Math.ceil(n));
   let best=null, bd=ECHANGE.portee;
-  for(const o of VILS){ if(o===e||o.vil!==v.id||o.baby>0||o.ko||(o.attendTroc||0)>w.t||(o.act&&o.act.k==='echanger')) continue; const g=ficheDe(o); if(!g||!((g.inv[r]|0)>0)) continue;
+  for(const o of VILS){ if(o===e||o.vil!==v.id||o.baby>0||o.ko||(o.attendTroc||0)>w.t||(o.act&&o.act.k==='echanger')) continue; const g=ficheDe(o); if(!g||!((g.inv[r]|0)>0)||refusTroc(g,f,r,o.vslot)==='besoin') continue; // inutile d'aller voir qui en a besoin pour son travail
     const d=Math.hypot(o.x-e.x,o.z-e.z); if(d<bd){ bd=d; best=o; } }
   if(best) return {r,n,slot:best.vslot};
   if(marcheDe(v)&&(w.etal[r]|0)>0) return {r,n,marche:1};
