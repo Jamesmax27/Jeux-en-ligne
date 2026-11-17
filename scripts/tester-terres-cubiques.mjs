@@ -106,7 +106,7 @@ async function continuer(c) { const b = c.locator('jel-sauvegarde').getByRole('b
 // sur une machine lente, la simulation va moins vite et une attente fixe ne suffirait pas.
 async function attendreVillage(c, vid, secondes, cond = 'false', maxMs = 240000) {
   const t0 = await T(c, `vie(VILLAGES.get(${vid})).t`), fin = Date.now() + maxMs;
-  while (Date.now() < fin) { await attendre(1000); await T(c, 'time=Math.min(time,.45)');
+  while (Date.now() < fin) { await attendre(1000); await T(c, 'time=Math.min(time,.45); P.food=20;');
     if (await T(c, `(${cond})`)) return true;
     if (await T(c, `vie(VILLAGES.get(${vid})).t`) - t0 >= secondes) return false; }
   return false;
@@ -152,6 +152,7 @@ try {
 
   console.log('3. villages par proximité');
   await continuer(c);
+  await T(c, 'prefs.monsters=false; P.food=20; P.hp=20;'); // une longue partie en survie : le joueur de l'essai ne doit ni mourir de faim ni des monstres
   const vid = await T(c, `(()=>{ const v=[...VILLAGES.values()].sort((a,b)=>Math.hypot(a.cx-P.x,a.cz-P.z)-Math.hypot(b.cx-P.x,b.cz-P.z))[0]; P.fly=true; P.x=v.cx+.5; P.z=v.cz+12.5; P.y=v.h0+3; loadAround(P.x,P.z); return v.id; })()`);
   await attendre(2500);
   r = await T(c, `(()=>{ const v=VILLAGES.get(${vid}); const vil=ents.filter(e=>e.type==='villager'&&e.vil===v.id); return {sim:v.sim,n:vil.length,noms:vil.every(e=>typeof e.nom==='string'&&e.nom),etat:state,bord:Math.round(Math.hypot(P.x-v.cx,P.z-v.cz)-v.R)}; })()`);
