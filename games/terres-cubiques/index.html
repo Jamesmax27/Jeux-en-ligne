@@ -7682,7 +7682,7 @@ let NID=1;
 function makeEnt(type,x,y,z,hp){ const d=MOBS[type]; return {nid:NID++,type,d,x,y,z,vx:0,vy:0,vz:0,yaw:Math.random()*6.28,tyaw:0,hp:hp||d.hp,ground:false,mesh:null,parts:null,shadow:null,hurt:0,dead:0,t:Math.random()*3,dir:null,flee:0,cd:1,cd2:0,leap:0,phase:0,burn:.5,angry:0,snd:4+Math.random()*10,inWater:false,age:0,love:0,breedCd:0,baby:0,sheared:false,var:type==='horse'?((Math.random()*5)|0):(type==='sheep'&&Math.random()<.12)?1:0,heartT:0,sc:1,tame:false,temper:0}; }
 function ensureMesh(e){ if(e.mesh) return; const p=MODELS[e.type](e); e.parts=p; e.mesh=p.root; entRoot.add(p.root); if(p.saddle) p.saddle.visible=!!e.tame;
   if(SHADOW_GEO){ e.shadow=new THREE.Mesh(SHADOW_GEO,shadowMat); e.shadow.renderOrder=1; entRoot.add(e.shadow); } }
-function dropMesh(e){ if(!e.mesh) return; entRoot.remove(e.mesh); e.parts.mat.dispose(); e.mesh=null; e.parts=null; if(e.shadow){ entRoot.remove(e.shadow); e.shadow=null; } }
+function dropMesh(e){ if(!e.mesh) return; entRoot.remove(e.mesh); e.parts.mat.dispose(); if(e.parts.fusions) for(const g of e.parts.fusions) g.dispose(); e.mesh=null; e.parts=null; if(e.shadow){ entRoot.remove(e.shadow); e.shadow=null; } }
 function overlapsB(px,py,pz,r,h){ const x0=Math.floor(px-r+1e-4), x1=Math.floor(px+r-1e-4), y0=Math.floor(py+1e-4), y1=Math.floor(py+h-1e-4), z0=Math.floor(pz-r+1e-4), z1=Math.floor(pz+r-1e-4);
   for(let y=y0;y<=y1;y++) for(let z=z0;z<=z1;z++) for(let x=x0;x<=x1;x++) if(solidAt(x,y,z)) return true; return false; }
 function moveBody(b,ax,d,r,h){ if(!d) return false;
@@ -7706,7 +7706,7 @@ function updateEnts(dt){
     if(e.puppet){ ensureMesh(e); e.mesh.visible=true; puppetMove(e,dt); entAnim(e,dt); continue; }
     if(e.d.villager){ const vv=vilV(e); if(vv&&vv.sim){ const k=vitesseVillages(); for(let s=0;s<k;s++){ villagerAI(e,dt); entPhysics(e,dt); } } else { e.vx=e.vz=0; e.anim=0; } } // hors du rayon : figé
     else { TG=T; entAI(e,dt,dist,dx,dz,night); entPhysics(e,dt); }
-    if(hd<=64){ ensureMesh(e); e.mesh.visible=true; entAnim(e,dt); } else if(e.mesh){ e.mesh.visible=false; if(e.shadow) e.shadow.visible=false; }
+    if(hd<=64){ ensureMesh(e); e.mesh.visible=true; if(e.d.villager) animerVillageois(e,dt,hd); else entAnim(e,dt); } else if(e.mesh){ e.mesh.visible=false; if(e.shadow) e.shadow.visible=false; }
   }
 }
 function entAI(e,dt,dist,dx,dz,night){
@@ -7727,7 +7727,9 @@ function entAI(e,dt,dist,dx,dz,night){
   else if(e.love>0&&(partner=findPartner(e))){ const qx=partner.x-e.x, qz=partner.z-e.z, qd=Math.hypot(qx,qz)||1; mx=qx/qd; mz=qz/qd; speed=d.speed; e.tyaw=Math.atan2(-mx,-mz); if(qd<1.3) breed(e,partner); }
   else if(d.passive&&hot[sel]&&hot[sel]===FEED[e.type]&&dist<8&&state==='play'){ e.tyaw=Math.atan2(-dx,-dz); if(dist>2.2){ mx=ux; mz=uz; speed=d.speed; } }
   else if(e.raid!==undefined&&!d.passive&&VILLAGES.get(e.raid)){ const vv=VILLAGES.get(e.raid), qx=vv.cx+.5-e.x, qz=vv.cz+.5-e.z, qd=Math.hypot(qx,qz)||1; if(qd>2.5){ mx=qx/qd; mz=qz/qd; speed=d.speed*.8; e.tyaw=Math.atan2(-mx,-mz); } }
-  else { if(e.t<=0){ if(Math.random()<.55){ const a=Math.random()*Math.PI*2; e.dir=[Math.sin(a),Math.cos(a)]; e.t=2+Math.random()*3; } else { e.dir=null; e.t=2+Math.random()*4; } }
+  else { if(e.t<=0){ if(Math.random()<.55){ let a=Math.random()*Math.PI*2; const pv=e.paturage!==undefined&&!e.tame&&VILLAGES.get(e.paturage);
+        if(pv&&pv.sim&&Math.hypot(pv.cx-e.x,pv.cz-e.z)>pv.R+12) a=Math.atan2(pv.cx+.5-e.x,pv.cz+.5-e.z)+(Math.random()-.5)*.8; // pâturage : un animal du village qui s'éloigne revient vers la place
+        e.dir=[Math.sin(a),Math.cos(a)]; e.t=2+Math.random()*3; } else { e.dir=null; e.t=2+Math.random()*4; } }
     if(e.dir){ mx=e.dir[0]; mz=e.dir[1]; speed=d.speed*(d.passive?1:.5); e.tyaw=Math.atan2(-mx,-mz); }
     if(e.type==='sheep'&&e.sheared&&!e.dir&&Math.random()<dt/25){ const bx=Math.floor(e.x), by=Math.floor(e.y-.5), bz=Math.floor(e.z); if(getB(bx,by,bz)===GRASS){ setBlock(bx,by,bz,DIRT); e.sheared=false; if(e.parts) e.parts.wool.forEach(m=>m.visible=true); } } }
   if(speed>0&&!aggro){ const ax=Math.floor(e.x+mx*.9), az=Math.floor(e.z+mz*.9), fy=Math.floor(e.y+.01); let drop=0;
@@ -8345,7 +8347,7 @@ function vilLine(x0,y0,z0,x1,z1,stop){ const d=Math.hypot(x1-x0,z1-z0), n=Math.c
   return true; }
 function vilFindTree(e,v){ const list=[];
   for(const t of vilTrees(v)){ const dc=Math.hypot(t[0]-v.cx,t[1]-v.cz); if(dc<v.R||dc>v.R+v.BL+32) continue;
-    if((e.badT&&e.badT.has(t[0]*65536+t[1]))||VILS.some(o=>o!==e&&o.task&&o.task.k==='b'&&o.task.x===t[0]&&o.task.z===t[1])) continue; list.push([Math.hypot(t[0]-e.x,t[1]-e.z),t]); }
+    if(arbreEcarte(e,t[0],t[1])||VILS.some(o=>o!==e&&o.task&&o.task.k==='b'&&o.task.x===t[0]&&o.task.z===t[1])) continue; list.push([Math.hypot(t[0]-e.x,t[1]-e.z),t]); }
   list.sort((a,b)=>a[0]-b[0]); let tries=0;
   for(const [,t] of list){ const x=t[0], z=t[1], y1=surfaceY(x,z); if(!isLog(getB(x,y1,z))) continue; let y0=y1; while(y0>1&&isLog(getB(x,y0-1,z))) y0--;
     if(Math.abs(y0-1-v.h0)>6||!SOLID[getB(x,y0-1,z)]) continue; if(++tries>8) break;
@@ -8365,7 +8367,7 @@ function vilWoodWork(e,v,dt,move){ const eco=vilEco(v), pd=Math.hypot(P.x-e.x,P.
   if(!(e.task&&e.task.k==='b')){ if(!need) return false; e.woodCd=(e.woodCd===undefined?8:e.woodCd)-dt; if(e.woodCd>0) return false;
     const t=vilFindTree(e,v); if(!t){ e.woodCd=60; return false; } e.task=t; vilSay(e,39); }
   const T=e.task; if(!isLog(getB(T.x,T.y0,T.z))){ e.task=null; e.route=null; e.woodCd=5; return true; }
-  const r=vilWalk(e,T.x+.5,T.z+.5,dt,move,2.1); if(r<0){ (e.badT||(e.badT=new Set())).add(T.x*65536+T.z); e.task=null; e.route=null; e.woodCd=10; return true; } if(!r) return true;
+  const r=vilWalk(e,T.x+.5,T.z+.5,dt,move,2.1); if(r<0){ ecarterArbre(e,T.x,T.z); e.task=null; e.route=null; e.woodCd=10; return true; } if(!r) return true;
   e.tyaw=Math.atan2(-(T.x+.5-e.x),-(T.z+.5-e.z)); e.anim=2; T.t-=dt; T.s-=dt; if(T.s<=0){ T.s=.55; if(pd<16) sfx('hit','wood',.6*(1-pd/16)); }
   if(T.t>0) return true;
   let n=0; for(let y=T.y0;y<=T.y1;y++) if(isLog(getB(T.x,y,T.z))){ setBlock(T.x,y,T.z,AIR,true); n++; }
@@ -8634,10 +8636,10 @@ function habiller(e,f){ if(!f||!f.metier) return; const look=LOOK[f.metier]|0; i
 // candidats d'action d'un villageois : [clé, score, ressource qui manque, données]
 function candidats(e,v,f){ const out=[], m=f.metier, w=vie(v), sac=invTotal(f), retab=!!w.impasse, add=(k,s,manque,d)=>out.push({k,s,manque:manque||null,d:d||null});
   if(sac>=DURABLE.sac) add('livrer',3); else if(sac>0) add('livrer',.35+sac*.08);
-  if(m==='bucheron'){ const n=arbresAdultes(v), sous=n<DURABLE.arbres;
+  if(m==='bucheron'){ const n=arbresAdultes(v), coupable=n>DURABLE.arbres&&!!arbreACouper(e,v), sous=n<DURABLE.arbres||!coupable; // aucun arbre à sa portée : comme sous le seuil, il replante
     if((f.inv.pousse|0)>0||(sous&&stockDe(v,'pousse')>0)) add('replanter',sous?2.6:1.4);
     else if(sous) add('cueillir',2.2,'pousse');
-    if(n>DURABLE.arbres) add('couper',.1+besoin(v,'bois')*1.4+(retab?.3:0)); else add('attendre',.05,'arbres'); }
+    if(coupable) add('couper',.1+besoin(v,'bois')*1.4+(retab?.3:0)); else add('attendre',.05,'arbres'); }
   else if(m==='fermier'&&cellsChamps(v).length){ let mur=0, vide=0; for(const c of cellsChamps(v)){ const id=getB(c[0],c[2]+1,c[1]); if(B[id]&&B[id].crop&&B[id].stage===3&&!blocJoueur(c[0],c[2]+1,c[1])) mur++; else if(id===AIR&&getB(c[0],c[2],c[1])===FARMLAND) vide++; }
     if(vide&&stockDe(v,'graines')+(f.inv.graines|0)>0) add('semer',1.8+(retab?.5:0)); else if(vide) add('attendre',.05,'graines');
     if(mur) add('recolter',.5+besoinRepas(v)*1.2+besoin(v,'ble')*.4); }
@@ -8663,7 +8665,7 @@ function choisirAction(e,v,f){ const l=candidats(e,v,f); let best=null, manque=n
   e.act={k:best.k,d:best.d,phase:0,t:0}; e.dbg={action:best.k,score:best.s,manque}; return e.act; }
 function animauxVillage(v){ const c=vie(v).cache; if(c.animT>vie(v).t-3) return c.anim; const par={}; let total=0, laine=null, exces=null;
   for(const o of ents){ if(!o.d.passive||o.d.villager||o.puppet||o.dead>0||o.type==='horse'||!FEED[o.type]||o.tame) continue; if(Math.hypot(o.x-v.cx,o.z-v.cz)>v.R+20||Math.abs(o.y-v.h0)>8) continue;
-    total++; (par[o.type]||(par[o.type]=[])).push(o); if(o.type==='sheep'&&!o.sheared&&!(o.baby>0)) laine=o; }
+    total++; (par[o.type]||(par[o.type]=[])).push(o); if(o.type==='sheep'&&!o.sheared&&!(o.baby>0)) laine=o; if(o.paturage===undefined) o.paturage=v.id; } // l'animal est désormais du village (pâturage)
   let paire=false, manqueCouple=false; for(const t in par){ const adultes=par[t].filter(o=>!(o.baby>0)); if(adultes.length>=2) paire=true; if(par[t].length<DURABLE.couple+1) manqueCouple=true; if(adultes.length>DURABLE.couple+DURABLE.surplus) exces=adultes[adultes.length-1]; }
   c.anim={par,total,paire,manqueCouple,exces,laine}; c.animT=vie(v).t; return c.anim; }
 
@@ -8676,7 +8678,7 @@ function vieTravail(e,v,dt,move){ const f=ficheDe(e); if(!f||!f.metier){ return;
   switch(a.k){
   case 'livrer': { if(!a.d) a.d=depotPour(v,e,f); const r=aller(a.d[0],a.d[1],a.d.p||2); if(r<0){ if(a.d.p!==2){ a.d=[v.cx+v.ps+1,v.cz]; a.d.p=2; return; } return fini(e,v); } /* dépôt inaccessible : la place */ if(!r) return; reglerDettes(v,e,f,f.inv,false); for(const k in f.inv){ if(f.inv[k]>0) ajouter(v,k,f.inv[k]); } f.inv={}; dire(e,['travail'])||vilSay(e,40,2.2); return fini(e,v); }
   case 'couper': { if(!a.d){ const t=arbreACouper(e,v); if(!t) { e.dbg.manque='arbres'; return fini(e,v); } a.d=t; dire(e,['travail'])||vilSay(e,39); }
-    const T=a.d; if(!isLog(getB(T.x,T.y0,T.z))) return fini(e,v); const r=aller(T.x,T.z,2); if(r<0){ (e.badT||(e.badT=new Set())).add(T.x*65536+T.z); return fini(e,v); } if(!r) return;
+    const T=a.d; if(!isLog(getB(T.x,T.y0,T.z))) return fini(e,v); const r=aller(T.x,T.z,2); if(r<0){ ecarterArbre(e,T.x,T.z); return fini(e,v); } if(!r) return;
     e.tyaw=Math.atan2(-(T.x+.5-e.x),-(T.z+.5-e.z)); if(!travailler(e,dt,5,['hit','wood'])) return;
     let n=0; for(let y=T.y0;y<=T.y1;y++) if(isLog(getB(T.x,y,T.z))&&!blocJoueur(T.x,y,T.z)){ setBlock(T.x,y,T.z,AIR,true,ORIGINE.village); n++; }
     rebuildAround(T.x-1,T.z-1,T.x+1,T.z+1); burst(T.x,T.y0,T.z,[.55,.4,.25],10,1); vie(v).cache.arbresT=-99;
@@ -8733,8 +8735,13 @@ function vieTravail(e,v,dt,move){ const f=ficheDe(e); if(!f||!f.metier){ return;
   case 'attendre': { a.t+=dt; if(a.t>3) return fini(e,v); return; }
   default: { if(!a.d){ const ang=Math.random()*6.283, d=Math.random()*(v.R-3); a.d=[Math.round(v.cx+Math.cos(ang)*d),Math.round(v.cz+Math.sin(ang)*d)]; } const r=aller(a.d[0],a.d[1],1.5); if(r!==0) return fini(e,v); return; } } }
 // arbre à couper : jamais sous le seuil, jamais un bloc d'un joueur, le plus proche qu'on peut atteindre
+// arbre qu'un bûcheron n'a pas pu atteindre : écarté 300 s de simulation du village, pas pour toujours
+// (un chemin introuvable peut venir de la limite de recherches par image, ou d'un passage bouché un moment)
+const ARBRE_ECARTE=300, tVil=e=>{ const v=vilV(e); return v&&v.vie?v.vie.t:0; };
+function ecarterArbre(e,x,z){ if(!(e.badT instanceof Map)) e.badT=new Map(); e.badT.set(x*65536+z,tVil(e)+ARBRE_ECARTE); }
+function arbreEcarte(e,x,z){ if(!(e.badT instanceof Map)) return false; const k=x*65536+z, t=e.badT.get(k); if(t===undefined) return false; if(t>tVil(e)) return true; e.badT.delete(k); return false; }
 function arbreACouper(e,v){ const enCours=VILS.filter(o=>o!==e&&o.vil===v.id&&o.act&&o.act.k==='couper'&&o.act.d).length;
-  if(arbresAdultes(v)-enCours-1<DURABLE.arbres) return null; /* les coupes déjà commencées comptent : jamais sous le seuil */ const l=(vie(v).cache.liste||[]).filter(t=>!(e.badT&&e.badT.has(t[0]*65536+t[1]))&&!VILS.some(o=>o!==e&&o.act&&o.act.k==='couper'&&o.act.d&&o.act.d.x===t[0]&&o.act.d.z===t[1]))
+  if(arbresAdultes(v)-enCours-1<DURABLE.arbres) return null; /* les coupes déjà commencées comptent : jamais sous le seuil */ const l=(vie(v).cache.liste||[]).filter(t=>!arbreEcarte(e,t[0],t[1])&&!VILS.some(o=>o!==e&&o.act&&o.act.k==='couper'&&o.act.d&&o.act.d.x===t[0]&&o.act.d.z===t[1]))
     .sort((p,q)=>Math.hypot(p[0]-e.x,p[1]-e.z)-Math.hypot(q[0]-e.x,q[1]-e.z));
   for(const t of l.slice(0,6)){ const x=t[0], z=t[1]; let y0=t[2]+1; if(!isLog(getB(x,y0,z))) continue; let y1=y0; while(isLog(getB(x,y1+1,z))) y1++; return {x,z,y0,y1}; }
   return null; }
@@ -9814,6 +9821,39 @@ function etapeChantier(v){ const eco=vilEco(v), S=eco.s, ys=new Set(); if(!S) re
     if(cout) S.credit[cout[0]]-=cout[1]; S.p++; n++; ys.add(it[1]); S.manque=null; }
   if(S.p>=S.plan.length) chantierFini(v,S,null);
   return {n,couches:ys.size}; }
+/* ================= Optimisation du rendu des villageois (étape 12) ================= */
+/* Un villageois est fait d'une vingtaine de petites boîtes, chacune dessinée à part : une foule de 20
+   villageois coûtait plus de 500 appels de dessin. Les boîtes fixes de chaque partie (corps, tête, chaque
+   bras, chaque jambe) sont fusionnées en une seule maille au moment où le modèle est créé ; les petits
+   détails du visage forment une maille à part, cachée au-delà de OPTI.lod blocs, comme l'objet tenu.
+   Un villageois hors du champ de vision n'est pas animé (ni membres, ni ombre, ni lumière) : seule sa
+   position suit. Les autres créatures ne changent pas. */
+const OPTI={lod:24,detail:.15,proche:4,vueMarge:.45};
+// fusionne les boîtes d'un groupe (même matériau) en une maille ; renvoie la géométrie créée
+function fusionMailles(g,ms,mat){ if(ms.length<2) return null; let nv=0, ni=0; for(const m of ms){ nv+=m.geometry.attributes.position.count; ni+=m.geometry.index.count; }
+  const pos=new Float32Array(nv*3), col=new Float32Array(nv*3), idx=nv<65535?new Uint16Array(ni):new Uint32Array(ni), v=new THREE.Vector3(); let ov=0, oi=0;
+  for(const m of ms){ m.updateMatrix(); const G=m.geometry, A=G.attributes.position, C=G.attributes.color, I=G.index;
+    for(let i=0;i<A.count;i++){ v.fromBufferAttribute(A,i).applyMatrix4(m.matrix); pos[(ov+i)*3]=v.x; pos[(ov+i)*3+1]=v.y; pos[(ov+i)*3+2]=v.z; col[(ov+i)*3]=C.getX(i); col[(ov+i)*3+1]=C.getY(i); col[(ov+i)*3+2]=C.getZ(i); }
+    for(let i=0;i<I.count;i++) idx[oi++]=I.getX(i)+ov; ov+=A.count; g.remove(m); }
+  const geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(pos,3)); geo.setAttribute('color',new THREE.BufferAttribute(col,3)); geo.setIndex(new THREE.BufferAttribute(idx,1)); geo.computeBoundingSphere();
+  const mm=new THREE.Mesh(geo,mat); g.add(mm); return mm; }
+const tailleBoite=m=>{ const p=m.geometry.parameters||{}; return Math.max(p.width||1,p.height||1,p.depth||1); };
+function optimiserVillageois(p){ p.fusions=[];
+  const groupe=(g,avecDetail)=>{ const ms=g.children.filter(o=>o.isMesh&&o.material===p.mat&&o.geometry.index), det=avecDetail?ms.filter(m=>tailleBoite(m)<OPTI.detail):[], base=ms.filter(m=>!det.includes(m));
+    const a=fusionMailles(g,base,p.mat); if(a) p.fusions.push(a.geometry);
+    if(det.length){ const d=det.length>1?fusionMailles(g,det,p.mat):det[0]; if(d!==det[0]) p.fusions.push(d.geometry); p.detail=d; } };
+  groupe(p.root,false); groupe(p.head,true); for(const l of p.legs) groupe(l,false); for(const a of p.arms) groupe(a,false);
+  return p; }
+{ const base=MODELS.villager; MODELS.villager=e=>optimiserVillageois(base(e)); }
+// le villageois est-il dans le champ de vision (avec une marge) ?
+function dansLaVue(e,hd){ if(hd<OPTI.proche) return true;
+  const dx=e.x-P.x, dy=e.y+1-(P.y+EYE), dz=e.z-P.z, d=Math.hypot(dx,dy,dz)||1, cp=Math.cos(P.pitch);
+  const dot=(dx*-Math.sin(P.yaw)*cp+dy*Math.sin(P.pitch)+dz*-Math.cos(P.yaw)*cp)/d, demi=camera.fov*Math.PI/360, h=Math.atan(Math.tan(demi)*camera.aspect);
+  return dot>Math.cos(Math.min(Math.PI,Math.max(demi,h)+OPTI.vueMarge)); }
+// à chaque image, pour un villageois à moins de 64 blocs : animation complète s'il est visible, sinon la position seule
+function animerVillageois(e,dt,hd){ const p=e.parts; if(p.detail) p.detail.visible=hd<OPTI.lod; if(p.item) p.item.visible=hd<OPTI.lod;
+  if(dansLaVue(e,hd)){ entAnim(e,dt); return true; }
+  e.mesh.position.set(e.x,e.y,e.z); e.mesh.rotation.y=e.yaw; e.mesh.scale.set(e.sc,e.sc,e.sc); if(e.shadow) e.shadow.visible=false; return false; }
 /* ================= Mode test (?debug=1 dans l'adresse) ================= */
 /* Seulement si l'adresse du jeu contient ?debug=1 (le lanceur le transmet : window.JEL_DEBUG) :
    sinon rien n'en est visible et aucun raccourci ne l'active. Il n'agit que sur la simulation des
