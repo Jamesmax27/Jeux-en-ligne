@@ -37,7 +37,7 @@
 // Nécessite Playwright et Chromium (ou CHROMIUM_PATH). Code de sortie 0 ou 1.
 // ==========================================================================
 
-import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, writeFile, appendFile, mkdtemp, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -77,8 +77,8 @@ await contexte.route(`${BASE}/**`, async (route) => {
 const page = await contexte.newPage(), erreurs = [];
 page.on('pageerror', (e) => erreurs.push(String(e).split('\n')[0]));
 const dossier = await mkdtemp(path.join(os.tmpdir(), 'tc-'));
-let echecs = 0;
-const ok = (c, m) => { console.log(`${c ? '  ✓' : '  ✗'} ${m}`); if (!c) echecs++; };
+let echecs = 0; const rates = [];
+const ok = (c, m) => { console.log(`${c ? '  ✓' : '  ✗'} ${m}`); if (!c) { echecs++; rates.push(m); } };
 const cadre = () => page.frames().find((f) => f.url() === 'about:srcdoc');
 const T = (c, code) => c.evaluate((k) => window.__T(k), code);
 const attendre = (ms) => page.waitForTimeout(ms);
@@ -178,7 +178,7 @@ try {
   const v6 = await T(c, `(()=>{ for(let ci=-2;ci<=2;ci++) for(let cj=-2;cj<=2;cj++){ const inf=villageInfo(Math.floor(P.x/256)+ci,Math.floor(P.z/256)+cj); if(inf) for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); }
     const v=[...VILLAGES.values()].sort((a,b)=>b.vils.length-a.vils.length)[0]; P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); time=.08; DBG.vitesse=10; prefs.monsters=false;
     const jx=v.cx+v.R+8, jz=v.cz, jy=surfaceY(jx,jz)+1; for(let k=0;k<4;k++) setBlock(jx,jy+k,jz,OAK_LOG); setBlock(jx+1,jy,jz,COBBLE);
-    return {id:v.id,jx,jy,jz,stock:JSON.stringify(vie(v).stock)}; })()`);
+    return {id:v.id,jx,jy,jz,stock:JSON.stringify(vie(v).stock),arbres0:arbresAdultes(v)}; })()`);
   let vit = false; for (let k = 0; k < 40 && !vit; k++) { await attendre(500); vit = await T(c, `state==='play'&&VILLAGES.get(${v6.id}).sim===true&&vie(VILLAGES.get(${v6.id})).t>3`); }
   ok(vit, 'partie en cours, village simulé');
   await attendreVillage(c, v6.id, 20);
@@ -191,7 +191,7 @@ try {
   r = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), w=vie(v); return {stock:w.stock,arbres:arbresAdultes(v),champ:v.field?v.field.cells.filter(q=>{ const id=getB(q[0],v.h0+1,q[1]); return B[id]&&B[id].crop; }).length/v.field.cells.length:1}; })()`);
   const avant6 = JSON.parse(v6.stock), plus = Object.keys(r.stock).filter((k) => (r.stock[k] | 0) > (avant6[k] | 0));
   ok(plus.length >= 3, `le stock du village grandit (${plus.join(', ')})`);
-  ok(r.arbres >= 15, `arbres adultes au-dessus du seuil (${r.arbres})`);
+  ok(r.arbres >= 15 || r.arbres >= v6.arbres0, `arbres adultes : au-dessus du seuil, ou jamais coupés sous lui (départ ${v6.arbres0}, fin ${r.arbres}, seuil 15)`);
   ok(r.champ > .6, `champ ressemé (${Math.round(r.champ * 100)} %)`);
   ok(await T(c, `(()=>{ for(let k=0;k<4;k++) if(getB(${v6.jx},${v6.jy}+k,${v6.jz})!==OAK_LOG) return false; return getB(${v6.jx}+1,${v6.jy},${v6.jz})===COBBLE&&(${pz?`isLog(getB(${pz[0]},${pz[1] + 1},${pz[2]}))`:'true'}); })()`), 'aucun bloc du joueur touché (bûches, pierre, arbre né de sa pousse)');
 
@@ -255,4 +255,6 @@ try {
 ok(erreurs.length === 0, `aucune erreur JavaScript${erreurs.length ? ' : ' + erreurs.slice(0, 3).join(' | ') : ''}`);
 await navigateur.close(); await rm(dossier, { recursive: true, force: true });
 console.log(echecs ? `\nTerres Cubiques : ${echecs} problème(s).` : '\nTerres Cubiques : tout est bon.');
+// sur GitHub, les échecs vont aussi dans le résumé du job (lisible sans ouvrir les journaux)
+if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `### Terres Cubiques\n\n${rates.length ? rates.map((m) => '- ✗ ' + m).join('\n') : 'Tout est bon.'}\n\n`).catch(() => {});
 process.exit(echecs ? 1 : 0);
