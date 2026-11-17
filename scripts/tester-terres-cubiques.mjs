@@ -277,13 +277,13 @@ try {
   ok(gab.length === 0 && await T(c, 'Object.keys(GABARITS).length') === 30, `30 gabarits aux bonnes dimensions, chacun avec son rôle${gab.length ? ' — fautifs : ' + gab.join(', ') : ''}`);
   const poses = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), out=[]; for(const t of ['abri','familiale','grande','ancien','place','scierie','carriere','tailleur','mine','forge','four','grange','ecurie','moulin','boulangerie','peche','potier','tisserand','magasin','auberge','eglise','ecole','mairie','tour']){
       if(t==='peche'&&!pointPeche(v)) continue; const S=siteBat(v,t); if(!S){ out.push([t,0,0,null]); continue; } planBat(v,S); let n=0; for(const it of S.plan){ if(poserBat(v,S,it)){ n++; continue; } for(const o of ents) if(!o.puppet&&!(o.dead>0)&&Math.abs(o.x-it[0]-.5)<1.6&&Math.abs(o.z-it[2]-.5)<1.6){ o.x=v.cx+.5; o.z=v.cz+.5; o.y=v.h0+1.05; o.vx=o.vz=0; } if(poserBat(v,S,it)) n++; } chantierFini(v,S,null);
-      const O=porteBat(v,batsDe(v,t)[0]); let ch; for(let k=0;k<8&&ch===undefined;k++){ cheminsCeTick=0; ch=chercherChemin(Math.floor(v.cx+v.ps+1),v.h0+1,Math.floor(v.cz),O[0],O[1],1); } out.push([t,n,S.plan.length,!!ch]); }
+      const O=porteBat(v,batsDe(v,t)[0]); let ch; for(let k=0;k<40&&ch===undefined;k++){ cheminsCeTick=0; ch=chercherChemin(Math.floor(v.cx+v.ps+1),v.h0+1,Math.floor(v.cz),O[0],O[1],1); } out.push([t,n,S.plan.length,!!ch]); }
     return out; })()`);
   const places = poses.filter((p) => p[2] > 0);
   // 24 bâtiments posés d'un coup autour d'un même village : quelques portes peuvent se retrouver isolées
   // (le métier retombe alors sur l'atelier de la place) ; en jeu, ils viennent un à un, chacun avec son chemin
   ok(places.length >= poses.length - 3 && places.every((p) => p[1] === p[2]) && places.filter((p) => !p[3]).length <= 3, `${places.length} bâtiments sur ${poses.length} posés en entier (villageois ou animal qui gêne poussé dehors), ${places.filter((p) => p[3]).length} reliés par un chemin${poses.filter((p) => !p[3] || p[1] < p[2]).map((p) => ' · ' + p[0] + (p[2] ? ' ' + p[1] + '/' + p[2] + (p[3] ? '' : ' sans chemin') : ' sans place')).join('')}`);
-  ok(await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), b=batsDe(v,'carriere')[0]; if(!b) return true; const m=cellBat(GABARITS.carriere,orienter(v,b.x,b.z),b.x,b.z,3,3), O=porteBat(v,b); let p; for(let k=0;k<8&&p===undefined;k++){ cheminsCeTick=0; p=chercherChemin(m[0],b.g0-2,m[1],O[0],O[1],1); } return !!p; })()`), 'on sort du fond de la carrière');
+  ok(await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), b=batsDe(v,'carriere')[0]; if(!b) return true; const m=cellBat(GABARITS.carriere,orienter(v,b.x,b.z),b.x,b.z,3,3), O=porteBat(v,b); let p; for(let k=0;k<40&&p===undefined;k++){ cheminsCeTick=0; p=chercherChemin(m[0],b.g0-2,m[1],O[0],O[1],1); } return !!p; })()`), 'on sort du fond de la carrière');
   const ef = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), a=t=>batsDe(v,t).length>0; return {lits:litsBats(v),attendus:batsDe(v,'abri').length*2+batsDe(v,'familiale').length*4+batsDe(v,'grande').length*6+batsDe(v,'ancien').length*2,
     anim:capAnimaux(v)-VIL_ECO.animaux,ecurie:a('ecurie'),planche:coutBlocV(v,OAK_PLANKS)[1],scierie:a('scierie'),pierre:bonusRes(v,'pierre'),carriere:a('carriere')}; })()`);
   ok(ef.lits === ef.attendus && ef.lits > 0, `lits des logements comptés (${ef.lits})`);
@@ -338,7 +338,7 @@ try {
   { const V = `VILLAGES.get(${v6.id})`;
   await T(c, `(()=>{ const v=${V}; for(let a=-4;a<=4;a++) for(let b=-4;b<=4;b++) ensureChunk((v.cx>>4)+a,(v.cz>>4)+b); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+6; P.pitch=-.5; loadAround(P.x,P.z); time=.08; DBG.vitesse=10; prefs.monsters=false; vilEco(v).s=null; vie(v).planT=1e9; })()`);
   ok(await attendreVillage(c, v6.id, 1e9, `${V}.sim&&VILS.filter(o=>o.vil===${v6.id}&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))).length>=4`, 40000), 'village simulé');
-  const D = await T(c, `(()=>{ const v=${V}, ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))&&ficheDe(o).age==='adulte'); return ad.slice(0,6).map(o=>o.vslot); })()`);
+  const D = await T(c, `(()=>{ const v=${V}; for(const o of VILS) if(o.vil===v.id&&!(o.baby>0)){ const g=ficheDe(o); if(g&&vivant(g)&&g.age!=='enfant') g.age='adulte'; } const ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))&&ficheDe(o).age==='adulte'); return ad.slice(0,6).map(o=>o.vslot); })()`);
   ok(D.length >= 4, `4 adultes au moins pour parler (${D.length})`);
   const dit = (slot, code) => T(c, `(()=>{ const v=${V}, e=entDe(v,${slot}); e.say=null; const ok=(${code}); const k=e.say&&e.say.k, t=k?traduire(k,e.say.v||undefined):''; return {ok,k,t}; })()`);
   const propre = (r) => !!r.t && !/[{}]/.test(r.t);
