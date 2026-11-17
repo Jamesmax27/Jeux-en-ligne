@@ -117,6 +117,7 @@ on:
       - "scripts/tester-multijoueur.mjs"
       - "public/temps-reel/**"
       - "scripts/tester-temps-reel.mjs"
+      - "scripts/tester-poussiere-d-empire.mjs"
       - "scripts/idees.mjs"
       - "scripts/inspirations.mjs"
       - "scripts/tester-inspirations.mjs"
@@ -149,6 +150,7 @@ jobs:
       tr: ${{ steps.quoi.outputs.tr }}
       profil: ${{ steps.quoi.outputs.profil }}
       inspirations: ${{ steps.quoi.outputs.inspirations }}
+      poussiere: ${{ steps.quoi.outputs.poussiere }}
       jeux: ${{ steps.quoi.outputs.jeux }}
       lots: ${{ steps.quoi.outputs.lots }}
     steps:
@@ -218,6 +220,10 @@ jobs:
           inspirations=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then inspirations=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(idees|inspirations|tester-inspirations)\.mjs|calendrier-saisons\.json|public/taxonomie\.js)$'; then inspirations=1; fi
+          # Poussière d'Empire (docs/cadrage-poussiere-d-empire.md) : simulation de conquête testée en Node (jeu ou script de test modifié).
+          poussiere=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then poussiere=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(games/poussiere-d-empire/|scripts/tester-poussiere-d-empire\.mjs$)'; then poussiere=1; fi
           # Référencement de tout le site : tout ce qui précède, plus les règles et
           # le vérificateur du référencement (sans navigateur).
           seo=0
@@ -248,6 +254,7 @@ jobs:
             echo "tr=$tr"
             echo "profil=$profil"
             echo "inspirations=$inspirations"
+            echo "poussiere=$poussiere"
             echo "jeux=$jeux"
             echo "lots=$lots_json"
           } >> "$GITHUB_OUTPUT"
@@ -444,6 +451,13 @@ jobs:
       - name: Contrôler les saisons et tendances
         if: needs.quoi.outputs.inspirations == '1'
         run: node scripts/tester-inspirations.mjs
+
+      # Poussière d'Empire (docs/cadrage-poussiere-d-empire.md) : simulation de conquête en Node, sans navigateur
+      # (mots interdits, outils identiques au moteur temps réel, rejeu déterministe sous le moteur et sous le pilote
+      # local, états entiers, instantané, coût par tick, duels de robots, missions et cartes).
+      - name: Contrôler Poussière d'Empire
+        if: needs.quoi.outputs.poussiere == '1'
+        run: node scripts/tester-poussiere-d-empire.mjs --missions --cartes
 
       # Icônes des regroupements : le bloc généré de public/style.css doit
       # correspondre aux dessins de scripts/icones/sources (sans navigateur).
