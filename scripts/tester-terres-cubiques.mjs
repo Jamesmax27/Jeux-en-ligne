@@ -36,6 +36,10 @@
 //      par un chemin, sortie de la carrière, lits, écurie, scierie, bonus, meunier au
 //      moulin, tour souhaitée après une attaque ; carrière creusée et bâtie par l'aide
 //      de chantier d'un village sans bâtisseur, personne coincé au fond.
+//  10. Familles : un enfant devient apprenti puis adulte, ancien à 60 jours, décès
+//      et deuil ; mariage d'un couple sans foyer, logement voulu, emménagement,
+//      naissance ; plafond atteint : des colons partent fonder un village, relu
+//      après rechargement, qui prend corps à l'approche d'un joueur (abri bâti).
 // Le jeu est servi avec une porte d'entrée de test (window.__T, ajoutée à la
 // volée, jamais dans le fichier publié). Aucune erreur JavaScript permise.
 // Nécessite Playwright et Chromium (ou CHROMIUM_PATH). Code de sortie 0 ou 1.
@@ -287,6 +291,42 @@ try {
   const carEtat = carOk ? '' : ' — ' + await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), S=vilEco(v).s, a=aideChantier(v); return S?S.t+' '+S.p+'/'+(S.plan?S.plan.length:0)+(S.manque?' manque '+S.manque:'')+' · aide '+(a?a.metier+' '+(a.act&&a.act.k)+' à '+Math.round(Math.hypot(a.x-S.x,a.z-S.z))+' blocs':'aucune'):'pas de chantier'; })()`);
   ok(carOk, 'sans bâtisseur, l\'aide de chantier creuse et bâtit une carrière' + (car ? '' : ' (pas de place : essai sauté)') + carEtat);
   ok(!car || await T(c, `!VILS.some(o=>o.vil===${v6.id}&&o.y<${car ? car.g0 : 0}-1.5&&Math.hypot(o.x-${car ? car.x : 0},o.z-${car ? car.z : 0})<4)`), 'personne n\'est coincé au fond');
+
+  console.log('10. familles, naissances, nouveaux villages');
+  const V = `VILLAGES.get(${v6.id})`;
+  await T(c, `(()=>{ const v=${V}; P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; vilEco(v).s=null; vie(v).planT=1e9; vie(v).stock.pain=80; for(const f of v.pop.values()) if(vivant(f)) f.humeur=70; })()`);
+  ok(await attendreVillage(c, v6.id, 1e9, `VILS.filter(o=>o.vil===${v6.id}&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))).length>=4`, 30000), '4 adultes au moins');
+  const k = await T(c, `(()=>{ const v=${V}, e=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o)))[0], f=ficheDe(e); f.age='enfant'; f.metier=null; e.baby=.01; return e.vslot; })()`);
+  ok(await attendreVillage(c, v6.id, 1e9, `(()=>{ const f=${V}.pop.get(${k}), e=entDe(${V},${k}); return f.age==='ado'&&!!f.metier&&!!e&&e.ado&&e.sc===.8; })()`, 30000), 'un enfant qui grandit devient apprenti (adolescent, métier, plus petit)');
+  ok(await T(c, `(()=>{ const v=${V}, f=v.pop.get(${k}); f.adoDepuis=jourJeu-2; vieFamille(v); const a=f.age==='adulte'; f.naissance=jourJeu-61; vieFamille(v); return a&&f.age==='ancien'; })()`), 'puis adulte au bout d\'un jour, et ancien à 60 jours');
+  const dc = await T(c, `(()=>{ const v=${V}, p=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))&&o.vslot!==${k})[0], f=v.pop.get(${k}); f.famille.enfants.push(p.vslot); ficheDe(p).famille.parents=[${k}]; f.naissance=jourJeu-200; vieFamille(v); return {p:p.vslot,mort:Number.isFinite(f.mort)}; })()`);
+  ok(dc.mort && await attendreVillage(c, v6.id, 1e9, `!entDe(${V},${k})&&${V}.pop.get(${dc.p}).memoire.some(m=>m[2]==='deuil')`, 20000), 'un ancien meurt : il quitte la scène, deuil chez son enfant');
+  const mar = await T(c, `(()=>{ const v=${V}, ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))).slice(0,4); for(const o of ad){ const f=ficheDe(o); f.famille.conjoint=null; f.famille.parents=[]; f.age='adulte'; f.naissance=jourJeu-30; delete f.sansFoyer; }
+    for(const [s2,f] of v.pop) if(!ad.some(o=>o.vslot===s2)&&vivant(f)&&!Number.isInteger(f.famille.conjoint)) f.famille.conjoint=s2;
+    const a=ad[0], b=ad[1], t=ad[2]; ficheDe(b).maison=ficheDe(a).maison=ficheDe(t).maison=a.house; b.house=t.house=a.house; for(const o of ad.slice(2)) ficheDe(o).famille.conjoint=o.vslot;
+    VIE_FAMILLE.mariage=1; vieFamille(v); VIE_FAMILLE.mariage=.35; const fa=ficheDe(a); return {a:a.vslot,c:fa.famille.conjoint,sf:fa.sansFoyer!==undefined,veut:souhaits(v)[0],plein:v.houses.length>=PLAFOND_MAISONS}; })()`);
+  ok(Number.isInteger(mar.c) && mar.sf && (['maison', 'familiale', 'grande', 'ancien'].includes(mar.veut) || mar.plein), `mariage ; le couple vit chez un autre adulte : sans foyer, le planificateur veut un logement (${mar.plein ? 'plafond de logements atteint : les colons partiront' : mar.veut})`);
+  const em = await T(c, `(()=>{ const v=${V}, S=siteBat(v,'familiale'); if(!S) return null; planBat(v,S); for(const it of S.plan){ if(!poserBat(v,S,it)){ for(const o of ents) if(!o.puppet&&!(o.dead>0)&&Math.abs(o.x-it[0]-.5)<1.6&&Math.abs(o.z-it[2]-.5)<1.6){ o.x=v.cx+.5; o.z=v.cz+.5; o.y=v.h0+1.05; } poserBat(v,S,it); } } chantierFini(v,S,null);
+    const hi=v.houses.length-1, f=v.pop.get(${mar.a}); return {ok:f.maison===hi&&entDe(v,${mar.a}).house===hi&&f.sansFoyer===undefined&&v.houses[hi].lits===4}; })()`);
+  ok(!em || em.ok, 'maison familiale bâtie : le couple y emménage (4 lits)' + (em ? '' : ' (pas de place : essai sauté)'));
+  const nNaiss = await T(c, `${V}.pop.size`);
+  await T(c, `(()=>{ const v=${V}; vie(v).stock.pain=80; vie(v).naissT=-1e9; for(const f of v.pop.values()) delete f.dernNaiss; })()`);
+  ok(!em || await attendreVillage(c, v6.id, 1e9, `${V}.pop.size>${nNaiss}&&[...${V}.pop.values()].some(f=>f.age==='enfant'&&f.famille.parents.includes(${mar.a}))`, 90000), 'le couple a un enfant');
+  let col = null;
+  for (let i = 0; i < 5 && !col; i++) col = await T(c, `(()=>{ const v=${V}; VIE_FAMILLE.plafond.village=VIE_FAMILLE.plafond.ville=2; vie(v).colonieJour=undefined; vie(v).stock.pain=80; const nv=fonderVillage(v); VIE_FAMILLE.plafond.village=18; VIE_FAMILLE.plafond.ville=26;
+    return nv?{id:nv.id,n:nv.pop.size,cx:nv.cx,cz:nv.cz,d:Math.round(Math.hypot(nv.cx-v.cx,nv.cz-v.cz)),partis:[...v.pop.values()].filter(f=>f.parti===nv.id).length}:null; })()`);
+  ok(!!col && col.n >= 2 && col.n <= 4 && col.partis === col.n, col ? `plafond atteint : ${col.n} colons partent fonder un village à ${col.d} blocs` : 'plafond atteint : aucun terrain plat trouvé à 100-170 blocs');
+  if (col) {
+    ok(await attendreVillage(c, v6.id, 1e9, `!VILS.some(o=>o.vil===${v6.id}&&o.colon)`, 120000), 'les colons s\'en vont et quittent la scène');
+    await T(c, `(async()=>{ saveNow(); await saving; })()`);
+    c = await ouvrir('&debug=1'); await continuer(c);
+    ok(await T(c, `COLONIES.has(${col.id})&&VILLAGES.has(${col.id})&&!!VILLAGES.get(${col.id}).pop&&VILLAGES.get(${col.id}).pop.size===${col.n}`), 'le village fondé et ses colons sont relus après rechargement');
+    await T(c, `(()=>{ P.fly=true; P.x=${col.cx}+.5; P.z=${col.cz}+12.5; P.y=terrain(${col.cx},${col.cz})+14; loadAround(P.x,P.z); time=.08; DBG.vitesse=10; prefs.monsters=false; })()`);
+    const prend = await attendreVillage(c, v6.id, 1e9, `(()=>{ const nv=VILLAGES.get(${col.id}); return nv.active&&nv.houses.length>0&&ents.filter(e=>e.vil===${col.id}&&e.type==='villager').length===${col.n}; })()`, 90000).catch(() => false)
+      || await T(c, `(()=>{ const nv=VILLAGES.get(${col.id}); return nv.active&&nv.houses.length>0&&ents.filter(e=>e.vil===${col.id}&&e.type==='villager').length===${col.n}; })()`);
+    ok(prend, 'un joueur approche : il prend corps (abri de fondation, colons)');
+    ok(prend && await attendreVillage(c, `${col.id}`, 2000, `(()=>{ const nv=VILLAGES.get(${col.id}), S=vilEco(nv).s; return batsDe(nv,'abri').length>0||(!!S&&S.t==='abri'&&S.p>10); })()`, 240000), 'les colons bâtissent l\'abri de fondation');
+  }
 } catch (e) { ok(false, e.message); }
 ok(erreurs.length === 0, `aucune erreur JavaScript${erreurs.length ? ' : ' + erreurs.slice(0, 3).join(' | ') : ''}`);
 await navigateur.close(); await rm(dossier, { recursive: true, force: true });

@@ -131,7 +131,31 @@ Tout est dans la section « Les 30 bâtiments » du code. Pour ajouter un bâtim
   Les villageois n'ouvrent pas les portes : ils travaillent devant (`porteBat`). Si une porte est inaccessible, ils retombent sur l'atelier ou le dépôt de la place.
 - **Aide de chantier** : dans un village sans bâtisseur, un seul adulte (le métier le moins indispensable, jamais un garde) bâtit avec la même priorité qu'un bâtisseur (`aideChantier`). Avant, tous les adultes pouvaient aider, mais avec une priorité si faible que le chantier n'avançait presque pas.
 
-## 10. Étapes
+## 10. Familles, naissances et nouveaux villages (étape 8)
+
+Tout est dans la section « Familles, naissances et nouveaux villages » du code. Les réglages sont dans `VIE_FAMILLE`.
+
+- **Âges** (`vieFamille`, une fois par jour du jeu ; un jour dure 12 minutes) : l'âge se compte en jours depuis la naissance.
+  - Un bébé qui a grandi devient adolescent apprenti pendant 1 jour. Il prend un métier qui manque au village, sinon celui d'un parent, et il est un peu plus petit qu'un adulte.
+  - Il devient ensuite adulte, puis ancien à 60 jours.
+  - Les anciens meurent entre 75 et 90 jours. C'est un événement discret : le villageois quitte la scène, ses proches (conjoint, parents, enfants) gardent un souvenir de deuil et perdent un peu d'humeur, un message s'affiche près du village, et le journal le note. Un mort ou un parti ne réapparaît jamais.
+  - Les habitants d'une partie déjà commencée ont de 20 à 59 jours : les premiers anciens viennent donc après quelques heures de jeu.
+- **Mariages** : un adulte célibataire épouse un autre adulte célibataire du village, à condition qu'il ne soit pas de sa famille proche (une chance sur trois par jour). S'ils vivent chez d'autres adultes, le couple est « sans foyer » : le planificateur lui bâtit alors d'abord un logement, et il y emménage dès qu'il est fini (« enfant qui part fonder sa maison »).
+- **Logements** : la maison familiale, la grande maison, la maison des anciens et l'abri sont de vraies maisons (`ajouterLogement`). Ils ont une porte, une place intérieure, un chemin jusqu'à la place et un nombre de lits ; on y dort et on y naît. Ils sont rejoués au chargement dans l'ordre de construction (`eco.h`, avec leur type).
+- **Naissances** (`coupleParent`) : il faut un couple d'adultes présents, un lit libre dans leur maison (sinon dans une maison bâtie) et de la nourriture. Il y a un délai d'un jour entre deux naissances d'un même couple, et de 120 s de simulation entre deux naissances d'un village.
+- **Plafond et nouveaux villages** (`fonderVillage`) : au-delà de 18 habitants (26 pour une ville), un groupe de 2 à 4 adultes part fonder un village. Les conditions :
+  - au plus un départ tous les 3 jours, quand la nourriture suit ;
+  - les colons sont un couple sans foyer d'abord, puis les plus jeunes ;
+  - le dernier bâtisseur ne part jamais.
+
+  Le site est un terrain plat, à 100-170 blocs, à 120 blocs au moins de tout autre village. Les colons disent au revoir, s'éloignent vers leur nouveau village et quittent la scène. Ils emportent du bois, de la pierre, du pain, des graines et des pousses.
+- **Village fondé** (`COLONIES`, sauvegarde `vc`) : il est gardé dans la sauvegarde avec ses colons. Il prend corps quand un joueur approche et que son terrain est chargé (`installerColonie`) :
+  - l'abri de fondation y est placé en chantier, et c'est aussitôt la maison des colons ;
+  - les colons prennent les premiers métiers de la liste et bâtissent l'abri ;
+  - puis le village vit comme les autres (planificateur, métiers, échanges).
+- **Mode test** : la population de chaque village s'affiche (enfants, adolescents, adultes, anciens, couples, sans foyer, plafond), et le journal note les passages d'âge, les décès, les mariages, les emménagements et les départs de colons.
+
+## 11. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
@@ -142,9 +166,10 @@ Tout est dans la section « Les 30 bâtiments » du code. Pour ajouter un bâtim
 | 5 | Synchronisation multijoueur | hors périmètre (choix du 16/11) |
 | 6 | Échanges et marché | fait (16/11, branche `terres-cubiques-etape-6`) |
 | 7 | Les 25 autres bâtiments (24, le marché étant fait à l'étape 6) | fait (17/11, branche `terres-cubiques-etape-7`) |
-| 8 à 12 | naissances et nouveaux villages, dialogues, interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
+| 8 | Naissances, croissance, nouvelles maisons, plafond de population et nouveaux villages | fait (17/11, branche `terres-cubiques-etape-8`) |
+| 9 à 12 | dialogues, interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
 
-## 11. Essais
+## 12. Essais
 
 - `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture), les 30 bâtiments (24 gabarits posés et reliés par un chemin, sortie de la carrière, effets, meunier au moulin, tour après une attaque, carrière bâtie par l'aide de chantier). Sur GitHub, les échecs sont aussi écrits dans le résumé du job.
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
