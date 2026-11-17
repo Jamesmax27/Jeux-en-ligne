@@ -183,7 +183,29 @@ Tout est dans la section « Dialogues » du code. Les textes sont des clés `dlg
 - **Textes** : écrits en français sans accord en genre, puisque les fiches ne disent pas si un villageois est une femme ou un homme. Le nom d'un bâtiment sert d'étiquette (« Moulin : 40 % »). Les 4 autres langues ont été traduites d'après le français, avec les mêmes variables ; l'essai vérifie ces variables dans les 5 langues.
 - Les anciennes bulles fixes restent en repli, ainsi que pour le salon de claude.ai : un invité ne voit que les bulles numérotées.
 
-## 12. Étapes
+## 12. Le joueur et les villages (étape 10, première partie)
+
+Tout est dans la section « Le joueur et les villages » du code. Les réglages sont dans `REPUTATION` et `RIPOSTE`.
+
+- **Fiche et menu du villageois** (`openVillageois`, onglet `vil` du sac) : toucher un villageois ouvre sa fiche. Elle donne son prénom en titre, son âge et son métier, sa famille, ce qu'il fait en ce moment, son humeur et la réputation du joueur dans le village. Quatre gros boutons suivent, sans menu imbriqué :
+  - **Parler** : le villageois répond avec une réplique de la banque (étape 9).
+  - **Échanger** : la table de troc du villageois (celle de la demande #347) et, s'il y a un marché, les étals, payés aux valeurs de `VALEURS_TROC` avec ce dont le village a besoin. Les prix suivent la réputation : ×1,5 si elle est mauvaise, ×0,75 si elle est excellente. Sous `REPUTATION.refus`, les villageois ne commercent plus. Pas d'échange en mode créatif.
+  - **Aider** : le joueur dépose des bûches ou de la pierre dans le chantier en cours (16 au plus à la fois). Elles vont droit au chantier, qui avance plus vite, et la réputation monte.
+  - **Demander une tâche** : le villageois demande la ressource dont le village manque le plus (« Apporte-moi 10 pierres »). La récompense vient des surplus du village, sinon c'est du pain. La tâche est gardée 3 jours ; une fois livrée, la réputation gagne 12.
+- **Réputation** (`vie.rel.rep`, de -100 à 100, par village) : elle change les salutations (répliques selon la réputation) et les prix. Ce qui la fait monter : dons au villageois, matériaux apportés, tâches, échanges, aide pendant une attaque. Elle remonte de 4 par jour vers 0 (`pardonJour`).
+- **Actes hostiles** (`acteHostile`) : bloc d'un bâtiment cassé (-6) ou d'un chantier (-4), vol dans un coffre du village (-10, une fois par coffre ouvert), villageois frappé (-15 ; il recule mais n'est pas blessé), animal du village frappé (-5).
+- **Riposte graduée** :
+  1. au premier acte, un avertissement dans une bulle (« Hé ! Ce coffre appartient au village ! ») ;
+  2. ensuite, les prix montent, puis plus aucun échange ;
+  3. après un coup sur un villageois, ou une récidive avec une réputation à -50 ou moins, la colère : les gardes et les adultes poursuivent le joueur et le frappent (`RIPOSTE` : dégâts, cadence, portée) jusqu'à sa mort ou sa fuite hors du village ;
+  4. sous -75, la colère reprend dès qu'il revient au village.
+
+  Enfants, adolescents et anciens ne se battent pas, et rien de tout cela en mode créatif.
+- **Réparation** : chaque bloc cassé est noté (64 au plus). Le planificateur lance d'abord un chantier « Réparations », bâti par les villageois comme les autres. Le trou laissé par le joueur dans un bâtiment est le seul bloc « du joueur » que les villageois reprennent.
+- **Sauvegarde** : réputation, nombre d'actes, blocs à réparer et tâche en cours. Le mode test affiche la réputation et la colère, et le journal note chaque changement de réputation, la colère, le calme revenu et les tâches accomplies.
+- Restent pour la suite de l'étape 10 : les caravanes et les relations entre villages, la fiche du village et la carte.
+
+## 13. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
@@ -196,9 +218,10 @@ Tout est dans la section « Dialogues » du code. Les textes sont des clés `dlg
 | 7 | Les 25 autres bâtiments (24, le marché étant fait à l'étape 6) | fait (17/11, branche `terres-cubiques-etape-7`) |
 | 8 | Naissances, croissance, nouvelles maisons, plafond de population et nouveaux villages | fait (17/11, branche `terres-cubiques-etape-8`) |
 | 9 | Dialogues complets | fait (17/11, branche `terres-cubiques-etape-9`) |
-| 10 à 12 | interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
+| 10 | Interaction avec le joueur, tâches, réputation, sabotage et riposte (première partie) | fait (17/11, branche `terres-cubiques-etape-10`) ; caravanes, fiches de village et carte à faire |
+| 10 (suite) à 12 | caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
 
-## 13. Essais
+## 14. Essais
 
 - `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture), les 30 bâtiments (24 gabarits posés et reliés par un chemin, sortie de la carrière, effets, meunier au moulin, tour après une attaque, carrière bâtie par l'aide de chantier). Sur GitHub, les échecs sont aussi écrits dans le résumé du job.
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
