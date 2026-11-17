@@ -474,7 +474,7 @@ try {
     ok(await T(c, `voisins(${VA}).includes(${VB})&&voisins(${VB}).includes(${VA})`), 'chaque village connaît ses voisins');
     const car = await T(c, `(()=>{ const A=${VA}, B=${VB}; for(const v of [A,B]){ vie(v); if(!v.pop) v.pop=new Map(); }
       if(![...A.pop.values()].some(f=>f.metier==='marchand'&&vivant(f))) A.pop.set(900,{nom:'Lou',age:'adulte',naissance:jourJeu-30,metier:'marchand',maison:0,famille:{parents:[],conjoint:null,enfants:[]},inv:{},humeur:70,memoire:[]});
-      vie(A).stock.bois=300; vie(A).stock.fer=0; vie(B).stock.fer=60; vie(B).stock.bois=0; vie(A).caravaneT=undefined; CARAVANES.clear();
+      for(const w of [vie(A),vie(B)]) for(const r in w.stock) w.stock[r]=0; vie(A).stock.bois=300; vie(B).stock.fer=60; /* seuls surplus : le bois de A, le fer de B */ vie(A).caravaneT=undefined; CARAVANES.clear();
       const c=partirCaravane(A); return c?{id:c.id,charge:JSON.stringify(c.charge),veut:c.veut,vers:c.vers,bois:stockDe(A,'bois')}:null; })()`);
     ok(!!car && car.veut === 'fer' && car.vers === pair.b && /bois/.test(car.charge), car ? `une caravane part avec son surplus (${car.charge}) chercher du fer` : 'aucune caravane');
     if (car) {
