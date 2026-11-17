@@ -116,7 +116,14 @@ async function ouvrir(q = '') {
   for (let i = 0; i < 120; i++) { const c = cadre(); if (c && await c.evaluate(() => !!window.__T && window.__T('state') === 'title').catch(() => false)) return c; await attendre(250); }
   throw new Error('le jeu ne s\'ouvre pas dans le lanceur');
 }
-async function continuer(c) { const b = c.locator('jel-sauvegarde').getByRole('button', { name: /Continuer/ }); if (await b.count()) await b.first().click(); else await c.locator('#tContinue').click(); await attendre(1500); }
+// « Continuer » : la fenêtre de reprise de la sauvegarde (jel-sauvegarde) peut s'ouvrir un instant après
+// l'écran titre et recouvrir son bouton ; on l'attend un peu, sinon le bouton de l'écran titre, puis la fenêtre
+async function continuer(c) {
+  const b = c.locator('jel-sauvegarde').getByRole('button', { name: /Continuer/ });
+  try { await b.first().waitFor({ state: 'visible', timeout: 3000 }); await b.first().click(); }
+  catch { await c.locator('#tContinue').click({ timeout: 10000 }).catch(async () => { await b.first().click(); });
+    if (await T(c, 'state') !== 'play' && await b.count()) await b.first().click().catch(() => {}); }
+  await attendre(1500); }
 // Attend que la vie du village avance de `secondes` (temps du village, vitesse comprise) ou que `cond`
 // soit vraie, en gardant le jour ; plafond en temps réel. Le pas de chaque image est plafonné à 0,05 s :
 // sur une machine lente, la simulation va moins vite et une attente fixe ne suffirait pas.
