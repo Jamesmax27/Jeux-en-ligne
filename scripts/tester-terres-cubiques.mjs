@@ -61,6 +61,11 @@
 //      rechargement (villages figés) ; deux jours d'absence rattrapés d'un coup (récolte sous
 //      le plafond, une couche de chantier au plus, aucune recherche de chemin, réputation),
 //      plafond de 3 jours, retour du joueur sans compter deux fois l'absence.
+//  16. Rendu des villageois (étape 12) : boîtes fusionnées (7 mailles par villageois),
+//      détails du visage cachés au-delà de 24 blocs, champ de vision, pas d'animation hors
+//      de la vue (position suivie), géométries libérées quand le modèle est retiré.
+//      Bûcheron : arbre hors de portée écarté 300 s seulement ; sans arbre à sa portée, il replante.
+//      Les mesures de charge et l'endurance sont dans scripts/charge-terres-cubiques.mjs.
 // Le jeu est servi avec une porte d'entrée de test (window.__T, ajoutée à la
 // volée, jamais dans le fichier publié). Aucune erreur JavaScript permise.
 // Nécessite Playwright et Chromium (ou CHROMIUM_PATH). Code de sortie 0 ou 1.
@@ -610,6 +615,36 @@ try {
   const rb = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); window.__rat=vie(v).rattrapage; P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); return 1; })()`);
   const retour = await attendreVillage(c, v6.id, 1e9, `VILLAGES.get(${v6.id}).sim===true`, 60000), etatR = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), r=vie(v).rattrapage; return 'simulé '+!!v.sim+' · rattrapage '+(r===window.__rat?'inchangé':JSON.stringify(r)); })()`);
   ok(retour && await T(c, `(()=>{ const r=vie(VILLAGES.get(${v6.id})).rattrapage; return r===window.__rat||r.j<.2; })()`), 'retour du joueur : le village repart sans recompter son absence (' + etatR + ')');
+  }
+
+  console.log('16. rendu des villageois');
+  { if (await T(c, `state`) !== 'play') await T(c, `resume()`);
+  // --- rendu des villageois : boîtes fusionnées, détails cachés de loin, pas d'animation hors de la vue
+  const ru = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z);
+    const o=VILS.find(x=>x.vil===v.id&&!x.puppet&&!(x.dead>0)); if(!o) return null; ensureMesh(o); const p=o.parts; let n=0; o.mesh.traverse(m=>{ if(m.isMesh&&!p.item.children.includes(m)) n++; });
+    return {n,fusions:(p.fusions||[]).length,detail:!!p.detail}; })()`);
+  ok(!!ru && ru.n <= 8 && ru.fusions >= 5 && ru.detail, ru ? `un villageois : ${ru.n} mailles (une vingtaine de boîtes avant), ${ru.fusions} géométries fusionnées, détails du visage à part` : 'pas de villageois présent');
+  if (ru) {
+    const vue = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), o=VILS.find(x=>x.vil===v.id&&!x.puppet&&!(x.dead>0)), p=o.parts, out={};
+      P.x=o.x+20; P.z=o.z; P.y=o.y+1; P.pitch=0;
+      animerVillageois(o,0,30); out.loin=p.detail.visible; animerVillageois(o,0,10); out.pres=p.detail.visible;
+      P.yaw=Math.atan2(-(o.x-P.x),-(o.z-P.z)); out.face=dansLaVue(o,20);
+      P.yaw+=Math.PI; out.dos=dansLaVue(o,20); p.legs[0].rotation.x=.77; o.vx=1; o.vz=0; o.x+=.5; const anime=animerVillageois(o,.1,20); out.horsVue=!anime&&p.legs[0].rotation.x===.77&&o.mesh.position.x===o.x;
+      P.yaw-=Math.PI; out.vu=animerVillageois(o,.1,20)&&p.legs[0].rotation.x!==.77; o.x-=.5; o.vx=0;
+      let libere=0; for(const g of p.fusions){ const d=g.dispose.bind(g); g.dispose=()=>{ libere++; d(); }; } const nf=p.fusions.length; dropMesh(o); out.libere=libere===nf; ensureMesh(o);
+      return out; })()`);
+    ok(vue.loin === false && vue.pres === true, `détails du visage cachés à 30 blocs, visibles à 10 (${vue.loin} / ${vue.pres})`);
+    ok(vue.face === true && vue.dos === false, 'champ de vision : villageois vu de face, pas de dos');
+    ok(vue.horsVue && vue.vu, 'hors de la vue : position suivie, membres non animés ; de retour dans la vue : animé');
+    ok(vue.libere, 'modèle retiré : géométries fusionnées libérées');
+  }
+  // bûcheron : un arbre hors d'atteinte n'est écarté que 300 s ; sans arbre à sa portée, il replante
+  const bu = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), o=VILS.find(x=>x.vil===v.id&&!x.puppet&&ficheDe(x)&&!(x.dead>0)); if(!o) return null; const f=ficheDe(o), m0=f.metier, w=vie(v);
+    ecarterArbre(o,5,7); const avant=arbreEcarte(o,5,7); w.t+=ARBRE_ECARTE+1; const apres=arbreEcarte(o,5,7);
+    f.metier='bucheron'; w.cache.arbresT=-1e9; const n=arbresAdultes(v), liste=(w.cache.liste||[]).slice(); /* liste fraîche, prise après le comptage */ for(const t of liste) ecarterArbre(o,t[0],t[1]); w.stock.pousse=Math.max(3,w.stock.pousse|0);
+    const ks=candidats(o,v,f).map(x=>x.k); f.metier=m0; o.badT=null; return {avant,apres,n,ks}; })()`);
+  ok(!bu || (bu.avant && !bu.apres), 'arbre hors de portée écarté 300 s seulement');
+  ok(!bu || bu.n <= 15 || (!bu.ks.includes('couper') && (bu.ks.includes('replanter') || bu.ks.includes('cueillir'))), bu ? `bûcheron sans arbre à sa portée (${bu.n} arbres, tous écartés) : ${bu.ks.join(', ')}` : 'pas de villageois présent');
   }
 } catch (e) { ok(false, e.message); }
 ok(erreurs.length === 0, `aucune erreur JavaScript${erreurs.length ? ' : ' + erreurs.slice(0, 3).join(' | ') : ''}`);
