@@ -53,6 +53,10 @@
 //  13. Caravanes : voisins connus, départ avec le surplus vers un voisin qui a ce qui
 //      manque, marchand visible près du joueur, échange aux valeurs de troc, escorte
 //      récompensée dans les deux villages, réplique sur la caravane, retour, relecture.
+//  14. Fiche du village et carte : fiche ouverte depuis le pilier de la place, depuis un
+//      villageois (et retour), contenu (habitants, métiers, chantier, réserves, manques,
+//      voisins, caravanes) ; carte : couleur de la réputation, nom, caravane tracée, liste
+//      des villages découverts (boutons de 44 px au moins), fiche ouverte et retour à la carte.
 // Le jeu est servi avec une porte d'entrée de test (window.__T, ajoutée à la
 // volée, jamais dans le fichier publié). Aucune erreur JavaScript permise.
 // Nécessite Playwright et Chromium (ou CHROMIUM_PATH). Code de sortie 0 ou 1.
@@ -409,7 +413,7 @@ try {
   const A = await T(c, `(()=>{ const v=${V}; for(const o of VILS) if(o.vil===v.id&&!(o.baby>0)){ const g=ficheDe(o); if(g&&vivant(g)&&g.age!=='enfant') g.age='adulte'; } const e=VILS.find(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))&&ficheDe(o).age==='adulte'); rel(v).rep=0; rel(v).actes=0; rel(v).colere=0; rel(v).reparer=[]; rel(v).quete=null; P.hp=20; return e.vslot; })()`);
   const ouvrirFiche = () => T(c, `(()=>{ const v=${V}, e=entDe(v,${A}); openVillageois(e); return state; })()`);
   const cliquer = async (txt) => { await c.locator('#bagBody .vbtn', { hasText: txt }).first().click(); await attendre(300); };
-  ok(await ouvrirFiche() === 'bag' && await c.locator('#bagBody .vfiche').count() === 1 && (await c.locator('#bTitle').innerText()).trim() === (await T(c, `ficheDe(entDe(${V},${A})).nom`)) && await c.locator('#bagBody .vmenu .vbtn').count() === 4, 'toucher un villageois ouvre sa fiche et le menu (4 boutons)');
+  ok(await ouvrirFiche() === 'bag' && await c.locator('#bagBody .vfiche').count() === 1 && (await c.locator('#bTitle').innerText()).trim() === (await T(c, `ficheDe(entDe(${V},${A})).nom`)) && await c.locator('#bagBody .vmenu .vbtn').count() === 5, 'toucher un villageois ouvre sa fiche et le menu (4 boutons et « Le village »)');
   const ficheTxt = await c.locator('#bagBody .vfiche').innerText();
   ok(/Famille/.test(ficheTxt) && /En ce moment/.test(ficheTxt) && /Humeur/.test(ficheTxt) && /réputation/.test(ficheTxt), 'fiche : âge, métier, famille, action, humeur, réputation');
   await cliquer('Parler');
@@ -499,6 +503,48 @@ try {
       c = await ouvrir('&debug=1'); await attendre(800);
       ok(n > 0 && await T(c, `CARAVANES.size`) === n, 'caravane en route relue après rechargement');
     }
+  }
+  }
+
+  console.log('14. fiche du village et carte');
+  { c = await ouvrir('&debug=1'); await continuer(c);
+  const vf = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id})||[...VILLAGES.values()][0]; if(!v) return null; for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((v.cx>>4)+a,(v.cz>>4)+b);
+    if(state==='dead') respawn(); P.fly=true; P.x=v.cx+3.5; P.z=v.cz+3.5; P.y=v.h0+3; loadAround(P.x,P.z); P.food=20; P.hp=20; prefs.monsters=false; vie(v); if(!v.pop) v.pop=new Map(); markSeen(); seen.add(CK(v.cx>>4,v.cz>>4));
+    const o=[...VILLAGES.values()].find(x=>x!==v); CARAVANES.clear(); if(o){ seen.add(CK(o.cx>>4,o.cz>>4)); CARAVANES.set(990,{id:990,de:v.id,vers:o.id,veut:'fer',charge:{bois:16},retour:null,etat:'aller',depart:maintenant(),duree:50,escorteT:0,nuit:0}); }
+    return {id:v.id,nom:villageNom(v),autre:o?villageNom(o):null,hab:habitants(v)}; })()`);
+  ok(!!vf, vf ? `village ${vf.nom} (${vf.hab} habitants)` : 'aucun village chargé');
+  if (vf) {
+    const V = `VILLAGES.get(${vf.id})`;
+    // le pilier (ou le puits) de la place : le bouton d'action ouvre la fiche
+    const pil = await T(c, `(()=>{ const v=${V}, b={x:v.cx,y:v.h0+1,z:v.cz}; b.id=getB(b.x,b.y,b.z); if(villageIci(b)!==v) return 'non reconnu'; setState('play'); target=b; targetEnt=null; useKey=''; updateUseBtn(); const l=$('#useLbl').textContent; useAction(); return l+' → '+state+' / '+bagTab+' / '+$('#bTitle').textContent; })()`);
+    ok(new RegExp('^Le village → bag / village / ' + vf.nom + '$').test(pil), 'le pilier de la place : bouton « Le village », fiche ouverte (' + pil + ')');
+    const txt = await T(c, `$('#bagBody').textContent`);
+    const attendus = ['Habitants', 'Métiers', 'Bâtiments', 'Ta réputation', 'Chantier en cours', 'Réserves', 'Ce qui manque', 'Villages voisins', 'Caravanes'].filter((m) => !txt.includes(m));
+    ok(attendus.length === 0 && !/[{}]/.test(txt), 'la fiche donne habitants, métiers, bâtiments, réputation, chantier, réserves, manques, voisins et caravanes' + (attendus.length ? ' — manque : ' + attendus.join(', ') : ''));
+    if (vf.autre) ok(txt.includes('Partie pour ' + vf.autre + ' avec du bois ×16'), `la caravane en route vers ${vf.autre} est dans la fiche`);
+    // depuis un villageois : bouton « Le village », puis retour au villageois
+    const vil = await T(c, `(()=>{ const v=${V}, o=VILS.find(x=>x.vil===v.id&&!(x.baby>0)&&!x.puppet&&ficheDe(x)&&!(x.dead>0)); if(!o) return null; setState('play'); openVillageois(o); return o.nom; })()`);
+    if (vil) {
+      await c.locator('#bagBody .vbtn', { hasText: 'Le village' }).click(); await attendre(200);
+      ok(await T(c, `bagTab==='village'&&$('#bTitle').textContent===${JSON.stringify(vf.nom)}`), `depuis ${vil} : « Le village » ouvre la fiche du village`);
+      await c.locator('#bagBody .vbtn', { hasText: 'Retour à ' + vil }).click(); await attendre(200);
+      ok(await T(c, `bagTab==='vil'&&$('#bTitle').textContent===${JSON.stringify(vil)}`), 'retour à la fiche du villageois');
+    } else ok(true, 'pas de villageois présent (bouton « Le village » non essayé)');
+    // la carte : couleur de la réputation, nom, caravane, liste des villages
+    await T(c, `(()=>{ rel(${V}).rep=40; setState('play'); openMap(); })()`); await attendre(300);
+    const d1 = await T(c, `JSON.stringify(carteDessin)`), dv = JSON.parse(d1);
+    const mv = dv.villages.find((x) => x.id === vf.id);
+    ok(!!mv && mv.couleur === '#3fa34d' && mv.nom === vf.nom, mv ? `sur la carte : ${mv.nom}, toit vert (réputation excellente), taille ${mv.taille}` : 'le village n\'est pas sur la carte : ' + d1);
+    await T(c, `(()=>{ rel(${V}).rep=-60; drawMap(); })()`);
+    ok(await T(c, `carteDessin.villages.find(x=>x.id===${vf.id}).couleur`) === '#c0392b', 'réputation très mauvaise : toit rouge');
+    if (vf.autre) ok(dv.caravanes >= 1, `caravane en route tracée sur la carte (${dv.caravanes})`);
+    const btn = await c.locator('#mVils .mvil').evaluateAll((l) => l.map((b) => [b.textContent, Math.round(b.getBoundingClientRect().height)]));
+    ok(btn.length >= 1 && btn.some((b) => b[0].startsWith(vf.nom + ' · ')) && btn.every((b) => b[1] >= 44), `liste des villages découverts : ${btn.map((b) => b[0] + ' (' + b[1] + ' px)').join(', ')}`);
+    await c.locator('#mVils .mvil', { hasText: vf.nom + ' · ' }).first().click(); await attendre(200);
+    ok(await T(c, `state==='bag'&&bagTab==='village'&&ficheRetour==='map'`), 'un village de la liste ouvre sa fiche');
+    await c.locator('#bagBody .vbtn', { hasText: 'Retour à la carte' }).click(); await attendre(200);
+    ok(await T(c, `state`) === 'map', 'retour à la carte');
+    await T(c, `(()=>{ rel(${V}).rep=0; CARAVANES.delete(990); resume(); })()`);
   }
   }
 } catch (e) { ok(false, e.message); }
