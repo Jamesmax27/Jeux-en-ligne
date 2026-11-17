@@ -64,6 +64,7 @@
 //  16. Rendu des villageois (étape 12) : boîtes fusionnées (7 mailles par villageois),
 //      détails du visage cachés au-delà de 24 blocs, champ de vision, pas d'animation hors
 //      de la vue (position suivie), géométries libérées quand le modèle est retiré.
+//      Bûcheron : arbre hors de portée écarté 300 s seulement ; sans arbre à sa portée, il replante.
 //      Les mesures de charge et l'endurance sont dans scripts/charge-terres-cubiques.mjs.
 // Le jeu est servi avec une porte d'entrée de test (window.__T, ajoutée à la
 // volée, jamais dans le fichier publié). Aucune erreur JavaScript permise.
@@ -640,7 +641,7 @@ try {
   // bûcheron : un arbre hors d'atteinte n'est écarté que 300 s ; sans arbre à sa portée, il replante
   const bu = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), o=VILS.find(x=>x.vil===v.id&&!x.puppet&&ficheDe(x)&&!(x.dead>0)); if(!o) return null; const f=ficheDe(o), m0=f.metier, w=vie(v);
     ecarterArbre(o,5,7); const avant=arbreEcarte(o,5,7); w.t+=ARBRE_ECARTE+1; const apres=arbreEcarte(o,5,7);
-    f.metier='bucheron'; const liste=(w.cache.liste||[]).slice(), n=arbresAdultes(v); for(const t of liste) ecarterArbre(o,t[0],t[1]); w.stock.pousse=Math.max(3,w.stock.pousse|0);
+    f.metier='bucheron'; w.cache.arbresT=-1e9; const n=arbresAdultes(v), liste=(w.cache.liste||[]).slice(); /* liste fraîche, prise après le comptage */ for(const t of liste) ecarterArbre(o,t[0],t[1]); w.stock.pousse=Math.max(3,w.stock.pousse|0);
     const ks=candidats(o,v,f).map(x=>x.k); f.metier=m0; o.badT=null; return {avant,apres,n,ks}; })()`);
   ok(!bu || (bu.avant && !bu.apres), 'arbre hors de portée écarté 300 s seulement');
   ok(!bu || bu.n <= 15 || (!bu.ks.includes('couper') && (bu.ks.includes('replanter') || bu.ks.includes('cueillir'))), bu ? `bûcheron sans arbre à sa portée (${bu.n} arbres, tous écartés) : ${bu.ks.join(', ')}` : 'pas de villageois présent');

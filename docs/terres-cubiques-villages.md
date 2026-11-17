@@ -262,7 +262,33 @@ Tout est dans la section « Rattrapage au retour » du code (réglages `RATTRAPA
   - **Aucune recherche de chemin**, aucun déplacement : seul l'hôte rattrape.
   - Le mode test note chaque rattrapage dans son journal.
 
-## 16. Étapes
+## 16. Optimisation et essais de charge (étape 12)
+
+Mesures de `scripts/charge-terres-cubiques.mjs` (processeur ralenti 4 fois pour imiter un téléphone moyen, écran de 390 × 844). Elles portent sur le temps passé par image, et non sur les images par seconde : le navigateur de test dessine sans carte graphique, ses images par seconde ne disent rien d'un vrai téléphone.
+
+| Situation | Calcul des villages par image | Appels de dessin par image |
+| --- | --- | --- |
+| Loin de tout village (plus de 1 000 blocs) | 0,02 ms (0 avec la simulation coupée) | 49 (49 avec la simulation coupée) |
+| Près d'un village de 20 villageois actifs, le regard tourné vers eux | 0,31 ms (simulation 0,03, IA 0,28) | 495 avant l'étape 12, 206 à 211 après |
+| Même foule, vitesse ×10 du mode test | 1,0 ms | 207 |
+
+Le budget d'une image est de 33 ms pour tenir 30 images par seconde. Le calcul des villages n'en prend que 1 %. Le point faible était le dessin : chaque villageois était fait d'une vingtaine de boîtes dessinées une à une.
+
+Section « Optimisation du rendu des villageois » du code (réglages `OPTI`) :
+
+- **Boîtes fusionnées** : à la création du modèle, les boîtes fixes de chaque partie (corps, tête, chaque bras, chaque jambe) sont fusionnées en une seule maille. Un villageois tient en 7 mailles, plus l'objet tenu. Face à une foule de 20, les appels de dessin passent de 495 à 206 environ, et la préparation du rendu de 2,15 à 1,43 ms par image.
+  - Les géométries fusionnées sont libérées quand le modèle est retiré. Les autres créatures ne changent pas.
+- **Niveau de détail** : au-delà de 24 blocs, les détails du visage (yeux, bouche, joues) et l'objet tenu sont cachés.
+- **Hors de la vue** : un villageois hors du champ de vision n'est pas animé (membres, ombre, lumière), seule sa position suit.
+- **Pâturage** : un animal compté par un village est désormais « du village ». Quand il s'éloigne de plus de 12 blocs au-delà du rayon du village, et que le village est simulé, sa promenade suivante le ramène vers la place. L'endurance avait montré des couples d'animaux qui s'éparpillaient : 3 cochons au départ, 1 seul encore dans le village au bout de 3 heures.
+- **Bûcheron** : un arbre qu'il n'a pas pu atteindre n'est plus écarté pour toujours, mais pour 300 s de simulation du village. Un chemin introuvable peut venir de la limite de recherches de chemin par image, ou d'un passage bouché un moment. S'il n'a plus aucun arbre à sa portée, il se comporte comme sous le seuil : il cueille des pousses et replante.
+  - Une endurance avait fini en « impasse bois » avec 46 arbres adultes autour : la liste des arbres écartés, jamais vidée, avait fini par les contenir tous.
+- **Endurance** : 3 heures de simulation accélérée (×10) près d'un village de 20 villageois. Trois passages sur trois mondes différents tirés au hasard. Les arbres adultes, les graines, les couples d'animaux et le champ semé sont restés au-dessus de leurs seuils (par exemple : arbres de 10 à 15, graines de 8 à 86, couples de poules et de cochons formés, champ semé à 100 %). Un village parti sous un seuil (4 arbres au désert) n'est jugé que par rapport à son départ : en 3 heures simulées à ×10, il ne passe qu'un jour et demi du jeu, et les pousses mettent un jour à grandir. Reste à surveiller : dans un des mondes, le chantier d'une maison d'ancien a attendu de la pierre pendant les 3 heures.
+  - La plus longue « impasse » n'est qu'une information : à ×10, une pousse met toujours un jour du jeu à devenir un arbre, et la vitesse n'accélère pas les jours. Quand les arbres sont au seuil, l'attente du bois paraît donc 10 fois plus longue qu'en jeu normal.
+
+Le script n'est pas dans `validate.yml` : il est long, et ses temps dépendent de la machine. À lancer à la main après un changement des villages : `node scripts/charge-terres-cubiques.mjs` (20 à 45 minutes), ou `--rapide` pour les mesures seules (2 minutes).
+
+## 17. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
@@ -279,10 +305,11 @@ Tout est dans la section « Rattrapage au retour » du code (réglages `RATTRAPA
 | 10 (suite) | Relations entre villages et caravanes | fait (17/11, branche `terres-cubiques-etape-10b`) |
 | 10 (fin) | Fiche du village et carte | fait (17/11, branche `terres-cubiques-etape-10c`) |
 | 11 | Sauvegarde complète des villages et rattrapage | fait (17/11, branche `terres-cubiques-etape-11`) |
-| 12 | Optimisation et tests de charge | à faire |
+| 12 | Optimisation et tests de charge | fait (17/11, branche `terres-cubiques-etape-12`) |
 
-## 17. Essais
+## 18. Essais
 
 - `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture), les 30 bâtiments (24 gabarits posés et reliés par un chemin, sortie de la carrière, effets, meunier au moulin, tour après une attaque, carrière bâtie par l'aide de chantier). Sur GitHub, les échecs sont aussi écrits dans le résumé du job.
+- `node scripts/charge-terres-cubiques.mjs` (à la main, section 16) : mesures de charge et endurance de 3 heures de simulation accélérée.
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
 - Contrôles habituels : `validate-games.mjs --jouer`, `tester-sauvegarde.mjs`, `check-i18n.js`, `verifier-seo.mjs`.

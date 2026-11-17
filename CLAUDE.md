@@ -577,6 +577,12 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
   - Au retour d'un joueur, rattrapage d'un coup, plafonné à 3 jours du jeu, sans recherche de chemin : récolte selon les métiers et les moyens du village, transformations des artisans, réserves plafonnées, repas, pardon, au plus une couche par chantier.
   - Réglages `RATTRAPAGE` ; `version` 19. Testé : `tester-terres-cubiques.mjs` (section 15).
   - Reste : étape 12 (optimisation et tests de charge).
+- Terres Cubiques, étape 12 (optimisation et essais de charge) — fait (branche `terres-cubiques-etape-12`, 17 novembre 2026, `docs/terres-cubiques-villages.md`, section 16).
+  - Mesures, processeur ralenti 4 fois : 0,02 ms de calcul des villages par image loin des villages, 0,31 ms près d'un village de 20 villageois, 1 ms à ×10.
+  - Rendu des villageois : boîtes fusionnées (de 495 à 206 appels de dessin face à une foule de 20), détails cachés au-delà de 24 blocs, pas d'animation hors du champ de vision.
+  - Pâturage des animaux du village, pour que les couples restent ensemble. Bûcheron : un arbre hors de portée n'est plus écarté pour toujours (300 s) ; sans arbre à sa portée, il replante.
+  - `scripts/charge-terres-cubiques.mjs` (à la main : mesures et endurance de 3 heures simulées) ; `tester-terres-cubiques.mjs`, section 16 ; `version` 20.
+  - La consigne « villageois autonomes » est faite, sauf l'étape 5 (multijoueur), hors périmètre.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 
