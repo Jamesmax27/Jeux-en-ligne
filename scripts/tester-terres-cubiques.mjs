@@ -28,12 +28,16 @@
 //      progression, blocs notés « village » ; chantier en pause faute de bois
 //      (besoin maximal), reprise à la livraison ; le planificateur lance un
 //      chantier ; chantier et bâtiments finis relus après rechargement.
+//   8. Échanges et marché (vitesse ×10) : un meunier sans blé va en chercher chez
+//      un porteur, dette notée puis rendue sur la farine ; refus d'un porteur de
+//      mauvaise humeur ; marché bâti, marchand nommé, surplus rangé sur les étals,
+//      blé pris au marché faute de porteur ; étals et compteurs relus après rechargement.
 // Le jeu est servi avec une porte d'entrée de test (window.__T, ajoutée à la
 // volée, jamais dans le fichier publié). Aucune erreur JavaScript permise.
 // Nécessite Playwright et Chromium (ou CHROMIUM_PATH). Code de sortie 0 ou 1.
 // ==========================================================================
 
-import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, writeFile, appendFile, mkdtemp, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -73,8 +77,8 @@ await contexte.route(`${BASE}/**`, async (route) => {
 const page = await contexte.newPage(), erreurs = [];
 page.on('pageerror', (e) => erreurs.push(String(e).split('\n')[0]));
 const dossier = await mkdtemp(path.join(os.tmpdir(), 'tc-'));
-let echecs = 0;
-const ok = (c, m) => { console.log(`${c ? '  ✓' : '  ✗'} ${m}`); if (!c) echecs++; };
+let echecs = 0; const rates = [];
+const ok = (c, m) => { console.log(`${c ? '  ✓' : '  ✗'} ${m}`); if (!c) { echecs++; rates.push(m); } };
 const cadre = () => page.frames().find((f) => f.url() === 'about:srcdoc');
 const T = (c, code) => c.evaluate((k) => window.__T(k), code);
 const attendre = (ms) => page.waitForTimeout(ms);
@@ -174,7 +178,7 @@ try {
   const v6 = await T(c, `(()=>{ for(let ci=-2;ci<=2;ci++) for(let cj=-2;cj<=2;cj++){ const inf=villageInfo(Math.floor(P.x/256)+ci,Math.floor(P.z/256)+cj); if(inf) for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); }
     const v=[...VILLAGES.values()].sort((a,b)=>b.vils.length-a.vils.length)[0]; P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); time=.08; DBG.vitesse=10; prefs.monsters=false;
     const jx=v.cx+v.R+8, jz=v.cz, jy=surfaceY(jx,jz)+1; for(let k=0;k<4;k++) setBlock(jx,jy+k,jz,OAK_LOG); setBlock(jx+1,jy,jz,COBBLE);
-    return {id:v.id,jx,jy,jz,stock:JSON.stringify(vie(v).stock)}; })()`);
+    return {id:v.id,jx,jy,jz,stock:JSON.stringify(vie(v).stock),arbres0:arbresAdultes(v)}; })()`);
   let vit = false; for (let k = 0; k < 40 && !vit; k++) { await attendre(500); vit = await T(c, `state==='play'&&VILLAGES.get(${v6.id}).sim===true&&vie(VILLAGES.get(${v6.id})).t>3`); }
   ok(vit, 'partie en cours, village simulé');
   await attendreVillage(c, v6.id, 20);
@@ -187,7 +191,7 @@ try {
   r = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), w=vie(v); return {stock:w.stock,arbres:arbresAdultes(v),champ:v.field?v.field.cells.filter(q=>{ const id=getB(q[0],v.h0+1,q[1]); return B[id]&&B[id].crop; }).length/v.field.cells.length:1}; })()`);
   const avant6 = JSON.parse(v6.stock), plus = Object.keys(r.stock).filter((k) => (r.stock[k] | 0) > (avant6[k] | 0));
   ok(plus.length >= 3, `le stock du village grandit (${plus.join(', ')})`);
-  ok(r.arbres >= 15, `arbres adultes au-dessus du seuil (${r.arbres})`);
+  ok(r.arbres >= 15 || r.arbres >= v6.arbres0, `arbres adultes : au-dessus du seuil, ou jamais coupés sous lui (départ ${v6.arbres0}, fin ${r.arbres}, seuil 15)`);
   ok(r.champ > .6, `champ ressemé (${Math.round(r.champ * 100)} %)`);
   ok(await T(c, `(()=>{ for(let k=0;k<4;k++) if(getB(${v6.jx},${v6.jy}+k,${v6.jz})!==OAK_LOG) return false; return getB(${v6.jx}+1,${v6.jy},${v6.jz})===COBBLE&&(${pz?`isLog(getB(${pz[0]},${pz[1] + 1},${pz[2]}))`:'true'}); })()`), 'aucun bloc du joueur touché (bûches, pierre, arbre né de sa pousse)');
 
@@ -218,8 +222,39 @@ try {
   await T(c, `(async()=>{ saveNow(); await saving; })()`);
   c = await ouvrir('&debug=1'); await attendre(800);
   ok(await T(c, `(()=>{ const ci=Math.floor((${v6.id}-1000)/256), cj=(${v6.id}-1000)%256, inf=villageInfo(ci,cj); for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); const v=VILLAGES.get(${v6.id}); return !!(v&&v.eco&&v.eco.s&&v.eco.s.t===${JSON.stringify(plan)}&&(vie(v).bats||[]).some(b=>b.t==='cabane')); })()`), 'chantier en cours et bâtiments finis relus après rechargement');
+
+  console.log('8. échanges et marché (vitesse ×10)');
+  await continuer(c);
+  await T(c, `window.vueSur=S=>{ const v=VILLAGES.get(${v6.id}), dx=v.cx-S.x, dz=v.cz-S.z, d=Math.hypot(dx,dz)||1, k=Math.min(14,d)/d; P.fly=true; P.x=S.x+.5+dx*k; P.z=S.z+.5+dz*k; P.y=S.g0+9; P.yaw=Math.atan2(dx,dz); P.pitch=-Math.atan2(6,Math.min(14,d)); }`);
+  await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); time=.08; DBG.vitesse=10; prefs.monsters=false; vilEco(v).s=null; vie(v).planT=1e9;
+    for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g) g.humeur=70; } })()`);
+  ok(await attendreVillage(c, v6.id, 1e9, `VILLAGES.get(${v6.id}).sim&&VILS.filter(o=>o.vil===${v6.id}&&!(o.baby>0)&&ficheDe(o)).length>=3`, 30000), 'village simulé, 3 adultes au moins');
+  // A devient meunier sans blé ; B (garde, qui ne livre pas tout de suite) porte du blé ; personne d'autre n'en a
+  const prep = `(hB,sac)=>{ const v=VILLAGES.get(${v6.id}), w=vie(v), ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)), A=ad[0], B=ad[1];
+    w.stock.ble=0; w.stock.farine=0; for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g){ delete g.inv.ble; g.dettes={}; } }
+    const fa=ficheDe(A), fb=ficheDe(B); fa.metier='meunier'; fa.inv={}; fa.humeur=60; fa.memoire=[]; fb.metier='garde'; fb.inv=sac||{ble:6}; fb.humeur=hB;
+    A.act=null; A.trocT=0; A.decT=0; B.act=null; B.attendTroc=0; return {a:A.vslot,b:B.vslot}; }`;
+  let tr = await T(c, `(${prep})(70)`); const n0 = await T(c, `echg(VILLAGES.get(${v6.id})).troc.n`);
+  ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.n>${n0}`, 120000), 'le meunier sans blé en obtient d\'un porteur');
+  ok(await T(c, `VILLAGES.get(${v6.id}).pop.get(${tr.b}).humeur>70`), 'échange : le porteur est plus content');
+  ok(await attendreVillage(c, v6.id, 900, `(()=>{ const fa=VILLAGES.get(${v6.id}).pop.get(${tr.a}); return !((fa.dettes||{})[${tr.b}]>0)&&fa.memoire.some(m=>m[2]==='dette'); })()`, 120000), 'sac vide : dette notée, puis rendue sur la farine moulue');
+  tr = await T(c, `(${prep})(10)`); const rf0 = await T(c, `echg(VILLAGES.get(${v6.id})).troc.refus`);
+  ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.refus>${rf0}`, 120000) && await T(c, `VILLAGES.get(${v6.id}).pop.get(${tr.b}).inv.ble===6`), 'porteur de mauvaise humeur : il refuse et garde son blé');
+  await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g) g.humeur=70; } vie(v).stock.bois=80; vie(v).stock.pierre=80; const S=siteBat(v,'marche'); if(S){ vilEco(v).s=S; vueSur(S); } })()`);
+  ok(await attendreVillage(c, v6.id, 2000, `(vie(VILLAGES.get(${v6.id})).bats||[]).some(b=>b.t==='marche')`, 240000), 'marché bâti');
+  ok(await T(c, `[...VILLAGES.get(${v6.id}).pop.values()].some(f=>f.metier==='marchand')`), 'un villageois devient marchand');
+  await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; vie(v).stock.pierre=60; })()`);
+  ok(await attendreVillage(c, v6.id, 900, `(echg(VILLAGES.get(${v6.id})).etal.pierre|0)>0`, 150000), 'le marchand range le surplus de pierre sur les étals');
+  tr = await T(c, `(()=>{ const r=(${prep})(70,{}); echg(VILLAGES.get(${v6.id})).etal.ble=6; return r; })()`); const mk0 = await T(c, `echg(VILLAGES.get(${v6.id})).troc.marche`);
+  ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.marche>${mk0}`, 150000), 'sans porteur, le meunier prend du blé au marché');
+  const etal = await T(c, `JSON.stringify([echg(VILLAGES.get(${v6.id})).etal,echg(VILLAGES.get(${v6.id})).troc])`);
+  await T(c, `(async()=>{ saveNow(); await saving; })()`);
+  c = await ouvrir('&debug=1'); await attendre(800);
+  ok(await T(c, `(()=>{ const ci=Math.floor((${v6.id}-1000)/256), cj=(${v6.id}-1000)%256, inf=villageInfo(ci,cj); for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); const v=VILLAGES.get(${v6.id}); return !!v&&!!v.vie&&JSON.stringify([v.vie.etal,v.vie.troc])===${JSON.stringify(etal)}&&!!marcheDe(v); })()`), 'étals, compteurs et marché relus après rechargement');
 } catch (e) { ok(false, e.message); }
 ok(erreurs.length === 0, `aucune erreur JavaScript${erreurs.length ? ' : ' + erreurs.slice(0, 3).join(' | ') : ''}`);
 await navigateur.close(); await rm(dossier, { recursive: true, force: true });
 console.log(echecs ? `\nTerres Cubiques : ${echecs} problème(s).` : '\nTerres Cubiques : tout est bon.');
+// sur GitHub, les échecs vont aussi dans le résumé du job (lisible sans ouvrir les journaux)
+if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `### Terres Cubiques\n\n${rates.length ? rates.map((m) => '- ✗ ' + m).join('\n') : 'Tout est bon.'}\n\n`).catch(() => {});
 process.exit(echecs ? 1 : 0);
