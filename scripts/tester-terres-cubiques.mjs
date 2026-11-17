@@ -45,6 +45,11 @@
 //      chantier, ressource qui manque, famille, rumeur tirée de la mémoire d'un
 //      voisin et conversation, échanges, aucune redite avant 5 autres ; les
 //      villageois parlent d'eux-mêmes près du joueur, sans variable non remplie.
+//  12. Le joueur et les villages : fiche et menu du villageois (Parler, Échanger,
+//      Aider, Demander une tâche), prix et refus selon la réputation, matériaux
+//      déposés dans un chantier, tâche livrée, bloc cassé puis réparé, vol, coup,
+//      colère et attaque, fuite, attaque dès l'entrée, pardon ; réputation et tâche
+//      relues après rechargement.
 // Le jeu est servi avec une porte d'entrée de test (window.__T, ajoutée à la
 // volée, jamais dans le fichier publié). Aucune erreur JavaScript permise.
 // Nécessite Playwright et Chromium (ou CHROMIUM_PATH). Code de sortie 0 ou 1.
@@ -152,7 +157,7 @@ try {
 
   console.log('3. villages par proximité');
   await continuer(c);
-  await T(c, 'prefs.monsters=false; P.food=20; P.hp=20;'); // une longue partie en survie : le joueur de l'essai ne doit ni mourir de faim ni des monstres
+  await T(c, "(()=>{ prefs.monsters=false; if(state==='dead') respawn(); P.food=20; P.hp=20; })()"); await attendre(500); // relevé s'il est mort plus tôt (voyage de la section 2) // une longue partie en survie : le joueur de l'essai ne doit ni mourir de faim ni des monstres
   const vid = await T(c, `(()=>{ const v=[...VILLAGES.values()].sort((a,b)=>Math.hypot(a.cx-P.x,a.cz-P.z)-Math.hypot(b.cx-P.x,b.cz-P.z))[0]; P.fly=true; P.x=v.cx+.5; P.z=v.cz+12.5; P.y=v.h0+3; loadAround(P.x,P.z); return v.id; })()`);
   await attendre(2500);
   r = await T(c, `(()=>{ const v=VILLAGES.get(${vid}); const vil=ents.filter(e=>e.type==='villager'&&e.vil===v.id); return {sim:v.sim,n:vil.length,noms:vil.every(e=>typeof e.nom==='string'&&e.nom),etat:state,bord:Math.round(Math.hypot(P.x-v.cx,P.z-v.cz)-v.R)}; })()`);
@@ -212,7 +217,7 @@ try {
   console.log('7. construction (vitesse ×10)');
   // le joueur vole au-dessus du chantier, tourné vers lui (l'étiquette n'est montrée que si on la voit)
   await T(c, `window.vueSur=S=>{ const v=VILLAGES.get(${v6.id}), dx=v.cx-S.x, dz=v.cz-S.z, d=Math.hypot(dx,dz)||1, k=Math.min(14,d)/d; P.fly=true; P.x=S.x+.5+dx*k; P.z=S.z+.5+dz*k; P.y=S.g0+9; P.yaw=Math.atan2(dx,dz); P.pitch=-Math.atan2(6,Math.min(14,d)); }`);
-  const cab = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); vie(v).stock.bois=60; vie(v).stock.pierre=40; const S=siteBat(v,'cabane'); if(!S) return null; vilEco(v).s=S; vie(v).planT=1e9; vueSur(S); return {x:S.x,z:S.z,g0:S.g0}; })()`);
+  const cab = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); vie(v).stock.bois=150; vie(v).stock.pierre=150; const S=siteBat(v,'cabane'); if(!S) return null; vilEco(v).s=S; vie(v).planT=1e9; vueSur(S); return {x:S.x,z:S.z,g0:S.g0}; })()`);
   ok(!!cab, 'emplacement de cabane trouvé (terrain aplani de 2 blocs au plus)');
   let fini = null, etiquette = false;
   const tc = await T(c, `vie(VILLAGES.get(${v6.id})).t`), finC = Date.now() + 420000;
@@ -227,8 +232,10 @@ try {
   const ent = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); vie(v).stock.bois=0; vie(v).stock.pierre=40; for(const e of ents) if(e.vil===v.id){ const f=ficheDe(e); if(f) f.inv={}; } const S=siteBat(v,'entrepot'); if(!S) return false; S.credit={}; vilEco(v).s=S; vueSur(S); return true; })()`);
   let pause = null;
   const tp = await T(c, `vie(VILLAGES.get(${v6.id})).t`), finP = Date.now() + 300000;
-  while (ent && !pause && Date.now() < finP && await T(c, `vie(VILLAGES.get(${v6.id})).t`) - tp < 300) { await attendre(1000); await T(c, 'time=Math.min(time,.45)'); pause = await T(c, `(()=>{ const S=vilEco(VILLAGES.get(${v6.id})).s; return S&&S.manque==='bois'?{p:S.p,lab:[...document.querySelectorAll('.chantier.pause')].filter(b=>!b.hidden).length}:null; })()`); }
-  ok(!!pause && pause.lab > 0 && await T(c, `besoin(VILLAGES.get(${v6.id}),'bois')`) === 1, 'entrepôt en pause faute de bois, besoin de bois maximal');
+  while (ent && !pause && Date.now() < finP && await T(c, `vie(VILLAGES.get(${v6.id})).t`) - tp < 300) { await attendre(1000); await T(c, 'time=Math.min(time,.45)'); pause = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), S=vilEco(v).s; return S&&S.pauseR==='bois'?{p:S.p,enCours:S.manque==='bois',besoin:besoin(v,'bois'),lab:[...document.querySelectorAll('.chantier.pause')].filter(b=>!b.hidden).length}:null; })()`); }
+  // la pause peut être brève : le bâtisseur va aussitôt chercher du bois chez un bûcheron qui en porte (étape 6)
+  const pauseOk = !!pause && (!pause.enCours || (pause.besoin === 1 && pause.lab > 0));
+  ok(pauseOk, 'entrepôt en pause faute de bois (besoin de bois maximal et étiquette rouge pendant la pause)' + (pauseOk ? '' : ' — ' + JSON.stringify(pause) + ' · ' + await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), S=vilEco(v).s, b=VILS.find(o=>o.vil===v.id&&metierDe(o)==='batisseur')||aideChantier(v); return (S?S.t+' '+S.p+'/'+(S.plan?S.plan.length:'?')+' manque '+S.manque+' pause '+S.pauseR+' crédit '+JSON.stringify(S.credit):'pas de chantier')+' · bois '+stockDe(v,'bois')+' pierre '+stockDe(v,'pierre')+' · '+(b?(metierDe(b)+' '+(b.act&&b.act.k)+' '+vilWant(b)+' à '+(S?Math.round(Math.hypot(b.x-S.x,b.z-S.z)):'?')+' blocs'):'personne pour bâtir'); })()`)));
   await T(c, `ajouter(VILLAGES.get(${v6.id}),'bois',80)`);
   const reprise = !!pause && await attendreVillage(c, v6.id, 300, `(()=>{ const S=vilEco(VILLAGES.get(${v6.id})).s; return !S||(!S.manque&&S.p>${pause ? pause.p : 0}); })()`, 180000);
   ok(reprise, 'bois livré : le chantier reprend');
@@ -247,6 +254,7 @@ try {
   // A devient meunier sans blé ; B (garde, qui ne livre pas tout de suite) porte du blé ; personne d'autre n'en a
   const prep = `(hB,sac)=>{ const v=VILLAGES.get(${v6.id}), w=vie(v), ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)), A=ad.find(o=>vilWant(o)==='work')||ad[0], B=ad.find(o=>o!==A);
     w.stock.ble=0; w.stock.farine=0; for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g){ delete g.inv.ble; g.dettes={}; g.humeur=70; } }
+    for(const o of VILS) if(o.vil===v.id&&o!==A){ const g=ficheDe(o); if(g&&g.metier==='meunier') g.metier='tisserand'; } /* un seul meunier : celui de l'essai */
     const fa=ficheDe(A), fb=ficheDe(B); fa.metier='meunier'; fa.inv={}; fa.humeur=60; fa.memoire=[]; fb.metier='garde'; fb.inv=sac||{ble:6}; fb.humeur=hB;
     A.act=null; A.trocT=0; A.decT=0; B.act=null; B.attendTroc=0; return {a:A.vslot,b:B.vslot}; }`;
   let tr = await T(c, `(${prep})(70)`); const n0 = await T(c, `echg(VILLAGES.get(${v6.id})).troc.n`);
@@ -290,7 +298,8 @@ try {
   ok(ef.lits === ef.attendus && ef.lits > 0, `lits des logements comptés (${ef.lits})`);
   ok((!ef.ecurie || ef.anim === 4) && (!ef.scierie || ef.planche === .25) && (!ef.carriere || ef.pierre === .5), 'écurie (+4 animaux), scierie (planches à moitié prix), carrière (bonus de pierre)');
   const meu = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); if(!pointBat(v,'moulin')) return null; const ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)), A=ad.find(o=>vilWant(o)==='work')||ad[0]; ficheDe(A).metier='meunier'; ficheDe(A).inv={}; vie(v).stock.ble=30; A.act=null; A.decT=0; A.trocT=0; return A.vslot; })()`);
-  ok(meu === null || await attendreVillage(c, v6.id, 900, `(()=>{ const v=VILLAGES.get(${v6.id}), A=VILS.find(o=>o.vil===v.id&&o.vslot===${meu}), O=pointBat(v,'moulin'); return !!A&&!!A.act&&A.act.k==='transformer'&&Math.hypot(A.x-O[0]-.5,A.z-O[1]-.5)<2; })()`, 180000), 'le meunier moud devant le moulin');
+  const meuOk = meu === null || await attendreVillage(c, v6.id, 900, `(()=>{ const v=VILLAGES.get(${v6.id}), A=VILS.find(o=>o.vil===v.id&&o.vslot===${meu}), O=pointBat(v,'moulin'); return !!A&&!!A.act&&A.act.k==='transformer'&&Math.hypot(A.x-O[0]-.5,A.z-O[1]-.5)<2; })()`, 180000);
+  ok(meuOk, 'le meunier moud devant le moulin' + (meuOk ? '' : ' — ' + await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), A=VILS.find(o=>o.vil===v.id&&o.vslot===${meu}), O=pointBat(v,'moulin'); return A?('action '+(A.act&&A.act.k)+(A.act&&A.act.sansBat?' (atelier inaccessible)':'')+' · '+vilWant(A)+' · à '+Math.round(Math.hypot(A.x-O[0],A.z-O[1]))+' blocs du moulin · blé '+stockDe(v,'ble')+' · métier '+metierDe(A)):'absent'; })()`)));
   ok(await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), b=v.vie.bats; v.vie.bats=b.filter(x=>x.t!=='tour'); v.vie.attaque=1; const ok=souhaits(v).includes('tour'); v.vie.bats=b; return ok; })()`), 'après une attaque, le planificateur veut une tour de guet');
   const car = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); v.vie.bats=v.vie.bats.filter(b=>b.t!=='carriere'); vie(v).stock.pierre=200; vie(v).stock.bois=100;
     for(const o of VILS) if(o.vil===v.id&&o.metier==='batisseur'){ ficheDe(o).metier='tisserand'; o.act=null; } const S=siteBat(v,'carriere'); if(!S) return null; vilEco(v).s=S; return {x:S.x,z:S.z,g0:S.g0}; })()`);
@@ -387,6 +396,66 @@ try {
   ok(await T(c, `DLG.proche===16`), 'bavardages et répliques de travail à moins de 16 blocs d’un joueur');
   ok(await attendreVillage(c, v6.id, 1e9, `VILS.some(o=>o.vil===${v6.id}&&o.say&&typeof o.say.k==='string'&&o.say.k.startsWith('dlg.'))`, 120000), 'près du joueur, les villageois parlent d\'eux-mêmes');
   ok(await T(c, `[...document.querySelectorAll('#bulles .bulle')].filter(b=>!b.hidden).every(b=>!/[{}]/.test(b.textContent))`), 'aucune bulle avec une variable non remplie');
+  }
+
+  console.log('12. le joueur et les villages');
+  { const V = `VILLAGES.get(${v6.id})`, VID = v6.id;
+  await T(c, `(()=>{ const v=${V}; P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+6; loadAround(P.x,P.z); time=.08; DBG.vitesse=10; prefs.monsters=false; vilEco(v).s=null; vie(v).planT=1e9; })()`);
+  ok(await attendreVillage(c, v6.id, 1e9, `${V}.sim&&VILS.some(o=>o.vil===${v6.id}&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))&&ficheDe(o).age==='adulte')`, 40000), 'village simulé');
+  const A = await T(c, `(()=>{ const v=${V}; for(const o of VILS) if(o.vil===v.id&&!(o.baby>0)){ const g=ficheDe(o); if(g&&vivant(g)&&g.age!=='enfant') g.age='adulte'; } const e=VILS.find(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))&&ficheDe(o).age==='adulte'); rel(v).rep=0; rel(v).actes=0; rel(v).colere=0; rel(v).reparer=[]; rel(v).quete=null; P.hp=20; return e.vslot; })()`);
+  const ouvrirFiche = () => T(c, `(()=>{ const v=${V}, e=entDe(v,${A}); openVillageois(e); return state; })()`);
+  const cliquer = async (txt) => { await c.locator('#bagBody .vbtn', { hasText: txt }).first().click(); await attendre(300); };
+  ok(await ouvrirFiche() === 'bag' && await c.locator('#bagBody .vfiche').count() === 1 && (await c.locator('#bTitle').innerText()).trim() === (await T(c, `ficheDe(entDe(${V},${A})).nom`)) && await c.locator('#bagBody .vmenu .vbtn').count() === 4, 'toucher un villageois ouvre sa fiche et le menu (4 boutons)');
+  const ficheTxt = await c.locator('#bagBody .vfiche').innerText();
+  ok(/Famille/.test(ficheTxt) && /En ce moment/.test(ficheTxt) && /Humeur/.test(ficheTxt) && /réputation/.test(ficheTxt), 'fiche : âge, métier, famille, action, humeur, réputation');
+  await cliquer('Parler');
+  ok(!/[{}]/.test(await c.locator('#bagBody .vquote').innerText()), 'Parler : le villageois répond (« ' + (await c.locator('#bagBody .vquote').innerText()).replace(/[«»]/g, '').trim() + ' »)');
+  // échanges : prix selon la réputation, refus en dessous du palier
+  ok(await T(c, `(()=>{ const v=${V}; rel(v).rep=-15; const a=prixPour(v,4); rel(v).rep=40; const b=prixPour(v,4); rel(v).rep=0; return a===6&&b===3&&prixPour(v,4)===4; })()`), 'prix : plus chers si la réputation est mauvaise, moins chers si elle est excellente');
+  await T(c, `rel(${V}).rep=-30`); await cliquer('Échanger');
+  ok(/ne veulent plus commercer/.test(await c.locator('#bagBody').innerText()), 'réputation très basse : plus d’échange');
+  await T(c, `rel(${V}).rep=0`); await cliquer('Parler'); await cliquer('Échanger');
+  ok(await c.locator('#bagBody .rec').count() >= 3, 'Échanger : la table de troc du villageois');
+  // aider : matériaux déposés dans le chantier
+  const aide = await T(c, `(()=>{ const v=${V}, S=siteBat(v,'cabane'); if(!S) return null; vilEco(v).s=S; vie(v).planT=1e9; addItem(OAK_LOG,20,true); return {bois:haveOf('logs'),rep:rel(v).rep}; })()`);
+  if (aide) { await cliquer('Aider'); await c.locator('#bagBody .rec .cbtn').first().click(); await attendre(300);
+    const ap = await T(c, `(()=>{ const v=${V}, S=vilEco(v).s; return {credit:(S.credit&&S.credit.bois)|0,bois:haveOf('logs'),rep:rel(v).rep}; })()`);
+    ok(ap.credit === 16 && ap.bois === aide.bois - 16 && ap.rep > aide.rep, `Aider : 16 bûches déposées dans le chantier, réputation +${ap.rep - aide.rep}`); }
+  // tâche : une ressource qui manque vraiment, livrée contre une récompense
+  await T(c, `(()=>{ const v=${V}; vilEco(v).s=null; vie(v).stock.ble=0; vie(v).stock.pain=60; vie(v).stock.bois=80; rel(v).quete=null; })()`);
+  await cliquer('Demander une tâche');
+  const q = await T(c, `(()=>{ const q=rel(${V}).quete; return q?{r:q.r,n:q.n,obj:objetRecu(q.objet),rec:objetRecu(q.recompense[0]),m:q.recompense[1]}:null; })()`);
+  ok(!!q && /Apporte-moi/.test(await c.locator('#bagBody').innerText()), q ? `tâche : apporter ${q.n} (${q.r}), récompense ${q.m}` : 'tâche : aucune');
+  if (q) { const av = await T(c, `(()=>{ addItem(${q.obj},${q.n},true); renderBag(); return {stock:stockDe(${V},'${q.r}'),rec:inv[${q.rec}]|0,rep:rel(${V}).rep}; })()`);
+    await c.locator('#bagBody .rec .cbtn').first().click(); await attendre(300);
+    const ap = await T(c, `({stock:stockDe(${V},'${q.r}'),rec:inv[${q.rec}]|0,rep:rel(${V}).rep,q:rel(${V}).quete})`);
+    ok(ap.stock === av.stock + q.n && ap.rec >= av.rec + q.m - (q.obj === q.rec ? q.n : 0) && ap.rep >= av.rep + 12 && !ap.q, 'tâche livrée : stock du village, récompense, réputation +12'); }
+  await T(c, `setState('play')`);
+  // un bloc d'une maison cassé : réputation, avertissement, puis réparation par les villageois
+  const blk = await T(c, `(()=>{ const v=${V}; rel(v).rep=0; rel(v).actes=0; for(const h of v.houses){ for(let x=h.x0;x<=h.x1;x++) for(let z=h.z0;z<=h.z1;z++) for(let y=v.h0+1;y<v.h0+5;y++){ const id=getB(x,y,z); if(id!==AIR&&SOLID[id]&&!DOORF[id]&&id!==BED&&id!==CHEST&&!blocJoueur(x,y,z)) return {x,y,z,id}; } } return null; })()`);
+  if (blk) { await T(c, `breakBlock({x:${blk.x},y:${blk.y},z:${blk.z},id:${blk.id}})`);
+    const r = await T(c, `({rep:rel(${V}).rep,actes:rel(${V}).actes,rep2:rel(${V}).reparer.length,colere:rel(${V}).colere})`);
+    ok(r.rep === -6 && r.actes === 1 && r.rep2 === 1 && !r.colere, 'bloc d’une maison cassé : réputation -6, premier acte (avertissement, pas encore de colère), bloc à réparer');
+    await T(c, `(()=>{ const v=${V}; vie(v).planT=0; vie(v).stock.bois=80; vie(v).stock.pierre=80; P.x=v.cx+.5; P.z=v.cz+.5; })()`);
+    ok(await attendreVillage(c, VID, 600, `getB(${blk.x},${blk.y},${blk.z})===${blk.id}`, 120000), 'les villageois reconstruisent le bloc cassé (chantier « Réparations »)'); }
+  // vol dans un coffre du village
+  const vol = await T(c, `(()=>{ const v=${V}; let idx=null; for(const k of GENCH.keys()){ const x=KX(k), z=KZ(k); if(villageDe(x,z)===v){ idx=k; break; } } if(idx===null){ for(const h of v.houses) for(let x=h.x0;x<=h.x1&&idx===null;x++) for(let z=h.z0;z<=h.z1&&idx===null;z++) for(let y=v.h0+1;y<v.h0+4;y++) if(getB(x,y,z)===CHEST){ idx=I(x,y,z); break; } }
+    if(idx===null) return null; const a=rel(v).rep; coffreVol=null; coffrePris(idx); coffrePris(idx); return {d:rel(v).rep-a}; })()`);
+  ok(!vol || vol.d === -10, vol ? 'vol dans un coffre du village : réputation -10 (une fois par coffre ouvert)' : 'pas de coffre dans ce village (essai du vol sauté)');
+  // frapper un villageois : colère, les gardes et les adultes attaquent jusqu'à la fuite
+  await T(c, `(()=>{ const v=${V}, e=entDe(v,${A}); rel(v).rep=0; rel(v).colere=0; P.fly=false; P.x=v.cx+2.5; P.z=v.cz+.5; P.y=v.h0+1.05; P.vx=P.vy=P.vz=0; /* au sol, sur la place (pas sur un toit) */ P.hp=20; invul=0; damageEnt(e,2,'player'); })()`);
+  ok(await T(c, `rel(${V}).colere===1&&rel(${V}).rep<=-15`), 'frapper un villageois : réputation -15, le village se met en colère');
+  const attaque = await attendreVillage(c, VID, 300, `P.hp<20`, 60000);
+  ok(attaque, 'les villageois attaquent le joueur fautif' + (attaque ? '' : ' — ' + await T(c, `(()=>{ const v=${V}; return 'colère '+rel(v).colere+' · état '+state+' · mode '+mode+' · sim '+v.sim+' · '+VILS.filter(o=>o.vil===v.id).map(o=>{ const g=ficheDe(o); return (g?g.age:'?')+'/'+(o.act&&o.act.k)+'/'+o.goal+'/'+Math.round(Math.hypot(o.x-P.x,o.z-P.z))+(o.ko?'/ko':''); }).join(' '); })()`)));
+  await T(c, `(()=>{ const v=${V}; P.fly=true; P.hp=20; P.x=v.cx+v.R+v.BL+40; P.y=v.h0+20; })()`); await attendre(1500);
+  ok(await T(c, `rel(${V}).colere===0`), 'le joueur s’enfuit hors du village : la colère cesse');
+  await T(c, `(()=>{ const v=${V}; rel(v).rep=-80; P.x=v.cx+.5; P.z=v.cz+.5; })()`); await attendre(1500);
+  ok(await T(c, `rel(${V}).colere===1`), 'réputation très basse : attaqué dès l’entrée au village');
+  ok(await T(c, `(()=>{ const v=${V}; rel(v).colere=0; rel(v).rep=-30; pardonJour(v); const a=rel(v).rep; rel(v).rep=0; pardonJour(v); return a===-26&&rel(v).rep===0; })()`), 'pardon : la réputation remonte chaque jour vers 0');
+  await T(c, `(()=>{ const v=${V}; rel(v).rep=-12; rel(v).actes=3; rel(v).quete={r:'ble',n:6,objet:WHEAT,recompense:[BREAD,3,'pain'],de:'Lou',jour:jourJeu}; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+6; })()`);
+  await T(c, `(async()=>{ saveNow(); await saving; })()`);
+  c = await ouvrir('&debug=1'); await attendre(800);
+  ok(await T(c, `(()=>{ const ci=Math.floor((${VID}-1000)/256), cj=(${VID}-1000)%256, inf=villageInfo(ci,cj); for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); const v=${V}; return !!v&&rel(v).rep===-12&&rel(v).actes===3&&!!rel(v).quete&&rel(v).quete.n===6; })()`), 'réputation, actes et tâche relus après rechargement');
   }
 } catch (e) { ok(false, e.message); }
 ok(erreurs.length === 0, `aucune erreur JavaScript${erreurs.length ? ' : ' + erreurs.slice(0, 3).join(' | ') : ''}`);
