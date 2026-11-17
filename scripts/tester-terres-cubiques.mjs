@@ -392,5 +392,6 @@ ok(erreurs.length === 0, `aucune erreur JavaScript${erreurs.length ? ' : ' + err
 await navigateur.close(); await rm(dossier, { recursive: true, force: true });
 console.log(echecs ? `\nTerres Cubiques : ${echecs} problème(s).` : '\nTerres Cubiques : tout est bon.');
 // sur GitHub, les échecs vont aussi dans le résumé du job (lisible sans ouvrir les journaux)
+if (process.env.GITHUB_ACTIONS) for (const m of rates.slice(0, 10)) console.log('::error title=Terres Cubiques::' + String(m).replace(/[\r\n%]/g, ' '));
 if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY, `### Terres Cubiques\n\n${rates.length ? rates.map((m) => '- ✗ ' + m).join('\n') : 'Tout est bon.'}\n\n`).catch(() => {});
 process.exit(echecs ? 1 : 0);
