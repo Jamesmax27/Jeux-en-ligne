@@ -81,7 +81,7 @@ Tout est dans la section « Construction autonome » du code (après « Vie des 
 - **Gabarits** (`GABARITS`) : 5 bâtiments décrits couche par couche, avec une lettre par sorte de bloc. Ce sont la maison (2 lits), le puits, la cabane de bûcheron (porte, coffre), la ferme (parcelles) et l'entrepôt. Les murs, le toit et le sol prennent les matériaux du biome du village, avec 3 variantes (`styleBat`). Les 25 autres bâtiments viendront à l'étape 7.
 - **Emplacement** (`siteBat`) : autour du village, hors des maisons, des routes, du champ, de l'eau et des blocs du joueur. Le terrain doit être presque plat (2 blocs d'écart au plus). Il est aplani avant les murs, et un chemin relie la porte à la place.
 - **Planificateur** (`planifier`, toutes les 30 s de simulation, un chantier à la fois) : par ordre de priorité, le logement (plus d'habitants que de lits, `PLAFOND_MAISONS` maisons au plus), la nourriture (une ferme si les repas manquent), la production (une cabane s'il y a un bûcheron, un entrepôt quand le stock dépasse 160), puis les services (un puits). Un bâtiment qui n'a pas d'emplacement laisse sa place au suivant. Une maison se bâtit sur le plateau du village s'il reste de la place, sinon autour.
-- **Bâtisseur** (`construire`) : il va chercher au stock commun les matériaux des 40 blocs suivants (24 unités au plus, `coutBloc` : un demi de bois ou une pierre par bloc), puis pose un bloc toutes les 0,6 s. Il travaille de devant la porte, ou à côté du bloc, et ne se laisse jamais enfermer. Un villageois qui gêne est poussé dehors, mais un joueur est attendu. Dans un village sans bâtisseur, les autres adultes (sauf les gardes) bâtissent à sa place.
+- **Bâtisseur** (`construire`) : il va chercher au stock commun les matériaux des 40 blocs suivants (24 unités au plus, `coutBloc` : un demi de bois ou une pierre par bloc), puis pose un bloc toutes les 0,6 s. Il travaille de devant la porte, ou à côté du bloc, et ne se laisse jamais enfermer. Un villageois ou un animal qui gêne est poussé dehors, mais un joueur, son cheval et les autres joueurs sont attendus. Dans un village sans bâtisseur, les autres adultes (sauf les gardes) bâtissent à sa place.
 - **Pause** : s'il manque un matériau, le chantier s'arrête et l'étiquette le dit. Le besoin de ce matériau devient maximal, ce qui envoie le bûcheron ou le mineur le chercher. Le chantier reprend dès la livraison.
 - **Progression visible** : un contour doré au sol et une étiquette au-dessus du chantier (« Cabane de bûcheron · 42 % », en rouge pendant une pause). Elle n'apparaît qu'à moins de 40 blocs, et seulement si le chantier est dans le champ de la caméra. Un message s'affiche près du village au début et à la fin du chantier, et le journal du mode test les note.
 - **Blocs** : chaque bloc posé a l'origine `village`. Un bloc du joueur n'est jamais remplacé (le chantier le contourne).
@@ -96,11 +96,42 @@ Tout est dans la section « Échanges et marché » du code. Les réglages sont 
 - **Paiement** (`payer`) : en marchandises du sac de même valeur, sauf ce que le payeur vient de recevoir et ce dont ses chaînes ont besoin. Ce qui reste devient une dette (`fiche.dettes`), rendue sur la production suivante (`reglerDettes` après une transformation) ou à la livraison suivante.
 - **Refus** (`refusTroc`) : le porteur refuse s'il en a besoin lui-même (entrée de ses chaînes, matériaux du bâtisseur), si son humeur est sous `ECHANGE.humeurMin`, ou si le demandeur lui doit déjà `ECHANGE.detteMax` parts. Le demandeur refusé perd un peu d'humeur et attend `ECHANGE.attente` s avant de redemander. Un échange réussi rend les deux plus contents.
 - **Marché** (gabarit `marche` : deux étals sous une toile rayée, comptoirs et coffres) : le planificateur le bâtit quand le village a 3 métiers différents (`ECHANGE.metiers`). Un adulte devient alors marchand s'il n'y en a pas (`nommerMarchand` : un métier en double, sinon le moins urgent). Le marchand range sur les étals (`vie.etal`) ce que le stock a au-delà de 2 fois sa cible. Il ramène au stock ce dont le village manque, et le reste du temps il tient son étal.
-- **Achat au marché** : quand personne ne porte la ressource qui manque, le villageois va au marché. Il la prend sur l'étal en payant en marchandises, et le marché fait crédit du reste. Il attend le marchand s'il n'est pas à son étal.
+- **Achat au marché** : quand personne ne porte la ressource qui manque, le villageois va au marché. Il la prend sur l'étal en payant en marchandises, et le marché fait crédit du reste. Il attend le marchand s'il n'est pas à son étal. Si la place derrière les étals est inaccessible, le marchand se tient devant, du côté des clients.
 - Les échanges avec le joueur et les caravanes (étape 10) passeront par ces étals et cette table.
 - **Sauvegarde** : étals et compteurs des échanges (`vie.etal`, `vie.troc`), dettes de chaque villageois (13ᵉ champ de la fiche). Le mode test affiche les étals et les compteurs (échanges, refus, achats au marché), et le journal note chaque échange.
 
-## 9. Étapes
+## 9. Les 30 bâtiments (étape 7)
+
+Tout est dans la section « Les 30 bâtiments » du code. Pour ajouter un bâtiment, il suffit d'ajouter un gabarit dans `GABARITS`, sa catégorie dans `ROLE_BAT`, son déclencheur dans `souhaits` et son nom `bat.<id>` dans les 5 langues.
+
+- **Gabarits** : 30 bâtiments décrits couche par couche, une lettre par sorte de bloc (la légende est en tête de la section). Les matériaux suivent le biome, en 3 variantes. Le contrôle des dimensions de chaque couche est fait par l'essai (section 9).
+  - Logements : abri de fondation, maison simple, maison familiale (4 lits), grande maison à étage (6 lits), maison des anciens.
+  - Nourriture : ferme et champs, moulin, boulangerie, grange, cabane de pêcheur avec son ponton, écurie et enclos.
+  - Production : cabane de bûcheron, entrepôt, scierie, carrière (une fosse avec un escalier taillé dans la paroi, pour en ressortir), atelier du tailleur de pierre, entrée de mine, forge, four à charbon, ateliers du tisserand et du potier.
+  - Services : puits, place du village, marché, magasin général, auberge, église, école, mairie, tour de guet et palissade.
+- **Planificateur** (`souhaits`) : il suit l'ordre de priorité de la consigne (logement, nourriture, production, services) et ses déclencheurs. Par exemple :
+  - le logement choisit son type : des anciens sans maison → maison des anciens, plus de 12 habitants → grande maison, des enfants → maison familiale ;
+  - le moulin vient quand le blé s'entasse, la scierie quand le bois dépasse 2 fois sa cible ;
+  - l'église vient à 10 habitants, l'école à 3 enfants, la tour après une attaque ou à 12 habitants ;
+  - un seul chantier à la fois, et un bâtiment sans place laisse la sienne au suivant.
+
+  L'abri de fondation servira à la fondation des nouveaux villages (étape 8).
+- **Emplacement** (`siteBat`) : l'écart entre deux bâtiments dépend de leur taille. Le sol devant la porte doit être au niveau du bâtiment (1 bloc d'écart au plus, sans eau). Les sites s'éloignent quand le village grandit, et la cabane de pêcheur se bâtit près du point de pêche.
+- **Rôle de chaque bâtiment** :
+  - **lits** des logements comptés dans la population possible (`litsBats`) ;
+  - **chaînes** de production faites devant leur atelier (moulin, boulangerie, forge, four, ateliers), deux fois plus lentes à l'atelier de la place tant qu'il n'est pas bâti ;
+  - **scierie** : les blocs de planches coûtent deux fois moins de bois ;
+  - **carrière, entrée de mine, ponton** : une chance sur deux d'une pierre, d'un minerai ou d'un poisson de plus ;
+  - **écurie** : 4 animaux de plus au plus ;
+  - **grange et entrepôt** : dépôts plus proches (la grange pour les récoltes) ;
+  - **église, auberge, magasin** : lieux de travail du prêtre, de l'aubergiste et du marchand sans marché ;
+  - **tour de guet** : une ronde des gardes sur trois y passe ;
+  - **école** : les enfants y vont la moitié de la journée.
+
+  Les villageois n'ouvrent pas les portes : ils travaillent devant (`porteBat`). Si une porte est inaccessible, ils retombent sur l'atelier ou le dépôt de la place.
+- **Aide de chantier** : dans un village sans bâtisseur, un seul adulte (le métier le moins indispensable, jamais un garde) bâtit avec la même priorité qu'un bâtisseur (`aideChantier`). Avant, tous les adultes pouvaient aider, mais avec une priorité si faible que le chantier n'avançait presque pas.
+
+## 10. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
@@ -110,10 +141,11 @@ Tout est dans la section « Échanges et marché » du code. Les réglages sont 
 | 4 | Construction autonome (5 bâtiments) avec progression visible | fait (16/11, branche `terres-cubiques-etape-4`) |
 | 5 | Synchronisation multijoueur | hors périmètre (choix du 16/11) |
 | 6 | Échanges et marché | fait (16/11, branche `terres-cubiques-etape-6`) |
-| 7 à 12 | 25 autres bâtiments, naissances et nouveaux villages, dialogues, interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
+| 7 | Les 25 autres bâtiments (24, le marché étant fait à l'étape 6) | fait (17/11, branche `terres-cubiques-etape-7`) |
+| 8 à 12 | naissances et nouveaux villages, dialogues, interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
 
-## 10. Essais
+## 11. Essais
 
-- `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture).
+- `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture), les 30 bâtiments (24 gabarits posés et reliés par un chemin, sortie de la carrière, effets, meunier au moulin, tour après une attaque, carrière bâtie par l'aide de chantier). Sur GitHub, les échecs sont aussi écrits dans le résumé du job.
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
 - Contrôles habituels : `validate-games.mjs --jouer`, `tester-sauvegarde.mjs`, `check-i18n.js`, `verifier-seo.mjs`.

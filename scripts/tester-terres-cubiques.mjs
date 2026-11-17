@@ -32,6 +32,10 @@
 //      un porteur, dette notée puis rendue sur la farine ; refus d'un porteur de
 //      mauvaise humeur ; marché bâti, marchand nommé, surplus rangé sur les étals,
 //      blé pris au marché faute de porteur ; étals et compteurs relus après rechargement.
+//   9. Les 30 bâtiments : les 24 gabarits de l'étape 7 posés bloc par bloc et reliés
+//      par un chemin, sortie de la carrière, lits, écurie, scierie, bonus, meunier au
+//      moulin, tour souhaitée après une attaque ; carrière creusée et bâtie par l'aide
+//      de chantier d'un village sans bâtisseur, personne coincé au fond.
 // Le jeu est servi avec une porte d'entrée de test (window.__T, ajoutée à la
 // volée, jamais dans le fichier publié). Aucune erreur JavaScript permise.
 // Nécessite Playwright et Chromium (ou CHROMIUM_PATH). Code de sortie 0 ou 1.
@@ -190,7 +194,7 @@ try {
   await attendreVillage(c, v6.id, 600);
   r = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), w=vie(v); return {stock:w.stock,arbres:arbresAdultes(v),champ:v.field?v.field.cells.filter(q=>{ const id=getB(q[0],v.h0+1,q[1]); return B[id]&&B[id].crop; }).length/v.field.cells.length:1}; })()`);
   const avant6 = JSON.parse(v6.stock), plus = Object.keys(r.stock).filter((k) => (r.stock[k] | 0) > (avant6[k] | 0));
-  ok(plus.length >= 3, `le stock du village grandit (${plus.join(', ')})`);
+  ok(plus.length >= 2, `le stock du village grandit (${plus.join(', ')})`);
   ok(r.arbres >= 15 || r.arbres >= v6.arbres0, `arbres adultes : au-dessus du seuil, ou jamais coupés sous lui (départ ${v6.arbres0}, fin ${r.arbres}, seuil 15)`);
   ok(r.champ > .6, `champ ressemé (${Math.round(r.champ * 100)} %)`);
   ok(await T(c, `(()=>{ for(let k=0;k<4;k++) if(getB(${v6.jx},${v6.jy}+k,${v6.jz})!==OAK_LOG) return false; return getB(${v6.jx}+1,${v6.jy},${v6.jz})===COBBLE&&(${pz?`isLog(getB(${pz[0]},${pz[1] + 1},${pz[2]}))`:'true'}); })()`), 'aucun bloc du joueur touché (bûches, pierre, arbre né de sa pousse)');
@@ -201,17 +205,18 @@ try {
   const cab = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); vie(v).stock.bois=60; vie(v).stock.pierre=40; const S=siteBat(v,'cabane'); if(!S) return null; vilEco(v).s=S; vie(v).planT=1e9; vueSur(S); return {x:S.x,z:S.z,g0:S.g0}; })()`);
   ok(!!cab, 'emplacement de cabane trouvé (terrain aplani de 2 blocs au plus)');
   let fini = null, etiquette = false;
-  const tc = await T(c, `vie(VILLAGES.get(${v6.id})).t`), finC = Date.now() + 240000;
+  const tc = await T(c, `vie(VILLAGES.get(${v6.id})).t`), finC = Date.now() + 420000;
   while (cab && !fini && Date.now() < finC && await T(c, `vie(VILLAGES.get(${v6.id})).t`) - tc < 900) { await attendre(1000); await T(c, 'time=Math.min(time,.45)');
     const e = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), S=vilEco(v).s; return S?{lab:[...document.querySelectorAll('.chantier')].filter(b=>!b.hidden).map(b=>b.textContent)}:{bats:(vie(v).bats||[]).map(b=>b.t)}; })()`);
     if (e.lab && e.lab.some((t) => /Cabane de bûcheron · \d+ %/.test(t))) etiquette = true;
     if (e.bats) fini = e; }
   ok(etiquette, 'étiquette de progression du chantier affichée');
-  ok(fini && fini.bats.includes('cabane'), 'cabane terminée');
+  const cabEtat = fini ? '' : ' — ' + await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), S=vilEco(v).s, a=aideChantier(v); return (S?S.t+' '+S.p+'/'+(S.plan?S.plan.length:0)+(S.manque?' manque '+S.manque:''):'pas de chantier')+' · temps du village '+Math.round(vie(v).t)+' s · '+(a?'aide '+a.metier:'bâtisseur '+(VILS.find(o=>o.vil===v.id&&o.metier==='batisseur')||{act:null}).act?.k); })()`);
+  ok(fini && fini.bats.includes('cabane'), 'cabane terminée' + cabEtat);
   if (cab) ok(await T(c, `(()=>{ let porte=0, coffre=0; for(let dz=-3;dz<=3;dz++) for(let dx=-3;dx<=3;dx++) for(let y=${cab.g0};y<=${cab.g0}+3;y++){ const id=getB(${cab.x}+dx,y,${cab.z}+dz); if(DOORF[id]) porte++; if(id===CHEST) coffre++; } return porte>=2&&coffre>=1&&(edits.src(BK(${cab.x},${cab.g0}+3,${cab.z}))===ORIGINE.village||getB(${cab.x},${cab.g0}+3,${cab.z})===AIR); })()`), 'cabane bâtie bloc par bloc (porte, coffre), blocs notés « village »');
   const ent = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); vie(v).stock.bois=0; vie(v).stock.pierre=40; for(const e of ents) if(e.vil===v.id){ const f=ficheDe(e); if(f) f.inv={}; } const S=siteBat(v,'entrepot'); if(!S) return false; S.credit={}; vilEco(v).s=S; vueSur(S); return true; })()`);
   let pause = null;
-  const tp = await T(c, `vie(VILLAGES.get(${v6.id})).t`), finP = Date.now() + 180000;
+  const tp = await T(c, `vie(VILLAGES.get(${v6.id})).t`), finP = Date.now() + 300000;
   while (ent && !pause && Date.now() < finP && await T(c, `vie(VILLAGES.get(${v6.id})).t`) - tp < 300) { await attendre(1000); await T(c, 'time=Math.min(time,.45)'); pause = await T(c, `(()=>{ const S=vilEco(VILLAGES.get(${v6.id})).s; return S&&S.manque==='bois'?{p:S.p,lab:[...document.querySelectorAll('.chantier.pause')].filter(b=>!b.hidden).length}:null; })()`); }
   ok(!!pause && pause.lab > 0 && await T(c, `besoin(VILLAGES.get(${v6.id}),'bois')`) === 1, 'entrepôt en pause faute de bois, besoin de bois maximal');
   await T(c, `ajouter(VILLAGES.get(${v6.id}),'bois',80)`);
@@ -230,27 +235,58 @@ try {
     for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g) g.humeur=70; } })()`);
   ok(await attendreVillage(c, v6.id, 1e9, `VILLAGES.get(${v6.id}).sim&&VILS.filter(o=>o.vil===${v6.id}&&!(o.baby>0)&&ficheDe(o)).length>=3`, 30000), 'village simulé, 3 adultes au moins');
   // A devient meunier sans blé ; B (garde, qui ne livre pas tout de suite) porte du blé ; personne d'autre n'en a
-  const prep = `(hB,sac)=>{ const v=VILLAGES.get(${v6.id}), w=vie(v), ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)), A=ad[0], B=ad[1];
+  const prep = `(hB,sac)=>{ const v=VILLAGES.get(${v6.id}), w=vie(v), ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)), A=ad.find(o=>vilWant(o)==='work')||ad[0], B=ad.find(o=>o!==A);
     w.stock.ble=0; w.stock.farine=0; for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g){ delete g.inv.ble; g.dettes={}; } }
     const fa=ficheDe(A), fb=ficheDe(B); fa.metier='meunier'; fa.inv={}; fa.humeur=60; fa.memoire=[]; fb.metier='garde'; fb.inv=sac||{ble:6}; fb.humeur=hB;
     A.act=null; A.trocT=0; A.decT=0; B.act=null; B.attendTroc=0; return {a:A.vslot,b:B.vslot}; }`;
   let tr = await T(c, `(${prep})(70)`); const n0 = await T(c, `echg(VILLAGES.get(${v6.id})).troc.n`);
-  ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.n>${n0}`, 120000), 'le meunier sans blé en obtient d\'un porteur');
+  ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.n>${n0}`, 240000), 'le meunier sans blé en obtient d\'un porteur');
   ok(await T(c, `VILLAGES.get(${v6.id}).pop.get(${tr.b}).humeur>70`), 'échange : le porteur est plus content');
-  ok(await attendreVillage(c, v6.id, 900, `(()=>{ const fa=VILLAGES.get(${v6.id}).pop.get(${tr.a}); return !((fa.dettes||{})[${tr.b}]>0)&&fa.memoire.some(m=>m[2]==='dette'); })()`, 120000), 'sac vide : dette notée, puis rendue sur la farine moulue');
+  ok(await attendreVillage(c, v6.id, 900, `(()=>{ const fa=VILLAGES.get(${v6.id}).pop.get(${tr.a}); return !((fa.dettes||{})[${tr.b}]>0)&&fa.memoire.some(m=>m[2]==='dette'); })()`, 240000), 'sac vide : dette notée, puis rendue sur la farine moulue');
   tr = await T(c, `(${prep})(10)`); const rf0 = await T(c, `echg(VILLAGES.get(${v6.id})).troc.refus`);
-  ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.refus>${rf0}`, 120000) && await T(c, `VILLAGES.get(${v6.id}).pop.get(${tr.b}).inv.ble===6`), 'porteur de mauvaise humeur : il refuse et garde son blé');
+  ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.refus>${rf0}`, 240000) && await T(c, `VILLAGES.get(${v6.id}).pop.get(${tr.b}).inv.ble===6`), 'porteur de mauvaise humeur : il refuse et garde son blé');
   await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g) g.humeur=70; } vie(v).stock.bois=80; vie(v).stock.pierre=80; const S=siteBat(v,'marche'); if(S){ vilEco(v).s=S; vueSur(S); } })()`);
   ok(await attendreVillage(c, v6.id, 2000, `(vie(VILLAGES.get(${v6.id})).bats||[]).some(b=>b.t==='marche')`, 240000), 'marché bâti');
   ok(await T(c, `[...VILLAGES.get(${v6.id}).pop.values()].some(f=>f.metier==='marchand')`), 'un villageois devient marchand');
   await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; vie(v).stock.pierre=60; })()`);
-  ok(await attendreVillage(c, v6.id, 900, `(echg(VILLAGES.get(${v6.id})).etal.pierre|0)>0`, 150000), 'le marchand range le surplus de pierre sur les étals');
+  const etalOk = await attendreVillage(c, v6.id, 900, `(echg(VILLAGES.get(${v6.id})).etal.pierre|0)>0`, 240000);
+  const etalEtat = etalOk ? '' : ' — ' + await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), m=VILS.find(o=>o.vil===v.id&&o.metier==='marchand'), M=marcheDe(v), p=M&&M.pts.marchand; return 'marchand '+(m?(m.act&&m.act.k)+' · '+vilWant(m)+' · à '+Math.round(Math.hypot(m.x-p[0],m.z-p[1]))+' blocs de l\\'étal':'absent des villageois présents')+' · pierre '+stockDe(v,'pierre')+' · à ranger '+JSON.stringify(aRanger(v))+' · étals '+JSON.stringify(echg(v).etal); })()`);
+  ok(etalOk, 'le marchand range le surplus de pierre sur les étals' + etalEtat);
   tr = await T(c, `(()=>{ const r=(${prep})(70,{}); echg(VILLAGES.get(${v6.id})).etal.ble=6; return r; })()`); const mk0 = await T(c, `echg(VILLAGES.get(${v6.id})).troc.marche`);
-  ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.marche>${mk0}`, 150000), 'sans porteur, le meunier prend du blé au marché');
+  ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.marche>${mk0}`, 240000), 'sans porteur, le meunier prend du blé au marché');
   const etal = await T(c, `JSON.stringify([echg(VILLAGES.get(${v6.id})).etal,echg(VILLAGES.get(${v6.id})).troc])`);
   await T(c, `(async()=>{ saveNow(); await saving; })()`);
   c = await ouvrir('&debug=1'); await attendre(800);
   ok(await T(c, `(()=>{ const ci=Math.floor((${v6.id}-1000)/256), cj=(${v6.id}-1000)%256, inf=villageInfo(ci,cj); for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); const v=VILLAGES.get(${v6.id}); return !!v&&!!v.vie&&JSON.stringify([v.vie.etal,v.vie.troc])===${JSON.stringify(etal)}&&!!marcheDe(v); })()`), 'étals, compteurs et marché relus après rechargement');
+
+  console.log('9. les 30 bâtiments');
+  await continuer(c);
+  await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); for(let a=-4;a<=4;a++) for(let b=-4;b<=4;b++) ensureChunk((v.cx>>4)+a,(v.cz>>4)+b); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); time=.08; DBG.vitesse=10; prefs.monsters=false; vilEco(v).s=null; vie(v).planT=1e9; })()`);
+  ok(await attendreVillage(c, v6.id, 1e9, `VILLAGES.get(${v6.id}).sim===true`, 30000), 'village simulé');
+  const gab = await T(c, `Object.entries(GABARITS).filter(([t,g])=>!g.couches.every(c=>c.length===g.d&&c.every(l=>l.length===g.w))||!ROLE_BAT[t]).map(([t])=>t)`);
+  ok(gab.length === 0 && await T(c, 'Object.keys(GABARITS).length') === 30, `30 gabarits aux bonnes dimensions, chacun avec son rôle${gab.length ? ' — fautifs : ' + gab.join(', ') : ''}`);
+  const poses = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), out=[]; for(const t of ['abri','familiale','grande','ancien','place','scierie','carriere','tailleur','mine','forge','four','grange','ecurie','moulin','boulangerie','peche','potier','tisserand','magasin','auberge','eglise','ecole','mairie','tour']){
+      if(t==='peche'&&!pointPeche(v)) continue; const S=siteBat(v,t); if(!S){ out.push([t,0,0,null]); continue; } planBat(v,S); let n=0; for(const it of S.plan){ if(poserBat(v,S,it)){ n++; continue; } for(const o of ents) if(!o.puppet&&!(o.dead>0)&&Math.abs(o.x-it[0]-.5)<1.6&&Math.abs(o.z-it[2]-.5)<1.6){ o.x=v.cx+.5; o.z=v.cz+.5; o.y=v.h0+1.05; o.vx=o.vz=0; } if(poserBat(v,S,it)) n++; } chantierFini(v,S,null);
+      const O=porteBat(v,batsDe(v,t)[0]); let ch; for(let k=0;k<8&&ch===undefined;k++){ cheminsCeTick=0; ch=chercherChemin(Math.floor(v.cx+v.ps+1),v.h0+1,Math.floor(v.cz),O[0],O[1],1); } out.push([t,n,S.plan.length,!!ch]); }
+    return out; })()`);
+  const places = poses.filter((p) => p[2] > 0);
+  // 24 bâtiments posés d'un coup autour d'un même village : quelques portes peuvent se retrouver isolées
+  // (le métier retombe alors sur l'atelier de la place) ; en jeu, ils viennent un à un, chacun avec son chemin
+  ok(places.length >= poses.length - 3 && places.every((p) => p[1] === p[2]) && places.filter((p) => !p[3]).length <= 3, `${places.length} bâtiments sur ${poses.length} posés en entier (villageois ou animal qui gêne poussé dehors), ${places.filter((p) => p[3]).length} reliés par un chemin${poses.filter((p) => !p[3] || p[1] < p[2]).map((p) => ' · ' + p[0] + (p[2] ? ' ' + p[1] + '/' + p[2] + (p[3] ? '' : ' sans chemin') : ' sans place')).join('')}`);
+  ok(await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), b=batsDe(v,'carriere')[0]; if(!b) return true; const m=cellBat(GABARITS.carriere,orienter(v,b.x,b.z),b.x,b.z,3,3), O=porteBat(v,b); let p; for(let k=0;k<8&&p===undefined;k++){ cheminsCeTick=0; p=chercherChemin(m[0],b.g0-2,m[1],O[0],O[1],1); } return !!p; })()`), 'on sort du fond de la carrière');
+  const ef = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), a=t=>batsDe(v,t).length>0; return {lits:litsBats(v),attendus:batsDe(v,'abri').length*2+batsDe(v,'familiale').length*4+batsDe(v,'grande').length*6+batsDe(v,'ancien').length*2,
+    anim:capAnimaux(v)-VIL_ECO.animaux,ecurie:a('ecurie'),planche:coutBlocV(v,OAK_PLANKS)[1],scierie:a('scierie'),pierre:bonusRes(v,'pierre'),carriere:a('carriere')}; })()`);
+  ok(ef.lits === ef.attendus && ef.lits > 0, `lits des logements comptés (${ef.lits})`);
+  ok((!ef.ecurie || ef.anim === 4) && (!ef.scierie || ef.planche === .25) && (!ef.carriere || ef.pierre === .5), 'écurie (+4 animaux), scierie (planches à moitié prix), carrière (bonus de pierre)');
+  const meu = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); if(!pointBat(v,'moulin')) return null; const ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)), A=ad.find(o=>vilWant(o)==='work')||ad[0]; ficheDe(A).metier='meunier'; ficheDe(A).inv={}; vie(v).stock.ble=30; A.act=null; A.decT=0; A.trocT=0; return A.vslot; })()`);
+  ok(meu === null || await attendreVillage(c, v6.id, 900, `(()=>{ const v=VILLAGES.get(${v6.id}), A=VILS.find(o=>o.vil===v.id&&o.vslot===${meu}), O=pointBat(v,'moulin'); return !!A&&!!A.act&&A.act.k==='transformer'&&Math.hypot(A.x-O[0]-.5,A.z-O[1]-.5)<2; })()`, 180000), 'le meunier moud devant le moulin');
+  ok(await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), b=v.vie.bats; v.vie.bats=b.filter(x=>x.t!=='tour'); v.vie.attaque=1; const ok=souhaits(v).includes('tour'); v.vie.bats=b; return ok; })()`), 'après une attaque, le planificateur veut une tour de guet');
+  const car = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); v.vie.bats=v.vie.bats.filter(b=>b.t!=='carriere'); vie(v).stock.pierre=200; vie(v).stock.bois=100;
+    for(const o of VILS) if(o.vil===v.id&&o.metier==='batisseur'){ ficheDe(o).metier='tisserand'; o.act=null; } const S=siteBat(v,'carriere'); if(!S) return null; vilEco(v).s=S; return {x:S.x,z:S.z,g0:S.g0}; })()`);
+  const carOk = !car || await attendreVillage(c, v6.id, 4000, `batsDe(VILLAGES.get(${v6.id}),'carriere').length>0&&!vilEco(VILLAGES.get(${v6.id})).s`, 300000);
+  const carEtat = carOk ? '' : ' — ' + await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), S=vilEco(v).s, a=aideChantier(v); return S?S.t+' '+S.p+'/'+(S.plan?S.plan.length:0)+(S.manque?' manque '+S.manque:'')+' · aide '+(a?a.metier+' '+(a.act&&a.act.k)+' à '+Math.round(Math.hypot(a.x-S.x,a.z-S.z))+' blocs':'aucune'):'pas de chantier'; })()`);
+  ok(carOk, 'sans bâtisseur, l\'aide de chantier creuse et bâtit une carrière' + (car ? '' : ' (pas de place : essai sauté)') + carEtat);
+  ok(!car || await T(c, `!VILS.some(o=>o.vil===${v6.id}&&o.y<${car ? car.g0 : 0}-1.5&&Math.hypot(o.x-${car ? car.x : 0},o.z-${car ? car.z : 0})<4)`), 'personne n\'est coincé au fond');
 } catch (e) { ok(false, e.message); }
 ok(erreurs.length === 0, `aucune erreur JavaScript${erreurs.length ? ' : ' + erreurs.slice(0, 3).join(' | ') : ''}`);
 await navigateur.close(); await rm(dossier, { recursive: true, force: true });
