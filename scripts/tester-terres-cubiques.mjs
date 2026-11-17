@@ -467,7 +467,7 @@ try {
   await T(c, `(()=>{ const v=${V}; rel(v).rep=-12; rel(v).actes=3; rel(v).quete={r:'ble',n:6,objet:WHEAT,recompense:[BREAD,3,'pain'],de:'Lou',jour:jourJeu}; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+6; })()`);
   await T(c, `(async()=>{ saveNow(); await saving; })()`);
   c = await ouvrir('&debug=1'); await attendre(800);
-  ok(await T(c, `(()=>{ const ci=Math.floor((${VID}-1000)/256), cj=(${VID}-1000)%256, inf=villageInfo(ci,cj); for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); const v=${V}; return !!v&&rel(v).rep===-12&&rel(v).actes===3&&!!rel(v).quete&&rel(v).quete.n===6; })()`), 'réputation, actes et tâche relus après rechargement');
+  ok(await T(c, `(()=>{ const ci=Math.floor((${VID}-1000)/256), cj=(${VID}-1000)%256, inf=villageInfo(ci,cj); for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); const v=${V}; return !!v&&rel(v).rep===-12&&rel(v).actes===3&&!!rel(v).quete&&rel(v).quete.n===6; })()`), 'réputation, actes et tâche relus après rechargement' + await T(c, `(()=>{ const v=${V}; if(!v) return ' — village absent'; const r=rel(v); return r.rep===-12&&r.actes===3&&r.quete&&r.quete.n===6?'':' — relu : réputation '+r.rep+', actes '+r.actes+', tâche '+JSON.stringify(r.quete)+', rattrapage '+JSON.stringify(vie(v).rattrapage||null); })()`));
   }
 
   console.log('13. caravanes');
