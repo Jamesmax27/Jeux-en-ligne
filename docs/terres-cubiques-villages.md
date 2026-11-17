@@ -240,7 +240,29 @@ Tout est dans la section « Fiche du village et carte » du code (réglages `FIC
   - à côté de la carte (dessous sur téléphone), la liste des 8 villages découverts les plus proches : un gros bouton par village (nom, habitants, pastille de la réputation) ouvre sa fiche.
 - Rien de nouveau dans la sauvegarde : tout est lu dans l'état du village.
 
-## 15. Étapes
+## 15. Sauvegarde complète et rattrapage (étape 11)
+
+Tout est dans la section « Rattrapage au retour » du code (réglages `RATTRAPAGE`).
+
+- **Sauvegarde** : l'état complet de chaque village est gardé dans son emplacement :
+  - fiches des villageois (familles, métiers, humeur, mémoire, inventaire, dettes) ;
+  - réserves, bâtiments, champs, chantier et son avancement ;
+  - étals, réputation, caravanes ;
+  - moment de la dernière simulation (`vu`, en jours du jeu, dernier champ de la ligne du village).
+
+  Le test relève une empreinte complète des villages figés, recharge la partie et la retrouve à l'identique.
+- **Rattrapage** (`rattraperVillage`, appelé quand un joueur revient près d'un village figé, avant la remise en place des villageois) : le temps écoulé depuis `vu` est rattrapé d'un coup.
+  - Il est compté en temps du jeu : la partie fermée, le temps ne passe pas.
+  - Il faut au moins 0,05 jour (36 s) d'absence, et 3 jours au plus sont comptés.
+  - **Récolte** : chaque adulte d'un métier de récolte rapporte sa part par jour (`RATTRAPAGE.recolte`), si le village en a les moyens. Le fermier a besoin de champs, le bûcheron d'arbres adultes au-dessus du seuil de durabilité, le pêcheur d'un point de pêche, le mineur d'une mine pour le charbon et le minerai.
+  - **Artisans** : ils font tourner leurs transformations (`CHAINES`) avec ce qu'il y a en réserve, 6 par jour au plus.
+  - **Plafond** : aucune réserve ne dépasse 3 fois sa cible.
+  - **Repas et pardon** : un repas par habitant et par jour manqué, avec l'humeur qui suit, et la réputation qui remonte comme chaque jour.
+  - **Construction** : au plus une étape par chantier en cours, c'est-à-dire la couche de blocs suivante (24 au plus), payée sur la réserve. S'il manque un matériau, le chantier se met en pause.
+  - **Aucune recherche de chemin**, aucun déplacement : seul l'hôte rattrape.
+  - Le mode test note chaque rattrapage dans son journal.
+
+## 16. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
@@ -256,9 +278,10 @@ Tout est dans la section « Fiche du village et carte » du code (réglages `FIC
 | 10 | Interaction avec le joueur, tâches, réputation, sabotage et riposte (première partie) | fait (17/11, branche `terres-cubiques-etape-10`) |
 | 10 (suite) | Relations entre villages et caravanes | fait (17/11, branche `terres-cubiques-etape-10b`) |
 | 10 (fin) | Fiche du village et carte | fait (17/11, branche `terres-cubiques-etape-10c`) |
-| 11 et 12 | sauvegarde complète et rattrapage, optimisation | à faire |
+| 11 | Sauvegarde complète des villages et rattrapage | fait (17/11, branche `terres-cubiques-etape-11`) |
+| 12 | Optimisation et tests de charge | à faire |
 
-## 16. Essais
+## 17. Essais
 
 - `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture), les 30 bâtiments (24 gabarits posés et reliés par un chemin, sortie de la carrière, effets, meunier au moulin, tour après une attaque, carrière bâtie par l'aide de chantier). Sur GitHub, les échecs sont aussi écrits dans le résumé du job.
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.

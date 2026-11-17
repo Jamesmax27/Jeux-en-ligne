@@ -57,6 +57,10 @@
 //      villageois (et retour), contenu (habitants, métiers, chantier, réserves, manques,
 //      voisins, caravanes) ; carte : couleur de la réputation, nom, caravane tracée, liste
 //      des villages découverts (boutons de 44 px au moins), fiche ouverte et retour à la carte.
+//  15. Sauvegarde complète et rattrapage : empreinte complète des villages identique après
+//      rechargement (villages figés) ; deux jours d'absence rattrapés d'un coup (récolte sous
+//      le plafond, une couche de chantier au plus, aucune recherche de chemin, réputation),
+//      plafond de 3 jours, retour du joueur sans compter deux fois l'absence.
 // Le jeu est servi avec une porte d'entrée de test (window.__T, ajoutée à la
 // volée, jamais dans le fichier publié). Aucune erreur JavaScript permise.
 // Nécessite Playwright et Chromium (ou CHROMIUM_PATH). Code de sortie 0 ou 1.
@@ -546,6 +550,56 @@ try {
     ok(await T(c, `state`) === 'map', 'retour à la carte');
     await T(c, `(()=>{ rel(${V}).rep=0; CARAVANES.delete(990); resume(); })()`);
   }
+  }
+
+  console.log('15. sauvegarde complète et rattrapage');
+  { await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); DBG.vitesse=10; prefs.monsters=false; if(state==='dead') respawn(); P.food=20; P.hp=20; if(state!=='play') resume(); })()`); await attendre(1000);
+  // --- empreinte complète des villages : relevée, sauvegardée, rechargée, comparée
+  const SIG = `(()=>{ const o={}; for(const v of VILLAGES.values()){ if(!v.vie) continue; const e=v.eco||{}, w=v.vie;
+    o[v.id]={stock:w.stock,bats:(w.bats||[]).map(b=>b.t+' '+b.x+','+b.z).join(' / '),champs:(w.champs||[]).length,
+      pop:v.pop?[...v.pop].map(([s,f])=>[s,f.nom,f.age,f.naissance,f.metier,f.maison,f.humeur,JSON.stringify(f.famille),f.memoire.length,JSON.stringify(f.inv),JSON.stringify(f.dettes||{}),f.mort|0,f.parti|0]):null,
+      chantier:e.s?[e.s.t,e.s.p,e.s.x,e.s.z,JSON.stringify(e.s.credit||{})]:null,h:(e.h||[]).length,houses:v.houses.length,
+      rep:w.rel?[w.rel.rep,w.rel.actes,w.rel.reparer.length,JSON.stringify(w.rel.quete||null)]:null,etal:w.etal&&Object.keys(w.etal).length?w.etal:null,troc:w.troc&&(w.troc.n||w.troc.refus||w.troc.marche)?w.troc:null,t:Math.round(w.t),prog:Math.round(w.prog),jour:w.jour,
+      mine:JSON.stringify(w.mine||null),foret:JSON.stringify(w.foret||null),vu:w.vu===undefined?null:+w.vu.toFixed(3)}; } return JSON.stringify(o); })()`;
+  await attendreVillage(c, v6.id, 400, 'false', 120000);
+  // le joueur s'éloigne : les villages sont figés, rien ne bouge entre la sauvegarde et la relecture
+  const loin = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.fly=true; P.x=v.cx+700.5; P.z=v.cz+.5; P.y=terrain(Math.floor(P.x),Math.floor(P.z))+20; loadAround(P.x,P.z); return [P.x,P.y,P.z]; })()`); await attendre(1500);
+  ok(await T(c, `![...VILLAGES.values()].some(v=>v.sim)`), 'loin des villages : tous figés');
+  const avant = JSON.parse(await T(c, SIG)), vids = Object.keys(avant);
+  await T(c, `(async()=>{ saveNow(); await saving; })()`);
+  c = await ouvrir('&debug=1'); await continuer(c);
+  await T(c, `(()=>{ for(const id of ${JSON.stringify(vids.map(Number))}){ const inf=villageInfo(Math.floor((id-1000)/256),(id-1000)%256); if(inf) for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); } })()`);
+  const apres = JSON.parse(await T(c, SIG)); let diffs = [];
+  for (const id of vids) { const a = avant[id], b = apres[id]; if (!b) { diffs.push(id + ' : village perdu'); continue; }
+    for (const k in a) { const x = JSON.stringify(a[k]), y = JSON.stringify(b[k]); if (x !== y) diffs.push(id + ' ' + k + ' : ' + x.slice(0, 200) + ' → ' + y.slice(0, 200)); } }
+  for (const d of diffs.slice(0, 30)) console.log('    ' + d);
+  ok(diffs.length === 0, `${vids.length} villages identiques après rechargement` + (diffs.length ? ` — ${diffs.length} différence(s)` : ''));
+  // --- rattrapage : deux jours du jeu passent loin du village (figé), puis il rattrape d'un coup
+  const ra = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((v.cx>>4)+a,(v.cz>>4)+b);
+    const w=vie(v), eco=vilEco(v); if(v.sim) return {err:'village encore simulé'}; if(w.vu===undefined) return {err:'pas de date de dernière simulation'};
+    for(const r of ['ble','graines','carotte','poisson','viande','laine','charbon','minerai']) w.stock[r]=0; w.stock.bois=200; w.stock.pierre=200;
+    if(!eco.s){ const S=siteBat(v,'abri'); if(S) eco.s=S; } const S=eco.s; if(S&&!S.plan) planChantier(v,S); const p0=S?S.p:0;
+    if(!w.rel) rel(v); w.rel.rep=-20; const st0=JSON.stringify(w.stock), cap={}; for(const r in CIBLES) cap[r]=Math.max(w.stock[r]|0,Math.ceil(CIBLES[r](habitants(v))*RATTRAPAGE.plafond));
+    jourJeu+=2; // deux jours du jeu loin du village
+    const orig=chercherChemin; let chemins=0; chercherChemin=(...a)=>{ chemins++; return orig(...a); };
+    let b; try { b=rattraperVillage(v); } finally { chercherChemin=orig; }
+    const trop=Object.keys(CIBLES).filter(r=>stockDe(v,r)>cap[r]);
+    const metiers=fichesVivantes(v).filter(([,f])=>f.age==='adulte'&&RATTRAPAGE.recolte[f.metier]&&moyensRecolte(v,f.metier)).map(([,f])=>f.metier);
+    return {b,chemins,trop,metiers,st0,st1:JSON.stringify(w.stock),rep:w.rel.rep,chantier:S?[S.t,p0,S.p,S.manque||null]:null}; })()`);
+  ok(!ra.err && ra.b && Math.abs(ra.b.j - 2) < 0.05, ra.err || (ra.b ? `deux jours rattrapés d'un coup (${ra.b.j} j)` : 'aucun rattrapage'));
+  if (ra.b) {
+    ok(ra.metiers.length === 0 || Object.keys(ra.b.recolte).length > 0, `récolte des ${ra.metiers.length} récoltants : ${JSON.stringify(ra.b.recolte)}`);
+    ok(ra.trop.length === 0, 'aucune réserve au-delà du plafond' + (ra.trop.length ? ' — ' + ra.trop.join(', ') : ''));
+    ok(ra.chantier === null || (ra.b.blocs <= 24 && ra.b.couches <= 1 && (ra.b.blocs > 0 || !!ra.chantier[3])), ra.chantier ? `chantier « ${ra.chantier[0]} » : une étape au plus (${ra.b.blocs} blocs sur ${ra.b.couches} couche, ${ra.chantier[1]} → ${ra.chantier[2]}${ra.chantier[3] ? ', attend ' + ra.chantier[3] : ''})` : 'pas de chantier (étape non essayée)');
+    ok(ra.chemins === 0, `aucune recherche de chemin pendant le rattrapage (${ra.chemins})`);
+    ok(ra.rep === -16, `réputation remontée d'un jour manqué (−20 → ${ra.rep})`);
+  }
+  // plafond : dix jours d'absence ne comptent que pour trois
+  ok(await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); vie(v).vu=maintenant()-10; const b=rattraperVillage(v); return !!b&&b.j===RATTRAPAGE.maxJours; })()`), 'dix jours d\'absence : rattrapage plafonné à 3 jours');
+  // le joueur revient : le village se remet en marche, sans rattraper une seconde fois
+  const rb = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); window.__rat=vie(v).rattrapage; P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); return 1; })()`);
+  const retour = await attendreVillage(c, v6.id, 1e9, `VILLAGES.get(${v6.id}).sim===true`, 60000), etatR = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), r=vie(v).rattrapage; return 'simulé '+!!v.sim+' · rattrapage '+(r===window.__rat?'inchangé':JSON.stringify(r)); })()`);
+  ok(retour && await T(c, `(()=>{ const r=vie(VILLAGES.get(${v6.id})).rattrapage; return r===window.__rat||r.j<.2; })()`), 'retour du joueur : le village repart sans recompter son absence (' + etatR + ')');
   }
 } catch (e) { ok(false, e.message); }
 ok(erreurs.length === 0, `aucune erreur JavaScript${erreurs.length ? ' : ' + erreurs.slice(0, 3).join(' | ') : ''}`);

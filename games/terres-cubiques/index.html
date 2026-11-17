@@ -247,6 +247,7 @@
   "dbg.ev.range": "{village} : villageois rangés",
   "dbg.ev.sim": "{village} : simulation en marche",
   "dbg.ev.fige": "{village} : simulation figée",
+  "dbg.ev.rattrapage": "{village} : {j} jour(s) rattrapé(s) — récolte : {r} ; {b} bloc(s) posé(s)",
   "nom.pousseChene": "Pousse de chêne",
   "nom.pousseBouleau": "Pousse de bouleau",
   "nom.pousseSapin": "Pousse de sapin",
@@ -1248,6 +1249,7 @@
   "dbg.ev.range": "{village}: villagers put away",
   "dbg.ev.sim": "{village}: simulation running",
   "dbg.ev.fige": "{village}: simulation frozen",
+  "dbg.ev.rattrapage": "{village}: {j} day(s) caught up — harvest: {r}; {b} block(s) placed",
   "nom.pousseChene": "Oak sapling",
   "nom.pousseBouleau": "Birch sapling",
   "nom.pousseSapin": "Spruce sapling",
@@ -2249,6 +2251,7 @@
   "dbg.ev.range": "{village}: aldeanos guardados",
   "dbg.ev.sim": "{village}: simulación en marcha",
   "dbg.ev.fige": "{village}: simulación congelada",
+  "dbg.ev.rattrapage": "{village}: {j} día(s) recuperado(s) — cosecha: {r}; {b} bloque(s) colocado(s)",
   "nom.pousseChene": "Brote de roble",
   "nom.pousseBouleau": "Brote de abedul",
   "nom.pousseSapin": "Brote de abeto",
@@ -3250,6 +3253,7 @@
   "dbg.ev.range": "{village}: aldeões guardados",
   "dbg.ev.sim": "{village}: simulação em andamento",
   "dbg.ev.fige": "{village}: simulação congelada",
+  "dbg.ev.rattrapage": "{village}: {j} dia(s) recuperado(s) — colheita: {r}; {b} bloco(s) colocado(s)",
   "nom.pousseChene": "Muda de carvalho",
   "nom.pousseBouleau": "Muda de bétula",
   "nom.pousseSapin": "Muda de abeto",
@@ -4251,6 +4255,7 @@
   "dbg.ev.range": "{village}: Dorfbewohner weggeräumt",
   "dbg.ev.sim": "{village}: Simulation läuft",
   "dbg.ev.fige": "{village}: Simulation eingefroren",
+  "dbg.ev.rattrapage": "{village}: {j} Tag(e) nachgeholt — Ernte: {r}; {b} Block/Blöcke gesetzt",
   "nom.pousseChene": "Eichensetzling",
   "nom.pousseBouleau": "Birkensetzling",
   "nom.pousseSapin": "Fichtensetzling",
@@ -8041,7 +8046,7 @@ function lireFiches(v,a){ if(!Array.isArray(a)||!Array.isArray(a[1])) return; if
     v.pop.set(r[0],{nom:typeof r[1]==='string'?r[1].slice(0,24):PRENOMS[0],age:AGES_VIL.includes(r[2])?r[2]:'adulte',naissance:Number.isFinite(r[3])?r[3]:0,metier:METIERS.includes(r[4])?r[4]:null,maison:r[5]|0,
       famille:{parents:ent(r[6]),conjoint:Number.isInteger(r[7])?r[7]:null,enfants:ent(r[8])},inv:r[9]&&typeof r[9]==='object'?r[9]:{},humeur:clamp(+r[10]||0,0,100),memoire:Array.isArray(r[11])?r[11].slice(-SIM.memoire):[],dettes:r[12]&&typeof r[12]==='object'?r[12]:{},...extraFiche(r[13])}); } }
 // retour d'un joueur près d'un village figé : chacun à la place de l'heure (sans recherche de chemin)
-function vilRattrapage(v){ for(const e of ents){ if(e.type!=='villager'||e.puppet||e.vil!==v.id) continue; e.farT=0; villagerFar(e,0); } journal('sim',{village:villageNom(v)}); }
+function vilRattrapage(v){ rattraperVillage(v); for(const e of ents){ if(e.type!=='villager'||e.puppet||e.vil!==v.id) continue; e.farT=0; villagerFar(e,0); } journal('sim',{village:villageNom(v)}); }
 
 /* ---------- villages du nouveau monde : emplacement tiré de la graine, plan bâti à la demande ---------- */
 /* Une case de 256 × 256 a au plus un village, tiré près de son centre (200 blocs au moins entre deux
@@ -8736,7 +8741,7 @@ function arbreACouper(e,v){ const enCours=VILS.filter(o=>o!==e&&o.vil===v.id&&o.
 
 /* ---------- le village, chaque seconde de simulation ---------- */
 // temps simulé, impasse (rien n'avance pendant DURABLE.impasse s : mode « rétablissement »), repas de chaque jour
-function vieTick(v,dt){ const w=vie(v); w.t+=dt;
+function vieTick(v,dt){ const w=vie(v); w.t+=dt; w.vu=maintenant(); // moment de la dernière simulation (rattrapage)
   // impasse : rien n'avance alors qu'un besoin essentiel n'est pas couvert (se reposer quand tout va bien n'en est pas une)
   if(w.t-w.prog>DURABLE.impasse&&besoinEssentiel(v)){ if(!w.impasse){ w.impasse={depuis:w.t,cause:causeImpasse(v)}; journal('impasse',{village:villageNom(v),cause:w.impasse.cause}); } }
   else if(w.impasse){ journal('reprise',{village:villageNom(v)}); w.impasse=null; }
@@ -8747,15 +8752,16 @@ function causeImpasse(v){ if(besoinRepas(v)>.5) return 'repas'; if(arbresAdultes
 // un repas par habitant et par jour : rassasié, l'humeur monte ; sinon elle baisse
 function journee(v){ if(!v.pop) return; pardonJour(v); vieFamille(v); fonderVillage(v); partirCaravane(v); for(const [s,f] of v.pop){ if(!vivant(f)) continue; if(f.age==='enfant'&&!ents.some(e=>e.type==='villager'&&e.vil===v.id&&e.vslot===s)) continue;
     const ok=consommerRepas(v,1); f.humeur=clamp(f.humeur+(ok?4:-12),0,100); if(!ok) f.memoire.push([jourJeu,+time.toFixed(3),'faim',null]); if(f.memoire.length>SIM.memoire) f.memoire.shift(); } saveDirty=true; }
-// sauvegarde : [village, stock, mine, essai de mine, places de la forêt, temps simulé, dernier progrès]
-const vieRow=v=>v.vie?[v.id,v.vie.stock,v.vie.mine?[v.vie.mine.x,v.vie.mine.y,v.vie.mine.z,v.vie.mine.dx,v.vie.mine.dz,v.vie.mine.i,v.vie.mine.k|0]:0,v.vie.mineEssai|0,v.vie.foret||0,Math.round(v.vie.t),Math.round(v.vie.prog),v.vie.jour===undefined?-1:v.vie.jour,v.vie.bats||[],v.vie.champs||[],v.vie.etal||{},v.vie.troc||{},relRow(v)]:null;
+// sauvegarde : [village, stock, mine, essai de mine, places de la forêt, temps simulé, dernier progrès, jour, bâtiments,
+//   champs, étals, compteurs d'échange, réputation, dernière simulation (jours du jeu, pour le rattrapage)]
+const vieRow=v=>v.vie?[v.id,v.vie.stock,v.vie.mine?[v.vie.mine.x,v.vie.mine.y,v.vie.mine.z,v.vie.mine.dx,v.vie.mine.dz,v.vie.mine.i,v.vie.mine.k|0]:0,v.vie.mineEssai|0,v.vie.foret||0,Math.round(v.vie.t),Math.round(v.vie.prog),v.vie.jour===undefined?-1:v.vie.jour,v.vie.bats||[],v.vie.champs||[],v.vie.etal||{},v.vie.troc||{},relRow(v),v.vie.vu===undefined?-1:Math.round(v.vie.vu*1e4)/1e4]:null;
 function lireVie(v,a){ if(!Array.isArray(a)) return; const w=vie(v); if(a[1]&&typeof a[1]==='object'){ w.stock={}; for(const k in a[1]) if(CIBLES[k]&&Number.isFinite(a[1][k])) w.stock[k]=Math.max(0,a[1][k]|0); }
   if(Array.isArray(a[2])) w.mine={x:a[2][0]|0,y:a[2][1]|0,z:a[2][2]|0,dx:a[2][3]|0,dz:a[2][4]|0,i:a[2][5]|0,k:a[2][6]|0};
   w.mineEssai=a[3]|0; if(Array.isArray(a[4])) w.foret=a[4].filter(p=>Array.isArray(p)&&p.length===3); w.t=+a[5]||0; w.prog=+a[6]||0; if(Number.isInteger(a[7])&&a[7]>=0) w.jour=a[7];
   if(Array.isArray(a[8])) w.bats=a[8].filter(b=>b&&GABARITS[b.t]); if(Array.isArray(a[9])) w.champs=a[9].filter(Array.isArray);
   if(a[10]&&typeof a[10]==='object'){ w.etal={}; for(const k in a[10]) if(VALEURS_TROC[k]&&Number.isFinite(a[10][k])) w.etal[k]=Math.max(0,a[10][k]|0); }
   if(a[11]&&typeof a[11]==='object') w.troc={n:a[11].n|0,refus:a[11].refus|0,marche:a[11].marche|0};
-  lireRel(v,a[12]); }
+  lireRel(v,a[12]); if(Number.isFinite(a[13])&&a[13]>=0) w.vu=a[13]; }
 
 /* ================= Construction autonome (étape 4) ================= */
 /* Un planificateur choisit le prochain bâtiment (logement, puis nourriture, production, services),
@@ -9749,6 +9755,63 @@ function listeVillagesCarte(){ const box=$('#mVils'); if(!box) return; box.textC
   if(!l.length){ box.appendChild(el('p','hint',traduire('fvil.aucunDecouvert'))); return; }
   for(const v of l){ const b=el('button','mvil'), i=el('i'); i.style.background=REP_COULEUR[repMot(repDe(v))]; b.type='button'; b.dataset.vil=v.id; b.append(i,traduire('fvil.bouton',{nom:villageNom(v),n:habitants(v)}));
     b.addEventListener('click',()=>openFicheVillage(v,'map')); box.appendChild(b); } }
+/* ================= Rattrapage au retour (étape 11) ================= */
+/* Un village loin de tout joueur est figé (rien n'est calculé). Le moment de sa dernière simulation
+   (« vu », en jours du jeu) est gardé dans la sauvegarde. Quand un joueur revient, le village rattrape
+   le temps écoulé d'un coup, de façon simplifiée et plafonnée (RATTRAPAGE.maxJours) :
+   - récolte : chaque adulte d'un métier de récolte rapporte sa part par jour, si le village en a les
+     moyens (champs, arbres adultes au-dessus du seuil, eau pour la pêche, mine pour le charbon et le
+     minerai) ; les artisans font tourner leurs transformations (CHAINES) avec ce qu'il y a en réserve ;
+     aucune réserve ne dépasse RATTRAPAGE.plafond fois sa cible ;
+   - repas et pardon : un repas par habitant et par jour manqué (l'humeur suit), et la réputation
+     remonte comme chaque jour ;
+   - construction : au plus une étape par chantier en cours, c'est-à-dire la couche de blocs suivante
+     (RATTRAPAGE.blocs au plus), payée sur la réserve ; il manque un matériau : le chantier se met en pause.
+   Aucune recherche de chemin, aucun déplacement : les villageois sont ensuite remis à leur place de
+   l'heure (vilRattrapage). Seul l'hôte rattrape (les invités ne simulent pas). */
+const RATTRAPAGE={min:.05,maxJours:3,plafond:3,transfoJour:6,blocs:24,
+  recolte:{fermier:{ble:8,graines:2,carotte:2},bucheron:{bois:10},mineur:{pierre:8,charbon:1,minerai:2},pecheur:{poisson:5},eleveur:{viande:2,laine:2}}};
+function moyensRecolte(v,m){ const w=vie(v); // ce que le village peut récolter sans rien abîmer
+  if(m==='fermier') return !!(v.field||(w.champs&&w.champs.length));
+  if(m==='bucheron') return arbresAdultes(v)>=DURABLE.arbres;
+  if(m==='pecheur') return !!pointPeche(v);
+  return true; }
+function rattraperVillage(v){ const w=vie(v), now=maintenant();
+  if(w.vu===undefined||!Number.isFinite(w.vu)){ w.vu=now; return null; }
+  const brut=now-w.vu; w.vu=now; if(brut<RATTRAPAGE.min) return null;
+  const j=Math.min(brut,RATTRAPAGE.maxJours), bilan={j:+j.toFixed(2),recolte:{},blocs:0,repas:0};
+  const plus=(r,n)=>{ if(!CIBLES[r]||n<=0) return 0; const cap=Math.max(stockDe(v,r),Math.ceil(CIBLES[r](habitants(v))*RATTRAPAGE.plafond)), k=Math.max(0,Math.min(n,cap-stockDe(v,r)));
+    if(k>0){ ajouter(v,r,k); bilan.recolte[r]=(bilan.recolte[r]||0)+k; } return k; };
+  const adultes=fichesVivantes(v).filter(([,f])=>f.age==='adulte'&&f.metier);
+  // 1. récolte
+  for(const [,f] of adultes){ const t=RATTRAPAGE.recolte[f.metier]; if(!t||!moyensRecolte(v,f.metier)) continue;
+    for(const r in t){ if((r==='charbon'||r==='minerai')&&!w.mine) continue; plus(r,Math.floor(t[r]*j)); } }
+  // 2. transformations des artisans, avec ce qu'il y a en réserve
+  for(const [,f] of adultes){ const ch=CHAINES.filter(c=>c.m===f.metier); if(!ch.length) continue;
+    for(let n=Math.floor(RATTRAPAGE.transfoJour*j);n>0;n--){ const c=ch.find(c=>Object.keys(c.out).some(r=>besoin(v,r)>0)&&Object.entries(c.in).every(([r,q])=>stockDe(v,r)>=q)); if(!c) break;
+      for(const r in c.in) ajouter(v,r,-c.in[r]); let k=0; for(const r in c.out) k+=plus(r,c.out[r]); if(!k){ for(const r in c.in) ajouter(v,r,c.in[r]); break; } } }
+  // 3. repas et pardon des jours manqués (le jour en cours est compté par la journée habituelle)
+  const jours=Math.min(Math.max(0,jourJeu-(w.jour===undefined?jourJeu:w.jour)-1),Math.ceil(RATTRAPAGE.maxJours));
+  for(let d=0;d<jours;d++){ pardonJour(v); for(const [,f] of fichesVivantes(v)){ const ok=consommerRepas(v,1); f.humeur=clamp(f.humeur+(ok?4:-12),0,100); if(ok) bilan.repas++; } }
+  // 4. une étape de construction : la couche suivante du chantier en cours, sans déplacement
+  const ch=etapeChantier(v); bilan.blocs=ch.n; bilan.couches=ch.couches;
+  w.rattrapage=bilan; w.prog=w.t; saveDirty=true;
+  journal('rattrapage',{village:villageNom(v),j:bilan.j.toFixed(2),r:Object.entries(bilan.recolte).map(([r,n])=>nomRes(r)+' ×'+n).join(', ')||'—',b:bilan.blocs});
+  return bilan; }
+function etapeChantier(v){ const eco=vilEco(v), S=eco.s, ys=new Set(); if(!S) return {n:0,couches:0}; if(!S.plan) planChantier(v,S); if(!S.credit) S.credit={};
+  const pret=it=>{ const y=it[1]<0?surfaceY(it[0],it[2]):it[1], cur=getB(it[0],y,it[2]); return cur===it[3]||(blocJoueur(it[0],y,it[2])&&!(S.t==='reparation'&&cur===AIR))||(it[4]===2&&!vilGround(cur)); };
+  while(S.p<S.plan.length&&pret(S.plan[S.p])) S.p++;
+  if(S.p>=S.plan.length){ chantierFini(v,S,null); return {n:0,couches:0}; }
+  const couche=S.plan[S.p][1]; let n=0;
+  while(S.p<S.plan.length&&n<RATTRAPAGE.blocs&&S.plan[S.p][1]===couche){ const it=S.plan[S.p];
+    if(!chunkAt(it[0]>>4,it[2]>>4)) break; // morceau pas encore chargé : on s'arrête là
+    if(pret(it)){ S.p++; continue; }
+    const cout=coutBlocV(v,it[3]);
+    if(cout&&(S.credit[cout[0]]||0)<cout[1]){ const r=cout[0], k=Math.min(stockDe(v,r),24); if(k<=0||(S.credit[r]||0)+k<cout[1]){ S.manque=r; S.pauseR=r; break; } ajouter(v,r,-k); S.credit[r]=(S.credit[r]||0)+k; }
+    if(!poserBat(v,S,it)) break; // un villageois ou un animal dans le passage : le bâtisseur s'en chargera
+    if(cout) S.credit[cout[0]]-=cout[1]; S.p++; n++; ys.add(it[1]); S.manque=null; }
+  if(S.p>=S.plan.length) chantierFini(v,S,null);
+  return {n,couches:ys.size}; }
 /* ================= Mode test (?debug=1 dans l'adresse) ================= */
 /* Seulement si l'adresse du jeu contient ?debug=1 (le lanceur le transmet : window.JEL_DEBUG) :
    sinon rien n'en est visible et aucun raccourci ne l'active. Il n'agit que sur la simulation des

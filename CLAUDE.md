@@ -572,6 +572,11 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
   - Carte : toit à la couleur de la réputation et à la taille de la population, nom lisible sur téléphone, caravanes tracées, liste des villages découverts (gros boutons).
   - Textes dans les 5 langues ; `version` 18. Testé : `tester-terres-cubiques.mjs` (section 14), captures à 390 et 1 000 px.
   - Reste : étapes 11 et 12.
+- Terres Cubiques, étape 11 (sauvegarde complète et rattrapage) — fait (branche `terres-cubiques-etape-11`, 17 novembre 2026, `docs/terres-cubiques-villages.md`, section 15).
+  - État complet des villages relu à l'identique après rechargement, et moment de la dernière simulation gardé.
+  - Au retour d'un joueur, rattrapage d'un coup, plafonné à 3 jours du jeu, sans recherche de chemin : récolte selon les métiers et les moyens du village, transformations des artisans, réserves plafonnées, repas, pardon, au plus une couche par chantier.
+  - Réglages `RATTRAPAGE` ; `version` 19. Testé : `tester-terres-cubiques.mjs` (section 15).
+  - Reste : étape 12 (optimisation et tests de charge).
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 
