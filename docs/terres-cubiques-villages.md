@@ -218,7 +218,29 @@ Tout est dans la section « Relations entre villages et caravanes » du code. Le
 - **Dialogues** : « Une caravane est arrivée de {lieu} avec du fer ! », « Notre caravane est partie pour {lieu} avec nos surplus. ».
 - **Sauvegarde** : caravanes en route (`ca`). Le mode test affiche le nombre de voisins et de caravanes, et le journal note les départs, arrivées, retours, attaques de nuit et monstres.
 
-## 14. Étapes
+## 14. Fiche du village et carte (étape 10, fin)
+
+Tout est dans la section « Fiche du village et carte » du code (réglages `FICHE_VIL`, couleurs `REP_COULEUR`).
+
+- **Fiche du village** (onglet « village » du sac, le nom du village en titre) :
+  - habitants (adultes, jeunes, anciens), métiers (avec leur nombre), bâtiments et maisons ;
+  - ta réputation, avec la couleur de la carte ;
+  - chantier en cours et son avancement (barre), et la ressource qu'il attend ;
+  - réserves, les 8 plus grosses (celles qui manquent en couleur), puis ce qui manque (5 au plus, « de quoi manger » d'abord) ;
+  - villages voisins (distance et direction), caravanes en route (aller, retour, de passage).
+- **Où l'ouvrir** :
+  - en touchant le puits ou le pilier de la place, ou la mairie (le bouton d'action devient « Le village ») ;
+  - avec le bouton « Le village » de la fiche d'un villageois, avec un bouton pour revenir au villageois ;
+  - depuis la carte, avec un bouton pour revenir à la carte.
+- **Carte** :
+  - un village découvert est dessiné avec un toit à la couleur de ta réputation (vert : excellente ou bonne, jaune : neutre, orange : mauvaise, rouge : très mauvaise) ;
+  - la taille du toit suit la population, et le nom est écrit dessous, 12 px à l'écran sur téléphone comme sur ordinateur ;
+  - une caravane en route est tracée en pointillés entre ses deux villages, avec sa position, dès que l'un des deux est découvert ;
+  - la légende est complétée ;
+  - à côté de la carte (dessous sur téléphone), la liste des 8 villages découverts les plus proches : un gros bouton par village (nom, habitants, pastille de la réputation) ouvre sa fiche.
+- Rien de nouveau dans la sauvegarde : tout est lu dans l'état du village.
+
+## 15. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
@@ -231,11 +253,12 @@ Tout est dans la section « Relations entre villages et caravanes » du code. Le
 | 7 | Les 25 autres bâtiments (24, le marché étant fait à l'étape 6) | fait (17/11, branche `terres-cubiques-etape-7`) |
 | 8 | Naissances, croissance, nouvelles maisons, plafond de population et nouveaux villages | fait (17/11, branche `terres-cubiques-etape-8`) |
 | 9 | Dialogues complets | fait (17/11, branche `terres-cubiques-etape-9`) |
-| 10 | Interaction avec le joueur, tâches, réputation, sabotage et riposte (première partie) | fait (17/11, branche `terres-cubiques-etape-10`) ; caravanes, fiches de village et carte à faire |
-| 10 (suite) | Relations entre villages et caravanes | fait (17/11, branche `terres-cubiques-etape-10b`) ; fiches de village et carte à faire |
-| 10 (fin) à 12 | fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
+| 10 | Interaction avec le joueur, tâches, réputation, sabotage et riposte (première partie) | fait (17/11, branche `terres-cubiques-etape-10`) |
+| 10 (suite) | Relations entre villages et caravanes | fait (17/11, branche `terres-cubiques-etape-10b`) |
+| 10 (fin) | Fiche du village et carte | fait (17/11, branche `terres-cubiques-etape-10c`) |
+| 11 et 12 | sauvegarde complète et rattrapage, optimisation | à faire |
 
-## 15. Essais
+## 16. Essais
 
 - `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture), les 30 bâtiments (24 gabarits posés et reliés par un chemin, sortie de la carrière, effets, meunier au moulin, tour après une attaque, carrière bâtie par l'aide de chantier). Sur GitHub, les échecs sont aussi écrits dans le résumé du job.
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
