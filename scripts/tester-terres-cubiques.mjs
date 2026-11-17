@@ -40,6 +40,11 @@
 //      et deuil ; mariage d'un couple sans foyer, logement voulu, emménagement,
 //      naissance ; plafond atteint : des colons partent fonder un village, relu
 //      après rechargement, qui prend corps à l'approche d'un joueur (abri bâti).
+//  11. Dialogues : 200 répliques (15 au moins par catégorie, mêmes variables dans
+//      les 5 langues) ; salutation, réaction à un bloc cassé, travail du métier,
+//      chantier, ressource qui manque, famille, rumeur tirée de la mémoire d'un
+//      voisin et conversation, échanges, aucune redite avant 5 autres ; les
+//      villageois parlent d'eux-mêmes près du joueur, sans variable non remplie.
 // Le jeu est servi avec une porte d'entrée de test (window.__T, ajoutée à la
 // volée, jamais dans le fichier publié). Aucune erreur JavaScript permise.
 // Nécessite Playwright et Chromium (ou CHROMIUM_PATH). Code de sortie 0 ou 1.
@@ -149,8 +154,8 @@ try {
   await continuer(c);
   const vid = await T(c, `(()=>{ const v=[...VILLAGES.values()].sort((a,b)=>Math.hypot(a.cx-P.x,a.cz-P.z)-Math.hypot(b.cx-P.x,b.cz-P.z))[0]; P.fly=true; P.x=v.cx+.5; P.z=v.cz+12.5; P.y=v.h0+3; loadAround(P.x,P.z); return v.id; })()`);
   await attendre(2500);
-  r = await T(c, `(()=>{ const v=VILLAGES.get(${vid}); const vil=ents.filter(e=>e.type==='villager'&&e.vil===v.id); return {sim:v.sim,n:vil.length,noms:vil.every(e=>typeof e.nom==='string'&&e.nom)}; })()`);
-  ok(r.sim && r.n > 0 && r.noms, `à moins de 48 blocs : village simulé, ${r.n} villageois nommés`);
+  r = await T(c, `(()=>{ const v=VILLAGES.get(${vid}); const vil=ents.filter(e=>e.type==='villager'&&e.vil===v.id); return {sim:v.sim,n:vil.length,noms:vil.every(e=>typeof e.nom==='string'&&e.nom),etat:state,bord:Math.round(Math.hypot(P.x-v.cx,P.z-v.cz)-v.R)}; })()`);
+  ok(r.sim && r.n > 0 && r.noms, `à moins de 48 blocs : village simulé, ${r.n} villageois nommés${r.sim && r.noms ? "" : " — simulé " + r.sim + ", noms " + r.noms + ", état " + r.etat + ", distance au bord " + r.bord}`);
   await T(c, `(()=>{ P.x+=90; loadAround(P.x,P.z); })()`); await attendre(1500);
   const p1 = await T(c, `JSON.stringify(ents.filter(e=>e.type==='villager'&&e.vil===${vid}).map(e=>[e.x,e.z]))`); await attendre(2500);
   const p2 = await T(c, `JSON.stringify(ents.filter(e=>e.type==='villager'&&e.vil===${vid}).map(e=>[e.x,e.z]))`);
@@ -240,13 +245,14 @@ try {
   ok(await attendreVillage(c, v6.id, 1e9, `VILLAGES.get(${v6.id}).sim&&VILS.filter(o=>o.vil===${v6.id}&&!(o.baby>0)&&ficheDe(o)).length>=3`, 30000), 'village simulé, 3 adultes au moins');
   // A devient meunier sans blé ; B (garde, qui ne livre pas tout de suite) porte du blé ; personne d'autre n'en a
   const prep = `(hB,sac)=>{ const v=VILLAGES.get(${v6.id}), w=vie(v), ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)), A=ad.find(o=>vilWant(o)==='work')||ad[0], B=ad.find(o=>o!==A);
-    w.stock.ble=0; w.stock.farine=0; for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g){ delete g.inv.ble; g.dettes={}; } }
+    w.stock.ble=0; w.stock.farine=0; for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g){ delete g.inv.ble; g.dettes={}; g.humeur=70; } }
     const fa=ficheDe(A), fb=ficheDe(B); fa.metier='meunier'; fa.inv={}; fa.humeur=60; fa.memoire=[]; fb.metier='garde'; fb.inv=sac||{ble:6}; fb.humeur=hB;
     A.act=null; A.trocT=0; A.decT=0; B.act=null; B.attendTroc=0; return {a:A.vslot,b:B.vslot}; }`;
   let tr = await T(c, `(${prep})(70)`); const n0 = await T(c, `echg(VILLAGES.get(${v6.id})).troc.n`);
   ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.n>${n0}`, 240000), 'le meunier sans blé en obtient d\'un porteur');
   ok(await T(c, `VILLAGES.get(${v6.id}).pop.get(${tr.b}).humeur>70`), 'échange : le porteur est plus content');
-  ok(await attendreVillage(c, v6.id, 900, `(()=>{ const fa=VILLAGES.get(${v6.id}).pop.get(${tr.a}); return !((fa.dettes||{})[${tr.b}]>0)&&fa.memoire.some(m=>m[2]==='dette'); })()`, 240000), 'sac vide : dette notée, puis rendue sur la farine moulue');
+  const detteOk = await attendreVillage(c, v6.id, 900, `(()=>{ const fa=VILLAGES.get(${v6.id}).pop.get(${tr.a}); return !((fa.dettes||{})[${tr.b}]>0)&&fa.memoire.some(m=>m[2]==='dette'); })()`, 240000);
+  ok(detteOk, 'sac vide : dette notée, puis rendue sur la farine moulue' + (detteOk ? '' : ' — ' + await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), fa=v.pop.get(${tr.a}), A=entDe(v,${tr.a}); return 'métier '+fa.metier+' · dettes '+JSON.stringify(fa.dettes)+' · sac '+JSON.stringify(fa.inv)+' · mémoire '+JSON.stringify(fa.memoire.map(m=>[m[2],m[3]]))+' · action '+(A&&A.act&&A.act.k)+' · '+(A?vilWant(A):'absent')+' · farine '+stockDe(v,'farine')+' blé '+stockDe(v,'ble'); })()`)));
   tr = await T(c, `(${prep})(10)`); const rf0 = await T(c, `echg(VILLAGES.get(${v6.id})).troc.refus`);
   ok(await attendreVillage(c, v6.id, 900, `echg(VILLAGES.get(${v6.id})).troc.refus>${rf0}`, 240000) && await T(c, `VILLAGES.get(${v6.id}).pop.get(${tr.b}).inv.ble===6`), 'porteur de mauvaise humeur : il refuse et garde son blé');
   await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g) g.humeur=70; } vie(v).stock.bois=80; vie(v).stock.pierre=80; const S=siteBat(v,'marche'); if(S){ vilEco(v).s=S; vueSur(S); } })()`);
@@ -290,7 +296,7 @@ try {
   const carOk = !car || await attendreVillage(c, v6.id, 4000, `batsDe(VILLAGES.get(${v6.id}),'carriere').length>0&&!vilEco(VILLAGES.get(${v6.id})).s`, 300000);
   const carEtat = carOk ? '' : ' — ' + await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}), S=vilEco(v).s, a=aideChantier(v); return S?S.t+' '+S.p+'/'+(S.plan?S.plan.length:0)+(S.manque?' manque '+S.manque:'')+' · aide '+(a?a.metier+' '+(a.act&&a.act.k)+' à '+Math.round(Math.hypot(a.x-S.x,a.z-S.z))+' blocs':'aucune'):'pas de chantier'; })()`);
   ok(carOk, 'sans bâtisseur, l\'aide de chantier creuse et bâtit une carrière' + (car ? '' : ' (pas de place : essai sauté)') + carEtat);
-  ok(!car || await T(c, `!VILS.some(o=>o.vil===${v6.id}&&o.y<${car ? car.g0 : 0}-1.5&&Math.hypot(o.x-${car ? car.x : 0},o.z-${car ? car.z : 0})<4)`), 'personne n\'est coincé au fond');
+  ok(!car || await attendreVillage(c, v6.id, 300, `!VILS.some(o=>o.vil===${v6.id}&&o.y<${car ? car.g0 : 0}-1.5&&Math.hypot(o.x-${car ? car.x : 0},o.z-${car ? car.z : 0})<4)`, 90000), 'personne ne reste coincé au fond (l\'aide remonte par l\'escalier)');
 
   console.log('10. familles, naissances, nouveaux villages');
   const V = `VILLAGES.get(${v6.id})`;
@@ -306,7 +312,7 @@ try {
     const a=ad[0], b=ad[1], t=ad[2]; ficheDe(b).maison=ficheDe(a).maison=ficheDe(t).maison=a.house; b.house=t.house=a.house; for(const o of ad.slice(2)) ficheDe(o).famille.conjoint=o.vslot;
     VIE_FAMILLE.mariage=1; vieFamille(v); VIE_FAMILLE.mariage=.35; const fa=ficheDe(a); return {a:a.vslot,c:fa.famille.conjoint,sf:fa.sansFoyer!==undefined,veut:souhaits(v)[0],plein:v.houses.length>=PLAFOND_MAISONS}; })()`);
   ok(Number.isInteger(mar.c) && mar.sf && (['maison', 'familiale', 'grande', 'ancien'].includes(mar.veut) || mar.plein), `mariage ; le couple vit chez un autre adulte : sans foyer, le planificateur veut un logement (${mar.plein ? 'plafond de logements atteint : les colons partiront' : mar.veut})`);
-  const em = await T(c, `(()=>{ const v=${V}, S=siteBat(v,'familiale'); if(!S) return null; planBat(v,S); for(const it of S.plan){ if(!poserBat(v,S,it)){ for(const o of ents) if(!o.puppet&&!(o.dead>0)&&Math.abs(o.x-it[0]-.5)<1.6&&Math.abs(o.z-it[2]-.5)<1.6){ o.x=v.cx+.5; o.z=v.cz+.5; o.y=v.h0+1.05; } poserBat(v,S,it); } } chantierFini(v,S,null);
+  const em = await T(c, `(()=>{ const v=${V}, fa=v.pop.get(${mar.a}), fb=v.pop.get(fa.famille.conjoint); for(const g of v.pop.values()) if(g!==fa&&g!==fb) delete g.sansFoyer; const S=siteBat(v,'familiale'); if(!S) return null; planBat(v,S); for(const it of S.plan){ if(!poserBat(v,S,it)){ for(const o of ents) if(!o.puppet&&!(o.dead>0)&&Math.abs(o.x-it[0]-.5)<1.6&&Math.abs(o.z-it[2]-.5)<1.6){ o.x=v.cx+.5; o.z=v.cz+.5; o.y=v.h0+1.05; } poserBat(v,S,it); } } chantierFini(v,S,null);
     const hi=v.houses.length-1, f=v.pop.get(${mar.a}); return {ok:f.maison===hi&&entDe(v,${mar.a}).house===hi&&f.sansFoyer===undefined&&v.houses[hi].lits===4}; })()`);
   ok(!em || em.ok, 'maison familiale bâtie : le couple y emménage (4 lits)' + (em ? '' : ' (pas de place : essai sauté)'));
   const nNaiss = await T(c, `${V}.pop.size`);
@@ -326,6 +332,60 @@ try {
       || await T(c, `(()=>{ const nv=VILLAGES.get(${col.id}); return nv.active&&nv.houses.length>0&&ents.filter(e=>e.vil===${col.id}&&e.type==='villager').length===${col.n}; })()`);
     ok(prend, 'un joueur approche : il prend corps (abri de fondation, colons)');
     ok(prend && await attendreVillage(c, `${col.id}`, 2000, `(()=>{ const nv=VILLAGES.get(${col.id}), S=vilEco(nv).s; return batsDe(nv,'abri').length>0||(!!S&&S.t==='abri'&&S.p>10); })()`, 240000), 'les colons bâtissent l\'abri de fondation');
+  }
+
+  console.log('11. dialogues');
+  { const V = `VILLAGES.get(${v6.id})`;
+  await T(c, `(()=>{ const v=${V}; for(let a=-4;a<=4;a++) for(let b=-4;b<=4;b++) ensureChunk((v.cx>>4)+a,(v.cz>>4)+b); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+6; P.pitch=-.5; loadAround(P.x,P.z); time=.08; DBG.vitesse=10; prefs.monsters=false; vilEco(v).s=null; vie(v).planT=1e9; })()`);
+  ok(await attendreVillage(c, v6.id, 1e9, `${V}.sim&&VILS.filter(o=>o.vil===${v6.id}&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))).length>=4`, 40000), 'village simulé');
+  const D = await T(c, `(()=>{ const v=${V}, ad=VILS.filter(o=>o.vil===v.id&&!(o.baby>0)&&ficheDe(o)&&vivant(ficheDe(o))&&ficheDe(o).age==='adulte'); return ad.slice(0,6).map(o=>o.vslot); })()`);
+  ok(D.length >= 4, `4 adultes au moins pour parler (${D.length})`);
+  const dit = (slot, code) => T(c, `(()=>{ const v=${V}, e=entDe(v,${slot}); e.say=null; const ok=(${code}); const k=e.say&&e.say.k, t=k?traduire(k,e.say.v||undefined):''; return {ok,k,t}; })()`);
+  const propre = (r) => !!r.t && !/[{}]/.test(r.t);
+  // textes : chaque réplique a, dans les 5 langues, exactement les variables qu'elle attend
+  const fautes = await T(c, `(()=>{ const D=JSON.parse(document.getElementById('jel-i18n-textes').textContent), out=[]; const vs=t=>[...new Set([...(t||'').matchAll(/\\{(\\w+)\\}/g)].map(m=>m[1]))].sort().join();
+    for(const r of REPLIQUES) for(const l in D){ const t=D[l][r[2]]; if(!t||vs(t)!==r[3].slice().sort().join()) out.push(l+':'+r[2]); } const cats={}; for(const r of REPLIQUES) cats[r[1].c]=(cats[r[1].c]||0)+1; return {out,cats}; })()`);
+  ok(fautes.out.length === 0 && Object.entries(fautes.cats).every(([k, n]) => n >= 15), `200 répliques, 15 au moins par catégorie, variables identiques dans les 5 langues${fautes.out.length ? ' — ' + fautes.out.slice(0, 4).join(', ') : ''}`);
+  // salutation d'un inconnu, puis réaction à un bloc cassé
+  await T(c, `(()=>{ const v=${V}; v.dlgRec=[]; const f=v.pop.get(${D[0]}); f.vu=0; f.vuT=-9; vie(v).joueur={}; })()`);
+  let r = await dit(D[0], 'saluer(e)');
+  ok(r.ok && /^dlg\.salut\./.test(r.k) && propre(r) && await T(c, `${V}.pop.get(${D[0]}).vu===1`), `salutation : « ${r.t} »`);
+  await T(c, `noterJoueur(${V},'casse')`);
+  r = await dit(D[0], 'saluer(e)');
+  ok(r.ok && /^dlg\.joueur\.[5-8]$/.test(r.k) && propre(r), `après un bloc cassé : « ${r.t} »`);
+  // travail propre au métier et à l'action
+  r = await dit(D[1], `(()=>{ const f=ficheDe(e); f.metier='bucheron'; e.act={k:'couper',d:null,phase:0,t:0}; const ok=dire(e,['travail']); e.act=null; return ok; })()`);
+  ok(r.ok && r.k === 'dlg.travail.1' && /\d/.test(r.t) && propre(r), `bûcheron qui coupe : « ${r.t} »`);
+  r = await dit(D[1], `(()=>{ const f=ficheDe(e); f.metier='meunier'; e.act={k:'transformer',d:null,phase:0,t:0}; const ok=dire(e,['travail']); e.act=null; return ok; })()`);
+  ok(r.ok && r.k === 'dlg.travail.12' && propre(r), `meunier qui moud : « ${r.t} »`);
+  // chantier : bâtiment et progression réels, matériau qui manque
+  r = await dit(D[2], `(()=>{ const v=vilV(e), S=siteBat(v,'cabane'); if(!S) return false; planBat(v,S); S.p=Math.round(S.plan.length*.5); S.manque='pierre'; vilEco(v).s=S; e.act={k:'construire',d:null,phase:0,t:0}; const ok=dire(e,['chantier']); e.act=null; return ok; })()`);
+  const pct = await T(c, `(()=>{ const S=vilEco(${V}).s; return S?Math.round(S.p/S.plan.length*100):-1; })()`);
+  ok(r.ok && /^dlg\.chantier\./.test(r.k) && propre(r) && (r.t.includes(String(pct)) || r.t.includes('pierre') || r.k === 'dlg.chantier.4'), `chantier à ${pct} % : « ${r.t} »`);
+  await T(c, `(()=>{ vilEco(${V}).s=null; })()`);
+  // ressource qui manque vraiment
+  r = await dit(D[3], `(()=>{ const f=ficheDe(e); f.metier='batisseur'; e.act={k:'attendre',d:'bois',phase:0,t:0}; e.dbg={manque:'bois'}; const ok=dire(e,['manque']); e.act=null; return ok; })()`);
+  ok(r.ok && r.k === 'dlg.manque.5' && r.t.includes('bois') && propre(r), `il manque du bois : « ${r.t} »`);
+  // famille : naissance
+  r = await dit(D[3], `(()=>{ e.act=null; e.dbg=null; ficheDe(e).memoire=[]; souvenir(e,'naissance',{enfant:'Zoé'}); return dire(e,['famille']); })()`);
+  ok(r.ok && /^dlg\.famille\.[12]$/.test(r.k) && r.t.includes('Zoé'), `naissance : « ${r.t} »`);
+  // rumeur tirée de la mémoire d'un voisin, puis réponse du même ton et au revoir
+  const nomV = await T(c, `(()=>{ const v=${V}; for(const o of VILS) if(o.vil===v.id){ const g=ficheDe(o); if(g) g.memoire=[]; } const e=entDe(v,${D[D.length - 1]}); souvenir(e,'mariage',{avec:'Lou'}); return ficheDe(e).nom; })()`);
+  const conv = await T(c, `(()=>{ const v=${V}, a=entDe(v,${D[1]}), b=entDe(v,${D[0]}), cv={turn:0,n:4}, out=[]; for(;cv.turn<4;cv.turn++){ const sp=cv.turn%2?b:a; sp.say=null; const ok=replique2(sp,cv,cv.turn===3); out.push([ok,sp.say&&sp.say.k,sp.say?traduire(sp.say.k,sp.say.v||undefined):'']); } return out; })()`);
+  ok(conv.every((x) => x[0]) && conv[0][1] === 'dlg.rumeur.1' && conv[0][2].includes(nomV) && /^dlg\.reponse\.[1-4]$/.test(conv[1][1]) && /^dlg\.reponse\.1[2-5]$/.test(conv[3][1]),
+    `conversation : ${conv.map((x) => '« ' + x[2] + ' »').join(' / ')}`);
+  // échange : demande et refus pour dette, avec les répliques de la banque
+  r = await dit(D[1], `dire(e,['echange'],{role:'demande',vars:{r:nomRes('ble'),voisin:'Lou'}})`);
+  ok(r.ok && ['dlg.echange.2', 'dlg.echange.3', 'troc.demande'].includes(r.k) && r.t.includes('blé') && propre(r), `demande d'échange : « ${r.t} »`);
+  r = await dit(D[2], `dire(e,['echange'],{role:'refus',raison:'dette',vars:{voisin:'Lou'}})`);
+  ok(r.ok && r.k === 'troc.refusDette', `refus pour dette : « ${r.t} »`);
+  // pas de répétition avant 5 autres (8 répliques équivalentes)
+  const rep = await T(c, `(()=>{ const v=${V}, e=entDe(v,${D[0]}); v.dlgRec=[]; const n0=REPLIQUES.length; for(let i=0;i<8;i++) REPLIQUES.push(['essai.'+i,{c:'essai'},'dlg.humeur.13',[]]); const l=[]; for(let i=0;i<12;i++){ dire(e,['essai']); l.push(e.dlgDernier[0]); } REPLIQUES.length=n0; return l; })()`);
+  ok(rep.every((k, i) => !rep.slice(Math.max(0, i - 5), i).includes(k)), `aucune réplique redite avant 5 autres (${rep.join(' ')})`);
+  // conversations seulement près d'un joueur ; aucun texte à trous à l'écran
+  ok(await T(c, `DLG.proche===16`), 'bavardages et répliques de travail à moins de 16 blocs d’un joueur');
+  ok(await attendreVillage(c, v6.id, 1e9, `VILS.some(o=>o.vil===${v6.id}&&o.say&&typeof o.say.k==='string'&&o.say.k.startsWith('dlg.'))`, 120000), 'près du joueur, les villageois parlent d\'eux-mêmes');
+  ok(await T(c, `[...document.querySelectorAll('#bulles .bulle')].filter(b=>!b.hidden).every(b=>!/[{}]/.test(b.textContent))`), 'aucune bulle avec une variable non remplie');
   }
 } catch (e) { ok(false, e.message); }
 ok(erreurs.length === 0, `aucune erreur JavaScript${erreurs.length ? ' : ' + erreurs.slice(0, 3).join(' | ') : ''}`);

@@ -155,7 +155,35 @@ Tout est dans la section « Familles, naissances et nouveaux villages » du code
   - puis le village vit comme les autres (planificateur, métiers, échanges).
 - **Mode test** : la population de chaque village s'affiche (enfants, adolescents, adultes, anciens, couples, sans foyer, plafond), et le journal note les passages d'âge, les décès, les mariages, les emménagements et les départs de colons.
 
-## 11. Étapes
+## 11. Dialogues (étape 9)
+
+Tout est dans la section « Dialogues » du code. Les textes sont des clés `dlg.<catégorie>.<n>` dans les 5 langues, et les noms des métiers des clés `metier.<id>`.
+
+- **Banque** (`REPLIQUES`) : 200 répliques en données, chacune de la forme `[id, conditions, clé du texte, variables]`. Il y en a au moins 15 par catégorie :
+  - salutations ;
+  - travail de chaque métier ;
+  - chantier avec la progression réelle ;
+  - manque de ressource ;
+  - échanges (demande, accord, refus, remerciement) ;
+  - famille ;
+  - vie du village ;
+  - danger ;
+  - humeur ;
+  - rumeurs ;
+  - réactions aux actions du joueur ;
+  - réponses de conversation.
+
+  Les conditions portent sur : métier, action en cours, âge, humeur, heure, météo, événement récent de la mémoire du villageois (`evt`) ou du village (`vevt`), familiarité avec le joueur (`fam` : inconnu, connu, ami), action récente du joueur (`joueur` : aide, bloc cassé, cadeau, échange), chantier (`prog`, `manque`, `logement`) et bâtiments présents. Les variables sont `{nom}`, `{metier}`, `{ressource}`, `{batiment}`, `{voisin}`, `{enfant}`, `{quantite}`, `{progression}`, `{village}` et `{lieu}`.
+- **Choix** (`choisirReplique`) : parmi les répliques dont toutes les conditions sont vraies et toutes les variables connues, on prend la plus spécifique, c'est-à-dire celle qui a le plus de conditions. Un événement vécu, une action du joueur, une rumeur ou la ressource précise qui manque comptent double (`POIDS_COND`) : un villageois parle de son bébé plutôt que de son âge. Jamais une des 5 dernières dites dans le village (`DLG.recents`). Une réplique ne peut donc pas contredire ce que fait le villageois.
+- **Quand on parle** :
+  - **Salutation** à l'approche du joueur ou quand il parle à un villageois. La familiarité grandit à chaque rencontre et est gardée dans la fiche. Ce que le joueur vient de faire (aider pendant une attaque, casser un bloc du village, faire un cadeau, échanger) passe avant le bonjour.
+  - **En travaillant**, quand un joueur est à moins de 16 blocs (`DLG.proche`), toutes les 25 à 45 s au plus, et une réplique toutes les 6 s au plus par village : le travail, ce qui manque, le chantier, l'humeur, le village, le danger.
+  - **Sur la place**, deux villageois bavardent (2 à 4 répliques), seulement près d'un joueur. Une rumeur tirée de la vraie mémoire d'un voisin (mariage, naissance, deuil, échange, bâtiment construit…) ouvre la conversation, la réponse a le même ton (joyeux, triste, neutre), puis vient un au revoir.
+  - **Au moment des événements** : naissance, mariage, deuil, emménagement, enfant devenu grand, bâtiment fini, échanges entre villageois.
+- **Textes** : écrits en français sans accord en genre, puisque les fiches ne disent pas si un villageois est une femme ou un homme. Le nom d'un bâtiment sert d'étiquette (« Moulin : 40 % »). Les 4 autres langues ont été traduites d'après le français, avec les mêmes variables ; l'essai vérifie ces variables dans les 5 langues.
+- Les anciennes bulles fixes restent en repli, ainsi que pour le salon de claude.ai : un invité ne voit que les bulles numérotées.
+
+## 12. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
@@ -167,9 +195,10 @@ Tout est dans la section « Familles, naissances et nouveaux villages » du code
 | 6 | Échanges et marché | fait (16/11, branche `terres-cubiques-etape-6`) |
 | 7 | Les 25 autres bâtiments (24, le marché étant fait à l'étape 6) | fait (17/11, branche `terres-cubiques-etape-7`) |
 | 8 | Naissances, croissance, nouvelles maisons, plafond de population et nouveaux villages | fait (17/11, branche `terres-cubiques-etape-8`) |
-| 9 à 12 | dialogues, interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
+| 9 | Dialogues complets | fait (17/11, branche `terres-cubiques-etape-9`) |
+| 10 à 12 | interaction, réputation, caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
 
-## 12. Essais
+## 13. Essais
 
 - `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture), les 30 bâtiments (24 gabarits posés et reliés par un chemin, sortie de la carrière, effets, meunier au moulin, tour après une attaque, carrière bâtie par l'aide de chantier). Sur GitHub, les échecs sont aussi écrits dans le résumé du job.
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
