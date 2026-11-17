@@ -205,7 +205,20 @@ Tout est dans la section « Le joueur et les villages » du code. Les réglages 
 - **Sauvegarde** : réputation, nombre d'actes, blocs à réparer et tâche en cours. Le mode test affiche la réputation et la colère, et le journal note chaque changement de réputation, la colère, le calme revenu et les tâches accomplies.
 - Restent pour la suite de l'étape 10 : les caravanes et les relations entre villages, la fiche du village et la carte.
 
-## 13. Étapes
+## 13. Relations entre villages et caravanes (étape 10, suite)
+
+Tout est dans la section « Relations entre villages et caravanes » du code. Les réglages sont dans `CARAVANE`.
+
+- **Voisins** (`voisins`) : chaque village connaît les villages à moins de 600 blocs. Ce sont ceux qu'un joueur a déjà approchés, et les villages fondés, qui entrent ainsi dans le réseau.
+- **Départ** (`partirCaravane`, une fois par jour, une caravane à la fois, 2 jours au moins entre deux départs) : il faut au village un marchand ou un marché. Il cherche ce qui lui manque (besoin d'au moins 0,5) chez un voisin qui en a de trop, c'est-à-dire plus de 2 fois sa cible, et au moins 4. Il emporte son plus gros surplus, 16 au plus.
+- **Trajet** : simulé simplement, sans recherche de chemin, en ligne droite d'un centre à l'autre. Il dure selon la distance (1,4 bloc par seconde du jeu). Près d'un joueur (64 blocs), on voit le marchand marcher. Lui parler, il dit où il va.
+- **Échange** : à l'arrivée, le chargement entre dans le stock du voisin, qui donne en retour ce qui manquait, aux valeurs de `VALEURS_TROC` et dans la limite de son surplus. La caravane rentre ensuite et dépose sa marchandise.
+- **Escorte** : rester à moins de 16 blocs de la caravane pendant 30 s de simulation avant son arrivée rapporte +8 de réputation dans les deux villages, à l'aller comme au retour.
+- **Nuit** : un trajet qui passe par la nuit sans escorte a 30 % de risques de perdre 30 % du chargement. Près d'un joueur, la nuit, un monstre s'approche de la caravane, une fois par trajet.
+- **Dialogues** : « Une caravane est arrivée de {lieu} avec du fer ! », « Notre caravane est partie pour {lieu} avec nos surplus. ».
+- **Sauvegarde** : caravanes en route (`ca`). Le mode test affiche le nombre de voisins et de caravanes, et le journal note les départs, arrivées, retours, attaques de nuit et monstres.
+
+## 14. Étapes
 
 | Étape | Contenu | État |
 | --- | --- | --- |
@@ -219,9 +232,10 @@ Tout est dans la section « Le joueur et les villages » du code. Les réglages 
 | 8 | Naissances, croissance, nouvelles maisons, plafond de population et nouveaux villages | fait (17/11, branche `terres-cubiques-etape-8`) |
 | 9 | Dialogues complets | fait (17/11, branche `terres-cubiques-etape-9`) |
 | 10 | Interaction avec le joueur, tâches, réputation, sabotage et riposte (première partie) | fait (17/11, branche `terres-cubiques-etape-10`) ; caravanes, fiches de village et carte à faire |
-| 10 (suite) à 12 | caravanes, fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
+| 10 (suite) | Relations entre villages et caravanes | fait (17/11, branche `terres-cubiques-etape-10b`) ; fiches de village et carte à faire |
+| 10 (fin) à 12 | fiches et carte, sauvegarde complète et rattrapage, optimisation | à faire |
 
-## 14. Essais
+## 15. Essais
 
 - `node scripts/tester-terres-cubiques.mjs` (dans `validate.yml` quand ce jeu change) : ancienne partie identique, nouveau monde, voyage de 1 000 blocs, IndexedDB, proximité, fiches, export et import, mode test, vie des villages en vitesse ×10 (métiers, stock, seuil des arbres, champ ressemé, pousse qui grandit, blocs du joueur intacts), construction en vitesse ×10 (cabane bâtie bloc par bloc avec son étiquette, pause faute de bois puis reprise, planificateur, chantier relu après rechargement), échanges en vitesse ×10 (troc avec dette puis remboursement, refus, marché bâti avec son marchand, étals, achat au marché, relecture), les 30 bâtiments (24 gabarits posés et reliés par un chemin, sortie de la carrière, effets, meunier au moulin, tour après une attaque, carrière bâtie par l'aide de chantier). Sur GitHub, les échecs sont aussi écrits dans le résumé du job.
 - `node scripts/tester-stockage.mjs` : pont de stockage dans le lanceur.
