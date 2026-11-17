@@ -560,7 +560,8 @@ try {
   }
 
   console.log('15. sauvegarde complète et rattrapage');
-  { await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); DBG.vitesse=10; prefs.monsters=false; if(state==='dead') respawn(); P.food=20; P.hp=20; if(state!=='play') resume(); })()`); await attendre(1000);
+  { await T(c, `(()=>{ const inf=villageInfo(Math.floor((${v6.id}-1000)/256),(${v6.id}-1000)%256); for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++) ensureChunk((inf.cx>>4)+a,(inf.cz>>4)+b); /* le village de l'essai, chargé (la section 14 a rechargé la partie ailleurs) */
+    const v=VILLAGES.get(${v6.id}); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); DBG.vitesse=10; prefs.monsters=false; if(state==='dead') respawn(); P.food=20; P.hp=20; if(state!=='play') resume(); })()`); await attendre(1000);
   // --- empreinte complète des villages : relevée, sauvegardée, rechargée, comparée
   const SIG = `(()=>{ const o={}; for(const v of VILLAGES.values()){ if(!v.vie) continue; const e=v.eco||{}, w=v.vie;
     o[v.id]={stock:w.stock,bats:(w.bats||[]).map(b=>b.t+' '+b.x+','+b.z).join(' / '),champs:(w.champs||[]).length,
