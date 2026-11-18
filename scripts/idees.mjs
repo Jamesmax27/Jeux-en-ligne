@@ -60,6 +60,13 @@
 // l'agent attendent. Une idée à la fois multijoueur, 13+ et inspirée compte
 // dans chacun des quotas.
 //
+// Jury (variable d'environnement JURY_IDEES=1, posée par boucle-de-nuit.yml) : une idée de
+// l'agent n'est fabriquée que si un jury lui a donné au moins SEUIL_NOTE sur 10. Champs
+// "note" et "avis" (posés par « noter » et « appliquer-notes »), "accroche",
+// "premieres_secondes" et "relance" (écrits par l'agent, transmis au créateur du jeu). Les
+// idées notées passent de la meilleure à la moins bonne ; sans idée retenue, aucun jeu
+// n'est fabriqué. Les idées du propriétaire ne passent pas devant le jury.
+//
 // Les textes pour les moteurs de recherche (titre_seo, description_seo,
 // presentation, regles, competences, jaquette_alt de game.json) ne sont pas
 // dans l'idée : l'agent créateur les rédige d'après le jeu fini. Les
@@ -113,6 +120,11 @@
 //                          identifiants ou libellés ; ages et univers
 //                          facultatifs, une valeur illisible est écartée)
 //                          qui ne sont pas déjà dans idees.json ou l'archive
+//   preparer-jury <nouvelles> <sortie>   fichier lu par le jury (nouvelles idées et file sans note)
+//   noter <nouvelles> <notes> <sortie-nouvelles> <sortie-file>
+//                          calcule les notes du jury : nouvelles idées retenues, notes de la file
+//   appliquer-notes <fichier>   range les notes de la file dans idees.json
+//   quota <n> <k> <passage>     part de ce passage pour k jeux sur 5, avec n jeux par passage
 //   choisir <n> [--multi <k>] [--ados <k>] [--tendances <k>]
 //                          passe n idées "en_cours" et écrit leur liste (JSON :
 //                          id, titre, description, genre, genres_secondaires,
@@ -143,7 +155,7 @@
 // ==========================================================================
 
 import { readFile, writeFile, readdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GENRES, UNIVERS, IDS_GENRES, IDS_UNIVERS, UNIVERS_MAX, pourAdos } from '../public/taxonomie.js';
@@ -159,7 +171,12 @@ const FICHIER_ARCHIVE = path.join(RACINE, 'idees-archive.json');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
 const CATALOGUE_CONSTRUIT = path.join(RACINE, 'public', 'catalog.json');
 
-const IDEES_VISEES = 15;   // idées "en_attente" que l'idéation maintient
+// Jury des idées (boucle de nuit) : voir l'en-tête. Critères notés sur 10 et leur poids.
+const JURY = process.env.JURY_IDEES === '1';
+const SEUIL_NOTE = 7.5, PLANCHER_CRITERE = 6, LONGUEUR_PROMESSE = 300;
+const CRITERES = { accroche: 0.25, relance: 0.25, clarte: 0.15, profondeur: 0.15, originalite: 0.1, faisabilite: 0.1 };
+const CRITERES_ESSENTIELS = ['accroche', 'relance', 'clarte'];   // sous le plancher, l'idée est écartée
+const IDEES_VISEES = JURY ? 6 : 15;   // idées "en_attente" que l'idéation maintient (avec le jury : 3 nuits d'avance)
 const PASSAGES_D_AVANCE = 3;   // idées multijoueurs ou 13+ gardées en attente : de quoi faire 3 passages
 // Idées multijoueurs (ou 13+) à garder en attente, pour k jeux de ce type par passage (--multi k, --ados k).
 const multiVisees = (k) => PASSAGES_D_AVANCE * Math.max(0, Math.min(CHOIX_MAX, parseInt(k, 10) || 0));
@@ -182,7 +199,7 @@ const DATE_VALIDE = /^\d{4}-\d{2}-\d{2}$/;
 const AGE_VALIDE = /^\d{1,2}\+$/;   // « 6+ » : même format que "ages" de game.json (validate-games.mjs)
 // Repli des idées sans "ages" : la phrase « Âge conseillé : 6+. » de la description.
 const AGE_DANS_DESCRIPTION = /Âge\s+conseillé\s*:\s*(\d{1,2})\s*\+/i;
-const ORDRE_CHAMPS = ['id', 'titre', 'description', 'genre', 'genres_secondaires', 'univers', 'ages', 'multijoueur', 'places', 'inspiration', 'pour_le', 'source', 'date_ajout', 'statut', 'jeu_id', 'issue', 'essais'];
+const ORDRE_CHAMPS = ['id', 'titre', 'description', 'genre', 'genres_secondaires', 'univers', 'ages', 'multijoueur', 'places', 'inspiration', 'pour_le', 'accroche', 'premieres_secondes', 'relance', 'note', 'avis', 'source', 'date_ajout', 'statut', 'jeu_id', 'issue', 'essais'];
 const placesValides = (n) => Number.isInteger(n) && n >= PLACES_MIN && n <= PLACES_MAX;
 const estMulti = (i) => i?.multijoueur === true;
 // Idée pour adolescents : âge conseillé 13+ (champ "ages" ou phrase de la description).
@@ -277,7 +294,8 @@ function universDonnes(valeur) {
 
 // Ordre de fabrication : idées perso (issue la plus ancienne d'abord), idées humaines, puis idées de l'agent :
 // les idées inspirées actives d'abord (la date la plus proche en tête), puis les autres, dans l'ordre du fichier.
-const choisissables = (idees) => idees.filter((i) => i.statut === 'en_attente' && (i.essais || 0) < ESSAIS_MAX);
+const retenueParJury = (i) => !JURY || duProprietaire(i) || (typeof i.note === 'number' && i.note >= SEUIL_NOTE);
+const choisissables = (idees) => idees.filter((i) => i.statut === 'en_attente' && (i.essais || 0) < ESSAIS_MAX && retenueParJury(i));
 const estPerso = (i) => Number.isInteger(i.issue);
 const duProprietaire = (i) => estPerso(i) || i.source === 'humain';
 const ordreDeFabrication = (idees) => {
@@ -286,7 +304,7 @@ const ordreDeFabrication = (idees) => {
   const autres = libres.filter((i) => !estPerso(i));
   const agent = autres.filter((i) => i.source !== 'humain');
   const inspirees = agent.filter((i) => estInspiree(i)).sort((a, b) => a.pour_le.localeCompare(b.pour_le));
-  return [...perso, ...autres.filter((i) => i.source === 'humain'), ...inspirees, ...agent.filter((i) => !estInspiree(i))];
+  return [...perso, ...autres.filter((i) => i.source === 'humain'), ...inspirees, ...agent.filter((i) => !estInspiree(i)).sort((a, b) => (b.note ?? 0) - (a.note ?? 0))];
 };
 
 // --------------------------------------------------------------------------
@@ -326,6 +344,10 @@ function problemesIdee(idee, fichier, statutsPermis) {
     p.push('"pour_le" : date AAAA-MM-JJ, avec "inspiration" seulement');
   }
   if (idee.pour_le !== undefined && idee.inspiration === undefined) p.push('"pour_le" sans "inspiration"');
+  if (idee.note !== undefined && !(typeof idee.note === 'number' && idee.note >= 0 && idee.note <= 10)) p.push('"note" (facultatif) : nombre de 0 à 10');
+  for (const k of ['accroche', 'premieres_secondes', 'relance', 'avis']) {
+    if (idee[k] !== undefined && !(typeof idee[k] === 'string' && idee[k].length <= LONGUEUR_PROMESSE)) p.push(`"${k}" (facultatif) : texte de ${LONGUEUR_PROMESSE} caractères au plus`);
+  }
   return p.map((x) => `${fichier}, idée ${JSON.stringify(idee.id ?? idee.titre ?? '?')} : ${x}`);
 }
 
@@ -571,8 +593,12 @@ async function ajouter(fichier, k = 0, ados = null, tendances = 0) {
         else if (!pour_le) refusInspiration = `${inspiration} : fête passée, sans date à venir`;
       } else pour_le = ajouterJours(jour, FRAICHEUR_TENDANCE);
     }
+    const note = JURY && typeof p?.note === 'number' ? p.note : undefined;
+    const promesse = Object.fromEntries(['accroche', 'premieres_secondes', 'relance', ...(note !== undefined ? ['avis'] : [])]
+      .map((k) => [k, uneLigne(p?.[k], LONGUEUR_PROMESSE)]).filter(([, v]) => v));
     let refus = '';
-    if (ados13 && ados === 0) refus = 'idée 13+ alors que ADOS_BOUCLE vaut 0';
+    if (JURY && !(note >= SEUIL_NOTE && note <= 10)) refus = 'note du jury absente ou sous le seuil';
+    else if (ados13 && ados === 0) refus = 'idée 13+ alors que ADOS_BOUCLE vaut 0';
     else if (refusInspiration) refus = refusInspiration;
     else if (place === 0 && !(multijoueur && placeMulti > 0) && !(ados13 && placeAdos > 0) && !(inspiration && placeTendances > 0)) refus = `déjà ${IDEES_VISEES} idées en attente`;
     else if (p?.multijoueur !== undefined && typeof p.multijoueur !== 'boolean') refus = '"multijoueur" : true ou false';
@@ -592,6 +618,7 @@ async function ajouter(fichier, k = 0, ados = null, tendances = 0) {
       id, titre, description, genre, genres_secondaires, univers, ...(ages ? { ages } : {}),
       ...(multijoueur ? { multijoueur: true, ...(places !== undefined ? { places } : {}) } : {}),
       ...(inspiration ? { inspiration, pour_le } : {}),
+      ...promesse, ...(note !== undefined ? { note } : {}),
       source: 'agent', date_ajout: jour, statut: 'en_attente', jeu_id: null,
     });
     ids.add(id); titresPris.add(cle(titre)); ajoutees++;
@@ -773,6 +800,7 @@ async function choisir(n, args = []) {
     genres_secondaires: x.genres_secondaires || [], univers: x.univers || [], ages: ageDeIdee(x),
     multijoueur: estMulti(x), places: estMulti(x) && placesValides(x.places) ? x.places : null,
     inspiration: inspirationDe(x), saison: estSaison(x) ? libelleSaison(x) : '',
+    accroche: x.accroche || '', premieres_secondes: x.premieres_secondes || '', relance: x.relance || '',
     ...(estPerso(x) ? { issue: x.issue } : {}),
   }))));
 }
@@ -882,6 +910,102 @@ async function controler(jeuId) {
 }
 
 // --------------------------------------------------------------------------
+// Jury des idées (étape a de la boucle) et quotas sur plusieurs passages
+// --------------------------------------------------------------------------
+
+function lireJsonFacultatif(fichier, nom) {
+  if (!fichier || !existsSync(fichier)) return null;
+  try { return JSON.parse(readFileSync(fichier, 'utf8').replace(/^﻿/, '')); }
+  catch (e) { console.error(`${nom} illisible, ignoré : ${e.message}`); return null; }
+}
+const propositionsDe = (v) => (Array.isArray(v) ? v : Array.isArray(v?.idees) ? v.idees : []);
+const aNoter = (idees) => idees.filter((i) => i.statut === 'en_attente' && (i.essais || 0) < ESSAIS_MAX && !duProprietaire(i) && i.note === undefined);
+
+// Fichier lu par le jury : les nouvelles idées (ref « nouvelle-N ») et les idées de la file encore sans note (ref = id).
+async function preparerJury(fichierNouvelles, sortie) {
+  if (!sortie) throw new Error('usage : node scripts/idees.mjs preparer-jury <nouvelles.json> <sortie.json>');
+  const { idees } = await charger();
+  const resume = (x, ref) => ({
+    ref, titre: uneLigne(x?.titre, 80), accroche: uneLigne(x?.accroche, LONGUEUR_PROMESSE), premieres_secondes: uneLigne(x?.premieres_secondes, LONGUEUR_PROMESSE),
+    relance: uneLigne(x?.relance, LONGUEUR_PROMESSE), description: uneLigne(x?.description, 2000), genre: uneLigne(x?.genre, 40),
+    univers: nettoyerListe(x?.univers), ages: uneLigne(x?.ages, 6), multijoueur: x?.multijoueur === true,
+  });
+  const candidats = [
+    ...propositionsDe(lireJsonFacultatif(fichierNouvelles, 'nouvelles idées')).map((p, n) => resume(p, `nouvelle-${n + 1}`)),
+    ...aNoter(idees).map((i) => resume(i, i.id)),
+  ];
+  console.log(`Idées à noter : ${candidats.length}`);
+  if (!candidats.length) return;
+  mkdirSync(path.dirname(path.resolve(sortie)), { recursive: true });
+  writeFileSync(sortie, `${JSON.stringify({ candidats }, null, 2)}\n`);
+}
+
+// Note sur 10 d'un avis du jury ; null s'il manque un critère. Un critère essentiel sous le plancher recale l'idée.
+function noteDuJury(avis) {
+  let total = 0;
+  for (const [critere, poids] of Object.entries(CRITERES)) {
+    const n = avis?.[critere];
+    if (typeof n !== 'number' || !Number.isFinite(n) || n < 0 || n > 10) return null;
+    total += n * poids;
+  }
+  const note = Math.round(total * 10) / 10;
+  return CRITERES_ESSENTIELS.some((c) => avis[c] < PLANCHER_CRITERE) ? Math.min(note, SEUIL_NOTE - 0.1) : note;
+}
+
+// Calcule les notes (jamais celles écrites par l'auteur des idées) : nouvelles idées retenues, de la meilleure
+// à la moins bonne, dans <sortie-nouvelles> ; notes des idées de la file dans <sortie-file>.
+async function noter(fichierNouvelles, fichierNotes, sortieNouvelles, sortieFile) {
+  if (!sortieFile) throw new Error('usage : node scripts/idees.mjs noter <nouvelles.json> <notes.json> <sortie-nouvelles.json> <sortie-file.json>');
+  const { idees } = await charger();
+  const propositions = propositionsDe(lireJsonFacultatif(fichierNouvelles, 'nouvelles idées'));
+  const brut = lireJsonFacultatif(fichierNotes, 'notes du jury');
+  const avis = Array.isArray(brut) ? brut : Array.isArray(brut?.notes) ? brut.notes : [];
+  const enFile = new Set(aNoter(idees).map((i) => i.id));
+  const retenues = [], file = [], vus = new Set();
+  for (const a of avis) {
+    const ref = typeof a?.ref === 'string' ? a.ref : '';
+    const note = noteDuJury(a);
+    if (!ref || vus.has(ref) || note === null) { console.log(`Avis ignoré : ${JSON.stringify(ref || '?')} (référence en double ou absente, ou critère manquant)`); continue; }
+    vus.add(ref);
+    const texte = uneLigne(a.avis, LONGUEUR_PROMESSE);
+    const m = /^nouvelle-(\d+)$/.exec(ref);
+    const proposition = m ? propositions[Number(m[1]) - 1] : null;
+    if (m && !proposition) { console.log(`Avis ignoré : ${ref} n'existe pas`); continue; }
+    if (!m && !enFile.has(ref)) { console.log(`Avis ignoré : ${ref} n'est pas une idée à noter`); continue; }
+    console.log(`${note >= SEUIL_NOTE ? 'Retenue' : 'Écartée'} (${note}/10) : ${uneLigne(proposition?.titre, 80) || ref}`);
+    if (!m) file.push({ id: ref, note, avis: texte });
+    else if (note >= SEUIL_NOTE) retenues.push({ ...proposition, note, avis: texte });
+  }
+  retenues.sort((a, b) => b.note - a.note);
+  writeFileSync(sortieNouvelles, JSON.stringify(retenues));
+  writeFileSync(sortieFile, JSON.stringify(file));
+  console.log(`${retenues.length} nouvelle(s) idée(s) retenue(s) sur ${propositions.length} ; ${file.length} idée(s) de la file notée(s).`);
+}
+
+// Étape b : range dans idees.json les notes données aux idées de la file (jamais de nouvelle note sur une idée déjà notée).
+async function appliquerNotes(fichier) {
+  const { idees } = await charger();
+  const liste = lireJsonFacultatif(fichier, 'notes de la file');
+  let n = 0;
+  for (const x of Array.isArray(liste) ? liste : []) {
+    const idee = aNoter(idees).find((i) => i.id === x?.id);
+    if (!idee || typeof x.note !== 'number' || x.note < 0 || x.note > 10) continue;
+    idee.note = x.note;
+    if (x.avis) idee.avis = uneLigne(x.avis, LONGUEUR_PROMESSE);
+    n++;
+  }
+  await ecrire(FICHIER_IDEES, idees);
+  console.log(`${n} note(s) rangée(s) dans idees.json.`);
+}
+
+// Quota d'un passage pour « k jeux sur 5 », réparti sur les passages successifs : avec 2 jeux par passage, k = 1
+// donne 0, 0, 1, 0, 1… (2 jeux sur 5 passages) au lieu d'un arrondi toujours à 0.
+function quotaDuPassage(nombre, k, passage) {
+  const n = Math.max(0, parseInt(nombre, 10) || 0), q = Math.max(0, Math.min(CHOIX_MAX, parseInt(k, 10) || 0)), p = Math.max(1, parseInt(passage, 10) || 1);
+  return Math.min(n, Math.floor((p * n * q) / CHOIX_MAX) - Math.floor(((p - 1) * n * q) / CHOIX_MAX));
+}
+
+// --------------------------------------------------------------------------
 // Programme principal
 // --------------------------------------------------------------------------
 
@@ -897,6 +1021,10 @@ const COMMANDES = {
   ajouter: () => ajouter(args[0], optionMulti(args), optionAdos(args), optionTendances(args)),
   'ajouter-humain': ajouterHumain,
   'importer-perso': () => importerPerso(args[0]),
+  'preparer-jury': () => preparerJury(args[0], args[1]),
+  noter: () => noter(args[0], args[1], args[2], args[3]),
+  'appliquer-notes': () => appliquerNotes(args[0]),
+  quota: async () => console.log(quotaDuPassage(args[0], args[1], args[2])),
   choisir: () => choisir(args[0], args.slice(1)),
   reconcilier: () => reconcilier(args),
   controler: () => controler(args[0]),
