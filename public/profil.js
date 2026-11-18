@@ -453,8 +453,9 @@ const RE_FICHE = /^\/(?:(?:en|es|pt|de)\/)?(?:jeux|games|juegos|jogos|spiele)\/(
 
 /**
  * Check vert sur la vignette des jeux terminés : toute carte (lien .carte vers
- * la fiche d'un jeu, ou élément [data-jeu]) dans « racine ». etiquette : texte
- * lu par les lecteurs d'écran (« Terminé »).
+ * la fiche d'un jeu, ou élément [data-jeu]) qui contient une jaquette, dans
+ * « racine » ; le bloc de classement d'une page de jeu porte aussi data-jeu mais
+ * n'a pas de jaquette. etiquette : texte lu par les lecteurs d'écran (« Terminé »).
  */
 export function marquerTermines(racine, etiquette) {
   const termines = jeuxTermines();
@@ -463,7 +464,8 @@ export function marquerTermines(racine, etiquette) {
     if (!id && carte.getAttribute('href')) {
       try { id = RE_FICHE.exec(new URL(carte.getAttribute('href'), location.href).pathname)?.[1]; } catch { id = null; }
     }
-    const zone = carte.querySelector('.jaquette') || carte;
+    const zone = carte.querySelector('.jaquette');
+    if (!zone) continue;
     const existant = zone.querySelector(':scope > .badge-termine');
     if (id && termines.has(id)) {
       if (!existant) {

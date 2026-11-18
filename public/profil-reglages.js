@@ -92,6 +92,10 @@ export const PSEUDOS_CHANGES_JOUR = 10;       // changements de pseudo au plus p
 
 // --- Classement ------------------------------------------------------------------
 export const CLASSEMENT_PERIODES = ['semaine', 'mois'];    // périodes proposées ; la première est celle par défaut
+// Classements au nombre de jeux à étoiles : terminés, et terminés avec toutes leurs étoiles (docs/cadrage-fidelisation.md, section 14.11).
+export const CLASSEMENT_PERIMETRES_JEUX = ['termines', 'parfaits'];
+export const CLASSEMENT_PERIODES_JEUX = ['semaine', 'mois', 'total'];    // leurs périodes ; la première est celle par défaut
+export const CLASSEMENT_DEBUT_TOTAL = '2000-01-01';    // période « Au total » : date de départ, avant tout jeu terminé
 export const CLASSEMENT_SEMAINE_DEBUT = 1;    // jour de remise à zéro de la semaine (UTC) : 1 = lundi
 export const CLASSEMENT_TAILLE = 100;         // joueurs affichés (top 100)
 export const CLASSEMENT_CACHE_S = 300;        // le top est recalculé au plus toutes les 5 minutes

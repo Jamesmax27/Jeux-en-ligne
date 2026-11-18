@@ -267,6 +267,16 @@ verifier(c.lignes?.length === 2 && c.lignes[0].id === tom.id && c.lignes[1].id =
 verifier(c.lignes?.[0].presence?.etat && !c.lignes[1].presence, 'présence des amis sur leur ligne (pas sur la mienne)');
 c = await amis(lea.jeton, { action: 'classement', perimetre: 'etoiles', periode: 'mois', presence: false });
 verifier(c.lignes?.[0].id === lea.id && c.lignes[0].points === 9, 'périmètre « étoiles » : même calcul que le classement général', c.lignes);
+await DB.prepare("INSERT INTO profils_jeux (profil, jeu, secondes, premiere, derniere, termine, etoiles, etoiles_max, etoiles_le) VALUES (?1, 'fin-a', 300, 1, 1, 1767225600000, 60, 60, 1767225600000), (?1, 'fin-b', 300, 1, 1, 1767225600000, 10, 60, 1767225600000), (?2, 'fin-a', 300, 1, 1, 1767225600000, 60, 60, 1767225600000), (?2, 'fin-sans', 300, 1, 1, 1767225600000, NULL, NULL, NULL), (?3, 'fin-a', 300, 1, 1, 1767225600000, 60, 60, 1767225600000)").bind(tom.id, lea.id, zoe.id).run();
+c = await amis(lea.jeton, { action: 'classement', perimetre: 'termines', periode: 'total', presence: false });
+verifier(c.periode === 'total' && c.lignes?.length === 2 && c.lignes[0].id === tom.id && c.lignes[0].points === 2 && c.lignes[1].points === 1, 'jeux terminés au total, entre amis (jeu sans étoiles non compté)', c.lignes);
+c = await amis(lea.jeton, { action: 'classement', perimetre: 'parfaits', periode: 'total', presence: false });
+verifier(c.lignes?.length === 2 && c.lignes.every((l) => l.points === 1) && c.lignes[0].rang === c.lignes[1].rang, 'jeux terminés à 100 %, entre amis : égalité, même rang', c.lignes);
+c = await amis(lea.jeton, { action: 'classement', perimetre: 'parfaits', periode: 'semaine', presence: false });
+verifier(c.periode === 'semaine' && c.lignes?.every((l) => l.points === 0), 'jeux terminés avant cette semaine : zéro sur la semaine', c.lignes);
+c = await amis(lea.jeton, { action: 'classement', perimetre: 'general', periode: 'total', presence: false });
+verifier(c.periode === 'semaine', '« Au total » sans effet sur le classement général', c.periode);
+await DB.prepare("DELETE FROM profils_jeux WHERE jeu LIKE 'fin-%'").run();
 c = await amis(lea.jeton, { action: 'classement', perimetre: 'multi:enclos-de-la-ferme', periode: 'semaine', presence: false });
 verifier(c.lignes?.length === 2 && c.lignes.every((l) => l.points === 0), 'jeu multijoueur sans manche : tout le groupe, à zéro', c.lignes);
 verifier((await amis(lea.jeton, { action: 'classement', perimetre: 'multi:robot-max', periode: 'semaine' })).statut === 400, 'périmètre d\'un jeu non multijoueur : refusé');

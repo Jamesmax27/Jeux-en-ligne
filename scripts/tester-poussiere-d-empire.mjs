@@ -100,6 +100,8 @@ const MISSIONS_PASSIF = [5, 6, 9, 10, 12, 15, 16, 17, 18, 19, 20];   // un rival
 // Fin d'acte : un joueur peu attentif (robot de niveau 1 à sa place) doit y perdre souvent (réglage du 18 novembre 2026).
 const MISSIONS_FIN_ACTE = [16, 17, 18, 19, 20];
 const TAUX_MAX_ROBOT1_FIN_ACTE = 70;
+// Mission 17 allégée après l'essai du propriétaire (18 novembre 2026), qui ne la gagnait pas en 10 parties.
+const TAUX_MAX_ROBOT1_PAR_MISSION = { 17: 85 };
 // Mission où chaque capacité est gagnée (contrat v2, section 5).
 const CAPACITE_MISSION = { rallier: 3, fortin: 6, transfert: 10, arrierepays: 15, relais: 25, chantier: 32, frappe: 47, pont: 66, essaimage: 71, sursaut: 85 };
 
@@ -807,8 +809,8 @@ if (AVEC_MISSIONS) {
       mesures.missions[`m${m}n${niveau}`] = { taux, mediane: mediane(r.ticks) };
       const detail = `${sujet} : ${r.victoires} / ${r.parties} victoires (${taux} %), médiane ${mediane(r.ticks)} ticks (victoires : ${mediane(r.ticksV)}), ${(r.etoiles / Math.max(1, r.victoires)).toFixed(1)} étoile(s) par victoire, ${raisonsDe(r.raisons)}${fiche.graine ? ' (carte fixe, hasard varié)' : ''}`;
       if (niveau === 2 && taux < 70) { if (SOUPLE) avertir('missions', `${detail} : sous les 70 % attendus`); else probleme('missions', `${detail} : 70 % attendus`); }
-      else if (niveau === 1 && MISSIONS_FIN_ACTE.includes(m) && taux > TAUX_MAX_ROBOT1_FIN_ACTE) {
-        const t = `${detail} : ${TAUX_MAX_ROBOT1_FIN_ACTE} % au plus attendus (fin d'acte trop facile pour un joueur peu attentif)`;
+      else if (niveau === 1 && MISSIONS_FIN_ACTE.includes(m) && taux > (TAUX_MAX_ROBOT1_PAR_MISSION[m] ?? TAUX_MAX_ROBOT1_FIN_ACTE)) {
+        const t = `${detail} : ${TAUX_MAX_ROBOT1_PAR_MISSION[m] ?? TAUX_MAX_ROBOT1_FIN_ACTE} % au plus attendus (fin d'acte trop facile pour un joueur peu attentif)`;
         if (SOUPLE) avertir('missions', t); else probleme('missions', t);
       }
       else ok(detail);
