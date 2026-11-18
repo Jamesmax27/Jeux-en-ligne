@@ -25,6 +25,8 @@
 //   - classement : ordre, niveau minimal, position hors du top, périmètre ;
 //   - classement des étoiles d'un jeu : ordre et égalités, top 100, position hors
 //     du top, maximum du jeu, lecture par l'index, ancienne base mise à jour ;
+//   - classements des jeux terminés et terminés à 100 % : jeux comptés, périodes,
+//     « Au total », position hors du top, lecture par l'index ;
 //   - indicateurs de fidélisation et effacements quotidiens ;
 //   - provenance (autre site refusé).
 // Code de sortie 1 si un test échoue.
@@ -86,7 +88,7 @@ const env = {
 const { onRequestPost: apiProfil } = await import('../functions/api/profil.js');
 const { onRequestPost: apiClassement } = await import('../functions/api/classement.js');
 const { onRequestPost: apiMulti } = await import('../functions/api/profil-multi.js');
-const { tacheQuotidienneProfil, archiverPodiums, finPeriode, periodePrecedente, badgesMerites } = await import('../functions/_profil.js');
+const { tacheQuotidienneProfil, archiverPodiums, finPeriode, periodePrecedente, badgesMerites, requetePoints } = await import('../functions/_profil.js');
 
 let ipCourante = '203.0.113.1';
 async function appeler(fonction, corps, { ip = ipCourante, entetes = {} } = {}) {
@@ -453,10 +455,80 @@ await DB.prepare('DELETE FROM profils WHERE id = ?').bind(sansEtoiles.etat.id).r
   const lignes = ancienne.sqlite.prepare('SELECT profil, etoiles_le FROM profils_jeux ORDER BY profil').all();
   const index = ancienne.sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'profils_jeux_etoiles'").get();
   verifier(lignes.map((l) => l.etoiles_le).join() === '7,,' && !!index, 'ancienne base : colonne et index ajoutés, date = fin du jeu', lignes);
+  verifier(!!ancienne.sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'profils_jeux_termines'").get(), 'ancienne base : index des jeux terminés ajouté');
   const encore = await import('../functions/_profil.js?migration2');
   let erreurMigration = null;
   try { await encore.preparerTablesProfil({ DB: ancienne }); } catch (e) { erreurMigration = String(e); }
   verifier(erreurMigration === null, 'préparation relancée sur une base à jour : rien à faire', erreurMigration);
+}
+
+// ==========================================================================
+console.log('Classements des jeux terminés et terminés à 100 %');
+{
+  const lire = (perimetre, periode, jeton) => appeler(apiClassement, { perimetre, periode, jeton });
+  const repere = await lire('termines', 'semaine');
+  const reperesMois = await lire('termines', 'mois');
+  const SEMAINE = Date.parse(`${repere.debut}T00:00:00Z`) + 1000;       // pendant la semaine en cours
+  const MOIS = Date.parse(`${repere.debut}T00:00:00Z`) - 1000;          // ce mois-ci, avant cette semaine
+  const VIEUX = Date.parse(`${reperesMois.debut}T00:00:00Z`) - JOUR;     // avant ce mois-ci
+  verifier(repere.statut === 200 && repere.periode === 'semaine' && MOIS > Date.parse(`${reperesMois.debut}T00:00:00Z`), 'semaine en cours, comme les autres classements', repere.debut);
+  const joueur = (id, niveau = 5) => DB.prepare('INSERT INTO profils (id, numero, xp, niveau, cree_le, vu_le, sync_le) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(id, id, R.seuilNiveau(niveau), niveau, T0, maintenant, T0).run();
+  const jeu = (id, nom, termine, etoiles, max, le) => DB.prepare('INSERT INTO profils_jeux (profil, jeu, secondes, premiere, derniere, termine, etoiles, etoiles_max, etoiles_le) VALUES (?, ?, 300, ?, ?, ?, ?, ?, ?)')
+    .bind(id, `fin-${nom}`, T0, T0, termine, etoiles, max, le).run();
+  for (const id of [6001, 6002, 6004, 6005]) await joueur(id);
+  await joueur(6003, 1);
+  await jeu(6001, 'a', VIEUX, 60, 60, VIEUX);        // 100 % il y a longtemps
+  await jeu(6001, 'b', SEMAINE, 72, 72, SEMAINE);    // 100 % cette semaine
+  await jeu(6001, 'sans-etoiles', SEMAINE, null, null, null); // jeu sans étoiles : jamais compté
+  await jeu(6002, 'a', VIEUX, 60, 60, SEMAINE);      // terminé il y a longtemps, 100 % cette semaine
+  await jeu(6002, 'b', MOIS, 10, 60, MOIS);          // terminé ce mois-ci, pas à 100 %
+  await jeu(6003, 'a', SEMAINE, 60, 60, SEMAINE);    // niveau 1 : absent
+  await jeu(6004, 'a', null, 60, 60, SEMAINE);       // pas terminé : absent
+  await jeu(6005, 'a', MOIS, 60, 60, null);          // sans date des étoiles : date de fin du jeu
+  const scores = (r) => r.top.filter((l) => l.id > 6000 && l.id < 6100).map((l) => `${l.id}:${l.points}`).sort().join(' ');
+  const attendu = async (perimetre, periode, valeur, message) => {
+    const r = await lire(perimetre, periode);
+    verifier(scores(r) === valeur, message, scores(r));
+    return r;
+  };
+  const total = await attendu('termines', 'total', '6001:2 6002:2 6005:1', 'terminés au total : jeux à étoiles seulement, niveau minimal');
+  verifier(total.periode === 'total' && total.debut === R.CLASSEMENT_DEBUT_TOTAL, 'période « Au total » acceptée', total.periode);
+  const l1 = total.top.find((l) => l.id === 6001);
+  const l2 = total.top.find((l) => l.id === 6002);
+  verifier(l1.rang === l2.rang && total.top.indexOf(l1) < total.top.indexOf(l2), 'égalité : même rang, puis numéro de profil', [l1.rang, l2.rang]);
+  await attendu('termines', 'semaine', '6001:1', 'terminés cette semaine');
+  await attendu('termines', 'mois', '6001:1 6002:1 6005:1', 'terminés ce mois-ci');
+  await attendu('parfaits', 'total', '6001:2 6002:1 6005:1', '100 % au total : toutes les étoiles seulement');
+  await attendu('parfaits', 'semaine', '6001:1 6002:1', '100 % cette semaine : date de la dernière étoile, pas de la fin du jeu');
+  await attendu('parfaits', 'mois', '6001:1 6002:1 6005:1', '100 % ce mois-ci, sans date des étoiles : date de fin du jeu');
+  verifier((await lire('termines', 'inconnue')).periode === 'semaine', 'période inconnue : la semaine');
+  const general = await lire('general', 'total');
+  verifier(general.statut === 200 && general.periode === 'semaine' && general.debut === repere.debut, '« Au total » sans effet sur le classement général', general.periode);
+  verifier((await lire('etoiles', 'total')).periode === 'semaine', '« Au total » sans effet sur les étoiles');
+  // Position : dans le top, puis hors du top 100.
+  await jeu(idA, 'a', SEMAINE, 60, 60, SEMAINE);
+  const nA = (await DB.prepare('SELECT COUNT(*) AS n FROM profils_jeux WHERE profil = ? AND termine IS NOT NULL AND etoiles_max > 0').bind(idA).first()).n;
+  let r = await lire('termines', 'total', jetonA);
+  verifier(r.moi?.id === idA && r.moi.points === nA && r.moi.rang === r.top.find((l) => l.id === idA)?.rang, 'joueur dans le top : sa position est celle de sa ligne', r.moi);
+  for (let i = 0; i < 105; i++) {
+    await joueur(6100 + i);
+    for (let k = 0; k <= nA; k++) await jeu(6100 + i, `x${k}`, SEMAINE, 60, 60, SEMAINE);
+  }
+  r = await lire('termines', 'total', jetonA);
+  verifier(r.top.length === R.CLASSEMENT_TAILLE && !r.top.some((l) => l.id === idA) && r.moi?.rang > R.CLASSEMENT_TAILLE && r.moi.points === nA, 'joueur hors du top 100 : sa position et son nombre de jeux', r.moi);
+  const sansJeu = await profil({ action: 'creer', jour: jourLocal() }, { ip: '203.0.113.78' });
+  r = await lire('parfaits', 'total', sansJeu.jeton);
+  verifier(r.moi?.rang === null && r.moi.points === 0, 'joueur sans jeu terminé : pas de place', r.moi);
+  // Lecture économe : seul l'index des jeux à étoiles terminés est parcouru.
+  for (const perimetre of R.CLASSEMENT_PERIMETRES_JEUX) {
+    const plan = planSql(requetePoints(perimetre, repere.debut).sql.replace('?', '0'));
+    verifier(/COVERING INDEX profils_jeux_termines/.test(plan), `${perimetre} : lecture par l'index`, plan);
+  }
+  await DB.prepare("DELETE FROM profils_jeux WHERE jeu LIKE 'fin-%'").run();
+  await DB.prepare('DELETE FROM profils WHERE id > 6000 AND id < 6300').run();
+  await DB.prepare('DELETE FROM profils_appareils WHERE profil = ?').bind(sansJeu.etat.id).run();
+  await DB.prepare('DELETE FROM profils WHERE id = ?').bind(sansJeu.etat.id).run();
 }
 
 // ==========================================================================

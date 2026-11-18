@@ -1,13 +1,15 @@
 // ==========================================================================
 // POST /api/classement — classement des joueurs (page /classement/, …)
 //
-// Corps : { "perimetre": "general" | "etoiles" | "multi:<id du jeu>",
-//           "periode": "semaine" | "mois", "jeton": "…" (facultatif) }
+// Corps : { "perimetre": "general" | "etoiles" | "termines" | "parfaits" | "multi:<id du jeu>",
+//           "periode": "semaine" | "mois" | "total", "jeton": "…" (facultatif) }
 //   general : XP gagnée sur la période ; etoiles : étoiles gagnées sur la
 //   période (meilleurs résultats améliorés) ; multi:<jeu> : XP des manches en
-//   ligne de ce jeu multijoueur.
+//   ligne de ce jeu multijoueur ; termines : jeux à étoiles terminés ; parfaits :
+//   jeux à étoiles terminés avec toutes leurs étoiles (section 14.11 du cadrage).
 // Période : semaine en cours (depuis lundi, UTC) ou mois en cours : remise à
-// zéro automatique au début de chaque période.
+// zéro automatique au début de chaque période. « total » (depuis le début) :
+// termines et parfaits seulement ; ailleurs, elle redevient la semaine.
 //
 // Réponse : { perimetre, periode, debut, top: [{ rang, id, pseudo, numero,
 //   avatar, cadre, niveau, points }], moi: { id, rang, points } | null }
@@ -37,7 +39,7 @@
 
 import { json, lireJeux } from '../_commun.js';
 import {
-  preparerTablesProfil, profilParJeton, perimetreValide, debutPeriode, topClassement, rangDe,
+  preparerTablesProfil, profilParJeton, perimetreValide, periodeClassement, debutPeriode, topClassement, rangDe,
   jeuAEtoiles, topClassementJeu, rangJeu,
   assurerPodiums, couronnesPrecedentes, historiquePodiums, periodePrecedente,
 } from '../_profil.js';
@@ -51,7 +53,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
     return json({ erreur: 'Requête invalide.' }, 400);
   }
   const perimetre = corps?.perimetre || 'general';
-  const periode = R.CLASSEMENT_PERIODES.includes(corps?.periode) ? corps.periode : R.CLASSEMENT_PERIODES[0];
+  const periode = periodeClassement(perimetre, corps?.periode);
   if (!env.DB) return json({ erreur: 'Classement indisponible.' }, 503);
   if (corps?.type === 'historique') return historique(request, env, waitUntil, periode, corps.avant);
   try {
@@ -79,7 +81,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
     let moi = null;
     const profil = corps?.jeton ? await profilParJeton(env, corps.jeton) : null;
-    if (profil) moi = { id: profil.id, ...(await rangDe(env, perimetre, debut, profil)) };
+    if (profil) moi = { id: profil.id, ...(await positionDansClassement(request, env, waitUntil, { perimetre, periode, debut, top, profil })) };
     let couronnes = [];
     if (perimetre === 'general' && R.COURONNE_CHAMPION) {
       try {
@@ -107,6 +109,16 @@ async function avecCache(adresse, duree, waitUntil, calculer) {
     if (typeof waitUntil === 'function') waitUntil(ecriture); else await ecriture;
   }
   return donnees;
+}
+
+// Position du joueur. Jeux terminés (calcul sur profils_jeux) : sa ligne du top s'il y
+// est, sinon position gardée quelques minutes ; autres classements : calcul à chaque demande.
+function positionDansClassement(request, env, waitUntil, { perimetre, periode, debut, top, profil }) {
+  if (!R.CLASSEMENT_PERIMETRES_JEUX.includes(perimetre)) return rangDe(env, perimetre, debut, profil);
+  const ligne = top.find((l) => l.id === profil.id);
+  if (ligne) return { rang: ligne.rang, points: ligne.points };
+  const cle = new Request(new URL(`/api/classement/position?p=${perimetre}&d=${debut}&per=${periode}&profil=${profil.id}`, request.url));
+  return avecCache(cle, R.CLASSEMENT_CACHE_S, waitUntil, () => rangDe(env, perimetre, debut, profil));
 }
 
 // Classement des étoiles d'un jeu : appelé dans le try de onRequestPost (503 en cas d'erreur).
