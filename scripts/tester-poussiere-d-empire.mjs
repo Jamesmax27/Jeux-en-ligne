@@ -11,7 +11,8 @@
 //   node scripts/tester-poussiere-d-empire.mjs --cartes        + 13 : la planète de l'acte 1, les zones des 20
 //                                                              missions, 500 graines de la carte « ligne »
 //   --rapide    1 500 ticks au lieu de 6 000, 5 parties au lieu de 20 (mise au point ; seuils relâchés)
-//   --souple    le taux de victoire des missions (≥ 70 % au niveau 2) n'est plus bloquant
+//   --souple    les taux de victoire des missions (≥ 70 % au niveau 2 ; ≤ 70 % au niveau 1 sur les missions
+//               de fin d'acte) ne sont plus bloquants
 //   --sources <dossier>   lit <dossier>/pe-outils.js, pe-donnees.js, pe-sim.js, pe-pilote.js au lieu des
 //                         blocs de games/poussiere-d-empire/index.html (sources du lot avant assemblage)
 //
@@ -42,8 +43,8 @@
 //   11. mission 1 gagnée par l'humain d'essai (essais.ordres) en moins de 3 000 ticks, et chaque mission
 //       1 à 20 jouée une fois jusqu'au bout avec un robot moyen à la place du joueur ;
 //   12. (--missions) chaque mission 1 à 20 jouée 20 fois avec un robot à la place du joueur (niveau 2,
-//       puis niveau 1 à titre indicatif) : taux de victoire et médiane des ticks ; ≥ 70 % au niveau 2
-//       (bloquant sauf --souple) ; temps visé comparé à la règle (1,5 × médiane des victoires du robot 2,
+//       puis niveau 1) : taux de victoire et médiane des ticks ; ≥ 70 % au niveau 2 et, sur les missions de
+//       fin d'acte (MISSIONS_FIN_ACTE), ≤ 70 % au niveau 1 (bloquants sauf --souple) ; temps visé comparé à la règle (1,5 × médiane des victoires du robot 2,
 //       bornée à 50–100 % de la durée visée dv, arrondie à 10 s : avertissement) ; puis chaque mission où un
 //       rival attaque (MISSIONS_PASSIF) jouée 20 fois sans aucun ordre : 0 victoire, et la base assiégée
 //       à chaque partie pour les missions « tenir » (bloquant sauf --souple) ;
@@ -82,7 +83,10 @@ const PARTIES = RAPIDE ? 5 : 20;                 // parties des duels et des mis
 const TICK_INSTANTANE = RAPIDE ? 750 : 3000;     // reprise depuis l'instantané de ce tick
 const NB_MISSIONS = 20;                          // missions publiées (acte 1, sur la planète ; contrat v2)
 const NB_FICHES = 100;                           // 5 actes × 20 missions ; 21 à 100 : fiches « verrou »
-const MISSIONS_PASSIF = [5, 6, 9, 10, 12, 15, 17, 18, 19, 20];   // un rival attaque : le joueur sans ordre perd
+const MISSIONS_PASSIF = [5, 6, 9, 10, 12, 15, 16, 17, 18, 19, 20];   // un rival attaque : le joueur sans ordre perd
+// Fin d'acte : un joueur peu attentif (robot de niveau 1 à sa place) doit y perdre souvent (réglage du 18 novembre 2026).
+const MISSIONS_FIN_ACTE = [16, 17, 18, 19, 20];
+const TAUX_MAX_ROBOT1_FIN_ACTE = 70;
 // Mission où chaque capacité est gagnée (contrat v2, section 5).
 const CAPACITE_MISSION = { rallier: 3, fortin: 6, transfert: 10, arrierepays: 15, relais: 25, chantier: 32, frappe: 47, pont: 66, essaimage: 71, sursaut: 85 };
 
@@ -760,7 +764,7 @@ titre(`11. Mission 1 gagnée par essais.ordres en moins de 3 000 ticks ; mission
 // --------------------------------------------------------------------------
 
 if (AVEC_MISSIONS) {
-  titre(`12. Missions 1 à ${NB_MISSIONS} × ${PARTIES} parties, robot à la place du joueur (niveau 2 : ≥ 70 % attendus${SOUPLE ? ', non bloquant (--souple)' : ''} ; niveau 1 : indicatif)`);
+  titre(`12. Missions 1 à ${NB_MISSIONS} × ${PARTIES} parties, robot à la place du joueur (niveau 2 : ≥ 70 % attendus ; niveau 1 : ≤ ${TAUX_MAX_ROBOT1_FIN_ACTE} % sur les missions ${MISSIONS_FIN_ACTE[0]} à ${MISSIONS_FIN_ACTE[MISSIONS_FIN_ACTE.length - 1]}, indicatif ailleurs${SOUPLE ? ' ; non bloquant (--souple)' : ''})`);
   mesures.missions = {};
   for (const niveau of [2, 1]) {
     for (let m = 1; m <= NB_MISSIONS; m++) {
@@ -786,6 +790,10 @@ if (AVEC_MISSIONS) {
       mesures.missions[`m${m}n${niveau}`] = { taux, mediane: mediane(r.ticks) };
       const detail = `${sujet} : ${r.victoires} / ${r.parties} victoires (${taux} %), médiane ${mediane(r.ticks)} ticks (victoires : ${mediane(r.ticksV)}), ${(r.etoiles / Math.max(1, r.victoires)).toFixed(1)} étoile(s) par victoire, ${raisonsDe(r.raisons)}${fiche.graine ? ' (carte fixe, hasard varié)' : ''}`;
       if (niveau === 2 && taux < 70) { if (SOUPLE) avertir('missions', `${detail} : sous les 70 % attendus`); else probleme('missions', `${detail} : 70 % attendus`); }
+      else if (niveau === 1 && MISSIONS_FIN_ACTE.includes(m) && taux > TAUX_MAX_ROBOT1_FIN_ACTE) {
+        const t = `${detail} : ${TAUX_MAX_ROBOT1_FIN_ACTE} % au plus attendus (fin d'acte trop facile pour un joueur peu attentif)`;
+        if (SOUPLE) avertir('missions', t); else probleme('missions', t);
+      }
       else ok(detail);
       // Temps visé (règle du 17 novembre 2026) : 1,5 × la médiane des victoires du robot de niveau 2, bornée
       // entre 50 % et 100 % de la durée visée (dv, secondes) et arrondie à 10 s ; objectifs à durée fixe : d.
