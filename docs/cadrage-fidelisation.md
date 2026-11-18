@@ -281,3 +281,17 @@ Consigne du propriétaire : sur la page de chaque jeu à étoiles, un classement
 - **Pannes** : hors ligne, serveur indisponible ou quota atteint : une phrase à la place de la liste (« Tu peux quand même jouer »), nouvel essai au retour du réseau ; rien d'autre de la page n'en dépend.
 - **Textes** : clés `classementJeu.*` (5 langues). **Tests** : `scripts/tester-profil.mjs` (section « Classement des étoiles d'un jeu » : ordre et égalités, top 100, position hors du top, maximum, lecture par l'index, ancienne base mise à jour). Politique de confidentialité (fr, en). Coquille `v22`. Référence : `migrations/0005_classement-etoiles-jeu.sql`.
 - **Non fait** (à décider) : classement par jeu entre amis ; choix d'un jeu dans la page `/classement/`.
+
+### 14.11 Classements des jeux terminés (novembre 2026)
+
+Demande du propriétaire : deux classements de plus sur la page `/classement/`, dans la même logique que les autres. Ses choix : périodes **Semaine** (par défaut), **Mois** et **Au total** ; **seuls les jeux à étoiles comptent** ; la coche verte reste en haut à droite de la jaquette.
+
+- **Jeux terminés** (`termines`) : nombre de jeux à étoiles terminés par le joueur, comptés à la date de fin du jeu (`termine`).
+- **Jeux terminés à 100 %** (`parfaits`) : parmi eux, ceux dont le meilleur score égale toutes les étoiles du jeu (`etoiles >= etoiles_max`), comptés à la date de la dernière étoile gagnée (`etoiles_le`, sinon `termine`).
+- **Non comptés** : jeux sans étoiles (ils gardent leur coche, leur bonus et leur place dans le profil, dont le total peut donc être plus élevé que celui du classement) et jeux sans fin.
+- **Même logique** : top 100, niveau minimal, à égalité même rang puis numéro de profil, position du joueur, signalement des pseudos, choix « Parmi : Mes amis ». Podiums, couronnes et historique restent réservés au classement général ; aucun badge ni aucune expérience en plus.
+- **« Au total »** : proposé seulement pour ces deux classements (`CLASSEMENT_PERIODES_JEUX`, `periodeClassement` de `functions/_profil.js`) ; pour les autres, le serveur revient à la semaine et la page retire l'option.
+- **Économie** : aucune nouvelle table ni colonne (`requetePoints` lit `profils_jeux`) ; index partiel et couvrant `profils_jeux_termines`, créé automatiquement (`migrations/0006_classement-jeux-termines.sql`) ; top gardé 5 minutes, position d'un joueur hors du top aussi.
+- **Coche verte** : `marquerTermines` ne traite plus que les éléments qui ont une jaquette (le bloc de classement de la page d'un jeu porte aussi `data-jeu` et recevait une coche égarée).
+- **Limite** : comme pour les étoiles, ces résultats viennent du navigateur (section 8) ; 60 s de jeu au moins et 10 nouveaux jeux terminés par jour au plus.
+- **Textes** : clés `classement.termines`, `.parfaits`, `.total`, `.depuisToujours`, `.aide.*`, `.pointsJeux`, `.pasClasse.*` (5 langues). **Tests** : `scripts/tester-profil.mjs` (section « Classements des jeux terminés »), `scripts/tester-amis.mjs`. Politique de confidentialité (fr, en).

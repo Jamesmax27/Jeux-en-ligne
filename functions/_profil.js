@@ -106,6 +106,9 @@ export function preparerTablesProfil(env) {
   return tablesPretes;
 }
 
+// Jeu terminé qui compte dans les classements des jeux terminés : un jeu à étoiles.
+const JEU_A_ETOILES_FINI = 'termine IS NOT NULL AND etoiles_max > 0';
+
 // Classement des étoiles par jeu (docs/cadrage-fidelisation.md, section 14.10) :
 // colonne etoiles_le (date du meilleur nombre d'étoiles, pour départager les
 // égalités), ajoutée si elle manque (ALTER TABLE … ADD COLUMN ne réécrit aucune
@@ -127,6 +130,9 @@ async function preparerClassementJeu(env) {
     if (ajoutee) await env.DB.prepare('UPDATE profils_jeux SET etoiles_le = termine WHERE etoiles > 0 AND etoiles_le IS NULL AND termine IS NOT NULL').run();
   }
   await env.DB.prepare('CREATE INDEX IF NOT EXISTS profils_jeux_etoiles ON profils_jeux (jeu, etoiles DESC, etoiles_le, profil) WHERE etoiles > 0').run();
+  // Classements des jeux terminés (section 14.11) : index partiel et couvrant, seules
+  // les lignes des jeux à étoiles terminés sont lues. Conditions identiques à JEU_A_ETOILES_FINI.
+  await env.DB.prepare(`CREATE INDEX IF NOT EXISTS profils_jeux_termines ON profils_jeux (profil, termine, etoiles, etoiles_max, etoiles_le) WHERE ${JEU_A_ETOILES_FINI}`).run();
 }
 
 // --- Dates ---------------------------------------------------------------------
@@ -145,8 +151,9 @@ export function jourAcceptable(jour, maintenant) {
   return Math.abs(ecartJours(jourUTC(maintenant), jour)) <= 1;
 }
 
-/** Début de la période de classement (jour UTC « AAAA-MM-JJ ») : semaine (lundi) ou mois. */
+/** Début de la période de classement (jour UTC « AAAA-MM-JJ ») : semaine (lundi), mois ou total. */
 export function debutPeriode(periode, maintenant) {
+  if (periode === 'total') return R.CLASSEMENT_DEBUT_TOTAL;
   const d = new Date(maintenant);
   if (periode === 'mois') return `${d.toISOString().slice(0, 7)}-01`;
   const recul = (d.getUTCDay() - R.CLASSEMENT_SEMAINE_DEBUT + 7) % 7;
@@ -622,7 +629,9 @@ export async function appliquerResultatMulti(env, r, catalogue, maintenant) {
 
 /**
  * Points de la période par profil. perimetre : 'general' (XP gagnée),
- * 'etoiles' (étoiles gagnées) ou 'multi:<id du jeu>' (XP des manches en ligne de ce jeu).
+ * 'etoiles' (étoiles gagnées), 'multi:<id du jeu>' (XP des manches en ligne de ce jeu),
+ * 'termines' (jeux à étoiles terminés sur la période) ou 'parfaits' (jeux à étoiles dont
+ * la dernière étoile a été gagnée sur la période, toutes les étoiles étant obtenues).
  * Renvoie { sql, valeurs } d'une sous-requête (profil, points).
  * fin (facultatif, « AAAA-MM-JJ » compris) : seulement pour le classement général
  * d'une période terminée (podiums).
@@ -631,12 +640,21 @@ export function requetePoints(perimetre, debut, fin = null) {
   if (perimetre === 'general' && fin) return { sql: 'SELECT profil, SUM(xp) AS points FROM profils_gains WHERE jour >= ? AND jour <= ? GROUP BY profil', valeurs: [debut, fin] };
   if (perimetre === 'general') return { sql: 'SELECT profil, SUM(xp) AS points FROM profils_gains WHERE jour >= ? GROUP BY profil', valeurs: [debut] };
   if (perimetre === 'etoiles') return { sql: 'SELECT profil, SUM(etoiles) AS points FROM profils_gains WHERE jour >= ? GROUP BY profil', valeurs: [debut] };
+  const debutMs = Date.parse(`${debut}T00:00:00Z`);
+  if (perimetre === 'termines') return { sql: `SELECT profil, COUNT(*) AS points FROM profils_jeux WHERE ${JEU_A_ETOILES_FINI} AND termine >= ? GROUP BY profil`, valeurs: [debutMs] };
+  if (perimetre === 'parfaits') return { sql: `SELECT profil, COUNT(*) AS points FROM profils_jeux WHERE ${JEU_A_ETOILES_FINI} AND etoiles >= etoiles_max AND COALESCE(etoiles_le, termine) >= ? GROUP BY profil`, valeurs: [debutMs] };
   const jeu = perimetre.slice('multi:'.length);
   return { sql: 'SELECT profil, SUM(xp) AS points FROM multi_resultats WHERE jeu = ? AND jour >= ? GROUP BY profil', valeurs: [jeu, debut] };
 }
 
+/** Période demandée si ce classement la propose, sinon sa période par défaut (« total » : jeux terminés seulement). */
+export function periodeClassement(perimetre, periode) {
+  const permises = R.CLASSEMENT_PERIMETRES_JEUX.includes(perimetre) ? R.CLASSEMENT_PERIODES_JEUX : R.CLASSEMENT_PERIODES;
+  return permises.includes(periode) ? periode : permises[0];
+}
+
 export function perimetreValide(perimetre, catalogue) {
-  if (perimetre === 'general' || perimetre === 'etoiles') return true;
+  if (perimetre === 'general' || perimetre === 'etoiles' || R.CLASSEMENT_PERIMETRES_JEUX.includes(perimetre)) return true;
   if (typeof perimetre !== 'string' || !perimetre.startsWith('multi:')) return false;
   const jeu = perimetre.slice('multi:'.length);
   return ID_JEU.test(jeu) && (!catalogue || catalogue.get(jeu)?.multijoueur === true);

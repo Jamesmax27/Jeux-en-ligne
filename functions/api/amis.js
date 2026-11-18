@@ -31,7 +31,7 @@
 // ==========================================================================
 
 import { json, empreinteVisiteur, lireJeux, verifierTurnstile } from '../_commun.js';
-import { preparerTablesProfil, profilParJeton, perimetreValide, resumeAmis, compterEvenement, assurerPodiums, couronnesPrecedentes } from '../_profil.js';
+import { preparerTablesProfil, profilParJeton, perimetreValide, periodeClassement, resumeAmis, compterEvenement, assurerPodiums, couronnesPrecedentes } from '../_profil.js';
 import {
   relations, demander, accepter, effacer, bloquer, debloquer, changerInvisible, ticketPresence,
   ajouterPresence, classementAmis, empreinteGroupe, debutPeriode,
@@ -122,7 +122,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
 
     if (action === 'classement') {
       const perimetre = corps.perimetre || 'general';
-      const periode = R.CLASSEMENT_PERIODES.includes(corps.periode) ? corps.periode : R.CLASSEMENT_PERIODES[0];
+      const periode = periodeClassement(perimetre, corps.periode);
       const catalogue = await lireJeux(env, request);
       if (!perimetreValide(perimetre, catalogue)) return json({ erreur: 'Classement inconnu.' }, 400);
       const debut = debutPeriode(periode, maintenant);
