@@ -180,6 +180,7 @@ async function controlerJeu(id, dossier) {
     erreur(id, 'stockage local utilisé sans try/catch : le jeu plantera dans le cadre isolé du site');
   }
   controlerSauvegarde(id, html);
+  controlerStockage(id, html);
   controlerFinDePartie(id, html);
   controlerJeuTermine(id, html);
   if (fiches.get(id)?.multijoueur === true) controlerMultijoueur(id, html);
@@ -319,6 +320,21 @@ function controlerSauvegarde(id, html) {
     [/\bJEL_SAVE\.surFermeture\s*\(/, 'JEL_SAVE.surFermeture(…) (sauvegarde à la fermeture de la page)'],
   ];
   for (const [motif, quoi] of usages) if (!motif.test(code)) erreur(id, `sauvegarde : le jeu n'appelle pas ${quoi}`);
+}
+
+// Stockage des grosses données (public/stockage.js, facultatif) : s'il est là, à jour
+// et chargé juste après le module de sauvegarde, avant le code du jeu.
+const RE_STOCKAGE = /<script\b[^>]*\bid=["']jel-stockage["'][^>]*>([\s\S]*?)<\/script>/i;
+const moduleStockage = (await readFile(path.join(RACINE, 'public', 'stockage.js'), 'utf8')).replace(/\r\n/g, '\n').trim();
+
+function controlerStockage(id, html) {
+  const bloc = RE_STOCKAGE.exec(html);
+  if (!bloc) return;
+  if (bloc[1].replace(/\r\n/g, '\n').trim() !== moduleStockage) erreur(id, 'module de stockage pas à jour : lancer node scripts/i18n-jeu.mjs ' + id + ' (recopie public/stockage.js)');
+  const sauvegarde = RE_SAUVEGARDE.exec(html);
+  if (sauvegarde && bloc.index < sauvegarde.index) erreur(id, 'le module jel-stockage se place juste après jel-sauvegarde');
+  const premierScript = /<script\b(?![^>]*\bid=["']jel-(?:i18n|i18n-textes|sauvegarde|stockage)["'])(?![^>]*type=["']application\/json)[^>]*>/i.exec(html);
+  if (premierScript && premierScript.index < bloc.index) erreur(id, 'le module jel-stockage doit être chargé avant le code du jeu');
 }
 
 async function controlerDossier(id) {

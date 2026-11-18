@@ -63,6 +63,8 @@ on:
       - "games/**"
       - "public/i18n/**"
       - "public/save.js"
+      - "public/stockage.js"
+      - "public/stockage-lanceur.js"
       - "public/taxonomie.js"
       - "public/style.css"
       - "public/chemins.js"
@@ -94,6 +96,9 @@ on:
       - "scripts/check-i18n.js"
       - "scripts/i18n-jeu.mjs"
       - "scripts/tester-sauvegarde.mjs"
+      - "scripts/tester-stockage.mjs"
+      - "scripts/tester-terres-cubiques.mjs"
+      - "scripts/terres-cubiques/**"
       - "scripts/jaquette-sans-texte.mjs"
       - "scripts/icones/**"
       - "scripts/build-catalog.mjs"
@@ -174,6 +179,10 @@ jobs:
           fi
           # (bash de GitHub : -e et pipefail ; d'où « || true » et les « if » plutôt que « && ».)
           ids=$(printf '%s\n' "$fichiers" | { grep '^games/' || true; } | cut -d/ -f2 | sort -u | while read -r id; do if [ -n "$id" ] && [ -d "games/$id" ]; then echo "$id"; fi; done | tr '\n' ' ')
+          # Essais de Terres Cubiques modifiés : ce jeu passe aussi au robot (et à ses essais).
+          if printf '%s\n' "$fichiers" | grep -Eq '^scripts/(tester-terres-cubiques\.mjs|terres-cubiques/)'; then
+            ids=$(printf '%s\n' $ids terres-cubiques | sort -u | tr '\n' ' ')
+          fi
           # Moteur multijoueur (recopié dans chaque jeu multijoueur) : ces jeux passent aussi au robot.
           if printf '%s\n' "$fichiers" | grep -q '^public/multijoueur/moteur\.js$'; then
             ids=$(printf '%s\n' $ids $( (grep -l '"multijoueur": *true' games/*/game.json || true) | cut -d/ -f2) | sort -u | tr '\n' ' ')
@@ -194,7 +203,7 @@ jobs:
           tous=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then tous=1; fi
           # Modules communs de traduction et de sauvegarde : recopiés dans chaque jeu, donc tous les jeux sont concernés.
-          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|slugs-jeux\.mjs|classes-jeu\.mjs|jaquette-sans-texte\.mjs|tester-sauvegarde\.mjs)|public/i18n/i18n\.js|public/save\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|slugs-jeux\.mjs|classes-jeu\.mjs|jaquette-sans-texte\.mjs|tester-sauvegarde\.mjs|tester-stockage\.mjs)|public/i18n/i18n\.js|public/save\.js|public/stockage(-lanceur)?\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
           # Textes, taxonomie, gabarits (textes des catégories compris), générateur
           # des pages et pages du site : le site est testé avec un seul jeu.
           site=0
@@ -308,6 +317,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: node scripts/tester-sauvegarde.mjs ${{ steps.lot.outputs.liste }}
 
+      # Stockage des grosses données (public/stockage.js, facultatif) dans le lanceur :
+      # IndexedDB du site, isolement entre jeux, rechargement, export (jeux qui ont le bloc jel-stockage).
+      - name: Contrôler le stockage
+        if: ${{ !cancelled() }}
+        run: node scripts/tester-stockage.mjs --seulement ${{ steps.lot.outputs.liste }}
+
+      # Terres Cubiques (docs/terres-cubiques-villages.md) : ancienne partie gardée à l'identique,
+      # monde par morceaux, emplacements, villages par proximité, mode test (si ce jeu est dans le lot).
+      - name: Essayer Terres Cubiques
+        if: ${{ !cancelled() }}
+        run: node scripts/tester-terres-cubiques.mjs --seulement ${{ steps.lot.outputs.liste }}
+
       # Traductions des jeux (5 langues), sans les pages du site (job « controle »).
       - name: Contrôler les traductions des jeux
         if: ${{ !cancelled() }}
@@ -319,7 +340,8 @@ jobs:
     needs: [quoi, jeux]
     if: ${{ always() && needs.quoi.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 60 min : quand le lanceur change, tous les jeux multijoueurs et temps réel passent au navigateur (environ 20 min à eux seuls)
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
