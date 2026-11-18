@@ -1,6 +1,6 @@
 # « Poussière d'Empire » — cadrage (conquête spatiale à cinq échelles, campagne solo contre des robots)
 
-> État : **validé par le propriétaire le 16 novembre 2026** (réponses : 10 ans et +, badge donné pour l'acte 1, dézoom du lot 1 vers la silhouette ; les autres choix par défaut de la section 16 sont retenus). Lot 1 en cours sur la branche `poussiere-lot1`.
+> État : **validé par le propriétaire le 16 novembre 2026** (réponses : 10 ans et +, badge donné pour l'acte 1, dézoom du lot 1 vers la silhouette ; les autres choix par défaut de la section 16 sont retenus). Lot 1 en cours sur la branche `poussiere-lot1`. **Révisé le 18 novembre 2026 après le premier essai du propriétaire : voir la section 17, qui l'emporte sur les sections 5 (acte 1), 6, 7 (missions des capacités), 11 et 15 pour les nombres.**
 > À lire avec `docs/cadrage-temps-reel.md` (section 5 : contrat `jel-sim`), `docs/cadrage-dernier-sas.md` (section 4 : simulation solo au contrat `jel-sim` avec un pilote local), `docs/cadrage-fidelisation.md` (profil joueur), `CONSIGNES-JEU.md` et `CLAUDE.md`.
 > Ce document sera versionné sous `docs/cadrage-poussiere-d-empire.md` (pull request 0, document seul). Les tailles et temps donnés ici sont des estimations ; chaque pull request de lot publiera les mesures.
 
@@ -99,7 +99,7 @@ Repères : à forces égales en plaine, **le défenseur tient** (15 ticks, il ga
 
 Chaque mission commence par un bandeau d'une ligne (objectif, secondaire, temps visé) posé sur la carte déjà générée, jamais un écran de texte. Durées visées pour un joueur moyen (2e étoile). Unités renommées par acte : escouade, flotte, armada, légion, essaim. Production ×2 par acte, formules inchangées.
 
-**Acte 1, la planète** (12 à 40 régions : grille hexagonale de rayon 2 à 4 avec des mers retirées ; 6 voisins au plus). Types : plaine (prod 100, def 0, cap 400), montagne (60, +50), cratère riche (160), calotte polaire (100, vit 50), capitale (250, +25, cap 600). Enjeu : dominer la planète face aux Cendrés ; tutoriel par l'action, une nouveauté par mission, graine fixe pour les missions 1 à 3.
+**Acte 1, la planète** (version du lot 1, remplacée par la planète persistante de la section 17 ; 12 à 40 régions : grille hexagonale de rayon 2 à 4 avec des mers retirées ; 6 voisins au plus). Générateur (règles arrêtées au lot 1, après mesure des taux de victoire) : la capitale du joueur est en bas de la carte, les rivaux sont posés le plus loin possible d'elle, à 3 cases au moins les uns des autres et de la balise ; une mer n'est retirée que si elle ne crée ni déconnexion ni case d'articulation (un passage d'une seule case figeait des parties entières derrière une montagne fortifiée), le reste du quota en gardant seulement la connexité. Types : plaine (prod 100, def 0, cap 400), montagne (60, +50), cratère riche (160), calotte polaire (100, vit 50), capitale (250, +25, cap 600). Enjeu : dominer la planète face aux Cendrés ; tutoriel par l'action, une nouveauté par mission, graine fixe pour les missions 1 à 3.
 
 | N° | Mission | Objectif affiché | Nouveauté, capacité | Durée |
 | --- | --- | --- | --- | --- |
@@ -289,9 +289,11 @@ Le bloc de simulation définit déjà `window.JEL_SIM` mais ne s'appelle pas `je
 
 **Courbe** : acte 1, missions 1 à 3 sans rival, 4 à 7 robot niveau 1 (Cendrés prudents : ils laissent des trous), 8 niveau 2 ; acte 2 niveau 2 avec deux rivaux complémentaires ; acte 3 niveau 2 puis 3, Hégémonie à 40 % des nœuds ; acte 4 niveau 3, un seul rival ; acte 5 niveau 2 puis 3, jusqu'à 4 rivaux. La difficulté vient du nombre de fronts et de la taille des cartes, jamais d'un bonus caché. Chaque nouveauté arrive seule la première fois, contre un rival faible. Campagne sans échec : 5 à 6 heures.
 
-**Valeurs de départ** (dans `PE_DONNEES`, aucune constante dans le code) : mission 1 capitale 20, neutres 5 à 12 ; mission 4 capitale 30 contre une capitale rivale 25 et 2 régions ; acte 2 planète mère 120, Guilde 3 corps dont une géante à 200, Essaims 4 astéroïdes à 40 ; acte 3 système natal 300, Hégémonie 32 systèmes à 80 ; acte 4 capitale héritée 600, Silence 20 secteurs à 150 ; acte 5 capitale 1 200. Vent dans le dos : forces de départ × (100 + 10 × échecs) / 100, 30 % au plus, dans `config` (déterministe), sans effet sur les étoiles. Temps visé (2e étoile) : 1,2 × la médiane du robot niveau 3 assis à la place du joueur.
+**Valeurs de départ** (dans `PE_DONNEES`, aucune constante dans le code) : mission 1 capitale 20, neutres 5 à 12 ; mission 4 capitale 30 contre une capitale rivale 25 et 2 régions en tout (capitale comprise : avec 3 régions, le rival produisait près du double dès le départ et le robot de niveau 2 à la place du joueur ne gagnait que 65 % des parties, 85 % avec 2) ; acte 2 planète mère 120, Guilde 3 corps dont une géante à 200, Essaims 4 astéroïdes à 40 ; acte 3 système natal 300, Hégémonie 32 systèmes à 80 ; acte 4 capitale héritée 600, Silence 20 secteurs à 150 ; acte 5 capitale 1 200. Vent dans le dos : forces de départ × (100 + 10 × échecs) / 100, 30 % au plus, dans `config` (déterministe), sans effet sur les étoiles. Temps visé (2e étoile) : 1,2 × la médiane du robot niveau 3 assis à la place du joueur.
 
 **Méthode** : (1) le robot de contrôle joue chaque mission 20 fois avec un robot à la place du joueur : au niveau 2 il gagne ≥ 70 % (la mission est faisable par l'IA, donc par un humain qui lit la carte), au niveau 1 < 50 % dès l'acte 3 (la mission résiste) ; coût : environ 3 000 ticks × 0,3 ms × 20 = 20 s par mission, 11 minutes pour la campagne ; (2) duels entre robots sur la carte « ligne » : niveau 3 contre 1 ≥ 85 %, 2 contre 1 ≥ 65 %, 3 contre 2 ≥ 60 %, robots égaux 35 à 65 % pour le camp 0 ; (3) 500 graines par échelle : graphe connexe, capitale à 3 arêtes au moins de tout rival, plus petite cellule ≥ 44 px au zoom plancher ; (4) trois parties humaines par mission dans Edge à 390 px, écart entre temps humain et temps visé noté ; (5) au lot 3, passe globale : étoiles manquantes réparties sur tous les actes, aucune mission à 3 étoiles trop facile ni impossible. Le tableau des taux est joint à chaque pull request.
+
+**Mise à jour après le lot 1 (17 novembre 2026, mesures du test `scripts/tester-poussiere-d-empire.mjs --missions`)** : (1) la mission 5 se gagnait sans aucun ordre (le robot de niveau 1 n'assiégeait jamais la capitale) ; son rival est devenu un assiégeant propre à la fiche : il n'attaque qu'en offensive, concentre ses forces sur la région la plus proche de la capitale du joueur (la pile grossit à vue) et, toutes les 40 s, annoncée 5 s avant (onde, son, événement `[8, camp, 50]`), jette toute cette tête de pont vers la capitale ; un joueur passif perd à chaque fois, un robot de niveau 2 gagne 75 %, un joueur qui garde sa capitale garnie et rallie à l'annonce gagne toujours ; (2) **2e étoile des missions à durée fixe** (objectifs « tenir », « survivre », « couper », dont la victoire tombe exactement à la fin du compte à rebours) : finir avec au moins autant de régions qu'au départ, au lieu du temps visé ; le secondaire de la mission 5 est « prendre le cratère riche le plus proche de la capitale » (celui « capitale jamais perdue » était automatique) ; (3) **temps visé** : 1,5 × la médiane des victoires du robot de niveau 2 à la place du joueur, bornée entre 50 % et 100 % de la durée du tableau de la section 5, arrondie à 10 s (la règle « 1,2 × médiane du robot 3 » donnait des temps hors de portée d'un enfant) ; `tmax` ≥ 3 × temps visé. Taux de victoire mesurés (20 parties par mission) avec un robot de niveau 2 à la place du joueur : 100, 100, 100, 85, 75, 80, 100, 85 % ; niveau 1 : 100, 100, 100, 20, 35, 0, 15, 30 %. Les parties humaines de la méthode (4) restent à faire par le propriétaire.
 
 ## 14. Tests et contrôles
 
@@ -329,3 +331,44 @@ Le bloc de simulation définit déjà `window.JEL_SIM` mais ne s'appelle pas `je
 | Bac à sable sans étoiles, débloqué dès la mission 29 ? | oui |
 | Ravitaillement dès l'acte 3 (territoire coupé de la capitale à demi-production, capitale perdue : tout le camp) ? | oui, joueur et robots |
 | Humanizer des descriptions avant chaque pull request ? | oui |
+
+## 17. Révision du 18 novembre 2026 : une planète persistante, 20 missions par acte, sons Kenney
+
+**Retour du propriétaire après avoir joué le lot 1** : le jeu est agréable et les capacités qui s'ajoutent plaisent, mais la progression ne se voit pas sur la carte. Chaque mission avait sa propre petite carte, le joueur enchaînait des niveaux sans rien posséder. Il demande que les territoires conquis s'additionnent en une carte du monde qui grandit, une vingtaine de missions sur la planète, et de meilleurs sons tirés des packs Kenney de sa bibliothèque d'assets.
+
+**Une planète par acte, la même pour tous, qui se remplit.** L'acte 1 se joue sur une seule planète (graine fixe, grille hexagonale de rayon 8, environ 180 régions) découpée en 24 provinces de 6 à 9 régions, numérotées du sud (province natale) vers le nord. Les Cendrés tiennent le nord avec leur capitale tout en haut, les Pionniers deux provinces du milieu. Chaque mission se joue sur cette planète, à la frontière de l'empire : sa zone active réunit les provinces cibles, les provinces rivales en jeu et les provinces du joueur qui les touchent. Le reste de la planète est dessiné autour, atténué, dans la couleur de son propriétaire. Gagner une mission donne au joueur ses provinces cibles, et la mission suivante commence avec cet empire agrandi. À la mission 20, la planète entière est turquoise et le dézoom part de la planète complète.
+
+**Ce que voit le joueur** : la carte de campagne est un plateau de conquête. La planète occupe presque tout l'écran, entourée d'un anneau qui se remplit avec la part conquise (régions, pourcentage, étoiles). Une route dorée relie les missions gagnées, en pointillés pour la suite, et un drapeau de l'Aube marque la mission en cours. La route est un arbre : chaque mission part d'une mission déjà faite dont la province touche la sienne, car l'ordre des numéros saute d'un front à l'autre et traverserait le globe. Les capacités sont des trésors posés sur la route. Toucher une étape ouvre sa fiche (province illuminée, objectif, étoiles, meilleur temps, récompense, « Jouer »). Une orbite part du globe et porte les quatre échelles suivantes en silhouettes verrouillées. **Chaque victoire passe par cette carte** (bouton « Voir ma conquête », ou retour automatique après 6 s) : la province s'allume, la route s'allonge, les compteurs montent en 1,4 s, puis « Jouer » lance la mission suivante. C'est un toucher de plus qu'au lot 1, choisi parce que voir l'empire grandir est le cœur de la demande du propriétaire. En mission, le HUD affiche la taille de l'empire.
+
+**Ce qui ne change pas** : les règles de conquête (section 4), le contrat `jel-sim`, l'architecture (section 12), les règles d'étoiles et de temps visé arrêtées au lot 1 (section 13), le format de sauvegarde. La possession de la planète ne se sauvegarde pas : elle se déduit des missions gagnées, et les propriétaires au départ d'une mission ne dépendent que de son numéro (une mission rejouée reste comparable).
+
+**Nombre de missions** : 20 par acte, soit 100 missions pour la campagne complète (confirmé par le propriétaire le 18 novembre 2026). Acte 1 : missions 1 à 20 (tableau ci-dessous). Les tableaux des actes 2 à 5 de la section 5 gardent leurs thèmes et seront étendus à 20 missions chacun au début des lots 2 et 3. Capacités renumérotées : Rallier 3, Fortin 6, Transfert 10, Arrière-pays 15, Relais 25, Chantier 32, Frappe de rupture 47, Pont stellaire 66, Essaimage 71, Sursaut 85.
+
+| N° | Mission | Objectif | Rivaux | Nouveauté, capacité |
+| --- | --- | --- | --- | --- |
+| 1 | Premiers pas | prendre toute la province natale | — | toucher, glisser, production |
+| 2 | Les cratères | prendre la province riche en cratères | — | terrains, pourcentage |
+| 3 | La chaîne | prendre la province des montagnes | — | défense, siège ; Rallier |
+| 4 | Les Pionniers | atteindre une balise avant les Pionniers | Pionniers | premier rival |
+| 5 | Premier contact | 60 % de la zone | Cendrés | perte de territoire |
+| 6 | Le siège | tenir 3 min contre des offensives annoncées | Cendrés assiégeants | Fortin |
+| 7 | Le col | prendre la province du col | Cendrés | |
+| 8 | La calotte sud | atteindre la balise au-delà de la calotte | — | routes lentes |
+| 9 | Deux fronts | prendre une province disputée | Pionniers et Cendrés | deux rivaux |
+| 10 | La fin des Pionniers | éliminer les Pionniers | Pionniers | Transfert |
+| 11 | Les plaines fertiles | posséder n régions sur deux provinces | Cendrés | logistique |
+| 12 | Contre-attaque | tenir 3 min contre une offensive plus forte | Cendrés assiégeants | |
+| 13 | La mer intérieure | prendre les provinces du rivage | Cendrés | longues routes |
+| 14 | Le cratère géant | prendre la province du grand cratère | Cendrés | |
+| 15 | La ligne de crête | 60 % de la zone | Cendrés | Arrière-pays |
+| 16 | Les glaces du nord | atteindre la balise de la calotte nord | Cendrés | |
+| 17 | Le bastion | prendre la province fortifiée des Cendrés | Cendrés | |
+| 18 | Tenir la ligne | tenir 3 min contre la grande offensive | Cendrés assiégeants | |
+| 19 | Le cœur des Cendrés | prendre la province de leur capitale | Cendrés | |
+| 20 | Maîtres de la planète | éliminer les Cendrés | Cendrés | dézoom vers le système |
+
+**Lots (remplace le tableau de la section 11)** : lot 1 = acte 1, `niveaux` 20, `etoiles` 60, `"consignes": 2` (les 20 niveaux sont atteints), badge « jeu terminé » à la fin de l'acte 1 ; lot 2 = actes 2 et 3, 60 missions, 180 étoiles ; lot 3 = actes 4 et 5, 100 missions, 300 étoiles. Les règles de la section 11 sur `reportComplete` restent les mêmes.
+
+**Fin de l'acte 1 durcie (demande du propriétaire)** : sur 20 parties, le robot de niveau 2 à la place du joueur gagne les missions 16 à 20 à 90, 85, 80, 85 et 75 %, le robot de niveau 1 à 60, 50, 30, 30 et 30 % (95 à 100 % avant). Les rivaux sont plus forts, disposent du Fortin, la mission 18 a des offensives plus rapprochées et la mission 19 un robot de niveau 3. Le test refuse désormais un robot de niveau 1 au-dessus de 70 % sur ces cinq missions.
+
+**Sons** : effets tirés des packs Kenney CC0 de la bibliothèque locale (Sci-Fi Sounds, Interface Sounds, Digital Audio, Music Jingles), intégrés en OGG dans le bloc `pe-son` ; la synthèse Web Audio du lot 1 reste le repli d'un navigateur qui ne lit pas l'OGG.

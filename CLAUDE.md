@@ -109,6 +109,7 @@ Jeux-en-ligne/
 │  ├─ slugs-jeux.mjs        slugs traduits des fiches (game.json « slugs »)
 │  ├─ classes-jeu.mjs       classes de l'école des jeux éducatifs (pages école)
 │  ├─ indexnow.mjs          prévient Bing des nouveaux jeux (IndexNow)
+│  ├─ tester-poussiere-d-empire.mjs  test Node de la simulation de « Poussière d'Empire » (docs/cadrage-poussiere-d-empire.md)
 │  └─ validate-games.mjs    contrôle qualité des jeux
 ├─ idees.json               idées à fabriquer (« en_attente », « en_cours »)
 ├─ idees-archive.json       idées réalisées (« faite », avec jeu_id)
@@ -583,6 +584,8 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
   - Pâturage des animaux du village, pour que les couples restent ensemble. Bûcheron : un arbre hors de portée n'est plus écarté pour toujours (300 s) ; sans arbre à sa portée, il replante.
   - `scripts/charge-terres-cubiques.mjs` (à la main : mesures et endurance de 3 heures simulées) ; `tester-terres-cubiques.mjs`, section 16 ; `version` 20.
   - La consigne « villageois autonomes » est faite, sauf l'étape 5 (multijoueur), hors périmètre.
+
+- « Poussière d'Empire », conquête spatiale à cinq échelles, lot 1 — fait (branches `poussiere-cadrage` puis `poussiere-lot1`, 16 au 18 novembre 2026), consigne du propriétaire (campagne complète, exception au format mini-jeu ; cadrage validé en PR #358 : `docs/cadrage-poussiere-d-empire.md`, choix en section 16, révision du 18 novembre en section 17). `games/poussiere-d-empire/` : moteur de conquête au contrat `jel-sim` dans un bloc `pe-sim` (le robot refuse `jel-sim` sans `temps_reel`) avec un pilote local qui recopie la boucle du moteur temps réel (`pe-pilote`), données et fiches dans `pe-donnees`, rendu 2D canvas à zoom continu (`pe-rendu`), écrans et sauvegarde (`pe-jeu`), sons Kenney CC0 en OGG intégrés (`pe-son`, repli Web Audio). Acte 1 : **une seule planète persistante** (graine fixe, 182 régions, 24 provinces) qui se remplit de la couleur du joueur, **20 missions** jouées à la frontière de l'empire (Pionniers, Cendrés, assiégeants aux missions 6, 12 et 18), carte de campagne en plateau de conquête (globe plein écran, anneau de progression, route dorée, drapeau, trésors des capacités, fiche de mission, orbite vers les échelles suivantes ; `planCampagne` et `peindreCampagne` de `pe-rendu`, réutilisables par les actes suivants), chaque victoire passe par cette carte (province qui s'allume, route qui s'allonge), dézoom de fin d'acte depuis la planète entière ; Rallier, Fortin, Transfert, Arrière-pays (missions 3, 6, 10, 15) ; sauvegarde au tick près ; `niveaux` 20, `etoiles` 60, `consignes` 2. Campagne prévue : 5 × 20 = 100 missions. Test Node dédié `scripts/tester-poussiere-d-empire.mjs` (90 contrôles, dans `validate.yml`). Mesures : 801 Ko ; tick 0,012 ms en Node sur la plus grande zone ; image médiane 3,8 ms à ×4 sur téléphone ; robot de niveau 2 à la place du joueur : 75 à 100 % selon la mission. Missions 16 à 20 durcies à la demande du propriétaire (robot 1 : 30 à 60 %). Reste : essai sur téléphone ; lots 2 et 3 (100 missions confirmées), jamais fusionnés par Claude.
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 
