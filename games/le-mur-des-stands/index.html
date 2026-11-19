@@ -4524,7 +4524,7 @@
       mc.setTransform(dpr, 0, 0, dpr, 0, 0);
       mc.globalCompositeOperation = 'source-over';
       mc.clearRect(0, 0, w, h);
-      mc.fillStyle = 'rgba(2,3,14,.9)'; mc.fillRect(0, 0, w, h);
+      mc.fillStyle = APERCU ? 'rgba(2,3,14,.72)' : 'rgba(2,3,14,.9)'; mc.fillRect(0, 0, w, h);   // un peu plus clair pour les images du jeu
       mc.globalCompositeOperation = 'destination-out';
       mc.lineCap = 'round'; mc.lineJoin = 'round'; mc.strokeStyle = '#000'; mc.lineWidth = s * 1.5;
       const c0 = e.d[m];
@@ -5421,6 +5421,340 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  //  Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) :
+  //  une scène composée, sans interface ni texte (CONSIGNES-JEU.md, section 5).
+  //  Le casque du pilote rouge en grand sous la lune et les projecteurs ; en
+  //  dessous, son bolide lancé à pleine vitesse sur la ligne droite des stands,
+  //  sous la pluie, le bolide bleu dans son aspiration, étincelles et reflets.
+  // ---------------------------------------------------------------------
+
+  const AFFICHE = !!window.JEL_AFFICHE;
+  const APERCU = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.style.display = 'block';
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Cadre de 600 × 800 au centre ; le décor continue jusqu'aux bords.
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+    const al = graineHasard(77);
+    // Ciel de nuit : indigo en haut, lueur rose et violette de la ville en bas.
+    const hz = Y(430);
+    let g = c.createLinearGradient(0, 0, 0, hz);
+    g.addColorStop(0, '#0c1040'); g.addColorStop(0.5, '#2c2a78'); g.addColorStop(0.85, '#7a3c8c'); g.addColorStop(1, '#c0567a');
+    c.fillStyle = g; c.fillRect(0, 0, w, hz + 2);
+    for (let i = 0; i < 120; i++) {
+      c.fillStyle = 'rgba(255,255,255,' + (0.35 + al() * 0.6).toFixed(2) + ')';
+      rond(c, al() * w, al() * hz * 0.6, (al() * 1.3 + 0.4) * k); c.fill();
+    }
+    // Lune pleine, avec son halo, en haut à droite.
+    const lx = X(488), ly = Y(112), lr = 46 * k;
+    let gl = c.createRadialGradient(lx, ly, lr * 0.6, lx, ly, lr * 4.2);
+    gl.addColorStop(0, 'rgba(255,248,214,.55)'); gl.addColorStop(1, 'rgba(255,248,214,0)');
+    c.fillStyle = gl; c.fillRect(0, 0, w, hz);
+    c.fillStyle = '#fbf6dc'; rond(c, lx, ly, lr); c.fill();
+    c.fillStyle = 'rgba(200,190,150,.45)';
+    rond(c, lx - lr * 0.3, ly - lr * 0.2, lr * 0.22); c.fill(); rond(c, lx + lr * 0.25, ly + lr * 0.3, lr * 0.16); c.fill(); rond(c, lx + lr * 0.35, ly - lr * 0.35, lr * 0.1); c.fill();
+    // Ville au loin, fenêtres allumées.
+    const al2 = graineHasard(5), u = 60 * k;
+    for (let x = -10; x < w + 20;) {
+      const bw = u * (0.5 + al2() * 0.9), bh = u * (0.9 + al2() * 2.3);
+      c.fillStyle = '#1a1745'; c.fillRect(x, hz - bh, bw, bh + 2);
+      c.fillStyle = 'rgba(255,214,120,.7)';
+      for (let yy = hz - bh + u * 0.2; yy < hz - u * 0.2; yy += u * 0.32) for (let xx = x + u * 0.12; xx < x + bw - u * 0.15; xx += u * 0.25) if (al2() < 0.4) c.fillRect(xx, yy, u * 0.09, u * 0.12);
+      x += bw + u * 0.05;
+    }
+    // Projecteurs : deux tours dont les faisceaux tombent sur la piste.
+    const faisceaux = [[60, -1], [540, 1]];
+    faisceaux.forEach(([px, sens]) => {
+      const x0 = X(px), y0 = Y(250);
+      const fx = c.createLinearGradient(x0, y0, x0, Y(800));
+      fx.addColorStop(0, 'rgba(255,250,215,.55)'); fx.addColorStop(1, 'rgba(255,250,215,.04)');
+      c.fillStyle = fx;
+      c.beginPath(); c.moveTo(x0 - 18 * k, y0); c.lineTo(x0 + 18 * k, y0);
+      c.lineTo(x0 - sens * 40 * k + 150 * k, Y(800)); c.lineTo(x0 - sens * 40 * k - 150 * k, Y(800)); c.closePath(); c.fill();
+      c.fillStyle = '#2a2f55'; c.fillRect(x0 - 5 * k, y0, 10 * k, hz - y0);
+      c.fillStyle = '#3a4070'; rr(c, x0 - 34 * k, y0 - 24 * k, 68 * k, 28 * k, 5 * k); c.fill();
+      c.save(); c.shadowColor = '#fffbe0'; c.shadowBlur = 18 * k; c.fillStyle = '#fffbe0';
+      for (let i = 0; i < 4; i++) { rond(c, x0 - 24 * k + i * 16 * k, y0 - 10 * k, 6 * k); c.fill(); }
+      c.restore();
+    });
+    // Mur des stands : garages éclairés aux couleurs des six écuries.
+    const my = Y(430), mh = 58 * k;
+    c.fillStyle = '#20264d'; c.fillRect(0, my, w, mh);
+    const lg = 600 * k / 7;
+    for (let x = ox - lg * Math.ceil(ox / lg), i = 0; x < w; x += lg, i++) {
+      const col = COUL[(i + 60) % 6];
+      c.save(); c.shadowColor = col; c.shadowBlur = 14 * k;
+      c.fillStyle = col; c.fillRect(x + lg * 0.14, my + mh * 0.18, lg * 0.72, mh * 0.6);
+      c.restore();
+      c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(x + lg * 0.14, my + mh * 0.18, lg * 0.72, mh * 0.12);
+    }
+    c.fillStyle = '#e8e8f0'; c.fillRect(0, my + mh, w, 10 * k);
+    c.fillStyle = '#ff3b4d';
+    for (let x = ox % (40 * k) - 40 * k; x < w; x += 40 * k) c.fillRect(x, my + mh, 20 * k, 10 * k);
+    // Piste mouillée.
+    const py = my + mh + 10 * k;
+    g = c.createLinearGradient(0, py, 0, h);
+    g.addColorStop(0, '#3a3c52'); g.addColorStop(1, '#17182a');
+    c.fillStyle = g; c.fillRect(0, py, w, h - py);
+    // Reflets des garages et des projecteurs sur l'asphalte mouillé.
+    for (let x = ox - lg * Math.ceil(ox / lg), i = 0; x < w; x += lg, i++) {
+      const col = COUL[(i + 60) % 6];
+      const rf = c.createLinearGradient(0, py, 0, py + 150 * k);
+      rf.addColorStop(0, col); rf.addColorStop(1, 'rgba(0,0,0,0)');
+      c.globalAlpha = 0.3; c.fillStyle = rf; c.fillRect(x + lg * 0.25, py, lg * 0.5, 150 * k); c.globalAlpha = 1;
+    }
+    c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 5 * k; c.setLineDash([36 * k, 28 * k]);
+    c.beginPath(); c.moveTo(0, Y(640)); c.lineTo(w, Y(640)); c.stroke(); c.setLineDash([]);
+    // Le pilote rouge, en grand, au-dessus de la piste : buste en combinaison et
+    // casque tourné vers la course, lueur rouge autour (montage d'affiche).
+    const hx = X(300), hy = Y(196), hr = 112 * k;
+    const halo = c.createRadialGradient(hx, hy + hr * 0.6, hr * 0.4, hx, hy + hr * 0.6, hr * 2.6);
+    halo.addColorStop(0, 'rgba(255,77,77,.6)'); halo.addColorStop(1, 'rgba(255,77,77,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, w, hz);
+    piloteAffiche(c, hx, hy, hr);
+    // Pluie dans la lumière des projecteurs.
+    c.strokeStyle = 'rgba(220,235,255,.45)'; c.lineWidth = 1.5 * k;
+    for (let i = 0; i < 130; i++) { const x = al() * w, y = al() * h; c.beginPath(); c.moveTo(x, y); c.lineTo(x - 5 * k, y + 15 * k); c.stroke(); }
+    // Le bolide bleu, plus loin, dans l'aspiration du rouge.
+    const bx = X(150), by = Y(528), bl = 250 * k;
+    c.strokeStyle = 'rgba(159,216,255,.75)'; c.lineWidth = 3 * k; c.lineCap = 'round';
+    for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(bx - bl * (0.6 + i * 0.04), by - bl * 0.1 + i * bl * 0.045); c.lineTo(bx - bl * (1.4 + i * 0.1), by - bl * 0.1 + i * bl * 0.045); c.stroke(); }
+    c.save(); c.shadowColor = '#3fa9ff'; c.shadowBlur = 16 * k;
+    bolideAffiche(c, bx, by, bl, COUL[1], COUL_F[1], '#f5f5ff');
+    c.restore();
+    // Reflet du bolide rouge sur la piste mouillée, traînées, phares, puis le bolide.
+    const rx = X(372), ry = Y(626), rl = 420 * k;
+    const ref = c.createLinearGradient(0, ry, 0, ry + 100 * k);
+    ref.addColorStop(0, 'rgba(255,77,77,.5)'); ref.addColorStop(1, 'rgba(255,77,77,0)');
+    c.fillStyle = ref; c.fillRect(rx - rl * 0.55, ry + 8 * k, rl * 1.1, 100 * k);
+    c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 4 * k;
+    for (let i = 0; i < 5; i++) { c.beginPath(); c.moveTo(rx - rl * (0.62 + i * 0.03), ry - rl * 0.17 + i * rl * 0.045); c.lineTo(rx - rl * (1.15 + i * 0.08), ry - rl * 0.17 + i * rl * 0.045); c.stroke(); }
+    const ph = c.createLinearGradient(rx + rl * 0.5, 0, rx + rl * 1.1, 0);
+    ph.addColorStop(0, 'rgba(255,250,200,.7)'); ph.addColorStop(1, 'rgba(255,250,200,0)');
+    c.fillStyle = ph;
+    c.beginPath(); c.moveTo(rx + rl * 0.55, ry - rl * 0.02); c.lineTo(rx + rl * 1.2, ry - rl * 0.15); c.lineTo(rx + rl * 1.2, ry + rl * 0.1); c.closePath(); c.fill();
+    c.save(); c.shadowColor = '#ff4d4d'; c.shadowBlur = 26 * k;
+    bolideAffiche(c, rx, ry, rl, COUL[0], COUL_F[0], '#ffd23f');
+    c.restore();
+    // Étincelles sous le fond plat du bolide rouge.
+    c.fillStyle = '#ffe36b'; c.shadowColor = '#ffb020'; c.shadowBlur = 12 * k;
+    for (let i = 0; i < 18; i++) etincelle(c, rx - rl * (0.2 + al() * 0.5) - al() * 40 * k, ry + rl * (0.06 + al() * 0.06), (4 + al() * 7) * k);
+    c.shadowBlur = 0;
+    // Premier plan : pile de pneus coupée à gauche, vibreur rouge et blanc en bas à droite.
+    for (let j = 0; j < 5; j++) {
+      const tx = X(18), ty = Y(790) - j * 36 * k, rx2 = 70 * k, ry2 = 20 * k;
+      c.fillStyle = '#121219'; c.fillRect(tx - rx2, ty - 30 * k, rx2 * 2, 30 * k); ell(c, tx, ty, rx2, ry2); c.fill();
+      c.fillStyle = j % 2 ? '#ff3b4d' : '#f4f4f8'; c.fillRect(tx - rx2, ty - 22 * k, rx2 * 2, 9 * k);
+      c.fillStyle = '#2b2c38'; ell(c, tx, ty - 30 * k, rx2, ry2); c.fill();
+      c.fillStyle = '#07070b'; ell(c, tx, ty - 30 * k, rx2 * 0.5, ry2 * 0.5); c.fill();
+      c.strokeStyle = 'rgba(255,250,215,.35)'; c.lineWidth = 2 * k; ell(c, tx, ty - 30 * k, rx2, ry2); c.stroke();
+    }
+    c.save(); c.translate(X(600), Y(800)); c.rotate(-0.35);
+    for (let i = -6; i < 4; i++) { c.fillStyle = i % 2 ? '#ff3b4d' : '#f4f4f8'; c.fillRect(i * 50 * k, -30 * k, 50 * k, 40 * k); }
+    c.restore();
+  }
+
+  // Bolide de course vu de profil, plus détaillé que sur l'écran titre (affiche) :
+  // nez long, aileron avant, pontons, prise d'air, aileron arrière, roues nues.
+  function bolideAffiche(c, x, y, L, coul, coulF, coulCasque) {
+    c.save(); c.translate(x, y);
+    c.lineJoin = 'round';
+    c.fillStyle = 'rgba(0,0,0,.45)'; ell(c, 0, L * 0.13, L * 0.56, L * 0.035); c.fill();
+    // aileron arrière
+    c.fillStyle = '#16182a';
+    c.beginPath(); c.moveTo(-L * 0.5, -L * 0.08); c.lineTo(-L * 0.47, -L * 0.24); c.lineTo(-L * 0.43, -L * 0.24); c.lineTo(-L * 0.42, -L * 0.1); c.closePath(); c.fill();
+    c.fillStyle = coulF; rr(c, -L * 0.56, -L * 0.28, L * 0.17, L * 0.05, L * 0.01); c.fill();
+    c.fillStyle = coul; rr(c, -L * 0.56, -L * 0.28, L * 0.17, L * 0.022, L * 0.01); c.fill();
+    c.fillStyle = '#16182a'; c.fillRect(-L * 0.565, -L * 0.3, L * 0.018, L * 0.09); c.fillRect(-L * 0.4, -L * 0.3, L * 0.018, L * 0.09);
+    // carrosserie
+    const g = c.createLinearGradient(0, -L * 0.2, 0, L * 0.06);
+    g.addColorStop(0, coul); g.addColorStop(0.55, coul); g.addColorStop(1, coulF);
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(-L * 0.52, L * 0.04);
+    c.lineTo(-L * 0.52, -L * 0.09);
+    c.lineTo(-L * 0.2, -L * 0.12);
+    c.quadraticCurveTo(-L * 0.12, -L * 0.24, -L * 0.04, -L * 0.22);   // prise d'air au-dessus du pilote
+    c.lineTo(L * 0.02, -L * 0.13);
+    c.lineTo(L * 0.14, -L * 0.115);
+    c.quadraticCurveTo(L * 0.4, -L * 0.07, L * 0.58, -L * 0.005);    // long nez
+    c.lineTo(L * 0.58, L * 0.025);
+    c.lineTo(L * 0.1, L * 0.05);
+    c.lineTo(-L * 0.52, L * 0.05);
+    c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = Math.max(1, L * 0.006); c.stroke();
+    // ponton (côté) et bandes
+    c.fillStyle = coulF; rr(c, -L * 0.3, -L * 0.07, L * 0.3, L * 0.09, L * 0.03); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.9)';
+    c.beginPath(); c.moveTo(-L * 0.5, -L * 0.055); c.lineTo(L * 0.5, -L * 0.035); c.lineTo(L * 0.5, -L * 0.02); c.lineTo(-L * 0.5, -L * 0.035); c.closePath(); c.fill();
+    c.fillStyle = '#ffd23f'; c.fillRect(-L * 0.28, -L * 0.005, L * 0.26, L * 0.012);
+    // reflet sur le dessus
+    c.strokeStyle = 'rgba(255,240,225,.75)'; c.lineWidth = Math.max(1.5, L * 0.008);
+    c.beginPath(); c.moveTo(-L * 0.5, -L * 0.095); c.lineTo(-L * 0.2, -L * 0.125); c.quadraticCurveTo(-L * 0.12, -L * 0.235, -L * 0.05, -L * 0.215); c.stroke();
+    c.beginPath(); c.moveTo(L * 0.15, -L * 0.112); c.quadraticCurveTo(L * 0.4, -L * 0.065, L * 0.56, -L * 0.006); c.stroke();
+    // casque du pilote et arceau
+    c.fillStyle = coulCasque; ell(c, L * 0.045, -L * 0.15, L * 0.05, L * 0.045); c.fill();
+    c.fillStyle = '#121a33'; c.fillRect(L * 0.055, -L * 0.165, L * 0.04, L * 0.022);
+    c.strokeStyle = '#16182a'; c.lineWidth = L * 0.014; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-L * 0.01, -L * 0.13); c.quadraticCurveTo(L * 0.05, -L * 0.215, L * 0.13, -L * 0.12); c.stroke();
+    // aileron avant
+    c.fillStyle = '#16182a'; rr(c, L * 0.4, L * 0.035, L * 0.22, L * 0.022, L * 0.008); c.fill();
+    c.fillStyle = coul; c.fillRect(L * 0.585, L * 0.0, L * 0.02, L * 0.06);
+    // roues nues
+    [[-L * 0.33, 0.125], [L * 0.31, 0.11]].forEach(([wx, r]) => {
+      const R2 = L * r;
+      c.fillStyle = '#0b0b10'; rond(c, wx, L * 0.04, R2); c.fill();
+      c.strokeStyle = '#2a2b36'; c.lineWidth = R2 * 0.12; rond(c, wx, L * 0.04, R2 * 0.85); c.stroke();
+      c.fillStyle = '#9aa0b8'; rond(c, wx, L * 0.04, R2 * 0.48); c.fill();
+      c.fillStyle = '#5a5f74'; rond(c, wx, L * 0.04, R2 * 0.2); c.fill();
+      c.strokeStyle = 'rgba(255,240,225,.6)'; c.lineWidth = R2 * 0.06;
+      c.beginPath(); c.arc(wx, L * 0.04, R2 * 0.95, -Math.PI * 0.85, -Math.PI * 0.35); c.stroke();
+    });
+    // feu arrière rouge et phare
+    c.fillStyle = '#ff2d3d'; c.shadowColor = '#ff2d3d'; c.shadowBlur = L * 0.04; c.fillRect(-L * 0.56, -L * 0.04, L * 0.02, L * 0.035);
+    c.fillStyle = '#fffbd0'; c.shadowColor = '#fffbd0'; rond(c, L * 0.565, L * 0.008, L * 0.012); c.fill();
+    c.restore();
+  }
+
+  // Le pilote en buste, de trois quarts, casque tourné vers la droite (affiche).
+  function piloteAffiche(c, x, y, r) {
+    c.save(); c.translate(x, y);
+    // combinaison : épaules, col, bandes, insigne en étoile
+    const gs = c.createLinearGradient(0, r * 0.4, 0, r * 2.2);
+    gs.addColorStop(0, '#ff5a5a'); gs.addColorStop(1, '#8f1b22');
+    c.fillStyle = gs;
+    c.beginPath();
+    c.moveTo(-r * 0.55, r * 0.55);
+    c.quadraticCurveTo(-r * 1.55, r * 0.75, -r * 1.75, r * 2.2);
+    c.lineTo(r * 1.75, r * 2.2);
+    c.quadraticCurveTo(r * 1.55, r * 0.75, r * 0.55, r * 0.55);
+    c.closePath(); c.fill();
+    c.fillStyle = '#f4f4f8';
+    c.beginPath(); c.moveTo(-r * 1.2, r * 0.82); c.lineTo(-r * 0.95, r * 0.7); c.lineTo(-r * 0.8, r * 2.2); c.lineTo(-r * 1.08, r * 2.2); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(r * 1.2, r * 0.82); c.lineTo(r * 0.95, r * 0.7); c.lineTo(r * 0.8, r * 2.2); c.lineTo(r * 1.08, r * 2.2); c.closePath(); c.fill();
+    c.fillStyle = '#ffd23f';
+    c.fillRect(-r * 0.6, r * 1.45, r * 1.2, r * 0.1);
+    etoile(c, r * 0.55, r * 1.15, r * 0.17); c.fill();
+    c.fillStyle = '#1b1d2e'; rr(c, -r * 0.5, r * 0.5, r * 1.0, r * 0.3, r * 0.12); c.fill();   // col
+    // liseré de lumière sur les épaules
+    c.strokeStyle = 'rgba(255,235,215,.85)'; c.lineWidth = r * 0.04;
+    c.beginPath(); c.moveTo(r * 0.6, r * 0.58); c.quadraticCurveTo(r * 1.5, r * 0.78, r * 1.7, r * 1.9); c.stroke();
+    c.beginPath(); c.moveTo(-r * 0.6, r * 0.58); c.quadraticCurveTo(-r * 1.5, r * 0.78, -r * 1.7, r * 1.9); c.stroke();
+    // casque (même dessin que dans la course), légèrement penché
+    c.save(); c.rotate(-0.1);
+    c.shadowColor = '#ff6b6b'; c.shadowBlur = r * 0.3;
+    casque(c, 0, 0, r, COUL[0], 1);
+    c.shadowBlur = 0;
+    // flammes dorées sur le côté du casque
+    c.save();
+    c.beginPath(); c.arc(0, 0, r, Math.PI * 0.82, Math.PI * 2.12); c.lineTo(r * 0.95, r * 0.6); c.quadraticCurveTo(0, r * 0.95, -r * 0.9, r * 0.62); c.closePath(); c.clip();
+    c.fillStyle = '#ffd23f';
+    c.beginPath(); c.moveTo(-r * 1.0, r * 0.75); c.quadraticCurveTo(-r * 0.8, r * 0.05, -r * 0.25, -r * 0.05); c.quadraticCurveTo(-r * 0.55, r * 0.15, -r * 0.3, r * 0.3);
+    c.quadraticCurveTo(-r * 0.05, r * 0.2, r * 0.1, r * 0.42); c.quadraticCurveTo(-r * 0.3, r * 0.5, -r * 0.2, r * 0.8); c.closePath(); c.fill();
+    c.fillStyle = '#ff7a1a';
+    c.beginPath(); c.moveTo(-r * 0.95, r * 0.75); c.quadraticCurveTo(-r * 0.75, r * 0.25, -r * 0.38, r * 0.12); c.quadraticCurveTo(-r * 0.5, r * 0.35, -r * 0.3, r * 0.5); c.quadraticCurveTo(-r * 0.5, r * 0.6, -r * 0.45, r * 0.8); c.closePath(); c.fill();
+    c.restore();
+    // visière : reflet de la piste, des projecteurs et des garages
+    c.beginPath(); c.moveTo(-r * 0.12, -r * 0.18); c.lineTo(r * 0.98, -r * 0.2); c.lineTo(r * 0.96, r * 0.32); c.lineTo(-r * 0.02, r * 0.32); c.closePath();
+    const vz = c.createLinearGradient(0, -r * 0.2, 0, r * 0.32);
+    vz.addColorStop(0, '#1b2a6e'); vz.addColorStop(0.45, '#6a3c9c'); vz.addColorStop(0.65, '#ff8a3d'); vz.addColorStop(1, '#2a1030');
+    c.fillStyle = vz; c.fill();
+    c.save(); c.clip();
+    c.fillStyle = 'rgba(255,255,255,.7)';
+    c.beginPath(); c.moveTo(r * 0.12, -r * 0.2); c.lineTo(r * 0.3, -r * 0.2); c.lineTo(r * 0.12, r * 0.32); c.lineTo(-r * 0.06, r * 0.32); c.closePath(); c.fill();
+    c.fillStyle = '#fffbe0';
+    for (let i = 0; i < 5; i++) { rond(c, r * (0.45 + i * 0.1), r * 0.02, r * 0.024); c.fill(); }
+    COUL.forEach((col, i) => { c.fillStyle = col; c.fillRect(r * (0.38 + i * 0.09), r * 0.14, r * 0.06, r * 0.045); });
+    c.restore();
+    c.beginPath(); c.moveTo(-r * 0.12, -r * 0.18); c.lineTo(r * 0.98, -r * 0.2); c.lineTo(r * 0.96, r * 0.32); c.lineTo(-r * 0.02, r * 0.32); c.closePath();
+    c.strokeStyle = '#0b0d1a'; c.lineWidth = r * 0.06; c.stroke();
+    // contour du casque et liseré clair côté lune
+    c.beginPath(); c.arc(0, 0, r, Math.PI * 0.82, Math.PI * 2.12); c.lineTo(r * 0.95, r * 0.6); c.quadraticCurveTo(0, r * 0.95, -r * 0.9, r * 0.62); c.closePath();
+    c.strokeStyle = '#0b0d1a'; c.lineWidth = r * 0.05; c.stroke();
+    c.strokeStyle = 'rgba(255,240,220,.9)'; c.lineWidth = r * 0.04;
+    c.beginPath(); c.arc(0, 0, r * 0.96, -Math.PI * 0.62, -Math.PI * 0.1); c.stroke();
+    // aérations du menton
+    c.fillStyle = '#0b0d1a';
+    for (let i = 0; i < 3; i++) { rr(c, r * (0.3 + i * 0.16), r * 0.45, r * 0.1, r * 0.05, r * 0.02); c.fill(); }
+    c.restore();
+    c.restore();
+  }
+
+  function cacherInterface() {
+    document.querySelectorAll('.ecran, .voile, #toast, #confettis, button, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    cacherInterface();
+    dessinerAffiche();
+    // Le bouton de langue peut être créé après ce script : on le cache encore un peu après.
+    setTimeout(cacherInterface, 100);
+    setTimeout(cacherInterface, 600);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  //  Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par
+  //  le jeu) : une vraie course solo contre les robots, avec sa vraie interface
+  //  (places, tableau de bord, main de cartes, aperçu du trajet), sans écran
+  //  titre, ni fenêtre « Continuer », ni tutoriel. Les tours sont joués d'avance
+  //  par les robots (hasard à graine fixe), jusqu'au tour du joueur, puis la
+  //  course reste figée sur ce moment : ni moteur, ni son, ni sauvegarde.
+  //    1 = Grand Prix 1, ville : la carte 3, sans risque, en aperçu ;
+  //    2 = Grand Prix 10, désert sous la pluie : pneus, stand, aspiration, une carte risquée ;
+  //    3 = Grand Prix 19, bord de mer de nuit : essence, voiture de sécurité, phares.
+  // ---------------------------------------------------------------------
+
+  const SCENES_APERCU = {
+    1: { niveau: 1, tours: 2, graine: 11, carte: 'sur' },
+    2: { niveau: 10, tours: 6, graine: 23, carte: 'risque', pluie: true, livree: 1 },
+    3: { niveau: 19, tours: 7, graine: 37, carte: 'sur', sc: true, livree: 3, casque: 3 }
+  };
+
+  function ouvrirApercu(n) {
+    const sc = SCENES_APERCU[n];
+    let graine = 1234567 + sc.graine * 7919;
+    const alea = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    Math.random = alea;
+    // Garage en mémoire seulement (rien n'est enregistré).
+    prog.livree = sc.livree || 0; prog.casque = sc.casque || 0;
+    session = 'solo'; niveau = sc.niveau; enPartie = false; enPause = false; attenteTuto = false;
+    const e = R.depart(alea, PLACES, { niveau: niveau });
+    // Les robots jouent les premiers tours (le joueur compris), jusqu'au tour du joueur.
+    for (let coups = 0; coups < 600 && !e.fini; coups++) {
+      const s = R.aQui(e);
+      if (s === 0 && e.ro > sc.tours) break;
+      R.jouer(e, s, R.bot(e, s, alea, e.fr), alea);
+    }
+    e.rv = { p: 0, k: 0 }; e.ev = null;
+    if (sc.pluie) e.pl = 1;
+    if (sc.sc) { e.sR = Math.max(1, e.sR); }
+    vue = e;
+    // Partie figée : c'est au joueur (place 0), les autres places sont des robots.
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 1, chef: -1,
+      monTour: () => true, sieges: () => { const l = []; for (let s = 0; s < PLACES; s++) l.push({ moi: s === 0, humain: s === 0, chef: false }); return l; },
+      estChef: () => false, pause: () => {}, quitter: () => {}, jouer: () => false, lancerManche: () => false, recommencer: () => false
+    };
+    // Carte en aperçu : la plus forte sans risque, ou une carte risquée.
+    const cartes = O.actions(e, 0).filter((v) => v > 0);
+    const etat = (v) => { const tj = O.trajet(e, 0, v); return tj.tete ? 'tete' : (tj.risques.length ? 'risque' : 'sur'); };
+    const sures = cartes.filter((v) => etat(v) === 'sur'), risquees = cartes.filter((v) => etat(v) === 'risque');
+    choix = sc.carte === 'risque' && risquees.length ? risquees[0] : (sures.length ? sures[sures.length - 1] : cartes[0]);
+    placerVoitures(vue, true, 0);
+    afficherEcran('jeu');
+    majInterface();
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5455,7 +5789,7 @@
   $('btn-salon-quitter').addEventListener('click', () => { audio(); sons.clic(); quitterPartie(); afficherEcran('titre'); });
 
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !APERCU && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une course solo.
@@ -5471,10 +5805,14 @@
   construireCartes();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  if (AFFICHE) demarrerAffiche();
+  else if (APERCU) ouvrirApercu(APERCU);
+  else {
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>

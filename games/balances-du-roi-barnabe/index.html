@@ -2426,6 +2426,7 @@
     return p;
   })();
   function garderLocal() {
+    if (apercu) return; // image du jeu : rien d'enregistré
     try { localStorage.setItem(CLE_LOCALE, JSON.stringify(P)); } catch (e) { /* stockage refusé : la sauvegarde du site suffit */ }
   }
   // « Effacer la sauvegarde » : la progression repart de zéro (le son et la tapisserie restent)
@@ -2707,6 +2708,7 @@
     L: { W: 360, H: 400, k: 1, ox: 0, oy: 0, S: 44, RH: 90 }, elems: {}, cibles2: {}
   };
   var ecranActuel = 'titre';
+  var apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
   function afficher(nom) {
     document.querySelectorAll('.ecran').forEach(function (e) { e.classList.toggle('actif', e.id === 'ecran-' + nom); });
@@ -3488,6 +3490,7 @@
     return e;
   }
   function sauverPartie(niveau) {
+    if (apercu) return;
     var donnees = { niveau: niveau, score: scoreTotal(), progres: P, options: { son: P.son } };
     try { window.JEL_SAVE.save(JEU, donnees); } catch (e) { /* sauvegarde indisponible */ }
   }
@@ -3789,7 +3792,7 @@
     var att = etat.attentes; etat.attentes = [];
     att.forEach(function (fn) { setTimeout(fn, 250); });
   }
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') mettrePause(); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && !apercu) mettrePause(); });
 
   // ------------------------------------------------------------------------
   // Écran des niveaux
@@ -3996,10 +3999,237 @@
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie
   window.JEL_SAVE.surFermeture(function () {
-    if (etat.actif && !etat.fini && !etat.defi) sauverPartie(etat.niv + 1);
+    if (etat.actif && !etat.fini && !etat.defi && !apercu) sauverPartie(etat.niv + 1);
   });
 
-  majTitre();
+  // ------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le roi Barnabé,
+  // ravi, lâche un lingot d'or sur le plateau qui remonte ; un gros fromage fait pencher l'autre
+  // plateau. Vitraux et rayons de lumière, torches, coffret et jarre au premier plan.
+  function etincelle(x, y, r, couleur) {
+    return '<path d="M' + x + ' ' + (y - r) + ' L' + (x + r * 0.25) + ' ' + (y - r * 0.25) + ' L' + (x + r) + ' ' + y + ' L' + (x + r * 0.25) + ' ' + (y + r * 0.25) + ' L' + x + ' ' + (y + r) + ' L' + (x - r * 0.25) + ' ' + (y + r * 0.25) + ' L' + (x - r) + ' ' + y + ' L' + (x - r * 0.25) + ' ' + (y - r * 0.25) + 'Z" fill="' + (couleur || '#fff6d0') + '"/>';
+  }
+  // Objet du jeu (dessin 44 × 44) posé par le milieu de sa base
+  var BAS_OBJET = { S: 41, L: 35, F: 34, P: 41.5, C: 39, J: 40 };
+  function objetAffiche(k, cx, bas, ech, rot) {
+    return '<g transform="translate(' + f1(cx - 22 * ech) + ' ' + f1(bas - BAS_OBJET[k] * ech) + ') scale(' + ech + ')' + (rot ? ' rotate(' + rot + ' 22 22)' : '') + '">' + DESSINS[k] + '</g>';
+  }
+  function svgAffiche() {
+    var s = '<defs>' +
+      '<linearGradient id="aMur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9563c4"/><stop offset=".65" stop-color="#6a3c96"/><stop offset="1" stop-color="#4a2870"/></linearGradient>' +
+      '<linearGradient id="aOr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff2b0"/><stop offset=".45" stop-color="#f6cf52"/><stop offset="1" stop-color="#c98f1c"/></linearGradient>' +
+      '<radialGradient id="aHalo" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff6cc" stop-opacity=".95"/><stop offset=".4" stop-color="#ffe08a" stop-opacity=".5"/><stop offset="1" stop-color="#ffd98a" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="aFeu" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe9a0" stop-opacity=".9"/><stop offset="1" stop-color="#ffb02e" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="aRayon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6d0" stop-opacity=".6"/><stop offset="1" stop-color="#fff6d0" stop-opacity="0"/></linearGradient>' +
+      '<linearGradient id="aVitrail" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a8dcff"/><stop offset=".5" stop-color="#ffe27a"/><stop offset="1" stop-color="#ff8a9a"/></linearGradient>' +
+      '<linearGradient id="aSol" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a6238"/><stop offset="1" stop-color="#5a321c"/></linearGradient>' +
+      '<linearGradient id="aTapis" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c0303f"/><stop offset="1" stop-color="#8a1a2a"/></linearGradient>' +
+      '<pattern id="aPierres" width="120" height="64" patternUnits="userSpaceOnUse">' +
+      '<rect x="2" y="2" width="56" height="28" rx="5" fill="none" stroke="#3d1f5c" stroke-width="2.5" opacity=".45"/><rect x="62" y="2" width="56" height="28" rx="5" fill="none" stroke="#3d1f5c" stroke-width="2.5" opacity=".45"/>' +
+      '<rect x="-28" y="34" width="56" height="28" rx="5" fill="none" stroke="#3d1f5c" stroke-width="2.5" opacity=".45"/><rect x="32" y="34" width="56" height="28" rx="5" fill="none" stroke="#3d1f5c" stroke-width="2.5" opacity=".45"/><rect x="92" y="34" width="56" height="28" rx="5" fill="none" stroke="#3d1f5c" stroke-width="2.5" opacity=".45"/>' +
+      '</pattern>' +
+      '</defs>';
+    // Mur (dessiné large : sur un écran en largeur, le décor continue jusqu'aux bords)
+    s += '<rect x="-1600" y="-400" width="3800" height="1010" fill="url(#aMur)"/><rect x="-1600" y="-400" width="3800" height="1010" fill="url(#aPierres)"/>';
+    // Grand halo doré derrière le trône
+    s += '<circle cx="300" cy="270" r="360" fill="url(#aHalo)"/>';
+    // Vitraux et leurs rayons de lumière
+    [[80, 1], [520, -1], [-250, 1], [850, -1], [-600, 1], [1200, -1]].forEach(function (v) {
+      var x = v[0], d = v[1];
+      s += '<path d="M' + (x - 38) + ' 236 L' + (x + 38) + ' 236 L' + (x + d * 250 + 70) + ' 660 L' + (x + d * 250 - 90) + ' 660Z" fill="url(#aRayon)" opacity=".55"/>';
+      s += '<circle cx="' + x + '" cy="140" r="95" fill="url(#aHalo)" opacity=".55"/>';
+      s += '<path d="M' + (x - 40) + ' 238 V96 Q' + x + ' 30 ' + (x + 40) + ' 96 V238Z" fill="url(#aVitrail)" stroke="#3d1f5c" stroke-width="7"/>' +
+        '<path d="M' + x + ' 52 V238 M' + (x - 40) + ' 140 H' + (x + 40) + ' M' + (x - 40) + ' 190 H' + (x + 40) + '" stroke="#3d1f5c" stroke-width="4"/>' +
+        '<circle cx="' + x + '" cy="98" r="14" fill="#fff6cc" stroke="#3d1f5c" stroke-width="4"/>';
+    });
+    // Torches (sources de lumière)
+    [[28, 330], [572, 330], [-420, 330], [1020, 330]].forEach(function (p) {
+      var x = p[0], y = p[1];
+      s += '<circle cx="' + x + '" cy="' + (y - 34) + '" r="70" fill="url(#aFeu)"/>' +
+        '<path d="M' + (x - 9) + ' ' + (y - 8) + ' H' + (x + 9) + ' L' + (x + 5) + ' ' + (y + 46) + ' H' + (x - 5) + 'Z" fill="#7a4a24" stroke="#3e2410" stroke-width="2"/>' +
+        '<path d="M' + x + ' ' + (y - 64) + ' Q' + (x + 20) + ' ' + (y - 34) + ' ' + x + ' ' + (y - 8) + ' Q' + (x - 20) + ' ' + (y - 34) + ' ' + x + ' ' + (y - 64) + 'Z" fill="#ffb02e"/>' +
+        '<path d="M' + x + ' ' + (y - 46) + ' Q' + (x + 9) + ' ' + (y - 28) + ' ' + x + ' ' + (y - 12) + ' Q' + (x - 9) + ' ' + (y - 28) + ' ' + x + ' ' + (y - 46) + 'Z" fill="#fff3b0"/>';
+    });
+    // Tapisseries sur les écrans larges
+    [-150, 690, -820, 1360].forEach(function (x) { s += '<svg x="' + x + '" y="250" width="100" height="150" viewBox="0 0 60 90">' + contenuTapis(['lion', 'dragon', 'chateau', 'foret'][Math.abs(x) % 4]) + '</svg>'; });
+    // Sol, planches et tapis rouge
+    s += '<rect x="-1600" y="600" width="3800" height="500" fill="url(#aSol)"/><path d="M-1600 600 H2200" stroke="#3e2414" stroke-width="5"/>';
+    for (var i = -24; i <= 34; i++) s += '<path d="M' + (300 + (i * 50 - 300) * 0.55) + ' 600 L' + (i * 50) + ' 860" stroke="#5a321c" stroke-width="2.5"/>';
+    s += '<path d="M-1600 660 H2200 M-1600 740 H2200" stroke="#5a321c" stroke-width="2.5"/>';
+    s += '<path d="M245 600 H355 L450 860 H150Z" fill="url(#aTapis)"/><path d="M245 600 L150 860 M355 600 L450 860" stroke="#f2c94c" stroke-width="6"/>';
+    // Trône
+    s += '<path d="M178 600 V200 Q178 112 300 92 Q422 112 422 200 V600Z" fill="#7e1830" stroke="url(#aOr)" stroke-width="11"/>' +
+      '<path d="M204 586 V210 Q204 142 300 126 Q396 142 396 210 V586Z" fill="#a8263e"/>' +
+      '<circle cx="300" cy="86" r="17" fill="url(#aOr)" stroke="#9a6c12" stroke-width="3"/><circle cx="178" cy="196" r="14" fill="url(#aOr)" stroke="#9a6c12" stroke-width="3"/><circle cx="422" cy="196" r="14" fill="url(#aOr)" stroke="#9a6c12" stroke-width="3"/>' +
+      '<rect x="166" y="560" width="268" height="32" rx="10" fill="url(#aOr)" stroke="#9a6c12" stroke-width="3"/>' +
+      '<rect x="182" y="590" width="20" height="30" fill="#9a6c12"/><rect x="398" y="590" width="20" height="30" fill="#9a6c12"/>';
+    s += '<circle cx="300" cy="235" r="175" fill="url(#aHalo)" opacity=".75"/>';
+    // Le roi Barnabé, en grand : cape royale, bras levé qui vient de lâcher un lingot
+    var roi = '';
+    roi += '<path d="M-74 168 Q-80 72 0 54 Q80 72 74 168Z" fill="#4b3aa8" stroke="#2a1f6a" stroke-width="3"/>';
+    roi += '<path d="M-74 168 Q-80 72 0 54 Q80 72 74 168" fill="none" stroke="#f8f3ea" stroke-width="10"/>';
+    for (var k = 1; k < 10; k++) {
+      var tt = k / 10;
+      [-1, 1].forEach(function (c) {
+        var ex = c * ((1 - tt) * (1 - tt) * 74 + 2 * tt * (1 - tt) * 80), ey = (1 - tt) * (1 - tt) * 168 + 2 * tt * (1 - tt) * 72 + tt * tt * 54;
+        roi += '<path d="M' + f1(ex) + ' ' + f1(ey - 3) + ' L' + f1(ex + 2) + ' ' + f1(ey + 3) + ' L' + f1(ex - 2) + ' ' + f1(ey + 3) + 'Z" fill="#2a1a1a"/>';
+      });
+    }
+    roi += '<path d="M-56 160 Q-62 78 0 60 Q62 78 56 160Z" fill="#c23646" stroke="#7a1a24" stroke-width="3"/>' +
+      '<path d="M-15 62 L-6 160 H6 L15 62Z" fill="#f4efe6"/>' +
+      '<circle cx="0" cy="88" r="2.4" fill="#2a1a1a"/><circle cx="1" cy="112" r="2.4" fill="#2a1a1a"/><circle cx="-1" cy="136" r="2.4" fill="#2a1a1a"/>' +
+      '<path d="M-44 70 Q-30 58 -16 64 M44 70 Q30 58 16 64" stroke="#f4efe6" stroke-width="10" fill="none" stroke-linecap="round"/>';
+    // bras gauche : main ouverte, l'air étonné et ravi
+    roi += '<path d="M-36 78 Q-62 92 -58 112" stroke="#7a1a24" stroke-width="25" fill="none" stroke-linecap="round"/><path d="M-36 78 Q-62 92 -58 112" stroke="#c23646" stroke-width="20" fill="none" stroke-linecap="round"/>' +
+      '<rect x="-70" y="106" width="24" height="11" rx="5" fill="#f4efe6"/><circle cx="-58" cy="124" r="10" fill="#f3c9a0" stroke="#c48f63" stroke-width="2"/>';
+    // bras droit levé
+    roi += '<path d="M32 78 Q70 64 72 14" stroke="#7a1a24" stroke-width="25" fill="none" stroke-linecap="round"/><path d="M32 78 Q70 64 72 14" stroke="#c23646" stroke-width="20" fill="none" stroke-linecap="round"/>' +
+      '<rect x="60" y="8" width="25" height="11" rx="5" fill="#f4efe6" transform="rotate(-6 72 13)"/>' +
+      '<ellipse cx="66" cy="-6" rx="3.6" ry="7" transform="rotate(-18 66 -6)" fill="#f3c9a0" stroke="#c48f63" stroke-width="1.6"/>' +
+      '<ellipse cx="73" cy="-8.5" rx="3.6" ry="7.5" fill="#f3c9a0" stroke="#c48f63" stroke-width="1.6"/>' +
+      '<ellipse cx="80" cy="-6" rx="3.6" ry="7" transform="rotate(18 80 -6)" fill="#f3c9a0" stroke="#c48f63" stroke-width="1.6"/>' +
+      '<ellipse cx="85" cy="2" rx="3.4" ry="6" transform="rotate(50 85 2)" fill="#f3c9a0" stroke="#c48f63" stroke-width="1.6"/>' +
+      '<circle cx="73" cy="4" r="9.5" fill="#f3c9a0" stroke="#c48f63" stroke-width="2"/>';
+    // tête : sourcils levés, grands yeux, bouche ouverte et joyeuse
+    roi += svgRoi(false).replace('M-18 4 Q-11 0 -5 4 M5 4 Q11 0 18 4', 'M-19 1 Q-11 -5 -4 0 M4 0 Q11 -5 19 1').replace(/r="3\.6"/g, 'r="4.6"') +
+      '<path d="M-12 37 Q0 60 12 37 Q0 41 -12 37Z" fill="#5a0f18" stroke="#f3c9a0" stroke-width="2"/><path d="M-9 38.5 Q0 41.5 9 38.5 L8 41.5 Q0 43.5 -8 41.5Z" fill="#fff"/><path d="M-6 50 Q0 56 6 50 Q0 47 -6 50Z" fill="#ef7f86"/>';
+    s += '<g transform="translate(300 232) scale(1.8)">' + roi + '</g>';
+    // Grande balance d'or : le fromage fait pencher la gauche, le lingot tombe à droite
+    var px = 300, py = 482, a = -7, rad = a * Math.PI / 180, ca = Math.cos(rad), sa = Math.sin(rad), bras = 200, pend = 104;
+    s += '<ellipse cx="300" cy="736" rx="96" ry="16" fill="#2e180c" opacity=".45"/>' +
+      '<path d="M214 734 Q300 680 386 734Z" fill="url(#aOr)" stroke="#9a6c12" stroke-width="3"/>' +
+      '<rect x="289" y="' + py + '" width="22" height="236" rx="7" fill="url(#aOr)" stroke="#9a6c12" stroke-width="3"/>';
+    var crochets = [-1, 1].map(function (c) { return { x: px + c * bras * ca, y: py + c * bras * sa }; });
+    crochets.forEach(function (h) {
+      var yp = h.y + pend;
+      s += '<path d="M' + f1(h.x) + ' ' + f1(h.y) + ' L' + f1(h.x - 72) + ' ' + f1(yp) + ' M' + f1(h.x) + ' ' + f1(h.y) + ' L' + f1(h.x + 72) + ' ' + f1(yp) + '" stroke="#e8c463" stroke-width="3"/>';
+    });
+    s += '<g transform="rotate(' + a + ' ' + px + ' ' + py + ')">' +
+      '<rect x="' + (px - bras - 14) + '" y="' + (py - 10) + '" width="' + (2 * bras + 28) + '" height="20" rx="10" fill="url(#aOr)" stroke="#9a6c12" stroke-width="3"/>' +
+      '<path d="M' + (px - 7) + ' ' + py + ' L' + px + ' ' + (py - 52) + ' L' + (px + 7) + ' ' + py + 'Z" fill="#ff8a8a" stroke="#9a2a2a" stroke-width="2"/>' +
+      '<circle cx="' + (px - bras) + '" cy="' + py + '" r="9" fill="#9a6c12" stroke="#ffe08a" stroke-width="3"/><circle cx="' + (px + bras) + '" cy="' + py + '" r="9" fill="#9a6c12" stroke="#ffe08a" stroke-width="3"/>' +
+      '</g>' +
+      '<circle cx="' + px + '" cy="' + py + '" r="16" fill="#9a6c12" stroke="#ffe08a" stroke-width="4"/>';
+    var g = crochets[0], d = crochets[1], yg = g.y + pend, yd = d.y + pend;
+    // plateau de gauche : gros fromage et sac (il penche)
+    s += objetAffiche('S', g.x + 36, yg + 2, 1.75) + objetAffiche('F', g.x - 18, yg + 4, 2.5);
+    // plateau de droite : lingots (il remonte)
+    s += objetAffiche('L', d.x - 28, yd + 2, 1.55) + objetAffiche('L', d.x + 28, yd + 2, 1.55) + objetAffiche('L', d.x + 2, yd - 21, 1.55);
+    [[g.x, yg], [d.x, yd]].forEach(function (p) {
+      s += '<path d="M' + f1(p[0] - 80) + ' ' + f1(p[1]) + ' H' + f1(p[0] + 80) + ' Q' + f1(p[0]) + ' ' + f1(p[1] + 40) + ' ' + f1(p[0] - 80) + ' ' + f1(p[1]) + 'Z" fill="url(#aOr)" stroke="#9a6c12" stroke-width="3"/>' +
+        '<path d="M' + f1(p[0] - 74) + ' ' + f1(p[1] + 3) + ' H' + f1(p[0] + 74) + '" stroke="#fff6c0" stroke-width="3"/>';
+    });
+    // traits de mouvement : le lingot tombe de la main du roi
+    s += '<path d="M450 268 L462 312 M476 262 L486 304 M500 274 L506 306" stroke="#fff6d0" stroke-width="5" stroke-linecap="round" opacity=".7"/>';
+    s += '<circle cx="478" cy="356" r="58" fill="url(#aHalo)"/>' + objetAffiche('L', 478, 380, 2.1, 16);
+    s += etincelle(430, 330, 13) + etincelle(526, 318, 10, '#ffe08a') + etincelle(512, 404, 9) + etincelle(446, 398, 8, '#ffe08a');
+    // Étincelles dans la lumière
+    [[150, 110, 12], [455, 140, 10], [118, 420, 9], [250, 70, 8], [360, 470, 7], [560, 470, 9], [40, 560, 8]].forEach(function (p, j) { s += etincelle(p[0], p[1], p[2], j % 2 ? '#ffe08a' : '#fff6d0'); });
+    // Premier plan : coffret au poids caché, jarre, pièces d'or (coupés par les bords)
+    [[218, 700], [246, 716], [372, 724], [400, 708], [150, 760], [460, 770], [118, 690], [500, 690]].forEach(function (p) {
+      s += '<ellipse cx="' + p[0] + '" cy="' + p[1] + '" rx="15" ry="6" fill="#f2c94c" stroke="#9a6c12" stroke-width="2"/>';
+    });
+    s += objetAffiche('C', 36, 820, 3.4, -8) + objetAffiche('J', 566, 826, 3.3, 8) + objetAffiche('S', 120, 812, 2.2, 10);
+    s += etincelle(74, 690, 11) + etincelle(538, 668, 10, '#ffe08a');
+    return s;
+  }
+  function dessinerAffiche() {
+    var el = document.getElementById('affiche');
+    // Format de l'affiche (3:4) : plus étroit, on coupe les côtés ; plus large, le décor continue
+    var large = window.innerWidth / Math.max(1, window.innerHeight) > 0.75;
+    el.innerHTML = '<svg viewBox="0 0 600 800" preserveAspectRatio="' + (large ? 'xMidYMid meet' : 'xMidYMid slice') + '" aria-hidden="true" style="width:100%;height:100%;display:block">' + svgAffiche() + '</svg>';
+  }
+  function cacherInterface() {
+    document.querySelectorAll('.ecran, .voile, #main, #effets, button, .jel-langue, jel-langue').forEach(function (e) { e.style.setProperty('display', 'none', 'important'); });
+  }
+  function demarrerAffiche() {
+    var st = document.createElement('style');
+    st.textContent = '.ecran, .voile, #main, #effets, button, .jel-langue, jel-langue { display: none !important; } #affiche { position: fixed; inset: 0; z-index: 50; background: #4a2870; }';
+    document.head.appendChild(st);
+    var el = document.createElement('div');
+    el.id = 'affiche';
+    el.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(el);
+    cacherInterface();
+    [0, 200, 800, 1500].forEach(function (ms) { setTimeout(cacherInterface, ms); });
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (bandeau des commandes, balances, réserve,
+  // boutons), sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5).
+  // Les objets sont posés, une pesée est faite (les balances penchent), puis tout est figé :
+  // ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1 : un sac glissé au doigt vers le plateau, la balance penche ;
+  //   2 = niveau 9 : balance à deux étages (celle du bas droite), commande du roi, objet choisi ;
+  //   3 = niveau 24 : levier à crans, coffrets et jarre au poids caché, chandelles soufflées.
+  // poses : [rang de l'objet dans la réserve, emplacement] ; glisse / choisi : rang dans la réserve.
+  var SCENES_APERCU = {
+    1: { niv: 0, poses: [[0, '0:d1']], pesees: 1, glisse: 1 },
+    2: { niv: 8, poses: [[0, '1:g1'], [4, '1:d1'], [5, '0:d1']], pesees: 1, choisi: 3, tapis: 'lion', bulle: 'msg.pencheG' },
+    3: { niv: 23, poses: [[2, '0:d1'], [0, '0:d3']], pesees: 2, tapis: 'dragon', bulle: 'msg.pencheG' }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    var sc = SCENES_APERCU[numero];
+    // Progression neuve en mémoire seulement : tutoriels déjà vus, son coupé, rien d'enregistré.
+    P = progresVide();
+    P.son = false;
+    P.debloque = NIVEAUX.length;
+    P.tapis = sc.tapis || '';
+    NIVEAUX.forEach(function (n) { if (n.nouv) P.vus[n.nouv] = true; });
+    lancerNiveau(sc.niv);
+    var M = etat.M;
+    var libres = M.objets.filter(function (o) { return !o.fixe; });
+    sc.poses.forEach(function (p, i) { libres[p[0]].lieu = p[1]; libres[p[0]].ordre = ++etat.ordre; });
+    // Une pesée vient d'être faite : les balances penchent (ou restent droites), aiguilles en couleur.
+    var lieux = lieuxActuels(M);
+    etat.pesees = sc.pesees;
+    etat.cale = false;
+    M.balances.forEach(function (B) {
+      var m = moment(M, B, lieux);
+      etat.cibles[B.id] = angleCible(B, m);
+      etat.angles[B.id] = etat.cibles[B.id];
+      etat.vit[B.id] = 0;
+      etat.droites[B.id] = (m === 0);
+    });
+    if (sc.choisi !== undefined) etat.choisi = libres[sc.choisi].id;
+    etat.verrou = true; // partie figée : plus rien ne se gagne ni ne se perd
+    majObjets();
+    majBandeau();
+    rendre();
+    if (sc.bulle) bulle(t(sc.bulle), 600000);
+    if (sc.glisse !== undefined) {
+      // Un sac glissé au doigt vers le plateau de droite
+      var o = libres[sc.glisse], b = etat.elems[o.id], L = etat.L;
+      var cible = geometrie().plateaux['0:d1'];
+      var x = L.ox + (cible.x - 30) * L.k, y = L.oy + (cible.y - 95) * L.k;
+      b.classList.add('glisse');
+      b.style.left = (x - L.S / 2) + 'px';
+      b.style.top = (y - L.S / 2) + 'px';
+      if (etat.cibles2['0:d1']) etat.cibles2['0:d1'].classList.add('survol');
+      var r = b.getBoundingClientRect(), m2 = $('#main');
+      m2.innerHTML = MAIN_SVG;
+      m2.style.left = (r.left + r.width * 0.45) + 'px';
+      m2.style.top = (r.top + r.height * 0.55) + 'px';
+      m2.classList.add('vu');
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // Démarrage
+  // ------------------------------------------------------------------------
+  var numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else majTitre();
 })();
 </script>
 </body>
