@@ -6509,9 +6509,6 @@ const $=s=>document.querySelector(s);
 // Textes traduits (fr, en, es, pt, de) : le nom « t » sert souvent de variable locale dans ce jeu
 const traduire=window.JEL_I18N.t;
 const SAVE_KEY='terres-cubiques:v2', PREF_KEY='terres-cubiques:prefs';
-// Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU = 1, 2 ou 3), posés seulement par le robot du site :
-// une scène composée, sans rien écrire nulle part (ni JEL_SAVE, ni JEL_STOCK, ni réglages). Voir « Affiche et images du jeu ».
-const AFFICHE=!!window.JEL_AFFICHE, APERCU=!AFFICHE&&[1,2,3].includes(Number(window.JEL_APERCU))?Number(window.JEL_APERCU):0, VITRINE=AFFICHE||APERCU>0;
 
 /* ================= Monde : constantes ================= */
 /* Monde quasi infini, découpé en morceaux (« chunks ») de 16 × 16 colonnes sur 64 blocs de haut,
@@ -6930,7 +6927,7 @@ const prefs={sens:1,sound:true,autoJump:true,view:1,monsters:true,music:true,gfx
 try{ Object.assign(prefs,JSON.parse(localStorage.getItem(PREF_KEY)||'{}')); }catch(e){}
 if(!(prefs.view>=0&&prefs.view<=2)) prefs.view=1; prefs.gfx=prefs.gfx?1:0;
 if(!(prefs.col>=0&&prefs.col<8)) prefs.col=(Math.random()*8)|0; if(typeof prefs.nick!=='string') prefs.nick='';
-function savePrefs(){ if(VITRINE) return; try{ localStorage.setItem(PREF_KEY,JSON.stringify(prefs)); }catch(e){} }
+function savePrefs(){ try{ localStorage.setItem(PREF_KEY,JSON.stringify(prefs)); }catch(e){} }
 const VIEW=[3,4,6], VIEW_N=[traduire('vue.0'),traduire('vue.1'),traduire('vue.2')];
 
 /* ================= Génération ================= */
@@ -10068,7 +10065,7 @@ function renderGoal(){ const g=$('#goal');
   if(mode==='creative'){ $('#goalStep').textContent=traduire('modeCreatif'); $('#goalTxt').textContent=traduire('creatifTxt'); g.classList.remove('done'); return; }
   if(step>=STEPS.length){ $('#goalStep').textContent=traduire('toutAccompli'); $('#goalTxt').textContent=traduire('bravoMonde'); g.classList.add('done'); return; }
   g.classList.remove('done'); $('#goalStep').textContent=traduire('etapeN',{n:step+1,total:STEPS.length}); $('#goalTxt').textContent=STEPS[step].t; }
-function checkSteps(){ if(mode!=='survival'||VITRINE) return; const before=step; while(step<STEPS.length&&STEPS[step].ok()) step++;
+function checkSteps(){ if(mode!=='survival') return; const before=step; while(step<STEPS.length&&STEPS[step].ok()) step++;
   if(step!==before){
   if (window.FMG) window.FMG.reportEnd({ completed: true, level: step });
   // Jeu terminé : toutes les étapes de la Survie accomplies (pas d'étoiles).
@@ -10246,7 +10243,7 @@ function drawMap(){
 /* ================= Santé et faim ================= */
 let invul=0, fallTop=null, hungerT=0, regenT=0, starveT=0, cactusT=0;
 const CAUSES=Object.fromEntries(['zombie','skeleton','arrow','spider','fall','hunger','cactus'].map(k=>[k,traduire('cause.'+k)]));
-function hurtPlayer(amt,sx,sz,cause){ if(mode!=='survival'||state==='dead'||invul>0||VITRINE) return;
+function hurtPlayer(amt,sx,sz,cause){ if(mode!=='survival'||state==='dead'||invul>0) return;
   if(cause!=='fall'&&cause!=='hunger'){ const pts=armorPts(); if(pts){ amt*=1-pts*.04; damageArmor(); } }
   P.hp-=amt; invul=.5; const v=$('#vign'); v.classList.add('on'); setTimeout(()=>v.classList.remove('on'),60); sfx('hurt');
   if(sx!==null&&sx!==undefined){ const dx=P.x-sx, dz=P.z-sz, l=Math.hypot(dx,dz)||1; P.vx=dx/l*6; P.vz=dz/l*6; if(!P.inWater) P.vy=4.5; }
@@ -10280,7 +10277,7 @@ function serialize(){
   return {v:3,seed,lg:legacy?1:0,tp:Math.round(playSec),mode,ed:edits.pack(),facing:[...FACING],inv,dur,hot,sel,got,placed:placedF,step,fuel:+fuelPts.toFixed(2),
     p:[+P.x.toFixed(2),+P.y.toFixed(2),+P.z.toFixed(2),+P.yaw.toFixed(3),+P.pitch.toFixed(3)],fly:P.fly,hp:P.hp,food:P.food,time:+time.toFixed(4),spawn:spawnPos,
     va,vx,vn,vp,vv,ps:[...POUSSES].map(([k,a])=>[k,a[0],a[1]]),ap:[...ARBRES.values()],jj:jourJeu,vc:[...COLONIES.values()],ca:[...CARAVANES.values()].map(caravaneRow),test:partieTest?1:0,ents:an,chests:[...chestData],armor,armorDur,bed:bedSpawn,seen:[...seen],hd:[...HERDS],wx:[+WX.rain.toFixed(2),WX.target,Math.round(WX.t)]}; }
-function saveNow(){ if(!worldInfo||!playingWorld||VITRINE) return; saveSlot(); jelSauver(); }
+function saveNow(){ if(!worldInfo||!playingWorld) return; saveSlot(); jelSauver(); }
 const saveOk=o=>!!o&&typeof o==='object'&&(o.v===2||o.v===3)&&Number.isInteger(o.seed)&&o.seed>0;
 // format 2 → format 3 : le monde de 256 × 256 devient l'ancienne zone (décalée de LO)
 function migrateV2(s){ const lk=i=>BK(i%LW+LO,(i/(LW*LW))|0,((i/LW)|0)%LW+LO), okI=i=>Number.isInteger(i)&&i>=0&&i<LW*LW*H;
@@ -10304,7 +10301,7 @@ const JEU='terres-cubiques', JEL_MONDE_MAX=98000;
 let jelDernier='';
 function jelMonde(){ const m=JEL_SAVE.load(JEU).monde; return saveOk(m)?m:null; }
 function jelSauver(){
-  if(!worldInfo||!playingWorld||enMenu(state)||isGuest()||VITRINE) return;
+  if(!worldInfo||!playingWorld||enMenu(state)||isGuest()) return;
   // le monde est gardé dans son emplacement (stockage.js) ; ici, une copie réduite seulement sans aucun stockage
   const sansStock=JEL_STOCK.mode()==='memoire';
   let monde=sansStock?serialize():null, texte=monde?JSON.stringify(monde):'slot'+curSlot;
@@ -10409,7 +10406,7 @@ async function decompresser(t){ if(typeof t!=='string') throw new Error('format'
 async function chargerIndex(){ try{ const t=await JEL_STOCK.get('index'), o=t?JSON.parse(t):null;
     if(o&&Array.isArray(o.s)){ const s=new Array(NB_PARTIES).fill(null); for(let i=0;i<NB_PARTIES;i++) if(o.s[i]&&typeof o.s[i]==='object') s[i]=o.s[i];
       parties={v:1,s,dernier:Number.isInteger(o.dernier)&&o.dernier>=0&&o.dernier<NB_PARTIES&&s[o.dernier]?o.dernier:-1,migre:!!o.migre,persiste:!!o.persiste}; } }catch(e){} }
-async function ecrireIndex(){ if(VITRINE) return; try{ await JEL_STOCK.set('index',JSON.stringify(parties)); }catch(e){ placeManque(e); } }
+async function ecrireIndex(){ try{ await JEL_STOCK.set('index',JSON.stringify(parties)); }catch(e){ placeManque(e); } }
 function nomPartie(n){ const m=parties.s[n]; return (m&&typeof m.nom==='string'&&m.nom)||traduire('slot.nom',{n:n+1}); }
 // ancienne sauvegarde (une seule partie, avant les emplacements) : rangée dans le premier emplacement libre
 async function migrerAncienne(){ if(parties.migre) return; let s=null;
@@ -10421,7 +10418,7 @@ async function migrerAncienne(){ if(parties.migre) return; let s=null;
   parties.migre=true; await ecrireIndex(); }
 function nbVillageois(){ let n=0; for(const v of VILLAGES.values()){ if(v.active) n+=ents.filter(e=>e.type==='villager'&&!e.puppet&&e.vil===v.id&&!(e.dead>0)).length; else n+=v.vils.length+((v.saved&&v.saved.vn.length)||0); } return n; }
 let saving=null, saveAgain=false;
-function saveSlot(){ if(curSlot<0||!playingWorld||isGuest()||VITRINE) return null; if(saving){ saveAgain=true; return saving; }
+function saveSlot(){ if(curSlot<0||!playingWorld||isGuest()) return null; if(saving){ saveAgain=true; return saving; }
   const n=curSlot, s=serialize();
   saving=(async()=>{ try{ await JEL_STOCK.set(cleP(n),await compresser(JSON.stringify(s)));
       const m=parties.s[n]||{nom:traduire('slot.nom',{n:n+1})}; Object.assign(m,{date:Date.now(),temps:Math.round(playSec),vil:nbVillageois(),mode,test:s.test?1:0}); parties.s[n]=m; parties.dernier=n;
@@ -11135,125 +11132,6 @@ function frame(now){
   updateBubbles(); majChantiers(); dbgMaj(dt);
 }
 
-/* ================= Affiche et images du jeu (robot du site) ================= */
-/* Seulement avec window.JEL_AFFICHE (jaquette) ou window.JEL_APERCU = 1, 2 ou 3 (images de la page du jeu),
-   posés par le robot du site, jamais par le jeu (CONSIGNES-JEU.md, section 5). Un monde de graine fixe est
-   chargé en mémoire et la scène est posée par le code, puis rendue par le vrai moteur. Rien n'est écrit
-   (VITRINE coupe sauvegardes, emplacements, réglages et étapes), aucun son, aucun salon, aucune fenêtre.
-   Les blocs posés pour la scène (minerai, fleurs, torches) ne vivent qu'en mémoire.
-     affiche : le héros en grand, pioche de diamant levée sur un minerai qui éclate, le village derrière
-               (villageoise qui l'acclame, cheval sellé, villageois sur la place), soleil du matin ;
-     1 : étape 1, à l'orée de la forêt, le joueur frappe un bouleau (fissures, copeaux), vaches, moutons et poules ;
-     2 : au village, vu d'un toit : une maison en chantier (70 %) et son bâtisseur, le fermier dans le blé qui parle, un cheval ;
-     3 : étape 10, dans une grotte sous l'altitude 15 : torches, minerais, un diamant fendu sous la pioche de fer, armure. */
-const VIT={graine:4242, fov:60};
-let vitCam=null, vitHalo=null;
-// monde de la scène : morceaux bâtis et village réveillé autour de (x, z)
-function vitCharger(x,z,rd){ P.x=x; P.z=z; updateChunks(x,z,1e9,rd); worldT=0; manageWorld(.1,1e9); }
-// repère de la caméra : at(avant, droite) donne [x, z] au sol
-function vitRepere(c,l){ const n=Math.hypot(l[0]-c[0],l[2]-c[2]), f=[(l[0]-c[0])/n,(l[2]-c[2])/n]; return (a,b)=>[c[0]+f[0]*a-f[1]*b, c[2]+f[1]*a+f[0]*b]; }
-const vitFace=(p,x,z)=>Math.atan2(-(x-p[0]),-(z-p[1])); // orientation d'un modèle placé en p et tourné vers (x, z)
-function vitEnt(type,x,y,z,o){ const e=makeEnt(type,x,y,z); Object.assign(e,o||{}); ents.push(e); return e; }
-// éclats d'un bloc frappé : petits cubes figés en l'air
-function vitEclats(x,y,z,taille,liste){ const g=new THREE.BoxGeometry(taille,taille,taille);
-  for(const [a,b,c,col] of liste){ const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({color:col,fog:false})); m.position.set(x+a,y+b,z+c); m.rotation.set(a*3,b*2,c); scene.add(m); } }
-// héros de l'affiche : le joueur vu de face, même style que les joueurs du jeu, plus détaillé (yeux, sourire, ceinture)
-function vitHeros(){ const mat=newMat(), root=new THREE.Group(), legs=[], arms=[], CH=0xd8443c, CH2=0xa8302a, SK=0xe2ac82, PA=0x34405a, SH=0x3a2a1e, HA=0x6a4426;
-  S2.forEach(s=>{ const l=grp(root,s*.12,.75,0); box(l,mat,.24,.75,.24,PA,0,-.375,0); box(l,mat,.26,.12,.28,SH,0,-.7,-.01); legs.push(l); });
-  box(root,mat,.5,.72,.28,CH,0,1.11,0); box(root,mat,.52,.08,.3,0x5a3a20,0,.8,0); box(root,mat,.08,.08,.02,0xf2d27a,0,.8,-.16); box(root,mat,.14,.5,.02,CH2,0,1.15,-.145);
-  S2.forEach(s=>{ const a=grp(root,s*.37,1.44,0); box(a,mat,.22,.32,.24,CH,0,-.14,0); box(a,mat,.2,.42,.2,SK,0,-.5,0); arms.push(a); });
-  const head=grp(root,0,1.47,0); box(head,mat,.46,.46,.46,SK,0,.23,0); box(head,mat,.5,.14,.5,HA,0,.44,0); box(head,mat,.5,.32,.1,HA,0,.32,.21); box(head,mat,.12,.1,.06,HA,.16,.38,-.24);
-  S2.forEach(s=>{ box(head,mat,.1,.1,.02,0xffffff,s*.1,.26,-.235); box(head,mat,.05,.07,.02,0x1c1c20,s*.1+.02,.255,-.245); box(head,mat,.07,.05,.02,0xf09080,s*.17,.15,-.235); });
-  box(head,mat,.18,.05,.02,0x6a2a22,0,.11,-.235); box(head,mat,.12,.03,.02,0xffffff,0,.125,-.243);
-  // pioche de diamant tenue haut : manche dans le prolongement du bras, fer en travers
-  const item=grp(arms[1],0,-.72,-.06); item.rotation.y=Math.PI/2;
-  box(item,mat,.08,.95,.08,0x8a5a2c,0,-.36,0); box(item,mat,.1,.14,.5,0x7aeee4,0,-.82,-.18); box(item,mat,.1,.12,.36,0x7aeee4,0,-.82,.16); box(item,mat,.1,.1,.12,0xc8fff8,0,-.84,-.45); box(item,mat,.1,.1,.1,0x3fbfb4,0,-.8,.36); box(item,mat,.14,.16,.14,0x5a3a1c,0,-.82,0);
-  entRoot.add(root); return {root,mat,legs,arms,head}; }
-// halo du soleil (calque 2D au-dessus du monde) : la lumière du matin derrière le héros
-function vitDessinerHalo(){ const c=vitHalo; if(!c) return; const w=innerWidth, h=innerHeight; if(c.width!==w||c.height!==h){ c.width=w; c.height=h; }
-  const g=c.getContext('2d'); g.clearRect(0,0,w,h); const p=new THREE.Vector3(); sun.getWorldPosition(p); p.project(camera); if(p.z>1) return;
-  const x=(p.x+1)/2*w, y=(1-p.y)/2*h, r=Math.max(w,h), gr=g.createRadialGradient(x,y,0,x,y,r*.55);
-  gr.addColorStop(0,'rgba(255,248,214,.95)'); gr.addColorStop(.08,'rgba(255,240,190,.7)'); gr.addColorStop(.3,'rgba(255,226,150,.22)'); gr.addColorStop(1,'rgba(255,226,150,0)');
-  g.fillStyle=gr; g.fillRect(0,0,w,h); }
-function afficheVitrine(){
-  const v=[...VILLAGES.values()][0], y0=v.h0+1; time=.055;
-  const c=[v.cx-18.1,y0+1,v.cz-1.5], l=[c[0]+6.6,y0+1.55,c[2]+2.2], at=vitRepere(c,l); vitCam={p:c,l};
-  const [hx,hz]=at(3.9,.25), hero=vitHeros(); hero.root.position.set(hx,y0,hz); hero.root.rotation.y=vitFace([hx,hz],c[0],c[2])-.45;
-  hero.arms[1].rotation.set(-2.6,0,-.1); hero.arms[0].rotation.set(-.6,0,.35); hero.head.rotation.set(-.05,.45,0);
-  // minerai de diamant fendu, ses éclats en l'air
-  const [ox,oz]=at(5.6,-.95).map(Math.floor); setBlock(ox,y0,oz,DIAMOND_ORE,true);
-  crack.position.set(ox+.5,y0+.5,oz+.5); crack.material.map=crackTex[2]; crack.material.needsUpdate=true; crack.visible=true;
-  vitEclats(ox+.5,y0-.2,oz+.5,.11,[[.3,1.25,.2,0x7aeee4],[.1,1.55,.5,0xc8fff8],[.7,1.6,-.1,0x7aeee4],[.4,1.85,.3,0xb0b4ba],[-.2,1.2,0,0x3fbfb4],[.8,1.3,.6,0xffffff],[.3,2.05,-.2,0x7aeee4],[1,1.1,.3,0xb0b4ba]]);
-  // fleurs au premier plan, coupées par le bas de l'image
-  for(const [a,b,id] of [[1.7,-1.05,POPPY],[1.9,1.1,DANDELION]]){ const [x,z]=at(a,b).map(Math.floor); setBlock(x,y0,z,id,true); }
-  rebuildAround(c[0]-3,c[2]-4,c[0]+8,c[2]+6);
-  // cheval sellé derrière le héros, villageoise qui l'acclame
-  const [hox,hoz]=at(7.4,1.5); vitEnt('horse',hox,y0,hoz,{tame:true,var:0,yaw:vitFace([hox,hoz],c[0],c[2])+1});
-  const [wx,wz]=at(8.5,-1.6); vitEnt('villager',wx,y0,wz,{var:3,job:3,anim:3,yaw:vitFace([wx,wz],c[0],c[2])});
-  vitHalo=document.createElement('canvas'); vitHalo.setAttribute('aria-hidden','true'); vitHalo.style.cssText='position:fixed;inset:0;width:100%;height:100%;pointer-events:none';
-  renderer.domElement.after(vitHalo);
-}
-// images du jeu : le joueur placé, sa vraie interface (étape, barre, vie, faim, armure, heure), sur téléphone
-function vitJoueur(x,y,z,yaw,pitch){ P.x=x; P.y=y; P.z=z; P.yaw=yaw; P.pitch=pitch; P.vx=P.vy=P.vz=0; P.ground=true; }
-function vitInterface(o){ step=o.step; inv=o.inv||{}; hot=o.hot.concat(new Array(9).fill(0)).slice(0,9); sel=o.sel; armor=o.armor||[0,0,0,0]; P.hp=o.hp||20; P.food=o.food||20;
-  document.body.classList.add('touch'); setState('play'); lastHp=-1; renderHotbar(); renderGoal(); renderStatus(); lastPhase=phaseOf(time); updateClock(); syncDownBtn();
-  equipT=1; swingT=o.coup===undefined?1:o.coup; }
-// bloc visé, avec ses fissures et l'anneau de minage à moitié plein
-function vitVise(x,y,z,etape,anneau){ highlight.position.set(x+.5,y+.5,z+.5); highlight.visible=true;
-  if(etape>=0){ crack.position.set(x+.5,y+.5,z+.5); crack.material.map=crackTex[etape]; crack.material.needsUpdate=true; crack.visible=true; }
-  if(anneau){ $('#ring').setAttribute('stroke-dashoffset',(106.8*(1-anneau)).toFixed(1)); $('#ringBg').setAttribute('opacity',1); $('#bMine').classList.add('on'); } }
-const vitSol=(x,z)=>surfaceY(Math.floor(x),Math.floor(z))+1;
-// joueur à la distance d du point visé (x, y, z), du côté de l'angle donné ; renvoie le repère de sa vue
-function vitRegard(x,y,z,ang,d,dyaw,dpitch){ const px=x+.5+Math.cos(ang)*d, pz=z+.5+Math.sin(ang)*d, py=vitSol(px,pz);
-  vitJoueur(px,py,pz,Math.atan2(-(x+.5-px),-(z+.5-pz))+(dyaw||0),Math.atan2(y+.5-(py+EYE),d)+(dpitch||0)); return vitRepere([px,0,pz],[x+.5,0,z+.5]); }
-function apercuVitrine(n){
-  const v=[...VILLAGES.values()][0];
-  if(n===1){ // étape 1 : un bouleau à l'orée de la forêt, le joueur le frappe ; vaches, moutons et poules autour
-    time=.18; const t=[v.cx+10,v.cz-23]; vitCharger(t[0],t[1],6); let y=H-1; while(y>0&&!(SOLID[getB(t[0],y,t[1])]&&!LEAF[getB(t[0],y,t[1])]&&!isLog(getB(t[0],y,t[1])))) y--; y+=2; // 2e bûche du tronc
-    const at=vitRegard(t[0],y,t[1],.14,4.4,-.03,-.12);
-    vitInterface({step:0,hot:[],sel:0,coup:.3}); vitVise(t[0],y,t[1],1,.45);
-    for(const [ty,a,b,yaw] of [['cow',6.5,-2.6,2.2],['sheep',9,-4.2,-.6],['sheep',11,-1.6,.9],['chicken',5,-1.8,1.4],['chicken',5.4,-2.5,2.4],['cow',13,2.5,-1]]){ const [x,z]=at(a,b); vitEnt(ty,x,vitSol(x,z),z,{yaw}); }
-    vitEclats(t[0]+.5,y,t[1]+.5,.09,[[.62,.3,.1,0xe8e4d8],[.75,.75,-.2,0xd8d2c4],[.9,.45,.25,0x3a3630],[.7,.95,.3,0xe8e4d8],[.95,.2,-.25,0xcfc8b8]]);
-  }
-  else if(n===2){ // au village : une maison en chantier (70 %), le bâtisseur sur le toit, le fermier dans le blé qui parle, un cheval
-    time=.33; vitCharger(v.cx,v.cz,6); const s=vilFindSite(v), S={t:'maison',x:s.hx,z:s.hz,f:s.fx,p:0,credit:{}}; planChantier(v,S);
-    const k=Math.round(S.plan.length*.7); for(let i=0;i<k;i++) poserBat(v,S,S.plan[i]); S.p=k; vilEco(v).s=S; // en mémoire seulement
-    vitInterface({step:6,inv:{[toolId(0,1)]:1,[toolId(3,1)]:1,[OAK_PLANKS]:24,[COBBLE]:31,[TORCH]:8,[BREAD]:3,[OAK_LOG]:5},hot:[toolId(0,1),toolId(3,1),OAK_PLANKS,COBBLE,TORCH,BREAD,OAK_LOG],sel:2,hp:18,food:15});
-    const px=v.cx-4, pz=v.cz-6, at=vitRegard(S.x,v.h0+2,S.z,Math.atan2(pz-S.z,px-S.x),Math.hypot(px-S.x,pz-S.z),0,0); // sur un toit, au-dessus du champ
-    const vil=(a,b,o)=>{ const [x,z]=at(a,b); return vitEnt(o.t||'villager',x,vitSol(x,z),z,Object.assign({yaw:vitFace([x,z],P.x,P.z)+(o.dy||0)},o)); };
-    vil(4.5,-.6,{var:0,job:0,anim:2,dy:.6}).say={k:1,t:99}; // « Le blé pousse bien cette année. »
-    vil(6.5,1.6,{var:6,job:6,dy:-.8}); vil(8,-3.2,{t:'horse',tame:true,var:2,dy:1.8});
-    const [bx,bz]=at(9.2,.9); vitEnt('villager',bx,vitSol(bx,bz),bz,{var:2,job:2,anim:2,yaw:vitFace([bx,bz],S.x+.5,S.z+.5)});
-  }
-  else { // étape 10 : une grotte sous l'altitude 15, éclairée de torches ; diamant fendu sous la pioche de fer, un zombie approche
-    const X=v.cx-80, Z=v.cz+33; vitCharger(X,Z,5);
-    for(const [a,b,c] of [[-1,11,-2],[-3,12,0],[2,11,-4],[-6,11,-3],[0,12,-6],[-2,13,1],[4,11,-2]]) setBlock(X+a,b,Z+c,TORCH,true);
-    rebuildAround(X-12,Z-12,X+12,Z+12);
-    vitInterface({step:9,hot:[toolId(0,2),toolId(3,2),TORCH,COBBLE,BREAD],inv:{[toolId(0,2)]:1,[toolId(3,2)]:1,[TORCH]:14,[COBBLE]:40,[BREAD]:5},sel:0,coup:.3,armor:[armorId(0,1),armorId(1,1),0,0],hp:16,food:13});
-    const px=X-3.2, pz=Z-2.2, py=11, d=Math.hypot(X+.5-px,Z+.5-pz); vitJoueur(px,py,pz,Math.atan2(-(X+.5-px),-(Z+.5-pz)),Math.atan2(12.5-(py+EYE),d));
-    vitVise(X,12,Z,2,.6); vitEclats(X,12,Z,.08,[[-.15,.7,.4,0x7aeee4],[-.3,.4,.7,0xc8fff8],[-.2,.9,.2,0x8a8e94],[-.4,.55,.5,0x7aeee4]]);
-    const zb=vitEnt('zombie',X+2.5,11,Z-.5); zb.yaw=vitFace([zb.x,zb.z],P.x,P.z);
-  }
-  lightCache=lightsNear(Math.floor(P.x)-70,Math.floor(P.z)-70,Math.floor(P.x)+70,Math.floor(P.z)+70);
-}
-function demarrerVitrine(){
-  Math.random=mulberry32(20261119); // hasard fixe : la même image à chaque capture
-  prefs.sound=false; prefs.music=false; prefs.gfx=1; prefs.view=2; prefs.monsters=true; // en mémoire seulement
-  const cacher=()=>{ for(const e of document.querySelectorAll(AFFICHE?'.screen,#hud,#bulles,#chant,#dbg,#dbgL,.jel-langue,jel-langue':'.screen,#dbg,#dbgL')) e.style.setProperty('display','none','important'); };
-  loadWorld(VIT.graine,'survival',false); spawnPos=findSpawn(); playingWorld=true; curSlot=-1; state='vitrine'; // villages réveillés, aucune sauvegarde
-  if(AFFICHE){ const v=[...VILLAGES.values()][0]; vitCharger(v.cx-12,v.cz,6); afficheVitrine(); }
-  else apercuVitrine(APERCU);
-  cacher(); setTimeout(cacher,300); setTimeout(cacher,1200);
-  requestAnimationFrame(boucleVitrine);
-}
-function boucleVitrine(){ requestAnimationFrame(boucleVitrine);
-  if(AFFICHE){ if(camera.fov!==VIT.fov){ camera.fov=VIT.fov; camera.updateProjectionMatrix(); } camera.position.set(vitCam.p[0],vitCam.p[1],vitCam.p[2]); camera.lookAt(vitCam.l[0],vitCam.l[1],vitCam.l[2]); }
-  else { camera.position.set(P.x,P.y+EYE,P.z); camera.rotation.set(P.pitch,P.yaw,0); }
-  for(const e of ents){ ensureMesh(e); entAnim(e,0); } // la scène est figée : chacun garde sa pose
-  updateSky(); renderer.render(scene,camera); vitDessinerHalo();
-  if(APERCU&&handRoot){ updateHand(0); renderer.autoClear=false; renderer.clearDepth(); renderer.render(hudScene,hudCam); renderer.autoClear=true; updateBubbles(); majChantiers(); }
-}
-
 /* ================= Démarrage ================= */
 let wakeLock=null;
 // Écran toujours allumé, seulement si la page l'autorise (refusé dans le cadre isolé du site : on ne demande pas)
@@ -11286,7 +11164,6 @@ async function start(data){
   $('#stTable img').src=ICON[TABLE]; $('#stFurn img').src=ICON[FURNACE];
   try{ initRenderer(); }catch(e){ fail(traduire('erreurWebgl')); return; }
   bindCanvas();
-  if(VITRINE){ demarrerVitrine(); return; } // affiche ou images du jeu : ni écran titre, ni sauvegarde, ni salon
   await chargerIndex(); await migrerAncienne();
   const hotSave=data&&data.save; let pret=false;
   if(hotSave&&saveOk(hotSave)){ applySave(hotSave); curSlot=Number.isInteger(data.slot)?data.slot:-1; pret=true; }
