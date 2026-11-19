@@ -96,6 +96,10 @@
   "resultat.raison3": "Le temps est écoulé.",
   "resultat.raison4": "L'allié à défendre est tombé.",
   "resultat.raison5": "Un rival a gagné la course.",
+  "resultat.raison7": "Toute la carte est à toi : victoire avant la fin du chrono !",
+  "test.marque": "Mode test : tout est ouvert, rien n'est enregistré",
+  "aria.dezoomer": "Dézoomer : voir le monde du dessus",
+  "aria.zoomer": "Zoomer : voir le monde du dessous",
   "resultat.acteFini": "Premier acte terminé : la planète est à toi.",
   "resultat.conquete": "Ton empire s'agrandit : {p}.",
   "univers.titre": "Part de l'univers connu",
@@ -1064,6 +1068,10 @@
   "resultat.raison3": "Time has run out.",
   "resultat.raison4": "The ally you had to defend has fallen.",
   "resultat.raison5": "A rival has won the race.",
+  "resultat.raison7": "The whole map is yours: victory before the timer runs out!",
+  "test.marque": "Test mode: everything is open, nothing is saved",
+  "aria.dezoomer": "Zoom out: see the world above",
+  "aria.zoomer": "Zoom in: see the world below",
   "resultat.acteFini": "First act complete: the planet is yours.",
   "resultat.conquete": "Your empire grows: {p}.",
   "univers.titre": "Share of the known universe",
@@ -2032,6 +2040,10 @@
   "resultat.raison3": "Se acabó el tiempo.",
   "resultat.raison4": "El aliado que debías defender cayó.",
   "resultat.raison5": "Un rival ganó la carrera.",
+  "resultat.raison7": "¡Todo el mapa es tuyo: victoria antes de que acabe el tiempo!",
+  "test.marque": "Modo de prueba: todo está abierto, no se guarda nada",
+  "aria.dezoomer": "Alejar: ver el mundo de arriba",
+  "aria.zoomer": "Acercar: ver el mundo de abajo",
   "resultat.acteFini": "Primer acto terminado: el planeta es tuyo.",
   "resultat.conquete": "Tu imperio crece: {p}.",
   "univers.titre": "Parte del universo conocido",
@@ -3000,6 +3012,10 @@
   "resultat.raison3": "O tempo acabou.",
   "resultat.raison4": "O aliado a defender caiu.",
   "resultat.raison5": "Um rival venceu a corrida.",
+  "resultat.raison7": "O mapa inteiro é seu: vitória antes do fim do tempo!",
+  "test.marque": "Modo de teste: tudo está aberto, nada é salvo",
+  "aria.dezoomer": "Afastar: ver o mundo de cima",
+  "aria.zoomer": "Aproximar: ver o mundo de baixo",
   "resultat.acteFini": "Primeiro ato concluído: o planeta é seu.",
   "resultat.conquete": "Seu império cresce: {p}.",
   "univers.titre": "Parte do universo conhecido",
@@ -3968,6 +3984,10 @@
   "resultat.raison3": "Die Zeit ist um.",
   "resultat.raison4": "Der Verbündete, den du schützen solltest, ist gefallen.",
   "resultat.raison5": "Ein Rivale hat das Rennen gewonnen.",
+  "resultat.raison7": "Die ganze Karte gehört dir: Sieg, bevor die Zeit abläuft!",
+  "test.marque": "Testmodus: alles ist offen, nichts wird gespeichert",
+  "aria.dezoomer": "Herauszoomen: die Welt darüber sehen",
+  "aria.zoomer": "Hineinzoomen: die Welt darunter sehen",
   "resultat.acteFini": "Erster Akt geschafft: Der Planet gehört dir.",
   "resultat.conquete": "Dein Imperium wächst: {p}.",
   "univers.titre": "Anteil am bekannten Universum",
@@ -6172,6 +6192,27 @@ p { margin: 0; }
   .fin-boutons { flex-direction: row; }
   .fin-boutons .bt { flex: 1; }
 }
+
+/* Mode test (?debug=1) */
+.marque-test { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); z-index: 60; margin: 0; padding: 1px 10px calc(1px + env(safe-area-inset-bottom, 0px)); border-radius: 8px 8px 0 0; background: var(--or); color: var(--nuit); font-size: 11px; font-weight: 600; line-height: 1.3; white-space: nowrap; pointer-events: none; opacity: 0.85; }
+.marque-test[hidden] { display: none; }
+
+/* Zoom entre les mondes : boutons − (monde du dessus) et + (monde du dessous) ; calque de la carte quittée */
+.zoom-calque { pointer-events: none; }
+.zoom-boutons { position: absolute; right: calc(10px + var(--sar)); top: calc(66px + var(--sat)); display: flex; flex-direction: column; gap: 8px; z-index: 2; }
+.zoom-boutons .bt.zoom { width: 44px; height: 44px; }
+.zoom-boutons .bt.zoom:disabled { opacity: .35; cursor: default; }
+.zoom-boutons .bt.zoom.vers-verrou { opacity: .7; }
+.ico-zoom { position: relative; display: block; width: 18px; height: 18px; margin: auto; }
+.ico-zoom::before, .ico-zoom.plus::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 3px; margin-top: -1.5px; border-radius: 2px; background: currentColor; }
+.ico-zoom.plus::after { transform: rotate(90deg); }
+.sans-planete .zoom-boutons { display: none; }
+.zoom-boutons.autour { right: auto; flex-direction: row; gap: 0; width: 184px; margin: -22px 0 0 -92px; justify-content: space-between; pointer-events: none; }
+.zoom-boutons.autour .bt { pointer-events: auto; }
+.zoom-boutons.cote { right: auto; flex-direction: column-reverse; }
+@media (min-aspect-ratio: 11/10) {
+  .zoom-boutons { right: auto; top: auto; left: calc(10px + var(--sal)); bottom: calc(10px + var(--sab)); flex-direction: row; }
+}
 </style>
 </head>
 <body>
@@ -6225,6 +6266,10 @@ p { margin: 0; }
     <h2 class="sr-only" data-i18n="campagne.titre"></h2>
     <p class="campagne-acte"><strong id="campagne-acte-nom"></strong> <span id="campagne-acte-num"></span> <span id="campagne-total" class="campagne-total" hidden></span></p>
   </header>
+  <div id="zoom-boutons" class="zoom-boutons">
+    <button type="button" id="bt-dezoomer" class="bt rond zoom" data-i18n-title="aria.dezoomer" data-i18n-aria="aria.dezoomer"><span class="ico-zoom" aria-hidden="true"></span></button>
+    <button type="button" id="bt-zoomer" class="bt rond zoom" data-i18n-title="aria.zoomer" data-i18n-aria="aria.zoomer"><span class="ico-zoom plus" aria-hidden="true"></span></button>
+  </div>
   <div id="carte-part" class="carte-part"></div>
   <div id="campagne-stats" class="campagne-stats">
     <p id="stat-regions-bloc" class="stat" role="img"><b id="stat-regions"></b><span id="stat-regions-mot"></span></p>
@@ -6437,6 +6482,9 @@ p { margin: 0; }
   </dl>
   <button type="button" id="bt-mesures-fermer" class="bt" data-i18n="bt.fermer" data-i18n-aria="aria.fermer"></button>
 </div>
+
+<!-- Mode test (?debug=1) : tout ouvert, rien d'enregistré -->
+<p id="marque-test" class="marque-test" data-i18n="test.marque" aria-live="polite" hidden></p>
 <script id="pe-outils">
 /* ==========================================================================
    Poussière d'Empire — pe-outils : outils entiers du moteur temps réel
@@ -9792,6 +9840,21 @@ window.PE_DONNEES = {
     return { gagnant: gagnant, scores: sc, raison: raison, etoiles: etoiles };
   }
 
+  // Mission à durée (5 tenir, 6 survivre puis conquérir, 8 couper, 10 l'allié tient) : quand toutes les régions de
+  // la carte sont au joueur ou à ses alliés, la mission est gagnée sans attendre la fin du chrono (raison 7 ; demande
+  // du propriétaire, 19 novembre 2026 : « toute la carte est prise »). Il ne doit rester non plus aucune flotte ni
+  // aucun siège ennemi : un rival qui vide sa dernière région pour lancer son offensive laisse la carte entière au
+  // joueur avec une armada encore en route (mission 69). Objectif déjà manqué (o.ok à 0) : rien.
+  function carteEntiere(etat) {
+    const t = etat.o.t;
+    if ((t !== 5 && t !== 6 && t !== 8 && t !== 10) || !etat.o.ok) return false;
+    const p = etat.p, eq = etat.eq, e0 = eq[0];
+    for (let i = 0; i < etat.nn; i++) { const c = p[i]; if (c < 0 || (c !== 0 && eq[c] !== e0)) return false; }
+    for (let x = 0; x < etat.fl.length; x++) if (eq[etat.fl[x].c] !== e0) return false;
+    for (let x = 0; x < etat.sg.length; x++) if (eq[etat.sg[x].c] !== e0) return false;
+    return true;
+  }
+
   function fin(etat) {
     const c = etat.c;
     if (etat.bac) {
@@ -9819,6 +9882,7 @@ window.PE_DONNEES = {
       return null;
     }
     if (atteint(etat) && etat.o.ok) return resultat(etat, 0, 1);
+    if (carteEntiere(etat)) return resultat(etat, 0, 7);
     // Joueur éliminé (compté au tick, sans attendre le contrôle des 10 ticks).
     compterCamps(etat);
     if (!VIF[0]) return resultat(etat, meilleurRival(etat), 2);
@@ -14741,6 +14805,10 @@ window.PE_DONNEES = {
   const BAC_TAILLES = [40, 80, 120], BAC_RIVAUX = [1, 2, 3, 4], BAC_NIVEAUX = [1, 2, 3];
   const BAC_BONUS = 20;                           // bonus de victoire, par rival et par niveau
   const DEZOOM_ULTIME_MS = 12000;                 // dézoom de la mission 100 à travers les cinq cartes
+  // Mode test : « ?debug=1 » tapé dans l'adresse du lanceur (window.JEL_DEBUG). Les cinq mondes, les 100 missions et
+  // le bac à sable sont ouverts ; rien n'est écrit (ni sauvegarde, ni profil, ni fin de partie). Demande du propriétaire,
+  // 19 novembre 2026, pour essayer les actes 4 et 5 sans rejouer la campagne.
+  const MODE_TEST = typeof window !== 'undefined' && Number(window.JEL_DEBUG) === 1;
 
   window.JEL_NIVEAUX = NB_MISSIONS;
 
@@ -15051,7 +15119,7 @@ window.PE_DONNEES = {
   }
 
   function sauver(avecMission) {
-    if (!window.JEL_SAVE) return false;
+    if (!window.JEL_SAVE || MODE_TEST) return false;
     let mission = null;
     if (avecMission && partie && enMission && M && !M.fini) {
       try {
@@ -15143,6 +15211,7 @@ window.PE_DONNEES = {
   function jouer() {
     creerSon(); if (son) son.init();
     jouerSon('clic');
+    if (MODE_TEST) { charger(); ouvrirCampagne(); return; }   // ni « Continuer » ni « Effacer la sauvegarde » en mode test
     if (!window.JEL_SAVE) { allerMission(1); return; }
     window.JEL_SAVE.reprise({
       jeu: JEU,
@@ -15248,7 +15317,7 @@ window.PE_DONNEES = {
   const effetCapacite = (c) => (a(cleEffet(c)) ? t(cleEffet(c)) : '');
   const nomCapacite = (c) => (a('capacite.' + c.id + '.nom') ? t('capacite.' + c.id + '.nom') : c.id);
   const courantDe = (liste) => { for (const m of liste) if (!(C.et[m - 1] > 0)) return m; return 0; };
-  const missionJouable = (mi) => !!CARTE && (C.et[mi - 1] > 0 || mi === CARTE.courant);
+  const missionJouable = (mi) => !!CARTE && (MODE_TEST || C.et[mi - 1] > 0 || mi === CARTE.courant);
   const etoilesActe = (liste) => liste.reduce((s, m) => s + (C.et[m - 1] | 0), 0);
 
   function labelMission(mi) {
@@ -15365,7 +15434,7 @@ window.PE_DONNEES = {
     const n = autres.length;
     for (let i = 0; i < n; i++) {
       const av = autres[i], u = n > 1 ? 0.27 + 0.7 * (i / (n - 1)) : 0.5, p = surOrbite(q, u), rm = (paysage ? 17 : 21) * ech * (1 + i * 0.24);
-      const ouvert = av <= enCours;
+      const ouvert = MODE_TEST || av <= enCours;
       mondes.push({ acte: av, x: Math.round(Math.max(rm + 4, Math.min(W - rm - 4, p.x))), y: Math.round(Math.max(hautB + rm + 3, p.y))
         , r: Math.round(rm), f: ouvert || (av === acte + 1 && fini) ? 1 : 0.78, ouvert, actuel: av === enCours, conquis: acteComplet(C.et, av) });
     }
@@ -15424,7 +15493,7 @@ window.PE_DONNEES = {
     b.style.left = e.x.toFixed(1) + 'px'; b.style.top = e.y.toFixed(1) + 'px';
     b.setAttribute('aria-label', labelMission(mi)); b.title = b.getAttribute('aria-label');
     const d = document.createElement('span'); d.className = 'etape-disque'; d.setAttribute('aria-hidden', 'true');
-    if (et > 0 || mi === courant) d.textContent = nombre(mi);
+    if (et > 0 || mi === courant || MODE_TEST) d.textContent = nombre(mi);
     b.appendChild(d);
     if (et > 0) b.appendChild(miniEtoiles(et, 'etape-et'));
     b.addEventListener('click', surChoix({ mi }));
@@ -15444,12 +15513,103 @@ window.PE_DONNEES = {
     b.addEventListener('click', surChoix({ mi: tr.mi }));
     return b;
   }
+  // Passer à un autre monde : la carte zoome ou dézoome vers lui (animerZoom), elle ne change plus d'un coup.
   function changerActe(acte) {
+    if (zoomAnim || !CARTE || acte === CARTE.acte) return;
     jouerSon('clic');
+    const depart = CARTE.acte, cv = $('planete-campagne');
+    const avant = CARTE.plan ? { plan: CARTE.plan, mondes: CARTE.mondes } : null;
+    const image = avant && cv && cv.width > 0 ? copieCanvas(cv) : null;
     acteVu = acte === acteMontre() ? 0 : acte;
     construireCampagne(true);
     const bt = $('fiche-jouer');
     if (bt && !bt.hidden) bt.focus({ preventScroll: true });
+    if (image && CARTE.plan) animerZoom(depart, avant, image);
+  }
+
+  // ---------- Zoom entre les mondes (demande du propriétaire, 19 novembre 2026) ----------
+  // Un cran, un monde. Dézoomer (molette vers soi, pincer, touche −, bouton −) montre le monde du dessus : la carte
+  // actuelle rapetisse jusqu'à son petit monde sur l'orbite de la nouvelle carte. Zoomer (molette vers l'avant, écarter
+  // les doigts, touche +, bouton +, toucher un monde) fait le chemin inverse. Monde encore fermé : sa fiche (cadenas)
+  // et un petit rebond de la carte. Mouvements réduits : simple fondu.
+  const ZOOM_MS = 850, ZOOM_MR_MS = 220, ZOOM_REBOND_MS = 380;
+  let zoomAnim = 0, zoomFin = null;
+  const lisse = (u) => (u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2);
+  const entre01 = (a, b, x) => { const u = borne((x - a) / (b - a), 0, 1); return u * u * (3 - 2 * u); };
+  const acteOuvert = (x) => x >= 1 && x <= ACTES_PUBLIES && (MODE_TEST || x <= acteMontre());
+  function majBoutonsZoom() {
+    const a = CARTE ? CARTE.acte : 1, dz = $('bt-dezoomer'), zo = $('bt-zoomer');
+    if (dz) { dz.disabled = a >= NB_ACTES; dz.classList.toggle('vers-verrou', a < NB_ACTES && !acteOuvert(a + 1)); }
+    if (zo) zo.disabled = a <= 1;
+  }
+  // sens : +1 monde du dessus (dézoom), -1 monde du dessous (zoom).
+  function crans(sens) {
+    if (!CARTE || !CARTE.plan || zoomAnim || E.campagne.hidden) return;
+    const cible = CARTE.acte + sens;
+    if (cible < 1 || cible > NB_ACTES) return;
+    if (acteOuvert(cible)) { changerActe(cible); return; }
+    jouerSon('clic');
+    choisirEtape({ monde: cible });
+    const cv = $('planete-campagne'), m = CARTE.mondes.find((x) => x.acte === cible);
+    if (MR || !cv.animate) return;
+    cv.style.transformOrigin = m ? m.x + 'px ' + m.y + 'px' : '50% 50%';
+    const s = sens > 0 ? 0.95 : 1.05;
+    cv.animate([{ transform: 'scale(1)' }, { transform: 'scale(' + s + ')' }, { transform: 'scale(1)' }], { duration: ZOOM_REBOND_MS, easing: 'ease-out' });
+  }
+  function copieCanvas(src) {
+    const c = document.createElement('canvas');
+    c.width = src.width; c.height = src.height;
+    c.getContext('2d').drawImage(src, 0, 0);
+    c.className = 'carte-fond zoom-calque'; c.setAttribute('aria-hidden', 'true');
+    return c;
+  }
+  function finirZoom() {
+    if (zoomAnim) cancelAnimationFrame(zoomAnim);
+    zoomAnim = 0;
+    if (zoomFin) { const f = zoomFin; zoomFin = null; f(); }
+  }
+  // depart : l'acte quitté ; avant : son plan et ses mondes ; image : la carte quittée, figée. La nouvelle carte est déjà
+  // construite (CARTE). Grande carte L, petite carte P, w : le petit monde de P sur l'orbite de L, k = w.r / P.r.
+  // À t = 0 on voit P telle quelle, à t = 1 L telle quelle ; le centre de w glisse du centre de P vers sa place.
+  function animerZoom(depart, avant, image) {
+    const apres = { plan: CARTE.plan, mondes: CARTE.mondes }, cv = $('planete-campagne');
+    const dezoom = CARTE.acte > depart, L = dezoom ? apres : avant, P = dezoom ? avant : apres, petit = dezoom ? depart : CARTE.acte;
+    const w = L.mondes.find((m) => m.acte === petit), k = w ? w.r / P.plan.r : 0, fondu = MR || !w || !(k > 0);
+    const diag = Math.hypot(window.innerWidth, window.innerHeight);
+    const dmin = P.plan ? Math.max(P.plan.r * 1.25, Math.min(P.plan.cx, P.plan.cy, window.innerWidth - P.plan.cx, window.innerHeight - P.plan.cy)) : 0;
+    if (dezoom || fondu) cv.after(image); else cv.before(image);
+    const elL = dezoom ? cv : image, elS = dezoom ? image : cv, calques = [$('carte-couche'), $('carte-part')];
+    for (const el of calques) { el.style.transition = 'none'; el.style.opacity = '0'; el.style.pointerEvents = 'none'; }
+    for (const el of [elL, elS]) { el.style.transformOrigin = '0 0'; el.style.willChange = 'transform, opacity'; }
+    zoomFin = () => {
+      image.remove();
+      cv.style.transform = ''; cv.style.opacity = ''; cv.style.transformOrigin = ''; cv.style.willChange = '';
+      cv.style.webkitMaskImage = ''; cv.style.maskImage = '';
+      for (const el of calques) { el.style.transition = 'opacity .25s ease'; el.style.opacity = ''; el.style.pointerEvents = ''; }
+      setTimeout(() => { for (const el of calques) el.style.transition = ''; }, 300);
+    };
+    const pose = (u) => {
+      if (fondu) { image.style.opacity = String(1 - u); return; }
+      const t = dezoom ? u : 1 - u, sL = Math.pow(k, t - 1), sS = sL * k;
+      const cx = P.plan.cx + (w.x - P.plan.cx) * t, cy = P.plan.cy + (w.y - P.plan.cy) * t;
+      elL.style.transform = 'translate(' + (cx - sL * w.x).toFixed(2) + 'px,' + (cy - sL * w.y).toFixed(2) + 'px) scale(' + sL.toFixed(4) + ')';
+      elS.style.transform = 'translate(' + (cx - sS * P.plan.cx).toFixed(2) + 'px,' + (cy - sS * P.plan.cy).toFixed(2) + 'px) scale(' + sS.toFixed(4) + ')';
+      elS.style.opacity = String(1 - entre01(0.3, 0.75, t));
+      // Masque rond : la petite carte ne garde que son globe et un halo en rapetissant (sinon son fond étoilé forme un
+      // rectangle sombre). Rayon dans les coordonnées de la petite carte : tout l'écran à t = 0, puis jamais plus loin que
+      // le bord le plus proche (le cadre de la carte ne se voit pas), enfin le globe et son halo.
+      const rg = P.plan.r * 1.25, rm = t < 0.08 ? diag + (dmin - diag) * t / 0.08 : dmin + (rg - dmin) * entre01(0.08, 0.55, t), masque = 'radial-gradient(circle at ' + P.plan.cx + 'px ' + P.plan.cy + 'px, #000 ' + rm.toFixed(1) + 'px, transparent ' + (rm + P.plan.r * 0.45).toFixed(1) + 'px)';
+      elS.style.webkitMaskImage = masque; elS.style.maskImage = masque;
+    };
+    pose(0);
+    const duree = fondu ? ZOOM_MR_MS : ZOOM_MS, t0 = performance.now();
+    const pas = (now) => {
+      const u = Math.min(1, (now - t0) / duree);
+      pose(fondu ? u : lisse(u));
+      if (u < 1) zoomAnim = requestAnimationFrame(pas);
+      else { zoomAnim = 0; finirZoom(); }
+    };
+    zoomAnim = requestAnimationFrame(pas);
   }
   function creerMonde(m, W) {
     const b = document.createElement('button'), taille = Math.max(44, m.r * 2 + 4), nom = t('campagne.acte' + m.acte);
@@ -15482,13 +15642,15 @@ window.PE_DONNEES = {
   // Construit tout l'écran. retour : joue l'animation des victoires pas encore montrées.
   function construireCampagne(retour) {
     arreterRetour();
-    const enCours = acteMontre(), acte = acteVu >= 1 && acteVu <= enCours ? acteVu : enCours;
+    if (zoomAnim) finirZoom();
+    const enCours = acteMontre(), acte = acteVu >= 1 && acteVu <= (MODE_TEST ? ACTES_PUBLIES : enCours) ? acteVu : enCours;
     const liste = missionsActe(acte), pl = planete(acte), courant = courantDe(liste);
     const prop = pl ? proprietaires(acte, missionEmpire(acte)) : null;
     let avecPlanete = !!(pl && prop && vuePlanetePossible(acte) && rendu && rendu.planCampagne);
     const ancien = CARTE && CARTE.acte === acte ? CARTE.sel : null;
     const regions = avecPlanete ? regionsEmpire(pl, prop) : 0, total = pl ? (pl.n || TAILLES_ECHELLES[acte - 1]) : 0;
     CARTE = { acte, liste, courant, plan: null, prop, regions, total, part: total ? regions / total : 0, etoiles: etoilesActe(liste), orbite: null, mondes: [], sel: null, anim: null };
+    majBoutonsZoom();
     const defaut = { mi: courant || liste[liste.length - 1] };
     const garde = !retour && ancien && (ancien.monde || liste.includes(ancien.mi)) ? ancien : defaut;
     E.campagne.classList.toggle('sans-planete', !avecPlanete);
@@ -15529,6 +15691,19 @@ window.PE_DONNEES = {
     $('campagne-stats').style.top = CARTE.paysage ? '' : Math.round($('carte-fiche').getBoundingClientRect().top - $('campagne-stats').offsetHeight - 4) + 'px';
     const part = $('carte-part');
     part.style.left = plan.cx + 'px'; part.style.top = plan.rAnneau + plan.cy + 'px';
+    // Portrait : les boutons de zoom encadrent la pastille du pourcentage, sous le globe (« − 42 % + ») ; l'orbite des
+    // mondes occupe le haut de l'écran. Paysage : en bas à gauche (style.css).
+    const zb = $('zoom-boutons');
+    // Petit écran où le globe laisse une marge d'au moins 58 px à gauche : les boutons s'y empilent (+ en haut).
+    const marge = plan.cx - plan.rAnneau - 14, cote = !CARTE.paysage && marge >= 58;
+    zb.classList.toggle('autour', !CARTE.paysage && !cote);
+    zb.classList.toggle('cote', cote);
+    if (CARTE.paysage) { zb.style.left = ''; zb.style.top = ''; }
+    else if (cote) { zb.style.left = Math.round(Math.max(8, (marge - 44) / 2)) + 'px'; zb.style.top = Math.round(plan.cy - 48) + 'px'; }
+    else { zb.style.left = Math.round(plan.cx) + 'px'; zb.style.top = Math.round(plan.rAnneau + plan.cy) + 'px'; }
+    // Autour de la pastille : collés à elle (6 px), d'après sa largeur réelle.
+    const lz = cote || CARTE.paysage ? 0 : part.offsetWidth + 2 * 44 + 12;
+    zb.style.width = lz ? lz + 'px' : ''; zb.style.marginLeft = lz ? -lz / 2 + 'px' : '';
     for (const tr of plan.tresors) { const b = creerTresor(tr); if (b) couche.appendChild(b); }
     for (const e of plan.etapes) couche.appendChild(creerEtape(e, courant));
     const finitions = [];
@@ -15589,6 +15764,8 @@ window.PE_DONNEES = {
   // Clavier sur la carte : flèches pour passer d'une mission à l'autre, Début et Fin, Échap pour revenir à la mission en cours.
   E.campagne.addEventListener('keydown', (ev) => {
     if (!CARTE || !CARTE.liste.length) return;
+    if (ev.key === '+' || ev.key === '=' || ev.key === 'Add') { ev.preventDefault(); crans(-1); return; }
+    if (ev.key === '-' || ev.key === '_' || ev.key === 'Subtract') { ev.preventDefault(); crans(1); return; }
     const l = CARTE.liste, mi = CARTE.sel && CARTE.sel.mi ? CARTE.sel.mi : CARTE.courant || l[l.length - 1], i = l.indexOf(mi);
     let n = -1;
     if (ev.key === 'ArrowRight' || ev.key === 'ArrowUp') n = Math.min(l.length - 1, i + 1);
@@ -15601,6 +15778,40 @@ window.PE_DONNEES = {
     if (E.campagne.classList.contains('sans-planete')) { choisirDansListe({ mi: l[n] }); const b = $('campagne-liste').children[n]; if (b) b.focus(); return; }
     choisirEtape({ mi: l[n] }, { focus: 'etape' });
   });
+  // Zoom : boutons, molette (un cran par geste : un pavé tactile envoie une rafale de petits pas, séparés de moins de
+  // 250 ms), pincement à deux doigts (un cran par pincement).
+  $('bt-dezoomer').addEventListener('click', () => crans(1));
+  $('bt-zoomer').addEventListener('click', () => crans(-1));
+  let rouleCumul = 0, rouleDernier = 0, rouleFait = false;
+  E.campagne.addEventListener('wheel', (ev) => {
+    if (!CARTE || !CARTE.plan || (ev.target.closest && ev.target.closest('.fiche'))) return;
+    ev.preventDefault();
+    const now = performance.now();
+    if (now - rouleDernier > 250) { rouleCumul = 0; rouleFait = false; }
+    rouleDernier = now;
+    if (rouleFait || zoomAnim) return;
+    rouleCumul += ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaMode === 2 ? ev.deltaY * 400 : ev.deltaY;
+    if (Math.abs(rouleCumul) >= 40) { rouleFait = true; crans(rouleCumul > 0 ? 1 : -1); }
+  }, { passive: false });
+  const doigts = new Map();
+  let pince = null;
+  E.campagne.addEventListener('pointerdown', (ev) => {
+    if (ev.pointerType !== 'touch') return;
+    doigts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (doigts.size === 2) { const [a, b] = [...doigts.values()]; pince = { d0: Math.hypot(a.x - b.x, a.y - b.y), fait: false }; }
+  });
+  E.campagne.addEventListener('pointermove', (ev) => {
+    const p = doigts.get(ev.pointerId);
+    if (!p) return;
+    p.x = ev.clientX; p.y = ev.clientY;
+    if (!pince || pince.fait || doigts.size !== 2 || !(pince.d0 > 20)) return;
+    const [a, b] = [...doigts.values()], q = Math.hypot(a.x - b.x, a.y - b.y) / pince.d0;
+    if (q < 0.72 || q > 1.38) { pince.fait = true; crans(q < 1 ? 1 : -1); }
+  });
+  const leverDoigt = (ev) => { doigts.delete(ev.pointerId); if (doigts.size < 2) pince = null; };
+  E.campagne.addEventListener('pointerup', leverDoigt);
+  E.campagne.addEventListener('pointercancel', leverDoigt);
+
   $('fiche-jouer').addEventListener('click', () => {
     if (!CARTE || !CARTE.sel || !CARTE.sel.mi || !missionJouable(CARTE.sel.mi)) return;
     jouerSon('clic'); arreterRetour(); allerMission(CARTE.sel.mi);
@@ -16185,7 +16396,7 @@ window.PE_DONNEES = {
     const etat = partie.etat;
     const victoire = !!(res && (res.gagnant === 0 || (etat.eq && res.gagnant === etat.eq[0])));
     const etoiles = victoire ? borne(entier(res.etoiles, 1), 1, 3) : 0;
-    if (window.FMG) window.FMG.reportEnd({ completed: victoire, level: m });
+    if (window.FMG && !MODE_TEST) window.FMG.reportEnd({ completed: victoire, level: m });
     let nouvelleCap = null;
     const fiche = ficheMission(m);
     const premiere = victoire && !(C.et[m - 1] > 0);   // première victoire : la province cible rejoint l'empire
@@ -16209,7 +16420,7 @@ window.PE_DONNEES = {
         M.finActe = premiere;                  // première fois seulement : écran de fin d'acte et dézoom
       }
       C.ec[m - 1] = 0;   // le vent dans le dos ne compte que les échecs d'affilée sur la mission (cadrage, section 13)
-      if (C.et.slice(0, NB_MISSIONS).every((e) => e > 0)) { if (window.FMG) window.FMG.reportComplete({ stars: C.et.slice(0, NB_MISSIONS).reduce((x, y) => x + y, 0), maxStars: 3 * NB_MISSIONS }); }
+      if (C.et.slice(0, NB_MISSIONS).every((e) => e > 0)) { if (window.FMG && !MODE_TEST) window.FMG.reportComplete({ stars: C.et.slice(0, NB_MISSIONS).reduce((x, y) => x + y, 0), maxStars: 3 * NB_MISSIONS }); }
     } else {
       C.ec[m - 1] = Math.min(3, (C.ec[m - 1] | 0) + 1);
     }
@@ -16240,7 +16451,7 @@ window.PE_DONNEES = {
     const acteM = acteDe(m);
     if (res && res.raison === 1 && missionTenir(etat)) cle = etat.c && etat.c[0] && etat.c[0].cap === -1 ? 'resultat.raisonCapitale' : 'resultat.raisonRegion';
     cle = cleActe(cle, acteM);
-    raison.hidden = victoire || !a(cle);
+    raison.hidden = (victoire && !(res && res.raison === 7)) || !a(cle);   // 7 : victoire avant le chrono, carte entière prise
     if (!raison.hidden) raison.textContent = t(cle);
     if (victoire && m === derniereMissionActe(acteM)) { raison.hidden = false; raison.textContent = t(cleActe('resultat.acteFini', acteM)); }
     // Étoiles une à une.
@@ -16875,12 +17086,14 @@ window.PE_DONNEES = {
   // ---------- Sauvegarde à la fermeture ----------
   if (window.JEL_SAVE) {
     window.JEL_SAVE.surFermeture(() => { if (enMission && partie && M && !M.fini) sauver(true); });
-    effacerTitre = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('zone-effacer'), apres: () => { charger(); majTitre(); } });
+    if (!MODE_TEST) effacerTitre = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('zone-effacer'), apres: () => { charger(); majTitre(); } });
   }
+
+  if (MODE_TEST) { const mt = $('marque-test'); if (mt) mt.hidden = false; }
 
   // ---------- Bac à sable (contrat du lot 3, section 5) ----------
   // Hors campagne : ni niveaux ni étoiles. Une toile tirée de la graine, tous les rivaux à éliminer.
-  function bacOuvert() { return C.et[MISSION_BAC - 1] > 0; }
+  function bacOuvert() { return MODE_TEST || C.et[MISSION_BAC - 1] > 0; }
   function reglagesBac() {
     if (!O.bac) O.bac = { taille: 80, rivaux: 2, niveau: 1, g: 0, rec: {} };
     if (!O.bac.g) O.bac.g = graineDe(null) >>> 0;
@@ -16927,7 +17140,7 @@ window.PE_DONNEES = {
   function finBac(res) {
     const etat = partie.etat, bac = M.bac, victoire = res.gagnant === 0, b = reglagesBac();
     const maxT = etat.st && etat.st.maxT ? etat.st.maxT | 0 : 0, score = scoreBac(maxT, victoire, bac);
-    if (window.FMG) window.FMG.reportEnd({ completed: victoire, level: score });
+    if (window.FMG && !MODE_TEST) window.FMG.reportEnd({ completed: victoire, level: score });
     const ancien = b.rec[bac.taille] | 0, record = score > ancien;
     if (record) b.rec[bac.taille] = score;
     b.g = M.g >>> 0;
@@ -16981,7 +17194,7 @@ window.PE_DONNEES = {
   window.PE_JEU = {
     partie: () => partie,
     get rendu() { return rendu; },
-    sauver, charger, allerMission, ouvrirBac, lancerBac, ouvrirFin,
+    sauver, charger, allerMission, ouvrirBac, lancerBac, ouvrirFin, ouvrirCampagne,
     campagne: () => C,
     carte: () => CARTE,
     VERSION,

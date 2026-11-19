@@ -117,6 +117,10 @@ const MISSIONS_FIN_ACTE = [16, 17, 18, 19, 20];
 const TAUX_MAX_ROBOT1_FIN_ACTE = 70;
 // Mission 17 allégée après l'essai du propriétaire (18 novembre 2026), qui ne la gagnait pas en 10 parties.
 const TAUX_MAX_ROBOT1_PAR_MISSION = { 17: 85 };
+// Victoire avant le chrono (carte entière prise, raison 7 ; 19 novembre 2026) : les missions de siège 69 et 86 se
+// gagnent dès que l'assaillant est écrasé à sa première offensive (vers 40 s pour le robot 2, qui les gagnait avant
+// en tenant 3 minutes). Le robot 1 n'y gagne que 30 % et 15 % : elles ne sont pas faciles, seulement courtes.
+const MEDIANE_MIN_PAR_MISSION = { 69: 300, 86: 300 };
 // Mission où chaque capacité est gagnée (contrat v2, section 5).
 const CAPACITE_MISSION = { rallier: 3, fortin: 6, transfert: 10, arrierepays: 15, relais: 25, chantier: 32, frappe: 47, pont: 66, essaimage: 71, sursaut: 85 };
 
@@ -1413,6 +1417,31 @@ async function controlerActesSuite() {
     const r3 = simNu.fin(e3);
     if (!r3 || r3.gagnant === 0 || r3.raison !== 4) return `allié tombé : fin ${JSON.stringify(r3)}`;
   }) && ok('allié : renforts acceptés, Frappe refusée, objectif 10 gagné à d = 0, défaite (raison 4) si l\'allié tombe');
+  // Missions à durée (tenir, survivre puis conquérir, couper, l'allié tient) : toute la carte prise = victoire sans
+  // attendre le chrono (raison 7), une seule région encore à un rival ou neutre = la partie continue.
+  garder('carte entière', () => {
+    const duree = [];
+    D.missions.forEach((f, x) => { if ([5, 6, 8, 10].includes(f.objectif.t)) duree.push(x + 1); });
+    if (duree.length < 15) return `${duree.length} missions à durée seulement`;
+    for (const mi of duree) {
+      const e = nouvelle(mi);
+      const allie = (c) => c > 0 && e.eq[c] === e.eq[0];
+      for (let i = 0; i < e.nn; i++) if (!allie(e.p[i])) e.p[i] = 0;
+      e.fl = e.fl.filter((f) => f.c === 0 || allie(f.c)); e.sg = e.sg.filter((s) => s.c === 0 || allie(s.c));
+      const r = simNu.fin(e);
+      if (!r || r.gagnant !== 0 || r.raison !== 7 || r.etoiles < 1) return `mission ${mi}, carte entière : fin ${JSON.stringify(r)}`;
+      const e2 = nouvelle(mi);
+      for (let i = 0; i < e2.nn; i++) if (!(e2.p[i] > 0 && e2.eq[e2.p[i]] === e2.eq[0])) e2.p[i] = 0;
+      const k = e2.p.findIndex((c, i) => i < e2.nn && c === 0 && i !== e2.c[0].cap && !e2.o.l.includes(i));
+      e2.p[k] = -1;
+      const r2 = simNu.fin(e2);
+      if (r2 && r2.raison === 7) return `mission ${mi} : raison 7 avec une région neutre restante`;
+    }
+    const e3 = nouvelle(1);
+    for (let i = 0; i < e3.nn; i++) e3.p[i] = 0;
+    const r3 = simNu.fin(e3);
+    if (r3 && r3.raison === 7) return 'mission 1 (sans chrono) : raison 7';
+  }) && ok('carte entière : les missions à durée sont gagnées dès que toute la carte est prise (raison 7), pas avant');
   garder('couper', () => {
     const e = nouvelle(32), l = e.o.l, d0 = D.missions[31].objectif.d;
     if (l.length !== D.missions[31].passages.nb) return `${l.length} passages`;
@@ -1962,7 +1991,7 @@ async function controlerActesFin() {
       if (AVEC_MISSIONS) {
         const detail = `mission ${m}, robot ${niveau} : ${r.v} / ${r.n} (${taux} %), médiane ${mediane(r.t)} ticks (victoires ${mediane(r.tv)}), ${raisonsDe(r.ra)}`;
         if (niveau === 2 && taux < 70) ecart('missions', `${detail} : 70 % attendus`);
-        else if (niveau === 2 && aRival(fiche) && !debutActe(m) && mediane(r.t) < 600) ecart('missions', `${detail} : médiane d'au moins 600 ticks attendue`);
+        else if (niveau === 2 && aRival(fiche) && !debutActe(m) && mediane(r.t) < (MEDIANE_MIN_PAR_MISSION[m] ?? 600)) ecart('missions', `${detail} : médiane d'au moins ${MEDIANE_MIN_PAR_MISSION[m] ?? 600} ticks attendue`);
         else if (niveau === 1 && aRival(fiche) && !debutActe(m) && taux > 50) ecart('missions', `${detail} : 50 % au plus attendus`);
         else ok(detail);
         if (niveau === 2 && r.tv.length && fiche.dv && ![5, 6, 8, 10].includes(fiche.objectif.t)) {
