@@ -400,3 +400,70 @@ Le bloc de simulation définit déjà `window.JEL_SIM` mais ne s'appelle pas `je
 **Mesures à la fin du lot** (`tester-poussiere-d-empire.mjs --missions`, 20 parties par mission et par robot). Le robot de niveau 2 gagne 75 à 100 % des missions 21 à 60. Le robot de niveau 1 reste à 70 % au plus sur les missions 33 à 40 et à 50 % au plus sur les missions 45 à 60. Un joueur qui ne donne aucun ordre perd toutes les missions à rival (5 parties chacune).
 
 **Limites connues.** Ces mesures viennent de robots et leurs graines ont servi au réglage. Sur 100 autres graines, le robot de niveau 2 tombe à 66 % sur la mission 51 (objectif 70 %), 72 % sur la 44 et 77 % sur la 31. Plusieurs missions se terminent en 32 à 44 secondes pour lui (24, 26, 34, 36, 44, 45, 49, 54), sous les 3 à 8 minutes visées pour un joueur ; la durée humaine n'est pas mesurée. La mission 47 se gagne encore par une attaque directe, en 37 secondes pour un joueur simulé très rapide. À revoir au lot 3 avec l'équilibrage global, d'après de vraies parties.
+
+## 19. Lot 3 : décisions prises pendant la réalisation (19 novembre 2026)
+
+Le lot 3 termine la campagne : actes 4 et 5, missions 61 à 100, 300 étoiles, bac à sable. `version` 5 dans `game.json`, parce que le lot 2 en est à la version 4 sur sa branche : sans ce saut, les appareils ne retéléchargeraient pas le jeu.
+
+**Cartes.** Même principe qu'aux actes précédents : une carte par acte, gardée d'une mission à l'autre, 24 provinces. Acte 4 : une galaxie de 238 nœuds, quatre bras spiraux autour d'un cœur, avec le Silence au cœur et dans le bras opposé. Acte 5 : une toile cosmique de 264 galaxies, des superamas reliés par des filaments, de grands vides franchis par quelques routes de 40 ticks au moins, et quatre rivaux aux coins (les Lointains, la Marée, les Fileurs, l'Écho), qui se battent aussi entre eux. Les zones de mission vont de 19 à 105 nœuds à l'acte 4 et de 22 à 90 à l'acte 5.
+
+**Essaimage (écart au cadrage, section 7, et au contrat du lot 3).** La règle prévue, « un nœud au plafond envoie 25 % vers son voisin neutre le plus faible », ne faisait presque rien : le plafond était rarement atteint et 25 % ne prenaient aucun neutre. Allumé, l'Essaimage ralentissait même le joueur. Nouvelle règle : un nœud qui peut prendre seul son voisin neutre le plus faible y envoie la défense du neutre × 130 %, en gardant au moins 25 % de ses forces. Au plus un envoi par camp et par tick, un neutre déjà visé est laissé de côté, et seuls 12 nœuds sont examinés par tick, ce qui borne le coût (`PE_DONNEES.essaim`). À la mission 72, allumé seul pendant 5 minutes, il fait passer de 9 à 16 ou 18 territoires. Aux missions 74, 81 et 84, où les neutres sont bien plus forts que les nœuds du joueur, il ne déclenche aucun envoi en 5 minutes s'il est seul à jouer.
+
+**Rivaux de niveau 3.** Aux actes 4 et 5, leur ratio d'attaque passe de 110 à 180 (`ratioGrand`) : à 1,1 contre 1, un siège coûtait presque tout l'assaillant et le rival s'effondrait en moins d'une minute, plus faible qu'au niveau 2. Les actes 1 à 3 gardent 110. Les fiches 76 à 80 et 96 à 100 ont été réglées de nouveau en conséquence.
+
+**Garde du trône.** Quand le seul objectif d'une mission est la capitale d'un rival (91, 96, 97), un rival de niveau 2 ou 3 n'en retire plus aucune force. Si des forces ennemies à 3 arêtes dépassent 70 % de sa défense, il la rallie et y fait couler ses réserves (`PE_DONNEES.garde`). Avant, la capitale se vidait toute seule et une pile lancée en ligne droite gagnait en 24 à 36 secondes, souvent avec 3 étoiles.
+
+**Joueur ciblé (nouveau contrôle).** Le joueur glouton du contrat ne suit pas de chemin et ne voyait pas ces victoires éclair. Le test `--missions` joue donc aussi un joueur « ciblé » : un geste toutes les 1,3 s, 100 % de sa plus grosse pile, sur le plus court chemin vers l'objectif. Sur les missions à rival, hors les 3 premières de chaque acte, il ne doit gagner aucune partie en moins de 20 % de la durée visée (60 s au moins). Les fiches 71, 74, 84, 85 et 91 ont été réglées pour cela. Dans la vraie interface, à 390 px et au toucher, le même geste ne gagne plus les missions 74, 85, 91, 96 et 97 en 45 secondes.
+
+**Commandes.** Fortin, Relais et Chantier passent derrière un bouton « Bâtir » : la barre garde des boutons de 44 px à 360 px, en paysage et à 1 280 px. La touche B construit sur le territoire choisi ; sans territoire choisi, elle ouvre le tiroir. Quand la zone est coupée en deux (mission 67), les anneaux dorés du Pont ne montrent que les nœuds dont le pont réunit les deux rives ; les autres ponts restent permis.
+
+**Cadrage et repères.** Au départ, la caméra cherche une fenêtre qui montre à la fois un front et la pile qui porte au moins le quart des forces du joueur. Si les deux ne tiennent pas dans la même fenêtre au zoom plancher, elle garde le front, et un triangle turquoise au bord de la zone libre indique la base. Les flèches rouges de menace pointaient à l'opposé de la menace et flottaient au milieu de l'écran en paysage : elles longent maintenant le bord de la zone libre, HUD déduit, et pointent vers la menace.
+
+**Bac à sable.** Débloqué par la victoire de la mission 81, hors missions, sans étoiles. Réglages à gros boutons : 40, 80 ou 120 galaxies, 1 à 4 rivaux, niveau 1 à 3. La graine est affichée ; « Rejouer cette carte » la reprend, « Nouvelle carte » en tire une depuis l'état du jeu. `JEL_SIM.configBac` fabrique une carte en toile et l'objectif « éliminer tout le monde », avec la technologie du joueur figée au lancement. La partie reprend exactement grâce à `mission: { bac, k, snap, h }` dans la sauvegarde. La fin appelle `FMG.reportEnd` avec le score, jamais `reportComplete`, et le record par taille reste dans `options`.
+
+**Fin de campagne.** Mission 100 : dézoom ultime à travers les cinq cartes emboîtées (environ 12 s, un toucher pour passer, version courte si les mouvements sont réduits), puis écran « Voix de l'Horizon ». `reportComplete` part quand les 100 missions sont gagnées, avec `maxStars` 300.
+
+**Mission 17.** Le lot 3 était parti d'avant l'allègement demandé par le propriétaire. Il est rétabli (régions rivales à 10 forces, 85 % au plus pour le robot de niveau 1). L'acte 1 reste par ailleurs identique à cette référence : fiches, cartes et 124 parties rejouées au même hachage.
+
+**Retouches des actes 2 et 3.** Seuls les nombres des fiches 24, 26, 31, 34, 36, 44, 45, 47, 49, 51 et 54 ont changé.
+
+**Mesures à la fin du lot** (robots à la place du joueur).
+
+| Série | Missions | Robot de niveau 2 : minimum | Moyenne |
+| --- | --- | --- | --- |
+| R, réglage (20 parties) | 21 à 60 | 75 % (mission 58) | 94 % |
+| R, réglage (20 parties) | 61 à 100 | 75 % (missions 80 et 99) | 93 % |
+| C, contrôle (100 parties) | 21 à 60 | 77 % (mission 33) | 94 % |
+| C, contrôle (100 parties) | 61 à 100 | 71 % (mission 76) | 92 % |
+
+Sur 61 à 100 en série R : robot de niveau 1 à 50 % au plus (hors missions sans rival et 3 premières de chaque acte), joueur sans ordre battu sur toutes les missions à rival, secondaire réussi au moins une fois sur chaque mission. Le coût de la simulation est de 0,031 ms par tick avec des robots de niveau 3 et l'instantané le plus lourd fait 14 094 caractères. Rendu dans Edge, à 120 nœuds et environ 230 flottes (300 flottes non atteintes) : médiane de 2,1 ms par image, 95e centile de 6,1 ms au plus.
+
+**Limites connues.**
+
+- Personne n'a joué ces 40 missions pour de vrai : ni humain, ni vrai téléphone, ni son. Toutes les difficultés viennent de robots.
+- La mission 99 tombait à 55 % sur la série de contrôle (les rivaux éliminaient le robot). Leurs capitales sont passées de 5 150, 4 500 et 4 500 à 3 400, 3 000 et 3 000 forces, réglées sur une série à part (graines 800 000 et suivantes), sans se servir de la série de contrôle : 89 % sur 100 parties neuves (graines 900 000 et suivantes), 89 % sur la série de contrôle, 75 % sur les 20 parties du test.
+- Les missions 78 et 80 sont très contrastées : le robot y gagne vite ou se fait éliminer, et leur médiane reste proche de 60 s (654 et 635 ticks).
+- Plusieurs missions restent courtes pour un robot au regard des 6 à 10 minutes visées pour un joueur ; la durée humaine n'est pas mesurée.
+- Sur les missions 65, 71 et 83, à 390 px, aucune route de front n'est entièrement visible au départ : on voit les nœuds du joueur, pas encore ce qu'ils peuvent prendre.
+- L'Essaimage n'agit pas tant que les nœuds du joueur restent plus faibles que les neutres voisins.
+
+## 20. Retours du 19 novembre 2026 : mode test, zoom entre les mondes, victoire avant le chrono
+
+Trois demandes du propriétaire, plan validé avant le développement (version 6 du jeu).
+
+**Mode test.** `?debug=1` tapé dans l'adresse du lanceur (`window.JEL_DEBUG`, rien d'autre ne l'active) ouvre les cinq mondes, les 100 missions et le bac à sable. Choix du propriétaire : rien n'est enregistré. Ni sauvegarde (`sauver` ne fait rien), ni fin de partie ou jeu terminé envoyés au site (`FMG`), ni « Continuer » ou « Effacer la sauvegarde » sur l'écran titre (« Jouer » ouvre la carte). La progression réelle s'affiche, mais n'est pas modifiée. Une marque « Mode test : tout est ouvert, rien n'est enregistré » reste en bas de l'écran.
+
+**Voyage entre les mondes.** Version 7, d'après une planche de trois propositions (« puissances de dix », « la loupe », « le grand saut »). Le propriétaire a retenu un mélange des trois, sans texte à côté de la loupe, pour sentir l'immensité de l'espace. Un cran, un monde.
+- Les cinq cartes sont emboîtées. Chaque monde est posé dans celui du dessus, à la première étape de l'acte du dessus, là où sa conquête commence, et il y est 36 fois plus petit à l'écran.
+- Un voyage a trois temps : la carte rapetisse jusqu'à n'être qu'un point (0,9 s), on traverse le noir où les étoiles filent, puis le monde du dessus sort de l'obscurité (1,1 s).
+- La traversée du noir s'allonge à chaque étage. Dézoom vers le système : 2,8 s ; vers les systèmes voisins : 3,4 s ; vers la galaxie : 4,2 s ; vers l'au-delà : 5,2 s. Revenir vers la planète prend 55 % de ces durées.
+- Toucher l'écran termine le voyage. Mouvements réduits : fondu de 0,3 s.
+- Pendant le voyage, la largeur de la vue défile en bas (`LARGEUR_KM` : la Terre, le Système solaire, 20 années-lumière, la Voie lactée, un superamas), puis s'affiche en grand au milieu du noir. Une échelle des cinq mondes s'allume à droite et l'en-tête suit le monde le plus proche. Au repos, la largeur reste sous le nom du monde (« Vue ≈ 100 000 années-lumière »).
+- Le voyage est dessiné dans un canvas posé sur la carte (`#voyage`). Le globe de chaque acte est peint une fois, sans orbite ni étapes, dans un canvas caché (`#planete-cuisson`), puis gardé tant que la progression et la taille de l'écran ne changent pas.
+- Au repos, une loupe montre le monde du dessous. Deux traits la relient à la première étape de l'acte, qui pulse en or. Toucher la loupe fait zoomer. L'orbite ne montre plus que les mondes du dessus (le propriétaire voyait toujours la planète reliée à l'orbite, même depuis l'au-delà).
+- Commandes : molette, pincement, touches + et −, boutons − et +, loupe, monde de l'orbite. Un monde encore fermé affiche sa fiche (cadenas) et la carte fait un petit rebond.
+- Place de la loupe et des boutons : en portrait, en haut à gauche sous l'en-tête, l'orbite partant désormais vers la droite et s'arrêtant au milieu du haut ; si la place manque, sur le côté du globe ou autour de la pastille du pourcentage. En paysage, en bas à gauche, la loupe au-dessus des boutons.
+
+**Victoire avant le chrono.** Choix du propriétaire : toute la carte prise. Dans les 20 missions à durée (5 tenir, 6 survivre puis conquérir, 8 couper, 10 l'allié tient), la mission est gagnée dès que toutes les régions sont au joueur ou à ses alliés, neutres compris, et qu'il ne reste aucune flotte ni aucun siège ennemi (raison de fin 7, phrase « Toute la carte est à toi : victoire avant la fin du chrono ! »). La condition sur les flottes vient de la mission 69 : le rival vide sa dernière région pour lancer son offensive, et la carte entière était au joueur avec une armada encore en route. Les étoiles ne changent pas : 2ᵉ étoile si l'on finit avec au moins autant de territoires qu'au départ, 3ᵉ pour l'objectif secondaire.
+
+Mesures (20 parties par mission, robot de niveau 2 à la place du joueur) : 16 des 20 missions à durée sont maintenant gagnées au moins une fois avant le chrono, dont 13 dans la plupart des parties (les 46, 55 et 77 rarement). Les missions de siège 69 et 86 se gagnent vers 40 s quand l'assaillant est écrasé à sa première offensive. Le contrôle « médiane d'au moins 600 ticks » y est abaissé à 300 (`MEDIANE_MIN_PAR_MISSION` du test). Le robot de niveau 1 n'y gagne que 30 % et 15 % des parties : elles restent difficiles, elles sont seulement plus courtes. Renforcer le rival (forces de départ, régions, rythme des offensives) donnait soit 40 % au robot 2, soit 100 % aux deux robots. Série de contrôle : minimum 71 %, aucune mission sous 65 %.
