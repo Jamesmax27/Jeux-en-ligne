@@ -13372,17 +13372,29 @@ window.PE_DONNEES = {
         c.strokeStyle = PAL.or; c.lineWidth = Math.max(1, r * 0.1); c.beginPath(); c.arc(0, 0, r * 1.05, 0, TAU); c.stroke();
       } else {
         c.save(); artAstre(c, nom, r, v); c.restore();
+        // Astre libre : éteint (gris, plus sombre). Ce qui est en couleur appartient à quelqu'un, ce qui est gris est à prendre.
+        if (libre) {
+          c.save(); c.beginPath(); c.arc(0, 0, r * 1.02, 0, TAU); c.clip();
+          c.globalCompositeOperation = 'saturation'; c.fillStyle = '#808080'; c.fillRect(-r * 2, -r * 2, r * 4, r * 4);
+          c.globalCompositeOperation = 'source-atop'; c.fillStyle = rgba(PAL.nuit, 0.45); c.fillRect(-r * 2, -r * 2, r * 4, r * 4);
+          c.restore();
+        }
       }
       if (mode === 0) {
-        // Assombrit le milieu (le chiffre s'y lit), teinte du propriétaire, anneau.
+        // Assombrit le milieu (le chiffre s'y lit).
         tacheDouce(c, 0, 0, r * 0.78, PAL.nuit, vignette && acte >= 4 ? 0.3 : 0.62);   // capitale des grandes cartes : le monde conquis reste bien visible
-        if (acte >= 4 && !libre && s.glyphe !== 1) {       // rivaux des actes 4 et 5 : anneau à la forme de leur glyphe, petit glyphe en haut à droite
-          anneauFaction(c, s.glyphe, r * 1.12, Math.max(1.5, r * 0.13), s.lisiereClaire);
-          if (r >= 7) { const x = r * 0.86, y = -r * 0.86; c.fillStyle = rgba(PAL.nuit, 0.9); c.beginPath(); c.arc(x, y, r * 0.36, 0, TAU); c.fill(); peindreGlyphe(c, s.glyphe, x, y, r * 0.25, s.lisiereClaire); }
-        } else {
-          c.beginPath(); c.arc(0, 0, r * 1.1, 0, TAU); c.lineWidth = Math.max(1.5, r * 0.13);
-          c.strokeStyle = libre ? rgba(PAL.craie, 0.42) : s.lisiereClaire; c.stroke();
-          if (!libre) { c.beginPath(); c.arc(0, 0, r * 1.26, 0, TAU); c.lineWidth = Math.max(1, r * 0.05); c.strokeStyle = rgba(s.couleur, 0.5); c.stroke(); }
+        if (libre) { c.beginPath(); c.arc(0, 0, r * 1.1, 0, TAU); c.lineWidth = Math.max(1, r * 0.08); c.strokeStyle = rgba(PAL.craie, 0.25); c.stroke(); }
+        else {
+          // Anneau épais : bord sombre puis couleur pleine du maître, qui se détache sur une planète de n'importe quelle couleur ;
+          // rivaux des actes 4 et 5 : à la forme de leur glyphe.
+          const g = acte >= 4 && s.glyphe !== 1 ? s.glyphe : 0, rr = r * 1.22, e1 = Math.max(2.2, r * 0.42), e2 = Math.max(1.4, r * 0.24);
+          if (g) { anneauFaction(c, g, rr, e1, rgba(PAL.nuit, 0.95)); anneauFaction(c, g, rr, e2, s.couleur); }
+          else {
+            c.beginPath(); c.arc(0, 0, rr, 0, TAU); c.lineWidth = e1; c.strokeStyle = rgba(PAL.nuit, 0.95); c.stroke();
+            c.lineWidth = e2; c.strokeStyle = s.couleur; c.stroke();
+          }
+          // Fanion : pastille du maître en haut, avec son signe (on reconnaît un camp sans se fier à sa couleur).
+          if (r >= 6) { const y = -r * 1.42; c.fillStyle = PAL.nuit; c.beginPath(); c.arc(0, y, r * 0.4, 0, TAU); c.fill(); c.fillStyle = s.couleur; c.beginPath(); c.arc(0, y, r * 0.31, 0, TAU); c.fill(); peindreGlyphe(c, s.glyphe, 0, y, r * 0.2, PAL.nuit); }
         }
       } else if (mode === 1 && !libre) {
         c.beginPath(); c.arc(0, 0, r * 1.08, 0, TAU); c.lineWidth = Math.max(1, r * 0.12); c.strokeStyle = rgba(s.couleur, 0.8); c.stroke();
