@@ -1943,6 +1943,7 @@
 
   /* ---------------- Progression (sauvegardée avec JEL_SAVE) ---------------- */
   const P = { debloque: 1, etoiles: [], records: [], album: {}, bouee: 'classique', bateau: 'barque', tutos: {}, son: true };
+  let apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   function chargerProgression() {
     let d = null;
     try { d = SAVE ? SAVE.load(JEU) : null; } catch (e) { d = null; }
@@ -1960,7 +1961,7 @@
   function totalEtoiles() { let s = 0; for (let i = 0; i < NIVEAUX.length; i++) s += P.etoiles[i] || 0; return s; }
   function totalCoquillages() { let s = 0; for (let i = 0; i < NIVEAUX.length; i++) s += P.records[i] || 0; return s; }
   function sauver(niveauReprise) {
-    if (!SAVE) return;
+    if (!SAVE || apercu) return; // image du jeu : rien n'est écrit dans la sauvegarde
     try {
       JEL_SAVE.save(JEU, {
         niveau: clamp(niveauReprise, 1, NIVEAUX.length), score: totalCoquillages(), debloque: P.debloque,
@@ -2018,7 +2019,7 @@
     decouverte: () => { [660, 880, 1320].forEach((f, i) => note(f, 0.16, 'sine', 0.12, i * 0.08)); },
     clic: () => { note(700, 0.05, 'sine', 0.08); },
   };
-  function son(nom) { try { if (SONS[nom]) SONS[nom](); } catch (e) { /* rien */ } }
+  function son(nom) { if (apercu || window.JEL_AFFICHE) return; try { if (SONS[nom]) SONS[nom](); } catch (e) { /* rien */ } }
   document.addEventListener('pointerdown', audio, true);
   document.addEventListener('keydown', audio, true);
 
@@ -3050,6 +3051,350 @@
     G.surface = sauve.surface; G.fond = sauve.fond;
   }
 
+  /* ---------------- Affiche (jaquette du jeu) ----------------
+     Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+     interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La plongeuse, en grand,
+     file vers une algue dorée qui brille et la cueille d'un glissement : étincelles et coquillages
+     jaillissent. Sur la corde, un oursin gourmand reçoit une étoile de mer ; au-dessus, le bateau du
+     port attend au soleil. Mêmes dessins que la partie, plus grands et plus détaillés. */
+  function dessinerPlongeuseAffiche(c, x, y, s, ang) {
+    const contour = '#0d3f5c';
+    c.save(); c.translate(x, y); c.rotate(ang); c.scale(s, s);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    // Palmes (celle du fond plus sombre).
+    const palme = (dy, rot, c1, c2) => {
+      c.save(); c.translate(-60, dy); c.rotate(rot);
+      const g = c.createLinearGradient(0, 0, -50, 0); g.addColorStop(0, c1); g.addColorStop(1, c2);
+      c.beginPath(); c.moveTo(0, -5); c.quadraticCurveTo(-22, -17, -50, -20); c.quadraticCurveTo(-57, -4, -50, 12); c.quadraticCurveTo(-22, 9, 0, 5); c.closePath();
+      c.fillStyle = g; c.fill(); c.strokeStyle = contour; c.lineWidth = 2.4; c.stroke();
+      c.strokeStyle = '#d99a00'; c.lineWidth = 1.6;
+      for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(-8, i * 2); c.lineTo(-46, i * 9 - 4); c.stroke(); }
+      c.restore();
+    };
+    palme(-7, -0.26, '#f2c020', '#e0a000');
+    // Jambes (combinaison).
+    const jambe = (pts, col) => {
+      c.strokeStyle = contour; c.lineWidth = 15; c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); c.quadraticCurveTo(pts[1][0], pts[1][1], pts[2][0], pts[2][1]); c.stroke();
+      c.strokeStyle = col; c.lineWidth = 11; c.stroke();
+    };
+    jambe([[-24, -5], [-44, -14], [-62, -8]], '#1b8a97');
+    palme(7, 0.24, '#ffe04a', '#ffc21a');
+    jambe([[-24, 6], [-44, 14], [-62, 7]], '#22a9b8');
+    // Bras du fond, levé : il vient de lancer l'étoile de mer.
+    c.strokeStyle = contour; c.lineWidth = 11; c.beginPath(); c.moveTo(10, -8); c.quadraticCurveTo(-2, -26, -16, -38); c.stroke();
+    c.strokeStyle = '#1b8a97'; c.lineWidth = 7.5; c.beginPath(); c.moveTo(10, -8); c.quadraticCurveTo(4, -18, -2, -24); c.stroke();
+    c.strokeStyle = '#e8a87e'; c.beginPath(); c.moveTo(-2, -24); c.lineTo(-16, -38); c.stroke();
+    c.fillStyle = '#e8a87e'; c.strokeStyle = contour; c.lineWidth = 2; c.beginPath(); c.arc(-17, -40, 5, 0, 6.29); c.fill(); c.stroke();
+    // Corps.
+    let g = c.createLinearGradient(0, -16, 0, 16); g.addColorStop(0, '#5fe0ea'); g.addColorStop(0.45, '#26b5c4'); g.addColorStop(1, '#14808e');
+    c.beginPath(); c.ellipse(0, 0, 33, 16, 0, 0, 6.29); c.fillStyle = g; c.fill();
+    c.save(); c.clip();
+    c.fillStyle = '#ff7a9c'; c.fillRect(-12, -18, 7, 36);
+    c.fillStyle = '#ffd23a'; c.fillRect(8, -18, 3, 36);
+    c.restore();
+    c.strokeStyle = contour; c.lineWidth = 2.6; c.beginPath(); c.ellipse(0, 0, 33, 16, 0, 0, 6.29); c.stroke();
+    // Reflet du soleil sur le dos.
+    c.strokeStyle = '#e8ffff'; c.lineWidth = 3; c.globalAlpha = 0.8;
+    c.beginPath(); c.ellipse(0, 0, 28, 11, 0, 3.6, 5.6); c.stroke(); c.globalAlpha = 1;
+    // Bras tendu vers l'algue.
+    c.strokeStyle = contour; c.lineWidth = 11.5; c.beginPath(); c.moveTo(16, 5); c.quadraticCurveTo(36, 13, 62, 10); c.stroke();
+    c.strokeStyle = '#22a9b8'; c.lineWidth = 8; c.beginPath(); c.moveTo(16, 5); c.quadraticCurveTo(26, 10, 36, 12); c.stroke();
+    c.strokeStyle = '#f2b98f'; c.beginPath(); c.moveTo(36, 12); c.quadraticCurveTo(48, 12, 62, 10); c.stroke();
+    c.fillStyle = '#f2b98f'; c.strokeStyle = contour; c.lineWidth = 2;
+    c.beginPath(); c.ellipse(65, 9, 7, 5.5, -0.2, 0, 6.29); c.fill(); c.stroke();
+    c.beginPath(); c.ellipse(68, 3, 4, 2.6, -0.7, 0, 6.29); c.fill(); c.stroke();
+    // Queue de cheval qui flotte.
+    c.fillStyle = '#5a3420'; c.strokeStyle = contour; c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(32, -24); c.bezierCurveTo(18, -36, 6, -26, -8, -34); c.bezierCurveTo(-2, -24, 10, -22, 30, -14); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#ff7a9c'; c.beginPath(); c.arc(30, -20, 3.2, 0, 6.29); c.fill();
+    // Tuba, derrière la tête.
+    c.strokeStyle = contour; c.lineWidth = 6.5; c.beginPath(); c.moveTo(44, 0); c.quadraticCurveTo(34, 0, 33, -12); c.lineTo(31, -40); c.stroke();
+    c.strokeStyle = '#ffd23a'; c.lineWidth = 4; c.stroke();
+    c.fillStyle = '#ff7a2a'; c.strokeStyle = contour; c.lineWidth = 1.8; c.beginPath(); c.ellipse(31, -42, 4, 2.6, -0.1, 0, 6.29); c.fill(); c.stroke();
+    // Tête.
+    c.fillStyle = '#f2b98f'; c.strokeStyle = contour; c.lineWidth = 2.2; c.beginPath(); c.arc(46, -12, 14, 0, 6.29); c.fill(); c.stroke();
+    c.fillStyle = '#5a3420'; c.beginPath(); c.moveTo(32, -10); c.bezierCurveTo(30, -30, 52, -34, 58, -20); c.quadraticCurveTo(46, -24, 34, -6); c.closePath(); c.fill(); c.stroke();
+    // Joue et sourire.
+    c.fillStyle = '#ff9db0'; c.globalAlpha = 0.7; c.beginPath(); c.arc(47, -3, 3.4, 0, 6.29); c.fill(); c.globalAlpha = 1;
+    c.strokeStyle = '#a03a4a'; c.lineWidth = 2; c.beginPath(); c.arc(50, -5, 4.5, 0.2, 1.9); c.stroke();
+    // Masque : verre, œil, reflet.
+    c.strokeStyle = '#ff7a9c'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(48, -16); c.lineTo(33, -14); c.stroke();
+    g = c.createLinearGradient(50, -22, 62, -8); g.addColorStop(0, '#e6fdff'); g.addColorStop(1, '#8fe2f5');
+    c.fillStyle = g; c.beginPath(); c.ellipse(55, -14, 8.5, 7, 0.1, 0, 6.29); c.fill();
+    c.strokeStyle = '#ff5a86'; c.lineWidth = 3.4; c.stroke();
+    c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(56.5, -13.5, 3.6, 4.2, 0, 0, 6.29); c.fill();
+    c.fillStyle = '#16324f'; c.beginPath(); c.arc(58, -13, 2.3, 0, 6.29); c.fill();
+    c.fillStyle = '#ffffff'; c.beginPath(); c.arc(58.8, -14, 0.9, 0, 6.29); c.fill();
+    c.globalAlpha = 0.85; c.strokeStyle = '#ffffff'; c.lineWidth = 1.6; c.beginPath(); c.arc(55, -14, 5.5, 3.6, 4.6); c.stroke(); c.globalAlpha = 1;
+    c.restore();
+  }
+  function etincelleAffiche(c, x, y, r, coul) {
+    c.fillStyle = coul;
+    c.beginPath(); c.moveTo(x, y - r); c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r); c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fill();
+  }
+  function coquillageAffiche(c, x, y, r, rot) {
+    c.save(); c.translate(x, y); c.rotate(rot);
+    c.fillStyle = '#ffd2b0'; c.strokeStyle = '#c46a3a'; c.lineWidth = r * 0.14;
+    c.beginPath(); c.moveTo(0, r); c.lineTo(-r, -r * 0.2); c.quadraticCurveTo(0, -r * 1.4, r, -r * 0.2); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = '#e08a5a'; c.lineWidth = r * 0.1;
+    for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(0, r * 0.9); c.lineTo(i * r * 0.38, -r * 0.62 + Math.abs(i) * r * 0.12); c.stroke(); }
+    c.restore();
+  }
+  function dessinerAffiche() {
+    const c = ctx, t = 0.6;
+    const k = Math.min(W / 600, H / 800);
+    const ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    const X = (u) => ox + u * k, Y = (v) => oy + v * k;
+    c.save();
+    c.clearRect(0, 0, W, H);
+    const surf = Y(165);
+    // Ciel.
+    let g = c.createLinearGradient(0, 0, 0, surf);
+    g.addColorStop(0, '#46b8f5'); g.addColorStop(1, '#d6f5ff');
+    c.fillStyle = g; c.fillRect(0, 0, W, surf + 2);
+    // Soleil et son halo.
+    const sx = X(505), sy = Y(62);
+    g = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 190 * k);
+    g.addColorStop(0, 'rgba(255,250,200,1)'); g.addColorStop(0.3, 'rgba(255,240,170,.55)'); g.addColorStop(1, 'rgba(255,240,170,0)');
+    c.fillStyle = g; c.fillRect(0, 0, W, surf);
+    c.fillStyle = '#fff3a6'; c.beginPath(); c.arc(sx, sy, 40 * k, 0, 6.29); c.fill();
+    c.fillStyle = '#fffbe0'; c.beginPath(); c.arc(sx - 8 * k, sy - 8 * k, 22 * k, 0, 6.29); c.fill();
+    // Nuages.
+    c.fillStyle = '#ffffff';
+    [[150, 62, 1], [330, 104, 0.75], [-20, 112, 0.8], [650, 120, 0.7]].forEach(([u, v, f]) => {
+      c.beginPath(); c.ellipse(X(u), Y(v), 46 * k * f, 15 * k * f, 0, 0, 6.29); c.ellipse(X(u) - 18 * k * f, Y(v) - 10 * k * f, 22 * k * f, 16 * k * f, 0, 0, 6.29); c.ellipse(X(u) + 14 * k * f, Y(v) - 13 * k * f, 26 * k * f, 19 * k * f, 0, 0, 6.29); c.fill();
+    });
+    // Île au palmier (coupée par le bord gauche).
+    c.fillStyle = '#f5dca0'; c.beginPath(); c.moveTo(0, surf - 30 * k); c.quadraticCurveTo(X(120), surf - 30 * k, X(185), surf + 2); c.lineTo(0, surf + 2); c.fill();
+    c.strokeStyle = '#8a5a2a'; c.lineWidth = 10 * k; c.beginPath(); c.moveTo(X(55), surf - 26 * k); c.quadraticCurveTo(X(40), Y(90), X(92), Y(38)); c.stroke();
+    c.fillStyle = '#2f9a42';
+    for (let i = 0; i < 6; i++) { const a = -2.9 + i * 0.6; c.beginPath(); c.ellipse(X(92) + Math.cos(a) * 34 * k, Y(38) + Math.sin(a) * 18 * k + 8 * k, 42 * k, 10 * k, a, 0, 6.29); c.fill(); }
+    c.fillStyle = '#7a4a1a'; c.beginPath(); c.arc(X(88), Y(46), 6 * k, 0, 6.29); c.arc(X(98), Y(48), 6 * k, 0, 6.29); c.fill();
+    // Bateau du port, voile au vent.
+    dessinerBateau(c, X(345), surf - 5 * k, 1.75 * k, 'voilier', t);
+    // Eau.
+    g = c.createLinearGradient(0, surf, 0, H);
+    g.addColorStop(0, '#8af0ec'); g.addColorStop(0.45, '#33b9d0'); g.addColorStop(1, '#147aa3');
+    c.fillStyle = g; c.fillRect(0, surf, W, H - surf);
+    // Rayons du soleil qui plongent dans le lagon.
+    c.save(); c.globalAlpha = 0.16; c.fillStyle = '#ffffff';
+    for (let i = -3; i < 8; i++) {
+      const x0 = X(140 + i * 85);
+      c.beginPath(); c.moveTo(x0, surf); c.lineTo(x0 + 36 * k, surf); c.lineTo(x0 - 120 * k, H); c.lineTo(x0 - 200 * k, H); c.fill();
+    }
+    c.restore();
+    // Plan lointain : une autre corde de la ferme, plus pâle, des poissons, une tortue.
+    c.save(); c.globalAlpha = 0.42;
+    const yLoin = Y(262);
+    c.strokeStyle = '#f3ecd0'; c.lineWidth = 3 * k; c.beginPath(); c.moveTo(0, yLoin); c.lineTo(W, yLoin - 6 * k); c.stroke();
+    let n = 0;
+    for (let u = X(20) - Math.ceil(X(20) / (62 * k)) * 62 * k; u < W; u += 62 * k) { dessinerAlgue(c, ORDRE_TYPES[n % 3], u, yLoin - 3 * k, 52 * k, t + n, 1.1 * k); n++; }
+    c.restore();
+    c.save(); c.globalAlpha = 0.7;
+    [[455, 215, -1], [492, 232, -1], [470, 247, -1], [515, 212, -1], [530, 245, -1]].forEach(([u, v, d], i) => dessinerPoisson(c, X(u), Y(v), 1.1 * k, d, i, i % 2));
+    c.restore();
+    c.save(); c.globalAlpha = 0.85; dessinerAnimal(c, 'tortue', X(150), Y(312), 2.1 * k, 0.4, 1); c.restore();
+    // Reflets ondulés sous la surface.
+    c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = 2 * k;
+    for (let i = 0; i < 18; i++) { const u = (i * 97) % 640 - 20, v = 182 + (i * 37) % 60; c.beginPath(); c.moveTo(X(u), Y(v)); c.quadraticCurveTo(X(u + 10), Y(v - 4), X(u + 22), Y(v)); c.stroke(); }
+    // La surface.
+    c.strokeStyle = '#ffffff'; c.lineWidth = 3.5 * k; c.beginPath();
+    for (let x = 0; x <= W + 10; x += 10) c.lineTo(x, surf + Math.sin(x * 0.03 / k) * 3 * k);
+    c.stroke();
+    // Corde principale de la ferme, tendue entre deux bouées.
+    const yCordeA = (x) => Y(452) - (x - X(0)) * 0.045 + Math.sin((x - X(0)) / k * 0.02) * 4 * k;
+    [X(30), X(570)].forEach((x) => { c.strokeStyle = 'rgba(240,232,205,.8)'; c.lineWidth = 2 * k; c.beginPath(); c.moveTo(x, surf); c.lineTo(x, yCordeA(x)); c.stroke(); });
+    c.strokeStyle = '#7a5a2a'; c.lineWidth = 9 * k; c.beginPath();
+    for (let x = -10; x <= W + 10; x += 8) c.lineTo(x, yCordeA(x));
+    c.stroke();
+    c.strokeStyle = '#efdcaa'; c.lineWidth = 6 * k; c.stroke();
+    c.strokeStyle = '#c9b07a'; c.lineWidth = 1.5 * k; c.setLineDash([7 * k, 7 * k]); c.stroke(); c.setLineDash([]);
+    // Algues sur la corde (la dorée, à droite, est mûre et brille).
+    [['verte', 120, 132], ['rouge', 205, 118], ['verte', 300, 104], ['rouge', 575, 112]].forEach(([type, u, h]) => dessinerAlgue(c, type, X(u), yCordeA(X(u)), h * k, t + u, 2.1 * k));
+    const ax = X(452), ay = yCordeA(ax);
+    g = c.createRadialGradient(ax, ay - 90 * k, 8 * k, ax, ay - 90 * k, 150 * k);
+    g.addColorStop(0, 'rgba(255,255,215,.95)'); g.addColorStop(0.45, 'rgba(255,236,140,.5)'); g.addColorStop(1, 'rgba(255,236,140,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(ax, ay - 90 * k, 150 * k, 0, 6.29); c.fill();
+    c.save(); c.shadowColor = '#fff4a0'; c.shadowBlur = 24 * k;
+    dessinerAlgue(c, 'doree', ax, ay, 185 * k, 1.1, 2.6 * k);
+    c.restore();
+    dessinerBouee(c, X(30), yCordeA(X(30)), 19 * k, 'classique', 0);
+    dessinerBouee(c, X(570), yCordeA(X(570)), 19 * k, 'classique', 1.5);
+    // L'oursin gourmand sur la corde, et l'étoile de mer qui file vers lui.
+    const uxO = X(118), uyO = yCordeA(uxO) - 22 * k;
+    // Le glissement qui cueille l'algue dorée : une traînée lumineuse.
+    const tr0 = [X(392), Y(262)], tr1 = [X(520), Y(232)], tr2 = [X(575), Y(316)];
+    for (let i = 0; i < 26; i++) {
+      const p = i / 25, q = 1 - p;
+      const x = q * q * tr0[0] + 2 * q * p * tr1[0] + p * p * tr2[0], y = q * q * tr0[1] + 2 * q * p * tr1[1] + p * p * tr2[1];
+      c.fillStyle = `rgba(255,255,255,${0.15 + 0.6 * p})`; c.beginPath(); c.arc(x, y, (3 + 11 * p) * k, 0, 6.29); c.fill();
+    }
+    // Étincelles et coquillages qui jaillissent vers le haut.
+    [[420, 228, 15, '#ffffff'], [548, 262, 13, '#fff6a0'], [500, 196, 18, '#ffffff'], [440, 312, 10, '#fff6a0'], [585, 210, 11, '#ffffff'], [395, 300, 8, '#ffffff'], [520, 330, 9, '#fff6a0'], [470, 170, 9, '#ffffff']].forEach(([u, v, r, col]) => etincelleAffiche(c, X(u), Y(v), r * k, col));
+    [[478, 205, 13, -0.4], [530, 175, 15, 0.3], [560, 140, 12, 0.8], [432, 182, 11, -0.9]].forEach(([u, v, r, a]) => coquillageAffiche(c, X(u), Y(v), r * k, a));
+    // La plongeuse, en grand.
+    dessinerPlongeuseAffiche(c, X(250), Y(468), 2.85 * k, -0.52);
+    // Bulles du tuba qui remontent.
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2.2 * k;
+    [[262, 300, 7], [270, 270, 5], [258, 244, 8], [266, 214, 4.5], [255, 190, 6]].forEach(([u, v, r]) => { c.beginPath(); c.arc(X(u), Y(v), r * k, 0, 6.29); c.stroke(); });
+    // L'oursin et l'étoile lancée (devant la corde).
+    dessinerOursin(c, uxO, uyO, 2.4 * k, 0.2, true);
+    c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 3 * k; c.setLineDash([3 * k, 9 * k]);
+    c.beginPath(); c.moveTo(X(232), Y(318)); c.quadraticCurveTo(X(185), Y(300), X(160), Y(360)); c.stroke(); c.setLineDash([]);
+    dessinerEtoileMer(c, X(155), Y(368), 19 * k, 0.5);
+    // Sol du lagon.
+    c.fillStyle = '#f2d99a'; c.beginPath(); c.moveTo(0, H);
+    for (let x = 0; x <= W + 20; x += 20) c.lineTo(x, Y(738) + Math.sin(x / k * 0.02) * 9 * k);
+    c.lineTo(W, H); c.closePath(); c.fill();
+    c.fillStyle = '#e4c47e'; for (let i = 0; i < 14; i++) { c.beginPath(); c.ellipse(X((i * 53) % 640 - 20), Y(762 + (i % 3) * 12), 9 * k, 3 * k, 0, 0, 6.29); c.fill(); }
+    coquillageAffiche(c, X(300), Y(772), 11 * k, 0.2);
+    // Premier plan : grandes algues coupées par les bords, corail rouge, étoile de mer, gros poisson.
+    c.save(); c.globalAlpha = 1;
+    frond(c, X(-10), H + 6 * k, 330 * k, 46 * k, 0.12, 30 * k, '#4fcf5c', '#1d6e30');
+    frond(c, X(38), H + 6 * k, 260 * k, 40 * k, 0.32, 22 * k, '#6fe26a', '#237a34');
+    frond(c, X(612), H + 6 * k, 250 * k, 44 * k, -0.25, -18 * k, '#4fcf5c', '#1d6e30');
+    c.restore();
+    dessinerAlgue(c, 'rouge', X(520), Y(800), 150 * k, 0.3, 3 * k);
+    dessinerEtoileMer(c, X(118), Y(762), 28 * k, 0.3);
+    dessinerPoisson(c, X(612), Y(612), 3.4 * k, -1, 0.6, 0);
+    c.restore();
+  }
+  function cacherInterface() {
+    document.querySelectorAll('.ecran, #hud, #commandes, #outils, #tuto, #main, #toast, #alerte, .jel-langue, jel-langue, button')
+      .forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    cacherInterface();
+    [60, 400, 1200].forEach((ms) => setTimeout(cacherInterface, ms)); // bouton de langue posé parfois plus tard
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche); // après redim(), qui vide le canvas
+  }
+
+  /* ---------------- Images du jeu (page du jeu) ----------------
+     Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+     directement en pleine partie, avec sa vraie interface (barre du haut, commandes du port, algues et
+     réserve en bas), sans écran titre, ni fenêtre « Continuer », ni démonstration (CONSIGNES-JEU.md,
+     section 5). La scène est posée par le code, les effets tournent un quart de seconde, puis la
+     partie est figée sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+       1 = niveau 1, la baie : on cueille d'un glissement, la tortue vient d'être repérée ;
+       2 = niveau 10, le récif : trois algues, un oursin qui grignote, une étoile de mer lancée,
+           une corde emmêlée par la tempête ;
+       3 = niveau 20, le grand large : marée, eau trouble, banc de poissons nettoyeurs, commande
+           urgente à livrer dans l'ordre, dauphin et raie. */
+  const SCENES_APERCU = {
+    1: {
+      niveau: 0, bouee: 'classique', bateau: 'barque', temps: 32, restant: 78, livrees: 0, score: 0, choix: 'verte',
+      stock: { verte: 2, rouge: 0, doree: 0 },
+      cordes: [
+        [['verte', 1], ['verte', 1], ['verte', 0.62], null, ['verte', 0.3]],
+        [['verte', 0.45], null, ['verte', 1], ['verte', 0.8], null],
+      ],
+      commandes: [[['verte', 2]], [['verte', 3]], [['verte', 2]]],
+      genere: 3, cueille: { r: 0, s: 3, de: 2.45, a: 3.75, type: 'verte' },
+      animaux: [['tortue', 0.24, 0.9, 1, true]], gain: { n: 3, animal: 0 },
+    },
+    2: {
+      niveau: 9, bouee: 'rayee', bateau: 'voilier', temps: 48, restant: 92, livrees: 2, score: 34, choix: 'rouge', etoilesMer: 2,
+      stock: { verte: 1, rouge: 3, doree: 1 },
+      cordes: [
+        [['doree', 1], ['doree', 0.7], ['verte', 1], null, ['doree', 0.45]],
+        [['rouge', 1], ['verte', 0.8], ['rouge', 0.55], null, ['rouge', 1]],
+        [['rouge', 0.6], ['verte', 0.5], null, ['rouge', 0.4], ['verte', 0.3]],
+        [['rouge', 0.9], null, ['rouge', 1], ['verte', 0.4], ['rouge', 0.7]],
+      ],
+      noeuds: { 2: [0, 2, 4] },
+      oursins: [[3, 2, 1, 0.8], [1, 3.15, -1, 0, 0.55]],
+      commandes: [[['rouge', 2], ['doree', 1]], [['verte', 2], ['rouge', 2]], [['verte', 1], ['doree', 2]]],
+      genere: 5, plongeuse: [2.6, 1, -0.55],
+      animaux: [['perroquet', 0.72, 0.93, -1, false]],
+    },
+    3: {
+      niveau: 19, bouee: 'coquillage', bateau: 'chalutier', temps: 9, restant: 61, livrees: 5, score: 146, choix: 'doree', etoilesMer: 3,
+      stock: { verte: 2, rouge: 1, doree: 2 },
+      cordes: [
+        [['doree', 1], ['verte', 0.6], ['doree', 0.85], null, ['doree', 0.3]],
+        [['rouge', 0.7], ['rouge', 1], null, ['verte', 0.9], ['rouge', 0.5]],
+        [['rouge', 1], ['verte', 0.4], ['rouge', 0.8], null, ['rouge', 1]],
+        [null, ['rouge', 0.6], ['verte', 0.3], ['rouge', 0.9], null],
+      ],
+      oursins: [[2, 3.4, -1, 0]],
+      commandes: [[['verte', 2], ['doree', 2]], [['verte', 2], ['rouge', 3]], [['verte', 1], ['rouge', 2], ['doree', 1]]],
+      urgente: 0, genere: 8, cueille: { r: 0, s: 3, de: 2.5, a: 3.8, type: 'verte' },
+      trouble: 0.34, banc: true, attentePoissons: 8,
+      animaux: [['dauphin', 0.3, 0.07, 1, false], ['raie', 0.74, 0.92, -1, false]],
+    },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 1234567 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    // Progression neuve, en mémoire seulement : démonstrations déjà vues, album complet.
+    P.debloque = NIVEAUX.length; P.etoiles = [1]; P.records = []; P.son = false;
+    P.album = {}; ALBUM.forEach((id) => { P.album[id] = 1; });
+    P.tutos = {}; ['base', 'detache', 'rouge', 'melange', 'maree', 'oursin', 'doree', 'tempete', 'trouble', 'ordre', 'grandmaree', 'urgent'].forEach((cle) => { P.tutos[cle] = 1; });
+    P.bouee = sc.bouee; P.bateau = sc.bateau;
+    lancerNiveau(sc.niveau);
+    if (tutoActif) { tutoActif = null; $('tuto').classList.add('cache'); $('main').classList.add('cache'); }
+    S.tuto = null;
+    S.temps = sc.temps; S.restant = sc.restant; S.livrees = sc.livrees; S.score = sc.score; S.scoreAffiche = sc.score;
+    S.stock = Object.assign({}, sc.stock); S.choix = sc.choix;
+    if (sc.etoilesMer !== undefined) S.etoilesMer = sc.etoilesMer;
+    S.prochainOursin = 999; S.prochaineTempete = 999; S.prochainAnimal = 999;
+    // Cordes et algues.
+    sc.cordes.forEach((ligne, r) => ligne.forEach((p, s) => {
+      S.cordes[r].places[s] = p ? Object.assign(nouvellePlante(p[0], p[1]), p[1] >= 1 ? { mur: 8 } : {}) : null;
+    }));
+    if (sc.noeuds) Object.keys(sc.noeuds).forEach((r) => sc.noeuds[r].forEach((s) => { S.cordes[r].noeuds[s] = true; }));
+    // Commandes du port.
+    S.commandes = sc.commandes.map((lignes, i) => {
+      let val = 2; lignes.forEach(([type, q]) => { val += q * TYPES[type].val * 2; });
+      const urgent = sc.urgente === i;
+      return { id: ++idCommande, lignes: lignes.map(([type, q]) => ({ type, q })), val: urgent ? val * 2 : val, urgent, sablier: 21, sablierMax: 35 };
+    });
+    S.genere = sc.genere;
+    S.trouble = sc.trouble || 0;
+    S.attentePoissons = sc.attentePoissons || 0;
+    construireOutils(); majCommandes(); majHud();
+    redim();
+    // Animaux du coin.
+    S.animaux = (sc.animaux || []).map(([id, fx, fy, dir, vu]) => ({ id, x: W * fx, y: G.surface + G.prof * fy, dir, v: 0, vu, t: 0.3 }));
+    // Oursins (et l'étoile de mer lancée vers l'un d'eux).
+    S.oursins = (sc.oursins || []).map(([r, pos, dir, mange, etoile]) => {
+      const o = { r, pos, dir, mange, x: G.xL + (pos + 0.5) * G.pw, y: yCorde(S, r) - 9 * G.s, fuit: false, vy: 0, a: 1 };
+      if (etoile !== undefined) { o.vise = true; S.projectiles.push({ x: 0, y: 0, cible: o, t: etoile }); }
+      return o;
+    });
+    // La plongeuse.
+    const pl = S.plongeuse;
+    // Pendant un glissement, la plongeuse suit le doigt, un peu en dessous (viserPlongeuse).
+    if (sc.cueille) { pl.x = pl.tx = xPlace(sc.cueille.a + 0.1); pl.y = pl.ty = yCorde(S, sc.cueille.r) - G.haut * 0.8 + 30; pl.dir = 1; }
+    else if (sc.plongeuse) { pl.x = pl.tx = xPlace(sc.plongeuse[0]); pl.y = pl.ty = yCorde(S, sc.plongeuse[1]) + sc.plongeuse[2] * G.haut; pl.dir = 1; }
+    S.projectiles.forEach((q) => { q.x = pl.x; q.y = pl.y; });
+    // Banc de poissons nettoyeurs qui traverse l'eau trouble.
+    if (sc.banc) {
+      S.poissons = 2;
+      S.banc = [];
+      for (let i = 0; i < 9; i++) S.banc.push({ x: W * (0.06 + i * 0.1), y: G.surface + G.prof * (0.3 + ((i * 37) % 9) * 0.05), dir: 1, ph: i, coul: i % 2 });
+    }
+    // Un geste en cours : l'algue vient d'être cueillie d'un glissement, les coquillages s'envolent.
+    if (sc.cueille) {
+      const q = sc.cueille, x = xPlace(q.s), y = yCorde(S, q.r);
+      etincelles(x, y - G.haut * 0.5, TYPES[q.type].c1, 14);
+      bulles(x, y, 6);
+    }
+    if (sc.gain) { const a = S.animaux[sc.gain.animal]; etincelles(a.x, a.y, '#fff6a0', 12); gagner(sc.gain.n, { x: a.x, y: a.y }); }
+    for (let i = 0; i < 15; i++) majCommun(1 / 60);
+    if (sc.cueille) {
+      const q = sc.cueille, y = yCorde(S, q.r) - G.haut * 0.55;
+      for (let i = 0; i <= 10; i++) { const u = i / 10, s = q.de + (q.a - q.de) * u; S.particules.push({ k: 'trace', x: xPlace(s), y: y - Math.sin(u * Math.PI) * G.haut * 0.3, t: (1 - u) * 0.3, d: 0.35 }); }
+    }
+    majOutils(); majHud();
+    // Figée sur ce moment, sans fenêtre de pause.
+    S.pause = true;
+  }
+
   let precedent = 0, horloge = 0;
   function boucle(ms) {
     const dt = Math.min(0.05, (ms - precedent) / 1000 || 0);
@@ -3146,6 +3491,7 @@
   /* ---------------- Messages ---------------- */
   let toastMinuteur = 0, dernierToast = '';
   function toast(cle, vars) {
+    if (apercu) return; // image du jeu : aucun message par-dessus la partie
     const el = $('toast');
     const txt = tr(cle, vars);
     if (txt === dernierToast && el.classList.contains('vu')) { clearTimeout(toastMinuteur); }
@@ -3256,7 +3602,7 @@
     if (S.alerte > 0) $('alerte').classList.remove('cache');
     montrerEcran(null);
   }
-  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu) pause(); });
 
   function construireNiveaux() {
     const g = $('grille'); g.innerHTML = '';
@@ -3427,12 +3773,17 @@
   });
 
   /* ---------------- Sauvegarde à la fermeture ---------------- */
-  if (SAVE) JEL_SAVE.surFermeture(() => { if (enPartie && S && !S.fini) sauver(S.n + 1); });
+  if (SAVE) JEL_SAVE.surFermeture(() => { if (enPartie && S && !S.fini && !apercu) sauver(S.n + 1); });
 
   /* ---------------- Démarrage ---------------- */
   majBoutonsSon();
   redim();
-  requestAnimationFrame((ms) => { precedent = ms; boucle(ms); });
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche(); // affiche : ni écran titre, ni boucle de jeu, ni son
+  else {
+    if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+    requestAnimationFrame((ms) => { precedent = ms; boucle(ms); });
+  }
 })();
 </script>
 </body>

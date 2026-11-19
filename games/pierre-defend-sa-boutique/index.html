@@ -1615,7 +1615,9 @@
   if (donnees.options && typeof donnees.options.son === 'boolean') sonActif = donnees.options.son;
   try { const s = localStorage.getItem(CLE_SON); if (s === '0') sonActif = false; if (s === '1') sonActif = true; } catch (e) { /* stockage refusé */ }
 
+  let apercu = 0;   // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   function sauver(niveauReprise, score) {
+    if (apercu) return;   // une image du jeu n'écrit jamais dans la sauvegarde
     try { window.JEL_SAVE.save(JEU, { niveau: niveauReprise, score: score || 0, progres, options: { son: sonActif } }); } catch (e) { /* rien */ }
   }
 
@@ -3241,17 +3243,324 @@
     if (etat === 'tuto') { tuto.t += dt; animerMainTuto(); }
     if (etat === 'police' && monde) { monde.police += dt; for (const p of monde.gens) majPerso(p, dt); monde.gens = monde.gens.filter((p) => p.etat !== 'parti' && p.y > 20); }
     if (etat === 'vide' && monde) { for (const p of monde.gens) if (p.etat !== 'fige') majPerso(p, dt); }
-    if (monde && etat !== 'pause') majEffets(dt);
+    if (monde && etat !== 'pause' && etat !== 'apercu') majEffets(dt);
     ctx.clearRect(0, 0, W, H);
     dessinerScene();
     requestAnimationFrame(boucle);
   }
 
+  // ---------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Pierre, en grand sous la
+  // lampe de sa boutique, abat son plumeau sur la main d'un pilleur aux yeux qui brillent, penché par la
+  // vitrine brisée ; le Costaud entre par la porte un carton sous le bras ; dehors, la rue en émeute sous
+  // les gyrophares. Cadre de 600 × 800 au centre ; le décor continue jusqu'aux bords sur écran large.
+  function afficheRue(x0, x1) {
+    // ciel de nuit (vu par la vitrine et la porte)
+    const g = ctx.createLinearGradient(0, 90, 0, 340);
+    g.addColorStop(0, '#1a1040'); g.addColorStop(0.55, '#4a2268'); g.addColorStop(1, '#9a3f78');
+    ctx.fillStyle = g; ctx.fillRect(x0, 90, x1 - x0, 260);
+    // immeubles d'en face, fenêtres allumées
+    for (let i = Math.floor(x0 / 78) - 1; i * 78 < x1; i++) {
+      const bx = i * 78, h = 110 + (((i * 53) % 7) + 7) % 7 * 16, haut = 330 - h;
+      ctx.fillStyle = i % 2 ? '#241a40' : '#2c2050'; ctx.fillRect(bx, haut, 74, h);
+      for (let r = 0; r < 6; r++) for (let c = 0; c < 3; c++) {
+        if (((i + r + c) % 3 + 3) % 3 === 0 || haut + 14 + r * 22 > 320) continue;
+        ctx.fillStyle = (i + r) % 4 ? '#ffd96acc' : '#ffb35acc'; ctx.fillRect(bx + 10 + c * 21, haut + 14 + r * 22, 11, 11);
+      }
+    }
+    // chaussée et trottoir
+    ctx.fillStyle = '#34303f'; ctx.fillRect(x0, 330, x1 - x0, 150);
+    ctx.fillStyle = '#e8e2c855'; for (let x = Math.floor(x0 / 70) * 70; x < x1; x += 70) ctx.fillRect(x, 372, 36, 5);
+    ctx.fillStyle = '#5e5870'; ctx.fillRect(x0, 410, x1 - x0, 70);
+    // gyrophares : grandes lueurs rouge et bleue
+    for (const [lx, ly, c] of [[40, 300, '255,50,80'], [600, 250, '60,110,255']]) {
+      const lg = ctx.createRadialGradient(lx, ly, 10, lx, ly, 300);
+      lg.addColorStop(0, `rgba(${c},.85)`); lg.addColorStop(0.4, `rgba(${c},.35)`); lg.addColorStop(1, `rgba(${c},0)`);
+      ctx.fillStyle = lg; ctx.fillRect(x0, 90, x1 - x0, 390);
+    }
+    // fumée cartoon
+    for (let i = Math.floor(x0 / 120) - 1; i * 120 < x1; i++) {
+      const x = i * 120 + 20, y = 215 + (((i * 37) % 3) + 3) % 3 * 18;
+      ctx.fillStyle = '#d8cfe066'; ctx.beginPath(); ctx.arc(x, y, 26, 0, 7); ctx.arc(x + 28, y - 10, 22, 0, 7); ctx.arc(x + 52, y + 4, 18, 0, 7); ctx.fill();
+    }
+    // foule de la manifestation, pancartes sans texte
+    for (let i = Math.floor(x0 / 26) - 1; i * 26 < x1; i++) {
+      const x = i * 26, b = ((i * 7) % 5) * 1.5, y = 352 + b;
+      ctx.fillStyle = '#170f26'; ctx.beginPath(); ctx.arc(x, y - 22, 9, 0, 7); ctx.fill(); rr(x - 10, y - 14, 20, 30, 6); ctx.fill();
+      if (((i % 4) + 4) % 4 === 1) {
+        ctx.fillRect(x + 7, y - 52, 3, 34);
+        ctx.fillStyle = ['#ff8a3d', '#4fb0ff', '#ffd23f'][((i % 3) + 3) % 3]; ctx.fillRect(x - 6, y - 66, 30, 18);
+      }
+    }
+    // lampadaire allumé
+    ctx.fillStyle = '#15101f'; ctx.fillRect(70, 170, 6, 180);
+    const lp = ctx.createRadialGradient(73, 170, 2, 73, 170, 70);
+    lp.addColorStop(0, '#fff3c4'); lp.addColorStop(0.25, '#ffd36acc'); lp.addColorStop(1, '#ffd36a00');
+    ctx.fillStyle = lp; ctx.beginPath(); ctx.arc(73, 170, 70, 0, 7); ctx.fill();
+  }
+
+  function afficheSol(x0, x1, y1) {
+    // sol en damier, en perspective (point de fuite au fond de la boutique)
+    const fx = 300, fy = 250, haut = 470;
+    const X = (u, y) => fx + (u - fx) * (y - fy) / (haut - fy);
+    let y = haut, i = 0;
+    while (y < y1) {
+      const yb = y + 22 + i * 10;
+      for (let u = -2000, j = 0; u < 2600; u += 44, j++) {
+        ctx.fillStyle = (i + j) % 2 ? '#d9d3ea' : '#bcb2d8';
+        ctx.beginPath(); ctx.moveTo(X(u, y), y); ctx.lineTo(X(u + 44, y), y); ctx.lineTo(X(u + 44, yb), yb); ctx.lineTo(X(u, yb), yb); ctx.closePath(); ctx.fill();
+      }
+      y = yb; i++;
+    }
+    const og = ctx.createLinearGradient(0, haut, 0, haut + 40);
+    og.addColorStop(0, '#00000055'); og.addColorStop(1, '#00000000');
+    ctx.fillStyle = og; ctx.fillRect(x0, haut, x1 - x0, 40);
+  }
+
+  function dessinerAffiche() {
+    const r = cadre.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
+    const k = Math.min(r.width / 600, r.height / 800);
+    const ox = (r.width - 600 * k) / 2, oy = (r.height - 800 * k) / 2;
+    const x0 = -ox / k - 2, x1 = (r.width - ox) / k + 2, y0 = -oy / k - 2, y1 = (r.height - oy) / k + 2;
+    ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    horloge = 1.3; monde = null; L = NIVEAUX[0];
+    ctx.fillStyle = '#1d1630'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    // 1. La rue, derrière la vitrine et la porte
+    afficheRue(x0, x1);
+    // 2. Le pilleur à la vitrine (son corps est dehors, derrière le présentoir)
+    const a = nouveauPerso('voleur');
+    a.peau = '#e0a87c'; a.lieu = 'v'; a.etat = 'tend'; a.dedans = true; a.x = 0; a.y = 0; a.etoilesTete = 1;
+    ctx.save(); ctx.translate(140, 470); ctx.scale(2.7, 2.7); dessinerPerso(a, true); ctx.restore();
+    // 3. Le sol, puis le mur de la boutique troué par la vitrine et la porte
+    afficheSol(x0, x1, y1);
+    const mur = ctx.createLinearGradient(0, y0, 0, 470);
+    mur.addColorStop(0, '#120d24'); mur.addColorStop(Math.max(0, Math.min(1, (70 - y0) / (470 - y0))), '#2c2150'); mur.addColorStop(1, '#45346f');
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, 470 - y0); ctx.rect(30, 150, 300, 250); ctx.rect(410, 130, 150, 340);
+    ctx.fillStyle = mur; ctx.fill('evenodd'); ctx.restore();
+    ctx.fillStyle = '#0e0a1c'; ctx.fillRect(x0, 60, x1 - x0, 6);
+    // rayonnages muraux sur les bords (sur écran large)
+    for (const bx of [-150, 600]) {
+      if (bx + 120 < x0 || bx > x1) continue;
+      ctx.fillStyle = '#6b4426'; ctx.fillRect(bx + 15, 160, 120, 300);
+      for (let j = 0; j < 4; j++) { ctx.fillStyle = '#8a5a34'; ctx.fillRect(bx + 15, 220 + j * 72, 120, 6); for (let q = 0; q < 4; q++) { ctx.save(); ctx.translate(bx + 22 + q * 28, 182 + j * 72); ctx.scale(2.2, 2.2); dessinerBoite(0, 0, COULEURS_BOITES[(j + q) % 6]); ctx.restore(); } }
+    }
+    // vitrine brisée : éclats de verre et fêlures
+    ctx.fillStyle = '#9fd8ff3a';
+    for (const t of [[30, 150, 120, 150, 30, 250], [330, 150, 330, 280, 250, 150], [30, 400, 30, 330, 95, 400], [330, 400, 270, 400, 330, 340]]) { ctx.beginPath(); ctx.moveTo(t[0], t[1]); ctx.lineTo(t[2], t[3]); ctx.lineTo(t[4], t[5]); ctx.closePath(); ctx.fill(); }
+    ctx.strokeStyle = '#ffffffaa'; ctx.lineWidth = 2.5; ctx.beginPath();
+    ctx.moveTo(120, 150); ctx.lineTo(30, 250); ctx.moveTo(250, 150); ctx.lineTo(330, 280); ctx.moveTo(30, 330); ctx.lineTo(95, 400); ctx.moveTo(270, 400); ctx.lineTo(330, 340);
+    ctx.moveTo(75, 150); ctx.lineTo(62, 196); ctx.moveTo(300, 194); ctx.lineTo(318, 210); ctx.stroke();
+    ctx.strokeStyle = '#1f1838'; ctx.lineWidth = 10; ctx.strokeRect(30, 150, 300, 250);
+    // néons : bandeau rose au-dessus de la vitrine, manette bleue au-dessus de la porte (sans texte)
+    ctx.save(); ctx.shadowBlur = 22; ctx.lineCap = 'round';
+    ctx.shadowColor = '#ff3fb4'; ctx.strokeStyle = '#ff7ad0'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(40, 126); ctx.lineTo(320, 126); ctx.stroke();
+    ctx.shadowColor = '#3ff0ff'; ctx.strokeStyle = '#9ff8ff'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(452, 78); ctx.lineTo(518, 78); ctx.quadraticCurveTo(538, 78, 542, 100); ctx.quadraticCurveTo(546, 120, 528, 118); ctx.lineTo(518, 110); ctx.lineTo(452, 110); ctx.lineTo(442, 118); ctx.quadraticCurveTo(424, 120, 428, 100); ctx.quadraticCurveTo(432, 78, 452, 78); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(452, 94); ctx.lineTo(468, 94); ctx.moveTo(460, 86); ctx.lineTo(460, 102); ctx.stroke();
+    ctx.shadowColor = '#ff3fb4'; ctx.fillStyle = '#ff7ad0'; ctx.beginPath(); ctx.arc(506, 90, 4.5, 0, 7); ctx.arc(518, 100, 4.5, 0, 7); ctx.fill();
+    ctx.restore();
+    // présentoir en bois et consoles exposées
+    ctx.fillStyle = '#8a5a34'; ctx.fillRect(18, 395, 324, 48);
+    ctx.fillStyle = '#a8703f'; ctx.fillRect(18, 395, 324, 8);
+    ctx.fillStyle = '#00000033'; ctx.fillRect(18, 437, 324, 6);
+    dessinerConsole(70, 412, 2.1, '#d6dbe8'); dessinerConsole(160, 414, 2.1, '#3b3f52');
+    // 4. La lampe de la boutique, son cône de lumière et le halo derrière Pierre
+    ctx.strokeStyle = '#0b0816'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(390, y0); ctx.lineTo(390, 72); ctx.stroke();
+    const cone = ctx.createLinearGradient(0, 100, 0, 700);
+    cone.addColorStop(0, 'rgba(255,236,170,.3)'); cone.addColorStop(1, 'rgba(255,236,170,0)');
+    ctx.fillStyle = cone; ctx.beginPath(); ctx.moveTo(352, 100); ctx.lineTo(428, 100); ctx.lineTo(540, 720); ctx.lineTo(230, 720); ctx.closePath(); ctx.fill();
+    const halo = ctx.createRadialGradient(385, 380, 20, 385, 380, 250);
+    halo.addColorStop(0, 'rgba(255,226,160,.55)'); halo.addColorStop(1, 'rgba(255,226,160,0)');
+    ctx.fillStyle = halo; ctx.fillRect(x0, 100, x1 - x0, 600);
+    ctx.fillStyle = '#2a2050'; ctx.beginPath(); ctx.moveTo(366, 72); ctx.lineTo(414, 72); ctx.lineTo(436, 102); ctx.lineTo(344, 102); ctx.closePath(); ctx.fill();
+    const amp = ctx.createRadialGradient(390, 104, 2, 390, 104, 40);
+    amp.addColorStop(0, '#ffffff'); amp.addColorStop(0.4, '#fff3c4'); amp.addColorStop(1, '#fff3c400');
+    ctx.fillStyle = amp; ctx.beginPath(); ctx.arc(390, 104, 40, 0, 7); ctx.fill();
+    // 5. Le Costaud qui entre par la porte, un carton volé contre lui
+    const c = nouveauPerso('costaud');
+    c.peau = '#c68a5e'; c.dedans = true; c.lieu = 'p'; c.etat = 'marche'; c.phase = 1.2; c.x = 0; c.y = 0; c.porte = 2;
+    ctx.save(); ctx.translate(500, 486); ctx.scale(2.45, 2.45); dessinerPerso(c, true); ctx.restore();
+    // montants de la porte ouverte
+    ctx.fillStyle = '#1f1838'; ctx.fillRect(404, 126, 10, 346); ctx.fillRect(556, 126, 10, 346); ctx.fillRect(404, 122, 162, 10);
+    ctx.fillStyle = '#9fd8ff30'; ctx.beginPath(); ctx.moveTo(414, 134); ctx.lineTo(440, 152); ctx.lineTo(440, 450); ctx.lineTo(414, 470); ctx.fill();
+    // 6. Le bras du pilleur qui plonge vers la console du présentoir
+    const sx = 140 + 8 * 2.7, sy = 470 - 48 * 2.7, gx = 282, gy = 382;
+    dessinerConsole(286, 408, 2.2, '#ffffff');
+    ctx.save(); ctx.lineCap = 'round';
+    ctx.strokeStyle = '#3d3d4f'; ctx.lineWidth = 19; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(gx, gy); ctx.stroke();
+    ctx.strokeStyle = '#d9d9e3'; ctx.lineWidth = 5;
+    for (const f of [0.35, 0.55, 0.75]) { const px = lerp(sx, gx, f), py = lerp(sy, gy, f); ctx.beginPath(); ctx.moveTo(px - 3, py - 8); ctx.lineTo(px + 3, py + 8); ctx.stroke(); }
+    ctx.fillStyle = '#2b2b33'; ctx.beginPath(); ctx.arc(gx, gy, 18, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#2b2b33'; ctx.lineWidth = 7;
+    for (let q = -1; q <= 1; q++) { ctx.beginPath(); ctx.moveTo(gx + q * 9, gy + 8); ctx.lineTo(gx + q * 12, gy + 24); ctx.stroke(); }
+    ctx.restore();
+    // 7. Pierre, en grand, plumeau abattu
+    pierre.x = 200; pierre.y = 100; pierre.cible = 200; pierre.coup = 0.2; pierre.pose = true; pierre.joie = 0; pierre.vit = 0; pierre.pas = 0;
+    const S = 3.8;
+    ctx.save(); ctx.translate(390 - 200 * S, 662 - 100 * S); ctx.scale(S, S); dessinerPierre(); ctx.restore();
+    // 8. L'impact : éclair blanc, traits, étoiles et coup de plumeau rose
+    const ix = 286, iy = 374;
+    const fl = ctx.createRadialGradient(ix, iy, 4, ix, iy, 80);
+    fl.addColorStop(0, 'rgba(255,255,240,.95)'); fl.addColorStop(0.35, 'rgba(255,240,150,.5)'); fl.addColorStop(1, 'rgba(255,240,150,0)');
+    ctx.fillStyle = fl; ctx.beginPath(); ctx.arc(ix, iy, 80, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#ffe066'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    for (let q = 0; q < 10; q++) { const an = q * 0.628 + 0.2; ctx.beginPath(); ctx.moveTo(ix + Math.cos(an) * 36, iy + Math.sin(an) * 36); ctx.lineTo(ix + Math.cos(an) * (58 + (q % 2) * 16), iy + Math.sin(an) * (58 + (q % 2) * 16)); ctx.stroke(); }
+    ctx.strokeStyle = '#ff9ad5'; ctx.lineWidth = 12; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.arc(330, 350, 74, -2.9, -1.35); ctx.stroke();
+    ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(330, 350, 92, -2.75, -1.6); ctx.stroke();
+    ctx.globalAlpha = 1;
+    for (const [dx, dy, rr3, col] of [[-52, -30, 15, '#ffe066'], [-30, -62, 11, '#ffffff'], [-66, 18, 12, '#ff9ad5'], [8, -50, 9, '#ffe066'], [-40, 48, 9, '#ffffff'], [-80, -10, 8, '#ffe066'], [0, 0, 20, '#fff6b0']]) etoile(ix + dx, iy + dy, rr3, col);
+    // 9. Premier plan : rayon de jeux coupé à gauche, cartons à droite, consoles qui volent
+    ctx.fillStyle = '#5a3820'; ctx.fillRect(x0, 540, 100 - x0, y1 - 540);
+    ctx.fillStyle = '#6b4426'; ctx.fillRect(x0, 540, 92 - x0, y1 - 540);
+    for (let j = 0; j < 4; j++) {
+      const yy = 610 + j * 92;
+      ctx.fillStyle = '#8a5a34'; ctx.fillRect(x0, yy, 100 - x0, 9);
+      for (let q = 0; q * 38 + 4 < 92 - x0; q++) { const bx = 88 - (q + 1) * 38; ctx.save(); ctx.translate(bx, yy - 63); ctx.scale(3, 4.1); dessinerBoite(0, 0, COULEURS_BOITES[(j * 2 + q) % 6]); ctx.restore(); }
+    }
+    for (let q = 0; q < 3; q++) for (let j = 0; j < 2; j++) {
+      const bx = 520 + j * 64, by = 740 - q * 52;
+      if (bx > x1) continue;
+      ctx.fillStyle = (q + j) % 2 ? '#c8955a' : '#b5814a'; ctx.fillRect(bx, by, 64, 52);
+      ctx.fillStyle = '#8a5f30'; ctx.fillRect(bx + 26, by, 10, 52); ctx.fillStyle = '#00000022'; ctx.fillRect(bx, by + 46, 64, 6);
+    }
+    for (let j = 2; (520 + j * 64) < x1; j++) { ctx.fillStyle = j % 2 ? '#c8955a' : '#b5814a'; ctx.fillRect(520 + j * 64, 740, 64, 60); }
+    for (const [cx2, cy2, rot, sc, col] of [[548, 560, 0.5, 2.8, '#3b3f52'], [196, 540, -0.5, 2.6, '#d6dbe8']]) {
+      ctx.strokeStyle = '#ffffff88'; ctx.lineWidth = 3;
+      for (let q = -1; q <= 1; q++) { ctx.beginPath(); ctx.moveTo(cx2 - 30, cy2 - 38 + q * 12); ctx.lineTo(cx2 - 60, cy2 - 66 + q * 12); ctx.stroke(); }
+      ctx.save(); ctx.translate(cx2, cy2); ctx.rotate(rot); dessinerConsole(0, 0, sc, col); ctx.restore();
+    }
+    // 10. Bords assombris (profondeur), lumière gardée au centre
+    const vg = ctx.createRadialGradient(330, 380, 260, 330, 380, 620);
+    vg.addColorStop(0, 'rgba(10,6,24,0)'); vg.addColorStop(1, 'rgba(10,6,24,.55)');
+    ctx.fillStyle = vg; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  }
+  function cacherPourAffiche() {
+    for (const el of document.querySelectorAll('.ecran, #hud, #b-bonus, #annonce, #tuto, #main-tuto, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    cadre.style.setProperty('width', '100%', 'important');
+    cacherPourAffiche();
+    setTimeout(cacherPourAffiche, 300); setTimeout(cacherPourAffiche, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (stock, niveau, score, jauge de la police,
+  // boutons des rideaux, bouton bonus), sans écran titre, ni fenêtre « Continuer », ni tutoriel
+  // (CONSIGNES-JEU.md, section 5). La scène est posée, la partie tourne une demi-seconde, Pierre donne
+  // un coup de plumeau, puis tout est figé sans fenêtre de pause : ni victoire, ni défaite, ni son, ni
+  // sauvegarde.
+  //   1 = niveau 1 : deux pilleurs aux vitrines, l'un lâche sa console sous le plumeau ;
+  //   2 = niveau 10 : le Costaud, le Rapide en rollers, un rideau de fer baissé, un client, un bonus ;
+  //   3 = niveau 20 : coupure de courant (yeux qui brillent), la Pince, le pilleur de la porte de
+  //       service, la fleuriste et le bonus alarme prêt.
+  function placerVitrine(type, v, s, et, r) {
+    const p = nouveauPerso(type); cheminVitrine(p, v, s);
+    p.x = xSlot(v, s); p.y = G.vy; p.chemin = []; p.etat = et; p.r = r;
+    monde.gens.push(p); return p;
+  }
+  function placerRue(type, x, y, v, s) {
+    const p = nouveauPerso(type); p.x = x; p.y = y; cheminVitrine(p, v, s);
+    monde.gens.push(p); return p;
+  }
+  function placerDedans(type, x, y, et, chemin) {
+    const p = nouveauPerso(type); p.lieu = 'p'; p.dedans = true; p.x = x; p.y = y; p.etat = et; p.chemin = chemin || []; p.tps = 9;
+    monde.gens.push(p); return p;
+  }
+  const SCENES_APERCU = {
+    1: {
+      niveau: 1, police: 0.38, stock: 10, score: 40,
+      poser() {
+        placerVitrine('voleur', 0, 1, 'tend', 0.62);
+        const b = placerVitrine('voleur', 1, 0, 'tire', 0.62);
+        placerRue('voleur', 120, 130, 0, 0);
+        placerRue('voleur', 300, 96, 1, 1);
+        return [b];
+      },
+    },
+    2: {
+      niveau: 10, police: 0.56, stock: 13, score: 1180,
+      poser() {
+        const co = placerVitrine('costaud', 0, 1, 'tend', 0.75);
+        monde.rideaux[1] = { f: 1, t: 3.6, rech: 0 };
+        const at = placerVitrine('voleur', 1, 0, 'attend', 0); at.tps = 9;
+        placerDedans('rapide', 200, G.FL + 30, 'marche', [[300, G.rayonY]]);
+        placerDedans('client', 120, G.FL + 80, 'choisit');
+        monde.objets.push({ x: 300, y: G.FL + 150, sol: G.FL + 150, vy: 0, t: 3.4, val: 1 });
+        monde.bulles.push({ kind: 'chariot', x: 330, y: Math.min(G.caisseY - 30, G.FL + 200), vx: -45, t: 0 });
+        placerRue('pince', 260, 110, 1, 1);
+        return [co];
+      },
+    },
+    3: {
+      niveau: 20, police: 0.82, stock: 16, score: 3640, noir: 0.36,
+      poser() {
+        placerVitrine('pince', 0, 0, 'tire', 0.7);
+        const vo = placerVitrine('voleur', 1, 1, 'tend', 0.8);
+        const f = nouveauPerso('fourbe'); f.lieu = 'd'; f.dedans = true; f.x = G.dosX + 34; f.y = G.dosY; f.etat = 'marche'; f.chemin = [[G.reserveX - 8, G.dosY]]; monde.gens.push(f);
+        const dg = placerDedans('deguise', 128, G.FL + 96, 'choisit'); dg.revele = true;
+        placerRue('costaud', 200, 120, 1, 0);
+        monde.voisine = 6; monde.voisineTic = 99;
+        monde.bonus = 'alarme';
+        monde.panneT = 6.5; monde.noir = 0.42;
+        return [vo];
+      },
+    },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 7349 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    progres = progresVide();   // en mémoire seulement
+    for (const k of NIVEAUX[sc.niveau - 1].nv) vus.add(k + sc.niveau);   // pas de tutoriel
+    demarrerNiveau(sc.niveau);
+    const m = monde;
+    m.temps = L.d * sc.police;
+    m.prochain = 99; m.prochainClient = 99; m.prochainBonus = 99; m.vagues = [];
+    const cibles = sc.poser();
+    const pas = (n) => { for (let i = 0; i < n; i++) { horloge += 1 / 60; majPartie(1 / 60); majEffets(1 / 60); } };
+    // La partie tourne une demi-seconde (les pilleurs avancent, les mains plongent)…
+    pas(30);
+    // … puis Pierre donne un coup de plumeau, et l'on fige juste après.
+    for (const p of cibles) {
+      const s = echellePerso(p) * p.T.taille;
+      let x = p.x, y = p.y - 40 * s;
+      if (p.lieu === 'v' && (p.etat === 'tend' || p.etat === 'saisit' || p.etat === 'tire')) { const mm = posMain(p); x = mm.x; y = mm.y; }
+      pierre.cible = pierre.x = bornee(x, 60, 340);
+      effetPlumeau(x, y, 1);
+      frapperPerso(p, 1);
+    }
+    pas(8);
+    m.stock = sc.stock; m.score = sc.score; m.secousse = 0; m.flash = 0;
+    if (sc.noir) m.noir = sc.noir;
+    majHud(); majPolice(); majBonus();
+    etat = 'apercu';
+  }
+
   // Démarrage
   redimensionner();
   majBoutonsSon();
-  sceneTitre();
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    sceneTitre();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>
