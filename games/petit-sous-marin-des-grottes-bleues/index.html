@@ -4259,11 +4259,209 @@ JEL_SAVE.surFermeture(() => {
   if (ecran === 'jeu' && P && partieEnCours && !P.fini) JEL_SAVE.save(JEU, { niveau: P.n + 1, score: scoreTotal(), prog: copieProg(), options: { son: sonActif } });
 });
 
+/* ==========================================================================
+   Affiche (jaquette du jeu)
+   ========================================================================== */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Bulle, en grand, rapporte
+// la perle géante accrochée sous lui et lève l'œil vers Mamie Nacre, qui l'attend toute joyeuse en
+// haut ; son phare révèle un chapelet de perles ; le soleil perce la surface ; coraux et algues au
+// premier plan. Dessinée dans une boîte de 600 × 800, centrée, le décor débordant jusqu'aux bords.
+function dessinerAffiche() {
+  redimensionner();
+  const g = ctx, t = 1.15;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const k = Math.min(LARG / 600, HAUT / 800);
+  const ox = (LARG - 600 * k) / 2, oy = (HAUT - 800 * k) / 2;
+  g.translate(ox, oy); g.scale(k, k);
+  const x0 = -ox / k - 2, y0 = -oy / k - 2, x1 = (LARG - ox) / k + 2, y1 = (HAUT - oy) / k + 2; // bords de l'écran
+  g.lineCap = 'round'; g.lineJoin = 'round';
+
+  // Eau : claire près de la surface, bleu profond en bas
+  const eau = g.createLinearGradient(0, 0, 0, 800);
+  eau.addColorStop(0, '#6fdcf0'); eau.addColorStop(0.22, '#2bb2dc'); eau.addColorStop(0.58, '#137fb6'); eau.addColorStop(1, '#0b4f82');
+  g.fillStyle = eau; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+
+  // Soleil qui perce la surface, en haut à droite
+  const soleil = g.createRadialGradient(440, -20, 10, 440, -20, 560);
+  soleil.addColorStop(0, 'rgba(255,252,215,.95)'); soleil.addColorStop(0.25, 'rgba(255,245,190,.38)'); soleil.addColorStop(1, 'rgba(255,245,190,0)');
+  g.fillStyle = soleil; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+
+  // Rayons de soleil qui descendent en biais
+  for (let i = 0; i < 8; i++) {
+    const a = 170 + i * 58, l = 18 + (i % 3) * 14;
+    g.fillStyle = 'rgba(255,255,225,' + (0.1 + (i % 2) * 0.06) + ')';
+    g.beginPath(); g.moveTo(a, -10); g.lineTo(a + l, -10); g.lineTo(a - 170 + l * 3, 780); g.lineTo(a - 230, 780); g.closePath(); g.fill();
+  }
+
+  // Surface de la mer, ondulée et brillante
+  g.fillStyle = 'rgba(225,252,255,.55)';
+  g.beginPath(); g.moveTo(x0, y0);
+  for (let x = x0; x <= x1; x += 10) g.lineTo(x, 22 + Math.sin(x * 0.045) * 6);
+  g.lineTo(x1, y0); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3;
+  g.beginPath();
+  for (let x = x0; x <= x1; x += 10) g.lineTo(x, 22 + Math.sin(x * 0.045) * 6);
+  g.stroke();
+
+  // Fond lointain : roches pâles, voilées par l'eau
+  g.fillStyle = 'rgba(70,150,190,.55)';
+  g.beginPath(); g.moveTo(x0, 520);
+  g.quadraticCurveTo(80, 430, 150, 500); g.quadraticCurveTo(230, 560, 300, 520); g.quadraticCurveTo(400, 450, 470, 510); g.quadraticCurveTo(540, 560, x1, 470);
+  g.lineTo(x1, 800); g.lineTo(x0, 800); g.closePath(); g.fill();
+  // Banc de petits poissons au loin
+  g.globalAlpha = 0.55;
+  for (let i = 0; i < 7; i++) dessinerCreature(g, 'poissonBleu', 70 + (i % 4) * 34 + (i > 3 ? 18 : 0), 150 + (i > 3 ? 26 : 0) + (i % 2) * 10, 52, 1, t + i);
+  g.globalAlpha = 1;
+
+  // Parois de la grotte (plan moyen) : à gauche et en bas à droite, avec un liseré de lumière
+  const paroi = (pts, couleur, bord) => {
+    g.fillStyle = couleur; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill();
+    g.strokeStyle = bord; g.lineWidth = 5; g.beginPath(); pts.slice(1, -2).forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
+  };
+  paroi([[x0, 250], [28, 268], [52, 330], [38, 410], [62, 480], [44, 560], [70, 640], [x0, 800], [x0, 250]], '#12597a', 'rgba(150,230,255,.6)');
+  paroi([[x1, 470], [560, 500], [538, 560], [552, 630], [520, 700], [x1, 800], [x1, 470]], '#12597a', 'rgba(150,230,255,.6)');
+
+  // Une méduse rose et un hippocampe, pour la vie de la grotte
+  dessinerMeduse(g, 96, 300, 66, t);
+  dessinerCreature(g, 'hippocampe', 560, 420, 70, -1, t);
+
+  // Mamie Nacre, en haut à droite, tournée vers Bulle, toute contente : un halo de soleil derrière elle
+  const tx = 448, ty = 178;
+  const halo = g.createRadialGradient(tx - 20, ty, 10, tx - 20, ty, 170);
+  halo.addColorStop(0, 'rgba(255,250,210,.75)'); halo.addColorStop(1, 'rgba(255,250,210,0)');
+  g.fillStyle = halo; g.beginPath(); g.arc(tx - 20, ty, 170, 0, Math.PI * 2); g.fill();
+  g.save(); g.translate(tx, ty); g.scale(-1, 1); g.rotate(-0.12);
+  dessinerTortue(g, 0, 0, 118, t, true);
+  g.restore();
+
+  // Sable du fond, avec ses rochers (le bas porte le bandeau du titre)
+  g.fillStyle = '#e6cf8f';
+  g.beginPath(); g.moveTo(x0, 690);
+  for (let x = x0; x <= x1; x += 10) g.lineTo(x, 690 + Math.sin(x * 0.018) * 12);
+  g.lineTo(x1, y1); g.lineTo(x0, y1); g.closePath(); g.fill();
+  g.fillStyle = '#f4e2ad';
+  g.beginPath(); g.ellipse(330, 712, 140, 12, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#1f5d78';
+  for (const [rx, ry, rw, rh] of [[150, 706, 70, 34], [440, 700, 90, 40]]) { g.beginPath(); g.ellipse(rx, ry, rw, rh, 0, Math.PI, 0); g.fill(); }
+  dessinerCreature(g, 'etoile', 300, 742, 80, 1, t);
+  dessinerCreature(g, 'crabe', 470, 740, 82, -1, t);
+  dessinerOursin(g, 395, 690, 58, t);
+
+  // Algues du plan moyen qui ondulent
+  for (let i = 0; i < 6; i++) {
+    const ax = 110 + i * 78, haut = 90 + (i % 3) * 40;
+    g.strokeStyle = i % 2 ? '#3f9a55' : '#58b86a'; g.lineWidth = 12;
+    g.beginPath(); g.moveTo(ax, 712);
+    for (let j = 1; j <= 6; j++) g.lineTo(ax + Math.sin(t * 1.4 + j * 0.8 + i) * 12, 712 - haut * j / 6);
+    g.stroke();
+  }
+
+  // Bulle : position, taille, inclinaison (le nez remonte un peu)
+  const bx = 232, by = 392, s = 296, incl = -0.12;
+  const lampeX = bx + Math.cos(incl) * s * 0.47, lampeY = by + Math.sin(incl) * s * 0.47;
+
+  // Perles révélées par le phare, qui scintillent dans le faisceau
+  for (const [px, py, r] of [[446, 352, 17], [500, 336, 15], [552, 322, 14], [478, 398, 13], [540, 386, 12]]) {
+    const lueur = g.createRadialGradient(px, py, r * 0.5, px, py, r * 2.6);
+    lueur.addColorStop(0, 'rgba(255,255,240,.8)'); lueur.addColorStop(1, 'rgba(255,255,240,0)');
+    g.fillStyle = lueur; g.beginPath(); g.arc(px, py, r * 2.6, 0, Math.PI * 2); g.fill();
+    dessinerPerle(g, px, py, r, false, t);
+    g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(px - r * 1.6, py - r * 1.2); g.lineTo(px - r * 0.6, py - r * 1.2); g.moveTo(px - r * 1.1, py - r * 1.7); g.lineTo(px - r * 1.1, py - r * 0.7); g.stroke();
+  }
+
+  // Douce lumière autour de Bulle, pour le détacher du fond
+  const aura = g.createRadialGradient(bx, by, 40, bx, by, 270);
+  aura.addColorStop(0, 'rgba(255,250,215,.42)'); aura.addColorStop(1, 'rgba(255,250,215,0)');
+  g.fillStyle = aura; g.beginPath(); g.arc(bx, by, 270, 0, Math.PI * 2); g.fill();
+
+  // Bulles d'air qui sortent de l'hélice
+  for (let i = 0; i < 9; i++) {
+    const hx = bx - s * 0.66 - i * 9 + Math.sin(i * 1.7) * 10, hy = by + 8 - i * 30, r = 5 + (i % 3) * 4;
+    g.strokeStyle = 'rgba(235,252,255,.9)'; g.lineWidth = 3;
+    g.beginPath(); g.arc(hx, hy, r, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(hx - r * 0.35, hy - r * 0.35, r * 0.25, 0, Math.PI * 2); g.fill();
+  }
+
+  // Bulle en grand, phare allumé, la perle géante accrochée sous lui
+  dessinerSousMarin(g, bx, by, s, 1, 0.9, { phare: true, perle: true, incl });
+
+  // Détails ajoutés en grand : liseré de lumière, reflet sur la coque, joue rose, œil levé vers Mamie Nacre
+  g.save(); g.translate(bx, by); g.rotate(incl);
+  g.strokeStyle = '#fffbe2'; g.lineWidth = s * 0.022;
+  g.beginPath(); g.ellipse(0, 0, s * 0.5, s * 0.3, 0, -2.6, -0.55); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.6)';
+  g.beginPath(); g.ellipse(-s * 0.17, -s * 0.18, s * 0.17, s * 0.045, -0.1, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.45)';
+  g.beginPath(); g.ellipse(-s * 0.04, -s * 0.38, s * 0.1, s * 0.03, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,120,120,.45)';
+  g.beginPath(); g.ellipse(s * 0.36, s * 0.02, s * 0.05, s * 0.032, 0, 0, Math.PI * 2); g.fill();
+  // l'œil, redessiné un peu plus grand et tourné vers le haut
+  g.fillStyle = '#bff0ff'; g.beginPath(); g.arc(s * 0.16, -s * 0.03, s * 0.11, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#1b2a3a'; g.beginPath(); g.arc(s * 0.2, -s * 0.075, s * 0.058, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(s * 0.22, -s * 0.095, s * 0.022, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(s * 0.18, -s * 0.055, s * 0.01, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = s * 0.012;
+  g.beginPath(); g.arc(s * 0.16, -s * 0.03, s * 0.085, -2.6, -1.7); g.stroke();
+  g.restore();
+
+  // Éclat de lumière sur la lampe du phare
+  const eclatPhare = g.createRadialGradient(lampeX, lampeY, 0, lampeX, lampeY, 46);
+  eclatPhare.addColorStop(0, 'rgba(255,255,235,1)'); eclatPhare.addColorStop(1, 'rgba(255,250,200,0)');
+  g.fillStyle = eclatPhare; g.beginPath(); g.arc(lampeX, lampeY, 46, 0, Math.PI * 2); g.fill();
+  // Étincelles autour de la perle géante
+  const perleX = bx - Math.sin(incl) * s * 0.56, perleY = by + Math.cos(incl) * s * 0.56;
+  g.fillStyle = '#fff8d0';
+  for (const [dx, dy, r] of [[-78, -24, 7], [74, -10, 6], [-60, 44, 5], [62, 50, 7]]) {
+    g.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? r * 0.35 : r * 1.6; g.lineTo(perleX + dx + Math.cos(a) * rr, perleY + dy + Math.sin(a) * rr); }
+    g.closePath(); g.fill();
+  }
+
+  // Premier plan : grand corail à gauche et grandes algues à droite, coupés par les bords
+  g.strokeStyle = '#ff6f5e'; g.lineWidth = 30;
+  g.beginPath();
+  g.moveTo(40, 830); g.lineTo(52, 640);
+  g.moveTo(50, 700); g.quadraticCurveTo(-10, 650, -20, 570);
+  g.moveTo(52, 660); g.quadraticCurveTo(110, 620, 120, 560);
+  g.moveTo(118, 600); g.lineTo(160, 575);
+  g.stroke();
+  g.strokeStyle = '#ffa08f'; g.lineWidth = 9;
+  g.beginPath(); g.moveTo(44, 820); g.lineTo(54, 648); g.moveTo(58, 655); g.quadraticCurveTo(106, 622, 113, 568); g.stroke();
+  for (const [ax, haut, coul] of [[600, 420, '#2f8f47'], [565, 330, '#46ad5c'], [628, 470, '#3a9a52']]) {
+    g.strokeStyle = coul; g.lineWidth = 26;
+    g.beginPath(); g.moveTo(ax, 830);
+    for (let j = 1; j <= 8; j++) g.lineTo(ax + Math.sin(t * 1.2 + j * 0.75) * 22 - j * 3, 830 - haut * j / 8);
+    g.stroke();
+  }
+
+  // Grosses bulles floues tout devant
+  for (const [hx, hy, r] of [[24, 120, 16], [580, 250, 12], [150, 610, 10]]) {
+    g.strokeStyle = 'rgba(235,252,255,.75)'; g.lineWidth = 3.5;
+    g.beginPath(); g.arc(hx, hy, r, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.arc(hx - r * 0.35, hy - r * 0.35, r * 0.25, 0, Math.PI * 2); g.fill();
+  }
+}
+function demarrerAffiche() {
+  ecran = 'affiche'; // ni écran titre ni partie : la touche Entrée ne lance rien
+  // Rien d'autre que la scène : écrans, interface, fenêtres, boutons et sélecteur de langue cachés
+  const style = document.createElement('style');
+  style.textContent = '.ecran, #hud, #toast, .voile, button, .jel-langue, jel-langue, .place-langue { display: none !important; }';
+  document.head.appendChild(style);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---------- Démarrage ---------- */
 document.title = tr('titre');
 chargerProg();
 majBoutonsSon();
-montrer('titre');
-requestAnimationFrame(boucle);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else {
+  montrer('titre');
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

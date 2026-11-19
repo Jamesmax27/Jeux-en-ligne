@@ -1112,6 +1112,326 @@
     lancerNiveau();
   });
   window.addEventListener("resize", dimensionner);
+
+  /* ---------- Affiche (jaquette du jeu) ---------- */
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Une grande vache rieuse
+  // jaillit de la carte qu'on vient de retourner, dans un éclat de lumière ; autour, d'autres cartes du
+  // jeu : une paire de cochons trouvée (bord vert), un poussin, des cartes encore cachées ; derrière, la
+  // ferme sous le soleil. Les animaux sont dessinés au canvas, dans le style des animaux du jeu.
+  var PI2 = Math.PI * 2;
+
+  // Rectangle aux coins arrondis (chemin seulement)
+  function arrondi(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.quadraticCurveTo(x + w, y, x + w, y + r);
+    c.lineTo(x + w, y + h - r); c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    c.lineTo(x + r, y + h); c.quadraticCurveTo(x, y + h, x, y + h - r);
+    c.lineTo(x, y + r); c.quadraticCurveTo(x, y, x + r, y); c.closePath();
+  }
+  function ovale(c, x, y, rx, ry, rot) { c.beginPath(); c.ellipse(x, y, rx, ry, rot || 0, 0, PI2); }
+
+  // Petite étincelle à quatre branches
+  function etincelle(c, x, y, r, couleur) {
+    c.save(); c.fillStyle = couleur || "#fff6a8"; c.shadowColor = "#ffe45c"; c.shadowBlur = r * 1.2;
+    c.beginPath(); c.moveTo(x, y - r);
+    c.quadraticCurveTo(x + r * 0.18, y - r * 0.18, x + r, y); c.quadraticCurveTo(x + r * 0.18, y + r * 0.18, x, y + r);
+    c.quadraticCurveTo(x - r * 0.18, y + r * 0.18, x - r, y); c.quadraticCurveTo(x - r * 0.18, y - r * 0.18, x, y - r);
+    c.fill(); c.restore();
+  }
+  // Petit cœur
+  function coeur(c, x, y, r, couleur) {
+    c.save(); c.fillStyle = couleur; c.beginPath(); c.moveTo(x, y + r * 0.9);
+    c.bezierCurveTo(x - r * 1.4, y, x - r * 0.9, y - r * 1.1, x, y - r * 0.35);
+    c.bezierCurveTo(x + r * 0.9, y - r * 1.1, x + r * 1.4, y, x, y + r * 0.9);
+    c.fill(); c.restore();
+  }
+  // Œil brillant (pupille et deux reflets)
+  function oeil(c, x, y, r) {
+    c.fillStyle = "#2b1d1a"; ovale(c, x, y, r * 0.82, r); c.fill();
+    c.fillStyle = "#fff"; ovale(c, x + r * 0.28, y - r * 0.38, r * 0.32, r * 0.36); c.fill();
+    c.beginPath(); c.arc(x - r * 0.25, y + r * 0.4, r * 0.15, 0, PI2); c.fill();
+  }
+  // Empreinte de patte (dos des cartes du jeu)
+  function patte(c, x, y, r, couleur) {
+    c.fillStyle = couleur;
+    ovale(c, x, y + r * 0.3, r * 0.55, r * 0.45); c.fill();
+    [[-0.62, -0.28, -0.4], [-0.22, -0.68, -0.15], [0.22, -0.68, 0.15], [0.62, -0.28, 0.4]].forEach(function (d) {
+      ovale(c, x + d[0] * r, y + d[1] * r, r * 0.2, r * 0.27, d[2]); c.fill();
+    });
+  }
+
+  // Têtes d'animaux (r : rayon de la tête), dans l'esprit des animaux du jeu
+  function cochon(c, x, y, r) {
+    c.save(); c.translate(x, y); c.scale(r, r); c.lineJoin = "round";
+    [-1, 1].forEach(function (s) {
+      c.fillStyle = "#f06d9b"; c.beginPath(); c.moveTo(s * 0.35, -0.72); c.lineTo(s * 0.98, -0.95); c.lineTo(s * 0.86, -0.3); c.closePath(); c.fill();
+    });
+    var g = c.createRadialGradient(0.3, -0.4, 0.1, 0, 0, 1.05);
+    g.addColorStop(0, "#ffd0e0"); g.addColorStop(0.6, "#ff9cc0"); g.addColorStop(1, "#ef6f9c");
+    c.fillStyle = g; ovale(c, 0, 0, 1, 0.92); c.fill();
+    c.fillStyle = "rgba(255,90,140,.45)"; ovale(c, -0.62, 0.22, 0.17, 0.11); c.fill(); ovale(c, 0.62, 0.22, 0.17, 0.11); c.fill();
+    c.fillStyle = "#ff8db4"; ovale(c, 0, 0.2, 0.44, 0.3); c.fill();
+    c.strokeStyle = "#d9507f"; c.lineWidth = 0.05; c.stroke();
+    c.fillStyle = "#a83461"; ovale(c, -0.15, 0.2, 0.07, 0.11); c.fill(); ovale(c, 0.15, 0.2, 0.07, 0.11); c.fill();
+    oeil(c, -0.4, -0.25, 0.12); oeil(c, 0.4, -0.25, 0.12);
+    c.strokeStyle = "#a83461"; c.lineWidth = 0.07; c.lineCap = "round";
+    c.beginPath(); c.arc(0, 0.38, 0.32, 0.35 * Math.PI, 0.65 * Math.PI); c.stroke();
+    c.restore();
+  }
+  function poussin(c, x, y, r) {
+    c.save(); c.translate(x, y); c.scale(r, r);
+    c.fillStyle = "#ffc93b"; ovale(c, -0.1, -0.98, 0.12, 0.2, -0.4); c.fill(); ovale(c, 0.1, -1.0, 0.1, 0.18, 0.4); c.fill();
+    var g = c.createRadialGradient(0.3, -0.4, 0.1, 0, 0, 1.05);
+    g.addColorStop(0, "#fff6a8"); g.addColorStop(0.6, "#ffe04a"); g.addColorStop(1, "#ffbe1f");
+    c.fillStyle = g; ovale(c, 0, 0, 0.95, 0.92); c.fill();
+    c.fillStyle = "#ffb21a"; ovale(c, -0.95, 0.25, 0.22, 0.35, 0.6); c.fill(); ovale(c, 0.95, 0.25, 0.22, 0.35, -0.6); c.fill();
+    c.fillStyle = "rgba(255,120,90,.5)"; ovale(c, -0.58, 0.18, 0.15, 0.1); c.fill(); ovale(c, 0.58, 0.18, 0.15, 0.1); c.fill();
+    oeil(c, -0.36, -0.18, 0.13); oeil(c, 0.36, -0.18, 0.13);
+    c.fillStyle = "#ff8a1f"; c.beginPath(); c.moveTo(-0.2, 0.08); c.lineTo(0.2, 0.08); c.lineTo(0, 0.38); c.closePath(); c.fill();
+    c.restore();
+  }
+
+  // Carte du jeu, centrée en (x, y), de côté « t », tournée de « rot » ;
+  // genre : "dos" (cachée), "devant" (retournée) ou "trouvee" (paire trouvée, bord vert)
+  function carte(c, x, y, t, rot, genre, dessin, aplati) {
+    var r = t * 0.11, b = t * 0.035;
+    c.save(); c.translate(x, y); c.rotate(rot); c.scale(1, aplati || 1);
+    c.save(); c.shadowColor = "rgba(70,45,10,.38)"; c.shadowBlur = t * 0.14; c.shadowOffsetY = t * 0.07;
+    if (genre === "trouvee") { c.shadowColor = "rgba(120,255,90,.9)"; c.shadowBlur = t * 0.22; c.shadowOffsetY = 0; }
+    arrondi(c, -t / 2, -t / 2, t, t, r); c.fillStyle = "#7a3e12"; c.fill(); c.restore();
+    arrondi(c, -t / 2 + b, -t / 2 + b, t - 2 * b, t - 2 * b, r * 0.8);
+    if (genre === "dos") {
+      c.save(); c.clip(); c.fillStyle = "#c9703a"; c.fillRect(-t, -t, 2 * t, 2 * t);
+      c.strokeStyle = "#b45f2c"; c.lineWidth = t * 0.075;
+      for (var i = -12; i <= 12; i++) { var d = i * t * 0.155; c.beginPath(); c.moveTo(d - t, t); c.lineTo(d + t, -t); c.stroke(); }
+      patte(c, 0, 0, t * 0.28, "rgba(255,226,170,.55)");
+      c.restore();
+    } else {
+      c.fillStyle = genre === "trouvee" ? "#d8f5b0" : "#fffdf2"; c.fill();
+      if (genre === "trouvee") { c.strokeStyle = "#4e9a1c"; c.lineWidth = b * 1.1; c.stroke(); }
+      if (dessin) dessin(c, 0, 0, t * 0.3);
+    }
+    // Reflet de lumière sur le haut de la carte
+    c.save(); arrondi(c, -t / 2 + b, -t / 2 + b, t - 2 * b, t - 2 * b, r * 0.8); c.clip();
+    var g = c.createLinearGradient(-t / 2, -t / 2, t / 2, t / 2);
+    g.addColorStop(0, "rgba(255,255,255,.45)"); g.addColorStop(0.35, "rgba(255,255,255,0)");
+    c.fillStyle = g; c.fillRect(-t / 2, -t / 2, t, t); c.restore();
+    c.restore();
+  }
+
+  // La vache, héroïne de l'affiche : tête en grand, épaules et sabots posés sur le bord de la carte
+  function vache(c, x, y, r) {
+    c.save(); c.translate(x, y); c.scale(r, r); c.lineJoin = "round"; c.lineCap = "round";
+    // Cornes
+    [-1, 1].forEach(function (s) {
+      var g = c.createLinearGradient(0, -1.25, 0, -0.7); g.addColorStop(0, "#fff3c8"); g.addColorStop(1, "#e7b867");
+      c.fillStyle = g; c.beginPath(); c.moveTo(s * 0.3, -0.7); c.quadraticCurveTo(s * 0.42, -1.18, s * 0.66, -1.22);
+      c.quadraticCurveTo(s * 0.6, -0.95, s * 0.62, -0.72); c.closePath(); c.fill();
+    });
+    // Oreilles
+    [-1, 1].forEach(function (s) {
+      c.fillStyle = "#5a5a66"; ovale(c, s * 1.08, -0.5, 0.42, 0.2, s * 0.35); c.fill();
+      c.fillStyle = "#f7a3b8"; ovale(c, s * 1.1, -0.49, 0.28, 0.11, s * 0.35); c.fill();
+    });
+    // Tête blanche, éclairée par le soleil (en haut à droite)
+    var g = c.createRadialGradient(0.4, -0.55, 0.1, 0, 0, 1.15);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(0.65, "#f3f2f8"); g.addColorStop(1, "#cfd0de");
+    c.save(); ovale(c, 0, -0.08, 0.95, 0.9); c.fillStyle = g; c.fill(); c.clip();
+    // Taches noires
+    c.fillStyle = "#43434f"; ovale(c, -0.62, -0.48, 0.5, 0.42, 0.4); c.fill(); ovale(c, 0.78, -0.82, 0.32, 0.28); c.fill();
+    c.restore();
+    // Contour de lumière à droite
+    c.strokeStyle = "rgba(255,248,200,.9)"; c.lineWidth = 0.05;
+    c.beginPath(); c.ellipse(0, -0.08, 0.93, 0.88, 0, -1.2, 0.3); c.stroke();
+    // Mèche de poils sur le front
+    c.fillStyle = "#43434f"; [-0.16, 0, 0.16].forEach(function (d, i) { ovale(c, d, -0.92 + (i === 1 ? -0.05 : 0), 0.13, 0.17, d * 2); c.fill(); });
+    // Yeux et sourcils joyeux
+    oeil(c, -0.38, -0.24, 0.17); oeil(c, 0.38, -0.24, 0.17);
+    c.strokeStyle = "#43434f"; c.lineWidth = 0.06;
+    c.beginPath(); c.arc(-0.4, -0.5, 0.17, 1.15 * Math.PI, 1.8 * Math.PI); c.stroke();
+    c.beginPath(); c.arc(0.4, -0.5, 0.17, 1.2 * Math.PI, 1.85 * Math.PI); c.stroke();
+    // Joues roses
+    c.fillStyle = "rgba(255,110,150,.5)"; ovale(c, -0.7, 0.08, 0.16, 0.1); c.fill(); ovale(c, 0.7, 0.08, 0.16, 0.1); c.fill();
+    // Museau rose
+    var m = c.createLinearGradient(0, 0.05, 0, 0.95); m.addColorStop(0, "#ffd3dc"); m.addColorStop(1, "#f592a8");
+    c.fillStyle = m; ovale(c, 0, 0.45, 0.76, 0.48); c.fill();
+    c.fillStyle = "#c95a75"; ovale(c, -0.27, 0.3, 0.08, 0.12, 0.3); c.fill(); ovale(c, 0.27, 0.3, 0.08, 0.12, -0.3); c.fill();
+    // Grand sourire ouvert et langue
+    c.fillStyle = "#7a2335"; c.beginPath(); c.moveTo(-0.36, 0.5); c.quadraticCurveTo(0, 0.6, 0.36, 0.5);
+    c.quadraticCurveTo(0.3, 0.88, 0, 0.88); c.quadraticCurveTo(-0.3, 0.88, -0.36, 0.5); c.fill();
+    c.save(); c.clip(); c.fillStyle = "#ff6f8e"; ovale(c, 0, 0.88, 0.22, 0.16); c.fill(); c.restore();
+    // Collier rouge et clochette dorée
+    c.strokeStyle = "#e23b3b"; c.lineWidth = 0.13; c.beginPath(); c.moveTo(-0.62, 0.86); c.quadraticCurveTo(0, 1.12, 0.62, 0.86); c.stroke();
+    var cl = c.createRadialGradient(0.06, 1.1, 0.02, 0, 1.18, 0.24); cl.addColorStop(0, "#fff7b0"); cl.addColorStop(0.5, "#ffcc2a"); cl.addColorStop(1, "#d48a0a");
+    c.fillStyle = cl; c.beginPath(); c.moveTo(-0.17, 1.28); c.quadraticCurveTo(-0.17, 1.02, 0, 1.0); c.quadraticCurveTo(0.17, 1.02, 0.17, 1.28); c.closePath(); c.fill();
+    c.fillStyle = "#a86a08"; c.beginPath(); c.arc(0, 1.29, 0.05, 0, PI2); c.fill();
+    c.restore();
+  }
+  // Épaules de la vache, sous la tête (descendent jusqu'à « basY », en rayons de tête)
+  function epaulesVache(c, x, y, r, basY) {
+    c.save(); c.translate(x, y); c.scale(r, r);
+    var g = c.createLinearGradient(-1, 0, 1, 0); g.addColorStop(0, "#d4d5e3"); g.addColorStop(0.6, "#ffffff"); g.addColorStop(1, "#e6e6f0");
+    c.fillStyle = g; c.beginPath(); c.moveTo(-0.72, basY); c.quadraticCurveTo(-0.85, 0.6, -0.4, 0.5);
+    c.lineTo(0.4, 0.5); c.quadraticCurveTo(0.85, 0.6, 0.72, basY); c.closePath(); c.fill();
+    c.fillStyle = "#43434f"; ovale(c, 0.5, 1.25, 0.22, 0.18, 0.3); c.fill();
+    c.restore();
+  }
+  // Pattes avant de la vache, qui prennent appui sur la carte de part et d'autre du passage
+  // de lumière, comme pour s'en extraire (sabots en (±sabotX, sabotY), en rayons de tête)
+  function pattesVache(c, x, y, r, sabotX, sabotY) {
+    c.save(); c.translate(x, y); c.scale(r, r); c.lineCap = "round"; c.lineJoin = "round";
+    [-1, 1].forEach(function (s) {
+      c.beginPath(); c.moveTo(s * 0.5, 1.05); c.quadraticCurveTo(s * (sabotX + 0.05), 1.15, s * sabotX, sabotY - 0.1);
+      c.strokeStyle = "#b9bacb"; c.lineWidth = 0.4; c.stroke();
+      c.strokeStyle = "#fbfbfe"; c.lineWidth = 0.32; c.stroke();
+      c.fillStyle = "#5a5a66"; arrondi(c, s * sabotX - 0.2, sabotY - 0.14, 0.4, 0.24, 0.1); c.fill();
+      c.fillStyle = "rgba(255,255,255,.4)"; arrondi(c, s * sabotX - 0.13, sabotY - 0.11, 0.12, 0.07, 0.035); c.fill();
+    });
+    c.restore();
+  }
+
+  function dessinerAffiche(cv) {
+    var dpr = window.devicePixelRatio || 1, W = window.innerWidth, H = window.innerHeight;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    var c = cv.getContext("2d");
+    // Scène pensée en 600 × 800, agrandie pour couvrir tout l'écran
+    var e = Math.max(W / 600, H / 800);
+    c.setTransform(dpr * e, 0, 0, dpr * e, dpr * (W - 600 * e) / 2, dpr * (H - 800 * e) / 2);
+    var i, k;
+
+    // Ciel et soleil
+    var ciel = c.createLinearGradient(0, -200, 0, 520);
+    ciel.addColorStop(0, "#2fb2ff"); ciel.addColorStop(0.6, "#7fd6ff"); ciel.addColorStop(1, "#d6f6ff");
+    c.fillStyle = ciel; c.fillRect(-600, -400, 1800, 1000);
+    var sx = 485, sy = 105;
+    c.save(); c.translate(sx, sy); c.fillStyle = "rgba(255,240,150,.35)";
+    for (i = 0; i < 14; i++) { c.rotate(PI2 / 14); c.beginPath(); c.moveTo(-14, 0); c.lineTo(0, 330); c.lineTo(14, 0); c.fill(); }
+    c.restore();
+    var halo = c.createRadialGradient(sx, sy, 20, sx, sy, 230);
+    halo.addColorStop(0, "rgba(255,250,200,.95)"); halo.addColorStop(0.35, "rgba(255,240,160,.45)"); halo.addColorStop(1, "rgba(255,240,160,0)");
+    c.fillStyle = halo; c.fillRect(sx - 240, sy - 240, 480, 480);
+    var sol = c.createRadialGradient(sx - 15, sy - 15, 5, sx, sy, 58);
+    sol.addColorStop(0, "#fffbd0"); sol.addColorStop(0.6, "#ffe55a"); sol.addColorStop(1, "#ffc21f");
+    c.fillStyle = sol; c.beginPath(); c.arc(sx, sy, 56, 0, PI2); c.fill();
+
+    // Nuages
+    [[95, 120, 1], [300, 62, 0.75], [600, 230, 0.8]].forEach(function (n) {
+      c.save(); c.translate(n[0], n[1]); c.scale(n[2], n[2]); c.fillStyle = "rgba(255,255,255,.95)";
+      [[-50, 10, 32], [-15, -8, 42], [28, 2, 36], [58, 14, 24]].forEach(function (b) { c.beginPath(); c.arc(b[0], b[1], b[2], 0, PI2); c.fill(); });
+      c.fillRect(-70, 10, 140, 28); c.restore();
+    });
+
+    // Collines lointaines, plus pâles
+    c.fillStyle = "#b9ea8c"; c.beginPath(); c.moveTo(-100, 520);
+    c.quadraticCurveTo(80, 400, 260, 470); c.quadraticCurveTo(450, 400, 700, 470); c.lineTo(700, 900); c.lineTo(-100, 900); c.fill();
+    // Grange rouge et arbre, au loin
+    c.save(); c.translate(70, 468);
+    c.fillStyle = "#d8463a"; c.fillRect(-40, -55, 80, 60);
+    c.fillStyle = "#8f2d25"; c.beginPath(); c.moveTo(-50, -52); c.lineTo(0, -92); c.lineTo(50, -52); c.closePath(); c.fill();
+    c.fillStyle = "#fff"; c.fillRect(-16, -30, 32, 35);
+    c.strokeStyle = "#d8463a"; c.lineWidth = 4; c.beginPath(); c.moveTo(-14, -28); c.lineTo(14, 3); c.moveTo(14, -28); c.lineTo(-14, 3); c.stroke();
+    c.restore();
+    c.fillStyle = "#8a5a2b"; c.fillRect(556, 420, 12, 50);
+    c.fillStyle = "#5fbf3a"; [[562, 405, 34], [540, 420, 24], [585, 420, 24]].forEach(function (b) { c.beginPath(); c.arc(b[0], b[1], b[2], 0, PI2); c.fill(); });
+
+    // Prairie du devant et barrière
+    var pre = c.createLinearGradient(0, 480, 0, 800);
+    pre.addColorStop(0, "#8ddc4e"); pre.addColorStop(1, "#4fae2e");
+    c.fillStyle = pre; c.beginPath(); c.moveTo(-100, 560); c.quadraticCurveTo(300, 470, 700, 545); c.lineTo(700, 900); c.lineTo(-100, 900); c.fill();
+    c.fillStyle = "#c48a4e";
+    c.fillRect(-20, 528, 640, 9); c.fillRect(-20, 552, 640, 9);
+    for (i = 0; i < 13; i++) { arrondi(c, i * 50 - 6, 512, 12, 62, 4); c.fill(); }
+
+    // Éclat de lumière qui jaillit de la carte retournée
+    var cx0 = 300, cy0 = 470;
+    c.save(); c.translate(cx0, cy0);
+    for (i = 0; i < 18; i++) {
+      c.rotate(PI2 / 18); c.fillStyle = i % 2 ? "rgba(255,247,190,.55)" : "rgba(255,214,90,.35)";
+      c.beginPath(); c.moveTo(-18, 0); c.lineTo(0, 420); c.lineTo(18, 0); c.fill();
+    }
+    c.restore();
+    var lueur = c.createRadialGradient(cx0, cy0 - 40, 10, cx0, cy0 - 40, 260);
+    lueur.addColorStop(0, "rgba(255,255,230,1)"); lueur.addColorStop(0.4, "rgba(255,245,180,.6)"); lueur.addColorStop(1, "rgba(255,245,180,0)");
+    c.fillStyle = lueur; c.fillRect(cx0 - 280, cy0 - 320, 560, 560);
+
+    // Cartes du plan moyen : une cachée, le poussin, et la paire de cochons trouvée
+    carte(c, 92, 285, 128, -0.26, "dos");
+    carte(c, 96, 520, 122, 0.16, "devant", poussin);
+    carte(c, 512, 300, 132, 0.22, "trouvee", cochon);
+    carte(c, 505, 520, 126, -0.14, "trouvee", cochon);
+    etincelle(c, 560, 225, 18); etincelle(c, 445, 405, 13); etincelle(c, 572, 445, 11); etincelle(c, 452, 585, 15);
+
+    // La grande carte retournée, un peu penchée vers l'arrière, et la vache qui en sort
+    var r = 138, vx = 300, vy = 292, px = 300, py = 552, prx = 118, pry = 56;
+    c.save(); c.translate(300, 565); c.rotate(-0.04); c.scale(1, 0.76);
+    c.save(); c.shadowColor = "rgba(70,45,10,.4)"; c.shadowBlur = 30; c.shadowOffsetY = 22;
+    arrondi(c, -152, -152, 304, 304, 32); c.fillStyle = "#7a3e12"; c.fill(); c.restore();
+    arrondi(c, -141, -141, 282, 282, 26);
+    c.fillStyle = "#fffdf2"; c.fill();
+    c.restore();
+    // Passage de lumière au milieu de la face de la carte : la vache en sort
+    var trou = c.createRadialGradient(px, py, 5, px, py, prx);
+    trou.addColorStop(0, "#ffffff"); trou.addColorStop(0.55, "#fff4b8"); trou.addColorStop(1, "#ffd04a");
+    c.save(); c.shadowColor = "#ffe066"; c.shadowBlur = 40;
+    ovale(c, px, py, prx, pry); c.fillStyle = trou; c.fill(); c.restore();
+    // Épaules visibles seulement au-dessus du milieu du passage et dans son ouverture
+    c.save(); c.beginPath(); c.rect(-200, -400, 1000, py + 400); c.ellipse(px, py, prx, pry, 0, 0, PI2); c.clip();
+    epaulesVache(c, vx, vy, r, (py + pry - vy) / r);
+    c.restore();
+    // Lumière qui monte du passage sur le bas du corps, puis bord avant doré du passage
+    var monte = c.createLinearGradient(0, py + pry, 0, py - 70);
+    monte.addColorStop(0, "rgba(255,246,190,1)"); monte.addColorStop(1, "rgba(255,246,190,0)");
+    c.save(); ovale(c, px, py, prx, pry); c.rect(px - prx, py - 70, prx * 2, 70); c.clip();
+    c.fillStyle = monte; c.fillRect(px - prx, py - 70, prx * 2, pry + 70); c.restore();
+    c.strokeStyle = "#ffb81f"; c.lineWidth = 7; c.shadowColor = "#ffe066"; c.shadowBlur = 18;
+    c.beginPath(); c.ellipse(px, py, prx, pry, 0, 0.05, Math.PI - 0.05); c.stroke(); c.shadowBlur = 0;
+    pattesVache(c, vx, vy, r, 0.97, (py + 8 - vy) / r);
+    vache(c, vx, vy, r);
+    etincelle(c, px - prx + 8, py + 6, 14); etincelle(c, px + prx - 6, py - 4, 12); etincelle(c, px + 30, py + pry + 22, 10);
+    // Cœurs et étincelles autour de la vache
+    coeur(c, 132, 165, 16, "#ff5f8f"); coeur(c, 468, 186, 13, "#ff7aa2"); coeur(c, 160, 410, 11, "#ff7aa2");
+    etincelle(c, 300, 128, 20); etincelle(c, 172, 238, 15); etincelle(c, 430, 140, 14); etincelle(c, 410, 420, 12); etincelle(c, 200, 470, 14);
+
+    // Premier plan : grandes cartes cachées coupées par le bord, herbes et fleurs
+    carte(c, 30, 770, 210, 0.32, "dos");
+    carte(c, 585, 760, 200, -0.28, "dos");
+    c.fillStyle = "#3f9a28";
+    for (i = 0; i < 26; i++) {
+      k = i * 24 - 10;
+      c.beginPath(); c.moveTo(k, 805); c.quadraticCurveTo(k + 6, 760 - (i % 3) * 14, k + 14 - (i % 2) * 8, 735 - (i % 4) * 10); c.quadraticCurveTo(k + 10, 770, k + 18, 805); c.fill();
+    }
+    [[150, 742, "#ff5f8f"], [255, 760, "#ffd23b"], [360, 748, "#ffffff"], [455, 765, "#ff8a3d"]].forEach(function (f) {
+      c.fillStyle = f[2];
+      for (var p = 0; p < 5; p++) { var a = p * PI2 / 5; c.beginPath(); c.arc(f[0] + Math.cos(a) * 11, f[1] + Math.sin(a) * 11, 8, 0, PI2); c.fill(); }
+      c.fillStyle = "#ffb21a"; c.beginPath(); c.arc(f[0], f[1], 7, 0, PI2); c.fill();
+    });
+  }
+
+  function demarrerAffiche() {
+    // Rien d'autre que la scène : ni écran, ni bouton, ni texte, ni bouton de langue (créé plus tard)
+    var style = document.createElement("style");
+    style.textContent = ".ecran, #haut, #plateau-zone, button, .jel-langue { display: none !important; }" +
+      " #affiche { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }";
+    document.head.appendChild(style);
+    var cv = document.createElement("canvas");
+    cv.id = "affiche"; cv.setAttribute("aria-hidden", "true");
+    document.body.appendChild(cv);
+    dessinerAffiche(cv);
+    window.addEventListener("resize", function () { dessinerAffiche(cv); });
+    // Le bouton de langue porte son propre style en ligne (« !important ») et n'est créé qu'au
+    // chargement complet de la page : on le cache alors, en ligne lui aussi.
+    function cacherLangue() {
+      var l = document.querySelectorAll(".jel-langue");
+      for (var i = 0; i < l.length; i++) l[i].style.setProperty("display", "none", "important");
+    }
+    cacherLangue();
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", cacherLangue);
+    setTimeout(cacherLangue, 0);
+  }
+
+  /* ---------- Démarrage ---------- */
+  if (window.JEL_AFFICHE) demarrerAffiche();
 })();
 </script>
 </body>

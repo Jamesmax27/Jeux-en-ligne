@@ -1961,6 +1961,207 @@ function photo(){
   img.src = 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
 
+/* ---------- affiche (jaquette du jeu) ----------
+   Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) :
+   une scène composée en 600 × 800, sans interface ni texte, d'où sort la
+   jaquette (CONSIGNES-JEU.md, section 5). Le poney du jeu, en grand, se fait
+   habiller par magie : un coffre de sellerie ouvert et lumineux lance un
+   ruban d'étincelles, des bulles de couleur et un nœud rose qui vient se
+   poser sur sa crinière, devant un grand soleil et un arc-en-ciel. */
+var TENUE_AFFICHE = {
+  name:'', coat:'#E0B87C', pattern:'balzanes',
+  maneColor:'#F49AC1', maneStyle:'bouclee',
+  braid:'rubans', braidColor:'#8B5CF6',
+  padMotif:'etoiles', padColor:'#2E6FCF',
+  bootStyle:'bandes', bootColor:'#E8407A',
+  bonnetStyle:'aucun', bonnetColor:'#E8407A',
+  scene:'prairie'
+};
+
+/* nuage dodu : quelques ronds blancs */
+function nuageAffiche(x,y,k,op){
+  return '<g fill="#fff" opacity="'+op+'">'+
+    '<ellipse cx="'+x+'" cy="'+y+'" rx="'+f(60*k)+'" ry="'+f(26*k)+'"/>'+
+    '<circle cx="'+f(x-24*k)+'" cy="'+f(y-12*k)+'" r="'+f(24*k)+'"/>'+
+    '<circle cx="'+f(x+12*k)+'" cy="'+f(y-22*k)+'" r="'+f(30*k)+'"/>'+
+    '<circle cx="'+f(x+40*k)+'" cy="'+f(y-6*k)+'" r="'+f(20*k)+'"/></g>';
+}
+/* fleur à 6 pétales (premier plan) */
+function fleurAffiche(x,y,r,coul){
+  var s='';
+  for(var p=0;p<6;p++){
+    var a=p*Math.PI/3;
+    s += '<circle cx="'+f(x+Math.cos(a)*r)+'" cy="'+f(y+Math.sin(a)*r)+'" r="'+f(r*.72)+'" fill="'+coul+'"/>';
+  }
+  return s+'<circle cx="'+x+'" cy="'+y+'" r="'+f(r*.62)+'" fill="#FFE47A"/>';
+}
+/* bulle de couleur, comme les pastilles du jeu, avec un reflet */
+function bulleAffiche(x,y,r,coul){
+  return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+coul+'" stroke="#fff" stroke-width="'+f(r*.22)+'" filter="url(#af-ombre)"/>'+
+    '<ellipse cx="'+f(x-r*.32)+'" cy="'+f(y-r*.36)+'" rx="'+f(r*.3)+'" ry="'+f(r*.18)+'" fill="#fff" opacity=".7" transform="rotate(-35 '+f(x-r*.32)+' '+f(y-r*.36)+')"/>';
+}
+/* gros nœud de ruban */
+function noeudAffiche(x,y,k,rot,coul){
+  var fonce = melange(coul,-.25), clair2 = melange(coul,.45);
+  return '<g transform="translate('+x+' '+y+') rotate('+rot+') scale('+k+')" filter="url(#af-ombre)">'+
+    '<path d="M-4 6 -16 44 -4 38 2 48 6 8Z" fill="'+fonce+'"/>'+
+    '<path d="M4 6 18 42 6 38 0 48 -2 8Z" fill="'+fonce+'"/>'+
+    '<path d="M0 0C-14-22-46-26-44 0-42 22-14 18 0 0Z" fill="'+coul+'"/>'+
+    '<path d="M0 0C14-22 46-26 44 0 42 22 14 18 0 0Z" fill="'+coul+'"/>'+
+    '<path d="M-8-4C-20-14-34-14-34-2" stroke="'+clair2+'" stroke-width="4" fill="none" stroke-linecap="round"/>'+
+    '<circle cx="0" cy="0" r="10" fill="'+fonce+'"/><circle cx="-3" cy="-3" r="3.5" fill="'+clair2+'"/></g>';
+}
+
+function afficheSVG(){
+  var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice" style="display:block;width:100%;height:100%">';
+  /* dégradés et filtres */
+  s += '<defs>'+
+    '<linearGradient id="af-ciel" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0" stop-color="#4FB8FF"/><stop offset=".5" stop-color="#A9E2FF"/><stop offset=".72" stop-color="#FFF1CF"/></linearGradient>'+
+    '<radialGradient id="af-soleil" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(160 215) scale(330)">'+
+      '<stop offset="0" stop-color="#FFFBE0"/><stop offset=".25" stop-color="#FFF3A8" stop-opacity=".9"/><stop offset="1" stop-color="#FFF3A8" stop-opacity="0"/></radialGradient>'+
+    '<linearGradient id="af-pre" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0" stop-color="#8FDA7E"/><stop offset="1" stop-color="#4FA84C"/></linearGradient>'+
+    '<radialGradient id="af-coffre" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(112 660) scale(190 150)">'+
+      '<stop offset="0" stop-color="#FFFBD6"/><stop offset=".4" stop-color="#FFE47A" stop-opacity=".85"/><stop offset="1" stop-color="#FFE47A" stop-opacity="0"/></radialGradient>'+
+    '<linearGradient id="af-ruban" x1="0" y1="1" x2="1" y2="0">'+
+      '<stop offset="0" stop-color="#FFE47A"/><stop offset=".35" stop-color="#FF8FB1"/><stop offset=".7" stop-color="#C3A6F0"/><stop offset="1" stop-color="#8FC9FF"/></linearGradient>'+
+    '<filter id="af-lueur" x="-20%" y="-20%" width="140%" height="140%">'+
+      '<feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#FFFBE6" flood-opacity="1"/>'+
+      '<feDropShadow dx="6" dy="10" stdDeviation="8" flood-color="#2B241D" flood-opacity=".25"/></filter>'+
+    '<filter id="af-ombre" x="-30%" y="-30%" width="160%" height="160%">'+
+      '<feDropShadow dx="2" dy="4" stdDeviation="3" flood-color="#2B241D" flood-opacity=".25"/></filter>'+
+    '<filter id="af-brille" x="-50%" y="-50%" width="200%" height="200%">'+
+      '<feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#FFF6B0" flood-opacity="1"/></filter>'+
+    '</defs>';
+
+  /* fond : ciel, rayons du soleil, arc-en-ciel, nuages */
+  s += '<rect width="600" height="800" fill="url(#af-ciel)"/>';
+  for(var r=0;r<14;r++){
+    var a0 = r*Math.PI/7, a1 = a0+Math.PI/16;
+    s += '<path d="M160 215L'+f(160+Math.cos(a0)*900)+' '+f(215+Math.sin(a0)*900)+'L'+f(160+Math.cos(a1)*900)+' '+f(215+Math.sin(a1)*900)+'Z" fill="#fff" opacity=".2"/>';
+  }
+  var arc = ['#FF8FB1','#FFC46B','#FFEE8C','#9BE6A8','#8FC9FF','#C3A6F0'];
+  for(var i=0;i<arc.length;i++){
+    var ra = 380-i*24;
+    s += '<path d="M'+(420-ra)+' 640A'+ra+' '+ra+' 0 0 1 '+(420+ra)+' 640" fill="none" stroke="'+arc[i]+'" stroke-width="25" opacity=".85"/>';
+  }
+  s += '<rect width="600" height="800" fill="url(#af-soleil)"/>'+
+       '<circle cx="160" cy="215" r="74" fill="#FFE066"/><circle cx="160" cy="215" r="58" fill="#FFF3A8"/>';
+  s += nuageAffiche(495,150,1.15,.95) + nuageAffiche(70,395,.8,.85) + nuageAffiche(560,395,.75,.8);
+
+  /* fond : collines, arbres et barrière du paddock, plus pâles */
+  s += '<ellipse cx="90" cy="575" rx="260" ry="80" fill="#B6E6A6"/>'+
+       '<ellipse cx="500" cy="565" rx="280" ry="85" fill="#A8E09A"/>';
+  [[470,505,30],[530,515,24],[60,520,26]].forEach(function(t){
+    s += '<rect x="'+(t[0]-4)+'" y="'+(t[1]+10)+'" width="8" height="'+(t[2]+8)+'" fill="#B08A63"/>'+
+         '<circle cx="'+t[0]+'" cy="'+t[1]+'" r="'+t[2]+'" fill="#8CCF7E"/>'+
+         '<circle cx="'+(t[0]-t[2]*.35)+'" cy="'+(t[1]-t[2]*.35)+'" r="'+(t[2]*.4)+'" fill="#A9DE9C"/>';
+  });
+  s += '<g fill="#FFFDF6" opacity=".95">';
+  for(var p=0;p<9;p++) s += '<rect x="'+(8+p*72)+'" y="540" width="10" height="46" rx="3"/>';
+  s += '<rect x="0" y="550" width="600" height="7" rx="3"/><rect x="0" y="568" width="600" height="7" rx="3"/></g>';
+
+  /* sol : la prairie */
+  s += '<path d="M0 590Q150 572 300 588T600 584V800H0Z" fill="url(#af-pre)"/>';
+  for(var h=0;h<16;h++){
+    var hx = 12+h*38, hy = 612+(h%3)*22;
+    s += '<path d="M'+hx+' '+(hy+14)+'L'+(hx+5)+' '+hy+'L'+(hx+10)+' '+(hy+14)+'Z" fill="#5FB25A"/>';
+  }
+  s += '<ellipse cx="365" cy="604" rx="200" ry="20" fill="#2B5E2A" opacity=".25"/>';
+
+  /* lumière du coffre ouvert, derrière tout le premier plan */
+  s += '<rect width="600" height="800" fill="url(#af-coffre)"/>';
+
+  /* le poney, en grand, avec une lueur claire tout autour */
+  s += '<g transform="translate(10 150) scale(1.5)" filter="url(#af-lueur)">'+poney(TENUE_AFFICHE,'affiche')+
+       /* expression : grand sourire, double reflet dans l'œil */
+       '<path d="M33 112Q44 128 58 113Q45 119 33 112Z" fill="#7A2E3B"/>'+
+       '<path d="M40 118Q46 123 52 118Q46 116 40 118Z" fill="#F2789F"/>'+
+       '<circle cx="78.5" cy="75.5" r="1.6" fill="#fff"/>'+
+       '</g>';
+
+  /* ruban magique d'étincelles qui monte du coffre, longe le poney et passe
+     au-dessus de sa tête jusqu'au nœud (devant le poney, sans le cacher) */
+  var trajet = 'M112 628C20 560 0 430 26 330S70 130 190 112 290 70 304 92';
+  s += '<path d="'+trajet+'" fill="none" stroke="#fff" stroke-width="28" stroke-linecap="round" opacity=".6"/>'+
+       '<path d="'+trajet+'" fill="none" stroke="url(#af-ruban)" stroke-width="16" stroke-linecap="round"/>'+
+       '<path d="'+trajet+'" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 22" opacity=".95"/>';
+
+  /* bulles de couleur qui tourbillonnent autour du poney */
+  s += bulleAffiche(46,300,22,'#F0B429') + bulleAffiche(30,470,18,'#20C4A0') +
+       bulleAffiche(520,270,24,'#E8407A') + bulleAffiche(568,470,18,'#8B5CF6') +
+       bulleAffiche(420,95,17,'#2E6FCF') + bulleAffiche(372,190,13,'#FF7A45');
+
+  /* étincelles le long du ruban et autour du nœud */
+  var etincelles = [[62,560,15],[52,450,11],[60,380,9],[44,232,14],[108,138,16],[236,74,12],[340,64,18],[252,128,9],[470,210,12],[560,330,10],[330,140,9]];
+  s += '<g filter="url(#af-brille)">';
+  etincelles.forEach(function(e,n){
+    s += '<path d="'+etoile(e[0],e[1],e[2])+'" fill="'+(n%3===1?'#FFFFFF':'#FFF07A')+'"/>';
+  });
+  s += '</g>';
+  [[300,262,10,'#FF8FB1'],[505,355,9,'#FF8FB1'],[120,280,8,'#E8407A']].forEach(function(c){
+    s += '<path d="'+coeur(c[0],c[1],c[2])+'" fill="'+c[3]+'" filter="url(#af-ombre)"/>';
+  });
+
+  /* le gros nœud rose qui vient se poser sur la crinière, avec ses traits de vitesse */
+  s += '<path d="M352 70l42-22M362 92l46-8M352 112l40 10" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".9"/>';
+  s += noeudAffiche(318,92,1.35,-18,'#E8407A');
+
+  /* premier plan : le coffre de sellerie ouvert, plein d'accessoires */
+  s += '<g filter="url(#af-ombre)">'+
+    /* couvercle ouvert */
+    '<path d="M18 606L44 548Q112 520 196 548L210 608Z" fill="#9A5B33"/>'+
+    '<path d="M30 600L50 556Q112 532 188 556L198 602Z" fill="#B66E3F"/>'+
+    '<path d="M104 536L108 600" stroke="#F0B429" stroke-width="9"/>'+
+    /* ouverture du coffre qui brille */
+    '<ellipse cx="113" cy="640" rx="104" ry="18" fill="#FFF6B0"/>'+
+    '<ellipse cx="113" cy="640" rx="70" ry="10" fill="#FFFFFF"/>'+
+    /* accessoires qui dépassent : guêtre, tapis, ruban */
+    '<rect x="40" y="602" width="34" height="58" rx="14" fill="#2E6FCF" transform="rotate(-20 57 631)"/>'+
+    '<rect x="40" y="616" width="34" height="5" fill="#1D4E99" transform="rotate(-20 57 631)"/>'+
+    '<path d="M150 640Q170 590 206 600Q196 640 170 660Z" fill="#20C4A0"/>'+
+    '<path d="M86 640Q96 596 120 610Q130 630 112 650Z" fill="#FF8FB1"/>'+
+    '<path d="'+etoile(176,622,9)+'" fill="#fff"/>'+
+    /* caisse */
+    '<path d="M8 640H218L208 800H18Z" fill="#B66E3F"/>'+
+    '<path d="M8 640H218V660H8Z" fill="#8A4F2B"/>'+
+    '<path d="M60 640V800M166 640V800" stroke="#F0B429" stroke-width="12"/>'+
+    '<rect x="96" y="672" width="34" height="30" rx="6" fill="#F0B429"/>'+
+    '<circle cx="113" cy="686" r="5" fill="#8A4F2B"/>'+
+    '<path d="M20 720H208" stroke="#9A5B33" stroke-width="4" opacity=".6"/>'+
+    '</g>';
+
+  /* premier plan à droite : grandes fleurs coupées par le bord */
+  s += '<path d="M548 800Q540 730 556 690M584 800Q596 750 590 716M505 800Q500 770 512 742" stroke="#2F7A34" stroke-width="7" fill="none" stroke-linecap="round"/>'+
+       fleurAffiche(556,688,20,'#FF8FB1') + fleurAffiche(590,712,16,'#C3A6F0') + fleurAffiche(512,740,14,'#FFFFFF');
+  return s+'</svg>';
+}
+
+/* cache l'interface du jeu et le bouton de langue (posé plus tard par jel-i18n) */
+function cacherInterfaceAffiche(){
+  var els = document.querySelectorAll('#app, #bulle, .voile, .jel-langue, jel-langue');
+  for(var i=0;i<els.length;i++) els[i].style.setProperty('display','none','important');
+}
+function dessinerAffiche(){
+  var hote = document.getElementById('affiche');
+  if(!hote){
+    hote = document.createElement('div');
+    hote.id = 'affiche';
+    hote.setAttribute('aria-hidden','true');
+    hote.style.cssText = 'position:fixed;inset:0;z-index:40;background:#A9E2FF;overflow:hidden';
+    document.body.appendChild(hote);
+  }
+  hote.innerHTML = afficheSVG();
+  cacherInterfaceAffiche();
+}
+function demarrerAffiche(){
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+  document.addEventListener('DOMContentLoaded', cacherInterfaceAffiche);
+  setTimeout(cacherInterfaceAffiche, 300);
+}
+
 /* ---------- branchements ---------- */
 function init(){
   faireOnglets(); faireOptions(); dessine();
@@ -1996,7 +2197,10 @@ function init(){
   });
   document.addEventListener('dblclick', function(e){ e.preventDefault(); }, {passive:false});
 }
-if(typeof document !== 'undefined' && document.getElementById) init();
+/* Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : l'affiche seule, sans interface */
+if(typeof document !== 'undefined' && document.getElementById){
+  if(window.JEL_AFFICHE) demarrerAffiche(); else init();
+}
 
 /* ---------- sauvegarde du site (JEL_SAVE) ----------
    Jeu sans niveaux : on garde la tenue en cours et la galerie (niveau 1),
@@ -2026,7 +2230,7 @@ function sauverTenue(){
 JEL_SAVE.surFermeture(sauverTenue);
 document.getElementById('btn-garder').addEventListener('click', sauverTenue);
 document.body.addEventListener('click', function(e){ if(e.target.closest('[data-jeter]')) sauverTenue(); });
-JEL_SAVE.reprise({
+if(!window.JEL_AFFICHE) JEL_SAVE.reprise({
   jeu: JEU, sansNiveau: true,
   onContinuer: function(d){
     repriseFaite = true;

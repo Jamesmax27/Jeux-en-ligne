@@ -3436,10 +3436,338 @@
     requestAnimationFrame(boucle);
   }
 
+  // ---------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le petit pompier,
+  // en grand, arrose en riant une flamme de cheminée ; le camion rouge l'attend avec un chat
+  // content sur le toit, le soleil fait briller un arc-en-ciel dans le jet d'eau.
+  // Repère fixe de 600 × 800, mis à l'échelle pour couvrir tout l'écran.
+  // ---------------------------------------------------------------------------
+  const AW = 600, AH = 800;
+
+  // Forme d'étoile à n branches (étincelles, insigne du casque)
+  function formeEtoile(x, y, r, n, creux, rot) {
+    ctx.beginPath();
+    for (let i = 0; i < n * 2; i++) {
+      const a = rot + i * Math.PI / n, rr = i % 2 ? r * creux : r;
+      ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+  }
+  // Nuage de beau temps, comme dans le jeu, en plus grand
+  function nuageAffiche(x, y, s, alpha) {
+    ctx.fillStyle = 'rgba(255,255,255,' + alpha + ')';
+    ctx.beginPath();
+    ctx.arc(x, y, 22 * s, 0, 7); ctx.arc(x + 26 * s, y - 14 * s, 27 * s, 0, 7);
+    ctx.arc(x + 56 * s, y - 2 * s, 22 * s, 0, 7); ctx.arc(x + 28 * s, y + 8 * s, 22 * s, 0, 7);
+    ctx.fill();
+  }
+  // Morceau de tuyau d'incendie jaune (contour sombre, reflet clair)
+  function tuyau(points, epaisseur) {
+    const trace = () => {
+      ctx.beginPath(); ctx.moveTo(points[0], points[1]);
+      ctx.bezierCurveTo(points[2], points[3], points[4], points[5], points[6], points[7]);
+    };
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#a8650c'; ctx.lineWidth = epaisseur + 5; trace(); ctx.stroke();
+    ctx.strokeStyle = '#f2b51f'; ctx.lineWidth = epaisseur; trace(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,240,170,0.9)'; ctx.lineWidth = epaisseur * 0.3;
+    ctx.save(); ctx.translate(1.5, -2.5); trace(); ctx.stroke(); ctx.restore();
+  }
+
+  // Le petit pompier de l'écran titre, dessiné en grand et plus détaillé :
+  // il tient la lance à deux mains, regarde la flamme et rit.
+  function pompierAffiche(hx, pied, dore) {
+    const peau = '#f6cfa6', veste = '#2b3a6b', vesteClaire = '#3a4f8f', pantalon = '#23305a', jaune = '#ffd84a';
+    // ombre au sol
+    ctx.fillStyle = 'rgba(20,40,20,0.25)'; ctx.beginPath(); ctx.ellipse(hx + 6, pied, 104, 15, 0, 0, 7); ctx.fill();
+    // jambes, bandes réfléchissantes et bottes
+    for (const jx of [hx - 55, hx + 7]) {
+      ctx.fillStyle = pantalon; arrondi(jx, pied - 150, 48, 128, 14); ctx.fill();
+      ctx.fillStyle = jaune; ctx.fillRect(jx, pied - 72, 48, 11);
+      ctx.fillStyle = '#e9eef5'; ctx.fillRect(jx, pied - 68, 48, 3);
+      ctx.fillStyle = '#2a2a33'; arrondi(jx - 9, pied - 44, 64, 42, 13); ctx.fill();
+      ctx.fillStyle = '#141419'; ctx.fillRect(jx - 9, pied - 9, 64, 8);
+      ctx.fillStyle = 'rgba(255,255,255,0.22)'; arrondi(jx + 30, pied - 38, 16, 9, 4); ctx.fill();
+    }
+    // veste (plus claire du côté du soleil, à droite)
+    const corps = () => {
+      ctx.beginPath();
+      ctx.moveTo(hx - 66, pied - 132); ctx.lineTo(hx - 60, pied - 262);
+      ctx.quadraticCurveTo(hx - 57, pied - 296, hx - 24, pied - 300); ctx.lineTo(hx + 24, pied - 300);
+      ctx.quadraticCurveTo(hx + 57, pied - 296, hx + 60, pied - 262); ctx.lineTo(hx + 66, pied - 132);
+      ctx.quadraticCurveTo(hx, pied - 116, hx - 66, pied - 132); ctx.closePath();
+    };
+    const dg = ctx.createLinearGradient(hx - 66, 0, hx + 66, 0);
+    dg.addColorStop(0, veste); dg.addColorStop(0.6, veste); dg.addColorStop(1, vesteClaire);
+    corps(); ctx.fillStyle = dg; ctx.fill();
+    ctx.save(); corps(); ctx.clip();
+    ctx.fillStyle = jaune; ctx.fillRect(hx - 80, pied - 236, 160, 13); ctx.fillRect(hx - 80, pied - 168, 160, 15);
+    ctx.fillStyle = '#e9eef5'; ctx.fillRect(hx - 80, pied - 231, 160, 3); ctx.fillRect(hx - 80, pied - 162, 160, 4);
+    ctx.restore();
+    ctx.strokeStyle = '#1b2547'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(hx, pied - 296); ctx.lineTo(hx, pied - 124); ctx.stroke();
+    // col
+    ctx.fillStyle = '#1f2b52';
+    ctx.beginPath(); ctx.moveTo(hx - 30, pied - 302); ctx.lineTo(hx, pied - 276); ctx.lineTo(hx + 30, pied - 302); ctx.lineTo(hx + 22, pied - 290); ctx.lineTo(hx, pied - 268); ctx.lineTo(hx - 22, pied - 290); ctx.closePath(); ctx.fill();
+    // contour de lumière sur le bord droit
+    ctx.strokeStyle = 'rgba(255,240,190,0.75)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(hx + 30, pied - 299); ctx.quadraticCurveTo(hx + 57, pied - 296, hx + 60, pied - 262); ctx.lineTo(hx + 65, pied - 136); ctx.stroke();
+
+    // tête (un peu penchée vers la flamme)
+    const tx = hx, ty = pied - 352;
+    ctx.save(); ctx.translate(tx, ty + 30); ctx.rotate(-0.1); ctx.translate(-tx, -(ty + 30));
+    ctx.fillStyle = peau;
+    ctx.beginPath(); ctx.arc(tx - 50, ty + 6, 12, 0, 7); ctx.arc(tx + 50, ty + 6, 12, 0, 7); ctx.fill();
+    const vg = ctx.createRadialGradient(tx + 14, ty - 12, 8, tx, ty, 54);
+    vg.addColorStop(0, '#ffe2c2'); vg.addColorStop(0.7, peau); vg.addColorStop(1, '#e6ae84');
+    ctx.fillStyle = vg; ctx.beginPath(); ctx.arc(tx, ty, 52, 0, 7); ctx.fill();
+    // mèches sous le casque
+    ctx.fillStyle = '#7a4a2e';
+    for (const [mx, r] of [[-34, 13], [-16, 15], [4, 14], [24, 13], [40, 11]]) { ctx.beginPath(); ctx.arc(tx + mx, ty - 30, r, 0, Math.PI); ctx.fill(); }
+    // sourcils levés, grands yeux brillants qui regardent la flamme
+    ctx.strokeStyle = '#6a3a22'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    for (const ex of [tx - 20, tx + 20]) { ctx.beginPath(); ctx.arc(ex - 2, ty - 6, 14, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke(); }
+    for (const ex of [tx - 20, tx + 20]) {
+      ctx.fillStyle = '#23222b'; ctx.beginPath(); ctx.ellipse(ex - 3, ty + 3, 9, 12, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(ex - 6, ty - 2, 3.8, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex + 0.5, ty + 8, 1.8, 0, 7); ctx.fill();
+    }
+    // joues roses, nez
+    ctx.fillStyle = 'rgba(255,110,110,0.45)'; ctx.beginPath(); ctx.arc(tx - 36, ty + 20, 10, 0, 7); ctx.arc(tx + 36, ty + 20, 10, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e9a47c'; ctx.beginPath(); ctx.ellipse(tx, ty + 14, 7, 5.5, 0, 0, 7); ctx.fill();
+    // grand sourire ouvert
+    ctx.fillStyle = '#8f2a2a';
+    ctx.beginPath(); ctx.moveTo(tx - 21, ty + 24); ctx.quadraticCurveTo(tx, ty + 30, tx + 21, ty + 24); ctx.quadraticCurveTo(tx + 16, ty + 52, tx, ty + 52); ctx.quadraticCurveTo(tx - 16, ty + 52, tx - 21, ty + 24); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(tx - 17, ty + 26); ctx.quadraticCurveTo(tx, ty + 31, tx + 17, ty + 26); ctx.lineTo(tx + 15, ty + 32); ctx.quadraticCurveTo(tx, ty + 36, tx - 15, ty + 32); ctx.fill();
+    ctx.fillStyle = '#ff8a8a'; ctx.beginPath(); ctx.ellipse(tx, ty + 46, 10, 5, 0, 0, 7); ctx.fill();
+    // casque rouge (ou doré) : bombe, crête, visière, insigne étoilé, reflet
+    const cy = ty - 24;
+    const cg = ctx.createLinearGradient(tx - 60, cy - 60, tx + 60, cy);
+    cg.addColorStop(0, dore ? '#f2c94c' : '#e8463a'); cg.addColorStop(1, dore ? '#c8961c' : '#b42a20');
+    ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(tx, cy, 60, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = dore ? '#ffe08a' : '#ff6a5a'; arrondi(tx - 8, cy - 64, 16, 62, 7); ctx.fill();
+    ctx.fillStyle = dore ? '#c8961c' : '#a3231b'; ctx.beginPath(); ctx.ellipse(tx, cy + 2, 80, 13, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = dore ? '#ffd860' : '#e8463a'; ctx.beginPath(); ctx.ellipse(tx, cy - 1, 78, 9, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffd84a'; ctx.strokeStyle = '#b07a00'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(tx, cy - 46); ctx.lineTo(tx + 17, cy - 38); ctx.lineTo(tx + 15, cy - 16); ctx.lineTo(tx, cy - 7); ctx.lineTo(tx - 15, cy - 16); ctx.lineTo(tx - 17, cy - 38); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff6c8'; formeEtoile(tx, cy - 26, 10, 5, 0.45, -Math.PI / 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 7; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(tx, cy, 47, -1.15, -0.5); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,240,190,0.8)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(tx, cy, 59, -0.9, -0.05); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Bras, gants et lance : à dessiner par-dessus le corps
+  function brasEtLance(hx, pied) {
+    const veste = '#2b3a6b';
+    // la lance pointe vers le haut et la gauche, au-dessus de la flamme (le jet retombe dessus)
+    const ux = -0.42, uy = -0.91;
+    const arriere = { x: hx - 70, y: pied - 226 }, avant = { x: arriere.x + ux * 62, y: arriere.y + uy * 62 };
+    const debut = { x: arriere.x - ux * 18, y: arriere.y - uy * 18 }, bout = { x: avant.x + ux * 46, y: avant.y + uy * 46 };
+    // bras (manches de la veste) : épaule gauche vers la main arrière, épaule droite vers la main avant
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#1f2b52'; ctx.lineWidth = 36;
+    ctx.beginPath(); ctx.moveTo(hx - 46, pied - 278); ctx.quadraticCurveTo(hx - 84, pied - 228, arriere.x + 10, arriere.y + 8); ctx.stroke();
+    ctx.strokeStyle = veste; ctx.lineWidth = 31; ctx.stroke();
+    ctx.strokeStyle = '#1f2b52'; ctx.lineWidth = 36;
+    ctx.beginPath(); ctx.moveTo(hx + 44, pied - 274); ctx.quadraticCurveTo(hx + 10, pied - 196, avant.x + 16, avant.y + 14); ctx.stroke();
+    ctx.strokeStyle = veste; ctx.lineWidth = 31; ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,240,190,0.6)'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(hx + 58, pied - 264); ctx.quadraticCurveTo(hx + 26, pied - 190, avant.x + 30, avant.y + 26); ctx.stroke();
+    // bandes jaunes des manches
+    ctx.fillStyle = '#ffd84a';
+    for (const m of [arriere, avant]) { ctx.beginPath(); ctx.arc(m.x + 12, m.y + 10, 15, 0, 7); ctx.fill(); }
+    // lance argentée, embout doré
+    const trait = (a, b, larg, coul) => { ctx.strokeStyle = coul; ctx.lineWidth = larg; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
+    trait(debut, bout, 23, '#4c5260');
+    trait(debut, bout, 17, '#c9ced8');
+    trait({ x: debut.x - uy * 4, y: debut.y + ux * 4 }, { x: bout.x - uy * 4, y: bout.y + ux * 4 }, 4, '#ffffff');
+    const pointe = { x: bout.x + ux * 16, y: bout.y + uy * 16 };
+    trait(bout, pointe, 24, '#b07a00');
+    trait(bout, pointe, 17, '#ffd84a');
+    trait({ x: bout.x - uy * 4, y: bout.y + ux * 4 }, { x: pointe.x - uy * 4, y: pointe.y + ux * 4 }, 4, '#fff3b0');
+    // gants qui serrent la lance
+    for (const m of [arriere, avant]) {
+      ctx.fillStyle = '#c8741c'; ctx.beginPath(); ctx.arc(m.x, m.y, 18, 0, 7); ctx.fill();
+      ctx.fillStyle = '#f7a83a'; ctx.beginPath(); ctx.arc(m.x - 2, m.y - 3, 14, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,200,0.6)'; ctx.beginPath(); ctx.arc(m.x + 4, m.y - 7, 5, 0, 7); ctx.fill();
+    }
+    return { bout: pointe, ux, uy };
+  }
+
+  function dessinerAffiche() {
+    redimensionner();
+    const sc = Math.max(cw / AW, ch / AH);
+    const ox = (cw - AW * sc) / 2, oy = (ch - AH * sc) / 2;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.setTransform(dpr * sc, 0, 0, dpr * sc, dpr * ox, dpr * oy);
+    const r = graine(42);
+
+    // Ciel
+    const ciel = ctx.createLinearGradient(0, 0, 0, 430);
+    ciel.addColorStop(0, '#2f98ec'); ciel.addColorStop(0.55, '#86cdf9'); ciel.addColorStop(1, '#dcf4ff');
+    ctx.fillStyle = ciel; ctx.fillRect(-10, -10, AW + 20, 450);
+    // Soleil en haut à droite : rayons et grande lueur
+    const sx = 505, sy = 112;
+    const lueur = ctx.createRadialGradient(sx, sy, 20, sx, sy, 330);
+    lueur.addColorStop(0, 'rgba(255,248,200,1)'); lueur.addColorStop(0.25, 'rgba(255,240,170,0.6)'); lueur.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = lueur; ctx.fillRect(-10, -10, AW + 20, 520);
+    ctx.fillStyle = 'rgba(255,252,220,0.35)';
+    for (let i = 0; i < 14; i++) {
+      const a = i * Math.PI / 7 + 0.1;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + Math.cos(a - 0.09) * 420, sy + Math.sin(a - 0.09) * 420); ctx.lineTo(sx + Math.cos(a + 0.09) * 420, sy + Math.sin(a + 0.09) * 420); ctx.fill();
+    }
+    rond(sx, sy, 62, 'rgba(255,243,168,0.55)');
+    rond(sx, sy, 48, '#fff3a8'); rond(sx - 8, sy - 8, 30, '#fffbe2');
+    // Nuages
+    nuageAffiche(28, 92, 1.25, 0.95); nuageAffiche(250, 48, 0.9, 0.9); nuageAffiche(330, 250, 0.7, 0.75);
+
+    // Collines lointaines puis village du fond, voilés de bleu
+    ctx.fillStyle = '#a8dc94';
+    ctx.beginPath(); ctx.moveTo(-10, 420);
+    for (let x = -10; x <= AW + 10; x += 20) ctx.lineTo(x, 352 + Math.sin(x / 70) * 18 + Math.sin(x / 23) * 5);
+    ctx.lineTo(AW + 10, 420); ctx.fill();
+    ctx.save(); ctx.translate(300, 418); ctx.scale(1.15, 1.15);
+    for (const [x, mur, toit] of [[0, '#cfe3f2', '#5f7fb3'], [104, '#f4e7b0', '#b0703c'], [190, '#e6cfee', '#7b5ea8']]) {
+      const m = { x, w: 78, base: 0, h: 52, toit: 36, cote: 0.72, mur, toitC: toit, boulangerie: false };
+      m.chem = cheminee(m, false); dessinerMaison(m, []);
+    }
+    ctx.restore();
+    ctx.fillStyle = 'rgba(214,238,255,0.38)'; ctx.fillRect(-10, 300, AW + 20, 122);
+    // Pelouse
+    ctx.fillStyle = '#8fd17a';
+    ctx.beginPath(); ctx.moveTo(-10, 440);
+    for (let x = -10; x <= AW + 10; x += 20) ctx.lineTo(x, 404 + Math.sin(x / 45) * 8);
+    ctx.lineTo(AW + 10, 440); ctx.fill();
+    ctx.fillStyle = '#7cc768'; ctx.fillRect(-10, 430, AW + 20, 240);
+    ctx.fillStyle = '#6fbb5b'; ctx.fillRect(-10, 560, AW + 20, 110);
+
+    // Arbre à droite (coupé par le bord), comme ceux du jeu
+    ctx.fillStyle = '#8a5a35'; ctx.fillRect(552, 330, 22, 220);
+    ctx.fillStyle = '#4fa34a';
+    ctx.beginPath(); ctx.arc(565, 318, 70, 0, 7); ctx.arc(520, 340, 50, 0, 7); ctx.arc(605, 345, 50, 0, 7); ctx.fill();
+    rond(545, 292, 26, 'rgba(255,255,255,0.18)');
+    for (const [dx, dy] of [[-30, 10], [20, -22], [-6, 34], [34, 26], [-48, 44]]) rond(565 + dx, 318 + dy, 7, '#e9524a');
+
+    // Grande maison à gauche, avec une flamme de cheminée bien visible
+    const maison = { x: 0, w: 112, base: 0, h: 84, toit: 54, cote: 0.38, mur: '#f6d6a8', toitC: '#c4573a', boulangerie: false };
+    maison.chem = cheminee(maison, false);
+    const mx = 6, my = 520, ms = 2.05;
+    ctx.save(); ctx.translate(mx, my); ctx.scale(ms, ms);
+    dessinerMaison(maison, []);
+    ctx.restore();
+    const fx = mx + maison.chem.x * ms, fy = my + maison.chem.y * ms;   // haut de la cheminée à l'écran
+    ctx.save(); ctx.translate(fx, fy + 4); ctx.scale(2.9, 2.9);
+    dessinerFlamme({ x: 0, y: 0, force: 0.8, phase: 0.25, sauteuse: false, type: 'cheminee', arrosee: 0 });
+    ctx.restore();
+    // Haies fleuries devant la maison
+    for (let i = 0; i < 8; i++) { rond(10 + i * 34, 528, 22, '#4f9e48'); rond(6 + i * 34, 520, 12, 'rgba(255,255,255,0.12)'); }
+    for (let i = 0; i < 14; i++) rond(4 + r() * 270, 512 + r() * 26, 4.5, ['#ff6b8a', '#ffd84a', '#ff9a3c', '#ffffff'][i % 4]);
+
+    // Trottoir et route (le bas porte le bandeau du titre du site)
+    ctx.fillStyle = '#d8d2c4'; ctx.fillRect(-10, 652, AW + 20, 20);
+    ctx.fillStyle = '#b9b2a2'; ctx.fillRect(-10, 670, AW + 20, 4);
+    ctx.fillStyle = '#5b6170'; ctx.fillRect(-10, 674, AW + 20, 140);
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    for (let x = -20; x < AW; x += 90) ctx.fillRect(x, 742, 52, 7);
+
+    // Le camion rouge (dessin du jeu, en grand) et le chat sur son toit
+    const camion = { i: 0, x: 0, voie: 0, eau: 1, cap: 1, tache: null, ext: 0, angle: -2.3, rayure: '#ffd84a', gyro: 0.05 };
+    const tx = 122, ty = 690, ts = 2.75;
+    ctx.save(); ctx.translate(tx, ty); ctx.scale(ts, ts);
+    dessinerCamion(camion);
+    dessinerChat({ x: 2, y: -48, etat: 'pose', t: 0, pelage: PELAGES[0] });
+    ctx.restore();
+    // reflet sur la carrosserie
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; arrondi(tx - 40 * ts, ty - 39 * ts, 58 * ts, 4, 2); ctx.fill();
+    // petit cœur au-dessus du chat : il est content, le pompier est là
+    const kx = tx + 1 * ts, ky = ty - 85 * ts;
+    ctx.fillStyle = '#ff5a6e';
+    ctx.beginPath(); ctx.moveTo(kx, ky + 12); ctx.bezierCurveTo(kx - 21, ky - 6, kx - 9, ky - 21, kx, ky - 9); ctx.bezierCurveTo(kx + 9, ky - 21, kx + 21, ky - 6, kx, ky + 12); ctx.fill();
+    rond(kx - 7, ky - 8, 3.5, 'rgba(255,255,255,0.7)');
+
+    // Le héros, son tuyau (qui part du camion) et sa lance
+    const hx = 410, pied = 652;
+    tuyau([tx + 36 * ts, ty - 20 * ts, 300, 700, 380, 560, hx - 58, pied - 210], 15);
+    pompierAffiche(hx, pied, false);
+    const lance = brasEtLance(hx, pied), bout = lance.bout;
+
+    // Jet d'eau : il part dans l'axe de la lance, monte en arc et retombe sur la flamme
+    const impact = { x: fx + 16, y: fy - 50 };
+    const t0 = (bout.y - (impact.y - 150)) / -lance.uy;
+    const ctrl = { x: bout.x + lance.ux * t0, y: bout.y + lance.uy * t0 };
+    const jet = () => { ctx.beginPath(); ctx.moveTo(bout.x, bout.y); ctx.quadraticCurveTo(ctrl.x, ctrl.y, impact.x, impact.y); };
+    // Arc-en-ciel dans la bruine, sous le jet, éclairé par le soleil
+    ['#ff5a4a', '#ff9a3c', '#ffd84a', '#5cbf6a', '#4fa8ff', '#9a6ad8'].forEach((col, i) => {
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.arc(bout.x - 70, bout.y + 40, 150 - i * 7, Math.PI * 1.08, Math.PI * 1.62); ctx.stroke();
+    });
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(160,220,255,0.9)'; ctx.shadowBlur = 18;
+    ctx.strokeStyle = 'rgba(70,160,255,0.9)'; ctx.lineWidth = 24; jet(); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(190,230,255,0.95)'; ctx.lineWidth = 12; jet(); ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; ctx.setLineDash([16, 12]); jet(); ctx.stroke(); ctx.setLineDash([]);
+    // gouttes le long du jet
+    for (let i = 0; i < 26; i++) {
+      const p = r(), q = 1 - p;
+      const x = q * q * bout.x + 2 * q * p * ctrl.x + p * p * impact.x + (r() - 0.5) * 34;
+      const y = q * q * bout.y + 2 * q * p * ctrl.y + p * p * impact.y + (r() - 0.5) * 30;
+      rond(x, y, 2 + r() * 4, 'rgba(150,210,255,0.9)'); rond(x - 1, y - 1, 1.2, '#ffffff');
+    }
+    // Éclaboussures et petits nuages de vapeur là où l'eau touche la flamme
+    for (let i = 0; i < 14; i++) {
+      const a = -Math.PI * (r() * 1.1) + 0.2, d = 16 + r() * 40;
+      rond(impact.x + Math.cos(a) * d, impact.y + Math.sin(a) * d, 3 + r() * 5, 'rgba(200,235,255,0.95)');
+    }
+    for (const [vx, vy, vr] of [[22, -26, 15], [44, -8, 12], [36, -44, 11]]) {
+      rond(impact.x + vx, impact.y + vy, vr, 'rgba(255,255,255,0.78)');
+    }
+    // Étincelles de lumière
+    ctx.fillStyle = '#ffffff';
+    for (const [ex, ey, er] of [[impact.x + 70, impact.y - 40, 13], [ctrl.x + 60, ctrl.y + 40, 10], [hx + 64, pied - 400, 12], [bout.x + 30, bout.y - 30, 8]]) {
+      formeEtoile(ex, ey, er, 4, 0.28, 0); ctx.fill();
+    }
+
+    // Premier plan : borne d'incendie et grandes fleurs dans les coins du bas
+    ctx.save(); ctx.translate(560, 790); ctx.scale(3.6, 3.6); dessinerBorne({ x: 0, y: 0 }); ctx.restore();
+    [[22, 800, 1.6, '#ff6b8a'], [86, 806, 1.2, '#ffd84a'], [500, 806, 1.1, '#ff9a3c']].forEach(([px, py, f, col]) => {
+      ctx.strokeStyle = '#2f7a34'; ctx.lineWidth = 6 * f;
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.quadraticCurveTo(px - 10, py - 40 * f, px + 6, py - 72 * f); ctx.stroke();
+      const cx2 = px + 6, cy2 = py - 72 * f;
+      ctx.fillStyle = col;
+      for (let p = 0; p < 6; p++) { const a = p * 1.047; rond(cx2 + Math.cos(a) * 14 * f, cy2 + Math.sin(a) * 14 * f, 10 * f, col); }
+      rond(cx2, cy2, 9 * f, '#fff3a0');
+    });
+  }
+
+  function demarrerAffiche() {
+    etat = 'affiche';
+    // Ni écran, ni bouton, ni texte : seule la scène dessinée reste
+    const style = document.createElement('style');
+    style.textContent = '.ecran,#hud,#tuto,#bandeau,#message,button,.jel-langue{display:none!important}';
+    document.head.appendChild(style);
+    L = Object.assign({}, NIVEAUX[0], { citerne: 0, vent: 0, nuit: false });
+    monde = creerMonde(1, true);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Démarrage : affiche pour le robot du site, sinon écran titre et boucle du jeu
+  // ---------------------------------------------------------------------------
   majBoutonsSon();
-  redimensionner();
-  preparerTitre();
-  requestAnimationFrame(boucle);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else {
+    redimensionner();
+    preparerTitre();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>
