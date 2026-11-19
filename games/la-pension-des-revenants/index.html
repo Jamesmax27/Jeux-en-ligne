@@ -4203,6 +4203,177 @@
   }
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La Dame blanche,
+  // en grand, hurle devant l'aile ouverte de l'hôtel ; son voile file vers la chambre libre qui
+  // s'allume en vert (l'aperçu du jeu), une chambre voisine hurle en rouge et la Chose guette en bas.
+
+  // Chauve-souris en silhouette (même dessin que l'écran titre).
+  function chauveSouris(c, bx, by, k) {
+    c.beginPath(); c.moveTo(bx, by);
+    c.quadraticCurveTo(bx - k, by - k, bx - k * 2.2, by - k * 0.3); c.quadraticCurveTo(bx - k * 1.2, by, bx - k * 0.9, by + k * 0.4); c.quadraticCurveTo(bx - k * 0.4, by, bx, by + k * 0.5);
+    c.quadraticCurveTo(bx + k * 0.4, by, bx + k * 0.9, by + k * 0.4); c.quadraticCurveTo(bx + k * 1.2, by, bx + k * 2.2, by - k * 0.3); c.quadraticCurveTo(bx + k, by - k, bx, by); c.fill();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const t = 1500;                       // instant figé (pas de boucle)
+    // Ciel sur tout l'écran : nuit violette, plus claire vers l'horizon
+    const g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#1c0f38'); g.addColorStop(0.45, '#4a2468'); g.addColorStop(0.72, '#74357a'); g.addColorStop(1, '#2a1238');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    // La scène est composée dans un cadre de 600 × 800, centré ; sol et grille débordent sur les côtés.
+    const k = Math.min(w / 600, h / 800);
+    const dx = (w - 600 * k) / 2, dy = (h - 800 * k) / 2;
+    const X0 = -dx / k, X1 = 600 + dx / k, Y1 = 800 + dy / k;
+    c.save(); c.translate(dx, dy); c.scale(k, k);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+
+    // Étoiles
+    const al = graineHasard(29);
+    c.fillStyle = '#fff';
+    for (let i = 0; i < 110; i++) { c.globalAlpha = 0.3 + al() * 0.7; rond(c, X0 + al() * (X1 - X0), al() * 520, 0.5 + al() * 1.3); c.fill(); }
+    c.globalAlpha = 1;
+
+    // Pleine lune derrière le toit, grand halo qui éclaire la scène
+    const lx = 455, ly = 150;
+    let lu = c.createRadialGradient(lx, ly, 40, lx, ly, 380);
+    lu.addColorStop(0, 'rgba(255,236,190,.75)'); lu.addColorStop(0.35, 'rgba(230,170,230,.28)'); lu.addColorStop(1, 'rgba(230,170,230,0)');
+    c.fillStyle = lu; c.fillRect(X0, 0, X1 - X0, 700);
+    lunePleine(c, lx, ly, 82);
+    c.fillStyle = '#3a1c55d0';
+    ell(c, 360, 205, 120, 16); c.fill(); ell(c, 545, 120, 80, 12); c.fill();
+
+    // Chauves-souris devant la lune
+    c.fillStyle = '#0a0614';
+    chauveSouris(c, 420, 110, 16); chauveSouris(c, 500, 175, 11); chauveSouris(c, 330, 95, 9);
+
+    // Arbre mort à droite, derrière l'hôtel
+    arbreMort(c, 590, 600, 170, -1);
+
+    // L'aile de l'hôtel ouverte comme une maison de poupée : 3 étages, 6 chambres
+    const e = { R: 3, C: 2, N: 6, m: [0, 1, 0, 0, 0, 0], cl: [], ca: 0 };
+    const a = { ch: ['pendu', 'violon', 'enfant', 'chose', '', 'noye', ''], b: [0, 0, 1, 0, 0, 0, 0], k: [], h: [0, 0, 0, 1, 0, 0, 0], cv: 0 };
+    const hx = 285, hy = 172;
+    const geoA = geoAile(e, 310, 430);
+    c.save(); c.translate(hx, hy);
+    // lueur chaude derrière la façade
+    const lf = c.createRadialGradient(geoA.ox + geoA.L / 2, geoA.oy + geoA.hh * 1.5, 20, geoA.ox + geoA.L / 2, geoA.oy + geoA.hh * 1.5, geoA.L);
+    lf.addColorStop(0, 'rgba(255,190,110,.35)'); lf.addColorStop(1, 'rgba(255,190,110,0)');
+    c.fillStyle = lf; c.fillRect(geoA.ox - geoA.L * 0.6, geoA.oy - geoA.s, geoA.L * 2.2, geoA.hh * 4.5);
+    dessinerAile(c, e, a, geoA, t, { apercus: { 4: 'bon' }, type: 'dame' });
+    // la chambre libre visée brille en vert (l'aperçu « client apaisé » du jeu)
+    const q = geoA.ch[4];
+    const vg = c.createRadialGradient(q.x + q.w / 2, q.y + q.h / 2, 5, q.x + q.w / 2, q.y + q.h / 2, q.w * 0.9);
+    vg.addColorStop(0, 'rgba(95,224,176,.35)'); vg.addColorStop(1, 'rgba(95,224,176,0)');
+    c.globalCompositeOperation = 'lighter';
+    c.fillStyle = vg; rond(c, q.x + q.w / 2, q.y + q.h / 2, q.w * 0.9); c.fill();
+    c.globalCompositeOperation = 'source-over';
+    c.strokeStyle = '#5fe0b0'; c.lineWidth = 5; c.shadowColor = '#5fe0b0'; c.shadowBlur = 20;
+    rr(c, q.x + 4, q.y + 4, q.w - 8, q.h - 8, 8); c.stroke(); c.shadowBlur = 0;
+    // lanternes vertes de part et d'autre de la façade
+    [geoA.ox - geoA.s * 0.2, geoA.ox + geoA.L + geoA.s * 0.2].forEach((x) => {
+      const y = geoA.sol - geoA.hh * 0.55;
+      const gl = c.createRadialGradient(x, y, 2, x, y, geoA.s * 0.7);
+      gl.addColorStop(0, '#5fe0b0cc'); gl.addColorStop(1, '#5fe0b000');
+      c.fillStyle = gl; rond(c, x, y, geoA.s * 0.7); c.fill();
+      c.fillStyle = '#2a1d3e'; c.fillRect(x - 9, y - 22, 18, 5);
+      c.fillStyle = '#5fe0b0'; rr(c, x - 7, y - 17, 14, 30, 4); c.fill();
+      c.fillStyle = '#eafff6'; ell(c, x, y - 2, 3.5, 7); c.fill();
+    });
+    c.restore();
+    const q4 = geoA.ch[4];
+    const cibleX = hx + q4.x + q4.w / 2, cibleY = hy + q4.y + q4.h / 2;
+
+    // Colline et brume au pied de l'hôtel
+    c.fillStyle = '#1a0d2b';
+    c.beginPath(); c.moveTo(X0, 640); c.quadraticCurveTo(300, 575, X1, 625); c.lineTo(X1, Y1); c.lineTo(X0, Y1); c.closePath(); c.fill();
+    for (let i = 0; i < 5; i++) {
+      const by = 610 + (i % 2) * 18;
+      const fg = c.createRadialGradient(X0 + i * 150 + 40, by, 5, X0 + i * 150 + 40, by, 170);
+      fg.addColorStop(0, 'rgba(205,185,240,.32)'); fg.addColorStop(1, 'rgba(205,185,240,0)');
+      c.fillStyle = fg; ell(c, X0 + i * 150 + 40, by, 170, 45); c.fill();
+    }
+
+    // Arbre mort à gauche, derrière la Dame
+    arbreMort(c, 30, 660, 210, 1);
+
+    // La Dame blanche, en grand : halo de lune, voile tendu vers la chambre verte
+    const dX = 185, dY = 335, dK = 3.7;
+    const ox = Math.sin(t / 30) * 3 * dK, oy = Math.cos(t / 37) * 2 * dK;   // même tremblement que revenant()
+    const hd = c.createRadialGradient(dX, dY - 60, 20, dX, dY - 40, 250);
+    hd.addColorStop(0, 'rgba(220,245,255,.55)'); hd.addColorStop(1, 'rgba(220,245,255,0)');
+    c.fillStyle = hd; rond(c, dX, dY - 40, 250); c.fill();
+    // traînée d'ectoplasme verte, de sa main jusqu'à la chambre libre
+    const mainX = dX + ox + 44 * dK, mainY = dY + oy + 15 * dK;
+    // le corps, avec un contour de lumière
+    c.shadowColor = '#d8f6ff'; c.shadowBlur = 34;
+    revenant(c, 'dame', dX, dY, dK, t, 2);
+    c.shadowBlur = 0;
+    // bras tendu vers la chambre libre (manche bordée de gris pour se détacher de la robe)
+    c.save(); c.translate(dX + ox, dY + oy); c.scale(dK, dK);
+    c.fillStyle = '#eef3f9'; c.strokeStyle = '#9aa3b5'; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(9, -14); c.quadraticCurveTo(30, -10, 40, 8); c.quadraticCurveTo(36, 16, 30, 14); c.quadraticCurveTo(24, 2, 11, -2); c.closePath(); c.fill(); c.stroke();
+    // main pâle aux longs doigts
+    c.fillStyle = '#f7f3ea'; c.strokeStyle = '#b9c1cf'; c.lineWidth = 1;
+    ell(c, 39, 15, 4.5, 3.5, 0.9); c.fill(); c.stroke();
+    [[44, 22], [41, 23], [46, 19]].forEach((p) => { c.beginPath(); c.moveTo(39, 15); c.lineTo(p[0], p[1]); c.lineWidth = 1.6; c.strokeStyle = '#f7f3ea'; c.stroke(); });
+    c.restore();
+    // traînée d'ectoplasme verte, de sa main jusqu'à la chambre libre
+    c.shadowColor = '#5fe0b0'; c.shadowBlur = 18;
+    for (let i = 0; i < 7; i++) {
+      const p = (i + 1) / 8;
+      const x = mainX + (cibleX - mainX) * p, y = mainY + (cibleY - mainY) * p + Math.sin(p * Math.PI) * 18;
+      c.fillStyle = i % 2 ? '#c8ffe9' : '#5fe0b0';
+      etincelle(c, x, y, 14 - i * 0.8);
+    }
+    c.shadowBlur = 0;
+    // ondes du hurlement autour de sa tête
+    c.strokeStyle = '#ff4d6a'; c.lineWidth = 6;
+    for (let i = 0; i < 3; i++) {
+      const r = 105 + i * 26;
+      c.globalAlpha = 0.85 - i * 0.25;
+      c.beginPath(); c.arc(dX + ox, dY + oy - 70, r, Math.PI + 0.55, Math.PI + 1.15); c.stroke();
+      c.beginPath(); c.arc(dX + ox, dY + oy - 70, r, -1.15, -0.55); c.stroke();
+    }
+    c.globalAlpha = 1;
+
+    // La Chose sous le lit, qui guette au premier plan (yeux jaunes)
+    const ch = c.createRadialGradient(95, 610, 5, 95, 610, 120);
+    ch.addColorStop(0, 'rgba(255,230,107,.25)'); ch.addColorStop(1, 'rgba(255,230,107,0)');
+    c.fillStyle = ch; rond(c, 95, 610, 120); c.fill();
+    revenant(c, 'chose', 95, 615, 1.7, t, 0);
+
+    // Coins assombris : ambiance de film, le regard va au centre
+    const vi = c.createRadialGradient(300, 380, 260, 300, 380, 560);
+    vi.addColorStop(0, 'rgba(8,4,18,0)'); vi.addColorStop(1, 'rgba(8,4,18,.6)');
+    c.fillStyle = vi; c.fillRect(X0, 0, X1 - X0, Y1);
+
+    // Grille du jardin au premier plan (bas de l'image, sous le bandeau du titre)
+    const u = 34, gy = 668;
+    c.strokeStyle = '#07040d'; c.lineWidth = 5;
+    c.beginPath(); c.moveTo(X0, gy); c.lineTo(X1, gy); c.moveTo(X0, gy + 40); c.lineTo(X1, gy + 40); c.stroke();
+    c.fillStyle = '#07040d';
+    for (let x = X0 + 10; x < X1; x += u) {
+      c.lineWidth = 6; c.beginPath(); c.moveTo(x, gy - 40); c.lineTo(x, Y1); c.stroke();
+      c.beginPath(); c.moveTo(x - 7, gy - 38); c.lineTo(x, gy - 58); c.lineTo(x + 7, gy - 38); c.fill();
+    }
+    c.restore();
+  }
+
+  function demarrerAffiche() {
+    for (const el of document.querySelectorAll('.ecran, .voile, #toast, #confettis, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
   //  Partie : état de l'écran
   // ---------------------------------------------------------------------
 
@@ -5369,9 +5540,12 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? O.points(vue, partie.siege) : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran === 'titre') dessinerTitre(); });
-
   document.title = tr('titre');
+  // Affiche du site (window.JEL_AFFICHE, posé par le robot seulement) : la scène seule, sans écran
+  // titre, sans bouton, sans son ni boucle de jeu.
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+
+  window.addEventListener('resize', () => { if (ecran === 'titre') dessinerTitre(); });
   chargerProgression();
   construirePlaces();
   majBoutonsSon();

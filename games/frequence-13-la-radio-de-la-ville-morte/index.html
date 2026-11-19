@@ -4928,6 +4928,400 @@
   }
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La vieille radio
+  // en grand sur sa caisse, cadran allumé, au milieu de la ville morte ; la Voix, spectre rouge fait
+  // d'ondes, sort du haut-parleur et chante au-dessus d'elle ; une main appuie sur un des six
+  // boutons lumineux pour rejouer la chaîne ; la lune verte et l'antenne éclairent la scène.
+  // Tout est dessiné dans un repère de 600 × 800, mis à l'échelle pour couvrir l'écran.
+
+  // Formes blanches des 6 boutons (mêmes dessins que FORMES, repère de 24 × 24).
+  const FORMES_AFFICHE = [
+    'M4 12a8 8 0 1 0 16 0a8 8 0 1 0-16 0z',
+    'M12 3l9 17H3z',
+    'M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+    'M12 2l9 10-9 10-9-10z',
+    'M12 2l2.9 6.3 6.9.7-5.2 4.6 1.5 6.8L12 17l-6.1 3.4 1.5-6.8L2.2 9l6.9-.7z',
+    'M15 3a9 9 0 1 0 6 15A8 8 0 0 1 15 3z'
+  ];
+  function formeAffiche(c, b, x, y, r, coul) {
+    c.save();
+    c.translate(x - r, y - r); c.scale(r / 12, r / 12);
+    c.fillStyle = coul; c.fill(new Path2D(FORMES_AFFICHE[b]));
+    c.restore();
+  }
+
+  // Ville en ruines : une rangée d'immeubles au toit cassé, fenêtres allumées si « fenetres ».
+  function villeAffiche(c, sol, graine, coul, hMin, hMax, fenetres) {
+    const r2 = hasardFixe(graine);
+    let x = -20;
+    while (x < 620) {
+      const bw = 45 + r2() * 60, bh = hMin + r2() * (hMax - hMin), top = sol - bh;
+      c.fillStyle = coul;
+      c.beginPath(); c.moveTo(x, sol); c.lineTo(x, top);
+      const morceaux = 3 + Math.floor(r2() * 3);
+      for (let m = 1; m <= morceaux; m++) c.lineTo(x + bw * m / morceaux, top + (r2() < 0.5 ? r2() * bh * 0.16 : 0));
+      c.lineTo(x + bw, sol); c.closePath(); c.fill();
+      if (fenetres) {
+        for (let fy = top + 14; fy < sol - 12; fy += 16) {
+          for (let fx = x + 7; fx < x + bw - 9; fx += 13) {
+            const v = r2();
+            if (v < 0.07) { c.fillStyle = '#ffcf6b'; c.globalAlpha = 0.85; }
+            else if (v < 0.09) { c.fillStyle = '#ff3d55'; c.globalAlpha = 0.9; }
+            else { c.fillStyle = '#07060c'; c.globalAlpha = 0.75; }
+            c.fillRect(fx, fy, 7, 9);
+            c.globalAlpha = 1;
+          }
+        }
+      }
+      x += bw + r2() * 10;
+    }
+  }
+
+  // La Voix : spectre à capuche fait d'ondes rouges, bras tendus autour de la radio.
+  function voixAffiche(c) {
+    // silhouette (capuche, épaules, corps qui se resserre vers la radio)
+    const corps = new Path2D();
+    corps.moveTo(300, 96);
+    corps.bezierCurveTo(352, 96, 392, 140, 398, 210);
+    corps.bezierCurveTo(404, 262, 440, 280, 478, 318);
+    corps.bezierCurveTo(500, 342, 470, 360, 430, 360);
+    corps.bezierCurveTo(400, 380, 372, 400, 352, 430);
+    corps.lineTo(248, 430);
+    corps.bezierCurveTo(228, 400, 200, 380, 170, 360);
+    corps.bezierCurveTo(130, 360, 100, 342, 122, 318);
+    corps.bezierCurveTo(160, 280, 196, 262, 202, 210);
+    corps.bezierCurveTo(208, 140, 248, 96, 300, 96);
+    corps.closePath();
+    // corps lumineux
+    c.save();
+    c.shadowColor = '#ff2050'; c.shadowBlur = 50;
+    const g = c.createLinearGradient(0, 96, 0, 430);
+    g.addColorStop(0, 'rgba(255,110,140,.95)'); g.addColorStop(0.45, 'rgba(225,30,75,.85)'); g.addColorStop(1, 'rgba(150,10,50,.55)');
+    c.fillStyle = g; c.fill(corps);
+    c.restore();
+    // le corps est fait d'ondes : lignes sinueuses claires dans la silhouette
+    c.save(); c.clip(corps);
+    c.lineWidth = 2;
+    for (let y = 104, i = 0; y < 432; y += 10, i++) {
+      c.strokeStyle = 'rgba(255,200,215,' + (0.22 + 0.18 * (i % 2)).toFixed(2) + ')';
+      c.beginPath();
+      for (let x = 100; x <= 500; x += 6) {
+        const yy = y + Math.sin(x / 18 + i * 0.9) * (3 + (i % 3));
+        if (x === 100) c.moveTo(x, yy); else c.lineTo(x, yy);
+      }
+      c.stroke();
+    }
+    c.restore();
+    c.save();
+    c.strokeStyle = '#ffb3c2'; c.lineWidth = 3; c.shadowColor = '#ff3d60'; c.shadowBlur = 18;
+    c.stroke(corps);
+    c.restore();
+    // ouverture de la capuche : le vide
+    const vide = c.createRadialGradient(300, 214, 10, 300, 214, 74);
+    vide.addColorStop(0, '#12020a'); vide.addColorStop(0.75, '#2a0614'); vide.addColorStop(1, 'rgba(60,6,24,0)');
+    c.fillStyle = vide;
+    c.beginPath(); c.ellipse(300, 216, 58, 74, 0, 0, 7); c.fill();
+    // yeux brûlants, en amande et inclinés
+    [[-1, 272], [1, 328]].forEach(([s, x]) => {
+      c.save();
+      c.translate(x, 196); c.rotate(s * 0.28);
+      c.shadowColor = '#ff2a4a'; c.shadowBlur = 26;
+      c.fillStyle = '#fff1c8';
+      c.beginPath(); c.moveTo(-17, 0); c.quadraticCurveTo(0, -12, 17, 0); c.quadraticCurveTo(0, 8, -17, 0); c.closePath(); c.fill();
+      c.shadowBlur = 0;
+      c.fillStyle = '#ff2a4a'; c.beginPath(); c.arc(0, -1, 4, 0, 7); c.fill();
+      c.restore();
+    });
+    // bouche ouverte qui chante
+    c.save();
+    c.shadowColor = '#ff2a4a'; c.shadowBlur = 20;
+    c.fillStyle = '#ff5070'; c.beginPath(); c.ellipse(300, 252, 15, 23, 0, 0, 7); c.fill();
+    c.fillStyle = '#16020a'; c.beginPath(); c.ellipse(300, 254, 10, 17, 0, 0, 7); c.fill();
+    c.restore();
+    // le chant de la Voix : ondes rouges qui partent de la bouche
+    for (let k = 0; k < 4; k++) {
+      c.strokeStyle = 'rgba(255,' + (80 + k * 30) + ',110,' + (0.85 - k * 0.18).toFixed(2) + ')';
+      c.lineWidth = 5 - k; c.lineCap = 'round';
+      c.beginPath(); c.arc(300, 252, 40 + k * 26, -0.55, 0.55); c.stroke();
+      c.beginPath(); c.arc(300, 252, 40 + k * 26, Math.PI - 0.55, Math.PI + 0.55); c.stroke();
+    }
+  }
+
+  // Griffes de la Voix, dessinées devant la radio : deux bras d'onde qui partent des épaules
+  // et dont les doigts se referment sur les coins du haut de la radio.
+  function griffesAffiche(c) {
+    [[-1, 128, 340, 112, 392], [1, 472, 340, 488, 392]].forEach(([s, ex, ey, gx, gy]) => {
+      for (let d = 0; d < 3; d++) {
+        c.save();
+        c.strokeStyle = 'rgba(255,' + (70 + d * 50) + ',' + (110 + d * 25) + ',' + (0.85 - d * 0.15).toFixed(2) + ')';
+        c.lineWidth = 22 - d * 7; c.lineCap = 'round';
+        c.shadowColor = '#ff2050'; c.shadowBlur = 22;
+        c.beginPath(); c.moveTo(ex, ey);
+        c.bezierCurveTo(ex + s * 40, ey + 4, gx + s * 30, gy - 34, gx, gy - 8);
+        c.stroke();
+        c.restore();
+      }
+      // quatre longs doigts crochus qui descendent sur la face de la radio
+      c.save();
+      c.lineCap = 'round'; c.shadowColor = '#ff2050'; c.shadowBlur = 14;
+      for (let f = 0; f < 4; f++) {
+        const fx = gx - s * (f * 13 - 14), fy = gy - 6;
+        c.strokeStyle = '#ff7a96'; c.lineWidth = 7;
+        c.beginPath(); c.moveTo(fx, fy);
+        c.quadraticCurveTo(fx + s * 8, fy + 26 + f * 3, fx - s * 6, fy + 44 + f * 5);
+        c.stroke();
+        c.strokeStyle = '#ffd6de'; c.lineWidth = 2.5;
+        c.beginPath(); c.moveTo(fx, fy);
+        c.quadraticCurveTo(fx + s * 8, fy + 26 + f * 3, fx - s * 6, fy + 44 + f * 5);
+        c.stroke();
+      }
+      c.restore();
+    });
+  }
+
+  // La grande radio, de face : (x0, y0) coin haut gauche, largeur w, hauteur h.
+  function radioAffiche(c, x0, y0, w, h) {
+    const r = RADIOS[0];
+    // antenne télescopique (trois brins), boule qui émet
+    c.lineCap = 'round';
+    [[7, '#8a8e9e'], [4.5, '#c9ccd8'], [2.5, '#eef0f6']].forEach(([lw, col], i) => {
+      c.strokeStyle = col; c.lineWidth = lw;
+      c.beginPath(); c.moveTo(x0 + w * 0.88, y0 + 8); c.lineTo(x0 + w * 0.88 + (92 - i * 0) * (1 - i * 0.02), y0 - 190); c.stroke();
+    });
+    const ax = x0 + w * 0.88 + 92, ay = y0 - 190;
+    c.save(); c.shadowColor = '#7ff0d0'; c.shadowBlur = 24;
+    c.fillStyle = '#d8fff2'; c.beginPath(); c.arc(ax, ay, 8, 0, 7); c.fill();
+    c.restore();
+    for (let k = 0; k < 4; k++) {
+      c.strokeStyle = 'rgba(127,240,208,' + (0.9 - k * 0.2).toFixed(2) + ')'; c.lineWidth = 4 - k * 0.6;
+      c.beginPath(); c.arc(ax, ay, 20 + k * 18, Math.PI * 0.9, Math.PI * 1.6); c.stroke();
+      c.beginPath(); c.arc(ax, ay, 20 + k * 18, Math.PI * 1.75, Math.PI * 2.25); c.stroke();
+    }
+    // poignée
+    c.strokeStyle = '#1e1813'; c.lineWidth = 16;
+    c.beginPath(); c.moveTo(x0 + w * 0.2, y0 + 6); c.bezierCurveTo(x0 + w * 0.25, y0 - 70, x0 + w * 0.75, y0 - 70, x0 + w * 0.8, y0 + 6); c.stroke();
+    c.strokeStyle = 'rgba(255,140,160,.55)'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(x0 + w * 0.22, y0 - 6); c.bezierCurveTo(x0 + w * 0.27, y0 - 74, x0 + w * 0.73, y0 - 74, x0 + w * 0.78, y0 - 6); c.stroke();
+    // flanc droit (volume)
+    c.fillStyle = '#2e241b';
+    c.beginPath(); c.moveTo(x0 + w - 10, y0 + 6); c.lineTo(x0 + w + 16, y0 + 22); c.lineTo(x0 + w + 16, y0 + h - 8); c.lineTo(x0 + w - 10, y0 + h); c.closePath(); c.fill();
+    // corps en bois
+    c.fillStyle = r.corps; rrect(c, x0, y0, w, h, 30); c.fill();
+    const g = c.createLinearGradient(0, y0, 0, y0 + h);
+    g.addColorStop(0, 'rgba(255,190,150,.25)'); g.addColorStop(0.5, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.5)');
+    c.fillStyle = g; rrect(c, x0, y0, w, h, 30); c.fill();
+    // veines du bois
+    c.save(); rrect(c, x0, y0, w, h, 30); c.clip();
+    const rv = hasardFixe(7);
+    c.strokeStyle = 'rgba(40,26,14,.35)'; c.lineWidth = 1.5;
+    for (let k = 0; k < 14; k++) {
+      const yy = y0 + 10 + rv() * (h - 20);
+      c.beginPath(); c.moveTo(x0, yy); c.bezierCurveTo(x0 + w * 0.3, yy - 6 + rv() * 12, x0 + w * 0.7, yy - 6 + rv() * 12, x0 + w, yy + rv() * 6); c.stroke();
+    }
+    c.restore();
+    // liseré de lumière rouge (la Voix) sur le dessus, ambre sur le bas
+    c.strokeStyle = 'rgba(255,120,150,.75)'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(x0 + 26, y0 + 2); c.lineTo(x0 + w - 26, y0 + 2); c.stroke();
+    c.strokeStyle = '#120c08'; c.lineWidth = 3; rrect(c, x0, y0, w, h, 30); c.stroke();
+    // haut-parleur, d'où sort la Voix (lueur rouge derrière la grille)
+    const hx = x0 + w * 0.255, hy = y0 + h * 0.52, hr = h * 0.36;
+    c.fillStyle = '#c9b48e'; c.beginPath(); c.arc(hx, hy, hr + 8, 0, 7); c.fill();
+    c.fillStyle = '#5a4630'; c.beginPath(); c.arc(hx, hy, hr + 3, 0, 7); c.fill();
+    const fh = c.createRadialGradient(hx, hy, 4, hx, hy, hr);
+    fh.addColorStop(0, '#ff3d60'); fh.addColorStop(0.55, '#6a0a24'); fh.addColorStop(1, '#1c1a16');
+    c.fillStyle = fh; c.beginPath(); c.arc(hx, hy, hr, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(20,14,10,.85)'; c.lineWidth = 3.5;
+    for (let k = -hr + 6; k < hr; k += 9) { const d = Math.sqrt(hr * hr - k * k); c.beginPath(); c.moveTo(hx - d, hy + k); c.lineTo(hx + d, hy + k); c.stroke(); }
+    // cadran lumineux ambré (graduations sans chiffres) et aiguille rouge
+    const cx = x0 + w * 0.5, cy = y0 + h * 0.12, cw = w * 0.44, ch = h * 0.26;
+    c.fillStyle = '#c9b48e'; rrect(c, cx - 6, cy - 6, cw + 12, ch + 12, 12); c.fill();
+    c.save(); c.shadowColor = r.lueur; c.shadowBlur = 40;
+    const gd = c.createLinearGradient(0, cy, 0, cy + ch);
+    gd.addColorStop(0, '#fff2c4'); gd.addColorStop(1, '#ffc54a');
+    c.fillStyle = gd; rrect(c, cx, cy, cw, ch, 8); c.fill();
+    c.restore();
+    c.strokeStyle = '#4a2c08'; c.lineWidth = 2;
+    for (let k = 0; k <= 24; k++) {
+      const tx = cx + 10 + (cw - 20) * k / 24;
+      c.beginPath(); c.moveTo(tx, cy + ch * 0.7); c.lineTo(tx, cy + ch * (k % 4 === 0 ? 0.2 : 0.45)); c.stroke();
+    }
+    c.beginPath(); c.moveTo(cx + 10, cy + ch * 0.7); c.lineTo(cx + cw - 10, cy + ch * 0.7); c.stroke();
+    const ai = cx + 10 + (cw - 20) * 0.62;
+    c.save(); c.shadowColor = '#ff2a3a'; c.shadowBlur = 10;
+    c.strokeStyle = '#e0141f'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(ai, cy + 3); c.lineTo(ai, cy + ch - 3); c.stroke();
+    c.restore();
+    // les six boutons lumineux (2 rangées de 3) ; celui en bas à droite est enfoncé
+    const ordre = [0, 1, 2, 5, 4, 3];
+    const bx = (i) => cx + cw * (0.17 + (i % 3) * 0.33), by = (i) => y0 + h * (0.6 + Math.floor(i / 3) * 0.25);
+    ordre.forEach((b, i) => {
+      const x = bx(i), y = by(i), rb = 21, appuye = i === 5;
+      c.fillStyle = '#17120e'; c.beginPath(); c.arc(x, y, rb + 6, 0, 7); c.fill();
+      c.save(); c.shadowColor = TOUCHES[b]; c.shadowBlur = appuye ? 40 : 18;
+      const gb = c.createRadialGradient(x - rb * 0.3, y - rb * 0.3, 2, x, y, rb);
+      gb.addColorStop(0, '#ffffff'); gb.addColorStop(appuye ? 0.45 : 0.25, TOUCHES[b]); gb.addColorStop(1, TOUCHES[b]);
+      c.fillStyle = gb; c.beginPath(); c.arc(x, y, appuye ? rb - 1 : rb, 0, 7); c.fill();
+      c.restore();
+      formeAffiche(c, b, x, y, rb * 0.62, 'rgba(255,255,255,.92)');
+    });
+    return { x: bx(5), y: by(5), coul: TOUCHES[3], hx: hx, hy: hy };
+  }
+
+  // Main (dessin du tutoriel) qui appuie sur le bouton, avec sa manche, venue d'en bas à droite.
+  function mainAffiche(c, x, y, coul) {
+    c.save();
+    c.translate(x, y); c.rotate(-0.62);
+    const k = 2.7;
+    // manche de blouson
+    c.save(); c.scale(k, k);
+    c.fillStyle = '#26324e'; c.strokeStyle = '#0e1424'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(-14, 52); c.lineTo(36, 50); c.lineTo(46, 200); c.lineTo(-24, 200); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#e8735a'; c.beginPath(); c.moveTo(-14, 50); c.lineTo(36, 48); c.lineTo(37, 60); c.lineTo(-15, 62); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(126,240,170,.7)'; c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(-15, 62); c.lineTo(-24, 200); c.stroke();
+    c.restore();
+    main(c, 0, 0, k, 0.7);
+    c.restore();
+    // éclat de lumière au bout du doigt
+    c.save();
+    const e = c.createRadialGradient(x, y, 2, x, y, 70);
+    e.addColorStop(0, 'rgba(220,255,230,.85)'); e.addColorStop(0.3, coul + 'aa'); e.addColorStop(1, coul + '00');
+    c.fillStyle = e; c.beginPath(); c.arc(x, y, 70, 0, 7); c.fill();
+    c.strokeStyle = coul; c.lineWidth = 3;
+    for (let k = 0; k < 8; k++) {
+      const a = k * Math.PI / 4 + 0.3;
+      c.beginPath(); c.moveTo(x + Math.cos(a) * 34, y + Math.sin(a) * 34); c.lineTo(x + Math.cos(a) * 50, y + Math.sin(a) * 50); c.stroke();
+    }
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const c = cv.getContext('2d');
+    // repère 600 × 800 qui couvre tout l'écran, centré
+    const k = Math.max(W / 600, H / 800);
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * (W - 600 * k) / 2, dpr * (H - 800 * k) / 2);
+    const sol = 540;
+    // ciel violet, plus clair à l'horizon
+    const g = c.createLinearGradient(0, 0, 0, 800);
+    g.addColorStop(0, '#141640'); g.addColorStop(0.32, '#33275e'); g.addColorStop(0.6, '#6e3266'); g.addColorStop(0.7, '#3a2042'); g.addColorStop(1, '#100c16');
+    c.fillStyle = g; c.fillRect(-400, -400, 1400, 1600);
+    const rnd = hasardFixe(13);
+    for (let i = 0; i < 80; i++) {
+      c.fillStyle = 'rgba(230,235,255,' + (0.35 + 0.6 * rnd()).toFixed(2) + ')';
+      c.fillRect(rnd() * 600, rnd() * 380, 2, 2);
+    }
+    // lune verte et son halo
+    const lx = 506, ly = 132, lr = 50;
+    const halo = c.createRadialGradient(lx, ly, lr * 0.6, lx, ly, lr * 5);
+    halo.addColorStop(0, 'rgba(214,240,196,.7)'); halo.addColorStop(0.4, 'rgba(180,220,170,.22)'); halo.addColorStop(1, 'rgba(180,220,170,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, 600, 600);
+    c.fillStyle = '#e6f2d2'; c.beginPath(); c.arc(lx, ly, lr, 0, 7); c.fill();
+    c.fillStyle = 'rgba(170,196,150,.55)';
+    [[-16, -10, 11], [18, 14, 8], [6, -24, 5], [-10, 22, 6]].forEach(([dx, dy, rc]) => { c.beginPath(); c.arc(lx + dx, ly + dy, rc, 0, 7); c.fill(); });
+    // lueur rouge de la Voix sur toute la ville
+    const lv = c.createRadialGradient(300, 270, 30, 300, 270, 380);
+    lv.addColorStop(0, 'rgba(255,50,90,.45)'); lv.addColorStop(1, 'rgba(255,50,90,0)');
+    c.fillStyle = lv; c.fillRect(0, 0, 600, 800);
+    // ville morte : rangée lointaine éclairée par la lune, puis rangée proche aux fenêtres
+    villeAffiche(c, sol, 21, '#3b2f62', 150, 300, false);
+    c.fillStyle = 'rgba(190,170,230,.12)'; c.fillRect(0, 300, 600, sol - 300);
+    villeAffiche(c, sol, 7, '#1c1530', 70, 200, true);
+    // château d'eau et poteaux électriques
+    c.fillStyle = '#120e1c';
+    c.fillRect(70, 330, 6, 210); c.fillRect(110, 360, 5, 180);
+    c.beginPath(); c.ellipse(92, 330, 46, 22, 0, 0, 7); c.fill(); c.fillRect(46, 300, 92, 30);
+    c.strokeStyle = '#120e1c'; c.lineWidth = 4;
+    [210, 410].forEach((px) => { c.beginPath(); c.moveTo(px, sol); c.lineTo(px, 400); c.moveTo(px - 16, 410); c.lineTo(px + 16, 410); c.stroke(); });
+    c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(0, 425); c.quadraticCurveTo(105, 445, 210, 410); c.quadraticCurveTo(310, 440, 410, 410); c.quadraticCurveTo(510, 440, 600, 418); c.stroke();
+    // brume au pied des immeubles
+    const brume = c.createLinearGradient(0, sol - 60, 0, sol + 60);
+    brume.addColorStop(0, 'rgba(170,150,210,0)'); brume.addColorStop(0.5, 'rgba(190,160,220,.3)'); brume.addColorStop(1, 'rgba(170,150,210,0)');
+    c.fillStyle = brume; c.fillRect(0, sol - 60, 600, 120);
+    // sol
+    const gs = c.createLinearGradient(0, sol, 0, 800);
+    gs.addColorStop(0, '#2a1d30'); gs.addColorStop(1, '#0b080e');
+    c.fillStyle = gs; c.fillRect(-400, sol, 1400, 800);
+    // la Voix, qui sort de la radio
+    voixAffiche(c);
+    // flaque de lumière ambrée au pied de la caisse
+    const fl = c.createRadialGradient(300, 690, 20, 300, 690, 300);
+    fl.addColorStop(0, 'rgba(255,190,100,.4)'); fl.addColorStop(1, 'rgba(255,190,100,0)');
+    c.fillStyle = fl; c.fillRect(0, 520, 600, 280);
+    // caisse en bois
+    c.fillStyle = '#4a3420'; c.fillRect(110, 630, 380, 96);
+    c.fillStyle = '#6a4a2a'; c.fillRect(110, 630, 380, 10);
+    c.strokeStyle = '#21160c'; c.lineWidth = 3;
+    for (let p = 1; p < 3; p++) { c.beginPath(); c.moveTo(110, 630 + p * 32); c.lineTo(490, 630 + p * 32); c.stroke(); }
+    c.beginPath(); c.moveTo(130, 640); c.lineTo(130, 726); c.moveTo(470, 640); c.lineTo(470, 726); c.stroke();
+    // la radio
+    const rad = radioAffiche(c, 80, 382, 440, 250);
+    // traînée rouge entre le haut-parleur et la Voix (elle sort de la grille)
+    c.save();
+    c.shadowColor = '#ff2050'; c.shadowBlur = 16; c.lineCap = 'round';
+    for (let i = 0; i < 4; i++) {
+      c.strokeStyle = 'rgba(255,' + (90 + i * 30) + ',130,' + (0.75 - i * 0.12).toFixed(2) + ')'; c.lineWidth = 6 - i;
+      c.beginPath();
+      for (let s = 0; s <= 30; s++) {
+        const p = s / 30;
+        const x = rad.hx + (245 - rad.hx) * p + Math.sin(p * 9 + i * 1.6) * 16 * (1 - p * 0.4) + (i - 1.5) * 12 * p;
+        const y = rad.hy - 10 + (335 - rad.hy + 10) * p;
+        if (s === 0) c.moveTo(x, y); else c.lineTo(x, y);
+      }
+      c.stroke();
+    }
+    c.restore();
+    // les notes de la chaîne, qui s'échappent du haut-parleur vers la gauche
+    [[0, 52, 452, 13], [2, 44, 392, 11], [4, 70, 346, 10]].forEach(([b, x, y, r]) => {
+      c.save(); c.shadowColor = TOUCHES[b]; c.shadowBlur = 18;
+      formeAffiche(c, b, x, y, r, TOUCHES[b]);
+      c.restore();
+    });
+    // les griffes de la Voix sur la radio
+    griffesAffiche(c);
+    // la main du joueur qui appuie sur le bouton vert
+    mainAffiche(c, rad.x, rad.y, rad.coul);
+    // premier plan : réverbère penché coupé par le bord gauche, gravats et cassettes
+    c.fillStyle = '#07050a';
+    c.beginPath(); c.moveTo(0, 800); c.lineTo(0, 610); c.lineTo(40, 640); c.lineTo(70, 700); c.lineTo(110, 730); c.lineTo(150, 800); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(600, 800); c.lineTo(600, 740); c.lineTo(560, 760); c.lineTo(520, 800); c.closePath(); c.fill();
+    c.strokeStyle = '#07050a'; c.lineWidth = 12;
+    c.beginPath(); c.moveTo(18, 800); c.lineTo(26, 330); c.quadraticCurveTo(30, 296, 64, 290); c.stroke();
+    c.fillStyle = '#07050a'; c.beginPath(); c.moveTo(50, 284); c.lineTo(94, 284); c.lineTo(86, 300); c.lineTo(58, 300); c.closePath(); c.fill();
+    c.save(); c.shadowColor = '#ffcf6b'; c.shadowBlur = 20; c.fillStyle = '#ffe2a0';
+    c.beginPath(); c.ellipse(72, 302, 13, 4, 0, 0, 7); c.fill(); c.restore();
+    const cone = c.createLinearGradient(72, 300, 72, 520);
+    cone.addColorStop(0, 'rgba(255,214,140,.35)'); cone.addColorStop(1, 'rgba(255,214,140,0)');
+    c.fillStyle = cone; c.beginPath(); c.moveTo(62, 302); c.lineTo(82, 302); c.lineTo(150, 520); c.lineTo(10, 520); c.closePath(); c.fill();
+    [[40, 742, -0.35, '#2a3440'], [96, 768, 0.2, '#3a3530'], [66, 714, 0.12, '#40302a']].forEach(([x, y, a, col]) => {
+      c.save(); c.translate(x, y); c.rotate(a);
+      c.fillStyle = col; rrect(c, -40, -24, 80, 48, 6); c.fill();
+      c.fillStyle = '#d8c8a0'; rrect(c, -32, -18, 64, 18, 3); c.fill();
+      c.fillStyle = '#0b0c12'; rrect(c, -20, 4, 40, 14, 4); c.fill();
+      c.fillStyle = '#e9e4d4'; c.beginPath(); c.arc(-11, 11, 5, 0, 7); c.arc(11, 11, 5, 0, 7); c.fill();
+      c.restore();
+    });
+    // vignette légère sur les bords
+    const vg = c.createRadialGradient(300, 400, 260, 300, 400, 560);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.45)');
+    c.fillStyle = vg; c.fillRect(-400, -400, 1400, 1600);
+  }
+
+  // Démarrage en mode affiche : aucun écran, bouton, fenêtre, son ni boucle de jeu.
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    for (const el of document.querySelectorAll('.ecran, .voile, .rond, .btn, button, #toast, #parasites, #confettis, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+    $('fond').style.setProperty('display', 'block', 'important');
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
   //  Commandes
   // ---------------------------------------------------------------------
 
@@ -4993,6 +5387,8 @@
   chargerProgression();
   construirePlaces();
   construireTouches();
+  // Affiche demandée par le robot du site : la scène seule, rien d'autre.
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
   let boutonEffacer = null;
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
   afficherEcran('titre');
