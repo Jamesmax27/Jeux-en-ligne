@@ -9026,11 +9026,12 @@ function allerBoutique(onglet) {
 // --- Messages courts ---------------------------------------------------------------------
 let minuterieToast = 0;
 function toast(texte, classe) {
+  if (apercu) return;      // image du jeu : aucun message par-dessus la course
   const el = $('toast'); el.textContent = texte; el.className = 'toast ' + (classe || '');
   void el.offsetWidth; el.classList.add('visible');
   clearTimeout(minuterieToast); minuterieToast = setTimeout(() => el.classList.remove('visible'), 1300);
 }
-function secousse() { const c = $('scene'); c.classList.remove('secoue'); void c.offsetWidth; c.classList.add('secoue'); }
+function secousse() { if (apercu) return; const c = $('scene'); c.classList.remove('secoue'); void c.offsetWidth; c.classList.add('secoue'); }
 
 // --- Course ---------------------------------------------------------------------------------
 function lancerCourse(numero) {
@@ -9532,7 +9533,266 @@ function majDebug() {
   $('debug').textContent = ligne;
 }
 
+// --------------------------------------------------------------------------
+// AFFICHE (jaquette du jeu)
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène
+// composée, sans écran titre, ni bouton, ni texte, ni son, ni boucle de course
+// (CONSIGNES-JEU.md, section 5). Le héros, sur sa bouée rouge, s'envole par-dessus
+// le bord de la glissière dans une gerbe d'eau, bras levés, au milieu des pièces ;
+// derrière lui, les autres bouées dévalent la piste vers le lagon, sous le soleil.
+// --------------------------------------------------------------------------
+const AFFICHE = { niveau: 1, i: 450, centre: [-10, -230], rot: -0.3, pique: 0.2, dist: 4.2, hx: 0.05, hy: -0.02, taille: 1, lacet: 0.6, tangage: 0.05, roulis: 0.3, bascule: 0.5,
+  autres: [[-12, -0.3, 1], [-22, 0.4, 3], [-34, -0.1, 4], [-48, 0.3, 5]], pieces: [[0.6, 0.6, 7], [0.82, 0.25, 9], [-0.7, 0.65, 8]],
+  volants: [[-0.5, 0.3, 14, 4]], soleil: [0.55, 0.85, 130] };
+
+function cacherPourAffiche() {
+  for (const el of document.querySelectorAll('.ecran, #hud, #toast, #reseau, #tuto, #pause, #resultats, #erreur, #debug, button, .jel-langue, jel-langue'))
+    el.style.setProperty('display', 'none', 'important');
+}
+
+function textureHalo() {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'), d = g.createRadialGradient(128, 128, 4, 128, 128, 128);
+  d.addColorStop(0, 'rgba(255,255,255,1)'); d.addColorStop(0.16, 'rgba(255,250,215,1)'); d.addColorStop(0.24, 'rgba(255,236,150,0.75)');
+  d.addColorStop(0.5, 'rgba(255,214,120,0.22)'); d.addColorStop(1, 'rgba(255,214,120,0)');
+  g.fillStyle = d; g.fillRect(0, 0, 256, 256);
+  const t = new T3.CanvasTexture(c); t.colorSpace = T3.SRGBColorSpace; return t;
+}
+
+// Le héros de l'affiche : la bouée du jeu, avec un visage, des bras levés et des joues roses
+function herosAffiche(bouee) {
+  const m = creerMeshBouee(bouee, 0xffffff), blanc = lambert(0xffffff), noir = lambert(0x1b2330), rose = lambert(0xff8fa0), peau = lambert(0xffcfa3);
+  for (const c of [-1, 1]) {
+    const oeil = new T3.Mesh(new T3.SphereGeometry(0.075, 12, 10), blanc); oeil.position.set(c * 0.095, 0.87, -0.2); oeil.scale.set(1, 1.25, 0.6); m.add(oeil);
+    const pup = new T3.Mesh(new T3.SphereGeometry(0.04, 10, 8), noir); pup.position.set(c * 0.085, 0.872, -0.245); m.add(pup);
+    const joue = new T3.Mesh(new T3.SphereGeometry(0.045, 8, 6), rose); joue.position.set(c * 0.155, 0.79, -0.18); joue.scale.set(1, 0.7, 0.5); m.add(joue);
+    // bras levés de joie, mains ouvertes
+    const bras = new T3.Mesh(new T3.CylinderGeometry(0.07, 0.08, 0.62, 8), blanc);
+    bras.position.set(c * 0.42, 0.72, -0.02); bras.rotation.z = -c * 0.62; m.add(bras);
+    const main = new T3.Mesh(new T3.SphereGeometry(0.1, 10, 8), peau); main.position.set(c * 0.6, 0.98, -0.04); m.add(main);
+  }
+  const bouche = new T3.Mesh(new T3.TorusGeometry(0.07, 0.022, 6, 14, PI), lambert(0xc0283a));
+  bouche.position.set(0, 0.775, -0.225); bouche.rotation.z = PI; m.add(bouche);
+  const dedans = new T3.Mesh(new T3.CircleGeometry(0.066, 14, 0, PI), lambert(0x7a1424)); dedans.position.set(0, 0.775, -0.222); dedans.rotation.set(0, PI, PI); m.add(dedans);
+  m.userData.flamme.visible = false;
+  return m;
+}
+
+function composerAffiche() {
+  const A = AFFICHE, vis = construireScene(A.niveau), P = vis.P;
+  viderDynamique();
+  const i = A.i;
+  // le bord de la glissière tourné vers l'extérieur du parc
+  const ox0 = P.px[i] - A.centre[0], oz0 = P.pz[i] - A.centre[1];
+  const c = (P.rx[i] * ox0 + P.rz[i] * oz0) >= 0 ? 1 : -1;
+  pointPiste(P, i, c * 1.45, 0, _o); const bord = { x: _o.x, y: _o.y, z: _o.z };
+  // le héros : juste au-dessus du bord, lancé vers l'extérieur
+  const H = { x: bord.x + P.rx[i] * c * 1.7, y: bord.y + 1.5, z: bord.z + P.rz[i] * c * 1.7 };
+  let ox = H.x - A.centre[0], oz = H.z - A.centre[1]; const ol = Math.hypot(ox, oz) || 1; ox /= ol; oz /= ol;
+  const px = -oz, pz = ox;      // à droite de l'extérieur
+  // la caméra : dehors, elle regarde vers le centre du parc (tournée de « rot ») et vers le bas (« pique ») ;
+  // elle est placée pour que le héros tombe au point (hx, hy) de l'image, à « dist » mètres
+  const ry = Math.atan2(-ox, -oz) + A.rot, cp = Math.cos(A.pique);
+  const fw = new T3.Vector3(Math.sin(ry) * cp, -Math.sin(A.pique), Math.cos(ry) * cp);
+  R3.camera.up.set(0, 1, 0);
+  const dr = new T3.Vector3().crossVectors(fw, R3.camera.up).normalize(), du = new T3.Vector3().crossVectors(dr, fw).normalize();
+  const tanV = Math.tan(R3.camera.fov * PI / 360), tanH = tanV * R3.camera.aspect;
+  const cam = new T3.Vector3(H.x, H.y, H.z).addScaledVector(fw, -A.dist).addScaledVector(dr, -A.hx * tanH * A.dist).addScaledVector(du, -A.hy * tanV * A.dist);
+  const cx = cam.x, cy = cam.y, cz = cam.z;
+  R3.camera.position.copy(cam);
+  R3.camera.lookAt(cx + fw.x, cy + fw.y, cz + fw.z);
+  R3.camera.updateMatrixWorld();
+  const dansImage = (x, y, dist) => new T3.Vector3(cx, cy, cz).addScaledVector(fw, dist).addScaledVector(dr, x * tanH * dist).addScaledVector(du, y * tanV * dist);
+  // le héros, tourné vers la caméra (de trois quarts), penché dans son vol
+  const heros = herosAffiche(CONFIG.bouees[0]);
+  heros.position.set(H.x, H.y, H.z); heros.scale.setScalar(A.taille);
+  const ca = Math.cos(A.lacet), sa = Math.sin(A.lacet), vx = -fw.x * ca - fw.z * sa, vz = -fw.z * ca + fw.x * sa;
+  orienter(heros, vx, A.tangage, vz, dr.x * A.roulis - fw.x * A.bascule, 1, dr.z * A.roulis - fw.z * A.bascule);
+  vis.dyn.add(heros);
+  // les autres bouées sur la piste
+  A.autres.forEach(([ds, phi, k]) => {
+    const b = creerMeshBouee(CONFIG.bouees[k % CONFIG.bouees.length], CONFIG.couleursBots[k % 7]), j = borne(i + ds, 0, P.n - 1);
+    pointPiste(P, j, phi, 0.42, _o); b.position.set(_o.x, _o.y, _o.z);
+    const sn = Math.sin(phi), cs = Math.cos(phi);
+    orienter(b, P.tx[j], P.ty[j], P.tz[j], -sn * P.rx[j] + cs * P.nx[j], cs * P.ny[j], -sn * P.rz[j] + cs * P.nz[j]);
+    b.userData.flamme.visible = k === 3;
+    vis.dyn.add(b);
+  });
+  // d'autres bouées qui sautent aussi, plus loin derrière lui
+  (A.volants || []).forEach(([x, y, dist, k]) => {
+    const b = creerMeshBouee(CONFIG.bouees[k % CONFIG.bouees.length], CONFIG.couleursBots[k % 7]), q = dansImage(x, y, dist);
+    b.position.copy(q); orienter(b, vx * 0.6 - dr.x, -0.2, vz * 0.6 - dr.z, 0.3 * dr.x, 1, 0.3 * dr.z); vis.dyn.add(b);
+  });
+  // la gerbe d'eau : du bord jusqu'au héros, et des gouttes tout autour de lui
+  const rnd = alea(2024), gouttes = [], tg = textureGoutte();
+  for (let k = 0; k < 120; k++) {
+    const u = Math.pow(rnd(), 0.8), a = rnd() * 2 * PI, e = (0.25 + rnd() * 1.2) * A.taille;
+    gouttes.push(bord.x + (H.x - bord.x) * u + Math.cos(a) * e, bord.y + 0.1 + (H.y - bord.y - 0.4) * u + Math.abs(Math.sin(a)) * e * 0.5, bord.z + (H.z - bord.z) * u + Math.sin(a) * e);
+  }
+  const gg = new T3.BufferGeometry(); gg.setAttribute('position', new T3.Float32BufferAttribute(gouttes, 3));
+  const pts = new T3.Points(gg, new T3.PointsMaterial({ color: 0xf2fdff, size: 0.22, map: tg, transparent: true, opacity: 0.95, depthWrite: false }));
+  pts.renderOrder = 7; vis.dyn.add(pts);
+  // grosses gouttes tout près de la caméra, coupées par les bords de l'image
+  const pres = [];
+  for (let k = 0; k < 40; k++) { const g = dansImage((rnd() < 0.5 ? -1 : 1) * (0.75 + rnd() * 0.4), -1.1 + rnd() * 1.2, 2.2 + rnd() * 1.5); pres.push(g.x, g.y, g.z); }
+  const gp = new T3.BufferGeometry(); gp.setAttribute('position', new T3.Float32BufferAttribute(pres, 3));
+  const ptp = new T3.Points(gp, new T3.PointsMaterial({ color: 0xffffff, size: 0.1, map: tg, transparent: true, opacity: 0.75, depthWrite: false }));
+  ptp.renderOrder = 8; vis.dyn.add(ptp);
+  // les pièces qui volent autour de lui (une tout près, coupée par le bord)
+  const mp = lambert(0xffc928, { emissive: 0x8a5200 }), mr = lambert(0xfff1a0, { emissive: 0x6a4a00 });
+  A.pieces.forEach(([x, y, dist], k) => {
+    const p = new T3.Group(), q = dansImage(x, y, dist);
+    p.add(new T3.Mesh(new T3.CylinderGeometry(0.42, 0.42, 0.1, 22), mp));
+    for (const f of [-1, 1]) { const r = new T3.Mesh(new T3.TorusGeometry(0.29, 0.035, 6, 22), mr); r.rotation.x = PI / 2; r.position.y = f * 0.055; p.add(r); }
+    p.position.copy(q); p.lookAt(cx, cy, cz); p.rotateX(PI / 2); p.rotateZ(0.35 + k * 0.4); p.rotateX(0.25 * (k % 2 ? 1 : -1)); vis.dyn.add(p);
+  });
+  // le soleil, en contre-jour, et les lumières qui détourent le héros
+  const sol = dansImage(A.soleil[0], A.soleil[1], 380);
+  const soleil = new T3.Mesh(new T3.PlaneGeometry(A.soleil[2], A.soleil[2]), new T3.MeshBasicMaterial({ map: textureHalo(), transparent: true, depthWrite: false, fog: false }));
+  soleil.position.copy(sol); soleil.lookAt(cx, cy, cz); soleil.renderOrder = -1; vis.dyn.add(soleil);
+  const contre = new T3.DirectionalLight(0xffe2a0, 1.5); contre.position.copy(sol); contre.target = heros; vis.dyn.add(contre);
+  const face = new T3.DirectionalLight(0xffffff, 0.6); face.position.set(cx, cy + 4, cz); face.target = heros; vis.dyn.add(face);
+  vis.temps = 1.3;
+  return vis;
+}
+
+function dessinerAffiche() {
+  if (!R3.renderer) return;
+  redimensionner();
+  R3.camera.fov = 52; R3.camera.updateProjectionMatrix();
+  composerAffiche();
+  R3.vis.eau.material.uniforms.uTemps.value = 1.2;
+  R3.renderer.render(R3.vis.scene, R3.camera);
+}
+
+function demarrerAffiche() {
+  cacherPourAffiche();
+  setTimeout(cacherPourAffiche, 300); setTimeout(cacherPourAffiche, 1200);
+  if (!initRendu()) return;
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+// --------------------------------------------------------------------------
+// IMAGES DU JEU (page du jeu)
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+// s'ouvre directement en pleine course solo, avec sa vraie interface (place, pièces, temps,
+// classement, barre de progression, bouton d'objet), sans écran titre, ni fenêtre « Continuer »,
+// ni tutoriel (CONSIGNES-JEU.md, section 5). La course est jouée en avance, à pas fixes, par le
+// pilote d'essai (même graine : la même image à chaque fois), jusqu'au moment choisi, puis elle
+// est figée : ni arrivée, ni chute, ni son, ni sauvegarde, ni FMG, ni réseau.
+//   1 = niveau 1 (lagon) : le peloton qui dévale la glissière, les pièces devant ;
+//   2 = niveau 9 (crique au couchant) : en plein vol par-dessus le bord, l'anneau vert sur l'étage du dessous ;
+//   3 = niveau 19 (parc de nuit) : la bouée étoile achetée à la boutique, un objet en main, la piste géante.
+// --------------------------------------------------------------------------
+const MOMENTS_APERCU = {
+  1: { niveau: 1, bouee: 'classique', am: [0, 0, 0, 0], pilote: 1, de: 3, a: 22, note: (co, J, P) => noteGroupe(co, J, P) + (J.etat === 'piste' ? 0 : -50) },
+  2: { niveau: 9, bouee: 'classique', am: [3, 3, 3, 3], pilote: 3, de: 8, a: 70, anneau: true, note: (co, J, P) => (J.etat === 'vol' && J.cible >= 0 && J.tVol > 0.35 && J.tVol < 0.9 ? 40 + noteGroupe(co, J, P) * 0.3 : -50) },
+  3: { niveau: 19, bouee: 'etoile', am: [5, 5, 5, 5], pilote: 3, de: 5, a: 80, note: (co, J, P) => (J.etat === 'piste' && J.objet && !P.ferme[borne(Math.round(J.s), 0, P.n - 1)] ? 20 + noteGroupe(co, J, P) * 1.5 + (co.concurrents.some((c) => c !== J && Math.abs(c.s - J.s) < 30 && (c.turbo > 0 || c.bouclier > 0 || c.plaque > 0)) ? 6 : 0) + (co.canards.length ? 4 : 0) : -50) }
+};
+let apercu = 0;
+
+// La vue de la caméra est-elle dégagée ? (ni autre étage de la piste ni bouée entre elle et le joueur)
+// Renvoie aussi si l'anneau vert (en vol) est dans l'image.
+const _vue = new T3.Vector3();
+function vueDegagee(co, J, P) {
+  cameraCourse(co, 0, true);
+  const c = R3.camera.position, R = CONFIG.rayonTube;
+  // le joueur bien dans l'image, et aucune plaque turbo juste sous la caméra
+  _vue.set(J.pos.x, J.pos.y, J.pos.z).project(R3.camera);
+  if (_vue.z >= 1 || Math.abs(_vue.x) > 0.5 || _vue.y < -0.7 || _vue.y > 0.35) return false;
+  for (const q of P.plaques) if (q.s > J.s - 12 && q.s < J.s + 1) return false;
+  for (let k = 0; k < P.pieces.length; k++) { const q = P.pieces[k].pos; if (co.pt[k] === 0 && P.pieces[k].air && (q.x - c.x) ** 2 + (q.y - c.y) ** 2 + (q.z - c.z) ** 2 < 49) return false; }
+  for (let t = 0; t <= 0.85; t += 0.085) {
+    const x = c.x + (J.pos.x - c.x) * t, y = c.y + (J.pos.y - c.y) * t, z = c.z + (J.pos.z - c.z) * t;
+    for (let j = 0; j < P.n; j += 2) {
+      if (j > J.s - 22 && j < J.s + 6) continue;      // la glissière du joueur, sous la caméra
+      const dx = P.px[j] - x, dy = P.py[j] + R - y, dz = P.pz[j] - z;
+      if (dx * dx + dy * dy + dz * dz < (R + 1.2) * (R + 1.2)) return false;
+    }
+    for (const b of co.concurrents) if (b !== J && b.etat !== 'plouf' && (b.pos.x - x) ** 2 + (b.pos.y - y) ** 2 + (b.pos.z - z) ** 2 < 3.2) return false;
+  }
+  return true;
+}
+// Nombre d'autres bouées bien visibles dans l'image (après vueDegagee, qui place la caméra)
+function boueesVisibles(co, J) {
+  let n = 0;
+  for (const b of co.concurrents) {
+    if (b === J || b.etat === 'plouf') continue;
+    _vue.set(b.pos.x, b.pos.y, b.pos.z);
+    if (_vue.distanceTo(R3.camera.position) > 45) continue;
+    _vue.project(R3.camera);
+    if (_vue.z < 1 && Math.abs(_vue.x) < 0.85 && Math.abs(_vue.y) < 0.8) n++;
+  }
+  return n;
+}
+function anneauVisible(J, P) {
+  const j = Math.min(P.n - 2, J.cible + 6);
+  pointPiste(P, j, 0, 0.25, _o); _vue.set(_o.x, _o.y, _o.z).project(R3.camera);
+  return _vue.z < 1 && Math.abs(_vue.x) < 0.75 && _vue.y > -0.55 && _vue.y < 0.6;
+}
+
+// Des bouées et des pièces bien en vue devant le joueur
+function noteGroupe(co, J, P) {
+  let n = 0;
+  for (const c of co.concurrents) if (c !== J && c.etat === 'piste' && c.s - J.s > 3 && c.s - J.s < 32) n += 1;
+  let p = 0;
+  for (let k = 0; k < P.pieces.length; k++) if (co.pt[k] === 0 && P.pieces[k].s - J.s > 4 && P.pieces[k].s - J.s < 30) p++;
+  return n * 3 + Math.min(p, 8) * 0.4;
+}
+
+function demarrerApercu(numero) {
+  apercu = numero;
+  const M = MOMENTS_APERCU[numero];
+  // hasard fixe (éclaboussures) : la même image à chaque capture
+  let graine = 7919 * numero + 12345;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  for (const el of document.querySelectorAll('.jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+  if (!initRendu()) { JEUX.sans3d = true; $('erreur').classList.remove('cache'); return; }
+  // progression en mémoire seulement (rien n'est lu ni écrit dans la sauvegarde), tutoriel déjà vu
+  S.tuto = true; S.max = M.niveau; S.son = false; S.bouee = M.bouee;
+  const dt = 1 / 60, nouvelle = () => creerCourse(M.niveau, { profil: { bouee: M.bouee, am: M.am }, graine: 90210 + numero, adresse: 2, force: 'libre' }), nouvelleCourse = () => { const co = nouvelle(); co.ctl[0] = M.pilote; return co; };
+  // 1er passage : le meilleur moment entre « de » et « a » secondes de course
+  let co = nouvelleCourse(), meilleur = -1e9, pas = 0, k = 0;
+  while (co.etat !== 'course' || co.temps < M.a) {
+    majCourse(co, dt); sorties.length = 0; k++;
+    if (co.etat === 'course' && co.temps >= M.de && !co.concurrents[0].fini) {
+      const J = co.concurrents[0], P = pisteDe(co);
+      let n = M.note(co, J, P);
+      if (n + 30 > meilleur) {
+        if (!vueDegagee(co, J, P)) n -= 100;
+        else { n += Math.min(boueesVisibles(co, J), 5) * 5; if (M.anneau && !anneauVisible(J, P)) n -= 30; }
+        if (n > meilleur) { meilleur = n; pas = k; }
+      }
+    }
+    if (co.concurrents[0].fini || k > 60 * 120) break;
+  }
+  // 2e passage : la même course rejouée jusque-là ; la dernière demi-seconde avec les éclaboussures
+  const fin = 30;
+  co = nouvelleCourse();
+  for (let j = 0; j < pas - fin; j++) { majCourse(co, dt); sorties.length = 0; }
+  JEUX.niveau = M.niveau; JEUX.camp = 0; JEUX.pause = false; JEUX.resultats = false; JEUX.tuto = 0; JEUX.course = co;
+  installerCourse(co);
+  $('hud-niveau').textContent = tr('niv.niveau', { n: M.niveau });
+  $('nouveau').classList.add('cache');
+  for (let j = 0; j < fin; j++) {
+    majCourse(co, dt); traiterEvenements(co);
+    majVisuels(co, dt); cameraCourse(co, dt, false); majParticules(dt);
+  }
+  $('decompte').textContent = '';
+  majObjetHUD(moi(co).objet);
+  majHUD(co, true);
+  // la course est figée sur ce moment : on ne fait plus que la redessiner
+  const peindre = () => { if (R3.vis) R3.renderer.render(R3.vis.scene, R3.camera); };
+  peindre();
+  window.addEventListener('resize', () => { redimensionner(); cameraCourse(co, dt, true); peindre(); });
+  (function figer() { peindre(); requestAnimationFrame(figer); })();
+}
+
 function demarrer() {
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) { demarrerApercu(numeroApercu); return; }
   chargerSauvegarde();
   partie = window.JEL_TR.creer({ sim: SIM, surEvenement });
   brancherEntrees();
