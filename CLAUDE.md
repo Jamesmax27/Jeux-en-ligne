@@ -213,7 +213,7 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 | --- | --- |
 | `index.html` | Jeu complet dans un seul fichier : CSS, JS, images (SVG inline ou base64), sons (base64 ou Web Audio). **Aucune ressource externe** (pas de CDN, pas de police Google, pas d'appel réseau). Moins de 2 Mo. |
 | `cover.webp` | Jaquette portrait 600 × 800 px (ratio 3:4), moins de 100 Ko, **sans aucun texte** (le site affiche le titre traduit en bandeau). Acceptés aussi en dépannage : `cover.png`, `cover.jpg`, `cover.svg`. Sans jaquette, une image par défaut s'affiche. |
-| `apercu-1.webp` à `apercu-3.webp` | Images du jeu montrées sur sa page sous le bouton « Jouer » : 3 vrais moments de partie au format téléphone (488 × 1055 px), en anglais, 200 Ko au plus chacune, capturées par `node scripts/apercus-jeu.mjs <id>` (`window.JEL_APERCU`). Obligatoires pour les jeux ajoutés depuis le 21 novembre 2026, facultatives avant. |
+| `apercu-1.webp` à `apercu-3.webp` | Images du jeu montrées sur sa page sous le bouton « Jouer » : 3 vrais moments de partie, les deux premiers sur un téléphone (488 × 1055 px), le troisième sur un ordinateur (1280 × 720 px) ; bande qui défile au doigt sur téléphone, une ligne sur ordinateur ; en anglais, 200 Ko au plus chacune, capturées par `node scripts/apercus-jeu.mjs <id>` (`window.JEL_APERCU`). Obligatoires pour les jeux ajoutés depuis le 21 novembre 2026, facultatives avant. |
 | `game.json` | Fiche du jeu (voir ci-dessous). |
 
 ```json
