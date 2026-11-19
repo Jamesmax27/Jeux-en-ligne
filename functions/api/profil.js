@@ -6,7 +6,10 @@
 //
 //   creer      { jour }                      → { jeton, etat }   nouveau profil (« Joueur <nombre> »)
 //   etat       { jeton }                     → { etat }          lecture seule
-//   sync       { jeton, jour, temps, termines } → { etat, gains } temps de jeu, série, jeux terminés et étoiles
+//   sync       { jeton, jour, temps, termines, sauvegardes? } → { etat, gains, sauvegardes? }
+//                                            temps de jeu, série, jeux terminés et étoiles, sauvegardes des jeux
+//   sauvegarde { jeton, jeu, base, donnees | lire } → { sauvegarde }  sauvegarde d'un jeu au lancement
+//                                            (docs/cadrage-fidelisation.md, 14.13)
 //   code       { jeton }                     → { code }          code de sauvegarde (créé à la première demande)
 //   restaurer  { code, turnstileToken }      → { jeton, etat }   relie cet appareil au profil du code
 //   pseudo     { jeton, pseudo }             → { etat } | { erreur, raison }
@@ -30,12 +33,16 @@ import { json, empreinteVisiteur, lireJeux, verifierTurnstile } from '../_commun
 import {
   preparerTablesProfil, profilParJeton, etatComplet, creerProfil, synchroniser, codeDuProfil, lireCode,
   profilParCode, ajouterAppareil, controlerPseudo, choixPermis, compterLimite, noterLimite, blocageCode,
-  essaiRate, ID_JEU,
+  essaiRate, ID_JEU, sauvegardeUnJeu,
 } from '../_profil.js';
 import { signerTicket } from '../../multijoueur/src/ticket.js';
 import * as R from '../../public/profil-reglages.js';
 
 const TAILLE_MAX = 16384;
+// « sync » et « sauvegarde » portent aussi les sauvegardes des jeux (64 000 caractères
+// chacune au plus, 200 000 au plus par envoi : public/profil-reglages.js).
+const TAILLE_MAX_SAUVEGARDES = 262144;
+const AVEC_SAUVEGARDES = new Set(['sync', 'sauvegarde']);
 const JOUR_MS = 86400000;
 
 function origineRefusee(request) {
@@ -58,8 +65,9 @@ export async function onRequestPost({ request, env }) {
   let corps;
   try {
     const texte = await request.text();
-    if (texte.length > TAILLE_MAX) throw new Error('trop long');
+    if (texte.length > TAILLE_MAX_SAUVEGARDES) throw new Error('trop long');
     corps = JSON.parse(texte) || {};
+    if (texte.length > TAILLE_MAX && !AVEC_SAUVEGARDES.has(corps.action)) throw new Error('trop long');
   } catch {
     return json({ erreur: 'Requête invalide.' }, 400);
   }
@@ -104,6 +112,14 @@ export async function onRequestPost({ request, env }) {
     if (action === 'sync') {
       const catalogue = await lireJeux(env, request);
       return json(await synchroniser(env, profil, corps, catalogue, maintenant));
+    }
+
+    if (action === 'sauvegarde') {
+      const catalogue = await lireJeux(env, request);
+      const { jeu, base, donnees, envoye, lire } = corps;
+      const article = lire === true ? { jeu, base, lire: true } : { jeu, base, donnees: donnees === undefined ? null : donnees, envoye };
+      if (lire !== true && donnees === undefined) return json({ erreur: 'Requête invalide.' }, 400);
+      return json(await sauvegardeUnJeu(env, profil, article, catalogue, maintenant));
     }
 
     if (action === 'code') {

@@ -31,7 +31,8 @@
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
 import { activerHorsLigne } from './hors-ligne.js';
 import { SCRIPT_SUIVI, suivreJeu, noterErreur, noterFin } from './suivi.js';
-import { suivreTemps, noterTermine, ticketMulti } from './profil.js';
+import { suivreTemps, noterTermine, ticketMulti, sauvegardeAuLancement } from './profil.js';
+import { noter as noterSauvegarde } from './sauvegardes-nuage.js';
 import { brancherMultijoueur, verifierPartie, RE_PARTIE } from './multijoueur/lanceur.js';
 // Jeux en temps réel 1 contre 1 (docs/cadrage-temps-reel.md) : recherche, WebRTC, relais.
 import { brancherTempsReel } from './temps-reel/lanceur.js';
@@ -208,7 +209,10 @@ function activerVotes(gameId) {
 // Le cadre isolé n'a pas de stockage : le lanceur garde la sauvegarde du jeu
 // dans le localStorage du site, sous « save_<id> ». Il la donne au jeu au
 // démarrage (window.JEL_SAUVEGARDES) et enregistre les messages
-// « jel-sauvegarde » du jeu, pour sa seule clé.
+// « jel-sauvegarde » du jeu, pour sa seule clé. Chaque changement est aussi
+// noté pour le serveur (sauvegardes-nuage.js : la progression suit d'un
+// appareil à l'autre avec le profil) ; au lancement, la sauvegarde du serveur
+// est relue d'abord si le profil est relié à plusieurs appareils.
 const SAUVEGARDE_MAX = 100000; // caractères (même limite que save.js)
 
 function cleSauvegarde() { return jeuCourant ? `save_${jeuCourant.id}` : null; }
@@ -227,6 +231,8 @@ function enregistrerSauvegarde(cle, valeur) {
   try {
     if (valeur === null) localStorage.removeItem(cle);
     else if (typeof valeur === 'string' && valeur.length <= SAUVEGARDE_MAX) localStorage.setItem(cle, valeur);
+    else return;
+    noterSauvegarde(jeuCourant.id);
   } catch (e) {
     console.warn('Sauvegarde du jeu impossible :', e);
   }
@@ -271,6 +277,8 @@ function proposerQuandMeme(etat) {
 }
 
 async function chargerJeu(jeu) {
+  // En même temps que le fichier du jeu : la sauvegarde du serveur (profil sur plusieurs appareils, 2 s au plus).
+  const sauvegardeRelue = sauvegardeAuLancement(jeu.id);
   const reponse = await fetch(jeu.play); // ex. « games/saut-obstacles/?v=1 »
   if (!reponse.ok) throw Object.assign(new Error(`HTTP ${reponse.status}`), { statut: reponse.status });
   htmlJeu = await reponse.text();
@@ -301,6 +309,7 @@ async function chargerJeu(jeu) {
       }
     }
   }
+  await sauvegardeRelue;
   afficherJeu();
 }
 
