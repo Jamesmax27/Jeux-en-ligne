@@ -65,7 +65,8 @@ async function vignette(page, png) {
 
 /** Fenêtres et boutons de menu visibles au milieu de l'écran (tutoriel, « Jouer », « Got it »…). */
 function boutonsDeMenu() {
-  const motif = /^(play|start|got it|ok|okay|continue|next|let's go|new game|resume|tap to start)\b/i;
+  // Libellé exact d'un bouton de menu : « Next weapon » ou « Play again » sont des commandes du jeu, pas un menu.
+  const motif = /^(play|start|got it|ok|okay|continue|next|let's go|new game|resume|tap to start)[\s!.…▶►›>]*$/i;
   let n = 0;
   for (const el of document.querySelectorAll('button, [role="button"], a')) {
     if (el.closest('.jel-langue')) continue;
