@@ -2292,7 +2292,13 @@ try {
   const s = JSON.parse(localStorage.getItem(CLE) || 'null');
   if (s && typeof s === 'object') Object.assign(sauve, s);
 } catch (e) { /* stockage indisponible : pas de sauvegarde */ }
+// Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU = 1, 2 ou 3) : posés seulement
+// par le robot du site. Dans ces deux modes : ni son, ni sauvegarde, ni fin de partie signalée.
+const modeAffiche = !!window.JEL_AFFICHE;
+const numeroApercu = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+const modeSilence = modeAffiche || numeroApercu > 0;
 function enregistrer() {
+  if (modeSilence) return;
   try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* tant pis */ }
 }
 
@@ -2311,7 +2317,7 @@ try {
   });
 } catch (e) { /* sauvegarde illisible : rien */ }
 JEL_SAVE.surFermeture(() => {
-  if (reprendreA && ecran !== 'accueil') JEL_SAVE.save(JEU, { niveau: reprendreA, score: scorePartie });
+  if (!modeSilence && reprendreA && ecran !== 'accueil') JEL_SAVE.save(JEU, { niveau: reprendreA, score: scorePartie });
 });
 
 /* ==========================================================================
@@ -2320,6 +2326,7 @@ JEL_SAVE.surFermeture(() => {
 let ac = null, bruit = null;
 const dernierSon = {};
 function reveillerAudio() {
+  if (modeSilence) return;
   if (!ac) {
     try {
       ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -3272,11 +3279,12 @@ $('b-vitesse').addEventListener('click', () => {
   $('b-vitesse').classList.toggle('actif', vitesse === 2);
   $('b-vitesse').setAttribute('aria-label', traduire(vitesse === 2 ? 'vitesseNormale' : 'vitesseRapide'));
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && ecran === 'jeu' && !enPause()) ouvrirPause(); });
+document.addEventListener('visibilitychange', () => { if (!modeSilence && document.hidden && ecran === 'jeu' && !enPause()) ouvrirPause(); });
 
 /* ---------- Bilan ---------- */
 let minuteursBilan = [];
 function afficherBilan() {
+  if (modeSilence) return;
   const e = partie, n = e.n;
   if (window.FMG) window.FMG.reportEnd({ completed: e.gagne, level: n });
   minuteursBilan.forEach(clearTimeout); minuteursBilan = [];
@@ -3484,10 +3492,330 @@ document.querySelectorAll('.b-son').forEach((b) => b.addEventListener('click', (
   sauve.son = !sauve.son; enregistrer(); majBoutonsSon(); jouer('clic');
 }));
 
+/* ==========================================================================
+   Affiche (jaquette du jeu) : window.JEL_AFFICHE, posé seulement par le robot du site
+   ========================================================================== */
+// Scène composée, sans interface ni texte (CONSIGNES-JEU.md, section 5) : au crépuscule, le bastion en
+// grand et sa lanterne qui éclaire la vallée ; sur le chemin, les Ombrelins arrivent. Le Phare lance son
+// rayon sur le premier, la Luciole tire ses boules de lumière, la Fleur-éclat éclate sur un groupe, le
+// Champignon givré ralentit l'ombre à carapace, et une ombre touchée redevient une nuée de lucioles.
+function hasardFixe(graine) { return () => (graine = (graine * 16807) % 2147483647) / 2147483647; }
+function ombreAffiche(type, extra = {}) {
+  return { type, def: ENNEMIS[type], x: 0, y: 0, dx: 0.8, dy: -0.6, pv: 1, pvMax: 1, phase: 0.4, lent: 1, lentT: 0, touche: 0, ...extra };
+}
+function dessinerAffiche() {
+  const c = $('affiche');
+  const W = innerWidth, H = innerHeight, d = Math.min(3, window.devicePixelRatio || 1);
+  c.width = Math.round(W * d); c.height = Math.round(H * d);
+  const g = c.getContext('2d');
+  // Repère de l'affiche : 600 × 800 au centre ; le décor continue jusqu'aux bords sur écran large.
+  const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  g.setTransform(d * k, 0, 0, d * k, d * ox, d * oy);
+  const xG = -ox / k - 2, xD = (W - ox) / k + 2, yH = -oy / k - 2, yB = (H - oy) / k + 2;
+  const t = 1.7;                        // instant figé des animations
+  const h = hasardFixe(20261119);
+  const sprite = (x, y, s, f) => { g.save(); g.translate(x, y); g.scale(s, s); f(); g.restore(); };
+  const halo = (x, y, r, couleur, a = 1) => lueur(g, x, y, r, couleur, a);
+
+  // 1. Ciel du crépuscule, étoiles, lune
+  const ciel = g.createLinearGradient(0, Math.min(0, yH), 0, 450);
+  ciel.addColorStop(0, '#26338a'); ciel.addColorStop(0.45, '#4d5cc0'); ciel.addColorStop(0.78, '#a57fd2'); ciel.addColorStop(1, '#ffb88f');
+  g.fillStyle = ciel; g.fillRect(xG, yH, xD - xG, yB - yH);
+  for (let i = 0; i < 90; i++) {
+    const x = xG + h() * (xD - xG), y = yH + h() * (330 - yH), r = 0.8 + h() * 1.8;
+    g.fillStyle = `rgba(255,250,230,${0.45 + h() * 0.5})`; cercle(g, x, y, r); g.fill();
+  }
+  [[120, 70, 7], [210, 130, 5], [560, 250, 6], [40, 250, 5], [380, 60, 6]].forEach(([x, y, r]) => { g.fillStyle = '#fff6c8'; etoile(g, x, y, r, 4); g.fill(); });
+  const mx = 488, my = 118, mr = 50;
+  halo(mx, my, 150, 'rgba(225,232,255,.55)');
+  g.save(); g.beginPath(); g.rect(xG, yH, xD - xG, yB - yH); g.arc(mx + 26, my - 14, mr * 0.86, 0, Math.PI * 2); g.clip('evenodd');
+  g.fillStyle = '#f2f4ff'; cercle(g, mx, my, mr); g.fill();
+  g.fillStyle = '#d5dcf7'; cercle(g, mx - 22, my + 10, 8); g.fill(); cercle(g, mx - 8, my + 30, 6); g.fill();
+  g.restore();
+
+  // 2. Grande lumière de la lanterne derrière le bastion
+  halo(300, 215, 390, 'rgba(255,214,130,.85)');
+  halo(300, 190, 170, 'rgba(255,240,190,.9)');
+
+  // 3. Collines lointaines avec leurs sapins
+  const colline = (base, amp, couleur, graine) => {
+    const hh = hasardFixe(graine);
+    g.fillStyle = couleur; g.beginPath(); g.moveTo(xG, yB);
+    for (let x = xG; x <= xD + 40; x += 40) g.lineTo(x, base - amp * (0.5 + 0.5 * Math.sin(x / 70 + graine)) - hh() * 10);
+    g.lineTo(xD, yB); g.closePath(); g.fill();
+  };
+  colline(420, 70, '#7b6cc2', 3);
+  colline(445, 45, '#5a54a8', 7);
+  g.fillStyle = '#4a4794';
+  for (let x = xG + 10; x < xD; x += 34) {
+    if (x > 120 && x < 480) continue;
+    const y = 440 - 30 * (0.5 + 0.5 * Math.sin(x / 70 + 7)), s = 16 + (x % 3) * 4;
+    g.beginPath(); g.moveTo(x, y - s * 2); g.lineTo(x - s * 0.7, y); g.lineTo(x + s * 0.7, y); g.fill();
+  }
+
+  // 4. La prairie (lumière chaude au centre)
+  g.beginPath(); g.moveTo(xG, 478); g.quadraticCurveTo(300, 418, xD, 478); g.lineTo(xD, yB); g.lineTo(xG, yB); g.closePath();
+  const pre = g.createLinearGradient(0, 430, 0, 800);
+  pre.addColorStop(0, '#5fbf6a'); pre.addColorStop(0.45, '#3c9a55'); pre.addColorStop(1, '#22643f');
+  g.fillStyle = pre; g.fill();
+  halo(300, 470, 260, 'rgba(255,220,140,.45)');
+  g.strokeStyle = 'rgba(255,255,255,.12)'; g.lineWidth = 1.6;
+  for (let i = 0; i < 140; i++) {
+    const x = xG + h() * (xD - xG), y = 470 + h() * (yB - 470), s = 3 + (y - 450) / 40;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x - s * 0.4, y - s); g.moveTo(x, y); g.lineTo(x + s * 0.4, y - s * 0.9); g.stroke();
+  }
+
+  // 5. Le chemin, qui vient du premier plan jusqu'à la porte du bastion
+  const P = [[-70, 606], [200, 650], [540, 570], [300, 452]];
+  const pt = (u) => {
+    const a = 1 - u;
+    return [a * a * a * P[0][0] + 3 * a * a * u * P[1][0] + 3 * a * u * u * P[2][0] + u * u * u * P[3][0],
+            a * a * a * P[0][1] + 3 * a * a * u * P[1][1] + 3 * a * u * u * P[2][1] + u * u * u * P[3][1]];
+  };
+  const largeur = (u) => 150 - 108 * u;
+  g.lineCap = 'round';
+  [['#8f6d3f', 1], ['#d8b47a', 0.84]].forEach(([couleur, f]) => {
+    g.strokeStyle = couleur;
+    // sur écran large, le chemin vient du bord gauche
+    g.lineWidth = largeur(0) * f; g.beginPath(); g.moveTo(Math.min(xG, P[0][0]) - 80, P[0][1]); g.lineTo(P[0][0], P[0][1]); g.stroke();
+    for (let i = 0; i < 80; i++) {
+      const u0 = i / 80, u1 = (i + 1) / 80, a = pt(u0), b = pt(u1);
+      g.lineWidth = largeur(u0) * f; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    }
+  });
+  g.fillStyle = 'rgba(255,255,255,.18)';
+  for (let i = 1; i < 26; i++) { const [x, y] = pt(i / 26); cercle(g, x, y, 4.5 - i * 0.12); g.fill(); }
+
+  // 6. Le bastion, en grand
+  const pierre = (x, y, w, hh) => {
+    const gr = g.createLinearGradient(x, 0, x + w, 0);
+    gr.addColorStop(0, '#c4c8e6'); gr.addColorStop(0.55, '#9da2c8'); gr.addColorStop(1, '#73789f');
+    g.fillStyle = gr; g.fillRect(x, y, w, hh);
+    g.strokeStyle = 'rgba(70,72,110,.35)'; g.lineWidth = 2;
+    for (let yy = y + 22, rang = 0; yy < y + hh; yy += 22, rang++) {
+      g.beginPath(); g.moveTo(x, yy); g.lineTo(x + w, yy); g.stroke();
+      for (let xx = x + (rang % 2 ? 18 : 36); xx < x + w; xx += 36) { g.beginPath(); g.moveTo(xx, yy - 22); g.lineTo(xx, yy); g.stroke(); }
+    }
+  };
+  const creneaux = (x, y, w, nb, couleur) => {
+    const lm = w / (nb * 2 - 1);
+    g.fillStyle = couleur;
+    for (let i = 0; i < nb; i++) g.fillRect(x + i * 2 * lm, y - 22, lm, 24);
+  };
+  const fenetre = (x, y, w, hh) => {
+    halo(x + w / 2, y + hh / 2, w * 2.2, 'rgba(255,200,110,.6)');
+    g.fillStyle = '#ffd27a'; g.beginPath(); g.moveTo(x, y + hh); g.lineTo(x, y + w / 2); g.arc(x + w / 2, y + w / 2, w / 2, Math.PI, 0); g.lineTo(x + w, y + hh); g.closePath(); g.fill();
+    g.fillStyle = '#fff2b8'; g.fillRect(x + w * 0.3, y + w * 0.5, w * 0.4, hh - w * 0.6);
+  };
+  g.fillStyle = 'rgba(30,20,60,.35)'; g.beginPath(); g.ellipse(300, 456, 200, 20, 0, 0, Math.PI * 2); g.fill();
+  pierre(142, 300, 74, 156); creneaux(142, 300, 74, 3, '#b6bbdc');
+  pierre(384, 300, 74, 156); creneaux(384, 300, 74, 3, '#8f94bb');
+  pierre(206, 248, 188, 208); creneaux(206, 248, 188, 5, '#b3b8da');
+  fenetre(168, 338, 22, 34); fenetre(410, 338, 22, 34); fenetre(236, 296, 20, 30); fenetre(344, 296, 20, 30);
+  // porte en arc, avec la lumière qui en sort
+  halo(300, 440, 90, 'rgba(255,190,100,.55)');
+  g.fillStyle = '#5a4030'; g.beginPath(); g.moveTo(258, 456); g.lineTo(258, 400); g.arc(300, 400, 42, Math.PI, 0); g.lineTo(342, 456); g.closePath(); g.fill();
+  g.strokeStyle = '#3f2c20'; g.lineWidth = 3;
+  for (const x of [279, 300, 321]) { g.beginPath(); g.moveTo(x, 362 + Math.abs(300 - x) * 0.5); g.lineTo(x, 456); g.stroke(); }
+  g.fillStyle = '#ffd95e'; cercle(g, 314, 422, 4); g.fill();
+  // la lanterne, source de lumière de toute la vallée
+  g.fillStyle = '#7a5232'; g.fillRect(295, 196, 10, 32);
+  for (let i = 0; i < 9; i++) {
+    const a = -Math.PI / 2 + (i - 4) * 0.36;
+    g.fillStyle = 'rgba(255,236,170,.13)';
+    g.beginPath(); g.moveTo(300, 168); g.lineTo(300 + Math.cos(a - 0.07) * 260, 168 + Math.sin(a - 0.07) * 260); g.lineTo(300 + Math.cos(a + 0.07) * 260, 168 + Math.sin(a + 0.07) * 260); g.fill();
+  }
+  halo(300, 168, 120, 'rgba(255,190,90,.95)');
+  g.fillStyle = '#a8652a'; g.fillRect(268, 124, 64, 10); g.fillRect(272, 196, 56, 9);
+  g.fillStyle = '#ffb84a'; g.beginPath(); g.moveTo(274, 134); g.lineTo(326, 134); g.lineTo(316, 196); g.lineTo(284, 196); g.closePath(); g.fill();
+  g.fillStyle = '#fff0a0'; g.beginPath(); g.moveTo(284, 142); g.lineTo(316, 142); g.lineTo(309, 188); g.lineTo(291, 188); g.closePath(); g.fill();
+  halo(300, 165, 34, 'rgba(255,255,240,1)');
+  g.fillStyle = '#a8652a'; g.beginPath(); g.moveTo(280, 124); g.lineTo(300, 104); g.lineTo(320, 124); g.fill();
+
+  // 7. Les Ombrelins sur le chemin, du plus loin au plus près
+  // le papillon d'ombre, en vol, visé par la Luciole
+  sprite(392, 250, 120, () => dessinerEnnemi(g, ombreAffiche('v', { x: 0, y: 0.28, dx: -0.6, dy: 0.3, phase: 0.2, touche: 0.1 }), t));
+  // le groupe frappé par la Fleur-éclat
+  const [fx, fy] = pt(0.47);
+  halo(fx, fy, 110, 'rgba(255,150,210,.5)');
+  g.strokeStyle = 'rgba(255,160,215,.95)'; g.lineWidth = 6; cercle(g, fx, fy - 6, 74); g.stroke();
+  g.fillStyle = 'rgba(255,170,220,.16)'; g.fill();
+  sprite(fx - 30, fy - 14, 112, () => dessinerEnnemi(g, ombreAffiche('n', { phase: 0.9, dx: 0.9, dy: -0.3 }), t));
+  sprite(fx + 38, fy + 6, 100, () => dessinerEnnemi(g, ombreAffiche('d', { phase: 1.6, dx: 0.9, dy: -0.4, touche: 0.1 }), t));
+  for (let i = 0; i < 12; i++) {
+    const a = i * 0.52, x = fx + Math.cos(a) * 88, y = fy - 6 + Math.sin(a) * 66;
+    halo(x, y, 10, 'rgba(255,170,220,.9)');
+  }
+  // une ombre dans le rayon du Phare, qui redevient une nuée de lucioles
+  const [px, py] = pt(0.7);
+  const phX = 520, phY = 520, phS = 200;
+  const lx = phX, ly = phY + (0.2 - (0.62 + 2 * 0.06) - 0.07) * phS;
+  g.lineCap = 'round';
+  g.strokeStyle = 'rgba(255,245,190,.45)'; g.lineWidth = 30; g.beginPath(); g.moveTo(lx, ly); g.lineTo(px, py - 30); g.stroke();
+  g.strokeStyle = 'rgba(255,252,220,.9)'; g.lineWidth = 12; g.stroke();
+  g.strokeStyle = '#ffffff'; g.lineWidth = 4; g.stroke();
+  g.globalAlpha = 0.5;
+  sprite(px, py - 24, 104, () => dessinerEnnemi(g, ombreAffiche('n', { touche: 0.1, phase: 2.6 }), t));
+  g.globalAlpha = 1;
+  halo(px, py - 28, 74, 'rgba(255,240,150,.95)');
+  for (let i = 0; i < 26; i++) {
+    const a = i * 2.39, r = 14 + (i % 7) * 10, x = px + Math.cos(a) * r, y = py - 34 + Math.sin(a) * r * 0.8 - (i % 5) * 10;
+    halo(x, y, 9, 'rgba(255,236,120,.95)'); g.fillStyle = '#fffbe0'; cercle(g, x, y, 2.6); g.fill();
+  }
+  [[px - 44, py - 76, 9], [px + 46, py - 60, 7], [px + 6, py - 104, 10], [px - 58, py - 30, 6]].forEach(([x, y, r]) => { g.fillStyle = '#ffe36e'; etoile(g, x, y, r); g.fill(); });
+  // le premier, le plus grand, qui arrive en souriant, éclairé par la lanterne
+  const [bx, by] = pt(0.22);
+  halo(bx + 30, by - 70, 110, 'rgba(255,215,140,.55)');
+  sprite(bx + 22, by - 34, 176, () => dessinerEnnemi(g, ombreAffiche('n', { phase: 0.3, dx: 0.95, dy: -0.3 }), t));
+
+  // 8. Les tours du premier plan
+  sprite(phX, phY, phS, () => dessinerTour(g, 'phare', 2, 0, 0, t, -Math.PI / 2, 0.15));
+  // Luciole, à gauche, qui tire sur le papillon
+  const luX = 54, luY = 452, luS = 176;
+  sprite(luX, luY, luS, () => dessinerTour(g, 'luciole', 2, 0, 0, t, -Math.PI / 2, 0.2));
+  const depart = [luX, luY - 0.32 * luS];
+  for (let i = 1; i <= 3; i++) {
+    const u = i / 4, x = depart[0] + (392 - depart[0]) * u, y = depart[1] + (250 - depart[1]) * u - Math.sin(u * Math.PI) * 50;
+    halo(x, y, 22, 'rgba(255,235,120,.95)'); g.fillStyle = '#fffbe0'; cercle(g, x, y, 6); g.fill();
+  }
+  // Fleur-éclat, en bas à droite, coupée par le bord
+  sprite(556, 712, 190, () => dessinerTour(g, 'fleur', 2, 0, 0, t, -Math.PI / 2, 0.1));
+  // Grandes herbes et fleurs du premier plan, coupées par les bords
+  [[xG + 20, 1.4, '#ff9ad0'], [250, 1.0, '#ffd95e'], [xD - 30, 1.2, '#b8a8ff'], [400, 0.9, '#ff9ad0']].forEach(([x, f, couleur]) => {
+    g.strokeStyle = '#2f7a40'; g.lineWidth = 7 * f;
+    for (let j = -1; j <= 1; j++) { g.beginPath(); g.moveTo(x + j * 14 * f, yB); g.quadraticCurveTo(x + j * 24 * f, yB - 60 * f, x + j * 30 * f, yB - 110 * f); g.stroke(); }
+    const hx = x, hy = yB - 120 * f;
+    g.fillStyle = couleur;
+    for (let p = 0; p < 6; p++) { const a = p * 1.047; cercle(g, hx + Math.cos(a) * 14 * f, hy + Math.sin(a) * 14 * f, 10 * f); g.fill(); }
+    g.fillStyle = '#fff3a0'; cercle(g, hx, hy, 8 * f); g.fill();
+  });
+  // Lucioles d'ambiance partout
+  for (let i = 0; i < 40; i++) {
+    const x = xG + h() * (xD - xG), y = 130 + h() * 520, r = 6 + h() * 8;
+    halo(x, y, r, `rgba(255,236,120,${0.5 + h() * 0.45})`);
+  }
+}
+function demarrerAffiche() {
+  const style = document.createElement('style');
+  style.textContent = 'body>*:not(#affiche){display:none!important}jel-langue,.jel-langue,button{display:none!important}' +
+    '#affiche{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:100}';
+  document.head.appendChild(style);
+  const c = document.createElement('canvas');
+  c.id = 'affiche';
+  document.body.appendChild(c);
+  // Bouton de langue créé parfois plus tard, avec un style en ligne : caché aussi par code.
+  const cacher = () => document.querySelectorAll('jel-langue, .jel-langue, button').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  cacher(); [50, 300, 1000, 1800].forEach((ms) => setTimeout(cacher, ms));
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ==========================================================================
+   Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé seulement par le robot
+   ========================================================================== */
+// Le jeu s'ouvre directement en pleine partie, avec sa vraie interface (lanternes, lumière, vague,
+// barre du bas), sans écran d'accueil, ni fenêtre « Continuer », ni carte « Nouveau ! », ni tutoriel
+// (CONSIGNES-JEU.md, section 5). Les tours sont bâties, les ombres posées sur le chemin, la partie tourne
+// un court instant (tirs, ombres dissoutes), puis elle est figée sans fenêtre : ni victoire, ni défaite,
+// ni son, ni sauvegarde.
+//   1 = niveau 1, la Prairie : premières Lucioles, une vague d'Ombrelins ;
+//   2 = niveau 8, le Marais : les 4 tours, papillons d'ombre, ombres qui se divisent, Phare choisi ;
+//   3 = niveau 15, la Montagne : deux chemins, le Roi des Ombres, le Grand Ombron, l'éclat de lune.
+const SCENES_APERCU = {
+  1: {
+    niveau: 1, or: 35, vies: 10, vague: 2, reste: 2, lumiere: 40, arretes: 8, secondes: 0.7,
+    tours: [['luciole', 0, 2, 2], ['luciole', 0, 5, 4], ['luciole', 0, 3, 8], ['luciole', 0, 7, 5]],
+    ombres: [['n', 0, 1.6, 1], ['n', 0, 3.0, 0.7], ['n', 0, 4.4, 1], ['n', 0, 6.4, 0.5], ['n', 0, 8.3, 0.8], ['n', 0, 10.6, 0.4]],
+  },
+  2: {
+    niveau: 8, or: 145, vies: 9, vague: 4, reste: 5, lumiere: 410, arretes: 63, secondes: 0.8, choix: [5, 8],
+    tours: [['luciole', 2, 4, 2], ['luciole', 1, 5, 2], ['givre', 1, 2, 5], ['fleur', 1, 4, 5], ['phare', 0, 5, 8], ['luciole', 1, 2, 8]],
+    ombres: [['c', 0, 1.2, 1], ['d', 0, 3.4, 0.9], ['v', 0, 5.6, 0.7], ['c', 0, 8.4, 0.6], ['d', 0, 10.4, 0.5], ['p', 0, 11.0, 1],
+      ['v', 0, 13.2, 0.8], ['n', 0, 15.6, 0.5], ['d', 0, 17.4, 0.7]],
+  },
+  3: {
+    niveau: 15, or: 260, vies: 7, vague: 7, reste: 14, lumiere: 1980, arretes: 214, secondes: 0.5, lune: [4.5, 6.4],
+    tours: [['phare', 2, 5, 5], ['fleur', 2, 2, 7], ['givre', 2, 3, 5], ['luciole', 2, 5, 3], ['luciole', 1, 2, 1], ['fleur', 1, 4, 8],
+      ['luciole', 2, 6, 8], ['phare', 1, 0, 7]],
+    ombres: [['R', 0, 8.8, 0.62], ['G', 1, 4.0, 0.8], ['n', 0, 7.6, 1], ['n', 0, 7.0, 1], ['g', 0, 6.0, 0.9], ['v', 1, 2.2, 0.8],
+      ['c', 0, 2.0, 1], ['v', 0, 3.6, 0.6], ['c', 1, 6.6, 0.7], ['d', 0, 11.6, 0.6], ['g', 1, 1.0, 1], ['r', 0, 13.8, 0.4]],
+  },
+};
+function ouvrirApercu(numero) {
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  const h = hasardFixe(9173 + numero * 7919);
+  Math.random = h;
+  partie = creerPartie(sc.niveau);
+  const e = partie;
+  sel = null; modeLune = false; curseur = null; finTimer = 0; secousse = 0; pauseManuelle = false;
+  effets = { parts: [], textes: [], anneaux: [], rayons: [] };
+  lucioles = Array.from({ length: 7 }, () => ({ x: h() * COLS, y: h() * ROWS, a: h() * 6.28, p: h() * 6 }));
+  montrer('jeu');
+  // Tours déjà bâties et améliorées.
+  e.or = 99999;
+  for (const [type, niv, c, r] of sc.tours) {
+    if (construire(e, type, c, r) !== 'ok') continue;
+    const tour = e.tours[e.tours.length - 1];
+    for (let i = 0; i < niv; i++) ameliorer(e, tour);
+    tour.recharge = h() * 0.3;
+  }
+  // Vague en cours : ombres sur le chemin, quelques-unes encore à venir.
+  e.vague = sc.vague;
+  e.file = lireVague(e.def.vagues[sc.vague - 1]).slice(-sc.reste);
+  e.attente = 3;
+  for (const [type, ich, dist, part] of sc.ombres) {
+    const en = creerEnnemi(e, type, ich, dist);
+    en.pv = Math.max(1, Math.round(en.pvMax * part));
+  }
+  e.evts.length = 0;
+  e.lumiere = sc.lumiere; e.arretes = sc.arretes;
+  // La partie tourne un court instant (tirs, givre, ombres dissoutes), sans pouvoir être gagnée ni perdue.
+  const pas = Math.round(sc.secondes * 60);
+  for (let i = 0; i < pas; i++) {
+    majPartie(e, 1 / 60); traiterEvenements(); majEffets(1 / 60); temps += 1 / 60;
+    e.vies = sc.vies;
+  }
+  // Éclat de lune lancé au croisement des deux chemins.
+  if (sc.lune) {
+    e.sortCharge = 0;
+    lancerSort(e, sc.lune[0], sc.lune[1]);
+    for (let i = 0; i < 12; i++) { traiterEvenements(); majEffets(1 / 60); }
+    e.sortCharge = SORT.recharge * 0.9;
+  }
+  // Tirs en vol au moment figé : chaque Luciole et chaque Fleur-éclat vise l'ombre la plus avancée à sa portée.
+  for (const tour of e.tours) {
+    if (tour.type === 'givre') continue;
+    const s = TOURS[tour.type].niv[tour.niv], cible = choisirCible(e, tour, s.portee, TOURS[tour.type].air);
+    if (!cible) continue;
+    if (tour.type === 'phare') {     // le rayon du Phare, en plein éclat
+      effets.rayons.push({ x1: tour.x, y1: tour.y - 0.3, x2: cible.x, y2: cible.y, niv: tour.niv, vie: 0.18, duree: 0.2 });
+      tour.tirT = 0.2;
+      continue;
+    }
+    const u = 0.35 + h() * 0.35;
+    e.tirs.push({ type: tour.type, x: tour.x + (cible.x - tour.x) * u, y: tour.y - 0.25 + (cible.y - tour.y + 0.25) * u, cible, cx: cible.x, cy: cible.y,
+      vit: tour.type === 'fleur' ? 5 : 8, degats: s.degats, zone: s.zone || 0, niv: tour.niv });
+    tour.tirT = 0.2;
+  }
+  // Puis tout est figé sur ce moment, avec la vraie interface et sans fenêtre de pause.
+  e.or = sc.or; e.vies = sc.vies; secousse = 0;
+  effets.textes.forEach((tx) => { tx.vie = Math.max(tx.vie, tx.duree * 0.7); });
+  if (sc.choix) { const tour = tourEn(e, sc.choix[0], sc.choix[1]); if (tour) sel = { type: 'tour', tour }; }
+  pauseManuelle = true;
+  dernierHud = ''; majHud(); majBarre(true);
+}
+
 remplirIcones();
 majBoutonsSon();
-ouvrirAccueil();
-requestAnimationFrame(boucle);
+if (modeAffiche) demarrerAffiche();
+else if (numeroApercu) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  ouvrirAccueil();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>
