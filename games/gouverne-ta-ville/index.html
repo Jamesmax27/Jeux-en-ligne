@@ -2604,6 +2604,8 @@
   let tuto = 0;                // guide du niveau 1 : 0 route, 1 maison, 2 fini
   let particules = [], confettis = [];
   let vitrine = null;
+  let apercu = 0;              // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
+  let affiche = false;         // affiche (jaquette) dessinée pour le robot du site (window.JEL_AFFICHE)
 
   // Progression (gardée avec JEL_SAVE : le cadre du site n'a pas d'autre stockage)
   let progression = { debloque: 1, etoiles: [], records: [] };
@@ -2680,7 +2682,7 @@
     defaite() { [523, 440, 349, 262].forEach((f, i) => bip(f, 0.3, 'triangle', 0.1, 0, i * 0.2)); },
     etoile() { bip(1400, 0.15, 'sine', 0.08, 300); },
   };
-  function jouer(nom, arg) { try { if (son) SONS[nom](arg); } catch (e) { /* audio indisponible */ } }
+  function jouer(nom, arg) { try { if (son && !apercu && !affiche) SONS[nom](arg); } catch (e) { /* audio indisponible */ } }
 
   // =====================================================================
   // Icônes SVG de l'interface (sans texte)
@@ -3568,6 +3570,7 @@
     grad.addColorStop(0, '#8fd0f0'); grad.addColorStop(1, '#c9ecd4');
     c.fillStyle = grad; c.fillRect(0, 0, innerWidth, innerHeight);
     const { T, ox, oy } = geo;
+    if (apercu === 3) dessinerAlentours(c);
     c.fillStyle = 'rgba(40,70,40,.35)'; rr(c, ox - 5, oy - 5, W * T + 10, H * T + 10, 12); c.fill();
     c.save(); rr(c, ox, oy, W * T, H * T, 8); c.clip();
     dessinerGrille(c, grille, T, ox, oy, { signes: true });
@@ -3657,8 +3660,11 @@
     const fige = ecran === 'pause';
     if (!fige) horloge += dt;
     if (ecran === 'jeu') {
-      tempsMois += dt * 1000 * vitesse;
-      if (tempsMois >= DUREE_MOIS) { tempsMois -= DUREE_MOIS; finMois(); }
+      // Image du jeu (JEL_APERCU) : le mois reste figé, rien ne se gagne ni ne se perd.
+      if (!apercu) {
+        tempsMois += dt * 1000 * vitesse;
+        if (tempsMois >= DUREE_MOIS) { tempsMois -= DUREE_MOIS; finMois(); }
+      }
       const barre = $('barre-mois');
       if (barre) barre.style.width = Math.min(100, tempsMois / DUREE_MOIS * 100) + '%';
     }
@@ -4241,6 +4247,361 @@
     });
   }
 
+  // =====================================================================
+  // Affiche (jaquette du jeu)
+  // =====================================================================
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le maire, en grand, pose
+  // d'un geste une maison toute neuve sur son terrain ; la ville du jeu (mêmes dessins) s'étend derrière
+  // lui sous un grand soleil, les habitants sont heureux (cœurs) et les pièces tombent dans la caisse.
+  function formeEtoile(c, x, y, r, a) {
+    c.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const d = i % 2 ? r * 0.45 : r, an = a + i * Math.PI / 5 - Math.PI / 2;
+      c.lineTo(x + Math.cos(an) * d, y + Math.sin(an) * d);
+    }
+    c.closePath();
+  }
+  function pieceAffiche(c, x, y, r, aplati) {
+    // pièce dorée, comme l'icône de la caisse ; « aplati » < 1 : la pièce tourne sur elle-même
+    c.save(); c.translate(x, y); c.scale(aplati, 1);
+    rond(c, 0, 0, r, '#f5b82e');
+    c.lineWidth = r * 0.16; c.strokeStyle = '#b7791f';
+    c.beginPath(); c.arc(0, 0, r * 0.92, 0, Math.PI * 2); c.stroke();
+    c.beginPath(); c.arc(0, 0, r * 0.52, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.ellipse(-r * 0.38, -r * 0.38, r * 0.24, r * 0.12, -0.8, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+  function nuageAffiche(c, x, y, s) {
+    c.fillStyle = 'rgba(220,236,250,.9)';
+    c.beginPath(); c.ellipse(x + 8 * s, y + 18 * s, 70 * s, 16 * s, 0, 0, Math.PI * 2); c.fill();
+    rond(c, x - 40 * s, y + 4 * s, 26 * s, '#fff'); rond(c, x - 6 * s, y - 12 * s, 36 * s, '#fff');
+    rond(c, x + 34 * s, y, 28 * s, '#fff'); rond(c, x + 60 * s, y + 10 * s, 18 * s, '#fff');
+  }
+  // Un bâtiment posé au sol : base = ligne du sol, x = bord gauche, s = taille
+  function batAuSol(c, type, x, base, s, o) { dessinBat(c, type, x, base - s * 0.92, s, o); }
+
+  function dessinerMaire(c) {
+    const peau = '#f5c7a1', peauOmbre = '#e2a77f', veste = '#2f5d9e', vesteOmbre = '#244a80';
+    // Ombre au sol
+    c.fillStyle = 'rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(198, 772, 92, 16, 0, 0, Math.PI * 2); c.fill();
+    // Jambes et chaussures
+    rect(c, 150, 610, 42, 160, '#34405a'); rect(c, 202, 610, 42, 160, '#2c3750');
+    c.fillStyle = '#2b2b2b';
+    c.beginPath(); c.ellipse(165, 772, 30, 12, 0, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(232, 772, 30, 12, 0, 0, Math.PI * 2); c.fill();
+    // Bras gauche (main sur la hanche)
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.strokeStyle = vesteOmbre; c.lineWidth = 34;
+    c.beginPath(); c.moveTo(132, 455); c.lineTo(96, 528); c.lineTo(140, 584); c.stroke();
+    rond(c, 145, 586, 17, peauOmbre);
+    // Veste
+    c.beginPath();
+    c.moveTo(130, 438); c.quadraticCurveTo(196, 412, 264, 438);
+    c.lineTo(262, 640); c.quadraticCurveTo(197, 656, 128, 640); c.closePath();
+    c.fillStyle = veste; c.fill();
+    c.beginPath(); c.moveTo(130, 438); c.lineTo(164, 432); c.lineTo(160, 640); c.lineTo(128, 640); c.closePath();
+    c.fillStyle = vesteOmbre; c.fill();
+    // Chemise, cravate, boutons
+    poly(c, [172, 424, 222, 424, 197, 505], '#ffffff');
+    poly(c, [197, 440, 207, 452, 203, 530, 197, 542, 191, 530, 187, 452], '#d6453d');
+    poly(c, [190, 432, 204, 432, 207, 452, 187, 452], '#b8322b');
+    rond(c, 197, 575, 6, '#1b355e'); rond(c, 197, 610, 6, '#1b355e');
+    // Écharpe dorée du maire, avec sa médaille
+    poly(c, [238, 430, 262, 446, 150, 622, 128, 606], '#f5b82e');
+    poly(c, [238, 430, 246, 435, 136, 611, 128, 606], '#ffd86b');
+    rond(c, 158, 590, 17, '#ffd34d');
+    c.lineWidth = 4; c.strokeStyle = '#b7791f'; c.beginPath(); c.arc(158, 590, 17, 0, Math.PI * 2); c.stroke();
+    c.fillStyle = '#d99a00'; formeEtoile(c, 158, 590, 10, 0); c.fill();
+    // Bras droit levé vers la maison
+    c.strokeStyle = veste; c.lineWidth = 34;
+    c.beginPath(); c.moveTo(250, 452); c.lineTo(300, 412); c.lineTo(322, 350); c.stroke();
+    rect(c, 308, 344, 30, 12, '#ffffff');
+    // Main ouverte, paume vers la maison
+    c.fillStyle = peau;
+    c.beginPath(); c.ellipse(326, 322, 19, 23, 0.35, 0, Math.PI * 2); c.fill();
+    const doigts = [[-0.25, 30], [0.12, 33], [0.5, 31], [0.9, 26]];
+    for (const [a, l] of doigts) {
+      c.save(); c.translate(328, 318); c.rotate(a);
+      c.beginPath(); c.ellipse(0, -l * 0.62, 7, l * 0.5, 0, 0, Math.PI * 2); c.fill();
+      c.restore();
+    }
+    c.save(); c.translate(312, 330); c.rotate(-1.0);
+    c.beginPath(); c.ellipse(0, -16, 7, 16, 0, 0, Math.PI * 2); c.fill();
+    c.restore();
+    // Cou
+    rect(c, 182, 396, 30, 34, peauOmbre);
+    // Tête
+    const tx = 197, ty = 352;
+    rond(c, tx - 58, ty + 6, 14, peauOmbre); rond(c, tx + 58, ty + 6, 14, peau);
+    c.fillStyle = peau; c.beginPath(); c.ellipse(tx, ty, 58, 63, 0, 0, Math.PI * 2); c.fill();
+    // Cheveux
+    c.fillStyle = '#5b3a24';
+    c.beginPath(); c.moveTo(tx - 60, ty - 2);
+    c.quadraticCurveTo(tx - 66, ty - 78, tx + 4, ty - 70);
+    c.quadraticCurveTo(tx + 70, ty - 70, tx + 60, ty - 4);
+    c.quadraticCurveTo(tx + 50, ty - 40, tx + 10, ty - 42);
+    c.quadraticCurveTo(tx - 30, ty - 44, tx - 46, ty - 22);
+    c.quadraticCurveTo(tx - 52, ty - 10, tx - 60, ty - 2); c.fill();
+    c.beginPath(); c.moveTo(tx - 6, ty - 66); c.quadraticCurveTo(tx + 26, ty - 92, tx + 30, ty - 62); c.quadraticCurveTo(tx + 14, ty - 74, tx - 6, ty - 66); c.fill();
+    // Sourcils levés, yeux qui brillent
+    c.strokeStyle = '#4a2e1c'; c.lineWidth = 6; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(tx - 36, ty - 26); c.quadraticCurveTo(tx - 22, ty - 36, tx - 8, ty - 28); c.stroke();
+    c.beginPath(); c.moveTo(tx + 10, ty - 28); c.quadraticCurveTo(tx + 24, ty - 36, tx + 38, ty - 26); c.stroke();
+    for (const ex of [tx - 21, tx + 23]) {
+      c.fillStyle = '#2a1d14'; c.beginPath(); c.ellipse(ex, ty - 6, 8, 11, 0, 0, Math.PI * 2); c.fill();
+      rond(c, ex + 3, ty - 10, 3.4, '#ffffff');
+    }
+    // Joues roses, nez
+    c.fillStyle = 'rgba(255,120,120,.45)';
+    c.beginPath(); c.ellipse(tx - 36, ty + 16, 12, 8, 0, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(tx + 38, ty + 16, 12, 8, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = peauOmbre; c.beginPath(); c.ellipse(tx + 2, ty + 8, 8, 6, 0, 0, Math.PI * 2); c.fill();
+    // Grand sourire
+    c.beginPath(); c.moveTo(tx - 26, ty + 22); c.quadraticCurveTo(tx + 2, ty + 62, tx + 30, ty + 22); c.closePath();
+    c.fillStyle = '#8a2f2f'; c.fill();
+    c.save(); c.clip();
+    rect(c, tx - 30, ty + 20, 64, 9, '#ffffff');
+    c.fillStyle = '#ff7a7a'; c.beginPath(); c.ellipse(tx + 4, ty + 44, 14, 8, 0, 0, Math.PI * 2); c.fill();
+    c.restore();
+    // Lumière du soleil sur son côté droit
+    c.strokeStyle = 'rgba(255,240,190,.9)'; c.lineWidth = 6;
+    c.beginPath(); c.ellipse(tx, ty, 56, 61, 0, -0.45, 0.7); c.stroke();
+  }
+
+  function dessinerAffiche() {
+    redimensionner();
+    const c = ctx, Wp = innerWidth, Hp = innerHeight;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const k = Math.min(Wp / 600, Hp / 800);
+    const dx = (Wp - 600 * k) / 2, dy = (Hp - 800 * k) / 2;
+    const xMin = -dx / k - 2, xMax = 600 + dx / k + 2, yMin = -dy / k - 2, yMax = 800 + dy / k + 2;
+    const L0 = xMax - xMin;
+    c.save();
+    c.translate(dx, dy); c.scale(k, k);
+    // Ciel lumineux
+    const ciel = c.createLinearGradient(0, yMin, 0, 520);
+    ciel.addColorStop(0, '#3d98e6'); ciel.addColorStop(0.55, '#8ed2f4'); ciel.addColorStop(1, '#fff0c2');
+    c.fillStyle = ciel; c.fillRect(xMin, yMin, L0, 600 - yMin);
+    // Soleil et ses rayons (la source de lumière)
+    const sx = 470, sy = 150;
+    c.save();
+    for (let i = 0; i < 16; i++) {
+      const a = i * Math.PI / 8 + 0.1;
+      c.fillStyle = i % 2 ? 'rgba(255,255,255,.10)' : 'rgba(255,246,190,.22)';
+      c.beginPath(); c.moveTo(sx, sy); c.arc(sx, sy, 900, a, a + Math.PI / 8); c.closePath(); c.fill();
+    }
+    c.restore();
+    const halo = c.createRadialGradient(sx, sy, 20, sx, sy, 300);
+    halo.addColorStop(0, 'rgba(255,250,210,1)'); halo.addColorStop(0.3, 'rgba(255,236,160,.6)'); halo.addColorStop(1, 'rgba(255,236,160,0)');
+    c.fillStyle = halo; c.fillRect(xMin, yMin, L0, 640 - yMin);
+    rond(c, sx, sy, 56, '#ffe27a'); rond(c, sx, sy, 44, '#fff6c8');
+    // Nuages
+    nuageAffiche(c, 96, 112, 1.05); nuageAffiche(c, 300, 66, 0.7); nuageAffiche(c, 590, 250, 0.8);
+    for (let x = -260; x > xMin - 200; x -= 340) nuageAffiche(c, x, 130 + (x % 3) * 20, 0.9);
+    for (let x = 860; x < xMax + 200; x += 340) nuageAffiche(c, x, 110, 0.9);
+    // Colline lointaine et ville au loin, dans la brume
+    c.fillStyle = '#b6e09c';
+    c.beginPath(); c.moveTo(xMin, 520);
+    for (let x = xMin; x <= xMax + 40; x += 40) c.lineTo(x, 470 + Math.sin(x * 0.012) * 16 + Math.sin(x * 0.031) * 7);
+    c.lineTo(xMax, 520); c.closePath(); c.fill();
+    const loin = [['maison', 3], ['eau', 1], ['maison', 3], ['usine', 1], ['maison', 2], ['elec', 1], ['maison', 3], ['commerce', 1], ['maison', 3], ['ecole', 1]];
+    let i = 0;
+    for (let x = Math.floor(xMin / 62) * 62 - 62; x < xMax; x += 62, i++) {
+      const [type, niv] = loin[((i % loin.length) + loin.length) % loin.length];
+      const s = type === 'elec' ? 96 : (niv === 3 ? 78 : 62);
+      batAuSol(c, type, x, 506 + Math.sin(x * 0.02) * 4, s, { niv, seed: (i * 7) & 63, tm: 0.4 });
+    }
+    c.fillStyle = 'rgba(205,233,248,.5)'; c.fillRect(xMin, 380, L0, 132);
+    // Quartier du milieu : pelouse, maisons, école, éolienne, et le terrain qui attend sa maison
+    c.fillStyle = '#97d572';
+    c.beginPath(); c.moveTo(xMin, 640); c.lineTo(xMin, 512);
+    for (let x = xMin; x <= xMax + 30; x += 30) c.lineTo(x, 506 + Math.sin(x * 0.02 + 1) * 5);
+    c.lineTo(xMax, 640); c.closePath(); c.fill();
+    c.fillStyle = '#8fcf6a'; c.fillRect(xMin, 590, L0, 60);
+    const motif = [['maison', 2, 100], ['arbre', 0, 26], ['commerce', 1, 104], ['maison', 1, 96], ['arbre', 0, 30], ['ecole', 1, 112], ['maison', 3, 120]];
+    const posePlace = (x, j) => {
+      const [type, niv, s] = motif[((j % motif.length) + motif.length) % motif.length];
+      if (type === 'arbre') { arbre(c, x + s, 580 - s, s); return x + s * 2 + 10; }
+      batAuSol(c, type, x, 612, s, { niv, seed: (j * 11) & 63, tm: 0.5 });
+      return x + s + 6;
+    };
+    let gx = -120, j = 0;
+    while (gx > xMin - 140) { gx -= 120; j--; }
+    for (let x = gx, jj = j; x < -100; jj++) x = posePlace(x, jj);
+    for (let x = 700, jj = 3; x < xMax + 20; jj++) x = posePlace(x, jj);
+    // Scène principale (de gauche à droite)
+    batAuSol(c, 'ecole', -60, 612, 130, { niv: 1, seed: 3, tm: 0.5 });
+    batAuSol(c, 'maison', 56, 612, 108, { niv: 2, seed: 21, tm: 0.5 });
+    batAuSol(c, 'commerce', 196, 612, 110, { niv: 1, seed: 4, tm: 0.5 });
+    arbre(c, 312, 566, 22);
+    batAuSol(c, 'elec', 428, 600, 230, { niv: 1, seed: 5, tm: 0.9 });
+    batAuSol(c, 'maison', 448, 616, 132, { niv: 3, seed: 42, tm: 0.5 });
+    // Terrain à bâtir : la maison va s'y poser
+    batAuSol(c, 'maison', 330, 616, 118, { niv: 0, seed: 1, tm: 0.5 });
+    // Route du quartier
+    rect(c, xMin, 640, L0, 14, '#e8e2d0');
+    rect(c, xMin, 652, L0, 76, '#6b7280');
+    rect(c, xMin, 652, L0, 5, '#5b616c');
+    c.fillStyle = '#f4f1e6';
+    for (let x = Math.floor(xMin / 64) * 64; x < xMax; x += 64) c.fillRect(x, 688, 34, 6);
+    rect(c, xMin, 726, L0, 10, '#e8e2d0');
+    // La maison neuve qui descend sur son terrain, dans la lumière
+    const hx = 316, hy = 196, hs = 146;
+    const lueur = c.createRadialGradient(hx + hs / 2, hy + hs / 2, 10, hx + hs / 2, hy + hs / 2, 150);
+    lueur.addColorStop(0, 'rgba(255,248,200,.95)'); lueur.addColorStop(0.5, 'rgba(255,236,150,.5)'); lueur.addColorStop(1, 'rgba(255,236,150,0)');
+    c.fillStyle = lueur; c.fillRect(hx - 120, hy - 120, hs + 240, hs + 240);
+    // traînée de lumière entre la main du maire et la maison
+    c.strokeStyle = 'rgba(255,240,150,.85)'; c.lineWidth = 10; c.lineCap = 'round';
+    c.setLineDash([2, 22]);
+    c.beginPath(); c.moveTo(340, 292); c.quadraticCurveTo(352, 330, 372, 352); c.stroke();
+    c.setLineDash([]);
+    // flèches de pose (le geste du jeu : choisir, puis toucher la case)
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 7;
+    for (const ax of [356, 390, 424]) { c.beginPath(); c.moveTo(ax, 360); c.lineTo(ax, 400); c.stroke(); poly(c, [ax - 11, 398, ax + 11, 398, ax, 414], 'rgba(255,255,255,.9)'); }
+    c.shadowColor = 'rgba(255,220,120,.9)'; c.shadowBlur = 24;
+    dessinBat(c, 'maison', hx, hy, hs, { niv: 2, seed: 37, tm: 0.5 });
+    c.shadowBlur = 0;
+    // étincelles autour de la maison
+    const etincelles = [[300, 214, 16, '#fff3a0'], [478, 196, 13, '#ffffff'], [462, 300, 11, '#ffd34d'], [292, 302, 10, '#ffffff'], [396, 168, 12, '#ffd34d'], [500, 250, 8, '#fff3a0']];
+    for (const [ex, ey, r, col] of etincelles) { c.fillStyle = col; c.shadowColor = '#ffe27a'; c.shadowBlur = 12; formeEtoile(c, ex, ey, r, ex * 0.01); c.fill(); }
+    c.shadowBlur = 0;
+    // Habitants heureux : cœurs qui s'envolent des maisons
+    const coeurs = [[96, 470, 11, 1], [126, 432, 8, 0.8], [108, 396, 6, 0.55], [470, 470, 9, 0.9]];
+    for (const [cx0, cy0, r, a] of coeurs) { c.globalAlpha = a; c.strokeStyle = '#fff'; c.lineWidth = 3; coeur(c, cx0, cy0, r, '#ff5c8a'); }
+    c.globalAlpha = 1;
+    // Pièces qui volent vers la caisse (impôts des habitants)
+    pieceAffiche(c, 506, 354, 14, 1); pieceAffiche(c, 536, 324, 11, 0.45); pieceAffiche(c, 516, 292, 9, 0.8);
+    // Grands arbres de premier plan, coupés par les bords
+    arbre(c, -62, 560, 104);
+    arbre(c, 680, 610, 95);
+    // Le maire, en grand
+    dessinerMaire(c);
+    // Premier plan : haie fleurie
+    rect(c, xMin, 736, L0, yMax - 736, '#6cc04a');
+    for (let x = Math.floor(xMin / 46) * 46; x < xMax + 46; x += 46) {
+      const h = 18 + ((x * 7) % 5) * 3;
+      rond(c, x, 760 - h * 0.2, h + 12, '#4e9a35'); rond(c, x - 8, 752 - h * 0.3, h, '#5fb24e');
+    }
+    const fleurs = ['#ff6b9a', '#ffd34d', '#ffffff', '#ff9f43'];
+    for (let x = Math.floor(xMin / 23) * 23, n = 0; x < xMax; x += 23, n++) {
+      const fy = 748 + (n % 3) * 14;
+      rond(c, x + 6, fy, 5, fleurs[((n % 4) + 4) % 4]); rond(c, x + 6, fy, 2, '#d99a00');
+    }
+    if (yMax > 800) { c.fillStyle = '#5aa83e'; c.fillRect(xMin, 800, L0, yMax - 800); }
+    c.restore();
+  }
+  function cacherInterface() {
+    for (const el of document.querySelectorAll('.ecran, #hud, #bas, #toast, #fiche, .rond, .jel-langue, jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    affiche = true;
+    cacherInterface();
+    // le bouton de langue peut être créé après ce script : on le cache encore un peu plus tard
+    setTimeout(cacherInterface, 50); setTimeout(cacherInterface, 400); setTimeout(cacherInterface, 1200);
+    dessinerAffiche();
+  }
+
+  // =====================================================================
+  // Images du jeu (page du jeu)
+  // =====================================================================
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (caisse, habitants, bonheur, mandat,
+  // objectifs, barre des outils), sans écran titre, ni fenêtre « Continuer », ni présentation du niveau
+  // (CONSIGNES-JEU.md, section 5). La ville est posée par le code, puis le mois reste figé : ni victoire,
+  // ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1 : les premières rues et les premières maisons, une en construction ;
+  //   2 = niveau 11 : ville animée, une maison en feu, une demande d'école, caserne à placer ;
+  //   3 = niveau 20 (ordinateur) : rivières et ponts, stade, centre de santé, panne d'un château d'eau,
+  //       déchets ; la campagne autour de la carte remplit la largeur de l'écran.
+  // Lettres des cartes : celles des niveaux, plus j = maison de niveau 2 et o = maison en construction.
+  const SCENES_APERCU = {
+    1: {
+      niveau: 1, outil: 'maison', mois: 3, argent: 45, survol: [5, 4],
+      carte: ['T....T', '......', '.hoh..', '=====.', '.h.o=.', '...o=.', 'TT...T'],
+      coeurs: [[1, 2], [3, 2]],
+    },
+    2: {
+      niveau: 11, outil: 'caserne', mois: 9, argent: 240, survol: [1, 3],
+      carte: ['TTT=jeh.', 'TTh=====', 'Tpc=ijlu', 'l.j=hpjc', '========', 'sjp=jhce', 'hie=u.TT', '=====lTT', 'Rhj.iTTT'],
+      feux: [[2, 3]], demandes: [[6, 3, 'ecole']], coeurs: [[4, 2], [1, 6], [4, 8]],
+    },
+    3: {
+      niveau: 20, outil: 'eau', mois: 17, argent: 610, survol: [1, 0],
+      carte: ['p.WWi=WW', 'liWWj=lc', '==##====', 'mh#je=sj', 'WW#ih=Sp', 'pj=cW#WW', 'ji=eW=lf', '====#===', 'lj=dW=iu', 'TT=uW=cT'],
+      pannes: [[3, 6]], demandes: [[7, 3, 'sante']], coeurs: [[4, 0], [6, 8], [3, 4]],
+    },
+  };
+  function grilleApercu(lignes) {
+    const g = lireCarte(lignes.map((l) => l.replace(/[jo]/g, 'h')));
+    lignes.forEach((l, y) => [...l].forEach((ch, x) => {
+      if (ch === 'j') g[y][x].b.niv = 2;
+      if (ch === 'o') g[y][x].b.niv = 0;
+    }));
+    return g;
+  }
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graineHasard = 1234567 + numero * 7919;
+    Math.random = () => { graineHasard = (graineHasard + 0x6D2B79F5) | 0; let x = Math.imul(graineHasard ^ (graineHasard >>> 15), 1 | graineHasard); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    progression = { debloque: NB, etoiles: [], records: [] }; // en mémoire seulement (rien n'est enregistré)
+    demarrerNiveau(sc.niveau);
+    enJeu = false;
+    grille = grilleApercu(sc.carte); H = grille.length; W = grille[0].length;
+    for (const [x, y, type] of (L.res || [])) grille[y][x].res = type;
+    for (const [x, y] of sc.feux || []) grille[y][x].b.feu = 1;
+    for (const [x, y] of sc.pannes || []) grille[y][x].b.panne = true;
+    for (const [x, y, type] of sc.demandes || []) grille[y][x].b.dem = { type, reste: 6 };
+    mois = sc.mois; argent = sc.argent; tempsMois = DUREE_MOIS * 0.6;
+    outil = sc.outil; tuto = 2; horloge = 3;
+    calculer();
+    if (actif('dechets')) {
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const b = grille[y][x].b; if (b && b.type === 'maison') b.dechets = b.niv > 0 && !couvert('dechetterie', x, y);
+      }
+    }
+    ecran = 'jeu';
+    montrer(null);
+    majHud(); majOutils();
+    survol = { x: sc.survol[0], y: sc.survol[1] };
+    // Habitants heureux : cœurs immobiles au-dessus de quelques maisons
+    for (const [x, y] of sc.coeurs || []) {
+      const { px, py } = centreCase(x, y);
+      particules.push({ type: 'coeur', x: px + geo.T * 0.28, y: py - geo.T * 0.42, vx: 0, vy: 0, vie: 1e9, max: 1.4 });
+    }
+  }
+  // Ordinateur (image 3) : la campagne continue autour de la carte jusqu'aux bords de l'écran
+  // (rivières et routes prolongées, forêt de plus en plus dense) ; décor seulement.
+  function dessinerAlentours(c) {
+    const { T, ox, oy } = geo;
+    const x0 = Math.floor(-ox / T) - 1, x1 = Math.ceil((innerWidth - ox) / T);
+    const y0 = Math.floor(-oy / T) - 1, y1 = Math.ceil((innerHeight - oy) / T);
+    const w = T * 0.6, m = (T - w) / 2;
+    for (let gy = y0; gy <= y1; gy++) for (let gx = x0; gx <= x1; gx++) {
+      const dehorsX = gx < 0 || gx >= W, dehorsY = gy < 0 || gy >= H;
+      if (!dehorsX && !dehorsY) continue;
+      const px = ox + gx * T, py = oy + gy * T;
+      const bord = grille[Math.max(0, Math.min(H - 1, gy))][Math.max(0, Math.min(W - 1, gx))];
+      const prolonge = dehorsX !== dehorsY;
+      if (prolonge && bord.ter === 'eau' && !(bord.b && bord.b.type === 'route')) { terrain(c, { ter: 'eau' }, px, py, T, gx, gy); continue; }
+      const route = prolonge && bord.b && bord.b.type === 'route';
+      const loin = Math.max(gx < 0 ? -gx : gx - W + 1, gy < 0 ? -gy : gy - H + 1, 0);
+      const s = graine(gx + 64, gy + 64) % 100;
+      terrain(c, { ter: !route && s < Math.min(75, 18 + loin * 14) ? 'arbre' : 'herbe' }, px, py, T, gx, gy);
+      if (route) {
+        c.fillStyle = '#6b7280';
+        if (dehorsX) c.fillRect(px - 0.5, py + m, T + 1, w); else c.fillRect(px + m, py - 0.5, w, T + 1);
+        c.strokeStyle = '#f4f1e6'; c.lineWidth = Math.max(1, T * 0.045); c.setLineDash([T * 0.12, T * 0.1]);
+        c.beginPath();
+        if (dehorsX) { c.moveTo(px, py + T / 2); c.lineTo(px + T, py + T / 2); } else { c.moveTo(px + T / 2, py); c.lineTo(px + T / 2, py + T); }
+        c.stroke(); c.setLineDash([]);
+      }
+    }
+    c.fillStyle = 'rgba(30,60,40,.12)'; c.fillRect(0, 0, innerWidth, innerHeight);
+  }
+
   // Boutons
   $('b-jouer').addEventListener('click', boutonJouer);
   $('b-niveaux-titre').addEventListener('click', () => { jouer('clic'); allerNiveaux(); });
@@ -4263,17 +4624,27 @@
   $('b-pause').innerHTML = SVG.pause;
 
   // Pause automatique quand l'écran est caché
-  document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
-  // Sauvegarde à la fermeture, seulement pendant une partie
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu && !affiche) pause(); });
+  // Sauvegarde à la fermeture, seulement pendant une partie (jamais pour l'affiche ni les images du jeu)
   window.JEL_SAVE.surFermeture(() => {
-    if (enJeu) window.JEL_SAVE.save(JEU, donneesSauvegarde(N, scoreNiveau()));
+    if (enJeu && !apercu && !affiche) window.JEL_SAVE.save(JEU, donneesSauvegarde(N, scoreNiveau()));
   });
 
-  window.addEventListener('resize', () => { redimensionner(); if (!$('fiche').hidden) placerFiche(); });
+  window.addEventListener('resize', () => {
+    if (affiche) { dessinerAffiche(); return; }
+    redimensionner(); if (!$('fiche').hidden) placerFiche();
+  });
   redimensionner();
   majSon();
-  montrer('ecran-titre');
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    montrer('ecran-titre');
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

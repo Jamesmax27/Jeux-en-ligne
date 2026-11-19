@@ -3250,6 +3250,19 @@
   @keyframes eclate{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
   .sceauAnim .morceau{transform-box:fill-box;transform-origin:center}
 
+  /* ---------- Affiche (window.JEL_AFFICHE) et image du jeu sur ordinateur (window.JEL_APERCU = 3) ---------- */
+  #affiche{position:fixed;inset:0;z-index:1000;background:#3b2470}
+  #affiche svg{display:block;width:100%;height:100%}
+  #jeu.large{max-width:none}
+  #jeu.large #ennemis{gap:40px}
+  #jeu.large .en .nom{font-size:16px}
+  #jeu.large #info,#jeu.large #zJ{width:100%;max-width:900px;margin-left:auto;margin-right:auto}
+  #jeu.large #zMain{height:178px;width:100%;max-width:1000px;margin:0 auto}
+  #jeu.large .carte{width:108px;height:152px;padding:5px}
+  #jeu.large .carte .nomc{font-size:12.5px;min-height:28px}
+  #jeu.large .carte .art{font-size:34px}
+  #jeu.large .carte .res{font-size:15px}
+
   @media (min-height:760px){ #zMain{height:146px} }
   @media (prefers-reduced-motion:reduce){ .aura,.livre svg{animation:none} }
 </style>
@@ -3294,8 +3307,9 @@ document.addEventListener('click', (ev) => {
 // ---------- Sauvegarde (toujours dans try/catch) ----------
 const CLE = 'grimoire-sept-sceaux-v1';
 const REC = { meilleur: 0, etoiles: 0, sceaux: 0, son: true, vus: {}, partie: null };
+let apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 function charger() { try { const t = localStorage.getItem(CLE); if (t) Object.assign(REC, JSON.parse(t)); } catch (e) { /* sans stockage, on joue quand même */ } }
-function sauver() { try { localStorage.setItem(CLE, JSON.stringify(REC)); } catch (e) { /* stockage refusé */ } }
+function sauver() { if (apercu) return; try { localStorage.setItem(CLE, JSON.stringify(REC)); } catch (e) { /* stockage refusé */ } }
 
 // ---------- Sons (Web Audio, aucun fichier) ----------
 let AC = null;
@@ -3342,7 +3356,7 @@ const SONS = {
   erreur: () => bip(180, 0.18, 'square', 0.06),
   soin: () => { [600, 750, 900].forEach((f, i) => bip(f, 0.15, 'sine', 0.08, i * 0.07)); },
 };
-function son(n) { try { if (SONS[n]) SONS[n](); } catch (e) { /* son indisponible */ } }
+function son(n) { if (apercu || window.JEL_AFFICHE) return; try { if (SONS[n]) SONS[n](); } catch (e) { /* son indisponible */ } }
 
 // ---------- Icônes (SVG dessinés à la main) ----------
 const IC = {
@@ -3690,11 +3704,12 @@ function sauverPartie() { REC.partie = clone(S); sauver(); retenirReprise(REC.pa
 const JEU = 'grimoire-des-sept-sceaux';
 let pointReprise = null, partieFinie = null;
 function retenirReprise(etat) {
+  if (apercu) return; // image du jeu : rien n'est écrit dans la sauvegarde
   pointReprise = etat;
   if (etat) JEL_SAVE.save(JEU, { niveau: Math.min(12, Math.max(1, etat.niv)), score: etat.score, options: { son: REC.son }, partie: etat });
 }
 JEL_SAVE.surFermeture(() => {
-  if (!S || S === partieFinie || $('#ecran .accueil')) return; // pas de partie en cours
+  if (apercu || window.JEL_AFFICHE || !S || S === partieFinie || $('#ecran .accueil')) return; // pas de partie en cours
   const etat = C ? snap : pointReprise;
   if (etat) retenirReprise(clone(etat));
 });
@@ -4164,6 +4179,7 @@ function lancerCombat(liste, type) {
   </div>`);
   majBarre(true);
   construireEnnemis();
+  if (apercu) return; // image du jeu : ouvrirApercu pose lui-même le tour et la main
   debutTourJoueur().then(async () => {
     if (type === 'niveau') {
       const nv = NIVEAUX[S.niv - 1];
@@ -4185,7 +4201,9 @@ function construireEnnemis() {
   const zone = $('#ennemis'); if (!zone) return;
   const n = C.ennemis.length, haut = ($('#zEn').clientHeight || 400) - 100;
   zone.innerHTML = C.ennemis.map((e) => {
-    const taille = Math.max(70, Math.min(haut, e.boss && n === 1 ? 210 : n === 1 ? 180 : n === 2 ? 150 : n === 3 ? 105 : 80));
+    // Image du jeu sur ordinateur (JEL_APERCU = 3) : créatures plus grandes, la partie occupe toute la largeur.
+    const taille = apercu === 3 ? Math.max(70, Math.min(haut, n === 1 ? 300 : n === 2 ? 260 : 230))
+      : Math.max(70, Math.min(haut, e.boss && n === 1 ? 210 : n === 1 ? 180 : n === 2 ? 150 : n === 3 ? 105 : 80));
     return `<div class="en ${e.delivre ? 'parti' : ''}" id="en-${e.uid}" data-f="${on(() => toucherEnnemi(e))}" style="max-width:${taille + 20}px">
       <div class="intent"></div><div class="art" style="width:100%;max-width:${taille}px">${creature(ENNEMIS[e.id].art, e.delivre)}</div>
       <div class="nom">${e.nom}</div><div class="pvbar"><i></i><span></span><b></b></div><div class="sts"></div></div>`;
@@ -4264,8 +4282,8 @@ function info(m) {
 }
 function dessinerMain() {
   const zone = $('#main'); if (!zone) return;
-  const w = (zone.clientWidth || 360) - 10, n = C.main.length, cw = 82;
-  const pas = n > 1 ? Math.min(cw + 4, (w - cw) / (n - 1)) : 0;
+  const w = (zone.clientWidth || 360) - 10, n = C.main.length, cw = apercu === 3 ? 108 : 82;
+  const pas = n > 1 ? Math.min(cw + (apercu === 3 ? 22 : 4), (w - cw) / (n - 1)) : 0;
   const total = pas * (n - 1) + cw, x0 = (w - total) / 2;
   zone.innerHTML = C.main.map((c, i) => {
     const trop = defC(c).type === 'M' || coutDe(c) > C.energie;
@@ -4682,8 +4700,263 @@ function finPartie(gagne) {
 // Redessiner la main si la taille change (rotation du téléphone)
 window.addEventListener('resize', () => { if (C && $('#main')) dessinerMain(); });
 
+/* =====================================================================
+   AFFICHE (jaquette du jeu)
+   Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+   sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le petit magicien,
+   en grand, tient son grimoire ouvert : ses cartes s'envolent et sa baguette lance une pluie
+   d'étoiles sur le Dragonnet de braise ensorcelé ; la Gelée bleue, déjà délivrée, sourit ;
+   la lune et les sept sceaux brillent dans le ciel du soir.
+   ===================================================================== */
+function etoileSVG(x, y, r, couleur, extra = '') {
+  const p = [];
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; p.push((x + Math.cos(a) * rr).toFixed(1) + ' ' + (y + Math.sin(a) * rr).toFixed(1)); }
+  return `<path d="M${p.join('L')}z" fill="${couleur}" ${extra}/>`;
+}
+// Icône du jeu (IC) dessinée à une place précise de l'affiche
+function iconeSVG(n, x, y, taille, couleur) {
+  const p = (IC[n] || IC.gemme).replace(/class="p"/g, `fill="${couleur}" stroke="none"`);
+  return `<svg x="${x - taille / 2}" y="${y - taille / 2}" width="${taille}" height="${taille}" viewBox="0 0 24 24" fill="none" stroke="${couleur}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" overflow="visible">${p}</svg>`;
+}
+// Une carte du grimoire, comme dans la main du joueur (sans nom ni chiffre)
+function carteAffiche(x, y, rot, s, type, ic2) {
+  const c = TYPES[type].c;
+  return `<g transform="translate(${x} ${y}) rotate(${rot}) scale(${s})">
+    <rect x="-30" y="-42" width="60" height="84" rx="8" fill="#1a1036" opacity=".35" transform="translate(3 5)"/>
+    <rect x="-30" y="-42" width="60" height="84" rx="8" fill="url(#aParchemin)" stroke="${c}" stroke-width="4"/>
+    <rect x="-12" y="-37" width="30" height="4" rx="2" fill="#2a1a10" opacity=".2"/>
+    <rect x="-23" y="-28" width="46" height="36" rx="5" fill="${c}"/>
+    ${iconeSVG(TYPES[type].ic, 0, -10, 26, '#fff')}
+    ${iconeSVG(ic2 || TYPES[type].ic, -9, 22, 15, c)}
+    <rect x="2" y="19" width="14" height="6" rx="3" fill="${c}" opacity=".55"/>
+    <circle cx="-27" cy="-39" r="9.5" fill="url(#aOrbe)" stroke="#7a4a10" stroke-width="2"/>
+  </g>`;
+}
+// Le petit magicien du jeu (MAGE), redessiné en grand et en détail
+function mageAffiche(x, y, s) {
+  const etoilesRobe = [[30, 118, 3.4], [62, 132, 3], [44, 104, 2.4], [72, 112, 2.2], [22, 140, 2.6], [52, 146, 2.8]]
+    .map(([a, b, r]) => etoileSVG(a, b, r, '#ffd76a', 'opacity=".9"')).join('');
+  return `<g transform="translate(${x} ${y}) scale(${s})">
+    <ellipse cx="50" cy="160" rx="46" ry="7" fill="#1a1036" opacity=".45"/>
+    <path d="M30 90Q50 82 70 90L92 156Q50 167 8 156Z" fill="#6a46c9"/>
+    <path d="M52 86Q63 86 70 90L92 156Q72 163 52 164Z" fill="#5434b0"/>
+    <path d="M8 156Q50 167 92 156L90 148Q50 159 10 148Z" fill="#ffd76a"/>
+    ${etoilesRobe}
+    <path d="M30 90Q24 96 23 104" stroke="#cbb8ff" stroke-width="2" fill="none" opacity=".7"/>
+    <ellipse cx="50" cy="89" rx="17" ry="5" fill="#2a1d6b"/>
+    <path d="M30 62q-8 10 1 18q1-9 6-11zM70 62q8 10-1 18q-1-9-6-11z" fill="#8a5a2e"/>
+    <circle cx="50" cy="68" r="20" fill="#ffd9b8"/>
+    <path d="M31 62a20 20 0 0 1 6-12" stroke="#fff3e0" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".8"/>
+    <circle cx="38" cy="76" r="4.6" fill="#ff9aa8" opacity=".75"/><circle cx="62" cy="76" r="4.6" fill="#ff9aa8" opacity=".75"/>
+    <ellipse cx="43" cy="67" rx="3.3" ry="4.2" fill="#2a1a10"/><ellipse cx="57" cy="67" rx="3.3" ry="4.2" fill="#2a1a10"/>
+    <circle cx="44.3" cy="65.4" r="1.4" fill="#fff"/><circle cx="58.3" cy="65.4" r="1.4" fill="#fff"/>
+    <path d="M38 59q5-3.5 9-.5M53 58.5q5-3 9 .5" stroke="#5a3418" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M42.5 76Q50 86 57.5 76Z" fill="#8a2a3a"/><path d="M45.5 80.5Q50 84 54.5 80.5Q50 78.5 45.5 80.5Z" fill="#ff8aa0"/>
+    <path d="M24 54Q40 30 48 10Q52 0 62 2Q72 4 75 15Q67 8 61 12Q58 30 77 54Z" fill="#3b2a8b"/>
+    <path d="M24 54Q40 30 48 10Q52 0 62 2" stroke="#b9a6ff" stroke-width="2.4" fill="none" opacity=".75"/>
+    <rect x="17" y="50" width="66" height="10" rx="5" fill="#2a1d6b"/>
+    <rect x="22" y="51.5" width="30" height="3" rx="1.5" fill="#6d5ab8" opacity=".7"/>
+    ${etoileSVG(50, 33, 8, '#ffd76a')}${etoileSVG(75.5, 15.5, 4.5, '#ffe39a')}
+    <path d="M66 96Q84 90 94 75" stroke="#6a46c9" stroke-width="14" stroke-linecap="round" fill="none"/>
+    <circle cx="93" cy="77" r="7.4" fill="#ffd76a"/>
+    <path d="M95 74L118 37" stroke="#a0703a" stroke-width="4.6" stroke-linecap="round"/>
+    <path d="M96 71L117 38" stroke="#d8a868" stroke-width="1.4" stroke-linecap="round"/>
+    <circle cx="97" cy="72" r="6.4" fill="#ffd9b8"/>
+    <circle cx="119" cy="35" r="17" fill="url(#aHalo)"/>
+    ${etoileSVG(119, 35, 7.5, '#fffbe0')}
+    <path d="M34 98Q20 112 28 125" stroke="#5434b0" stroke-width="13" stroke-linecap="round" fill="none"/>
+    <ellipse cx="40" cy="112" rx="34" ry="20" fill="url(#aHalo)"/>
+    <path d="M12 122Q38 111 64 119L66 145Q40 136 14 147Z" fill="#7a3a2a" stroke="#4a2010" stroke-width="2"/>
+    <path d="M16 120Q29 112 40 117L41 139Q30 134 18 141Z" fill="#fbf0d6"/>
+    <path d="M40 117Q52 111 62 117L63 136Q52 132 41 139Z" fill="#f4e4c0"/>
+    <path d="M21 123q8-4 15-1M21 128q8-4 15-1M21 133q8-4 15-1M44 121q8-4 15-1M44 126q8-4 15-1M44 131q8-4 15-1" stroke="#b9a07a" stroke-width="1.3" fill="none"/>
+    <circle cx="28" cy="126" r="6.2" fill="#ffd9b8"/>
+  </g>`;
+}
+function dessinerAffiche() {
+  let zone = $('#affiche');
+  if (!zone) { zone = document.createElement('div'); zone.id = 'affiche'; document.body.appendChild(zone); }
+  // Cadre de 600 × 800 au centre ; sur un écran plus large (ou plus haut), le décor continue jusqu'aux bords.
+  const L = window.innerWidth || 600, H = window.innerHeight || 800;
+  let vx = 0, vy = 0, vw = 600, vh = 800;
+  if (L / H >= 0.75) { vw = 800 * L / H; vx = 300 - vw / 2; } else { vh = 600 * H / L; vy = 400 - vh / 2; }
+  const x0 = vx, x1 = vx + vw, y1 = vy + vh;
+  // Collines : lointaines (lavande), proches (violettes, avec des arbres ronds)
+  let collines = '', arbres = '';
+  const loin = [], pres = [];
+  for (let x = Math.floor(x0 / 20) * 20 - 40; x <= x1 + 40; x += 20) {
+    loin.push(`${x} ${(520 + Math.sin(x * 0.011) * 34 + Math.sin(x * 0.027 + 1) * 14).toFixed(1)}`);
+    pres.push(`${x} ${(590 + Math.sin(x * 0.008 + 2) * 26 + Math.sin(x * 0.021) * 10).toFixed(1)}`);
+  }
+  collines += `<path d="M${loin.join('L')}L${x1 + 40} ${y1 + 10}L${x0 - 40} ${y1 + 10}Z" fill="#9b7fd0"/>`;
+  for (let x = Math.floor(x0 / 46) * 46; x <= x1 + 46; x += 46) {
+    const h = 590 + Math.sin(x * 0.008 + 2) * 26 + Math.sin(x * 0.021) * 10, r = 20 + ((x / 46) % 3 + 3) % 3 * 6;
+    arbres += `<rect x="${x - 3}" y="${h - 22}" width="6" height="24" fill="#3a2668"/><circle cx="${x}" cy="${h - 30 - r * 0.4}" r="${r}" fill="#4f3a92"/><circle cx="${x - r * 0.35}" cy="${h - 36 - r * 0.55}" r="${r * 0.45}" fill="#6a52b0" opacity=".8"/>`;
+  }
+  collines += arbres + `<path d="M${pres.join('L')}L${x1 + 40} ${y1 + 10}L${x0 - 40} ${y1 + 10}Z" fill="#3f2d7e"/>`;
+  // Petites étoiles du ciel et lucioles (positions fixes)
+  let ciel = '', lucioles = '';
+  let g = 7;
+  const hasard = () => { g = (g * 16807) % 2147483647; return g / 2147483647; };
+  for (let i = 0; i < 90; i++) { const x = x0 + hasard() * vw, y = vy + hasard() * (470 - vy); ciel += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(0.8 + hasard() * 1.6).toFixed(1)}" fill="#fff" opacity="${(0.4 + hasard() * 0.6).toFixed(2)}"/>`; }
+  for (let i = 0; i < 26; i++) { const x = x0 + hasard() * vw, y = 470 + hasard() * 240; lucioles += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(2 + hasard() * 3).toFixed(1)}" fill="#fff1a0" opacity=".85"/><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" fill="url(#aHalo)" opacity=".7"/>`; }
+  // Les sept sceaux en arc dans le ciel : les trois premiers déjà brisés brillent d'or
+  let sceaux = '';
+  for (let i = 0; i < 7; i++) {
+    const a = Math.PI * (1.29 + i * 0.07), x = 300 + Math.cos(a) * 480, y = 600 + Math.sin(a) * 480, ok = i < 3;
+    sceaux += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="34" fill="url(#aHalo)" opacity="${ok ? 0.9 : 0.35}"/>
+      <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="19" fill="${ok ? '#7a3ac0' : '#4a3486'}" stroke="${ok ? '#ffd76a' : '#a99cff'}" stroke-width="3.5"/>
+      ${etoileSVG(x, y, 10, ok ? '#ffd76a' : '#a99cff')}`;
+  }
+  // Créatures du jeu (creature) : le Dragonnet ensorcelé, la Gelée bleue délivrée
+  const placer = (svg, x, y, l, h) => svg.replace('<svg ', `<svg x="${x}" y="${y}" width="${l}" height="${h}" overflow="visible" `);
+  const dragon = placer(creature(ENNEMIS.dragonnet.art, false), 318, 96, 250, 260);
+  const gelee = placer(creature(ENNEMIS.gelee.art, true), 452, 452, 120, 125);
+  // Rayon d'étoiles de la baguette (pointe en 318, 328) jusqu'au Dragonnet
+  const bx = 319, by = 328, qx = 318, qy = 196, cx = 366, cy = 300;
+  let rayon = `<path d="M${bx} ${by}Q${qx} ${qy} ${cx} ${cy}" stroke="#fff3a0" stroke-width="16" fill="none" stroke-linecap="round" opacity=".35" filter="url(#aFlou)"/>
+    <path d="M${bx} ${by}Q${qx} ${qy} ${cx} ${cy}" stroke="#fffbe8" stroke-width="5" fill="none" stroke-linecap="round"/>`;
+  const cols = ['#ffd76a', '#ff8aa8', '#8cc8ff', '#a6ff9a', '#c48aff', '#ffffff'];
+  for (let i = 1; i < 7; i++) {
+    const p = i / 7, x = (1 - p) * (1 - p) * bx + 2 * (1 - p) * p * qx + p * p * cx, y = (1 - p) * (1 - p) * by + 2 * (1 - p) * p * qy + p * p * cy;
+    rayon += etoileSVG(x + (i % 2 ? 14 : -14), y + (i % 2 ? 6 : -8), 6 + i, cols[i % 6], 'stroke="#fff" stroke-width="1.5"');
+  }
+  const impact = `<circle cx="${cx}" cy="${cy}" r="48" fill="url(#aHalo)"/>${etoileSVG(cx, cy, 26, '#fff6c8', 'stroke="#ffd76a" stroke-width="3"')}
+    ${[0, 1, 2, 3, 4, 5, 6, 7].map((k) => { const a = k * Math.PI / 4 + 0.3; return `<path d="M${(cx + Math.cos(a) * 30).toFixed(1)} ${(cy + Math.sin(a) * 30).toFixed(1)}L${(cx + Math.cos(a) * 48).toFixed(1)} ${(cy + Math.sin(a) * 48).toFixed(1)}" stroke="${cols[k % 6]}" stroke-width="5" stroke-linecap="round"/>`; }).join('')}`;
+  // Cartes qui s'envolent du grimoire vers le Dragonnet, et une carte floue au premier plan
+  const cartes = carteAffiche(292, 482, 12, 1.05, 'D') + carteAffiche(368, 442, 22, 1.12, 'S', 'livre') + carteAffiche(450, 404, 32, 1.2, 'A', 'flamme');
+  const traine = [[252, 516], [270, 502], [328, 464], [345, 454], [405, 428], [423, 418]].map(([a, b], i) => etoileSVG(a, b, 5, cols[i % 6], 'opacity=".9"')).join('');
+  const devant = `<g filter="url(#aFlou2)">${carteAffiche(x1 - 34, y1 - 150, -22, 2.1, 'P')}</g>`;
+  // Premier plan : grands champignons et herbes, coupés par les bords
+  const champi = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-12 0Q-14 -40 -8 -60L8 -60Q14 -40 12 0Z" fill="#f6e8d0"/><path d="M-56 -56Q0 -130 56 -56Q0 -40 -56 -56Z" fill="#e2463c"/><path d="M-50 -60Q-20 -110 20 -104" stroke="#ff9a8a" stroke-width="5" fill="none" opacity=".7"/><g fill="#fff"><circle cx="-26" cy="-76" r="8"/><circle cx="8" cy="-92" r="9"/><circle cx="32" cy="-70" r="6"/></g></g>`;
+  let herbes = '';
+  for (let x = Math.floor(x0 / 18) * 18; x <= x1 + 18; x += 18) {
+    const h = 40 + ((x * 7) % 5 + 5) % 5 * 9;
+    herbes += `<path d="M${x - 6} ${y1 + 2}Q${x - 2} ${y1 - h * 0.6} ${x + 4} ${y1 - h}Q${x + 2} ${y1 - h * 0.5} ${x + 8} ${y1 + 2}Z" fill="#2a1d5a"/>`;
+  }
+  const sol = `<path d="M${x0 - 20} 640Q300 610 ${x1 + 20} 640L${x1 + 20} ${y1 + 10}L${x0 - 20} ${y1 + 10}Z" fill="#33246c"/>`;
+  zone.innerHTML = `<svg viewBox="${vx} ${vy} ${vw} ${vh}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="aCiel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3c2a86"/><stop offset=".45" stop-color="#8a5ac4"/><stop offset=".78" stop-color="#f2a2c0"/><stop offset="1" stop-color="#ffd59a"/></linearGradient>
+      <radialGradient id="aHalo"><stop offset="0" stop-color="#fffbe0" stop-opacity="1"/><stop offset=".4" stop-color="#ffe39a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd76a" stop-opacity="0"/></radialGradient>
+      <radialGradient id="aLune"><stop offset="0" stop-color="#fffbe8"/><stop offset=".55" stop-color="#fff0c0" stop-opacity=".55"/><stop offset="1" stop-color="#ffe9b0" stop-opacity="0"/></radialGradient>
+      <radialGradient id="aOrbe" cx=".35" cy=".3"><stop offset="0" stop-color="#fff6c8"/><stop offset=".55" stop-color="#ffcf4d"/><stop offset="1" stop-color="#d98a2b"/></radialGradient>
+      <linearGradient id="aParchemin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf3e2"/><stop offset="1" stop-color="#e9dcc3"/></linearGradient>
+      <filter id="aFlou" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+      <filter id="aFlou2" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.5"/></filter>
+    </defs>
+    <rect x="${x0 - 20}" y="${vy - 20}" width="${vw + 40}" height="${vh + 40}" fill="url(#aCiel)"/>
+    ${ciel}
+    <circle cx="462" cy="200" r="230" fill="url(#aLune)" opacity=".8"/>
+    <circle cx="462" cy="200" r="86" fill="#fff6d6"/>
+    <circle cx="436" cy="178" r="14" fill="#f2e2b4" opacity=".7"/><circle cx="492" cy="226" r="10" fill="#f2e2b4" opacity=".7"/>
+    ${sceaux}
+    ${collines}
+    ${sol}
+    ${lucioles}
+    <circle cx="150" cy="520" r="190" fill="url(#aHalo)" opacity=".55"/>
+    ${dragon}
+    ${gelee}
+    ${etoileSVG(446, 452, 7, '#ff8aa8')}${etoileSVG(578, 470, 6, '#ffd76a')}${etoileSVG(566, 440, 4, '#fff')}
+    ${mageAffiche(-2, 236, 2.7)}
+    ${rayon}
+    ${impact}
+    ${traine}
+    ${cartes}
+    ${champi(x0 + 46, y1 + 8, 1.5)}${champi(x0 + 128, y1 + 22, 0.9)}
+    ${herbes}
+    ${devant}
+  </svg>`;
+}
+function demarrerAffiche() {
+  const cacher = () => {
+    for (const el of document.querySelectorAll('#jeu, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+  };
+  cacher();
+  dessinerAffiche();
+  setTimeout(cacher, 300); setTimeout(cacher, 1200);
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* =====================================================================
+   IMAGES DU JEU (page du jeu)
+   Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+   s'ouvre directement en plein combat, avec sa vraie interface (barre du haut, créatures et
+   leurs intentions, énergie, main de cartes), sans écran titre, ni fenêtre « Continuer », ni
+   tutoriel (CONSIGNES-JEU.md, section 5). Rien ne bouge ensuite : ni victoire, ni défaite,
+   ni son, ni sauvegarde.
+     1 = niveau 1 : la Gelée bleue, le paquet de départ ;
+     2 = niveau 6 : le Dragonnet de braise (gardien du 3e sceau), la brûlure, des reliques ;
+     3 = niveau 10 (sur ordinateur) : les trois hydres qui repoussent, épines, régénération et pouvoirs.
+   ===================================================================== */
+const SCENES_APERCU = {
+  1: {
+    niveau: 1, pv: 50, pvMax: 50, or: 60, score: 0, sceaux: 0, etoiles: {}, rel: [], tour: 2, energie: 2, energieMax: 3,
+    joueur: { pv: 45, bouc: 5, st: {} }, pioche: 3,
+    main: [['etincelle'], ['rayon'], ['etincelle'], ['bouclier']], sel: 1,
+    ennemis: [{ pv: 13, st: { fragile: 0 }, intention: { a: 7 } }], degat: [0, '-9'],
+  },
+  2: {
+    niveau: 6, pv: 41, pvMax: 58, or: 134, score: 1460, sceaux: 2, etoiles: { 1: 3, 2: 3, 3: 2, 4: 3, 5: 2 }, rel: ['bougie', 'lanterne', 'etoileArgent'],
+    tour: 3, energie: 3, energieMax: 3, joueur: { pv: 41, bouc: 0, st: { force: 2, brulure: 2 } }, pioche: 9,
+    main: [['bouleFeu', 1], ['souffleDragon'], ['mur'], ['flammeBleue'], ['courage']], sel: 3,
+    ennemis: [{ pv: 57, bouc: 0, st: { brulure: 6 }, intention: { brul: 5, a: 4 } }], degat: [0, '-11', 0.86, 0.42],
+  },
+  3: {
+    niveau: 10, pv: 66, pvMax: 70, or: 212, score: 4380, sceaux: 4, etoiles: { 1: 3, 2: 3, 3: 2, 4: 3, 5: 3, 6: 2, 7: 3, 8: 3, 9: 2 },
+    rel: ['coquillage', 'cristalForce', 'plumePhenix', 'anneauEpines', 'coeurCristal', 'bougie'],
+    tour: 4, energie: 4, energieMax: 4, joueur: { pv: 52, bouc: 12, st: { force: 3, epines: 5, regen: 2 } }, pioche: 14,
+    main: [['tempete', 1], ['echo'], ['lunaire'], ['souffleDragon', 1], ['inspiration'], ['phenix']], sel: 0,
+    ennemis: [
+      { pv: 31, bouc: 0, st: { regen: 3, brulure: 4 }, intention: { a: 7 } },
+      { pv: 18, bouc: 8, st: { regen: 3, fragile: 2 }, intention: { b: 8 } },
+      { pv: 40, bouc: 0, st: { regen: 3, faible: 1 }, intention: { brul: 3 } },
+    ], degat: [1, '-14'],
+  },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 1234567 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  if (numero === 3) $('#jeu').classList.add('large');
+  nouvellePartie(); // partie neuve en mémoire seulement (rien n'est enregistré)
+  Object.assign(S, { niv: sc.niveau, pv: sc.pv, pvMax: sc.pvMax, or: sc.or, score: sc.score, sceaux: sc.sceaux, etoiles: sc.etoiles, rel: sc.rel.slice() });
+  S.deck.push(...sc.main.map(([id, plus]) => ({ id, plus: plus || 0 })));
+  lancerCombat(NIVEAUX[sc.niveau - 1].en, 'niveau');
+  // Le tour en cours : énergie, main, PV, bouclier et statuts du magicien et des créatures.
+  C.tour = sc.tour; C.energie = sc.energie; C.energieMax = sc.energieMax;
+  C.main = sc.main.map(([id, plus]) => ({ id, plus: plus || 0, uid: UID++ }));
+  C.pioche = C.pioche.slice(0, sc.pioche);
+  Object.assign(C.j, { pv: sc.joueur.pv, bouc: sc.joueur.bouc });
+  Object.assign(C.j.st, { force: 0, epines: 0 }, sc.joueur.st);
+  C.premiereAttaque = false;
+  sc.ennemis.forEach((d, i) => {
+    const e = C.ennemis[i];
+    e.pv = d.pv; e.bouc = d.bouc || 0; Object.assign(e.st, d.st); e.intention = d.intention;
+  });
+  C.cible = C.ennemis[sc.degat[0]].uid;
+  majTout();
+  // Une carte choisie (posée au-dessus de la main, son effet écrit dans la bulle d'aide).
+  toucherCarte(sc.sel);
+  // Les dégâts du coup précédent, encore affichés au-dessus de la créature visée.
+  const el = elEn(C.ennemis[sc.degat[0]]), j = $('#jeu').getBoundingClientRect();
+  if (el) {
+    const r = el.querySelector('.art').getBoundingClientRect(), f = document.createElement('div');
+    f.className = 'flot d'; f.textContent = sc.degat[1];
+    Object.assign(f.style, { animation: 'none', left: (r.left - j.left + r.width * (sc.degat[2] || 0.72)) + 'px', top: (r.top - j.top + r.height * (sc.degat[3] || 0.12)) + 'px', transform: 'translateX(-50%) scale(1.15)' });
+    $('#fx').appendChild(f);
+  }
+  C.occupe = true; // partie figée sur ce moment : aucun geste ne la fait avancer
+}
+
+/* ---------- Démarrage ---------- */
 charger();
-accueil();
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+else accueil();
 </script>
 </body>
 </html>

@@ -1720,6 +1720,8 @@
   const tr = (cle, vars) => (window.JEL_I18N ? window.JEL_I18N.t(cle, vars) : cle);
   const nb = (x) => (window.JEL_I18N ? window.JEL_I18N.nombre(x) : String(x));
   const $ = (id) => document.getElementById(id);
+  // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU, posé par le robot du site), sinon 0
+  let modeApercu = 0;
 
   // ---------------------------------------------------------------------
   //  Paysages (couleurs)
@@ -2066,11 +2068,12 @@
     return { etoiles: prog.etoiles, records: prog.records, debloque: prog.debloque, amis: prog.amis, tutos: prog.tutos, tenue: prog.tenue, options: { son: sonActif } };
   }
   function sauverProg(niveau, score) {
-    if (!SAVE) return;
+    if (!SAVE || modeApercu) return; // image du jeu : rien n'est écrit dans la sauvegarde
     window.JEL_SAVE.save(JEU, Object.assign(donneesProg(), { niveau: Math.max(1, Math.min(NIVEAUX.length, niveau)), score }));
   }
   // Petits réglages (son, tenue) : seulement si une sauvegarde existe déjà
   function sauverReglages() {
+    if (modeApercu) return;
     try { localStorage.setItem('frimas-son', sonActif ? '1' : '0'); } catch (e) { /* stockage refusé */ }
     if (SAVE && SAVE.existe(JEU)) SAVE.save(JEU, { tenue: prog.tenue, options: { son: sonActif } });
   }
@@ -2190,7 +2193,7 @@
     if (o.plonge) { c.translate(0, -0.35); c.rotate(1.2); c.translate(0, 0.35); }
     if (o.ecrase) c.scale(1 + o.ecrase * 0.25, 1 - o.ecrase * 0.25);
     const bob = o.air ? 0 : Math.abs(Math.sin(ph)) * 0.035;
-    c.lineWidth = 0.03; c.strokeStyle = 'rgba(28, 42, 92, .55)';
+    c.lineWidth = o.trait || 0.03; c.strokeStyle = 'rgba(28, 42, 92, .55)';
     // Queue touffue
     c.save();
     c.translate(-0.36, -0.42 - bob);
@@ -2253,7 +2256,7 @@
       }
     }
     // Oreilles
-    c.fillStyle = pel.corps; c.strokeStyle = 'rgba(28, 42, 92, .55)'; c.lineWidth = 0.03;
+    c.fillStyle = pel.corps; c.strokeStyle = 'rgba(28, 42, 92, .55)'; c.lineWidth = o.trait || 0.03;
     [[0.19, 0.22, 0.31], [0.33, 0.39, 0.44]].forEach(([a, m, bb]) => {
       c.beginPath(); c.moveTo(a, hy - 0.1); c.lineTo(m, hy - 0.32); c.lineTo(bb, hy - 0.12); c.closePath(); c.fill(); c.stroke();
     });
@@ -2268,7 +2271,7 @@
     if (o.ecrase) c.scale(1 + o.ecrase * 0.35, 1 - o.ecrase * 0.4);
     const saut = o.saut || 0;
     c.translate(0, -saut);
-    c.strokeStyle = 'rgba(28,42,92,.5)'; c.lineWidth = 0.03;
+    c.strokeStyle = 'rgba(28,42,92,.5)'; c.lineWidth = o.trait || 0.03;
     c.fillStyle = '#f4f6fb';
     c.beginPath(); c.ellipse(-0.05, -0.28, 0.32, 0.25, 0, 0, Math.PI * 2); c.fill(); c.stroke();
     rond(c, -0.35, -0.32, 0.09);
@@ -3528,15 +3531,193 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  //  Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  //  sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Frimas, en grand,
+  //  vient de rebondir sur un lièvre blanc et s'envole vers une grappe de baies, sous le soleil
+  //  d'hiver et l'aurore ; la lanterne brille, la chouette regarde depuis son sapin.
+  // ---------------------------------------------------------------------
+  function cacherInterface() {
+    document.querySelectorAll('.ecran, #hud, #commandes, #annonce, button, .jel-langue, jel-langue')
+      .forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function dessinerAffiche() {
+    redimensionner();
+    const c = ctx, W = LW, H = LH, t = 1.0;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // Scène composée dans un cadre de 600 × 800, centré ; le décor continue jusqu'aux bords.
+    const k = Math.min(W / 600, H / 800);
+    const ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+    const r = alea(11);
+    // Ciel : bleu profond en haut, lumière chaude près des montagnes
+    const gr = c.createLinearGradient(0, 0, 0, H);
+    gr.addColorStop(0, '#22328a'); gr.addColorStop(0.3, '#4a68c8'); gr.addColorStop(0.55, '#97afee'); gr.addColorStop(0.72, '#ffd7b8'); gr.addColorStop(1, '#ffe9d6');
+    c.fillStyle = gr; c.fillRect(0, 0, W, H);
+    // Petites étoiles tout en haut
+    c.fillStyle = '#ffffff';
+    for (let i = 0; i < 70; i++) { c.globalAlpha = 0.35 + r() * 0.6; rond(c, r() * W, r() * Y(260), (0.6 + r() * 1.6) * k); }
+    c.globalAlpha = 1;
+    // Aurore d'hiver (rubans vert d'eau et violet)
+    [['120,240,200', 0.32, 120], ['185,140,255', 0.26, 175], ['120,240,200', 0.2, 225]].forEach(([coul, a, y0], i) => {
+      const g2 = c.createLinearGradient(0, Y(y0 - 50), 0, Y(y0 + 60));
+      g2.addColorStop(0, `rgba(${coul},0)`); g2.addColorStop(0.5, `rgba(${coul},${a})`); g2.addColorStop(1, `rgba(${coul},0)`);
+      c.fillStyle = g2; c.beginPath(); c.moveTo(0, Y(y0 - 40));
+      for (let x = 0; x <= W + 20; x += 20) c.lineTo(x, Y(y0 - 40) + Math.sin(x * 0.012 / k + i * 1.7) * 30 * k);
+      for (let x = W + 20; x >= -20; x -= 20) c.lineTo(x, Y(y0 + 50) + Math.sin(x * 0.01 / k + i * 2.3) * 24 * k);
+      c.closePath(); c.fill();
+    });
+    // Soleil d'hiver en haut à droite : la lumière de la scène
+    const sx = X(470), sy = Y(185);
+    const halo = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 330 * k);
+    halo.addColorStop(0, 'rgba(255,246,214,1)'); halo.addColorStop(0.18, 'rgba(255,232,180,.75)'); halo.addColorStop(0.5, 'rgba(255,214,160,.25)'); halo.addColorStop(1, 'rgba(255,214,160,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#fff8e6'; rond(c, sx, sy, 46 * k);
+    // Montagnes enneigées au loin
+    crete(c, 120 / k, Y(520), 120 * k, '#8ea3e0', 2, W, H, true);
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(0, Y(520), W, H);
+    crete(c, 420 / k, Y(585), 80 * k, '#7b93d6', 4, W, H, true);
+    // Petits sapins sur la colline du fond
+    for (let i = -2; i < W / (46 * k) + 2; i++) {
+      const x = i * 46 * k + (r() - 0.5) * 20 * k;
+      sapin(c, x, Y(612) + r() * 14 * k, (52 + r() * 34) * k, '#5f7cc0');
+    }
+    // Colline de neige où l'on court
+    c.fillStyle = '#dfe9ff'; c.beginPath(); c.moveTo(0, Y(640));
+    c.quadraticCurveTo(W * 0.5, Y(585), W, Y(650)); c.lineTo(W, H); c.lineTo(0, H); c.fill();
+    c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(0, Y(690));
+    c.quadraticCurveTo(W * 0.45, Y(640), W, Y(700)); c.lineTo(W, H); c.lineTo(0, H); c.fill();
+    c.fillStyle = 'rgba(160,185,235,.45)';
+    ellipse(c, X(160), Y(700), 120 * k, 16 * k); ellipse(c, X(470), Y(722), 150 * k, 14 * k);
+    // Lanterne allumée (point de reprise), à gauche
+    const lx = X(62), ly = Y(668);
+    const hl = c.createRadialGradient(lx + 40 * k, ly - 120 * k, 4 * k, lx + 40 * k, ly - 120 * k, 120 * k);
+    hl.addColorStop(0, 'rgba(255,214,120,.8)'); hl.addColorStop(1, 'rgba(255,214,120,0)');
+    c.fillStyle = hl; rond(c, lx + 40 * k, ly - 120 * k, 120 * k);
+    dessinerLanterne(c, lx, ly, 150 * k, true, t);
+    // Sapin du premier plan à droite, avec la chouette posée sur sa branche
+    sapin(c, X(590), Y(735), 360 * k, '#2c4c80');
+    dessinerAmi(c, 'hulotte', X(515), Y(492), 64 * k, 0.4);
+    // Le lièvre tremplin, écrasé : Frimas vient de rebondir sur lui
+    const hx = X(170), hy = Y(680);
+    c.fillStyle = 'rgba(120,150,210,.35)'; ellipse(c, hx, hy + 4 * k, 85 * k, 12 * k);
+    dessinerLievre(c, hx, hy, 165 * k, { dir: 1, ecrase: 0.45, t: 0.6, trait: 0.015 });
+    // Bouffées de neige et étincelles dorées du rebond, de chaque côté du lièvre
+    for (let i = 0; i < 12; i++) {
+      const cote = i % 2 ? 1 : -1, d = (70 + r() * 50) * k;
+      c.fillStyle = 'rgba(255,255,255,.95)'; rond(c, hx + cote * d, hy - (4 + r() * 26) * k, (5 + r() * 8) * k);
+    }
+    const etincelle = (x, y, t2, coul) => {
+      c.fillStyle = coul; c.beginPath(); c.moveTo(x, y - t2 * 2); c.lineTo(x + t2 * 0.6, y); c.lineTo(x, y + t2 * 2); c.lineTo(x - t2 * 0.6, y); c.closePath(); c.fill();
+    };
+    [[-95, 120], [-60, 150], [80, 135], [110, 105], [-120, 85]].forEach(([dx, dy], i) => etincelle(hx + dx * k, hy - dy * k, (8 + (i % 2) * 4) * k, '#ffc94d'));
+    // Frimas en grand, en plein bond, le museau vers les baies
+    const fs = 290 * k, fx = X(335), fy = Y(505), rot = -0.25;
+    c.save();
+    c.translate(fx, fy); c.rotate(rot);
+    dessinerRenard(c, 0, 0, fs, { dir: 1, course: 0.6, air: true, temps: t, trait: 0.012, tenue: { echarpe: 'echarpe-rouge', bonnet: 'bonnet-aucun', pelage: 'pelage-blanc' } });
+    // Œil plus grand et brillant, grand sourire (en unités du dessin du renard)
+    c.scale(fs, fs);
+    const hyR = -0.62;
+    c.fillStyle = '#1d2240'; rond(c, 0.39, hyR - 0.035, 0.05);
+    c.fillStyle = '#ffffff'; rond(c, 0.405, hyR - 0.055, 0.02); rond(c, 0.375, hyR - 0.015, 0.009);
+    c.strokeStyle = '#1d2240'; c.lineWidth = 0.018; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(0.43, hyR + 0.085); c.quadraticCurveTo(0.5, hyR + 0.15, 0.58, hyR + 0.09); c.stroke();
+    c.fillStyle = '#ff7f95'; c.beginPath(); c.moveTo(0.47, hyR + 0.11); c.quadraticCurveTo(0.505, hyR + 0.17, 0.545, hyR + 0.115); c.closePath(); c.fill();
+    c.restore();
+    // Baies qui l'attendent, en arc vers le soleil ; la première éclate en étincelles
+    [[505, 268, 62], [545, 212, 66], [574, 154, 56]].forEach(([x, y, s2], i) => dessinerBaie(c, X(x), Y(y), s2 * k, i * 1.4));
+    for (let i = 0; i < 6; i++) { const a = -0.4 + i * 1.05; etincelle(X(505) + Math.cos(a) * 44 * k, Y(268) + Math.sin(a) * 44 * k, (6 + (i % 2) * 3) * k, i % 2 ? '#ff6b7d' : '#ffd27a'); }
+    // Gros flocons du premier plan
+    c.fillStyle = 'rgba(255,255,255,.85)';
+    for (let i = 0; i < 60; i++) rond(c, r() * W, r() * H, (1.2 + r() * 3.2) * k);
+    c.fillStyle = 'rgba(255,255,255,.55)';
+    for (let i = 0; i < 9; i++) rond(c, r() * W, r() * H * 0.9, (6 + r() * 7) * k);
+  }
+  function demarrerAffiche() {
+    modeApercu = -1; // ni sauvegarde, ni réglage écrit
+    Son.init = () => {};
+    cacherInterface();
+    setTimeout(cacherInterface, 300); setTimeout(cacherInterface, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  //  Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  //  s'ouvre directement en pleine partie, avec sa vraie interface (niveau, baies, cœurs, boutons),
+  //  sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5).
+  //  La scène est posée, la partie tourne un instant, puis elle est figée sans fenêtre de pause :
+  //  ni victoire, ni défaite, ni son, ni sauvegarde.
+  //    1 = niveau 1, la forêt de sapins : grand bond au-dessus d'un trou, une baie attrapée ;
+  //    2 = niveau 9, le lac gelé : sauts de congère en congère au-dessus de l'eau glacée ;
+  //    3 = niveau 19, le sommet : stalactites qui tombent, pont de neige qui fond, lanterne allumée.
+  // ---------------------------------------------------------------------
+  const SCENES_APERCU = {
+    1: { niveau: 0, x: 30.25, bas: 10.9, vx: 5, vy: -8.5, secondes: 0.3, coeurs: 3, prises: 29,
+      tenue: { echarpe: 'echarpe-rouge', bonnet: 'bonnet-aucun', pelage: 'pelage-blanc' } },
+    2: { niveau: 8, x: 15.9, bas: 15.2, vx: 5, vy: -5, secondes: 0.12, coeurs: 2, prises: 16,
+      tenue: { echarpe: 'echarpe-verte', bonnet: 'bonnet-rouge', pelage: 'pelage-blanc' },
+      etats: [[11, 16, { tombe: true, r: 0.4 }], [12, 16, { tombe: true, r: 0.4 }], [14, 16, { t: 0.32 }], [15, 16, { t: 0.32 }]] },
+    3: { niveau: 18, x: 105.4, bas: 16.1, vx: 5.5, vy: -4, secondes: 0.1, coeurs: 3, prises: 106,
+      tenue: { echarpe: 'echarpe-or', bonnet: 'bonnet-raye', pelage: 'pelage-givre' },
+      stalactites: [[3, 'chute', 0.5], [4, 'tremble', 0]],
+      etats: [[115, 17, { fonte: 0.55 }], [116, 17, { fonte: 0.3 }]] },
+  };
+  function ouvrirApercu(numero) {
+    modeApercu = numero;
+    const sc = SCENES_APERCU[numero];
+    Son.init = () => {}; // aucun son
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 98765 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let q = Math.imul(graine ^ (graine >>> 15), 1 | graine); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+    // Progression neuve, en mémoire seulement : tutoriels déjà vus, tenue de la scène.
+    prog = progVide();
+    NIVEAUX.forEach((nv) => nv.tutos.forEach((cle) => { if (!prog.tutos.includes(cle)) prog.tutos.push(cle); }));
+    prog.tenue = Object.assign({}, sc.tenue);
+    nouvellePartie(sc.niveau);
+    clearTimeout(annonceMinuteur); $('annonce').classList.remove('vu');
+    const J = jeu, C = J.carte, p = J.p;
+    J.temps = 2.5;
+    // Baies déjà ramassées et lanternes déjà allumées avant ce moment
+    C.E.baies.forEach((o) => { if (o.x < sc.prises) { o.prise = true; J.baiesPrises++; } });
+    C.E.lanternes.forEach((l) => { if (l.x < sc.x) { l.allumee = true; J.reprise = { x: l.x - 0.6, y: l.y - JOUEUR_H - 0.01 }; } });
+    J.coeurs = sc.coeurs;
+    (sc.etats || []).forEach(([tx, ty, st]) => J.etats.set(ty * C.W + tx, Object.assign({}, st)));
+    (sc.stalactites || []).forEach(([i, etat, dy]) => { const s = C.E.stalactites[i]; if (s) { s.etat = etat; s.y = s.y0 + dy; s.vy = etat === 'chute' ? 2 : 0; s.t = 0.2; } });
+    // Frimas en plein saut, qui court vers la droite
+    Object.assign(p, { x: sc.x, y: sc.bas - JOUEUR_H, vx: sc.vx, vy: sc.vy, sol: false, dir: 1, invincible: 0, coyote: 0, tenuActif: false, course: 1.2, dernierSol: sc.bas });
+    touches.droite = true;
+    const pas = Math.round(sc.secondes * 120);
+    for (let i = 0; i < pas && J.etat === 'jeu'; i++) mettreAJour(1 / 120);
+    touches.droite = false;
+    J.secousse = 0;
+    majHud();
+    // Caméra posée sur ce moment (pas de glissé), puis la partie est figée sans fenêtre de pause.
+    const s = tailleCase(), vueL = LW / s, vueH = LH / s;
+    J.cam.x = Math.max(0, Math.min(C.W - vueL, p.x + p.w / 2 - vueL * 0.42 + p.dir * 1.2));
+    J.cam.y = Math.max(0, Math.min(C.H - vueH, p.y - vueH * 0.56));
+    J.pause = true;
+  }
+
+  // ---------------------------------------------------------------------
   //  Démarrage
   // ---------------------------------------------------------------------
   try { document.title = tr('titre'); } catch (e) { /* rien */ }
   chargerProg();
   majBoutonsSon();
   let boutonEffacer = null;
-  if (SAVE) boutonEffacer = SAVE.boutonEffacer({ jeu: JEU, conteneur: $('effacerTitre'), apres: () => { chargerProg(); majBoutonsSon(); } });
-  allerTitre();
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    if (SAVE) boutonEffacer = SAVE.boutonEffacer({ jeu: JEU, conteneur: $('effacerTitre'), apres: () => { chargerProg(); majBoutonsSon(); } });
+    allerTitre();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>
