@@ -2,9 +2,12 @@
 // Free Micro Games — pastille du profil joueur (toutes les pages du site)
 //
 // Petite pastille dans le coin haut de l'écran (en-tête des pages, barre du
-// lanceur) : avatar et niveau du joueur. Un toucher ouvre un petit menu à trois
-// entrées : « Mon profil », « Classement » et « Amis » (docs/cadrage-fidelisation.md,
-// sections 2 et 8 ; docs/consigne-amis.md, section 2). Un point doré sur la
+// lanceur) : avatar et niveau du joueur. Un toucher ouvre un menu : en tête, l'avatar,
+// le pseudo, le niveau et la barre d'expérience (lien « Mon profil »), puis « Mes jeux »,
+// « Mes badges », « Classement », « Amis », « Changer mon avatar » et « Sauvegarder
+// mon profil » ; les entrées du profil ouvrent le bon bloc de la page (#bloc-…)
+// (docs/cadrage-fidelisation.md, sections 2, 8 et 14.12 ; docs/consigne-amis.md,
+// section 2). Un point doré sur la
 // pastille signale une demande d'ami en attente ; une annonce le dit aussi,
 // une fois, quand une nouvelle demande arrive.
 // Sur les pages du site (pas le lanceur, qui le fait lui-même), elle annonce la
@@ -41,9 +44,22 @@ function creerPastille() {
       <span class="pastille-demande" aria-hidden="true" hidden></span>
     </button>
     <div class="pastille-menu" role="menu" hidden>
-      <a role="menuitem" class="pastille-lien" data-lien="profil"></a>
+      <a role="menuitem" class="pastille-tete" data-lien="profil">
+        <span class="pastille-tete-avatar" aria-hidden="true"></span>
+        <span class="pastille-tete-texte">
+          <span class="pastille-tete-titre"></span>
+          <strong class="pastille-tete-nom"></strong>
+          <span class="pastille-tete-niveau"></span>
+          <span class="profil-barre" aria-hidden="true"><span></span></span>
+        </span>
+      </a>
+      <a role="menuitem" class="pastille-lien" data-lien="jeux"><span></span><span class="pastille-compte"></span></a>
+      <a role="menuitem" class="pastille-lien" data-lien="badges"><span></span><span class="pastille-compte"></span></a>
       <a role="menuitem" class="pastille-lien" data-lien="classement"></a>
       <a role="menuitem" class="pastille-lien" data-lien="amis"></a>
+      <span class="pastille-separ" role="separator"></span>
+      <a role="menuitem" class="pastille-lien" data-lien="avatar"></a>
+      <a role="menuitem" class="pastille-lien" data-lien="sauvegarde"></a>
     </div>`;
   if (lanceur) {
     boite.classList.add('dans-lanceur');
@@ -64,6 +80,8 @@ function creerPastille() {
     if (!menu.hidden) menu.querySelector('a')?.focus();
   });
   document.addEventListener('click', (e) => { if (!boite.contains(e.target)) fermer(); });
+  // Un lien vers un bloc de la page de profil déjà ouverte ne change pas de page : on ferme.
+  menu.addEventListener('click', (e) => { if (e.target.closest('a')) fermer(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { fermer(); bouton.focus(); } });
 }
 
@@ -83,9 +101,48 @@ function afficher() {
     : t('profil.pastille');
   bouton.setAttribute('aria-label', demandes ? `${aria} · ${t('amis.pastilleDemandes', { n: demandes })}` : aria);
   bouton.title = bouton.getAttribute('aria-label');
-  const [profil, classement, amis] = menu.querySelectorAll('a');
-  profil.href = urlProfil(lang);
-  profil.textContent = t('profil.monProfil');
+  const lien = (nom) => menu.querySelector(`[data-lien="${nom}"]`);
+  const profil = urlProfil(lang);
+
+  // En tête : avatar, pseudo, niveau et rang, barre d'expérience ; mène au profil.
+  const tete = lien('profil');
+  tete.href = profil;
+  tete.querySelector('.pastille-tete-titre').textContent = t('profil.monProfil');
+  peindreAvatar(tete.querySelector('.pastille-tete-avatar'), {
+    avatar: e?.avatar, cadre: e?.cadre || 'aucun', niveau: e ? e.niveau : null,
+  });
+  const nom = tete.querySelector('.pastille-tete-nom');
+  const niveau = tete.querySelector('.pastille-tete-niveau');
+  const piste = tete.querySelector('.profil-barre');
+  nom.hidden = niveau.hidden = piste.hidden = !e;
+  if (e) {
+    nom.textContent = nomAffiche(e, t);
+    niveau.textContent = `${t('profil.niveau', { n: e.niveau })} · ${t(`rang.${R.rangPourNiveau(e.niveau).id}`)}`;
+    const pourcent = e.suivant ? Math.max(0, Math.min(100, Math.round(((e.xp - e.seuil) / (e.suivant - e.seuil)) * 100))) : 100;
+    piste.firstElementChild.style.width = `${pourcent}%`;
+    tete.setAttribute('aria-label', `${t('profil.monProfil')} · ${nomAffiche(e, t)} · ${niveau.textContent}`);
+  } else {
+    tete.removeAttribute('aria-label');
+  }
+
+  // Entrées qui ouvrent un bloc de la page de profil, avec leur compte.
+  const jeux = lien('jeux');
+  jeux.href = `${profil}#bloc-jeux`;
+  jeux.firstElementChild.textContent = t('profil.menu.jeux');
+  jeux.lastElementChild.textContent = e?.jeux?.length ? String(e.jeux.length) : '';
+  const badges = lien('badges');
+  badges.href = `${profil}#bloc-badges`;
+  badges.firstElementChild.textContent = t('profil.menu.badges');
+  const rares = R.listeBadges();
+  const obtenus = new Set((e?.badges || []).map((b) => b.id));
+  badges.lastElementChild.textContent = e ? t('profil.pli.badges', { n: rares.filter((b) => obtenus.has(b.id)).length, max: rares.length }) : '';
+  lien('avatar').href = `${profil}#bloc-apparence`;
+  lien('avatar').textContent = t('profil.apparence.changer');
+  lien('sauvegarde').href = `${profil}#bloc-code`;
+  lien('sauvegarde').textContent = t('profil.menu.sauvegarde');
+
+  const classement = lien('classement');
+  const amis = lien('amis');
   classement.href = urlClassement(lang);
   classement.textContent = t('classement.titre');
   amis.href = urlAmis(lang);

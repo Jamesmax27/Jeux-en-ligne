@@ -18,7 +18,7 @@
     <section class="profil-carte" id="profil-carte" aria-labelledby="profil-nom">
       <div class="profil-avatar-bloc">
         <div class="profil-avatar" id="profil-avatar" aria-hidden="true"></div>
-        <a class="bouton bouton-secondaire profil-changer-avatar" id="profil-changer-avatar" href="#titre-apparence">{{t:profil.apparence.changer}}</a>
+        <a class="bouton bouton-secondaire profil-changer-avatar" id="profil-changer-avatar" href="#bloc-apparence">{{t:profil.apparence.changer}}</a>
       </div>
       <div class="profil-identite">
         <p class="profil-nom"><strong id="profil-nom">…</strong>
@@ -45,97 +45,130 @@
 
     <p class="message" id="profil-etat" role="status" aria-live="polite"></p>
 
-    <section class="profil-bloc" aria-labelledby="titre-serie">
-      <h2 id="titre-serie">{{t:profil.serie.titre}}</h2>
-      <p id="profil-serie"></p>
-    </section>
+    <!-- Trois chiffres sous la carte : série de jours, étoiles, jeux terminés.
+         Le reste du profil est rangé en blocs qui se déplient (<details>) : la ligne
+         fermée montre déjà un résumé. « Mes jeux » est ouvert par défaut ; une adresse
+         en #bloc-… (menu de la pastille, page Amis) ouvre le bloc visé. -->
+    <ul class="profil-chiffres" aria-label="{{t:profil.h1}}">
+      <li class="profil-chiffre">
+        <strong id="profil-serie-n">·</strong>
+        <span id="profil-serie-libelle">{{t:profil.serie.titre}}</span>
+        <small id="profil-serie-record"></small>
+      </li>
+      <li class="profil-chiffre">
+        <strong id="profil-etoiles-n">·</strong>
+        <span id="profil-etoiles-libelle">{{t:profil.etoiles.titre}}</span>
+        <small id="profil-etoiles-sur"></small>
+        <div class="profil-barre etoiles" role="progressbar" id="profil-barre-etoiles" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+      </li>
+      <li class="profil-chiffre">
+        <strong id="profil-termines-n">·</strong>
+        <span id="profil-termines-libelle"></span>
+        <small id="profil-termines-joues"></small>
+      </li>
+    </ul>
+    <p class="profil-aide profil-serie-prochain" id="profil-serie-prochain"></p>
 
-    <section class="profil-bloc" aria-labelledby="titre-etoiles">
-      <h2 id="titre-etoiles">{{t:profil.etoiles.titre}}</h2>
-      <p id="profil-etoiles-texte"></p>
-      <div class="profil-barre etoiles" role="progressbar" id="profil-barre-etoiles" aria-valuemin="0" aria-valuemax="100"><span></span></div>
-    </section>
+    <details class="profil-pli" id="bloc-jeux" open>
+      <summary><h2 id="titre-jeux">{{t:profil.jeux.titre}}</h2><span class="profil-pli-resume" id="resume-jeux"></span></summary>
+      <div class="profil-pli-dedans">
+        <div class="profil-filtres" role="group" aria-label="{{t:profil.jeux.filtreAria}}" id="profil-jeux-filtres" hidden>
+          <button type="button" class="bouton bouton-secondaire" data-filtre="tous" aria-pressed="true">{{t:profil.jeux.filtre.tous}}</button>
+          <button type="button" class="bouton bouton-secondaire" data-filtre="enCours" aria-pressed="false">{{t:profil.jeux.filtre.enCours}}</button>
+          <button type="button" class="bouton bouton-secondaire" data-filtre="termines" aria-pressed="false">{{t:profil.jeux.filtre.termines}}</button>
+        </div>
+        <p class="profil-aide" id="profil-jeux-vide" hidden>{{t:profil.jeux.vide}}</p>
+        <ul class="profil-jeux" id="profil-jeux"></ul>
+        <button type="button" class="bouton bouton-secondaire" id="profil-jeux-plus" hidden></button>
+      </div>
+    </details>
 
-    <section class="profil-bloc" aria-labelledby="titre-jeux">
-      <h2 id="titre-jeux">{{t:profil.jeux.titre}}</h2>
-      <p class="profil-aide" id="profil-jeux-vide" hidden>{{t:profil.jeux.vide}}</p>
-      <ul class="profil-jeux" id="profil-jeux"></ul>
-    </section>
+    <details class="profil-pli" id="bloc-badges">
+      <summary><h2 id="titre-badges">{{t:profil.badges.titre}}</h2><span class="profil-pli-resume" id="resume-badges"></span></summary>
+      <div class="profil-pli-dedans">
+        <p class="profil-aide" id="profil-badges-resume"></p>
+        <ul class="profil-badges" id="profil-badges"></ul>
+      </div>
+    </details>
 
     <!-- Vitrine des trophées : podiums du classement général (semaines et mois terminés),
          comptés par place, puis la liste des périodes. Rempli par /profil-page.js. -->
-    <section class="profil-bloc" aria-labelledby="titre-trophees">
-      <h2 id="titre-trophees">{{t:profil.trophees.titre}}</h2>
-      <p class="profil-aide" id="profil-trophees-resume"></p>
-      <div class="profil-trophees" id="profil-trophees"></div>
-      <ul class="profil-trophees-liste" id="profil-trophees-liste"></ul>
-      <button type="button" class="bouton bouton-secondaire" id="profil-trophees-plus" hidden>{{t:classement.historique.plus}}</button>
-      <p class="legal-retour" id="profil-trophees-lien"><a class="bouton bouton-secondaire" href="{{classement}}">{{t:classement.voir}}</a></p>
-    </section>
+    <details class="profil-pli" id="bloc-trophees">
+      <summary><h2 id="titre-trophees">{{t:profil.trophees.titre}}</h2><span class="profil-pli-resume" id="resume-trophees"></span></summary>
+      <div class="profil-pli-dedans">
+        <p class="profil-aide" id="profil-trophees-resume"></p>
+        <div class="profil-trophees" id="profil-trophees"></div>
+        <ul class="profil-trophees-liste" id="profil-trophees-liste"></ul>
+        <button type="button" class="bouton bouton-secondaire" id="profil-trophees-plus" hidden>{{t:classement.historique.plus}}</button>
+        <p><a class="bouton bouton-secondaire" href="{{classement}}">{{t:classement.voir}}</a></p>
+      </div>
+    </details>
 
-    <section class="profil-bloc" aria-labelledby="titre-badges">
-      <h2 id="titre-badges">{{t:profil.badges.titre}}</h2>
-      <p class="profil-aide" id="profil-badges-resume"></p>
-      <ul class="profil-badges" id="profil-badges"></ul>
-    </section>
+    <details class="profil-pli" id="bloc-multi">
+      <summary><h2 id="titre-multi">{{t:profil.multi.titre}}</h2><span class="profil-pli-resume" id="resume-multi"></span></summary>
+      <div class="profil-pli-dedans">
+        <p id="profil-multi"></p>
+      </div>
+    </details>
 
-    <section class="profil-bloc" aria-labelledby="titre-multi" id="bloc-multi">
-      <h2 id="titre-multi">{{t:profil.multi.titre}}</h2>
-      <p id="profil-multi"></p>
-    </section>
+    <details class="profil-pli" id="bloc-apparence">
+      <summary><h2 id="titre-apparence">{{t:profil.apparence.titre}}</h2><span class="profil-pli-resume" id="resume-apparence"></span></summary>
+      <div class="profil-pli-dedans">
+        <div class="profil-prochain" id="profil-prochain" hidden>
+          <span id="profil-prochain-avatar" aria-hidden="true"></span>
+          <div class="profil-prochain-texte">
+            <p>{{t:profil.prochain.titre}} · <span id="profil-prochain-niveau"></span></p>
+            <strong id="profil-prochain-nom"></strong>
+            <div class="profil-barre" id="profil-prochain-barre" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span></span></div>
+            <p id="profil-prochain-reste"></p>
+          </div>
+        </div>
+        <h3>{{t:profil.apparence.avatars}}</h3>
+        <ul class="profil-choix" id="profil-avatars"></ul>
+        <h3>{{t:profil.apparence.cadres}}</h3>
+        <ul class="profil-choix" id="profil-cadres"></ul>
+      </div>
+    </details>
 
     <!-- Amis (docs/consigne-amis.md) : nombre d'amis, rang parmi eux cette semaine,
          mode invisible (se montrer hors ligne). -->
-    <section class="profil-bloc" aria-labelledby="titre-amis" id="bloc-amis">
-      <h2 id="titre-amis">{{t:profil.amis.titre}}</h2>
-      <p><span id="profil-amis-compte"></span> <a href="{{amis}}" id="profil-amis-lien">{{t:profil.amis.lien}}</a></p>
-      <p class="profil-rang" id="profil-amis-rang" hidden></p>
-      <p class="amis-interrupteur">
-        <input type="checkbox" id="profil-invisible">
-        <label for="profil-invisible">{{t:profil.amis.invisible}}</label>
-      </p>
-      <p class="profil-aide">{{t:profil.amis.invisibleAide}}</p>
-      <p class="message" id="profil-amis-message" role="status" aria-live="polite"></p>
-    </section>
-
-    <section class="profil-bloc" aria-labelledby="titre-apparence">
-      <h2 id="titre-apparence">{{t:profil.apparence.titre}}</h2>
-      <div class="profil-prochain" id="profil-prochain" hidden>
-        <span id="profil-prochain-avatar" aria-hidden="true"></span>
-        <div class="profil-prochain-texte">
-          <p>{{t:profil.prochain.titre}} · <span id="profil-prochain-niveau"></span></p>
-          <strong id="profil-prochain-nom"></strong>
-          <div class="profil-barre" id="profil-prochain-barre" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span></span></div>
-          <p id="profil-prochain-reste"></p>
-        </div>
+    <details class="profil-pli" id="bloc-amis">
+      <summary><h2 id="titre-amis">{{t:profil.amis.titre}}</h2><span class="profil-pli-resume" id="resume-amis"></span></summary>
+      <div class="profil-pli-dedans">
+        <p><span id="profil-amis-compte"></span> <a href="{{amis}}" id="profil-amis-lien">{{t:profil.amis.lien}}</a></p>
+        <p class="profil-rang" id="profil-amis-rang" hidden></p>
+        <p class="amis-interrupteur">
+          <input type="checkbox" id="profil-invisible">
+          <label for="profil-invisible">{{t:profil.amis.invisible}}</label>
+        </p>
+        <p class="profil-aide">{{t:profil.amis.invisibleAide}}</p>
+        <p class="message" id="profil-amis-message" role="status" aria-live="polite"></p>
       </div>
-      <h3>{{t:profil.apparence.avatars}}</h3>
-      <ul class="profil-choix" id="profil-avatars"></ul>
-      <h3>{{t:profil.apparence.cadres}}</h3>
-      <ul class="profil-choix" id="profil-cadres"></ul>
-    </section>
+    </details>
 
-    <section class="profil-bloc" aria-labelledby="titre-code" id="bloc-code">
-      <h2 id="titre-code">{{t:profil.code.titre}}</h2>
-      <p>{{t:profil.code.explication}}</p>
-      <p><button type="button" class="bouton" id="profil-code-afficher">{{t:profil.code.afficher}}</button></p>
-      <div class="profil-code" id="profil-code" hidden>
-        <p class="profil-code-texte" id="profil-code-texte"></p>
-        <p><button type="button" class="bouton bouton-secondaire" id="profil-code-copier">{{t:profil.code.copier}}</button></p>
-        <p class="profil-aide">{{t:profil.code.prudence}}</p>
-      </div>
-      <h3>{{t:profil.code.restaurerTitre}}</h3>
-      <form class="profil-restaurer" id="profil-restaurer" novalidate>
-        <label for="profil-restaurer-champ">{{t:profil.code.restaurerLabel}}</label>
-        <p class="profil-aide">{{t:profil.code.restaurerAide}}</p>
-        <div class="profil-ligne">
-          <input id="profil-restaurer-champ" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="chat-lune-fusee-pomme-37" enterkeyhint="done">
-          <button type="submit" class="bouton">{{t:profil.code.restaurer}}</button>
+    <details class="profil-pli" id="bloc-code">
+      <summary><h2 id="titre-code">{{t:profil.code.titre}}</h2><span class="profil-pli-resume">{{t:profil.pli.code}}</span></summary>
+      <div class="profil-pli-dedans">
+        <p>{{t:profil.code.explication}}</p>
+        <p><button type="button" class="bouton" id="profil-code-afficher">{{t:profil.code.afficher}}</button></p>
+        <div class="profil-code" id="profil-code" hidden>
+          <p class="profil-code-texte" id="profil-code-texte"></p>
+          <p><button type="button" class="bouton bouton-secondaire" id="profil-code-copier">{{t:profil.code.copier}}</button></p>
+          <p class="profil-aide">{{t:profil.code.prudence}}</p>
         </div>
-        <p class="message" id="profil-restaurer-message" role="status" aria-live="polite"></p>
-      </form>
-      <p class="message" id="profil-code-message" role="status" aria-live="polite"></p>
-    </section>
+        <h3>{{t:profil.code.restaurerTitre}}</h3>
+        <form class="profil-restaurer" id="profil-restaurer" novalidate>
+          <label for="profil-restaurer-champ">{{t:profil.code.restaurerLabel}}</label>
+          <p class="profil-aide">{{t:profil.code.restaurerAide}}</p>
+          <div class="profil-ligne">
+            <input id="profil-restaurer-champ" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="chat-lune-fusee-pomme-37" enterkeyhint="done">
+            <button type="submit" class="bouton">{{t:profil.code.restaurer}}</button>
+          </div>
+          <p class="message" id="profil-restaurer-message" role="status" aria-live="polite"></p>
+        </form>
+        <p class="message" id="profil-code-message" role="status" aria-live="polite"></p>
+      </div>
+    </details>
 
     <p class="legal-retour"><a class="bouton" href="{{classement}}">{{t:classement.voir}}</a> <a class="bouton bouton-secondaire" href="{{accueil}}">{{t:jeu.voirTous}}</a></p>
     <noscript><p class="message erreur">{{t:profil.sansJavascript}}</p></noscript>

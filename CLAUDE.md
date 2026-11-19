@@ -597,6 +597,13 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
 
 - Boucle de nuit, qualité (lot 1 : idées) — fait (branche `boucle-qualite-idees`, 18 novembre 2026), demande du propriétaire (jeux jugés faibles, trop nombreux) : 2 jeux par nuit au lieu de 5, 12 concepts proposés d'après `docs/formules-qui-marchent.md`, jury séparé (6 critères, seuil 7,5 sur 10, `JURY_IDEES=1`), file de 6 idées retenues triée par note, promesse du jeu transmise au créateur, quotas répartis sur les passages (`idees.mjs quota`), `etoiles-jeu.mjs` autorisé à la fabrication ; `scripts/tester-idees.mjs` (dans `validate.yml`). Choix du propriétaire : `MULTI_BOUCLE` = 0, `ADOS_BOUCLE` = 1 (variables à poser), aucune limite de genre, 20 niveaux ou mode sans fin (lot 2). Reste : lot 2 (prototype, vrai testeur, plaisir bloquant, réparation au lieu de jeter), lot 3 (statistiques des joueurs dans la boucle).
 
+- Profil en blocs dépliables et menu de l'avatar enrichi — fait (branche `profil-blocs-depliables`, 19 novembre 2026). Demande du propriétaire, qui a choisi la page parmi trois maquettes, puis les entrées du menu (`docs/cadrage-fidelisation.md`, section 14.12).
+  - Page : la carte, trois chiffres (jours de suite, étoiles, jeux terminés), puis des blocs `<details>` qui se déplient, avec leur résumé sur la ligne fermée. « Mes jeux » est ouvert par défaut (filtres Tous / En cours / Terminés, « Continuer » ou « Rejouer »).
+  - Adresses `#bloc-<nom>` qui ouvrent le bloc visé.
+  - Menu de la pastille : avatar, niveau et barre d'expérience en tête, puis Mes jeux, Mes badges, Classement, Amis, Changer mon avatar, Sauvegarder mon profil.
+  - Testé : captures dans Edge (390, 360 en allemand, 1 280 px ; profil imité, API coupée), `tester-profil`, `tester-amis`, `check-i18n`, `verifier-seo`.
+  - Reste : essai sur téléphone.
+
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 
 *Mettre à jour la section 14 à chaque étape terminée.*
