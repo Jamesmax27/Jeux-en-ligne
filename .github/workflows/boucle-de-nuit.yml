@@ -603,7 +603,7 @@ jobs:
           claude_args: |
             --model claude-opus-5-5
             --max-turns 250
-            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*),Bash(node scripts/idees.mjs catalogue),Bash(node scripts/i18n-jeu.mjs --assembler:*),Bash(node scripts/check-i18n.js:*),Bash(node scripts/regles-seo.mjs:*),Bash(node scripts/verifier-seo.mjs:*),Bash(node scripts/tester-sauvegarde.mjs:*),Bash(node scripts/tester-multijoueur.mjs:*),Bash(node scripts/etoiles-jeu.mjs:*)"
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(node scripts/validate-games.mjs:*),Bash(node scripts/idees.mjs catalogue),Bash(node scripts/i18n-jeu.mjs --assembler:*),Bash(node scripts/check-i18n.js:*),Bash(node scripts/regles-seo.mjs:*),Bash(node scripts/verifier-seo.mjs:*),Bash(node scripts/tester-sauvegarde.mjs:*),Bash(node scripts/tester-multijoueur.mjs:*),Bash(node scripts/etoiles-jeu.mjs:*),Bash(node scripts/apercus-jeu.mjs:*)"
           prompt: |
             Tu es le développeur de jeux du site Free Micro Games. Ta mission : créer UN nouveau mini-jeu complet, riche et
             travaillé (jamais un simple prototype), auquel un enfant a envie de jouer au moins 15 minutes, puis le
@@ -699,6 +699,12 @@ jobs:
                  entre 12 % et 75 % de la hauteur (le bas porte le bandeau du titre). Dessins du jeu plus grands et
                  plus détaillés si besoin. Jeu "13+" : ambiance de film mais LISIBLE (sujet et menace bien éclairés,
                  jamais une image presque noire).
+               - Images du jeu OBLIGATOIRES (CONSIGNES-JEU.md, section 5 « Images du jeu ») : la page du jeu montre
+                 3 captures d'une vraie partie sous le bouton « Jouer ». À la fin de l'initialisation : if
+                 (window.JEL_APERCU) { ouvrirApercu(window.JEL_APERCU); return; } : sans écran titre, fenêtre ni
+                 tutoriel, le jeu s'ouvre en pleine partie avec sa vraie interface : 1 = premier niveau en action,
+                 2 = un niveau du milieu, 3 = un niveau avancé (mécanique ou décor qu'on ne voit pas au début) ;
+                 moment vivant posé par le code, puis jeu figé sans fenêtre de pause ; ni son ni sauvegarde.
                - Dans game.json : "genre", "genres_secondaires" (liste, vide possible) et "univers" (1 ou 2) = ceux de
                  l'idée (ou ton choix quand l'idée n'en donne pas), jamais de champ "tags" ; "ages" = l'âge conseillé
                  de l'idée (forme "6+") ; "idee" = "${{ matrix.idee.id }}" ;
@@ -713,6 +719,11 @@ jobs:
                comme un joueur qui parcourt le catalogue : en petit (200 px de large), donne-t-elle envie de
                cliquer plus que les autres ? Si non (héros trop petit, rien ne se passe, trop sombre, trop vide,
                décor plat), reprends-la. Corrige les erreurs et ce que tu vois, puis relance.
+               Puis fabrique les images du jeu : node scripts/apercus-jeu.mjs <id> (écrit apercu-1.webp à
+               apercu-3.webp dans games/<id>/ ; doit finir par « Images du jeu : tout est bon »). Regarde les 3 avec
+               Read : un parent qui découvre la page comprend-il tout de suite à quoi on joue, avec 3 moments
+               différents ? Sinon, reprends JEL_APERCU et relance. Relance ce script après toute correction du jeu
+               qui change ce qu'on voit.
             7. Relecture : demande-toi « qu'est-ce qui manque pour qu'un enfant y joue 15 minutes ? ».
                Vérifie un à un les points bloquants de la grille de validation de CONSIGNES-JEU.md (section 7) :
                le jeu n'est publié que s'ils sont tous respectés. Relis le code des niveaux pour t'assurer que les
@@ -1247,7 +1258,8 @@ jobs:
                textes de référencement) et vérifié l'entrée du catalogue : ne les refais pas.
             4. Regarde chaque capture d'écran de captures/${{ steps.pr.outputs.id }}/ avec Read (téléphone 390 × 844 :
                accueil, début, partie au hasard ; puis ordinateur 1366 × 768 : 7-ordinateur.png à l'accueil et
-               8-ordinateur-partie.png pendant la partie ; puis l'affiche, 9-affiche.png). S'il n'y en a pas, le
+               8-ordinateur-partie.png pendant la partie ; puis l'affiche, 9-affiche.png ; puis les images du jeu
+               montrées sur sa page, 10-apercu-1.png à 10-apercu-3.png). S'il n'y en a pas, le
                robot s'est arrêté avant : juge d'après le code. Sur ordinateur, le jeu doit remplir l'écran (décor
                jusqu'aux bords) : une colonne de téléphone entre deux bandes vides ou unies est NON au point « Écran
                de téléphone et d'ordinateur ». Regarde aussi la jaquette (games/${{ steps.pr.outputs.id }}/cover.jpg,
@@ -1301,6 +1313,10 @@ jobs:
                  héros en grand, moment d'action, profondeur, lumière, sujet lisible même pour un jeu 13+
                  (CONSIGNES-JEU.md, section 5, « L'affiche du jeu ») ; puis, en une ou deux phrases, ce qui
                  manque pour atteindre 9. Cette note ne bloque pas le jeu ;
+               - une section « Images du jeu » : les 3 images (10-apercu-*.png) montrent-elles de vrais moments de
+                 partie, différents, fidèles au jeu (ni écran titre, ni fenêtre, ni tutoriel, ni pause) et
+                 donnent-elles une idée juste du jeu à un parent qui découvre la page ? Une ou deux phrases. Non
+                 bloquant (le robot a déjà refusé les images vides, identiques ou avec un menu) ;
                - une section « Conseils » : 3 idées d'amélioration au plus, non bloquantes.
             7. Écris verdict.json, exactement sous l'une de ces formes :
                {"decision": "ok", "corrections": [], "jaquette": "ok", "note_jaquette": 7}

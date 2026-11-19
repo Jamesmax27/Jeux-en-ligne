@@ -2732,6 +2732,7 @@
     // --- Obscurité, percée par les faisceaux ---
     const coupure = g.coupure || (g.alerteCoupure > 0 && Math.random() < 0.4);
     let amb = titre ? 0.84 : (coupure ? 0.975 : 0.9);
+    if (etat === 'apercu') amb = g.ombreApercu || 0.68; // images du jeu : la salle reste lisible en petit sur la page du jeu
     if (g.aube > 0) amb *= 1 - g.aube;
     mctx.setTransform(1, 0, 0, 1, 0, 0);
     mctx.globalCompositeOperation = 'source-over';
@@ -3644,9 +3645,118 @@
     window.addEventListener('resize', dessinerAffiche);
   }
 
+  /* ---------------------------------------------------------------
+     Images du jeu (page du jeu)
+     --------------------------------------------------------------- */
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine nuit, avec sa vraie interface (pile, aube, cœurs, reliques, boutons), sans écran
+  // titre, sans « Continuer », sans tutoriel (CONSIGNES-JEU.md, section 5, « Images du jeu »).
+  //   1 = nuit 1, la crypte : une momie figée dans le faisceau, une autre approche dans le noir.
+  //   2 = nuit 9, la salle des statues : faisceau concentré sur une statue, sarcophage qui tremble,
+  //       essaim de scarabées, boîte de piles.
+  //   3 = nuit 20, le grand hall : la lampe frappe un miroir qui renvoie la lumière sur un prêtre,
+  //       une âme et des scarabées arrivent par derrière, une amulette brille.
+  // La scène est posée par le code puis figée (état « apercu » : la boucle dessine sans rien faire
+  // avancer) : on ne perd ni ne gagne. Aucun son, rien d'écrit dans la sauvegarde, aucun appel à FMG.
+  function ouvrirApercu(numero) {
+    const n = clamp(Math.floor(Number(numero)) || 1, 1, 3);
+    sonActif = false;       // en mémoire seulement : la préférence enregistrée n'est pas touchée
+    enPartie = false;       // rien d'enregistré à la fermeture
+    // Progression plausible (en mémoire seulement) : lampes et tenues des nuits avancées.
+    const progres = (nuits, amulettes, lampeChoisie, tenueChoisie) => {
+      for (let i = 0; i < nuits; i++) S.et[i] = 3;
+      for (let i = 0; i < amulettes; i++) S.am[i] = true;
+      S.lampe = lampeChoisie; S.tenue = tenueChoisie;
+    };
+    const niveau = [0, 8, 19][n - 1];
+    if (n === 1) { S.lampe = 0; S.tenue = 0; }
+    else if (n === 2) progres(8, 7, 2, 2);
+    else progres(19, 12, 4, 3);
+
+    modeJeu = true; miseEnPage();
+    G = nouvellePartie(niveau);
+    G.ev = [];              // aucun événement prévu ne vient déranger la scène
+    const pos = (b, d) => { const a = deg(b); const dd = Math.min(d, distBord(a) - 24); return { x: Math.cos(a) * dd, y: Math.sin(a) * dd }; };
+    const placer = (type, b, d, extra) => {
+      const p = pos(b, d), e = creer(type, p.x, p.y, vitesseNuit(G));
+      const l = Math.hypot(p.x, p.y) || 1; e.dx = -p.x / l; e.dy = -p.y / l;
+      Object.assign(e, extra || {}); G.ents.push(e); return e;
+    };
+    const essaim = (b, d, nb) => { for (let i = 0; i < nb; i++) placer('scarabee', b + (i - nb / 2) * 4, d + (i % 2) * 16 - i * 5, { anim: i * 0.7 }); };
+    // Poussière d'une créature qui vient d'être défaite, déjà un peu dispersée, et ses points.
+    const poussiere = (b, d, pts) => {
+      const p = pos(b, d);
+      for (let i = 0; i < 18; i++) particule(G, p.x, p.y, i % 3 ? '#e8d8a8' : '#ffd36a', 1.2);
+      for (const q of G.part) { q.x += q.vx * 0.3; q.y += q.vy * 0.3; }
+      G.txt.push({ x: p.x, y: p.y - 26, s: t('plus', { n: pts }), vie: 0.9 });
+    };
+    const message = (cle, alerte) => { const m = $('#message'); m.textContent = t(cle); m.classList.toggle('alerte', !!alerte); m.classList.add('vu'); };
+
+    if (n === 1) {
+      // Nuit 1 : une momie prise dans le faisceau perd ses forces ; dans le noir, une autre est déjà
+      // tout près du gardien (arc rouge d'alerte) et deux autres sortent des portes ; deux momies
+      // viennent de tomber en poussière.
+      G.t = 26; G.pile = 74; G.pts = 400; G.aim = deg(338); G.ombreApercu = 0.6;
+      placer('momie', 336, 150, { pv: 0.55 });
+      placer('momie', 34, 112);
+      placer('momie', 24, 300);
+      placer('momie', 322, 300);
+      placer('momie', 10, 240);
+      poussiere(352, 95, 100);
+      poussiere(318, 190, 100);
+      // L'amulette cachée de la nuit vient d'être trouvée dans le faisceau : éclat doré et message.
+      const am = pos(347, 205);
+      for (let i = 0; i < 24; i++) particule(G, am.x, am.y, '#ffe08a', 3);
+      for (const q of G.part) if (q.col === '#ffe08a') { q.x += q.vx * 0.2; q.y += q.vy * 0.2; }
+      G.amTrouvee = true;
+      message('msg.amulette', false);
+    } else if (n === 2) {
+      // Nuit 9 : faisceau concentré sur une statue, sarcophage qui tremble derrière le gardien,
+      // scarabées qui accourent, une boîte de piles à ramasser, une relique déjà brisée.
+      G.t = 33; G.pile = 46; G.pts = 1150; G.coeurs = 2; G.focus = true; G.aim = deg(334);
+      placer('statue', 334, 235, { pv: 1.7 });
+      placer('momie', 297, 225);
+      placer('momie', 34, 300);
+      essaim(78, 150, 5);
+      G.boites.push(Object.assign(pos(118, 105), { vie: 7 }));
+      G.vitrines[2].casse = true;
+      G.sarcos[0].etat = 'alerte'; G.sarcos[0].ouvre = 0.45; G.sarcos[0].tremble = 2;
+      message('msg.sarco', true);
+    } else {
+      // Nuit 20 : la lampe vise le miroir, qui renvoie la lumière sur un prêtre ; une momie se fige
+      // dans le faisceau principal ; une âme et des scarabées arrivent dans le dos du gardien.
+      G.t = 58; G.pile = 64; G.pts = 2350; G.coeurs = 2; G.aim = deg(334);
+      const m = G.miroirs[0], porte = G.portes[m.porte];
+      const pr = creer('pretre', lerp(m.x, porte.x, 0.62), lerp(m.y, porte.y, 0.62), vitesseNuit(G));
+      const l = Math.hypot(pr.x, pr.y) || 1; pr.dx = -pr.x / l; pr.dy = -pr.y / l; pr.pv = 2.1;
+      G.ents.push(pr);
+      placer('momie', 346, 190, { pv: 0.9 });
+      placer('rampante', 268, 175);
+      placer('ame', 182, 108, { taps: 2 });
+      essaim(232, 150, 4);
+      G.amulette = Object.assign(pos(122, 150), { vie: 7, charge: 0.3 });
+      G.boites.push(Object.assign(pos(150, 85), { vie: 7 }));
+      G.vitrines[3].casse = true;
+      G.sarcos[1].etat = 'alerte'; G.sarcos[1].ouvre = 0.55; G.sarcos[1].tremble = 2;
+      poussiere(14, 150, 120);
+    }
+    calculerFaisceaux(G);
+    G.ents.forEach((e) => { e.lit = eclairage(G, e.x, e.y, e.r); });
+
+    // Vraie interface de la partie, sans fenêtre par-dessus.
+    montrer(null);
+    $('#hud').hidden = false;
+    $('#b-focus').hidden = !G.focusDispo;
+    majHud();
+    etat = 'apercu';        // la boucle dessine la scène sans la faire avancer
+    requestAnimationFrame(boucle);
+    window.addEventListener('resize', () => { if (G) { calculerFaisceaux(G); G.ents.forEach((e) => { e.lit = eclairage(G, e.x, e.y, e.r); }); } });
+  }
+
   /* ---------- Démarrage ---------- */
   majSon();
   if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (window.JEL_APERCU) ouvrirApercu(window.JEL_APERCU);
   else {
     allerTitre();
     requestAnimationFrame(boucle);

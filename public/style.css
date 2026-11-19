@@ -2414,10 +2414,116 @@ main.catalogue {
 
 .similaires { margin-top: 8px; }
 
+/* Images du jeu (public/apercus.js) : 3 vrais moments de partie au format téléphone, sous le
+   bouton « Jouer ». Sur téléphone, une bande qui défile au doigt (environ deux images visibles) ;
+   dès 720 px, les 3 côte à côte. Un toucher les agrandit. */
+.fiche-apercus h2 {
+  margin: 24px 0 10px;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.apercus-liste {
+  display: flex;
+  gap: 12px;
+  margin: 0 -16px;
+  padding: 2px 16px 10px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 16px;
+  scrollbar-width: thin;
+}
+
+.apercus-liste li { flex: none; scroll-snap-align: start; }
+
+.apercu {
+  display: block;
+  width: 40vw;
+  max-width: 200px;
+  border-radius: var(--r-commande);
+  outline-offset: 3px;
+}
+
+.apercu img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 488 / 1055;
+  object-fit: cover;
+  border-radius: var(--r-commande);
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--lisere-jaquette), var(--ombre-jaquette);
+  transition: transform .15s ease;
+}
+
+.apercu:hover img,
+.apercu:focus-visible img { transform: translateY(-3px); }
+
+/* Fenêtre de l'image agrandie. */
+.apercu-ouvert { overflow: hidden; }
+
+.apercu-grand {
+  width: 100vw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--craie);
+}
+
+.apercu-grand::backdrop { background: rgba(8, 7, 26, .92); }
+
+.apercu-grand[open] {
+  display: grid;
+  place-items: center;
+}
+
+.apercu-grand img {
+  grid-area: 1 / 1;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 96px);
+  width: auto;
+  height: auto;
+  border-radius: var(--r-commande);
+  box-shadow: var(--ombre-flottante);
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.apercu-grand-bouton {
+  position: fixed;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--orbite);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--craie);
+  font: 700 28px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.apercu-grand-bouton:hover { background: var(--surface-relevee); }
+.apercu-grand-bouton:focus-visible { outline: 3px solid var(--lavande); outline-offset: 2px; }
+.apercu-fermer { top: 12px; right: 12px; }
+.apercu-precedente { left: 12px; top: 50%; transform: translateY(-50%); }
+.apercu-suivante { right: 12px; top: 50%; transform: translateY(-50%); }
+.apercu-grand-bouton[hidden] { display: none; }
+
 @media (min-width: 720px) {
   .fiche-tete { grid-template-columns: 280px minmax(0, 1fr); gap: 28px; }
   .fiche-infos h1 { font-size: 30px; }
   .bouton-jouer { width: auto; min-width: 240px; }
+  .apercus-liste { margin: 0; padding: 2px 0 10px; overflow: visible; }
+  .apercu { width: 200px; }
+  .apercu-precedente { left: 24px; }
+  .apercu-suivante { right: 24px; }
 }
 
 /* Page d'une catégorie. */
