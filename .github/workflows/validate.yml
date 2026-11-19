@@ -44,7 +44,7 @@
 # Le reste (documentation, autres fichiers du site…) ne déclenche rien.
 #
 # Trois jobs : « quoi » (ce qui a changé), « jeux » (les jeux dans le
-# navigateur, partagés entre 4 machines au plus qui travaillent en même temps :
+# navigateur, partagés entre 6 machines au plus qui travaillent en même temps :
 # robot, sauvegarde, traductions des jeux ; un jeu prend environ 50 s, d'où
 # environ 15 min au lieu d'une heure quand tous les jeux sont contrôlés), puis
 # « controle » (site, référencement, fonctions) qui donne le verdict
@@ -249,7 +249,8 @@ jobs:
             jeux="$ids"
           fi
           nb=$(printf '%s\n' $jeux | { grep -c . || true; })
-          LOTS_MAX=4
+          # 6 depuis le test sur ordinateur (novembre 2026) : à 4, un lot de tous les jeux dépassait 40 minutes.
+          LOTS_MAX=6
           lots=$(( nb < LOTS_MAX ? nb : LOTS_MAX ))
           if [ "$lots" -gt 0 ]; then lots_json="[$(seq -s, 0 $((lots - 1)))]"; else lots_json="[]"; fi
           {
