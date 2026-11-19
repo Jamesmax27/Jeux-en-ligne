@@ -1764,6 +1764,9 @@ const NIVEAUX = [
 ];
 // Nombre réel de niveaux, lu par le robot de contrôle du site
 window.JEL_NIVEAUX = NIVEAUX.length;
+// Image du jeu pour sa page (window.JEL_APERCU = 1, 2 ou 3, posé seulement par le robot), sinon 0 ;
+// apercuFige : la partie est figée sur son moment (plus de simulation, rien ne se gagne ni ne se perd).
+let apercu = 0, apercuFige = false;
 
 // Présentations des nouveautés (bulle + flèche animée sur l'élément ; texte : traduction intro.<clé>)
 const INTROS = {
@@ -1805,6 +1808,7 @@ try {
   });
 } catch (e) { /* sauvegarde illisible : étoiles du stockage local seulement */ }
 JEL_SAVE.surFermeture(() => {
+  if (apercu || window.JEL_AFFICHE) return;   // image du jeu ou affiche : rien n'est enregistré
   if (etat === 'intro' || etat === 'jeu' || etat === 'victoire' || etat === 'pause') JEL_SAVE.save(JEU, { niveau: niv + 1 });
 });
 const totalEtoiles = () => sauve.etoiles.reduce((a, b) => a + (b || 0), 0);
@@ -1818,7 +1822,7 @@ function initAudio() {
   try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
 }
 function note(freq, duree, type = 'sine', vol = 0.15, glisse = 0, delai = 0) {
-  if (!audio || !sauve.son) return;
+  if (!audio || !sauve.son || apercu || window.JEL_AFFICHE) return;
   try {
     const t0 = audio.currentTime + delai;
     const o = audio.createOscillator(), g = audio.createGain();
@@ -2133,6 +2137,7 @@ let tPrec = performance.now(), reserve = 0;
 function boucle(maintenant) {
   const dt = Math.min(0.05, (maintenant - tPrec) / 1000);
   tPrec = maintenant;
+  if (apercuFige) { dessiner(); requestAnimationFrame(boucle); return; }
   if (etat === 'jeu' || etat === 'victoire') {
     reserve += dt;
     let n = 0;
@@ -2797,14 +2802,278 @@ document.addEventListener('keydown', (ev) => {
 });
 
 // ---------------------------------------------------------------------
+// Affiche (jaquette du jeu)
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+// sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le grand bac bleu,
+// tout content, ouvre sa trappe : ses gouttes glissent sur un trait violet jusqu'au verre, où elles
+// rejoignent celles du bac jaune et deviennent vertes ; le crayon vient de tracer le chemin.
+// Scène de 600 × 800, centrée ; le ciel, les collines et le lac continuent jusqu'aux bords.
+// ---------------------------------------------------------------------
+function goutteAffiche(x, y, r, coul, etire) {
+  ctx.fillStyle = coul;
+  ctx.beginPath(); ctx.ellipse(x, y, r, r * (etire || 1), 0, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.65)';
+  ctx.beginPath(); ctx.arc(x - r * 0.32, y - r * 0.34 * (etire || 1), r * 0.3, 0, 7); ctx.fill();
+}
+function rocherAffiche(x, y, r) {
+  ctx.fillStyle = '#7c8297'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  ctx.fillStyle = '#9aa0b4'; ctx.beginPath(); ctx.arc(x - r * 0.18, y - r * 0.22, r * 0.72, 0, 7); ctx.fill();
+  ctx.fillStyle = '#b9bfcf'; ctx.beginPath(); ctx.arc(x - r * 0.4, y - r * 0.45, r * 0.24, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#24406e'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
+}
+function nuageAffiche(x, y, s) {
+  ctx.fillStyle = 'rgba(255,255,255,.92)';
+  for (const [dx, dy, r] of [[-44, 8, 30], [-8, -10, 40], [34, 4, 32], [62, 14, 22], [-70, 18, 20]]) {
+    ctx.beginPath(); ctx.arc(x + dx * s, y + dy * s, r * s, 0, 7); ctx.fill();
+  }
+  ctx.fillRect(x - 70 * s, y + 10 * s, 132 * s, 28 * s);
+}
+// Un bac de l'équipe, en grand : (x, y) = coin haut gauche de la cuve ; le bandeau au visage est au-dessus.
+function bacAffiche(x, y, w, h, c, clair, regard) {
+  const hb = w * 0.28, ep = w * 0.035, demi = w / 2;
+  // Intérieur : verre clair, puis l'eau en gouttes rangées (comme dans le jeu)
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  ctx.fillStyle = clair; ctx.fillRect(x, y, w, h);
+  const r = w * 0.055, pasG = r * 2.05;
+  let ligne = 0;
+  for (let gy = y + h - r * 0.9; gy > y + h * 0.3; gy -= pasG * 0.9, ligne++) {
+    for (let gx = x + r * 1.2 + (ligne % 2) * r; gx < x + w - r * 0.6; gx += pasG) goutteAffiche(gx, gy, r, c);
+  }
+  // Ouverture de la trappe : un trou sans gouttes au milieu du fond
+  ctx.restore();
+  // Parois
+  ctx.lineCap = 'round'; ctx.strokeStyle = '#24406e'; ctx.lineWidth = ep * 2;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + h); ctx.moveTo(x + w, y); ctx.lineTo(x + w, y + h); ctx.stroke();
+  // Reflet de la lumière (soleil en haut à droite)
+  ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = ep * 0.8;
+  ctx.beginPath(); ctx.moveTo(x + w - ep * 2.2, y + h * 0.12); ctx.lineTo(x + w - ep * 2.2, y + h * 0.7); ctx.stroke();
+  // Trappe ouverte : deux battants qui pendent
+  const a = 1.25, lb = demi * 0.42;
+  ctx.strokeStyle = '#24406e'; ctx.lineWidth = ep * 1.8;
+  ctx.beginPath();
+  ctx.moveTo(x, y + h); ctx.lineTo(x + demi * 0.58, y + h);
+  ctx.moveTo(x + w, y + h); ctx.lineTo(x + w - demi * 0.58, y + h);
+  ctx.moveTo(x + demi * 0.58, y + h); ctx.lineTo(x + demi * 0.58 + Math.cos(a) * lb, y + h + Math.sin(a) * lb);
+  ctx.moveTo(x + w - demi * 0.58, y + h); ctx.lineTo(x + w - demi * 0.58 - Math.cos(a) * lb, y + h + Math.sin(a) * lb);
+  ctx.stroke();
+  // Bandeau avec le visage
+  const yb = y - hb;
+  ctx.fillStyle = c; rondRect(x - ep, yb, w + ep * 2, hb, hb * 0.42); ctx.fill();
+  ctx.strokeStyle = '#24406e'; ctx.lineWidth = ep * 1.6; ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = ep * 0.9;
+  ctx.beginPath(); ctx.moveTo(x + hb * 0.4, yb + ep * 1.6); ctx.lineTo(x + w - hb * 0.4, yb + ep * 1.6); ctx.stroke();
+  const cx = x + demi, cy = yb + hb * 0.5, re = hb * 0.3;
+  for (const s of [-1, 1]) {
+    const ex = cx + s * hb * 0.62, ey = cy - hb * 0.06;
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#24406e'; ctx.lineWidth = ep * 0.8;
+    ctx.beginPath(); ctx.ellipse(ex, ey, re, re * 1.12, 0, 0, 7); ctx.fill(); ctx.stroke();
+    const px = ex + regard[0] * re * 0.4, py = ey + regard[1] * re * 0.4;
+    ctx.fillStyle = '#24406e'; ctx.beginPath(); ctx.arc(px, py, re * 0.55, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px - re * 0.2, py - re * 0.22, re * 0.2, 0, 7); ctx.fill();
+    // Sourcils levés : il est ravi
+    ctx.strokeStyle = '#24406e'; ctx.lineWidth = ep * 0.9;
+    ctx.beginPath(); ctx.arc(ex, ey - re * 0.2, re * 1.35, -Math.PI / 2 - 0.55, -Math.PI / 2 + 0.55); ctx.stroke();
+    // Joues roses
+    ctx.fillStyle = 'rgba(255,110,140,.55)';
+    ctx.beginPath(); ctx.ellipse(cx + s * hb * 1.18, cy + hb * 0.2, re * 0.55, re * 0.32, 0, 0, 7); ctx.fill();
+  }
+  // Grande bouche ouverte, avec la langue
+  ctx.fillStyle = '#24406e';
+  ctx.beginPath(); ctx.moveTo(cx - hb * 0.3, cy + hb * 0.08); ctx.quadraticCurveTo(cx, cy + hb * 0.62, cx + hb * 0.3, cy + hb * 0.08); ctx.closePath(); ctx.fill();
+  ctx.save(); ctx.clip();
+  ctx.fillStyle = '#ff7a8f'; ctx.beginPath(); ctx.ellipse(cx, cy + hb * 0.4, hb * 0.17, hb * 0.12, 0, 0, 7); ctx.fill();
+  ctx.restore();
+}
+// Le crayon violet qui vient de tracer le chemin : (x, y) = pointe, il part vers l'angle « ang »
+function crayonAffiche(x, y, ang, L, e) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+  ctx.lineJoin = 'round'; ctx.strokeStyle = '#24406e'; ctx.lineWidth = 5;
+  ctx.fillStyle = '#7a5ce0'; ctx.fillRect(e * 1.6, -e / 2, L, e);
+  ctx.fillStyle = '#9a7bff'; ctx.fillRect(e * 1.6, -e / 6, L, e / 3);
+  ctx.fillStyle = '#5b46b8'; ctx.fillRect(e * 1.6, e / 3, L, e / 6);
+  ctx.strokeRect(e * 1.6, -e / 2, L, e);
+  ctx.fillStyle = '#f6d7a8';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(e * 1.6, -e / 2); ctx.lineTo(e * 1.6, e / 2); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#5b46b8';
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(e * 0.6, -e * 0.19); ctx.lineTo(e * 0.6, e * 0.19); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function traitAffiche(pts) {
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const chemin = () => { ctx.beginPath(); ctx.moveTo(pts[0], pts[1]); ctx.quadraticCurveTo(pts[2], pts[3], pts[4], pts[5]); };
+  ctx.strokeStyle = 'rgba(36,64,110,.18)'; ctx.lineWidth = 18; ctx.save(); ctx.translate(0, 7); chemin(); ctx.stroke(); ctx.restore();
+  ctx.strokeStyle = '#5b46b8'; ctx.lineWidth = 17; chemin(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 5; ctx.save(); ctx.translate(-1, -3); chemin(); ctx.stroke(); ctx.restore();
+}
+// Point d'une courbe du second degré (pour poser les gouttes qui glissent sur un trait)
+const surCourbe = (p, u) => [
+  (1 - u) * (1 - u) * p[0] + 2 * (1 - u) * u * p[2] + u * u * p[4],
+  (1 - u) * (1 - u) * p[1] + 2 * (1 - u) * u * p[3] + u * u * p[5],
+];
+function dessinerAffiche() {
+  const lw = toile.width / dpr, lh = toile.height / dpr;
+  const k = Math.min(lw / 600, lh / 800), ox = (lw - 600 * k) / 2, oy = (lh - 800 * k) / 2;
+  const xg = -ox / k, xd = (lw - ox) / k, yh = -oy / k, yb = (lh - oy) / k;   // bords de l'écran
+  ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+  // Ciel
+  const ciel = ctx.createLinearGradient(0, 0, 0, 640);
+  ciel.addColorStop(0, '#5bbcff'); ciel.addColorStop(0.55, '#b9e6ff'); ciel.addColorStop(1, '#fff1cf');
+  ctx.fillStyle = ciel; ctx.fillRect(xg, yh, xd - xg, yb - yh);
+  // Soleil en haut à droite : la source de lumière
+  const halo = ctx.createRadialGradient(500, 95, 20, 500, 95, 360);
+  halo.addColorStop(0, 'rgba(255,250,215,1)'); halo.addColorStop(0.35, 'rgba(255,240,180,.55)'); halo.addColorStop(1, 'rgba(255,240,180,0)');
+  ctx.fillStyle = halo; ctx.fillRect(xg, yh, xd - xg, yb - yh);
+  ctx.save(); ctx.translate(500, 95);
+  const rayons = ctx.createRadialGradient(0, 0, 40, 0, 0, 330);
+  rayons.addColorStop(0, 'rgba(255,236,150,.6)'); rayons.addColorStop(0.6, 'rgba(255,236,150,.35)'); rayons.addColorStop(1, 'rgba(255,236,150,0)');
+  ctx.fillStyle = rayons;
+  for (let i = 0; i < 12; i++) { ctx.rotate(Math.PI / 6); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(330, -34); ctx.lineTo(330, 34); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+  ctx.fillStyle = '#fff3a8'; ctx.beginPath(); ctx.arc(500, 95, 50, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffe36b'; ctx.beginPath(); ctx.arc(500, 95, 40, 0, 7); ctx.fill();
+  nuageAffiche(150, 70, 0.9); nuageAffiche(xd - 40, 250, 0.6); nuageAffiche(xg + 60, 320, 0.55);
+  // Collines au loin, puis plus près
+  ctx.fillStyle = '#b7e3c4';
+  ctx.beginPath(); ctx.moveTo(xg, 640); ctx.lineTo(xg, 560);
+  for (let x = xg; x <= xd + 60; x += 60) ctx.quadraticCurveTo(x + 30, 520 + 20 * Math.sin(x * 0.013), x + 60, 565);
+  ctx.lineTo(xd, 640); ctx.fill();
+  ctx.fillStyle = '#86cf8f';
+  ctx.beginPath(); ctx.moveTo(xg, 660); ctx.lineTo(xg, 610);
+  for (let x = xg; x <= xd + 90; x += 90) ctx.quadraticCurveTo(x + 45, 570 + 18 * Math.cos(x * 0.02), x + 90, 615);
+  ctx.lineTo(xd, 660); ctx.fill();
+  // Le lac en bas (il porte le bandeau du titre du site)
+  const lac = ctx.createLinearGradient(0, 640, 0, 800);
+  lac.addColorStop(0, '#4fb3ff'); lac.addColorStop(1, '#1f6fc4');
+  ctx.fillStyle = lac; ctx.fillRect(xg, 640, xd - xg, yb - 640);
+  ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 3;
+  for (const [x, y, r] of [[170, 680, 60], [430, 700, 80], [300, 760, 50], [560, 670, 40], [60, 770, 50]]) {
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.18, 0, 0, 7); ctx.stroke();
+  }
+  // Trait du bac jaune (le crayon vient de le tracer) et trait du bac bleu
+  const tJ = [556, 392, 520, 452, 478, 494];
+  const tB = [40, 468, 230, 452, 342, 498];
+  traitAffiche(tB); traitAffiche(tJ);
+  // Le verre : il se remplit de vert (bleu + jaune)
+  const vg = 322, vd = 512, vh = 500, vb = 612;
+  const lueur = ctx.createRadialGradient(417, 560, 10, 417, 560, 170);
+  lueur.addColorStop(0, 'rgba(120,255,140,.55)'); lueur.addColorStop(1, 'rgba(120,255,140,0)');
+  ctx.fillStyle = lueur; ctx.fillRect(240, 400, 360, 300);
+  ctx.fillStyle = 'rgba(255,255,255,.6)';
+  ctx.beginPath(); ctx.moveTo(vg, vh); ctx.lineTo(vg + 14, vb); ctx.lineTo(vd - 14, vb); ctx.lineTo(vd, vh); ctx.closePath(); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(vg, vh); ctx.lineTo(vg + 14, vb); ctx.lineTo(vd - 14, vb); ctx.lineTo(vd, vh); ctx.closePath(); ctx.clip();
+  const vert = ctx.createLinearGradient(0, 530, 0, 612);
+  vert.addColorStop(0, '#6ff08a'); vert.addColorStop(1, '#25a845');
+  ctx.fillStyle = vert; ctx.fillRect(vg, 532, vd - vg, 90);
+  ctx.fillStyle = '#9dffb0'; ctx.beginPath(); ctx.ellipse(417, 533, 92, 9, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.7)';
+  for (const [x, y, r] of [[360, 585, 6], [380, 560, 4], [460, 575, 7], [445, 598, 4], [405, 590, 5]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+  ctx.restore();
+  ctx.strokeStyle = '#24406e'; ctx.lineWidth = 9; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(vg, vh); ctx.lineTo(vg + 14, vb); ctx.lineTo(vd - 14, vb); ctx.lineTo(vd, vh); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.moveTo(vg + 20, vh + 16); ctx.lineTo(vg + 26, vb - 16); ctx.stroke();
+  // Éclaboussures vertes là où les gouttes tombent
+  for (const [x, y, r] of [[358, 512, 6], [372, 500, 5], [455, 508, 6], [470, 496, 5], [415, 505, 4]]) goutteAffiche(x, y, r, '#3fcf5a');
+  // Le grand bac bleu, héros de l'affiche, et le bac jaune
+  bacAffiche(52, 188, 270, 205, COUL.b.hex, '#e3f1ff', [0.55, 0.75]);
+  bacAffiche(398, 250, 140, 104, COUL.j.hex, '#fff6d6', [-0.6, 0.7]);
+  // Gouttes bleues qui tombent de la trappe, puis glissent sur le trait vers le verre
+  for (const [x, y] of [[170, 410], [204, 418], [186, 440], [148, 432], [222, 445]]) goutteAffiche(x, y, 13, COUL.b.hex, 1.15);
+  for (let i = 0; i < 9; i++) { const [x, y] = surCourbe(tB, 0.38 + i * 0.075); goutteAffiche(x + 2, y - 19, 12.5, COUL.b.hex); }
+  goutteAffiche(352, 494, 12, COUL.b.hex, 1.15);
+  // Gouttes jaunes
+  for (const [x, y] of [[452, 372], [476, 384], [462, 400], [440, 392]]) goutteAffiche(x, y, 9.5, COUL.j.hex, 1.15);
+  for (let i = 0; i < 5; i++) { const [x, y] = surCourbe(tJ, 0.3 + i * 0.15); goutteAffiche(x - 3, y - 16, 10, COUL.j.hex); }
+  goutteAffiche(470, 490, 10, COUL.j.hex, 1.15);
+  // Étincelles de réussite au-dessus du verre
+  ctx.fillStyle = '#ffd84a';
+  for (const [x, y, r] of [[330, 470, 12], [505, 462, 14], [418, 452, 9], [540, 520, 8]]) { ctx.save(); dessinerEtoile(x, y, r); ctx.restore(); }
+  ctx.fillStyle = '#fff';
+  for (const [x, y, r] of [[300, 520, 6], [526, 486, 6]]) dessinerEtoile(x, y, r);
+  // Le crayon violet (premier plan, coupé par le bord droit)
+  crayonAffiche(560, 388, -1.12, 320, 38);
+  // Premier plan : gros rochers coupés par les bords
+  rocherAffiche(10, 750, 120);
+  rocherAffiche(592, 790, 85);
+  for (const [x, y, r] of [[150, 700, 8], [470, 690, 9]]) goutteAffiche(x, y, r, '#bfe6ff');
+}
+function demarrerAffiche() {
+  const cacher = () => {
+    for (const el of document.querySelectorAll('.ecran, #barre-haut, #barre-bas, #bulle, #toast, .jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+  };
+  cacher(); setTimeout(cacher, 200); setTimeout(cacher, 1000);
+  redimensionner(); dessinerAffiche();
+  window.addEventListener('resize', () => { redimensionner(); dessinerAffiche(); });
+}
+
+// ---------------------------------------------------------------------
+// Images du jeu (page du jeu)
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (niveau, encre, outils), sans accueil, ni
+// fenêtre « Continuer », ni présentation (CONSIGNES-JEU.md, section 5). Les chemins sont tracés, les
+// bacs ouverts, l'eau coule pendant quelques secondes simulées, puis la partie est figée : ni
+// victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = niveau 1 : le premier verre, un seul trait ;
+//   2 = niveau 15 : rouge + jaune = orange, dans un verre perché, le rocher et l'éponge ;
+//   3 = niveau 30 : le mur, le tuyau magique, l'éponge, la zone rayée et le verre qui bouge.
+// ---------------------------------------------------------------------
+const SCENES_APERCU = {
+  1: { niveau: 0, secondes: 2.3, traits: [[[22, 148], [140, 210], [252, 268]], [[342, 290], [290, 370], [264, 378]]] },
+  2: { niveau: 14, secondes: 1.15, traits: [[[14, 132], [90, 210], [166, 292]], [[352, 132], [272, 214], [196, 292]]] },
+  3: { niveau: 29, secondes: 1.7, traits: [[[8, 142], [70, 240], [128, 330]], [[354, 120], [290, 212], [224, 296]]] },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture
+  let graine = 987654 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  // Présentations déjà vues, en mémoire seulement (rien n'est enregistré)
+  for (const cle of ['tuto', ...Object.keys(INTROS)]) sauve.vus[cle] = true;
+  $('accueil').classList.remove('visible');
+  chargerNiveau(sc.niveau);
+  clearTimeout(minuterieToast); cacherToast(); fermerBulle();
+  // Les chemins tracés, point par point comme au doigt
+  traits = sc.traits.map((pl) => {
+    const pts = [pl[0].slice()];
+    let long = 0;
+    for (let i = 1; i < pl.length; i++) {
+      const [ax, ay] = pl[i - 1], [bx, by] = pl[i];
+      const d = Math.hypot(bx - ax, by - ay), n = Math.max(1, Math.round(d / 9));
+      for (let j = 1; j <= n; j++) pts.push([ax + (bx - ax) * j / n, ay + (by - ay) * j / n]);
+      long += d;
+    }
+    return { pts, long };
+  });
+  reconstruireTraits();
+  for (const b of bacs) { b.ouvert = true; b.tOuvert = 1; }
+  construireFixes();
+  encrePic = encreUtilisee();
+  majEncre(); majOuvrir();
+  // L'eau coule quelques secondes, puis la partie est figée sur ce moment
+  const n = Math.round(sc.secondes / PAS);
+  for (let i = 0; i < n; i++) { pas(PAS); tJeu += PAS; if (i % 2) compterVerres(); }
+  compterVerres();
+  apercuFige = true;
+  requestAnimationFrame(boucle);
+}
+
+// ---------------------------------------------------------------------
 // Démarrage : l'accueil, avec le niveau 1 en fond
 // ---------------------------------------------------------------------
 majSon();
 redimensionner();
-chargerNiveau(0);
-etat = 'menu'; fermerBulle();
-if (totalEtoiles() > 0) $('total-accueil').textContent = t('accueilTotal', { e: totalEtoiles(), max: NIVEAUX.length * 3 });
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+else {
+  chargerNiveau(0);
+  etat = 'menu'; fermerBulle();
+  if (totalEtoiles() > 0) $('total-accueil').textContent = t('accueilTotal', { e: totalEtoiles(), max: NIVEAUX.length * 3 });
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

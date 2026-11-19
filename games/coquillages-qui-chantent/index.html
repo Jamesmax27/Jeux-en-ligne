@@ -2089,6 +2089,15 @@ button:focus-visible { outline: 3px solid #ffe27a; outline-offset: 3px; }
   const I18N = window.JEL_I18N;
   const traduire = I18N.t;
   const $ = (id) => document.getElementById(id);
+  // Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU = 1, 2 ou 3) : posés par le
+  // robot du site seulement, jamais par le jeu (CONSIGNES-JEU.md, section 5).
+  const AFFICHE = !!window.JEL_AFFICHE;
+  const APERCU = AFFICHE ? 0 : ([1, 2, 3].indexOf(Number(window.JEL_APERCU)) + 1);
+  if (APERCU) {
+    // Hasard à graine fixe : la même image à chaque capture (bulles du décor comprises).
+    let graine = 98765 + APERCU * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
   const hasard = (n) => Math.floor(Math.random() * n);
   const choisir = (liste) => liste[hasard(liste.length)];
 
@@ -3053,7 +3062,7 @@ button:focus-visible { outline: 3px solid #ffe27a; outline-offset: 3px; }
     tPrec = performance.now();
     if (ctx && ctx.state === 'suspended' && !prog.options.muet) ctx.resume().catch(() => {});
   }
-  document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !APERCU) mettrePause(); });
 
   // --- Tutoriels animés ---------------------------------------------------------
   function miniCoq(i, x, anim, delai) {
@@ -3182,7 +3191,7 @@ button:focus-visible { outline: 3px solid #ffe27a; outline-offset: 3px; }
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie.
   window.JEL_SAVE.surFermeture(() => {
-    if (etat.enPartie) sauver(etat.niv + 1);
+    if (etat.enPartie && !APERCU) sauver(etat.niv + 1);
   });
 
   // Bulles décoratives des écrans de menu.
@@ -3199,9 +3208,206 @@ button:focus-visible { outline: 3px solid #ffe27a; outline-offset: 3px; }
     }
   });
 
-  chargerProgression();
+  // --- Affiche (jaquette du jeu) -------------------------------------------------
+  // Avec window.JEL_AFFICHE : une scène composée, sans interface ni texte, d'où sort la jaquette.
+  // La grande conque chante dans un rayon de soleil, ses notes s'envolent ; le coquillage rose
+  // vient d'être touché (ondes), le poisson-lune arrive pour cacher le bleu, la pieuvre danse.
+  // Mêmes dessins que le jeu (symboles SVG de la page), en plus grand. Format 600 × 800 ; sur un
+  // écran plus large ou plus haut, l'eau, les rayons et le sable continuent jusqu'aux bords.
+  function coqAffiche(x, y, t, i, o) {
+    const c = COQUILLAGES[i];
+    const dy = c.forme === 'conque' ? 7 : 0;
+    const bouche = o && o.chante
+      ? '<path d="M40.5 64.5 Q50 67 59.5 64.5 Q58 78 50 78 Q42 78 40.5 64.5Z" fill="#2a1838"/><path d="M44.5 74.5 Q50 70.5 55.5 74.5 Q53 78 50 78 Q47 78 44.5 74.5Z" fill="#ff7f9e"/>'
+      : '<path d="M43 66 Q50 72 57 66" stroke="#2a1838" stroke-width="3.5" fill="none" stroke-linecap="round"/>';
+    const sourcils = o && o.chante
+      ? '<path d="M34 46 Q39 42.5 44 45 M56 45 Q61 42.5 66 46" stroke="#2a1838" stroke-width="2.4" fill="none" stroke-linecap="round"/>' : '';
+    const ombre = o && o.chante ? `drop-shadow(0 0 ${t * 0.05}px ${c.c2}) drop-shadow(0 ${t * 0.03}px ${t * 0.03}px rgba(0,30,60,.45))`
+      : `drop-shadow(0 ${t * 0.03}px ${t * 0.025}px rgba(0,30,60,.45))`;
+    return `<svg x="${x}" y="${y}" width="${t}" height="${t}" viewBox="0 0 100 100" overflow="visible" style="--c:${c.c};--c2:${c.c2};filter:${ombre}${o && o.clair ? ' brightness(1.15)' : ''}">`
+      + `<use href="#forme-${c.forme}"/><g transform="translate(0 ${dy})"><use href="#visage"/>${sourcils}${bouche}</g></svg>`;
+  }
+  const NOTE_AFFICHE = (x, y, t, col, r) => `<use href="#sym-note" x="${x}" y="${y}" width="${t}" height="${t}" fill="${col}" stroke="#fff" stroke-width="1.6" paint-order="stroke" transform="rotate(${r} ${x + t / 2} ${y + t / 2})" style="filter:drop-shadow(0 0 5px rgba(255,255,255,.9)) drop-shadow(0 3px 3px rgba(0,30,60,.35))"/>`;
+  const ETINCELLE = (x, y, r, col) => `<path d="M${x} ${y - r} Q${x + r * 0.18} ${y - r * 0.18} ${x + r} ${y} Q${x + r * 0.18} ${y + r * 0.18} ${x} ${y + r} Q${x - r * 0.18} ${y + r * 0.18} ${x - r} ${y} Q${x - r * 0.18} ${y - r * 0.18} ${x} ${y - r}Z" fill="${col}"/>`;
+  function dessinerAffiche() {
+    const rayonsSoleil = [];
+    for (let k = 0; k < 14; k++) {
+      const a = k / 14 * Math.PI * 2, b = a + 0.11;
+      rayonsSoleil.push(`M300 320 L${300 + Math.cos(a) * 300} ${320 + Math.sin(a) * 300} L${300 + Math.cos(b) * 300} ${320 + Math.sin(b) * 300}Z`);
+    }
+    const bulles = [[566, 362, 20], [584, 318, 11], [560, 290, 7], [36, 214, 16], [60, 176, 9], [250, 120, 7], [420, 96, 10], [212, 470, 9], [580, 560, 26]]
+      .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="rgba(255,255,255,.2)" stroke="rgba(255,255,255,.85)" stroke-width="${Math.max(2, r / 7)}"/><circle cx="${x - r * 0.35}" cy="${y - r * 0.35}" r="${r * 0.22}" fill="#fff" opacity=".8"/>`).join('');
+    const svg = `<svg id="affiche" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+ <defs>
+  <linearGradient id="affEau" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="800"><stop offset="0" stop-color="#6fd6f7"/><stop offset=".32" stop-color="#2ea3de"/><stop offset=".66" stop-color="#1774b8"/><stop offset="1" stop-color="#0d568f"/></linearGradient>
+  <radialGradient id="affSoleil" gradientUnits="userSpaceOnUse" cx="300" cy="-30" r="360"><stop offset="0" stop-color="#fffbe0"/><stop offset=".35" stop-color="#fff3b0" stop-opacity=".7"/><stop offset="1" stop-color="#fff3b0" stop-opacity="0"/></radialGradient>
+  <linearGradient id="affRayon" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="720"><stop offset="0" stop-color="#fff" stop-opacity=".42"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="affHalo" gradientUnits="userSpaceOnUse" cx="300" cy="330" r="270"><stop offset="0" stop-color="#fffbe6"/><stop offset=".3" stop-color="#fff2b8" stop-opacity=".85"/><stop offset=".62" stop-color="#ffd27a" stop-opacity=".3"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+  <radialGradient id="affHaloRose" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#ffd0e0" stop-opacity=".7"/><stop offset="1" stop-color="#ffd0e0" stop-opacity="0"/></radialGradient>
+  <linearGradient id="affSable" gradientUnits="userSpaceOnUse" x1="0" y1="600" x2="0" y2="800"><stop offset="0" stop-color="#fbe4b2"/><stop offset="1" stop-color="#e0b878"/></linearGradient>
+ </defs>
+ <rect x="-4000" y="-4000" width="8600" height="8800" fill="url(#affEau)"/>
+ <circle cx="300" cy="-30" r="360" fill="url(#affSoleil)"/>
+ <g fill="url(#affRayon)">
+  <polygon points="250,-20 330,-20 470,720 300,720"/><polygon points="120,-20 175,-20 150,640 30,640"/><polygon points="400,-20 450,-20 640,600 540,620"/>
+  <polygon points="-60,-20 -10,-20 -150,560 -250,560"/><polygon points="640,-20 690,-20 860,560 780,580"/><polygon points="20,-20 60,-20 -40,500 -110,500"/>
+ </g>
+ <use href="#sym-baleine" x="150" y="40" width="300" height="180" opacity=".22"/>
+ <path d="M-4000 590 L-40 590 Q40 540 110 566 Q170 520 240 556 Q330 528 400 560 Q480 520 560 556 Q620 536 4600 560 L4600 700 L-4000 700Z" fill="#0f5d93" opacity=".55"/>
+ <use href="#sym-corail1" x="40" y="470" width="80" height="134" style="--c:#c98bff" opacity=".85"/>
+ <use href="#sym-corail3" x="470" y="460" width="78" height="130" style="--c:#ff7aa8" opacity=".85"/>
+ <use href="#sym-algue" x="96" y="470" width="44" height="140" opacity=".8"/>
+ <use href="#sym-algue" x="452" y="450" width="44" height="160" opacity=".8"/>
+ <path d="M-4000 640 L-20 640 Q140 596 300 620 Q450 642 620 600 L4600 600 L4600 4800 L-4000 4800Z" fill="url(#affSable)"/>
+ <path d="M-4000 700 L0 700 Q130 672 260 694 Q420 716 620 676 L4600 676 L4600 4800 L-4000 4800Z" fill="#e8c78c" opacity=".7"/>
+ <circle cx="300" cy="330" r="270" fill="url(#affHalo)"/>
+ <g fill="#fff3b8" opacity=".3"><path d="${rayonsSoleil.join(' ')}"/></g>
+ ${coqAffiche(158, 520, 92, 3, {})}
+ ${coqAffiche(350, 528, 88, 5, {})}
+ <circle cx="105" cy="548" r="112" fill="url(#affHaloRose)"/>
+ <g fill="none" stroke="#ffd0e0" stroke-linecap="round"><circle cx="105" cy="548" r="92" stroke-width="6" opacity=".9"/><circle cx="105" cy="548" r="122" stroke-width="4" opacity=".5"/></g>
+ ${coqAffiche(22, 462, 166, 0, { chante: true })}
+ ${coqAffiche(418, 476, 158, 4, {})}
+ <use href="#sym-poisson" x="-36" y="250" width="214" height="214" style="filter:drop-shadow(0 8px 8px rgba(0,30,60,.35))"/>
+ <use href="#sym-meduse" x="56" y="100" width="76" height="88" opacity=".95"/>
+ <g transform="rotate(-12 520 230)"><use href="#sym-pieuvre" x="436" y="146" width="176" height="176" style="filter:drop-shadow(0 8px 8px rgba(0,30,60,.35))"/></g>
+ ${coqAffiche(120, 136, 360, 1, { chante: true, clair: true })}
+ ${NOTE_AFFICHE(196, 104, 58, '#ffc21f', -14)}
+ ${NOTE_AFFICHE(340, 98, 50, '#ff5f9a', 10)}
+ ${NOTE_AFFICHE(430, 330, 54, '#2f9cf0', 14)}
+ ${NOTE_AFFICHE(108, 200, 44, '#2fbf6f', -8)}
+ ${NOTE_AFFICHE(150, 410, 40, '#ff5f9a', -16)}
+ ${NOTE_AFFICHE(166, 330, 34, '#a66cff', 6)}
+ ${ETINCELLE(118, 128, 14, '#fffbe0')}${ETINCELLE(470, 120, 12, '#fffbe0')}${ETINCELLE(500, 420, 10, '#fff')}${ETINCELLE(80, 410, 9, '#fff')}${ETINCELLE(260, 120, 9, '#fff')}
+ <use href="#sym-crabe" x="268" y="626" width="132" height="99" style="filter:drop-shadow(0 6px 4px rgba(90,60,20,.35))"/>
+ <use href="#sym-etoile-mer" x="470" y="676" width="84" height="84" transform="rotate(14 512 718)"/>
+ <use href="#sym-algue" x="-46" y="360" width="118" height="430"/>
+ <use href="#sym-algue" x="540" y="330" width="120" height="460" transform="scale(-1 1) translate(-1200 0)"/>
+ <use href="#sym-corail2" x="-40" y="640" width="130" height="220" style="--c:#ff9a3c"/>
+ <use href="#sym-corail1" x="530" y="600" width="120" height="200" style="--c:#ff5f6d"/>
+ ${bulles}
+</svg>`;
+    let el = document.getElementById('affiche');
+    if (el) el.remove();
+    document.body.insertAdjacentHTML('beforeend', svg);
+  }
+  function cacherPourAffiche() {
+    document.querySelectorAll('.ecran, .fenetre, #fete, button, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    const style = document.createElement('style');
+    style.textContent = '#affiche{position:fixed;inset:0;width:100%;height:100%;z-index:2147483600;display:block;background:#1774b8}'
+      + '.ecran,.fenetre,#fete,button,.jel-langue,jel-langue{display:none!important}';
+    document.head.appendChild(style);
+    cacherPourAffiche();
+    dessinerAffiche();
+    // Le bouton de langue peut être créé après ce script, avec un style en ligne.
+    setTimeout(cacherPourAffiche, 0);
+    setTimeout(cacherPourAffiche, 300);
+    setTimeout(cacherPourAffiche, 1200);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // --- Images du jeu (page du jeu) -------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 : le jeu s'ouvre directement en pleine partie, avec sa
+  // vraie interface (niveau, chanson, bulles d'essai, points de la mélodie, message, score), sans
+  // écran titre, ni « Continuer », ni tutoriel. Le moment est posé par le code, puis figé (horloge
+  // et animations arrêtées, sans fenêtre de pause) : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1 : trois coquillages, c'est au joueur, il vient de toucher le bon (+10) ;
+  //   2 = niveau 6 : cinq coquillages, le poisson-lune en cache un pendant la chanson ;
+  //   3 = niveau 19 : six coquillages, la pieuvre en fait chanter deux à la fois, la méduse
+  //       demande la chanson à l'envers, le récif est rempli d'amis marins.
+  const MOMENTS_APERCU = {
+    1: { niv: 0, chanson: 1, melodie: [[1], [0], [2]], phase: 'joue', msg: 'msg.atoi', fait: [0, 1], chantent: [0], onde: 0, plus: 0, score: 65, erreurs: 0 },
+    2: { niv: 5, chanson: 1, melodie: [[3], [0], [4], [2]], phase: 'ecoute', msg: 'msg.poisson', ecoute: [0, 1], chantent: [0], cache: 4, score: 55, erreurs: 1 },
+    3: { niv: 18, chanson: 2, melodie: [[5], [1, 4], [0], [3], [2], [1]], phase: 'ecoute', msg: 'msg.meduse', ecoute: [0, 1], chantent: [1, 4], pieuvre: true, meduse: true, place: [2, 1, 0, 3, 5, 4], score: 160, erreurs: 1 }
+  };
+  function noteFixe(s, dx, dy) {
+    const c = centre(etat.place[s]);
+    const n = document.createElement('div');
+    n.className = 'note-vol';
+    n.style.animation = 'none';
+    n.innerHTML = `<svg viewBox="0 0 24 24" width="26" height="26" fill="${COQUILLAGES[s].c2}"><use href="#sym-note"/></svg>`;
+    n.style.left = (c.x + taille * 0.15) + 'px';
+    n.style.top = (c.y - taille * 0.6) + 'px';
+    n.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
+    $('scene').appendChild(n);
+  }
+  function ouvrirApercu(n) {
+    const M = MOMENTS_APERCU[n];
+    // Progression en mémoire seulement (jamais enregistrée) : niveaux d'avant gagnés, pour les amis du récif.
+    for (let i = 0; i < M.niv; i++) prog.etoiles[i] = 3;
+    prog.niveauMax = M.niv + 1;
+    etat.pause = false; etat.tuto = false;
+    etat.niv = M.niv; etat.cfg = NIVEAUX[M.niv];
+    etat.chanson = M.chanson; etat.reussies = M.chanson; etat.erreurs = M.erreurs; etat.score = M.score;
+    etat.place = M.place ? M.place.slice() : Array.from({ length: etat.cfg.n }, (_, i) => i);
+    etat.melodie = M.melodie;
+    etat.pas = M.melodie.slice(0, etat.cfg.debut + M.chanson);
+    etat.special = { meduse: !!M.meduse, caches: M.cache >= 0 ? [M.cache] : [], milieu: 0, melange: 0 };
+    etat.cache = -1; etat.phase = M.phase;
+    etat.enPartie = false; // ni pause, ni sauvegarde à la fermeture, ni toucher
+    construireScene();
+    afficher('ecranJeu');
+    disposer();
+    majHud();
+    construirePoints();
+    for (let k = 0; k < M.chanson; k++) pousserCorail(k);
+    document.querySelectorAll('#coraux .corail').forEach((d) => { d.style.animation = 'none'; });
+    // La tortue nage d'un bord à l'autre : figée au milieu de son trajet, bien en vue.
+    document.querySelectorAll('#amis .ami.nage').forEach((d) => { d.style.animationDelay = '-7s'; });
+    for (let k = 0; k < M.erreurs; k++) {
+      const b = $('bulles').children[ERREURS_MAX - 1 - k];
+      if (b) { b.style.animation = 'none'; b.style.transform = 'scale(.35)'; b.style.opacity = '.25'; }
+    }
+    (M.fait || []).forEach((k) => point(k, 'fait'));
+    (M.ecoute || []).forEach((k) => point(k, 'ecoute'));
+    message(M.msg);
+    if (M.phase === 'joue') elCoq.forEach((el, i) => { if (!M.chantent.includes(i)) el.classList.add('invite'); });
+    M.chantent.forEach((s, k) => {
+      elCoq[s].classList.add('chante');
+      noteFixe(s, 10 + k * 4, -34);
+      noteFixe(s, -taille * 0.42, -12 - k * 6);
+    });
+    if (M.onde >= 0 && M.onde !== undefined) {
+      const c = centre(etat.place[M.onde]);
+      const o = document.createElement('div');
+      o.className = 'onde';
+      o.style.cssText = `width:${taille}px;height:${taille}px;left:${c.x - taille / 2}px;top:${c.y - taille / 2}px;border-color:${COQUILLAGES[M.onde].c2};animation:none;transform:scale(1.3);opacity:.7`;
+      $('scene').appendChild(o);
+    }
+    if (M.plus >= 0 && M.plus !== undefined) {
+      const c = centre(etat.place[M.plus]);
+      const d = document.createElement('div');
+      d.className = 'points-vol';
+      d.textContent = '+' + I18N.nombre(10);
+      d.style.cssText = `left:${c.x + taille * 0.6}px;top:${c.y - taille * 0.5}px;animation:none;font-size:22px`;
+      $('scene').appendChild(d);
+    }
+    if (M.cache >= 0) {
+      etat.cache = M.cache;
+      $('poisson').style.display = 'block';
+      disposer();
+    }
+    if (M.pieuvre) { $('pieuvre').classList.add('visible', 'joue'); }
+    if (M.meduse) $('meduse').classList.add('visible');
+    // Figé : horloge du jeu et animations arrêtées, sans fenêtre de pause.
+    etat.pause = true;
+    $('app').classList.add('gele');
+  }
+
+  // --- Démarrage ----------------------------------------------------------------
   majBoutonsSon();
-  requestAnimationFrame(boucle);
+  if (AFFICHE) {
+    demarrerAffiche();
+  } else if (APERCU) {
+    ouvrirApercu(APERCU);
+    majBoutonsSon();
+  } else {
+    chargerProgression();
+    majBoutonsSon();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

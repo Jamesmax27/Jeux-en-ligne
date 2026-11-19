@@ -1864,6 +1864,7 @@ function courtOuvert(c) { return niveauDebloque(c * 5); }
 /* ---------- Son (Web Audio, rien avant la première action) ---------- */
 let ctx = null, maitre = null, busMus = null, bruitBuf = null, latence = 0;
 function initAudio() {
+  if (window.JEL_AFFICHE || apercu) return; // affiche et images du jeu : aucun son
   if (ctx) { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); return; }
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -2106,6 +2107,8 @@ const scene = $('scene'); const cx2 = scene.getContext('2d');
 let W = 360, H = 640, DPR = 1;
 const V = { cx: 180, yNear: 560, yFar: 160, demi: 150 };
 let tempsDemo = 0;
+let apercu = 0;            // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
+let apercuNow = null;      // horloge du dessin figée de l'image du jeu, sinon null
 const particules = [];
 const bulles = [];        // textes « Parfait ! » qui s'envolent
 
@@ -3095,6 +3098,7 @@ function majParticules(dt) {
 
 /* ---------- Boucle principale ---------- */
 function boucle() {
+  if (apercuNow !== null) { dessiner(apercuNow); requestAnimationFrame(boucle); return; } // image du jeu figée
   const now = performance.now();
   let dt = (now - dernierFrame) / 1000; dernierFrame = now;
   if (dt > 0.5) dt = 0.5;
@@ -3160,7 +3164,7 @@ document.addEventListener('keydown', (e) => {
     if (jeu.etat === 'intro' && (code === 'Space' || code === 'Enter')) { e.preventDefault(); apresIntro(); return; }
   }
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden && jeu && ['jeu', 'reprise'].includes(jeu.etat)) pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu && jeu && ['jeu', 'reprise'].includes(jeu.etat)) pause(); });
 
 // Boutons
 const surClic = (id, f) => $(id).addEventListener('click', (e) => { e.stopPropagation(); initAudio(); sonClic(); f(); });
@@ -3188,7 +3192,341 @@ surClic('btn-bilan-accueil', ouvrirTitre);
 document.querySelectorAll('.bouton-son').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); initAudio(); P.son = !P.son; enregistrerReglages(); majSon(); sonClic(); }));
 
 /* ---------- Sauvegarde à la fermeture ---------- */
-window.JEL_SAVE.surFermeture(() => { if (jeu && jeu.enCours) enregistrer(jeu.idx + 1, jeu.score); });
+window.JEL_SAVE.surFermeture(() => { if (!apercu && jeu && jeu.enCours) enregistrer(jeu.idx + 1, jeu.score); });
+
+/* ---------- Affiche (jaquette du jeu) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Lili en grand, de trois
+// quarts, frappe une balle parfaite (anneau blanc, étincelles) ; la balle file en arc de notes de
+// musique vers la cible dorée, où Rémi le renard se jette ; soleil, guirlande et tribunes en fête.
+// Dessin dans un cadre de 600 × 800 (k), le décor continue jusqu'aux bords sur un écran large.
+function etoile5(c, x, y, r, rot) {
+  c.beginPath();
+  for (let i = 0; i < 10; i++) { const a = rot - Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? r * 0.45 : r; c.lineTo(x + Math.cos(a) * q, y + Math.sin(a) * q); }
+  c.closePath();
+}
+// Croche dessinée (jamais un caractère) : tête, hampe, crochet
+function croche(c, x, y, s, couleur, rot) {
+  c.save(); c.translate(x, y); c.rotate(rot);
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  const forme = () => {
+    c.beginPath(); c.ellipse(0, 0, s * 0.55, s * 0.4, -0.4, 0, 7);
+    c.moveTo(s * 0.48, -s * 0.1); c.lineTo(s * 0.48, -s * 1.7);
+    c.quadraticCurveTo(s * 0.7, -s * 1.15, s * 1.25, -s * 0.95);
+  };
+  forme(); c.strokeStyle = '#ffffff'; c.lineWidth = s * 0.55; c.stroke();
+  c.beginPath(); c.ellipse(0, 0, s * 0.55, s * 0.4, -0.4, 0, 7); c.fillStyle = couleur; c.fill();
+  c.beginPath(); c.moveTo(s * 0.48, -s * 0.1); c.lineTo(s * 0.48, -s * 1.7); c.quadraticCurveTo(s * 0.7, -s * 1.15, s * 1.25, -s * 0.95);
+  c.strokeStyle = couleur; c.lineWidth = s * 0.22; c.stroke();
+  c.restore();
+}
+// Lili de trois quarts (tournée vers la droite), en pleine frappe : plus grande et plus détaillée que
+// pendant la partie (où on la voit de dos), mêmes couleurs : bandeau rose, tenue blanche, raquette corail.
+function dessinerLiliAffiche(c, x, y, u) {
+  const peau = '#f6c9a0', peauOmbre = '#e9b388', cheveux = '#7a4a2a', rose = '#ff5fa2';
+  c.save(); c.translate(x, y);
+  c.fillStyle = 'rgba(0,0,0,.22)'; c.beginPath(); c.ellipse(0.2 * u, 0, 3 * u, 0.7 * u, 0, 0, 7); c.fill();
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // queue de cheval qui vole derrière la tête
+  const hx = 0.25 * u, hy = -9.7 * u, R = 1.5 * u;
+  c.fillStyle = cheveux;
+  c.beginPath(); c.moveTo(hx - 0.9 * u, hy - 0.9 * u);
+  c.bezierCurveTo(hx - 2.6 * u, hy - 2.1 * u, hx - 3.9 * u, hy - 1.2 * u, hx - 4.1 * u, hy + 0.3 * u);
+  c.bezierCurveTo(hx - 3.4 * u, hy - 0.4 * u, hx - 2.4 * u, hy - 0.5 * u, hx - 1.1 * u, hy + 0.1 * u);
+  c.closePath(); c.fill();
+  c.strokeStyle = 'rgba(255,220,180,.35)'; c.lineWidth = 0.12 * u;
+  c.beginPath(); c.moveTo(hx - 1.2 * u, hy - 0.9 * u); c.quadraticCurveTo(hx - 2.8 * u, hy - 1.6 * u, hx - 3.7 * u, hy - 0.4 * u); c.stroke();
+  // bras arrière (équilibre)
+  c.strokeStyle = peauOmbre; c.lineWidth = 0.62 * u;
+  c.beginPath(); c.moveTo(-1.0 * u, -7.8 * u); c.lineTo(-2.2 * u, -7.0 * u); c.lineTo(-3.0 * u, -7.6 * u); c.stroke();
+  c.fillStyle = peauOmbre; c.beginPath(); c.arc(-3.05 * u, -7.65 * u, 0.36 * u, 0, 7); c.fill();
+  // jambes : arrière tendue, avant pliée (fente)
+  const jambe = (x0, y0, x1, y1, x2, y2, coul) => {
+    c.strokeStyle = coul; c.lineWidth = 0.9 * u;
+    c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(x1, y1, x2, y2); c.stroke();
+    c.strokeStyle = '#ffffff'; c.lineWidth = 0.95 * u; // chaussette
+    c.beginPath(); c.moveTo(lerp(x1, x2, 0.72), lerp(y1, y2, 0.72)); c.lineTo(x2, y2); c.stroke();
+  };
+  jambe(-0.5 * u, -4.6 * u, -1.3 * u, -2.4 * u, -1.9 * u, -0.45 * u, peauOmbre);
+  jambe(0.6 * u, -4.6 * u, 1.9 * u, -2.6 * u, 1.5 * u, -0.45 * u, peau);
+  const chaussure = (cx0, cy0, sens) => {
+    c.fillStyle = '#ffffff'; c.strokeStyle = '#c9d2e4'; c.lineWidth = 0.08 * u;
+    c.beginPath(); c.ellipse(cx0 + sens * 0.35 * u, cy0, 0.85 * u, 0.42 * u, 0, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = rose; c.fillRect(cx0 - 0.5 * u, cy0 - 0.1 * u, 1.3 * u, 0.18 * u);
+  };
+  chaussure(-1.95 * u, -0.25 * u, -1); chaussure(1.55 * u, -0.25 * u, 1);
+  // jupette plissée
+  c.fillStyle = '#ffffff';
+  c.beginPath(); c.moveTo(-1.25 * u, -5.7 * u); c.lineTo(1.25 * u, -5.7 * u); c.lineTo(2.05 * u, -3.9 * u); c.lineTo(-2.05 * u, -3.9 * u); c.closePath(); c.fill();
+  c.strokeStyle = '#dfe4ee'; c.lineWidth = 0.08 * u;
+  for (let k = -2; k <= 2; k++) { c.beginPath(); c.moveTo(k * 0.45 * u, -5.6 * u); c.lineTo(k * 0.75 * u, -4.0 * u); c.stroke(); }
+  c.fillStyle = rose; c.beginPath(); c.moveTo(-2.0 * u, -4.25 * u); c.lineTo(2.0 * u, -4.25 * u); c.lineTo(2.08 * u, -3.9 * u); c.lineTo(-2.08 * u, -3.9 * u); c.closePath(); c.fill();
+  // maillot
+  c.fillStyle = '#ffffff';
+  c.beginPath(); c.roundRect ? c.roundRect(-1.4 * u, -8.5 * u, 2.8 * u, 3.1 * u, 0.7 * u) : c.rect(-1.4 * u, -8.5 * u, 2.8 * u, 3.1 * u); c.fill();
+  c.fillStyle = '#e6ebf5'; c.beginPath(); c.roundRect ? c.roundRect(-1.4 * u, -8.5 * u, 0.7 * u, 3.1 * u, 0.5 * u) : c.rect(-1.4 * u, -8.5 * u, 0.7 * u, 3.1 * u); c.fill();
+  c.fillStyle = rose; c.fillRect(-1.4 * u, -6.0 * u, 2.8 * u, 0.28 * u);
+  c.beginPath(); c.moveTo(-0.6 * u, -8.5 * u); c.lineTo(0.25 * u, -7.6 * u); c.lineTo(1.0 * u, -8.5 * u); c.closePath(); c.fill();
+  // cou et tête
+  c.fillStyle = peauOmbre; c.fillRect(-0.3 * u, -9.0 * u, 0.75 * u, 0.7 * u);
+  c.fillStyle = peau; c.beginPath(); c.arc(hx, hy, R, 0, 7); c.fill();
+  c.beginPath(); c.arc(hx - 0.75 * u, hy + 0.05 * u, 0.33 * u, 0, 7); c.fill(); // oreille
+  c.fillStyle = peauOmbre; c.beginPath(); c.arc(hx - 0.75 * u, hy + 0.05 * u, 0.15 * u, 0, 7); c.fill();
+  // cheveux : calotte du haut et de l'arrière, frange sur le front
+  c.fillStyle = cheveux;
+  c.beginPath(); c.arc(hx, hy, R * 1.07, -0.28 * Math.PI, 0.72 * Math.PI, true);
+  c.quadraticCurveTo(hx - 0.35 * u, hy - 0.3 * u, hx - 0.25 * u, hy - 0.85 * u);
+  c.quadraticCurveTo(hx + 0.4 * u, hy - 0.75 * u, hx + 0.95 * u, hy - 1.2 * u);
+  c.closePath(); c.fill();
+  c.beginPath(); c.arc(hx + 0.75 * u, hy - 0.95 * u, 0.42 * u, 0, 7); c.arc(hx + 0.2 * u, hy - 1.05 * u, 0.45 * u, 0, 7); c.fill();
+  // bandeau rose et ses deux pans qui volent
+  c.strokeStyle = rose; c.lineWidth = 0.5 * u;
+  c.beginPath(); c.arc(hx, hy, R * 1.02, -0.95 * Math.PI, -0.2 * Math.PI); c.stroke();
+  c.fillStyle = rose;
+  c.beginPath(); c.moveTo(hx - 1.35 * u, hy - 0.7 * u); c.lineTo(hx - 2.6 * u, hy - 1.5 * u); c.lineTo(hx - 2.4 * u, hy - 0.8 * u); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(hx - 1.35 * u, hy - 0.5 * u); c.lineTo(hx - 2.5 * u, hy - 0.2 * u); c.lineTo(hx - 2.1 * u, hy - 0.75 * u); c.closePath(); c.fill();
+  // visage : grands yeux tournés vers la balle, sourcils décidés, joues roses, grand sourire
+  const oeil = (ox, oy, rx, ry) => {
+    c.fillStyle = '#1d2340'; c.beginPath(); c.ellipse(ox, oy, rx, ry, 0, 0, 7); c.fill();
+    c.fillStyle = '#ffffff'; c.beginPath(); c.arc(ox + rx * 0.35, oy - ry * 0.4, rx * 0.42, 0, 7); c.fill();
+    c.beginPath(); c.arc(ox - rx * 0.25, oy + ry * 0.35, rx * 0.18, 0, 7); c.fill();
+  };
+  oeil(hx + 0.3 * u, hy - 0.05 * u, 0.24 * u, 0.33 * u);
+  oeil(hx + 1.02 * u, hy - 0.08 * u, 0.2 * u, 0.3 * u);
+  c.strokeStyle = cheveux; c.lineWidth = 0.13 * u;
+  c.beginPath(); c.moveTo(hx + 0.05 * u, hy - 0.55 * u); c.lineTo(hx + 0.55 * u, hy - 0.6 * u); c.stroke();
+  c.beginPath(); c.moveTo(hx + 0.85 * u, hy - 0.62 * u); c.lineTo(hx + 1.2 * u, hy - 0.56 * u); c.stroke();
+  c.fillStyle = 'rgba(255,120,150,.45)';
+  c.beginPath(); c.ellipse(hx + 0.1 * u, hy + 0.5 * u, 0.32 * u, 0.2 * u, 0, 0, 7); c.fill();
+  c.beginPath(); c.ellipse(hx + 1.2 * u, hy + 0.48 * u, 0.22 * u, 0.17 * u, 0, 0, 7); c.fill();
+  c.fillStyle = '#8c2b3b';
+  c.beginPath(); c.moveTo(hx + 0.38 * u, hy + 0.62 * u); c.quadraticCurveTo(hx + 0.75 * u, hy + 0.66 * u, hx + 1.15 * u, hy + 0.58 * u); c.quadraticCurveTo(hx + 0.85 * u, hy + 1.25 * u, hx + 0.38 * u, hy + 0.62 * u); c.fill();
+  c.fillStyle = '#ff8fa3'; c.beginPath(); c.ellipse(hx + 0.75 * u, hy + 0.95 * u, 0.2 * u, 0.1 * u, 0, 0, 7); c.fill();
+  // bras de frappe et raquette lancée vers la balle
+  c.strokeStyle = peau; c.lineWidth = 0.66 * u;
+  c.beginPath(); c.moveTo(1.0 * u, -7.9 * u); c.lineTo(2.1 * u, -8.0 * u); c.lineTo(2.85 * u, -8.95 * u); c.stroke();
+  const ax = 2.95 * u, ay = -9.1 * u, ang = -0.75; // angle du manche
+  c.save(); c.translate(ax, ay); c.rotate(ang);
+  c.fillStyle = '#6b4a2b'; c.fillRect(-0.18 * u, -0.2 * u, 1.7 * u, 0.36 * u);
+  c.fillStyle = 'rgba(255,255,255,.8)'; c.strokeStyle = '#ff6b6b'; c.lineWidth = 0.32 * u;
+  c.beginPath(); c.ellipse(2.75 * u, 0, 1.3 * u, 0.95 * u, 0, 0, 7); c.fill(); c.stroke();
+  c.strokeStyle = 'rgba(150,160,180,.7)'; c.lineWidth = 0.06 * u;
+  for (let k = -2; k <= 2; k++) {
+    c.beginPath(); c.moveTo(1.6 * u, k * 0.32 * u); c.lineTo(3.9 * u, k * 0.32 * u); c.stroke();
+    c.beginPath(); c.moveTo(2.75 * u + k * 0.4 * u, -0.85 * u); c.lineTo(2.75 * u + k * 0.4 * u, 0.85 * u); c.stroke();
+  }
+  c.restore();
+  c.fillStyle = peau; c.beginPath(); c.arc(ax, ay, 0.4 * u, 0, 7); c.fill();
+  c.restore();
+}
+function dessinerAffiche() {
+  redimensionner();
+  const c = cx2;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.clearRect(0, 0, W, H);
+  const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  c.save(); c.translate(ox, oy); c.scale(k, k);
+  // bornes de l'écran dans le cadre (le décor va jusqu'aux bords)
+  const L = -ox / k, Rr = (W - ox) / k, T = -oy / k, B = (H - oy) / k;
+  const sauve = Object.assign({}, V);
+  try {
+    // Court vu de derrière Lili, caméra basse
+    V.cx = 330; V.yFar = 380; V.yNear = 960; V.demi = 470; completerVue();
+    const yH = 278;
+    // ciel
+    let gr = c.createLinearGradient(0, T, 0, yH); gr.addColorStop(0, '#2fa8f5'); gr.addColorStop(0.6, '#8fd8ff'); gr.addColorStop(1, '#e6f8ff');
+    c.fillStyle = gr; c.fillRect(L, T, Rr - L, yH - T + 2);
+    // soleil et rayons (la lumière vient d'en haut à gauche)
+    const sx = 95, sy = 95;
+    c.save(); c.translate(sx, sy);
+    for (let i = 0; i < 14; i++) {
+      c.rotate(Math.PI / 7);
+      c.fillStyle = i % 2 ? 'rgba(255,248,200,.28)' : 'rgba(255,255,255,.18)';
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(-40, -760); c.lineTo(40, -760); c.closePath(); c.fill();
+    }
+    c.restore();
+    let halo = c.createRadialGradient(sx, sy, 10, sx, sy, 260);
+    halo.addColorStop(0, 'rgba(255,250,215,1)'); halo.addColorStop(0.25, 'rgba(255,240,170,.75)'); halo.addColorStop(1, 'rgba(255,240,170,0)');
+    c.fillStyle = halo; c.fillRect(L, T, Rr - L, 520 - T);
+    c.fillStyle = '#ffe066'; c.beginPath(); c.arc(sx, sy, 46, 0, 7); c.fill();
+    c.fillStyle = '#fff3a8'; c.beginPath(); c.arc(sx - 8, sy - 8, 30, 0, 7); c.fill();
+    // nuages
+    c.fillStyle = 'rgba(255,255,255,.95)';
+    [[300, 70, 1.3], [520, 150, 1.0], [L + 20, 210, 0.9], [Rr + 10, 60, 1.1]].forEach(([x, y, s]) => {
+      c.beginPath(); c.arc(x, y, 22 * s, 0, 7); c.arc(x + 26 * s, y - 10 * s, 28 * s, 0, 7); c.arc(x + 54 * s, y, 21 * s, 0, 7); c.arc(x + 26 * s, y + 6 * s, 22 * s, 0, 7); c.fill();
+    });
+    // tribunes pleines de spectateurs, puis la haie
+    c.fillStyle = '#2f6b4f'; c.fillRect(L, yH - 62, Rr - L, 62);
+    c.fillStyle = '#285c44'; for (let r = 0; r < 4; r++) c.fillRect(L, yH - 62 + r * 15.5, Rr - L, 2);
+    const cs = ['#ff6b6b', '#ffd23f', '#3aa0ff', '#ffffff', '#a066ff', '#3ed17a', '#ff9f1a'];
+    for (let r = 0; r < 4; r++) for (let x = L + 5 + r * 6; x < Rr; x += 12) {
+      const n = Math.abs(Math.round(x * 7 + r * 13));
+      const bras = n % 5 === 0;
+      const yy = yH - 54 + r * 15.5 - (bras ? 3 : 0);
+      c.fillStyle = cs[n % cs.length]; c.beginPath(); c.arc(x, yy + 3, 4.6, 0, 7); c.fill();
+      c.fillStyle = '#f6c9a0'; c.beginPath(); c.arc(x, yy - 3, 3.2, 0, 7); c.fill();
+      if (bras) { c.strokeStyle = '#f6c9a0'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(x - 3, yy); c.lineTo(x - 5, yy - 8); c.moveTo(x + 3, yy); c.lineTo(x + 5, yy - 8); c.stroke(); }
+    }
+    c.fillStyle = '#2f8a4a'; for (let x = L - 20; x < Rr + 40; x += 34) { c.beginPath(); c.arc(x, yH + 2, 18 + Math.abs(Math.round(x * 7)) % 7, Math.PI, 0); c.fill(); }
+    c.fillStyle = '#3f9d4a'; c.fillRect(L, yH, Rr - L, B - yH);
+    // le court de gazon (dessin du jeu)
+    dessinerCourt(c, 0);
+    // cible dorée sur le côté du renard
+    const pc = proj(0.62, 0.86, 0);
+    let lueur = c.createRadialGradient(pc.x, pc.y, 4, pc.x, pc.y, 90);
+    lueur.addColorStop(0, 'rgba(255,240,120,.95)'); lueur.addColorStop(1, 'rgba(255,215,0,0)');
+    c.fillStyle = lueur; c.beginPath(); c.ellipse(pc.x, pc.y, 95, 40, 0, 0, 7); c.fill();
+    const rx = 62, ry = 24;
+    c.fillStyle = 'rgba(255,215,0,.75)'; c.beginPath(); c.ellipse(pc.x, pc.y, rx, ry, 0, 0, 7); c.fill();
+    c.strokeStyle = '#fff'; c.lineWidth = 4; c.beginPath(); c.ellipse(pc.x, pc.y, rx * 0.62, ry * 0.62, 0, 0, 7); c.stroke();
+    c.fillStyle = '#ffd700'; c.beginPath(); c.ellipse(pc.x, pc.y, rx * 0.28, ry * 0.28, 0, 0, 7); c.fill();
+    // Rémi le renard qui se jette vers la balle (dessin du jeu, agrandi)
+    const sauveV = Object.assign({}, V);
+    const fx = 556, fy = 376, uf = 12.5;
+    Object.assign(V, { cx: fx, yNear: fy, yFar: fy, demi: 1 });
+    V.u = uf / (0.96 * echelle(1.02));
+    c.save(); c.translate(fx, fy); c.rotate(-0.16); c.translate(-fx, -fy);
+    dessinerRival(c, 'renard', { x: 0, coup: 0 }, 0.12, 900, false);
+    c.restore();
+    Object.assign(V, sauveV);
+    // traits de vitesse du renard
+    c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 3; c.lineCap = 'round';
+    [[586, 296], [592, 318], [584, 340]].forEach(([x, y]) => { c.beginPath(); c.moveTo(x, y); c.lineTo(x + 22, y + 2); c.stroke(); });
+    // filet (dessin du jeu)
+    dessinerFilet(c, 0, false, 0);
+    // la balle part en arc de notes vers la cible
+    const bx = 392, by = 262;
+    const P0 = { x: bx, y: by }, P1 = { x: 430, y: -40 }, P2 = { x: pc.x - 10, y: pc.y - 6 };
+    const surArc = (s) => ({ x: (1 - s) * (1 - s) * P0.x + 2 * s * (1 - s) * P1.x + s * s * P2.x, y: (1 - s) * (1 - s) * P0.y + 2 * s * (1 - s) * P1.y + s * s * P2.y });
+    c.setLineDash([3, 14]); c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 5;
+    c.beginPath(); c.moveTo(P0.x, P0.y); c.quadraticCurveTo(P1.x, P1.y, P2.x, P2.y); c.stroke(); c.setLineDash([]);
+    for (let i = 0; i < 6; i++) {
+      const s = 0.3 + i * 0.11, p = surArc(s);
+      c.shadowColor = ARC_EN_CIEL[i]; c.shadowBlur = 14;
+      croche(c, p.x + (i % 2 ? 20 : -20), p.y + (i % 2 ? 6 : -6), 15 + (i % 3) * 2, ARC_EN_CIEL[i], (i % 2 ? 0.2 : -0.2));
+    }
+    c.shadowBlur = 0;
+    // Lili en grand, avec une lueur chaude autour
+    const lx = 222, ly = 708, u = 41;
+    halo = c.createRadialGradient(lx + 40, 420, 20, lx + 40, 420, 300);
+    halo.addColorStop(0, 'rgba(255,248,210,.55)'); halo.addColorStop(1, 'rgba(255,248,210,0)');
+    c.fillStyle = halo; c.fillRect(L, 100, Rr - L, 620);
+    c.save(); c.shadowColor = 'rgba(255,250,215,.95)'; c.shadowBlur = 16;
+    dessinerLiliAffiche(c, lx, ly, u);
+    c.restore();
+    // frappe parfaite : éclat, anneau blanc refermé, étincelles
+    let ec = c.createRadialGradient(bx, by, 4, bx, by, 110);
+    ec.addColorStop(0, 'rgba(255,255,235,1)'); ec.addColorStop(0.35, 'rgba(255,230,120,.6)'); ec.addColorStop(1, 'rgba(255,230,120,0)');
+    c.fillStyle = ec; c.beginPath(); c.arc(bx, by, 110, 0, 7); c.fill();
+    c.strokeStyle = '#ffd23f'; c.lineWidth = 5; c.lineCap = 'round';
+    for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6 + 0.2, r1 = 50, r2 = i % 2 ? 76 : 92; c.beginPath(); c.moveTo(bx + Math.cos(a) * r1, by + Math.sin(a) * r1); c.lineTo(bx + Math.cos(a) * r2, by + Math.sin(a) * r2); c.stroke(); }
+    c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 3; c.setLineDash([7, 6]); c.beginPath(); c.arc(bx, by, 44, 0, 7); c.stroke(); c.setLineDash([]);
+    c.strokeStyle = '#ffffff'; c.lineWidth = 7; c.beginPath(); c.arc(bx, by, 38, 0, 7); c.stroke();
+    // traînée et balle
+    c.strokeStyle = 'rgba(255,243,107,.55)'; c.lineWidth = 22;
+    c.beginPath(); c.moveTo(bx - 30, by + 26); c.lineTo(bx, by); c.stroke();
+    c.fillStyle = '#fff36b'; c.strokeStyle = 'rgba(60,60,60,.7)'; c.lineWidth = 2;
+    c.beginPath(); c.arc(bx, by, 22, 0, 7); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,.95)'; c.lineWidth = 3;
+    c.beginPath(); c.arc(bx - 20, by, 18, -0.9, 0.9); c.stroke(); c.beginPath(); c.arc(bx + 20, by, 18, Math.PI - 0.9, Math.PI + 0.9); c.stroke();
+    [[bx - 70, by - 50, 13], [bx + 64, by - 58, 11], [bx + 80, by + 30, 9], [bx - 50, by + 62, 8], [bx + 10, by - 92, 10], [bx - 96, by + 6, 7]].forEach(([x, y, r], i) => {
+      c.fillStyle = i % 2 ? '#ffffff' : '#ffd23f'; c.shadowColor = '#ffd23f'; c.shadowBlur = 12; etoile5(c, x, y, r, i * 0.4); c.fill();
+    });
+    c.shadowBlur = 0;
+    // guirlande de fanions en haut (premier plan, coupée par le bord)
+    c.strokeStyle = '#5b3a1e'; c.lineWidth = 2.5;
+    const g0 = { x: 250, y: T - 10 }, g1 = { x: Rr + 20, y: 64 };
+    c.beginPath(); c.moveTo(g0.x, g0.y); c.quadraticCurveTo(470, 70, g1.x, g1.y); c.stroke();
+    for (let i = 0; i < 9; i++) {
+      const s = 0.06 + i * 0.11; if (s > 1) break;
+      const x = (1 - s) * (1 - s) * g0.x + 2 * s * (1 - s) * 470 + s * s * g1.x, y = (1 - s) * (1 - s) * g0.y + 2 * s * (1 - s) * 70 + s * s * g1.y;
+      c.fillStyle = ARC_EN_CIEL[i % 6]; c.beginPath(); c.moveTo(x - 13, y); c.lineTo(x + 13, y); c.lineTo(x, y + 30); c.closePath(); c.fill();
+    }
+    // premier plan : grosse balle floue en bas à gauche, fleurs en bas à droite
+    c.fillStyle = 'rgba(255,243,107,.9)'; c.beginPath(); c.arc(L + 30, B - 40, 78, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 8; c.beginPath(); c.arc(L + 30 - 70, B - 40, 62, -0.9, 0.9); c.stroke();
+    [[Rr - 50, B - 30, 1.5], [Rr - 110, B + 5, 1.2]].forEach(([fx2, fy2, f], i) => {
+      c.strokeStyle = '#2f7a34'; c.lineWidth = 6 * f;
+      c.beginPath(); c.moveTo(fx2, B + 10); c.quadraticCurveTo(fx2 - 10, fy2 - 30 * f, fx2 + 4, fy2 - 60 * f); c.stroke();
+      const hx2 = fx2 + 4, hy2 = fy2 - 60 * f;
+      c.fillStyle = ['#ff5fa2', '#ffd23f'][i];
+      for (let p = 0; p < 6; p++) { const a = p * 1.047; c.beginPath(); c.arc(hx2 + Math.cos(a) * 13 * f, hy2 + Math.sin(a) * 13 * f, 9 * f, 0, 7); c.fill(); }
+      c.fillStyle = '#fff3a0'; c.beginPath(); c.arc(hx2, hy2, 8 * f, 0, 7); c.fill();
+    });
+  } finally { Object.assign(V, sauve); c.restore(); }
+}
+function cacherPourAffiche() {
+  document.querySelectorAll('.ecran, .rond, #hud, #annonce, .jel-langue, jel-langue, button').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+}
+function demarrerAffiche() {
+  cacherPourAffiche();
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+  // le bouton de langue peut être créé après ce script
+  setTimeout(cacherPourAffiche, 100); setTimeout(cacherPourAffiche, 600);
+}
+
+/* ---------- Images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en plein match, avec sa vraie interface (cœurs, échange, score, barre du match, pause,
+// son), sans écran titre, ni fenêtre « Continuer », ni présentation, ni tutoriel (CONSIGNES-JEU.md,
+// section 5). Lili joue seule les premiers échanges (toutes ses frappes parfaites), puis l'image est
+// figée : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = match 1 (gazon, Rémi le renard) : la balle arrive, l'anneau se referme ;
+//   2 = match 9 (terre battue, Capucine la chèvre) : frappe parfaite vers une cible dorée ;
+//   3 = match 20 (plage, le grand robot) : balle de vent, souffle, palmiers, cible qui saute.
+const SCENES_APERCU = {
+  1: { niveau: 0, des: 5, avant: 0.24, raquette: 'corail', bandeau: 'rose' },
+  2: { niveau: 8, des: 9, cible: true, frappe: 0.13, raquette: 'soleil', bandeau: 'bleu' },
+  3: { niveau: 19, des: 13, type: 'vent', avecCible: true, avant: 0.32, coeurs: 2, raquette: 'arcenciel', bandeau: 'etoiles' },
+};
+// Avance le match pas à pas ; Lili frappe chaque balle pile sur le temps (et vise les cibles).
+function jouerApercuJusqua(gFin) {
+  let garde = 0;
+  while (jeu.g < gFin - 1e-6 && garde++ < 100000) {
+    const pas = Math.min(1 / 60, gFin - jeu.g);
+    majJeu(pas); majParticules(pas);
+    const b = jeu.part.balles[jeu.prochaine];
+    if (!b || jeu.g >= gFin) continue;
+    if (b.etat === 'attente' && jeu.g >= b.tA - 0.004) { dernierFrame = performance.now(); frapper(b.cible ? coteCible(b, jeu.g) : 0, 'clavier'); }
+    else if (b.etat === 'amortie1' && jeu.g - b.tH1 > 0.08) { dernierFrame = performance.now(); frapper(0, 'clavier'); }
+  }
+}
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  P = progressionVide(); // progression neuve en mémoire seulement (rien n'est enregistré)
+  P.raquette = sc.raquette; P.bandeau = sc.bandeau;
+  lancerNiveau(sc.niveau);
+  demarrer(); // sans présentation ni tutoriel
+  const balles = jeu.part.balles;
+  // balle du moment : la première qui convient à partir de « des »
+  let cible = balles[Math.min(sc.des, balles.length - 1)];
+  const convient = (b, avecCible) => !(sc.cible && !(b.cible && (b.type === 'normal' || b.type === 'lob'))) && !(sc.type && b.type !== sc.type) && !(avecCible && !b.cible);
+  const trouvee = balles.slice(sc.des, balles.length - 2).find((b) => convient(b, sc.avecCible)) || balles.slice(sc.des, balles.length - 2).find((b) => convient(b, false));
+  if (trouvee) cible = trouvee;
+  if (sc.cible) {
+    // jusqu'à la frappe, puis Lili frappe vers la cible (au doigt : la visée n'est pas encore fixée)
+    jouerApercuJusqua(cible.tA - 0.01);
+    particules.length = 0; bulles.length = 0;
+    jouerApercuJusqua(cible.tA);
+    dernierFrame = performance.now();
+    frapper(coteCible(cible, jeu.g), 'doigt');
+    jouerApercuJusqua(cible.tA + sc.frappe);
+    apercuNow = performance.now() + sc.frappe * 1000;
+  } else {
+    jouerApercuJusqua(cible.tA - sc.avant);
+    particules.length = 0; bulles.length = 0;
+    apercuNow = performance.now();
+  }
+  if (sc.coeurs) jeu.coeurs = sc.coeurs;
+  jeu.secousse = 0;
+  clearTimeout(minuteAnnonce); $('annonce').classList.remove('vu');
+  majHud();
+}
 
 /* ---------- Démarrage ---------- */
 P = lireProgression();
@@ -3199,7 +3537,12 @@ if (window.JEL_I18N.surChangement) window.JEL_I18N.surChangement(() => {
   if (mode === 'vestiaire') remplirVestiaire();
   if (jeu) { majHud(); if (jeu.etat === 'intro') ouvrirIntro(); }
 });
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else requestAnimationFrame(boucle);
 </script>
 </body>
 </html>
