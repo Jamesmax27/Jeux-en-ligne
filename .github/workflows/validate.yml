@@ -126,6 +126,7 @@ on:
       - "scripts/idees.mjs"
       - "scripts/inspirations.mjs"
       - "scripts/tester-inspirations.mjs"
+      - "scripts/tester-idees.mjs"
       - "calendrier-saisons.json"
       - "schema.sql"
       - "migrations/**"
@@ -228,7 +229,7 @@ jobs:
           # Saisons et tendances de la boucle de nuit (file d'idées, calendrier) : tests sans navigateur.
           inspirations=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then inspirations=1; fi
-          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(idees|inspirations|tester-inspirations)\.mjs|calendrier-saisons\.json|public/taxonomie\.js)$'; then inspirations=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(idees|inspirations|tester-inspirations|tester-idees)\.mjs|calendrier-saisons\.json|public/taxonomie\.js)$'; then inspirations=1; fi
           # Poussière d'Empire (docs/cadrage-poussiere-d-empire.md) : simulation de conquête testée en Node (jeu ou script de test modifié).
           poussiere=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then poussiere=1; fi
@@ -472,7 +473,7 @@ jobs:
       # dates des fêtes, calendrier, flux Google Trends (exemple), filtre, choix des idées.
       - name: Contrôler les saisons et tendances
         if: needs.quoi.outputs.inspirations == '1'
-        run: node scripts/tester-inspirations.mjs
+        run: node scripts/tester-inspirations.mjs && node scripts/tester-idees.mjs
 
       # Poussière d'Empire (docs/cadrage-poussiere-d-empire.md) : simulation de conquête en Node, sans navigateur
       # (mots interdits, outils identiques au moteur temps réel, rejeu déterministe sous le moteur et sous le pilote

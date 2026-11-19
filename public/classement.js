@@ -1,9 +1,10 @@
 // ==========================================================================
 // Free Micro Games — classement des joueurs (/classement/, /en/leaderboard/…)
 //
-// Deux choix en haut : périmètre (classement général du site, étoiles, ou un
-// jeu multijoueur) et période (semaine ou mois, remis à zéro au début de
-// chaque période). Top 100 : rang, avatar, pseudo, niveau, points ; or,
+// Deux choix en haut : périmètre (classement général du site, étoiles, jeux
+// terminés, jeux terminés à 100 %, ou un jeu multijoueur) et période (semaine
+// ou mois, remis à zéro au début de chaque période ; « Au total » en plus pour
+// les jeux terminés, section 14.11 du cadrage). Top 100 : rang, avatar, pseudo, niveau, points ; or,
 // argent et bronze pour les 3 premiers. Un joueur hors du top 100 voit
 // d'abord sa propre position ; en la touchant, il ouvre le top 100.
 // Chaque pseudo peut être signalé (🚩) : après plusieurs signalements de
@@ -33,8 +34,37 @@ const titreJeu = (fiche) => (fiche ? fiche.i18n?.[langue()]?.title || fiche.titl
 
 const $ = (id) => document.getElementById(id);
 
+const compteJeux = (perimetre) => R.CLASSEMENT_PERIMETRES_JEUX.includes(perimetre);
+
 function points(perimetre, n) {
+  if (compteJeux(perimetre)) return t('classement.pointsJeux', { n });
   return t(perimetre === 'etoiles' ? 'classement.pointsEtoiles' : 'classement.pointsXp', { n });
+}
+
+// « Au total » n'existe que pour les jeux terminés (dernière option). En le
+// quittant pour un autre classement, on revient à la période par défaut.
+function majPeriodes() {
+  const choix = $('classement-periode');
+  const total = choix.querySelector('option[value="total"]');
+  if (compteJeux($('classement-perimetre').value)) {
+    if (total) return;
+    const option = document.createElement('option');
+    option.value = 'total';
+    option.textContent = t('classement.total');
+    choix.append(option);
+  } else if (total) {
+    const choisi = choix.value === 'total';
+    total.remove();
+    if (choisi) choix.value = R.CLASSEMENT_PERIODES[0];
+  }
+}
+
+// Phrase sous les choix : ce qui compte (jeux terminés) et depuis quand.
+function texteAide(perimetre, periode, debut) {
+  const depuis = periode === 'total'
+    ? t('classement.depuisToujours')
+    : t(periode === 'mois' ? 'classement.depuisMois' : 'classement.depuisSemaine', { date: date(Date.parse(`${debut}T00:00:00Z`), { day: 'numeric', month: 'long' }) });
+  return compteJeux(perimetre) ? `${t(`classement.aide.${perimetre}`)} ${depuis}` : depuis;
 }
 
 // Petite couronne (or, argent, bronze : place de la période précédente), avec son texte pour les lecteurs d'écran.
@@ -75,7 +105,7 @@ async function chargerAmis() {
   if (!r.ok) { $('classement-etat').textContent = t('amis.erreur'); return r.statut >= 500 ? { arreter: true } : {}; }
   const d = r.donnees;
   $('classement-etat').textContent = '';
-  $('classement-aide').textContent = t(periode === 'mois' ? 'classement.depuisMois' : 'classement.depuisSemaine', { date: date(Date.parse(`${d.debut}T00:00:00Z`), { day: 'numeric', month: 'long' }) });
+  $('classement-aide').textContent = texteAide(perimetre, d.periode, d.debut);
   $('classement-amis-vide').hidden = d.lignes.some((l) => l.ami);
   $('classement-presence').hidden = d.presence !== 'indisponible';
   liste.hidden = false;
@@ -155,6 +185,7 @@ async function chargerHistorique({ suite = null } = {}) {
 }
 
 async function charger() {
+  majPeriodes();
   chargerHistorique();
   const amis = $('classement-portee').value === 'amis';
   $('classement-amis-barre').hidden = !amis;
@@ -178,7 +209,7 @@ async function charger() {
   moiBouton.hidden = true;
   const r = await classement(perimetre, periode);
   if (r.erreur) { $('classement-etat').textContent = t(r.erreur === 'hors' ? 'profil.horsLigne' : 'profil.erreur'); return; }
-  $('classement-aide').textContent = t(periode === 'mois' ? 'classement.depuisMois' : 'classement.depuisSemaine', { date: date(Date.parse(`${r.debut}T00:00:00Z`), { day: 'numeric', month: 'long' }) });
+  $('classement-aide').textContent = texteAide(perimetre, r.periode, r.debut);
   $('classement-etat').textContent = r.top.length ? '' : t('classement.vide');
   const moiId = r.moi?.id ?? etat()?.id;
   const couronnes = lireCouronnes(r.couronnes);
@@ -189,7 +220,7 @@ async function charger() {
     moiBouton.hidden = false;
     moiBouton.textContent = r.moi.rang
       ? t('classement.maPosition', { n: r.moi.rang, points: points(perimetre, r.moi.points) })
-      : t('classement.pasClasse', { n: R.CLASSEMENT_NIVEAU_MIN });
+      : t(compteJeux(perimetre) ? `classement.pasClasse.${perimetre}` : 'classement.pasClasse', { n: R.CLASSEMENT_NIVEAU_MIN });
     if (r.top.length) {
       liste.hidden = true;
       moiBouton.setAttribute('aria-expanded', 'false');

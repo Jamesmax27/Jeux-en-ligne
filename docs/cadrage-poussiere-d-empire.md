@@ -432,16 +432,16 @@ Le lot 3 termine la campagne : actes 4 et 5, missions 61 à 100, 300 étoiles, b
 | Série | Missions | Robot de niveau 2 : minimum | Moyenne |
 | --- | --- | --- | --- |
 | R, réglage (20 parties) | 21 à 60 | 75 % (mission 58) | 94 % |
-| R, réglage (20 parties) | 61 à 100 | 75 % (mission 80) | 94 % |
+| R, réglage (20 parties) | 61 à 100 | 75 % (missions 80 et 99) | 93 % |
 | C, contrôle (100 parties) | 21 à 60 | 77 % (mission 33) | 94 % |
-| C, contrôle (100 parties) | 61 à 100 | **55 % (mission 99)** | 92 % sans la mission 99 |
+| C, contrôle (100 parties) | 61 à 100 | 71 % (mission 76) | 92 % |
 
 Sur 61 à 100 en série R : robot de niveau 1 à 50 % au plus (hors missions sans rival et 3 premières de chaque acte), joueur sans ordre battu sur toutes les missions à rival, secondaire réussi au moins une fois sur chaque mission. Le coût de la simulation est de 0,031 ms par tick avec des robots de niveau 3 et l'instantané le plus lourd fait 14 094 caractères. Rendu dans Edge, à 120 nœuds et environ 230 flottes (300 flottes non atteintes) : médiane de 2,1 ms par image, 95e centile de 6,1 ms au plus.
 
 **Limites connues.**
 
 - Personne n'a joué ces 40 missions pour de vrai : ni humain, ni vrai téléphone, ni son. Toutes les difficultés viennent de robots.
-- La mission 99 tombe à 55 % sur la série de contrôle, sous les 65 % visés. Conformément au contrat, cette série n'a servi à aucun réglage et rien n'a été retouché après sa lecture : à reprendre après un essai réel.
+- La mission 99 tombait à 55 % sur la série de contrôle (les rivaux éliminaient le robot). Leurs capitales sont passées de 5 150, 4 500 et 4 500 à 3 400, 3 000 et 3 000 forces, réglées sur une série à part (graines 800 000 et suivantes), sans se servir de la série de contrôle : 89 % sur 100 parties neuves (graines 900 000 et suivantes), 89 % sur la série de contrôle, 75 % sur les 20 parties du test.
 - Les missions 78 et 80 sont très contrastées : le robot y gagne vite ou se fait éliminer, et leur médiane reste proche de 60 s (654 et 635 ticks).
 - Plusieurs missions restent courtes pour un robot au regard des 6 à 10 minutes visées pour un joueur ; la durée humaine n'est pas mesurée.
 - Sur les missions 65, 71 et 83, à 390 px, aucune route de front n'est entièrement visible au départ : on voit les nœuds du joueur, pas encore ce qu'ils peuvent prendre.
