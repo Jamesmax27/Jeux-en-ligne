@@ -61,6 +61,18 @@
 //       mission 21 à 60 jouée jusqu'au bout ; avec --missions, 20 parties par mission et par robot : niveau 2 ≥ 70 %,
 //       niveau 1 ≤ 70 % sur 33 à 40 et ≤ 50 % sur 45 à 60 (missions avec un rival), joueur sans ordre toujours battu
 //       (5 parties par mission à rival), bloquants sauf --souple ou --rapide ; tvise comparé à la règle de l'acte 1.
+//   15. actes 4 et 5 et bac à sable (CONTRAT-LOT3) : cartes (galaxie, toile : connexes, 24 provinces, routes, rivaux, zones
+//       de 15 à 120 nœuds, conquêtes qui couvrent toute la carte à la fin de chaque acte), règles isolées (Pont, Essaimage,
+//       Sursaut, vagues, robots, rivaux entre eux), bac à sable (carte fixée par la graine, reprise, fin), déterminisme
+//       avec les trois capacités (rejeu, reprise, JEL_TR.Simulation contre PE_PILOTE.Simulation), instantané, coût d'un
+//       tick, chaque mission 61 à 100 jouée jusqu'au bout ; avec --missions, seuils du contrat du lot 3 (section 4) :
+//       robot 2 ≥ 70 %, robot 1 ≤ 50 % (missions à rival, hors 3 premières de l'acte), médiane du robot 2 ≥ 600 ticks,
+//       objectif secondaire réussi au moins une fois par le robot 2 ou 3, joueur sans ordre battu, joueur glouton
+//       (un geste toutes les 1,3 s, attaque directe) jamais vainqueur en moins de 60 s.
+//   --controle  seul : robot 2 sur les missions 21 à 100, 100 graines de la série de contrôle (jamais utilisées pour
+//               régler ; hors CI) ; objectif ≥ 65 % partout (avertissement en dessous). TRAVAILLEURS=n : nombre de fils.
+// Les parties de --missions sont jouées par des fils de travail (node:worker_threads), sans les hachages de contrôle
+// (le déterminisme est vérifié à part, sections 4 et 14 c, 15 d) : mêmes résultats, bien plus vite.
 // Rien n'est écrit sur le disque. Code de sortie 1 dès qu'un problème bloquant a
 // été rencontré (tous les contrôles possibles sont quand même joués et imprimés) ;
 // les avertissements (⚠) ne changent pas le code de sortie.
@@ -69,7 +81,9 @@
 import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Worker, isMainThread, parentPort, workerData } from 'node:worker_threads';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ID = 'poussiere-d-empire';
@@ -78,6 +92,7 @@ const AVEC_MISSIONS = args.includes('--missions');
 const AVEC_CARTES = args.includes('--cartes');
 const RAPIDE = args.includes('--rapide');
 const SOUPLE = args.includes('--souple');
+const AVEC_CONTROLE = args.includes('--controle');
 const DETAIL = !!process.env.DETAIL;             // DETAIL=1 : une ligne par duel (mise au point)
 const iSources = args.indexOf('--sources');
 const SOURCES = iSources >= 0 ? args[iSources + 1] : null;
@@ -89,8 +104,8 @@ const TICKS = RAPIDE ? 1500 : 6000;              // ticks de chaque partie rejou
 const PARTIES = RAPIDE ? 5 : 20;                 // parties des duels et des missions
 const TICK_INSTANTANE = RAPIDE ? 750 : 3000;     // reprise depuis l'instantané de ce tick
 const NB_MISSIONS = 20;                          // missions de l'acte 1 (contrôles 1 à 13, inchangés)
-const NB_JOUABLES = 60;                          // missions jouables : actes 1 à 3 (contrat du lot 2)
-const NB_FICHES = 100;                           // 5 actes × 20 missions ; 61 à 100 : fiches « verrou »
+const NB_JOUABLES = 100;                         // missions jouables : les 5 actes (contrat du lot 3)
+const NB_FICHES = 100;                           // 5 actes × 20 missions
 const TICKS_SUITE = RAPIDE ? 800 : 3000;         // ticks des rejeux des actes 2 et 3
 const PARTIES_SUITE = RAPIDE ? 3 : 20;           // parties par mission 21 à 60 et par robot avec --missions
 const PARTIES_PASSIF_SUITE = RAPIDE ? 2 : 5;     // parties du joueur sans ordre, par mission à rival (longues : jusqu'à tmax)
@@ -178,6 +193,122 @@ function evaluerBlocs(blocs, ids, fenetre) {
 }
 
 // --------------------------------------------------------------------------
+// Fil de travail : joue des lots de parties (contexte « nu », celui du jeu publié)
+// tache : { m, niveau (0 : personne ne joue le camp du joueur), graines, varie, limite, court, siege, glouton }
+// --------------------------------------------------------------------------
+
+const SANS_CONTROLE = { hashTous: 1 << 30, instantaneTous: 1 << 30 };   // ni hachage ni instantané : la partie n'en dépend pas
+// Joueur « glouton » : un geste toutes les 13 ticks (1,3 s) : 100 % de la source qui a la plus grande avance sur un voisin à
+// prendre, les cibles de l'objectif d'abord. Pas de plan, pas de défense : il mesure si l'attaque directe suffit.
+function gesteGlouton(sim, e, bonus) {
+  let b = null;
+  for (let a = 0; a < e.nn; a++) {
+    if (e.p[a] !== 0 || e.f[a] < 6) continue;
+    for (const j of e.m.vois[a]) {
+      if (e.p[j] === 0 || (e.p[j] > 0 && e.eq[e.p[j]] === 0)) continue;
+      const sc = e.f[a] - e.f[j] * 1.2 + (e.o.l && e.o.l.includes(j) ? bonus : 0);
+      if (!b || sc > b.s) b = { s: sc, a, j };
+    }
+  }
+  return b && sim.valide(e, 0, [1, b.a, b.j, 100]) ? [1, b.a, b.j, 100] : null;
+}
+// Joueur « ciblé » (relecture du lot 3) : un geste toutes les 13 ticks, 100 % de sa plus grosse pile, sur le plus court
+// chemin vers l'objectif. Il mesure si une seule pile lancée en ligne droite suffit à gagner.
+function ciblesDirectes(e) {
+  const o = e.o || {}; let T = [];
+  if (o.t === 7) { for (let i = 0; i < e.nn; i++) if (e.p[i] > 0 && (o.l || []).includes(e.p[i])) T.push(i); }
+  else if (o.l && o.l.length) T = o.l.filter((i) => e.p[i] !== 0);
+  if (!T.length) for (let c = 1; c < e.c.length; c++) { const cp = e.c[c].cap; if (cp >= 0 && e.c[c].v && e.eq[c] !== e.eq[0]) T.push(cp); }
+  if (!T.length) for (let i = 0; i < e.nn; i++) if (e.p[i] !== 0) T.push(i);
+  return T;
+}
+function gesteCible(sim, e) {
+  const n = e.nn, d = new Int32Array(n).fill(1e9), q = [];
+  for (const t of ciblesDirectes(e)) { d[t] = 0; q.push(t); }
+  for (let h = 0; h < q.length; h++) for (const j of e.m.vois[q[h]]) if (d[j] > d[q[h]] + 1) { d[j] = d[q[h]] + 1; q.push(j); }
+  let b = null;
+  for (let a = 0; a < n; a++) {
+    if (e.p[a] !== 0 || e.f[a] < 6) continue;
+    let j0 = -1;
+    for (const j of e.m.vois[a]) if (d[j] < d[a] && (j0 < 0 || d[j] < d[j0])) j0 = j;
+    if (j0 < 0) continue;
+    const s = e.f[a] - (e.p[j0] === 0 ? 0 : e.f[j0] * 0.5) - d[a] * 5;
+    if (!b || s > b.s) b = { s, a, j: j0 };
+  }
+  return b && sim.valide(e, 0, [1, b.a, b.j, 100]) ? [1, b.a, b.j, 100] : null;
+}
+function jouerLot(X, t) {
+  const fiche = X.D.missions[t.m - 1], sortie = [];
+  const limite = t.limite || (fiche.tmax > 0 ? fiche.tmax + 1 : 20001), bonus = Math.max(30, fiche.neutres[1] >> 1);
+  for (let i = 0; i < t.graines.length; i++) {
+    const r = { fin: 0, ga: -1, k: 0, ra: 0, et: 0, sec: 0, si: 0, fl: null, err: null };
+    try {
+      const g = t.graines[i], config = JSON.parse(JSON.stringify(X.S.configMission(t.m, { graine: g, vent: 0 })));
+      config.ctl[0] = t.niveau;
+      const s = new X.P.Simulation(X.S, g, config, SANS_CONTROLE);
+      // Missions à carte fixe (graine de la fiche) : seul le hasard de l'état varie d'une partie à l'autre.
+      if (t.varie && fiche.graine && i > 0) s.etat.a = (fiche.graine ^ (i * 0x9e3779b9)) >>> 0;
+      const cap0 = s.etat.m.cap[0];
+      let seq = 0, file = [];
+      while (!s.resultat && s.k() < limite) {
+        let ordres = [];
+        if (t.glouton || t.cible) {
+          const k = s.k();
+          ordres = file.filter((o) => o[0] <= k + 1).map((o) => o[1]); file = file.filter((o) => o[0] > k + 1);
+          if (k % 13 === 0) { const o = t.cible ? gesteCible(X.S, s.etat) : gesteGlouton(X.S, s.etat, bonus); if (o) file.push([k + 2, [0, ++seq].concat(o)]); }
+        }
+        s.avancer(ordres);
+        if (!r.fl && s.k() % 97 === 0) r.fl = X.O.premierFlottant(s.etat);
+        if (t.siege && !r.si) for (const ev of s.etat.ev) if (ev[0] === 4 && ev[1] === cap0 && ev[2] !== 0) r.si = 1;
+      }
+      r.k = s.k();
+      if (s.resultat) {
+        const e = s.etat;
+        r.fin = 1; r.ga = s.resultat.gagnant; r.ra = s.resultat.raison; r.et = s.resultat.etoiles | 0;
+        r.sec = r.ga === 0 && e.s2.t && e.s2.ok && (e.s2.t !== 3 || e.s2.x === 1) ? 1 : 0;
+      } else if (t.court) r.fin = 1;                                       // arrêt voulu : sans ordre, cet objectif est hors d'atteinte
+    } catch (err) { r.err = err.message; }
+    sortie.push(r);
+  }
+  return sortie;
+}
+if (!isMainThread) {
+  const f = evaluerBlocs(workerData.blocs, BLOCS, {}), X = { S: f.JEL_SIM, D: f.PE_DONNEES, P: f.PE_PILOTE, O: f.PE_OUTILS };
+  parentPort.on('message', ({ id, tache }) => parentPort.postMessage({ id, lot: jouerLot(X, tache) }));
+  await new Promise(() => {});                                             // le fil reste à l'écoute jusqu'à terminate()
+}
+
+// Joue toutes les tâches sur NB_FILS fils ; renvoie les lots dans l'ordre des tâches.
+const NB_FILS = Math.max(1, Math.min(16, Number(process.env.TRAVAILLEURS) || (os.availableParallelism ? os.availableParallelism() : os.cpus().length)));
+async function lancerLots(taches) {
+  const lots = new Array(taches.length);
+  let suivante = 0;
+  await Promise.all(Array.from({ length: Math.min(NB_FILS, taches.length) }, () => new Promise((fini, echec) => {
+    const w = new Worker(fileURLToPath(import.meta.url), { workerData: { blocs } });
+    const envoyer = () => { if (suivante >= taches.length) { w.terminate().then(fini); return; } const id = suivante++; w.postMessage({ id, tache: taches[id] }); };
+    w.on('message', ({ id, lot }) => { lots[id] = lot; envoyer(); });
+    w.on('error', echec);
+    envoyer();
+  })));
+  return lots;
+}
+// Résumé d'un lot ; les anomalies (exception, état non entier, partie sans fin) sont des problèmes bloquants.
+function bilanLot(lot, sujet) {
+  const r = { v: 0, n: 0, t: [], tv: [], ra: {}, et: 0, sec: false, assiegees: 0 };
+  for (const p of lot) {
+    if (p.err) { probleme(sujet, p.err); continue; }
+    if (p.fl) probleme(sujet, `état non entier : ${p.fl}`);
+    if (!p.fin) { probleme(sujet, `partie sans fin au tick ${p.k}`); continue; }
+    r.n++; r.t.push(p.k); r.ra[p.ra] = (r.ra[p.ra] || 0) + 1; if (p.si) r.assiegees++;
+    if (p.ga === 0) { r.v++; r.tv.push(p.k); r.et += p.et; if (p.sec) r.sec = true; }
+  }
+  return r;
+}
+const serie = (n, f) => Array.from({ length: n }, (_, i) => f(i));
+// Sans ordre, le joueur ne prend rien : un objectif de conquête (1, 2, 3, 4, 9) est hors d'atteinte, inutile d'aller jusqu'à tmax.
+const objectifConquete = (fiche) => [1, 2, 3, 4, 9].includes(fiche.objectif.t);
+
+// --------------------------------------------------------------------------
 // Moteur temps réel, chargé à part (import) : JEL_TR
 // --------------------------------------------------------------------------
 
@@ -233,6 +364,23 @@ try {
   sortir();
 }
 const simNu = NU.JEL_SIM, simTR = MOTEUR.JEL_SIM, D = NU.PE_DONNEES, OUTILS = NU.PE_OUTILS, PILOTE = NU.PE_PILOTE;
+
+// --------------------------------------------------------------------------
+// --controle : série de contrôle (contrat du lot 3, section 4), graines jamais utilisées pour régler
+// --------------------------------------------------------------------------
+
+if (AVEC_CONTROLE) {
+  const N = 100, debut = Date.now(), taches = serie(80, (i) => ({ m: 21 + i, niveau: 2, graines: serie(N, (x) => 600000 + 1000 * (21 + i) + x) }));
+  titre(`Série de contrôle : robot 2 à la place du joueur, missions 21 à 100, ${N} graines (${NB_FILS} fils ; objectif ≥ 65 %)`);
+  const lots = await lancerLots(taches), taux = [];
+  taches.forEach((t, i) => {
+    const r = bilanLot(lots[i], `mission ${t.m}`), v = pct(r.v, r.n); taux.push(v);
+    const ligne = `mission ${t.m} : ${v} % (${r.v} / ${r.n}), médiane ${mediane(r.t)} ticks`;
+    if (v < 65) avertir('contrôle', `${ligne} : sous les 65 % visés`); else ok(ligne);
+  });
+  console.log(`\nContrôle : minimum ${Math.min(...taux)} %, moyenne ${Math.round(taux.reduce((a, b) => a + b, 0) / taux.length)} %, ${taux.filter((v) => v < 65).length} mission(s) sous 65 %, ${Math.round((Date.now() - debut) / 1000)} s`);
+  sortir();
+}
 
 // --------------------------------------------------------------------------
 // 2. PE_OUTILS identique au moteur
@@ -377,7 +525,10 @@ titre('3. Interfaces du contrat');
   }
   if (!D.silhouette2 || !Array.isArray(D.silhouette2.corps)) f('pe-donnees', 'silhouette2 { orbites, corps } attendue');
   if (Array.isArray(D.capacites)) for (const c of D.capacites) if (CAPACITE_MISSION[c.id] !== c.mission) f('pe-donnees', `capacité ${c.id} : gagnée à la mission ${CAPACITE_MISSION[c.id]} attendue (${c.mission} obtenue)`);
-  if (!Array.isArray(D.planetes) || D.planetes[0] !== null || !D.planetes[1] || !D.planetes[2] || !D.planetes[3]) f('pe-donnees', 'planetes : [ null, PLANETE_1, SYSTEME, AMAS ] attendu (contrat du lot 2, section 1)');
+  if (!Array.isArray(D.planetes) || D.planetes[0] !== null || [1, 2, 3, 4, 5].some((a) => !D.planetes[a])) f('pe-donnees', 'planetes : [ null, PLANETE_1, SYSTEME, AMAS, GALAXIE, TOILE ] attendu (contrats des lots 2 et 3)');
+  for (const fa of [7, 8, 9, 10, 11]) if (!D.factions[fa] || !D.factions[fa].perso) f('pe-donnees', `faction ${fa} : personnalité attendue (contrat du lot 3)`);
+  if (typeof simNu.configBac !== 'function' || typeof simNu.planeteBac !== 'function' || typeof simNu.graineSuivante !== 'function') f('pe-sim', 'configBac, planeteBac, graineSuivante attendus (contrat du lot 3, section 5)');
+  if (!D.bac) f('pe-donnees', 'bac attendu (réglages du bac à sable)');
   if (!D.pulsar || D.pulsar.periode !== 200 || D.pulsar.ferme !== 50) f('pe-donnees', 'pulsar { periode: 200, ferme: 50 } attendu');
   if (!D.silhouettes || !D.silhouettes[4] || !Array.isArray(D.silhouettes[4].points) || !D.silhouettes[4].points.length) f('pe-donnees', 'silhouettes[4] { points } attendue (galaxie, après l\'acte 3)');
   for (const fn of ['planete', 'proprietaires', 'conquetes', 'missionsActe', 'position']) if (typeof simNu[fn] !== 'function') f('pe-sim', `aide JEL_SIM.${fn} absente (contrat v2, section 3)`);
@@ -413,7 +564,7 @@ function configMission(sim, m, graine, ctl0 = 0) {
 // Carte « ligne » : 2 camps. camps est lu par JEL_TR.Simulation (campsDe : sans lui, le moteur
 // crée sim.camps = 6 entrées ctl) ; pe-sim.depart le lit aussi (2 par défaut pour la ligne).
 const configLigne = (ctl) => ({ ligne: 1, ctl: ctl.slice(), camps: ctl.length });
-const nomConfig = (cfg) => (cfg.ligne ? `« ligne » (ctl ${cfg.ctl.join('/')})` : `mission ${cfg.mission} (carte ${cfg.graine}, ctl ${cfg.ctl.join('/')})`);
+const nomConfig = (cfg) => (cfg.bac ? `bac ${cfg.bac.taille} (${cfg.bac.rivaux} rivaux, niveau ${cfg.bac.niveau})` : cfg.ligne ? `« ligne » (ctl ${cfg.ctl.join('/')})` : `mission ${cfg.mission} (carte ${cfg.graine}, ctl ${cfg.ctl.join('/')})`);
 
 // Hasard du test (jamais celui de l'état) : alea(n) → entier de 0 à n − 1, déterministe par graine.
 const hasardTest = (graine) => TR.aleaDe({ a: (graine ^ 0x5bd1e995) >>> 0 });
@@ -457,7 +608,8 @@ const CONFIGS = [
 ];
 let msTickTotal = 0, ticksTotal = 0, tailleMax = 0;
 // nbTicks, tickSnap : longueur de la partie, tick de l'instantané ; cumuler : compte dans les mesures de l'acte 1.
-function controleRejeu(nom, faireConfig, graine, nbTicks, tickSnap, cumuler) {
+// ordresSup (facultatif) : (sim, etat, k) → ordres de plus pour le camp 0 (capacités des actes 4 et 5).
+function controleRejeu(nom, faireConfig, graine, nbTicks, tickSnap, cumuler, ordresSup = null) {
   const sujet = `rejeu ${nom}`;
   let config;
   try { config = faireConfig(); } catch (e) { probleme(sujet, `configuration impossible : ${e.message}`); return; }
@@ -474,6 +626,7 @@ function controleRejeu(nom, faireConfig, graine, nbTicks, tickSnap, cumuler) {
   let msAvancer = 0;
   for (let k = 0; k < nbTicks && !s.resultat; k++) {
     if (k % 7 === 0) for (const o of ordresEssai(simTR, s.etat, 0, alea)) { if (cad.recevoir(0, ++seq, o)) nbOrdres++; else refuses++; }
+    if (ordresSup) for (const o of ordresSup(simTR, s.etat, k)) { if (cad.recevoir(0, ++seq, o)) nbOrdres++; else refuses++; }
     if (k === 1500 && camps > 1) cad.controle(1, 3);                 // le camp 1 change de robot en cours de partie
     if (k % 13 === 0) cad.recevoir(0, ++seq, [9, 9999, 0, 0]);       // ordre mal formé pour le jeu : ignoré par valide
     const paquet = cad.pas();
@@ -785,29 +938,24 @@ titre(`11. Mission 1 gagnée par essais.ordres en moins de 3 000 ticks ; mission
 if (AVEC_MISSIONS) {
   titre(`12. Missions 1 à ${NB_MISSIONS} × ${PARTIES} parties, robot à la place du joueur (niveau 2 : ≥ 70 % attendus ; niveau 1 : ≤ ${TAUX_MAX_ROBOT1_FIN_ACTE} % sur les missions ${MISSIONS_FIN_ACTE[0]} à ${MISSIONS_FIN_ACTE[MISSIONS_FIN_ACTE.length - 1]}, indicatif ailleurs${SOUPLE ? ' ; non bloquant (--souple)' : ''})`);
   mesures.missions = {};
+  const taches = [];
+  for (const niveau of [2, 1]) for (let m = 1; m <= NB_MISSIONS; m++) {
+    // Missions à carte fixe (graine de la fiche) : la carte ne change pas, seul le hasard de l'état varie (varie).
+    const fiche = D.missions[m - 1];
+    taches.push({ m, niveau, graines: serie(PARTIES, (i) => fiche.graine || 6000 + 100 * m + i), varie: true });
+  }
+  for (const mp of MISSIONS_PASSIF) taches.push({ m: mp, niveau: 0, graines: serie(PARTIES, (i) => D.missions[mp - 1].graine || 6500 + 100 * mp + i), limite: 20001, siege: true });
+  const lots = await lancerLots(taches);
+  let x = 0;
   for (const niveau of [2, 1]) {
     for (let m = 1; m <= NB_MISSIONS; m++) {
       const sujet = `mission ${m}, robot ${niveau}`;
       const fiche = D.missions[m - 1];
-      const r = { victoires: 0, parties: 0, ticks: [], ticksV: [], raisons: {}, etoiles: 0 };
-      try {
-        for (let i = 0; i < PARTIES; i++) {
-          const graine = fiche.graine || 6000 + 100 * m + i;
-          const s = new TR.Simulation(simTR, graine, configMission(simTR, m, graine, niveau));
-          // Missions à carte fixe (graine de la fiche) : la carte ne change pas d'une partie à
-          // l'autre, seul le hasard de l'état varie (sinon les 20 parties seraient identiques).
-          if (fiche.graine && i > 0) s.etat.a = (fiche.graine ^ (i * 0x9e3779b9)) >>> 0;
-          const limite = fiche.tmax > 0 ? fiche.tmax + 1 : 20001;
-          while (!s.resultat && s.k() < limite) s.avancer([]);
-          if (!s.resultat) { probleme(sujet, `partie ${i} sans fin au tick ${s.k()}`); break; }
-          r.parties++; r.ticks.push(s.k()); r.raisons[s.resultat.raison] = (r.raisons[s.resultat.raison] || 0) + 1;
-          if (s.resultat.gagnant === 0) { r.victoires++; r.ticksV.push(s.k()); r.etoiles += s.resultat.etoiles | 0; }
-        }
-      } catch (err) { probleme(sujet, err.message); }
-      if (!r.parties) continue;
-      const taux = pct(r.victoires, r.parties);
-      mesures.missions[`m${m}n${niveau}`] = { taux, mediane: mediane(r.ticks) };
-      const detail = `${sujet} : ${r.victoires} / ${r.parties} victoires (${taux} %), médiane ${mediane(r.ticks)} ticks (victoires : ${mediane(r.ticksV)}), ${(r.etoiles / Math.max(1, r.victoires)).toFixed(1)} étoile(s) par victoire, ${raisonsDe(r.raisons)}${fiche.graine ? ' (carte fixe, hasard varié)' : ''}`;
+      const r = bilanLot(lots[x++], sujet);
+      if (!r.n) continue;
+      const taux = pct(r.v, r.n);
+      mesures.missions[`m${m}n${niveau}`] = { taux, mediane: mediane(r.t) };
+      const detail = `${sujet} : ${r.v} / ${r.n} victoires (${taux} %), médiane ${mediane(r.t)} ticks (victoires : ${mediane(r.tv)}), ${(r.et / Math.max(1, r.v)).toFixed(1)} étoile(s) par victoire, ${raisonsDe(r.ra)}`;
       if (niveau === 2 && taux < 70) { if (SOUPLE) avertir('missions', `${detail} : sous les 70 % attendus`); else probleme('missions', `${detail} : 70 % attendus`); }
       else if (niveau === 1 && MISSIONS_FIN_ACTE.includes(m) && taux > (TAUX_MAX_ROBOT1_PAR_MISSION[m] ?? TAUX_MAX_ROBOT1_FIN_ACTE)) {
         const t = `${detail} : ${TAUX_MAX_ROBOT1_PAR_MISSION[m] ?? TAUX_MAX_ROBOT1_FIN_ACTE} % au plus attendus (fin d'acte trop facile pour un joueur peu attentif)`;
@@ -816,9 +964,9 @@ if (AVEC_MISSIONS) {
       else ok(detail);
       // Temps visé (règle du 17 novembre 2026) : 1,5 × la médiane des victoires du robot de niveau 2, bornée
       // entre 50 % et 100 % de la durée visée (dv, secondes) et arrondie à 10 s ; objectifs à durée fixe : d.
-      if (niveau === 2 && r.ticksV.length && fiche.dv && ![5, 6, 8].includes(fiche.objectif.t)) {
-        const borne = Math.min(fiche.dv * 10, Math.max(Math.round((fiche.dv * 5) / 100) * 100, Math.round((1.5 * mediane(r.ticksV)) / 100) * 100));
-        if (Math.abs(borne - fiche.tvise) > 100) avertir('temps visé', `mission ${m} : tvise ${fiche.tvise}, la règle donne ${borne} (médiane des victoires ${mediane(r.ticksV)} ticks, dv ${fiche.dv} s)`);
+      if (niveau === 2 && r.tv.length && fiche.dv && ![5, 6, 8].includes(fiche.objectif.t)) {
+        const borne = Math.min(fiche.dv * 10, Math.max(Math.round((fiche.dv * 5) / 100) * 100, Math.round((1.5 * mediane(r.tv)) / 100) * 100));
+        if (Math.abs(borne - fiche.tvise) > 100) avertir('temps visé', `mission ${m} : tvise ${fiche.tvise}, la règle donne ${borne} (médiane des victoires ${mediane(r.tv)} ticks, dv ${fiche.dv} s)`);
       }
     }
   }
@@ -829,23 +977,11 @@ if (AVEC_MISSIONS) {
     const sujet = `mission ${mp}, joueur sans ordre`;
     const fiche = D.missions[mp - 1];
     const tenir = fiche.objectif && fiche.objectif.t === 5;
-    let victoires = 0, parties = 0, assiegees = 0;
-    const ks = [];
-    try {
-      for (let i = 0; i < PARTIES; i++) {
-        const graine = fiche.graine || 6500 + 100 * mp + i;
-        const s = new TR.Simulation(simTR, graine, configMission(simTR, mp, graine, 0));
-        const cap0 = s.etat.m.cap[0];
-        let vu = false;
-        while (!s.resultat && s.k() < 20001) { s.avancer([]); if (!vu) for (const e of s.etat.ev) if (e[0] === 4 && e[1] === cap0 && e[2] !== 0) vu = true; }
-        if (!s.resultat) { probleme(sujet, `partie ${i} sans fin au tick ${s.k()}`); break; }
-        parties++; ks.push(s.k()); if (vu) assiegees++; if (s.resultat.gagnant === 0) victoires++;
-      }
-    } catch (err) { probleme(sujet, err.message); }
-    if (!parties) continue;
-    mesures.missions[`m${mp}passif`] = { taux: pct(victoires, parties), mediane: mediane(ks), assiegees };
-    const detail = `${sujet} : ${victoires} / ${parties} victoires${tenir ? `, base assiégée dans ${assiegees} parties` : ''}, fin médiane ${mediane(ks)} ticks`;
-    if (victoires > 0 || (tenir && assiegees < parties)) { const t = `${detail} : 0 victoire${tenir ? ' et un siège de la base à chaque partie' : ''} attendus`; if (SOUPLE) avertir('missions', t); else probleme('missions', t); }
+    const r = bilanLot(lots[x++], sujet);
+    if (!r.n) continue;
+    mesures.missions[`m${mp}passif`] = { taux: pct(r.v, r.n), mediane: mediane(r.t), assiegees: r.assiegees };
+    const detail = `${sujet} : ${r.v} / ${r.n} victoires${tenir ? `, base assiégée dans ${r.assiegees} parties` : ''}, fin médiane ${mediane(r.t)} ticks`;
+    if (r.v > 0 || (tenir && r.assiegees < r.n)) { const t = `${detail} : 0 victoire${tenir ? ' et un siège de la base à chaque partie' : ''} attendus`; if (SOUPLE) avertir('missions', t); else probleme('missions', t); }
     else ok(detail);
   }
 }
@@ -967,7 +1103,7 @@ function controlerPlanete() {
   } catch (err) { probleme('planète', `JEL_SIM.planete(1) : ${err.message}`); return; }
   if (!P) { probleme('planète', 'JEL_SIM.planete(1) renvoie null (génération impossible avec ces réglages)'); return; }
   if (simNu.planete(1) !== P) probleme('planète', 'JEL_SIM.planete(1) doit renvoyer la planète en cache (même objet)');
-  if (simNu.planete(4) !== null) probleme('planète', 'JEL_SIM.planete(4) : null attendu (acte sans carte au lot 2)');
+  if (simNu.planete(6) !== null) probleme('planète', 'JEL_SIM.planete(6) : null attendu (il n’y a que cinq actes)');
   const liste = D.echelles[1].liste, tCap = liste.length - 1, tCal = liste.indexOf('calotte');
   let fautes = 0;
   const faute = (texte) => { fautes++; if (fautes <= 12) probleme('planète', texte); };
@@ -1092,7 +1228,7 @@ const ACTES_SUITE = [[2, 21, 40, 130, 170], [3, 41, 60, 160, 190]];
 const NOM_ORDRE = (t) => ({ 1: 'pourcentage', 2: 'nombre', 3: 'liste', 4: 'atteindre', 5: 'tenir', 6: 'survivre', 7: 'éliminer', 8: 'couper', 9: 'course', 10: 'allié' }[t] || t);
 const faux1 = () => 1;                                            // hasard qui ne saute jamais une décision
 
-function controlerActesSuite() {
+async function controlerActesSuite() {
   titre('14 a. Cartes des actes 2 et 3 (connexes, tailles, 24 provinces, routes, positions, numérotation)');
   for (const [acte, debut, fin, nMin, nMax] of ACTES_SUITE) {
     const sujet = `carte de l'acte ${acte}`;
@@ -1397,30 +1533,25 @@ function controlerActesSuite() {
   const ecart = (sujet, texte) => { if (bloquant) probleme(sujet, texte); else avertir(sujet, texte); };
   titre(`14 e. Missions 21 à 60 : ${NB} partie(s) par mission et par robot à la place du joueur${AVEC_MISSIONS ? ` (niveau 2 ≥ 70 % ; niveau 1 ≤ 70 % sur 33 à 40, ≤ 50 % sur 45 à 60${bloquant ? '' : ' ; non bloquant'})` : ' (doivent aller au bout sans erreur)'}`);
   mesures.missionsSuite = {};
-  const lignes = [];
+  const lignes = [], niveaux = AVEC_MISSIONS ? [2, 1] : [2], taches = [];
+  for (let m = 21; m <= 60; m++) for (const niveau of niveaux) taches.push({ m, niveau, graines: serie(NB, (i) => 8000 + 100 * m + i) });
+  const rival = (fiche) => fiche.camps.some((c, x) => x > 0 && c.eq !== 0);
+  const passives = [];
+  if (AVEC_MISSIONS) for (let m = 21; m <= 60; m++) {
+    const fiche = D.missions[m - 1];
+    if (rival(fiche)) passives.push({ m, niveau: 0, graines: serie(PARTIES_PASSIF_SUITE, (i) => 8500 + 100 * m + i), siege: fiche.objectif.t === 5, court: objectifConquete(fiche), limite: objectifConquete(fiche) ? 1500 : 0 });
+  }
+  const lots = await lancerLots(taches.concat(passives));
+  let x = 0;
   for (let m = 21; m <= 60; m++) {
     const fiche = D.missions[m - 1];
-    for (const niveau of AVEC_MISSIONS ? [2, 1] : [2]) {
-      const r = { v: 0, n: 0, t: [], tv: [], ra: {} };
-      try {
-        for (let i = 0; i < NB; i++) {
-          const g = 8000 + 100 * m + i, s = new TR.Simulation(simTR, g, configMission(simTR, m, g, niveau));
-          const lim = fiche.tmax > 0 ? fiche.tmax + 1 : 20001;
-          let flot = null;
-          while (!s.resultat && s.k() < lim) { s.avancer([]); if (!flot && s.k() % 97 === 0) flot = TR.premierFlottant(s.etat); }
-          if (flot) probleme(`mission ${m}`, `état non entier : ${flot}`);
-          if (!s.resultat) { probleme(`mission ${m}`, `partie ${i} sans fin au tick ${s.k()}`); continue; }
-          r.n++; r.t.push(s.k()); r.ra[s.resultat.raison] = (r.ra[s.resultat.raison] || 0) + 1;
-          if (s.resultat.gagnant === 0) { r.v++; r.tv.push(s.k()); }
-        }
-      } catch (err) { probleme(`mission ${m}, robot ${niveau}`, err.message); }
-      const taux = pct(r.v, r.n);
+    for (const niveau of niveaux) {
+      const r = bilanLot(lots[x++], `mission ${m}, robot ${niveau}`), taux = pct(r.v, r.n);
       mesures.missionsSuite[`m${m}n${niveau}`] = { taux, mediane: mediane(r.t) };
       if (AVEC_MISSIONS) {
-        const detail = `mission ${m}, robot ${niveau} : ${r.v} / ${r.n} (${taux} %), médiane ${mediane(r.t)} ticks (victoires ${mediane(r.tv)}), ${raisonsDe(r.ra)}`;
-        const rival = fiche.camps.some((c, x) => x > 0 && c.eq !== 0), plafond = plafondRobot1(m);
+        const detail = `mission ${m}, robot ${niveau} : ${r.v} / ${r.n} (${taux} %), médiane ${mediane(r.t)} ticks (victoires ${mediane(r.tv)}), ${raisonsDe(r.ra)}`, plafond = plafondRobot1(m);
         if (niveau === 2 && taux < 70) ecart('missions', `${detail} : 70 % attendus`);
-        else if (niveau === 1 && rival && plafond !== null && taux > plafond) ecart('missions', `${detail} : ${plafond} % au plus attendus`);
+        else if (niveau === 1 && rival(fiche) && plafond !== null && taux > plafond) ecart('missions', `${detail} : ${plafond} % au plus attendus`);
         else ok(detail);
         // Temps visé : même règle qu'à l'acte 1 (section 12), hors objectifs à durée fixe.
         if (niveau === 2 && r.tv.length && fiche.dv && ![5, 6, 8, 10].includes(fiche.objectif.t)) {
@@ -1435,30 +1566,443 @@ function controlerActesSuite() {
   if (AVEC_MISSIONS) {
     titre(`14 f. Missions 21 à 60 avec un rival, joueur sans ordre (${PARTIES_PASSIF_SUITE} parties par mission : toutes perdues)`);
     let vues = 0;
-    for (let m = 21; m <= 60; m++) {
-      const fiche = D.missions[m - 1];
-      if (!fiche.camps.some((c, x) => x > 0 && c.eq !== 0)) continue;
-      const tenir = fiche.objectif.t === 5;
-      let v = 0, n = 0, assiegees = 0;
-      try {
-        for (let i = 0; i < PARTIES_PASSIF_SUITE; i++) {
-          const g = 8500 + 100 * m + i, s = new TR.Simulation(simTR, g, configMission(simTR, m, g, 0)), cap0 = s.etat.m.cap[0];
-          const lim = fiche.tmax > 0 ? fiche.tmax + 1 : 20001;
-          let vu = false;
-          while (!s.resultat && s.k() < lim) { s.avancer([]); if (!vu) for (const e of s.etat.ev) if (e[0] === 4 && e[1] === cap0 && e[2] !== 0) vu = true; }
-          if (!s.resultat) { probleme(`mission ${m}, joueur sans ordre`, `partie ${i} sans fin au tick ${s.k()}`); continue; }
-          n++; if (vu) assiegees++; if (s.resultat.gagnant === 0) v++;
-        }
-      } catch (err) { probleme(`mission ${m}, joueur sans ordre`, err.message); }
-      mesures.missionsSuite[`m${m}passif`] = { taux: pct(v, n), mediane: 0 };
-      if (v > 0 || (tenir && assiegees < n)) ecart('missions', `mission ${m}, joueur sans ordre : ${v} / ${n} victoires${tenir ? `, base assiégée dans ${assiegees} parties` : ''} : 0 victoire${tenir ? ' et un siège à chaque partie' : ''} attendus`);
+    for (const t of passives) {
+      const tenir = D.missions[t.m - 1].objectif.t === 5, r = bilanLot(lots[x++], `mission ${t.m}, joueur sans ordre`);
+      mesures.missionsSuite[`m${t.m}passif`] = { taux: pct(r.v, r.n), mediane: 0 };
+      if (r.v > 0 || (tenir && r.assiegees < r.n)) ecart('missions', `mission ${t.m}, joueur sans ordre : ${r.v} / ${r.n} victoires${tenir ? `, base assiégée dans ${r.assiegees} parties` : ''} : 0 victoire${tenir ? ' et un siège à chaque partie' : ''} attendus`);
       else vues++;
     }
     ok(`joueur sans ordre battu sur ${vues} missions à rival`);
   }
 }
 
-controlerActesSuite();
+await controlerActesSuite();
+
+// --------------------------------------------------------------------------
+// 15. Actes 4 et 5 et bac à sable : cartes, règles, déterminisme, instantané, coût, parties (CONTRAT-LOT3)
+// --------------------------------------------------------------------------
+
+const ACTES_FIN = [[4, 61, 80, 220, 260], [5, 81, 100, 240, 280]];
+const MISSIONS_REJEU_FIN = [67, 72, 78, 86, 93, 100];
+const MISSION_PONT = 67;                                          // la seule zone en deux morceaux (le Pont les relie)
+const TICKS_FIN = RAPIDE ? 800 : 2500;
+const PARTIES_FIN = RAPIDE ? 3 : 20;                              // parties par mission 61 à 100 et par robot avec --missions
+const PARTIES_GLOUTON = RAPIDE ? 2 : 6;                           // parties du joueur glouton par mission à rival
+const PARTIES_CIBLE = RAPIDE ? 2 : 8;                             // parties du joueur ciblé par mission à rival
+// Durée plancher d'une victoire du joueur ciblé : 20 % de la durée visée de la mission, 60 s au moins.
+const plancherCible = (fiche) => Math.max(600, fiche.dv * 2);
+// Pont permis pour le camp : deux de ses nœuds non voisins, à 1,5 × l'arête moyenne au plus (le plus proche d'abord).
+function chercherPont(sim, e, camp = 0) {
+  const m = e.m, lim = TR.div(m.dmoy * 150, 100);
+  let meilleur = null, bd = 0;
+  for (let a = 0; a < e.nn; a++) {
+    if (e.p[a] !== camp || e.f[a] <= D.capacites[7].cout) continue;
+    for (let b = 0; b < e.nn; b++) {
+      if (b === a || e.p[b] !== camp || m.vois[a].includes(b)) continue;
+      const dx = m.x[a] - m.x[b], dy = m.y[a] - m.y[b], d = TR.racineEntiere(dx * dx + dy * dy);
+      if (d <= lim && (!meilleur || d < bd) && sim.valide(e, camp, [5, a, b])) { meilleur = [5, a, b]; bd = d; }
+    }
+  }
+  return meilleur;
+}
+// Capacités jouées par le « joueur » des rejeux : Essaimage au début, Sursaut et Pont dès qu'ils sont prêts.
+function ordresCapacites(sim, e, k) {
+  const l = [], cc = e.c[0];
+  if (k === 2 && sim.valide(e, 0, [7, 1])) l.push([7, 1]);
+  if (k % 40 === 5 && sim.valide(e, 0, [6])) l.push([6]);
+  if (k % 60 === 7 && cc.r[2] === 0 && (cc.t & 128)) { const o = chercherPont(sim, e); if (o) l.push(o); }
+  return l;
+}
+
+async function controlerActesFin() {
+  titre('15 a. Cartes des actes 4 et 5 (connexes, tailles, 24 provinces, routes, zones de 15 à 120 nœuds, conquêtes)');
+  for (const [acte, debut, fin, nMin, nMax] of ACTES_FIN) {
+    const sujet = `carte de l'acte ${acte}`;
+    let fautes = 0;
+    const faute = (texte) => { fautes++; if (fautes <= 12) probleme(sujet, texte); };
+    const P = simNu.planete(acte), PD = D.planetes[acte], L = D.echelles[acte].liste, tVide = L.indexOf('vide');
+    if (!P) { probleme(sujet, 'JEL_SIM.planete renvoie null'); continue; }
+    if (simNu.planete(acte) !== P) faute('la carte doit rester en cache (même objet)');
+    if (P.forme !== 2) faute(`forme ${P.forme} (2 attendue)`);
+    if (P.orb || P.per) faute('pas d\'orbites attendues');
+    if (P.n < nMin || P.n > nMax) faute(`${P.n} nœuds (${nMin} à ${nMax} attendus)`);
+    if (P.nProv !== 24 || P.cellules.length !== 24) faute(`${P.nProv} provinces (24 attendues)`);
+    let dMin = 9, dMax = 0, longues = 0;
+    for (let i = 0; i < P.n; i++) {
+      if (![P.x[i], P.y[i]].every((v) => Number.isInteger(v) && v >= 0 && v <= 4096)) faute(`nœud ${i} : position non entière ou hors carte`);
+      const v = P.vois[i];
+      dMin = Math.min(dMin, v.length); dMax = Math.max(dMax, v.length);
+      for (let x = 0; x < v.length; x++) {
+        if (x && v[x] <= v[x - 1]) faute(`nœud ${i} : voisins non triés`);
+        if (!P.vois[v[x]].includes(i)) faute(`nœud ${i} : voisin ${v[x]} non symétrique`);
+        const Lr = P.lv[i][x], vide = tVide >= 0 && (P.t[i] === tVide || P.t[v[x]] === tVide);
+        if (!Number.isInteger(Lr) || (vide ? Lr < 40 || Lr > 90 : Lr < 5 || Lr > 40)) faute(`route ${i}-${v[x]} : longueur ${Lr}`);
+        if (vide) longues++;
+      }
+    }
+    if (dMin < 2 || dMax > 6) faute(`routes par nœud : ${dMin} à ${dMax} (2 à 6 attendues)`);
+    if (parties(P.n, P.vois, -1).length !== 1) faute('carte non connexe');
+    let art = 0;
+    for (let a = 0; a < P.n; a++) if (parties(P.n, P.vois, a).length > 1) art++;
+    if (art) faute(`${art} nœud(s) d'articulation`);
+    const vues = new Uint8Array(P.n);
+    let tMin = 99, tMax = 0;
+    for (let k = 0; k < P.nProv; k++) {
+      const cel = P.cellules[k];
+      tMin = Math.min(tMin, cel.length); tMax = Math.max(tMax, cel.length);
+      if (cel.length < PD.taille[0] || cel.length > PD.taille[1]) faute(`province ${k} : ${cel.length} nœuds (${PD.taille[0]} à ${PD.taille[1]} attendus)`);
+      for (const i of cel) { if (P.prov[i] !== k) faute(`nœud ${i} mal rangé`); vues[i]++; }
+      if (parties(P.n, P.vois, -1, (i) => P.prov[i] === k).length !== 1) faute(`province ${k} non contiguë`);
+      const vp = new Set();
+      for (const i of cel) for (const j of P.vois[i]) if (P.prov[j] !== k) vp.add(P.prov[j]);
+      if ([...vp].sort((a, b) => a - b).join(',') !== P.voisinsProv[k].join(',')) faute(`province ${k} : voisinsProv incohérent`);
+    }
+    if ([...vues].some((v) => v !== 1)) faute('les provinces ne couvrent pas exactement la carte');
+    for (let k = 1; k < P.nProv; k++) if (P.niveau[k] < P.niveau[k - 1]) faute(`province ${k} : numérotation non croissante`);
+    if (P.prov[P.capitales[0]] !== 0 || P.t[P.capitales[0]] !== L.length - 1 || P.depart[0] !== 0) faute('capitale du joueur : province 0, type « héritée », province au joueur attendus');
+    for (const nom of L) if (!P.t.some((t) => L[t] === nom)) faute(`aucun nœud de type ${nom}`);
+    // Rivaux au départ.
+    const parFa = {};
+    P.depart.forEach((fa, k) => { if (fa > 0) (parFa[fa] = parFa[fa] || []).push(k); });
+    let detail;
+    if (acte === 4) {
+      const noeuds = (parFa[7] || []).reduce((s, k) => s + P.cellules[k].length, 0), part = pct(noeuds, P.n);
+      if (Object.keys(parFa).join() !== '7') faute(`rivaux au départ : ${Object.keys(parFa)} (le Silence seul attendu)`);
+      if (part < 33 || part > 47) faute(`le Silence tient ${part} % de la carte (environ 40 % attendus)`);
+      if (P.prov[P.capitales[7]] !== P.provCoeur || L[P.t[P.capitales[7]]] !== 'coeur') faute('capitale du Silence : au cœur attendue');
+      if (!P.provBras || P.provBras.length !== 4 || P.provHalo.length !== 4) faute('repères provBras, provHalo attendus');
+      if (P.prov[P.capitales[0]] !== P.provBras[0][P.provBras[0].length - 1]) faute('capitale du joueur : au bout de son bras attendue');
+      // Routes directes entre bras voisins : 2 à 3 par paire.
+      for (let a = 0; a < 4; a++) { const b = (a + 3) % 4; let nb = 0; for (let i = 0; i < P.n; i++) if (P.bras[i] === a) for (const j of P.vois[i]) if (P.bras[j] === b) nb++; if (nb < 2 || nb > 3) faute(`bras ${a} et ${b} : ${nb} routes directes (2 à 3 attendues)`); }
+      detail = `Silence ${part} %`;
+    } else {
+      if (Object.keys(parFa).sort().join() !== '10,11,8,9') faute(`rivaux au départ : ${Object.keys(parFa)} (factions 8 à 11 attendues)`);
+      for (const [fa, l] of Object.entries(parFa)) { if (l.length < 3 || l.length > 4) faute(`faction ${fa} : ${l.length} provinces (3 à 4 attendues)`); if (!l.includes(P.prov[P.capitales[fa]])) faute(`faction ${fa} : capitale hors de ses provinces`); }
+      if (longues < 8) faute(`${longues} extrémités de routes de grand vide seulement`);
+      detail = `${P.vides.length} grands vides`;
+    }
+    if (!fautes) ok(`${sujet} : ${P.n} nœuds, 24 provinces de ${tMin} à ${tMax}, ${dMin} à ${dMax} routes par nœud, connexe, sans articulation, ${detail}`);
+    // Zones et conquêtes.
+    fautes = 0;
+    const fauteZ = (m, texte) => { fautes++; if (fautes <= 24) probleme(`mission ${m}`, texte); };
+    if (simNu.missionsActe(acte).join(',') !== Array.from({ length: 20 }, (_, i) => debut + i).join(',')) fauteZ(debut, 'missionsActe incohérent');
+    const conquises = new Map(), bilans = [];
+    let zMin = 1e9, zMax = 0;
+    for (let m = debut; m <= fin; m++) {
+      const fiche = D.missions[m - 1];
+      if (fiche.verrou) { fauteZ(m, 'fiche encore verrouillée'); continue; }
+      const av = simNu.proprietaires(acte, m);
+      for (const k of simNu.conquetes(m)) { if (conquises.has(k)) fauteZ(m, `province ${k} déjà conquise à la mission ${conquises.get(k)}`); if (av[k] === 0) fauteZ(m, `province ${k} déjà au joueur`); conquises.set(k, m); }
+      if (!simNu.conquetes(m).length) fauteZ(m, 'aucune province conquise');
+      // Ce qui est conquis touche l'empire (province au joueur, ou conquise par la même mission).
+      const cq = simNu.conquetes(m), monde = new Set(av.map((p, k) => (p === 0 ? k : -1)).filter((k) => k >= 0));
+      for (let t = 0; t < cq.length; t++) for (const k of cq) if (!monde.has(k) && P.voisinsProv[k].some((b) => monde.has(b))) monde.add(k);
+      for (const k of cq) if (!monde.has(k)) fauteZ(m, `province ${k} conquise sans toucher l'empire`);
+      let e;
+      try { const c = simNu.configMission(m, { graine: 4321 }); e = simNu.depart(c.graine, c); } catch (err) { fauteZ(m, `depart : ${err.message}`); continue; }
+      const z = e.m, n = z.n, morceaux = parties(n, z.vois, -1).length;
+      zMin = Math.min(zMin, n); zMax = Math.max(zMax, n); bilans.push(`m${m} ${n}`);
+      if (n < 15 || n > 120) fauteZ(m, `${n} nœuds actifs (15 à 120 attendus)`);
+      if (z.forme !== 2) fauteZ(m, `m.forme ${z.forme} (2 attendue)`);
+      if (m === MISSION_PONT) { if (morceaux !== 2) fauteZ(m, `${morceaux} morceaux (2 attendus : aucune route vers l'objectif)`); if (!chercherPont(simNu, e)) fauteZ(m, 'aucun Pont possible au départ'); }
+      else if (morceaux !== 1) fauteZ(m, `zone en ${morceaux} morceaux`);
+      fiche.camps.forEach((c, x) => { if (!e.p.includes(x)) fauteZ(m, `camp ${x} sans territoire au départ`); if (!(z.cap[x] >= 0 && e.p[z.cap[x]] === x)) fauteZ(m, `base du camp ${x} hors de son camp`); });
+      const o = e.o;
+      if ([3, 4, 5, 8, 9].includes(o.t) && !o.l.length) fauteZ(m, `objectif ${NOM_ORDRE(o.t)} sans nœud`);
+      if ((o.t === 1 || o.t === 2) && o.x >= o.n) fauteZ(m, `objectif déjà atteint (${o.x} / ${o.n})`);
+      if (o.t === 3 && o.x >= o.l.length) fauteZ(m, 'objectif déjà atteint');
+      if ((o.t === 4 || o.t === 9) && (o.x !== 0 || (o.t === 9 && e.p[o.l[0]] > 0))) fauteZ(m, 'balise déjà prise au départ');
+      if (o.t === 7 && !o.l.every((c) => e.p.includes(c))) fauteZ(m, 'camp à éliminer absent');
+      if ([6, 8].includes(o.t) && !(fiche.tmax > 0)) fauteZ(m, 'tmax attendu');
+      if (fiche.secondaire.t === 3 && !e.s2.l.length) fauteZ(m, 'objectif secondaire sans nœud');
+      if (fiche.capacite && !D.capacites.some((c) => c.id === fiche.capacite && c.mission === m)) fauteZ(m, `capacité ${fiche.capacite} : mauvaise mission`);
+      const attendu = D.capacites.filter((c) => c.mission < m).reduce((s, c) => s | c.bit, 0);
+      if (fiche.tech !== attendu) fauteZ(m, `tech ${fiche.tech} (${attendu} attendu)`);
+    }
+    for (let k = 0; k < 24; k++) if (P.depart[k] !== 0 && !conquises.has(k)) fauteZ(fin, `province ${k} jamais conquise`);
+    if (simNu.proprietaires(acte, fin + 1).some((p) => p !== 0)) fauteZ(fin, `après la mission ${fin}, toute la carte n'est pas au joueur`);
+    if (!fautes) ok(`zones de l'acte ${acte} : ${zMin} à ${zMax} nœuds actifs (${bilans.join(', ')}), chaque province conquise une fois en touchant l'empire, toute la carte au joueur après la mission ${fin}`);
+    mesures[`zones${acte}`] = `${zMin} à ${zMax}`;
+  }
+
+  titre('15 b. Pont stellaire, Essaimage, Sursaut, vagues, rivaux entre eux (règles isolées)');
+  const nouvelle = (m, g = 77, ctl0 = 0) => { const c = configMission(simNu, m, g, ctl0); return simNu.depart(c.graine, c); };
+  const garder = (sujet, f) => { try { const r = f(); if (r) probleme(sujet, r); else return true; } catch (err) { probleme(sujet, err.message); } return false; };
+  const compter = (m, ctl0, ticks, graine, f) => { const c = configMission(simTR, m, graine, ctl0); const s = new TR.Simulation(simTR, graine, c); while (!s.resultat && s.k() < ticks) { s.avancer([]); for (const v of s.etat.ev) f(v, s); } return s; };
+  garder('pont', () => {
+    const e = nouvelle(MISSION_PONT), o = chercherPont(simNu, e), cp = D.capacites[7];
+    if (!o) return 'aucun pont possible';
+    const [, a, b] = o, fa = e.f[a];
+    if (parties(e.nn, e.m.vois, -1).length !== 2) return 'zone déjà reliée';
+    if (simNu.valide(e, 1, o)) return 'pont accepté pour un camp qui n\'a pas ces nœuds';
+    const sansTech = nouvelle(66);
+    if (chercherPont(simNu, sansTech)) return 'pont accepté sans la capacité (mission 66)';
+    simNu.ordre(e, 0, o);
+    if (e.f[a] !== fa - cp.cout || e.c[0].r[2] !== cp.recharge) return `coût ou recharge : f ${fa} → ${e.f[a]}, recharge ${e.c[0].r[2]}`;
+    if (!e.m.vois[a].includes(b) || !e.m.vois[b].includes(a) || e.pont.length !== 1) return 'route absente après le pont';
+    if (parties(e.nn, e.m.vois, -1).length !== 1) return 'le pont doit relier les deux morceaux';
+    if (simNu.valide(e, 0, [5, a, b]) || chercherPont(simNu, e)) return 'recharge ignorée';
+    e.c[0].r[2] = 0;
+    if (simNu.valide(e, 0, [5, a, b])) return 'pont entre deux nœuds déjà voisins accepté';
+    const lim = TR.div(e.m.dmoy * 150, 100), loin = e.p.findIndex((p, i) => p === 0 && i !== a && TR.racineEntiere((e.m.x[i] - e.m.x[a]) ** 2 + (e.m.y[i] - e.m.y[a]) ** 2) > lim);
+    if (loin >= 0 && simNu.valide(e, 0, [5, a, loin])) return 'pont trop long accepté';
+    const c = simNu.importer(JSON.parse(JSON.stringify(simNu.exporter(e))));
+    if (!c.m.vois[a].includes(b) || c.pont.length !== 1) return 'route perdue à la reprise';
+    if (TR.hacher(simNu.empreinte(c)) !== TR.hacher(simNu.empreinte(e))) return 'empreinte différente après reprise';
+    const e2 = nouvelle(MISSION_PONT); simNu.ordre(e2, 0, o);
+    if (simNu.duree(e2, a, b) === null) return 'trajet impossible sur le pont';
+  }) && ok('Pont stellaire : 150 forces, recharge de 300 ticks, deux nœuds à soi non voisins à 1,5 × l\'arête moyenne, route gardée à la reprise et hachée');
+  garder('essaimage', () => {
+    const e = nouvelle(72), m = e.m, R = D.essaim, GROS = 30000;
+    const besoin = (q, j) => TR.div(TR.div(q.f[j] * (100 + simNu.defense(q, j)), 100) * R.ratio, 100) + 1;
+    // Deux voisins d'un même neutre passent au joueur, bien garnis ; tous ses autres nœuds sont vidés.
+    for (let i = 0; i < e.nn; i++) if (e.p[i] === 0) e.f[i] = 10;
+    const neutre = e.p.findIndex((p, j) => p < 0 && m.vois[j].length >= 2);
+    if (neutre < 0) return 'aucun neutre';
+    const srcs = m.vois[neutre].slice(0, 2);
+    for (const i of srcs) { e.p[i] = 0; e.f[i] = GROS; }
+    const sans = JSON.parse(JSON.stringify(simNu.exporter(e)));
+    for (let t = 0; t < e.nn; t++) { simNu.pas(e, faux1); e.k++; }
+    if (e.fl.length) return 'envoi sans Essaimage';
+    const e2 = simNu.importer(sans);
+    if (!simNu.valide(e2, 0, [7, 1])) return 'interrupteur refusé';
+    simNu.ordre(e2, 0, [7, 1]);
+    for (let t = 0; t < e2.nn && !e2.fl.length; t++) { simNu.pas(e2, faux1); e2.k++; }
+    if (e2.fl.length !== 1) return `${e2.fl.length} envois en un tick (1 attendu)`;
+    const fl = e2.fl[0];
+    if (e2.p[fl.d] !== 0) return 'envoi depuis un nœud qui n\'est pas au joueur';
+    if (e2.p[fl.v] >= 0) return 'envoi vers un non-neutre';
+    if (fl.n !== besoin(e2, fl.v)) return `envoi de ${fl.n} forces (${besoin(e2, fl.v)} attendues : défense × ${R.ratio} %)`;
+    if (e2.f[fl.d] * 100 < (e2.f[fl.d] + fl.n) * R.garde - 100) return 'le nœud garde moins que sa réserve';
+    const faible = Math.min(...e2.m.vois[fl.d].filter((j) => e2.p[j] < 0).map((j) => e2.f[j]));
+    if (e2.f[fl.v] !== faible) return 'le voisin neutre le plus faible n\'est pas choisi';
+    const visee = fl.v;
+    for (let t = 0; t < 8; t++) {
+      const avant = e2.fl.length; simNu.pas(e2, faux1); e2.k++;
+      if (e2.fl.length > avant + 1) return 'plus d\'un envoi en un tick';
+      if (e2.fl.filter((x) => x.v === visee).length > 1) return 'deux envois vers le même neutre';
+    }
+    simNu.ordre(e2, 0, [7, 0]); e2.fl.length = 0;
+    for (let t = 0; t < e2.nn; t++) { simNu.pas(e2, faux1); e2.k++; }
+    if (e2.fl.length) return 'envoi après l\'arrêt de l\'interrupteur';
+    // Un nœud trop faible pour prendre un neutre n'envoie rien.
+    const e3 = simNu.importer(sans);
+    for (let i = 0; i < e3.nn; i++) if (e3.p[i] === 0) e3.f[i] = 10;
+    simNu.ordre(e3, 0, [7, 1]);
+    for (let t = 0; t < e3.nn; t++) { simNu.pas(e3, faux1); e3.k++; }
+    if (e3.fl.length) return 'envoi d\'un nœud trop faible';
+  }) && ok(`Essaimage : au plus un envoi par tick, défense × ${D.essaim.ratio} % vers le voisin neutre le plus faible, ${D.essaim.garde} % gardés, un neutre visé une seule fois ; interrupteur`);
+  garder('rivaux de niveau 3', () => {
+    if (!(D.robots[3].ratioGrand > D.robots[2].ratio)) return 'le niveau 3 doit garder une vraie marge aux actes 4 et 5';
+    let sorties = 0;
+    compter(96, 0, 500, 77, (v, s) => { if (v[0] === 2 && v[4] === 1 && v[2] === s.etat.m.cap[1]) sorties++; });
+    if (sorties) return `${sorties} flotte(s) parties de la capitale visée par la mission 96`;
+  }) && ok('rivaux de niveau 3 : marge d\'attaque aux actes 4 et 5, capitale visée jamais vidée (garde du trône)');
+  garder('sursaut', () => {
+    const e = nouvelle(86), cs = D.capacites[9];
+    if (!simNu.valide(e, 0, [6])) return 'ordre refusé';
+    const i = e.p.findIndex((p, x) => p === 0 && x !== e.c[0].cap);
+    if (i < 0) return 'aucun nœud du joueur hors de sa base';
+    const aucun = simNu.importer(JSON.parse(JSON.stringify(simNu.exporter(e))));
+    for (const q of [e, aucun]) { q.acc[i] = 0; q.f[i] = 10; }
+    simNu.ordre(e, 0, [6]);
+    if (e.c[0].s !== cs.duree || e.c[0].r[1] !== cs.recharge) return `durée ${e.c[0].s}, recharge ${e.c[0].r[1]}`;
+    if (simNu.valide(e, 0, [6])) return 'recharge ignorée';
+    simNu.pas(e, faux1); simNu.pas(aucun, faux1);
+    const g1 = e.acc[i] + 1000 * (e.f[i] - 10), g0 = aucun.acc[i] + 1000 * (aucun.f[i] - 10);
+    if (g1 !== 3 * g0) return `production ${g1} au lieu de 3 × ${g0}`;
+    for (let k = 0; k < 100; k++) simNu.pas(e, faux1);
+    if (e.c[0].s !== 0) return 'Sursaut non terminé après 100 ticks';
+  }) && ok('Sursaut : production × 3 pendant 100 ticks, recharge de 900 ticks');
+  garder('vagues', () => {
+    const vu = {};
+    // Partie entre robots sur une mission longue : le camp 1 est le Silence (77) ou la Marée (81), sa cadence se mesure.
+    for (const [m, per] of [[77, 900], [81, 1200]]) {
+      const c = configMission(simTR, m, 300 + m, 0), s = new TR.Simulation(simTR, 300 + m, c), an = [];
+      s.etat.tmax = 0; s.etat.o.d = 999999;
+      while (s.k() < 3000 && s.etat.c[1].v) { s.avancer([]); s.resultat = null; for (const v of s.etat.ev) if (v[0] === 8 && v[1] === 1) an.push(s.k()); }
+      if (an.length < 2) return `mission ${m} : ${an.length} annonce(s) en ${s.k()} ticks`;
+      if (an[1] - an[0] !== per) return `mission ${m} : annonces espacées de ${an[1] - an[0]} ticks (${per} attendus)`;
+      vu[m] = an.length;
+    }
+    mesures.vagues = JSON.stringify(vu);
+  }) && ok(`vagues du Silence (900 ticks) et offensives de la Marée (1 200 ticks) annoncées (${mesures.vagues})`);
+  garder('robots', () => {
+    let ponts2 = 0; compter(MISSION_PONT, 2, 3000, 411, (v) => { if (v[0] === 7 && v[1] === 5 && v[3] === 0) ponts2++; });
+    if (!ponts2) return 'le robot de niveau 2 ne pose pas de pont à la mission 67';
+    const n = { 5: 0, 6: 0, 7: 0 };
+    for (const m of [80, 99, 100]) compter(m, 3, 2500, 500 + m, (v) => { if (v[0] === 7 && n[v[1]] !== undefined) n[v[1]]++; });
+    mesures.capFin = `${n[5]} ponts, ${n[6]} sursauts, ${n[7]} essaimages`;
+    if (!n[6] || !n[7]) return `niveau 3 : ${mesures.capFin}`;
+    if (!n[5]) avertir('robots', `niveau 3 : aucun pont (${mesures.capFin})`);
+    let entre = 0;
+    for (const m of [93, 100]) compter(m, 2, 3000, 600 + m, (v, q) => { if (v[0] === 1 && v[2] > 0 && v[3] > 0 && v[2] !== v[3]) entre++; });
+    mesures.entreEux = entre;
+    if (!entre) return 'les rivaux ne s\'attaquent jamais entre eux';
+  }) && ok(`robots : pont du niveau 2 à la mission 67, capacités du niveau 3 (${mesures.capFin}), ${mesures.entreEux} nœuds pris entre rivaux`);
+
+  // ------------------------------------------------------------------------
+  titre('15 c. Bac à sable : cartes, reprise, fin de partie');
+  for (const taille of [40, 80, 120]) for (const rivaux of [1, 4]) {
+    const sujet = `bac ${taille} galaxies, ${rivaux} rival(aux)`;
+    garder(sujet, () => {
+      const cfg = simNu.configBac({ taille, rivaux, niveau: 2, graine: 123456 + taille + rivaux, tech: 1023 });
+      if (cfg.camps !== rivaux + 1 || cfg.ctl.length !== rivaux + 1 || cfg.ctl[0] !== 0 || cfg.ctl[1] !== 2) return `configuration ${JSON.stringify(cfg)}`;
+      const e = simNu.depart(cfg.graine, cfg), z = e.m;
+      if (e.nn !== taille) return `${e.nn} galaxies`;
+      if (parties(e.nn, z.vois, -1).length !== 1) return 'carte non connexe';
+      if (z.forme !== 2 || !z.planete || z.gi.length !== e.nn) return 'carte de mission attendue (forme 2, planete, gi)';
+      for (let c = 0; c <= rivaux; c++) if (!(z.cap[c] >= 0 && e.p[z.cap[c]] === c)) return `base du camp ${c}`;
+      if (e.o.t !== 7 || e.o.l.length !== rivaux || e.o.x !== rivaux) return `objectif ${JSON.stringify(e.o)}`;
+      if (e.c[0].t !== 1023 || e.mi !== 0 || !e.bac) return 'tech ou marque du bac';
+      const b = simNu.depart(cfg.graine, simNu.configBac({ taille, rivaux, niveau: 2, graine: cfg.graine, tech: 1023 }));
+      if (TR.hacher(simNu.empreinte(b)) !== TR.hacher(simNu.empreinte(e)) || JSON.stringify(b.m.vois) !== JSON.stringify(z.vois)) return 'même graine : carte différente';
+      const c2 = simNu.depart(cfg.graine + 1, simNu.configBac({ taille, rivaux, niveau: 2, graine: cfg.graine + 1, tech: 1023 }));
+      if (JSON.stringify(c2.m.x) === JSON.stringify(z.x)) return 'autre graine : même carte';
+      if (simNu.graineSuivante(cfg.graine) === cfg.graine || simNu.graineSuivante(cfg.graine) !== simNu.graineSuivante(cfg.graine)) return 'graineSuivante';
+      const re = simNu.importer(JSON.parse(JSON.stringify(simNu.exporter(e))));
+      if (TR.hacher(simNu.empreinte(re)) !== TR.hacher(simNu.empreinte(e)) || !re.bac || re.m.n !== taille) return 'reprise différente';
+      const s = new TR.Simulation(simTR, cfg.graine, copie(Object.assign(cfg, { ctl: cfg.ctl.map((_, c) => (c === 0 ? 2 : 1)) })));
+      const lim = taille === 40 ? 6000 : 2500;
+      while (!s.resultat && s.k() < lim) s.avancer([]);
+      if (TR.premierFlottant(s.etat)) return 'état non entier';
+      if (s.resultat && s.resultat.etoiles !== 0) return 'étoiles dans le bac';
+      // Fin : tous les rivaux éliminés → victoire ; joueur éliminé → défaite.
+      const v = simNu.depart(cfg.graine, cfg);
+      for (let i = 0; i < v.nn; i++) if (v.p[i] > 0) v.p[i] = 0;
+      for (let k = 0; k < 10; k++) { simNu.pas(v, faux1); v.k++; }
+      const rv = simNu.fin(v);
+      if (!rv || rv.gagnant !== 0 || rv.raison !== 1 || rv.etoiles !== 0) return `victoire : ${JSON.stringify(rv)}`;
+      const d = simNu.depart(cfg.graine, cfg);
+      for (let i = 0; i < d.nn; i++) if (d.p[i] === 0) d.p[i] = 1;
+      const rd = simNu.fin(d);
+      if (!rd || rd.gagnant === 0 || rd.raison !== 2) return `défaite : ${JSON.stringify(rd)}`;
+    }) && ok(`${sujet} : taille exacte, connexe, carte fixée par la graine, reprise, fin de partie, sans étoiles`);
+  }
+
+  // ------------------------------------------------------------------------
+  titre(`15 d. Déterminisme des actes 4 et 5 et du bac (${TICKS_FIN} ticks : rejeu, reprise, JEL_TR.Simulation contre PE_PILOTE, avec Pont, Essaimage, Sursaut)`);
+  for (const m of MISSIONS_REJEU_FIN) { const graine = 5200 + m; controleRejeu(`mission ${m}`, () => configMission(simTR, m, graine, 0), graine, TICKS_FIN, Math.floor(TICKS_FIN / 2), false, ordresCapacites); }
+  for (const [taille, rivaux, niveau] of [[80, 3, 3], [40, 1, 2], [120, 4, 2]]) {
+    const graine = 7000 + taille + rivaux;
+    controleRejeu(`bac ${taille}/${rivaux}/${niveau}`, () => simTR.configBac({ taille, rivaux, niveau, graine, tech: 1023 }), graine, TICKS_FIN, Math.floor(TICKS_FIN / 2), false, ordresCapacites);
+  }
+
+  // ------------------------------------------------------------------------
+  let G = 61, tG = 0;
+  for (let m = 61; m <= 100; m++) { const c = simNu.configMission(m, { graine: 1 }), e = simNu.depart(c.graine, c); if (e.nn > tG) { tG = e.nn; G = m; } }
+  titre(`15 e. Plus grande zone des actes 4 et 5 (mission ${G}, ${tG} nœuds) : instantané avec 300 flottes, coût d'un tick`);
+  try {
+    const config = configMission(simTR, G, 9201, 0);
+    config.ctl = config.ctl.map(() => 0);
+    const s = new TR.Simulation(simTR, 9201, config), alea = hasardTest(9201);
+    let seq = 0;
+    for (let k = 0; k < 400 && !s.resultat; k++) {
+      const liste = [];
+      for (let c = 0; c < s.etat.ctl.length; c++) for (const o of ordresEssai(simTR, s.etat, c, alea)) liste.push([c, ++seq, ...o]);
+      s.avancer(liste);
+    }
+    const e = s.etat, modele = e.fl.length ? e.fl.slice() : [{ i: 0, c: 0, n: 7, d: 0, v: 1, q: 1, L: 12 }];
+    for (let i = 0; i < 6; i++) e.pont.push([i, i + 2, 20]);
+    while (e.fl.length < 300) { const f = modele[e.fl.length % modele.length]; e.fl.push({ i: e.nf++, c: f.c, n: f.n, d: f.d, v: f.v, q: f.q, L: f.L }); }
+    const texte = JSON.stringify(simNu.exporter(e));
+    mesures.instantaneFin = texte.length;
+    if (texte.length >= 25000) probleme('instantané', `${texte.length} caractères (< 25 000 attendus)`);
+    else ok(`instantané : ${texte.length} caractères (${e.nn} nœuds, 300 flottes, 6 ponts)`);
+  } catch (err) { probleme('instantané', err.message); }
+  try {
+    const mesure = { ms: 0, max: 0, ticks: 0 };
+    let graine = 5401, n = 0;
+    { const c = configMission(simTR, G, 5400, 3); c.ctl = c.ctl.map(() => 3); jouerSeul(simTR, 5400, c, 300); }
+    while (mesure.ticks < 2000 && n < 50) { const c = configMission(simTR, G, graine++, 3); c.ctl = c.ctl.map(() => 3); jouerSeul(simTR, graine, c, 2000 - mesure.ticks, mesure); n++; }
+    const moy = mesure.ms / Math.max(1, mesure.ticks);
+    mesures.msTickFin = moy;
+    const detail = `${ms(moy)} par tick (pire ${ms(mesure.max)}) sur ${mesure.ticks} ticks, ${n} partie(s), mission ${G}, robots de niveau 3 partout`;
+    if (moy > 1) probleme('coût', `${detail} : plus de 1 ms`);
+    else if (moy > 0.5) avertir('coût', `${detail} : au-dessus des 0,5 ms visés`);
+    else ok(`coût : ${detail}`);
+    // Le bac le plus lourd : 120 galaxies, 4 rivaux de niveau 3, un robot de niveau 3 à la place du joueur.
+    const mb = { ms: 0, max: 0, ticks: 0 }, cb = simTR.configBac({ taille: 120, rivaux: 4, niveau: 3, graine: 5501, tech: 1023 });
+    cb.ctl = cb.ctl.map(() => 3);
+    jouerSeul(simTR, 5501, cb, 2000, mb);
+    const moyB = mb.ms / Math.max(1, mb.ticks), detB = `${ms(moyB)} par tick (pire ${ms(mb.max)}) sur ${mb.ticks} ticks, bac de 120 galaxies, 5 robots de niveau 3`;
+    mesures.msTickBac = moyB;
+    if (moyB > 1) probleme('coût', `${detB} : plus de 1 ms`); else if (moyB > 0.5) avertir('coût', `${detB} : au-dessus des 0,5 ms visés`); else ok(`coût : ${detB}`);
+  } catch (err) { probleme('coût', err.message); }
+
+  // ------------------------------------------------------------------------
+  const NB = AVEC_MISSIONS ? PARTIES_FIN : 1;
+  const bloquant = !SOUPLE && !RAPIDE;
+  const ecart = (sujet, texte) => { if (bloquant) probleme(sujet, texte); else avertir(sujet, texte); };
+  const debutActe = (m) => (m - 1) % 20 < 3;
+  const aRival = (f) => f.camps.some((c, x) => x > 0 && c.eq !== 0);
+  titre(`15 f. Missions 61 à 100 : ${NB} partie(s) par mission et par robot à la place du joueur${AVEC_MISSIONS ? ` (niveau 2 ≥ 70 % ; niveau 1 ≤ 50 % sauf sans rival et 3 premières de l'acte ; médiane ≥ 600 ticks ; secondaire réussi au moins une fois${bloquant ? '' : ' ; non bloquant'})` : ' (doivent aller au bout sans erreur)'}`);
+  mesures.missionsFin = {};
+  const lignes = [], niveaux = AVEC_MISSIONS ? [2, 1, 3] : [2], taches = [], passives = [], gloutons = [], cibles = [];
+  for (let m = 61; m <= 100; m++) {
+    const fiche = D.missions[m - 1];
+    for (const niveau of niveaux) taches.push({ m, niveau, graines: serie(niveau === 3 ? Math.ceil(NB / 4) : NB, (i) => 8000 + 100 * m + i) });
+    if (AVEC_MISSIONS && aRival(fiche)) {
+      passives.push({ m, niveau: 0, graines: serie(PARTIES_PASSIF_SUITE, (i) => 8700 + 100 * m + i), court: objectifConquete(fiche), limite: objectifConquete(fiche) ? 1500 : 0 });
+      if (!debutActe(m)) {
+        gloutons.push({ m, niveau: 0, graines: serie(PARTIES_GLOUTON, (i) => 3000 + m + i), glouton: true });
+        cibles.push({ m, niveau: 0, graines: serie(PARTIES_CIBLE, (i) => 930000 + 100 * m + i), cible: true });
+      }
+    }
+  }
+  const lots = await lancerLots(taches.concat(passives, gloutons, cibles));
+  let x = 0;
+  for (let m = 61; m <= 100; m++) {
+    const fiche = D.missions[m - 1];
+    let secondaire = false;
+    for (const niveau of niveaux) {
+      const r = bilanLot(lots[x++], `mission ${m}, robot ${niveau}`), taux = pct(r.v, r.n);
+      if (niveau >= 2 && r.sec) secondaire = true;
+      mesures.missionsFin[`m${m}n${niveau}`] = { taux, mediane: mediane(r.t) };
+      if (AVEC_MISSIONS) {
+        const detail = `mission ${m}, robot ${niveau} : ${r.v} / ${r.n} (${taux} %), médiane ${mediane(r.t)} ticks (victoires ${mediane(r.tv)}), ${raisonsDe(r.ra)}`;
+        if (niveau === 2 && taux < 70) ecart('missions', `${detail} : 70 % attendus`);
+        else if (niveau === 2 && aRival(fiche) && !debutActe(m) && mediane(r.t) < 600) ecart('missions', `${detail} : médiane d'au moins 600 ticks attendue`);
+        else if (niveau === 1 && aRival(fiche) && !debutActe(m) && taux > 50) ecart('missions', `${detail} : 50 % au plus attendus`);
+        else ok(detail);
+        if (niveau === 2 && r.tv.length && fiche.dv && ![5, 6, 8, 10].includes(fiche.objectif.t)) {
+          const borne = Math.min(fiche.dv * 10, Math.max(Math.round((fiche.dv * 5) / 100) * 100, Math.round((1.5 * mediane(r.tv)) / 100) * 100));
+          if (Math.abs(borne - fiche.tvise) > 100) avertir('temps visé', `mission ${m} : tvise ${fiche.tvise}, la règle donne ${borne} (médiane des victoires ${mediane(r.tv)} ticks, dv ${fiche.dv} s)`);
+        }
+      } else lignes.push(`m${m} ${r.v ? 'gagnée' : 'perdue'} au tick ${r.t[0]} (raison ${Object.keys(r.ra)[0]})`);
+    }
+    if (AVEC_MISSIONS && !secondaire) ecart('missions', `mission ${m} : objectif secondaire jamais réussi par les robots 2 et 3`);
+  }
+  if (!AVEC_MISSIONS) ok(`missions 61 à 100 jouées jusqu'au bout avec un robot de niveau 2 : ${lignes.join(' ; ')}`);
+  if (AVEC_MISSIONS) {
+    titre(`15 g. Missions 61 à 100 avec un rival, joueur sans ordre (${PARTIES_PASSIF_SUITE} parties par mission : toutes perdues)`);
+    let vues = 0;
+    for (const t of passives) {
+      const r = bilanLot(lots[x++], `mission ${t.m}, joueur sans ordre`);
+      if (r.v > 0) ecart('missions', `mission ${t.m}, joueur sans ordre : ${r.v} / ${r.n} victoires (0 attendue)`); else vues++;
+    }
+    ok(`joueur sans ordre battu sur ${vues} missions à rival`);
+    titre(`15 h. Joueur glouton (un geste toutes les 1,3 s, attaque directe, ${PARTIES_GLOUTON} parties par mission) : aucune victoire en moins de 60 s`);
+    let bons = 0, gagnees = 0;
+    for (const t of gloutons) {
+      const r = bilanLot(lots[x++], `mission ${t.m}, joueur glouton`), rapides = r.tv.filter((k) => k < 600);
+      gagnees += r.v;
+      if (rapides.length) ecart('missions', `mission ${t.m}, joueur glouton : ${rapides.length} victoire(s) en moins de 600 ticks (${Math.min(...rapides)} au mieux)`); else bons++;
+    }
+    ok(`joueur glouton : ${bons} missions sans victoire éclair sur ${gloutons.length} (${gagnees} victoires, toutes après 60 s)`);
+    titre(`15 i. Joueur ciblé (une pile à 100 % sur le plus court chemin de l'objectif, un geste toutes les 1,3 s, ${PARTIES_CIBLE} parties par mission) : aucune victoire sous 20 % de la durée visée (60 s au moins)`);
+    let bonsC = 0, gagneesC = 0;
+    for (const t of cibles) {
+      const pl = plancherCible(D.missions[t.m - 1]), r = bilanLot(lots[x++], `mission ${t.m}, joueur ciblé`), rapides = r.tv.filter((k) => k < pl);
+      gagneesC += r.v;
+      if (rapides.length) ecart('missions', `mission ${t.m}, joueur ciblé : ${rapides.length} victoire(s) en moins de ${pl} ticks (${Math.min(...rapides)} au mieux)`); else bonsC++;
+    }
+    ok(`joueur ciblé : ${bonsC} missions sans victoire éclair sur ${cibles.length} (${gagneesC} victoires au total)`);
+  }
+}
+
+await controlerActesFin();
+
 
 // --------------------------------------------------------------------------
 // Résumé
@@ -1472,6 +2016,8 @@ if (mesures.mission1Ticks) console.log(`  mission 1 gagnée par l'humain d'essai
 if (mesures.missions) console.log(`  missions (taux %, médiane ticks) : ${Object.entries(mesures.missions).map(([k, v]) => `${k} ${v.taux} % / ${v.mediane}`).join(' ; ')}`);
 if (mesures.planete) console.log(`  planète : ${mesures.planete.n} régions, ${mesures.planete.provinces} provinces de ${mesures.planete.tMin} à ${mesures.planete.tMax} régions, construite en ${mesures.planete.ms} ms ; zones des missions : ${mesures.planete.zMin} à ${mesures.planete.zMax} régions`);
 if (mesures.zones2) console.log(`  actes 2 et 3 : zones de ${mesures.zones2} (acte 2) et ${mesures.zones3} (acte 3) nœuds ; ${mesures.msTickSuite !== undefined ? ms(mesures.msTickSuite) + ' par tick (robots de niveau 3)' : 'coût non mesuré'} ; instantané ${mesures.instantaneSuite} caractères avec 300 flottes`);
+if (mesures.zones4) console.log(`  actes 4 et 5 : zones de ${mesures.zones4} (acte 4) et ${mesures.zones5} (acte 5) nœuds ; ${mesures.msTickFin !== undefined ? ms(mesures.msTickFin) + ' par tick (robots de niveau 3)' : 'coût non mesuré'} ; instantané ${mesures.instantaneFin} caractères avec 300 flottes`);
+if (mesures.missionsFin && AVEC_MISSIONS) console.log(`  missions 61 à 100 (taux %, médiane ticks) : ${Object.entries(mesures.missionsFin).map(([k, v]) => `${k} ${v.taux} % / ${v.mediane}`).join(' ; ')}`);
 if (mesures.missionsSuite && AVEC_MISSIONS) console.log(`  missions 21 à 60 (taux %, médiane ticks) : ${Object.entries(mesures.missionsSuite).map(([k, v]) => `${k} ${v.taux} % / ${v.mediane}`).join(' ; ')}`);
 if (mesures.cartes) console.log(`  cartes : ${Object.entries(mesures.cartes).map(([r, v]) => `rayon ${r} : ${v.nMin}–${v.nMax} territoires, ${v.msCarte} ms`).join(' ; ')}`);
 if (!AVEC_MISSIONS || !AVEC_CARTES) console.log(`  (non joués : ${[!AVEC_MISSIONS && '--missions', !AVEC_CARTES && '--cartes'].filter(Boolean).join(', ')})`);
