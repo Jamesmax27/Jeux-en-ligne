@@ -2425,7 +2425,7 @@
     if (Array.isArray(s.tutos)) s.tutos.forEach((k) => { prog.tutos[k] = true; });
     if (s.options && typeof s.options.son === 'boolean') prog.son = s.options.son;
   }
-  function ecrireLocal() { try { localStorage.setItem(CLE_PROGRES, JSON.stringify(prog)); } catch (e) { /* rien */ } }
+  function ecrireLocal() { if (apercu) return; try { localStorage.setItem(CLE_PROGRES, JSON.stringify(prog)); } catch (e) { /* rien */ } }
   const totalEtoiles = () => prog.etoiles.reduce((a, b) => a + (b || 0), 0);
   const totalScore = () => prog.records.reduce((a, b) => a + (b || 0), 0);
   function donneesSauvegarde(niveau) {
@@ -2447,6 +2447,7 @@
   let etat = 'titre'; // titre | niveaux | jeu
   let J = null;       // niveau en cours
   let enPause = false, tutoOuvert = false;
+  let apercu = 0;     // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   let G = { ox: 0, oy: 0, cs: 40 };
   let secousse = 0, temps = 0, minuteToast = 0, affScore = 0, scoreCible = 0, pageNiveaux = 0;
 
@@ -2488,6 +2489,7 @@
     if (ANNONCES[P.n]) annonces.push(T(ANNONCES[P.n]));
     if (P.coeursMax === 1) annonces.push(T('defiAnnonce'));
     else if (P.sablier) annonces.push(T('sablierAnnonce'));
+    if (apercu) return; // image du jeu : ni annonce, ni tutoriel
     if (annonces.length) toast(annonces.join(' '), 3);
     const nouveaux = (TUTOS_NIVEAU[P.n] || []).filter((k) => !prog.tutos[k]);
     if (nouveaux.length) ouvrirTuto(nouveaux[0]);
@@ -2593,7 +2595,7 @@
   }
 
   function gagner() {
-    if (J.fini) return;
+    if (J.fini || apercu) return;
     J.fini = true;
     const i = J.index;
     const bonusCoeurs = J.coeurs * 30, bonusTemps = J.tempsMax ? Math.ceil(J.temps) * 2 : 0;
@@ -2620,7 +2622,7 @@
   }
 
   function perdre(raison) {
-    if (J.fini) return;
+    if (J.fini || apercu) return;
     J.fini = true;
     if (window.FMG) window.FMG.reportEnd({ completed: false, level: J.index + 1 });
     SON.defaite();
@@ -2860,7 +2862,7 @@
     if (minuteToast > 0) { minuteToast -= dt; if (minuteToast <= 0) $('toast').classList.remove('visible'); }
     if (demoTuto) majDemo(demoTuto, dt, false);
     if (etat === 'titre' && demoTitre) majDemo(demoTitre, dt, true);
-    if (etat === 'jeu' && J && !enPause && !tutoOuvert) {
+    if (etat === 'jeu' && J && !enPause && !tutoOuvert && !apercu) { // image du jeu : partie figée
       majPlateau(J.p, dt, evenementJeu);
       majEffets(dt);
       if (secousse > 0) secousse = Math.max(0, secousse - dt);
@@ -3028,23 +3030,286 @@
   }
 
   // Pause automatique quand l'écran est caché
-  document.addEventListener('visibilitychange', () => { if (document.hidden && etat === 'jeu' && J && !J.fini && !enPause) pause(true); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu && etat === 'jeu' && J && !J.fini && !enPause) pause(true); });
 
   // Sauvegarde à la fermeture, seulement pendant un niveau
   JEL_SAVE.surFermeture(() => {
-    if (etat !== 'jeu' || !J || J.fini) return;
+    if (apercu || etat !== 'jeu' || !J || J.fini) return;
     JEL_SAVE.save(JEU, donneesSauvegarde(J.index + 1));
   });
   const effacerTitre = JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('effacer-titre'), apres: toutEffacer });
 
   // =====================================================================
+  //  Affiche (jaquette du jeu)
+  //  Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) :
+  //  une scène composée, sans interface ni texte, d'où sort la jaquette
+  //  (CONSIGNES-JEU.md, section 5). Sur un grand plateau du jardin, vu de
+  //  près et penché, une flèche rouge coudée jaillit du plateau vers le
+  //  soleil en ramassant un cœur ; une flèche gelée se fissure, des
+  //  jumelles attendent, une autre flèche file déjà dans le ciel.
+  // =====================================================================
+  function fleurAffiche(c, x, y, r, couleur, coeur) {
+    c.fillStyle = couleur;
+    for (let q = 0; q < 5; q++) { c.beginPath(); c.arc(x + Math.cos(q * 1.256) * r, y + Math.sin(q * 1.256) * r, r * 0.68, 0, 7); c.fill(); }
+    c.fillStyle = coeur || '#ffe066'; c.beginPath(); c.arc(x, y, r * 0.5, 0, 7); c.fill();
+  }
+  function dessinerAffiche() {
+    redimensionner();
+    const c = ctx;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const k = Math.min(W / 600, H / 800);
+    const cx = W / 2, rnd = mulberry32(2026);
+    // Ciel lumineux
+    let g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#6cc9ff'); g.addColorStop(0.5, '#c4eeff'); g.addColorStop(1, '#a6e48a');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    // Soleil en haut à gauche, ses rayons et sa lueur
+    const sx = cx - 175 * k, sy = 92 * k, loin = Math.max(W, H) * 1.5;
+    c.save(); c.translate(sx, sy);
+    for (let i = 0; i < 16; i++) {
+      c.rotate(Math.PI * 2 / 16);
+      c.fillStyle = 'rgba(255,252,215,0.26)';
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(loin, -loin * 0.09); c.lineTo(loin, loin * 0.09); c.closePath(); c.fill();
+    }
+    c.restore();
+    g = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 330 * k);
+    g.addColorStop(0, 'rgba(255,255,230,1)'); g.addColorStop(0.3, 'rgba(255,248,200,0.6)'); g.addColorStop(1, 'rgba(255,248,200,0)');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#fff3a6'; c.beginPath(); c.arc(sx, sy, 50 * k, 0, 7); c.fill();
+    c.fillStyle = '#ffe066'; c.beginPath(); c.arc(sx, sy, 40 * k, 0, 7); c.fill();
+    // Nuages
+    const nuage = (x, y, s) => {
+      c.fillStyle = 'rgba(255,255,255,0.92)';
+      [[0, 0, 1], [-0.9, 0.25, 0.7], [0.9, 0.25, 0.75], [0.35, -0.35, 0.75]].forEach(([a, b, r]) => { c.beginPath(); c.arc(x + a * s, y + b * s, r * s, 0, 7); c.fill(); });
+    };
+    nuage(cx + 250 * k, 120 * k, 34 * k); nuage(cx - 330 * k, 210 * k, 28 * k); nuage(cx + 360 * k, 200 * k, 30 * k);
+    // Collines du fond, plus pâles, puis plus vertes
+    c.fillStyle = '#bfe9a8';
+    c.beginPath(); c.moveTo(0, H);
+    for (let x = 0; x <= W; x += 10 * k) c.lineTo(x, 300 * k - Math.sin((x - cx) / (120 * k)) * 26 * k);
+    c.lineTo(W, H); c.closePath(); c.fill();
+    c.fillStyle = '#8fd673';
+    c.beginPath(); c.moveTo(0, H);
+    for (let x = 0; x <= W; x += 10 * k) c.lineTo(x, 380 * k - Math.sin((x - cx) / (90 * k) + 2) * 30 * k);
+    c.lineTo(W, H); c.closePath(); c.fill();
+    // Petites fleurs qui flottent (motif du premier jardin)
+    for (let i = 0; i < 34; i++) {
+      const x = rnd() * W, y = 150 * k + rnd() * (H - 150 * k), s = (3 + rnd() * 4) * k;
+      c.globalAlpha = 0.45 + rnd() * 0.4;
+      fleurAffiche(c, x, y, s, i % 3 ? '#ffffff' : '#ff9ad5', '#ffe066');
+    }
+    c.globalAlpha = 1;
+    // Au loin : une flèche déjà sortie file dans le ciel, avec sa traînée d'étoiles
+    {
+      const cs2 = 30 * k, p0 = creerPlateau(2, 1);
+      const f = nouvelleFleche(p0, [[0, 0], [1, 0]], 1); f.couleur = 5;
+      c.save(); c.translate(cx + 120 * k, 62 * k); c.rotate(-0.45);
+      for (let i = 1; i <= 6; i++) {
+        c.globalAlpha = 0.9 - i * 0.12; c.fillStyle = i % 2 ? '#ffe066' : '#ffffff';
+        cheminEtoile(c, -i * 26 * k, Math.sin(i) * 4 * k, (8 - i * 0.7) * k); c.fill();
+      }
+      c.globalAlpha = 1;
+      dessinerFleche(c, f, { cs: cs2, ox: -cs2, oy: -cs2 / 2 }, { temps: 0 });
+      c.restore();
+    }
+    // Le plateau du jardin, vu de près et penché
+    const cs = 88 * k, bx = cx - 6 * k, by = 470 * k, ang = -0.12;
+    const p = creerPlateau(5, 5);
+    p.rochers.add(cle(0, 3));
+    const ff = (cells, dir, couleur, extra) => { const f = nouvelleFleche(p, cells, dir); f.couleur = couleur; Object.assign(f, extra || {}); placer(p, f); return f; };
+    const jA = ff([[0, 0], [1, 0]], 1, 100);
+    ff([[0, 2], [0, 1]], 0, 1, { feuilles: 1 });
+    ff([[1, 1], [1, 2], [2, 2]], 1, 6);
+    const gel = ff([[4, 4], [4, 3]], 0, 5, { glace: 1 });
+    const jB = ff([[0, 4], [1, 4], [2, 4]], 1, 100);
+    jA.jumeau = jB.id; jB.jumeau = jA.id;
+    ff([[4, 0]], 1, 2);
+    ff([[2, 1]], 0, 4);
+    const Gp = { cs, ox: -2.5 * cs, oy: -2.5 * cs };
+    c.save(); c.translate(bx, by); c.rotate(ang);
+    dessinerPlateau(c, p, Gp, { monde: 0, temps: 0.3 });
+    // La glace se fissure : éclats qui volent
+    const [gx, gy] = [Gp.ox + 4.5 * cs, Gp.oy + 3.6 * cs];
+    c.strokeStyle = '#ffffff'; c.lineWidth = 3 * k;
+    c.beginPath(); c.moveTo(gx - 28 * k, gy - 30 * k); c.lineTo(gx - 6 * k, gy - 8 * k); c.lineTo(gx - 14 * k, gy + 10 * k); c.lineTo(gx + 10 * k, gy + 34 * k); c.stroke();
+    for (let i = 0; i < 9; i++) {
+      const a = -Math.PI / 2 + (rnd() - 0.5) * 2.6, d = (40 + rnd() * 40) * k;
+      c.save(); c.translate(gx + Math.cos(a) * d, gy - 30 * k + Math.sin(a) * d); c.rotate(rnd() * 6);
+      c.fillStyle = i % 2 ? '#e6f7ff' : '#9fd8ff'; c.fillRect(-6 * k, -3 * k, 12 * k, 6 * k); c.restore();
+    }
+    // Le héros : grande flèche rouge coudée qui jaillit du plateau vers le haut
+    const L = 5, hero = nouvelleFleche(p, [[1, 3], [2, 3], [3, 3], [3, 2], [3, 1]], 0);
+    hero.id = 99; hero.couleur = 0;
+    hero.piste = [[1, 3, false], [2, 3, false], [3, 3, false], [3, 2, false], [3, 1, false], [3, 0, false], [3, -1, false], [3, -2, false]];
+    hero.s = 1.45; hero.etat = 'sort';
+    // tête : position s + L - 1 de la piste, entre la case (3, 0) et la case (3, -1)
+    const yTete = -(hero.s + L - 1 - 5);
+    const tx = Gp.ox + 3.5 * cs, hy = Gp.oy + (yTete + 0.5) * cs;
+    const milieuY = Gp.oy + ((3 + yTete) / 2 + 0.5) * cs;
+    // lueur chaude derrière la tête
+    g = c.createRadialGradient(tx, hy - 0.4 * cs, 4 * k, tx, hy - 0.4 * cs, 1.9 * cs);
+    g.addColorStop(0, 'rgba(255,255,220,0.95)'); g.addColorStop(0.4, 'rgba(255,236,150,0.5)'); g.addColorStop(1, 'rgba(255,236,150,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(tx, hy - 0.4 * cs, 1.9 * cs, 0, 7); c.fill();
+    // petits traits de vitesse de part et d'autre de la tête, hors du plateau
+    c.lineCap = 'round'; c.strokeStyle = 'rgba(255,255,255,0.9)';
+    [[-0.7, -0.1, 0.55, 5], [0.7, -0.2, 0.45, 5], [-1.0, 0.25, 0.75, 3], [1.0, 0.15, 0.65, 3]].forEach(([dx, y1, y2, l]) => {
+      c.lineWidth = l * k; c.beginPath(); c.moveTo(tx + dx * cs, hy + y1 * cs - 0.5 * cs); c.lineTo(tx + dx * cs, hy + y2 * cs - 0.5 * cs); c.stroke();
+    });
+    c.save();
+    c.translate(tx, milieuY); c.scale(1.16, 1.16); c.translate(-tx, -milieuY);
+    // contour lumineux, puis la flèche bien nette par-dessus
+    c.shadowColor = 'rgba(255,255,255,1)'; c.shadowBlur = 26 * k;
+    dessinerFleche(c, hero, Gp, { temps: 0 });
+    c.shadowBlur = 0;
+    dessinerFleche(c, hero, Gp, { temps: 0 });
+    c.restore();
+    // le cœur ramassé s'envole, entouré de petits cœurs et d'étoiles
+    const hcx = tx + 0.95 * cs, hcy = hy - 1.05 * cs;
+    c.shadowColor = '#ffffff'; c.shadowBlur = 14 * k;
+    cheminCoeur(c, hcx, hcy, 0.34 * cs); c.fillStyle = '#ff4d6d'; c.fill(); c.strokeStyle = '#fff'; c.lineWidth = 4 * k; c.stroke();
+    c.shadowBlur = 0;
+    for (let i = 0; i < 7; i++) {
+      const a = -Math.PI + i * 0.5 + rnd() * 0.2, d = (0.95 + rnd() * 0.4) * cs;
+      cheminCoeur(c, tx + Math.cos(a) * d * 0.9, hy - 0.3 * cs + Math.sin(a) * d * 0.8, (7 + rnd() * 5) * k);
+      c.fillStyle = i % 2 ? '#ff8fa3' : '#ff4d6d'; c.fill();
+    }
+    const tons = ['#ffe066', '#ffffff', '#69db7c', '#4dabf7', '#ffa94d'];
+    for (let i = 0; i < 12; i++) {
+      const a = -Math.PI * 0.95 + i * 0.27, d = (1.1 + rnd() * 0.9) * cs;
+      c.fillStyle = tons[i % tons.length];
+      cheminEtoile(c, tx + Math.cos(a) * d, hy - 0.5 * cs + Math.sin(a) * d * 0.9, (6 + rnd() * 7) * k); c.fill();
+    }
+    c.restore();
+    // Premier plan : grandes fleurs et touffes d'herbe coupées par les bords
+    const touffe = (x, y, s, dir) => {
+      c.fillStyle = '#3f9e45';
+      for (let i = -3; i <= 3; i++) {
+        c.beginPath(); c.moveTo(x + i * 9 * s, y);
+        c.quadraticCurveTo(x + i * 14 * s + dir * 10 * s, y - 60 * s, x + i * 20 * s + dir * 18 * s, y - (90 - Math.abs(i) * 12) * s);
+        c.quadraticCurveTo(x + i * 12 * s + dir * 6 * s, y - 40 * s, x + i * 9 * s + 8 * s, y); c.fill();
+      }
+    };
+    touffe(cx - 285 * k, H + 6 * k, 1.5 * k, 1); touffe(cx + 290 * k, H + 6 * k, 1.6 * k, -1);
+    [[cx - 268 * k, H - 120 * k, 26 * k, '#ff6b6b'], [cx - 225 * k, H - 55 * k, 20 * k, '#ffd43b'], [cx + 262 * k, H - 140 * k, 28 * k, '#9775fa'], [cx + 222 * k, H - 50 * k, 19 * k, '#f783ac']].forEach(([x, y, r, col]) => {
+      c.strokeStyle = '#2f7d3a'; c.lineWidth = 6 * k; c.beginPath(); c.moveTo(x, y + r); c.lineTo(x + 4 * k, H + 10 * k); c.stroke();
+      c.shadowColor = 'rgba(0,0,0,0.18)'; c.shadowBlur = 8 * k;
+      fleurAffiche(c, x, y, r, col, '#ffe066');
+      c.shadowBlur = 0;
+    });
+    // Feuille du coin en haut à droite
+    c.save(); c.translate(W + 10 * k, 300 * k); c.rotate(2.6);
+    c.fillStyle = '#4caf50'; c.beginPath(); c.ellipse(0, 0, 70 * k, 28 * k, 0, 0, 7); c.fill();
+    c.strokeStyle = '#2f7d3a'; c.lineWidth = 3 * k; c.beginPath(); c.moveTo(-66 * k, 0); c.lineTo(66 * k, 0); c.stroke();
+    c.restore();
+  }
+  function cacherInterface() {
+    for (const el of document.querySelectorAll('.ecran, #hud, #toast, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    cacherInterface();
+    setTimeout(cacherInterface, 300); setTimeout(cacherInterface, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // =====================================================================
+  //  Images du jeu (page du jeu)
+  //  Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais
+  //  par le jeu) : le jeu s'ouvre directement en pleine partie, avec sa vraie
+  //  interface (niveau, cœurs, flèches restantes, sablier, indice), sans
+  //  écran titre, ni fenêtre « Continuer », ni tutoriel. Quelques flèches
+  //  sont lancées par le code, puis la partie est figée : ni victoire, ni
+  //  défaite, ni son, ni sauvegarde (CONSIGNES-JEU.md, section 5).
+  //   1 = niveau 1 : petit plateau de la prairie, une flèche qui sort ;
+  //   2 = niveau 112 : jardin de la forêt, glace double qui se fissure,
+  //       tas de feuilles, cœur à ramasser, cailloux ;
+  //   3 = niveau 211 : jardin des lilas, grand plateau, terriers, sablier,
+  //       jumelles ; une flèche est déjà sortie et une autre est saisie au
+  //       moment où elle ressort d'un terrier.
+  // =====================================================================
+  const APERCUS = {
+    1: { niveau: 0, score: 0 },
+    2: { niveau: 111, score: 140 },
+    3: { niveau: 210, score: 0, temps: 0.62 },
+  };
+  // flèche libre qui passe par un terrier et garde au moins une case à parcourir après le saut
+  const routeParTerrier = (p) => libres(p).find((f) => { const r = rayon(p, f).piste, k = r.findIndex((q) => q[2]); return k >= 0 && r.length - 1 - k >= 1; });
+  function avancerApercu(sec, jusque) {
+    for (let i = 0; i < Math.round(sec * 60); i++) {
+      majPlateau(J.p, 1 / 60, evenementJeu); majEffets(1 / 60); temps += 1 / 60;
+      if (jusque && jusque()) break;
+    }
+  }
+  function libres(p) {
+    return p.fleches.filter((f) => f.etat === 'repos' && !f.glace && !f.feuilles && f.jumeau < 0 && rayon(p, f).libre);
+  }
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = APERCUS[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 98765 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    // Progression neuve, en mémoire seulement (rien n'est enregistré).
+    const niveau = sc.niveau;
+    prog = { etoiles: [], records: [], debloque: niveau + 1, tutos: {}, son: true };
+    for (const cleTuto in TUTOS) prog.tutos[cleTuto] = true;
+    lancerNiveau(niveau);
+    const p = J.p;
+    for (const f of p.fleches) f.app = 1;
+    if (numero === 1) {
+      // Premier niveau : une flèche file hors du plateau, les autres attendent
+      const a = libres(p).find((f) => f.cells.length >= 2) || libres(p)[0];
+      if (a) { jouerFleche(a); avancerApercu(0.14); }
+    } else if (numero === 2) {
+      // Une première flèche est déjà sortie, la glace d'une autre se fissure, une troisième file
+      const a = libres(p)[0];
+      if (a) { jouerFleche(a); avancerApercu(1.2, () => a.etat === 'parti'); avancerApercu(0.2); }
+      const gel = p.fleches.find((f) => f.etat === 'repos' && f.glace > 1 && !f.feuilles) || p.fleches.find((f) => f.etat === 'repos' && f.glace > 0 && !f.feuilles);
+      if (gel) jouerFleche(gel);
+      J.serie = 0; // pas de bulle « Série » coupée par le bord
+      const b = libres(p).find((f) => f.cells.length >= 2) || libres(p)[0];
+      if (b) { jouerFleche(b); avancerApercu(0.16); }
+    } else {
+      // Quelques flèches sont déjà sorties, jusqu'à ce qu'une route passe par un terrier ;
+      // cette flèche est saisie au moment où elle ressort de l'autre trou.
+      let parTerrier = routeParTerrier(p);
+      for (let n = 0; n < 12 && (!parTerrier || n < 1); n++) {
+        const f = libres(p).find((g) => g !== parTerrier);
+        if (!f) break;
+        jouerFleche(f); avancerApercu(1.5, () => f.etat === 'parti');
+        parTerrier = routeParTerrier(p);
+      }
+      avancerApercu(0.25);
+      J.serie = 0; textes.length = 0; // pas de bulle « Série » par-dessus le saut
+      if (parTerrier) {
+        jouerFleche(parTerrier);
+        const saut = parTerrier.piste.findIndex((q) => q[2]);
+        avancerApercu(2, () => parTerrier.s + parTerrier.cells.length - 1 >= saut + 0.55 || parTerrier.etat !== 'sort');
+      }
+      J.temps = Math.round(J.tempsMax * sc.temps);
+    }
+    J.score += sc.score;
+    secousse = 0;
+    majHud();
+  }
+
+  // =====================================================================
   //  Démarrage
   // =====================================================================
-  chargerProgres();
-  redimensionner();
-  majBoutonsSon();
-  allerTitre();
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    redimensionner();
+    majBoutonsSon();
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    chargerProgres();
+    redimensionner();
+    majBoutonsSon();
+    allerTitre();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

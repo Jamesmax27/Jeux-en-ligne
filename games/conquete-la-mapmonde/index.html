@@ -2113,6 +2113,7 @@
   let demo = null;       // carte animée de l'écran titre
   let niveauCourant = 0;
   let reglagesLibre = { carte: 0, rivaux: 1, force: 'normal' };
+  let apercu = 0;        // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
   function creerPartie(def, numero) {
     const Q = construireCarte(def.carte, def.types);
@@ -3702,7 +3703,7 @@
     if (!P || P.numero < 0) return 0;
     return P.fin && P.fin.victoire ? Math.min(NIVEAUX.length, P.numero + 2) : P.numero + 1;
   }
-  JEL_SAVE.surFermeture(() => { const n = niveauAReprendre(); if (n) JEL_SAVE.save(JEU, { niveau: n }); });
+  JEL_SAVE.surFermeture(() => { if (apercu) return; const n = niveauAReprendre(); if (n) JEL_SAVE.save(JEU, { niveau: n }); });
   let effacerTitre = null;
   function majEffacerTitre() { if (effacerTitre) { effacerTitre.maj(); if (demo) demo.vue = null; } }
   function nouvellePartie() { if (!S.et[0]) lancerNiveau(0); else ouvrirNiveaux(); }
@@ -3803,11 +3804,383 @@
     requestAnimationFrame(boucle);
   }
 
+  // ========================================================================
+  // 13. Affiche (jaquette du jeu)
+  // ========================================================================
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le chevalier du royaume bleu,
+  // en grand sur sa colline, lève son étendard ; derrière lui, l'Île du Matin vue en perspective :
+  // ses troupes marchent vers la tour du centre et le château doré, les royaumes rouge et doré
+  // arrivent en face, une région vient d'être prise (drapeau planté, éclats).
+  function dessinerHeros(c, x, y, u) {
+    c.save(); c.translate(x, y); c.scale(u, u);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    const bleu = COULEURS[1], fonce = FONCES[1], peau = '#ffd6ad', trait = '#0d2a55', lumiere = 'rgba(255,246,196,.95)';
+    // Ombre au sol
+    c.fillStyle = 'rgba(20,60,20,.35)'; c.beginPath(); c.ellipse(4, 1, 30, 6, 0, 0, Math.PI * 2); c.fill();
+    // Cape qui flotte derrière lui
+    c.fillStyle = '#1b56b0'; c.strokeStyle = trait; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(-8, -60); c.quadraticCurveTo(-30, -52, -46, -14); c.quadraticCurveTo(-37, -17, -31, -9);
+    c.quadraticCurveTo(-25, -17, -17, -11); c.lineTo(-3, -56); c.closePath(); c.fill(); c.stroke();
+    // Hampe de l'étendard
+    const hb = [22, -2], hh = [36, -158];
+    c.strokeStyle = '#7a4a22'; c.lineWidth = 3.4; c.beginPath(); c.moveTo(hb[0], hb[1]); c.lineTo(hh[0], hh[1]); c.stroke();
+    c.strokeStyle = '#c08a4e'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(hb[0] + 0.8, hb[1]); c.lineTo(hh[0] + 0.8, hh[1]); c.stroke();
+    c.fillStyle = '#ffd34d'; c.beginPath(); c.arc(hh[0], hh[1] - 2, 3.6, 0, Math.PI * 2); c.fill();
+    // Étendard bleu qui claque au vent, bordé d'or, avec la couronne du royaume
+    const ox = hh[0], oy = hh[1], L = 50;
+    c.beginPath(); c.moveTo(ox - 0.4, oy + 4);
+    c.bezierCurveTo(ox + 14, oy - 6, ox + 28, oy + 12, ox + L, oy + 2);
+    c.lineTo(ox + L - 9, oy + 17); c.lineTo(ox + L + 1, oy + 32);
+    c.bezierCurveTo(ox + L - 20, oy + 38, ox + 16, oy + 24, ox - 2.6, oy + 31); c.closePath();
+    c.fillStyle = bleu; c.fill(); c.strokeStyle = '#ffd34d'; c.lineWidth = 2.6; c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.2)'; c.beginPath(); c.moveTo(ox - 0.4, oy + 4); c.bezierCurveTo(ox + 14, oy - 6, ox + 28, oy + 12, ox + L, oy + 2);
+    c.lineTo(ox + L - 3, oy + 7); c.bezierCurveTo(ox + 28, oy + 18, ox + 14, oy + 2, ox - 0.8, oy + 11); c.closePath(); c.fill();
+    icone(c, 'couronne', ox + 23, oy + 18, 9, '#ffd34d');
+    // Jambes et bottes
+    c.fillStyle = fonce;
+    c.beginPath(); c.moveTo(-10, -24); c.lineTo(-3, -24); c.lineTo(-3.5, -4); c.lineTo(-9.5, -4); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(3, -24); c.lineTo(10, -24); c.lineTo(11, -4); c.lineTo(4.5, -4); c.closePath(); c.fill();
+    c.fillStyle = '#6b4024';
+    c.beginPath(); c.ellipse(-7, -3, 6.5, 4, 0, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(9.5, -3, 7.5, 4, 0, 0, Math.PI * 2); c.fill();
+    // Tunique
+    c.beginPath(); c.moveTo(-13, -61); c.lineTo(13, -61); c.lineTo(18, -21); c.quadraticCurveTo(0, -15, -18, -21); c.closePath();
+    c.fillStyle = bleu; c.fill(); c.strokeStyle = trait; c.lineWidth = 1.5; c.stroke();
+    c.strokeStyle = lumiere; c.lineWidth = 2.2; c.beginPath(); c.moveTo(12.5, -57); c.lineTo(16.6, -23); c.stroke();
+    c.fillStyle = '#7a4a22'; c.fillRect(-15.5, -35, 32, 5);
+    c.fillStyle = '#ffd34d'; c.fillRect(-2.5, -36, 6, 7);
+    // Bras levé qui tient la hampe
+    c.strokeStyle = bleu; c.lineWidth = 8; c.beginPath(); c.moveTo(9, -56); c.quadraticCurveTo(22, -66, 31, -82); c.stroke();
+    c.strokeStyle = lumiere; c.lineWidth = 1.6; c.beginPath(); c.moveTo(13, -60); c.quadraticCurveTo(24, -69, 33.5, -82); c.stroke();
+    c.fillStyle = peau; c.strokeStyle = trait; c.lineWidth = 1.2; c.beginPath(); c.arc(32, -84, 5, 0, Math.PI * 2); c.fill(); c.stroke();
+    // Tête
+    c.fillStyle = peau; c.beginPath(); c.arc(3, -77, 17, 0, Math.PI * 2); c.fill(); c.strokeStyle = trait; c.lineWidth = 1.5; c.stroke();
+    // Joues, yeux décidés, grand sourire
+    c.fillStyle = 'rgba(255,120,120,.45)';
+    c.beginPath(); c.arc(-5, -70, 3.4, 0, Math.PI * 2); c.fill(); c.beginPath(); c.arc(15, -70, 3.4, 0, Math.PI * 2); c.fill();
+    [[0, -76], [11, -76]].forEach(([ex, ey]) => {
+      c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(ex, ey, 3.4, 4.3, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#1d2a44'; c.beginPath(); c.arc(ex + 1, ey + 0.4, 2.4, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#ffffff'; c.beginPath(); c.arc(ex + 1.8, ey - 0.8, 0.9, 0, Math.PI * 2); c.fill();
+    });
+    c.strokeStyle = '#5a3418'; c.lineWidth = 1.8;
+    c.beginPath(); c.moveTo(-4, -82.5); c.lineTo(3, -80.6); c.stroke();
+    c.beginPath(); c.moveTo(8, -80.6); c.lineTo(15, -82.5); c.stroke();
+    c.strokeStyle = '#d9a27a'; c.lineWidth = 1.2; c.beginPath(); c.arc(7, -72, 1.6, 0.2, 2.6); c.stroke();
+    c.fillStyle = '#9a2f2f'; c.beginPath(); c.moveTo(0, -68); c.quadraticCurveTo(7, -59, 14, -68); c.closePath(); c.fill();
+    c.fillStyle = '#ff8a8a'; c.beginPath(); c.ellipse(7, -63.6, 3.2, 1.6, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffffff'; c.fillRect(2.2, -68, 9.6, 1.6);
+    c.strokeStyle = lumiere; c.lineWidth = 2; c.beginPath(); c.arc(3, -77, 16, -0.6, 0.55); c.stroke();
+    // Casque d'argent et plumet
+    c.fillStyle = '#4e9cff';
+    [[-10, -100, -0.7], [-5, -104, -0.35], [1, -105, 0]].forEach(([px, py, a]) => { c.beginPath(); c.ellipse(px, py, 4.5, 11, a, 0, Math.PI * 2); c.fill(); });
+    c.fillStyle = '#ffd34d'; c.beginPath(); c.ellipse(-2, -101, 2.6, 8, -0.3, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(3, -81, 18.6, Math.PI, Math.PI * 2); c.closePath();
+    const metal = c.createLinearGradient(-16, -100, 20, -80); metal.addColorStop(0, '#9fb0c4'); metal.addColorStop(0.55, '#e8eef5'); metal.addColorStop(1, '#ffffff');
+    c.fillStyle = metal; c.fill(); c.strokeStyle = trait; c.lineWidth = 1.5; c.stroke();
+    c.fillStyle = '#b9c6d6'; c.fillRect(-16, -83, 38.5, 5.4); c.strokeRect(-16, -83, 38.5, 5.4);
+    c.strokeStyle = '#8796ab'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(3, -99); c.lineTo(3, -84); c.stroke();
+    // Bouclier du lancier, au bras gauche
+    c.save(); c.translate(-16, -40); c.rotate(-0.08);
+    c.beginPath(); c.moveTo(-15, -19); c.lineTo(15, -19); c.lineTo(15, 1); c.quadraticCurveTo(15, 16, 0, 22); c.quadraticCurveTo(-15, 16, -15, 1); c.closePath();
+    const ecu = c.createLinearGradient(-15, -19, 15, 20); ecu.addColorStop(0, '#5aa6ff'); ecu.addColorStop(1, fonce);
+    c.fillStyle = ecu; c.fill(); c.strokeStyle = '#ffffff'; c.lineWidth = 3; c.stroke();
+    c.strokeStyle = trait; c.lineWidth = 1; c.stroke();
+    icone(c, 'couronne', 0, -1, 9, '#ffd34d');
+    c.restore();
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    redimensionner();
+    const c = ctx, W = LARG, H = HAUT;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // Composition de 600 × 800, centrée ; sur un écran plus large ou plus haut, le décor continue.
+    const k = Math.min(W / 600, H / 800);
+    const X = (u) => W / 2 + (u - 300) * k, Y = (v) => H / 2 + (v - 400) * k;
+    // Cadre du premier plan accroché aux bords de l'écran (écran large : il reste dans les coins).
+    const XG = (u) => u * k, XD = (u) => W - (600 - u) * k;
+    const r7 = alea(7);
+    // 1. Ciel, soleil et nuages
+    const hor = Y(212);
+    let g = c.createLinearGradient(0, Math.min(0, Y(0)), 0, hor);
+    g.addColorStop(0, '#3f9fe8'); g.addColorStop(0.65, '#9fd6ff'); g.addColorStop(1, '#e6f7ff');
+    c.fillStyle = g; c.fillRect(0, 0, W, hor + 2);
+    const sx = X(512), sy = Y(64);
+    c.save(); c.translate(sx, sy); c.fillStyle = 'rgba(255,248,205,.28)';
+    const lr = Math.max(W, H) * 1.6, er = lr * 0.058;
+    for (let i = 0; i < 12; i++) { c.rotate(Math.PI / 6); c.beginPath(); c.moveTo(0, 0); c.lineTo(lr, -er); c.lineTo(lr, er); c.closePath(); c.fill(); }
+    c.restore();
+    let halo = c.createRadialGradient(sx, sy, 0, sx, sy, 300 * k);
+    halo.addColorStop(0, 'rgba(255,251,215,1)'); halo.addColorStop(0.2, 'rgba(255,240,170,.8)'); halo.addColorStop(1, 'rgba(255,240,170,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#fff1a8'; c.beginPath(); c.arc(sx, sy, 42 * k, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#fffbe8'; c.beginPath(); c.arc(sx, sy, 32 * k, 0, Math.PI * 2); c.fill();
+    nuage(c, X(96), Y(86), 50 * k, 0.97); nuage(c, X(30), Y(110), 34 * k, 0.95);
+    nuage(c, X(300), Y(42), 26 * k, 0.9); nuage(c, X(-120), Y(60), 40 * k, 0.95); nuage(c, X(720), Y(150), 36 * k, 0.95);
+    // Mouettes
+    c.strokeStyle = '#2f5f8f'; c.lineWidth = 2.4 * k;
+    [[360, 132, 1], [392, 150, 0.8], [340, 160, 0.65]].forEach(([mx, my, f]) => {
+      const x = X(mx), y = Y(my), s = 9 * k * f;
+      c.beginPath(); c.moveTo(x - s * 1.4, y); c.quadraticCurveTo(x - s * 0.7, y - s * 0.9, x, y); c.quadraticCurveTo(x + s * 0.7, y - s * 0.9, x + s * 1.4, y); c.stroke();
+    });
+    // 2. Mer et îles lointaines
+    g = c.createLinearGradient(0, hor, 0, H);
+    g.addColorStop(0, '#5aaee8'); g.addColorStop(0.25, '#3a8fd8'); g.addColorStop(1, '#22609f');
+    c.fillStyle = g; c.fillRect(0, hor, W, H - hor);
+    c.fillStyle = 'rgba(255,250,215,.55)';
+    for (let i = 0; i < 9; i++) { const y = hor + (4 + i * 7) * k, l = (60 - i * 5) * k; c.fillRect(sx - l / 2 + Math.sin(i * 2.1) * 14 * k, y, l, 2.2 * k); }
+    c.fillStyle = '#a8d48e';
+    [[60, 40, 9], [150, 26, 6], [600, 50, 10], [-120, 60, 8], [760, 40, 7]].forEach(([ix, lx, hy]) => {
+      c.beginPath(); c.ellipse(X(ix), hor + 1, lx * k, hy * k, 0, Math.PI, Math.PI * 2); c.fill();
+    });
+    c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineCap = 'round';
+    for (let i = 0; i < 60; i++) {
+      const vx = r7() * 1.6 - 0.3, vy = r7();
+      const x = vx * W, y = hor + 14 * k + vy * vy * (H - hor);
+      const s = (6 + vy * 16) * k; c.lineWidth = (1.2 + vy * 2.2) * k;
+      c.beginPath(); c.arc(x, y, s, Math.PI * 1.15, Math.PI * 1.85); c.stroke();
+    }
+
+    // 3. L'Île du Matin, vue en perspective
+    const Q = construireCarte(0, null);
+    const plan = [[2, 'chateau'], [2, 'ecurie'], [3, 'caserne'], [0, 'tour'], [1, 'caserne'], [3, 'chateau'], [1, 'caserne'], [1, 'caserne'], [1, 'ecurie'], [1, 'chateau']];
+    Q.noeuds.forEach((nd) => { nd.owner = plan[nd.i][0]; nd.type = plan[nd.i][1]; });
+    const Z = (y) => 1 + (150 - y) / 150 * 1.4;
+    const proj = (x, y) => { const z = Z(y); return [X(345 + (x - 50) * 8 / z), Y(-80 + 780 / z), z]; };
+    const rx = (r, z) => r * 8 / z * k, ry = (r, z) => r * 7.28 / (z * z) * k;
+    const formeIle = (rayon, demi) => {
+      const p = new Path2D();
+      for (const nd of Q.noeuds) { const [x, y, z] = proj(nd.x, nd.y); p.moveTo(x + rx(rayon, z), y); p.ellipse(x, y, rx(rayon, z), ry(rayon, z), 0, 0, Math.PI * 2); }
+      for (const e of Q.aretes) {
+        const a = Q.noeuds[e.a], b = Q.noeuds[e.b];
+        const nx = -(b.y - a.y) / e.len * demi, ny = (b.x - a.x) / e.len * demi;
+        let pts = [proj(a.x + nx, a.y + ny), proj(b.x + nx, b.y + ny), proj(b.x - nx, b.y - ny), proj(a.x - nx, a.y - ny)];
+        let aire = 0;
+        for (let i = 0; i < 4; i++) { const p1 = pts[i], p2 = pts[(i + 1) % 4]; aire += p1[0] * p2[1] - p2[0] * p1[1]; }
+        if (aire < 0) pts = pts.reverse();
+        p.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < 4; i++) p.lineTo(pts[i][0], pts[i][1]); p.closePath();
+      }
+      return p;
+    };
+    const rivage = formeIle(16.5, 12.5), terre = formeIle(14, 10);
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.save(); c.translate(0, 3 * k); c.fill(formeIle(18.5, 14.5)); c.restore();
+    c.fillStyle = '#efdca2'; c.fill(rivage);
+    c.fillStyle = '#8fd065'; c.fill(terre);
+    c.save(); c.clip(terre);
+    // lumière du soleil sur l'île
+    halo = c.createRadialGradient(X(470), Y(220), 0, X(470), Y(220), 520 * k);
+    halo.addColorStop(0, 'rgba(255,248,190,.45)'); halo.addColorStop(1, 'rgba(255,248,190,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    for (const nd of Q.noeuds) {
+      if (!nd.owner) continue;
+      const [x, y, z] = proj(nd.x, nd.y);
+      c.save(); c.translate(x, y); c.scale(1, ry(1, z) / rx(1, z));
+      const gr = c.createRadialGradient(0, 0, 0, 0, 0, rx(17, z));
+      gr.addColorStop(0, COULEURS[nd.owner] + 'aa'); gr.addColorStop(1, COULEURS[nd.owner] + '00');
+      c.fillStyle = gr; c.beginPath(); c.arc(0, 0, rx(17, z), 0, Math.PI * 2); c.fill(); c.restore();
+    }
+    const decor = (Q.carte.decorListe || (Q.carte.decorListe = genererDecor(Q))).filter((d) => d.type !== 'vague' && d.type !== 'montagne').slice().sort((a, b) => a.y - b.y);
+    for (const d of decor) { const [x, y, z] = proj(d.x, d.y); dessinerDecor(c, d.type, x, y, 2.4 * d.t * 8 / z * k); }
+    c.restore();
+    // Routes
+    for (const e of Q.aretes) {
+      const a = Q.noeuds[e.a], b = Q.noeuds[e.b];
+      const [ax, ay, az] = proj(a.x, a.y), [bx, by, bz] = proj(b.x, b.y);
+      const l = 1.2 * 8 / ((az + bz) / 2) * k;
+      c.save(); c.lineCap = 'round'; c.strokeStyle = '#b98e52'; c.lineWidth = l; c.setLineDash([l * 1.7, l * 0.9]);
+      c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke(); c.restore();
+    }
+    // Régions (du fond vers l'avant)
+    const R = (z) => 5.4 * 8 / z * k;
+    Q.noeuds.slice().sort((a, b) => a.y - b.y).forEach((nd) => {
+      const [x, y, z] = proj(nd.x, nd.y), r = R(z);
+      c.fillStyle = 'rgba(20,50,20,.25)'; c.beginPath(); c.ellipse(x, y + r * 0.95, r * 1.05, r * 0.36, 0, 0, Math.PI * 2); c.fill();
+      pastille(c, x, y, r, nd.owner, nd.type, {});
+    });
+    // Région tout juste prise par le royaume bleu : onde, éclats, drapeau planté
+    {
+      const nd = Q.noeuds[8]; const [x, y, z] = proj(nd.x, nd.y), r = R(z);
+      c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 4 * k; c.beginPath(); c.ellipse(x, y, r * 2.1, r * 1.3, 0, 0, Math.PI * 2); c.stroke();
+      c.strokeStyle = COULEURS[1]; c.lineWidth = 3 * k; c.beginPath(); c.ellipse(x, y, r * 2.5, r * 1.6, 0, 0, Math.PI * 2); c.stroke();
+      for (let i = 0; i < 16; i++) {
+        const a = r7() * Math.PI * 2, d = r * (1.3 + r7() * 1.3);
+        c.fillStyle = i % 3 ? COULEURS[1] : '#ffe066';
+        c.save(); c.translate(x + Math.cos(a) * d, y - r * 0.4 + Math.sin(a) * d * 0.8); c.rotate(a); c.fillRect(-4 * k, -4 * k, 8 * k, 8 * k); c.restore();
+      }
+      const bx = x + r * 0.15, by = y - r * 1.35, h = r * 1.7;
+      c.strokeStyle = '#5b3a1a'; c.lineWidth = 3.5 * k; c.beginPath(); c.moveTo(bx, by); c.lineTo(bx, by - h); c.stroke();
+      c.fillStyle = COULEURS[1]; c.strokeStyle = '#ffffff'; c.lineWidth = 2 * k;
+      c.beginPath(); c.moveTo(bx, by - h); c.quadraticCurveTo(bx + r * 0.6, by - h - r * 0.15, bx + r * 1.15, by - h + r * 0.3); c.lineTo(bx, by - h + r * 0.68); c.closePath(); c.fill(); c.stroke();
+    }
+    // Troupes en marche
+    const troupe = (ia, ib, part, owner, unite, vitesse) => {
+      const a = Q.noeuds[ia], b = Q.noeuds[ib];
+      const [x, y, z] = proj(lerp(a.x, b.x, part), lerp(a.y, b.y, part));
+      const [ax, ay] = proj(a.x, a.y);
+      const rr = R(z) * 0.66, l = Math.hypot(x - ax, y - ay) || 1, ux = (ax - x) / l, uy = (ay - y) / l;
+      c.fillStyle = 'rgba(20,50,20,.25)'; c.beginPath(); c.ellipse(x, y + rr * 0.95, rr, rr * 0.32, 0, 0, Math.PI * 2); c.fill();
+      if (vitesse) {
+        c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 3 * k;
+        for (let i = 0; i < 3; i++) { const o = (i - 1) * rr * 0.55; c.beginPath(); c.moveTo(x + ux * rr * 1.5 - uy * o, y + uy * rr * 1.5 + ux * o); c.lineTo(x + ux * rr * 2.9 - uy * o, y + uy * rr * 2.9 + ux * o); c.stroke(); }
+      }
+      c.fillStyle = COULEURS[owner];
+      for (let i = 3; i >= 1; i--) { c.beginPath(); c.arc(x + ux * rr * 1.35 * i, y + uy * rr * 1.35 * i, rr * 0.4, 0, Math.PI * 2); c.fill(); }
+      jeton(c, x, y, rr, owner, unite);
+    };
+    troupe(1, 3, 0.45, 2, 'cavalier');
+    troupe(2, 3, 0.4, 3, 'lancier');
+    troupe(6, 3, 0.55, 1, 'lancier');
+    troupe(6, 5, 0.5, 1, 'cavalier', true);
+    // Petit nuage de poussière : la tour du centre résiste
+    { const nd = Q.noeuds[3]; const [x, y, z] = proj(nd.x, nd.y); const r = R(z);
+      c.fillStyle = 'rgba(250,247,238,.9)';
+      [[-1.3, 0.2, 0.42], [1.25, 0.1, 0.36], [-0.9, -0.9, 0.3]].forEach(([dx, dy, f]) => { c.beginPath(); c.arc(x + dx * r, y + dy * r, r * f, 0, Math.PI * 2); c.fill(); }); }
+
+    // 4. Colline du premier plan et chevalier en grand
+    g = c.createLinearGradient(0, Y(640), 0, Y(800));
+    g.addColorStop(0, '#74c650'); g.addColorStop(1, '#3f8f31');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(0, Y(675)); c.lineTo(X(-60), Y(675));
+    c.quadraticCurveTo(X(150), Y(640), X(330), Y(706)); c.quadraticCurveTo(X(470), Y(752), X(700), Y(742));
+    c.lineTo(W, Y(742)); c.lineTo(W, H + 2); c.lineTo(0, H + 2); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,250,200,.7)'; c.lineWidth = 3 * k;
+    c.beginPath(); c.moveTo(X(-60), Y(675)); c.quadraticCurveTo(X(150), Y(640), X(330), Y(706)); c.quadraticCurveTo(X(470), Y(752), X(700), Y(742)); c.stroke();
+    // Lueur dorée derrière le héros
+    halo = c.createRadialGradient(X(150), Y(420), 0, X(150), Y(420), 230 * k);
+    halo.addColorStop(0, 'rgba(255,240,160,.55)'); halo.addColorStop(1, 'rgba(255,240,160,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    dessinerHeros(c, X(128), Y(712), 3.8 * k);
+    // Premier plan : herbes, fleurs et buisson coupés par les bords
+    c.strokeStyle = '#2f7a2a'; c.lineWidth = 3 * k;
+    for (let i = 0, n = Math.ceil(W / (27 * k)) + 2; i < n; i++) {
+      const x = (i * 27 + r7() * 10 - 20) * k, y = Y(800 - r7() * 30), h = (18 + r7() * 26) * k;
+      c.beginPath(); c.moveTo(x, y + 20 * k); c.quadraticCurveTo(x + 3 * k, y - h * 0.5, x + (r7() * 12 - 6) * k, y - h); c.stroke();
+    }
+    c.fillStyle = '#2f7d2c';
+    [[-10, 790, 70], [60, 812, 56], [-40, 740, 46]].forEach(([bx, by, br]) => { c.beginPath(); c.arc(XG(bx), Y(by), br * k, 0, Math.PI * 2); c.fill(); });
+    c.fillStyle = '#46a03a';
+    [[-4, 776, 40], [62, 798, 30]].forEach(([bx, by, br]) => { c.beginPath(); c.arc(XG(bx), Y(by), br * k, 0, Math.PI * 2); c.fill(); });
+    [[548, 778, 1.5, '#ff6b6b'], [596, 748, 1.8, '#ffd34d'], [500, 806, 1.2, '#ff9ad5']].forEach(([fx, fy, f, coul]) => {
+      const x = XD(fx), y = Y(fy);
+      c.strokeStyle = '#2f7a34'; c.lineWidth = 4 * k * f; c.beginPath(); c.moveTo(x, y + 60 * k); c.quadraticCurveTo(x - 8 * k, y + 20 * k, x, y); c.stroke();
+      c.fillStyle = coul;
+      for (let p = 0; p < 6; p++) { const a = p * 1.047; c.beginPath(); c.arc(x + Math.cos(a) * 11 * k * f, y + Math.sin(a) * 11 * k * f, 8 * k * f, 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = '#fff3a0'; c.beginPath(); c.arc(x, y, 7 * k * f, 0, Math.PI * 2); c.fill();
+    });
+    // Branche feuillue en haut à gauche (cadre)
+    c.fillStyle = '#3d8f3a';
+    [[-20, -10, 70, 40, 0.4], [40, 10, 50, 26, 0.6], [-30, 60, 46, 24, 0.9]].forEach(([fx, fy, a, b, rot]) => { c.beginPath(); c.ellipse(XG(fx), Y(fy), a * k, b * k, rot, 0, Math.PI * 2); c.fill(); });
+    c.fillStyle = '#5db552';
+    [[-14, -18, 46, 22, 0.4], [40, 4, 30, 14, 0.6]].forEach(([fx, fy, a, b, rot]) => { c.beginPath(); c.ellipse(XG(fx), Y(fy), a * k, b * k, rot, 0, Math.PI * 2); c.fill(); });
+  }
+  function cacherPourAffiche() {
+    for (const el of document.querySelectorAll('.ecran, #hud, #barre, #bulle, #toasts, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    cacherPourAffiche();
+    dessinerAffiche();
+    setTimeout(cacherPourAffiche, 300); setTimeout(cacherPourAffiche, 1200);
+    window.removeEventListener('resize', redimensionner);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ========================================================================
+  // 14. Images du jeu (page du jeu)
+  // ========================================================================
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (objectif, chrono, pause, pouvoirs), sans écran
+  // titre, ni fenêtre « Continuer », ni fiche, ni main du tutoriel (CONSIGNES-JEU.md, section 5). La carte
+  // est posée, la partie tourne un tiers de seconde, puis elle est figée sans fenêtre de pause :
+  // ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1, Île du Matin : quatre régions bleues, des troupes en marche, un glisser vers la tour ;
+  //   2 = niveau 16, Archipel des Mouettes : bateaux entre les îles, tempête, bouclier, rivaux rouge et doré ;
+  //   3 = niveau 22, Grand Continent : brouillard, cité d'or assiégée par les catapultes, étendard actif.
+  const SCENES_APERCU = {
+    1: {
+      niveau: 0, depart: 9, temps: 38,
+      regions: [[9, 1, 14], [7, 1, 9], [8, 1, 7], [6, 1, 4, true], [3, 0, 5], [4, 0, 4], [5, 0, 5]],
+      troupes: [[7, 4, 0.5, 1, 6], [8, 5, 0.3, 1, 5]],
+      glisse: [6, 3, 0.7],
+    },
+    2: {
+      niveau: 15, depart: 0, temps: 96, chateaux: [4, 12], vivants: [2, 3],
+      regions: [[0, 1, 22, false, 'chateau'], [1, 1, 12], [2, 1, 15], [6, 1, 9], [3, 3, 8], [4, 3, 24, false, 'chateau'], [5, 3, 11],
+        [12, 2, 23, false, 'chateau'], [11, 2, 10], [10, 0, 6], [9, 0, 7], [7, 0, 8], [8, 0, 6]],
+      troupes: [[1, 3, 0.5, 1, 9], [6, 7, 0.42, 1, 7], [11, 8, 0.38, 2, 8], [4, 5, 0.5, 3, 6]],
+      bouclier: 6, tempete: [5, 7], pouvoirs: { cor: 0, bouclier: 22 },
+    },
+    3: {
+      niveau: 21, depart: 0, temps: 212, chateaux: [2, 17], vivants: [2, 3], ratio: 0.5,
+      regions: [[0, 1, 26, false, 'chateau'], [1, 1, 14], [3, 1, 12], [4, 1, 9], [6, 1, 16], [7, 1, 11], [9, 1, 13], [12, 1, 10], [13, 1, 30], [15, 1, 12],
+        [2, 2, 28, false, 'chateau'], [5, 2, 21], [11, 2, 9], [17, 3, 25, false, 'chateau'], [14, 3, 13], [16, 3, 11], [8, 0, 9], [10, 0, 34]],
+      troupes: [[13, 10, 0.2, 1, 14, 'catapulte'], [7, 10, 0.3, 1, 10], [2, 1, 0.35, 2, 12], [16, 13, 0.3, 3, 9]],
+      pouvoirs: { cor: 14, bouclier: 0, etendard: 0 }, etendard: 5,
+    },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 987654 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const def = NIVEAUX[sc.niveau];
+    niveauCourant = sc.niveau;
+    P = creerPartie(def, sc.niveau);
+    P.tuto = 0; P.fiches = []; P.attente = false;
+    montrer(null);
+    $('hud').classList.remove('cache');
+    placer(sc.depart);
+    const Q = P;
+    Q.effets = []; Q.noeuds[sc.depart].eclat = 0; // pas l'éclat du départ : la partie est déjà bien avancée
+    // Carte posée : propriétaires, bâtiments et soldats de chaque région.
+    Q.noeuds.forEach((nd) => { nd.type = (def.types && def.types[nd.i]) || CARTES[def.carte].noeuds[nd.i][2]; if (def.cite === nd.i) nd.type = 'cite'; });
+    for (const [i, o, n, prise, type] of sc.regions) {
+      const nd = Q.noeuds[i];
+      nd.owner = o; nd.n = n; if (type) nd.type = type;
+      if (prise) { nd.eclat = 1; effetConquete(Q, nd); }
+    }
+    Q.noeuds[sc.depart].type = 'chateau';
+    if (sc.chateaux) Q.chateauxRivaux = sc.chateaux.slice();
+    if (sc.vivants) { Q.vivants = {}; sc.vivants.forEach((o) => { Q.vivants[o] = true; }); }
+    for (const [a, b, part, o, q, unite] of sc.troupes) {
+      const e = Q.paires[a * 100 + b], na = Q.noeuds[a], nb = Q.noeuds[b];
+      Q.groupes.push({ id: ++Q.idGroupe, o, u: unite || BATIMENTS[na.type].unite, n: q, ch: [a, b], s: 0, d: e.len * part,
+        x: lerp(na.x, nb.x, part), y: lerp(na.y, nb.y, part) });
+    }
+    if (sc.bouclier != null) Q.noeuds[sc.bouclier].bouclier = 6;
+    if (sc.tempete) { Q.paires[sc.tempete[0] * 100 + sc.tempete[1]].ferme = 9; Q.tempeteT = 60; }
+    if (sc.pouvoirs) for (const nom in sc.pouvoirs) if (Q.pouvoirs[nom]) Q.pouvoirs[nom].recharge = sc.pouvoirs[nom];
+    if (sc.etendard && Q.pouvoirs.etendard) { Q.pouvoirs.etendard.actif = sc.etendard; Q.pouvoirs.etendard.recharge = POUVOIRS.etendard.recharge - 2; }
+    if (sc.ratio) Q.ratio = sc.ratio;
+    Q.temps = sc.temps;
+    for (const o in Q.ia) Q.ia[o].t = 30; // les royaumes rivaux attendent : rien ne change avant la capture
+    majHud();
+    // La partie tourne un tiers de seconde (troupes en marche, éclats), puis elle est figée.
+    for (let i = 0; i < 20; i++) maj(Q, 1 / 60);
+    Q.temps = sc.temps;
+    if (sc.glisse) {
+      calculerVue(Q);
+      const [a, b, part] = sc.glisse;
+      const [x0, y0] = vers(Q, Q.noeuds[a].x, Q.noeuds[a].y), [x1, y1] = vers(Q, Q.noeuds[b].x, Q.noeuds[b].y);
+      Q.selection = Q.noeuds[a];
+      Q.glisse = { x: lerp(x0, x1, part), y: lerp(y0, y1, part), x0, y0, bouge: true, deja: false, id: -1 };
+    }
+    majHud();
+    Q.pause = true;
+  }
+
   // Démarrage
   document.title = traduire('titre');
   redimensionner();
   iconeSon();
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else {
+    if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

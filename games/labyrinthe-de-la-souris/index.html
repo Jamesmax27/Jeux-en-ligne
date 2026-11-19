@@ -1090,8 +1090,8 @@ document.getElementById('jouer').onclick = function(){
     onNouvelle: function(){ lancer(1); }
   });
 };
-// Page fermée en plein labyrinthe : on reprendra ce niveau
-JEL_SAVE.surFermeture(function(){ if(!fini) JEL_SAVE.save(JEU, { niveau: niveau, score: 0 }); });
+// Page fermée en plein labyrinthe : on reprendra ce niveau (jamais pour une image du jeu)
+JEL_SAVE.surFermeture(function(){ if(!fini && !apercu) JEL_SAVE.save(JEU, { niveau: niveau, score: 0 }); });
 // « Effacer la sauvegarde » sous Jouer (caché sans sauvegarde)
 document.getElementById('jouer').after(JEL_SAVE.boutonEffacer({ jeu: JEU }));
 document.getElementById('suite').onclick = function(){
@@ -1117,8 +1117,352 @@ cv.addEventListener('pointermove', function(e){
 });
 window.addEventListener('pointerup', function(){ glisse = false; });
 window.addEventListener('pointercancel', function(){ glisse = false; });
-window.addEventListener('resize', redim);
-redim();
+
+/* ---------- Hasard à graine fixe (affiche et images du jeu) ---------- */
+function alea(graine){
+  return function(){
+    graine = (graine + 0x6D2B79F5) | 0;
+    var r = Math.imul(graine ^ (graine >>> 15), 1 | graine);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- Affiche (jaquette du jeu) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le labyrinthe du jeu (sol
+// crème, murs violets) vu de près et en profondeur ; la souris, en grand, court sur son trait jaune
+// et montre le fromage qui brille au bout du couloir.
+var AFF = { C: 1.5, haut: 0.9, ep: 0.13, camH: 2.6, incl: 0.36, F: 640, cy: 330, cols: 24, rangs: 30, Z0: 0.6 };
+var AFF_TRAIT = [[-3,4],[-2,4],[-2,3],[-2,2],[-1,2],[-1,1],[0,1]];  // chemin déjà parcouru (jaune)
+var AFF_DEVANT = [[0,1],[1,1],[1,2],[1,3]];                          // couloir ouvert jusqu'au fromage
+var AFF_FROMAGE = [1,3], affLab = null, affCanvas = null;
+
+function melange(a, b, f){
+  var pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  function ca(p, d){ return (p >> d) & 255; }
+  return 'rgb(' + Math.round(ca(pa,16)*(1-f) + ca(pb,16)*f) + ',' + Math.round(ca(pa,8)*(1-f) + ca(pb,8)*f) + ',' + Math.round(ca(pa,0)*(1-f) + ca(pb,0)*f) + ')';
+}
+
+// Grand labyrinthe parfait (même génération que le jeu), puis couloirs du trait et du fromage ouverts.
+function labyrintheAffiche(){
+  var L = 2*AFF.cols + 1, P = AFF.rangs, r = alea(20261119), m = [], vu = [], i;
+  for(i=0;i<L*P;i++){ m.push(15); vu.push(false); }
+  var pile = [AFF.cols]; vu[AFF.cols] = true;
+  while(pile.length){
+    var cur = pile[pile.length-1], cx = cur%L, cy = (cur-cx)/L, vois = [];
+    for(var d=0;d<4;d++){
+      var nx = cx+DX[d], ny = cy+DY[d];
+      if(nx>=0&&ny>=0&&nx<L&&ny<P&&!vu[ny*L+nx]) vois.push(d);
+    }
+    if(!vois.length){ pile.pop(); continue; }
+    var dd = vois[Math.floor(r()*vois.length)], nxt = (cy+DY[dd])*L+cx+DX[dd];
+    m[cur] &= ~BIT[dd]; m[nxt] &= ~BIT[(dd+2)%4]; vu[nxt] = true; pile.push(nxt);
+  }
+  function ouvrir(a, b){
+    for(var d=0;d<4;d++) if(a[0]+DX[d]===b[0] && a[1]+DY[d]===b[1]){
+      m[a[1]*L + a[0]+AFF.cols] &= ~BIT[d]; m[b[1]*L + b[0]+AFF.cols] &= ~BIT[(d+2)%4];
+    }
+  }
+  [AFF_TRAIT, AFF_DEVANT].forEach(function(ch){ for(var j=1;j<ch.length;j++) ouvrir(ch[j-1], ch[j]); });
+  ouvrir([0,0],[0,1]); ouvrir([1,0],[1,1]); ouvrir([-1,0],[-1,1]);
+  ouvrir([1,1],[2,1]); ouvrir([1,2],[2,2]); ouvrir([1,3],[2,3]); ouvrir([2,2],[2,3]); // rien devant le fromage
+  // Murs (boîtes) : mur de devant (bit 1) et de gauche (bit 8) de chaque case, bords du fond et de droite.
+  var C = AFF.C, e = AFF.ep, h = AFF.haut, murs2 = [];
+  for(var j=0;j<P;j++) for(var c=0;c<L;c++){
+    var b = m[j*L+c], x = (c-AFF.cols)*C, z = AFF.Z0 + j*C;
+    if(b&1) murs2.push({ x0: x-C/2-e, x1: x+C/2+e, z0: z-e, z1: z+e });
+    if(b&8) murs2.push({ x0: x-C/2-e, x1: x-C/2+e, z0: z+e, z1: z+C-e });
+    if(c===L-1 && (b&2)) murs2.push({ x0: x+C/2-e, x1: x+C/2+e, z0: z+e, z1: z+C-e });
+  }
+  murs2.forEach(function(w){ w.h = h; w.cle = (w.z0 + w.z1)/2; });
+  return murs2;
+}
+
+function dessinerAffiche(){
+  var W = innerWidth, H = innerHeight, r = window.devicePixelRatio || 1;
+  affCanvas.width = Math.round(W*r); affCanvas.height = Math.round(H*r);
+  var c = affCanvas.getContext('2d');
+  c.setTransform(r,0,0,r,0,0);
+  var k = Math.min(W/600, H/800), ox = W/2, oy = (H - 800*k)/2;
+  var cs = Math.cos(AFF.incl), sn = Math.sin(AFF.incl);
+  function proj(x, y, z){
+    var dy = y - AFF.camH, zc = z*cs - dy*sn, yc = dy*cs + z*sn;
+    return [ox + x*AFF.F/zc*k, oy + (AFF.cy - yc*AFF.F/zc)*k, zc];
+  }
+  function poly(pts){ c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for(var i=1;i<pts.length;i++) c.lineTo(pts[i][0], pts[i][1]); c.closePath(); }
+  var BRUME = '#ffe0d2', hor = oy + (AFF.cy - AFF.F*Math.tan(AFF.incl))*k;
+  var fromage = proj(AFF_FROMAGE[0]*AFF.C, 0, AFF.Z0 + (AFF_FROMAGE[1]+0.5)*AFF.C);
+
+  // Ciel du soir, doux et lumineux
+  var ciel = c.createLinearGradient(0, 0, 0, hor);
+  ciel.addColorStop(0, '#8f7ff0'); ciel.addColorStop(0.55, '#d7a8f0'); ciel.addColorStop(1, '#ffd8c4');
+  c.fillStyle = ciel; c.fillRect(0, 0, W, hor + 2);
+  // Nuages
+  c.fillStyle = 'rgba(255,255,255,.75)';
+  [[-210,30,1],[150,14,0.8],[420,40,1.1],[-470,18,0.9]].forEach(function(n){
+    var nx = ox + n[0]*k, ny = oy + n[1]*k, f = n[2]*k;
+    c.beginPath(); c.ellipse(nx, ny, 46*f, 13*f, 0, 0, 6.283); c.ellipse(nx-22*f, ny-7*f, 22*f, 14*f, 0, 0, 6.283); c.ellipse(nx+16*f, ny-10*f, 26*f, 16*f, 0, 0, 6.283); c.fill();
+  });
+  // Collines lointaines sur l'horizon
+  [['#c7aef0', 20, 0.011, 1], ['#e7bfe0', 11, 0.017, 2.3]].forEach(function(col){
+    c.fillStyle = col[0]; c.beginPath(); c.moveTo(0, hor + 2);
+    for(var x=0;x<=W+10;x+=10) c.lineTo(x, hor - (col[1] + Math.sin(x/k*col[2] + col[3])*col[1]*0.6 + Math.sin(x/k*col[2]*2.7)*col[1]*0.3)*k);
+    c.lineTo(W, hor + 2); c.closePath(); c.fill();
+  });
+  // Sol crème du labyrinthe
+  var sol = c.createLinearGradient(0, hor, 0, H);
+  sol.addColorStop(0, BRUME); sol.addColorStop(0.25, '#fff0c8'); sol.addColorStop(1, '#fff3c4');
+  c.fillStyle = sol; c.fillRect(0, hor, W, H - hor);
+
+  var liste = affLab || (affLab = labyrintheAffiche());
+  var visibles = [];
+  liste.forEach(function(w){
+    var p = [proj(w.x0,0,w.z0), proj(w.x1,0,w.z0), proj(w.x1,0,w.z1), proj(w.x0,0,w.z1),
+             proj(w.x0,w.h,w.z0), proj(w.x1,w.h,w.z0), proj(w.x1,w.h,w.z1), proj(w.x0,w.h,w.z1)];
+    var minX = Infinity, maxX = -Infinity;
+    p.forEach(function(q){ minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]); });
+    if(maxX < -20 || minX > W + 20) return;
+    visibles.push({ w: w, p: p, cle: w.cle });
+  });
+  // Ombres douces des murs sur le sol (lumière du fromage, en haut à droite)
+  c.fillStyle = 'rgba(110,60,150,.13)';
+  visibles.forEach(function(v){
+    var w = v.w, d = -0.28;
+    poly([proj(w.x0+d,0,w.z0-0.1), proj(w.x1+d,0,w.z0-0.1), proj(w.x1+d,0,w.z1-0.1), proj(w.x0+d,0,w.z1-0.1)]); c.fill();
+  });
+  // Lueur dorée du fromage sur le sol
+  var lueur = c.createRadialGradient(fromage[0], fromage[1], 0, fromage[0], fromage[1], 330*k);
+  lueur.addColorStop(0, 'rgba(255,214,90,.75)'); lueur.addColorStop(0.5, 'rgba(255,214,90,.25)'); lueur.addColorStop(1, 'rgba(255,214,90,0)');
+  c.fillStyle = lueur; c.fillRect(0, hor, W, H - hor);
+
+  // Trait jaune déjà parcouru, posé sur le sol
+  function surSol(i, j){ return [i*AFF.C, AFF.Z0 + (j+0.5)*AFF.C]; }
+  function bande(larg, couleur){
+    c.fillStyle = couleur;
+    for(var n=0;n<AFF_TRAIT.length;n++){
+      var a = surSol(AFF_TRAIT[n][0], AFF_TRAIT[n][1]);
+      var rond = [];
+      for(var q=0;q<20;q++){ var an = q/20*6.283; rond.push(proj(a[0]+Math.cos(an)*larg, 0, a[1]+Math.sin(an)*larg)); }
+      poly(rond); c.fill();
+      if(n){
+        var b = surSol(AFF_TRAIT[n-1][0], AFF_TRAIT[n-1][1]);
+        var px = (a[0]===b[0]) ? larg : 0, pz = (a[0]===b[0]) ? 0 : larg;
+        poly([proj(a[0]-px,0,a[1]-pz), proj(a[0]+px,0,a[1]+pz), proj(b[0]+px,0,b[1]+pz), proj(b[0]-px,0,b[1]-pz)]); c.fill();
+      }
+    }
+  }
+  c.save(); c.shadowColor = 'rgba(255,190,40,.9)'; c.shadowBlur = 18*k;
+  bande(0.25, '#f08a1c'); c.restore();
+  bande(0.2, '#ffc928');
+
+  // Objets dans l'ordre, du plus loin au plus proche : murs, fromage, souris
+  var souris = { x: -0.3*AFF.C, z: AFF.Z0 + 1.55*AFF.C };
+  visibles.push({ fromage: true, cle: AFF.Z0 + (AFF_FROMAGE[1]+0.5)*AFF.C - 0.2 });
+  visibles.push({ souris: true, cle: souris.z - 0.62 });
+  visibles.sort(function(a, b){ return b.cle - a.cle; });
+  visibles.forEach(function(v){
+    if(v.fromage){ dessinerLumiereFromage(c, fromage[0], fromage[1], k); dessinerFromage(c, fromage[0] + 8*k, fromage[1] + 4*k, 1.5*k); return; }
+    if(v.souris){
+      var pied = proj(souris.x, 0, souris.z);
+      dessinerSourisAffiche(c, pied[0], pied[1], 3.75*k);
+      return;
+    }
+    var p = v.p, w = v.w, brume = Math.max(0, Math.min(0.8, (p[0][2] - 5) / 26));
+    var trait = melange('#3b2160', BRUME, brume * 0.9);
+    c.lineJoin = 'round'; c.lineWidth = Math.max(0.6, 2.2*k*3/p[0][2]); c.strokeStyle = trait;
+    if(0 < w.x0){ poly([p[0], p[3], p[7], p[4]]); c.fillStyle = melange('#55318a', BRUME, brume); c.fill(); c.stroke(); }
+    if(0 > w.x1){ poly([p[1], p[2], p[6], p[5]]); c.fillStyle = melange('#5d3794', BRUME, brume); c.fill(); c.stroke(); }
+    poly([p[0], p[1], p[5], p[4]]); c.fillStyle = melange('#6b3fa0', BRUME, brume); c.fill(); c.stroke();
+    poly([p[4], p[5], p[6], p[7]]); c.fillStyle = melange('#a77be0', BRUME, brume); c.fill(); c.stroke();
+    // Arête éclairée
+    c.strokeStyle = melange('#e2c8ff', BRUME, brume); c.lineWidth = Math.max(0.5, 1.4*k*3/p[0][2]);
+    c.beginPath(); c.moveTo(p[4][0], p[4][1]); c.lineTo(p[5][0], p[5][1]); c.stroke();
+  });
+}
+
+// Halo, rayons et étincelles derrière le fromage (la source de lumière de l'affiche)
+function dessinerLumiereFromage(c, x, y, k){
+  var cy = y - 60*k;
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  var halo = c.createRadialGradient(x, cy, 0, x, cy, 230*k);
+  halo.addColorStop(0, 'rgba(255,230,140,.85)'); halo.addColorStop(0.4, 'rgba(255,200,90,.35)'); halo.addColorStop(1, 'rgba(255,190,80,0)');
+  c.fillStyle = halo; c.beginPath(); c.arc(x, cy, 230*k, 0, 6.283); c.fill();
+  for(var i=0;i<12;i++){
+    var a = i/12*6.283 + 0.2, l = (i%2 ? 190 : 260)*k;
+    var g = c.createLinearGradient(x, cy, x + Math.cos(a)*l, cy + Math.sin(a)*l);
+    g.addColorStop(0, 'rgba(255,240,170,.45)'); g.addColorStop(1, 'rgba(255,240,170,0)');
+    c.fillStyle = g; c.beginPath(); c.moveTo(x, cy);
+    c.lineTo(x + Math.cos(a-0.07)*l, cy + Math.sin(a-0.07)*l); c.lineTo(x + Math.cos(a+0.07)*l, cy + Math.sin(a+0.07)*l); c.closePath(); c.fill();
+  }
+  c.restore();
+  // Poussières dorées dans la lumière
+  var r2 = alea(77);
+  for(var p=0;p<26;p++){
+    var a2 = r2()*6.283, d = (40 + r2()*230)*k;
+    c.fillStyle = 'rgba(255,246,190,' + (0.5 + r2()*0.5).toFixed(2) + ')';
+    c.beginPath(); c.arc(x + Math.cos(a2)*d*1.3, cy + Math.sin(a2)*d*0.8, (1.5 + r2()*2.5)*k, 0, 6.283); c.fill();
+  }
+  // Étincelles à quatre branches
+  [[-78,-118,13],[84,-128,10],[96,-30,8],[-60,-30,7],[10,-160,9]].forEach(function(e){
+    var ex = x + e[0]*k, ey = y + e[1]*k, t = e[2]*k;
+    c.fillStyle = '#fffbe0'; c.beginPath();
+    c.moveTo(ex, ey - t); c.quadraticCurveTo(ex, ey, ex + t, ey); c.quadraticCurveTo(ex, ey, ex, ey + t);
+    c.quadraticCurveTo(ex, ey, ex - t, ey); c.quadraticCurveTo(ex, ey, ex, ey - t); c.fill();
+  });
+}
+
+// Le gros morceau de fromage (comme dans le jeu, en plus grand) ; (x, y) : bas du morceau, s : échelle
+function dessinerFromage(c, x, y, s){
+  c.save(); c.translate(x, y); c.scale(s, s); c.lineJoin = 'round';
+  var CONT = '#a8560a';
+  function forme(pts, coul){ c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for(var i=1;i<pts.length;i++) c.lineTo(pts[i][0], pts[i][1]); c.closePath(); c.fillStyle = coul; c.fill(); c.strokeStyle = CONT; c.lineWidth = 2.5; c.stroke(); }
+  c.fillStyle = 'rgba(150,80,40,.25)'; c.beginPath(); c.ellipse(4, 2, 58, 9, 0, 0, 6.283); c.fill();
+  // côté épais (croûte), face avant, dessus
+  forme([[-52,-10],[-52,-56],[-22,-78],[-22,-30]], '#f3a922');
+  forme([[-52,-10],[50,4],[50,-38],[-52,-56]], '#ffcf33');
+  forme([[-52,-56],[50,-38],[-22,-78]], '#ffe680');
+  // trous
+  c.fillStyle = '#e8961a';
+  [[-28,-30,8,6],[2,-16,6,4.5],[24,-22,9,6.5],[-6,-40,5,4],[36,-8,4.5,3.5]].forEach(function(t){ c.beginPath(); c.ellipse(t[0], t[1], t[2], t[3], 0.15, 0, 6.283); c.fill(); });
+  c.fillStyle = '#d98410';
+  [[-38,-32,4,7],[-30,-60,3.5,5]].forEach(function(t){ c.beginPath(); c.ellipse(t[0], t[1], t[2], t[3], 0, 0, 6.283); c.fill(); });
+  c.fillStyle = '#f7c64a';
+  [[-8,-58,7,3],[14,-50,5,2.2]].forEach(function(t){ c.beginPath(); c.ellipse(t[0], t[1], t[2], t[3], 0.1, 0, 6.283); c.fill(); });
+  // reflet
+  c.strokeStyle = 'rgba(255,255,230,.9)'; c.lineWidth = 3; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(-44, -54); c.lineTo(-24, -70); c.stroke();
+  c.restore();
+}
+
+// La souris du jeu en grand : elle court vers la droite, la patte tendue vers le fromage.
+// (x, y) : entre ses pieds ; s : échelle (elle mesure environ 100 unités de haut)
+function dessinerSourisAffiche(c, x, y, s){
+  var CONT = '#3d2463', GRIS = '#c3bcd6', GRIS_F = '#a59cc0', VENTRE = '#f4f0fa', ROSE = '#ffa3c2', ROSE_F = '#ef7aa2';
+  c.save(); c.translate(x, y); c.scale(s, s); c.lineJoin = 'round'; c.lineCap = 'round';
+  function trace(fill, ep){ c.fillStyle = fill; c.fill(); if(ep !== 0){ c.strokeStyle = CONT; c.lineWidth = ep || 2.4; c.stroke(); } }
+  function membre(x1, y1, x2, y2){
+    c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2);
+    c.strokeStyle = CONT; c.lineWidth = 9.5; c.stroke(); c.strokeStyle = GRIS; c.lineWidth = 5.5; c.stroke();
+  }
+  function ellipse(cx, cy, rx, ry, rot){ c.beginPath(); c.ellipse(cx, cy, rx, ry, rot || 0, 0, 6.283); }
+  // ombre au sol
+  c.fillStyle = 'rgba(70,30,100,.3)'; ellipse(2, 0, 38, 7); c.fill();
+  // queue qui ondule derrière
+  c.beginPath(); c.moveTo(-14, -22); c.bezierCurveTo(-46, -16, -60, -46, -46, -62); c.bezierCurveTo(-36, -74, -24, -66, -30, -58);
+  c.strokeStyle = CONT; c.lineWidth = 6.5; c.stroke(); c.strokeStyle = ROSE_F; c.lineWidth = 3.4; c.stroke();
+  // jambe et bras de derrière
+  membre(-8, -18, -26, -7); c.fillStyle = ROSE; ellipse(-30, -6, 8, 4.5, -0.2); trace(ROSE);
+  membre(-8, -44, -26, -32); ellipse(-28, -31, 4.5, 4.5); trace(ROSE);
+  // corps penché vers l'avant, ventre clair
+  ellipse(0, -32, 20, 24, 0.25); trace(GRIS);
+  ellipse(6, -29, 11.5, 16, 0.25); trace(VENTRE, 0);
+  // jambe avant, en pleine foulée
+  membre(8, -15, 22, -4); ellipse(27, -3, 9, 4.5, 0.1); trace(ROSE);
+  // oreilles (derrière la tête)
+  ellipse(-12, -90, 17, 17); trace(GRIS); ellipse(-11, -89, 11, 11); trace(ROSE, 0);
+  ellipse(24, -93, 16, 16, 0.2); trace(GRIS); ellipse(24, -92, 10, 10.5, 0.2); trace(ROSE, 0);
+  // tête et museau
+  ellipse(8, -66, 24, 23); trace(GRIS);
+  ellipse(28, -59, 15, 11, -0.15); trace(GRIS);
+  c.fillStyle = VENTRE; ellipse(25, -55, 11, 6.5, -0.15); c.fill();
+  // bouche ouverte, toute contente
+  c.beginPath(); c.moveTo(19, -56); c.quadraticCurveTo(28, -42, 37, -55); c.closePath(); trace('#8b2346', 2);
+  c.fillStyle = '#ff7f9f'; ellipse(28, -49, 4.5, 3); c.fill();
+  // nez rose
+  ellipse(42, -62, 5.5, 5); trace(ROSE); c.fillStyle = '#fff'; ellipse(40.5, -63.5, 1.6, 1.3); c.fill();
+  // moustaches
+  c.strokeStyle = CONT; c.lineWidth = 1.2;
+  [[36,-60,54,-66],[36,-58,55,-58],[35,-56,52,-50]].forEach(function(m){ c.beginPath(); c.moveTo(m[0], m[1]); c.lineTo(m[2], m[3]); c.stroke(); });
+  // joues
+  c.fillStyle = 'rgba(255,120,160,.45)'; ellipse(4, -56, 6.5, 4); c.fill();
+  // grands yeux qui regardent vers nous
+  [[4, -70, 6.8, 9], [20, -72, 6.2, 8.5]].forEach(function(o){
+    ellipse(o[0], o[1], o[2], o[3]); trace('#fff', 1.8);
+    c.fillStyle = '#2a1640'; ellipse(o[0] + 1, o[1] + 1, o[2]*0.68, o[3]*0.7); c.fill();
+    c.fillStyle = '#fff'; ellipse(o[0] + 2.6, o[1] - 2.2, 2.1, 2.1); c.fill(); ellipse(o[0] - 1, o[1] + 3, 1, 1); c.fill();
+  });
+  // sourcils levés
+  c.strokeStyle = CONT; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(-1, -82); c.quadraticCurveTo(4, -86, 9, -83); c.stroke();
+  c.beginPath(); c.moveTo(16, -84); c.quadraticCurveTo(21, -87, 25, -84); c.stroke();
+  // bras avant tendu vers le fromage
+  membre(10, -42, 36, -36); ellipse(40, -35, 5, 4.6); trace(ROSE);
+  c.restore();
+}
+
+function demarrerAffiche(){
+  function cacher(){
+    document.querySelectorAll('#app, .ecran, button, .jel-langue, jel-langue').forEach(function(el){ el.style.setProperty('display', 'none', 'important'); });
+  }
+  cacher();
+  document.addEventListener('DOMContentLoaded', cacher);
+  [0, 200, 600, 1200].forEach(function(d){ setTimeout(cacher, d); });
+  affCanvas = document.createElement('canvas');
+  affCanvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:5;background:#ffe0d2;border-radius:0;box-shadow:none';
+  document.body.append(affCanvas);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---------- Images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (niveau, pas, flèches), sans écran titre ni
+// fenêtre « Continuer » (CONSIGNES-JEU.md, section 5). Le labyrinthe est tiré à graine fixe, la souris
+// est posée sur le bon chemin avec son trait jaune, puis la partie est figée : ni victoire, ni son,
+// ni sauvegarde.
+//   1 = niveau 1 : petit labyrinthe de 5 cases, la souris vient de partir ;
+//   2 = niveau 5 : 9 cases, la souris a fait la moitié du chemin ;
+//   3 = niveau 10 : le plus grand labyrinthe (14 cases), long trait jaune déjà parcouru.
+var apercu = [1,2,3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+var MOMENTS_APERCU = {
+  1: { niveau: 1, part: 0.4, detours: 2, graine: 31 },
+  2: { niveau: 5, part: 0.55, detours: 10, graine: 52 },
+  3: { niveau: 10, part: 0.78, detours: 34, graine: 107 }
+};
+// Le seul chemin du départ au fromage (labyrinthe parfait)
+function cheminSolution(){
+  var avant = [], file = [0], i;
+  for(i=0;i<N*N;i++) avant.push(-1);
+  avant[0] = 0;
+  while(file.length){
+    var cur = file.shift(), x = cur%N, y = (cur-x)/N;
+    if(cur === sortie) break;
+    for(var d=0;d<4;d++){
+      if(murs[cur] & BIT[d]) continue;
+      var nx = x+DX[d], ny = y+DY[d], nn = ny*N+nx;
+      if(nx<0||ny<0||nx>=N||ny>=N||avant[nn]>=0) continue;
+      avant[nn] = cur; file.push(nn);
+    }
+  }
+  var ch = [], p = sortie;
+  while(p !== 0){ ch.unshift([p%N, (p-p%N)/N]); p = avant[p]; }
+  ch.unshift([0,0]);
+  return ch;
+}
+function ouvrirApercu(n){
+  var m = MOMENTS_APERCU[n], hasard = Math.random;
+  Math.random = alea(m.graine);
+  document.getElementById('accueil').classList.add('cache');
+  niveau = m.niveau; demarrer();
+  Math.random = hasard;
+  var ch = cheminSolution(), k = Math.max(1, Math.round((ch.length-1)*m.part));
+  trace = ch.slice(0, k+1); sx = trace[k][0]; sy = trace[k][1];
+  pas = k + m.detours;
+  document.getElementById('pas').textContent = t('pas', { n: pas });
+  fini = true; // partie figée : plus aucun pas, rien ne se gagne avant la capture
+  dessiner();
+}
+
+window.addEventListener('resize', function(){ if(!window.JEL_AFFICHE) redim(); });
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (apercu) {
+  // Après la traduction de la page (data-i18n), qui remettrait « Niveau 1 » et « Pas : 0 »
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ ouvrirApercu(apercu); });
+  else ouvrirApercu(apercu);
+}
+else redim();
 </script>
 </body>
 </html>
