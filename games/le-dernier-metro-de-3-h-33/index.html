@@ -5278,16 +5278,300 @@
 
   window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(performance.now()); });
 
+  // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène
+  // composée, sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5).
+  // Dans la rame de 3 h 33, la Veilleuse lève sa lanterne et serre son ticket doré ;
+  // au bout du couloir, dans la porte rougeoyante, le Contrôleur sans visage tend le bras.
+  // Les mêmes dessins que la partie (passager, controleur, objet, lanterneDessin), en grand.
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (!w || !h) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.fillStyle = '#1a1b2a'; c.fillRect(0, 0, w, h);
+    // Composition de 600 × 800, centrée ; le décor continue jusqu'aux bords.
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    c.save(); c.translate(ox, oy); c.scale(k, k);
+    // Intérieur de la voiture en perspective : v (0 paroi gauche, 1 droite), u (0 plafond,
+    // 1 plancher), f (1 = cloison du fond, plus grand = plus près).
+    const VX = 390, VY = 330;
+    const P = (v, u, f) => [VX + (250 + 280 * v - VX) * f, VY + (200 + 270 * u - VY) * f];
+    const quad = (pts, fond) => { c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]); c.closePath(); if (fond) { c.fillStyle = fond; c.fill(); } };
+    const LOIN = 9;
+    // Plafond, plancher, parois
+    let g = c.createLinearGradient(0, -400, 0, 200);
+    g.addColorStop(0, '#15172a'); g.addColorStop(1, '#30334c');
+    quad([P(0, 0, 1), P(1, 0, 1), P(1, 0, LOIN), P(0, 0, LOIN)], g);
+    g = c.createLinearGradient(0, 470, 0, 1200);
+    g.addColorStop(0, '#2c2734'); g.addColorStop(1, '#0c0b12');
+    quad([P(0, 1, 1), P(1, 1, 1), P(1, 1, LOIN), P(0, 1, LOIN)], g);
+    g = c.createLinearGradient(250, 0, -600, 0);
+    g.addColorStop(0, '#3a3d56'); g.addColorStop(1, '#14152a');
+    quad([P(0, 0, 1), P(0, 1, 1), P(0, 1, LOIN), P(0, 0, LOIN)], g);
+    g = c.createLinearGradient(530, 0, 1300, 0);
+    g.addColorStop(0, '#3a3d56'); g.addColorStop(1, '#14152a');
+    quad([P(1, 0, 1), P(1, 1, 1), P(1, 1, LOIN), P(1, 0, LOIN)], g);
+    // Lattes du plancher
+    c.strokeStyle = 'rgba(255,255,255,.05)'; c.lineWidth = 2;
+    for (let i = 1; i < 8; i++) { const a = P(i / 8, 1, 1), b = P(i / 8, 1, LOIN); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+    // Fenêtres des deux parois : le tunnel noir, des lumières qui filent
+    const fenetres = [[1.08, 1.4], [1.6, 2.1], [2.45, 3.4], [4, 6.2]];
+    [0, 1].forEach((v) => {
+      fenetres.forEach(([f1, f2], i) => {
+        const pts = [P(v, 0.2, f1), P(v, 0.2, f2), P(v, 0.52, f2), P(v, 0.52, f1)];
+        quad(pts, '#2a2d40');
+        const marge = (f2 - f1) * 0.05;
+        const vitre = [P(v, 0.23, f1 + marge), P(v, 0.23, f2 - marge), P(v, 0.49, f2 - marge), P(v, 0.49, f1 + marge)];
+        quad(vitre, '#07070f');
+        c.save(); quad(vitre); c.clip();
+        for (let j = 0; j < 4; j++) {
+          const uu = 0.27 + ((j * 0.37 + i * 0.21 + v * 0.13) % 1) * 0.18;
+          const a = P(v, uu, f1 + (f2 - f1) * ((j * 0.29 + i * 0.4) % 1) * 0.5), b = P(v, uu, f1 + (f2 - f1) * (0.5 + ((j * 0.29 + i * 0.4) % 1) * 0.5));
+          c.strokeStyle = j % 2 ? 'rgba(255,190,110,.75)' : 'rgba(170,190,255,.5)'; c.lineWidth = 2 + f1 * 0.8;
+          c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+        }
+        c.restore();
+      });
+    });
+    // Reflet du Contrôleur dans une vitre de droite (les vitres miroirs du jeu)
+    c.save(); quad([P(1, 0.23, 1.68), P(1, 0.23, 2.02), P(1, 0.49, 2.02), P(1, 0.49, 1.68)]); c.clip();
+    c.globalAlpha = 0.35; controleur(c, P(1, 0.5, 1.84)[0] - 4, P(1, 0.5, 1.84)[1] + 4, 70, { fantome: true }); c.restore();
+    // Banquettes rouges le long des parois
+    [[1.06, 1.9], [2.15, 3.5], [3.8, 7]].forEach(([f1, f2]) => {
+      [0, 1].forEach((v) => {
+        const dv = v ? -0.16 : 0.16;
+        quad([P(v, 0.6, f1), P(v, 0.6, f2), P(v, 0.79, f2), P(v, 0.79, f1)], '#7a2632');
+        quad([P(v, 0.79, f1), P(v, 0.79, f2), P(v + dv, 0.79, f2), P(v + dv, 0.79, f1)], '#a8323e');
+        quad([P(v + dv, 0.79, f1), P(v + dv, 0.79, f2), P(v + dv, 0.9, f2), P(v + dv, 0.9, f1)], '#4e1820');
+      });
+    });
+    // Cloison du fond et sa porte ouverte : la voiture suivante, rouge d'alarme
+    quad([P(0, 0, 1), P(1, 0, 1), P(1, 1, 1), P(0, 1, 1)], '#2b2d42');
+    g = c.createLinearGradient(0, 225, 0, 470);
+    g.addColorStop(0, '#ff5a6a'); g.addColorStop(0.55, '#c4192f'); g.addColorStop(1, '#5a0a16');
+    c.fillStyle = '#15151f'; rr(c, 335, 216, 110, 256, 8); c.fill();
+    c.fillStyle = g; rr(c, 345, 226, 90, 246, 6); c.fill();
+    // Lueur rouge qui déborde sur le plancher et les parois
+    let lr = c.createRadialGradient(390, 430, 10, 390, 440, 300);
+    lr.addColorStop(0, 'rgba(255,50,75,.6)'); lr.addColorStop(0.45, 'rgba(255,30,60,.2)'); lr.addColorStop(1, 'rgba(255,30,60,0)');
+    c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = lr; c.fillRect(-1000, -200, 2600, 1200); c.restore();
+    // Brume rasante au fond du couloir
+    lr = c.createLinearGradient(0, 380, 0, 520);
+    lr.addColorStop(0, 'rgba(160,150,200,0)'); lr.addColorStop(0.6, 'rgba(160,150,200,.16)'); lr.addColorStop(1, 'rgba(160,150,200,0)');
+    c.fillStyle = lr; c.fillRect(-1000, 380, 2600, 140);
+    // Halo chaud de la lanterne, sous les personnages
+    const vx = 200, vy = 792, vh = 440, u = vh / 100;
+    const lx = vx + 106, ly = vy - 108 * u;              // lanterne, dans sa main levée
+    lr = c.createRadialGradient(lx, ly, 8, lx, ly, 360);
+    lr.addColorStop(0, 'rgba(255,190,100,.55)'); lr.addColorStop(0.3, 'rgba(255,170,80,.2)'); lr.addColorStop(1, 'rgba(255,160,70,0)');
+    c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = lr; c.fillRect(-1000, -200, 2600, 1200); c.restore();
+    // Le Contrôleur sans visage dans l'embrasure, ses mains pâles au bout de ses bras trop longs
+    c.save();
+    c.shadowColor = 'rgba(255,60,80,1)'; c.shadowBlur = 22;
+    controleur(c, 392, 470, 214, {});
+    c.restore();
+    c.save(); c.translate(392, 470); c.scale(2.14, 2.14);
+    c.strokeStyle = '#d8d4c8'; c.lineWidth = 1.5; c.lineCap = 'round';
+    for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(-22, -16); c.lineTo(-24.5 + i * 1.6, -6 + (i % 3) * 0.8); c.stroke(); }
+    // Ses boutons dorés luisent
+    c.fillStyle = '#ffd27a'; c.shadowColor = '#ffd27a'; c.shadowBlur = 10;
+    for (let i = 0; i < 4; i++) { rond(c, 0, -70 + i * 15, 2.2); c.fill(); }
+    c.restore();
+    // Barres de maintien
+    const barre = (v, f, epais, sombre) => {
+      const a = P(v, 0, f), b = P(v, 1, f);
+      const gb = c.createLinearGradient(a[0] - epais, 0, a[0] + epais, 0);
+      gb.addColorStop(0, sombre ? '#1c1c26' : '#6a6a7a'); gb.addColorStop(0.6, sombre ? '#8a6a4a' : '#e9e6f2'); gb.addColorStop(1, sombre ? '#2a2420' : '#4a4a58');
+      c.fillStyle = gb; c.fillRect(a[0] - epais / 2, a[1], epais, b[1] - a[1]);
+    };
+    barre(0.72, 1.9, 9);
+    // Plafonniers : de longues barres froides ; près de nous, l'une grésille, l'autre est morte
+    [[1.1, 1.5, 1], [1.9, 2.6, 0.4], [3.2, 4.6, 0], [5.6, 8.5, 0]].forEach(([f1, f2, on]) => {
+      const pts = [P(0.42, 0, f1), P(0.58, 0, f1), P(0.58, 0, f2), P(0.42, 0, f2)];
+      c.save(); c.shadowColor = 'rgba(200,215,255,.95)'; c.shadowBlur = 30 * on;
+      quad(pts, on > 0.9 ? '#e8ecff' : on > 0 ? '#9aa0c0' : '#2a2c40'); c.restore();
+    });
+    // Horloge de quai suspendue : aiguilles sur 3 h 33, aucun chiffre
+    const hx = 104, hy = 178, hr = 56;
+    c.strokeStyle = '#2a2a38'; c.lineWidth = 5; c.beginPath(); c.moveTo(hx, -400); c.lineTo(hx, hy - hr); c.stroke();
+    c.save(); c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 18;
+    c.fillStyle = '#f1ead2'; rond(c, hx, hy, hr); c.fill(); c.restore();
+    c.strokeStyle = '#2a2a38'; c.lineWidth = 6; rond(c, hx, hy, hr); c.stroke();
+    for (let i = 0; i < 12; i++) {
+      const a = i / 12 * Math.PI * 2;
+      c.lineWidth = i % 3 ? 2 : 5;
+      c.beginPath(); c.moveTo(hx + Math.cos(a) * hr * 0.76, hy + Math.sin(a) * hr * 0.76); c.lineTo(hx + Math.cos(a) * hr * 0.9, hy + Math.sin(a) * hr * 0.9); c.stroke();
+    }
+    const aH = (3 + 33 / 60) / 12 * Math.PI * 2 - Math.PI / 2, aM = 33 / 60 * Math.PI * 2 - Math.PI / 2;
+    c.lineCap = 'round';
+    c.lineWidth = 7; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx + Math.cos(aH) * hr * 0.48, hy + Math.sin(aH) * hr * 0.48); c.stroke();
+    c.lineWidth = 4.5; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx + Math.cos(aM) * hr * 0.76, hy + Math.sin(aM) * hr * 0.76); c.stroke();
+    c.strokeStyle = '#c4303a'; c.lineWidth = 2; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx + Math.cos(0.4) * hr * 0.84, hy + Math.sin(0.4) * hr * 0.84); c.stroke();
+    c.fillStyle = '#2a2a38'; rond(c, hx, hy, 5); c.fill();
+    c.lineCap = 'butt';
+    // La Veilleuse, en grand : elle lève sa lanterne vers le couloir et serre son ticket
+    // Bras levé (derrière le corps), manche du manteau
+    c.save(); c.lineCap = 'round';
+    c.strokeStyle = '#d9704a'; c.lineWidth = 11 * u;
+    c.beginPath(); c.moveTo(vx + 15 * u, vy - 70 * u); c.quadraticCurveTo(vx + 30 * u, vy - 92 * u, lx - 4 * u, ly + 14 * u); c.stroke();
+    c.restore();
+    c.save();
+    c.shadowColor = 'rgba(255,190,110,.85)'; c.shadowBlur = 22;
+    passager(c, 0, vx, vy, vh, {});
+    c.restore();
+    // Visage : grands yeux tournés vers le Contrôleur, sourcils inquiets, bouche ouverte
+    c.save(); c.translate(vx, vy); c.scale(u, u);
+    // Ombre du manteau du côté opposé à la lanterne
+    const om = c.createLinearGradient(-25, 0, 18, 0);
+    om.addColorStop(0, 'rgba(40,10,30,.55)'); om.addColorStop(1, 'rgba(40,10,30,0)');
+    c.fillStyle = om;
+    c.beginPath(); c.moveTo(-20, -72); c.quadraticCurveTo(0, -80, 20, -72); c.lineTo(25, -30); c.quadraticCurveTo(0, -24, -25, -30); c.closePath(); c.fill();
+    const ot = c.createLinearGradient(-14, 0, 10, 0);
+    ot.addColorStop(0, 'rgba(60,20,30,.4)'); ot.addColorStop(1, 'rgba(60,20,30,0)');
+    c.fillStyle = ot; rond(c, 0, -86, 14); c.fill();
+    c.fillStyle = PEAU[0]; rond(c, -5, -87, 3.4); c.fill(); rond(c, 5, -87, 3.4); c.fill();
+    c.fillStyle = '#fff'; ell(c, -5, -87, 3.2, 3.7); c.fill(); ell(c, 5, -87, 3.2, 3.7); c.fill();
+    c.fillStyle = '#16121c'; rond(c, -3.6, -86.6, 1.9); c.fill(); rond(c, 6.4, -86.6, 1.9); c.fill();
+    c.fillStyle = '#fff'; rond(c, -3.1, -87.3, 0.6); c.fill(); rond(c, 6.9, -87.3, 0.6); c.fill();
+    c.strokeStyle = '#5a3a2a'; c.lineWidth = 1.1; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-8.5, -91.2); c.lineTo(-2.5, -92.8); c.stroke();
+    c.beginPath(); c.moveTo(8.5, -91.2); c.lineTo(2.5, -92.8); c.stroke();
+    c.fillStyle = '#4a1a22'; ell(c, 1, -79.5, 2.2, 2.8); c.fill();
+    // Joues éclairées par la lanterne
+    c.fillStyle = 'rgba(255,170,110,.35)'; rond(c, 7, -82, 4); c.fill();
+    // Main levée qui tient la lanterne
+    c.restore();
+    c.fillStyle = PEAU[0]; rond(c, lx, ly + 12 * u, 5 * u); c.fill();
+    lanterneDessin(c, lx, ly, 27 * u, '#ffbf5a');
+    // Autre main contre la poitrine, avec le ticket poinçonné qui brille
+    const tx = vx - 4 * u, ty = vy - 56 * u;
+    c.save(); c.shadowColor = '#ffd76a'; c.shadowBlur = 34;
+    c.save(); c.translate(tx, ty); c.rotate(-0.28); objet(c, 'T', 0, 0, 9 * u); c.restore();
+    c.restore();
+    c.fillStyle = PEAU[0]; rond(c, tx + 7 * u, ty + 4 * u, 4.6 * u); c.fill();
+    // Éclats dorés autour du ticket
+    c.fillStyle = '#fff3b8';
+    [[-14, -10, 1.6], [12, -14, 1.2], [-18, 6, 1], [16, 4, 1.3]].forEach(([a, b, r]) => {
+      c.beginPath(); const px = tx + a * u, py = ty + b * u, rr2 = r * u * 1.4;
+      c.moveTo(px, py - rr2 * 2); c.lineTo(px + rr2 * 0.5, py - rr2 * 0.5); c.lineTo(px + rr2 * 2, py); c.lineTo(px + rr2 * 0.5, py + rr2 * 0.5);
+      c.lineTo(px, py + rr2 * 2); c.lineTo(px - rr2 * 0.5, py + rr2 * 0.5); c.lineTo(px - rr2 * 2, py); c.lineTo(px - rr2 * 0.5, py - rr2 * 0.5); c.closePath(); c.fill();
+    });
+    // Premier plan : une barre coupée par le bord, la banquette fouillée et ce qui en est tombé
+    barre(0.22, 4.8, 30, true);
+    objet(c, 'O', 470, 742, 34);
+    objet(c, 'J', 100, 776, 40);
+    // Vignette : les coins s'assombrissent, le centre reste lisible
+    const vg = c.createRadialGradient(300, 380, 240, 300, 400, 720);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.6)');
+    c.fillStyle = vg; c.fillRect(-1000, -400, 2600, 1600);
+    c.restore();
+  }
+
+  function demarrerAffiche() {
+    const cacher = () => {
+      for (const el of document.querySelectorAll('.ecran, .voile, #toast, #confettis, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+    };
+    cacher();
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    setTimeout(cacher, 300);
+    setTimeout(cacher, 1200);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine partie solo, avec sa vraie interface (places, niveau, message,
+  // boutons d'action), sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md,
+  // section 5). L'état vient des vraies règles (R.depart, hasard à graine fixe), puis il est posé à
+  // la main et figé : c'est au joueur de jouer, aucun robot ne bouge, rien ne se gagne ni ne se perd.
+  // Aucun réseau, aucun son, rien d'écrit dans la sauvegarde.
+  //   1 = niveau 1 : trois voitures, le Livreur vient de trouver un ticket ;
+  //   2 = niveau 9 : voitures noires et lampe, portes verrouillées et clé, le Contrôleur approche ;
+  //   3 = niveau 20 : deux Contrôleurs, reflets dans les vitres, ticket piégé à glisser à un rival.
+  const passagerApercu = (w, o) => Object.assign({ w: w, b: 0, c: 0, t: 0, x: 0, l: 0, k: 0, m: 0, d: 0, pts: 0, o: 0 }, o || {});
+  const SCENES_APERCU = {
+    1: {
+      niveau: 1, graine: 3331, tt: 3, st: 1,
+      p: [passagerApercu(1, { b: 1, pts: 1 }), passagerApercu(0, { pts: 1 }), passagerApercu(2, { b: 2, t: 1, pts: 1 }), passagerApercu(0, { b: 1, pts: 2, o: 1 }), passagerApercu(2, { pts: 1 })],
+      fouillees: [1, 3, 6, 8], objet: ['T', 6], message: ['evt.ticket', { qui: 2 }]
+    },
+    2: {
+      niveau: 9, graine: 3332, tt: 3, st: 1, C: [2], cd: [1],
+      p: [passagerApercu(4, { b: 2, l: 1, k: 1, pts: 2 }), passagerApercu(2, { c: 1, pts: 1 }), passagerApercu(1, { pts: 1 }), passagerApercu(3, { b: 2, t: 1, pts: 1 }), passagerApercu(5, { pts: 2, o: 1 })],
+      fouillees: [4, 9, 10, 12, 13, 16], objet: ['K', 13], message: ['objet.K']
+    },
+    3: {
+      niveau: 20, graine: 3333, tt: 7, st: 3, C: [4, 6], cd: [-1, -1],
+      p: [passagerApercu(2, { b: 1, t: 1, x: 1, l: 1, m: 1, pts: 4 }), passagerApercu(2, { t: 1, pts: 3 }), passagerApercu(3, { b: 1, pts: 3 }), passagerApercu(0, { c: 1, pts: 2 }), passagerApercu(2, { pts: 3, k: 1 })],
+      fouillees: [0, 2, 5, 6, 7, 10, 12, 14, 18, 19], message: ['objet.P'], glisser: true
+    }
+  };
+
+  function ouvrirApercu(numero) {
+    const sc = SCENES_APERCU[numero];
+    for (const el of document.querySelectorAll('.voile')) el.classList.remove('actif');
+    niveau = sc.niveau;
+    session = 'solo';
+    enPartie = false;   // rien n'est sauvegardé à la fermeture
+    const e = R.depart(graineHasard(sc.graine), PLACES, { niveau: sc.niveau });
+    e.p = sc.p.map((q) => Object.assign({}, q));
+    if (sc.C) { e.C = sc.C.slice(); e.cd = sc.cd.slice(); }
+    sc.fouillees.forEach((x) => { e.s[x] = ''; });
+    e.tt = sc.tt; e.st = sc.st; e.quai = 0;
+    e.jo = e.p.map((_, s) => (s === 0 ? 0 : 1));
+    e.dep = PLACES - 1; e.tour = 0; e.ev = [];
+    // Une partie posée là, côté écran : c'est le tour du joueur (place 0), personne d'autre ne joue.
+    partie = {
+      mode: 'solo', phase: 'jeu', siege: 0, manche: 1, chef: -1, etat: e,
+      sieges: () => e.p.map((_, s) => ({ humain: s === 0, moi: s === 0, chef: false, nom: null })),
+      monTour: () => true, estChef: () => false, jouer: () => false, recommencer: () => false,
+      pause: () => {}, quitter: () => {}, lancer: () => {}, lancerManche: () => false
+    };
+    nouvelleVue(e);
+    vuReflet = true;
+    afficherEcran('jeu');
+    majInterface();
+    // Message de ce qui vient d'arriver (ligne d'aide), posé après la traduction de la page.
+    const [cle, vars] = sc.message;
+    setTimeout(() => toast(tr(cle, vars && vars.qui !== undefined ? { qui: tr('passager.' + vars.qui) } : vars), 600000, cle === 'objet.P' ? 'rouge' : 'vert'), 500);
+    if (sc.glisser) ouvrirChoixGlisser();
+    // Objet trouvé qui jaillit de sa banquette, posé quand la rame est dessinée.
+    if (sc.objet) {
+      const poser = (essai) => {
+        if (!geo) { if (essai < 30) requestAnimationFrame(() => poser(essai + 1)); return; }
+        const [code, x] = sc.objet, pt = centreSiege(x);
+        particules.push({ code: code, x: pt[0], y: pt[1] - geo.wh * 0.42, vx: 0, vy: 0, vie: 1e6, k: geo.wh * 0.2 });
+        [[-1, -0.3], [1.1, -0.5], [-0.7, 0.4], [0.8, 0.5], [0, -1]].forEach(([a, b], i) => {
+          particules.push({ x: pt[0] + a * geo.wh * 0.32, y: pt[1] - geo.wh * 0.42 + b * geo.wh * 0.28, vx: 0, vy: 0, vie: 1e6, k: 1.6 + (i % 2), coul: '#ffd27a' });
+        });
+      };
+      requestAnimationFrame(() => poser(0));
+    }
+  }
+
   document.title = tr('titre');
   chargerProgression();
   majLanterne();
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else {
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>

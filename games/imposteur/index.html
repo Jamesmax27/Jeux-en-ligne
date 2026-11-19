@@ -1881,6 +1881,7 @@ body.en-pause *, body.en-pause *::before, body.en-pause *::after { animation-pla
 
   // Horloge du jeu : avance seulement quand le jeu n'est pas en pause.
   var horloge = 0, dernierTemps = null, enPause = false, attentes = [], jeton = 0;
+  var apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   function boucle(ts) {
     if (dernierTemps !== null && !enPause) horloge += Math.min(100, ts - dernierTemps);
     dernierTemps = ts;
@@ -2014,7 +2015,7 @@ body.en-pause *, body.en-pause *::before, body.en-pause *::after { animation-pla
     defaite: function () { [392, 330, 262].forEach(function (f, i) { bip(f, 0.35, 'triangle', 0.11, i * 0.18); }); },
     etoile: function () { bip(1300, 0.18, 'sine', 0.1, 0, 1900); }
   };
-  function son(nom) { if (SONS[nom]) SONS[nom](); }
+  function son(nom) { if (apercu || window.JEL_AFFICHE) return; if (SONS[nom]) SONS[nom](); }
   function majBoutonsSon() {
     document.querySelectorAll('.btn-son').forEach(function (b) { b.innerHTML = muet ? SVG_MUET : SVG_SON; b.setAttribute('aria-pressed', muet ? 'true' : 'false'); });
   }
@@ -2039,6 +2040,7 @@ body.en-pause *, body.en-pause *::before, body.en-pause *::after { animation-pla
   }
   function existeSauvegarde() { try { return !!(window.JEL_SAVE && window.JEL_SAVE.existe(JEU)); } catch (e) { return false; } }
   function sauver(niveau) {
+    if (apercu) return; // image du jeu : rien n'est écrit dans la sauvegarde
     try {
       if (!window.JEL_SAVE) return;
       window.JEL_SAVE.save(JEU, {
@@ -2667,7 +2669,7 @@ body.en-pause *, body.en-pause *::before, body.en-pause *::after { animation-pla
   // Pause
   // ---------------------------------------------------------------------
   function mettrePause() {
-    if (!enPartie || enPause || $('fin').classList.contains('ouvert')) return;
+    if (apercu || !enPartie || enPause || $('fin').classList.contains('ouvert')) return;
     enPause = true;
     document.body.classList.add('en-pause');
     if (ac) { try { ac.suspend(); } catch (e) { /* rien */ } }
@@ -2874,11 +2876,292 @@ body.en-pause *, body.en-pause *::before, body.en-pause *::after { animation-pla
     window.JEL_SAVE.surFermeture(function () { if (enPartie && etat) sauver(etat.idx + 1); });
   } catch (e) { /* module absent */ }
 
+  // ---------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) :
+  // une scène composée, sans interface ni texte, d'où sort la jaquette
+  // (CONSIGNES-JEU.md, section 5). Sous la lampe de la salle de jeu,
+  // l'imposteur démasqué, en grand, est pris sur le fait : sa carte fusée,
+  // grossie par la loupe, ne va pas du tout avec les fruits de ses amis.
+  // Tout est dessiné en SVG (cartes redessinées : pas d'emoji).
+  // ---------------------------------------------------------------------
+  var DESSINS_CARTES = {
+    pomme: '<path d="M20 12C14 8 6 11 6 21C6 31 13 37 20 34C27 37 34 31 34 21C34 11 26 8 20 12Z" fill="#e8343b"/><path d="M20 12Q21 6 24 4" stroke="#6b3f1f" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M22 9Q29 3 33 8Q27 12 22 9Z" fill="#4caf50"/><ellipse cx="13" cy="19" rx="3" ry="5.5" fill="#fff" opacity=".5"/>',
+    banane: '<path d="M8 9Q5 28 21 33Q31 36 36 28Q26 30 19 24Q12 18 12 9Z" fill="#ffd23f" stroke="#d9a400" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 12Q12 22 20 27" stroke="#f0b400" stroke-width="1.5" fill="none"/><path d="M8 9L12 9L11.5 5L8.5 5.5Z" fill="#6b4a1f"/>',
+    raisin: '<path d="M20 9Q21 4 25 3" stroke="#6b3f1f" stroke-width="2.2" fill="none" stroke-linecap="round"/><path d="M21 7Q28 2 32 7Q26 11 21 7Z" fill="#4caf50"/>' +
+      [[12, 13], [20, 12], [28, 13], [16, 20], [24, 20], [12, 26], [20, 27], [28, 26], [16, 32], [24, 32]].filter(function (p, i) { return i !== 5 && i !== 7; }).map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="5.2" fill="#8e44ad" stroke="#6c2f88" stroke-width="1"/><circle cx="' + (p[0] - 1.6) + '" cy="' + (p[1] - 1.8) + '" r="1.4" fill="#fff" opacity=".6"/>'; }).join(''),
+    fraise: '<path d="M20 36C10 30 6 22 8 16C10 11 16 11 20 13C24 11 30 11 32 16C34 22 30 30 20 36Z" fill="#f03e4f"/><path d="M11 14L15 8L20 12L25 8L29 14Q20 17 11 14Z" fill="#3fa34d"/>' +
+      [[14, 20], [20, 19], [26, 20], [17, 26], [23, 26], [20, 31]].map(function (p) { return '<ellipse cx="' + p[0] + '" cy="' + p[1] + '" rx="1" ry="1.5" fill="#ffe08a"/>'; }).join(''),
+    poire: '<path d="M20 8C16 8 15 13 15 16C9 20 9 33 20 34C31 33 31 20 25 16C25 13 24 8 20 8Z" fill="#b7d84b" stroke="#8fb02c" stroke-width="1.2"/><path d="M20 8Q20 4 23 2" stroke="#6b3f1f" stroke-width="2.2" fill="none" stroke-linecap="round"/><ellipse cx="15" cy="25" rx="2.5" ry="4" fill="#fff" opacity=".45"/>',
+    fusee: '<g transform="rotate(32 20 20)"><path d="M15 28Q20 42 25 28Z" fill="#ff9f1c"/><path d="M17.5 28Q20 36 22.5 28Z" fill="#ffe14d"/><path d="M14 21L7 31L14 29Z M26 21L33 31L26 29Z" fill="#e5484d"/><path d="M20 3C27 9 28 20 26 29L14 29C12 20 13 9 20 3Z" fill="#f4f4f8" stroke="#8d93a8" stroke-width="1.2"/><path d="M20 3C24 6 26 9 26.6 13L13.4 13C14 9 16 6 20 3Z" fill="#e5484d"/><circle cx="20" cy="19" r="3.8" fill="#4aa3ff" stroke="#3a4a6b" stroke-width="1.4"/><circle cx="18.8" cy="17.8" r="1.1" fill="#fff"/></g>'
+  };
+  // Une carte de jeu (face visible, ou dos violet), centrée en (x, y)
+  function carteAffiche(x, y, l, h, angle, dessin, opts) {
+    opts = opts || {};
+    var s = '<g transform="translate(' + x + ' ' + y + ') rotate(' + angle + ')' + (opts.aplat ? ' scale(1 ' + opts.aplat + ')' : '') + '">';
+    s += '<rect x="' + (-l / 2 + l * 0.05) + '" y="' + (-h / 2 + h * 0.07) + '" width="' + l + '" height="' + h + '" rx="' + (l * 0.14) + '" fill="rgba(70,30,10,.25)"/>';
+    if (dessin === 'dos') {
+      s += '<rect x="' + (-l / 2) + '" y="' + (-h / 2) + '" width="' + l + '" height="' + h + '" rx="' + (l * 0.14) + '" fill="url(#aff-dos)" stroke="#fff" stroke-width="' + (l * 0.06) + '"/>';
+    } else {
+      var k = l * 0.8 / 40;
+      s += '<rect x="' + (-l / 2) + '" y="' + (-h / 2) + '" width="' + l + '" height="' + h + '" rx="' + (l * 0.14) + '" fill="' + (opts.intrus ? '#ffecec' : '#fff') + '" stroke="' + (opts.intrus ? '#e5484d' : '#ffd27a') + '" stroke-width="' + (l * 0.06) + '"/>';
+      s += '<g transform="translate(' + (-20 * k) + ' ' + (-20 * k) + ') scale(' + k + ')">' + DESSINS_CARTES[dessin] + '</g>';
+    }
+    return s + '</g>';
+  }
+  // Un Pompon dessiné en grand pour l'affiche (même dessin que dans le jeu,
+  // dans la même boîte de 100 × 100, avec du relief, de la laine et une expression).
+  function pomponAffiche(i, x, y, taille, o) {
+    var c = POMPONS[i]; o = o || {};
+    var k = taille / 100, rx = o.regardX || 0, ry = o.regardY || 0;
+    var s = '<g transform="translate(' + (x - 50 * k) + ' ' + (y - 56 * k) + ') scale(' + k + ')">';
+    s += '<ellipse cx="50" cy="95" rx="28" ry="5" fill="rgba(70,30,10,.2)"/>';
+    s += '<ellipse cx="37" cy="89" rx="9.5" ry="6.5" fill="' + c.fonce + '"/><ellipse cx="63" cy="89" rx="9.5" ry="6.5" fill="' + c.fonce + '"/>';
+    s += '<circle cx="50" cy="56" r="33" fill="' + c.base + '" stroke="' + c.base + '" stroke-width="9" stroke-dasharray="2 5" stroke-linecap="round"/>';
+    s += '<circle cx="50" cy="56" r="31" fill="' + c.base + '"/>';
+    s += '<circle cx="50" cy="56" r="33" fill="url(#aff-volume)"/>';
+    // Brins de laine
+    s += '<g stroke="' + c.fonce + '" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".55">' +
+      '<path d="M28 72Q35 79 44 79"/><path d="M60 31Q69 33 74 41"/><path d="M66 81Q74 75 79 66"/><path d="M23 52Q24 43 31 37"/><path d="M52 84Q58 85 62 83"/><path d="M78 52Q80 58 78 62"/></g>';
+    // Contour de lumière (la lampe est au-dessus)
+    s += '<path d="M21 47A31 31 0 0 1 79 47" stroke="#fff6cf" stroke-width="3.2" fill="none" stroke-linecap="round" opacity=".85"/>';
+    s += '<ellipse cx="38" cy="40" rx="11" ry="6" fill="#fff" opacity=".4"/>';
+    if (o.mainsDerriere) s += o.mainsDerriere;
+    // Yeux
+    if (!o.masque) {
+      s += '<ellipse cx="39" cy="54" rx="7.5" ry="9" fill="#fff"/><ellipse cx="61" cy="54" rx="7.5" ry="9" fill="#fff"/>';
+      s += '<circle cx="' + (40 + rx) + '" cy="' + (56 + ry) + '" r="4.2" fill="#2d2240"/><circle cx="' + (62 + rx) + '" cy="' + (56 + ry) + '" r="4.2" fill="#2d2240"/>';
+      s += '<circle cx="' + (41.6 + rx) + '" cy="' + (54.4 + ry) + '" r="1.5" fill="#fff"/><circle cx="' + (63.6 + rx) + '" cy="' + (54.4 + ry) + '" r="1.5" fill="#fff"/>';
+    }
+    if (o.sourcils) s += '<path d="M31 41Q37 36 44 39M56 39Q63 36 69 41" stroke="#2d2240" stroke-width="2.6" fill="none" stroke-linecap="round"/>';
+    s += '<circle cx="28" cy="67" r="4.8" fill="#ff6f91" opacity=".5"/><circle cx="72" cy="67" r="4.8" fill="#ff6f91" opacity=".5"/>';
+    // Bouche
+    if (o.bouche === 'o') s += '<ellipse cx="50" cy="71" rx="4.6" ry="5.6" fill="#2d2240"/><ellipse cx="50" cy="74" rx="2.8" ry="2" fill="#ff7a8a"/>';
+    else if (o.bouche === 'rire') s += '<path d="M41 67Q50 79 59 67Z" fill="#2d2240"/><path d="M45 72Q50 76 55 72Q50 70 45 72Z" fill="#ff7a8a"/>';
+    else if (!o.masque) s += '<path d="M43 69Q50 75 57 69" stroke="#2d2240" stroke-width="3" fill="none" stroke-linecap="round"/>';
+    s += svgAccessoire(c.acc, c);
+    // Déguisement de l'imposteur : masque et moustache, sourire gêné dessous
+    if (o.masque) {
+      s += '<path d="M41 75Q50 80 59 75" stroke="#2d2240" stroke-width="2.6" fill="none" stroke-linecap="round"/>';
+      s += '<path d="M24 48Q50 39 76 48L75 62Q50 55 25 62Z" fill="#2d2240"/>';
+      s += '<path d="M28 48Q50 42 72 48" stroke="#6c4bd8" stroke-width="1.6" fill="none" opacity=".8"/>';
+      s += '<ellipse cx="39" cy="54" rx="6" ry="5.6" fill="#fff"/><ellipse cx="61" cy="54" rx="6" ry="5.6" fill="#fff"/>';
+      s += '<circle cx="' + (40 + rx) + '" cy="' + (55 + ry) + '" r="3.2" fill="#2d2240"/><circle cx="' + (62 + rx) + '" cy="' + (55 + ry) + '" r="3.2" fill="#2d2240"/>';
+      s += '<circle cx="' + (41 + rx) + '" cy="' + (53.8 + ry) + '" r="1" fill="#fff"/><circle cx="' + (63 + rx) + '" cy="' + (53.8 + ry) + '" r="1" fill="#fff"/>';
+      s += '<path d="M35 70Q43 61 50 66.5Q57 61 65 70Q57 73.5 50 69.5Q43 73.5 35 70Z" fill="#5a3a1c"/>';
+    }
+    if (o.sueur) s += '<path d="M83 36Q87 43 83 46Q79 43 83 36Z" fill="#8fd3ff" stroke="#3f8fd1" stroke-width="1"/><path d="M15 44Q18 49 15 51Q12 49 15 44Z" fill="#8fd3ff" stroke="#3f8fd1" stroke-width="1"/>';
+    // Petites mains (boules de laine)
+    (o.mains || []).forEach(function (m) {
+      s += '<circle cx="' + m[0] + '" cy="' + m[1] + '" r="8" fill="' + c.base + '" stroke="' + c.fonce + '" stroke-width="2"/><path d="M' + (m[0] - 4) + ' ' + (m[1] - 3) + 'Q' + m[0] + ' ' + (m[1] - 6) + ' ' + (m[0] + 4) + ' ' + (m[1] - 3) + '" stroke="#fff" stroke-width="1.6" fill="none" opacity=".6"/>';
+    });
+    return s + '</g>';
+  }
+  function etincelle(x, y, r, coul) {
+    return '<path d="M' + x + ' ' + (y - r) + 'Q' + (x + r * 0.18) + ' ' + (y - r * 0.18) + ' ' + (x + r) + ' ' + y + 'Q' + (x + r * 0.18) + ' ' + (y + r * 0.18) + ' ' + x + ' ' + (y + r) + 'Q' + (x - r * 0.18) + ' ' + (y + r * 0.18) + ' ' + (x - r) + ' ' + y + 'Q' + (x - r * 0.18) + ' ' + (y - r * 0.18) + ' ' + x + ' ' + (y - r) + 'Z" fill="' + coul + '"/>';
+  }
+  function dessinerAffiche() {
+    var L = window.innerWidth || 600, H = window.innerHeight || 800;
+    // Scène composée en 600 × 800, étendue jusqu'aux bords de l'écran
+    var vx = 0, vy = 0, vl = 600, vh = 800;
+    if (L / H > 0.75) { vl = 800 * L / H; vx = -(vl - 600) / 2; }
+    else { vh = 600 * H / L; vy = -(vh - 800) / 2; }
+    var g = '';
+    g += '<defs>' +
+      '<linearGradient id="aff-mur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb98c"/><stop offset=".55" stop-color="#ffd7ae"/><stop offset="1" stop-color="#f7a36f"/></linearGradient>' +
+      '<pattern id="aff-pois" width="28" height="28" patternUnits="userSpaceOnUse"><circle cx="14" cy="14" r="2.6" fill="#f08f5c" opacity=".45"/></pattern>' +
+      '<radialGradient id="aff-halo" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fffbe6" stop-opacity="1"/><stop offset=".35" stop-color="#fff2b8" stop-opacity=".75"/><stop offset="1" stop-color="#ffe9a8" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="aff-cone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff8cf" stop-opacity=".85"/><stop offset=".7" stop-color="#fff3c0" stop-opacity=".35"/><stop offset="1" stop-color="#fff3c0" stop-opacity="0"/></linearGradient>' +
+      '<radialGradient id="aff-volume" cx=".36" cy=".3" r=".75"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#3a1850" stop-opacity=".3"/></radialGradient>' +
+      '<radialGradient id="aff-tapis" cx=".5" cy=".35" r=".7"><stop offset="0" stop-color="#86dcae"/><stop offset=".55" stop-color="#4fae7e"/><stop offset="1" stop-color="#2f7a54"/></radialGradient>' +
+      '<linearGradient id="aff-rideau" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9c1f3a"/><stop offset=".25" stop-color="#e2445f"/><stop offset=".5" stop-color="#b52a46"/><stop offset=".75" stop-color="#e2445f"/><stop offset="1" stop-color="#9c1f3a"/></linearGradient>' +
+      '<pattern id="aff-dos" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#6c4bd8"/><rect width="5" height="10" fill="#7b5ce6"/></pattern>' +
+      '<clipPath id="aff-verre"><circle cx="458" cy="292" r="74"/></clipPath>' +
+      '</defs>';
+    // Mur à pois (comme le papier peint du jeu), jusqu'aux bords
+    g += '<rect x="' + (vx - 10) + '" y="' + (vy - 10) + '" width="' + (vl + 20) + '" height="' + (vh + 20) + '" fill="url(#aff-mur)"/>';
+    g += '<rect x="' + (vx - 10) + '" y="' + (vy - 10) + '" width="' + (vl + 20) + '" height="' + (vh + 20) + '" fill="url(#aff-pois)"/>';
+    // Rideaux de scène sur les bords (premier plan coupé)
+    function rideau(x0, sens) {
+      var r = '<g transform="translate(' + x0 + ' 0) scale(' + sens + ' 1)">';
+      r += '<path d="M-20 ' + (vy - 10) + 'L110 ' + (vy - 10) + 'Q78 260 96 470Q60 520 70 ' + (vy + vh + 10) + 'L-20 ' + (vy + vh + 10) + 'Z" fill="url(#aff-rideau)"/>';
+      r += '<path d="M-20 ' + (vy - 10) + 'L150 ' + (vy - 10) + 'Q140 40 70 70Q20 80 -20 70Z" fill="#c8324f"/>';
+      r += '<path d="M-20 ' + (vy - 10) + 'L150 ' + (vy - 10) + 'Q140 40 70 70" stroke="#ffc93c" stroke-width="5" fill="none"/>';
+      r += '<circle cx="92" cy="470" r="11" fill="#ffc93c" stroke="#d99a1c" stroke-width="3"/>';
+      return r + '</g>';
+    }
+    g += rideau(vx, 1) + rideau(vx + vl, -1);
+    // Lampe suspendue et son cône de lumière sur la table
+    g += '<path d="M232 108L368 108L560 620L40 620Z" fill="url(#aff-cone)"/>';
+    g += '<ellipse cx="300" cy="300" rx="250" ry="260" fill="url(#aff-halo)" opacity=".7"/>';
+    g += '<path d="M300 ' + (vy - 10) + 'L300 62" stroke="#3a2556" stroke-width="5"/>';
+    g += '<circle cx="300" cy="112" r="58" fill="url(#aff-halo)"/>';
+    g += '<path d="M262 62L338 62L372 108L228 108Z" fill="#6c4bd8" stroke="#4a2fa6" stroke-width="4" stroke-linejoin="round"/>';
+    g += '<path d="M272 70L292 70L280 102L246 102Z" fill="#9b82f0" opacity=".7"/>';
+    g += '<ellipse cx="300" cy="110" rx="26" ry="11" fill="#fffbe0"/>';
+    // Confettis de la fête
+    var conf = [[150, 150, '#6ec3ff', 20], [205, 95, '#ff8fb8', -30], [420, 150, '#86dd84', 40], [470, 85, '#ffd65a', 10], [130, 235, '#b89cff', 60], [530, 190, '#ff8fb8', -20], [395, 70, '#ffa45c', 70], [180, 330, '#ffd65a', 25]];
+    conf.forEach(function (c) { g += '<rect x="' + (c[0] - 6) + '" y="' + (c[1] - 4) + '" width="12" height="8" rx="2" fill="' + c[2] + '" transform="rotate(' + c[3] + ' ' + c[0] + ' ' + c[1] + ')"/>'; });
+    // Table ronde : bord en bois et tapis vert, vue de devant
+    g += '<ellipse cx="300" cy="640" rx="420" ry="190" fill="#9b6232"/>';
+    g += '<ellipse cx="300" cy="625" rx="414" ry="180" fill="#c98a4b"/>';
+    g += '<ellipse cx="300" cy="628" rx="378" ry="152" fill="url(#aff-tapis)"/>';
+    // Deux Pompons honnêtes, au fond de la table, montrent leurs fruits
+    g += carteAffiche(140, 380, 62, 76, -12, 'pomme');
+    g += pomponAffiche(1, 72, 448, 150, { regardX: 3, regardY: -1, bouche: 'o', sourcils: true, mains: [[94, 58]] });
+    g += carteAffiche(536, 400, 58, 72, 10, 'raisin');
+    g += pomponAffiche(3, 548, 470, 140, { regardX: -3, regardY: -1, bouche: 'o', sourcils: true, mains: [[14, 60]] });
+    // Lueur de la lampe derrière l'imposteur
+    g += '<ellipse cx="282" cy="330" rx="150" ry="140" fill="url(#aff-halo)" opacity=".9"/>';
+    // L'imposteur démasqué, en grand, avec sa carte fusée
+    g += pomponAffiche(4, 268, 382, 330, { masque: true, regardX: 2.2, regardY: -1.2, sueur: true, sourcils: true, mains: [[13, 66], [90, 48]] });
+    // Petits traits de surprise autour de lui
+    g += '<g stroke="#fff" stroke-width="6" stroke-linecap="round">' +
+      '<path d="M120 236L96 220"/><path d="M114 276L86 274"/><path d="M128 198L112 176"/></g>';
+    g += '<g stroke="#e5484d" stroke-width="4" stroke-linecap="round">' +
+      '<path d="M120 236L96 220"/><path d="M114 276L86 274"/><path d="M128 198L112 176"/></g>';
+    // La carte fusée, tenue en l'air, et la grande loupe qui la grossit
+    g += carteAffiche(458, 292, 74, 90, 12, 'fusee', { intrus: true });
+    g += '<g clip-path="url(#aff-verre)"><rect x="380" y="214" width="160" height="160" fill="#fff8e6"/>' + carteAffiche(462, 296, 136, 164, 12, 'fusee', { intrus: true }) + '</g>';
+    g += '<circle cx="458" cy="292" r="74" fill="#cfe9ff" opacity=".18"/>';
+    g += '<path d="M410 250A62 62 0 0 1 470 226" stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round" opacity=".85"/>';
+    g += '<path d="M518 318L604 432" stroke="#2d2240" stroke-width="30" stroke-linecap="round"/>';
+    g += '<path d="M518 318L604 432" stroke="#6c4bd8" stroke-width="22" stroke-linecap="round"/>';
+    g += '<path d="M548 356L596 420" stroke="#9b82f0" stroke-width="7" stroke-linecap="round"/>';
+    g += '<circle cx="458" cy="292" r="74" fill="none" stroke="#2d2240" stroke-width="16"/>';
+    g += '<circle cx="458" cy="292" r="74" fill="none" stroke="#ffc93c" stroke-width="10"/>';
+    g += '<path d="M400 248A72 72 0 0 1 450 220" stroke="#fff3b0" stroke-width="4" fill="none" stroke-linecap="round"/>';
+    // Étincelles : le coupable est trouvé !
+    g += etincelle(552, 220, 18, '#fff') + etincelle(552, 220, 12, '#ffc93c');
+    g += etincelle(380, 196, 13, '#fff') + etincelle(380, 196, 8, '#ffc93c');
+    g += etincelle(560, 290, 9, '#ffe14d');
+    g += etincelle(418, 386, 10, '#fff');
+    // Cartes posées sur la table, faces visibles (des fruits) et un dos violet
+    g += carteAffiche(205, 560, 64, 78, -18, 'banane', { aplat: 0.62 });
+    g += carteAffiche(300, 592, 64, 78, 4, 'dos', { aplat: 0.62 });
+    g += carteAffiche(400, 566, 64, 78, 16, 'poire', { aplat: 0.62 });
+    // Premier plan : un Pompon rose, coupé par le bord, montre l'imposteur du doigt
+    g += carteAffiche(122, 600, 70, 86, 14, 'fraise');
+    g += pomponAffiche(0, 40, 710, 260, { regardX: 3.5, regardY: -3, bouche: 'rire', mains: [[92, 44]] });
+    // Lumière douce sur le tapis
+    g += '<ellipse cx="300" cy="580" rx="210" ry="56" fill="#fff8cf" opacity=".18"/>';
+
+    var svg = document.getElementById('affiche-jeu');
+    if (!svg) {
+      svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.id = 'affiche-jeu';
+      svg.setAttribute('aria-hidden', 'true');
+      svg.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;z-index:100';
+      document.body.appendChild(svg);
+    }
+    svg.setAttribute('viewBox', vx + ' ' + vy + ' ' + vl + ' ' + vh);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    svg.innerHTML = g;
+  }
+  function cacherPourAffiche() {
+    var els = document.querySelectorAll('#app, .voile, #effets, .jel-langue, jel-langue, button');
+    for (var i = 0; i < els.length; i++) els[i].style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    document.body.classList.add('affiche');
+    cacherPourAffiche();
+    // Le bouton de langue peut être créé après ce script : on le cache aussi un peu après.
+    setTimeout(cacherPourAffiche, 50);
+    setTimeout(cacherPourAffiche, 400);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par
+  // le jeu) : le jeu s'ouvre directement en pleine manche, avec sa vraie
+  // interface (cœurs, niveau, manche, bandeau du thème, table, loupe), sans
+  // écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md,
+  // section 5). Le moment est posé par le code, hasard à graine fixe, puis
+  // rien n'avance : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1 : les Pompons montrent leurs cartes l'un après l'autre,
+  //       la dernière (celle de l'imposteur) ne va pas avec les fruits ;
+  //   2 = niveau 10 : deux cartes chacun, la loupe retourne toutes les cartes ;
+  //   3 = niveau 18 : six Pompons, thème caché (éclair), deux imposteurs,
+  //       le premier déjà démasqué.
+  // ---------------------------------------------------------------------
+  var SCENES_APERCU = {
+    1: { niveau: 0, theme: 'fruits', manche: 0, coeurs: 3, score: 0, graine: 11 },
+    2: { niveau: 9, theme: 'mer', manche: 2, coeurs: 3, score: 268, loupes: 1, graine: 23 },
+    3: { niveau: 17, theme: 'espace', manche: 3, coeurs: 2, score: 431, loupes: 2, graine: 37 }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    var sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    var graine = 7919 * sc.graine;
+    Math.random = function () { graine = (graine + 0x6D2B79F5) | 0; var t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    annulerTout();
+    var cfg = NIVEAUX[sc.niveau];
+    etat = { idx: sc.niveau, cfg: cfg, coeurs: sc.coeurs, loupes: cfg.loupe ? sc.loupes : 0, loupesUtilisees: 0, erreurs: 0, score: sc.score, reussies: sc.manche, manche: sc.manche, themes: [], roleFinale: -1 };
+    enPartie = false; // rien n'est sauvegardé à la fermeture
+    montrerEcran('ecran-jeu');
+    $('lbl-niveau').textContent = T('jeu.niveau', { n: sc.niveau + 1 });
+    $('lbl-manche').textContent = T('jeu.manche', { n: sc.manche + 1, total: cfg.m });
+    majCoeurs();
+    construireTable(cfg.p);
+    // Le thème voulu : tous les autres sont déjà « vus » dans ce niveau.
+    etat.themes = THEMES.filter(function (t) { return t !== sc.theme; });
+    var o = preparerManche(sc.manche);
+    etat.o = o;
+    sieges.forEach(function (s) {
+      var paire = s.el.querySelector('.paire'); paire.innerHTML = '';
+      s.cartes.forEach(function (c) { var el = creerCarte(c); el.classList.add('vide'); paire.appendChild(el); });
+    });
+    $('choix').innerHTML = '';
+    $('btn-continuer').classList.add('cache');
+    var ordre = siegesDansLOrdre();
+    if (numero === 1) {
+      // Les cartes passent de Pompon en Pompon : les deux premières sont déjà
+      // retournées, la dernière se montre, et c'est celle de l'imposteur.
+      var imp = sieges[o.imposteurs[0]], dernier = ordre[ordre.length - 1];
+      if (imp !== dernier) { var pl = imp.place; imp.place = dernier.place; dernier.place = pl; placerSieges(); }
+      ordre = siegesDansLOrdre();
+      montrerTheme(o, true);
+      consigne(T('phase.regarde'), '');
+      ordre.forEach(function (s) { s.el.querySelector('.carte').classList.remove('vide'); });
+      imp.el.querySelector('.carte').classList.add('ouverte');
+      imp.el.classList.add('parle');
+      mode = 'attente';
+    } else {
+      // Toutes les cartes sont distribuées ; le joueur a déjà montré la sienne.
+      sieges.forEach(function (s) { s.el.querySelectorAll('.carte').forEach(function (c) { c.classList.remove('vide'); }); });
+      if (o.main) {
+        var tc = $('toi-carte'); tc.className = 'carte ouverte'; tc.querySelector('.avant').textContent = o.bonneCarte;
+      }
+      if (numero === 2) {
+        montrerTheme(o, true);
+        consigne(T('phase.accuse'), '');
+        mode = 'loupe';
+        retournerToutes(true);
+      } else {
+        montrerTheme(o, false);
+        var trouve = sieges[o.imposteurs[0]];
+        trouve.el.classList.add('trouve', 'demasque');
+        consigne(T('phase.accuseEncore'), 'bon');
+        mode = 'accuse';
+        activerSieges(true);
+      }
+    }
+    majLoupe();
+  }
+
   // Démarrage
   chargerMemo();
   majBoutonsSon();
-  dessinerIllustration();
-  majEffacer();
+  var numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else {
+    dessinerIllustration();
+    majEffacer();
+  }
 })();
 </script>
 </body>
