@@ -990,7 +990,8 @@ const JEU = 'pommes-du-poney';
 function jouer() {
   JEL_SAVE.reprise({ jeu: JEU, sansNiveau: true, onContinuer: (d) => demarrer(d), onNouvelle: () => demarrer() });
 }
-function sauvegarder() { if (enJeu) JEL_SAVE.save(JEU, { niveau: 1, score, vies }); }
+let apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
+function sauvegarder() { if (enJeu && !apercu) JEL_SAVE.save(JEU, { niveau: 1, score, vies }); }
 JEL_SAVE.surFermeture(sauvegarder);
 
 // --- Partie --------------------------------------------------------
@@ -1104,6 +1105,38 @@ function dessinerDecor() {
   ctx.beginPath(); ctx.ellipse(L * 0.85, H - 10 * echelle, L * 0.55, 90 * echelle, 0, Math.PI, 0); ctx.fill();
   ctx.fillStyle = '#5fae46';
   ctx.fillRect(0, H - 40 * echelle, L, 40 * echelle);
+  if (apercu) dessinerPreApercu();
+}
+
+// Images du jeu seulement (window.JEL_APERCU) : touffes d'herbe et fleurs dans le pré, pour que la
+// petite image ne paraisse pas vide ; la partie normale garde son décor d'origine.
+function dessinerPreApercu() {
+  const s = echelle;
+  for (let i = 0, x = 4 * s; x < L; i++, x += 13 * s) {
+    const h = (12 + (i * 7) % 13) * s, y = H - (i % 3) * 9 * s;
+    ctx.fillStyle = i % 2 ? '#4a9636' : '#3f8a30';
+    ctx.beginPath(); ctx.moveTo(x - 6 * s, y); ctx.quadraticCurveTo(x - 2 * s, y - h * 0.6, x + ((i % 2) ? 5 : -4) * s, y - h); ctx.quadraticCurveTo(x + 2 * s, y - h * 0.5, x + 6 * s, y); ctx.fill();
+    if (i % 5 === 2) {
+      ctx.fillStyle = ['#ffffff', '#ff8fb8', '#fff07a'][i % 3];
+      const fx = x + 5 * s, fy = H - 26 * s + (i % 2) * 8 * s;
+      for (let p = 0; p < 5; p++) { const a = p * 1.2566; ctx.beginPath(); ctx.arc(fx + Math.cos(a) * 4 * s, fy + Math.sin(a) * 4 * s, 3.2 * s, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#ffb703'; ctx.beginPath(); ctx.arc(fx, fy, 2.6 * s, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // Petites fleurs sur les collines
+  for (let i = 0; i < 36; i++) {
+    const rang = Math.floor(i / 12);
+    const fx = L * (0.03 + (i % 12) * 0.085 + (rang % 2 ? 0.04 : 0)), fy = H - (50 + (i % 3) * 10 + rang * 24) * s;
+    // Haut des collines à cet endroit (mêmes ellipses que dessinerDecor) : pas de fleur dans le ciel.
+    let haut = H - 40 * s;
+    for (const [cx, rx, cy, ry] of [[L * 0.2, L * 0.6, H - 20 * s, 110 * s], [L * 0.85, L * 0.55, H - 10 * s, 90 * s]]) {
+      const d = (fx - cx) / rx;
+      if (Math.abs(d) < 1) haut = Math.min(haut, cy - ry * Math.sqrt(1 - d * d));
+    }
+    if (fy < haut + 8 * s) continue;
+    ctx.fillStyle = ['#ffffff', '#ff8fb8', '#fff07a'][i % 3];
+    for (let p = 0; p < 5; p++) { const a = p * 1.2566; ctx.beginPath(); ctx.arc(fx + Math.cos(a) * 3.5 * s, fy + Math.sin(a) * 3.5 * s, 2.8 * s, 0, Math.PI * 2); ctx.fill(); }
+  }
 }
 
 function nuage(x, y, s) {
@@ -1142,9 +1175,16 @@ function dessinerPoney() {
   const s = echelle;
   const x = poney.x, y = H - 70 * s - poney.rebond * 10 * s;
   ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  dessinerTetePoney(poney.rebond);
+  ctx.restore();
+}
+
+// Tête du poney, dans son repère (bouche en 0, 18). Options de l'affiche : cou plus long,
+// regard vers le haut, bouche grande ouverte avec la langue.
+function dessinerTetePoney(rebond, o = {}) {
   // cou
   ctx.fillStyle = '#b07040';
-  ctx.fillRect(-34, 10, 68, 80);
+  ctx.fillRect(-34, 10, 68, o.cou || 80);
   // oreilles
   ctx.fillStyle = '#9a5f33';
   ctx.beginPath(); ctx.moveTo(-40, -70); ctx.lineTo(-30, -112); ctx.lineTo(-12, -78); ctx.fill();
@@ -1161,8 +1201,9 @@ function dessinerPoney() {
   // yeux
   for (const c of [-24, 24]) {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(c, -46, 11, 13, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#2a2140'; ctx.beginPath(); ctx.arc(c + (c < 0 ? 2 : -2), -43, 7, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(c + (c < 0 ? 4 : 0), -46, 2.5, 0, Math.PI * 2); ctx.fill();
+    const rx = o.regardX || 0, ry = o.regardY || 0;
+    ctx.fillStyle = '#2a2140'; ctx.beginPath(); ctx.arc(c + (c < 0 ? 2 : -2) + rx, -43 + ry, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(c + (c < 0 ? 4 : 0) + rx, -46 + ry, 2.5, 0, Math.PI * 2); ctx.fill();
   }
   // museau + bouche ouverte
   ctx.fillStyle = '#e8b48a';
@@ -1170,11 +1211,15 @@ function dessinerPoney() {
   ctx.fillStyle = '#7a3b2e';
   ctx.beginPath(); ctx.ellipse(-14, -4, 5, 7, 0.2, 0, Math.PI * 2); ctx.ellipse(14, -4, 5, 7, -0.2, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#7a2f2f';
-  ctx.beginPath(); ctx.ellipse(0, 18, 18, 8 + poney.rebond * 4, 0, 0, Math.PI * 2); ctx.fill();
+  const ouverture = 8 + rebond * 4 + (o.bouche || 0);
+  ctx.beginPath(); ctx.ellipse(0, 18, 18 + (o.bouche || 0) * 0.4, ouverture, 0, 0, Math.PI * 2); ctx.fill();
+  if (o.bouche) {
+    ctx.fillStyle = '#ff8fa3';
+    ctx.beginPath(); ctx.ellipse(0, 18 + ouverture * 0.45, 13, ouverture * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+  }
   // joues roses
   ctx.fillStyle = 'rgba(255,120,120,.35)';
   ctx.beginPath(); ctx.arc(-38, -12, 9, 0, Math.PI * 2); ctx.arc(38, -12, 9, 0, Math.PI * 2); ctx.fill();
-  ctx.restore();
 }
 
 function dessinerInterface() {
@@ -1207,11 +1252,167 @@ let avant = performance.now();
 function boucle(maintenant) {
   const dt = Math.min(0.05, (maintenant - avant) / 1000);
   avant = maintenant;
-  if (enJeu) mettreAJour(dt); else temps += dt;
+  if (apercu) { /* image du jeu : moment figé */ }
+  else if (enJeu) mettreAJour(dt); else temps += dt;
   dessiner();
   requestAnimationFrame(boucle);
 }
-requestAnimationFrame(boucle);
+
+/* ---------- Affiche (jaquette du jeu) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le poney en grand, bouche
+// grande ouverte, regarde la pomme qui arrive ; pommes et carottes pleuvent sous le soleil, des
+// étincelles jaillissent d'une prise, le pommier au loin, l'herbe et une grosse pomme au premier plan.
+function etoileAffiche(x, y, r, a) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const ang = a + i * Math.PI / 5 - Math.PI / 2, rr = i % 2 ? r * 0.45 : r;
+    ctx.lineTo(x + Math.cos(ang) * rr, y + Math.sin(ang) * rr);
+  }
+  ctx.closePath(); ctx.fill();
+}
+function dessinerAffiche() {
+  const k = Math.min(L / 600, H / 800);
+  const X = (x) => L / 2 + (x - 300) * k, Y = (y) => H / 2 + (y - 400) * k;
+  ctx.save();
+  // Ciel
+  const ciel = ctx.createLinearGradient(0, 0, 0, H);
+  ciel.addColorStop(0, '#5ec0ff'); ciel.addColorStop(0.6, '#bfe9ff'); ciel.addColorStop(1, '#eafaff');
+  ctx.fillStyle = ciel; ctx.fillRect(0, 0, L, H);
+  // Soleil : halo, rayons, disque
+  const sx = X(505), sy = Y(105);
+  const halo = ctx.createRadialGradient(sx, sy, 20 * k, sx, sy, 330 * k);
+  halo.addColorStop(0, 'rgba(255,246,190,.95)'); halo.addColorStop(0.4, 'rgba(255,236,150,.45)'); halo.addColorStop(1, 'rgba(255,236,150,0)');
+  ctx.fillStyle = halo; ctx.fillRect(0, 0, L, H);
+  ctx.fillStyle = 'rgba(255,240,160,.55)';
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6 + 0.2;
+    ctx.beginPath(); ctx.moveTo(sx + Math.cos(a - 0.08) * 70 * k, sy + Math.sin(a - 0.08) * 70 * k);
+    ctx.lineTo(sx + Math.cos(a) * 150 * k, sy + Math.sin(a) * 150 * k);
+    ctx.lineTo(sx + Math.cos(a + 0.08) * 70 * k, sy + Math.sin(a + 0.08) * 70 * k); ctx.fill();
+  }
+  ctx.fillStyle = '#ffd84a'; ctx.beginPath(); ctx.arc(sx, sy, 56 * k, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff2a6'; ctx.beginPath(); ctx.arc(sx - 10 * k, sy - 10 * k, 38 * k, 0, Math.PI * 2); ctx.fill();
+  // Nuages (le décor continue jusqu'aux bords sur écran large)
+  ctx.fillStyle = 'rgba(255,255,255,.95)';
+  nuage(X(20), Y(205), 1.5 * k); nuage(X(330), Y(95), 1.1 * k); nuage(X(560), Y(300), 1.2 * k);
+  if (L > 600 * k + 10) { nuage(X(-260), Y(130), 1.4 * k); nuage(X(800), Y(170), 1.3 * k); }
+  // Collines lointaines, puis plus proches
+  ctx.fillStyle = '#c6eaa6';
+  ctx.beginPath(); ctx.ellipse(X(110), Y(640), Math.max(440 * k, L * 0.5), 190 * k, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#addf88';
+  ctx.beginPath(); ctx.ellipse(X(560), Y(650), Math.max(420 * k, L * 0.5), 170 * k, 0, Math.PI, 0); ctx.fill();
+  // Pommier au loin, à gauche
+  ctx.fillStyle = '#8a5a33'; ctx.fillRect(X(48), Y(470), 26 * k, 150 * k);
+  ctx.fillStyle = '#4fae45';
+  for (const [fx, fy, fr] of [[60, 430, 95], [-10, 470, 70], [125, 470, 70], [60, 370, 70]]) { ctx.beginPath(); ctx.arc(X(fx), Y(fy), fr * k, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,255,255,.18)';
+  ctx.beginPath(); ctx.arc(X(85), Y(380), 45 * k, 0, Math.PI * 2); ctx.fill();
+  for (const [px, py] of [[20, 420], [80, 400], [110, 470], [40, 490], [-20, 470], [70, 330]]) dessinerPomme(X(px), Y(py), 0, 0.75 * k);
+  // Herbe proche
+  ctx.fillStyle = '#86cc5e';
+  ctx.beginPath(); ctx.ellipse(L / 2, Y(720), Math.max(520 * k, L * 0.7), 110 * k, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = '#5fae46'; ctx.fillRect(0, Y(700), L, H - Y(700));
+  // Le poney, en grand, bouche grande ouverte, qui regarde la pomme arriver
+  const px = X(290), py = Y(450), ps = 2.25 * k;
+  ctx.save(); ctx.translate(px, py); ctx.scale(ps, ps);
+  dessinerTetePoney(1, { cou: 220, regardX: 3, regardY: -4, bouche: 9 });
+  // Contour clair côté soleil
+  ctx.strokeStyle = 'rgba(255,240,190,.9)'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.ellipse(0, -30, 51, 61, 0, -0.95, 0.45); ctx.stroke();
+  ctx.restore();
+  // Étincelles d'une prise, en couronne autour du museau
+  const bx = px, by = py + 14 * ps;
+  for (let i = 0; i < 13; i++) {
+    const a = -0.12 * Math.PI + i * (1.24 * Math.PI / 12), d = (i % 2 ? 1 : 1.18);
+    const ex = bx + Math.cos(a) * 128 * k * d, ey = by + Math.sin(a) * 92 * k * d;
+    ctx.fillStyle = i % 2 ? '#ffd23f' : '#ff9f1c';
+    if (i % 2 === 0) etoileAffiche(ex, ey, 15 * k, a);
+    else { ctx.beginPath(); ctx.arc(ex, ey, 7 * k, 0, Math.PI * 2); ctx.fill(); }
+  }
+  // Pluie de pommes et de carottes, avec une traînée de lumière
+  const chutes = [
+    ['pomme', 452, 318, 2.6, 0.3], ['carotte', 150, 262, 2.3, 0.9], ['pomme', 385, 150, 1.7, 1.6],
+    ['pomme', 205, 128, 1.4, 2.4], ['carotte', 540, 205, 1.5, 0.2], ['pomme', 90, 150, 1.1, 1.1],
+  ];
+  for (const [type, cx, cy, s] of chutes) {
+    if (type !== 'pomme') continue;
+    const tx = X(cx), ty = Y(cy) - 4 * s * k, r = 12 * s * k, h = 42 * s * k;
+    const tr = ctx.createLinearGradient(tx, ty - h, tx, ty);
+    tr.addColorStop(0, 'rgba(255,255,255,0)'); tr.addColorStop(1, 'rgba(255,255,255,.55)');
+    ctx.fillStyle = tr;
+    ctx.beginPath(); ctx.moveTo(tx - r * 0.2, ty - h); ctx.lineTo(tx + r * 0.2, ty - h); ctx.lineTo(tx + r, ty); ctx.lineTo(tx - r, ty); ctx.closePath(); ctx.fill();
+  }
+  for (const [type, cx, cy, s, a] of chutes) (type === 'pomme' ? dessinerPomme : dessinerCarotte)(X(cx), Y(cy), a, s * k);
+  // Premier plan : touffes d'herbe, fleurs et une grosse pomme coupée par le bord
+  ctx.fillStyle = '#3f8f32';
+  for (let i = 0; i < 16; i++) {
+    const gx = (i / 15) * L, gh = (60 + (i * 37) % 50) * k;
+    ctx.beginPath(); ctx.moveTo(gx - 18 * k, H); ctx.quadraticCurveTo(gx - 6 * k, H - gh * 0.6, gx + ((i % 2) ? 12 : -10) * k, H - gh); ctx.quadraticCurveTo(gx + 4 * k, H - gh * 0.5, gx + 18 * k, H); ctx.fill();
+  }
+  for (const [fx, fy, fc] of [[500, 735, '#ff6fa8'], [560, 760, '#fff3a0'], [120, 765, '#ffffff']]) {
+    ctx.fillStyle = fc;
+    for (let p = 0; p < 6; p++) { const a = p * 1.047; ctx.beginPath(); ctx.arc(X(fx) + Math.cos(a) * 11 * k, Y(fy) + Math.sin(a) * 11 * k, 8 * k, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#ffb703'; ctx.beginPath(); ctx.arc(X(fx), Y(fy), 7 * k, 0, Math.PI * 2); ctx.fill();
+  }
+  dessinerPomme(X(-5), Y(770), 0.4, 3.2 * k);
+  ctx.restore();
+}
+function cacherPourAffiche() {
+  for (const el of document.querySelectorAll('.ecran, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherPourAffiche();
+  document.addEventListener('DOMContentLoaded', cacherPourAffiche);
+  setTimeout(cacherPourAffiche, 100); setTimeout(cacherPourAffiche, 600);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---------- Images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (score, pommes de vie), sans écran d'accueil
+// ni fenêtre « Continuer » (CONSIGNES-JEU.md, section 5). Le moment est posé puis figé : ni prise,
+// ni chute, ni son, ni sauvegarde.
+//   1 = début : peu de pommes, qui tombent lentement, 3 vies ;
+//   2 = milieu : une carotte vient d'être attrapée (étincelles), plus de chutes, 2 vies ;
+//   3 = avancé : pluie serrée de pommes et de carottes, une pomme ratée éclabousse l'herbe, dernière vie.
+const SCENES_APERCU = {
+  1: { score: 6, vies: 3, poney: 0.3, temps: 10, rebond: 0.9, prise: '#ffd23f',
+    objets: [['pomme', 0.3, 0.6], ['pomme', 0.72, 0.47], ['pomme', 0.16, 0.36], ['carotte', 0.52, 0.27], ['pomme', 0.86, 0.17],
+      ['pomme', 0.4, 0.1], ['pomme', 0.66, 0.71], ['pomme', 0.9, 0.6]] },
+  2: { score: 37, vies: 2, poney: 0.66, temps: 8, rebond: 0.8, prise: '#ff9f1c',
+    objets: [['pomme', 0.22, 0.3], ['pomme', 0.44, 0.52], ['carotte', 0.56, 0.14], ['pomme', 0.86, 0.24], ['pomme', 0.12, 0.62],
+      ['pomme', 0.34, 0.74], ['carotte', 0.8, 0.44], ['pomme', 0.6, 0.36], ['pomme', 0.32, 0.1]] },
+  3: { score: 96, vies: 1, poney: 0.46, temps: 12, rebond: 0.5, prise: '#ffd23f', ratee: 0.86,
+    objets: [['pomme', 0.14, 0.18], ['carotte', 0.3, 0.42], ['pomme', 0.5, 0.6], ['pomme', 0.64, 0.24], ['carotte', 0.78, 0.5],
+      ['pomme', 0.9, 0.12], ['pomme', 0.18, 0.7], ['pomme', 0.4, 0.08], ['pomme', 0.72, 0.72], ['pomme', 0.1, 0.46], ['pomme', 0.54, 0.34]] },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 987654 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  ecranAccueil.hidden = true; ecranFin.hidden = true;
+  enJeu = true;
+  score = sc.score; vies = sc.vies; temps = sc.temps;
+  poney.x = poney.cible = L * sc.poney; poney.rebond = sc.rebond;
+  objets = sc.objets.map(([type, x, y]) => ({ type, x: L * x, y: H * y, v: vitesseChute(), angle: Math.random() * Math.PI }));
+  particules = [];
+  if (sc.prise) etoiles(poney.x, H - 52 * echelle - sc.rebond * 10 * echelle, sc.prise);
+  if (sc.ratee) etoiles(L * sc.ratee, H - 40 * echelle, '#7cc35b');
+  // Les étincelles s'écartent un peu (0,3 s), puis tout reste figé.
+  for (const p of particules) { p.x += p.vx * 0.32; p.y += p.vy * 0.32; p.vie = 0.5; }
+}
+
+/* ---------- Démarrage ---------- */
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else {
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>
