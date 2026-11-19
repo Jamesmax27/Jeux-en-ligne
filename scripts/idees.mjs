@@ -28,13 +28,13 @@
 // et "places" (2 à 10, nombre de places suggéré ; l'agent créateur le fixe sinon).
 // Le jeu publié doit être multijoueur si et seulement si son idée l'est (vérifié
 // par « controler »). La variable GitHub MULTI_BOUCLE donne le nombre de jeux
-// multijoueurs par passage de 5 jeux (ex. 2 ; absente ou 0 : aucun) : la boucle
-// en choisit autant (« choisir 5 --multi 2 ») et l'idéation en garde
+// multijoueurs par nuit (ex. 1 ; absente ou 0 : aucun) : la boucle
+// en choisit autant (« choisir 2 --multi 1 ») et l'idéation en garde
 // PASSAGES_D_AVANCE fois plus en attente (« manque-multi 2 », « ajouter … --multi 2 »).
 //
 // Jeux pour adolescents (« ages » 13+, pourAdos de public/taxonomie.js) : la
-// variable GitHub ADOS_BOUCLE donne leur nombre par passage de 5 jeux (0 à 5).
-// La boucle en choisit autant (« choisir 5 --ados 2 ») et l'idéation en garde
+// variable GitHub ADOS_BOUCLE donne leur nombre par nuit (0 à 5 ; 1 : un chaque nuit).
+// La boucle en choisit autant (« choisir 2 --ados 1 ») et l'idéation en garde
 // PASSAGES_D_AVANCE fois plus en attente (« manque-ados 2 », « ajouter … --ados 2 »).
 // --ados 0 : les idées 13+ de l'agent attendent et l'idéation n'en ajoute plus.
 // Les idées du propriétaire (source « humain » ou idée perso) ne sont jamais
@@ -48,8 +48,8 @@
 // « tendance:<id d'une recherche Google> ») et "pour_le" (AAAA-MM-JJ : date de
 // la fête, ou fin de la fraîcheur de la tendance), posés par « ajouter », jamais
 // par l'agent. La variable GitHub TENDANCES_BOUCLE donne le nombre d'idées
-// inspirées par passage de 5 jeux (0 à 5 ; absente ou 0 : aucune) : la boucle
-// en choisit autant (« choisir 5 --tendances 1 ») et l'idéation en garde
+// inspirées par nuit (0 à 5 ; absente ou 0 : aucune) : la boucle
+// en choisit autant (« choisir 2 --tendances 1 ») et l'idéation en garde
 // PASSAGES_D_AVANCE fois plus en vue (« manque-tendances 1 », « ajouter …
 // --tendances 1 »). Une idée inspirée « active » (fête dans sa fenêtre de
 // fabrication, tendance encore fraîche) passe devant les autres idées de
@@ -124,7 +124,7 @@
 //   noter <nouvelles> <notes> <sortie-nouvelles> <sortie-file>
 //                          calcule les notes du jury : nouvelles idées retenues, notes de la file
 //   appliquer-notes <fichier>   range les notes de la file dans idees.json
-//   quota <n> <k> <passage>     part de ce passage pour k jeux sur 5, avec n jeux par passage
+//   quota <n> <k>          jeux d'un type (k par nuit) pour un passage de n jeux : k, n au plus
 //   choisir <n> [--multi <k>] [--ados <k>] [--tendances <k>]
 //                          passe n idées "en_cours" et écrit leur liste (JSON :
 //                          id, titre, description, genre, genres_secondaires,
@@ -998,11 +998,12 @@ async function appliquerNotes(fichier) {
   console.log(`${n} note(s) rangée(s) dans idees.json.`);
 }
 
-// Quota d'un passage pour « k jeux sur 5 », réparti sur les passages successifs : avec 2 jeux par passage, k = 1
-// donne 0, 0, 1, 0, 1… (2 jeux sur 5 passages) au lieu d'un arrondi toujours à 0.
-function quotaDuPassage(nombre, k, passage) {
-  const n = Math.max(0, parseInt(nombre, 10) || 0), q = Math.max(0, Math.min(CHOIX_MAX, parseInt(k, 10) || 0)), p = Math.max(1, parseInt(passage, 10) || 1);
-  return Math.min(n, Math.floor((p * n * q) / CHOIX_MAX) - Math.floor(((p - 1) * n * q) / CHOIX_MAX));
+// Quota d'un passage : MULTI_BOUCLE, ADOS_BOUCLE et TENDANCES_BOUCLE donnent un nombre de jeux par nuit (un
+// seul passage par nuit), jamais plus que le nombre de jeux du passage. L'ancienne répartition « k sur 5 » sur
+// plusieurs nuits donnait 0 certaines nuits, lu comme « aucun » : une idée 13+ bien notée était alors écartée.
+function quotaDuPassage(nombre, k) {
+  const n = Math.max(0, parseInt(nombre, 10) || 0), q = Math.max(0, Math.min(CHOIX_MAX, parseInt(k, 10) || 0));
+  return Math.min(n, q);
 }
 
 // --------------------------------------------------------------------------
@@ -1024,7 +1025,7 @@ const COMMANDES = {
   'preparer-jury': () => preparerJury(args[0], args[1]),
   noter: () => noter(args[0], args[1], args[2], args[3]),
   'appliquer-notes': () => appliquerNotes(args[0]),
-  quota: async () => console.log(quotaDuPassage(args[0], args[1], args[2])),
+  quota: async () => console.log(quotaDuPassage(args[0], args[1])),
   choisir: () => choisir(args[0], args.slice(1)),
   reconcilier: () => reconcilier(args),
   controler: () => controler(args[0]),

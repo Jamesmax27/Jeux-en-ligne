@@ -54,12 +54,21 @@ Un nouveau jeu est **complet et travaillé, jamais un simple prototype** : il do
 - Un seul fichier `index.html` (HTML + CSS + JavaScript), **moins de 2 Mo**, avec `<html lang="fr">` et `<meta name="viewport" content="width=device-width, initial-scale=1">`.
 - **Aucune adresse Internet** dans le fichier : pas de CDN, pas de police Google, pas d'image en ligne. Images en SVG ou dessinées en canvas ; polices système (`system-ui, sans-serif`).
 - Jouable **au doigt et au clavier/souris**. Cibles tactiles d'au moins 44 px.
-- Pensé pour un **téléphone en portrait** (360 à 430 px de large), qui s'adapte aussi à l'ordinateur. Pas de défilement de la page pendant le jeu.
+- Pensé d'abord pour un **téléphone en portrait** (360 à 430 px de large), et **beau aussi sur ordinateur** (ci-dessous, « Ordinateur »). Pas de défilement de la page pendant le jeu.
 - Le jeu tourne dans un **cadre isolé** : `localStorage` peut être refusé. Tout accès au stockage est entouré de `try { … } catch (e) { … }`, et le jeu fonctionne sans sauvegarde.
 - Interdits : `alert()`, `confirm()`, `prompt()`, `window.open()`, formulaires, fenêtres pop-up.
 - Aucune erreur dans la console, au démarrage comme pendant la partie.
 - **Suivi des parties : seulement `FMG.reportEnd` dans le jeu** (ci-dessous). Le lanceur place lui-même, en tête de chaque jeu (anciens comme nouveaux), le script commun de suivi (`SCRIPT_SUIVI` dans `public/suivi.js`), qui lui signale les erreurs JavaScript et fournit `window.FMG.reportEnd` ; il mesure aussi le temps de jeu et envoie le tout au site (« Tendances » de l'accueil, onglet « Stats » de la page privée). Le jeu ne contient donc **aucun code réseau** (`fetch`, `sendBeacon`… : bloqués par la règle de sécurité) et ne doit pas empêcher les erreurs d'arriver jusqu'à `window` (pas de `stopImmediatePropagation()` sur l'événement `error`) ; `window.onerror` reste utilisable.
 - Code lisible et commenté en français.
+
+### Ordinateur (obligatoire)
+
+Beaucoup de joueurs ouvrent le site sur un ordinateur (écran large, 1366 × 768 le plus souvent). Un jeu dessiné dans une colonne de téléphone au milieu de l'écran, avec deux grandes bandes vides ou unies de chaque côté, a l'air cassé (« Le Petit Sorcier et les Nuages », novembre 2026).
+
+- **Le décor remplit toute la largeur** : ciel, sol, paysage, murs, fond animé… se prolongent jusqu'aux bords de l'écran, quelle que soit sa largeur. Jamais de `max-width` sur le conteneur principal ni de fond uni (ou simple dégradé du haut vers le bas) autour d'une colonne.
+- **La zone de jeu s'adapte** : elle s'élargit en paysage (plateau ou terrain plus large, caméra qui montre plus de monde) ; si la règle du jeu a besoin d'une largeur limitée (tir vertical, colonne de blocs), la zone de jeu garde sa largeur au centre, mais le décor continue de chaque côté (et peut porter le score, les commandes ou des éléments du monde). Les tailles se calculent d'après la largeur **et** la hauteur (`Math.min(W / …, H / …)`), pour que rien ne soit minuscule ni énorme.
+- Les fenêtres (règles, pause, fin de niveau) restent centrées et de taille raisonnable ; c'est le fond derrière elles qui remplit l'écran.
+- **Contrôle** : `validate-games.mjs` lance une partie sur un écran de 1366 × 768 et mesure la largeur que le jeu occupe vraiment (capture `captures/<id>/8-ordinateur-partie.png` avec `--jouer`) : moins de 70 % est bloquant pour les jeux ajoutés depuis le 20 novembre 2026, et signalé pour les autres. La relecture regarde cette capture (section 7, point 11).
 
 ### Fin de partie (obligatoire)
 
@@ -245,10 +254,25 @@ Chaque jeu a sa page, générée au build dans les 5 langues (gabarit unique `ga
 ## 5. La jaquette et les images
 
 - Image portrait 600 × 800 px : `cover.webp` (idéal, moins de 100 Ko), sinon `cover.png` ou `cover.jpg` (moins de 300 Ko).
-- La boucle automatique la fabrique elle-même, d'après le jeu terminé (capture de l'écran d'accueil du jeu, **textes masqués** ; une jaquette provisoire faite pendant la fabrication par `--covers` est remplacée) : la jaquette ne contient **aucun texte**, car le site affiche le titre traduit en HTML. L'écran d'accueil doit donc avoir un beau dessin, pas seulement du texte.
-- **Aucune image ne contient de texte** : ni la jaquette, ni les dessins du jeu (SVG, canvas) ; pas de titre, de lettre ni de chiffre dessinés. Les textes sont toujours écrits par `t()` (section 3), pour être traduits.
-- Jaquette faite à la main : sans aucun texte, ou `node scripts/jaquette-sans-texte.mjs <id>`. Si la relecture voit du texte sur la jaquette d'un jeu par ailleurs bon, la boucle refait seulement la jaquette avec ce script.
-- La jaquette sert aussi d'image de partage de la page du jeu (réseaux sociaux) si elle est en `.webp`, `.png` ou `.jpg` ; une jaquette `.svg` est alors remplacée par l'icône du site. Son texte de remplacement est `jaquette_alt` (section 4) : il décrit le dessin de l'écran d'accueil, d'après lequel la jaquette automatique est faite.
+- **Aucune image ne contient de texte** : ni la jaquette, ni les dessins du jeu (SVG, canvas) ; pas de titre, de lettre ni de chiffre dessinés. Les textes sont toujours écrits par `t()` (section 3), pour être traduits. Le site écrit le titre traduit en bandeau sur le bas de la jaquette.
+- La jaquette est la **première chose que voit un joueur** : c'est elle qui donne envie de cliquer, ou pas. Une capture de l'écran titre (boutons masqués, beaucoup de vide, personnage minuscule, image trop sombre) ne suffit pas.
+
+### L'affiche du jeu (obligatoire pour les jeux ajoutés depuis le 20 novembre 2026)
+
+Le jeu dessine lui-même son affiche, avec ses propres dessins, quand `window.JEL_AFFICHE` est vrai. Le robot ouvre alors le jeu seul, en 600 × 800, et en tire la jaquette (`cover.jpg`).
+
+- **Code** : à la fin de l'initialisation, `if (window.JEL_AFFICHE) { dessinerAffiche(); return; }` (ou l'équivalent) : ni écran titre, ni bouton, ni fenêtre, ni texte, ni son ; le bouton de langue est caché (`document.querySelectorAll('.jel-langue')`…). La scène remplit tout l'écran, redessinée au redimensionnement ; elle peut s'animer (la capture est faite après 2 secondes). `window.JEL_AFFICHE` est posé par le robot seulement : le jeu ne l'écrit jamais.
+- **Composition**, comme l'affiche d'un film ou la jaquette d'un jeu vendu en magasin :
+  - **un héros en grand** (personnage, animal, véhicule, créature) : 35 à 60 % de la hauteur, bien en vue, de face ou de trois quarts, avec une expression ou une pose qui raconte quelque chose ;
+  - **un moment d'action** qui montre ce qu'on fait dans le jeu : le saut, le tir, la fusion, la course, l'objet qu'on attrape, l'ennemi qui arrive ;
+  - **de la profondeur** : un premier plan (éléments plus grands, un peu coupés par le bord), le héros, un fond plus pâle ou plus flou ; rien de plat ni de vide ;
+  - **de la lumière** : une source visible (soleil, lampe, magie, néon, lune), un contour clair sur le héros, des ombres ; une couleur d'accent vive qui attire l'œil ;
+  - **cadrage** : l'essentiel entre 12 % et 75 % de la hauteur (en haut à gauche, le site pose ses badges ; en bas, le bandeau du titre sur environ 20 %) ; le bas reste un décor qui supporte un bandeau sombre ;
+  - dessins du jeu **plus grands et plus détaillés** que pendant la partie si besoin (même style, mêmes personnages) ; jamais d'interface (score, jauge, boutons, flèches de commande).
+- **Jeux pour adolescents (« 13+ »)** : ambiance de film, mais **lisible** : le sujet et la menace se voient (contre-jour, lampe, lueur, néon, éclair), une couleur vive tranche sur le sombre. Une image presque noire où l'on devine à peine le sujet ne donne envie à personne. Ni sang ni gore (section 1).
+- **Contrôles** : le robot (`validate-games.mjs --browser`) exige l'affiche des nouveaux jeux et refuse une affiche qui montre un bouton, trop sombre (luminosité moyenne sous 45 sur 255), trop plate (contraste sous 22) ou trop vide (moins de 20 % de l'image occupée par des détails). L'agent créateur regarde son affiche (`captures/<id>/9-affiche.png`, faite par `validate-games.mjs --jouer` ; ou `node scripts/jaquette-sans-texte.mjs <id> --affiche`) et la reprend tant qu'elle ne donne pas envie ; la relecture la note (section 7).
+- Jaquette d'un jeu sans affiche (anciens jeux) : capture de l'écran d'accueil, **textes masqués** (`node scripts/jaquette-sans-texte.mjs <id>`). Si la relecture voit du texte sur la jaquette d'un jeu par ailleurs bon, la boucle refait seulement la jaquette avec ce script.
+- La jaquette sert aussi d'image de partage de la page du jeu (réseaux sociaux) si elle est en `.webp`, `.png` ou `.jpg` ; une jaquette `.svg` est alors remplacée par l'icône du site. Son texte de remplacement est `jaquette_alt` (section 4) : il décrit ce que montre la jaquette (l'affiche, ou l'écran d'accueil pour un jeu sans affiche).
 
 ## 6. Avant de proposer le jeu
 
@@ -274,6 +298,8 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Chargement | le jeu ne s'ouvre pas dans le lanceur, ou l'écran reste vide |
 | Console | une erreur apparaît au démarrage ou pendant 30 secondes de partie au hasard |
 | Téléphone | une erreur survient pendant la partie au toucher, sur un écran de 390 × 844 |
+| Ordinateur | (jeux ajoutés depuis le 20 novembre 2026) pendant la partie, sur un écran de 1366 × 768, le jeu occupe moins de 70 % de la largeur : colonne de téléphone entourée de bandes vides (section 3, « Ordinateur ») |
+| Affiche | (jeux ajoutés depuis le 20 novembre 2026) pas de `window.JEL_AFFICHE`, ou une affiche qui montre un bouton, trop sombre, trop plate ou trop vide (section 5, « L'affiche du jeu ») |
 | Hors ligne | le jeu tente un appel réseau, ou ne marche pas avec le navigateur coupé du réseau |
 | Fichiers | `game.json` incomplet ou invalide, jaquette absente ou trop lourde, `index.html` de plus de 2 Mo, fichier en trop |
 | Niveaux | (jeux `"consignes": 2`) moins de 20 niveaux, `window.JEL_NIVEAUX` absent ou différent de `"niveaux"` dans `game.json`, présentation absente |
@@ -300,12 +326,12 @@ Points bloquants, vérifiés dans le code et sur les captures d'écran du robot 
 8. **Contrôles** : jouable entièrement au doigt, et au clavier ou à la souris ; cibles tactiles d'au moins 44 px.
 9. **Son** : sons Web Audio, bouton pour couper le son visible et mémorisé, aucun son avant la première action.
 10. **Effets et fins de niveau** : retours visuels soignés ; écran de victoire et écran de défaite avec score, étoiles, record, « Niveau suivant » ou « Réessayer », et « Rejouer ». Chaque écran de fin appelle `window.FMG.reportEnd` (section 3, « Fin de partie ») au bon endroit, une fois par fin : `completed: true` à la victoire, `false` à la défaite, `level` = numéro du niveau joué (à partir de 1) ou score. Le message « jeu terminé » `window.FMG.reportComplete({ stars, maxStars })` (section 3, « Jeu terminé et étoiles ») part seulement quand tous les niveaux ont été gagnés, avec la somme des meilleures étoiles **gardées dans la sauvegarde** et le nombre possible égal à `"etoiles"` de `game.json`.
-11. **Écran de téléphone** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page.
+11. **Écran de téléphone et d'ordinateur** : sur les captures, rien de coupé, de caché ou d'illisible ; pas de défilement de la page. Sur ordinateur (`7-ordinateur.png`, `8-ordinateur-partie.png`), le jeu remplit l'écran : décor jusqu'aux bords, pas de colonne de téléphone entre deux bandes vides ou unies, rien de minuscule (section 3, « Ordinateur »).
 12. **Contenu** : adapté à l'âge de `ages` (enfants ; jeu « 13+ » : tout est permis sauf les limites de la section 1, « Jeux pour adolescents », et l'écran titre dit « Conseillé dès 13 ans »), en français sans faute, création originale ; ni publicité, ni lien, ni achat, ni collecte de données (section 1).
 13. **Langues** : aucun texte en dur ; les 5 langues présentes, justes et au ton enfant (adolescent pour un jeu « 13+ ») ; bouton de langue visible sans gêner le jeu ; rien ne déborde en allemand ; aucune image du jeu avec du texte (sections 3 et 5).
 14. **Page du jeu** : les textes de référencement de `game.json` (`titre_seo`, `description_seo`, `presentation`, `regles`, `competences` ; en français, et au moins les nombres dans les traductions) sont fidèles au code : règles et gestes réels (doigt et clavier), nombre réel de niveaux, étoiles, âge cohérent avec `ages`. Ils décrivent **ce** jeu (pas un texte passe-partout), sans promesse fausse (mode, fonction ou contenu absent du jeu) ni marque ou personnage existant (section 4). Les longueurs sont déjà contrôlées par le robot.
 15. **Multijoueur** (jeu `"multijoueur": true`, `docs/multijoueur.md` section 9, captures de `captures/multijoueur/<id>/`) : au tour par tour ; salon d'attente clair (places, chef, compte à rebours, bouton « Lancer la partie » du chef) ; robots crédibles et battables ; places montrées avec « Toi », robot ou vrai joueur, sans nom tapé ni message libre ; pseudo des autres vrais joueurs à la place de « Joueur » (places, salon, tour en cours, classement de fin) ; « Rejoindre » : `"rejoindre": true` et salon de la partie de l'ami ouvert tout seul ; arrivée et départ d'un vrai joueur visibles ; messages traduits (recherche de joueurs, robots locaux, connexion perdue) ; lisible et fluide sur téléphone avec toutes les places occupées ; 20 niveaux solo jouables hors ligne.
 
-À part, non bloquant pour le jeu : **la jaquette** ne contient aucun texte, aucune lettre, aucun chiffre (et, pour un jeu « 13+ », ni sang ni gore : section 1). Sinon, la boucle refait seulement la jaquette (section 5).
+À part, non bloquant pour le jeu : **la jaquette** ne contient aucun texte, aucune lettre, aucun chiffre (et, pour un jeu « 13+ », ni sang ni gore : section 1). Sinon, la boucle refait seulement la jaquette (section 5). Le relecteur la **note aussi de 0 à 10 sur l'envie de cliquer** (héros en grand, action, profondeur, lumière, lisibilité en petit, section 5) : la note et ce qui manque figurent dans le commentaire de la pull request.
 
 Conseils (non bloquants, notés dans la relecture) : amusant dès la première minute, variété d'un niveau à l'autre, de quoi jouer 15 minutes ; texte de la jaquette (`jaquette_alt`) qui correspond bien à ce qu'elle montre.

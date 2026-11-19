@@ -136,27 +136,27 @@ Si une règle de protection de `main` exige une relecture humaine, la boucle ne 
 Par défaut, l'agent d'idées propose un jeu « 13+ » de temps en temps, au hasard. Pour en fixer le nombre :
 
 1. Sur github.com, dépôt → **Settings** → **Secrets and variables** → **Actions** → onglet **Variables**.
-2. **New repository variable** : nom `ADOS_BOUCLE`, valeur de `0` à `5` (le nombre de jeux 13+ sur les 5 jeux d'un passage), puis **Add variable**. Pour la changer : crayon à côté de la variable.
+2. **New repository variable** : nom `ADOS_BOUCLE`, valeur de `0` à `2` (le nombre de jeux 13+ par nuit, sur les 2 jeux d'un passage), puis **Add variable**. Pour la changer : crayon à côté de la variable.
 
-- `2` par exemple : chaque passage fabrique 2 jeux 13+ et 3 jeux pour les plus jeunes. L'agent garde d'avance des idées 13+ pour 3 passages. S'il en manque, d'autres idées complètent : un passage fait toujours 5 jeux.
+- `1` par exemple : chaque nuit fabrique 1 jeu 13+ et 1 jeu pour les plus jeunes. L'agent garde d'avance des idées 13+ pour 3 nuits. S'il n'y a pas d'idée 13+ assez bien notée par le jury, une autre idée prend la place.
 - `0` : plus aucun jeu 13+ proposé par l'agent.
 - Variable supprimée : retour au hasard.
-- Vos propres idées (page `/idees`, formulaire) passent toujours en premier, quels que soient `ADOS_BOUCLE` et `MULTI_BOUCLE`, même avec `0`, et comptent dans le nombre ; les jeux 13+ et multijoueurs de l'agent prennent les places restantes. Exemple : 2 idées à vous en attente, `MULTI_BOUCLE` = 3 → vos 2 jeux + 3 multijoueurs.
+- Vos propres idées (page `/idees`, formulaire) passent toujours en premier, quels que soient `ADOS_BOUCLE` et `MULTI_BOUCLE`, même avec `0`, et comptent dans le nombre ; les jeux 13+ et multijoueurs de l'agent prennent les places restantes. Exemple : 1 idée à vous en attente, `ADOS_BOUCLE` = 1 → votre jeu + 1 jeu 13+ (si votre idée est déjà 13+, elle compte : le 2e jeu est pour les plus jeunes).
 - Un jeu multijoueur 13+ compte à la fois comme multijoueur et comme 13+.
-- La boucle fabrique 2 jeux par nuit : la valeur garde la même proportion, répartie sur les nuits (`1` donne environ 2 jeux 13+ toutes les 5 nuits).
+- La valeur est un nombre **par nuit** (depuis le 19 novembre 2026 ; avant, c'était « sur 5 jeux », réparti sur les nuits, et une nuit sur deux n'avait aucun 13+).
 
 ## Des jeux de saison et d'actualité
 
 La boucle peut s'inspirer des fêtes à venir (Noël, Halloween, Pâques, Carnaval, Thanksgiving, Festa Junina…) et des recherches qui montent sur Google. C'est coupé par défaut. Pour l'activer et choisir combien de jeux en tirer :
 
 1. Sur github.com, dépôt → **Settings** → **Secrets and variables** → **Actions** → onglet **Variables**.
-2. **New repository variable** : nom `TENDANCES_BOUCLE`, valeur de `0` à `5` (le nombre de jeux de saison ou d'actualité sur les 5 jeux d'un passage), puis **Add variable**. Pour la changer : crayon à côté de la variable.
+2. **New repository variable** : nom `TENDANCES_BOUCLE`, valeur de `0` à `2` (le nombre de jeux de saison ou d'actualité par nuit), puis **Add variable**. Pour la changer : crayon à côté de la variable.
 
 Ce qui se passe ensuite :
 
 - **Fêtes** : la liste est dans `calendrier-saisons.json`, à la racine du dépôt (23 fêtes et saisons des pays des 5 langues). Vous pouvez en ajouter, en retirer ou changer leurs pistes de thèmes ; `node scripts/inspirations.mjs calendrier 2027` affiche leurs dates. Un jeu de saison n'est fabriqué que **de 6 semaines à 1 semaine avant la fête**, le temps que Google trouve sa page. Une idée de Noël qui n'a pas eu sa place attend le Noël suivant. Une seule idée par fête, et pas deux jeux de la même fête dans l'année.
 - **Actualité** : les recherches Google en hausse en France, aux États-Unis, en Espagne, au Mexique, au Brésil et en Allemagne sont relevées toutes les 6 heures (workflow « Relevé des tendances Google », quelques secondes, aucun abonnement Claude utilisé) et gardées 14 jours. Presque toutes parlent d'actualité, de personnes ou de marques : un filtre retire le plus gros, puis l'agent d'idées ne garde que ce qui évoque un thème joyeux et jouable, sans aucun nom propre (un film de dragons → « des dragons », une Coupe du monde → un tournoi de foot imaginaire). Si rien ne s'y prête, il n'invente rien. Une idée d'actualité est prioritaire pendant 10 jours, puis devient une idée comme les autres.
-- `1` par exemple : chaque passage fabrique au plus 1 jeu de saison ou d'actualité, la fête la plus proche d'abord. S'il n'y en a pas, d'autres idées complètent : un passage fait toujours 5 jeux.
+- `1` par exemple : chaque nuit fabrique au plus 1 jeu de saison ou d'actualité, la fête la plus proche d'abord. S'il n'y en a pas, d'autres idées complètent.
 - `0` ou variable supprimée : plus de jeux de saison ni d'actualité ; ceux déjà en attente patientent.
 - Vos propres idées passent toujours en premier. Un jeu à la fois multijoueur, 13+ et de saison compte dans chacun des nombres.
 - L'onglet **« Stats »** de `/idees` a une colonne « Inspiration » et compare les lancements de ces jeux à ceux des autres.
@@ -226,8 +226,8 @@ Bon à savoir :
 | Revérifier les pull requests en attente | Actions → Créer des jeux (boucle de nuit) → Run workflow → 0 jeu |
 | Faire corriger un jeu proposé | Commentaire « @claude … » dans sa pull request |
 | Couper la fusion automatique | Variable `FUSION_AUTO` = `non` (voir plus haut) |
-| Fixer le nombre de jeux 13+ par passage | Variable `ADOS_BOUCLE` = `0` à `5` (voir plus haut) |
-| Fixer le nombre de jeux de saison ou d'actualité par passage | Variable `TENDANCES_BOUCLE` = `0` à `5` (voir plus haut) |
+| Fixer le nombre de jeux 13+ par nuit | Variable `ADOS_BOUCLE` = `0` à `2` (voir plus haut) |
+| Fixer le nombre de jeux de saison ou d'actualité par nuit | Variable `TENDANCES_BOUCLE` = `0` à `2` (voir plus haut) |
 | Ajouter ou retirer une fête | Modifier `calendrier-saisons.json`, puis Commit + Push |
 | Mettre la boucle en pause | Actions → Créer des jeux (boucle de nuit) → menu « … » → **Disable workflow** |
 | Comprendre un échec | Actions → cliquer sur le passage en rouge → lire l'étape en échec |
