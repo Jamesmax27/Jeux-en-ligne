@@ -1824,6 +1824,7 @@ function preparer(i) {
 }
 
 /* ---------- Sauvegarde et progression ---------------------------------- */
+let apercu = 0;          // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 let prog = { etoiles: [], records: [], couleur: 1, son: true, niveauMax: 1 };
 function lireProgression() {
   let d = null;
@@ -1840,6 +1841,7 @@ function lireProgression() {
 }
 function totalEtoiles() { return prog.etoiles.reduce((a, b) => a + b, 0); }
 function sauver(niveau) {
+  if (apercu) return; // image du jeu : rien n'est écrit dans la sauvegarde
   try {
     if (!window.JEL_SAVE) return;
     window.JEL_SAVE.save(JEU, { niveau: Math.max(1, Math.min(NIVEAUX.length, niveau)), score: totalEtoiles(), etoiles: prog.etoiles.slice(), records: prog.records.slice(), couleur: prog.couleur, options: { son: prog.son } });
@@ -1849,7 +1851,7 @@ function sauver(niveau) {
 /* ---------- Sons (Web Audio, aucun avant la première action) ------------- */
 let audioCtx = null;
 function audio() {
-  if (!prog.son) return null;
+  if (!prog.son || apercu || window.JEL_AFFICHE) return null; // ni son pour l'affiche, ni pour les images du jeu
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -2489,6 +2491,7 @@ function dessinerJeu(dt) {
   dessinerPlateau();
   // meuble tenu au doigt ou au clavier
   if (drag && drag.bouge) dessinerMeuble(ctx, drag.sorte, drag.forme, drag.x - drag.ox, drag.y - drag.oy, k, { alpha: 0.95 });
+  if (apercu && drag && drag.main) main(ctx, drag.main.x, drag.main.y, 0); // image du jeu : le doigt qui tient le meuble
   if (clavier.tenu) {
     const ct = clavier.tenu;
     dessinerMeuble(ctx, ct.sorte, ct.forme, L.gx + ct.c * k, L.gy + ct.r * k, k, { alpha: 0.75 });
@@ -2641,7 +2644,7 @@ function verifierFin() {
 function cellule(x, y) { return { r: Math.floor((y - L.gy) / L.k), c: Math.floor((x - L.gx) / L.k) }; }
 function dansPlateau(y, x) { return L.paysage ? x > L.tray.x - 4 : y > L.sol + L.k * 0.4; }
 toile.addEventListener('pointerdown', (e) => {
-  if (etat !== 'jeu' || drag || clavier.tenu) return;
+  if (apercu || etat !== 'jeu' || drag || clavier.tenu) return;
   audio();
   const x = e.clientX, y = e.clientY;
   // trottoir
@@ -2700,6 +2703,7 @@ toile.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === dra
 
 /* ---------- Clavier ---------------------------------------------------- */
 document.addEventListener('keydown', (e) => {
+  if (apercu || window.JEL_AFFICHE) return; // image du jeu ou affiche : la partie est figée
   const code = e.code;
   if (etat === 'tuto') { if (code === 'Enter' || code === 'Space' || code === 'Escape') { e.preventDefault(); fermerTuto(); } return; }
   if (etat === 'pause') { if (code === 'Escape' || code === 'KeyP') { e.preventDefault(); reprendre(); } return; }
@@ -3200,11 +3204,260 @@ document.getElementById('b-tuto').addEventListener('click', (e) => { e.stopPropa
 document.getElementById('b-fin-rejouer').addEventListener('click', () => { SON.clic(); lancerNiveau(niv); });
 document.getElementById('b-fin-niveaux').addEventListener('click', () => { SON.clic(); ouvrirNiveaux(); });
 
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') mettreEnPause(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && !apercu) mettreEnPause(); });
 window.addEventListener('resize', () => { mettreEnPage(); });
 
 // Sauvegarde à la fermeture de la page, seulement pendant une partie.
 if (window.JEL_SAVE) window.JEL_SAVE.surFermeture(() => { if (enPartie) sauver(niv + 1); });
+
+/* ---------- Affiche (jaquette du jeu) ---------------------------------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Pompon, en grand, soulève
+// le canapé rouge au-dessus de sa tête et l'envoie vers la place qui brille en vert dans le camion
+// ouvert, à moitié chargé ; le soleil éclaire la petite rue, des cartons et une plante au premier plan.
+// Pompon en deux temps : le dos (ombre, bras levés), puis, par-dessus le meuble qu'il soulève, la face.
+function dessinerPomponDos(c, x, y, s) {
+  const trait = '#2b2340', fourrure = '#f7f4fb', lw = Math.max(2, s * 0.018);
+  c.save(); c.translate(x, y);
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  c.fillStyle = 'rgba(40,30,70,.22)'; c.beginPath(); c.ellipse(0, 0, s * 0.42, s * 0.09, 0, 0, 7); c.fill();
+  // bras levés (derrière la tête)
+  for (const sens of [-1, 1]) {
+    c.strokeStyle = trait; c.lineWidth = s * 0.15; c.beginPath(); c.moveTo(sens * s * 0.2, -s * 0.42); c.quadraticCurveTo(sens * s * 0.44, -s * 0.72, sens * s * 0.38, -s * 1.02); c.stroke();
+    c.strokeStyle = fourrure; c.lineWidth = s * 0.15 - lw * 2; c.stroke();
+  }
+  c.restore();
+}
+function dessinerPomponAffiche(c, x, y, s) {
+  // Pompon, bras levés (même lapin que pendant la partie, plus grand et plus détaillé).
+  const trait = '#2b2340', fourrure = '#f7f4fb', ombreF = '#ddd6ea', lw = Math.max(2, s * 0.018);
+  c.save(); c.translate(x, y);
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  // grandes oreilles dressées, devant le canapé soulevé (l'une un peu penchée)
+  for (const [sens, angle] of [[-1, -0.32], [1, 0.12]]) {
+    c.save(); c.translate(sens * s * 0.11, -s * 0.9); c.rotate(angle);
+    c.fillStyle = fourrure; c.strokeStyle = trait; c.lineWidth = lw;
+    c.beginPath(); c.ellipse(0, -s * 0.22, s * 0.09, s * 0.26, 0, 0, 7); c.fill(); c.stroke();
+    c.fillStyle = '#ffb3cc'; c.beginPath(); c.ellipse(0, -s * 0.21, s * 0.045, s * 0.19, 0, 0, 7); c.fill();
+    c.restore();
+  }
+  // jambes et chaussures
+  c.fillStyle = '#2f5fae'; rr(c, -s * 0.2, -s * 0.16, s * 0.16, s * 0.13, s * 0.04); c.fill(); rr(c, s * 0.04, -s * 0.16, s * 0.16, s * 0.13, s * 0.04); c.fill();
+  c.fillStyle = trait; rr(c, -s * 0.25, -s * 0.06, s * 0.22, s * 0.08, s * 0.035); c.fill(); rr(c, s * 0.03, -s * 0.06, s * 0.22, s * 0.08, s * 0.035); c.fill();
+  // corps : t-shirt blanc, salopette bleue, bretelles, poche
+  c.fillStyle = fourrure; c.strokeStyle = trait; c.lineWidth = lw; rr(c, -s * 0.24, -s * 0.5, s * 0.48, s * 0.38, s * 0.15); c.fill(); c.stroke();
+  c.fillStyle = '#3f7fd8'; rr(c, -s * 0.24, -s * 0.36, s * 0.48, s * 0.25, s * 0.1); c.fill(); c.stroke();
+  c.fillStyle = '#3f7fd8'; c.fillRect(-s * 0.19, -s * 0.5, s * 0.07, s * 0.16); c.fillRect(s * 0.12, -s * 0.5, s * 0.07, s * 0.16);
+  c.fillStyle = '#5c97e6'; rr(c, -s * 0.09, -s * 0.31, s * 0.18, s * 0.11, s * 0.03); c.fill();
+  c.fillStyle = '#ffcf3a'; c.beginPath(); c.arc(-s * 0.155, -s * 0.36, s * 0.028, 0, 7); c.arc(s * 0.155, -s * 0.36, s * 0.028, 0, 7); c.fill();
+  // queue en pompon
+  c.fillStyle = fourrure; c.beginPath(); c.arc(s * 0.25, -s * 0.2, s * 0.06, 0, 7); c.fill();
+  // tête
+  c.fillStyle = fourrure; c.strokeStyle = trait; c.lineWidth = lw; c.beginPath(); c.arc(0, -s * 0.7, s * 0.27, 0, 7); c.fill(); c.stroke();
+  c.fillStyle = ombreF; c.beginPath(); c.ellipse(0, -s * 0.6, s * 0.15, s * 0.09, 0, 0, 7); c.fill();
+  c.fillStyle = '#ffa8c2'; c.beginPath(); c.ellipse(-s * 0.17, -s * 0.63, s * 0.06, s * 0.04, 0, 0, 7); c.ellipse(s * 0.17, -s * 0.63, s * 0.06, s * 0.04, 0, 0, 7); c.fill();
+  // grands yeux brillants
+  for (const sens of [-1, 1]) {
+    c.fillStyle = trait; c.beginPath(); c.ellipse(sens * s * 0.095, -s * 0.74, s * 0.045, s * 0.06, 0, 0, 7); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(sens * s * 0.095 + s * 0.015, -s * 0.76, s * 0.018, 0, 7); c.fill();
+  }
+  // nez et grand sourire ouvert
+  c.fillStyle = '#ff7aa2'; c.beginPath(); c.ellipse(0, -s * 0.665, s * 0.03, s * 0.022, 0, 0, 7); c.fill();
+  c.fillStyle = '#7a2a3a'; c.beginPath(); c.moveTo(-s * 0.09, -s * 0.625); c.quadraticCurveTo(0, -s * 0.5, s * 0.09, -s * 0.625); c.closePath(); c.fill();
+  c.fillStyle = '#ff8fab'; c.beginPath(); c.ellipse(0, -s * 0.57, s * 0.04, s * 0.022, 0, 0, 7); c.fill();
+  c.fillStyle = '#fff'; c.fillRect(-s * 0.025, -s * 0.626, s * 0.05, s * 0.03);
+  // casquette rouge, visière vers le camion
+  c.fillStyle = '#e8574f'; c.strokeStyle = trait; c.lineWidth = lw;
+  c.beginPath(); c.arc(0, -s * 0.86, s * 0.21, Math.PI, 0); c.closePath(); c.fill(); c.stroke();
+  rr(c, -s * 0.02, -s * 0.89, s * 0.34, s * 0.065, s * 0.03); c.fill(); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.45)'; c.beginPath(); c.ellipse(-s * 0.08, -s * 0.97, s * 0.07, s * 0.035, -0.4, 0, 7); c.fill();
+  c.fillStyle = '#ffcf3a'; c.beginPath(); c.arc(0, -s * 1.07, s * 0.03, 0, 7); c.fill();
+  c.restore();
+}
+function dessinerMaisonAffiche(c, x, sol, w, h, mur, toit) {
+  c.fillStyle = mur; c.fillRect(x, sol - h, w, h);
+  c.fillStyle = toit; c.beginPath(); c.moveTo(x - w * 0.08, sol - h); c.lineTo(x + w / 2, sol - h - w * 0.42); c.lineTo(x + w * 1.08, sol - h); c.closePath(); c.fill();
+  c.fillStyle = '#ffffff'; c.fillRect(x + w * 0.15, sol - h * 0.78, w * 0.24, w * 0.22); c.fillRect(x + w * 0.6, sol - h * 0.78, w * 0.24, w * 0.22);
+  c.fillStyle = 'rgba(120,180,230,.55)'; c.fillRect(x + w * 0.18, sol - h * 0.76, w * 0.18, w * 0.17); c.fillRect(x + w * 0.63, sol - h * 0.76, w * 0.18, w * 0.17);
+  c.fillStyle = 'rgba(90,60,40,.55)'; rr(c, x + w * 0.38, sol - h * 0.42, w * 0.24, h * 0.42, w * 0.05); c.fill();
+}
+function dessinerAffiche() {
+  mettreEnPage(); // taille de la toile (aucun niveau chargé)
+  const c = ctx;
+  const e = Math.min(W / 600, H / 800);           // échelle de la scène (600 × 800)
+  const ox = (W - 600 * e) / 2, oy = (H - 800 * e) / 2;
+  const Y = (v) => oy + v * e;
+  const sol = Y(512);
+  c.save();
+  c.clearRect(0, 0, W, H);
+  // Ciel sur toute la largeur
+  const ciel = c.createLinearGradient(0, 0, 0, sol);
+  ciel.addColorStop(0, '#46b4f2'); ciel.addColorStop(0.6, '#a6e0ff'); ciel.addColorStop(1, '#fff1cf');
+  c.fillStyle = ciel; c.fillRect(0, 0, W, sol);
+  // Soleil en haut à gauche, avec ses rayons
+  const sx = ox + 70 * e, sy = Y(110);
+  c.save(); c.translate(sx, sy); c.fillStyle = 'rgba(255,240,170,.35)';
+  for (let i = 0; i < 14; i++) { c.rotate(Math.PI / 7); c.beginPath(); c.moveTo(-14 * e, 0); c.lineTo(0, -900 * e); c.lineTo(14 * e, 0); c.closePath(); c.fill(); }
+  c.restore();
+  const halo = c.createRadialGradient(sx, sy, 10 * e, sx, sy, 330 * e);
+  halo.addColorStop(0, 'rgba(255,250,215,.95)'); halo.addColorStop(0.35, 'rgba(255,236,160,.45)'); halo.addColorStop(1, 'rgba(255,236,160,0)');
+  c.fillStyle = halo; c.fillRect(0, 0, W, H);
+  c.fillStyle = '#ffe066'; c.shadowColor = '#ffd23a'; c.shadowBlur = 40 * e; c.beginPath(); c.arc(sx, sy, 52 * e, 0, 7); c.fill(); c.shadowBlur = 0;
+  c.fillStyle = '#fff6b8'; c.beginPath(); c.arc(sx - 12 * e, sy - 12 * e, 26 * e, 0, 7); c.fill();
+  // Nuages
+  c.fillStyle = 'rgba(255,255,255,.92)';
+  const nuage = (nx, ny, r) => { c.beginPath(); c.arc(nx, ny, r, 0, 7); c.arc(nx + r * 1.1, ny - r * 0.45, r * 1.25, 0, 7); c.arc(nx + r * 2.3, ny, r, 0, 7); c.rect(nx, ny - r * 0.2, r * 2.3, r * 1.0); c.fill(); };
+  for (let gx = ox - 600 * e; gx < W + 600 * e; gx += 600 * e) { nuage(gx + 370 * e, Y(95), 26 * e); nuage(gx + 210 * e, Y(190), 18 * e); nuage(gx + 520 * e, Y(220), 16 * e); }
+  // Petite rue : maisons colorées sur toute la largeur, un peu pâlies (lointain)
+  const murs = ['#f7c59f', '#b8e0d2', '#f2a6a6', '#d6c1f0', '#fde49c'], toits = ['#d9604f', '#c0564a', '#e0784a'];
+  let i = 0;
+  for (let mx = ox - 640 * e; mx < W + 120 * e; mx += 128 * e, i++) {
+    const n = ((i % 5) + 5) % 5;
+    dessinerMaisonAffiche(c, mx, sol, 112 * e, (120 + (n % 3) * 30) * e, murs[n], toits[n % 3]);
+    if (n === 1 || n === 3) { // arbre rond
+      c.fillStyle = '#7a5a3a'; c.fillRect(mx + 116 * e, sol - 50 * e, 8 * e, 50 * e);
+      c.fillStyle = '#6fc25a'; c.beginPath(); c.arc(mx + 120 * e, sol - 66 * e, 26 * e, 0, 7); c.fill();
+      c.fillStyle = '#8fd86e'; c.beginPath(); c.arc(mx + 112 * e, sol - 74 * e, 13 * e, 0, 7); c.fill();
+    }
+  }
+  c.fillStyle = 'rgba(214,238,255,.28)'; c.fillRect(0, 0, W, sol); // brume légère : profondeur
+  // Trottoir et rue
+  c.fillStyle = '#d4cfe0'; c.fillRect(0, sol, W, H - sol);
+  c.fillStyle = 'rgba(0,0,0,.1)'; c.fillRect(0, sol, W, 7 * e);
+  c.fillStyle = 'rgba(255,255,255,.35)';
+  for (let y = sol + 18 * e, l = 0; y < H; y += 34 * e, l++) for (let x = -60 * e + (l % 2) * 30 * e; x < W; x += 62 * e) { rr(c, x, y, 54 * e, 26 * e, 6 * e); c.fill(); }
+  c.restore();
+
+  // Le sujet, dessiné dans la scène de 600 × 800
+  c.save(); c.translate(ox, oy); c.scale(e, e);
+  // Camion rouge, portes grandes ouvertes, à moitié chargé (cabine coupée par le bord droit)
+  const k = 62, col = 4, lig = 3, gx = 282, gy = 512 - 0.9 * k - lig * k;
+  c.fillStyle = 'rgba(40,30,70,.2)'; c.beginPath(); c.ellipse(gx + 220, 512 + 4, 300, 16, 0, 0, 7); c.fill();
+  dessinerCamion(c, gx, gy, col, lig, k, 0, {});
+  dessinerMeuble(c, 'canape', [[0, 0], [0, 1]], gx, gy + 2 * k, k, {});
+  dessinerMeuble(c, 'vaisselle', [[0, 0]], gx + 2 * k, gy + 2 * k, k, {});
+  dessinerMeuble(c, 'frigo', [[0, 0], [1, 0]], gx + 3 * k, gy + k, k, {});
+  dessinerMeuble(c, 'lampe', [[0, 0], [1, 0]], gx, gy, k, {});
+  dessinerMeuble(c, 'carton', [[0, 0]], gx + k, gy + k, k, {});
+  dessinerMeuble(c, 'jouet:rose', [[0, 0]], gx + 2 * k, gy + k, k, {});
+  dessinerMeuble(c, 'carton', [[0, 0]], gx + 3 * k, gy, k, {});
+  dessinerPortes(c, gx, gy, col, lig, k, 0, 1);
+  // La place libre qui brille en vert : c'est là que va le canapé
+  c.save(); c.shadowColor = '#7dff9c'; c.shadowBlur = 26;
+  c.fillStyle = 'rgba(76,191,107,.62)';
+  for (const cc of [1, 2]) { rr(c, gx + cc * k + 4, gy + 4, k - 8, k - 8, k * 0.15); c.fill(); }
+  c.restore();
+  c.strokeStyle = '#2f9a48'; c.lineWidth = 4; c.setLineDash([10, 7]); rr(c, gx + k + 3, gy + 3, 2 * k - 6, k - 6, k * 0.16); c.stroke(); c.setLineDash([]);
+  // Halo de lumière derrière Pompon
+  const px = 168, py = 668, s = 250;
+  const lum = c.createRadialGradient(px - 20, py - s * 0.8, 20, px - 20, py - s * 0.8, s * 0.75);
+  lum.addColorStop(0, 'rgba(255,252,225,.9)'); lum.addColorStop(0.5, 'rgba(255,244,190,.4)'); lum.addColorStop(1, 'rgba(255,244,190,0)');
+  c.fillStyle = lum; c.fillRect(px - s, py - 2 * s, 2 * s, 2 * s);
+  // Trajet du canapé, de Pompon jusqu'à sa place (pointillés et étoiles)
+  const kc = s * 0.37, cx0 = px - kc, cy0 = py - s * 1.05 - kc;
+  c.strokeStyle = 'rgba(255,255,255,.95)'; c.lineWidth = 7; c.setLineDash([3, 16]); c.lineCap = 'round';
+  c.beginPath(); c.moveTo(px + kc * 0.6, cy0 - 12); c.quadraticCurveTo(300, gy - 110, gx + 2 * k, gy - 18); c.stroke(); c.setLineDash([]);
+  // flèche au bout du trajet
+  c.fillStyle = '#fff'; c.beginPath(); c.moveTo(gx + 2 * k + 6, gy - 6); c.lineTo(gx + 2 * k - 22, gy - 26); c.lineTo(gx + 2 * k - 6, gy - 36); c.closePath(); c.fill();
+  const or = ['#ffcf3a', '#ff8a3d', '#ffe27a'];
+  [[250, 238, 13], [312, 205, 10], [372, 196, 15], [440, 214, 9], [205, 300, 9], [118, 270, 11], [470, 168, 8]].forEach(([x, y, r], j) => {
+    c.fillStyle = or[j % 3]; c.shadowColor = '#fff3b0'; c.shadowBlur = 12; pictoEtoile(c, x, y, r); c.shadowBlur = 0;
+  });
+  // Pompon, en grand, soulève le canapé
+  dessinerPomponDos(c, px, py, s);
+  c.save(); c.translate(cx0 + kc, cy0 + kc / 2); c.rotate(-0.08); c.translate(-(cx0 + kc), -(cy0 + kc / 2));
+  c.fillStyle = 'rgba(40,30,70,.18)'; rr(c, cx0 + 6, cy0 + 10, 2 * kc, kc, kc * 0.18); c.fill();
+  dessinerMeuble(c, 'canape', [[0, 0], [0, 1]], cx0, cy0, kc, {});
+  c.restore();
+  // pattes qui tiennent le canapé
+  c.fillStyle = '#f7f4fb'; c.strokeStyle = '#2b2340'; c.lineWidth = 4.5;
+  for (const sens of [-1, 1]) { c.beginPath(); c.arc(px + sens * s * 0.38, py - s * 1.04, s * 0.085, 0, 7); c.fill(); c.stroke(); }
+  dessinerPomponAffiche(c, px, py, s);
+  // traits de mouvement près du canapé
+  c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 5; c.lineCap = 'round';
+  for (const [x1, y1, l] of [[cx0 - 14, cy0 + 12, 30], [cx0 - 24, cy0 + 34, 38], [cx0 - 12, cy0 + 56, 26]]) { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x1 - l, y1 + 6); c.stroke(); }
+  // Premier plan : pile de cartons (bas à gauche) et grande plante (bas à droite), coupées par les bords
+  dessinerMeuble(c, 'carton', [[0, 0]], -38, 676, 118, {});
+  dessinerMeuble(c, 'carton', [[0, 0]], 56, 722, 104, {});
+  dessinerMeuble(c, 'carton', [[0, 0]], -20, 572, 104, {});
+  dessinerMeuble(c, 'jouet:bleu', [[0, 0]], 26, 520, 64, {});
+  dessinerMeuble(c, 'plante', [[0, 0], [1, 0]], 486, 560, 150, {});
+  dessinerMeuble(c, 'carton', [[0, 0]], 388, 690, 112, {});
+  c.restore();
+}
+function cacherPourAffiche() {
+  for (const el of document.querySelectorAll('.ecran, #hud, #bas, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherPourAffiche();
+  setTimeout(cacherPourAffiche, 300); setTimeout(cacherPourAffiche, 1200); // bouton de langue créé plus tard
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---------- Images du jeu (page du jeu) -------------------------------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (niveau, gestes, trous, Annuler, Recommencer,
+// trottoir), sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5).
+// Une partie des meubles est déjà rangée à sa place, un meuble est tenu au doigt au-dessus du camion
+// avec son ombre d'atterrissage ; rien ne bouge ensuite : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = niveau 1 (petite rue) : la chaise va se poser sur le canapé, ombre verte ;
+//   2 = niveau 10 (ferme) : le frigo lourd au-dessus des verres, ombre rouge et Pompon qui prévient ;
+//   3 = niveau 19 (bord de mer) : camion doré à deux étages, lits et jouets, canapé en L, ombre verte.
+const SCENES_APERCU = {
+  1: { niveau: 0, couleur: 1, poses: 'B', tenu: 'A', gestes: 1, message: 'msg.debut.0', humeur: 'content' },
+  2: { niveau: 9, couleur: 3, poses: 'JKIdF', tenu: 'G', colonne: 1, gestes: 7, message: 'msg.fragile', humeur: 'non' },
+  3: { niveau: 18, couleur: 5, poses: 'IOJKPNHBGL', tenu: 'g', gestes: 14, humeur: 'content' },
+};
+function casesSolution(lettre) {
+  const N = NIVEAUX[niv], cases = [];
+  N.g.forEach((ligne, r) => { for (let c = 0; c < ligne.length; c++) if (ligne[c] === lettre) cases.push([r, c]); });
+  const sorte = N.p[lettre], forme = normaliser(cases);
+  const r0 = Math.min(...cases.map((x) => x[0])), c0 = Math.min(...cases.map((x) => x[1]));
+  const groupe = P.groupes.find((g) => g.cle === sorte + '|' + cleCanonique(forme) && g.nombre > 0);
+  return { sorte, forme, r0, c0, groupe };
+}
+function placerTenuApercu() {
+  if (!apercu || !drag || !P) return;
+  const k = L.k, { w, h } = taille(drag.forme);
+  drag.cible = atterrir(drag.sorte, drag.forme, 0, drag.colonne);
+  drag.cible.depart = 0;
+  drag.x = L.gx + drag.cible.c * k + k * 0.22;
+  drag.y = L.gy + (drag.cible.r - 0.55) * k;
+  drag.main = { x: drag.x + w * k * 0.78, y: drag.y + h * k * 0.82 };
+}
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  prog.couleur = sc.couleur; // en mémoire seulement (rien n'est enregistré)
+  niv = sc.niveau; P = preparer(niv);
+  poses = []; historique = []; prochainId = 1; anims = []; particules = []; drag = null;
+  clavier = { sel: -1, tenu: null }; depart = null; clignote = { ids: [], t: 0 }; secousse = 0; // sel -1 : pas de case choisie au clavier
+  construireOcc();
+  for (const lettre of sc.poses) {
+    const s = casesSolution(lettre);
+    s.groupe.nombre--;
+    poses.push({ id: prochainId++, sorte: s.sorte, forme: s.forme, r: s.r0, c: s.c0, groupe: s.groupe.id });
+  }
+  construireOcc();
+  gestes = sc.gestes;
+  enPartie = false; // aucune écriture à la fermeture de la page
+  cacherEcrans();
+  document.getElementById('hud').classList.remove('cache');
+  document.getElementById('bas').classList.remove('cache');
+  etat = 'jeu';
+  mettreEnPage(); majHud();
+  const t = casesSolution(sc.tenu);
+  drag = { source: 'plateau', groupe: t.groupe.id, sorte: t.sorte, forme: t.forme, colonne: sc.colonne != null ? sc.colonne : t.c0, x: 0, y: 0, x0: 0, y0: 0, ox: 0, oy: 0, bouge: true, pid: -1 };
+  placerTenuApercu();
+  message = sc.message ? { texte: T(sc.message), t: 1e6 } : null;
+  humeur = sc.humeur; humeurT = 1e6;
+  tempsTotal = 2;
+  window.addEventListener('resize', placerTenuApercu);
+}
 
 /* ---------- Démarrage ------------------------------------------------- */
 lireProgression();
@@ -3213,8 +3466,15 @@ if (window.JEL_I18N) {
   window.JEL_I18N.creerSelecteur({ conteneur: document.getElementById('langue-titre'), isole: true });
   window.JEL_I18N.creerSelecteur({ conteneur: document.getElementById('langue-pause'), isole: true });
 }
-mettreEnPage();
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  mettreEnPage();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

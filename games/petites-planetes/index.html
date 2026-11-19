@@ -3126,7 +3126,8 @@
     etoile: function () { note(1200, 0.12, 'sine', 0.1, 1600); },
     trouve: function () { note(600, 0.1, 'sine', 0.12); note(900, 0.2, 'sine', 0.12, 0, 0.1); },
   };
-  function son(nom) { if (SONS[nom]) SONS[nom](); }
+  var apercu = 0;                  // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
+  function son(nom) { if (!apercu && SONS[nom]) SONS[nom](); }
   var ICONE_SON = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>';
   var ICONE_MUET = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
   function majSon() {
@@ -3228,7 +3229,7 @@
   }
 
   function surEvenement(e) {
-    if (!e) return;
+    if (!e || apercu) return;
     if (e.type === 'recherche') {
       if (!session || session.type !== 'ligne') return;
       $('rechercheReste').textContent = t('rechercheReste', { n: Math.ceil(e.reste / 1000) });
@@ -4208,10 +4209,10 @@
 
   // Page cachée : pause complète contre le robot (en ligne, la partie continue).
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'hidden' && enJeu && partie.mode === 'local' && !partie.resultat) ouvrirPause();
+    if (document.visibilityState === 'hidden' && enJeu && !apercu && partie.mode === 'local' && !partie.resultat) ouvrirPause();
   });
   JEL_SAVE.surFermeture(function () {
-    if (session && session.type === 'solo' && enJeu) JEL_SAVE.save(JEU, donneesSauvegarde(session.i + 1));
+    if (session && session.type === 'solo' && enJeu && !apercu) JEL_SAVE.save(JEU, donneesSauvegarde(session.i + 1));
   });
 
   // --- Boutons ----------------------------------------------------------------------------------
@@ -4243,13 +4244,240 @@
     for (var i = 0; i < b.length; i++) b[i].addEventListener('click', function () { reglages.robot = +this.dataset.robot; ecrireLocal('pp-robot', String(reglages.robot)); majChoixRobot(); son('clic'); });
   })();
 
+  // --- Affiche (jaquette du jeu) ------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La grande planète bleue
+  // du joueur, éclairée par une étoile, lance une nuée de vaisseaux-graines sur la planète orange du
+  // robot, protégée par son bouclier ; une flotte orange file vers la planète dorée.
+  function dessinerAffiche() {
+    redimensionner();
+    var w = innerWidth, h = innerHeight, k = Math.min(w / 600, h / 800), cx = w / 2, cy = h / 2;
+    var X = function (u) { return cx + (u - 300) * k; }, Y = function (v) { return cy + (v - 400) * k; };
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Ciel violet lumineux (sur écran large, il continue jusqu'aux bords)
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#3a2f8f'); g.addColorStop(0.45, '#5b3fa8'); g.addColorStop(0.8, '#3b2a86'); g.addColorStop(1, '#1d1650');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    // Étoile qui éclaire la scène, en haut à gauche
+    var sx = X(95), sy = Y(150);
+    var halo = ctx.createRadialGradient(sx, sy, 0, sx, sy, 520 * k);
+    halo.addColorStop(0, 'rgba(255,246,214,0.95)'); halo.addColorStop(0.12, 'rgba(255,226,170,0.6)'); halo.addColorStop(0.45, 'rgba(255,170,200,0.22)'); halo.addColorStop(1, 'rgba(255,170,200,0)');
+    ctx.fillStyle = halo; ctx.fillRect(0, 0, w, h);
+    // Nébuleuses roses et bleues
+    var nebs = [[470, 600, 230, 'rgba(255,140,210,0.30)'], [140, 380, 200, 'rgba(120,190,255,0.28)'], [520, 180, 170, 'rgba(190,140,255,0.32)'], [300, 760, 260, 'rgba(255,170,120,0.18)']];
+    for (var n = 0; n < nebs.length; n++) {
+      var nb0 = nebs[n], gn = ctx.createRadialGradient(X(nb0[0]), Y(nb0[1]), 0, X(nb0[0]), Y(nb0[1]), nb0[2] * k);
+      gn.addColorStop(0, nb0[3]); gn.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gn; ctx.fillRect(0, 0, w, h);
+    }
+    for (var e = 0; e < etoilesCiel.length; e++) {
+      var s = etoilesCiel[e];
+      ctx.globalAlpha = 0.55 + 0.45 * Math.abs(Math.sin(s.p)); ctx.fillStyle = e % 7 === 0 ? '#ffe2b8' : '#ffffff';
+      ctx.beginPath(); ctx.arc(s.x * w, s.y * h, s.r * 1.2 * Math.max(1, k), 0, 6.283); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // Cœur de l'étoile et ses rayons
+    ctx.save(); ctx.translate(sx, sy);
+    for (var r = 0; r < 12; r++) {
+      ctx.rotate(Math.PI / 6);
+      var gr = ctx.createLinearGradient(0, 0, 0, -(r % 2 ? 90 : 150) * k);
+      gr.addColorStop(0, 'rgba(255,248,220,0.85)'); gr.addColorStop(1, 'rgba(255,248,220,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(-6 * k, 0); ctx.lineTo(0, -(r % 2 ? 90 : 150) * k); ctx.lineTo(6 * k, 0); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    ctx.save(); ctx.shadowColor = '#fff1b8'; ctx.shadowBlur = 40 * k; ctx.fillStyle = '#fffbea';
+    ctx.beginPath(); ctx.arc(sx, sy, 30 * k, 0, 6.283); ctx.fill(); ctx.restore();
+
+    // Fond : petites planètes grises lointaines
+    dessinerBoule(X(565), Y(345), 18 * k, GRIS, 3, false);
+    dessinerBoule(X(285), Y(128), 15 * k, GRIS, 5, false);
+    dessinerBoule(X(35), Y(285), 20 * k, GRIS, 7, false);
+
+    // Planète orange du robot, sous son bouclier (en haut à droite)
+    var ox = X(462), oy = Y(205), orr = 72 * k, rb = orr + 16 * k;
+    dessinerBoule(ox, oy, orr, LUI, 2, false);
+    anneau(ox, oy, orr + 1.5 * k, LUI.trait, 0.9, 3 * k);
+    var bulleB = ctx.createRadialGradient(ox, oy, orr, ox, oy, rb + 10 * k);
+    bulleB.addColorStop(0, 'rgba(143,227,255,0)'); bulleB.addColorStop(0.7, 'rgba(143,227,255,0.35)'); bulleB.addColorStop(1, 'rgba(143,227,255,0)');
+    ctx.fillStyle = bulleB; ctx.beginPath(); ctx.arc(ox, oy, rb + 10 * k, 0, 6.283); ctx.fill();
+    ctx.save(); ctx.strokeStyle = '#bff1ff'; ctx.lineWidth = 4 * k; ctx.shadowColor = '#8fe3ff'; ctx.shadowBlur = 18 * k;
+    ctx.beginPath(); ctx.arc(ox, oy, rb, 0, 6.283); ctx.stroke();
+    ctx.lineWidth = 2 * k; ctx.globalAlpha = 0.7;
+    for (var hx = 0; hx < 8; hx++) {
+      var ah = hx * 0.785 + 0.3;
+      ctx.beginPath(); ctx.arc(ox, oy, rb, ah, ah + 0.42); ctx.lineTo(ox + Math.cos(ah + 0.21) * (rb + 8 * k), oy + Math.sin(ah + 0.21) * (rb + 8 * k)); ctx.closePath(); ctx.stroke();
+    }
+    ctx.restore();
+    // Petite planète orange plus loin
+    dessinerBoule(X(552), Y(640), 26 * k, LUI, 8, false);
+    anneau(X(552), Y(640), 27.5 * k, LUI.trait, 0.9, 2 * k);
+
+    // Planète dorée qui brille (à droite, au milieu)
+    var dx = X(492), dy = Y(492), dr = 42 * k;
+    var gd = ctx.createRadialGradient(dx, dy, dr * 0.8, dx, dy, dr * 2.4);
+    gd.addColorStop(0, 'rgba(255,214,110,0.75)'); gd.addColorStop(1, 'rgba(255,214,110,0)');
+    ctx.fillStyle = gd; ctx.beginPath(); ctx.arc(dx, dy, dr * 2.4, 0, 6.283); ctx.fill();
+    dessinerBoule(dx, dy, dr, { clair: '#fff6d2', base: '#f6c64e', fonce: '#a8741a' }, 6, true);
+
+    // Héros : la grande planète bleue du joueur, avec son anneau d'or et son usine
+    var bx = X(195), by = Y(468), br = 152 * k;
+    var lueur = ctx.createRadialGradient(bx, by, br * 0.9, bx, by, br * 1.35);
+    lueur.addColorStop(0, 'rgba(170,185,255,0.55)'); lueur.addColorStop(1, 'rgba(170,185,255,0)');
+    ctx.fillStyle = lueur; ctx.beginPath(); ctx.arc(bx, by, br * 1.35, 0, 6.283); ctx.fill();
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(-0.3);
+    ctx.strokeStyle = 'rgba(255,209,102,0.6)'; ctx.lineWidth = 15 * k;
+    ctx.beginPath(); ctx.ellipse(0, 0, br * 1.6, br * 0.4, 0, Math.PI, 2 * Math.PI); ctx.stroke();
+    ctx.restore();
+    dessinerBoule(bx, by, br, { clair: '#eef1ff', base: '#8c9bff', fonce: '#3f43b0' }, 4, false);
+    // Contour de lumière côté étoile
+    ctx.save(); ctx.beginPath(); ctx.arc(bx, by, br, 0, 6.283); ctx.clip();
+    var rim = ctx.createRadialGradient(bx + br * 0.35, by + br * 0.4, br * 0.7, bx + br * 0.35, by + br * 0.4, br * 1.5);
+    rim.addColorStop(0, 'rgba(255,255,255,0)'); rim.addColorStop(0.75, 'rgba(255,255,255,0)'); rim.addColorStop(1, 'rgba(255,244,214,0.75)');
+    ctx.fillStyle = rim; ctx.fillRect(bx - br, by - br, br * 2, br * 2);
+    ctx.restore();
+    anneau(bx, by, br + 2 * k, MOI.trait, 0.9, 4 * k);
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(-0.3);
+    ctx.strokeStyle = 'rgba(255,215,120,0.95)'; ctx.lineWidth = 15 * k;
+    ctx.beginPath(); ctx.ellipse(0, 0, br * 1.6, br * 0.4, 0, 0, Math.PI); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,245,200,0.8)'; ctx.lineWidth = 4 * k;
+    ctx.beginPath(); ctx.ellipse(0, 0, br * 1.6, br * 0.4, 0, 0.1, Math.PI - 0.1); ctx.stroke();
+    ctx.restore();
+    dessinerUsine(bx - br * 0.5, by - br * 0.8, 28 * k);
+    // Lune grise en orbite
+    dessinerBoule(X(372), Y(612), 22 * k, GRIS, 1, false);
+
+    // Graine-vaisseau avec sa traînée lumineuse
+    var vaisseau = function (px, py, ang, taille, coul, trace) {
+      var lx = px - Math.cos(ang) * taille, ly = py - Math.sin(ang) * taille;
+      var fx = px - Math.cos(ang) * taille * 7, fy = py - Math.sin(ang) * taille * 7;
+      var tr = ctx.createLinearGradient(lx, ly, fx, fy);
+      tr.addColorStop(0, trace); tr.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = tr; ctx.lineWidth = taille * 0.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(fx, fy); ctx.stroke();
+      ctx.save(); ctx.shadowColor = coul.trait; ctx.shadowBlur = taille;
+      dessinerGraine(px, py, ang, taille, coul);
+      ctx.restore();
+    };
+    // Nuée de vaisseaux-graines bleus : elle part de la planète bleue et fonce sur le bouclier orange
+    var depX = bx + br * 0.72, depY = by - br * 0.7, arX = ox + Math.cos(2.5) * rb, arY = oy + Math.sin(2.5) * rb;
+    var ctrlX = X(440), ctrlY = Y(410);
+    for (var v = 0; v < 10; v++) {
+      var u = 0.07 + v * 0.096, voie = v % 2 ? 1 : -1;
+      var px = (1 - u) * (1 - u) * depX + 2 * (1 - u) * u * ctrlX + u * u * arX;
+      var py = (1 - u) * (1 - u) * depY + 2 * (1 - u) * u * ctrlY + u * u * arY;
+      var tx = 2 * (1 - u) * (ctrlX - depX) + 2 * u * (arX - ctrlX), ty = 2 * (1 - u) * (ctrlY - depY) + 2 * u * (arY - ctrlY);
+      var ang = Math.atan2(ty, tx);
+      px += -Math.sin(ang) * voie * 13 * k; py += Math.cos(ang) * voie * 13 * k;
+      vaisseau(px, py, ang, (13 - u * 4) * k, MOI, 'rgba(214,220,255,0.75)');
+    }
+    // Éclat là où les vaisseaux touchent le bouclier
+    var ix = arX, iy = arY;
+    ctx.save(); ctx.translate(ix, iy); ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 20 * k;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    for (var p8 = 0; p8 < 16; p8++) { var a8 = p8 * Math.PI / 8, rr8 = (p8 % 2 ? 9 : 30) * k; ctx.lineTo(Math.cos(a8) * rr8, Math.sin(a8) * rr8); }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    var etincelles = ['#ffffff', '#bff1ff', '#ffd166', '#c9d1ff'];
+    for (var q = 0; q < 12; q++) {
+      var aq = q * 0.52 + 0.2, dq = (24 + (q * 13) % 30) * k;
+      ctx.fillStyle = etincelles[q % 4];
+      ctx.beginPath(); ctx.arc(ix + Math.cos(aq) * dq, iy + Math.sin(aq) * dq, (2 + q % 3) * k, 0, 6.283); ctx.fill();
+    }
+    // Flotte orange qui descend vers la planète dorée
+    var fdX = ox + orr * 0.25, fdY = oy + rb + 6 * k, af = Math.atan2(dy - dr - fdY, dx - fdX);
+    for (var f = 0; f < 5; f++) {
+      var uf = 0.12 + f * 0.17, fvx = fdX + (dx - fdX) * uf + ((f % 2) * 2 - 1) * 9 * k, fvy = fdY + (dy - dr - 14 * k - fdY) * uf;
+      vaisseau(fvx, fvy, af, 10 * k, LUI, 'rgba(255,224,179,0.7)');
+    }
+
+    // Premier plan : gros astéroïdes coupés par les bords, vaisseaux tout proches
+    dessinerBoule(X(615), Y(800), 125 * k, { clair: '#b7b2d6', base: '#6d6895', fonce: '#2e2a4f' }, 9, false);
+    dessinerBoule(X(-15), Y(815), 90 * k, { clair: '#a9b2e6', base: '#5d64a8', fonce: '#272b5e' }, 3, false);
+    vaisseau(X(130), Y(720), -0.75, 21 * k, MOI, 'rgba(214,220,255,0.8)');
+    vaisseau(X(230), Y(752), -0.8, 16 * k, MOI, 'rgba(214,220,255,0.8)');
+  }
+  function demarrerAffiche() {
+    var cacher = function () {
+      var els = document.querySelectorAll('.ecran, #hud, #menuBat, #toast, #reseau, #tuto, button, .jel-langue');
+      for (var i = 0; i < els.length; i++) els[i].style.setProperty('display', 'none', 'important');
+    };
+    cacher();
+    setTimeout(cacher, 300);
+    setTimeout(cacher, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // --- Images du jeu (page du jeu) -----------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (niveau, chrono, jauge, boutons de pourcentage),
+  // sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). Le camp bleu
+  // est joué un moment par le robot du jeu (même simulation, même graine : la même image à chaque fois),
+  // puis la partie est figée sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1 : premières planètes grises colonisées ;
+  //   2 = niveau 10 : lunes en orbite, usine et bouclier ;
+  //   3 = niveau 20 : nébuleuses, planètes dorées, forteresse du robot difficile.
+  var SCENES_APERCU = {
+    1: { niveau: 0, ticks: 95, flottes: 5, robot: 2, vise: -1 },
+    2: { niveau: 9, ticks: 230, flottes: 5, robot: 3, usine: true, bouclier: true, vise: -1 },
+    3: { niveau: 19, ticks: 330, flottes: 6, robot: 3, usine: true, vise: 1 },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    var sc = SCENES_APERCU[numero];
+    // Hasard fixe pour les effets du dessin.
+    var graineH = 1234567 + numero * 7919;
+    Math.random = function () { graineH = (graineH + 0x6D2B79F5) | 0; var x = Math.imul(graineH ^ (graineH >>> 15), 1 | graineH); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    reglages.pct = 50; majPct();       // en mémoire seulement
+    var i = sc.niveau, niv = NIVEAUX[i];
+    session = { type: 'solo', i: i };
+    preparerJeu();
+    var config = configNiveau(niv);
+    config.ctl = [sc.robot, niv.robot];  // le camp bleu joue seul pendant la mise en place
+    partie.local({ graine: niv.graine, config: config, camp: 0 });
+    partie.pause(true);
+    var sim = partie.s;
+    for (var n = 0; n < sc.ticks && !sim.resultat; n++) partie.cad.pas();
+    for (var m = 0; m < 200 && !sim.resultat && sim.etat.f.length < sc.flottes; m++) partie.cad.pas();
+    var etat = sim.etat, mien = -1, sien = -1;
+    for (var p = 0; p < etat.pl.length; p++) {
+      var pl = etat.pl[p];
+      if (pl.c === 0 && (mien < 0 || pl.n > etat.pl[mien].n)) mien = p;
+      if (pl.c === 1 && (sien < 0 || pl.n > etat.pl[sien].n)) sien = p;
+    }
+    if (sc.usine && mien >= 0 && etat.bat >= SIM.USINE) etat.pl[mien].b = SIM.USINE;
+    if (sc.bouclier && sien >= 0 && etat.bat >= SIM.BOUCLIER) etat.pl[sien].b = SIM.BOUCLIER;
+    if (sim.prec) sim.prec = JEL_TR.copie(etat);
+    majInfo();
+    // Le joueur vise : sa plus grande planète choisie, une flèche en pointillés vers une planète grise
+    // (vise : -1) ou orange (1) assez loin pour que la flèche se voie.
+    if (mien >= 0) {
+      selection = [mien];
+      var cible = -1, dmin = Infinity;
+      for (var c = 0; c < etat.pl.length; c++) {
+        if (etat.pl[c].c !== sc.vise) continue;
+        var d = Math.hypot(etat.pl[c].x - etat.pl[mien].x, etat.pl[c].y - etat.pl[mien].y);
+        if (d >= 260 * U && d < dmin) { dmin = d; cible = c; }
+      }
+      if (cible >= 0) marqueurs.push({ de: mien, vers: cible, t0: performance.now() + 1e7 });
+    }
+  }
+
   // --- Démarrage ----------------------------------------------------------------------------------
   construireBarrePct();
   majSon();
   majTitre();
   redimensionner();
-  montrer('titre');
-  requestAnimationFrame(image);
+  var numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(image);
+  } else {
+    montrer('titre');
+    requestAnimationFrame(image);
+  }
 })();
 </script>
 </body>
