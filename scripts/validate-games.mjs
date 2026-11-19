@@ -12,6 +12,11 @@
 //   … --jouer     (implique --browser) joue en plus 30 secondes au hasard sur
 //                 téléphone et enregistre des captures d'écran dans captures/<id>/
 //
+// Avec --browser, chaque jeu est aussi lancé sur un ordinateur (1366 × 768) :
+// largeur occupée pendant la partie (testerOrdinateur), et son affiche
+// (window.JEL_AFFICHE, jaquette-sans-texte.mjs) est ouverte et mesurée.
+// Bloquant pour les jeux ajoutés depuis ORDI_AFFICHE_DEPUIS, signalé pour les autres.
+//
 // Jeux faits selon les consignes de 2026 (game.json : "consignes": 2, posé par
 // la boucle de nuit) : au moins 20 niveaux, nombre déclaré dans game.json
 // ("niveaux") ET donné par le jeu lui-même (window.JEL_NIVEAUX, lu dans le
@@ -58,6 +63,15 @@ const PORT_TEST = 8123;
 const NIVEAUX_MIN = 20;
 const fiches = new Map();        // id → contenu de game.json (pour le test dans le navigateur)
 const consignes2 = (id) => Number(fiches.get(id)?.consignes) >= 2;
+// Jeux ajoutés depuis cette date (game.json "added") : écran d'ordinateur rempli et affiche
+// (window.JEL_AFFICHE) obligatoires ; avant : simple avertissement (CONSIGNES-JEU.md, sections 3 et 5).
+const ORDI_AFFICHE_DEPUIS = '2026-11-20';
+const nouvellesRegles = (id) => String(fiches.get(id)?.added || '') >= ORDI_AFFICHE_DEPUIS;
+const signaler = (id, msg) => (nouvellesRegles(id) ? erreur : avertir)(id, msg);
+// Ordinateur 1366 × 768 : part de la largeur que le jeu doit occuper pendant la partie.
+const ORDI_PART_MIN = 0.7;
+// Affiche (jaquette) : en dessous, l'image est trop sombre, trop plate ou trop vide (mesurerImage).
+const AFFICHE_MIN = { luminosite: 45, contraste: 22, details: 0.2 };
 
 const args = process.argv.slice(2);
 const avecPartie = args.includes('--jouer');                     // partie au hasard + captures
@@ -183,6 +197,9 @@ async function controlerJeu(id, dossier) {
   controlerStockage(id, html);
   controlerFinDePartie(id, html);
   controlerJeuTermine(id, html);
+  if (nouvellesRegles(id) && !/\bJEL_AFFICHE\b/.test(html)) {
+    erreur(id, 'affiche absente : avec window.JEL_AFFICHE, le jeu doit dessiner une scène composée pour sa jaquette, sans interface ni texte (CONSIGNES-JEU.md, section 5, « Jaquette et affiche »)');
+  }
   if (fiches.get(id)?.multijoueur === true) controlerMultijoueur(id, html);
   else if (/<script\b[^>]*\bid=["']jel-(?:multi|regles)["']/i.test(html)) erreur(id, 'blocs jel-multi ou jel-regles présents : ajouter "multijoueur": true et "places" dans game.json (ou retirer ces blocs)');
   if (fiches.get(id)?.temps_reel === true) controlerTempsReel(id, html);
@@ -465,20 +482,102 @@ async function testerNavigateur(ids) {
 
       await testerHorsLigne(navigateur, id);
       if (avecPartie) await jouerPartie(navigateur, base, id);
+      await testerOrdinateur(navigateur, base, id);
 
-      // Jaquette automatique : capture du jeu au démarrage, format portrait 600 × 800,
-      // SANS AUCUN TEXTE (le site affiche le titre traduit par-dessus) : voir jaquette-sans-texte.mjs.
+      // Jaquette automatique, format portrait 600 × 800, SANS AUCUN TEXTE (le site affiche le titre
+      // traduit par-dessus) : l'affiche du jeu (window.JEL_AFFICHE) s'il en a une, sinon une capture
+      // du jeu au démarrage. Voir jaquette-sans-texte.mjs.
       const dossier = path.join(DOSSIER_JEUX, id);
+      const { capturerSansTexte, convertir, aUneAffiche, mesurerImage } = await import('./jaquette-sans-texte.mjs');
+      const affiche = aUneAffiche(await readFile(path.join(dossier, 'index.html'), 'utf8'));
+      let pngAffiche = null;
+      if (affiche) {
+        const { png, boutons } = await capturerSansTexte(navigateur, `${base}/games/${id}/?lang=fr`, { affiche: true, details: true });
+        pngAffiche = png;
+        if (avecPartie) await writeFile(path.join(RACINE, 'captures', id, '9-affiche.png'), png);
+        if (boutons) signaler(id, `affiche (window.JEL_AFFICHE) : ${boutons} bouton(s) ou lien(s) encore visibles ; l'affiche ne montre aucune interface`);
+        const m = await mesurerImage(navigateur, png);
+        const defauts = [
+          m.luminosite < AFFICHE_MIN.luminosite && `trop sombre (luminosité ${m.luminosite}, ${AFFICHE_MIN.luminosite} au moins : éclaire le sujet, même la nuit)`,
+          m.contraste < AFFICHE_MIN.contraste && `trop plate (contraste ${m.contraste}, ${AFFICHE_MIN.contraste} au moins)`,
+          m.details < AFFICHE_MIN.details && `trop vide (${Math.round(m.details * 100)} % de l'image occupée, ${AFFICHE_MIN.details * 100} % au moins : sujet plus grand, décor plus riche)`,
+        ].filter(Boolean);
+        if (defauts.length) signaler(id, `affiche ${defauts.join(', ')} (CONSIGNES-JEU.md, section 5)`);
+        console.log(`  🖼  ${id} : affiche mesurée (luminosité ${m.luminosite}, contraste ${m.contraste}, occupée ${Math.round(m.details * 100)} %, couleur ${m.couleur})`);
+      }
       if (avecJaquettes && !erreurs.has(id) && !JAQUETTES.some((n) => existsSync(path.join(dossier, n)))) {
-        const { capturerSansTexte, convertir } = await import('./jaquette-sans-texte.mjs');
-        const png = await capturerSansTexte(navigateur, `${base}/games/${id}/?lang=fr`);
-        await writeFile(path.join(dossier, 'cover.jpg'), await convertir(navigateur, png, 'jpeg', 80));
-        console.log(`  🖼  ${id} : jaquette cover.jpg (sans texte) créée automatiquement`);
+        const png = pngAffiche || await capturerSansTexte(navigateur, `${base}/games/${id}/?lang=fr`);
+        await writeFile(path.join(dossier, 'cover.jpg'), await convertir(navigateur, png, 'jpeg', 82));
+        console.log(`  🖼  ${id} : jaquette cover.jpg (sans texte) créée automatiquement${pngAffiche ? ' depuis son affiche' : ''}`);
       }
     }
   } finally {
     await navigateur.close();
     serveur.kill();
+  }
+}
+
+// Ordinateur (1366 × 768, souris) : le jeu est lancé dans le lanceur, puis on mesure la largeur qu'il
+// occupe vraiment pendant la partie, à l'image : en partant de chaque bord, les colonnes de pixels toutes
+// identiques à leur voisine sont des bandes vides (fond uni, ou simple dégradé du haut vers le bas). Sous
+// ORDI_PART_MIN, c'est une « colonne de téléphone » au milieu de l'écran. (Mesurer les éléments de la page
+// ne marche pas : un fond plein écran en dégradé ou un voile de fenêtre de règles passent pour un décor.)
+// Avec --jouer, la capture est gardée dans captures/<id>/8-ordinateur-partie.png.
+async function testerOrdinateur(navigateur, base, id) {
+  const contexte = await navigateur.newContext({ viewport: { width: 1366, height: 768 }, locale: 'fr-FR' });
+  try {
+    const page = await contexte.newPage();
+    await page.goto(`${base}/play.html?id=${id}`);
+    await page.waitForTimeout(2500);
+    const cadre = page.frames().find((f) => f.url() === 'about:srcdoc');
+    const boite = await page.locator('#cadre-jeu').boundingBox();
+    if (!cadre || !boite) return;
+    // Lancer la partie : « Jouer » (ou équivalent), puis une éventuelle fenêtre de règles.
+    const appuyer = async (motif) => {
+      const b = cadre.getByRole('button', { name: motif }).first();
+      if (await b.isVisible().catch(() => false)) { await b.click({ timeout: 3000 }).catch(() => {}); await page.waitForTimeout(1200); return true; }
+      return false;
+    };
+    if (!(await appuyer(/jouer|commencer|c.est parti|démarrer|nouvelle partie/i))) await page.mouse.click(boite.x + boite.width / 2, boite.y + boite.height / 2);
+    for (let i = 0; i < 2; i++) await appuyer(/compris|c.est parti|commencer|action|suivant|go\b|ok\b|nouvelle partie|jouer/i);
+    await page.waitForTimeout(1500);
+    const png = await page.screenshot({ clip: boite });
+    if (avecPartie) {
+      await mkdir(path.join(RACINE, 'captures', id), { recursive: true });
+      await writeFile(path.join(RACINE, 'captures', id, '8-ordinateur-partie.png'), png);
+    }
+    const image = await page.evaluate(async (src) => {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      const W = img.naturalWidth, H = img.naturalHeight;
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, W, H).data;
+      const pareilles = (x1, x2) => {
+        for (let y = 0; y < H; y += 2) {
+          const a = (y * W + x1) * 4, b = (y * W + x2) * 4;
+          for (let k = 0; k < 3; k++) if (Math.abs(d[a + k] - d[b + k]) > 3) return false;
+        }
+        return true;
+      };
+      let gauche = 0;
+      while (gauche < W / 2 && pareilles(gauche, gauche + 1)) gauche++;
+      let droite = W - 1;
+      while (droite > W / 2 && pareilles(droite, droite - 1)) droite--;
+      return Math.max(0, droite - gauche) / W;
+    }, `data:image/png;base64,${png.toString('base64')}`);
+    const part = image;
+    console.log(`  🖥  ${id} : sur ordinateur, ${Math.round(part * 100)} % de la largeur occupée pendant la partie`);
+    if (part < ORDI_PART_MIN) {
+      signaler(id, `sur ordinateur (1366 × 768), le jeu n'occupe que ${Math.round(part * 100)} % de la largeur pendant la partie : bandes vides de chaque côté, comme une colonne de téléphone. Le décor doit remplir tout l'écran et la zone de jeu s'élargir (CONSIGNES-JEU.md, section 3, « Ordinateur »)`);
+    }
+  } catch (e) {
+    avertir(id, `test sur ordinateur interrompu : ${e.message.split('\n')[0]}`);
+  } finally {
+    await contexte.close();
   }
 }
 

@@ -9,6 +9,10 @@
 // strokeText). Les emoji seuls et les dessins restent visibles.
 //
 //   node scripts/jaquette-sans-texte.mjs <id> [options]
+//     --affiche            affiche du jeu (window.JEL_AFFICHE = 1 : scène composée pour la
+//                            jaquette, CONSIGNES-JEU.md section 5) ; prise d'office si le jeu
+//                            en a une et qu'aucun --clic ni --touche n'est donné
+//     --sans-affiche       capture de l'écran d'accueil même si le jeu a une affiche
 //     --clic "<sélecteur>"   clique d'abord (ex. bouton Jouer), répétable
 //     --touche <touche>      appuie sur une touche (ex. Enter), répétable
 //     --attendre <ms>        attente avant la capture (défaut 1500)
@@ -99,23 +103,106 @@ export function masquerTextes({ selecteursEnPlus = [], fin = false } = {}) {
   document.head.append(style);
 }
 
+/** Le jeu sait-il dessiner son affiche (window.JEL_AFFICHE, CONSIGNES-JEU.md, section 5) ? */
+export const aUneAffiche = (html) => /\bJEL_AFFICHE\b/.test(html);
+
+/** Boutons, champs et liens visibles (une affiche n'en montre aucun). */
+function compterBoutons() {
+  // Le bouton de langue (.jel-langue) est masqué avec les textes : il ne compte pas.
+  return [...document.querySelectorAll('button, input, select, textarea, a[href], [role="button"]')].filter((e) => {
+    if (e.closest('.jel-langue')) return false;
+    const r = e.getBoundingClientRect(), s = getComputedStyle(e);
+    return r.width > 4 && r.height > 4 && s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0.05
+      && r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
+  }).length;
+}
+
 /**
  * Ouvre l'adresse du jeu dans « navigateur », fait les gestes demandés,
  * masque les textes et renvoie la capture (Buffer PNG).
+ * affiche : le jeu est ouvert avec window.JEL_AFFICHE = 1 et dessine son affiche
+ * (scène composée pour la jaquette, sans interface) ; details : renvoie
+ * { png, boutons } (boutons visibles avant le masquage des textes).
  */
-export async function capturerSansTexte(navigateur, adresse, { largeur = 600, hauteur = 800, clics = [], touches = [], attendre = 1500, cacher = [], fin = false } = {}) {
+export async function capturerSansTexte(navigateur, adresse, { largeur = 600, hauteur = 800, clics = [], touches = [], attendre = 1500, cacher = [], fin = false, affiche = false, details = false } = {}) {
   const contexte = await navigateur.newContext({ viewport: { width: largeur, height: hauteur }, deviceScaleFactor: 1 });
   try {
     const page = await contexte.newPage();
+    if (affiche) await page.addInitScript(() => { window.JEL_AFFICHE = 1; });
     await page.addInitScript(scriptCanvasSansTexte);
     await page.goto(adresse);
     await page.waitForTimeout(800);
     for (const s of clics) { await page.click(s, { timeout: 5000 }); await page.waitForTimeout(400); }
     for (const k of touches) { await page.keyboard.press(k); await page.waitForTimeout(300); }
-    await page.waitForTimeout(attendre);
+    await page.waitForTimeout(affiche ? Math.max(attendre, 2000) : attendre);
+    const boutons = await page.evaluate(compterBoutons).catch(() => 0);
     await page.evaluate(masquerTextes, { selecteursEnPlus: cacher, fin });
     await page.waitForTimeout(150);
-    return await page.screenshot({ type: 'png' });
+    const png = await page.screenshot({ type: 'png' });
+    return details ? { png, boutons } : png;
+  } finally {
+    await contexte.close();
+  }
+}
+
+/**
+ * Mesures d'une jaquette (image PNG, JPEG ou WebP), pour repérer une jaquette qui ne donne pas envie :
+ *   luminosite : luminance moyenne, de 0 (noir) à 255 (blanc) ;
+ *   contraste  : écart type de la luminance (une image grise et plate est faible) ;
+ *   details    : part des carrés de 20 px qui contiennent quelque chose (variation de luminance
+ *                ou de couleur), de 0 à 1 (une grande surface vide ou un fond uni est faible) ;
+ *   couleur    : saturation moyenne, de 0 (gris) à 1.
+ */
+export async function mesurerImage(navigateur, image) {
+  const contexte = await navigateur.newContext();
+  try {
+    const page = await contexte.newPage();
+    const type = image[0] === 0x89 ? 'png' : image[0] === 0xff ? 'jpeg' : 'webp';
+    return await page.evaluate(async (src) => {
+      const img = new Image();
+      img.src = src;
+      await img.decode();
+      const W = img.naturalWidth, H = img.naturalHeight;
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const g = c.getContext('2d');
+      g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, W, H).data;
+      const L = new Float32Array(W * H);
+      let somme = 0, carres = 0, sat = 0;
+      for (let i = 0; i < W * H; i++) {
+        const r = d[i * 4], v = d[i * 4 + 1], b = d[i * 4 + 2];
+        L[i] = 0.2126 * r + 0.7152 * v + 0.0722 * b;
+        somme += L[i]; carres += L[i] * L[i];
+        const max = Math.max(r, v, b), min = Math.min(r, v, b);
+        sat += max ? (max - min) / max : 0;
+      }
+      const n = W * H, moyenne = somme / n;
+      const T = 20;
+      let pleins = 0, total = 0;
+      for (let by = 0; by + T <= H; by += T) {
+        for (let bx = 0; bx + T <= W; bx += T) {
+          let s = 0, s2 = 0, rMin = 255, rMax = 0, bMin = 255, bMax = 0;
+          for (let y = by; y < by + T; y++) {
+            for (let x = bx; x < bx + T; x++) {
+              const i = y * W + x, l = L[i];
+              s += l; s2 += l * l;
+              rMin = Math.min(rMin, d[i * 4]); rMax = Math.max(rMax, d[i * 4]);
+              bMin = Math.min(bMin, d[i * 4 + 2]); bMax = Math.max(bMax, d[i * 4 + 2]);
+            }
+          }
+          const m = s / (T * T), ecart = Math.sqrt(Math.max(0, s2 / (T * T) - m * m));
+          total++;
+          if (ecart > 6 || rMax - rMin > 40 || bMax - bMin > 40) pleins++;
+        }
+      }
+      return {
+        luminosite: Math.round(moyenne),
+        contraste: Math.round(Math.sqrt(Math.max(0, carres / n - moyenne * moyenne))),
+        details: Math.round((pleins / total) * 100) / 100,
+        couleur: Math.round((sat / n) * 100) / 100,
+      };
+    }, `data:image/${type};base64,${image.toString('base64')}`);
   } finally {
     await contexte.close();
   }
@@ -191,17 +278,25 @@ async function principal() {
     const taille = existante && !valeur('--largeur') ? await dimensions(navigateur, path.join(dossier, existante)) : { largeur: 600, hauteur: 800 };
     const largeur = Number(valeur('--largeur')) || taille.largeur;
     const hauteur = Number(valeur('--hauteur')) || taille.hauteur;
-    const png = await capturerSansTexte(navigateur, `http://localhost:${serveur.address().port}/?lang=fr`, {
+    // Affiche du jeu (window.JEL_AFFICHE) : demandée par --affiche, ou prise d'office quand le jeu en a
+    // une et qu'aucun geste n'est demandé (--sans-affiche : capture de l'écran d'accueil comme avant).
+    const html = await readFile(path.join(dossier, 'index.html'), 'utf8');
+    const affiche = args.includes('--affiche') || (aUneAffiche(html) && !args.includes('--sans-affiche') && !valeurs('--clic').length && !valeurs('--touche').length);
+    const { png, boutons } = await capturerSansTexte(navigateur, `http://localhost:${serveur.address().port}/?lang=fr`, {
       largeur, hauteur,
       clics: valeurs('--clic'),
       touches: valeurs('--touche'),
       attendre: Number(valeur('--attendre')) || 1500,
       cacher: valeurs('--cacher'),
       fin: args.includes('--fin'),
+      affiche,
+      details: true,
     });
     const image = await convertir(navigateur, png, format, Number(valeur('--qualite')) || 80);
     await writeFile(sortie, image);
-    console.log(`  🖼  ${id} : ${path.basename(sortie)} sans texte (${largeur} × ${hauteur}, ${Math.round(image.length / 1024)} Ko)`);
+    console.log(`  🖼  ${id} : ${path.basename(sortie)} sans texte${affiche ? ', depuis son affiche' : ''} (${largeur} × ${hauteur}, ${Math.round(image.length / 1024)} Ko)`);
+    const m = await mesurerImage(navigateur, png);
+    console.log(`     luminosité ${m.luminosite} (45 au moins), contraste ${m.contraste} (22 au moins), image occupée ${Math.round(m.details * 100)} % (20 % au moins), couleur ${m.couleur}${affiche && boutons ? ` ; ATTENTION : ${boutons} bouton(s) visible(s) sur l'affiche` : ''}`);
   } finally {
     serveur.close();
     await navigateur.close();

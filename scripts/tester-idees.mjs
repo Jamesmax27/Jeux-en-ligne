@@ -45,12 +45,17 @@ function test(nom, f) {
 
 console.log('Jury des idées et quotas');
 try {
-  test('quota : k jeux sur 5, répartis sur les passages', () => {
-    const suite = (n, k, total = 10) => Array.from({ length: total }, (_, i) => Number(lancer(['quota', n, k, i + 1]).trim()));
-    assert.deepEqual(suite(2, 1), [0, 0, 1, 0, 1, 0, 0, 1, 0, 1]);
-    assert.deepEqual(suite(5, 2, 3), [2, 2, 2]);
-    assert.deepEqual(suite(2, 5, 3), [2, 2, 2]);
-    assert.deepEqual(suite(2, 0, 3), [0, 0, 0]);
+  test('quota : k jeux par nuit, jamais plus que le passage', () => {
+    const q = (n, k) => Number(lancer(['quota', n, k]).trim());
+    assert.equal(q(2, 1), 1);
+    assert.equal(q(2, 5), 2);
+    assert.equal(q(2, 0), 0);
+    assert.equal(q(1, 2), 1);
+  });
+
+  test('choisir --ados 1 : l\'idée 13+ retenue passe chaque nuit, même moins bien notée', () => {
+    ecrire('idees.json', [idee('petits', { note: 8.2 }), idee('petits-2', { note: 8 }), idee('ados', { note: 7.9, ages: '13+' })]);
+    assert.deepEqual(ids(lancer(['choisir', '2', '--ados', '1'])).sort(), ['ados', 'petits']);
   });
 
   test('manque : seules les idées retenues comptent, 6 visées', () => {
