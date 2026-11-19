@@ -3632,6 +3632,430 @@
   });
 
   // ------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La gardienne en ciré jaune,
+  // en grand sur les rochers, lève sa lanterne : un noyé qui sort de la mer se fige, givré, dans sa
+  // lumière ; d'autres remontent des vagues. Derrière, le phare rayé balaie la tempête de son faisceau
+  // et un éclair déchire le ciel. Scène dessinée dans un repère de 600 × 800, agrandi pour couvrir l'écran.
+  const AFF_L = 600, AFF_H = 800;
+
+  // Polygone fermé (liste de points)
+  function polyAff(c, pts) {
+    c.beginPath(); c.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+    c.closePath();
+  }
+  // Ligne brisée (liste de points)
+  function traitAff(c, pts) {
+    c.beginPath(); c.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+  }
+  // Petit cristal de givre à six branches
+  function cristalAff(c, x, y, r) {
+    c.beginPath();
+    for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3; c.moveTo(x - Math.cos(a) * r, y - Math.sin(a) * r); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); }
+    c.stroke();
+  }
+  // Éclat de lumière à quatre pointes
+  function eclatAff(c, x, y, r) {
+    c.beginPath();
+    c.moveTo(x, y - r); c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r);
+    c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fill();
+  }
+
+  // La gardienne, en grand et plus détaillée que pendant la partie (même ciré, même lanterne).
+  // Repère local : pieds en (0, 0), tournée vers la droite, environ 100 unités de haut.
+  function gardienneAffiche(c, cire) {
+    const contour = '#140e05';
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    // Bras arrière, écarté pour garder l'équilibre dans le vent
+    const brasArriere = [[-8, -64], [-19, -53], [-27, -44]];
+    c.strokeStyle = contour; c.lineWidth = 11; traitAff(c, brasArriere); c.stroke();
+    c.strokeStyle = cire.ombre; c.lineWidth = 8.4; traitAff(c, brasArriere); c.stroke();
+    c.fillStyle = contour; c.beginPath(); c.arc(-28.5, -42, 4.8, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#c9a586'; c.beginPath(); c.arc(-28.5, -42, 3.6, 0, Math.PI * 2); c.fill();
+    // Bottes, la jambe avant en appui
+    c.fillStyle = contour;
+    polyAff(c, [[-18, -26], [-4, -26], [-3, 1], [-21, 1]]); c.fill();
+    polyAff(c, [[1, -26], [14, -26], [19, 1], [1, 1]]); c.fill();
+    c.fillStyle = '#2a241e';
+    polyAff(c, [[-16.5, -25], [-5.5, -25], [-4.5, -2.5], [-18.5, -2.5]]); c.fill();
+    polyAff(c, [[2.5, -25], [12.5, -25], [16.5, -2.5], [2.5, -2.5]]); c.fill();
+    c.fillStyle = 'rgba(255,215,140,.35)';
+    c.fillRect(11, -23, 2, 18);
+    // Ciré, pan arrière soulevé par le vent
+    const forme = () => {
+      c.beginPath(); c.moveTo(-12, -71);
+      c.quadraticCurveTo(-19, -46, -32, -20);
+      c.lineTo(-22, -24); c.lineTo(-13, -17); c.lineTo(-3, -21); c.lineTo(8, -17); c.lineTo(21, -20);
+      c.quadraticCurveTo(16, -46, 13, -71);
+      c.quadraticCurveTo(0, -75, -12, -71); c.closePath();
+    };
+    forme(); c.strokeStyle = contour; c.lineWidth = 3; c.stroke();
+    c.fillStyle = cire.couleur; c.fill();
+    // Ombre dans le dos, lumière chaude devant (la lanterne est devant elle)
+    const gd = c.createLinearGradient(-32, 0, 21, 0);
+    gd.addColorStop(0, 'rgba(80,50,0,.6)'); gd.addColorStop(0.5, 'rgba(80,50,0,0)'); gd.addColorStop(1, 'rgba(255,245,200,.4)');
+    forme(); c.fillStyle = gd; c.fill();
+    // Plis, patte de boutonnage, boutons et poche
+    c.strokeStyle = cire.ombre; c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(-8, -60); c.quadraticCurveTo(-14, -40, -21, -24);
+    c.moveTo(-3, -52); c.quadraticCurveTo(-5, -36, -8, -21);
+    c.moveTo(15, -52); c.quadraticCurveTo(16, -36, 17, -22);
+    c.stroke();
+    c.lineWidth = 1.8; c.beginPath(); c.moveTo(6, -69); c.lineTo(8, -19); c.stroke();
+    c.fillStyle = '#3a2a10';
+    [-61, -50, -39, -28].forEach((y) => { c.beginPath(); c.arc(9.6 + (y + 69) * 0.04, y, 1.4, 0, Math.PI * 2); c.fill(); });
+    c.strokeStyle = cire.ombre; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-7, -38); c.lineTo(3, -37.5); c.stroke();
+    // Capuche
+    c.fillStyle = contour; c.beginPath(); c.arc(0, -82, 14.6, 0, Math.PI * 2); c.fill();
+    c.fillStyle = cire.couleur; c.beginPath(); c.arc(0, -82, 13, 0, Math.PI * 2); c.fill();
+    const gc = c.createLinearGradient(-13, 0, 13, 0);
+    gc.addColorStop(0, 'rgba(80,50,0,.55)'); gc.addColorStop(0.55, 'rgba(80,50,0,0)');
+    c.fillStyle = gc; c.beginPath(); c.arc(0, -82, 13, 0, Math.PI * 2); c.fill();
+    // Mèches qui s'échappent de la capuche, battues par le vent
+    c.strokeStyle = '#5a341c'; c.lineWidth = 1.7;
+    c.beginPath();
+    c.moveTo(2, -88); c.bezierCurveTo(-8, -96, -16, -86, -26, -91);
+    c.moveTo(0, -86); c.bezierCurveTo(-10, -90, -15, -80, -23, -83);
+    c.stroke();
+    // Visage, éclairé par la lanterne
+    c.fillStyle = '#e8c9a8'; c.beginPath(); c.ellipse(5, -80, 7.6, 9, 0.1, 0, Math.PI * 2); c.fill();
+    const gv = c.createLinearGradient(-2, 0, 13, 0);
+    gv.addColorStop(0, 'rgba(120,70,40,.35)'); gv.addColorStop(1, 'rgba(255,230,170,.35)');
+    c.fillStyle = gv; c.beginPath(); c.ellipse(5, -80, 7.6, 9, 0.1, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = cire.ombre; c.lineWidth = 2.4;
+    c.beginPath(); c.ellipse(4.6, -80.4, 8.8, 10.3, 0.1, Math.PI * 0.62, Math.PI * 1.98); c.stroke();
+    // Regard décidé : sourcil froncé, œil, bouche serrée
+    c.fillStyle = '#1a1310'; c.beginPath(); c.ellipse(8.6, -81.5, 1.3, 1.8, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffffff'; c.fillRect(8.9, -82.6, 0.7, 0.7);
+    c.strokeStyle = '#5a3a22'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(5.6, -86.2); c.lineTo(11.4, -84.6); c.stroke();
+    c.strokeStyle = '#7a4a3a'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(7.6, -75.2); c.lineTo(11.4, -75.8); c.stroke();
+    c.fillStyle = 'rgba(220,120,90,.28)'; c.beginPath(); c.arc(6, -77.5, 2, 0, Math.PI * 2); c.fill();
+    // Bras levé, la lanterne tendue vers les noyés
+    const brasAvant = [[8, -66], [24, -73], [36, -89]];
+    c.strokeStyle = contour; c.lineWidth = 12; traitAff(c, brasAvant); c.stroke();
+    c.strokeStyle = cire.couleur; c.lineWidth = 9.4; traitAff(c, brasAvant); c.stroke();
+    c.strokeStyle = 'rgba(255,245,205,.55)'; c.lineWidth = 2.6;
+    traitAff(c, [[10, -69], [24, -76], [34, -90]]); c.stroke();
+    c.fillStyle = contour; c.beginPath(); c.arc(37.5, -91.5, 5.2, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#e8c9a8'; c.beginPath(); c.arc(37.5, -91.5, 3.9, 0, Math.PI * 2); c.fill();
+  }
+
+  // La lanterne tenue par la gardienne (même repère), dessinée par-dessus le halo
+  function lanterneAffiche(c, lant) {
+    const [r, g, b] = lant.lumiere;
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.strokeStyle = lant.metal; c.lineWidth = 1.6;
+    c.beginPath(); c.arc(38, -92.5, 2.6, 0, Math.PI * 2); c.stroke();
+    // Chapeau, verre et socle
+    c.fillStyle = '#140e05'; polyAff(c, [[30.5, -86], [45.5, -86], [42.5, -91], [33.5, -91]]); c.fill();
+    c.fillStyle = lant.metal; polyAff(c, [[31.5, -86.8], [44.5, -86.8], [42, -90.2], [34, -90.2]]); c.fill();
+    const verre = c.createRadialGradient(38, -78, 1, 38, -78, 10);
+    verre.addColorStop(0, '#fffbe8'); verre.addColorStop(0.5, 'rgb(' + r + ',' + Math.min(255, g + 30) + ',' + Math.min(255, b + 60) + ')'); verre.addColorStop(1, 'rgb(' + r + ',' + g + ',' + b + ')');
+    c.fillStyle = verre; c.fillRect(32, -86, 12, 16);
+    c.fillStyle = '#fff6d6';
+    c.beginPath(); c.moveTo(38, -84); c.quadraticCurveTo(41.5, -77, 38, -74); c.quadraticCurveTo(34.5, -77, 38, -84); c.fill();
+    c.strokeStyle = lant.metal; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(35, -86); c.lineTo(35, -70); c.moveTo(41, -86); c.lineTo(41, -70); c.stroke();
+    c.strokeStyle = '#140e05'; c.lineWidth = 1.2; c.strokeRect(32, -86, 12, 16);
+    c.fillStyle = '#140e05'; c.fillRect(30.5, -70.5, 15, 4);
+    c.fillStyle = lant.metal; c.fillRect(31.5, -70, 13, 2.8);
+  }
+
+  // Le noyé figé par la lumière : givré, pâle, les bras tendus. Repère local : la surface de l'eau
+  // en (0, 0), tourné vers la droite (vers la gardienne).
+  function noyeAffiche(c) {
+    const contour = '#061012', peau = '#b4d6e2', peauOmbre = '#7fa7b6';
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    // Bras levé derrière lui, la main ouverte
+    const brasLeve = [[-12, -36], [-24, -56], [-20, -74]];
+    c.strokeStyle = contour; c.lineWidth = 9; traitAff(c, brasLeve); c.stroke();
+    c.strokeStyle = peauOmbre; c.lineWidth = 6.4; traitAff(c, brasLeve); c.stroke();
+    const doigtsLeves = [[-27, -82], [-23, -85], [-18.5, -84.5], [-14.5, -81]];
+    c.strokeStyle = contour; c.lineWidth = 3.6;
+    doigtsLeves.forEach(([x, y]) => { c.beginPath(); c.moveTo(-20, -74); c.lineTo(x, y); c.stroke(); });
+    c.strokeStyle = peauOmbre; c.lineWidth = 2;
+    doigtsLeves.forEach(([x, y]) => { c.beginPath(); c.moveTo(-20, -74); c.lineTo(x, y); c.stroke(); });
+    // Torse voûté dans un tricot de marin délavé
+    const torse = () => {
+      c.beginPath(); c.moveTo(-23, 6);
+      c.quadraticCurveTo(-27, -24, -14, -40); c.quadraticCurveTo(0, -49, 13, -43);
+      c.quadraticCurveTo(25, -28, 23, 6); c.closePath();
+    };
+    torse(); c.strokeStyle = contour; c.lineWidth = 3; c.stroke();
+    c.fillStyle = '#2f4a50'; c.fill();
+    c.save(); torse(); c.clip();
+    c.fillStyle = 'rgba(190,225,232,.3)';
+    for (let y = -44; y < 8; y += 8) c.fillRect(-30, y, 60, 3.2);
+    c.fillStyle = 'rgba(10,24,26,.6)';
+    polyAff(c, [[-13, -14], [-10, -16], [-9, -11], [-12, -9]]); c.fill();
+    polyAff(c, [[9, -26], [12, -28], [13, -23], [10, -22]]); c.fill();
+    // Givre sur les épaules
+    c.fillStyle = 'rgba(235,250,255,.55)'; c.beginPath(); c.ellipse(1, -43, 15, 4.5, 0, 0, Math.PI * 2); c.fill();
+    c.restore();
+    // Tête
+    c.fillStyle = contour; c.beginPath(); c.ellipse(9, -55, 12, 14, 0.2, 0, Math.PI * 2); c.fill();
+    c.fillStyle = peau; c.beginPath(); c.ellipse(9, -55, 10.4, 12.4, 0.2, 0, Math.PI * 2); c.fill();
+    const gt = c.createLinearGradient(-2, 0, 20, 0);
+    gt.addColorStop(0, 'rgba(60,100,118,.45)'); gt.addColorStop(0.6, 'rgba(60,100,118,0)');
+    c.fillStyle = gt; c.beginPath(); c.ellipse(9, -55, 10.4, 12.4, 0.2, 0, Math.PI * 2); c.fill();
+    // Orbites sombres, yeux pâles qui luisent, bouche ouverte
+    c.fillStyle = '#0b1a1e';
+    c.beginPath(); c.ellipse(8, -57, 3.4, 4, 0.1, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(16, -55.2, 2.8, 3.6, 0.1, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(13.5, -46, 3.4, 4.8, 0.2, 0, Math.PI * 2); c.fill();
+    c.save();
+    c.shadowColor = '#5ffff0'; c.shadowBlur = 12; c.fillStyle = '#c8fff8';
+    c.beginPath(); c.arc(8.6, -57, 1.4, 0, Math.PI * 2); c.arc(16.4, -55.2, 1.2, 0, Math.PI * 2); c.fill();
+    c.restore();
+    // Cheveux d'algues, raidis par le givre
+    for (let k = 0; k < 6; k++) {
+      const x0 = -2 + k * 2.2, y0 = -67 + Math.abs(k - 2.5) * 0.8;
+      const mx = -9 + k * 0.8, ex = -11 + k * 1.1, ey = -40 + k * 1.5;
+      c.strokeStyle = '#2f6652'; c.lineWidth = 2.6;
+      c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(mx, -60, ex, ey); c.stroke();
+      c.strokeStyle = 'rgba(235,250,255,.6)'; c.lineWidth = 0.8;
+      c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(mx, -60, ex, ey); c.stroke();
+    }
+    // Bras tendu vers la gardienne, figé en plein geste
+    const brasTendu = [[12, -38], [26, -46], [35, -59]];
+    c.strokeStyle = contour; c.lineWidth = 9.4; traitAff(c, brasTendu); c.stroke();
+    c.strokeStyle = peau; c.lineWidth = 6.8; traitAff(c, brasTendu); c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 1.6; traitAff(c, [[13, -40.5], [26, -48.5], [33.5, -60]]); c.stroke();
+    const doigts = [[43, -66], [45, -61.5], [44.5, -57], [42, -53]];
+    c.strokeStyle = contour; c.lineWidth = 3.8;
+    doigts.forEach(([x, y]) => { c.beginPath(); c.moveTo(35, -59); c.lineTo(x, y); c.stroke(); });
+    c.strokeStyle = peau; c.lineWidth = 2.2;
+    doigts.forEach(([x, y]) => { c.beginPath(); c.moveTo(35, -59); c.lineTo(x, y); c.stroke(); });
+    // Glaçons sous le bras et cristaux de givre
+    c.fillStyle = 'rgba(235,250,255,.85)';
+    [[19, -42.5, 5], [25, -45.5, 7], [30, -50, 4.5]].forEach(([x, y, l]) => { polyAff(c, [[x - 1.6, y], [x + 1.6, y], [x, y + l]]); c.fill(); });
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 0.9;
+    [[21, -50, 3], [31, -55, 2.6], [0, -66, 3.2], [-18, -46, 2.8], [-23, -63, 2.4], [19, -40, 2.2], [3, -45, 2.6]].forEach(([x, y, r]) => cristalAff(c, x, y, r));
+  }
+
+  // Un noyé lointain qui remonte des vagues (silhouette de l'écran titre, plus grande)
+  function silhouetteNoyeAffiche(c, x, y, s, lev) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    c.fillStyle = 'rgba(92,134,126,.9)';
+    c.beginPath(); c.ellipse(0, -8 - lev * 8, 6, 7, 0, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(0, 3 - lev * 6, 9, 6, 0, Math.PI, 0); c.fill();
+    c.strokeStyle = 'rgba(92,134,126,.9)'; c.lineWidth = 3; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-5, -1); c.lineTo(-11, -20 - lev * 10); c.moveTo(5, -1); c.lineTo(10, -18 - lev * 12); c.stroke();
+    c.shadowColor = '#9ffff0'; c.shadowBlur = 6; c.fillStyle = '#e6fffa';
+    c.fillRect(-3, -10 - lev * 8, 2, 2); c.fillRect(1, -10 - lev * 8, 2, 2);
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    redimensionner();
+    const c = ctx, L = ecranL, H = ecranH;
+    const cire = CIRES[0], lant = LANTERNES[0];
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.fillStyle = '#0a1a22'; c.fillRect(0, 0, L, H);
+    // Repère de 600 × 800, agrandi pour couvrir tout l'écran et centré
+    const k = Math.max(L / AFF_L, H / AFF_H);
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * (L - AFF_L * k) / 2, dpr * (H - AFF_H * k) / 2);
+    c.save();
+
+    // Ciel de tempête, éclairé par l'éclair à gauche
+    const ciel = c.createLinearGradient(0, 0, 0, 490);
+    ciel.addColorStop(0, '#1d3245'); ciel.addColorStop(0.55, '#3b5d70'); ciel.addColorStop(1, '#7aa1a9');
+    c.fillStyle = ciel; c.fillRect(0, 0, AFF_L, 490);
+    const flash = c.createRadialGradient(95, 240, 10, 95, 240, 330);
+    flash.addColorStop(0, 'rgba(215,235,255,.5)'); flash.addColorStop(1, 'rgba(215,235,255,0)');
+    c.fillStyle = flash; c.fillRect(0, 0, AFF_L, 490);
+    // Nuages bas, le dessous éclairé
+    [[90, 30, 170, 46], [330, 18, 200, 50], [560, 70, 150, 44], [200, 128, 150, 32], [440, 196, 170, 28], [30, 196, 120, 26]].forEach(([x, y, rx, ry]) => {
+      c.fillStyle = 'rgba(30,48,64,.72)';
+      c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.ellipse(x - rx * 0.45, y + ry * 0.35, rx * 0.6, ry * 0.8, 0, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.ellipse(x + rx * 0.5, y + ry * 0.3, rx * 0.55, ry * 0.75, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = 'rgba(190,215,230,.14)';
+      c.beginPath(); c.ellipse(x, y + ry * 0.8, rx * 0.8, ry * 0.28, 0, 0, Math.PI * 2); c.fill();
+    });
+    // Éclair
+    const eclairPts = [[112, -5], [94, 70], [112, 94], [66, 182], [84, 198], [34, 300], [48, 312], [16, 450]];
+    const brancheEclair = [[66, 182], [104, 222], [116, 262]];
+    c.save();
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    c.shadowColor = '#bfe0ff'; c.shadowBlur = 30;
+    c.strokeStyle = 'rgba(200,225,255,.55)'; c.lineWidth = 11; traitAff(c, eclairPts); c.stroke();
+    traitAff(c, brancheEclair); c.lineWidth = 6; c.stroke();
+    c.shadowBlur = 0;
+    c.strokeStyle = '#ffffff'; c.lineWidth = 3.6; traitAff(c, eclairPts); c.stroke();
+    c.lineWidth = 2; traitAff(c, brancheEclair); c.stroke();
+    c.restore();
+
+    // Le faisceau du phare balaie le ciel vers la gauche (et faiblement vers la droite)
+    const fx = 500, fy = 117;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const fa = c.createLinearGradient(fx, fy, 0, 70);
+    fa.addColorStop(0, 'rgba(255,226,150,.8)'); fa.addColorStop(0.55, 'rgba(255,226,150,.25)'); fa.addColorStop(1, 'rgba(255,226,150,.08)');
+    c.fillStyle = fa;
+    polyAff(c, [[fx, fy - 9], [-20, -80], [-20, 220], [fx, fy + 9]]); c.fill();
+    const fb = c.createLinearGradient(fx, fy, AFF_L, fy);
+    fb.addColorStop(0, 'rgba(255,226,150,.45)'); fb.addColorStop(1, 'rgba(255,226,150,0)');
+    c.fillStyle = fb;
+    polyAff(c, [[fx, fy - 7], [640, fy - 46], [640, fy + 36], [fx, fy + 7]]); c.fill();
+    c.restore();
+
+    // Mer au loin (deux premières rangées de vagues)
+    const rangee = (i) => {
+      const y0 = 470 + i * 30;
+      c.fillStyle = ['#2c4e5a', '#22424e', '#193744', '#132d39', '#0e2430'][i];
+      c.beginPath(); c.moveTo(0, AFF_H);
+      for (let x = 0; x <= AFF_L; x += 15) c.lineTo(x, y0 + Math.sin(x * 0.03 + i * 1.7) * (5 + i * 3));
+      c.lineTo(AFF_L, AFF_H); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(205,232,238,' + (0.4 - i * 0.05) + ')'; c.lineWidth = 2;
+      c.beginPath();
+      for (let x = 0; x <= AFF_L; x += 15) c.lineTo(x, y0 + Math.sin(x * 0.03 + i * 1.7) * (5 + i * 3));
+      c.stroke();
+    };
+    rangee(0); rangee(1);
+    // Reflet du faisceau sur la mer
+    c.fillStyle = 'rgba(255,220,150,.12)';
+    c.beginPath(); c.ellipse(330, 486, 200, 10, 0, 0, Math.PI * 2); c.fill();
+
+    // Le phare rayé rouge et blanc, sur son rocher, au fond à droite
+    c.save(); c.translate(500, 522);
+    const hautTour = 370, bandes = 7;
+    for (let b = 0; b < bandes; b++) {
+      const y1 = -b * hautTour / bandes, y2 = -(b + 1) * hautTour / bandes;
+      const w1 = 52 - 16 * b / bandes, w2 = 52 - 16 * (b + 1) / bandes;
+      c.fillStyle = b % 2 ? '#dcd4c2' : '#a9362a';
+      polyAff(c, [[-w1, y1], [w1, y1], [w2, y2], [-w2, y2]]); c.fill();
+    }
+    c.fillStyle = 'rgba(10,20,30,.32)';
+    polyAff(c, [[14, 0], [52, 0], [36, -hautTour], [10, -hautTour]]); c.fill();
+    c.fillStyle = '#ffcf6b';
+    [[-18, -70], [8, -150], [-12, -230], [6, -300]].forEach(([x, y]) => c.fillRect(x, y, 9, 15));
+    // Galerie, salle de la lanterne et toit
+    c.fillStyle = '#1f2328'; c.fillRect(-48, -hautTour - 9, 96, 10);
+    c.strokeStyle = '#3c4046'; c.lineWidth = 2.5;
+    for (let x = -42; x <= 42; x += 12) { c.beginPath(); c.moveTo(x, -hautTour - 9); c.lineTo(x, -hautTour - 24); c.stroke(); }
+    c.beginPath(); c.moveTo(-44, -hautTour - 24); c.lineTo(44, -hautTour - 24); c.stroke();
+    c.fillStyle = '#fff1bf'; c.fillRect(-26, -hautTour - 58, 52, 49);
+    c.strokeStyle = '#22262b'; c.lineWidth = 4; c.strokeRect(-26, -hautTour - 58, 52, 49);
+    c.beginPath(); c.moveTo(-9, -hautTour - 58); c.lineTo(-9, -hautTour - 9); c.moveTo(9, -hautTour - 58); c.lineTo(9, -hautTour - 9); c.stroke();
+    c.fillStyle = '#1b1e22';
+    polyAff(c, [[-34, -hautTour - 58], [0, -hautTour - 90], [34, -hautTour - 58]]); c.fill();
+    c.beginPath(); c.arc(0, -hautTour - 93, 5, 0, Math.PI * 2); c.fill();
+    // Rocher du phare et écume
+    c.fillStyle = '#172022';
+    polyAff(c, [[-95, 16], [-64, -6], [-20, -12], [40, -10], [70, -4], [100, 16]]); c.fill();
+    c.fillStyle = 'rgba(220,240,245,.75)';
+    for (let i = 0; i < 12; i++) { c.beginPath(); c.arc(-90 + i * 16, 6 - (i % 3) * 5, 3 + (i % 2) * 2, 0, Math.PI * 2); c.fill(); }
+    c.restore();
+    // Halo de la salle de la lanterne
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const hp = c.createRadialGradient(fx, fy, 4, fx, fy, 90);
+    hp.addColorStop(0, 'rgba(255,235,170,.9)'); hp.addColorStop(1, 'rgba(255,200,110,0)');
+    c.fillStyle = hp; c.beginPath(); c.arc(fx, fy, 90, 0, Math.PI * 2); c.fill();
+    c.restore();
+
+    // Mer plus proche, avec des noyés qui remontent
+    rangee(2);
+    [[34, 548, 2.3, 0.7], [98, 560, 2.6, 0.2], [262, 552, 2.1, 0.9], [318, 566, 2.4, 0.4], [570, 572, 2.2, 0.6]].forEach(([x, y, s, l]) => silhouetteNoyeAffiche(c, x, y, s, l));
+    rangee(3); rangee(4);
+
+    // Le noyé figé, sorti de l'eau jusqu'à la taille, juste devant la gardienne
+    c.save(); c.translate(150, 606); c.scale(3.4, 3.4); noyeAffiche(c); c.restore();
+    // L'eau autour de sa taille, avec l'écume
+    c.fillStyle = '#0f2733';
+    c.beginPath(); c.moveTo(0, AFF_H);
+    for (let x = 0; x <= 300; x += 10) c.lineTo(x, 604 + Math.sin(x * 0.045 + 0.8) * 6);
+    c.lineTo(300, AFF_H); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(225,242,246,.85)'; c.lineWidth = 3;
+    c.beginPath(); for (let x = 0; x <= 300; x += 10) c.lineTo(x, 604 + Math.sin(x * 0.045 + 0.8) * 6); c.stroke();
+    c.fillStyle = 'rgba(225,242,246,.8)';
+    for (let i = 0; i < 9; i++) { c.beginPath(); c.arc(80 + i * 16, 598 - (i % 3) * 6, 2.5 + (i % 2) * 2, 0, Math.PI * 2); c.fill(); }
+
+    // Rochers mouillés où se tient la gardienne
+    c.fillStyle = '#1b2427';
+    polyAff(c, [[226, AFF_H], [236, 668], [260, 628], [300, 606], [350, 600], [420, 602], [470, 612], [520, 600], [AFF_L, 596], [AFF_L, AFF_H]]); c.fill();
+    c.fillStyle = '#3a4a4f';
+    polyAff(c, [[260, 628], [300, 606], [350, 600], [420, 602], [470, 612], [520, 600], [AFF_L, 596], [AFF_L, 606], [520, 610], [470, 622], [420, 612], [350, 610], [300, 616], [266, 640]]); c.fill();
+    c.strokeStyle = '#0d1315'; c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(330, 612); c.lineTo(318, 680); c.lineTo(332, 760); c.moveTo(470, 622); c.lineTo(492, 700); c.moveTo(540, 610); c.lineTo(528, 690); c.stroke();
+    c.strokeStyle = 'rgba(200,230,240,.35)'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(380, 640); c.lineTo(404, 636); c.moveTo(500, 650); c.lineTo(520, 646); c.moveTo(280, 660); c.lineTo(292, 652); c.stroke();
+    // Gerbe d'écume là où la vague frappe le rocher
+    c.fillStyle = 'rgba(230,245,248,.85)';
+    for (let i = 0; i < 14; i++) { const a = Math.PI * (1.05 + i * 0.06); c.beginPath(); c.arc(250 + Math.cos(a) * (20 + (i % 4) * 9), 628 + Math.sin(a) * (26 + (i % 3) * 10), 2 + (i % 3), 0, Math.PI * 2); c.fill(); }
+
+    // La gardienne, en grand, tournée vers le noyé
+    const gx = 360, gy = 604, gs = 3.6;
+    c.save(); c.translate(gx, gy); c.scale(-gs, gs); gardienneAffiche(c, cire); c.restore();
+
+    // Lumière de la lanterne : halo chaud, rayons vers le noyé, éclats de givre
+    const lx = gx - 38 * gs, ly = gy - 79 * gs;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const [lr, lg, lb] = lant.lumiere;
+    const halo = c.createRadialGradient(lx, ly, 6, lx, ly, 300);
+    halo.addColorStop(0, 'rgba(' + lr + ',' + lg + ',' + lb + ',.8)');
+    halo.addColorStop(0.16, 'rgba(' + lr + ',' + lg + ',' + lb + ',.34)');
+    halo.addColorStop(0.5, 'rgba(' + lr + ',' + lg + ',' + lb + ',.13)');
+    halo.addColorStop(1, 'rgba(' + lr + ',' + lg + ',' + lb + ',0)');
+    c.fillStyle = halo; c.beginPath(); c.arc(lx, ly, 300, 0, Math.PI * 2); c.fill();
+    for (let i = 0; i < 7; i++) {
+      const a = Math.PI * 0.58 + i * 0.11, d = 0.025;
+      const ray = c.createRadialGradient(lx, ly, 10, lx, ly, 280);
+      ray.addColorStop(0, 'rgba(' + lr + ',' + lg + ',' + lb + ',.22)'); ray.addColorStop(1, 'rgba(' + lr + ',' + lg + ',' + lb + ',0)');
+      c.fillStyle = ray;
+      polyAff(c, [[lx, ly], [lx + Math.cos(a - d) * 280, ly + Math.sin(a - d) * 280], [lx + Math.cos(a + d) * 280, ly + Math.sin(a + d) * 280]]); c.fill();
+    }
+    c.fillStyle = 'rgba(235,250,255,.9)';
+    [[150, 360, 9], [226, 392, 7], [96, 400, 6], [252, 446, 5], [120, 470, 5], [200, 330, 5]].forEach(([x, y, r]) => eclatAff(c, x, y, r));
+    c.restore();
+    c.save(); c.translate(gx, gy); c.scale(-gs, gs); lanterneAffiche(c, lant); c.restore();
+
+    // Premier plan : une grosse vague qui se brise en bas à gauche, une main qui en sort
+    c.fillStyle = '#0a1f29';
+    c.beginPath(); c.moveTo(0, AFF_H); c.lineTo(0, 692);
+    c.quadraticCurveTo(60, 652, 132, 666); c.quadraticCurveTo(172, 674, 186, 704);
+    c.quadraticCurveTo(220, 744, 268, AFF_H); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(225,242,246,.9)'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(0, 692); c.quadraticCurveTo(60, 652, 132, 666); c.quadraticCurveTo(172, 674, 186, 704); c.stroke();
+    c.fillStyle = 'rgba(225,242,246,.8)';
+    for (let i = 0; i < 12; i++) { c.beginPath(); c.arc(20 + i * 15, 662 - Math.sin(i * 1.3) * 12 - (i % 2) * 8, 2 + (i % 3), 0, Math.PI * 2); c.fill(); }
+    c.save(); c.translate(70, 712); c.rotate(-0.25);
+    c.strokeStyle = '#061012'; c.lineWidth = 15; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(0, 40); c.lineTo(0, -10); c.stroke();
+    c.strokeStyle = '#3f5f59'; c.lineWidth = 11; c.beginPath(); c.moveTo(0, 40); c.lineTo(0, -10); c.stroke();
+    [[-14, -34], [-6, -40], [3, -40], [11, -33], [14, -18]].forEach(([x, y]) => {
+      c.strokeStyle = '#061012'; c.lineWidth = 6.5; c.beginPath(); c.moveTo(0, -12); c.lineTo(x, y); c.stroke();
+      c.strokeStyle = '#3f5f59'; c.lineWidth = 3.5; c.beginPath(); c.moveTo(0, -12); c.lineTo(x, y); c.stroke();
+    });
+    c.restore();
+
+    // Pluie poussée par le vent
+    c.strokeStyle = 'rgba(205,228,238,.38)'; c.lineWidth = 1.5; c.lineCap = 'round';
+    for (let i = 0; i < 120; i++) {
+      const x = (i * 53.7) % 640 - 20, y = (i * 97.3) % 820 - 10;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + 5, y + 18); c.stroke();
+    }
+    // Le bas s'assombrit doucement (le site y pose le bandeau du titre)
+    const bas = c.createLinearGradient(0, 640, 0, AFF_H);
+    bas.addColorStop(0, 'rgba(3,8,12,0)'); bas.addColorStop(1, 'rgba(3,8,12,.4)');
+    c.fillStyle = bas; c.fillRect(0, 640, AFF_L, AFF_H - 640);
+    c.restore();
+  }
+
+  function demarrerAffiche() {
+    // Ni écran, ni bouton, ni bulle, ni bouton de langue : la scène seule
+    const style = document.createElement('style');
+    style.textContent = '.ecran, #barre, #commandes, #bulle, .jel-langue, button { display: none !important; }';
+    document.head.appendChild(style);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ------------------------------------------------------------------------
   // Démarrage
   // ------------------------------------------------------------------------
   chargerProgression();
@@ -3640,6 +4064,8 @@
     if (LANTERNES.some((l) => l.id === tenue[0])) prog.lanterne = tenue[0];
     if (CIRES.some((c) => c.id === tenue[1])) prog.cire = tenue[1];
   } catch (e) { /* pas de stockage */ }
+  // Affiche du jeu : ni écran titre, ni son, ni boucle de jeu
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
   majBoutonsSon();
   allerTitre();
   requestAnimationFrame(boucle);
