@@ -142,7 +142,7 @@ Fichiers ajoutés pour la validation automatique et la publicité :
 
 Fichiers ajoutés pour les 5 langues (détails dans `I18N.md`) :
 - `public/i18n/i18n.js` : module commun de traduction (site et jeux, recopié dans chaque jeu) ; `public/i18n/site/{fr,en,es,pt,de}.json` : textes du site (dont les intitulés `page.*` des pages générées) ; `public/langue.js` : langue, sélecteur, noms traduits du catalogue.
-- `scripts/check-i18n.js` : vérification des traductions (bloquante dans `validate.yml`) ; `scripts/i18n-jeu.mjs` : recopie le module commun dans les jeux, `--assembler` et `--meta` rangent les textes d'un jeu ; `scripts/jaquette-sans-texte.mjs` : jaquette sans texte.
+- `scripts/check-i18n.js` : vérification des traductions (bloquante dans `validate.yml`) ; `scripts/i18n-jeu.mjs` : recopie le module commun dans les jeux, `--assembler` et `--meta` rangent les textes d'un jeu ; `scripts/jaquette-sans-texte.mjs` : jaquette sans texte ; `scripts/apercus-jeu.mjs` : images du jeu de sa page (`apercu-1.webp` à `apercu-3.webp`).
 
 Référencement (SEO, octobre 2026) — tout est produit au build, pour tout jeu publié, quelle que soit sa source :
 - Pages statiques dans les 5 langues (adresses : `public/chemins.js`) : accueils `/`, `/en/`, `/es/`, `/pt/`, `/de/` ; page de chaque jeu `/jeux/<id>/`, `/en/games/<slug>/`, `/es/juegos/<slug>/`, `/pt/jogos/<slug>/`, `/de/spiele/<slug>/` (slugs traduits : `"slugs"` de `game.json`, gabarit unique `gabarits/jeu.html`) ; catégories `/genres/<id>/`, `/univers/<id>/`, `/ages/<4-6|7-9|10-12|13-plus>/` et leurs équivalents aux slugs traduits (`/en/worlds/animals/`, `/de/spielarten/logik/`, `/es/edades/13-mas/`… : `SLUGS_CATEGORIES` de `public/chemins.js`) ; pages école `/ecole/<cp…cm2>/`, `/en/school/<1st-grade…>/`, `/de/schule/<klasse-1…4>/` (champ `"classes"` de `game.json`, publiées avec leurs textes `gabarits/textes/ecole.<langue>.json` et 3 jeux au moins) ; page 404 par langue. Les anciennes pages d'âge (`3-4`, `5-6`, `7-8`, `9-plus`) mènent en 301 à la nouvelle tranche (`ANCIENNES_TRANCHES` de `public/taxonomie.js`).
@@ -213,6 +213,7 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 | --- | --- |
 | `index.html` | Jeu complet dans un seul fichier : CSS, JS, images (SVG inline ou base64), sons (base64 ou Web Audio). **Aucune ressource externe** (pas de CDN, pas de police Google, pas d'appel réseau). Moins de 2 Mo. |
 | `cover.webp` | Jaquette portrait 600 × 800 px (ratio 3:4), moins de 100 Ko, **sans aucun texte** (le site affiche le titre traduit en bandeau). Acceptés aussi en dépannage : `cover.png`, `cover.jpg`, `cover.svg`. Sans jaquette, une image par défaut s'affiche. |
+| `apercu-1.webp` à `apercu-3.webp` | Images du jeu montrées sur sa page sous le bouton « Jouer » : 3 vrais moments de partie au format téléphone (488 × 1055 px), en anglais, 200 Ko au plus chacune, capturées par `node scripts/apercus-jeu.mjs <id>` (`window.JEL_APERCU`). Obligatoires pour les jeux ajoutés depuis le 21 novembre 2026, facultatives avant. |
 | `game.json` | Fiche du jeu (voir ci-dessous). |
 
 ```json
@@ -282,6 +283,7 @@ Chaque jeu = un dossier `games/<id>/` contenant **exactement** :
 - Jouable au doigt (tactile) **et** au clavier/souris.
 - S'adapte à l'écran (portrait mobile en priorité), pas de défilement de la page pendant le jeu. Sur ordinateur, le décor remplit toute la largeur : jamais de colonne de téléphone entre deux bandes vides (`CONSIGNES-JEU.md`, section 3, « Ordinateur » ; mesuré par `validate-games.mjs` sur 1366 × 768, bloquant pour les jeux ajoutés depuis le 20 novembre 2026).
 - Affiche (jeux ajoutés depuis le 20 novembre 2026) : avec `window.JEL_AFFICHE`, le jeu dessine une scène composée sans interface ni texte (héros en grand, action, profondeur, lumière), d'où le robot tire la jaquette (`CONSIGNES-JEU.md`, section 5 ; `jaquette-sans-texte.mjs --affiche`, mesures `mesurerImage`).
+- Images du jeu (jeux ajoutés depuis le 21 novembre 2026, décision du propriétaire du 19 novembre : la jaquette devient une affiche, la page doit montrer le vrai jeu) : avec `window.JEL_APERCU` = 1, 2 ou 3, le jeu s'ouvre en pleine partie, avec sa vraie interface (début, milieu, niveau avancé) ; `scripts/apercus-jeu.mjs` capture les 3 images en anglais sur un téléphone de 390 × 844 ; bande « Images du jeu » de la page (`gabarits/jeu.html`, `public/apercus.js` : image agrandie au toucher), `screenshot` du JSON-LD, sitemap des images (`CONSIGNES-JEU.md`, section 5, « Images du jeu »).
 - Fonctionne même si `localStorage` est indisponible (le jeu est dans une iframe sandbox) : entourer tout accès au stockage de `try/catch`.
 - Pas de `alert()`, `confirm()`, `prompt()`, ni de pop-up, ni d'ouverture de nouvelle fenêtre.
 - Règles du jeu expliquées à l'écran en quelques mots au démarrage.
@@ -606,6 +608,11 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
   - Menu de la pastille : avatar, niveau et barre d'expérience en tête, puis Mes jeux, Mes badges, Classement, Amis, Changer mon avatar, Sauvegarder mon profil.
   - Testé : captures dans Edge (390, 360 en allemand, 1 280 px ; profil imité, API coupée), `tester-profil`, `tester-amis`, `check-i18n`, `verifier-seo`.
   - Reste : essai sur téléphone.
+
+- Jaquettes en affiches et images du jeu — en cours (19 novembre 2026), demandes du propriétaire (jaquettes « basiques » ; la page doit montrer le vrai jeu).
+  - Jaquettes des jeux 13+ tirées d'une affiche dessinée par le jeu (`window.JEL_AFFICHE`), par lots de 5 validés sur planche avant / après : #390, #391 ; texte de la jaquette réécrit dans les 5 langues, `version` +1. Essai sur 5 jeux d'enfants montré au propriétaire.
+  - Images du jeu (branche `apercus-jeu`) : `scripts/apercus-jeu.mjs` (3 captures `apercu-1.webp` à `apercu-3.webp`, téléphone 390 × 844, en anglais, contrôles : remplies, différentes, sans bouton de menu, 200 Ko au plus), `window.JEL_APERCU` (contrat : `CONSIGNES-JEU.md`, section 5), copie au build (`build-catalog.mjs`, hors de `catalog.json`), bande sous le bouton « Jouer » (`gabarits/jeu.html`, `public/apercus.js`, styles « Images du jeu » de `public/style.css`), `screenshot` du JSON-LD et sitemap des images (`pages-seo.mjs`), textes `page.apercu*` (5 langues), coquille `v25` ; robot (`validate-games.mjs`, `APERCUS_DEPUIS` = 21 novembre 2026, captures `10-apercu-*.png`), boucle de nuit (fabrication, relecture non bloquante), compétence `ajouter-jeu-site`. Choix du propriétaire : sous le bouton Jouer, vrais moments choisis par le jeu, une seule série en anglais (limite de 20 000 fichiers de Cloudflare), téléphone seulement.
+  - Reste : jeux existants (affiche et images du jeu par le même agent, lots de 5).
 
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 

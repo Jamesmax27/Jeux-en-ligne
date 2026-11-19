@@ -521,6 +521,17 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
       const alt = tx.jaquette_alt || titre;
       const age = ageMinimum(jeu.ages);
       const description = tx.description_seo || tx.description || jeu.description;
+      // Images du jeu (scripts/apercus-jeu.mjs) : 3 vrais moments de partie, au format téléphone,
+      // juste sous le bouton Jouer ; un lien vers l'image sans JavaScript, agrandie par public/apercus.js.
+      const apercus = (jeu.apercus || []).map((src, i) => ({ src: `/${src}`, n: i + 1, alt: t('page.apercuAlt', { titre, n: i + 1 }) }));
+      const blocApercus = apercus.length
+        ? `<section class="fiche-apercus" aria-labelledby="titre-apercus">
+        <h2 id="titre-apercus">${echapper(t('page.apercus'))}</h2>
+        <ul class="apercus-liste" data-fermer="${echapper(t('page.apercuFermer'))}" data-precedente="${echapper(t('page.apercuPrecedente'))}" data-suivante="${echapper(t('page.apercuSuivante'))}">${apercus.map((a) => `
+          <li><a class="apercu" href="${echapper(a.src)}" aria-label="${echapper(t('page.apercuAgrandir', { n: a.n }))}"><img src="${echapper(a.src)}" alt="${echapper(a.alt)}" width="488" height="1055" loading="lazy" decoding="async"></a></li>`).join('')}
+        </ul>
+      </section>`
+        : '';
 
       const similaires = jeuxSimilaires(jeu, jeuxDe(lang));
       const puces = [
@@ -542,6 +553,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         description,
         url: canonique,
         image,
+        ...(apercus.length ? { screenshot: apercus.map((a) => absolue(a.src)) } : {}),
         // Langue du jeu : le français pour un jeu de mots ou de lettres (non_traduisible).
         inLanguage: jeu.fiche.non_traduisible === true ? 'fr' : HREFLANG[lang],
         genre: [jeu.genre, ...jeu.genres_secondaires].filter((g) => g && g !== ID_AUTRE).map((g) => t(`genre.${g}`)),
@@ -581,6 +593,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
         partage_url: canonique,
         partage_texte: t('partage.message', { titre }),
         puces: puces.join(''),
+        apercus: blocApercus,
         presentation: paragraphes(tx.presentation || tx.description || jeu.description),
         regles: tx.regles ? `<h2>${echapper(t('page.commentJouer'))}</h2>\n      ${paragraphes(tx.regles)}` : '',
         age: age !== null ? t('page.ageConseille', { n: age }) : '',
@@ -598,7 +611,7 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
           : '',
       };
       await ecrire(dossierPublic, chemin, remplir(gabarits.jeu, valeurs, t, morceaux, 'gabarits/jeu.html'));
-      pages.push({ chemin, lang, type: 'jeu', id: jeu.id, indexable, lastmod: jeu.lastmod, image: imageMatricielle ? image : null });
+      pages.push({ chemin, lang, type: 'jeu', id: jeu.id, indexable, lastmod: jeu.lastmod, images: [...(imageMatricielle ? [image] : []), ...apercus.map((a) => absolue(a.src))] });
     }
   }
 
@@ -849,10 +862,10 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
 
   // --- Sitemap et robots.txt --------------------------------------------------
   const indexables = pages.filter((p) => p.indexable);
-  // Fiches des jeux : leur jaquette (Google Images) quand c'est une image matricielle.
+  // Fiches des jeux : leur jaquette (Google Images) quand c'est une image matricielle, et leurs images du jeu.
   const lignes = ['<?xml version="1.0" encoding="UTF-8"?>', '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'];
   for (const p of indexables) {
-    const image = p.image ? `<image:image><image:loc>${echapper(p.image)}</image:loc></image:image>` : '';
+    const image = (p.images || []).map((src) => `<image:image><image:loc>${echapper(src)}</image:loc></image:image>`).join('');
     lignes.push(`  <url><loc>${echapper(absolue(p.chemin))}</loc><lastmod>${p.lastmod}</lastmod>${image}</url>`);
   }
   lignes.push('</urlset>');
