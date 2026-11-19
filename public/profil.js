@@ -14,6 +14,9 @@
 // (navigator.sendBeacon) ; à l'ouverture d'une page, seulement s'il y a
 // quelque chose à envoyer ou un nouveau jour (série de jours consécutifs).
 // Sinon, simple relecture (sans écriture) au plus toutes les RAFRAICHIR_MINUTES.
+// Les sauvegardes des jeux changées sur l'appareil partent avec ces envois, et
+// le lanceur relit celle du jeu au lancement si le profil est relié à
+// plusieurs appareils (sauvegardes-nuage.js, docs/cadrage-fidelisation.md, 14.13).
 // Hors connexion : tout attend sur l'appareil ; le serveur ne compte jamais
 // plus de temps que le temps réellement écoulé.
 //
@@ -26,6 +29,7 @@
 
 import * as R from './profil-reglages.js';
 import { jetonTurnstile } from './turnstile.js';
+import * as Nuage from './sauvegardes-nuage.js';
 
 const ADRESSE = '/api/profil';
 const CLE = 'fmg-profil';
@@ -115,14 +119,14 @@ export function noterVisite(date) { lire().vu = date; ecrire(); }
 
 // --- Appels à l'API -----------------------------------------------------------------
 
-async function appeler(corps) {
+async function appeler(corps, delai = DELAI) {
   if (navigator.onLine === false) return { hors: true };
   try {
     const reponse = await fetch(ADRESSE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corps),
-      signal: AbortSignal.timeout ? AbortSignal.timeout(DELAI) : undefined,
+      signal: AbortSignal.timeout ? AbortSignal.timeout(delai) : undefined,
     });
     let donnees = null;
     try { donnees = await reponse.json(); } catch { /* réponse vide */ }
@@ -166,11 +170,12 @@ function oublierJeton() {
   memoire.jeton = null;
   memoire.etat = null;
   ecrire();
+  Nuage.oublier(); // les sauvegardes des jeux repartiront vers le nouveau profil
 }
 
 const aEnvoyer = () => {
   const a = lire().attente;
-  return Object.values(a.temps).some((s) => s > 0) || a.termines.length > 0;
+  return Object.values(a.temps).some((s) => s > 0) || a.termines.length > 0 || Nuage.enAttente();
 };
 const nouveauJour = () => !!memoire.etat && memoire.etat.dernierJour !== jourLocal();
 
@@ -200,10 +205,13 @@ async function envoyerUneFois() {
   if (!memoire.jeton) return null;
   const temps = Object.entries(memoire.attente.temps).filter(([, s]) => s > 0).map(([jeu, s]) => ({ jeu, secondes: Math.min(Math.round(s), R.SECONDES_MAX_ENVOI) }));
   const termines = memoire.attente.termines.map(({ jeu, etoiles, max }) => ({ jeu, etoiles, max }));
-  const r = await appeler({ action: 'sync', jeton: memoire.jeton, jour: jourLocal(), temps, termines });
+  const sauvegardes = Nuage.aEnvoyer();
+  Nuage.noterEnvoi(sauvegardes);
+  const r = await appeler({ action: 'sync', jeton: memoire.jeton, jour: jourLocal(), temps, termines, ...(sauvegardes.length ? { sauvegardes } : {}) });
   lire();
   if (r.statut === 401 && r.donnees.inconnu) { oublierJeton(); return null; }
   if (!r.ok) return null;
+  if (sauvegardes.length) Nuage.appliquer(r.donnees.sauvegardes, sauvegardes);
   // Temps envoyé : retiré de l'attente (le temps compté pendant l'envoi reste).
   for (const { jeu, secondes } of temps) {
     const reste = (memoire.attente.temps[jeu] || 0) - secondes;
@@ -230,9 +238,15 @@ function envoyerEnPartant() {
   if (!memoire.jeton || !aEnvoyer() || navigator.onLine === false) return;
   const temps = Object.entries(memoire.attente.temps).filter(([, s]) => s >= 1).map(([jeu, s]) => ({ jeu, secondes: Math.min(Math.round(s), R.SECONDES_MAX_ENVOI) }));
   const termines = memoire.attente.termines.map(({ jeu, etoiles, max }) => ({ jeu, etoiles, max }));
-  const corps = JSON.stringify({ action: 'sync', jeton: memoire.jeton, jour: jourLocal(), temps, termines });
+  const base = { action: 'sync', jeton: memoire.jeton, jour: jourLocal(), temps, termines };
+  // Sauvegardes des jeux : seulement ce qui tient dans un envoi de fermeture
+  // (64 Ko au plus) ; le reste part au prochain envoi. Elles restent « à
+  // envoyer » (réponse non lue) : le serveur reconnaîtra son propre envoi.
+  const sauvegardes = Nuage.aEnvoyer(R.SAUVEGARDES_BEACON_MAX - JSON.stringify(base).length - 2000);
+  const corps = JSON.stringify(sauvegardes.length ? { ...base, sauvegardes } : base);
   try {
     if (navigator.sendBeacon(ADRESSE, new Blob([corps], { type: 'application/json' }))) {
+      Nuage.noterEnvoi(sauvegardes);
       // Le temps est parti ; les jeux terminés restent jusqu'à un envoi confirmé
       // (le serveur ne compte jamais deux fois la même fin).
       memoire.attente.temps = {};
@@ -331,6 +345,32 @@ export function noterTermine(jeuId, stars, maxStars) {
   return synchroniser();
 }
 
+/**
+ * Au lancement d'un jeu (lanceur, avant de donner la sauvegarde au jeu) : si le
+ * profil est relié à plusieurs appareils, relit la sauvegarde du serveur et la
+ * recopie sur l'appareil si elle est plus récente (ou gagne le conflit).
+ * Attend ATTENTE_LANCEMENT_MS au plus ; hors connexion, sans profil, profil sur
+ * un seul appareil ou jeu gardé sur l'appareil : rend la main tout de suite.
+ * Ne lève jamais d'erreur.
+ */
+export async function sauvegardeAuLancement(jeuId) {
+  try {
+    lire();
+    if (!memoire.jeton || (memoire.etat?.appareils || 1) < 2 || navigator.onLine === false) return;
+    const article = Nuage.articleLancement(jeuId);
+    if (!article) return;
+    if (!article.lire) Nuage.noterEnvoi([article]);
+    let tardive = false;
+    const appel = appeler({ action: 'sauvegarde', jeton: memoire.jeton, ...article }).then((r) => {
+      if (r.ok && r.donnees.sauvegarde) Nuage.appliquer([r.donnees.sauvegarde], [article], { tardive });
+    });
+    await Promise.race([appel, new Promise((ok) => setTimeout(ok, R.ATTENTE_LANCEMENT_MS))]);
+    tardive = true;
+  } catch (erreur) {
+    console.warn('Sauvegarde du serveur non relue (le jeu démarre avec celle de l\'appareil) :', erreur);
+  }
+}
+
 /** Ticket d'entrée d'une partie en ligne (Turnstile « multi ») ; null sans profil ou en cas d'échec. */
 export async function ticketMulti(jeuId) {
   await assurerProfil();
@@ -372,7 +412,11 @@ export async function restaurer(code) {
   memoire = { ...vide(), jeton: r.donnees.jeton, syncLe: Date.now(), vu: lire().vu };
   garderEtat(r.donnees.etat);
   ecrire();
+  // Sauvegardes des jeux de cet appareil : fusionnées avec celles du profil
+  // (la plus avancée de chaque jeu gagne), dès maintenant.
+  Nuage.oublier();
   prevenir(null);
+  synchroniser();
   return { ok: true };
 }
 
