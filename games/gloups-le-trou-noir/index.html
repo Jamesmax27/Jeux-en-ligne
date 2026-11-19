@@ -3126,6 +3126,7 @@
 
   let M = null;              // ville affichée (démo de l'écran titre ou niveau)
   let mode = 'titre';        // titre, menu, intro, jeu, pause, fin
+  let apercu = 0;            // 1, 2 ou 3 : image du jeu figée pour sa page (window.JEL_APERCU), sinon 0
   const cam = { x: 0, y: 0, z: 1 };
   function zoomCible() {
     const m = Math.min(LW, LH);
@@ -3293,7 +3294,7 @@
     if (!nuitCv || nuitCv.width !== nw || nuitCv.height !== nh) { nuitCv = document.createElement('canvas'); nuitCv.width = nw; nuitCv.height = nh; nuitCtx = nuitCv.getContext('2d'); }
     const n = nuitCtx;
     n.setTransform(1, 0, 0, 1, 0, 0); n.globalCompositeOperation = 'source-over'; n.globalAlpha = 1;
-    n.clearRect(0, 0, nw, nh); n.fillStyle = 'rgba(16,12,54,.68)'; n.fillRect(0, 0, nw, nh);
+    n.clearRect(0, 0, nw, nh); n.fillStyle = apercu ? 'rgba(16,12,54,.5)' : 'rgba(16,12,54,.68)'; n.fillRect(0, 0, nw, nh);
     n.globalCompositeOperation = 'destination-out';
     const k = nw / cv.width;
     const lum = (x, y, r, a) => {
@@ -3884,6 +3885,7 @@
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie
   if (window.JEL_SAVE) window.JEL_SAVE.surFermeture(() => {
+    if (apercu) return; // image du jeu : rien n'est enregistré
     if (M && !M.demo && (mode === 'jeu' || mode === 'pause' || mode === 'intro')) enregistrer({ niveau: niv + 1 });
   });
 
@@ -3960,6 +3962,7 @@
     let dt = (now - dernierTemps) / 1000; dernierTemps = now;
     if (!(dt > 0)) dt = 0.016;
     dt = Math.min(dt, 0.05);
+    if (apercu) dt = 0; // image du jeu : la partie reste figée sur son moment
     try {
       if (mode === 'jeu') { majMonde(M, dt, calculEntree()); majPartie(dt); }
       else if ((mode === 'titre' || mode === 'menu') && M.demo) { majMonde(M, dt, null); M.demoT += dt; if (M.demoT > 80 || M.joueur.R > 60) creerDemo(); }
@@ -3979,8 +3982,292 @@
     }
     requestAnimationFrame(boucle);
   }
-  creerDemo();
-  requestAnimationFrame(boucle);
+  // =========================================================================
+  // AFFICHE (jaquette du jeu)
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une
+  // scène composée, sans interface ni texte, d'où sort la jaquette
+  // (CONSIGNES-JEU.md, section 5). Gloups, en grand et couronné, aspire le
+  // carrefour : un bus et des voitures glissent vers lui, des objets tombent en
+  // tourbillon dans son trou, Mandarine, plus petite, le regarde de loin.
+  // Repère de 600 × 800 (k = échelle), le décor de la ville continue jusqu'aux bords.
+  // =========================================================================
+  function dessinerAffiche() {
+    redimensionner();
+    const c = ctx, W = LW, H = LH;
+    const k = Math.min(W / 600, H / 800);
+    const ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    c.fillStyle = '#79c95a'; c.fillRect(0, 0, W, H);
+    c.setTransform(DPR * k, 0, 0, DPR * k, DPR * ox, DPR * oy);
+    const X0 = -ox / k - 2, X1 = (W - ox) / k + 2, Y0 = -oy / k - 2, Y1 = (H - oy) / k + 2;
+    const S = QUARTIERS[0].sol, E = 1.7;                 // E : échelle des objets (unités du monde → repère)
+    const GX = 300, GY = 400, GR = 158;                   // Gloups : centre et rayon
+    const P = 560, RW = 110, TR = 30;                     // pas des rues, largeur d'une rue, trottoir
+    // Un objet de la ville, dessiné par le jeu, à l'échelle e
+    const obj = (type, x, y, e, extra) => {
+      const o = objet(type, 0, 0, extra);
+      c.save(); c.translate(x, y); c.scale(e, e); if (o.a) c.rotate(o.a);
+      try { TYPES[type].d(c, o); } catch (er) { /* rien */ }
+      c.restore();
+      return o;
+    };
+    // --- Sol : rues, trottoirs, pâtés de maisons ---
+    c.fillStyle = S.route; c.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+    const i0 = Math.floor((X0 - GX) / P) - 1, i1 = Math.ceil((X1 - GX) / P);
+    const j0 = Math.floor((Y0 - GY) / P) - 1, j1 = Math.ceil((Y1 - GY) / P);
+    const blocs = [];
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const bx = GX + i * P + RW / 2, by = GY + j * P + RW / 2, bs = P - RW;
+      if (bx > X1 || bx + bs < X0 || by > Y1 || by + bs < Y0) continue;
+      const type = i === -1 && j === -1 ? 'maisons' : i === 0 && j === -1 ? 'tour' : i === -1 && j === 0 ? 'parc' : i === 0 && j === 0 ? 'parking' : ((i + j) & 1 ? 'parc' : 'maisons');
+      blocs.push({ i, j, bx, by, bs, type });
+      c.fillStyle = S.trottoir; c.fillRect(bx, by, bs, bs);
+      c.strokeStyle = mix(S.trottoir, '#000000', 0.16); c.lineWidth = 4; c.strokeRect(bx + 2, by + 2, bs - 4, bs - 4);
+      c.fillStyle = type === 'parking' ? SOLS.parking : type === 'tour' ? SOLS.beton : S.herbe;
+      c.fillRect(bx + TR, by + TR, bs - 2 * TR, bs - 2 * TR);
+      if (type === 'parking') {
+        c.fillStyle = 'rgba(255,255,255,.7)';
+        for (let r = 0; r < 4; r++) for (let x = bx + TR + 10; x < bx + bs - TR; x += 44) c.fillRect(x, by + TR + 34 + r * 110, 2.5, 74);
+      }
+      if (type === 'maisons') {
+        c.fillStyle = '#86d266'; c.fillRect(bx + TR + 10, by + TR + 10, bs - 2 * TR - 20, bs - 2 * TR - 20);
+        c.fillStyle = '#3f8f3c'; c.fillRect(bx + TR + 10, by + TR + 10, bs - 2 * TR - 20, 5); c.fillRect(bx + TR + 10, by + bs - TR - 15, bs - 2 * TR - 20, 5);
+      }
+      if (type === 'parc') {
+        c.fillStyle = '#e8d6a0'; c.fillRect(bx + TR, by + bs / 2 - 18, bs - 2 * TR, 36); c.fillRect(bx + bs / 2 - 18, by + TR, 36, bs - 2 * TR);
+      }
+    }
+    // Traits au milieu des rues et passages piétons
+    c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 4; c.setLineDash([24, 24]); c.beginPath();
+    for (let i = i0; i <= i1 + 1; i++) { const x = GX + i * P; c.moveTo(x, Y0); c.lineTo(x, Y1); }
+    for (let j = j0; j <= j1 + 1; j++) { const y = GY + j * P; c.moveTo(X0, y); c.lineTo(X1, y); }
+    c.stroke(); c.setLineDash([]);
+    c.fillStyle = 'rgba(255,255,255,.66)';
+    for (let i = i0; i <= i1 + 1; i++) for (let j = j0; j <= j1 + 1; j++) {
+      const x = GX + i * P, y = GY + j * P;
+      for (let d = -RW / 2 + 8; d < RW / 2 - 6; d += 15) {
+        c.fillRect(x - RW / 2 - 24, y + d, 18, 8); c.fillRect(x + RW / 2 + 6, y + d, 18, 8);
+        c.fillRect(x + d, y - RW / 2 - 24, 8, 18); c.fillRect(x + d, y + RW / 2 + 6, 8, 18);
+      }
+    }
+    // --- Contenu des pâtés ---
+    for (const b of blocs) {
+      const { bx, by, bs } = b;
+      // lampadaires et poubelles sur les trottoirs
+      for (let d = 60; d < bs - 40; d += 130) {
+        obj('lampadaire', bx + d, by + 12, E); obj('lampadaire', bx + 12, by + d, E);
+        obj('poubelle', bx + d + 40, by + bs - 13, E); obj('borne', bx + bs - 12, by + d + 50, E);
+      }
+      if (b.type === 'maisons') {
+        obj('arbre', bx + 90, by + 110, E, { v: 1 }); obj('buisson', bx + 380, by + 360, E);
+        obj('fleurs', bx + 330, by + 95, E, { v: 2 }); obj('arbre', bx + 120, by + 380, E, { v: 2 });
+        obj('piscine', bx + 140, by + 250, E);
+        obj('maison', bx + 300, by + 230, E, { w: 90, h: 74, z: 32, v: 3 });
+        obj('voiture', bx + 395, by + 330, E, { a: Math.PI / 2, v: 0 });
+        obj('nain', bx + 210, by + 330, E);
+      } else if (b.type === 'tour') {
+        obj('arbre', bx + 60, by + 395, E, { v: 0 }); obj('velo', bx + 120, by + 405, E, { v: 3 });
+        obj('tour', bx + 200, by + 210, E, { w: 150, h: 130, z: 130, v: 1 });
+      } else if (b.type === 'parc') {
+        obj('fontaine', bx + bs / 2, by + bs / 2, E, { v: 1 });
+        obj('grandArbre', bx + 110, by + 110, E, { v: 0 }); obj('sapin', bx + 360, by + 100, E);
+        obj('arbre', bx + 120, by + 340, E, { v: 2 }); obj('buisson', bx + 340, by + 330, E, { v: 1 });
+        obj('banc', bx + 300, by + 190, E); obj('fleurs', bx + 210, by + 110, E, { v: 4 }); obj('fleurs', bx + 380, by + 260, E, { v: 1 });
+        obj('toboggan', bx + 120, by + 230, E);
+      } else if (b.type === 'parking') {
+        for (let r = 0; r < 4; r++) for (let q = 0, x = bx + TR + 32; x < bx + bs - TR - 10; x += 44, q++) {
+          if ((q * 7 + r * 3) % 5 === 2) continue;
+          obj(q % 6 === 4 ? 'camionnette' : 'voiture', x, by + TR + 71 + r * 110, E, { a: (q + r) % 2 ? Math.PI / 2 : -Math.PI / 2, v: q + r * 3 });
+        }
+      }
+    }
+    // --- Lumière du soleil, en haut à gauche ---
+    c.globalCompositeOperation = 'lighter';
+    let g = c.createRadialGradient(40, 20, 0, 40, 20, 520);
+    g.addColorStop(0, 'rgba(255,236,170,.24)'); g.addColorStop(0.5, 'rgba(255,220,140,.08)'); g.addColorStop(1, 'rgba(255,220,140,0)');
+    c.fillStyle = g; c.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+    // Halo lilas et bleu autour de Gloups
+    g = c.createRadialGradient(GX, GY, GR * 0.8, GX, GY, GR * 2);
+    g.addColorStop(0, 'rgba(150,120,255,.5)'); g.addColorStop(0.45, 'rgba(90,200,255,.2)'); g.addColorStop(1, 'rgba(90,200,255,0)');
+    c.fillStyle = g; c.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+    c.globalCompositeOperation = 'source-over';
+    // --- Traînées d'aspiration qui tournent vers le trou ---
+    c.lineCap = 'round';
+    for (let n = 0; n < 14; n++) {
+      const a0 = n * 0.449 + 0.2, r0 = GR * (1.25 + (n % 3) * 0.18);
+      c.strokeStyle = 'rgba(255,255,255,' + (0.35 + (n % 2) * 0.2) + ')'; c.lineWidth = 3 + (n % 3);
+      c.beginPath();
+      for (let u = 0; u <= 1.001; u += 0.1) { const a = a0 + u * 0.9, r = r0 - (r0 - GR * 1.04) * u; c.lineTo(GX + Math.cos(a) * r, GY + Math.sin(a) * r); }
+      c.stroke();
+    }
+    // --- Gloups : le trou, en grand ---
+    const T = TENUES[0];
+    const G = { a: T.a, b: T.b, rx: 0.85, ry: 0.15, cligne: 0, miam: 0, sens: 1 };
+    dessinerTrou(c, G, GX, GY, GR, 1.15);
+    // objets qui tombent en tourbillon dans le trou
+    c.save(); c.beginPath(); c.arc(GX, GY, GR * 0.93, 0, TAU); c.clip();
+    [['voiture', -2.55, 0.68, 1.05, { v: 2 }], ['cone', 2.2, 0.74, 1.3], ['pieton', 0.75, 0.72, 1.3, { v: 9 }], ['banc', 1.45, 0.66, 0.95],
+      ['poubelle', 2.85, 0.6, 1.0], ['arbre', -1.95, 0.42, 0.62, { v: 1 }], ['velo', 0.25, 0.5, 0.8, { v: 5 }], ['camionnette', -3.5, 0.5, 0.72, { v: 4 }], ['pieton', -0.3, 0.3, 0.7, { v: 20 }]]
+      .forEach(([type, a, r, e, extra]) => {
+        c.globalAlpha = 0.75 + 0.25 * r;
+        obj(type, GX + Math.cos(a) * GR * r, GY + Math.sin(a) * GR * r, E * e, Object.assign({ a: a + 2.2 }, extra || {}));
+      });
+    c.globalAlpha = 1;
+    g = c.createRadialGradient(GX, GY, 0, GX, GY, GR * 0.93);
+    g.addColorStop(0, 'rgba(0,0,0,.8)'); g.addColorStop(0.5, 'rgba(0,0,0,.15)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.fillRect(GX - GR, GY - GR, 2 * GR, 2 * GR);
+    c.restore();
+    // contour lumineux du trou
+    c.save(); c.shadowColor = '#7fe0ff'; c.shadowBlur = 26;
+    c.strokeStyle = 'rgba(214,240,255,.95)'; c.lineWidth = 5; c.beginPath(); c.arc(GX, GY, GR * 1.01, Math.PI * 0.95, Math.PI * 1.85); c.stroke();
+    c.strokeStyle = 'rgba(200,180,255,.7)'; c.lineWidth = 3; c.beginPath(); c.arc(GX, GY, GR * 1.01, Math.PI * 1.95, Math.PI * 2.75); c.stroke();
+    c.restore();
+    // --- Ce qui glisse vers Gloups : le bus, des voitures, un passant ---
+    obj('bus', 512, 420, E, { a: Math.PI - 0.32, v: 0 });
+    obj('voiture', 276, 128, E, { a: Math.PI / 2 - 0.35, v: 0 });
+    obj('voiture', 326, 22, E, { a: Math.PI / 2 + 0.1, v: 6 });
+    obj('pieton', 470, 250, E * 1.2, { a: 2.4, v: 3 });
+    obj('cone', 452, 300, E * 1.2, { a: 0.6 });
+    obj('pieton', 160, 560, E * 1.2, { a: -0.8, v: 13 });
+    // petites lignes de vitesse derrière le bus et les voitures
+    c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 4;
+    [[600, 372, 640, 360], [610, 404, 650, 396], [604, 440, 644, 436], [236, 40, 248, 76], [262, 34, 272, 68], [300, -60, 304, -30]].forEach(([a, b, d, e]) => { c.beginPath(); c.moveTo(a, b); c.lineTo(d, e); c.stroke(); });
+    // --- Mandarine, rival plus petit, qui ouvre de grands yeux ---
+    const Rm = ROBOTS[0], Mx = 74, My = 406, MR = 44;
+    const Man = { a: Rm.a, b: Rm.b, rx: 1, ry: -0.2, cligne: 0, miam: 0, sens: -1 };
+    c.globalCompositeOperation = 'lighter';
+    g = c.createRadialGradient(Mx, My, MR * 0.8, Mx, My, MR * 1.9); g.addColorStop(0, 'rgba(255,150,70,.4)'); g.addColorStop(1, 'rgba(255,150,70,0)');
+    c.fillStyle = g; c.fillRect(Mx - MR * 2, My - MR * 2, MR * 4, MR * 4);
+    c.globalCompositeOperation = 'source-over';
+    dessinerTrou(c, Man, Mx, My, MR, 0.6); dessinerYeux(c, Man, Mx, My, MR * 1.15);
+    // gouttes d'émotion de Mandarine
+    disque(c, Mx - MR * 0.95, My - MR * 0.75, 6, '#bfe8ff'); disque(c, Mx - MR * 1.12, My - MR * 0.45, 4, '#bfe8ff');
+    // --- Yeux, joues et couronne de Gloups ---
+    dessinerYeux(c, G, GX, GY - 4, GR * 1.12);
+    c.fillStyle = 'rgba(255,120,190,.55)';
+    c.beginPath(); c.ellipse(GX - GR * 0.5, GY + GR * 0.06, GR * 0.12, GR * 0.07, 0, 0, TAU); c.fill();
+    c.beginPath(); c.ellipse(GX + GR * 0.5, GY + GR * 0.06, GR * 0.12, GR * 0.07, 0, 0, TAU); c.fill();
+    c.save(); c.shadowColor = '#ffe27a'; c.shadowBlur = 22;
+    dessinerCouronne(c, GX, GY - GR * 1.1 - 14, GR * 0.27);
+    c.restore();
+    // étincelles dorées autour du trou
+    [[-2.3, 1.22, 9], [-0.7, 1.28, 7], [0.5, 1.18, 8], [2.5, 1.24, 7], [1.5, 1.32, 6], [-1.5, 1.4, 6]].forEach(([a, r, s], n) => {
+      c.fillStyle = n % 2 ? '#ffd45c' : '#fff3b0';
+      etoile5(c, GX + Math.cos(a) * GR * r, GY + Math.sin(a) * GR * r, s, s * 0.42, n); c.fill();
+    });
+    // --- Étoile filante dorée qui file vers la ville ---
+    const sx = 132, sy = 128;
+    g = c.createLinearGradient(sx, sy, sx + 170, sy - 190);
+    g.addColorStop(0, 'rgba(255,240,180,.95)'); g.addColorStop(1, 'rgba(255,240,180,0)');
+    c.strokeStyle = g; c.lineWidth = 12; c.lineCap = 'round'; c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + 170, sy - 190); c.stroke();
+    c.save(); c.shadowColor = '#ffd45c'; c.shadowBlur = 24; c.fillStyle = '#ffd45c'; etoile5(c, sx, sy, 22, 9, 0.3); c.fill();
+    c.fillStyle = '#fff5c4'; etoile5(c, sx, sy, 10, 4, 0.3); c.fill(); c.restore();
+    // --- Premier plan : grands arbres coupés par les coins du bas ---
+    obj('grandArbre', X0 + 40, 770, 3.4, { v: 1 });
+    obj('grandArbre', X1 - 30, 790, 3.8, { v: 2 });
+    obj('arbre', X1 - 150, 830, 3.2, { v: 0 });
+    // léger voile sombre tout en bas (bandeau du titre)
+    g = c.createLinearGradient(0, 640, 0, Y1);
+    g.addColorStop(0, 'rgba(20,14,50,0)'); g.addColorStop(1, 'rgba(20,14,50,.35)');
+    c.fillStyle = g; c.fillRect(X0, 640, X1 - X0, Y1 - 640);
+  }
+  function cacherPourAffiche() {
+    for (const el of document.querySelectorAll('.ecran, #hud, #message, #astuce, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    cacherPourAffiche();
+    [50, 300, 900].forEach((d) => setTimeout(cacherPourAffiche, d));
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // =========================================================================
+  // IMAGES DU JEU (page du jeu)
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le
+  // jeu) : le jeu s'ouvre directement en pleine partie, avec sa vraie barre du
+  // haut (temps, score, rang, taille), ses flèches et sa mini-carte, sans écran
+  // titre, ni fenêtre « Continuer », ni carte du niveau (CONSIGNES-JEU.md,
+  // section 5). La partie tourne un instant (Gloups mange), puis elle est figée
+  // sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1, les jardins : Gloups encore petit avale cônes et passants ;
+  //   2 = niveau 9, le centre-ville : aimant, objets lourds, bus, trous rivaux ;
+  //   3 = niveau 20, la ville la nuit : fête foraine, canal, géant, étoile filante.
+  // =========================================================================
+  const SCENES_APERCU = {
+    1: { niveau: 0, masse: 120, score: 128, temps: 58, secondes: 2.2, rivauxApres: [[0, 30, 120, 150]] },
+    2: { niveau: 8, masse: 760, score: 420, temps: 66, secondes: 1.6, aimant: 6, bonus: [['turbo', -150, -200]],
+      rivaux: [[0, 1150, 300, 230], [1, 260, -220, 30], [2, 420, 40, 360]] },
+    3: { niveau: 19, masse: 1900, score: 660, temps: 47, secondes: 1.4, bouclier: 5, bonus: [['sablier', 170, 230]],
+      rivaux: [[6, 3600, -170, -390], [0, 600, 250, 160]], filante: [120, -250, 0.72], regard: true }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 7654321 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    niv = sc.niveau;
+    M = creerMonde(niv, false);
+    placerTrous(M, 'nuit', false);
+    const j = M.joueur;
+    j.masse = sc.masse; j.score = sc.score; j.R = rayonDe(j.masse); j.Rv = j.R; j.avales = Math.round(sc.score / 6);
+    // rivaux près de Gloups : [numéro du trou, masse, décalage x, décalage y]
+    const robots = M.trous.filter((h) => h !== j);
+    (sc.rivaux || []).forEach(([n, masse, dx, dy]) => {
+      const h = robots[n]; if (!h) return;
+      h.masse = masse; h.R = rayonDe(masse); h.Rv = h.R; h.score = Math.round(masse * 0.8);
+      const x = clamp(j.x + dx, 20, M.W - 20), y = clamp(j.y + dy, 20, M.H - 20);
+      if (!bloque(M, x, y)) { h.x = x; h.y = y; }
+    });
+    if (sc.aimant) j.aimant = sc.aimant;
+    if (sc.bouclier) j.bouclier = sc.bouclier;
+    (sc.bonus || []).forEach(([type, dx, dy]) => M.bonus.push({ type, x: j.x + dx, y: j.y + dy, tau: 0.5 }));
+    M.bonusT = 30; M.pluieT = 30;
+    if (sc.filante) M.etoileFilante = { x: j.x + sc.filante[0], y: j.y + sc.filante[1], k: sc.filante[2] };
+    M.temps = sc.temps;
+    // Gloups mange un instant tout seul (il garde son vrai rendu de joueur)
+    j.auto = true; j.p = parametresRobot(0.8);
+    mode = 'jeu'; montrer(null);
+    viderSprites(); majCamera(0, true);
+    const pas = Math.round(sc.secondes * 60);
+    for (let n = 0; n < pas; n++) { majMonde(M, 1 / 60, null); majCamera(1 / 60); }
+    if (sc.filante && !M.etoileFilante) M.etoileFilante = { x: j.x + sc.filante[0], y: j.y + sc.filante[1], k: sc.filante[2] };
+    else if (M.etoileFilante) M.etoileFilante.k = sc.filante ? sc.filante[2] : M.etoileFilante.k;
+    j.auto = false; j.p = null;
+    M.temps = sc.temps; M.secousse = 0;
+    // Gloups, les yeux grands ouverts, regarde le géant qui rôde
+    if (sc.regard) {
+      const geant = M.trous.find((h) => h.geant);
+      if (geant) { const dx = geant.x - j.x, dy = geant.y - j.y, d = Math.hypot(dx, dy) || 1; j.rx = dx / d; j.ry = dy / d; geant.rx = -j.rx; geant.ry = -j.ry; geant.miam = 0; geant.cligne = 0; }
+      j.miam = 0; j.cligne = 0;
+    }
+    // rivaux posés près de Gloups une fois qu'il a bougé (même forme que « rivaux »)
+    (sc.rivauxApres || []).forEach(([n, masse, dx, dy]) => {
+      const h = robots[n]; if (!h) return;
+      h.masse = masse; h.R = rayonDe(masse); h.Rv = h.R; h.score = Math.round(masse * 0.8); h.miam = 0;
+      const x = clamp(j.x + dx, 20, M.W - 20), y = clamp(j.y + dy, 20, M.H - 20);
+      if (!bloque(M, x, y)) { h.x = x; h.y = y; const d = Math.hypot(dx, dy) || 1; h.rx = -dx / d; h.ry = -dy / d; }
+    });
+    M.classement = M.trous.slice().sort((a, b) => b.masse - a.masse || b.score - a.score);
+    M.classement.forEach((h, n) => { h.rang = n + 1; });
+    // Puis la partie est figée : vraie barre du haut, mini-carte, flèches, sans fenêtre de pause.
+    $('hud').classList.add('actif'); majHUD(true);
+    hudBas = $('hud').getBoundingClientRect().bottom || 50;
+    clearTimeout(msgMinuterie); $('message').className = ''; astuce('');
+    majCamera(0, true);
+    mode = 'pause';
+  }
+
+  // --- Démarrage ---
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    creerDemo();
+    requestAnimationFrame(boucle);
+  }
   // Fin du jeu
 })();
 </script>
