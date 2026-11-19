@@ -487,7 +487,7 @@
   "desc.vente": "Get back half of what it cost.",
   "tactile.tirer": "Fire",
   "tactile.recharger": "Reload",
-  "tactile.arme": "Next weapon",
+  "tactile.arme": "Switch weapon",
   "tactile.grenade": "Grenade",
   "tactile.kit": "Medkit",
   "tactile.mine": "Mine",
@@ -8219,9 +8219,17 @@ void main() {
   const SIM = window.JEL_SIM;
   const D = SIM.DONNEES;
   const FX = SIM.FX;
-  // Sons : muets pendant la démonstration de l'écran titre.
+  // Affiche (jaquette) et images du jeu (page du jeu) : window.JEL_AFFICHE et window.JEL_APERCU (1, 2 ou 3)
+  // sont posés seulement par le robot du site, jamais par le jeu (CONSIGNES-JEU.md, section 5). Dans ces
+  // deux cas : aucun son, rien d'écrit dans la sauvegarde (voir la section 6, en fin de fichier).
+  const AFFICHE = !!window.JEL_AFFICHE;
+  const APERCU = AFFICHE ? 0 : [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+  const POUR_LE_ROBOT = AFFICHE || APERCU > 0;
+  // Sons : muets pendant la démonstration de l'écran titre (et toujours pour l'affiche et les images du jeu).
   const SON_BRUT = window.SAS_SON;
-  const SON = {
+  const SON = POUR_LE_ROBOT ? {
+    demarrer: () => {}, couper: () => {}, volume: () => {}, pause: () => {}, jouer: () => {}, clic: () => {}, ambiance: () => {}, battement: () => {},
+  } : {
     demarrer: () => SON_BRUT.demarrer(),
     couper: (oui) => SON_BRUT.couper(oui),
     volume: (v) => SON_BRUT.volume(v),
@@ -8283,6 +8291,7 @@ void main() {
 
   // Écrit la sauvegarde. extra : { niveau, score, partie } (la progression de la partie en cours).
   function ecrireSauvegarde(extra) {
+    if (POUR_LE_ROBOT) return;                             // affiche, images du jeu : rien n'est enregistré
     const donnees = Object.assign({ xp: meta.xp, record: meta.record, options: meta.options }, extra || {});
     try { window.JEL_SAVE.save(JEU, donnees); } catch (e) { /* sans stockage : le jeu continue */ }
   }
@@ -9647,7 +9656,7 @@ void main() {
       const E = partie.etat;
       ecrireSauvegarde({ niveau: E.v, score: E.j[partie.camp].sc, partie: { vs: VERSION_ETAT, snap: partie.s.instantane() } });
     }
-    if (!modeDemo && window.FMG) window.FMG.reportEnd({ completed: false, level: v });
+    if (!modeDemo && !POUR_LE_ROBOT && window.FMG) window.FMG.reportEnd({ completed: false, level: v });
     if (meta.record.vague < v && !modeDemo) fil(t('fil.record', { n: v }), false);
   }
 
@@ -10141,7 +10150,7 @@ void main() {
   $('b-pause-options').addEventListener('click', () => ouvrirOptions('pause'));
   $('b-pause-aide').addEventListener('click', () => ouvrirAide('pause'));
   $('b-accueil').addEventListener('click', () => { garderPartie(); SON.pause(false); allerAccueil(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden && etatJeu === 'jeu' && tempsArretable()) ouvrirPause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && etatJeu === 'jeu' && tempsArretable() && !POUR_LE_ROBOT) ouvrirPause(); });
 
   // Touches dans les menus.
   function toucheMenu(code, e) {
@@ -10190,7 +10199,7 @@ void main() {
     // La partie est finie : on garde l'expérience, le record et les réglages. Seul : plus rien à
     // reprendre ; à plusieurs : la partie gardée du bouton « Jouer », s'il y en a une, reste là.
     if (solo) ecrireSauvegarde({ niveau: 1, score: 0, partie: null }); else ecrireSauvegarde();
-    if (window.FMG) window.FMG.reportEnd({ completed: false, level: E.v });
+    if (!POUR_LE_ROBOT && window.FMG) window.FMG.reportEnd({ completed: false, level: E.v });
 
     $('fin-titre').textContent = t('fin.titre');
     $('fin-raison').textContent = t(E.rf === 1 ? 'fin.sas' : 'fin.equipe');
@@ -10584,7 +10593,7 @@ void main() {
 
     // Appareil trop lent : on dessine moins de points (une fois ou deux, pas plus).
     cumulImages += dtReel; nImages += 1;
-    if (nImages >= 90) {
+    if (nImages >= 90 && !APERCU) {
       if (cumulImages / nImages > 0.03 && echelleRendu > 0.6 && !document.hidden) { echelleRendu *= 0.8; redimensionner(); }
       cumulImages = 0; nImages = 0;
     }
@@ -10620,9 +10629,239 @@ void main() {
     }
   }
 
+  // ==========================================================================
+  // 6. Affiche (jaquette) et images du jeu (page du jeu)
+  // window.JEL_AFFICHE et window.JEL_APERCU (1, 2 ou 3) : posés seulement par le robot du site, jamais
+  // par le jeu (CONSIGNES-JEU.md, section 5). Ni son, ni sauvegarde, ni fin de partie signalée.
+  // ==========================================================================
+
+  // Hasard répétable (la même image à chaque capture).
+  function hasardFixe(graine) {
+    let g = graine >>> 0;
+    return () => { g = (g + 0x6D2B79F5) | 0; let x = Math.imul(g ^ (g >>> 15), 1 | g); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  // --- L'affiche : scène composée, sans interface ni texte -------------------------------
+  // Un défenseur en grand, de trois quarts, tire sur la matriarche qui charge au milieu des rampants ;
+  // une grenade explose derrière la nuée, la planète aux anneaux domine le canyon. Les aliens, le
+  // défenseur, l'arme et le décor sont ceux du jeu.
+  function dessinerAffiche() {
+    const h = hasardFixe(20261119);
+    Math.random = hasardFixe(77);                          // étincelles et giclées : les mêmes à chaque image
+    const T = 7.3;                                         // instant figé (poches et mandibules des aliens)
+    moteur.redimensionner(innerWidth, innerHeight, Math.min(window.devicePixelRatio || 1, 2));
+    moteur.vider();
+    moteur.ambiance({ nuit: 0.5 });
+    // Caméra basse, derrière l'épaule du défenseur : le monstre domine, la planète aux anneaux en haut à droite.
+    // Écran large : même hauteur de champ, le décor continue sur les côtés.
+    Object.assign(cam, { x: 1.7, y: 1.2, z: 7.4, lacet: 0.12, tangage: 0.13, fov: 64, temps: T, secousse: 0 });
+    moteur.debut(cam);
+    dessinerDecor();
+    for (let i = 0; i < 3; i++) { const G = CARTE.galeries[i]; moteur.disque(G[0], G[1], 3.4, 0.03, 0.01, 0.04, 0.92); }
+
+    // La matriarche, au centre, qui charge vers le défenseur (poches lumineuses).
+    const MX = 0.6, MZ = 19.5, M = CREA.matriarche;
+    moteur.poser(M.maillage, MX, 0, MZ, Math.PI - 0.12, 1.32, 1.15, 1, 1.1, 0, 2.2, 1, 0.12, 1);
+    moteur.disque(MX, MZ, 3.6, 0, 0, 0, 0.45);
+    moteur.lumiere(MX - 0.4, 3.4, MZ - 3.4, 0.95, 0.3, 0.8, 9);   // lueur magenta qui éclaire le monstre de face
+    // Les rampants qui déferlent devant elle, et deux guerriers sur les côtés.
+    const RAMPANTS = [[-3.2, 15.5, 0.3], [-1.6, 14.2, -0.2], [2.4, 14.6, 0.1], [4.8, 16.6, -0.5], [-5.6, 17.6, 0.6], [0.2, 16.2, 0], [-2.4, 17.6, 0.2], [6.3, 19, -0.3], [-0.6, 13.2, 0.4]];
+    RAMPANTS.forEach(([x, z, la], i) => {
+      const saut = i === 1 || i === 8 ? 0.5 : 0;
+      moteur.poser(CREA.rampant.maillage, x, saut, z, Math.PI + la, 1.15, 1, 1, 1, 0, i * 1.7, 1, 0, 1);
+      moteur.disque(x, z, 0.7, 0, 0, 0, 0.4);
+    });
+    moteur.poser(CREA.guerrier.maillage, -6.8, 0, 21.5, Math.PI + 0.35, 1.25, 1, 1, 1, 0, 1.1, 1, 0, 1);
+    moteur.poser(CREA.guerrier.maillage, 7.6, 0, 22.5, Math.PI - 0.4, 1.25, 1, 1, 1, 0, 2.9, 1, 0, 1);
+    moteur.poser(CREA.cracheur.maillage, 10.5, 0, 26, Math.PI - 0.5, 1.2, 1, 1, 1, 0, 0.6, 1, 0, 1);
+
+    // Grenade qui explose à gauche, derrière la nuée.
+    const GX = -2.6, GZ = 23;
+    moteur.lumiere(GX, 1.6, GZ, 1, 0.55, 0.18, 10);
+    moteur.particule(GX, 1.2, GZ, 0, 0, 0, 1, 3.4, 3.4, 1, 0.62, 0.22, 0.9, 0, 1);
+    for (let i = 0; i < 34; i++) {
+      const a = h() * TAU, r = h() * 2.6, y = 0.4 + h() * 3.2;
+      moteur.particule(GX + Math.cos(a) * r, y, GZ + Math.sin(a) * r * 0.7, 0, 0, 0, 1, 0.5 + h() * 0.9, 0.5, 1, 0.5 + h() * 0.4, 0.15, 0.95, 0, 1);
+    }
+    for (let i = 0; i < 16; i++) {
+      const a = h() * TAU, r = 1 + h() * 2.5;
+      moteur.particule(GX + Math.cos(a) * r, 2 + h() * 3, GZ + Math.sin(a) * r, 0, 0, 0, 1, 1.4 + h(), 1.4, 0.2, 0.17, 0.2, 0.55, 0, 0);
+    }
+
+    // Le défenseur, en grand, de trois quarts, arme épaulée vers la matriarche.
+    const DX = 3.1, DZ = 11.2;
+    const laD = Math.atan2(MX - DX, MZ - DZ) - 0.1;
+    if (MAILLES['astronaut-a']) moteur.poser(MAILLES['astronaut-a'], DX, 0, DZ, laD + ORIENTATION_ASTRONAUTE, 2.45, 0.95, 0.97, 1.05, 0, 0, 0, 0, 1);
+    moteur.disque(DX, DZ, 0.75, 0, 0, 0, 0.5);
+    // Son fusil (modèle du jeu), tenu à hauteur d'épaule ; le canon regarde vers le monstre.
+    const s = Math.sin(laD), c = Math.cos(laD);
+    const ax = DX + s * 1.2 - c * 0.22, az = DZ + c * 1.2 + s * 0.22, ay = 1.1;
+    const mA = new Float32Array(16);
+    moteur.mat.trs(mA, ax, ay, az, laD + Math.PI, 1.0, 1.0, 1.0);
+    if (MAILLES['blaster-e']) moteur.poserMat(MAILLES['blaster-e'], mA, 1, 1, 1, 0, 0, 0, 0, 1);
+    // Bouche du canon : éclair, rafale de traits lumineux jusqu'au monstre, éclaboussures d'acide sur lui.
+    const bx = ax + s * 0.08, bz = az + c * 0.08, by = ay + 0.04;
+    moteur.lumiere(bx, by + 0.2, bz, 1, 0.75, 0.35, 4);
+    moteur.particule(bx, by, bz, 0, 0, 0, 1, 0.55, 0.55, 1, 0.85, 0.45, 1, 0, 1);
+    moteur.particule(bx, by, bz, 0, 0, 0, 1, 0.25, 0.25, 1, 1, 0.9, 1, 0, 1);
+    const cibles = [[MX - 0.3, 3.1, MZ - 1.6], [MX + 0.5, 2.6, MZ - 1.7], [MX - 0.1, 3.5, MZ - 1.4]];
+    cibles.forEach(([x, y, z], i) => {
+      moteur.traceur(bx + (x - bx) * 0.08 * i, by + (y - by) * 0.08 * i, bz + (z - bz) * 0.08 * i, x, y, z, 0.07, 1, 0.78, 0.35, 0.12);
+      for (let n = 0; n < 7; n++) moteur.particule(x + (h() - 0.5) * 0.8, y + (h() - 0.5) * 0.8, z - h() * 0.4, 0, 0, 0, 1, 0.16 + h() * 0.14, 0.1, 0.55, 1, 0.25, 0.95, 0, 1);
+    });
+    // Contre-jour : une lueur chaude derrière le défenseur dessine sa silhouette ; le sas, dans le dos, éclaire en cyan.
+    moteur.lumiere(DX - 0.6, 2.2, DZ + 1.6, 0.9, 0.5, 0.3, 3);
+    moteur.lumiere(DX + 1.4, 1.8, DZ - 1.6, 0.25, 0.6, 0.85, 4);
+    // Poussière soulevée par la charge.
+    for (let i = 0; i < 22; i++) {
+      const x = MX + (h() - 0.5) * 9, z = MZ - 2 + h() * 3;
+      moteur.particule(x, 0.3 + h() * 1.2, z, 0, 0, 0, 1, 1 + h() * 1.4, 1, 0.62, 0.38, 0.26, 0.35, 0, 0);
+    }
+    // Premier plan : cailloux coupés par le bord du bas.
+    if (MAILLES['rocks-small-a']) moteur.poser(MAILLES['rocks-small-a'], -1.2, 0, 8.4, 0.7, 3.2, 0.78, 0.5, 0.42, 0, 0, 0, 0, 1);
+    if (MAILLES['rock-large-b']) moteur.poser(MAILLES['rock-large-b'], -4.2, -0.3, 8.6, 1.9, 2.2, 0.55, 0.36, 0.34, 0, 0, 0, 0, 1);
+    moteur.fin();
+  }
+
+  function demarrerAffiche() {
+    const cacher = () => {
+      for (const el of document.querySelectorAll('.ecran, #ath, .jel-langue, jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+    };
+    cacher();
+    setTimeout(cacher, 300);
+    setTimeout(cacher, 1200);
+    // La scène est redessinée à chaque image (même instant) : elle suit les changements de taille.
+    const boucleAffiche = () => { if (!moteur.perdu) dessinerAffiche(); requestAnimationFrame(boucleAffiche); };
+    requestAnimationFrame(boucleAffiche);
+  }
+
+  // --- Les images du jeu : une vraie partie, avec sa vraie interface ------------------------
+  // La partie (seul, sur l'appareil) est lancée et jouée en accéléré quelques secondes (la vague part,
+  // les premiers aliens sortent des galeries) ; puis le moment est posé : aliens devant le joueur,
+  // tourelles qui tirent, tir du joueur, et la partie est figée sans fenêtre de pause : ni victoire,
+  // ni défaite, ni son, ni sauvegarde.
+  //   1 = vague 3 : la nuée de rampants, pistolet en main, une tourelle ;
+  //   2 = vague 9 : guerriers, cracheur, bombardier et blindé, fusil d'assaut, tourelles et barricades ;
+  //   3 = vague 20, de nuit : la matriarche, sa barre de vie et ses œufs, lance-plasma, quatre capacités.
+  // tourelles : [emplacement, type (1 mitrailleuse, 2 lourde), niveau] ; barricades : emplacements ;
+  // aliens : [type, distance (m), angle par rapport au regard (rad)], le premier est visé.
+  const SCENES_APERCU = {
+    1: { vague: 3, xp: 0, secondes: 3, joueur: [1.5, 8.5], lacet: 0.04, arme: 0, armes: 1, credits: 165, kits: 1, grenades: 1, mines: 0, pv: 100, sas: 0.97,
+      tourelles: [[5, 1, 1]], barricades: [],
+      aliens: [[0, 6.5, -0.08], [0, 8.5, 0.2], [0, 9.5, -0.3], [0, 11.5, 0.05], [0, 5.2, 0.34], [0, 13, 0.3], [0, 14, -0.18], [1, 15.5, -0.02]] },
+    2: { vague: 9, xp: 3800, secondes: 4, joueur: [0, 9.5], lacet: -0.04, arme: 1, armes: 3, credits: 420, kits: 2, grenades: 3, mines: 1, pv: 76, sas: 0.81,
+      tourelles: [[0, 1, 2], [1, 1, 2], [4, 2, 1], [5, 1, 1]], barricades: [1, 2],
+      aliens: [[1, 9.5, 0.03], [2, 16, 0.3], [4, 7.5, -0.27], [0, 11.5, -0.14], [0, 13, 0.18], [0, 8.2, 0.36], [0, 15.5, -0.33], [3, 21, -0.06], [1, 18, 0.16]], crachat: 1 },
+    3: { vague: 20, xp: 12500, secondes: 4, joueur: [3.5, 8], lacet: -0.14, arme: 4, armes: 31, credits: 980, kits: 2, grenades: 4, mines: 2, pv: 58, sas: 0.46, nuit: 0.72,
+      tourelles: [[0, 2, 3], [1, 2, 2], [2, 1, 3], [3, 1, 3], [4, 1, 2], [5, 2, 2]], barricades: [1, 2, 3],
+      aliens: [[5, 11.5, 0], [6, 9.5, -0.36], [6, 10, -0.24], [6, 10.5, 0.3], [0, 7, 0.2], [0, 8, -0.15], [4, 9, 0.36], [2, 17, 0.38], [1, 16, -0.4]] },
+  };
+
+  // Un alien posé à (x, y), tourné vers (versX, versY) ; pas : phase de la marche (pattes).
+  function poserAlien(E, type, x, y, versX, versY, pas) {
+    const A = ALIENS[type];
+    const pv = Math.round(A.pv * (1 + D.vague.pvParVague * (Math.min(E.v, 20) - 1)) * (type === 5 ? 2.1 : 1));
+    const vx = versX - x, vy = versY - y, l = Math.hypot(vx, vy) || 1;
+    const e = { i: E.n++, t: type, x, y, dx: vx / l, dy: vy / l, pv, pm: pv, c: 1, ci: 0, cd: 30, d: pas, st: 0, sl: 0, ph: 1, tm: 100, mo: 0 };
+    E.e.push(e);
+    return e;
+  }
+
+  function ouvrirApercu(n) {
+    const sc = SCENES_APERCU[n];
+    Math.random = hasardFixe(4242 + n * 7919);              // effets répétables
+    meta.xp = sc.xp;
+    meta.options.tuto = true;
+    typePartie = 'solo';
+    modeDemo = false;
+    partie = pJeu;
+    viderMonde();
+    gradeJoueur = gradeDe(meta.xp);
+    pJeu.local({ graine: 9100 + n, config: { joueurs: 1, vague: sc.vague }, camp: 0 });
+    pJeu.pause(true);                                      // le temps ne passe que quand on le fait avancer ici
+    entrerEnJeu(true, 0);
+    const E = partie.etat, J = E.j[0];
+    // Défenses en place, joueur solide le temps de la mise en place ; la vague part tout de suite.
+    for (const [emp, type, niveau] of sc.tourelles) { const T = E.tu[emp]; T.t = type; T.n = niveau; T.pv = 1e6; }
+    for (const b of sc.barricades) E.ba[b].pv = 1e6;
+    J.x = sc.joueur[0]; J.y = sc.joueur[1]; J.pv = 1e6; J.pr = 1;
+    E.sas = 1e9;
+    const ticks = Math.round(sc.secondes * TPS);
+    for (let i = 0; i < ticks && !partie.s.resultat; i++) { J.x = sc.joueur[0]; J.y = sc.joueur[1]; J.pv = 1e6; pJeu.cad.pas(); }
+    // Le moment posé : les aliens devant le joueur, chacun tourné vers lui.
+    const px = sc.joueur[0], py = sc.joueur[1];
+    const poses = sc.aliens.map(([type, d, a], k) => {
+      const ang = sc.lacet + a;
+      return poserAlien(E, type, px + Math.sin(ang) * d, py + Math.cos(ang) * d, px, py, k * 1.9 + 0.4);
+    });
+    for (const e of poses) {
+      if (e.t === 5) { e.ph = 2; e.pv = Math.round(e.pm * 0.62); }
+      if (e.t === 6) e.tm = 40;
+    }
+    // État affiché : vie, sas, défenses, munitions, objets, crédits plausibles.
+    for (const [emp, type, niveau] of sc.tourelles) { const T = E.tu[emp]; T.pv = Math.round(D.tourelles[type].pv[niveau - 1] * 0.8); }
+    for (const b of sc.barricades) E.ba[b].pv = Math.round(D.barricade.pv * 0.7);
+    E.sasMax = Math.round(D.sas.pv); E.sas = Math.round(E.sasMax * sc.sas);
+    J.x = px; J.y = py; J.la = sc.lacet;
+    J.pv = sc.pv; J.cr = sc.credits; J.ki = sc.kits; J.gr = sc.grenades; J.mn = sc.mines;
+    J.ar = sc.armes; J.ac = sc.arme;
+    for (let a = 0; a < ARMES.length; a++) if (J.ar & (1 << a)) { J.mu[a] = Math.max(1, Math.round(ARMES[a].chargeur * 0.7)); if (ARMES[a].reserve >= 0) J.re[a] = Math.round(ARMES[a].reserve * 0.6); }
+    J.ca = [0, 0, 0, 0].map((x, i) => (i === 1 ? Math.round(CAPACITES[1].recharge * TPS * 0.4) : 0));
+    // Les aliens sont là depuis un moment (pas de naissance qui grossit) ; la nuit sans transition.
+    for (const e of E.e) {
+      const v = { lacet: Math.atan2(e.dx, e.dy), eclat: 0, ne: -10, vu: E.k, x: e.x, z: e.y, echelle: 1 };
+      if (e.t === 5) v.echelle = 1 + Math.min(0.5, Math.floor((E.v - 1) / 5) * 0.08);
+      vues.set(e.i, v);
+    }
+    nuitVue = E.nuit ? sc.nuit || 1 : 0;                   // une vague de nuit, un peu éclaircie pour la photo
+    tempsJeu = 30;
+    // Le joueur, à sa place, vise le premier alien ; la balle vient de partir.
+    const cible = poses[0], A = ALIENS[cible.t], ech = vues.get(cible.i).echelle;
+    const dCible = Math.hypot(cible.x - px, cible.y - py);
+    Object.assign(moi, { x: px, y: py, arme: sc.arme, chargeur: J.mu.slice(), recharge: 0, prochainTir: 1e9, derniereAction: 1e9, recul: 0.7, rafale: 0.25 });
+    moi.lacet = Math.atan2(cible.x - px, cible.y - py);
+    moi.tangage = Math.atan2(A.hauteur * ech * 0.55 - HAUTEUR_YEUX, dCible) + (cible.t === 5 ? 0.12 : 0.05);
+    moi.envoiX = moi.x; moi.envoiY = moi.y; moi.envoiLacet = moi.lacet; moi.dernierEnvoi = 1e9;
+    poserCamera();
+    // Les tourelles tirent sur l'alien posé le plus proche d'elles.
+    dernierFx = E.k;
+    E.tu.forEach((T, emp) => {
+      if (!T.t) return;
+      const p = CARTE.tourelles[emp];
+      let proche = null, dm = D.tourelles[T.t].portee[T.n - 1];
+      for (const e of poses) { const d = Math.hypot(e.x - p[0], e.y - p[1]); if (d < dm && e.t !== 6) { dm = d; proche = e; } }
+      if (!proche) return;
+      T.dx = (proche.x - p[0]) / dm; T.dy = (proche.y - p[1]) / dm;
+      effet([E.k, FX.TOURELLE, emp, proche.x, proche.y], E);
+    });
+    // Un crachat d'acide en vol vers le joueur.
+    if (sc.crachat !== undefined) {
+      const e = poses[sc.crachat], V = D.crachat.vitesse, l = Math.hypot(px - e.x, py - e.y);
+      E.p.push({ i: E.n++, x: e.x + (px - e.x) * 0.35, y: e.y + (py - e.y) * 0.35, vx: (px - e.x) / l * V, vy: (py - e.y) / l * V, t: 20, d: 9, c: 1, ci: 0 });
+    }
+    // Mon tir : trait et éclaboussure sur la cible (ou boule de plasma en route vers la matriarche).
+    const s = Math.sin(moi.lacet), c = Math.cos(moi.lacet);
+    const bx = px + s * 0.7 + c * 0.2, bz = py + c * 0.7 - s * 0.2, by = cam.y - 0.16;
+    if (moi.arme === 4) {
+      projectiles.push({ genre: 5, x0: bx, z0: bz, y0: 1.3, x1: cible.x, z1: cible.y, t: 0, duree: 1 });
+      projectiles[projectiles.length - 1].t = 0.42;
+    } else {
+      const R = rayonDuRegard(0, 0), d = dCible - ALIENS[cible.t].rayon * 0.5;
+      const ix = R.ox + R.dx * d, iy = R.oy + R.dy * d, iz = R.oz + R.dz * d;
+      moteur.traceur(bx, by, bz, ix, iz, iy, 0.035, 1, 0.75, 0.35, 0.07);
+      const col = COULEUR_SANG[cible.t];
+      giclee(ix, iz, iy, 5, col[0], col[1], col[2], 2.2);
+      marqueurTouche(false);
+    }
+    eclairBouche = 1;
+    moi.cibleVue = cible;
+    $('fil').textContent = '';
+    $('annonce').hidden = true;
+  }
+
   // --- Démarrage ------------------------------------------------------------------------
   function demarrer() {
-    lireSauvegarde();
+    if (!POUR_LE_ROBOT) lireSauvegarde();                 // affiche, images du jeu : réglages par défaut
     if (!chargerMoteur()) {
       document.querySelectorAll('.ecran').forEach((e) => { e.hidden = true; });
       $('ecran-incompatible').hidden = false;
@@ -10632,11 +10871,13 @@ void main() {
     pDemo = window.JEL_TR.creer({ sim: window.JEL_SIM });
     pJeu = window.JEL_TR.creer({ sim: window.JEL_SIM, surEvenement });
     partie = pDemo;
+    if (AFFICHE) { demarrerAffiche(); return; }
     SON.volume(meta.options.volume / 10);
     SON.couper(meta.options.muet);
     majSon();
     redimensionner();
     construirePave();
+    if (APERCU) { ouvrirApercu(APERCU); requestAnimationFrame(image); return; }
 
     $('b-jouer').addEventListener('click', () => {
       pleinEcran();

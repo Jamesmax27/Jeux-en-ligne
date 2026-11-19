@@ -5123,6 +5123,224 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène
+  // composée, sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5).
+  // Le fuyard à la cape rouge court vers nous sur le sentier, lanterne au poing ; derrière
+  // lui, la Bête aux bois se dresse devant la pleine lune et tend sa griffe vers sa capuche.
+  // Ses cartes de course s'envolent dans le vent de la fuite.
+
+  // Une carte de course qui vole (centre x, y ; largeur l ; rot en radians ; dorée si rare).
+  function carteVolante(c, type, x, y, l, rot, rare) {
+    c.save(); c.translate(x, y); c.rotate(rot);
+    const h = l * 1.4;
+    c.shadowColor = rare ? '#ffd27a' : 'rgba(0,0,0,.6)'; c.shadowBlur = rare ? l * 0.5 : l * 0.25;
+    const g = c.createLinearGradient(0, -h / 2, 0, h / 2);
+    if (rare) { g.addColorStop(0, '#fff1b8'); g.addColorStop(1, '#e9b94a'); } else { g.addColorStop(0, '#f6ead0'); g.addColorStop(1, '#cdb68a'); }
+    c.fillStyle = g; rr(c, -l / 2, -h / 2, l, h, l * 0.14); c.fill();
+    c.shadowBlur = 0;
+    c.strokeStyle = rare ? '#9a6a00' : '#6d5230'; c.lineWidth = l * 0.05; c.stroke();
+    c.strokeStyle = rare ? '#c79a2a' : '#a88a5a'; c.lineWidth = l * 0.025; rr(c, -l * 0.38, -h * 0.4, l * 0.76, h * 0.8, l * 0.1); c.stroke();
+    iconeCarte(c, type, 0, 0, l * 0.62);
+    c.restore();
+  }
+
+  // Le fuyard en pleine course, en grand : origine aux hanches, 1 unité = s pixels.
+  // Il court vers la gauche, cape au vent, lanterne tendue devant lui.
+  function fuyardCourse(c, x, y, s, t) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    // ombre au sol, poussée vers la droite par la lanterne
+    c.fillStyle = 'rgba(0,0,0,.5)'; ell(c, 14, 50, 50, 8); c.fill();
+    const cape = () => {
+      c.beginPath(); c.moveTo(-14, -46);
+      c.bezierCurveTo(14, -54, 52, -34, 80, -12);
+      c.lineTo(68, -2); c.lineTo(78, 14); c.lineTo(58, 10); c.lineTo(62, 28); c.lineTo(40, 20);
+      c.lineTo(36, 38); c.lineTo(16, 26); c.lineTo(4, 34); c.lineTo(-6, 18);
+      c.closePath();
+    };
+    const capuche = () => {
+      c.beginPath(); c.moveTo(-31, -44);
+      c.bezierCurveTo(-36, -72, -16, -90, 10, -88);
+      c.bezierCurveTo(24, -86, 22, -66, 17, -42);
+      c.quadraticCurveTo(-8, -32, -31, -44); c.closePath();
+    };
+    // contour de lune (lumière froide derrière lui) : la même forme, décalée
+    c.fillStyle = '#bcd2ff';
+    c.save(); c.translate(2.4, -2); cape(); c.fill(); capuche(); c.fill(); c.restore();
+    // jambe arrière, repliée haut derrière lui
+    c.strokeStyle = '#1a140f'; c.lineWidth = 11;
+    c.beginPath(); c.moveTo(6, 4); c.lineTo(22, 22); c.lineTo(40, 22); c.stroke();
+    c.fillStyle = '#120d09'; ell(c, 44, 22, 8, 5, -0.3); c.fill();
+    // cape qui flotte : rouge vif côté lanterne, sombre côté Bête
+    let g = c.createLinearGradient(-20, 0, 80, 0);
+    g.addColorStop(0, '#ff6a5e'); g.addColorStop(0.45, '#d6343c'); g.addColorStop(1, '#6a1418');
+    c.fillStyle = g; c.strokeStyle = '#5a1014'; c.lineWidth = 2.2; cape(); c.fill(); c.stroke();
+    // plis de la cape
+    c.strokeStyle = 'rgba(60,5,10,.55)'; c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(4, -40); c.quadraticCurveTo(30, -26, 52, 8); c.moveTo(18, -44); c.quadraticCurveTo(48, -30, 66, -4); c.moveTo(-4, -30); c.quadraticCurveTo(10, -6, 18, 24); c.stroke();
+    // corps (tunique), penché en avant
+    g = c.createLinearGradient(-24, 0, 14, 0);
+    g.addColorStop(0, '#ff7a6c'); g.addColorStop(1, '#b8262e');
+    c.fillStyle = g; c.strokeStyle = '#5a1014'; c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(-24, -40); c.lineTo(12, -40); c.quadraticCurveTo(16, -10, 12, 10); c.lineTo(-14, 12); c.quadraticCurveTo(-24, -14, -24, -40); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#3a2416'; rr(c, -15, 2, 28, 5, 2); c.fill();
+    // jambe avant, lancée vers nous
+    c.strokeStyle = '#2a2119'; c.lineWidth = 12;
+    c.beginPath(); c.moveTo(-6, 6); c.lineTo(-24, 22); c.lineTo(-26, 42); c.stroke();
+    c.fillStyle = '#17110c'; ell(c, -30, 45, 10, 5.5, 0.15); c.fill();
+    c.fillStyle = 'rgba(255,190,110,.35)'; ell(c, -33, 43, 5, 2.2, 0.15); c.fill();
+    // capuche (lumière chaude de la lanterne à gauche)
+    g = c.createLinearGradient(-34, 0, 22, 0);
+    g.addColorStop(0, '#ff8a76'); g.addColorStop(0.5, '#e5484d'); g.addColorStop(1, '#8a1d22');
+    c.fillStyle = g; c.strokeStyle = '#5a1014'; c.lineWidth = 2.2; capuche(); c.fill(); c.stroke();
+    // visage dans l'ombre de la capuche, grands yeux apeurés qui regardent en arrière
+    c.fillStyle = '#120d0a'; ell(c, -9, -58, 13, 15, 0.1); c.fill();
+    c.fillStyle = '#ffffff'; ell(c, -14, -60, 3.8, 4.4); c.fill(); ell(c, -3.5, -60, 3.8, 4.4); c.fill();
+    c.fillStyle = '#120d0a'; rond(c, -12.6, -60.5, 1.7); c.fill(); rond(c, -2.1, -60.5, 1.7); c.fill();
+    // bras tendu qui porte la lanterne
+    c.strokeStyle = '#c42f37'; c.lineWidth = 9;
+    c.beginPath(); c.moveTo(-18, -36); c.quadraticCurveTo(-36, -26, -50, -42); c.stroke();
+    c.fillStyle = '#3a2c1e'; rond(c, -51, -43, 4.6); c.fill();
+    c.strokeStyle = '#2b2116'; c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(-51, -40); c.lineTo(-52, -32); c.stroke();
+    lanterneDessin(c, -52, -22, 12, t, false);
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d'), t = 900;
+    // Composition dans un cadre 600 × 800 centré ; le ciel et le sol remplissent tout l'écran.
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    const xg = -ox / k, xd = 600 + ox / k, yh = -oy / k, yb = 800 + oy / k;
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    const HZ = 458;                                   // ligne d'horizon
+    // ciel de pleine lune, bleu profond
+    let g = c.createLinearGradient(0, yh, 0, HZ);
+    g.addColorStop(0, '#1b2a5c'); g.addColorStop(0.6, '#33477e'); g.addColorStop(1, '#4a5d8c');
+    c.fillStyle = g; c.fillRect(xg, yh, xd - xg, HZ - yh + 2);
+    const al = graineHasard(7);
+    for (let i = 0; i < 110; i++) { c.fillStyle = 'rgba(255,255,240,' + (0.35 + al() * 0.6).toFixed(2) + ')'; rond(c, xg + al() * (xd - xg), yh + al() * (HZ - yh) * 0.7, al() * 1.5 + 0.4); c.fill(); }
+    // la pleine lune, énorme, derrière la Bête
+    const lx = 418, ly = 222, lr = 112;
+    halo(c, lx, ly, lr * 3.6, '#cfe0ff', 0.5);
+    halo(c, lx, ly, lr * 1.6, '#eef4ff', 0.55);
+    c.fillStyle = '#f6f2e2'; rond(c, lx, ly, lr); c.fill();
+    c.fillStyle = 'rgba(170,170,160,.35)';
+    rond(c, lx - lr * 0.35, ly - lr * 0.25, lr * 0.2); c.fill(); rond(c, lx + lr * 0.3, ly + lr * 0.32, lr * 0.14); c.fill(); rond(c, lx + lr * 0.42, ly - lr * 0.4, lr * 0.1); c.fill();
+    // forêt lointaine, bleutée sous la lune
+    c.fillStyle = '#22325a';
+    c.beginPath(); c.moveTo(xg, HZ);
+    for (let x = xg; x <= xd + 1; x += 18) c.lineTo(x, HZ - 26 - Math.abs(Math.sin(x * 0.045)) * 22);
+    c.lineTo(xd, HZ + 10); c.lineTo(xg, HZ + 10); c.fill();
+    const al2 = graineHasard(31);
+    for (let i = 0; i < 16; i++) {
+      const x = xg + (i + 0.2 + al2() * 0.6) / 16 * (xd - xg);
+      arbre(c, x, HZ + 4, 120 + al2() * 90, '#1a2748', al2, 0, t, 0.8);
+    }
+    // brume au pied des arbres
+    for (let i = 0; i < 6; i++) { c.fillStyle = 'rgba(170,190,225,.13)'; ell(c, xg + (i / 5) * (xd - xg), HZ + 4 + (i % 2) * 10, 170, 22); c.fill(); }
+    // sol
+    g = c.createLinearGradient(0, HZ, 0, yb);
+    g.addColorStop(0, '#1d2a2a'); g.addColorStop(0.4, '#111a16'); g.addColorStop(1, '#060a08');
+    c.fillStyle = g; c.fillRect(xg, HZ + 6, xd - xg, yb - HZ);
+    // le sentier qui file vers la forêt, éclairé par la lanterne
+    g = c.createLinearGradient(0, HZ, 0, 800);
+    g.addColorStop(0, '#4a3e30'); g.addColorStop(0.5, '#5a4632'); g.addColorStop(1, '#2c2318');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(20, 800); c.bezierCurveTo(140, 680, 300, 560, 352, HZ + 8);
+    c.lineTo(392, HZ + 8); c.bezierCurveTo(400, 560, 470, 680, 560, 800); c.closePath(); c.fill();
+    [[372, 478, 14], [356, 506, 20], [330, 548, 28], [380, 590, 30], [300, 650, 40], [420, 690, 44], [250, 745, 56], [440, 770, 50]].forEach((p) => {
+      c.fillStyle = '#6e5c47'; ell(c, p[0], p[1], p[2], p[2] * 0.32); c.fill();
+      c.fillStyle = 'rgba(255,220,170,.12)'; ell(c, p[0] - p[2] * 0.2, p[1] - p[2] * 0.08, p[2] * 0.6, p[2] * 0.14); c.fill();
+    });
+    // la Bête aux bois, dressée devant la lune : d'abord une lueur bleutée tout autour
+    const bx = 400, by = 318, br = 160, bs = br / 50;
+    c.save(); c.shadowColor = '#a9c4ff'; c.shadowBlur = 34 * k * dpr; bete(c, 0, bx, by, br, t, true); c.restore();
+    // son bras qui se lève derrière le fuyard (la main griffue est dessinée après lui)
+    c.save(); c.translate(bx, by); c.scale(bs, bs);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.shadowColor = '#a9c4ff'; c.shadowBlur = 18 * k * dpr;
+    c.strokeStyle = '#120b0e'; c.lineWidth = 10;
+    c.beginPath(); c.moveTo(-22, 2); c.quadraticCurveTo(-42, -6, -31, -33); c.stroke();
+    c.shadowBlur = 0; c.fillStyle = '#120b0e';
+    // fourrure hérissée sur le bras
+    for (let i = 0; i < 4; i++) { const px = -28 - i * 4, py = -2 - i * 6; c.beginPath(); c.moveTo(px + 2, py + 2); c.lineTo(px - 7, py - 1); c.lineTo(px + 1, py - 4); c.fill(); }
+    c.restore();
+    // griffe levée au-dessus de la capuche
+    const griffe = () => {
+      c.save(); c.translate(bx, by); c.scale(bs, bs);
+      c.lineCap = 'round'; c.lineJoin = 'round';
+      c.shadowColor = '#a9c4ff'; c.shadowBlur = 16 * k * dpr;
+      c.fillStyle = '#120b0e'; ell(c, -31, -36, 10, 8, -0.6); c.fill();
+      // doigts noirs puis longues griffes pâles, recourbées vers la capuche
+      c.shadowBlur = 0;
+      c.strokeStyle = '#120b0e'; c.lineWidth = 4.5;
+      const doigts = [[-37, -43, -43, -45, -54, -40], [-39, -38, -46, -37, -55, -29], [-38, -33, -44, -29, -50, -20], [-34, -29, -38, -24, -40, -14]];
+      doigts.forEach((d) => { c.beginPath(); c.moveTo(-31, -36); c.lineTo(d[2], d[3]); c.stroke(); });
+      c.shadowColor = '#fff6d8'; c.shadowBlur = 10 * k * dpr;
+      c.fillStyle = '#f2ead6';
+      doigts.forEach((d) => {
+        // griffe pleine qui s'effile, de la phalange (d[2], d[3]) à la pointe (d[4], d[5])
+        const ax = d[2], ay = d[3], px = d[4], py = d[5], dx = px - ax, dy = py - ay, n = Math.hypot(dx, dy) || 1;
+        const nx = -dy / n * 2.2, ny = dx / n * 2.2, mx = (ax + px) / 2 - ny * 1.4, my = (ay + py) / 2 + nx * 1.4;
+        c.beginPath(); c.moveTo(ax + nx, ay + ny); c.quadraticCurveTo(mx + nx * 0.6, my + ny * 0.6, px, py);
+        c.quadraticCurveTo(mx - nx * 0.6, my - ny * 0.6, ax - nx, ay - ny); c.closePath(); c.fill();
+      });
+      c.restore();
+    };
+    // yeux encore plus brillants
+    halo(c, bx - 8 * bs, by - 20 * bs, 34, '#ff2a1a', 0.55); halo(c, bx + 8 * bs, by - 20 * bs, 34, '#ff2a1a', 0.55);
+    c.fillStyle = '#ffd0c0'; ell(c, bx - 8 * bs, by - 20 * bs, 5, 3, 0.3); c.fill(); ell(c, bx + 8 * bs, by - 20 * bs, 5, 3, -0.3); c.fill();
+    // la lumière chaude de la lanterne, qui éclaire le fuyard et le sentier
+    const fx = 238, fy = 478, fs = 2.75;
+    const lax = fx - 52 * fs, lay = fy - 22 * fs;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    halo(c, lax, lay, 250, '#ff9a3c', 0.32);
+    halo(c, lax, lay, 110, '#ffcf7a', 0.35);
+    c.restore();
+    // cartes de course arrachées par le vent de la fuite
+    carteVolante(c, 'c', 462, 400, 44, 0.55, false);
+    carteVolante(c, 'b', 478, 528, 54, -0.35, true);
+    carteVolante(c, 'f', 392, 604, 36, -0.2, false);
+    // le fuyard, en grand, puis la griffe qui le guette
+    fuyardCourse(c, fx, fy, fs, t);
+    griffe();
+    // grands arbres tordus aux bords, lanternes suspendues
+    const al3 = graineHasard(5);
+    arbre(c, Math.min(-30, xg + 14), 830, 760, '#05080b', al3, 2, t, 0.45);
+    arbre(c, Math.max(606, xd - 14), 830, 800, '#05080b', al3, 3, t, 0.45);
+    // yeux dans les fourrés
+    [[60, 520], [548, 600], [120, 640]].forEach((p) => {
+      halo(c, p[0], p[1], 20, '#ff2a1a', 0.5);
+      c.fillStyle = '#ff3a26'; ell(c, p[0] - 7, p[1], 4, 2.4, 0.3); c.fill(); ell(c, p[0] + 7, p[1], 4, 2.4, -0.3); c.fill();
+    });
+    // premier plan : ronces et fourrés sombres en bas (sous le bandeau du titre)
+    ronces(c, 40, 700, 150); ronces(c, 565, 690, 170);
+    c.fillStyle = '#030506';
+    for (let x = xg - 20; x <= xd + 20; x += 46) { rond(c, x, 792 + Math.sin(x) * 8, 44 + (Math.round(x / 46) % 2) * 18); c.fill(); }
+    c.fillRect(xg, 800, xd - xg, yb - 800 + 1);
+    // lucioles
+    for (let i = 0; i < 16; i++) {
+      const px = ((i * 0.137 + 0.05) % 1) * 600, py = HZ - 40 + ((i * 0.293) % 1) * 300;
+      halo(c, px, py, 9, '#d9ff8a', 0.55 + 0.35 * ((i * 7) % 3) / 2);
+    }
+  }
+
+  function demarrerAffiche() {
+    // Rien d'autre que la scène : ni écran, ni bouton, ni fenêtre, ni texte, ni son.
+    const st = document.createElement('style');
+    st.textContent = '.ecran, .voile, .rond, #toast, #flash, #confettis, .jel-langue { display: none !important; }';
+    document.head.appendChild(st);
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5164,6 +5382,9 @@
   window.JEL_SAVE.surFermeture(() => {
     if (enPartie && session === 'solo') sauver(niveau, 0);
   });
+
+  // Affiche (window.JEL_AFFICHE, posé par le robot seulement) : la scène, et rien d'autre.
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
 
   window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(performance.now()); });
 

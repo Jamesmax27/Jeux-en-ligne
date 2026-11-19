@@ -16,6 +16,8 @@
 // largeur occupée pendant la partie (testerOrdinateur), et son affiche
 // (window.JEL_AFFICHE, jaquette-sans-texte.mjs) est ouverte et mesurée.
 // Bloquant pour les jeux ajoutés depuis ORDI_AFFICHE_DEPUIS, signalé pour les autres.
+// Images du jeu (window.JEL_APERCU, apercu-1.webp à apercu-3.webp, scripts/apercus-jeu.mjs) :
+// recapturées et contrôlées ; obligatoires pour les jeux ajoutés depuis APERCUS_DEPUIS.
 //
 // Jeux faits selon les consignes de 2026 (game.json : "consignes": 2, posé par
 // la boucle de nuit) : au moins 20 niveaux, nombre déclaré dans game.json
@@ -55,7 +57,10 @@ const DOSSIER_JEUX = path.join(RACINE, 'games');
 
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const JAQUETTES = ['cover.webp', 'cover.png', 'cover.jpg', 'cover.jpeg', 'cover.svg'];
-const FICHIERS_AUTORISES = new Set(['index.html', 'game.json', ...JAQUETTES]);
+// Images du jeu montrées sur sa page (scripts/apercus-jeu.mjs) : apercu-1.webp à apercu-3.webp.
+const APERCUS_FICHIERS = ['apercu-1.webp', 'apercu-2.webp', 'apercu-3.webp'];
+const TAILLE_MAX_APERCU = 200 * 1024;
+const FICHIERS_AUTORISES = new Set(['index.html', 'game.json', ...JAQUETTES, ...APERCUS_FICHIERS]);
 const TAILLE_MAX_JEU = 2 * 1024 * 1024;
 const TAILLE_MAX_JAQUETTE = 300 * 1024;
 const PORT_TEST = 8123;
@@ -68,6 +73,11 @@ const consignes2 = (id) => Number(fiches.get(id)?.consignes) >= 2;
 const ORDI_AFFICHE_DEPUIS = '2026-11-20';
 const nouvellesRegles = (id) => String(fiches.get(id)?.added || '') >= ORDI_AFFICHE_DEPUIS;
 const signaler = (id, msg) => (nouvellesRegles(id) ? erreur : avertir)(id, msg);
+// Jeux ajoutés depuis cette date : 3 images du jeu (window.JEL_APERCU, apercu-1.webp à apercu-3.webp)
+// obligatoires ; avant : demandées seulement si le jeu prépare ses images (CONSIGNES-JEU.md, section 5).
+const APERCUS_DEPUIS = '2026-11-21';
+const apercusObligatoires = (id) => String(fiches.get(id)?.added || '') >= APERCUS_DEPUIS;
+const signalerApercus = (id, msg) => (apercusObligatoires(id) ? erreur : avertir)(id, msg);
 // Ordinateur 1366 × 768 : part de la largeur que le jeu doit occuper pendant la partie.
 const ORDI_PART_MIN = 0.7;
 // Affiche (jaquette) : en dessous, l'image est trop sombre, trop plate ou trop vide (mesurerImage).
@@ -199,6 +209,19 @@ async function controlerJeu(id, dossier) {
   controlerJeuTermine(id, html);
   if (nouvellesRegles(id) && !/\bJEL_AFFICHE\b/.test(html)) {
     erreur(id, 'affiche absente : avec window.JEL_AFFICHE, le jeu doit dessiner une scène composée pour sa jaquette, sans interface ni texte (CONSIGNES-JEU.md, section 5, « Jaquette et affiche »)');
+  }
+  // Images du jeu (sa page) : le jeu les prépare (JEL_APERCU), les 3 fichiers sont là, légers.
+  const prepareApercus = /\bJEL_APERCU\b/.test(html);
+  const presents = APERCUS_FICHIERS.filter((f) => existsSync(path.join(DOSSIER_JEUX, id, f)));
+  if (apercusObligatoires(id) && !prepareApercus) {
+    erreur(id, 'images du jeu absentes : avec window.JEL_APERCU = 1, 2 ou 3, le jeu doit s\'ouvrir sur un vrai moment de partie (CONSIGNES-JEU.md, section 5, « Images du jeu »), capturé par node scripts/apercus-jeu.mjs');
+  }
+  if ((prepareApercus || presents.length) && presents.length !== APERCUS_FICHIERS.length) {
+    signalerApercus(id, `images du jeu incomplètes (${presents.length} sur ${APERCUS_FICHIERS.length}) : lancer node scripts/apercus-jeu.mjs ${id}`);
+  }
+  for (const f of presents) {
+    const t = (await stat(path.join(DOSSIER_JEUX, id, f))).size;
+    if (t > TAILLE_MAX_APERCU) erreur(id, `${f} trop lourd (${Math.round(t / 1024)} Ko, maximum ${TAILLE_MAX_APERCU / 1024} Ko)`);
   }
   if (fiches.get(id)?.multijoueur === true) controlerMultijoueur(id, html);
   else if (/<script\b[^>]*\bid=["']jel-(?:multi|regles)["']/i.test(html)) erreur(id, 'blocs jel-multi ou jel-regles présents : ajouter "multijoueur": true et "places" dans game.json (ou retirer ces blocs)');
@@ -504,6 +527,15 @@ async function testerNavigateur(ids) {
         ].filter(Boolean);
         if (defauts.length) signaler(id, `affiche ${defauts.join(', ')} (CONSIGNES-JEU.md, section 5)`);
         console.log(`  🖼  ${id} : affiche mesurée (luminosité ${m.luminosite}, contraste ${m.contraste}, occupée ${Math.round(m.details * 100)} %, couleur ${m.couleur})`);
+      }
+      // Images du jeu (window.JEL_APERCU) : 3 vrais moments de partie, remplis, différents, sans écran
+      // titre ni tutoriel (scripts/apercus-jeu.mjs). Avec --jouer : captures/<id>/10-apercu-<n>.png.
+      const { aDesApercus, capturerApercus } = await import('./apercus-jeu.mjs');
+      if (aDesApercus(await readFile(path.join(dossier, 'index.html'), 'utf8'))) {
+        const { images, problemes } = await capturerApercus(navigateur, `${base}/games/${id}/`);
+        if (avecPartie) for (const im of images) await writeFile(path.join(RACINE, 'captures', id, `10-apercu-${im.n}.png`), im.png);
+        for (const p of problemes) signalerApercus(id, `images du jeu (window.JEL_APERCU) : ${p}`);
+        console.log(`  📷 ${id} : images du jeu capturées (${images.map((im) => `occupée ${Math.round(im.mesures.details * 100)} %`).join(', ')})`);
       }
       if (avecJaquettes && !erreurs.has(id) && !JAQUETTES.some((n) => existsSync(path.join(dossier, n)))) {
         const png = pngAffiche || await capturerSansTexte(navigateur, `${base}/games/${id}/?lang=fr`);

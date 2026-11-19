@@ -2172,7 +2172,9 @@ window.JEL_NIVEAUX = NIVEAUX.length;
     etoile: (i) => note(880 + i * 220, 0.22, 'sine', 0.18),
     nuit: () => { [330, 294, 262].forEach((f, i) => note(f, 0.4, 'sine', 0.12, i * 0.25)); }
   };
-  function son(nom, x) { try { if (SONS[nom]) SONS[nom](x); } catch (e) { /* son impossible */ } }
+  // Affiche et images du jeu (robot du site) : aucun son.
+  let apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
+  function son(nom, x) { if (apercu || window.JEL_AFFICHE) return; try { if (SONS[nom]) SONS[nom](x); } catch (e) { /* son impossible */ } }
 
   const ICONE_SON = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#3b2a1c"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="#3b2a1c" stroke-width="2" stroke-linecap="round"/></svg>';
   const ICONE_MUET = '<svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z" fill="#3b2a1c"/><path d="M16 9l5 6M21 9l-5 6" stroke="#d9483b" stroke-width="2.4" stroke-linecap="round"/></svg>';
@@ -2712,6 +2714,7 @@ window.JEL_NIVEAUX = NIVEAUX.length;
   }
 
   function jouer(action) {
+    if (apercu) return; // image du jeu : partie figée
     if (!P.actif || P.pause || P.etat.fin || !$('ecran-nouveau').hidden) return;
     if (action.t === 'pas') action.m = P.selection;
     if (action.t === 'pas' && P.reposArme) action.repos = true;
@@ -2755,6 +2758,7 @@ window.JEL_NIVEAUX = NIVEAUX.length;
   }
 
   function annuler() {
+    if (apercu) return;
     if (!P.actif || P.pause || !P.historique.length) return;
     P.avant = null; P.etat = P.historique.pop(); P.t0 = horloge; P.finAffichee = false;
     const m = P.etat.meres[P.selection]; if (!m || m.maison) mereSuivante();
@@ -2975,6 +2979,7 @@ window.JEL_NIVEAUX = NIVEAUX.length;
   }
 
   function mettrePause() {
+    if (apercu) return; // image du jeu : jamais de fenêtre de pause
     if (!P.actif || P.pause || !$('ecran-fin').hidden || !$('ecran-nouveau').hidden) return;
     P.pause = true; son('clic'); montrer('ecran-pause');
   }
@@ -3128,11 +3133,270 @@ window.JEL_NIVEAUX = NIVEAUX.length;
   document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
   window.addEventListener('resize', redimensionner);
 
-  if (window.JEL_SAVE) window.JEL_SAVE.surFermeture(() => { if (P.actif && P.etat && !P.etat.fin) ecrireProg(P.index + 1); });
+  if (window.JEL_SAVE) window.JEL_SAVE.surFermeture(() => { if (!apercu && !window.JEL_AFFICHE && P.actif && P.etat && !P.etat.fin) ecrireProg(P.index + 1); });
+
+  // ------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène
+  // composée, sans interface ni texte (CONSIGNES-JEU.md, section 5). Maman hérisson, en
+  // grand, mène ses petits vers le tas de feuilles qui brille au soleil couchant ; le chien
+  // dort dans sa zone violette, la tondeuse fonce sur les cases rouges, l'arroseur lance
+  // son jet. Le décor est posé dans un cadre de 600 × 800, prolongé jusqu'aux bords.
+  // ------------------------------------------------------------------
+  function tondeuseProfil(g, x, y, s) {
+    // Tondeuse vue de côté (mêmes couleurs que sur le plateau), qui roule vers la droite.
+    g.save(); g.translate(x, y); g.scale(s, s);
+    g.fillStyle = 'rgba(0,0,0,.18)'; ellipse(g, 0, 46, 92, 12); g.fill();
+    g.strokeStyle = '#555'; g.lineWidth = 7; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(-50, -8); g.lineTo(-118, -96); g.stroke();
+    g.strokeStyle = '#333'; g.lineWidth = 11; g.beginPath(); g.moveTo(-124, -104); g.lineTo(-106, -118); g.stroke();
+    g.fillStyle = '#b8352a'; rondRect(g, -78, -18, 160, 50, 16); g.fill();
+    g.fillStyle = '#d9483b'; rondRect(g, -74, -26, 150, 40, 18); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.35)'; rondRect(g, -62, -22, 110, 8, 4); g.fill();
+    g.fillStyle = '#f5c443'; g.fillRect(-70, 2, 144, 6);
+    g.fillStyle = '#c9c9c9'; ellipse(g, -6, -30, 34, 18); g.fill();
+    g.fillStyle = '#9a9a9a'; ellipse(g, -6, -30, 22, 11); g.fill();
+    g.fillStyle = '#c9c9c9'; rondRect(g, 76, -10, 12, 36, 5); g.fill();
+    [[-50, 30, 20], [56, 32, 18]].forEach(([rx, ry, rr]) => {
+      g.fillStyle = '#222'; ellipse(g, rx, ry, rr, rr); g.fill();
+      g.fillStyle = '#9a9a9a'; ellipse(g, rx, ry, rr * 0.45, rr * 0.45); g.fill();
+    });
+    // Herbe coupée qui jaillit à l'avant
+    for (let i = 0; i < 16; i++) {
+      const a = -0.5 - hasard(i + 40) * 1.2, d = 20 + hasard(i + 60) * 60;
+      g.fillStyle = i % 3 ? '#6fbf4a' : '#a8de84';
+      ellipse(g, 92 + Math.cos(a) * d, 30 + Math.sin(a) * d * 0.9, 7, 3, a * 2 + i); g.fill();
+    }
+    // Traits de vitesse derrière
+    g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 5;
+    for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(-96 - i * 10, -14 + i * 18); g.lineTo(-150 - i * 14, -14 + i * 18); g.stroke(); }
+    g.restore();
+  }
+
+  function arroseurProfil(g, x, y, s) {
+    g.save(); g.translate(x, y); g.scale(s, s);
+    g.fillStyle = 'rgba(0,0,0,.2)'; ellipse(g, 0, 26, 40, 9); g.fill();
+    g.fillStyle = '#7d8a96'; rondRect(g, -34, 4, 68, 22, 10); g.fill();
+    g.fillStyle = '#4f6070'; g.fillRect(-7, -34, 14, 40);
+    g.save(); g.translate(0, -36); g.rotate(-0.6);
+    g.fillStyle = '#3c8fd8'; rondRect(g, -40, -8, 52, 16, 7); g.fill();
+    g.restore();
+    g.fillStyle = '#9fd3ff'; ellipse(g, 0, -36, 9, 9); g.fill();
+    g.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('affiche'); if (!cv) return;
+    const d = Math.min(2.5, window.devicePixelRatio || 1);
+    const W = window.innerWidth, H = window.innerHeight;
+    cv.width = Math.round(W * d); cv.height = Math.round(H * d);
+    const g2 = cv.getContext('2d');
+    const k = Math.min(W / 600, H / 800);
+    const decX = (W - 600 * k) / 2, decY = (H - 800 * k) / 2;
+    g2.setTransform(d * k, 0, 0, d * k, d * decX, d * decY);
+    // Bords du décor dans le repère du cadre (sur écran large ou haut, le décor continue).
+    const L = -decX / k, R = 600 + decX / k, T = -decY / k, B = 800 + decY / k;
+    const g = g2, temps = 0.6;
+    const HORIZON = 300;
+
+    // Ciel de fin d'après-midi
+    const ciel = g.createLinearGradient(0, T, 0, HORIZON);
+    ciel.addColorStop(0, '#6fc1ee'); ciel.addColorStop(0.6, '#b7e2f0'); ciel.addColorStop(1, '#ffe8a8');
+    g.fillStyle = ciel; g.fillRect(L, T, R - L, HORIZON - T + 2);
+    // Soleil et grand halo derrière le tas de feuilles
+    const SX = 470, SY = 190;
+    const halo = g.createRadialGradient(SX, SY, 20, SX, SY, 330);
+    halo.addColorStop(0, 'rgba(255,246,190,1)'); halo.addColorStop(0.3, 'rgba(255,232,150,.6)'); halo.addColorStop(1, 'rgba(255,232,150,0)');
+    g.fillStyle = halo; g.fillRect(L, T, R - L, 560 - T);
+    g.save(); g.translate(SX, SY);
+    for (let i = 0; i < 14; i++) {
+      g.rotate(Math.PI * 2 / 14);
+      g.fillStyle = 'rgba(255,240,170,.28)'; g.beginPath(); g.moveTo(0, 0); g.lineTo(-22, -300); g.lineTo(22, -300); g.closePath(); g.fill();
+    }
+    g.restore();
+    g.fillStyle = '#fff3b8'; ellipse(g, SX, SY, 54, 54); g.fill();
+    g.fillStyle = '#ffe48a'; ellipse(g, SX, SY, 44, 44); g.fill();
+    // Nuages
+    g.fillStyle = 'rgba(255,255,255,.92)';
+    [[110, 110, 1], [300, 70, 0.8], [-40, 60, 0.9], [650, 90, 1]].forEach(([x, y, s]) => {
+      ellipse(g, x, y, 52 * s, 18 * s); g.fill(); ellipse(g, x + 30 * s, y - 12 * s, 32 * s, 20 * s); g.fill(); ellipse(g, x - 24 * s, y - 6 * s, 24 * s, 14 * s); g.fill();
+    });
+    // Collines lointaines et pommiers
+    g.fillStyle = '#a9d98a'; g.beginPath(); g.moveTo(L, 280);
+    for (let x = L; x <= R + 40; x += 40) g.lineTo(x, 262 + Math.sin(x * 0.012) * 14);
+    g.lineTo(R, HORIZON + 10); g.lineTo(L, HORIZON + 10); g.closePath(); g.fill();
+    for (let x = Math.floor(L / 120) * 120 + 20; x < R; x += 120) {
+      const tx = x + hasard(x) * 40;
+      g.fillStyle = '#8a6a48'; g.fillRect(tx - 4, 262, 8, 26);
+      g.fillStyle = '#6aaa55'; ellipse(g, tx, 250, 30, 24); g.fill();
+      g.fillStyle = '#e8735f'; for (let i = 0; i < 3; i++) { ellipse(g, tx - 14 + i * 13, 244 + (i % 2) * 10, 4, 4); g.fill(); }
+    }
+
+    // Pelouse en cases, vue en perspective (le plateau du jeu)
+    const PX = 300, PY = 240, LARG = 125;
+    const yZ = (z) => PY + 420 / z;
+    const xZ = (i, z) => PX + i * LARG / z;
+    g.fillStyle = '#93cf6c'; g.fillRect(L, HORIZON, R - L, B - HORIZON);
+    for (let j = 0; j < 14; j++) {
+      const z0 = 0.62 + j * 0.45, z1 = z0 + 0.45;
+      const y0 = yZ(z1), y1 = yZ(z0);
+      if (y1 < HORIZON) continue;
+      for (let i = -16; i <= 16; i++) {
+        const xa = xZ(i - 0.5, z1), xb = xZ(i + 0.5, z1), xc = xZ(i + 0.5, z0), xd = xZ(i - 0.5, z0);
+        if (Math.max(xb, xc) < L || Math.min(xa, xd) > R) continue;
+        g.fillStyle = (i + j) % 2 ? '#88c661' : '#97d270';
+        g.beginPath(); g.moveTo(xa, y0); g.lineTo(xb, y0); g.lineTo(xc, y1); g.lineTo(xd, y1); g.closePath(); g.fill();
+      }
+    }
+    // Lumière chaude sur la pelouse
+    const nappe = g.createRadialGradient(SX, 380, 30, SX, 380, 380);
+    nappe.addColorStop(0, 'rgba(255,236,160,.55)'); nappe.addColorStop(1, 'rgba(255,236,160,0)');
+    g.fillStyle = nappe; g.fillRect(L, HORIZON, R - L, B - HORIZON);
+    // Lumière douce derrière la maman (posée avant le décor, pour ne pas le délaver)
+    const MX = 296, MY = 482, MR = 182;
+    const aura = g.createRadialGradient(MX + 60, MY - 40, 40, MX + 60, MY - 40, 280);
+    aura.addColorStop(0, 'rgba(255,244,200,.55)'); aura.addColorStop(1, 'rgba(255,244,200,0)');
+    g.fillStyle = aura; ellipse(g, MX + 40, MY - 20, 300, 230); g.fill();
+    // Haie au fond
+    for (let x = Math.floor(L / 46) * 46; x < R + 46; x += 46) { g.fillStyle = (x / 46) % 2 ? '#3f8a4a' : '#2f6e3a'; ellipse(g, x, HORIZON, 34, 20); g.fill(); }
+
+    // Chien endormi dans sa zone violette, et ses bulles de sommeil
+    const CHX = 196, CHY = 322;
+    g.fillStyle = 'rgba(140,90,220,.3)'; ellipse(g, CHX, CHY + 18, 92, 30); g.fill();
+    g.strokeStyle = 'rgba(110,60,190,.7)'; g.lineWidth = 3; g.setLineDash([12, 8]); ellipse(g, CHX, CHY + 18, 92, 30); g.stroke(); g.setLineDash([]);
+    dessinerChien(g, CHX, CHY, 112, temps, false);
+    // Tas de feuilles : la maison, qui brille dans le soleil
+    const tx = 452, ty = 386;
+    const lueur = g.createRadialGradient(tx, ty - 10, 10, tx, ty - 10, 150);
+    lueur.addColorStop(0, 'rgba(255,240,170,.9)'); lueur.addColorStop(1, 'rgba(255,240,170,0)');
+    g.fillStyle = lueur; ellipse(g, tx, ty - 10, 150, 120); g.fill();
+    dessinerTas(g, tx, ty, 200, 0, temps, false);
+    // Feuilles qui virevoltent autour du tas
+    for (let i = 0; i < 14; i++) {
+      const a = hasard(i + 7) * Math.PI * 2, dd = 80 + hasard(i + 21) * 150;
+      g.fillStyle = NIDS[0].couleurs[i % 4];
+      ellipse(g, tx + Math.cos(a) * dd, ty - 70 + Math.sin(a) * dd * 0.6, 9, 4, a * 3); g.fill();
+    }
+
+    // Arroseur au bord droit et son grand jet en arc, qui scintille au soleil
+    arroseurProfil(g, 582, 352, 1.1);
+    for (let i = 0; i < 26; i++) {
+      const p = i / 25, x = 556 + (330 - 556) * p, y = 306 + (262 - 306) * p - Math.sin(p * Math.PI) * 150;
+      const r = 5 + (1 - Math.abs(p - 0.5) * 2) * 4;
+      g.fillStyle = 'rgba(80,170,240,.85)'; ellipse(g, x, y, r, r * 1.2); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.9)'; ellipse(g, x - r * 0.3, y - r * 0.4, r * 0.35, r * 0.35); g.fill();
+    }
+    for (let i = 0; i < 18; i++) {
+      const x = 296 + hasard(i + 90) * 70, y = 250 + hasard(i + 120) * 50;
+      g.fillStyle = 'rgba(160,215,255,.9)'; ellipse(g, x, y, 4, 6); g.fill();
+    }
+    // Petit arc-en-ciel dans les gouttes
+    ['#ff8a8a', '#ffc46b', '#fff27a', '#8fe08a', '#7cc4f5', '#b49cf0'].forEach((col, i) => {
+      g.strokeStyle = col; g.globalAlpha = 0.5; g.lineWidth = 5; g.beginPath(); g.arc(445, 300, 150 - i * 5, Math.PI * 1.12, Math.PI * 1.55); g.stroke();
+    });
+    g.globalAlpha = 1;
+
+    // Les petits qui suivent leur maman (au loin, à gauche)
+    const f0 = FAMILLES[0];
+    [[16, 342, 42, 5], [80, 386, 56, 0]].forEach(([x, y, r, id], n) => {
+      dessinerHerisson(g, x, y, r, Object.assign(stylePetit(id, 0), { face: 1, pas: 1.2 + n * 1.7 }));
+    });
+    // Maman hérisson, en grand, en pleine marche vers le tas de feuilles
+    // Contour clair : lumière du soleil derrière elle
+    g.save(); g.shadowColor = 'rgba(255,236,150,.95)'; g.shadowBlur = 22;
+    dessinerHerisson(g, MX, MY, MR, { piquants: f0.piquants, piquants2: f0.piquants2, corps: f0.corps, face: 1, pas: 1.1 });
+    g.restore();
+    dessinerHerisson(g, MX, MY, MR, { piquants: f0.piquants, piquants2: f0.piquants2, corps: f0.corps, face: 1, pas: 1.1 });
+    // Visage plus expressif : grand œil brillant, sourcil décidé, sourire
+    g.fillStyle = '#2a1d14'; ellipse(g, MX + MR * 0.6, MY - MR * 0.03, MR * 0.1, MR * 0.12); g.fill();
+    g.fillStyle = '#fff'; ellipse(g, MX + MR * 0.63, MY - MR * 0.08, MR * 0.04, MR * 0.04); g.fill();
+    ellipse(g, MX + MR * 0.57, MY + MR * 0.03, MR * 0.018, MR * 0.018); g.fill();
+    g.strokeStyle = '#2a1d14'; g.lineCap = 'round'; g.lineWidth = MR * 0.035;
+    g.beginPath(); g.moveTo(MX + MR * 0.48, MY - MR * 0.2); g.quadraticCurveTo(MX + MR * 0.6, MY - MR * 0.25, MX + MR * 0.72, MY - MR * 0.18); g.stroke();
+    g.beginPath(); g.arc(MX + MR * 0.86, MY + MR * 0.2, MR * 0.1, 0.35, 1.9); g.stroke();
+    // Une pomme toute proche (premier plan, à droite)
+    dessinerPomme(g, 548, 650, 150, temps);
+    // Tondeuse qui fonce, au premier plan à gauche (coupée par le bord)
+    tondeuseProfil(g, 50, 598, 1.1);
+    // Premier plan : grandes herbes et fleurs dans les coins du bas
+    [[L + 10, B, 1.6, '#e6779c'], [R - 30, B, 1.4, '#f5c443'], [190, B + 20, 1.2, '#9b6bd6']].forEach(([fx, fy, s, col]) => {
+      g.strokeStyle = '#2f7a34'; g.lineWidth = 6 * s;
+      g.beginPath(); g.moveTo(fx, fy); g.quadraticCurveTo(fx - 12 * s, fy - 50 * s, fx + 8 * s, fy - 90 * s); g.stroke();
+      for (let b = -1; b <= 1; b += 2) { g.fillStyle = '#4f9a3c'; ellipse(g, fx + b * 18 * s, fy - 34 * s, 22 * s, 7 * s, b * 0.6); g.fill(); }
+      const hx = fx + 8 * s, hy = fy - 90 * s;
+      g.fillStyle = col; for (let p = 0; p < 6; p++) { const a = p * 1.047; ellipse(g, hx + Math.cos(a) * 15 * s, hy + Math.sin(a) * 15 * s, 11 * s, 11 * s); g.fill(); }
+      g.fillStyle = '#fff3a0'; ellipse(g, hx, hy, 9 * s, 9 * s); g.fill();
+    });
+  }
+
+  function cacherLangue() {
+    document.querySelectorAll('.jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    // Ni écran titre, ni bouton, ni fenêtre, ni son, ni boucle de jeu : seulement la scène.
+    $('app').style.setProperty('display', 'none', 'important');
+    const cv = document.createElement('canvas');
+    cv.id = 'affiche';
+    cv.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;display:block;z-index:100;';
+    document.body.appendChild(cv);
+    cacherLangue(); [50, 300, 1000, 1800].forEach((ms) => setTimeout(cacherLangue, ms));
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine partie, avec sa vraie interface (jardin, tours, petits, barre
+  // de la nuit, boutons Annuler, Attendre, Repos), sans écran titre, ni « Continuer », ni carte
+  // « Nouveau ! », ni tutoriel (CONSIGNES-JEU.md, section 5). Les premiers pas de la solution
+  // la plus courte sont joués par le vrai moteur, puis la partie est figée : aucun pas, aucun
+  // son, rien dans la sauvegarde.
+  //   1 = jardin 1 (potager) : la maman en route vers le tas de feuilles ;
+  //   2 = jardin 10 (verger) : petit qui suit, tondeuse juste derrière, jet d'eau, chien endormi ;
+  //   3 = jardin 20 (automne) : deux familles, pentes, pot de fleurs, tondeuses rapides, chien.
+  // ------------------------------------------------------------------
+  const MOMENTS_APERCU = {
+    1: { niv: 0, nid: 0, sel: 0, coups: ['m0d1', 'm0d0', 'm0d0'] },
+    2: { niv: 9, nid: 1, sel: 0, coups: ['m0d3', 'm0d0', 'm0d3', 'm0d2', 'm0d1', 'm0d1', 'm0d1', 'm0d1', 'm0d0', 'm0d0'] },
+    3: { niv: 19, nid: 4, sel: 1, coups: ['m0d0', 'm0d0', 'm1d3', 'm1d3'] }
+  };
+  function ouvrirApercu(n) {
+    apercu = n;
+    const mo = MOMENTS_APERCU[n];
+    // Progression en mémoire seulement (rien n'est lu ni écrit dans la sauvegarde) :
+    // jardins précédents déjà gagnés, cartes « Nouveau ! » déjà vues, pas de tutoriel.
+    prog.etoiles = NIVEAUX.map((x, i) => (i <= mo.niv ? 3 - (i % 2) : 0));
+    prog.debloque = mo.niv + 1; prog.nid = mo.nid;
+    Object.keys(DEMOS).forEach((cle) => dejaVus.add(cle));
+    majBoutonsSon();
+    lancerNiveau(mo.niv);
+    let avant = P.etat;
+    mo.coups.forEach((s) => {
+      const ac = { t: 'pas', m: +s[s.indexOf('m') + 1], d: +s[s.indexOf('d') + 1], repos: s[0] === 'r' };
+      const r = jouerTour(P.fixe, P.etat, ac);
+      if (r.refus || r.etat.fin) return;
+      P.historique.push(P.etat);
+      avant = P.etat; P.etat = r.etat;
+      if (DIRS[ac.d][0]) P.faces[ac.m] = DIRS[ac.d][0];
+    });
+    // Le dernier pas se joue sous les yeux (animation courte), puis tout reste figé.
+    P.avant = avant; P.t0 = horloge; P.duree = 0.3;
+    P.selection = mo.sel;
+    majApercu(); majHud();
+  }
 
   // ------------------------------------------------------------------
   // Démarrage
   // ------------------------------------------------------------------
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    redimensionner();
+    requestAnimationFrame(boucle);
+    return;
+  }
   lireProg(true);
   majBoutonsSon();
   montrer('ecran-titre');

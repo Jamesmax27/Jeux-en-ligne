@@ -1424,8 +1424,193 @@ function frame(now) {
   render();
   requestAnimationFrame(frame);
 }
-startLevel(0);
-requestAnimationFrame(frame);
+
+// ---- Affiche (jaquette du jeu) ----
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La balle rouge, en grand,
+// rebondit sur un trampoline rose au premier plan et vole vers le chemin de blocs (glace, bloc fissuré,
+// bloc fantôme, drapeau, gemmes) qui monte jusqu'à la grande étoile dorée, qui brille comme un soleil.
+function blocAffiche(cx, w, z0, d, top, hue, extra) {
+  return Object.assign({ cx, w, z0, z1: z0 + d, top, base: top, amp: 0, sp: 0, ph: 0, hue, cp: false,
+    x0: cx - w / 2, x1: cx + w / 2, ct: -1, drop: 0, fv: 0, solid: true, bt: 0 }, extra || {});
+}
+function nuageAffiche(x, y, s, alpha) {
+  ctx.fillStyle = 'rgba(255,255,255,' + alpha + ')';
+  ctx.beginPath();
+  ctx.ellipse(x, y, 90 * s, 30 * s, 0, 0, 7);
+  ctx.ellipse(x - 50 * s, y + 4 * s, 55 * s, 24 * s, 0, 0, 7);
+  ctx.ellipse(x + 34 * s, y - 20 * s, 56 * s, 32 * s, 0, 0, 7);
+  ctx.ellipse(x - 22 * s, y - 26 * s, 44 * s, 28 * s, 0, 0, 7);
+  ctx.fill();
+}
+const ETOILE = [4.2, 1.0, 26.7]; // étoile d'arrivée de l'affiche
+function dessinerAffiche() {
+  resize();
+  const k = Math.min(W / 600, H / 800);
+  cam = { x: 0, y: 0, z: 0 };
+  T = 0.6;
+  // Ciel lumineux, plus chaud vers l'horizon
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#3157b8'); g.addColorStop(0.45, '#6f98ee'); g.addColorStop(0.8, '#b9d4ff'); g.addColorStop(1, '#ffe7c4');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // L'étoile d'arrivée brille comme un soleil, avec ses rayons
+  const star = cs(ETOILE[0], ETOILE[1], ETOILE[2]), stx = sx(star), sty = sy(star);
+  const halo = ctx.createRadialGradient(stx, sty, 10 * k, stx, sty, 420 * k);
+  halo.addColorStop(0, 'rgba(255,246,190,1)'); halo.addColorStop(0.25, 'rgba(255,226,140,.6)'); halo.addColorStop(1, 'rgba(255,226,140,0)');
+  ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
+  ctx.save(); ctx.translate(stx, sty);
+  for (let i = 0; i < 14; i++) {
+    ctx.rotate(Math.PI / 7);
+    ctx.fillStyle = 'rgba(255,240,180,' + (i % 2 ? 0.16 : 0.26) + ')';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-30 * k, -520 * k); ctx.lineTo(30 * k, -520 * k); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  // Nuages lointains
+  nuageAffiche(W * 0.12, H * 0.2, 0.7 * k, 0.55);
+  nuageAffiche(W * 0.5 - 40 * k, H * 0.12, 0.5 * k, 0.45);
+  nuageAffiche(W * 0.95, H * 0.36, 0.8 * k, 0.5);
+  // Nuages sous le chemin : on est très haut dans le ciel
+  nuageAffiche(W * 0.62, H * 0.52, 0.9 * k, 0.55);
+  nuageAffiche(W * 0.2, H * 0.62, 1.0 * k, 0.6);
+  nuageAffiche(W * 0.86, H * 0.66, 1.1 * k, 0.65);
+  // Le chemin de blocs, du trampoline jusqu'à l'étoile
+  const chemin = [
+    blocAffiche(-1.0, 3.4, 0.6, 3.2, -2.4, 320, { spring: true }),        // premier plan : trampoline
+    blocAffiche(3.3, 2.3, 7.5, 2.2, -2.6, 190, { ice: true }),            // glace
+    blocAffiche(2.3, 2.4, 11.0, 2.2, -2.4, 28, { crumble: true, ct: 0.3 }), // bloc fissuré
+    blocAffiche(4.7, 2.4, 14.5, 2.2, -2.2, 48, { cp: true }),            // drapeau
+    blocAffiche(3.0, 2.4, 18.0, 2.2, -2.0, 275, { blink: true, bt: 0.5 }), // bloc fantôme
+    blocAffiche(5.4, 2.4, 21.5, 2.2, -1.8, 100),
+    blocAffiche(4.2, 3.6, 25.0, 3.4, -1.6, 130, { fin: true }),           // arrivée
+  ];
+  plats = chemin;
+  cp = null;
+  const order = chemin.slice().sort((a, b) => dist(b) - dist(a));
+  for (const p of order) { drawPlat(p); if (p.cp) drawFlag(p); }
+  // Grande étoile dorée au-dessus du bloc d'arrivée
+  ctx.shadowColor = '#fff1a0'; ctx.shadowBlur = 40 * k;
+  drawStar(ETOILE[0], ETOILE[1], ETOILE[2], 2.6, '#ffd75e');
+  ctx.shadowBlur = 0;
+  // Gemmes qui dansent au-dessus du chemin
+  [[3.3, -1.6, 8.6], [2.3, -1.4, 12.1], [3.0, -1.0, 19.1], [5.4, -0.8, 22.6]].forEach(([x, y, z]) => drawGem({ x, y, z }));
+  // Trajectoire du saut, en pointillés, du trampoline jusqu'à la balle
+  const bx = -0.33, by = -0.33, bz = 2.01;
+  const bc = cs(bx, by, bz), px = sx(bc), py = sy(bc), r = F * 0.5 / bc[2];
+  const dep = cs(-1.0, -2.4, 2.6), dx0 = sx(dep), dy0 = sy(dep);
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 7 * k; ctx.lineCap = 'round';
+  ctx.setLineDash([2, 22 * k]);
+  ctx.beginPath(); ctx.moveTo(dx0, dy0); ctx.quadraticCurveTo(dx0 - 10 * k, py + r * 1.1, px - r * 0.45, py + r * 0.9); ctx.stroke();
+  ctx.setLineDash([]);
+  // Traits de vitesse derrière la balle
+  ctx.strokeStyle = 'rgba(255,255,255,.75)';
+  [[-0.2, 0.9, 1.0], [0.25, 1.05, 0.8], [0.6, 0.95, 0.6]].forEach(([o, l, w]) => {
+    ctx.lineWidth = 9 * k * w;
+    ctx.beginPath(); ctx.moveTo(px - r * (0.7 - o) + r * 0.1, py + r * (0.85 + o * 0.3)); ctx.lineTo(px - r * (0.7 - o) - r * l * 0.6, py + r * (0.85 + o * 0.3) + r * l * 0.9); ctx.stroke();
+  });
+  // Ombre de la balle sur le trampoline
+  const om = cs(bx - 0.2, -2.38, bz + 0.5);
+  ctx.fillStyle = 'rgba(90,0,60,.22)';
+  ctx.beginPath(); ctx.ellipse(sx(om), sy(om), r * 0.55, r * 0.18, 0, 0, 7); ctx.fill();
+  // La balle, en grand, tournée vers l'étoile
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,240,190,.9)'; ctx.shadowBlur = 40 * k;
+  const gb = ctx.createRadialGradient(px + r * 0.35, py - r * 0.4, r * 0.08, px, py, r);
+  gb.addColorStop(0, '#ffd2c4'); gb.addColorStop(0.5, '#ec4630'); gb.addColorStop(1, '#7e150c');
+  ctx.fillStyle = gb; ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.fill();
+  ctx.restore();
+  // Taches blanches de la balle (même balle que dans le jeu)
+  const ca = Math.cos(0.5), sa = Math.sin(0.5), cz = Math.cos(-0.45), sz = Math.sin(-0.45);
+  ctx.save(); ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.clip();
+  for (const d of DOTS) {
+    let x = d[0], y = d[1], z = d[2];
+    const y1 = y * ca - z * sa, z1 = y * sa + z * ca; y = y1; z = z1;
+    const x1 = x * cz - y * sz, y2 = x * sz + y * cz; x = x1; y = y2;
+    if (z < -0.1) {
+      ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.beginPath();
+      ctx.ellipse(px + x * r * 0.8, py - y * r * 0.8, r * 0.22 * (-z), r * 0.22, Math.atan2(y, x), 0, 7); ctx.fill();
+    }
+  }
+  // Reflet du soleil et liseré de lumière côté étoile
+  const rf = ctx.createRadialGradient(px + r * 0.4, py - r * 0.48, 0, px + r * 0.4, py - r * 0.48, r * 0.3);
+  rf.addColorStop(0, 'rgba(255,255,255,.95)'); rf.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = rf; ctx.fillRect(px - r, py - r, 2 * r, 2 * r);
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(255,236,170,.95)'; ctx.lineWidth = 6 * k;
+  ctx.beginPath(); ctx.arc(px, py, r - 3 * k, -1.5, 0.3); ctx.stroke();
+  // Étincelles autour de la balle
+  ctx.fillStyle = '#fff6c8';
+  [[1.15, -0.9, 14], [1.35, -0.2, 9], [-1.05, -0.95, 10], [0.6, -1.3, 8]].forEach(([ox, oy, s]) => {
+    const ex = px + ox * r, ey = py + oy * r, e = s * k;
+    ctx.beginPath(); ctx.moveTo(ex, ey - e * 2); ctx.lineTo(ex + e * 0.5, ey - e * 0.5); ctx.lineTo(ex + e * 2, ey); ctx.lineTo(ex + e * 0.5, ey + e * 0.5);
+    ctx.lineTo(ex, ey + e * 2); ctx.lineTo(ex - e * 0.5, ey + e * 0.5); ctx.lineTo(ex - e * 2, ey); ctx.lineTo(ex - e * 0.5, ey - e * 0.5); ctx.closePath(); ctx.fill();
+  });
+  // Premier plan : gros nuages coupés par les bords du bas
+  nuageAffiche(-30 * k, H - 20 * k, 1.6 * k, 0.9);
+  nuageAffiche(W + 20 * k, H + 10 * k, 1.8 * k, 0.9);
+}
+function demarrerAffiche() {
+  const cacher = () => {
+    for (const el of document.querySelectorAll('#hud, #toast, #pad, #bJ, #ov, .jel-langue, jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+  };
+  cacher();
+  document.addEventListener('DOMContentLoaded', cacher);
+  setTimeout(cacher, 50); setTimeout(cacher, 400); setTimeout(cacher, 1200);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+// ---- Images du jeu (page du jeu) ----
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (niveau, gemmes, chutes, flèches et bouton de
+// saut), sans écran titre ni fenêtre « Continuer » (CONSIGNES-JEU.md, section 5). La balle est posée sur
+// un bloc, saute vers le suivant pendant une fraction de seconde, puis tout est figé : ni victoire,
+// ni chute, ni son, ni sauvegarde (state reste « apercu »).
+//   1 = niveau 1 : premiers blocs, gemmes, drapeau ;
+//   2 = niveau 15 : trampolines roses, glace, ascenseur, bloc mobile ;
+//   3 = niveau 27 : tout se mélange, bloc fantôme, trampoline, glace, blocs mobiles.
+// gemmes : gemmes des niveaux déjà finis (le compteur continue d'un niveau à l'autre).
+const SCENES_APERCU = {
+  1: { niveau: 0, bloc: 3, saut: 0.3, t: 1.2, chutes: 0, gemmes: 0 },
+  2: { niveau: 14, bloc: 1, saut: 0.3, t: 2.4, chutes: 4, gemmes: 41 },
+  3: { niveau: 26, bloc: 13, saut: 0.3, t: 1.6, chutes: 9, gemmes: 86 },
+};
+let apercu = 0;
+function ouvrirApercu(n) {
+  apercu = n;
+  const sc = SCENES_APERCU[n];
+  document.getElementById('ov').classList.add('off');
+  effacerSave.remove();
+  falls = sc.chutes; score = sc.gemmes;
+  startLevel(sc.niveau);
+  state = 'apercu';
+  // Blocs et gemmes déjà passés : le dernier drapeau atteint, les gemmes ramassées
+  T = sc.t; plats.forEach(placePlat); plats.forEach(placePlat);
+  const depart = plats[sc.bloc];
+  for (let i = 1; i <= sc.bloc; i++) if (plats[i].cp) cp = plats[i];
+  for (const g of gems) if (g.z < depart.z0) { g.got = true; score++; }
+  updHud();
+  spawn(depart);
+  // La balle avance et saute vers le bloc suivant
+  inp.u = 1; ball.buf = 0.15;
+  const pas = Math.round(sc.saut * 120);
+  for (let i = 0; i < pas; i++) step(1 / 120);
+  for (const k in inp) inp[k] = 0;
+  cam = { x: ball.x * 0.85, y: depart.top + 3.5, z: ball.z - 6 };
+  render();
+  // Le module de traduction remet « Niveau 1 » et « Chutes : 0 » au chargement : on réécrit l'interface.
+  const hud = () => { document.getElementById('hN').textContent = t('niveau', { n: level + 1, total: LEVELS.length }); updHud(); };
+  hud();
+  document.addEventListener('DOMContentLoaded', hud);
+  window.addEventListener('resize', render);
+}
+
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+else {
+  startLevel(0);
+  requestAnimationFrame(frame);
+}
 </script>
 </body>
 </html>

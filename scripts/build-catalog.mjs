@@ -116,6 +116,12 @@ async function lireJeu(nomDossier) {
     avertir(nomDossier, 'pas de jaquette (cover.webp) : image par défaut utilisée');
   }
 
+  // --- images du jeu (scripts/apercus-jeu.mjs) : apercu-1.webp, apercu-2.webp…, à la suite ---
+  // Montrées seulement sur la page du jeu (pages-seo.mjs), pas dans catalog.json.
+  const fichiersApercus = [];
+  for (let n = 1; n <= 3 && existsSync(path.join(dossier, `apercu-${n}.webp`)); n++) fichiersApercus.push(`apercu-${n}.webp`);
+  const apercus = fichiersApercus.map((f) => `games/${fiche.id}/${f}?v=${version}`);
+
   // --- traductions (titre, description et présentation dans les autres langues) ---
   const i18n = {};
   const traductions = fiche.i18n && typeof fiche.i18n === 'object' ? fiche.i18n : {};
@@ -186,7 +192,9 @@ async function lireJeu(nomDossier) {
     cover,
     play: `games/${fiche.id}/?v=${version}`,
     fichierJaquette: fichierJaquette || null,
-    fiche,                                   // game.json complet, pour les pages (retiré du catalogue)
+    apercus,                                 // images du jeu, pour sa page (retirées du catalogue)
+    fichiersApercus,
+    fiche,                                 // game.json complet, pour les pages (retiré du catalogue)
   };
 }
 
@@ -210,12 +218,12 @@ async function main() {
   }
 
   // Copie des jeux valides vers public/games/ (repart d'un dossier vide) : le jeu
-  // et sa jaquette seulement (game.json n'est lu par aucune page du site).
+  // sa jaquette et ses images (game.json n'est lu par aucune page du site).
   await rm(SORTIE_JEUX, { recursive: true, force: true });
   await mkdir(SORTIE_JEUX, { recursive: true });
   for (const jeu of jeux) {
     await mkdir(path.join(SORTIE_JEUX, jeu.id), { recursive: true });
-    for (const fichier of ['index.html', jeu.fichierJaquette].filter(Boolean)) {
+    for (const fichier of ['index.html', jeu.fichierJaquette, ...jeu.fichiersApercus].filter(Boolean)) {
       await cp(path.join(DOSSIER_JEUX, jeu.id, fichier), path.join(SORTIE_JEUX, jeu.id, fichier));
     }
   }
@@ -227,7 +235,7 @@ async function main() {
     generatedAt: new Date().toISOString(),
     count: jeux.length,
     // listes et ordre des genres et des univers : public/taxonomie.js
-    games: jeux.map(({ fiche, fichierJaquette, ...entree }) => entree),
+    games: jeux.map(({ fiche, fichierJaquette, apercus, fichiersApercus, ...entree }) => entree),
   };
   await writeFile(SORTIE_CATALOGUE, JSON.stringify(catalogue, null, 2) + '\n', 'utf8');
 

@@ -274,9 +274,19 @@ Le jeu dessine lui-même son affiche, avec ses propres dessins, quand `window.JE
 - Jaquette d'un jeu sans affiche (anciens jeux) : capture de l'écran d'accueil, **textes masqués** (`node scripts/jaquette-sans-texte.mjs <id>`). Si la relecture voit du texte sur la jaquette d'un jeu par ailleurs bon, la boucle refait seulement la jaquette avec ce script.
 - La jaquette sert aussi d'image de partage de la page du jeu (réseaux sociaux) si elle est en `.webp`, `.png` ou `.jpg` ; une jaquette `.svg` est alors remplacée par l'icône du site. Son texte de remplacement est `jaquette_alt` (section 4) : il décrit ce que montre la jaquette (l'affiche, ou l'écran d'accueil pour un jeu sans affiche).
 
+### Images du jeu (obligatoires pour les jeux ajoutés depuis le 21 novembre 2026)
+
+La jaquette est une affiche composée : pour que le joueur voie à quoi ressemble **vraiment** le jeu avant de le lancer, sa page montre 3 captures d'une vraie partie, au format téléphone, juste sous le bouton « Jouer ». Le jeu les prépare lui-même quand `window.JEL_APERCU` vaut 1, 2 ou 3 ; `node scripts/apercus-jeu.mjs <id>` ouvre alors le jeu seul, en anglais, sur un téléphone de 390 × 844, et écrit `apercu-1.webp`, `apercu-2.webp` et `apercu-3.webp` dans le dossier du jeu.
+
+- **Code** : à la fin de l'initialisation, `if (window.JEL_APERCU) { ouvrirApercu(window.JEL_APERCU); return; }` (ou l'équivalent) : le jeu saute l'écran titre, la fenêtre « Continuer », le tutoriel et toute fenêtre, et s'ouvre directement **en pleine partie**, avec sa **vraie interface** (score, vies, jauges, boutons de commande, comme pendant une partie) : 1 = début de partie (premier niveau, déjà en action), 2 = un niveau du milieu, 3 = un niveau avancé, avec une mécanique ou un décor qu'on ne voit pas au début. L'état est posé par le code (niveau chargé, héros placé, quelques ennemis ou objets en vue, un score plausible) ; la boucle peut tourner, mais le joueur ne doit pas perdre ni gagner pendant les 2,5 secondes avant la capture (figer la partie après la mise en place, ou la mettre en pause sans montrer de fenêtre de pause). Aucun son. Rien n'est écrit dans la sauvegarde. `window.JEL_APERCU` est posé par le robot seulement : le jeu ne l'écrit jamais.
+- **Ce que montrent les images** : un vrai moment de jeu, lisible et vivant (action en cours, plusieurs éléments du jeu), jamais l'écran titre, un menu, une fenêtre, un tutoriel, une pause, un écran de victoire ou de défaite ; 3 moments **différents** (niveau, décor, ennemis, mécanique). Contrairement à l'affiche, l'interface et ses textes sont permis (ils s'affichent en anglais).
+- **Contrôles** : `node scripts/apercus-jeu.mjs <id>` (et `validate-games.mjs --browser`, qui les recapture) refusent un jeu sans `window.JEL_APERCU` (jeux ajoutés depuis le 21 novembre 2026), une image presque vide ou plate, deux images presque identiques, un bouton de menu (« Play », « Got it »…) visible ou une image de plus de 200 Ko. L'agent regarde ses 3 images (`games/<id>/apercu-*.webp`, ou `captures/<id>/10-apercu-*.png` faites par `validate-games.mjs --jouer`) et les reprend si elles ne donnent pas une idée juste du jeu ; la relecture le vérifie (section 7).
+- Après un changement du jeu qui modifie ce qu'on voit, relancer `node scripts/apercus-jeu.mjs <id>` (et augmenter `version`).
+
 ## 6. Avant de proposer le jeu
 
 ```text
+node scripts/apercus-jeu.mjs <id>                  (images du jeu de sa page : apercu-1.webp à apercu-3.webp)
 node scripts/validate-games.mjs --jouer <id>      (ajouter --covers si le jeu n'a pas encore de jaquette)
 node scripts/check-i18n.js <id> --rapport
 node scripts/tester-sauvegarde.mjs <id> --captures (sauvegarde : écriture, reprise, effacement)
@@ -300,6 +310,7 @@ Avant d'être publié, chaque jeu de la boucle de nuit passe par la vérificatio
 | Téléphone | une erreur survient pendant la partie au toucher, sur un écran de 390 × 844 |
 | Ordinateur | (jeux ajoutés depuis le 20 novembre 2026) pendant la partie, sur un écran de 1366 × 768, le jeu occupe moins de 70 % de la largeur : colonne de téléphone entourée de bandes vides (section 3, « Ordinateur ») |
 | Affiche | (jeux ajoutés depuis le 20 novembre 2026) pas de `window.JEL_AFFICHE`, ou une affiche qui montre un bouton, trop sombre, trop plate ou trop vide (section 5, « L'affiche du jeu ») |
+| Images du jeu | (jeux ajoutés depuis le 21 novembre 2026) pas de `window.JEL_APERCU`, images `apercu-1.webp` à `apercu-3.webp` absentes, presque vides ou plates, presque identiques, avec un bouton de menu visible, ou de plus de 200 Ko (section 5, « Images du jeu ») |
 | Hors ligne | le jeu tente un appel réseau, ou ne marche pas avec le navigateur coupé du réseau |
 | Fichiers | `game.json` incomplet ou invalide, jaquette absente ou trop lourde, `index.html` de plus de 2 Mo, fichier en trop |
 | Niveaux | (jeux `"consignes": 2`) moins de 20 niveaux, `window.JEL_NIVEAUX` absent ou différent de `"niveaux"` dans `game.json`, présentation absente |

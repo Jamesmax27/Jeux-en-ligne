@@ -6052,6 +6052,175 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Un veilleur à capuche rouge
+  // vient de rallumer le lampadaire du coin : sa lumière dorée l'entoure, tandis que l'Ombre, immense,
+  // se dresse devant la lune au bout de la rue éteinte et tend ses bras de fumée vers lui.
+
+  function dessinerAffiche() {
+    const cv = $('fond'), W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const k = Math.min(W / 600, H / 800);
+    const t = 1300;                       // instant figé des ondulations de l'Ombre
+    const al = graineHasard(31);
+
+    // Ciel violet de nuit, plus clair en haut
+    const ciel = c.createLinearGradient(0, 0, 0, H);
+    ciel.addColorStop(0, '#45347a'); ciel.addColorStop(0.32, '#2e2a5e'); ciel.addColorStop(0.58, '#181936'); ciel.addColorStop(1, '#08080f');
+    c.fillStyle = ciel; c.fillRect(0, 0, W, H);
+    for (let i = 0; i < 90; i++) {
+      c.fillStyle = 'rgba(230,226,255,' + (0.3 + al() * 0.6).toFixed(2) + ')';
+      const s = (1.2 + al() * 1.6) * k;
+      c.fillRect(al() * W, al() * H * 0.5, s, s);
+    }
+
+    // Pleine lune derrière la tête de l'Ombre : la silhouette se découpe dessus
+    const ox = W * 0.68, lx = ox, ly = H * 0.25, lr = 150 * k;
+    halo(c, lx, ly, lr * 3.8, 'rgba(176,130,255,0.6)');
+    halo(c, lx, ly, lr * 1.9, 'rgba(236,226,255,0.7)');
+    const lune = c.createRadialGradient(lx - lr * 0.3, ly - lr * 0.3, lr * 0.1, lx, ly, lr);
+    lune.addColorStop(0, '#ffffff'); lune.addColorStop(1, '#d4c8f2');
+    c.fillStyle = lune; rond(c, lx, ly, lr); c.fill();
+    c.fillStyle = 'rgba(160,140,210,0.35)';
+    [[-0.35, 0.25, 0.18], [0.3, -0.35, 0.12], [0.42, 0.3, 0.1], [-0.1, -0.5, 0.08]].forEach(([a, b, r]) => { rond(c, lx + a * lr, ly + b * lr, r * lr); c.fill(); });
+
+    // La rue en perspective, qui file vers l'Ombre
+    const hz = H * 0.6, cx = ox;
+    const sol = c.createLinearGradient(0, hz, 0, H);
+    sol.addColorStop(0, '#2a2648'); sol.addColorStop(1, '#0e0d18');
+    c.fillStyle = sol;
+    poly(c, [[cx - W * 0.05, hz], [cx + W * 0.05, hz], [W * 1.3, H], [-W * 0.4, H]]); c.fill();
+    c.strokeStyle = 'rgba(150,140,200,0.35)'; c.lineWidth = 4 * k; c.setLineDash([16 * k, 20 * k]);
+    c.beginPath(); c.moveTo(cx, hz); c.lineTo(cx - W * 0.12, H); c.stroke(); c.setLineDash([]);
+
+    // Immeubles des deux côtés : fenêtres dorées à gauche (rue rallumée), éteintes ou violettes à droite
+    for (let cote = -1; cote <= 1; cote += 2) {
+      for (let n = 6; n >= 0; n--) {
+        const p = 1 - n / 7, p2 = 1 - (n + 1) / 7;
+        const xa = cx + cote * (W * 0.07 + W * 0.7 * p), xb = cx + cote * (W * 0.07 + W * 0.7 * p2);
+        const ya = hz + H * 0.4 * p, yb = hz + H * 0.4 * p2;
+        const ha = H * (0.1 + 0.42 * p), hb = H * (0.1 + 0.42 * p2);
+        c.fillStyle = n % 2 ? '#25244a' : '#2d2b56';
+        poly(c, [[xa, ya - ha], [xb, yb - hb], [xb, yb], [xa, ya]]); c.fill();
+        // liseré de lune sur le toit
+        c.strokeStyle = 'rgba(200,180,255,0.55)'; c.lineWidth = 2 * k;
+        c.beginPath(); c.moveTo(xa, ya - ha); c.lineTo(xb, yb - hb); c.stroke();
+        for (let f = 0; f < 3; f++) {
+          for (let e = 0; e < 3; e++) {
+            const r = al();
+            if (r > 0.45) continue;
+            const u = 0.2 + f * 0.28, v = 0.25 + e * 0.22;
+            const fx = xa + (xb - xa) * u, fy = (ya - ha * (1 - v)) + ((yb - hb * (1 - v)) - (ya - ha * (1 - v))) * u;
+            const tw = Math.abs(xb - xa) * 0.14, th = (ha * (1 - u) + hb * u) * 0.1;
+            c.fillStyle = cote < 0 ? (r < 0.38 ? '#ffcf6a' : '#3a3660') : (r < 0.08 ? '#c8a0ff' : '#1a1934');
+            c.fillRect(fx - tw / 2, fy, tw, th);
+          }
+        }
+      }
+    }
+
+    // Brume violette au pied de l'Ombre
+    for (let i = 0; i < 7; i++) halo(c, W * (0.15 + i * 0.13), hz + (i % 3) * 12 * k, W * 0.28, 'rgba(150,120,210,0.22)');
+
+    // Lampadaires lointains : allumés derrière le veilleur, éteints du côté de l'Ombre
+    for (let n = 6; n >= 2; n--) {
+      const p = 1 - n / 7;
+      for (let cote = -1; cote <= 1; cote += 2) {
+        const x = cx + cote * (W * 0.06 + W * 0.5 * p), y = hz + H * 0.36 * p;
+        const etat = cote < 0 && n <= 4 ? 1 : 0;
+        lampadaire(c, x, y, H * 0.34 * p + 12 * k, etat, t);
+        if (etat) halo(c, x, y, W * 0.16 * p + 10 * k, 'rgba(255,206,110,0.4)');
+      }
+    }
+
+    // L'Ombre, immense, bras ouverts vers le veilleur
+    halo(c, ox, H * 0.42, H * 0.36, 'rgba(120,60,220,0.45)');
+    ombre(c, ox, H * 0.66, H * 0.54, t, { bras: 0.6 });
+    // Contour violet vif sur la tête et les épaules, éclairées par la lune
+    c.save();
+    c.translate(ox, H * 0.66); c.scale(H * 0.0054, H * 0.0054);
+    c.strokeStyle = 'rgba(205,150,255,0.9)'; c.lineWidth = 2.2; c.shadowColor = '#b06aff'; c.shadowBlur = 14 * k;
+    c.beginPath(); c.moveTo(-24, -62); c.quadraticCurveTo(-14, -96, 0, -98); c.quadraticCurveTo(14, -96, 24, -62); c.stroke();
+    // filets de fumée qui s'échappent de ses flancs
+    c.shadowBlur = 0; c.lineCap = 'round';
+    [[-28, -30, -44, -6, 1], [28, -36, 46, -14, -1], [-24, -10, -38, 6, 1], [26, -6, 40, 8, -1]].forEach(([x0, y0, x1, y1, sg]) => {
+      c.strokeStyle = 'rgba(12,8,22,0.85)'; c.lineWidth = 3.2;
+      c.beginPath(); c.moveTo(x0, y0); c.bezierCurveTo(x0 + sg * -6, y0 - 10, x1 + sg * 8, y1 - 4, x1, y1); c.stroke();
+      c.strokeStyle = 'rgba(190,130,255,0.5)'; c.lineWidth = 0.8; c.stroke();
+    });
+    c.restore();
+    // Volutes de fumée qui rampent vers le veilleur et éteignent la rue
+    for (let i = 0; i < 5; i++) {
+      c.save(); c.translate(ox - W * (0.04 + i * 0.07), H * (0.665 + (i % 2) * 0.012)); c.scale(1, 0.28);
+      halo(c, 0, 0, (70 - i * 6) * k, 'rgba(12,6,24,0.85)');
+      c.restore();
+    }
+
+    // Lampadaire du premier plan, que le veilleur vient de rallumer
+    const lpX = W * -0.01, lpY = H * 0.86, lpH = H * 0.7, lpK = lpH / 100;
+    const ampX = lpX + 17 * lpK, ampY = lpY - 75 * lpK;
+    // cône de lumière vers le sol, sur le veilleur
+    const cone = c.createLinearGradient(0, ampY, 0, H * 0.8);
+    cone.addColorStop(0, 'rgba(255,226,150,0.55)'); cone.addColorStop(1, 'rgba(255,200,110,0.08)');
+    c.fillStyle = cone;
+    poly(c, [[ampX - 14 * k, ampY], [ampX + 14 * k, ampY], [ampX + W * 0.3, H * 0.8], [ampX - W * 0.22, H * 0.8]]); c.fill();
+    halo(c, ampX, ampY, W * 0.6, 'rgba(255,200,100,0.45)');
+    lampadaire(c, lpX, lpY, lpH, 1, t);
+    halo(c, ampX, ampY + 6 * k, 60 * k, 'rgba(255,250,220,0.95)');
+    // étincelles du rallumage
+    for (let i = 0; i < 12; i++) {
+      const a = i * 0.52 + 0.2, d = (60 + (i % 4) * 26) * k;
+      c.fillStyle = i % 3 ? '#ffe08a' : '#fff6d0'; c.shadowColor = '#ffc94a'; c.shadowBlur = 12 * k;
+      etoile(c, ampX + Math.cos(a) * d, ampY + Math.sin(a) * d * 0.8, (9 - (i % 4)) * k, (3.4 - (i % 4) * 0.4) * k, 4, a);
+      c.fill();
+    }
+    c.shadowBlur = 0;
+    // cœur blanc de l'ampoule rallumée
+    c.fillStyle = '#fffbe8'; ell(c, ampX, ampY - lpK, 6 * lpK, 3.2 * lpK); c.fill();
+
+    // Lucioles dorées dans la lumière (derrière le veilleur)
+    for (let i = 0; i < 14; i++) {
+      const x = W * (0.03 + al() * 0.45), y = H * (0.22 + al() * 0.5);
+      halo(c, x, y, (7 + al() * 5) * k, 'rgba(255,214,120,0.6)');
+      c.fillStyle = '#fff3c4'; rond(c, x, y, 1.8 * k); c.fill();
+    }
+
+    // Le veilleur, en grand, la peur au visage, lanterne levée vers l'Ombre
+    const vx = W * 0.28, vy = H * 0.555, vr = 178 * k;
+    c.fillStyle = 'rgba(0,0,0,0.45)'; ell(c, vx + vr * 0.5, vy + vr * 0.92, vr * 0.9, vr * 0.12, -0.08); c.fill();
+    halo(c, vx + vr * 0.62, vy + vr * 0.42, vr * 0.8, 'rgba(255,170,60,0.5)');
+    c.save();
+    c.shadowColor = 'rgba(255,200,110,0.75)'; c.shadowBlur = 10 * k;
+    veilleur(c, 0, vx, vy, vr, { peur: true, style: 0 });
+    c.restore();
+
+    // Premier plan : pavés du bas
+    c.strokeStyle = 'rgba(120,110,170,0.12)'; c.lineWidth = 2 * k;
+    for (let rg = 0; rg < 5; rg++) {
+      const y = H * (0.8 + rg * 0.045), pas = (34 + rg * 10) * k;
+      for (let x = ((rg % 2) * pas) / 2 - pas; x < W + pas; x += pas) { ell(c, x, y, pas * 0.42, (6 + rg * 2) * k); c.stroke(); }
+    }
+    // léger vignetage pour concentrer le regard
+    const vig = c.createRadialGradient(W * 0.48, H * 0.45, Math.min(W, H) * 0.35, W * 0.48, H * 0.45, Math.max(W, H) * 0.75);
+    vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(0,0,0,0.45)');
+    c.fillStyle = vig; c.fillRect(0, 0, W, H);
+  }
+
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    // Ni écran, ni bouton, ni bouton de langue, ni fenêtre : seulement la scène.
+    const st = document.createElement('style');
+    st.textContent = '.ecran, button, .rond, #toast, #lucioles, #alerte, .jel-langue { display: none !important; } #fond { display: block !important; }';
+    document.head.appendChild(st);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -6094,10 +6263,12 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? vue.sc[partie.siege] : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(performance.now()); });
+  window.addEventListener('resize', () => { if (ecran !== 'jeu' && ecran !== 'affiche') dessinerTitre(performance.now()); });
 
   document.title = tr('titre');
   chargerProgression();
+  // Affiche du jeu (robot du site seulement) : la scène, sans écran titre, sans son ni boucle de jeu.
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }

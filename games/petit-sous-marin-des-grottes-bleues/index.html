@@ -1983,6 +1983,7 @@ function etoilesDispo() { return Math.max(0, totalEtoiles() - prog.depense); }
 function scoreTotal() { return prog.records.reduce((a, b) => a + b, 0); }
 // Enregistre les souvenirs (atelier, carnet, son) sans toucher au niveau de reprise.
 function sauverProg() {
+  if (apercu) return; // image du jeu : rien n'est écrit dans la sauvegarde
   try { if (JEL_SAVE.existe(JEU)) JEL_SAVE.save(JEU, { prog: copieProg(), options: { son: sonActif } }); } catch (e) { /* rien */ }
 }
 
@@ -2535,7 +2536,7 @@ const SONS = {
   achat: () => { note(880, 0.1, 'square', 0.05); note(1320, 0.2, 'square', 0.05, 0, 0.08); },
 };
 function son(nom) {
-  if (!sonActif || !premiereAction) return;
+  if (apercu || !sonActif || !premiereAction) return; // image du jeu : aucun son
   if (!audio()) return;
   try { SONS[nom](); } catch (e) { /* audio indisponible */ }
 }
@@ -2585,6 +2586,7 @@ let ecran = 'titre';
 let P = null;              // partie en cours
 let enPause = false, introOuverte = false, carteVisible = false;
 let partieEnCours = false; // une plongée commencée et pas finie (sauvegarde à la fermeture)
+let apercu = 0;            // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
 function redimensionner() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -3240,7 +3242,7 @@ function cheminVers(p, de, versK) {
 // --- Fin de plongée ---
 function victoire() {
   const p = P;
-  if (p.fini) return;
+  if (p.fini || apercu) return;
   p.fini = true; p.gagne = true; partieEnCours = false;
   const ratio = p.perlesPrises / p.perlesTotal;
   const etoiles = ratio >= 1 ? 3 : ratio >= 0.6 ? 2 : 1;
@@ -3264,7 +3266,7 @@ function victoire() {
 }
 function defaite(raison) {
   const p = P;
-  if (p.fini) return;
+  if (p.fini || apercu) return;
   p.fini = true; p.gagne = false; partieEnCours = false;
   if (window.FMG) window.FMG.reportEnd({ completed: false, level: p.n + 1 });
   son('defaite');
@@ -3332,7 +3334,7 @@ function ouvrirPause() {
   try { $('b-reprendre').focus(); } catch (e) { /* rien */ }
 }
 function reprendre() { enPause = false; $('pause').hidden = true; son('clic'); }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && !introOuverte) ouvrirPause(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && !introOuverte && !apercu) ouvrirPause(); });
 
 // --- Tutoriel et cartes des nouveautés ---
 let introCle = null, introDebut = 0;
@@ -4190,8 +4192,8 @@ function boucle(maintenant) {
   const temps = maintenant / 1000;
   try {
     if (ecran === 'jeu' && P) {
-      if (!enPause && !introOuverte && !P.fini) majPartie(dt);
-      if (!enPause) majEffets(dt);
+      if (!enPause && !introOuverte && !P.fini && !P.fige) majPartie(dt);
+      if (!enPause && !P.fige) majEffets(dt);
       dessinerPartie(P.anim);
     } else dessinerAccueil(temps);
     if (introOuverte) dessinerIntroAnim(temps);
@@ -4256,14 +4258,308 @@ window.addEventListener('keydown', (e) => {
 
 // Sauvegarde à la fermeture de la page, seulement pendant une plongée
 JEL_SAVE.surFermeture(() => {
-  if (ecran === 'jeu' && P && partieEnCours && !P.fini) JEL_SAVE.save(JEU, { niveau: P.n + 1, score: scoreTotal(), prog: copieProg(), options: { son: sonActif } });
+  if (ecran === 'jeu' && P && partieEnCours && !P.fini && !apercu) JEL_SAVE.save(JEU, { niveau: P.n + 1, score: scoreTotal(), prog: copieProg(), options: { son: sonActif } });
 });
 
+/* ==========================================================================
+   Affiche (jaquette du jeu)
+   ========================================================================== */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Bulle, en grand, rapporte
+// la perle géante accrochée sous lui et lève l'œil vers Mamie Nacre, qui l'attend toute joyeuse en
+// haut ; son phare révèle un chapelet de perles ; le soleil perce la surface ; coraux et algues au
+// premier plan. Dessinée dans une boîte de 600 × 800, centrée, le décor débordant jusqu'aux bords.
+function dessinerAffiche() {
+  redimensionner();
+  const g = ctx, t = 1.15;
+  g.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const k = Math.min(LARG / 600, HAUT / 800);
+  const ox = (LARG - 600 * k) / 2, oy = (HAUT - 800 * k) / 2;
+  g.translate(ox, oy); g.scale(k, k);
+  const x0 = -ox / k - 2, y0 = -oy / k - 2, x1 = (LARG - ox) / k + 2, y1 = (HAUT - oy) / k + 2; // bords de l'écran
+  g.lineCap = 'round'; g.lineJoin = 'round';
+
+  // Eau : claire près de la surface, bleu profond en bas
+  const eau = g.createLinearGradient(0, 0, 0, 800);
+  eau.addColorStop(0, '#6fdcf0'); eau.addColorStop(0.22, '#2bb2dc'); eau.addColorStop(0.58, '#137fb6'); eau.addColorStop(1, '#0b4f82');
+  g.fillStyle = eau; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+
+  // Soleil qui perce la surface, en haut à droite
+  const soleil = g.createRadialGradient(440, -20, 10, 440, -20, 560);
+  soleil.addColorStop(0, 'rgba(255,252,215,.95)'); soleil.addColorStop(0.25, 'rgba(255,245,190,.38)'); soleil.addColorStop(1, 'rgba(255,245,190,0)');
+  g.fillStyle = soleil; g.fillRect(x0, y0, x1 - x0, y1 - y0);
+
+  // Rayons de soleil qui descendent en biais
+  for (let i = 0; i < 8; i++) {
+    const a = 170 + i * 58, l = 18 + (i % 3) * 14;
+    g.fillStyle = 'rgba(255,255,225,' + (0.1 + (i % 2) * 0.06) + ')';
+    g.beginPath(); g.moveTo(a, -10); g.lineTo(a + l, -10); g.lineTo(a - 170 + l * 3, 780); g.lineTo(a - 230, 780); g.closePath(); g.fill();
+  }
+
+  // Surface de la mer, ondulée et brillante
+  g.fillStyle = 'rgba(225,252,255,.55)';
+  g.beginPath(); g.moveTo(x0, y0);
+  for (let x = x0; x <= x1; x += 10) g.lineTo(x, 22 + Math.sin(x * 0.045) * 6);
+  g.lineTo(x1, y0); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3;
+  g.beginPath();
+  for (let x = x0; x <= x1; x += 10) g.lineTo(x, 22 + Math.sin(x * 0.045) * 6);
+  g.stroke();
+
+  // Fond lointain : roches pâles, voilées par l'eau
+  g.fillStyle = 'rgba(70,150,190,.55)';
+  g.beginPath(); g.moveTo(x0, 520);
+  g.quadraticCurveTo(80, 430, 150, 500); g.quadraticCurveTo(230, 560, 300, 520); g.quadraticCurveTo(400, 450, 470, 510); g.quadraticCurveTo(540, 560, x1, 470);
+  g.lineTo(x1, 800); g.lineTo(x0, 800); g.closePath(); g.fill();
+  // Banc de petits poissons au loin
+  g.globalAlpha = 0.55;
+  for (let i = 0; i < 7; i++) dessinerCreature(g, 'poissonBleu', 70 + (i % 4) * 34 + (i > 3 ? 18 : 0), 150 + (i > 3 ? 26 : 0) + (i % 2) * 10, 52, 1, t + i);
+  g.globalAlpha = 1;
+
+  // Parois de la grotte (plan moyen) : à gauche et en bas à droite, avec un liseré de lumière
+  const paroi = (pts, couleur, bord) => {
+    g.fillStyle = couleur; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.fill();
+    g.strokeStyle = bord; g.lineWidth = 5; g.beginPath(); pts.slice(1, -2).forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
+  };
+  paroi([[x0, 250], [28, 268], [52, 330], [38, 410], [62, 480], [44, 560], [70, 640], [x0, 800], [x0, 250]], '#12597a', 'rgba(150,230,255,.6)');
+  paroi([[x1, 470], [560, 500], [538, 560], [552, 630], [520, 700], [x1, 800], [x1, 470]], '#12597a', 'rgba(150,230,255,.6)');
+
+  // Une méduse rose et un hippocampe, pour la vie de la grotte
+  dessinerMeduse(g, 96, 300, 66, t);
+  dessinerCreature(g, 'hippocampe', 560, 420, 70, -1, t);
+
+  // Mamie Nacre, en haut à droite, tournée vers Bulle, toute contente : un halo de soleil derrière elle
+  const tx = 448, ty = 178;
+  const halo = g.createRadialGradient(tx - 20, ty, 10, tx - 20, ty, 170);
+  halo.addColorStop(0, 'rgba(255,250,210,.75)'); halo.addColorStop(1, 'rgba(255,250,210,0)');
+  g.fillStyle = halo; g.beginPath(); g.arc(tx - 20, ty, 170, 0, Math.PI * 2); g.fill();
+  g.save(); g.translate(tx, ty); g.scale(-1, 1); g.rotate(-0.12);
+  dessinerTortue(g, 0, 0, 118, t, true);
+  g.restore();
+
+  // Sable du fond, avec ses rochers (le bas porte le bandeau du titre)
+  g.fillStyle = '#e6cf8f';
+  g.beginPath(); g.moveTo(x0, 690);
+  for (let x = x0; x <= x1; x += 10) g.lineTo(x, 690 + Math.sin(x * 0.018) * 12);
+  g.lineTo(x1, y1); g.lineTo(x0, y1); g.closePath(); g.fill();
+  g.fillStyle = '#f4e2ad';
+  g.beginPath(); g.ellipse(330, 712, 140, 12, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#1f5d78';
+  for (const [rx, ry, rw, rh] of [[150, 706, 70, 34], [440, 700, 90, 40]]) { g.beginPath(); g.ellipse(rx, ry, rw, rh, 0, Math.PI, 0); g.fill(); }
+  dessinerCreature(g, 'etoile', 300, 742, 80, 1, t);
+  dessinerCreature(g, 'crabe', 470, 740, 82, -1, t);
+  dessinerOursin(g, 395, 690, 58, t);
+
+  // Algues du plan moyen qui ondulent
+  for (let i = 0; i < 6; i++) {
+    const ax = 110 + i * 78, haut = 90 + (i % 3) * 40;
+    g.strokeStyle = i % 2 ? '#3f9a55' : '#58b86a'; g.lineWidth = 12;
+    g.beginPath(); g.moveTo(ax, 712);
+    for (let j = 1; j <= 6; j++) g.lineTo(ax + Math.sin(t * 1.4 + j * 0.8 + i) * 12, 712 - haut * j / 6);
+    g.stroke();
+  }
+
+  // Bulle : position, taille, inclinaison (le nez remonte un peu)
+  const bx = 232, by = 392, s = 296, incl = -0.12;
+  const lampeX = bx + Math.cos(incl) * s * 0.47, lampeY = by + Math.sin(incl) * s * 0.47;
+
+  // Perles révélées par le phare, qui scintillent dans le faisceau
+  for (const [px, py, r] of [[446, 352, 17], [500, 336, 15], [552, 322, 14], [478, 398, 13], [540, 386, 12]]) {
+    const lueur = g.createRadialGradient(px, py, r * 0.5, px, py, r * 2.6);
+    lueur.addColorStop(0, 'rgba(255,255,240,.8)'); lueur.addColorStop(1, 'rgba(255,255,240,0)');
+    g.fillStyle = lueur; g.beginPath(); g.arc(px, py, r * 2.6, 0, Math.PI * 2); g.fill();
+    dessinerPerle(g, px, py, r, false, t);
+    g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(px - r * 1.6, py - r * 1.2); g.lineTo(px - r * 0.6, py - r * 1.2); g.moveTo(px - r * 1.1, py - r * 1.7); g.lineTo(px - r * 1.1, py - r * 0.7); g.stroke();
+  }
+
+  // Douce lumière autour de Bulle, pour le détacher du fond
+  const aura = g.createRadialGradient(bx, by, 40, bx, by, 270);
+  aura.addColorStop(0, 'rgba(255,250,215,.42)'); aura.addColorStop(1, 'rgba(255,250,215,0)');
+  g.fillStyle = aura; g.beginPath(); g.arc(bx, by, 270, 0, Math.PI * 2); g.fill();
+
+  // Bulles d'air qui sortent de l'hélice
+  for (let i = 0; i < 9; i++) {
+    const hx = bx - s * 0.66 - i * 9 + Math.sin(i * 1.7) * 10, hy = by + 8 - i * 30, r = 5 + (i % 3) * 4;
+    g.strokeStyle = 'rgba(235,252,255,.9)'; g.lineWidth = 3;
+    g.beginPath(); g.arc(hx, hy, r, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(hx - r * 0.35, hy - r * 0.35, r * 0.25, 0, Math.PI * 2); g.fill();
+  }
+
+  // Bulle en grand, phare allumé, la perle géante accrochée sous lui
+  dessinerSousMarin(g, bx, by, s, 1, 0.9, { phare: true, perle: true, incl });
+
+  // Détails ajoutés en grand : liseré de lumière, reflet sur la coque, joue rose, œil levé vers Mamie Nacre
+  g.save(); g.translate(bx, by); g.rotate(incl);
+  g.strokeStyle = '#fffbe2'; g.lineWidth = s * 0.022;
+  g.beginPath(); g.ellipse(0, 0, s * 0.5, s * 0.3, 0, -2.6, -0.55); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,.6)';
+  g.beginPath(); g.ellipse(-s * 0.17, -s * 0.18, s * 0.17, s * 0.045, -0.1, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.45)';
+  g.beginPath(); g.ellipse(-s * 0.04, -s * 0.38, s * 0.1, s * 0.03, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = 'rgba(255,120,120,.45)';
+  g.beginPath(); g.ellipse(s * 0.36, s * 0.02, s * 0.05, s * 0.032, 0, 0, Math.PI * 2); g.fill();
+  // l'œil, redessiné un peu plus grand et tourné vers le haut
+  g.fillStyle = '#bff0ff'; g.beginPath(); g.arc(s * 0.16, -s * 0.03, s * 0.11, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#1b2a3a'; g.beginPath(); g.arc(s * 0.2, -s * 0.075, s * 0.058, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.arc(s * 0.22, -s * 0.095, s * 0.022, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.arc(s * 0.18, -s * 0.055, s * 0.01, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = s * 0.012;
+  g.beginPath(); g.arc(s * 0.16, -s * 0.03, s * 0.085, -2.6, -1.7); g.stroke();
+  g.restore();
+
+  // Éclat de lumière sur la lampe du phare
+  const eclatPhare = g.createRadialGradient(lampeX, lampeY, 0, lampeX, lampeY, 46);
+  eclatPhare.addColorStop(0, 'rgba(255,255,235,1)'); eclatPhare.addColorStop(1, 'rgba(255,250,200,0)');
+  g.fillStyle = eclatPhare; g.beginPath(); g.arc(lampeX, lampeY, 46, 0, Math.PI * 2); g.fill();
+  // Étincelles autour de la perle géante
+  const perleX = bx - Math.sin(incl) * s * 0.56, perleY = by + Math.cos(incl) * s * 0.56;
+  g.fillStyle = '#fff8d0';
+  for (const [dx, dy, r] of [[-78, -24, 7], [74, -10, 6], [-60, 44, 5], [62, 50, 7]]) {
+    g.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, rr = i % 2 ? r * 0.35 : r * 1.6; g.lineTo(perleX + dx + Math.cos(a) * rr, perleY + dy + Math.sin(a) * rr); }
+    g.closePath(); g.fill();
+  }
+
+  // Premier plan : grand corail à gauche et grandes algues à droite, coupés par les bords
+  g.strokeStyle = '#ff6f5e'; g.lineWidth = 30;
+  g.beginPath();
+  g.moveTo(40, 830); g.lineTo(52, 640);
+  g.moveTo(50, 700); g.quadraticCurveTo(-10, 650, -20, 570);
+  g.moveTo(52, 660); g.quadraticCurveTo(110, 620, 120, 560);
+  g.moveTo(118, 600); g.lineTo(160, 575);
+  g.stroke();
+  g.strokeStyle = '#ffa08f'; g.lineWidth = 9;
+  g.beginPath(); g.moveTo(44, 820); g.lineTo(54, 648); g.moveTo(58, 655); g.quadraticCurveTo(106, 622, 113, 568); g.stroke();
+  for (const [ax, haut, coul] of [[600, 420, '#2f8f47'], [565, 330, '#46ad5c'], [628, 470, '#3a9a52']]) {
+    g.strokeStyle = coul; g.lineWidth = 26;
+    g.beginPath(); g.moveTo(ax, 830);
+    for (let j = 1; j <= 8; j++) g.lineTo(ax + Math.sin(t * 1.2 + j * 0.75) * 22 - j * 3, 830 - haut * j / 8);
+    g.stroke();
+  }
+
+  // Grosses bulles floues tout devant
+  for (const [hx, hy, r] of [[24, 120, 16], [580, 250, 12], [150, 610, 10]]) {
+    g.strokeStyle = 'rgba(235,252,255,.75)'; g.lineWidth = 3.5;
+    g.beginPath(); g.arc(hx, hy, r, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.arc(hx - r * 0.35, hy - r * 0.35, r * 0.25, 0, Math.PI * 2); g.fill();
+  }
+}
+function demarrerAffiche() {
+  ecran = 'affiche'; // ni écran titre ni partie : la touche Entrée ne lance rien
+  // Rien d'autre que la scène : écrans, interface, fenêtres, boutons et sélecteur de langue cachés
+  const style = document.createElement('style');
+  style.textContent = '.ecran, #hud, #toast, .voile, button, .jel-langue, jel-langue, .place-langue { display: none !important; }';
+  document.head.appendChild(style);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ==========================================================================
+   Images du jeu (page du jeu)
+   ========================================================================== */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine plongée, avec sa vraie interface (perles, cœurs, clés, air, phare, carte), sans
+// écran titre, ni fenêtre « Continuer », ni carte de présentation (CONSIGNES-JEU.md, section 5). La
+// plongée est posée, Bulle avance une demi-seconde (hélice, bulles), puis tout est figé sans fenêtre de
+// pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = plongée 1, forêt d'algues : Bulle descend vers les premières perles et la perle géante ;
+//   2 = plongée 9, l'épave : une clé-coquillage en poche, Bulle file vers une porte de corail, courants ;
+//   3 = plongée 20, volcan endormi : Bulle remonte un courant avec la perle géante (flèche dorée),
+//       geyser qui souffle, méduse, baleine au loin, jauge d'air et phare.
+// sub : position de départ ; entree : touches tenues ; vu : zones déjà découvertes [x, y, rayon] ;
+// prises : cases des perles déjà rapportées ; prisesLoin : autres perles rapportées (les plus loin) ;
+// decor : créatures du décor posées près de Bulle [espèce, x, y, sens].
+const SCENES_APERCU = {
+  1: {
+    niveau: 0, sub: [4.6, 8.2], entree: ['ArrowDown', 'ArrowLeft'], secondes: 0.5, coeurs: 3,
+    vu: [[14.5, 4.5, 3.4], [11, 4, 3.4], [7.5, 4, 3.4], [4, 4, 3.4], [4, 7.5, 3.4], [4, 10.5, 3.4], [4, 13.5, 3.4]],
+    decor: [['crabe', 4.5, 14.75, -1], ['poissonBleu', 2.9, 6.6, 1], ['hippocampe', 5.2, 3.4, -1]],
+  },
+  2: {
+    niveau: 8, sub: [19.4, 12.55], entree: ['ArrowLeft'], secondes: 0.4, coeurs: 2, cles: [[19, 20]],
+    amelio: { phare: 1, helice: 1, pince: 1 },
+    vu: [[22, 4, 3.4], [21, 8, 3.4], [21, 12, 3.4], [21, 16, 3.4], [20.5, 20.5, 3.4], [19.4, 12.6, 3.4]],
+    prises: [[21, 12], [21, 19], [19, 22]], prisesLoin: 0,
+  },
+  3: {
+    niveau: 19, sub: [28.6, 16.4], entree: ['ArrowUp'], secondes: 0.35, coeurs: 3, geante: true,
+    amelio: { phare: 2, helice: 1, coque: 2, reservoir: 1, pince: 1 }, air: 0.58, batterie: 0.55,
+    vu: [[29, 5, 9], [28.5, 15, 9], [28, 24, 9], [20, 10, 9], [10, 5, 6], [12, 12, 5], [20, 32, 9], [4, 31, 7], [8, 36, 7]],
+    prises: [[28, 9], [26, 13], [30, 21]], prisesLoin: 5, geyser: [30, 13], baleine: 27.5,
+  },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  // Progression en mémoire seulement : améliorations de l'atelier, cartes et carnet déjà vus
+  // (ni carte de présentation, ni message du carnet par-dessus la partie).
+  AMELIOS.forEach((a) => { prog.amelio[a.cle] = (sc.amelio && sc.amelio[a.cle]) || 0; });
+  prog.intros = ['pilotage'].concat(NIVEAUX.map((n) => n.nouveau).filter(Boolean));
+  prog.carnet = ESPECES.slice();
+  prog.debloque = sc.niveau + 1;
+  lancerNiveau(sc.niveau);
+  partieEnCours = false; // rien n'est enregistré à la fermeture
+  const p = P, s = p.sub;
+  s.x = sc.sub[0]; s.y = sc.sub[1];
+  p.cam.x = s.x; p.cam.y = s.y;
+  p.parti = true;
+  p.coeurs = sc.coeurs;
+  // Zones déjà explorées
+  p.rev.fill(0); p.aReveler = [];
+  for (const [vx, vy, r] of sc.vu) {
+    for (let y = 0; y < p.H; y++) for (let x = 0; x < p.W; x++) if (Math.hypot(x + 0.5 - vx, y + 0.5 - vy) <= r) p.rev[y * p.W + x] = 1;
+  }
+  // Perles, clés et perle géante déjà rapportées
+  const ici = (o, [x, y]) => Math.floor(o.x) === x && Math.floor(o.y) === y;
+  for (const pe of p.perles) if ((sc.prises || []).some((c) => ici(pe, c))) pe.pris = true;
+  const loin = p.perles.filter((pe) => !pe.pris).sort((a, b) => Math.hypot(b.x - s.x, b.y - s.y) - Math.hypot(a.x - s.x, a.y - s.y));
+  for (const pe of loin.slice(0, sc.prisesLoin || 0)) pe.pris = true;
+  p.perlesPrises = p.perles.filter((pe) => pe.pris).length;
+  for (const c of p.cles) if ((sc.cles || []).some((k) => ici(c, k))) { c.pris = true; p.clesTenues++; }
+  if (sc.geante) { p.perleGeante.prise = true; p.porte = true; p.distRetour = carteDistances(p); }
+  if (sc.air && p.airMax) p.air = p.airMax * sc.air;
+  if (sc.batterie !== undefined) p.batterie = sc.batterie;
+  if (sc.baleine !== undefined) for (const c of p.decor) if (c.fond) { c.x = sc.baleine; c.ph = 1; }
+  // Quelques créatures du décor venues nager près de Bulle (elles restent sur place pendant la mise en place)
+  for (const [espece, x, y, dir] of sc.decor || []) {
+    const c = p.decor.find((d) => d.espece === espece && !d.place);
+    if (c) Object.assign(c, { x, y, cx: x, cy: y, dir, place: true, pause: 99, cible: 0 });
+  }
+  // Geyser qui souffle au moment de la capture (cycle de 4,2 s : il souffle entre 3,1 et 4,2)
+  const fin = p.temps + sc.secondes;
+  for (const ge of p.geysers) ge.phase = sc.geyser && ici(ge, sc.geyser) ? (3.6 - fin + 42) % 4.2 : (1.0 - fin + 42) % 4.2;
+  // Bulle avance une demi-seconde : hélice, sillage de bulles, perle qui s'envole vers le compteur.
+  s.invul = 99;
+  touches.clear();
+  sc.entree.forEach((t) => touches.add(t));
+  const pas = Math.round(sc.secondes * 60);
+  for (let i = 0; i < pas && !p.fini; i++) { majPartie(1 / 60); majEffets(1 / 60); }
+  touches.clear();
+  // Puis la partie est figée sur ce moment, avec la vraie interface et sans fenêtre de pause.
+  s.invul = 0; p.secousse = 0;
+  p.cam.x = s.x; p.cam.y = s.y;
+  majHud();
+  clearTimeout(minuterieToast); $('toast').classList.remove('visible');
+  p.fige = true;
+}
+
+/* ---------- Démarrage ---------- */
 document.title = tr('titre');
 chargerProg();
 majBoutonsSon();
-montrer('titre');
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  montrer('titre');
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

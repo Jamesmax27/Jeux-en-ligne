@@ -7205,6 +7205,8 @@ const PART = []; const VPROJ = []; const BEAMS = []; const TIMED = [];
 const WX = [];
 let FOG = { cv: null, img: null, blur: null, dirty: true };
 let frameDT = .016, lastFrame = 0, FPS = 60;
+let FIGE = false;   // affiche et images du jeu (JEL_AFFICHE, JEL_APERCU) : les effets ne bougent plus
+let APERCU = 0;     // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 const IS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const LOWFX = IS_TOUCH && Math.min(screen.width, screen.height) < 700;
 
@@ -7635,7 +7637,7 @@ function render(alpha) {
   resizeCanvas();
   const c = CX;
   const th = THEMES[G.map.theme];
-  updateFx(frameDT);
+  updateFx(FIGE ? 0 : frameDT);
   if (FOG.dirty) updateFogTex();
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.fillStyle = th.sky; c.fillRect(0, 0, CV.width, CV.height);
@@ -9473,6 +9475,307 @@ function demoTick(dt) {
   if ((G.over || G.time > 600) && !G.restarting) { G.restarting = true; startDemo(); }
 }
 
+// ---------------- affiche et images du jeu (robot du site) ----------------
+// Hasard fixe : la même image à chaque capture (rendu seulement ; la simulation tire son hasard de G.a).
+function hasardFixe(graine) {
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+// Bâtiment posé à la case libre la plus proche de (tx, ty).
+function poserBatiment(t, o, tx, ty) {
+  for (let r = 0; r < 9; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+    if (canPlace(t, tx + dx, ty + dy, -1, true)) return makeBld(t, o, tx + dx, ty + dy, true);
+  }
+  return null;
+}
+// Unité posée sur une place libre autour de (x, y) ; k = rang dans le groupe.
+function poserUnite(t, o, x, y, k, a) {
+  const p = freeSpot(x, y, k || 0);
+  const u = makeUnit(t, o, p.x, p.y);
+  if (a !== undefined) { u.a = a; u.ta = a; }
+  return u;
+}
+function deplacerUnite(u, x, y) { u.x = u.px = u.lastX = x; u.y = u.py = u.lastY = y; }
+
+/* ---------- Affiche (jaquette du jeu) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Un chasseur intercepteur de
+// la Coalition, en grand, fonce au ras du sable rouge de Mars et lâche ses missiles sur la base de
+// Hélix, dont une tourelle explose ; la flak rouge le manque, chars et fantassins s'affrontent plus bas.
+const AFF = { A: null };
+function preparerAffiche() {
+  hasardFixe(20291);
+  const cfg = {
+    seed: 4417, size: 96, theme: 'mars', mode: 'solo', me: 0, reveal: true, players: [
+      { name: '', team: 0, color: 0, start: 0, credits: 0, workers: 0, hq: false },
+      { name: '', team: 1, color: 1, start: 1, credits: 0, workers: 0, hq: false }]
+  };
+  newGame(cfg);
+  G.revealAll = true;
+  const W = G.W, e = Math.round(W * .12), cx = W / 2;
+  // Base de Hélix autour du gisement du haut de la carte
+  const hq = poserBatiment('hq', 1, cx - 1, e + 3);
+  AFF.A = { x: hq.x, y: hq.y };
+  const A = AFF.A, ax = tileOf(A.x), ay = tileOf(A.y), haut = -Math.PI / 2, bas = Math.PI / 2;
+  const t1 = poserBatiment('turret', 1, ax - 6, ay + 1);
+  const t2 = poserBatiment('turret', 1, ax + 3, ay + 3);
+  poserBatiment('power', 1, ax - 6, ay - 3);
+  poserBatiment('factory', 1, ax + 4, ay - 3);
+  poserBatiment('sam', 1, ax - 2, ay + 4);
+  AFF.t1 = t1; AFF.t2 = t2;
+  // Défenseurs de Hélix (rouges)
+  [[-60, 150], [70, 175], [-150, 120]].forEach(([dx, dy], i) => poserUnite('tank', 1, A.x + dx, A.y + dy, 0, bas + (i - 1) * .35));
+  [[-110, 190], [-90, 205], [10, 205], [30, 190]].forEach(([dx, dy]) => poserUnite('marine', 1, A.x + dx, A.y + dy, 0, bas + .3));
+  // La Coalition (bleue) monte à l'assaut
+  [[-250, 290], [-190, 330], [-60, 470], [150, 420]].forEach(([dx, dy], i) => poserUnite('tank', 0, A.x + dx, A.y + dy, 0, haut + (i % 2 ? .3 : .15)));
+  [[-210, 250], [-185, 262], [-230, 268], [-150, 280], [120, 330], [140, 345], [100, 350]].forEach(([dx, dy]) => poserUnite('marine', 0, A.x + dx, A.y + dy, 0, haut + .2));
+  for (const u of G.ents) if (u.k === 'u') { u.ta = u.a; u.moving = true; }
+  // tourelles de Hélix tournées vers le chasseur
+  if (t1) t1.ta = 1.2; if (t2) t2.ta = 2.3;
+  computeFog(true);
+  bakeTerrain();
+  // Effets : la tourelle de gauche explose, la fumée monte, échanges de tirs au sol
+  PART.length = 0; BEAMS.length = 0; VPROJ.length = 0;
+  const tx = t1 ? t1.x : A.x - 160, ty = t1 ? t1.y : A.y;
+  explosion(tx, ty, 2.4);
+  for (let i = 0; i < 5; i++) updateFx(.05);
+  explosion(tx + 20, ty - 14, 1.4);
+  puff(tx, ty, 'dsmoke', 12, 26, 3, 24, { spread: 40, grow: 2, vy: -16 });
+  for (let i = 0; i < 3; i++) updateFx(.05);
+  const tirs = [[-60, 150, -150, 280], [-150, 120, -210, 250], [-185, 262, -110, 190], [70, 175, 120, 330], [140, 345, 30, 190]];
+  for (const [x0, y0, x1, y1] of tirs) {
+    const f = .55, mx = A.x + x0 + (x1 - x0) * f, my = A.y + y0 + (y1 - y0) * f;
+    beam(A.x + x0, A.y + y0, mx, my, 'rgba(255,230,170,.95)', 1.4, 1, null);
+    flash(A.x + x0, A.y + y0, 14, 'fire', 1);
+  }
+  CAM.shake = 0;
+  FIGE = true;
+}
+// Chasseur intercepteur dessiné en grand avec les fonctions du jeu (UPAINT), sur un calque.
+function calqueChasseur(S, col) {
+  const R = Math.ceil(44 * S), cv = mk(R * DPR, R * DPR), h = cv.getContext('2d');
+  h.setTransform(DPR * S, 0, 0, DPR * S, R * DPR / 2, R * DPR / 2);
+  UPAINT.interceptor(h, col, 'body');
+  return { cv, R };
+}
+function dessinerAffiche() {
+  if (!AFF.A) preparerAffiche();
+  resizeCanvas();
+  const W = innerWidth, H = innerHeight, k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  const X = x => ox + x * k, Y = y => oy + y * k;
+  const A = AFF.A;
+  CAM.z = 1.1 * k; CAM.shake = 0;
+  CAM.x = A.x - X(360) / CAM.z; CAM.y = A.y - Y(150) / CAM.z;
+  lastFrame = performance.now();
+  render(1);
+  const c = CX;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const qg = worldToScreen(A.x, A.y);
+  const t1 = AFF.t1 ? worldToScreen(AFF.t1.x, AFF.t1.y) : { x: X(200), y: Y(150) };
+  const t2 = AFF.t2 ? worldToScreen(AFF.t2.x, AFF.t2.y) : { x: X(420), y: Y(260) };
+  // Lueur chaude de l'explosion, qui éclaire le haut de la scène
+  c.globalCompositeOperation = 'lighter';
+  c.fillStyle = rg(c, t1.x, t1.y, 10 * k, 330 * k, [[0, 'rgba(255,190,110,.5)'], [.4, 'rgba(255,120,50,.16)'], [1, 'rgba(255,90,30,0)']]);
+  c.fillRect(0, 0, W, H);
+  c.globalCompositeOperation = 'source-over';
+  const col = TEAM_COLORS[0];
+  // Le chasseur, en grand : il fonce vers la base de Hélix
+  const hx = X(255), hy = Y(455), S = 9.2 * k;
+  const a = Math.atan2(qg.y - hy, qg.x - hx);
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const loc = (lx, ly) => ({ x: hx + ca * lx * S - sa * ly * S, y: hy + sa * lx * S + ca * ly * S });
+  const { cv, R } = calqueChasseur(S, col);
+  const dessinerCalque = (x, y, alpha) => { c.save(); c.globalAlpha = alpha; c.translate(x, y); c.rotate(a); c.drawImage(cv, -R / 2, -R / 2, R, R); c.restore(); };
+  // ombre portée loin en dessous (il vole au-dessus du champ de bataille)
+  const ombre = blurred(shadowOf(cv, .55), 7 * k * DPR);
+  c.save(); c.translate(hx + 70 * k, hy + 110 * k); c.rotate(a); c.scale(.85, .85); c.drawImage(ombre, -R / 2, -R / 2, R, R); c.restore();
+  // traînée des réacteurs et filé de vitesse
+  const tuyere = loc(-15, 0);
+  c.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 14; i++) {
+    const d = i * 16 * k, r = (30 - i * 1.6) * k;
+    c.globalAlpha = .55 - i * .035;
+    c.drawImage(SPRITES.glow.blue, tuyere.x - ca * d - r, tuyere.y - sa * d - r, r * 2, r * 2);
+  }
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  for (let i = 3; i >= 1; i--) dessinerCalque(hx - ca * i * 18 * k, hy - sa * i * 18 * k, .09);
+  // le chasseur, avec un liseré de lumière froide
+  c.save(); c.shadowColor = 'rgba(150,215,255,.9)'; c.shadowBlur = 18 * k; dessinerCalque(hx, hy, 1); c.restore();
+  // reflet chaud de l'explosion sur le dessus
+  c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = .22; dessinerCalque(hx, hy, .22); c.restore();
+  // flamme du réacteur, cockpit, feux de bout d'aile
+  c.globalCompositeOperation = 'lighter';
+  c.drawImage(SPRITES.glow.blue, tuyere.x - 60 * k, tuyere.y - 60 * k, 120 * k, 120 * k);
+  c.drawImage(SPRITES.glow.white, tuyere.x - 20 * k, tuyere.y - 20 * k, 40 * k, 40 * k);
+  const cockpit = loc(6.5, 0);
+  c.drawImage(SPRITES.glow.cyan, cockpit.x - 34 * k, cockpit.y - 34 * k, 68 * k, 68 * k);
+  const g1 = loc(-9, -14), g2 = loc(-9, 14);
+  c.drawImage(SPRITES.glow.red, g1.x - 16 * k, g1.y - 16 * k, 32 * k, 32 * k);
+  c.drawImage(SPRITES.glow.green, g2.x - 16 * k, g2.y - 16 * k, 32 * k, 32 * k);
+  c.globalCompositeOperation = 'source-over';
+  // Deux missiles partent vers la base de Hélix, avec leur fumée
+  const missile = (lx, ly, f, cible) => {
+    const m = 1.7 * k;
+    const p0 = loc(lx, ly), x = p0.x + (cible.x - p0.x) * f, y = p0.y + (cible.y - p0.y) * f;
+    const ang = Math.atan2(cible.y - p0.y, cible.x - p0.x), dx = Math.cos(ang), dy = Math.sin(ang);
+    const L = Math.hypot(x - p0.x, y - p0.y);
+    for (let d = 16 * k; d < L; d += 8 * k) {
+      const q = d / L, r = (9 + 20 * q) * k;
+      c.globalAlpha = .8 * (1 - q * .55);
+      c.drawImage(SPRITES.glow.steam, x - dx * d - r, y - dy * d - r, r * 2, r * 2);
+    }
+    c.globalAlpha = 1;
+    c.save(); c.translate(x, y); c.rotate(ang);
+    c.scale(m / k, m / k);
+    c.fillStyle = '#e8edf2'; rr(c, -16 * k, -3 * k, 22 * k, 6 * k, 3 * k); c.fill();
+    c.fillStyle = '#ff5a48'; c.beginPath(); c.moveTo(6 * k, -3 * k); c.lineTo(12 * k, 0); c.lineTo(6 * k, 3 * k); c.fill();
+    c.fillStyle = '#8a939c'; poly(c, [-16 * k, -3 * k, -20 * k, -8 * k, -12 * k, -3 * k]); c.fill(); poly(c, [-16 * k, 3 * k, -20 * k, 8 * k, -12 * k, 3 * k]); c.fill();
+    c.restore();
+    c.globalCompositeOperation = 'lighter';
+    c.drawImage(SPRITES.glow.fire, x - dx * 30 * k - 34 * k, y - dy * 30 * k - 34 * k, 68 * k, 68 * k);
+    c.drawImage(SPRITES.glow.white, x - dx * 30 * k - 10 * k, y - dy * 30 * k - 10 * k, 20 * k, 20 * k);
+    c.globalCompositeOperation = 'source-over';
+  };
+  missile(-2, -11, .62, qg);
+  missile(-2, 11, .42, t2);
+  // Flak rouge de la tourelle de droite, qui frôle le chasseur
+  c.globalCompositeOperation = 'lighter';
+  for (const [dxp, dyp, f] of [[-40, -30, .8], [30, 60, .7], [-80, 40, .9]]) {
+    const ex = hx + dxp * k, ey = hy + dyp * k;
+    const bx = t2.x + (ex - t2.x) * f, by = t2.y + (ey - t2.y) * f;
+    c.strokeStyle = 'rgba(255,110,80,.85)'; c.lineWidth = 2.4 * k; c.beginPath(); c.moveTo(t2.x + (ex - t2.x) * (f - .25), t2.y + (ey - t2.y) * (f - .25)); c.lineTo(bx, by); c.stroke();
+    c.drawImage(SPRITES.glow.red, bx - 12 * k, by - 12 * k, 24 * k, 24 * k);
+  }
+  c.drawImage(SPRITES.glow.fire, t2.x - 24 * k, t2.y - 24 * k, 48 * k, 48 * k);
+  c.globalCompositeOperation = 'source-over';
+  // Deux ailiers plus loin, plus petits
+  for (const [px, py, s2] of [[X(470), Y(560), 3.6 * k], [X(95), Y(300), 3 * k]]) {
+    const w = calqueChasseur(s2, col);
+    c.save(); c.translate(px + 26 * k, py + 40 * k); c.rotate(a); c.globalAlpha = .5; c.drawImage(blurred(shadowOf(w.cv, .6), 3 * DPR), -w.R / 2, -w.R / 2, w.R, w.R); c.restore();
+    c.save(); c.translate(px, py); c.rotate(a); c.drawImage(w.cv, -w.R / 2, -w.R / 2, w.R, w.R); c.restore();
+    const tq = { x: px - Math.cos(a) * 15 * s2, y: py - Math.sin(a) * 15 * s2 };
+    c.globalCompositeOperation = 'lighter';
+    c.drawImage(SPRITES.glow.blue, tq.x - 22 * k, tq.y - 22 * k, 44 * k, 44 * k);
+    c.globalCompositeOperation = 'source-over';
+  }
+  // Premier plan : gros cristaux flous dans les coins du bas
+  const cristal = (v, x, y, s, flou) => {
+    c.save(); try { c.filter = `blur(${flou}px)`; } catch (e) { }
+    c.globalCompositeOperation = 'lighter'; c.globalAlpha = .55;
+    c.drawImage(SPRITES.glow.cyan, x - s * .7, y - s * .55, s * 1.4, s * 1.1);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+    c.drawImage(SPRITES.crystal[v], x - s / 2, y - s / 2, s, s);
+    c.restore();
+  };
+  cristal(2, X(30), Y(735), 300 * k, 2.5 * k);
+  cristal(4, X(585), Y(760), 260 * k, 3 * k);
+  c.filter = 'none';
+}
+function demarrerAffiche() {
+  const cacher = () => { for (const el of document.querySelectorAll('#hud, #screens, #loading, #tooltip, #reseau, .jel-langue, button')) el.style.setProperty('display', 'none', 'important'); };
+  cacher();
+  dessinerAffiche();
+  setTimeout(cacher, 300); setTimeout(cacher, 1200);
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---------- Images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine mission, avec sa vraie interface (cristaux, énergie, population, objectif,
+// chrono, minicarte, sélection, commandes), sans écran titre, ni fenêtre « Continuer », ni tutoriel
+// (CONSIGNES-JEU.md, section 5). Les troupes sont placées au contact de l'ennemi, la partie tourne
+// une seconde (tirs, explosions), puis elle est figée sans fenêtre de pause : ni victoire, ni défaite,
+// ni son, ni sauvegarde.
+//   1 = mission 1 (Mars) : fantassins et lance-roquettes à l'assaut d'un avant-poste ;
+//   2 = mission 13 (Europa) : la base, ses drones qui récoltent, ses tourelles face à une vague ;
+//   3 = mission 22 (Io) : chars, artillerie et roquettes contre les Titans prototypes, sur la lave.
+const SCENES_APERCU = {
+  1: { ci: 0, mi: 0, avance: 60, zoom: 1.35, depart: 7.5 },
+  2: { ci: 1, mi: 2, avance: 40, zoom: .8 },
+  3: { ci: 2, mi: 1, avance: 60, zoom: .8, depart: 8 },
+};
+function ouvrirApercu(numero) {
+  APERCU = numero;
+  hasardFixe(1234567 + numero * 7919);
+  const sc = SCENES_APERCU[numero];
+  CUR.kind = 'mission'; CUR.ci = sc.ci; CUR.mi = sc.mi; CUR.tips = [];
+  hideScreens();
+  PART.length = 0; VPROJ.length = 0; BEAMS.length = 0; TIMED.length = 0; WX.length = 0;
+  UI.sel = []; UI.selSet = new Set(); UI.groups = {}; UI.mode = null; UI.card = 'main'; UI.markers = []; UI.pings = []; UI.cardSig = ''; UI.panelSig = '';
+  newGame(missionCfg(sc.ci, sc.mi));
+  G.demo = false;
+  // Pendant l'image : jamais de fin de partie (ni victoire, ni défaite, ni sauvegarde, ni FMG).
+  SORTIES.fin = () => {};
+  const moi = G.players[G.me], ennemi = G.players.find(p => p.team !== moi.team);
+  const s1 = ennemi.start, E = { x: (s1.x + .5) * TILE, y: (s1.y + .5) * TILE };
+  const C = { x: G.W * TILE / 2, y: G.H * TILE / 2 };
+  const dl = Math.hypot(C.x - E.x, C.y - E.y), dir = { x: (C.x - E.x) / dl, y: (C.y - E.y) / dl };
+  const mesUnites = () => G.ents.filter(e => !e.dead && e.k === 'u' && e.o === G.me && e.t !== 'worker');
+  const centre = l => ({ x: l.reduce((t, e) => t + e.x, 0) / Math.max(1, l.length), y: l.reduce((t, e) => t + e.y, 0) / Math.max(1, l.length) });
+  const milieu = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  let focus;
+  if (numero === 2) {
+    // Base installée depuis quelques minutes ; une vague arrive par le centre de la carte.
+    const s0 = moi.start, B = { x: (s0.x + .5) * TILE, y: (s0.y + .5) * TILE };
+    const d0 = Math.hypot(C.x - B.x, C.y - B.y), v = { x: (C.x - B.x) / d0, y: (C.y - B.y) / d0 }, n = { x: -v.y, y: v.x };
+    const bx = tileOf(B.x), by = tileOf(B.y);
+    const pose = (t, fx, fn) => poserBatiment(t, G.me, Math.round(bx + v.x * fx + n.x * fn) - 1, Math.round(by + v.y * fx + n.y * fn) - 1);
+    pose('power', -1, -5); pose('power', -1, 5); pose('barracks', -5, 2); pose('refinery', -4, -4); pose('factory', 2, 6);
+    const tours = [pose('turret', 6, -3), pose('turret', 6, 3), pose('sam', 5, 0)];
+    const avant = { x: B.x + v.x * 7.5 * TILE, y: B.y + v.y * 7.5 * TILE };
+    const ang = Math.atan2(v.y, v.x);
+    ['tank', 'tank', 'marine', 'marine', 'rocket', 'marine'].forEach((t, k) => poserUnite(t, G.me, avant.x, avant.y, k, ang));
+    for (const t of tours) if (t) t.ta = ang;
+    const vague = { x: B.x + v.x * 11 * TILE, y: B.y + v.y * 11 * TILE };
+    const ids = ['marine', 'rocket', 'marine', 'scout', 'tank', 'marine', 'rocket', 'marine'].map((t, k) => poserUnite(t, ennemi.id, vague.x, vague.y, k, ang + Math.PI).id);
+    execCmd({ c: 'amove', p: ennemi.id, ids, x: B.x, y: B.y });
+    G.time = 262; ennemi.waves.next = G.time + 40; ennemi.waves.n = 3;
+    moi.credits = 735;
+    focus = () => milieu(centre(G.ents.filter(e => e.k === 'r' && Math.hypot(e.x - B.x, e.y - B.y) < 9 * TILE)), centre(G.ents.filter(e => !e.dead && e.k === 'u' && e.o === ennemi.id)));
+  } else {
+    // Armée du joueur placée à quelques cases de l'avant-poste ennemi, qui donne l'assaut.
+    const dep = { x: E.x + dir.x * sc.depart * TILE, y: E.y + dir.y * sc.depart * TILE };
+    const ang = Math.atan2(-dir.y, -dir.x);
+    mesUnites().forEach((u, k) => { const p = freeSpot(dep.x, dep.y, k); deplacerUnite(u, p.x, p.y); u.a = u.ta = ang; });
+    const us = mesUnites();
+    execCmd({ c: 'amove', p: G.me, ids: us.map(u => u.id), x: E.x, y: E.y });
+    // mission 22 : chars et artillerie visent un Titan prototype
+    const titan = G.ents.find(e => !e.dead && e.vip);
+    if (titan) execCmd({ c: 'attack', p: G.me, ids: us.filter(u => u.t === 'tank' || u.t === 'arty').map(u => u.id), tgt: titan.id });
+    G.time = numero === 1 ? 74 : 196;
+    // vue : entre l'armée et les Titans prototypes (mission 22), sinon les ennemis les plus proches
+    focus = () => {
+      const a = centre(mesUnites());
+      const titans = G.ents.filter(e => !e.dead && e.vip);
+      if (titans.length) { const t = centre(titans); return { x: a.x + (t.x - a.x) * .6, y: a.y + (t.y - a.y) * .6 }; }
+      const proches = G.ents.filter(e => !e.dead && e.k !== 'r' && e.o >= 0 && isEnemy(G.me, e.o)).sort((p, q) => Math.hypot(p.x - a.x, p.y - a.y) - Math.hypot(q.x - a.x, q.y - a.y)).slice(0, 4);
+      return proches.length ? milieu(a, centre(proches)) : a;
+    };
+  }
+  computeFog(true);
+  // La partie avance sans effets jusqu'au contact (rien n'est montré ni entendu).
+  const fx0 = SORTIES.fx, msg0 = SORTIES.msg;
+  SORTIES.fx = () => {}; SORTIES.msg = () => {};
+  for (let i = 0; i < sc.avance; i++) simStep();
+  SORTIES.fx = fx0; SORTIES.msg = msg0;
+  bakeTerrain();
+  FOG.dirty = true;
+  CAM.z = sc.zoom;
+  const vue = focus();
+  CAM.x = vue.x - viewW() / 2; CAM.y = vue.y - viewH() * .4;
+  $('msgs').innerHTML = '';
+  document.body.classList.add('ingame');
+  $('hud').classList.remove('hidden');
+  SPEED = 1; PAUSED = false; ACC = 0;
+  G.stats = { start: performance.now() };
+  UI.showBars = false;
+  setSel(mesUnites().filter(u => Math.hypot(u.x - vue.x, u.y - vue.y) < 12 * TILE));
+  showMsg(traduire('msg.objectif', { texte: objectiveText() }), 'info');
+  updateHud(); layoutHud();
+  // La partie tourne une seconde (tirs, explosions), puis elle est figée, sans fenêtre de pause.
+  setTimeout(() => { PAUSED = true; FIGE = true; CAM.shake = 0; updateHud(); }, 1000);
+}
+
 // ---------------- démarrage ----------------
 function boot() {
   localiserDonnees();
@@ -9502,11 +9805,13 @@ function boot() {
     $('idleW').addEventListener('click', ev => { ev.stopPropagation(); audioInit(); if (G) selectIdleWorkers(); });
     window.addEventListener('resize', () => { layoutHud(); });
     document.addEventListener('pointerdown', () => audioInit(), { once: true });
-    document.addEventListener('visibilitychange', () => { const robotLocal = G && G.mode === 'tr' && TRJ.affichee && TRJ.partie && TRJ.partie.mode === 'local'; if (document.hidden && G && (G.mode === 'solo' || robotLocal) && !G.demo && !G.over && $('screens').dataset.open !== '1') togglePause(); });
-    if (window.JEL_SAVE && JEL_SAVE.surFermeture) JEL_SAVE.surFermeture(() => { const enMission = G && !G.demo && !G.over && G.mission && !G.mission.skirm && G.mode === 'solo'; if (enMission || CUR.briefing) sauverProgression(numeroMission(CUR.ci, CUR.mi)); });
+    document.addEventListener('visibilitychange', () => { if (APERCU) return; const robotLocal = G && G.mode === 'tr' && TRJ.affichee && TRJ.partie && TRJ.partie.mode === 'local'; if (document.hidden && G && (G.mode === 'solo' || robotLocal) && !G.demo && !G.over && $('screens').dataset.open !== '1') togglePause(); });
+    if (window.JEL_SAVE && JEL_SAVE.surFermeture) JEL_SAVE.surFermeture(() => { if (APERCU || window.JEL_AFFICHE) return; const enMission = G && !G.demo && !G.over && G.mission && !G.mission.skirm && G.mode === 'solo'; if (enMission || CUR.briefing) sauverProgression(numeroMission(CUR.ci, CUR.mi)); });
     hideLoading();
-    mainMenu();
-    requestAnimationFrame(loop);
+    const numeroApercu = Number(window.JEL_APERCU);
+    if (window.JEL_AFFICHE) demarrerAffiche();
+    else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) { ouvrirApercu(numeroApercu); requestAnimationFrame(loop); }
+    else { mainMenu(); requestAnimationFrame(loop); }
   }, 20);
 }
 window.addEventListener('load', boot);
