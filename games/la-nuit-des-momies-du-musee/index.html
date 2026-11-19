@@ -3321,10 +3321,337 @@
     requestAnimationFrame(boucleDemo);
   }
 
+  /* ---------------------------------------------------------------
+     Affiche (jaquette du jeu)
+     --------------------------------------------------------------- */
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Vue de face, dans la crypte :
+  // le gardien, de dos au premier plan, braque sa lampe sur une momie qui sort de son sarcophage doré ;
+  // prise dans le faisceau, elle se fige, les mains tendues vers lui. D'autres yeux brillent dans la porte
+  // du fond, la lune entre par une fenêtre haute et des scarabées turquoise courent vers le gardien.
+  // La scène est dessinée dans un repère de 600 × 800, agrandi pour tenir dans l'écran ; murs, sol et
+  // plafond débordent largement pour remplir les écrans plus larges ou plus hauts.
+  function dessinerAffiche() {
+    miseEnPage();
+    const c = ctx;
+    const k = Math.min(W / 600, H / 800);
+    const ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.shadowBlur = 0;
+    c.fillStyle = '#140f14'; c.fillRect(0, 0, cv.width, cv.height);
+    c.setTransform(DPR * k, 0, 0, DPR * k, DPR * ox, DPR * oy);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+
+    const poly = (pts) => { c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.closePath(); };
+    const lin = (x0, y0, x1, y1, arrets) => { const g = c.createLinearGradient(x0, y0, x1, y1); arrets.forEach(([p, col]) => g.addColorStop(p, col)); return g; };
+    const rad = (x, y, r0, r1, arrets) => { const g = c.createRadialGradient(x, y, r0, x, y, r1); arrets.forEach(([p, col]) => g.addColorStop(p, col)); return g; };
+
+    // --- La salle en perspective (point de fuite vers (300, 278)) ---
+    // plafond
+    c.fillStyle = lin(0, -400, 0, 110, [[0, '#0d0a10'], [1, '#2a2028']]);
+    poly([170, 110, 430, 110, 1790, -770, -1190, -770]); c.fill();
+    // poutres du plafond
+    c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 6;
+    for (let i = 1; i < 5; i++) { const x = 170 + i * 52; c.beginPath(); c.moveTo(x, 110); c.lineTo(300 + (x - 300) * 9, 110 - 880); c.stroke(); }
+    // sol
+    c.fillStyle = lin(0, 400, 0, 800, [[0, '#3a2c2a'], [0.5, '#4a382c'], [1, '#2e2320']]);
+    poly([170, 400, 430, 400, 1790, 1680, -1190, 1680]); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,.32)'; c.lineWidth = 2;
+    for (let i = -14; i <= 24; i++) { const x = 170 + i * 26; c.beginPath(); c.moveTo(x, 400); c.lineTo(300 + (x - 300) * 11.5, 400 + 122 * 10.5); c.stroke(); }
+    for (let j = 0; j < 9; j++) { const y = 278 + 122 / (1 - j * 0.11); c.lineWidth = 1.5 + j * 0.5; c.beginPath(); c.moveTo(-1200, y); c.lineTo(1800, y); c.stroke(); }
+    // murs de côté
+    c.fillStyle = lin(-300, 0, 170, 0, [[0, '#1c1418'], [1, '#33262a']]);
+    poly([170, 110, 170, 400, -1190, 1680, -1190, -770]); c.fill();
+    c.fillStyle = lin(430, 0, 900, 0, [[0, '#33262a'], [1, '#1a1318']]);
+    poly([430, 110, 430, 400, 1790, 1680, 1790, -770]); c.fill();
+    // mur du fond
+    c.fillStyle = lin(0, 110, 0, 400, [[0, '#3a2b2c'], [1, '#4a372e']]);
+    c.fillRect(170, 110, 260, 290);
+    // frise du fond : bande turquoise et dents d'or (motifs, aucun signe d'écriture)
+    c.fillStyle = '#1f6f72'; c.fillRect(170, 118, 260, 10);
+    c.strokeStyle = '#c9a24a'; c.lineWidth = 3;
+    c.beginPath(); for (let x = 170; x <= 430; x += 13) { c.lineTo(x, 132); c.lineTo(x + 6.5, 142); } c.stroke();
+    c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 1.5;
+    for (let y = 160; y < 400; y += 22) { c.beginPath(); c.moveTo(170, y); c.lineTo(430, y); c.stroke(); }
+
+    // piliers peints sur les murs de côté (premier plan, coupés par le bord)
+    const pilier = (xa, xb, gauche) => {
+      const haut = (x) => gauche ? 110 - (170 - x) * (110 / 170) : 110 - (x - 430) * (110 / 170);
+      const bas = (x) => gauche ? 400 + (170 - x) * (160 / 170) : 400 + (x - 430) * (160 / 170);
+      c.fillStyle = lin(xa, 0, xb, 0, gauche ? [[0, '#2a2024'], [1, '#5a4636']] : [[0, '#5a4636'], [1, '#2a2024']]);
+      poly([xa, haut(xa), xb, haut(xb), xb, bas(xb), xa, bas(xa)]); c.fill();
+      // bandes peintes, qui suivent la perspective
+      [[0.16, '#2a8f8a'], [0.2, '#d9b24e'], [0.24, '#2a8f8a'], [0.76, '#2a8f8a'], [0.8, '#d9b24e'], [0.84, '#2a8f8a']].forEach(([p, col]) => {
+        c.fillStyle = col;
+        const ya = haut(xa) + (bas(xa) - haut(xa)) * p, yb = haut(xb) + (bas(xb) - haut(xb)) * p;
+        const ea = (bas(xa) - haut(xa)) * 0.035, eb = (bas(xb) - haut(xb)) * 0.035;
+        poly([xa, ya, xb, yb, xb, yb + eb, xa, ya + ea]); c.fill();
+      });
+    };
+    pilier(-40, 46, true); pilier(120, 150, true); pilier(556, 650, false);
+
+    // --- Fenêtre haute et lune (mur de droite) ---
+    poly([500, 74, 540, 50, 540, 196, 500, 206]); c.fillStyle = '#0c1430'; c.fill();
+    c.save(); poly([500, 74, 540, 50, 540, 196, 500, 206]); c.clip();
+    c.fillStyle = rad(522, 112, 2, 60, [[0, '#ffffff'], [0.35, '#dbe8ff'], [0.4, '#6b86c8'], [1, '#14204a']]);
+    c.fillRect(490, 40, 60, 170);
+    c.restore();
+    c.strokeStyle = '#6b5a44'; c.lineWidth = 4; poly([500, 74, 540, 50, 540, 196, 500, 206]); c.stroke();
+    c.lineWidth = 3; c.beginPath(); c.moveTo(520, 62); c.lineTo(520, 201); c.moveTo(500, 140); c.lineTo(540, 124); c.stroke();
+    // rayon de lune qui traverse la salle
+    c.globalCompositeOperation = 'screen';
+    c.fillStyle = lin(520, 120, 330, 640, [[0, 'rgba(150,185,255,.42)'], [0.6, 'rgba(120,160,255,.14)'], [1, 'rgba(120,160,255,0)']]);
+    poly([500, 80, 540, 60, 470, 700, 250, 700]); c.fill();
+    c.globalCompositeOperation = 'source-over';
+
+    // --- Porte du fond : d'autres créatures attendent dans le noir ---
+    c.fillStyle = '#c9a24a'; c.fillRect(186, 236, 8, 164); c.fillRect(262, 236, 8, 164);
+    c.fillStyle = '#060408'; c.beginPath(); c.moveTo(194, 400); c.lineTo(194, 272); c.arc(228, 272, 34, PI, 0); c.lineTo(262, 400); c.closePath(); c.fill();
+    const yeux = (x, y, r, col) => {
+      c.fillStyle = col; c.shadowColor = col; c.shadowBlur = 10;
+      c.beginPath(); c.arc(x - r * 1.7, y, r, 0, TAU); c.arc(x + r * 1.7, y, r, 0, TAU); c.fill(); c.shadowBlur = 0;
+    };
+    // silhouette de la statue à tête de chacal, au fond de la porte
+    c.fillStyle = '#17121a';
+    c.beginPath(); c.moveTo(240, 400); c.lineTo(240, 310); c.lineTo(236, 290); c.lineTo(240, 262); c.lineTo(246, 280); c.lineTo(252, 262); c.lineTo(256, 290); c.lineTo(262, 300); c.lineTo(262, 400); c.closePath(); c.fill();
+    // une deuxième momie arrive dans l'ombre, bras tendus
+    c.fillStyle = '#2a2026';
+    c.beginPath(); c.arc(218, 306, 13, 0, TAU); c.fill();
+    c.beginPath(); c.roundRect(204, 318, 30, 60, 8); c.fill();
+    c.fillRect(206, 376, 11, 24); c.fillRect(221, 376, 11, 24);
+    c.lineWidth = 8; c.strokeStyle = '#2a2026';
+    c.beginPath(); c.moveTo(208, 326); c.lineTo(194, 334); c.moveTo(230, 326); c.lineTo(222, 340); c.stroke();
+    c.strokeStyle = 'rgba(255,170,90,.35)'; c.lineWidth = 2;
+    c.beginPath(); c.arc(218, 306, 13, PI * 1.1, PI * 1.9); c.stroke();
+    yeux(249, 293, 2.4, '#7fe0ff');
+    yeux(218, 305, 3.2, '#ffb347');
+    yeux(204, 352, 2.2, '#ffb347');
+    yeux(246, 388, 2.4, '#ffd35b');
+
+    // --- Sarcophage ouvert, debout contre le mur du fond ---
+    c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.ellipse(405, 412, 96, 12, 0, 0, TAU); c.fill();
+    c.fillStyle = lin(318, 0, 492, 0, [[0, '#8a6a26'], [0.3, '#e8c36a'], [0.55, '#f6dc8e'], [1, '#7a5a20']]);
+    c.beginPath(); c.roundRect(318, 118, 174, 292, [80, 80, 12, 12]); c.fill();
+    c.fillStyle = '#2a5d8f'; for (let i = 0; i < 5; i++) { c.fillRect(318, 300 + i * 20, 12, 8); c.fillRect(480, 300 + i * 20, 12, 8); }
+    // intérieur : lueur orange inquiétante, qui détoure la momie
+    c.fillStyle = rad(400, 250, 10, 150, [[0, '#ff8a3a'], [0.35, '#a8401c'], [1, '#1a0b06']]);
+    c.beginPath(); c.roundRect(336, 136, 138, 268, [66, 66, 8, 8]); c.fill();
+
+    // --- Couvercle doré, appuyé à droite ---
+    c.save(); c.translate(548, 452); c.rotate(0.15);
+    c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.roundRect(-46, -158, 104, 330, [52, 52, 10, 10]); c.fill();
+    c.fillStyle = lin(-52, 0, 52, 0, [[0, '#9a7428'], [0.45, '#ffe49a'], [1, '#a7832f']]);
+    c.beginPath(); c.roundRect(-52, -166, 104, 330, [52, 52, 10, 10]); c.fill();
+    c.fillStyle = '#2a5d8f';
+    c.fillRect(-46, -150, 14, 110); c.fillRect(32, -150, 14, 110);
+    for (let i = 0; i < 6; i++) c.fillRect(-48, 2 + i * 22, 96, 9);
+    c.fillStyle = '#4fb3a6'; for (let i = 0; i < 6; i++) c.fillRect(-48, 11 + i * 22, 96, 3);
+    // visage peint du couvercle
+    c.fillStyle = '#f0d29a'; c.beginPath(); c.ellipse(0, -100, 26, 34, 0, 0, TAU); c.fill();
+    c.fillStyle = '#1a1208'; c.fillRect(-16, -108, 11, 4); c.fillRect(5, -108, 11, 4);
+    c.strokeStyle = '#1a1208'; c.lineWidth = 2; c.beginPath(); c.moveTo(-5, -84); c.lineTo(5, -84); c.stroke();
+    c.fillStyle = '#c9a24a'; c.fillRect(-8, -66, 16, 26);
+    c.restore();
+
+    // --- Le faisceau de la lampe : il éclaire d'abord la salle, derrière la momie ---
+    const L = { x: 206, y: 466 }, A = -0.44, OUV = 0.62, LONG = 640;
+    const faisceau = (force) => {
+      c.globalCompositeOperation = 'lighter';
+      c.fillStyle = rad(L.x, L.y, 6, LONG, [[0, 'rgba(255,236,170,' + 0.62 * force + ')'], [0.35, 'rgba(255,226,150,' + 0.34 * force + ')'], [0.75, 'rgba(255,214,130,' + 0.12 * force + ')'], [1, 'rgba(255,214,130,0)']]);
+      c.beginPath(); c.moveTo(L.x, L.y);
+      for (let i = 0; i <= 24; i++) { const a = A - OUV + (2 * OUV) * i / 24; c.lineTo(L.x + Math.cos(a) * LONG, L.y + Math.sin(a) * LONG); }
+      c.closePath(); c.fill();
+      // cœur plus vif du faisceau
+      c.fillStyle = rad(L.x, L.y, 6, 420, [[0, 'rgba(255,248,210,' + 0.45 * force + ')'], [1, 'rgba(255,240,190,0)']]);
+      c.beginPath(); c.moveTo(L.x, L.y);
+      for (let i = 0; i <= 12; i++) { const a = A - 0.3 + 0.6 * i / 12; c.lineTo(L.x + Math.cos(a) * 520, L.y + Math.sin(a) * 520); }
+      c.closePath(); c.fill();
+      c.globalCompositeOperation = 'source-over';
+    };
+    faisceau(1);
+
+    // --- La momie, en grand, penchée vers le gardien ---
+    const MOMIE_CLAIR = '#f6ead0', MOMIE = '#d9ceb0', MOMIE_OMBRE = '#7d7466', BANDE = 'rgba(120,100,70,.55)';
+    const peau = lin(300, 0, 470, 0, [[0, MOMIE_CLAIR], [0.55, MOMIE], [1, MOMIE_OMBRE]]);
+    // bandelettes en biais, dessinées dans une zone découpée
+    const bandes = (pente) => {
+      c.strokeStyle = BANDE; c.lineWidth = 2.6;
+      for (let i = -40; i < 40; i++) { const y = 200 + i * 10; c.beginPath(); c.moveTo(250, y - 150 * pente); c.lineTo(520, y + 120 * pente); c.stroke(); }
+    };
+    // ombre au sol
+    c.fillStyle = 'rgba(0,0,0,.5)'; c.beginPath(); c.ellipse(400, 570, 86, 16, 0, 0, TAU); c.fill();
+    const bras = (x0, y0, x1, y1, epais) => {
+      c.strokeStyle = MOMIE_OMBRE; c.lineWidth = epais + 4; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+      c.strokeStyle = peau; c.lineWidth = epais; c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
+      // bandelettes enroulées autour du bras
+      const n = 6, dx = (x1 - x0) / n, dy = (y1 - y0) / n, l = Math.hypot(dx, dy), px = -dy / l * epais * 0.5, py = dx / l * epais * 0.5;
+      c.strokeStyle = BANDE; c.lineWidth = 2.4;
+      for (let i = 0; i < n; i++) { const x = x0 + dx * (i + 0.3), y = y0 + dy * (i + 0.3); c.beginPath(); c.moveTo(x + px, y + py); c.lineTo(x - px + dx * 0.35, y - py + dy * 0.35); c.stroke(); }
+    };
+    const main = (x, y, a, s) => {
+      c.save(); c.translate(x, y); c.rotate(a); c.scale(s, s);
+      c.fillStyle = MOMIE_CLAIR; c.beginPath(); c.ellipse(0, 0, 14, 12, 0, 0, TAU); c.fill();
+      c.strokeStyle = MOMIE_CLAIR; c.lineWidth = 6;
+      [[-0.55, 26], [-0.18, 30], [0.18, 29], [0.55, 24]].forEach(([b, l]) => { c.beginPath(); c.moveTo(8, b * 14); c.quadraticCurveTo(8 + l * 0.6, b * 22, 8 + l, b * 30 + 4); c.stroke(); });
+      c.lineWidth = 5; c.beginPath(); c.moveTo(-2, -10); c.quadraticCurveTo(10, -22, 20, -20); c.stroke();
+      c.restore();
+    };
+    // bras du fond (passe derrière le corps)
+    bras(440, 292, 312, 372, 30);
+    main(306, 376, PI + 0.5, 1.15);
+    // jambes
+    c.fillStyle = peau;
+    poly([352, 436, 394, 436, 390, 566, 348, 566]); c.fill();
+    poly([404, 436, 446, 436, 454, 566, 410, 566]); c.fill();
+    c.fillStyle = MOMIE; c.beginPath(); c.ellipse(362, 566, 26, 9, 0, 0, TAU); c.ellipse(436, 566, 26, 9, 0, 0, TAU); c.fill();
+    c.save(); c.beginPath(); c.moveTo(352, 436); c.lineTo(394, 436); c.lineTo(390, 566); c.lineTo(348, 566); c.closePath();
+    c.moveTo(404, 436); c.lineTo(446, 436); c.lineTo(454, 566); c.lineTo(410, 566); c.closePath(); c.clip(); bandes(-0.25); c.restore();
+    // torse, penché vers la gauche
+    c.save(); c.translate(395, 450); c.rotate(-0.12); c.translate(-395, -450);
+    c.fillStyle = peau; c.beginPath(); c.roundRect(334, 266, 122, 188, [34, 34, 22, 22]); c.fill();
+    c.save(); c.beginPath(); c.roundRect(334, 266, 122, 188, [34, 34, 22, 22]); c.clip(); bandes(0.3); c.restore();
+    c.restore();
+    // tête
+    const tx = 360, ty = 218;
+    c.fillStyle = MOMIE_OMBRE; c.fillRect(354, 244, 30, 30);
+    c.fillStyle = lin(320, 0, 400, 0, [[0, MOMIE_CLAIR], [1, '#a89c84']]);
+    c.beginPath(); c.arc(tx, ty, 42, 0, TAU); c.fill();
+    c.save(); c.beginPath(); c.arc(tx, ty, 42, 0, TAU); c.clip();
+    c.strokeStyle = BANDE; c.lineWidth = 3;
+    for (let i = -5; i < 6; i++) { c.beginPath(); c.moveTo(310, ty + i * 9 - 6); c.lineTo(410, ty + i * 9 + 8); c.stroke(); }
+    // fente des yeux et bouche ouverte
+    c.fillStyle = '#120c06';
+    c.beginPath(); c.moveTo(318, 202); c.lineTo(400, 214); c.lineTo(398, 230); c.lineTo(318, 220); c.closePath(); c.fill();
+    c.beginPath(); c.ellipse(350, 248, 11, 7, -0.1, 0, TAU); c.fill();
+    c.restore();
+    // yeux brûlants
+    [[338, 212], [372, 218]].forEach(([x, y]) => {
+      c.fillStyle = '#ff9a2a'; c.shadowColor = '#ff7a00'; c.shadowBlur = 24;
+      c.beginPath(); c.arc(x, y, 8.5, 0, TAU); c.fill();
+      c.shadowBlur = 0; c.fillStyle = '#fff1b0'; c.beginPath(); c.arc(x, y, 3.6, 0, TAU); c.fill();
+    });
+    // bras du devant, tendu vers la lampe
+    bras(352, 286, 288, 314, 32);
+    main(280, 318, PI + 0.15, 1.25);
+    // bandelette qui pend du bras
+    c.strokeStyle = MOMIE_OMBRE; c.lineWidth = 13;
+    c.beginPath(); c.moveTo(322, 302); c.bezierCurveTo(314, 340, 334, 362, 322, 404); c.stroke();
+    c.strokeStyle = MOMIE_CLAIR; c.lineWidth = 9;
+    c.beginPath(); c.moveTo(322, 302); c.bezierCurveTo(314, 340, 334, 362, 322, 404); c.stroke();
+    // contour bleu de la lune sur l'arrière de la tête et l'épaule
+    c.strokeStyle = 'rgba(170,205,255,.8)'; c.lineWidth = 4;
+    c.beginPath(); c.arc(tx, ty, 42, -0.9, 0.4); c.stroke();
+    c.save(); c.translate(395, 450); c.rotate(-0.12); c.translate(-395, -450);
+    c.beginPath(); c.moveTo(430, 268); c.quadraticCurveTo(456, 270, 456, 300); c.lineTo(456, 420); c.stroke();
+    c.restore();
+    // la lumière la fige : petits éclats de givre (comme dans le jeu)
+    c.strokeStyle = 'rgba(205,235,255,.95)'; c.lineWidth = 3;
+    [[300, 170, 1], [412, 176, -1], [252, 290, 1], [262, 360, 1]].forEach(([x, y, s]) => {
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + 10 * s, y + 10); c.moveTo(x + 14 * s, y - 4); c.lineTo(x + 16 * s, y + 8); c.stroke();
+    });
+
+    // --- Par-dessus la momie : un voile chaud léger (le faisceau l'éclaire sans l'effacer) ---
+    faisceau(0.3);
+    c.globalCompositeOperation = 'lighter';
+    // poussière qui danse dans la lumière
+    const r = rng(31);
+    for (let i = 0; i < 70; i++) {
+      const a = A + (r() * 2 - 1) * OUV * 0.85, d = 40 + r() * 420;
+      c.fillStyle = 'rgba(255,240,200,' + (0.25 + r() * 0.5) + ')';
+      c.beginPath(); c.arc(L.x + Math.cos(a) * d, L.y + Math.sin(a) * d, 0.8 + r() * 1.8, 0, TAU); c.fill();
+    }
+    // éclat de la lampe
+    c.fillStyle = rad(L.x, L.y, 2, 70, [[0, 'rgba(255,255,240,1)'], [0.3, 'rgba(255,240,190,.55)'], [1, 'rgba(255,230,160,0)']]);
+    c.beginPath(); c.arc(L.x, L.y, 70, 0, TAU); c.fill();
+    c.globalCompositeOperation = 'source-over';
+
+    // --- Scarabées turquoise qui filent vers le gardien ---
+    const scarabee = (x, y, s, a) => {
+      c.save(); c.translate(x, y); c.rotate(a + PI / 2); c.scale(s, s);
+      c.fillStyle = 'rgba(0,0,0,.4)'; c.beginPath(); c.ellipse(1.5, 3, 7, 8, 0, 0, TAU); c.fill();
+      c.strokeStyle = '#0d1a16'; c.lineWidth = 1.4;
+      for (let i = -1; i <= 1; i++) { c.beginPath(); c.moveTo(-3, i * 3); c.lineTo(-9, i * 3 + (i % 2 ? 2 : -2)); c.moveTo(3, i * 3); c.lineTo(9, i * 3 - (i % 2 ? 2 : -2)); c.stroke(); }
+      c.shadowColor = '#5ff0c0'; c.shadowBlur = 8;
+      c.fillStyle = lin(-5, 0, 5, 0, [[0, '#14503f'], [0.5, '#6ff5c8'], [1, '#14503f']]);
+      c.beginPath(); c.ellipse(0, 1, 5.5, 7, 0, 0, TAU); c.fill();
+      c.shadowBlur = 0;
+      c.fillStyle = '#0d1a16'; c.beginPath(); c.arc(0, -6.5, 3.2, 0, TAU); c.fill();
+      c.strokeStyle = 'rgba(0,0,0,.5)'; c.lineWidth = 1; c.beginPath(); c.moveTo(0, -4); c.lineTo(0, 8); c.stroke();
+      c.fillStyle = 'rgba(255,255,255,.7)'; c.beginPath(); c.ellipse(-2, -1, 1.2, 2.4, 0, 0, TAU); c.fill();
+      c.restore();
+    };
+    [[330, 610, 2.2], [262, 640, 1.8], [400, 652, 2.4], [300, 690, 2.6], [520, 700, 3.8], [222, 596, 1.5]].forEach(([x, y, s]) => scarabee(x, y, s, Math.atan2(660 - y, 120 - x)));
+
+    // --- Le gardien, de dos, au premier plan ---
+    const tn = TENUES[0];
+    // corps et épaules
+    c.fillStyle = lin(-80, 600, 280, 600, [[0, '#1a2544'], [0.6, tn.corps], [1, '#4a62a0']]);
+    c.beginPath(); c.ellipse(92, 690, 168, 116, 0, PI, 0); c.lineTo(260, 2000); c.lineTo(-76, 2000); c.closePath(); c.fill();
+    // pli du dos
+    c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 4; c.beginPath(); c.moveTo(92, 590); c.lineTo(98, 2000); c.stroke();
+    // bras levé qui tient la lampe : il part de l'épaule droite et s'affine jusqu'au poignet
+    c.fillStyle = lin(150, 0, 230, 0, [[0, '#22305a'], [0.6, '#3a5292'], [1, '#5a74b8']]);
+    poly([160, 604, 226, 622, 186, 498, 154, 494]); c.fill();
+    c.beginPath(); c.ellipse(194, 614, 36, 28, -0.3, 0, TAU); c.fill();
+    c.fillStyle = tn.galon; c.fillRect(154, 494, 32, 7);
+    c.strokeStyle = 'rgba(255,220,150,.8)'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(222, 612); c.lineTo(186, 504); c.stroke();
+    // galons d'or sur les épaules
+    c.fillStyle = tn.galon;
+    c.save(); c.translate(10, 610); c.rotate(-0.35); c.fillRect(-30, -6, 54, 10); c.restore();
+    c.save(); c.translate(186, 600); c.rotate(0.45); c.fillRect(-20, -5, 46, 10); c.restore();
+    // la lampe torche
+    c.save(); c.translate(L.x, L.y); c.rotate(A);
+    c.fillStyle = '#3a332c'; c.beginPath(); c.roundRect(-74, -10, 58, 20, 6); c.fill();
+    c.fillStyle = '#5a4f42'; c.fillRect(-60, -10, 6, 20); c.fillRect(-44, -10, 6, 20);
+    c.fillStyle = '#c9a24a'; poly([-18, -12, 0, -18, 0, 18, -18, 12]); c.fill();
+    c.fillStyle = '#fffbe8'; c.beginPath(); c.ellipse(0, 0, 4, 17, 0, 0, TAU); c.fill();
+    c.restore();
+    // main sur la lampe
+    c.fillStyle = '#e0b48a'; c.beginPath(); c.ellipse(170, 484, 17, 14, -0.4, 0, TAU); c.fill();
+    c.fillStyle = 'rgba(255,230,180,.8)'; c.beginPath(); c.ellipse(176, 476, 8, 5, -0.4, 0, TAU); c.fill();
+    // col et nuque
+    c.fillStyle = '#1b2747'; c.beginPath(); c.ellipse(92, 588, 50, 20, 0, 0, TAU); c.fill();
+    c.fillStyle = '#c99a72'; c.fillRect(70, 540, 44, 46);
+    // tête vue de dos : cheveux, oreilles, casquette
+    c.fillStyle = '#c99a72'; c.beginPath(); c.ellipse(46, 528, 8, 13, 0, 0, TAU); c.ellipse(138, 528, 8, 13, 0, 0, TAU); c.fill();
+    c.fillStyle = '#3b2a1e'; c.beginPath(); c.arc(92, 520, 46, 0, TAU); c.fill();
+    c.fillStyle = lin(40, 0, 150, 0, [[0, '#121a33'], [0.6, tn.casquette], [1, '#34487e']]);
+    c.beginPath(); c.ellipse(92, 494, 54, 34, 0, PI, 0); c.lineTo(146, 508); c.lineTo(38, 508); c.closePath(); c.fill();
+    c.fillStyle = tn.galon; c.fillRect(38, 502, 108, 8);
+    // contours de lumière : chaude côté lampe, froide côté lune
+    c.strokeStyle = 'rgba(255,225,160,.85)'; c.lineWidth = 3;
+    c.beginPath(); c.ellipse(92, 494, 54, 34, 0, -1.2, -0.05); c.stroke();
+    c.beginPath(); c.arc(92, 520, 46, 0.05, 0.6); c.stroke();
+    c.strokeStyle = 'rgba(150,185,255,.5)'; c.lineWidth = 3;
+    c.beginPath(); c.ellipse(92, 690, 168, 116, 0, PI * 1.05, PI * 1.35); c.stroke();
+
+    // --- Vignette et bas plus sombre (bandeau du titre du site) ---
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    const vg = c.createRadialGradient(cv.width * 0.5, cv.height * 0.42, Math.min(cv.width, cv.height) * 0.35, cv.width * 0.5, cv.height * 0.42, Math.max(cv.width, cv.height) * 0.8);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.5)');
+    c.fillStyle = vg; c.fillRect(0, 0, cv.width, cv.height);
+    const bas = c.createLinearGradient(0, DPR * (oy + 640 * k), 0, DPR * (oy + 800 * k));
+    bas.addColorStop(0, 'rgba(0,0,0,0)'); bas.addColorStop(1, 'rgba(0,0,0,.35)');
+    c.fillStyle = bas; c.fillRect(0, DPR * (oy + 640 * k), cv.width, cv.height);
+  }
+  function demarrerAffiche() {
+    // Rien d'autre que la scène : ni écran, ni bouton, ni message, ni bouton de langue.
+    const style = document.createElement('style');
+    style.textContent = '.ecran, #hud, #message, button, jel-langue, .jel-langue { display: none !important; }';
+    document.head.appendChild(style);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  /* ---------- Démarrage ---------- */
   majSon();
-  allerTitre();
-  requestAnimationFrame(boucle);
-  requestAnimationFrame(boucleDemo);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else {
+    allerTitre();
+    requestAnimationFrame(boucle);
+    requestAnimationFrame(boucleDemo);
+  }
 })();
 </script>
 </body>
