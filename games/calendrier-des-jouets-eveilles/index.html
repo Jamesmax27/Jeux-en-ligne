@@ -5626,6 +5626,230 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  //  Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) :
+  //  une scène composée, sans interface ni texte, d'où sort la jaquette
+  //  (CONSIGNES-JEU.md, section 5). Au grenier, une porte du calendrier vient
+  //  de s'ouvrir sur une friandise dorée ; derrière, le Pantin de bois se
+  //  dresse devant la lune, yeux allumés, mâchoire grande ouverte.
+  // ---------------------------------------------------------------------
+
+  let calqueAffiche = null;   // calque du Pantin (éclairé à part, puis posé sur la scène)
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    // Scène dessinée dans un cadre de 600 × 800, agrandie pour couvrir tout l'écran.
+    const s = Math.max(w / 600, h / 800), ox = (w - 600 * s) / 2, oy = (h - 800 * s) / 2;
+    const repere = (ctx) => ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * ox, dpr * oy);
+    const th = THEMES[0];
+    const hasard = graineHasard(1224);
+    let g;
+    c.globalCompositeOperation = 'source-over';
+    c.shadowBlur = 0;
+    repere(c);
+
+    // --- Fond : le mur du grenier -------------------------------------------
+    g = c.createLinearGradient(0, 0, 0, 800);
+    g.addColorStop(0, '#2a1840'); g.addColorStop(0.55, '#40213f'); g.addColorStop(1, '#22111c');
+    c.fillStyle = g; c.fillRect(-600, -600, 1800, 2000);
+    // planches du mur
+    c.strokeStyle = '#00000030'; c.lineWidth = 3;
+    for (let x = 20; x < 600; x += 58) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x + 4, 800); c.stroke(); }
+
+    // --- La lucarne ronde et la pleine lune, derrière la tête du Pantin -------
+    const LX = 300, LY = 282, LR = 192;
+    g = c.createRadialGradient(LX, LY, LR * 0.6, LX, LY, LR * 2.3);
+    g.addColorStop(0, 'rgba(150,180,255,.55)'); g.addColorStop(0.45, 'rgba(120,140,230,.18)'); g.addColorStop(1, 'rgba(120,140,230,0)');
+    c.fillStyle = g; c.fillRect(-100, -100, 800, 1000);
+    c.save(); rond(c, LX, LY, LR); c.clip();
+    g = c.createLinearGradient(0, LY - LR, 0, LY + LR);
+    g.addColorStop(0, '#1c2c66'); g.addColorStop(1, '#3a58a8');
+    c.fillStyle = g; c.fillRect(LX - LR, LY - LR, LR * 2, LR * 2);
+    // la lune
+    g = c.createRadialGradient(LX - 30, LY - 40, 10, LX, LY - 10, 150);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.7, '#e4ebff'); g.addColorStop(1, '#b8c8f0');
+    c.fillStyle = g; rond(c, LX, LY - 10, 150); c.fill();
+    c.fillStyle = '#c9d4f2';
+    [[-70, -60, 22], [50, -80, 14], [-40, 60, 18], [80, 30, 26], [10, 100, 12]].forEach((p) => { rond(c, LX + p[0], LY - 10 + p[1], p[2]); c.fill(); });
+    // neige dehors
+    c.fillStyle = '#ffffff';
+    for (let i = 0; i < 60; i++) { rond(c, LX - LR + hasard() * LR * 2, LY - LR + hasard() * LR * 2, 1.2 + hasard() * 2.4); c.fill(); }
+    c.restore();
+    // cadre de bois et croisillons
+    c.strokeStyle = '#3e2416'; c.lineWidth = 16;
+    c.beginPath(); c.moveTo(LX - LR, LY); c.lineTo(LX + LR, LY); c.moveTo(LX, LY - LR); c.lineTo(LX, LY + LR); c.stroke();
+    c.lineWidth = 30; rond(c, LX, LY, LR + 8); c.stroke();
+    c.strokeStyle = '#8a5a34'; c.lineWidth = 5; rond(c, LX, LY, LR - 5); c.stroke();
+    // rayons de lune qui descendent dans la poussière
+    c.save(); c.globalCompositeOperation = 'lighter';
+    [[-0.5, 0.06], [-0.15, 0.05], [0.25, 0.06], [0.55, 0.04]].forEach((r) => {
+      const a = Math.PI / 2 + r[0];
+      g = c.createLinearGradient(LX, LY, LX + Math.cos(a) * 700, LY + Math.sin(a) * 700);
+      g.addColorStop(0, 'rgba(160,190,255,.16)'); g.addColorStop(1, 'rgba(160,190,255,0)');
+      c.fillStyle = g;
+      poly(c, [[LX, LY], [LX + Math.cos(a - r[1]) * 800, LY + Math.sin(a - r[1]) * 800], [LX + Math.cos(a + r[1]) * 800, LY + Math.sin(a + r[1]) * 800]]); c.fill();
+    });
+    c.restore();
+
+    // --- Poutres du toit et toile d'araignée --------------------------------
+    c.fillStyle = '#24130d';
+    poly(c, [[-10, 60], [300, -40], [300, 6], [-10, 118]]); c.fill();
+    poly(c, [[610, 60], [300, -40], [300, 6], [610, 118]]); c.fill();
+    c.fillRect(-10, 0, 40, 800); c.fillRect(570, 0, 40, 800);
+    c.strokeStyle = '#ffffff30'; c.lineWidth = 1.2;
+    for (let i = 0; i < 6; i++) { c.beginPath(); c.moveTo(30, 96); c.lineTo(30 + i * 22, 96 + (6 - i) * 16); c.stroke(); }
+    for (let j = 1; j < 4; j++) { c.beginPath(); for (let i = 0; i < 6; i++) { const px = 30 + i * 22 * j / 4, py = 96 + (6 - i) * 16 * j / 4; if (i) c.lineTo(px, py); else c.moveTo(px, py); } c.stroke(); }
+
+    // --- Le calendrier (premier plan) : position de la porte qui s'ouvre ------
+    const geoA = { cols: 4, lignes: 2, pw: 128, ph: 140, ox: 44, oy: 530, tw: 512, th: 280, bord: 22 };
+    const pOuv = posPorte(geoA, 1), dX = pOuv[0] + geoA.pw / 2, dY = pOuv[1] + geoA.ph / 2;
+
+    // Gerbe de lumière dorée qui jaillit de la porte vers le Pantin
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 9; i++) {
+      const a = -Math.PI / 2 + (i - 4) * 0.2 + (hasard() - 0.5) * 0.08, l = 380 + hasard() * 160, d = 0.035 + hasard() * 0.03;
+      g = c.createLinearGradient(dX, dY, dX + Math.cos(a) * l, dY + Math.sin(a) * l);
+      g.addColorStop(0, 'rgba(255,200,90,.42)'); g.addColorStop(1, 'rgba(255,170,60,0)');
+      c.fillStyle = g;
+      poly(c, [[dX, dY], [dX + Math.cos(a - d) * l, dY + Math.sin(a - d) * l], [dX + Math.cos(a + d) * l, dY + Math.sin(a + d) * l]]); c.fill();
+    }
+    c.restore();
+
+    // --- Le Pantin de bois, en grand, sur son calque -------------------------
+    if (!calqueAffiche) calqueAffiche = document.createElement('canvas');
+    const q = calqueAffiche;
+    if (q.width !== cv.width || q.height !== cv.height) { q.width = cv.width; q.height = cv.height; }
+    const p = q.getContext('2d');
+    p.setTransform(1, 0, 0, 1, 0, 0); p.globalCompositeOperation = 'source-over'; p.clearRect(0, 0, q.width, q.height);
+    repere(p);
+    const PX = 322, PY = 600, PH = 484, ROT = -0.06, k = PH / 220;
+    p.save(); p.translate(PX, PY); p.rotate(ROT);
+    pantin(p, 0, 0, PH, { lueur: true, bouche: 1.1, bras: 0.95 });
+    // fils prolongés jusqu'en haut (le marionnettiste reste invisible)
+    p.strokeStyle = '#e8e0d0aa'; p.lineWidth = 0.9;
+    p.beginPath(); p.moveTo(-34, -258); p.lineTo(-34, -330); p.moveTo(34, -258); p.lineTo(34, -330); p.moveTo(0, -268); p.lineTo(0, -330); p.stroke();
+    p.restore();
+    // Le Pantin éclairé par en dessous : lueur chaude de la porte, reflet froid de la lune en haut
+    p.globalCompositeOperation = 'source-atop';
+    g = p.createLinearGradient(0, 640, 0, 160);
+    g.addColorStop(0, 'rgba(255,190,90,.24)'); g.addColorStop(0.55, 'rgba(255,150,70,.06)'); g.addColorStop(1, 'rgba(255,150,70,0)');
+    p.fillStyle = g; p.fillRect(0, 0, 600, 800);
+    g = p.createRadialGradient(dX, dY, 10, dX, dY, 330);
+    g.addColorStop(0, 'rgba(255,220,120,.22)'); g.addColorStop(1, 'rgba(255,220,120,0)');
+    p.fillStyle = g; p.fillRect(0, 0, 600, 800);
+    p.globalCompositeOperation = 'source-over';
+    // Pose du calque avec un liseré de lune autour de la silhouette
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    c.shadowColor = 'rgba(200,220,255,.9)'; c.shadowBlur = 22 * s * dpr;
+    c.drawImage(q, 0, 0);
+    c.shadowBlur = 0;
+    c.restore();
+    repere(c);
+    // Yeux qui luisent
+    c.save(); c.globalCompositeOperation = 'lighter';
+    [[-11, -148], [13, -148]].forEach((e) => {
+      const ex = PX + (e[0] * Math.cos(ROT) - e[1] * Math.sin(ROT)) * k, ey = PY + (e[0] * Math.sin(ROT) + e[1] * Math.cos(ROT)) * k;
+      g = c.createRadialGradient(ex, ey, 1, ex, ey, 34);
+      g.addColorStop(0, 'rgba(255,240,150,1)'); g.addColorStop(0.3, 'rgba(255,200,40,.75)'); g.addColorStop(1, 'rgba(255,140,0,0)');
+      c.fillStyle = g; rond(c, ex, ey, 34); c.fill();
+    });
+    c.restore();
+
+    // --- Le calendrier ----------------------------------------------------------
+    // toit plat du calendrier, juste sous le Pantin
+    cadreCalendrier(c, geoA, th, 0);
+    for (let i = 0; i < 8; i++) {
+      const pp = posPorte(geoA, i);
+      if (i === 1) continue;
+      if (i === 2) porte(c, pp[0], pp[1], geoA.pw, geoA.ph, i, { po: 9, pk: 6, ouverture: 0.75 }, th);
+      else porte(c, pp[0], pp[1], geoA.pw, geoA.ph, i, { po: -1, px: 0, grande: i === 6 }, th);
+    }
+    // Le jouet maudit de la porte voisine : lueur rouge et yeux qui brûlent
+    {
+      const pp = posPorte(geoA, 2), jx = pp[0] + geoA.pw / 2, jy = pp[1] + geoA.pw * 0.06 + (geoA.ph - geoA.pw * 0.12) * 0.52;
+      const kj = (geoA.pw - geoA.pw * 0.12) * 0.34 * 1.05 / 50;
+      c.save(); c.globalCompositeOperation = 'lighter';
+      g = c.createRadialGradient(jx, jy, 4, jx, jy, 90);
+      g.addColorStop(0, 'rgba(255,40,30,.4)'); g.addColorStop(1, 'rgba(255,40,30,0)');
+      c.fillStyle = g; rond(c, jx, jy, 90); c.fill();
+      c.globalCompositeOperation = 'source-over';
+      [-6, 6].forEach((ex) => {
+        g = c.createRadialGradient(jx + ex * kj, jy - 26 * kj, 0.5, jx + ex * kj, jy - 26 * kj, 8);
+        g.addColorStop(0, 'rgba(255,200,120,1)'); g.addColorStop(0.3, 'rgba(255,30,20,1)'); g.addColorStop(1, 'rgba(255,0,0,0)');
+        c.fillStyle = g; rond(c, jx + ex * kj, jy - 26 * kj, 8); c.fill();
+      });
+      c.restore();
+    }
+    // La porte qui s'ouvre : niche baignée d'or, friandise, battant rabattu vers nous
+    {
+      const m = geoA.pw * 0.06, rx = pOuv[0] + m, ry = pOuv[1] + m, rw = geoA.pw - 2 * m, rh = geoA.ph - 2 * m;
+      g = c.createRadialGradient(dX, dY, 4, dX, dY, rw * 0.8);
+      g.addColorStop(0, '#fff6c8'); g.addColorStop(0.5, '#ffc54a'); g.addColorStop(1, '#d0701a');
+      c.fillStyle = g; rr(c, rx, ry, rw, rh, rw * 0.12); c.fill();
+      friandise(c, 0, dX, dY + 4, rw * 0.36);
+      c.fillStyle = th.b; poly(c, [[rx, ry], [rx - rw * 0.3, ry - rh * 0.07], [rx - rw * 0.3, ry + rh * 1.07], [rx, ry + rh]]); c.fill();
+      c.strokeStyle = th.fonce; c.lineWidth = 3; c.stroke();
+      c.save(); c.globalCompositeOperation = 'lighter';
+      g = c.createRadialGradient(dX, dY, 10, dX, dY, 200);
+      g.addColorStop(0, 'rgba(255,210,110,.6)'); g.addColorStop(1, 'rgba(255,170,60,0)');
+      c.fillStyle = g; rond(c, dX, dY, 200); c.fill();
+      c.restore();
+    }
+    // guirlande de grosses ampoules sur le haut du calendrier
+    const gy = geoA.oy - geoA.bord;
+    c.strokeStyle = '#1a2a1a'; c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(geoA.ox - geoA.bord, gy + 4);
+    for (let i = 1; i <= 8; i++) c.quadraticCurveTo(geoA.ox - geoA.bord + (i - 0.5) * 69.5, gy + 18, geoA.ox - geoA.bord + i * 69.5, gy + 4);
+    c.stroke();
+    for (let i = 0; i < 8; i++) {
+      const bx = geoA.ox - geoA.bord + (i + 0.5) * 69.5, by = gy + 16;
+      const col = ['#ff4a3a', '#ffd34a', '#4ad0ff', '#7dff6a'][i % 4];
+      c.shadowColor = col; c.shadowBlur = 14 * s * dpr;
+      c.fillStyle = col; ell(c, bx, by + 5, 5.5, 8); c.fill();
+      c.shadowBlur = 0;
+    }
+
+    // --- Jouet assis sur le calendrier : l'ours en peluche, inquiet ------------
+    jouet(c, 1, 92, gy - 40, 46, {});
+
+    // --- Bougie au premier plan, à droite --------------------------------------
+    {
+      const bx = 536, by = 690, kb = 34;
+      g = c.createRadialGradient(bx, by - kb * 2, 4, bx, by - kb * 2, 170);
+      g.addColorStop(0, 'rgba(255,210,120,.55)'); g.addColorStop(1, 'rgba(255,160,60,0)');
+      c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = g; rond(c, bx, by - kb * 2, 170); c.fill(); c.restore();
+      c.fillStyle = '#fff2d8'; rr(c, bx - kb * 0.4, by - kb * 1.4, kb * 0.8, kb * 3, kb * 0.14); c.fill();
+      c.fillStyle = '#e8d6b4'; rr(c, bx + kb * 0.1, by - kb * 1.4, kb * 0.3, kb * 3, kb * 0.1); c.fill();
+      c.fillStyle = '#ffb02a'; c.beginPath(); c.moveTo(bx, by - kb * 2.5); c.quadraticCurveTo(bx + kb * 0.34, by - kb * 1.8, bx, by - kb * 1.45); c.quadraticCurveTo(bx - kb * 0.34, by - kb * 1.8, bx, by - kb * 2.5); c.fill();
+      c.fillStyle = '#fff6c0'; ell(c, bx, by - kb * 1.75, kb * 0.11, kb * 0.24); c.fill();
+    }
+
+    // --- Poussière dorée dans la lumière -------------------------------------
+    c.fillStyle = '#ffe6a0';
+    for (let i = 0; i < 40; i++) {
+      const a = -Math.PI / 2 + (hasard() - 0.5) * 1.8, l = 60 + hasard() * 380;
+      c.globalAlpha = 0.3 + hasard() * 0.6;
+      rond(c, dX + Math.cos(a) * l, dY + Math.sin(a) * l, 0.8 + hasard() * 1.8); c.fill();
+    }
+    c.globalAlpha = 1;
+
+    // --- Coins assombris (le bas reste un décor qui porte le bandeau du titre) -
+    g = c.createRadialGradient(300, 380, 260, 300, 420, 620);
+    g.addColorStop(0, 'rgba(10,4,16,0)'); g.addColorStop(1, 'rgba(10,4,16,.55)');
+    c.fillStyle = g; c.fillRect(-600, -600, 1800, 2000);
+  }
+
+  function demarrerAffiche() {
+    // Rien que la scène : écrans, fenêtres, boutons, bouton de langue et messages cachés.
+    const st = document.createElement('style');
+    st.textContent = 'body > *:not(#fond), .jel-langue, button { display: none !important; }';
+    document.head.appendChild(st);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5669,9 +5893,11 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? vue.g[partie.siege] : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(performance.now()); });
+  window.addEventListener('resize', () => { if (ecran !== 'jeu' && !window.JEL_AFFICHE) dessinerTitre(performance.now()); });
 
   document.title = tr('titre');
+  // Affiche (robot du site seulement) : la scène, sans écran titre, ni son, ni boucle de jeu.
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
   chargerProgression();
   construirePlaces();
   majBoutonsSon();

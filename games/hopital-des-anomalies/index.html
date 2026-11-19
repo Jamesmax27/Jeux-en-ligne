@@ -4370,12 +4370,207 @@ function boucle(maintenant) {
   requestAnimationFrame(boucle);
 }
 
+/* ---------------------------------------------------------------------------
+   Affiche (jaquette du jeu)
+   Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène
+   composée, sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5).
+   Dans un couloir de l'hôpital, l'infirmier braque sa lampe sur un chien aux yeux rouges :
+   sur le mur, son ombre est celle d'un rôdeur géant qui tend les bras vers lui.
+   --------------------------------------------------------------------------- */
+// Infirmier de l'affiche : même dessin que dessinerJoueur, plus détaillé, bras levé avec
+// une lampe torche, visage effrayé. Origine sous les pieds, regard vers la droite.
+// Renvoie la position du bout de la lampe (repère local).
+function dessinerInfirmierAffiche(c) {
+  // jambes, la jambe arrière un peu reculée (il recule)
+  c.fillStyle = '#1d2a33'; c.fillRect(-13, -40, 8, 40); c.fillRect(4, -40, 8, 40);
+  c.fillStyle = '#0f1418'; c.fillRect(-16, -4, 12, 5); c.fillRect(3, -4, 12, 5);
+  // bras arrière, le long du corps
+  c.fillStyle = '#1f8478'; c.fillRect(-21, -76, 7, 30); rond(c, -17.5, -44, 4.5, '#d9ad86');
+  // tunique et ses plis
+  c.fillStyle = '#2bb3a3'; c.beginPath(); c.moveTo(-17, -78); c.lineTo(17, -78); c.lineTo(15, -36); c.lineTo(-15, -36); c.closePath(); c.fill();
+  c.fillStyle = '#239a8c'; c.fillRect(-15, -42, 30, 6);
+  c.strokeStyle = 'rgba(10,60,55,.45)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(-4, -76); c.lineTo(-6, -40); c.moveTo(8, -76); c.lineTo(9, -40); c.stroke();
+  c.fillStyle = '#f4f1ea'; c.fillRect(-4, -70, 8, 3); c.fillRect(-1.5, -72.5, 3, 8);
+  // stéthoscope autour du cou
+  c.strokeStyle = '#3d4152'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-8, -78); c.quadraticCurveTo(-10, -60, -2, -56); c.stroke(); rond(c, -2, -55, 2.4, '#c9cfdc');
+  // bras avant levé, qui tient la lampe torche
+  c.strokeStyle = '#239a8c'; c.lineCap = 'round'; c.lineWidth = 7.5; c.beginPath(); c.moveTo(15, -73); c.lineTo(30, -68); c.stroke();
+  c.save(); c.translate(36, -69); c.rotate(-0.08);
+  c.fillStyle = '#2b2f3c'; c.fillRect(-6, -3, 16, 6);
+  c.fillStyle = '#4a5064'; c.fillRect(8, -4.5, 5, 9);
+  c.fillStyle = '#fff6c9'; c.fillRect(12.5, -3.5, 1.8, 7);
+  c.restore();
+  rond(c, 32, -68, 4.6, '#e8bf98');
+  // tête
+  rond(c, 0, -94, 15, '#e8bf98');
+  ellipse(c, -3, -104, 16, 9, '#3a2a22');
+  ellipse(c, -12, -96, 5, 9, '#3a2a22');
+  c.fillStyle = '#2bb3a3'; c.fillRect(-15, -110, 30, 7);
+  // visage effrayé : œil écarquillé, sourcil haut, bouche ouverte, goutte de sueur
+  rond(c, 7.5, -96, 3.6, '#fff'); rond(c, 8.6, -96, 1.8, '#141018');
+  c.strokeStyle = '#3a2a22'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(4, -102.5); c.quadraticCurveTo(8, -105, 12, -102); c.stroke();
+  ellipse(c, 11.5, -86.5, 2, 2.6, '#5a1d22');
+  c.fillStyle = '#bfe8ff'; c.beginPath(); c.moveTo(3, -101); c.quadraticCurveTo(5.5, -96, 3, -94.5); c.quadraticCurveTo(0.5, -96, 3, -101); c.fill();
+  return [49, -72];
+}
+
+function dessinerAffiche() {
+  redim();
+  const W = LW, H = LH;
+  const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  const c = ctx;
+  c.setTransform(DPR * k, 0, 0, DPR * k, DPR * ox, DPR * oy);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // Bords de l'écran dans le repère de l'affiche (600 × 800) : le décor remplit tout l'écran.
+  const X0 = -ox / k, X1 = (W - ox) / k, Y0 = -oy / k, Y1 = (H - oy) / k;
+  const SOL = 545; // pied du mur du fond
+
+  /* --- Fond : le mur du couloir --- */
+  let g = c.createLinearGradient(0, Y0, 0, SOL);
+  g.addColorStop(0, '#120e2a'); g.addColorStop(0.5, '#2a2356'); g.addColorStop(1, '#3a3270');
+  c.fillStyle = g; c.fillRect(X0, Y0, X1 - X0, SOL - Y0);
+  // plafond et ses néons (un allumé, un qui grésille)
+  c.fillStyle = '#0b0920'; c.fillRect(X0, Y0, X1 - X0, 62 - Y0);
+  c.fillStyle = '#1a1538'; c.fillRect(X0, 58, X1 - X0, 6);
+  const lum = c.createLinearGradient(0, 62, 0, 360);
+  lum.addColorStop(0, 'rgba(190,230,255,.38)'); lum.addColorStop(1, 'rgba(190,230,255,0)');
+  c.fillStyle = lum; c.beginPath(); c.moveTo(370, 62); c.lineTo(520, 62); c.lineTo(640, 360); c.lineTo(260, 360); c.closePath(); c.fill();
+  c.shadowColor = '#bfeaff'; c.shadowBlur = 24;
+  c.fillStyle = '#eef9ff'; c.fillRect(380, 40, 130, 10);
+  c.fillStyle = '#6d7aa0'; c.fillRect(70, 40, 130, 10);
+  c.fillStyle = '#dff4ff'; c.fillRect(70, 40, 38, 10);
+  c.shadowBlur = 0;
+  // soubassement carrelé (vert d'hôpital)
+  c.fillStyle = '#24505a'; c.fillRect(X0, 410, X1 - X0, SOL - 410);
+  c.fillStyle = '#2f6a72'; c.fillRect(X0, 404, X1 - X0, 8);
+  c.strokeStyle = 'rgba(8,20,30,.35)'; c.lineWidth = 1.5;
+  for (let y = 440; y < SOL; y += 34) { c.beginPath(); c.moveTo(X0, y); c.lineTo(X1, y); c.stroke(); }
+  for (let x = Math.floor(X0 / 34) * 34; x < X1; x += 34) { c.beginPath(); c.moveTo(x, 412); c.lineTo(x, SOL); c.stroke(); }
+  // main courante
+  c.fillStyle = '#8f86c8'; c.fillRect(X0, 378, X1 - X0, 7);
+  c.fillStyle = '#4b4486'; c.fillRect(X0, 385, X1 - X0, 4);
+
+  // Porte de gauche entrouverte sur le noir, avec la croix verte en néon au-dessus
+  c.fillStyle = '#4b4486'; c.fillRect(-30, 168, 124, SOL - 168);
+  c.fillStyle = '#05040c'; c.fillRect(-20, 180, 102, SOL - 180);
+  poly(c, [[52, 180], [82, 180], [82, SOL], [52, SOL + 10]], '#2e2860');
+  c.fillStyle = '#9de9ff'; c.globalAlpha = 0.35; c.fillRect(58, 220, 16, 60); c.globalAlpha = 1;
+  // deux yeux rouges dans le noir de la porte (une autre anomalie)
+  c.shadowColor = '#ff2233'; c.shadowBlur = 14;
+  rond(c, 10, 330, 5, '#ff2a35'); rond(c, 30, 330, 5, '#ff2a35');
+  c.shadowBlur = 0;
+  // enseigne : croix verte qui brille
+  c.fillStyle = '#141230'; c.fillRect(-4, 96, 92, 56);
+  c.shadowColor = '#4fffc0'; c.shadowBlur = 30;
+  c.fillStyle = '#5bffc8'; c.fillRect(32, 104, 20, 40); c.fillRect(22, 114, 40, 20);
+  c.shadowBlur = 0;
+  c.fillStyle = '#e8fff6'; c.fillRect(37, 109, 10, 30); c.fillRect(27, 119, 30, 10);
+  const halo = c.createRadialGradient(42, 124, 10, 42, 124, 140);
+  halo.addColorStop(0, 'rgba(79,255,190,.35)'); halo.addColorStop(1, 'rgba(79,255,190,0)');
+  c.fillStyle = halo; c.fillRect(-100, 0, 300, 300);
+
+  // Horloge murale sans chiffres, presque 3 h du matin
+  c.fillStyle = '#d9d4ee'; c.beginPath(); c.arc(540, 150, 34, 0, 7); c.fill();
+  c.fillStyle = '#f6f3ff'; c.beginPath(); c.arc(540, 150, 28, 0, 7); c.fill();
+  c.fillStyle = '#3a3270';
+  for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6; c.beginPath(); c.arc(540 + Math.cos(a) * 23, 150 + Math.sin(a) * 23, i % 3 ? 1.6 : 2.8, 0, 7); c.fill(); }
+  c.strokeStyle = '#1b1640'; c.lineWidth = 4; c.beginPath(); c.moveTo(540, 150); c.lineTo(556, 152); c.stroke();
+  c.lineWidth = 2.6; c.beginPath(); c.moveTo(540, 150); c.lineTo(538, 128); c.stroke();
+  c.strokeStyle = '#ff3b4a'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(540, 150); c.lineTo(523, 162); c.stroke();
+
+  /* --- Lumière de la lampe torche sur le mur --- */
+  const tache = c.createRadialGradient(240, 330, 20, 240, 330, 270);
+  tache.addColorStop(0, 'rgba(255,236,170,.92)'); tache.addColorStop(0.5, 'rgba(255,214,130,.55)'); tache.addColorStop(1, 'rgba(255,200,120,0)');
+  c.fillStyle = tache; c.beginPath(); c.ellipse(240, 330, 250, 280, 0, 0, 7); c.fill();
+
+  /* --- Sol carrelé en perspective --- */
+  g = c.createLinearGradient(0, SOL, 0, Y1);
+  g.addColorStop(0, '#3b3466'); g.addColorStop(0.45, '#231e44'); g.addColorStop(1, '#100d22');
+  c.fillStyle = g; c.fillRect(X0, SOL, X1 - X0, Y1 - SOL);
+  c.strokeStyle = 'rgba(160,150,220,.22)'; c.lineWidth = 1.5;
+  for (let i = -14; i <= 14; i++) { c.beginPath(); c.moveTo(300 + i * 46, SOL); c.lineTo(300 + i * 150, Y1); c.stroke(); }
+  for (let j = 1; j < 8; j++) { const y = SOL + (Y1 - SOL) * Math.pow(j / 8, 1.6); c.beginPath(); c.moveTo(X0, y); c.lineTo(X1, y); c.stroke(); }
+  // flaque de lumière au sol, autour du chien
+  const flaque = c.createRadialGradient(200, 600, 10, 200, 600, 210);
+  flaque.addColorStop(0, 'rgba(255,230,160,.6)'); flaque.addColorStop(1, 'rgba(255,230,160,0)');
+  c.fillStyle = flaque; c.beginPath(); c.ellipse(200, 600, 230, 80, 0, 0, 7); c.fill();
+
+  /* --- L'ombre du chien sur le mur : un rôdeur géant --- */
+  // l'ombre part des pattes du chien, glisse au sol et monte sur le mur
+  c.fillStyle = 'rgba(14,8,22,.82)';
+  c.beginPath(); c.moveTo(120, 612); c.lineTo(220, 612); c.lineTo(300, SOL); c.lineTo(150, SOL); c.closePath(); c.fill();
+  c.save(); c.translate(228, SOL + 4); c.globalAlpha = 0.95;
+  c.shadowColor = 'rgba(255,40,90,.45)'; c.shadowBlur = 22; // lueur rouge qui détache la menace du mur
+  dessinerRodeur(c, 2.65, 0.35, true, false);
+  c.restore();
+  // yeux de l'ombre qui brillent
+  c.shadowColor = '#ff1e32'; c.shadowBlur = 26;
+  [13, 27].forEach((ex) => rond(c, 228 + ex * 2.65, SOL + 4 - 146 * 2.65, 9, '#ff2a3a'));
+  c.shadowBlur = 0;
+  [13, 27].forEach((ex) => rond(c, 228 + ex * 2.65 + 1.5, SOL + 4 - 146 * 2.65 - 1.5, 3, '#ffe0e0'));
+
+  /* --- Faisceau de la lampe --- */
+  const nx = 505, ny = 742, ns = 3.3; // infirmier : pieds, échelle
+  const bout = [nx - 49 * ns, ny - 72 * ns];
+  const fais = c.createRadialGradient(bout[0], bout[1], 4, bout[0], bout[1], 380);
+  fais.addColorStop(0, 'rgba(255,246,200,.75)'); fais.addColorStop(0.35, 'rgba(255,236,170,.32)'); fais.addColorStop(1, 'rgba(255,230,160,0)');
+  c.fillStyle = fais; c.beginPath(); c.moveTo(bout[0], bout[1] - 6); c.lineTo(-20, 150); c.lineTo(-20, 700); c.lineTo(bout[0], bout[1] + 6); c.closePath(); c.fill();
+
+  /* --- Le patient : un chien… aux yeux rouges --- */
+  c.save(); c.translate(185, 612);
+  c.shadowColor = 'rgba(255,220,150,.7)'; c.shadowBlur = 18;
+  dessinerAnimal(c, { esp: 'chien', couleur: '#c48a50', acc: 'collier', tell: 'yeux' }, 1.75, {});
+  c.restore();
+  c.shadowColor = '#ff1e32'; c.shadowBlur = 18;
+  yeuxDe('chien').y.forEach(([ex, ey]) => rond(c, 185 + ex * 1.75, 612 + ey * 1.75, 7, '#ff2a35'));
+  yeuxDe('chien').y.forEach(([ex, ey]) => rond(c, 185 + ex * 1.75 + 1.5, 612 + ey * 1.75 - 1.5, 2.2, '#ffe0e0'));
+  c.shadowBlur = 0;
+
+  /* --- Premier plan : coin d'un brancard, coupé par le bord --- */
+  const gb = Math.min(-40, X0 - 10); // le brancard sort toujours par le bord gauche
+  c.fillStyle = '#0c0a1a'; c.fillRect(gb, 688, 190 - gb, 22);
+  c.fillStyle = '#6c66a0'; c.fillRect(gb, 676, 196 - gb, 14);
+  c.fillStyle = '#a49ed0'; c.fillRect(gb, 664, 186 - gb, 14);
+  c.strokeStyle = '#2a2650'; c.lineWidth = 7; c.beginPath(); c.moveTo(170, 708); c.lineTo(170, Y1 + 10); c.moveTo(40, 708); c.lineTo(40, Y1 + 10); c.stroke();
+  rond(c, 170, 790, 11, '#1a1730');
+
+  /* --- L'infirmier, en grand, éclairé par la croix verte et le néon --- */
+  c.save(); c.translate(nx, ny); c.scale(-ns, ns);
+  ellipse(c, 0, 0, 30, 8, 'rgba(0,0,0,.45)');
+  c.shadowColor = 'rgba(150,255,225,.55)'; c.shadowBlur = 8;
+  dessinerInfirmierAffiche(c);
+  c.restore();
+  c.shadowBlur = 0;
+  // éclat de la lampe
+  c.shadowColor = '#fff3b0'; c.shadowBlur = 30;
+  rond(c, bout[0], bout[1], 7, '#fffbe6');
+  c.shadowBlur = 0;
+
+  /* --- Brume au sol, sous le bandeau du titre --- */
+  const brume = c.createLinearGradient(0, 660, 0, Y1);
+  brume.addColorStop(0, 'rgba(110,90,200,0)'); brume.addColorStop(1, 'rgba(70,50,140,.45)');
+  c.fillStyle = brume; c.fillRect(X0, 660, X1 - X0, Y1 - 660);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+}
+function demarrerAffiche() {
+  // ni écran, ni bouton, ni fenêtre, ni texte, ni bouton de langue
+  const st = document.createElement('style');
+  st.textContent = '.ecran, #hud, #barre, #panneau, #minicarte, #objectif, #alerte, #fx, button, .jel-langue { display:none !important; }';
+  document.head.appendChild(st);
+  $('ecran-titre').hidden = true;
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
 /* Démarrage */
 lireProgres();
 redim();
 majSon();
-ecranTitre();
-requestAnimationFrame(boucle);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else {
+  ecranTitre();
+  requestAnimationFrame(boucle);
+}
 })();
 </script>
 </body>
