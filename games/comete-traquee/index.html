@@ -1755,6 +1755,7 @@ function cfgFor(L){return{
 let S=null, cfg=cfgFor(1);
 let grid=[], lane=[], deco=[], vLines=[], hLines=[], rueOf={}, avOf={};
 let T=28, W=COLS*28, H=ROWS*28, dpr=1, bg=null, held=null;
+let apercu=0;  // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
 function fresh(){return{level:1,score:0,lives:3,phase:'menu',time:0,play:0,sightings:0,fx:[],trail:[],pings:[],walkers:[],drones:[],hero:{c:0,r:0,pc:0,pr:0,mt:-1e9}};}
 function ent(p,next){return{c:p.c,r:p.r,pc:p.c,pr:p.r,mt:-1e9,next,target:null,chasing:false};}
@@ -1841,7 +1842,7 @@ function jouer(){
     onNouvelle:newGame});
 }
 // Fermeture de la page pendant une partie (en jeu, en pause ou entre deux quartiers)
-JEL_SAVE.surFermeture(()=>{if(S&&(S.phase==='play'||S.phase==='paused'||S.phase==='intro'))sauvegarder();});
+JEL_SAVE.surFermeture(()=>{if(!apercu&&S&&(S.phase==='play'||S.phase==='paused'||S.phase==='intro'))sauvegarder();});
 
 /* ---------- Niveaux ---------- */
 function startLevel(phase){
@@ -2088,7 +2089,7 @@ function drawMission(m,now,t){
 }
 function drawHero(now,t){
   const h=S.hero,p=lp(h,now,MOVE_MS*0.9),onRoof=grid[h.r][h.c]===ROOF;
-  if(S.phase==='play'||S.phase==='menu'){S.trail.push({x:p.x,y:p.y});if(S.trail.length>10)S.trail.shift();}
+  if(!apercu&&(S.phase==='play'||S.phase==='menu')){S.trail.push({x:p.x,y:p.y});if(S.trail.length>10)S.trail.shift();}
   const n=S.trail.length;
   for(let i=0;i<n-1;i++){const q=S.trail[i],f=(i+1)/n;ctx.fillStyle=rgba(C.amber,0.08+0.35*f);circle(q.x,q.y,T*0.26*f);ctx.fill();}
   if(onRoof&&p.k<1){
@@ -2259,7 +2260,7 @@ ov.addEventListener('click',e=>{
   else if(a==='menu')showMenu();
 });
 function togglePause(){
-  if(!S)return;
+  if(!S||apercu)return;
   if(S.phase==='play'){setPhase('paused');showOverlay('pause');}
   else if(S.phase==='paused'){hideOverlay();setPhase('play');}
 }
@@ -2285,7 +2286,7 @@ function showMenu(){
 /* ---------- Commandes ---------- */
 const KEYMAP={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',KeyW:'up',KeyS:'down',KeyA:'left',KeyD:'right'};
 function nudge(d){
-  if(!S||S.phase!=='play')return;
+  if(!S||S.phase!=='play'||apercu)return;
   if(S.time>=S.nextMoveAt)tryMove(d);else S.queued=d;
 }
 addEventListener('keydown',e=>{
@@ -2356,18 +2357,386 @@ function resize(){
   cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
   cv.style.width=W+'px';cv.style.height=H+'px';
   if(grid.length)buildBg();
-  if(S)S.trail=[];
+  if(S)S.trail=apercu?traineeApercu():[];
 }
 let rq=0;
 addEventListener('resize',()=>{cancelAnimationFrame(rq);rq=requestAnimationFrame(resize);});
+
+/* ---------- Hasard à graine fixe (affiche et images du jeu : toujours la même image) ---------- */
+function hasardFixe(graine){
+  let s=graine|0;
+  return()=>{s=(s+0x6D2B79F5)|0;let q=Math.imul(s^(s>>>15),1|s);q=(q+Math.imul(q^(q>>>7),61|q))^q;return((q^(q>>>14))>>>0)/4294967296;};
+}
+
+/* ---------- Affiche (jaquette du jeu) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Comète, en grand, file
+// au-dessus des toits au bout de son grappin, sa traînée de comète derrière lui ; il fonce vers
+// l'incident (un chat coincé sur une enseigne, sous le losange turquoise) pendant qu'un drone de
+// presse le cherche de son projecteur et que deux traqueurs le visent de leur téléphone.
+let afficheCv=null;
+function dessinerAffiche(){
+  const LW=Math.max(1,innerWidth||600), LH=Math.max(1,innerHeight||800), pr=Math.min(2,devicePixelRatio||1);
+  if(!afficheCv){
+    afficheCv=document.createElement('canvas');afficheCv.setAttribute('aria-hidden','true');
+    afficheCv.style.cssText='position:fixed;left:0;top:0;width:100vw;height:100vh;display:block;z-index:50';
+    document.body.appendChild(afficheCv);
+  }
+  afficheCv.width=Math.round(LW*pr);afficheCv.height=Math.round(LH*pr);
+  const g=afficheCv.getContext('2d');
+  // Dessin en unités de l'affiche (600 × 800), centré ; le décor continue jusqu'aux bords de l'écran.
+  const k=Math.min(LW/600,LH/800), ox=(LW-600*k)/2, oy=(LH-800*k)/2;
+  g.setTransform(pr*k,0,0,pr*k,pr*ox,pr*oy);
+  const gx=-ox/k-2, dx=LW/k+4, gy=-oy/k-2, dy=LH/k+4, droite=gx+dx, bas=gy+dy;
+  const al=hasardFixe(2026);
+  const disque=(x,y,r)=>{g.beginPath();g.arc(x,y,r,0,PI2);};
+  const lueur=(couleur,flou)=>{g.shadowColor=couleur;g.shadowBlur=flou;};
+  const sansLueur=()=>{g.shadowBlur=0;g.shadowColor='transparent';};
+
+  // Ciel du soir : bleu nuit en haut, violet rosé au-dessus de la ville
+  const ciel=g.createLinearGradient(0,0,0,600);
+  ciel.addColorStop(0,'#26387e');ciel.addColorStop(0.45,'#3f4a9c');ciel.addColorStop(0.8,'#7c5cab');ciel.addColorStop(1,'#b06ea4');
+  g.fillStyle=ciel;g.fillRect(gx,gy,dx,dy);
+  for(let i=0;i<110;i++){
+    const x=gx+al()*dx,y=gy+al()*(440-gy),r=0.8+al()*1.8;
+    g.fillStyle=`rgba(255,250,235,${0.35+al()*0.6})`;disque(x,y,r);g.fill();
+  }
+  // Grande lune : la source de lumière
+  let halo=g.createRadialGradient(480,150,60,480,150,330);
+  halo.addColorStop(0,'rgba(255,240,200,.6)');halo.addColorStop(0.4,'rgba(255,230,190,.22)');halo.addColorStop(1,'rgba(255,230,190,0)');
+  g.fillStyle=halo;g.fillRect(gx,gy,dx,dy);
+  const lune=g.createRadialGradient(455,122,8,480,150,74);
+  lune.addColorStop(0,'#fffdf0');lune.addColorStop(1,'#ffe6a6');
+  lueur('rgba(255,240,190,.9)',40);g.fillStyle=lune;disque(480,150,74);g.fill();sansLueur();
+  g.fillStyle='rgba(224,190,120,.28)';
+  for(const [x,y,r] of [[455,135,14],[505,175,10],[498,120,7],[465,185,8]]){disque(x,y,r);g.fill();}
+  // Lueur de la ville
+  halo=g.createRadialGradient(300,600,20,300,600,460);
+  halo.addColorStop(0,'rgba(255,160,190,.4)');halo.addColorStop(1,'rgba(255,160,190,0)');
+  g.fillStyle=halo;g.fillRect(gx,gy,dx,dy);
+
+  // Ville lointaine : immeubles bleutés aux fenêtres allumées
+  for(let x=gx-10;x<droite;){
+    const w=38+al()*52,h=120+al()*210,top=570-h;
+    g.fillStyle='#363c84';g.fillRect(x,top,w-3,h);
+    g.fillStyle='rgba(170,180,255,.25)';g.fillRect(x,top,w-3,2);
+    for(let y=top+12;y<555;y+=17)for(let wx=x+6;wx<x+w-12;wx+=12){
+      if(al()<0.32){g.fillStyle=`rgba(255,214,138,${0.45+al()*0.4})`;g.fillRect(wx,y,5,8);}
+    }
+    x+=w;
+  }
+
+  // Rue en bas, entre les deux immeubles proches
+  const rue=g.createLinearGradient(0,560,0,800);
+  rue.addColorStop(0,'#33465e');rue.addColorStop(1,'#16242a');
+  g.fillStyle=rue;g.fillRect(gx,560,dx,bas-560);
+  g.fillStyle='#4a6078';g.fillRect(gx,560,dx,10);
+  g.fillStyle='rgba(227,235,229,.28)';
+  for(let x=gx;x<droite;x+=46)g.fillRect(x,640,24,4);
+
+  // Immeuble proche à droite (avec l'antenne où s'accroche le grappin)
+  function fenetres(x0,x1,y0,y1,pasX,pasY,lw,lh){
+    for(let y=y0;y<y1;y+=pasY)for(let x=x0;x<x1;x+=pasX){
+      if(al()<0.55){lueur('rgba(255,181,71,.8)',8);g.fillStyle=al()<0.5?'#ffb547':'#ffd27a';}
+      else{sansLueur();g.fillStyle='#183039';}
+      g.fillRect(x,y,lw,lh);
+    }
+    sansLueur();
+  }
+  let face=g.createLinearGradient(0,300,0,800);
+  face.addColorStop(0,'#335e6c');face.addColorStop(1,'#1c3943');
+  g.fillStyle=face;g.fillRect(405,300,droite-405,bas-300);
+  g.fillStyle='#4f8a94';g.fillRect(405,286,droite-405,14);
+  g.fillStyle='#8fe0d6';g.fillRect(405,286,droite-405,3);
+  g.fillStyle='rgba(0,0,0,.25)';g.fillRect(405,300,10,bas-300);
+  fenetres(430,droite-10,322,bas,38,48,18,24);
+  // Antenne du toit, découpée sur la lune
+  g.strokeStyle='#1a2a33';g.lineWidth=5;g.lineCap='round';
+  g.beginPath();g.moveTo(505,288);g.lineTo(505,208);g.moveTo(490,235);g.lineTo(520,235);g.moveTo(494,258);g.lineTo(516,258);g.stroke();
+  lueur('#ff5d8f',16);g.fillStyle='#ff5d8f';disque(505,203,6);g.fill();sansLueur();
+
+  // Immeuble proche à gauche (le toit d'où Comète s'est élancé)
+  face=g.createLinearGradient(0,470,0,800);
+  face.addColorStop(0,'#2f5866');face.addColorStop(1,'#19333c');
+  g.fillStyle=face;g.fillRect(gx,470,200-gx,bas-470);
+  g.fillStyle='#4f8a94';g.fillRect(gx,456,200-gx,14);
+  g.fillStyle='#8fe0d6';g.fillRect(gx,456,200-gx,3);g.fillRect(197,456,3,bas-456);
+  fenetres(gx+14,190,492,bas,36,46,17,23);
+  // Le dernier signalement, sur ce toit (cercle rose en pointillés, comme dans le jeu)
+  g.setLineDash([7,7]);g.strokeStyle='rgba(255,93,143,.95)';g.lineWidth=3.5;disque(70,520,34);g.stroke();g.setLineDash([]);
+  g.fillStyle='#ff5d8f';disque(70,520,6);g.fill();
+
+  // Projecteur du drone de presse, qui balaie le toit juste derrière Comète
+  const faisceau=g.createLinearGradient(95,175,150,520);
+  faisceau.addColorStop(0,'rgba(200,185,255,.55)');faisceau.addColorStop(1,'rgba(200,185,255,.08)');
+  g.fillStyle=faisceau;g.beginPath();g.moveTo(88,180);g.lineTo(102,180);g.lineTo(225,520);g.lineTo(40,530);g.closePath();g.fill();
+  g.fillStyle='rgba(215,205,255,.3)';g.beginPath();g.ellipse(132,524,94,20,0,0,PI2);g.fill();
+  // Le drone
+  g.save();g.translate(95,165);g.rotate(-0.18);
+  g.strokeStyle='#b5a3ff';g.lineWidth=7;g.lineCap='round';
+  g.beginPath();g.moveTo(-34,-34);g.lineTo(34,34);g.moveTo(34,-34);g.lineTo(-34,34);g.stroke();
+  for(const [ux,uy] of [[-1,-1],[1,-1],[1,1],[-1,1]]){
+    g.fillStyle='rgba(225,215,255,.35)';g.beginPath();g.ellipse(ux*34,uy*34,22,7,0,0,PI2);g.fill();
+    g.strokeStyle='#d8ccff';g.lineWidth=3;disque(ux*34,uy*34,10);g.stroke();
+  }
+  g.fillStyle='#7a66d6';g.fillRect(-15,-15,30,30);g.strokeStyle='#d8ccff';g.lineWidth=2.5;g.strokeRect(-15,-15,30,30);
+  lueur('#ff5d8f',14);g.fillStyle='#ff5d8f';disque(0,0,8);g.fill();sansLueur();
+  g.fillStyle='#fff';disque(-3,-3,2.5);g.fill();
+  g.restore();
+
+  // L'incident : un chat coincé sur une enseigne, sous le losange turquoise du jeu
+  g.strokeStyle='#1a2a33';g.lineWidth=6;g.beginPath();g.moveTo(405,422);g.lineTo(318,422);g.stroke();
+  g.lineWidth=3;g.beginPath();g.moveTo(330,422);g.lineTo(330,440);g.moveTo(388,422);g.lineTo(388,440);g.stroke();
+  g.fillStyle='#10201f';g.beginPath();g.roundRect(318,440,82,44,9);g.fill();
+  lueur('#4fe0c8',18);g.strokeStyle='#4fe0c8';g.lineWidth=3.5;g.stroke();
+  // Poisson en néon sur l'enseigne (un dessin, pas de lettre)
+  g.lineWidth=3;g.beginPath();g.ellipse(352,462,15,9,0,0,PI2);g.moveTo(367,462);g.lineTo(380,453);g.lineTo(380,471);g.closePath();g.stroke();
+  sansLueur();
+  g.fillStyle='#4fe0c8';disque(345,459,2.5);g.fill();
+  // Le chat
+  g.strokeStyle='#5d6778';g.lineWidth=6;g.lineCap='round';
+  g.beginPath();g.moveTo(386,430);g.quadraticCurveTo(410,440,402,476);g.stroke();
+  g.fillStyle='#5d6778';g.beginPath();g.ellipse(372,428,17,14,0,0,PI2);g.fill();
+  disque(364,404,15);g.fill();
+  g.beginPath();g.moveTo(352,398);g.lineTo(351,380);g.lineTo(363,391);g.closePath();g.fill();
+  g.beginPath();g.moveTo(370,391);g.lineTo(380,381);g.lineTo(378,399);g.closePath();g.fill();
+  g.fillStyle='#fff';disque(358,402,5);g.fill();disque(370,402,5);g.fill();
+  g.fillStyle='#10201f';disque(357,400,2.6);g.fill();disque(369,400,2.6);g.fill();
+  g.fillStyle='#ffb3c8';disque(364,410,2.5);g.fill();
+  // Le losange de l'incident et son compte à rebours
+  const ix=380,iy=340;
+  g.fillStyle='rgba(79,224,200,.22)';disque(ix,iy,40);g.fill();
+  g.lineWidth=6;g.strokeStyle='rgba(79,224,200,.3)';disque(ix,iy,33);g.stroke();
+  lueur('#4fe0c8',20);g.strokeStyle='#4fe0c8';g.beginPath();g.arc(ix,iy,33,-Math.PI/2,-Math.PI/2+PI2*0.68);g.stroke();
+  g.fillStyle='#4fe0c8';g.beginPath();g.moveTo(ix,iy-19);g.lineTo(ix+19,iy);g.lineTo(ix,iy+19);g.lineTo(ix-19,iy);g.closePath();g.fill();sansLueur();
+  g.fillStyle='rgba(255,255,255,.75)';g.beginPath();g.moveTo(ix,iy-13);g.lineTo(ix+7,iy-6);g.lineTo(ix,iy+1);g.lineTo(ix-7,iy-6);g.closePath();g.fill();
+
+  // Les traqueurs, dans la rue, téléphones levés vers Comète (flash rose)
+  function traqueur(x,y,r,tx,ty,sens){
+    g.fillStyle='#71839a';g.beginPath();g.ellipse(x,y+r*2.1,r*1.35,r*1.4,0,0,PI2);g.fill();
+    // Bras levé et téléphone
+    g.strokeStyle='#71839a';g.lineWidth=r*0.5;g.lineCap='round';
+    g.beginPath();g.moveTo(x+sens*r*0.9,y+r*1.5);g.lineTo(tx,ty+r*0.5);g.stroke();
+    g.save();g.translate(tx,ty);g.rotate(sens*0.25);
+    g.fillStyle='#0a1416';g.beginPath();g.roundRect(-r*0.38,-r*0.65,r*0.76,r*1.3,4);g.fill();
+    g.restore();
+    lueur('#ff5d8f',22);g.fillStyle='#fff';disque(tx,ty-r*0.45,r*0.2);g.fill();
+    g.strokeStyle='rgba(255,93,143,.95)';g.lineWidth=3;g.beginPath();
+    for(let i=0;i<8;i++){const a=i*Math.PI/4,r0=r*0.35,r1=r*(i%2?0.75:1.05);g.moveTo(tx+Math.cos(a)*r0,ty-r*0.45+Math.sin(a)*r0);g.lineTo(tx+Math.cos(a)*r1,ty-r*0.45+Math.sin(a)*r1);}
+    g.stroke();sansLueur();
+    // Tête (comme dans le jeu : disque clair, contour rose quand il traque)
+    g.fillStyle='#d4dce2';disque(x,y,r);g.fill();
+    g.strokeStyle='#ff5d8f';g.lineWidth=4;g.stroke();
+    g.fillStyle='#10201f';disque(x+sens*r*0.25,y-r*0.12,r*0.13);g.fill();disque(x+sens*r*0.62,y-r*0.12,r*0.13);g.fill();
+    g.beginPath();g.ellipse(x+sens*r*0.42,y+r*0.38,r*0.14,r*0.18,0,0,PI2);g.fill();
+  }
+  traqueur(372,572,21,346,526,-1);
+  traqueur(288,596,26,262,546,-1);
+
+  // Comète, en grand : traînée de comète, cape, rubans du masque, grappin
+  const hx=200,hy=362,R=112;
+  for(let i=0;i<11;i++){
+    const f=(i+1)/11,x=24+(hx-70-24)*f,y=575+(hy+70-575)*f+Math.sin(f*Math.PI)*12;
+    g.fillStyle=`rgba(255,181,71,${0.1+0.45*f})`;disque(x,y,8+34*f);g.fill();
+  }
+  g.fillStyle='#fff6d8';
+  for(const [x,y,s] of [[60,500,7],[110,455,9],[40,560,5],[150,500,6],[95,520,4]]){
+    g.beginPath();g.moveTo(x,y-s*2);g.lineTo(x+s*0.5,y-s*0.5);g.lineTo(x+s*2,y);g.lineTo(x+s*0.5,y+s*0.5);g.lineTo(x,y+s*2);g.lineTo(x-s*0.5,y+s*0.5);g.lineTo(x-s*2,y);g.lineTo(x-s*0.5,y-s*0.5);g.closePath();g.fill();
+  }
+  // Cape qui flotte derrière lui
+  const cape=g.createLinearGradient(hx-40,hy-80,60,520);
+  cape.addColorStop(0,'#ff6f45');cape.addColorStop(1,'#c63b2c');
+  g.fillStyle=cape;g.strokeStyle='#0a1416';g.lineWidth=4;g.lineJoin='round';
+  g.beginPath();g.moveTo(hx-62,hy-82);g.bezierCurveTo(hx-150,hy-60,hx-150,hy+30,hx-185,hy+95);
+  g.quadraticCurveTo(hx-150,hy+80,hx-140,hy+120);g.quadraticCurveTo(hx-110,hy+90,hx-80,hy+112);
+  g.lineTo(hx-30,hy+60);g.closePath();g.fill();g.stroke();
+  // Jambes et bottes
+  g.lineCap='round';
+  for(const [x0,y0,x1,y1] of [[hx-30,hy+95,hx-75,hy+150],[hx+5,hy+105,hx-12,hy+168]]){
+    g.strokeStyle='#0a1416';g.lineWidth=34;g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();
+    g.strokeStyle='#ff9f2e';g.lineWidth=27;g.beginPath();g.moveTo(x0,y0);g.lineTo(x1,y1);g.stroke();
+    g.fillStyle='#1a3034';disque(x1,y1,17);g.fill();g.strokeStyle='#0a1416';g.lineWidth=3;g.stroke();
+  }
+  // Bras arrière
+  g.strokeStyle='#0a1416';g.lineWidth=30;g.beginPath();g.moveTo(hx-95,hy+10);g.lineTo(hx-150,hy-30);g.stroke();
+  g.strokeStyle='#ff9f2e';g.lineWidth=23;g.beginPath();g.moveTo(hx-95,hy+10);g.lineTo(hx-150,hy-30);g.stroke();
+  g.fillStyle='#1a3034';disque(hx-152,hy-32,15);g.fill();
+  // Rubans du masque, qui claquent au vent
+  g.fillStyle='#10201f';
+  g.beginPath();g.moveTo(hx-95,hy-32);g.bezierCurveTo(hx-130,hy-70,hx-150,hy-40,hx-190,hy-78);g.lineTo(hx-178,hy-52);g.bezierCurveTo(hx-150,hy-25,hx-125,hy-45,hx-92,hy-10);g.closePath();g.fill();
+  g.beginPath();g.moveTo(hx-95,hy-20);g.bezierCurveTo(hx-135,hy-10,hx-150,hy+20,hx-195,hy+5);g.lineTo(hx-182,hy+28);g.bezierCurveTo(hx-140,hy+40,hx-130,hy+5,hx-92,hy);g.closePath();g.fill();
+  // Le corps rond de Comète (le disque orange du jeu), éclairé par la lune
+  const corps=g.createRadialGradient(hx+38,hy-45,12,hx,hy,R);
+  corps.addColorStop(0,'#ffe6a8');corps.addColorStop(0.5,'#ffb547');corps.addColorStop(1,'#e9852a');
+  lueur('rgba(255,181,71,.7)',36);g.fillStyle=corps;disque(hx,hy,R);g.fill();sansLueur();
+  g.strokeStyle='#0a1416';g.lineWidth=5;g.stroke();
+  g.strokeStyle='rgba(255,250,225,.95)';g.lineWidth=6;g.lineCap='round';g.beginPath();g.arc(hx,hy,R-9,-1.35,-0.15);g.stroke();
+  // Masque noir et grands yeux qui fixent l'incident
+  g.save();g.translate(hx,hy-14);g.rotate(-0.1);
+  g.fillStyle='#0a1416';g.beginPath();g.ellipse(0,0,R*0.84,R*0.32,0,0,PI2);g.fill();
+  for(const s of [-1,1]){
+    g.fillStyle='#fff';g.beginPath();g.ellipse(s*R*0.34,-2,R*0.19,R*0.15,s*0.12,0,PI2);g.fill();
+    g.fillStyle='#10201f';disque(s*R*0.34+8,-6,R*0.08);g.fill();
+    g.fillStyle='#fff';disque(s*R*0.34+11,-9,3.2);g.fill();
+  }
+  g.restore();
+  // Grand sourire décidé et joues roses
+  g.fillStyle='#6b2c12';g.beginPath();g.moveTo(hx-28,hy+38);g.quadraticCurveTo(hx+6,hy+82,hx+44,hy+30);g.closePath();g.fill();
+  g.fillStyle='#fff';g.beginPath();g.moveTo(hx-22,hy+40);g.quadraticCurveTo(hx+8,hy+50,hx+38,hy+34);g.lineTo(hx+34,hy+44);g.quadraticCurveTo(hx+6,hy+56,hx-16,hy+48);g.closePath();g.fill();
+  g.fillStyle='rgba(255,110,110,.35)';disque(hx-62,hy+32,15);g.fill();disque(hx+68,hy+22,15);g.fill();
+  // Bras tendu vers l'antenne, et le câble du grappin
+  const mainX=hx+128,mainY=hy-120;
+  g.strokeStyle='#0a1416';g.lineWidth=30;g.lineCap='round';g.beginPath();g.moveTo(hx+80,hy-55);g.lineTo(mainX,mainY);g.stroke();
+  g.strokeStyle='#ff9f2e';g.lineWidth=23;g.beginPath();g.moveTo(hx+80,hy-55);g.lineTo(mainX,mainY);g.stroke();
+  lueur('rgba(255,255,255,.8)',10);
+  g.strokeStyle='#eef4f0';g.lineWidth=3.5;g.beginPath();g.moveTo(mainX,mainY);g.quadraticCurveTo(420,224,503,214);g.stroke();sansLueur();
+  g.strokeStyle='#eef4f0';g.lineWidth=4;g.beginPath();g.arc(505,214,9,Math.PI*0.2,Math.PI*1.3);g.stroke();
+  g.fillStyle='#1a3034';disque(mainX,mainY,17);g.fill();g.strokeStyle='#0a1416';g.lineWidth=3;g.stroke();
+
+  // Premier plan : rebord de toit et cheminée à gauche, arbres du square à droite (coupés par les bords)
+  g.fillStyle='#0f1d22';g.beginPath();g.moveTo(gx,700);g.lineTo(150,712);g.lineTo(175,bas);g.lineTo(gx,bas);g.closePath();g.fill();
+  g.fillStyle='#2c4c50';g.beginPath();g.moveTo(gx,700);g.lineTo(150,712);g.lineTo(152,718);g.lineTo(gx,706);g.closePath();g.fill();
+  g.fillStyle='#132429';g.fillRect(48,640,52,70);g.fillStyle='#2c4c50';g.fillRect(42,630,64,14);
+  for(const [x,y,r] of [[470,770,72],[562,735,64],[640,790,80],[410,815,56],[720,760,70],[800,800,80]]){
+    if(x-r>droite)continue;
+    g.fillStyle='#1d4433';disque(x,y,r);g.fill();
+    g.fillStyle='#2f6b4f';g.beginPath();g.arc(x+r*0.15,y-r*0.15,r*0.75,-2.6,-0.4);g.arc(x+r*0.15,y-r*0.15,r*0.45,-0.4,-2.6,true);g.closePath();g.fill();
+  }
+}
+function demarrerAffiche(){
+  // Ni écran titre, ni bouton, ni fenêtre, ni texte, ni son, ni boucle de jeu.
+  const st=document.createElement('style');
+  st.textContent='.app,#overlay,button,jel-langue,.jel-langue{display:none!important}body{padding:0!important}';
+  document.head.appendChild(st);
+  const cacher=()=>{for(const el of document.querySelectorAll('jel-langue, .jel-langue, button'))el.style.setProperty('display','none','important');};
+  cacher();setTimeout(cacher,300);setTimeout(cacher,1200);
+  dessinerAffiche();
+  addEventListener('resize',dessinerAffiche);
+}
+
+/* ---------- Images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (quartier, sauvés, score, masques, grappin,
+// fil des signalements, croix), sans écran titre ni fenêtre « Continuer » (CONSIGNES-JEU.md, section 5).
+// La ville est tirée au hasard à graine fixe, la scène est posée puis figée (aucune mise à jour) :
+// ni photo, ni sauvetage, ni sauvegarde, ni son.
+//   1 = Vieux-Port (niveau 1) : Comète dans la rue, l'incident à rejoindre, un traqueur qui le piste ;
+//   2 = Docks (niveau 3) : Comète saute sur les toits au grappin, trois traqueurs foncent sur le signalement ;
+//   3 = Colline Nord (niveau 6) : deux drones de presse, sept traqueurs, un incident presque manqué.
+const MOMENTS_APERCU={
+  1:{niveau:1,graine:11,score:184,sauves:1,masques:3,grappin:6,sol:'rue',centre:[5,8],horizontal:false,reste:0.62,chasseurs:2,inc:0,merci:null,vu:'roll',heure:9},
+  2:{niveau:3,graine:23,score:1310,sauves:2,masques:2,grappin:3,sol:'toit',centre:[5,7],horizontal:true,reste:0.5,chasseurs:3,inc:4,merci:2,pts:168,vu:'near',heure:36},
+  3:{niveau:6,graine:37,score:4460,sauves:4,masques:2,grappin:4,sol:'parc',centre:[4,7],horizontal:true,reste:0.24,chasseurs:4,inc:9,merci:6,pts:212,vu:'roll',heure:74,fx:true}
+};
+let apercuDepart=null;  // case d'où part la traînée de Comète
+function traineeApercu(){
+  if(!S||!apercuDepart)return[];
+  const p=lp(S.hero,S.time,MOVE_MS*0.9),a={x:apercuDepart.c*T+T/2,y:apercuDepart.r*T+T/2},out=[];
+  for(let i=1;i<=10;i++){const f=i/10;out.push({x:a.x+(p.x-a.x)*f,y:a.y+(p.y-a.y)*f});}
+  return out;
+}
+function ouvrirApercu(n){
+  apercu=n;
+  const m=MOMENTS_APERCU[n];
+  Math.random=hasardFixe(m.graine);
+  // Plan un peu éclairci (images seulement), pour qu'on le lise bien en petit sur la page du jeu
+  Object.assign(C,{asphalt:'#152830',block:'#25454f',['block-hi']:'#3f727a',park:'#183d2c',tree:'#2a6443'});
+  document.documentElement.style.setProperty('--asphalt',C.asphalt);
+  resize();
+  S=fresh();S.level=m.niveau;S.score=m.score;S.lives=m.masques;
+  clearFeed();startLevel('play');
+  Object.assign(S,{time:20000,play:m.heure*2000,rescues:m.sauves,cable:m.grappin,nextMoveAt:1e12,missionAt:1e12,invUntil:0,shakeUntil:0,sightings:6+n*9});
+  // Comète : au milieu du plan, en train d'avancer (dans la rue, sur un toit au grappin, ou dans un square)
+  let best=null;
+  for(const sol of [m.sol,'rue']){
+    const SOL={rue:STREET,toit:ROOF,parc:PARK}[sol];
+    for(let r=3;r<ROWS-3;r++)for(let c=2;c<COLS-2;c++){
+      if(grid[r][c]!==SOL)continue;
+      for(const [ddx,ddy] of DV){
+        const pc=c-ddx,pr=r-ddy;
+        if(!inB(c-3*ddx,r-3*ddy))continue;
+        if(sol==='toit'?grid[pr][pc]!==STREET:![1,2,3].every(i=>(sol==='rue'?grid[r-i*ddy][c-i*ddx]===STREET:ground(grid[r-i*ddy][c-i*ddx]))))continue;
+        const sc=Math.abs(c-m.centre[0])+Math.abs(r-m.centre[1])+((ddy!==0)===m.horizontal?3:0);
+        if(!best||sc<best.sc)best={c,r,ddx,ddy,sc};
+      }
+    }
+    if(best)break;
+  }
+  const h=S.hero;
+  Object.assign(h,{c:best.c,r:best.r,pc:best.c-best.ddx,pr:best.r-best.ddy,mt:S.time-MOVE_MS*0.9*0.45});
+  apercuDepart={c:best.c-3*best.ddx,r:best.r-3*best.ddy};
+  const pris=new Set([0,1,2,3].map(i=>(h.c-i*best.ddx)+','+(h.r-i*best.ddy)));
+  // L'incident, droit devant, à 3 à 5 cases
+  let mi=null;
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    if(!ground(grid[r][c])||pris.has(c+','+r))continue;
+    const d=man(c,r,h.c,h.r);if(d<3||d>5)continue;
+    const devant=(c-h.c)*best.ddx+(r-h.r)*best.ddy;
+    const sc=Math.abs(d-4)*2-(devant>0?3:0)+(c<1||c>COLS-2||r<1||r>ROWS-2?2:0);
+    if(!mi||sc<mi.sc)mi={c,r,sc};
+  }
+  const dist=man(mi.c,mi.r,h.c,h.r),dur=(cfg.base+dist*cfg.perTile)*1000;
+  S.mission={c:mi.c,r:mi.r,inc:INCIDENTS[m.inc],dur,expires:S.time+m.reste*dur};
+  pris.add(mi.c+','+mi.r);
+  // Le dernier signalement, deux cases derrière Comète
+  const ping={c:h.c-2*best.ddx,r:h.r-2*best.ddy,t:S.time-420};
+  S.pings=[ping];S.lastPing=ping;
+  // Les traqueurs qui pistent ce signalement : à 3 à 5 cases, bien écartés
+  const libres=[];
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    const d=man(c,r,h.c,h.r);
+    if(ground(grid[r][c])&&!pris.has(c+','+r)&&d>=3&&d<=5)libres.push({c,r});
+  }
+  const choisis=[];
+  for(let i=0;i<m.chasseurs&&i<S.walkers.length&&libres.length;i++){
+    let b=null,bs=-1;
+    for(const p of libres){const s=choisis.length?Math.min(...choisis.map(q=>man(p.c,p.r,q.c,q.r))):10-Math.abs(man(p.c,p.r,ping.c,ping.r)-3);if(s>bs){bs=s;b=p;}}
+    choisis.push(b);libres.splice(libres.indexOf(b),1);pris.add(b.c+','+b.r);
+    Object.assign(S.walkers[i],{c:b.c,r:b.r,pc:b.c,pr:b.r,target:{c:ping.c,r:ping.r},chasing:true});
+  }
+  for(const w of S.walkers.slice(choisis.length)){
+    if(man(w.c,w.r,h.c,h.r)<3||pris.has(w.c+','+w.r)){
+      const p=randTile((tt,c,r)=>ground(tt)&&!pris.has(c+','+r),h,5)||randTile(ground,h,3);
+      w.c=w.pc=p.c;w.r=w.pr=p.r;
+    }
+    pris.add(w.c+','+w.r);
+  }
+  // Drones : le premier tout près, qui fonce sur Comète
+  S.drones.forEach((d,i)=>{
+    if(i===0){
+      const p=randTile((tt,c,r)=>!pris.has(c+','+r)&&man(c,r,h.c,h.r)===3)||randTile(()=>true,h,3);
+      Object.assign(d,{c:p.c,r:p.r,pc:p.c,pr:p.r,target:{c:h.c,r:h.r},chasing:true});
+    }else if(man(d.c,d.r,h.c,h.r)<5){
+      const p=randTile(()=>true,h,6)||randTile(()=>true,h,4);d.c=d.pc=p.c;d.r=d.pr=p.r;
+    }
+  });
+  // Un sauvetage qui vient de finir, juste derrière (« +points »)
+  if(m.fx){
+    const p=randTile((tt,c,r)=>ground(tt)&&!pris.has(c+','+r)&&c>=2&&c<=COLS-3&&r>=2&&man(c,r,h.c,h.r)<=4&&(r<h.r||Math.abs(c-h.c)>=2)&&man(c,r,mi.c,mi.r)>=3,h,2);
+    if(p)S.fx=[{c:p.c,r:p.r,t:S.time-230,text:'+'+m.pts}];
+  }
+  // Fil des signalements, comme après quelques minutes de partie
+  const fil=[['sys',t('appli'),t('feed.debut',{quartier:district(S.level).name,n:cfg.need})]];
+  if(m.merci!=null)fil.push(['sys',PSEUDOS[(m.graine*5)%PSEUDOS.length],t('feed.merci',{inc:t(INCIDENTS[m.merci]),pts:m.pts})]);
+  fil.push(['alert',t('alerte'),`${cap(t(S.mission.inc))}, ${placeName(S.mission.c,S.mission.r)}`]);
+  fil.push(['sight',PSEUDOS[(m.graine*3)%PSEUDOS.length],sightMsg(m.vu,placeName(ping.c,ping.r))]);
+  if(S.drones.length)fil.push(['sight','@drone_presse',sightMsg('drone',placeName(h.c,h.r))]);
+  fil.forEach(([kind,who,msg],i)=>{
+    const mn=21*60+m.heure-(fil.length-1-i)*2;
+    addFeed(kind,who,msg,pad(Math.floor(mn/60)%24)+':'+pad(mn%60));
+  });
+  feedEl.querySelectorAll('li').forEach(li=>li.classList.remove('new'));
+  S.trail=traineeApercu();
+  updateHUD();slowHud();lastCableKey='';hudFrame();
+}
 
 /* ---------- Démarrage ---------- */
 let lastT=0,hudT=0;
 function loop(t){
   const dt=Math.min(50,Math.max(0,t-lastT));lastT=t;
-  if(S&&(S.phase==='play'||S.phase==='menu'))update(dt);
+  if(S&&!apercu&&(S.phase==='play'||S.phase==='menu'))update(dt);  // image du jeu : partie figée
   render(t);
-  if(S){hudFrame();if(t-hudT>600){hudT=t;slowHud();}}
+  if(S){hudFrame();if(!apercu&&t-hudT>600){hudT=t;slowHud();}}
   requestAnimationFrame(loop);
 }
 function boot(data){
@@ -2381,9 +2750,17 @@ function boot(data){
   requestAnimationFrame(t=>{lastT=t;loop(t);});
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize).catch(()=>{});
 }
-try{if(window.claude&&window.claude.hot&&window.claude.hot.snapshot)window.claude.hot.snapshot(()=>S&&S.phase!=='menu'&&S.phase!=='over'?{level:S.level,score:S.score,lives:S.lives}:{});}catch(_){}
-const hot=window.claude&&window.claude.hot;
-if(hot&&hot.ready)hot.ready(boot);else boot((hot&&hot.data)||{});
+const numeroApercu=Number(window.JEL_APERCU);
+if(window.JEL_AFFICHE)demarrerAffiche();
+else if(numeroApercu===1||numeroApercu===2||numeroApercu===3){
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(t=>{lastT=t;loop(t);});
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(resize).catch(()=>{});
+}else{
+  try{if(window.claude&&window.claude.hot&&window.claude.hot.snapshot)window.claude.hot.snapshot(()=>S&&S.phase!=='menu'&&S.phase!=='over'?{level:S.level,score:S.score,lives:S.lives}:{});}catch(_){}
+  const hot=window.claude&&window.claude.hot;
+  if(hot&&hot.ready)hot.ready(boot);else boot((hot&&hot.data)||{});
+}
 })();
 </script>
 
