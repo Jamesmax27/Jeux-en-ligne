@@ -5341,6 +5341,242 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La capsule cyan
+  // du joueur, en grand, vient de frôler le trou noir et s'arrache à son attraction à pleine
+  // poussée (la fronde) ; une capsule rivale rose est aspirée vers l'horizon, une verte la talonne ;
+  // mine, cellule de carburant, pièce de coque et rochers autour, éclairés par le disque de feu.
+
+  // Centre et rayon du trou noir dans le cadre de l'affiche (600 × 800).
+  const AF = { x: 300, y: 215, rz: 80 };
+
+  // Capsule du héros, plus détaillée que pendant la course (même forme « goutte », design 0) :
+  // volume, panneaux, bande rose, hublot, ailerons, tuyère, contour de lumière côté trou noir.
+  function capsuleHeros(c, x, y, a, k) {
+    c.save(); c.translate(x, y); c.rotate(a); c.scale(k / 40, k / 40);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    // flamme de la poussée : longue lueur rose-orangée, cœur blanc
+    let g = c.createLinearGradient(-14, 0, -80, 0);
+    g.addColorStop(0, 'rgba(255,180,90,.9)'); g.addColorStop(0.45, 'rgba(255,80,150,.5)'); g.addColorStop(1, 'rgba(255,60,150,0)');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(-13, -10); c.quadraticCurveTo(-50, -13, -80, 0); c.quadraticCurveTo(-50, 13, -13, 10); c.closePath(); c.fill();
+    g = c.createLinearGradient(-14, 0, -55, 0);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, '#fff2b0'); g.addColorStop(0.7, '#ffb347'); g.addColorStop(1, 'rgba(255,140,60,0)');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(-14, -6); c.quadraticCurveTo(-36, -6.5, -55, 0); c.quadraticCurveTo(-36, 6.5, -14, 6); c.closePath(); c.fill();
+    // ailerons
+    c.fillStyle = '#0b5f7a'; c.strokeStyle = '#04263a'; c.lineWidth = 1.2;
+    poly(c, [-3, -10, -15, -17.5, -19, -16, -13, -6]); c.fill(); c.stroke();
+    poly(c, [-3, 10, -15, 17.5, -19, 16, -13, 6]); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(255,214,140,.8)'; poly(c, [-3, -10, -15, -17.5, -14, -15.5, -4, -9]); c.fill();
+    // feux de position au bout des ailerons, avec leur halo
+    [[-17, -16.5, '255,77,94'], [-17, 16.5, '110,240,138']].forEach((f) => {
+      const h = c.createRadialGradient(f[0], f[1], 0, f[0], f[1], 5);
+      h.addColorStop(0, 'rgba(' + f[2] + ',.9)'); h.addColorStop(1, 'rgba(' + f[2] + ',0)');
+      c.fillStyle = h; rond(c, f[0], f[1], 5); c.fill();
+      c.fillStyle = '#fff'; rond(c, f[0], f[1], 1.1); c.fill();
+    });
+    // tuyère
+    c.fillStyle = '#2a3446'; c.strokeStyle = '#04263a'; c.lineWidth = 1;
+    rr(c, -18, -6.5, 6, 13, 2); c.fill(); c.stroke();
+    c.fillStyle = '#fff1c0'; rr(c, -18.6, -4.2, 2.6, 8.4, 1.2); c.fill();
+    // coque : éclairée par le disque (au-dessus), dans l'ombre en dessous
+    const corps = () => {
+      c.beginPath(); c.moveTo(21, 0); c.bezierCurveTo(14, -12, -10, -14, -15, -8); c.lineTo(-15, 8);
+      c.bezierCurveTo(-10, 14, 14, 12, 21, 0); c.closePath();
+    };
+    g = c.createLinearGradient(0, -13, 0, 12);
+    g.addColorStop(0, '#e2fcff'); g.addColorStop(0.28, '#4fd8ff'); g.addColorStop(0.72, '#1690b8'); g.addColorStop(1, '#0a3f58');
+    corps(); c.fillStyle = g; c.fill();
+    c.save(); corps(); c.clip();
+    // bande rose de course
+    c.fillStyle = '#ff5fa8'; c.fillRect(-16, 3.6, 40, 2.6);
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(-16, 3.6, 40, 0.7);
+    // panneaux et rivets
+    c.strokeStyle = 'rgba(4,38,58,.5)'; c.lineWidth = 0.6;
+    [-3, -10].forEach((px) => { c.beginPath(); c.moveTo(px, -14); c.quadraticCurveTo(px - 3, 0, px, 14); c.stroke(); });
+    c.fillStyle = 'rgba(4,38,58,.55)';
+    for (let i = 0; i < 5; i++) { rond(c, -5.3 + (i % 2) * 0.3, -8 + i * 4, 0.45); c.fill(); }
+    // reflet brillant le long du dos
+    c.fillStyle = 'rgba(255,255,255,.55)'; ell(c, -1, -7.4, 11, 1.9, -0.05); c.fill();
+    c.restore();
+    c.strokeStyle = '#04263a'; c.lineWidth = 1.3; corps(); c.stroke();
+    // contour de lumière chaude du côté du trou noir
+    c.strokeStyle = 'rgba(255,214,140,.95)'; c.lineWidth = 0.9;
+    c.beginPath(); c.moveTo(19.5, -1.5); c.bezierCurveTo(13, -11.2, -9, -13.2, -14, -7.6); c.stroke();
+    // hublot : verre sombre, reflet du disque orange
+    g = c.createRadialGradient(9.5, -2, 0.5, 8.5, 0, 6.5);
+    g.addColorStop(0, '#9ff0ff'); g.addColorStop(0.45, '#1f6f9a'); g.addColorStop(1, '#0a1c3a');
+    c.fillStyle = g; c.strokeStyle = '#04263a'; c.lineWidth = 1;
+    ell(c, 8.5, -0.3, 6.2, 4.8); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(255,170,80,.9)'; c.lineWidth = 0.8;
+    c.beginPath(); c.ellipse(8.5, -0.3, 4.6, 3.3, 0, Math.PI * 1.1, Math.PI * 1.55); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.85)'; ell(c, 10.5, -2.4, 1.6, 0.9, -0.4); c.fill();
+    c.restore();
+  }
+
+  // Rocher éclairé par le trou noir : face claire et liseré orangé de son côté, ombre de l'autre.
+  function rocherAffiche(c, x, y, k, graine) {
+    const al = graineHasard(graine * 13 + 7);
+    const pts = [];
+    for (let i = 0; i < 11; i++) { const a = i / 11 * Math.PI * 2, ra = k * (0.38 + al() * 0.14); pts.push(Math.cos(a) * ra, Math.sin(a) * ra); }
+    const d = Math.hypot(AF.x - x, AF.y - y) || 1, lx = (AF.x - x) / d, ly = (AF.y - y) / d;
+    c.save(); c.translate(x, y);
+    const g = c.createLinearGradient(lx * k * 0.45, ly * k * 0.45, -lx * k * 0.45, -ly * k * 0.45);
+    g.addColorStop(0, '#d2a69a'); g.addColorStop(0.35, '#6f6082'); g.addColorStop(1, '#1b1630');
+    poly(c, pts); c.fillStyle = g; c.fill();
+    c.save(); poly(c, pts); c.clip();
+    c.fillStyle = 'rgba(18,12,34,.45)';
+    for (let i = 0; i < 5; i++) { ell(c, (al() - 0.5) * k * 0.5, (al() - 0.5) * k * 0.5, k * (0.04 + al() * 0.05), k * (0.03 + al() * 0.035)); c.fill(); }
+    c.translate(-lx * k * 0.035, -ly * k * 0.035);
+    c.strokeStyle = 'rgba(255,190,120,.9)'; c.lineWidth = k * 0.045; poly(c, pts); c.stroke();
+    c.restore();
+    c.strokeStyle = '#120e20'; c.lineWidth = Math.max(1.5, k * 0.02); poly(c, pts); c.stroke();
+    c.restore();
+  }
+
+  // Halo coloré (lumière douce) en (x, y).
+  function halo(c, x, y, r, coul, a) {
+    const g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(' + coul + ',' + a + ')'); g.addColorStop(1, 'rgba(' + coul + ',0)');
+    c.fillStyle = g; rond(c, x, y, r); c.fill();
+  }
+
+  let cielAffiche = null;
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(w * dpr)); cv.height = Math.max(1, Math.round(h * dpr));
+    const c = cv.getContext('2d');
+    // Scène composée dans un cadre de 600 × 800, agrandie pour remplir tout l'écran (bords coupés si besoin).
+    const s = Math.max(w / 600, h / 800);
+    c.setTransform(dpr * s, 0, 0, dpr * s, dpr * (w - 600 * s) / 2, dpr * (h - 800 * s) / 2);
+    const T = 1800, X = AF.x, Y = AF.y, RZ = AF.rz;
+    c.lineCap = 'round'; c.lineJoin = 'round';
+
+    // Fond : violet profond, étoiles et nébuleuses du jeu
+    let g = c.createLinearGradient(0, 0, 0, 800);
+    g.addColorStop(0, '#2c0f52'); g.addColorStop(0.5, '#1f0c40'); g.addColorStop(1, '#0d0b28');
+    c.fillStyle = g; c.fillRect(-1200, -1200, 3000, 3200);
+    if (!cielAffiche) cielAffiche = ciel(1200, 1600, 23);
+    c.drawImage(cielAffiche, -300, -400);
+    halo(c, 540, 640, 380, '42,124,240', 0.38);
+    halo(c, 40, 90, 330, '255,95,168', 0.26);
+
+    // Grande lueur du disque d'accrétion : la lumière de toute la scène
+    g = c.createRadialGradient(X, Y, RZ, X, Y, 540);
+    g.addColorStop(0, 'rgba(255,195,120,.8)'); g.addColorStop(0.22, 'rgba(255,110,130,.42)');
+    g.addColorStop(0.55, 'rgba(170,60,210,.18)'); g.addColorStop(1, 'rgba(90,30,160,0)');
+    c.fillStyle = g; c.fillRect(-1200, -1200, 3000, 3200);
+
+    // Anneaux de la piste (orbites en pointillés autour du trou)
+    c.save(); c.translate(X, Y); c.scale(1, 0.42); c.setLineDash([10, 12]);
+    for (let i = 0; i < 6; i++) {
+      c.strokeStyle = 'rgba(200,190,255,' + (0.42 - i * 0.05).toFixed(2) + ')'; c.lineWidth = 3;
+      rond(c, 0, 0, RZ * (1.7 + i * 0.62)); c.stroke();
+    }
+    c.restore(); c.setLineDash([]);
+
+    // Disque d'accrétion aplati, derrière le trou
+    c.save(); c.translate(X, Y); c.scale(1, 0.3);
+    g = c.createRadialGradient(0, 0, RZ * 0.9, 0, 0, RZ * 3.3);
+    g.addColorStop(0, 'rgba(255,248,220,1)'); g.addColorStop(0.2, 'rgba(255,175,70,.9)');
+    g.addColorStop(0.55, 'rgba(235,70,160,.45)'); g.addColorStop(1, 'rgba(80,20,140,0)');
+    c.fillStyle = g; rond(c, 0, 0, RZ * 3.3); c.fill();
+    c.restore();
+    trouNoir(c, X, Y, RZ, T);
+    // Arc de lumière qui passe par-dessus le trou (lentille gravitationnelle)
+    c.save(); c.translate(X, Y);
+    g = c.createLinearGradient(0, -RZ * 1.5, 0, RZ * 0.25);
+    g.addColorStop(0, 'rgba(255,235,180,.15)'); g.addColorStop(0.4, 'rgba(255,205,120,.95)'); g.addColorStop(1, 'rgba(255,140,60,0)');
+    c.strokeStyle = g; c.lineWidth = RZ * 0.24;
+    c.beginPath(); c.ellipse(0, 0, RZ * 1.33, RZ * 1.24, 0, Math.PI * 1.03, Math.PI * 1.97); c.stroke();
+    c.restore();
+    // Capsule rivale rose, happée vers l'horizon (traînées étirées vers le trou)
+    const px = X + RZ * 1.55, py = Y + RZ * 0.42, pa = Math.atan2(Y - py, X - px);
+    c.strokeStyle = 'rgba(255,95,168,.55)'; c.lineWidth = 3;
+    for (let i = -1; i <= 1; i++) {
+      c.beginPath(); c.moveTo(px - Math.cos(pa) * 18 + i * 7 * Math.sin(pa), py - Math.sin(pa) * 18 - i * 7 * Math.cos(pa));
+      c.quadraticCurveTo(px + 50 + i * 6, py + 20, px + 95, py + 8 + i * 10); c.stroke();
+    }
+    halo(c, px, py, 46, '255,77,94', 0.45);
+    capsule(c, px, py, pa, 54, COUL[1], COUL_F[1], 1, 0);
+    // Bande avant du disque (passe devant le trou et la capsule aspirée)
+    c.save(); c.translate(X, Y); c.scale(1, 0.18);
+    c.strokeStyle = 'rgba(255,215,140,.9)'; c.lineWidth = RZ * 0.5;
+    c.beginPath(); c.arc(0, 0, RZ * 1.6, 0.08, Math.PI - 0.08); c.stroke();
+    c.strokeStyle = 'rgba(255,252,235,.95)'; c.lineWidth = RZ * 0.15;
+    c.beginPath(); c.arc(0, 0, RZ * 1.5, 0.12, Math.PI - 0.12); c.stroke();
+    c.restore();
+
+    // Débris happés en spirale vers l'horizon
+    c.strokeStyle = 'rgba(255,225,190,.55)'; c.lineWidth = 2.5;
+    [[0.4, 2.7], [2.3, 2.4], [3.6, 2.9], [5.2, 2.5]].forEach((d) => {
+      c.beginPath();
+      for (let j = 0; j <= 12; j++) {
+        const a = d[0] + j * 0.07, r = RZ * (d[1] - j * 0.07);
+        const x = X + Math.cos(a) * r, y = Y + Math.sin(a) * r * 0.42;
+        if (j) c.lineTo(x, y); else c.moveTo(x, y);
+      }
+      c.stroke();
+      c.fillStyle = '#fff4dc'; rond(c, X + Math.cos(d[0]) * RZ * d[1], Y + Math.sin(d[0]) * RZ * d[1] * 0.42, 3.2); c.fill();
+    });
+
+    // Soucoupe jaune lointaine, plus pâle (profondeur)
+    c.globalAlpha = 0.85;
+    capsule(c, 168, 108, 0.35, 36, COUL[2], COUL_F[2], 2, 0.6);
+    c.globalAlpha = 1;
+    rocherAffiche(c, 560, 250, 62, 5);
+    // Mine rouge à l'affût sur l'orbite, avec sa lueur menaçante
+    halo(c, 450, 132, 70, '255,77,94', 0.55);
+    dessinerMine(c, 450, 132, 66, 400, -1);
+
+    // Le héros : position, cap et taille
+    const HXc = 318, HYc = 440, HA = -0.6, HK = 320;
+    const ca = Math.cos(HA), sa = Math.sin(HA);
+    const queueX = HXc - ca * 15 * HK / 40, queueY = HYc - sa * 15 * HK / 40;
+    // Sillage cyan : la courbe de la fronde, qui passe sous le trou noir
+    for (let i = 0; i < 3; i++) {
+      c.strokeStyle = ['rgba(79,216,255,.16)', 'rgba(79,216,255,.35)', 'rgba(220,250,255,.75)'][i];
+      c.lineWidth = [46, 20, 5][i];
+      c.beginPath(); c.moveTo(20, 175); c.quadraticCurveTo(95, 560, queueX, queueY); c.stroke();
+    }
+    // Capsule verte qui la talonne sur la même trajectoire
+    capsule(c, 66, 360, 1.25, 78, COUL[3], COUL_F[3], 3, 1);
+    // Cellule de carburant devant le nez du héros, pièce de coque dorée sous son ventre
+    halo(c, 540, 318, 60, '110,240,138', 0.4);
+    dessinerCellule(c, 540, 318, 58, 0);
+    halo(c, 505, 505, 55, '255,194,61', 0.45);
+    dessinerPiece(c, 505, 505, 52, 0);
+    // Traits de vitesse le long du héros
+    c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 2.5;
+    [[-150, -105, 120], [-60, -120, 90], [-200, 70, 140], [-120, 118, 100], [40, 100, 70]].forEach((l) => {
+      const x0 = HXc + ca * l[0] - sa * l[1], y0 = HYc + sa * l[0] + ca * l[1];
+      c.beginPath(); c.moveTo(x0, y0); c.lineTo(x0 - ca * l[2], y0 - sa * l[2]); c.stroke();
+    });
+    // Lumière du moteur et reflet cyan autour du héros
+    halo(c, HXc, HYc, 230, '79,216,255', 0.22);
+    halo(c, queueX - ca * 40, queueY - sa * 40, 120, '255,170,90', 0.5);
+    capsuleHeros(c, HXc, HYc, HA, HK);
+
+    // Premier plan : gros rochers coupés par les bords
+    rocherAffiche(c, 600, 735, 250, 2);
+    rocherAffiche(c, -20, 790, 230, 9);
+    rocherAffiche(c, 18, 40, 130, 4);
+  }
+
+  function demarrerAffiche() {
+    // Ni écran, ni fenêtre, ni bouton, ni bouton de langue : seulement la scène.
+    const st = document.createElement('style');
+    st.textContent = '.ecran, .voile, #toast, #confettis, .jel-langue, button { display: none !important; } #fond { display: block !important; }';
+    document.head.appendChild(st);
+    for (const el of document.querySelectorAll('.ecran, .voile, #toast, .jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5382,9 +5618,11 @@
     if (enPartie && session === 'solo') sauver(niveau, 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(); });
+  window.addEventListener('resize', () => { if (ecran !== 'jeu' && !window.JEL_AFFICHE) dessinerTitre(); });
 
   document.title = tr('titre');
+  // Affiche du jeu (robot du site seulement) : la scène, sans écran titre, ni son, ni boucle.
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
   chargerProgression();
   construirePlaces();
   majBoutonsSon();

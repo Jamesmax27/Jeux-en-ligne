@@ -4007,6 +4007,266 @@
   }
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le spectre jaillit
+  // de la lentille de la planchette, au-dessus de la table de séance, griffes tendues ; les tuiles du
+  // mot (gravées de symboles, jamais de lettres) tourbillonnent autour de lui, dont une tuile maudite
+  // rouge ; la bougie éclaire la scène ; deux médiums encapuchonnés, vus de dos, au premier plan.
+  // Dessinée dans un cadre de 600 × 800, centré et mis à l'échelle de l'écran.
+  function dessinerAffiche() {
+    const { c, w, h } = preparerFond();
+    const k = Math.min(w / 600, h / 800);
+    const ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    const p = PLATEAUX[0];
+    let graine = 11;
+    const hasard = () => (graine = (graine * 16807) % 2147483647) / 2147483647;
+    const flou = (v) => v * k; // le flou des ombres ne suit pas la mise à l'échelle
+    c.save();
+    c.translate(ox, oy); c.scale(k, k);
+    const X0 = -ox / k, Y0 = -oy / k, LW = w / k, LH = h / k; // tout l'écran, dans le repère de l'affiche
+
+    // --- Fond : salle de séance, lueur froide du spectre, lueur chaude de la bougie
+    let g = c.createLinearGradient(0, 0, 0, 800);
+    g.addColorStop(0, '#24102e'); g.addColorStop(0.55, '#2c1022'); g.addColorStop(1, '#0c0610');
+    c.fillStyle = g; c.fillRect(X0, Y0, LW, LH);
+    g = c.createRadialGradient(300, 250, 20, 300, 250, 440);
+    g.addColorStop(0, 'rgba(140,210,250,.62)'); g.addColorStop(0.5, 'rgba(90,150,210,.28)'); g.addColorStop(1, 'rgba(90,150,210,0)');
+    c.fillStyle = g; c.fillRect(X0, Y0, LW, LH);
+    g = c.createRadialGradient(130, 520, 10, 130, 520, 420);
+    g.addColorStop(0, 'rgba(255,160,70,.6)'); g.addColorStop(0.5, 'rgba(255,110,40,.2)'); g.addColorStop(1, 'rgba(255,110,40,0)');
+    c.fillStyle = g; c.fillRect(X0, Y0, LW, LH);
+    // Rideaux sur les côtés (plis éclairés par la bougie à gauche, par le spectre à droite)
+    for (let i = 0; i < 7; i++) {
+      const xg = -10 + i * 20, xd = 610 - i * 20;
+      c.globalAlpha = 0.55 - i * 0.06;
+      c.fillStyle = i % 2 ? '#3a0f20' : '#6a2030';
+      c.beginPath(); c.moveTo(xg - 12, -20); c.quadraticCurveTo(xg + 8, 260, xg - 4, 560); c.lineTo(xg + 14, 560); c.quadraticCurveTo(xg + 24, 260, xg + 10, -20); c.closePath(); c.fill();
+      c.fillStyle = i % 2 ? '#1e1030' : '#3a2a5a';
+      c.beginPath(); c.moveTo(xd + 12, -20); c.quadraticCurveTo(xd - 8, 260, xd + 4, 560); c.lineTo(xd - 14, 560); c.quadraticCurveTo(xd - 24, 260, xd - 10, -20); c.closePath(); c.fill();
+    }
+    c.globalAlpha = 1;
+
+    // --- Tuile du mot : une plaquette de bois clair gravée d'un symbole (jamais de lettre)
+    function chemin(x, y, lw, lh, r) {
+      c.beginPath();
+      c.moveTo(x + r, y); c.lineTo(x + lw - r, y); c.quadraticCurveTo(x + lw, y, x + lw, y + r);
+      c.lineTo(x + lw, y + lh - r); c.quadraticCurveTo(x + lw, y + lh, x + lw - r, y + lh);
+      c.lineTo(x + r, y + lh); c.quadraticCurveTo(x, y + lh, x, y + lh - r);
+      c.lineTo(x, y + r); c.quadraticCurveTo(x, y, x + r, y); c.closePath();
+    }
+    function motif(type, x, y, r) {
+      if (type === 'etoile') symbole(c, 0, x, y, r);
+      else if (type === 'oeil') {
+        c.beginPath(); c.moveTo(x - r * 1.2, y); c.quadraticCurveTo(x, y - r * 1.1, x + r * 1.2, y); c.quadraticCurveTo(x, y + r * 1.1, x - r * 1.2, y); c.closePath(); c.fill();
+      } else if (type === 'soleil') {
+        c.beginPath(); c.arc(x, y, r * 0.5, 0, Math.PI * 2); c.fill();
+        c.lineWidth = r * 0.22; c.strokeStyle = c.fillStyle;
+        for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; c.beginPath(); c.moveTo(x + Math.cos(a) * r * 0.7, y + Math.sin(a) * r * 0.7); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); c.stroke(); }
+      } else { // losange
+        c.beginPath(); c.moveTo(x, y - r); c.lineTo(x + r * 0.7, y); c.lineTo(x, y + r); c.lineTo(x - r * 0.7, y); c.closePath(); c.fill();
+      }
+    }
+    const BOIS = { fond: '#f3dcae', ombre: '#7a4a20', encre: '#5a3418', lueur: 'rgba(255,190,110,.7)' };
+    const MAUDITE = { fond: '#ff6b78', ombre: '#8a1020', encre: '#3a0008', lueur: '#ff2a40' };
+    const ESPRIT = { fond: '#cfe8f4', ombre: '#4a6a80', encre: '#1a3448', lueur: '#9fdcff' };
+    function tuile(x, y, lw, rot, st, type, alpha) {
+      const lh = lw * 1.22;
+      c.save(); c.translate(x, y); c.rotate(rot); c.globalAlpha = alpha || 1;
+      c.shadowColor = st.lueur; c.shadowBlur = flou(lw * 0.55);
+      c.fillStyle = st.ombre; chemin(-lw / 2, -lh / 2 + lw * 0.12, lw, lh, lw * 0.2); c.fill();
+      c.shadowBlur = 0;
+      c.fillStyle = st.fond; chemin(-lw / 2, -lh / 2, lw, lh, lw * 0.2); c.fill();
+      c.fillStyle = 'rgba(255,255,255,.4)'; chemin(-lw / 2 + lw * 0.1, -lh / 2 + lw * 0.07, lw * 0.8, lh * 0.18, lw * 0.08); c.fill();
+      c.fillStyle = st.encre; motif(type, 0, lh * 0.04, lw * 0.3);
+      if (type === 'oeil') { c.fillStyle = st.fond; c.beginPath(); c.arc(0, lh * 0.04, lw * 0.11, 0, Math.PI * 2); c.fill(); c.fillStyle = st.encre; c.beginPath(); c.arc(0, lh * 0.04, lw * 0.05, 0, Math.PI * 2); c.fill(); }
+      c.restore();
+    }
+
+    // --- Tuiles lointaines, petites et pâles (profondeur), derrière le spectre
+    tuile(205, 112, 26, 0.5, ESPRIT, 'losange', 0.55);
+    tuile(402, 104, 24, -0.45, BOIS, 'soleil', 0.5);
+    tuile(560, 150, 22, 0.3, BOIS, 'etoile', 0.45);
+
+    // --- Table ronde et plateau de séance
+    c.fillStyle = '#050206'; c.beginPath(); c.ellipse(300, 612, 368, 142, 0, 0, Math.PI * 2); c.fill();
+    g = c.createRadialGradient(150, 520, 10, 300, 590, 420);
+    g.addColorStop(0, '#8a4e28'); g.addColorStop(0.5, '#4a2614'); g.addColorStop(1, '#1a0c06');
+    c.fillStyle = g; c.beginPath(); c.ellipse(300, 592, 360, 140, 0, 0, Math.PI * 2); c.fill();
+    g = c.createLinearGradient(40, 500, 560, 660);
+    g.addColorStop(0, p.b1); g.addColorStop(1, p.b2);
+    c.fillStyle = g; c.beginPath(); c.ellipse(300, 578, 262, 94, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = p.g; c.lineWidth = 4; c.stroke();
+    c.beginPath(); c.ellipse(300, 578, 246, 84, 0, 0, Math.PI * 2); c.lineWidth = 1.5; c.stroke();
+    // Les 26 cases du plateau, remplacées par des symboles gravés ; ceux de devant sont plus gros.
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2 - Math.PI / 2;
+      const x = 300 + Math.cos(a) * 222, y = 578 + Math.sin(a) * 70, r = 5 + (Math.sin(a) + 1) * 2.6;
+      c.fillStyle = i % 5 === 2 ? '#bfe8ff' : p.g;
+      c.shadowColor = c.fillStyle; c.shadowBlur = flou(i % 5 === 2 ? 14 : 6);
+      symbole(c, i % 3, x, y, r);
+    }
+    c.shadowBlur = 0;
+    // Reflet froid du spectre sur le plateau
+    c.save(); c.globalCompositeOperation = 'lighter';
+    g = c.createRadialGradient(300, 540, 5, 300, 560, 220);
+    g.addColorStop(0, 'rgba(150,220,255,.45)'); g.addColorStop(1, 'rgba(150,220,255,0)');
+    c.fillStyle = g; c.beginPath(); c.ellipse(300, 578, 262, 94, 0, 0, Math.PI * 2); c.fill();
+    c.restore();
+
+    // --- Traînées : les tuiles arrachées du plateau montent en spirale vers le spectre
+    const VOLANTES = [
+      [135, 205, 50, -0.32, BOIS, 'etoile'], [470, 192, 48, 0.36, BOIS, 'oeil'],
+      [50, 262, 40, -0.15, BOIS, 'soleil'], [560, 282, 40, 0.22, ESPRIT, 'losange'],
+      [150, 432, 52, -0.25, BOIS, 'oeil'], [455, 428, 58, 0.26, MAUDITE, 'etoile']
+    ];
+    c.lineCap = 'round';
+    VOLANTES.forEach(([x, y, lw, , st], i) => {
+      const dep = 300 + (x < 300 ? -1 : 1) * (60 + (i % 3) * 30);
+      g = c.createLinearGradient(dep, 560, x, y);
+      g.addColorStop(0, 'rgba(255,220,150,0)'); g.addColorStop(1, st === MAUDITE ? 'rgba(255,90,110,.75)' : 'rgba(255,230,180,.55)');
+      c.strokeStyle = g; c.lineWidth = lw * 0.28;
+      c.beginPath(); c.moveTo(dep, 560); c.quadraticCurveTo((dep + x) / 2 + (x < 300 ? -60 : 60), (560 + y) / 2 + 30, x, y + lw * 0.5); c.stroke();
+    });
+
+    // --- Le spectre, en grand, qui jaillit de la planchette
+    function corps() {
+      c.beginPath();
+      c.moveTo(300, 100);
+      c.bezierCurveTo(390, 100, 420, 170, 418, 235);
+      c.bezierCurveTo(450, 255, 500, 290, 520, 345);
+      c.lineTo(540, 374); c.lineTo(512, 357); c.lineTo(522, 392); c.lineTo(497, 362); c.lineTo(491, 388); c.lineTo(478, 352);
+      c.bezierCurveTo(455, 320, 430, 302, 405, 302);
+      c.bezierCurveTo(395, 362, 362, 420, 328, 455);
+      c.bezierCurveTo(314, 472, 306, 495, 300, 518);
+      c.bezierCurveTo(294, 495, 286, 472, 272, 455);
+      c.bezierCurveTo(238, 420, 205, 362, 195, 302);
+      c.bezierCurveTo(170, 302, 145, 320, 122, 352);
+      c.lineTo(109, 388); c.lineTo(103, 362); c.lineTo(78, 392); c.lineTo(88, 357); c.lineTo(60, 374); c.lineTo(80, 345);
+      c.bezierCurveTo(100, 290, 150, 255, 182, 235);
+      c.bezierCurveTo(180, 170, 210, 100, 300, 100);
+      c.closePath();
+    }
+    const peau = c.createRadialGradient(300, 180, 10, 300, 260, 330);
+    peau.addColorStop(0, '#ffffff'); peau.addColorStop(0.35, '#e8f7ff'); peau.addColorStop(0.7, 'rgba(180,226,250,.95)'); peau.addColorStop(1, 'rgba(120,185,235,.6)');
+    // halo froid tout autour
+    c.save(); c.shadowColor = '#7fd3ff'; c.shadowBlur = flou(60); c.fillStyle = peau; corps(); c.fill(); c.restore();
+    c.fillStyle = peau; corps(); c.fill();
+    c.save(); corps(); c.clip();
+    // côté gauche réchauffé par la bougie, côté droit dans l'ombre bleutée
+    g = c.createRadialGradient(130, 520, 20, 130, 520, 330);
+    g.addColorStop(0, 'rgba(255,170,90,.55)'); g.addColorStop(1, 'rgba(255,170,90,0)');
+    c.fillStyle = g; c.fillRect(0, 0, 600, 600);
+    g = c.createLinearGradient(330, 0, 540, 0);
+    g.addColorStop(0, 'rgba(60,90,160,0)'); g.addColorStop(1, 'rgba(60,90,160,.4)');
+    c.fillStyle = g; c.fillRect(0, 0, 600, 600);
+    // volutes de brume dans le corps
+    c.strokeStyle = 'rgba(120,180,230,.35)'; c.lineWidth = 5;
+    for (let i = 0; i < 4; i++) {
+      c.beginPath(); c.moveTo(250 + i * 12, 330 + i * 30); c.bezierCurveTo(300, 320 + i * 30, 330, 360 + i * 28, 360 - i * 14, 350 + i * 34); c.stroke();
+    }
+    c.restore();
+    // contour clair
+    c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 2.5; corps(); c.stroke();
+    // Yeux creux, sourcils froncés (le haut intérieur de chaque œil est rogné)
+    c.fillStyle = '#0a0612';
+    c.beginPath(); c.ellipse(254, 205, 26, 36, 0.2, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(346, 205, 26, 36, -0.2, 0, Math.PI * 2); c.fill();
+    c.fillStyle = peau;
+    c.beginPath(); c.moveTo(214, 146); c.lineTo(300, 146); c.lineTo(300, 210); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(386, 146); c.lineTo(300, 146); c.lineTo(300, 210); c.closePath(); c.fill();
+    // Orbites creusées autour des yeux
+    [254, 346].forEach((x) => {
+      g = c.createRadialGradient(x, 210, 20, x, 210, 62);
+      g.addColorStop(0, 'rgba(50,40,90,.5)'); g.addColorStop(1, 'rgba(50,40,90,0)');
+      c.fillStyle = g; c.beginPath(); c.arc(x, 210, 62, 0, Math.PI * 2); c.fill();
+    });
+    // Pupilles rouges, qui fixent la planchette
+    c.fillStyle = '#ff3b4e'; c.shadowColor = '#ff2a40'; c.shadowBlur = flou(22);
+    c.beginPath(); c.arc(262, 222, 10, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(338, 222, 10, 0, Math.PI * 2); c.fill();
+    c.shadowBlur = 0; c.fillStyle = '#ffe0e4';
+    c.beginPath(); c.arc(259, 218, 3, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(335, 218, 3, 0, Math.PI * 2); c.fill();
+    // Bouche ouverte qui hurle, crocs pâles en haut et en bas
+    c.fillStyle = '#0a0612';
+    c.beginPath(); c.moveTo(300, 256); c.bezierCurveTo(338, 256, 344, 306, 328, 334); c.bezierCurveTo(316, 352, 284, 352, 272, 334); c.bezierCurveTo(256, 306, 262, 256, 300, 256); c.fill();
+    g = c.createRadialGradient(300, 318, 2, 300, 318, 30);
+    g.addColorStop(0, 'rgba(110,190,240,.5)'); g.addColorStop(1, 'rgba(110,190,240,0)');
+    c.fillStyle = g; c.fill();
+    c.fillStyle = '#e8f7ff';
+    [[282, 262, 9, 1], [300, 257, 10, 1], [318, 262, 9, 1], [289, 346, 8, -1], [311, 346, 8, -1]].forEach(([x, y, l, s]) => {
+      c.beginPath(); c.moveTo(x - l * 0.5, y); c.lineTo(x + l * 0.5, y); c.lineTo(x, y + s * l * 1.5); c.closePath(); c.fill();
+    });
+
+    // --- La planchette, et le rayon de lumière qui sort de sa lentille
+    planchetteCanvas(c, 300, 548, 64);
+    c.save(); c.globalCompositeOperation = 'lighter';
+    g = c.createLinearGradient(0, 535, 0, 400);
+    g.addColorStop(0, 'rgba(210,245,255,.85)'); g.addColorStop(1, 'rgba(150,220,255,0)');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(286, 535); c.lineTo(314, 535); c.lineTo(352, 400); c.lineTo(248, 400); c.closePath(); c.fill();
+    g = c.createRadialGradient(300, 535, 2, 300, 535, 46);
+    g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(0.4, 'rgba(170,230,255,.6)'); g.addColorStop(1, 'rgba(170,230,255,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(300, 535, 46, 0, Math.PI * 2); c.fill();
+    c.restore();
+
+    // --- Les tuiles qui volent autour du spectre (la maudite, rouge, en dernier)
+    VOLANTES.forEach(([x, y, lw, rot, st, type]) => tuile(x, y, lw, rot, st, type));
+
+    // --- Bougies : une grande à gauche (source de lumière), une petite au fond à droite
+    bougieCanvas(c, 512, 498, 13, 0);
+    c.save(); c.globalCompositeOperation = 'lighter';
+    g = c.createRadialGradient(130, 520, 5, 130, 520, 170);
+    g.addColorStop(0, 'rgba(255,200,110,.7)'); g.addColorStop(1, 'rgba(255,140,40,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(130, 520, 170, 0, Math.PI * 2); c.fill();
+    c.restore();
+    bougieCanvas(c, 130, 610, 30, 0);
+    // fumée
+    c.strokeStyle = 'rgba(220,230,255,.18)'; c.lineWidth = 2.5;
+    for (let i = 0; i < 2; i++) { c.beginPath(); c.moveTo(130, 520); c.bezierCurveTo(110 + i * 30, 470, 160 - i * 40, 420, 120 + i * 20, 360); c.stroke(); }
+
+    // --- Poussière de lumière autour du spectre
+    for (let i = 0; i < 46; i++) {
+      const a = hasard() * Math.PI * 2, d = 170 + hasard() * 160;
+      const x = 300 + Math.cos(a) * d * 0.9, y = 300 + Math.sin(a) * d * 0.7, r = 1 + hasard() * 2.6;
+      c.fillStyle = hasard() < 0.25 ? 'rgba(255,190,110,.85)' : 'rgba(200,240,255,.8)';
+      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    }
+
+    // --- Premier plan : deux médiums encapuchonnés, vus de dos, coupés par les bords
+    function medium(tx, ty, e, bord) {
+      c.save(); c.translate(tx, ty); c.scale(e, e);
+      // capuche pointue (pointe un peu tombante), épaules larges
+      c.beginPath();
+      c.moveTo(26, 0); c.bezierCurveTo(18, 4, 11, 14, 11, 26); c.bezierCurveTo(4, 30, -2, 40, -4, 56);
+      c.lineTo(52, 56); c.bezierCurveTo(50, 40, 44, 30, 37, 26); c.bezierCurveTo(37, 15, 33, 6, 26, 0); c.closePath();
+      g = c.createLinearGradient(0, 6, 0, 52);
+      g.addColorStop(0, '#2a1626'); g.addColorStop(1, '#07030a');
+      c.fillStyle = g; c.fill();
+      c.shadowColor = bord; c.shadowBlur = flou(12 * e);
+      c.strokeStyle = bord; c.lineWidth = 1.1; c.stroke();
+      c.restore();
+    }
+    medium(-62, 612, 4.3, '#ffb347');
+    medium(466, 628, 4.1, '#c792ff');
+
+    // --- Vignette : bords assombris pour concentrer le regard
+    g = c.createRadialGradient(300, 330, 260, 300, 400, 560);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(5,2,8,.55)');
+    c.fillStyle = g; c.fillRect(X0, Y0, LW, LH);
+    c.restore();
+  }
+
+  function demarrerAffiche() {
+    ecran = 'affiche'; // ni titre ni jeu : l'écouteur de redimensionnement du jeu ne redessine rien
+    for (const el of document.querySelectorAll('.ecran, .voile, button, #toast, #spectre, #confettis, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
   //  Plateau de lettres et places
   // ---------------------------------------------------------------------
 
@@ -5153,11 +5413,15 @@
   construirePlateau();
   construirePlaces();
   majBoutonsSon();
-  try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  // Affiche du jeu (robot du site seulement) : la scène, sans écran titre, sans son ni boucle.
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else {
+    try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>
