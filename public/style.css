@@ -2863,7 +2863,8 @@ body.lanceur::after { animation: none; }
   z-index: 50;
   display: flex;
   flex-direction: column;
-  min-width: 180px;
+  min-width: 240px;
+  max-width: calc(100vw - 24px);
   padding: 6px;
   border: 1px solid var(--lisere);
   border-radius: var(--r-plaque);
@@ -2887,6 +2888,30 @@ body.lanceur::after { animation: none; }
 }
 
 .pastille-lien:hover, .pastille-lien:focus-visible { background: var(--surface-relevee); }
+.pastille-compte { margin-left: auto; padding-left: 12px; color: var(--craie-douce); font-size: 13px; font-variant-numeric: tabular-nums; }
+.pastille-compte:empty { display: none; }
+.pastille-separ { height: 1px; margin: 4px 8px; background: var(--lisere); }
+
+/* En tête du menu : avatar, pseudo, niveau et barre d'expérience (lien « Mon profil »). */
+.pastille-tete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+  padding: 10px 12px;
+  border-radius: var(--r-commande);
+  background: var(--surface-relevee);
+  color: var(--craie);
+  text-decoration: none;
+}
+.pastille-tete:hover, .pastille-tete:focus-visible { filter: brightness(1.12); }
+.pastille-tete-avatar { --trait-cadre: 5px; flex: none; width: 44px; height: 44px; margin: 4px; font-size: 26px; }
+.pastille-tete-texte { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.pastille-tete-titre { color: var(--lavande); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
+.pastille-tete-nom { font-size: 16px; overflow-wrap: anywhere; }
+.pastille-tete-niveau { color: var(--or); font-size: 13px; font-weight: 700; }
+.pastille-tete .profil-barre { height: 6px; margin-top: 4px; }
+.pastille-tete [hidden] { display: none; }
 
 /* Annonces (niveau, badge, jeu terminé) : en haut, au milieu, sans gêner les clics. */
 .profil-toasts {
@@ -3045,7 +3070,6 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 /* L'avatar et, dessous, « Changer mon avatar » (mène au choix des avatars). */
 .profil-avatar-bloc { display: flex; flex: none; flex-direction: column; align-items: center; gap: 10px; max-width: 150px; }
 .profil-changer-avatar { min-height: 44px; padding: 6px 12px; font-size: 14px; line-height: 1.2; text-align: center; }
-#titre-apparence { scroll-margin-top: 16px; }
 @media (min-width: 720px) { .profil-avatar-bloc { max-width: none; } }
 
 .profil-identite { flex: 1 1 220px; min-width: 0; }
@@ -3069,6 +3093,81 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 .profil-bloc { margin: 24px 0; }
 .profil-bloc h2 { margin: 0 0 8px; }
 .profil-bloc h3 { margin: 14px 0 8px; font-size: 16px; }
+
+/* Trois chiffres sous la carte du profil : série, étoiles, jeux terminés. */
+.profil-chiffres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.profil-chiffre {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 6px;
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-commande);
+  background: var(--verre);
+  text-align: center;
+}
+.profil-chiffre strong { font-family: var(--police-titre); font-size: 24px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.profil-chiffre span { font-size: 13px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.profil-chiffre small { color: var(--craie-douce); font-size: 12px; line-height: 1.25; overflow-wrap: anywhere; }
+.profil-chiffre .profil-barre { align-self: stretch; height: 6px; margin: 4px 6px 0; }
+.profil-serie-prochain { margin: 8px 0 0; text-align: center; }
+.profil-serie-prochain:empty { display: none; }
+
+/* Blocs qui se déplient (<details>) : la ligne fermée montre le titre et un résumé. */
+.profil-pli {
+  margin: 10px 0;
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-plaque);
+  background: var(--verre);
+  box-shadow: var(--reflet);
+  scroll-margin-top: 16px;
+}
+.profil-chiffres + .profil-pli, .profil-serie-prochain + .profil-pli { margin-top: 16px; }
+.profil-pli > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px 12px;
+  min-height: 56px;
+  padding: 8px 16px;
+  border-radius: var(--r-plaque);
+  list-style: none;
+  cursor: pointer;
+}
+.profil-pli > summary::-webkit-details-marker { display: none; }
+/* Chevron dessiné : vers le bas fermé, vers le haut ouvert. */
+.profil-pli > summary::after {
+  content: "";
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin: 0 4px 4px 0;
+  border-right: 2px solid var(--lavande);
+  border-bottom: 2px solid var(--lavande);
+  transform: rotate(45deg);
+  transition: transform .2s ease;
+}
+.profil-pli[open] > summary::after { margin: 4px 4px 0 0; transform: rotate(225deg); }
+.profil-pli > summary h2 { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 17px; }
+.profil-pli-resume { flex: none; max-width: 50%; color: var(--craie-douce); font-size: 14px; font-weight: 700; text-align: right; }
+.profil-pli-resume:empty { display: none; }
+.profil-pli-dedans { padding: 0 16px 16px; }
+.profil-pli-dedans > :first-child { margin-top: 0; }
+.profil-pli-dedans h3 { margin: 14px 0 8px; font-size: 16px; }
+@media (hover: hover) {
+  .profil-pli > summary:hover { background: var(--surface-relevee); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .profil-pli > summary::after { transition: none; }
+}
+
+/* Filtres de « Mes jeux » : Tous, En cours, Terminés. */
+.profil-filtres { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 4px; }
+.profil-filtres[hidden], #profil-jeux-plus[hidden] { display: none; }
+.profil-filtres .bouton { min-height: 44px; padding: 0 14px; font-size: 14px; }
+.profil-filtres .bouton[aria-pressed="true"] { border-color: var(--lavande); background: var(--lavande); color: var(--nuit); }
+#profil-jeux-plus { margin-top: 12px; }
 
 .profil-ligne { display: flex; flex-wrap: wrap; gap: 8px; }
 .profil-ligne input {
@@ -3113,7 +3212,9 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
   .profil-rejouer { grid-column: 2; justify-self: start; }
 }
 
-.profil-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.profil-badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+/* Les listes de la page « legal » ont un retrait à gauche : pas dans les blocs du profil. */
+.profil .profil-jeux, .profil .profil-badges, .profil .profil-choix, .profil .profil-trophees-liste { padding-left: 0; }
 
 .profil-badge {
   display: flex;

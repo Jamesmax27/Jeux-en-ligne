@@ -3,12 +3,15 @@
 //
 // Affiche le profil gardé sur l'appareil (copie de la base, profil.js) puis
 // le relit : avatar, pseudo (modifiable), niveau et expérience, rang de la
-// semaine, série de jours consécutifs, étoiles, jeux joués (derniers d'abord,
-// avec temps passé, étoiles, check vert et bouton « Rejouer »), trophées
-// (podiums du classement général : docs/cadrage-fidelisation.md, 14.9), badges,
-// parties en ligne, amis (nombre, rang parmi eux cette semaine, mode
-// invisible : docs/consigne-amis.md), choix de l'avatar et du cadre, code de
+// semaine ; trois chiffres (série de jours consécutifs, étoiles, jeux terminés) ;
+// puis des blocs qui se déplient, chacun avec son résumé sur la ligne fermée
+// (docs/cadrage-fidelisation.md, 14.12) : jeux joués (ouvert par défaut ; derniers
+// d'abord, filtres Tous / En cours / Terminés, temps passé, étoiles, check vert,
+// « Continuer » ou « Rejouer »), badges, trophées (podiums du classement général :
+// 14.9), parties en ligne, choix de l'avatar et du cadre, amis (nombre, rang
+// parmi eux cette semaine, mode invisible : docs/consigne-amis.md), code de
 // sauvegarde (afficher, copier, ou relier cet appareil à un autre profil).
+// Une adresse en #bloc-<nom> (menu de la pastille, page Amis) ouvre ce bloc.
 // Page générée par scripts/pages-seo.mjs (gabarits/profil.html), non indexée.
 // ==========================================================================
 
@@ -27,12 +30,16 @@ const $ = (id) => document.getElementById(id);
 let catalogue = new Map();
 let tousLesTrophees = false;   // « Voir plus » touché : toute la liste des trophées
 const TROPHEES_VISIBLES = 10;  // trophées listés avant « Voir plus »
+const JEUX_VISIBLES = 6;       // jeux listés avant « Voir tous mes jeux »
+let filtreJeux = 'tous';       // « tous », « enCours » ou « termines »
+let tousLesJeux = false;       // « Voir tous mes jeux » touché
 const MEDAILLE = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
 // Vitrine des trophées : par période (semaines, mois), le nombre de 1res, 2es et 3es places,
 // puis la liste des périodes, plus récentes d'abord.
 function afficherTrophees(e) {
   const trophees = Array.isArray(e.trophees) ? e.trophees : [];
+  $('resume-trophees').textContent = t('profil.pli.trophees', { n: trophees.length });
   $('profil-trophees-resume').textContent = trophees.length ? t('profil.trophees.resume', { n: trophees.length }) : t('profil.trophees.vide');
   const vitrine = $('profil-trophees');
   vitrine.textContent = '';
@@ -122,27 +129,45 @@ function afficher() {
     $('profil-xp').textContent = t('profil.xpMax', { xp: e.xp });
   }
 
-  // Série de jours consécutifs.
+  // Trois chiffres : série de jours consécutifs, étoiles, jeux terminés.
   const palier = R.PALIERS_SERIE.find((p) => p > e.serie);
-  $('profil-serie').textContent = [
-    t('profil.serie.actuelle', { n: e.serie }),
-    t('profil.serie.record', { n: e.serieRecord }),
-    palier ? t('profil.serie.prochain', { n: palier }) : '',
-  ].filter(Boolean).join(' ');
+  $('profil-serie-n').textContent = String(e.serie);
+  $('profil-serie-libelle').textContent = t('profil.chiffre.serie', { n: e.serie });
+  $('profil-serie-record').textContent = t('profil.chiffre.record', { n: e.serieRecord });
+  $('profil-serie-prochain').textContent = palier ? t('profil.serie.prochain', { n: palier }) : '';
 
   // Étoiles : total des jeux terminés qui ont des étoiles.
   const avecEtoiles = e.jeux.filter((j) => j.termine && j.max);
   const gagnees = avecEtoiles.reduce((s, j) => s + (j.etoiles || 0), 0);
   const possibles = avecEtoiles.reduce((s, j) => s + j.max, 0);
-  $('profil-etoiles-texte').textContent = possibles ? t('profil.etoiles.total', { n: gagnees, max: possibles }) : t('profil.etoiles.aucune');
+  $('profil-etoiles-n').textContent = String(gagnees);
+  $('profil-etoiles-libelle').textContent = t('profil.chiffre.etoiles', { n: gagnees });
+  $('profil-etoiles-sur').textContent = possibles ? t('profil.chiffre.etoilesSur', { max: possibles }) : '';
   barre($('profil-barre-etoiles'), gagnees, possibles);
-  $('profil-barre-etoiles').setAttribute('aria-label', t('profil.etoiles.titre'));
+  $('profil-barre-etoiles').setAttribute('aria-label', possibles ? t('profil.etoiles.total', { n: gagnees, max: possibles }) : t('profil.etoiles.aucune'));
 
-  // Jeux joués, derniers d'abord.
+  const termines = e.jeux.filter((j) => j.termine).length;
+  $('profil-termines-n').textContent = String(termines);
+  $('profil-termines-libelle').textContent = t('profil.chiffre.termines', { n: termines });
+  $('profil-termines-joues').textContent = t('profil.chiffre.joues', { n: e.jeux.length });
+
+  // Jeux joués, derniers d'abord, selon le filtre choisi ; les premiers seulement
+  // jusqu'à « Voir tous mes jeux ».
+  $('resume-jeux').textContent = t('profil.pli.jeux', { n: e.jeux.length });
+  const filtres = $('profil-jeux-filtres');
+  filtres.hidden = e.jeux.length === 0;
+  for (const b of filtres.querySelectorAll('button')) b.setAttribute('aria-pressed', String(b.dataset.filtre === filtreJeux));
+  const choisis = e.jeux.filter((j) => (filtreJeux === 'enCours' ? !j.termine : filtreJeux === 'termines' ? !!j.termine : true));
+  const montres = tousLesJeux ? choisis : choisis.slice(0, JEUX_VISIBLES);
+  const plus = $('profil-jeux-plus');
+  plus.hidden = montres.length >= choisis.length;
+  plus.textContent = t('profil.jeux.plus', { n: choisis.length });
   const liste = $('profil-jeux');
   liste.textContent = '';
-  $('profil-jeux-vide').hidden = e.jeux.length > 0;
-  for (const j of e.jeux) {
+  const vide = $('profil-jeux-vide');
+  vide.hidden = choisis.length > 0;
+  vide.textContent = t(e.jeux.length ? 'profil.jeux.videFiltre' : 'profil.jeux.vide');
+  for (const j of montres) {
     const fiche = catalogue.get(j.id);
     const li = document.createElement('li');
     li.className = 'profil-jeu';
@@ -179,10 +204,10 @@ function afficher() {
       texte.append(badge);
     }
     const rejouer = document.createElement('a');
-    rejouer.className = 'bouton profil-rejouer';
+    rejouer.className = `bouton profil-rejouer${j.termine ? ' bouton-secondaire' : ''}`;
     rejouer.href = urlLanceur(j.id, langue());
-    rejouer.textContent = t('profil.jeux.rejouer');
-    rejouer.setAttribute('aria-label', t('profil.jeux.rejouerAria', { titre: titre(fiche, j.id) }));
+    rejouer.textContent = t(j.termine ? 'profil.jeux.rejouer' : 'profil.jeux.continuer');
+    rejouer.setAttribute('aria-label', t(j.termine ? 'profil.jeux.rejouerAria' : 'profil.jeux.continuerAria', { titre: titre(fiche, j.id) }));
     li.append(lien, texte, rejouer);
     liste.append(li);
   }
@@ -193,9 +218,11 @@ function afficher() {
   // Badges : rares (débloqués en couleur, les autres grisés avec leur condition).
   const listeBadges = $('profil-badges');
   listeBadges.textContent = '';
-  const termines = e.jeux.filter((j) => j.termine).length;
+  const rares = R.listeBadges();
+  $('resume-badges').textContent = t('profil.pli.badges', { n: rares.filter((b) => badges.has(b.id)).length, max: rares.length });
   $('profil-badges-resume').textContent = t('profil.badges.resume', { n: e.badges.length, termines });
-  for (const b of R.listeBadges()) {
+  // Badges gagnés d'abord, puis ceux qui restent (même ordre que les réglages).
+  for (const b of [...rares.filter((x) => badges.has(x.id)), ...rares.filter((x) => !badges.has(x.id))]) {
     const li = document.createElement('li');
     const obtenu = badges.has(b.id);
     li.className = `profil-badge famille-${b.famille}${obtenu ? ' obtenu' : ''}`;
@@ -209,15 +236,18 @@ function afficher() {
   // Amis : nombre, mode invisible (le rang parmi les amis : afficherRangAmis).
   const amis = e.amis || { amis: 0, recues: 0, invisible: false };
   $('profil-amis-compte').textContent = t('profil.amis.compte', { n: amis.amis });
+  $('resume-amis').textContent = t('profil.pli.amis', { n: amis.amis });
   $('profil-invisible').checked = amis.invisible;
 
   // Parties en ligne.
   $('profil-multi').textContent = e.multi.parties
     ? t('profil.multi.resume', { n: e.multi.parties, v: e.multi.victoires, h: e.multi.humains })
     : t('profil.multi.aucune');
+  $('resume-multi').textContent = t('profil.pli.multi', { n: e.multi.victoires || 0 });
 
   // Prochain avatar à débloquer par le niveau : silhouette, niveau, distance.
   const prochain = R.AVATARS.find((a) => !a.badge && a.niveau > e.niveau);
+  $('resume-apparence').textContent = prochain ? t('profil.pli.apparence', { n: prochain.niveau }) : '';
   $('profil-prochain').hidden = !prochain;
   if (prochain) {
     const image = $('profil-prochain-avatar');
@@ -313,18 +343,46 @@ function brancherInvisible() {
   });
 }
 
-// « Changer mon avatar » : défile en douceur jusqu'au choix des avatars (sans
-// JavaScript, le lien y mène quand même).
-function brancherChangerAvatar() {
-  $('profil-changer-avatar').addEventListener('click', (ev) => {
-    const cible = $('titre-apparence');
-    if (!cible) return;
-    ev.preventDefault();
-    const doux = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    cible.scrollIntoView({ behavior: doux ? 'smooth' : 'auto', block: 'start' });
-    cible.setAttribute('tabindex', '-1');
-    cible.focus({ preventScroll: true });
+// Ouvre un bloc dépliable et y défile en douceur : adresse en #bloc-<nom> (menu de
+// la pastille : « Mes jeux », « Mes badges », « Changer mon avatar », « Sauvegarder
+// mon profil » ; page Amis), aussi quand l'adresse change sur cette page même, et
+// bouton « Changer mon avatar » de la carte. Sans JavaScript, le lien mène au bloc fermé.
+function ouvrirBloc(id, doux = true) {
+  const bloc = document.getElementById(id);
+  if (!bloc || bloc.tagName !== 'DETAILS') return false;
+  bloc.open = true;
+  const resume = bloc.querySelector('summary');
+  const sansMouvement = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  bloc.scrollIntoView({ behavior: doux && !sansMouvement ? 'smooth' : 'auto', block: 'start' });
+  resume?.focus({ preventScroll: true });
+  return true;
+}
+
+function brancherBlocs() {
+  const depuisAdresse = (doux) => {
+    const id = decodeURIComponent(location.hash.slice(1));
+    if (id) ouvrirBloc(id, doux);
+  };
+  window.addEventListener('hashchange', () => depuisAdresse(true));
+  // Lien vers le bloc déjà visé par l'adresse : pas de « hashchange », on ouvre quand même.
+  document.addEventListener('click', (ev) => {
+    const lien = ev.target.closest?.('a[href*="#bloc-"]');
+    if (!lien || lien.pathname !== location.pathname) return;
+    const id = lien.hash.slice(1);
+    if (lien.hash === location.hash && ouvrirBloc(id)) ev.preventDefault();
   });
+  depuisAdresse(false);
+}
+
+function brancherFiltresJeux() {
+  for (const b of $('profil-jeux-filtres').querySelectorAll('button')) {
+    b.addEventListener('click', () => {
+      filtreJeux = b.dataset.filtre;
+      tousLesJeux = false;
+      afficher();
+    });
+  }
+  $('profil-jeux-plus').addEventListener('click', () => { tousLesJeux = true; afficher(); });
 }
 
 // --- Pseudo ------------------------------------------------------------------------------
@@ -422,10 +480,11 @@ async function demarrer() {
     catalogue = new Map((c.games || []).map((j) => [j.id, j]));
   } catch { /* hors connexion : identifiants à la place des titres */ }
   brancherPseudo();
-  brancherChangerAvatar();
+  brancherFiltresJeux();
   brancherCode();
   brancherInvisible();
   afficher();
+  brancherBlocs();
   surChangement(() => afficher());
   await rafraichir();
   afficher();
