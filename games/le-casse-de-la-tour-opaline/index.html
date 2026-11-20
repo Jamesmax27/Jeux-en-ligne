@@ -5716,6 +5716,414 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  //  Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) :
+  //  une scène composée, sans interface ni texte, d'où sort la jaquette
+  //  (CONSIGNES-JEU.md, section 5). Renarde, en grand, se faufile dans un
+  //  bureau de la Tour Opaline, un diamant à la main et le sac plein ; la
+  //  lampe d'un garde balaie le parquet juste à côté d'elle, les lasers et la
+  //  caméra veillent, les trois rivaux guettent ; derrière la baie vitrée, la
+  //  couronne d'opale de la tour brille sous la lune.
+  // ---------------------------------------------------------------------
+
+  let modeAffiche = false;
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (!w || !h) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Cadre de 600 × 800 au centre ; le décor continue jusqu'aux bords sur un écran large.
+    const k = Math.min(w / 600, h / 800);
+    const X = (u) => w / 2 + (u - 300) * k, Y = (v) => h / 2 + (v - 400) * k;
+    const gauche = -(w / 2) / k + 300, droite = (w / 2) / k + 300; // bords de l'écran, en unités du cadre
+    const t = 1800;
+
+    // --- Mur du bureau ---
+    let g = c.createLinearGradient(0, Y(0), 0, Y(800));
+    g.addColorStop(0, '#2a1d52'); g.addColorStop(0.55, '#33245e'); g.addColorStop(1, '#1a1236');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+
+    // --- Grande baie vitrée : ciel, lune, ville, la Tour Opaline ---
+    const fh = Y(36), fb = Y(440);
+    g = c.createLinearGradient(0, fh, 0, fb);
+    g.addColorStop(0, '#1b2766'); g.addColorStop(0.5, '#3d3590'); g.addColorStop(0.85, '#8a4f9e'); g.addColorStop(1, '#d0709a');
+    c.fillStyle = g; c.fillRect(0, fh, w, fb - fh);
+    const al = graineHasard(19);
+    for (let i = 0; i < 160; i++) {
+      const x = al() * w, y = fh + al() * (fb - fh) * 0.6, r = (al() * 1.4 + 0.4) * k;
+      c.fillStyle = 'rgba(255,255,255,' + (0.35 + al() * 0.6).toFixed(2) + ')'; rond(c, x, y, r); c.fill();
+    }
+    // lune et son halo
+    const lx = X(262), ly = Y(112), lr = 40 * k;
+    g = c.createRadialGradient(lx, ly, lr * 0.5, lx, ly, lr * 3.4);
+    g.addColorStop(0, 'rgba(255,246,220,.55)'); g.addColorStop(1, 'rgba(255,246,220,0)');
+    c.fillStyle = g; rond(c, lx, ly, lr * 3.4); c.fill();
+    c.fillStyle = '#fbf3dc'; rond(c, lx, ly, lr); c.fill();
+    c.fillStyle = '#e4d8b6'; rond(c, lx - lr * 0.32, ly - lr * 0.18, lr * 0.2); c.fill(); rond(c, lx + lr * 0.3, ly + lr * 0.28, lr * 0.14); c.fill(); rond(c, lx + lr * 0.1, ly - lr * 0.45, lr * 0.09); c.fill();
+    // faisceaux des projecteurs de la ville
+    c.save(); c.globalCompositeOperation = 'lighter';
+    [[X(250), -0.28], [X(560), 0.3]].forEach((p) => {
+      c.save(); c.translate(p[0], fb); c.rotate(p[1]);
+      const gr = c.createLinearGradient(0, 0, 0, -(fb - fh));
+      gr.addColorStop(0, 'rgba(190,200,255,.3)'); gr.addColorStop(1, 'rgba(190,200,255,0)');
+      c.fillStyle = gr; c.beginPath(); c.moveTo(-5 * k, 0); c.lineTo(5 * k, 0); c.lineTo(60 * k, -(fb - fh)); c.lineTo(-60 * k, -(fb - fh)); c.closePath(); c.fill();
+      c.restore();
+    });
+    c.restore();
+    // ville au loin (deux rangées)
+    const al2 = graineHasard(31);
+    for (let x = X(gauche) - 20; x < w; x += (14 + al2() * 26) * k) immeuble(c, x, fb, (20 + al2() * 36) * k, (70 + al2() * 120) * k, '#2a2160', al2, true);
+    const al3 = graineHasard(57);
+    for (let x = X(gauche) - 30; x < w; x += (30 + al3() * 40) * k) immeuble(c, x, fb, (34 + al3() * 44) * k, (30 + al3() * 70) * k, '#1a1442', al3, true);
+    // la Tour Opaline et sa couronne irisée
+    const tx = X(408), tl = 112 * k, ty = Y(170);
+    g = c.createLinearGradient(tx, 0, tx + tl, 0);
+    g.addColorStop(0, '#221d5a'); g.addColorStop(0.5, '#3a3485'); g.addColorStop(1, '#1a1648');
+    c.fillStyle = g; c.beginPath(); c.moveTo(tx + tl * 0.12, ty); c.lineTo(tx + tl * 0.88, ty); c.lineTo(tx + tl, fb); c.lineTo(tx, fb); c.closePath(); c.fill();
+    const al4 = graineHasard(5);
+    for (let yy = ty + tl * 0.18; yy < fb - 6 * k; yy += tl * 0.1) {
+      const q = (yy - ty) / (fb - ty), x1 = tx + tl * 0.12 * (1 - q) + 5 * k, x2 = tx + tl - tl * 0.12 * (1 - q) - 5 * k;
+      for (let xx = x1; xx < x2 - 6 * k; xx += tl * 0.11) if (al4() < 0.45) { c.fillStyle = al4() < 0.45 ? '#ffe9a8' : '#6a74c8'; c.fillRect(xx, yy, tl * 0.055, tl * 0.05); }
+    }
+    g = c.createLinearGradient(tx, ty - tl * 0.8, tx + tl, ty);
+    g.addColorStop(0, '#ffd6f0'); g.addColorStop(0.35, '#b8f0ff'); g.addColorStop(0.7, '#d9c8ff'); g.addColorStop(1, '#fff3c8');
+    c.save(); c.shadowColor = '#bfe8ff'; c.shadowBlur = 40 * k;
+    c.fillStyle = g; c.beginPath(); c.moveTo(tx + tl * 0.12, ty); c.lineTo(tx + tl * 0.5, ty - tl * 0.85); c.lineTo(tx + tl * 0.88, ty); c.closePath(); c.fill();
+    c.restore();
+    c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.moveTo(tx + tl * 0.5, ty - tl * 0.85); c.lineTo(tx + tl * 0.57, ty); c.lineTo(tx + tl * 0.45, ty); c.closePath(); c.fill();
+    c.fillStyle = '#ff4a5a'; rond(c, tx + tl * 0.5, ty - tl * 0.9, 3.5 * k); c.fill();
+    // montants et traverse de la baie (cadre sombre)
+    c.fillStyle = '#120c26';
+    c.fillRect(0, fh - 10 * k, w, 12 * k);
+    c.fillRect(0, Y(250) - 4 * k, w, 8 * k);
+    for (let u = 0 - 600 * Math.ceil((300 - gauche) / 600); u < droite + 200; u += 200) c.fillRect(X(u) - 5 * k, fh, 10 * k, fb - fh);
+    c.fillRect(0, fb - 3 * k, w, 14 * k);
+    // reflets sur la vitre
+    c.save(); c.globalCompositeOperation = 'lighter'; c.fillStyle = 'rgba(200,210,255,.06)';
+    for (let u = 20 - 600 * Math.ceil((300 - gauche) / 600); u < droite + 200; u += 200) { c.beginPath(); c.moveTo(X(u), fb); c.lineTo(X(u + 50), fb); c.lineTo(X(u + 130), fh); c.lineTo(X(u + 80), fh); c.closePath(); c.fill(); }
+    c.restore();
+
+    // --- Plinthe et sol en perspective ---
+    c.fillStyle = '#211744'; c.fillRect(0, fb + 11 * k, w, Y(470) - fb - 11 * k);
+    c.fillStyle = '#4a3a86'; c.fillRect(0, Y(468), w, 3 * k);
+    const sol0 = Y(470);
+    g = c.createLinearGradient(0, sol0, 0, h);
+    g.addColorStop(0, '#2f2a62'); g.addColorStop(0.5, '#3a3474'); g.addColorStop(1, '#241f4c');
+    c.fillStyle = g; c.fillRect(0, sol0, w, h - sol0);
+    // damier du sol (comme les cases du jeu), fuyant vers la baie
+    const fuite = { x: X(300), y: Y(250) };
+    const lignes = [470, 484, 501, 522, 548, 580, 620, 670, 734, 815, 920];
+    for (let a = 0; a < lignes.length - 1; a++) {
+      for (let b = -40; b < 40; b++) {
+        if ((a + b) % 2 === 0) continue;
+        const pt = (v, u) => { const q = (Y(v) - fuite.y) / (Y(800) - fuite.y); return [fuite.x + (X(u) - fuite.x) * q, Y(v)]; };
+        const p1 = pt(lignes[a], b * 90), p2 = pt(lignes[a], (b + 1) * 90), p3 = pt(lignes[a + 1], (b + 1) * 90), p4 = pt(lignes[a + 1], b * 90);
+        c.fillStyle = 'rgba(120,110,200,.13)'; c.beginPath(); c.moveTo(p1[0], p1[1]); c.lineTo(p2[0], p2[1]); c.lineTo(p3[0], p3[1]); c.lineTo(p4[0], p4[1]); c.closePath(); c.fill();
+      }
+    }
+    // clair de lune qui tombe de la baie sur le sol
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (let u = 0 - 600 * Math.ceil((300 - gauche) / 600); u < droite + 200; u += 200) {
+      c.fillStyle = 'rgba(150,160,255,.1)';
+      c.beginPath(); c.moveTo(X(u + 12), sol0); c.lineTo(X(u + 188), sol0); c.lineTo(X(u + 150), Y(560)); c.lineTo(X(u - 40), Y(560)); c.closePath(); c.fill();
+    }
+    c.restore();
+
+    // --- Caméra au plafond (en haut à gauche) et son champ rouge ---
+    c.save(); c.globalCompositeOperation = 'lighter';
+    g = c.createLinearGradient(X(70), Y(70), X(150), Y(470));
+    g.addColorStop(0, 'rgba(255,60,70,.32)'); g.addColorStop(1, 'rgba(255,60,70,.05)');
+    c.fillStyle = g; c.beginPath(); c.moveTo(X(78), Y(62)); c.lineTo(X(20), Y(520)); c.lineTo(X(190), Y(520)); c.closePath(); c.fill();
+    c.restore();
+    c.fillStyle = '#1a1530'; c.fillRect(X(56), Y(8), 8 * k, 40 * k);
+    c.save(); c.translate(X(64), Y(56)); c.rotate(1.15);
+    c.fillStyle = '#c9ced9'; rr(c, -12 * k, -15 * k, 48 * k, 30 * k, 7 * k); c.fill();
+    c.fillStyle = '#8a90a6'; c.fillRect(-12 * k, 6 * k, 48 * k, 9 * k);
+    c.fillStyle = '#10131c'; rond(c, 38 * k, 0, 11 * k); c.fill();
+    c.fillStyle = 'rgba(120,180,255,.9)'; rond(c, 40 * k, -3 * k, 3.5 * k); c.fill();
+    c.restore();
+    c.save(); c.shadowColor = '#ff2a2a'; c.shadowBlur = 14 * k; c.fillStyle = '#ff3a2a'; rond(c, X(52), Y(46), 5 * k); c.fill(); c.restore();
+
+    // --- Les lasers (rouges, au ras du sol, au fond) ---
+    [[492, 497], [512, 520]].forEach((p) => {
+      c.save(); c.globalCompositeOperation = 'lighter';
+      c.strokeStyle = 'rgba(255,40,40,.35)'; c.lineWidth = 9 * k; c.beginPath(); c.moveTo(0, Y(p[0])); c.lineTo(w, Y(p[1])); c.stroke();
+      c.restore();
+      c.strokeStyle = '#ff6a5a'; c.lineWidth = 2.4 * k; c.beginPath(); c.moveTo(0, Y(p[0])); c.lineTo(w, Y(p[1])); c.stroke();
+    });
+
+    // --- Sortie (pictogramme vert du jeu, sans lettre) à gauche ---
+    c.save(); c.shadowColor = '#3cdc8c'; c.shadowBlur = 26 * k;
+    c.fillStyle = '#1d6b45'; rr(c, X(14), Y(380), 46 * k, 62 * k, 6 * k); c.fill();
+    c.restore();
+    c.fillStyle = '#7dffb8'; c.beginPath(); c.moveTo(X(37), Y(390)); c.lineTo(X(52), Y(410)); c.lineTo(X(22), Y(410)); c.closePath(); c.fill();
+    c.fillRect(X(32), Y(410), 10 * k, 20 * k);
+
+    // --- Chevalet avec un tableau, et Vipère cachée derrière ---
+    jeton(c, 2, X(118), Y(456), 27 * k, 0);
+    c.strokeStyle = '#5a3a24'; c.lineWidth = 6 * k; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(X(70), Y(530)); c.lineTo(X(95), Y(380)); c.moveTo(X(130), Y(530)); c.lineTo(X(103), Y(380)); c.moveTo(X(99), Y(400)); c.lineTo(X(118), Y(530)); c.stroke();
+    butin(c, 2, X(99), Y(418), 62 * k, t);
+
+    // --- Lynx, suspendu à sa corde devant la vitre ---
+    c.strokeStyle = '#e6dcc2'; c.lineWidth = 2 * k; c.beginPath(); c.moveTo(X(566), Y(0)); c.lineTo(X(566), Y(150)); c.stroke();
+    jeton(c, 3, X(566), Y(178), 28 * k, 0);
+    sacDessin(c, X(590), Y(196), 20 * k);
+
+    // --- Le garde et sa lampe ---
+    const gx = X(478), gy = Y(330);
+    // halo de la lampe sur le garde
+    g = c.createRadialGradient(X(420), Y(440), 4 * k, X(420), Y(440), 150 * k);
+    g.addColorStop(0, 'rgba(255,236,170,.45)'); g.addColorStop(1, 'rgba(255,236,170,0)');
+    c.fillStyle = g; rond(c, X(420), Y(440), 150 * k); c.fill();
+    // le faisceau de la lampe : il balaie le parquet juste derrière Renarde
+    const lp = [gx - 68 * k, gy + 126 * k];
+    c.save(); c.globalCompositeOperation = 'lighter';
+    g = c.createLinearGradient(lp[0], lp[1], X(380), Y(800));
+    g.addColorStop(0, 'rgba(255,240,180,.8)'); g.addColorStop(0.5, 'rgba(255,230,150,.34)'); g.addColorStop(1, 'rgba(255,220,130,.16)');
+    c.fillStyle = g; c.beginPath(); c.moveTo(lp[0] - 7 * k, lp[1]); c.lineTo(X(282), Y(820)); c.lineTo(X(486), Y(820)); c.lineTo(lp[0] + 7 * k, lp[1]); c.closePath(); c.fill();
+    g = c.createRadialGradient(X(384), Y(745), 10 * k, X(384), Y(745), 130 * k);
+    g.addColorStop(0, 'rgba(255,240,190,.55)'); g.addColorStop(1, 'rgba(255,240,190,0)');
+    c.fillStyle = g; ell(c, X(384), Y(748), 130 * k, 56 * k); c.fill();
+    // poussière dans le faisceau
+    const al5 = graineHasard(77);
+    for (let i = 0; i < 26; i++) { const q = al5(), p = al5(); const x = lp[0] + (X(282 + p * 204) - lp[0]) * q, y = lp[1] + (Y(820) - lp[1]) * q; c.fillStyle = 'rgba(255,250,220,' + (0.3 + al5() * 0.5).toFixed(2) + ')'; rond(c, x, y, (0.8 + al5() * 1.6) * k); c.fill(); }
+    c.restore();
+    // corps
+    c.fillStyle = '#2b3d6e'; c.strokeStyle = '#0b1328'; c.lineWidth = 3 * k;
+    c.beginPath(); c.moveTo(gx - 46 * k, gy + 54 * k); c.quadraticCurveTo(gx - 52 * k, gy + 160 * k, gx - 40 * k, gy + 200 * k); c.lineTo(gx + 44 * k, gy + 200 * k); c.quadraticCurveTo(gx + 54 * k, gy + 140 * k, gx + 44 * k, gy + 54 * k); c.quadraticCurveTo(gx, gy + 38 * k, gx - 46 * k, gy + 54 * k); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#ffd76a'; rond(c, gx + 18 * k, gy + 82 * k, 6 * k); c.fill();
+    c.fillStyle = '#16203f'; c.fillRect(gx - 44 * k, gy + 150 * k, 88 * k, 10 * k);
+    // jambes
+    c.fillStyle = '#1e2c52'; rr(c, gx - 36 * k, gy + 196 * k, 30 * k, 70 * k, 8 * k); c.fill(); rr(c, gx + 6 * k, gy + 196 * k, 30 * k, 70 * k, 8 * k); c.fill();
+    c.fillStyle = '#0d1022'; ell(c, gx - 24 * k, gy + 268 * k, 22 * k, 9 * k); c.fill(); ell(c, gx + 24 * k, gy + 268 * k, 22 * k, 9 * k); c.fill();
+    // bras tendu, lampe torche pointée vers le sol
+    c.strokeStyle = '#2b3d6e'; c.lineWidth = 22 * k; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(gx - 34 * k, gy + 70 * k); c.lineTo(gx - 58 * k, gy + 92 * k); c.stroke();
+    c.fillStyle = '#e8c39e'; rond(c, gx - 62 * k, gy + 95 * k, 10 * k); c.fill();
+    c.save(); c.translate(gx - 64 * k, gy + 96 * k); c.rotate(1.72);
+    c.fillStyle = '#d0d4dd'; rr(c, -6 * k, -7 * k, 34 * k, 14 * k, 4 * k); c.fill();
+    c.fillStyle = '#fff6c0'; c.fillRect(26 * k, -9 * k, 6 * k, 18 * k);
+    c.restore();
+    c.save(); c.shadowColor = '#fff3b0'; c.shadowBlur = 24 * k; c.fillStyle = '#fffbe0'; rond(c, lp[0], lp[1], 8 * k); c.fill(); c.restore();
+    // tête (de trois quarts, regard vers le sol) et casquette
+    c.fillStyle = '#e8c39e'; rond(c, gx - 2 * k, gy + 18 * k, 32 * k); c.fill();
+    c.fillStyle = '#16203f'; c.beginPath(); c.arc(gx - 2 * k, gy + 10 * k, 34 * k, Math.PI, 0); c.fill();
+    c.beginPath(); c.moveTo(gx - 40 * k, gy + 8 * k); c.quadraticCurveTo(gx - 58 * k, gy + 12 * k, gx - 66 * k, gy + 20 * k); c.lineTo(gx - 20 * k, gy + 16 * k); c.closePath(); c.fill();
+    c.fillStyle = '#ffd76a'; rond(c, gx - 4 * k, gy - 8 * k, 6 * k); c.fill();
+    c.fillStyle = '#1a1f33'; ell(c, gx - 18 * k, gy + 24 * k, 4 * k, 5 * k); c.fill(); ell(c, gx + 4 * k, gy + 24 * k, 4 * k, 5 * k); c.fill();
+    c.strokeStyle = '#7a4a30'; c.lineWidth = 3 * k; c.beginPath(); c.moveTo(gx - 16 * k, gy + 40 * k); c.lineTo(gx - 2 * k, gy + 38 * k); c.stroke();
+    c.strokeStyle = '#3a2a1a'; c.lineWidth = 3.5 * k; c.beginPath(); c.moveTo(gx - 26 * k, gy + 14 * k); c.lineTo(gx - 12 * k, gy + 17 * k); c.moveTo(gx + 10 * k, gy + 15 * k); c.lineTo(gx - 2 * k, gy + 18 * k); c.stroke();
+
+    // --- Corbeau, qui dépasse d'une plante à droite ---
+    jeton(c, 0, X(572), Y(432), 30 * k, 0);
+    plante(c, X(560), Y(520), 150 * k);
+
+    // --- Renarde, l'héroïne, en grand ---
+    const hx = X(238), hy = Y(292), r = 70 * k;
+    // ombre au sol
+    c.fillStyle = 'rgba(8,5,20,.5)'; ell(c, X(232), Y(648), 120 * k, 20 * k); c.fill();
+    // sac de butin sur le dos (bijoux qui dépassent)
+    butin(c, 1, X(150), Y(338), 40 * k, t);
+    sacDessin(c, X(160), Y(400), 112 * k);
+    c.strokeStyle = '#6a4a1a'; c.lineWidth = 7 * k; c.beginPath(); c.moveTo(X(175), Y(350)); c.quadraticCurveTo(X(215), Y(370), X(262), Y(430)); c.stroke();
+    // jambes : en équilibre sur la pointe des pieds
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const jambe = (pts, coul, l) => { c.strokeStyle = coul; c.lineWidth = l * k; c.beginPath(); c.moveTo(X(pts[0]), Y(pts[1])); c.quadraticCurveTo(X(pts[2]), Y(pts[3]), X(pts[4]), Y(pts[5])); c.stroke(); };
+    jambe([215, 500, 170, 560, 150, 628], '#1c1730', 38);
+    jambe([258, 500, 330, 540, 300, 628], '#231c3c', 38);
+    c.fillStyle = '#0f0c1c'; ell(c, X(140), Y(636), 30 * k, 12 * k, 0.15); c.fill(); ell(c, X(308), Y(636), 30 * k, 12 * k); c.fill();
+    // torse penché
+    g = c.createLinearGradient(X(190), 0, X(300), 0);
+    g.addColorStop(0, '#191428'); g.addColorStop(0.7, '#2a2142'); g.addColorStop(1, '#43325e');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(X(186), Y(372)); c.quadraticCurveTo(X(238), Y(350), X(296), Y(380)); c.quadraticCurveTo(X(300), Y(450), X(278), Y(512)); c.lineTo(X(200), Y(512)); c.quadraticCurveTo(X(180), Y(440), X(186), Y(372)); c.closePath(); c.fill();
+    // ceinture orange de Renarde et bandoulière
+    c.fillStyle = COUL[1]; c.fillRect(X(196), Y(486), 86 * k, 12 * k);
+    c.fillStyle = '#ffd76a'; rr(c, X(232), Y(484), 16 * k, 16 * k, 3 * k); c.fill();
+    // bras gauche qui tient le sac
+    c.strokeStyle = '#1c1730'; c.lineWidth = 24 * k;
+    c.beginPath(); c.moveTo(X(196), Y(392)); c.quadraticCurveTo(X(176), Y(430), X(186), Y(452)); c.stroke();
+    c.fillStyle = COUL[1]; rond(c, X(188), Y(456), 13 * k); c.fill();
+    // bras droit qui brandit le diamant
+    c.strokeStyle = '#2a2142'; c.lineWidth = 24 * k;
+    c.beginPath(); c.moveTo(X(288), Y(394)); c.quadraticCurveTo(X(340), Y(390), X(356), Y(318)); c.stroke();
+    c.fillStyle = COUL[1]; rond(c, X(357), Y(312), 14 * k); c.fill();
+    // le diamant qui brille (couleur vive)
+    c.save(); c.globalCompositeOperation = 'lighter';
+    g = c.createRadialGradient(X(362), Y(278), 4 * k, X(362), Y(278), 95 * k);
+    g.addColorStop(0, 'rgba(160,240,255,.85)'); g.addColorStop(0.4, 'rgba(90,200,255,.3)'); g.addColorStop(1, 'rgba(90,200,255,0)');
+    c.fillStyle = g; rond(c, X(362), Y(278), 95 * k); c.fill();
+    c.restore();
+    butin(c, 3, X(362), Y(282), 46 * k, t);
+    etincelle(c, X(392), Y(250), 14 * k); etincelle(c, X(332), Y(262), 8 * k);
+    // contour doré : la lampe du garde éclaire son flanc droit
+    c.strokeStyle = 'rgba(255,215,120,.85)'; c.lineWidth = 3 * k;
+    c.beginPath(); c.moveTo(X(296), Y(382)); c.quadraticCurveTo(X(300), Y(450), X(278), Y(512)); c.stroke();
+    c.beginPath(); c.moveTo(X(306), Y(512)); c.quadraticCurveTo(X(336), Y(546), X(314), Y(626)); c.stroke();
+    // la tête : le jeton de Renarde, en grand, regard vers le garde
+    c.save(); c.shadowColor = 'rgba(255,140,100,.7)'; c.shadowBlur = 28 * k;
+    c.fillStyle = COUL[1]; rond(c, hx, hy, r); c.fill();
+    c.restore();
+    jeton(c, 1, hx, hy, r, 0);
+    // pupilles tournées vers le garde, sourire en coin
+    c.fillStyle = '#11131c'; rond(c, hx - r * 0.24, hy - r * 0.08, r * 0.08); c.fill(); rond(c, hx + r * 0.4, hy - r * 0.08, r * 0.08); c.fill();
+    c.strokeStyle = '#3a0e04'; c.lineWidth = 4 * k; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(hx - r * 0.12, hy + r * 0.6); c.quadraticCurveTo(hx + r * 0.12, hy + r * 0.72, hx + r * 0.34, hy + r * 0.5); c.stroke();
+    // reflet bleu du diamant sur la joue
+    c.save(); c.globalCompositeOperation = 'lighter';
+    g = c.createRadialGradient(hx + r * 0.8, hy - r * 0.2, 2, hx + r * 0.8, hy - r * 0.2, r * 0.7);
+    g.addColorStop(0, 'rgba(120,220,255,.35)'); g.addColorStop(1, 'rgba(120,220,255,0)');
+    c.fillStyle = g; rond(c, hx + r * 0.8, hy - r * 0.2, r * 0.7); c.fill();
+    c.restore();
+
+    // --- Premier plan : grandes feuilles (bas gauche), coin d'un bureau (bas droite) ---
+    c.fillStyle = '#163c22';
+    [[X(-10), Y(800), 1.0, 0.5], [X(30), Y(820), 1.25, 0.15], [X(70), Y(830), 0.9, -0.3]].forEach((p) => {
+      c.save(); c.translate(p[0], p[1]); c.rotate(p[3]); ell(c, 0, -110 * k * p[2], 34 * k * p[2], 120 * k * p[2]); c.fill(); c.restore();
+    });
+    c.strokeStyle = 'rgba(90,200,120,.35)'; c.lineWidth = 2 * k;
+    c.beginPath(); c.moveTo(X(30), Y(820)); c.lineTo(X(36), Y(690)); c.stroke();
+    c.fillStyle = '#3a2416'; c.beginPath(); c.moveTo(X(520), Y(800)); c.lineTo(X(560), Y(700)); c.lineTo(droite > 640 ? X(droite) : X(640), Y(700)); c.lineTo(droite > 640 ? X(droite) : X(640), Y(800)); c.closePath(); c.fill();
+    c.fillStyle = '#5a3a24'; c.beginPath(); c.moveTo(X(548), Y(708)); c.lineTo(X(560), Y(690)); c.lineTo(droite > 640 ? X(droite) : X(640), Y(690)); c.lineTo(droite > 640 ? X(droite) : X(640), Y(708)); c.closePath(); c.fill();
+    butin(c, 1, X(590), Y(678), 30 * k, t);
+    // assombrissement léger du bas (le site y pose le bandeau du titre)
+    g = c.createLinearGradient(0, Y(640), 0, Y(800));
+    g.addColorStop(0, 'rgba(10,6,24,0)'); g.addColorStop(1, 'rgba(10,6,24,.45)');
+    c.fillStyle = g; c.fillRect(0, Y(640), w, h - Y(640));
+  }
+
+  function demarrerAffiche() {
+    modeAffiche = true;
+    const cacher = () => {
+      document.querySelectorAll('.ecran, .voile, #toast, #flash, #confettis, button, .jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+    };
+    cacher();
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    setTimeout(cacher, 300);
+    setTimeout(cacher, 1200);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  //  Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par
+  //  le jeu) : le jeu s'ouvre directement en pleine partie solo contre les
+  //  robots, avec sa vraie interface (places, alarme, tours, boutons), sans
+  //  écran titre, ni fenêtre « Continuer », ni tutoriel, ni réseau. La partie
+  //  est jouée par des robots (vraies règles, hasard à graine fixe) jusqu'au
+  //  moment choisi, puis figée à ton tour : rien ne se gagne ni ne se perd,
+  //  aucun son, rien dans la sauvegarde.
+  //    1 = casse 1 : butin, sortie et les quatre voleurs ;
+  //    2 = casse 7 : portes rouges, badge, caméra et deux gardes ;
+  //    3 = casse 19 (ordinateur) : chien de garde, lasers et coffre à code.
+  // ---------------------------------------------------------------------
+
+  const SCENES_APERCU = {
+    1: { niveau: 1, coups: 12, graine: 3, tenue: 0 },
+    2: { niveau: 7, coups: 22, graine: 4, tenue: 1 },
+    3: { niveau: 19, coups: 32, graine: 5, tenue: 3, clavier: true }
+  };
+  let modeApercu = 0;
+
+  function ouvrirApercu(n) {
+    modeApercu = n;
+    const sc = SCENES_APERCU[n];
+    const alea = graineHasard(sc.graine);
+    Math.random = graineHasard(sc.graine * 7919 + 1);
+    prog.tenue = sc.tenue; prog.outil = 0;           // en mémoire seulement
+    let e = R.depart(alea, PLACES, { niveau: sc.niveau, outil: 0 });
+    for (let coup = 0; coup < 300 && !e.fin; coup++) {
+      const s = R.aQui(e);
+      if (coup >= sc.coups && s === 0 && e.j[0].p >= 0) break;
+      let a = R.bot(copie(e), s, alea, s === 0 ? 0.85 : e.fr);
+      if (!a || !R.valide(copie(e), s, a)) a = { t: 'm', c: e.j[s].p };
+      e = R.jouer(copie(e), s, a);
+    }
+    e.ev = [];
+    e.j.forEach((j) => { j.tr = []; });
+    e.gd.forEach((g) => { g.tr = []; });
+    // Partie figée : ton tour, contre trois robots, sans moteur ni réseau.
+    session = 'solo';
+    niveau = sc.niveau;
+    enPartie = false;
+    vue = e;
+    partie = {
+      siege: 0, mode: 'solo', phase: 'jeu', manche: 1, chef: -1, etat: e,
+      monTour: () => true, estChef: () => false,
+      sieges: () => [0, 1, 2, 3].map((s) => ({ humain: s === 0, moi: s === 0, chef: false })),
+      jouer: () => false, recommencer: () => false, lancerManche: () => false, pause: () => {}, quitter: () => {}
+    };
+    monTourAvant = true;             // la boucle ne replace pas le curseur du clavier
+    if (sc.clavier) { clavier = true; const d = Object.keys(O.destinations(e, 0)).map(Number).filter((i) => i !== e.j[0].p); curseur = d.length ? d[d.length - 1] : e.j[0].p; }
+    afficherEcran('jeu');
+    $('plateau').style.filter = 'brightness(1.3)'; // plan un peu éclairci pour l'image
+    majJetonsPlaces();
+    majInterface();
+    if (n === 3) {
+      // Écran d'ordinateur : le reste de l'étage, dans le noir, continue jusqu'aux bords.
+      $('ecran-jeu').style.background = 'transparent';
+      $('fond').style.display = 'block';
+      requestAnimationFrame(() => requestAnimationFrame(dessinerDecorLarge));
+      window.addEventListener('resize', () => requestAnimationFrame(dessinerDecorLarge));
+    }
+  }
+
+  // Décor de l'image 3 : l'étage continue autour du plan (murs, bureaux, plantes), assombri.
+  function dessinerDecorLarge() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.fillStyle = '#070a14'; c.fillRect(0, 0, w, h);
+    if (!vue || !geo) return;
+    const z = $('zone').getBoundingClientRect();
+    const s = geo.s, ox = z.left + geo.ox, oy = z.top + geo.oy;
+    const pal = PAL[(NIVEAUX[vue.n] || NIVEAUX[0]).imm];
+    const c0 = Math.floor(-ox / s) - 1, c1 = Math.ceil((w - ox) / s) + 1;
+    const r0 = Math.floor(-oy / s) - 1, r1 = Math.ceil((h - oy) / s) + 1;
+    const W = c1 - c0, H = r1 - r0, al = graineHasard(91);
+    let texte = '';
+    for (let r = r0; r < r1; r++) {
+      for (let col = c0; col < c1; col++) {
+        const dansPlan = r >= 0 && r < vue.H && col >= 0 && col < vue.W;
+        let ch = '.';
+        const mr = ((r % 5) + 5) % 5, mc = ((col % 7) + 7) % 7;
+        if (dansPlan) ch = '#';
+        else if ((mr === 0 && mc !== 3) || (mc === 0 && mr !== 2)) ch = '#';
+        else { const v = al(); ch = v < 0.06 ? 'h' : (v < 0.08 ? 'x' : (v < 0.2 ? 'p' : '.')); }
+        texte += ch;
+      }
+    }
+    const ef = { W: W, H: H, c: texte, v: new Array(W * H).fill(0) };
+    for (let i = 0; i < W * H; i++) {
+      const col = i % W, r = Math.floor(i / W);
+      if (r + r0 >= 0 && r + r0 < vue.H && col + c0 >= 0 && col + c0 < vue.W) continue;
+      tuile(c, ef, i, ox + (col + c0) * s, oy + (r + r0) * s, s, 1200, pal, null);
+    }
+    // l'étage autour reste dans le noir ; quelques lampes de gardes au loin
+    const cx = ox + vue.W * s / 2, cy = oy + vue.H * s / 2;
+    const g = c.createRadialGradient(cx, cy, s * vue.W * 0.55, cx, cy, Math.max(w, h) * 0.7);
+    g.addColorStop(0, 'rgba(5,7,15,.25)'); g.addColorStop(1, 'rgba(5,7,15,.62)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.save(); c.globalCompositeOperation = 'lighter';
+    [[0.13, 0.62, 0.5], [0.86, 0.35, 2.6]].forEach((p) => {
+      const lx = w * p[0], ly = h * p[1];
+      c.save(); c.translate(lx, ly); c.rotate(p[2]);
+      const gr = c.createLinearGradient(0, 0, s * 3.2, 0);
+      gr.addColorStop(0, 'rgba(255,236,170,.32)'); gr.addColorStop(1, 'rgba(255,236,170,0)');
+      c.fillStyle = gr; c.beginPath(); c.moveTo(0, 0); c.lineTo(s * 3.2, -s * 1.1); c.lineTo(s * 3.2, s * 1.1); c.closePath(); c.fill();
+      c.restore();
+    });
+    c.restore();
+    // cadre lumineux autour du plan de jeu
+    c.strokeStyle = 'rgba(185,200,255,.35)'; c.lineWidth = 2;
+    c.strokeRect(ox - 3, oy - 3, vue.W * s + 6, vue.H * s + 6);
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5752,7 +6160,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !modeApercu && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -5760,17 +6168,22 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 && vue.j[partie.siege] ? vue.j[partie.siege].sc : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(); });
+  window.addEventListener('resize', () => { if (modeAffiche) dessinerAffiche(); else if (ecran !== 'jeu') dessinerTitre(); });
 
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else {
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>

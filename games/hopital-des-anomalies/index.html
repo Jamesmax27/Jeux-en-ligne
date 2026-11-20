@@ -2321,7 +2321,9 @@ function lireProgres() {
     }
   } catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
 }
+let apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU) ; rien n'est alors enregistré
 function sauver(niveau, score) {
+  if (apercu) return;
   try {
     window.JEL_SAVE.save(JEU, { niveau: borne(niveau, 1, N), score: score || 0, etoiles: progres.etoiles, records: progres.records, debloque: progres.debloque, options: { son: sonActif } });
   } catch (e) { /* rien */ }
@@ -3542,7 +3544,8 @@ function dessiner(tm) {
   if (!G) return;
   const j = G.j;
   const vise = j.cache ? P(j.cache.u[0] + 0.5, j.cache.u[1] + 0.5) : P(j.x, j.y);
-  G.cam[0] += (vise[0] - G.cam[0]) * 0.12; G.cam[1] += (vise[1] - 30 - G.cam[1]) * 0.12;
+  if (G.camFixe) { G.cam[0] = G.camFixe[0]; G.cam[1] = G.camFixe[1]; } // images du jeu : cadre posé à l'avance
+  else { G.cam[0] += (vise[0] - G.cam[0]) * 0.12; G.cam[1] += (vise[1] - 30 - G.cam[1]) * 0.12; }
   let tx = 0, ty = 0;
   if (G.tremble > 0) { tx = hasard(-1, 1) * G.tremble * 12; ty = hasard(-1, 1) * G.tremble * 12; }
   const Z = ZOOM;
@@ -3777,7 +3780,7 @@ function dessinerLumiere(jx, jy, tm) {
   octx.globalCompositeOperation = 'source-over';
   octx.clearRect(0, 0, w, h);
   const proche = G.rodeurs.reduce((m, r) => Math.min(m, dist(r, G.j)), 99);
-  const nuit = G.panne ? 0.94 : 0.32;
+  const nuit = G.panne ? 0.94 : apercu ? 0.18 : 0.32; // images du jeu : nuit un peu plus claire
   octx.fillStyle = 'rgba(2,1,10,' + nuit + ')'; octx.fillRect(0, 0, w, h);
   octx.globalCompositeOperation = 'destination-out';
   const rr = (G.panne ? 115 : 330) * ZOOM / 2 * (G.j.cache ? 0.5 : 1);
@@ -4101,7 +4104,7 @@ function dessinerConfettis(dt) {
 
 /* Fin de niveau */
 function finNiveau(gagne, raison, deja) {
-  if (!G || (G.fini && !deja)) return;
+  if (!G || (G.fini && !deja) || apercu) return;
   G.fini = true; fermerPanneau(); clavier = {};
   const i = G.idx;
   let etoiles = 0, bonus = 0;
@@ -4562,12 +4565,118 @@ function demarrerAffiche() {
   window.addEventListener('resize', dessinerAffiche);
 }
 
+/* ---------------------------------------------------------------------------
+   Images du jeu (page du jeu)
+   Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+   s'ouvre directement en pleine nuit, avec sa vraie interface (cœurs, patients soignés, heure,
+   mini-carte, bouton d'action), sans écran titre, ni « Continuer », ni carte de la nuit
+   (CONSIGNES-JEU.md, section 5). La scène est posée par le code (hasard à graine fixe), puis
+   figée sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+     1 = nuit 1 : l'infirmier guide un chien blessé vers la salle de soins, la file attend dehors ;
+     2 = nuit 10 : la fiche d'admission d'un chien aux yeux rouges (une anomalie déguisée) ;
+     3 = nuit 20, sur ordinateur : tout l'hôpital, rideaux fermés sur la masse aux mille yeux,
+         un rôdeur lâché dans le couloir, une grille d'aération qui tremble, salles pleines.
+   --------------------------------------------------------------------------- */
+// Ajoute un patient posé à la main : etat 'file' | 'comptoir' | 'attente' | 'table' | 'suit'.
+function patientApercu(esp, couleur, etat, x, y, o) {
+  o = o || {};
+  const p = nouveauPatient(!!o.tell);
+  p.esp = esp; p.couleur = couleur; p.acc = o.acc || null; p.tell = o.tell || null; p.faux = o.faux || null;
+  if (o.soins) p.soins = o.soins.slice();
+  if (o.flacon !== undefined) p.flacon = o.flacon;
+  p.etat = etat; p.x = x; p.y = y; p.chemin = null; p.but = null;
+  p.flip = o.flip !== undefined ? o.flip : etat !== 'attente';
+  p.patience = p.patMax * (o.pat || 0.8); p.pas = o.pas || 0;
+  if (etat === 'attente') p.siege = [Math.floor(x), Math.floor(y)];
+  if (etat === 'table') { const tb = G.tables.find((q) => q.s.t[0] === Math.floor(x) && q.s.t[1] === Math.floor(y)); if (tb) tb.patient = p; }
+  if (etat === 'suit') G.suiveur = p;
+  G.patients.push(p);
+  return p;
+}
+const SCENES_APERCU = {
+  1: () => {
+    const j = G.j;
+    j.x = 7.55; j.y = 10.6; j.flip = false; j.pas = 1.2;
+    G.tps = 46; G.soignes = 1; G.score = 128;
+    patientApercu('chien', '#b07a45', 'suit', 7.5, 11.75, { soins: ['plaie'], acc: 'collier', pas: 2, pat: 0.85, flip: false });
+    j.trace = [{ x: 7.5, y: 11.75 }, { x: 7.55, y: 11.15 }, { x: 7.55, y: 10.6 }];
+    patientApercu('chat', '#6f6f7c', 'table', 9.5, 9.5, { soins: ['plaie'], flip: false, pat: 0.6 });
+    patientApercu('chat', '#e08a3c', 'comptoir', 10.5, 15.5, { soins: ['plaie'], pat: 0.9 });
+    patientApercu('lapin', '#d9cfc4', 'file', 10.5, 17.5, { soins: ['plaie'], pat: 0.95 });
+    patientApercu('herisson', '#8b6b4a', 'file', 11.5, 17.5, { soins: ['plaie'], pat: 0.9 });
+    patientApercu('tortue', '#5f8f45', 'file', 12.5, 17.5, { soins: ['plaie'], pat: 0.97 });
+    patientApercu('perroquet', '#e0453a', 'attente', 14.5, 11.5, { soins: ['plaie'], pat: 0.7 });
+    const v = P(j.x, j.y); G.camFixe = [v[0], v[1] - 30];
+    alerte(t('msg.suit', { salle: t(SALLES.S.nom) }), '', 99);
+  },
+  2: () => {
+    const j = G.j;
+    j.x = 10.5; j.y = 13.5; j.flip = true;
+    G.tps = 74; G.soignes = 3; G.score = 465; G.coeurs = 2; G.erreurs = 1;
+    const anomalie = patientApercu('chien', '#b07a45', 'comptoir', 10.5, 15.5, { soins: ['urgence'], tell: 'yeux', acc: 'collier', pat: 0.8 });
+    patientApercu('chat', '#2d2c33', 'attente', 13.5, 9.5, { soins: ['fracture'], pat: 0.55 });
+    patientApercu('lapin', '#8a6a52', 'attente', 14.5, 11.5, { soins: ['fievre'], flacon: 1, pat: 0.7 });
+    patientApercu('herisson', '#a3825d', 'attente', 15.5, 11.5, { soins: ['plaie'], pat: 0.4 });
+    patientApercu('tortue', '#7d7f3a', 'attente', 17.5, 9.5, { soins: ['urgence'], tell: 'ombre', pat: 0.8 });
+    patientApercu('perroquet', '#3b7bd6', 'table', 9.5, 9.5, { soins: ['plaie'], flip: false, pat: 0.5 });
+    patientApercu('chien', '#efece4', 'file', 10.5, 17.5, { soins: ['fracture'], pat: 0.8 });
+    patientApercu('chat', '#c9b08a', 'file', 11.5, 17.5, { soins: ['fievre'], flacon: 2, pat: 0.9 });
+    // le cadre remonte un peu : la fiche couvre le bas de l'écran
+    const v = P(j.x, j.y); G.camFixe = [v[0] + 40, v[1] + 46];
+    ouvrirFiche(anomalie);
+  },
+  3: () => {
+    const j = G.j;
+    j.x = 9.6; j.y = 6.0; j.flip = false; j.pas = 2.4; j.flacon = 2;
+    G.tps = 150; G.soignes = 6; G.score = 1240; G.coeurs = 2; G.erreurs = 2;
+    // la masse aux mille yeux cogne contre les rideaux fermés de l'entrée
+    G.rideaux.ferme = true; G.rideaux.anim = 1;
+    G.cogneurs.push({ x: 10.5, y: 17.5, etat: 'cogne', minuteur: 99, coups: 0, ph: 1.3, flip: true });
+    // un rôdeur lâché dans le couloir, sur les talons de l'infirmier
+    G.rodeurs.push({ x: 5.6, y: 6.1, etat: 'chasse', chemin: [], recalc: 99, ph: 0.4, flip: false, renifle: 0, cible: null, apparition: 0 });
+    // une grille qui tremble à l'accueil, une autre déjà scellée
+    G.vents.forEach((v) => { if (v.x === 16 && v.y === 15) { v.etat = 'tremble'; v.minuteur = 99; } if (v.x === 10 && v.y === 11) v.etat = 'scelle'; });
+    patientApercu('chien', '#4a3426', 'table', 16.5, 2.5, { soins: ['urgence'], flip: false, pat: 0.6 });
+    patientApercu('lapin', '#f4f2ee', 'table', 8.5, 2.5, { soins: ['fracture', 'plaie'], flip: false, pat: 0.7 });
+    patientApercu('tortue', '#4f7a5c', 'table', 7.5, 9.5, { soins: ['plaie'], flip: false, pat: 0.5 });
+    patientApercu('perroquet', '#3fae5a', 'attente', 13.5, 9.5, { soins: ['fievre'], flacon: 3, tell: 'trois', pat: 0.7 });
+    patientApercu('chat', '#e08a3c', 'attente', 15.5, 9.5, { soins: ['fievre'], flacon: 1, pat: 0.45 });
+    patientApercu('herisson', '#6a5440', 'attente', 17.5, 9.5, { soins: ['fracture'], pat: 0.8 });
+    patientApercu('lapin', '#5e5650', 'attente', 14.5, 11.5, { soins: ['fracture', 'plaie'], pat: 0.6 });
+    patientApercu('chien', '#e2c9a2', 'attente', 18.5, 11.5, { soins: ['plaie'], tell: 'bouche', pat: 0.9 });
+    patientApercu('chat', '#f0ece2', 'file', 13.5, 17.5, { soins: ['plaie'], pat: 0.7 });
+    patientApercu('chien', '#8c8c8c', 'file', 14.5, 17.5, { soins: ['fievre'], flacon: 0, pat: 0.85 });
+    G.camFixe = [48, 212];
+    alerte(t('msg.vent', { salle: t(SALLES.A.nom) }), 'danger', 99);
+  },
+};
+function ouvrirApercu(n) {
+  apercu = n;
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 7331 + n * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let q = Math.imul(graine ^ (graine >>> 15), 1 | graine); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+  preparerNiveau(n === 1 ? 0 : n === 2 ? 9 : 19);
+  G.evts = []; G.attente = []; // rien n'arrive pendant la capture
+  enPartie = true; pause = false; clavier = {};
+  hudVisible(true);
+  $('objectif').textContent = t('hud.objectif', { n: G.L.but });
+  montrer(null);
+  SCENES_APERCU[n]();
+  majHud(); majMain(); majSon(); majAction(true);
+  // Partie figée sur ce moment, avec la vraie interface et sans fenêtre de pause.
+  pause = true;
+}
+
 /* Démarrage */
 lireProgres();
 redim();
 majSon();
+const numeroApercu = Number(window.JEL_APERCU);
 if (window.JEL_AFFICHE) demarrerAffiche();
-else {
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
   ecranTitre();
   requestAnimationFrame(boucle);
 }

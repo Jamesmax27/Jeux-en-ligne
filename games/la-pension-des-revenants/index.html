@@ -3331,6 +3331,8 @@
     .fiche canvas { width: 50px; height: 42px; }
   }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
+  /* Image du jeu n° 3 (écran d'ordinateur, window.JEL_APERCU = 3 seulement) : interface élargie. */
+  body.apercu-large #places, body.apercu-large #infos, body.apercu-large #reception { max-width: 1040px; }
 </style>
 </head>
 <body>
@@ -4679,6 +4681,7 @@
     c.clearRect(0, 0, w, h);
     if (!vue) { geo = null; return; }
     geo = geoAile(vue, w, h);
+    if (APERCU === 3) dessinerVoisins(c, w, h, t);
     const ap = apercus();
     dessinerAile(c, vue, monAile(), geo, t, {
       apercus: ap, type: sel && sel.m === 'l' ? vue.rec[sel.g] : null, anims: anims,
@@ -4700,6 +4703,45 @@
       if (p.etoile) etincelle(c, p.x, p.y, p.k); else { rond(c, p.x, p.y, p.k * 0.5); c.fill(); }
       c.globalAlpha = 1;
     }
+  }
+
+  // Image du jeu n° 3 (écran d'ordinateur, window.JEL_APERCU = 3 seulement) : l'hôtel continue
+  // jusqu'aux bords ; les ailes des trois rivaux, avec leurs vrais clients, se dressent plus loin
+  // de part et d'autre de la sienne, sous la pleine lune, chacune avec sa lanterne.
+  function dessinerVoisins(c, w, h, t) {
+    const L = geo.L, cote = Math.max(0, (w - L) / 2 - geo.s * 0.3);
+    if (cote < 120) return;
+    // ciel et sol jusqu'aux bords
+    const ciel = c.createLinearGradient(0, 0, 0, geo.sol);
+    ciel.addColorStop(0, '#2a1f4a'); ciel.addColorStop(1, '#171029');
+    c.fillStyle = ciel; c.fillRect(0, 0, w, geo.sol);
+    lunePleine(c, w - cote * 0.22, h * 0.13, Math.min(h, cote) * 0.09);
+    // trois ailes rivales : 1 à gauche, 2 à droite, 3 plus loin à gauche
+    const ailes = [[3, 0, cote * 0.5, 0.55], [1, cote * 0.42, cote * 0.58, 0.8], [2, w - cote, cote * 0.62, 0.8]];
+    ailes.forEach(([s, x0, larg, k]) => {
+      const g2 = geoAile(vue, larg, h * k);
+      const dy = geo.sol - g2.sol;
+      c.save(); c.translate(x0, dy);
+      dessinerAile(c, vue, vue.ai[s], g2, t, {});
+      c.restore();
+      // un voile de nuit : les ailes rivales restent au second plan
+      c.fillStyle = k < 0.7 ? 'rgba(14,10,26,.5)' : 'rgba(14,10,26,.28)';
+      c.fillRect(x0 + g2.ox - g2.s * 0.3, dy + g2.oy - g2.s * 0.75, g2.L + g2.s * 0.6, g2.sol - g2.oy + g2.s * 2);
+      const r = Math.max(10, g2.s * 0.32);
+      const lx = x0 + g2.ox + g2.L / 2, ly = dy + g2.oy - g2.s * 0.75 - r * 0.2;
+      const halo = c.createRadialGradient(lx, ly, 1, lx, ly, r * 3);
+      halo.addColorStop(0, COUL[s] + '66'); halo.addColorStop(1, COUL[s] + '00');
+      c.fillStyle = halo; rond(c, lx, ly, r * 3); c.fill();
+      lanterne(c, s, lx, ly, r);
+    });
+    arbreMort(c, w - cote * 0.06, geo.sol, geo.s * 0.9, -1);
+    arbreMort(c, cote * 0.06, geo.sol, geo.s * 0.8, 1);
+    c.fillStyle = '#0b0714'; c.fillRect(0, geo.sol, w, h - geo.sol);
+    // lanterne de sa propre aile, au-dessus du toit
+    const r0 = Math.max(12, geo.s * 0.3), lx0 = geo.ox + L / 2, ly0 = geo.oy - geo.s * 0.95;
+    const h0 = c.createRadialGradient(lx0, ly0, 1, lx0, ly0, r0 * 3.2);
+    h0.addColorStop(0, COUL[0] + '77'); h0.addColorStop(1, COUL[0] + '00');
+    c.fillStyle = h0; rond(c, lx0, ly0, r0 * 3.2); c.fill();
   }
 
   function jaillir(i, coul, nbre, monte) {
@@ -5504,6 +5546,65 @@
 
   let boutonEffacer = null;
 
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3
+  // ---------------------------------------------------------------------
+  // Posé par le robot du site seulement (scripts/apercus-jeu.mjs, CONSIGNES-JEU.md, section 5) :
+  // le jeu s'ouvre sur une nuit solo déjà commencée contre les 3 robots, avec sa vraie interface
+  // (ailes des rivaux, réception, allumettes, exorcismes) et une carte choisie, dont les aperçus
+  // vert et rouge s'allument sur les chambres libres. Les premiers coups des quatre ailes sont
+  // joués d'avance par les robots des règles (hasard à graine fixe : la même image à chaque
+  // capture) ; puis la partie est figée : plus aucun robot ne joue, rien ne se gagne ni ne se perd,
+  // ni son, ni sauvegarde, ni FMG. Les règles (jel-regles) et le moteur (jel-multi) ne changent pas.
+  //   1 = nuit 1 : la petite aile, la dame blanche et le pendu, un miroir ;
+  //   2 = nuit 10 : 3 étages, la nonne muette, les cloisons qui saignent, l'allumette ;
+  //   3 = nuit 20, sur un écran d'ordinateur : 4 étages, la cave et ses clés, les noyés, les
+  //       exorcismes, la pleine lune ; les ailes des rivaux s'étendent de part et d'autre.
+  const APERCU = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+  const SCENES_APERCU = {
+    1: { nuit: 1, coups: 8, graine: 19 },
+    2: { nuit: 10, coups: 14, graine: 23 },
+    3: { nuit: 18, coups: 28, graine: 83 }
+  };
+  function ouvrirApercu(n) {
+    const sc = SCENES_APERCU[n];
+    let graine = 9876 + sc.graine * 7919;
+    const alea = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    Math.random = alea;   // particules et petits détails : toujours la même image
+    session = 'solo'; niveau = sc.nuit; enPartie = false;
+    // Début de la nuit joué d'avance par les robots des règles (le gardien du joueur joue bien).
+    const e = R.depart(alea, PLACES, { niveau: niveau });
+    const fo = e.fo;
+    let coups = 0;
+    while (!e.fini && coups < sc.coups + 8 && (coups < sc.coups || e.tour !== 0)) {
+      const p = e.tour;
+      e.fo = p === 0 ? 1 : fo;
+      const a = R.bot(e, p, alea, e.fo);
+      if (!R.valide(e, p, a)) break;
+      R.jouer(e, p, a, alea);
+      coups++;
+    }
+    e.fo = fo; e.tour = 0; e.der = null;
+    vue = JSON.parse(JSON.stringify(e));
+    // Partie figée : une place « Toi » et trois robots ; aucun coup ne peut plus être joué.
+    const sieges = [0, 1, 2, 3].map((s) => ({ moi: s === 0, humain: s === 0, chef: false }));
+    partie = {
+      mode: 'solo', phase: 'jeu', siege: 0, manche: 0, etat: vue,
+      monTour: () => true, sieges: () => sieges.map((x) => Object.assign({}, x)),
+      jouer: () => false, pause: () => {}, quitter: () => {}, recommencer: () => false, lancerManche: () => false
+    };
+    // Une carte de la réception choisie : ses aperçus s'allument sur les chambres libres.
+    // (de préférence une carte qui hurlerait dans certaines chambres : du vert et du rouge)
+    let g = vue.rec.findIndex((c) => c && c !== 'cle' && O.libres(vue, vue.ai[0]).some((i) => {
+      const cp = O.copier(vue); cp.ai[0].ch[i] = c; return O.hurleType(cp, cp.ai[0], i, c);
+    }));
+    if (g < 0) g = vue.rec.findIndex((c) => c && c !== 'cle');
+    sel = g >= 0 ? { m: 'l', g: g } : null;
+    document.body.classList.toggle('apercu-large', n === 3);
+    afficherEcran('jeu');
+    majInterface();
+  }
+
   $('btn-jouer').addEventListener('click', () => {
     audio(); sons.clic();
     window.JEL_SAVE.reprise({
@@ -5549,6 +5650,9 @@
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
+  // Images du jeu (window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement) : une nuit déjà
+  // commencée, figée, sans écran titre, ni fenêtre, ni tutoriel, ni son, ni sauvegarde.
+  if (APERCU) { ouvrirApercu(APERCU); return; }
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
   afficherEcran('titre');
   // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
