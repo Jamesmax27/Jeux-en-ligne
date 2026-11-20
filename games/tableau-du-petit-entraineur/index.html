@@ -1823,6 +1823,9 @@
   const t = T.t;
   const nb = (x) => T.nombre(x);
   const JEU = 'tableau-du-petit-entraineur';
+  // Posés par le robot du site seulement (jamais par le jeu) : affiche (jaquette) et images de la page du jeu.
+  const affiche = !!window.JEL_AFFICHE;
+  let apercu = 0;          // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
   /* MOTEUR-DEBUT */
   // ------------------------------------------------------------------------
@@ -2166,7 +2169,7 @@
     siffletFin: () => { note(2100, 0, 0.25, 'square', 0.05); note(2100, 0.3, 0.25, 'square', 0.05); note(2100, 0.6, 0.6, 'square', 0.05); },
     rate: () => { [392, 330, 262].forEach((f, i) => note(f, i * 0.16, 0.25, 'triangle', 0.15)); },
   };
-  function jouerSon(nom, x) { try { if (SONS[nom]) SONS[nom](x); } catch (e) { /* son indisponible */ } }
+  function jouerSon(nom, x) { if (affiche || apercu) return; try { if (SONS[nom]) SONS[nom](x); } catch (e) { /* son indisponible */ } }
 
   // ------------------------------------------------------------------------
   // Petits dessins SVG de l'interface (aucun texte).
@@ -2750,6 +2753,7 @@
   }
   // Décor autour du terrain selon le stade.
   function dessinerAutour(c2, th, w, h, ox, oy, bw, bh) {
+    if (apercu === 3) { dessinerStadeLarge(c2, w, h, ox, bw); return; }
     c2.fillStyle = th.autour; c2.fillRect(0, 0, w, h);
     if (th.deco === 'pre') {
       // fleurs et clôture en bois
@@ -2775,6 +2779,49 @@
       c2.globalAlpha = 1;
       c2.fillStyle = 'rgba(0,0,0,.35)'; c2.fillRect(ox - 6, oy - 6, bw + 12, bh + 12);
     }
+  }
+  // Image du jeu sur ordinateur (JEL_APERCU = 3) : le grand stade de nuit continue jusqu'aux bords
+  // de l'écran (bord de pelouse, panneaux, tribunes pleines, projecteurs), au lieu de deux bandes vides.
+  function dessinerStadeLarge(c2, w, h, ox, bw) {
+    c2.fillStyle = '#121d3a'; c2.fillRect(0, 0, w, h);
+    const marge = 46, g = ox - marge, d = ox + bw + marge;
+    // bord de pelouse rayé autour du terrain
+    for (let x = g, k = 0; x < d; x += 28, k++) { c2.fillStyle = k % 2 ? '#2f8a52' : '#34945a'; c2.fillRect(x, 0, Math.min(28, d - x), h); }
+    // panneaux colorés le long des lignes (sans texte)
+    const panneaux = ['#ffd34d', '#3d8bff', '#ff5f57', '#3ccf7a', '#ffffff', '#9a7dff'];
+    [g - 12, d].forEach((px) => {
+      for (let y = 0, k = 0; y < h; y += 46, k++) {
+        c2.fillStyle = panneaux[(k + (px > ox ? 3 : 0)) % panneaux.length]; c2.fillRect(px, y, 12, 44);
+        c2.fillStyle = 'rgba(255,255,255,.4)'; c2.fillRect(px + 4, y + 6, 3, 32);
+      }
+    });
+    // tribunes : gradins parallèles aux lignes, public en couleurs (bleu, et rayé rouge et blanc)
+    const foule = ['#3d8bff', '#ffffff', '#ff5f57', '#ffd34d', '#2f7bff', '#e23a33', '#3ccf7a', '#ff9ec4'];
+    const gradins = (deb, fin, sens) => {
+      for (let j = 0, x = deb; sens > 0 ? x < fin : x > fin; j++, x += sens * 26) {
+        const xg = sens > 0 ? x : x - 26;
+        c2.fillStyle = j % 2 ? '#24346a' : '#2b3d78'; c2.fillRect(xg, 0, 26, h);
+        c2.fillStyle = 'rgba(0,0,0,.25)'; c2.fillRect(sens > 0 ? xg + 24 : xg, 0, 2, h);
+        for (let y = 6 + (j % 2) * 5; y < h; y += 10) {
+          for (let s = 0; s < 2; s++) {
+            c2.fillStyle = foule[(j * 5 + Math.round(y / 10) * 3 + s * 7) % foule.length];
+            c2.beginPath(); c2.arc(xg + 7 + s * 12, y, 3.6, 0, Math.PI * 2); c2.fill();
+          }
+        }
+      }
+    };
+    c2.globalAlpha = 0.8;
+    gradins(g - 14, 0, -1);
+    gradins(d + 14, w, 1);
+    c2.globalAlpha = 1;
+    // projecteurs du grand stade
+    [[g * 0.45, 60], [g * 0.45, h - 70], [w - (w - d) * 0.45, 60], [w - (w - d) * 0.45, h - 70]].forEach(([x, y]) => {
+      const lum = c2.createRadialGradient(x, y, 6, x, y, 260);
+      lum.addColorStop(0, 'rgba(255,250,215,.85)'); lum.addColorStop(0.3, 'rgba(255,245,200,.28)'); lum.addColorStop(1, 'rgba(255,245,200,0)');
+      c2.fillStyle = lum; c2.fillRect(x - 260, y - 260, 520, 520);
+      c2.fillStyle = '#2a3554'; rondRect(c2, x - 40, y - 22, 80, 44, 8); c2.fill();
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 2; b++) { c2.fillStyle = '#fffbe0'; c2.beginPath(); c2.arc(x - 24 + a * 24, y - 10 + b * 20, 7.5, 0, Math.PI * 2); c2.fill(); }
+    });
   }
   function dessinerMeteo(c2, th, w, h) {
     if (th.deco === 'pluie') {
@@ -2916,7 +2963,7 @@
 
   // Toucher (ou Entrée) sur une case du plateau (r = -1 : le but).
   function toucherCase(c, r) {
-    if (!enPartie || occupe || enPause || ouverteTuto) return;
+    if (apercu || !enPartie || occupe || enPause || ouverteTuto) return;
     if (r < 0) {
       const ts = tirs(etat);
       if (!ts.length) {
@@ -3439,6 +3486,320 @@
   }
 
   // ------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le petit joueur en maillot
+  // bleu, en grand, frappe le ballon, qui suit la flèche jaune du plan de l'entraîneur par-dessus les
+  // grands bras du défenseur rayé ; le gardien plonge du mauvais côté ; les projecteurs du stade
+  // brillent ; le tableau tactique est posé au premier plan, la coupe dorée brille à droite.
+  // Mêmes joueurs que pendant la partie (maillots bleu, rayé, gardien), vus de face et en grand.
+  const CONTOUR = '#1d2a44';
+  const milieu = (a, b, p) => [a[0] + (b[0] - a[0]) * p, a[1] + (b[1] - a[1]) * p];
+  function trait(c, pts, larg, coul, sansContour) {
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
+    if (!sansContour) { c.strokeStyle = CONTOUR; c.lineWidth = larg + 4; c.stroke(); }
+    c.strokeStyle = coul; c.lineWidth = larg; c.stroke();
+  }
+  // Poses (unité : 1/100 de la taille ; origine au sol, sous les pieds).
+  const POSES = {
+    frappe: { brasA: [[-13, -67], [-23, -77], [-27, -89]], brasB: [[13, -67], [24, -61], [31, -56]],
+      jambeA: [[-6, -38], [-8, -21], [-6, -6]], piedA: 0.05, jambeB: [[6, -38], [20, -31], [33, -40]], piedB: -0.55 },
+    grandsBras: { brasA: [[-13, -67], [-28, -71], [-44, -78]], brasB: [[13, -67], [28, -71], [44, -78]],
+      jambeA: [[-6, -38], [-10, -21], [-12, -6]], piedA: 0.2, jambeB: [[6, -38], [10, -21], [12, -6]], piedB: -0.2 },
+    plongeon: { brasA: [[-13, -67], [-17, -83], [-20, -98]], brasB: [[13, -67], [17, -83], [21, -98]],
+      jambeA: [[-6, -38], [-11, -21], [-16, -8]], piedA: 0.3, jambeB: [[6, -38], [9, -21], [13, -7]], piedB: -0.1 },
+  };
+  // Footballeur vu de face. o : maillot, rayures, short, chaussette, gants, cheveux, pose, bouche, regard.
+  function dessinerFootballeur(c, x, y, u, rot, o) {
+    const P = POSES[o.pose];
+    const peau = '#f2c9a0';
+    c.save();
+    c.translate(x, y); c.rotate(rot || 0); c.scale(u, u);
+    if (!rot && !o.saut) { c.fillStyle = 'rgba(0,0,0,.22)'; ellipse(c, 0, 0, 30, 5.5); c.fill(); }
+    const jambe = (pts, ang) => {
+      const [h, g, ch] = pts;
+      trait(c, pts, 9, peau);
+      trait(c, [milieu(g, ch, 0.1), ch], 9.4, o.chaussette, true);
+      trait(c, [milieu(g, ch, 0.1), milieu(g, ch, 0.24)], 9.4, o.bande || '#ffffff', true);
+      c.save(); c.translate(ch[0], ch[1]); c.rotate(ang);
+      c.fillStyle = '#26314a'; c.strokeStyle = CONTOUR; c.lineWidth = 2;
+      ellipse(c, 4, 2.5, 9.5, 5.2); c.fill(); c.stroke();
+      c.fillStyle = 'rgba(255,255,255,.85)'; c.fillRect(1, 0.5, 7, 1.6);
+      c.restore();
+      return h;
+    };
+    const bras = (pts) => {
+      trait(c, pts, 7.5, peau);
+      trait(c, [pts[0], milieu(pts[0], pts[1], 0.55)], 10, o.maillot);
+      c.fillStyle = o.gants || peau; c.strokeStyle = CONTOUR; c.lineWidth = 2;
+      c.beginPath(); c.arc(pts[2][0], pts[2][1], o.gants ? 6 : 4.8, 0, Math.PI * 2); c.fill(); c.stroke();
+    };
+    bras(P.brasA);
+    jambe(P.jambeA, P.piedA);
+    jambe(P.jambeB, P.piedB);
+    // short
+    c.fillStyle = o.short; c.strokeStyle = CONTOUR; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(-14, -50); c.lineTo(14, -50); c.lineTo(17, -34); c.lineTo(2, -33); c.lineTo(0, -39); c.lineTo(-2, -33); c.lineTo(-17, -34); c.closePath(); c.fill(); c.stroke();
+    // maillot
+    c.beginPath(); c.moveTo(-15, -70); c.quadraticCurveTo(0, -74, 15, -70); c.lineTo(14, -47); c.quadraticCurveTo(0, -44, -14, -47); c.closePath();
+    c.fillStyle = o.maillot; c.fill();
+    if (o.rayures) {
+      c.save(); c.clip(); c.fillStyle = o.rayures;
+      for (let k = -12; k <= 12; k += 8) c.fillRect(k - 2, -76, 4.2, 32);
+      c.restore();
+      c.beginPath(); c.moveTo(-15, -70); c.quadraticCurveTo(0, -74, 15, -70); c.lineTo(14, -47); c.quadraticCurveTo(0, -44, -14, -47); c.closePath();
+    }
+    c.strokeStyle = CONTOUR; c.lineWidth = 2; c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(-13, -66, 4, 17); // reflet de la lumière
+    c.strokeStyle = o.col || '#ffffff'; c.lineWidth = 2.6; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-5, -71); c.lineTo(0, -65); c.lineTo(5, -71); c.stroke();
+    if (o.etoile) { c.fillStyle = o.etoile; etoileCanvas(c, 7.5, -61, 3.6); c.fill(); }
+    bras(P.brasB);
+    // cou, oreilles, tête
+    trait(c, [[0.5, -71], [1, -75]], 7, peau);
+    c.fillStyle = peau; c.strokeStyle = CONTOUR; c.lineWidth = 2;
+    [[-11.5, -85], [15.5, -85]].forEach(([ex, ey]) => { c.beginPath(); c.arc(ex, ey, 3.6, 0, Math.PI * 2); c.fill(); c.stroke(); });
+    c.beginPath(); c.arc(2, -86, 14, 0, Math.PI * 2); c.fill(); c.stroke();
+    // cheveux
+    c.fillStyle = o.cheveux;
+    c.beginPath(); c.arc(2, -87, 15, Math.PI * 0.93, Math.PI * 2.07);
+    [[15, -91], [11, -88.5], [8, -92.5], [4, -88.5], [0, -92.5], [-4, -88.5], [-8, -92], [-12, -89]].forEach(([hx, hy]) => c.lineTo(hx, hy));
+    c.closePath(); c.fill(); c.stroke();
+    // yeux, sourcils, joues, bouche
+    const [rx, ry] = o.regard || [1.4, 0];
+    [[-3, -84.5], [8, -84.5]].forEach(([ex, ey]) => {
+      c.fillStyle = '#ffffff'; c.strokeStyle = CONTOUR; c.lineWidth = 1.2;
+      ellipse(c, ex, ey, 3.6, 4.4); c.fill(); c.stroke();
+      c.fillStyle = '#1d2233'; c.beginPath(); c.arc(ex + rx, ey + ry, 2.3, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#ffffff'; c.beginPath(); c.arc(ex + rx + 0.8, ey + ry - 0.9, 0.8, 0, Math.PI * 2); c.fill();
+    });
+    c.strokeStyle = o.cheveux; c.lineWidth = 1.8; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-6, -91); c.lineTo(-0.5, -90); c.moveTo(5, -90); c.lineTo(10.5, -91); c.stroke();
+    c.fillStyle = 'rgba(255,110,110,.35)';
+    [[-7, -79.5], [13, -79.5]].forEach(([ex, ey]) => { c.beginPath(); c.arc(ex, ey, 2.6, 0, Math.PI * 2); c.fill(); });
+    c.strokeStyle = CONTOUR; c.lineWidth = 1.4;
+    if (o.bouche === 'o') {
+      c.fillStyle = '#7a2430'; ellipse(c, 3, -77.5, 2.5, 3.2); c.fill(); c.stroke();
+    } else {
+      c.fillStyle = '#7a2430';
+      c.beginPath(); c.moveTo(-2.5, -79); c.quadraticCurveTo(3, -69.5, 9, -79); c.closePath(); c.fill(); c.stroke();
+      c.fillStyle = '#ffffff'; c.fillRect(-1, -79, 8.5, 1.8);
+      c.fillStyle = '#ff8a95'; ellipse(c, 3.3, -74.6, 2.6, 1.4); c.fill();
+    }
+    c.restore();
+  }
+
+  // Petit hasard à graine fixe : l'affiche est toujours la même.
+  function hasardFixe(graine) {
+    let g = graine;
+    return () => { g = (Math.imul(g, 1103515245) + 12345) >>> 0; return g / 4294967296; };
+  }
+  function dessinerAffiche() {
+    const w = art.clientWidth || window.innerWidth, h = art.clientHeight || window.innerHeight;
+    if (!w || !h) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    art.width = Math.round(w * dpr); art.height = Math.round(h * dpr);
+    const c = actx;
+    // Scène composée dans un cadre de 600 × 800 au centre ; le décor continue jusqu'aux bords.
+    const k = Math.min(w / 600, h / 800), dx = (w - 600 * k) / 2, dy = (h - 800 * k) / 2;
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * dx, dpr * dy);
+    const x0 = -dx / k - 2, x1 = (w - dx) / k + 2, y0 = -dy / k - 2, y1 = (h - dy) / k + 2;
+    const hasard = hasardFixe(20261120);
+    // Ciel de fin d'après-midi
+    const ciel = c.createLinearGradient(0, 0, 0, 280);
+    ciel.addColorStop(0, '#2f6fe0'); ciel.addColorStop(0.55, '#62aef5'); ciel.addColorStop(1, '#ffd9a0');
+    c.fillStyle = ciel; c.fillRect(x0, y0, x1 - x0, 290 - y0);
+    // Nuages
+    c.fillStyle = 'rgba(255,255,255,.9)';
+    for (let gx = Math.floor((x0 - 120) / 340) * 340; gx < x1 + 120; gx += 340) {
+      [[gx + 170, 70, 1], [gx + 20, 128, 0.7]].forEach(([nx, ny, f]) => {
+        [[0, 0, 26], [28, -10, 32], [60, 0, 24], [30, 8, 24]].forEach(([ax, ay, ar]) => { c.beginPath(); c.arc(nx + ax * f, ny + ay * f, ar * f, 0, Math.PI * 2); c.fill(); });
+      });
+    }
+    // Tribunes et public
+    c.fillStyle = '#20305e'; c.fillRect(x0, 160, x1 - x0, 14);
+    c.fillStyle = '#4b6fd1'; c.fillRect(x0, 172, x1 - x0, 4);
+    c.fillStyle = '#334a86'; c.fillRect(x0, 176, x1 - x0, 92);
+    const foule = ['#ff5f57', '#ffd34d', '#ffffff', '#3d8bff', '#3ccf7a', '#ff9ec4', '#8e6cff'];
+    for (let yy = 182; yy < 266; yy += 8) {
+      c.fillStyle = 'rgba(0,0,0,.18)'; c.fillRect(x0, yy + 3, x1 - x0, 1.5);
+      for (let xx = Math.floor(x0 / 8) * 8 + ((yy / 8) % 2) * 4; xx < x1; xx += 8) {
+        c.fillStyle = foule[Math.abs(Math.round(xx * 3 + yy * 7)) % foule.length];
+        c.beginPath(); c.arc(xx, yy, 2.9, 0, Math.PI * 2); c.fill();
+      }
+    }
+    // Panneaux colorés du bord du terrain (sans texte)
+    const panneaux = ['#ffd34d', '#3d8bff', '#ff5f57', '#3ccf7a', '#ffffff', '#8e6cff'];
+    for (let xx = Math.floor(x0 / 60) * 60, i = 0; xx < x1; xx += 60, i++) {
+      c.fillStyle = panneaux[Math.abs(Math.round(xx / 60)) % panneaux.length]; c.fillRect(xx, 266, 58, 16);
+      c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(xx + 6, 270, 46, 3);
+    }
+    // Projecteurs (la lumière de la scène)
+    const tours = [];
+    for (let tx = 46 + Math.floor((x0 - 46) / 520) * 520; tx < x1 + 60; tx += 520) tours.push(tx);
+    for (let tx = 556 + Math.floor((x0 - 556) / 520) * 520; tx < x1 + 60; tx += 520) tours.push(tx);
+    tours.forEach((tx) => {
+      c.fillStyle = '#5b6b8c'; c.fillRect(tx - 4, 60, 8, 210);
+      c.fillStyle = '#2a3554'; rondRect(c, tx - 38, 30, 76, 42, 8); c.fill();
+      for (let a = 0; a < 3; a++) for (let b = 0; b < 2; b++) {
+        c.fillStyle = '#fffbe0'; c.beginPath(); c.arc(tx - 24 + a * 24, 42 + b * 18, 7.5, 0, Math.PI * 2); c.fill();
+      }
+      const g = c.createRadialGradient(tx, 51, 4, tx, 51, 230);
+      g.addColorStop(0, 'rgba(255,252,225,.95)'); g.addColorStop(0.25, 'rgba(255,245,200,.45)'); g.addColorStop(1, 'rgba(255,245,200,0)');
+      c.fillStyle = g; c.fillRect(tx - 240, 51 - 240, 480, 480);
+    });
+    // Pelouse rayée, en perspective
+    let yy = 282, bande = 18, i = 0;
+    while (yy < y1) { c.fillStyle = i % 2 ? '#47b34b' : '#55c457'; c.fillRect(x0, yy, x1 - x0, bande + 1); yy += bande; bande *= 1.28; i++; }
+    // Lignes à la craie
+    c.strokeStyle = 'rgba(255,255,255,.92)'; c.lineWidth = 3.5; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(x0, 284); c.lineTo(x1, 284); c.stroke();
+    c.beginPath(); c.moveTo(214, 284); c.lineTo(150, 352); c.lineTo(640, 352); c.lineTo(572, 284); c.stroke();
+    c.beginPath(); c.moveTo(316, 284); c.lineTo(306, 302); c.lineTo(478, 302); c.lineTo(468, 284); c.stroke();
+    // Confettis de fête (derrière les joueurs)
+    const couleurs = ['#ffd34d', '#ff5f57', '#3d8bff', '#3ccf7a', '#ffffff', '#ff9ec4'];
+    for (let n = 0; n < 46; n++) {
+      const cx2 = x0 + hasard() * (x1 - x0), cy2 = 20 + hasard() * 300;
+      c.save(); c.translate(cx2, cy2); c.rotate(hasard() * 6);
+      c.fillStyle = couleurs[n % couleurs.length];
+      if (n % 6 === 0) { etoileCanvas(c, 0, 0, 7); c.fill(); } else c.fillRect(-6, -3, 12, 6);
+      c.restore();
+    }
+    // But : filet, gardien qui plonge, poteaux
+    c.fillStyle = 'rgba(255,255,255,.2)'; c.fillRect(300, 165, 180, 120);
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1.2;
+    for (let gx = 309; gx < 480; gx += 9) { c.beginPath(); c.moveTo(gx, 166); c.lineTo(gx, 284); c.stroke(); }
+    for (let gy = 174; gy < 285; gy += 9) { c.beginPath(); c.moveTo(300, gy); c.lineTo(480, gy); c.stroke(); }
+    dessinerFootballeur(c, 408, 262, 0.95, -1.2, { pose: 'plongeon', maillot: '#b7e02a', short: '#2c5e12', chaussette: '#b7e02a', bande: '#2c5e12', gants: '#ff8a2a', cheveux: '#7a4a1e', col: '#2c5e12', bouche: 'o', regard: [-1.6, -0.4] });
+    c.save();
+    c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 6; c.shadowOffsetY = 3;
+    c.strokeStyle = '#ffffff'; c.lineWidth = 8; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(300, 286); c.lineTo(300, 165); c.lineTo(480, 165); c.lineTo(480, 286); c.stroke();
+    c.restore();
+    // Défenseur rayé : il saute, ses grands bras grands ouverts
+    c.fillStyle = 'rgba(0,0,0,.2)'; ellipse(c, 540, 470, 40, 7); c.fill();
+    dessinerFootballeur(c, 540, 448, 1.55, 0, { saut: true, pose: 'grandsBras', maillot: '#ffffff', rayures: '#e23a33', short: '#7a1b1b', chaussette: '#e23a33', cheveux: '#3b2416', col: '#e23a33', bouche: 'o', regard: [-0.6, -1.6] });
+    // Lumière chaude derrière le héros
+    const halo = c.createRadialGradient(236, 410, 20, 236, 410, 320);
+    halo.addColorStop(0, 'rgba(255,250,215,.75)'); halo.addColorStop(0.5, 'rgba(255,240,190,.3)'); halo.addColorStop(1, 'rgba(255,240,190,0)');
+    c.fillStyle = halo; c.fillRect(x0, 90, x1 - x0, 650);
+    // Flèche jaune du plan de l'entraîneur : du pied jusqu'au coin du but, par-dessus le défenseur
+    const A = [378, 428], B = [566, 214], C = [466, 180];
+    const sur = (t) => [(1 - t) * (1 - t) * A[0] + 2 * (1 - t) * t * B[0] + t * t * C[0], (1 - t) * (1 - t) * A[1] + 2 * (1 - t) * t * B[1] + t * t * C[1]];
+    c.save();
+    c.strokeStyle = '#ffd34d'; c.lineWidth = 7; c.lineCap = 'round'; c.setLineDash([16, 12]);
+    c.shadowColor = 'rgba(80,50,0,.45)'; c.shadowBlur = 6;
+    c.beginPath(); c.moveTo(A[0], A[1]); c.quadraticCurveTo(B[0], B[1], C[0], C[1]); c.stroke();
+    c.setLineDash([]);
+    const ang = Math.atan2(C[1] - B[1], C[0] - B[0]);
+    c.fillStyle = '#ffd34d';
+    c.beginPath(); c.moveTo(C[0] + Math.cos(ang) * 10, C[1] + Math.sin(ang) * 10);
+    c.lineTo(C[0] - Math.cos(ang - 0.5) * 26, C[1] - Math.sin(ang - 0.5) * 26); c.lineTo(C[0] - Math.cos(ang + 0.5) * 26, C[1] - Math.sin(ang + 0.5) * 26);
+    c.closePath(); c.fill();
+    c.restore();
+    // Le héros, en grand : il frappe le ballon
+    dessinerFootballeur(c, 226, 596, 3.8, 0, { pose: 'frappe', maillot: '#2f7bff', short: '#ffffff', chaussette: '#2f7bff', cheveux: '#4a2c17', etoile: '#ffd34d', bouche: 'joie', regard: [1.6, -0.8] });
+    // Éclat de la frappe
+    c.save();
+    c.strokeStyle = '#fff6c2'; c.lineWidth = 5; c.lineCap = 'round';
+    for (let a = 0; a < 8; a++) {
+      const an = a * Math.PI / 4 + 0.3;
+      c.beginPath(); c.moveTo(392 + Math.cos(an) * 20, 418 + Math.sin(an) * 20); c.lineTo(392 + Math.cos(an) * 36, 418 + Math.sin(an) * 36); c.stroke();
+    }
+    c.restore();
+    // Ballon en vol, avec ses traits de vitesse
+    const [bx, by] = sur(0.84), [px, py] = sur(0.7);
+    const va = Math.atan2(by - py, bx - px);
+    c.save();
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 4; c.lineCap = 'round';
+    [-11, 0, 11].forEach((d) => {
+      const nx = -Math.sin(va) * d, ny = Math.cos(va) * d;
+      c.beginPath(); c.moveTo(bx - Math.cos(va) * 26 + nx, by - Math.sin(va) * 26 + ny); c.lineTo(bx - Math.cos(va) * (52 - Math.abs(d)) + nx, by - Math.sin(va) * (52 - Math.abs(d)) + ny); c.stroke();
+    });
+    c.restore();
+    dessinerBallon(c, bx, by, 21, 0);
+    // Premier plan : le tableau tactique de l'entraîneur, coupé par le bord
+    c.save();
+    c.translate(36, 712); c.rotate(-0.2);
+    const tw = 240, th = 300;
+    c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 18; c.shadowOffsetY = 8;
+    c.fillStyle = '#9a6230'; rondRect(c, -tw / 2 - 14, -th / 2 - 14, tw + 28, th + 28, 18); c.fill();
+    c.shadowColor = 'transparent';
+    c.fillStyle = '#7b4a1f'; rondRect(c, -tw / 2 - 5, -th / 2 - 5, tw + 10, th + 10, 10); c.fill();
+    for (let r = 0; r < 9; r++) { c.fillStyle = r % 2 ? '#3e9c4f' : '#46a857'; c.fillRect(-tw / 2, -th / 2 + r * th / 9, tw, th / 9 + 1); }
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 3;
+    c.strokeRect(-tw / 2 + 4, -th / 2 + 4, tw - 8, th - 8);
+    c.strokeRect(-tw / 2 + tw / 7, -th / 2 + 4, tw * 5 / 7, th * 0.28);
+    const tcs = tw / 7, TB = (cc, rr) => [-tw / 2 + (cc + 0.5) * tcs, -th / 2 + (rr + 0.5) * th / 9];
+    c.strokeStyle = '#ffffff'; c.lineWidth = 4; c.setLineDash([9, 7]); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(...TB(3, 7)); c.quadraticCurveTo(...TB(0.8, 5.5), ...TB(1.2, 3.6)); c.stroke();
+    c.strokeStyle = '#ffd34d';
+    c.beginPath(); c.moveTo(...TB(1.2, 3.4)); c.quadraticCurveTo(...TB(3.2, 1.2), ...TB(4.6, 1.6)); c.stroke();
+    c.setLineDash([]);
+    dessinerFleche(c, ...TB(4, 4.6), ...TB(3, 4.6), tcs, '#ff4b3e');
+    dessinerJoueur(c, ...TB(4, 4.6), tcs * 0.95, { equipe: 'raye', coupeur: true });
+    dessinerJoueur(c, ...TB(3, 7), tcs * 0.95, { equipe: 'bleu' });
+    dessinerJoueur(c, ...TB(1.2, 3.5), tcs * 0.95, { equipe: 'bleu' });
+    dessinerJoueur(c, ...TB(4.6, 1.6), tcs * 0.95, { equipe: 'bleu' });
+    dessinerBallon(c, TB(3, 7)[0] + tcs * 0.22, TB(3, 7)[1] + tcs * 0.26, tcs * 0.15);
+    c.restore();
+    // La coupe dorée qui brille, en bas à droite
+    const tmp = document.createElement('canvas'); tmp.width = 220; tmp.height = 220;
+    dessinerObjet(tmp.getContext('2d'), OBJETS[19], 220, true, true);
+    const lueur = c.createRadialGradient(536, 676, 10, 536, 676, 130);
+    lueur.addColorStop(0, 'rgba(255,225,120,.75)'); lueur.addColorStop(1, 'rgba(255,225,120,0)');
+    c.fillStyle = lueur; c.fillRect(400, 540, 280, 280);
+    c.drawImage(tmp, 436, 572, 210, 210);
+  }
+  function cacherInterfaceAffiche() {
+    document.querySelectorAll('#ecran-titre .haut, #ecran-titre .bas, .voile, button, .jel-langue, jel-langue, #langue-titre, #langue-pause')
+      .forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    montrer('ecran-titre');
+    cacherInterfaceAffiche();
+    setTimeout(cacherInterfaceAffiche, 300);
+    setTimeout(cacherInterfaceAffiche, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le match s'ouvre
+  // directement en pleine partie, avec sa vraie interface (nom du match, objectif, compteur de tours,
+  // message, boutons Annuler, Lob, Aide), sans écran titre, ni fenêtre « Continuer », ni tutoriel
+  // (CONSIGNES-JEU.md, section 5). Quelques coups de la solution sont joués d'avance, puis le moment
+  // est figé (pas de coup possible, horloge arrêtée) : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = match 1 (le pré du village) : le porteur choisi, sa passe vers le coéquipier qui s'est démarqué ;
+  //   2 = match 8 (le stade de la ville) : défenseurs et coupeur avec leurs flèches, zone orange, lob ;
+  //   3 = match 17 (le grand stade de nuit) : gardien, flaque de boue, joueurs fatigués, coupeurs,
+  //       tours comptés.
+  const SCENES_APERCU = {
+    1: { niveau: 0, coups: [{ type: 'dep', i: 0, c: 3, r: 2 }] },
+    2: { niveau: 7, coups: [{ type: 'dep', i: 0, c: 1, r: 2 }, { type: 'dep', i: 2, c: 1, r: 6 }, { type: 'passe', cible: 2, lob: false }], lob: true },
+    3: { niveau: 16, coups: [{ type: 'dep', i: 1, c: 6, r: 3 }, { type: 'dep', i: 3, c: 2, r: 7 }], lob: true },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Progression neuve, en mémoire seulement : tous les tutoriels déjà vus, rien n'est enregistré.
+    prog = { etoiles: [], records: [], vus: Object.keys(TUTOS), niveau: 1 };
+    commencerNiveau(sc.niveau);
+    sc.coups.forEach((a) => { const r = jouer(etat, a); if (r && !r.fin) { historique.push(etat); etat = r.etat; } });
+    synchro();
+    modeLob = !!sc.lob;
+    selection = etat.bal;
+    horloge = 900;
+    majHud();
+    majMessage();
+  }
+
+  // ------------------------------------------------------------------------
   // Boucle d'affichage
   // ------------------------------------------------------------------------
   let dernier = performance.now();
@@ -3446,7 +3807,7 @@
     const dt = Math.min(60, maintenant - dernier);
     dernier = maintenant;
     if (!enPause) {
-      horloge += dt;
+      if (!apercu) horloge += dt; // image du jeu : moment figé, toujours le même
       if (ecranActuel === 'ecran-jeu' && etat) {
         avancerAnims(dt);
         particules.forEach((p) => { p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.rot += p.vr; p.vie -= dt / 1000; });
@@ -3509,6 +3870,7 @@
   $('ecran-jeu').setAttribute('aria-label', t('titre'));
 
   document.addEventListener('keydown', (ev) => {
+    if (affiche || apercu) return;
     ouvrirAudio();
     const k = ev.code;
     if (ouverteTuto && (k === 'Enter' || k === 'Space' || k === 'Escape')) { ev.preventDefault(); fermerTuto(); return; }
@@ -3538,17 +3900,22 @@
       toucherCase(curseur.c, curseur.r);
     }
   });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') ouvrirPause(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && !apercu) ouvrirPause(); });
   window.addEventListener('resize', () => { redimensionner(); dessinerTitreBientot(); });
 
-  // Sauvegarde à la fermeture de la page, seulement pendant un match.
+  // Sauvegarde à la fermeture de la page, seulement pendant un match (jamais pour une image du jeu).
   JEL_SAVE.surFermeture(() => {
-    if (enPartie) JEL_SAVE.save(JEU, donneesSauvegarde(N + 1));
+    if (enPartie && !apercu) JEL_SAVE.save(JEU, donneesSauvegarde(N + 1));
   });
 
   lireProgression();
   majBoutonsSon();
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (affiche) demarrerAffiche();
+  else {
+    if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

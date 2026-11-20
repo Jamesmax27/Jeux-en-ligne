@@ -3100,6 +3100,10 @@
     .place canvas.icone { width: 28px; height: 28px; }
     #aide { display: none; }
   }
+  /* Image du jeu sur ordinateur (window.JEL_APERCU = 3) : la ville morte jusqu'aux bords */
+  body.apercu-large #ecran-jeu { background: radial-gradient(ellipse 30% 95% at 50% 60%, #07080fe6 55%, #07080f00 100%); }
+  body.apercu-large #fond { filter: brightness(1.4) saturate(1.15); }
+  body.apercu-large #temps { align-self: center; width: 540px; }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
 </style>
 </head>
@@ -3729,6 +3733,7 @@
   let fileTouches = [];       // touches tapées pendant l'aller-retour de la précédente
   let finSoloFaite = false;   // l'écran de fin d'une nuit solo est déjà montré
   let onde = { f: 0, amp: 0, voix: 0, bruit: 0, coul: '#7ff0d0' };   // haut-parleur
+  let apercuFige = null;      // images du jeu (window.JEL_APERCU) : garde le moment figé à chaque image
 
   function afficherEcran(nom) {
     ecran = nom;
@@ -3976,6 +3981,7 @@
     if (ecran !== 'jeu') return;
     const dt = Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
     tPrec = t;
+    if (apercuFige) apercuFige();
     if (!enPause) {
       dessinerRuban(t);
       dessinerHautParleur(t, dt);
@@ -5322,6 +5328,75 @@
   }
 
   // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine nuit solo contre les robots, avec sa vraie interface (postes et
+  // piles, ruban de la chaîne, pièges, temps, radio), sans écran titre, ni « Continuer », ni
+  // tutoriel, ni fenêtre (CONSIGNES-JEU.md, section 5). L'état est posé par le code (règles
+  // inchangées, aucun réseau, aucun robot qui joue) et reste figé : ni son, ni sauvegarde, ni FMG.
+  //   1 = nuit 1 : deux postes, une chaîne courte, je la rejoue ;
+  //   2 = nuit 8 : quatre postes, tour en écho, la Voix vient de chanter (Silence attendu), un poste éteint ;
+  //   3 = nuit 19 (ordinateur) : cinq postes à 2 piles, chaîne de 20 sur deux lignes, interférence
+  //       zébrée, antenne qui éteint un bouton et renvoie sa note sur le bouton d'en face.
+  const MOMENTS_APERCU = {
+    1: { nuit: 1, ch: [0, 4, 2, 5, 1], k: 3, pi: [3, 2], out: [0, 0], best: [4, 4], pts: [9, 7], reste: 0.64, joue: 2 },
+    2: {
+      nuit: 8, ch: [3, 0, 6, 4, 1, 5, 6, 2, 0, 3, 4], k: 6, pi: [2, 3, 0, 1], out: [0, 0, 1, 0], best: [9, 10, 6, 8], pts: [31, 34, 17, 26],
+      echo: 1, reste: 0.48, joue: 5, voix: true, radio: 1
+    },
+    3: {
+      nuit: 19, ch: [1, 4, 0, 3, 6, 5, 2, 0, 4, 1, 3, 6, 5, 0, 2, 4, 1, 3, 5, 2], k: 7, pi: [2, 1, 0, 2, 0], out: [0, 0, 1, 0, 2],
+      best: [17, 18, 12, 16, 13], pts: [88, 84, 51, 79, 60], inter: [11, 15], jam: 2, reste: 0.57, joue: 5, large: true, radio: 3
+    }
+  };
+
+  function ouvrirApercu(numero) {
+    const m = MOMENTS_APERCU[numero];
+    session = 'solo';
+    niveau = m.nuit;
+    enPartie = false;               // rien n'est écrit à la fermeture
+    prog.radio = m.radio || 0;      // radio montrée (en mémoire seulement ; aucun son n'est lancé)
+    // État de la nuit, construit par les règles puis placé au moment voulu.
+    const e = R.depart(() => 0, PLACES, { niveau: m.nuit });
+    e.ch = m.ch.slice(); e.tour = 0; e.ph = 0; e.k = m.k;
+    m.pi.forEach((p, s) => { e.pi[s] = p; e.out[s] = m.out[s]; e.best[s] = m.best[s]; e.pts[s] = m.pts[s]; });
+    e.no = m.out.filter((x) => x > 0).length;
+    e.inter = m.inter || null; e.jam = m.jam === undefined ? -1 : m.jam; e.echo = m.echo || 0;
+    e.nb = 60 + m.ch.length * 4;
+    vue = e;
+    // Partie locale figée : mêmes réponses que le moteur pour l'écran, aucun coup n'est joué.
+    partie = {
+      phase: 'jeu', mode: 'solo', siege: 0, manche: 0, chef: -1, etat: e,
+      sieges: () => Array.from({ length: PLACES }, (_, s) => ({ humain: s === 0, moi: s === 0, chef: false })),
+      monTour: () => true, jouer: () => true, pause: () => {}, quitter: () => {},
+      recommencer: () => false, estChef: () => false, lancerManche: () => false
+    };
+    if (m.large) document.body.classList.add('apercu-large');
+    afficherEcran('jeu');
+    majBoutonsSon();
+    majInterface();
+    // Le bouton qu'on vient de jouer reste allumé, son onde dans le haut-parleur.
+    const t = $('touche-' + m.joue);
+    t.style.setProperty('filter', 'brightness(1.5) saturate(1.2)', 'important');
+    t.style.boxShadow = '0 0 0 4px #ffffffaa, 0 0 34px ' + TOUCHES[m.joue] + ', inset 0 -5px 0 #0006';
+    if (m.voix) toast(tr('msg.voix'), 600000, true);
+    // Décor de la ville morte jusqu'aux bords de l'écran d'ordinateur.
+    if (m.large) {
+      const decor = () => { $('fond').style.display = 'block'; dessinerTitre(0); };
+      decor();
+      window.addEventListener('resize', decor);
+    }
+    apercuFige = () => {
+      onde.f = m.joue; onde.amp = m.voix ? 0.5 : 0.9; onde.coul = TOUCHES[m.joue]; onde.bruit = 0;
+      onde.voix = m.voix ? 0.95 : 0;
+      debutNote = Date.now() - tempsParNote() * (1 - m.reste);
+      tempsEnvoye = true;
+    };
+    apercuFige();
+  }
+
+  // ---------------------------------------------------------------------
   //  Commandes
   // ---------------------------------------------------------------------
 
@@ -5389,6 +5464,9 @@
   construireTouches();
   // Affiche demandée par le robot du site : la scène seule, rien d'autre.
   if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  // Images du jeu demandées par le robot du site : directement en pleine nuit, figée.
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) { ouvrirApercu(numeroApercu); return; }
   let boutonEffacer = null;
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
   afficherEcran('titre');

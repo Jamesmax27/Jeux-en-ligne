@@ -2369,7 +2369,7 @@ const SONS = {
   presque: () => [440, 392, 440, 523].forEach((f, i) => note(f, 0.25, { type: 'triangle', vol: 0.1, retard: i * 0.16 })),
   tic: () => note(1200, 0.03, { type: 'square', vol: 0.03 }),
 };
-function son(nom, ...args) { try { SONS[nom](...args); } catch (e) { /* son indisponible */ } }
+function son(nom, ...args) { if (apercu || window.JEL_AFFICHE) return; try { SONS[nom](...args); } catch (e) { /* son indisponible */ } }
 
 const ICONE_SON = '<svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>';
 const ICONE_MUET = '<svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M15 9l6 6M21 9l-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
@@ -2460,6 +2460,8 @@ let tutoOuvert = false, tutoT = 0, tutoEtape = 0, tutoDebut = 0;
 let jeu = null;              // partie en cours
 let parts = [];              // confettis et étoiles
 let bilanAnim = null;        // compteur de score qui défile
+let apercu = 0;              // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
+let apercuFige = false;      // image du jeu : partie figée sur son moment (ni gain, ni perte)
 const touches = { gauche: false, droite: false };
 
 const cv = $('#scene'), ctx = cv.getContext('2d');
@@ -2824,7 +2826,7 @@ function reprendre() {
   if (ac && sauve.son) ac.resume().catch(() => {});
   son('clic');
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu) mettrePause(); });
 
 // ---------- Tutoriel ----------
 function ouvrirTuto(cle) {
@@ -3047,7 +3049,9 @@ function dessinerJudoka(c, x, y, s, o) {
   c.beginPath(); c.arc(3, -81, 20, Math.PI * 0.82, Math.PI * 1.92); c.closePath(); c.fill();
   // Visage souriant
   c.fillStyle = CONTOUR; c.beginPath(); c.arc(13, -80, 2.4, 0, Math.PI * 2); c.fill();
-  c.lineWidth = 2; c.beginPath(); c.arc(12, -73, 4.5, 0.2 * Math.PI, 0.85 * Math.PI); c.stroke();
+  c.lineWidth = 2;
+  if (o.joie) { c.fillStyle = '#8a2b22'; c.beginPath(); c.arc(12, -75, 6, 0.08 * Math.PI, 0.92 * Math.PI); c.closePath(); c.fill(); c.stroke(); } // grand sourire (affiche)
+  else { c.beginPath(); c.arc(12, -73, 4.5, 0.2 * Math.PI, 0.85 * Math.PI); c.stroke(); }
   c.fillStyle = 'rgba(255,120,120,.45)'; c.beginPath(); c.arc(6, -73, 3.5, 0, Math.PI * 2); c.fill();
   c.restore();
   c.restore();
@@ -3408,8 +3412,8 @@ function boucle(maintenant) {
     tutoT += dt;
     if (tutoT > 2.4) { tutoT = 0; tutoEtape = (tutoEtape + 1) % 3; majTuto(); }
   }
-  if (actif()) maj(dt);
-  if (!enPause) majParts(dt);
+  if (actif() && !apercuFige) maj(dt);
+  if (!enPause && !apercuFige) majParts(dt);
   if (jeu && W) dessinerJeu();
   if (ecran === 'accueil') dessinerIllu();
   if (ecran === 'menu' && $('#kimono').classList.contains('visible')) dessinerApercu();
@@ -3448,7 +3452,7 @@ function jouer() {
   });
 }
 // Le score repart de zéro à chaque ceinture : on garde seulement le niveau.
-JEL_SAVE.surFermeture(() => { if (ecran === 'jeu' && jeu) JEL_SAVE.save(JEU, { niveau: jeu.i + 1, score: 0 }); });
+JEL_SAVE.surFermeture(() => { if (ecran === 'jeu' && jeu && !apercu)JEL_SAVE.save(JEU, { niveau: jeu.i + 1, score: 0 }); });
 const boutonEffacer = JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('#accueil .rangee') });
 function retourAccueil() {
   ecran = 'accueil'; enPause = false; jeu = null; tutoOuvert = false; bilanAnim = null;
@@ -3555,10 +3559,258 @@ $('#b-bil-accueil').addEventListener('click', () => { son('clic'); retourAccueil
 for (const b of document.querySelectorAll('#hud button')) b.addEventListener('pointerdown', (e) => e.stopPropagation());
 
 addEventListener('resize', redim);
-majSon();
-majAccueil();
-redim();
-requestAnimationFrame(boucle);
+
+// ==========================================================================
+// Affiche (jaquette du jeu)
+// ==========================================================================
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Dans un dojo baigné de
+// soleil, le petit judoka en grand fait passer son partenaire par-dessus sa hanche, au milieu des
+// étoiles et des confettis ; d'autres enfants s'entraînent au fond, une lanterne rouge éclaire le coin.
+function cacherInterfaceAffiche() {
+  for (const el of document.querySelectorAll('#jeu, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+}
+function dessinerAffiche() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const AW = innerWidth, AH = innerHeight;
+  fx.width = Math.round(AW * dpr); fx.height = Math.round(AH * dpr);
+  const c = fctx;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const k = Math.min(AW / 600, AH / 800), cx = AW / 2;
+  let graine = 4242;
+  const rnd = () => { graine = (graine * 16807) % 2147483647; return graine / 2147483647; };
+  const sol = AH * 0.56;            // pied du mur
+  const fy = AH * 0.755;            // pieds du héros
+
+  // --- Mur chaud du dojo ---
+  let g = c.createLinearGradient(0, 0, 0, sol);
+  g.addColorStop(0, '#ffad4d'); g.addColorStop(0.55, '#ffd28a'); g.addColorStop(1, '#eeae62');
+  c.fillStyle = g; c.fillRect(0, 0, AW, sol);
+  // Poutres et piliers de bois (le décor continue jusqu'aux bords)
+  c.fillStyle = '#8a5530';
+  for (let x = cx - 300 * k; x > -60 * k; x -= 300 * k) c.fillRect(x - 13 * k, 0, 26 * k, sol);
+  for (let x = cx + 300 * k; x < AW + 60 * k; x += 300 * k) c.fillRect(x - 13 * k, 0, 26 * k, sol);
+  c.fillStyle = '#6e4224'; c.fillRect(0, AH * 0.035, AW, 24 * k);
+  c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(0, AH * 0.035, AW, 5 * k);
+
+  // --- Grande fenêtre ronde pleine de soleil, derrière le héros ---
+  const wx = cx - 10 * k, wy = AH * 0.27, wr = 150 * k;
+  g = c.createRadialGradient(wx, wy, wr * 0.3, wx, wy, wr * 2.3);
+  g.addColorStop(0, 'rgba(255,250,220,.95)'); g.addColorStop(0.45, 'rgba(255,236,170,.4)'); g.addColorStop(1, 'rgba(255,236,170,0)');
+  c.fillStyle = g; c.fillRect(0, 0, AW, AH);
+  c.save(); c.beginPath(); c.arc(wx, wy, wr, 0, Math.PI * 2); c.clip();
+  g = c.createRadialGradient(wx - 30 * k, wy - 30 * k, 5 * k, wx, wy, wr);
+  g.addColorStop(0, '#ffffff'); g.addColorStop(0.6, '#fff6d2'); g.addColorStop(1, '#ffe39a');
+  c.fillStyle = g; c.fillRect(wx - wr, wy - wr, wr * 2, wr * 2);
+  // Branche de cerisier en fleurs derrière le papier
+  c.strokeStyle = 'rgba(150,100,80,.45)'; c.lineWidth = 7 * k; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(wx + wr, wy - wr * 0.5); c.quadraticCurveTo(wx + wr * 0.2, wy - wr * 0.25, wx - wr * 0.5, wy - wr * 0.7); c.stroke();
+  c.fillStyle = 'rgba(255,150,190,.55)';
+  for (let i = 0; i < 9; i++) { c.beginPath(); c.arc(wx + wr * (0.9 - i * 0.16), wy - wr * (0.42 + Math.sin(i * 1.7) * 0.18), (6 + (i % 3) * 2) * k, 0, Math.PI * 2); c.fill(); }
+  c.strokeStyle = 'rgba(185,138,85,.55)'; c.lineWidth = 3 * k;
+  c.beginPath();
+  for (let x = wx - wr; x <= wx + wr; x += wr / 3) { c.moveTo(x, wy - wr); c.lineTo(x, wy + wr); }
+  for (let y = wy - wr; y <= wy + wr; y += wr / 3) { c.moveTo(wx - wr, y); c.lineTo(wx + wr, y); }
+  c.stroke(); c.restore();
+  c.strokeStyle = '#7a4a2a'; c.lineWidth = 14 * k; c.beginPath(); c.arc(wx, wy, wr, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = '#b07a46'; c.lineWidth = 4 * k; c.beginPath(); c.arc(wx, wy, wr - 5 * k, 0, Math.PI * 2); c.stroke();
+
+  // --- Ceintures accrochées (à gauche) et rouleau peint (à droite) ---
+  const rx = cx - 215 * k, ry = AH * 0.17;
+  c.fillStyle = '#7a4a2a'; rr(c, rx - 70 * k, ry - 7 * k, 140 * k, 14 * k, 7 * k); c.fill();
+  [0, 2, 4, 6, 8, 9].forEach((b, i) => {
+    const bx = rx - 55 * k + i * 22 * k, col = CEINTURES[b];
+    c.fillStyle = col.c1; c.strokeStyle = CONTOUR; c.lineWidth = 2 * k;
+    rr(c, bx - 6 * k, ry, 12 * k, 120 * k + (i % 2) * 18 * k, 4 * k); c.fill(); c.stroke();
+    if (col.c2) { c.fillStyle = col.c2; c.fillRect(bx - 4.5 * k, ry + 4 * k, 9 * k, 100 * k); }
+  });
+  const sx2 = cx + 215 * k, sy2 = AH * 0.1;
+  c.fillStyle = '#6e4224'; c.fillRect(sx2 - 52 * k, sy2, 104 * k, 10 * k); c.fillRect(sx2 - 52 * k, sy2 + 230 * k, 104 * k, 10 * k);
+  c.fillStyle = '#fffaf0'; c.fillRect(sx2 - 44 * k, sy2 + 10 * k, 88 * k, 220 * k);
+  c.fillStyle = '#e8503f'; c.beginPath(); c.arc(sx2 + 10 * k, sy2 + 70 * k, 22 * k, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#6f93c9'; c.beginPath(); c.moveTo(sx2 - 44 * k, sy2 + 200 * k); c.lineTo(sx2 - 10 * k, sy2 + 120 * k); c.lineTo(sx2 + 20 * k, sy2 + 175 * k); c.lineTo(sx2 + 44 * k, sy2 + 140 * k); c.lineTo(sx2 + 44 * k, sy2 + 230 * k); c.lineTo(sx2 - 44 * k, sy2 + 230 * k); c.closePath(); c.fill();
+  c.fillStyle = '#fffaf0'; c.beginPath(); c.moveTo(sx2 - 22 * k, sy2 + 150 * k); c.lineTo(sx2 - 10 * k, sy2 + 120 * k); c.lineTo(sx2 + 1 * k, sy2 + 141 * k); c.closePath(); c.fill();
+
+  // --- Plinthe et tatamis en perspective ---
+  c.fillStyle = '#8a5530'; c.fillRect(0, sol - 14 * k, AW, 14 * k);
+  const vy = sol - 520 * k;          // point de fuite
+  const f = (y) => (y - vy) / (AH - vy);
+  const lignes = [sol, sol + (AH - sol) * 0.18, sol + (AH - sol) * 0.42, sol + (AH - sol) * 0.72, AH + 2];
+  const L = 170 * k;
+  const jMax = Math.ceil((AW / 2) / (L * f(sol))) + 1;
+  for (let r = 0; r < lignes.length - 1; r++) {
+    const y0 = lignes[r], y1 = lignes[r + 1];
+    for (let j = -jMax; j < jMax; j++) {
+      c.fillStyle = (j + r) % 2 === 0 ? '#a9cf5a' : '#8fb945';
+      c.beginPath();
+      c.moveTo(cx + j * L * f(y0), y0); c.lineTo(cx + (j + 1) * L * f(y0), y0);
+      c.lineTo(cx + (j + 1) * L * f(y1), y1); c.lineTo(cx + j * L * f(y1), y1); c.closePath(); c.fill();
+    }
+  }
+  c.strokeStyle = 'rgba(70,95,35,.4)'; c.lineWidth = 2 * k; c.beginPath();
+  for (const y of lignes) { c.moveTo(0, y); c.lineTo(AW, y); }
+  for (let j = -jMax; j <= jMax; j++) { c.moveTo(cx + j * L * f(sol), sol); c.lineTo(cx + j * L * f(AH), AH); }
+  c.stroke();
+  // Lumière du soleil posée sur le tapis
+  g = c.createRadialGradient(cx, fy, 10 * k, cx, fy, 330 * k);
+  g.addColorStop(0, 'rgba(255,248,210,.22)'); g.addColorStop(1, 'rgba(255,248,210,0)');
+  c.fillStyle = g; c.fillRect(0, sol, AW, AH - sol);
+  // Rayons de soleil depuis la fenêtre
+  c.fillStyle = 'rgba(255,250,215,.08)';
+  for (const [a, b] of [[-0.9, -0.55], [-0.3, 0.05], [0.35, 0.7]]) {
+    c.beginPath(); c.moveTo(wx, wy); c.lineTo(wx + a * 420 * k, AH); c.lineTo(wx + b * 420 * k, AH); c.closePath(); c.fill();
+  }
+
+  // --- Au fond : d'autres petits judokas qui se saluent (plus pâles) ---
+  c.save(); c.globalAlpha = 0.6;
+  const pf = sol + 30 * k, sf = 0.8 * k;
+  for (const [x, ce, p] of [[cx - 200 * k, 2, 1], [cx + 228 * k, 6, 3]]) {
+    const pa = PARTENAIRES[p];
+    dessinerJudoka(c, x - 26 * k, pf, sf, { face: 1, gi: '#f7f5ef', giO: '#d6cfbf', c1: CEINTURES[ce].c1, c2: CEINTURES[ce].c2, peau: '#f1c7a2', cheveux: '#3a2a1e', bow: 0.45, bras: 0 });
+    dessinerJudoka(c, x + 26 * k, pf, sf, { face: -1, gi: '#3b6fc4', giO: '#294f92', c1: CEINTURES[ce].c1, peau: pa.peau, cheveux: pa.cheveux, queue: pa.queue, bow: 0.45, bras: 0 });
+  }
+  c.restore();
+
+  // --- Confettis de la réussite (derrière les personnages) ---
+  for (let i = 0; i < 44; i++) {
+    const x = rnd() * AW, y = AH * (0.08 + rnd() * 0.55), col = COULEURS[i % COULEURS.length], tl = (6 + rnd() * 7) * k;
+    c.save(); c.translate(x, y); c.rotate(rnd() * 6); c.fillStyle = col;
+    if (i % 4 === 0) { cheminEtoile(c, 0, 0, tl, tl * 0.45); c.fill(); } else c.fillRect(-tl / 2, -tl / 4, tl, tl / 2);
+    c.restore();
+  }
+
+  // --- Le héros fait passer son partenaire par-dessus sa hanche ---
+  const s = 2.3 * k, hx = cx - 100 * k;
+  // Ombres au sol
+  c.fillStyle = 'rgba(50,70,15,.3)';
+  c.beginPath(); c.ellipse(hx + 10 * k, fy + 3 * k, 46 * s, 10 * s, 0, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.ellipse(hx + 230 * k, fy + 3 * k, 30 * s, 6 * s, 0, 0, Math.PI * 2); c.fill();
+  // Trajectoire du partenaire (grand arc lumineux, de l'épaule du héros vers le tapis)
+  c.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    c.strokeStyle = `rgba(255,255,255,${0.8 - i * 0.22})`; c.lineWidth = (13 - i * 4) * k;
+    c.beginPath(); c.arc(hx + 120 * k, fy - 90 * k, (200 + i * 20) * k, -Math.PI * 0.98, -Math.PI * 0.08); c.stroke();
+  }
+  // Partenaire en l'air, à l'horizontale, tout sourire
+  const pa = PARTENAIRES[0];
+  c.save(); c.shadowColor = 'rgba(255,255,255,.95)'; c.shadowBlur = 14 * k;
+  dessinerJudoka(c, hx + 75 * k, fy - 85 * k, s, { face: -1, gi: '#3b6fc4', giO: '#294f92', c1: '#f2cf3a', peau: pa.peau, cheveux: pa.cheveux, rot: 1.45, bras: 0.5, joie: true });
+  // Le héros, en grand, qui le tient par la veste
+  dessinerJudoka(c, hx, fy, s, { face: 1, gi: '#f7f5ef', giO: '#d6cfbf', c1: '#f08a2c', ecusson: 1, peau: '#f6d2b0', cheveux: '#6b4226', lean: 0.1, bow: 0.18, bras: 1, joie: true });
+  c.restore();
+
+  // --- Étoiles de la réussite, là où le partenaire va se poser ---
+  const ex = hx + 250 * k, ey = fy - 15 * k;
+  c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 5 * k;
+  for (let i = 0; i < 7; i++) {
+    const a = -Math.PI * (0.1 + i * 0.13);
+    c.beginPath(); c.moveTo(ex + Math.cos(a) * 34 * k, ey + Math.sin(a) * 34 * k); c.lineTo(ex + Math.cos(a) * 62 * k, ey + Math.sin(a) * 62 * k); c.stroke();
+  }
+  for (let i = 0; i < 7; i++) {
+    const a = -Math.PI * (0.05 + i * 0.15), d = (72 + (i % 3) * 22) * k;
+    c.fillStyle = i % 2 ? '#f5b301' : '#ffd84a'; c.strokeStyle = '#c98c00'; c.lineWidth = 2 * k;
+    cheminEtoile(c, ex + Math.cos(a) * d, ey + Math.sin(a) * d, (16 - (i % 3) * 3) * k, (7 - (i % 3)) * k); c.fill(); c.stroke();
+  }
+
+  // --- Premier plan : lanterne rouge (en haut à droite) et bambous (à gauche), coupés par les bords ---
+  const lx = cx + 268 * k, ly = AH * 0.14;
+  g = c.createRadialGradient(lx, ly, 10 * k, lx, ly, 200 * k);
+  g.addColorStop(0, 'rgba(255,170,90,.55)'); g.addColorStop(1, 'rgba(255,170,90,0)');
+  c.fillStyle = g; c.fillRect(lx - 200 * k, ly - 200 * k, 400 * k, 400 * k);
+  c.strokeStyle = '#3a2a1e'; c.lineWidth = 3 * k; c.beginPath(); c.moveTo(lx, 0); c.lineTo(lx, ly - 70 * k); c.stroke();
+  g = c.createRadialGradient(lx - 15 * k, ly - 10 * k, 5 * k, lx, ly, 70 * k);
+  g.addColorStop(0, '#ffd27a'); g.addColorStop(0.45, '#f0563f'); g.addColorStop(1, '#b8281e');
+  c.fillStyle = g; c.beginPath(); c.ellipse(lx, ly, 58 * k, 68 * k, 0, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(120,20,15,.6)'; c.lineWidth = 2.5 * k;
+  for (let i = -2; i <= 2; i++) { c.beginPath(); c.ellipse(lx, ly, Math.abs(i) * 14 * k + 1, 68 * k, 0, 0, Math.PI * 2); c.stroke(); }
+  c.fillStyle = '#2b2b2b'; rr(c, lx - 32 * k, ly - 76 * k, 64 * k, 14 * k, 4 * k); c.fill(); rr(c, lx - 32 * k, ly + 62 * k, 64 * k, 14 * k, 4 * k); c.fill();
+  c.strokeStyle = '#f5b301'; c.lineWidth = 4 * k; c.beginPath(); c.moveTo(lx, ly + 76 * k); c.lineTo(lx, ly + 110 * k); c.stroke();
+  // Bambous
+  for (const [bx, h, w] of [[cx - 282 * k, AH * 0.62, 22], [cx - 252 * k, AH * 0.5, 16]]) {
+    c.fillStyle = '#4f9a3a'; c.strokeStyle = '#2f6a24'; c.lineWidth = 2.5 * k;
+    for (let y = AH; y > AH - h; y -= 70 * k) {
+      rr(c, bx - w * k / 2, y - 66 * k, w * k, 66 * k, 6 * k); c.fill(); c.stroke();
+    }
+    c.fillStyle = '#6cbf4e';
+    for (let i = 0; i < 4; i++) {
+      const y = AH - h + i * 60 * k, d = i % 2 ? 1 : -1;
+      c.save(); c.translate(bx, y); c.rotate(d * 0.5);
+      c.beginPath(); c.ellipse(d * 34 * k, 0, 36 * k, 8 * k, 0, 0, Math.PI * 2); c.fill(); c.restore();
+    }
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+}
+function demarrerAffiche() {
+  cacherInterfaceAffiche();
+  setTimeout(cacherInterfaceAffiche, 300);
+  setTimeout(cacherInterfaceAffiche, 1200);
+  dessinerAffiche();
+  addEventListener('resize', dessinerAffiche);
+}
+
+// ==========================================================================
+// Images du jeu (page du jeu)
+// ==========================================================================
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (barre du haut, consigne, jauge…), sans écran
+// titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). Le moment est posé par le
+// code puis figé : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = ceinture blanche : l'aiguille est dans le vert, Léo passe par-dessus la hanche, confettis ;
+//   2 = ceinture orange-verte : Lina fait chuter le joueur, la flèche et son chrono disent où glisser ;
+//   3 = ceinture marron : Maître Rosa, prise en mouvement (jauge et barre du centre qui pousse).
+function ouvrirApercu(numero) {
+  apercu = numero;
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 7331 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  // Kimono et écusson de l'image, en mémoire seulement (rien n'est enregistré).
+  sauve.gi = numero === 3 ? 1 : 0; sauve.ecusson = numero === 1 ? 0 : numero === 2 ? 1 : 4;
+  const niveau = numero === 1 ? 0 : numero === 2 ? 5 : 9;
+  lancer(niveau);
+  if (tutoOuvert) { tutoOuvert = false; montrer('tuto', false); }
+  const J = jeu;
+  if (numero === 1) {
+    // Le joueur vient de toucher, l'aiguille dans le vert : la prise part, l'enfant passe par-dessus la hanche.
+    J.liste = ['prise', 'prise', 'prise', 'prise', 'prise', 'prise']; J.max = 18;
+    J.idx = 2; J.type = 'prise'; J.pts = 6; J.score = 60; J.combo = 2;
+    J.aig.a = 1.42; J.aig.s = 1; J.aig.e = -1;
+    reussite(3, t('parfait'));
+    J.anim = 'priseOK'; J.dureeResultat = 1.7; aller('resultat'); J.haut = 'jauge'; J.t = 0.36;
+    consigne(t('ippon'));
+    for (const x of J.textes) x.age = 0.32;
+    for (let i = 0; i < 20; i++) majParts(1 / 60);
+    J.secousse = 0;
+  } else if (numero === 2) {
+    // Chute à amortir : la flèche montre le sens, l'anneau du chrono se vide.
+    J.idx = 4; J.type = 'chute'; J.pts = 11; J.score = 135; J.combo = 3; J.meilleureSerie = 3;
+    J.dir = 'gauche'; aller('chute'); J.haut = 'fleche'; J.t = 0.62;
+    consigne(t('glisseFleche'));
+  } else {
+    // Prise en mouvement : garder le point rouge dans le vert pendant que Maître Rosa pousse, puis toucher.
+    J.idx = 8; J.type = 'mobile'; J.pts = 22; J.score = 310; J.combo = 4; J.meilleureSerie = 5;
+    initAiguille(); aller('mobile'); J.haut = 'jauge'; J.t = 2.1;
+    J.aig.a = -0.9; J.aig.att = 0; J.centre = 0.1; J.pousse = 0.75; J.pousseCible = 0.75; J.pousseT = 1;
+    consigne(t('centreEtVert'));
+  }
+  majHud();
+  apercuFige = true;
+}
+
+// ==========================================================================
+// Démarrage
+// ==========================================================================
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  majSon();
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  majSon();
+  majAccueil();
+  redim();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>
