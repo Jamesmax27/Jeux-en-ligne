@@ -1746,6 +1746,7 @@
   const I18N = window.JEL_I18N;
   const T = (cle, vars) => I18N.t(cle, vars);
   const NB = (x) => I18N.nombre(x);
+  let apercu = 0;                // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
   // ------------------------------------------------------------------------
   // Réglages généraux
@@ -1834,7 +1835,7 @@
   function totalScore() { return prog.records.reduce((a, b) => a + b, 0); }
   function estDebloque(i) { return i === 0 || prog.etoiles[i - 1] > 0 || i < prog.atteint; }
   function sauver(niveauReprise) {
-    if (!window.JEL_SAVE) return;
+    if (!window.JEL_SAVE || apercu) return; // image du jeu : rien n'est écrit dans la sauvegarde
     window.JEL_SAVE.save(JEU, {
       niveau: niveauReprise, score: totalScore(), etoiles: prog.etoiles.slice(), records: prog.records.slice(),
       lanterne: prog.lanterne, cire: prog.cire,
@@ -1852,6 +1853,7 @@
   // ------------------------------------------------------------------------
   let audio = null, sortie = null, bruitTampon = null, pluie = null;
   function initAudio() {
+    if (apercu) return; // image du jeu : aucun son
     if (audio) { if (audio.state === 'suspended') audio.resume(); return; }
     try {
       audio = new (window.AudioContext || window.webkitAudioContext)();
@@ -1912,7 +1914,7 @@
     clic: () => ton(660, 0.06, 'triangle', 0.08),
     etoile: (i) => ton(700 + i * 220, 0.3, 'triangle', 0.12, 1000 + i * 260),
   };
-  function son(nom, arg) { try { if (SONS[nom]) SONS[nom](arg); } catch (e) { /* audio refusé */ } }
+  function son(nom, arg) { if (apercu) return; try { if (SONS[nom]) SONS[nom](arg); } catch (e) { /* audio refusé */ } }
   function pluieAmbiance(oui) {
     if (!audio) return;
     if (oui && !pluie && sonActif) {
@@ -2143,6 +2145,7 @@
   const bulle = document.getElementById('bulle');
   let bulleMinuteur = 0;
   function annoncer(texte, duree) {
+    if (apercu) return;
     bulle.textContent = texte;
     bulle.classList.add('visible');
     clearTimeout(bulleMinuteur);
@@ -2433,7 +2436,7 @@
   // Fin d'étage
   // ------------------------------------------------------------------------
   function terminer(gagne, cause) {
-    if (finPartie) return;
+    if (finPartie || apercu) return; // image du jeu : ni victoire, ni défaite
     finPartie = { gagne, cause, t: 0 };
     const n = niveau;
     if (gagne) {
@@ -2892,6 +2895,72 @@
   });
   let motifsCtx = null;
 
+  // Image du jeu sur un écran large (window.JEL_APERCU) : de chaque côté de la cage d'escalier, l'épaisse
+  // maçonnerie du phare continue jusqu'au bord de l'écran, percée de hautes fenêtres sur la mer en tempête.
+  // Dessiné dans le repère du monde (défile avec la caméra) ; jamais pendant une vraie partie.
+  let fenetresCotes = [];
+  function fenetreTempete(c, x, y, w, h) {
+    const flash = eclair > 0, haut = y - h, r = w / 2;
+    const arche = (dx) => { c.beginPath(); c.moveTo(x - r - dx, y); c.lineTo(x - r - dx, haut + r); c.arc(x, haut + r, r + dx, Math.PI, 0); c.lineTo(x + r + dx, y); c.closePath(); };
+    // Embrasure de pierre
+    c.fillStyle = '#0a0d10'; arche(10); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.06)'; arche(6); c.fill();
+    c.save(); arche(0); c.clip();
+    // Ciel d'orage (blanchi par l'éclair)
+    const g = c.createLinearGradient(0, haut, 0, y);
+    g.addColorStop(0, flash ? '#d8e6fa' : '#243c5a'); g.addColorStop(0.55, flash ? '#8eaccd' : '#2e5272'); g.addColorStop(1, '#14324a');
+    c.fillStyle = g; c.fillRect(x - r - 2, haut - 2, w + 4, h + 4);
+    // Nuages
+    c.fillStyle = flash ? 'rgba(120,140,170,.55)' : 'rgba(14,22,34,.6)';
+    for (let k = 0; k < 3; k++) { c.beginPath(); c.ellipse(x - r + k * r * 0.9, haut + h * (0.2 + k * 0.09), r * 0.8, h * 0.07, 0, 0, Math.PI * 2); c.fill(); }
+    // Éclair
+    if (flash) {
+      c.strokeStyle = '#ffffff'; c.lineWidth = 2.5; c.lineJoin = 'round';
+      c.beginPath(); c.moveTo(x + r * 0.2, haut); c.lineTo(x - r * 0.15, haut + h * 0.22); c.lineTo(x + r * 0.15, haut + h * 0.3); c.lineTo(x - r * 0.3, haut + h * 0.55); c.stroke();
+    }
+    // Mer déchaînée
+    const mer = y - h * 0.3;
+    for (let k = 0; k < 3; k++) {
+      c.fillStyle = ['#123548', '#0d2a3a', '#09202d'][k];
+      c.beginPath(); c.moveTo(x - r - 4, y + 4);
+      for (let xx = -r - 4; xx <= r + 4; xx += 8) c.lineTo(x + xx, mer + k * h * 0.09 + Math.sin(xx * 0.09 + k * 2 + horloge * 2) * (5 + k * 2));
+      c.lineTo(x + r + 4, y + 4); c.closePath(); c.fill();
+      c.strokeStyle = 'rgba(215,240,245,' + (0.55 - k * 0.12) + ')'; c.lineWidth = 1.6;
+      c.beginPath();
+      for (let xx = -r - 4; xx <= r + 4; xx += 8) c.lineTo(x + xx, mer + k * h * 0.09 + Math.sin(xx * 0.09 + k * 2 + horloge * 2) * (5 + k * 2));
+      c.stroke();
+    }
+    // Pluie battante sur la vitre
+    c.strokeStyle = 'rgba(200,220,235,.35)'; c.lineWidth = 1;
+    for (let k = 0; k < 9; k++) { const xx = x - r + ((k * 37) % w), yy = haut + ((k * 53) % h); c.beginPath(); c.moveTo(xx, yy); c.lineTo(xx - 4, yy + 14); c.stroke(); }
+    c.restore();
+    // Croisillons et rebord
+    c.fillStyle = '#101418';
+    c.fillRect(x - 2.5, haut, 5, h); c.fillRect(x - r, haut + h * 0.45, w, 5);
+    c.fillStyle = '#3a4046'; c.fillRect(x - r - 14, y, w + 28, 8);
+    c.fillStyle = 'rgba(0,0,0,.4)'; c.fillRect(x - r - 14, y + 8, w + 28, 5);
+    fenetresCotes.push({ x, y: y - h * 0.5, r: h * 0.6 });
+  }
+  function dessinerCotes(c, L) {
+    const ext = decalX / echelle + 6;
+    const y0 = camY - 20, h = vueH + 40;
+    c.fillStyle = motifsCtx[L.palier];
+    c.fillRect(-ext, y0, ext, h); c.fillRect(LARGEUR, y0, ext, h);
+    c.fillStyle = 'rgba(0,0,0,.3)';
+    c.fillRect(-ext, y0, ext, h); c.fillRect(LARGEUR, y0, ext, h);
+    // Fenêtres, en quinconce d'un côté à l'autre
+    const pas = 300, fw = 92, fh = 170;
+    for (let wy = Math.floor((camY - 300) / pas) * pas; wy < camY + vueH + 300; wy += pas) {
+      fenetreTempete(c, -ext * 0.5, wy, fw, fh);
+      fenetreTempete(c, LARGEUR + ext * 0.5, wy + pas / 2, fw, fh);
+    }
+    // Piliers de pierre qui encadrent la cage d'escalier
+    [-12, LARGEUR].forEach((px) => {
+      c.fillStyle = PALIERS[L.palier].joint; c.fillRect(px, y0, 12, h);
+      c.fillStyle = 'rgba(255,255,255,.08)'; c.fillRect(px + 2, y0, 2, h);
+    });
+  }
+
   // ------------------------------------------------------------------------
   // Dessin du jeu
   // ------------------------------------------------------------------------
@@ -2906,6 +2975,9 @@
     c.setTransform(dpr * echelle, 0, 0, dpr * echelle, dpr * (decalX + sx), dpr * (-camY * echelle + sy));
     // Murs intérieurs en pierre
     if (!motifsCtx) motifsCtx = motifs.map((mo) => c.createPattern(mo, 'repeat'));
+    // Image du jeu sur un écran large : la maçonnerie et ses fenêtres sur la tempête continuent jusqu'aux bords
+    fenetresCotes = [];
+    if (apercu && decalX > 2) dessinerCotes(c, L);
     c.fillStyle = motifsCtx[L.palier];
     c.fillRect(0, camY - 20, LARGEUR, vueH + 40);
     // Ombre de la cage d'escalier
@@ -3029,6 +3101,7 @@
       if (m.porte) lueur(m.porte.x, m.porte.y - 30, 50);
       if (m.foyer) lueur(m.foyer.x, m.foyer.y - 40, 50 + m.foyer.progres * 30);
       m.noyes.forEach((e) => { if (e.vu) lueur(e.x, e.p.y - 29, 7); }); // yeux qui brillent
+      fenetresCotes.forEach((f) => lueur(f.x, f.y, f.r)); // fenêtres des côtés (image du jeu sur écran large)
       c.drawImage(nuit, 0, 0, ecranL, ecranH);
     }
     if (flashBlanc > 0) { c.fillStyle = 'rgba(220,235,255,' + flashBlanc * 0.35 + ')'; c.fillRect(0, 0, ecranL, ecranH); }
@@ -3383,6 +3456,8 @@
   function boucle(maintenant) {
     const dt = Math.min(0.033, Math.max(0, (maintenant - avant) / 1000));
     avant = maintenant;
+    // Image du jeu : la partie est figée sur son moment, sans fenêtre de pause (rien ne bouge)
+    if (apercu) { if (monde) dessinerJeu(); requestAnimationFrame(boucle); return; }
     horloge += dt;
     if (etat === 'jeu' && monde) mettreAJour(dt);
     else if (etat === 'fin' && monde && finPartie) {
@@ -3536,7 +3611,7 @@
   }
 
   function pause() {
-    if (etat !== 'jeu') return;
+    if (etat !== 'jeu' || apercu) return;
     etat = 'pause';
     Object.keys(touches).forEach((k) => { touches[k] = false; });
     document.querySelectorAll('.tc').forEach((b) => b.classList.remove('appui'));
@@ -3628,7 +3703,7 @@
 
   // Sauvegarde à la fermeture, seulement pendant une partie
   window.JEL_SAVE.surFermeture(() => {
-    if (partieEnCours && monde) sauver(niveau + 1);
+    if (partieEnCours && monde && !apercu) sauver(niveau + 1);
   });
 
   // ------------------------------------------------------------------------
@@ -4056,6 +4131,103 @@
   }
 
   // ------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (étage, cœurs, huile, médaillons, boutons),
+  // sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). Le moment
+  // est posé par le code, la partie tourne une demi-seconde (lumière, particules, monstres qui
+  // approchent), puis elle est figée sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = étage 1, la cave inondée : la gardienne lève sa lanterne et fige le premier noyé ;
+  //   2 = étage 10, la chambre du gardien : elle saute vers la marche suivante, un flotteur la poursuit,
+  //       la marée monte avec ses mains de noyés et une vague s'annonce ;
+  //   3 = étage 20, la lanterne (écran d'ordinateur) : dans le noir zébré d'éclairs, elle rallume le grand
+  //       feu pendant qu'un noyé figé, une main sortie du mur et un flotteur arrivent par l'escalier.
+  const SCENES_APERCU = {
+    1: {
+      niveau: 0, lanterne: 'cuivre',
+      poser(m, j) {
+        const p = m.plats[8];
+        j.x = 198; j.y = p.y; j.sol = p; j.dir = -1;
+        const e = m.noyes[0]; e.p = p; e.x = 140; e.vu = true; e.sortie = 1; e.dir = 1;
+        m.objets[0].pris = true;
+        touches.lanterne = true;
+      },
+      finir(m, j) {
+        m.noyes[0].gel = GEL_APRES;
+        huile = 74; coeurs = 3; medaillons = 1;
+        document.getElementById('b-lanterne').classList.add('appui');
+      },
+    },
+    2: {
+      niveau: 9, lanterne: 'cuivre',
+      poser(m, j) {
+        const p = m.plats[9];
+        j.x = 222; j.y = p.y; j.sol = p; j.dir = -1;
+        const f = m.flotteurs[1]; f.actif = true; f.x = 300; f.y = -800;
+        m.noyes.forEach((e) => { if (e.p === m.plats[12]) { e.vu = true; e.sortie = 1; e.x = 90; e.dir = 1; } });
+        m.objets.forEach((o) => { if (o.type === 'medaillon' && o.y > -700) o.pris = true; });
+      },
+      finir(m, j) {
+        // En plein saut vers la marche du dessus, à gauche
+        j.x = 176; j.y = -706; j.sol = null; j.vy = -220; j.dir = -1;
+        gerbe(212, -664, 6, '#9fb7b0', 60, 300, 0.4);
+        eau = -540;
+        vague = { t: 0.5, dir: 1, alerte: 1.6, duree: 1.8, son: true };
+        huile = 52; coeurs = 2; medaillons = 1;
+        document.getElementById('b-saut').classList.add('appui');
+      },
+    },
+    3: {
+      niveau: 19, lanterne: 'laiton',
+      poser(m, j) {
+        const p = m.plats[m.plats.length - 1];
+        j.x = 132; j.y = p.y; j.sol = p; j.dir = 1;
+        m.foyer.progres = 1.4;
+        const bas = m.plats[30];
+        m.noyes.forEach((e) => {
+          if (e.p === m.plats[25]) { e.p = bas; e.x = 236; }
+          if (e.p === bas || e.p === m.plats[29]) { e.vu = true; e.sortie = 1; }
+        });
+        const f = m.flotteurs[3]; f.actif = true; f.x = 312; f.y = -2372;
+        m.objets.forEach((o) => { if (o.type === 'medaillon') o.pris = true; });
+        touches.lanterne = true;
+      },
+      finir(m, j) {
+        m.foyer.progres = 2;
+        m.noyes.forEach((e) => { if (e.p === m.plats[30]) e.gel = GEL_APRES; });
+        const h = m.mains[0]; h.x = LARGEUR - MUR; h.dir = -1; h.y = m.plats[28].y - 16; h.etat = 'sortie'; h.sortie = 1;
+        eclair = 0.2; flashBlanc = 0.08;
+        huile = 46; coeurs = 2; medaillons = 3;
+        document.getElementById('b-lanterne').classList.add('appui');
+      },
+    },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture
+    Math.random = hasard(424242 + numero * 7919);
+    viderProgression(); // progression neuve en mémoire seulement (rien n'est enregistré)
+    prog.lanterne = sc.lanterne; prog.cire = 'jaune';
+    // Tutoriels déjà vus : la partie s'ouvre directement
+    NIVEAUX.forEach((L) => (L.nouveau || []).forEach((k) => tutosVus.add(k)));
+    lancerNiveau(sc.niveau);
+    const m = monde, j = joueur;
+    sc.poser(m, j);
+    // La partie tourne une demi-seconde, gardienne intouchable et marée tenue loin (ni défaite ni victoire)
+    j.invul = 99; eau = 1e6; horloge = 2;
+    for (let i = 0; i < 30; i++) { mettreAJour(1 / 60); horloge += 1 / 60; }
+    j.invul = 0; secousse = 0; prochainEclair = Infinity;
+    sc.finir(m, j);
+    camY = Math.max(m.haut - 160, Math.min(150 / echelle - vueH, j.y - vueH * 0.6));
+  }
+  // Redimensionnement pendant une image : la caméra suit la nouvelle hauteur de vue
+  window.addEventListener('resize', () => {
+    if (apercu && monde) camY = Math.max(monde.haut - 160, Math.min(150 / echelle - vueH, joueur.y - vueH * 0.6));
+  });
+
+  // ------------------------------------------------------------------------
   // Démarrage
   // ------------------------------------------------------------------------
   chargerProgression();
@@ -4067,6 +4239,13 @@
   // Affiche du jeu : ni écran titre, ni son, ni boucle de jeu
   if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
   majBoutonsSon();
+  // Images du jeu : directement en pleine partie, figée (ni écran titre, ni son, ni sauvegarde)
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+    return;
+  }
   allerTitre();
   requestAnimationFrame(boucle);
 })();

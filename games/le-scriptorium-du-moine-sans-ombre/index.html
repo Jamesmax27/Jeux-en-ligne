@@ -3949,6 +3949,9 @@
   const nb = (x) => I18N.nombre(x);
   const $ = (id) => document.getElementById(id);
   const copie = (x) => JSON.parse(JSON.stringify(x));
+  // Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé seulement par le robot du site.
+  const APERCU_N = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+  let tFige = 0;               // image du jeu : instant figé des animations
 
   // Une couleur d'encre par place : 0 lapis, 1 carmin, 2 sinople, 3 safran.
   const COUL = ['#2b5fb0', '#b83a32', '#2f7d55', '#b7791f'];
@@ -4006,6 +4009,7 @@
   }
 
   function sauver(score) {
+    if (APERCU_N) return; // image du jeu : rien n'est écrit dans la sauvegarde
     try {
       window.JEL_SAVE.save(JEU, {
         niveau: prog.reprise, score: score || 0, etoiles: prog.etoiles.slice(), records: prog.records.slice(), pages: prog.pages.slice(),
@@ -4980,7 +4984,9 @@
     if (ecran !== 'jeu' || enPause) return;
     const dt = Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
     tPrec = t;
-    dessinerJeu(performance.now(), dt);
+    // Image du jeu : le moment est figé (animations à un instant choisi, rien ne bouge).
+    if (APERCU_N) dessinerJeu(tFige, 0);
+    else dessinerJeu(performance.now(), dt);
     majTemps();
     majCompte();
     majInfos();
@@ -4995,6 +5001,7 @@
     const c = cv.getContext('2d');
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, w, h);
+    if (APERCU_N === 3) decorApercu(c, w, h, t);
     if (!vue) { geo = null; return; }
     geo = geometrie(vue, w, h, 8);
     const s = moi();
@@ -5976,7 +5983,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !APERCU_N && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une nuit solo.
@@ -5984,12 +5991,375 @@
     if (enPartie && session === 'solo') { prog.reprise = niveau; sauver(vue && moi() >= 0 ? vue.sc[moi()] : 0); }
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(); });
+  window.addEventListener('resize', () => { if (ecran !== 'jeu' && ecran !== 'affiche') dessinerTitre(); });
+
+  // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu) : window.JEL_AFFICHE, posé seulement par le
+  //  robot du site (CONSIGNES-JEU.md, section 5). Scène composée, sans
+  //  interface ni texte, et sans aucune lettre : le copiste en capuche bleue
+  //  pose une lettre-tuile lumineuse sur le manuscrit, pendant que le Moine
+  //  sans Ombre, découpé sur la grande fenêtre au clair de lune, efface de sa
+  //  main les tuiles du mot le plus long, qui s'envolent en poussière bleue.
+  // ---------------------------------------------------------------------
+
+  // Tuile vierge (aucune lettre) : parchemin, liseré de la couleur du copiste, points de valeur.
+  function tuileAffiche(c, x, y, s, coul, v, o) {
+    o = o || {};
+    c.save();
+    const g = c.createLinearGradient(x, y, x, y + s);
+    g.addColorStop(0, o.lumiere ? '#fffbe8' : '#f6e9c8'); g.addColorStop(1, o.lumiere ? '#ffe39a' : '#d8bd86');
+    c.fillStyle = g; rr(c, x + s * 0.05, y + s * 0.05, s * 0.9, s * 0.9, s * 0.15); c.fill();
+    c.strokeStyle = coul; c.lineWidth = Math.max(2, s * 0.09);
+    rr(c, x + s * 0.1, y + s * 0.1, s * 0.8, s * 0.8, s * 0.12); c.stroke();
+    // trait d'encre décoratif (une volute, jamais une lettre)
+    c.strokeStyle = coul; c.globalAlpha = 0.55; c.lineWidth = Math.max(1.5, s * 0.06); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x + s * 0.28, y + s * 0.5); c.quadraticCurveTo(x + s * 0.5, y + s * 0.28, x + s * 0.72, y + s * 0.5); c.stroke();
+    c.globalAlpha = 1;
+    pastilles(c, v, x, y, s, coul);
+    c.restore();
+  }
+
+  // Copiste du joueur, en grand : capuche lapis, visage dans l'ombre, yeux d'or.
+  function copisteAffiche(c, x, y, r) {
+    c.save();
+    // robe et épaules
+    const robe = c.createLinearGradient(x - r * 1.6, 0, x + r * 1.4, 0);
+    robe.addColorStop(0, '#3f7fe0'); robe.addColorStop(0.45, '#2b5fb0'); robe.addColorStop(1, '#14284f');
+    c.fillStyle = robe;
+    c.beginPath();
+    c.moveTo(x - r * 1.9, y + r * 5); c.quadraticCurveTo(x - r * 1.75, y + r * 1.4, x - r * 0.8, y + r * 0.9);
+    c.lineTo(x + r * 0.8, y + r * 0.9); c.quadraticCurveTo(x + r * 1.75, y + r * 1.4, x + r * 1.9, y + r * 5); c.closePath(); c.fill();
+    // capuche
+    const cap = c.createLinearGradient(x - r * 1.2, y - r, x + r * 1.2, y + r);
+    cap.addColorStop(0, '#5a97f0'); cap.addColorStop(0.5, '#2b5fb0'); cap.addColorStop(1, '#16305e');
+    c.fillStyle = cap;
+    c.beginPath();
+    c.moveTo(x - r * 1.05, y + r * 1.2);
+    c.quadraticCurveTo(x - r * 1.25, y - r * 0.5, x - r * 0.1, y - r * 1.35);
+    c.quadraticCurveTo(x + r * 0.2, y - r * 1.5, x + r * 0.35, y - r * 1.2);
+    c.quadraticCurveTo(x + r * 1.25, y - r * 0.4, x + r * 1.05, y + r * 1.2);
+    c.closePath(); c.fill();
+    // liseré d'or de la capuche, éclairé par la chandelle
+    c.strokeStyle = '#ffcf6a'; c.lineWidth = r * 0.09;
+    c.beginPath(); c.moveTo(x - r * 0.78, y + r * 1.05); c.quadraticCurveTo(x - r * 0.85, y - r * 0.85, x, y - r * 0.92); c.quadraticCurveTo(x + r * 0.85, y - r * 0.85, x + r * 0.78, y + r * 1.05); c.stroke();
+    // visage dans l'ombre, tourné vers le Moine
+    c.fillStyle = '#0b0705';
+    c.beginPath(); c.ellipse(x - r * 0.05, y + r * 0.12, r * 0.62, r * 0.8, -0.08, 0, Math.PI * 2); c.fill();
+    // lueur chaude de la chandelle sur le bas du visage
+    const lv = c.createRadialGradient(x + r * 0.25, y + r * 0.85, 0, x + r * 0.25, y + r * 0.85, r * 0.7);
+    lv.addColorStop(0, 'rgba(255,170,80,.55)'); lv.addColorStop(1, 'rgba(255,170,80,0)');
+    c.fillStyle = lv; c.beginPath(); c.ellipse(x - r * 0.05, y + r * 0.12, r * 0.62, r * 0.8, -0.08, 0, Math.PI * 2); c.fill();
+    // yeux d'or grands ouverts, sourcils froncés
+    c.shadowColor = '#ffd77a'; c.shadowBlur = r * 0.35;
+    c.fillStyle = '#ffe08a';
+    c.beginPath(); c.ellipse(x - r * 0.3, y + r * 0.05, r * 0.13, r * 0.17, 0, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(x + r * 0.15, y + r * 0.05, r * 0.13, r * 0.17, 0, 0, Math.PI * 2); c.fill();
+    c.shadowBlur = 0;
+    c.fillStyle = '#2a1606';
+    rond(c, x - r * 0.35, y + r * 0.06, r * 0.06); c.fill();
+    rond(c, x + r * 0.1, y + r * 0.06, r * 0.06); c.fill();
+    c.strokeStyle = '#ffcf6a'; c.lineWidth = r * 0.07; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x - r * 0.5, y - r * 0.24); c.lineTo(x - r * 0.18, y - r * 0.12); c.stroke();
+    c.beginPath(); c.moveTo(x + r * 0.32, y - r * 0.24); c.lineTo(x + r * 0.02, y - r * 0.12); c.stroke();
+    c.restore();
+  }
+
+  // Le Moine sans Ombre, en grand : robe noire bordée de lune, yeux bleu glacé.
+  function moineAffiche(c, x, y, h) {
+    c.save();
+    const forme = () => {
+      c.beginPath();
+      c.moveTo(x - h * 0.34, y + h * 0.62);
+      c.quadraticCurveTo(x - h * 0.42, y - h * 0.05, x - h * 0.05, y - h * 0.46);
+      c.quadraticCurveTo(x + h * 0.02, y - h * 0.52, x + h * 0.08, y - h * 0.44);
+      c.quadraticCurveTo(x + h * 0.4, y - h * 0.08, x + h * 0.34, y + h * 0.62);
+      c.closePath();
+    };
+    // contour de lune (contre-jour)
+    c.shadowColor = '#9fe8ff'; c.shadowBlur = h * 0.06;
+    c.strokeStyle = '#bff2ff'; c.lineWidth = h * 0.012; forme(); c.stroke();
+    c.shadowBlur = 0;
+    const robe = c.createLinearGradient(x, y - h * 0.5, x, y + h * 0.62);
+    robe.addColorStop(0, '#1a1426'); robe.addColorStop(0.7, '#120c18'); robe.addColorStop(1, 'rgba(18,12,24,0)');
+    c.fillStyle = robe; forme(); c.fill();
+    // ouverture de la capuche, et deux yeux bleu glacé
+    c.fillStyle = '#000';
+    c.beginPath(); c.ellipse(x + h * 0.02, y - h * 0.22, h * 0.11, h * 0.14, 0.05, 0, Math.PI * 2); c.fill();
+    c.shadowColor = '#7fe3ff'; c.shadowBlur = h * 0.05;
+    c.fillStyle = '#d8f8ff';
+    c.beginPath(); c.ellipse(x - h * 0.025, y - h * 0.22, h * 0.022, h * 0.014, -0.2, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(x + h * 0.07, y - h * 0.22, h * 0.022, h * 0.014, 0.2, 0, Math.PI * 2); c.fill();
+    c.shadowBlur = 0;
+    // le bras tendu vers le manuscrit (manche noire bordée de lune)
+    const sx = x + h * 0.1, sy = y - h * 0.06, ex = x + h * 0.3, ey = y + h * 0.05, wx = x + h * 0.2, wy = y + h * 0.19;
+    const bras = () => { c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(ex, ey - h * 0.04, ex, ey); c.quadraticCurveTo(ex - h * 0.02, ey + h * 0.08, wx, wy); };
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.shadowColor = '#9fe8ff'; c.shadowBlur = h * 0.03;
+    c.strokeStyle = '#bff2ff'; c.lineWidth = h * 0.09; bras(); c.stroke();
+    c.shadowBlur = 0;
+    c.strokeStyle = '#16101e'; c.lineWidth = h * 0.075; bras(); c.stroke();
+    // main pâle aux longs doigts, ouverte au-dessus des tuiles qu'elle efface
+    c.fillStyle = '#c9d6e6';
+    c.beginPath(); c.ellipse(wx - h * 0.01, wy + h * 0.025, h * 0.032, h * 0.026, 0.4, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#c9d6e6'; c.lineWidth = h * 0.013;
+    [[-0.075, 0.06], [-0.05, 0.085], [-0.02, 0.095], [0.012, 0.085], [0.03, 0.04]].forEach((d) => {
+      c.beginPath(); c.moveTo(wx - h * 0.01, wy + h * 0.03);
+      c.quadraticCurveTo(wx + h * d[0] * 0.5, wy + h * d[1] * 0.9, wx + h * d[0], wy + h * d[1]); c.stroke();
+    });
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const c = cv.getContext('2d');
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    const X0 = -ox / k, X1 = (w - ox) / k, Y0 = -oy / k, Y1 = (h - oy) / k, LW = X1 - X0;
+    const t = 1800;
+    // mur de pierre, la nuit (il continue jusqu'aux bords d'un écran large)
+    const mur = c.createLinearGradient(0, Y0, 0, Y1);
+    mur.addColorStop(0, '#2a2140'); mur.addColorStop(0.55, '#3a2a2c'); mur.addColorStop(1, '#1a110c');
+    c.fillStyle = mur; c.fillRect(X0, Y0, LW, Y1 - Y0);
+    c.strokeStyle = '#00000055'; c.lineWidth = 2;
+    const hz = graineHasard(11);
+    for (let y = Math.floor(Y0 / 34) * 34; y < 640; y += 34) {
+      const dec = (Math.round(y / 34) % 2) * 32;
+      for (let x = Math.floor(X0 / 64) * 64 - dec; x < X1; x += 64) c.strokeRect(x + hz() * 2, y, 64, 34);
+    }
+    // grande fenêtre en ogive au clair de lune, derrière le Moine
+    const fx = 205, fw = 250, fy = 70, fh = 420;
+    const ogive = () => {
+      c.beginPath();
+      c.moveTo(fx - fw / 2, fy + fh); c.lineTo(fx - fw / 2, fy + fw * 0.5);
+      c.quadraticCurveTo(fx - fw / 2, fy, fx, fy - fw * 0.2); c.quadraticCurveTo(fx + fw / 2, fy, fx + fw / 2, fy + fw * 0.5);
+      c.lineTo(fx + fw / 2, fy + fh); c.closePath();
+    };
+    c.save();
+    ogive();
+    const ciel = c.createLinearGradient(0, fy, 0, fy + fh);
+    ciel.addColorStop(0, '#3550a8'); ciel.addColorStop(0.6, '#6f8fe0'); ciel.addColorStop(1, '#a9c2ff');
+    c.fillStyle = ciel; c.fill(); c.clip();
+    const lune = c.createRadialGradient(fx + 40, fy + 90, 10, fx + 40, fy + 90, 190);
+    lune.addColorStop(0, 'rgba(240,250,255,.95)'); lune.addColorStop(0.3, 'rgba(200,225,255,.5)'); lune.addColorStop(1, 'rgba(200,225,255,0)');
+    c.fillStyle = lune; c.fillRect(fx - fw, fy - fw, fw * 2, fh + fw);
+    c.fillStyle = '#fbfdff'; rond(c, fx + 40, fy + 90, 46); c.fill();
+    const hs = graineHasard(5);
+    c.fillStyle = '#ffffff';
+    for (let i = 0; i < 24; i++) { rond(c, fx - fw / 2 + hs() * fw, fy - 20 + hs() * fh * 0.7, 0.8 + hs() * 1.6); c.fill(); }
+    c.restore();
+    c.strokeStyle = '#120b08'; c.lineWidth = 12;
+    c.beginPath(); c.moveTo(fx, fy - fw * 0.15); c.lineTo(fx, fy + fh); c.moveTo(fx - fw / 2, fy + fh * 0.5); c.lineTo(fx + fw / 2, fy + fh * 0.5); c.stroke();
+    c.strokeStyle = '#6a5848'; c.lineWidth = 16; ogive(); c.stroke();
+    c.strokeStyle = '#8e7a64'; c.lineWidth = 4; ogive(); c.stroke();
+    // rayons de lune vers le manuscrit
+    c.save(); c.globalAlpha = 0.16; c.fillStyle = '#cfe6ff';
+    c.beginPath(); c.moveTo(fx - fw / 2, fy + fh * 0.2); c.lineTo(fx + fw / 2, fy + fh * 0.1); c.lineTo(470, 640); c.lineTo(40, 660); c.closePath(); c.fill();
+    c.restore();
+    // halo chaud de la chandelle, à droite
+    const bx = 548, by = 330;
+    const halo = c.createRadialGradient(bx, by, 6, bx, by, 380);
+    halo.addColorStop(0, 'rgba(255,200,110,.75)'); halo.addColorStop(0.35, 'rgba(255,160,70,.32)'); halo.addColorStop(1, 'rgba(255,160,70,0)');
+    c.fillStyle = halo; c.fillRect(X0, Y0, LW, Y1 - Y0);
+    // le Moine sans Ombre, découpé sur la fenêtre
+    moineAffiche(c, 190, 330, 470);
+    // brume à ses pieds : il n'a pas d'ombre
+    c.save(); c.globalAlpha = 0.35; c.fillStyle = '#c9e6ff';
+    for (let i = 0; i < 4; i++) { c.beginPath(); c.ellipse(80 + i * 90, 560 + (i % 2) * 14, 120, 18, 0, 0, Math.PI * 2); c.fill(); }
+    c.restore();
+    // le copiste, en grand, à droite
+    copisteAffiche(c, 440, 300, 72);
+    // pupitre et manuscrit ouvert (tuiles sans lettres, en mots croisés)
+    c.fillStyle = '#3a2416';
+    c.beginPath(); c.moveTo(X0, 640); c.lineTo(X1, 640); c.lineTo(X1, Y1); c.lineTo(X0, Y1); c.closePath(); c.fill();
+    const bois = c.createLinearGradient(0, 600, 0, 660);
+    bois.addColorStop(0, '#6a4426'); bois.addColorStop(1, '#3a2416');
+    c.fillStyle = bois; c.fillRect(X0, 612, LW, 40);
+    c.save();
+    c.translate(300, 540); c.rotate(-0.06); c.transform(1, 0, -0.18, 0.62, 0, 0);
+    // couverture et pages
+    c.shadowColor = '#000c'; c.shadowBlur = 30;
+    c.fillStyle = '#5a1f16'; rr(c, -250, -150, 500, 300, 18); c.fill();
+    c.shadowBlur = 0;
+    const pg = c.createLinearGradient(-230, -130, 230, 130);
+    pg.addColorStop(0, '#f3e4bd'); pg.addColorStop(0.5, '#ead6a4'); pg.addColorStop(1, '#d7bb7e');
+    c.fillStyle = pg; rr(c, -236, -136, 472, 272, 12); c.fill();
+    c.strokeStyle = '#7a5a2a88'; c.lineWidth = 3; c.beginPath(); c.moveTo(0, -136); c.lineTo(0, 136); c.stroke();
+    // grille de la page et mots croisés
+    const s = 44, gx = -198, gy = -114;
+    c.strokeStyle = '#7a5a2a33'; c.lineWidth = 1;
+    for (let r = 0; r < 5; r++) for (let q = 0; q < 9; q++) c.strokeRect(gx + q * s, gy + r * s, s, s);
+    iconeCase(c, 'e', gx + 8 * s, gy, s, t, 1);
+    iconeCase(c, 'o', gx + 6 * s, gy + 4 * s, s, t, 2);
+    tacheEncre(c, gx + 8.5 * s, gy + 3.5 * s, s, 5, 1);
+    iconeCase(c, 'r', gx + 0 * s, gy + 4 * s, s, t, 3);
+    // le mot du manuscrit (rangée du milieu) et les mots qui le croisent
+    const mots = [
+      [[2, 3], [2, 4], [2, 5], [2, 6], [2, 7]], // rangée du milieu
+      [[0, 5], [1, 5]], [[3, 7], [4, 7]], [[3, 4], [4, 4]]
+    ];
+    const couls = ['#3a2410', '#b83a32', '#2f7d55', '#2b5fb0'];
+    mots.forEach((m, n) => m.forEach((p, z) => tuileAffiche(c, gx + p[1] * s, gy + p[0] * s, s, couls[n], 1 + ((z + n) % 3))));
+    // les tuiles que le Moine efface (à gauche) : elles s'envolent en poussière bleue
+    [[2, 0], [2, 1], [2, 2]].forEach((p, z) => {
+      c.save(); c.globalAlpha = 0.95 - z * 0.12;
+      c.translate(gx + p[1] * s + s / 2 + z * 14, gy + p[0] * s + s / 2 - (3 - z) * 44); c.rotate((z - 1) * 0.45);
+      c.shadowColor = '#7fe3ff'; c.shadowBlur = 24;
+      tuileAffiche(c, -s / 2, -s / 2, s, '#b83a32', 2);
+      c.restore();
+    });
+    c.restore();
+    // poussière bleue qui monte vers la main du Moine
+    c.save();
+    const hp = graineHasard(23);
+    c.shadowColor = '#7fe3ff'; c.shadowBlur = 10;
+    for (let i = 0; i < 46; i++) {
+      const p = hp(), x = 110 + p * 170 + (hp() - 0.5) * 50, y = 520 - p * 120 + (hp() - 0.5) * 60;
+      c.fillStyle = i % 4 ? 'rgba(160,236,255,.9)' : '#ffffff';
+      rond(c, x, y, 1.2 + hp() * 3.2); c.fill();
+    }
+    c.restore();
+    // la main du copiste qui pose une tuile lumineuse sur la page
+    c.save();
+    const tx = 352, ty = 452;
+    const lueur = c.createRadialGradient(tx + 22, ty + 22, 4, tx + 22, ty + 22, 90);
+    lueur.addColorStop(0, 'rgba(255,230,140,.9)'); lueur.addColorStop(1, 'rgba(255,230,140,0)');
+    c.fillStyle = lueur; c.fillRect(tx - 80, ty - 80, 210, 210);
+    c.translate(tx + 22, ty + 22); c.rotate(-0.18);
+    c.shadowColor = '#ffd77a'; c.shadowBlur = 26;
+    tuileAffiche(c, -27, -27, 54, '#2b5fb0', 3, { lumiere: true });
+    c.restore();
+    // manche bleue et main du copiste
+    c.save();
+    c.fillStyle = '#2b5fb0';
+    c.beginPath(); c.moveTo(500, 470); c.quadraticCurveTo(450, 430, 405, 440); c.lineTo(400, 478); c.quadraticCurveTo(450, 490, 500, 530); c.closePath(); c.fill();
+    c.strokeStyle = '#ffcf6a'; c.lineWidth = 3; c.beginPath(); c.moveTo(405, 440); c.lineTo(400, 478); c.stroke();
+    // main qui tient la tuile par le haut (paume et trois doigts)
+    c.fillStyle = '#e9b98c'; c.strokeStyle = '#8a5a36'; c.lineWidth = 1.5;
+    c.beginPath(); c.ellipse(402, 452, 17, 13, -0.4, 0, Math.PI * 2); c.fill(); c.stroke();
+    [[384, 448], [380, 458], [382, 468]].forEach((p) => { c.beginPath(); c.ellipse(p[0], p[1], 9, 5.5, -0.2, 0, Math.PI * 2); c.fill(); c.stroke(); });
+    c.restore();
+    // chandelle au premier plan, à droite (coupée par le bord), et encrier à gauche
+    c.fillStyle = '#efe3c4'; c.fillRect(bx - 16, by + 26, 32, 300);
+    c.fillStyle = '#d6c8a4'; c.fillRect(bx + 6, by + 26, 10, 300);
+    c.fillStyle = '#f7edd2'; c.beginPath(); c.ellipse(bx, by + 26, 16, 6, 0, 0, Math.PI * 2); c.fill();
+    flamme(c, bx, by, 70, t);
+    c.fillStyle = '#120c0a'; rr(c, 18, 600, 70, 54, 12); c.fill();
+    c.fillStyle = '#2b5fb0'; c.beginPath(); c.ellipse(53, 604, 26, 7, 0, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#efe3c4'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(62, 604); c.quadraticCurveTo(80, 540, 120, 500); c.stroke();
+    c.fillStyle = '#f2ead6';
+    c.beginPath(); c.moveTo(120, 500); c.quadraticCurveTo(86, 522, 80, 566); c.quadraticCurveTo(104, 536, 120, 500); c.fill();
+  }
+
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    const cacher = () => {
+      for (const el of document.querySelectorAll('.ecran, .voile, #toast, #confettis, .jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+    };
+    cacher();
+    [100, 500, 1500].forEach((d) => setTimeout(cacher, d));
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3. Le jeu
+  //  s'ouvre directement en pleine nuit solo contre les 3 robots, avec sa
+  //  vraie interface (copistes, encre, réserve, boutons), sans écran titre,
+  //  ni fenêtre « Continuer », ni tutoriel. La page est remplie par les
+  //  règles mêmes du jeu (robots à chaque place, hasard à graine fixe), puis
+  //  c'est à toi d'écrire : un mot est posé en lettres provisoires. Le moment
+  //  est figé : ni son, ni sauvegarde, ni fin de partie, ni réseau.
+  //   1 = nuit 1 : premiers mots croisés autour du mot du manuscrit ;
+  //   2 = nuit 10 : enluminures, feuilles d'or, taches, reliques ;
+  //   3 = nuit 19, sur ordinateur : lignes du miroir, chandelles, la cloche
+  //       vient de sonner et le Moine sans Ombre efface deux mots.
+  // ---------------------------------------------------------------------
+  const SCENES_APERCU = {
+    1: { nuit: 1, graine: 11, coups: 4 },
+    2: { nuit: 10, graine: 22, coups: 12, message: true },
+    3: { nuit: 19, graine: 33, coups: 12, moine: true }
+  };
+
+  function aleaFixe(graine) {
+    let g = graine >>> 0;
+    return () => { g = (g + 0x6D2B79F5) | 0; let x = Math.imul(g ^ (g >>> 15), 1 | g); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  // Décor des côtés sur un écran d'ordinateur (image 3) : le scriptorium la nuit.
+  function decorApercu(c, w, h, t) {
+    dessinerScene(c, w, h, t);
+    c.fillStyle = 'rgba(10,6,4,.25)'; c.fillRect(0, 0, w, h);
+  }
+
+  function ouvrirApercu(n) {
+    const sc = SCENES_APERCU[n];
+    const alea = aleaFixe(sc.graine);
+    Math.random = aleaFixe(sc.graine + 977);
+    prog.plume = 'lapis';
+    prog.options.son = false;            // aucun son (rien n'est enregistré)
+    session = 'solo';
+    niveau = sc.nuit;
+    // La nuit jouée par les robots à chaque place, jusqu'à ton tour.
+    let e = R.depart(alea, PLACES, { niveau: sc.nuit }), avant = null, action = null;
+    for (let k = 0; k < 200 && !(e.coups >= sc.coups && R.aQui(e) === 0); k++) {
+      const s = R.aQui(e);
+      let a = R.bot(copie(e), s, alea, 0.6);
+      if (!R.valide(e, s, a)) a = { t: 'passe' };
+      avant = copie(e); action = a;
+      e = R.jouer(copie(e), s, a, alea);
+      if (R.fin(e)) break;
+    }
+    // Une fausse partie solo, figée : c'est ton tour, rien ne se joue.
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 1, chef: -1, etat: e,
+      monTour: () => true, estChef: () => false,
+      sieges: () => [0, 1, 2, 3].map((s) => ({ humain: s === 0, moi: s === 0, chef: false })),
+      jouer: () => false, recommencer: () => false, lancerManche: () => false, pause: () => {}, quitter: () => {}
+    };
+    nouvelleVue(e);
+    afficherEcran('jeu');
+    synchroReserve();
+    tFige = performance.now() + 100000;
+    // Ton mot, posé en lettres provisoires : le meilleur coup de ta réserve.
+    const coups = O.coupsPossibles(vue, 0, 7).sort((x, y) => (y.p - x.p) || (y.lg - x.lg));
+    if (coups.length) {
+      const pris = {};
+      coups[0].a.c.forEach((p) => {
+        for (let k = 0; k < reserveLocale.length; k++) if (!pris[k] && reserveLocale.charAt(k) === p[1]) { pris[k] = 1; poses.push({ i: p[0], k: k }); break; }
+      });
+    }
+    const d = e.der || {};
+    if (sc.moine && e.ev && e.ev.moine && e.ev.moine.length) {
+      // La cloche vient de sonner : le Moine glisse sur les mots qu'il efface.
+      const efface = [];
+      e.ev.moine.forEach((m) => m.c.forEach((i) => {
+        let ch = avant.l.charAt(i);
+        if (ch === '.' && action && Array.isArray(action.c)) { const p = action.c.find((x) => x[0] === i); ch = p ? p[1] : ''; }
+        if (ch && ch !== '.') efface.push({ i: i, ch: ch, q: m.q });
+      }));
+      anims.efface = { c: efface, t: tFige - 600 };
+      anims.moine = { c: e.ev.moine.reduce((a, m) => a.concat(m.c), []), t: tFige - 950 };
+      if (e.ev.tache >= 0) anims.tache = { i: e.ev.tache, t: tFige - 500 };
+      // Ce que dit le jeu à la cloche (sur la ligne des messages, sans couvrir l'interface).
+      const m0 = e.ev.moine[0];
+      msgCoup = { texte: tr('moine.efface', { qui: m0.q === 0 ? tr('place.toi') : tr('copiste.' + m0.q), mot: m0.mot, n: m0.perte }), jusqua: Date.now() + 600000 };
+    } else if (d.t === 'pose') {
+      anims.brille = { c: d.c, t: tFige - 500, coul: couleurPlace(d.q) };
+    }
+    if (sc.message && d.t === 'pose') {
+      msgCoup = { texte: tr('coup.ecrit', { qui: tr('copiste.' + d.q), mots: d.mots.join(' · '), n: d.p }), jusqua: Date.now() + 600000 };
+    }
+    majInterface();
+  }
 
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  if (APERCU_N) { ouvrirApercu(APERCU_N); return; }
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
   afficherEcran('titre');
   // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement

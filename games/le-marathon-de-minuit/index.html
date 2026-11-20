@@ -3035,6 +3035,11 @@
   }
   #toast.actif { opacity: 1; transform: translateX(-50%) translateY(0); }
   @media (min-width: 720px) { .grille { grid-template-columns: repeat(5, 1fr); } .dossards { grid-template-columns: repeat(4, 1fr); } }
+  /* Image du jeu sur un écran d'ordinateur (window.JEL_APERCU = 3) : la partie prend toute la largeur. */
+  .apercu-large #jeu-boite { max-width: none; padding-left: 14px; padding-right: 14px; }
+  .apercu-large #course { height: 76px; }
+  .apercu-large .place canvas { width: 44px; height: 44px; }
+  .apercu-large .place .tag { font-size: 13px; }
 </style>
 </head>
 <body>
@@ -3304,7 +3309,9 @@
   // ---------------------------------------------------------------------
 
   let ac = null;
+  let modeApercu = 0;          // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   function audio() {
+    if (modeApercu) return;      // image du jeu : aucun son
     try {
       if (!ac) { const C = window.AudioContext || window.webkitAudioContext; if (C) ac = new C(); }
       if (ac && ac.state === 'suspended') ac.resume();
@@ -4019,7 +4026,9 @@
   function boucle(t) {
     rafId = 0;
     if (ecran !== 'jeu' || enPause) return;
-    const dt = Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
+    // Image du jeu : la nuit est figée sur le moment posé (seules les flammes et les foulées bougent).
+    if (modeApercu) { dessinerJeu(t); majInfos(); rafId = requestAnimationFrame(boucle); return; }
+    const dt =Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
     tPrec = t;
     // Début de mon tour ?
     if (partie && vue && !rejeu && !attenteTuto && !finMontree && partie.monTour() && (!mon || mon.n !== partie.n)) commencerTour();
@@ -4123,6 +4132,7 @@
     const c = cv.getContext('2d');
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, w, h);
+    if (modeApercu === 3 && vue) decorLarge(c, w, h, geometrie(w, h, GW, GH, 4), t);
     // courbe de la course
     const cc = $('course'), cw = cc.clientWidth, chh = cc.clientHeight;
     if (cw && chh) {
@@ -4148,6 +4158,59 @@
     if (sec < 500 && mon && mon.faux >= 0 && mon.faux !== undefined) { c.fillStyle = `rgba(160,20,20,${0.25 * (1 - sec / 500)})`; c.fillRect(0, 0, w, h); }
     // nuit masquée : liseré de la couleur du rival
     if (mon && mon.phase === 'montre' && mon.ch.m) { c.strokeStyle = COUL[mon.ch.m.c] + '66'; c.lineWidth = 3; rr(c, geo.ox - 2, geo.oy - 2, geo.s * GW + 4, geo.s * GH + 4, 12); c.stroke(); }
+  }
+
+  // Image du jeu sur un écran d'ordinateur (JEL_APERCU = 3) : la ville noyée de brume continue de part et
+  // d'autre du plan (immeubles, lune, réverbères), le Coureur pâle rôde à gauche, deux rivaux fuient à droite.
+  function decorLarge(c, w, h, g, t) {
+    const gx0 = g.ox, gx1 = g.ox + g.s * g.W, sol = h * 0.58;
+    const ciel = c.createLinearGradient(0, 0, 0, h);
+    ciel.addColorStop(0, '#0e1430'); ciel.addColorStop(0.5, '#28305e'); ciel.addColorStop(0.58, '#363d6e'); ciel.addColorStop(1, '#141a2c');
+    c.fillStyle = ciel; c.fillRect(0, 0, w, h);
+    const hs = graineHasard(5);
+    for (let i = 0; i < 80; i++) { c.fillStyle = `rgba(255,255,255,${0.25 + hs() * 0.5})`; c.fillRect(hs() * w, hs() * sol * 0.6, 1.6, 1.6); }
+    const lx = gx1 + (w - gx1) * 0.62, ly = h * 0.17, lr = h * 0.075;
+    const halo = c.createRadialGradient(lx, ly, lr * 0.5, lx, ly, lr * 5);
+    halo.addColorStop(0, 'rgba(225,235,255,.55)'); halo.addColorStop(1, 'rgba(225,235,255,0)');
+    c.fillStyle = halo; rond(c, lx, ly, lr * 5); c.fill();
+    c.fillStyle = '#eef1fb'; rond(c, lx, ly, lr); c.fill();
+    c.fillStyle = 'rgba(160,170,195,.35)'; rond(c, lx - lr * 0.3, ly - lr * 0.2, lr * 0.22); c.fill(); rond(c, lx + lr * 0.35, ly + lr * 0.3, lr * 0.15); c.fill();
+    [['#2c3466', 0.8, 51], ['#161c36', 1, 53]].forEach(([coul, f, gr], n) => {
+      const hb = graineHasard(gr);
+      let x = -10;
+      while (x < w + 10) {
+        const bw = 46 + hb() * 70, bh = h * (0.12 + hb() * 0.3) * f;
+        c.fillStyle = coul; c.fillRect(x, sol - bh, bw, bh + 4);
+        if (hb() < 0.5) { c.beginPath(); c.moveTo(x, sol - bh); c.lineTo(x + bw / 2, sol - bh - 26); c.lineTo(x + bw, sol - bh); c.fill(); }
+        for (let j = 0; j < 5; j++) if (hb() < (n ? 0.4 : 0.25)) { c.fillStyle = n ? 'rgba(255,196,110,.8)' : 'rgba(255,196,110,.4)'; c.fillRect(x + 8 + hb() * (bw - 20), sol - bh + 12 + hb() * bh * 0.6, 6, 8); }
+        x += bw + 4 + hb() * 14;
+      }
+    });
+    const rue = c.createLinearGradient(0, sol, 0, h);
+    rue.addColorStop(0, '#2e355e'); rue.addColorStop(1, '#121726');
+    c.fillStyle = rue; c.fillRect(0, sol, w, h - sol);
+    c.strokeStyle = 'rgba(150,165,210,.14)'; c.lineWidth = 1;
+    for (let k = 1; k < 8; k++) { const q = (k / 8) * (k / 8), yy = sol + (h - sol) * q; c.beginPath(); c.moveTo(0, yy); c.lineTo(w, yy); c.stroke(); }
+    // réverbères à lanternes sur les deux trottoirs
+    [[0.18, 0], [0.7, 3], [0.3, 1], [0.82, 4]].forEach(([f, k], i) => {
+      const x = i < 2 ? gx0 * f : gx1 + (w - gx1) * f, y = sol + (h - sol) * 0.35;
+      c.strokeStyle = '#0c0f1a'; c.lineWidth = 5; c.beginPath(); c.moveTo(x, y + 6); c.lineTo(x, y + h * 0.16); c.stroke();
+      lanterne(c, x, y, h * 0.045, 'vraie', COUL[k], 1, t);
+    });
+    lanterne(c, gx1 + (w - gx1) * 0.48, sol + (h - sol) * 0.62, h * 0.04, 'froide', '#fff', 1, t);
+    // le Coureur pâle rôde à gauche, deux rivaux fuient à droite
+    pale(c, gx0 * 0.5, h * 0.96, h * 0.62, t, 0.95);
+    coureur(c, gx1 + (w - gx1) * 0.3, h * 0.94, h * 0.36, COUL[1], -1, t / 110, false);
+    coureur(c, gx1 + (w - gx1) * 0.66, h * 0.8, h * 0.24, COUL[2], -1, t / 110 + 2, false);
+    for (let n = 0; n < 5; n++) {
+      const yy = sol + (h - sol) * (0.15 + n * 0.2);
+      const bg = c.createLinearGradient(0, yy - 30, 0, yy + 30);
+      bg.addColorStop(0, 'rgba(185,195,220,0)'); bg.addColorStop(0.5, 'rgba(185,195,220,.12)'); bg.addColorStop(1, 'rgba(185,195,220,0)');
+      c.fillStyle = bg; c.fillRect(0, yy - 30, w, 60);
+    }
+    // le plan de la ville se détache sur une dalle sombre
+    c.fillStyle = 'rgba(8,10,18,.82)'; rr(c, gx0 - 10, g.oy - 10, gx1 - gx0 + 20, g.s * g.H + 20, 16); c.fill();
+    c.strokeStyle = 'rgba(255,210,122,.25)'; c.lineWidth = 2; rr(c, gx0 - 10, g.oy - 10, gx1 - gx0 + 20, g.s * g.H + 20, 16); c.stroke();
   }
 
   function jaillir(i, coul, n) {
@@ -4958,7 +5021,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !modeApercu && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une nuit solo.
@@ -4977,15 +5040,277 @@
 
   window.addEventListener('resize', () => { ajusterTitre(); if (ecran === 'titre') dessinerTitre(performance.now()); });
 
+  // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Dans la rue noyée de brume,
+  // sous la lune, le coureur au dossard rouge file sur le tracé des lanternes et se retourne : le Coureur
+  // pâle, yeux de givre, tend déjà la main vers lui ; deux rivaux courent plus loin vers l'horizon.
+
+  // Le héros de l'affiche : même coureur que pendant la partie, plus grand et plus détaillé (chaussures,
+  // short, bandeau, visage tourné vers son poursuivant) ; liseré bleuté du côté du Coureur pâle.
+  function heroAffiche(c, x, y, k) {
+    c.save(); c.translate(x, y); c.scale(k / 100, k / 100);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const corps = (p, dx, dy) => {
+      c.save(); c.translate(dx, dy);
+      const trait = (pts, l, coul) => { c.strokeStyle = coul; c.lineWidth = l; c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]); c.stroke(); };
+      // jambe arrière, tendue, pied relevé
+      trait([[-2, -44], [-17, -27], [-35, -17]], 11, p.jambe2);
+      c.fillStyle = p.chaussure; ell(c, -38, -15, 9, 5, 0.55); c.fill();
+      c.fillStyle = p.semelle; ell(c, -41, -12, 7, 2.2, 0.55); c.fill();
+      // bras arrière
+      trait([[3, -74], [-13, -63], [-19, -50]], 8, p.bras2);
+      // short et maillot
+      c.fillStyle = p.short; c.beginPath(); c.moveTo(-11, -52); c.lineTo(13, -52); c.lineTo(17, -37); c.lineTo(3, -34); c.lineTo(-13, -38); c.closePath(); c.fill();
+      c.fillStyle = p.maillot; c.beginPath(); c.moveTo(-11, -50); c.lineTo(13, -50); c.quadraticCurveTo(20, -66, 17, -81); c.quadraticCurveTo(5, -88, -5, -82); c.quadraticCurveTo(-14, -68, -11, -50); c.closePath(); c.fill();
+      if (p.ombre) { c.fillStyle = p.ombre; c.beginPath(); c.moveTo(-11, -50); c.lineTo(-2, -50); c.quadraticCurveTo(-8, -66, -3, -83); c.quadraticCurveTo(-14, -68, -11, -50); c.closePath(); c.fill(); }
+      // dossard (sans numéro)
+      if (p.dossard) {
+        c.save(); c.translate(6, -66); c.rotate(-0.12);
+        c.fillStyle = p.dossard; rr(c, -8, -8, 17, 15, 2.5); c.fill();
+        c.fillStyle = 'rgba(255,255,255,.6)'; c.fillRect(-5, -4, 11, 2); c.fillRect(-5, 1, 7, 2);
+        c.fillStyle = '#1c1d22'; rond(c, -6, -6, 0.9); c.fill(); rond(c, 7, -6, 0.9); c.fill();
+        c.restore();
+      }
+      // jambe avant, genou haut
+      trait([[4, -44], [25, -35], [22, -11]], 11, p.jambe);
+      c.fillStyle = p.chaussure; ell(c, 27, -8, 9.5, 5, 0.12); c.fill();
+      c.fillStyle = p.semelle; ell(c, 27, -4.5, 8, 2, 0.12); c.fill();
+      // cou, bras avant
+      trait([[8, -81], [8, -86]], 7, p.peau);
+      trait([[10, -74], [24, -63], [32, -75]], 8, p.bras);
+      c.fillStyle = p.peau; rond(c, 33, -77, 3.6); c.fill();
+      // tête tournée vers l'arrière : cheveux derrière, visage à gauche
+      c.fillStyle = p.cheveux; rond(c, 10, -97, 13.5); c.fill();
+      c.fillStyle = p.peau; ell(c, 5, -94, 11.5, 12.5); c.fill();
+      if (p.visage) {
+        c.fillStyle = p.peau; rond(c, -6.5, -92.5, 2.6); c.fill(); // nez
+        c.fillStyle = '#c99e7c'; rond(c, 12, -93, 2.6); c.fill(); // oreille
+        c.save(); c.translate(6, -103); c.rotate(-0.2); c.fillStyle = p.bandeau; c.fillRect(-12, -2.5, 25, 5); c.restore();
+        c.fillStyle = '#fbfbff'; ell(c, -0.5, -95, 3.4, 2.7); c.fill();
+        c.fillStyle = '#16181f'; rond(c, -2, -95, 1.7); c.fill();
+        c.strokeStyle = '#3b2618'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(-4.5, -99.5); c.lineTo(2.5, -101.5); c.stroke();
+        c.fillStyle = '#3a1a14'; ell(c, -1.5, -87.5, 2.3, 3.1); c.fill();
+        c.fillStyle = 'rgba(160,220,255,.85)'; c.beginPath(); c.moveTo(19, -104); c.quadraticCurveTo(22, -98, 19, -96); c.quadraticCurveTo(16, -98, 19, -104); c.fill();
+      }
+      c.restore();
+    };
+    // liseré de lumière froide (le Coureur pâle est derrière, à gauche), puis le coureur
+    const lis = '#bfe6ff';
+    corps({ jambe: lis, jambe2: lis, bras: lis, bras2: lis, short: lis, maillot: lis, peau: lis, cheveux: lis, chaussure: lis, semelle: lis }, -2.6, -0.8);
+    corps({
+      jambe: '#46557a', jambe2: '#36415e', bras: '#a9b6d2', bras2: '#7f8cab', short: '#232a3d', maillot: '#9aa8c8', ombre: '#7584a6',
+      peau: '#ecd0ad', cheveux: '#2b1d14', chaussure: '#f1f4fa', semelle: '#ff6b4a', dossard: COUL[0], bandeau: '#ffb347', visage: true
+    }, 0, 0);
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    // Scène composée sur 600 × 800 ; sur un écran plus large ou plus haut, le décor continue jusqu'aux bords.
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    const X0 = -ox / k - 2, X1 = 600 + ox / k + 2, Y0 = -oy / k - 2, Y1 = 800 + oy / k + 2, LW = X1 - X0;
+    const t = 1200, HZ = 372;
+    // ciel
+    const ciel = c.createLinearGradient(0, Y0, 0, HZ + 20);
+    ciel.addColorStop(0, '#070a1c'); ciel.addColorStop(0.55, '#1b2150'); ciel.addColorStop(1, '#383d76');
+    c.fillStyle = ciel; c.fillRect(X0, Y0, LW, HZ + 20 - Y0);
+    const hs = graineHasard(11);
+    for (let i = 0; i < 90; i++) { c.fillStyle = `rgba(255,255,255,${0.3 + hs() * 0.6})`; const r = 0.8 + hs() * 1.4; c.fillRect(X0 + hs() * LW, Y0 + hs() * (HZ - 120 - Y0), r, r); }
+    // lune et son halo
+    const lx = 462, ly = 128, lr = 66;
+    const halo = c.createRadialGradient(lx, ly, lr * 0.6, lx, ly, lr * 5);
+    halo.addColorStop(0, 'rgba(225,235,255,.7)'); halo.addColorStop(0.35, 'rgba(170,190,255,.25)'); halo.addColorStop(1, 'rgba(170,190,255,0)');
+    c.fillStyle = halo; rond(c, lx, ly, lr * 5); c.fill();
+    c.fillStyle = '#f3f5ff'; c.shadowColor = '#dfe8ff'; c.shadowBlur = 40 * k * dpr; rond(c, lx, ly, lr); c.fill(); c.shadowBlur = 0;
+    c.fillStyle = 'rgba(165,175,205,.4)';
+    [[-22, -14, 15], [20, 18, 11], [12, -26, 7], [-10, 26, 8]].forEach((q) => { rond(c, lx + q[0], ly + q[1], q[2]); c.fill(); });
+    // ville engloutie : deux rangées d'immeubles, la plus lointaine pâlie par la brume
+    [['#283062', 0.75, 41], ['#10152b', 1, 43]].forEach(([coul, f, g], n) => {
+      const hb = graineHasard(g);
+      let x = X0 - 10;
+      while (x < X1 + 10) {
+        const bw = 42 + hb() * 62, bh = (90 + hb() * 170) * f;
+        const centre = x + bw / 2 > 220 && x + bw / 2 < 380;
+        const hh = centre ? bh * 0.45 : bh;
+        const pente = (hb() - 0.5) * 0.06;
+        c.save(); c.translate(x + bw / 2, HZ); c.rotate(pente);
+        c.fillStyle = coul; c.fillRect(-bw / 2, -hh, bw, hh + 6);
+        if (hb() < 0.55) { c.beginPath(); c.moveTo(-bw / 2, -hh); c.lineTo(0, -hh - 22 - hb() * 18); c.lineTo(bw / 2, -hh); c.fill(); }
+        for (let j = 0; j < 6; j++) if (hb() < (n ? 0.4 : 0.25)) { c.fillStyle = n ? 'rgba(255,196,110,.85)' : 'rgba(255,196,110,.45)'; c.fillRect(-bw / 2 + 7 + hb() * (bw - 18), -hh + 10 + hb() * hh * 0.7, 5, 7); }
+        c.fillStyle = coul;
+        c.restore();
+        x += bw + 3 + hb() * 12;
+      }
+    });
+    // rue pavée et mouillée en perspective
+    const rue = c.createLinearGradient(0, HZ, 0, Y1);
+    rue.addColorStop(0, '#2a3058'); rue.addColorStop(0.35, '#171c36'); rue.addColorStop(1, '#0b0f1e');
+    c.fillStyle = rue; c.fillRect(X0, HZ, LW, Y1 - HZ);
+    c.strokeStyle = 'rgba(170,185,230,.11)'; c.lineWidth = 1.4;
+    for (let i = 1; i < 12; i++) { const q = (i / 12) * (i / 12), yy = HZ + (Y1 - HZ) * q; c.beginPath(); c.moveTo(X0, yy); c.lineTo(X1, yy); c.stroke(); }
+    for (let i = -8; i <= 8; i++) { c.beginPath(); c.moveTo(300 + i * 6, HZ); c.lineTo(300 + i * 95, Y1); c.stroke(); }
+    // reflet de la lune sur les pavés mouillés
+    const ref = c.createLinearGradient(0, HZ, 0, Y1);
+    ref.addColorStop(0, 'rgba(210,225,255,.26)'); ref.addColorStop(1, 'rgba(210,225,255,0)');
+    c.fillStyle = ref; c.beginPath(); c.moveTo(lx - 10, HZ); c.lineTo(lx + 10, HZ); c.lineTo(lx + 70, Y1); c.lineTo(lx - 40, Y1); c.closePath(); c.fill();
+    // brume lointaine sur l'horizon
+    const bh = c.createLinearGradient(0, HZ - 70, 0, HZ + 60);
+    bh.addColorStop(0, 'rgba(190,200,235,0)'); bh.addColorStop(0.55, 'rgba(190,200,235,.32)'); bh.addColorStop(1, 'rgba(190,200,235,0)');
+    c.fillStyle = bh; c.fillRect(X0, HZ - 70, LW, 130);
+    // tracé de lanternes qui serpente vers l'horizon, avec leurs reflets
+    const trace = [[302, 384, 9], [326, 400, 11], [286, 421, 13], [336, 450, 16], [262, 487, 20], [318, 534, 25]];
+    trace.forEach((p, i) => {
+      const g = c.createLinearGradient(0, p[1], 0, p[1] + p[2] * 4);
+      g.addColorStop(0, 'rgba(255,190,90,.35)'); g.addColorStop(1, 'rgba(255,190,90,0)');
+      c.fillStyle = g; c.fillRect(p[0] - p[2] * 0.4, p[1], p[2] * 0.8, p[2] * 4);
+      lanterne(c, p[0], p[1], p[2], 'vraie', COUL[(i + 1) % 5], 1, t);
+    });
+    // lanterne froide, qui ment, sur le bas-côté
+    lanterne(c, 520, 468, 20, 'froide', '#fff', 1, t);
+    // deux rivaux, plus loin sur le tracé
+    coureur(c, 352, 418, 44, COUL[1], -1, 0.5, false);
+    coureur(c, 238, 452, 58, COUL[2], -1, 2.6, false);
+    // le Coureur pâle, grand et lumineux, la main tendue vers le héros
+    const lueur = c.createRadialGradient(178, 380, 20, 178, 380, 280);
+    lueur.addColorStop(0, 'rgba(160,205,255,.34)'); lueur.addColorStop(1, 'rgba(180,215,255,0)');
+    c.fillStyle = lueur; rond(c, 178, 380, 280); c.fill();
+    c.fillStyle = 'rgba(214,226,246,.28)';
+    for (let i = 0; i < 4; i++) { ell(c, 120 - i * 40, 420 + i * 22, 70 - i * 8, 18, -0.2); c.fill(); }
+    c.save(); c.shadowColor = '#9fd2ff'; c.shadowBlur = 16 * k * dpr;
+    pale(c, 176, 586, 300, 820, 1);
+    c.restore();
+    pale(c, 176, 586, 300, 820, 1);
+    // lambeaux qui flottent sous son buste, bouche fine sous les yeux de givre
+    c.fillStyle = 'rgba(223,229,240,.85)';
+    [[140, 18], [158, 26], [178, 20], [198, 30], [214, 16]].forEach(([x, l], i) => { c.beginPath(); c.moveTo(x - 7, 446); c.lineTo(x + 8, 446); c.lineTo(x - 10 - (i % 2) * 6, 446 + l); c.closePath(); c.fill(); });
+    c.strokeStyle = '#5b6f8c'; c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(173, 271); c.quadraticCurveTo(184, 276, 196, 270); c.stroke();
+    // longs doigts blafards tendus vers le héros
+    c.strokeStyle = '#d6dded'; c.lineWidth = 3.4; c.lineCap = 'round';
+    [[-12, 0.5], [-5, 0.25], [2, 0.05], [8, -0.15]].forEach(([dy, a]) => { c.beginPath(); c.moveTo(305, 388 + dy * 0.4); c.quadraticCurveTo(318, 386 + dy, 330, 384 + dy + a * 14); c.stroke(); });
+    // lanterne du tracé, au sol entre les deux coureurs
+    lanterne(c, 222, 616, 26, 'vraie', COUL[4], 1, t);
+    // le héros, en pleine foulée
+    c.fillStyle = 'rgba(0,0,0,.4)'; ell(c, 392, 593, 78, 12); c.fill();
+    const chaud = c.createRadialGradient(392, 560, 10, 392, 560, 150);
+    chaud.addColorStop(0, 'rgba(255,180,90,.35)'); chaud.addColorStop(1, 'rgba(255,180,90,0)');
+    c.fillStyle = chaud; rond(c, 392, 560, 150); c.fill();
+    heroAffiche(c, 384, 588, 330);
+    // poussière soulevée par la foulée
+    c.fillStyle = 'rgba(200,210,235,.35)';
+    [[300, 580, 16], [272, 570, 11], [250, 584, 8]].forEach((q) => { rond(c, q[0], q[1], q[2]); c.fill(); });
+    // premier plan : grandes lanternes coupées par les bords, pierres effondrées, brume au sol
+    lanterne(c, 548, 690, 62, 'vraie', COUL[0], 1, t);
+    lanterne(c, 52, 724, 66, 'vraie', COUL[3], 1, t);
+    for (let n = 0; n < 6; n++) {
+      const yy = 560 + n * 46, dx = (n % 2 ? -1 : 1) * 30;
+      const bg = c.createLinearGradient(0, yy - 40, 0, yy + 40);
+      bg.addColorStop(0, 'rgba(190,200,225,0)'); bg.addColorStop(0.5, `rgba(190,200,225,${0.14 + n * 0.03})`); bg.addColorStop(1, 'rgba(190,200,225,0)');
+      c.fillStyle = bg; c.fillRect(X0 + dx, yy - 40, LW, 80);
+    }
+    // vignette : les bords plongent dans la nuit
+    const vig = c.createRadialGradient(300, 400, 260, 300, 400, 620);
+    vig.addColorStop(0, 'rgba(4,6,14,0)'); vig.addColorStop(1, 'rgba(4,6,14,.55)');
+    c.fillStyle = vig; c.fillRect(X0, Y0, LW, Y1 - Y0);
+  }
+
+  function cacherInterface() {
+    document.querySelectorAll('.ecran, .voile, #toast, .rond, button, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    cacherInterface();
+    // Le bouton de langue peut être créé après ce script : on le cache aussi un peu plus tard.
+    setTimeout(cacherInterface, 50);
+    setTimeout(cacherInterface, 400);
+    setTimeout(cacherInterface, 1200);
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine nuit solo contre les 4 robots, avec sa vraie interface (places et foulées,
+  // bande de la course, plan de la ville), sans écran titre, ni fenêtre « Continuer », ni tutoriel
+  // (CONSIGNES-JEU.md, section 5). La nuit est jouée par les règles (jel-regles) avec un hasard à graine
+  // fixe jusqu'au tour du joueur, puis figée : ni victoire, ni défaite, ni son, ni sauvegarde, ni réseau.
+  //   1 = nuit 1 : le tracé s'allume en lanternes jusqu'au poste ;
+  //   2 = nuit 8 : le joueur rejoue le tracé de mémoire entre les ruines, une case dans la brume ;
+  //   3 = nuit 19, sur un écran d'ordinateur : sprint à deux postes, lanternes froides, brume, Coureur pâle
+  //       masqué aux couleurs d'un rival, minuit a sonné et un coureur est déjà rattrapé.
+  const SCENES_APERCU = {
+    1: { nuit: 1, coups: 6, phase: 'montre', sp: 0, tenue: 0, ok: (e) => e.ch.k1 >= 4 && e.av.some((a) => a < 3) },
+    2: { nuit: 8, coups: 9, phase: 'saisie', sp: 0, pas: 3, tenue: 2, ok: (e) => e.ch.b.length >= 1 && e.ch.b[0] >= 3 && e.ch.k1 >= 5 },
+    3: { nuit: 19, coups: 14, phase: 'montre', sp: 1, tenue: 4, ok: (e) => e.ch.m && e.ch.f.length >= 2 && e.ch.b.length >= 1 && !e.ch.r && e.nOut >= 1 }
+  };
+
+  // Rejoue la nuit (robots aux 5 places, le joueur bien réglé) jusqu'à un tour du joueur qui montre la scène.
+  function nuitApercu(sc) {
+    for (let graine = 1; graine < 600; graine++) {
+      const alea = graineHasard(graine * 7919 + sc.nuit * 104729);
+      let e = R.depart(alea, PLACES, { niveau: sc.nuit });
+      for (let coup = 0; coup < 120 && !R.fin(e) && !e.out[0]; coup++) {
+        if (e.tour === 0 && coup >= sc.coups && sc.ok(e)) return e;
+        const s = e.tour, a = R.bot(e, s, alea, s === 0 ? 0.97 : O.forceNiveau(sc.nuit));
+        if (!R.valide(e, s, a)) break;
+        e = R.jouer(e, s, a, alea);
+      }
+    }
+    return null;
+  }
+
+  function ouvrirApercu(numero) {
+    modeApercu = numero;
+    const sc = SCENES_APERCU[numero];
+    if (numero === 3) document.documentElement.classList.add('apercu-large');
+    let e = nuitApercu(sc);
+    if (!e) { e = R.depart(graineHasard(7), PLACES, { niveau: sc.nuit }); e.tour = 0; e.ch.s = 0; }
+    prog.tenue = sc.tenue; // en mémoire seulement : rien n'est enregistré
+    session = 'solo'; niveau = sc.nuit; enPartie = false;
+    vue = JSON.parse(JSON.stringify(e));
+    // Partie figée, sans moteur ni robots qui jouent : le joueur (place 0) est à son tour.
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', n: 0, manche: 0, chef: -1, etat: vue,
+      sieges: () => { const l = []; for (let s = 0; s < PLACES; s++) l.push({ humain: s === 0, moi: s === 0, chef: false }); return l; },
+      monTour: () => true, jouer: () => false, pause: () => {}, quitter: () => {}, estChef: () => false, lancerManche: () => false
+    };
+    affAv = vue.av.slice();
+    const ch = vue.ch, hor = horaire(ch, sc.sp, NIVEAUX[vue.n]);
+    mon = { n: 0, phase: sc.phase, sp: sc.sp, tt: 0, tot: hor.tot, allumees: hor.tot, pas: [], pasT: [], pos: ch.d, ch: ch, hor: hor };
+    if (sc.phase === 'montre') mon.tt = hor.fin - 320; // tout le tracé est allumé, juste avant que la nuit l'avale
+    else {
+      const k = Math.min(sc.pas, hor.tot - 1);
+      mon.pas = ch.p.slice(0, k); mon.pasT = mon.pas.map(() => -1e6);
+      mon.pos = k ? ch.p[k - 1] : ch.d;
+      survol = ch.p[k]; // le doigt sur la case suivante
+    }
+    afficherEcran('jeu');
+    majInterface();
+  }
+
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
-  try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  ajusterTitre();
-  // Ouvert par le bouton « Rejoindre » d'un ami : directement dans le salon de sa partie en ligne.
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else {
+    try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
+    afficherEcran('titre');
+    ajusterTitre();
+    // Ouvert par le bouton « Rejoindre » d'un ami : directement dans le salon de sa partie en ligne.
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>

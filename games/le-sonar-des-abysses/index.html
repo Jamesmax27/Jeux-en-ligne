@@ -4025,6 +4025,7 @@
       c.beginPath(); c.arc((p.x + Math.sin(h / 4000 + p.y * 6) * 0.01) * W, p.y * H, p.r, 0, Math.PI * 2); c.fill();
     });
     c.globalAlpha = 1;
+    if (apercuN && W > 900) decorLarge(c, W, H, h);
     if (ecran === 'titre') {
       const h1 = document.querySelector('#ecran-titre h1').getBoundingClientRect();
       const pan = document.querySelector('#ecran-titre .panneau').getBoundingClientRect();
@@ -4035,6 +4036,47 @@
       dessinerSonar(c, taille, taille, { mode: 'titre', h: h, efface: false });
       c.restore();
     }
+  }
+
+  // Image du jeu sur ordinateur (JEL_APERCU, écran large) : le décor s'élargit jusqu'aux
+  // bords. À gauche, la coque du Fanal échoué, ses hublots allumés et son projecteur ; à
+  // droite, la créature qui rôde ; en bas, le fond rocheux.
+  function decorLarge(c, W, H, h) {
+    const k = H / 720;
+    // Fond rocheux
+    c.fillStyle = '#04121a';
+    c.beginPath(); c.moveTo(0, H);
+    for (let i = 0; i <= 24; i++) { const x = (W * i) / 24; c.lineTo(x, H * 0.86 - Math.abs(Math.sin(i * 1.9)) * 40 * k - (i % 3) * 8 * k); }
+    c.lineTo(W, H); c.closePath(); c.fill();
+    // Le Fanal échoué (coupé par le bord gauche) : coque, kiosque, hublots, projecteur
+    const nez = W * 0.17, haut = H * 0.36, bas = H * 0.62, ry = (bas - haut) / 2, my = (haut + bas) / 2;
+    const px = nez - 4 * k, py = my + ry * 0.2;
+    const gp = c.createLinearGradient(px, py, px + W * 0.2, py);
+    gp.addColorStop(0, 'rgba(210,250,255,.32)'); gp.addColorStop(1, 'rgba(210,250,255,0)');
+    c.fillStyle = gp;
+    c.beginPath(); c.moveTo(px, py - 6 * k); c.lineTo(px + W * 0.21, py - 70 * k); c.lineTo(px + W * 0.21, py + 120 * k); c.lineTo(px, py + 8 * k); c.closePath(); c.fill();
+    const gc = c.createLinearGradient(0, haut - 60 * k, 0, bas);
+    gc.addColorStop(0, '#4a7f8c'); gc.addColorStop(0.5, '#1f4550'); gc.addColorStop(1, '#0a1c24');
+    c.fillStyle = gc;
+    c.beginPath(); c.roundRect ? c.roundRect(W * 0.03, haut - 62 * k, W * 0.065, 70 * k, 10 * k) : c.rect(W * 0.03, haut - 62 * k, W * 0.065, 70 * k); c.fill();
+    c.beginPath(); c.moveTo(-10, haut); c.lineTo(nez - ry, haut); c.arc(nez - ry, my, ry, -Math.PI / 2, Math.PI / 2); c.lineTo(-10, bas); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(170,235,245,.4)'; c.lineWidth = 3 * k;
+    c.beginPath(); c.moveTo(-10, haut + 2); c.lineTo(nez - ry, haut + 2); c.arc(nez - ry, my, ry - 2, -Math.PI / 2, -0.2); c.stroke();
+    for (let i = 0; i < 3; i++) {
+      const hx = W * (0.025 + i * 0.04), hy = my - ry * 0.15;
+      c.fillStyle = '#b8892a'; c.beginPath(); c.arc(hx, hy, 15 * k, 0, Math.PI * 2); c.fill();
+      c.save(); c.shadowColor = '#ffcf5a'; c.shadowBlur = 22 * k;
+      c.fillStyle = i === 1 ? '#ff5a64' : '#ffd88a'; c.beginPath(); c.arc(hx, hy, 10 * k, 0, Math.PI * 2); c.fill();
+      c.restore();
+    }
+    c.fillStyle = '#e8fbff'; c.beginPath(); c.arc(px, py, 7 * k, 0, Math.PI * 2); c.fill();
+    // La créature, à droite, dans l'ombre
+    creature(c, W * 0.88, H * 0.5, 80 * k, h, 1);
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const go = c.createRadialGradient(W * 0.88, H * 0.5, 0, W * 0.88, H * 0.5, 170 * k);
+    go.addColorStop(0, 'rgba(255,40,60,.32)'); go.addColorStop(1, 'rgba(255,40,60,0)');
+    c.fillStyle = go; c.fillRect(W * 0.88 - 170 * k, H * 0.5 - 170 * k, 340 * k, 340 * k);
+    c.restore();
   }
 
   // ---------------------------------------------------------------------
@@ -4052,7 +4094,9 @@
 
   // Horloge de l'affichage, figée pendant la pause.
   let decalage = 0, pauseDebut = 0;
-  const maintenant = () => (enPause ? pauseDebut : performance.now()) - decalage;
+  let figeA = 0;               // images du jeu (JEL_APERCU) : horloge figée sur ce moment, sinon 0
+  let apercuN = 0;             // 1, 2 ou 3 : image du jeu préparée pour sa page, sinon 0
+  const maintenant = () => (enPause ? pauseDebut : (figeA || performance.now())) - decalage;
 
   let vue = null;              // état affiché (en retard sur partie.etat pendant les animations)
   let vueP = null;             // état montré dans les cabines (mis à jour après la réponse)
@@ -5370,6 +5414,466 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche du jeu (jaquette) : window.JEL_AFFICHE, posé seulement par le robot du site
+  // ---------------------------------------------------------------------
+  // Une scène composée, sans interface ni texte (CONSIGNES-JEU.md, section 5) : dans la
+  // cabine du Fanal, sous la lampe d'alarme rouge, le plongeur au casque corail se fige,
+  // la main sur le sonar dont les échos montent en formes vertes ; derrière lui, dans le
+  // grand hublot éclairé par le projecteur, la créature plaque ses tentacules et son œil
+  // rouge contre la vitre qui se fêle. Sur un écran large, la coque continue jusqu'aux bords.
+
+  function hasardFixe(g) {
+    return () => { g = (g + 0x6D2B79F5) | 0; let t = Math.imul(g ^ (g >>> 15), 1 | g); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  const AFF_NEIGE = (() => { const a = hasardFixe(4242); const l = []; for (let i = 0; i < 90; i++) l.push({ x: a(), y: a(), r: 0.8 + a() * 2.4, v: 0.3 + a() }); return l; })();
+  const AFF_BULLES = (() => { const a = hasardFixe(777); const l = []; for (let i = 0; i < 16; i++) l.push({ x: a(), y: a(), r: 3 + a() * 9, o: a() * 6 }); return l; })();
+
+  function affRivet(c, x, y, r) {
+    c.fillStyle = '#3f6a74'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(220,250,255,.38)'; c.beginPath(); c.arc(x - r * 0.3, y - r * 0.3, r * 0.42, 0, Math.PI * 2); c.fill();
+  }
+
+  // Tuyau horizontal (cylindre éclairé par-dessus).
+  function affTuyau(c, x0, x1, y, r, teinte) {
+    const g = c.createLinearGradient(0, y - r, 0, y + r);
+    g.addColorStop(0, teinte[0]); g.addColorStop(0.35, teinte[1]); g.addColorStop(1, teinte[2]);
+    c.fillStyle = g; c.fillRect(x0, y - r, x1 - x0, 2 * r);
+  }
+
+  // Paroi de la cabine : plaques, joints, rivets, tuyaux (sur toute la largeur de l'écran).
+  function affMur(c, x0, x1, y0, y1) {
+    const g = c.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, '#24586a'); g.addColorStop(0.5, '#173f4d'); g.addColorStop(1, '#0a222b');
+    c.fillStyle = g; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+    const pas = 150;
+    for (let x = Math.floor((x0 - 75) / pas) * pas + 75; x < x1 + pas; x += pas) {
+      c.fillStyle = 'rgba(0,0,0,.33)'; c.fillRect(x - 2, y0, 4, y1 - y0);
+      c.fillStyle = 'rgba(150,220,230,.1)'; c.fillRect(x + 2, y0, 2, y1 - y0);
+      for (let y = Math.ceil(y0 / 46) * 46; y < y1; y += 46) { affRivet(c, x - 11, y, 3.4); affRivet(c, x + 13, y, 3.4); }
+    }
+    c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(x0, 470, x1 - x0, 4);
+    c.fillStyle = 'rgba(150,220,230,.08)'; c.fillRect(x0, 474, x1 - x0, 2);
+    // Deux tuyaux en haut, avec leurs colliers
+    affTuyau(c, x0, x1, 22, 15, ['#7fb2ba', '#3f6e78', '#132d35']);
+    affTuyau(c, x0, x1, 58, 9, ['#c79a4a', '#8a6420', '#3a2808']);
+    for (let x = Math.floor(x0 / 120) * 120; x < x1; x += 120) {
+      c.fillStyle = '#0f252c'; c.fillRect(x, 4, 12, 66);
+      c.fillStyle = 'rgba(200,240,250,.25)'; c.fillRect(x + 2, 4, 3, 66);
+    }
+  }
+
+  // Lampe d'alarme rouge (cage), qui teinte la cabine.
+  function affLampe(c, x, y, h) {
+    const p = 0.82 + 0.18 * Math.sin(h / 260);
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    const g = c.createRadialGradient(x, y, 4, x, y, 380);
+    g.addColorStop(0, 'rgba(255,70,80,' + (0.8 * p) + ')'); g.addColorStop(0.35, 'rgba(255,40,60,' + (0.3 * p) + ')'); g.addColorStop(1, 'rgba(255,40,60,0)');
+    c.fillStyle = g; c.fillRect(x - 400, y - 400, 800, 800);
+    c.restore();
+    c.fillStyle = '#2a1a14'; c.fillRect(x - 30, y - 34, 60, 12);
+    c.save(); c.shadowColor = '#ff3348'; c.shadowBlur = 40;
+    const b = c.createRadialGradient(x - 6, y - 6, 2, x, y, 26);
+    b.addColorStop(0, '#fff0e8'); b.addColorStop(0.35, '#ff5a64'); b.addColorStop(1, '#a3101e');
+    c.fillStyle = b; c.beginPath(); c.arc(x, y, 24, Math.PI, 0); c.lineTo(x + 24, y + 6); c.arc(x, y + 6, 24, 0, Math.PI); c.closePath(); c.fill();
+    c.restore();
+    c.strokeStyle = '#3a2a20'; c.lineWidth = 4;
+    for (let i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(x + i * 10, y - 22); c.quadraticCurveTo(x + i * 13, y + 6, x + i * 10, y + 30); c.stroke(); }
+    c.beginPath(); c.moveTo(x - 27, y + 8); c.lineTo(x + 27, y + 8); c.stroke();
+  }
+
+  // Manomètre de l'air (aiguille dans le rouge), sans chiffre.
+  function affManometre(c, x, y, r, h) {
+    c.save();
+    c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = 12; c.shadowOffsetY = 5;
+    const g = c.createLinearGradient(x - r, y - r, x + r, y + r);
+    g.addColorStop(0, '#f2d27a'); g.addColorStop(0.5, '#a3772a'); g.addColorStop(1, '#4a3210');
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    c.restore();
+    c.fillStyle = '#dfe9e2'; c.beginPath(); c.arc(x, y, r * 0.8, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = '#d42a3a'; c.lineWidth = r * 0.16;
+    c.beginPath(); c.arc(x, y, r * 0.62, Math.PI * 0.8, Math.PI * 1.15); c.stroke();
+    c.strokeStyle = '#2a3a40'; c.lineWidth = 2;
+    for (let i = 0; i <= 8; i++) { const a = Math.PI * 0.8 + i * Math.PI * 1.4 / 8; c.beginPath(); c.moveTo(x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55); c.lineTo(x + Math.cos(a) * r * 0.72, y + Math.sin(a) * r * 0.72); c.stroke(); }
+    const a = Math.PI * 0.92 + Math.sin(h / 90) * 0.05;
+    c.strokeStyle = '#111'; c.lineWidth = 3.5; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * r * 0.66, y + Math.sin(a) * r * 0.66); c.stroke();
+    c.fillStyle = '#111'; c.beginPath(); c.arc(x, y, r * 0.1, 0, Math.PI * 2); c.fill();
+  }
+
+  // Tentacule effilé le long d'une courbe ; liseré clair du côté du projecteur, ventouses.
+  function affTentacule(c, pts, r0, r1, ventouses) {
+    const n = 40;
+    const pos = (u) => {
+      const a = pts[0], b = pts[1], d = pts[2], e = pts[3], v = 1 - u;
+      return [v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * d[0] + u * u * u * e[0], v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * d[1] + u * u * u * e[1]];
+    };
+    for (let passe = 0; passe < 2; passe++) {
+      c.fillStyle = passe ? '#0d0812' : 'rgba(140,230,240,.55)';
+      for (let i = 0; i <= n; i++) {
+        const u = i / n, p = pos(u), r = r0 + (r1 - r0) * u;
+        c.beginPath(); c.arc(p[0] + (passe ? 0 : -2.2), p[1] + (passe ? 0 : -2.2), r, 0, Math.PI * 2); c.fill();
+      }
+    }
+    if (ventouses) {
+      for (let i = 4; i < n - 2; i += 3) {
+        const u = i / n, p = pos(u), q = pos(u + 0.01), r = r0 + (r1 - r0) * u;
+        const ang = Math.atan2(q[1] - p[1], q[0] - p[0]) + Math.PI / 2;
+        c.fillStyle = '#4a3550'; c.beginPath(); c.arc(p[0] + Math.cos(ang) * r * 0.55, p[1] + Math.sin(ang) * r * 0.55, r * 0.32, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#1a1020'; c.beginPath(); c.arc(p[0] + Math.cos(ang) * r * 0.55, p[1] + Math.sin(ang) * r * 0.55, r * 0.14, 0, Math.PI * 2); c.fill();
+      }
+    }
+  }
+
+  // La créature derrière la vitre : masse sombre, tentacules, grand œil rouge.
+  function affCreature(c, x, y, h) {
+    const o = Math.sin(h / 1400) * 6;
+    affTentacule(c, [[x, y], [x - 60, y - 120], [x - 170, y - 150], [x - 210, y - 70 + o]], 34, 7, true);
+    affTentacule(c, [[x, y + 10], [x - 90, y + 20], [x - 160, y + 110], [x - 120, y + 170 + o]], 36, 8, true);
+    affTentacule(c, [[x + 10, y + 20], [x + 20, y + 120], [x - 50, y + 180], [x - 70, y + 230]], 32, 9, false);
+    affTentacule(c, [[x + 20, y - 10], [x + 60, y - 120], [x + 10, y - 180], [x - 40, y - 200]], 30, 8, false);
+    affTentacule(c, [[x, y], [x - 110, y - 40], [x - 150, y + 20], [x - 230, y + 30 - o]], 30, 6, true);
+    // Corps (en partie hors du hublot)
+    c.fillStyle = 'rgba(140,230,240,.5)';
+    c.beginPath(); c.ellipse(x + 50, y - 4, 100, 84, -0.3, 0, Math.PI * 2); c.fill();
+    const g = c.createRadialGradient(x + 20, y - 30, 10, x + 60, y, 120);
+    g.addColorStop(0, '#2e1a36'); g.addColorStop(1, '#09050c');
+    c.fillStyle = g; c.beginPath(); c.ellipse(x + 54, y, 100, 84, -0.3, 0, Math.PI * 2); c.fill();
+    // Œil
+    const ex = x + 16, ey = y - 8;
+    c.save();
+    c.shadowColor = '#ff2a40'; c.shadowBlur = 50;
+    const go = c.createRadialGradient(ex - 8, ey - 6, 2, ex, ey, 44);
+    go.addColorStop(0, '#ffd9b0'); go.addColorStop(0.3, '#ff5a50'); go.addColorStop(0.8, '#d4102a'); go.addColorStop(1, '#5a0010');
+    c.fillStyle = go; c.beginPath(); c.ellipse(ex, ey, 46, 30, -0.15, 0, Math.PI * 2); c.fill();
+    c.restore();
+    c.fillStyle = '#12000a'; c.beginPath(); c.ellipse(ex + 4, ey, 7, 26, -0.15, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.75)'; c.beginPath(); c.arc(ex - 16, ey - 11, 5, 0, Math.PI * 2); c.fill();
+    // Paupière lourde
+    c.fillStyle = '#09050c';
+    c.beginPath(); c.ellipse(ex, ey - 26, 54, 22, -0.15, 0, Math.PI); c.fill();
+  }
+
+  // Grand hublot de laiton : l'eau éclairée par le projecteur, la neige marine, la créature.
+  function affHublot(c, x, y, h) {
+    const R = 182, r = 150;
+    c.save();
+    c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 34; c.shadowOffsetY = 12;
+    const gb = c.createLinearGradient(x - R, y - R, x + R, y + R);
+    gb.addColorStop(0, '#ffe08a'); gb.addColorStop(0.4, '#b9862e'); gb.addColorStop(1, '#4e3410');
+    c.fillStyle = gb; c.beginPath(); c.arc(x, y, R, 0, Math.PI * 2); c.fill();
+    c.restore();
+    c.fillStyle = '#2e1f06'; c.beginPath(); c.arc(x, y, r + 9, 0, Math.PI * 2); c.fill();
+    for (let i = 0; i < 14; i++) {
+      const a = i * Math.PI * 2 / 14 + 0.1, bx = x + Math.cos(a) * (R - 15), by = y + Math.sin(a) * (R - 15);
+      c.fillStyle = '#6a4a14'; c.beginPath(); c.arc(bx + 1.5, by + 2, 7.5, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#e8c56a'; c.beginPath(); c.arc(bx, by, 6.5, 0, Math.PI * 2); c.fill();
+    }
+    c.save();
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.clip();
+    const ge = c.createRadialGradient(x - 80, y - 90, 8, x - 20, y, r * 1.35);
+    ge.addColorStop(0, '#b4f4f4'); ge.addColorStop(0.25, '#3fa6b8'); ge.addColorStop(0.7, '#0f4258'); ge.addColorStop(1, '#05182a');
+    c.fillStyle = ge; c.fillRect(x - r, y - r, 2 * r, 2 * r);
+    // Faisceaux du projecteur
+    c.fillStyle = 'rgba(210,255,255,.12)';
+    for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(x - r, y - r + i * 40); c.lineTo(x - r + 60 + i * 20, y - r); c.lineTo(x + r, y + 40 + i * 50); c.lineTo(x + r - 40, y + r); c.closePath(); c.fill(); }
+    // Neige marine
+    AFF_NEIGE.forEach((p) => {
+      const py = y - r + ((p.y * 2 * r + h * 0.01 * p.v) % (2 * r));
+      c.fillStyle = 'rgba(230,255,250,' + (0.35 + 0.45 * p.v / 1.3) + ')';
+      c.beginPath(); c.arc(x - r + p.x * 2 * r, py, p.r, 0, Math.PI * 2); c.fill();
+    });
+    affCreature(c, x + 60, y + 6, h);
+    // Reflets de la vitre et fêlure
+    c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 7;
+    c.beginPath(); c.arc(x, y, r - 22, Math.PI * 1.08, Math.PI * 1.42); c.stroke();
+    c.lineWidth = 3; c.beginPath(); c.arc(x, y, r - 38, Math.PI * 1.12, Math.PI * 1.3); c.stroke();
+    const fx = x - 70, fy = y + 64;
+    c.strokeStyle = 'rgba(240,255,255,.85)'; c.lineWidth = 2; c.lineJoin = 'round';
+    [[-70, -40, -110, -30], [30, -60, 60, -100], [50, 20, 95, 30], [-20, 60, -40, 95], [-60, 10, -120, 30]].forEach(([a, b, d, e]) => {
+      c.beginPath(); c.moveTo(fx, fy); c.lineTo(fx + a * 0.6, fy + b * 0.6); c.lineTo(fx + d * 0.8, fy + e * 0.8); c.stroke();
+    });
+    c.restore();
+    c.strokeStyle = 'rgba(0,0,0,.55)'; c.lineWidth = 10;
+    c.beginPath(); c.arc(x, y, r + 3, 0, Math.PI * 2); c.stroke();
+  }
+
+  // Petit hublot des côtés (écran large) : l'eau, et parfois un bout de tentacule.
+  function affPetitHublot(c, x, y, h, tentacule) {
+    const R = 92, r = 74;
+    const gb = c.createLinearGradient(x - R, y - R, x + R, y + R);
+    gb.addColorStop(0, '#e6c06a'); gb.addColorStop(0.5, '#9a7026'); gb.addColorStop(1, '#4e3410');
+    c.fillStyle = gb; c.beginPath(); c.arc(x, y, R, 0, Math.PI * 2); c.fill();
+    c.save(); c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.clip();
+    const ge = c.createRadialGradient(x - 30, y - 30, 4, x, y, r * 1.3);
+    ge.addColorStop(0, '#5cc4cf'); ge.addColorStop(0.6, '#124a60'); ge.addColorStop(1, '#05182a');
+    c.fillStyle = ge; c.fillRect(x - r, y - r, 2 * r, 2 * r);
+    AFF_NEIGE.slice(0, 25).forEach((p) => { c.fillStyle = 'rgba(230,255,250,.6)'; c.beginPath(); c.arc(x - r + p.x * 2 * r, y - r + ((p.y * 2 * r + h * 0.008 * p.v) % (2 * r)), p.r * 0.7, 0, Math.PI * 2); c.fill(); });
+    if (tentacule) affTentacule(c, [[x + r + 20, y + 40], [x + 20, y + 10], [x - 10, y - 60], [x - 50, y - 40]], 20, 5, true);
+    c.strokeStyle = 'rgba(255,255,255,.3)'; c.lineWidth = 4; c.beginPath(); c.arc(x, y, r - 12, Math.PI * 1.1, Math.PI * 1.4); c.stroke();
+    c.restore();
+  }
+
+  // Le plongeur : combinaison, plastron de laiton, casque corail de trois quarts, visage
+  // éclairé en vert par le sonar, les yeux levés vers le hublot.
+  function affPlongeur(c, x, y, r, h) {
+    // Combinaison (épaules et buste, coupés par le bas)
+    const gs = c.createLinearGradient(x - 200, 0, x + 200, 0);
+    gs.addColorStop(0, '#3a2c34'); gs.addColorStop(0.55, '#4d5a5e'); gs.addColorStop(1, '#2e5a50');
+    c.fillStyle = gs;
+    c.beginPath();
+    c.moveTo(x - 215, 900); c.lineTo(x - 205, y + 190); c.quadraticCurveTo(x - 190, y + 108, x - 90, y + 98);
+    c.lineTo(x + 100, y + 98); c.quadraticCurveTo(x + 200, y + 110, x + 215, y + 190); c.lineTo(x + 235, 900); c.closePath(); c.fill();
+    // Sangles corail
+    c.strokeStyle = '#d2603a'; c.lineWidth = 16;
+    c.beginPath(); c.moveTo(x - 120, y + 120); c.lineTo(x - 70, 900); c.stroke();
+    c.beginPath(); c.moveTo(x + 125, y + 120); c.lineTo(x + 80, 900); c.stroke();
+    // Plastron de laiton et ses boulons
+    const gp = c.createLinearGradient(x - 160, y + 80, x + 160, y + 170);
+    gp.addColorStop(0, '#7a5414'); gp.addColorStop(0.45, '#e7c36a'); gp.addColorStop(1, '#6a4a10');
+    c.fillStyle = gp; c.beginPath(); c.ellipse(x, y + 112, 168, 56, 0, 0, Math.PI * 2); c.fill();
+    for (let i = 0; i < 9; i++) { const a = Math.PI * (0.08 + i * 0.105); affRivet(c, x + Math.cos(a) * 150, y + 112 + Math.sin(a) * 44, 5); }
+    // Casque
+    const g = c.createRadialGradient(x - r * 0.4, y - r * 0.45, r * 0.06, x, y, r * 1.05);
+    g.addColorStop(0, '#ffe6d2'); g.addColorStop(0.22, '#ffa06c'); g.addColorStop(0.65, '#c8562c'); g.addColorStop(1, '#5c1e0e');
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+    c.save();
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.clip();
+    c.globalCompositeOperation = 'lighter';
+    const gv = c.createRadialGradient(x + r * 1.15, y + r * 0.9, 0, x + r * 1.15, y + r * 0.9, r * 1.3);
+    gv.addColorStop(0, 'rgba(109,255,176,.85)'); gv.addColorStop(1, 'rgba(109,255,176,0)');
+    c.fillStyle = gv; c.fillRect(x - r, y - r, 2 * r, 2 * r);
+    const gr = c.createRadialGradient(x - r * 1.2, y - r * 0.8, 0, x - r * 1.2, y - r * 0.8, r * 1.2);
+    gr.addColorStop(0, 'rgba(255,60,80,.6)'); gr.addColorStop(1, 'rgba(255,60,80,0)');
+    c.fillStyle = gr; c.fillRect(x - r, y - r, 2 * r, 2 * r);
+    c.restore();
+    // Valve sur le dessus, hublot latéral
+    c.fillStyle = '#b8892a'; c.fillRect(x - 16, y - r - 18, 32, 26);
+    c.fillStyle = '#ffe08a'; c.fillRect(x - 16, y - r - 18, 8, 26);
+    c.fillStyle = '#7a5414'; c.beginPath(); c.ellipse(x, y - r - 18, 26, 8, 0, 0, Math.PI * 2); c.fill();
+    const lx = x - r * 0.8, ly = y - r * 0.08;
+    c.fillStyle = '#c9a04a'; c.beginPath(); c.ellipse(lx, ly, r * 0.15, r * 0.24, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#0a2a30'; c.beginPath(); c.ellipse(lx + 2, ly, r * 0.09, r * 0.17, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,90,100,.6)'; c.beginPath(); c.ellipse(lx, ly - r * 0.06, r * 0.03, r * 0.06, 0, 0, Math.PI * 2); c.fill();
+    // Hublot de face (trois quarts, tourné vers la droite) et visage
+    const fx = x + r * 0.2, fy = y + r * 0.02, fr = r * 0.52;
+    c.save();
+    c.beginPath(); c.arc(fx, fy, fr, 0, Math.PI * 2); c.clip();
+    c.fillStyle = '#04161c'; c.fillRect(fx - fr, fy - fr, 2 * fr, 2 * fr);
+    const gf = c.createLinearGradient(0, fy - fr * 0.8, 0, fy + fr * 0.9);
+    gf.addColorStop(0, '#3a2620'); gf.addColorStop(0.55, '#8a6a52'); gf.addColorStop(1, '#a8ffcc');
+    c.fillStyle = gf; c.beginPath(); c.ellipse(fx + fr * 0.05, fy + fr * 0.12, fr * 0.62, fr * 0.8, 0, 0, Math.PI * 2); c.fill();
+    // Sourcils levés, yeux écarquillés tournés vers le hublot, bouche ouverte
+    const oy = fy - fr * 0.05;
+    [[-0.27, 0], [0.3, 0]].forEach(([dx]) => {
+      const ox = fx + fr * dx;
+      c.fillStyle = '#f4fff8'; c.beginPath(); c.ellipse(ox, oy, fr * 0.16, fr * 0.13, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#10201c'; c.beginPath(); c.arc(ox + fr * 0.06, oy - fr * 0.05, fr * 0.075, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#fff'; c.beginPath(); c.arc(ox + fr * 0.08, oy - fr * 0.08, fr * 0.025, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = '#1e120e'; c.lineWidth = fr * 0.06; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(ox - fr * 0.15, oy - fr * 0.22); c.quadraticCurveTo(ox, oy - fr * 0.36, ox + fr * 0.16, oy - fr * 0.27); c.stroke();
+    });
+    c.fillStyle = '#1e0c0a'; c.beginPath(); c.ellipse(fx + fr * 0.06, fy + fr * 0.48, fr * 0.1, fr * 0.14, 0, 0, Math.PI * 2); c.fill();
+    // Reflets : l'œil rouge et les échos verts dans la vitre
+    c.save(); c.shadowColor = '#ff2a40'; c.shadowBlur = 16;
+    c.fillStyle = 'rgba(255,60,70,.85)'; c.beginPath(); c.ellipse(fx + fr * 0.55, fy - fr * 0.55, fr * 0.13, fr * 0.08, -0.2, 0, Math.PI * 2); c.fill();
+    c.restore();
+    c.fillStyle = 'rgba(109,255,176,.5)';
+    formeCanvas(c, 1, fx + fr * 0.6, fy + fr * 0.55, fr * 0.07); c.fill();
+    formeCanvas(c, 0, fx + fr * 0.4, fy + fr * 0.72, fr * 0.05); c.fill();
+    c.fillStyle = 'rgba(160,240,255,.12)'; c.fillRect(fx - fr, fy - fr, 2 * fr, 2 * fr);
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = fr * 0.07;
+    c.beginPath(); c.arc(fx, fy, fr * 0.8, Math.PI * 1.1, Math.PI * 1.45); c.stroke();
+    c.restore();
+    // Bague de laiton du hublot et ses boulons
+    const ga = c.createLinearGradient(fx - fr, fy - fr, fx + fr, fy + fr);
+    ga.addColorStop(0, '#ffe8a0'); ga.addColorStop(0.5, '#c0902e'); ga.addColorStop(1, '#5e3e10');
+    c.strokeStyle = ga; c.lineWidth = r * 0.13;
+    c.beginPath(); c.arc(fx, fy, fr + r * 0.06, 0, Math.PI * 2); c.stroke();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + 0.3; c.fillStyle = '#f2d27a'; c.beginPath(); c.arc(fx + Math.cos(a) * (fr + r * 0.06), fy + Math.sin(a) * (fr + r * 0.06), r * 0.035, 0, Math.PI * 2); c.fill(); }
+    // Liseré vert du sonar sur le bord droit du casque
+    c.save(); c.shadowColor = VERT; c.shadowBlur = 24;
+    c.strokeStyle = 'rgba(160,255,200,.9)'; c.lineWidth = 4;
+    c.beginPath(); c.arc(x, y, r - 2, -0.35, 1.1); c.stroke();
+    c.restore();
+  }
+
+  // Bras et gant posés sur le pupitre du sonar.
+  function affBras(c, x0, y0, x1, y1) {
+    c.strokeStyle = '#3e5852'; c.lineWidth = 64; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(x0 + 40, y1 - 10, x1, y1); c.stroke();
+    c.strokeStyle = 'rgba(140,255,190,.35)'; c.lineWidth = 8;
+    c.beginPath(); c.moveTo(x0 + 22, y0 - 26); c.quadraticCurveTo(x0 + 60, y1 - 40, x1 + 10, y1 - 26); c.stroke();
+    // Gant de cuir, l'index tendu vers l'écran du sonar
+    c.save();
+    c.translate(x1 + 20, y1 + 10); c.rotate(0.55);
+    c.fillStyle = '#5a3820';
+    c.beginPath(); c.roundRect ? c.roundRect(-6, -24, 52, 48, 18) : c.rect(-6, -24, 52, 48); c.fill();
+    c.beginPath(); c.roundRect ? c.roundRect(30, -22, 44, 17, 8) : c.rect(30, -22, 44, 17); c.fill();
+    c.fillStyle = 'rgba(150,255,200,.45)';
+    c.beginPath(); c.roundRect ? c.roundRect(32, -22, 40, 5, 3) : c.rect(32, -22, 40, 5); c.fill();
+    c.beginPath(); c.roundRect ? c.roundRect(0, -24, 34, 5, 3) : c.rect(0, -24, 34, 5); c.fill();
+    c.restore();
+    c.fillStyle = '#c0902e'; c.beginPath(); c.ellipse(x1, y1, 22, 34, 0.6, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffe08a'; c.beginPath(); c.ellipse(x1 - 6, y1 - 8, 6, 16, 0.6, 0, Math.PI * 2); c.fill();
+  }
+
+  // Le sonar au premier plan (les vrais dessins du jeu), ses échos qui montent en formes vertes.
+  const AFF_ECHOS = { e: [{ d: 0, r: 1, a: 1, f: 0 }, { d: 1, r: 2, a: 3, f: 1 }, { d: 2, r: 0, a: 2, f: 2 }, { d: 3, r: 1, a: 4, f: 3 }, { d: 1, r: 0, a: 0, f: 0 }, { d: 3, r: 2, a: 1, f: 1 }], en: -1, pa: 0 };
+  function affSonar(c, x, y, R, h) {
+    const taille = R / 0.4;
+    c.save();
+    c.translate(x - taille / 2, y - taille / 2);
+    dessinerSonar(c, taille, taille, { sc: AFF_ECHOS, t: 99999, d: 4000, mode: 'balayage', h: h, efface: false, lettres: false });
+    c.restore();
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    const g = c.createRadialGradient(x, y, R * 0.2, x, y, R * 2.4);
+    g.addColorStop(0, 'rgba(60,255,150,.32)'); g.addColorStop(1, 'rgba(60,255,150,0)');
+    c.fillStyle = g; c.fillRect(x - R * 2.6, y - R * 2.6, R * 5.2, R * 5.2);
+    c.restore();
+    // Échos qui s'élèvent (rond, triangle, carré, losange) et leurs ondes
+    const echos = [[0, x - R * 0.55, y - R * 1.45, 21], [1, x + R * 0.25, y - R * 1.95, 24], [2, x + R * 0.85, y - R * 1.35, 19], [3, x + R * 0.05, y - R * 1.15, 17]];
+    echos.forEach(([f, ex, ey, s], i) => {
+      const flotte = Math.sin(h / 500 + i) * 4;
+      c.save();
+      c.shadowColor = VERT; c.shadowBlur = 30;
+      c.fillStyle = '#c8ffe2';
+      formeCanvas(c, f, ex, ey + flotte, s); c.fill();
+      c.shadowBlur = 0;
+      c.fillStyle = VERT;
+      formeCanvas(c, f, ex, ey + flotte, s * 0.72); c.fill();
+      const k = ((h / 1400) + i * 0.27) % 1;
+      c.globalAlpha = 1 - k; c.strokeStyle = VERT; c.lineWidth = 3;
+      c.beginPath(); c.arc(ex, ey + flotte, s * (1.2 + k * 2.4), 0, Math.PI * 2); c.stroke();
+      c.restore();
+    });
+  }
+
+  // Premier plan à gauche : gros tuyau, vanne, fuite d'air qui monte en bulles.
+  function affPremierPlan(c, y0, y1, h) {
+    const g = c.createLinearGradient(-40, 0, 46, 0);
+    g.addColorStop(0, '#0c1c22'); g.addColorStop(0.55, '#5e8a92'); g.addColorStop(1, '#14303a');
+    c.fillStyle = g; c.fillRect(-40, 380, 86, y1 - 380 + 40);
+    c.fillStyle = '#0e2026'; c.fillRect(-46, 500, 98, 22); c.fillRect(-46, 690, 98, 22);
+    c.strokeStyle = '#b52a36'; c.lineWidth = 11;
+    c.beginPath(); c.arc(52, 610, 46, 0, Math.PI * 2); c.stroke();
+    for (let i = 0; i < 3; i++) { const a = i * Math.PI / 3 + 0.4; c.beginPath(); c.moveTo(52 - Math.cos(a) * 46, 610 - Math.sin(a) * 46); c.lineTo(52 + Math.cos(a) * 46, 610 + Math.sin(a) * 46); c.stroke(); }
+    c.fillStyle = '#e8c56a'; c.beginPath(); c.arc(52, 610, 10, 0, Math.PI * 2); c.fill();
+    AFF_BULLES.forEach((b) => {
+      const yy = 520 - (((b.y * 520) + h * 0.05 * (0.5 + b.r / 12)) % 520);
+      const xx = 48 + b.x * 30 + Math.sin(h / 400 + b.o) * 8 + (520 - yy) * 0.05;
+      c.strokeStyle = 'rgba(200,255,240,.7)'; c.lineWidth = 2;
+      c.beginPath(); c.arc(xx, yy, b.r, 0, Math.PI * 2); c.stroke();
+      c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.arc(xx - b.r * 0.35, yy - b.r * 0.35, b.r * 0.28, 0, Math.PI * 2); c.fill();
+    });
+  }
+
+  function dessinerAffiche(h) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = window.innerWidth, H = window.innerHeight;
+    if (fond.width !== Math.round(W * dpr) || fond.height !== Math.round(H * dpr)) { fond.width = Math.round(W * dpr); fond.height = Math.round(H * dpr); }
+    const c = fond.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, W, H);
+    const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    const x0 = -ox / k, x1 = (W - ox) / k, y0 = -oy / k, y1 = (H - oy) / k;
+    c.save();
+    c.translate(ox, oy); c.scale(k, k);
+    affMur(c, x0, x1, y0, y1);
+    // Écran large : d'autres hublots le long de la coque
+    for (let xx = -170; xx > x0 - 100; xx -= 330) affPetitHublot(c, xx, 250, h, xx === -170);
+    for (let xx = 790; xx < x1 + 100; xx += 330) affPetitHublot(c, xx, 250, h, xx === 1120);
+    affHublot(c, 395, 238, h);
+    affLampe(c, 66, 118, h);
+    affManometre(c, 120, 236, 40, h);
+    // Pupitre des instruments, sur toute la largeur, devant la paroi
+    const gd = c.createLinearGradient(0, 590, 0, y1);
+    gd.addColorStop(0, '#2c4d56'); gd.addColorStop(0.08, '#14292f'); gd.addColorStop(1, '#081418');
+    c.fillStyle = gd; c.fillRect(x0, 590, x1 - x0, y1 - 590);
+    c.fillStyle = 'rgba(170,240,250,.35)'; c.fillRect(x0, 590, x1 - x0, 3);
+    for (let xx = Math.floor(x0 / 90) * 90 + 40; xx < x1; xx += 90) affRivet(c, xx, 606, 3.4);
+    affPlongeur(c, 196, 452, 134, h);
+    affSonar(c, 476, 688, 128, h);
+    affBras(c, 330, 590, 392, 618);
+    affPremierPlan(c, y0, y1, h);
+    // Vignette légère
+    const gv = c.createRadialGradient(300, 380, 260, 300, 400, 640);
+    gv.addColorStop(0, 'rgba(0,0,0,0)'); gv.addColorStop(1, 'rgba(0,6,10,.45)');
+    c.fillStyle = gv; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+    c.restore();
+  }
+
+  function demarrerAffiche() {
+    const style = document.createElement('style');
+    style.textContent = '.ecran, .voile, #toast, #flash, #confettis, .jel-langue, button { display: none !important; }';
+    document.head.appendChild(style);
+    const cacher = () => { for (const el of document.querySelectorAll('.ecran, .voile, #toast, #flash, #confettis, .jel-langue, button')) el.style.setProperty('display', 'none', 'important'); };
+    cacher();
+    setTimeout(cacher, 300); setTimeout(cacher, 1000);
+    const image = (h) => { dessinerAffiche(h); requestAnimationFrame(image); };
+    requestAnimationFrame(image);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé seulement par le robot
+  // ---------------------------------------------------------------------
+  // Le jeu s'ouvre directement en pleine plongée solo, avec sa vraie interface (cabines,
+  // air, bruit, fusées, jauge de la créature, sonar, question et réponses), sans écran
+  // titre, ni fenêtre « Continuer », ni tutoriel, ni réseau. La partie est rejouée par les
+  // vraies règles (jel-regles) avec un hasard à graine fixe jusqu'au moment voulu, puis
+  // l'horloge de l'affichage est figée : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = plongée 1 : à toi de regarder le sonar, trois échos allumés, le faisceau tourne ;
+  //   2 = plongée 10 : deuxième question du tour (réserve d'air), réponses en formes,
+  //       la créature tout près de la coque, fusée prête ;
+  //   3 = plongée 19 (ordinateur) : sept échos, l'encre de la créature couvre un quart du
+  //       sonar, une cabine déjà noyée.
+  const MOMENTS_APERCU = {
+    1: { niveau: 1, graine: 2, regard: 0.83, cond: (e) => e.ro === 2 && e.k === 1 && e.sc.e.length === 3 && !e.sc.e.some((x) => x.x) },
+    2: { niveau: 10, graine: 649, regard: 0, cond: (e) => e.ro >= 3 && e.me === 2 && e.k === 2 && e.re > 0 && ['der', 'pre', 'abs'].indexOf(e.sc.q.t) >= 0 && !e.sc.pa && e.fl[0] > 0 && O.vivants(e) === 4 },
+    3: { niveau: 19, graine: 5, regard: 0.62, cond: (e) => e.sc.en >= 0 && !e.sc.pa && e.sc.e.length >= 6 && e.me >= 1 && O.vivants(e) === 3 && e.vi[0] }
+  };
+
+  // Rejoue des plongées (le joueur et les robots jouent par les règles) jusqu'au moment voulu.
+  function etatApercu(m, n) {
+    for (let g = m.graine; g < m.graine + 3000; g++) {
+      const alea = hasardFixe(g * 7919 + n);
+      let e = R.depart(alea, PLACES, { niveau: m.niveau });
+      for (let pas = 0; pas < 200 && !R.fin(e); pas++) {
+        if (e.to === 0 && e.ph === 'q' && m.cond(e)) return e;
+        e = R.jouer(e, e.to, R.bot(e, e.to, alea, e.to === 0 ? 0.85 : NIVEAUX[m.niveau - 1].fr), alea);
+      }
+    }
+    return R.depart(hasardFixe(n), PLACES, { niveau: m.niveau });
+  }
+
+  function ouvrirApercu(n) {
+    apercuN = n;
+    const m = MOMENTS_APERCU[n];
+    Math.random = hasardFixe(31337 + n);     // neige du fond, bruit : la même image à chaque capture
+    const e = etatApercu(m, n);
+    session = 'solo';
+    niveau = m.niveau;
+    // Partie posée sur l'appareil, sans moteur ni robots qui jouent : rien ne bouge plus.
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 0, etat: e,
+      sieges: () => [0, 1, 2, 3].map((s) => ({ humain: s === 0, moi: s === 0, chef: false, nom: null })),
+      monTour: () => !!vue && vue.to === 0,
+      jouer: () => {}, quitter: () => {}, pause: () => {}, estChef: () => false, lancerManche: () => false
+    };
+    reinitialiserVue();
+    vue = copie(e); vueP = copie(e);
+    afficherEcran('jeu');
+    figeA = performance.now();
+    if (m.regard) {
+      commencerRegard(0, false);
+      bal.t0 = maintenant() - m.regard * bal.d;
+      bal.fin = bal.t0 + bal.d + 250;
+      bal.ping = true; bal.joues = bal.sc.e.map(() => true);
+    }
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5406,7 +5910,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !apercuN && !enPause &&!$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une plongée solo.
@@ -5419,11 +5923,18 @@
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  requestAnimationFrame(boucle);
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    afficherEcran('titre');
+    requestAnimationFrame(boucle);
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>

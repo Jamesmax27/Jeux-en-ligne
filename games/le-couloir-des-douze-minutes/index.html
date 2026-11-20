@@ -2052,6 +2052,7 @@ function chargerProgression() {
   if (d.options && typeof d.options.son === 'boolean') sonCoupe = !d.options.son;
 }
 function enregistrer(niveauReprise) {
+  if (apercu || affiche) return; // image du jeu ou affiche : rien n'est écrit dans la sauvegarde
   try {
     window.JEL_SAVE.save(JEU, {
       niveau: niveauReprise, score: totalEtoiles(), etoiles: prog.etoiles, records: prog.records,
@@ -2066,7 +2067,8 @@ function tousGagnes() { for (let i = 0; i < NIVEAUX.length; i++) if (!(prog.etoi
 /* ---------- Sons (Web Audio, créés à la première action) ---------- */
 let audio = null, sortie = null, vent = null, ventGain = null;
 function initAudio() {
-  if (audio) return;
+  if (audio || apercu || affiche) return; // images du jeu et affiche : aucun son
+
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
@@ -2180,6 +2182,9 @@ let tempsGlobal = 0;   // horloge des animations du décor
 let secousse = 0;
 const particules = [];
 let decorTitre = { dist: 0 };
+let apercu = 0;        // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
+let fige = false;      // image du jeu : la partie est figée sur son moment (ni victoire, ni défaite)
+let affiche = false;   // window.JEL_AFFICHE : scène de la jaquette, sans partie
 
 function vitesseNominale(niv, d) { return niv.v0 + (niv.v1 - niv.v0) * Math.min(1, Math.max(0, d / niv.len)); }
 
@@ -3031,7 +3036,7 @@ let derniere = performance.now();
 function boucle(t) {
   const dt = Math.min(0.05, Math.max(0, (t - derniere) / 1000));
   derniere = t;
-  if (etat !== 'pause') {
+  if (etat !== 'pause' && !fige) {
     tempsGlobal += dt;
     if (secousse > 0) secousse = Math.max(0, secousse - dt * 1.6);
     if (etat === 'jeu' && partie) majPartie(dt);
@@ -3150,12 +3155,12 @@ function reprendre() {
   try { if (audio) audio.resume(); } catch (e) { /* rien */ }
   etat = 'jeu'; derniere = performance.now(); montrer(null);
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu) mettrePause(); });
 
 // Fin de section : victoire ou défaite.
 let finInfo = null;
 function terminer(gagne, raison) {
-  const p = partie; if (!p || p.fini) return;
+  const p = partie; if (!p || p.fini || apercu) return; // image du jeu : ni victoire ni défaite
   p.fini = true;
   try { if (audio) audio.resume(); } catch (e) { /* rien */ }
   etat = 'fin'; doigts.clear(); clavierBottes = false;
@@ -3399,15 +3404,322 @@ for (const id of ['b-son-jeu', 'b-son-titre', 'b-son-pause']) $(id).addEventList
 
 // Sauvegarde à la fermeture : seulement pendant une section
 window.JEL_SAVE.surFermeture(() => {
-  if (partie && (etat === 'jeu' || etat === 'pause' || etat === 'intro')) enregistrer(partie.n + 1);
+  if (apercu || affiche) return; // image du jeu ou affiche : rien n'est écrit
+  if (partie &&(etat === 'jeu' || etat === 'pause' || etat === 'intro')) enregistrer(partie.n + 1);
 });
+
+/* ---------- Affiche (jaquette du jeu) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La coureuse, vue de face et
+// en grand, fuit vers nous et attrape une carte d'accès ; derrière elle, le couloir de la capsule
+// penche, une brèche s'ouvre sur le vide, un drone la poursuit, une grille laser s'allume et le fond
+// du couloir explose dans une lueur orange.
+function membre(c, pts, ep, base, clair) {
+  // bras ou jambe : un trait épais aux bouts arrondis, ombré d'un côté
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = base; c.lineWidth = ep;
+  c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (const q of pts.slice(1)) c.lineTo(q[0], q[1]); c.stroke();
+  c.strokeStyle = clair; c.lineWidth = ep * 0.55;
+  c.beginPath(); c.moveTo(pts[0][0] - ep * 0.12, pts[0][1]); for (const q of pts.slice(1)) c.lineTo(q[0] - ep * 0.12, q[1]); c.stroke();
+}
+function dessinerCoureuseFace(c, x, y, u, lueur) {
+  // La coureuse vue de face, en pleine course : jambe droite levée, main tendue vers la carte.
+  const combi = '#eef1f8', ombre = '#aab3c8', orange = '#ff8a2a', sombre = '#262c44';
+  c.save(); c.translate(x, y); c.rotate(-0.05);
+  const figure = (contour) => {
+    const b = contour ? lueur : null;
+    // sac à oxygène (derrière les épaules)
+    c.fillStyle = b || '#8f98ae';
+    c.beginPath(); c.roundRect(-u * 0.36, -u * 1.36, u * 0.72, u * 0.5, u * 0.1); c.fill();
+    // jambe gauche (d'appui, pied au sol)
+    membre(c, [[-u * 0.13, -u * 0.7], [-u * 0.2, -u * 0.38], [-u * 0.19, -u * 0.1]], u * 0.19, b || '#9aa3b8', b || '#d5dbe8');
+    // bras gauche (balancé en arrière)
+    membre(c, [[-u * 0.3, -u * 1.16], [-u * 0.47, -u * 0.9], [-u * 0.36, -u * 0.7]], u * 0.15, b || ombre, b || combi);
+    // jambe droite (genou levé haut vers nous, pied décollé du sol)
+    membre(c, [[u * 0.13, -u * 0.7], [u * 0.27, -u * 0.6], [u * 0.22, -u * 0.32]], u * 0.24, b || ombre, b || combi);
+    // torse
+    c.fillStyle = b || combi;
+    c.beginPath(); c.moveTo(-u * 0.33, -u * 1.22); c.lineTo(u * 0.33, -u * 1.22); c.lineTo(u * 0.25, -u * 0.64); c.lineTo(-u * 0.25, -u * 0.64); c.closePath(); c.fill();
+    // bras droit (tendu vers la carte)
+    membre(c, [[u * 0.3, -u * 1.16], [u * 0.52, -u * 1.08], [u * 0.74, -u * 1.2]], u * 0.15, b || ombre, b || combi);
+    // casque
+    c.fillStyle = b || '#dfe4ef';
+    c.beginPath(); c.arc(0, -u * 1.46, u * 0.27, 0, 7); c.fill();
+  };
+  // contour lumineux (la lueur de l'explosion derrière elle)
+  c.save(); c.shadowColor = lueur; c.shadowBlur = u * 0.25;
+  c.translate(u * 0.012, -u * 0.012); c.scale(1.02, 1.015); figure(true);
+  c.restore();
+  // ombre au sol
+  c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.ellipse(0, 0, u * 0.42, u * 0.07, 0, 0, 7); c.fill();
+  figure(false);
+  // bottes (dessous sombre, bout orange)
+  c.fillStyle = sombre;
+  c.beginPath(); c.roundRect(-u * 0.31, -u * 0.14, u * 0.24, u * 0.14, u * 0.05); c.fill();
+  c.beginPath(); c.roundRect(u * 0.08, -u * 0.38, u * 0.3, u * 0.17, u * 0.06); c.fill();
+  c.fillStyle = orange; c.fillRect(u * 0.11, -u * 0.27, u * 0.24, u * 0.04); c.fillRect(-u * 0.28, -u * 0.1, u * 0.18, u * 0.03);
+  // genouillère
+  c.fillStyle = orange; c.beginPath(); c.ellipse(u * 0.27, -u * 0.6, u * 0.11, u * 0.08, 0.3, 0, 7); c.fill();
+  // ceinture, épaulettes et plastron
+  c.fillStyle = orange; c.fillRect(-u * 0.26, -u * 0.74, u * 0.52, u * 0.08);
+  c.beginPath(); c.ellipse(-u * 0.3, -u * 1.17, u * 0.1, u * 0.07, 0.3, 0, 7); c.fill();
+  c.beginPath(); c.ellipse(u * 0.3, -u * 1.17, u * 0.1, u * 0.07, -0.3, 0, 7); c.fill();
+  c.fillStyle = '#9aa4ba'; c.beginPath(); c.roundRect(-u * 0.16, -u * 1.12, u * 0.32, u * 0.3, u * 0.04); c.fill();
+  c.fillStyle = '#3a4260'; c.fillRect(-u * 0.12, -u * 1.08, u * 0.24, u * 0.12);
+  [['#3ae09b', -0.08], ['#ffd447', 0], ['#ff5050', 0.08]].forEach(([col, dx]) => { c.fillStyle = col; c.shadowColor = col; c.shadowBlur = u * 0.04; c.beginPath(); c.arc(dx * u, -u * 0.9, u * 0.025, 0, 7); c.fill(); });
+  c.shadowBlur = 0;
+  // tuyaux d'air du sac vers le casque
+  c.strokeStyle = '#7d869c'; c.lineWidth = u * 0.035; c.lineCap = 'round';
+  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * u * 0.2, -u * 1.2); c.quadraticCurveTo(s * u * 0.26, -u * 1.3, s * u * 0.17, -u * 1.33); c.stroke(); }
+  // gant tendu, doigts ouverts
+  c.fillStyle = '#cfd6e4';
+  c.beginPath(); c.arc(u * 0.77, -u * 1.21, u * 0.075, 0, 7); c.fill();
+  c.strokeStyle = '#cfd6e4'; c.lineWidth = u * 0.032;
+  for (let i = 0; i < 4; i++) { const a = -1.2 + i * 0.42; c.beginPath(); c.moveTo(u * 0.77, -u * 1.21); c.lineTo(u * 0.77 + Math.cos(a) * u * 0.13, -u * 1.21 + Math.sin(a) * u * 0.13); c.stroke(); }
+  // casque : visière, visage décidé, reflets
+  const hy = -u * 1.46;
+  c.fillStyle = orange; c.fillRect(-u * 0.27, hy - u * 0.2, u * 0.54, u * 0.05);
+  c.save();
+  c.beginPath(); c.ellipse(0, hy + u * 0.02, u * 0.2, u * 0.16, 0, 0, 7); c.clip();
+  c.fillStyle = '#10162a'; c.fillRect(-u * 0.3, hy - u * 0.3, u * 0.6, u * 0.6);
+  // visage, éclairé par la lueur dorée de la capsule devant elle
+  c.fillStyle = '#d99a72'; c.beginPath(); c.ellipse(0, hy + u * 0.04, u * 0.13, u * 0.15, 0, 0, 7); c.fill();
+  c.fillStyle = '#2a1a14'; c.beginPath(); c.ellipse(0, hy - u * 0.1, u * 0.15, u * 0.07, 0, 0, 7); c.fill(); // cheveux
+  c.fillStyle = '#ffffff';
+  for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * u * 0.055, hy + u * 0.015, u * 0.03, u * 0.022, 0, 0, 7); c.fill(); }
+  c.fillStyle = '#1b2440';
+  for (const s of [-1, 1]) { c.beginPath(); c.arc(s * u * 0.055 + u * 0.008, hy + u * 0.017, u * 0.016, 0, 7); c.fill(); }
+  c.strokeStyle = '#2a1a14'; c.lineWidth = u * 0.016; c.lineCap = 'round';
+  for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * u * 0.09, hy - u * 0.025); c.lineTo(s * u * 0.025, hy - u * 0.008); c.stroke(); }
+  c.fillStyle = '#5a1e1e'; c.beginPath(); c.ellipse(0, hy + u * 0.1, u * 0.035, u * 0.022, 0, 0, 7); c.fill(); // bouche ouverte, essoufflée
+  // verre teinté et reflet de l'explosion
+  const verre = c.createLinearGradient(0, hy - u * 0.16, 0, hy + u * 0.18);
+  verre.addColorStop(0, 'rgba(120,200,255,.35)'); verre.addColorStop(1, 'rgba(40,80,160,.15)');
+  c.fillStyle = verre; c.fillRect(-u * 0.3, hy - u * 0.3, u * 0.6, u * 0.6);
+  c.strokeStyle = 'rgba(255,170,90,.75)'; c.lineWidth = u * 0.03;
+  c.beginPath(); c.arc(0, hy + u * 0.02, u * 0.17, Math.PI * 1.12, Math.PI * 1.45); c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.85)'; c.beginPath(); c.ellipse(u * 0.11, hy - u * 0.07, u * 0.03, u * 0.018, -0.6, 0, 7); c.fill();
+  c.restore();
+  c.strokeStyle = '#9aa4ba'; c.lineWidth = u * 0.025;
+  c.beginPath(); c.ellipse(0, hy + u * 0.02, u * 0.2, u * 0.16, 0, 0, 7); c.stroke();
+  // lampe frontale allumée
+  c.fillStyle = '#fffbe6'; c.shadowColor = '#fff2b0'; c.shadowBlur = u * 0.12;
+  c.beginPath(); c.arc(0, hy - u * 0.2, u * 0.035, 0, 7); c.fill(); c.shadowBlur = 0;
+  c.restore();
+}
+function dessinerAffiche() {
+  redimensionner();
+  const c = ctx;
+  c.setTransform(RATIO, 0, 0, RATIO, 0, 0);
+  const k = Math.min(L / 600, H / 800);
+  const sauve = { FOC, CX, VY };
+  FOC = 470 * k; CX = L / 2 + 80 * k; VY = H * 0.33;
+  const X0 = L / 2 - 300 * k; // bord gauche du cadre 600 × 800
+  partie = { niv: NIVEAUX[NIVEAUX.length - 1] }; // couleurs du module de la capsule (teinte())
+  tempsGlobal = Math.PI / 14; // gyrophares allumés
+  const m = MODULES.capsule, angle = -0.1;
+  c.fillStyle = rgb(m.fond); c.fillRect(0, 0, L, H);
+  dessinerTube(m, 1.3, angle, true, { c: [255, 140, 60], a: 1 });
+  c.save(); c.translate(CX, VY); c.rotate(angle);
+  // Le mur de feu : la station explose derrière elle et l'incendie remonte le couloir
+  const feu = (rel, f) => {
+    const s = FOC / (rel + RECUL);
+    for (let i = 0; i < 22; i++) {
+      const a = (i * 0.618) % 1, b = (i * 0.414) % 1;
+      const x = (-1.9 + a * 3.8) * s, y = (-1.3 + b * 2.6) * s, r = (0.5 + ((i * 0.29) % 1) * 0.6) * s * f;
+      const gr = c.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, 'rgba(255,245,200,.95)'); gr.addColorStop(0.45, 'rgba(255,160,60,.85)'); gr.addColorStop(1, 'rgba(230,60,30,0)');
+      c.fillStyle = gr; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    }
+  };
+  feu(20, 1.4); feu(14, 1.1);
+  // Les dangers derrière elle, dans le couloir qui penche
+  const objets = [
+    [{ t: 'laser', z: 0, P: 2, ph: 1.2 }, 8],                                         // grille laser haute (violette)
+    [{ t: 'breche', z: 7, len: 9, cote: -1, s: 0 }, 1.2],                             // brèche sur le vide, à gauche
+    [{ t: 'eclat', lane: 1, y: 0.6, z: 0 }, 2.4], [{ t: 'eclat', lane: 1, y: 0.6, z: 1 }, 3.6],
+  ];
+  for (const [o, rel] of objets) dessinerObjet(o, rel, 0.2);
+  // poussière et débris aspirés par la brèche
+  c.fillStyle = 'rgba(210,225,255,.6)';
+  for (let i = 0; i < 24; i++) {
+    const a = (i * 0.618) % 1, b = (i * 0.37) % 1;
+    c.fillRect((-220 + a * 160) * k, (-30 + b * 150) * k, (14 + a * 30) * k, Math.max(1, 2 * k));
+  }
+  c.restore();
+  // Lueur de l'explosion : la vraie source de lumière, juste derrière la coureuse
+  c.save(); c.globalCompositeOperation = 'lighter';
+  const ex = CX, ey = VY;
+  const boule = c.createRadialGradient(ex, ey, 2, ex, ey, H * 0.45);
+  boule.addColorStop(0, 'rgba(255,240,200,.9)'); boule.addColorStop(0.15, 'rgba(255,170,80,.6)');
+  boule.addColorStop(0.45, 'rgba(255,80,40,.22)'); boule.addColorStop(1, 'rgba(255,60,30,0)');
+  c.fillStyle = boule; c.fillRect(0, 0, L, H);
+  // traits de vitesse vers le fond
+  c.strokeStyle = 'rgba(255,210,160,.14)'; c.lineWidth = 2 * k;
+  for (let i = 0; i < 28; i++) {
+    const a = i * 0.83 + 0.2, r0 = H * (0.12 + (i % 5) * 0.04), r1 = r0 + H * (0.18 + (i % 3) * 0.08);
+    c.beginPath(); c.moveTo(ex + Math.cos(a) * r0, ey + Math.sin(a) * r0); c.lineTo(ex + Math.cos(a) * r1, ey + Math.sin(a) * r1); c.stroke();
+  }
+  c.restore();
+  // Débris projetés par l'explosion (morceaux de coque bordés de feu)
+  const debris = [[-0.55, -0.12, 22, 0.4], [0.5, -0.22, 18, 1.2], [-0.25, -0.26, 11, 2], [0.36, 0.05, 13, 0.8], [0.62, 0.3, 16, 2.6], [0.18, -0.3, 9, 1.9]];
+  for (const [dx, dy, r, rot] of debris) {
+    c.save(); c.translate(CX + dx * 300 * k, VY + dy * 400 * k); c.rotate(rot);
+    c.shadowColor = '#ff8a3a'; c.shadowBlur = 14 * k;
+    c.fillStyle = '#2b2440'; c.beginPath(); c.moveTo(-r * k, -r * 0.5 * k); c.lineTo(r * 0.8 * k, -r * 0.7 * k); c.lineTo(r * k, r * 0.4 * k); c.lineTo(-r * 0.3 * k, r * 0.6 * k); c.closePath(); c.fill();
+    c.shadowBlur = 0; c.strokeStyle = '#ffb36b'; c.lineWidth = 2 * k; c.stroke();
+    c.restore();
+  }
+  // Étincelles
+  for (let i = 0; i < 40; i++) {
+    const a = i * 2.39996, d = H * (0.08 + ((i * 0.137) % 1) * 0.42);
+    const x = CX + Math.cos(a) * d * 0.9, y = VY + Math.sin(a) * d * 0.75;
+    c.fillStyle = i % 3 ? 'rgba(255,200,110,.9)' : 'rgba(255,245,210,.95)';
+    c.beginPath(); c.arc(x, y, (1.4 + (i % 4) * 0.7) * k, 0, 7); c.fill();
+  }
+  // Le drone de maintenance détraqué, qui la poursuit et la balaie de son œil rouge
+  const dx0 = X0 + 112 * k, dy0 = H * 0.3, dr = 46 * k;
+  const faisceau = c.createLinearGradient(dx0, dy0, dx0 + 200 * k, dy0 + 240 * k);
+  faisceau.addColorStop(0, 'rgba(255,50,50,.55)'); faisceau.addColorStop(1, 'rgba(255,50,50,0)');
+  c.fillStyle = faisceau;
+  c.beginPath(); c.moveTo(dx0, dy0 + dr * 0.1); c.lineTo(dx0 + 120 * k, dy0 + 300 * k); c.lineTo(dx0 + 290 * k, dy0 + 170 * k); c.closePath(); c.fill();
+  c.save(); c.translate(dx0, dy0); c.rotate(0.18);
+  c.shadowColor = '#ff6a3a'; c.shadowBlur = 18 * k;
+  c.fillStyle = '#4a4e64'; c.beginPath(); c.ellipse(0, 0, dr, dr * 0.48, 0, 0, 7); c.fill();
+  c.shadowBlur = 0;
+  c.fillStyle = '#6c7290'; c.beginPath(); c.ellipse(0, -dr * 0.12, dr * 0.8, dr * 0.26, 0, Math.PI, 0); c.fill();
+  c.fillStyle = '#2a2c3a'; c.fillRect(-dr * 1.45, -dr * 0.13, dr * 2.9, dr * 0.26);
+  c.fillStyle = 'rgba(210,220,240,.5)';
+  for (const sx of [-1.45, 1.45]) { c.beginPath(); c.ellipse(sx * dr, -dr * 0.25, dr * 0.55, dr * 0.1, 0, 0, 7); c.fill(); }
+  c.fillStyle = '#ff2a2a'; c.shadowColor = '#ff2a2a'; c.shadowBlur = 24 * k;
+  c.beginPath(); c.arc(dr * 0.05, dr * 0.08, dr * 0.24, 0, 7); c.fill();
+  c.shadowBlur = 0; c.fillStyle = '#ffd0d0'; c.beginPath(); c.arc(-dr * 0.02, dr * 0.02, dr * 0.08, 0, 7); c.fill();
+  c.strokeStyle = '#ffb36b'; c.lineWidth = 2 * k; c.beginPath(); c.moveTo(-dr * 0.6, dr * 0.3); c.lineTo(-dr * 0.75, dr * 0.75); c.lineTo(-dr * 0.6, dr * 0.95); c.stroke(); // bras arraché
+  c.restore();
+  // La coureuse, en grand, éclairée de face par la lueur dorée de la capsule
+  const u = H * 0.282;
+  const fx = L / 2 - 30 * k, fy = H * 0.735;
+  const devant = c.createRadialGradient(fx, fy - u, u * 0.2, fx, fy - u, u * 1.4);
+  devant.addColorStop(0, 'rgba(255,225,150,.22)'); devant.addColorStop(1, 'rgba(255,225,150,0)');
+  c.fillStyle = devant; c.fillRect(0, 0, L, H);
+  dessinerCoureuseFace(c, fx, fy, u, '#ff9a4a');
+  // La carte d'accès dorée qu'elle va attraper
+  const cx2 = fx + u * 0.98, cy2 = fy - u * 1.33;
+  c.save(); c.translate(cx2, cy2); c.rotate(-0.35);
+  const halo = c.createRadialGradient(0, 0, 4, 0, 0, u * 0.42);
+  halo.addColorStop(0, 'rgba(255,225,110,.85)'); halo.addColorStop(1, 'rgba(255,212,71,0)');
+  c.fillStyle = halo; c.beginPath(); c.arc(0, 0, u * 0.42, 0, 7); c.fill();
+  c.shadowColor = '#ffd447'; c.shadowBlur = u * 0.1;
+  c.fillStyle = '#ffd447'; c.beginPath(); c.roundRect(-u * 0.15, -u * 0.1, u * 0.3, u * 0.2, u * 0.03); c.fill();
+  c.shadowBlur = 0;
+  c.fillStyle = '#7a5a14'; c.fillRect(-u * 0.1, -u * 0.04, u * 0.07, u * 0.06); c.fillRect(u * 0.0, u * 0.04, u * 0.11, u * 0.02);
+  c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(-u * 0.13, -u * 0.085, u * 0.26, u * 0.025);
+  c.restore();
+  // Premier plan : poutre arrachée qui pend en haut à gauche, caisse renversée en bas à droite
+  c.save(); c.translate(-20 * k + Math.min(0, CX - 300 * k), 40 * k); c.rotate(0.5);
+  c.fillStyle = '#1a1626'; c.fillRect(0, -26 * k, 300 * k, 52 * k);
+  c.fillStyle = '#e6be28'; for (let i = 0; i < 6; i++) { c.beginPath(); c.moveTo(i * 48 * k, -26 * k); c.lineTo(i * 48 * k + 22 * k, -26 * k); c.lineTo(i * 48 * k + 6 * k, 26 * k); c.lineTo(i * 48 * k - 16 * k, 26 * k); c.closePath(); c.fill(); }
+  c.fillStyle = 'rgba(255,120,60,.6)'; c.fillRect(0, 22 * k, 300 * k, 4 * k);
+  c.restore();
+  c.save(); c.translate(L - 70 * k, H * 0.86); c.rotate(-0.25);
+  c.fillStyle = '#4a3220'; c.fillRect(-90 * k, -70 * k, 200 * k, 150 * k);
+  c.fillStyle = '#6e4a28'; c.fillRect(-90 * k, -70 * k, 200 * k, 18 * k);
+  c.fillStyle = '#2a1c12'; c.fillRect(-90 * k, -10 * k, 200 * k, 12 * k);
+  c.strokeStyle = 'rgba(255,150,80,.7)'; c.lineWidth = 3 * k; c.strokeRect(-90 * k, -70 * k, 200 * k, 150 * k);
+  c.restore();
+  // Vignette légère
+  const v = c.createRadialGradient(L / 2, H * 0.45, Math.min(L, H) * 0.4, L / 2, H * 0.45, Math.max(L, H) * 0.8);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.4)');
+  c.fillStyle = v; c.fillRect(0, 0, L, H);
+  FOC = sauve.FOC; CX = sauve.CX; VY = sauve.VY;
+  partie = null;
+}
+function cacherInterface() {
+  for (const el of document.querySelectorAll('.ecran, #hud, #message, #aide-bottes, .jel-langue, jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  affiche = true;
+  cacherInterface();
+  setTimeout(cacherInterface, 300); setTimeout(cacherInterface, 1200); // bouton de langue posé après coup
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---------- Images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine course, avec sa vraie interface (chrono, intégrité, cartes, score, combo,
+// progression, oxygène), sans écran titre, ni fenêtre « Continuer », ni présentation de section
+// (CONSIGNES-JEU.md, section 5). La course est placée à un moment choisi, tourne une fraction de
+// seconde (la coureuse saute, la poussière file vers la brèche), puis elle est figée sans fenêtre de
+// pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = section 1, le hangar : caisses, éclats bleus, la première carte d'accès à attraper ;
+//   2 = section 7, les serres : une brèche aspire tout vers le vide, bottes magnétiques accrochées ;
+//   3 = section 14, le réacteur (écran d'ordinateur) : alarme, grille laser qui balaie le couloir,
+//       anneau violet de gravité au loin, la coureuse qui saute par-dessus le laser bas.
+const SCENES_APERCU = {
+  1: { n: 0, dist: 121, lane: -1, laneX: 0, secondes: 0.4, score: 340, combo: 13, cartes: 0, integ: 3, reste: 55 },
+  2: { n: 6, dist: 228, lane: 1, laneX: VOIE, secondes: 0.5, bottes: true, score: 1650, combo: 22, cartes: 0, integ: 2, reste: 58 },
+  3: { n: 13, dist: 151, lane: 0, laneX: 0, secondes: 0.4, saut: 0.14, laser: 'bas', score: 3120, combo: 30, cartes: 0, integ: 2, reste: 61 },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  sansBouteille = false;
+  nouvellePartie(sc.n);
+  const p = partie;
+  // La course reprend à la distance choisie : ce qui est derrière est passé (gravité comprise).
+  p.dist = sc.dist;
+  let g = 0;
+  for (const o of p.objs) {
+    if (o.z >= sc.dist - 1) continue;
+    if (o.t === 'gravite') g = 1 - g;
+    if (o.t !== 'breche') o.fait = true;
+  }
+  p.g = g; p.angle = g * Math.PI;
+  p.lane = sc.lane; p.laneX = sc.laneX;
+  p.score = sc.score; p.combo = sc.combo; p.cartes = sc.cartes; p.integ = sc.integ;
+  p.reste = sc.reste; p.eclats = Math.round(sc.score / 20);
+  if (p.niv.oxy && sc.oxy) p.oxy = sc.oxy;
+  p.horloge = p.tempsMax - sc.reste;
+  etat = 'jeu'; montrer(null); majHUD(true);
+  // Pendant la mise en place : aucun choc possible (ni perte d'intégrité, ni fin de section).
+  p.intouchable = 99;
+  clavierBottes = !!sc.bottes;
+  const pas = Math.round(sc.secondes * 60);
+  for (let i = 0; i < pas; i++) {
+    if (sc.saut && i === pas - Math.round(sc.saut * 60)) sauter(); // saut juste avant la capture
+    tempsGlobal += 1 / 60; majPartie(1 / 60); majParticules(1 / 60);
+  }
+  // Grille laser la plus proche devant elle : allumée en bas (la coureuse saute par-dessus).
+  if (sc.laser) {
+    const l = p.objs.find((o) => o.t === 'laser' && o.z > p.dist);
+    if (l) p.horloge = l.P * (Math.ceil(p.horloge / l.P) + 0.2) - l.ph;
+  }
+  // Puis la course est figée sur ce moment, avec la vraie interface et sans fenêtre de pause.
+  p.intouchable = 0; p.trebuche = 0; secousse = 0;
+  p.score = Math.max(p.score, sc.score);
+  majHUD(true);
+  clearTimeout(message.minuteur); $('message').classList.remove('vu');
+  $('aide-bottes').classList.add('cache');
+  fige = true;
+}
 
 /* ---------- Démarrage ---------- */
 chargerProgression();
 majSon();
-allerTitre();
-requestAnimationFrame(boucle);
-requestAnimationFrame(demoFrame);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  allerTitre();
+  requestAnimationFrame(boucle);
+  requestAnimationFrame(demoFrame);
+}
 </script>
 </body>
 </html>

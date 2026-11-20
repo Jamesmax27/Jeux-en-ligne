@@ -2790,8 +2790,8 @@ document.addEventListener('keydown', function (e) {
   if (mode === 'jeu' && e.code === 'KeyR') { recommencer(); e.preventDefault(); }
 });
 document.addEventListener('keyup', function (e) { if (CODES[e.code]) { touches[CODES[e.code]] = false; majEntree(); } });
-window.addEventListener('blur', function () { relacher(); mettrePause(); });
-document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') mettrePause(); });
+window.addEventListener('blur', function () { if (apercuNum) return; relacher(); mettrePause(); });
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && !apercuNum) mettrePause(); });
 
 $('b-jouer').addEventListener('click', jouer);
 $('b-niveaux').addEventListener('click', function () { initAudio(); SONS.clic(); allerNiveaux(); });
@@ -3181,6 +3181,7 @@ function eclats(x, y, n, couleurs, force, type) {
 function confettis() { if (!partie) return; var m = partie.moto.p[2]; eclats(m.x, m.y - 30, 70, ['#ffd24a', '#ff8a3a', '#5aff8a', '#b18cff', '#fff'], 420); }
 
 function lumiereProjo(tps) {
+  if (apercuNum) return 1; // image du jeu : projecteurs allumés
   var u = tps % 3.2;
   if (u < 0.12) return Math.random() > 0.5 ? 1 : 0;   // le projecteur grésille en s'allumant
   if (u < 0.95) return 1;
@@ -3225,7 +3226,7 @@ function dessinerJeu(tps) {
   var s = borne(Math.min(W / 400, (Hh - bas) / 300), 0.55, 2.3);
   camera.echelle = s;
   var m = S.moto, A = m.p[0], B = m.p[1];
-  var cx = (A.x + B.x) / 2 + borne(((A.vx + B.vx) / 2) * 0.35, -60, 150) + 40, cy = (A.y + B.y) / 2 - 30;
+  var cx = (A.x + B.x) / 2 + borne(((A.vx + B.vx) / 2) * 0.35, -60, 150) + 40, cy = (A.y + B.y) / 2 - 30 + (camera.decalY || 0);
   if (S.etat === 'chute' || S.etat === 'happe') { cx = camera.x; cy = camera.y; }
   if (!camera.init) { camera.x = cx; camera.y = cy; camera.init = true; }
   camera.x += (cx - camera.x) * 0.1; camera.y += (cy - camera.y) * 0.1;
@@ -3292,7 +3293,7 @@ function boucle(maintenant) {
   requestAnimationFrame(boucle);
   var dt = Math.min(0.05, (maintenant - dernier) / 1000); dernier = maintenant;
   var tps = maintenant / 1000;
-  if (partie && (mode === 'jeu')) {
+  if (partie && mode === 'jeu' && !apercuNum) { // image du jeu : la partie reste figée
     accu += dt;
     while (accu >= 1 / 60) {
       avancer(partie, entree, 1 / 60); accu -= 1 / 60;
@@ -3339,13 +3340,201 @@ function traiterEvenements(S) {
   }
 }
 
+// --- Images du jeu (page du jeu) --------------------------------------------
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (barre du haut, pédales), sans écran titre,
+// ni fenêtre « Continuer », ni carte d'explication (CONSIGNES-JEU.md, section 5). La vraie physique
+// tourne un court instant (gaz, penché en arrière), puis la partie est figée sur ce moment, sans
+// fenêtre de pause : ni victoire, ni chute, ni son, ni sauvegarde.
+//   1 = niveau 1 : la moto décolle du tremplin, le boulon doré juste devant ;
+//   2 = niveau 7 : roue levée sous une presse qui clignote, prête à frapper ;
+//   3 = niveau 20 : de nuit, sur l'huile, le chien d'acier et le broyeur aux trousses (ordinateur).
+var apercuNum = 0;
+var SCENES_APERCU = {
+  1: { niv: 0, x: 2150, v: 300, penche: 0, images: 54, moto: 0, casque: 0, temps: 21.4, chutes: 0, decalY: -110 },
+  2: { niv: 6, x: 1572, v: 250, penche: -0.6, images: 15, moto: 1, casque: 1, temps: 27.8, chutes: 1, horloge: 0.8, decalY: -110 },
+  3: { niv: 19, x: 2640, v: 300, penche: -0.6, images: 15, moto: 4, casque: 4, temps: 46.3, chutes: 2, chien: 2615, broyeur: 2530, decalY: -40 }
+};
+function ouvrirApercu(numero) {
+  apercuNum = numero;
+  var sc = SCENES_APERCU[numero], i;
+  // Hasard fixe : la même image à chaque capture.
+  var graine = 987654 + numero * 7919;
+  Math.random = function () { graine = (graine + 0x6D2B79F5) | 0; var u = Math.imul(graine ^ (graine >>> 15), 1 | graine); u = (u + Math.imul(u ^ (u >>> 7), 61 | u)) ^ u; return ((u ^ (u >>> 14)) >>> 0) / 4294967296; };
+  prog.moto = sc.moto; prog.casque = sc.casque; // en mémoire seulement : rien n'est enregistré
+  nivCourant = sc.niv; enCours = false; finTraitee = true;
+  partie = creerPartie(NIVEAUX[sc.niv]);
+  var S = partie, N = S.N;
+  poserMoto(S, sc.x);
+  for (i = 0; i < 3; i++) S.moto.p[i].vx = sc.v;
+  for (i = 1; i < N.cps.length; i++) if (N.cps[i].x < sc.x) S.cp = i;
+  S.demarre = true;
+  entree.gaz = 1; entree.frein = 0; entree.penche = sc.penche;
+  for (i = 0; i < sc.images; i++) avancer(S, entree, 1 / 60);
+  // Le moment est posé : chronomètre, chutes, presses, chien, broyeur.
+  S.temps = sc.temps; S.chutes = sc.chutes; S.ev.length = 0; S.secousse = 0;
+  if (sc.horloge !== undefined) {
+    S.horloge = sc.horloge;
+    for (i = 0; i < N.presses.length; i++) { var e = etatPresse(N.presses[i], S.horloge); N.presses[i].phase = e.ph; N.presses[i].b = e.b; }
+  }
+  if (sc.chien) { var ch = N.chiens[0]; ch.actif = true; ch.fini = false; ch.x = sc.chien; ch.v = ch.vmax; var hy = hauteurSol(N, ch.x); ch.y = hy === null ? 0 : hy; }
+  if (sc.broyeur) S.broyX = sc.broyeur;
+  // Caméra centrée sur la moto (sans l'avance due à la vitesse).
+  for (i = 0; i < 3; i++) { S.moto.p[i].vx = 0; S.moto.p[i].vy = 0; }
+  particules.length = 0;
+  camera.init = false; camera.decalY = sc.decalY; // cadrage un peu plus haut : plus de décor, moins de sol nu
+  mode = 'jeu'; montrer(null);
+  $('hud-nom').textContent = tr('hudNiveau', { n: nivCourant + 1, nom: tr('niv' + (nivCourant + 1)) });
+  majHud();
+  touches = { gaz: true }; majPedales();
+}
+
+// --- Affiche (jaquette du jeu) ----------------------------------------------
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La moto rouillée s'envole
+// d'une planche au-dessus d'une carcasse, phare allumé vers le boulon doré ; un chien d'acier aux yeux
+// rouges la poursuit, l'aimant d'une grue grésille au-dessus du pilote, sous une grande lune.
+function dessinerAffiche() {
+  redimensionner();
+  var c = ctx, t = 1.3, i;
+  var k = Math.min(W / 600, Hh / 800), ox = (W - 600 * k) / 2, oy = (Hh - 800 * k) / 2, sol = oy + 640 * k;
+  function scene() { c.setTransform(DPR * k, 0, 0, DPR * k, DPR * ox, DPR * oy); }
+  function pixels() { c.setTransform(DPR, 0, 0, DPR, 0, 0); }
+  c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1; c.shadowBlur = 0;
+  pixels();
+  // Ciel de nuit, rougi par la fonderie à l'horizon
+  var g = c.createLinearGradient(0, 0, 0, sol);
+  g.addColorStop(0, '#2a1d58'); g.addColorStop(0.45, '#5a2a78'); g.addColorStop(0.8, '#b04656'); g.addColorStop(1, '#f08a44');
+  c.fillStyle = g; c.fillRect(0, 0, W, Hh);
+  c.fillStyle = 'rgba(255,255,255,.8)';
+  for (i = 0; i < 90; i++) c.fillRect(alea(i) * W, alea(i + 50) * sol * 0.55, 1.8, 1.8);
+  // Grande lune et son halo
+  scene();
+  var lx = 120, ly = 160, lr = 84;
+  var hl = c.createRadialGradient(lx, ly, lr * 0.8, lx, ly, 330);
+  hl.addColorStop(0, 'rgba(255,236,200,.55)'); hl.addColorStop(1, 'rgba(255,236,200,0)');
+  c.fillStyle = hl; c.fillRect(-600, -200, 1800, 900);
+  c.fillStyle = '#fbf0d6'; c.shadowColor = '#ffe9b8'; c.shadowBlur = 60; c.beginPath(); c.arc(lx, ly, lr, 0, 7); c.fill(); c.shadowBlur = 0;
+  c.fillStyle = 'rgba(150,120,100,.22)'; [[-28, -18, 20], [30, 26, 13], [18, -34, 9], [-34, 34, 8]].forEach(function (q) { c.beginPath(); c.arc(lx + q[0], ly + q[1], q[2], 0, 7); c.fill(); });
+  // Silhouettes lointaines : cheminées de la fonderie, puis bus empilés
+  pixels();
+  dessinerLointain(c, 2, PALETTES[2], 40, sol - 80 * k, 0.3, '#45203f', 3);
+  dessinerLointain(c, 0, PALETTES[0], 90, sol - 8 * k, 0.55, '#2a1630', 2);
+  // Grue aimantée : pylône à droite, flèche au-dessus du pilote
+  scene();
+  c.strokeStyle = '#1c1424'; c.lineWidth = 18; c.lineCap = 'butt';
+  c.beginPath(); c.moveTo(560, 660); c.lineTo(560, 92); c.moveTo(640, 92); c.lineTo(190, 92); c.stroke();
+  c.strokeStyle = '#3a2c44'; c.lineWidth = 3;
+  for (var gy = 640; gy > 100; gy -= 34) { c.beginPath(); c.moveTo(552, gy); c.lineTo(568, gy - 34); c.stroke(); }
+  for (var gx = 200; gx < 640; gx += 34) { c.beginPath(); c.moveTo(gx, 84); c.lineTo(gx + 34, 100); c.stroke(); }
+  c.fillStyle = '#ff3020'; c.shadowColor = '#ff3020'; c.shadowBlur = 22; c.beginPath(); c.arc(560, 76, 8, 0, 7); c.fill(); c.shadowBlur = 0;
+  var ax = 320, ay = 150;
+  c.strokeStyle = '#b8b2c0'; c.lineWidth = 3; c.beginPath(); c.moveTo(ax - 10, 100); c.lineTo(ax - 4, ay); c.moveTo(ax + 10, 100); c.lineTo(ax + 4, ay); c.stroke();
+  var gm = c.createLinearGradient(0, ay, 0, ay + 40); gm.addColorStop(0, '#d23a30'); gm.addColorStop(1, '#7a1818');
+  c.fillStyle = gm; c.fillRect(ax - 62, ay, 124, 34);
+  c.fillStyle = '#9a98a4'; c.fillRect(ax - 62, ay + 30, 124, 11);
+  c.fillStyle = 'rgba(255,255,255,.35)'; c.fillRect(ax - 58, ay + 3, 116, 4);
+  // Sol de la casse (toute la largeur)
+  pixels();
+  var gs = c.createLinearGradient(0, sol, 0, Hh); gs.addColorStop(0, '#2a1c26'); gs.addColorStop(0.3, '#16101c'); gs.addColorStop(1, '#0c0910');
+  c.fillStyle = gs; c.fillRect(0, sol, W, Hh - sol);
+  c.strokeStyle = '#c0724a'; c.lineWidth = 3 * k; c.beginPath(); c.moveTo(0, sol); c.lineTo(W, sol); c.stroke();
+  scene();
+  // Carcasse de voiture sous le saut, planche d'appel derrière
+  dessinerDecor(c, { type: 'voiture', x: 250, y: 640, w: 250, h: 64, v: 1 }, PALETTES[0], t);
+  dessinerDecor(c, { type: 'planche', x1: 140, y1: 640, x2: 262, y2: 586 }, PALETTES[0], t);
+  c.strokeStyle = '#7a5838'; c.lineWidth = 5; c.beginPath(); c.moveTo(140, 637); c.lineTo(262, 583); c.stroke();
+  // Pose de la moto (même dessin que dans le jeu, en grand) : cabrée en plein vol
+  var e = 5, ang = -0.5, ux = Math.cos(ang), uy = Math.sin(ang), nx = uy, ny = -ux;
+  var mx0 = 226, my0 = 520;
+  var A = { x: 0, y: 0 }, B = { x: ux * 48, y: uy * 48 };
+  var H = { x: B.x / 2 + nx * 36 - ux * 5, y: B.y / 2 + ny * 36 - uy * 5 };
+  var phx = mx0 + e * (B.x - ux * 3 + nx * 26), phy = my0 + e * (B.y - uy * 3 + ny * 26);
+  // Faisceau du phare vers le boulon doré
+  c.globalCompositeOperation = 'lighter';
+  var fx = c.createRadialGradient(phx, phy, 0, phx, phy, 520);
+  fx.addColorStop(0, 'rgba(255,236,170,.75)'); fx.addColorStop(0.5, 'rgba(255,220,140,.3)'); fx.addColorStop(1, 'rgba(255,220,140,0)');
+  c.fillStyle = fx; c.beginPath(); c.moveTo(phx, phy); c.arc(phx, phy, 520, ang - 0.3, ang + 0.34); c.closePath(); c.fill();
+  c.globalCompositeOperation = 'source-over';
+  // Boulon doré dans la lumière
+  var bx = 505, by = 218;
+  c.save(); c.translate(bx, by); c.rotate(0.4); c.shadowColor = '#ffd24a'; c.shadowBlur = 34; c.fillStyle = '#ffd24a';
+  c.beginPath(); for (i = 0; i < 6; i++) { var an = i * Math.PI / 3; c.lineTo(Math.cos(an) * 26, Math.sin(an) * 26); } c.closePath(); c.fill();
+  c.shadowBlur = 0; c.strokeStyle = '#a87410'; c.lineWidth = 3; c.stroke();
+  c.fillStyle = '#6a4808'; c.beginPath(); c.arc(0, 0, 10, 0, 7); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.6)'; c.beginPath(); c.arc(-9, -9, 5, 0, 7); c.fill(); c.restore();
+  c.fillStyle = '#fff3b0'; for (i = 0; i < 8; i++) { var aa = i * 0.79 + 0.2, rr = 40 + (i % 2) * 10; c.fillRect(bx + Math.cos(aa) * rr - 2, by + Math.sin(aa) * rr - 2, 4, 4); }
+  // Chien d'acier lancé à la poursuite
+  c.save(); c.translate(80, 640); c.scale(2.8, 2.8); c.shadowColor = 'rgba(255,70,40,.7)'; c.shadowBlur = 16;
+  dessinerChien(c, { x: 0, y: 0, actif: true, fini: false }, 1.05);
+  c.restore();
+  c.fillStyle = '#ff2a2a'; c.shadowColor = '#ff2a2a'; c.shadowBlur = 30; c.beginPath(); c.arc(80 + 22 * 2.8, 640 - 34 * 2.8, 7, 0, 7); c.fill(); c.shadowBlur = 0;
+  c.fillStyle = 'rgba(120,90,80,.5)'; for (i = 0; i < 6; i++) { c.beginPath(); c.arc(-30 + i * 12, 634 - (i % 3) * 6, 7 + i % 2 * 3, 0, 7); c.fill(); }
+  // Étincelles arrachées par la roue arrière au bout de la planche
+  c.lineCap = 'round';
+  for (i = 0; i < 26; i++) {
+    var sa = Math.PI * (0.62 + alea(i + 200) * 0.5), sl = 18 + alea(i + 300) * 60, sx = 252 + alea(i + 400) * 14, sy = 585 + alea(i + 500) * 8;
+    c.strokeStyle = i % 3 ? '#ffd27a' : '#ff8a3a'; c.lineWidth = 2 + alea(i + 600) * 2;
+    c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + Math.cos(sa) * sl, sy + Math.sin(sa) * sl * 0.6 - 10); c.stroke();
+  }
+  // Fumée d'échappement
+  for (i = 0; i < 6; i++) { c.fillStyle = 'rgba(190,170,200,' + (0.32 - i * 0.045) + ')'; c.beginPath(); c.arc(mx0 - 40 - i * 16, my0 - 70 - i * 14, 9 + i * 4, 0, 7); c.fill(); }
+  // La moto et son pilote, cernés de lumière
+  var hors = document.createElement('canvas'); hors.width = toile.width; hors.height = toile.height;
+  var hc = hors.getContext('2d');
+  hc.setTransform(DPR * k * e, 0, 0, DPR * k * e, DPR * (ox + mx0 * k), DPR * (oy + my0 * k));
+  dessinerMoto(hc, A, B, H, MOTOS[0], CASQUES[3], 0.3, 0.9, false, 0);
+  var contour = document.createElement('canvas'); contour.width = hors.width; contour.height = hors.height;
+  var cc = contour.getContext('2d'); cc.drawImage(hors, 0, 0); cc.globalCompositeOperation = 'source-in'; cc.fillStyle = '#ffe2b0'; cc.fillRect(0, 0, contour.width, contour.height);
+  pixels();
+  c.shadowColor = 'rgba(255,170,90,.75)'; c.shadowBlur = 26 * k;
+  c.drawImage(contour, -3 * k, -3 * k, W, Hh);
+  c.shadowBlur = 0;
+  c.drawImage(hors, 0, 0, W, Hh);
+  // Ondes de l'aimant qui cherchent le pilote
+  scene();
+  c.strokeStyle = 'rgba(130,210,255,.85)'; c.lineWidth = 4; c.shadowColor = '#6ac8ff'; c.shadowBlur = 14;
+  for (i = 0; i < 3; i++) { var r = 22 + i * 24; c.beginPath(); c.arc(ax, ay + 44 + i * 14, r, 0.2 * Math.PI, 0.8 * Math.PI); c.stroke(); }
+  c.shadowBlur = 0;
+  // Premier plan : piles de pneus coupées par les bords
+  function pneu(x, y, rx, ry) {
+    c.fillStyle = '#100c12'; c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, 7); c.fill();
+    c.strokeStyle = '#3a3040'; c.lineWidth = 4; c.beginPath(); c.ellipse(x, y - 2, rx - 6, ry - 5, 0, Math.PI, 2 * Math.PI); c.stroke();
+    c.fillStyle = '#060408'; c.beginPath(); c.ellipse(x, y - 3, rx * 0.45, ry * 0.35, 0, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(255,170,100,.35)'; c.lineWidth = 2; c.beginPath(); c.ellipse(x, y - 2, rx - 2, ry - 2, 0, 1.15 * Math.PI, 1.6 * Math.PI); c.stroke();
+  }
+  for (i = 0; i < 5; i++) pneu(585, 790 - i * 44, 96, 30);
+  pneu(0, 770, 110, 34); pneu(10, 730, 100, 30);
+  // Bas plus sombre (le bandeau du titre s'y pose)
+  pixels();
+  var vb = c.createLinearGradient(0, oy + 660 * k, 0, Hh); vb.addColorStop(0, 'rgba(8,6,12,0)'); vb.addColorStop(1, 'rgba(8,6,12,.7)');
+  c.fillStyle = vb; c.fillRect(0, oy + 660 * k, W, Hh);
+}
+function cacherPourAffiche() {
+  var els = document.querySelectorAll('.ecran, #hud, #pedales, #toast, .jel-langue, button');
+  for (var i = 0; i < els.length; i++) els[i].style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherPourAffiche();
+  setTimeout(cacherPourAffiche, 300); setTimeout(cacherPourAffiche, 1200);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
 // --- Démarrage -------------------------------------------------------------
 document.title = tr('titre');
 lireProgression();
 try { var rg = JSON.parse(localStorage.getItem('trial-casse-reglages') || 'null'); if (rg) { if (motoDispo(rg.moto | 0)) prog.moto = rg.moto | 0; if (casqueDispo(rg.casque | 0)) prog.casque = rg.casque | 0; } } catch (e) { /* stockage refusé */ }
 majSon();
-allerTitre();
-requestAnimationFrame(boucle);
+var numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  allerTitre();
+  requestAnimationFrame(boucle);
+}
 })();
 </script>
 </body>
