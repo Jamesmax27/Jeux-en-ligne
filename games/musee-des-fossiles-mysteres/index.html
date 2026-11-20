@@ -2433,6 +2433,12 @@ body[data-salle="4"] { --fond-jeu: linear-gradient(#27405e, #6f97b8 60%, #d6e6f0
 @media (min-height: 760px) { .carte-choix { min-height: 110px; } .carte-choix .img svg { max-height: 86px; } }
 @media (max-height: 640px) { .titre-illu { max-height: 30vh; } .titre-illu svg { max-height: 30vh; } .carte-choix { min-height: 84px; } .consigne { min-height: 2.2em; } }
 @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; } }
+/* Image du jeu sur un écran d'ordinateur (window.JEL_APERCU = 3) : fouille et question côte à côte. */
+body.apercu-large #zone { max-width: 1200px; flex-direction: row; justify-content: center; align-items: center; gap: 48px; }
+body.apercu-large .col-fouille { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: none; }
+body.apercu-large .fouille, body.apercu-large .fouille-barre { width: min(44vw, 72vh, 540px); }
+body.apercu-large .question { flex: 0 1 520px; animation: none; }
+body.apercu-large .consigne { max-width: none; }
 </style>
 </head>
 <body data-salle="1">
@@ -2902,7 +2908,7 @@ body[data-salle="4"] { --fond-jeu: linear-gradient(#27405e, #6f97b8 60%, #d6e6f0
      --------------------------------------------------------------- */
   let ac = null, dernierBrosse = 0;
   function audio() {
-    if (!sauve.son) return null;
+    if (!sauve.son || apercu || window.JEL_AFFICHE) return null; // affiche et images du jeu : aucun son
     if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
     if (ac.state === 'suspended') { try { ac.resume(); } catch (e) { /* rien */ } }
     return ac;
@@ -2993,6 +2999,8 @@ body[data-salle="4"] { --fond-jeu: linear-gradient(#27405e, #6f97b8 60%, #d6e6f0
      --------------------------------------------------------------- */
   const etat = { ecran: 'titre', niveau: 0, iEp: 0, epreuves: [], coeurs: 3, erreurs: 0, scoreNiv: 0, scoreTotal: 0, reussies: 0, enPartie: false, fini: false, pauseMenu: false, tutoOuvert: false, suivant: null, touchesChoix: null, verrou: false, resultats: [] };
   let ep = null, horloge = 0, gen = 0, minuteurs = [];
+  // Images du jeu (window.JEL_APERCU, posé par le robot du site) : numéro de l'image, partie figée.
+  let apercu = 0, apercuFige = false;
   const bloque = () => etat.pauseMenu || etat.tutoOuvert || !etat.enPartie;
   function plusTard(ms, fn) { const g = gen; minuteurs.push({ a: horloge + ms, fn, g }); }
   function majMinuteurs() {
@@ -3466,7 +3474,7 @@ body[data-salle="4"] { --fond-jeu: linear-gradient(#27405e, #6f97b8 60%, #d6e6f0
         retour(false, t('fb.oups'), `${t('fb.bonne', { rep: labelDe(q) })}<br><b>${nom(d.animal)}</b> — ${fait(d.animal)}`, mort ? 2200 : 0, apresErreur(mort));
       }
     }
-    return { maj: (dt) => fouille.maj(dt), clavier: (e) => fouille.clavier(e), detruire: () => fouille.fin() };
+    return { fouille, maj: (dt) => fouille.maj(dt), clavier: (e) => fouille.clavier(e), detruire: () => fouille.fin() };
   }
 
   // « Lequel ? » et « Détail à la loupe ».
@@ -4005,31 +4013,256 @@ body[data-salle="4"] { --fond-jeu: linear-gradient(#27405e, #6f97b8 60%, #d6e6f0
     if (m && etat.touchesChoix) { const b = etat.touchesChoix[Number(m[1]) - 1]; if (b && b.isConnected && !b.disabled) { e.preventDefault(); b.click(); } return; }
     if (ep && ep.clavier && ep.clavier(e)) e.preventDefault();
   });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && etat.enPartie) ouvrirPause(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && etat.enPartie && !apercu) ouvrirPause(); });
   window.addEventListener('resize', tailleFx);
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie.
-  if (window.JEL_SAVE) window.JEL_SAVE.surFermeture(() => { if (etat.enPartie) window.JEL_SAVE.save(JEU, { niveau: etat.niveau + 1, score: etat.scoreTotal, tutos: sauve.tutos }); });
+  if (window.JEL_SAVE) window.JEL_SAVE.surFermeture(() => { if (etat.enPartie && !apercu) window.JEL_SAVE.save(JEU, { niveau: etat.niveau + 1, score: etat.scoreTotal, tutos: sauve.tutos }); });
 
   // Boucle principale : horloge de jeu, épreuve en cours, effets.
   let avant = performance.now();
   function boucle(n) {
     const dt = Math.min(50, n - avant); avant = n;
-    if (etat.enPartie && !etat.pauseMenu && !etat.tutoOuvert) {
-      horloge += dt; majMinuteurs();
-      if (ep && ep.maj) ep.maj(dt);
+    if (!apercuFige) {
+      if (etat.enPartie && !etat.pauseMenu && !etat.tutoOuvert) {
+        horloge += dt; majMinuteurs();
+        if (ep && ep.maj) ep.maj(dt);
+      }
+      if (!etat.pauseMenu) majFx(dt);
     }
-    if (!etat.pauseMenu) majFx(dt);
     requestAnimationFrame(boucle);
+  }
+
+  /* ---------------------------------------------------------------
+     Affiche (jaquette du jeu)
+     Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) :
+     une scène composée, sans interface ni texte, d'où sort la jaquette
+     (CONSIGNES-JEU.md, section 5). Dans la grande salle du musée, sous la
+     lumière d'une haute fenêtre, un tyrannosaure penché sur une caisse de
+     fouille regarde, ravi, son propre crâne fossile que le pinceau dégage du
+     sable ; loupe et ammonite au premier plan, squelette de diplodocus au fond.
+     --------------------------------------------------------------- */
+  function sceneAffiche() {
+    const etoile = (x, y, r, c) => `<path d="M${x} ${y - r} Q${x + r * .18} ${y - r * .18} ${x + r} ${y} Q${x + r * .18} ${y + r * .18} ${x} ${y + r} Q${x - r * .18} ${y + r * .18} ${x - r} ${y} Q${x - r * .18} ${y - r * .18} ${x} ${y - r}Z" fill="${c || '#fff6c8'}"/>`;
+    const sousSvg = (inner, vb, x, y, w, h, extra) => `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="${vb}" overflow="visible"${extra ? ' ' + extra : ''}>${inner}</svg>`;
+    // Fenêtres en arc et colonnes, répétées pour que le mur continue sur un écran large.
+    let mur = '';
+    for (let k = -3; k <= 3; k++) {
+      const cx = 150 + k * 560;
+      mur += `<path d="M${cx - 110} 330 V120 A110 110 0 0 1 ${cx + 110} 120 V330Z" fill="#7a4f2a"/>
+        <path d="M${cx - 96} 322 V122 A96 96 0 0 1 ${cx + 96} 122 V322Z" fill="url(#af-ciel)"/>
+        <path d="M${cx} 30 V322 M${cx - 96} 200 H${cx + 96} M${cx - 96} 262 H${cx + 96}" stroke="#7a4f2a" stroke-width="9"/>
+        <ellipse cx="${cx - 40}" cy="250" rx="38" ry="14" fill="#fff" opacity=".85"/><ellipse cx="${cx + 30}" cy="140" rx="30" ry="11" fill="#fff" opacity=".7"/>
+        <rect x="${cx - 124}" y="326" width="248" height="16" rx="5" fill="#c99a5b" stroke="#7a4f2a" stroke-width="4"/>`;
+      const col = cx + 280;
+      mur += `<rect x="${col - 30}" y="0" width="60" height="470" fill="#f3e2bd"/><path d="M${col - 14} 0 V470 M${col} 0 V470 M${col + 14} 0 V470" stroke="#dcc391" stroke-width="5"/>
+        <rect x="${col - 40}" y="440" width="80" height="34" rx="4" fill="#e3cb9b" stroke="#a37a46" stroke-width="3"/>`;
+    }
+    // Rayons de lumière de la fenêtre vers la caisse.
+    const rayons = `<path d="M70 120 L250 110 L640 520 L330 560Z" fill="url(#af-rayon)"/><path d="M120 200 L230 190 L520 600 L400 610Z" fill="url(#af-rayon)" opacity=".7"/>`;
+    // Squelette de diplodocus exposé au fond, pâle.
+    const fond = `<g opacity=".42">${sousSvg(squeletteComplet('diplodocus'), '0 0 340 200', 300, 70, 330, 194)}
+      <rect x="350" y="258" width="240" height="18" rx="4" fill="#c9a26a"/><path d="M380 276 V300 M560 276 V300" stroke="#c9a26a" stroke-width="10"/></g>`;
+    // Le héros : le tyrannosaure, penché vers la caisse, l'œil brillant et tout content.
+    const visage = `<circle cx="94" cy="16" r="3.6" fill="#fff"/><circle cx="95.6" cy="17.6" r="2.1" fill="#1d140c"/><circle cx="94.8" cy="16.6" r=".8" fill="#fff"/>
+      <path d="M89.6 11.2 Q94 8.6 98.4 11" stroke="#3a4a20" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+      <ellipse cx="88.5" cy="22.5" rx="2.6" ry="1.6" fill="#ef8f7c" opacity=".7"/>
+      <path d="M46 26 Q52 22 60 25" stroke="#a9b876" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".8"/>`;
+    const heros = `<g transform="rotate(9 250 470)" filter="url(#af-contour)">${sousSvg(D.tyrannosaure() + visage, '0 0 120 80', -46, 112, 570, 380)}</g>`;
+    // La caisse de fouille, le crâne fossile qui sort du sable, le pinceau et la poussière.
+    const crane = sousSvg(CRANES.tyrannosaure, '0 0 80 60', 362, 312, 196, 147);
+    const caisse = `<ellipse cx="462" cy="612" rx="170" ry="16" fill="#3a2110" opacity=".45"/>
+      <path d="M330 404 L590 404 L606 456 L314 456Z" fill="#8a5a30" stroke="#4e2f14" stroke-width="5" stroke-linejoin="round"/>
+      <circle cx="462" cy="386" r="150" fill="url(#af-lueur)"/>
+      ${crane}
+      <path d="M322 452 Q350 420 382 436 Q404 414 432 432 Q470 418 500 436 Q534 418 560 434 Q586 428 600 452Z" fill="url(#af-sable)"/>
+      <path d="M352 444 q12 -8 24 0 M450 440 q14 -8 28 0 M530 444 q10 -6 20 0" stroke="#fff3c8" stroke-width="3" fill="none" stroke-linecap="round" opacity=".8"/>
+      <rect x="314" y="454" width="292" height="152" rx="6" fill="url(#af-bois)" stroke="#4e2f14" stroke-width="5"/>
+      <path d="M314 504 H606 M314 556 H606" stroke="#6b4320" stroke-width="5"/>
+      <path d="M318 458 L602 602 M602 458 L318 602" stroke="#6b4320" stroke-width="4" opacity=".45"/>
+      ${[[330, 470], [590, 470], [330, 590], [590, 590]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="#d9b06a" stroke="#4e2f14" stroke-width="2"/>`).join('')}
+      <path d="M316 460 H604" stroke="#e8b878" stroke-width="3" opacity=".7"/>`;
+    const poussiere = [[502, 380, 9], [522, 362, 7], [540, 384, 6], [486, 352, 5], [556, 360, 5], [520, 400, 8], [570, 392, 4], [498, 330, 4], [548, 336, 3.5]]
+      .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#f6dca0" opacity=".9"/>`).join('');
+    const pinceau = `<g transform="rotate(-8 520 330)">${sousSvg(ICONES.pinceau.replace(/<\/?svg[^>]*>/g, ''), '0 0 46 46', 500, 252, 140, 140)}</g>
+      <path d="M470 348 q-14 -10 -10 -26 M560 410 q16 -6 18 -22" stroke="#fff6d0" stroke-width="4" fill="none" stroke-linecap="round" opacity=".85"/>`;
+    const eclats = etoile(388, 330, 16) + etoile(560, 308, 12) + etoile(420, 300, 9, '#ffe27a') + etoile(588, 440, 10, '#ffe27a') + etoile(340, 380, 8);
+    // Premier plan : la loupe qui grossit une ammonite (coupée par le bord), cordon rouge à droite.
+    const loupe = `<g transform="rotate(-18 120 640)">
+        <rect x="104" y="700" width="34" height="150" rx="14" fill="#5b3a1e" stroke="#2e1a0a" stroke-width="4"/>
+        <circle cx="120" cy="620" r="108" fill="#fbf2dc" stroke="#3b2a1a" stroke-width="18"/>
+        <circle cx="120" cy="620" r="99" fill="none" stroke="#c99a5b" stroke-width="4"/>
+        ${sousSvg(D.ammonite(), '24 4 84 72', 40, 552, 168, 144, 'style="filter:sepia(.55) saturate(1.3)"')}
+        <ellipse cx="78" cy="566" rx="34" ry="16" fill="#fff" opacity=".6" transform="rotate(-30 78 566)"/></g>`;
+    const cordon = `<path d="M560 520 Q640 580 760 520" stroke="#c8303a" stroke-width="14" fill="none" stroke-linecap="round"/>
+      <path d="M560 520 Q640 580 760 520" stroke="#ef6a5a" stroke-width="4" fill="none" stroke-linecap="round" opacity=".7"/>
+      <rect x="548" y="500" width="22" height="200" rx="8" fill="#e2b04a" stroke="#7a5212" stroke-width="3"/><circle cx="559" cy="498" r="16" fill="#f3c95a" stroke="#7a5212" stroke-width="3"/>`;
+    const trilobite = sousSvg(D.trilobite(), '0 0 120 80', 236, 560, 120, 80, 'style="filter:sepia(.6)"');
+    const sol = `<rect x="-2000" y="468" width="4600" height="2000" fill="url(#af-sol)"/>
+      ${[-1200, -900, -600, -300, 0, 300, 600, 900, 1200, 1500].map((x) => `<path d="M${x} 468 L${x + (x - 300) * 1.6} 1200" stroke="#4e2c14" stroke-width="3" opacity=".35"/>`).join('')}
+      <path d="M-2000 520 H2600 M-2000 600 H2600 M-2000 700 H2600" stroke="#4e2c14" stroke-width="3" opacity=".3"/>
+      <rect x="-2000" y="462" width="4600" height="10" fill="#d9a865"/>`;
+    return `<defs>
+        <linearGradient id="af-mur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe3a6"/><stop offset="1" stop-color="#eeb26a"/></linearGradient>
+        <linearGradient id="af-ciel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc8f0"/><stop offset="1" stop-color="#d8f2ff"/></linearGradient>
+        <linearGradient id="af-rayon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffbe6" stop-opacity=".75"/><stop offset="1" stop-color="#fff3c0" stop-opacity="0"/></linearGradient>
+        <linearGradient id="af-sol" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b27440"/><stop offset=".35" stop-color="#7e4a24"/><stop offset="1" stop-color="#4a2a12"/></linearGradient>
+        <linearGradient id="af-sable" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7d996"/><stop offset="1" stop-color="#d9a55c"/></linearGradient>
+        <linearGradient id="af-bois" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d39a58"/><stop offset="1" stop-color="#9a6332"/></linearGradient>
+        <radialGradient id="af-lueur"><stop offset="0" stop-color="#fff8d0" stop-opacity=".95"/><stop offset=".5" stop-color="#ffd970" stop-opacity=".45"/><stop offset="1" stop-color="#ffd970" stop-opacity="0"/></radialGradient>
+        <radialGradient id="af-soleil" cx=".25" cy=".2" r=".7"><stop offset="0" stop-color="#fffbe8" stop-opacity=".9"/><stop offset="1" stop-color="#fffbe8" stop-opacity="0"/></radialGradient>
+        <filter id="af-contour" x="-15%" y="-15%" width="130%" height="130%">
+          <feMorphology in="SourceAlpha" operator="dilate" radius="3" result="d"/>
+          <feFlood flood-color="#2e3a14"/><feComposite in2="d" operator="in" result="c"/>
+          <feGaussianBlur in="SourceAlpha" stdDeviation="6" result="b"/><feOffset in="b" dx="10" dy="12" result="o"/>
+          <feFlood flood-color="#3a1e08" flood-opacity=".35"/><feComposite in2="o" operator="in" result="s"/>
+          <feMerge><feMergeNode in="s"/><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect x="-2000" y="-2000" width="4600" height="2470" fill="url(#af-mur)"/>
+      ${mur}${fond}
+      <rect x="-2000" y="-2000" width="4600" height="4600" fill="url(#af-soleil)"/>
+      ${sol}${rayons}${heros}${caisse}${poussiere}${pinceau}${eclats}${trilobite}${cordon}${loupe}`;
+  }
+  function dessinerAffiche() {
+    const w = window.innerWidth || 600, h = window.innerHeight || 800;
+    let vx = 0, vy = 0, vw = 600, vh = 800;
+    if (w / h > 0.75) { vw = 800 * w / h; vx = 300 - vw / 2; } else { vh = 600 * h / w; vy = 400 - vh / 2; }
+    let boite = document.getElementById('affiche');
+    if (!boite) {
+      boite = el('div'); boite.id = 'affiche';
+      boite.style.cssText = 'position:fixed;inset:0;z-index:100;background:#eeb26a;overflow:hidden';
+      document.body.append(boite);
+    }
+    boite.innerHTML = `<svg viewBox="${vx.toFixed(1)} ${vy.toFixed(1)} ${vw.toFixed(1)} ${vh.toFixed(1)}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">${sceneAffiche()}</svg>`;
+  }
+  function cacherInterface() {
+    document.getElementById('app').style.setProperty('display', 'none', 'important');
+    document.querySelectorAll('.jel-langue, jel-langue, button').forEach((b) => b.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    cacherInterface();
+    dessinerAffiche();
+    // Le bouton de langue peut être créé un peu après ce script : on le cache aussi ensuite.
+    [50, 300, 1000].forEach((ms) => setTimeout(cacherInterface, ms));
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  /* ---------------------------------------------------------------
+     Images du jeu (page du jeu)
+     Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par
+     le jeu) : le jeu s'ouvre directement en pleine partie, avec sa vraie
+     interface (caisse, salle, cœurs, score, épreuves), sans écran titre, ni
+     fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). Le moment
+     est posé par le code (hasard à graine fixe), puis la partie est figée sans
+     fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+       1 = caisse 1 (mers anciennes) : l'ichtyosaure sort du sable sous le pinceau, la question arrive ;
+       2 = caisse 10 (forêts géantes) : squelette de diplodocus à remonter, un os en main ;
+       3 = caisse 16 (âge de glace), écran d'ordinateur : fossile pris dans la glace
+           et question « Quel est ce fossile ? » à côté.
+     --------------------------------------------------------------- */
+  const MOMENTS_APERCU = {
+    1: { L: 0, iEp: 1, animal: 'ichthyosaure', options: ['mammouth', 'ichthyosaure', 'triceratops'], score: 100, coeurs: 3, brosse: 0.6, devoile: true },
+    2: { L: 9, iEp: 1, animal: 'diplodocus', score: 160, coeurs: 2, poses: ['queue', 'arriere'], enMain: 'crane' },
+    3: { L: 15, iEp: 1, animal: 'smilodon', options: ['mammouth', 'smilodon', 'megaceros'], score: 220, coeurs: 3, brosse: 0.42, large: true }
+  };
+  // Brosse le sable par des pointeurs simulés, en spirale depuis le centre, jusqu'à la part voulue.
+  function brosserApercu(fouille, part) {
+    const wrap = document.querySelector('.fouille'); if (!wrap) return null;
+    const r = wrap.getBoundingClientRect();
+    const tirer = (type, x, y) => wrap.dispatchEvent(new PointerEvent(type, { clientX: r.left + x * r.width, clientY: r.top + y * r.height, pointerId: 7, bubbles: true }));
+    let fin = [0.5, 0.5];
+    for (let passe = 0; passe < 6 && fouille.pct() < part; passe++) {
+      horloge += 120; // chaque passe peut user une couche de plus (glace, roche)
+      tirer('pointerdown', 0.5, 0.48);
+      for (let a = 0; a < 40 && fouille.pct() < part; a += 0.35) {
+        const ray = 0.02 + 0.017 * a, x = 0.5 + ray * Math.cos(a), y = 0.48 + ray * 1.3 * Math.sin(a);
+        if (x < 0.06 || x > 0.94 || y < 0.06 || y > 0.94) continue;
+        tirer('pointermove', x, y); fin = [x, y];
+      }
+      tirer('pointerup', fin[0], fin[1]);
+    }
+    return { wrap, fin };
+  }
+  function ouvrirApercu(n) {
+    apercu = n;
+    const m = MOMENTS_APERCU[n];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 98765 + n * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    // Tous les tutoriels déjà vus (en mémoire seulement : rien n'est enregistré).
+    sauve.tutos = ['pinceau', 'devine', 'question', 'loupe', 'frise', 'squelette', 'empreintes', 'vf', 'roche', 'fragile', 'glace'];
+    if (m.large) document.body.classList.add('apercu-large');
+    nettoyer();
+    Object.assign(etat, { niveau: m.L, iEp: 0, coeurs: 3, erreurs: 0, scoreNiv: 0, reussies: 0, enPartie: true, fini: false, pauseMenu: false, tutoOuvert: false, resultats: [] });
+    etat.epreuves = construireNiveau(m.L);
+    const d = etat.epreuves[m.iEp];
+    d.animal = m.animal;
+    if (m.options) d.options = m.options;
+    document.body.dataset.salle = salleDe(m.L);
+    afficherEcran('jeu');
+    for (let i = 0; i < m.iEp; i++) { etat.resultats[i] = true; etat.reussies++; }
+    demarrerEpreuve(m.iEp);
+    etat.scoreNiv = m.score; etat.coeurs = m.coeurs; etat.erreurs = 3 - m.coeurs;
+    majHud();
+    apercuFige = true; // la boucle ne fait plus avancer la partie : tout est posé ici
+    const zone = document.getElementById('zone');
+    if (d.t === 'fouille' || d.t === 'devine') {
+      const f = ep.fouille;
+      if (m.large) {
+        // Écran d'ordinateur : la fouille à gauche, la question à droite, sur toute la largeur.
+        const col = el('div', 'col-fouille');
+        zone.prepend(col); col.append(zone.querySelector('.fouille'), zone.querySelector('.fouille-barre'));
+      }
+      f.maj(16);
+      const b = brosserApercu(f, m.brosse);
+      f.maj(16);
+      if (b) {
+        // Le pinceau reste posé au bord de la zone dégagée, dans un petit nuage de poussière.
+        const cur = b.wrap.querySelector('.pinceau-curseur'), rw = b.wrap.getBoundingClientRect();
+        cur.style.left = (b.fin[0] * rw.width) + 'px'; cur.style.top = (b.fin[1] * rw.height - 30) + 'px';
+        cur.classList.add('visible');
+        parts = [];
+        const sable = getComputedStyle(document.body).getPropertyValue('--sable').trim() || '200,170,120';
+        for (let i = 0; i < 9; i++) poussiere(rw.left + b.fin[0] * rw.width, rw.top + b.fin[1] * rw.height, d.i ? '235,248,255' : sable);
+        // Image 1 : l'instant où le fossile est dégagé (le sable commence juste à s'envoler).
+        if (m.devoile) { f.devoiler(); b.wrap.querySelector('.fouille-sable').classList.remove('parti'); }
+        for (let i = 0; i < 10; i++) majFx(16);
+      }
+    } else if (d.t === 'squelette') {
+      // Deux os déjà en place, le crâne en main au-dessus de sa place.
+      const boutons = Array.from(zone.querySelectorAll('.piece'));
+      for (const role of m.poses) {
+        const e = zone.querySelector(`.emplacement[data-role="${role}"]`);
+        const b = boutons.find((x) => x.isConnected && x._piece.vrai && (x._piece.role === role || (x._piece.role === 'patte' && role === 'arriere')));
+        if (!e || !b) continue;
+        e.classList.add('rempli'); e.innerHTML = dessinPiece(b._piece); e.disabled = true; b.remove();
+      }
+      const cible = zone.querySelector(`.emplacement[data-role="${m.enMain}"]`);
+      const piece = boutons.find((x) => x.isConnected && x._piece.role === m.enMain);
+      if (cible && piece) {
+        piece.classList.add('choisi');
+        cible.classList.add('vise');
+        const rc = cible.getBoundingClientRect();
+        const fant = el('div', 'fantome', dessinPiece(piece._piece));
+        fant.style.left = (rc.left + rc.width * 0.3) + 'px'; fant.style.top = (rc.top + rc.height * 0.85) + 'px';
+        document.getElementById('app').append(fant);
+      }
+    }
   }
 
   // Démarrage.
   lireSauvegarde();
   tailleFx();
-  document.getElementById('titre-illu').innerHTML = illustrationTitre();
-  majBoutonsSon();
-  afficherEcran('titre');
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else {
+    document.getElementById('titre-illu').innerHTML = illustrationTitre();
+    majBoutonsSon();
+    if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+    else afficherEcran('titre');
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

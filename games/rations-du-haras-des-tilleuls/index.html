@@ -2286,6 +2286,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // ------------------------------------------------------------------------
   const prog = { etoiles: [], records: [], couverture: 'rouge', debloque: 1 };
   let sonActif = true;
+  let apercu = 0;         // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   function chargerProgression() {
     let d = null;
     try { d = window.JEL_SAVE.load(JEU); } catch (e) { d = null; }
@@ -2323,7 +2324,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   document.addEventListener('pointerdown', geste, true);
   document.addEventListener('keydown', geste, true);
   function note(f, duree, type, vol, f2, delai) {
-    if (!sonActif || !premierGeste) return;
+    if (!sonActif || !premierGeste || apercu) return;
     const a = audio(); if (!a) return;
     const t0 = a.currentTime + (delai || 0);
     const o = a.createOscillator(), g = a.createGain();
@@ -2337,7 +2338,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     o.start(t0); o.stop(t0 + duree + 0.05);
   }
   function hennissement() {
-    if (!sonActif || !premierGeste) return;
+    if (!sonActif || !premierGeste || apercu) return;
     const a = audio(); if (!a) return;
     const t0 = a.currentTime;
     const o = a.createOscillator(), lfo = a.createOscillator(), lg = a.createGain(), g = a.createGain(), f = a.createBiquadFilter();
@@ -3150,7 +3151,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     dernier = performance.now();
     if (actx && actx.state === 'suspended' && sonActif) { try { actx.resume(); } catch (e) { /* rien */ } }
   }
-  document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu) mettrePause(); });
 
   // ------------------------------------------------------------------------
   // Fin de niveau
@@ -3279,6 +3280,181 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
 
   // ------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Un grand cheval alezan se
+  // penche par-dessus la porte de son box, éclairé par la lanterne ; une carotte et une pomme volent
+  // vers sa mangeoire déjà bien garnie, l'ardoise du box compte en points de craie, des cœurs montent.
+  const sansSvg = (s) => s.replace(/^<svg[^>]*>/, '').replace(/<\/svg>$/, '');
+  function afObjet(nom, x, y, taille, rot) {
+    return '<g transform="translate(' + x + ' ' + y + ') rotate(' + (rot || 0) + ') scale(' + (taille / 40) + ') translate(-20 -20)">' + sansSvg(svgAliment(nom)) + '</g>';
+  }
+  function afCoeur(x, y, taille, rot) {
+    return '<g transform="translate(' + x + ' ' + y + ') rotate(' + (rot || 0) + ') scale(' + (taille / 24) + ') translate(-12 -12)"><path d="M12 21C5 15 2 12 2 8a5 5 0 019-3 5 5 0 019 3c0 4-3 7-10 13z" fill="#ff5d8f" stroke="#fff" stroke-width="1.6"/><ellipse cx="7.5" cy="8" rx="2" ry="2.8" fill="#ffffffaa"/></g>';
+  }
+  function afEtincelle(x, y, r, c) {
+    return '<path d="M' + x + ' ' + (y - r) + 'Q' + (x + r * 0.18) + ' ' + (y - r * 0.18) + ' ' + (x + r) + ' ' + y + 'Q' + (x + r * 0.18) + ' ' + (y + r * 0.18) + ' ' + x + ' ' + (y + r) +
+      'Q' + (x - r * 0.18) + ' ' + (y + r * 0.18) + ' ' + (x - r) + ' ' + y + 'Q' + (x - r * 0.18) + ' ' + (y - r * 0.18) + ' ' + x + ' ' + (y - r) + 'z" fill="' + (c || '#fff6b0') + '"/>';
+  }
+  function afTilleul(x, y, s, voile) {
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')"' + (voile ? ' opacity="' + voile + '"' : '') + '><rect x="-8" y="0" width="16" height="90" fill="#6b4325"/><circle cx="0" cy="-30" r="60" fill="#5a9e3a"/><circle cx="-40" cy="-6" r="38" fill="#4f8f33"/><circle cx="42" cy="-10" r="40" fill="#68ad45"/><circle cx="6" cy="-70" r="36" fill="#77bb50"/><circle cx="-20" cy="-40" r="6" fill="#f5e88a"/><circle cx="22" cy="-22" r="5" fill="#f5e88a"/><circle cx="-34" cy="-14" r="5" fill="#f5e88a"/><circle cx="34" cy="-56" r="5" fill="#f5e88a"/></g>';
+  }
+  function afNuage(x, y, s) {
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')" fill="#fff"><ellipse cx="0" cy="0" rx="46" ry="20"/><circle cx="-18" cy="-12" r="20"/><circle cx="12" cy="-18" r="24"/><circle cx="34" cy="-4" r="16"/></g>';
+  }
+  function svgAffiche() {
+    // Cadre 600 × 800 au centre, élargi (ou allongé) pour remplir tout l'écran sans déformer.
+    const W = window.innerWidth || 600, H = window.innerHeight || 800;
+    let vw = 600, vh = 800;
+    if (W / H > 0.75) vw = 800 * W / H; else vh = 600 * H / W;
+    const x0 = 300 - vw / 2, y0 = 400 - vh / 2;
+    const cheval = svgCheval(ROBES[0], COUVERTURES[0], false).replace('<svg class="cheval"', '<svg class="cheval" x="130" y="170" width="480" height="400"');
+    let s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + x0 + ' ' + y0 + ' ' + vw + ' ' + vh + '" width="100%" height="100%" aria-hidden="true"><defs>' +
+      '<linearGradient id="af-ciel" gradientUnits="userSpaceOnUse" x1="0" y1="-200" x2="0" y2="560"><stop offset="0" stop-color="#3ea8ea"/><stop offset=".55" stop-color="#9ad6f6"/><stop offset="1" stop-color="#fff1cf"/></linearGradient>' +
+      '<radialGradient id="af-soleil" gradientUnits="userSpaceOnUse" cx="545" cy="72" r="300"><stop offset="0" stop-color="#fffbe0"/><stop offset=".22" stop-color="#fff3a6" stop-opacity=".85"/><stop offset="1" stop-color="#fff3a6" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="af-box" gradientUnits="userSpaceOnUse" cx="250" cy="330" r="330"><stop offset="0" stop-color="#ffd98a"/><stop offset=".35" stop-color="#d48f45"/><stop offset=".75" stop-color="#6b3f1e"/><stop offset="1" stop-color="#3a2312"/></radialGradient>' +
+      '<radialGradient id="af-lampe" gradientUnits="userSpaceOnUse" cx="178" cy="252" r="70"><stop offset="0" stop-color="#fff6c8"/><stop offset=".4" stop-color="#ffd27a" stop-opacity=".7"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>' +
+      '<linearGradient id="af-mur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d08a50"/><stop offset="1" stop-color="#9a6438"/></linearGradient>' +
+      '<linearGradient id="af-sol" gradientUnits="userSpaceOnUse" x1="0" y1="600" x2="0" y2="900"><stop offset="0" stop-color="#ecc77c"/><stop offset="1" stop-color="#c9984f"/></linearGradient>' +
+      '</defs>';
+    // Ciel, soleil et ses rayons, nuages
+    s += '<rect x="-4000" y="-4000" width="8600" height="4560" fill="url(#af-ciel)"/>';
+    s += '<circle cx="545" cy="72" r="300" fill="url(#af-soleil)"/>';
+    for (let k = 0; k < 12; k++) {
+      const a = k * Math.PI / 6 + 0.2;
+      s += '<path d="M' + (545 + Math.cos(a) * 58) + ' ' + (72 + Math.sin(a) * 58) + 'L' + (545 + Math.cos(a) * 92) + ' ' + (72 + Math.sin(a) * 92) + '" stroke="#fff3a6" stroke-width="7" stroke-linecap="round" opacity=".8"/>';
+    }
+    s += '<circle cx="545" cy="72" r="44" fill="#fff6b8" stroke="#ffe27a" stroke-width="5"/>';
+    s += afNuage(250, 70, 1.1) + afNuage(-120, 120, 0.9) + afNuage(860, 150, 1) + afNuage(1250, 80, 1.2) + afNuage(-500, 60, 1);
+    // Collines, tilleuls lointains, clôture
+    s += '<path d="M-4000 470 Q-300 400 120 455 T 760 440 T 1500 470 T 4600 450 V4000 H-4000Z" fill="#a8d985"/>';
+    s += afTilleul(-560, 480, 0.8, 0.85) + afTilleul(-300, 470, 0.9, 0.85) + afTilleul(45, 470, 0.85) + afTilleul(800, 465, 0.9) + afTilleul(1080, 480, 0.75, 0.85) + afTilleul(1340, 470, 0.9, 0.85);
+    s += '<path d="M-4000 525 Q0 480 300 515 T 1000 505 T 4600 520 V4000 H-4000Z" fill="#8cc56a"/>';
+    s += '<g stroke="#8a5a33" stroke-width="7"><path d="M-4000 560h8600M-4000 590h8600"/></g><g fill="#a26d3e">';
+    for (let k = -40; k < 50; k++) s += '<rect x="' + (k * 110 + 20) + '" y="542" width="11" height="70"/>';
+    s += '</g>';
+    // Sol de paille
+    s += '<rect x="-4000" y="610" width="8600" height="4000" fill="url(#af-sol)"/>';
+    for (let k = -30; k < 40; k++) s += '<path d="M' + (k * 47) + ' ' + (650 + (k * 37 % 90 + 90) % 90) + 'l18 -6" stroke="#b98b45" stroke-width="3" stroke-linecap="round"/>';
+    // Le box : mur, toit, ouverture éclairée par la lanterne
+    s += '<path d="M60 168 L740 168 L705 104 L95 104 Z" fill="#b5483a" stroke="#6e2a1c" stroke-width="5"/>';
+    s += '<path d="M88 124H712M76 146H724" stroke="#8f3326" stroke-width="4"/>';
+    s += '<rect x="100" y="166" width="600" height="604" fill="url(#af-mur)" stroke="#5e3a1f" stroke-width="5"/>';
+    for (let k = 1; k < 20; k++) s += '<path d="M' + (100 + k * 30) + ' 168V768" stroke="#00000018" stroke-width="2"/>';
+    s += '<rect x="140" y="212" width="460" height="300" rx="6" fill="url(#af-box)" stroke="#5e3a1f" stroke-width="7"/>';
+    s += '<circle cx="178" cy="252" r="70" fill="url(#af-lampe)"/>';
+    s += '<path d="M178 212v24" stroke="#3a2312" stroke-width="3"/><path d="M166 236h24l-3 30h-18z" fill="#ffe9a0" stroke="#5e3a1f" stroke-width="3"/><path d="M164 236h28M166 266h24" stroke="#5e3a1f" stroke-width="4" stroke-linecap="round"/><circle cx="178" cy="252" r="6" fill="#fff"/>';
+    // Rayons de soleil en biais
+    s += '<path d="M545 72 L120 820 L300 820 Z" fill="#fff8d0" opacity=".13"/><path d="M545 72 L420 820 L520 820 Z" fill="#fff8d0" opacity=".1"/>';
+    // Cœurs qui montent du cheval content
+    s += afCoeur(262, 250, 40, -12) + afCoeur(212, 300, 28, 10) + afCoeur(318, 214, 30, 8);
+    // Le héros : grand cheval alezan penché par-dessus la porte de son box
+    s += cheval;
+    // Bas de la porte
+    s += '<rect x="130" y="566" width="480" height="204" fill="#b67d4a" stroke="#5e3a1f" stroke-width="5"/>';
+    s += '<path d="M138 572L602 764M138 764L602 572" stroke="#7a4c28" stroke-width="16" stroke-linecap="round"/>';
+    // L'ardoise du box : points de craie et coche
+    s += '<path d="M528 180L486 214M528 180L572 214" stroke="#3a2312" stroke-width="3"/><circle cx="528" cy="179" r="5" fill="#c9a24b"/>';
+    s += '<rect x="476" y="210" width="108" height="86" rx="8" fill="#2f3b36" stroke="#a47143" stroke-width="7"/>';
+    [[497, 232], [516, 232], [535, 232], [497, 254], [516, 254], [535, 254], [554, 254]].forEach(([x, y]) => { s += '<circle cx="' + x + '" cy="' + y + '" r="6" fill="#f4f1e6"/>'; });
+    s += '<path d="M500 276l10 9 22-18" stroke="#b9f28c" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+    // Mangeoire accrochée à la porte, bien garnie
+    s += '<ellipse cx="180" cy="508" rx="148" ry="34" fill="#e9c75a"/><path d="M60 506c20-26 60-30 80-12M200 492c30-20 70-16 100 8" stroke="#d8b445" stroke-width="5" fill="none" stroke-linecap="round"/>';
+    s += afObjet('carotte', 98, 486, 82, -38) + afObjet('foin', 262, 488, 70, 8) + afObjet('pomme', 168, 482, 58, 0) + afObjet('carotte', 214, 490, 64, 30);
+    s += '<path d="M28 508H332L312 596H48Z" fill="#7a4c28" stroke="#4d2f18" stroke-width="6" stroke-linejoin="round"/>';
+    s += '<path d="M36 530H324M44 574H316" stroke="#5e3a1f" stroke-width="5"/><circle cx="60" cy="552" r="5" fill="#c9a24b"/><circle cx="300" cy="552" r="5" fill="#c9a24b"/>';
+    // Le moment d'action : une carotte, une pomme et un seau doré lancés vers la mangeoire
+    s += '<path d="M-40 780 Q20 250 150 440" stroke="#fffbe8" stroke-width="7" stroke-dasharray="4 18" stroke-linecap="round" fill="none" opacity=".9"/>';
+    s += afObjet('dore', 66, 268, 82, -22) + afObjet('pomme', 34, 372, 66, 18) + afObjet('carotte', 122, 404, 124, 118);
+    s += afEtincelle(110, 236, 18) + afEtincelle(22, 318, 12) + afEtincelle(170, 392, 14, '#fff') + afEtincelle(60, 452, 10) + afEtincelle(336, 470, 16) + afEtincelle(26, 492, 12, '#fff');
+    // Premier plan : botte de foin et carottes coupées par les bords
+    s += afObjet('foin', 590, 720, 250, -10) + afObjet('carotte', 40, 742, 150, 20) + afObjet('seau', 300, 760, 120, 4);
+    s += '</svg>';
+    return s;
+  }
+  function cacherPourAffiche() {
+    for (const e of document.querySelectorAll('#app, .jel-langue')) e.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    const af = document.createElement('div');
+    af.id = 'affiche';
+    af.style.cssText = 'position:fixed;inset:0;z-index:1000;background:#9ad6f6;';
+    document.body.appendChild(af);
+    const dessiner = () => { af.innerHTML = svgAffiche(); };
+    cacherPourAffiche();
+    dessiner();
+    window.addEventListener('resize', dessiner);
+    // Le bouton de langue peut être créé après ce script : on le cache aussi un peu plus tard.
+    setTimeout(cacherPourAffiche, 200);
+    setTimeout(cacherPourAffiche, 1000);
+  }
+
+  // ------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (fers, rangée, chrono, ardoises, réserve),
+  // sans écran titre, ni fenêtre « Continuer », ni présentation (CONSIGNES-JEU.md, section 5). Les
+  // mangeoires sont garnies par le code, puis le jeu est figé : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1 au printemps : deux boxes, un cheval déjà servi pile ;
+  //   2 = niveau 9, concours d'été : le sac de carottes à partager entre trois poulains et un cheval de course ;
+  //   3 = niveau 20 sous la neige : mash chaud, réserve comptée, chrono, cheval « le double d'hier » et la balance.
+  const SCENES_APERCU = {
+    1: { niveau: 0, fers: 5, choix: 'seau', gagnes: 0, couv: 'rouge', bulle: true,
+      remplir: [{ carotte: 1, seau: 1 }, { seau: 1 }] },
+    2: { niveau: 8, fers: 4, choix: 'sac', gagnes: 8, couv: 'bleue',
+      remplir: [{ sac: 5 }, { sac: 3 }, {}, { foin: 1, dore: 1 }] },
+    3: { niveau: 19, fers: 4, choix: 'mash', gagnes: 19, couv: 'violette', temps: 168,
+      remplir: [{ mash: 3, dore: 1 }, { mash: 2 }, { mash: 1, pomme: 1 }] },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 1234567 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    // Progression en mémoire seulement (rien n'est enregistré) : niveaux déjà gagnés, robes et couverture.
+    prog.etoiles = NIVEAUX.map((_, i) => (i < sc.gagnes ? 3 - (i % 3 === 2 ? 1 : 0) : 0));
+    prog.records = NIVEAUX.map(() => 0);
+    prog.couverture = sc.couv;
+    prog.debloque = sc.niveau + 1;
+    demarrerNiveau(sc.niveau);
+    arreterBoucle();
+    fermerCouches();
+    cacherGuide();
+    const ecran = $('#ecran-jeu');
+    if (numero === 3) $('#ecurie').style.maxWidth = '1240px';
+    J.fers = sc.fers;
+    J.mangeoires.forEach((m, k) => {
+      const contenu = sc.remplir[k] || {};
+      Object.keys(contenu).forEach((a) => {
+        const n = contenu[a];
+        m.contenu[a] = n;
+        m.somme += n * ALIMENTS[a];
+        J.servi += n * ALIMENTS[a];
+        if (J.stock[a] !== Infinity) J.stock[a] = Math.max(0, J.stock[a] - n);
+      });
+      if (m.somme === m.cible) {
+        m.ok = true;
+        if (m.kind === 'poulain') { m.carte.classList.add('content'); m.ardoise.textContent = nb(m.cible); }
+        else m.carte.classList.add('contente');
+        if (m.kind === 'course') { const r = el('span', 'revele', m.ardoise); r.textContent = '= ' + nb(m.cible); }
+      }
+      majMangeoire(m);
+    });
+    selection = sc.choix;
+    if (sc.temps) J.temps = sc.temps;
+    majReserve();
+    majBarre();
+    if (sc.bulle) { bulle(t('msg.juste', { nom: J.mangeoires[0].nom })); clearTimeout(minuterieBulle); }
+    // Figé sur ce moment : décor arrêté, aucun focus clavier visible.
+    document.body.classList.add('fige');
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    ecran.scrollTop = 0;
+  }
+
+  // ------------------------------------------------------------------------
   // Boutons et démarrage
   // ------------------------------------------------------------------------
   function lancer() {
@@ -3297,7 +3473,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie.
   window.JEL_SAVE.surFermeture(() => {
-    if (J && J.enCours) window.JEL_SAVE.save(JEU, Object.assign({ niveau: J.i + 1, score: scoreTotal() }, donneesProgression()));
+    if (J && J.enCours && !apercu) window.JEL_SAVE.save(JEU, Object.assign({ niveau: J.i + 1, score: scoreTotal() }, donneesProgression()));
   });
 
   function init() {
@@ -3315,6 +3491,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     $('#btn-recommencer').addEventListener('click', () => { $('#couche-pause').classList.add('cache'); enPause = false; if (actx && sonActif) { try { actx.resume(); } catch (e) { /* rien */ } } demarrerNiveau(J ? J.i : 0); });
     $('#btn-pause-niveaux').addEventListener('click', () => { $('#couche-pause').classList.add('cache'); if (actx && sonActif) { try { actx.resume(); } catch (e) { /* rien */ } } afficherNiveaux(); });
     $('#btn-pause-accueil').addEventListener('click', () => { $('#couche-pause').classList.add('cache'); if (actx && sonActif) { try { actx.resume(); } catch (e) { /* rien */ } } allerAccueil(); });
+    // Affiche (jaquette) ou images du jeu : posés seulement par le robot du site.
+    const numeroApercu = Number(window.JEL_APERCU);
+    if (window.JEL_AFFICHE) demarrerAffiche();
+    else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
   }
   init();
 })();

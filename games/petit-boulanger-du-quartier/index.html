@@ -1792,6 +1792,19 @@
   #tuto .boutons-tuto { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
   #tuto .main { position: fixed; transition: left .35s, top .35s; }
   .coin-langue { min-height: 44px; display: flex; align-items: center; }
+
+  /* Affiche (window.JEL_AFFICHE, posé par le robot du site seulement) */
+  #affiche { position: fixed; inset: 0; background: #fde7c2; }
+  #affiche svg { width: 100%; height: 100%; }
+  /* Image du jeu sur ordinateur (window.JEL_APERCU = 3) : la boutique à gauche, l'atelier à droite */
+  #app.apercu-large #ecran-jeu { max-width: none; display: grid; grid-template-columns: 1.1fr 1fr; grid-template-rows: 50px minmax(0, 1fr) auto; }
+  #app.apercu-large .hud { grid-column: 1 / -1; }
+  #app.apercu-large .boutique { grid-column: 1; grid-row: 2; }
+  #app.apercu-large .vitrine { grid-column: 1; grid-row: 3; }
+  #app.apercu-large .atelier { grid-column: 2; grid-row: 2 / 4; border-left: 4px solid #e9a868; }
+  #app.apercu-large .figure { height: 190px; }
+  #app.apercu-large .bulle .item { width: 60px; height: 42px; }
+  #app.apercu-large .case { height: 74px; }
 </style>
 </head>
 <body>
@@ -2039,13 +2052,16 @@
     return p;
   }
   const prog = chargerProgres();
+  let apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   function ecrireLocal() {
+    if (apercu) return; // image du jeu : rien n'est écrit
     try { localStorage.setItem(CLE_PROGRES, JSON.stringify(prog)); } catch (e) { /* stockage refusé */ }
   }
   const totalEtoiles = () => prog.etoiles.reduce((a, b) => a + b, 0);
   const totalRecords = () => prog.records.reduce((a, b) => a + b, 0);
   // Sauvegarde complète (jamais depuis l'écran titre).
   function sauver(niveau) {
+    if (apercu) return;
     ecrireLocal();
     try {
       window.JEL_SAVE.save(JEU, {
@@ -2061,7 +2077,7 @@
   // ---------------------------------------------------------------------
   let ac = null;
   function audio() {
-    if (!prog.son) return null;
+    if (!prog.son || apercu) return null;
     try {
       if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
       if (ac.state === 'suspended') ac.resume();
@@ -3248,7 +3264,7 @@
   // Fin de journée
   // ---------------------------------------------------------------------
   function finJournee(gagne) {
-    if (jeu.fini) return;
+    if (jeu.fini || apercu) return;
     const j = jeu;
     j.fini = true;
     const i = j.i;
@@ -3466,7 +3482,7 @@
     });
   }
   JEL_SAVE.surFermeture(() => {
-    if (etat.enPartie) window.JEL_SAVE.save(JEU, { niveau: etat.niveauReprise, score: totalRecords(), etoiles: prog.etoiles.slice(), records: prog.records.slice(), debloque: prog.debloque, vus: Object.assign({}, prog.vus), options: { son: prog.son } });
+    if (etat.enPartie && !apercu) window.JEL_SAVE.save(JEU, { niveau: etat.niveauReprise, score: totalRecords(), etoiles: prog.etoiles.slice(), records: prog.records.slice(), debloque: prog.debloque, vus: Object.assign({}, prog.vus), options: { son: prog.son } });
   });
 
   $('b-jouer').addEventListener('click', jouer);
@@ -3550,16 +3566,251 @@
 
   // Pause automatique quand l'écran est caché.
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && jeu && !jeu.fini && etat.ecran === 'jeu') mettrePause();
+    if (document.hidden && !apercu && jeu && !jeu.fini && etat.ecran === 'jeu') mettrePause();
   });
   window.addEventListener('resize', () => {
     if (jeu && jeu.pigeon) placerPigeon();
     if ($('tuto').classList.contains('visible')) montrerEtape();
   });
 
-  majBoutonsSon();
-  afficherTitre();
-  requestAnimationFrame(boucle);
+  // ---------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le boulanger,
+  // en grand, sort du four rougeoyant une pelle de pains dorés qui brillent ; une petite cliente
+  // montre dans sa bulle les pains qu'elle veut, le pigeon gourmand guette, la vitrine déborde.
+  const affPain = (type, x, y, w, rot = 0, etat = 'dore') => {
+    const h = w * 42 / 60;
+    return `<g transform="translate(${x} ${y}) rotate(${rot})"><svg x="${-w / 2}" y="${-h / 2}" width="${w}" height="${h}" viewBox="0 0 60 42" overflow="visible">${dessinPain(type, etat)}</svg></g>`;
+  };
+  const affEtincelle = (x, y, r, c = '#fff6b0') => `<path transform="translate(${x} ${y})" d="M0 ${-r}L${r * 0.22} ${-r * 0.22}L${r} 0L${r * 0.22} ${r * 0.22}L0 ${r}L${-r * 0.22} ${r * 0.22}L${-r} 0L${-r * 0.22} ${-r * 0.22}z" fill="${c}"/>`;
+  function sceneAffiche() {
+    // Fanions de fête tendus en haut du mur (de bord à bord, même sur écran large).
+    const COULEURS = ['#e0603a', '#f2b632', '#4f8cc9', '#6dbf73', '#e86fa6', '#9b6bc9'];
+    let fanions = '';
+    for (let i = -10; i < 15; i++) {
+      const x0 = i * 150;
+      fanions += `<path d="M${x0} 34Q${x0 + 75} 84 ${x0 + 150} 34" stroke="#7a4a26" stroke-width="3" fill="none"/>`;
+      for (let k = 0; k < 5; k++) {
+        const tt = 0.1 + k * 0.2, x = x0 + 150 * tt, y = 34 + 100 * tt * (1 - tt);
+        fanions += `<path d="M${x - 12} ${y}L${x + 12} ${y}L${x} ${y + 30}z" fill="${COULEURS[(i * 5 + k + 60) % 6]}"/>`;
+      }
+    }
+    // Maisons de la rue derrière la vitrine.
+    const maisons = [[410, 330, 70, '#f7c9a8', '#d9734f'], [482, 300, 66, '#c9e4b7', '#5f9a4a'], [550, 320, 80, '#f3d78a', '#c9883a'], [632, 295, 70, '#cfe0f5', '#5f7fb0']]
+      .map(([x, y, w, c, toit]) => `<rect x="${x}" y="${y}" width="${w}" height="${440 - y}" fill="${c}"/><path d="M${x - 6} ${y}L${x + w / 2} ${y - 34}L${x + w + 6} ${y}z" fill="${toit}"/>
+        <rect x="${x + w * 0.2}" y="${y + 22}" width="${w * 0.22}" height="22" rx="3" fill="#fff" opacity=".8"/><rect x="${x + w * 0.58}" y="${y + 22}" width="${w * 0.22}" height="22" rx="3" fill="#fff" opacity=".8"/>`).join('');
+    const cliente = `<svg x="440" y="372" width="180" height="216" viewBox="0 0 80 96">${svgClient({ look: { p: 2, c: 3, h: 4, s: 5 }, type: 'normal' }, 'ravi').replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '')}</svg>`;
+    return `<defs>
+      <pattern id="aff-mur" width="60" height="60" patternUnits="userSpaceOnUse"><rect width="30" height="60" fill="#fde7c2"/><rect x="30" width="30" height="60" fill="#f8d9aa"/></pattern>
+      <pattern id="aff-briques" width="48" height="32" patternUnits="userSpaceOnUse"><rect width="48" height="32" fill="#c9603e"/><rect x="4" y="3" width="18" height="9" rx="2" fill="#dc7a52"/><rect x="28" y="19" width="16" height="9" rx="2" fill="#dc7a52"/><path d="M0 16h48M0 32h48M24 0v16M0 16v16M48 16v16" stroke="#94391f" stroke-width="3"/></pattern>
+      <radialGradient id="aff-feu" cx="50%" cy="78%" r="72%"><stop offset="0" stop-color="#fffbd0"/><stop offset=".28" stop-color="#ffd25a"/><stop offset=".62" stop-color="#ff8a2a"/><stop offset="1" stop-color="#9a2e12"/></radialGradient>
+      <radialGradient id="aff-halo"><stop offset="0" stop-color="#ffc56a" stop-opacity=".75"/><stop offset=".55" stop-color="#ffb04a" stop-opacity=".28"/><stop offset="1" stop-color="#ffb04a" stop-opacity="0"/></radialGradient>
+      <radialGradient id="aff-dore"><stop offset="0" stop-color="#fff6b0" stop-opacity=".95"/><stop offset="1" stop-color="#fff6b0" stop-opacity="0"/></radialGradient>
+      <linearGradient id="aff-ciel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fc2f0"/><stop offset="1" stop-color="#dff3ff"/></linearGradient>
+      <linearGradient id="aff-comptoir" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d48c4c"/><stop offset=".25" stop-color="#b9773f"/><stop offset="1" stop-color="#7d4a22"/></linearGradient>
+      <linearGradient id="aff-rayon" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff4b8" stop-opacity=".75"/><stop offset="1" stop-color="#fff4b8" stop-opacity="0"/></linearGradient>
+      <clipPath id="aff-vitre"><rect x="410" y="100" width="330" height="330"/></clipPath>
+      <filter id="aff-lueur" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="-7" dy="2" stdDeviation="6" flood-color="#ff9d3a" flood-opacity=".9"/></filter>
+      <filter id="aff-ombre" x="-25%" y="-25%" width="150%" height="150%"><feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#5a3418" flood-opacity=".35"/></filter>
+    </defs>
+    <rect x="-1600" y="-1200" width="3800" height="3200" fill="url(#aff-mur)"/>
+    <rect x="-1600" y="-1200" width="3800" height="1222" fill="#8f5a2c"/>
+    <rect x="-1600" y="16" width="3800" height="10" fill="#6b3f1e"/>
+    ${fanions}
+    <g>
+      <rect x="395" y="85" width="360" height="360" rx="10" fill="#b9773f"/>
+      <g clip-path="url(#aff-vitre)">
+        <rect x="410" y="100" width="330" height="330" fill="url(#aff-ciel)"/>
+        <g stroke="#ffd34d" stroke-width="7" stroke-linecap="round"><path d="M548 112v-14M548 196v14M506 154h-14M590 154h14M518 124l-10-10M578 184l10 10M518 184l-10 10M578 124l10-10"/></g>
+        <circle cx="548" cy="154" r="30" fill="#ffd34d"/>
+        <g fill="#fff"><ellipse cx="460" cy="205" rx="34" ry="13"/><ellipse cx="482" cy="196" rx="20" ry="12"/><ellipse cx="660" cy="130" rx="38" ry="14"/></g>
+        ${maisons}
+      </g>
+      <path d="M567 100v330M410 262h330" stroke="#b9773f" stroke-width="10"/>
+      <rect x="388" y="436" width="374" height="16" rx="5" fill="#8f5a2c"/>
+    </g>
+    <path d="M412 100L520 100L250 640L60 640Z" fill="url(#aff-rayon)" opacity=".75"/>
+    <path d="M540 100L600 100L420 640L330 640Z" fill="url(#aff-rayon)" opacity=".5"/>
+    <rect x="-140" y="-1200" width="110" height="1380" fill="url(#aff-briques)"/>
+    <path d="M-600 600V250Q-600 160 -380 160H60Q275 160 285 330V600Z" fill="url(#aff-briques)"/>
+    <path d="M-600 600V250Q-600 160 -380 160H60Q275 160 285 330V600Z" fill="none" stroke="#7d2e18" stroke-width="6"/>
+    <circle cx="128" cy="455" r="290" fill="url(#aff-halo)"/>
+    <path d="M14 572V420A114 114 0 0 1 242 420V572Z" fill="#e6c49a" stroke="#a8784a" stroke-width="5"/>
+    <path d="M36 572V424A92 92 0 0 1 220 424V572Z" fill="url(#aff-feu)"/>
+    <g fill="#ffe36b"><path d="M58 572q-6-52 22-84q-4 40 18 52q4-34 26-50q-8 46 14 82z"/><path d="M150 572q-2-44 24-70q-2 34 16 44q6-24 22-30q-10 36 0 56z"/></g>
+    <g fill="#fffbd8"><path d="M80 572q0-28 16-44q0 24 12 30q4-16 14-22q-4 22 2 36z"/><path d="M168 572q2-24 14-34q0 18 10 22q4-10 10-12q-4 14 0 24z"/></g>
+    <rect x="-600" y="566" width="900" height="30" rx="6" fill="#e2c9a6" stroke="#b9996f" stroke-width="3"/>
+    <g transform="translate(18 82) scale(1.75)">${svgPigeon().replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').replace('class="picore"', '')}</g>
+    <g transform="translate(335 596) scale(.94) translate(-335 -596)">
+      <g filter="url(#aff-lueur)">
+        <path d="M188 620C188 478 240 410 335 410C430 410 482 478 482 620Z" fill="#fff" stroke="#d6c7b0" stroke-width="4"/>
+        <path d="M335 418v190" stroke="#e8dccb" stroke-width="3"/>
+        <g fill="#d6c7b0"><circle cx="306" cy="478" r="7"/><circle cx="306" cy="528" r="7"/><circle cx="364" cy="478" r="7"/><circle cx="364" cy="528" r="7"/></g>
+        <ellipse cx="430" cy="566" rx="20" ry="9" fill="#f1e6d2"/>
+        <rect x="309" y="364" width="52" height="52" fill="#f1c7a3"/>
+        <path d="M290 404L380 404L335 452Z" fill="#e0603a"/><circle cx="335" cy="410" r="11" fill="#c94f3a"/>
+        <circle cx="256" cy="310" r="17" fill="#e8b48e"/><circle cx="414" cy="310" r="17" fill="#e8b48e"/>
+        <circle cx="335" cy="304" r="82" fill="#f1c7a3"/>
+        <path d="M250 228C200 226 194 158 242 148C238 96 302 80 326 114C346 76 414 88 412 138C462 142 466 222 422 228Z" fill="#fff" stroke="#d6c7b0" stroke-width="4"/>
+        <path d="M290 150q8-20 26-24M370 128q16 2 22 18" stroke="#ece2d2" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <rect x="250" y="208" width="170" height="36" rx="10" fill="#fff" stroke="#d6c7b0" stroke-width="4"/>
+      </g>
+      <path d="M284 270q16-14 34-4M352 266q16-10 34 4" stroke="#7a4a26" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <ellipse cx="302" cy="298" rx="10" ry="13" fill="#3b2414"/><ellipse cx="362" cy="298" rx="10" ry="13" fill="#3b2414"/>
+      <circle cx="298" cy="292" r="4" fill="#fff"/><circle cx="358" cy="292" r="4" fill="#fff"/>
+      <circle cx="282" cy="336" r="15" fill="#f28c8c" opacity=".55"/><circle cx="388" cy="336" r="15" fill="#f28c8c" opacity=".55"/>
+      <ellipse cx="333" cy="322" rx="13" ry="10" fill="#e8a57f"/>
+      <path d="M298 352q37 52 74 0z" fill="#b8432a"/><path d="M316 374q19 14 38 0q-19-12-38 0z" fill="#f28c8c"/>
+      <path d="M333 340q-22-4-42 12M337 340q22-4 42 12" stroke="#7a4a26" stroke-width="10" fill="none" stroke-linecap="round"/>
+      <circle cx="128" cy="452" r="120" fill="url(#aff-dore)"/>
+      <path d="M244 462L410 482" stroke="#6b3f1e" stroke-width="22" stroke-linecap="round"/>
+      <path d="M244 462L410 482" stroke="#c98a4e" stroke-width="14" stroke-linecap="round"/>
+      <path d="M22 466Q22 436 62 434L222 438Q250 440 250 462Q250 486 222 488L62 492Q22 494 22 466Z" fill="#d9a066" stroke="#7a4a26" stroke-width="5"/>
+      ${affPain('baguette', 92, 446, 130, 6)}${affPain('boule', 196, 436, 82)}${affPain('baguette', 112, 470, 126, 10)}
+      <g stroke="#fff" stroke-width="7" fill="none" stroke-linecap="round" opacity=".75"><path d="M84 418q-16-24 0-46q16-22 0-46"/><path d="M190 400q-14-20 0-40q14-20 0-40"/><path d="M140 420q12-18 0-34"/></g>
+      ${affEtincelle(46, 392, 20)}${affEtincelle(150, 360, 28)}${affEtincelle(244, 404, 16)}${affEtincelle(108, 412, 12, '#fff')}${affEtincelle(232, 336, 14)}
+      <g stroke="#d6c7b0" stroke-width="54" stroke-linecap="round" fill="none"><path d="M232 456Q206 510 270 486"/><path d="M450 466Q452 528 360 490"/></g>
+      <g stroke="#fff" stroke-width="44" stroke-linecap="round" fill="none"><path d="M232 456Q206 510 270 486"/><path d="M450 466Q452 528 360 490"/></g>
+      <circle cx="280" cy="472" r="21" fill="#f1c7a3" stroke="#d9a07a" stroke-width="3"/><circle cx="356" cy="482" r="21" fill="#f1c7a3" stroke="#d9a07a" stroke-width="3"/>
+    </g>
+    ${cliente}
+    <g filter="url(#aff-ombre)">
+      <path d="M442 286H588Q602 286 602 300V350Q602 364 588 364H540L522 388L514 364H442Q428 364 428 350V300Q428 286 442 286Z" fill="#fff" stroke="#f0dcc0" stroke-width="4"/>
+    </g>
+    ${affPain('croissant', 480, 325, 64)}${affPain('brioche', 556, 322, 56)}
+    <rect x="-1600" y="588" width="3800" height="16" fill="#e9a868"/>
+    <rect x="-1600" y="604" width="3800" height="1400" fill="url(#aff-comptoir)"/>
+    <rect x="150" y="628" width="330" height="190" rx="16" fill="#fffaf0" opacity=".85" stroke="#fff" stroke-width="5"/>
+    <path d="M152 718H478" stroke="#e9a868" stroke-width="6"/>
+    ${affPain('croissant', 214, 686, 92)}${affPain('painchoc', 314, 686, 92)}${affPain('brioche', 414, 682, 80)}
+    ${affPain('graines', 222, 768, 92)}${affPain('raisins', 322, 768, 72)}${affPain('boule', 420, 768, 72)}
+    ${affEtincelle(380, 650, 12)}${affEtincelle(262, 740, 10)}
+    ${affPain('croissant', 62, 724, 230, -12)}
+    ${affPain('baguette', 540, 640, 210, -72)}${affPain('baguette', 596, 650, 210, -84)}
+    <path d="M492 690H690L668 830H514Z" fill="#c8924f" stroke="#8a5a2b" stroke-width="5"/>
+    <path d="M500 730H684M506 770H678" stroke="#8a5a2b" stroke-width="4"/>
+    <g fill="#fffaf0" opacity=".8"><circle cx="60" cy="300" r="5"/><circle cx="250" cy="390" r="4"/><circle cx="20" cy="360" r="3"/><circle cx="270" cy="300" r="3"/><circle cx="460" cy="560" r="4"/></g>`;
+  }
+  function demarrerAffiche() {
+    app.style.setProperty('display', 'none', 'important');
+    const cacher = () => document.querySelectorAll('.jel-langue, jel-langue, button').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+    cacher();
+    setTimeout(cacher, 200);
+    setTimeout(cacher, 1000);
+    const boite = document.createElement('div');
+    boite.id = 'affiche';
+    boite.setAttribute('aria-hidden', 'true');
+    boite.innerHTML = `<svg viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice">${sceneAffiche()}</svg>`;
+    document.body.appendChild(boite);
+    const svg = boite.firstElementChild;
+    // Redessinée au redimensionnement : la composition reste au centre, le décor continue jusqu'aux bords.
+    const cadrer = () => {
+      const L = window.innerWidth || 600, Ha = window.innerHeight || 800;
+      let vx = 0, vy = 0, vw = 600, vh = 800;
+      if (L / Ha > 600 / 800) { vw = 800 * L / Ha; vx = (600 - vw) / 2; } else { vh = 600 * Ha / L; vy = (800 - vh) / 2; }
+      svg.setAttribute('viewBox', `${vx} ${vy} ${vw} ${vh}`);
+    };
+    cadrer();
+    window.addEventListener('resize', cadrer);
+  }
+
+  // ---------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine journée, avec sa vraie interface, sans écran titre, ni « Continuer », ni
+  // tutoriel, ni fenêtre (CONSIGNES-JEU.md, section 5). La scène est posée par le code puis figée
+  // (sans fenêtre de pause) : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = journée 1 : une baguette dorée au four, deux clients, la pâte en cours ;
+  //   2 = journée 9 : client pressé, commande double, moulin qui tourne, champ de blé ;
+  //   3 = journée 20 (ordinateur) : trois fours, client au panier, pigeon gourmand, décorations gagnées.
+  const SCENES_APERCU = {
+    1: {
+      niveau: 0, etoiles: 0, recette: 'baguette', bol: { ajoutes: ['farine', 'eau', 'levure'] },
+      clients: [[0, ['baguette'], 'normal', 0.62, { p: 1, c: 2, h: 0, s: 1 }], [2, ['baguette'], 'normal', 0.93, { p: 3, c: 0, h: 2, s: 0 }]],
+      fours: [['baguette', 1.2]], vitrine: [['baguette', 'dore'], ['baguette', 'dore']], passes: 1, perdus: 0, pieces: 3,
+    },
+    2: {
+      niveau: 8, etoiles: 2, recette: 'croissant', bol: { ajoutes: ['farine', 'beurre', 'sucre', 'levure'], petri: 3 },
+      clients: [[0, ['croissant', 'painchoc'], 'normal', 0.5, { p: 0, c: 5, h: 1, s: 1 }], [1, ['baguette'], 'presse', 0.4, { p: 3, c: 3, h: 0, s: 3 }], [2, ['boule'], 'normal', 0.9, { p: 4, c: 1, h: 3, s: 2 }]],
+      fours: [['croissant', 1.15], ['boule', 0.55]], vitrine: [['painchoc', 'dore'], ['baguette', 'dore'], ['painchoc', 'cuit']],
+      passes: 2, perdus: 1, pieces: 12, attente: 1, ble: 1, farine: 3, moulin: 1.6, champ: [1, 0.6, 0.25],
+    },
+    3: {
+      niveau: 19, etoiles: 3, large: true, recette: 'graines', bol: { ajoutes: ['farine', 'eau', 'sel'] },
+      clients: [[0, ['brioche', 'raisins', 'baguette'], 'panier', 0.75, { p: 1, c: 2, h: 6, s: 4 }], [1, ['painchoc'], 'presse', 0.5, { p: 5, c: 0, h: 1, s: 3 }], [2, ['graines', 'croissant'], 'normal', 0.3, { p: 2, c: 4, h: 4, s: 2 }]],
+      fours: [['croissant', 1.1], ['brioche', 0.6], ['raisins', 1.6]],
+      vitrine: [['brioche', 'dore'], ['baguette', 'dore'], ['raisins', 'dore'], ['painchoc', 'cuit'], ['croissant', 'dore']],
+      passes: 6, perdus: 1, pieces: 46, attente: 2, ble: 2, farine: 4, champ: [1, 0.8, 0.4], pigeon: 2,
+    },
+  };
+  function ouvrirApercu(n) {
+    apercu = n;
+    const sc = SCENES_APERCU[n];
+    // Hasard fixe : la même image à chaque capture.
+    const r = alea(9001 + n * 131);
+    Math.random = r;
+    // Progression en mémoire seulement (rien n'est enregistré) : étoiles des journées passées
+    // (décorations de la boutique), nouveautés déjà vues (ni tutoriel, ni fenêtre d'astuce).
+    prog.son = true;
+    prog.etoiles = prog.etoiles.map((_, i) => (i < sc.niveau ? sc.etoiles : 0));
+    NIVEAUX.forEach((d) => { if (d.nouveau) prog.vus[d.nouveau] = true; });
+    if (sc.large) app.classList.add('apercu-large');
+    lancerNiveau(sc.niveau);
+    const j = jeu;
+    j.recette = sc.recette;
+    j.bol = { ajoutes: sc.bol.ajoutes.slice(), petri: sc.bol.petri || 0, pret: false };
+    // Clients au comptoir (les journées précédentes de la file sont déjà passées).
+    let idx = sc.passes + sc.perdus;
+    sc.clients.forEach(([place, items, type, frac, look]) => {
+      const facteur = type === 'presse' ? 0.55 : type === 'panier' ? 1.35 : 1;
+      j.clients[idx] = Object.assign({}, j.clients[idx], { items, type, look, patience: j.def.patience * (1 + 0.45 * (items.length - 1)) * facteur });
+      j.prochain = idx;
+      arriverClient(place);
+      const c = j.places[place];
+      c.patience = c.patienceMax * frac;
+      majClient(c);
+      idx++;
+    });
+    j.prochain = idx;
+    const attendu = j.clients[Math.min(j.clients.length, idx + (sc.attente || 0)) - 1];
+    j.horloge = sc.attente && attendu ? attendu.arrivee : 0;
+    j.temps = j.horloge;
+    j.contents = sc.passes; j.mecontents = sc.perdus; j.pieces = sc.pieces;
+    sc.fours.forEach(([recette, ratio], k) => {
+      const e = ratio < DORE ? 'cru' : ratio < CUIT ? 'dore' : ratio < BRULE ? 'cuit' : 'brule';
+      j.fours[k] = { recette, t: ratio * RECETTES[recette].cuisson, etat: e };
+    });
+    sc.vitrine.forEach(([recette, qualite], k) => { j.vitrine[k] = { recette, qualite }; });
+    if (j.def.moulin) { j.ble = sc.ble; j.farine = sc.farine; if (sc.moulin) j.moulin = { actif: true, t: sc.moulin }; }
+    (sc.champ || []).forEach((f, k) => { if (j.champ[k]) j.champ[k].t = POUSSE * f; });
+    majTout();
+    if (sc.pigeon !== undefined) {
+      poserPigeon();
+      j.pigeon.v = sc.pigeon;
+      placerPigeon();
+    }
+    // Figée sur ce moment, avec la vraie interface et sans fenêtre de pause.
+    j.pause = true;
+  }
+
+  // ---------------------------------------------------------------------
+  // Démarrage
+  // ---------------------------------------------------------------------
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) {
+    demarrerAffiche();
+  } else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    majBoutonsSon();
+    requestAnimationFrame(boucle);
+  } else {
+    majBoutonsSon();
+    afficherTitre();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>
