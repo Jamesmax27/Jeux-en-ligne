@@ -1956,6 +1956,7 @@
   // -------------------------------------------------------------- Progression
 
   const prog = { etoiles: [], records: [], carnet: {}, vus: {}, chapeau: 'explorateur', sac: 'sacoche', tutos: {}, son: true, niveauMax: 1 };
+  let apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   function progVide() {
     prog.etoiles = NIVEAUX.map(() => 0); prog.records = NIVEAUX.map(() => 0);
     prog.carnet = {}; prog.vus = {}; prog.chapeau = 'explorateur'; prog.sac = 'sacoche'; prog.tutos = {}; prog.niveauMax = 1;
@@ -2021,6 +2022,7 @@
     } catch (e) { /* rien */ }
   }
   function son(nom) {
+    if (apercu) return; // image du jeu : aucun son
     switch (nom) {
       case 'pas': note(95, 0.1, 'sine', 0.12, 55); break;
       case 'clic': note(700, 0.06, 'triangle', 0.12); break;
@@ -3271,6 +3273,198 @@
     if (partieEnCours) window.JEL_SAVE.save(JEU, Object.assign({ niveau: S.niv + 1, score: scoreTotal() }, donnees()));
   });
 
+  // ------------------------------------------------------- Affiche (jaquette)
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Une maman tricératops,
+  // en grand, avance dans la boue et y laisse des empreintes toutes fraîches ; le petit explorateur,
+  // caché derrière son rocher, la regarde passer ; au loin, le troupeau défile au bord du lac.
+
+  // Dessine fn() sur un calque, puis le pose avec un halo de lumière autour de la silhouette.
+  let calque = null;
+  function avecHalo(c, couleur, flou, fn) {
+    if (!calque) calque = document.createElement('canvas');
+    if (calque.width !== cv.width || calque.height !== cv.height) { calque.width = cv.width; calque.height = cv.height; }
+    const k2 = calque.getContext('2d');
+    k2.setTransform(1, 0, 0, 1, 0, 0); k2.clearRect(0, 0, calque.width, calque.height);
+    k2.setTransform(c.getTransform());
+    fn(k2);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    c.shadowColor = couleur; c.shadowBlur = flou; c.drawImage(calque, 0, 0);
+    c.restore();
+  }
+  // Empreinte posée dans la boue, vue en perspective (écrasée en hauteur), avec un bord éclairé.
+  function empreinteSol(c, e, x, y, ang, s, ecrase) {
+    c.save(); c.translate(x, y); c.scale(1, ecrase);
+    empreinte(c, e, 0, s * 0.06, ang, s, 0.9, false, 'rgba(255,214,160,');
+    empreinte(c, e, 0, 0, ang, s, 1, false, 'rgba(58,30,14,');
+    c.restore();
+  }
+  function nuageCiel(c, x, y, s) {
+    [[0, 0, 1], [-0.9, 0.18, 0.7], [0.95, 0.15, 0.75], [0.35, -0.35, 0.72]].forEach((p) => ell(c, x + p[0] * s, y + p[1] * s, s * p[2], s * p[2] * 0.72, 0, 'rgba(255,255,255,0.93)'));
+  }
+  function dessinerAffiche() {
+    mise();
+    const c = cx;
+    // Cadre de référence 600 × 800 ; sur un écran plus large ou plus haut, le décor continue jusqu'aux bords.
+    const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    const L = -ox / k, R = (W - ox) / k, T = -oy / k, B = (H - oy) / k, LW = R - L;
+    S.horloge = 1.1;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0); c.clearRect(0, 0, W, H);
+    c.setTransform(DPR * k, 0, 0, DPR * k, DPR * ox, DPR * oy);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    const r = rng(2026);
+    // Ciel
+    let g = c.createLinearGradient(0, Math.min(T, 0), 0, 380);
+    g.addColorStop(0, '#4fb0ec'); g.addColorStop(0.55, '#9fd8f6'); g.addColorStop(1, '#fff1c6');
+    c.fillStyle = g; c.fillRect(L, T, LW, 380 - T);
+    // Soleil (en haut à droite) et ses rayons
+    const sx = 488, sy = 116;
+    c.save(); c.translate(sx, sy);
+    for (let i = 0; i < 16; i++) {
+      c.rotate(Math.PI * 2 / 16);
+      c.fillStyle = i % 2 ? 'rgba(255,248,210,0.20)' : 'rgba(255,248,210,0.11)';
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(900, -70); c.lineTo(900, 70); c.closePath(); c.fill();
+    }
+    c.restore();
+    g = c.createRadialGradient(sx, sy, 10, sx, sy, 330);
+    g.addColorStop(0, 'rgba(255,252,225,1)'); g.addColorStop(0.22, 'rgba(255,240,175,0.65)'); g.addColorStop(1, 'rgba(255,240,175,0)');
+    c.fillStyle = g; c.fillRect(L, T, LW, 700 - T);
+    ell(c, sx, sy, 50, 50, 0, '#fff8d4');
+    // Nuages
+    nuageCiel(c, 150, 120, 34); nuageCiel(c, 330, 190, 24); nuageCiel(c, L + 40, 230, 22); nuageCiel(c, R - 30, 250, 26);
+    // Volcan endormi (à gauche, au loin) et sa petite fumée
+    c.fillStyle = '#a98ac2';
+    c.beginPath(); c.moveTo(-70, 352); c.lineTo(92, 222); c.lineTo(168, 222); c.lineTo(330, 352); c.closePath(); c.fill();
+    c.fillStyle = 'rgba(255,255,255,0.18)';
+    c.beginPath(); c.moveTo(92, 222); c.lineTo(130, 222); c.lineTo(60, 300); c.lineTo(20, 300); c.closePath(); c.fill();
+    ell(c, 130, 222, 38, 7, 0, '#f7a86a');
+    [[132, 200, 15], [146, 176, 20], [128, 148, 25]].forEach((p, i) => ell(c, p[0], p[1], p[2], p[2] * 0.8, 0, 'rgba(244,238,250,' + (0.85 - i * 0.18).toFixed(2) + ')'));
+    // Collines et lac
+    for (let x = L - 60; x < R + 60; x += 120) ell(c, x, 352, 90 + ((x * 7) % 40), 26 + ((x * 3) % 14), 0, '#9fd27c');
+    ell(c, 300, 366, LW * 0.75, 26, 0, '#58ace0');
+    ell(c, 260, 360, LW * 0.45, 9, 0, 'rgba(255,255,255,0.42)');
+    // Rive lointaine
+    c.fillStyle = '#8fd06a'; c.fillRect(L, 384, LW, 50);
+    c.fillStyle = '#7cc05c'; c.fillRect(L, 384, LW, 5);
+    for (let x = L + 10; x < R; x += 210) fougere(c, x + 20, 432, 110, 0.05, '#5fa451', '#47873f');
+    // Boue de la vallée (plus sombre vers l'avant)
+    g = c.createLinearGradient(0, 426, 0, Math.max(B, 800));
+    g.addColorStop(0, '#a87650'); g.addColorStop(0.45, '#8a5a36'); g.addColorStop(1, '#5c3820');
+    c.fillStyle = g; c.fillRect(L, 426, LW, B - 426);
+    c.fillStyle = '#6fb350'; c.fillRect(L, 424, LW, 6);
+    for (let i = 0; i < 90; i++) {
+      const p = Math.pow(r(), 0.85), y = 436 + p * (Math.max(B, 800) - 436), x = L + r() * LW, rx = (10 + r() * 26) * (0.45 + p * 1.3);
+      ell(c, x, y, rx, rx * 0.32, 0, r() < 0.5 ? 'rgba(110,68,40,0.55)' : 'rgba(176,124,84,0.45)');
+    }
+    // Le troupeau au loin, chacun suivi de ses empreintes
+    [['par', 'violet', 64, 452, 82], ['dip', 'bleu', 530, 450, 132], ['rap', 'orange', R - 6, 456, 64]].forEach((h) => {
+      for (let i = 1; i < 9; i++) empreinteSol(c, h[0], h[2] + h[4] * 0.55 + i * h[4] * 0.32, h[3] + 3 + (i % 2 ? 4 : -2), 0, h[4] * 0.2, 0.5);
+      dessinerDino(c, h[0], h[2], h[3], h[4], COULEURS[h[1]], -1, 1.4 + h[2] * 0.01, false, 1);
+    });
+    c.fillStyle = 'rgba(255,240,210,0.16)'; c.fillRect(L, 300, LW, 170);
+    // Empreintes fraîches de la maman : de l'avant-plan jusqu'à ses pattes arrière
+    const piste = [];
+    for (let i = 0; i < 6; i++) {
+      const t = i / 5, x = 468 + t * 120, y = 636 + t * 150;
+      piste.push({ x: x + (i % 2 ? -22 : 22) * (0.6 + t), y: y, s: 62 + t * 90 });
+    }
+    const angPiste = Math.atan2(-150 * 1.8, -120);
+    piste.slice().reverse().forEach((p) => empreinteSol(c, 'tri', p.x, p.y, angPiste, p.s, 0.55));
+    // Étoiles dorées : la bonne piste est retrouvée
+    c.fillStyle = '#ffd94a';
+    [[500, 612, 10], [548, 650, 7], [430, 668, 8], [575, 720, 6], [520, 588, 6], [452, 720, 5]].forEach((e) => {
+      c.save(); c.shadowColor = '#fff3a0'; c.shadowBlur = 10; etoileChemin(c, e[0], e[1], e[2]); c.fill(); c.restore();
+    });
+    // Fougère au bord gauche (derrière l'explorateur)
+    fougere(c, -40, 820, 300, 0.55, '#62a852', '#3f7d3a');
+    // La maman tricératops, en grand, avec un halo de soleil
+    const tx = 362, ty = 612, ts = 342;
+    avecHalo(c, 'rgba(255,246,205,0.95)', 26 * DPR * k, (c2) => {
+      dessinerDino(c2, 'tri', tx, ty, ts, COULEURS.vert, -1, 1.1, false, 1);
+    });
+    // Éclaboussures de boue sous sa patte avant
+    for (let i = 0; i < 9; i++) {
+      const a = -Math.PI * (0.55 + 0.42 * (i / 8)), d = 26 + (i % 3) * 16;
+      ell(c, 236 + Math.cos(a) * d * 1.5, 618 + Math.sin(a) * d * 0.7, 5 - (i % 3), 4 - (i % 3) * 0.8, 0, '#6e4428');
+    }
+    // Le petit explorateur, caché derrière son rocher, l'admire
+    avecHalo(c, 'rgba(255,246,205,0.8)', 18 * DPR * k, (c2) => {
+      dessinerExplorateur(c2, 98, 752, 214, 'explorateur', 'sacoche', true);
+    });
+    c.strokeStyle = '#fff6c0'; c.lineWidth = 5;
+    [[-1.95, 26], [-2.35, 30], [-2.75, 26]].forEach((t) => {
+      const cxp = 98, cyp = 585, a = t[0];
+      c.beginPath(); c.moveTo(cxp + Math.cos(a) * 100, cyp + Math.sin(a) * 100); c.lineTo(cxp + Math.cos(a) * (100 + t[1]), cyp + Math.sin(a) * (100 + t[1])); c.stroke();
+    });
+    // Avant-plan : fougère coupée par le bord droit
+    fougere(c, R + 40, 880, 190, -0.7, '#5a9e4a', '#356b30');
+  }
+  function cacherInterfaceAffiche() {
+    document.querySelectorAll('.ecran, #hud, #bandeau, .rond, .btn, jel-langue, .jel-langue, .lang-place').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    cacherInterfaceAffiche();
+    setTimeout(cacherInterfaceAffiche, 200); setTimeout(cacherInterfaceAffiche, 1000);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ------------------------------------------------------- Images du jeu (page du jeu)
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (niveau, traces, cœurs, plateau), sans écran
+  // titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). Le moment est posé par
+  // le code, puis la partie est figée sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1, le lac : la main montre comment glisser le tricératops sur ses empreintes ;
+  //   2 = niveau 10, la forêt de fougères : le troupeau défile, un bébé marche dans les pas de sa maman ;
+  //   3 = niveau 20, le volcan la nuit : nids, pluie qui efface les traces, fumées, un dinosaure tenu au doigt.
+  const SCENES_APERCU = {
+    1: { niveau: 0, chapeau: 'explorateur', sac: 'sacoche' },
+    2: { niveau: 9, chapeau: 'casquette', sac: 'dos', temps: 4.0 },
+    3: { niveau: 19, chapeau: 'lampe', sac: 'etoiles' },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    Math.random = rng(4242 + numero * 7919); // hasard fixe : la même image à chaque capture
+    progVide(); // progression neuve en mémoire seulement (rien n'est enregistré)
+    Object.keys(DEMOS).forEach((cle) => { prog.tutos[cle] = true; });
+    const sc = SCENES_APERCU[numero];
+    prog.chapeau = sc.chapeau; prog.sac = sc.sac;
+    lancerNiveau(sc.niveau);
+    partieEnCours = false; // rien n'est écrit à la fermeture
+    S.horloge = 2.3;
+    if (numero === 1) {
+      commencerPlacement();
+      S.main = { t: 1.3 };
+      bandeau(trad('phase.ordre'), 0);
+    } else if (numero === 2) {
+      S.temps = sc.temps;
+      S.etats = S.dinos.map((dd) => marche(dd, S.temps));
+      bandeau(trad('phase.regarde'), 0);
+    } else {
+      commencerPlacement(); S.main = null;
+      S.coeurs = 2; S.erreurs = 1; S.tp = 18.4;
+      const parRang = S.dinos.slice().sort((a, b) => a.rang - b.rang);
+      const fractions = [0.8, 0.6, 0.24];
+      parRang.slice(0, 3).forEach((dd, i) => {
+        dd.etat = 'place'; dd.lPose = placerSur(dd, S.pistes[dd.p].len * fractions[i]);
+        const it = S.plateau.find((x) => x.d === dd); if (it) it.fait = true;
+      });
+      const dernier = parRang[2], q = pointA(S.pistes[dernier.p], dernier.lPose);
+      dernier.saut = 0.5;
+      particules(q.x, q.y - dernier.taille * 0.5, 'etoile', 7);
+      // Le dinosaure suivant est tenu au doigt, en route vers ses empreintes.
+      const suivant = parRang[3], items = itemsPlateau(), idx = items.findIndex((x) => x.d === suivant);
+      const rc = caseItem(idx, items.length), cib = pointCible(suivant.p);
+      const kx = 0.62, px = rc.x + rc.w / 2 + (cib.x - rc.x - rc.w / 2) * kx, py = rc.y + rc.h / 2 + (cib.y - rc.y - rc.h / 2) * kx;
+      S.drag = { it: items[idx], x: px, y: py, sx: 0, sy: 0, moved: true };
+      // La pluie tombe une demi-seconde : les traces suivantes commencent à s'effacer.
+      for (let i = 0; i < 24; i++) maj(1 / 60);
+      bandeau(trad('phase.suivant'), 0);
+    }
+    majHud();
+    S.pause = true; // figé, sans fenêtre de pause
+  }
+
   // ------------------------------------------------------- Démarrage
 
   try { document.title = trad('titre'); } catch (e) { /* rien */ }
@@ -3278,8 +3472,15 @@
   try { const v = localStorage.getItem('empreintes-tenue'); if (v) { const p = v.split(','); if (CHAPEAUX.some((o) => o.id === p[0])) prog.chapeau = p[0]; if (SACS.some((o) => o.id === p[1])) prog.sac = p[1]; } } catch (e) { /* rien */ }
   majBoutonsSon();
   if (window.JEL_I18N && window.JEL_I18N.surChangement) window.JEL_I18N.surChangement(() => { majBoutonsSon(); majHud(); });
-  allerTitre();
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    allerTitre();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

@@ -1984,6 +1984,7 @@ function annulerTout() { S.jeton++; taches = []; S.attente = null; }
 /* =========================================================================
    DESSIN
    ========================================================================= */
+let SOURIRES = false; // visages souriants : seulement pour l'affiche (window.JEL_AFFICHE)
 const PEAUX = ['#f6d3b3', '#e8b98f', '#c98d5e', '#9a6640', '#6e4528', '#f2c7a0'];
 const CHEVEUX = ['#3b2414', '#6b3e1e', '#1c1c1c', '#c98b32', '#e6c25a', '#8a8a8a', '#a8432b'];
 const HABITS = ['#e5533d', '#3b7fe0', '#34a866', '#8d5fd3', '#f2862b', '#ee77ab', '#2a9d8f', '#ffcc33', '#6d7f99'];
@@ -2113,6 +2114,7 @@ function dessinerTete(c, x, y, r, p, versGauche) {
   c.fillStyle = '#1f2a44';
   const dx = versGauche ? -r * 0.35 : r * 0.35;
   c.beginPath(); c.arc(x + dx - r * 0.25, y + r * 0.05, r * 0.13, 0, 7); c.arc(x + dx + r * 0.25, y + r * 0.05, r * 0.13, 0, 7); c.fill();
+  if (SOURIRES) { c.strokeStyle = '#1f2a44'; c.lineWidth = r * 0.14; c.lineCap = 'round'; c.beginPath(); c.arc(x + dx, y + r * 0.28, r * 0.32, 0.2 * Math.PI, 0.8 * Math.PI); c.stroke(); }
   if (p.chapeau) { c.fillStyle = p.chapeau; c.beginPath(); c.arc(x, y - r * 0.3, r * 0.95, Math.PI, 0); c.fill(); c.fillRect(x - r * 1.5, y - r * 0.35, r * 1.2, r * 0.3); }
 }
 
@@ -2279,6 +2281,11 @@ function dessinerPersonne(c, a) {
   c.fillStyle = a.peau; c.beginPath(); c.arc(x, y - 38 * s - saut, 6.5 * s, 0, 7); c.fill();
   c.fillStyle = a.cheveux; c.beginPath(); c.arc(x, y - 39 * s - saut, 6.7 * s, Math.PI * 1.05, Math.PI * 1.95); c.fill();
   c.fillStyle = '#1f2a44'; c.beginPath(); c.arc(x - 2.2 * s, y - 37.5 * s - saut, 0.9 * s, 0, 7); c.arc(x + 2.2 * s, y - 37.5 * s - saut, 0.9 * s, 0, 7); c.fill();
+  if (SOURIRES) {
+    c.strokeStyle = '#1f2a44'; c.lineWidth = 0.75 * s; c.lineCap = 'round';
+    c.beginPath(); c.arc(x, y - 35.8 * s - saut, 2.3 * s, 0.2 * Math.PI, 0.8 * Math.PI); c.stroke();
+    c.fillStyle = 'rgba(240,110,110,.35)'; c.beginPath(); c.arc(x - 3.8 * s, y - 35.4 * s - saut, 1.2 * s, 0, 7); c.arc(x + 3.8 * s, y - 35.4 * s - saut, 1.2 * s, 0, 7); c.fill();
+  }
   if (a.chapeau) { c.fillStyle = a.chapeau; c.beginPath(); c.arc(x, y - 40 * s - saut, 6.6 * s, Math.PI, 0); c.fill(); c.fillRect(x - 9 * s, y - 41 * s - saut, 5 * s, 2 * s); }
   c.restore();
 }
@@ -3331,12 +3338,275 @@ JEL_SAVE.surFermeture(() => { if (S.enJeu) enregistrer(S.niv + 1); });
 
 if (window.JEL_I18N && window.JEL_I18N.surChangement) window.JEL_I18N.surChangement(() => { majSon(); if (S.ecran === 'jeu') majHud(); if (S.ecran === 'lignes') construireLignes(); if (S.ecran === 'album') construireAlbum(); });
 
+/* =========================================================================
+   AFFICHE (jaquette du jeu)
+   Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une
+   scène composée, sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md,
+   section 5). Le grand bus à étage jaune s'arrête, plein de passagers souriants ;
+   une classe aux casquettes jaunes, main dans la main, monte par la porte ouverte ;
+   le soleil brille sur la ville et des tickets s'envolent.
+   ========================================================================= */
+function hasardFixe(n) {
+  let graine = 1234567 + n * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+let toileAffiche = null;
+function dessinerAffiche() {
+  hasardFixe(7); // même image à chaque dessin
+  const cv = toileAffiche;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = Math.max(1, Math.round(window.innerWidth * dpr)), H = Math.max(1, Math.round(window.innerHeight * dpr));
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const c = cv.getContext('2d');
+  // Repère virtuel de 600 × 800 au centre ; le décor continue jusqu'aux bords.
+  const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  const virtuel = () => c.setTransform(k, 0, 0, k, ox, oy);
+  // Repère du jeu agrandi : (0, 0) du jeu placé en (vx, vy) du repère virtuel, à l'échelle e.
+  const jeu = (e, vx, vy) => c.setTransform(k * e, 0, 0, k * e, ox + vx * k, oy + vy * k);
+  const E = 1.85, BX = 22, BY = 68; // bus : son toit à 15 % de la hauteur, ses roues vers 60 %
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.fillStyle = '#bfe6fb'; c.fillRect(0, 0, W, H);
+  SOURIRES = true;
+
+  // Fond : la ville (grands immeubles), plus pâle
+  const pal = ['#f4a259', '#8ecae6', '#e76f51', '#90be6d', '#cdb4db', '#e9c46a', '#f4a261', '#bc4b51', '#5b8e7d'];
+  const bat = [];
+  const hauts = [175, 205, 160, 215, 185, 150, 200, 170, 140, 120, 190, 210, 165, 180];
+  let bxw = -360;
+  hauts.forEach((h, i) => { const w = 58 + (i * 37) % 26; bat.push({ x: bxw, w, h, c: pal[i % pal.length], toit: false }); bxw += w + 4; });
+  for (let x = 560; x < 1000; x += 70) bat.push({ x, w: 64, h: 150 + (x % 5) * 10, c: pal[(x / 70) % pal.length | 0], toit: false });
+  const decor = { type: 'avenue', corresp: false, bat, sapins: [], monts: [],
+    nuages: [{ x: -260, y: -18, s: 1.3 }, { x: 40, y: -26, s: 1.1 }, { x: 130, y: 4, s: 0.8 }, { x: -120, y: 6, s: 0.9 }, { x: 420, y: -10, s: 1.2 }] };
+  jeu(E, BX, BY);
+  dessinerDecor(c, decor, 0);
+  // Brume légère sur le fond (profondeur)
+  c.fillStyle = 'rgba(225,243,255,.32)'; c.fillRect(-900, -2000, 2600, 2160);
+
+  // Soleil, halo et rayons (en haut à droite)
+  virtuel();
+  const sx = 498, sy = 66;
+  const halo = c.createRadialGradient(sx, sy, 10, sx, sy, 330);
+  halo.addColorStop(0, 'rgba(255,250,215,.95)'); halo.addColorStop(0.35, 'rgba(255,240,180,.45)'); halo.addColorStop(1, 'rgba(255,240,180,0)');
+  c.fillStyle = halo; c.fillRect(-1000, -1000, 2600, 2000);
+  c.save(); c.beginPath(); c.rect(-1000, -1000, 2600, 1360); c.clip(); // rayons seulement dans le ciel
+  c.fillStyle = 'rgba(255,244,190,.32)';
+  for (let i = 0; i < 14; i++) {
+    const a = i * (Math.PI * 2 / 14) + 0.1;
+    c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + Math.cos(a - 0.07) * 700, sy + Math.sin(a - 0.07) * 700); c.lineTo(sx + Math.cos(a + 0.07) * 700, sy + Math.sin(a + 0.07) * 700); c.closePath(); c.fill();
+  }
+  c.restore();
+  c.fillStyle = '#ffe680'; c.shadowColor = '#fff3b0'; c.shadowBlur = 40 * k;
+  c.beginPath(); c.arc(sx, sy, 38, 0, 7); c.fill(); c.shadowBlur = 0;
+  c.fillStyle = '#fff6c4'; c.beginPath(); c.arc(sx - 9, sy - 9, 18, 0, 7); c.fill();
+
+  // Le héros : le grand bus à étage, plein de passagers
+  const bus = nouveauBus('etage'); bus.x = 0; bus.portes = [1, 0]; bus.casquette = 'helice';
+  const g = geo('etage', 0);
+  bus.bas = bus.bas.map((_, i) => (i === 3 ? null : nouvellePersonne()));
+  bus.haut = bus.haut.map((_, i) => (i === 8 ? null : nouvellePersonne()));
+  bus.escalier = [{ p: 0.55, pers: nouvellePersonne() }];
+  jeu(E, BX, BY);
+  c.fillStyle = 'rgba(0,0,0,.12)'; c.beginPath(); c.ellipse(150, 214, 175, 10, 0, 0, 7); c.fill();
+  dessinerVehicule(c, bus, 900);
+  // Passagers qui saluent de la main (fenêtres du haut et du bas)
+  const saluer = (pl, p, sens) => {
+    c.strokeStyle = p.habit; c.lineWidth = 3; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(pl.x + 4 * sens, pl.y + 1); c.lineTo(pl.x + 9 * sens, pl.y - 12); c.stroke();
+    c.fillStyle = p.peau; c.beginPath(); c.arc(pl.x + 9.5 * sens, pl.y - 14, 2.8, 0, 7); c.fill();
+  };
+  [1, 4, 7, 10].forEach((i, n) => { if (bus.haut[i]) saluer(g.sieges.haut[i], bus.haut[i], n % 2 ? -1 : 1); });
+  [2, 6, 9].forEach((i, n) => { if (bus.bas[i]) saluer(g.sieges.bas[i], bus.bas[i], n % 2 ? 1 : -1); });
+  // Reflet de lumière sur le toit et le flanc éclairé par le soleil
+  c.save(); rr(c, 0, g.top, 300, g.bas - g.top, 16); c.clip();
+  const reflet = c.createLinearGradient(300, g.top, 120, g.bas);
+  reflet.addColorStop(0, 'rgba(255,255,230,.45)'); reflet.addColorStop(0.4, 'rgba(255,255,230,0)');
+  c.fillStyle = reflet; c.fillRect(0, g.top, 300, g.bas - g.top);
+  c.restore();
+  c.strokeStyle = 'rgba(255,255,240,.85)'; c.lineWidth = 2.2;
+  c.beginPath(); c.moveTo(40, g.top + 0.5); c.lineTo(284, g.top + 0.5); c.quadraticCurveTo(299.5, g.top + 0.5, 299.5, g.top + 16); c.lineTo(299.5, g.bas - 30); c.stroke();
+
+  // La classe en sortie monte dans le bus : la première entre, les autres suivent, main dans la main
+  const porteBus = g.portes[0];
+  const enVirtuel = (wx, wy) => [BX + wx * E, BY + wy * E];
+  const [px0, py0] = enVirtuel(porteBus.cx + 2, 214);
+  const file = [
+    { x: px0, y: py0, e: E, o: { taille: 0.8, chapeau: '#ffd23f', habit: '#3b7fe0' } },
+    { x: 200, y: 516, e: 2.1, o: { taille: 0.8, chapeau: '#ffd23f', habit: '#3b7fe0' } },
+    { x: 254, y: 546, e: 2.35, o: { taille: 0.8, chapeau: '#ffd23f', habit: '#3b7fe0' } },
+    { x: 313, y: 580, e: 2.6, o: { taille: 0.8, chapeau: '#ffd23f', habit: '#3b7fe0' } },
+    { x: 378, y: 616, e: 2.9, o: { taille: 0.8, chapeau: '#ffd23f', habit: '#3b7fe0' } },
+    { x: 470, y: 690, e: 3.4, o: { taille: 1, habit: '#e5533d' } },
+  ];
+  // Grand panneau de l'arrêt au premier plan, à gauche
+  jeu(3.0, 58 - 0 * 3, 470 - 166 * 3);
+  dessinerPoteau(c, 0);
+  // Mains tenues (dessinées avant les enfants)
+  virtuel();
+  for (let i = 1; i + 1 < file.length; i++) {
+    const a = file[i], b = file[i + 1], ta = a.o.taille * a.e, tb = b.o.taille * b.e;
+    c.strokeStyle = '#33405a'; c.lineWidth = 2.4 * (a.e + b.e) / 2; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(a.x + 8 * ta, a.y - 18 * ta); c.quadraticCurveTo((a.x + b.x) / 2, (a.y - 18 * ta + b.y - 18 * tb) / 2 + 8, b.x - 8 * tb, b.y - 18 * tb); c.stroke();
+  }
+  file.forEach((f, i) => {
+    const p = nouvellePersonne(f.o);
+    p.x = f.x / f.e; p.y = f.y / f.e; p.marche = i > 0; p.phase = 0.9 + i * 1.3; p.sac = i === 5;
+    jeu(f.e, 0, 0);
+    dessinerPersonne(c, p);
+  });
+
+  // Tickets, étoiles et confettis qui s'envolent au-dessus de la porte (une bonne réponse !)
+  const coul = ['#e5533d', '#3b7fe0', '#34a866', '#ffd23f', '#ee77ab', '#8d5fd3'];
+  const parts = [];
+  // Positions en repère virtuel / 2 : au-dessus du toit (y virtuel de 20 à 112), sans couvrir les fenêtres
+  for (let i = 0; i < 30; i++) {
+    const vx = 30 + (i / 30) * 400 + Math.random() * 40, vy = 24 + Math.random() * 86;
+    parts.push({ x: vx / 2, y: vy / 2, vie: 600, rot: i * 0.9, couleur: coul[i % 6], forme: i % 5 === 0 ? 'etoile' : 'conf' });
+  }
+  [[70, 40, -0.3], [175, 26, 0.25], [282, 44, -0.15]].forEach(([x, y, rot]) => parts.push({ x, y, vie: 600, rot, forme: 'ticket' }));
+  jeu(2, 0, 0);
+  c.shadowColor = 'rgba(255,255,255,.9)'; c.shadowBlur = 8 * k;
+  dessinerParticules(c, parts);
+  c.shadowBlur = 0;
+
+  // Premier plan : jardinière fleurie coupée par le bord, en bas à gauche
+  virtuel();
+  c.fillStyle = '#8a5a3b'; rr(c, -40, 728, 190, 90, 14); c.fill();
+  c.fillStyle = '#a06c48'; rr(c, -40, 728, 190, 16, 8); c.fill();
+  c.fillStyle = '#3f9a4a';
+  for (let i = 0; i < 9; i++) { c.beginPath(); c.arc(-20 + i * 20, 724 - (i % 2) * 8, 22, 0, 7); c.fill(); }
+  [[10, 700, '#ee77ab'], [52, 690, '#ffd23f'], [96, 702, '#e5533d'], [130, 692, '#8d5fd3']].forEach(([fx, fy, fc]) => {
+    c.fillStyle = fc;
+    for (let p = 0; p < 6; p++) { const a = p * 1.047; c.beginPath(); c.arc(fx + Math.cos(a) * 9, fy + Math.sin(a) * 9, 7, 0, 7); c.fill(); }
+    c.fillStyle = '#fff3a0'; c.beginPath(); c.arc(fx, fy, 6, 0, 7); c.fill();
+  });
+  // Premier plan à droite : buisson en pot, coupé par le bord
+  c.fillStyle = '#6d7f99'; rr(c, 520, 740, 120, 80, 12); c.fill();
+  c.fillStyle = '#2f8f55';
+  for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(530 + i * 18, 728 - (i % 3) * 14, 30, 0, 7); c.fill(); }
+  c.fillStyle = '#3fae66';
+  for (let i = 0; i < 5; i++) { c.beginPath(); c.arc(536 + i * 20, 712 - (i % 2) * 12, 16, 0, 7); c.fill(); }
+  // Lumière chaude du soleil sur le trottoir
+  const sol = c.createLinearGradient(600, 480, 200, 800);
+  sol.addColorStop(0, 'rgba(255,236,170,.30)'); sol.addColorStop(1, 'rgba(255,236,170,0)');
+  c.fillStyle = sol; c.fillRect(-1000, 482, 2600, 2000);
+  SOURIRES = false;
+}
+function cacherBoutonsAffiche() {
+  for (const el of document.querySelectorAll('#app, .jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  const st = document.createElement('style');
+  st.textContent = '#app, .jel-langue, button { display: none !important; } html, body { background: #bfe6fb; }';
+  document.head.appendChild(st);
+  toileAffiche = document.createElement('canvas');
+  toileAffiche.setAttribute('aria-hidden', 'true');
+  toileAffiche.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;z-index:50';
+  document.body.appendChild(toileAffiche);
+  cacherBoutonsAffiche();
+  setTimeout(cacherBoutonsAffiche, 100);
+  setTimeout(cacherBoutonsAffiche, 600);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* =========================================================================
+   IMAGES DU JEU (page du jeu)
+   Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le
+   jeu) : le jeu s'ouvre directement en pleine partie, avec sa vraie interface
+   (ligne, arrêt, cœurs, tickets, compteurs, réponses), sans écran titre, ni
+   fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). La scène est
+   posée par le code, à hasard fixe, puis figée sans fenêtre de pause : rien ne se
+   gagne ni ne se perd, aucun son, rien d'écrit dans la sauvegarde.
+     1 = ligne 1, bus jaune : la bonne réponse vient d'être donnée (confettis, ticket) ;
+     2 = ligne 8, minibus rouge : trop de monde sur le trottoir (famille, classe en
+         sortie), compteur à flèches ;
+     3 = ligne 20, car de montagne bleu aux vitres teintées : un passager attend sa monnaie.
+   ========================================================================= */
+function poserBus(type, couleur, casquette, assis, teinte) {
+  const N = NIVEAUX[S.niv];
+  const cible = Math.round((420 - VEH[type].long) / 2);
+  S.bus = nouveauBus(type); S.bus.x = cible; S.bus.teinteBas = !!teinte;
+  P.couleur = couleur; P.casquette = casquette;
+  for (let i = 0; i < assis; i++) asseoir(S.bus, 'bas', nouvellePersonne());
+  S.decor = nouveauDecor(N.v === 'car' ? 'montagne' : VEH[N.v].decor, false);
+  S.train = false; S.bus2 = null; S.acteurs = []; S.particules = [];
+  const g = geo(type, cible);
+  S.poteau = g.portes[0].cx - 26;
+  return g;
+}
+
+function ouvrirApercu(numero) {
+  hasardFixe(numero);
+  P = defautP(); P.son = false; // aucun son ; progression neuve en mémoire seulement
+  annulerTout();
+  S.enJeu = false; S.pause = false; S.tutoOuvert = false;
+  let st;
+  if (numero === 1) {
+    // Ligne 1, 2e arrêt : 3 passagers à bord, 2 sont montés ; « 5 » vient d'être choisi.
+    S.niv = 0; S.arret = 1; S.erreurs = 0; S.tickets = 2; S.abord = 3; S.haut = 0;
+    poserBus('bus', 'jaune', 'marine', 5, false);
+    st = { type: 'normal', q: 'total', mode: 'choix', reponse: 5, d: 0, m: 2, avant: { tot: 3, haut: 0 }, apres: { tot: 5, haut: 0 }, desc: [] };
+  } else if (numero === 2) {
+    // Ligne 8, 2e arrêt : 5 passagers assis sur 8 places ; une famille, un passager et
+    // une classe de 5 attendent. Combien resteront sur le trottoir ?
+    S.niv = 7; S.arret = 1; S.erreurs = 0; S.tickets = 1; S.abord = 6; S.haut = 0;
+    const g = poserBus('minibus', 'rouge', 'rouge', 5, false);
+    S.bus.portes = [1, 0];
+    st = { type: 'trottoir', q: 'trottoir', mode: 'compteur', reponse: 5, attente: 8, libres: 3, d: 1, m: 3,
+      mont: [{ membres: ['bas', 'bas'], porte: 0 }, { membres: ['bas'], porte: 0 }],
+      restants: [{ membres: ['bas', 'bas', 'bas', 'bas', 'bas'], porte: 0 }] };
+    placerFile(st, g, false);
+    S.acteurs.forEach((a, i) => { a.marche = i % 3 === 1; a.phase = 1 + i; });
+  } else {
+    // Ligne 20, 6e arrêt : car de montagne aux vitres teintées ; la passagère paie
+    // son ticket à la porte et attend sa monnaie.
+    S.niv = 19; S.arret = 5; S.erreurs = 1; S.tickets = 4; S.abord = 9; S.haut = 0;
+    const g = poserBus('car', 'bleu', 'montagne', 9, true);
+    S.bus.portes = [1, 0];
+    const payeur = nouvellePersonne({ habit: '#ee77ab' });
+    payeur.x = g.portes[0].cx + 16; payeur.y = 248; payeur.sac = true;
+    S.acteurs.push(payeur);
+    S.bus.payeur = payeur;
+    const noms = String(tr('noms')).split(',').map((x) => x.trim()).filter(Boolean);
+    st = { type: 'monnaie', q: 'monnaie', mode: 'choix', prix: 3, donne: 5, reponse: 2, d: 2, m: 3, nom: noms[0] || '' };
+  }
+  afficherEcran('jeu');
+  $('reponses').innerHTML = ''; $('pieces').innerHTML = ''; $('explication').textContent = '';
+  $('msg').textContent = texteQuestion(st);
+  attendreReponse(st); // vraies réponses à l'écran (la promesse reste en attente)
+  if (numero === 1) {
+    // La bonne réponse vient d'être donnée : bouton vert, ticket gagné, confettis.
+    S.attente = null;
+    $('reponses').querySelectorAll('.rep').forEach((b) => { b.disabled = true; if (b.dataset.v === '5') b.classList.add('bon'); });
+    $('msg').textContent = tr('bravo1') + ' ' + tr('ticketGagne');
+    $('explication').textContent = explication(st);
+    confettis();
+    for (let i = 0; i < 22; i++) majParticules(16);
+  } else if (numero === 2 && S.attente && S.attente.changer) {
+    for (let i = 0; i < 3; i++) S.attente.changer(1); // le joueur règle le compteur
+  }
+  majHud();
+  // Partie figée sur ce moment, sans fenêtre de pause : les réponses ne répondent plus.
+  S.pause = true;
+  P.son = true; majSon(); // icône du son comme en partie (aucun son n'est joué)
+}
+
 /* Démarrage */
-P = chargerP();
-majSon();
-preparerTitre();
-window.addEventListener('resize', () => { ajuster(toile); ajuster(toileTitre); });
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) {
+  demarrerAffiche();
+} else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  window.addEventListener('resize', () => { ajuster(toile); });
+  requestAnimationFrame(boucle);
+} else {
+  P = chargerP();
+  majSon();
+  preparerTitre();
+  window.addEventListener('resize', () => { ajuster(toile); ajuster(toileTitre); });
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

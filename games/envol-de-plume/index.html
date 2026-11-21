@@ -5068,6 +5068,7 @@ window.addEventListener('orientationchange', () => setTimeout(resize, 150));
 const JEU = 'envol-de-plume';
 const NIVEAU_MAX = 999; // au-delà de 50 : ciel sans fin
 const EN_PARTIE = ['play', 'pause', 'arrive', 'dying', 'intro'];
+let apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 function jouer() {
   JEL_SAVE.reprise({
     jeu: JEU,
@@ -5082,7 +5083,7 @@ function jouer() {
   });
 }
 JEL_SAVE.surFermeture(() => {
-  if (EN_PARTIE.includes(G.state)) JEL_SAVE.save(JEU, { niveau: G.level, score: G.startScore });
+  if (!apercu && EN_PARTIE.includes(G.state)) JEL_SAVE.save(JEU, { niveau: G.level, score: G.startScore });
 });
 $('playBtn').addEventListener('click', jouer);
 // « Effacer la sauvegarde » sous le bouton Jouer (caché sans sauvegarde)
@@ -5101,6 +5102,197 @@ $('overMenuBtn').addEventListener('click', showMenu);
 $('muteBtn').addEventListener('click', toggleMute);
 $('pauseMuteBtn').addEventListener('click', toggleMute);
 
+/* ================= Affiche (jaquette du jeu) ================= */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Plume, en grand, bat des
+// ailes sous l'arc-en-ciel et file vers une traînée de graines dorées, entre une grosse montgolfière
+// au premier plan et un avion au loin ; son nid l'attend sur la branche, en bas à droite.
+// Scène pensée en 600 × 800 ; sur un écran plus large, le ciel et les collines continuent jusqu'aux bords.
+function dessinerAffiche() {
+  resize();
+  const c = ctx, k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  const x0 = -ox / k - 20, x1 = (W - ox) / k + 20; // bords réels de l'écran, en unités de l'affiche
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const gr = c.createLinearGradient(0, 0, 0, H);
+  gr.addColorStop(0, '#2f9ef0'); gr.addColorStop(0.5, '#8fd3ff'); gr.addColorStop(1, '#ffe2c4');
+  c.fillStyle = gr; c.fillRect(0, 0, W, H);
+  c.setTransform(DPR * k, 0, 0, DPR * k, DPR * ox, DPR * oy);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // Soleil et ses rayons (la lumière vient d'en haut à droite)
+  const sx = 485, sy = 135;
+  c.save(); c.translate(sx, sy);
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * TAU + 0.1;
+    c.fillStyle = i % 2 ? 'rgba(255,248,200,.16)' : 'rgba(255,248,200,.28)';
+    c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 900, a - 0.11, a + 0.11); c.closePath(); c.fill();
+  }
+  c.restore();
+  glowDot(c, sx, sy, 230, '#fff4b0', 0.9);
+  c.fillStyle = '#ffe98a'; circ(c, sx, sy, 62);
+  c.fillStyle = '#fff8d6'; circ(c, sx - 8, sy - 8, 48);
+  // Nuages du fond
+  softCloud(c, x0 + 40, 95, 1.5, 'rgba(255,255,255,.92)');
+  softCloud(c, 250, 60, 1.05, 'rgba(255,255,255,.85)');
+  softCloud(c, 330, 560, 1.4, 'rgba(255,255,255,.75)');
+  // Grand arc-en-ciel derrière Plume
+  for (let i = 0; i < 6; i++) {
+    c.strokeStyle = css(RAINBOW[i], 0.8); c.lineWidth = 20;
+    c.beginPath(); c.arc(300, 780, 430 - i * 19, Math.PI * 1.02, Math.PI * 1.98); c.stroke();
+  }
+  // Avion au loin (fond), avec sa traînée
+  for (let i = 0; i < 9; i++) { c.fillStyle = 'rgba(255,255,255,' + (0.75 - i * 0.07).toFixed(2) + ')'; circ(c, 382 + i * 18, 186 + Math.sin(i) * 2, 6 + i * 1.3); }
+  drawPlane(c, 330, 190, 0.85, PLANE_COLS[1], 0.3, false);
+  // Petite montgolfière au loin, à droite
+  drawBalloon(c, 548, 452, 38, BALLOON_COLS[3]);
+  // Collines, arbres et moulin
+  const colline = (base, amp, f, ph, col) => {
+    c.fillStyle = col; c.beginPath(); c.moveTo(x0, 820);
+    for (let x = x0; x <= x1; x += 8) c.lineTo(x, base - Math.sin(x * f + ph) * amp - Math.sin(x * f * 2.7 + ph * 1.3) * amp * 0.35);
+    c.lineTo(x1, 820); c.closePath(); c.fill();
+  };
+  const yColline = (x, base, amp, f, ph) => base - Math.sin(x * f + ph) * amp - Math.sin(x * f * 2.7 + ph * 1.3) * amp * 0.35;
+  colline(655, 22, 0.009, 1.2, '#a9d9a8');
+  const mx = 92, my = yColline(mx, 655, 22, 0.009, 1.2) + 4;
+  c.fillStyle = '#f4f6f8'; c.beginPath(); c.moveTo(mx - 7, my); c.lineTo(mx - 3, my - 92); c.lineTo(mx + 3, my - 92); c.lineTo(mx + 7, my); c.closePath(); c.fill();
+  c.strokeStyle = '#f4f6f8'; c.lineWidth = 6;
+  for (let i = 0; i < 3; i++) { const a = 0.4 + (i * TAU) / 3; line(c, mx, my - 92, mx + Math.cos(a) * 46, my - 92 + Math.sin(a) * 46); }
+  c.fillStyle = '#c9cfd8'; circ(c, mx, my - 92, 5);
+  colline(712, 16, 0.012, 3.9, '#7cc48d');
+  for (const [tx, ts] of [[170, 1.6], [260, 1.25], [345, 1.5], [430, 1.2], [x0 + 30, 1.4], [x1 - 40, 1.3]]) {
+    const ty = yColline(tx, 712, 16, 0.012, 3.9) + 6;
+    c.fillStyle = '#4f9a68'; c.fillRect(tx - 3 * ts, ty - 16 * ts, 6 * ts, 16 * ts); circ(c, tx, ty - 22 * ts, 14 * ts);
+    c.fillStyle = 'rgba(255,255,255,.18)'; circ(c, tx + 4 * ts, ty - 26 * ts, 6 * ts);
+  }
+  colline(772, 12, 0.016, 0.5, '#5fae73');
+  // Branche et nid (le but de Plume), en bas à droite
+  c.strokeStyle = '#7a4b25'; c.lineWidth = 22;
+  c.beginPath(); c.moveTo(x1 + 10, 548); c.quadraticCurveTo(560, 575, 470, 612); c.stroke();
+  c.lineWidth = 9; line(c, 520, 588, 545, 625);
+  c.fillStyle = '#4f9a68'; ell(c, 470, 612, 22, 11, -0.4); ell(c, 548, 630, 18, 10, 0.6); ell(c, x1 - 10, 552, 30, 16, 0.2);
+  c.fillStyle = '#f6efe0'; ell(c, 488, 570, 14, 18); c.fillStyle = '#cfe9f7'; ell(c, 516, 568, 14, 18);
+  c.fillStyle = '#8a5a2b'; c.beginPath(); c.moveTo(452, 572); c.quadraticCurveTo(503, 598, 556, 572); c.quadraticCurveTo(550, 612, 503, 614); c.quadraticCurveTo(458, 612, 452, 572); c.closePath(); c.fill();
+  c.strokeStyle = '#b07a3e'; c.lineWidth = 3;
+  for (let i = 0; i < 6; i++) { c.beginPath(); c.moveTo(458 + i * 15, 580 + (i % 2) * 4); c.quadraticCurveTo(470 + i * 15, 600, 486 + i * 13, 586 + (i % 3) * 5); c.stroke(); }
+  // Grosse montgolfière au premier plan, coupée par le bord gauche
+  drawBalloon(c, x0 + 70, 215, 118, BALLOON_COLS[1]);
+  // Traînée de graines dorées que Plume va attraper
+  const graines = [[492, 338], [536, 318], [580, 308], [624, 306], [668, 312]];
+  for (const [gx, gy] of graines) {
+    glowDot(c, gx, gy, 34, '#fff2a8', 0.75);
+    c.save(); c.translate(gx, gy); c.scale(2.6, 2.6); drawSeed(c, 0, 0); c.restore();
+  }
+  c.fillStyle = '#ffffff';
+  for (const [gx, gy, r] of [[512, 300, 7], [560, 350, 5], [604, 282, 6], [474, 372, 4]]) { starPath(c, gx, gy, r, r * 0.4, 0.3); c.fill(); }
+  // Traits de vitesse et plumes qui volent derrière Plume
+  c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 6;
+  for (const [lx, ly, l] of [[70, 462, 70], [86, 500, 95], [110, 536, 62], [60, 428, 40]]) line(c, lx, ly, lx - l, ly + 14);
+  for (const [fx, fy, r, col] of [[96, 540, 0.8, '#ffb627'], [150, 300, -0.5, '#f29a1f'], [60, 330, 1.6, '#ffe3a3']]) {
+    c.save(); c.translate(fx, fy); c.rotate(r); c.fillStyle = col; ell(c, 0, 0, 18, 6.5); c.strokeStyle = 'rgba(217,118,15,.6)'; c.lineWidth = 1.6; line(c, -16, 0, 16, 0); c.restore();
+  }
+  // Plume, en grand : halo clair, contour lumineux, ailes levées en plein battement
+  const px = 272, py = 415, s = 7, tilt = -0.24;
+  glowDot(c, px + 20, py - 20, 240, '#ffffff', 0.5);
+  // L'aile du fond, levée haut derrière le dos
+  const ailes = () => {
+    c.save(); c.translate(px, py); c.rotate(tilt); c.scale(s, s);
+    c.fillStyle = '#e8891c'; ell(c, -16, -14, 15, 6, -0.7);
+    c.fillStyle = 'rgba(255,227,163,.55)'; ell(c, -15, -16, 7, 2.2, -0.7);
+    c.restore();
+  };
+  // Contour lumineux : silhouette éclairée, puis l'oiseau net par-dessus
+  c.save(); c.shadowColor = 'rgba(255,255,235,1)'; c.shadowBlur = 30;
+  ailes(); drawBird(c, px, py, s, tilt, -0.75, false);
+  c.restore();
+  ailes(); drawBird(c, px, py, s, tilt, -0.75, false);
+  // Premier plan : herbes et fleurs dans les coins du bas
+  for (const [fx, f, col] of [[x0 + 40, 1.6, '#ff5d5d'], [x0 + 110, 1.1, '#ffd23f'], [x1 - 60, 1.5, '#8f5bd8'], [x1 - 140, 1.0, '#ff8fc7']]) {
+    c.strokeStyle = '#2f7a34'; c.lineWidth = 5 * f;
+    c.beginPath(); c.moveTo(fx, 820); c.quadraticCurveTo(fx - 12, 790 - 30 * f, fx + 6, 770 - 60 * f); c.stroke();
+    const hx = fx + 6, hy = 770 - 60 * f;
+    c.fillStyle = col;
+    for (let p = 0; p < 6; p++) { const a = p * 1.047; circ(c, hx + Math.cos(a) * 12 * f, hy + Math.sin(a) * 12 * f, 8.5 * f); }
+    c.fillStyle = '#fff3a0'; circ(c, hx, hy, 7.5 * f);
+  }
+}
+function cacherInterfaceAffiche() {
+  for (const el of document.querySelectorAll('#hud, #status, #actions, #toast, .overlay, button, jel-langue, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherInterfaceAffiche();
+  setTimeout(cacherInterfaceAffiche, 300); setTimeout(cacherInterfaceAffiche, 1200);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+  window.addEventListener('orientationchange', () => setTimeout(dessinerAffiche, 200));
+}
+
+/* ================= Images du jeu (page du jeu) ================= */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (cœurs, trajet, score, météo, boutons),
+// sans menu, ni fenêtre « Continuer », ni présentation du niveau (CONSIGNES-JEU.md, section 5).
+// La partie tourne un court instant (pluie, neige, nuages), la scène est posée, puis elle est figée
+// sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = niveau 1 : matin sur la prairie, montgolfières et graines ;
+//   2 = niveau 17 : neige dans les montagnes, l'aigle, l'hélicoptère, une boule de neige lancée ;
+//   3 = niveau 50 : le vaisseau-mère dans l'espace, ses orbes, les mini-ovnis, un cristal et le rayon.
+function ouvrirApercu(numero) {
+  apercu = numero; muted = true; // aucun son (rien n'est enregistré)
+  let graine = 2468013 + numero * 7919; // hasard fixe : la même image à chaque capture
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let q = Math.imul(graine ^ (graine >>> 15), 1 | graine); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+  resize(); bgInit();
+  const niveau = numero === 1 ? 1 : numero === 2 ? 17 : 50;
+  G.score = 0; prepareLevel(niveau);
+  G.state = 'play'; show(null); setHud(true);
+  const P = playH(), Y = (f) => TOP + P * f, X = (f) => VW * f;
+  const by = Y(numero === 3 ? 0.56 : 0.46);
+  G.t = numero === 1 ? 13 : numero === 2 ? 12 : 30;
+  G.spawnT = G.itemT = G.bonusT = G.wItemT = G.letterT = G.crystalT = G.hailT = G.thermT = 999;
+  G.ammoTold = true;
+  const boss = bossObj(); if (boss) { boss.st = 'fight'; boss.atkT = 999; boss.x = X(0.7); }
+  // La partie tourne un court instant (décor, pluie de neige, étoiles), Plume tenu en place.
+  for (let i = 0; i < 30; i++) { bird.inv = 9; bird.y = by; bird.vy = -150; update(1 / 60); }
+  G.objs = G.objs.filter((o) => o.kind === 'boss'); G.items = []; G.parts = []; G.floats = []; G.shots = [];
+  bird.y = by; bird.vy = -170; bird.flapT = 0.08; bird.wing = -Math.PI / 2; bird.inv = 0; bird.shield = 0;
+  const graines = (x, y, n, arc) => { for (let i = 0; i < n; i++) G.items.push({ k: 'seed', x: x + i * 32, y: y - Math.sin((i / (n - 1)) * Math.PI) * arc, ph: i * 0.5 }); };
+  if (numero === 1) {
+    G.lives = 3; G.score = 180; G.seeds = 9;
+    add({ kind: 'balloon', x: X(0.66), y: Y(0.24), by: Y(0.24), cy: Y(0.24), r: 44, ph: 0, amp: 0, drift: 0, col: BALLOON_COLS[1] });
+    add({ kind: 'balloon', x: X(0.9), y: Y(0.58), by: Y(0.58), cy: Y(0.58), r: 40, ph: 0, amp: 0, drift: 0, col: BALLOON_COLS[3] });
+    add({ kind: 'balloon', x: X(0.42), y: Y(0.76), by: Y(0.76), cy: Y(0.76), r: 36, ph: 0, amp: 0, drift: 0, col: BALLOON_COLS[0] });
+    graines(bird.x + 70, by - 10, 6, 46);
+    sparks(bird.x + 40, by - 6, '#ffd23f', 5);
+  } else if (numero === 2) {
+    G.lives = 2; G.hits = 1; G.score = 3150; G.seeds = 14;
+    G.ammo = 3; G.ammoKind = 'flake'; G.dashCharge = 0.75;
+    add({ kind: 'eagle', x: X(0.72), y: Y(0.2), y0: Y(0.2), cy: Y(0.2), st: 'soar', ph: 1.3 });
+    add({ kind: 'heli', x: X(0.74), y: Y(0.5), by: Y(0.5), cy: Y(0.5), amp: 0, f: 0, ph: 0, col: HELI_COLS[0] });
+    add({ kind: 'party', x: X(0.44), y: Y(0.78), cy: -999, vy: 0, ph: 0.5, bs: [[0, 0], [-15, -9], [15, -8], [-6, -25]].map(([dx, dy], i) => ({ dx, dy, col: PARTY_COLS[i], alive: true })) });
+    G.items.push({ k: 'flake', x: X(0.46), y: Y(0.3), ph: 0.4 }, { k: 'flake', x: X(0.9), y: Y(0.36), ph: 1.1 });
+    graines(X(0.5), Y(0.64), 5, 30);
+    G.shots.push({ k: 'snow', x: bird.x + 120, y: by - 4, vx: 540, vy: -20, life: 2, rot: 0.6 });
+    for (let i = 0; i < 4; i++) G.parts.push({ k: 'puff', x: bird.x + 60 + i * 14, y: by - 2 + i, r: 3 + i * 0.6, vx: 0, vy: 0, life: 0.5, max: 0.7, col: '#ffffff' });
+  } else {
+    G.lives = 2; G.hits = 1; G.score = 48200; G.seeds = 21;
+    G.ammo = 2; G.ammoKind = 'dust'; G.dashCharge = 1;
+    if (boss) { boss.x = X(0.66); boss.y = TOP + 82; boss.hp = 5; boss.flashT = 0; boss.t = 2; }
+    const bx = X(0.66) - 60, bY = TOP + 102;
+    for (const [i, f] of [[-1, 0.42], [0, 0.55], [1, 0.68]]) {
+      const ang = Math.atan2(by - bY, bird.x - bx) + i * 0.22;
+      add({ kind: 'orb', x: bx + Math.cos(ang) * 300 * f, y: bY + Math.sin(ang) * 300 * f, cy: -999, vx: 0, vy: 0 });
+    }
+    add({ kind: 'miniufo', x: X(0.58), y: Y(0.5), by: Y(0.5), cy: -999, ph: 0 });
+    add({ kind: 'miniufo', x: X(0.84), y: Y(0.7), by: Y(0.7), cy: -999, ph: 1 });
+    G.items.push({ k: 'crystal', x: X(0.42), y: Y(0.78), ph: 0 }, { k: 'dust', x: X(0.9), y: Y(0.4), ph: 0.5 });
+    G.shots.push({ k: 'ray', x: bird.x + 70, y: by - 70, vx: 0, vy: 0, life: 5 }, { k: 'star', x: bird.x + 150, y: by + 4, vx: 540, vy: 0, life: 2, rot: 0.4 });
+    sparks(bird.x + 70, by - 70, '#7ee0ff', 6);
+  }
+  // Puis la partie est figée sur ce moment, avec la vraie interface et sans fenêtre de pause.
+  els.score.textContent = G.score;
+  for (const key in actCache) delete actCache[key];
+  updateHearts(); updateProgress(); updateStatus(); updateActions();
+  els.toast.hidden = true; G.toastT = 0; G.flash = 0; G.red = 0; G.shake = 0;
+  G.paused = 'play'; G.state = 'pause';
+}
+
 /* ================= Démarrage ================= */
 let last = 0;
 function loop(now) {
@@ -5115,6 +5307,9 @@ function loop(now) {
 function start(data) {
   G.def = levelDef(1);
   resize();
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) { ouvrirApercu(numeroApercu); requestAnimationFrame(loop); return; }
   if (data && data.inGame && data.level) { G.score = data.score || 0; prepareLevel(data.level); showIntro(); }
   else showMenu();
   requestAnimationFrame(loop);

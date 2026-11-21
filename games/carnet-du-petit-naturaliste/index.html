@@ -4419,20 +4419,240 @@
 
   // Sauvegarde à la fermeture de la page, seulement pendant une balade.
   JEL_SAVE.surFermeture(() => {
+    if (apercu || affiche) return; // images de la page et affiche : rien n'est enregistré
     if (partie && ecran === 'jeu' && partie.mode !== 'fin') JEL_SAVE.save(JEU, Object.assign(donneesProgres(), { niveau: partie.n + 1, score: partie.score }));
     garderLocal();
   });
 
   /* ------------------------------------------------------------------------
+     Affiche (jaquette du jeu)
+     Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+     sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Dans la forêt
+     ensoleillée, un renard curieux, en grand, regarde la loupe géante qui vient de révéler son
+     empreinte dans la boue du sentier ; la piste mène jusqu'à lui, un geai observe depuis sa branche,
+     une plume flotte et un buisson chante.
+     ------------------------------------------------------------------------ */
+  let affiche = false;
+  let apercu = 0;
+  // Renard assis entier (la tête est celle des autocollants du jeu), repère : tête en (0, 0).
+  function renardEntier(c, x, y, s, incl) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    E(c, 14, 152, 96, 15, 'rgba(40,60,20,0.32)');
+    // Queue touffue qui remonte sur le côté, bout blanc.
+    E(c, 66, 118, 74, 27, '#d9661f', -0.55); E(c, 58, 124, 56, 15, '#e8772a', -0.55);
+    E(c, 124, 80, 21, 15, '#fff4e6', -0.55);
+    // Corps, poitrail, cuisse
+    E(c, 0, 86, 46, 62, '#e8772a');
+    E(c, 30, 120, 28, 30, '#d9661f');
+    E(c, 0, 76, 25, 44, '#fff4e6');
+    // Pattes avant aux chaussettes sombres
+    for (const sx of [-1, 1]) {
+      P(c, [sx * 8, 100, sx * 23, 100, sx * 23, 148, sx * 8, 148], '#e8772a');
+      P(c, [sx * 8, 126, sx * 23, 126, sx * 23, 148, sx * 8, 148], '#3a2418');
+      E(c, sx * 15.5, 149, 11, 5.5, '#3a2418');
+    }
+    // Tête, penchée vers la loupe, joues roses
+    c.save(); c.rotate(incl || 0);
+    DESSINS.renard(c);
+    E(c, -25, 10, 7, 4.5, 'rgba(255,130,130,0.55)'); E(c, 25, 10, 7, 4.5, 'rgba(255,130,130,0.55)');
+    C(c, -16, -8, 1.2, '#fff'); C(c, 12, -8, 1.2, '#fff');
+    c.restore();
+    c.restore();
+  }
+  function papillon(c, x, y, s, col, ouv) {
+    c.save(); c.translate(x, y); c.scale(s * Math.max(0.25, ouv), s);
+    E(c, -8, -5, 9, 7, col, 0.4); E(c, 8, -5, 9, 7, col, -0.4); E(c, -6, 6, 6, 5, col, -0.3); E(c, 6, 6, 6, 5, col, 0.3);
+    C(c, -8, -5, 2.5, 'rgba(255,255,255,0.7)'); C(c, 8, -5, 2.5, 'rgba(255,255,255,0.7)');
+    c.restore();
+    L(c, [x, y - 7 * s, x, y + 8 * s], '#3a2a1a', 2.5 * s);
+  }
+  function fougere(c, x, y, s, a, col) {
+    c.save(); c.translate(x, y); c.rotate(a); c.scale(s, s);
+    L(c, [0, 0, 0, -200], col, 6);
+    for (let i = 0; i < 12; i++) {
+      const yy = -14 - i * 15, lg = 62 - i * 4.4;
+      E(c, -lg * 0.5, yy, lg * 0.5, 7, col, 0.35); E(c, lg * 0.5, yy, lg * 0.5, 7, col, -0.35);
+    }
+    c.restore();
+  }
+  function dessinerAffiche() {
+    redimensionner();
+    const c = ctx;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    c.clearRect(0, 0, W, H);
+    fxc.clearRect(0, 0, W, H);
+    solCourant = 'foret';
+    // Décor de la forêt du jeu, sur tout l'écran.
+    dessinerFond(c, W, H, 'foret', false, 23);
+    const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    // Grand soleil et rayons, en haut à droite.
+    const sx = W * 0.82, sy = H * 0.1; // le soleil du décor de la forêt
+    const halo = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 520 * k);
+    halo.addColorStop(0, 'rgba(255,252,215,0.98)'); halo.addColorStop(0.3, 'rgba(255,240,170,0.55)'); halo.addColorStop(1, 'rgba(255,240,170,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    c.save(); c.globalAlpha = 0.22;
+    for (let i = 0; i < 9; i++) {
+      const a = 1.75 + i * 0.13;
+      c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + Math.cos(a - 0.03) * 900 * k, sy + Math.sin(a - 0.03) * 900 * k); c.lineTo(sx + Math.cos(a + 0.03) * 900 * k, sy + Math.sin(a + 0.03) * 900 * k); c.closePath();
+      c.fillStyle = '#fff8d0'; c.fill();
+    }
+    c.restore();
+    C(c, sx, sy, 46 * k, '#fff3a8'); C(c, sx, sy, 36 * k, '#fffbe0');
+
+    c.save(); c.translate(ox, oy); c.scale(k, k);
+    // Buisson qui chante, à droite, au fond.
+    dessiner(c, 'c_mesange', 548, 372, 150, 0.6, false);
+    // Branche en haut à gauche, avec un geai qui observe la scène.
+    c.save();
+    Qd(c, -700, 190, 60, 110, 230, 168, '#6b4a2b', 20);
+    Qd(c, 120, 130, 160, 100, 200, 70, '#6b4a2b', 9);
+    for (const [fx, fy, r] of [[-10, 120, 0.4], [40, 150, 2.6], [150, 98, -0.6], [205, 70, 0.2], [230, 175, 2.2], [90, 145, 2.9]]) { c.save(); c.translate(fx, fy); c.rotate(r); c.scale(0.95, 0.95); DESSINS.f_chene(c); c.restore(); }
+    c.save(); c.translate(132, 94); c.scale(1.35, 1.35); DESSINS.geai(c); c.restore();
+    c.restore();
+    // Lumière chaude derrière le renard
+    const lum = c.createRadialGradient(410, 300, 20, 410, 300, 230);
+    lum.addColorStop(0, 'rgba(255,248,205,0.9)'); lum.addColorStop(1, 'rgba(255,248,205,0)');
+    c.fillStyle = lum; c.fillRect(150, 60, 520, 500);
+    // Piste d'empreintes pâles qui mène de la loupe au renard.
+    for (const [px, py, t, r] of [[318, 560, 48, -0.9], [352, 530, 42, -0.7], [300, 600, 52, -1.0]]) { c.save(); c.globalAlpha = 0.55; c.translate(px, py); c.rotate(r); dessiner(c, 'e_renard', 0, 0, t); c.restore(); }
+    // Le renard, en grand, avec un contour lumineux.
+    c.save(); c.shadowColor = 'rgba(255,246,200,0.95)'; c.shadowBlur = 26 * k * DPR;
+    renardEntier(c, 410, 238, 1.95, -0.16);
+    c.restore();
+    renardEntier(c, 410, 238, 1.95, -0.16);
+    // Papillons et plume du geai qui flottent
+    papillon(c, 262, 248, 1.6, '#f8a838', 0.7);
+    papillon(c, 560, 250, 1.3, '#7ac0f0', 0.45);
+    papillon(c, 230, 330, 1.1, '#f6a8c8', 0.9);
+    c.save(); c.translate(84, 300); c.rotate(-0.5); dessiner(c, 'p_geai', 0, 0, 130); c.restore();
+    // Loupe géante : l'empreinte du renard, nette et grossie, dans la boue du sentier.
+    const lx = 190, ly = 480, lr = 118;
+    c.save(); c.beginPath(); c.arc(lx, ly, lr, 0, TAU); c.clip();
+    const gb = c.createRadialGradient(lx - 30, ly - 30, 10, lx, ly, lr);
+    gb.addColorStop(0, '#e2c08a'); gb.addColorStop(1, '#b88a52');
+    c.fillStyle = gb; c.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
+    for (let i = 0; i < 14; i++) { const a = i * 2.4, d = 30 + (i * 37) % 80; E(c, lx + Math.cos(a) * d, ly + Math.sin(a) * d, 6 + (i % 3) * 3, 4 + (i % 2) * 2, 'rgba(120,86,50,0.35)'); }
+    for (let i = 0; i < 6; i++) touffe(c, lx - 110 + i * 42, ly + 100 + (i % 2) * 8, 3, '#5e9a3a');
+    c.save(); c.translate(lx + 4, ly - 6); c.rotate(-0.35); dessiner(c, 'e_renard', 0, 0, 175); c.restore();
+    c.fillStyle = 'rgba(210,240,255,0.12)'; c.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
+    c.restore();
+    // Manche, qui sort par le coin en bas à gauche
+    L(c, [lx - lr * 0.7, ly + lr * 0.7, lx - lr * 5, ly + lr * 5], '#5a3a1a', 34);
+    L(c, [lx - lr * 0.78, ly + lr * 0.66, lx - lr * 5, ly + lr * 4.88], 'rgba(255,220,170,0.35)', 6);
+    c.lineWidth = 18; c.strokeStyle = '#8a5a2a'; c.beginPath(); c.arc(lx, ly, lr, 0, TAU); c.stroke();
+    c.lineWidth = 4; c.strokeStyle = '#d8a24a'; c.beginPath(); c.arc(lx, ly, lr - 7, 0, TAU); c.stroke();
+    c.lineWidth = 9; c.strokeStyle = 'rgba(255,255,255,0.75)'; c.lineCap = 'round'; c.beginPath(); c.arc(lx, ly, lr - 22, -2.7, -1.75); c.stroke();
+    // Anneau doré de mise au point, presque plein
+    c.save(); c.shadowColor = '#ffe27a'; c.shadowBlur = 18 * k * DPR;
+    c.strokeStyle = '#f2c84b'; c.lineWidth = 12; c.lineCap = 'round';
+    c.beginPath(); c.arc(lx, ly, lr + 18, -Math.PI / 2, -Math.PI / 2 + TAU * 0.78); c.stroke();
+    c.restore();
+    for (const [ex, ey, es] of [[lx + 128, ly - 92, 16], [lx - 120, ly - 100, 12], [lx + 150, ly + 20, 10], [lx + 30, ly - 150, 13]]) etincelle(c, ex, ey, es, 1);
+    // Gland et feuille d'érable au bord du sentier
+    c.save(); c.translate(352, 640); c.rotate(0.3); dessiner(c, 'x_gland', 0, 0, 62); c.restore();
+    c.save(); c.translate(420, 660); c.rotate(-0.4); dessiner(c, 'f_erable', 0, 0, 80); c.restore();
+    c.restore();
+
+    // Premier plan, collé aux bords de l'écran : grandes fougères et champignon.
+    fougere(c, W + 10 * k, H + 20 * k, 1.9 * k, -0.55, '#3f7a30');
+    fougere(c, W - 30 * k, H + 30 * k, 1.5 * k, -0.25, '#4f9a3c');
+    fougere(c, -20 * k, H + 30 * k, 1.4 * k, 0.5, '#3a7030');
+    dessiner(c, 's_champignon', W - 150 * k, H - 120 * k, 120 * k);
+  }
+  function cacherInterface() {
+    for (const el of document.querySelectorAll('.ecran, .voile, #hud, #bas, #toast, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    affiche = true;
+    afficherEcran('affiche');
+    cacherInterface();
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+    // Le bouton de langue peut être créé après ce script : on le cache encore un peu après.
+    setTimeout(cacherInterface, 50); setTimeout(cacherInterface, 400); setTimeout(cacherInterface, 1200);
+  }
+
+  /* ------------------------------------------------------------------------
+     Images du jeu (page du jeu)
+     Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+     s'ouvre directement en pleine balade, avec sa vraie interface (balade, indices, feuilles de vie,
+     consigne, plateau, jauge), sans écran titre, ni fenêtre « Continuer », ni explication
+     (CONSIGNES-JEU.md, section 5). La scène est posée (hasard à graine fixe), la loupe est placée sur
+     un indice, l'anneau de mise au point se remplit, puis la balade est figée sans fenêtre de pause :
+     ni question, ni victoire, ni défaite, ni son, ni sauvegarde.
+       1 = balade 1 : la forêt, empreintes visibles, un indice déjà trouvé ;
+       2 = balade 9 : la mare, indices pâles, une plume qui vole, un buisson qui chante, la moitié
+           d'une question à deux indices sur le plateau ;
+       3 = balade 18 : le bord de mer, la marée qui monte (jauge), un nuage à reconnaître, les
+           jumelles qui font scintiller les indices.
+     ------------------------------------------------------------------------ */
+  const SCENES_APERCU = {
+    1: { n: 0, vies: 3, finies: 1, focus: 0.45, objets: [] },
+    2: { n: 8, vies: 2, finies: 1, double: true, focus: 0.55, objets: ['sac'] },
+    3: { n: 17, vies: 2, finies: 1, maree: 0.24, jumelles: true, focus: 0.35, objets: ['sac', 'jumelles', 'chapeau'] }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    Math.random = graine(424242 + numero * 7919); // la même image à chaque capture
+    // Progression neuve, en mémoire seulement : sans son, explications et chants déjà vus.
+    progres.son = false;
+    progres.debloque = sc.n + 1;
+    progres.objets = sc.objets.slice();
+    progres.vus = [];
+    NIVEAUX.forEach((d) => (d.intro || []).forEach((cle) => { if (!progres.vus.includes(cle)) progres.vus.push(cle); }));
+    progres.chants = Object.keys(CHANTS_SONS);
+    majBoutonsSon();
+    lancerNiveau(sc.n);
+    const p = partie;
+    clearTimeout(toastMinuteur); $('toast').hidden = true;
+    p.mode = 'recherche';
+    p.temps = sc.maree ? sc.maree * p.def.maree : 7;
+    p.dernierTrouve = p.temps - 3;
+    if (sc.maree) p.maree = sc.maree;
+    p.objets.forEach((o) => positionObjet(o, p.temps));
+    const auSol = (o) => { const ty = INDICES[o.id].type; return ty !== 'chant' && ty !== 'nuage' && !o.mobile; };
+    const finir = (t) => { t.fini = true; t.objets.forEach((o) => { o.trouve = true; }); p.score += 100; p.bonnes++; };
+    // Marée : les indices déjà sous la mer ont été trouvés avant.
+    if (sc.maree) { const yMer = ligneMaree(); p.taches.forEach((t) => { if (t.objets.some((o) => auSol(o) && o.py - o.taille * 0.2 < yMer + 10)) finir(t); }); }
+    let aFinir = sc.finies - p.taches.filter((t) => t.fini).length;
+    for (const t of p.taches) { if (aFinir <= 0) break; if (!t.fini && t.genre === 'simple' && t.objets.every(auSol)) { finir(t); aFinir--; } }
+    // Question à deux indices : le premier est déjà posé sur le plateau.
+    if (sc.double) { const d = p.taches.find((t) => t.genre === 'double' && !t.fini); if (d) { d.objets[0].trouve = true; p.plateau.push(d.objets[0].id); } }
+    p.vies = sc.vies; p.erreurs = VIES - sc.vies;
+    // La loupe sur un indice encore caché, près du centre, l'anneau doré en train de se remplir.
+    const cands = objetsActifs().filter(auSol);
+    cands.sort((a, b) => Math.hypot(a.px - W * 0.5, a.py - H * 0.62) - Math.hypot(b.px - W * 0.5, b.py - H * 0.62));
+    const cible = cands[0];
+    if (cible) { p.loupe.x = cible.px + 8; p.loupe.y = cible.py - 6; p.focus = cible; p.focusT = sc.focus * 0.6; }
+    if (sc.jumelles) { p.jumellesUtilisees = true; p.jumelles = 2; }
+    majHud(); majPlateau();
+    // Figée sur ce moment, sans fenêtre de pause.
+    p.pause = true;
+  }
+
+  /* ------------------------------------------------------------------------
      Démarrage
      ------------------------------------------------------------------------ */
-  chargerProgres();
-  redimensionner();
-  majBoutonsSon();
-  $('q-aide-icone').outerHTML = '<span id="q-aide-icone"></span>';
-  $('q-aide-icone').appendChild(icone('sac', 26));
-  afficherEcran('titre');
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) {
+    redimensionner();
+    demarrerAffiche();
+  } else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    redimensionner();
+    $('q-aide-icone').outerHTML = '<span id="q-aide-icone"></span>';
+    $('q-aide-icone').appendChild(icone('sac', 26));
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    chargerProgres();
+    redimensionner();
+    majBoutonsSon();
+    $('q-aide-icone').outerHTML = '<span id="q-aide-icone"></span>';
+    $('q-aide-icone').appendChild(icone('sac', 26));
+    afficherEcran('titre');
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

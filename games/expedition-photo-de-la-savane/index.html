@@ -5133,6 +5133,210 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  //  Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) :
+  //  une scène composée, sans interface ni texte, d'où sort la jaquette
+  //  (CONSIGNES-JEU.md, section 5). La jeep bleue fonce sur la piste au
+  //  coucher du soleil ; le flash de son appareil photographie un lion au
+  //  cadre doré, la photo s'envole ; girafe, zèbre et éléphant attendent.
+  // ---------------------------------------------------------------------
+
+  let modeAffiche = false;
+  let modeApercu = 0;          // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU)
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Composition dans une boîte de 600 × 800 centrée ; ciel et sol vont jusqu'aux bords.
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+    const hz = Y(400);
+    // Ciel du couchant
+    let g = c.createLinearGradient(0, 0, 0, hz);
+    g.addColorStop(0, '#ff9a64'); g.addColorStop(0.5, '#ffc872'); g.addColorStop(1, '#fff0b4');
+    c.fillStyle = g; c.fillRect(0, 0, w, hz + 2);
+    // Grand soleil derrière le lion : la vraie source de lumière
+    const sx = X(420), sy = Y(300);
+    g = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 330 * k);
+    g.addColorStop(0, 'rgba(255,252,220,1)'); g.addColorStop(0.35, 'rgba(255,240,180,.7)'); g.addColorStop(1, 'rgba(255,220,150,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,244,196,.8)'; rond(c, sx, sy, 135 * k); c.fill();
+    // Oiseaux
+    c.strokeStyle = '#8a3f2a'; c.lineWidth = 3 * k; c.lineCap = 'round';
+    [[90, 120, 1], [130, 100, 0.8], [520, 70, 0.9], [555, 95, 0.7]].forEach((p) => {
+      const bx = X(p[0]), by = Y(p[1]), q = 12 * k * p[2];
+      c.beginPath(); c.moveTo(bx - q, by); c.quadraticCurveTo(bx - q * 0.5, by - q * 0.6, bx, by); c.quadraticCurveTo(bx + q * 0.5, by - q * 0.6, bx + q, by); c.stroke();
+    });
+    // Collines lointaines, acacias
+    c.fillStyle = '#e39a58';
+    c.beginPath(); c.moveTo(0, hz + 10 * k);
+    c.bezierCurveTo(X(100), hz - 60 * k, X(220), hz - 10 * k, X(330), hz - 34 * k);
+    c.bezierCurveTo(X(450), hz - 70 * k, X(540), hz - 20 * k, w, hz - 30 * k);
+    c.lineTo(w, hz + 40 * k); c.lineTo(0, hz + 40 * k); c.fill();
+    acacia(c, X(70), hz + 6 * k, 120 * k, '#8a4a2a');
+    acacia(c, X(585), hz + 4 * k, 80 * k, '#9a5a32');
+    acacia(c, X(-40), hz + 30 * k, 190 * k, '#6a3a22');
+    // Sol de la savane
+    g = c.createLinearGradient(0, hz, 0, h);
+    g.addColorStop(0, '#f0c260'); g.addColorStop(1, '#cf9334');
+    c.fillStyle = g; c.fillRect(0, hz + 20 * k, w, h);
+    const al = graineHasard(21);
+    c.strokeStyle = '#a8742a'; c.lineWidth = 2.4 * k;
+    for (let i = 0; i < 160; i++) {
+      const x = al() * w, y = hz + 30 * k + al() * (h - hz);
+      const q = (0.6 + (y - hz) / (h - hz)) * 9 * k;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x - q * 0.35, y - q); c.moveTo(x + q * 0.2, y); c.lineTo(x + q * 0.55, y - q * 0.9); c.stroke();
+    }
+    // La piste de terre posée par la jeep, du bas de l'image jusqu'à elle
+    const piste = () => { c.beginPath(); c.moveTo(X(130), h + 20 * k); c.bezierCurveTo(X(170), Y(700), X(200), Y(620), X(250), Y(540)); };
+    c.lineCap = 'round';
+    c.strokeStyle = '#b48a52'; c.lineWidth = 120 * k; piste(); c.stroke();
+    c.strokeStyle = '#ecd8a8'; c.lineWidth = 92 * k; piste(); c.stroke();
+    c.strokeStyle = COUL[0]; c.globalAlpha = 0.55; c.lineWidth = 5 * k; c.setLineDash([18 * k, 16 * k]); piste(); c.stroke();
+    c.setLineDash([]); c.globalAlpha = 1;
+    // Animaux du fond : éléphant et girafe, puis un zèbre au premier plan
+    pion(c, 'E', X(78), Y(345), 48 * k, {});
+    pion(c, 'G', X(560), Y(418), 50 * k, {});
+    const lx = X(430), ly = Y(250), lr = 104 * k;
+    const jx = X(285), jy = Y(470), ja = 0.42;
+    // Poussière soulevée derrière la jeep
+    c.fillStyle = 'rgba(255,238,200,.75)';
+    [[-70, 175, 34], [-30, 205, 28], [-110, 205, 26], [-80, 240, 22], [10, 230, 20]].forEach((p) => {
+      const x = jx + (p[0] * Math.cos(ja) - p[1] * Math.sin(ja)) * k * 0.5, y = jy + (p[0] * Math.sin(ja) + p[1] * Math.cos(ja)) * k * 0.9;
+      rond(c, x, y, p[2] * k); c.fill();
+    });
+    // Rayon lumineux de l'appareil, de la jeep jusqu'au lion
+    g = c.createLinearGradient(jx, jy, lx, ly);
+    g.addColorStop(0, 'rgba(255,255,230,0)'); g.addColorStop(0.4, 'rgba(255,255,230,.3)'); g.addColorStop(1, 'rgba(255,255,255,.55)');
+    c.fillStyle = g;
+    const an = Math.atan2(ly - jy, lx - jx), nx = -Math.sin(an), ny = Math.cos(an);
+    c.beginPath();
+    c.moveTo(jx + nx * 18 * k, jy + ny * 18 * k); c.lineTo(lx + nx * 80 * k, ly + ny * 80 * k);
+    c.lineTo(lx - nx * 80 * k, ly - ny * 80 * k); c.lineTo(jx - nx * 18 * k, jy - ny * 18 * k); c.closePath(); c.fill();
+    // Flash de l'appareil sur le lion
+    g = c.createRadialGradient(lx, ly, lr * 0.6, lx, ly, lr * 2.3);
+    g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(0.5, 'rgba(255,250,215,.45)'); g.addColorStop(1, 'rgba(255,250,215,0)');
+    c.fillStyle = g; rond(c, lx, ly, lr * 2.3); c.fill();
+    c.strokeStyle = '#ffffff'; c.lineCap = 'round';
+    for (let i = 0; i < 12; i++) {
+      const a = i * Math.PI / 6 + 0.13, l1 = lr * 1.22, l2 = lr * (i % 2 ? 1.62 : 1.9);
+      c.lineWidth = (i % 2 ? 5 : 8) * k;
+      c.beginPath(); c.moveTo(lx + Math.cos(a) * l1, ly + Math.sin(a) * l1); c.lineTo(lx + Math.cos(a) * l2, ly + Math.sin(a) * l2); c.stroke();
+    }
+    // Le lion au cadre doré (animal rare), en grand
+    pion(c, 'L', lx, ly, lr, { t: 1300 });
+    // Étincelles dorées autour de la photo rare
+    [[-1.4, 1.5, 22], [-0.4, 1.75, 16], [0.7, 1.6, 20], [2.3, 1.5, 15], [3.3, 1.7, 18], [1.6, 1.45, 12]].forEach((p, i) => {
+      c.fillStyle = i % 2 ? '#fff' : '#ffd84d'; c.shadowColor = '#ffc21a'; c.shadowBlur = 14 * k;
+      etincelle(c, lx + Math.cos(p[0]) * lr * p[1], ly + Math.sin(p[0]) * lr * p[1], p[2] * k);
+    });
+    c.shadowBlur = 0;
+    // La jeep bleue de l'expédition, en grand, qui fonce vers le lion
+    c.save(); c.shadowColor = 'rgba(255,255,255,.9)'; c.shadowBlur = 20 * k;
+    jeep(c, jx, jy, 400 * k, ja, 0, 'zebre');
+    c.restore();
+    jeep(c, jx, jy, 400 * k, ja, 0, 'zebre');
+    // Petit appareil photo sur le capot, qui lance son flash
+    c.save(); c.translate(jx, jy); c.rotate(ja);
+    appareil(c, 0, -128 * k, 26 * k, '#1b2f6a');
+    c.fillStyle = '#fffbe0'; c.shadowColor = '#fff'; c.shadowBlur = 18 * k; etincelle(c, 0, -160 * k, 22 * k); c.shadowBlur = 0;
+    c.restore();
+    // La photo du lion qui vient de sortir et s'envole
+    photoTitre(c, 'L', X(118), Y(175), 150 * k, -0.24);
+    c.fillStyle = '#ffd84d'; etincelle(c, X(190), Y(110), 16 * k); etincelle(c, X(52), Y(260), 12 * k);
+    // Zèbre au premier plan, coupé par le bord droit
+    pion(c, 'z', X(560), Y(560), 78 * k, {});
+    // Premier plan : grandes herbes dans les coins du bas
+    [[X(20), 1.6], [X(70), 1.2], [X(470), 1.1], [X(590), 1.7], [X(540), 1.3]].forEach((p, i) => {
+      const fx = p[0], f = p[1];
+      c.strokeStyle = i % 2 ? '#7a4e14' : '#9a6a1e'; c.lineWidth = 7 * k * f; c.lineCap = 'round';
+      for (let b = -1; b <= 1; b++) {
+        c.beginPath(); c.moveTo(fx + b * 10 * k, h + 6 * k);
+        c.quadraticCurveTo(fx + b * 18 * k, h - 70 * k * f, fx + b * 40 * k + 8 * k, h - 120 * k * f); c.stroke();
+      }
+    });
+  }
+
+  function demarrerAffiche() {
+    modeAffiche = true;
+    ecran = 'affiche';
+    const cacher = () => {
+      for (const el of document.querySelectorAll('.ecran, .voile, #toast, #confettis, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+      $('fond').style.setProperty('display', 'block', 'important');
+    };
+    cacher();
+    dessinerAffiche();
+    // Le bouton de langue peut être créé après ce script : on le recache un peu plus tard.
+    setTimeout(cacher, 50); setTimeout(cacher, 400); setTimeout(cacher, 1200);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  //  Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais
+  //  par le jeu) : une vraie partie solo contre les 3 robots, avec sa vraie
+  //  interface (places et points, niveau, tour, main de tuiles), sans écran
+  //  titre, ni fenêtre « Continuer », ni tutoriel. Les coups sont joués
+  //  d'avance par les règles (hasard à graine fixe), puis la partie est figée
+  //  au moment où c'est à toi de jouer : ni robot, ni réseau, ni son, ni
+  //  sauvegarde, ni FMG.
+  //    1 = niveau 1, la plaine : premières photos ;
+  //    2 = niveau 8, le marais : rivières, gué, flamants et hippopotames ;
+  //    3 = niveau 20, la forêt la nuit : yeux qui brillent, jumelles, léopard.
+  // ---------------------------------------------------------------------
+
+  const SCENES_APERCU = {
+    1: { niveau: 1, coups: 12, graine: 44, peinture: 'sable' },
+    2: { niveau: 8, coups: 16, graine: 324, peinture: 'girafe' },
+    3: { niveau: 20, coups: 16, graine: 368, peinture: 'leopard' }
+  };
+
+  function ouvrirApercu(numero) {
+    modeApercu = numero;
+    const sc = SCENES_APERCU[numero];
+    prog.options.son = false;
+    prog.options.peinture = sc.peinture;
+    const alea = graineHasard(sc.graine);
+    const e = O.preparer(NIVEAUX[sc.niveau - 1], PLACES, alea, sc.niveau - 1);
+    e.fr = O.forceNiveau(sc.niveau);
+    let photo = null;
+    for (let i = 0; i < sc.coups; i++) {
+      const s = e.tour, fr = e.fr;
+      e.fr = s === 0 ? 0.95 : fr;               // ta jeep joue bien
+      const k = R.bot(e, s, alea);
+      e.fr = fr;
+      R.jouer(e, s, k, alea);
+      if (s === 0 && e.der && e.der.p >= 0) photo = e.der.p;
+    }
+    session = 'solo';
+    niveau = sc.niveau;
+    enPartie = false;                           // rien n'est écrit à la fermeture
+    vue = e;
+    // Partie figée : c'est à toi de jouer, mais rien ne bouge (pas de moteur, pas de robot).
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 0, chef: -1,
+      monTour: () => true, estChef: () => false, jouer: () => false, pause: () => {}, quitter: () => {},
+      sieges: () => [{ humain: true, moi: true }, { humain: false }, { humain: false }, { humain: false }]
+    };
+    // La tuile que ta jeep s'apprête à jouer est mise en avant.
+    const fr = e.fr; e.fr = 0.95;
+    const prochaine = R.bot(e, 0, graineHasard(sc.graine + 1));
+    e.fr = fr;
+    choix = prochaine < 3 ? prochaine : -1;
+    // La photo que tu viens de prendre, encore affichée au-dessus de l'animal.
+    const t = performance.now();
+    if (photo !== null) {
+      const a = e.a[photo], val = ESP[a.s].v, longue = 1e9;
+      effets.push({ genre: 'texte', texte: tr('photo.prise', { animal: nomEsp(a.s), n: val }), r: a.r, c: a.c, t0: t - longue * 0.12, duree: longue, coul: val === 3 ? '#ffd84d' : '#fff', gros: val === 3 });
+      if (val === 3) effets.push({ genre: 'etoiles', r: a.r, c: a.c, t0: t - longue * 0.35, duree: longue });
+    }
+    afficherEcran('jeu');
+    majInterface();
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5166,7 +5370,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !modeApercu && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -5174,17 +5378,28 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? vue.sc[partie.siege] : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran === 'titre') dessinerTitre(); });
+  window.addEventListener('resize', () => { if (ecran === 'titre' && !modeAffiche) dessinerTitre(); });
 
   document.title = tr('titre');
-  chargerProgression();
-  construirePlaces();
-  majBoutonsSon();
-  try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); dessinerTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) {
+    // Affiche : ni écran titre, ni bouton, ni son, ni invitation en ligne.
+    demarrerAffiche();
+  } else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    // Image du jeu : progression neuve en mémoire seulement (rien n'est lu ni écrit).
+    construirePlaces();
+    majBoutonsSon();
+    ouvrirApercu(numeroApercu);
+  } else {
+    chargerProgression();
+    construirePlaces();
+    majBoutonsSon();
+    try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); dessinerTitre(); } }); } catch (e) { boutonEffacer = null; }
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>
