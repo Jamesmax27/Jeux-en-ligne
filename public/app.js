@@ -24,13 +24,14 @@
 //   l'appareil) : posé sur toute carte « a.carte » de la page par
 //   profil-pastille.js (marquerTermines de profil.js), y compris celles créées ici.
 // - Première ligne (« vitrine »), sans tenir compte des filtres, en deux moitiés :
-//   - à gauche, les Nouveautés : les NOUVEAUTES_NOMBRE derniers jeux ajoutés
-//     (aussi hors connexion) ;
+//   - à gauche, les Nouveautés : les NOUVEAUTES_NOMBRE derniers jeux ajoutés,
+//     jeux pour adolescents compris (choix du propriétaire, 21 novembre 2026 :
+//     on les voit arriver), aussi hors connexion ;
 //   - à droite, les Tendances : TENDANCES_NOMBRE jeux parmi les plus joués des
 //     7 derniers jours (/api/tendances, qui ne donne que leurs identifiants : ni
-//     rang, ni chiffre), dans un ordre qui change chaque jour, sans les
-//     NOUVEAUTES_EXCLUES premières Nouveautés ni plus de TENDANCES_PAR_GENRE jeux
-//     du même genre.
+//     rang, ni chiffre), dans un ordre qui change chaque jour, sans jeu pour
+//     adolescents, sans les NOUVEAUTES_EXCLUES premières Nouveautés ni plus de
+//     TENDANCES_PAR_GENRE jeux du même genre.
 //   Chaque moitié défile : au doigt, à la souris (on attrape la bande), au
 //   clavier, avec la barre fine. Ni l'une ni l'autre ne montre de jeu des
 //   Archives. Sans API ou sous TENDANCES_MIN jeux, pas de moitié Tendances :
@@ -483,7 +484,7 @@ function afficherVitrine() {
   const racine = document.documentElement;
   const ordre = (jeu) => hachage(`${GRAINE_VITRINE}|${jeu.id}`);
   const nouveautes = etat.jeux
-    .filter((jeu) => !estArchive(jeu) && !pourAdos(jeu.ages))
+    .filter((jeu) => !estArchive(jeu)) // jeux 13+ compris (pourAdos : Tendances seulement)
     .sort((a, b) => String(b.added).localeCompare(String(a.added)) || ordre(a) - ordre(b) || a.id.localeCompare(b.id));
   const tendances = choisirTendances(new Set(nouveautes.slice(0, NOUVEAUTES_EXCLUES).map((jeu) => jeu.id)));
   const avecTendances = tendances.length >= TENDANCES_MIN;
