@@ -2355,8 +2355,17 @@
     var local = null, site = null;
     try { local = JSON.parse(localStorage.getItem(CLE_LOCALE) || 'null'); } catch (e) { local = null; }
     try { site = window.JEL_SAVE.load(JEU).progres; } catch (e) { site = null; }
-    return fusionner(nettoyer(local), nettoyer(site));
+    return reparerEtoiles(fusionner(nettoyer(local), nettoyer(site)));
   })();
+  // Un niveau n'est débloqué qu'en gagnant le précédent : tout niveau en dessous du
+  // dernier débloqué a donc été gagné, au moins une étoile (sauvegardes anciennes ou
+  // reprises par « Continuer » qui n'avaient pas gardé ses étoiles).
+  function reparerEtoiles(p) {
+    for (var i = 0; i < Math.min(NIVEAUX.length, p.debloque - 1); i++) p.etoiles[i] = Math.max(1, p.etoiles[i]);
+    return p;
+  }
+  // Jeu terminé : tous les niveaux gagnés au moins une fois
+  function jeuTermine() { return P.etoiles.every(function (e) { return e > 0; }); }
   function garderLocal() {
     P._vide = false;
     try { localStorage.setItem(CLE_LOCALE, JSON.stringify(P)); } catch (e) { /* stockage refusé : la sauvegarde du site suffit */ }
@@ -3310,11 +3319,12 @@
     P.etoiles[i] = Math.max(P.etoiles[i], etoiles);
     P.records[i] = Math.max(ancien, score);
     P.debloque = Math.max(P.debloque, Math.min(NIVEAUX.length, i + 2));
+    reparerEtoiles(P);
     P.graines[i] = J.essai + 1; // la prochaine partie de ce niveau aura une autre donne
     garderLocal();
     sauverPartie(Math.min(NIVEAUX.length, i + 2), score);
     // Jeu terminé (tous les niveaux gagnés, maintenant ou avant) : total des meilleures étoiles.
-    if (P.etoiles.every(function (e) { return e > 0; })) {
+    if (jeuTermine()) {
       if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: NIVEAUX.length * 3 });
     }
     var gains = [];
@@ -3332,7 +3342,7 @@
     montrerFin(false, { raison: raison });
   }
   function montrerFin(gagne, r) {
-    var dernier = gagne && J.n === NIVEAUX.length - 1;
+    var dernier = gagne && J.n === NIVEAUX.length - 1 && jeuTermine();
     $('#fin-titre').textContent = gagne ? t(dernier ? 'fin.toutTitre' : 'fin.gagne') : t('perdu.titre');
     $('#fin-texte').textContent = gagne ? (dernier ? t('fin.toutFini', { n: NIVEAUX.length, e: totalEtoiles() }) : t('fin.gagneTexte')) : t(r.raison === 'limite' ? 'perdu.limite' : 'perdu.bloque');
     var et = $('#fin-etoiles');
@@ -3378,8 +3388,8 @@
     }
     var premier;
     if (gagne) {
-      if (!dernier) premier = bouton('fin.suivant', function () { lancerNiveau(J.n + 1); }, true);
-      var b2 = bouton('fin.rejouer', function () { lancerNiveau(J.n, 'nouvelle'); }, dernier);
+      if (J.n < NIVEAUX.length - 1) premier = bouton('fin.suivant', function () { lancerNiveau(J.n + 1); }, true);
+      var b2 = bouton('fin.rejouer', function () { lancerNiveau(J.n, 'nouvelle'); }, J.n === NIVEAUX.length - 1);
       premier = premier || b2;
     } else {
       if (r.raison === 'bloque' && J.histo.length) premier = bouton('fin.annulerCoup', function () { fermerVoiles(); J.fini = false; J.actif = true; annuler(); }, true);
@@ -3500,7 +3510,10 @@
       jeu: JEU,
       onContinuer: function (d) {
         var n = Math.max(1, Math.min(NIVEAUX.length, d.niveau || 1));
-        if (n > P.debloque) P.debloque = n;
+        if (n > P.debloque) { P.debloque = n; reparerEtoiles(P); garderLocal(); }
+        // Dernier niveau déjà gagné : le jeu est fini, on montre les niveaux (tous validés)
+        // au lieu de relancer le niveau 24 comme s'il restait à faire.
+        if (n === NIVEAUX.length && P.etoiles[n - 1] > 0) { afficher('niveaux'); return; }
         lancerNiveau(n - 1);
       },
       onNouvelle: function () { lancerNiveau(0); },
