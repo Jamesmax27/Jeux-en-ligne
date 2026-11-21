@@ -3200,6 +3200,15 @@
     .place canvas.tete { width: 28px; height: 28px; }
   }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
+  /* Image 3 du jeu (window.JEL_APERCU = 3, écran d'ordinateur) : la partie occupe toute la largeur,
+     le pont à gauche, les commandes dans une colonne à droite. */
+  body.apercu-large #ecran-jeu.actif { display: grid; grid-template-columns: 1fr 440px; grid-template-rows: auto auto auto 1fr; }
+  body.apercu-large #places, body.apercu-large #infos, body.apercu-large #temps { grid-column: 1 / -1; max-width: 1000px; justify-self: center; width: 100%; }
+  body.apercu-large #zone { grid-column: 1; grid-row: 4; }
+  body.apercu-large #commandes {
+    grid-column: 2; grid-row: 4; max-width: none; align-self: stretch; justify-content: center; gap: 12px; padding: 16px 18px;
+    border-top: none; border-left: 2px solid #2f4644;
+  }
 </style>
 </head>
 <body>
@@ -3854,7 +3863,7 @@
 
   function geometrie(w, h, e) {
     const ph = Math.max(40, Math.min(66, h / 8.2));
-    const pw = Math.min(w * 0.6, 300);
+    const pw = Math.min(w * 0.6, modeApercu === 3 ? 520 : 300);   // image 3 du jeu (ordinateur) : pont plus large
     const cx = Math.min(w * 0.47, w / 2 - 6);
     const visibles = h / ph;
     const Y = (k) => h - ph * 0.85 - (k - cam) * ph;
@@ -5360,7 +5369,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto && !modeApercu) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -5368,18 +5377,326 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? vue.pos[partie.siege] : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(performance.now()); });
+  window.addEventListener('resize', () => { if (ecran !== 'jeu' && ecran !== 'affiche') dessinerTitre(performance.now()); });
+
+  // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu) : avec window.JEL_AFFICHE (posé par le robot
+  //  du site, jamais par le jeu), une scène composée, sans interface ni
+  //  texte (CONSIGNES-JEU.md, section 5). L'explorateur au chapeau ambre,
+  //  en grand sur le pont, brandit sa torche face à un raptor qui jaillit
+  //  de la brume ; la lune éclaire le ravin, une planche dorée brille plus
+  //  loin, des yeux jaunes guettent sous le pont.
+  // ---------------------------------------------------------------------
+
+  // Tête de l'explorateur pour l'affiche : celle du jeu, qui crie, les yeux tournés vers le raptor.
+  function teteAffiche(c, s, x, y, r) {
+    c.save(); c.translate(x, y); c.scale(r / 50, r / 50);
+    c.fillStyle = COUL_F[s]; c.beginPath(); c.moveTo(6, 44); c.quadraticCurveTo(22, 52, 30, 66); c.lineTo(16, 66); c.closePath(); c.fill();  // bout du foulard
+    c.fillStyle = COUL[s]; ell(c, 0, 42, 30, 12); c.fill();                     // foulard
+    c.fillStyle = PEAU[s]; rond(c, 0, 10, 30); c.fill();
+    c.strokeStyle = '#00000040'; c.lineWidth = 2; c.stroke();
+    c.fillStyle = 'rgba(230,110,90,.35)'; ell(c, -18, 21, 6, 4); c.fill(); ell(c, 19, 21, 6, 4); c.fill();
+    c.fillStyle = '#fff'; ell(c, -10, 10, 6.8, 7.8); c.fill(); ell(c, 11, 10, 6.8, 7.8); c.fill();
+    c.fillStyle = '#1b1b1b'; rond(c, -7, 10.5, 4.2); c.fill(); rond(c, 14, 10.5, 4.2); c.fill();
+    c.fillStyle = '#fff'; rond(c, -5.6, 8.8, 1.6); c.fill(); rond(c, 15.4, 8.8, 1.6); c.fill();
+    c.strokeStyle = '#5a2e1a'; c.lineWidth = 3.2; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-18, -2); c.lineTo(-5, 2.5); c.moveTo(19, -2); c.lineTo(6, 2.5); c.stroke();   // sourcils froncés
+    c.fillStyle = '#5a1a14'; ell(c, 3, 25, 7.5, 6); c.fill();                    // il crie
+    c.fillStyle = '#f2ead6'; c.fillRect(-2.5, 19.5, 11, 2.4);
+    c.fillStyle = COUL_F[s]; ell(c, 0, -12, 47, 11); c.fill();                    // bord du chapeau
+    c.fillStyle = COUL[s];
+    c.beginPath(); c.moveTo(-27, -12); c.quadraticCurveTo(-25, -46, 0, -46); c.quadraticCurveTo(25, -46, 27, -12); c.closePath(); c.fill();
+    c.fillStyle = COUL_F[s]; c.fillRect(-27, -21, 54, 7);                       // ruban
+    c.fillStyle = '#ffffff55'; ell(c, -10, -36, 9, 4, -0.3); c.fill();
+    c.restore();
+  }
+
+  // Explorateur en pied (pieds en (x, y), unité u : environ 190 unités de haut), torche levée à droite.
+  function explorateurAffiche(c, x, y, u) {
+    c.save(); c.translate(x, y); c.scale(u, u);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.fillStyle = 'rgba(0,0,0,.45)'; ell(c, 4, 2, 46, 9); c.fill();
+    // sac à dos et sa corde enroulée
+    c.fillStyle = '#4a3a22'; rr(c, -48, -104, 28, 56, 10); c.fill();
+    c.strokeStyle = '#d9b77a'; c.lineWidth = 4; ell(c, -38, -66, 14, 10); c.stroke();
+    c.strokeStyle = '#b8925a'; c.lineWidth = 3; ell(c, -38, -66, 8, 5.5); c.stroke();
+    // jambes et bottes (pas en avant)
+    c.strokeStyle = '#3a3020'; c.lineWidth = 18;
+    c.beginPath(); c.moveTo(-12, -52); c.lineTo(-22, -8); c.stroke();
+    c.beginPath(); c.moveTo(12, -52); c.lineTo(28, -10); c.stroke();
+    c.fillStyle = '#1e1610'; ell(c, -26, -3, 16, 8); c.fill(); ell(c, 34, -5, 16, 8); c.fill();
+    // bras gauche : la main tient la corde du pont
+    c.strokeStyle = '#5e4e30'; c.lineWidth = 15;
+    c.beginPath(); c.moveTo(-24, -94); c.quadraticCurveTo(-48, -80, -62, -62); c.stroke();
+    c.fillStyle = PEAU[0]; rond(c, -64, -60, 8.5); c.fill();
+    // veste, ceinture, poche
+    c.fillStyle = '#6b5a3a'; rr(c, -31, -108, 62, 64, 18); c.fill();
+    c.fillStyle = '#7d6a44'; rr(c, -4, -106, 33, 60, 14); c.fill();
+    c.fillStyle = '#3a2a14'; c.fillRect(-31, -58, 62, 7);
+    c.fillStyle = '#d9a640'; c.fillRect(-5, -58, 10, 7);
+    c.fillStyle = '#5a4a2e'; rr(c, 9, -88, 15, 14, 3); c.fill();
+    // bras droit levé, torche au poing
+    c.strokeStyle = '#7d6a44'; c.lineWidth = 15;
+    c.beginPath(); c.moveTo(22, -98); c.quadraticCurveTo(50, -116, 56, -150); c.stroke();
+    c.save(); c.translate(58, -160); c.rotate(0.22);
+    c.fillStyle = '#6b4420'; c.fillRect(-4.5, -34, 9, 56);
+    c.fillStyle = '#3a2a14'; c.fillRect(-6, -40, 12, 10);
+    c.restore();
+    c.fillStyle = PEAU[0]; rond(c, 57, -156, 9); c.fill();
+    teteAffiche(c, 0, 0, -150, 52);
+    c.restore();
+  }
+
+  // Flamme de la torche (centre en (x, y), taille k), avec sa lueur.
+  function flammeAffiche(c, x, y, k) {
+    c.save();
+    c.shadowColor = '#ff9a2c'; c.shadowBlur = k * 1.6;
+    c.fillStyle = '#ff5e14';
+    c.beginPath(); c.moveTo(x - k * 0.55, y + k * 0.35);
+    c.quadraticCurveTo(x - k * 0.8, y - k * 0.5, x - k * 0.1, y - k * 1.5);
+    c.quadraticCurveTo(x + k * 0.05, y - k * 0.8, x + k * 0.3, y - k * 1.15);
+    c.quadraticCurveTo(x + k * 0.9, y - k * 0.4, x + k * 0.55, y + k * 0.35);
+    c.closePath(); c.fill();
+    c.fillStyle = '#ffa22e'; ell(c, x, y - k * 0.1, k * 0.42, k * 0.62); c.fill();
+    c.fillStyle = '#fff1a0'; ell(c, x, y + k * 0.05, k * 0.2, k * 0.34); c.fill();
+    c.restore();
+  }
+
+  // Dessin éclairé : le dessin est fait à part, puis teinté par une lumière ronde (torche) qui ne déborde pas.
+  function eclaire(c, dessin, lx, ly, r, couleur, lueur) {
+    const cv = c.canvas, off = document.createElement('canvas');
+    off.width = cv.width; off.height = cv.height;
+    const o = off.getContext('2d');
+    o.setTransform(c.getTransform());
+    dessin(o);
+    o.globalCompositeOperation = 'source-atop';
+    const g = o.createRadialGradient(lx, ly, 0, lx, ly, r);
+    g.addColorStop(0, couleur); g.addColorStop(1, 'rgba(255,160,70,0)');
+    o.fillStyle = g; o.fillRect(lx - r, ly - r, r * 2, r * 2);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    if (lueur) { c.shadowColor = lueur; c.shadowBlur = 12; }
+    c.drawImage(off, 0, 0);
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Scène de 600 × 800 au centre ; sur un écran plus large, le décor continue jusqu'aux bords.
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    c.translate(ox, oy); c.scale(k, k);
+    const X0 = -ox / k - 2, X1 = 600 + ox / k + 2, Y0 = -oy / k - 2, Y1 = 800 + oy / k + 2;
+    c.lineCap = 'round'; c.lineJoin = 'round';
+
+    // Ciel de pleine lune, vert d'eau
+    const ciel = c.createLinearGradient(0, Y0, 0, 560);
+    ciel.addColorStop(0, '#0f3340'); ciel.addColorStop(0.45, '#2f6a6c'); ciel.addColorStop(1, '#1d4446');
+    c.fillStyle = ciel; c.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+    const ge = graineHasard(5);
+    for (let i = 0; i < 90; i++) { const x = X0 + ge() * (X1 - X0), y = Y0 + ge() * (300 - Y0), a = 0.35 + 0.55 * ge(); c.fillStyle = 'rgba(255,255,235,' + a + ')'; c.fillRect(x, y, 1.8, 1.8); }
+    // Lune et son halo
+    const mx = 470, my = 150, mr = 62;
+    const halo = c.createRadialGradient(mx, my, mr * 0.6, mx, my, mr * 5);
+    halo.addColorStop(0, 'rgba(240,236,200,0.55)'); halo.addColorStop(0.35, 'rgba(200,230,215,0.2)'); halo.addColorStop(1, 'rgba(200,230,215,0)');
+    c.fillStyle = halo; c.fillRect(mx - mr * 5, my - mr * 5, mr * 10, mr * 10);
+    c.fillStyle = '#f4eed4'; rond(c, mx, my, mr); c.fill();
+    c.fillStyle = '#ddd4b2'; rond(c, mx - 18, my - 12, 13); c.fill(); rond(c, mx + 22, my + 16, 9); c.fill(); rond(c, mx + 8, my - 26, 6); c.fill();
+    // Montagnes lointaines
+    const gm = graineHasard(13);
+    [['#24585a', 300, 0.06], ['#1a4446', 340, 0.05]].forEach(([coul, base, amp]) => {
+      c.fillStyle = coul; c.beginPath(); c.moveTo(X0, Y1);
+      for (let x = X0; x <= X1 + 40; x += 36) c.lineTo(x, base - 800 * amp * gm());
+      c.lineTo(X1, Y1); c.closePath(); c.fill();
+    });
+    brume(c, 600, 800, 0, 300, 380, 5, 0.12);
+    // Fond du ravin, très profond
+    const fondR = c.createLinearGradient(0, 330, 0, 800);
+    fondR.addColorStop(0, '#356462'); fondR.addColorStop(0.5, '#173332'); fondR.addColorStop(1, '#081415');
+    c.fillStyle = fondR; c.fillRect(X0, 330, X1 - X0, Y1 - 330);
+    // Falaises de chaque côté (bord éclairé par la lune)
+    falaise(c, [[X0, 300], [40, 304], [120, 322], [190, 352], [240, 392], [222, 470], [256, 560], [214, 700], [240, Y1], [X0, Y1]], '#11282a', '#5e908a');
+    falaise(c, [[X1, 290], [560, 296], [470, 330], [410, 372], [380, 420], [404, 500], [370, 620], [400, Y1], [X1, Y1]], '#0f2426', '#5e908a');
+    // Raptor tapi sur la falaise de gauche, en ombre sur le ciel
+    raptor(c, 92, 318, 64, 1, 300, 0.95, false);
+    // Yeux dans la brume, sous le pont
+    yeux(c, 300, 460, 6, 0, 1); yeux(c, 352, 520, 5, 400, 0.9); yeux(c, 150, 560, 7, 800, 0.9); yeux(c, 470, 600, 6, 1200, 0.85);
+    brume(c, 600, 800, 0, 420, 640, 8, 0.1);
+
+    // Le pont de cordes, qui s'enfonce dans la brume
+    const N = 15, yN = 860, yF = 360, WN = 820, WF = 66, xN = 250, xF = 316;
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const q = i / N, e = 1 - Math.pow(1 - q, 1.7);
+      pts.push({ y: lerp(yN, yF, e) + Math.sin(Math.PI * q) * 26, l: lerp(WN, WF, e), x: lerp(xN, xF, e) });
+    }
+    const rampe = (cote, haut) => { c.beginPath(); pts.forEach((p, i) => { const x = p.x + cote * p.l / 2, y = p.y - (haut ? p.l * 0.2 : 0); if (i) c.lineTo(x, y); else c.moveTo(x, y); }); c.stroke(); };
+    c.strokeStyle = '#7a5530'; c.lineWidth = 3;
+    [-1, 1].forEach((cote) => { rampe(cote, false); rampe(cote, true); });
+    for (let i = N; i >= 1; i--) {
+      const p = pts[i], e = p.l / WN, ep = Math.max(3, 30 * e);
+      c.strokeStyle = '#4a321b'; c.lineWidth = Math.max(1.5, 5 * e);
+      c.beginPath(); c.moveTo(p.x - p.l / 2, p.y); c.lineTo(p.x - p.l / 2, p.y - p.l * 0.2); c.moveTo(p.x + p.l / 2, p.y); c.lineTo(p.x + p.l / 2, p.y - p.l * 0.2); c.stroke();
+      if (i === 7) {                                   // planche tombée : deux bouts qui pendent
+        c.fillStyle = '#5a3b20';
+        c.save(); c.translate(p.x - p.l / 2, p.y); c.rotate(1.15); c.fillRect(0, -ep / 2, p.l * 0.22, ep); c.restore();
+        c.save(); c.translate(p.x + p.l / 2, p.y); c.rotate(2.05); c.fillRect(0, -ep / 2, p.l * 0.16, ep); c.restore();
+        continue;
+      }
+      if (i === 10) {                                  // planche dorée qui brille, une griffe fossile posée dessus
+        const gr = c.createLinearGradient(p.x - p.l / 2, p.y, p.x + p.l / 2, p.y);
+        gr.addColorStop(0, '#c08a22'); gr.addColorStop(0.5, '#ffe27a'); gr.addColorStop(1, '#b07818');
+        c.save(); c.shadowColor = '#ffd34a'; c.shadowBlur = 26; c.fillStyle = gr;
+        rr(c, p.x - p.l / 2, p.y - ep / 2, p.l, ep, 3); c.fill(); c.restore();
+        dessinGriffe(c, p.x + p.l * 0.12, p.y - ep * 0.9, 20, true);
+        continue;
+      }
+      c.fillStyle = i % 3 === 0 ? '#7a5230' : '#8f6238';
+      rr(c, p.x - p.l / 2, p.y - ep / 2, p.l, ep, 3); c.fill();
+      c.fillStyle = '#00000038'; c.fillRect(p.x - p.l / 2, p.y + ep * 0.12, p.l, ep * 0.38);
+      c.fillStyle = '#ffffff18'; c.fillRect(p.x - p.l / 2, p.y - ep / 2, p.l, ep * 0.18);
+    }
+    // Deux autres explorateurs, plus loin sur le pont
+    tete(c, 1, pts[9].x + pts[9].l * 0.3, pts[9].y - 14, 13);
+    tete(c, 2, pts[6].x + pts[6].l * 0.3, pts[6].y - 20, 17);
+
+    // Lumière de la torche sur la scène
+    const fx = 348, fy = 210;
+    const lum = c.createRadialGradient(fx, fy, 10, fx, fy, 380);
+    lum.addColorStop(0, 'rgba(255,190,100,0.55)'); lum.addColorStop(0.4, 'rgba(255,150,70,0.2)'); lum.addColorStop(1, 'rgba(255,150,70,0)');
+    c.fillStyle = lum; c.fillRect(fx - 380, fy - 380, 760, 760);
+
+    // Le raptor qui jaillit de la brume, gueule ouverte, éclairé par la torche
+    eclaire(c, (o) => {
+      o.save(); o.translate(560, 450); o.rotate(-0.16); raptor(o, 0, 0, 210, -1, 0, 1, true); o.restore();
+    }, fx, fy, 360, 'rgba(255,175,95,0.42)', 'rgba(255,150,60,0.75)');
+
+    // L'explorateur, en grand
+    const hx = 214, hy = 634, u = 2.02;
+    eclaire(c, (o) => explorateurAffiche(o, hx, hy, u), fx, fy, 300, 'rgba(255,190,110,0.42)', 'rgba(255,200,120,0.5)');
+    flammeAffiche(c, hx + 67 * u, hy - 205 * u, 16 * u);
+    // Étincelles qui montent de la torche
+    const gs = graineHasard(21);
+    for (let i = 0; i < 26; i++) {
+      const a = gs() * Math.PI * 2, d = 20 + gs() * 120;
+      c.fillStyle = gs() < 0.5 ? '#ffd27a' : '#ff8a2c';
+      rond(c, fx + Math.cos(a) * d * 0.8, fy - 20 - Math.abs(Math.sin(a)) * d, 1.4 + gs() * 2.2); c.fill();
+    }
+
+    // Premier plan : poteaux et cordes du pont, coupés par les bords, fougères sombres
+    c.strokeStyle = '#2a1a0c'; c.lineWidth = 9;
+    c.beginPath(); c.moveTo(X0, 660); c.quadraticCurveTo(40, 690, 90, 760); c.stroke();
+    c.fillStyle = '#24160a'; c.fillRect(-12, 630, 34, Y1 - 630); c.fillRect(560, 600, 40, Y1 - 600);
+    c.strokeStyle = '#2a1a0c'; c.beginPath(); c.moveTo(X1, 640); c.quadraticCurveTo(560, 660, 520, 760); c.stroke();
+    [[-10, 800, 1, 1.3], [612, 800, -1, 1.1]].forEach(([x, y, dir, f]) => {
+      c.fillStyle = '#081a14';
+      for (let i = 0; i < 5; i++) {
+        const ang = -1.9 + i * 0.32;
+        c.save(); c.translate(x, y); c.scale(dir, 1); c.rotate(ang + 1.57);
+        ell(c, 0, -60 * f, 16 * f, 64 * f); c.fill();
+        c.restore();
+      }
+    });
+    // Vignette légère
+    const vg = c.createRadialGradient(300, 380, 260, 300, 420, 620);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.42)');
+    c.fillStyle = vg; c.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+  }
+
+  function cacherInterfaceAffiche() {
+    document.querySelectorAll('.ecran, .voile, #toast, #confettis, button, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    cacherInterfaceAffiche();
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    [50, 300, 1000].forEach((ms) => setTimeout(cacherInterfaceAffiche, ms));
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu) : avec window.JEL_APERCU = 1, 2 ou 3 (posé
+  //  par le robot du site, jamais par le jeu), le jeu s'ouvre directement en
+  //  pleine partie solo contre les robots, avec sa vraie interface (places,
+  //  pont, pierres, calcul juste prêt à valider), sans écran titre, ni
+  //  fenêtre « Continuer », ni tutoriel. La partie est figée sur ce moment
+  //  (une fausse partie sans robots ni réseau) : ni victoire, ni défaite,
+  //  ni son, ni sauvegarde.
+  //    1 = niveau 1 : pont court, premier calcul (+), une griffe sur la planche visée ;
+  //    2 = niveau 10 : planche cassée, torche et corde gardées, planche dorée (×) ;
+  //    3 = niveau 20 : nids, quatre raptors, un trou à franchir avec trois pierres vers une planche dorée.
+  // ---------------------------------------------------------------------
+
+  let modeApercu = 0;
+  const SCENES_APERCU = {
+    1: { niveau: 1, pos: [2, 1, 0, 0], rap: [[-1, -2]], pi: [3, 4, 2], cible: 7, calcul: [0, '+', 1], coups: 4,
+      to: [0, 0, 0, 0], co: [0, 0, 0, 0], gr: [0, 0, 0, 0], casse: [], vide: [], nids: [] },
+    2: { niveau: 10, pos: [6, 5, 3, 1], rap: [[2, -2], [-3, -3]], pi: [3, 4, 5], cible: 12, calcul: [0, 'x', 1], coups: 20,
+      to: [1, 0, 0, 0], co: [1, 1, 0, 0], gr: [1, 0, 0, 0], casse: [4], vide: [2, 5, 6], nids: [] },
+    3: { niveau: 20, pos: [8, 6, 5, 3], rap: [[7, -2], [-3, -3], [11, 16], [13, 17]], pi: [3, 5, 3], cible: 24, calcul: [0, '+', 1, 'x', 2], coups: 56,
+      to: [1, 1, 1, 0], co: [2, 0, 0, 1], gr: [2, 1, 0, 0], casse: [9], vide: [3, 5, 6, 8], nids: [7] }
+  };
+
+  function ouvrirApercu(n) {
+    modeApercu = n;
+    const sc = SCENES_APERCU[n];
+    niveau = sc.niveau;
+    session = 'solo';
+    enPartie = false;         // rien n'est écrit dans la sauvegarde
+    enPause = false;
+    attenteTuto = false;
+    const e = R.depart(graineHasard(sc.niveau * 31 + 7), PLACES, { niveau: sc.niveau });
+    e.tour = 0;
+    e.pos = sc.pos.slice();
+    e.rap = sc.rap.map((r) => r.slice());
+    e.pi = sc.pi.slice();
+    e.coups = sc.coups;
+    e.nt = e.pos.map(() => Math.floor(sc.coups / PLACES));
+    e.to = sc.to.slice(); e.co = sc.co.slice(); e.gr = sc.gr.slice();
+    sc.casse.forEach((k) => { e.ty = e.ty.slice(0, k) + 'x' + e.ty.slice(k + 1); });
+    sc.vide.forEach((k) => { e.ob[k] = 0; });
+    const ci = O.cible(e, 0, false);
+    if (ci) e.v[ci.ar] = sc.cible;
+    e.ev = [];
+    // Partie figée : à toi de jouer, aucun robot ne joue, rien ne part sur le réseau.
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 1, chef: -1, etat: e,
+      sieges: () => e.pos.map((_, s) => ({ humain: s === 0, moi: s === 0, chef: false, nom: null })),
+      monTour: () => true, estChef: () => false, lancerManche: () => false,
+      jouer: () => false, pause: () => {}, quitter: () => {}, recommencer: () => false
+    };
+    vue = e;
+    anim.ex = [[], [], [], []]; anim.ra = [];
+    particules.length = 0; flottants.length = 0; nidT = {}; casseT = {};
+    sc.nids.forEach((k) => { nidT[k] = 0; });
+    remettreCalcul();
+    expr = sc.calcul.map((x) => (typeof x === 'number' ? { p: x } : { o: x }));
+    if (n === 3) document.body.classList.add('apercu-large');
+    afficherEcran('jeu');
+    // Caméra posée tout de suite sur l'explorateur du joueur.
+    const zone = $('zone'), g0 = geometrie(zone.clientWidth, zone.clientHeight, e);
+    const camMax = Math.max(-0.4, e.L + 1.7 - g0.visibles);
+    cam = Math.max(-0.4, Math.min(camMax, e.pos[0] - 1.6));
+    majInterface();
+  }
 
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
-  try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  dessinerTitre(0);
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else {
+    try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
+    afficherEcran('titre');
+    dessinerTitre(0);
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>

@@ -3566,6 +3566,9 @@
     .place .etat { font-size: .74rem; }
   }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
+  /* Image du jeu sur ordinateur (window.JEL_APERCU = 3) : l'interface occupe toute la largeur. */
+  body.apercu-large #places { max-width: 1240px; grid-template-columns: repeat(6, 1fr); }
+  body.apercu-large #infos, body.apercu-large #main-zone, body.apercu-large #actions { max-width: 1240px; }
 </style>
 </head>
 <body>
@@ -4527,7 +4530,8 @@
     const dt = Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
     tPrec = t;
     if (ecran === 'jeu') {
-      dessinerScene(performance.now(), dt);
+      // Image du jeu (window.JEL_APERCU) : scène figée sur son moment.
+      dessinerScene(modeApercu ? T_APERCU : performance.now(), modeApercu ? 0 : dt);
       majTemps();
       majCompte();
     } else if (ecran === 'titre') {
@@ -5504,6 +5508,276 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Orage au
+  // crépuscule : Rouge serre contre lui la caisse de rations qui luit, les autres naufragés la
+  // guettent depuis le radeau, un grand requin surgit devant le soleil couchant, l'éclair frappe.
+
+  // Caisse de bois (affiche), centrée en (x, y), tournée de rot ; ouverte : rations qui luisent.
+  function caisseAffiche(c, x, y, w, h, rot, ouverte) {
+    c.save(); c.translate(x, y); c.rotate(rot);
+    c.fillStyle = 'rgba(0,0,0,.3)'; ell(c, 4, h * 0.55, w * 0.55, h * 0.14); c.fill();
+    const g = c.createLinearGradient(0, -h / 2, 0, h / 2);
+    g.addColorStop(0, '#d8995a'); g.addColorStop(1, '#8a5a2b');
+    c.fillStyle = g; c.strokeStyle = '#4a2c12'; c.lineWidth = Math.max(2, w * 0.03);
+    rr(c, -w / 2, -h / 2, w, h, w * 0.06); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(74,44,18,.55)'; c.lineWidth = Math.max(1.5, w * 0.015);
+    for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(-w / 2, -h / 2 + i * h / 4); c.lineTo(w / 2, -h / 2 + i * h / 4); c.stroke(); }
+    c.strokeStyle = '#5b3a19'; c.lineWidth = Math.max(3, w * 0.07);
+    c.beginPath(); c.moveTo(-w / 2 + w * 0.06, -h / 2 + h * 0.08); c.lineTo(w / 2 - w * 0.06, h / 2 - h * 0.08); c.stroke();
+    if (ouverte) {
+      // couvercle soulevé et rations dorées qui brillent
+      c.save(); c.translate(-w / 2, -h / 2); c.rotate(-0.55);
+      c.fillStyle = '#b07a42'; c.strokeStyle = '#4a2c12'; c.lineWidth = 3; rr(c, 0, -h * 0.16, w * 0.9, h * 0.16, 4); c.fill(); c.stroke();
+      c.restore();
+      c.shadowColor = '#ffd36b'; c.shadowBlur = w * 0.35;
+      c.fillStyle = '#ffe9a0'; ell(c, 0, -h / 2, w * 0.44, h * 0.13); c.fill();
+      c.shadowBlur = 0;
+      [[-0.22, 0.95], [0.02, 1.15], [0.24, 0.9], [-0.06, 0.8]].forEach((p, i) => {
+        c.fillStyle = i % 2 ? '#f2b33a' : '#ffd36b'; c.strokeStyle = '#a0620a'; c.lineWidth = 2;
+        ell(c, p[0] * w, -h / 2 - h * 0.1 * p[1], w * 0.13, w * 0.09); c.fill(); c.stroke();
+      });
+    }
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (!w || !h) return;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const c = cv.getContext('2d');
+    // Cadre de 600 × 800 au centre ; ciel, mer et pluie continuent jusqu'aux bords de l'écran.
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    const x0 = -ox / k - 2, x1 = (w - ox) / k + 2, y0 = -oy / k - 2, y1 = (h - oy) / k + 2;
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    const HZ = 340, al = graineHasard(29);
+
+    // Ciel d'orage au crépuscule
+    let g = c.createLinearGradient(0, y0, 0, HZ);
+    g.addColorStop(0, '#1a1c48'); g.addColorStop(0.42, '#57275e'); g.addColorStop(0.78, '#c4473f'); g.addColorStop(1, '#ff9a45');
+    c.fillStyle = g; c.fillRect(x0, y0, x1 - x0, HZ - y0 + 2);
+    // Soleil rouge qui sombre (derrière le requin)
+    g = c.createRadialGradient(535, HZ, 20, 535, HZ, 190);
+    g.addColorStop(0, 'rgba(255,190,100,.75)'); g.addColorStop(1, 'rgba(255,150,80,0)');
+    c.fillStyle = g; c.fillRect(x0, y0, x1 - x0, HZ - y0);
+    c.fillStyle = '#ffc25a'; rond(c, 535, HZ, 70); c.fill();
+    // Lueur de l'éclair dans les nuages
+    g = c.createRadialGradient(110, 120, 10, 110, 120, 260);
+    g.addColorStop(0, 'rgba(215,232,255,.75)'); g.addColorStop(1, 'rgba(215,232,255,0)');
+    c.fillStyle = g; c.fillRect(x0, y0, x1 - x0, HZ - y0);
+    // Nuages d'orage, bords éclairés de rose
+    for (let couche = 0; couche < 2; couche++) {
+      for (let x = x0 - 60; x < x1 + 60; x += 105) {
+        const y = (couche ? 150 : 62) + al() * 30, rx = 80 + al() * 40, ry = 30 + al() * 14;
+        c.fillStyle = couche ? 'rgba(230,110,110,.55)' : 'rgba(200,150,200,.5)'; ell(c, x, y + 7, rx, ry); c.fill();
+        c.fillStyle = couche ? 'rgba(70,32,74,.92)' : 'rgba(34,30,74,.95)'; ell(c, x, y, rx, ry); c.fill();
+      }
+    }
+    // Éclair qui frappe la mer, à gauche
+    const zig = [[132, 40], [104, 118], [138, 128], [92, 220], [124, 230], [66, HZ + 18]];
+    c.shadowColor = '#cfe6ff'; c.shadowBlur = 30;
+    c.strokeStyle = '#e6f2ff'; c.lineWidth = 9;
+    c.beginPath(); zig.forEach((p, i) => (i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]))); c.stroke();
+    c.shadowBlur = 0; c.strokeStyle = '#ffffff'; c.lineWidth = 3.5; c.stroke();
+
+    // Mer agitée
+    g = c.createLinearGradient(0, HZ, 0, y1);
+    g.addColorStop(0, '#2f7f98'); g.addColorStop(0.35, '#1a5670'); g.addColorStop(1, '#0a2433');
+    c.fillStyle = g; c.fillRect(x0, HZ, x1 - x0, y1 - HZ);
+    // Reflet doré du soleil, reflet de l'éclair
+    for (let i = 0; i < 9; i++) { c.fillStyle = 'rgba(255,190,100,' + (0.55 - i * 0.05).toFixed(2) + ')'; ell(c, 535 + (i % 2 ? 10 : -8), HZ + 8 + i * 16, 70 - i * 6, 4); c.fill(); }
+    c.fillStyle = 'rgba(220,236,255,.5)'; ell(c, 66, HZ + 22, 46, 6); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.22)'; c.lineWidth = 2.5;
+    for (let j = 0; j < 9; j++) {
+      const y = HZ + 14 + j * 40, amp = 4 + j * 2.2;
+      c.beginPath();
+      for (let x = x0; x <= x1; x += 10) { const yy = y + Math.sin(x / 34 + j * 1.9) * amp; if (x === x0) c.moveTo(x, yy); else c.lineTo(x, yy); }
+      c.stroke();
+    }
+
+    // Le grand requin qui surgit (ombre sous l'eau, aileron devant le soleil)
+    c.fillStyle = 'rgba(5,20,30,.5)'; ell(c, 520, 470, 125, 28, -0.12); c.fill();
+    g = c.createLinearGradient(470, 290, 560, 470);
+    g.addColorStop(0, '#53687a'); g.addColorStop(1, '#16222c');
+    c.fillStyle = g; c.strokeStyle = '#0c151c'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(462, 472); c.quadraticCurveTo(500, 400, 528, 282); c.quadraticCurveTo(548, 380, 592, 472); c.closePath(); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(214,234,255,.9)'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(466, 466); c.quadraticCurveTo(502, 398, 528, 286); c.stroke();
+    // écume autour de l'aileron
+    c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 5;
+    c.beginPath(); c.moveTo(440, 476); c.quadraticCurveTo(527, 456, 616, 478); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.8)';
+    for (let i = 0; i < 16; i++) { rond(c, 450 + al() * 150, 470 - al() * 50, 2 + al() * 4); c.fill(); }
+
+    // Le radeau, ses voiles et les autres naufragés qui guettent la caisse
+    c.save(); c.translate(250, 488); c.rotate(-0.05);
+    radeau(c, 0, 0, 430, 0, 0);
+    c.restore();
+    c.strokeStyle = '#4a2c12'; c.lineWidth = 7;
+    c.beginPath(); c.moveTo(318, 470); c.lineTo(322, 228); c.stroke();
+    voile(c, 'rapiecee', 324, 236, 78, 130, 0);
+    survivant(c, 4, 70, 428, 30, '', 0);
+    survivant(c, 2, 128, 452, 30, 'mal', 0);
+    survivant(c, 1, 392, 424, 30, '', 0);
+    survivant(c, 3, 440, 458, 31, 'faim', 0);
+
+    // Rouge, le héros, au premier plan : torse, bras serrés sur la caisse de rations
+    const hx = 212, hy = 330;
+    c.fillStyle = COUL_F[0];
+    c.beginPath(); c.moveTo(hx - 158, 760); c.quadraticCurveTo(hx - 160, 452, hx, 446); c.quadraticCurveTo(hx + 160, 452, hx + 158, 760); c.closePath(); c.fill();
+    g = c.createLinearGradient(hx - 130, 0, hx + 130, 0);
+    g.addColorStop(0, '#a8352a'); g.addColorStop(1, '#ff7a55');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(hx - 132, 760); c.quadraticCurveTo(hx - 136, 470, hx, 466); c.quadraticCurveTo(hx + 136, 470, hx + 132, 760); c.closePath(); c.fill();
+    c.fillStyle = '#d9a983'; rr(c, hx - 30, 400, 60, 74, 20); c.fill();
+    // bras gauche (devant le corps) et bras droit vers la caisse
+    c.strokeStyle = COUL_F[0]; c.lineWidth = 52;
+    c.beginPath(); c.moveTo(hx + 112, 520); c.quadraticCurveTo(hx + 150, 610, hx + 128, 640); c.stroke();
+    c.beginPath(); c.moveTo(hx - 112, 520); c.quadraticCurveTo(hx - 60, 660, hx + 70, 640); c.stroke();
+    c.strokeStyle = COUL[0]; c.lineWidth = 40;
+    c.beginPath(); c.moveTo(hx + 112, 520); c.quadraticCurveTo(hx + 150, 610, hx + 128, 640); c.stroke();
+    c.beginPath(); c.moveTo(hx - 112, 520); c.quadraticCurveTo(hx - 60, 660, hx + 70, 640); c.stroke();
+    // la caisse ouverte, serrée contre lui
+    caisseAffiche(c, hx + 128, 600, 150, 112, -0.12, true);
+    c.fillStyle = PEAU[0]; c.strokeStyle = '#8a5a3b'; c.lineWidth = 3;
+    rond(c, hx + 58, 632, 22); c.fill(); c.stroke();
+    rond(c, hx + 196, 588, 21); c.fill(); c.stroke();
+    // la tête, inquiète, qui regarde le requin
+    tete(c, 0, hx, hy, 108, 'faim');
+    // lumière dorée des rations sur le héros, liseré bleu de l'éclair à gauche
+    c.save(); c.globalCompositeOperation = 'lighter';
+    g = c.createRadialGradient(hx + 128, 540, 10, hx + 128, 540, 280);
+    g.addColorStop(0, 'rgba(255,190,80,.5)'); g.addColorStop(0.5, 'rgba(255,170,60,.16)'); g.addColorStop(1, 'rgba(255,170,60,0)');
+    c.fillStyle = g; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+    c.restore();
+    c.strokeStyle = 'rgba(200,228,255,.85)'; c.lineWidth = 5;
+    c.beginPath(); c.ellipse(hx, hy + 8, 81, 90, 0, Math.PI * 0.62, Math.PI * 1.25); c.stroke();
+    c.beginPath(); c.moveTo(hx - 136, 740); c.quadraticCurveTo(hx - 140, 478, hx - 30, 462); c.stroke();
+    // rayons dorés qui montent de la caisse
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 4; i++) {
+      const a = -Math.PI / 2 - 0.42 + i * 0.28;
+      g = c.createRadialGradient(hx + 128, 548, 10, hx + 128, 548, 210);
+      g.addColorStop(0, 'rgba(255,215,120,.2)'); g.addColorStop(1, 'rgba(255,215,120,0)');
+      c.fillStyle = g;
+      c.beginPath(); c.moveTo(hx + 128, 548); c.lineTo(hx + 128 + Math.cos(a - 0.09) * 210, 548 + Math.sin(a - 0.09) * 210); c.lineTo(hx + 128 + Math.cos(a + 0.09) * 210, 548 + Math.sin(a + 0.09) * 210); c.closePath(); c.fill();
+    }
+    c.restore();
+
+    // Premier plan : vague sombre et caisses qui flottent, coupées par les bords
+    caisseAffiche(c, 16, 668, 120, 96, 0.42, false);
+    caisseAffiche(c, 590, 600, 100, 82, -0.35, false);
+    g = c.createLinearGradient(0, 640, 0, y1);
+    g.addColorStop(0, '#12455c'); g.addColorStop(1, '#061822');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(x0, y1);
+    for (let x = x0; x <= x1; x += 8) c.lineTo(x, 690 + Math.sin(x / 70) * 18 + Math.sin(x / 23) * 5);
+    c.lineTo(x1, y1); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 4;
+    c.beginPath();
+    for (let x = x0; x <= x1; x += 8) { const yy = 690 + Math.sin(x / 70) * 18 + Math.sin(x / 23) * 5; if (x === x0) c.moveTo(x, yy); else c.lineTo(x, yy); }
+    c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.75)';
+    for (let i = 0; i < 26; i++) { rond(c, x0 + al() * (x1 - x0), 670 + al() * 30, 1.5 + al() * 3.5); c.fill(); }
+    // Pluie d'orage
+    c.strokeStyle = 'rgba(210,230,255,.28)'; c.lineWidth = 1.6;
+    for (let i = 0; i < 110; i++) { const x = x0 + al() * (x1 - x0), y = y0 + al() * (y1 - y0); c.beginPath(); c.moveTo(x, y); c.lineTo(x - 7, y + 22); c.stroke(); }
+  }
+
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    const cacher = () => document.querySelectorAll('.ecran, .voile, #toast, #confettis, button, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+    cacher();
+    setTimeout(cacher, 300);
+    setTimeout(cacher, 1200);
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine partie solo contre les robots, avec sa vraie interface (places,
+  // vivres, ration, caisses, cale, boutons), sans écran titre, ni fenêtre « Continuer », ni
+  // tutoriel. Le moment est posé par le code puis figé : aucun robot ne joue, rien ne se gagne ni
+  // ne se perd, aucun son, rien n'est écrit dans la sauvegarde, aucun réseau.
+  //   1 = niveau 1, jour 2 : trois naufragés, à toi de piocher, 11 sur une ration de 12 ;
+  //   2 = niveau 8 : six naufragés, le requin arrache la caisse de 9 de Vert, filet chez Orange ;
+  //   3 = niveau 20, la nuit dans la brume : marée, île où l'on troque sa dernière caisse, éclair.
+  let modeApercu = 0;
+  const T_APERCU = 40000;      // instant figé de la scène (vagues, aileron, voile)
+  const SCENES_APERCU = {
+    1: {
+      niveau: 1, jour: 2, cible: 12, voile: 'toile', prem: 1,
+      jr: [3, 2, 3], fini: [0, 1, 1], mal: [0, 1, 0], sc: [10, 0, 10],
+      main: [['n5', 'n4', 'n2'], ['n6', 'n6', 'n3'], ['n4', 'n6']]
+    },
+    2: {
+      niveau: 8, jour: 3, cible: 17, voile: 'rayures', prem: 1,
+      jr: [3, 2, 3, 1, 2, 3], fini: [0, 1, 1, 1, 1, 1], mal: [0, 0, 0, 1, 0, 0], sc: [40, 20, 30, 10, 30, 40],
+      main: [['n7', 'n3'], ['n8', 'n6', 'n2'], ['n-2', 'n7'], ['n6', 'n8', 'n5'], ['n4', 'n6', 'n3'], ['n5', 'f']],
+      tires: ['r', 'n9'], requin: { s: 0, a: 2, c: 'n9' }
+    },
+    3: {
+      niveau: 20, jour: 4, cible: 19, voile: 'nuit', hamecon: 'or', prem: 1, att: 'ile', vise: 2, eclair: 0.15,
+      jr: [2, 1, 2, 0, 1, 2], dep: [0, 0, 0, 3, 0, 0], fini: [0, 1, 1, 1, 1, 1], mal: [0, 0, 0, 0, 0, 0],
+      ham: [1, 0, 1, 0, 0, 1], sc: [55, 35, 45, 20, 35, 45],
+      main: [['n9', 'n6', 'n-2'], ['n7', 'n8'], ['n10', 'n3', 'n4'], [], ['n5', 'n6', 'n2'], ['n9', 'n-3', 'n8']],
+      tires: ['i']
+    }
+  };
+
+  function ouvrirApercu(numero) {
+    modeApercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 98765 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    prog.voile = sc.voile;
+    prog.hamecon = sc.hamecon || 'rouille';
+    dessinerIconeHamecon();
+    if (numero === 3) document.body.classList.add('apercu-large');
+    // État du niveau, posé à la main d'après les règles (jel-regles inchangées).
+    session = 'solo';
+    niveau = sc.niveau;
+    const e = apercu(niveau);
+    e.jour = sc.jour; e.cible = sc.cible; e.prem = sc.prem; e.tour = 0; e.att = sc.att || '';
+    for (let s = 0; s < PLACES; s++) {
+      if (e.jr[s] < 0) continue;
+      e.jr[s] = sc.jr[s]; e.dep[s] = sc.dep ? sc.dep[s] : 0; e.main[s] = sc.main[s].slice();
+      e.fini[s] = !!sc.fini[s]; e.mal[s] = !!sc.mal[s]; e.ham[s] = sc.ham ? sc.ham[s] : 0; e.sc[s] = sc.sc[s];
+    }
+    // La cale ne compte plus les caisses déjà tirées.
+    const tirees = [].concat.apply([], e.main).concat(sc.tires || []);
+    tirees.forEach((x) => { const i = e.pioche.indexOf(x); if (i >= 0) e.pioche.splice(i, 1); });
+    vue = e;
+    // Partie figée : aucun robot ne joue, aucun coup n'est accepté.
+    const sieges = [];
+    for (let s = 0; s < PLACES; s++) sieges.push({ humain: false, moi: s === 0, chef: false, nom: null });
+    partie = {
+      mode: 'solo', phase: 'jeu', siege: 0, manche: 0, chef: -1, etat: e,
+      sieges: () => sieges, monTour: () => true, jouer: () => false, pause: () => {}, quitter: () => {},
+      recommencer: () => false, estChef: () => false, lancerManche: () => false
+    };
+    afficherEcran('jeu');
+    choixTroc = sc.vise === undefined ? -1 : sc.vise;
+    majInterface();
+    if (sc.requin) {
+      // Le requin vient d'arracher la plus grosse caisse du radeau.
+      effets.requin = { a: sc.requin.a, t0: T_APERCU - 0.72 * 1300 };
+      jaillir(sc.requin.a, '#7fd0ff', 18);
+      for (let i = 0; i < 14; i++) dessinerScene(T_APERCU, 1 / 60);
+      toast(tr('ev.requin', { nom: nomSurv(sc.requin.s), victime: nomSurv(sc.requin.a), v: nb(O.valeur(sc.requin.c)) }), 600000);
+    }
+    if (sc.eclair) effets.eclair = T_APERCU - sc.eclair * 2500;
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5546,13 +5820,17 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && moi() >= 0 ? scoreDe(vue, moi()) : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(); });
+  window.addEventListener('resize', () => { if (ecran !== 'jeu' && ecran !== 'affiche') dessinerTitre(); });
 
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
   dessinerIconeHamecon();
+  // Affiche et images du jeu : posées par le robot du site seulement (CONSIGNES-JEU.md, section 5).
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) { ouvrirApercu(numeroApercu); return; }
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); dessinerIconeHamecon(); } }); } catch (e) { boutonEffacer = null; }
   afficherEcran('titre');
   // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
