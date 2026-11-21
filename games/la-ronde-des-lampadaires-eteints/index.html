@@ -3896,6 +3896,9 @@
   const tr = (cle, vars) => I18N.t(cle, vars);
   const nb = (x) => I18N.nombre(x);
   const $ = (id) => document.getElementById(id);
+  // Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé seulement par le robot
+  // (scripts/apercus-jeu.mjs). Le jeu s'ouvre alors en pleine nuit solo, figée, sans son ni sauvegarde.
+  const APERCU = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
 
   // Une couleur de capuche par place : 0 rouge, 1 vert, 2 bleu, 3 ambre.
   const COUL = ['#e2483d', '#3fae6a', '#4a8fe0', '#e8b130'];
@@ -4436,7 +4439,7 @@
   function posNoeud(g, i) { return [g.ox + (i % g.w) * g.cell, g.oy + Math.floor(i / g.w) * g.cell]; }
 
   // Immeubles d'un pâté de maisons ; plus il y a de lumière autour, plus les fenêtres s'allument.
-  function pate(c, e, g, bx, by, t) {
+  function pate(c, e, g, bx, by, t, ambiant) {
     const x0 = g.ox + bx * g.cell + g.cell * 0.17, y0 = g.oy + by * g.cell + g.cell * 0.17;
     const w = g.cell * 0.66, h = g.cell * 0.66;
     let allumes = 0, total = 0;
@@ -4445,7 +4448,8 @@
       total++;
       if (e.L[p[1] * e.w + p[0]] >= 1) allumes++;
     });
-    const frac = total ? allumes / total : 0;
+    // ambiant : quartiers autour de la ville (image d'ordinateur seulement), quelques fenêtres allumées.
+    const frac = total ? allumes / total : (ambiant || 0);
     const al = graineHasard(e.n * 7919 + (bx + 3) * 131 + (by + 3) * 977);
     const deux = al() < 0.5;
     const blocs = deux ? [[x0, y0, w * 0.48, h], [x0 + w * 0.52, y0, w * 0.48, h]] : [[x0, y0, w, h]];
@@ -4496,9 +4500,22 @@
     const P = (i) => posNoeud(g, i);
     // ciel et sol
     const ciel = c.createLinearGradient(0, 0, 0, H);
-    ciel.addColorStop(0, '#0b0d18'); ciel.addColorStop(1, '#05060a');
+    // (image d'ordinateur : nuit un peu plus claire, pour que la ville se lise en petit)
+    ciel.addColorStop(0, opt.large ? '#1a1e34' : '#0b0d18'); ciel.addColorStop(1, opt.large ? '#0e1020' : '#05060a');
     c.fillStyle = ciel; c.fillRect(0, 0, W, H);
     // pâtés (y compris ceux du bord, coupés par le cadre)
+    if (opt.large) {
+      // Image d'ordinateur : la ville continue jusqu'aux bords de l'écran.
+      const bx0 = Math.floor(-g.ox / cell) - 1, bx1 = Math.ceil((W - g.ox) / cell);
+      const by0 = Math.floor(-g.oy / cell) - 1, by1 = Math.ceil((H - g.oy) / cell);
+      for (let by = by0; by <= by1; by++) {
+        for (let bx = bx0; bx <= bx1; bx++) {
+          if (bx >= -1 && bx < e.w && by >= -1 && by < e.h) continue;
+          const loin = Math.max(bx < 0 ? -bx : bx - e.w + 1, by < 0 ? -by : by - e.h + 1);
+          pate(c, e, g, bx, by, t, Math.max(0.08, 0.34 - loin * 0.04));
+        }
+      }
+    }
     for (let by = -1; by < e.h; by++) for (let bx = -1; bx < e.w; bx++) pate(c, e, g, bx, by, t);
     // rues
     c.lineCap = 'round';
@@ -4950,7 +4967,8 @@
     if (curseur >= 0 && coups.indexOf(curseur) < 0) curseur = -1;
     geo = dessinerVille(c, vue, w, h, t, {
       coups: coups, curseur: clavier ? curseur : -1, survol: survol, anims: anims,
-      moi: partie ? partie.siege : -1, tourVisible: !!(partie && partie.phase === 'jeu'), brouillard: brouillardActif(t)
+      moi: partie ? partie.siege : -1, tourVisible: !!(partie && partie.phase === 'jeu'), brouillard: brouillardActif(t),
+      large: APERCU === 3
     });
     // étincelles et nombres qui s'envolent
     for (let i = particules.length - 1; i >= 0; i--) {
@@ -6221,6 +6239,70 @@
   }
 
   // ---------------------------------------------------------------------
+  //  Images du jeu (window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement)
+  // ---------------------------------------------------------------------
+  // 1 : nuit 1, question « silhouette » ouverte sur la ville ; 2 : nuit 10, mon tour en cours
+  // (rues en jeu, clés, fusibles, doubles, ampoules) ; 3 : nuit 16 sur ordinateur, faux veilleurs
+  // et Ombre toute proche. La nuit est jouée d'avance par les robots des règles (hasard à graine
+  // fixe : toujours la même image), puis figée : la partie affichée ne reçoit plus aucun coup.
+  const MOMENTS_APERCU = {
+    1: { niveau: 1, ok: (e) => e.ro >= 2 && e.ph === 'q' && e.q.k === 'o' && e.sc[0] >= 1 },
+    2: { niveau: 10, ok: (e) => e.ro >= 2 && e.sc[0] >= 2 && e.ph === 'c' && e.nt >= 2 && O.coups(e, 0).length >= 2 && compte(e.F) >= 1 && compte(e.X) >= 1 && e.K.some((k) => k >= 0) },
+    3: { niveau: 16, ok: (e) => e.ro >= 3 && e.ph === 'c' && e.nt >= 1 && O.coups(e, 0).length >= 2 && compte(e.M) >= 1 && compte(e.F) >= 1 && O.distances(e, e.o)[e.v[0]] === 2 }
+  };
+  function compte(l) { return l.filter((x) => x > 0).length; }
+
+  // Joue la nuit avec les robots des règles (le veilleur rouge, le mien, joue bien) jusqu'au moment voulu.
+  function nuitApercu(m) {
+    for (let graine = 1; graine < 400; graine++) {
+      let a = graine * 7919 + 17;
+      const alea = () => { a = (a * 1103515245 + 12345) % 2147483648; return a / 2147483648; };
+      const e = R.depart(alea, PLACES, { niveau: m.niveau });
+      const fo = e.fo;
+      for (let coup = 0; coup < 400; coup++) {
+        const s = R.aQui(e);
+        if (s === 0 && e.el.every((x) => x === 0) && e.fl[0] === NIVEAUX[e.n].fl && m.ok(e)) return e;
+        e.fo = s === 0 ? 0.95 : fo;
+        const act = R.bot(e, s, alea, e.fo);
+        e.fo = fo;
+        if (!R.valide(e, s, act)) break;
+        R.jouer(e, s, act, alea);
+        if (R.fin(e)) break;
+      }
+    }
+    return null;
+  }
+
+  function ouvrirApercu(n) {
+    const m = MOMENTS_APERCU[n];
+    const e = nuitApercu(m);
+    if (!e) return false;
+    prog.options.son = false;                  // aucun son
+    prog.lanterne = 0;
+    majBoutonsSon();
+    session = 'solo';
+    niveau = m.niveau;
+    enPartie = false;                          // rien d'écrit à la fermeture
+    // Partie figée : la nuit solo contre les robots, sans réseau, qui n'accepte plus aucun coup.
+    partie = {
+      mode: 'solo', phase: 'jeu', siege: 0, manche: 0, chef: -1, etat: e,
+      sieges: () => [0, 1, 2, 3].map((s) => ({ moi: s === 0, humain: s === 0, chef: false })),
+      monTour: () => R.aQui(e) === 0, jouer: () => false, pause: () => {}, quitter: () => {},
+      recommencer: () => false, lancerManche: () => false, estChef: () => false
+    };
+    vue = JSON.parse(JSON.stringify(e));
+    anims = { veil: {}, ombre: null, flash: {} };
+    particules.length = 0;
+    afficherEcran('jeu');
+    if (vue.ph === 'q' && vue.q) {
+      ouvrirQuestion(vue.q, 0);
+      $('question').style.animation = 'none';
+    }
+    majInterface();
+    return true;
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -6255,7 +6337,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !APERCU && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une nuit solo.
@@ -6271,6 +6353,8 @@
   if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
   construirePlaces();
   majBoutonsSon();
+  // Images du jeu (robot du site seulement) : directement en pleine nuit, sans écran titre ni fenêtre.
+  if (APERCU && ouvrirApercu(APERCU)) return;
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
   afficherEcran('titre');
   // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement

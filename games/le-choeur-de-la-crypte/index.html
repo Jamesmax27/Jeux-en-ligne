@@ -3553,9 +3553,10 @@
   //  Géométrie de l'orgue dans la partie
   // ---------------------------------------------------------------------
 
+  let orgueLarge = false;     // image du jeu sur ordinateur (JEL_APERCU = 3) : orgue élargi
   function geometrieOrgue(k, w, h) {
     const marge = 10, gap = Math.max(5, w * 0.014);
-    const pw = Math.max(36, Math.min(66, (Math.min(w, 620) - 2 * marge - gap * (k - 1)) / k));
+    const pw = Math.max(36, Math.min(orgueLarge ? 112 : 66, (Math.min(w, orgueLarge ? w * 0.8 : 620) - 2 * marge - gap * (k - 1)) / k));
     const tot = k * pw + (k - 1) * gap;
     const ox = (w - tot) / 2;
     const bas = h - Math.max(18, h * 0.06);
@@ -4813,15 +4814,300 @@
     if (enPartie && session === 'solo') sauver(niveau, vue ? vue.sc[0] : 0);
   });
 
+  // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Ta grande bougie brûle
+  // devant l'orgue de pierre au clair de lune ; un tuyau chante, ses notes montent vers la lune ; la
+  // main squelettique surgit du bord droit et rampe vers la bougie, dont la flamme se couche de peur.
+
+  // Grande bougie de l'affiche (couleur de la place s), flamme penchée de « penche ».
+  function grandeBougie(c, x, base, haut, lw, s, penche, t) {
+    // bougeoir de laiton
+    const gb = c.createLinearGradient(x - lw, 0, x + lw, 0);
+    gb.addColorStop(0, '#5a4128'); gb.addColorStop(0.45, '#c99a52'); gb.addColorStop(1, '#4a321c');
+    c.fillStyle = gb; ell(c, x, base, lw * 1.05, lw * 0.26); c.fill();
+    c.fillStyle = '#7a5a34'; rr(c, x - lw * 0.62, base - lw * 0.32, lw * 1.24, lw * 0.34, lw * 0.1); c.fill();
+    // cire
+    const g = c.createLinearGradient(x - lw / 2, 0, x + lw / 2, 0);
+    g.addColorStop(0, COUL_F[s]); g.addColorStop(0.42, COUL[s]); g.addColorStop(0.62, '#fff1cf'); g.addColorStop(1, COUL_F[s]);
+    c.fillStyle = g; c.fillRect(x - lw / 2, haut, lw, base - lw * 0.3 - haut);
+    c.fillStyle = '#ffe2a6'; ell(c, x, haut, lw / 2, lw * 0.12); c.fill();
+    // coulures
+    c.fillStyle = COUL[s];
+    [[-0.5, 0.34], [-0.12, 0.2], [0.3, 0.46]].forEach(([dx, l]) => { rr(c, x + dx * lw, haut - 2, lw * 0.2, (base - haut) * l, lw * 0.1); c.fill(); });
+    // emblème peint sur la cire
+    embleme(c, s, x, haut + (base - haut) * 0.52, lw * 0.32, COUL_F[s]);
+    // mèche et flamme
+    c.strokeStyle = '#1a1a1a'; c.lineWidth = Math.max(2, lw * 0.05);
+    c.beginPath(); c.moveTo(x, haut); c.lineTo(x - penche * 0.12, haut - lw * 0.22); c.stroke();
+    const fh = lw * 2.1, v = Math.sin(t / 90) * 0.05;
+    c.save();
+    c.shadowColor = '#ffb84a'; c.shadowBlur = lw * 0.9;
+    c.fillStyle = '#ff9a2e';
+    c.beginPath(); c.moveTo(x - penche, haut - fh * (1 + v));
+    c.quadraticCurveTo(x + lw * 0.42, haut - fh * 0.35, x, haut - lw * 0.12);
+    c.quadraticCurveTo(x - lw * 0.46, haut - fh * 0.3, x - penche, haut - fh * (1 + v)); c.fill();
+    c.fillStyle = '#ffd36b';
+    c.beginPath(); c.moveTo(x - penche * 0.8, haut - fh * 0.8);
+    c.quadraticCurveTo(x + lw * 0.26, haut - fh * 0.3, x, haut - lw * 0.15);
+    c.quadraticCurveTo(x - lw * 0.3, haut - fh * 0.26, x - penche * 0.8, haut - fh * 0.8); c.fill();
+    c.shadowBlur = 0;
+    c.fillStyle = '#fffbe8'; ell(c, x - penche * 0.2, haut - lw * 0.5, lw * 0.11, lw * 0.28, -0.25); c.fill();
+    c.restore();
+  }
+
+  // Note de musique dessinée (tête, hampe, crochet), couleur coul.
+  function noteMusique(c, x, y, r, coul, rot) {
+    c.save(); c.translate(x, y); c.rotate(rot || 0);
+    c.fillStyle = coul; c.strokeStyle = coul; c.shadowColor = coul; c.shadowBlur = r * 1.4;
+    ell(c, 0, 0, r, r * 0.72, -0.4); c.fill();
+    c.lineWidth = r * 0.28; c.beginPath(); c.moveTo(r * 0.85, -r * 0.2); c.lineTo(r * 0.85, -r * 3.2); c.stroke();
+    c.beginPath(); c.moveTo(r * 0.85, -r * 3.2); c.quadraticCurveTo(r * 2.2, -r * 2.4, r * 1.6, -r * 1.3); c.stroke();
+    c.restore();
+  }
+
+  // Main squelettique de l'affiche (la même que celle des bougies, en grand) : avant-bras sorti du
+  // bord droit, os des doigts articulés, griffes recourbées vers la bougie.
+  function mainAffiche(c) {
+    const os = [], jointures = [], griffes = [];
+    os.push([680, 456, 478, 436, 24], [680, 506, 478, 478, 22]);
+    jointures.push([478, 436, 15], [478, 478, 14], [458, 444, 10], [452, 462, 11], [462, 470, 9], [446, 480, 9]);
+    [[402, 402, -1], [392, 432, 0], [392, 461, 1], [402, 490, 2]].forEach(([kx, ky, b], i) => {
+      os.push([450, 444 + i * 12, kx, ky, 13]);
+      const p1x = kx - 50 + i * 4, p1y = ky - 8 + b * 3;
+      const p2x = p1x - 34, p2y = p1y + 18 + i * 2;
+      os.push([kx, ky, p1x, p1y, 12], [p1x, p1y, p2x, p2y, 10]);
+      jointures.push([kx, ky, 9], [p1x, p1y, 8], [p2x, p2y, 7]);
+      griffes.push([p2x, p2y, p2x - 18, p2y + 22]);
+    });
+    os.push([452, 488, 428, 524, 12], [428, 524, 400, 538, 10]);
+    jointures.push([428, 524, 8], [400, 538, 7]);
+    griffes.push([400, 538, 378, 552]);
+    c.save();
+    c.lineCap = 'round';
+    // contour sombre et lueur violette, puis l'os
+    c.shadowColor = '#c27bff'; c.shadowBlur = 28;
+    c.strokeStyle = '#2a1d3a'; c.fillStyle = '#2a1d3a';
+    os.forEach(([a, b, x, y, w]) => { c.lineWidth = w + 7; c.beginPath(); c.moveTo(a, b); c.lineTo(x, y); c.stroke(); });
+    jointures.forEach(([x, y, r]) => { rond(c, x, y, r + 3.5); c.fill(); });
+    griffes.forEach(([a, b, x, y]) => { c.lineWidth = 14; c.beginPath(); c.moveTo(a, b); c.quadraticCurveTo(x - 4, b + 4, x, y); c.stroke(); });
+    c.shadowBlur = 0;
+    c.strokeStyle = '#efe6d2'; c.fillStyle = '#efe6d2';
+    os.forEach(([a, b, x, y, w]) => { c.lineWidth = w; c.beginPath(); c.moveTo(a, b); c.lineTo(x, y); c.stroke(); });
+    jointures.forEach(([x, y, r]) => { rond(c, x, y, r); c.fill(); });
+    griffes.forEach(([a, b, x, y]) => { c.lineWidth = 7; c.beginPath(); c.moveTo(a, b); c.quadraticCurveTo(x - 4, b + 4, x, y); c.stroke(); });
+    // reflets de lune sur le dessus des os
+    c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 3;
+    os.forEach(([a, b, x, y, w]) => { c.beginPath(); c.moveTo(a, b - w * 0.28); c.lineTo(x, y - w * 0.28); c.stroke(); });
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (!W || !H) return;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const c = cv.getContext('2d');
+    const t = 1800;
+    const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Mur de la crypte sur toute la largeur, éclairé par la lune
+    const mur = c.createLinearGradient(0, 0, 0, H);
+    mur.addColorStop(0, '#3a3050'); mur.addColorStop(0.6, '#241d33'); mur.addColorStop(1, '#120e1a');
+    c.fillStyle = mur; c.fillRect(0, 0, W, H);
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    const gx0 = -ox / k, gw = W / k, gy0 = -oy / k, gh = H / k; // bords de l'écran en coordonnées de l'affiche
+    c.strokeStyle = 'rgba(255,255,255,0.07)'; c.lineWidth = 1.5;
+    for (let y = gy0 - (gy0 % 34) - 34, r = 0; y < gy0 + gh; y += 34, r++) {
+      c.beginPath(); c.moveTo(gx0, y); c.lineTo(gx0 + gw, y); c.stroke();
+      for (let x = gx0 - (gx0 % 80) - 80 + (r % 2) * 40; x < gx0 + gw; x += 80) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 34); c.stroke(); }
+    }
+    // Grand halo de lune
+    const halo = c.createRadialGradient(385, 215, 20, 385, 215, 520);
+    halo.addColorStop(0, 'rgba(200,205,255,.55)'); halo.addColorStop(0.5, 'rgba(150,140,230,.18)'); halo.addColorStop(1, 'rgba(150,140,230,0)');
+    c.fillStyle = halo; c.fillRect(gx0, gy0, gw, gh);
+    // Arche gothique au clair de lune
+    const ciel = c.createRadialGradient(385, 215, 30, 330, 300, 420);
+    ciel.addColorStop(0, '#a9a6e6'); ciel.addColorStop(0.35, '#6a62aa'); ciel.addColorStop(0.75, '#352c5c'); ciel.addColorStop(1, '#221a38');
+    arche(c, 300, 120, 500, 760, ciel);
+    // Lune
+    c.save(); c.fillStyle = '#f2f3ff'; c.shadowColor = '#dfe3ff'; c.shadowBlur = 70;
+    rond(c, 385, 215, 64); c.fill(); c.restore();
+    c.fillStyle = 'rgba(170,175,215,.45)';
+    rond(c, 365, 200, 13); c.fill(); rond(c, 405, 238, 9); c.fill(); rond(c, 398, 190, 6); c.fill();
+    // Chauves-souris devant la lune
+    embleme(c, 0, 352, 238, 22, '#140f20');
+    embleme(c, 0, 190, 170, 14, '#140f20');
+    embleme(c, 0, 470, 132, 11, '#140f20');
+    // Lumière chaude de ta bougie, sur le mur et l'orgue
+    const bx = 215, chaud = c.createRadialGradient(bx, 330, 10, bx, 330, 340);
+    chaud.addColorStop(0, 'rgba(255,214,140,.6)'); chaud.addColorStop(0.4, 'rgba(255,160,70,.22)'); chaud.addColorStop(1, 'rgba(255,160,70,0)');
+    c.fillStyle = chaud; c.fillRect(gx0, gy0, gw, gh);
+    // Orgue de pierre : un tuyau chante (lumière bleue), un tuyau maudit brille de violet
+    const pw = 48, gap = 10, x0 = 300 - (7 * pw + 6 * gap) / 2, bas = 600;
+    for (let i = 0; i < 7; i++) {
+      const ph = 330 * (0.62 + 0.38 * (1 - Math.abs(i - 3) / 3));
+      dessinerTuyau(c, x0 + i * (pw + gap), bas - ph, pw, ph, {
+        idx: i, lum: i === 4 ? 1 : (i === 2 ? 0.55 : 0.28), orgue: 0, t: t, maudit: i === 1
+      });
+    }
+    c.fillStyle = '#2b2533'; rr(c, x0 - 16, bas - 4, 7 * pw + 6 * gap + 32, 44, 10); c.fill();
+    c.strokeStyle = '#7d7194'; c.lineWidth = 3; c.stroke();
+    // Notes qui montent du tuyau qui chante, dans sa colonne de lumière
+    const nx = x0 + 4 * (pw + gap) + pw / 2, ny = bas - 330 * (0.62 + 0.38 * (2 / 3));
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    const faisceau = c.createLinearGradient(0, ny + 40, 0, 90);
+    faisceau.addColorStop(0, 'rgba(79,195,255,.55)'); faisceau.addColorStop(1, 'rgba(79,195,255,0)');
+    c.fillStyle = faisceau;
+    c.beginPath(); c.moveTo(nx - pw * 0.5, ny + 40); c.lineTo(nx + pw * 0.5, ny + 40); c.lineTo(nx + 110, 90); c.lineTo(nx - 70, 90); c.closePath(); c.fill();
+    const eclat = c.createRadialGradient(nx, ny + 20, 4, nx, ny + 20, 90);
+    eclat.addColorStop(0, 'rgba(160,225,255,.8)'); eclat.addColorStop(1, 'rgba(79,195,255,0)');
+    c.fillStyle = eclat; rond(c, nx, ny + 20, 90); c.fill();
+    c.restore();
+    [[nx + 10, 245, 11, 0.1], [nx + 60, 190, 13, -0.15], [nx - 30, 150, 9, 0.2], [nx + 95, 118, 10, 0.05]].forEach(([x, y, r, a], i) => noteMusique(c, x, y, r, GEMMES[[4, 6, 3, 2][i]], a));
+    // Rebord de pierre, sur toute la largeur
+    c.fillStyle = '#3a3146'; c.fillRect(gx0, 640, gw, gy0 + gh - 640);
+    c.fillStyle = '#5a4f6a'; c.fillRect(gx0, 640, gw, 6);
+    const sol = c.createLinearGradient(0, 646, 0, 800);
+    sol.addColorStop(0, 'rgba(255,170,80,.22)'); sol.addColorStop(1, 'rgba(0,0,0,.35)');
+    c.fillStyle = sol; c.fillRect(gx0, 646, gw, gy0 + gh - 646);
+    // Bougies des autres chanteurs, plus loin, coupées par les bords
+    grandeBougie(c, 40, 668, 520, 34, 1, -6, t + 300);
+    grandeBougie(c, 548, 690, 600, 30, 3, 4, t + 700);
+    // Ta bougie, en grand, flamme couchée vers la gauche (loin de la main)
+    grandeBougie(c, bx, 668, 410, 78, 0, 46, t);
+    // La main squelettique, sortie du bord droit, doigts tendus vers la bougie
+    mainAffiche(c);
+    // Petits crânes sur le rebord, brume au sol
+    crane(c, 118, 694, 15, '#d8d0bf'); crane(c, 470, 712, 12, '#bfb6a8');
+    c.fillStyle = 'rgba(200,190,240,0.13)';
+    for (let i = 0; i < 7; i++) { ell(c, gx0 + (i / 6) * gw, 700 + (i % 2) * 22, 150, 26); c.fill(); }
+    // Coins plus sombres (ambiance de crypte), le centre reste éclairé
+    const vign = c.createRadialGradient(300, 380, 260, 300, 400, 620);
+    vign.addColorStop(0, 'rgba(8,5,14,0)'); vign.addColorStop(1, 'rgba(8,5,14,.6)');
+    c.fillStyle = vign; c.fillRect(gx0, gy0, gw, gh);
+    // Toiles d'araignée dans les coins du haut de l'écran
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    toile(c, 0, 0, Math.min(W, H) * 0.24, 1, 1);
+    toile(c, W, 0, Math.min(W, H) * 0.2, -1, 1);
+  }
+
+  function cacherPourAffiche() {
+    document.querySelectorAll('.ecran, .voile, #toast, #confettis, button, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+    $('fond').style.display = 'block';
+  }
+  function demarrerAffiche() {
+    cacherPourAffiche();
+    dessinerAffiche();
+    // Le bouton de langue peut être créé après ce script : on le cache encore un peu plus tard.
+    setTimeout(cacherPourAffiche, 200);
+    setTimeout(cacherPourAffiche, 1000);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie solo contre les robots, avec sa vraie interface (bougies des places,
+  // niveau, chant, pièges), sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md,
+  // section 5). Les tours sont joués par les règles (jel-regles) avec un hasard fixe jusqu'au tour du
+  // joueur, qui rejoue le chant ; l'image est ensuite figée, sans fenêtre de pause : ni son, ni
+  // réseau, ni sauvegarde.
+  //   1 = niveau 1 : petit orgue de 4 tuyaux, deux robots ;
+  //   2 = niveau 9 : orgue de 6 tuyaux, passage à rebours, la main a avancé sur un robot ;
+  //   3 = niveau 20 (crypte bonus) : orgue d'os à 7 tuyaux, tuyau maudit, brouillard, voix échangées,
+  //       une bougie éteinte ; sur ordinateur, orgue élargi.
+  const SCENES_APERCU = {
+    1: { niveau: 1, graine: 11, chant: 4, pos: 2, crans: { 2: 1 } },
+    2: { niveau: 9, graine: 23, chant: 6, pos: 3, rebours: true, crans: { 2: 1, 3: 2 }, annonce: 'rebours' },
+    3: { niveau: 20, graine: 37, chant: 9, pos: 4, maudit: 3, brume: 1, echange: [1, 5], crans: { 1: 1 }, eteinte: 4, orgue: 1, annonce: 'echo', large: true }
+  };
+  let apercuFige = null;
+
+  function etatApercu(sc) {
+    const alea = window.JEL_MULTI.hasard(sc.graine);
+    const e = R.depart(alea, PLACES, { niveau: sc.niveau });
+    // Tours joués par les règles : robots selon leur force, joueur sans faute.
+    for (let g = 0; g < 300 && !e.fini && (e.mel.length < sc.chant || e.tour !== 0); g++) {
+      if (e.tour === 0) {
+        const der = e.mel[e.mel.length - 1];
+        let n = (der + 2) % e.k;
+        while (n === e.mt || n === der) n = (n + 1) % e.k;
+        R.jouer(e, 0, e.att.slice(e.pos).concat([n]), alea);
+      } else R.jouer(e, e.tour, R.bot(e, e.tour, alea), alea);
+    }
+    // Pièges du tour, posés pour l'image.
+    e.fini = false; e.tour = 0;
+    e.mt = sc.maudit !== undefined ? sc.maudit : -1;
+    e.rv = !!sc.rebours;
+    e.bp = sc.brume !== undefined ? sc.brume : -1;
+    e.sw = null;
+    if (sc.echange) { const [a, b] = sc.echange; const v = e.vx[a]; e.vx[a] = e.vx[b]; e.vx[b] = v; e.sw = [a, b]; }
+    e.att = (e.rv ? e.mel.slice().reverse() : e.mel.slice()).filter((p) => p !== e.mt);
+    e.pos = 0;
+    for (let s = 0; s < PLACES; s++) if (e.el[s] > 0) { e.el[s] = 0; e.cr[s] = 0; }
+    e.nel = 0;
+    if (sc.crans) Object.keys(sc.crans).forEach((s) => { if (e.el[s] === 0) e.cr[s] = Math.min(e.mx - 1, sc.crans[s]); });
+    if (sc.eteinte !== undefined && e.el[sc.eteinte] === 0) { e.cr[sc.eteinte] = e.mx; e.nel = 1; e.el[sc.eteinte] = 1; }
+    e.cr[0] = Math.min(e.cr[0], e.mx - 1);
+    // Le joueur a déjà rejoué le début du chant.
+    for (let i = 0; i < sc.pos && e.pos < e.att.length; i++) R.jouer(e, 0, e.att[e.pos], alea);
+    return e;
+  }
+
+  function dessinerApercuFige() {
+    if (!apercuFige) return;
+    dessinerJeu(apercuFige.t, 0);
+    dessinerPlaces(apercuFige.t);
+  }
+
+  function ouvrirApercu(numero) {
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 98765 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    prog.orgue = sc.orgue || 0; // en mémoire seulement (rien n'est enregistré)
+    orgueLarge = !!sc.large;
+    if (sc.large) ['places', 'infos'].forEach((id) => { $(id).style.maxWidth = '980px'; });
+    session = 'solo';
+    niveau = sc.niveau;
+    vue = etatApercu(sc);
+    enPause = true; // la boucle d'affichage ne tourne pas : l'image est dessinée puis figée
+    afficherEcran('jeu');
+    majInterface();
+    if (sc.annonce) annonce(tr('annonce.' + sc.annonce), 600000);
+    // Le joueur vient de toucher le bon tuyau : il s'allume et lance ses étincelles.
+    const t0 = 100000;
+    dessinerJeu(t0, 0);
+    const p = vue.att[vue.pos - 1], avant = vue.att[vue.pos - 2];
+    if (p !== undefined) jaillir(p, GEMMES[p % GEMMES.length], 14);
+    for (let i = 1; i <= 14; i++) dessinerJeu(t0 + i * 20, 0.02);
+    const t = t0 + 300;
+    if (p !== undefined) lueurs[p] = t - 90;
+    if (avant !== undefined) lueurs[avant] = t - 400;
+    if (sc.echange) echange = { a: sc.echange[0], b: sc.echange[1], t: t - 650 };
+    apercuFige = { t: t };
+    dessinerApercuFige();
+    window.addEventListener('resize', () => requestAnimationFrame(dessinerApercuFige));
+  }
+
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else {
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>

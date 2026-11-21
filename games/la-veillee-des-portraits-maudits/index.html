@@ -3881,7 +3881,7 @@
       if (te < 450) x += Math.sin(te / 25) * 4 * (1 - te / 450);
       const pris = e.p[i] >= 0;
       let alpha = 1;
-      if (e.noir && !(t < aff.montre[i]) && !(i === e.prem && t < aff.montre[i])) alpha = pris ? 0.42 : 0.3;
+      if (e.noir && !(t < aff.montre[i]) && !(i === e.prem && t < aff.montre[i])) alpha = apercuNum ? (pris ? 0.66 : 0.52) : (pris ? 0.42 : 0.3); // images de la page : un peu plus clair
       const tr2 = t - aff.trouve[i];
       let k = 1;
       if (tr2 < 600) k = 1 + 0.12 * Math.sin(tr2 / 600 * Math.PI);
@@ -4002,6 +4002,9 @@
   let survol = -1, curseur = -1, clavier = false;
   let dernierAttends = 0;
   const particules = [];
+  // Images de la page du jeu (window.JEL_APERCU, posé par le robot du site) :
+  // numéro de l'image (1, 2, 3) et heure figée du dessin ; 0 en partie normale.
+  let apercuNum = 0, apercuT = 0;
 
   function afficherEcran(nom) {
     ecran = nom;
@@ -4169,9 +4172,10 @@
   function boucle(t) {
     rafId = 0;
     if (ecran !== 'jeu' || enPause) return;
-    const dt = Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
+    // Image de la page du jeu : moment figé (même heure, rien ne bouge).
+    const dt = apercuT ? 0 : Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
     tPrec = t;
-    const now = performance.now();
+    const now = apercuT || performance.now();
     dessinerJeu(now, dt);
     dessinerCouloir(now);
     majTemps();
@@ -4194,6 +4198,7 @@
     const lg = c.createRadialGradient(w / 2, h * 0.55, 0, w / 2, h * 0.55, Math.max(w, h) * 0.7);
     lg.addColorStop(0, vue.noir ? 'rgba(80,90,140,.10)' : 'rgba(255,190,110,.16)'); lg.addColorStop(1, 'rgba(0,0,0,.35)');
     c.fillStyle = lg; c.fillRect(0, 0, w, h);
+    if (apercuNum) decorApercu(c, w, h, geo, t);
     const moi = partie ? partie.siege : -1;
     dessinerGalerie(c, vue, geo, {
       t: t, dpr: dpr, survol: partie && partie.monTour() ? survol : -1,
@@ -5015,6 +5020,446 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche du jeu (jaquette) : window.JEL_AFFICHE, posé par le robot du site
+  // ---------------------------------------------------------------------
+  // Une scène composée, sans interface ni texte (CONSIGNES-JEU.md, section 5) :
+  // le chat veilleur, sa bougie levée, arrache le voile d'un portrait maudit
+  // (le corbeau aux yeux rouges) ; derrière lui, au bout de la galerie, la Dame
+  // Pâle avance dans la lumière de la lune. La chouette veille sur le cadre, la
+  // chauve-souris passe sous le plafond.
+
+  // Le chat veilleur en grand, tête centrée en (0, 0) (mêmes mesures que son médaillon).
+  function chatAffiche(c, t) {
+    const fourrure = '#3a3242', sombre = '#221c2a';
+    // queue qui s'enroule derrière lui
+    c.strokeStyle = sombre; c.lineWidth = 11;
+    c.beginPath(); c.moveTo(30, 132); c.bezierCurveTo(78, 128, 86, 82, 64, 64); c.stroke();
+    // cape lavande (la couleur du joueur 1), doublure sombre
+    const g = c.createLinearGradient(-50, 40, 60, 150);
+    g.addColorStop(0, '#d2bcff'); g.addColorStop(0.45, COUL[0]); g.addColorStop(1, COUL_F[0]);
+    c.fillStyle = COUL_F[0];
+    c.beginPath(); c.moveTo(-30, 40); c.bezierCurveTo(-58, 80, -66, 130, -70, 160); c.lineTo(70, 160); c.bezierCurveTo(64, 126, 56, 80, 30, 40); c.closePath(); c.fill();
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(-28, 38); c.bezierCurveTo(-50, 80, -56, 128, -58, 160); c.lineTo(58, 160); c.bezierCurveTo(54, 124, 48, 80, 28, 38); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(40,20,90,.45)'; c.lineWidth = 2.2;
+    [[-30, 70, -42, 156], [-8, 66, -12, 158], [14, 66, 20, 158], [32, 76, 42, 156]].forEach((p) => { c.beginPath(); c.moveTo(p[0], p[1]); c.quadraticCurveTo(p[0] + 4, (p[1] + p[3]) / 2, p[2], p[3]); c.stroke(); });
+    // poitrail clair et col doré
+    c.fillStyle = '#5a5064'; ell(c, 0, 50, 17, 16); c.fill();
+    c.fillStyle = '#e2b85a'; rr(c, -24, 34, 48, 7, 3); c.fill();
+    c.fillStyle = '#ff6a86'; rond(c, 0, 38, 4.5); c.fill();
+    // bras gauche tendu vers le voile du portrait
+    c.strokeStyle = '#8f6ae0'; c.lineWidth = 15;
+    c.beginPath(); c.moveTo(-24, 50); c.quadraticCurveTo(-52, 46, -70, 20); c.stroke();
+    // bras droit levé, qui tient la bougie
+    c.beginPath(); c.moveTo(24, 50); c.quadraticCurveTo(46, 40, 46, 6); c.stroke();
+    // oreilles
+    c.fillStyle = fourrure;
+    tri(c, -36, -6, -34, -48, -8, -28); c.fill(); tri(c, 30, -8, 32, -46, 6, -28); c.fill();
+    c.fillStyle = '#b06a90'; tri(c, -30, -12, -30, -38, -15, -26); c.fill(); tri(c, 25, -13, 27, -36, 13, -26); c.fill();
+    // tête, éclairée par la bougie à droite
+    const gt = c.createRadialGradient(22, -6, 4, 6, 6, 46);
+    gt.addColorStop(0, '#8a7280'); gt.addColorStop(0.5, '#4a4052'); gt.addColorStop(1, '#262030');
+    c.fillStyle = gt; ell(c, 0, 4, 37, 32); c.fill();
+    // touffes des joues
+    c.fillStyle = '#4a4052'; tri(c, -36, 8, -46, 16, -32, 20); c.fill(); tri(c, 36, 8, 46, 14, 32, 20); c.fill();
+    // grands yeux verts qui regardent vers le portrait (à gauche)
+    [[-15, 0], [11, 0]].forEach(([x, y]) => {
+      c.fillStyle = '#eaffd8'; ell(c, x, y, 10, 9.5); c.fill();
+      const gy = c.createRadialGradient(x - 2, y, 1, x - 2, y, 9);
+      gy.addColorStop(0, '#d8ff9a'); gy.addColorStop(1, '#5ad040');
+      c.fillStyle = gy; ell(c, x - 2, y, 7.5, 8); c.fill();
+      c.fillStyle = '#0d0a10'; ell(c, x - 4, y, 3, 6.5); c.fill();
+      c.fillStyle = '#fff'; rond(c, x - 1, y - 3.5, 2.2); c.fill(); rond(c, x - 5.5, y + 3, 1); c.fill();
+    });
+    // sourcils inquiets
+    c.strokeStyle = '#d8c8e0'; c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(-24, -13); c.lineTo(-8, -10); c.moveTo(3, -10); c.lineTo(18, -14); c.stroke();
+    // museau, bouche entrouverte, moustaches
+    c.fillStyle = '#e07aa0'; tri(c, -6, 11, 2, 11, -2, 16); c.fill();
+    c.fillStyle = '#1a0a12'; ell(c, -2, 21, 4.5, 4); c.fill();
+    c.fillStyle = '#e07aa0'; ell(c, -2, 23, 2.6, 1.6); c.fill();
+    c.strokeStyle = '#efe6f4'; c.lineWidth = 1.3;
+    c.beginPath(); c.moveTo(-10, 15); c.lineTo(-40, 9); c.moveTo(-10, 18); c.lineTo(-40, 20); c.moveTo(6, 15); c.lineTo(36, 9); c.moveTo(6, 18); c.lineTo(36, 20); c.stroke();
+    // pattes
+    c.fillStyle = fourrure; rond(c, -71, 19, 8); c.fill(); rond(c, 46, 6, 8); c.fill();
+    // bougeoir et bougie dans la patte droite
+    c.fillStyle = '#c99a3a'; ell(c, 46, 0, 12, 3.5); c.fill();
+    c.fillStyle = '#e2b85a'; rr(c, 42, -4, 8, 6, 2); c.fill();
+    bougie(c, 46, -4, 26, t);
+    // contour clair de la lune sur l'épaule gauche
+    c.strokeStyle = 'rgba(200,220,255,.55)'; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(-30, 40); c.bezierCurveTo(-58, 80, -66, 130, -70, 160); c.stroke();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.style.display = 'block';
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const c = cv.getContext('2d');
+    // Scène dessinée en 600 × 800, centrée ; le décor continue jusqu'aux bords.
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    const L = -ox / k - 2, D = (w - ox) / k + 2, H0 = -oy / k - 2, B = (h - oy) / k + 2;
+    const t = 1300;
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    // Galerie en perspective : fond au bout (x 252 à 348, y 250 à 372).
+    const VX0 = 252, VX1 = 348, VY0 = 250, VY1 = 372;
+    const hautG = (x) => 30 + (VY0 - 30) * x / VX0, basG = (x) => 640 - (640 - VY1) * x / VX0;
+    // plafond
+    c.fillStyle = '#140a14'; c.fillRect(L, H0, D - L, B - H0);
+    // murs : papier peint prune, plus clair près de nous
+    [-1, 1].forEach((s) => {
+      const X = (x) => (s < 0 ? x : 600 - x);
+      const gm = c.createLinearGradient(X(0), 0, X(VX0), 0);
+      gm.addColorStop(0, '#6a3452'); gm.addColorStop(0.6, '#3e1c32'); gm.addColorStop(1, '#1e0c18');
+      c.fillStyle = gm;
+      c.beginPath(); c.moveTo(X(-400), hautG(-400)); c.lineTo(X(VX0), VY0); c.lineTo(X(VX0), VY1); c.lineTo(X(-400), basG(-400)); c.closePath(); c.fill();
+      // rayures verticales du papier peint (plus serrées au loin)
+      c.strokeStyle = 'rgba(255,190,220,.10)'; c.lineWidth = 3;
+      for (let i = 0; i < 18; i++) {
+        const x = VX0 - (VX0 + 400) * Math.pow(0.8, i);
+        c.beginPath(); c.moveTo(X(x), hautG(x)); c.lineTo(X(x), hautG(x) + (basG(x) - hautG(x)) * 0.66); c.stroke();
+      }
+      // lambris (bas du mur)
+      c.fillStyle = 'rgba(30,14,8,.75)';
+      c.beginPath(); c.moveTo(X(-400), hautG(-400) + (basG(-400) - hautG(-400)) * 0.7); c.lineTo(X(VX0), VY0 + (VY1 - VY0) * 0.7); c.lineTo(X(VX0), VY1); c.lineTo(X(-400), basG(-400)); c.closePath(); c.fill();
+      c.strokeStyle = '#a07a3a'; c.lineWidth = 2;
+      c.beginPath(); c.moveTo(X(-400), hautG(-400) + (basG(-400) - hautG(-400)) * 0.7); c.lineTo(X(VX0), VY0 + (VY1 - VY0) * 0.7); c.stroke();
+    });
+    // plancher et tapis rouge jusqu'à la Dame
+    c.fillStyle = '#2a170e';
+    c.beginPath(); c.moveTo(VX0, VY1); c.lineTo(VX1, VY1); c.lineTo(600 - (-400), basG(-400)); c.lineTo(-400, basG(-400)); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,.4)'; c.lineWidth = 2;
+    for (let i = -8; i <= 8; i++) { c.beginPath(); c.moveTo(300 + i * 6, VY1); c.lineTo(300 + i * 90, B); c.stroke(); }
+    c.fillStyle = '#6a1626';
+    c.beginPath(); c.moveTo(284, VY1 + 8); c.lineTo(316, VY1 + 8); c.lineTo(520, B); c.lineTo(80, B); c.closePath(); c.fill();
+    c.strokeStyle = '#d8a84a'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(288, VY1 + 8); c.lineTo(110, B); c.moveTo(312, VY1 + 8); c.lineTo(490, B); c.stroke();
+    // le mur du fond : une haute fenêtre en ogive, la lune derrière
+    c.fillStyle = '#1a0e1a'; c.fillRect(VX0, VY0, VX1 - VX0, VY1 - VY0);
+    const fx = 300, fy0 = 262, fy1 = 364, fl = 30;
+    const gf = c.createLinearGradient(0, fy0, 0, fy1);
+    gf.addColorStop(0, '#f4f8ff'); gf.addColorStop(1, '#8aa4e0');
+    c.fillStyle = gf;
+    c.beginPath(); c.moveTo(fx - fl, fy1); c.lineTo(fx - fl, fy0 + 28); c.quadraticCurveTo(fx - fl, fy0, fx, fy0 - 6); c.quadraticCurveTo(fx + fl, fy0, fx + fl, fy0 + 28); c.lineTo(fx + fl, fy1); c.closePath(); c.fill();
+    c.strokeStyle = '#1a0e1a'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(fx, fy0 - 4); c.lineTo(fx, fy1); c.moveTo(fx - fl, fy0 + 44); c.lineTo(fx + fl, fy0 + 44); c.stroke();
+    // lumière de la lune : halo et rayons sur le tapis
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const gl = c.createRadialGradient(fx, 310, 10, fx, 310, 260);
+    gl.addColorStop(0, 'rgba(170,190,255,.55)'); gl.addColorStop(0.4, 'rgba(120,130,220,.18)'); gl.addColorStop(1, 'rgba(120,130,220,0)');
+    c.fillStyle = gl; c.fillRect(L, H0, D - L, B - H0);
+    c.fillStyle = 'rgba(170,190,255,.10)';
+    c.beginPath(); c.moveTo(fx - fl, fy1); c.lineTo(fx + fl, fy1); c.lineTo(470, B); c.lineTo(130, B); c.closePath(); c.fill();
+    c.restore();
+    // petits tableaux sur les murs, en perspective (cadre doré, portrait ou voile)
+    const surMur = (s, xa, xb, va, vb, portrait, yeux2) => {
+      const P = (x, v) => [s < 0 ? x : 600 - x, hautG(x) + v * (basG(x) - hautG(x))];
+      const a = P(xa, va), b = P(xb, va), d = P(xb, vb), e2 = P(xa, vb);
+      const tl = s < 0 ? a : b, tr2 = s < 0 ? b : a, bl = s < 0 ? e2 : d;
+      c.save();
+      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.lineTo(e2[0], e2[1]); c.closePath(); c.clip();
+      c.transform((tr2[0] - tl[0]) / 100, (tr2[1] - tl[1]) / 100, (bl[0] - tl[0]) / 130, (bl[1] - tl[1]) / 130, tl[0], tl[1]);
+      tableau(c, 0, 0, 100, 130, portrait, t, yeux2);
+      c.restore();
+    };
+    surMur(-1, 160, 218, 0.2, 0.6, 1, false);
+    surMur(-1, 226, 248, 0.22, 0.58, -1, true);
+    surMur(1, 168, 224, 0.2, 0.6, 9, false);
+    surMur(1, 232, 248, 0.24, 0.58, 13, false);
+    // la Dame Pâle, au bout de la galerie, dans sa lueur froide
+    c.save(); c.translate(300, 404); c.scale(1.3, 1.3); c.translate(-300, -404);
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const gd = c.createRadialGradient(300, 330, 4, 300, 330, 110);
+    gd.addColorStop(0, 'rgba(220,235,255,.6)'); gd.addColorStop(1, 'rgba(220,235,255,0)');
+    c.fillStyle = gd; rond(c, 300, 330, 110); c.fill();
+    c.restore();
+    c.fillStyle = '#050508';
+    c.beginPath(); c.moveTo(300, 262); c.quadraticCurveTo(280, 266, 278, 300); c.quadraticCurveTo(276, 336, 270, 352); c.lineTo(330, 352); c.quadraticCurveTo(324, 336, 322, 300); c.quadraticCurveTo(320, 266, 300, 262); c.fill();
+    const gr = c.createLinearGradient(0, 290, 0, 404);
+    gr.addColorStop(0, '#f6f8ff'); gr.addColorStop(1, 'rgba(200,214,255,.15)');
+    c.fillStyle = gr;
+    c.beginPath(); c.moveTo(289, 298); c.quadraticCurveTo(300, 292, 311, 298);
+    c.quadraticCurveTo(320, 350, 334, 402);
+    for (let i = 0; i <= 6; i++) c.lineTo(334 - i * 11, 402 - (i % 2) * 9);
+    c.quadraticCurveTo(280, 350, 289, 298); c.fill();
+    // bras tendus vers nous
+    c.strokeStyle = '#eef2fb'; c.lineWidth = 4.5;
+    c.beginPath(); c.moveTo(290, 304); c.quadraticCurveTo(276, 324, 268, 334); c.moveTo(310, 304); c.quadraticCurveTo(324, 324, 332, 334); c.stroke();
+    c.lineWidth = 1.6;
+    [-1, 1].forEach((s) => { for (let i = 0; i < 3; i++) { c.beginPath(); c.moveTo(300 + s * 32, 334); c.lineTo(300 + s * (35 + i * 1.5), 339 + i * 1.5); c.stroke(); } });
+    // visage pâle, cheveux noirs qui le cachent à moitié
+    c.fillStyle = '#eef1f8'; ell(c, 300, 281, 8.5, 11); c.fill();
+    c.fillStyle = '#050508';
+    c.beginPath(); c.moveTo(300, 268); c.quadraticCurveTo(288, 270, 289, 296); c.quadraticCurveTo(292, 278, 300, 274); c.quadraticCurveTo(308, 278, 311, 296); c.quadraticCurveTo(312, 270, 300, 268); c.fill();
+    c.fillStyle = '#0a0a12'; ell(c, 296.5, 281, 2, 2.6); c.fill(); ell(c, 303.5, 281, 2, 2.6); c.fill();
+    c.restore();
+    // appliques à bougie le long du mur gauche (lumière chaude)
+    [[120, 0.5, 30], [205, 0.48, 18]].forEach(([x, v, hb]) => {
+      const y = hautG(x) + v * (basG(x) - hautG(x));
+      c.fillStyle = '#b8924a'; rr(c, x - hb * 0.4, y, hb * 0.8, hb * 0.18, 2); c.fill();
+      bougie(c, x, y, hb, t + x);
+    });
+    // Le portrait maudit, en grand à gauche : le chat arrache son voile.
+    const px = 34, py = 160, pw = 196, ph = 262;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const gp = c.createRadialGradient(px + pw / 2, py + ph * 0.42, 10, px + pw / 2, py + ph * 0.42, 200);
+    gp.addColorStop(0, 'rgba(255,40,60,.32)'); gp.addColorStop(1, 'rgba(255,40,60,0)');
+    c.fillStyle = gp; rond(c, px + pw / 2, py + ph * 0.42, 200); c.fill();
+    c.restore();
+    c.save(); c.translate(px + pw / 2, py + ph / 2); c.rotate(-0.035); c.translate(-pw / 2, -ph / 2);
+    tableau(c, 0, 0, pw, ph, O.MAUDIT, t, false);
+    // l'œil rouge du corbeau, qui brille
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const b0 = Math.max(3, pw * 0.085), oxx = b0 + 56 * (pw - 2 * b0) / 100, oyy = b0 + 50 * (ph - 2 * b0) / 130;
+    const go = c.createRadialGradient(oxx, oyy, 1, oxx, oyy, 46);
+    go.addColorStop(0, 'rgba(255,90,90,.95)'); go.addColorStop(0.3, 'rgba(255,40,40,.4)'); go.addColorStop(1, 'rgba(255,40,40,0)');
+    c.fillStyle = go; rond(c, oxx, oyy, 46); c.fill();
+    c.restore();
+    c.restore();
+    // le voile, tiré par la patte du chat, qui retombe en plis
+    const chx = 420, chy = 306, s = 2.5;
+    const patte = [chx - 71 * s, chy + 19 * s];
+    const gv = c.createLinearGradient(150, 300, 300, 560);
+    gv.addColorStop(0, '#7a2c6c'); gv.addColorStop(0.5, '#47183f'); gv.addColorStop(1, '#1a0818');
+    c.fillStyle = gv;
+    // (il couvre encore le bas du portrait et retombe jusqu'au sol)
+    c.beginPath(); c.moveTo(patte[0], patte[1] - 6);
+    c.quadraticCurveTo(150, 372, 52, 398);
+    c.quadraticCurveTo(40, 470, 58, 540);
+    c.quadraticCurveTo(110, 556, 150, 548); c.quadraticCurveTo(200, 566, 232, 552); c.quadraticCurveTo(262, 570, 288, 560);
+    c.quadraticCurveTo(286, 440, patte[0] + 10, patte[1] + 4); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,190,230,.3)'; c.lineWidth = 3;
+    c.beginPath();
+    c.moveTo(patte[0] - 4, patte[1]); c.quadraticCurveTo(170, 430, 150, 546);
+    c.moveTo(patte[0], patte[1] + 2); c.quadraticCurveTo(240, 460, 232, 550);
+    c.moveTo(patte[0] - 10, patte[1] - 2); c.quadraticCurveTo(110, 420, 90, 548);
+    c.stroke();
+    c.strokeStyle = 'rgba(0,0,0,.4)'; c.lineWidth = 5;
+    c.beginPath();
+    c.moveTo(patte[0] - 6, patte[1] + 2); c.quadraticCurveTo(200, 440, 192, 556);
+    c.moveTo(patte[0] + 4, patte[1] + 4); c.quadraticCurveTo(270, 470, 264, 562);
+    c.stroke();
+    // la chouette veille sur le cadre
+    c.save(); c.translate(150, 150); c.scale(0.62, 0.62);
+    c.fillStyle = '#7a5434'; ell(c, 0, 40, 30, 36); c.fill();
+    c.fillStyle = '#c9a87a'; ell(c, 0, 48, 17, 24); c.fill();
+    c.fillStyle = '#e2b85a'; c.fillRect(-14, 74, 28, 5);
+    familier(c, 1);
+    c.restore();
+    // le chat veilleur, en grand
+    c.save(); c.translate(chx, chy); c.scale(s, s);
+    chatAffiche(c, t);
+    c.restore();
+    // la flamme de sa bougie éclaire toute la scène
+    const flx = chx + 46 * s, fly = chy - 4 * s - 26 * s * 1.28;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const gb = c.createRadialGradient(flx, fly, 4, flx, fly, 330);
+    gb.addColorStop(0, 'rgba(255,214,130,.85)'); gb.addColorStop(0.18, 'rgba(255,170,70,.38)'); gb.addColorStop(0.55, 'rgba(255,140,50,.10)'); gb.addColorStop(1, 'rgba(255,140,50,0)');
+    c.fillStyle = gb; c.fillRect(L, H0, D - L, B - H0);
+    c.restore();
+    // la chauve-souris passe sous le plafond
+    c.save(); c.translate(430, 108); c.rotate(0.15); c.scale(0.9, 0.9); familier(c, 2); c.restore();
+    // premier plan : grand chandelier coupé à gauche, coin de cadre à droite, brume au sol
+    c.fillStyle = '#7a5a22';
+    rr(c, 14, 560, 12, B - 560, 4); c.fill();
+    c.strokeStyle = '#9a7228'; c.lineWidth = 9;
+    c.beginPath(); c.moveTo(-40, 560); c.quadraticCurveTo(20, 600, 80, 560); c.stroke();
+    [-40, 20, 80].forEach((x, i) => { c.fillStyle = '#c99a3a'; ell(c, x, 556, 16, 5); c.fill(); bougie(c, x, 552, 56 - (i % 2) * 8, t + i * 300); });
+    c.save(); c.translate(540, 650); c.rotate(-0.12);
+    cadre(c, 0, 0, 200, 260, 'or');
+    c.fillStyle = '#1a0818'; c.fillRect(17, 17, 166, 226);
+    c.restore();
+    c.save(); c.globalCompositeOperation = 'lighter';
+    [[120, 720, 220], [380, 740, 240], [600, 700, 200], [-60, 690, 180]].forEach(([x, y, r]) => {
+      const gn = c.createRadialGradient(x, y, 4, x, y, r);
+      gn.addColorStop(0, 'rgba(170,180,230,.22)'); gn.addColorStop(1, 'rgba(170,180,230,0)');
+      c.fillStyle = gn; ell(c, x, y, r, r * 0.4); c.fill();
+    });
+    c.restore();
+    // poussière qui danse dans la lumière
+    const hz = graineHasard(31);
+    c.fillStyle = 'rgba(255,235,200,.7)';
+    for (let i = 0; i < 40; i++) { rond(c, 180 + hz() * 300, 150 + hz() * 420, 0.8 + hz() * 1.4); c.fill(); }
+  }
+
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    const cacher = () => {
+      document.querySelectorAll('.ecran, .voile, #toast, #bandeau, .jel-langue, button').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+    };
+    cacher();
+    setTimeout(cacher, 300);
+    setTimeout(cacher, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images de la page du jeu : window.JEL_APERCU = 1, 2 ou 3 (robot du site)
+  // ---------------------------------------------------------------------
+  // La partie s'ouvre directement, avec sa vraie interface (veilleurs et
+  // bougies, nuit, message, couloir de la Dame Pâle), sans écran titre, ni
+  // « Continuer », ni tutoriel. Le moment est posé par le code, puis figé :
+  // aucun robot ne joue, rien ne se gagne ni ne se perd, aucun son, rien n'est
+  // enregistré. Partie solo contre les robots, sans réseau.
+  //   1 = nuit 1 : tu viens de trouver une paire, tu retournes ton 1er tableau ;
+  //   2 = nuit 11 : le corbeau maudit est trouvé, ton miroir dévoile un autre tableau ;
+  //   3 = nuit 17 (ordinateur) : le courant a sauté, un éclair montre 3 tableaux,
+  //       la Dame Pâle n'est plus qu'à 3 pas.
+
+  // Partie figée qui imite celle du moteur commun (une seule partie solo, toi à la place 0).
+  function partieApercu(e) {
+    return {
+      mode: 'solo', phase: 'jeu', siege: 0, manche: 0, chef: -1, etat: e,
+      sieges: () => [0, 1, 2, 3].map((s) => ({ moi: s === 0, humain: s === 0, chef: false })),
+      monTour: () => true, jouer: () => false, estChef: () => false, lancerManche: () => false,
+      recommencer: () => false, pause: () => {}, quitter: () => {}
+    };
+  }
+
+  // Nuit n, avec ses paires déjà trouvées : [veilleur, portrait (-1 : un portrait ordinaire)].
+  function nuitApercu(n, paires, bougies, dame) {
+    const e = R.depart(graineHasard(4100 + n * 131), PLACES, { niveau: n });
+    e.tour = 0; e.prem = -1; e.der = null; e.tick = 24;
+    const pris = [];
+    const libre = (x, sauf) => { for (let i = 0; i < e.t.length; i++) if (e.t[i] === x && e.p[i] < 0 && i !== sauf) return i; return -1; };
+    const ordinaire = () => {
+      for (let i = 0; i < e.t.length; i++) { const x = e.t[i]; if (x < O.MAUDIT && e.p[i] < 0 && pris.indexOf(x) < 0) { pris.push(x); return x; } }
+      return -1;
+    };
+    const trouvees = [];
+    paires.forEach(([s, x]) => {
+      const ty = x >= 0 ? x : ordinaire();
+      pris.push(ty);
+      const a = libre(ty), b = libre(ty, a);
+      e.p[a] = s; e.p[b] = s; e.pa[s] += 1;
+      trouvees.push([a, b]);
+    });
+    e.sc = bougies.slice(); e.dame = dame; e.ner = dame;
+    return { e: e, libre: libre, ordinaire: ordinaire, trouvees: trouvees };
+  }
+
+  // Un tableau encore voilé, pris dans l'ordre de la galerie (sauf ceux de la liste).
+  function voileeApercu(e, sauf, depuis) {
+    for (let k = 0; k < e.t.length; k++) { const i = (k + (depuis || 0)) % e.t.length; if (e.p[i] < 0 && sauf.indexOf(i) < 0) return i; }
+    return -1;
+  }
+
+  function ouvrirApercu(num) {
+    apercuNum = num;
+    // Hasard fixe : la même image à chaque capture (étincelles).
+    let graine = 1234567 + num * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    const T = performance.now() + 1000, TOUJOURS = T + 1e9;
+    const effets = { montre: [], halo: [], trouve: [], jaillir: [], survol: -1 };
+    let n = 1, sc = null;
+    if (num === 1) {
+      // Nuit 1 : tu viens de trouver une paire (étincelles), tu rejoues et retournes un 1er tableau.
+      n = 1;
+      sc = nuitApercu(1, [[2, -1], [0, -1]], [4, 2, 4, 2], 2);
+      const ty = sc.ordinaire();
+      sc.e.prem = sc.libre(ty);
+      const ta = sc.trouvees[1];
+      effets.trouve.push(ta[0], ta[1]);
+      effets.jaillir.push([ta[0], COUL[0]], [ta[1], COUL[0]]);
+      effets.survol = voileeApercu(sc.e, [sc.e.prem, sc.libre(ty, sc.e.prem)], 7);
+      rejoue = true;
+    } else if (num === 2) {
+      // Nuit 11 : le corbeau maudit déjà trouvé ; ton miroir dévoile un autre tableau.
+      n = 11;
+      sc = nuitApercu(11, [[0, O.MAUDIT], [1, -1], [0, -1], [1, -1], [2, -1]], [4, 4, 2, 1], 9);
+      sc.e.prem = sc.libre(O.MIROIR);
+      const m = sc.libre(sc.ordinaire());
+      effets.montre.push(m); effets.halo.push(m, sc.e.prem);
+      rejoue = false;
+    } else {
+      // Nuit 17 : coupure de courant ; un éclair vient de montrer 3 tableaux (dont une paire) ;
+      // la Dame Pâle n'est plus qu'à 3 pas de vos bougies.
+      n = 17;
+      sc = nuitApercu(17, [[0, O.DAME], [1, -1], [3, -1], [1, O.MAUDIT], [0, -1], [2, -1], [3, -1]], [5, 3, 2, 4], 19);
+      const ty = sc.ordinaire(), a = sc.libre(ty), b = sc.libre(ty, a), m = sc.libre(O.MIROIR);
+      effets.montre.push(a, b, m); effets.halo.push(a, b, m);
+      rejoue = false;
+    }
+    niveau = n;
+    session = 'solo';
+    enPartie = false;          // rien n'est enregistré, même à la fermeture
+    partie = partieApercu(sc.e);
+    aff = null;
+    prendreVue(sc.e);
+    dameAff = vue.dame / vue.dmax;
+    apercuT = T;
+    effets.montre.forEach((i) => { aff.montre[i] = TOUJOURS; });
+    effets.halo.forEach((i) => { aff.halo[i] = T - 250; });
+    effets.trouve.forEach((i) => { aff.trouve[i] = T - 300; });
+    for (let i = 0; i < vue.t.length; i++) aff.fv[i] = visible(vue, i, T);
+    survol = effets.survol;
+    afficherEcran('jeu');
+    majInterface();
+    // Étincelles de la paire trouvée, déjà envolées depuis 0,3 s, puis figées.
+    dessinerJeu(T, 0);
+    effets.jaillir.forEach(([i, coul]) => jaillir(i, coul));
+    particules.forEach((p) => { p.x += p.vx * 0.3; p.y += p.vy * 0.3 + 13.5; p.vie -= 0.3; });
+  }
+
+  // Sur un écran large, de chaque côté de la galerie : une haute fenêtre (nuit
+  // de coupure : un éclair dehors) ou un grand portrait, et un chandelier allumé.
+  function decorApercu(c, w, h, g, t) {
+    const marge = g.ox - 14;
+    if (marge < 110) return;
+    [-1, 1].forEach((s) => {
+      const xc = s < 0 ? g.ox / 2 : w - g.ox / 2;
+      const fw = Math.min(marge * 0.5, 200), fh = Math.min(h * 0.8, fw * (vue.noir ? 2.1 : 1.3));
+      const fx = xc - s * marge * 0.12 - fw / 2, fy = Math.max(10, h * 0.44 - fh / 2);
+      if (vue.noir) {
+        // fenêtre en ogive, nuit d'orage, un éclair qui zèbre le ciel
+        c.save();
+        c.beginPath(); c.moveTo(fx, fy + fh); c.lineTo(fx, fy + fw * 0.5); c.arc(fx + fw / 2, fy + fw * 0.5, fw / 2, Math.PI, 0); c.lineTo(fx + fw, fy + fh); c.closePath();
+        const gc = c.createLinearGradient(0, fy, 0, fy + fh);
+        gc.addColorStop(0, '#5a6ec8'); gc.addColorStop(0.5, '#2a3466'); gc.addColorStop(1, '#141a36');
+        c.fillStyle = gc; c.fill(); c.clip();
+        c.strokeStyle = 'rgba(200,215,255,.28)'; c.lineWidth = 1.5;
+        for (let i = 0; i < 26; i++) { const x = fx + ((i * 37) % fw), y = fy + ((i * 71) % fh); c.beginPath(); c.moveTo(x, y); c.lineTo(x - 4, y + 16); c.stroke(); }
+        c.shadowColor = '#e8f0ff'; c.shadowBlur = 24;
+        c.strokeStyle = '#f4f8ff'; c.lineWidth = 4;
+        const ex = fx + fw * (s < 0 ? 0.62 : 0.38);
+        c.beginPath(); c.moveTo(ex, fy); c.lineTo(ex - fw * 0.16 * s, fy + fh * 0.3); c.lineTo(ex + fw * 0.06 * s, fy + fh * 0.34); c.lineTo(ex - fw * 0.2 * s, fy + fh * 0.66); c.stroke();
+        c.shadowBlur = 0;
+        c.fillStyle = '#0b0712'; c.beginPath(); c.moveTo(fx, fy + fh); c.lineTo(fx, fy + fh * 0.84); c.quadraticCurveTo(fx + fw * 0.4, fy + fh * 0.76, fx + fw, fy + fh * 0.86); c.lineTo(fx + fw, fy + fh); c.fill();
+        c.restore();
+        c.strokeStyle = '#1a0e14'; c.lineWidth = Math.max(6, fw * 0.06);
+        c.beginPath(); c.moveTo(fx, fy + fh); c.lineTo(fx, fy + fw * 0.5); c.arc(fx + fw / 2, fy + fw * 0.5, fw / 2, Math.PI, 0); c.lineTo(fx + fw, fy + fh); c.closePath(); c.stroke();
+        c.lineWidth = Math.max(3, fw * 0.03);
+        c.beginPath(); c.moveTo(fx + fw / 2, fy); c.lineTo(fx + fw / 2, fy + fh); c.moveTo(fx, fy + fh * 0.5); c.lineTo(fx + fw, fy + fh * 0.5); c.stroke();
+        // lueur froide de l'éclair sur le mur
+        c.save(); c.globalCompositeOperation = 'lighter';
+        const ge = c.createRadialGradient(fx + fw / 2, fy + fh * 0.4, 10, fx + fw / 2, fy + fh * 0.4, fh * 0.8);
+        ge.addColorStop(0, 'rgba(160,180,255,.22)'); ge.addColorStop(1, 'rgba(160,180,255,0)');
+        c.fillStyle = ge; c.fillRect(fx - fh, fy - fh * 0.4, fw + 2 * fh, fh * 1.8);
+        c.restore();
+      } else {
+        tableau(c, fx, fy, fw, fh, s < 0 ? 9 : 1, t, false);
+      }
+      // chandelier à trois bougies, près de la galerie
+      const cx2 = s < 0 ? g.ox - marge * 0.2 : w - g.ox + marge * 0.2, base = h - 4, hb = Math.min(h * 0.5, 300);
+      c.fillStyle = '#7a5a22'; rr(c, cx2 - 5, base - hb, 10, hb, 3); c.fill();
+      c.fillStyle = '#9a7228'; ell(c, cx2, base, 34, 8); c.fill();
+      c.strokeStyle = '#9a7228'; c.lineWidth = 6;
+      c.beginPath(); c.moveTo(cx2 - 40, base - hb); c.quadraticCurveTo(cx2, base - hb + 40, cx2 + 40, base - hb); c.stroke();
+      [-40, 0, 40].forEach((d, i) => {
+        c.fillStyle = '#c99a3a'; ell(c, cx2 + d, base - hb - (d ? 0 : 14), 12, 4); c.fill();
+        bougie(c, cx2 + d, base - hb - (d ? 0 : 14) - 3, 34 - (i % 2) * 6, t + i * 200);
+      });
+      c.save(); c.globalCompositeOperation = 'lighter';
+      const gw = c.createRadialGradient(cx2, base - hb - 40, 4, cx2, base - hb - 40, 260);
+      gw.addColorStop(0, 'rgba(255,190,110,.35)'); gw.addColorStop(1, 'rgba(255,190,110,0)');
+      c.fillStyle = gw; c.fillRect(cx2 - 260, base - hb - 300, 520, 560);
+      c.restore();
+    });
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5048,7 +5493,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !apercuNum && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -5063,6 +5508,10 @@
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
+  // Affiche (jaquette) et images de la page du jeu : posées par le robot du site seulement.
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) { ouvrirApercu(numeroApercu); return; }
   afficherEcran('titre');
   // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
   // dans le salon de sa partie en ligne (le moteur la demande au serveur).

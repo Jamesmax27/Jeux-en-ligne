@@ -3389,6 +3389,23 @@
     .tuile { height: 38px; }
     #mot { min-height: 46px; }
   }
+  /* Image du jeu sur un écran d'ordinateur (window.JEL_APERCU = 3, robot du site seulement) :
+     la table occupe toute la largeur, au lieu d'une colonne de téléphone. */
+  html.apercu-large #places { max-width: 1180px; gap: 14px; padding-left: 24px; padding-right: 24px; }
+  html.apercu-large .place { flex-direction: row; justify-content: center; gap: 10px; padding: 6px 10px; }
+  html.apercu-large .place .avatar { width: 52px; height: 52px; }
+  html.apercu-large .place .tag { font-size: .9rem; }
+  html.apercu-large .flammes svg { width: 17px; height: 21px; }
+  html.apercu-large #infos { max-width: 1180px; padding-left: 24px; padding-right: 24px; }
+  html.apercu-large #message { font-size: 1.3rem; }
+  html.apercu-large .tuile { width: 54px; height: 64px; font-size: 2.1rem; }
+  html.apercu-large #plateau { width: min(96vw, 1060px); padding: 10px 18px; gap: 6px; }
+  html.apercu-large .rang-lettres { gap: 10px; }
+  html.apercu-large .moitie { gap: 6px; }
+  html.apercu-large .lettre { width: 128px; max-width: 128px; height: 54px; font-size: 1.8rem; }
+  html.apercu-large #actions { max-width: 900px; }
+  html.apercu-large #bougie { width: 108px; height: 100px; -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent); mask-image: radial-gradient(closest-side, #000 55%, transparent); }
+  html.apercu-large #ecran-jeu { background: radial-gradient(ellipse 70% 80% at 50% 45%, #4a2a30 0%, #24101e 55%, #0d0812 100%); }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
 </style>
 </head>
@@ -5361,6 +5378,58 @@
   }
 
   // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine séance solo contre les robots, avec sa vraie interface (places,
+  // flammes, mot en cours, plateau de lettres, planchette, boutons), sans écran titre, ni fenêtre
+  // « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). Le moment est posé par le code et
+  // figé : la partie n'a pas d'arbitre (aucun robot ne joue, aucune lettre ne se pose), donc ni
+  // victoire, ni défaite, ni son, ni sauvegarde, ni réseau.
+  //   1 = séance 1, plateau de chêne : « CHAN… », la lettre qui fermerait le mot frémit (aide) ;
+  //   2 = séance 10, plateau d'os : lettres maudites rouges, sel prêt à refuser la lettre d'un robot,
+  //       un médium déjà éliminé ;
+  //   3 = séance 19, plateau d'améthyste, sur un écran d'ordinateur : mot écrit dans le miroir,
+  //       lettre imposée par l'esprit, lettres maudites, bougie allumée, quatre médiums.
+  const MOMENTS_APERCU = {
+    1: {
+      niveau: 1, plateau: 'chene', choix: 'C',
+      e: { f: 'CHAN', q: [-1, 1, 0, 1], dq: 1, tour: 0, fl: [3, 1, 0, 0], el: [0, 0, -1, -1], se: [0, 0, 0, 0], mots: 1, k: 2, mau: '', nuit: -1, mir: 0 }
+    },
+    2: {
+      niveau: 10, plateau: 'os', choix: 'I',
+      e: { f: 'CHAR', q: [-1, 0, 1, 2], dq: 2, tour: 0, fl: [2, 2, 1, 0], el: [0, 0, 0, 1], ne: 1, se: [2, 1, 2, 0], mots: 6, k: 7, mau: 'RBM', nuit: -1, mir: 0 }
+    },
+    3: {
+      niveau: 19, plateau: 'amethyste', choix: 'I', large: true,
+      e: { f: 'MOIRE', q: [-1, 3, 2, 1, -1], dq: -1, es: 12, tour: 0, fl: [2, 3, 1, 2], el: [0, 0, 0, 0], se: [1, 2, 0, 2], mots: 5, k: 6, mau: 'MRS', nuit: -1, mir: 1 }
+    }
+  };
+
+  function ouvrirApercu(numero) {
+    const mo = MOMENTS_APERCU[numero];
+    if (mo.large) document.documentElement.classList.add('apercu-large');
+    prog.plateau = mo.plateau; // en mémoire seulement : rien n'est enregistré
+    appliquerPlateau();
+    session = 'solo';
+    niveau = mo.niveau;
+    enPartie = false;          // pas d'écriture à la fermeture de la page
+    vue = Object.assign(apercu(niveau), mo.e, { ban: -1, ns: 0, sel: -1, dm: null, der: 0, fini: 0 });
+    if (typeof vue.es !== 'number') vue.es = -1;
+    const sieges = [0, 1, 2, 3].map((s) => ({ humain: s === 0, moi: s === 0, chef: false }));
+    // Partie figée, sans arbitre : même interface que pendant une séance, mais rien ne se joue.
+    partie = {
+      mode: 'solo', phase: 'jeu', siege: 0, manche: 0, chef: -1, etat: vue,
+      monTour: () => true, sieges: () => sieges.map((x) => Object.assign({}, x)), estChef: () => false,
+      jouer: () => false, pause() {}, quitter() {}, lancerManche: () => false
+    };
+    choix = ALPHA.indexOf(mo.choix);
+    motAffiche = '';
+    afficherEcran('jeu');
+    majInterface();
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5414,7 +5483,10 @@
   construirePlaces();
   majBoutonsSon();
   // Affiche du jeu (robot du site seulement) : la scène, sans écran titre, sans son ni boucle.
+  const numeroApercu = Number(window.JEL_APERCU);
   if (window.JEL_AFFICHE) demarrerAffiche();
+  // Images du jeu (robot du site seulement) : directement en pleine séance, figée.
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
   else {
     try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
     afficherEcran('titre');

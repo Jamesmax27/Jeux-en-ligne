@@ -4052,6 +4052,8 @@
   let fantomes = [];
   let aVenir = [];            // effets programmés : { quand, f }
   let attenteTuto = false;
+  let apercuActif = false;    // image du jeu préparée pour sa page (window.JEL_APERCU)
+  let apercuLarge = false;    // image 3 (écran d'ordinateur) : le sentier s'étale sur toute la largeur
 
   function nouvellesAnims() { anims = { pions: {}, betes: {}, eclats: [] }; fantomes = []; aVenir = []; }
   function plusTard(ms, f) { const j = jeton; aVenir.push({ quand: performance.now() + ms, f: () => { if (j === jeton) f(); } }); }
@@ -4398,7 +4400,7 @@
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, w, h);
     if (!vue) { geo = null; return; }
-    geo = geometrie(vue, w, h, COLONNES, true);
+    geo = geometrie(vue, w, h, apercuLarge ? colonnesLarges(vue, w, h) : COLONNES, true);
     const moi = monFuyard();
     const ap = choix >= 0 ? apercuCarte() : null;
     dessinerPlateau(c, vue, geo, {
@@ -5341,6 +5343,71 @@
   }
 
   // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine partie solo contre les 5 robots, avec sa vraie interface
+  // (places, message du tour, main de cartes), sans écran titre, ni « Continuer », ni tutoriel,
+  // ni fenêtre (CONSIGNES-JEU.md, section 5). Les vraies règles jouent d'avance quelques tours
+  // de table avec un hasard à graine fixe (toujours la même image), puis la partie reste à ton
+  // tour, une carte choisie et son chemin montré : rien ne bouge plus, ni son, ni sauvegarde,
+  // ni réseau.
+  //   1 = niveau 1 : le premier sentier, la Bête juste derrière toi (ton Sprint pour la semer) ;
+  //   2 = niveau 10 : ronces, lanterne en poche (raccourcis visibles), une fourche droit devant ;
+  //   3 = niveau 19, sur un écran d'ordinateur : les deux Bêtes, les pièges posés, un fuyard
+  //       déjà dévoré, la carte rare Leurre, le sentier étalé sur toute la largeur.
+  const MOMENTS_APERCU = {
+    1: { niveau: 1, tours: 3, graine: 9, carte: 's' },
+    2: { niveau: 10, tours: 4, graine: 13, carte: 'f' },
+    3: { niveau: 19, tours: 9, graine: 7, carte: 'l', large: true }
+  };
+
+  // Image 3 : nombre de cases par rangée qui remplit au mieux la largeur de l'écran.
+  function colonnesLarges(e, w, h) {
+    let meilleur = COLONNES, note = -1;
+    for (let C = COLONNES; C <= 16; C++) {
+      const g = geometrie(e, w, h, C, true), n = g.s * C + g.s * 2;
+      if (n > note) { note = n; meilleur = C; }
+    }
+    return meilleur;
+  }
+
+  function ouvrirApercu(n) {
+    const m = MOMENTS_APERCU[n];
+    apercuActif = true;
+    apercuLarge = !!m.large;
+    if (apercuLarge) {
+      const st = document.createElement('style');
+      st.textContent = '#places, #infos, #bas { max-width: 960px; }';
+      document.head.appendChild(st);
+    }
+    // La partie jouée d'avance par les robots (toi compris), jusqu'à ton tour.
+    const alea = graineHasard(m.graine);
+    const e = R.depart(alea, PLACES, { niveau: m.niveau });
+    for (let garde = 0; garde < 2000 && !O.courseFinie(e); garde++) {
+      const s = R.aQui(e);
+      if (s === 0 && e.r >= m.tours) break;
+      R.jouer(e, s, R.bot(e, s, alea, e.fr), alea);
+    }
+    e.ev = null; e.bt = []; e.sa = [];
+    session = 'solo'; niveau = m.niveau;
+    enPartie = false; enPause = false; attenteTuto = false; finSoloMontree = true;
+    // Une partie figée : même interface que le moteur commun, mais personne ne joue plus.
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 0, chef: -1, etat: e,
+      monTour: () => !!vue && R.aQui(vue) === 0,
+      sieges: () => { const l = []; for (let s = 0; s < PLACES; s++) l.push({ humain: s === 0, moi: s === 0, chef: false }); return l; },
+      estChef: () => false, lancerManche: () => false, jouer: () => false, pause: () => {}, quitter: () => {}
+    };
+    vue = copie(e);
+    nouvellesAnims();
+    mainAvant = '';
+    choix = Math.max(0, vue.j[0].h.indexOf(m.carte));
+    afficherEcran('jeu');
+    majInterface();
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5375,7 +5442,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !apercuActif && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -5385,6 +5452,16 @@
 
   // Affiche (window.JEL_AFFICHE, posé par le robot seulement) : la scène, et rien d'autre.
   if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+
+  // Images du jeu (window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement) : la partie, et rien d'autre.
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    document.title = tr('titre');
+    construirePlaces();
+    majBoutonsSon();
+    ouvrirApercu(numeroApercu);
+    return;
+  }
 
   window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(performance.now()); });
 
