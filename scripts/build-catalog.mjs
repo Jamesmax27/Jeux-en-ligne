@@ -39,6 +39,19 @@ const SUR_CLOUDFLARE = process.env.CF_PAGES === '1';      // posée par Cloudfla
 const ID_VALIDE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const DATE_VALIDE = /^\d{4}-\d{2}-\d{2}$/;
 const JAQUETTES = ['cover.webp', 'cover.png', 'cover.jpg', 'cover.jpeg', 'cover.svg']; // par ordre de préférence
+
+/** Largeur et hauteur d'une image WebP, lues dans son en-tête (VP8, VP8L ou VP8X) ; null si illisible. */
+export function tailleWebp(b) {
+  if (b.length < 30 || b.toString('ascii', 0, 4) !== 'RIFF' || b.toString('ascii', 8, 12) !== 'WEBP') return null;
+  const type = b.toString('ascii', 12, 16);
+  if (type === 'VP8X') return { largeur: 1 + b.readUIntLE(24, 3), hauteur: 1 + b.readUIntLE(27, 3) };
+  if (type === 'VP8 ') return { largeur: b.readUInt16LE(26) & 0x3fff, hauteur: b.readUInt16LE(28) & 0x3fff };
+  if (type === 'VP8L') {
+    const v = b.readUInt32LE(21);
+    return { largeur: 1 + (v & 0x3fff), hauteur: 1 + ((v >> 14) & 0x3fff) };
+  }
+  return null;
+}
 const TAILLE_MAX_JEU = 2 * 1024 * 1024;   // 2 Mo
 const TAILLE_MAX_JAQUETTE = 300 * 1024;   // 300 Ko (objectif : < 100 Ko en WebP)
 
@@ -120,7 +133,13 @@ async function lireJeu(nomDossier) {
   // Montrées seulement sur la page du jeu (pages-seo.mjs), pas dans catalog.json.
   const fichiersApercus = [];
   for (let n = 1; n <= 3 && existsSync(path.join(dossier, `apercu-${n}.webp`)); n++) fichiersApercus.push(`apercu-${n}.webp`);
-  const apercus = fichiersApercus.map((f) => `games/${fiche.id}/${f}?v=${version}`);
+  // Taille lue dans le fichier : 2 images de téléphone (portrait) puis 1 d'ordinateur (paysage),
+  // ou, pour les jeux pas encore repris, 3 images de téléphone.
+  const apercus = [];
+  for (const f of fichiersApercus) {
+    const { largeur, hauteur } = tailleWebp(await readFile(path.join(dossier, f))) || { largeur: 488, hauteur: 1055 };
+    apercus.push({ src: `games/${fiche.id}/${f}?v=${version}`, largeur, hauteur });
+  }
 
   // --- traductions (titre, description et présentation dans les autres langues) ---
   const i18n = {};
