@@ -47,6 +47,19 @@ export const SYNC_MINUTES = 5;                // envoi toutes les 5 minutes de j
 export const RAFRAICHIR_MINUTES = 30;         // relecture du profil (sans écriture) au plus toutes les 30 min sur une page sans rien à envoyer
 export const APPAREILS_MAX = 10;              // appareils reliés à un même profil par le code de sauvegarde (le plus ancien est oublié au-delà)
 
+// --- Sauvegardes des jeux d'un appareil à l'autre ---------------------------
+// La sauvegarde de chaque jeu (save_<id>, bouton « Continuer ») est aussi
+// gardée sur le serveur avec le profil (public/sauvegardes-nuage.js,
+// docs/cadrage-fidelisation.md, section 14.13). Un seul appareil a joué depuis
+// la dernière synchronisation : sa sauvegarde gagne ; les deux ont joué : la
+// plus avancée (niveau, puis score, puis la plus récente).
+export const SAUVEGARDES_HORS_NUAGE = ['terres-cubiques']; // jeux dont la sauvegarde reste sur l'appareil (gros mondes : export de fichier)
+export const SAUVEGARDE_SERVEUR_MAX = 64000;  // caractères au plus pour une sauvegarde gardée sur le serveur (au-delà : seulement sur l'appareil)
+export const SAUVEGARDES_PAR_ENVOI = 20;      // sauvegardes au plus dans un envoi (les autres partent au suivant)
+export const SAUVEGARDES_TAILLE_ENVOI = 200000; // caractères de sauvegardes au plus dans un envoi
+export const SAUVEGARDES_BEACON_MAX = 60000;  // envoi à la fermeture de la page (navigator.sendBeacon, 64 Ko au plus) : sauvegardes jointes seulement sous cette taille
+export const ATTENTE_LANCEMENT_MS = 2000;     // au lancement d'un jeu (profil relié à 2 appareils au moins) : attente au plus de la sauvegarde du serveur
+
 // --- Jours consécutifs (série) ---------------------------------------------
 // Jour : celui de l'appareil du joueur (son fuseau horaire). Le serveur
 // n'accepte qu'un jour à moins d'un jour de la date UTC (tous les fuseaux
