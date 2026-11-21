@@ -4108,6 +4108,11 @@
     .recette .choix canvas { width: 42px; height: 42px; }
     #q-image { width: 42px; height: 42px; }
   }
+  /* Image du jeu sur ordinateur (window.JEL_APERCU = 3) : panneau élargi, plateau plus haut */
+  .apercu-ordi #places, .apercu-ordi #infos { max-width: 900px; }
+  .apercu-ordi #panneau { max-width: 1180px; }
+  .apercu-ordi #q-choix { grid-template-columns: repeat(4, 1fr); }
+  .apercu-ordi .recette .choix canvas { width: 64px; height: 64px; }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
 </style>
 </head>
@@ -5503,6 +5508,9 @@
   let ordreRecette = [];      // recette en cours : positions touchées dans l'ordre
   let attenteTuto = false;
   const particules = [];
+  let apercu = 0;             // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
+  let modeAffiche = false;    // affiche du jeu (window.JEL_AFFICHE)
+  const T_APERCU = 4321;      // images du jeu : instant figé des animations (même image à chaque capture)
 
   function afficherEcran(nom) {
     ecran = nom;
@@ -5898,7 +5906,7 @@
     if (ecran !== 'jeu' || enPause) return;
     const dt = Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
     tPrec = t;
-    dessinerJeu(performance.now(), dt);
+    dessinerJeu(apercu ? T_APERCU : performance.now(), dt);
     majTemps();
     majCompte();
     rafId = requestAnimationFrame(boucle);
@@ -6773,6 +6781,268 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu) : window.JEL_AFFICHE, posé par le robot du site seulement
+  //  Scène composée, sans interface ni texte (CONSIGNES-JEU.md, section 5) : Fraise, en
+  //  grand sur la place du marché, a trouvé la bonne image de la devinette (la carotte,
+  //  qui pousse sous la terre) ; la carotte tombe dans son panier, ses rivaux accourent.
+  // ---------------------------------------------------------------------
+
+  // Bras ou jambe d'un petit marchand (affiche seulement) : trait arrondi courbé.
+  function membre(c, x1, y1, cx1, cy1, x2, y2, ep) {
+    c.strokeStyle = '#5a2a14'; c.lineWidth = ep; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x1, y1); c.quadraticCurveTo(cx1, cy1, x2, y2); c.stroke();
+  }
+  // Main gantée ouverte (doigts écartés), centrée en (x, y), orientée selon ang.
+  function mainOuverte(c, x, y, r, ang) {
+    c.save(); c.translate(x, y); c.rotate(ang || 0);
+    c.fillStyle = '#ffffff'; c.strokeStyle = '#3b2412'; c.lineWidth = r * 0.16;
+    [-0.9, -0.3, 0.3, 0.9].forEach((a) => { ell(c, Math.sin(a) * r * 0.95, -Math.cos(a) * r * 0.95, r * 0.3, r * 0.42, a); c.fill(); c.stroke(); });
+    ell(c, -r * 1.0, r * 0.2, r * 0.42, r * 0.28, -0.6); c.fill(); c.stroke();
+    rond(c, 0, 0, r * 0.82); c.fill(); c.stroke();
+    c.restore();
+  }
+  // Chaussure, posée en (x, y).
+  function chaussure(c, x, y, r, sens) {
+    c.fillStyle = '#3b2412'; ell(c, x + sens * r * 0.35, y, r * 1.05, r * 0.55, 0); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.35)'; ell(c, x + sens * r * 0.55, y - r * 0.2, r * 0.35, r * 0.15, 0); c.fill();
+  }
+  // Petit marchand « vivant » de l'affiche : jambes, bras, grande bouche ouverte, sourcils.
+  function marchandAffiche(c, k, x, y, r, pose) {
+    const u = r / 50;
+    // jambes : une tendue, une repliée (il saute de joie)
+    membre(c, x - 14 * u, y + 34 * u, x - 18 * u, y + 56 * u, x - 26 * u, y + 74 * u, 8 * u);
+    membre(c, x + 14 * u, y + 34 * u, x + 34 * u, y + 52 * u, x + 26 * u, y + 70 * u, 8 * u);
+    chaussure(c, x - 28 * u, y + 76 * u, 9 * u, -1);
+    chaussure(c, x + 30 * u, y + 72 * u, 9 * u, 1);
+    // contour clair (lumière du soleil) autour du corps
+    c.save(); c.shadowColor = 'rgba(255,255,240,.95)'; c.shadowBlur = 16 * u;
+    mascotte(c, k, x, y, r);
+    c.restore();
+    mascotte(c, k, x, y, r);
+    // grande bouche ouverte et sourcils levés : il a trouvé !
+    const oy = k === 2 ? 4 : k === 3 ? 2 : k === 1 ? 0 : -2;
+    c.fillStyle = '#7a1424';
+    c.beginPath(); c.moveTo(x - 12 * u, y + (12 + oy) * u); c.quadraticCurveTo(x, y + (36 + oy) * u, x + 12 * u, y + (12 + oy) * u); c.closePath(); c.fill();
+    c.fillStyle = '#ff8fa0'; ell(c, x, y + (25 + oy) * u, 6 * u, 3.5 * u); c.fill();
+    c.fillStyle = '#ffffff'; rr(c, x - 7 * u, y + (12 + oy) * u, 14 * u, 4 * u, 1.5 * u); c.fill();
+    c.strokeStyle = '#3b1a0a'; c.lineWidth = 3 * u; c.lineCap = 'round';
+    [-1, 1].forEach((d) => { c.beginPath(); c.arc(x + d * 14 * u, y + (oy - 8) * u, 8 * u, -Math.PI * 0.8, -Math.PI * 0.2); c.stroke(); });
+    if (pose) pose(u);
+  }
+  // Carte d'une réponse en image (comme les boutons de la devinette), centrée en (x, y).
+  function carteReponse(c, id, x, y, l, ang, bonne) {
+    c.save(); c.translate(x, y); c.rotate(ang);
+    if (bonne) { c.shadowColor = '#ffd84d'; c.shadowBlur = l * 0.35; }
+    else { c.shadowColor = 'rgba(80,40,10,.35)'; c.shadowBlur = l * 0.12; c.shadowOffsetY = l * 0.05; }
+    rr(c, -l / 2, -l / 2, l, l, l * 0.16); c.fillStyle = bonne ? '#f1fbe9' : '#ffffff'; c.fill();
+    c.shadowBlur = 0; c.shadowOffsetY = 0;
+    c.lineWidth = l * (bonne ? 0.06 : 0.035); c.strokeStyle = bonne ? '#2f9a46' : '#e0c08a';
+    rr(c, -l / 2, -l / 2, l, l, l * 0.16); c.stroke();
+    if (id) objet(c, id, 0, 0, l * 0.36);
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.style.display = 'block';
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const c = cv.getContext('2d');
+    const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    // Repère de 600 × 800 ; le décor continue jusqu'aux bords de l'écran (X0 à X1, Y0 à Y1).
+    const X0 = -ox / k - 2, X1 = (W - ox) / k + 2, Y0 = -oy / k - 2, Y1 = (H - oy) / k + 2;
+    const sol = 430;
+    c.lineJoin = 'round';
+    // ciel
+    let g = c.createLinearGradient(0, Y0, 0, sol);
+    g.addColorStop(0, '#4fb2f2'); g.addColorStop(0.7, '#9fd8fb'); g.addColorStop(1, '#e4f5ff');
+    c.fillStyle = g; c.fillRect(X0, Y0, X1 - X0, sol - Y0);
+    // soleil et sa grande lumière chaude
+    g = c.createRadialGradient(520, 90, 10, 520, 90, 420);
+    g.addColorStop(0, 'rgba(255,246,190,1)'); g.addColorStop(0.25, 'rgba(255,236,160,.55)'); g.addColorStop(1, 'rgba(255,236,160,0)');
+    c.fillStyle = g; c.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+    c.strokeStyle = 'rgba(255,226,122,.75)'; c.lineWidth = 10; c.lineCap = 'round';
+    for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6 + 0.2; c.beginPath(); c.moveTo(520 + Math.cos(a) * 66, 90 + Math.sin(a) * 66); c.lineTo(520 + Math.cos(a) * 92, 90 + Math.sin(a) * 92); c.stroke(); }
+    c.fillStyle = '#ffd84d'; rond(c, 520, 90, 54); c.fill();
+    c.fillStyle = '#fff1a8'; rond(c, 508, 78, 30); c.fill();
+    // petits nuages
+    c.fillStyle = 'rgba(255,255,255,.9)';
+    [[70, 120, 1], [240, 82, 0.8], [X1 - 30, 250, 0.9], [X0 + 30, 230, 0.7]].forEach((n) => {
+      const s = n[2];
+      ell(c, n[0], n[1], 46 * s, 18 * s); c.fill(); rond(c, n[0] - 16 * s, n[1] - 10 * s, 20 * s); c.fill(); rond(c, n[0] + 14 * s, n[1] - 14 * s, 24 * s); c.fill();
+    });
+    // toits de la ville au loin
+    const al = graineHasard(7);
+    for (let x = X0 - 10; x < X1 + 40; x += 56 + al() * 20) {
+      const hh = 70 + al() * 80, lw = 46 + al() * 22;
+      c.fillStyle = ['#f6dcbc', '#efcda4', '#f9e6cc'][Math.floor(al() * 3)];
+      c.fillRect(x, sol - hh, lw, hh + 4);
+      c.fillStyle = ['#d0664a', '#c8564a', '#d9774e'][Math.floor(al() * 3)];
+      c.beginPath(); c.moveTo(x - 6, sol - hh); c.lineTo(x + lw / 2, sol - hh - 30); c.lineTo(x + lw + 6, sol - hh); c.closePath(); c.fill();
+      c.fillStyle = '#8fc4e6'; c.fillRect(x + lw * 0.22, sol - hh + 18, lw * 0.2, 16); c.fillRect(x + lw * 0.58, sol - hh + 18, lw * 0.2, 16);
+    }
+    // pavés de la place, en perspective
+    g = c.createLinearGradient(0, sol, 0, Y1);
+    g.addColorStop(0, '#f0d4a2'); g.addColorStop(1, '#d2a066');
+    c.fillStyle = g; c.fillRect(X0, sol, X1 - X0, Y1 - sol);
+    c.strokeStyle = 'rgba(150,100,50,.2)'; c.lineWidth = 2;
+    for (let y = sol + 12, p = 12; y < Y1; p *= 1.18, y += p) { c.beginPath(); c.moveTo(X0, y); c.lineTo(X1, y); c.stroke(); }
+    for (let i = -14; i <= 14; i++) { c.beginPath(); c.moveTo(300 + i * 30, sol); c.lineTo(300 + i * 150, Y1); c.stroke(); }
+    // guirlande de fanions
+    guirlande(c, X0 - 10, X1 + 10, 26, Math.max(12, Math.round((X1 - X0) / 42)), 62);
+    // étals : une devinette à gauche, l'étal d'or qui brille à droite
+    etal(c, { k: 'q', c: 'famille', a: 'pomme' }, 82, 392, 176);
+    etal(c, { k: 'or', c: 'saison', a: 'fraise' }, 528, 384, 186, 450);
+    // lumière chaude derrière le héros
+    g = c.createRadialGradient(300, 430, 20, 300, 430, 290);
+    g.addColorStop(0, 'rgba(255,252,225,.9)'); g.addColorStop(0.55, 'rgba(255,240,190,.35)'); g.addColorStop(1, 'rgba(255,240,190,0)');
+    c.fillStyle = g; c.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+    // rivaux qui accourent, avec leur panier
+    const rival = (kk, x, y, r, aliment) => {
+      c.fillStyle = 'rgba(80,50,20,.22)'; ell(c, x, y + r * 1.45, r * 0.95, r * 0.22); c.fill();
+      marchandAffiche(c, kk, x, y, r, (u) => {
+        membre(c, x + 38 * u, y + 4 * u, x + 58 * u, y + 14 * u, x + 62 * u, y + 30 * u, 7 * u);
+        panier(c, x + 66 * u, y + 40 * u, 52 * u, (cc) => objet(cc, aliment, 0, -18, 20));
+      });
+    };
+    rival(3, 492, 468, 32, 'pois');
+    rival(1, 88, 500, 44, 'citron');
+    // le héros : Fraise, en grand
+    const hx = 292, hy = 470, hr = 134, u = hr / 50;
+    c.fillStyle = 'rgba(80,50,20,.25)'; ell(c, hx, hy + 80 * u, 62 * u, 10 * u); c.fill();
+    marchandAffiche(c, 0, hx, hy, hr, () => {
+      // bras gauche levé : il salue de joie
+      membre(c, hx - 40 * u, hy - 2 * u, hx - 62 * u, hy - 8 * u, hx - 66 * u, hy - 38 * u, 8 * u);
+      mainOuverte(c, hx - 68 * u, hy - 44 * u, 8 * u, -0.35);
+      // bras droit : il tend son panier vers la carotte qui tombe
+      membre(c, hx + 38 * u, hy - 2 * u, hx + 60 * u, hy - 2 * u, hx + 60 * u, hy - 28 * u, 8 * u);
+    });
+    // le panier, plein, qui attrape la carotte
+    panier(c, hx + 66 * u, hy - 52 * u, 64 * u, (cc) => {
+      objet(cc, 'pomme', -24, -18, 17); objet(cc, 'raisin', 2, -24, 18); objet(cc, 'orange', 26, -16, 16);
+    });
+    mainOuverte(c, hx + 58 * u, hy - 32 * u, 8 * u, 0.4);
+    // la devinette en images : trois cartes, la bonne (la carotte) brille
+    carteReponse(c, 'pomme', 100, 186, 118, -0.12, false);
+    carteReponse(c, 'cerise', 250, 152, 118, 0.06, false);
+    carteReponse(c, '', 432, 146, 132, 0.1, true);
+    // la carotte jaillit de sa carte et plonge dans le panier (traits de vitesse et étoiles)
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 5; c.lineCap = 'round';
+    [[-40, -10], [-46, 14], [40, -6], [46, 18]].forEach((d) => { c.beginPath(); c.moveTo(448 + d[0], 214 + d[1] - 16); c.lineTo(448 + d[0] * 1.1, 214 + d[1] + 6); c.stroke(); });
+    c.save(); c.translate(448, 214); c.rotate(0.3); c.shadowColor = 'rgba(255,200,90,.95)'; c.shadowBlur = 22; objet(c, 'carotte', 0, 0, 60); c.restore();
+    coche(c, 490, 88, 26, true);
+    [[386, 210, 12, '#ffd84d'], [516, 226, 10, '#ffffff'], [398, 282, 8, '#ff8a1e'], [524, 290, 11, '#ffd84d'], [378, 140, 8, '#ffffff']]
+      .forEach((p, i) => etoile(c, p[0], p[1], p[2], p[3], i * 0.6));
+    // Myrtille, au premier plan à droite, court vers l'étal d'or
+    rival(2, 524, 604, 50, 'myrtille');
+    // premier plan : cagettes de fruits et légumes coupées par les bords
+    const cagette = (x, y, l, ids) => {
+      ids.forEach((id, j) => objet(c, id, x + (j - (ids.length - 1) / 2) * l * 0.3, y - l * 0.12 - (j % 2) * l * 0.08, l * 0.2));
+      rr(c, x - l / 2, y, l, l * 0.34, l * 0.05); P(c, '#c98f55', '#8a5a2b');
+      c.fillStyle = '#a8742a'; c.fillRect(x - l / 2, y + l * 0.15, l, l * 0.04);
+    };
+    cagette(40, 712, 230, ['tomate', 'poivron', 'tomate', 'aubergine']);
+    cagette(Math.max(570, X1 - 40), 724, 240, ['orange', 'citron', 'orange', 'clementine']);
+    objet(c, 'pasteque', 300, 770, 52);
+  }
+
+  function cacherInterface() {
+    for (const el of document.querySelectorAll('.ecran, .voile, .rond, #toast, #confettis, jel-langue, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    modeAffiche = true;
+    cacherInterface();
+    dessinerAffiche();
+    // Le bouton de langue peut être posé après ce script : on le cache encore un peu après.
+    [100, 400, 1000, 1800].forEach((d) => setTimeout(cacherInterface, d));
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement
+  //  Une vraie partie solo contre les 3 robots, jouée d'avance par les règles (hasard à
+  //  graine fixe), puis figée à un moment où c'est au joueur, avec la vraie interface :
+  //    1 = niveau 1 : devinette « Où pousse… ? » en images ;
+  //    2 = niveau 10 : panier lancé, choix entre deux étals, dont un étal d'or qui brille ;
+  //    3 = niveau 20 (sur ordinateur) : remettre une recette dans l'ordre, étals d'or, des
+  //        puces et charrette sur la place, paniers bien remplis.
+  //  Aucun son, rien d'enregistré, pas de robot qui joue : la partie ne bouge plus.
+  // ---------------------------------------------------------------------
+
+  const MOMENTS_APERCU = {
+    1: { niveau: 1, graine: 11, tours: 8, ph: 'q', min: 1 },
+    2: { niveau: 10, graine: 23, tours: 12, ph: 's', or: true, min: 2 },
+    3: { niveau: 20, graine: 37, tours: 16, ph: 'q', cats: ['recette'], min: 3 }
+  };
+
+  // Partie figée : le joueur est à la place 0 ; aucune action n'est acceptée.
+  const PARTIE_APERCU = {
+    mode: 'solo', phase: 'jeu', siege: 0, manche: 1,
+    monTour: () => !!vue && vue.tour === 0 && vue.fini < 0,
+    sieges: () => [0, 1, 2, 3].map((s) => ({ moi: s === 0, humain: s === 0, chef: false })),
+    jouer: () => false, pause: () => {}, quitter: () => {}, recommencer: () => false, lancerManche: () => false
+  };
+
+  // Joue la partie d'avance jusqu'au moment voulu (robots : leur force du niveau ; joueur :
+  // répond juste le plus souvent et va vers l'étal cherché).
+  function preparerApercu(m) {
+    for (let essai = 0; essai < 80; essai++) {
+      const alea = window.JEL_MULTI.hasard(m.graine + essai * 977);
+      const e = R.depart(alea, PLACES, { niveau: m.niveau });
+      for (let pas = 0; pas < 800 && e.fini < 0; pas++) {
+        const s = e.tour;
+        if (s === 0 && e.tt >= m.tours && e.pan[0].length >= m.min && e.pan.every((p) => p.length < e.cfg.but - 1)) {
+          if (m.ph === 'q' && e.ph === 'q' && e.q && (!m.cats || m.cats.indexOf(e.q.c) >= 0)) return e;
+          if (m.ph === 's' && e.ph === 's' && (!m.or || e.cible.some((i) => e.b[i].k === 'or'))) return e;
+        }
+        let a = R.bot(e, s, alea);
+        if (s === 0 && e.ph === 's' && m.cats) {
+          const j = [0, 1].filter((x) => { const et = e.b[e.cible[x]]; return et.k !== 'char' && m.cats.indexOf(et.c) >= 0; });
+          if (j.length) a = { t: 's', d: j[0] === 0 ? -1 : 1 };
+        }
+        if (s === 0 && e.ph === 'q' && e.q && alea() < 0.85) {
+          const q = e.q;
+          if (q.c === 'recette') { const o = []; for (let i = 0; i < q.n; i++) o.push(q.ch.indexOf(i)); a = { t: 'r', o: o }; }
+          else a = { t: 'r', i: q.ok };
+        }
+        if (!R.valide(e, s, a)) break;
+        R.jouer(e, s, a, alea);
+      }
+    }
+    return null;
+  }
+
+  function ouvrirApercu(n) {
+    const m = MOMENTS_APERCU[n];
+    const e = preparerApercu(m) || R.depart(window.JEL_MULTI.hasard(m.graine), PLACES, { niveau: m.niveau });
+    apercu = n;
+    prog.options.son = false;           // aucun son
+    session = 'solo';
+    niveau = m.niveau;
+    enPartie = false;                   // rien n'est écrit à la fermeture
+    enPause = false;
+    attenteTuto = false;
+    partie = PARTIE_APERCU;
+    vue = copie(e);
+    anims = { pions: {}, lancer: null, gains: [], echange: null };
+    particules.length = 0;
+    ordreRecette = [];
+    questionVue = null;
+    if (vue.ph === 'q' && vue.q) {
+      questionVue = { q: vue.q, s: 0, ancien: false };
+      // Recette : la première étape est déjà touchée (numérotée « 1 »).
+      if (vue.q.c === 'recette') ordreRecette = [vue.q.ch.indexOf(0)];
+    } else if (vue.ph === 's') {
+      anims.lancer = { t0: T_APERCU - 800, d: vue.de };   // le panier lancé et ses pommes
+      choixSens = vue.b[vue.cible[0]].k === 'or' ? -1 : 1;
+    }
+    for (const el of document.querySelectorAll('.voile')) el.classList.remove('actif');
+    if (n === 3) document.body.classList.add('apercu-ordi');
+    majBoutonsSon();
+    afficherEcran('jeu');
+    majInterface();
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -6806,7 +7076,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !apercu && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -6814,12 +7084,17 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? vue.bon[partie.siege] : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(); });
+  window.addEventListener('resize', () => { if (modeAffiche) dessinerAffiche(); else if (ecran !== 'jeu') dessinerTitre(); });
 
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
+  // Affiche et images du jeu (posées par le robot du site seulement) : ni écran titre, ni fenêtre,
+  // ni invitation en ligne.
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) { ouvrirApercu(numeroApercu); return; }
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
   afficherEcran('titre');
   // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement

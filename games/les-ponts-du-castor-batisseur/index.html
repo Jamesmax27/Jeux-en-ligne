@@ -4065,6 +4065,7 @@ window.JEL_NIVEAUX = NIVEAUX.length;
         o.aideMain = { x: a0[0] + (a1[0] - a0[0]) * f, y: a0[1], appui: u > 0.15 && u < 0.8 };
       }
       if (o.depart && !o.curseur) o.outil = ed.outil;
+      if (apercuMain) o.aideMain = apercuMain;   // image du jeu : le doigt qui glisse la planche
     }
     dessinerScene(c, VJ, niv, o);
   }
@@ -4108,6 +4109,271 @@ window.JEL_NIVEAUX = NIVEAUX.length;
       else if (ecranActif === 'hutte') dessinerHutte();
       if (fenetreOuverte === 'f-astuce') dessinerDemo();
     } catch (e) { setTimeout(function () { throw e; }); }
+  }
+
+  // =========================================================================
+  // Affiche du jeu (jaquette) : window.JEL_AFFICHE, posé par le robot du site seulement
+  // =========================================================================
+  // Une scène composée, sans interface ni texte (CONSIGNES-JEU.md, section 5) : le castor
+  // bâtisseur en grand, casque sur la tête et maillet levé, montre le pont qu'il vient de
+  // bâtir ; l'ours le traverse (la planche sous ses pattes force et jaunit), le lapin court
+  // devant, le cerf suit ; le soleil brille derrière le castor, les canards nagent dessous.
+  function dessinerCastorAffiche(c, x, y, s, kk) {
+    c.save();
+    c.translate(x, y); c.scale(s, s);
+    ellipse(c, 0.08, 0.01, 0.62, 0.09, 0, 'rgba(30,60,20,.35)');
+    // silhouette avec un contour de lumière (le soleil est derrière lui)
+    c.shadowColor = 'rgba(255,240,180,.95)'; c.shadowBlur = 26 * kk;
+    c.save(); c.translate(0.3, -0.12); c.rotate(0.32);
+    ellipse(c, 0.32, 0, 0.38, 0.15, 0, '#5a3d27');
+    c.restore();
+    ellipse(c, 0, -0.44, 0.37, 0.45, 0, '#8a5a34');
+    ellipse(c, -0.08, -0.98, 0.3, 0.27, 0, '#8a5a34');
+    c.shadowBlur = 0;
+    // écailles de la queue
+    c.save(); c.translate(0.3, -0.12); c.rotate(0.32);
+    c.strokeStyle = 'rgba(0,0,0,.28)'; c.lineWidth = 0.022;
+    for (var i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(0.06, i * 0.05); c.lineTo(0.66, i * 0.05); c.stroke(); }
+    for (i = 1; i < 6; i++) { c.beginPath(); c.moveTo(0.06 + i * 0.11, -0.13); c.lineTo(0.06 + i * 0.11, 0.13); c.stroke(); }
+    c.restore();
+    // pieds, ventre, ceinture à outils
+    ellipse(c, -0.15, -0.03, 0.16, 0.07, 0, '#3e2a1a'); ellipse(c, 0.18, -0.03, 0.16, 0.07, 0, '#3e2a1a');
+    ellipse(c, -0.06, -0.4, 0.24, 0.32, 0, '#c99a6a');
+    c.fillStyle = '#6b4423'; c.fillRect(-0.36, -0.36, 0.72, 0.08);
+    c.fillStyle = '#ffc23d'; c.fillRect(-0.1, -0.375, 0.1, 0.11);
+    c.fillStyle = '#6b4423'; c.fillRect(-0.075, -0.35, 0.05, 0.06);
+    // bras droit levé : le maillet de bois
+    c.save(); c.translate(0.36, -1.44); c.rotate(-0.19);
+    c.strokeStyle = '#7a4d27'; c.lineWidth = 0.07; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(-0.02, 0.42); c.stroke();
+    c.fillStyle = '#8b5a2b'; c.strokeStyle = '#4e3018'; c.lineWidth = 0.025;
+    c.beginPath(); arrondi(c, -0.18, -0.085, 0.36, 0.17, 0.06); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(214,160,100,.8)'; c.beginPath(); c.moveTo(-0.13, -0.035); c.lineTo(0.13, -0.035); c.stroke();
+    c.fillStyle = '#e0b27a'; c.strokeStyle = '#5a3a1c';
+    [-0.18, 0.18].forEach(function (ex) { c.beginPath(); c.ellipse(ex, 0, 0.035, 0.085, 0, 0, 7); c.fill(); c.stroke(); });
+    c.restore();
+    c.strokeStyle = '#7a4d2c'; c.lineWidth = 0.13;
+    c.beginPath(); c.moveTo(0.22, -0.64); c.quadraticCurveTo(0.42, -0.72, 0.42, -1.0); c.stroke();
+    ellipse(c, 0.42, -1.02, 0.085, 0.08, 0, '#6b4423');
+    // bras gauche tendu vers le pont
+    c.beginPath(); c.moveTo(-0.26, -0.64); c.quadraticCurveTo(-0.45, -0.7, -0.64, -0.9); c.stroke();
+    ellipse(c, -0.66, -0.92, 0.09, 0.08, 0, '#6b4423');
+    c.strokeStyle = '#6b4423'; c.lineWidth = 0.06;
+    c.beginPath(); c.moveTo(-0.7, -0.96); c.lineTo(-0.82, -1.02); c.stroke();
+    // tête : oreilles, joues, museau, dents, sourire
+    ellipse(c, 0.13, -1.17, 0.08, 0.08, 0, '#6b4423'); ellipse(c, -0.31, -1.17, 0.08, 0.08, 0, '#6b4423');
+    ellipse(c, 0.13, -1.17, 0.04, 0.04, 0, '#c99a6a'); ellipse(c, -0.31, -1.17, 0.04, 0.04, 0, '#c99a6a');
+    ellipse(c, 0.08, -0.9, 0.07, 0.045, 0, 'rgba(255,130,130,.45)');
+    ellipse(c, -0.21, -0.88, 0.17, 0.12, 0, '#c99a6a');
+    ellipse(c, -0.31, -0.95, 0.065, 0.048, 0, '#2a1a0d');
+    ellipse(c, -0.325, -0.965, 0.02, 0.014, 0, 'rgba(255,255,255,.8)');
+    c.strokeStyle = '#3e2a1a'; c.lineWidth = 0.025; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-0.33, -0.86); c.quadraticCurveTo(-0.22, -0.78, -0.1, -0.86); c.stroke();
+    c.fillStyle = '#fffaf0'; c.strokeStyle = '#c8b9a0'; c.lineWidth = 0.012;
+    c.beginPath(); arrondi(c, -0.27, -0.83, 0.1, 0.12, 0.02); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-0.22, -0.83); c.lineTo(-0.22, -0.71); c.stroke();
+    // moustaches
+    c.strokeStyle = 'rgba(60,40,25,.6)'; c.lineWidth = 0.012;
+    [[-0.36, -0.9, -0.5, -0.93], [-0.36, -0.87, -0.5, -0.86], [-0.08, -0.9, 0.04, -0.93], [-0.08, -0.87, 0.04, -0.86]].forEach(function (m) { c.beginPath(); c.moveTo(m[0], m[1]); c.lineTo(m[2], m[3]); c.stroke(); });
+    // yeux qui regardent le pont
+    [[-0.17, -1.05], [0.02, -1.05]].forEach(function (e) {
+      ellipse(c, e[0], e[1], 0.065, 0.075, 0, '#fff');
+      ellipse(c, e[0] - 0.02, e[1] + 0.005, 0.042, 0.05, 0, '#1d1208');
+      ellipse(c, e[0] - 0.005, e[1] - 0.02, 0.016, 0.016, 0, '#fff');
+    });
+    c.strokeStyle = '#4a2e17'; c.lineWidth = 0.022;
+    c.beginPath(); c.arc(-0.17, -1.1, 0.07, -2.6, -0.6); c.stroke();
+    c.beginPath(); c.arc(0.02, -1.1, 0.07, -2.6, -0.6); c.stroke();
+    // casque de chantier
+    c.fillStyle = '#ffc23d'; c.beginPath(); c.ellipse(-0.08, -1.18, 0.28, 0.17, 0, Math.PI, 0); c.fill();
+    c.fillStyle = '#f2a72a'; c.fillRect(-0.42, -1.2, 0.62, 0.05);
+    c.fillStyle = '#e8961c'; c.fillRect(-0.11, -1.35, 0.06, 0.16);
+    c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 0.03;
+    c.beginPath(); c.arc(-0.08, -1.18, 0.21, -2.6, -2.0); c.stroke();
+    c.restore();
+  }
+  // Massette de roseaux au premier plan.
+  function roseau(c, x, y, h, pench, kk) {
+    c.strokeStyle = '#3f8f4f'; c.lineWidth = 5 * kk; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + pench * 0.3, y - h * 0.6, x + pench, y - h); c.stroke();
+    c.fillStyle = '#7a4a24';
+    c.beginPath(); c.ellipse(x + pench * 0.93, y - h * 0.86, 7 * kk, 22 * kk, pench * 0.004, 0, 7); c.fill();
+    c.fillStyle = '#4fa858';
+    c.beginPath(); c.moveTo(x - 4 * kk, y); c.quadraticCurveTo(x - 30 * kk - pench * 0.2, y - h * 0.5, x - 50 * kk, y - h * 0.62); c.quadraticCurveTo(x - 20 * kk, y - h * 0.4, x + 4 * kk, y); c.fill();
+  }
+  function dessinerAffiche() {
+    var cv = $('toile-affiche'), c = cv.getContext('2d');
+    var W = window.innerWidth || 600, H = window.innerHeight || 800;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var kk = Math.min(W / 600, H / 800);
+    var px = function (x) { return W / 2 + (x - 300) * kk; }, py = function (y) { return H / 2 + (y - 400) * kk; };
+    var t = 2.2;
+    // ciel lumineux et grand soleil derrière le castor
+    var g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#5fb8f0'); g.addColorStop(0.45, '#bfe6ff'); g.addColorStop(1, '#e9f8ff');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    var sx = px(470), sy = py(110);
+    var halo = c.createRadialGradient(sx, sy, 10 * kk, sx, sy, 420 * kk);
+    halo.addColorStop(0, 'rgba(255,250,215,1)'); halo.addColorStop(0.25, 'rgba(255,236,160,.65)'); halo.addColorStop(1, 'rgba(255,236,160,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    c.save(); c.translate(sx, sy);
+    c.fillStyle = 'rgba(255,245,190,.35)';
+    for (var i = 0; i < 14; i++) { c.rotate(Math.PI / 7); c.beginPath(); c.moveTo(0, 0); c.lineTo(-24 * kk, -520 * kk); c.lineTo(24 * kk, -520 * kk); c.closePath(); c.fill(); }
+    c.restore();
+    c.fillStyle = '#fff3b0'; c.beginPath(); c.arc(sx, sy, 58 * kk, 0, 7); c.fill();
+    c.fillStyle = '#ffe27a'; c.beginPath(); c.arc(sx, sy, 48 * kk, 0, 7); c.fill();
+    nuage(c, px(60), py(70), 44 * kk); nuage(c, px(250), py(40), 30 * kk); nuage(c, px(-180), py(110), 40 * kk); nuage(c, px(700), py(60), 40 * kk);
+    // le pont, dans le monde du jeu (cases) : rives à 0,5 et 8,5
+    var k = 64 * kk;
+    var niv = { w: 9, haut: 0, rives: [0.5, 0, 8.5, 0], eau: 1.8, fond: 0, ancres: [[0.5, 0, 'route'], [8.5, 0, 'route'], [0.5, -4.6, 'arbre']], rochers: [], courant: 0 };
+    var V = { k: k, ox: px(4), oy: 0, haut: 0, cw: W, ch: H };
+    V.haut = -py(262) / k;
+    niv.haut = V.haut; niv.fond = (H + 20) / k + V.haut;
+    collines(c, V, Y(V, -0.15), k * 2.4, '#a8dcae', 0.7, 1);
+    collines(c, V, Y(V, -0.15) + k * 0.3, k * 1.5, '#86c98e', 1.1, 2);
+    dessinerEau(c, V, niv, t);
+    dessinerRives(c, V, niv, t);
+    dessinerArbres(c, V, niv);
+    // pont en treillis ; le tablier plie un peu sous l'ours
+    var plie = function (x) { return 0.16 * Math.max(0, 1 - Math.abs(x - 3.6) / 2.6); };
+    var noeuds = [], types = [], poutres = [];
+    var idx = function (x, y, ty) {
+      for (var j = 0; j < noeuds.length; j++) if (noeuds[j].bx === x && noeuds[j].by === y) return j;
+      noeuds.push({ bx: x, by: y, x: x, y: y + (ty === 'ancre' ? 0 : plie(x) * (y === 0 ? 1 : 0.6)) }); types.push(ty || 'joint'); return noeuds.length - 1;
+    };
+    niv.ancres.forEach(function (a) { idx(a[0], a[1], 'ancre'); });
+    var segs = [];
+    for (var x = 0.5; x < 8.5; x += 2) segs.push([x, 0, x + 2, 0, 'planche']);
+    for (x = 0.5; x < 8.5; x += 2) { segs.push([x, 0, x + 1, -1.3, 'rondin'], [x + 1, -1.3, x + 2, 0, 'rondin']); if (x + 2 < 8.5) segs.push([x + 1, -1.3, x + 3, -1.3, 'rondin']); }
+    segs.push([0.5, -4.6, 1.5, -1.3, 'corde'], [0.5, -4.6, 3.5, -1.3, 'corde']);
+    segs.forEach(function (sg) { poutres.push({ a: idx(sg[0], sg[1]), b: idx(sg[2], sg[3]), mat: sg[4], ratio: sg[4] === 'planche' && sg[0] === 2.5 ? 0.78 : 0 }); });
+    poutres.forEach(function (p) {
+      var a = noeuds[p.a], b = noeuds[p.b];
+      dessinerPiece(c, k, p.mat, X(V, a.x), Y(V, a.y), X(V, b.x), Y(V, b.y), p.mat === 'corde' ? longueur(a.x, a.y, b.x, b.y) + 0.15 : 0, p.ratio);
+    });
+    noeuds.forEach(function (n, j) { dessinerNoeud(c, k, types[j], X(V, n.x), Y(V, n.y), 0); });
+    // les voyageurs : le cerf entre, l'ours au milieu, le lapin court devant
+    [['cerf', 1.15, 2.4], ['ours', 3.6, 1.3], ['lapin', 5.7, 3.1]].forEach(function (an) {
+      dessinerAnimal(c, an[0], X(V, an[1]), Y(V, plie(an[1])) - k * 0.14, ANIMAUX[an[0]].taille * k * 1.08, an[2], 0, 'pont');
+    });
+    // petits nuages de poussière derrière le lapin
+    c.fillStyle = 'rgba(255,255,255,.85)';
+    [[5.0, -0.1, 0.13], [4.75, -0.2, 0.1], [4.55, -0.05, 0.08]].forEach(function (d) { c.beginPath(); c.arc(X(V, d[0]), Y(V, d[1]), k * d[2], 0, 7); c.fill(); });
+    // canards sur la rivière
+    dessinerSurface(c, V, niv, t);
+    for (i = 0; i < 3; i++) dessinerAnimal(c, 'canard', X(V, 1.3 + i * 1.0), Y(V, niv.eau) + k * 0.14, k * (1.05 - i * 0.12), i, 0, 'nage', Y(V, niv.eau));
+    // premier plan : la berge du castor (à droite) et les roseaux (à gauche)
+    var bx = px(250), by = py(672);
+    var gb = c.createLinearGradient(0, by, 0, H);
+    gb.addColorStop(0, '#b07b48'); gb.addColorStop(1, '#6e4626');
+    c.fillStyle = gb;
+    c.beginPath(); c.moveTo(bx - 40 * kk, H + 5); c.quadraticCurveTo(bx, by + 6 * kk, bx + 110 * kk, by); c.lineTo(W + 5, by - 10 * kk); c.lineTo(W + 5, H + 5); c.closePath(); c.fill();
+    c.fillStyle = '#5db65a';
+    c.beginPath(); c.moveTo(bx - 20 * kk, by + 40 * kk); c.quadraticCurveTo(bx + 10 * kk, by - 6 * kk, bx + 110 * kk, by - 10 * kk); c.lineTo(W + 5, by - 22 * kk); c.lineTo(W + 5, by + 22 * kk); c.lineTo(bx + 110 * kk, by + 16 * kk); c.quadraticCurveTo(bx + 20 * kk, by + 22 * kk, bx - 20 * kk, by + 40 * kk); c.fill();
+    c.fillStyle = '#4aa04a';
+    for (i = 0; i < 26; i++) {
+      var hx = bx + (alea(i * 3.3) * (W - bx + 20 * kk)), hy = by - 12 * kk - (hx > bx + 110 * kk ? (hx - bx - 110 * kk) / (W - bx) * 12 * kk : 0);
+      c.beginPath(); c.moveTo(hx - 5 * kk, hy + 4 * kk); c.lineTo(hx + 1 * kk, hy - 18 * kk); c.lineTo(hx + 6 * kk, hy + 4 * kk); c.fill();
+    }
+    [['#ff8fb1', 560, 664], ['#fff27a', 300, 680], ['#ffffff', 520, 676]].forEach(function (f) {
+      for (var p = 0; p < 5; p++) { c.fillStyle = f[0]; c.beginPath(); c.arc(px(f[1]) + Math.cos(p * 1.26) * 7 * kk, py(f[2]) + Math.sin(p * 1.26) * 7 * kk, 5 * kk, 0, 7); c.fill(); }
+      c.fillStyle = '#ffc23d'; c.beginPath(); c.arc(px(f[1]), py(f[2]), 4 * kk, 0, 7); c.fill();
+    });
+    // tas de bois du castor
+    [[px(318), py(686), 0], [px(352), py(688), 0], [px(335), py(664), 0]].forEach(function (r) {
+      dessinerPiece(c, 42 * kk, 'rondin', r[0] - 70 * kk, r[1], r[0], r[1], 0, 0);
+    });
+    dessinerPiece(c, 40 * kk, 'planche', px(272), py(708), px(380), py(694), 0, 0);
+    // le castor bâtisseur, en grand
+    dessinerCastorAffiche(c, px(425), py(670), 262 * kk, kk);
+    // roseaux coupés par le bord gauche
+    roseau(c, px(30), H + 10, 330 * kk, 30 * kk, kk);
+    roseau(c, px(-10), H + 10, 260 * kk, 50 * kk, kk);
+    roseau(c, px(75), H + 10, 220 * kk, 10 * kk, kk);
+  }
+  function cacherPourAffiche() {
+    var l = document.querySelectorAll('.ecran, .fenetre, button, .jel-langue, #toast');
+    for (var i = 0; i < l.length; i++) l[i].style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    var cv = document.createElement('canvas');
+    cv.id = 'toile-affiche'; cv.setAttribute('aria-hidden', 'true');
+    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;z-index:10';
+    document.body.appendChild(cv);
+    cacherPourAffiche();
+    setTimeout(cacherPourAffiche, 300); setTimeout(cacherPourAffiche, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // =========================================================================
+  // Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement
+  // =========================================================================
+  // Le jeu s'ouvre directement en pleine partie, avec sa vraie interface (barre du niveau,
+  // jauge du bois, outils), sans écran titre, ni « Continuer », ni carte d'astuce. Le pont est
+  // posé par le code, l'essai tourne quelques secondes en avance, puis tout est figé sans
+  // fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1 : le doigt glisse la première planche, le lapin attend sur la rive ;
+  //   2 = niveau 8 : les cordes accrochées aux arbres ; l'ours traverse, le lapin arrive ;
+  //   3 = niveau 20 (ordinateur) : le pont à deux étages, les lianes, le cerf et les canards
+  //       en haut, l'ours et l'élan en bas, le courant de la rivière.
+  var apercu = 0, apercuMain = null;
+  function planche2(y, x0, x1) { var s = []; for (var x = x0; x < x1; x += 2) s.push([x, y, x + 2, y, 'planche']); return s; }
+  var MOMENTS_APERCU = {
+    1: { niveau: 0, segs: [], piliers: [], glisse: [0, 4.85, 0.05], temps: 1.3 },
+    2: { niveau: 7, piliers: [], essai: 5.5, temps: 2.6,
+      segs: planche2(0, 3, 13).concat([[3, -4, 5, 0, 'corde'], [3, -4, 7, 0, 'corde'], [13, -4, 11, 0, 'corde'], [13, -4, 9, 0, 'corde']]) },
+    3: { niveau: 19, piliers: [0], essai: 9.5, temps: 4.1,
+      segs: (function () {
+        var s = planche2(0, 2, 18).concat(planche2(2, 2, 18));
+        for (var x = 2; x < 18; x += 2) s.push(x % 4 === 2 ? [x, 2, x + 2, 0, 'rondin'] : [x, 0, x + 2, 2, 'rondin']);
+        [4, 6, 8, 12, 14, 16].forEach(function (x2) { s.push([x2, 0, x2, 2, 'rondin']); });
+        s.push([2, -6, 6, 0, 'liane'], [18, -6, 14, 0, 'liane']);
+        return s;
+      })() },
+  };
+  function ouvrirApercu(n) {
+    apercu = n;
+    var m = MOMENTS_APERCU[n];
+    // Hasard fixe : la même image à chaque capture.
+    var graine = 98765 + n * 7919;
+    Math.random = function () { graine = (graine + 0x6D2B79F5) | 0; var q = Math.imul(graine ^ (graine >>> 15), 1 | graine); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+    // Progression neuve, en mémoire seulement (rien n'est enregistré), sons coupés, astuces déjà vues.
+    prog.etoiles = tableau(); prog.records = tableau(); prog.vus = []; prog.deco = {};
+    prog.son = false; prog.debloque = NIVEAUX.length; prog.astuces = Object.keys(DEMOS);
+    demarrerNiveau(m.niveau, false);
+    var niv = niveauCourant(), plan = planVide(niv);
+    m.piliers.forEach(function (r) {
+      var ro = niv.rochers[r];
+      plan.piliers.push(r);
+      [ro.haut, ro.bas].forEach(function (y) { plan.noeuds.push({ x: ro.x, y: y, type: 'pilier', rocher: r }); });
+    });
+    m.segs.forEach(function (sg) {
+      var a = trouverNoeud(plan, sg[0], sg[1]); if (a < 0) { plan.noeuds.push({ x: sg[0], y: sg[1], type: 'joint' }); a = plan.noeuds.length - 1; }
+      var b = trouverNoeud(plan, sg[2], sg[3]); if (b < 0) { plan.noeuds.push({ x: sg[2], y: sg[3], type: 'joint' }); b = plan.noeuds.length - 1; }
+      plan.poutres.push({ a: a, b: b, mat: sg[4] });
+    });
+    ed.plan = plan;
+    majJauge();
+    if (m.glisse) {
+      // le doigt glisse une planche de la rive gauche vers la rive droite
+      var pr = proposerPiece(m.glisse[0], m.glisse[1], m.glisse[2], 0.4);
+      ed.drag = { de: m.glisse[0], id: -1, pr: pr, bouge: true, x0: plan.noeuds[m.glisse[0]].x, y0: plan.noeuds[m.glisse[0]].y };
+      majJauge(pr.ok ? pr.cout : 0);
+      apercuMain = { x: m.glisse[1], y: m.glisse[2], appui: true };
+    }
+    if (m.essai) {
+      // l'essai tourne en avance : les animaux sont sur le pont
+      lancerEssai();
+      $('toast').classList.remove('vu');
+      var pas = Math.round(m.essai * 60);
+      for (var i = 0; i < pas && !ed.sim.fini; i++) { pasSimulation(ed.sim, 1 / 60); traiterEvenements(); majParticules(1 / 60, niv); }
+      secousse = 0;
+    }
+    tempsAnim = m.temps;
+    // figé sur ce moment, sans fenêtre de pause
+    enPause = true;
   }
 
   // =========================================================================
@@ -4181,8 +4447,16 @@ window.JEL_NIVEAUX = NIVEAUX.length;
     // Sauvegarde à la fermeture de la page, seulement pendant une partie.
     JEL_SAVE.surFermeture(function () {
       // niveau gagné : on reprendra au suivant
-      if (partieEnCours && ed) JEL_SAVE.save(JEU, donnees(Math.min(NIVEAUX.length + 1, ed.idx + (ed.gagne ? 2 : 1))));
+      if (partieEnCours && ed && !apercu) JEL_SAVE.save(JEU, donnees(Math.min(NIVEAUX.length + 1, ed.idx + (ed.gagne ? 2 : 1))));
     });
+    // Affiche (jaquette) ou images du jeu : posés seulement par le robot du site.
+    var numeroApercu = Number(window.JEL_APERCU);
+    if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+    if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+      ouvrirApercu(numeroApercu);
+      requestAnimationFrame(boucle);
+      return;
+    }
     redimensionner();
     requestAnimationFrame(boucle);
   }

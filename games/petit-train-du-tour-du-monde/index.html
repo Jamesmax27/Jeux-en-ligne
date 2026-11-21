@@ -1804,6 +1804,8 @@
     width: 100vw; width: min(100vw, 66dvh, 600px); overflow: hidden; background: #7fc8f5;
   }
   #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  /* Affiche (JEL_AFFICHE) et image d'ordinateur (JEL_APERCU = 3) : le décor occupe toute la largeur */
+  html.plein-large #app { width: 100vw; }
 
   /* --- Écrans (menus) --- */
   .ecran {
@@ -2947,8 +2949,10 @@
 
     // 3. Décor (graines fixes par bloc, loin des voies)
     const DB = 120;
+    // Image d'ordinateur (JEL_APERCU = 3) : décor aussi dense sur toute la largeur de l'écran.
+    const densite = apercu === 3 ? Math.max(1, Math.round(W / 450)) : 1;
     for (let k = Math.floor(sMin / DB); k <= Math.ceil(sMax / DB); k++) {
-      const n = 2 + Math.floor(hasard(k * 3.1 + L.d.e) * 3);
+      const n = (2 + Math.floor(hasard(k * 3.1 + L.d.e) * 3)) * densite;
       for (let i = 0; i < n; i++) {
         const s = k * DB + hasard(k * 7.7 + i * 1.3) * DB;
         const x = hasard(k * 9.1 + i * 2.9 + 4) * W;
@@ -3544,7 +3548,8 @@
     const r = $('app').getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.max(1, Math.round(r.width * dpr)); canvas.height = Math.max(1, Math.round(r.height * dpr));
-    const ech = Math.min(r.width / 400, r.height / 760);
+    // Image d'ordinateur (JEL_APERCU = 3) : vue un peu rapprochée pour que les trains se lisent bien.
+    const ech = Math.min(r.width / 400, r.height / 760) * (apercu === 3 ? 1.25 : 1);
     V.echelle = ech; V.dpr = dpr; V.W = r.width / ech; V.H = r.height / ech; V.trainY = V.H - 235;
   }
   window.addEventListener('resize', redimensionner);
@@ -3552,6 +3557,8 @@
   let ecran = 'titre';
   let monde = null, calc = null, N = 1, partieEnCours = false, demo = null, demoType = null;
   let retourDepuis = 'titre';
+  // Images du jeu (window.JEL_APERCU) : numéro de l'image (1, 2 ou 3), et partie figée sur son moment
+  let apercu = 0, apercuFige = false;
 
   function montrer(id) {
     ecran = id;
@@ -3962,7 +3969,7 @@
     dernierTemps = performance.now();
     if (monde && monde.finAttente) { const r = monde.finAttente; monde.finAttente = null; finNiveau(r); }
   }
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') pauser(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && !apercu) pauser(); });
   window.addEventListener('blur', () => { toucherFin(); });
 
   // Boutons des écrans
@@ -4024,7 +4031,7 @@
     tempsTitre += dt;
 
     // simulation
-    if (ecran === 'jeu' && monde) {
+    if (ecran === 'jeu' && monde && !apercuFige) {
       cumul += dt;
       let n = 0;
       while (cumul >= PAS && n < 6) { majMonde(monde, PAS); cumul -= PAS; n++; }
@@ -4088,14 +4095,330 @@
   }
 
   // ------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le petit train
+  // rouge et ses wagons arc-en-ciel foncent vers nous, fumée au vent, phares allumés ; le conducteur
+  // et les enfants saluent par les fenêtres ; le feu du passage est vert ; les champs de tulipes
+  // filent ; au loin, les pyramides, les montagnes enneigées et le moulin : le tour du monde.
+  // ------------------------------------------------------------------------
+  function dessinerAffiche() {
+    redimensionner();
+    const c = ctx, W = canvas.width / V.dpr, H = canvas.height / V.dpr;
+    c.setTransform(V.dpr, 0, 0, V.dpr, 0, 0);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const k = Math.min(W / 600, H / 800);
+    const cx = W / 2, oy = (H - 800 * k) / 2, hy = oy + 410 * k;
+
+    // Petite perspective : la voie part vers le fond à droite, le train vient vers nous.
+    // s = distance le long de la voie (vers le fond), l = de côté (vers nous), y = hauteur (mètres).
+    const AL = 0.34, DX = Math.sin(AL), DZ = Math.cos(AL), CAM = 2, X0 = -2.1, Z0 = 9.6, F = 800 * k, PX = cx - 18 * k;
+    const pr = (s, l, y) => {
+      const X = X0 + DX * s + DZ * l, Z = Math.max(0.3, Z0 + DZ * s - DX * l);
+      return [PX + F * X / Z, hy + F * (CAM - y) / Z, Z];
+    };
+    const sDeb = (l) => (0.6 - Z0 + DX * l) / DZ;   // premier point visible devant la caméra
+    const chemin = (pts) => { c.beginPath(); pts.forEach((p, i) => { const q = pr(p[0], p[1], p[2]); if (i) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]); }); c.closePath(); };
+    const remplir = (pts, coul) => { chemin(pts); c.fillStyle = coul; c.fill(); };
+    const cote = (s1, s2, y1, y2, l, coul) => remplir([[s1, l, y1], [s2, l, y1], [s2, l, y2], [s1, l, y2]], coul);
+    const face = (s, l1, l2, y1, y2, coul) => remplir([[s, l1, y1], [s, l2, y1], [s, l2, y2], [s, l1, y2]], coul);
+    const ovale = (fn) => { const pts = []; for (let i = 0; i < 30; i++) { const a = i / 30 * Math.PI * 2; pts.push(fn(Math.cos(a), Math.sin(a))); } return pts; };
+    const rondCote = (sc, yc, r, l, coul) => remplir(ovale((co, si) => [sc + r * co, l, yc + r * si]), coul);
+    const rondFace = (s, lc, yc, r, coul) => remplir(ovale((co, si) => [s, lc + r * co, yc + r * si]), coul);
+    const ligne = (pts, coul, larg) => { c.beginPath(); pts.forEach((p, i) => { const q = pr(p[0], p[1], p[2]); if (i) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]); }); c.strokeStyle = coul; c.lineWidth = larg; c.stroke(); };
+    const ech = (s, l, y) => F / pr(s, l, y)[2];      // pixels par mètre à cet endroit
+
+    // 1. Ciel, soleil, nuages
+    const ciel = c.createLinearGradient(0, 0, 0, hy);
+    ciel.addColorStop(0, '#3f9fec'); ciel.addColorStop(0.55, '#8fd2ff'); ciel.addColorStop(1, '#fff0c4');
+    c.fillStyle = ciel; c.fillRect(0, 0, W, hy + 2);
+    const soX = cx + 175 * k, soY = oy + 125 * k;
+    const halo = c.createRadialGradient(soX, soY, 0, soX, soY, 360 * k);
+    halo.addColorStop(0, 'rgba(255,252,225,1)'); halo.addColorStop(0.2, 'rgba(255,240,170,.75)'); halo.addColorStop(1, 'rgba(255,240,170,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, hy);
+    c.save(); c.translate(soX, soY); c.fillStyle = 'rgba(255,248,200,.35)';
+    for (let i = 0; i < 14; i++) { c.rotate(Math.PI / 7); c.beginPath(); c.moveTo(-12 * k, 60 * k); c.lineTo(0, 300 * k); c.lineTo(12 * k, 60 * k); c.closePath(); c.fill(); }
+    c.restore();
+    cercle(c, soX, soY, 52 * k, '#ffe773'); cercle(c, soX, soY, 42 * k, '#fff6b8');
+    const nuage = (x, y, e) => {
+      ellipse(c, x + 4 * k, y + 8 * k, 70 * e * k, 20 * e * k, 0, 'rgba(120,160,210,.25)');
+      ellipse(c, x, y, 70 * e * k, 20 * e * k, 0, '#ffffff');
+      cercle(c, x - 26 * e * k, y - 10 * e * k, 26 * e * k, '#ffffff'); cercle(c, x + 14 * e * k, y - 18 * e * k, 32 * e * k, '#ffffff');
+    };
+    nuage(cx - 205 * k, oy + 105 * k, 0.9); nuage(cx - 30 * k, oy + 215 * k, 0.6); nuage(cx + 255 * k, oy + 285 * k, 0.75);
+
+    // 2. Lointain : montagnes enneigées, pyramides et moulin
+    const pics = [];
+    for (let x = -60 * k, i = 0; x < W + 120 * k; x += 95 * k, i++) pics.push([x, (55 + hasard(i * 3.7 + 1) * 80) * k, 60 * k]);
+    c.fillStyle = '#a9c0dc';
+    c.beginPath(); c.moveTo(-80 * k, hy);
+    for (const [x, h] of pics) { c.lineTo(x - 47 * k, hy - 30 * k); c.lineTo(x, hy - h); }
+    c.lineTo(W + 80 * k, hy - 30 * k); c.lineTo(W + 80 * k, hy); c.closePath(); c.fill();
+    c.fillStyle = '#c4d6ea';
+    for (const [x, h] of pics) { c.beginPath(); c.moveTo(x, hy - h); c.lineTo(x + 47 * k, hy - 30 * k); c.lineTo(x + 47 * k * 0.4, hy - 30 * k); c.closePath(); c.fill(); }
+    c.fillStyle = '#ffffff';
+    for (const [x, h] of pics) {
+      const t = 0.3;
+      c.beginPath(); c.moveTo(x - 47 * k * t, hy - h + (h - 30 * k) * t); c.lineTo(x, hy - h); c.lineTo(x + 47 * k * t, hy - h + (h - 30 * k) * t);
+      c.lineTo(x + 10 * k, hy - h + (h - 30 * k) * t * 0.7); c.lineTo(x - 4 * k, hy - h + (h - 30 * k) * t * 1.1); c.closePath(); c.fill();
+    }
+    const pyramide = (x, base, l, h) => {
+      c.fillStyle = '#d9b06a'; c.beginPath(); c.moveTo(x - l, base); c.lineTo(x, base - h); c.lineTo(x + l * 0.25, base); c.closePath(); c.fill();
+      c.fillStyle = '#f3d697'; c.beginPath(); c.moveTo(x + l * 0.25, base); c.lineTo(x, base - h); c.lineTo(x + l, base); c.closePath(); c.fill();
+    };
+    pyramide(cx - 255 * k, hy + 4 * k, 78 * k, 92 * k); pyramide(cx - 155 * k, hy + 6 * k, 52 * k, 60 * k);
+    // moulin des Pays-Bas, à droite
+    {
+      const x = cx + 168 * k, b = hy + 6 * k;
+      c.fillStyle = '#8a6a4a'; c.beginPath(); c.moveTo(x - 18 * k, b); c.lineTo(x - 10 * k, b - 78 * k); c.lineTo(x + 10 * k, b - 78 * k); c.lineTo(x + 18 * k, b); c.closePath(); c.fill();
+      c.fillStyle = '#6f5238'; c.beginPath(); c.moveTo(x - 14 * k, b - 76 * k); c.lineTo(x, b - 96 * k); c.lineTo(x + 14 * k, b - 76 * k); c.closePath(); c.fill();
+      c.save(); c.translate(x, b - 82 * k); c.rotate(0.35);
+      for (let i = 0; i < 4; i++) { c.rotate(Math.PI / 2); c.fillStyle = '#f3ead8'; c.fillRect(-6 * k, -62 * k, 12 * k, 52 * k); c.strokeStyle = '#8a6a4a'; c.lineWidth = 1.5 * k; c.strokeRect(-6 * k, -62 * k, 12 * k, 52 * k); }
+      c.restore(); cercle(c, x, b - 82 * k, 6 * k, '#5e4630');
+    }
+
+    // 3. Sol : sable du désert au loin, prairie et tulipes de notre côté de la voie
+    const sol = c.createLinearGradient(0, hy, 0, H);
+    sol.addColorStop(0, '#f6e2ad'); sol.addColorStop(1, '#e7c582');
+    c.fillStyle = sol; c.fillRect(0, hy, W, H - hy);
+    for (const [x, y, rx] of [[-200, 445, 120], [-60, 470, 90], [-250, 520, 110]]) ellipse(c, cx + x * k, oy + y * k, rx * k, 14 * k, 0, 'rgba(255,248,220,.6)');
+    // prairie et rangs de tulipes (de notre côté de la voie)
+    const champ = (l1, l2, coul) => remplir([[sDeb(l1), l1, 0], [500, l1, 0], [500, l2, 0], [sDeb(l2), l2, 0]], coul);
+    champ(1.9, 90, '#86c862');
+    const TULIPES = ['#e84a5f', '#f7d046', '#f28dc2', '#ffffff', '#f08a24', '#b462e0'];
+    for (let i = 0; i < 16; i++) {
+      const l1 = 2.6 + i * 1.25;
+      champ(l1, l1 + 0.8, TULIPES[i % TULIPES.length]);
+      for (let s = Math.max(-3, sDeb(l1 + 0.8) + 0.5); s < 60; s += 0.8 + s * 0.06) {
+        const p = pr(s, l1 + 0.4, 0.05), r = Math.min(9 * k, 0.16 * F / p[2]);
+        if (p[1] > H + 20) continue;
+        cercle(c, p[0], p[1], r, i % TULIPES.length === 3 ? '#d9dbe6' : 'rgba(255,255,255,.4)');
+      }
+    }
+    // ballast, traverses et rails
+    remplir([[sDeb(-1.9), -1.9, 0], [600, -1.9, 0], [600, 1.9, 0], [sDeb(1.9), 1.9, 0]], '#bfb29c');
+    remplir([[sDeb(-1.9), -1.9, 0], [600, -1.9, 0], [600, -1.5, 0], [sDeb(-1.5), -1.5, 0]], '#a39780');
+    for (let s = -4.5; s < 140; s += 0.9) remplir([[s, -1.3, 0.06], [s + 0.32, -1.3, 0.06], [s + 0.32, 1.3, 0.06], [s, 1.3, 0.06]], '#7a5634');
+    for (const l of [-0.74, 0.74]) {
+      remplir([[-4.5, l - 0.08, 0.16], [400, l - 0.08, 0.16], [400, l + 0.08, 0.16], [-4.5, l + 0.08, 0.16]], '#5d6470');
+      ligne([[-4.5, l, 0.17], [400, l, 0.17]], 'rgba(240,246,255,.9)', 1.6 * k);
+    }
+
+    // 4. Le train : trois wagons (le plus loin d'abord), puis la locomotive
+    const PEAUX = ['#f2c9a0', '#c98e5f', '#8d5a3b', '#f7dcc0'], CHEVEUX = ['#3b2a20', '#e0a43a', '#1e1a18', '#a5532a'];
+    const enfant = (sc, yc, l, i, salue) => {
+      const r = 0.34;
+      rondCote(sc, yc, r, l, PEAUX[i % 4]);
+      remplir(ovale((co, si) => [sc + r * 1.05 * co, l, yc + r * 0.25 + r * 0.85 * Math.abs(si) * (si > 0 ? 1 : 0.15)]), CHEVEUX[i % 4]);
+      rondCote(sc - 0.12, yc - 0.02, 0.05, l + 0.01, '#222'); rondCote(sc + 0.12, yc - 0.02, 0.05, l + 0.01, '#222');
+      ligne([[sc - 0.12, l + 0.01, yc - 0.15], [sc, l + 0.01, yc - 0.21], [sc + 0.12, l + 0.01, yc - 0.15]], '#7a2d1f', Math.max(1, ech(sc, l, yc) * 0.05));
+      if (salue) {
+        const e = ech(sc, l, yc);
+        ligne([[sc + 0.3, l + 0.02, yc - 0.35], [sc + 0.48, l + 0.12, yc + 0.05], [sc + 0.5, l + 0.2, yc + 0.5]], PEAUX[i % 4], Math.max(2, e * 0.16));
+        rondCote(sc + 0.5, yc + 0.58, 0.14, l + 0.2, PEAUX[i % 4]);
+      }
+    };
+    const WAGONS = [['#f4c542', '#d9a826'], ['#3fae5a', '#2f8a46'], ['#3d7bd9', '#2c5fb0']];
+    const roue = (sc, yc, r, l, jante) => {
+      rondCote(sc, yc, r, l, '#2b2b33'); rondCote(sc, yc, r * 0.78, l + 0.01, jante); rondCote(sc, yc, r * 0.28, l + 0.02, '#e0b13a');
+      for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + 0.3; ligne([[sc, l + 0.02, yc], [sc + Math.cos(a) * r * 0.74, l + 0.02, yc + Math.sin(a) * r * 0.74]], '#2b2b33', Math.max(1, ech(sc, l, yc) * 0.07)); }
+    };
+    const LW = 1.3;
+    for (let w = 2; w >= 0; w--) {
+      const s1 = 7.8 + w * 6.8, s2 = s1 + 6, [coul, fonce] = WAGONS[w];
+      // attelage
+      cote(s1 - 0.8, s1, 0.7, 0.9, 0.2, '#333');
+      face(s1, -LW, LW, 0.55, 0.95, '#3a3a44'); cote(s1, s2, 0.55, 0.95, LW, '#3a3a44');
+      face(s1, -LW, LW, 0.95, 3.05, fonce);
+      face(s1, -0.45, 0.45, 1.2, 2.7, 'rgba(0,0,0,.18)');
+      const corps = c.createLinearGradient(...pr((s1 + s2) / 2, LW, 3.05).slice(0, 2), ...pr((s1 + s2) / 2, LW, 0.95).slice(0, 2));
+      corps.addColorStop(0, coul); corps.addColorStop(1, fonce);
+      cote(s1, s2, 0.95, 3.05, LW, corps);
+      cote(s1, s2, 2.85, 3.05, LW + 0.01, 'rgba(255,255,255,.35)');
+      // toit qui dépasse
+      face(s1 - 0.1, -LW - 0.1, LW + 0.1, 3.05, 3.35, '#e7ecf3'); cote(s1 - 0.1, s2 + 0.1, 3.05, 3.35, LW + 0.1, '#f4f7fb');
+      // fenêtres et enfants
+      for (let f = 0; f < 3; f++) {
+        const a = s1 + 0.55 + f * 1.7, b = a + 1.25;
+        cote(a - 0.08, b + 0.08, 1.52, 2.73, LW + 0.01, '#ffffff');
+        cote(a, b, 1.6, 2.65, LW + 0.02, '#cfe9fb');
+        enfant((a + b) / 2, 2.05, LW + 0.03, w * 3 + f, (w + f) % 2 === 0);
+      }
+      roue(s1 + 0.9, 0.55, 0.42, LW + 0.03, '#c2412c'); roue(s1 + 1.85, 0.55, 0.42, LW + 0.03, '#c2412c');
+      roue(s2 - 1.85, 0.55, 0.42, LW + 0.03, '#c2412c'); roue(s2 - 0.9, 0.55, 0.42, LW + 0.03, '#c2412c');
+    }
+    // locomotive (cabine, chaudière, cheminée, roues, chasse-pierres, phares)
+    cote(7, 7.8, 0.7, 0.9, 0.2, '#333');
+    face(4.4, -1.35, 1.35, 0.95, 3.75, '#a8331f');
+    face(4.4, -1.0, 1.0, 3.0, 3.55, '#bfe6ff');
+    const cab = c.createLinearGradient(...pr(5.7, 1.35, 3.75).slice(0, 2), ...pr(5.7, 1.35, 0.95).slice(0, 2));
+    cab.addColorStop(0, '#d9503a'); cab.addColorStop(1, '#a8331f');
+    cote(4.4, 7, 0.95, 3.75, 1.35, cab);
+    // conducteur à la fenêtre, casquette bleue, qui salue
+    cote(4.9, 6.5, 2.05, 3.4, 1.36, '#ffffff'); cote(5.0, 6.4, 2.12, 3.32, 1.37, '#bfe6ff');
+    {
+      const sc = 5.6, yc = 2.62, l = 1.38, r = 0.4;
+      rondCote(sc, yc, r, l, '#f2c9a0');
+      remplir(ovale((co, si) => [sc + r * 1.05 * co, l + 0.01, yc + 0.18 + Math.max(0, si) * r * 0.75]), '#2f6fe0');
+      cote(sc - 0.05, sc + 0.62, yc + 0.12, yc + 0.22, l + 0.02, '#1f4fa8');
+      rondCote(sc - 0.14, yc - 0.03, 0.06, l + 0.02, '#222'); rondCote(sc + 0.14, yc - 0.03, 0.06, l + 0.02, '#222');
+      ligne([[sc - 0.16, l + 0.02, yc - 0.17], [sc, l + 0.02, yc - 0.25], [sc + 0.16, l + 0.02, yc - 0.17]], '#7a2d1f', Math.max(1.2, ech(sc, l, yc) * 0.06));
+      const e = ech(sc, l, yc);
+      ligne([[6.0, l + 0.03, 2.3], [6.25, l + 0.15, 2.75], [6.3, l + 0.25, 3.25]], '#2f6fe0', e * 0.2);
+      rondCote(6.3, 3.4, 0.17, l + 0.25, '#f2c9a0');
+    }
+    face(4.25, -1.5, 1.5, 3.75, 4.0, '#2b2b33'); cote(4.25, 7.15, 3.75, 4.0, 1.5, '#3a3a44');
+    // chaudière
+    face(0, -1.42, 1.42, 0.5, 1.0, '#c2412c'); cote(0, 7, 0.55, 0.98, 1.36, '#3a3a44');
+    const chaud = c.createLinearGradient(...pr(2.2, 1.05, 3.05).slice(0, 2), ...pr(2.2, 1.05, 0.95).slice(0, 2));
+    chaud.addColorStop(0, '#ff9a78'); chaud.addColorStop(0.35, '#e8573f'); chaud.addColorStop(1, '#a8331f');
+    cote(0.3, 4.4, 0.95, 3.05, 1.05, chaud);
+    for (const s of [1.7, 3.3]) cote(s, s + 0.18, 0.95, 3.05, 1.06, '#e0b13a');
+    ligne([[0.3, 1.06, 3.04], [4.4, 1.06, 3.04]], 'rgba(255,240,210,.95)', 2.2 * k);
+    // dôme doré et cheminée noire
+    {
+      const [x, y] = pr(2.5, 0, 3.0), e = ech(2.5, 0, 3.0);
+      c.fillStyle = '#e0b13a'; c.beginPath(); c.ellipse(x, y, 0.5 * e, 0.55 * e, 0, Math.PI, 0); c.fill();
+      cercle(c, x - 0.15 * e, y - 0.3 * e, 0.12 * e, '#fff3c0');
+      const [hx, hy2] = pr(1.0, 0, 4.0), [bx, by] = pr(1.0, 0, 2.95), [tx, ty] = pr(1.0, 0, 4.45), e2 = ech(1.0, 0, 3.5);
+      c.fillStyle = '#2b2b33';
+      c.beginPath(); c.moveTo(bx - 0.4 * e2, by); c.lineTo(hx - 0.42 * e2, hy2); c.lineTo(tx - 0.6 * e2, ty); c.lineTo(tx + 0.6 * e2, ty); c.lineTo(hx + 0.42 * e2, hy2); c.lineTo(bx + 0.4 * e2, by); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(bx + 0.12 * e2, ty, 0.12 * e2, by - ty);
+      c.fillStyle = '#e0b13a'; c.fillRect(tx - 0.62 * e2, ty - 0.06 * e2, 1.24 * e2, 0.16 * e2);
+    }
+    // face avant de la chaudière
+    rondFace(0.3, 0, 2.0, 1.05, '#c2412c');
+    rondFace(0.29, 0, 2.0, 0.85, '#3a3a44');
+    rondFace(0.28, 0, 2.0, 0.22, '#e0b13a');
+    // roues motrices et bielle
+    roue(1.3, 0.78, 0.66, 1.4, '#e8573f'); roue(2.95, 0.78, 0.66, 1.4, '#e8573f'); roue(5.7, 0.62, 0.5, 1.4, '#e8573f');
+    ligne([[1.3, 1.45, 0.98], [2.95, 1.45, 0.98]], '#e0b13a', ech(2.1, 1.45, 1) * 0.16);
+    // chasse-pierres
+    remplir([[-0.75, -1.15, 0.2], [-0.75, 1.15, 0.2], [0, 1.4, 0.55], [0, -1.4, 0.55]], '#5d6470');
+    for (const l of [-0.7, 0, 0.7]) ligne([[-0.72, l * 0.85, 0.22], [0, l, 0.54]], '#3a3f48', ech(0, 0, 0.5) * 0.08);
+    // phares allumés
+    for (const l of [-0.9, 0.9]) { rondFace(-0.01, l, 0.78, 0.2, '#fff6b0'); }
+    rondFace(0.25, 0, 3.32, 0.28, '#2b2b33'); rondFace(0.24, 0, 3.32, 0.2, '#fff6b0');
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (const [l, y, r] of [[-0.9, 0.78, 0.8], [0.9, 0.78, 0.8], [0, 3.32, 0.75]]) {
+      const [x, yy] = pr(-0.02, l, y), e = ech(0, l, y) * r;
+      const g = c.createRadialGradient(x, yy, 0, x, yy, e);
+      g.addColorStop(0, 'rgba(255,245,190,.95)'); g.addColorStop(0.3, 'rgba(255,220,120,.45)'); g.addColorStop(1, 'rgba(255,220,120,0)');
+      c.fillStyle = g; c.beginPath(); c.arc(x, yy, e, 0, Math.PI * 2); c.fill();
+    }
+    c.restore();
+
+    // 5. Fumée : grosses bouffées qui partent en arrière, éclairées par le soleil
+    for (let i = 8; i >= 0; i--) {
+      const [x, y, z] = pr(1.2 + i * 2.3, -0.2 - i * 0.25, 4.9 + i * 0.75 + (i % 2) * 0.3), r = F * (0.62 + i * 0.3) / z;
+      cercle(c, x + r * 0.12, y + r * 0.14, r, 'rgba(170,190,215,.55)');
+      cercle(c, x, y, r, 'rgba(255,255,255,.96)');
+      cercle(c, x + r * 0.25, y - r * 0.25, r * 0.55, 'rgba(255,250,230,.9)');
+    }
+    // traits de vitesse
+    c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 3 * k;
+    for (const [s, l, y] of [[2, 2.2, 0.35], [4.5, 2.4, 0.6], [7.5, 2.1, 0.45]]) {
+      const a = pr(s, l, y), b = pr(s + 4, l, y); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    }
+
+    // 6. Premier plan : le feu vert du passage d'animaux et de grandes tulipes
+    {
+      const x = cx + 248 * k, y = oy + 300 * k;
+      c.fillStyle = '#4a4f59'; c.fillRect(x - 6 * k, y + 120 * k, 12 * k, H - y);
+      rr(c, x - 38 * k, y, 76 * k, 132 * k, 16 * k); c.fillStyle = '#222'; c.fill();
+      c.strokeStyle = '#555b66'; c.lineWidth = 4 * k; c.stroke();
+      cercle(c, x, y + 36 * k, 22 * k, '#4a2626');
+      const gv = c.createRadialGradient(x, y + 96 * k, 0, x, y + 96 * k, 90 * k);
+      gv.addColorStop(0, 'rgba(120,255,150,.9)'); gv.addColorStop(0.3, 'rgba(80,230,110,.4)'); gv.addColorStop(1, 'rgba(80,230,110,0)');
+      c.fillStyle = gv; c.beginPath(); c.arc(x, y + 96 * k, 90 * k, 0, Math.PI * 2); c.fill();
+      cercle(c, x, y + 96 * k, 22 * k, '#4ade6a'); cercle(c, x - 7 * k, y + 89 * k, 7 * k, '#d6ffe0');
+    }
+    const tulipe = (x, y, t, coul) => {
+      c.strokeStyle = '#2f7a34'; c.lineWidth = 7 * t; c.beginPath(); c.moveTo(x, H + 10); c.quadraticCurveTo(x + 6 * t, y + 60 * t, x, y); c.stroke();
+      ellipse(c, x - 16 * t, y + 70 * t, 9 * t, 30 * t, -0.5, '#3f9a4a');
+      c.fillStyle = coul; c.beginPath(); c.moveTo(x - 20 * t, y - 26 * t); c.lineTo(x - 9 * t, y - 12 * t); c.lineTo(x, y - 30 * t); c.lineTo(x + 9 * t, y - 12 * t); c.lineTo(x + 20 * t, y - 26 * t);
+      c.quadraticCurveTo(x + 22 * t, y + 8 * t, x, y + 8 * t); c.quadraticCurveTo(x - 22 * t, y + 8 * t, x - 20 * t, y - 26 * t); c.fill();
+      ellipse(c, x - 7 * t, y - 8 * t, 4 * t, 10 * t, 0.2, 'rgba(255,255,255,.4)');
+    };
+    tulipe(cx - 275 * k, oy + 700 * k, 1.5 * k, '#e84a5f'); tulipe(cx - 232 * k, oy + 742 * k, 1.2 * k, '#f7d046');
+    tulipe(cx + 280 * k, oy + 690 * k, 1.6 * k, '#f28dc2'); tulipe(cx + 236 * k, oy + 745 * k, 1.15 * k, '#e84a5f');
+  }
+  function cacherInterfaceAffiche() {
+    for (const el of document.querySelectorAll('.ecran, #hud, #levier, #toast, #carte-postale, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    document.documentElement.classList.add('plein-large');
+    cacherInterfaceAffiche();
+    setTimeout(cacherInterfaceAffiche, 300); setTimeout(cacherInterfaceAffiche, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (compteur, panneau suivant, temps, voyageurs,
+  // cœurs, barre de la course), sans écran titre, ni fenêtre « Continuer », ni carte d'étape
+  // (CONSIGNES-JEU.md, section 5). Le conducteur automatique amène le train au moment voulu, puis la
+  // partie est figée sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1, France : le train freine, le terminus et ses zones d'arrêt en vue ;
+  //   2 = niveau 10, Kenya : il quitte la gare, voyageurs à bord, les girafes traversent au feu rouge ;
+  //   3 = niveau 17, Inde, sur un écran d'ordinateur : la course contre le train rival sur le pont,
+  //       avec la locomotive à vapeur et les wagons arc-en-ciel du garage.
+  // ------------------------------------------------------------------------
+  const SCENES_APERCU = {
+    1: { n: 1, cible: (L) => L.fin.c - 420, v: 0.46, t: 10.8, garage: { wagon: 0, loco: 0 } },
+    2: { n: 10, cible: () => 2470, v: 0.4, t: 24.6, garage: { wagon: 1, loco: 0 }, passage: 0.5 },
+    3: { n: 17, cible: () => 2760, v: 0.35, t: 21.3, garage: { wagon: 6, loco: 1 }, rival: [60, 0.4] }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 1234567 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    if (numero === 3) document.documentElement.classList.add('plein-large');
+    redimensionner();
+    prog = progresVide(); // progression neuve en mémoire seulement (rien n'est enregistré)
+    Object.assign(prog.garage, sc.garage);
+    N = sc.n; calc = calculer(N);
+    monde = creerMonde(N, { auto: true });
+    const m = monde, cible = sc.cible(m.L);
+    if (calc.cap) m.rival = { s: 60, v: 0, cap: calc.cap, fini: false };
+    LARGEUR_MONDE = V.W;
+    // Le conducteur automatique amène le train au moment voulu (fumée, voyageurs montés, panneaux passés).
+    while (!m.fini && m.s < cible && m.t < 600) majMonde(m, PAS);
+    // Puis la partie est posée sur ce moment et figée, avec la vraie interface.
+    m.auto = false; m.appui = false; m.v = sc.v * VMAX; m.t = sc.t;
+    m.phase = 'conduite'; m.danger = 0; m.alerte = false; m.secousse = 0; m.flot = [];
+    if (sc.passage !== undefined) {
+      const p = m.L.passages.find((q) => q.etat === 0);
+      if (p) { p.trig = m.t - p.R * sc.passage; p.vert = false; }
+    }
+    if (m.rival && sc.rival) { m.rival.s = m.s + sc.rival[0]; m.rival.v = sc.rival[1] * VMAX; m.rival.fini = false; }
+    partieEnCours = false;
+    montrer('jeu');
+    majHud();
+    apercuFige = true;
+  }
+
+  // ------------------------------------------------------------------------
   // Démarrage
   // ------------------------------------------------------------------------
   chargerProgres();
-  redimensionner();
-  majBoutonsSon();
-  majTitre();
-  montrer('titre');
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    majBoutonsSon();
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    redimensionner();
+    majBoutonsSon();
+    majTitre();
+    montrer('titre');
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

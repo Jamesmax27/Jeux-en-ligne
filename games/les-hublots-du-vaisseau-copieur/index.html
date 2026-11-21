@@ -5138,9 +5138,9 @@
   });
   $('btn-salon-quitter').addEventListener('click', () => { audio(); sons.clic(); quitterPartie(); afficherEcran('titre'); });
 
-  // Écran caché : pause automatique.
+  // Écran caché : pause automatique (jamais sur une image du jeu préparée pour sa page).
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !modeApercu && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -5150,15 +5150,397 @@
 
   window.addEventListener('resize', () => { if (ecran === 'titre') dessinerTitre(); });
 
+  // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu) : window.JEL_AFFICHE, posé par le robot du
+  //  site seulement (CONSIGNES-JEU.md, section 5). Une scène composée, sans
+  //  interface ni texte : l'équipière rousse lève sa lampe torche vers le
+  //  grand hublot, où son double, le Copieur à l'œil qui luit, la regarde.
+  //  Gyrophare rouge, hublots coupés par les bords (un vrai visage à gauche,
+  //  son Copieur à droite), coque du cargo jusqu'aux bords de l'écran.
+  // ---------------------------------------------------------------------
+
+  function cacherInterfaceAffiche() {
+    document.querySelectorAll('.ecran, .voile, #toast, #confettis, #flash, .jel-langue, button')
+      .forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+
+  // Visage d'un équipier avec une expression : yeux tournés (dx, dy), sourcils inquiets, bouche ouverte.
+  function visageExpressif(c, f, d, x, y, r, regard) {
+    dessinerVisage(c, f, d, x, y, r, false);
+    const m = EQUIPAGE[f % EQUIPAGE.length], peau = PEAUX[m.peau];
+    c.save(); c.translate(x, y); c.scale(r / 50, r / 50);
+    c.lineCap = 'round';
+    // sourcils relevés vers le milieu (inquiétude)
+    c.fillStyle = peau; rr(c, -15.5, -16.5, 11.5, 5, 2); c.fill(); rr(c, 4, -16.5, 11.5, 5, 2); c.fill();
+    c.strokeStyle = m.ch; c.lineWidth = 2.6;
+    c.beginPath(); c.moveTo(-15, -14); c.quadraticCurveTo(-10, -16, -5, -18.5); c.moveTo(5, -18.5); c.quadraticCurveTo(10, -16, 15, -14); c.stroke();
+    // yeux grands ouverts, tournés vers le danger
+    [-9, 9].forEach((ex, q) => {
+      c.fillStyle = '#fbfbf7'; ell(c, ex, -6, 6, 4.6); c.fill();
+      if (d === 1 && q === 0) {
+        c.fillStyle = 'rgba(216,255,58,.45)'; ell(c, ex, -6, 9, 7); c.fill();
+        c.fillStyle = '#d8ff3a'; ell(c, ex, -6, 5.8, 4.4); c.fill();
+        c.fillStyle = '#101400'; ell(c, ex + regard[0] * 0.6, -6, 1.1, 3.8); c.fill();
+      } else {
+        c.fillStyle = m.yeux; rond(c, ex + regard[0], -6 + regard[1], 3); c.fill();
+        c.fillStyle = '#111'; rond(c, ex + regard[0], -6 + regard[1], 1.5); c.fill();
+        c.fillStyle = '#fff'; rond(c, ex + regard[0] + 1.1, -7.2 + regard[1], 0.9); c.fill();
+      }
+      c.strokeStyle = 'rgba(40,20,10,.55)'; c.lineWidth = 1.1; c.beginPath(); c.ellipse(ex, -6, 6, 4.6, 0, Math.PI * 1.08, Math.PI * 1.92); c.stroke();
+    });
+    // bouche entrouverte
+    c.fillStyle = peau; ell(c, 0, 11.5, 8.5, 4); c.fill();
+    c.fillStyle = '#4a1414'; ell(c, 0.5, 12, 3.6, 3); c.fill();
+    c.fillStyle = '#f4efe6'; rr(c, -2.6, 9.4, 6.2, 1.6, 0.8); c.fill();
+    c.restore();
+  }
+
+  // L'héroïne, en grand : combinaison, bras levé, lampe torche (dessinée dans la boîte 600 × 800).
+  function dessinerHeroine(c) {
+    const hx = 178, hy = 498, r = 185, z = r / 50;
+    c.save(); c.translate(hx, hy); c.scale(z, z);
+    // corps de la combinaison jusqu'au bas de l'image
+    c.fillStyle = '#3e4f63';
+    c.beginPath(); c.moveTo(-52, 40); c.quadraticCurveTo(-50, 26, -22, 22); c.lineTo(22, 22); c.quadraticCurveTo(50, 26, 54, 40); c.lineTo(58, 90); c.lineTo(-56, 90); c.closePath(); c.fill();
+    c.fillStyle = '#2c3a4a'; c.fillRect(-2, 30, 4, 60);
+    c.fillStyle = '#ffd166'; rr(c, -46, 58, 92, 5, 2); c.fill();
+    c.fillStyle = '#1d2732'; rr(c, -36, 66, 20, 14, 3); c.fill(); rr(c, 16, 66, 20, 14, 3); c.fill();
+    c.restore();
+    visageExpressif(c, 2, 0, hx, hy, r, [2, -1.4]);
+    c.save(); c.translate(hx, hy); c.scale(z, z);
+    // bras levé (épaule, coude, poing)
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.strokeStyle = '#26323f'; c.lineWidth = 17;
+    c.beginPath(); c.moveTo(44, 40); c.lineTo(60, 24); c.lineTo(55, 6); c.stroke();
+    c.strokeStyle = '#46586e'; c.lineWidth = 13;
+    c.beginPath(); c.moveTo(44, 40); c.lineTo(60, 24); c.lineTo(55, 6); c.stroke();
+    c.fillStyle = '#d7dee8'; c.save(); c.translate(55.5, 8); c.rotate(-0.25); rr(c, -7.5, -2, 15, 4, 2); c.fill(); c.restore();
+    // lampe torche, tournée vers le grand hublot
+    c.save(); c.translate(55, 1); c.rotate(0.12);
+    c.fillStyle = '#20262d'; rr(c, -2.6, -17, 5.2, 22, 1.5); c.fill();
+    c.fillStyle = '#6a7480'; rr(c, -1.8, -16, 1.4, 18, 0.7); c.fill();
+    c.fillStyle = '#2b323a'; c.beginPath(); c.moveTo(-3.2, -16); c.lineTo(3.2, -16); c.lineTo(4.6, -22); c.lineTo(-4.6, -22); c.closePath(); c.fill();
+    c.fillStyle = '#fff8dc'; ell(c, 0, -22, 4.6, 1.4); c.fill();
+    c.restore();
+    // poing ganté autour de la lampe
+    c.fillStyle = '#1b2026'; rr(c, 49.5, -4, 11, 9, 3.5); c.fill();
+    c.fillStyle = '#323a44'; rr(c, 48, -2.5, 4, 6, 2); c.fill();
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    cv.style.display = 'block';
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.shadowBlur = 0;
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    // Coque du cargo sur toute la largeur, hublots fermés du couloir sur les côtés (écran large)
+    coque(c, w, h, 11);
+    for (let x = ox - 110 * k; x > -100 * k; x -= 200 * k) { hublot(c, x, oy + 300 * k, 70 * k, { ouv: 0, t: 0 }); hublot(c, x - 100 * k, oy + 560 * k, 60 * k, { ouv: 0, t: 0 }); }
+    for (let x = ox + 710 * k; x < w + 100 * k; x += 200 * k) { hublot(c, x, oy + 300 * k, 70 * k, { ouv: 0, t: 0 }); hublot(c, x + 100 * k, oy + 560 * k, 60 * k, { ouv: 0, t: 0 }); }
+    // Lueur rouge de l'alarme, venue du haut
+    const alarme = c.createRadialGradient(ox + 150 * k, oy + 50 * k, 0, ox + 150 * k, oy + 50 * k, 520 * k);
+    alarme.addColorStop(0, 'rgba(255,50,70,.55)'); alarme.addColorStop(0.5, 'rgba(255,40,60,.2)'); alarme.addColorStop(1, 'rgba(255,40,60,0)');
+    c.fillStyle = alarme; c.fillRect(0, 0, w, h);
+
+    c.save(); c.translate(ox, oy); c.scale(k, k);
+    // Gyrophare et ses faisceaux
+    c.save(); c.globalCompositeOperation = 'lighter';
+    [[-0.35, 0.5], [2.6, 0.32]].forEach(([a, al]) => {
+      const fx = 150, fy = 52, g = c.createRadialGradient(fx, fy, 0, fx, fy, 330);
+      g.addColorStop(0, 'rgba(255,60,70,' + al + ')'); g.addColorStop(1, 'rgba(255,60,70,0)');
+      c.fillStyle = g; c.beginPath(); c.moveTo(fx, fy); c.arc(fx, fy, 330, a - 0.22, a + 0.22); c.closePath(); c.fill();
+    });
+    c.restore();
+    c.fillStyle = '#14181d'; rr(c, 128, 24, 44, 16, 4); c.fill();
+    const dome = c.createRadialGradient(146, 52, 2, 150, 56, 24);
+    dome.addColorStop(0, '#ffe0e0'); dome.addColorStop(0.35, '#ff3b4a'); dome.addColorStop(1, '#7a0c16');
+    c.fillStyle = dome; c.beginPath(); c.arc(150, 62, 22, Math.PI, 0); c.lineTo(172, 66); c.lineTo(128, 66); c.closePath(); c.fill();
+    c.fillStyle = '#14181d'; rr(c, 124, 64, 52, 8, 3); c.fill();
+
+    // Le grand hublot : étoiles, planète, et le double de l'héroïne (le Copieur)
+    const bx = 398, by = 258, R = 150;
+    c.fillStyle = 'rgba(0,0,0,.5)'; rond(c, bx + 10, by + 16, R * 1.13); c.fill();
+    const anneau = c.createLinearGradient(bx - R, by - R, bx + R, by + R);
+    anneau.addColorStop(0, '#eef3f8'); anneau.addColorStop(0.5, '#8794a3'); anneau.addColorStop(1, '#262e37');
+    c.fillStyle = anneau; rond(c, bx, by, R * 1.12); c.fill();
+    c.strokeStyle = 'rgba(255,90,100,.7)'; c.lineWidth = 4; c.beginPath(); c.arc(bx, by, R * 1.1, Math.PI * 1.05, Math.PI * 1.55); c.stroke();
+    c.fillStyle = '#161c22';
+    for (let q = 0; q < 12; q++) { const a = q / 12 * Math.PI * 2; rond(c, bx + Math.cos(a) * R * 1.03, by + Math.sin(a) * R * 1.03, 5.5); c.fill(); }
+    c.save(); rond(c, bx, by, R * 0.9); c.clip();
+    etoilesCiel(c, bx - R, by - R, R * 2, R * 2, 5, 0);
+    const pl = c.createRadialGradient(bx + R * 0.32, by - R * 0.52, R * 0.04, bx + R * 0.45, by - R * 0.42, R * 0.42);
+    pl.addColorStop(0, '#ffc49a'); pl.addColorStop(1, '#5a2235');
+    c.fillStyle = pl; rond(c, bx + R * 0.45, by - R * 0.42, R * 0.36); c.fill();
+    c.strokeStyle = 'rgba(255,200,170,.6)'; c.lineWidth = 4; ell(c, bx + R * 0.45, by - R * 0.42, R * 0.62, R * 0.12, -0.3); c.stroke();
+    // lueur verte, d'en bas, sur le Copieur
+    const verte = c.createRadialGradient(bx, by + R * 0.9, 0, bx, by + R * 0.9, R * 1.2);
+    verte.addColorStop(0, 'rgba(170,255,70,.6)'); verte.addColorStop(1, 'rgba(170,255,70,0)');
+    c.fillStyle = verte; c.fillRect(bx - R, by - R, R * 2, R * 2);
+    c.save(); c.translate(bx + 6, by + R * 0.4); c.rotate(-0.1);
+    dessinerVisage(c, 2, 1, 0, 0, R * 0.68, false);
+    // sourire trop large du double
+    c.scale(R * 0.68 / 50, R * 0.68 / 50);
+    c.fillStyle = PEAUX[EQUIPAGE[2].peau]; ell(c, 0, 11.5, 8, 3.6); c.fill();
+    c.fillStyle = '#1a0606'; c.beginPath(); c.moveTo(-13, 8); c.quadraticCurveTo(0, 19, 13, 8); c.quadraticCurveTo(0, 13, -13, 8); c.fill();
+    c.strokeStyle = '#1a0606'; c.lineWidth = 1.4; c.beginPath(); c.moveTo(-13, 8); c.lineTo(-15, 6); c.moveTo(13, 8); c.lineTo(15, 6); c.stroke();
+    c.restore();
+    // ombre sur la moitié du visage du double
+    const ombre = c.createLinearGradient(bx - R * 0.1, 0, bx + R * 0.5, 0);
+    ombre.addColorStop(0, 'rgba(4,8,6,0)'); ombre.addColorStop(1, 'rgba(4,8,6,.62)');
+    c.fillStyle = ombre; c.fillRect(bx - R, by - R * 0.2, R * 2, R * 1.2);
+    // l'œil qui luit, rallumé par-dessus l'ombre
+    c.save(); c.translate(bx + 6, by + R * 0.4); c.rotate(-0.1); c.scale(R * 0.68 / 50, R * 0.68 / 50);
+    c.globalCompositeOperation = 'lighter';
+    const oeil = c.createRadialGradient(-9, -6, 0, -9, -6, 11);
+    oeil.addColorStop(0, 'rgba(216,255,58,.55)'); oeil.addColorStop(1, 'rgba(216,255,58,0)');
+    c.fillStyle = oeil; rond(c, -9, -6, 11); c.fill();
+    c.restore();
+    // d'autres yeux, tapis dans le noir
+    c.fillStyle = 'rgba(216,255,58,.8)';
+    [[-0.62, -0.32, 0.2], [-0.42, -0.36, -0.2], [0.68, 0.1, 0.15], [0.84, 0.06, -0.15]].forEach(([ex, ey, rot]) => { ell(c, bx + R * ex, by + R * ey, 8, 3.6, rot); c.fill(); });
+    // la tache de la lampe sur la vitre
+    c.globalCompositeOperation = 'lighter';
+    const tache = c.createRadialGradient(bx - 20, by + 30, 0, bx - 20, by + 30, 110);
+    tache.addColorStop(0, 'rgba(255,240,200,.14)'); tache.addColorStop(1, 'rgba(255,240,200,0)');
+    c.fillStyle = tache; rond(c, bx - 20, by + 30, 110); c.fill();
+    c.globalCompositeOperation = 'source-over';
+    // fêlures sur la vitre
+    c.strokeStyle = 'rgba(230,245,255,.55)'; c.lineWidth = 1.6;
+    const fx0 = bx + R * 0.5, fy0 = by + R * 0.35;
+    [[0.9, -0.2], [0.6, 0.6], [0.1, 0.8], [0.95, 0.3], [0.3, -0.5]].forEach(([dx, dy]) => {
+      c.beginPath(); c.moveTo(fx0, fy0); c.lineTo(fx0 + dx * 40, fy0 + dy * 40 + 6); c.lineTo(fx0 + dx * 80, fy0 + dy * 80); c.stroke();
+    });
+    c.restore();
+    c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 7; c.beginPath(); c.arc(bx, by, R * 0.8, Math.PI * 1.1, Math.PI * 1.42); c.stroke();
+
+    // Hublots du premier plan, coupés par les bords : un vrai visage, et son Copieur
+    hublot(c, -8, 205, 96, { ouv: 1, contenu: { t: 'v', f: 0, d: 0 }, t: 0, lueur: 'rgba(80,220,255,.25)' });
+    hublot(c, 610, 640, 104, { ouv: 1, contenu: { t: 'c', f: 0, d: 1 }, t: 0, lueur: 'rgba(255,30,60,.5)' });
+
+    // Faisceau de la lampe torche, vers le grand hublot
+    const tx = 391, ty = 421, sx = bx - 6, sy = by + 36;
+    const ang = Math.atan2(sy - ty, sx - tx), L = Math.hypot(sx - tx, sy - ty), large = 92;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const fais = c.createLinearGradient(tx, ty, sx, sy);
+    fais.addColorStop(0, 'rgba(255,246,210,.6)'); fais.addColorStop(1, 'rgba(255,240,190,.06)');
+    c.fillStyle = fais;
+    c.beginPath(); c.moveTo(tx + Math.cos(ang + Math.PI / 2) * 14, ty + Math.sin(ang + Math.PI / 2) * 14);
+    c.lineTo(tx + Math.cos(ang) * L + Math.cos(ang + Math.PI / 2) * large, ty + Math.sin(ang) * L + Math.sin(ang + Math.PI / 2) * large);
+    c.lineTo(tx + Math.cos(ang) * L - Math.cos(ang + Math.PI / 2) * large, ty + Math.sin(ang) * L - Math.sin(ang + Math.PI / 2) * large);
+    c.lineTo(tx - Math.cos(ang + Math.PI / 2) * 14, ty - Math.sin(ang + Math.PI / 2) * 14); c.closePath(); c.fill();
+    // poussières dans la lumière
+    const al = graineHasard(42);
+    c.fillStyle = 'rgba(255,250,230,.8)';
+    for (let q = 0; q < 26; q++) { const p = al(), d = (al() - 0.5) * large * p * 1.6; rond(c, tx + Math.cos(ang) * L * p + Math.cos(ang + Math.PI / 2) * d, ty + Math.sin(ang) * L * p + Math.sin(ang + Math.PI / 2) * d, 0.8 + al() * 1.6); c.fill(); }
+    c.restore();
+
+    // Sol : grille sombre et bandes d'alerte (le bandeau du titre du site viendra dessus)
+    const sol = c.createLinearGradient(0, 640, 0, 800);
+    sol.addColorStop(0, 'rgba(4,7,12,0)'); sol.addColorStop(1, 'rgba(4,7,12,.75)');
+    c.fillStyle = sol; c.fillRect(-600, 640, 1800, 160);
+    c.restore();
+    c.save(); c.beginPath(); c.rect(0, oy + 774 * k, w, h); c.clip();
+    c.fillStyle = '#ffd166'; c.fillRect(0, oy + 774 * k, w, h);
+    c.fillStyle = '#1a1206';
+    for (let x = -26 * k; x < w + 26 * k; x += 34 * k) { c.beginPath(); c.moveTo(x, oy + 800 * k); c.lineTo(x + 17 * k, oy + 800 * k); c.lineTo(x + 43 * k, oy + 774 * k); c.lineTo(x + 26 * k, oy + 774 * k); c.fill(); }
+    c.restore();
+
+    // L'héroïne, dessinée à part puis éclairée : ombre par le bas, lumière chaude de la lampe, liseré cyan
+    const her = document.createElement('canvas');
+    her.width = Math.ceil(w * dpr); her.height = Math.ceil(h * dpr);
+    const hc = her.getContext('2d');
+    hc.setTransform(k * dpr, 0, 0, k * dpr, ox * dpr, oy * dpr);
+    dessinerHeroine(hc);
+    hc.globalCompositeOperation = 'source-atop';
+    const chaude = hc.createRadialGradient(330, 420, 10, 330, 420, 280);
+    chaude.addColorStop(0, 'rgba(255,225,160,.32)'); chaude.addColorStop(1, 'rgba(255,225,160,0)');
+    hc.fillStyle = chaude; hc.fillRect(-600, 0, 1800, 800);
+    const bas = hc.createLinearGradient(0, 600, 0, 800);
+    bas.addColorStop(0, 'rgba(0,0,8,0)'); bas.addColorStop(1, 'rgba(0,0,8,.55)');
+    hc.fillStyle = bas; hc.fillRect(-600, 0, 1800, 800);
+    const gauche = hc.createLinearGradient(0, 0, 150, 0);
+    gauche.addColorStop(0, 'rgba(0,0,10,.4)'); gauche.addColorStop(1, 'rgba(0,0,10,0)');
+    hc.fillStyle = gauche; hc.fillRect(-600, 0, 1800, 800);
+    c.save();
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.shadowColor = 'rgba(90,225,255,.9)'; c.shadowBlur = 22 * k * dpr;
+    c.drawImage(her, 0, 0);
+    c.shadowBlur = 0;
+    c.globalCompositeOperation = 'lighter';
+    // éclat de l'ampoule de la lampe
+    const ampoule = c.createRadialGradient((ox + 391 * k) * dpr, (oy + 421 * k) * dpr, 0, (ox + 391 * k) * dpr, (oy + 421 * k) * dpr, 40 * k * dpr);
+    ampoule.addColorStop(0, 'rgba(255,250,225,.95)'); ampoule.addColorStop(1, 'rgba(255,250,225,0)');
+    c.fillStyle = ampoule; c.fillRect(0, 0, w * dpr, h * dpr);
+    c.restore();
+  }
+
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    cacherInterfaceAffiche();
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+    // le bouton de langue peut être créé après ce script : on le recache un peu plus tard
+    [200, 700, 1500].forEach((ms) => setTimeout(cacherInterfaceAffiche, ms));
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé par le
+  //  robot du site seulement (CONSIGNES-JEU.md, section 5). Le jeu s'ouvre
+  //  directement en pleine partie solo contre les robots, avec sa vraie
+  //  interface (places, niveau, message, voyants de panne, bouton du sas),
+  //  sans écran titre, ni « Continuer », ni tutoriel, ni réseau. L'état est
+  //  posé à la main (grille tirée à graine fixe), puis figé : les robots ne
+  //  jouent pas, rien ne se gagne ni ne se perd, aucun son, aucune sauvegarde.
+  //   1 = niveau 1 : une paire déjà sauvée, un hublot ouvert, on cherche l'autre ;
+  //   2 = niveau 8 : équipes en course, panne imminente, un Copieur démasqué ;
+  //   3 = niveau 20 (ordinateur) : grande grille, 3 secteurs, oxygène et sas en
+  //       main, un rival déjà bloqué, on choisit qui sceller ; vaisseau « Lys ».
+  // ---------------------------------------------------------------------
+
+  let modeApercu = 0;
+  const MOMENTS_APERCU = {
+    1: { niveau: 1, vaisseau: 0, graine: 101 },
+    2: { niveau: 8, vaisseau: 0, graine: 202 },
+    3: { niveau: 20, vaisseau: 2, graine: 303 }
+  };
+
+  // Coque du cargo derrière la partie (un peu plus claire que le fond uni du jeu) ;
+  // sur un écran d'ordinateur, le couloir et ses grands hublots remplissent toute la largeur.
+  function decorApercu() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    cv.style.display = 'block';
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    coque(c, w, h, 17);
+    const al = c.createRadialGradient(w / 2, 0, 0, w / 2, 0, h * 0.9);
+    al.addColorStop(0, 'rgba(255,40,60,.22)'); al.addColorStop(1, 'rgba(255,40,60,0)');
+    c.fillStyle = al; c.fillRect(0, 0, w, h);
+    const cote = (w - 660) / 2;
+    if (cote > 140) {
+      const R = Math.min(cote * 0.36, h * 0.25);
+      [[cote / 2, h * 0.5, 31, false], [w - cote / 2, h * 0.5, 47, true]].forEach(([x, y, graine, yeux]) => {
+        c.fillStyle = 'rgba(0,0,0,.45)'; rond(c, x + R * 0.08, y + R * 0.12, R * 1.12); c.fill();
+        const g = c.createLinearGradient(x - R, y - R, x + R, y + R);
+        g.addColorStop(0, '#dfe7ef'); g.addColorStop(0.5, '#7a8796'); g.addColorStop(1, '#262e37');
+        c.fillStyle = g; rond(c, x, y, R * 1.12); c.fill();
+        c.fillStyle = '#161c22';
+        for (let q = 0; q < 12; q++) { const a = q / 12 * Math.PI * 2; rond(c, x + Math.cos(a) * R * 1.03, y + Math.sin(a) * R * 1.03, R * 0.04); c.fill(); }
+        c.save(); rond(c, x, y, R * 0.9); c.clip();
+        etoilesCiel(c, x - R, y - R, R * 2, R * 2, graine, 0);
+        if (!yeux) {
+          const pl = c.createRadialGradient(x - R * 0.2, y + R * 0.1, R * 0.05, x - R * 0.1, y + R * 0.2, R * 0.5);
+          pl.addColorStop(0, '#9fe7ff'); pl.addColorStop(1, '#1d3c6a');
+          c.fillStyle = pl; rond(c, x - R * 0.1, y + R * 0.25, R * 0.45); c.fill();
+        } else {
+          c.fillStyle = 'rgba(216,255,58,.85)';
+          ell(c, x - R * 0.18, y - R * 0.05, R * 0.08, R * 0.035, 0.2); c.fill();
+          ell(c, x + R * 0.1, y - R * 0.08, R * 0.08, R * 0.035, -0.2); c.fill();
+        }
+        c.restore();
+        c.strokeStyle = 'rgba(255,255,255,.3)'; c.lineWidth = R * 0.05; c.beginPath(); c.arc(x, y, R * 0.78, Math.PI * 1.1, Math.PI * 1.45); c.stroke();
+      });
+      // câbles le long de la coque
+      c.strokeStyle = '#0b0f14'; c.lineWidth = 6;
+      c.beginPath(); c.moveTo(0, h * 0.84); c.bezierCurveTo(cote * 0.5, h * 0.9, cote, h * 0.8, cote + 20, h * 0.86); c.stroke();
+      c.beginPath(); c.moveTo(w, h * 0.84); c.bezierCurveTo(w - cote * 0.5, h * 0.9, w - cote, h * 0.8, w - cote - 20, h * 0.86); c.stroke();
+    }
+    // bandes d'alerte en bas (écran large seulement : sur téléphone, l'aide est en bas)
+    if (cote > 140) {
+      c.save(); c.beginPath(); c.rect(0, h - 14, w, 14); c.clip();
+      c.fillStyle = '#ffd166'; c.fillRect(0, h - 14, w, 14);
+      c.fillStyle = '#1a1206';
+      for (let x = -14; x < w + 14; x += 24) { c.beginPath(); c.moveTo(x, h); c.lineTo(x + 12, h); c.lineTo(x + 26, h - 14); c.lineTo(x + 14, h - 14); c.fill(); }
+      c.restore();
+    }
+    $('ecran-jeu').style.background = 'transparent';
+  }
+
+  function ouvrirImageJeu(n) {
+    modeApercu = n;
+    const m = MOMENTS_APERCU[n];
+    prog.vaisseau = m.vaisseau;           // en mémoire seulement : rien n'est enregistré
+    cacheVisages.clear();
+    session = 'solo';
+    niveau = m.niveau;
+    enPartie = false;                     // pas de sauvegarde à la fermeture
+    const e = O.preparer(NIVEAUX[niveau - 1], window.JEL_MULTI.hasard(m.graine), PLACES);
+    e.n = niveau - 1;
+    // Les cartes de la grille : paires de vrais visages, copieurs, oxygène, sas.
+    const paires = {}, copies = [], speciaux = { x: [], o: [], s: [] };
+    for (let i = 0; i < e.t.length; i++) {
+      const t = e.t[i];
+      if (t === 'v') (paires[e.f[i]] = paires[e.f[i]] || []).push(i);
+      else if (t === 'c') copies.push(i);
+      else if (speciaux[t]) speciaux[t].push(i);
+    }
+    const faceCopie = copies.length ? e.f[copies[0]] : -1;
+    const liste = Object.keys(paires).map(Number).sort((a, b) => (a === faceCopie) - (b === faceCopie) || a - b).map((f) => paires[f]);
+    const sauve = (p, place) => { p.forEach((i) => { e.o[i] = place; e.v[i] = 1; }); e.sc[place] += 1; };
+    e.tour = 0;
+    if (n === 1) {
+      sauve(liste[0], 0);
+      e.pick = liste[1][0];
+      e.er = [1, 1, 2, 0]; e.k = 9;
+    } else if (n === 2) {
+      [0, 2, 1, 0, 3].forEach((pl, q) => sauve(liste[q], pl));
+      // Un vrai visage et son Copieur ouverts ensemble : le Copieur est démasqué.
+      const cop = copies[0], vrai = paires[faceCopie][0];
+      e.rev = [vrai, cop]; e.res = 'copie'; e.o[cop] = -3;
+      e.sc[0] -= 1;
+      e.er = [3, 2, 4, 3]; e.k = 31;
+      e.pn = 1; e.ps = O.secteur(e, vrai) === 0 ? 1 : 0;
+    } else {
+      [0, 1, 0, 3, 2, 1, 0, 3].forEach((pl, q) => sauve(liste[q], pl));
+      // Déjà passés : un Copieur éjecté, l'oxygène et une commande de sas pris.
+      e.o[copies[0]] = -3;
+      if (speciaux.o[0] !== undefined) e.o[speciaux.o[0]] = -3;
+      if (speciaux.s[0] !== undefined) e.o[speciaux.s[0]] = -3;
+      e.ox[0] = 1; e.sa[0] = 1; e.bl[2] = 1;
+      e.er = [4, 6, 5, 7]; e.k = 58;
+      e.pn = 2; e.ps = 1;
+    }
+    vue = e;
+    // Partie figée, sur l'appareil : les robots ne jouent pas, aucune minuterie.
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 0, chef: -1, etat: e,
+      sieges: () => [0, 1, 2, 3].map((s) => ({ humain: s === 0, moi: s === 0, chef: false })),
+      monTour: () => !!vue && R.aQui(vue) === 0,
+      jouer: () => false, pause: () => {}, quitter: () => {}, recommencer: () => false, lancerManche: () => false, estChef: () => false
+    };
+    anims = nouvellesAnims();
+    particules.length = 0;
+    rejoue = false;
+    afficherEcran('jeu');
+    if (n === 3) ciblage = true;
+    decorApercu();
+    window.addEventListener('resize', decorApercu);
+    majInterface();
+    if (n === 2) toast(tr('copie.toi'), 60000, true);
+  }
+
   document.title = tr('titre');
-  chargerProgression();
-  construirePlaces();
-  majBoutonsSon();
-  try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); dessinerTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) {
+    construirePlaces();
+    demarrerAffiche();
+  } else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    construirePlaces();
+    majBoutonsSon();
+    ouvrirImageJeu(numeroApercu);
+  } else {
+    chargerProgression();
+    construirePlaces();
+    majBoutonsSon();
+    try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); dessinerTitre(); } }); } catch (e) { boutonEffacer = null; }
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>
