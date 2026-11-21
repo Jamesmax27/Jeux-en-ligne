@@ -521,14 +521,17 @@ export async function genererPages({ jeux, racine, dossierPublic }) {
       const alt = tx.jaquette_alt || titre;
       const age = ageMinimum(jeu.ages);
       const description = tx.description_seo || tx.description || jeu.description;
-      // Images du jeu (scripts/apercus-jeu.mjs) : 3 vrais moments de partie, au format téléphone,
-      // juste sous le bouton Jouer ; un lien vers l'image sans JavaScript, agrandie par public/apercus.js.
-      const apercus = (jeu.apercus || []).map((src, i) => ({ src: `/${src}`, n: i + 1, alt: t('page.apercuAlt', { titre, n: i + 1 }) }));
+      // Images du jeu (scripts/apercus-jeu.mjs) : vrais moments de partie juste sous le bouton Jouer ;
+      // un lien vers l'image sans JavaScript, agrandie par public/apercus.js. Deux images de téléphone
+      // et une d'ordinateur (paysage) : classe avec-ordi (côte à côte puis dessous sur téléphone, une
+      // ligne sur ordinateur) ; anciens jeux à 3 images de téléphone : la bande qui défile.
+      const apercus = (jeu.apercus || []).map((a, i) => ({ ...a, src: `/${a.src}`, n: i + 1, paysage: a.largeur > a.hauteur, alt: t('page.apercuAlt', { titre, n: i + 1 }) }));
+      const avecOrdi = apercus.some((a) => a.paysage);
       const blocApercus = apercus.length
         ? `<section class="fiche-apercus" aria-labelledby="titre-apercus">
         <h2 id="titre-apercus">${echapper(t('page.apercus'))}</h2>
-        <ul class="apercus-liste" data-fermer="${echapper(t('page.apercuFermer'))}" data-precedente="${echapper(t('page.apercuPrecedente'))}" data-suivante="${echapper(t('page.apercuSuivante'))}">${apercus.map((a) => `
-          <li><a class="apercu" href="${echapper(a.src)}" aria-label="${echapper(t('page.apercuAgrandir', { n: a.n }))}"><img src="${echapper(a.src)}" alt="${echapper(a.alt)}" width="488" height="1055" loading="lazy" decoding="async"></a></li>`).join('')}
+        <ul class="apercus-liste${avecOrdi ? ' avec-ordi' : ''}" data-fermer="${echapper(t('page.apercuFermer'))}" data-precedente="${echapper(t('page.apercuPrecedente'))}" data-suivante="${echapper(t('page.apercuSuivante'))}">${apercus.map((a) => `
+          <li${a.paysage ? ' class="apercu-paysage"' : ''}><a class="apercu" href="${echapper(a.src)}" aria-label="${echapper(t('page.apercuAgrandir', { n: a.n }))}"><img src="${echapper(a.src)}" alt="${echapper(a.alt)}" width="${a.largeur}" height="${a.hauteur}" loading="lazy" decoding="async"></a></li>`).join('')}
         </ul>
       </section>`
         : '';

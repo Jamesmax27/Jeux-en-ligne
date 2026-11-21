@@ -4,10 +4,14 @@
 //
 // La jaquette est une affiche composée (CONSIGNES-JEU.md, section 5) : pour que
 // le joueur voie à quoi ressemble vraiment le jeu, sa page montre 3 captures
-// d'une vraie partie, au format téléphone. Le jeu les prépare lui-même : quand
-// window.JEL_APERCU vaut 1, 2 ou 3 (posé seulement par ce script), il s'ouvre
-// directement sur un vrai moment de partie, avec sa vraie interface :
-//   1 = début de partie, 2 = milieu du jeu, 3 = niveau avancé.
+// d'une vraie partie. Le jeu les prépare lui-même : quand window.JEL_APERCU
+// vaut 1, 2 ou 3 (posé seulement par ce script), il s'ouvre directement sur un
+// vrai moment de partie, avec sa vraie interface :
+//   1 = début de partie, 2 = milieu du jeu (sur un téléphone, 390 × 844) ;
+//   3 = niveau avancé, sur un écran d'ordinateur (1280 × 720).
+// Page du jeu : les deux images de téléphone côte à côte, l'image d'ordinateur
+// dessous sur téléphone, les trois sur une ligne sur ordinateur (choix du
+// propriétaire, 19 novembre 2026).
 // Captures en anglais (décision du propriétaire, 19 novembre 2026 : une seule
 // série par jeu, pour rester loin de la limite de 20 000 fichiers de Cloudflare).
 //
@@ -31,14 +35,16 @@ const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const APERCUS = {
   nombre: 3,
   fichier: (n) => `apercu-${n}.webp`,
-  largeur: 390, hauteur: 844,      // téléphone en portrait (choix du propriétaire)
-  echelle: 1.25,                    // image de 488 × 1055 px
+  // Écran de chaque image : téléphone en portrait (488 × 1055 px) pour 1 et 2, ordinateur (1280 × 720 px) pour 3.
+  ecran: (n) => (n === 3
+    ? { largeur: 1280, hauteur: 720, echelle: 1, mobile: false }
+    : { largeur: 390, hauteur: 844, echelle: 1.25, mobile: true }),
   qualite: 78,
   langue: 'en',
   attendre: 2500,                   // le jeu met son moment en place, puis capture
   tailleMax: 160 * 1024,            // par image
   // Une image doit montrer quelque chose (mesures de jaquette-sans-texte.mjs) :
-  detailsMin: 0.25, contrasteMin: 14,
+  detailsMin: 0.25, detailsMinOrdi: 0.2, contrasteMin: 14,
   // Deux images trop proches (écart moyen de luminance sur une vignette 39 × 84) = le même écran.
   ecartMin: 6,
 };
@@ -85,9 +91,10 @@ function boutonsDeMenu() {
 export async function capturerApercus(navigateur, adresse) {
   const images = [], problemes = [];
   for (let n = 1; n <= APERCUS.nombre; n++) {
+    const e = APERCUS.ecran(n);
     const contexte = await navigateur.newContext({
-      viewport: { width: APERCUS.largeur, height: APERCUS.hauteur },
-      deviceScaleFactor: APERCUS.echelle, isMobile: true, hasTouch: true, locale: 'en-US',
+      viewport: { width: e.largeur, height: e.hauteur },
+      deviceScaleFactor: e.echelle, isMobile: e.mobile, hasTouch: e.mobile, locale: 'en-US',
     });
     try {
       const page = await contexte.newPage();
@@ -102,7 +109,9 @@ export async function capturerApercus(navigateur, adresse) {
       const webp = await convertir(navigateur, png, 'webp', APERCUS.qualite);
       images.push({ n, png, webp, mesures, menus, vignette: await vignette(page, png) });
       for (const e of [...new Set(erreurs)].slice(0, 2)) problemes.push(`image ${n} : erreur JavaScript (${e.slice(0, 140)})`);
-      if (mesures.details < APERCUS.detailsMin || mesures.contraste < APERCUS.contrasteMin) {
+      // Écran d'ordinateur : le décor occupe naturellement plus de place (seuil de l'affiche, 20 %).
+      const detailsMin = e.mobile ? APERCUS.detailsMin : APERCUS.detailsMinOrdi;
+      if (mesures.details < detailsMin || mesures.contraste < APERCUS.contrasteMin) {
         problemes.push(`image ${n} : écran presque vide ou plat (occupée ${Math.round(mesures.details * 100)} %, contraste ${mesures.contraste}) : montrer un vrai moment de partie`);
       }
       if (menus) problemes.push(`image ${n} : ${menus} bouton(s) de menu visible(s) (« Play », « Got it »…) : JEL_APERCU doit ouvrir la partie elle-même, sans écran titre ni tutoriel`);
