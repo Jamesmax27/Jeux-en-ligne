@@ -2628,6 +2628,7 @@ let niveauReprise = 1;        // niveau où reprendre si la page se ferme
 let fini = false, tFin = 0, victoire = false;
 let cartes = [], indexCarte = 0;
 let lumiereBonus = 0;
+let apercu = 0;                // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
 // ---------- Entrées ----------
 const touches = { g: false, d: false, h: false };
@@ -2683,7 +2684,7 @@ window.addEventListener('keyup', (e) => {
   if (c === 'ArrowUp' || c === 'Space' || c === 'KeyW') touches.h = false;
 });
 window.addEventListener('blur', () => { touches.g = touches.d = touches.h = false; doigts.clear(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && (mode === 'jeu' || mode === 'carte')) mettrePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu && (mode === 'jeu' || mode === 'carte')) mettrePause(); });
 
 // ---------- Papillon ----------
 function nouveauPapillon() {
@@ -3018,7 +3019,7 @@ function boucle(maintenant) {
   const dt = Math.min(0.033, (maintenant - avant) / 1000 || 0);
   avant = maintenant;
   horloge += dt;
-  if (mode === 'jeu') majJeu(dt);
+  if (mode === 'jeu' && !apercu) majJeu(dt); // image du jeu : partie figée sur son moment
   else if (mode === 'fin' || mode === 'menu' || mode === 'titre') majParticules(dt);
   dessiner();
   if (mode === 'fin') animerCompteur(dt);
@@ -3246,7 +3247,7 @@ function dessinerNiveau(N, cx, cy, tps, avecPapillon) {
     nuitCtx.setTransform(1, 0, 0, 1, 0, 0);
     nuitCtx.globalCompositeOperation = 'source-over';
     nuitCtx.clearRect(0, 0, nuitCv.width, nuitCv.height);
-    nuitCtx.fillStyle = 'rgba(6,8,30,.86)'; nuitCtx.fillRect(0, 0, nuitCv.width, nuitCv.height);
+    nuitCtx.fillStyle = apercu ? 'rgba(6,8,30,.6)' : 'rgba(6,8,30,.86)'; // image du jeu : nuit un peu moins noire nuitCtx.fillRect(0, 0, nuitCv.width, nuitCv.height);
     nuitCtx.globalCompositeOperation = 'destination-out';
     const trou = (wx, wy, rr) => {
       const x = (wx - cx) * S * DPR, y = (wy - cy) * S * DPR, r = rr * S * DPR;
@@ -3768,17 +3769,198 @@ $('b-bilan-accueil').addEventListener('click', () => { Son.clic(); afficherTitre
 
 // ---------- Sauvegarde à la fermeture (seulement pendant une partie) ----------
 JEL_SAVE.surFermeture(() => {
-  if (enPartie && L) JEL_SAVE.save(JEU, { niveau: niveauReprise, score: totalScore(), options: optionsSauvegarde() });
+  if (enPartie && L && !apercu) JEL_SAVE.save(JEU, { niveau: niveauReprise, score: totalScore(), options: optionsSauvegarde() });
 });
+
+// ---------- Affiche (jaquette du jeu) ----------
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le papillon en grand file
+// vers le pollen doré, une grenouille bondit hors de la mare pour le croquer, une mésange arrive en
+// piqué, le soleil du matin l'éclaire par-derrière. Mêmes dessins que le jeu, en plus grand.
+let decorAffiche = null;
+function fleurAffiche(x, base, h, c, s, g) {
+  // Une fleur du jeu en grand : pied en (x, base) à l'écran, hauteur h (unités du monde), échelle s.
+  ctx.save();
+  ctx.setTransform(DPR * s, 0, 0, DPR * s, DPR * x, DPR * (base - SOL * s));
+  dessinerFleur(ctx, { x: 0, y: SOL - h, c, g: g || 0 }, 1.7);
+  ctx.restore();
+}
+function dessinerAffiche() {
+  redimensionner();
+  const W = VW, Hv = VH, k = Math.min(W / 600, Hv / 800);
+  const X = (u) => W / 2 + (u - 0.5) * 600 * k, Y = (v) => Hv / 2 + (v - 0.5) * 800 * k;
+  const tps = 1.7;
+  const a = (x, y, s, r) => ctx.setTransform(DPR * s * Math.cos(r || 0), DPR * s * Math.sin(r || 0), -DPR * s * Math.sin(r || 0), DPR * s * Math.cos(r || 0), DPR * x, DPR * y);
+  if (!decorAffiche) decorAffiche = construireNiveau(3);
+  DECORS.affiche = DECORS.affiche || { ciel: ['#3fa6ee', '#9fdbfb', '#fff0cf'], loin: '#a4d696', mid: '#78c466', sol: '#5aae47' };
+  cam.x = 0; cam.y = 0; cam.sec = 0;
+  // Ciel, collines lointaines, fermes, moulins et haies du jeu.
+  dessinerFond({ decor: 'affiche', deco: decorAffiche.deco }, 260, 60, tps);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // Soleil du matin, en haut à gauche, avec ses rayons.
+  const sx = X(0.17), sy = Y(0.13);
+  ctx.save(); ctx.translate(sx, sy);
+  ctx.fillStyle = 'rgba(255,255,230,.28)';
+  for (let i = 0; i < 14; i++) { ctx.rotate(Math.PI / 7); ctx.beginPath(); ctx.moveTo(-14 * k, 0); ctx.lineTo(0, 520 * k); ctx.lineTo(14 * k, 0); ctx.fill(); }
+  ctx.restore();
+  const halo = ctx.createRadialGradient(sx, sy, 0, sx, sy, 360 * k);
+  halo.addColorStop(0, 'rgba(255,252,225,1)'); halo.addColorStop(0.16, 'rgba(255,243,180,.95)');
+  halo.addColorStop(0.45, 'rgba(255,232,160,.35)'); halo.addColorStop(1, 'rgba(255,232,160,0)');
+  ctx.fillStyle = halo; ctx.fillRect(0, 0, W, Hv);
+  ctx.fillStyle = '#fffbe3'; ctx.beginPath(); ctx.arc(sx, sy, 44 * k, 0, Math.PI * 2); ctx.fill();
+  // Fleurs au loin, sur la colline.
+  const gy = Y(0.8);
+  [[0.58, 0.74, 3, 0.75], [0.66, 0.76, 0, 0.8], [0.93, 0.74, 5, 0.7], [0.08, 0.75, 4, 0.75]].forEach(([u, v, c, s]) => fleurAffiche(X(u), Y(v), 46, c, s * k, u * 7));
+  // Le pré et la mare.
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#5aae47'; ctx.fillRect(0, gy, W, Hv - gy);
+  ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.fillRect(0, gy + 26 * k, W, Hv);
+  const eau = ctx.createLinearGradient(0, gy, 0, Hv);
+  eau.addColorStop(0, '#76cdf4'); eau.addColorStop(1, '#2d6fa8');
+  ctx.fillStyle = eau;
+  ctx.beginPath(); ctx.moveTo(0, gy + 6 * k); ctx.lineTo(X(0.46), gy + 6 * k);
+  ctx.bezierCurveTo(X(0.62), gy + 10 * k, X(0.64), Hv - 40 * k, X(0.56), Hv + 4); ctx.lineTo(0, Hv + 4); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.65)'; ctx.lineWidth = 3 * k; ctx.lineCap = 'round';
+  [[0.06, 0.83], [0.33, 0.86], [0.14, 0.92], [0.42, 0.95], [0.27, 0.97]].forEach(([u, v]) => { ctx.beginPath(); ctx.moveTo(X(u), Y(v)); ctx.lineTo(X(u) + 34 * k, Y(v)); ctx.stroke(); });
+  // Nénuphars.
+  [[0.1, 0.835, 2.4], [0.4, 0.83, 2.1], [0.24, 0.9, 2.8]].forEach(([u, v, s]) => { a(X(u), Y(v), s * k); dessinerNenuphar(ctx, { x: 0, y: 0, w: 62, appui: true }); });
+  // Éclaboussure sous la grenouille qui vient de bondir.
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#d8f0ff';
+  for (let i = 0; i < 9; i++) { const an = Math.PI * (1.1 + i * 0.1); ctx.beginPath(); ctx.ellipse(X(0.24) + Math.cos(an) * 70 * k, Y(0.88) + Math.sin(an) * 46 * k, 6 * k, 9 * k, an, 0, Math.PI * 2); ctx.fill(); }
+  ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 3 * k;
+  ctx.beginPath(); ctx.ellipse(X(0.24), Y(0.9), 80 * k, 16 * k, 0, 0, Math.PI * 2); ctx.stroke();
+  // La mésange qui arrive en piqué, en haut à droite (traînées de vitesse).
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 4 * k;
+  [[0, 0], [14, 22], [-10, -20]].forEach(([dx, dy]) => { ctx.beginPath(); ctx.moveTo(X(0.86) + 60 * k + dx * k, Y(0.12) + dy * k); ctx.lineTo(X(0.86) + 130 * k + dx * k, Y(0.12) - 30 * k + dy * k); ctx.stroke(); });
+  a(X(0.81), Y(0.155), 2.5 * k, -0.35); dessinerOiseau(ctx, 0, 0, -1, 0.08);
+  // La grenouille qui bondit hors de l'eau vers le papillon.
+  a(X(0.25), Y(0.62), 3.6 * k, 0.3); dessinerGrenouille(ctx, { x: 0, y: 0, dy: 0, etat: 'saut' }, tps);
+  // Gouttes qui tombent de la grenouille.
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = '#bfe6ff';
+  [[0.19, 0.74], [0.27, 0.76], [0.22, 0.8]].forEach(([u, v]) => { ctx.beginPath(); ctx.arc(X(u), Y(v), 6 * k, 0, Math.PI * 2); ctx.fill(); });
+  // Poudre des ailes : le chemin du papillon depuis la mare.
+  const hx = X(0.52), hy = Y(0.38), ech = 6 * k, incl = 0.16;
+  for (let i = 0; i < 22; i++) {
+    const u = i / 21, px = hx - 60 * k - u * 210 * k, py = hy + 70 * k + u * u * 120 * k - Math.sin(u * 9) * 14 * k;
+    ctx.globalAlpha = 1 - u * 0.75;
+    ctx.fillStyle = i % 3 ? '#ffc15e' : '#fffbe3';
+    ctx.beginPath(); ctx.arc(px, py, (7 - u * 4) * k, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // Grains de pollen vers le pollen doré, à droite.
+  [[0.8, 0.4], [0.85, 0.36], [0.9, 0.34]].forEach(([u, v]) => { a(X(u), Y(v), 2.3 * k); dessinerPollen(ctx, 0, 0, tps, false); });
+  a(X(0.88), Y(0.5), 3.2 * k); dessinerPollen(ctx, 0, 0, tps, true);
+  // Le papillon, en grand, contour lumineux, ailes grandes ouvertes.
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,255,235,.95)'; ctx.shadowBlur = 26 * k * DPR;
+  dessinerPapillon(ctx, hx, hy, 0, 1, ech, incl, tps);
+  ctx.restore();
+  dessinerPapillon(ctx, hx, hy, 0, 1, ech, incl, tps); // par-dessus le halo : couleurs franches
+  // Son visage : grands yeux tournés vers la grenouille, sourire.
+  ctx.save(); ctx.translate(hx, hy); ctx.rotate(incl); ctx.scale(ech, ech);
+  for (const s of [-1, 1]) {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(s * 1.9, -11.9, 1.75, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1e1430'; ctx.beginPath(); ctx.arc(s * 1.9 - 0.55, -11.4, 1.05, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(s * 1.9 - 0.2, -12, 0.38, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,120,150,.75)'; ctx.beginPath(); ctx.arc(s * 3.1, -9.4, 0.8, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.strokeStyle = '#ffb3c7'; ctx.lineWidth = 0.55; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(0, -9.6, 1.5, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  ctx.restore();
+  // Premier plan : grandes fleurs coupées par les bords et herbes hautes.
+  fleurAffiche(X(0.05), Hv + 24 * k, 64, 0, 2.7 * k, 0.4);
+  fleurAffiche(X(0.97), Hv + 24 * k, 84, 1, 2.9 * k, 1.1);
+  fleurAffiche(X(0.76), Hv + 30 * k, 120, 2, 2 * k, 2);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.strokeStyle = '#3c8f34'; ctx.lineWidth = 4 * k; ctx.lineCap = 'round';
+  for (let i = 0; i < 26; i++) {
+    const x = X(0.5) + (i - 13) * 34 * k + (i % 3) * 7 * k;
+    if (x > X(0.08) && x < X(0.6)) continue; // pas d'herbe dans la mare
+    const hh = (40 + (i * 37 % 50)) * k;
+    ctx.beginPath(); ctx.moveTo(x, Hv + 2); ctx.quadraticCurveTo(x + 6 * k, Hv - hh * 0.6, x + 14 * k * ((i % 2) ? 1 : -1), Hv - hh); ctx.stroke();
+  }
+}
+function cacherInterfaceAffiche() {
+  for (const el of document.querySelectorAll('.ecran, #hud, #fleches, #bulle, #banniere, .jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  mode = 'affiche';
+  cacherInterfaceAffiche();
+  setTimeout(cacherInterfaceAffiche, 300); setTimeout(cacherInterfaceAffiche, 1200);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+// ---------- Images du jeu (page du jeu) ----------
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (cœurs, jauge de forces, pollen, pollens
+// dorés, progression, flèches), sans écran titre, ni fenêtre « Continuer », ni carte animée
+// (CONSIGNES-JEU.md, section 5). Le moment est posé par le code puis figé : ni victoire, ni défaite,
+// ni son, ni sauvegarde, ni progression enregistrée.
+//   1 = niveau 1 : le pré, le papillon file de fleur en fleur vers un pollen doré ;
+//   2 = niveau 10 : la mare, une grenouille bondit sous un pollen doré, une autre gonfle sa gorge, une mésange arrive ;
+//   3 = niveau 23 (écran d'ordinateur) : la nuit, chauves-souris, lucioles, mante qui jaillit des herbes.
+const SCENES_APERCU = {
+  1: { niveau: 1, aile: 0, x: 440, y: 375, vx: 120, camX: 360, coeurs: 3, energie: 8, dores: [], tps: 3.2, droite: true },
+  2: { niveau: 10, aile: 3, x: 1345, y: 385, vx: 110, camX: 1212, coeurs: 2, energie: 5, dores: [], tps: 6.4,
+    grenouilles: [[0, 'saut', -95], [1, 'pret', 0]], oiseau: [0, 1560, 290] },
+  3: { niveau: 23, aile: 6, x: 2250, y: 400, vx: 90, camX: 1810, coeurs: 2, energie: 7, dores: [0], tps: 9.3, lumiere: 1,
+    mantes: [[0, 190]] },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  Son.actif = false;          // aucun son
+  progres.aile = sc.aile;     // motif d'ailes, en mémoire seulement (rien n'est enregistré)
+  L = construireNiveau(sc.niveau);
+  P = nouveauPapillon();
+  particules = []; fini = false; victoire = false; tFin = 0; tempsNiveau = 0; lumiereBonus = sc.lumiere || 0;
+  enPartie = false;
+  mode = 'jeu'; montrer(null);
+  $('hud').hidden = false; $('fleches').hidden = false;
+  L.t = sc.tps;
+  // Le papillon en plein vol, battement d'ailes en cours.
+  P.x = sc.x; P.y = sc.y; P.vx = sc.vx; P.vy = -60; P.dir = 1; P.pose = null;
+  P.batt = 0.7; P.ph = 1.3; P.dernier = L.t - 0.1;
+  P.coeurs = sc.coeurs; P.touches = 3 - sc.coeurs; P.energie = sc.energie;
+  for (const g of L.pollens) if (g.x < P.x - 30) { g.pris = true; P.pollen++; }
+  for (const i of sc.dores) { L.dores[i].pris = true; P.dores++; }
+  for (const l of L.lucioles) if (l.x < P.x - 200) l.actif = false;
+  cam.x = sc.camX; cam.y = H - vueH; cam.sec = 0;
+  // Animaux à leur place (positions calculées par le jeu), le papillon hors d'atteinte pendant ce calcul.
+  P.inv = 99; majMonde(0); P.inv = 0;
+  for (const [i, etat, dy] of sc.grenouilles || []) { const g = L.grenouilles[i]; g.etat = etat; g.dy = dy; g.vy = -200; g.t = 0.2; }
+  if (sc.oiseau) { const o = L.oiseaux[sc.oiseau[0]]; o.etat = 'vol'; o.x = sc.oiseau[1]; o.yy = sc.oiseau[2]; }
+  for (const [i, h] of sc.mantes || []) { const m = L.mantes[i]; m.etat = 'frappe'; m.h = h; m.t = 0.3; }
+  // Poudre des ailes derrière le papillon et étincelles du pollen doré qu'il vient de prendre.
+  particules = particules.filter((p) => p.type === 'texte');
+  for (let i = 0; i < 9; i++) particules.push({ x: P.x - 14 - i * 11, y: P.y + 12 + i * 4 + Math.sin(i) * 5, vx: 0, vy: 0, vie: 0.5 - i * 0.04, max: 0.5, type: 'poudre', c: AILES[sc.aile].a });
+  $('bulle').hidden = true; clearTimeout(minuteurBulle);
+  $('banniere').hidden = true;
+  majHud(true);
+  if (sc.droite) $('fl-d').classList.add('actif');
+}
 
 // ---------- Démarrage ----------
 document.title = tr('titre');
 chargerProgres();
 majBoutonsSon();
 redimensionner();
-afficherTitre();
-(function animerDemo() { if (mode === 'carte' || (mode === 'pause' && modeAvantPause === 'carte')) dessinerDemo(); requestAnimationFrame(animerDemo); })();
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  afficherTitre();
+  (function animerDemo() { if (mode === 'carte' || (mode === 'pause' && modeAvantPause === 'carte')) dessinerDemo(); requestAnimationFrame(animerDemo); })();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

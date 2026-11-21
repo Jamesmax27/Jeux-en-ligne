@@ -1897,6 +1897,9 @@
 (function () {
   'use strict';
   var JEU = 'solidaire';
+  // Posés seulement par le robot du site (jamais par le jeu) : affiche de la jaquette, images de la page du jeu.
+  var AFFICHE = !!window.JEL_AFFICHE;
+  var APERCU = !AFFICHE && [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
   var I18 = window.JEL_I18N;
   var t = I18.t;
   function $(s) { return document.querySelector(s); }
@@ -2634,7 +2637,8 @@
     var espace = d.pioche || d.res ? gap : 0;
     var wHaut = (W - 2 * pad - (nHaut - 1) * gap - espace) / (nHaut + eventail);
     var wTab = (W - 2 * pad - (d.col - 1) * gap) / Math.max(d.col, 5);
-    var w = Math.floor(Math.min(wHaut, wTab, 104, H / 4.6 / 1.4));
+    // Image d'ordinateur de la page du jeu (JEL_APERCU = 3) : cartes un peu plus grandes, le tapis remplit la largeur.
+    var w = Math.floor(APERCU === 3 ? Math.min(wHaut, wTab, 128, H / 3.9 / 1.4) : Math.min(wHaut, wTab, 104, H / 4.6 / 1.4));
     var h = Math.round(w * 1.4);
     pl.style.setProperty('--w', w + 'px');
     pl.style.setProperty('--h', h + 'px');
@@ -3522,10 +3526,315 @@
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie
   window.JEL_SAVE.surFermeture(function () {
+    if (APERCU || AFFICHE) return; // images du robot : rien n'est enregistré
     if (J && !J.fini && ecranActuel === 'jeu') sauverPartie(J.n + 1, J.score || 0);
   });
 
-  majTitre();
+  // ------------------------------------------------------------------------
+  // Affiche (jaquette du jeu), avec window.JEL_AFFICHE posé par le robot du site.
+  // Scène sans interface ni texte (CONSIGNES-JEU.md, section 5) : sous la lampe de la table de jeu,
+  // le roi de cœur bondit en tête de la cascade de la victoire, la dame et le valet le suivent,
+  // les cartes rebondissent en traînées sur le tapis vert, les quatre maisons brillent en haut.
+  // Cartes sans lettre ni chiffre : seulement les formes des familles et les figures du jeu.
+  // ------------------------------------------------------------------------
+  var FORMES = {
+    f0: new Path2D('M50 90C22 68 6 52 6 32 6 16 18 6 31 6c9 0 16 5 19 13 3-8 10-13 19-13 13 0 25 10 25 26 0 20-16 36-44 58z'),
+    f1: new Path2D('M50 5C36 24 8 38 8 60c0 13 10 22 22 22 7 0 13-3 16-9-1 9-5 16-12 22h32c-7-6-11-13-12-22 3 6 9 9 16 9 12 0 22-9 22-22C92 38 64 24 50 5z'),
+    f2: new Path2D('M50 4l36 46-36 46-36-46z'),
+    f3: (function () { var p = new Path2D(); p.arc(50, 29, 19, 0, 7); p.moveTo(46, 58); p.arc(27, 58, 19, 0, 7); p.moveTo(92, 58); p.arc(73, 58, 19, 0, 7); p.addPath(new Path2D('M45 50c0 22-4 33-13 45h36c-9-12-13-23-13-45z')); return p; })(),
+    roi: new Path2D('M14 72 8 26l24 22 18-32 18 32 24-22-6 46z'),
+    dame: new Path2D('M18 80c4-20 6-34 4-50 10 8 18 10 28-8 10 18 18 16 28 8-2 16 0 30 4 50z'),
+    valet: new Path2D('M12 70c0-22 16-38 38-38s38 16 38 38z'),
+    plume: new Path2D('M58 36C66 18 82 10 94 8 88 20 80 34 62 42z'),
+    etoile: new Path2D('M12 2l3 6.5 7 .8-5.2 4.8 1.4 7L12 17.6 5.8 21.1l1.4-7L2 9.3l7-.8z')
+  };
+  var COULEUR_FAM = ['#d3222e', '#1d2433', '#d3222e', '#1d2433'];
+  // Forme d'une famille (f : 0 à 3), centrée en (x, y), de taille s
+  function formeAff(c, f, x, y, s, couleur) {
+    c.save(); c.translate(x - s / 2, y - s / 2); c.scale(s / 100, s / 100);
+    c.fillStyle = couleur || COULEUR_FAM[f]; c.fill(FORMES['f' + f]); c.restore();
+  }
+  // Figure (11 valet, 12 dame, 13 roi) dessinée comme dans le jeu, en plus grand
+  function figureAff(c, v, f, x, y, s) {
+    var coul = COULEUR_FAM[f];
+    c.save(); c.translate(x - s / 2, y - s / 2); c.scale(s / 100, s / 100);
+    c.lineWidth = 3; c.strokeStyle = '#9c6f0b'; c.lineJoin = 'round';
+    if (v === 13) {
+      c.fillStyle = '#f2bf2f'; c.fill(FORMES.roi); c.stroke(FORMES.roi);
+      c.fillStyle = '#e0a91e'; c.beginPath(); c.roundRect(14, 74, 72, 12, 3); c.fill(); c.stroke();
+      c.fillStyle = coul; [[50, 60, 7], [30, 62, 4.5], [70, 62, 4.5]].forEach(function (p) { c.beginPath(); c.arc(p[0], p[1], p[2], 0, 7); c.fill(); });
+      c.fillStyle = '#fff6c9'; [[8, 26], [32, 48], [50, 16], [68, 48], [92, 26]].forEach(function (p) { c.beginPath(); c.arc(p[0], p[1], 3.2, 0, 7); c.fill(); });
+    } else if (v === 12) {
+      c.fillStyle = '#f6d36a'; c.fill(FORMES.dame); c.stroke(FORMES.dame);
+      c.fillStyle = coul; [[50, 52, 9], [50, 38, 5], [36, 54, 5], [64, 54, 5], [50, 67, 5]].forEach(function (p) { c.beginPath(); c.arc(p[0], p[1], p[2], 0, 7); c.fill(); });
+      c.fillStyle = '#fff6c9'; c.beginPath(); c.arc(50, 52, 4, 0, 7); c.fill();
+    } else {
+      c.fillStyle = coul; c.fill(FORMES.valet);
+      c.fillStyle = '#f2bf2f'; c.beginPath(); c.roundRect(8, 68, 84, 12, 6); c.fill(); c.stroke();
+      c.fillStyle = '#f6d36a'; c.fill(FORMES.plume); c.stroke(FORMES.plume);
+    }
+    c.restore();
+  }
+  function rectArrondi(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); }
+  // Le roi de l'affiche : la couronne du jeu posée sur un visage joyeux (barbe, moustache, joues roses)
+  function visageRoi(c, f, w) {
+    var s = w / 100;
+    c.save(); c.translate(0, -w * 0.12); c.scale(s, s);
+    // Barbe et visage
+    c.fillStyle = '#f1f1ee'; c.strokeStyle = '#b9b3a3'; c.lineWidth = 1.6;
+    c.beginPath(); c.moveTo(-30, 18); c.quadraticCurveTo(-34, 60, 0, 72); c.quadraticCurveTo(34, 60, 30, 18); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = '#ffd3a8'; c.beginPath(); c.ellipse(0, 12, 29, 31, 0, 0, 7); c.fill();
+    c.strokeStyle = '#d99b6c'; c.lineWidth = 1.6; c.stroke();
+    // Joues
+    c.fillStyle = 'rgba(240,110,110,.55)';
+    c.beginPath(); c.ellipse(-17, 22, 7, 5, 0, 0, 7); c.fill();
+    c.beginPath(); c.ellipse(17, 22, 7, 5, 0, 0, 7); c.fill();
+    // Yeux qui rient (clin d'œil à droite)
+    c.fillStyle = '#1d2433';
+    c.beginPath(); c.ellipse(-11, 8, 4.2, 5.4, 0, 0, 7); c.fill();
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(-9.6, 6, 1.6, 0, 7); c.fill();
+    c.strokeStyle = '#1d2433'; c.lineWidth = 3; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(6, 8); c.quadraticCurveTo(11, 3, 16, 8); c.stroke();
+    // Sourcils
+    c.lineWidth = 2.6;
+    c.beginPath(); c.moveTo(-16, -1); c.quadraticCurveTo(-11, -5, -6, -2); c.stroke();
+    c.beginPath(); c.moveTo(6, -2); c.quadraticCurveTo(11, -5, 16, -1); c.stroke();
+    // Grand sourire et moustache
+    c.fillStyle = '#9b2230';
+    c.beginPath(); c.moveTo(-12, 30); c.quadraticCurveTo(0, 46, 12, 30); c.closePath(); c.fill();
+    c.fillStyle = '#ff8f9a'; c.beginPath(); c.ellipse(0, 37, 5, 3, 0, 0, 7); c.fill();
+    c.fillStyle = '#ffffff'; c.strokeStyle = '#b9b3a3'; c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(0, 25); c.quadraticCurveTo(-10, 18, -22, 26); c.quadraticCurveTo(-12, 31, 0, 28); c.quadraticCurveTo(12, 31, 22, 26); c.quadraticCurveTo(10, 18, 0, 25); c.fill(); c.stroke();
+    c.fillStyle = '#e8957a'; c.beginPath(); c.ellipse(0, 17, 4, 4.5, 0, 0, 7); c.fill();
+    c.restore();
+    // Couronne du jeu sur la tête
+    figureAff(c, 13, f, 0, -w * 0.4, w * 0.66);
+  }
+  // Dos des cartes (motifs 0 bleu rayé, 1 rouge à pois, 5 arc-en-ciel)
+  function dosAff(c, x, y, w, h, motif) {
+    var r = w * 0.1;
+    c.save(); rectArrondi(c, x, y, w, h, r); c.clip();
+    if (motif === 1) {
+      c.fillStyle = '#c2232f'; c.fillRect(x, y, w, h); c.fillStyle = '#ffd1d1';
+      var p = w / 6;
+      for (var yy = y + p / 2; yy < y + h; yy += p) for (var xx = x + p / 2; xx < x + w; xx += p) { c.beginPath(); c.arc(xx, yy, p * 0.22, 0, 7); c.fill(); }
+    } else if (motif === 5) {
+      var g = c.createLinearGradient(x, y, x + w, y + h);
+      ['#ff5b5b', '#ffb547', '#ffe35a', '#5bd67a', '#4fa3ff', '#9a6bff'].forEach(function (col, i) { g.addColorStop(i / 5, col); });
+      c.fillStyle = g; c.fillRect(x, y, w, h);
+    } else {
+      c.fillStyle = '#2d5bd8'; c.fillRect(x, y, w, h);
+      c.strokeStyle = '#2247ad'; c.lineWidth = w * 0.07;
+      for (var d = -h; d < w + h; d += w * 0.14) { c.beginPath(); c.moveTo(x + d, y); c.lineTo(x + d - h, y + h); c.stroke(); }
+    }
+    c.restore();
+    c.lineWidth = w * 0.06; c.strokeStyle = '#ffffff';
+    rectArrondi(c, x + c.lineWidth / 2, y + c.lineWidth / 2, w - c.lineWidth, h - c.lineWidth, r); c.stroke();
+  }
+  // Une carte centrée en (x, y), tournée de a (radians). o : { fam, v } (face) ou { dos } ; lueur, alpha.
+  function carteAff(c, x, y, w, a, o) {
+    var h = w * 1.4, r = w * 0.1;
+    c.save(); c.translate(x, y); c.rotate(a || 0); c.globalAlpha = o.alpha === undefined ? 1 : o.alpha;
+    c.shadowColor = o.lueur || 'rgba(0,0,0,.4)'; c.shadowBlur = (o.lueur ? 0.32 : 0.12) * w; c.shadowOffsetY = o.lueur ? 0 : 0.05 * w;
+    c.fillStyle = '#fffdf6'; rectArrondi(c, -w / 2, -h / 2, w, h, r); c.fill();
+    c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetY = 0;
+    if (o.dos !== undefined) dosAff(c, -w / 2, -h / 2, w, h, o.dos);
+    else {
+      c.lineWidth = Math.max(1, w * 0.012); c.strokeStyle = '#c9c1ad'; rectArrondi(c, -w / 2, -h / 2, w, h, r); c.stroke();
+      // Petite forme de la famille dans les deux coins (sans valeur écrite)
+      formeAff(c, o.fam, -w * 0.32, -h * 0.36, w * 0.2);
+      c.save(); c.rotate(Math.PI); formeAff(c, o.fam, -w * 0.32, -h * 0.36, w * 0.2); c.restore();
+      if (o.visage) visageRoi(c, o.fam, w);
+      else if (o.v >= 11) figureAff(c, o.v, o.fam, 0, h * 0.02, w * 0.74);
+      else formeAff(c, o.fam, 0, h * 0.02, w * 0.56);
+    }
+    c.restore();
+  }
+  function etoileAff(c, x, y, s, couleur, a) {
+    c.save(); c.translate(x, y); c.rotate(a || 0); c.scale(s / 24, s / 24); c.translate(-12, -12);
+    c.fillStyle = couleur; c.fill(FORMES.etoile); c.restore();
+  }
+  // Traînée de la cascade : une carte qui rebondit et laisse ses copies derrière elle
+  function traineeAff(c, x, y, vx, vy, sol, n, pas, w, o) {
+    var pts = [];
+    for (var i = 0; i < n * pas; i++) {
+      if (i % pas === 0) pts.push([x, y]);
+      vy += 0.9; x += vx; y += vy;
+      if (y > sol) { y = sol; vy = -vy * 0.74; }
+    }
+    pts.forEach(function (p) { carteAff(c, p[0], p[1], w, 0, o); });
+    return pts[pts.length - 1];
+  }
+  var canevasAffiche = null;
+  function dessinerAffiche() {
+    if (!canevasAffiche) {
+      canevasAffiche = document.createElement('canvas');
+      canevasAffiche.setAttribute('aria-hidden', 'true');
+      canevasAffiche.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:5000;display:block';
+      document.body.appendChild(canevasAffiche);
+    }
+    var W = innerWidth, H = innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    canevasAffiche.width = Math.round(W * dpr); canevasAffiche.height = Math.round(H * dpr);
+    var c = canevasAffiche.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Tapis vert sur tout l'écran
+    var fond = c.createRadialGradient(W / 2, H * 0.36, 10, W / 2, H * 0.4, Math.max(W, H) * 0.75);
+    fond.addColorStop(0, '#2fbf68'); fond.addColorStop(0.45, '#14873f'); fond.addColorStop(1, '#064a22');
+    c.fillStyle = fond; c.fillRect(0, 0, W, H);
+    // Cadre 600 × 800 au centre ; le décor continue jusqu'aux bords sur un écran large
+    var k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    c.save(); c.translate(ox, oy); c.scale(k, k);
+    var gauche = -ox / k, droite = 600 + ox / k;
+    // Lumière de la lampe au-dessus de la table
+    var lampe = c.createRadialGradient(300, 330, 20, 300, 330, 420);
+    lampe.addColorStop(0, 'rgba(255,246,190,.85)'); lampe.addColorStop(0.35, 'rgba(255,236,160,.35)'); lampe.addColorStop(1, 'rgba(255,236,160,0)');
+    c.fillStyle = lampe; c.fillRect(gauche, 0, droite - gauche, 800);
+    // Rayons
+    c.save(); c.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < 12; i++) {
+      var ang = i / 12 * Math.PI * 2 + 0.13;
+      c.fillStyle = 'rgba(255,240,170,' + (i % 2 ? 0.05 : 0.08) + ')';
+      c.beginPath(); c.moveTo(300, 330); c.arc(300, 330, 700, ang, ang + 0.17); c.closePath(); c.fill();
+    }
+    c.restore();
+    // Fond : les maisons en haut (un as de chaque famille), qui brillent
+    var j;
+    [0, 1, 2, 3].forEach(function (f, i) { carteAff(c, 165 + i * 90, 132, 64, 0, { fam: f, v: 1, lueur: 'rgba(255,214,90,.9)' }); });
+    // Cascade de la victoire : des traînées de cartes qui rebondissent vers les bords du tapis
+    c.save(); c.globalAlpha = 0.95;
+    traineeAff(c, 165, 132, -3.2, -5, 600, 11, 5, 62, { fam: 0, v: 8 });
+    traineeAff(c, 435, 132, 3.2, -5, 600, 11, 5, 62, { fam: 3, v: 6 });
+    traineeAff(c, 255, 132, -4.4, 0, 680, 9, 5, 62, { fam: 1, v: 3 });
+    traineeAff(c, 345, 132, 4.4, 0, 680, 9, 5, 62, { fam: 2, v: 9 });
+    c.restore();
+    // Copies pâles derrière le roi : il vient de bondir hors de sa maison
+    [[246, 236, 0.16], [276, 290, 0.3]].forEach(function (p) { carteAff(c, p[0], p[1], 240, -0.32 + p[2] * 0.4, { fam: 0, v: 13, visage: true, alpha: p[2] }); });
+    // Le roi de cœur en grand, en pleine lumière
+    carteAff(c, 310, 372, 250, -0.1, { fam: 0, v: 13, visage: true, lueur: 'rgba(255,224,110,1)' });
+    // Étincelles dorées
+    [[118, 300, 30, 0.2], [500, 262, 36, -0.3], [470, 520, 24, 0.5], [140, 500, 26, 0.1], [440, 190, 20, 0.4], [196, 214, 18, -0.2]].forEach(function (e, i) {
+      c.shadowColor = '#fff3a0'; c.shadowBlur = 14; etoileAff(c, e[0], e[1], e[2], i % 2 ? '#fff6c9' : '#f6c945', e[3]);
+    });
+    c.shadowBlur = 0;
+    // Premier plan : la pioche (dos colorés) et l'as de pique, coupés par les bords
+    for (j = 0; j < 4; j++) carteAff(c, 30 + j * 5, 712 - j * 6, 180, 0.34, { dos: j === 3 ? 5 : (j === 2 ? 1 : 0) });
+    carteAff(c, 572, 700, 180, -0.4, { fam: 1, v: 1 });
+    c.restore();
+  }
+  function demarrerAffiche() {
+    function cacher() {
+      document.querySelectorAll('.ecran, .voile, #toast, #main, #cascade, button, .jel-langue').forEach(function (e) { e.style.setProperty('display', 'none', 'important'); });
+    }
+    cacher();
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+    setTimeout(cacher, 200); setTimeout(cacher, 800);
+  }
+
+  // ------------------------------------------------------------------------
+  // Images du jeu (page du jeu), avec window.JEL_APERCU = 1, 2 ou 3 posé par le robot du site.
+  // La partie s'ouvre directement, avec sa vraie interface, sans écran titre, ni fenêtre « Continuer »,
+  // ni tutoriel, ni mélange (CONSIGNES-JEU.md, section 5). La donne vient d'une graine fixe ; le solveur
+  // du jeu en trouve la solution, dont on joue le début : la position est réelle. Puis la partie est
+  // figée (pause sans fenêtre) : ni son, ni victoire, ni défaite, rien d'enregistré.
+  //   1 = niveau 1 : une carte glissée du doigt vers une autre colonne ;
+  //   2 = niveau 11 : la pioche, les quatre familles, des cartes prises dans la glace, un indice doré ;
+  //   3 = niveau 24, sur ordinateur : 52 cartes, pioche par trois en éventail, réserve, glace,
+  //       cadenas sur une colonne, chrono ; curseur du clavier sur une pile.
+  // ------------------------------------------------------------------------
+  var MOMENTS_APERCU = {
+    1: { niveau: 0, essai: 0, part: 0, temps: 4, dos: 0, action: 'glisse' },
+    2: { niveau: 10, essai: 0, part: 0.3, temps: 74, dos: 1, action: 'indice' },
+    3: { niveau: 23, essai: 0, part: 0.22, temps: 96, dos: 3, action: 'clavier', cadenas: true }
+  };
+  function ouvrirApercu(n) {
+    var m = MOMENTS_APERCU[n];
+    var def = NIVEAUX[m.niveau];
+    // Progression neuve en mémoire seulement (jamais enregistrée) : aucun tutoriel, dos choisi.
+    P = progresVide(); P.son = false; P.dos = m.dos; P.debloque = NIVEAUX.length;
+    SON.regler(false);
+    // Donne gagnable et sa solution, trouvées par le solveur du jeu (graine fixe : toujours la même image)
+    var cand = null, rech = null;
+    for (var essai = m.essai; essai < m.essai + 12; essai++) {
+      cand = M.donne(def, graineDe(m.niveau, essai));
+      rech = M.recherche(cand.L, cand.S, 40000);
+      var t0 = Date.now();
+      while (rech.etat === 'cherche' && Date.now() - t0 < 1500) rech.pas(500);
+      if (rech.etat === 'trouve') break;
+    }
+    var S = cand.S, chemin = rech.etat === 'trouve' ? rech.chemin.slice() : [];
+    var nb = Math.round(chemin.length * m.part), score = 0, coups = 0;
+    for (var i = 0; i < nb; i++) {
+      var o = chemin[i];
+      if (o.pioche) { S = M.piocher(cand.L, S); coups++; continue; }
+      var r = M.jouer(cand.L, S, o.s, o.d);
+      // Le cadenas reste fermé sur l'image : on s'arrête juste avant le coup qui l'ouvrirait.
+      if (m.cadenas && cand.L.cadenas.some(function (cd) { return M.fermee(cand.L, S, cd.col) && !M.fermee(cand.L, r.S, cd.col); })) { nb = i; break; }
+      if (o.d.a === 'f') score += 10;
+      if (o.s.de === 'w' && o.d.a === 't') score += 5;
+      if (r.info.retournee >= 0) score += 5;
+      S = r.S; coups++;
+    }
+    var total = cand.L.total, longueur = chemin.length || Math.round(total * 3.2);
+    J = {
+      n: m.niveau, def: def, L: cand.L, S: S, essai: essai, verifiee: !!chemin.length,
+      par: longueur, limite: def.limite ? Math.ceil(longueur * def.limite) + 4 : 0,
+      cible: def.chrono ? Math.round(total * 4.5) : 0,
+      coups: coups, score: score, temps: m.temps, histo: [], indiceUtilise: false,
+      actif: true, fini: false, pause: false, sel: null, curseur: { zone: 'bas', i: 0, prof: 0 }, clavier: false
+    };
+    afficher('jeu');
+    construirePlateau();
+    majHud();
+    // Coup suivant de la solution : il montre ce qu'on fait (glisser, indice, clavier)
+    var suite = null;
+    for (i = nb; i < chemin.length; i++) if (!chemin[i].pioche && M.coupOk(J.L, J.S, chemin[i].s, chemin[i].d)) { suite = chemin[i]; break; }
+    if (!suite) suite = M.coups(J.L, J.S)[0] || null;
+    J.pause = true; // figée sans fenêtre : le chrono s'arrête, aucun coup ne se joue
+    requestAnimationFrame(function () { requestAnimationFrame(function () { poserAction(m.action, suite); }); });
+  }
+  // Pose le geste du moment, une fois les cartes à leur place
+  function poserAction(action, x) {
+    if (!x) return;
+    var cartes = M.cartesSource(J.S, x.s);
+    if (!cartes.length) return;
+    var pos = positions();
+    var dest = x.d.a === 'f' ? G.places['f' + M.fam(cartes[0])] : (x.d.a === 'r' ? G.places['r' + x.d.c] :
+      (J.S.t[x.d.c].length ? pos[J.S.t[x.d.c][J.S.t[x.d.c].length - 1]] : G.places['t' + x.d.c]));
+    if (!dest) return;
+    var pr = $('#plateau').getBoundingClientRect();
+    if (action === 'glisse') {
+      // La carte est tenue au doigt, à mi-chemin de sa colonne d'arrivée
+      var p0 = pos[cartes[0]];
+      var decale = x.d.a === 't' && J.S.t[x.d.c].length ? G.h * 0.3 : 0;
+      var dx = (dest.x - p0.x) * 0.62, dy = (dest.y + decale - p0.y) * 0.62 - G.h * 0.12;
+      cartes.forEach(function (k, i) {
+        var e = J.elems[k], p = pos[k];
+        e.classList.add('sans-anim', 'levee');
+        e.style.zIndex = 2000 + i;
+        e.style.transform = 'translate(' + (p.x + dx) + 'px,' + (p.y + dy) + 'px) rotate(-4deg)';
+      });
+      var mn = $('#main');
+      mn.classList.add('vue');
+      mn.style.left = (pr.left + p0.x + dx + G.w * 0.45 - 18) + 'px';
+      mn.style.top = (pr.top + p0.y + dy + G.h * 0.35) + 'px';
+    } else if (action === 'indice') {
+      cartes.forEach(function (k) { J.elems[k].classList.add('indice'); });
+      var col = x.d.a === 't' ? J.S.t[x.d.c] : [];
+      if (col.length) J.elems[col[col.length - 1]].classList.add('indice');
+    } else if (action === 'clavier') {
+      // Carte prise au clavier (bleue) et curseur sur la pile où elle va
+      J.clavier = true;
+      J.sel = x.s;
+      var haut = x.d.a === 'f' ? pilesHaut().indexOf('f' + M.fam(cartes[0])) : (x.d.a === 'r' ? pilesHaut().indexOf('r' + x.d.c) : -1);
+      J.curseur = haut >= 0 ? { zone: 'haut', i: haut, prof: 0 } : { zone: 'bas', i: x.d.c, prof: 0 };
+      majCurseur();
+    }
+  }
+
+  if (AFFICHE) demarrerAffiche();
+  else if (APERCU) ouvrirApercu(APERCU);
+  else majTitre();
 })();
 </script>
 </body>

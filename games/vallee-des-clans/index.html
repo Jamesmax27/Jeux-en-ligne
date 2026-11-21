@@ -3035,6 +3035,11 @@
   var $ = function (id) { return document.getElementById(id); };
   var ecrans = { titre: $('ecranTitre'), niveaux: $('ecranNiveaux'), jeu: $('ecranJeu') };
 
+  // Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU = 1, 2 ou 3) :
+  // posés par le robot du site seulement, jamais par le jeu (CONSIGNES-JEU.md, section 5).
+  var AFFICHE = !!window.JEL_AFFICHE;
+  var APERCU = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+
   // Clans : couleur et animal (dessiné, jamais écrit).
   var CLANS = [
     { cle: 'lapins', couleur: '#2f7de1', fonce: '#17488f' },
@@ -3798,6 +3803,7 @@
   }
 
   function redimensionner() {
+    if (AFFICHE) return; // l'affiche se redessine elle-même (le jeu est caché)
     if (G && ecrans.jeu.classList.contains('actif')) { V = cadrer(cv, G.carte, 8); G.coucheSale = true; placerTuto(); }
     if (ecrans.titre.classList.contains('actif')) dessinerTitre();
   }
@@ -4341,9 +4347,9 @@
   $('btnFinNiveaux').addEventListener('click', function () { son('clic'); fermerVoiles(); lireProgres(); montrerEcran('niveaux'); });
 
   // Écran caché : pause automatique.
-  document.addEventListener('visibilitychange', function () { if (document.hidden && G && !G.finie) pause(true); });
-  // Fermeture pendant une partie : on reprendra au niveau en cours.
-  JEL_SAVE.surFermeture(function () { if (G && !G.finie) enregistrer(G.n + 1); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && G && !G.finie && !APERCU) pause(true); });
+  // Fermeture pendant une partie : on reprendra au niveau en cours (jamais pour les images du jeu).
+  JEL_SAVE.surFermeture(function () { if (G && !G.finie && !APERCU && !AFFICHE) enregistrer(G.n + 1); });
 
   window.addEventListener('resize', redimensionner);
   if (window.ResizeObserver) { try { new ResizeObserver(redimensionner).observe($('zoneCarte')); } catch (e) { /* rien */ } }
@@ -4351,8 +4357,438 @@
   // Partie en cours, en lecture, pour les essais automatiques (aucun effet sur le jeu).
   window.VDC_PARTIE = function () { return G ? { n: G.n, carte: G.carte, etat: G.etat, robot: G.robot, occupe: G.occupe, sel: G.sel } : null; };
 
+  // ------------------------------------------------------------------------
+  // Affiche du jeu (jaquette) : avec window.JEL_AFFICHE, une scène composée sans
+  // interface ni texte. Le chef des Lapins, en grand, brandit la bannière du clan et
+  // lance ses troupes vers une zone des Renards éclairée en vert (on peut la prendre) ;
+  // le renard sursaute. Derrière, la vallée du dernier niveau, vue en perspective.
+  // ------------------------------------------------------------------------
+  var plateau = null;
+  function preparerPlateau() {
+    if (plateau) return plateau;
+    var carte = SIM.creerPartie(NIVEAUX.length - 1).carte;
+    var dist = carte.capitales.map(function (cz) { return SIM.distancesDepuis(carte, [cz]); });
+    // Chaque zone au clan le plus proche (les renards passent à droite, près des lapins).
+    var REMAP = [0, 3, 2, 1];
+    var proprio = carte.zones.map(function (z) {
+      var best = -1, bd = 1e9;
+      dist.forEach(function (d, k) { if (d[z.id] < bd - 0.01) { bd = d[z.id]; best = k; } });
+      return bd <= 3 ? REMAP[best] : -1;
+    });
+    // Zone visée : une zone des Renards voisine d'une zone des Lapins, la plus proche de leur terrier.
+    var d0 = dist[0], cible = -1, depuis = -1;
+    carte.zones.forEach(function (z) {
+      if (proprio[z.id] !== 1) return;
+      z.voisins.forEach(function (w) { if (proprio[w.z] === 0 && (cible < 0 || d0[z.id] < d0[cible])) { cible = z.id; depuis = w.z; } });
+    });
+    var b = bornes(carte), s = 56;
+    var v = { s: s, rot: false, dpr: 1, ox: 0, oy: 0 };
+    for (var k in b) v[k] = b[k];
+    v.w = Math.ceil((b.maxX - b.minX) * s); v.h = Math.ceil((b.maxY - b.minY) * s);
+    v.coins = []; v.centres = [];
+    carte.hex.forEach(function (hx) {
+      v.centres.push(versEcran(v, hx.x, hx.y));
+      var cs = [];
+      for (var i = 0; i < 6; i++) { var a = (60 * i - 90) * Math.PI / 180; cs.push(versEcran(v, hx.x + Math.cos(a), hx.y + Math.sin(a))); }
+      v.coins.push(cs);
+    });
+    var S = document.createElement('canvas'); S.width = v.w; S.height = v.h;
+    var sc = S.getContext('2d');
+    var vue = { proprio: proprio, troupes: carte.zones.map(function () { return 0; }), rempart: carte.zones.map(function () { return 0; }) };
+    dessinerCouche(sc, v, carte, vue, null, true);
+    if (cible >= 0) {
+      remplirZone(sc, v, carte, depuis, 'rgba(255,255,255,.28)');
+      remplirZone(sc, v, carte, cible, 'rgba(60,200,90,.6)');
+      sc.save(); sc.strokeStyle = '#ffffff'; sc.lineWidth = s * 0.24; sc.lineCap = 'round';
+      contourZone(sc, v, carte, cible); sc.stroke(); sc.restore();
+    }
+    plateau = { carte: carte, v: v, S: S, proprio: proprio, cible: cible, depuis: depuis };
+    return plateau;
+  }
+
+  // Petits outils de dessin en unités locales.
+  function ovale(c, x, y, rx, ry, rot, coul) { c.beginPath(); c.ellipse(x, y, rx, ry, rot || 0, 0, Math.PI * 2); c.fillStyle = coul; c.fill(); }
+  function ovaleTrait(c, x, y, rx, ry, rot, coul) { ovale(c, x, y, rx, ry, rot, coul); c.stroke(); }
+  function membre(c, x1, y1, x2, y2, ep, coul, trait) {
+    c.save(); c.lineCap = 'round';
+    c.strokeStyle = trait; c.lineWidth = ep + 2.2; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    c.strokeStyle = coul; c.lineWidth = ep; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
+    c.restore();
+  }
+
+  // Le chef des Lapins : 100 unités de haut, pieds en (x, y), tourné vers la droite.
+  function dessinLapinChef(c, x, y, u) {
+    var C = CLANS[0], blanc = '#fffaf0', rose = '#f6a5b9', fonce = '#2b2216', trait = '#1b3566';
+    c.save(); c.translate(x, y); c.scale(u, u);
+    c.lineJoin = 'round'; c.lineCap = 'round'; c.lineWidth = 1.2; c.strokeStyle = trait;
+    // ombre au sol
+    ovale(c, 2, 0, 30, 5.5, 0, 'rgba(18,40,30,.38)');
+    // cape qui flotte derrière
+    var gc = c.createLinearGradient(-40, -40, 0, 0); gc.addColorStop(0, '#1f5fbf'); gc.addColorStop(1, C.couleur);
+    c.fillStyle = gc;
+    c.beginPath(); c.moveTo(-9, -42); c.quadraticCurveTo(-30, -40, -42, -22); c.quadraticCurveTo(-36, -18, -44, -6);
+    c.quadraticCurveTo(-30, -9, -26, -2); c.quadraticCurveTo(-14, -12, -4, -16); c.closePath(); c.fill(); c.stroke();
+    // hampe de la bannière, tenue à gauche
+    c.strokeStyle = '#4a2f12'; c.lineWidth = 4; c.beginPath(); c.moveTo(-21, 3); c.lineTo(-30, -128); c.stroke();
+    c.strokeStyle = '#8a5a2b'; c.lineWidth = 2.4; c.beginPath(); c.moveTo(-21, 3); c.lineTo(-30, -128); c.stroke();
+    c.strokeStyle = trait; c.lineWidth = 1.2;
+    // bannière bleue qui claque au vent, avec l'emblème du clan
+    var gf = c.createLinearGradient(-30, -128, 22, -100); gf.addColorStop(0, '#5aa2f5'); gf.addColorStop(1, '#2569c9');
+    c.fillStyle = gf;
+    c.beginPath(); c.moveTo(-29.5, -127); c.quadraticCurveTo(-6, -134, 8, -124); c.quadraticCurveTo(18, -120, 26, -125);
+    c.quadraticCurveTo(20, -112, 24, -100); c.quadraticCurveTo(12, -96, 2, -101); c.quadraticCurveTo(-12, -106, -27, -99); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.moveTo(-28, -125); c.quadraticCurveTo(-6, -131, 8, -122); c.quadraticCurveTo(-8, -124, -28, -119); c.closePath(); c.fill();
+    disque(c, -4, -114, 9.5, blanc); c.beginPath(); c.arc(-4, -114, 9.5, 0, Math.PI * 2); c.stroke();
+    dessinAnimal(c, -4, -114, 8.2, 0);
+    // pommeau doré
+    disque(c, -30, -129.5, 3.2, '#ffc93c'); c.beginPath(); c.arc(-30, -129.5, 3.2, 0, Math.PI * 2); c.stroke();
+    // jambes et grands pieds (un pas en avant)
+    membre(c, -7, -14, -9, -3, 7.5, blanc, trait);
+    membre(c, 6, -14, 11, -3, 7.5, blanc, trait);
+    ovaleTrait(c, -10, -2, 9, 4.2, 0, blanc);
+    ovaleTrait(c, 13, -2.2, 10.5, 4.4, 0.05, blanc);
+    ovale(c, 16, -2.6, 3.5, 1.6, 0, '#f2c5d0');
+    // corps et tunique du clan
+    ovaleTrait(c, 0, -27, 15, 16.5, 0, blanc);
+    var gt = c.createLinearGradient(0, -44, 0, -12); gt.addColorStop(0, '#4d93ec'); gt.addColorStop(1, C.couleur);
+    c.fillStyle = gt;
+    c.beginPath(); c.moveTo(-13, -38); c.quadraticCurveTo(0, -44, 13, -38); c.lineTo(15, -20); c.quadraticCurveTo(0, -11, -15, -20); c.closePath(); c.fill(); c.stroke();
+    ovale(c, 1, -27, 6.5, 8.5, 0, blanc);
+    c.fillStyle = '#7a4f24'; c.beginPath(); c.moveTo(-14.5, -23); c.quadraticCurveTo(0, -17, 14.5, -23); c.lineTo(14.8, -19.5); c.quadraticCurveTo(0, -13.5, -14.8, -19.5); c.closePath(); c.fill();
+    c.fillStyle = '#ffc93c'; c.fillRect(-2.6, -21.5, 5.2, 4.2); c.strokeRect(-2.6, -21.5, 5.2, 4.2);
+    // bras gauche : la main serre la hampe
+    membre(c, -11, -36, -24, -52, 6.5, blanc, trait);
+    c.fillStyle = C.couleur; c.beginPath(); c.arc(-11, -36, 5, 0, Math.PI * 2); c.fill(); c.stroke();
+    disque(c, -25, -53, 4.4, blanc); c.beginPath(); c.arc(-25, -53, 4.4, 0, Math.PI * 2); c.stroke();
+    // bras droit tendu vers la zone à prendre
+    membre(c, 11, -37, 33, -47, 6.5, blanc, trait);
+    c.fillStyle = C.couleur; c.beginPath(); c.arc(11, -37, 5, 0, Math.PI * 2); c.fill(); c.stroke();
+    disque(c, 35, -48, 4.6, blanc); c.beginPath(); c.arc(35, -48, 4.6, 0, Math.PI * 2); c.stroke();
+    // oreilles (la droite se penche en avant)
+    c.save(); c.translate(-5, -82); c.rotate(-0.18);
+    ovaleTrait(c, 0, -4, 5.6, 16, 0, blanc); ovale(c, 0.4, -3, 2.6, 11.5, 0, rose); c.restore();
+    c.save(); c.translate(10, -81); c.rotate(0.42);
+    ovaleTrait(c, 0, -4, 5.6, 15.5, 0, blanc); ovale(c, -0.4, -3, 2.6, 11, 0, rose); c.restore();
+    // tête
+    ovaleTrait(c, 3, -56, 17, 15.5, 0, blanc);
+    ovale(c, -2, -50, 6, 4, 0, 'rgba(255,255,255,1)');
+    // couronne du chef (comme sur le terrier)
+    c.fillStyle = '#ffc93c'; c.strokeStyle = '#8a5a00'; c.lineWidth = 0.8;
+    c.beginPath(); c.moveTo(-5, -67); c.lineTo(-6, -76); c.lineTo(-1, -71); c.lineTo(3, -79); c.lineTo(7, -71); c.lineTo(12, -75); c.lineTo(10, -66); c.quadraticCurveTo(2.5, -68.5, -5, -67); c.closePath(); c.fill(); c.stroke();
+    disque(c, 3, -71.5, 1.4, '#d6386a');
+    c.strokeStyle = trait; c.lineWidth = 1.2;
+    // joues roses
+    ovale(c, -6, -50, 3.6, 2.4, 0, 'rgba(246,140,170,.55)'); ovale(c, 15.5, -50.5, 3.2, 2.2, 0, 'rgba(246,140,170,.55)');
+    // yeux décidés, sourcils froncés
+    ovale(c, 0, -58, 2.7, 3.8, 0, fonce); ovale(c, 10.5, -58, 2.5, 3.6, 0, fonce);
+    disque(c, 1, -59.4, 1, '#ffffff'); disque(c, 11.4, -59.4, 0.95, '#ffffff');
+    c.strokeStyle = fonce; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(-3.5, -65); c.lineTo(3, -63); c.stroke();
+    c.beginPath(); c.moveTo(14, -65); c.lineTo(8, -63); c.stroke();
+    // nez et grande bouche ouverte qui crie « en avant ! »
+    c.fillStyle = '#f07a95'; c.beginPath(); c.moveTo(4, -52.5); c.lineTo(8, -52.5); c.lineTo(6, -50.3); c.closePath(); c.fill();
+    c.fillStyle = '#7a1f2b'; c.beginPath(); c.moveTo(1.5, -48.5); c.quadraticCurveTo(6, -47, 11, -48.8); c.quadraticCurveTo(10, -41, 6, -40.6); c.quadraticCurveTo(2, -41, 1.5, -48.5); c.closePath(); c.fill();
+    ovale(c, 6.3, -42.6, 3, 1.6, 0, '#f48fa6');
+    c.fillStyle = '#ffffff'; c.fillRect(4.4, -48.4, 3.6, 2.4);
+    // lumière du soleil sur la tête et l'épaule
+    c.strokeStyle = 'rgba(255,248,200,.9)'; c.lineWidth = 1.6;
+    c.beginPath(); c.arc(3, -56, 14.6, -1.25, -0.2); c.stroke();
+    c.beginPath(); c.arc(0, -27, 13, -0.9, 0.1); c.stroke();
+    c.restore();
+  }
+
+  // Un renard surpris (100 unités de haut, pieds en (x, y)), pattes levées.
+  function dessinRenardSurpris(c, x, y, u) {
+    var C = CLANS[1], blanc = '#fffaf0', fonce = '#2b2216', trait = '#6b3108', roux = '#f08a2e';
+    c.save(); c.translate(x, y); c.scale(u, u);
+    c.lineJoin = 'round'; c.lineCap = 'round'; c.lineWidth = 1.4; c.strokeStyle = trait;
+    ovale(c, 0, 0, 22, 4.5, 0, 'rgba(18,40,30,.35)');
+    // queue en panache
+    c.fillStyle = roux; c.beginPath(); c.moveTo(6, -14); c.quadraticCurveTo(30, -16, 28, -42); c.quadraticCurveTo(20, -30, 10, -26); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = blanc; c.beginPath(); c.moveTo(28, -42); c.quadraticCurveTo(29, -33, 25, -31); c.quadraticCurveTo(22, -36, 28, -42); c.closePath(); c.fill();
+    // pattes
+    membre(c, -5, -12, -6, -2, 6.5, roux, trait); membre(c, 5, -12, 6, -2, 6.5, roux, trait);
+    ovaleTrait(c, -7, -1.5, 6, 3, 0, fonce); ovaleTrait(c, 7, -1.5, 6, 3, 0, fonce);
+    // corps et tunique orange du clan
+    ovaleTrait(c, 0, -25, 12.5, 15, 0, roux);
+    c.fillStyle = C.couleur; c.beginPath(); c.moveTo(-11, -34); c.quadraticCurveTo(0, -38, 11, -34); c.lineTo(12.5, -19); c.quadraticCurveTo(0, -11, -12.5, -19); c.closePath(); c.fill(); c.stroke();
+    ovale(c, 0, -25, 5.5, 8, 0, blanc);
+    // bras levés de surprise
+    membre(c, -10, -33, -21, -50, 5.5, roux, trait); membre(c, 10, -33, 21, -50, 5.5, roux, trait);
+    disque(c, -21.5, -51, 3.4, fonce); disque(c, 21.5, -51, 3.4, fonce);
+    // oreilles pointues
+    c.fillStyle = roux;
+    c.beginPath(); c.moveTo(-14, -60); c.lineTo(-13, -80); c.lineTo(-3, -66); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(14, -60); c.lineTo(13, -80); c.lineTo(3, -66); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = fonce;
+    c.beginPath(); c.moveTo(-12.5, -64); c.lineTo(-12.6, -76); c.lineTo(-6.5, -67); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(12.5, -64); c.lineTo(12.6, -76); c.lineTo(6.5, -67); c.closePath(); c.fill();
+    // tête : museau blanc, yeux ronds, bouche en O
+    c.fillStyle = roux; c.beginPath(); c.moveTo(-17, -58); c.quadraticCurveTo(0, -74, 17, -58); c.quadraticCurveTo(14, -44, 0, -38); c.quadraticCurveTo(-14, -44, -17, -58); c.closePath(); c.fill(); c.stroke();
+    c.fillStyle = blanc;
+    c.beginPath(); c.moveTo(-17, -56); c.quadraticCurveTo(-7, -52, 0, -38.5); c.quadraticCurveTo(-11, -44, -17, -56); c.fill();
+    c.beginPath(); c.moveTo(17, -56); c.quadraticCurveTo(7, -52, 0, -38.5); c.quadraticCurveTo(11, -44, 17, -56); c.fill();
+    disque(c, -6, -57, 4, blanc); disque(c, 6, -57, 4, blanc);
+    c.beginPath(); c.arc(-6, -57, 4, 0, Math.PI * 2); c.arc(6, -57, 4, 0, Math.PI * 2); c.lineWidth = 0.9; c.stroke();
+    disque(c, -5.4, -56.5, 1.7, fonce); disque(c, 5.4, -56.5, 1.7, fonce);
+    c.strokeStyle = fonce; c.lineWidth = 1.3;
+    c.beginPath(); c.arc(-6, -63, 4, -2.6, -0.6); c.stroke(); c.beginPath(); c.arc(6, -63, 4, -2.5, -0.5); c.stroke();
+    disque(c, 0, -46.5, 1.8, fonce);
+    ovale(c, 0, -41.8, 2.2, 2.8, 0, '#7a1f2b');
+    c.restore();
+  }
+
+  // Projection de la vallée : rangées lointaines vers l'horizon, proches en bas.
+  function projeterPlateau(W, H, k, p) {
+    var v = p.v, cz = p.cible >= 0 ? p.carte.zones[p.cible].pion : p.carte.zones[p.carte.capitales[0]].pion;
+    var cd = p.depuis >= 0 ? p.carte.zones[p.depuis].pion : cz;
+    var ct = v.centres[cz], cdep = v.centres[cd];
+    var yH = H * 0.2, yT = H * 0.53, sT = 0.6 * k, dT = 600;
+    var h0 = (yT - yH) / sT, F = sT * dT;
+    var xc = ct[0], cx = W / 2 + 140 * k;
+    function ysDe(y) { var sc = (y - yH) / h0; return ct[1] - (F / sc - dT); }
+    function proj(xs, ys) {
+      var d = dT + (ct[1] - ys), sc = F / Math.max(80, d);
+      return [cx + (xs - xc) * sc, yH + h0 * sc, sc];
+    }
+    return { yH: yH, h0: h0, ysDe: ysDe, proj: proj, cx: cx, xc: xc, cible: ct, depuis: cdep };
+  }
+
+  function dessinerAffiche() {
+    var cvA = $('afficheJeu');
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var W = Math.max(10, window.innerWidth), H = Math.max(10, window.innerHeight);
+    cvA.width = Math.round(W * dpr); cvA.height = Math.round(H * dpr);
+    var c = cvA.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2;
+    var p = preparerPlateau(), pr = projeterPlateau(W, H, k, p);
+    // Ciel lumineux et soleil (en haut à droite)
+    var ciel = c.createLinearGradient(0, 0, 0, H * 0.4);
+    ciel.addColorStop(0, '#3f9be6'); ciel.addColorStop(0.7, '#9fd8f6'); ciel.addColorStop(1, '#d9f1ff');
+    c.fillStyle = ciel; c.fillRect(0, 0, W, H);
+    var sx = ox + 520 * k, sy = 92 * k;
+    var halo = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 300 * k);
+    halo.addColorStop(0, 'rgba(255,250,215,1)'); halo.addColorStop(0.18, 'rgba(255,240,170,.85)'); halo.addColorStop(1, 'rgba(255,240,170,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    disque(c, sx, sy, 34 * k, '#fff6c8');
+    // Nuages
+    [[0.12, 0.09, 4.2], [0.58, 0.05, 3.2], [0.95, 0.2, 3.6], [-0.05, 0.25, 3]].forEach(function (n) { dessinNuage(c, ox + n[0] * 600 * k, n[1] * H, 10 * n[2] * k); });
+    // Collines lointaines autour du lac
+    [['#8cc79a', 0.215, 0.05, 1.3], ['#6fb27e', 0.25, 0.06, 2.1], ['#5a9e69', 0.29, 0.05, 3.3]].forEach(function (l, i) {
+      c.fillStyle = l[0]; c.beginPath(); c.moveTo(0, H * 0.45);
+      for (var x = 0; x <= W + 20; x += 20) c.lineTo(x, H * l[1] - Math.abs(Math.sin(x / (90 * k) + l[3])) * H * l[2] - Math.sin(x / (37 * k) + i) * H * 0.006);
+      c.lineTo(W, H * 0.45); c.closePath(); c.fill();
+    });
+    // Arbres sur la rive lointaine
+    for (var t = 0; t < 26; t++) dessinArbre(c, (hache(t + 40) * 1.1 - 0.05) * W, H * (0.285 + hache(t + 70) * 0.03), (7 + hache(t + 9) * 5) * k);
+    // La vallée : eau du lac puis la carte, rangée par rangée
+    var yLoin = Math.max(pr.yH + 2, pr.proj(0, 0)[1]);
+    var eau = c.createLinearGradient(0, yLoin, 0, H); eau.addColorStop(0, '#5aa8d0'); eau.addColorStop(1, '#2f7aa8');
+    c.fillStyle = eau; c.fillRect(0, yLoin - 1, W, H - yLoin + 1);
+    var pas = 2;
+    for (var y = yLoin; y < H; y += pas) {
+      var ys1 = pr.ysDe(y), ys2 = pr.ysDe(y + pas), sc = (y - pr.yH) / pr.h0;
+      if (ys2 < 0 || ys1 > p.S.height) continue;
+      var a = Math.max(0, ys1), bb = Math.min(p.S.height, ys2);
+      if (bb - a < 0.01) continue;
+      c.drawImage(p.S, 0, a, p.S.width, bb - a, pr.cx - pr.xc * sc, y, p.S.width * sc, pas + 0.6);
+    }
+    // Décors debout sur la carte : arbres, montagnes, icônes des zones, terriers (du plus loin au plus près)
+    var carte = p.carte, v = p.v, objets = [];
+    carte.hex.forEach(function (hx, i) {
+      var ce = v.centres[i];
+      if (hx.t === 2) objets.push({ xs: ce[0], ys: ce[1], f: function (q) { var r = v.s * q[2]; c.fillStyle = '#7d7262'; c.beginPath(); c.moveTo(q[0] - r * 0.95, q[1] + r * 0.35); c.lineTo(q[0] - r * 0.05, q[1] - r * 1.25); c.lineTo(q[0] + r * 0.95, q[1] + r * 0.35); c.closePath(); c.fill(); c.fillStyle = '#968a77'; c.beginPath(); c.moveTo(q[0] - r * 0.05, q[1] - r * 1.25); c.lineTo(q[0] + r * 0.95, q[1] + r * 0.35); c.lineTo(q[0] + r * 0.2, q[1] + r * 0.35); c.closePath(); c.fill(); c.fillStyle = '#fafafa'; c.beginPath(); c.moveTo(q[0] - r * 0.4, q[1] - r * 0.6); c.lineTo(q[0] - r * 0.05, q[1] - r * 1.25); c.lineTo(q[0] + r * 0.33, q[1] - r * 0.62); c.lineTo(q[0], q[1] - r * 0.78); c.closePath(); c.fill(); } });
+      else if (hx.t === 1) {
+        var zo = carte.zones[hx.zone];
+        if (zo.type === 'foret' && i !== zo.icone && hache(i + 3) > 0.25) objets.push({ xs: ce[0], ys: ce[1] + 1, f: function (q) { dessinArbre(c, q[0], q[1] - v.s * q[2] * 0.4, v.s * q[2] * 0.62); } });
+      }
+    });
+    carte.zones.forEach(function (zo) {
+      var ce = v.centres[zo.icone], own = p.proprio[zo.id];
+      if (zo.type === 'capitale') {
+        var cp = v.centres[zo.pion];
+        objets.push({ xs: cp[0], ys: cp[1] + 2, f: function (q) {
+          var r = v.s * q[2] * 0.62;
+          dessinRempart(c, q[0], q[1] - r * 0.6, r, '#a39a89');
+          disque(c, q[0], q[1] - r * 0.6, r, CLANS[own >= 0 ? own : 0].couleur);
+          dessinAnimal(c, q[0], q[1] - r * 0.6, r * 0.92, own >= 0 ? own : 0);
+          var cy = q[1] - r * 1.65, cw = r * 0.9;
+          c.fillStyle = '#ffc93c'; c.strokeStyle = '#8a5a00'; c.lineWidth = Math.max(1, r * 0.08);
+          c.beginPath(); c.moveTo(q[0] - cw / 2, cy + r * 0.25); c.lineTo(q[0] - cw / 2, cy - r * 0.2); c.lineTo(q[0] - cw / 4, cy + r * 0.02); c.lineTo(q[0], cy - r * 0.32); c.lineTo(q[0] + cw / 4, cy + r * 0.02); c.lineTo(q[0] + cw / 2, cy - r * 0.2); c.lineTo(q[0] + cw / 2, cy + r * 0.25); c.closePath(); c.fill(); c.stroke();
+        } });
+      } else objets.push({ xs: ce[0], ys: ce[1], f: function (q) { dessinIconeType(c, zo.type, q[0], q[1] - v.s * q[2] * 0.35, v.s * q[2] * 0.62, zo.terrierDe); } });
+    });
+    objets.sort(function (a, b2) { return a.ys - b2.ys; });
+    objets.forEach(function (o) {
+      var q = pr.proj(o.xs, o.ys);
+      if (q[1] >= yLoin - 4) o.f(q);
+    });
+    // Repère de la zone visée : pion du renard et coche verte (« tu peux la prendre »)
+    var qc = pr.proj(pr.cible[0], pr.cible[1]), qd = pr.proj(pr.depuis[0], pr.depuis[1]);
+    var rp = v.s * qc[2] * 0.62;
+    // Le renard, surpris, sur sa zone
+    var fx = qc[0] + rp * 2.2, fy = qc[1] + rp * 0.6;
+    dessinRenardSurpris(c, fx, fy, 1.55 * k);
+    c.save(); c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 6 * k; c.shadowOffsetY = 2 * k;
+    disque(c, qc[0], qc[1] - rp * 0.4, rp, CLANS[1].couleur); c.restore();
+    c.lineWidth = rp * 0.14; c.strokeStyle = CLANS[1].fonce; c.beginPath(); c.arc(qc[0], qc[1] - rp * 0.4, rp, 0, Math.PI * 2); c.stroke();
+    dessinAnimal(c, qc[0], qc[1] - rp * 0.4, rp * 0.9, 1);
+    var bx = qc[0] + rp * 0.9, by = qc[1] - rp * 1.35, rr = rp * 0.62;
+    c.save(); c.shadowColor = 'rgba(60,220,110,.9)'; c.shadowBlur = 14 * k; disque(c, bx, by, rr, '#2f9d4a'); c.restore();
+    c.strokeStyle = '#fff'; c.lineWidth = rr * 0.32; c.lineCap = 'round'; c.beginPath();
+    c.moveTo(bx - rr * 0.45, by); c.lineTo(bx - rr * 0.1, by + rr * 0.38); c.lineTo(bx + rr * 0.5, by - rr * 0.4); c.stroke();
+    // Premier plan : la colline des Lapins, d'où le chef regarde la vallée
+    var colline = c.createLinearGradient(0, H * 0.6, 0, H);
+    colline.addColorStop(0, '#86c95e'); colline.addColorStop(0.5, '#5fa848'); colline.addColorStop(1, '#3f8236');
+    var bordColline = function () {
+      c.beginPath(); c.moveTo(-10, H * 0.61);
+      c.bezierCurveTo(W * 0.3, H * 0.6, W * 0.55, H * 0.69, W * 0.75, H * 0.675);
+      c.bezierCurveTo(W * 0.88, H * 0.665, W * 0.95, H * 0.7, W + 10, H * 0.69);
+    };
+    bordColline(); c.lineTo(W + 10, H + 10); c.lineTo(-10, H + 10); c.closePath(); c.fillStyle = colline; c.fill();
+    bordColline(); c.strokeStyle = '#b8e58a'; c.lineWidth = 5 * k; c.stroke();
+    // herbes et fleurs de la colline
+    for (var f = 0; f < 34; f++) {
+      var gx = hache(f + 300) * W, gy = H * (0.72 + hache(f + 330) * 0.27), gr = (4 + hache(f + 360) * 4) * k;
+      if (f % 3 === 0) {
+        var fl = f % 9 === 0 ? '#ffffff' : f % 2 ? '#ffe36b' : '#f48fb1';
+        for (var pe = 0; pe < 5; pe++) { var pa = pe * 1.2566; disque(c, gx + Math.cos(pa) * gr * 0.7, gy + Math.sin(pa) * gr * 0.7, gr * 0.55, fl); }
+        disque(c, gx, gy, gr * 0.45, '#f2a30f');
+      } else {
+        c.strokeStyle = 'rgba(40,100,40,.55)'; c.lineWidth = 2 * k; c.lineCap = 'round';
+        c.beginPath(); c.moveTo(gx - gr, gy); c.lineTo(gx - gr * 0.3, gy - gr * 1.6); c.moveTo(gx, gy); c.lineTo(gx + gr * 0.2, gy - gr * 2); c.moveTo(gx + gr, gy); c.lineTo(gx + gr * 0.5, gy - gr * 1.4); c.stroke();
+      }
+    }
+    // Le chef des Lapins, en grand, au premier plan
+    var hx0 = ox + 190 * k, hy0 = H * 0.765, u = (H * 0.46) / 100;
+    // halo de lumière derrière lui
+    var hl = c.createRadialGradient(hx0, hy0 - 60 * u, 10 * k, hx0, hy0 - 60 * u, 230 * k);
+    hl.addColorStop(0, 'rgba(255,250,220,.75)'); hl.addColorStop(1, 'rgba(255,250,220,0)');
+    c.fillStyle = hl; c.fillRect(0, 0, W, H);
+    // Les troupes s'envolent de sa patte jusqu'à la zone des renards
+    var ax = hx0 + 36 * u, ay = hy0 - 49 * u, ex = qc[0] - rp * 0.2, ey = qc[1] - rp * 0.9;
+    var mx = (ax + ex) / 2, my = Math.min(ay, ey) - 140 * k;
+    c.save(); c.setLineDash([12 * k, 9 * k]); c.strokeStyle = 'rgba(255,255,255,.95)'; c.lineWidth = 5 * k; c.lineCap = 'round';
+    c.shadowColor = 'rgba(30,60,120,.4)'; c.shadowBlur = 4 * k;
+    c.beginPath(); c.moveTo(ax, ay); c.quadraticCurveTo(mx, my, ex, ey); c.stroke(); c.restore();
+    [0.2, 0.37, 0.53, 0.68, 0.82].forEach(function (tt, i) {
+      var x = (1 - tt) * (1 - tt) * ax + 2 * (1 - tt) * tt * mx + tt * tt * ex;
+      var y2 = (1 - tt) * (1 - tt) * ay + 2 * (1 - tt) * tt * my + tt * tt * ey;
+      var r = (30 - i * 3.2) * k;
+      c.save(); c.shadowColor = 'rgba(0,0,0,.3)'; c.shadowBlur = 6 * k; c.shadowOffsetY = 3 * k; disque(c, x, y2, r, '#ffffff'); c.restore();
+      dessinAnimal(c, x, y2, r * 0.88, 0);
+      // traînée de vitesse
+      c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 2.5 * k;
+      c.beginPath(); c.moveTo(x - r * 1.5, y2 + r * 0.5); c.lineTo(x - r * 2.4, y2 + r * 0.9); c.stroke();
+    });
+    // Éclat sur la zone visée
+    c.fillStyle = '#fff3a0';
+    for (var e = 0; e < 8; e++) { var an = e * Math.PI / 4 + 0.3; disque(c, ex + Math.cos(an) * rp * 1.9, ey + Math.sin(an) * rp * 1.4, (3 + (e % 3)) * k, e % 2 ? '#fff3a0' : '#ffffff'); }
+    dessinLapinChef(c, hx0, hy0, u);
+    // Premier plan : gerbe de blé à gauche et grand sapin coupé par le bord droit
+    dessinBle(c, ox - 6 * k, H * 0.9, 95 * k);
+    dessinPierre(c, ox + 470 * k, H * 0.97, 45 * k);
+  }
+  function demarrerAffiche() {
+    var cvA = document.createElement('canvas');
+    cvA.id = 'afficheJeu'; cvA.setAttribute('aria-hidden', 'true');
+    cvA.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:50;display:block';
+    document.body.appendChild(cvA);
+    var cacher = function () {
+      $('app').style.setProperty('display', 'none', 'important');
+      document.querySelectorAll('.jel-langue, button').forEach(function (el) { el.style.setProperty('display', 'none', 'important'); });
+    };
+    cacher(); setTimeout(cacher, 200); setTimeout(cacher, 900);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ------------------------------------------------------------------------
+  // Images du jeu (page du jeu) : avec window.JEL_APERCU = 1, 2 ou 3, le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface, sans écran titre, ni
+  // « Continuer », ni fiche, ni tutoriel. Les premiers tours sont joués d'avance par
+  // les robots (le joueur compris) : la simulation est à graine, l'image est toujours
+  // la même. Puis la partie est figée (ni son, ni sauvegarde, ni fin de partie).
+  //   1 = niveau 1, deuxième tour : une zone choisie, les cibles en vert et en rouge ;
+  //   2 = niveau 12 : l'archipel, ses îles reliées par des routes de mer, troupes en plein vol ;
+  //   3 = niveau 17 : l'hiver tombe sur la vallée, montagnes, rivière et trois clans rivaux.
+  // ------------------------------------------------------------------------
+  var MOMENTS_APERCU = {
+    1: { n: 0, tours: 1, vol: false },
+    2: { n: 11, tours: 3, vol: true },
+    3: { n: 16, tours: 3, vol: false, bandeau: 'bandeau.hiver' },
+  };
+  // Partie jouée d'avance jusqu'au début du tour du joueur (null si elle se termine avant).
+  function partieApercu(n, tours) {
+    var partie = SIM.creerPartie(n), carte = partie.carte, etat = partie.etat;
+    while (etat.tour <= tours && !etat.fini) SIM.tourIa(carte, etat);
+    if (etat.fini || etat.actif !== 0) return null;
+    SIM.debutTour(carte, etat);
+    if (etat.fini) return null;
+    SIM.iaRenforts(carte, etat).forEach(function (z) { SIM.placer(carte, etat, z); });
+    etat.phase = 'actions'; etat.renforts = 0;
+    // Il faut au moins une zone à prendre, pour montrer une cible verte.
+    return meilleureSource(carte, etat) ? partie : null;
+  }
+  // Ma zone qui a le plus de cibles possibles (au moins une qu'on peut prendre).
+  function meilleureSource(carte, etat) {
+    var best = null;
+    SIM.zonesDe(carte, etat, 0).forEach(function (z) {
+      var gagne = 0, perd = 0, cible = null;
+      carte.zones[z].voisins.forEach(function (w) {
+        var pr = SIM.prevoir(carte, etat, z, w.z, 0);
+        if (!pr || !pr.possible || pr.deplacement) return;
+        if (pr.gagne) { gagne++; if (cible === null) cible = w.z; } else perd++;
+      });
+      var note = gagne * 3 + perd * 2 + (gagne && perd ? 4 : 0);
+      if (gagne && (!best || note > best.note)) best = { z: z, cible: cible, note: note };
+    });
+    return best;
+  }
+  function ouvrirApercu(numero) {
+    var m = MOMENTS_APERCU[numero];
+    majBoutonsSon();
+    sonActif = false; // aucun son
+    var partie = null;
+    for (var t = m.tours; t >= 0 && !partie; t--) partie = partieApercu(m.n, t);
+    if (!partie) partie = SIM.creerPartie(m.n);
+    G = { n: m.n, carte: partie.carte, etat: partie.etat, vue: null, sel: null, survol: null, curseur: partie.carte.capitales[0],
+      pile: [], robot: false, occupe: false, clavier: false, coucheSale: true, secousse: {}, eclat: null, tuto: null, finie: false };
+    enPause = false; vitesse = 1;
+    syncVue();
+    montrerEcran('jeu');
+    redimensionner();
+    var src = meilleureSource(G.carte, G.etat);
+    if (src) {
+      G.sel = src.z;
+      message(texteCible(src.z, src.cible) || traduire('msg.choisirCible'));
+    } else message(traduire('msg.actions'));
+    majHud();
+    if (m.bandeau) { $('bandeau').textContent = traduire(m.bandeau); $('bandeau').classList.add('ouvert'); }
+    // Troupes en plein vol vers la zone visée (posées un peu après, une fois la carte cadrée).
+    setTimeout(function () {
+      if (!G) return;
+      if (m.vol && src) {
+        redimensionner();
+        var etat = G.etat, ev = SIM.agir(G.carte, etat, src.z, src.cible);
+        if (ev) {
+          G.sel = null;
+          G.vue.troupes[src.z] = etat.troupes[src.z];
+          voler(ev, null);
+          var a = anims[anims.length - 1]; a.t = a.d * 0.55; a.fin = null;
+          majHud();
+          $('btnFin').disabled = true; $('btnAnnuler').disabled = true;
+        }
+      }
+      enPause = true; // figée : plus rien ne bouge dans la partie
+    }, 350);
+  }
+
   // Démarrage
   creerImages();
+  if (AFFICHE) { demarrerAffiche(); return; }
+  if (APERCU) { ouvrirApercu(APERCU); requestAnimationFrame(boucle); return; }
   lireProgres();
   majBoutonsSon();
   try { I18N.creerSelecteur({ conteneur: $('langueTitre'), isole: true }); I18N.creerSelecteur({ conteneur: $('languePause'), isole: true }); } catch (e) { /* sélecteur indisponible */ }

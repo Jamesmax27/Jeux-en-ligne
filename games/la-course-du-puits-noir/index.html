@@ -3236,6 +3236,21 @@
     .dir svg { height: 16px; }
     .place .jauge { height: 4px; }
   }
+  /* Images du jeu, écran d'ordinateur (window.JEL_APERCU = 3 seulement) :
+     places à gauche, piste sur toute la hauteur au centre, commandes à droite. */
+  body.apercu-large #ecran-jeu { display: grid; grid-template-columns: minmax(0, .8fr) min(580px, 82vh) minmax(0, 1.4fr); grid-template-rows: auto auto auto 1fr; column-gap: 18px; padding: 0 16px; }
+  body.apercu-large #places { grid-column: 1; grid-row: 1 / 5; grid-template-columns: 1fr; align-self: center; justify-self: end; width: 100%; max-width: 280px; gap: 10px; padding: 0; }
+  body.apercu-large .place { flex-direction: row; flex-wrap: wrap; justify-content: space-between; padding: 8px 12px; gap: 5px 8px; }
+  body.apercu-large .place .jauge { width: 100%; height: 7px; order: 3; }
+  body.apercu-large .place canvas.cap { width: 40px; height: 40px; }
+  body.apercu-large .place .rg { font-size: 1.35rem; }
+  body.apercu-large .place .tag { font-size: .92rem; min-height: 24px; padding: 1px 9px; }
+  body.apercu-large .place .tag svg { width: 15px; height: 15px; }
+  body.apercu-large #zone { grid-column: 2; grid-row: 1 / 5; }
+  body.apercu-large #infos { grid-column: 3; grid-row: 1; justify-self: start; max-width: 400px; padding-top: 40px; }
+  body.apercu-large #alerte { grid-column: 3; grid-row: 2; justify-self: start; max-width: 400px; margin-top: 10px; }
+  body.apercu-large #temps { grid-column: 3; grid-row: 3; }
+  body.apercu-large #commandes { grid-column: 3; grid-row: 4; align-self: center; justify-self: start; max-width: 400px; }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
 </style>
 </head>
@@ -5577,6 +5592,68 @@
   }
 
   // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine course solo contre les robots, avec sa vraie interface
+  // (places, carburant, commandes, aperçu du coup), sans écran titre, ni « Continuer », ni
+  // tutoriel, ni fenêtre (CONSIGNES-JEU.md, section 5). Les premiers tours sont joués d'avance
+  // avec les vraies règles et un hasard à graine fixe, puis la course est figée au moment où
+  // c'est au joueur de piloter : aucun robot ne rejoue, ni son, ni sauvegarde, ni réseau.
+  //   1 = circuit 1 : la piste nue, les six capsules au départ du premier tour ;
+  //   2 = circuit 10 : astéroïdes, courants solaires et mines posées par les rivaux ;
+  //   3 = circuit 20 (écran d'ordinateur) : portes, plongeoir, cellules, pièce de coque,
+  //       et l'horizon qui va grandir à la fin du tour (alerte rouge, anneau qui palpite).
+  const SCENES_APERCU = {
+    1: { niveau: 1, tours: 2, graine: 2, capsule: 0, coup: { p: 3, d: 'a' } },
+    2: { niveau: 10, tours: 5, graine: 7, capsule: 0, coup: { p: 2, d: 'a' } },
+    3: { niveau: 20, tours: 5, graine: 9, capsule: 3, coup: { p: 2, d: 'o' } }
+  };
+  let apercu = 0;
+  function ouvrirApercu(n) {
+    apercu = n;
+    const sc = SCENES_APERCU[n];
+    // Hasard fixe (éclats, rien d'autre) : la même image à chaque capture.
+    Math.random = graineHasard(4242 + n * 977);
+    prog.options.son = false;                // aucun son ; progression neuve, en mémoire seulement
+    prog.capsule = sc.capsule;
+    majBoutonsSon();
+    // La course jouée d'avance (mêmes règles que l'arbitre), jusqu'au tour du joueur (place 0).
+    const al = graineHasard(sc.graine * 7919 + sc.niveau);
+    let e = R.depart(al, PLACES, { niveau: sc.niveau });
+    let der = -1;
+    for (let k = 0; k < 400 && !R.fin(e); k++) {
+      const s = R.aQui(e);
+      if (s === 0 && e.k >= sc.tours) break;
+      e = R.jouer(e, s, R.bot(e, s, al, s === 0 ? 0.95 : NIVEAUX[sc.niveau - 1].fr), al);
+      der = s;
+    }
+    // Le coup que le joueur s'apprête à lancer (montré par l'aperçu du trajet).
+    const coup = O.valideCoup(e, 0, { p: sc.coup.p, d: sc.coup.d, m: 0 }) ? sc.coup : R.bot(e, 0, al, 1);
+    // Une partie immobile, vue comme une course solo (même interface que le moteur commun).
+    partie = {
+      etat: e, siege: 0, phase: 'jeu', mode: 'solo', manche: 0, chef: -1,
+      sieges: () => e.c.map((_, s) => ({ humain: s === 0, moi: s === 0, chef: false })),
+      monTour: () => true, estChef: () => false, jouer: () => false, lancerManche: () => false,
+      pause: () => {}, quitter: () => {}
+    };
+    session = 'solo'; niveau = sc.niveau; enPartie = false;
+    vue = JSON.parse(JSON.stringify(e));
+    reinitAnim();
+    // La capsule qui vient de jouer garde sa flamme allumée.
+    if (der > 0 && e.c[der].st === 0) {
+      const t = performance.now();
+      anim.pistes[der] = [{ t: t - 1e9, r: e.c[der].r, u: e.c[der].s }, { t: t + 1e9, r: e.c[der].r, u: e.c[der].s, flamme: 1 }];
+    }
+    // Écran d'ordinateur : la piste prend toute la hauteur, les places à gauche, les commandes à droite.
+    if (n === 3 && window.innerWidth > window.innerHeight * 1.2) document.body.classList.add('apercu-large');
+    afficherEcran('jeu');
+    majInterface();
+    if (coup.p > 0 && valide({ p: coup.p, d: coup.d, m: 0 })) { choix.p = coup.p; choix.d = coup.d; }
+    majInterface();
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5610,7 +5687,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !apercu && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une course solo.
@@ -5623,6 +5700,9 @@
   document.title = tr('titre');
   // Affiche du jeu (robot du site seulement) : la scène, sans écran titre, ni son, ni boucle.
   if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  // Images du jeu (robot du site seulement) : directement en pleine course, figée.
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) { construirePlaces(); ouvrirApercu(numeroApercu); return; }
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
