@@ -32,10 +32,14 @@
 //                        chaque mois terminés, gardés sans limite (historique, trophées)
 //   podiums_periodes     périodes déjà enregistrées (même sans joueur classé)
 //                        (migrations/0004_podiums.sql ; docs/cadrage-fidelisation.md, 14.9)
+//   profils_sauvegardes  sauvegarde de chaque jeu (save_<id>), pour la retrouver sur un
+//                        autre appareil (migrations/0007_sauvegardes-jeux.sql ;
+//                        docs/cadrage-fidelisation.md, 14.13)
 // ==========================================================================
 
 import * as R from '../public/profil-reglages.js';
 import { nouveauCode, lireCode } from '../public/profil-code.js';
+import { empreinteSauvegarde, lireRang, horsNuage } from '../public/sauvegardes-nuage.js';
 import { pseudoInterdit } from './_pseudos-interdits.js';
 
 const JOUR_MS = 86400000;
@@ -98,6 +102,11 @@ export function preparerTablesProfil(env) {
       env.DB.prepare('CREATE INDEX IF NOT EXISTS podiums_profil ON podiums (profil)'),
       env.DB.prepare(`CREATE TABLE IF NOT EXISTS podiums_periodes (
         periode TEXT NOT NULL, debut TEXT NOT NULL, calcule_le INTEGER NOT NULL, PRIMARY KEY (periode, debut)) WITHOUT ROWID`),
+      // Sauvegardes des jeux : donnees = texte de save_<id> (NULL : effacée), version +1 à
+      // chaque changement accepté. Table ordinaire (avec rowid) : les textes peuvent être longs.
+      env.DB.prepare(`CREATE TABLE IF NOT EXISTS profils_sauvegardes (
+        profil INTEGER NOT NULL, jeu TEXT NOT NULL, version INTEGER NOT NULL, donnees TEXT,
+        niveau INTEGER, score REAL, maj INTEGER NOT NULL, PRIMARY KEY (profil, jeu))`),
     ]).then(() => preparerClassementJeu(env)).catch((erreur) => {
       tablesPretes = null; // nouvel essai à la prochaine requête
       throw erreur;
@@ -218,8 +227,14 @@ export async function tropheesDuProfil(env, id) {
   return results || [];
 }
 
+/** Nombre d'appareils reliés au profil (lecture de la sauvegarde d'un jeu au lancement : 2 au moins). */
+export async function nombreAppareils(env, id) {
+  const l = await env.DB.prepare('SELECT COUNT(*) AS n FROM profils_appareils WHERE profil = ?').bind(id).first();
+  return l?.n || 0;
+}
+
 /** État public du profil, renvoyé au navigateur (public/profil.js le garde en cache). */
-export function etatPublic(profil, jeux, gains, amis = null, trophees = []) {
+export function etatPublic(profil, jeux, gains, amis = null, trophees = [], appareils = 1) {
   const niveau = R.niveauPourXp(profil.xp);
   return {
     id: profil.id,
@@ -243,15 +258,110 @@ export function etatPublic(profil, jeux, gains, amis = null, trophees = []) {
     aujourdhui: { jour: gains.jour || null, secondes: gains.secondes, xp: gains.xp, multiXp: gains.multi_xp, termines: gains.termines },
     amis: amis || { amis: 0, recues: 0, invisible: false },
     trophees: trophees.map((x) => ({ periode: x.periode, debut: x.debut, rang: x.rang, points: x.points })),
+    appareils,
   };
 }
 
 export async function etatComplet(env, profil, maintenant) {
   const jour = jourUTC(maintenant);
-  const [jeux, gains, amis, trophees] = await Promise.all([
+  const [jeux, gains, amis, trophees, appareils] = await Promise.all([
     jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jour), resumeAmis(env, profil.id), tropheesDuProfil(env, profil.id),
+    nombreAppareils(env, profil.id),
   ]);
-  return etatPublic(profil, jeux, { ...gains, jour }, amis, trophees);
+  return etatPublic(profil, jeux, { ...gains, jour }, amis, trophees, appareils);
+}
+
+// --- Sauvegardes des jeux (d'un appareil à l'autre) ------------------------------------
+// Règle (docs/cadrage-fidelisation.md, 14.13 ; côté appareil : public/sauvegardes-nuage.js) :
+// l'appareil envoie { jeu, base, donnees, envoye? } (base : dernière version du
+// serveur qu'il connaît ; donnees : texte de save_<id>, null = effacée ; envoye :
+// empreinte d'un envoi précédent resté sans réponse lue), ou { jeu, base, lire: true }.
+//   - même contenu que le serveur : rien à écrire ;
+//   - base = version du serveur (ou le serveur garde l'envoi précédent de cet
+//     appareil) : seul cet appareil a changé la sauvegarde, son contenu gagne ;
+//   - sinon (conflit : les deux ont joué) : la plus avancée gagne, niveau puis
+//     score puis date ; une sauvegarde qui existe bat un effacement ; à égalité, le serveur garde la sienne.
+// Écriture conditionnelle (version inchangée depuis la lecture) : si un autre
+// appareil écrit au même moment, la réponse est « reessayer ».
+
+/** Sauvegardes du profil pour ces jeux : Map jeu → { version, donnees }. */
+async function sauvegardesDuProfil(env, id, jeux) {
+  if (!jeux.length) return new Map();
+  const { results } = await env.DB.prepare(`SELECT jeu, version, donnees FROM profils_sauvegardes WHERE profil = ? AND jeu IN (${jeux.map(() => '?').join(',')})`)
+    .bind(id, ...jeux).all();
+  return new Map((results || []).map((r) => [r.jeu, r]));
+}
+
+// La sauvegarde de l'appareil (texte ou null) gagne-t-elle un conflit contre celle du serveur ?
+function appareilPlusAvance(local, serveur) {
+  if (local === null) return false;
+  if (serveur === null || serveur === undefined) return true;
+  const a = lireRang(local), b = lireRang(serveur);
+  if (!b) return !!a;
+  if (!a) return false;
+  if (a.niveau !== b.niveau) return a.niveau > b.niveau;
+  if (a.score !== b.score) return a.score > b.score;
+  return a.date > b.date;
+}
+
+/**
+ * Décision pour un article : { resultat: { jeu, statut, version, donnees? }, ecriture? }.
+ * ligne : sauvegarde du serveur ({ version, donnees }) ou undefined.
+ */
+export function fusionnerSauvegarde(article, ligne, connu) {
+  const jeu = typeof article?.jeu === 'string' ? article.jeu.slice(0, 80) : '';
+  const refus = { resultat: { jeu, statut: 'refuse', version: 0 } };
+  if (!connu(jeu) || horsNuage(jeu)) return refus;
+  const version = ligne ? ligne.version : 0;
+  const serveur = ligne ? ligne.donnees : null;
+  const base = Number.isSafeInteger(article.base) && article.base >= 0 ? article.base : 0;
+  if (article.lire === true) {
+    if (ligne && version !== base) return { resultat: { jeu, statut: 'perdu', version, donnees: serveur } };
+    return { resultat: { jeu, statut: 'ok', version } };
+  }
+  const local = article.donnees === null ? null : article.donnees;
+  if (local !== null && (typeof local !== 'string' || local.length > R.SAUVEGARDE_SERVEUR_MAX || !lireRang(local))) return refus;
+  if (local === serveur) return { resultat: { jeu, statut: 'ok', version } };
+  const seulChangement = base === version || (typeof article.envoye === 'string' && article.envoye === empreinteSauvegarde(serveur));
+  if (!seulChangement && !appareilPlusAvance(local, serveur)) return { resultat: { jeu, statut: 'perdu', version, donnees: serveur } };
+  const rang = lireRang(local);
+  return {
+    resultat: { jeu, statut: 'ok', version: version + 1 },
+    ecriture: { jeu, attendue: ligne ? version : null, version: version + 1, donnees: local, niveau: rang?.niveau ?? null, score: rang?.score ?? null },
+  };
+}
+
+function ecrireSauvegarde(env, profilId, e, maintenant) {
+  if (e.attendue === null) {
+    return env.DB.prepare(`INSERT INTO profils_sauvegardes (profil, jeu, version, donnees, niveau, score, maj) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (profil, jeu) DO NOTHING`).bind(profilId, e.jeu, e.version, e.donnees, e.niveau, e.score, maintenant);
+  }
+  return env.DB.prepare(`UPDATE profils_sauvegardes SET version = ?, donnees = ?, niveau = ?, score = ?, maj = ?
+    WHERE profil = ? AND jeu = ? AND version = ?`).bind(e.version, e.donnees, e.niveau, e.score, maintenant, profilId, e.jeu, e.attendue);
+}
+
+/**
+ * Prépare la fusion des sauvegardes envoyées : { ecritures, finir(resultatsDuBatch) → résultats }.
+ * Les écritures vont dans le même batch que le reste de l'envoi.
+ */
+export async function preparerSauvegardes(env, profilId, liste, connu, maintenant) {
+  const articles = (Array.isArray(liste) ? liste : []).slice(0, R.SAUVEGARDES_PAR_ENVOI).filter((a) => a && typeof a === 'object');
+  const vus = new Set();
+  const uniques = articles.filter((a) => typeof a.jeu === 'string' && !vus.has(a.jeu) && vus.add(a.jeu));
+  const lignes = await sauvegardesDuProfil(env, profilId, uniques.map((a) => a.jeu).filter((j) => connu(j)));
+  const decisions = uniques.map((a) => fusionnerSauvegarde(a, lignes.get(a.jeu), connu));
+  const ecritures = [];
+  const index = decisions.map((d) => (d.ecriture ? ecritures.push(ecrireSauvegarde(env, profilId, d.ecriture, maintenant)) - 1 : -1));
+  return {
+    ecritures,
+    finir(resultats) {
+      return decisions.map((d, i) => {
+        if (index[i] < 0) return d.resultat;
+        const changes = resultats?.[index[i]]?.meta?.changes;
+        return changes === 0 ? { jeu: d.resultat.jeu, statut: 'reessayer', version: d.resultat.version - 1 } : d.resultat;
+      });
+    },
+  };
 }
 
 // --- Badges --------------------------------------------------------------------------
@@ -393,14 +503,15 @@ function entier(v, min, max) {
  */
 export async function synchroniser(env, profil, corps, catalogue, maintenant) {
   const jourU = jourUTC(maintenant);
-  const [jeux, gainsJour, amis, trophees] = await Promise.all([
+  const connu = (id) => typeof id === 'string' && ID_JEU.test(id) && (!catalogue || catalogue.has(id));
+  const [jeux, gainsJour, amis, trophees, appareils, sauve] = await Promise.all([
     jeuxDuProfil(env, profil.id), gainsDuJour(env, profil.id, jourU), resumeAmis(env, profil.id), tropheesDuProfil(env, profil.id),
+    nombreAppareils(env, profil.id), preparerSauvegardes(env, profil.id, corps.sauvegardes, connu, maintenant),
   ]);
   const ajout = { secondes: 0, xp: 0, etoiles: 0, termines: 0, multi_xp: 0 };
   const modifies = new Set();
   const p = { ...profil };
   const gains = { xp: 0, niveauAvant: R.niveauPourXp(profil.xp), niveau: 0, badges: [], termines: [], bienvenue: null };
-  const connu = (id) => typeof id === 'string' && ID_JEU.test(id) && (!catalogue || catalogue.has(id));
 
   // 1. Jour de visite : série de jours consécutifs, bonus du retour quotidien.
   let nouveauJour = false;
@@ -496,11 +607,23 @@ export async function synchroniser(env, profil, corps, catalogue, maintenant) {
   ];
   if (ajout.xp || ajout.secondes || ajout.etoiles || ajout.termines) ecritures.push(ecrireGains(env, p.id, jourU, ajout));
   if (nouveauJour) ecritures.push(env.DB.prepare('INSERT OR IGNORE INTO profils_jours (profil, jour) VALUES (?, ?)').bind(p.id, p.dernier_jour));
-  await env.DB.batch(ecritures);
+  const debutSauvegardes = ecritures.length;
+  ecritures.push(...sauve.ecritures);
+  const faits = await env.DB.batch(ecritures);
 
   const total = { ...gainsJour, jour: jourU };
   for (const k of Object.keys(ajout)) total[k] = (total[k] || 0) + ajout[k];
-  return { etat: etatPublic(p, jeux, total, amis, trophees), gains };
+  const reponse = { etat: etatPublic(p, jeux, total, amis, trophees, appareils), gains };
+  if (Array.isArray(corps.sauvegardes)) reponse.sauvegardes = sauve.finir((faits || []).slice(debutSauvegardes));
+  return reponse;
+}
+
+/** Action « sauvegarde » (lecture au lancement d'un jeu, ou envoi de sa sauvegarde) : { sauvegarde }. */
+export async function sauvegardeUnJeu(env, profil, article, catalogue, maintenant) {
+  const connu = (id) => typeof id === 'string' && ID_JEU.test(id) && (!catalogue || catalogue.has(id));
+  const sauve = await preparerSauvegardes(env, profil.id, [article], connu, maintenant);
+  const faits = sauve.ecritures.length ? await env.DB.batch(sauve.ecritures) : [];
+  return { sauvegarde: sauve.finir(faits)[0] || { jeu: '', statut: 'refuse', version: 0 } };
 }
 
 // --- Apparence, pseudo -------------------------------------------------------------------------
@@ -947,6 +1070,7 @@ export async function tacheQuotidienneProfil(env, maintenant) {
     env.DB.prepare('DELETE FROM profils_limites WHERE date < ?').bind(maintenant - R.LIMITES_JOURS_GARDES * JOUR_MS),
     env.DB.prepare('DELETE FROM profils_blocages WHERE jusqu_a < ? AND maj < ?').bind(maintenant, maintenant - R.CODE_BLOCAGE_OUBLI_JOURS * JOUR_MS),
     env.DB.prepare(`DELETE FROM profils_jeux WHERE profil IN (${anciens})`).bind(inactif),
+    env.DB.prepare(`DELETE FROM profils_sauvegardes WHERE profil IN (${anciens})`).bind(inactif),
     env.DB.prepare(`DELETE FROM profils_gains WHERE profil IN (${anciens})`).bind(inactif),
     env.DB.prepare(`DELETE FROM profils_jours WHERE profil IN (${anciens})`).bind(inactif),
     env.DB.prepare(`DELETE FROM multi_resultats WHERE profil IN (${anciens})`).bind(inactif),
