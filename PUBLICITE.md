@@ -36,7 +36,7 @@ Vérifiez ces points dans les conditions d'AdSense au moment de l'inscription : 
 
 - **Rien ne change dans les réglages ci-dessus** : le site reste destiné en partie aux moins de 13 ans, donc traitement « enfant » (`data-tag-for-age-treatment="1"`) et annonces non personnalisées **sur tout le site**, y compris pour un visiteur qui ne regarde que les jeux 13+. Ne jamais les retirer « pour les ados » : la loi COPPA s'applique dès qu'une partie du public visé a moins de 13 ans.
 - **Règle AdSense sur les contenus choquants** : la seule annonce est en bas de l'accueil, et l'accueil montre les jaquettes du catalogue. Les jaquettes des jeux 13+ restent donc sans sang ni gore (`CONSIGNES-JEU.md`, section 1) ; les jeux eux-mêmes, où tout est permis, n'ont jamais de publicité (lanceur et pages des jeux sans annonce).
-- Les jeux 13+ ne sont ni dans les Nouveautés ni dans les Tendances de l'accueil (`pourAdos`, `public/taxonomie.js`).
+- Les jeux 13+ ne sont pas dans les Tendances de l'accueil (`pourAdos`, `public/taxonomie.js`) ; ils sont dans les Nouveautés depuis le 21 novembre 2026 (décision du propriétaire), leur jaquette reste donc sans sang ni gore.
 
 ## Activer la publicité, le jour venu
 

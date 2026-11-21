@@ -20,7 +20,7 @@ Un jeu dont `ages` vaut `"13+"` (tuile « 13 ans et + », décision du propriét
 - ni haine ou discrimination visant des personnes réelles ou des groupes, ni incitation à se faire du mal ou à des actes dangereux dans la vraie vie ;
 - la **jaquette**, visible par tous dans le catalogue, intrigue sans choquer : ni sang, ni gore, ni visage terrifiant en gros plan. Le jeu lui-même n'a pas cette limite.
 
-Le jeu affiche « Conseillé dès 13 ans » sur son écran titre (texte traduit, jamais dans une image) : « Au hasard » peut le proposer à tout le monde. Ton adolescent (le tutoiement reste). Sur l'accueil, il est dans le catalogue, la recherche, sa tuile d'âge et « Au hasard », mais jamais dans les Nouveautés, les Tendances, les nouveautés intercalées de « Mieux notés », les « Derniers jeux ajoutés », ni dans les jeux similaires d'un jeu conseillé avant 10 ans (`pourAdos`, `public/taxonomie.js`). Univers : l'horreur va dans `fantasy` (« Magie et monstres »), sinon dans l'univers de son décor.
+Le jeu affiche « Conseillé dès 13 ans » sur son écran titre (texte traduit, jamais dans une image) : « Au hasard » peut le proposer à tout le monde. Ton adolescent (le tutoiement reste). Sur l'accueil, il est dans le catalogue, la recherche, sa tuile d'âge, « Au hasard » et les Nouveautés de la première ligne, mais jamais dans les Tendances, les nouveautés intercalées de « Mieux notés », les « Derniers jeux ajoutés », ni dans les jeux similaires d'un jeu conseillé avant 10 ans (`pourAdos`, `public/taxonomie.js`). Univers : l'horreur va dans `fantasy` (« Magie et monstres »), sinon dans l'univers de son décor.
 
 ## 2. Le contenu et la qualité attendus
 
