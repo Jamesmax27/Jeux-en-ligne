@@ -4424,7 +4424,8 @@
   //  Écran titre : la vallée au crépuscule, la météorite dans le ciel
   // ---------------------------------------------------------------------
 
-  function dessinerTitre() {
+  // decor : seulement le paysage (sans la tribu ni son feu), autour du plateau d'une image du jeu.
+  function dessinerTitre(decor) {
     const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
     if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
     const c = cv.getContext('2d');
@@ -4477,12 +4478,14 @@
     c.fillStyle = '#1e130d';
     c.beginPath(); c.moveTo(-u, h); c.lineTo(-u, h * 0.78); c.quadraticCurveTo(w * 0.25, h * 0.7, w * 0.55, h * 0.76); c.quadraticCurveTo(w * 0.8, h * 0.8, w + u, h * 0.74); c.lineTo(w + u, h); c.closePath(); c.fill();
     const sol = h * 0.745;
+    if (decor !== true) {
     c.fillStyle = 'rgba(255,140,40,.25)'; rond(c, w * 0.5, sol, u * 1.4); c.fill();
     flamme(c, w * 0.5, sol + u * 0.15, u * 0.5, 0, 0);
     chasseur(c, w * 0.36, sol + u * 0.25, u * 0.6, 0, 1);
     chasseur(c, w * 0.62, sol + u * 0.2, u * 0.55, 3, 1);
     chasseur(c, w * 0.72, sol + u * 0.32, u * 0.45, 2, 1);
     chasseur(c, w * 0.26, sol + u * 0.4, u * 0.42, 1, 1);
+    }
     // raptors en embuscade
     raptor(c, w * 0.1, h * 0.86, u * 0.95, 1, 0, 1);
     raptor(c, w * 0.92, h * 0.88, u * 0.85, -1, 0, 1);
@@ -4598,8 +4601,9 @@
   let nuitAnim = null;        // { avant, apres, t0, D, fait, msgs }
   const fileVue = [];         // actions reçues, montrées une par une
   let minuteurVue = 0;
+  let apercuNum = 0;          // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
-  const moiSiege = () => (partie ? partie.siege : -1);
+  const moiSiege =() => (partie ? partie.siege : -1);
 
   function afficherEcran(nom) {
     ecran = nom;
@@ -4861,7 +4865,8 @@
   function boucle() {
     rafId = 0;
     if (ecran !== 'jeu' || enPause) return;
-    const t = performance.now();
+    // Image du jeu (JEL_APERCU) : l'heure est figée, le moment ne bouge plus.
+    const t = apercuNum ? 4000 : performance.now();
     if (nuitAnim) {
       const k = (t - nuitAnim.t0) / nuitAnim.D;
       sonsNuit(nuitAnim, k);
@@ -5684,6 +5689,365 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  //  Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) :
+  //  une scène composée, sans interface ni texte (CONSIGNES-JEU.md, section 5).
+  //  Un chasseur de la tribu du Fleuve, en grand, pointe sa lance vers un
+  //  raptor qui bondit ; derrière lui, un grand carnivore sort de l'ombre ; la
+  //  météorite embrase le ciel au-dessus du volcan.
+  // ---------------------------------------------------------------------
+
+  // Le héros de l'affiche : un chasseur vu de trois quarts, tourné vers la droite
+  // (pieds en x, y ; h = hauteur ; s = tribu). Même style que les chasseurs et les chefs du jeu.
+  function heros(c, x, y, h, s) {
+    const q = h / 380, peau = '#c98b5a', trait = '#2a1408';
+    c.save(); c.translate(x, y); c.scale(q, q);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const membre = (pts, l) => {
+      [[trait, l + 8], [peau, l]].forEach((p) => {
+        c.strokeStyle = p[0]; c.lineWidth = p[1];
+        c.beginPath(); c.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]); c.stroke();
+      });
+    };
+    // ombre au sol
+    c.fillStyle = 'rgba(0,0,0,.45)'; ell(c, -5, 0, 130, 15); c.fill();
+    // jambes et pieds enveloppés de cuir
+    membre([-12, -175, -62, -92, -100, -14], 30);
+    membre([22, -175, 80, -104, 72, -16], 32);
+    c.fillStyle = '#5a3a1e'; c.strokeStyle = trait; c.lineWidth = 4;
+    ell(c, -110, -9, 28, 12, -0.08); c.fill(); c.stroke();
+    ell(c, 88, -10, 30, 12, 0); c.fill(); c.stroke();
+    c.strokeStyle = '#3a2410'; c.lineWidth = 4;
+    [[-104, -40, -86, -46], [70, -48, 92, -46]].forEach((l) => { c.beginPath(); c.moveTo(l[0], l[1]); c.lineTo(l[2], l[3]); c.stroke(); });
+    // lance : du talon A à la pointe T
+    const A = [-135, -128], T = [205, -336];
+    const P = (k) => [A[0] + (T[0] - A[0]) * k, A[1] + (T[1] - A[1]) * k];
+    const mainA = P(0.2), mainB = P(0.45);
+    // bras arrière (sur la lance)
+    membre([-36, -280, -90, -224, mainA[0], mainA[1]], 25);
+    // torse
+    c.fillStyle = peau; c.strokeStyle = trait; c.lineWidth = 5;
+    poly(c, [-46, -294, 40, -298, 50, -244, 38, -180, -42, -178, -52, -242]); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(80,30,10,.28)'; poly(c, [-46, -294, -10, -296, -16, -180, -42, -178, -52, -242]); c.fill();
+    c.strokeStyle = 'rgba(90,40,15,.55)'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(-22, -250); c.quadraticCurveTo(-4, -238, 10, -252); c.moveTo(14, -250); c.quadraticCurveTo(28, -238, 40, -252); c.stroke();
+    // bandoulière de fourrure aux couleurs de la tribu
+    c.fillStyle = COUL[s]; c.strokeStyle = COUL_F[s]; c.lineWidth = 4;
+    poly(c, [22, -298, 42, -292, -30, -186, -50, -194]); c.fill(); c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,.35)'; c.lineWidth = 2.5;
+    for (let k = 0; k < 6; k++) { const px = 30 - k * 13, py = -286 + k * 17; c.beginPath(); c.moveTo(px - 6, py); c.lineTo(px + 4, py + 5); c.stroke(); }
+    // pagne en fourrure
+    c.fillStyle = COUL[s]; c.strokeStyle = COUL_F[s]; c.lineWidth = 4;
+    poly(c, [-50, -192, 46, -194, 56, -138, 42, -124, 30, -140, 17, -118, 4, -138, -10, -116, -22, -136, -36, -120, -52, -136]); c.fill(); c.stroke();
+    c.fillStyle = '#5a3a1e'; rr(c, -54, -202, 108, 16, 6); c.fill();
+    c.fillStyle = '#efe6d2'; rond(c, 30, -194, 5); c.fill();
+    // collier de dents
+    c.fillStyle = '#efe6d2'; c.strokeStyle = '#6a5a40'; c.lineWidth = 2;
+    for (let k = -3; k <= 3; k++) { const px = k * 9, py = -286 + Math.abs(k) * -1.5; poly(c, [px - 3.5, py, px + 3.5, py, px, py + 14 - Math.abs(k)]); c.fill(); c.stroke(); }
+    // la lance
+    c.strokeStyle = '#2a1408'; c.lineWidth = 15; c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(P(0.9)[0], P(0.9)[1]); c.stroke();
+    c.strokeStyle = '#a06a32'; c.lineWidth = 9; c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(P(0.9)[0], P(0.9)[1]); c.stroke();
+    c.strokeStyle = '#d9a46a'; c.lineWidth = 3; c.beginPath(); c.moveTo(A[0] + 2, A[1] - 4); c.lineTo(P(0.88)[0] + 2, P(0.88)[1] - 4); c.stroke();
+    const L = Math.hypot(T[0] - A[0], T[1] - A[1]), ux = (T[0] - A[0]) / L, uy = (T[1] - A[1]) / L;
+    const B = P(0.86);
+    c.fillStyle = '#3b3f46'; c.strokeStyle = '#111'; c.lineWidth = 3;
+    poly(c, [T[0], T[1], B[0] - uy * 17, B[1] + ux * 17, B[0] + ux * 6, B[1] + uy * 6, B[0] + uy * 17, B[1] - ux * 17]); c.fill(); c.stroke();
+    c.fillStyle = '#9aa2ae'; poly(c, [T[0], T[1], B[0] + uy * 8, B[1] - ux * 8, B[0] + ux * 8, B[1] + uy * 8]); c.fill();
+    c.strokeStyle = COUL[s]; c.lineWidth = 6;
+    [0.84, 0.81].forEach((k) => { const p = P(k); c.beginPath(); c.moveTo(p[0] - uy * 9, p[1] + ux * 9); c.lineTo(p[0] + uy * 9, p[1] - ux * 9); c.stroke(); });
+    // plume accrochée sous la pointe
+    c.fillStyle = '#e2553f'; const pf = P(0.8); ell(c, pf[0] - 6, pf[1] + 22, 6, 18, 0.4); c.fill();
+    // bras avant
+    membre([36, -284, 86, -264, mainB[0], mainB[1]], 27);
+    c.fillStyle = peau; c.strokeStyle = trait; c.lineWidth = 4;
+    [mainA, mainB].forEach((p) => { rond(c, p[0], p[1], 15); c.fill(); c.stroke(); });
+    c.fillStyle = COUL[s]; rr(c, 72, -276, 20, 12, 4); c.fill();
+    // cou et tête
+    c.fillStyle = peau; rr(c, -14, -320, 30, 32, 8); c.fill();
+    c.fillStyle = '#1b120c';
+    c.beginPath(); c.moveTo(-10, -384); c.quadraticCurveTo(-58, -372, -54, -330); c.quadraticCurveTo(-70, -300, -58, -276);
+    c.quadraticCurveTo(-40, -298, -36, -312); c.quadraticCurveTo(-30, -292, -20, -286); c.quadraticCurveTo(-22, -320, -14, -340); c.closePath(); c.fill();
+    ell(c, 2, -352, 36, 36); c.fill();
+    c.fillStyle = peau; c.strokeStyle = trait; c.lineWidth = 4;
+    ell(c, 9, -338, 29, 35); c.fill(); c.stroke();
+    ell(c, -16, -336, 7, 10); c.fill(); c.stroke();
+    c.fillStyle = peau; poly(c, [34, -350, 47, -326, 33, -320]); c.fill(); c.stroke();
+    c.fillStyle = 'rgba(80,30,10,.25)'; ell(c, -4, -332, 12, 26); c.fill();
+    // peintures de guerre
+    c.fillStyle = COUL[s];
+    poly(c, [14, -334, 34, -331, 34, -325, 14, -327]); c.fill();
+    poly(c, [16, -322, 32, -319, 32, -314, 16, -316]); c.fill();
+    poly(c, [-10, -334, 2, -333, 2, -327, -10, -328]); c.fill();
+    // yeux décidés et sourcils froncés
+    c.fillStyle = '#fff'; ell(c, 22, -348, 7.5, 5); c.fill(); ell(c, 0, -348, 6, 4.5); c.fill();
+    c.fillStyle = '#1b0f08'; rond(c, 25, -348, 3.6); c.fill(); rond(c, 3, -348, 3); c.fill();
+    c.fillStyle = '#fff'; rond(c, 26.2, -349.5, 1.2); c.fill();
+    c.strokeStyle = trait; c.lineWidth = 4.5;
+    c.beginPath(); c.moveTo(12, -362); c.lineTo(32, -355); c.moveTo(-8, -360); c.lineTo(6, -357); c.stroke();
+    // bouche serrée
+    c.fillStyle = '#3a1408'; rr(c, 12, -313, 20, 7, 3); c.fill();
+    c.strokeStyle = '#f3ead8'; c.lineWidth = 2; c.beginPath(); c.moveTo(14, -309.5); c.lineTo(30, -309.5); c.stroke();
+    // bandeau à plumes (comme le premier chef)
+    c.fillStyle = '#7a4a22'; c.save(); c.translate(4, -372); c.rotate(-0.08); rr(c, -34, -6, 68, 11, 4); c.fill(); c.restore();
+    [['#e2553f', -24, -0.35], ['#f0d040', -10, -0.18], ['#3a8ad0', 4, -0.02]].forEach((p) => {
+      c.fillStyle = p[0]; ell(c, p[1] - 6, -398, 7, 22, p[2]); c.fill();
+      c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 2; c.beginPath(); c.moveTo(p[1] - 6 + Math.sin(p[2]) * 18, -398 + 18); c.lineTo(p[1] - 6 - Math.sin(p[2]) * 18, -398 - 18); c.stroke();
+    });
+    c.restore();
+  }
+
+  // Dessine « dessin » avec un liseré de lumière de couleur « coul » décalé de (dx, dy) (pixels de l'écran).
+  function avecLisere(c, dessin, coul, dx, dy, flou) {
+    const o = document.createElement('canvas'); o.width = c.canvas.width; o.height = c.canvas.height;
+    const oc = o.getContext('2d');
+    oc.setTransform(c.getTransform());
+    dessin(oc);
+    oc.setTransform(1, 0, 0, 1, 0, 0);
+    oc.globalCompositeOperation = 'source-in'; oc.fillStyle = coul; oc.fillRect(0, 0, o.width, o.height);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    c.shadowColor = coul; c.shadowBlur = flou; c.drawImage(o, dx, dy); c.shadowBlur = 0;
+    c.restore();
+    dessin(c);
+  }
+
+  // Fougère sombre du premier plan (pied en x, y ; longueur l ; angle a).
+  function fougere(c, x, y, l, a, coul) {
+    c.save(); c.translate(x, y); c.rotate(a);
+    c.strokeStyle = coul; c.fillStyle = coul; c.lineWidth = l * 0.03; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(l * 0.15, -l * 0.5, l * 0.05, -l); c.stroke();
+    for (let k = 1; k < 12; k++) {
+      const p = k / 12, px = l * 0.15 * 2 * p * (1 - p) + l * 0.05 * p * p, py = -l * p, f = l * 0.22 * (1 - p * 0.7);
+      ell(c, px - f * 0.5, py + f * 0.1, f * 0.5, f * 0.12, 0.5); c.fill();
+      ell(c, px + f * 0.5, py + f * 0.1, f * 0.5, f * 0.12, -0.5); c.fill();
+    }
+    c.restore();
+  }
+
+  // Gueule ouverte du raptor de l'affiche (repère du raptor tourné vers la droite, k = taille).
+  function machoires(c, k) {
+    c.save(); c.scale(k, k); c.lineJoin = 'round';
+    c.fillStyle = '#4a1410'; poly(c, [0.44, -0.9, 0.84, -0.93, 0.8, -0.79, 0.46, -0.84]); c.fill();
+    c.fillStyle = '#6b8a3a'; c.strokeStyle = '#26361a'; c.lineWidth = 0.02;
+    poly(c, [0.42, -0.88, 0.82, -0.8, 0.8, -0.74, 0.46, -0.8]); c.fill(); c.stroke();
+    c.fillStyle = '#f3ead8';
+    for (let q = 0; q < 5; q++) { const x = 0.52 + q * 0.06; poly(c, [x, -0.905 - q * 0.004, x + 0.03, -0.91 - q * 0.004, x + 0.015, -0.86 - q * 0.004]); c.fill(); }
+    for (let q = 0; q < 4; q++) { const x = 0.54 + q * 0.06; poly(c, [x, -0.82 + q * 0.012, x + 0.028, -0.815 + q * 0.012, x + 0.014, -0.855 + q * 0.012]); c.fill(); }
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const c = cv.getContext('2d');
+    // Repère de l'affiche : 600 × 800, centré ; le décor continue jusqu'aux bords sur un écran large.
+    const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    const x0 = -ox / k - 2, x1 = (W - ox) / k + 2, y0 = -oy / k - 2, y1 = (H - oy) / k + 2, HZ = 470;
+    const al = graineHasard(29);
+    // ciel embrasé
+    let g = c.createLinearGradient(0, Math.min(0, y0), 0, HZ);
+    g.addColorStop(0, '#1a0b2c'); g.addColorStop(0.35, '#55163a'); g.addColorStop(0.68, '#b8361f'); g.addColorStop(0.9, '#ff8a32'); g.addColorStop(1, '#ffc26a');
+    c.fillStyle = g; c.fillRect(x0, y0, x1 - x0, HZ - y0 + 4);
+    for (let i = 0; i < 80; i++) { c.fillStyle = 'rgba(255,240,220,' + (0.3 + al() * 0.6).toFixed(2) + ')'; rond(c, x0 + al() * (x1 - x0), y0 + al() * (260 - y0), al() * 1.6 + 0.4); c.fill(); }
+    // la météorite, sa traînée et ses éclats
+    const mx = 452, my = 150, mr = 46;
+    g = c.createRadialGradient(mx, my, 10, mx, my, 300);
+    g.addColorStop(0, 'rgba(255,220,150,.75)'); g.addColorStop(0.35, 'rgba(255,150,70,.35)'); g.addColorStop(1, 'rgba(255,120,60,0)');
+    c.fillStyle = g; c.fillRect(x0, y0, x1 - x0, 520 - y0);
+    const queue = (x, y, r, long) => {
+      const fx = x - long, fy = y - long * 0.62;
+      const tg = c.createLinearGradient(x, y, fx, fy);
+      tg.addColorStop(0, 'rgba(255,230,160,.95)'); tg.addColorStop(0.35, 'rgba(255,120,40,.6)'); tg.addColorStop(1, 'rgba(255,80,30,0)');
+      c.fillStyle = tg;
+      c.beginPath(); c.moveTo(x + r * 0.55, y + r * 0.85); c.lineTo(fx, fy); c.lineTo(x - r * 0.55, y - r * 0.85); c.closePath(); c.fill();
+    };
+    queue(mx, my, mr, 520);
+    c.fillStyle = 'rgba(255,200,110,.45)'; rond(c, mx, my, mr * 1.7); c.fill();
+    c.fillStyle = '#fff1c4'; rond(c, mx, my, mr); c.fill();
+    c.fillStyle = '#ffa142'; rond(c, mx + mr * 0.15, my + mr * 0.12, mr * 0.72); c.fill();
+    c.fillStyle = '#7a2e14'; rond(c, mx + mr * 0.22, my + mr * 0.26, mr * 0.36); c.fill();
+    c.fillStyle = '#4a1a0c'; rond(c, mx + mr * 0.05, my + mr * 0.4, mr * 0.12); c.fill(); rond(c, mx + mr * 0.42, my + mr * 0.05, mr * 0.1); c.fill();
+    [[318, 70, 9, 120], [560, 268, 8, 100], [208, 196, 6, 80]].forEach((f) => { queue(f[0], f[1], f[2], f[3]); c.fillStyle = '#ffdd88'; rond(c, f[0], f[1], f[2]); c.fill(); c.fillStyle = '#ff6a1a'; rond(c, f[0] + 1, f[1] + 1, f[2] * 0.6); c.fill(); });
+    // volcan en éruption, fumée éclairée par la lave
+    c.fillStyle = 'rgba(50,28,44,.8)';
+    [[92, 270, 34], [112, 230, 44], [96, 182, 52], [128, 140, 60], [92, 104, 56], [140, 72, 66]].forEach((p) => { rond(c, p[0], p[1], p[2]); c.fill(); });
+    c.fillStyle = 'rgba(255,110,40,.25)';
+    [[100, 262, 26], [118, 226, 30]].forEach((p) => { rond(c, p[0], p[1] + 8, p[2]); c.fill(); });
+    c.fillStyle = '#3a1820';
+    poly(c, [x0 - 10, HZ + 20, x0 - 10, 420, 46, 292, 140, 292, 300, HZ + 20]); c.fill();
+    c.fillStyle = '#ff6a1a';
+    poly(c, [50, 292, 136, 292, 118, 312, 104, 360, 92, 316, 72, 330]); c.fill();
+    c.strokeStyle = '#ff8a2a'; c.lineWidth = 5; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(104, 340); c.quadraticCurveTo(120, 390, 112, 440); c.moveTo(78, 326); c.quadraticCurveTo(60, 380, 40, 420); c.stroke();
+    c.fillStyle = '#ffcf6a';
+    [[86, 262, 5], [118, 250, 4], [70, 236, 3.5], [132, 270, 3]].forEach((p) => { rond(c, p[0], p[1], p[2]); c.fill(); });
+    // montagnes lointaines
+    c.fillStyle = '#5c2232';
+    c.beginPath(); c.moveTo(240, HZ + 10);
+    for (let i = 0; i <= 8; i++) c.lineTo(240 + i * 55, HZ - (i % 2 ? 62 : 22) - (i === 5 ? 20 : 0));
+    c.lineTo(x1 + 10, HZ - 30); c.lineTo(x1 + 10, HZ + 10); c.closePath(); c.fill();
+    // grands herbivores qui fuient à l'horizon
+    herbivore(c, 520, HZ + 4, 70, 1, '#3a1a24');
+    herbivore(c, 586, HZ + 10, 52, 1, '#3a1a24');
+    herbivore(c, 448, HZ + 12, 44, 1, '#3a1a24');
+    // la plaine
+    g = c.createLinearGradient(0, HZ, 0, 800);
+    g.addColorStop(0, '#9a6430'); g.addColorStop(0.3, '#6a4220'); g.addColorStop(1, '#2e1d10');
+    c.fillStyle = g; c.fillRect(x0, HZ, x1 - x0, y1 - HZ);
+    // rivière qui reflète le ciel en feu
+    c.fillStyle = '#e8743a';
+    c.beginPath(); c.moveTo(350, HZ); c.bezierCurveTo(330, 520, 470, 540, 430, 600); c.bezierCurveTo(400, 650, 520, 690, x1 + 10, 700);
+    c.lineTo(x1 + 10, 770); c.bezierCurveTo(520, 750, 470, 690, 500, 610); c.bezierCurveTo(530, 540, 380, 520, 372, HZ); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(255,230,170,.6)'; c.lineWidth = 3;
+    [[380, 520, 30], [462, 590, 26], [520, 700, 40]].forEach((p) => { c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(p[0] + p[2], p[1] + 2); c.stroke(); });
+    // arbres du bord de la plaine
+    for (let i = 0; i < 4; i++) arbre(c, 236 + i * 26, HZ + 18 + (i % 2) * 8, 46, true);
+    // tribus rivales qui courent vers les troupeaux
+    chasseur(c, 352, 530, 15, 0, 1);
+    chasseur(c, 382, 536, 14, 1, 1);
+    chasseur(c, 410, 526, 13, 3, 1);
+    // le grand carnivore sort de l'ombre derrière le héros
+    c.save(); c.filter = 'brightness(.72) saturate(.9)';
+    carnivore(c, -40, 548, 190, 1, 0, 1);
+    c.restore();
+    c.save(); c.shadowColor = '#ff7a1a'; c.shadowBlur = 14; c.fillStyle = '#ffb02a'; rond(c, -40 + 190 * 0.62, 548 - 190 * 0.9, 6); c.fill(); c.restore();
+    // feu de camp du premier plan, qui éclaire la scène par en bas
+    g = c.createRadialGradient(120, 740, 10, 120, 740, 260);
+    g.addColorStop(0, 'rgba(255,170,70,.55)'); g.addColorStop(1, 'rgba(255,120,40,0)');
+    c.fillStyle = g; c.fillRect(x0, 480, x1 - x0, y1 - 480);
+    // lumière derrière le héros
+    g = c.createRadialGradient(240, 460, 20, 240, 460, 260);
+    g.addColorStop(0, 'rgba(255,200,120,.45)'); g.addColorStop(1, 'rgba(255,170,90,0)');
+    c.fillStyle = g; c.fillRect(x0, 200, x1 - x0, 560);
+    // le raptor qui bondit sur le héros, gueule ouverte
+    const RX = 585, RY = 462, RA = -0.28, RK = 178;
+    avecLisere(c, (cc) => {
+      cc.save(); cc.translate(RX, RY); cc.rotate(RA); raptor(cc, 0, 0, RK, -1, 0, 1); cc.scale(-1, 1); machoires(cc, RK); cc.restore();
+    }, 'rgba(255,214,140,1)', 3 * dpr, -3 * dpr, 10 * dpr);
+    // œil jaune du raptor, qui brille
+    c.save(); c.translate(RX, RY); c.rotate(RA); c.scale(-1, 1);
+    c.shadowColor = '#ffe14a'; c.shadowBlur = 16; c.fillStyle = '#fff07a'; rond(c, RK * 0.62, -RK * 1.0, 6); c.fill();
+    c.restore();
+    // le héros, avec un liseré de lumière de la météorite
+    avecLisere(c, (cc) => heros(cc, 200, 708, 390, 2), 'rgba(255,214,140,1)', 4 * dpr, -3 * dpr, 12 * dpr);
+    // premier plan : rochers, fougères et yeux dans les buissons
+    c.fillStyle = '#1c120b';
+    poly(c, [x0 - 10, y1 + 10, x0 - 10, 722, 28, 708, 92, 730, 150, 768, 190, y1 + 10]); c.fill();
+    poly(c, [430, y1 + 10, 470, 752, 540, 724, x1 + 10, 716, x1 + 10, y1 + 10]); c.fill();
+    fougere(c, x0 + 8, y1, 230, 0.45, '#13230f');
+    fougere(c, x0 + 40, y1, 200, 0.15, '#1b3014');
+    fougere(c, x1 - 10, y1, 240, -0.5, '#13230f');
+    fougere(c, x1 - 60, y1, 190, -0.18, '#1b3014');
+    c.save(); c.shadowColor = '#ffe14a'; c.shadowBlur = 10; c.fillStyle = '#ffe66a';
+    [[526, 742], [546, 744], [586, 760], [604, 758]].forEach((p) => { ell(c, p[0], p[1], 5, 2.6, 0.15); c.fill(); });
+    c.restore();
+    // feu de camp
+    c.fillStyle = '#3a2414'; poly(c, [80, 772, 160, 764, 166, 776, 84, 784]); c.fill();
+    flamme(c, 122, 772, 64, 600, 0); flamme(c, 104, 774, 40, 900, 2); flamme(c, 142, 774, 44, 300, 4);
+    // braises qui s'envolent
+    for (let i = 0; i < 40; i++) {
+      const bx = 60 + al() * 420, by = 260 + al() * 470;
+      c.fillStyle = ['#ffd36a', '#ff8a3d', '#ffb31a'][i % 3]; c.globalAlpha = 0.55 + al() * 0.45; rond(c, bx, by, 1.2 + al() * 2.2); c.fill();
+    }
+    c.globalAlpha = 1;
+  }
+
+  function cacherPourAffiche() {
+    document.querySelectorAll('.ecran, .voile, button, #toast, #confettis, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    cacherPourAffiche();
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+    // Le bouton de langue est parfois créé après ce script : il est caché de nouveau un peu plus tard.
+    setTimeout(cacherPourAffiche, 200);
+    setTimeout(cacherPourAffiche, 900);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  //  Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par
+  //  le jeu) : le jeu s'ouvre directement en pleine partie solo contre les trois
+  //  tribus robots, avec sa vraie interface (tribus et viande, réserve, case
+  //  choisie, boutons Poser et Camp, flèches des prédateurs), sans écran titre,
+  //  ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). L'état
+  //  est posé avec les vraies règles, puis figé : aucun robot ne joue, aucune
+  //  nuit ne tombe, rien n'est gagné ni perdu, ni son, ni sauvegarde, ni réseau.
+  //    1 = niveau 1 : la petite vallée des troupeaux, deuxième jour ;
+  //    2 = niveau 9 : un grand carnivore et deux raptors qui convergent vers le troupeau choisi ;
+  //    3 = niveau 19 : la météorite (colonne détruite, colonne menacée), la forêt en feu,
+  //        quatre prédateurs ; sur ordinateur, la vallée au crépuscule tout autour.
+  // ---------------------------------------------------------------------
+
+  const SCENES_APERCU = {
+    1: {
+      niveau: 1, jour: 2, prem: 1, ch: [2, 2, 2, 2], vi: [4, 5, 3, 3], pe: [0, 0, 0, 0], si: [0, 0, 0, 0], la: [0, 0, 0, 0],
+      pr: [], poses: [['0,0', 1], ['2,2', 2], ['1,1', 3]], choix: '0,0'
+    },
+    2: {
+      niveau: 9, jour: 3, prem: 3, ch: [3, 3, 2, 3], vi: [8, 10, 6, 7], pe: [2, 1, 0, 3], si: [1, 2, 1, 0], la: [1, 0, 0, 1],
+      pr: [['C', '1,2'], ['R', '2,4'], ['R', '3,1']],
+      poses: [['0,0', 3], ['camp', 0], ['1,4', 1], ['0,2', 2], ['2,0', 3]], choix: '2,2'
+    },
+    3: {
+      niveau: 19, jour: 4, prem: 2, ch: [3, 2, 3, 1], vi: [16, 14, 12, 9], pe: [1, 2, 0, 1], si: [2, 0, 1, 1], la: [2, 1, 0, 0],
+      pr: [['R', '1,2'], ['R', '3,3'], ['C', '2,1'], ['C', '4,1']], cratere: [0], feu: [['0,2', 2], ['1,3', 1]],
+      poses: [['0,1', 2], ['4,2', 3], ['camp', 0], ['3,2', 1], ['1,4', 2]], choix: '0,4'
+    }
+  };
+
+  // État de la partie, posé avec les vraies règles (preparer, debutJour).
+  function etatApercu(d) {
+    const e = O.preparer(NIVEAUX[d.niveau - 1], PLACES), W = e.W;
+    e.n = d.niveau - 1;
+    e.j = d.jour;
+    e.prem = d.prem;
+    e.pr = d.pr.map((p, k) => ({ id: k, t: p[0], i: O.idx(W, p[1]), d: O.idx(W, p[1]) }));
+    e.ids = e.pr.length;
+    e.ar = e.ar.filter((a) => a[2] > d.jour);
+    (d.cratere || []).forEach((col) => { for (let r = 0; r < e.H; r++) e.zf[r * W + col] = 2; });
+    for (let i = 0; i < e.feu.length; i++) e.feu[i] = 0;
+    (d.feu || []).forEach((f) => { e.feu[O.idx(W, f[0])] = f[1]; });
+    ['ch', 'vi', 'pe', 'si', 'la'].forEach((cle) => { e[cle] = d[cle].slice(); });
+    O.debutJour(e);
+    d.poses.forEach((p) => { e.pl.push([p[0] === 'camp' ? -1 : O.idx(W, p[0]), p[1]]); e.rest[p[1]]--; });
+    e.tour = 0;
+    return e;
+  }
+
+  function ouvrirApercu(n) {
+    apercuNum = n;
+    const d = SCENES_APERCU[n];
+    // Progression neuve, en mémoire seulement (rien n'est enregistré), et sans son.
+    remettreAZero();
+    prog.options.son = false;
+    session = 'solo';
+    enPartie = false;
+    niveau = d.niveau;
+    vue = etatApercu(d);
+    // Partie solo figée : ta tribu (place 0) contre trois tribus robots ; personne ne joue.
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 0, chef: -1, etat: vue,
+      monTour: () => true,
+      sieges: () => [0, 1, 2, 3].map((s) => ({ humain: s === 0, moi: s === 0, chef: false })),
+      jouer: () => false, pause: () => {}, quitter: () => {}, recommencer: () => false, lancerManche: () => false, estChef: () => false
+    };
+    choix = O.idx(vue.W, d.choix);
+    afficherEcran('jeu');
+    if (n === 3) {
+      // Sur un écran d'ordinateur, la vallée au crépuscule remplit toute la largeur autour du plateau.
+      $('ecran-jeu').style.background = 'transparent';
+      $('fond').style.display = 'block';
+      ['places', 'infos', 'panneau-case'].forEach((id) => { $(id).style.maxWidth = '900px'; });
+      dessinerTitre(true);
+      window.addEventListener('resize', () => dessinerTitre(true));
+    }
+    majInterface();
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5719,7 +6083,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !apercuNum && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -5734,10 +6098,15 @@
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else {
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>

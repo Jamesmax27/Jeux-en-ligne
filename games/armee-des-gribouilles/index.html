@@ -1111,6 +1111,8 @@ const $ = id => document.getElementById(id);
 let etat = null;        // partie en cours
 let record = 0;         // meilleure vague atteinte (sauvegarde facultative)
 try { record = parseInt(localStorage.getItem("gribouilles-record") || "0", 10) || 0; } catch (e) { record = 0; }
+// Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé seulement par le robot du site
+const APERCU = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
 
 function stat(h, nom) { // statistique d'un héros selon son niveau
   return Math.round(TYPES[h.type][nom] * (1 + 0.3 * (h.niv - 1)));
@@ -1388,18 +1390,334 @@ function jouer() {
 
 // Page fermée pendant la préparation ou un combat : on reprendra cette vague
 JEL_SAVE.surFermeture(() => {
-  if (!etat) return;
+  if (!etat || APERCU) return; // images du jeu : rien d'écrit dans la sauvegarde
   if (etat.phase === "prep") sauvegarder(etat.vague, etat.pieces);
   else if (etat.phase === "combat") sauvegarder(etat.vague, etat.piecesDebut);
 });
 
+/* ===== Affiche (jaquette du jeu) =====
+   Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+   sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le Chevalier
+   Bouclier, en grand, charge l'épée levée devant le soleil couchant ; l'Archère tire sur le chef
+   Gloup couronné, le Magicien Étoile endort un Gloup d'un éclat d'étoiles (des pièces en jaillissent),
+   la Soigneuse Câline envoie des cœurs au chevalier. Mêmes personnages ronds que le jeu, plus détaillés. */
+const AFF_DEFS =
+  '<defs>' +
+  '<linearGradient id="affCiel" x1="0" y1="0" x2="0" y2="560" gradientUnits="userSpaceOnUse">' +
+  '<stop offset="0" stop-color="#4f7dff"/><stop offset=".42" stop-color="#9d82ff"/><stop offset=".78" stop-color="#ff9ec7"/><stop offset="1" stop-color="#ffd08a"/></linearGradient>' +
+  '<radialGradient id="affSoleil"><stop offset="0" stop-color="#fffbe2"/><stop offset=".18" stop-color="#fff0a8" stop-opacity=".9"/><stop offset=".5" stop-color="#ffd27a" stop-opacity=".35"/><stop offset="1" stop-color="#ffb070" stop-opacity="0"/></radialGradient>' +
+  '<radialGradient id="affLum" cx=".36" cy=".3" r=".78"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".42" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#1b0f3a" stop-opacity=".3"/></radialGradient>' +
+  '<linearGradient id="affHerbe" x1="0" y1="430" x2="0" y2="820" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#9be877"/><stop offset=".5" stop-color="#5fbf55"/><stop offset="1" stop-color="#3f9a46"/></linearGradient>' +
+  '<linearGradient id="affColline" x1="0" y1="300" x2="0" y2="470" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#d7c4ff"/><stop offset="1" stop-color="#b59cf2"/></linearGradient>' +
+  '<radialGradient id="affPiece" cx=".38" cy=".32" r=".75"><stop offset="0" stop-color="#fff6c0"/><stop offset=".45" stop-color="#ffcf3f"/><stop offset="1" stop-color="#d9951a"/></radialGradient>' +
+  '<radialGradient id="affEclat"><stop offset="0" stop-color="#fffde0"/><stop offset=".35" stop-color="#ffe66a" stop-opacity=".85"/><stop offset="1" stop-color="#ffb84a" stop-opacity="0"/></radialGradient>' +
+  '<radialGradient id="affArene" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#d6ff9c" stop-opacity=".55"/><stop offset="1" stop-color="#d6ff9c" stop-opacity="0"/></radialGradient>' +
+  '</defs>';
+
+// Étoile à n branches (polygone)
+function affEtoile(cx, cy, r1, r2, n, attributs) {
+  let d = "";
+  for (let i = 0; i < 2 * n; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / n, r = i % 2 ? r2 : r1;
+    d += (i ? "L" : "M") + (cx + r * Math.cos(a)).toFixed(1) + " " + (cy + r * Math.sin(a)).toFixed(1);
+  }
+  return '<path d="' + d + 'Z" ' + attributs + '/>';
+}
+function affCoeur(x, y, s, couleur) {
+  return '<path transform="translate(' + x + ' ' + y + ') scale(' + s + ')" d="M0 4C-6-6-18 0-10 9L0 18L10 9C18 0 6-6 0 4Z" fill="' + couleur + '" stroke="#fff" stroke-width="2"/>';
+}
+function affPiece(x, y, r, inclinaison) {
+  return '<g transform="translate(' + x + ' ' + y + ') rotate(' + (inclinaison || 0) + ') scale(1 .82)">' +
+    '<circle r="' + r + '" fill="url(#affPiece)" stroke="#b9780f" stroke-width="' + (r / 9).toFixed(1) + '"/>' +
+    '<circle r="' + (r * 0.66).toFixed(1) + '" fill="none" stroke="#e8a92a" stroke-width="' + (r / 8).toFixed(1) + '"/>' +
+    affEtoile(0, 0, r * 0.4, r * 0.17, 5, 'fill="#ffe680"') +
+    '<path d="M' + (-r * 0.55).toFixed(1) + ' ' + (-r * 0.3).toFixed(1) + 'q' + (r * 0.25).toFixed(1) + ' ' + (-r * 0.4).toFixed(1) + ' ' + (r * 0.6).toFixed(1) + ' ' + (-r * 0.4).toFixed(1) + '" stroke="#fff" stroke-width="' + (r / 7).toFixed(1) + '" fill="none" stroke-linecap="round" opacity=".8"/></g>';
+}
+function affTouffe(x, y, h, couleur, sens) {
+  let d = "";
+  for (let i = -3; i <= 3; i++) {
+    const bx = x + i * h * 0.09, hh = h * (1 - Math.abs(i) * 0.13), px = bx + (i + (sens || 0)) * h * 0.12;
+    d += "M" + (bx - h * 0.05).toFixed(1) + " " + y + "Q" + ((bx + px) / 2).toFixed(1) + " " + (y - hh * 0.55).toFixed(1) + " " + px.toFixed(1) + " " + (y - hh).toFixed(1) +
+      "Q" + ((bx + px) / 2 + h * 0.03).toFixed(1) + " " + (y - hh * 0.45).toFixed(1) + " " + (bx + h * 0.05).toFixed(1) + " " + y + "Z";
+  }
+  return '<path d="' + d + '" fill="' + couleur + '"/>';
+}
+function affFleur(x, y, r, couleur) {
+  let p = "";
+  for (let i = 0; i < 5; i++) { const a = i * 1.2566; p += '<circle cx="' + (x + r * Math.cos(a)).toFixed(1) + '" cy="' + (y + r * Math.sin(a)).toFixed(1) + '" r="' + (r * 0.75).toFixed(1) + '" fill="' + couleur + '"/>'; }
+  return p + '<circle cx="' + x + '" cy="' + y + '" r="' + (r * 0.6).toFixed(1) + '" fill="#ffd34d"/>';
+}
+function affNuage(x, y, s, opacite) {
+  return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')" fill="#fff" opacity="' + opacite + '">' +
+    '<ellipse cx="0" cy="0" rx="60" ry="22"/><circle cx="-24" cy="-12" r="24"/><circle cx="10" cy="-22" r="30"/><circle cx="40" cy="-8" r="20"/></g>';
+}
+
+// Visage commun aux héros (boîte 100 × 100 du jeu) : yeux qui regardent (dx, dy), joues, bouche ouverte
+function affVisage(dx, dy) {
+  return '<circle cx="40" cy="53" r="6" fill="#fff"/><circle cx="60" cy="53" r="6" fill="#fff"/>' +
+    '<circle cx="' + (40 + dx) + '" cy="' + (53 + dy) + '" r="3.3" fill="#24152e"/><circle cx="' + (60 + dx) + '" cy="' + (53 + dy) + '" r="3.3" fill="#24152e"/>' +
+    '<circle cx="' + (38.8 + dx) + '" cy="' + (51.6 + dy) + '" r="1.2" fill="#fff"/><circle cx="' + (58.8 + dx) + '" cy="' + (51.6 + dy) + '" r="1.2" fill="#fff"/>' +
+    '<ellipse cx="31" cy="65" rx="4.5" ry="2.8" fill="#ff6f91" opacity=".5"/><ellipse cx="69" cy="65" rx="4.5" ry="2.8" fill="#ff6f91" opacity=".5"/>' +
+    '<path d="M41 63q9 12 18 0z" fill="#5b1a2a"/><path d="M45.5 68.2q4.5 2.6 9 0q-4.5-2.8-9 0z" fill="#ff8a9a"/>';
+}
+// Corps rond éclairé par le soleil (en haut à gauche) avec un liseré de lumière
+function affCorps(couleur) {
+  return '<ellipse cx="50" cy="93" rx="30" ry="6" fill="rgba(30,60,20,.35)"/>' +
+    '<circle cx="50" cy="60" r="32" fill="' + couleur + '"/><circle cx="50" cy="60" r="32" fill="url(#affLum)"/>' +
+    '<path d="M47 29.2A31 31 0 0 0 19.4 56" stroke="#fff6cf" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".95"/>';
+}
+function affMain(x, y, couleur) {
+  return '<circle cx="' + x + '" cy="' + y + '" r="5.5" fill="' + couleur + '" stroke="rgba(40,20,60,.35)" stroke-width="1"/>';
+}
+
+function affChevalier() {
+  const c = TYPES.chevalier.couleur;
+  return affCorps(c) + affVisage(1.4, -1.6) +
+    // casque, visière et plumet
+    '<path d="M22 48a28 28 0 0 1 56 0z" fill="#c7d0de"/><path d="M22 48a28 28 0 0 1 56 0z" fill="url(#affLum)"/>' +
+    '<rect x="20" y="44.5" width="60" height="6" rx="3" fill="#97a3b8"/><path d="M50 21v23" stroke="#97a3b8" stroke-width="3"/>' +
+    '<path d="M50 20.5A27.5 27.5 0 0 0 22.5 47" stroke="#fff6cf" stroke-width="2.2" fill="none" stroke-linecap="round"/>' +
+    '<path d="M48 22C38 8 50-6 70-3C60 2 57 10 55 22Z" fill="#ff5a5a"/><path d="M50 18C46 8 54 0 64-1" stroke="#ffb3b3" stroke-width="2" fill="none" stroke-linecap="round"/>' +
+    // épée levée (à droite)
+    '<g transform="rotate(-12 86 64)"><path d="M83 60V22l3.5-9l3.5 9v38z" fill="#eef3fb" stroke="#9aa6ba" stroke-width="1"/><path d="M86.5 18v40" stroke="#c3cddd" stroke-width="1.4"/>' +
+    '<rect x="77" y="58" width="19" height="5.5" rx="2.7" fill="#ffc93c" stroke="#c9951a" stroke-width="1"/><rect x="84" y="63" width="5" height="10" rx="2" fill="#8a5a2b"/><circle cx="86.5" cy="75" r="3.2" fill="#ffc93c"/></g>' +
+    affMain(86, 67, c) +
+    affEtoile(76, 11, 7, 2.2, 4, 'fill="#fff"') +
+    // bouclier (à gauche)
+    '<path d="M4 58q15-8 30 0v14q0 17-15 23q-15-6-15-23z" fill="#4a6fd0" stroke="#ffc93c" stroke-width="2.6"/>' +
+    '<path d="M8 60q11-5 22 0v4q-11-5-22 0z" fill="#8fb0ff" opacity=".8"/>' +
+    affEtoile(19, 74, 8, 3.4, 5, 'fill="#ffd34d" stroke="#c9951a" stroke-width=".8"') + affMain(30, 80, c);
+}
+function affArchere() {
+  const c = TYPES.archere.couleur;
+  return affCorps(c) + affVisage(-1, -2) +
+    '<path d="M22 50a28 28 0 0 1 56 0q-28-14-56 0z" fill="#2f7a3c"/><path d="M22 50a28 28 0 0 1 56 0q-28-14-56 0z" fill="url(#affLum)"/>' +
+    '<path d="M68 30l14-12l-4 14z" fill="#ff7ab0"/>' +
+    // arc tendu vers le chef Gloup (en haut à gauche)
+    '<g transform="rotate(-97 50 60)"><path d="M80 32q22 28 0 56" stroke="#8a5a2b" stroke-width="4.5" fill="none" stroke-linecap="round"/>' +
+    '<path d="M80 32L91 60L80 88" stroke="#fff" stroke-width="1.4" fill="none"/></g>' + affMain(42, 18, c);
+}
+function affMagicien() {
+  const c = TYPES.magicien.couleur;
+  return affCorps(c) + affVisage(1.6, -2) +
+    '<path d="M50-4l27 42h-54z" fill="#5a3aa8"/><path d="M50-4l27 42h-54z" fill="url(#affLum)"/>' +
+    '<rect x="21" y="35" width="58" height="7.5" rx="3.5" fill="#3f2780"/>' +
+    affEtoile(50, 22, 5.5, 2.3, 5, 'fill="#ffe07a"') + affEtoile(40, 31, 2.6, 1, 5, 'fill="#ffe07a"') + affEtoile(60, 12, 2.4, 1, 5, 'fill="#ffe07a"') +
+    // baguette tendue, étoile au bout
+    '<path d="M80 70L93 40" stroke="#6b3f1f" stroke-width="3.6" stroke-linecap="round"/>' +
+    '<circle cx="94" cy="37" r="11" fill="url(#affEclat)"/>' + affEtoile(94, 37, 7.5, 3, 5, 'fill="#ffe66a" stroke="#fff" stroke-width="1"') +
+    affMain(81, 69, c);
+}
+function affSoigneuse() {
+  const c = TYPES.soigneuse.couleur;
+  return affCorps(c) + affVisage(-1.6, -1) +
+    '<path d="M26 40a24 18 0 0 1 48 0z" fill="#fff"/><path d="M50 12v14M43 19h14" stroke="#e8467c" stroke-width="5" stroke-linecap="round"/>' +
+    affMain(22, 70, c);
+}
+// Gloup (boîte 100 × 100) : « boude », « touche » (yeux plissés) ou « dort » (bulles de sommeil)
+function affGloup(couleur, humeur, boss) {
+  const corps = 'M16 88q-6-34 14-52q20-16 40 0q20 18 14 52z';
+  let s = '<ellipse cx="50" cy="91" rx="34" ry="6" fill="rgba(30,60,20,.35)"/>' +
+    '<path d="' + corps + '" fill="' + couleur + '"/><path d="' + corps + '" fill="url(#affLum)"/>' +
+    '<path d="M30.5 37Q18 50 16 70" stroke="#fff6cf" stroke-width="2.6" fill="none" stroke-linecap="round"/>' +
+    '<circle cx="34" cy="80" r="3" fill="rgba(255,255,255,.35)"/><circle cx="66" cy="76" r="4" fill="rgba(255,255,255,.3)"/>';
+  if (boss) {
+    s += '<path d="M28 32l7-20 11 11 4-14 4 14 11-11 7 20z" fill="#ffd34d" stroke="#c9951a" stroke-width="2" stroke-linejoin="round"/>' +
+      '<circle cx="35" cy="13" r="3" fill="#ff5a7a"/><circle cx="50" cy="8" r="3.4" fill="#5ad0ff"/><circle cx="65" cy="13" r="3" fill="#7ae87a"/>' +
+      '<path d="M31 28q19-6 38 0" stroke="#fff6cf" stroke-width="2" fill="none"/>';
+  }
+  if (humeur === "dort") {
+    s += '<path d="M30 60q8 6 16 0M54 60q8 6 16 0" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>' +
+      '<ellipse cx="50" cy="75" rx="4" ry="3" fill="#5b1a2a"/>' +
+      '<circle cx="76" cy="34" r="4" fill="#e9f6ff" stroke="#9ad0ff" stroke-width="1.5"/><circle cx="86" cy="20" r="6" fill="#e9f6ff" stroke="#9ad0ff" stroke-width="1.5"/><circle cx="99" cy="3" r="8.5" fill="#e9f6ff" stroke="#9ad0ff" stroke-width="1.5"/>';
+  } else if (humeur === "touche") {
+    s += '<path d="M31 53l11 5l-11 5M69 53l-11 5l11 5" stroke="#222" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '<path d="M41 76q9-7 18 0" stroke="#222" stroke-width="3" fill="none" stroke-linecap="round"/>';
+  } else {
+    s += '<circle cx="38" cy="58" r="8.5" fill="#fff"/><circle cx="62" cy="58" r="8.5" fill="#fff"/><circle cx="41" cy="61" r="4.2" fill="#222"/><circle cx="59" cy="61" r="4.2" fill="#222"/>' +
+      '<circle cx="39.5" cy="59.4" r="1.4" fill="#fff"/><circle cx="57.5" cy="59.4" r="1.4" fill="#fff"/>' +
+      '<path d="M31 47l13 4.5M69 47l-13 4.5" stroke="#222" stroke-width="3.4" stroke-linecap="round"/>' +
+      '<ellipse cx="50" cy="76" rx="6" ry="5" fill="#5b1a2a"/>';
+  }
+  return s;
+}
+function affPlace(x, y, s, contenu) { return '<g transform="translate(' + x + ' ' + y + ') scale(' + s + ')">' + contenu + '</g>'; }
+
+function sceneAffiche() {
+  const W = window.innerWidth || 600, H = window.innerHeight || 800;
+  let vx = 0, vy = 0, vw = 600, vh = 800;
+  if (W / H > 0.75) { vw = 800 * W / H; vx = (600 - vw) / 2; } else { vh = 600 * H / W; vy = (800 - vh) / 2; }
+  let s = '<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="' + [vx, vy, vw, vh].map(v => v.toFixed(1)).join(" ") + '" preserveAspectRatio="xMidYMid slice">' + AFF_DEFS;
+  // Ciel, soleil couchant et ses rayons, nuages
+  s += '<rect x="-3000" y="-3000" width="6600" height="6600" fill="url(#affCiel)"/>';
+  let rayons = "";
+  for (let i = 0; i < 14; i++) {
+    const a = i * Math.PI / 7 + 0.1, b = a + 0.12;
+    rayons += 'M215 195L' + (215 + 900 * Math.cos(a)).toFixed(0) + ' ' + (195 + 900 * Math.sin(a)).toFixed(0) + 'L' + (215 + 900 * Math.cos(b)).toFixed(0) + ' ' + (195 + 900 * Math.sin(b)).toFixed(0) + 'Z';
+  }
+  s += '<path d="' + rayons + '" fill="#fff8d8" opacity=".16"/>';
+  s += '<circle cx="215" cy="195" r="330" fill="url(#affSoleil)"/><circle cx="215" cy="195" r="62" fill="#fff6c8"/><circle cx="215" cy="195" r="50" fill="#fffbe6"/>';
+  s += affNuage(500, 120, 1.1, 0.85) + affNuage(70, 95, 0.8, 0.75) + affNuage(-180, 170, 1, 0.7) + affNuage(800, 80, 1.2, 0.75) + affNuage(360, 60, 0.6, 0.6);
+  // Collines lointaines, puis le pré de la bataille
+  s += '<path d="M-3000 430C-400 400-60 320 120 352S430 300 610 345S1100 390 3600 400V3000H-3000Z" fill="url(#affColline)"/>';
+  s += '<path d="M-3000 410C-1200 360-900 380-700 400S-200 380 0 420Z" fill="#c7b2ff" opacity=".7"/><path d="M600 420C800 360 1000 380 1300 410S2000 400 3600 420V430H600Z" fill="#c7b2ff" opacity=".7"/>';
+  s += '<path d="M-3000 520C-200 470 120 420 300 432S720 470 3600 500V3000H-3000Z" fill="url(#affHerbe)"/>';
+  s += '<path d="M-3000 520C-200 470 120 420 300 432S720 470 3600 500" stroke="#c9ff9a" stroke-width="4" fill="none" opacity=".8"/>';
+  s += '<ellipse cx="300" cy="560" rx="330" ry="120" fill="url(#affArene)"/>';
+  s += affTouffe(-60, 470, 40, "#6cc65c", 0) + affTouffe(640, 500, 44, "#6cc65c", 1) + affFleur(600, 520, 5, "#fff") + affFleur(-10, 500, 5, "#ffb3d1");
+  // Fond : un petit Gloup déjà endormi, le chef Gloup couronné, touché par la flèche
+  s += affPlace(150, 246, 0.62, affGloup(COULEURS_GLOUPS[2], "dort", false));
+  s += '<circle cx="460" cy="235" r="150" fill="#fff4b0" opacity=".18"/>';
+  s += affPlace(350, 120, 2.2, affGloup(COULEURS_GLOUPS[3], "boude", true));
+  s += '<circle cx="459" cy="318" r="30" fill="url(#affEclat)"/>' + affEtoile(459, 318, 20, 7, 8, 'fill="#fff6b0" stroke="#fff" stroke-width="2"');
+  // Flèche en plein vol, avec ses traits de vitesse
+  s += '<g stroke-linecap="round"><path d="M478 420L486 462M492 416L500 454M466 426L472 456" stroke="#fff" stroke-width="3" opacity=".75"/>' +
+    '<path d="M464 332L479 416" stroke="#8a5a2b" stroke-width="4.5"/><path d="M458 316L470 336L461 338Z" fill="#c3ccda" stroke="#7a8496" stroke-width="1.5" stroke-linejoin="round"/>' +
+    '<path d="M476 402L470 420L479 416ZM482 401L488 419L479 416Z" fill="#ff7ab0"/></g>';
+  // À gauche : Gloup touché par l'éclat du magicien, des pièces jaillissent
+  s += '<circle cx="78" cy="368" r="70" fill="url(#affEclat)"/>';
+  s += affPlace(4, 282, 1.38, affGloup(COULEURS_GLOUPS[0], "touche", false));
+  s += affEtoile(116, 400, 20, 7, 8, 'fill="#fff6b0" stroke="#fff" stroke-width="1.5"');
+  s += affPiece(150, 316, 15, -20) + affPiece(176, 286, 12, 15) + affPiece(128, 282, 10, 30);
+  // Héros : la Soigneuse (au fond à droite), l'Archère (à droite)
+  s += affPlace(470, 382, 1.15, affSoigneuse());
+  s += affCoeur(456, 404, 0.9, "#ff5a8a") + affCoeur(424, 378, 1.15, "#ff6f9a") + affCoeur(400, 340, 0.75, "#ff8fb0");
+  s += affPlace(400, 472, 1.95, affArchere());
+  // Le héros : le Chevalier Bouclier, en grand, au centre
+  s += '<ellipse cx="262" cy="574" rx="150" ry="22" fill="rgba(30,70,20,.35)"/>';
+  s += affPlace(60, 200, 4.0, affChevalier());
+  // Le Magicien, devant à gauche, et la traînée d'étoiles de sa baguette jusqu'au Gloup
+  s += affPlace(-44, 476, 1.9, affMagicien());
+  [[140, 516, 9], [128, 486, 7.5], [112, 458, 8], [100, 432, 6], [128, 440, 4.5], [146, 470, 5]].forEach(e => {
+    s += affEtoile(e[0], e[1], e[2], e[2] * 0.42, 5, 'fill="#ffe66a" stroke="#fff" stroke-width="1.2"');
+  });
+  s += affEtoile(400, 222, 10, 3, 4, 'fill="#fff"') + affEtoile(150, 260, 6, 2, 4, 'fill="#fff"') + affEtoile(560, 330, 7, 2.4, 4, 'fill="#fff"');
+  // Premier plan : herbes coupées par les bords, fleurs et pièces gagnées
+  s += affTouffe(-10, 820, 150, "#2f8a3c", 1) + affTouffe(70, 830, 110, "#3a9a44", -1) + affTouffe(610, 820, 160, "#2f8a3c", -1) + affTouffe(540, 835, 100, "#3a9a44", 1);
+  s += affTouffe(-200, 820, 140, "#2f8a3c", 0) + affTouffe(800, 820, 140, "#2f8a3c", 0);
+  s += affFleur(120, 690, 9, "#fff") + affFleur(470, 700, 8, "#ffb3d1") + affFleur(350, 742, 7, "#fff") + affFleur(30, 640, 7, "#ffe07a");
+  s += affPiece(48, 708, 26, -12) + affPiece(96, 732, 22, 18) + affPiece(18, 752, 24, 5) + affPiece(580, 745, 26, 14) + affPiece(536, 770, 20, -10);
+  return s + '</svg>';
+}
+
+// Cache le bouton de langue (créé parfois après ce script, avec un style en ligne) et tout bouton
+function cacherBoutonsAffiche() {
+  document.querySelectorAll(".jel-langue, jel-langue, jel-sauvegarde-effacer, button").forEach(el => el.style.setProperty("display", "none", "important"));
+}
+function demarrerAffiche() {
+  afficher(null);
+  document.body.style.background = "#9d82ff";
+  const boite = document.createElement("div");
+  boite.id = "affiche";
+  boite.style.cssText = "position:fixed;inset:0;z-index:10;overflow:hidden;";
+  document.body.appendChild(boite);
+  const dessiner = () => { boite.innerHTML = sceneAffiche(); };
+  dessiner();
+  window.addEventListener("resize", dessiner);
+  cacherBoutonsAffiche();
+  document.addEventListener("DOMContentLoaded", cacherBoutonsAffiche);
+  [0, 100, 400, 1000, 1800].forEach(ms => setTimeout(cacherBoutonsAffiche, ms));
+}
+
+/* ===== Images du jeu (window.JEL_APERCU = 1, 2 ou 3, posé seulement par le robot) =====
+   1 : début de partie (vague 3 en préparation : bilan de la vague 2, équipe de deux héros, pièces
+   pour recruter ou améliorer) ; 2 : vague 5, combat contre le premier chef Gloup ; 3 : vague 9 sur un écran
+   d'ordinateur, armée de 5 héros contre 5 Gloups, vitesse ×2. Tout est posé par le code puis figé
+   (phase « apercu ») : rien ne se gagne ni ne se perd, aucune écriture de sauvegarde ni FMG. */
+function flotterFixe(u, texte, couleur, monte) {
+  const f = document.createElement("div");
+  f.className = "flottant"; f.textContent = texte; f.style.color = couleur;
+  f.style.animation = "none"; f.style.transform = "translate(-50%, " + (-monte) + "px)";
+  u.el.appendChild(f);
+}
+// Même chose, posé sur le terrain (au-dessus d'un Gloup endormi, qui est grisé)
+function flotterChamp(u, texte, couleur, monte) {
+  const r = u.el.getBoundingClientRect(), c = $("champ").getBoundingClientRect();
+  const f = document.createElement("div");
+  f.className = "flottant"; f.textContent = texte; f.style.color = couleur; f.style.animation = "none";
+  f.style.left = (r.left - c.left + r.width / 2) + "px"; f.style.top = (r.top - c.top + r.height * 0.2 - monte) + "px";
+  f.style.transform = "translateX(-50%)";
+  $("champ").appendChild(f);
+}
+function equipeApercu(liste) {
+  return liste.map(([type, niv]) => { const h = nouveauHeros(type); h.niv = niv; h.pv = stat(h, "pv"); return h; });
+}
+function ouvrirApercu(n) {
+  if (n === 3) {
+    // Écran d'ordinateur : unités plus grandes pour que la bataille occupe la largeur
+    const st = document.createElement("style");
+    st.textContent = ".unite{max-width:150px}.unite.boss{max-width:210px}.rang{gap:28px;min-height:150px}#haut{font-size:1.2rem;padding:10px 24px}.flottant{font-size:1.5rem}.barre{height:10px}";
+    document.head.appendChild(st);
+  } else if (n === 2) {
+    // Téléphone, combat : héros et Gloups un peu plus grands, comme vus de plus près
+    const st = document.createElement("style");
+    st.textContent = ".unite{width:23%;max-width:100px}.unite.boss{width:40%;max-width:170px}.rang{gap:6px}";
+    document.head.appendChild(st);
+  }
+  nouvellePartie();
+  if (n === 1) {
+    etat.vague = 3; etat.pieces = 46;
+    etat.equipe = equipeApercu([["chevalier", 1], ["archere", 1]]);
+    montrerPrep(t("bilanGagne", { n: 42 }));
+    etat.phase = "apercu";
+    return;
+  }
+  if (n === 2) {
+    etat.vague = 5; etat.pieces = 62;
+    etat.equipe = equipeApercu([["chevalier", 3], ["archere", 2], ["magicien", 1], ["soigneuse", 1]]);
+    dessinerHeros(); majHaut();
+    lancerVague();
+    etat.phase = "apercu"; // figé : le message « Un chef Gloup arrive ! » reste affiché
+    const [boss, petit] = etat.ennemis, [chev, arch, mag, soi] = etat.equipe;
+    boss.pv = Math.round(boss.max * 0.62); majBarre(boss);
+    petit.pv = Math.round(petit.max * 0.35); majBarre(petit);
+    chev.pv = Math.round(stat(chev, "pv") * 0.55); majBarre(chev);
+    mag.pv = Math.round(stat(mag, "pv") * 0.8); majBarre(mag);
+    etat.cible = boss; boss.el.classList.add("cible");
+    flotterFixe(boss, "-" + stat(arch, "atk"), "#fff", 26);
+    flotterFixe(petit, "-" + Math.round(stat(mag, "atk") * 0.4), "#fff", 16);
+    flotterFixe(chev, "+" + stat(soi, "atk"), "#8dffa0", 12);
+    arch.el.style.transform = "translateY(-10px) scale(1.08)";
+    boss.el.style.filter = "brightness(1.3)";
+    $("vitesse").hidden = false;
+    return;
+  }
+  etat.vague = 9; etat.pieces = 143;
+  etat.equipe = equipeApercu([["chevalier", 5], ["archere", 4], ["magicien", 4], ["soigneuse", 3], ["archere", 3]]);
+  dessinerHeros(); majHaut();
+  lancerVague();
+  etat.phase = "apercu";
+  etat.vitesse = 2; $("vitesse").textContent = "×2"; $("vitesse").hidden = false;
+  const e = etat.ennemis, h = etat.equipe;
+  [0.0, 0.45, 0.8, 0.0, 0.25].forEach((f, i) => {
+    e[i].pv = Math.round(e[i].max * f);
+    if (f === 0) e[i].dort = true;
+    majBarre(e[i]);
+  });
+  [0.4, 0.9, 1, 0.7, 0.6].forEach((f, i) => { h[i].pv = Math.round(stat(h[i], "pv") * f); majBarre(h[i]); });
+  etat.cible = e[2]; e[2].el.classList.add("cible");
+  flotterFixe(e[2], "-" + stat(h[2], "atk"), "#fff", 8);
+  flotterFixe(e[4], "-" + Math.round(stat(h[2], "atk") * 0.4), "#fff", 14);
+  flotterChamp(e[3], "+" + e[3].prime + " 🪙", "#ffe07a", 20);
+  flotterFixe(h[0], "+" + stat(h[3], "atk"), "#8dffa0", 12);
+  flotterFixe(h[1], "-" + e[1].atk, "#ff9aa8", 6);
+  h[2].el.style.transform = "translateY(-10px) scale(1.08)";
+  e[2].el.style.filter = "brightness(1.3)";
+}
+
 /* ===== Démarrage ===== */
-$("vitrine").innerHTML = ["chevalier", "archere", "magicien", "soigneuse"].map(k => figure(k, TYPES[k].couleur)).join("");
-if (record > 0) $("record").textContent = t("record", { n: record, total: VAGUES });
-$("jouer").addEventListener("click", jouer);
-$("jouer").after(JEL_SAVE.boutonEffacer({ jeu: JEU }));
-$("rejouer").addEventListener("click", nouvellePartie);
-requestAnimationFrame(boucle);
+if (window.JEL_AFFICHE) {
+  demarrerAffiche();
+} else if (APERCU) {
+  ouvrirApercu(APERCU);
+} else {
+  $("vitrine").innerHTML = ["chevalier", "archere", "magicien", "soigneuse"].map(k => figure(k, TYPES[k].couleur)).join("");
+  if (record > 0) $("record").textContent = t("record", { n: record, total: VAGUES });
+  $("jouer").addEventListener("click", jouer);
+  $("jouer").after(JEL_SAVE.boutonEffacer({ jeu: JEU }));
+  $("rejouer").addEventListener("click", nouvellePartie);
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

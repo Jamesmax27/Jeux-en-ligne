@@ -2286,6 +2286,7 @@ let ecran = 'titre';   // titre, intro, jeu, pause, fin
 let S = null;          // stand en cours
 let temps = 0;         // temps global (décor)
 let enPause = false;
+let apercu = 0;        // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 const decor = { feux: [], confettis: [] };
 function hasard() { return Math.random(); }
 function choisir(liste) { return liste[Math.floor(hasard() * liste.length)]; }
@@ -3275,6 +3276,7 @@ function dessinerMonde() {
   const allee = S ? S.def.allee : 3;
   dessinerCiel(allee);
   dessinerStand(allee);
+  if (apercu === 3) dessinerCotesApercu(allee);
   if (!S) return;
   const def = S.def;
   for (const tp of def.tapis || []) dessinerTapis(tp);
@@ -3551,7 +3553,7 @@ $('b-pause').addEventListener('click', () => { SONS.clic(); if (ecran === 'intro
 $('b-reprendre').addEventListener('click', () => { reprendre(); SONS.clic(); });
 $('b-recommencer').addEventListener('click', () => { reprendre(); SONS.clic(); demarrerStand(S.n); });
 $('b-pause-accueil').addEventListener('click', () => { enPause = false; allerAccueil(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && ecran === 'jeu') pauser(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && ecran === 'jeu' && !apercu) pauser(); });
 
 document.querySelectorAll('.b-son').forEach((b) => b.addEventListener('click', () => {
   P.son = !P.son; garderLocal(); majBoutonsSon();
@@ -3774,16 +3776,341 @@ $('b-jouer').addEventListener('click', boutonJouer);
 
 // Sauvegarde à la fermeture, seulement pendant un stand
 JEL_SAVE.surFermeture(() => {
-  if (S && (ecran === 'jeu' || ecran === 'intro' || ecran === 'pause')) sauverPartie(S.n);
+  if (S && !apercu && (ecran === 'jeu' || ecran === 'intro' || ecran === 'pause')) sauverPartie(S.n);
 });
+
+// ---------------------------------------------------------------------------
+// Affiche (jaquette du jeu)
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène
+// composée, sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5).
+// Un soir de fête, le grand ourson en peluche vient de lancer son anneau : il retombe en
+// brillant autour d'une bouteille rouge, sous la grande roue et le feu d'artifice.
+// ---------------------------------------------------------------------------
+function etincelleAffiche(c, x, y, r, col) {
+  c.fillStyle = col;
+  c.beginPath(); c.moveTo(x, y - r); c.lineTo(x + r * 0.25, y); c.lineTo(x, y + r); c.lineTo(x - r * 0.25, y); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(x - r, y); c.lineTo(x, y + r * 0.25); c.lineTo(x + r, y); c.lineTo(x, y - r * 0.25); c.closePath(); c.fill();
+}
+function bouquetAffiche(c, x, y, R, col, k) {
+  c.save();
+  c.strokeStyle = col; c.fillStyle = col; c.lineCap = 'round';
+  c.shadowColor = col; c.shadowBlur = 14 * k;
+  for (let i = 0; i < 24; i++) {
+    const a = i / 24 * Math.PI * 2, v = i % 2 ? 0.8 : 1;
+    c.lineWidth = 3 * k;
+    c.beginPath(); c.moveTo(x + Math.cos(a) * R * 0.3, y + Math.sin(a) * R * 0.3); c.lineTo(x + Math.cos(a) * R * v * 0.85, y + Math.sin(a) * R * v * 0.85); c.stroke();
+    c.beginPath(); c.arc(x + Math.cos(a) * R * v, y + Math.sin(a) * R * v + 3 * k, 4 * k, 0, Math.PI * 2); c.fill();
+  }
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(x, y, 5 * k, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
+function grandeRoueAffiche(c, x, y, r, k) {
+  c.save();
+  const h = c.createRadialGradient(x, y, r * 0.2, x, y, r * 1.35);
+  h.addColorStop(0, 'rgba(255,224,160,.4)'); h.addColorStop(1, 'rgba(255,224,160,0)');
+  c.fillStyle = h; c.beginPath(); c.arc(x, y, r * 1.35, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = '#ffe9a8'; c.lineWidth = 7 * k; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(x - r * 0.6, y + r * 1.5); c.lineTo(x, y); c.lineTo(x + r * 0.6, y + r * 1.5); c.stroke();
+  c.strokeStyle = 'rgba(255,241,196,.85)'; c.lineWidth = 2 * k;
+  for (let i = 0; i < 12; i++) { const a = 0.2 + i * Math.PI / 6; c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); c.stroke(); }
+  c.strokeStyle = '#fff1c4'; c.lineWidth = 5 * k;
+  c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke();
+  c.lineWidth = 2.5 * k; c.beginPath(); c.arc(x, y, r * 0.6, 0, Math.PI * 2); c.stroke();
+  // Ampoules allumées tout autour
+  c.shadowColor = '#ffe9a8'; c.shadowBlur = 10 * k; c.fillStyle = '#fffbe0';
+  for (let i = 0; i < 36; i++) { const a = i / 36 * Math.PI * 2; c.beginPath(); c.arc(x + Math.cos(a) * r, y + Math.sin(a) * r, 3.2 * k, 0, Math.PI * 2); c.fill(); }
+  c.shadowBlur = 0;
+  // Nacelles de couleur
+  const cols = ['#ff5a5f', '#ffd166', '#3b82f6', '#2fb36b', '#ff8fd0', '#8e5cff'];
+  for (let i = 0; i < 12; i++) {
+    const a = 0.2 + i * Math.PI / 6, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+    c.fillStyle = cols[i % 6];
+    c.beginPath(); if (c.roundRect) c.roundRect(px - 13 * k, py + 3 * k, 26 * k, 20 * k, 6 * k); else c.rect(px - 13 * k, py + 3 * k, 26 * k, 20 * k); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.55)'; c.fillRect(px - 9 * k, py + 7 * k, 18 * k, 4 * k);
+  }
+  c.fillStyle = '#ffd166'; c.beginPath(); c.arc(x, y, 10 * k, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
+function lampionsAffiche(c, y, k) {
+  const cols = ['#ff5a5f', '#ffd166', '#3b82f6', '#2fb36b', '#ff8fd0'];
+  const courbe = (x) => y + Math.sin(x / W * Math.PI * 3) * 14 * k;
+  c.strokeStyle = '#3a2a20'; c.lineWidth = 2 * k;
+  c.beginPath();
+  for (let i = 0; i <= 80; i++) { const x = i / 80 * W; if (i) c.lineTo(x, courbe(x)); else c.moveTo(x, courbe(x)); }
+  c.stroke();
+  const pas = 48 * k;
+  for (let i = 0, x = (W % pas) / 2; x < W + pas; i++, x += pas) {
+    const yy = courbe(x), col = cols[i % 5];
+    c.save(); c.globalAlpha = 0.4; c.fillStyle = col; c.shadowColor = col; c.shadowBlur = 18 * k;
+    c.beginPath(); c.arc(x, yy + 14 * k, 21 * k, 0, Math.PI * 2); c.fill(); c.restore();
+    c.fillStyle = col; c.beginPath(); c.ellipse(x, yy + 14 * k, 11 * k, 14 * k, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.5)'; c.beginPath(); c.ellipse(x - 3.5 * k, yy + 10 * k, 3 * k, 6 * k, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#3a2a20'; c.fillRect(x - 5 * k, yy, 10 * k, 3 * k); c.fillRect(x - 5 * k, yy + 26 * k, 10 * k, 3 * k);
+  }
+}
+// Le grand ourson en peluche (même dessin que les peluches du jeu, en plus détaillé) :
+// un bras levé après le lancer, deux anneaux dans l'autre patte, grand sourire.
+function oursonAffiche(c, x, y, r) {
+  const brun = '#b5835a', clair = '#ecd0ad';
+  c.save(); c.translate(x, y);
+  c.lineWidth = Math.max(1.5, r * 0.035); c.strokeStyle = 'rgba(60,30,40,.55)'; c.lineJoin = 'round';
+  const ov = (cx, cy, rx, ry, col, a) => { c.fillStyle = col; c.beginPath(); c.ellipse(cx, cy, rx, ry, a || 0, 0, Math.PI * 2); c.fill(); c.stroke(); };
+  // Pieds, corps, ventre
+  ov(-r * 0.45, r * 1.8, r * 0.34, r * 0.23, brun); ov(r * 0.45, r * 1.8, r * 0.34, r * 0.23, brun);
+  ov(-r * 0.45, r * 1.8, r * 0.18, r * 0.13, clair); ov(r * 0.45, r * 1.8, r * 0.18, r * 0.13, clair);
+  ov(0, r * 1.18, r * 0.84, r * 0.76, brun);
+  ov(0, r * 1.28, r * 0.5, r * 0.45, clair);
+  // Bras levé (côté droit), patte ouverte vers l'anneau qui vole
+  ov(r * 1.02, r * 0.22, r * 0.25, r * 0.7, brun, 0.46);
+  ov(r * 1.32, -r * 0.42, r * 0.27, r * 0.27, brun);
+  ov(r * 1.32, -r * 0.42, r * 0.14, r * 0.14, clair);
+  // Autre bras, qui tient deux anneaux de réserve
+  ov(-r * 0.78, r * 1.05, r * 0.24, r * 0.4, brun, 0.5);
+  dessinerAnneau(c, -r * 0.5, r * 1.28, r * 0.42, r * 0.15, ANNEAUX[1], 1.2);
+  dessinerAnneau(c, -r * 0.5, r * 1.4, r * 0.42, r * 0.15, ANNEAUX[0], 0.4);
+  ov(-r * 0.55, r * 1.36, r * 0.2, r * 0.17, brun);
+  // Nœud papillon rouge
+  c.fillStyle = '#e5484d';
+  c.beginPath(); c.moveTo(0, r * 0.96); c.lineTo(-r * 0.34, r * 0.8); c.lineTo(-r * 0.34, r * 1.12); c.closePath(); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(0, r * 0.96); c.lineTo(r * 0.34, r * 0.8); c.lineTo(r * 0.34, r * 1.12); c.closePath(); c.fill(); c.stroke();
+  ov(0, r * 0.96, r * 0.1, r * 0.1, '#ff8a8e');
+  // Oreilles et tête
+  ov(-r * 0.72, -r * 0.7, r * 0.32, r * 0.32, brun); ov(r * 0.72, -r * 0.7, r * 0.32, r * 0.32, brun);
+  ov(-r * 0.72, -r * 0.7, r * 0.17, r * 0.17, clair); ov(r * 0.72, -r * 0.7, r * 0.17, r * 0.17, clair);
+  ov(0, 0, r, r, brun);
+  // Lumière chaude sur le bord droit (la grande roue)
+  c.save(); c.strokeStyle = 'rgba(255,236,180,.85)'; c.lineWidth = r * 0.07; c.lineCap = 'round';
+  c.beginPath(); c.arc(0, 0, r * 0.94, -1.25, 0.45); c.stroke(); c.restore();
+  // Museau, nez, grand sourire ouvert
+  ov(0, r * 0.36, r * 0.46, r * 0.33, clair);
+  c.fillStyle = '#3a2230'; c.beginPath(); c.ellipse(0, r * 0.2, r * 0.14, r * 0.095, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#7a2335';
+  c.beginPath(); c.moveTo(-r * 0.23, r * 0.36); c.quadraticCurveTo(0, r * 0.78, r * 0.23, r * 0.36); c.closePath(); c.fill();
+  c.fillStyle = '#ff8fa8'; c.beginPath(); c.ellipse(0, r * 0.53, r * 0.1, r * 0.06, 0, 0, Math.PI * 2); c.fill();
+  // Yeux brillants et sourcils levés
+  c.fillStyle = '#2a1a3a';
+  c.beginPath(); c.arc(-r * 0.36, -r * 0.1, r * 0.12, 0, Math.PI * 2); c.arc(r * 0.36, -r * 0.1, r * 0.12, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#fff';
+  c.beginPath(); c.arc(-r * 0.31, -r * 0.15, r * 0.045, 0, Math.PI * 2); c.arc(r * 0.41, -r * 0.15, r * 0.045, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = '#6b4022'; c.lineWidth = r * 0.05; c.lineCap = 'round';
+  c.beginPath(); c.arc(-r * 0.36, -r * 0.25, r * 0.13, Math.PI * 1.2, Math.PI * 1.8); c.stroke();
+  c.beginPath(); c.arc(r * 0.36, -r * 0.25, r * 0.13, Math.PI * 1.2, Math.PI * 1.8); c.stroke();
+  c.fillStyle = 'rgba(255,120,150,.42)';
+  c.beginPath(); c.arc(-r * 0.62, r * 0.2, r * 0.13, 0, Math.PI * 2); c.arc(r * 0.62, r * 0.2, r * 0.13, 0, Math.PI * 2); c.fill();
+  c.restore();
+}
+function dessinerAffiche() {
+  redim();
+  const c = ctx;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  c.clearRect(0, 0, W, H);
+  const k = Math.min(W / 600, H / 800);
+  const X = (u) => W / 2 + (u - 300) * k, Y = (v) => H / 2 + (v - 400) * k;
+  temps = 1.3;
+  // Ciel d'un soir de fête, sur toute la largeur
+  const ciel = c.createLinearGradient(0, Y(0), 0, Y(430));
+  ciel.addColorStop(0, '#4a2f93'); ciel.addColorStop(0.45, '#c9559a'); ciel.addColorStop(0.8, '#ff9a5a'); ciel.addColorStop(1, '#ffd08a');
+  c.fillStyle = ciel; c.fillRect(0, 0, W, Y(430) + 2);
+  c.fillStyle = '#fff';
+  for (let i = 0; i < 40; i++) { c.globalAlpha = 0.4 + 0.5 * ((i * 37) % 10) / 10; c.fillRect((i * 137.5) % W, Y(100) + ((i * 61.3) % 140) * k, 2.5 * k, 2.5 * k); }
+  c.globalAlpha = 1;
+  const halo = c.createRadialGradient(X(420), Y(330), 10 * k, X(420), Y(330), 340 * k);
+  halo.addColorStop(0, 'rgba(255,240,190,.85)'); halo.addColorStop(0.5, 'rgba(255,200,140,.3)'); halo.addColorStop(1, 'rgba(255,200,140,0)');
+  c.fillStyle = halo; c.fillRect(0, 0, W, Y(430));
+  // Feu d'artifice et grande roue illuminée
+  bouquetAffiche(c, X(105), Y(205), 58 * k, '#7dffb0', k);
+  bouquetAffiche(c, X(545), Y(185), 48 * k, '#ff8fd0', k);
+  bouquetAffiche(c, X(250), Y(150), 34 * k, '#a8f0ff', k);
+  grandeRoueAffiche(c, X(425), Y(255), 118 * k, k);
+  // Tentes rayées à l'horizon
+  for (let i = 0, x = -60 * k; x < W + 120 * k; i++, x += 115 * k) {
+    const y = Y(418);
+    c.fillStyle = i % 2 ? '#e94e77' : '#f6d55c';
+    c.beginPath(); c.moveTo(x - 62 * k, y); c.lineTo(x, y - 62 * k); c.lineTo(x + 62 * k, y); c.fill();
+    c.fillStyle = '#fff4e0'; c.fillRect(x - 50 * k, y, 100 * k, 16 * k);
+  }
+  lampionsAffiche(c, Y(132), k);
+  // Le stand du jeu (mêmes dessins), cadré pour l'affiche
+  const garde = Object.assign({}, L);
+  L.pw = 590 * k; L.ox = (W - L.pw) / 2; L.cx = W / 2; L.demi = L.pw * 0.47;
+  L.yFar = Y(420); L.yNear = Y(632); L.hEch = 248 * k;
+  dessinerStand(1);
+  // Bouteilles, cônes et canards, en plus grand
+  const f = 1.6;
+  L.demi *= f; L.hEch *= f;
+  const cibles = [
+    nouvelleCible('bouteille', -0.18, 0.95, 'b'), nouvelleCible('cone', 0.06, 0.98, 'j'), nouvelleCible('bouteille', 0.3, 0.95, 'v'), nouvelleCible('canard', 0.52, 0.92, 'r'),
+    nouvelleCible('canard', 0.1, 0.66, 'j'), nouvelleCible('cone', 0.55, 0.6, 'b'),
+    nouvelleCible('canard', 0.62, 0.26, 'v'),
+  ];
+  const heros = nouvelleCible('bouteille', 0.36, 0.3, 'r');
+  cibles.push(heros);
+  cibles.forEach((ci) => { ci.apparition = 1; });
+  cibles.sort((a, b) => b.z - a.z).forEach((ci) => dessinerCible(ci));
+  // Trajectoire de l'anneau, de la patte de l'ourson jusqu'au goulot
+  const col = proj(heros.x, heros.z, hauteurCible(heros) + 0.03);
+  const px = X(150) + 1.32 * 120 * k, py = Y(410) - 0.42 * 120 * k;
+  const cx2 = (px + col.x) / 2 + 30 * k, cy2 = Y(170);
+  c.save(); c.fillStyle = '#fffbe6'; c.shadowColor = '#ffd166'; c.shadowBlur = 10 * k;
+  for (let i = 1; i < 14; i++) {
+    const u = i / 14, x = (1 - u) * (1 - u) * px + 2 * u * (1 - u) * cx2 + u * u * col.x, y = (1 - u) * (1 - u) * py + 2 * u * (1 - u) * cy2 + u * u * col.y;
+    c.globalAlpha = 0.5 + 0.5 * u; c.beginPath(); c.arc(x, y, (4 + 5 * u) * k, 0, Math.PI * 2); c.fill();
+  }
+  c.restore();
+  // L'anneau à paillettes qui se pose autour du goulot, en pleine lumière
+  const rx = R_VISU * L.demi * col.s;
+  const lueur = c.createRadialGradient(col.x, col.y, 4 * k, col.x, col.y, rx * 2.4);
+  lueur.addColorStop(0, 'rgba(255,246,190,.95)'); lueur.addColorStop(0.4, 'rgba(255,214,102,.5)'); lueur.addColorStop(1, 'rgba(255,214,102,0)');
+  c.fillStyle = lueur; c.beginPath(); c.arc(col.x, col.y, rx * 2.4, 0, Math.PI * 2); c.fill();
+  c.save(); c.shadowColor = '#ffd166'; c.shadowBlur = 22 * k;
+  dessinerAnneau(c, col.x, col.y, rx, rx * 0.36, ANNEAUX[1], 1.3);
+  c.restore();
+  const etinc = ['#fff3c4', '#ffd166', '#ff8fd0', '#a8f0ff', '#ffffff'];
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * Math.PI * 2 + 0.3, d = rx * (1.35 + 0.45 * (i % 3));
+    etincelleAffiche(c, col.x + Math.cos(a) * d, col.y + Math.sin(a) * d * 0.75, (7 + (i % 3) * 3) * k, etinc[i % 5]);
+  }
+  L.demi /= f; L.hEch /= f;
+  // Premier plan : l'ourson à gauche, le lapin qui applaudit à droite, coupé par le bord
+  oursonAffiche(c, X(150), Y(410), 120 * k);
+  c.save(); c.translate(X(565), Y(548)); c.rotate(-0.12); dessinerPeluche(c, 0, 0, 165 * k, PELUCHES[1], true); c.restore();
+  dessinerComptoir();
+  // Anneaux posés sur le comptoir
+  for (let i = 0; i < 4; i++) dessinerAnneau(c, X(330 + i * 44), Y(700 + (i % 2) * 8), 22 * k, 8 * k, ANNEAUX[i % 2 ? 0 : 2], i);
+  Object.assign(L, garde);
+}
+function cacherInterfaceAffiche() {
+  for (const el of document.querySelectorAll('.ecran, #hud, #infos, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherInterfaceAffiche();
+  setTimeout(cacherInterfaceAffiche, 300);
+  setTimeout(cacherInterfaceAffiche, 1200);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+// ---------------------------------------------------------------------------
+// Images du jeu (page du jeu)
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+// s'ouvre directement en plein stand, avec sa vraie interface (stand, cibles réussies,
+// anneaux restants, commandes du forain), sans écran titre, ni « Continuer », ni carte
+// d'introduction (CONSIGNES-JEU.md, section 5). La scène est posée par le code, puis figée
+// sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = stand 1 (fanions, jour) : on vise une bouteille, l'anneau tiré en arrière, la trajectoire en pointillés ;
+//   2 = stand 9 (lampions, soir) : l'anneau vole au-dessus du tapis roulant, poussé par le vent du fanion ;
+//   3 = stand 19 (feu d'artifice, nuit) : manège, plots qui font rebondir, commande du forain (vu sur ordinateur).
+// ---------------------------------------------------------------------------
+// Image 3 (écran d'ordinateur) : les stands voisins et leurs murs de peluches remplissent les côtés.
+function dessinerCotesApercu(allee) {
+  const y0 = H * 0.16, y1 = proj(0, -0.04).y;
+  const cotes = [[0, L.ox - 8], [L.ox + L.pw + 8, W]];
+  let idx = 2;
+  for (const [x0, x1] of cotes) {
+    const w = x1 - x0;
+    if (w < 60) continue;
+    const g = ctx.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, '#6e4122'); g.addColorStop(1, '#4a2a14');
+    ctx.fillStyle = g; ctx.fillRect(x0, y0, w, y1 - y0);
+    const rangs = Math.max(3, Math.round((y1 - y0) / 115)), hr = (y1 - y0) / rangs, tp = Math.min(hr * 0.82, 84);
+    for (let r = 0; r < rangs; r++) {
+      const yb = y0 + (r + 1) * hr - 10;
+      const n = Math.max(1, Math.floor(w / (tp * 1.1)));
+      for (let i = 0; i < n; i++) {
+        const x = x0 + w * (i + 0.5) / n;
+        dessinerPeluche(ctx, x, yb - tp * 0.6, tp, PELUCHES[idx++ % PELUCHES.length], true);
+      }
+      ctx.fillStyle = '#c08a54'; ctx.fillRect(x0, yb, w, 10);
+      ctx.fillStyle = '#8a5a30'; ctx.fillRect(x0, yb + 10, w, 5);
+    }
+    // Auvent du stand voisin, et ses lampions qui brillent
+    const ya = H * 0.12, nb = Math.max(2, Math.round(w / 52)), lb = w / nb;
+    for (let i = 0; i < nb; i++) {
+      const x = x0 + i * lb;
+      ctx.fillStyle = i % 2 ? '#fff4e0' : (allee === 3 ? '#1f8a8a' : '#2f6fd0');
+      ctx.fillRect(x, 0, lb + 1, ya);
+      ctx.beginPath(); ctx.moveTo(x, ya); ctx.lineTo(x + lb + 1, ya); ctx.arc(x + lb / 2, ya, lb / 2, 0, Math.PI); ctx.fill();
+    }
+    ctx.fillStyle = '#7a4a26'; ctx.fillRect(x0 < L.ox ? x1 - 12 : x0, ya, 12, y1 - ya);
+  }
+}
+function ouvrirApercu(numero) {
+  apercu = numero;
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 20261121 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  for (const nom of Object.keys(SONS)) SONS[nom] = () => {};
+  // Progression neuve, en mémoire seulement (rien n'est enregistré)
+  P = { etoiles: [], records: [], peluches: [], skin: numero === 3 ? 'arcenciel' : 'classique', son: true };
+  for (let i = 0; i < NIVEAUX.length; i++) { P.etoiles[i] = 0; P.records[i] = 0; P.peluches[i] = false; }
+  majBoutonsSon();
+  demarrerStand(numero === 1 ? 1 : numero === 2 ? 9 : 19);
+  ecran = 'jeu'; montrer(null);
+  temps = 1 + numero;
+  majCibles(1.2);
+  S.cibles.forEach((c) => { c.apparition = 1; });
+  const prendre = (c, depuis, points, texte) => {
+    c.prise = depuis; c.prisePar = skinActuel();
+    etincelles(c.x, c.z, hauteurCible(c), 22);
+    for (const p of S.parts) { p.vie -= 0.18; p.x += p.vx * 0.18; p.y += p.vy * 0.18; p.vy += 54; }
+    popup(texte, c.x, c.z, 0.7, '#fff3c4');
+    popup('+' + nombre(points), c.x, c.z, 0.45, '#ffd166');
+  };
+  if (numero === 1) {
+    // On vise la bouteille verte du fond ; la jaune vient d'être prise.
+    S.reussis = 1; S.score = 100; S.serie = 1; S.anneaux = 6; S.nbLances = 2;
+    prendre(S.cibles.find((c) => c.c === 'j'), 0.22, 100, tr('popup.bravo'));
+    S.auSol.push({ x: -0.66, z: 0.68, vie: 1.4, skin: skinActuel() });
+    const v = viseePour(-0.2, 0.52);
+    clavier.ang = v.ang; clavier.p = v.p; clavier.actif = true;
+  } else if (numero === 2) {
+    // L'anneau vole vers le tapis roulant, le vent le pousse ; un canard du tapis vient d'être pris.
+    S.reussis = 2; S.score = 250; S.serie = 1; S.anneaux = 6; S.nbLances = 4;
+    S.vent = 0.38;
+    const tapis = S.cibles.filter((c) => c.mob.kind === 'tapis').sort((a, b) => Math.abs(a.x - 0.35) - Math.abs(b.x - 0.35));
+    if (tapis.length) prendre(tapis[0], 0.28, 150, tr('popup.bravo'));
+    S.anneau = preparerVol(viseePour(-0.15, 0.62));
+    for (let i = 0; i < 120 && S.anneau; i++) avancerAnneau(S.anneau, 1 / 240);
+    S.auSol.push({ x: 0.7, z: 0.4, vie: 1.4, skin: skinActuel() });
+  } else {
+    // Commande du forain en cours, manège qui tourne, anneau qui rebondit sur un plot.
+    S.reussis = 1; S.score = 1150; S.serie = 2; S.anneaux = 9; S.nbLances = 5;
+    S.ordre = { i: 1, prog: 1 };
+    S.manege.a = 0.9;
+    const cone = S.cibles.find((c) => c.type === 'cone' && c.x > 0.5) || S.cibles[0];
+    prendre(cone, 0.24, 250, tr('popup.rebond'));
+    const plot = S.plots[0];
+    plot.boing = 0.7;
+    S.anneau = preparerVol(viseePour(-0.3, 1.02));
+    Object.assign(S.anneau, { x: plot.x + 0.16, z: plot.z + 0.12, h: 0.62, rot: 1.2 });
+    popup(tr('popup.boing'), plot.x, plot.z, 0.8, '#ff8fd0');
+    decor.feux.length = 0;
+    [[0.06, 0.1, '#ff5a5f', 0.9], [0.22, 0.06, '#7dffb0', 1.2], [0.5, 0.05, '#ffd166', 0.7], [0.72, 0.08, '#a8f0ff', 1.0], [0.9, 0.12, '#ff8fd0', 1.3], [0.36, 0.13, '#ffd166', 1.4]].forEach(([fx, fy, fc, vie]) => {
+      const bouquet = { x: W * fx, y: H * fy, c: fc, vie, eclats: [] };
+      for (let i = 0; i < 26; i++) bouquet.eclats.push({ a: i / 26 * Math.PI * 2, v: 0.6 + Math.random() * 0.4 });
+      decor.feux.push(bouquet);
+    });
+  }
+  S.secousse = 0;
+  majHud();
+  // Figé sur ce moment, avec la vraie interface et sans fenêtre de pause.
+  enPause = true;
+}
 
 // Démarrage
 chargerProgression();
 try { const d = JEL_SAVE.load(JEU); if (JEL_SAVE.existe(JEU)) niveauOuvertSauvegarde = Math.max(1, Math.min(NIVEAUX.length, Number(d.niveau) || 1)); } catch (e) { /* rien */ }
 majBoutonsSon();
 preparerTitre();
-montrer('titre');
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  montrer('titre');
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>
