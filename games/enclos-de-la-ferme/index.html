@@ -2771,6 +2771,12 @@
   const nb = (x) => I18N.nombre(x);
   const $ = (id) => document.getElementById(id);
 
+  // Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU = 1, 2 ou 3) :
+  // posés seulement par le robot du site, jamais par le jeu (CONSIGNES-JEU.md, section 5).
+  const modeAffiche = !!window.JEL_AFFICHE;
+  const numeroApercu = Number(window.JEL_APERCU);
+  const modeApercu = !modeAffiche && (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3);
+
   // Une couleur et un animal par place : 0 mouton, 1 cochon, 2 poule, 3 vache.
   const COUL = ['#2f6fe0', '#e0508c', '#e8a400', '#1d8a55'];
   const COUL_F = ['#163d8f', '#8c1f4f', '#7a4f00', '#0d4f30'];
@@ -4210,6 +4216,332 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche du jeu (jaquette) : window.JEL_AFFICHE
+  //  Une scène composée, sans interface ni texte : le mouton, en grand, apporte
+  //  sa clôture bleue pour fermer l'enclos au trèfle qui brille ; le pré à
+  //  enclos s'étend derrière lui, le cochon, la poule et la vache dans les leurs.
+  // ---------------------------------------------------------------------
+
+  // Le mouton de l'affiche, de face, une clôture bleue dans les sabots.
+  // (x, y) : sol sous ses pattes ; h : hauteur totale.
+  function moutonAffiche(c, x, y, h) {
+    const z = h / 200;
+    c.save(); c.translate(x, y - 101 * z); c.scale(z, z);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    c.fillStyle = 'rgba(30,60,15,.32)'; ell(c, 6, 101, 78, 13); c.fill();
+    // pattes
+    c.fillStyle = '#3d3535';
+    rr(c, -38, 50, 22, 50, 9); c.fill(); rr(c, 16, 50, 22, 50, 9); c.fill();
+    c.fillStyle = '#211b1b'; rr(c, -40, 90, 26, 12, 5); c.fill(); rr(c, 14, 90, 26, 12, 5); c.fill();
+    // laine du corps
+    c.fillStyle = '#fbf8f1'; c.strokeStyle = '#cfc6b5'; c.lineWidth = 3;
+    for (let j = 0; j < 12; j++) { const a = j / 12 * Math.PI * 2; rond(c, Math.cos(a) * 50, 28 + Math.sin(a) * 38, 25); c.fill(); c.stroke(); }
+    ell(c, 0, 28, 56, 44); c.fill();
+    // ombre douce à gauche, lumière du soleil à droite
+    c.fillStyle = 'rgba(150,135,110,.18)'; ell(c, -30, 40, 26, 32, 0.3); c.fill();
+    c.fillStyle = 'rgba(255,247,205,.9)';
+    [[36, 4, 13], [54, 26, 10], [20, -8, 9], [46, 48, 8]].forEach((p) => { rond(c, p[0], p[1], p[2]); c.fill(); });
+    // tête
+    visage(c, 0, 0, -50, 52);
+    // grand sourire, joues roses, sourcils levés
+    c.fillStyle = '#6b1f2a';
+    c.beginPath(); c.moveTo(-10, -21); c.quadraticCurveTo(0, -5, 10, -21); c.closePath(); c.fill();
+    c.fillStyle = '#f08a99'; ell(c, 0, -13, 5, 3); c.fill();
+    c.fillStyle = 'rgba(255,120,150,.5)'; rond(c, -17, -32, 5); c.fill(); rond(c, 17, -32, 5); c.fill();
+    c.strokeStyle = '#fbf8f1'; c.lineWidth = 3.5;
+    c.beginPath(); c.moveTo(-16, -63); c.quadraticCurveTo(-10, -68, -4, -63); c.moveTo(4, -63); c.quadraticCurveTo(10, -68, 16, -63); c.stroke();
+    // la clôture bleue, portée à deux sabots vers l'enclos
+    const ax = -70, ay = 34, bx = 120, by = -2;
+    c.strokeStyle = 'rgba(30,60,15,.25)'; c.lineWidth = 22;
+    c.beginPath(); c.moveTo(ax + 8, ay + 10); c.lineTo(bx + 8, by + 10); c.stroke();
+    c.strokeStyle = COUL_F[0]; c.lineWidth = 23;
+    c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+    c.strokeStyle = COUL[0]; c.lineWidth = 16;
+    c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(ax + 4, ay - 4); c.lineTo(bx - 4, by - 4); c.stroke();
+    // manches de laine et sabots qui la tiennent
+    [[-34, 27], [44, 12]].forEach((p) => {
+      c.fillStyle = '#fbf8f1'; c.strokeStyle = '#cfc6b5'; c.lineWidth = 3;
+      rond(c, p[0] - 8, p[1] + 10, 15); c.fill(); c.stroke();
+      c.fillStyle = '#3d3535'; ell(c, p[0], p[1], 11, 13, 0.2); c.fill();
+      c.fillStyle = '#5a504d'; ell(c, p[0] - 3, p[1] - 5, 5, 4); c.fill();
+    });
+    c.restore();
+    return [x + bx * z, y - 101 * z + by * z];
+  }
+
+  // Étoile scintillante à 4 branches, lumineuse.
+  function eclat(c, x, y, k, coul) {
+    c.save(); c.shadowColor = coul || '#ffe066'; c.shadowBlur = k * 1.4;
+    c.fillStyle = '#fffbe0'; etincelle(c, x, y, k);
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    const k = Math.min(w / 600, h / 800), ox = w / 2 - 300 * k, oy = h / 2 - 400 * k;
+    const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+    const t = 900;
+    // ciel
+    const hz = Y(345);
+    let g = c.createLinearGradient(0, 0, 0, hz);
+    g.addColorStop(0, '#3ea6ee'); g.addColorStop(1, '#cfeeff');
+    c.fillStyle = g; c.fillRect(0, 0, w, hz + 4);
+    // soleil, rayons et grande lumière chaude
+    const sx = X(478), sy = Y(108);
+    c.save();
+    c.translate(sx, sy);
+    for (let i = 0; i < 16; i++) {
+      c.rotate(Math.PI * 2 / 16);
+      c.fillStyle = i % 2 ? 'rgba(255,248,200,.16)' : 'rgba(255,248,200,.26)';
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.max(w, h) * 1.2, -40 * k); c.lineTo(Math.max(w, h) * 1.2, 40 * k); c.closePath(); c.fill();
+    }
+    c.restore();
+    g = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 360 * k);
+    g.addColorStop(0, 'rgba(255,252,220,1)'); g.addColorStop(0.35, 'rgba(255,240,170,.55)'); g.addColorStop(1, 'rgba(255,240,170,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffe45c'; rond(c, sx, sy, 50 * k); c.fill();
+    c.fillStyle = '#fff6b8'; rond(c, sx - 12 * k, sy - 12 * k, 26 * k); c.fill();
+    nuage(c, X(30), Y(150), 32 * k);
+    nuage(c, X(210), Y(70), 24 * k);
+    nuage(c, X(-180), Y(90), 30 * k);
+    nuage(c, X(700), Y(200), 28 * k);
+    // collines, plus pâles au loin
+    c.fillStyle = '#b9e59c';
+    c.beginPath(); c.moveTo(0, hz - 20 * k);
+    c.bezierCurveTo(w * 0.25, hz - 120 * k, w * 0.45, hz - 30 * k, w * 0.62, hz - 70 * k);
+    c.bezierCurveTo(w * 0.8, hz - 110 * k, w * 0.9, hz - 40 * k, w, hz - 60 * k); c.lineTo(w, hz + 40 * k); c.lineTo(0, hz + 40 * k); c.fill();
+    c.fillStyle = '#9bd877';
+    c.beginPath(); c.moveTo(0, hz + 5 * k); c.bezierCurveTo(w * 0.3, hz - 45 * k, w * 0.6, hz + 15 * k, w, hz - 25 * k); c.lineTo(w, hz + 60 * k); c.lineTo(0, hz + 60 * k); c.fill();
+    // la ferme au loin
+    grange(c, X(14), Y(368), 118 * k);
+    silo(c, X(144), Y(368), 32 * k, 108 * k);
+    // prairie
+    g = c.createLinearGradient(0, Y(350), 0, h);
+    g.addColorStop(0, '#8fd664'); g.addColorStop(1, '#56a63d');
+    c.fillStyle = g; c.fillRect(0, Y(358), w, h);
+    barriere(c, X(186), w + 20 * k, Y(378), 24 * k);
+    barriere(c, -20 * k, X(12), Y(378), 24 * k);
+
+    // Le pré à enclos, vu de biais (perspective douce) : 6 × 3 enclos.
+    const e = O.preparer({ g: ['.o....', '...ot.', '......'] });
+    e.sc = [0, 0, 0, 0];
+    const NC = e.W, NR = e.H, S = 122, zB = 1.46, hyR = -200, yF = 650;
+    const zDe = (v) => zB - (zB - 1) * v / NR;
+    const P = (col, v) => { const z = zDe(v); return [X(300 + (col - NC / 2) * S / z), Y(hyR + (yF - hyR) / z)]; };
+    const fixer = (code, qui) => { const a = O.arete(e, code); if (a >= 0 && e.f[a] === -1) e.f[a] = qui; };
+    // enclos déjà gagnés : [rangée, colonne, animal, clôtures (haut, bas, gauche, droite)]
+    [[0, 0, 2, [2, 2, 3, 1]], [0, 1, 2, [0, 2, 1, 2]], [0, 4, 1, [1, 1, 3, 0]], [0, 5, 1, [2, 1, 0, 1]],
+      [2, 5, 3, [3, 0, 3, 3]], [2, 0, 0, [0, 1, 0, 0]], [2, 1, 0, [2, 0, 0, 0]]].forEach((q) => {
+      const r = q[0], col = q[1];
+      fixer('h' + r + ',' + col, q[3][0]); fixer('h' + (r + 1) + ',' + col, q[3][1]);
+      fixer('v' + r + ',' + col, q[3][2]); fixer('v' + r + ',' + (col + 1), q[3][3]);
+      e.o[r * NC + col] = q[2];
+    });
+    // l'enclos au trèfle : 3 côtés posés, le 4e attend la clôture du mouton
+    fixer('h1,4', 1); fixer('h2,4', 2); fixer('v1,5', 1);
+    [['h0,2', 1], ['h0,3', 3], ['v0,3', 2], ['v1,0', 3], ['h3,3', 2], ['h3,4', 1], ['v1,2', 1], ['h2,2', 3]].forEach((p) => fixer(p[0], p[1]));
+    const bilin = (col, v, a, b) => {
+      const p1 = P(col, v), p2 = P(col + 1, v), p3 = P(col + 1, v + 1), p4 = P(col, v + 1);
+      const tx = p1[0] + (p2[0] - p1[0]) * a, ty = p1[1] + (p2[1] - p1[1]) * a;
+      const bxx = p4[0] + (p3[0] - p4[0]) * a, byy = p4[1] + (p3[1] - p4[1]) * a;
+      return [tx + (bxx - tx) * b, ty + (byy - ty) * b];
+    };
+    // ombre du pré
+    const coin = [P(0, 0), P(NC, 0), P(NC, NR), P(0, NR)];
+    c.fillStyle = 'rgba(40,80,20,.28)';
+    c.beginPath(); coin.forEach((p, i) => { if (i) c.lineTo(p[0] + 8 * k, p[1] + 10 * k); else c.moveTo(p[0] + 8 * k, p[1] + 10 * k); }); c.closePath(); c.fill();
+    // sol des enclos : herbe, ou teinte de l'animal qui l'a gagné
+    for (let r = 0; r < NR; r++) {
+      for (let col = 0; col < NC; col++) {
+        const i = r * NC + col, q = [P(col, r), P(col + 1, r), P(col + 1, r + 1), P(col, r + 1)];
+        c.fillStyle = e.o[i] >= 0 ? COUL_T[e.o[i]] : ((r + col) % 2 ? '#86c95c' : '#7cc153');
+        c.beginPath(); q.forEach((p, j) => { if (j) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); c.closePath(); c.fill();
+        c.strokeStyle = 'rgba(40,110,30,.4)'; c.lineWidth = 2 * k;
+        const al = graineHasard(i * 97 + 13);
+        for (let n = 0; n < 5; n++) {
+          const p = bilin(col, r, 0.15 + 0.7 * al(), 0.2 + 0.7 * al()), f = 1 / zDe(r + 0.5);
+          c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(p[0] - 3 * k * f, p[1] - 9 * k * f); c.moveTo(p[0] + 3 * k * f, p[1]); c.lineTo(p[0] + 6 * k * f, p[1] - 8 * k * f); c.stroke();
+        }
+      }
+    }
+    // l'enclos visé brille
+    {
+      const q = [bilin(4, 1, 0.06, 0.08), bilin(4, 1, 0.94, 0.08), bilin(4, 1, 0.94, 0.92), bilin(4, 1, 0.06, 0.92)];
+      c.save(); c.shadowColor = '#fff27a'; c.shadowBlur = 24 * k;
+      c.strokeStyle = 'rgba(255,240,110,.95)'; c.lineWidth = 7 * k; c.lineJoin = 'round';
+      c.beginPath(); q.forEach((p, j) => { if (j) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); c.closePath(); c.stroke();
+      c.restore();
+    }
+    // la clôture qui manque à l'enclos au trèfle : un trait doré qui scintille
+    {
+      const p = P(4, 1), q = P(4, 2);
+      c.save(); c.shadowColor = '#ffe066'; c.shadowBlur = 18 * k; c.setLineDash([8 * k, 7 * k]); c.lineCap = 'round';
+      c.strokeStyle = '#fff6b0'; c.lineWidth = 6 * k;
+      c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke();
+      c.restore();
+    }
+    // clôtures libres : pointillés au sol
+    c.save(); c.setLineDash([5 * k, 9 * k]); c.lineCap = 'round'; c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 3.5 * k;
+    for (let a = 0; a < e.f.length; a++) {
+      if (e.f[a] !== -1) continue;
+      const s = O.segment(e, a), p = P(s[1], s[0]), q = P(s[3], s[2]);
+      c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke();
+    }
+    c.restore();
+    // clôtures posées, debout (deux lisses de la couleur de l'animal)
+    const lisses = (p, q, qui, f) => {
+      const hR = 30 * k * f;
+      c.lineCap = 'round';
+      c.strokeStyle = 'rgba(30,60,15,.28)'; c.lineWidth = 6 * k * f;
+      c.beginPath(); c.moveTo(p[0], p[1] + 2 * k); c.lineTo(q[0], q[1] + 2 * k); c.stroke();
+      [0.82, 0.4].forEach((m) => {
+        c.strokeStyle = COUL_F[qui]; c.lineWidth = 11 * k * f;
+        c.beginPath(); c.moveTo(p[0], p[1] - hR * m); c.lineTo(q[0], q[1] - hR * m); c.stroke();
+        c.strokeStyle = COUL[qui]; c.lineWidth = 7 * k * f;
+        c.beginPath(); c.moveTo(p[0], p[1] - hR * m); c.lineTo(q[0], q[1] - hR * m); c.stroke();
+        c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = 2 * k * f;
+        c.beginPath(); c.moveTo(p[0], p[1] - hR * m - 2 * k * f); c.lineTo(q[0], q[1] - hR * m - 2 * k * f); c.stroke();
+      });
+    };
+    const piquet = (p, f) => {
+      const l = 11 * k * f, hp = 36 * k * f;
+      c.fillStyle = '#8a5a2b'; c.strokeStyle = '#4a2e12'; c.lineWidth = 1.5 * k;
+      rr(c, p[0] - l / 2, p[1] - hp, l, hp, l * 0.4); c.fill(); c.stroke();
+      c.fillStyle = '#c08a52'; ell(c, p[0], p[1] - hp + l * 0.2, l * 0.42, l * 0.22); c.fill();
+    };
+    const animalDebout = (kk, p, f, tourne) => {
+      const z = 0.78 * k * f;
+      c.save(); c.translate(p[0], p[1] - 44 * z); c.scale(tourne ? -1 : 1, 1);
+      corps(c, kk, -6 * z, 0, z);
+      c.restore();
+    };
+    const posee = (code) => { const a = O.arete(e, code); return a >= 0 && e.f[a] >= 0 ? e.f[a] : -1; };
+    for (let r = 0; r <= NR; r++) {
+      const fr = 1 / zDe(r);
+      for (let col = 0; col < NC; col++) { const qui = posee('h' + r + ',' + col); if (qui >= 0) lisses(P(col, r), P(col + 1, r), qui, fr); }
+      for (let col = 0; col <= NC; col++) piquet(P(col, r), fr);
+      if (r === NR) break;
+      const fm = 1 / zDe(r + 0.5);
+      for (let col = 0; col <= NC; col++) { const qui = posee('v' + r + ',' + col); if (qui >= 0) lisses(P(col, r), P(col, r + 1), qui, fm); }
+      for (let col = 0; col < NC; col++) {
+        const i = r * NC + col, ch = e.c.charAt(i), m = bilin(col, r, 0.5, 0.62);
+        if (ch === 'o') botte(c, m[0], m[1] - 8 * k * fm, 26 * k * fm, t);
+        if (ch === 't') trefle(c, m[0], m[1] - 10 * k * fm, 30 * k * fm, t);
+      }
+      // animaux debout dans leurs enclos (le cochon et la vache regardent le mouton)
+      if (r === 0) { animalDebout(2, bilin(0, 0, 0.55, 0.75), fm * 1.1, false); animalDebout(1, bilin(5, 0, 0.45, 0.8), fm * 1.15, true); }
+      if (r === 2) animalDebout(3, bilin(5, 2, 0.55, 0.8), fm * 1.05, true);
+    }
+    // étincelles autour du trèfle
+    const mt = bilin(4, 1, 0.5, 0.55);
+    [[-40, -40, 12], [38, -50, 10], [52, 6, 8], [-10, -70, 7], [-52, 10, 7]].forEach((p) => eclat(c, mt[0] + p[0] * k, mt[1] + p[1] * k, p[2] * k, '#fff27a'));
+
+    // Le héros : le mouton, en grand, au premier plan
+    const bout = moutonAffiche(c, X(176), Y(668), 372 * k);
+    [[16, -26, 15], [36, 8, 10], [4, 24, 8], [-6, -46, 7]].forEach((p) => eclat(c, bout[0] + p[0] * k, bout[1] + p[1] * k, p[2] * k, '#9fc3ff'));
+
+    // premier plan : grosse barrière de bois coupée par les bords, touffes et fleurs
+    barriere(c, -40 * k, w + 40 * k, Y(806), 58 * k);
+    const fleurs = [[X(-20), Y(760), 1.6, '#ff8fb5'], [X(560), Y(745), 1.9, '#ffd84d'], [X(470), Y(782), 1.3, '#c9a8ff'], [X(90), Y(790), 1.2, '#fff']];
+    fleurs.forEach((fl) => {
+      const fx = fl[0], fy = fl[1], f = fl[2] * k;
+      c.strokeStyle = '#2f7a34'; c.lineWidth = 5 * f; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(fx, h + 10); c.quadraticCurveTo(fx - 8 * f, fy + 20 * f, fx + 4 * f, fy); c.stroke();
+      c.fillStyle = fl[3];
+      for (let p = 0; p < 6; p++) { const a = p * Math.PI / 3; rond(c, fx + 4 * f + Math.cos(a) * 11 * f, fy + Math.sin(a) * 11 * f, 8 * f); c.fill(); }
+      c.fillStyle = '#f6b400'; rond(c, fx + 4 * f, fy, 7 * f); c.fill();
+    });
+  }
+
+  function cacherInterface() {
+    document.querySelectorAll('.ecran, .voile, #toast, #confettis, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+
+  function demarrerAffiche() {
+    cacherInterface();
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    // Le bouton de langue peut être créé après ce script : on le cache encore un peu après.
+    setTimeout(cacherInterface, 50);
+    setTimeout(cacherInterface, 400);
+    setTimeout(cacherInterface, 1200);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3
+  //  Le jeu s'ouvre directement en pleine partie solo contre les 3 robots,
+  //  avec sa vraie interface, sans écran titre, ni « Continuer », ni tutoriel.
+  //  Les coups sont joués d'avance par les règles avec un hasard à graine
+  //  fixe, puis la partie est figée sur un moment où c'est à toi de jouer :
+  //  aucun robot ne joue, rien ne se gagne ni ne se perd, aucun son, rien
+  //  n'est écrit dans la sauvegarde, aucun réseau.
+  //    1 = niveau 1 : le premier petit pré, premières clôtures ;
+  //    2 = niveau 9 : grand pré avec rocher, bottes de foin d'or, clôtures de départ ;
+  //    3 = niveau 17 : la mare, les rochers, la boue, le trèfle, la partie bien avancée.
+  // ---------------------------------------------------------------------
+
+  const MOMENTS_APERCU = {
+    1: { niveau: 1, part: 0.45, graine: 28 },
+    2: { niveau: 9, part: 0.5, graine: 189 },
+    3: { niveau: 17, part: 0.6, graine: 114 }
+  };
+
+  function ouvrirApercu(n) {
+    const m = MOMENTS_APERCU[n];
+    const al = graineHasard(m.graine * 7919 + 1);
+    niveau = m.niveau;
+    session = 'solo';
+    enPartie = false;                       // rien d'écrit à la fermeture de la page
+    const e = apercu(niveau);
+    e.fr = O.forceNiveau(niveau);
+    e.tour = 0;
+    const depart = e.libres;
+    let der = -1, derSiege = -1, avantDer = null, garde = 0;
+    // On joue jusqu'à la part voulue du pré, et jusqu'à ce que ce soit à toi (place 0).
+    while (e.libres > 2 && garde++ < 400 && ((depart - e.libres) < depart * m.part || e.tour !== 0)) {
+      const s = R.aQui(e), fr = e.fr;
+      if (s === 0) e.fr = 0.9;          // toi : un joueur attentif, qui a déjà quelques enclos
+      const a = R.bot(e, s, al, e.fr);
+      e.fr = fr;
+      avantDer = e.o.slice();
+      R.jouer(e, s, a);
+      der = a; derSiege = s;
+    }
+    vue = e;
+    // Partie figée : le moteur n'est pas lancé, aucun robot ne joue.
+    partie = {
+      mode: 'solo', phase: 'jeu', siege: 0, chef: -1, manche: 1, etat: e,
+      sieges: () => [0, 1, 2, 3].map((s) => ({ moi: s === 0, humain: s === 0, chef: false })),
+      monTour: () => R.aQui(vue) === 0, jouer: () => false, pause: () => {}, quitter: () => {},
+      estChef: () => false, recommencer: () => false, lancerManche: () => false
+    };
+    anims = { aretes: {}, cases: {} };
+    const t0 = performance.now();
+    if (der >= 0) {
+      anims.aretes[der] = t0;
+      if (avantDer) e.o.forEach((q, i) => { if (avantDer[i] === -1 && q === derSiege) anims.cases[i] = t0; });
+    }
+    // Ta clôture visée : celle qui ferme un enclos s'il y en a une, sinon une clôture sûre.
+    let vise = -1, sure = -1;
+    for (let a = 0; a < e.f.length; a++) {
+      if (e.f[a] !== -1) continue;
+      const cs = O.cases(e, a);
+      if (cs.some((i) => e.o[i] === -1 && O.poses(e.f, e, i) === 3)) { vise = a; break; }
+      if (sure < 0 && cs.every((i) => O.poses(e.f, e, i) < 2)) sure = a;
+    }
+    survol = vise >= 0 ? vise : sure;
+    afficherEcran('jeu');
+    majInterface();
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -4241,7 +4573,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !modeApercu && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -4249,13 +4581,15 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? vue.sc[partie.siege] : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(); });
+  window.addEventListener('resize', () => { if (ecran !== 'jeu' && !modeAffiche) dessinerTitre(); });
 
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
+  if (modeAffiche) { demarrerAffiche(); return; }
+  if (modeApercu) { ouvrirApercu(numeroApercu); return; }
   afficherEcran('titre');
   // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
   // dans le salon de sa partie en ligne (le moteur la demande au serveur).
