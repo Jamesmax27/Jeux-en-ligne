@@ -4009,16 +4009,214 @@ $('b-bilan-vallee').addEventListener('click', () => { son('clic'); ouvrirVallee(
 $('b-bilan-niveaux').addEventListener('click', () => { son('clic'); ouvrirNiveaux(); });
 $('b-bilan-accueil').addEventListener('click', () => { son('clic'); fermerFenetres(); partieEnCours = false; montrerEcran('titre'); });
 
-// Sauvegarde à la fermeture de la page, seulement pendant une partie
+// Sauvegarde à la fermeture de la page, seulement pendant une partie (jamais pour une image du jeu)
 JEL_SAVE.surFermeture(() => {
-  if (partieEnCours && ecran === 'jeu') JEL_SAVE.save(JEU, { niveau: idx + 1, score: totalScore(), options: { son: !sonCoupe }, prog });
+  if (partieEnCours && ecran === 'jeu' && !apercu) JEL_SAVE.save(JEU, { niveau: idx + 1, score: totalScore(), options: { son: !sonCoupe }, prog });
 });
 if (window.JEL_I18N && JEL_I18N.surChangement) JEL_I18N.surChangement(() => { if (ecran === 'jeu') { construireReserve(); majInfos(); } });
 
+// ==========================================================================
+// Affiche (jaquette du jeu)
+// ==========================================================================
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+// sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La grande cabane
+// de troncs et de feuilles attachées par des lianes tient bon sous l'orage : le bébé dino et le
+// tricératops, au sec et heureux, se regardent ; la pluie rebondit sur le toit, le vent emporte une
+// feuille mal attachée, un éclair gronde à gauche et le soleil revient à droite avec l'arc-en-ciel.
+function dessinerAffiche() {
+  const c = $('toile-affiche');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = window.innerWidth || 600, H = window.innerHeight || 800;
+  c.width = Math.max(1, Math.round(W * dpr)); c.height = Math.max(1, Math.round(H * dpr));
+  const x = c.getContext('2d');
+  x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Cadre de 600 × 800 centré ; le décor (ciel, collines, sol) continue jusqu'aux bords.
+  const k = Math.min(W / 600, H / 800);
+  const ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  const X = (v) => ox + v * k, Y = (v) => oy + v * k;
+  const sol = Y(590);
+
+  // Ciel : orage en haut à gauche, éclaircie dorée à droite
+  const ciel = x.createLinearGradient(X(0), Y(0), X(600), Y(560));
+  ciel.addColorStop(0, '#6c80a3'); ciel.addColorStop(0.45, '#9fd4ec'); ciel.addColorStop(1, '#fff0b8');
+  x.fillStyle = ciel; x.fillRect(0, 0, W, H);
+  // Soleil et ses rayons
+  const sx = X(505), sy = Y(95);
+  const halo = x.createRadialGradient(sx, sy, 10 * k, sx, sy, 340 * k);
+  halo.addColorStop(0, 'rgba(255,248,200,.95)'); halo.addColorStop(0.4, 'rgba(255,236,170,.45)'); halo.addColorStop(1, 'rgba(255,236,170,0)');
+  x.fillStyle = halo; x.fillRect(0, 0, W, H);
+  x.fillStyle = 'rgba(255,244,190,.28)';
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6 + 0.12;
+    x.beginPath(); x.moveTo(sx, sy);
+    x.lineTo(sx + Math.cos(a - 0.09) * 520 * k, sy + Math.sin(a - 0.09) * 520 * k);
+    x.lineTo(sx + Math.cos(a + 0.09) * 520 * k, sy + Math.sin(a + 0.09) * 520 * k); x.fill();
+  }
+  ell(x, sx, sy, 46 * k, 46 * k, '#fff3a6');
+  ell(x, sx - 10 * k, sy - 10 * k, 26 * k, 26 * k, '#fffbe0');
+  // Arc-en-ciel, vu à travers la cabane, derrière les dinosaures
+  ['#ff6b6b', '#ffa94d', '#ffd43b', '#69db7c', '#4dabf7', '#9775fa'].forEach((col, i) => {
+    x.strokeStyle = col; x.globalAlpha = 0.6; x.lineWidth = 13 * k;
+    x.beginPath(); x.arc(X(330), Y(640), (290 - i * 13) * k, Math.PI * 1.0, Math.PI * 2.0); x.stroke();
+  });
+  x.globalAlpha = 1;
+  // Collines de fougères
+  x.fillStyle = '#a6d98f';
+  x.beginPath(); x.moveTo(0, sol);
+  for (let px = 0; px <= W + 20; px += 16) x.lineTo(px, sol - 70 * k - Math.sin((px - ox) / (80 * k)) * 22 * k);
+  x.lineTo(W, sol); x.fill();
+  x.fillStyle = '#86c76f';
+  x.beginPath(); x.moveTo(0, sol);
+  for (let px = 0; px <= W + 20; px += 16) x.lineTo(px, sol - 32 * k - Math.sin((px - ox) / (55 * k) + 1.7) * 12 * k);
+  x.lineTo(W, sol); x.fill();
+  // Éclair doux qui sort du nuage d'orage
+  const ex = X(120), ey = Y(95);
+  x.save();
+  x.fillStyle = '#fff3a0'; x.strokeStyle = '#ffe36b'; x.lineWidth = 5 * k; x.lineJoin = 'round';
+  x.shadowColor = '#ffe36b'; x.shadowBlur = 24 * k;
+  x.beginPath(); x.moveTo(ex, ey); x.lineTo(ex - 30 * k, ey + 62 * k); x.lineTo(ex - 6 * k, ey + 66 * k);
+  x.lineTo(ex - 36 * k, ey + 140 * k); x.lineTo(ex + 16 * k, ey + 54 * k); x.lineTo(ex - 10 * k, ey + 50 * k); x.lineTo(ex + 18 * k, ey); x.closePath();
+  x.fill(); x.stroke();
+  x.restore();
+  // Nuages : orage à gauche, petits nuages blancs dans l'éclaircie
+  nuage(x, X(30), Y(70), 70 * k, '#5e6a83');
+  nuage(x, X(160), Y(55), 80 * k, '#6b7891');
+  nuage(x, X(300), Y(30), 60 * k, '#8592a8');
+  nuage(x, X(110), Y(40), 50 * k, '#7e8ba3');
+  nuage(x, X(590), Y(150), 32 * k, '#ffffff');
+
+  // La cabane : case de 140 px dans le cadre de 600 ; poteaux coupés par les bords
+  const S = 140 * k, gx = X(-50);
+  const toitBas = sol - 2 * S, toitHaut = sol - 3 * S;
+  // Pluie au-dessus du toit, qui s'arrête dessus
+  x.strokeStyle = 'rgba(214,236,255,.95)'; x.lineWidth = 3.4 * k; x.lineCap = 'round';
+  x.beginPath();
+  for (let i = 0; i < 90; i++) {
+    const fx0 = hash(i + 1) * 640 - 20, fy0 = 20 + hash(i + 301) * 170;
+    if (fx0 > 400 && hash(i + 77) < (fx0 - 400) / 140) continue; // moins de pluie dans l'éclaircie
+    const px = X(fx0), py = Y(fy0);
+    if (py + 26 * k > toitHaut - 4 * k) continue;
+    x.moveTo(px, py); x.lineTo(px + 5 * k, py + 26 * k);
+  }
+  x.stroke();
+  // Lumière chaude à l'abri, derrière les dinosaures
+  const lum = x.createRadialGradient(X(300), Y(500), 10 * k, X(300), Y(500), 250 * k);
+  lum.addColorStop(0, 'rgba(255,246,205,.8)'); lum.addColorStop(1, 'rgba(255,246,205,0)');
+  x.fillStyle = lum; x.fillRect(0, toitBas, W, sol - toitBas);
+  // Sol : prairie claire, puis la terre
+  const pre = x.createLinearGradient(0, sol, 0, H);
+  pre.addColorStop(0, '#6cc055'); pre.addColorStop(0.2, '#56a844'); pre.addColorStop(0.21, '#9a6c40'); pre.addColorStop(1, '#7a5030');
+  x.fillStyle = pre; x.fillRect(0, sol, W, H - sol);
+  x.fillStyle = '#3f8f3a';
+  for (let px = 0; px < W; px += 12 * k) { x.beginPath(); x.moveTo(px, sol + 2); x.lineTo(px + 4 * k, sol - 12 * k); x.lineTo(px + 8 * k, sol + 2); x.fill(); }
+  x.fillStyle = 'rgba(30,60,20,.25)'; ell(x, X(300), sol + 8 * k, 280 * k, 20 * k, null); x.fill();
+
+  // Poteaux, dinosaures au sec et heureux, puis le toit de feuilles
+  dessinerPiece(x, 'tronc', gx, toitBas, S);
+  dessinerPiece(x, 'tronc', gx + 4 * S, toitBas, S);
+  const SD = 160 * k;
+  const gD = { S: SD, ox: X(58), base: sol, W: 3, H: 2, cw: W, ch: H };
+  const nvD = { cols: 3, rows: 2, dinos: [{ t: 'bebe', x: 0 }, { t: 'tricera', x: 1, m: 1 }] };
+  dessinerDino(x, gD, nvD, nvD.dinos[0], 'content', 0.05, 0);
+  dessinerDino(x, gD, nvD, nvD.dinos[1], 'content', 0.3, 1);
+  dessinerPiece(x, 'feuille', gx + 2.1 * S, toitHaut - 0.12 * S, S);
+  dessinerPiece(x, 'grandeFeuille', gx, toitHaut, S);
+  // Gouttes qui rebondissent sur le toit
+  x.strokeStyle = 'rgba(232,247,255,.95)'; x.lineWidth = 2.6 * k; x.lineCap = 'round';
+  for (let i = 0; i < 14; i++) {
+    const px = X(20 + hash(i + 900) * 520), py = toitHaut + S * (0.08 + hash(i + 950) * 0.1);
+    x.beginPath(); x.arc(px, py, 8 * k, Math.PI * 1.1, Math.PI * 1.9); x.stroke();
+    ell(x, px - 10 * k, py - 12 * k, 2.8 * k, 3.8 * k, 'rgba(232,247,255,.95)');
+    ell(x, px + 10 * k, py - 14 * k, 2.4 * k, 3.2 * k, 'rgba(232,247,255,.95)');
+  }
+  x.lineCap = 'butt';
+
+  // Premier plan : grandes fougères coupées par les bords, fleurs et champignon
+  fougere(x, X(-30), Y(812), 240 * k, 0.45, '#2f7f35');
+  fougere(x, X(630), Y(812), 220 * k, -0.45, '#357f3a');
+  dessinerDeco(x, 'fleur', X(150), Y(614), 14 * k);
+  dessinerDeco(x, 'champignon', X(470), Y(612), 15 * k);
+  dessinerDeco(x, 'fleur', X(395), Y(630), 11 * k);
+  dessinerDeco(x, 'coquille', X(250), Y(618), 12 * k);
+}
+function demarrerAffiche() {
+  const cacher = () => {
+    for (const el of document.querySelectorAll('.ecran, .fenetre, .rond, .bouton, .jel-langue, jel-langue, #toile-fx')) el.style.setProperty('display', 'none', 'important');
+  };
+  cacher();
+  setTimeout(cacher, 300); setTimeout(cacher, 1200);
+  const c = document.createElement('canvas');
+  c.id = 'toile-affiche';
+  c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:50;display:block';
+  document.body.appendChild(c);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+// ==========================================================================
+// Images du jeu (page du jeu)
+// ==========================================================================
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (abri, réserve, boutons, compteur), sans écran
+// titre, ni fenêtre « Continuer », ni carte de présentation (CONSIGNES-JEU.md, section 5). L'orage
+// tourne un peu, puis la partie est figée sans fenêtre de pause : ni victoire, ni défaite, ni son,
+// ni sauvegarde.
+//   1 = abri 1 (fougères) : un tronc posé, la feuille du toit glissée à sa place ;
+//   2 = abri 10 (volcan) : la cabane du diplodocus tient sous l'orage, les dinosaures au sec sont contents ;
+//   3 = abri 20 (falaises) : pluie de biais, ruisseau, rochers et trois dinosaures à abriter.
+let apercu = 0;
+const MOMENTS_APERCU = {
+  1: { niveau: 0, pieces: [['tronc', 3, 0]], glisse: { type: 'feuille', x: 3, y: 2 } },
+  2: { niveau: 9, orage: { etape: 'verdict', t: 0.3 } },
+  3: { niveau: 19, orage: { etape: 'pluie', t: 1.8 } }
+};
+function ouvrirApercu(n) {
+  apercu = n;
+  const m = MOMENTS_APERCU[n];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 20261119 + n * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  sonCoupe = true; // en mémoire seulement : aucun son, rien d'enregistré
+  prog = progVide(); // progression neuve en mémoire, nouveautés déjà vues (pas de carte de présentation)
+  prog.intros = Object.keys(INTROS); prog.dinosVus = ORDRE_DINOS.slice();
+  const nv = NIVEAUX[m.niveau];
+  const depart = m.pieces ? m.pieces.map((p) => ({ type: p[0], x: p[1], y: p[2], lie: !!p[3] })) : refPieces(nv);
+  lancerNiveau(m.niveau, depart);
+  if (m.glisse) {
+    // La feuille que l'on glisse depuis la réserve, au-dessus de sa place (contour vert)
+    outil = m.glisse.type; majReserve();
+    glisse = { source: 'reserve', type: m.glisse.type, x0: 0, y0: 0, bouge: true, tactile: false, id: -999, cible: { x: m.glisse.x, y: m.glisse.y, ok: true } };
+    bulleMinuteur = 99;
+  }
+  if (m.orage) {
+    lancerPluie();
+    if (indiceEtape(m.orage.etape) < 0) throw new Error('Image du jeu : étape absente');
+    const dt = 1 / 60;
+    for (let i = 0; i < 1500; i++) {
+      const et = etapeCourante();
+      if (et && et.nom === m.orage.etape && sim.t >= m.orage.t) break;
+      temps += dt;
+      avancerSim(dt);
+      majGouttes(dt);
+      for (const p of particules) { p.vie -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy -= 9 * dt; }
+      particules = particules.filter((p) => p.vie > 0);
+    }
+  }
+  enPause = true; // figé sur ce moment, sans fenêtre de pause
+}
+
 lireProg();
 majBoutonsSon();
-redimensionner();
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  redimensionner();
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  redimensionner();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

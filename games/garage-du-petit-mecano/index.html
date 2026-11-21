@@ -1989,6 +1989,7 @@
   // ==========================================================================
 
   var JEU = 'garage-du-petit-mecano';
+  var apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   var I18 = window.JEL_I18N;
   var t = I18.t;
   function nb(x) { return I18.nombre(x); }
@@ -2153,6 +2154,7 @@
   }
 
   function sauverProgres(extra) {
+    if (apercu) return; // image du jeu : rien n'est écrit dans la sauvegarde
     var donnees = { debloque: P.debloque, etoiles: P.etoiles, records: P.records, boulons: P.boulons, score: P.boulons, achats: P.achats, possede: P.possede, deco: P.deco, vus: P.vus, options: { muet: muet } };
     if (extra) for (var k in extra) donnees[k] = extra[k];
     try { window.JEL_SAVE.save(JEU, donnees); } catch (e) { /* sauvegarde indisponible */ }
@@ -2175,7 +2177,7 @@
     return AC;
   }
   function note(f, d, type, vol, f2, delai) {
-    if (muet) return;
+    if (muet || apercu) return;
     var a = audio(); if (!a) return;
     try {
       var t0 = a.currentTime + (delai || 0);
@@ -2192,7 +2194,7 @@
   }
   var bufferBruit = null;
   function bruit(d, vol, freq, delai, q) {
-    if (muet) return;
+    if (muet || apercu) return;
     var a = audio(); if (!a) return;
     try {
       if (!bufferBruit) {
@@ -4244,7 +4246,7 @@
     fermerVoiles(); montrer('titre');
   });
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'hidden' && J && J.enCours && ecranActif === 'jeu' && !$('#fin').classList.contains('vu')) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !apercu && J && J.enCours && ecranActif === 'jeu' && !$('#fin').classList.contains('vu')) ouvrirPause();
   });
 
   // --------------------------------------------------------------------------
@@ -4384,11 +4386,433 @@
     if (J) majHud();
   });
 
+  // --------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une
+  // scène composée, sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md,
+  // section 5). Le petit mécano en grand serre la roue de la voiture de course
+  // posée sur le pont, sous la lampe de l'atelier ; les boulons dorés s'envolent.
+  // --------------------------------------------------------------------------
+  var cvAffiche = null;
+  var DECO_AFFICHE = { c: 'rouge', m: 'flammes', j: 'or', a: 'oui' };
+
+  // Le petit mécano, grand format (mêmes couleurs que dans le jeu : salopette
+  // bleue, casquette rouge). Origine : entre ses pieds. cible = tête de la clé
+  // (unités du dessin), que sa main gauche pose sur l'écrou de la roue.
+  function dessinerMecano(c, x, sol, s, cible) {
+    var peau = '#ffd6a5', peauF = '#e8a878', bleu = '#3e7bfa', bleuF = '#2c5fd0', jaune = '#ffc93c';
+    c.save(); c.translate(x, sol); c.scale(s, s);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    // ombre
+    c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(0, 0, 62, 11, 0, 0, Math.PI * 2); c.fill();
+    // jambes et chaussures
+    c.fillStyle = bleu; rr(c, -31, -98, 27, 88, 10); c.fill(); rr(c, 4, -98, 27, 88, 10); c.fill();
+    c.fillStyle = bleuF; c.fillRect(-31, -30, 27, 7); c.fillRect(4, -30, 27, 7);
+    c.fillStyle = '#5c3b1f';
+    c.beginPath(); c.ellipse(-22, -7, 23, 11, 0, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(22, -7, 23, 11, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.ellipse(-28, -12, 8, 3, -0.2, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(16, -12, 8, 3, -0.2, 0, Math.PI * 2); c.fill();
+    // t-shirt jaune et salopette
+    c.fillStyle = jaune; rr(c, -43, -192, 86, 100, 28); c.fill();
+    c.fillStyle = bleu; rr(c, -38, -114, 76, 30, 12); c.fill();
+    rr(c, -30, -160, 60, 62, 12); c.fill();
+    c.strokeStyle = bleu; c.lineWidth = 9;
+    c.beginPath(); c.moveTo(-24, -154); c.lineTo(-34, -186); c.moveTo(24, -154); c.lineTo(34, -186); c.stroke();
+    c.fillStyle = jaune; rond(c, -22, -152, 4.5); c.fill(); rond(c, 22, -152, 4.5); c.fill();
+    c.fillStyle = bleuF; rr(c, -15, -146, 30, 24, 6); c.fill();
+    // tournevis dans la poche
+    c.fillStyle = '#e5484d'; rr(c, -9, -158, 7, 16, 3); c.fill();
+    c.fillStyle = '#c9cdd6'; c.fillRect(-7, -164, 3, 7);
+    // tache de cambouis sur la salopette
+    c.fillStyle = 'rgba(30,35,50,.35)'; c.beginPath(); c.ellipse(18, -104, 7, 4, 0.4, 0, Math.PI * 2); c.fill();
+
+    // bras qui tient la clé : épaule, coude, main calculés vers l'écrou
+    var ep = { x: -36, y: -176 }, lc = 46;
+    var dx = ep.x - cible.x, dy = ep.y - cible.y, dl = Math.sqrt(dx * dx + dy * dy) || 1;
+    var main = { x: cible.x + dx / dl * lc, y: cible.y + dy / dl * lc };
+    var coude = { x: (ep.x + main.x) / 2 + 4, y: (ep.y + main.y) / 2 + 16 };
+    c.strokeStyle = jaune; c.lineWidth = 26; c.beginPath(); c.moveTo(ep.x, ep.y); c.lineTo((ep.x + coude.x) / 2, (ep.y + coude.y) / 2); c.stroke();
+    c.strokeStyle = peau; c.lineWidth = 19; c.beginPath(); c.moveTo((ep.x + coude.x) / 2, (ep.y + coude.y) / 2); c.lineTo(coude.x, coude.y); c.lineTo(main.x, main.y); c.stroke();
+    // la grande clé plate
+    c.save(); c.translate(main.x, main.y); c.rotate(Math.atan2(cible.y - main.y, cible.x - main.x));
+    c.strokeStyle = '#8d93a3'; c.lineWidth = 15; c.beginPath(); c.moveTo(-14, 0); c.lineTo(lc - 10, 0); c.stroke();
+    c.strokeStyle = '#d7dbe4'; c.lineWidth = 9; c.stroke();
+    c.fillStyle = '#d7dbe4'; rond(c, lc, 0, 15); c.fill(); c.strokeStyle = '#8d93a3'; c.lineWidth = 3; c.stroke();
+    c.fillStyle = '#2a3654'; c.fillRect(lc + 2, -6, 16, 12);
+    c.fillStyle = 'rgba(255,255,255,.7)'; c.fillRect(4, -3, lc - 22, 2.5);
+    c.restore();
+    c.fillStyle = peau; rond(c, main.x, main.y, 13); c.fill();
+    c.strokeStyle = peauF; c.lineWidth = 2; c.beginPath(); c.arc(main.x, main.y, 13, -0.6, 1.4); c.stroke();
+
+    // bras levé, pouce en l'air
+    var ep2 = { x: 37, y: -177 }, co2 = { x: 70, y: -196 }, ma2 = { x: 70, y: -240 };
+    c.strokeStyle = jaune; c.lineWidth = 26; c.beginPath(); c.moveTo(ep2.x, ep2.y); c.lineTo((ep2.x + co2.x) / 2, (ep2.y + co2.y) / 2); c.stroke();
+    c.strokeStyle = peau; c.lineWidth = 19; c.beginPath(); c.moveTo((ep2.x + co2.x) / 2, (ep2.y + co2.y) / 2); c.lineTo(co2.x, co2.y); c.lineTo(ma2.x, ma2.y); c.stroke();
+    c.fillStyle = peau; rr(c, ma2.x - 14, ma2.y - 14, 28, 26, 9); c.fill();
+    rr(c, ma2.x - 6, ma2.y - 36, 12, 26, 6); c.fill();
+    c.strokeStyle = peauF; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(ma2.x - 10, ma2.y - 4); c.lineTo(ma2.x + 10, ma2.y - 4); c.moveTo(ma2.x - 10, ma2.y + 4); c.lineTo(ma2.x + 10, ma2.y + 4); c.stroke();
+
+    // cou et tête
+    c.fillStyle = peauF; rr(c, -11, -204, 22, 16, 5); c.fill();
+    c.fillStyle = peau; rond(c, -40, -228, 10); c.fill(); rond(c, 40, -228, 10); c.fill();
+    c.fillStyle = peauF; rond(c, -40, -228, 5); c.fill(); rond(c, 40, -228, 5); c.fill();
+    c.fillStyle = peau; rond(c, 0, -232, 40); c.fill();
+    // cheveux sous la casquette
+    c.fillStyle = '#7a4a22';
+    c.beginPath(); c.moveTo(-40, -246); c.quadraticCurveTo(-46, -226, -36, -214); c.lineTo(-30, -240); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(40, -246); c.quadraticCurveTo(46, -226, 36, -214); c.lineTo(30, -240); c.closePath(); c.fill();
+    // casquette rouge, visière vers la gauche (il regarde la roue)
+    c.fillStyle = '#ef5b5b'; c.beginPath(); c.arc(0, -244, 42, Math.PI, 0); c.closePath(); c.fill();
+    c.fillStyle = '#c43d3d'; rr(c, -43, -250, 86, 10, 4); c.fill();
+    c.fillStyle = '#d94848'; c.beginPath(); c.ellipse(-46, -243, 30, 8, -0.08, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.35)'; c.beginPath(); c.ellipse(-14, -272, 14, 6, -0.5, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#c43d3d'; rond(c, 0, -286, 5); c.fill();
+    dessinerPiece(c, 'eng8', 6, -264, 22, jaune, 0.2);
+    // yeux (regard vers la roue)
+    [-15, 15].forEach(function (ex) {
+      c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(ex, -228, 9, 11, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#2b2f3a'; rond(c, ex - 3, -227, 5.5); c.fill();
+      c.fillStyle = '#ffffff'; rond(c, ex - 5, -230, 2); c.fill();
+    });
+    c.strokeStyle = '#7a4a22'; c.lineWidth = 3.5;
+    c.beginPath(); c.arc(-15, -238, 10, 1.15 * Math.PI, 1.8 * Math.PI); c.stroke();
+    c.beginPath(); c.arc(15, -238, 10, 1.2 * Math.PI, 1.85 * Math.PI); c.stroke();
+    // joues, nez, grand sourire
+    c.fillStyle = 'rgba(255,110,110,.45)'; rond(c, -26, -212, 7); c.fill(); rond(c, 26, -212, 7); c.fill();
+    c.fillStyle = peauF; rond(c, -1, -217, 5); c.fill();
+    c.fillStyle = '#7a2b2b'; c.beginPath(); c.moveTo(-17, -208); c.quadraticCurveTo(0, -206, 17, -208); c.quadraticCurveTo(15, -190, 0, -189); c.quadraticCurveTo(-15, -190, -17, -208); c.fill();
+    c.fillStyle = '#ffffff'; c.beginPath(); c.moveTo(-14, -207); c.quadraticCurveTo(0, -205, 14, -207); c.lineTo(13, -202); c.quadraticCurveTo(0, -200, -13, -202); c.closePath(); c.fill();
+    c.fillStyle = '#ff7b8a'; c.beginPath(); c.ellipse(0, -193, 8, 4, 0, 0, Math.PI * 2); c.fill();
+    // petite trace de cambouis sur la joue
+    c.fillStyle = 'rgba(40,40,55,.4)'; c.beginPath(); c.ellipse(29, -220, 5, 2.5, 0.5, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
+
+  function nuageAffiche(c, x, y, k) {
+    c.fillStyle = 'rgba(255,255,255,.95)';
+    rond(c, x, y, 24 * k); c.fill(); rond(c, x + 28 * k, y - 12 * k, 30 * k); c.fill(); rond(c, x + 58 * k, y, 22 * k); c.fill();
+    rr(c, x - 4 * k, y - 4 * k, 66 * k, 24 * k, 12 * k); c.fill();
+  }
+
+  function dessinerAffiche() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var W = window.innerWidth || 600, H = window.innerHeight || 800;
+    cvAffiche.width = Math.round(W * dpr); cvAffiche.height = Math.round(H * dpr);
+    var c = cvAffiche.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Composition dessinée pour 600 × 800, centrée ; le décor continue jusqu'aux bords.
+    var k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    function X(v) { return ox + v * k; }
+    function Y(v) { return oy + v * k; }
+    c.lineJoin = 'round'; c.lineCap = 'round';
+
+    // ciel
+    var g = c.createLinearGradient(0, 0, 0, Y(600));
+    g.addColorStop(0, '#3fa6ef'); g.addColorStop(0.5, '#9fd8ff'); g.addColorStop(1, '#ffe6b0');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    // soleil et ses rayons (source de lumière, en haut à droite)
+    var sx = X(512), sy = Y(88);
+    var halo = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 230 * k);
+    halo.addColorStop(0, 'rgba(255,246,190,.95)'); halo.addColorStop(0.35, 'rgba(255,236,150,.4)'); halo.addColorStop(1, 'rgba(255,236,150,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, Y(500));
+    c.fillStyle = 'rgba(255,244,170,.35)';
+    for (var r = 0; r < 12; r++) {
+      var a0 = r * Math.PI / 6 + 0.1;
+      c.beginPath(); c.moveTo(sx, sy);
+      c.lineTo(sx + Math.cos(a0 - 0.09) * 190 * k, sy + Math.sin(a0 - 0.09) * 190 * k);
+      c.lineTo(sx + Math.cos(a0 + 0.09) * 190 * k, sy + Math.sin(a0 + 0.09) * 190 * k);
+      c.closePath(); c.fill();
+    }
+    c.fillStyle = '#ffe066'; rond(c, sx, sy, 44 * k); c.fill();
+    c.fillStyle = '#fff3a8'; rond(c, sx - 10 * k, sy - 10 * k, 26 * k); c.fill();
+    nuageAffiche(c, X(40), Y(92), k);
+    nuageAffiche(c, X(250), Y(58), 0.75 * k);
+    for (var nx = X(640); nx < W; nx += 260 * k) nuageAffiche(c, nx, Y(120), 0.8 * k);
+    for (var nx2 = X(-200); nx2 > -120 * k; nx2 -= 260 * k) nuageAffiche(c, nx2, Y(110), 0.8 * k);
+
+    // village au loin (jusqu'aux bords sur un écran large)
+    var couleursMaisons = ['#f4a261', '#e9c46a', '#90be6d', '#f28482', '#84c5e8'];
+    var iM = 0;
+    for (var hx = X(-30) - Math.ceil((X(-30)) / (92 * k)) * 92 * k; hx < W; hx += 92 * k, iM++) {
+      var hh = (78 + (iM % 3) * 22) * k, hw = 72 * k, hb = Y(470);
+      c.fillStyle = '#5fae5a'; rond(c, hx + 84 * k, hb - 40 * k, 30 * k); c.fill();
+      c.fillStyle = couleursMaisons[iM % 5]; c.fillRect(hx, hb - hh, hw, hh);
+      c.fillStyle = '#b5563c'; c.beginPath(); c.moveTo(hx - 7 * k, hb - hh); c.lineTo(hx + hw / 2, hb - hh - 38 * k); c.lineTo(hx + hw + 7 * k, hb - hh); c.fill();
+      c.fillStyle = '#bfe3ff'; c.fillRect(hx + 14 * k, hb - hh + 18 * k, 18 * k, 18 * k); c.fillRect(hx + 42 * k, hb - hh + 18 * k, 18 * k, 18 * k);
+    }
+
+    // trottoir et route (le bas porte le bandeau du titre du site)
+    c.fillStyle = '#c3c9d6'; c.fillRect(0, Y(556), W, Y(606) - Y(556));
+    c.fillStyle = '#e1e5ee'; c.fillRect(0, Y(556), W, 6 * k);
+    c.fillStyle = '#8c94a8'; c.fillRect(0, Y(600), W, 8 * k);
+    c.fillStyle = '#4a5268'; c.fillRect(0, Y(606), W, H - Y(606));
+    c.fillStyle = '#f2f2ee';
+    for (var dd = X(-40) - Math.ceil(X(-40) / (90 * k)) * 90 * k; dd < W; dd += 90 * k) c.fillRect(dd, Y(742), 46 * k, 7 * k);
+
+    // le garage : façade, auvent rayé, enseigne
+    c.fillStyle = '#e8ecf3'; c.fillRect(X(20), Y(206), 560 * k, 352 * k);
+    c.fillStyle = 'rgba(0,0,0,.06)'; c.fillRect(X(20), Y(206), 560 * k, 14 * k);
+    for (var b = 0; b < 14; b++) {
+      c.fillStyle = b % 2 ? '#ffc93c' : '#3e7bfa';
+      c.fillRect(X(2 + b * 42.6), Y(176), 42.6 * k + 1, 34 * k);
+      c.beginPath(); c.arc(X(2 + b * 42.6 + 21.3), Y(210), 21.3 * k, 0, Math.PI); c.fill();
+    }
+    var ex = X(300), ey = Y(130);
+    c.fillStyle = '#9aa0ad'; c.fillRect(ex - 50 * k, ey + 30 * k, 6 * k, 18 * k); c.fillRect(ex + 44 * k, ey + 30 * k, 6 * k, 18 * k);
+    c.fillStyle = '#17223b'; rr(c, ex - 78 * k, ey - 34 * k, 156 * k, 68 * k, 18 * k); c.fill();
+    c.strokeStyle = '#ffc93c'; c.lineWidth = 4 * k; rr(c, ex - 78 * k, ey - 34 * k, 156 * k, 68 * k, 18 * k); c.stroke();
+    for (var lp = 0; lp < 9; lp++) { c.fillStyle = lp % 2 ? '#ffe680' : '#ff8a3d'; rond(c, ex - 64 * k + lp * 16 * k, ey - 34 * k, 4 * k); c.fill(); }
+    dessinerPiece(c, 'eng8', ex - 26 * k, ey, 48 * k, '#ffc93c', 0.3);
+    c.save(); c.translate(ex + 28 * k, ey); c.rotate(-0.8);
+    c.strokeStyle = '#c9cdd6'; c.lineWidth = 10 * k; c.beginPath(); c.moveTo(-20 * k, 0); c.lineTo(18 * k, 0); c.stroke();
+    c.fillStyle = '#c9cdd6'; rond(c, 22 * k, 0, 13 * k); c.fill(); c.fillStyle = '#17223b'; c.fillRect(22 * k, -6 * k, 15 * k, 12 * k);
+    c.restore();
+
+    // grande porte ouverte : l'atelier éclairé par sa lampe
+    var p0 = X(38), p1 = X(398), pt = Y(234), pb = Y(558);
+    var gi = c.createLinearGradient(0, pt, 0, pb);
+    gi.addColorStop(0, '#2a3654'); gi.addColorStop(1, '#3a4a72');
+    c.fillStyle = gi; c.fillRect(p0, pt, p1 - p0, pb - pt);
+    c.fillStyle = '#8d97ad'; c.fillRect(p0, pt, p1 - p0, 26 * k);
+    c.fillStyle = '#6d7891'; for (var ri = 0; ri < 4; ri++) c.fillRect(p0, pt + ri * 7 * k, p1 - p0, 3 * k);
+    // panneau à outils et pneu au mur
+    c.fillStyle = '#8a5a34'; rr(c, X(62), Y(282), 120 * k, 66 * k, 8 * k); c.fill();
+    c.strokeStyle = '#c9cdd6'; c.lineWidth = 5 * k;
+    for (var o = 0; o < 5; o++) { c.beginPath(); c.moveTo(X(78 + o * 22), Y(292)); c.lineTo(X(78 + o * 22), Y(336)); c.stroke(); }
+    c.fillStyle = '#c9cdd6'; for (var o2 = 0; o2 < 5; o2++) { rond(c, X(78 + o2 * 22), Y(292), 6 * k); c.fill(); }
+    c.save(); c.translate(X(348), Y(312)); dessinerRoue(c, 0, 28 * k, 'ok', 0, '#e8b931', 0.4); c.restore();
+    // lumière de la lampe
+    var lx = X(214), ly = Y(292);
+    var lum = c.createRadialGradient(lx, ly, 6 * k, lx, ly, 250 * k);
+    lum.addColorStop(0, 'rgba(255,240,170,.85)'); lum.addColorStop(0.4, 'rgba(255,228,140,.32)'); lum.addColorStop(1, 'rgba(255,228,140,0)');
+    c.save(); c.beginPath(); c.rect(p0, pt, p1 - p0, pb - pt); c.clip();
+    c.fillStyle = lum; c.fillRect(p0, pt, p1 - p0, pb - pt);
+    c.fillStyle = 'rgba(255,240,180,.16)';
+    c.beginPath(); c.moveTo(lx - 16 * k, ly); c.lineTo(lx + 16 * k, ly); c.lineTo(lx + 175 * k, pb); c.lineTo(lx - 175 * k, pb); c.closePath(); c.fill();
+    c.restore();
+    c.strokeStyle = '#1b2440'; c.lineWidth = 3 * k; c.beginPath(); c.moveTo(lx, pt + 26 * k); c.lineTo(lx, ly - 14 * k); c.stroke();
+    c.fillStyle = '#2f8a5b'; c.beginPath(); c.moveTo(lx - 10 * k, ly - 16 * k); c.lineTo(lx + 10 * k, ly - 16 * k); c.lineTo(lx + 24 * k, ly); c.lineTo(lx - 24 * k, ly); c.closePath(); c.fill();
+    c.fillStyle = '#fffbe0'; c.shadowColor = '#fff3a0'; c.shadowBlur = 24 * k; rond(c, lx, ly + 2 * k, 9 * k); c.fill(); c.shadowBlur = 0;
+    // sol de l'atelier
+    c.fillStyle = '#5d6a88'; c.fillRect(p0, pb - 18 * k, p1 - p0, 18 * k);
+
+    // pont élévateur et la voiture de course
+    var pontY = Y(456);
+    c.fillStyle = '#9aa0ad'; c.fillRect(X(204), pontY + 10 * k, 22 * k, pb - pontY - 22 * k);
+    c.fillStyle = '#6d7891'; rr(c, X(180), pb - 18 * k, 70 * k, 10 * k, 3 * k); c.fill();
+    c.fillStyle = '#ffc93c'; c.fillRect(X(72), pontY, 286 * k, 12 * k);
+    c.fillStyle = '#2b2f3a'; for (var z = 0; z < 286; z += 20) c.fillRect(X(72 + z), pontY, 10 * k, 12 * k);
+    var sc = 1.65 * k, carX = X(214);
+    dessinerCourse(c, carX, pontY, sc, DECO_AFFICHE, 0.3);
+    var hubX = carX + 56 * sc, hubY = pontY - 16 * sc;
+
+    // pompe à essence (derrière le mécano)
+    var qx = X(518), qb = Y(566);
+    c.fillStyle = 'rgba(0,0,0,.2)'; c.beginPath(); c.ellipse(qx + 32 * k, qb, 44 * k, 8 * k, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#e5484d'; rr(c, qx, qb - 150 * k, 66 * k, 150 * k, 12 * k); c.fill();
+    c.fillStyle = '#c43d3d'; rr(c, qx - 4 * k, qb - 160 * k, 74 * k, 16 * k, 6 * k); c.fill();
+    c.fillStyle = '#ffe9a8'; rr(c, qx + 10 * k, qb - 132 * k, 46 * k, 34 * k, 5 * k); c.fill();
+    c.fillStyle = '#4cc38a'; rond(c, qx + 33 * k, qb - 74 * k, 8 * k); c.fill();
+    c.strokeStyle = '#2b2f3a'; c.lineWidth = 6 * k;
+    c.beginPath(); c.moveTo(qx + 66 * k, qb - 90 * k); c.quadraticCurveTo(qx + 100 * k, qb - 60 * k, qx + 82 * k, qb - 20 * k); c.stroke();
+
+    // halo chaud derrière le héros
+    var mx = X(455), msol = Y(600), ms = 1.18 * k;
+    var hh2 = c.createRadialGradient(mx, msol - 190 * ms, 20 * k, mx, msol - 190 * ms, 210 * k);
+    hh2.addColorStop(0, 'rgba(255,250,215,.7)'); hh2.addColorStop(1, 'rgba(255,250,215,0)');
+    c.fillStyle = hh2; c.fillRect(mx - 220 * k, msol - 420 * k, 440 * k, 440 * k);
+
+    // le petit mécano : sa clé serre l'écrou de la roue avant
+    dessinerMecano(c, mx, msol, ms, { x: (hubX - mx) / ms, y: (hubY - msol) / ms });
+
+    // étincelle sur l'écrou et boulons dorés qui s'envolent
+    c.save(); c.shadowColor = '#fff3a0'; c.shadowBlur = 20 * k;
+    c.fillStyle = '#fffbe0'; etoile(c, hubX, hubY, 26 * k, 4); c.fill();
+    c.fillStyle = '#ffe066'; etoile(c, hubX, hubY, 15 * k, 4); c.fill();
+    c.restore();
+    [[0.2, 274, 392, 11], [0.45, 238, 350, 13], [0.7, 205, 302, 15], [0.9, 176, 250, 17], [0.3, 132, 222, 12]].forEach(function (bo, i) {
+      c.save(); c.shadowColor = 'rgba(255,220,90,.9)'; c.shadowBlur = 14 * k;
+      c.translate(X(bo[1]), Y(bo[2])); c.rotate(bo[0] * 3); boulon(c, 0, 0, bo[3] * k);
+      c.restore();
+    });
+    var cols = ['#4cc38a', '#5aa9ff', '#ff8a3d', '#f27ab0', '#ffffff'];
+    [[300, 380, 7], [258, 312, 6], [150, 286, 6], [330, 340, 5], [118, 248, 5], [220, 260, 7]].forEach(function (e, i) {
+      c.fillStyle = cols[i % cols.length]; etoile(c, X(e[0]), Y(e[1]), e[2] * k); c.fill();
+    });
+
+    // premier plan : pneu debout coupé à gauche, plot, caisse à outils coupée à droite
+    c.fillStyle = 'rgba(0,0,0,.25)'; c.beginPath(); c.ellipse(X(20), Y(788), 110 * k, 14 * k, 0, 0, Math.PI * 2); c.fill();
+    c.save(); c.translate(X(10), Y(790)); dessinerRoue(c, 0, 102 * k, 'ok', 0, '#c9cdd6', 0.6); c.restore();
+    var cxp = X(150), cyp = Y(705);
+    c.fillStyle = '#ff8a3d'; c.beginPath(); c.moveTo(cxp - 22 * k, cyp); c.lineTo(cxp, cyp - 66 * k); c.lineTo(cxp + 22 * k, cyp); c.fill();
+    c.fillStyle = '#f2f2ee'; c.beginPath(); c.moveTo(cxp - 13 * k, cyp - 26 * k); c.lineTo(cxp + 13 * k, cyp - 26 * k); c.lineTo(cxp + 9 * k, cyp - 38 * k); c.lineTo(cxp - 9 * k, cyp - 38 * k); c.fill();
+    c.fillStyle = '#2b2f3a'; rr(c, cxp - 32 * k, cyp - 4 * k, 64 * k, 10 * k, 3 * k); c.fill();
+    var tx = X(468), ty = Y(690);
+    c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(tx - 6 * k, ty + 96 * k, 200 * k, 12 * k);
+    c.strokeStyle = '#2b2f3a'; c.lineWidth = 9 * k; c.beginPath(); c.moveTo(tx + 50 * k, ty); c.lineTo(tx + 50 * k, ty - 26 * k); c.lineTo(tx + 130 * k, ty - 26 * k); c.lineTo(tx + 130 * k, ty); c.stroke();
+    c.fillStyle = '#e5484d'; rr(c, tx, ty, 190 * k, 100 * k, 12 * k); c.fill();
+    c.fillStyle = '#c43d3d'; c.fillRect(tx, ty + 34 * k, 190 * k, 8 * k);
+    c.fillStyle = '#c9cdd6'; rr(c, tx + 80 * k, ty + 28 * k, 24 * k, 20 * k, 4 * k); c.fill();
+  }
+
+  function cacherPourAffiche() {
+    $$('#app, .voile, .jel-langue, button').forEach(function (el) { el.style.setProperty('display', 'none', 'important'); });
+  }
+  function demarrerAffiche() {
+    cvAffiche = document.createElement('canvas');
+    cvAffiche.setAttribute('aria-hidden', 'true');
+    cvAffiche.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;display:block;z-index:1000;';
+    document.body.appendChild(cvAffiche);
+    cacherPourAffiche();
+    setTimeout(cacherPourAffiche, 200);
+    setTimeout(cacherPourAffiche, 1000);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // --------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le
+  // jeu) : le jeu s'ouvre directement en pleine journée, avec sa vraie interface
+  // (journée, clients servis, boulons, rue, pont, outils), sans écran titre, ni
+  // fenêtre « Continuer », ni tutoriel. La scène est posée, la journée tourne un
+  // instant, puis elle est figée sans fenêtre de pause : ni victoire, ni défaite,
+  // ni son, ni sauvegarde.
+  //   1 = journée 1 : un pneu à gonfler, les premiers clients dans la rue ;
+  //   2 = journée 9 : le bus et ses pannes doubles, la boue à frotter, la file pleine ;
+  //   3 = journée 19 (ordinateur) : pluie, appels et dépanneuse, bétonnière,
+  //       couleur à mélanger, atelier tout équipé.
+  // --------------------------------------------------------------------------
+  var SCENES_APERCU = {
+    1: {
+      n: 0, servis: 1, gagnes: 6, secondes: 0.6,
+      atelier: { type: 'voiture', couleur: 'bleu', pannes: ['pneu'], etape: 0, pat: 0.9 },
+      file: [{ type: 'voiture', couleur: 'rouge', pannes: ['pneu'], pat: 0.9 }, { type: 'moto', couleur: 'vert', pannes: ['pneu'], pat: 0.45 }, { type: 'voiture', couleur: 'jaune', pannes: ['pneu'], pat: 0.75 }, null]
+    },
+    2: {
+      n: 8, servis: 3, gagnes: 31, achats: ['banc', 'compresseur'], secondes: 0.6,
+      atelier: { type: 'bus', couleur: 'jaune', pannes: ['pneu', 'lavage'], etape: 1, pat: 0.6 },
+      file: [{ type: 'tracteur', couleur: 'vert', pannes: ['plein', 'peinture'], pat: 0.7 }, { type: 'camionnette', couleur: 'blanc', pannes: ['piece'], pat: 0.3 }, { type: 'moto', couleur: 'rouge', pannes: ['roue'], pat: 0.9 }, { type: 'voiture', couleur: 'violet', pannes: ['lavage', 'plein'], pat: 0.55 }]
+    },
+    3: {
+      n: 18, servis: 6, gagnes: 74, achats: ['banc', 'compresseur', 'pompe', 'jet', 'fontaine', 'etagere', 'visseuse'],
+      deco: { c: 'or', m: 'flammes', j: 'rouge', a: 'oui' }, secondes: 0.8,
+      atelier: { type: 'betonniere', couleur: 'violet', pannes: ['piece', 'peinture'], etape: 1, pat: 0.65 },
+      file: [{ type: 'pompiers', couleur: 'rouge', pannes: ['pneu', 'roue'], pat: 0.3, presse: true }, { type: 'bus', couleur: 'bleu', pannes: ['lavage', 'plein', 'piece'], pat: 0.7 }, { type: 'moto', couleur: 'noir', pannes: ['plein'], pat: 0.85 }, { type: 'voiture', couleur: 'vert', pannes: ['peinture'], pat: 0.5 }],
+      appels: [{ type: 'voiture', couleur: 'orange', pannes: ['pneu'], pat: 0.6 }, { type: 'tracteur', couleur: 'rouge', pannes: ['plein'], pat: 0.35 }],
+      remorque: { type: 'camionnette', couleur: 'jaune', pannes: ['roue'], pat: 0.8, t: 0.5 }
+    }
+  };
+
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    var sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    var graine = 4242 + numero * 7919;
+    Math.random = function () {
+      graine = (graine + 0x6D2B79F5) | 0;
+      var r = Math.imul(graine ^ (graine >>> 15), 1 | graine);
+      r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+    // Progression neuve, en mémoire seulement (rien n'est enregistré).
+    P = progresVide();
+    (sc.achats || []).forEach(function (a) { P.achats.push(a); });
+    if (sc.deco) P.deco = sc.deco;
+    // Sur ordinateur, l'atelier prend toute la largeur de l'écran.
+    if (numero === 3) $('#ecran-jeu').style.maxWidth = 'none';
+    var niv = NIVEAUX[sc.n];
+    J = {
+      n: sc.n, niv: niv, t: 8, clients: [], file: [null, null, null, null], atelier: null, anim: null,
+      servis: sc.servis, partis: 0, coeurs: sc.servis * 3, gagnes: sc.gagnes, enCours: true, pause: false, attente: false,
+      mini: null, sel: 0, inactif: 0, particules: [], secousse: 0, fin: false, finT: 0,
+      depan: { etat: niv.appels ? 'garage' : 'aucune', t: 0, client: null, dur: 6 },
+      tutoTypes: {}, entreDeux: 0, rot: 0, gouttes: [], touches: {}, clavier: false
+    };
+    montrer('jeu');
+    var id = 0;
+    function client(d) {
+      var cl = preparerClient({
+        id: id++, type: d.type, couleur: d.couleur, pannes: d.pannes, arrivee: 0,
+        patBase: niv.pat * (1 + 0.22 * (d.pannes.length - 1)) * (d.presse ? 0.55 : 1), presse: !!d.presse, appel: false
+      });
+      cl.pat = cl.patMax * d.pat;
+      J.clients.push(cl);
+      return cl;
+    }
+    sc.file.forEach(function (d, i) {
+      if (!d) return;
+      var cl = client(d);
+      cl.etat = 'file'; cl.slot = i; cl.x = slotX(i); J.file[i] = cl;
+    });
+    (sc.appels || []).forEach(function (d) { var cl = client(d); cl.appel = true; cl.etat = 'appel'; });
+    if (sc.remorque) {
+      var cr = client(sc.remorque);
+      cr.appel = true; cr.etat = 'remorque';
+      J.depan.etat = 'aller'; J.depan.t = sc.remorque.t; J.depan.client = cr;
+    }
+    // le véhicule sur le pont, ses premières pannes déjà réparées
+    var a = sc.atelier, cla = client(a);
+    cla.etat = 'atelier'; cla.etape = a.etape; J.atelier = cla;
+    for (var k = 0; k < a.etape; k++) {
+      var p = cla.pannes[k];
+      if (p === 'pneu') cla.pneuPlat = null;
+      if (p === 'roue') cla.roueCassee = null;
+      if (p === 'lavage') cla.taches = null;
+      if (p === 'peinture') cla.rayure = null;
+      if (p === 'piece') cla.pieceCassee = null;
+    }
+    var m = J.mini = creerMini(cla);
+    var g = geoAtelier(cla), v = VEH[cla.type];
+    function poserMini() {
+      m.aide = false;
+      if (m.type === 'pneu') {
+        // la pompe vient d'être tapée : l'aiguille monte, le pneu se regonfle
+        m.p = 0.56; m.appui = 1;
+        cla.platValeur = borne(1 - m.p / m.zone[0], 0, 1);
+      } else if (m.type === 'lavage') {
+        // une partie de la boue est déjà partie, l'éponge frotte la suivante
+        var restes = [0, 0, 1, 0.45, 1, 0, 1, 1];
+        cla.taches.forEach(function (ta, i) { ta.d = restes[i % restes.length]; });
+        var ta = cla.taches.filter(function (x) { return x.d > 0 && x.d < 1; })[0] || cla.taches[2];
+        var pe = versEcran(g, ta.x, ta.y);
+        m.eponge.x = pe.x + 6; m.eponge.y = pe.y - 4; m.frotte = true;
+      } else if (m.type === 'peinture' && m.melange) {
+        // une couleur est déjà dans le seau : il reste à choisir la seconde
+        m.seau = ['rouge']; m.couleurSeau = null; m.sel = m.pots.indexOf('bleu');
+      }
+    }
+    poserMini();
+    // quelques effets du moment (bulles d'air, mousse)
+    var roue = cla.pneuPlat != null ? versEcran(g, v.roues[cla.pneuPlat].x, -v.roues[cla.pneuPlat].r) : null;
+    if (m.type === 'pneu' && roue) bulles(roue.x, roue.y, 8);
+    if (m.type === 'lavage') bulles(m.eponge.x, m.eponge.y, 10);
+    majHud();
+    // La journée tourne un instant (la pluie tombe, les bulles montent)...
+    var pas = Math.round(sc.secondes * 60);
+    for (var i = 0; i < pas; i++) maj(1 / 60);
+    // ... puis elle est figée sur ce moment, avec la vraie interface et sans fenêtre de pause.
+    poserMini();
+    J.inactif = 0; J.secousse = 0; J.fin = false;
+    majHud();
+    J.pause = true;
+  }
+
   chargerProgres();
   majBoutonsSon();
-  majTitre();
-  redimTitre();
-  requestAnimationFrame(boucle);
+  var numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) {
+    demarrerAffiche();
+  } else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    majTitre();
+    redimTitre();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

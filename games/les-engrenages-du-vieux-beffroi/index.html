@@ -1684,6 +1684,7 @@ function graine(n) { // générateur pseudo-aléatoire reproductible (mulberry32
 // ---------------------------------------------------------------------------
 let prog = { etoiles: [], records: [], cloches: [], tenue: 0, outil: 0 };
 let sonCoupe = false;
+let apercu = 0;         // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
 function lireProgression() {
   let d = null;
@@ -1726,7 +1727,7 @@ function sauverReglages() {
 // ---------------------------------------------------------------------------
 let audio = null;
 function ctxAudio() {
-  if (sonCoupe) return null;
+  if (sonCoupe || apercu || window.JEL_AFFICHE) return null; // images du jeu et affiche : aucun son
   try {
     if (!audio) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; audio = new C(); }
     if (audio.state === 'suspended') audio.resume();
@@ -2446,6 +2447,7 @@ function dessinerMurs(q, cy) {
     for (let x = -DECAL_X - 28 + dec; x < MUR; x += 28) { chemin(() => { ctx.moveTo(x, y); ctx.lineTo(x, y + 22); }); ctx.stroke(); }
     for (let x = DROITE + dec; x < LARGEUR + DECAL_X; x += 28) { chemin(() => { ctx.moveTo(x, y); ctx.lineTo(x, y + 22); }); ctx.stroke(); }
   }
+  if (apercu === 3) dessinerMargesApercu(q, cy); // image du jeu sur ordinateur : le clocher ouvert sur la ville
   ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(MUR - 4, cy - 10, 4, VUE_H + 20); ctx.fillRect(DROITE, cy - 10, 4, VUE_H + 20);
   // torches des murs (cave) / lucarnes (clocher)
   if (q === 0) {
@@ -2719,6 +2721,8 @@ function dessinerJeu() {
   ctx.restore();
   // voile chaud du clocher
   if (q === 3) { ctx.fillStyle = 'rgba(255,200,120,.06)'; ctx.fillRect(0, 0, LW, LH); }
+  // images du jeu : la cave et la salle des poids un peu éclaircies, pour être lisibles en petit
+  if (apercu && q < 2) { ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.fillStyle = 'rgba(120,92,72,.24)'; ctx.fillRect(0, 0, LW, LH); ctx.restore(); }
 }
 function dessinerParticules() {
   for (const p of particules) {
@@ -3231,7 +3235,7 @@ function boucle(maintenant) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (etage) {
     if (mode === 'jeu') mettreAJour(dt);
-    else { majParticules(dt); if (mode === 'bilan') horloge += dt; }
+    else if (!apercu) { majParticules(dt); if (mode === 'bilan') horloge += dt; } // image du jeu : tout reste figé
     dessinerJeu();
   } else {
     horloge += dt;
@@ -3240,10 +3244,372 @@ function boucle(maintenant) {
   if (mode === 'tuto') dessinerTuto(dt);
   requestAnimationFrame(boucle);
 }
+// ---------------------------------------------------------------------------
+// Affiche (jaquette du jeu)
+// ---------------------------------------------------------------------------
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Tic, en grand, bondit d'une
+// roue dentée vers un rouage doré, devant le grand cadran du beffroi éclairé par derrière ; la cloche
+// d'or, un automate de la parade et les deux autres rouages autour de lui, grands engrenages sombres
+// au premier plan. Aucun chiffre sur le cadran : seulement des traits.
+
+// Un membre (bras, jambe) : trait épais arrondi, cerné de sombre
+function membreAffiche(c, pts, w, col) {
+  c.beginPath(); c.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) c.lineTo(pts[i], pts[i + 1]);
+  c.strokeStyle = '#3a2218'; c.lineWidth = w + 3; c.stroke();
+  c.strokeStyle = col; c.lineWidth = w; c.stroke();
+}
+// Tic en grand (mêmes couleurs que dans le jeu), en plein saut, un bras tendu vers le haut à droite.
+// Unités : les pieds vers y = -12, le haut de la casquette vers y = -103.
+function dessinerTicAffiche(c, x, y, s) {
+  const T = TENUES[0];
+  const peau = '#f6d1a8', contour = '#3a2218';
+  c.save(); c.translate(x, y); c.scale(s, s);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // bras arrière et sa clé d'horloger
+  membreAffiche(c, [-30, -57, -43, -71], 3.5, '#c0c6cf');
+  c.strokeStyle = contour; c.lineWidth = 1.5; c.fillStyle = '#d8dde4';
+  c.beginPath(); c.arc(-45, -73, 5, 0.9, 5.6); c.fill(); c.stroke();
+  membreAffiche(c, [-8, -60, -20, -51], 8, '#f2e6d0');
+  membreAffiche(c, [-20, -51, -29, -56], 6, peau);
+  c.fillStyle = peau; c.strokeStyle = contour; c.lineWidth = 1.5;
+  c.beginPath(); c.arc(-30, -57, 4.6, 0, 6.283); c.fill(); c.stroke();
+  // jambes : l'une repliée vers l'avant, l'autre tendue vers l'arrière (il vient de sauter)
+  membreAffiche(c, [-5, -38, -12, -25, -23, -16], 9, '#3b2a22');
+  membreAffiche(c, [5, -38, 17, -30, 12, -18], 9, '#3b2a22');
+  c.fillStyle = '#24160f'; c.strokeStyle = contour; c.lineWidth = 1.5;
+  c.beginPath(); c.ellipse(-26, -14, 7.5, 4.6, -0.5, 0, 6.283); c.fill(); c.stroke();
+  c.beginPath(); c.ellipse(16, -15, 7.5, 4.6, 0.25, 0, 6.283); c.fill(); c.stroke();
+  // corps : chemise et tablier
+  c.fillStyle = '#f2e6d0'; c.strokeStyle = contour; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(-12, -63); c.quadraticCurveTo(0, -69, 12, -63); c.lineTo(12, -37); c.lineTo(-12, -37); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = T.tablier;
+  c.beginPath(); c.moveTo(-7, -60); c.lineTo(8, -60); c.lineTo(9, -50); c.lineTo(13, -49); c.lineTo(13, -33); c.lineTo(-12, -33); c.lineTo(-12, -49); c.lineTo(-8, -50); c.closePath(); c.fill(); c.stroke();
+  c.strokeStyle = '#7a4a22'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(-7, -60); c.lineTo(-10, -66); c.moveTo(8, -60); c.lineTo(10, -66); c.stroke();
+  c.fillStyle = '#9a5c2c'; c.fillRect(-5, -46, 11, 8);
+  membreAffiche(c, [3, -45, 5, -53], 1.6, '#c0c6cf');
+  c.fillStyle = '#e0533d'; c.fillRect(1.6, -47, 3, 4);
+  c.fillStyle = '#9a5c2c'; c.fillRect(-5, -45, 11, 7);
+  c.fillStyle = 'rgba(255,240,210,.35)'; c.fillRect(-11, -49, 23, 2);
+  // bras avant, tendu vers le rouage
+  membreAffiche(c, [8, -61, 19, -75], 8, '#f2e6d0');
+  membreAffiche(c, [19, -75, 28, -89], 6, peau);
+  c.fillStyle = peau; c.strokeStyle = contour; c.lineWidth = 1.5;
+  c.beginPath(); c.arc(29.5, -91, 5, 0, 6.283); c.fill(); c.stroke();
+  membreAffiche(c, [31, -94, 34, -100], 2.2, peau);
+  membreAffiche(c, [33, -92, 38, -96], 2.2, peau);
+  membreAffiche(c, [33, -89, 38, -90], 2.2, peau);
+  // tête
+  c.fillStyle = peau; c.strokeStyle = contour; c.lineWidth = 2;
+  c.beginPath(); c.arc(3, -82, 14, 0, 6.283); c.fill(); c.stroke();
+  c.beginPath(); c.arc(-9.5, -80, 3.6, 0, 6.283); c.fill(); c.stroke();
+  // cheveux
+  c.fillStyle = '#6b3b22';
+  c.beginPath(); c.moveTo(-11, -88); c.quadraticCurveTo(-17, -80, -12, -71); c.quadraticCurveTo(-9, -79, -6, -76); c.quadraticCurveTo(-6, -84, -2, -88); c.closePath(); c.fill();
+  // casquette bleue, visière vers l'avant, petit insigne en rouage
+  c.fillStyle = T.col; c.strokeStyle = contour; c.lineWidth = 2;
+  c.beginPath(); c.arc(2, -87, 15, Math.PI + 0.12, -0.12); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = '#2a54b0';
+  c.beginPath(); c.moveTo(12, -90); c.quadraticCurveTo(26, -91, 31, -86); c.quadraticCurveTo(22, -84, 12, -86); c.closePath(); c.fill(); c.stroke();
+  c.strokeStyle = 'rgba(255,255,255,.4)'; c.lineWidth = 2;
+  c.beginPath(); c.arc(2, -87, 11, Math.PI + 0.5, Math.PI + 1.3); c.stroke();
+  c.fillStyle = '#ffd34d'; c.strokeStyle = '#8a5a18'; c.lineWidth = 1;
+  c.beginPath(); c.arc(2, -94, 2.6, 0, 6.283); c.fill(); c.stroke();
+  // visage : grands yeux tournés vers le rouage, sourcils levés, bouche ouverte de joie
+  c.fillStyle = '#ffffff'; c.strokeStyle = contour; c.lineWidth = 1.2;
+  c.beginPath(); c.ellipse(6, -81, 3.3, 4.2, 0, 0, 6.283); c.fill(); c.stroke();
+  c.beginPath(); c.ellipse(13.5, -81, 2.9, 4, 0, 0, 6.283); c.fill(); c.stroke();
+  c.fillStyle = '#1d1620';
+  c.beginPath(); c.arc(7.2, -82.6, 2, 0, 6.283); c.arc(14.5, -82.6, 1.8, 0, 6.283); c.fill();
+  c.fillStyle = '#ffffff';
+  c.beginPath(); c.arc(7.8, -83.4, 0.7, 0, 6.283); c.arc(15, -83.4, 0.6, 0, 6.283); c.fill();
+  c.strokeStyle = '#6b3b22'; c.lineWidth = 1.4;
+  c.beginPath(); c.arc(6, -86.5, 3.2, Math.PI * 1.15, Math.PI * 1.85); c.stroke();
+  c.beginPath(); c.arc(13.6, -86.3, 2.8, Math.PI * 1.15, Math.PI * 1.85); c.stroke();
+  c.fillStyle = 'rgba(232,120,110,.55)';
+  c.beginPath(); c.arc(2.5, -75.5, 2.6, 0, 6.283); c.arc(15.5, -75.5, 2.2, 0, 6.283); c.fill();
+  c.fillStyle = '#e8b088'; c.beginPath(); c.arc(17.2, -78.4, 1.6, 0, 6.283); c.fill();
+  c.fillStyle = '#7a2a2a'; c.strokeStyle = contour; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(6.5, -74.5); c.quadraticCurveTo(10.5, -73.5, 14.5, -75); c.quadraticCurveTo(11, -68, 6.5, -74.5); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = '#e8707a'; c.beginPath(); c.arc(10.5, -71.6, 1.8, Math.PI, 0); c.fill();
+  // lumière du cadran sur le bord de la tête et de la casquette
+  c.strokeStyle = 'rgba(255,244,214,.85)'; c.lineWidth = 1.4;
+  c.beginPath(); c.arc(3, -82, 15.2, Math.PI * 0.75, Math.PI * 1.15); c.stroke();
+  c.beginPath(); c.arc(2, -87, 16.4, Math.PI * 1.2, Math.PI * 1.55); c.stroke();
+  c.restore();
+}
+// Petite étincelle à quatre branches
+function etincelleAffiche(c, x, y, r, col) {
+  c.fillStyle = col;
+  c.beginPath(); c.moveTo(x, y - r); c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r); c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fill();
+}
+function dessinerAffiche() {
+  redimensionner();
+  const c = ctx;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const k = Math.min(LW / 600, LH / 800);
+  const ox = (LW - 600 * k) / 2, oy = (LH - 800 * k) / 2;
+  const x0 = -ox / k - 2, x1 = (LW - ox) / k + 2, y0 = -oy / k - 2, y1 = (LH - oy) / k + 2;
+  c.save(); c.translate(ox, oy); c.scale(k, k);
+  const CX = 300, CY = 290, R = 252;
+  // Fond : la salle du cadran, baignée de la lumière chaude qui traverse le verre
+  const fond = c.createRadialGradient(CX, CY, 40, CX, CY, Math.max(760, (x1 - x0) * 0.7));
+  fond.addColorStop(0, '#ffe9b0'); fond.addColorStop(0.36, '#e9a464'); fond.addColorStop(0.62, '#9a5c4c'); fond.addColorStop(1, '#4a2c3a');
+  c.fillStyle = fond; c.fillRect(x0, y0, x1 - x0, y1 - y0);
+  // pierres du mur
+  c.strokeStyle = 'rgba(70,35,30,.22)'; c.lineWidth = 2;
+  for (let yy = Math.floor(y0 / 30) * 30; yy < y1; yy += 30) {
+    c.beginPath(); c.moveTo(x0, yy); c.lineTo(x1, yy); c.stroke();
+    const dec = (Math.round(yy / 30) % 2) * 32;
+    for (let xx = Math.floor(x0 / 64) * 64 + dec; xx < x1; xx += 64) { c.beginPath(); c.moveTo(xx, yy); c.lineTo(xx, yy + 30); c.stroke(); }
+  }
+  // Rayons de lumière qui partent du cadran
+  c.save(); c.translate(CX, CY);
+  for (let i = 0; i < 14; i++) {
+    const a = i * 0.4488 + 0.2;
+    c.fillStyle = i % 2 ? 'rgba(255,240,200,.10)' : 'rgba(255,230,170,.16)';
+    c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, 900, a, a + 0.17); c.closePath(); c.fill();
+  }
+  c.restore();
+  // Grand cadran éclairé par derrière (sans chiffres)
+  c.save();
+  c.shadowColor = 'rgba(255,220,140,.9)'; c.shadowBlur = 60;
+  const verre = c.createRadialGradient(CX - 40, CY - 50, 20, CX, CY, R);
+  verre.addColorStop(0, '#fffdf4'); verre.addColorStop(0.6, '#fff0c8'); verre.addColorStop(1, '#f7cf86');
+  c.fillStyle = verre; c.beginPath(); c.arc(CX, CY, R, 0, 6.283); c.fill();
+  c.restore();
+  // armature de fer du vitrail
+  c.strokeStyle = 'rgba(150,100,55,.35)'; c.lineWidth = 3;
+  c.beginPath(); c.arc(CX, CY, R * 0.56, 0, 6.283); c.stroke();
+  for (let i = 0; i < 12; i++) { const a = i * 0.5236 + 0.2618; c.beginPath(); c.moveTo(CX + Math.cos(a) * R * 0.56, CY + Math.sin(a) * R * 0.56); c.lineTo(CX + Math.cos(a) * R * 0.86, CY + Math.sin(a) * R * 0.86); c.stroke(); }
+  // couronne de bronze et graduations
+  c.strokeStyle = '#7a4a24'; c.lineWidth = 24; c.beginPath(); c.arc(CX, CY, R + 6, 0, 6.283); c.stroke();
+  c.strokeStyle = '#d7a64a'; c.lineWidth = 6; c.beginPath(); c.arc(CX, CY, R - 8, 0, 6.283); c.stroke();
+  c.strokeStyle = '#ffe08a'; c.lineWidth = 3; c.beginPath(); c.arc(CX, CY, R + 6, Math.PI * 1.05, Math.PI * 1.45); c.stroke();
+  c.strokeStyle = '#6b4220'; c.lineCap = 'round';
+  for (let i = 0; i < 60; i++) {
+    const a = i * 0.10472, gros = i % 5 === 0;
+    c.lineWidth = gros ? 9 : 3;
+    const r0 = gros ? R - 52 : R - 32, r1 = R - 18;
+    c.beginPath(); c.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0); c.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1); c.stroke();
+  }
+  // aiguilles, presque à midi
+  c.save(); c.translate(CX, CY); c.fillStyle = '#4a2f22';
+  c.save(); c.rotate(-0.2);
+  c.beginPath(); c.moveTo(-7, 20); c.lineTo(-4, -R * 0.78); c.lineTo(0, -R * 0.86); c.lineTo(4, -R * 0.78); c.lineTo(7, 20); c.closePath(); c.fill();
+  c.restore();
+  c.save(); c.rotate(-0.06);
+  c.beginPath(); c.moveTo(-10, 18); c.lineTo(-8, -R * 0.42); c.lineTo(0, -R * 0.55); c.lineTo(8, -R * 0.42); c.lineTo(10, 18); c.closePath(); c.fill();
+  c.restore();
+  c.fillStyle = '#d7a64a'; c.beginPath(); c.arc(0, 0, 16, 0, 6.283); c.fill();
+  c.fillStyle = '#4a2f22'; c.beginPath(); c.arc(0, 0, 6, 0, 6.283); c.fill();
+  c.restore();
+  // Engrenages du mécanisme, au second plan
+  roueDentee(c, 520, 620, 92, 0.3, 18, '#b8894a', '#5e3f1e', 0.2);
+  roueDentee(c, 40, 470, 78, 0.1, 15, '#c9974c', '#5e3f1e', 0.2);
+  // Poutre et automate de la parade (l'ours au tambour), à droite
+  c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(392, 506, 260, 22);
+  c.fillStyle = '#8a5a35'; c.fillRect(388, 498, 260, 22);
+  c.fillStyle = 'rgba(255,230,190,.35)'; c.fillRect(388, 498, 260, 4);
+  c.fillStyle = 'rgba(0,0,0,.2)'; c.fillRect(388, 514, 260, 6);
+  c.fillStyle = '#d9b26a'; c.beginPath(); c.arc(398, 509, 3.5, 0, 6.283); c.fill();
+  c.save(); c.translate(522, 498); c.scale(2.7, 2.7);
+  dessinerAutomate({ x: 0, y: 0, v: -1, pas: 0.22, sorte: 0 });
+  c.restore();
+  // Cloche d'or du beffroi qui sonne, en haut à gauche
+  c.fillStyle = '#4a2f22'; c.fillRect(x0, 38, 230 - x0, 16);
+  c.strokeStyle = '#3a2218'; c.lineWidth = 5; c.beginPath(); c.moveTo(108, 54); c.lineTo(112, 92); c.stroke();
+  c.save(); c.translate(112, 150); c.rotate(-0.22);
+  c.shadowColor = 'rgba(255,210,90,.8)'; c.shadowBlur = 24;
+  dessinerCloche(c, 0, 0, 3.4, '#ffcf3f');
+  c.restore();
+  c.strokeStyle = 'rgba(255,245,200,.9)'; c.lineWidth = 4; c.lineCap = 'round';
+  for (const r of [72, 92]) { c.beginPath(); c.arc(112, 150, r, 0.05, 0.75); c.stroke(); c.beginPath(); c.arc(112, 150, r, Math.PI - 0.35, Math.PI + 0.3); c.stroke(); }
+  // Roue dentée d'où Tic s'élance (avec la flèche de son sens, comme dans le jeu)
+  roueDentee(c, 172, 662, 92, 0.15, 20, '#d7a64a', '#5e3f1e', 0.2);
+  c.fillStyle = 'rgba(40,25,20,.75)'; c.beginPath(); c.arc(172, 662, 38, 0, 6.283); c.fill();
+  c.save(); c.translate(172, 670); c.scale(2.6, 2.6); c.translate(-172, -670);
+  dessinerAvec(c, () => fleche(172, 670, 1, '#fff1b8'));
+  c.restore();
+  // Les trois rouages dorés à rattraper : lueur, puis rouage
+  const rouages = [[456, 172, 36, 0.3], [552, 330, 20, 1.2], [372, 112, 15, 2.1]];
+  for (const [rx, ry, rr] of rouages) {
+    const l = c.createRadialGradient(rx, ry, 2, rx, ry, rr * 3.4);
+    l.addColorStop(0, 'rgba(255,240,150,.95)'); l.addColorStop(0.4, 'rgba(255,215,90,.45)'); l.addColorStop(1, 'rgba(255,215,90,0)');
+    c.fillStyle = l; c.fillRect(rx - rr * 3.4, ry - rr * 3.4, rr * 6.8, rr * 6.8);
+  }
+  for (const [rx, ry, rr, a] of rouages) roueDentee(c, rx, ry, rr, a, 8, '#ffd34d', '#a8701a', 0.3);
+  // Traînée du saut : de la roue jusqu'à Tic
+  c.strokeStyle = 'rgba(255,248,225,.75)'; c.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    c.lineWidth = 7 - i * 2;
+    c.beginPath(); c.moveTo(120 + i * 16, 560 - i * 4); c.quadraticCurveTo(150 + i * 14, 470 - i * 10, 200 + i * 10, 430 - i * 12); c.stroke();
+  }
+  // Halo derrière Tic, puis Tic en grand
+  const halo = c.createRadialGradient(262, 420, 20, 262, 420, 230);
+  halo.addColorStop(0, 'rgba(255,252,236,.75)'); halo.addColorStop(1, 'rgba(255,252,236,0)');
+  c.fillStyle = halo; c.fillRect(30, 190, 470, 460);
+  dessinerTicAffiche(c, 255, 610, 4.05);
+  // Étincelles autour du rouage attrapé
+  for (let i = 0; i < 9; i++) {
+    const a = i * 0.698 + 0.3, d = 52 + (i % 3) * 16;
+    etincelleAffiche(c, 456 + Math.cos(a) * d, 172 + Math.sin(a) * d, 7 + (i % 2) * 5, i % 3 ? '#fff6c0' : '#ffffff');
+  }
+  // Premier plan : grands engrenages sombres coupés par les bords
+  c.save();
+  c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 18;
+  roueDentee(c, -10, 845, 175, 0.4, 24, '#4a2f2c', '#24161a', 0.18);
+  roueDentee(c, 640, 860, 150, 0.1, 22, '#553632', '#24161a', 0.18);
+  roueDentee(c, 655, 20, 110, 0.25, 18, '#4a2f2c', '#24161a', 0.18);
+  c.restore();
+  // grande poutre au premier plan, en bas
+  c.fillStyle = '#5a3a24'; c.fillRect(x0, 742, x1 - x0, 70);
+  c.fillStyle = 'rgba(255,220,170,.25)'; c.fillRect(x0, 742, x1 - x0, 5);
+  // côtés d'un écran large : le mur continue dans l'ombre, avec d'autres engrenages
+  if (x0 < -40) { roueDentee(c, -120, 300, 120, 0.5, 20, '#5a3a32', '#24161a', 0.2); roueDentee(c, -200, 560, 90, 0.2, 16, '#6b4636', '#24161a', 0.2); }
+  if (x1 > 640) { roueDentee(c, 760, 420, 120, 0.7, 20, '#5a3a32', '#24161a', 0.2); roueDentee(c, 820, 180, 80, 0.3, 14, '#6b4636', '#24161a', 0.2); }
+  c.restore();
+}
+function cacherPourAffiche() {
+  for (const el of document.querySelectorAll('.ecran, #hud, #toast, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherPourAffiche();
+  setTimeout(cacherPourAffiche, 300);
+  setTimeout(cacherPourAffiche, 1200);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+// ---------------------------------------------------------------------------
+// Images du jeu (page du jeu)
+// ---------------------------------------------------------------------------
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie barre du haut (étage, cœurs, rouages, temps), sans écran
+// titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). Le moment est posé par le
+// code (mécanismes à un instant choisi, Tic placé), puis la partie reste figée : ni victoire, ni
+// défaite, ni son, ni sauvegarde.
+//   1 = étage 1 (la cave aux torches) : Tic saute et attrape son premier rouage doré ;
+//   2 = étage 10 (la salle des poids) : Tic suspendu à un balancier, contrepoids, ressort, roue inversée ;
+//   3 = étage 19 (le clocher ouvert au vent), sur ordinateur : Tic rebondit sur un automate, aiguille
+//       du cadran, planches fragiles, rafale de vent ; le clocher s'ouvre sur la ville de chaque côté.
+const SCENES_APERCU = {
+  1: {
+    niveau: 0, horloge: 6.3, coeurs: 3, temps: 7, cam: 0.62,
+    poser(E) {
+      E.rouages[0].pris = true;
+      tic.x = 268; tic.y = -246; tic.vx = 90; tic.vy = -140; tic.face = 1;
+      eclats(E.rouages[0].x, E.rouages[0].y, '#ffd34d', 18);
+      for (const p of particules) { p.x += p.vx * 0.12; p.y += p.vy * 0.12; }
+      poussiere(244, -164, 6);
+    },
+  },
+  2: {
+    niveau: 9, coeurs: 2, temps: 31, cam: 0.6,
+    poser(E) {
+      const b = E.balanciers[0];
+      sensRoues = -1; E.leviers[0].bascule = 0;
+      E.lanternes[0].allumee = true;
+      tic.accroche = b; tic.x = b.bx; tic.y = b.by + TIC_H - 6; tic.face = 1;
+      for (const r of E.roues) r.angle = horloge * 1.3 * r.dir * sensRoues;
+    },
+    // instant où le balancier est lancé vers la droite
+    instant(E) { const b = E.balanciers[0]; return chercherInstant((t) => { const ph = t * 6.283 / b.periode + b.phase; return Math.sin(ph) > 0.82 && Math.cos(ph) > 0; }); },
+  },
+  3: {
+    niveau: 18, coeurs: 2, temps: 46, cam: 0.55,
+    poser(E) {
+      const m = E.automates[0];
+      m.x = 312; m.v = -Math.abs(m.v); m.pas = 0.3;
+      E.lanternes[0].allumee = true;
+      tic.x = 300; tic.y = -500; tic.vx = -40; tic.vy = -520; tic.face = -1;
+      eclats(306, -452, '#bfe3ff', 12);
+      for (const p of particules) { p.x += p.vx * 0.1; p.y += p.vy * 0.1; }
+      for (const r of E.roues) r.angle = horloge * 1.3 * r.dir;
+    },
+    // instant où la rafale souffle dans la bande la plus basse
+    instant(E) { const v = E.vents[0]; return chercherInstant((t) => (t + v.phase) % 3.8 > 0.6 && (t + v.phase) % 3.8 < 1.2); },
+  },
+};
+function chercherInstant(ok) {
+  for (let t = 4; t < 12; t += 0.02) if (ok(t)) return t;
+  return 5;
+}
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  Math.random = graine(4242 + numero * 7919); // hasard fixe : la même image à chaque capture
+  prog = { etoiles: [], records: [], cloches: [], tenue: 0, outil: 0 }; // progression neuve, en mémoire seulement
+  demarrerEtage(sc.niveau, false); // sans tutoriel
+  horloge = sc.instant ? sc.instant(etage) : sc.horloge;
+  bougerMecanismes(0); // contrepoids, aiguilles, balanciers et vents à cet instant
+  for (const a of etage.aiguilles) { a.pxx = a.x; a.py = a.y; }
+  sc.poser(etage);
+  tic.reprise = { x: tic.x, y: tic.y }; tic.invinc = 0; tic.auSol = false;
+  coeurs = sc.coeurs;
+  tempsRestant = etage.temps - sc.temps;
+  secousse = 0;
+  camY = tic.y - VUE_H * sc.cam;
+  majHud();
+  mode = 'apercu'; // la boucle dessine sans rien faire avancer
+}
+// Ordinateur (image 3) : de chaque côté de la tour, de grandes arches ouvertes sur le ciel et la ville
+function dessinerMargesApercu(q, cy) {
+  if (DECAL_X < 40) return;
+  const Q = QUARTIERS[q];
+  const ciel = ctx.createLinearGradient(0, cy, 0, cy + VUE_H);
+  ciel.addColorStop(0, '#7fb6e6'); ciel.addColorStop(0.6, '#bfe0f2'); ciel.addColorStop(1, '#f6d29a');
+  const demi = Math.min(DECAL_X / 2 - 34, 150);
+  for (const [xc, sens] of [[-DECAL_X / 2 + MUR / 2, -1], [LARGEUR + DECAL_X / 2 - MUR / 2, 1]]) {
+    for (let yy = Math.floor((cy - 400) / 420) * 420; yy < cy + VUE_H + 420; yy += 420) {
+      const haut = yy + demi, bas = yy + 340;
+      ctx.save();
+      chemin(() => { ctx.moveTo(xc - demi, bas); ctx.lineTo(xc - demi, haut); ctx.arc(xc, haut, demi, Math.PI, 0); ctx.lineTo(xc + demi, bas); ctx.closePath(); });
+      ctx.fillStyle = ciel; ctx.fill();
+      ctx.clip();
+      // nuages qui passent
+      ctx.fillStyle = 'rgba(255,255,255,.85)';
+      for (let i = 0; i < 3; i++) {
+        const nx = xc - demi + ((i * 97 + yy * 0.37 * sens) % (demi * 2) + demi * 2) % (demi * 2), ny = yy + 70 + i * 60;
+        chemin(() => { ctx.arc(nx, ny, 22, 0, 6.283); ctx.arc(nx + 24, ny + 6, 16, 0, 6.283); ctx.arc(nx - 22, ny + 7, 15, 0, 6.283); }); ctx.fill();
+      }
+      // toits de la ville, tout en bas
+      for (let i = -4; i < 6; i++) {
+        const tx = xc - demi + i * 44 + (yy % 3) * 9, th = 26 + ((i * 37 + 70) % 5) * 9;
+        ctx.fillStyle = i % 2 ? '#c27a62' : '#a8645a';
+        ctx.fillRect(tx - 15, bas - th, 30, th + 10);
+        chemin(() => { ctx.moveTo(tx - 19, bas - th); ctx.lineTo(tx, bas - th - 20); ctx.lineTo(tx + 19, bas - th); ctx.closePath(); }); ctx.fill();
+        ctx.fillStyle = '#ffe9a8'; ctx.fillRect(tx - 4, bas - th + 10, 7, 9);
+      }
+      ctx.restore();
+      // encadrement de pierre et appui
+      ctx.strokeStyle = Q.joint; ctx.lineWidth = 10;
+      chemin(() => { ctx.moveTo(xc - demi, bas); ctx.lineTo(xc - demi, haut); ctx.arc(xc, haut, demi, Math.PI, 0); ctx.lineTo(xc + demi, bas); }); ctx.stroke();
+      ctx.fillStyle = '#6e6058'; ctx.fillRect(xc - demi - 14, bas, demi * 2 + 28, 14);
+      ctx.fillStyle = 'rgba(255,240,200,.35)'; ctx.fillRect(xc - demi - 14, bas, demi * 2 + 28, 3);
+    }
+  }
+  // grands engrenages du mécanisme du clocher, contre les murs de la tour
+  for (let yy = Math.floor((cy - 300) / 420) * 420 + 230; yy < cy + VUE_H + 300; yy += 420) {
+    roueDentee(ctx, -44, yy, 54, horloge * 0.4, 13, '#c9974c', '#5e3f1e', 0.2);
+    roueDentee(ctx, LARGEUR + 44, yy + 190, 54, -horloge * 0.4, 13, '#c9974c', '#5e3f1e', 0.2);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Démarrage
+// ---------------------------------------------------------------------------
 lireProgression();
 majBoutonsSon();
 window.JEL_I18N.surChangement(() => { majBoutonsSon(); majHud(); });
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else {
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>
