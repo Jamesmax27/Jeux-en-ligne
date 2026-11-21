@@ -1914,6 +1914,10 @@
   const nombre = (x) => (window.JEL_I18N ? window.JEL_I18N.nombre(x) : String(x));
   const $ = (id) => document.getElementById(id);
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+  // Posés seulement par le robot du site (jamais par le jeu) : affiche de la jaquette,
+  // ou image du jeu pour sa page (1, 2 ou 3). Ni son, ni sauvegarde dans ces deux modes.
+  const affiche = !!window.JEL_AFFICHE;
+  let apercu = 0;
 
   // ------------------------------------------------------------------
   // Variétés de tomates
@@ -2039,6 +2043,7 @@
   function totalEtoiles() { let s = 0; for (let i = 0; i < NIVEAUX.length; i++) s += prog.etoiles[i] || 0; return s; }
   function totalPoints() { let s = 0; for (let i = 0; i < NIVEAUX.length; i++) s += prog.records[i] || 0; return s; }
   function ecrireProg(niveauReprise) {
+    if (affiche || apercu) return; // affiche ou image du jeu : rien n'est enregistré
     try {
       window.JEL_SAVE.save(JEU, {
         niveau: clamp(niveauReprise, 1, NIVEAUX.length), score: totalPoints(), options: { son: prog.son },
@@ -2053,7 +2058,7 @@
   // ------------------------------------------------------------------
   let audio = null, audioPret = false;
   function ac() {
-    if (!prog.son || !audioPret) return null;
+    if (!prog.son || !audioPret || affiche || apercu) return null;
     try {
       if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
       if (audio.state === 'suspended') audio.resume();
@@ -3514,6 +3519,7 @@
   serre.addEventListener('pointercancel', (e) => finPointeur(e, true));
 
   document.addEventListener('keydown', (e) => {
+    if (affiche || apercu) return;
     const code = e.code;
     if (!$('ecran-intro').hidden) { if (code === 'Enter' || code === 'Space' || code === 'Escape') { e.preventDefault(); fermerIntro(); } return; }
     if ($('ecran-jeu').hidden || !P.actif) return;
@@ -3534,11 +3540,258 @@
     if (m) { const k = P.niv.vars[+m[1] - 1]; if (k) { e.preventDefault(); choisirGraine(k); } }
   });
   document.addEventListener('keyup', (e) => { if (e.code === 'KeyE') P.toucheE = false; });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu && !affiche) mettrePause(); });
   window.addEventListener('blur', () => { P.toucheE = false; P.arrose.actif = false; });
   window.addEventListener('resize', redimensionner);
 
   if (window.JEL_SAVE) window.JEL_SAVE.surFermeture(() => { if (P.actif && !P.fin) ecrireProg(P.index + 1); });
+
+  // ------------------------------------------------------------------
+  // Affiche (jaquette du jeu) : window.JEL_AFFICHE, posé par le robot seulement
+  // Une scène composée, sans interface ni texte (CONSIGNES-JEU.md, section 5) :
+  // dans la serre au soleil, un grand plant chargé de tomates de toutes les
+  // couleurs, la grosse tomate rouge sourit, l'arrosoir verse son eau, un
+  // bourdon vient à la fleur, une coccinelle veille ; panier plein devant.
+  // ------------------------------------------------------------------
+  function visage(c, x, y, r) {
+    // yeux, joues et sourire de la grosse tomate de l'affiche
+    [-1, 1].forEach((s) => {
+      c.fillStyle = '#ffffff'; ellipse(c, x + s * r * 0.3, y - r * 0.08, r * 0.15, r * 0.2); c.fill();
+      c.fillStyle = '#2a1408'; ellipse(c, x + s * r * 0.3 - r * 0.02, y - r * 0.12, r * 0.095, r * 0.12); c.fill();
+      c.fillStyle = '#ffffff'; ellipse(c, x + s * r * 0.3 - r * 0.05, y - r * 0.17, r * 0.035, r * 0.04); c.fill();
+      c.fillStyle = 'rgba(255,150,150,.6)'; ellipse(c, x + s * r * 0.55, y + r * 0.2, r * 0.13, r * 0.08); c.fill();
+    });
+    c.beginPath(); c.moveTo(x - r * 0.26, y + r * 0.16); c.quadraticCurveTo(x, y + r * 0.6, x + r * 0.26, y + r * 0.16); c.closePath();
+    c.fillStyle = '#6e120d'; c.fill();
+    c.fillStyle = '#ff8a7a'; ellipse(c, x, y + r * 0.34, r * 0.11, r * 0.06); c.fill();
+    c.strokeStyle = '#6e120d'; c.lineWidth = r * 0.05; c.lineCap = 'round'; c.stroke();
+  }
+  function scintille(c, x, y, r) {
+    c.save(); c.shadowColor = '#fff3a0'; c.shadowBlur = r * 1.2; c.fillStyle = '#fffbd0';
+    etoileForme(c, x, y, r, 4, 0.28); c.fill(); c.restore();
+  }
+  function dessinerAffiche() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = Math.max(1, window.innerWidth), H = Math.max(1, window.innerHeight);
+    fond.width = Math.round(W * dpr); fond.height = Math.round(H * dpr);
+    const c = cf; c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Repère de 600 × 800 au centre ; sur écran large, le décor continue jusqu'aux bords.
+    const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    const x0 = -ox / k, x1 = (W - ox) / k, y0 = -oy / k, y1 = (H - oy) / k, lx = x1 - x0, ly = y1 - y0;
+    const now = 2600;
+    c.save(); c.translate(ox, oy); c.scale(k, k);
+    // Ciel chaud vu à travers le verre, collines au loin
+    let g = c.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, '#ffc25c'); g.addColorStop(0.3, '#ffe2a6'); g.addColorStop(0.6, '#eef7d8'); g.addColorStop(1, '#9fd36e');
+    c.fillStyle = g; c.fillRect(x0, y0, lx, ly);
+    c.fillStyle = '#c5e7a0'; c.beginPath(); c.moveTo(x0, y1);
+    for (let x = x0; x <= x1 + 40; x += 40) c.lineTo(x, 430 + Math.sin(x / 85) * 16);
+    c.lineTo(x1, y1); c.closePath(); c.fill();
+    // Étagère du fond : des pots plus petits, pâlis par la distance
+    const ey = 512, pas = 96, vf = ['j', 'p', 'n', 'z', 'r', 'j', 'p', 'r', 'z'];
+    for (let n = Math.floor((x0 - 300) / pas) - 1; 300 + n * pas < x1 + pas; n++) {
+      const x = 300 + n * pas, v = vf[((n % vf.length) + vf.length) % vf.length];
+      const pl = { etat: 'plante', v, g: 1, m: 2.5, eau: 1, dir: n % 2 ? 1 : -1, ph: n, puc: 0, secoue: 0, penche: 0, tuteur: false, froid: 0, grappe: true };
+      dessinerCase(c, x - pas / 2, ey - 175, pas, 175, pl, now, { pot: POTS[((n % 5) + 5) % 5].id, sansIcones: true });
+    }
+    c.fillStyle = '#c08550'; c.fillRect(x0, ey - 4, lx, 12); c.fillStyle = '#8e5a2e'; c.fillRect(x0, ey + 8, lx, 5);
+    c.fillStyle = 'rgba(255,246,226,.42)'; c.fillRect(x0, y0, lx, ey + 14 - y0);
+    // Armature de la serre : montants blancs, traverse, reflets du verre
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 7;
+    for (let x = 75 + 150 * Math.floor((x0 - 75) / 150); x < x1 + 10; x += 150) { c.beginPath(); c.moveTo(x, y0); c.lineTo(x, ey - 4); c.stroke(); }
+    c.beginPath(); c.moveTo(x0, 48); c.lineTo(x1, 48); c.stroke();
+    c.lineWidth = 4; c.beginPath(); c.moveTo(x0, 300); c.lineTo(x1, 300); c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.22)';
+    for (let x = 40 + 210 * Math.floor((x0 - 40) / 210); x < x1 + 60; x += 210) { c.beginPath(); c.moveTo(x, y0); c.lineTo(x + 46, y0); c.lineTo(x - 70, ey); c.lineTo(x - 116, ey); c.fill(); }
+    // Le soleil, source de la lumière, et ses grands rayons
+    const sx = 505, sy = 96;
+    g = c.createRadialGradient(sx, sy, 10, sx, sy, 440);
+    g.addColorStop(0, 'rgba(255,252,222,1)'); g.addColorStop(0.16, 'rgba(255,240,160,.9)'); g.addColorStop(0.5, 'rgba(255,224,130,.32)'); g.addColorStop(1, 'rgba(255,224,130,0)');
+    c.fillStyle = g; c.fillRect(x0, y0, lx, ly);
+    [[-520, -400], [-300, -210], [-110, -40]].forEach(([a, b]) => {
+      const gr = c.createLinearGradient(sx, sy, sx - 200, 760);
+      gr.addColorStop(0, 'rgba(255,250,215,.55)'); gr.addColorStop(1, 'rgba(255,250,215,0)');
+      c.fillStyle = gr; c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + a, 800); c.lineTo(sx + b, 800); c.closePath(); c.fill();
+    });
+    c.save(); c.translate(sx, sy); c.rotate(0.1); c.fillStyle = 'rgba(255,196,60,.6)';
+    for (let i = 0; i < 14; i++) { c.rotate(Math.PI / 7); c.beginPath(); c.moveTo(60, -10); c.lineTo(112, 0); c.lineTo(60, 10); c.fill(); }
+    c.restore();
+    g = c.createRadialGradient(sx - 16, sy - 16, 6, sx, sy, 54); g.addColorStop(0, '#fff6b8'); g.addColorStop(1, '#ffb22a');
+    c.fillStyle = g; ellipse(c, sx, sy, 52, 52); c.fill();
+    // Table de rempotage sous le grand pot
+    c.fillStyle = '#d9a066'; c.fillRect(x0, 672, lx, 34); c.fillStyle = '#a8703f'; c.fillRect(x0, 706, lx, 40);
+    c.fillStyle = '#8e5a2e'; c.fillRect(x0, 704, lx, 4);
+    // Lumière chaude derrière le héros
+    g = c.createRadialGradient(318, 360, 20, 318, 360, 270);
+    g.addColorStop(0, 'rgba(255,255,236,.85)'); g.addColorStop(0.55, 'rgba(255,250,215,.4)'); g.addColorStop(1, 'rgba(255,250,215,0)');
+    c.fillStyle = g; c.fillRect(x0, y0, lx, ly);
+    // Le grand pot à pois
+    c.fillStyle = 'rgba(80,40,10,.25)'; ellipse(c, 300, 702, 120, 16); c.fill();
+    dessinerPot(c, 300, 700, 236, 172, POTS[2]);
+    // Tuteur en bambou
+    c.strokeStyle = '#c9a05a'; c.lineWidth = 9; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(262, 545); c.lineTo(258, 150); c.stroke();
+    c.strokeStyle = '#8a6a30'; c.lineWidth = 3;
+    [480, 380, 280, 190].forEach((y) => { c.beginPath(); c.moveTo(252, y); c.lineTo(266, y); c.stroke(); });
+    // Tige principale et branches
+    c.lineCap = 'round';
+    c.strokeStyle = '#3a8f34'; c.lineWidth = 15;
+    c.beginPath(); c.moveTo(300, 542); c.bezierCurveTo(284, 430, 326, 300, 300, 148); c.stroke();
+    c.strokeStyle = '#6fcf5a'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(296, 530); c.bezierCurveTo(280, 430, 322, 300, 296, 160); c.stroke();
+    const tomates = [
+      // x, y, rayon, variété, maturité, départ de la branche (x, y)
+      [178, 300, 46, 'j', 1, 304, 330],
+      [442, 282, 48, 'z', 1, 306, 300],
+      [180, 462, 42, 'n', 1, 296, 470],
+      [462, 445, 52, 'p', 1, 302, 420],
+      [372, 208, 30, 'r', 1, 302, 230],
+      [236, 222, 24, 'r', 0.18, 302, 240]
+    ];
+    c.strokeStyle = '#3a8f34'; c.lineWidth = 7;
+    tomates.forEach(([x, y, r, , , bx, by]) => { c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo((bx + x) / 2, by - 40, x, y - r * 0.95); c.stroke(); });
+    c.beginPath(); c.moveTo(304, 390); c.quadraticCurveTo(318, 330, 322, 318); c.stroke();
+    // Feuilles le long de la tige
+    [[298, 508, 80, -1, 0.35], [298, 492, 76, 1, 0.3], [302, 418, 70, -1, 0.25], [306, 362, 66, 1, 0.22],
+      [308, 300, 60, -1, 0.2], [306, 248, 54, 1, 0.15], [302, 196, 46, -1, 0.1], [301, 172, 40, 1, 0.05]].forEach(([x, y, s, cote, tombe], i) => {
+      feuille(c, x, y, s, cote, tombe, i % 2 ? '#5cbf4a' : '#4fb043', '#2f7a2a');
+    });
+    // Fleur au sommet, le bourdon arrive
+    c.fillStyle = '#ffe14d';
+    for (let i = 0; i < 5; i++) { const a = i * Math.PI * 0.4 + 0.3; ellipse(c, 300 + Math.cos(a) * 15, 140 + Math.sin(a) * 15, 14, 9, a); c.fill(); }
+    c.fillStyle = '#f39c12'; ellipse(c, 300, 140, 8, 8); c.fill();
+    c.strokeStyle = 'rgba(90,60,20,.35)'; c.lineWidth = 2.5; c.setLineDash([5, 7]);
+    c.beginPath(); c.moveTo(470, 170); c.quadraticCurveTo(420, 90, 368, 118); c.stroke(); c.setLineDash([]);
+    bourdon(c, 352, 118, 34, now);
+    // L'arrosoir arc-en-ciel verse son eau sur le plant (derrière les tomates)
+    for (let j = 0; j < 4; j++) {
+      for (let i = 1; i <= 6; i++) {
+        const t = i / 6, x = 224 + (22 + j * 15) * t * 2, y = 180 + 150 * t * t + j * 4;
+        c.globalAlpha = 1 - t * 0.3;
+        goutte(c, x, y, 11 - t * 3, '#3f9cf5');
+        c.fillStyle = 'rgba(255,255,255,.8)'; ellipse(c, x - 2.5, y - 3, 2.4, 3.2); c.fill();
+      }
+    }
+    c.globalAlpha = 1;
+    // Tomates : halos des tomates mûres, puis les tomates
+    tomates.forEach(([x, y, r, v, mat]) => {
+      if (mat < 1) return;
+      c.fillStyle = 'rgba(255,225,90,.38)'; ellipse(c, x, y, r * 1.5, r * 1.42); c.fill();
+    });
+    tomates.forEach(([x, y, r, v, mat]) => { tomate(c, x, y, r, v, mat); });
+    // La grosse tomate rouge, héroïne de l'affiche
+    c.fillStyle = 'rgba(255,225,90,.45)'; ellipse(c, 326, 398, 116, 108); c.fill();
+    tomate(c, 326, 398, 76, 'r', 1);
+    visage(c, 326, 404, 76);
+    // Étincelles des tomates prêtes à cueillir
+    [[244, 330, 14], [414, 340, 12], [392, 470, 10], [236, 288, 9], [500, 238, 11], [126, 262, 10], [522, 410, 11], [132, 436, 9], [408, 196, 9]].forEach(([x, y, r]) => scintille(c, x, y, r));
+    // Coccinelle sur une feuille
+    coccinelle(c, 236, 488, 22, -0.9);
+    // L'arrosoir, au premier plan en haut à gauche
+    arrosoir(c, 78, 150, 150, ARROSOIRS[2], 0.55);
+    // Premier plan : grandes feuilles coupées par le bord, panier plein, herbe
+    feuille(c, x0 - 30, 800, 170, 1, 0.15, '#4fae3f', '#2a6a26');
+    feuille(c, x0 - 10, 760, 120, 1, 0.55, '#5cbf4a', '#2a6a26');
+    const bx = 520, by = 700;
+    c.strokeStyle = '#9a6a30'; c.lineWidth = 12; c.beginPath(); c.arc(bx, by + 10, 100, Math.PI * 1.05, Math.PI * 1.95); c.stroke();
+    [['r', -70, 6, 34], ['j', -18, -4, 34], ['p', 40, 2, 38], ['n', 92, 10, 32], ['z', -44, 24, 30], ['r', 14, 24, 32], ['j', 66, 26, 30]].forEach(([v, dx, dy, r]) => tomate(c, bx + dx, by + dy, r, v, 1));
+    c.beginPath(); c.moveTo(bx - 130, by + 30); c.lineTo(bx + 130, by + 30); c.lineTo(bx + 108, by + 150); c.lineTo(bx - 108, by + 150); c.closePath();
+    c.fillStyle = '#d9a35a'; c.fill(); c.strokeStyle = '#9a6a30'; c.lineWidth = 3; c.stroke();
+    c.lineWidth = 2;
+    for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(bx - 130 + i * 6, by + 30 + i * 30); c.lineTo(bx + 130 - i * 6, by + 30 + i * 30); c.stroke(); }
+    for (let i = -4; i <= 4; i++) { c.beginPath(); c.moveTo(bx + i * 28, by + 30); c.lineTo(bx + i * 24, by + 150); c.stroke(); }
+    c.fillStyle = '#c08a48'; rr(c, bx - 136, by + 22, 272, 16, 8); c.fill();
+    c.fillStyle = '#6fb84a';
+    for (let x = x0; x < x1; x += 14) { c.beginPath(); c.moveTo(x, y1); c.lineTo(x + 5, y1 - 18 - (Math.abs(Math.round(x)) % 5) * 3); c.lineTo(x + 10, y1); c.fill(); }
+    c.restore();
+  }
+  function demarrerAffiche() {
+    const st = document.createElement('style');
+    st.textContent = '.ecran, .voile, .jel-langue, button, #fx { display: none !important; }';
+    document.head.appendChild(st);
+    ECRANS.forEach((e) => { $('ecran-' + e).hidden = true; });
+    ['ecran-pause', 'ecran-fin', 'ecran-bilan', 'ecran-intro'].forEach((id) => { $(id).hidden = true; });
+    fond.hidden = false;
+    const cacher = () => { document.querySelectorAll('.jel-langue, button').forEach((el) => el.style.setProperty('display', 'none', 'important')); };
+    cacher(); setTimeout(cacher, 120); setTimeout(cacher, 600); setTimeout(cacher, 1500);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ------------------------------------------------------------------
+  // Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement
+  // Le jeu s'ouvre directement en pleine journée, avec sa vraie interface (commandes,
+  // panier, score, barre du soleil, graines), sans écran titre, ni « Continuer », ni
+  // présentation ; la scène est posée puis figée sans fenêtre de pause : ni victoire,
+  // ni défaite, ni son, ni sauvegarde.
+  //   1 = journée 1 : semer, cueillir une tomate parfaite, la commande se remplit ;
+  //   2 = journée 9 : tomates noires, pucerons et coccinelle, tige qui penche, arrosoir ;
+  //   3 = journée 18 : 12 pots dorés, bourdon, tomates roses, rayées et vertes pour la
+  //       confiture, commandes à sablier, le soir qui tombe (fenêtres à fermer).
+  // ------------------------------------------------------------------
+  const SCENES_APERCU = {
+    1: {
+      niveau: 0, pot: 'terre', arro: 'vert', frac: 0.34, score: 35, livrees: 1, cmd: [1], panier: { r: 1 },
+      plantes: [{ v: 'r', g: 1, m: 3 }, null, { v: 'r', g: 0.5 }, { v: 'r', g: 0.22 }],
+      cueilli: [1, 'r']
+    },
+    2: {
+      niveau: 8, pot: 'bleu', arro: 'cuivre', frac: 0.52, score: 140, livrees: 1, cmd: [1, 2], panier: { j: 2, n: 1, r: 1 }, cocci: 2,
+      plantes: [
+        { v: 'r', g: 1, m: 3 }, { v: 'j', g: 0.72, puc: 3, cocci: 1, cocciT: 0.3 }, { v: 'n', g: 1, m: 3.5 }, { v: 'r', g: 0.5, penche: 6, aPenche: true },
+        { v: 'j', g: 0.86, eau: 0.24 }, { v: 'r', g: 0.66, tuteur: true, aPenche: true }, { v: 'n', g: 0.3 }, { v: 'j', g: 1, m: 1.6 }
+      ],
+      arrose: 4
+    },
+    3: {
+      niveau: 17, pot: 'dore', arro: 'arc', frac: 0.48, score: 260, livrees: 2, cmd: [2, 3, 4], reste: [64, 34, 15], panier: { v: 4, n: 1, r: 1, j: 1, z: 1 }, cocci: 3,
+      plantes: [
+        { v: 'p', g: 1, m: 2 }, { v: 'z', g: 1, m: 3 }, { v: 'r', g: 0.48, pollinise: false, bourdonT: 0.4 }, { v: 'n', g: 0.8, puc: 2, cocci: 1, cocciT: 0.2 },
+        { v: 'r', g: 0.78 }, { v: 'j', g: 1, m: 1.5 }, { v: 'p', g: 0.48, pollinise: false, attente: 4 }, { v: 'r', g: 0.92, tuteur: true, aPenche: true },
+        { v: 'z', g: 0.66 }, { v: 'n', g: 1, m: 7.3 }, { v: 'j', g: 0.3 }, { v: 'p', g: 0.08 }
+      ]
+    }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard à graine fixe : la même image à chaque capture.
+    let graine = 98765 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    prog.pot = sc.pot; prog.arro = sc.arro;   // en mémoire seulement
+    introVues.add(sc.niveau);                 // pas de présentation animée
+    lancerNiveau(sc.niveau);
+    const N = P.niv;
+    P.intro = false; messageT = 0; $('message').hidden = true;
+    P.plantes = sc.plantes.map((o, i) => (o ? Object.assign(nouvellePlante(o.v), { pollinise: true, dir: i % 2 ? 1 : -1 }, o) : potVide()));
+    ORDRE_VARS.forEach((v) => { P.panier[v] = sc.panier[v] || 0; });
+    P.visibles = sc.cmd.map((num, i) => ({ d: N.cmd[num], num, reste: sc.reste ? sc.reste[i] : N.delai, id: P.idc++ }));
+    P.prochaine = Math.max.apply(null, sc.cmd) + 1; P.livrees = sc.livrees;
+    P.score = sc.score; majScore(true);
+    P.temps = N.duree * sc.frac;
+    P.nuit = N.nuits.some(([a, b]) => sc.frac >= a && sc.frac < b);
+    const soir = !P.nuit && N.nuits.some(([a]) => sc.frac >= a - 6 / N.duree && sc.frac < a);
+    if (sc.cocci !== undefined) P.cocci = sc.cocci;
+    majPanier(); rendreCommandes(); majCocci(); majFenetres(); majHud();
+    $('b-fenetres').classList.toggle('alerte', soir && P.ouvert);
+    redimensionner();
+    // Le geste en cours : une tomate parfaite qui file vers le panier, ou l'arrosoir au-dessus d'un pot
+    if (sc.cueilli) {
+      const [i, v] = sc.cueilli, c = centreCase(i);
+      volerVersPanier(i, v);
+      texteFlottant(c.x, c.y - 40, tr('fx.parfait', { n: nombre(15) }), '#fff6b0');
+      eclats(c.x, c.y - 10, '#ffe14d', 16, 140);
+    }
+    if (sc.arrose !== undefined) {
+      const c = centreCase(sc.arrose), k = P.cases[sc.arrose];
+      P.arrose.actif = true; P.arrose.x = c.x + k.w * 0.05; P.arrose.y = c.y - k.h * 0.22;
+      for (let j = 0; j < 7; j++) P.particules.push({ x: c.x - 4 + (j % 3) * 9 - 6, y: P.arrose.y - 30 + j * 13, vx: 0, vy: 200, vie: 9, t: 0, col: '#4aa8ff', r: 2.6, goutte: true });
+    }
+    // Les effets avancent un instant (étincelles qui s'écartent), puis tout est figé
+    for (let i = 0; i < 9; i++) majAnims(1 / 60);
+    for (const vo of P.vols) vo.t = 0.42;
+    P.pause = true;
+  }
 
   // ------------------------------------------------------------------
   // Démarrage
@@ -3548,9 +3801,16 @@
 
   lireProg(true);
   majBoutonsSon();
-  montrer('titre');
-  redimensionner();
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (affiche) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    montrer('titre');
+    redimensionner();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

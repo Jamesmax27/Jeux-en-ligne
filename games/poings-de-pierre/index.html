@@ -1367,7 +1367,12 @@ function buildBackground() {
 
 /* ---------- son ---------- */
 let AC = null, NB = null, soundOn = store.get('pp_sound', true);
+// Affiche (window.JEL_AFFICHE) ou image du jeu (window.JEL_APERCU = 1, 2 ou 3) : posés par le robot du site
+// seulement ; ni son, ni vibration, ni sauvegarde dans ces deux cas.
+const affiche = !!window.JEL_AFFICHE;
+let apercu = 0;
 function audio() {
+  if (affiche || apercu) return;
   try {
     if (!AC) {
       const A = window.AudioContext || window.webkitAudioContext; if (!A) return;
@@ -1409,7 +1414,7 @@ const sfx = {
   over() { tone(330, 0.5, 'triangle', 0.12, 110); }
 };
 // Pas de vibration pendant la démo du menu (comme pour les sons) : le navigateur la refuse avant le premier toucher.
-function vibrate(ms) { if (G.mode === 'menu') return; try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+function vibrate(ms) { if (G.mode === 'menu' || apercu) return; try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 
 /* ---------- niveaux ---------- */
 // Nom et explication de chaque coup : traductions coup.<coup> et coupTxt.<coup>
@@ -1909,6 +1914,7 @@ function toMenu() { initDemo(); setPlayUI(false); showOverlay('menu'); refreshBe
    temps et cœurs servent à reprendre la partie telle quelle. */
 const JEU = 'poings-de-pierre';
 function sauvegarder() {
+  if (apercu) return;   // image du jeu : rien n'est écrit dans la sauvegarde
   JEL_SAVE.save(JEU, { niveau: G.level, score: Math.floor(G.t), temps: G.t, coeurs: G.hearts });
 }
 function jouer() {
@@ -1927,7 +1933,7 @@ function jouer() {
   });
 }
 // Fermeture de la page pendant une partie (en jeu ou en pause)
-JEL_SAVE.surFermeture(() => { if (G.mode === 'play' || G.mode === 'pause') sauvegarder(); });
+JEL_SAVE.surFermeture(() => { if (!apercu && (G.mode === 'play' || G.mode === 'pause')) sauvegarder(); });
 
 /* ---------- interface ---------- */
 const overlays = ['menu', 'pause', 'over'].map($);
@@ -2216,7 +2222,7 @@ function drawTexts() {
   ctx.globalAlpha = 1;
 }
 function drawJoy() {
-  if (joy.id === null || G.mode !== 'play') return;
+  if (joy.id === null || (G.mode !== 'play' && !apercu)) return;
   ctx.fillStyle = 'rgba(244,232,211,.10)'; ctx.strokeStyle = 'rgba(244,232,211,.35)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(joy.ox, joy.oy, 46, 0, TAU); ctx.fill(); ctx.stroke();
   const dx = joy.x - joy.ox, dy = joy.y - joy.oy, L = Math.hypot(dx, dy), m = L > 0 ? Math.min(L, 46) / L : 0;
@@ -2303,9 +2309,368 @@ $('menuBtn1').addEventListener('click', toMenu);
 $('menuBtn2').addEventListener('click', toMenu);
 for (const id of ['soundBtn1', 'soundBtn2']) $(id).addEventListener('click', () => { soundOn = !soundOn; store.set('pp_sound', soundOn); audio(); refreshSound(); });
 
+/* ---------- affiche (jaquette du jeu) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le petit héros à l'écharpe
+// jaune bondit hors de la zone rouge au moment où le poing de pierre d'un grand golem moussu s'y écrase ;
+// un golem beige lance un rocher au fond de l'arène, un cœur bonus flotte, le soleil éclaire le tout.
+// Mêmes personnages, mêmes couleurs et mêmes pierres (stone) que la partie, vus de face et en grand.
+function heroAffiche(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = 'rgba(45,26,12,.38)'; oval(8, 0, 48, 9);           // ombre au sol : il est en plein bond
+  ctx.translate(0, -26); ctx.rotate(-0.12);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  // cape qui flotte derrière lui
+  ctx.fillStyle = C.cloakDark;
+  ctx.beginPath(); ctx.moveTo(-16, -94); ctx.quadraticCurveTo(36, -102, 70, -74); ctx.quadraticCurveTo(84, -56, 88, -28);
+  ctx.quadraticCurveTo(76, -36, 66, -26); ctx.quadraticCurveTo(56, -38, 42, -26); ctx.quadraticCurveTo(28, -34, 12, -38); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = C.cloak;
+  ctx.beginPath(); ctx.moveTo(-10, -92); ctx.quadraticCurveTo(32, -98, 62, -72); ctx.quadraticCurveTo(72, -60, 76, -44);
+  ctx.quadraticCurveTo(54, -54, 24, -48); ctx.closePath(); ctx.fill();
+  // jambes : l'arrière repliée, l'avant tendue
+  ctx.strokeStyle = '#4a3424'; ctx.lineWidth = 12;
+  ctx.beginPath(); ctx.moveTo(8, -46); ctx.lineTo(22, -30); ctx.lineTo(38, -27); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-6, -46); ctx.lineTo(-18, -26); ctx.lineTo(-24, -8); ctx.stroke();
+  ctx.fillStyle = '#3b2a1e'; oval(42, -26, 10, 7); oval(-28, -6, 12, 7);
+  // bras arrière
+  ctx.strokeStyle = C.cloakDark; ctx.lineWidth = 11;
+  ctx.beginPath(); ctx.moveTo(14, -82); ctx.lineTo(30, -68); ctx.lineTo(42, -74); ctx.stroke();
+  ctx.fillStyle = C.face; circle(44, -75, 6.5);
+  // torse et ceinture
+  ctx.fillStyle = C.cloakDark; rr(ctx, -23, -94, 46, 54, 18); ctx.fill();
+  ctx.fillStyle = C.cloak; rr(ctx, -20, -92, 40, 50, 16); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.2)'; rr(ctx, -16, -88, 13, 30, 6); ctx.fill();
+  ctx.fillStyle = '#6b4526'; rr(ctx, -22, -54, 44, 8, 4); ctx.fill();
+  ctx.fillStyle = C.scarf; rr(ctx, -5, -56, 10, 11, 3); ctx.fill();
+  // écharpe jaune : pans qui claquent au vent
+  for (const [w, col] of [[10, '#c9932f'], [6.5, C.scarf]]) {
+    ctx.strokeStyle = col; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(10, -92); ctx.quadraticCurveTo(38, -114, 70, -106); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(10, -90); ctx.quadraticCurveTo(36, -98, 60, -86); ctx.stroke();
+  }
+  ctx.fillStyle = C.scarf; rr(ctx, -22, -99, 44, 13, 6); ctx.fill();
+  // bras avant, tendu vers le cœur bonus
+  ctx.strokeStyle = C.cloakDark; ctx.lineWidth = 12;
+  ctx.beginPath(); ctx.moveTo(-16, -84); ctx.lineTo(-38, -94); ctx.lineTo(-46, -122); ctx.stroke();
+  ctx.strokeStyle = C.cloak; ctx.lineWidth = 7.5; ctx.stroke();
+  ctx.fillStyle = C.face; circle(-47, -127, 7.5);
+  // tête : capuche bleu-vert, visage décidé, regard vers le poing
+  ctx.fillStyle = C.cloakDark; circle(0, -124, 36);
+  ctx.beginPath(); ctx.moveTo(14, -154); ctx.quadraticCurveTo(40, -166, 52, -146); ctx.quadraticCurveTo(38, -150, 28, -140); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = C.cloak; circle(-1, -125, 32);
+  ctx.strokeStyle = 'rgba(255,250,230,.45)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(-1, -125, 30, Math.PI * 1.05, Math.PI * 1.55); ctx.stroke();
+  ctx.fillStyle = C.face; oval(-3, -119, 23, 22);
+  ctx.strokeStyle = C.cloakDark; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(-3, -119, 23, 22, 0, 0, TAU); ctx.stroke();
+  ctx.fillStyle = 'rgba(232,120,96,.45)'; circle(-17, -110, 5); circle(12, -110, 5);
+  ctx.fillStyle = '#fff'; oval(-11, -122, 5.5, 7); oval(7, -122, 5.5, 7);
+  ctx.fillStyle = C.eye; circle(-8.5, -121, 3.6); circle(9.5, -121, 3.6);
+  ctx.fillStyle = '#fff'; circle(-7.5, -123, 1.3); circle(10.5, -123, 1.3);
+  ctx.strokeStyle = C.eye; ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.moveTo(-17, -133); ctx.lineTo(-6, -129); ctx.moveTo(2, -129); ctx.lineTo(13, -133); ctx.stroke();
+  ctx.fillStyle = '#5a2a1a';
+  ctx.beginPath(); ctx.moveTo(-10, -108); ctx.quadraticCurveTo(-1, -96, 8, -108); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e2553b'; oval(-1, -103, 3.5, 2);
+  ctx.restore();
+}
+// Golem de face : jambes, gros corps, tête, mousse, fissures et yeux orange qui brillent.
+function golemAffiche(x, y, s, T, colere) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = 'rgba(40,24,12,.4)'; oval(0, 0, 122, 22);
+  stone(-80, -62, 60, 64, 18, T); stone(20, -62, 60, 64, 18, T);
+  stone(-100, -252, 200, 200, 46, T);
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.shadowColor = '#ff8a3d'; ctx.shadowBlur = 16 * colere; ctx.strokeStyle = colere ? '#ffa04d' : T.dark; ctx.lineWidth = 4.5;
+  ctx.beginPath(); ctx.moveTo(-34, -214); ctx.lineTo(-14, -184); ctx.lineTo(-28, -152); ctx.lineTo(-8, -118);
+  ctx.moveTo(44, -206); ctx.lineTo(32, -176); ctx.lineTo(52, -150); ctx.stroke(); ctx.restore();
+  for (const [mx, my, r] of [[-78, -232, 20], [-56, -246, 15], [70, -238, 18], [86, -218, 12], [-90, -150, 11], [40, -120, 9]]) {
+    ctx.fillStyle = T.moss; circle(mx, my, r); ctx.fillStyle = 'rgba(255,255,255,.14)'; circle(mx - r * 0.25, my - r * 0.3, r * 0.5);
+  }
+  ctx.strokeStyle = C.vineDark; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(-70, -236); ctx.quadraticCurveTo(-80, -200, -66, -170); ctx.moveTo(74, -230); ctx.quadraticCurveTo(84, -200, 76, -178); ctx.stroke();
+  ctx.strokeStyle = C.vine; ctx.lineWidth = 1.8; ctx.stroke();
+  stone(-64, -350, 128, 112, 34, T);
+  for (const [mx, my, r] of [[-30, -350, 16], [-8, -356, 12], [26, -348, 14]]) { ctx.fillStyle = T.moss; circle(mx, my, r); }
+  ctx.fillStyle = T.dark; rr(ctx, -58, -310, 116, 22, 10); ctx.fill();
+  ctx.fillStyle = colere ? 'rgba(255,120,50,.45)' : 'rgba(255,190,90,.3)'; circle(-26, -280, 17); circle(26, -280, 17);
+  ctx.save(); ctx.shadowColor = '#ffb347'; ctx.shadowBlur = 20; ctx.fillStyle = colere ? '#ff7a3d' : C.glow;
+  rr(ctx, -38, -287, 24, 13, 5); ctx.fill(); rr(ctx, 14, -287, 24, 13, 5); ctx.fill();
+  ctx.fillStyle = '#ffe2a8'; rr(ctx, -33, -284, 10, 5, 2); ctx.fill(); rr(ctx, 19, -284, 10, 5, 2); ctx.fill(); ctx.restore();
+  ctx.fillStyle = 'rgba(30,20,12,.55)'; rr(ctx, -26, -256, 52, 9, 4); ctx.fill();
+  ctx.restore();
+}
+// Bras en chaîne de pierres liées par deux lianes, de l'épaule (a) au poing (b) ; les pierres grossissent
+// en approchant (le poing vient vers nous).
+function chaineAffiche(ax, ay, bx, by, s0, s1, T, n) {
+  const L = Math.hypot(bx - ax, by - ay), nx = -(by - ay) / L, ny = (bx - ax) / L;
+  ctx.lineCap = 'round';
+  for (const v of [-1, 1]) {
+    ctx.beginPath();
+    for (let i = 0; i <= 24; i++) {
+      const p = i / 24, w = lerp(s0, s1, p) * 0.3 * v + Math.sin(p * 14 + v * 1.7) * 2.5;
+      const x = lerp(ax, bx, p) + nx * w, y = lerp(ay, by, p) + ny * w;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.strokeStyle = C.vineDark; ctx.lineWidth = 6.5; ctx.stroke();
+    ctx.strokeStyle = C.vine; ctx.lineWidth = 2.6; ctx.stroke();
+  }
+  for (let i = 1; i <= n; i++) {
+    const p = i / (n + 1), sz = lerp(s0, s1, p), x = lerp(ax, bx, p), y = lerp(ay, by, p);
+    stone(x - sz / 2, y - sz * 0.45, sz, sz * 0.9, sz * 0.3, T);
+    if (i % 2) { ctx.fillStyle = T.moss; circle(x + sz * 0.22, y - sz * 0.2, sz * 0.16); }
+  }
+}
+function poingAffiche(x, y, sz, T) {
+  stone(x - sz / 2, y - sz / 2, sz, sz * 1.02, sz * 0.26, T);
+  ctx.strokeStyle = T.dark; ctx.lineWidth = sz * 0.05; ctx.lineCap = 'round';
+  for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(x + k * sz * 0.22, y + sz * 0.12); ctx.lineTo(x + k * sz * 0.22, y + sz * 0.36); ctx.stroke(); }
+  ctx.fillStyle = T.moss; circle(x - sz * 0.26, y - sz * 0.3, sz * 0.15); circle(x - sz * 0.1, y - sz * 0.38, sz * 0.1);
+}
+function dessinerAffiche() {
+  resize();
+  const k = Math.min(VW / 600, VH / 800), ox = (VW - 600 * k) / 2, oy = (VH - 800 * k) / 2;
+  const X0 = -ox / k - 2, X1 = (VW - ox) / k + 2, Y0 = -oy / k - 2, Y1 = (VH - oy) / k + 2;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+  ctx.fillStyle = '#7b5b41'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+  const R = rng(4242), HZ = 250, RIM = 280;
+  // ciel du matin et soleil
+  let gr = ctx.createLinearGradient(0, Y0, 0, HZ);
+  gr.addColorStop(0, '#6ec1ec'); gr.addColorStop(0.6, '#b9e4f4'); gr.addColorStop(1, '#ffe7ad');
+  ctx.fillStyle = gr; ctx.fillRect(X0, Y0, X1 - X0, HZ - Y0 + 1);
+  const SX = 120, SY = 105;
+  gr = ctx.createRadialGradient(SX, SY, 10, SX, SY, 330);
+  gr.addColorStop(0, 'rgba(255,250,215,1)'); gr.addColorStop(0.25, 'rgba(255,240,190,.6)'); gr.addColorStop(1, 'rgba(255,240,190,0)');
+  ctx.fillStyle = gr; ctx.fillRect(X0, Y0, X1 - X0, Y1 - Y0);
+  ctx.fillStyle = '#fffbe6'; circle(SX, SY, 40);
+  for (const [cx, cy, s] of [[330, 70, 1], [520, 150, 0.8], [-20, 200, 0.9], [700, 60, 1], [-160, 90, 0.9]]) {
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    oval(cx, cy, 46 * s, 16 * s); oval(cx - 26 * s, cy + 2, 26 * s, 13 * s); oval(cx + 16 * s, cy - 10 * s, 28 * s, 18 * s);
+  }
+  // collines et prairie autour de l'arène
+  for (let x = X0 - 80; x < X1 + 80; x += 150) { ctx.fillStyle = '#8fb565'; oval(x + R() * 60, HZ + 4, 120 + R() * 40, 40 + R() * 18); }
+  for (let x = X0 - 60; x < X1 + 60; x += 110) {
+    const tx = x + R() * 50; ctx.fillStyle = '#5e7d3c'; circle(tx, HZ - 18 - R() * 10, 16 + R() * 8);
+  }
+  ctx.fillStyle = '#6f9145'; ctx.fillRect(X0, HZ, X1 - X0, RIM - HZ + 10);
+  for (let i = 0; i < 260; i++) {
+    const x = X0 + R() * (X1 - X0), y = HZ + R() * (RIM - HZ);
+    ctx.strokeStyle = R() < 0.5 ? '#567434' : '#86a957'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + (R() - 0.5) * 3, y - 4 - R() * 4); ctx.stroke();
+  }
+  // sol de boue, en perspective
+  gr = ctx.createLinearGradient(0, RIM, 0, Math.max(Y1, 800));
+  gr.addColorStop(0, '#a98058'); gr.addColorStop(0.45, '#8a6646'); gr.addColorStop(1, '#5e4330');
+  ctx.fillStyle = gr; ctx.fillRect(X0, RIM, X1 - X0, Y1 - RIM);
+  for (let i = 0; i < 90; i++) {
+    const y = RIM + 10 + R() * (Y1 - RIM), f = (y - RIM) / 520 + 0.25, x = X0 + R() * (X1 - X0);
+    ctx.fillStyle = R() < 0.55 ? 'rgba(58,38,24,.16)' : 'rgba(225,180,128,.12)';
+    oval(x, y, (12 + R() * 34) * f, (5 + R() * 9) * f);
+  }
+  for (const [px, py, rx] of [[470, 330, 40], [60, 470, 46], [560, 640, 60], [-120, 600, 70], [760, 420, 60]]) {
+    ctx.fillStyle = 'rgba(70,46,28,.55)'; oval(px, py, rx, rx * 0.28);
+    ctx.fillStyle = 'rgba(160,215,235,.45)'; oval(px - rx * 0.06, py - 1, rx * 0.8, rx * 0.18);
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; oval(px - rx * 0.3, py - 2, rx * 0.25, rx * 0.05);
+  }
+  // cailloux du bord de l'arène
+  for (let x = X0; x < X1; x += 13 + R() * 6) {
+    const y = RIM - 2 + R() * 4, sz = 5 + R() * 3;
+    ctx.fillStyle = '#4a463f'; oval(x + 0.8, y + 1.2, sz * 1.2, sz * 0.8);
+    ctx.fillStyle = R() < 0.5 ? '#9a968b' : '#87837a'; oval(x, y, sz * 1.1, sz * 0.7);
+    ctx.fillStyle = 'rgba(255,255,255,.2)'; oval(x - sz * 0.3, y - sz * 0.25, sz * 0.4, sz * 0.2);
+  }
+  // lumière chaude du soleil sur l'arène
+  gr = ctx.createRadialGradient(SX + 60, 420, 30, SX + 60, 420, 420);
+  gr.addColorStop(0, 'rgba(255,226,160,.28)'); gr.addColorStop(1, 'rgba(255,226,160,0)');
+  ctx.fillStyle = gr; ctx.fillRect(X0, RIM, X1 - X0, Y1 - RIM);
+  // au fond : un golem beige lance un rocher
+  const T2 = TINTS[2];
+  chaineAffiche(268, 216, 246, 162, 12, 15, T2, 2);
+  golemAffiche(250, 336, 0.4, T2, 0);
+  ctx.save(); ctx.globalAlpha = 0.5; ctx.strokeStyle = '#fff3d6'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(214 - i * 12, 150 + i * 9); ctx.lineTo(176 - i * 12, 160 + i * 9); ctx.stroke(); }
+  ctx.restore();
+  drawBoulder(166, 132, 20, 0.6);
+  // le grand golem gris : un bras levé, l'autre écrase son poing dans la zone rouge
+  const T1 = TINTS[0], GX = 470, GY = 470, IX = 352, IY = 548;
+  chaineAffiche(GX + 92, GY - 220, GX + 140, GY - 372, 26, 34, T1, 3);
+  poingAffiche(GX + 146, GY - 404, 74, T1);
+  golemAffiche(GX, GY, 1, T1, 1);
+  // zone rouge, fissures, éclats : le coup tombe
+  ctx.save();
+  ctx.fillStyle = 'rgba(' + C.danger + ',.32)'; oval(IX, IY + 22, 104, 32);
+  ctx.setLineDash([14, 10]); ctx.strokeStyle = 'rgba(' + C.danger + ',.95)'; ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.ellipse(IX, IY + 22, 104, 32, 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(40,26,16,.6)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (let i = 0; i < 9; i++) {
+    const a = i / 9 * TAU + 0.2; let px = IX, py = IY + 26;
+    ctx.beginPath(); ctx.moveTo(px, py);
+    for (let s = 0; s < 3; s++) { px += Math.cos(a + (R() - 0.5) * 0.6) * 26; py += Math.sin(a + (R() - 0.5) * 0.6) * 8; ctx.lineTo(px, py); }
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle = 'rgba(255,250,235,.95)';
+  for (let i = 0; i < 11; i++) {
+    const a = Math.PI + i / 10 * Math.PI, Lr = 70 + (i % 3) * 22, bx = IX, by = IY + 34;
+    ctx.beginPath(); ctx.moveTo(bx + Math.cos(a - 0.12) * 40, by + Math.sin(a - 0.12) * 20);
+    ctx.lineTo(bx + Math.cos(a) * (40 + Lr), by + Math.sin(a) * (20 + Lr * 0.6));
+    ctx.lineTo(bx + Math.cos(a + 0.12) * 40, by + Math.sin(a + 0.12) * 20); ctx.closePath(); ctx.fill();
+  }
+  for (let i = 0; i < 16; i++) {
+    const a = Math.PI + R() * Math.PI, d = 60 + R() * 70;
+    ctx.fillStyle = 'rgba(210,175,135,' + (0.3 + R() * 0.25).toFixed(2) + ')'; circle(IX + Math.cos(a) * d * 1.2, IY + 34 + Math.sin(a) * d * 0.4, 7 + R() * 8);
+  }
+  chaineAffiche(GX - 92, GY - 206, IX + 10, IY - 40, 26, 44, T1, 4);
+  poingAffiche(IX, IY - 6, 96, T1);
+  for (let i = 0; i < 12; i++) {
+    const a = Math.PI * 1.05 + R() * Math.PI * 0.9, d = 70 + R() * 90;
+    ctx.save(); ctx.translate(IX + Math.cos(a) * d, IY + Math.sin(a) * d * 0.7); ctx.rotate(R() * TAU);
+    ctx.fillStyle = [T1.light, T1.base, '#6b4d36', C.vine][i % 4]; ctx.fillRect(-5, -3.5, 10, 7); ctx.restore();
+  }
+  // cœur bonus qui flotte, juste au-dessus de la main du héros
+  const HX = 44, HY = 238;
+  gr = ctx.createRadialGradient(HX, HY, 4, HX, HY, 48);
+  gr.addColorStop(0, 'rgba(255,170,140,.85)'); gr.addColorStop(1, 'rgba(255,120,90,0)');
+  ctx.fillStyle = gr; circle(HX, HY, 48);
+  ctx.fillStyle = C.heart; heartPath(HX, HY, 22); ctx.fill();
+  ctx.strokeStyle = '#ffd9c9'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; oval(HX - 9, HY - 8, 5, 3.5);
+  ctx.fillStyle = '#fff3c4';
+  for (const [sx, sy, sz] of [[12, 206, 6], [84, 214, 5], [78, 270, 4]]) drawStar(sx, sy, sz);
+  // le héros, en grand, avec un contour de lumière
+  ctx.save(); ctx.shadowColor = 'rgba(255,244,200,.9)'; ctx.shadowBlur = 22;
+  heroAffiche(150, 650, 2.05);
+  ctx.restore();
+  heroAffiche(150, 650, 2.05);
+  // traînée de poussière derrière lui (il vient de rouler hors de la zone)
+  for (let i = 0; i < 7; i++) { ctx.fillStyle = 'rgba(214,180,140,' + (0.38 - i * 0.045).toFixed(2) + ')'; circle(236 + i * 18, 646 - i * 5, 10 + i * 2); }
+  // premier plan : grosses pierres et herbes coupées par les bords
+  for (const [px, py, sz] of [[X0 + 20, 790, 70], [X1 - 30, 770, 58], [X0 + 110, 812, 38], [X1 - 120, 806, 34]]) {
+    ctx.fillStyle = '#3d3a34'; oval(px + 4, py + 8, sz * 1.25, sz * 0.85);
+    ctx.fillStyle = '#7f7b71'; oval(px, py, sz * 1.15, sz * 0.8);
+    ctx.fillStyle = 'rgba(255,255,255,.18)'; oval(px - sz * 0.35, py - sz * 0.35, sz * 0.5, sz * 0.25);
+    ctx.fillStyle = '#6f9a4a'; circle(px + sz * 0.4, py - sz * 0.4, sz * 0.28);
+  }
+  ctx.strokeStyle = '#4f6a2c'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (const [gx, gy] of [[X0 + 70, 760], [X1 - 80, 745], [X0 + 150, 790]]) {
+    for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(gx + i * 5, gy + 20); ctx.quadraticCurveTo(gx + i * 9, gy - 6, gx + i * 14, gy - 26 + Math.abs(i) * 6); ctx.stroke(); }
+  }
+  // léger assombrissement du bas (bandeau du titre du site)
+  gr = ctx.createLinearGradient(0, 640, 0, Math.max(Y1, 800));
+  gr.addColorStop(0, 'rgba(30,18,10,0)'); gr.addColorStop(1, 'rgba(30,18,10,.35)');
+  ctx.fillStyle = gr; ctx.fillRect(X0, 640, X1 - X0, Y1 - 640);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
+function cacherInterfaceAffiche() {
+  for (const el of document.querySelectorAll('.overlay, #hud, #dash, #banner, .jel-langue, jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherInterfaceAffiche();
+  dessinerAffiche();
+  setTimeout(cacherInterfaceAffiche, 300); setTimeout(cacherInterfaceAffiche, 1200);
+  let rzA = 0;
+  addEventListener('resize', () => { cancelAnimationFrame(rzA); rzA = requestAnimationFrame(dessinerAffiche); });
+}
+
+/* ---------- images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (cœurs, niveau, chrono, bouton Roulade), sans
+// menu, ni fenêtre « Continuer », ni bandeau (CONSIGNES-JEU.md, section 5). Le moment est posé par le
+// code, puis figé : ni victoire, ni défaite, ni son, ni sauvegarde, ni FMG.
+//   1 = niveau 1 : un seul golem, son poing en chaîne vient de frapper à côté du héros qui roule, cœur de mi-niveau ;
+//   2 = niveau 9 : quatre golems, frappe au sol, trois rochers en l'air, ruée, rafale, cœur bonus ;
+//   3 = niveau 13 : cinq golems, ruée finie contre le mur (golem étourdi), balayage, rafale, fissures ;
+//       un seul cœur : le bord de l'écran rougit.
+function ouvrirApercu(n) {
+  apercu = n;
+  let graine = 98765 + n * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let q = Math.imul(graine ^ (graine >>> 15), 1 | graine); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+  const debut = lv => lv < 3 ? (lv - 1) * 18 : 36 + (lv - 3) * 22;
+  const sc = { 1: { level: 1, levelT: 9.4, hearts: 2 }, 2: { level: 9, levelT: 11.2, hearts: 3 }, 3: { level: 13, levelT: 15.6, hearts: 1 } }[n];
+  G.mode = 'play'; G.level = sc.level; G.levelT = sc.levelT; G.t = debut(sc.level) + sc.levelT; G.levelCalm = 0;
+  G.hearts = sc.hearts; G.cfg = levelCfg(G.level); G.heartMid = true;
+  G.rocks = []; G.parts = []; G.decals = []; G.pickups = []; G.texts = []; G.golems = [];
+  const P = G.player = newPlayer();
+  const place = (fx, fy) => ({ x: AW * fx, y: AH * fy });
+  const golem = (i, fx, fy) => {
+    const g = newGolem(i, 99), p = place(fx, fy);
+    g.x = p.x; g.y = p.y; g.state = 'walk'; g.st = 0; g.walk = i * 1.7;
+    g.face = Math.atan2(P.y - g.y, P.x - g.x); G.golems.push(g); return g;
+  };
+  // Coup en préparation : la zone rouge est remplie à la proportion k.
+  const prepare = (g, atk, k, cx, cy) => {
+    g.atk = atk; g.state = 'windup'; g.aim = g.face = Math.atan2(cy - g.y, cx - g.x);
+    g.wind = 1; g.track = 0; g.st = k;
+    if (atk === 'slam') g.R = 100 + Math.min(25, Math.max(0, G.level - 2) * 3);
+    if (atk === 'sweep') { g.R = 150; g.half = 1.2; }
+    if (atk === 'punch' || atk === 'combo') g.len = punchLen(g);
+    if (atk === 'charge') g.len = rayToWall(g.x, g.y, g.aim, g.r + 2);
+  };
+  const vise = (g, cx, cy) => { g.aim = g.face = Math.atan2(cy - g.y, cx - g.x); };
+  if (n === 1) {
+    P.x = AW * 0.26; P.y = AH * 0.4; P.face = -2.2; P.vx = -110; P.vy = -150; P.walk = 2;
+    P.trail = [0.12, 0.24, 0.36, 0.48].map((a, i) => ({ x: P.x + (4 - i) * 9, y: P.y + (4 - i) * 13, a }));
+    const g = golem(0, 0.74, 0.7);
+    vise(g, AW * 0.58, AH * 0.3);   // le poing passe à droite du héros, qui vient de l'esquiver
+    G.pickups.push({ x: AW * 0.18, y: AH * 0.17, t: 0, life: 9, ph: 0.5 });
+    joy.id = -1; joy.ox = VW * 0.28; joy.oy = VH * 0.82; joy.x = joy.ox - 24; joy.y = joy.oy - 34;   // le doigt qui guide le héros   // cœur de mi-niveau (il en manque)
+    g.atk = 'punch'; g.state = 'active'; g.len = punchLen(g); g.ext = 1; g.st = 0.18; g.boomed = true;
+    punchBoom(g);
+  } else if (n === 2) {
+    P.x = AW * 0.56; P.y = AH * 0.5; P.face = -0.5; P.vx = 140; P.vy = -70; P.walk = 1;
+    const a = golem(0, 0.2, 0.36), b = golem(1, 0.8, 0.15), c = golem(2, 0.7, 0.86), d = golem(3, 0.36, 0.7);
+    // a : sa frappe au sol vient de tomber (onde, poussière, fissures)
+    vise(a, P.x, P.y); a.atk = 'slam'; a.state = 'active'; a.st = 0.08; a.R = 120; slamImpact(a);
+    // un premier rocher vient de s'écraser (cratère, poussière, onde)
+    { const x = AW * 0.66, y = AH * 0.3, peb = []; for (let i = 0; i < 5; i++) peb.push([rand(-16, 16), rand(-12, 12), rand(2, 4.5)]);
+      dust(x, y, 12, 70); shards(x, y, 9, 0, Math.PI, 150, ['#9b978c', '#6a675f', '#b9b5a8']); ring(x, y, 40, 0.3, '244,232,211');
+      addDecal({ k: 'crater', x, y, r: 22, t: 0, life: 3, peb }); }
+    updateFx(0.16);   // l'onde et la poussière se sont déjà élargies
+    // b : trois rochers en l'air, chacun avec sa cible rouge
+    vise(b, P.x, P.y); b.atk = 'throw'; b.state = 'active'; b.st = 0.1;
+    [[0.42, 0.6, 0.7], [0.76, 0.44, 0.55], [0.4, 0.2, 0.35]].forEach(([fx, fy, k], i) =>
+      G.rocks.push({ sx: b.x - 10, sy: b.y + 10, tx: AW * fx, ty: AH * fy, t: k, dur: 1.0, r: 40, rot: i * 2, owner: b }));
+    // c : prépare sa ruée, son couloir rouge traverse l'arène
+    prepare(c, 'charge', 0.82, P.x - 48, P.y - 40);
+    for (let i = 1; i <= 4; i++) dust(c.x + Math.cos(c.aim) * -26 + rand(-8, 8), c.y - Math.sin(c.aim) * 26 + i * 4, 2, 30);
+    prepare(d, 'slam', 0.8, P.x, P.y);
+    G.pickups.push({ x: AW * 0.86, y: AH * 0.56, t: 0, life: 9, ph: 0.5 });
+    joy.id = -1; joy.ox = VW * 0.16; joy.oy = VH * 0.9; joy.x = joy.ox + 36; joy.y = joy.oy - 18;
+  } else {
+    P.x = AW * 0.46; P.y = AH * 0.5; P.face = 2.4; P.vx = -150; P.vy = 110; P.walk = 3;
+    P.trail = [0.15, 0.3, 0.45].map((a, i) => ({ x: P.x + (3 - i) * 16, y: P.y - (3 - i) * 12, a }));
+    const a = golem(0, 0.86, 0.18), b = golem(1, 0.25, 0.3), c = golem(2, 0.72, 0.62), d = golem(3, 0.2, 0.74), e = golem(4, 0.56, 0.86);
+    // a : sa ruée l'a envoyé dans le mur, il est étourdi (étoiles)
+    a.x = AW - a.r - 4; a.y = AH * 0.16; a.face = -0.3; a.state = 'recover'; a.dizzy = true; a.rec = 99; a.st = 0.2;
+    makeCracks(a.x + 14, a.y, 40); dust(a.x + 20, a.y, 8, 50);
+    // b : balayage en cours, la chaîne passe derrière le héros
+    vise(b, P.x, P.y); b.atk = 'sweep'; b.state = 'active'; b.R = 150; b.half = 1.2; b.st = 0.16;
+    b.sweepA = b.aim - b.half + 2 * b.half * easeOut(0.45); b.prevSweep = b.sweepA - 0.1;
+    prepare(c, 'combo', 0.7, P.x, P.y);
+    prepare(d, 'charge', 0.4, P.x + 40, P.y - 10);
+    prepare(e, 'slam', 0.3, P.x, P.y);
+    makeCracks(AW * 0.62, AH * 0.36, 90);
+    const peb = []; for (let i = 0; i < 5; i++) peb.push([rand(-16, 16), rand(-12, 12), rand(2, 4.5)]);
+    addDecal({ k: 'crater', x: AW * 0.32, y: AH * 0.56, r: 22, t: 0.6, life: 3, peb });
+  }
+  showOverlay(null); setPlayUI(true); renderHearts(); renderLevel();
+  P.dashCd = n === 3 ? 0.55 : 0;
+  updateFx(0.05);
+  G.shake = 0; G.flash = n === 3 ? 0.16 : 0;   // un seul cœur : le bord de l'écran rougit, comme en partie
+  hudTick();
+  G.mode = 'fige';   // moment figé : la boucle redessine sans rien faire avancer
+}
+
 /* ---------- démarrage ---------- */
 function boot(data) {
   resize(); refreshBest(); refreshSound(); renderHearts();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (affiche) { demarrerAffiche(); return; }
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });
+    return;
+  }
   initDemo(); showOverlay('menu'); setPlayUI(false);
   if (data && data.round) { startGame(data.round); pauseGame(); }
   requestAnimationFrame(t => { last = t; requestAnimationFrame(frame); });

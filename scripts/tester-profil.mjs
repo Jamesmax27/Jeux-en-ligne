@@ -18,6 +18,9 @@
 //     catalogue, plafond du jour, badges ;
 //   - code de sauvegarde côté serveur : création limitée, restauration avec
 //     Turnstile, essais ratés et blocage progressif ;
+//   - sauvegardes des jeux d'un appareil à l'autre : version, un seul appareil
+//     qui change (gagne même plus bas), conflit (niveau, score, date), effacement,
+//     envoi précédent reconnu, refus, tailles, écriture concurrente ;
 //   - pseudos : filtre, unicité, signalements ;
 //   - multijoueur (anti-triche) : ticket signé (falsifié, expiré, autre jeu),
 //     présence réelle (durée, coups), un seul enregistrement par manche,
@@ -72,6 +75,7 @@ const CATALOGUE = {
     { id: 'glissade', title: 'Glissade' },
     { id: 'sans-fin', title: 'Sans fin', sans_fin: true },
     { id: 'enclos-de-la-ferme', title: 'Enclos', multijoueur: true },
+    { id: 'terres-cubiques', title: 'Terres Cubiques' },
     ...Array.from({ length: 14 }, (_, i) => ({ id: `jeu-${i + 1}`, title: `Jeu ${i + 1}` })),
   ],
 };
@@ -88,7 +92,8 @@ const env = {
 const { onRequestPost: apiProfil } = await import('../functions/api/profil.js');
 const { onRequestPost: apiClassement } = await import('../functions/api/classement.js');
 const { onRequestPost: apiMulti } = await import('../functions/api/profil-multi.js');
-const { tacheQuotidienneProfil, archiverPodiums, finPeriode, periodePrecedente, badgesMerites, requetePoints } = await import('../functions/_profil.js');
+const { tacheQuotidienneProfil, archiverPodiums, finPeriode, periodePrecedente, badgesMerites, requetePoints, preparerSauvegardes } = await import('../functions/_profil.js');
+const { empreinteSauvegarde } = await import('../public/sauvegardes-nuage.js');
 
 let ipCourante = '203.0.113.1';
 async function appeler(fonction, corps, { ip = ipCourante, entetes = {} } = {}) {
@@ -277,6 +282,103 @@ for (let i = 0; i <= R.CODES_CREES_JOUR; i++) {
   limite = await profil({ action: 'code', jeton: p.jeton });
 }
 verifier(limite.statut === 429, `création de codes limitée à ${R.CODES_CREES_JOUR} par adresse et par jour`, limite.statut);
+
+// ==========================================================================
+console.log('Sauvegardes des jeux (d\'un appareil à l\'autre)');
+{
+  // Deux appareils du même profil : jetonB (le premier) et r1.jeton (relié par le code).
+  const pc = jetonB, tel = r1.jeton;
+  const sv = (niveau, score, date = maintenant, extra = {}) => JSON.stringify({ v: 1, niveau, score, options: {}, date, ...extra });
+  const sauve = (jeton, article) => profil({ action: 'sauvegarde', jeton, ...article });
+  const lue = async (jeu) => DB.prepare('SELECT version, donnees FROM profils_sauvegardes WHERE profil = ? AND jeu = ?').bind(r1.etat.id, jeu).first();
+
+  verifier((await profil({ action: 'etat', jeton: pc })).etat.appareils === 2, 'état : nombre d\'appareils du profil (2)');
+  verifier(b.etat.appareils === 1, 'profil sur un seul appareil : 1');
+
+  // Envoi avec « sync » : premier envoi, accepté.
+  let s = await profil({ action: 'sync', jeton: pc, jour: jourLocal(), sauvegardes: [{ jeu: 'grimpe', base: 0, donnees: sv(5, 100) }] });
+  verifier(s.statut === 200 && s.sauvegardes?.[0]?.statut === 'ok' && s.sauvegardes[0].version === 1, 'sync : première sauvegarde acceptée (version 1)', s.sauvegardes);
+  verifier(!('sauvegardes' in (await profil({ action: 'sync', jeton: pc, jour: jourLocal() }))), 'sync sans sauvegardes : pas de réponse « sauvegardes »');
+
+  // L'autre appareil la relit au lancement.
+  let l = await sauve(tel, { jeu: 'grimpe', base: 0, lire: true });
+  verifier(l.sauvegarde.statut === 'perdu' && l.sauvegarde.version === 1 && JSON.parse(l.sauvegarde.donnees).niveau === 5, 'lancement sur l\'autre appareil : sauvegarde du serveur donnée', l.sauvegarde);
+  l = await sauve(tel, { jeu: 'grimpe', base: 1, lire: true });
+  verifier(l.sauvegarde.statut === 'ok' && l.sauvegarde.version === 1 && !('donnees' in l.sauvegarde), 'version déjà connue : rien à recopier', l.sauvegarde);
+
+  // « Nouvelle partie » sur un seul appareil : la sauvegarde plus basse gagne (pas de conflit).
+  avancer(60000);
+  l = await sauve(tel, { jeu: 'grimpe', base: 1, donnees: sv(2, 10) });
+  verifier(l.sauvegarde.statut === 'ok' && l.sauvegarde.version === 2 && (await lue('grimpe')).version === 2, 'un seul appareil a changé : sa sauvegarde plus basse est gardée', l.sauvegarde);
+
+  // Conflit : les deux ont joué. La plus avancée gagne.
+  avancer(60000);
+  s = await profil({ action: 'sync', jeton: pc, jour: jourLocal(), sauvegardes: [{ jeu: 'grimpe', base: 1, donnees: sv(7, 50) }] });
+  verifier(s.sauvegardes[0].statut === 'ok' && s.sauvegardes[0].version === 3, 'conflit : le niveau le plus haut gagne (appareil)', s.sauvegardes);
+  l = await sauve(tel, { jeu: 'grimpe', base: 2, donnees: sv(4, 999) });
+  verifier(l.sauvegarde.statut === 'perdu' && l.sauvegarde.version === 3 && JSON.parse(l.sauvegarde.donnees).niveau === 7, 'conflit perdu : la sauvegarde du serveur (niveau 7) est renvoyée', l.sauvegarde);
+  // Niveau égal : le score, puis la date.
+  const t0 = maintenant;
+  await sauve(pc, { jeu: 'glissade', base: 0, donnees: sv(3, 10, t0) });
+  l = await sauve(tel, { jeu: 'glissade', base: 0, donnees: sv(3, 20, t0 - 5000) });
+  verifier(l.sauvegarde.statut === 'ok' && l.sauvegarde.version === 2, 'conflit à niveau égal : le meilleur score gagne', l.sauvegarde);
+  l = await sauve(pc, { jeu: 'glissade', base: 1, donnees: sv(3, 20, t0 + 5000) });
+  verifier(l.sauvegarde.statut === 'ok' && l.sauvegarde.version === 3, 'niveau et score égaux : la plus récente gagne', l.sauvegarde);
+  l = await sauve(tel, { jeu: 'glissade', base: 2, donnees: sv(3, 20, t0 - 9000) });
+  verifier(l.sauvegarde.statut === 'perdu' && l.sauvegarde.version === 3, '… et la plus ancienne perd', l.sauvegarde);
+
+  // Effacement : suit sur l'autre appareil ; battu par une sauvegarde lors d'un conflit.
+  l = await sauve(pc, { jeu: 'grimpe', base: 3, donnees: null });
+  verifier(l.sauvegarde.statut === 'ok' && l.sauvegarde.version === 4 && (await lue('grimpe')).donnees === null, 'effacement accepté (un seul appareil)', l.sauvegarde);
+  l = await sauve(tel, { jeu: 'grimpe', base: 3, lire: true });
+  verifier(l.sauvegarde.statut === 'perdu' && l.sauvegarde.donnees === null, 'effacement transmis à l\'autre appareil', l.sauvegarde);
+  await sauve(pc, { jeu: 'robot-max', base: 0, donnees: sv(2, 5) });
+  l = await sauve(tel, { jeu: 'robot-max', base: 0, donnees: null });
+  verifier(l.sauvegarde.statut === 'perdu' && JSON.parse(l.sauvegarde.donnees).niveau === 2, 'conflit : une sauvegarde qui existe bat un effacement', l.sauvegarde);
+  l = await sauve(pc, { jeu: 'jeu-2', base: 0, donnees: null });
+  verifier(l.sauvegarde.statut === 'ok' && l.sauvegarde.version === 0 && !(await lue('jeu-2')), 'effacement d\'une sauvegarde inconnue du serveur : rien d\'écrit');
+
+  // Envoi précédent sans réponse lue (sendBeacon) : reconnu, pas de faux conflit.
+  const parti = sv(9, 900);
+  await sauve(pc, { jeu: 'jeu-1', base: 0, donnees: parti });
+  l = await sauve(pc, { jeu: 'jeu-1', base: 0, donnees: sv(1, 0), envoye: empreinteSauvegarde(parti) });
+  verifier(l.sauvegarde.statut === 'ok' && l.sauvegarde.version === 2, 'envoi précédent reconnu par son empreinte : la nouvelle partie plus basse passe', l.sauvegarde);
+  l = await sauve(pc, { jeu: 'jeu-1', base: 0, donnees: sv(0, 0), envoye: empreinteSauvegarde('autre chose') });
+  verifier(l.sauvegarde.statut === 'perdu', 'empreinte qui ne correspond pas : conflit ordinaire', l.sauvegarde);
+  const avant = await lue('jeu-1');
+  l = await sauve(tel, { jeu: 'jeu-1', base: 0, donnees: avant.donnees });
+  verifier(l.sauvegarde.statut === 'ok' && l.sauvegarde.version === avant.version && (await lue('jeu-1')).version === avant.version, 'même contenu que le serveur : version notée, rien de réécrit', l.sauvegarde);
+
+  // Refus : jeux gardés sur l'appareil, jeu inconnu, sauvegarde illisible ou trop grosse.
+  for (const [article, quoi] of [
+    [{ jeu: 'terres-cubiques', base: 0, donnees: sv(1, 0) }, 'Terres Cubiques (sauvegarde gardée sur l\'appareil)'],
+    [{ jeu: 'pas-au-catalogue', base: 0, donnees: sv(1, 0) }, 'jeu absent du catalogue'],
+    [{ jeu: 'jeu-3', base: 0, donnees: 'pas du JSON' }, 'texte illisible'],
+    [{ jeu: 'jeu-3', base: 0, donnees: JSON.stringify({ v: 2, niveau: 3 }) }, 'autre format que save.js'],
+    [{ jeu: 'jeu-3', base: 0, donnees: sv(1, 0, maintenant, { gros: 'x'.repeat(R.SAUVEGARDE_SERVEUR_MAX) }) }, `plus de ${R.SAUVEGARDE_SERVEUR_MAX} caractères`],
+  ]) {
+    l = await sauve(pc, article);
+    verifier(l.sauvegarde?.statut === 'refuse', `refusé : ${quoi}`, l.sauvegarde);
+  }
+  verifier((await sauve(pc, { jeu: 'jeu-3', base: 0 })).statut === 400, 'action « sauvegarde » sans données ni lecture : refusée');
+  verifier((await DB.prepare("SELECT COUNT(*) AS n FROM profils_sauvegardes WHERE jeu IN ('terres-cubiques', 'pas-au-catalogue', 'jeu-3')").first()).n === 0, 'rien d\'écrit pour les refus');
+
+  // Taille des envois : 256 Ko pour « sync » et « sauvegarde », 16 Ko pour le reste.
+  const grosses = Array.from({ length: 3 }, (_, i) => ({ jeu: `jeu-${4 + i}`, base: 0, donnees: sv(1, i, maintenant, { carte: 'y'.repeat(60000) }) }));
+  s = await profil({ action: 'sync', jeton: pc, jour: jourLocal(), sauvegardes: grosses });
+  verifier(s.statut === 200 && s.sauvegardes.every((x) => x.statut === 'ok'), 'sync de 180 000 caractères acceptée', s.statut);
+  verifier((await profil({ action: 'etat', jeton: pc, bourrage: 'z'.repeat(20000) })).statut === 400, 'autre action de plus de 16 Ko : refusée');
+  const trop = Array.from({ length: R.SAUVEGARDES_PAR_ENVOI + 3 }, (_, i) => ({ jeu: `jeu-${(i % 14) + 1}`, base: 99, lire: true }));
+  s = await profil({ action: 'sync', jeton: pc, jour: jourLocal(), sauvegardes: trop });
+  verifier(s.sauvegardes.length <= R.SAUVEGARDES_PAR_ENVOI, `au plus ${R.SAUVEGARDES_PAR_ENVOI} sauvegardes traitées par envoi`, s.sauvegardes.length);
+
+  // Écriture concurrente (deux appareils au même instant) : « reessayer », rien d'écrasé.
+  const connu = (id) => CATALOGUE.games.some((g) => g.id === id);
+  const prepa = await preparerSauvegardes(env, r1.etat.id, [{ jeu: 'glissade', base: 3, donnees: sv(1, 1) }], connu, maintenant);
+  await sauve(tel, { jeu: 'glissade', base: 3, donnees: sv(8, 8) });
+  const res = prepa.finir(await DB.batch(prepa.ecritures));
+  verifier(res[0].statut === 'reessayer' && JSON.parse((await lue('glissade')).donnees).niveau === 8, 'écriture concurrente : « reessayer », la sauvegarde de l\'autre appareil reste', res);
+}
 
 // ==========================================================================
 console.log('Pseudos');
@@ -589,8 +691,8 @@ h = await appeler(apiClassement, { type: 'historique', periode: 'semaine' });
 verifier(h.periodes.map((x) => x.debut).join() === '2026-11-09,2026-11-02', "semaines sans joueur classé (16 et 23 novembre) : absentes de l'historique", h.periodes.map((x) => x.debut));
 maintenant += (R.PROFIL_INACTIF_JOURS + 1) * JOUR;
 await tacheQuotidienneProfil(env, maintenant);
-const restants = await DB.prepare('SELECT (SELECT COUNT(*) FROM profils) AS p, (SELECT COUNT(*) FROM profils_jeux) AS j, (SELECT COUNT(*) FROM profils_appareils) AS a').first();
-verifier(restants.p === 0 && restants.j === 0 && restants.a === 0, 'profils inactifs depuis 2 ans effacés avec leurs données', restants);
+const restants = await DB.prepare('SELECT (SELECT COUNT(*) FROM profils) AS p, (SELECT COUNT(*) FROM profils_jeux) AS j, (SELECT COUNT(*) FROM profils_appareils) AS a, (SELECT COUNT(*) FROM profils_sauvegardes) AS s').first();
+verifier(restants.p === 0 && restants.j === 0 && restants.a === 0 && restants.s === 0, 'profils inactifs depuis 2 ans effacés avec leurs données (sauvegardes des jeux comprises)', restants);
 const podiumsRestants = (await DB.prepare('SELECT COUNT(*) AS n, COUNT(profil) AS lies FROM podiums').first());
 verifier(podiumsRestants.n > 0 && podiumsRestants.lies === 0, 'podiums gardés, sans lien vers les profils effacés', podiumsRestants);
 h = await appeler(apiClassement, { type: 'historique', periode: 'mois' });
