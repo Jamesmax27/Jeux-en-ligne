@@ -3081,8 +3081,9 @@ function boucle(now) {
     dessinerDemo($('demo'), carte.demo, horloge);
   }
   if (ecranActif === 'ecran-jeu' && partie) {
-    if (!enPause && !voileOuvert()) { tempsJeu += dt; majPartie(dt); }
-    dessinerPartie(enPause ? 0 : dt);
+    // Image du jeu (JEL_APERCU) : la partie reste figée sur le moment posé, sans fenêtre de pause.
+    if (!enPause && !voileOuvert() && !apercu) { tempsJeu += dt; majPartie(dt); }
+    dessinerPartie(enPause || apercu ? 0 : dt);
   }
   requestAnimationFrame(boucle);
 }
@@ -3267,14 +3268,345 @@ $('b-lancer-amis').addEventListener('click', function () {
 
 // Sauvegarde à la fermeture de la page, seulement pendant une partie de niveau.
 if (window.JEL_SAVE) window.JEL_SAVE.surFermeture(function () {
+  if (apercu) return; // image du jeu : rien n'est enregistré
   if (partie && partie.mode === 'niveau' && partie.enCours) window.JEL_SAVE.save(JEU, donneesSauvegarde(partie.idx + 1));
 });
+
+/* ======================================================================
+   Affiche (jaquette du jeu)
+   ====================================================================== */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le centurion rouge, en grand,
+// bondit par-dessus un pion bleu au soleil couchant ; sur la dalle de Coriovallum vue en perspective,
+// deux pions bleus enfermés se changent en statues, le porte-aigle est cerné, une fontaine jaillit.
+var afficheCanvas = null;
+function afficheAlea(graine) {
+  var s = graine;
+  return function () { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+}
+// Point (u, v) de la dalle (u : gauche-droite, v : fond-devant) vu en perspective, dans la scène 600 × 800.
+function afficheProj(u, v) {
+  var Z = 3 - 2 * v;
+  return { x: 300 + (u - 0.5) * 1000 / Z, y: 250 + 560 / Z, s: 1 / Z };
+}
+// Pion posé sur la dalle, vu de biais : tranche, puis face (dessin du jeu, écrasé).
+function affichePionSol(c, u, v, R, j, type, statue) {
+  var q = afficheProj(u, v), r = R * q.s, sq = 0.5, h = r * 0.34, C = COULEURS[j];
+  c.save();
+  c.fillStyle = 'rgba(60,30,15,.38)'; c.beginPath(); c.ellipse(q.x + r * 0.22, q.y + r * 0.1, r * 1.12, r * sq * 1.15, 0, 0, 6.3); c.fill();
+  var cote = statue ? '#77726a' : C.sombre;
+  c.fillStyle = cote; c.beginPath(); c.ellipse(q.x, q.y, r, r * sq, 0, 0, Math.PI); c.lineTo(q.x - r, q.y - h); c.lineTo(q.x + r, q.y - h); c.closePath(); c.fill();
+  c.fillRect(q.x - r, q.y - h, 2 * r, h);
+  c.translate(q.x, q.y - h); c.scale(1, sq);
+  dessinerPion(c, 0, 0, r, j, type, statue);
+  c.restore();
+  return { x: q.x, y: q.y - h, r: r };
+}
+// Le héros : le centurion rouge, debout face à nous, en plein saut.
+function afficheHeros(c, x, y, r) {
+  c.save();
+  c.translate(x, y); c.rotate(-0.17);
+  var sq = 0.93;
+  // Tranche du pion (il bascule vers nous) : on voit son épaisseur en bas.
+  for (var i = 16; i > 0; i--) { c.fillStyle = i > 12 ? '#3e0f06' : (i % 4 === 0 ? '#8e2616' : '#6e1a0c'); c.beginPath(); c.ellipse(0, i * 2.3, r, r * sq, 0, 0, 6.3); c.fill(); }
+  c.save(); c.scale(1, sq); dessinerPion(c, 0, 0, r, 0, 1, false); c.restore();
+  // Reflet du soleil sur la face.
+  var re = c.createRadialGradient(-r * 0.35, -r * 0.45, r * 0.05, -r * 0.2, -r * 0.3, r * 0.9);
+  re.addColorStop(0, 'rgba(255,240,210,.55)'); re.addColorStop(1, 'rgba(255,240,210,0)');
+  c.fillStyle = re; c.beginPath(); c.ellipse(0, 0, r, r * sq, 0, 0, 6.3); c.fill();
+  // Contour de lumière (le soleil est derrière, en haut à droite).
+  c.strokeStyle = 'rgba(255,236,170,.95)'; c.lineWidth = 7; c.lineCap = 'round';
+  c.beginPath(); c.ellipse(0, 0, r - 2, (r - 2) * sq, 0, Math.PI * 1.55, Math.PI * 2.15); c.stroke();
+  c.strokeStyle = 'rgba(255,248,225,.6)'; c.lineWidth = 3;
+  c.beginPath(); c.ellipse(0, 0, r - 2, (r - 2) * sq, 0, Math.PI * 0.95, Math.PI * 1.3); c.stroke();
+  // Grand cimier de crins rouges, en éventail, sur un support doré : comme un casque de centurion.
+  var cy = r * 0.1, base = r * 1.0, a0 = Math.PI * 1.15, a1 = Math.PI * 1.85, n, a;
+  function rayonExt(a) { var t = (a - a0) / (a1 - a0); return base + r * (0.3 + 0.26 * Math.sin(t * Math.PI)); }
+  var gp = c.createRadialGradient(0, cy, base, 0, cy, base + r * 0.56);
+  gp.addColorStop(0, '#8e1810'); gp.addColorStop(0.45, '#d92b22'); gp.addColorStop(1, '#ff6b45');
+  c.fillStyle = gp; c.beginPath();
+  for (n = 0; n <= 44; n++) { a = a0 + (a1 - a0) * n / 44; var ro = rayonExt(a) + (n % 2 ? -r * 0.035 : r * 0.02); c.lineTo(Math.cos(a) * ro, cy + Math.sin(a) * ro); }
+  for (n = 44; n >= 0; n--) { a = a0 + (a1 - a0) * n / 44; c.lineTo(Math.cos(a) * base, cy + Math.sin(a) * base); }
+  c.closePath(); c.fill();
+  c.lineCap = 'round';
+  for (n = 1; n < 40; n++) {
+    a = a0 + (a1 - a0) * n / 40;
+    c.strokeStyle = n % 2 ? 'rgba(110,12,8,.5)' : 'rgba(255,150,110,.35)'; c.lineWidth = r * 0.02;
+    c.beginPath(); c.moveTo(Math.cos(a) * base * 1.05, cy + Math.sin(a) * base * 1.05); c.lineTo(Math.cos(a) * (rayonExt(a) - r * 0.05), cy + Math.sin(a) * (rayonExt(a) - r * 0.05)); c.stroke();
+  }
+  // Crins éclairés par le soleil, à droite.
+  c.strokeStyle = 'rgba(255,224,170,.9)'; c.lineWidth = r * 0.045;
+  c.beginPath();
+  for (n = 22; n <= 41; n++) { a = a0 + (a1 - a0) * n / 44; var re2 = rayonExt(a) - r * 0.03; if (n === 22) c.moveTo(Math.cos(a) * re2, cy + Math.sin(a) * re2); else c.lineTo(Math.cos(a) * re2, cy + Math.sin(a) * re2); }
+  c.stroke();
+  // Support doré du cimier.
+  c.strokeStyle = '#b8862a'; c.lineWidth = r * 0.17;
+  c.beginPath(); c.arc(0, cy, base, a0 + 0.02, a1 - 0.02); c.stroke();
+  c.strokeStyle = '#ffe9a8'; c.lineWidth = r * 0.06;
+  c.beginPath(); c.arc(0, cy - r * 0.035, base, a0 + 0.05, a1 - 0.05); c.stroke();
+  c.restore();
+}
+function afficheColonne(c, x, larg, haut, bas) {
+  var g = c.createLinearGradient(x, 0, x + larg, 0);
+  g.addColorStop(0, '#b89e78'); g.addColorStop(0.35, '#fbefd4'); g.addColorStop(0.7, '#e2cfa8'); g.addColorStop(1, '#8f7656');
+  c.fillStyle = g; c.fillRect(x, haut, larg, bas - haut);
+  c.strokeStyle = 'rgba(110,85,55,.45)'; c.lineWidth = 3;
+  for (var f = 1; f < 5; f++) { c.beginPath(); c.moveTo(x + larg * f / 5, haut); c.lineTo(x + larg * f / 5, bas); c.stroke(); }
+  c.fillStyle = '#efdfbd'; c.fillRect(x - larg * 0.18, haut - larg * 0.3, larg * 1.36, larg * 0.3);
+  c.fillStyle = '#d9c39b'; c.fillRect(x - larg * 0.3, haut - larg * 0.52, larg * 1.6, larg * 0.24);
+  c.fillStyle = 'rgba(255,240,200,.5)'; c.fillRect(x - larg * 0.3, haut - larg * 0.52, larg * 1.6, larg * 0.05);
+}
+function afficheLaurier(c, x, y, ech, angle, sens) {
+  c.save(); c.translate(x, y); c.rotate(angle); c.scale(sens * ech, ech);
+  c.strokeStyle = '#4d6e22'; c.lineWidth = 4; c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(22, -70, 6, -150); c.stroke();
+  for (var f = 0; f < 9; f++) {
+    var yy = -f * 16 - 6, xx = 12 - Math.abs(f - 4) * 1.6;
+    c.fillStyle = f % 2 ? '#7fb34a' : '#9ccc5e';
+    c.save(); c.translate(xx, yy); c.rotate(-0.7); c.beginPath(); c.ellipse(11, 0, 12, 4.8, 0, 0, 6.3); c.fill(); c.restore();
+    c.fillStyle = f % 2 ? '#6a9a3c' : '#86bb50';
+    c.save(); c.translate(xx, yy - 7); c.rotate(-2.4); c.beginPath(); c.ellipse(11, 0, 12, 4.8, 0, 0, 6.3); c.fill(); c.restore();
+  }
+  c.restore();
+}
+function dessinerAffiche() {
+  if (!afficheCanvas) {
+    afficheCanvas = document.createElement('canvas');
+    afficheCanvas.setAttribute('aria-hidden', 'true');
+    afficheCanvas.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;display:block;z-index:5';
+    document.body.appendChild(afficheCanvas);
+  }
+  var dpr = Math.min(2, window.devicePixelRatio || 1), Wa = window.innerWidth, Ha = window.innerHeight;
+  afficheCanvas.width = Math.round(Wa * dpr); afficheCanvas.height = Math.round(Ha * dpr);
+  var c = afficheCanvas.getContext('2d');
+  var k = Math.min(Wa / 600, Ha / 800), ox = (Wa - 600 * k) / 2, oy = (Ha - 800 * k) / 2;
+  c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+  // Bords de l'écran dans la scène (sur écran large, le décor continue jusqu'aux bords).
+  var xl = -ox / k - 2, xr = (Wa - ox) / k + 2, yt = -oy / k - 2, yb = (Ha - oy) / k + 2;
+  var al = afficheAlea(5), i;
+  // Ciel du soir, chaud et lumineux.
+  var ciel = c.createLinearGradient(0, yt, 0, 450);
+  ciel.addColorStop(0, '#4a3478'); ciel.addColorStop(0.3, '#a8558a'); ciel.addColorStop(0.62, '#f3845a'); ciel.addColorStop(1, '#ffd58e');
+  c.fillStyle = ciel; c.fillRect(xl, yt, xr - xl, 460 - yt);
+  // Soleil derrière le héros, et ses rayons.
+  var sx = 372, sy = 236;
+  c.save();
+  for (i = 0; i < 18; i++) {
+    var a = i * Math.PI / 9 + 0.1;
+    c.fillStyle = i % 2 ? 'rgba(255,236,170,.13)' : 'rgba(255,250,220,.07)';
+    c.beginPath(); c.moveTo(sx, sy); c.arc(sx, sy, 900, a, a + 0.12); c.closePath(); c.fill();
+  }
+  var halo = c.createRadialGradient(sx, sy, 20, sx, sy, 380);
+  halo.addColorStop(0, 'rgba(255,250,215,1)'); halo.addColorStop(0.25, 'rgba(255,226,150,.8)'); halo.addColorStop(1, 'rgba(255,200,120,0)');
+  c.fillStyle = halo; c.fillRect(xl, yt, xr - xl, 600);
+  c.fillStyle = '#fff6d6'; c.beginPath(); c.arc(sx, sy, 78, 0, 6.3); c.fill();
+  c.restore();
+  // Nuages roses étirés.
+  c.fillStyle = 'rgba(255,190,190,.35)';
+  [[70, 120, 120], [520, 90, 150], [-80, 200, 110], [640, 210, 120]].forEach(function (n) {
+    c.beginPath(); c.ellipse(n[0], n[1], n[2], 14, 0, 0, 6.3); c.fill();
+    c.beginPath(); c.ellipse(n[0] + n[2] * 0.3, n[1] - 10, n[2] * 0.5, 12, 0, 0, 6.3); c.fill();
+  });
+  // Collines et ville romaine au loin : temple à gauche, aqueduc à droite.
+  c.fillStyle = '#b5607a';
+  c.beginPath(); c.moveTo(xl, 420); c.quadraticCurveTo(120, 380, 300, 405); c.quadraticCurveTo(480, 425, xr, 390); c.lineTo(xr, 470); c.lineTo(xl, 470); c.fill();
+  c.fillStyle = '#93496a';
+  c.fillRect(30, 372, 150, 60);
+  c.beginPath(); c.moveTo(20, 374); c.lineTo(105, 336); c.lineTo(190, 374); c.closePath(); c.fill();
+  c.fillStyle = '#a95a78';
+  for (i = 0; i < 6; i++) c.fillRect(40 + i * 25, 380, 9, 50);
+  c.fillStyle = '#93496a';
+  for (var ax = 400; ax < xr; ax += 46) {
+    c.fillRect(ax, 360, 46, 12);
+    c.fillRect(ax, 372, 10, 60);
+    c.beginPath(); c.arc(ax + 28, 384, 18, Math.PI, 0); c.lineTo(ax + 46, 372); c.lineTo(ax + 10, 372); c.fill();
+  }
+  for (ax = -60; ax > xl - 50; ax -= 70) { c.fillRect(ax, 392, 50, 40); c.beginPath(); c.moveTo(ax - 6, 394); c.lineTo(ax + 25, 376); c.lineTo(ax + 56, 394); c.fill(); }
+  // Sol de la cour, chaud.
+  var sol = c.createLinearGradient(0, 420, 0, yb);
+  sol.addColorStop(0, '#d79a62'); sol.addColorStop(1, '#8a5532');
+  c.fillStyle = sol; c.fillRect(xl, 425, xr - xl, yb - 425);
+  // La dalle gravée en perspective.
+  var coins = [afficheProj(-0.1, -0.12), afficheProj(1.1, -0.12), afficheProj(1.1, 1.2), afficheProj(-0.1, 1.2)];
+  c.fillStyle = 'rgba(70,35,15,.45)';
+  c.beginPath(); c.moveTo(coins[0].x + 6, coins[0].y + 10); c.lineTo(coins[1].x + 18, coins[1].y + 10); c.lineTo(coins[2].x + 40, coins[2].y + 40); c.lineTo(coins[3].x + 40, coins[3].y + 40); c.closePath(); c.fill();
+  c.fillStyle = '#8f7658';
+  c.beginPath(); c.moveTo(coins[0].x, coins[0].y); c.lineTo(coins[1].x, coins[1].y); c.lineTo(coins[1].x, coins[1].y + 9); c.lineTo(coins[0].x, coins[0].y + 9); c.closePath(); c.fill();
+  var gd = c.createLinearGradient(0, coins[0].y, 0, 800);
+  gd.addColorStop(0, '#fff0cf'); gd.addColorStop(0.35, '#e6d4ae'); gd.addColorStop(1, '#bfa47a');
+  c.fillStyle = gd;
+  c.beginPath(); c.moveTo(coins[0].x, coins[0].y); c.lineTo(coins[1].x, coins[1].y); c.lineTo(coins[2].x, coins[2].y); c.lineTo(coins[3].x, coins[3].y); c.closePath(); c.fill();
+  c.save(); c.clip();
+  MOUCHETURES.forEach(function (m) {
+    var q = afficheProj(-0.1 + m[0] * 1.2, -0.12 + m[1] * 1.32);
+    c.fillStyle = m[2] > .5 ? 'rgba(90,70,45,.2)' : 'rgba(255,250,235,.35)';
+    c.beginPath(); c.ellipse(q.x, q.y, (2 + m[2] * 5) * q.s * 2, (2 + m[2] * 5) * q.s, 0, 0, 6.3); c.fill();
+  });
+  c.restore();
+  // Lignes gravées de la dalle de Coriovallum.
+  var P = PLATEAUX.coriovallum;
+  function tracer(dx, dy, couleur, ep) {
+    c.strokeStyle = couleur; c.lineCap = 'round';
+    P.lignes.forEach(function (L) {
+      for (var n = 0; n + 1 < L.length; n++) {
+        var a = P.xy[L[n]], b = P.xy[L[n + 1]], qa = afficheProj(a[0], a[1]), qb = afficheProj(b[0], b[1]);
+        c.lineWidth = ep * (qa.s + qb.s) / 2;
+        c.beginPath(); c.moveTo(qa.x + dx, qa.y + dy * qa.s); c.lineTo(qb.x + dx, qb.y + dy * qb.s); c.stroke();
+      }
+    });
+  }
+  tracer(0, 5, 'rgba(255,250,235,.7)', 13);
+  tracer(0, 0, 'rgba(75,52,30,.9)', 13);
+  for (i = 0; i < P.n; i++) {
+    var qp = afficheProj(P.xy[i][0], P.xy[i][1]);
+    c.fillStyle = 'rgba(60,44,26,.9)'; c.beginPath(); c.ellipse(qp.x, qp.y, 26 * qp.s, 13 * qp.s, 0, 0, 6.3); c.fill();
+  }
+  var R = 120; // rayon d'un pion posé à la distance de la caméra
+  // Fontaine (point 7) qui jaillit, et borne (point 6).
+  var qf = afficheProj(0.25, 0.5);
+  c.save(); c.translate(qf.x, qf.y); c.scale(1, 0.5); dessinerFontaine(c, 0, 0, R * qf.s * 0.95, 700); c.restore();
+  c.strokeStyle = 'rgba(190,240,255,.9)'; c.lineWidth = 4; c.lineCap = 'round';
+  for (i = 0; i < 7; i++) {
+    var ang = -Math.PI / 2 + (i - 3) * 0.32, hh = 70 + (3 - Math.abs(i - 3)) * 16;
+    c.beginPath(); c.moveTo(qf.x, qf.y - 4); c.quadraticCurveTo(qf.x + Math.cos(ang) * 50, qf.y - hh, qf.x + Math.cos(ang) * 95, qf.y - hh * 0.25); c.stroke();
+  }
+  c.fillStyle = '#d8f6ff';
+  for (i = 0; i < 16; i++) { c.beginPath(); c.arc(qf.x + (al() - 0.5) * 170, qf.y - 30 - al() * 90, 2.5 + al() * 3.5, 0, 6.3); c.fill(); }
+  var qb6 = afficheProj(0, 0.5);
+  c.save(); c.translate(qb6.x, qb6.y - 6); c.scale(1, 0.62); dessinerBorne(c, 0, 0, R * qb6.s * 1.05); c.restore();
+  // Au fond : deux pions bleus enfermés, changés en statues, et la poussière de pierre.
+  var st1 = affichePionSol(c, 0.75, 0.25, R, 1, 0, true);
+  var st2 = affichePionSol(c, 1, 0, R, 1, 0, true);
+  affichePionSol(c, 0.5, 0, R, 0, 0, false);
+  affichePionSol(c, 1, 0.5, R, 0, 0, false);
+  [st1, st2].forEach(function (st) {
+    for (var n = 0; n < 14; n++) {
+      var a = al() * 6.3, d = st.r * (1.05 + al() * 0.9);
+      c.fillStyle = n % 2 ? '#d9d4ca' : '#a39e94';
+      c.save(); c.translate(st.x + Math.cos(a) * d, st.y + Math.sin(a) * d * 0.6 - st.r * 0.3); c.rotate(a);
+      c.fillRect(-4, -2.5, 8, 5); c.restore();
+    }
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2.5;
+    c.beginPath(); c.ellipse(st.x, st.y, st.r * 1.45, st.r * 0.75, 0, 0, 6.3); c.stroke();
+  });
+  // Le porte-aigle bleu, cerné, à droite.
+  affichePionSol(c, 0.75, 0.5, R, 1, 2, false);
+  // Pion bleu par-dessus lequel saute le héros (centre), et la case d'arrivée dorée du saut (point 4).
+  var qa4 = afficheProj(0.5, 0.25);
+  c.save(); c.translate(qa4.x, qa4.y); c.scale(1, 0.5);
+  c.shadowColor = '#ffd24a'; c.shadowBlur = 24;
+  c.fillStyle = 'rgba(255,214,90,.7)'; c.beginPath(); c.arc(0, 0, R * qa4.s * 0.6, 0, 6.3); c.fill();
+  c.strokeStyle = '#ffd24a'; c.lineWidth = 6; c.beginPath(); c.arc(0, 0, R * qa4.s * 0.95, 0, 6.3); c.stroke();
+  c.restore();
+  affichePionSol(c, 0.5, 0.5, R, 1, 0, false);
+  // Devant : deux légionnaires rouges, grands, coupés par le bas.
+  affichePionSol(c, 0.25, 0.75, R, 0, 0, false);
+  affichePionSol(c, 0.75, 0.75, R, 0, 0, false);
+  affichePionSol(c, 0.5, 1, R, 0, 0, false);
+  // Ombre du héros sur la dalle.
+  var hx = 285, hy = 292, hr = 125;
+  c.fillStyle = 'rgba(70,30,10,.25)'; c.beginPath(); c.ellipse(hx + 30, 500, hr * 0.85, 22, 0, 0, 6.3); c.fill();
+  // Traînée dorée du saut : de la case de départ (point 12, devant) jusqu'au héros.
+  var dep = afficheProj(0.5, 0.75);
+  c.save(); c.lineCap = 'round'; c.shadowColor = '#ffd24a'; c.shadowBlur = 18;
+  for (i = 0; i < 3; i++) {
+    c.strokeStyle = ['rgba(255,214,90,.55)', 'rgba(255,236,170,.75)', 'rgba(255,255,240,.9)'][i]; c.lineWidth = [34, 18, 6][i];
+    c.beginPath(); c.moveTo(dep.x - 10, dep.y - 30); c.quadraticCurveTo(dep.x - 130, hy + 170, hx - 72, hy + 72); c.stroke();
+  }
+  c.restore();
+  // Le héros, en grand.
+  afficheHeros(c, hx, hy, hr);
+  // Étincelles dorées autour du saut.
+  for (i = 0; i < 22; i++) {
+    var ea = al() * 6.3, ed = hr * (1.15 + al() * 0.6), ex = hx + Math.cos(ea) * ed, ey = hy + Math.sin(ea) * ed * 0.9, er = 3 + al() * 6;
+    c.fillStyle = i % 3 ? '#fff3b0' : '#ffd24a';
+    c.beginPath(); c.moveTo(ex, ey - er * 1.8); c.lineTo(ex + er * 0.5, ey - er * 0.5); c.lineTo(ex + er * 1.8, ey); c.lineTo(ex + er * 0.5, ey + er * 0.5);
+    c.lineTo(ex, ey + er * 1.8); c.lineTo(ex - er * 0.5, ey + er * 0.5); c.lineTo(ex - er * 1.8, ey); c.lineTo(ex - er * 0.5, ey - er * 0.5); c.closePath(); c.fill();
+  }
+  // Premier plan : colonnes coupées par les bords, lauriers dans les coins.
+  afficheColonne(c, -40, 92, 70, yb);
+  afficheColonne(c, 548, 92, 70, yb);
+  for (var cx2 = -170; cx2 > xl - 120; cx2 -= 150) afficheColonne(c, cx2, 80, 110, yb);
+  for (cx2 = 740; cx2 < xr + 40; cx2 += 150) afficheColonne(c, cx2, 80, 110, yb);
+  afficheLaurier(c, 30, 800, 1.5, 0.35, 1);
+  afficheLaurier(c, 570, 800, 1.5, -0.35, -1);
+  // Léger voile sombre tout en bas (le site y pose le titre).
+  var bas = c.createLinearGradient(0, 640, 0, yb);
+  bas.addColorStop(0, 'rgba(40,20,10,0)'); bas.addColorStop(1, 'rgba(40,20,10,.35)');
+  c.fillStyle = bas; c.fillRect(xl, 640, xr - xl, yb - 640);
+}
+function cacherPourAffiche() {
+  document.querySelectorAll('#app, .jel-langue, jel-langue, button').forEach(function (el) { el.style.setProperty('display', 'none', 'important'); });
+}
+function demarrerAffiche() {
+  cacherPourAffiche();
+  setTimeout(cacherPourAffiche, 200); setTimeout(cacherPourAffiche, 1000);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ======================================================================
+   Images du jeu (page du jeu)
+   ====================================================================== */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (niveau, sablier de coups, tour, joueurs), sans
+// écran titre, ni fenêtre « Continuer », ni carte de niveau (CONSIGNES-JEU.md, section 5). La position
+// est posée par le code, puis la partie reste figée : ni robot qui joue, ni fin, ni son, ni sauvegarde.
+//   1 = niveau 1, la Tabula : un pion rouge choisi va enfermer le pion bleu ;
+//   2 = niveau 8, Coriovallum : bornes, porte-aigle bleu, le centurion prêt à sauter (case dorée) ;
+//   3 = niveau 19, l'Arène aux deux cercles : trois robots, fontaine, Livia vient d'être changée en statue.
+var apercu = 0;
+var SCENES_APERCU = {
+  1: { niveau: 0, coups: 3, pions: [[[0,0],[4,0],[5,0]], [[1,0]]], selection: 5, dernier: [3, 0] },
+  2: { niveau: 7, coups: 6, pions: [[[3,0],[5,0],[12,0],[15,1],[9,0]], [[4,2],[0,0],[2,0]]], selection: 15, dernier: [7, 3] },
+  3: { niveau: 18, coups: 9, pions: [[[10,0],[12,0],[14,1],[1,1],[6,0]], [[9,0]], [[11,0]], [[15,0]]], selection: 14, dernier: [2, 10], statue: 2 }
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  var sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  var graine = 4242 + numero * 97;
+  Math.random = function () { graine = (graine * 9301 + 49297) % 233280; return graine / 233280; };
+  Son.poserMuet(true);
+  var base = NIVEAUX[sc.niveau], cfg = {};
+  Object.keys(base).forEach(function (cle) { cfg[cle] = base[cle]; });
+  delete cfg.pose; cfg.pions = sc.pions;
+  var joueurs = [];
+  for (var j = 0; j < sc.pions.length; j++) joueurs.push({ humain: j === 0, force: base.ia, role: j === 0 ? 'joueur' : roleRobot(base.objectif) });
+  var e = nouvelEtat(cfg);
+  e.coups[0] = sc.coups;
+  for (j = 1; j < e.coups.length; j++) e.coups[j] = sc.coups;
+  if (sc.statue != null) { e.vivant[sc.statue] = false; e.pieces.forEach(function (p) { if (p.j === sc.statue) p.statue = true; }); }
+  partie = { mode: 'niveau', idx: sc.niveau, cfg: base, etat: e, joueurs: joueurs, selection: e.occ[sc.selection], anim: null, attente: 99,
+             fini: false, indice: false, conseil: null, dernier: { de: sc.dernier[0], a: sc.dernier[1] }, curseur: null, statueCachee: {}, secousse: null, enCours: false };
+  particules = []; textesFlottants = [];
+  montrerEcran('ecran-jeu');
+  $('nom-niveau').textContent = tr('niveauN', { n: sc.niveau + 1 });
+  $('b-indice').style.visibility = 'visible';
+  majHud();
+  redimensionner();
+  LAY = mise(e.P, W, H, 0.09);
+  // Statue toute neuve : éclats de pierre et « Bloqué ! » au-dessus d'elle, figés.
+  if (sc.statue != null) {
+    e.pieces.forEach(function (p) {
+      if (p.j !== sc.statue) return;
+      var q = LAY.pt(p.n);
+      eclats(q[0], q[1], '#bdb8ae', 16, 3.5);
+      texteFlottant(Math.max(70, Math.min(W - 70, q[0])), q[1] - LAY.r * 1.9, tr('bloqueExclam'), '#fff4d8');
+    });
+    majParticules(ctx, 0.12); majTextes(ctx, 0.2);
+  }
+}
 
 chargerProgression();
 majBoutonsSon();
 majTitre();
 redimensionner();
-requestAnimationFrame(boucle);
+var numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else requestAnimationFrame(boucle);
 </script>
 </body>
 </html>
