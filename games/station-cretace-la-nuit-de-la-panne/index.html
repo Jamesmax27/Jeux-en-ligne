@@ -3532,6 +3532,10 @@
     #aide { display: none; }
     #prev { min-height: 0; }
   }
+  /* Image du jeu sur écran d'ordinateur (window.JEL_APERCU = 3) : les enclos prennent toute la largeur */
+  body.apercu-large #enclos, body.apercu-large #barre-jeu, body.apercu-large #prev { max-width: none; }
+  body.apercu-large #enclos { gap: 10px; padding: 0 12px; }
+  body.apercu-large #etal { max-width: 760px; }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
 </style>
 </head>
@@ -4877,7 +4881,9 @@
   // ---------------------------------------------------------------------
 
   let rafId = 0;
-  function relancerBoucle() { if (!rafId) rafId = requestAnimationFrame(boucle); }
+  let modeAffiche = false;    // affiche du jeu (window.JEL_AFFICHE) : aucune boucle
+  let modeApercu = 0;         // image du jeu (window.JEL_APERCU = 1, 2 ou 3), sinon 0
+  function relancerBoucle() { if (!rafId && !modeAffiche) rafId = requestAnimationFrame(boucle); }
   function boucle() {
     rafId = 0;
     const t = performance.now();
@@ -5881,6 +5887,260 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche du jeu (jaquette) : window.JEL_AFFICHE, posé par le robot du
+  //  site seulement (CONSIGNES-JEU.md, section 5). Une scène composée, sans
+  //  interface ni texte : sous l'orage, le Tyrannosaure rugit derrière la
+  //  clôture électrique qui grésille, pris dans le faisceau du projecteur ;
+  //  au premier plan, le bras du soigneur brandit une fusée rouge.
+  // ---------------------------------------------------------------------
+
+  function dessinerAffiche() {
+    const cv = $('fond'), dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = window.innerWidth, h = window.innerHeight;
+    if (!w || !h) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    // Zone de référence 600 × 800 centrée ; le décor continue jusqu'aux bords.
+    const k = Math.min(w / 600, h / 800);
+    const ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+    const al = graineHasard(2026);
+    const t = 2400;
+    const sol = Y(585);
+
+    // Ciel d'orage, plus clair à l'horizon (lueurs de la station)
+    let g = c.createLinearGradient(0, 0, 0, sol);
+    g.addColorStop(0, '#1d2350'); g.addColorStop(0.45, '#46407e'); g.addColorStop(0.85, '#8a4f78'); g.addColorStop(1, '#b06a6a');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    // Halo de l'éclair, en haut à gauche
+    const ex = X(130);
+    let hg = c.createRadialGradient(ex, Y(120), 10 * k, ex, Y(160), 420 * k);
+    hg.addColorStop(0, 'rgba(210,225,255,.75)'); hg.addColorStop(0.4, 'rgba(160,180,255,.28)'); hg.addColorStop(1, 'rgba(140,160,255,0)');
+    c.fillStyle = hg; c.fillRect(0, 0, w, h);
+    // Nuages d'orage, bordés de lumière
+    for (let i = 0; i < 14; i++) {
+      const x = (al() * 1.4 - 0.2) * w, y = Y(20 + al() * 210), r = (40 + al() * 70) * k;
+      c.fillStyle = 'rgba(28,30,62,.85)'; ell(c, x, y, r * 1.9, r * 0.62); c.fill();
+      c.fillStyle = 'rgba(150,160,220,.16)'; ell(c, x - r * 0.3, y - r * 0.3, r * 1.3, r * 0.3); c.fill();
+    }
+    // L'éclair
+    c.save();
+    c.strokeStyle = '#eef3ff'; c.lineWidth = 5 * k; c.lineJoin = 'round'; c.lineCap = 'round';
+    c.shadowColor = '#b8c8ff'; c.shadowBlur = 30 * k;
+    const pts = [[150, -10], [120, 70], [158, 90], [108, 190], [140, 205], [96, 330]];
+    c.beginPath(); pts.forEach((p, i) => (i ? c.lineTo(X(p[0]), Y(p[1])) : c.moveTo(X(p[0]), Y(p[1])))); c.stroke();
+    c.lineWidth = 2.5 * k; c.beginPath(); c.moveTo(X(158), Y(90)); c.lineTo(X(196), Y(140)); c.lineTo(X(186), Y(176)); c.stroke();
+    c.restore();
+    // Jungle sombre sur l'horizon
+    const hz = Y(470);
+    c.fillStyle = '#1a1730';
+    c.beginPath(); c.moveTo(0, hz);
+    for (let x = 0; x <= w + 20; x += 24 * k) c.lineTo(x, hz - (18 + Math.sin(x / (37 * k)) * 14 + Math.sin(x / (13 * k)) * 6) * k);
+    c.lineTo(w, h); c.lineTo(0, h); c.closePath(); c.fill();
+    c.fillStyle = '#141228';
+    for (let x = -20 * k; x < w + 40 * k; x += 92 * k) {
+      const hh = (70 + ((x / k) % 3) * 22) * k, px = x + Math.sin(x) * 10 * k;
+      c.fillRect(px - 3 * k, hz - hh, 6 * k, hh);
+      for (let f = 0; f < 5; f++) { ell(c, px + Math.cos(f * 1.3) * 18 * k, hz - hh + Math.sin(f * 1.3) * 6 * k, 30 * k, 8 * k, f * 1.3); c.fill(); }
+    }
+    // Tour du projecteur (à gauche) et son faisceau sur le Tyrannosaure
+    const tx = X(58), ty = Y(206);
+    c.fillStyle = '#262a44';
+    poly(c, [tx - 26 * k, Y(600), tx - 8 * k, ty, tx + 8 * k, ty, tx + 26 * k, Y(600)]); c.fill();
+    c.strokeStyle = '#3a3f60'; c.lineWidth = 3 * k;
+    for (let i = 0; i < 6; i++) { const y = ty + (i + 1) * 60 * k; c.beginPath(); c.moveTo(tx - 10 * k - i * 3 * k, y); c.lineTo(tx + 10 * k + i * 3 * k, y + 30 * k); c.stroke(); }
+    const fa = Math.atan2(Y(330) - ty, X(330) - tx);
+    const bg = c.createRadialGradient(tx, ty, 4 * k, tx, ty, 620 * k);
+    bg.addColorStop(0, 'rgba(255,246,210,.85)'); bg.addColorStop(0.5, 'rgba(255,240,190,.35)'); bg.addColorStop(1, 'rgba(255,236,180,0)');
+    c.fillStyle = bg; c.beginPath(); c.moveTo(tx, ty); c.arc(tx, ty, 620 * k, fa - 0.24, fa + 0.24); c.closePath(); c.fill();
+    c.fillStyle = '#4a4e6e'; rr(c, tx - 16 * k, ty - 12 * k, 30 * k, 22 * k, 5 * k); c.fill();
+    c.fillStyle = '#fffbe8'; c.shadowColor = '#fff2c0'; c.shadowBlur = 26 * k; rond(c, tx + 10 * k, ty + 2 * k, 9 * k); c.fill(); c.shadowBlur = 0;
+    // Sol de la station, mouillé
+    g = c.createLinearGradient(0, Y(520), 0, h);
+    g.addColorStop(0, '#2a3a30'); g.addColorStop(1, '#0e1612');
+    c.fillStyle = g; c.fillRect(0, Y(560), w, h);
+    // Lueur rouge de la fusée sur la scène
+    const fx0 = X(470), fy0 = Y(470);
+    let rg = c.createRadialGradient(fx0, fy0, 10 * k, fx0, fy0, 360 * k);
+    rg.addColorStop(0, 'rgba(255,90,60,.55)'); rg.addColorStop(0.5, 'rgba(255,60,40,.2)'); rg.addColorStop(1, 'rgba(255,40,30,0)');
+    c.fillStyle = rg; c.fillRect(0, 0, w, h);
+    // Le Tyrannosaure, en grand, qui rugit vers la fusée (contour de lumière)
+    c.save();
+    c.shadowColor = 'rgba(255,232,190,.9)'; c.shadowBlur = 16 * k;
+    dino(c, 'rex', X(250), sol, 4.35 * k, { t: t, n: 8, rugit: true, marche: false, dir: 1 });
+    c.restore();
+    dino(c, 'rex', X(250), sol, 4.35 * k, { t: t, n: 8, rugit: true, marche: false, dir: 1 });
+    // L'œil du Tyrannosaure qui brille
+    const oeilX = X(250) + 40 * 4.35 * k, oeilY = sol - 77 * 4.35 * k;
+    const og = c.createRadialGradient(oeilX, oeilY, 0, oeilX, oeilY, 26 * k);
+    og.addColorStop(0, 'rgba(255,220,120,.7)'); og.addColorStop(1, 'rgba(255,200,80,0)');
+    c.fillStyle = og; rond(c, oeilX, oeilY, 26 * k); c.fill();
+    // Grande clôture électrique au premier plan, qui grésille
+    const cy0 = Y(410), cy1 = Y(600);
+    c.strokeStyle = 'rgba(210,225,245,.75)'; c.lineWidth = 2.2 * k;
+    for (let i = 0; i < 6; i++) { const y = cy0 + 18 * k + i * (cy1 - cy0) / 6; c.beginPath(); c.moveTo(0, y); c.quadraticCurveTo(w / 2, y + 10 * k, w, y + Math.sin(i) * 4 * k); c.stroke(); }
+    for (let x = X(-60); x < w + 60 * k; x += 118 * k) {
+      c.fillStyle = '#2c324c'; c.strokeStyle = '#0c1020'; c.lineWidth = 2 * k;
+      rr(c, x - 7 * k, cy0 - 14 * k, 14 * k, cy1 - cy0 + 40 * k, 3 * k); c.fill(); c.stroke();
+      c.fillStyle = '#ff4a3a'; c.shadowColor = '#ff4a3a'; c.shadowBlur = 12 * k; rond(c, x, cy0 - 20 * k, 6 * k); c.fill(); c.shadowBlur = 0;
+    }
+    // Étincelles bleues là où la bête pousse sur les fils
+    c.save();
+    c.strokeStyle = '#9ff4ff'; c.shadowColor = '#3fd0ff'; c.shadowBlur = 18 * k; c.lineCap = 'round';
+    [[300, 488, 1], [348, 470, 0.8], [262, 520, 0.7]].forEach(([sx, sy, f]) => {
+      for (let i = 0; i < 7; i++) {
+        const a = i / 7 * Math.PI * 2 + 0.3, r1 = 6 * k * f, r2 = (22 + (i % 3) * 12) * k * f;
+        c.lineWidth = (i % 2 ? 2 : 3.2) * k;
+        c.beginPath(); c.moveTo(X(sx) + Math.cos(a) * r1, Y(sy) + Math.sin(a) * r1);
+        c.lineTo(X(sx) + Math.cos(a + 0.2) * r2 * 0.6, Y(sy) + Math.sin(a + 0.2) * r2 * 0.6);
+        c.lineTo(X(sx) + Math.cos(a) * r2, Y(sy) + Math.sin(a) * r2); c.stroke();
+      }
+      c.fillStyle = '#eaffff'; rond(c, X(sx), Y(sy), 6 * k * f); c.fill();
+    });
+    c.restore();
+    // Panneau d'avertissement (sans texte : triangle et empreinte de griffes)
+    const px = X(150), py = Y(452);
+    c.fillStyle = '#ffd84a'; c.strokeStyle = '#1a1a1a'; c.lineWidth = 3 * k;
+    poly(c, [px, py - 34 * k, px + 34 * k, py + 26 * k, px - 34 * k, py + 26 * k]); c.fill(); c.stroke();
+    c.fillStyle = '#1a1a1a'; ell(c, px, py + 12 * k, 7 * k, 6 * k); c.fill();
+    [[-8, -1, -0.5], [0, -6, 0], [8, -1, 0.5]].forEach((p) => { ell(c, px + p[0] * k, py + p[1] * k, 2.6 * k, 6.5 * k, p[2]); c.fill(); });
+    // Premier plan : flaques, planches, viande et bidon (coupés par le bas)
+    c.fillStyle = 'rgba(150,170,220,.2)';
+    ell(c, X(150), Y(690), 150 * k, 16 * k); c.fill(); ell(c, X(470), Y(740), 120 * k, 12 * k); c.fill();
+    icone(c, 'p', X(70), Y(660), 70 * k);
+    icone(c, 'v', X(200), Y(700), 50 * k);
+    icone(c, 'b', X(-10), Y(740), 56 * k);
+    // Le bras du soigneur (ciré jaune) qui brandit la fusée, entré par le coin du bas
+    c.save();
+    c.lineCap = 'round';
+    c.strokeStyle = '#8a5a10'; c.lineWidth = 74 * k;
+    c.beginPath(); c.moveTo(X(690), Y(860)); c.quadraticCurveTo(X(560), Y(690), X(500), Y(560)); c.stroke();
+    c.strokeStyle = '#f2b52a'; c.lineWidth = 64 * k;
+    c.beginPath(); c.moveTo(X(690), Y(860)); c.quadraticCurveTo(X(560), Y(690), X(500), Y(560)); c.stroke();
+    c.strokeStyle = '#ffd96a'; c.lineWidth = 18 * k;
+    c.beginPath(); c.moveTo(X(670), Y(850)); c.quadraticCurveTo(X(545), Y(690), X(492), Y(575)); c.stroke();
+    // bande réfléchissante du ciré
+    c.strokeStyle = '#e8eef2'; c.lineWidth = 66 * k; c.lineCap = 'butt';
+    c.beginPath(); c.moveTo(X(552), Y(668)); c.lineTo(X(541), Y(650)); c.stroke();
+    c.restore();
+    // La fusée, tenue par le gant : halo, bâton rouge, gant, puis la flamme
+    const fl = { x: X(466), y: Y(466) };
+    const flg = c.createRadialGradient(fl.x, fl.y, 0, fl.x, fl.y, 110 * k);
+    flg.addColorStop(0, 'rgba(255,240,200,.9)'); flg.addColorStop(0.2, 'rgba(255,170,90,.6)'); flg.addColorStop(0.5, 'rgba(255,70,40,.3)'); flg.addColorStop(1, 'rgba(255,40,30,0)');
+    c.fillStyle = flg; rond(c, fl.x, fl.y, 110 * k); c.fill();
+    c.save(); c.translate(X(492), Y(540)); c.rotate(-0.35);
+    c.fillStyle = '#e0283a'; c.strokeStyle = '#5a0a14'; c.lineWidth = 2.5 * k;
+    rr(c, -10 * k, -72 * k, 20 * k, 96 * k, 5 * k); c.fill(); c.stroke();
+    c.fillStyle = '#ff6a72'; c.fillRect(-6 * k, -66 * k, 5 * k, 50 * k);
+    c.fillStyle = '#f2e6d0'; c.fillRect(-10 * k, -46 * k, 20 * k, 8 * k);
+    // gant (poing fermé)
+    c.fillStyle = '#34343e'; c.strokeStyle = '#121218'; c.lineWidth = 2.5 * k;
+    rr(c, -30 * k, -26 * k, 60 * k, 52 * k, 18 * k); c.fill(); c.stroke();
+    c.fillStyle = '#4a4a58'; for (let i = 0; i < 4; i++) { rr(c, -27 * k + i * 14 * k, -30 * k, 13 * k, 20 * k, 6 * k); c.fill(); c.stroke(); }
+    c.fillStyle = 'rgba(255,140,110,.45)'; rr(c, -24 * k, -28 * k, 46 * k, 8 * k, 4 * k); c.fill();
+    c.restore();
+    c.save(); c.translate(fl.x, fl.y); c.rotate(-0.35);
+    c.shadowColor = '#ffd27a'; c.shadowBlur = 30 * k;
+    c.fillStyle = '#ffb02e'; c.beginPath(); c.moveTo(0, -46 * k); c.quadraticCurveTo(22 * k, -12 * k, 0, 8 * k); c.quadraticCurveTo(-22 * k, -12 * k, 0, -46 * k); c.fill();
+    c.fillStyle = '#fff8dc'; c.beginPath(); c.moveTo(0, -28 * k); c.quadraticCurveTo(11 * k, -6 * k, 0, 6 * k); c.quadraticCurveTo(-11 * k, -6 * k, 0, -28 * k); c.fill();
+    c.restore();
+    c.fillStyle = '#fff6c0';
+    for (let i = 0; i < 26; i++) { const a = al() * Math.PI * 2, r = (30 + al() * 110) * k; rond(c, fl.x + Math.cos(a) * r, fl.y + Math.sin(a) * r * 0.8 - 20 * k, (1.5 + al() * 2.5) * k); c.fill(); }
+    // Pluie sur toute l'image
+    c.strokeStyle = 'rgba(200,215,245,.35)'; c.lineWidth = 1.4 * k;
+    c.beginPath();
+    for (let i = 0; i < 220; i++) { const x = al() * w, y = al() * h, l = (14 + al() * 18) * k; c.moveTo(x, y); c.lineTo(x - l * 0.2, y + l); }
+    c.stroke();
+  }
+
+  function cacherInterfaceAffiche() {
+    document.querySelectorAll('.ecran, .voile, #bandeau, #annonce, #toast, #fantome, .jel-langue, button').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+
+  function demarrerAffiche() {
+    modeAffiche = true;
+    ecran = 'affiche';
+    cacherInterfaceAffiche();
+    // le bouton de langue est parfois créé après ce script : caché aussi un peu après
+    setTimeout(cacherInterfaceAffiche, 100);
+    setTimeout(cacherInterfaceAffiche, 600);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé par
+  //  le robot du site seulement. Une vraie nuit solo contre les robots, avec
+  //  sa vraie interface, posée par le code puis figée : aucun coup ne part,
+  //  ni victoire, ni défaite, ni son, ni sauvegarde, ni réseau.
+  //    1 = nuit 1 : premières cartes, la viande choisie pour le raptor ;
+  //    2 = nuit 10 : coupure annoncée, jeunes qui creusent, le Tyrannosaure
+  //        voisin rugit ; la fusée choisie ;
+  //    3 = nuit 19 (écran d'ordinateur) : panne générale et orage, le grand
+  //        carnivore rôde, un enclos a craqué ; échange de carburant visé.
+  // ---------------------------------------------------------------------
+
+  const SCENES_APERCU = {
+    1: {
+      niveau: 1, h: 1, f: [4, 3, 2, 5], l: [2, 1, 3, 0], k: [5, 4, 5, 3], nv: [3, 2, 1, 5], cal: [16, 17, 18, 13],
+      etal: [{ t: 'b' }, { t: 'v' }, null, { t: 'p' }, { t: 'v' }], pris: [3], tour: 0,
+      prev: { coup: [], terr: [], orage: 0, rod: -1 }, sel: 1, cible: -1, journal: { s: 3, t: 'p' }
+    },
+    2: {
+      niveau: 10, h: 3, f: [3, 5, 2, 6], l: [2, 3, 4, 1], k: [4, 2, 5, 3], nv: [5, 6, 2, 8], cal: [24, 22, 31, 17],
+      etal: [{ t: 'f' }, null, { t: 'g' }, { t: 'b' }, { t: 'p' }], pris: [3], tour: 0,
+      prev: { coup: [1], terr: [3], orage: 0, rod: -1 }, sel: 0, cible: -1, rug: 3
+    },
+    3: {
+      niveau: 19, h: 6, f: [3, 0, 5, 4], l: [1, 0, 4, 3], k: [3, 0, 4, 2], nv: [6, 10, 4, 7], cal: [29, 22, 38, 25], mort: [-1, 5, -1, -1],
+      etal: [{ t: 'x', g: 'l' }, { t: 'f' }, null, { t: 't' }], pris: [3], tour: 0,
+      prev: { coup: [3], terr: [], orage: 1, rod: 2 }, sel: 0, cible: 2, ecl: [3]
+    }
+  };
+
+  function ouvrirApercu(n) {
+    modeApercu = n;
+    const sc = SCENES_APERCU[n];
+    if (n === 3) document.body.classList.add('apercu-large');
+    // Une nuit solo posée par le code (hasard à graine fixe : toujours la même image).
+    const e = R.depart(graineHasard(4100 + n), PLACES, { niveau: sc.niveau });
+    e.h = sc.h;
+    ['f', 'l', 'k', 'nv', 'cal'].forEach((j) => { e[j] = sc[j].slice(); });
+    e.pic = e.nv.slice();
+    e.mort = sc.mort ? sc.mort.slice() : [-1, -1, -1, -1];
+    e.etal = sc.etal.map((x) => (x ? Object.assign({}, x) : null));
+    e.pris = [0, 1, 2, 3].map((s) => sc.pris.indexOf(s) >= 0 || e.mort[s] >= 0);
+    // fusée déjà allumée cette heure par un robot (son enclos reste éclairé malgré la coupure)
+    e.ecl = [0, 1, 2, 3].map((s) => (sc.ecl || []).indexOf(s) >= 0);
+    e.prev = JSON.parse(JSON.stringify(sc.prev));
+    e.rod = sc.prev.rod;
+    e.tour = sc.tour; e.prem = sc.pris[0];
+    e.nres = sc.h; e.fini = false;
+    // Une partie figée : c'est au joueur de l'appareil, mais aucun coup ne part.
+    partie = {
+      mode: 'solo', phase: 'jeu', siege: 0, manche: 0, chef: -1, etat: e,
+      monTour: () => true,
+      sieges: () => [0, 1, 2, 3].map((s) => ({ humain: false, moi: s === 0, chef: false, nom: null })),
+      jouer: () => false, pause: () => {}, quitter: () => {}, lancerManche: () => false, estChef: () => false, recommencer: () => false
+    };
+    session = 'solo';
+    niveau = sc.niveau;
+    vue = JSON.parse(JSON.stringify(e));
+    sel = sc.sel;
+    cibleClavier = sc.cible;
+    if (sc.journal) { const c0 = { t: sc.journal.t }; journal = tr('journal.pris', { qui: qui(sc.journal.s), carte: nomCarte(c0) }); }
+    afficherEcran('jeu');
+    majInterface();
+    // Le Tyrannosaure voisin rugit (effet relancé en boucle, sans son).
+    if (sc.rug >= 0) {
+      const rugir = () => { ajouterEffet(sc.rug, 'rug', 1300); };
+      rugir();
+      setInterval(rugir, 1300);
+    }
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5914,7 +6174,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !modeApercu && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une nuit solo.
@@ -5925,6 +6185,16 @@
   window.addEventListener('resize', () => { etalCle = ''; relancerBoucle(); });
 
   document.title = tr('titre');
+  // Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU), posées par
+  // le robot du site seulement : ni écran titre, ni sauvegarde lue, ni réseau.
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    construireEnclos();
+    majBoutonsSon();
+    ouvrirApercu(numeroApercu);
+    return;
+  }
   chargerProgression();
   construireEnclos();
   majBoutonsSon();

@@ -2545,7 +2545,12 @@ const debloque = (i) => i === 0 || i < prog.atteint || prog.etoiles[i - 1] > 0;
 // Sons (Web Audio, aucun fichier ; rien avant la première action du joueur)
 // ==========================================================================
 let ac = null, maitre = null, moteur = null;
+// Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU) : posés par le robot du site seulement.
+const AFFICHE = !!window.JEL_AFFICHE;
+const APERCU = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+let apercuFige = false;      // image du jeu : l'essai est figé sur son moment
 function audio() {
+  if (AFFICHE || APERCU) return;   // ni affiche ni image du jeu ne font de son
   if (!ac) {
     try {
       ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -3992,7 +3997,7 @@ function reprendre() {
   $('fen-pause').classList.add('cache');
   if (ac && ac.state === 'suspended' && !sonCoupe) ac.resume().catch(() => {});
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden && ecran === 'jeu' && !enPause && !fenetreOuverte()) pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !APERCU && ecran === 'jeu' && !enPause && !fenetreOuverte()) pause(); });
 
 // ==========================================================================
 // Écran titre : le hangar et un bolide farfelu
@@ -4085,7 +4090,7 @@ function boucle(maintenant) {
   else if (ecran === 'garage') dessinerGarage(temps);
   else if (ecran === 'jeu') {
     if (!enPause) {
-      if (mode === 'essai') majEssai(dt, temps);
+      if (mode === 'essai' && !apercuFige) majEssai(dt, temps);
       if (eclats.length) {
         for (const e of eclats) { e.vie -= dt; e.x += e.vx * dt; e.y += e.vy * dt; }
         eclats = eclats.filter((e) => e.vie > 0);
@@ -4193,13 +4198,238 @@ document.addEventListener('keydown', (e) => {
 
 // Sauvegarde à la fermeture de la page, seulement pendant une partie
 JEL_SAVE.surFermeture(() => {
-  if (partieEnCours && ecran === 'jeu') { prog.plans[idx] = grille.slice(); JEL_SAVE.save(JEU, { niveau: niveauReprise, score: totalScore(), options: { son: !sonCoupe }, prog }); }
+  if (partieEnCours && ecran === 'jeu' && !APERCU && !AFFICHE) { prog.plans[idx] = grille.slice(); JEL_SAVE.save(JEU, { niveau: niveauReprise, score: totalScore(), options: { son: !sonCoupe }, prog }); }
 });
 if (window.JEL_I18N && JEL_I18N.surChangement) JEL_I18N.surChangement(() => { if (ecran === 'jeu') { $('nom-niveau').textContent = T('niveauNom', { n: idx + 1, nom: T('nom.' + (idx + 1)) }); construireReserve(); majAtelier(); } });
 
-lireProg();
-majBoutonsSon();
-requestAnimationFrame(boucle);
+// ==========================================================================
+// Affiche (jaquette du jeu)
+// ==========================================================================
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le drôle de bolide, en grand,
+// s'envole au-dessus d'un gouffre des falaises : ressorts détendus, hélice qui tourne, ailes portées par
+// le vent qui monte, vers le drapeau d'arrivée sous un grand soleil.
+const PLAN_AFFICHE = planDe(['..B...', '.ACCA.', 'HCCCCC', 'O.SS.O']);
+function dessinerAffiche() {
+  let cv = $('c-affiche');
+  if (!cv) {
+    cv = document.createElement('canvas'); cv.id = 'c-affiche';
+    cv.style.cssText = 'position:fixed;inset:0;z-index:50;display:block';
+    document.body.appendChild(cv);
+  }
+  const W = window.innerWidth, H = window.innerHeight;
+  const ctx = preparerCanvas(cv, W, H);
+  const k = Math.min(W / 600, H / 800);
+  const ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  ctx.save();
+  ctx.translate(ox, oy); ctx.scale(k, k);
+  const xg = -ox / k - 2, xd = (W - ox) / k + 2, yh = -oy / k - 2, yb = (H - oy) / k + 2;
+  const temps = 1.7;
+  // Ciel d'été
+  const gc = ctx.createLinearGradient(0, yh, 0, 560);
+  gc.addColorStop(0, '#3d9cf0'); gc.addColorStop(0.55, '#8fd0ff'); gc.addColorStop(1, '#fff0c4');
+  ctx.fillStyle = gc; ctx.fillRect(xg, yh, xd - xg, yb - yh);
+  // Grand soleil et ses rayons
+  const sx = 470, sy = 170;
+  ctx.save(); ctx.translate(sx, sy);
+  ctx.fillStyle = 'rgba(255,248,200,.28)';
+  for (let i = 0; i < 14; i++) { ctx.rotate(Math.PI / 7); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-40, -620); ctx.lineTo(40, -620); ctx.closePath(); ctx.fill(); }
+  ctx.restore();
+  const halo = ctx.createRadialGradient(sx, sy, 20, sx, sy, 300);
+  halo.addColorStop(0, 'rgba(255,250,215,.95)'); halo.addColorStop(0.3, 'rgba(255,236,160,.5)'); halo.addColorStop(1, 'rgba(255,236,160,0)');
+  ctx.fillStyle = halo; ctx.fillRect(xg, yh, xd - xg, 700);
+  ctx.fillStyle = '#fff6cf'; ctx.beginPath(); ctx.arc(sx, sy, 62, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#ffe27a'; ctx.beginPath(); ctx.arc(sx, sy, 50, 0, Math.PI * 2); ctx.fill();
+  // Nuages
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  for (const [nx, ny, r] of [[90, 210, 26], [250, 120, 18], [xd - 70, 300, 22], [xg + 20, 330, 20], [600, 90, 16]]) {
+    ctx.beginPath(); ctx.arc(nx, ny, r, 0, Math.PI * 2); ctx.arc(nx + r, ny - r * 0.45, r * 0.95, 0, Math.PI * 2); ctx.arc(nx + r * 2, ny, r * 0.8, 0, Math.PI * 2); ctx.arc(nx + r, ny + r * 0.2, r * 0.8, 0, Math.PI * 2); ctx.fill();
+  }
+  // Mer au loin et falaises lointaines
+  ctx.fillStyle = '#4aa0dc'; ctx.fillRect(xg, 500, xd - xg, 300);
+  ctx.fillStyle = 'rgba(255,255,255,.55)';
+  for (let i = 0; i < 26; i++) ctx.fillRect(xg + (i * 83) % (xd - xg + 40), 512 + (i % 6) * 10, 26 + (i % 3) * 10, 2.5);
+  ctx.fillStyle = '#8fbfe6';
+  ctx.beginPath(); ctx.moveTo(xg, 520); ctx.lineTo(xg, 430); ctx.quadraticCurveTo(40, 410, 120, 440); ctx.lineTo(150, 520); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(430, 520); ctx.lineTo(470, 455); ctx.quadraticCurveTo(560, 420, xd, 440); ctx.lineTo(xd, 520); ctx.closePath(); ctx.fill();
+  // Mouettes
+  ctx.strokeStyle = 'rgba(40,50,80,.75)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  for (const [gx, gy, g] of [[120, 300, 1.3], [175, 270, 1], [560, 330, 1.1]]) {
+    ctx.beginPath(); ctx.moveTo(gx - 12 * g, gy - 4 * g); ctx.quadraticCurveTo(gx - 5 * g, gy - 10 * g, gx, gy); ctx.quadraticCurveTo(gx + 5 * g, gy - 10 * g, gx + 12 * g, gy - 4 * g); ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+  // Falaise de départ (à gauche) et falaise d'arrivée (à droite), le gouffre entre les deux
+  const falaise = (x0, x1, haut, bordD) => {
+    ctx.fillStyle = '#b48b67';
+    ctx.beginPath(); ctx.moveTo(x0, yb); ctx.lineTo(x0, haut);
+    ctx.lineTo(x1, haut); ctx.quadraticCurveTo(x1 + (bordD ? 18 : -18), haut + 120, x1 + (bordD ? -6 : 6), yb); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7c5b43';
+    ctx.beginPath(); ctx.moveTo(x0, yb); ctx.lineTo(x0, haut + 70);
+    ctx.lineTo(x1 + (bordD ? 4 : -4), haut + 70); ctx.quadraticCurveTo(x1 + (bordD ? 16 : -16), haut + 160, x1 + (bordD ? -6 : 6), yb); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.12)';
+    for (let i = 0; i < 9; i++) ctx.fillRect(x0 + ((i * 47) % Math.max(20, x1 - x0)), haut + 30 + (i % 4) * 40, 26, 4);
+    ctx.fillStyle = '#8cc461'; ctx.fillRect(x0, haut - 4, x1 - x0, 14);
+    ctx.fillStyle = '#6fae47';
+    for (let x = x0; x < x1; x += 12) { ctx.beginPath(); ctx.moveTo(x, haut + 8); ctx.lineTo(x + 6, haut - 8); ctx.lineTo(x + 12, haut + 8); ctx.fill(); }
+  };
+  // Courants d'air qui montent du gouffre
+  const gg = ctx.createLinearGradient(0, 600, 0, yb);
+  gg.addColorStop(0, 'rgba(40,60,110,.1)'); gg.addColorStop(1, 'rgba(40,60,110,.55)');
+  ctx.fillStyle = gg; ctx.fillRect(150, 560, 280, yb - 560);
+  falaise(xg, 160, 610, true);
+  falaise(420, xd, 590, false);
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (let i = 0; i < 7; i++) {
+    const x = 190 + i * 36, y = 700 - (i % 3) * 70;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 12, y - 30, x, y - 60); ctx.quadraticCurveTo(x - 12, y - 90, x, y - 120); ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+  // Fleurs et cactus sur l'herbe
+  dessinerObjetDecor(ctx, 'falaises', 60, 612, 70, 0.8, temps);
+  dessinerObjetDecor(ctx, 'falaises', 470, 592, 60, 0.2, temps);
+  // Drapeau d'arrivée en damier, avec confettis
+  const fx = 548, fy = 594;
+  ctx.strokeStyle = '#4a4458'; ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx, fy - 190); ctx.stroke();
+  ctx.fillStyle = '#f2c230'; ctx.beginPath(); ctx.arc(fx, fy - 194, 8, 0, Math.PI * 2); ctx.fill();
+  const cf = 19;
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
+    ctx.fillStyle = (i + j) % 2 ? '#ffffff' : '#2b2234';
+    ctx.fillRect(fx + 4 + i * cf, fy - 186 + j * cf + Math.sin(i * 1.2) * 5, cf, cf);
+  }
+  const couls = ['#e5483b', '#f2c230', '#3b7be5', '#3fae5a', '#ef6fb0', '#8d5ad8'];
+  for (let i = 0; i < 34; i++) {
+    const a = hasard(i + 3) * Math.PI * 2, d = 40 + hasard(i + 40) * 120;
+    ctx.save(); ctx.translate(fx + 20 + Math.cos(a) * d, fy - 230 + Math.sin(a) * d * 0.6); ctx.rotate(a * 3);
+    ctx.fillStyle = couls[i % couls.length]; ctx.fillRect(-6, -3, 12, 6); ctx.restore();
+  }
+  // Poussière du décollage au bord de la falaise de gauche
+  for (let i = 0; i < 12; i++) {
+    ctx.fillStyle = `rgba(235,215,180,${0.5 + 0.4 * hasard(i)})`;
+    ctx.beginPath(); ctx.arc(70 + i * 9 + hasard(i + 9) * 20, 600 - hasard(i + 20) * 40 - i * 3, 9 + hasard(i + 5) * 14, 0, Math.PI * 2); ctx.fill();
+  }
+  // Traits de vitesse derrière le bolide
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineCap = 'round';
+  for (let i = 0; i < 6; i++) {
+    const y = 230 + i * 42, x = 18 + (i % 2) * 20;
+    ctx.lineWidth = 6 - (i % 3); ctx.beginPath(); ctx.moveTo(x, y + 12); ctx.lineTo(x + 60 + (i % 3) * 18, y); ctx.stroke();
+  }
+  ctx.lineCap = 'butt';
+  // Le bolide vedette, en grand, qui s'envole en penchant vers le ciel
+  const s = 80, bx = 290, by = 470, ang = 0.16;
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,244,190,.95)'; ctx.shadowBlur = 34;
+  dessinerBolide(ctx, PLAN_AFFICHE, bx, by, s, ang, { rot: 0.5, spin: 0.7, comp: 0, t: 0.2, vol: true, couleur: '#e5483b' });
+  ctx.restore();
+  dessinerBolide(ctx, PLAN_AFFICHE, bx, by, s, ang, { rot: 0.5, spin: 0.7, comp: 0, t: 0.2, vol: true, couleur: '#e5483b' });
+  // Souffle de l'hélice (à l'arrière) et petits « boing » sous les ressorts
+  ctx.save(); ctx.translate(bx, by); ctx.rotate(-ang);
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(-3.3 * s, -1.6 * s, 22 + i * 16, Math.PI * 0.7, Math.PI * 1.3); ctx.stroke(); }
+  for (const cx of [-0.5 * s, 0.5 * s]) for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.arc(cx, 0.35 * s + i * 14, 16 + i * 8, Math.PI * 0.2, Math.PI * 0.8); ctx.stroke(); }
+  ctx.restore();
+  // Étincelles dorées autour du bolide
+  for (let i = 0; i < 12; i++) {
+    const a = i * 0.53 + 0.3, r = 250 + (i % 3) * 18;
+    const x = bx + Math.cos(a) * r * 0.95, y = 320 + Math.sin(a) * r * 0.55;
+    ctx.fillStyle = i % 2 ? '#fff3a0' : '#ffd23f';
+    ctx.beginPath(); for (let p = 0; p < 8; p++) { const rr = p % 2 ? 3 : 9, aa = p * Math.PI / 4; ctx.lineTo(x + Math.cos(aa) * rr, y + Math.sin(aa) * rr); } ctx.fill();
+  }
+  // Premier plan : une grosse roue et une bouée coupées par les bords, un ressort
+  const roueAvant = (cx, cy, r) => {
+    ctx.fillStyle = '#2a2833';
+    for (let i = 0; i < 12; i++) { const a = 0.2 + i * Math.PI / 6; ctx.save(); ctx.translate(cx + Math.cos(a) * r, cy + Math.sin(a) * r); ctx.rotate(a); ctx.fillRect(-r * 0.12, -r * 0.13, r * 0.24, r * 0.26); ctx.restore(); }
+    roueDessin(ctx, cx, cy, r, 0.2, '#f2c230');
+  };
+  roueAvant(xg + 40, yb - 30, 120);
+  dessinerPiece(ctx, 'bouee', xd - 150, yb - 190, 230, {});
+  dessinerPiece(ctx, 'ressort', xd - 250, yb - 140, 120, {});
+  // Guirlande de fanions tout en haut
+  for (let i = 0; i < 16; i++) {
+    const x = xg + (i + 0.5) * (xd - xg) / 16, y = 26 + Math.sin(i / 15 * Math.PI) * 26;
+    ctx.fillStyle = ['#e5483b', '#f2c230', '#3b7be5', '#3fae5a'][i % 4];
+    ctx.beginPath(); ctx.moveTo(x - 14, y); ctx.lineTo(x + 14, y); ctx.lineTo(x, y + 26); ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath();
+  for (let i = 0; i <= 16; i++) { const x = xg + i * (xd - xg) / 16, y = 26 + Math.sin(Math.min(1, i / 16) * Math.PI) * 26; if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+  ctx.stroke();
+  ctx.restore();
+}
+function cacherPourAffiche() {
+  for (const el of document.querySelectorAll('.ecran, .fenetre, #tuto, #bulle-tuto, .jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  prog = progVide();
+  cacherPourAffiche();
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+  // Le bouton de langue peut être créé après ce script : on le cache encore un peu après.
+  for (const ms of [50, 300, 1000]) setTimeout(cacherPourAffiche, ms);
+}
+
+// ==========================================================================
+// Images du jeu (page du jeu)
+// ==========================================================================
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface, sans écran titre, ni fenêtre « Continuer »,
+// ni fenêtre des nouveautés, ni tutoriel (CONSIGNES-JEU.md, section 5). Ni son, ni sauvegarde.
+//   1 = niveau 1 (désert) : un bolide monté sur la grille de l'atelier, une roue choisie dans la réserve ;
+//   2 = niveau 8 (glacier) : essai en cours, le bolide à bouées et hélices traverse la rivière ;
+//   3 = niveau 19 (falaises), sur ordinateur : le bolide à ailes plane au-dessus du gouffre venteux.
+// Pour un essai, la partie tourne un peu (éclaboussures, poussière) puis elle est figée avant l'arrivée.
+const SCENES_APERCU = {
+  1: { niveau: 0, plan: ['......', '......', '..C...', '.oCCo.'], choix: 'roue' },
+  2: { niveau: 7, plan: ['......', '......', 'HBBB..', 'HoCo..'], essai: 2.5 },
+  3: { niveau: 18, plan: ['......', 'AAAA..', 'HCBBB.', 'oSSSo.'], essai: 3.8, large: true }
+};
+function ouvrirApercu(n) {
+  const sc = SCENES_APERCU[n];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + n * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  prog = progVide();                               // progression neuve, en mémoire seulement
+  prog.vus = Object.keys(DEMOS);                   // pas de fenêtre des nouveautés
+  prog.atteint = N;
+  for (let i = 0; i < sc.niveau; i++) prog.etoiles[i] = i % 4 === 1 ? 2 : 3;
+  prog.peinture = n === 2 ? 'bleu' : 'rouge';
+  prog.plans[sc.niveau] = planDe(sc.plan);
+  if (sc.large) { $('ecran-jeu').style.maxWidth = 'none'; }
+  lancerNiveau(sc.niveau);
+  partieEnCours = false;                           // rien n'est écrit à la fermeture
+  requestAnimationFrame(() => {
+    if (sc.choix) { choix = sc.choix; majReserve(); }
+    if (!sc.essai) return;
+    // L'essai, sans son : comme lancerEssai, puis il roule un peu et se fige.
+    const res = simuler(grille, niv());
+    const debuts = [];
+    let acc = 0, prec = { x: 1.5, y: 0 };
+    for (const m of res.moves) { debuts.push({ t: acc, pose: prec }); prec = calculPose(terrainCourant, m, 1, prec, 0); acc += m.d; }
+    const t0 = sc.essai - 0.8;
+    let i0 = 0;
+    while (i0 < res.moves.length - 1 && t0 >= debuts[i0 + 1].t) i0++;
+    essai = { res, t: t0, total: acc, idxMove: i0 - 1, debuts, fini: false, secousse: 0, pose: { x: 1.5, y: 0, ang: 0 } };
+    camEssai = null; particules = [];
+    mode = 'essai';
+    $('ecran-jeu').classList.add('essai');
+    miseEnPage();
+    afficherMsg(T('essaiEnCours'), '');
+    let temps = 10;
+    for (let k = 0; k < 48; k++) { temps += 1 / 60; majEssai(1 / 60, temps); dessinerScene(temps); }
+    for (let k = 0; k < 40; k++) dessinerScene(temps);   // la caméra rejoint le bolide
+    apercuFige = true;
+  });
+}
+
+if (AFFICHE) demarrerAffiche();
+else if (APERCU) {
+  majBoutonsSon();
+  ouvrirApercu(APERCU);
+  requestAnimationFrame(boucle);
+} else {
+  lireProg();
+  majBoutonsSon();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

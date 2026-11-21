@@ -3327,6 +3327,8 @@
     .place canvas.tete { width: 32px; height: 32px; }
     #aide { display: none; }
   }
+  /* Image du jeu sur ordinateur (window.JEL_APERCU = 3) : l'interface s'étend sur toute la largeur. */
+  body.apercu-large #places, body.apercu-large #infos, body.apercu-large #panneau-tour, body.apercu-large #actions { max-width: 1120px; }
   @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
 </style>
 </head>
@@ -4299,7 +4301,7 @@
   function relancerBoucle() { if (!rafId) rafId = requestAnimationFrame(boucle); }
   function boucle(t) {
     rafId = 0;
-    if (ecran !== 'jeu' || enPause) return;
+    if (ecran !== 'jeu' || enPause || apercuFige) return;
     const dt = Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
     tPrec = t;
     dessinerJeu(performance.now(), dt);
@@ -4318,6 +4320,7 @@
     c.clearRect(0, 0, w, h);
     if (!vue) { geo = null; return; }
     geo = geometrieCite(vue.d.length, w, h);
+    if (apercuNum === 3) decorLarge(c, w, h, geo);
     const s = partie && partie.phase === 'jeu' ? R.aQui(vue) : -1;
     const monTour = partie && partie.monTour();
     dessinerCite(c, vue, geo, {
@@ -5188,6 +5191,411 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une
+  // scène composée, sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md,
+  // section 5). Le médecin au masque à bec, en grand, lève sa lanterne et pousse la
+  // porte d'une maison marquée de la croix rouge ; une lueur verte de contagion
+  // s'en échappe, les rats détalent, la lune et le clocher veillent sur la cité close.
+
+  let modeAffiche = false;    // affiche en cours (le redimensionnement la redessine)
+  let apercuNum = 0;          // 1, 2 ou 3 : image du jeu (window.JEL_APERCU), sinon 0
+  let apercuFige = false;     // image du jeu figée : la boucle ne redessine plus
+
+  // Rat dessiné par le jeu, tourné vers la gauche si sens < 0.
+  function ratAffiche(c, x, y, s, sens) {
+    c.save(); c.translate(x, y); c.scale(sens < 0 ? -1 : 1, 1); tuile(c, 'r', 0, 0, s, 0); c.restore();
+  }
+
+  // Corbeau en vol (silhouette).
+  function corbeau(c, x, y, s, a) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    c.fillStyle = '#120d18';
+    c.beginPath(); c.moveTo(-22, -4 - a * 8); c.quadraticCurveTo(-10, -6, 0, 2); c.quadraticCurveTo(10, -6, 22, -4 - a * 8);
+    c.quadraticCurveTo(10, 0, 0, 6); c.quadraticCurveTo(-10, 0, -22, -4 - a * 8); c.fill();
+    ell(c, 0, 3, 5, 3); c.fill();
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (!W || !H) return;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    const c = cv.getContext('2d');
+    // Scène composée dans un cadre de 600 × 800, centré ; le décor continue jusqu'aux bords.
+    const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    c.setTransform(dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy);
+    const G = -ox / k, D = (W - ox) / k, HAUT = -oy / k, BAS = (H - oy) / k;
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    const al = graineHasard(1348);
+
+    // Ciel de nuit, plus clair vers l'horizon
+    let g = c.createLinearGradient(0, HAUT, 0, 600);
+    g.addColorStop(0, '#191330'); g.addColorStop(0.45, '#3c2b5e'); g.addColorStop(0.8, '#6a4268'); g.addColorStop(1, '#7a4a5e');
+    c.fillStyle = g; c.fillRect(G, HAUT, D - G, BAS - HAUT);
+    for (let i = 0; i < 110; i++) {
+      c.fillStyle = 'rgba(255,245,220,' + (0.35 + al() * 0.6).toFixed(2) + ')';
+      rond(c, G + al() * (D - G), HAUT + al() * (420 - HAUT), al() * 1.6 + 0.4); c.fill();
+    }
+    // Grande lune et son halo
+    const lx = 455, ly = 138, lr = 66;
+    g = c.createRadialGradient(lx, ly, lr * 0.5, lx, ly, lr * 4.4);
+    g.addColorStop(0, 'rgba(255,238,200,.62)'); g.addColorStop(0.4, 'rgba(230,190,220,.2)'); g.addColorStop(1, 'rgba(230,190,220,0)');
+    c.fillStyle = g; rond(c, lx, ly, lr * 4.4); c.fill();
+    c.fillStyle = '#fbf1d0'; rond(c, lx, ly, lr); c.fill();
+    c.fillStyle = 'rgba(205,188,150,.55)';
+    rond(c, lx - lr * 0.32, ly - lr * 0.18, lr * 0.2); c.fill(); rond(c, lx + lr * 0.28, ly + lr * 0.3, lr * 0.14); c.fill(); rond(c, lx + lr * 0.1, ly - lr * 0.45, lr * 0.09); c.fill();
+    // Corbeaux devant la lune
+    [[402, 112, 1.1, 0.2], [508, 168, 0.8, 0.9], [352, 182, 0.65, 0.5], [560, 96, 0.55, 0.1]].forEach((p) => corbeau(c, p[0], p[1], p[2], p[3]));
+
+    // Rempart du fond, tours et clocher (la cloche dorée qui sonne la nuit)
+    const base = 500;
+    c.fillStyle = '#33264a';
+    c.fillRect(G, base - 70, D - G, 120);
+    for (let x = Math.floor(G / 26) * 26; x < D; x += 26) c.fillRect(x, base - 86, 14, 18);
+    [[30, 210], [585, 190], [-150, 170], [760, 200]].forEach((t) => {
+      const tx = t[0], th = t[1];
+      if (tx < G - 60 || tx > D + 60) return;
+      c.fillStyle = '#2d2242'; c.fillRect(tx - 34, base - th, 68, th);
+      for (let j = 0; j < 4; j++) c.fillRect(tx - 34 + j * 20, base - th - 16, 12, 18);
+      c.fillStyle = '#ffcf6a'; rr(c, tx - 7, base - th + 40, 14, 20, 6); c.fill();
+    });
+    {
+      const tx = 362, top = 236;
+      c.fillStyle = '#2b2040'; c.fillRect(tx - 30, top, 60, base - top);
+      c.fillStyle = '#231a36'; c.beginPath(); c.moveTo(tx - 38, top + 2); c.lineTo(tx, top - 70); c.lineTo(tx + 38, top + 2); c.closePath(); c.fill();
+      // baie de la cloche, éclairée par la lune
+      c.fillStyle = '#140f20'; c.beginPath(); c.moveTo(tx - 18, top + 70); c.lineTo(tx - 18, top + 32); c.arc(tx, top + 32, 18, Math.PI, 0); c.lineTo(tx + 18, top + 70); c.closePath(); c.fill();
+      g = c.createRadialGradient(tx, top + 44, 2, tx, top + 44, 40);
+      g.addColorStop(0, 'rgba(255,214,110,.6)'); g.addColorStop(1, 'rgba(255,214,110,0)');
+      c.fillStyle = g; rond(c, tx, top + 44, 40); c.fill();
+      c.fillStyle = '#e6b23a'; c.beginPath(); c.moveTo(tx - 14, top + 60); c.quadraticCurveTo(tx - 13, top + 30, tx, top + 28); c.quadraticCurveTo(tx + 13, top + 30, tx + 14, top + 60); c.closePath(); c.fill();
+      c.fillStyle = '#fff0b0'; ell(c, tx - 5, top + 42, 3, 8, 0.15); c.fill();
+      c.fillStyle = '#8f6c12'; rond(c, tx, top + 63, 4); c.fill();
+    }
+    // Maisons de la cité, fenêtres allumées
+    const al2 = graineHasard(77);
+    for (let x = Math.floor(G / 62) * 62 - 20, i = 0; x < D + 20; x += 62, i++) {
+      const mw = 50 + al2() * 22, mh = 80 + al2() * 70;
+      maisonDecor(c, x + al2() * 10, base + 52, mw, mh, TOITS[(i + 5) % TOITS.length], al2, 0.55);
+    }
+    croix(c, 162, base + 20, 9);
+    // Brume lilas sur la cité
+    g = c.createLinearGradient(0, base - 20, 0, base + 110);
+    g.addColorStop(0, 'rgba(176,140,200,0)'); g.addColorStop(0.5, 'rgba(176,140,200,.42)'); g.addColorStop(1, 'rgba(60,40,70,.9)');
+    c.fillStyle = g; c.fillRect(G, base - 20, D - G, 130);
+
+    // Rue pavée
+    g = c.createLinearGradient(0, 600, 0, BAS);
+    g.addColorStop(0, '#3a2d40'); g.addColorStop(1, '#1b1420');
+    c.fillStyle = g; c.fillRect(G, 598, D - G, BAS - 598);
+    for (let r = 0, y = 606; y < BAS + 20; r++, y += 14 + r * 3) {
+      const hh = 5 + r * 1.6, ww = 18 + r * 7;
+      for (let x = G - (r % 2) * ww * 0.5; x < D + ww; x += ww * 1.15) {
+        c.fillStyle = 'rgba(120,96,120,.35)'; ell(c, x, y, ww * 0.48, hh); c.fill();
+        c.fillStyle = 'rgba(200,170,190,.14)'; ell(c, x - ww * 0.06, y - hh * 0.35, ww * 0.32, hh * 0.4); c.fill();
+      }
+    }
+
+    // La maison marquée, à droite : colombages, fenêtre allumée, porte entrouverte
+    const mx0 = 412;
+    c.fillStyle = '#5d4652'; c.fillRect(mx0, 238, D - mx0 + 10, 430);
+    c.fillStyle = '#2e1e1a';
+    [[mx0, 238, 14, 430], [600, 238, 14, 430], [mx0, 290, D - mx0, 12], [mx0, 412, D - mx0, 12]].forEach((p) => c.fillRect(p[0], p[1], p[2], p[3]));
+    c.lineWidth = 10; c.strokeStyle = '#2e1e1a';
+    c.beginPath(); c.moveTo(mx0 + 10, 300); c.lineTo(mx0 + 60, 412); c.moveTo(600, 300); c.lineTo(552, 412); c.stroke();
+    // sur écran large, la façade continue : poutres et fenêtres
+    for (let x = 790; x < D + 190; x += 190) {
+      c.fillStyle = '#2e1e1a'; c.fillRect(x, 238, 14, 430);
+      c.beginPath(); c.moveTo(x - 180, 300); c.lineTo(x - 130, 412); c.moveTo(x + 4, 300); c.lineTo(x - 46, 412); c.stroke();
+      c.fillStyle = '#2e1e1a'; rr(c, x - 132, 444, 84, 74, 6); c.fill();
+      c.fillStyle = (x / 190) % 2 ? '#ffcf6a' : '#1e1a24'; rr(c, x - 125, 451, 70, 60, 4); c.fill();
+      c.fillStyle = '#2e1e1a'; c.fillRect(x - 93, 451, 5, 60);
+    }
+    // avant-toit
+    c.fillStyle = '#1f1622'; c.beginPath(); c.moveTo(mx0 - 26, 246); c.lineTo(D + 10, 172); c.lineTo(D + 10, 228); c.lineTo(mx0 - 26, 262); c.closePath(); c.fill();
+    // fenêtre de l'étage
+    c.fillStyle = '#2e1e1a'; rr(c, 468, 316, 92, 78, 6); c.fill();
+    g = c.createLinearGradient(0, 322, 0, 388); g.addColorStop(0, '#ffe08a'); g.addColorStop(1, '#ff9f3a');
+    c.fillStyle = g; rr(c, 476, 324, 76, 62, 4); c.fill();
+    c.fillStyle = '#2e1e1a'; c.fillRect(511, 324, 6, 62); c.fillRect(476, 351, 76, 5);
+    // ombre d'un malade derrière la fenêtre
+    c.fillStyle = 'rgba(60,30,30,.55)'; rond(c, 492, 362, 9); c.fill(); rr(c, 482, 370, 22, 16, 6); c.fill();
+    // encadrement de pierre de la porte
+    const px0 = 444, px1 = 580, pyH = 452, pyB = 668;
+    c.fillStyle = '#7a6a66';
+    c.beginPath(); c.moveTo(px0 - 14, pyB); c.lineTo(px0 - 14, pyH + 20); c.arc((px0 + px1) / 2, pyH + 20, (px1 - px0) / 2 + 14, Math.PI, 0); c.lineTo(px1 + 14, pyB); c.closePath(); c.fill();
+    // intérieur : lueur verte de la contagion
+    g = c.createRadialGradient(px0 + 30, pyB - 90, 4, px0 + 30, pyB - 90, 150);
+    g.addColorStop(0, '#f4ffc8'); g.addColorStop(0.3, '#9dff6e'); g.addColorStop(0.75, '#2f8a3a'); g.addColorStop(1, '#123a1c');
+    c.fillStyle = g;
+    c.beginPath(); c.moveTo(px0, pyB); c.lineTo(px0, pyH + 20); c.arc((px0 + px1) / 2, pyH + 20, (px1 - px0) / 2, Math.PI, 0); c.lineTo(px1, pyB); c.closePath(); c.fill();
+    // battant entrouvert (planches) et sa croix rouge
+    c.fillStyle = '#6e4022';
+    c.beginPath(); c.moveTo(px0 + 40, pyB + 4); c.lineTo(px0 + 40, pyH + 26); c.quadraticCurveTo(px0 + 80, pyH - 8, px1 + 2, pyH + 12); c.lineTo(px1 + 2, pyB + 6); c.closePath(); c.fill();
+    c.strokeStyle = 'rgba(30,14,6,.55)'; c.lineWidth = 2.5;
+    for (let i = 1; i < 4; i++) { const x = px0 + 40 + i * (px1 - px0 - 38) / 4; c.beginPath(); c.moveTo(x, pyH + 18 - i * 2); c.lineTo(x, pyB + 4); c.stroke(); }
+    c.fillStyle = '#2a1a10'; c.fillRect(px0 + 40, pyH + 70, px1 - px0 - 38, 9); c.fillRect(px0 + 40, pyB - 60, px1 - px0 - 38, 9);
+    c.strokeStyle = 'rgba(255,220,140,.75)'; c.lineWidth = 3;   // tranche éclairée par la lanterne
+    c.beginPath(); c.moveTo(px0 + 40, pyB + 2); c.lineTo(px0 + 40, pyH + 26); c.stroke();
+    c.save(); c.shadowColor = 'rgba(255,60,40,.7)'; c.shadowBlur = 14; croix(c, (px0 + 40 + px1) / 2 + 4, pyH + 120, 34); c.restore();
+    // brume verte qui s'échappe de la porte et rampe dans la rue
+    c.save();
+    c.shadowColor = '#7dff6a'; c.shadowBlur = 24;
+    [[px0 + 22, pyB - 40, 26, 40], [px0 + 4, pyB - 4, 40, 18], [px0 - 40, pyB + 18, 52, 16], [px0 - 104, pyB + 36, 50, 13], [px0 - 160, pyB + 50, 40, 10], [px0 + 60, pyB + 24, 46, 14]].forEach((p, i) => {
+      c.fillStyle = 'rgba(150,255,120,' + (0.42 - i * 0.04).toFixed(2) + ')'; ell(c, p[0], p[1], p[2], p[3], -0.1); c.fill();
+    });
+    c.restore();
+    c.strokeStyle = 'rgba(190,255,160,.6)'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(px0 + 10, pyB - 70); c.bezierCurveTo(px0 - 30, pyB - 100, px0 - 10, pyB - 140, px0 - 50, pyB - 150); c.stroke();
+    c.beginPath(); c.moveTo(px0 + 18, pyB - 30); c.bezierCurveTo(px0 - 20, pyB - 40, px0 - 30, pyB - 80, px0 - 70, pyB - 70); c.stroke();
+
+    // Lumière de la lanterne (sur toute la scène)
+    const lnx = 400, lny = 500;
+    c.save(); c.globalCompositeOperation = 'lighter';
+    g = c.createRadialGradient(lnx, lny, 8, lnx, lny, 300);
+    g.addColorStop(0, 'rgba(255,190,90,.75)'); g.addColorStop(0.35, 'rgba(255,150,60,.28)'); g.addColorStop(1, 'rgba(255,150,60,0)');
+    c.fillStyle = g; rond(c, lnx, lny, 300); c.fill();
+    c.restore();
+
+    // Le médecin, en grand : cape, canne, sacoche d'herbes, bras tendu vers la porte
+    const hx = 212, hy = 290, hr = 104;
+    g = c.createLinearGradient(40, 0, 390, 0);
+    g.addColorStop(0, '#120e18'); g.addColorStop(0.55, '#2a2030'); g.addColorStop(1, '#5a3a3a');
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(205, 352); c.quadraticCurveTo(120, 368, 100, 430); c.lineTo(28, BAS + 10); c.lineTo(392, BAS + 10);
+    c.lineTo(330, 440); c.quadraticCurveTo(310, 378, 205, 352); c.closePath(); c.fill();
+    // plis de la cape
+    c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 6;
+    [[150, 470, 110, BAS], [215, 440, 205, BAS], [285, 470, 320, BAS]].forEach((p) => { c.beginPath(); c.moveTo(p[0], p[1]); c.quadraticCurveTo((p[0] + p[2]) / 2 + 12, (p[1] + p[3]) / 2, p[2], p[3]); c.stroke(); });
+    // liserés de lumière : lanterne à droite, lune à gauche
+    c.save(); c.shadowColor = '#ffb050'; c.shadowBlur = 16;
+    c.strokeStyle = 'rgba(255,180,90,.9)'; c.lineWidth = 4;
+    c.beginPath(); c.moveTo(392, BAS); c.lineTo(330, 440); c.quadraticCurveTo(310, 378, 228, 356); c.stroke();
+    c.shadowColor = '#b8c4ff'; c.strokeStyle = 'rgba(190,200,255,.55)'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(28, BAS); c.lineTo(100, 430); c.quadraticCurveTo(120, 368, 190, 354); c.stroke();
+    c.restore();
+    // sacoche et herbes
+    c.strokeStyle = '#5a3418'; c.lineWidth = 7; c.beginPath(); c.moveTo(228, 598); c.quadraticCurveTo(190, 470, 160, 390); c.stroke();
+    tuile(c, 'H', 266, 574, 82, 0);
+    c.fillStyle = '#5a3418';
+    c.beginPath(); c.moveTo(218, 596); c.lineTo(304, 596); c.lineTo(298, 646); c.quadraticCurveTo(262, 676, 226, 648); c.closePath(); c.fill();
+    c.fillStyle = '#7a4a24';
+    c.beginPath(); c.moveTo(214, 592); c.lineTo(308, 592); c.lineTo(300, 616); c.quadraticCurveTo(262, 632, 222, 616); c.closePath(); c.fill();
+    c.fillStyle = '#d8a43a'; rond(c, 262, 620, 5); c.fill();
+    // bras gauche et canne
+    c.strokeStyle = '#4a3020'; c.lineWidth = 10; c.beginPath(); c.moveTo(122, 436); c.lineTo(86, BAS + 10); c.stroke();
+    c.fillStyle = '#d8a43a'; rond(c, 123, 430, 10); c.fill();
+    c.strokeStyle = '#1e1824'; c.lineWidth = 40; c.beginPath(); c.moveTo(146, 400); c.quadraticCurveTo(118, 420, 124, 452); c.stroke();
+    c.fillStyle = '#6a3e1e'; ell(c, 124, 458, 17, 19); c.fill();
+    // bras droit tendu, gant et lanterne
+    c.strokeStyle = '#2a2030'; c.lineWidth = 44;
+    c.beginPath(); c.moveTo(282, 400); c.quadraticCurveTo(330, 448, 374, 452); c.stroke();
+    c.save(); c.shadowColor = '#ffb050'; c.shadowBlur = 12; c.strokeStyle = 'rgba(255,190,100,.85)'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(300, 384); c.quadraticCurveTo(338, 426, 372, 430); c.stroke(); c.restore();
+    c.fillStyle = '#7a4a24'; ell(c, 384, 452, 19, 16); c.fill();
+    c.fillStyle = '#9a6430'; ell(c, 388, 446, 8, 5); c.fill();
+    c.strokeStyle = '#2a2026'; c.lineWidth = 3; c.beginPath(); c.moveTo(392, 452); c.lineTo(400, 474); c.stroke();
+    c.fillStyle = '#2a2026';
+    c.beginPath(); c.moveTo(380, 482); c.lineTo(400, 466); c.lineTo(420, 482); c.closePath(); c.fill();
+    rr(c, 376, 480, 48, 64, 6); c.fill();
+    g = c.createRadialGradient(lnx, lny + 12, 2, lnx, lny + 12, 30);
+    g.addColorStop(0, '#fffbe0'); g.addColorStop(0.5, '#ffd27a'); g.addColorStop(1, '#ff9a2a');
+    c.fillStyle = g; rr(c, 382, 486, 36, 52, 4); c.fill();
+    c.fillStyle = '#2a2026'; c.fillRect(398, 486, 4, 52);
+    c.fillStyle = '#fff6c8'; ell(c, 400, 514, 5, 11); c.fill();
+    // la tête : chapeau, masque à bec et verres qui brillent
+    docteur(c, hx, hy, hr, 0, '#c8902c');
+    c.save(); c.globalCompositeOperation = 'lighter';
+    [[hx - 18 * hr / 50, hy], [hx + 2 * hr / 50, hy - 2 * hr / 50]].forEach((p) => {
+      g = c.createRadialGradient(p[0], p[1], 2, p[0], p[1], 34);
+      g.addColorStop(0, 'rgba(255,220,130,.6)'); g.addColorStop(1, 'rgba(255,220,130,0)');
+      c.fillStyle = g; rond(c, p[0], p[1], 34); c.fill();
+    });
+    c.restore();
+    // liseré chaud sur le bec, côté lanterne
+    c.save(); c.translate(hx, hy); c.scale(hr / 50, hr / 50);
+    c.strokeStyle = 'rgba(255,214,140,.85)'; c.lineWidth = 2.2;
+    c.beginPath(); c.moveTo(14, 4); c.quadraticCurveTo(34, 8, 50, 34); c.stroke();
+    c.restore();
+
+    // Premier plan : rats qui détalent, poussière dorée dans la lumière
+    ratAffiche(c, 500, 708, 92, 1);
+    ratAffiche(c, 590, 742, 70, 1);
+    ratAffiche(c, 70, 770, 150, -1);
+    c.fillStyle = 'rgba(255,220,150,.75)';
+    for (let i = 0; i < 26; i++) { const a = al() * Math.PI * 2, d = 30 + al() * 170; rond(c, lnx + Math.cos(a) * d, lny + Math.sin(a) * d * 0.8, 0.8 + al() * 1.8); c.fill(); }
+    // Vignette légère
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g = c.createRadialGradient(W * 0.55, H * 0.45, Math.min(W, H) * 0.35, W * 0.55, H * 0.45, Math.max(W, H) * 0.8);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(8,4,14,.55)');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+  }
+
+  // Cache le bouton de langue (créé parfois après ce script, avec un style en ligne).
+  function cacherLangue() {
+    document.querySelectorAll('.jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+
+  function demarrerAffiche() {
+    modeAffiche = true;
+    document.querySelectorAll('.ecran, .voile, #toast, #confettis, button').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+    cacherLangue();
+    [0, 200, 800, 1600].forEach((d) => setTimeout(cacherLangue, d));
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le
+  // jeu) : le jeu s'ouvre directement en pleine nuit solo contre les 3 robots, avec
+  // sa vraie interface (places, message, vies et marques du tour, « Rentrer »,
+  // remèdes), sans écran titre, ni « Continuer », ni tutoriel, ni fenêtre, sans
+  // réseau. La cité est tirée à graine fixe, les robots (et les tours d'avant du
+  // joueur) jouent quelques tours avec les vraies règles, puis le joueur ouvre des
+  // maisons ; les cœurs jaillissent de la maison ouverte, et l'image est figée.
+  // Ni son, ni sauvegarde, ni FMG.
+  //   1 = nuit 1 : 3 quartiers, malades et familles, premières vies du tour ;
+  //   2 = nuit 8 : 4 quartiers, rats, une marque de contagion déjà prise, remèdes ;
+  //   3 = nuit 17 (ordinateur) : 5 quartiers, puits révélés par la cloche, quartier
+  //       fermé par une émeute, vinaigre qui montre la prochaine maison, masque rouge.
+  const SCENES_APERCU = {
+    1: { niveau: 1, graine: 22, premier: 2, tours: 2, quartier: 1, ouvrir: 2, masque: 0 },
+    2: { niveau: 8, graine: 71, tours: 3, quartier: 2, ouvrir: 3, masque: 1, main: { H: 1, V: 1, Q: 1, B: 0 } },
+    3: { niveau: 17, graine: 146, tours: 11, quartier: 1, ouvrir: 2, masque: 3, main: { H: 1, V: 0, Q: 1, B: 2 }, vinaigre: true, emeute: true }
+  };
+
+  // État de la cité pour une image : vraies règles, hasard à graine fixe.
+  function etatApercu(sc) {
+    const alea = graineHasard(sc.graine * 7919 + 17);
+    const e = O.preparer(sc.niveau - 1, alea, PLACES);
+    e.fr = O.forceNuit(sc.niveau);
+    e.tour = sc.premier || 1;
+    for (let garde = 0; garde < 500; garde++) {
+      if (e.co >= sc.tours && e.tour === 0 && e.q === -1) break;
+      if (R.fin(e)) break;
+      const s = e.tour, a = R.bot(e, s, alea, e.fr);
+      if (!R.valide(e, s, a)) break;
+      R.jouer(e, s, a, alea);
+    }
+    // Le tour du joueur : un quartier, quelques maisons, sans tomber fiévreux.
+    const ordre = [sc.quartier];
+    for (let q = 0; q < e.d.length; q++) if (q !== sc.quartier) ordre.push(q);
+    const sur = (q) => {
+      const d = e.d[q], x = d.m[0];
+      if (!O.ouvert(e, q) || d.m.length < 2 || x === 'e') return false;
+      if (O.estMarque(x) && e.mk + (x === 'p' ? 2 : 1) >= 2) return false;
+      return true;
+    };
+    let dernier = null;
+    for (const q of ordre) {
+      if (!sur(q)) continue;
+      for (let i = 0; i < sc.ouvrir && sur(q); i++) {
+        R.jouer(e, 0, { o: q }, alea);
+        dernier = e.ev;
+      }
+      break;
+    }
+    e.cl = 0; e.clv = 0;
+    if (sc.main) e.h[0] = Object.assign({}, sc.main);
+    if (sc.vinaigre && e.q >= 0 && e.d[e.q].m.length) e.d[e.q].v[0] = 1;
+    if (sc.emeute && !e.d.some((d) => d.f)) {
+      for (let q = e.d.length - 1; q >= 0; q--) {
+        if (q === e.q || !O.ouvert(e, q)) continue;
+        e.d[q].f = 1;
+        e.d[q].m.forEach((x) => { e.pe += O.vies(x); });
+        break;
+      }
+    }
+    return { e: e, dernier: dernier };
+  }
+
+  function ouvrirApercu(numero) {
+    apercuNum = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture (particules).
+    const alea = graineHasard(4242 + numero * 101);
+    Math.random = alea;
+    prog.options.son = false;                 // aucun son ; rien n'est enregistré
+    prog.options.masque = sc.masque;
+    session = 'solo';
+    niveau = sc.niveau;
+    enPartie = false;                         // pas de sauvegarde à la fermeture
+    const r = etatApercu(sc);
+    vue = r.e;
+    // Partie posée sur l'appareil, sans robots qui jouent ni réseau : l'image ne bouge plus.
+    partie = {
+      mode: 'solo', phase: 'jeu', siege: 0, manche: 0, chef: -1, etat: r.e,
+      monTour: () => true, estChef: () => false, pause: () => {}, quitter: () => {}, jouer: () => false, recommencer: () => false,
+      sieges: () => [{ humain: true, moi: true }, { humain: false }, { humain: false }, { humain: false }]
+    };
+    if (numero === 3) document.body.classList.add('apercu-large');
+    majCiel(niveau);
+    anims = { cartes: [] };
+    particules.length = 0;
+    curseur = premierOuvert(0, 1);
+    afficherEcran('jeu');
+    majInterface();
+    // Les cœurs jaillissent de la maison qu'on vient d'ouvrir, puis tout est figé.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const x = r.dernier;
+      if (x && x.t === 'o') {
+        const v = O.vies(x.k);
+        if (v) jaillir(x.q, 'coeur', 3 + v * 2, '#ff6a5a');
+        else if (O.estMarque(x.k)) jaillir(x.q, 'croix', 6, '#d8322a');
+        else jaillir(x.q, 'point', 10, '#9fe08a');
+      }
+      setTimeout(() => { apercuFige = true; }, 220);
+    }));
+  }
+
+  // Image 3 (ordinateur) : la cité continue de chaque côté des quartiers
+  // (rempart, clocher, maisons allumées, puits empoisonné), sous la lune.
+  function decorLarge(c, w, h, g) {
+    const sky = c.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#2a2040'); sky.addColorStop(0.6, '#3a2a4a'); sky.addColorStop(1, '#1a1420');
+    c.fillStyle = sky; c.fillRect(0, 0, w, h);
+    const al = graineHasard(99);
+    for (let i = 0; i < 120; i++) { c.fillStyle = 'rgba(255,245,220,' + (0.3 + al() * 0.6).toFixed(2) + ')'; rond(c, al() * w, al() * h * 0.45, al() * 1.4 + 0.4); c.fill(); }
+    const lx = w * 0.9, ly = h * 0.18, lr = Math.min(42, h * 0.08);
+    let gr = c.createRadialGradient(lx, ly, lr * 0.4, lx, ly, lr * 3.5);
+    gr.addColorStop(0, 'rgba(255,238,200,.45)'); gr.addColorStop(1, 'rgba(255,238,200,0)');
+    c.fillStyle = gr; rond(c, lx, ly, lr * 3.5); c.fill();
+    c.fillStyle = '#f6ecc8'; rond(c, lx, ly, lr); c.fill();
+    const base = h * 0.78, u = Math.min(46, h * 0.09);
+    c.fillStyle = '#2c2240'; c.fillRect(0, base - u * 2.2, w, h);
+    for (let x = 0; x < w; x += u * 0.7) c.fillRect(x, base - u * 2.55, u * 0.38, u * 0.4);
+    // clocher à gauche
+    const tx = w * 0.09;
+    c.fillStyle = '#251c36'; c.fillRect(tx - u * 0.8, base - u * 6.5, u * 1.6, u * 6.5);
+    c.beginPath(); c.moveTo(tx - u, base - u * 6.4); c.lineTo(tx, base - u * 8.4); c.lineTo(tx + u, base - u * 6.4); c.closePath(); c.fill();
+    c.fillStyle = '#e6b23a'; c.beginPath(); c.moveTo(tx - u * 0.35, base - u * 4.9); c.quadraticCurveTo(tx - u * 0.33, base - u * 5.8, tx, base - u * 5.85); c.quadraticCurveTo(tx + u * 0.33, base - u * 5.8, tx + u * 0.35, base - u * 4.9); c.closePath(); c.fill();
+    const al2 = graineHasard(5);
+    for (let x = -u * 0.5, i = 0; x < w; x += u * 1.5, i++) {
+      if (x > g.x0 - u * 0.6 && x < g.x0 + g.cw * g.Q) continue;
+      maisonDecor(c, x, base + u * 0.4, u * (1 + al2() * 0.4), u * (1.6 + al2() * 1.6), TOITS[i % TOITS.length], al2, 0.5);
+    }
+    // puits empoisonné à droite, croix sur une porte à gauche
+    const px = g.x0 + g.cw * g.Q + (w - g.x0 - g.cw * g.Q) * 0.45;
+    gr = c.createRadialGradient(px, base + u * 0.4, 4, px, base + u * 0.4, u * 2.4);
+    gr.addColorStop(0, 'rgba(120,255,110,.45)'); gr.addColorStop(1, 'rgba(120,255,110,0)');
+    c.fillStyle = gr; rond(c, px, base + u * 0.4, u * 2.4); c.fill();
+    tuile(c, 'p', px, base + u * 0.9, u * 2.2, performance.now());
+    croix(c, g.x0 * 0.55, base - u * 0.3, u * 0.3);
+    const brume = c.createLinearGradient(0, base - u, 0, h);
+    brume.addColorStop(0, 'rgba(140,110,160,0)'); brume.addColorStop(0.5, 'rgba(140,110,160,.3)'); brume.addColorStop(1, 'rgba(24,18,30,.9)');
+    c.fillStyle = brume; c.fillRect(0, base - u, w, h);
+    // les rues des quartiers restent lisibles sur le décor
+    c.fillStyle = 'rgba(18,14,26,.72)';
+    for (let q = 0; q < g.Q; q++) { rr(c, g.x0 + q * g.cw + 3, g.haut, g.cw - 6, g.h - g.haut - 4, 12); c.fill(); }
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5223,7 +5631,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && !apercuNum && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -5231,13 +5639,17 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? vue.sc[partie.siege] : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(); });
+  window.addEventListener('resize', () => { if (ecran !== 'jeu' && !modeAffiche) dessinerTitre(); });
 
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); dessinerTitre(); } }); } catch (e) { boutonEffacer = null; }
+  // Affiche (jaquette) et images du jeu : posées par le robot du site seulement.
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) { ouvrirApercu(numeroApercu); return; }
   afficherEcran('titre');
   // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
   // dans le salon de sa partie en ligne (le moteur la demande au serveur).

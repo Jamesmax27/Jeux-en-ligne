@@ -2414,6 +2414,7 @@ const JEU = 'apprenti-des-grandes-inventions';
 const tr = (cle, vars) => window.JEL_I18N.t(cle, vars);
 const nombre = (x) => window.JEL_I18N.nombre(x);
 const TAU = Math.PI * 2;
+let modeApercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
 /* ---- Missions ----------------------------------------------------------
    Carte : une chaîne par ligne.
@@ -2790,10 +2791,12 @@ function chargerProgres() {
   P.etoiles.forEach((e, i) => { if (e > 0) P.niveauMax = Math.max(P.niveauMax, Math.min(NIVEAUX.length, i + 2)); });
 }
 function sauverLocal() {
+  if (modeApercu) return; // image du jeu : rien n'est enregistré
   try { localStorage.setItem(CLE_LOCALE, JSON.stringify(P)); } catch (e) { /* stockage refusé : le jeu continue */ }
 }
 // Sauvegarde commune (save.js) : niveau où reprendre + progression.
 function sauverPartie(niveau) {
+  if (modeApercu) return; // image du jeu : rien n'est enregistré
   try {
     window.JEL_SAVE.save(JEU, { niveau, score: P.xp, options: { son: P.son }, etoiles: P.etoiles, records: P.records, xp: P.xp, tenue: P.tenue, vus: P.vus, niveauMax: P.niveauMax });
   } catch (e) { /* rien */ }
@@ -3576,7 +3579,7 @@ function lancerNiveau(n) {
   // nouveautés : tutoriel animé de la première mission, cartes des suivantes
   const nouvelles = niv.neuf.filter((k) => !P.vus[k]);
   setTimeout(() => {
-    if (!G || G.n !== n) return;
+    if (!G || G.n !== n || modeApercu) return;
     if (nouvelles.includes('roue')) { P.vus.roue = true; sauverLocal(); tutoRoue(); }
     else if (nouvelles.length) montrerNeuf(nouvelles);
   }, 350);
@@ -4195,6 +4198,7 @@ function dessinerJeu(t) {
   const fond = c.createLinearGradient(0, 0, 0, geo.H);
   fond.addColorStop(0, coul.fond1); fond.addColorStop(1, coul.fond2);
   c.fillStyle = fond; c.fillRect(0, 0, geo.W, geo.H);
+  if (modeApercu === 3) dessinerDecorApercu(c, G.niv.atelier, geo.W, geo.H);
   // rotations
   let res = null, ecoule = 0;
   if (G.test) {
@@ -4348,12 +4352,348 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+/* ---- Décors communs de l'affiche et de l'image d'ordinateur -------------- */
+function decorNuage(c, x, y, r) {
+  c.fillStyle = 'rgba(255,255,255,.93)';
+  c.beginPath();
+  c.arc(x, y, r, 0, TAU); c.arc(x + r * 0.95, y + r * 0.25, r * 0.72, 0, TAU);
+  c.arc(x - r * 0.95, y + r * 0.3, r * 0.66, 0, TAU); c.arc(x + r * 0.25, y - r * 0.45, r * 0.7, 0, TAU);
+  c.fill();
+}
+// Biplan vu de côté, nez vers la droite (pilote au casque et à l'écharpe blanche).
+function decorAvion(c, x, y, u, inclinaison) {
+  c.save(); c.translate(x, y); c.rotate(inclinaison);
+  c.lineWidth = Math.max(1, 1.6 * u); c.strokeStyle = '#4a2a0e'; c.lineJoin = 'round';
+  // traînées
+  c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineCap = 'round'; c.lineWidth = 3 * u;
+  for (const dy of [-22, 2, 18]) { c.beginPath(); c.moveTo(-70 * u, dy * u); c.lineTo(-120 * u + dy * u, dy * u); c.stroke(); }
+  c.strokeStyle = '#4a2a0e'; c.lineWidth = Math.max(1, 1.6 * u);
+  // aile du bas, roues
+  c.fillStyle = '#b8332a'; c.fillRect(-26 * u, 6 * u, 60 * u, 8 * u); c.strokeRect(-26 * u, 6 * u, 60 * u, 8 * u);
+  c.beginPath(); c.moveTo(6 * u, 14 * u); c.lineTo(12 * u, 26 * u); c.moveTo(22 * u, 14 * u); c.lineTo(16 * u, 26 * u); c.stroke();
+  disque(c, 14 * u, 28 * u, 7 * u, '#2a1c10', '#120a04', u);
+  disque(c, 14 * u, 28 * u, 2.5 * u, '#b9b2a6');
+  // queue
+  c.fillStyle = '#c0392b';
+  c.beginPath(); c.moveTo(-46 * u, -4 * u); c.lineTo(-64 * u, -26 * u); c.lineTo(-58 * u, -2 * u); c.closePath(); c.fill(); c.stroke();
+  // fuselage
+  const f = c.createLinearGradient(0, -14 * u, 0, 14 * u);
+  f.addColorStop(0, '#ffd77a'); f.addColorStop(1, '#c98a24');
+  c.fillStyle = f;
+  c.beginPath(); c.moveTo(46 * u, -9 * u); c.quadraticCurveTo(52 * u, 0, 46 * u, 9 * u); c.lineTo(-20 * u, 8 * u); c.lineTo(-62 * u, 0); c.lineTo(-20 * u, -12 * u); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = '#c0392b'; c.fillRect(-30 * u, -6 * u, 6 * u, 12 * u);
+  // pilote
+  disque(c, -4 * u, -16 * u, 9 * u, '#e8b98a', '#2a1c10', u);
+  c.fillStyle = '#7a4a28'; c.beginPath(); c.arc(-4 * u, -17 * u, 9.5 * u, Math.PI, 0); c.fill(); c.stroke();
+  disque(c, 0, -19 * u, 3.6 * u, '#9fd3f0', '#2a1c10', u);
+  c.strokeStyle = '#f4f1e6'; c.lineWidth = 4 * u; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(-10 * u, -9 * u); c.quadraticCurveTo(-24 * u, -16 * u, -34 * u, -10 * u); c.stroke();
+  c.strokeStyle = '#4a2a0e'; c.lineWidth = Math.max(1, 1.6 * u);
+  // aile du haut et mâts
+  c.beginPath(); c.moveTo(-16 * u, 6 * u); c.lineTo(-12 * u, -28 * u); c.moveTo(24 * u, 6 * u); c.lineTo(26 * u, -28 * u); c.stroke();
+  c.fillStyle = '#c0392b'; c.fillRect(-30 * u, -36 * u, 66 * u, 9 * u); c.strokeRect(-30 * u, -36 * u, 66 * u, 9 * u);
+  c.fillStyle = 'rgba(255,255,255,.3)'; c.fillRect(-28 * u, -35 * u, 62 * u, 3 * u);
+  // hélice qui tourne
+  c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(53 * u, 0, 5 * u, 28 * u, 0, 0, TAU); c.fill();
+  c.fillStyle = '#7a4a28'; c.beginPath(); c.ellipse(53 * u, -12 * u, 2.6 * u, 13 * u, 0.2, 0, TAU); c.fill(); c.stroke();
+  disque(c, 51 * u, 0, 5 * u, '#9aa3ad', '#2a1c10', u);
+  c.restore();
+}
+function decorMoulin(c, x, y, u, a) {
+  c.fillStyle = '#efe2c2'; c.strokeStyle = '#5a3d26'; c.lineWidth = Math.max(1, 2 * u); c.lineJoin = 'round';
+  c.beginPath(); c.moveTo(x - 24 * u, y); c.lineTo(x - 14 * u, y - 92 * u); c.lineTo(x + 14 * u, y - 92 * u); c.lineTo(x + 24 * u, y); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = '#7a5235'; c.fillRect(x - 6 * u, y - 22 * u, 12 * u, 22 * u);
+  c.fillStyle = '#b5562d'; c.beginPath(); c.moveTo(x - 19 * u, y - 92 * u); c.lineTo(x, y - 114 * u); c.lineTo(x + 19 * u, y - 92 * u); c.closePath(); c.fill(); c.stroke();
+  c.save(); c.translate(x, y - 96 * u); c.rotate(a);
+  for (let k = 0; k < 4; k++) {
+    c.rotate(TAU / 4);
+    c.fillStyle = '#fbf3df'; c.fillRect(4 * u, -7 * u, 52 * u, 14 * u); c.strokeRect(4 * u, -7 * u, 52 * u, 14 * u);
+    c.beginPath(); c.moveTo(4 * u, 0); c.lineTo(56 * u, 0); c.stroke();
+  }
+  c.restore();
+  disque(c, x, y - 96 * u, 5 * u, '#5a3d26');
+}
+function decorPhare(c, x, y, u, angle) {
+  // faisceau
+  const lx = x, ly = y - 118 * u;
+  const g = c.createRadialGradient(lx, ly, 4 * u, lx, ly, 520 * u);
+  g.addColorStop(0, 'rgba(255,250,200,.85)'); g.addColorStop(1, 'rgba(255,250,200,0)');
+  c.fillStyle = g;
+  c.beginPath(); c.moveTo(lx, ly);
+  c.lineTo(lx + Math.cos(angle - 0.13) * 600 * u, ly + Math.sin(angle - 0.13) * 600 * u);
+  c.lineTo(lx + Math.cos(angle + 0.13) * 600 * u, ly + Math.sin(angle + 0.13) * 600 * u);
+  c.closePath(); c.fill();
+  c.strokeStyle = '#5a3d26'; c.lineWidth = Math.max(1, 2 * u); c.lineJoin = 'round';
+  c.fillStyle = '#f7f4ea'; c.beginPath(); c.moveTo(x - 22 * u, y); c.lineTo(x - 14 * u, y - 104 * u); c.lineTo(x + 14 * u, y - 104 * u); c.lineTo(x + 22 * u, y); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = '#d23b2c';
+  for (let k = 0; k < 3; k++) { const yy = y - 22 * u - k * 30 * u, d = 20 - k * 2.4; c.fillRect(x - d * u, yy, d * 2 * u, 12 * u); }
+  c.fillStyle = '#2f3a4a'; c.fillRect(x - 18 * u, y - 108 * u, 36 * u, 6 * u);
+  const halo = c.createRadialGradient(lx, ly, 2 * u, lx, ly, 34 * u);
+  halo.addColorStop(0, 'rgba(255,255,220,1)'); halo.addColorStop(1, 'rgba(255,240,150,0)');
+  c.fillStyle = halo; c.beginPath(); c.arc(lx, ly, 34 * u, 0, TAU); c.fill();
+  c.fillStyle = '#ffe680'; c.fillRect(x - 11 * u, y - 128 * u, 22 * u, 20 * u); c.strokeRect(x - 11 * u, y - 128 * u, 22 * u, 20 * u);
+  c.fillStyle = '#2f3a4a'; c.beginPath(); c.moveTo(x - 14 * u, y - 128 * u); c.lineTo(x, y - 142 * u); c.lineTo(x + 14 * u, y - 128 * u); c.closePath(); c.fill(); c.stroke();
+}
+// Petite étoile à quatre branches (éclat de lumière, sans aucun signe).
+function decorEclat(c, x, y, r, coul) {
+  c.fillStyle = coul || '#fff8cf';
+  c.beginPath();
+  c.moveTo(x, y - r); c.quadraticCurveTo(x + r * 0.18, y - r * 0.18, x + r, y);
+  c.quadraticCurveTo(x + r * 0.18, y + r * 0.18, x, y + r);
+  c.quadraticCurveTo(x - r * 0.18, y + r * 0.18, x - r, y);
+  c.quadraticCurveTo(x - r * 0.18, y - r * 0.18, x, y - r);
+  c.fill();
+}
+// Arcs de mouvement autour d'une roue qui tourne.
+function decorMouvement(c, x, y, r, sens, coul) {
+  c.save(); c.strokeStyle = coul || 'rgba(255,255,255,.8)'; c.lineWidth = Math.max(2, r * 0.07); c.lineCap = 'round';
+  for (const d of [0, Math.PI]) {
+    c.beginPath(); c.arc(x, y, r * 1.22, d - 0.9 * sens, d - 0.2 * sens, sens < 0); c.stroke();
+  }
+  c.restore();
+}
+
+/* ---- Affiche (jaquette du jeu) ------------------------------------------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). L'apprenti, en grand, brandit
+// la dernière roue dentée devant le soleil ; derrière lui, les engrenages de l'établi tournent, la lampe
+// renvoyée par le prisme allume la lentille du phare ; le moulin, le phare et le biplan rappellent les
+// ateliers de l'histoire.
+function dessinerAffiche() {
+  const cv = $('toile-affiche');
+  const W = window.innerWidth, H = window.innerHeight;
+  const c = preparerToile(cv, W, H);
+  const k = Math.min(W / 600, H / 800);
+  const X = (v) => W / 2 + (v - 300) * k; // abscisse du cadre 600 × 800, centré
+  const Y = (v) => H / 2 + (v - 400) * k;
+  c.save();
+  // Ciel
+  const ciel = c.createLinearGradient(0, 0, 0, Y(540));
+  ciel.addColorStop(0, '#3d9fe6'); ciel.addColorStop(0.5, '#8fd2f2'); ciel.addColorStop(1, '#ffe2a2');
+  c.fillStyle = ciel; c.fillRect(0, 0, W, H);
+  // Soleil derrière la roue brandie, et ses rayons
+  const sx = X(395), sy = Y(250);
+  c.save(); c.translate(sx, sy); c.fillStyle = 'rgba(255,255,240,.16)';
+  for (let i = 0; i < 18; i++) { c.rotate(TAU / 18); c.beginPath(); c.moveTo(0, 0); c.lineTo(1200 * k, -95 * k); c.lineTo(1200 * k, 95 * k); c.closePath(); c.fill(); }
+  c.restore();
+  const halo = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 380 * k);
+  halo.addColorStop(0, 'rgba(255,253,225,1)'); halo.addColorStop(0.3, 'rgba(255,240,180,.75)'); halo.addColorStop(1, 'rgba(255,236,170,0)');
+  c.fillStyle = halo; c.fillRect(0, 0, W, H);
+  // Nuages (le décor continue sur les écrans larges)
+  [[-260, 300, 28], [-120, 120, 24], [70, 250, 22], [520, 175, 30], [720, 90, 26], [860, 260, 30]].forEach(([x, y, r]) => decorNuage(c, X(x), Y(y), r * k));
+  // Collines lointaines, moulin (à gauche), phare et son faisceau (à droite)
+  c.fillStyle = '#b3dc84';
+  c.beginPath(); c.moveTo(0, Y(470)); c.quadraticCurveTo(X(150), Y(400), X(330), Y(460)); c.quadraticCurveTo(X(470), Y(500), W, Y(430)); c.lineTo(W, H); c.lineTo(0, H); c.closePath(); c.fill();
+  decorMoulin(c, X(52), Y(468), 1.5 * k, 0.35);
+  decorPhare(c, X(568), Y(468), 1.45 * k, Math.PI + 0.5);
+  // Biplan qui file vers le haut
+  decorAvion(c, X(120), Y(140), 1.55 * k, -0.18);
+  // Prairie
+  const pre = c.createLinearGradient(0, Y(500), 0, H);
+  pre.addColorStop(0, '#93cf5e'); pre.addColorStop(1, '#4f8f34');
+  c.fillStyle = pre;
+  c.beginPath(); c.moveTo(0, Y(520)); c.quadraticCurveTo(X(200), Y(490), X(420), Y(515)); c.quadraticCurveTo(X(560), Y(530), W, Y(505)); c.lineTo(W, H); c.lineTo(0, H); c.closePath(); c.fill();
+  // Établi : pieds, montants des roues, courroie, roues qui tournent
+  c.fillStyle = '#5a3d26';
+  for (const px of [-200, 30, 520, 800]) c.fillRect(X(px), Y(520), 16 * k, 86 * k);
+  const roues = [[165, 420, 80, 12, 0.1, 1], [250, 337, 52, 9, 0.35, -1], [210, 270, 34, 8, 0.2, 1]];
+  c.fillStyle = '#4a3420';
+  for (const [x, y] of roues) c.fillRect(X(x) - 6 * k, Y(y), 12 * k, Y(505) - Y(y));
+  c.save(); c.strokeStyle = POULIES.poulieA[1]; c.lineWidth = 9 * k; c.lineCap = 'round';
+  c.setLineDash([16 * k, 9 * k]);
+  c.beginPath(); c.moveTo(X(55), Y(462)); c.lineTo(X(165), Y(420)); c.stroke(); c.restore();
+  dessinerPoulie(c, X(55), Y(462), 36 * k, 0.4, 'poulieA');
+  for (const [x, y, r, dents, a, sens] of roues) {
+    c.save(); c.shadowColor = 'rgba(90,50,10,.45)'; c.shadowBlur = 10 * k; c.shadowOffsetY = 4 * k;
+    engrenage(c, X(x), Y(y), r * k, a, '#f0b94c', '#7a4f12', dents);
+    c.restore();
+    c.strokeStyle = 'rgba(255,248,210,.75)'; c.lineWidth = r * k * 0.08; c.lineCap = 'round';
+    c.beginPath(); c.arc(X(x), Y(y), r * k * 0.68, Math.PI * 1.1, Math.PI * 1.45); c.stroke();
+    decorMouvement(c, X(x), Y(y), r * k, sens);
+  }
+  // Plateau de l'établi
+  const bois = c.createLinearGradient(0, Y(500), 0, Y(530));
+  bois.addColorStop(0, '#a87348'); bois.addColorStop(1, '#6e4a2c');
+  c.fillStyle = bois; c.fillRect(0, Y(500), W, 30 * k);
+  c.fillStyle = 'rgba(255,230,190,.35)'; c.fillRect(0, Y(500), W, 4 * k);
+  // Lampe → prisme → lentille du phare allumée
+  const ly = Y(470), px0 = X(492);
+  c.save(); c.lineCap = 'round';
+  c.strokeStyle = 'rgba(255,230,120,.6)'; c.lineWidth = 22 * k;
+  c.beginPath(); c.moveTo(X(570), ly); c.lineTo(px0, ly); c.lineTo(px0, Y(396)); c.stroke();
+  c.strokeStyle = 'rgba(255,252,220,.95)'; c.lineWidth = 6 * k;
+  c.beginPath(); c.moveTo(X(570), ly); c.lineTo(px0, ly); c.lineTo(px0, Y(396)); c.stroke();
+  c.restore();
+  dessinerLampe(c, X(585), ly, 70 * k, [-1, 0], 0.4);
+  dessinerPrisme(c, px0, ly, 64 * k, '\\');
+  dessinerLentille(c, px0, Y(380), 36 * k, 0.3, true, 0);
+  for (const [dx, dy, r] of [[-46, -40, 9], [44, -30, 7], [0, -70, 8]]) decorEclat(c, px0 + dx * k, Y(380) + dy * k, r * k);
+  // L'apprenti, en grand, devant l'établi
+  const ax = X(330), base = Y(622), s = 372 * k;
+  c.fillStyle = 'rgba(40,70,20,.35)'; c.beginPath(); c.ellipse(ax, base, s * 0.24, s * 0.035, 0, 0, TAU); c.fill();
+  const tenue = { chapeau: 3, tablier: 1 };
+  const t = Math.PI / 6; // bras levé bien haut
+  c.save(); c.shadowColor = 'rgba(255,250,225,.95)'; c.shadowBlur = 16 * k;
+  dessinerApprenti(c, ax, base, s, tenue, t);
+  c.restore();
+  dessinerApprenti(c, ax, base, s, tenue, t);
+  // Visage ravi : bouche ouverte, sourcils levés, yeux qui brillent
+  const fy = base - s * 0.75;
+  c.fillStyle = '#e8b98a'; c.beginPath(); c.arc(ax, base - s * 0.705, s * 0.062, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(230,110,90,.45)'; c.beginPath(); c.arc(ax - s * 0.09, base - s * 0.71, s * 0.026, 0, TAU); c.arc(ax + s * 0.09, base - s * 0.71, s * 0.026, 0, TAU); c.fill();
+  c.fillStyle = '#6b2412'; c.strokeStyle = '#2a1c10'; c.lineWidth = Math.max(1, s * 0.008);
+  c.beginPath(); c.arc(ax, base - s * 0.712, s * 0.048, 0.05, Math.PI - 0.05); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = '#ef8a76'; c.beginPath(); c.ellipse(ax, base - s * 0.678, s * 0.024, s * 0.011, 0, 0, TAU); c.fill();
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(ax - s * 0.045, fy - s * 0.006, s * 0.007, 0, TAU); c.arc(ax + s * 0.055, fy - s * 0.006, s * 0.007, 0, TAU); c.fill();
+  c.strokeStyle = '#3a2210'; c.lineWidth = s * 0.012; c.lineCap = 'round';
+  c.beginPath(); c.arc(ax - s * 0.05, fy - s * 0.015, s * 0.03, Math.PI * 1.2, Math.PI * 1.8); c.stroke();
+  c.beginPath(); c.arc(ax + s * 0.05, fy - s * 0.015, s * 0.03, Math.PI * 1.2, Math.PI * 1.8); c.stroke();
+  // La dernière roue, brandie devant le soleil
+  const ang = -1.9 + Math.sin(t * 3) * 0.35;
+  const hx = ax + s * 0.16 + Math.cos(ang) * s * 0.25, hy = base - s * 0.58 + Math.sin(ang) * s * 0.25;
+  const gx = hx + s * 0.1, gy = hy - s * 0.095, gr = s * 0.135;
+  const lueur = c.createRadialGradient(gx, gy, gr * 0.3, gx, gy, gr * 2.2);
+  lueur.addColorStop(0, 'rgba(255,255,230,.95)'); lueur.addColorStop(1, 'rgba(255,240,170,0)');
+  c.fillStyle = lueur; c.beginPath(); c.arc(gx, gy, gr * 2.2, 0, TAU); c.fill();
+  c.save(); c.shadowColor = '#fff3b0'; c.shadowBlur = 24 * k;
+  engrenage(c, gx, gy, gr, 0.25, '#ffc94a', '#8a5a10', 10);
+  c.restore();
+  c.strokeStyle = 'rgba(255,255,235,.9)'; c.lineWidth = gr * 0.09; c.lineCap = 'round';
+  c.beginPath(); c.arc(gx, gy, gr * 0.68, Math.PI * 1.05, Math.PI * 1.5); c.stroke();
+  disque(c, hx, hy, s * 0.045, '#e8b98a', '#2a1c10', s * 0.015);
+  for (const [dx, dy, r] of [[-1.7, -0.6, 0.32], [1.6, -1.0, 0.26], [1.9, 0.5, 0.2], [-1.3, 0.9, 0.18], [0.2, -1.8, 0.24]]) decorEclat(c, gx + dx * gr, gy + dy * gr, r * gr);
+  // Clé à molette dans l'autre main
+  const wx = ax - s * 0.25, wy = base - s * 0.34;
+  c.save(); c.translate(wx, wy); c.rotate(0.5);
+  c.fillStyle = '#a9b2bc'; c.strokeStyle = '#3c434c'; c.lineWidth = Math.max(1, s * 0.008);
+  c.beginPath(); c.roundRect ? c.roundRect(-s * 0.02, -s * 0.02, s * 0.04, s * 0.2, s * 0.02) : c.rect(-s * 0.02, -s * 0.02, s * 0.04, s * 0.2); c.fill(); c.stroke();
+  c.strokeStyle = '#3c434c'; c.lineWidth = s * 0.034; c.lineCap = 'butt';
+  c.beginPath(); c.arc(0, s * 0.21, s * 0.034, Math.PI / 2 + 0.75, Math.PI / 2 - 0.75 + TAU); c.stroke();
+  c.strokeStyle = '#a9b2bc'; c.lineWidth = s * 0.022;
+  c.beginPath(); c.arc(0, s * 0.21, s * 0.034, Math.PI / 2 + 0.8, Math.PI / 2 - 0.8 + TAU); c.stroke();
+  c.restore();
+  disque(c, wx, wy, s * 0.045, '#e8b98a', '#2a1c10', s * 0.015);
+  // Premier plan : grandes roues coupées par les bords, caisse de cuivre
+  c.save(); c.shadowColor = 'rgba(0,0,0,.35)'; c.shadowBlur = 14 * k;
+  engrenage(c, X(-30), Y(800), 165 * k, 0.15, '#d39a36', '#5a3a0e', 14);
+  engrenage(c, X(625), Y(760), 120 * k, 0.4, '#c9902e', '#5a3a0e', 12);
+  engrenage(c, X(478), Y(835), 70 * k, 0.05, '#e3ad4a', '#7a4f12', 9);
+  c.restore();
+  decorMouvement(c, X(-30), Y(800), 165 * k, -1, 'rgba(255,250,220,.7)');
+  decorMouvement(c, X(625), Y(760), 120 * k, 1, 'rgba(255,250,220,.7)');
+  dessinerCaisse(c, X(150), Y(668), 92 * k, 'cuivre');
+  c.restore();
+}
+function cacherInterfaceAffiche() {
+  for (const el of document.querySelectorAll('.ecran, .voile, #toast, #main-tuto, #tuto-voile, button, jel-langue, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  const cv = document.createElement('canvas');
+  cv.id = 'toile-affiche';
+  cv.setAttribute('aria-hidden', 'true');
+  cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:100;display:block';
+  document.body.appendChild(cv);
+  cacherInterfaceAffiche();
+  setTimeout(cacherInterfaceAffiche, 300);
+  setTimeout(cacherInterfaceAffiche, 1200);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---- Images du jeu (page du jeu) ----------------------------------------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement sur une mission, avec sa vraie interface (artisan qui parle, coups, caisse de pièces,
+// matériaux, boutons), sans écran titre, ni fenêtre « Continuer », ni carte « Nouveau », ni tutoriel
+// (CONSIGNES-JEU.md, section 5). Les gestes sont posés par le code, puis la mission est figée sans
+// fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = mission 4 (potière) : roues posées autour des rochers, deux tours de potier à relier ;
+//   2 = mission 12 (imprimerie) : caisses ouvertes, courroie rouge, poulie bleue, roue rouillée ;
+//   3 = mission 20 (hangar, sur ordinateur) : tout le mécanisme tourne, la lampe renvoyée par deux
+//       prismes allume la lentille, les hélices tournent ; le ciel du hangar continue sur les côtés.
+const MOMENTS_APERCU = {
+  1: { mission: 3, gestes: [0, 1, 2, 3], outil: 'roue', bouffee: [3, 2] },
+  2: { mission: 11, gestes: [1, 2, 3, 4], outil: 'poulieB', bouffee: [4, 2] },
+  3: { mission: 19, gestes: 'tout', tourne: true },
+};
+function ouvrirApercu(numero) {
+  modeApercu = numero;
+  const m = MOMENTS_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  // Progression neuve en mémoire seulement : nouveautés déjà vues (aucune carte ni tutoriel).
+  NIVEAUX.forEach((niv) => niv.neuf.forEach((cle) => { P.vus[cle] = true; }));
+  P.vus.roue = true;
+  majBoutonsSon();
+  lancerNiveau(m.mission);
+  const sol = G.niv.sol;
+  const gestes = m.gestes === 'tout' ? sol : m.gestes.map((i) => sol[i]);
+  for (const g of gestes) {
+    if (!appliquerGeste(G, g)) continue;
+    G.coups++;
+    if (g[0] === 'p') G.ang[g[3] * G.plan.w + g[2]] = ((g[2] + g[3]) % 2) * (Math.PI / 10);
+  }
+  if (m.outil) G.outil = m.outil;
+  if (m.tourne) {
+    // « Faire tourner » : la mission tourne, mais n'est jamais conclue (test déjà marqué fini).
+    G.coups++;
+    const res = simuler(G.plan);
+    G.test = { debut: 0, res, duree: 1e9, fini: true, ecoule: 1e6 };
+    G.plan.cases.forEach((cel, i) => { if (res.sens[i]) G.ang[i] += res.sens[i] * 0.9; });
+  }
+  majCaisse(); majMateriaux(); majCoups();
+  // Une fois la mise en page faite : une bouffée sur la dernière pièce posée, puis tout est figé.
+  setTimeout(() => {
+    if (!G) return;
+    redimensionner();
+    if (m.bouffee) {
+      bouffee(m.bouffee[0], m.bouffee[1], '#f6d27a', 14);
+      for (const p of G.particules) { p.x += p.vx * 0.28; p.y += p.vy * 0.28; p.vie = p.max; }
+    }
+    G.pause = true; // figé, sans fenêtre de pause
+  }, 250);
+}
+// Image d'ordinateur : le ciel du hangar continue de chaque côté de l'établi (nuages, collines, biplans).
+function dessinerDecorApercu(c, atelier, W, H) {
+  if (atelier !== 4) return;
+  const u = Math.max(0.6, Math.min(1.6, H / 420));
+  const soleil = c.createRadialGradient(W * 0.85, H * 0.15, 4, W * 0.85, H * 0.15, H * 0.5);
+  soleil.addColorStop(0, 'rgba(255,250,215,.95)'); soleil.addColorStop(1, 'rgba(255,250,215,0)');
+  c.fillStyle = soleil; c.fillRect(0, 0, W, H);
+  [[0.06, 0.16, 26], [0.2, 0.34, 20], [0.33, 0.12, 18], [0.7, 0.1, 22], [0.82, 0.36, 26], [0.95, 0.2, 18]].forEach(([x, y, r]) => decorNuage(c, W * x, H * y, r * u));
+  c.fillStyle = '#9ccf72';
+  c.beginPath(); c.moveTo(0, H * 0.78); c.quadraticCurveTo(W * 0.2, H * 0.66, W * 0.42, H * 0.8); c.quadraticCurveTo(W * 0.7, H * 0.9, W, H * 0.7); c.lineTo(W, H); c.lineTo(0, H); c.closePath(); c.fill();
+  c.fillStyle = '#7cb556';
+  c.beginPath(); c.moveTo(0, H * 0.92); c.quadraticCurveTo(W * 0.5, H * 0.82, W, H * 0.9); c.lineTo(W, H); c.lineTo(0, H); c.closePath(); c.fill();
+  // hangar à toit rond, à gauche
+  const hx = W * 0.12, hy = H * 0.86, hw = 120 * u, hh = 70 * u;
+  c.fillStyle = '#c9d2dc'; c.strokeStyle = '#3c434c'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(hx - hw / 2, hy); c.lineTo(hx - hw / 2, hy - hh * 0.45); c.quadraticCurveTo(hx, hy - hh * 1.35, hx + hw / 2, hy - hh * 0.45); c.lineTo(hx + hw / 2, hy); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = '#4b535c'; c.fillRect(hx - hw * 0.28, hy - hh * 0.55, hw * 0.56, hh * 0.55);
+  c.strokeStyle = '#6b747e';
+  for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(hx - hw * 0.28 + i * hw * 0.14, hy - hh * 0.55); c.lineTo(hx - hw * 0.28 + i * hw * 0.14, hy); c.stroke(); }
+  // manche à air, à droite
+  const mx = W * 0.9, my = H * 0.84;
+  c.strokeStyle = '#3c434c'; c.lineWidth = 3; c.beginPath(); c.moveTo(mx, my); c.lineTo(mx, my - 80 * u); c.stroke();
+  for (let i = 0; i < 4; i++) { c.fillStyle = i % 2 ? '#f4f1e6' : '#e0552f'; c.beginPath(); c.moveTo(mx + i * 14 * u, my - 80 * u - i * 1.5 * u); c.lineTo(mx + (i + 1) * 14 * u, my - 78 * u - (i + 1) * 1.5 * u); c.lineTo(mx + (i + 1) * 14 * u, my - 66 * u + (i + 1) * 1.5 * u); c.lineTo(mx + i * 14 * u, my - 64 * u + i * 1.5 * u); c.closePath(); c.fill(); }
+  decorAvion(c, W * 0.13, H * 0.42, 0.95 * u, -0.12);
+  decorAvion(c, W * 0.84, H * 0.56, 0.75 * u, 0.06);
+}
+
 /* ---- Démarrage ----------------------------------------------------------- */
 document.title = tr('titre');
-chargerProgres();
-majBoutonsSon();
-majTitre();
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) {
+  demarrerAffiche();
+} else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  chargerProgres();
+  majBoutonsSon();
+  majTitre();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>
