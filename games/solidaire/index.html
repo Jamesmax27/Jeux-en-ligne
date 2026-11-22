@@ -3337,6 +3337,9 @@
     if (!J || J.fini) return;
     if (window.FMG) window.FMG.reportEnd({ completed: false, level: J.n + 1 });
     J.fini = true; J.actif = false;
+    P.graines[J.n] = J.essai + 1; // partie perdue : la prochaine partie de ce niveau sera remélangée
+    garderLocal();
+    if (!APERCU && !AFFICHE) sauverPartie(J.n + 1, 0); // garde la nouvelle graine dans la sauvegarde du site
     effacerIndice();
     SON.defaite();
     montrerFin(false, { raison: raison });
@@ -3393,9 +3396,9 @@
       premier = premier || b2;
     } else {
       if (r.raison === 'bloque' && J.histo.length) premier = bouton('fin.annulerCoup', function () { fermerVoiles(); J.fini = false; J.actif = true; annuler(); }, true);
-      var b3 = bouton('fin.reessayer', function () { lancerNiveau(J.n, true); }, !premier);
+      // Réessayer repart sur une donne remélangée, différente de celle qui a bloqué
+      var b3 = bouton('fin.reessayer', function () { lancerNiveau(J.n, 'nouvelle'); }, !premier);
       premier = premier || b3;
-      bouton('fin.rejouer', function () { lancerNiveau(J.n, 'nouvelle'); });
     }
     bouton('fin.niveaux', function () { fermerVoiles(); afficher('niveaux'); });
     $('#voile-fin').classList.add('actif');
