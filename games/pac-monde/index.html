@@ -46,7 +46,12 @@
    "one": "{n} vie restante",
    "other": "{n} vies restantes"
   },
-  "trouvePorte": "trouve la porte scellée"
+  "trouvePorte": "trouve la porte scellée",
+  "sauvegardee": "PARTIE SAUVEGARDÉE",
+  "sauveeRegion": "reprise possible ici : région {n}",
+  "menuSauve": "Partie sauvegardée : \u003cb>région {n}\u003c/b>, score \u003cb>{score}\u003c/b>. Touche COMMENCER puis CONTINUER pour repartir du début de cette région.",
+  "repriseRegion": "reprise au début de la région",
+  "pauseSauve": "Sauvegarde : début de la région \u003cb>{n}\u003c/b>, score \u003cb>{score}\u003c/b>."
  },
  "en": {
   "titrePage": "PAC·WORLD — the growing world",
@@ -87,7 +92,12 @@
    "one": "{n} life left",
    "other": "{n} lives left"
   },
-  "trouvePorte": "find the sealed door"
+  "trouvePorte": "find the sealed door",
+  "sauvegardee": "GAME SAVED",
+  "sauveeRegion": "you can resume here: region {n}",
+  "menuSauve": "Saved game: \u003cb>region {n}\u003c/b>, score \u003cb>{score}\u003c/b>. Tap START, then CONTINUE to restart from the beginning of this region.",
+  "repriseRegion": "resuming at the start of the region",
+  "pauseSauve": "Saved: start of region \u003cb>{n}\u003c/b>, score \u003cb>{score}\u003c/b>."
  },
  "es": {
   "titrePage": "PAC·MUNDO — el mundo que crece",
@@ -128,7 +138,12 @@
    "one": "{n} vida restante",
    "other": "{n} vidas restantes"
   },
-  "trouvePorte": "busca la puerta sellada"
+  "trouvePorte": "busca la puerta sellada",
+  "sauvegardee": "PARTIDA GUARDADA",
+  "sauveeRegion": "podrás seguir aquí: región {n}",
+  "menuSauve": "Partida guardada: \u003cb>región {n}\u003c/b>, puntuación \u003cb>{score}\u003c/b>. Toca EMPEZAR y luego CONTINUAR para volver al principio de esta región.",
+  "repriseRegion": "sigues desde el principio de la región",
+  "pauseSauve": "Guardado: principio de la región \u003cb>{n}\u003c/b>, puntuación \u003cb>{score}\u003c/b>."
  },
  "pt": {
   "titrePage": "PAC·MUNDO — o mundo que cresce",
@@ -169,7 +184,12 @@
    "one": "{n} vida restante",
    "other": "{n} vidas restantes"
   },
-  "trouvePorte": "ache a porta lacrada"
+  "trouvePorte": "ache a porta lacrada",
+  "sauvegardee": "JOGO SALVO",
+  "sauveeRegion": "você pode continuar daqui: região {n}",
+  "menuSauve": "Jogo salvo: \u003cb>região {n}\u003c/b>, pontuação \u003cb>{score}\u003c/b>. Toque em COMEÇAR e depois em CONTINUAR para voltar ao início desta região.",
+  "repriseRegion": "continuando do início da região",
+  "pauseSauve": "Salvo: início da região \u003cb>{n}\u003c/b>, pontuação \u003cb>{score}\u003c/b>."
  },
  "de": {
   "titrePage": "PAC·WELT — die wachsende Welt",
@@ -210,7 +230,12 @@
    "one": "noch {n} Leben",
    "other": "noch {n} Leben"
   },
-  "trouvePorte": "finde die versiegelte Tür"
+  "trouvePorte": "finde die versiegelte Tür",
+  "sauvegardee": "SPIEL GESPEICHERT",
+  "sauveeRegion": "hier geht es weiter: Region {n}",
+  "menuSauve": "Gespeichertes Spiel: \u003cb>Region {n}\u003c/b>, Punkte \u003cb>{score}\u003c/b>. Tippe auf LOS GEHT'S und dann auf WEITERSPIELEN, um am Anfang dieser Region weiterzumachen.",
+  "repriseRegion": "weiter am Anfang der Region",
+  "pauseSauve": "Gespeichert: Anfang von Region \u003cb>{n}\u003c/b>, Punkte \u003cb>{score}\u003c/b>."
  }
 }
 </script>
@@ -1112,7 +1137,16 @@ html,body{height:100%;overflow:hidden;overscroll-behavior:none;background:var(--
   padding:10px 24px;border-radius:3px;border:1px solid var(--gold);color:var(--gold);background:transparent
 }
 #go2[hidden]{display:none}
-@media (prefers-reduced-motion: reduce){#toast{transition:none}}
+/* ---- pastille « Partie sauvegardée » ---- */
+#sauve{
+  position:absolute;left:10px;top:calc(env(safe-area-inset-top) + 64px);max-width:calc(100% - 150px);
+  border:1px solid var(--gold);border-radius:4px;background:rgba(9,8,20,.82);padding:6px 10px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--gold);
+  opacity:0;transform:translateY(-4px);transition:opacity .25s, transform .25s;pointer-events:none
+}
+#sauve.on{opacity:1;transform:none}
+#sauve small{display:block;color:var(--dim);font-size:10px;letter-spacing:.04em;margin-top:2px}
+@media (prefers-reduced-motion: reduce){#toast,#sauve{transition:none}}
 </style>
 </head>
 <body>
@@ -1130,6 +1164,7 @@ html,body{height:100%;overflow:hidden;overscroll-behavior:none;background:var(--
   <div id="mapbox"><span class="lab" data-i18n="labCarte">CARTE</span><canvas id="mini" width="112" height="112"></canvas></div>
 
   <div id="toast"></div>
+  <div id="sauve" role="status" aria-live="polite"></div>
 
   <div id="pad">
     <div class="sp"></div><button data-d="u">▲</button><div class="sp"></div>
@@ -1410,8 +1445,9 @@ function update(dt){
         if (lv.count===0 && lv===S.active){
           if (lv.id >= MAX_LEVELS){ JEL_SAVE.clear(JEU); finish('win'); return; }
           S.score += 500; openNextRegion();
-          scoreRegion = S.score;
+          scoreRegion = S.score; viesRegion = S.lives;
           sauvegarder();
+          montrerSauvegarde();
         }
       }
     }
@@ -1684,6 +1720,8 @@ function screen(kind){
   if (kind==='menu'){
     el.title.innerHTML = t('nomJeu') + '<span>' + t('mondeOuvert') + '</span>';
     el.msg.innerHTML = t('regleHtml');
+    const sv = lireSauvegarde();
+    if (sv) el.msg.innerHTML += '<span class="rule"></span>' + t('menuSauve', { n: sv.niveau, score: sv.score });
     el.go.textContent = t('commencer');
   } else if (kind==='over'){
     if (window.FMG) window.FMG.reportEnd({ completed: false, level: S.active.id });
@@ -1708,6 +1746,7 @@ function screen(kind){
   } else if (kind==='pause'){
     el.title.innerHTML = t('pause') + '<span>' + t('region', { n: S.active.id }) + '</span>';
     el.msg.innerHTML = t('pauseMsg', { score: S.score, n: S.active.count });
+    if (S.active.id > 1) el.msg.innerHTML += '<span class="rule"></span>' + t('pauseSauve', { n: S.active.id, score: scoreRegion });
     el.go.textContent = t('reprendre');
   }
 }
@@ -1720,14 +1759,31 @@ function finish(kind){
 }
 
 /* ---------- sauvegarde du site (JEL_SAVE) ---------- */
-// niveau = région où reprendre, score et vies au début de cette région.
-// Écrite à chaque région ouverte et à la fermeture ; monde complet = effacée.
-// Après une partie perdue, la sauvegarde reste : on peut reprendre la région.
+// niveau = région où reprendre, score et vies au début de cette région :
+// la sauvegarde est un point de reprise fixe, le même quel que soit le moment
+// où l'on quitte la région (rien de la région en cours n'y entre).
+// Écrite à chaque région ouverte (pastille « Partie sauvegardée ») et à la
+// fermeture ; monde complet = effacée. Après une partie perdue, la
+// sauvegarde reste : on peut reprendre la région.
 const JEU = 'pac-monde';
-let scoreRegion = 0;
+let scoreRegion = 0, viesRegion = 3;
 function sauvegarder(){
   if ((S.status==='play' || S.status==='pause') && S.active)
-    JEL_SAVE.save(JEU, { niveau: S.active.id, score: scoreRegion, vies: S.lives });
+    JEL_SAVE.save(JEU, { niveau: S.active.id, score: scoreRegion, vies: viesRegion });
+}
+const elSauve = document.getElementById('sauve');
+let sauveT = 0;
+function montrerSauvegarde(){
+  elSauve.innerHTML = t('sauvegardee') + '<small>' + t('sauveeRegion', { n: S.active.id }) + '</small>';
+  elSauve.classList.add('on');
+  sauveT = 3;
+}
+// Sauvegarde utilisable (région 2 au moins), sinon null.
+function lireSauvegarde(){
+  let d = null;
+  try { d = JEL_SAVE.load(JEU); } catch (e) { d = null; }
+  const n = d ? Math.floor(Number(d.niveau)) : 0;
+  return n > 1 && n <= MAX_LEVELS ? { niveau: n, score: Math.max(0, Math.floor(Number(d.score)) || 0) } : null;
 }
 JEL_SAVE.surFermeture(sauvegarder);
 const VIES_DEPART = 3;
@@ -1761,7 +1817,7 @@ function start(reprise){
     const v = Number(reprise.vies);
     if (v >= 1 && v <= 3) S.lives = Math.floor(v);
   }
-  scoreRegion = S.score;
+  scoreRegion = S.score; viesRegion = S.lives;
   S.player = { x: lv.spawn.x, y: lv.spawn.y, dir:{x:0,y:0}, next:null, speed:5.3, mouth:0 };
   S.cam.x = S.player.x; S.cam.y = S.player.y;
   S.status = 'play';
@@ -1769,7 +1825,7 @@ function start(reprise){
   el.go2.hidden = true;
   zoneEffacer.hidden = true;
   hud();
-  toast(t('region', { n: lv.id }), t('trouvePorte'), `hsl(${lv.hue} 90% 68%)`);
+  toast(t('region', { n: lv.id }), t(reprise ? 'repriseRegion' : 'trouvePorte'), `hsl(${lv.hue} 90% 68%)`);
 }
 
 let last = 0;
@@ -1780,6 +1836,7 @@ function frame(ts){
   if (S.status==='play'){
     update(dt);
     if (toastT>0){ toastT -= dt; if (toastT<=0) el.toast.classList.remove('on'); }
+    if (sauveT>0){ sauveT -= dt; if (sauveT<=0) elSauve.classList.remove('on'); }
     hud();
   }
   if (S.player){ draw(); drawMini(); }
@@ -1831,7 +1888,7 @@ el.go2.addEventListener('click', () => { if (S.status==='over') start(); });
 const zoneEffacer = document.createElement('div');
 zoneEffacer.style.marginTop = '14px';
 document.getElementById('panel').appendChild(zoneEffacer);
-JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: zoneEffacer });
+JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: zoneEffacer, apres: () => { if (S.status==='menu') screen('menu'); } });
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && S.status==='play'){ S.status='pause'; screen('pause'); }
 });
@@ -2168,7 +2225,7 @@ function dessinerAffiche(){
   c.restore();
 }
 function cacherInterfaceAffiche(){
-  for (const e of document.querySelectorAll('#topbar, #mapbox, #toast, #pad, #overlay, button, .jel-langue, jel-langue, jel-sauvegarde'))
+  for (const e of document.querySelectorAll('#topbar, #mapbox, #toast, #sauve, #pad, #overlay, button, .jel-langue, jel-langue, jel-sauvegarde'))
     e.style.setProperty('display', 'none', 'important');
 }
 function demarrerAffiche(){
