@@ -478,3 +478,12 @@ Demande du propriétaire : pouvoir jouer à **Toboggan Turbo** (`games/toboggan-
 
 - Essai sur de vrais téléphones (2 à 4), en wifi et en 4G : le délai entre le geste et la bouée (un tick, plus le trajet réseau) n'a été jugé que sur un ordinateur.
 - Une course ne dure qu'une à deux minutes : pas de reprise d'une course en ligne après sa fin, pas de revanche automatique (on relance une recherche).
+
+## 19. Jeu de conquête : Poussière d'Empire (23 novembre 2026)
+
+Le jeu de campagne **Poussière d'Empire** (`games/poussiere-d-empire/`) reçoit des parties à plusieurs (2 à 4 joueurs, 8 modes, 5 cartes en 3 tailles, capacités au choix) ; tout est décrit dans `docs/cadrage-poussiere-d-empire.md`, section 21. Le moteur, le lanceur et le Worker ne changent pas. Deux usages du contrat à connaître :
+
+- **Réglages dans les identifiants** : la taille de la carte et les capacités sont dans l'identifiant de la carte (`<monde><taille><capacités>`, 54 cartes) ; la Rencontre ne compare que des identifiants exacts (ou « `*` »), elle réunit donc seulement des joueurs qui ont tout choisi pareil.
+- **Partie privée sans choix pour celui qui rejoint** : la première lettre du code de salon donne le mode (rang dans `ALPHABET_SALON` modulo le nombre de modes ; le créateur tire des codes jusqu'à tomber juste) ; celui qui rejoint envoie la carte « `*` », le groupe prend celle du créateur.
+- **Chacun se voit en camp 0** : le jeu donne au rendu une vue de l'état où le camp du joueur et le camp 0 sont échangés ; les ordres (numéros de régions) partent tels quels.
+- Les données du jeu et sa simulation sont dans le même bloc `jel-sim` (le Worker ne recopie que ce bloc).

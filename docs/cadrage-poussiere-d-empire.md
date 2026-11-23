@@ -473,3 +473,67 @@ Trois demandes du propriétaire, plan validé avant le développement (version 6
 **Victoire avant le chrono.** Choix du propriétaire : toute la carte prise. Dans les 20 missions à durée (5 tenir, 6 survivre puis conquérir, 8 couper, 10 l'allié tient), la mission est gagnée dès que toutes les régions sont au joueur ou à ses alliés, neutres compris, et qu'il ne reste aucune flotte ni aucun siège ennemi (raison de fin 7, phrase « Toute la carte est à toi : victoire avant la fin du chrono ! »). La condition sur les flottes vient de la mission 69 : le rival vide sa dernière région pour lancer son offensive, et la carte entière était au joueur avec une armada encore en route. Les étoiles ne changent pas : 2ᵉ étoile si l'on finit avec au moins autant de territoires qu'au départ, 3ᵉ pour l'objectif secondaire.
 
 Mesures (20 parties par mission, robot de niveau 2 à la place du joueur) : 16 des 20 missions à durée sont maintenant gagnées au moins une fois avant le chrono, dont 13 dans la plupart des parties (les 46, 55 et 77 rarement). Les missions de siège 69 et 86 se gagnent vers 40 s quand l'assaillant est écrasé à sa première offensive. Le contrôle « médiane d'au moins 600 ticks » y est abaissé à 300 (`MEDIANE_MIN_PAR_MISSION` du test). Le robot de niveau 1 n'y gagne que 30 % et 15 % des parties : elles restent difficiles, elles sont seulement plus courtes. Renforcer le rival (forces de départ, régions, rythme des offensives) donnait soit 40 % au robot 2, soit 100 % aux deux robots. Série de contrôle : minimum 71 %, aucune mission sous 65 %.
+
+## 21. Parties à plusieurs (23 novembre 2026)
+
+Demande du propriétaire : un mode multijoueur « très varié », qui respecte ce qui existe déjà sur le site (1 contre 1, chacun pour soi, avec ou sans robots, plusieurs cartes et plusieurs tailles). Plan présenté puis validé le 23 novembre avec ses choix : 4 joueurs au plus, ouvert dès le début (pas besoin d'avancer dans la campagne), capacités au choix de celui qui crée la partie, livraison en un seul lot. La campagne, le bac à sable et la sauvegarde ne changent pas.
+
+### Ce que le joueur choisit
+
+Bouton « Jouer à plusieurs » de l'écran titre, puis un écran de réglages (gros boutons, aucune saisie) :
+
+| Mode (identifiant) | Camps (équipes) | Vrais joueurs | Places libres |
+| --- | --- | --- | --- |
+| 1 contre 1 (`duel`) | 2 (0, 1) | 2 | robot |
+| Chacun pour soi à 3 (`ffa3`) | 3 | 2 ou 3 | robots |
+| Chacun pour soi à 4 (`ffa4`) | 4 | 2 à 4 | robots |
+| Chacun pour soi, sans robots (`libre`) | 4 au plus | 2 à 4 | aucune : la carte est tirée pour les joueurs réunis |
+| 2 contre 2 (`2v2`) | 4 (0, 1, 0, 1 ; coéquipiers côte à côte sur la carte) | 2 à 4 | robots |
+| À deux contre un robot géant (`eq1`) | 3 (0, 0, 1) | 2 | robot géant |
+| À deux contre deux robots (`eq2`) | 4 (0, 0, 1, 1) | 2 | robots |
+| À trois contre un robot géant (`eq3`) | 4 (0, 0, 0, 1) | 3 | robot géant |
+
+- **Carte** : Planète, Système solaire, Amas, Galaxie, Toile, ou Au hasard (monde tiré de la graine de la partie, le même sur tous les appareils).
+- **Taille** : petite (8 minutes au plus), moyenne (12), grande (15). Au temps, l'équipe au plus gros score gagne (somme de ses camps : 10 par territoire, plus les forces divisées par 10) ; égalité possible.
+- **Capacités**, les mêmes pour tout le monde : aucune (seulement envoyer ses forces), de base (Rallier, Fortin, Transfert), toutes (les dix de la campagne). Une ligne sous les boutons dit ce que chaque choix donne.
+- **Robots** : faciles, moyens, forts (places libres, robots adverses, partie seul).
+- Puis **Partie rapide**, **Créer une partie privée** (code de 4 caractères affiché en grand), **Rejoindre avec un code** (pavé de touches), **Jouer seul contre des robots** (la partie libre, sur l'appareil, même hors connexion ; absente pour « sans robots »). Les derniers réglages sont gardés dans les options de la sauvegarde.
+- En partie : chacun se voit en turquoise ; les autres camps ont les couleurs des Cendrés, des Lointains et des Fileurs (`D.mj.factions`) et le fanion de leur signe (version 8). HUD : mode, objectif, temps qui reste, camps encore en jeu. Bandeau de réseau, annonces « Joueur 3 est parti : un robot prend sa place ». Un joueur éliminé alors que la partie continue voit « Tu es éliminé » : regarder la suite ou quitter. Bilan : victoire, défaite ou égalité, raison, score de chaque camp (Toi, Joueur n, Robot n, allié signalé), « Rejouer » (mêmes réglages), « Changer les réglages », « Accueil ». En ligne, le menu ne met pas la partie en pause (une ligne le dit) ; « Quitter la partie » laisse un robot à sa place. Une partie à plusieurs n'est jamais sauvegardée, ne compte ni pour les étoiles ni pour la campagne ; `FMG.reportEnd` reçoit la victoire et le score du joueur.
+
+### Branchement sur le moteur temps réel
+
+- Le jeu suit désormais le contrat du moteur commun (`docs/cadrage-temps-reel.md`, sections 5 et 16) : `"temps_reel": true` et `"places": 4` dans `game.json`, moteur recopié dans `<script id="jel-tr">` par `node scripts/i18n-jeu.mjs`, données et simulation réunies dans un seul bloc `<script id="jel-sim">` (l'ancien `pe-donnees` suivi de l'ancien `pe-sim` : ce bloc est recopié tel quel dans le Worker et doit tenir seul). `pe-outils` reste, juste après, pour le pilote local et le test dédié.
+- La campagne et le bac à sable passent toujours par `pe-pilote` (`PiloteLocal`) ; les parties à plusieurs, en ligne ou seul, par `JEL_TR.creer` (adaptateur `PartieMj` de `pe-jeu`).
+- `JEL_SIM.modes` (8 modes ci-dessus) et `JEL_SIM.cartes` : 54 identifiants `<monde><taille><capacités>` (monde `h` au hasard, `p`, `s`, `a`, `g`, `t` ; taille 1 à 3 ; capacités 0 à 2 ; ex. `p21`). La Rencontre réunit les joueurs du même mode et de la même carte, comme pour Nova Dominion : aucun changement du Worker ni du lanceur. « Au hasard » est une carte comme une autre (elle réunit ceux qui ont choisi « au hasard » dans la même taille).
+- **Partie privée** : la Rencontre réunit les joueurs du même code et du même mode. Celui qui rejoint ne choisit rien : la première lettre du code dit le mode (rang dans l'alphabet des codes, modulo 8 ; le code est tiré jusqu'à tomber juste), il envoie la carte « `*` » et le groupe prend la carte et le niveau des robots de celui qui a créé la partie.
+- `depart(graine, config)` : une configuration avec `mode` (celle de `JEL_TR.configMode`) donne une partie à plusieurs (`departMj`) ; sans `mode`, rien ne change (missions, bac, carte « ligne » des tests). L'état garde `mj` (mode, monde, taille, capacités, nombre de parts, camps présents, part de chaque camp) ; `importer` refait la carte à partir de la graine et de `mj`. `fin` : une seule équipe encore en jeu (raison 6), ou le temps (raison 3) ; `gagnant` est une équipe, −1 pour une égalité, avec `scores` et `equipes`.
+- « Sans robots » : les places sans joueur au départ sont absentes (aucun territoire, jamais vivantes) et la carte n'a que les parts des joueurs présents. Joué seul, ce mode prend des robots (il faut être au moins deux).
+- Robot géant (`D.mj.geants`) : forces de départ × 1,5 et production + 35 % contre deux joueurs, × 1,8 et + 50 % contre trois (champ `bo` du camp, ajouté seulement quand il existe : les instantanés de la campagne ne changent pas). Tous les robots d'une partie à plusieurs ont la personnalité des Cendrés (pas d'offensive annoncée), quel que soit leur camp.
+- **Ce que voit chaque joueur** : `PartieMj` donne au rendu et au HUD une vue de l'état où le camp du joueur et le camp 0 sont échangés (propriétaires, flottes, sièges, camps, équipes, événements, capitales). Le rendu ne change donc pas : le joueur est le camp 0, en turquoise. Les ordres ne portent que des numéros de régions : ils partent tels quels. La seule retouche du rendu : la galaxie de fond a autant de bras que de joueurs (`spirale.bras`).
+
+### Cartes symétriques
+
+Chaque carte a N parts (N = joueurs présents, 2 à 4) et le groupe de symétrie qui les échange : chaque nœud a son image par chaque élément du groupe, son coin (part d'un joueur, ou −1 : partagé) et son représentant (le plus petit index de son orbite). Types, forces neutres, longueur des routes et phase des pulsars sont lus sur l'orbite : chaque joueur a exactement la même part. À trois joueurs, un tiers de tour ne tombe pas juste en 1/1024 de tour : les positions sont arrondies (quelques unités), les longueurs des routes sont recopiées, donc égales.
+
+| Monde | Construction | Nœuds (petite / moyenne / grande, à 2, 3 et 4 joueurs) |
+| --- | --- | --- |
+| Planète | grille d'hexagones (demi-tour à 2, tiers de tour à 3, deux miroirs à 4 : les cases des axes sont partagées), mers tirées sans passage d'une seule case, montagnes et cratères, un cratère au centre | 31 à 49 / 49 à 75 / 73 à 105 |
+| Système solaire | 4 à 6 orbites ; sur chaque orbite, N fois le même motif de corps, qui tournent ensemble : la symétrie tient toute la partie ; une ceinture d'astéroïdes ; capitales : planètes mères | 20 à 40 / 32 à 64 / 48 à 96 |
+| Amas | la grille de la planète, positions décalées (le décalage suit la symétrie), routes éclaircies par orbites entières ; pulsars, relais, forteresses ; ravitaillement | 31 à 49 / 51 à 77 / 76 à 107 |
+| Galaxie | un cœur très riche, un bras spiral par joueur (deux files en échelle, capitale au milieu), un halo entre les pointes de deux bras voisins | 25 à 41 / 39 à 65 / 55 à 93 |
+| Toile | un superamas central, celui de chaque joueur, des superamas partagés entre deux voisins (moyenne et grande), un superamas lointain (grande), filaments, grands vides | 21 à 45 / 41 à 81 / 59 à 117 |
+
+Départ : la capitale et les deux territoires les plus proches dans sa part ; forces de départ et neutres à l'échelle du monde (`D.mj.mondes`, repris des missions de chaque acte). Réglages : bloc `mj` de `pe-donnees`.
+
+### Mesures (Node, 23 novembre 2026)
+
+- 135 cartes (5 mondes × 3 tailles × 2 à 4 parts, 3 graines chacune) : d'un seul tenant, routes réciproques de 5 à 90 ticks, capitales distinctes, parts identiques (types, degrés, routes autour des capitales), moins de 64 provinces.
+- Parties entre robots dans chaque mode et chaque monde : toutes vont au bout, de 1 min 30 à 15 min, sans nombre à virgule dans l'état ; 0,01 à 0,04 ms de calcul par tick ; instantanés de 1 à 7 Ko.
+- Équité : deux robots moyens en 1 contre 1, 80 parties sur les cinq mondes : le camp 0 en gagne 33 (41 %, dans le bruit).
+- Robot géant, 300 parties par mode (5 mondes, 3 tailles) entre robots de même niveau : deux robots le battent 66 % du temps, trois robots 73 % ; de vrais joueurs qui s'entendent font mieux qu'eux, et le niveau des robots règle la difficulté.
+- `tester-temps-reel.mjs poussiere-d-empire` : déterminisme, modes, deux parties en alternance, robots (difficile contre facile 100 %), Worker avec de faux Durable Objects à 2, 3 et 4 joueurs ; `--navigateur` : voir le compte rendu de la pull request.
+
+### Ce qui reste
+
+- Essai à plusieurs vrais téléphones, en wifi et en 4G, après la fusion (le Worker se redéploie seul) ; fluidité d'une grande carte à quatre.
+- Pas de pseudo (comme les autres jeux en temps réel), pas d'expérience du profil pour une partie en ligne, durée au plus 20 minutes côté serveur (les parties durent 15 minutes au plus).

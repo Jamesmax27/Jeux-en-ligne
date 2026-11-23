@@ -169,7 +169,12 @@ async function lireBlocs() {
     process.exit(1);
   }
   const html = (await readFile(fichier, 'utf8')).replace(/\r\n/g, '\n');
+  // Depuis les parties à plusieurs (cadrage, section 21), les données et la simulation forment un seul bloc jel-sim
+  // (le contrat du moteur temps réel) : il est lu ici comme « pe-donnees », « pe-sim » restant vide.
+  const jelSim = /<script\s+id="jel-sim"[^>]*>([\s\S]*?)<\/script>/i.exec(html);
+  if (jelSim) { blocs['pe-donnees'] = jelSim[1].trim(); blocs['pe-sim'] = '/* dans jel-sim */'; }
   for (const id of BLOCS) {
+    if (jelSim && (id === 'pe-donnees' || id === 'pe-sim')) continue;
     const re = new RegExp(`<script\\s+id="${id}"[^>]*>([\\s\\S]*?)</script>`, 'i');
     const m = re.exec(html);
     if (!m) { console.error(`Bloc <script id="${id}"> absent de ${fichier}`); process.exit(1); }
@@ -475,7 +480,7 @@ titre('3. Interfaces du contrat');
     if (typeof simNu[fn] !== 'function') f('pe-sim', `fonction JEL_SIM.${fn} absente (contrat, section 4.1)`);
   }
   if (simNu.flottants) f('pe-sim', 'flottants: true interdit (état entièrement entier)');
-  if (simNu.modes !== undefined || simNu.cartes !== undefined) avertir('pe-sim', 'modes/cartes présents : réservés à la bascule multijoueur (hors lot 1)');
+  if (!simNu.modes || !Array.isArray(simNu.cartes)) f('pe-sim', 'modes et cartes attendus (parties à plusieurs, cadrage section 21)');
   const es = simNu.essais;
   if (!es || typeof es !== 'object') f('pe-sim', 'JEL_SIM.essais absent');
   else {
