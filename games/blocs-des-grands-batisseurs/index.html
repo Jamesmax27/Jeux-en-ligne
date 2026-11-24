@@ -2359,6 +2359,9 @@ const jeu = {
   disposition: null,
 };
 
+// Image du jeu pour sa page (window.JEL_APERCU, posé par le robot du site) : voir « Images du jeu » plus bas.
+const imageJeu = { actif: false, decorLarge: false, n: 0 };
+
 function niveauCourant() { return NIVEAUX[jeu.index]; }
 
 function lancerNiveau(i) {
@@ -2477,6 +2480,7 @@ function dessinerPartie(t, dt) {
   const g = ctx.createLinearGradient(0, 0, 0, d.H);
   g.addColorStop(0, ET.ciel[0]); g.addColorStop(0.35, ET.ciel[1]); g.addColorStop(1, '#1b2340');
   ctx.fillStyle = g; ctx.fillRect(0, 0, d.W, d.H);
+  if (imageJeu.decorLarge) dessinerDecorLarge(ctx, d, t);
   // Monument qui se construit
   const cible = avancement(jeu.niv, E);
   jeu.anim.avanceVue += (cible - jeu.anim.avanceVue) * Math.min(1, dt * 3);
@@ -3363,6 +3367,7 @@ const effacerTitre = JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('effacer-ti
 
 // Sauvegarde à la fermeture de la page, seulement pendant une partie.
 JEL_SAVE.surFermeture(() => {
+  if (imageJeu.actif) return; // image du jeu (JEL_APERCU) : rien n'est écrit
   if ($('ecran-partie').classList.contains('actif') && jeu.E && !jeu.fini) {
     garderLocal();
     JEL_SAVE.save(JEU, {
@@ -3372,8 +3377,413 @@ JEL_SAVE.surFermeture(() => {
   }
 });
 
-montrerEcran('ecran-titre');
-requestAnimationFrame(boucle);
+/* =====================================================================
+   Affiche (jaquette du jeu)
+   ===================================================================== */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). L'apprenti bâtisseur, casque
+// sur la tête et marteau levé, lance une pièce dorée en L vers le sommet de la pyramide qu'il construit ;
+// devant lui, une rangée de blocs s'illumine et disparaît en lâchant ses trésors, au soleil couchant.
+function etincelle(ctx, x, y, r, couleur) {
+  ctx.save();
+  ctx.fillStyle = couleur;
+  ctx.beginPath();
+  ctx.moveTo(x, y - r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.quadraticCurveTo(x, y, x, y + r);
+  ctx.quadraticCurveTo(x, y, x - r, y); ctx.quadraticCurveTo(x, y, x, y - r);
+  ctx.fill();
+  ctx.restore();
+}
+function membre(ctx, x1, y1, x2, y2, epaisseur, couleur, contour) {
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = contour; ctx.lineWidth = epaisseur + 6;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.strokeStyle = couleur; ctx.lineWidth = epaisseur;
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  ctx.restore();
+}
+function rond(ctx, x, y, r, couleur, contour, lw = 3) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = couleur; ctx.fill();
+  if (contour) { ctx.strokeStyle = contour; ctx.lineWidth = lw; ctx.stroke(); }
+}
+// L'apprenti bâtisseur, dans le repère 600 × 800 de l'affiche : pieds au sol en (cx, sol).
+function dessinerBatisseur(ctx, cx, sol) {
+  const peau = '#ffd2a6', bord = '#4a2a14', bleu = '#3d63c6', orange = '#e8823a';
+  // Ombre au sol
+  ctx.fillStyle = 'rgba(80,40,10,0.3)';
+  ctx.beginPath(); ctx.ellipse(cx + 12, sol + 2, 100, 15, 0, 0, Math.PI * 2); ctx.fill();
+  // Jambes et bottes
+  for (const dx of [-27, 27]) {
+    ctx.fillStyle = bord; rectArrondi(ctx, cx + dx - 21, sol - 122, 42, 100, 14); ctx.fill();
+    ctx.fillStyle = bleu; rectArrondi(ctx, cx + dx - 18, sol - 119, 36, 96, 12); ctx.fill();
+    ctx.fillStyle = bord; rectArrondi(ctx, cx + dx - 28, sol - 36, 56, 38, 15); ctx.fill();
+    ctx.fillStyle = '#8a4b22'; rectArrondi(ctx, cx + dx - 25, sol - 33, 50, 32, 13); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.28)'; rectArrondi(ctx, cx + dx - 17, sol - 29, 22, 7, 3); ctx.fill();
+  }
+  // Bras gauche (à l'écran) : il lève le marteau du jeu, en grand
+  const epG = [cx - 52, sol - 205], mainG = [cx - 100, sol - 262];
+  membre(ctx, epG[0], epG[1], mainG[0], mainG[1], 30, orange, bord);
+  ctx.save();
+  ctx.translate(mainG[0], mainG[1]);
+  ctx.rotate(-0.45);
+  ctx.fillStyle = '#b0743c'; ctx.strokeStyle = bord; ctx.lineWidth = 3;
+  rectArrondi(ctx, -8, -112, 16, 128, 6); ctx.fill(); ctx.stroke();
+  const gm = ctx.createLinearGradient(0, -150, 0, -108);
+  gm.addColorStop(0, '#eef0f6'); gm.addColorStop(1, '#9aa0b0');
+  ctx.fillStyle = gm; ctx.strokeStyle = '#3a3f4f'; ctx.lineWidth = 3.5;
+  rectArrondi(ctx, -46, -150, 92, 42, 9); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'; rectArrondi(ctx, -38, -144, 50, 8, 4); ctx.fill();
+  ctx.restore();
+  rond(ctx, mainG[0], mainG[1], 18, peau, bord);
+  // Corps : chemise orange et salopette bleue
+  ctx.fillStyle = bord; rectArrondi(ctx, cx - 66, sol - 240, 132, 108, 36); ctx.fill();
+  ctx.fillStyle = orange; rectArrondi(ctx, cx - 63, sol - 237, 126, 102, 33); ctx.fill();
+  ctx.fillStyle = bord; rectArrondi(ctx, cx - 60, sol - 148, 120, 46, 16); ctx.fill();
+  ctx.fillStyle = bleu; rectArrondi(ctx, cx - 57, sol - 145, 114, 40, 14); ctx.fill();
+  ctx.fillStyle = bord; rectArrondi(ctx, cx - 47, sol - 212, 94, 82, 16); ctx.fill();
+  ctx.fillStyle = bleu; rectArrondi(ctx, cx - 44, sol - 209, 88, 78, 14); ctx.fill();
+  ctx.strokeStyle = bleu; ctx.lineWidth = 12; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(cx - 36, sol - 206); ctx.lineTo(cx - 44, sol - 236); ctx.moveTo(cx + 36, sol - 206); ctx.lineTo(cx + 44, sol - 236); ctx.stroke();
+  rond(ctx, cx - 34, sol - 200, 7, '#ffcf4a', bord, 2);
+  rond(ctx, cx + 34, sol - 200, 7, '#ffcf4a', bord, 2);
+  // Poche avec un petit bloc doré
+  ctx.fillStyle = '#5a80dc'; rectArrondi(ctx, cx - 22, sol - 186, 44, 34, 8); ctx.fill();
+  bloc(ctx, cx - 11, sol - 182, 22, '#f2c230');
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'; rectArrondi(ctx, cx - 40, sol - 206, 14, 70, 7); ctx.fill();
+  // Bras droit : levé, il vient de lancer la pièce dorée
+  const epD = [cx + 52, sol - 212], mainD = [cx + 122, sol - 300];
+  membre(ctx, epD[0], epD[1], mainD[0], mainD[1], 30, orange, bord);
+  rond(ctx, mainD[0], mainD[1], 19, peau, bord);
+  ctx.fillStyle = peau; ctx.strokeStyle = bord; ctx.lineWidth = 3;
+  for (const [a, l] of [[-1.9, 22], [-1.45, 26], [-1.0, 24], [-0.55, 20]]) {
+    ctx.save(); ctx.translate(mainD[0], mainD[1]); ctx.rotate(a);
+    rectArrondi(ctx, 8, -5.5, l, 11, 5.5); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  rond(ctx, mainD[0], mainD[1], 16, peau);
+  // Tête
+  const tx = cx + 4, ty = sol - 280;
+  rond(ctx, tx - 58, ty + 6, 13, peau, bord);
+  rond(ctx, tx + 58, ty + 2, 13, peau, bord);
+  rond(ctx, tx, ty, 60, peau, bord, 3.5);
+  // Lumière du soleil sur le côté droit du visage
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,244,190,0.95)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(tx, ty, 54, -0.9, 0.7); ctx.stroke();
+  ctx.restore();
+  // Cheveux qui dépassent du casque
+  ctx.fillStyle = '#7a3e1a';
+  for (const [hx, hy, r] of [[-48, -16, 14], [-36, -24, 13], [46, -18, 13], [34, -26, 12]]) rond(ctx, tx + hx, ty + hy, r, '#7a3e1a');
+  // Joues
+  ctx.fillStyle = 'rgba(255,120,110,0.45)';
+  ctx.beginPath(); ctx.ellipse(tx - 34, ty + 18, 12, 8, 0, 0, Math.PI * 2); ctx.ellipse(tx + 36, ty + 15, 12, 8, 0, 0, Math.PI * 2); ctx.fill();
+  // Yeux qui regardent la pièce là-haut
+  for (const [ex, ey] of [[-21, -2], [23, -5]]) {
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = bord; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(tx + ex, ty + ey, 12, 15, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    rond(ctx, tx + ex + 4, ty + ey - 5, 7.5, '#2a1a10');
+    rond(ctx, tx + ex + 6.5, ty + ey - 8, 2.8, '#fff');
+  }
+  // Sourcils levés
+  ctx.strokeStyle = '#5a2c12'; ctx.lineWidth = 4.5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(tx - 21, ty - 16, 13, -2.6, -0.7); ctx.stroke();
+  ctx.beginPath(); ctx.arc(tx + 23, ty - 19, 13, -2.5, -0.6); ctx.stroke();
+  // Grand sourire
+  ctx.fillStyle = '#8a2a22'; ctx.strokeStyle = bord; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(tx - 20, ty + 22); ctx.quadraticCurveTo(tx + 2, ty + 27, tx + 24, ty + 20); ctx.quadraticCurveTo(tx + 4, ty + 58, tx - 20, ty + 22); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ff8f86'; ctx.beginPath(); ctx.ellipse(tx + 3, ty + 37, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(tx - 14, ty + 24); ctx.lineTo(tx + 19, ty + 22); ctx.lineTo(tx + 17, ty + 28); ctx.lineTo(tx - 12, ty + 30); ctx.closePath(); ctx.fill();
+  // Casque de chantier jaune
+  const gc = ctx.createLinearGradient(tx - 60, ty - 80, tx + 60, ty - 20);
+  gc.addColorStop(0, '#ffe07a'); gc.addColorStop(1, '#f2a91e');
+  ctx.fillStyle = gc; ctx.strokeStyle = bord; ctx.lineWidth = 3.5;
+  ctx.beginPath(); ctx.arc(tx, ty - 22, 60, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#f29a1e';
+  ctx.beginPath(); ctx.ellipse(tx + 6, ty - 22, 80, 13, -0.04, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ffcf4a'; rectArrondi(ctx, tx - 9, ty - 84, 18, 62, 8); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.beginPath(); ctx.ellipse(tx - 30, ty - 56, 14, 7, -0.7, 0, Math.PI * 2); ctx.fill();
+}
+function dessinerAffiche() {
+  const c = imageJeu.toile;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = window.innerWidth || 600, H = window.innerHeight || 800;
+  c.width = Math.round(W * dpr); c.height = Math.round(H * dpr);
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const u = Math.min(W / 600, H / 800);
+  const ox = (W - 600 * u) / 2, oy = (H - 800 * u) / 2;
+  // Ciel du soir, sur tout l'écran
+  const g = ctx.createLinearGradient(0, oy, 0, oy + 620 * u);
+  g.addColorStop(0, '#5568c0'); g.addColorStop(0.42, '#f59a6a'); g.addColorStop(0.8, '#ffd59a'); g.addColorStop(1, '#ffe6b5');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(ox, oy); ctx.scale(u, u);
+  const gauche = -ox / u - 2, droite = (W - ox) / u + 2, bas = (H - oy) / u + 2, haut = -oy / u - 2;
+  // Soleil couchant et ses rayons
+  const sx = 452, sy = 178;
+  ctx.save();
+  ctx.globalAlpha = 0.16; ctx.fillStyle = '#fff6d0';
+  for (let k = 0; k < 12; k++) {
+    const a = k * Math.PI / 6 + 0.2;
+    ctx.beginPath(); ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + Math.cos(a - 0.09) * 900, sy + Math.sin(a - 0.09) * 900);
+    ctx.lineTo(sx + Math.cos(a + 0.09) * 900, sy + Math.sin(a + 0.09) * 900);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  const halo = ctx.createRadialGradient(sx, sy, 30, sx, sy, 270);
+  halo.addColorStop(0, 'rgba(255,248,210,0.95)'); halo.addColorStop(0.35, 'rgba(255,214,140,0.55)'); halo.addColorStop(1, 'rgba(255,190,120,0)');
+  ctx.fillStyle = halo; ctx.fillRect(sx - 280, sy - 280, 560, 560);
+  rond(ctx, sx, sy, 50, '#fff5c8');
+  // Nuages
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  for (const [nx, ny, e] of [[85, 150, 1.1], [300, 96, 0.8], [575, 330, 0.9], [-120, 260, 1], [760, 140, 1.1]]) {
+    ctx.beginPath();
+    ctx.ellipse(nx, ny, 58 * e, 16 * e, 0, 0, Math.PI * 2);
+    ctx.ellipse(nx + 30 * e, ny - 11 * e, 36 * e, 17 * e, 0, 0, Math.PI * 2);
+    ctx.ellipse(nx - 26 * e, ny - 6 * e, 28 * e, 13 * e, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Petits blocs qui tombent du ciel
+  for (const [bx, by, bs, bc] of [[52, 232, 26, '#2fb3a6'], [150, 70, 20, '#4f86d9'], [545, 70, 28, '#d9443b'], [250, 175, 16, '#5aa83c'], [590, 455, 20, '#e8b23a'], [-60, 120, 24, '#d9733b'], [700, 300, 26, '#2fb3a6']]) bloc(ctx, bx, by, bs, bc, 0.8);
+  // Au loin, sur la colline : temple grec, pagode, château et temple maya
+  ctx.fillStyle = '#ecb87c';
+  ctx.beginPath(); ctx.moveTo(gauche, 520);
+  ctx.quadraticCurveTo(300, 418, droite, 515); ctx.lineTo(droite, 620); ctx.lineTo(gauche, 620); ctx.closePath(); ctx.fill();
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  dessinerMonument(ctx, 1, 1, 62, 490, 9, 0, false);
+  dessinerMonument(ctx, 5, 1, 586, 498, 9, 0, false);
+  dessinerMonument(ctx, 4, 1, -110, 515, 10, 0, false);
+  dessinerMonument(ctx, 3, 1, 720, 515, 10, 0, false);
+  ctx.restore();
+  // Sol de sable
+  ctx.fillStyle = '#e2a560'; ctx.fillRect(gauche, 600, droite - gauche, bas - 600);
+  ctx.fillStyle = '#c4843f'; ctx.fillRect(gauche, 600, droite - gauche, 8);
+  // La pyramide en construction (ses derniers blocs attendent encore)
+  dessinerMonument(ctx, 0, 0.86, 450, 602, 24, 0, true);
+  // La pièce dorée en L qui vole vers le sommet
+  const gl = ctx.createRadialGradient(410, 240, 10, 410, 240, 130);
+  gl.addColorStop(0, 'rgba(255,236,150,0.9)'); gl.addColorStop(1, 'rgba(255,220,120,0)');
+  ctx.fillStyle = gl; ctx.fillRect(280, 110, 260, 260);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+  for (const [d1, d2] of [[0, 0], [16, 12], [-16, -10]]) {
+    ctx.beginPath(); ctx.moveTo(345 + d1, 300 - d2); ctx.quadraticCurveTo(352 + d1, 262 - d2, 372 + d1, 246 - d2); ctx.stroke();
+  }
+  ctx.setLineDash([8, 9]); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.beginPath(); ctx.moveTo(446, 300); ctx.quadraticCurveTo(452, 360, 450, 418); ctx.stroke();
+  ctx.restore();
+  ctx.save();
+  ctx.translate(410, 236); ctx.rotate(-0.22);
+  ctx.shadowColor = 'rgba(120,60,0,0.45)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 8;
+  const gs = 46;
+  for (const [dx, dy] of [[0, 0], [0, 1], [1, 1]]) bloc(ctx, -gs + dx * gs, -gs + dy * gs, gs, '#f2c230');
+  ctx.shadowColor = 'transparent';
+  for (const [dx, dy] of [[0, 0], [0, 1], [1, 1]]) brillance(ctx, -gs + dx * gs, -gs + dy * gs, gs, 0.45 + dx * 0.1);
+  ctx.restore();
+  etincelle(ctx, 470, 190, 16, '#ffffff');
+  etincelle(ctx, 352, 196, 11, '#fff3c9');
+  etincelle(ctx, 486, 290, 9, '#ffffff');
+  // Le héros
+  dessinerBatisseur(ctx, 212, 604);
+  // Devant : une rangée de blocs pleine qui s'illumine et s'efface
+  const ry = 626, rs = 50;
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,230,140,0.95)'; ctx.shadowBlur = 30;
+  ctx.fillStyle = 'rgba(255,236,160,0.65)';
+  ctx.fillRect(gauche, ry - 4, droite - gauche, rs + 8);
+  ctx.restore();
+  const cols = ETAPES[0].pieces.concat(['#d9443b', '#4f86d9']);
+  let k = 0;
+  for (let x = Math.floor(gauche / rs) * rs - rs; x < droite; x += rs, k++) {
+    bloc(ctx, x, ry, rs, cols[(k * 5 + 3) % cols.length]);
+    ctx.fillStyle = 'rgba(255,240,170,0.42)';
+    rectArrondi(ctx, x + 3, ry + 3, rs - 6, rs - 6, 8); ctx.fill();
+  }
+  // Blocs qui sautent de la rangée, trésors qui s'envolent
+  for (const [bx, by, bs, a, bc] of [[118, 560, 30, 0.5, '#2fb3a6'], [372, 556, 28, -0.6, '#d9733b'], [548, 548, 26, 0.4, '#3d63c6'], [-40, 570, 28, 0.3, '#e8b23a'], [660, 565, 30, -0.4, '#d9443b']]) {
+    ctx.save(); ctx.translate(bx, by); ctx.rotate(a); bloc(ctx, -bs / 2, -bs / 2, bs, bc, 0.95); ctx.restore();
+  }
+  gemme(ctx, 300, 566, 22, 0.3);
+  gemme(ctx, 520, 600, 18, 1.1);
+  gemme(ctx, 40, 600, 16, 2);
+  for (const [ex, ey, er] of [[270, 590, 12], [330, 540, 9], [500, 570, 11], [80, 548, 9], [440, 610, 8], [20, 640, 10], [590, 640, 9]]) etincelle(ctx, ex, ey, er, '#fffbe0');
+  // Premier plan : gros blocs coupés par les bords
+  for (const [bx, by, bs, bc] of [[-46, 694, 122, '#d9443b'], [66, 742, 96, '#2fb3a6'], [500, 688, 128, '#3d63c6'], [420, 752, 92, '#e8b23a'], [gauche - 70, 720, 120, '#5aa83c'], [droite - 60, 712, 120, '#d9733b']]) bloc(ctx, bx, by, bs, bc);
+  ctx.fillStyle = 'rgba(40,20,10,0.18)'; ctx.fillRect(gauche, 790, droite - gauche, bas - 790);
+  void haut;
+  ctx.restore();
+}
+function demarrerAffiche() {
+  imageJeu.actif = true; sonActif = false;
+  const cacher = () => {
+    for (const el of document.querySelectorAll('.ecran, .voile, #bulle, #confettis, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+  };
+  cacher(); setTimeout(cacher, 300); setTimeout(cacher, 1200);
+  const c = document.createElement('canvas');
+  c.setAttribute('aria-hidden', 'true');
+  c.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;z-index:40';
+  document.body.appendChild(c);
+  imageJeu.toile = c;
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* =====================================================================
+   Images du jeu (page du jeu)
+   ===================================================================== */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (objectifs, étoiles, marteau, réserve), sans
+// écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). La scène est posée
+// puis dessinée une seule fois, figée : ni victoire, ni défaite, ni son, ni sauvegarde.
+// Grilles : '.' case du niveau gardée, '_' case vidée, '0' à '3' bloc d'une couleur de l'étape,
+// 'd' bloc doré, 'p' pierre ; les autres lettres gardent la case du niveau.
+const APERCUS = {
+  // 1 : pyramides d'Égypte, premier niveau ; une pièce glissée va remplir deux rangées d'un coup.
+  1: { index: 0, score: 52, lignes: 1, pieces: 9,
+    grille: ['........', '........', '........', '.....1..', '0...112.', '00.3322.', '0013.122', '0013..22'],
+    reserve: [{ forme: '#./##', col: 2 }, { forme: '###', col: 1 }, { forme: '##/##', col: 3 }],
+    tenue: { i: 0, x: 4, y: 6, doigt: true, decale: [0.4, -0.4] } },
+  // 2 : temple maya ; une rangée vient de partir, la glace casse et un trésor s'envole.
+  2: { index: 9, score: 142, lignes: 4, pieces: 12, marteaux: 1,
+    grille: ['i.....1i', '..3j.00.', '.#2..3#.', '00g..i11', '__p_____', '.#3.22#0', '1.33j.00', 'i.2..33i'],
+    reserve: [{ forme: '##/.#', col: 0 }, { forme: '#/#/#', col: 2 }, { forme: '.#./###', col: 3 }],
+    efface: 4, avant: '30i12g02' },
+  // 3 : le grand tour du monde (grille de 9, trous, piliers, glace, trésors, pièces dorées), sur ordinateur.
+  3: { index: 23, score: 268, lignes: 6, pieces: 21, marteaux: 2, decorLarge: true,
+    grille: ['xx..1..xx', 'x.j.._j.x', '..2_.i3..', '.i..P..i.', '0.._.g.11', '.i..P.._.', '22.i.i.dd', 'x0j3.dd2x', 'xx01.33xx'],
+    reserve: [{ forme: '#/#', col: 1, dore: true }, { forme: '##/.#', col: 0 }, { forme: '###/.#.', col: 3, dore: true }],
+    tenue: { i: 0, x: 4, y: 7, doigt: false } },
+};
+// Hasard à graine fixe : la même image à chaque capture.
+function hasardFixe(graine) {
+  let g = graine;
+  return () => { g = (g * 16807) % 2147483647; return (g - 1) / 2147483646; };
+}
+function ouvrirApercu(n) {
+  const A = APERCUS[n];
+  imageJeu.actif = true; imageJeu.n = n; imageJeu.decorLarge = !!A.decorLarge;
+  sonActif = false;
+  Math.random = hasardFixe(1234 + n);
+  jeu.index = A.index; jeu.niv = NIVEAUX[A.index]; jeu.E = nouvelEtat(jeu.niv);
+  const E = jeu.E, P = E.P;
+  A.grille.forEach((ligne, y) => {
+    for (let x = 0; x < ligne.length; x++) {
+      const ch = ligne[x], k = caseEn(P, x, y);
+      if (!k) continue;
+      if (ch === '_') Object.assign(k, caseVide());
+      else if (ch >= '0' && ch <= '3') Object.assign(k, caseVide(), { b: true, col: Number(ch) });
+      else if (ch === 'd') Object.assign(k, caseVide(), { b: true, col: 0, dore: true });
+      else if (ch === 'p') Object.assign(k, caseVide(), { b: true, col: -1 });
+    }
+  });
+  E.gems = E.gemsTotal - compter(P, (k) => k.gem);
+  E.glaces = E.glacesTotal - compter(P, (k) => k.glace);
+  E.score = A.score; E.lignes = A.lignes; E.pieces = A.pieces;
+  if (A.marteaux != null) E.marteaux = A.marteaux;
+  jeu.pieces = A.reserve.map((p) => ({ forme: lireForme(p.forme), col: p.col, dore: !!p.dore }));
+  jeu.enCours = true; jeu.fini = false; jeu.pause = false; jeu.bloque = true;
+  jeu.sel = A.tenue ? A.tenue.i : 1; jeu.mode = 'pieces'; jeu.clavier = false; jeu.choixDoigt = -1; jeu.glisse = null;
+  jeu.anim = { parties: [], textes: [], eclats: [], secousse: 0, flash: [], avanceVue: avancement(jeu.niv, E), entree: -1e9, pose: [] };
+  voile('voile-fin', false); voile('voile-pause', false); voile('voile-finale', false); voile('voile-tuto', false);
+  montrerEcran('ecran-partie');
+  majEntete(); majObjectifs(); majBas();
+  dessinerApercu();
+  requestAnimationFrame(dessinerApercu);
+  setTimeout(dessinerApercu, 150); setTimeout(dessinerApercu, 700);
+  window.addEventListener('resize', dessinerApercu);
+}
+// Pose la pièce tenue et l'effacement en cours d'après la taille de l'écran, puis dessine une image figée.
+function dessinerApercu() {
+  if (!imageJeu.actif || !jeu.E) return;
+  redimensionner();
+  const A = APERCUS[imageJeu.n], d = jeu.disposition;
+  if (!d) return;
+  if (A.tenue) {
+    const p = jeu.pieces[A.tenue.i], s2 = d.s * 0.92;
+    // decale : la pièce flotte un peu à côté de sa place (moins d'une demi-case : même emplacement visé)
+    const dec = A.tenue.decale || [0, 0];
+    const gx = d.x0 + (A.tenue.x + p.forme.w / 2 + dec[0]) * d.s;
+    const cy = d.y0 + (A.tenue.y + p.forme.h / 2 + dec[1]) * d.s;
+    const gy = A.tenue.doigt ? cy + (p.forme.h * s2) / 2 + d.s * 0.9 : cy;
+    jeu.glisse = { i: A.tenue.i, x: gx, y: gy, doigt: A.tenue.doigt, bouge: true, depart: { x: gx, y: gy } };
+  }
+  if (A.efface != null) {
+    const P = jeu.E.P, s = d.s, y = A.efface, r = hasardFixe(77);
+    jeu.anim.parties = []; jeu.anim.eclats = []; jeu.anim.textes = [];
+    for (let x = 0; x < P.w; x++) {
+      const ch = A.avant[x], i = y * P.w + x;
+      const cx = d.x0 + (x + 0.5) * s, cyl = d.y0 + (y + 0.5) * s;
+      let couleur;
+      if (ch === 'i') {
+        jeu.anim.parties.push({ i, glace: true, vie: 0.27, duree: 0.45 });
+        couleur = '#dff4ff';
+      } else {
+        const k = ch === 'g' ? { b: true, col: -1, gem: true } : { b: true, col: Number(ch) };
+        jeu.anim.parties.push({ i, k, vie: 0.27, duree: 0.45 });
+        couleur = couleurCase(k);
+        if (k.gem) jeu.anim.eclats.push({ x: cx, y: cyl - s * 1.5, vx: 0, vy: 0, r: s * 0.32, gemme: true, vie: 0.9 });
+      }
+      for (let e = 0; e < 3; e++) jeu.anim.eclats.push({ x: cx + (r() - 0.5) * s * 1.8, y: cyl - r() * s * 1.4, vx: 0, vy: 0, r: 4 + r() * 6, c: couleur, vie: 0.8 });
+    }
+    texteVolant(traduire('plus', { n: nombre(50) }), d.x0 + d.bw * 0.3, d.y0 + y * s - s * 0.2, '#fff3c9');
+  }
+  dessinerPartie(1.767, 0); // instant où les rangées à effacer brillent le plus
+}
+// Image 3 (ordinateur) : de chaque côté de la grille, les monuments déjà bâtis du tour du monde, sous le ciel du soir.
+function dessinerDecorLarge(ctx, d, t) {
+  const cote = d.x0 - 16;
+  if (cote < 110) return;
+  const r = hasardFixe(5);
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  for (let k = 0; k < 50; k++) {
+    const aGauche = r() < 0.5;
+    const x = aGauche ? r() * cote : d.W - r() * cote, y = r() * d.H * 0.42, sz = 1.5 + r() * 2;
+    ctx.fillRect(x, y, sz, sz);
+  }
+  const sol = d.y0 + d.bh * 0.8;
+  const taille = Math.max(6, Math.min(16, cote / 30));
+  // Lune et nuages
+  const lx = d.W - cote * 0.2, ly = Math.max(40, d.bandeMon * 0.7);
+  const halo = ctx.createRadialGradient(lx, ly, 5, lx, ly, taille * 7);
+  halo.addColorStop(0, 'rgba(255,248,214,0.7)'); halo.addColorStop(1, 'rgba(255,248,214,0)');
+  ctx.fillStyle = halo; ctx.fillRect(lx - taille * 7, ly - taille * 7, taille * 14, taille * 14);
+  rond(ctx, lx, ly, taille * 2, '#fff3c9');
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for (const [nx, ny] of [[cote * 0.25, d.bandeMon + 30], [cote * 0.75, d.bandeMon + 90], [d.W - cote * 0.7, d.bandeMon + 50]]) {
+    ctx.beginPath(); ctx.ellipse(nx, ny, taille * 4, taille, 0, 0, Math.PI * 2); ctx.ellipse(nx + taille * 2, ny - taille * 0.8, taille * 2.4, taille, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  for (const [aGauche, devant, fond] of [[true, [0, 1], 2], [false, [4, 5], 6]]) {
+    const x0 = aGauche ? 0 : d.W - cote, x1 = aGauche ? cote : d.W, cx = (x0 + x1) / 2;
+    // Colline
+    const gh = ctx.createLinearGradient(0, sol - taille * 3, 0, d.reserveY + d.reserveH * 0.4);
+    gh.addColorStop(0, 'rgba(111,174,79,0.95)'); gh.addColorStop(1, 'rgba(40,70,60,0)');
+    ctx.fillStyle = gh;
+    ctx.beginPath(); ctx.moveTo(x0 - 20, sol + taille * 1.5);
+    ctx.quadraticCurveTo(cx, sol - taille * 3.5, x1 + 20, sol + taille * 1.5);
+    ctx.lineTo(x1 + 20, d.H); ctx.lineTo(x0 - 20, d.H); ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.globalAlpha = 0.65;
+    dessinerMonument(ctx, fond, 1, cx, sol - taille * 1.6, taille * 0.65, t, false);
+    ctx.restore();
+    dessinerMonument(ctx, devant[0], 1, cx - cote * 0.24, sol + taille * 0.4, taille, t, false);
+    dessinerMonument(ctx, devant[1], 1, cx + cote * 0.24, sol + taille * 0.4, taille, t, false);
+    etincelle(ctx, cx - cote * 0.38, sol - taille * 6, taille * 0.6, '#fff3c9');
+    etincelle(ctx, cx + cote * 0.4, sol - taille * 8, taille * 0.5, '#ffffff');
+  }
+  ctx.restore();
+}
+
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+else {
+  montrerEcran('ecran-titre');
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>
