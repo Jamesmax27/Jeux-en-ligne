@@ -2035,6 +2035,7 @@ try {
   if (lu && typeof lu === 'object') Object.assign(sauve, lu);
 } catch (e) { /* stockage indisponible : tant pis */ }
 function enregistrer() {
+  if (apercu) return; // image du jeu : rien n'est enregistré
   try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* rien */ }
 }
 const totalEtoiles = () => Object.values(sauve.journees).reduce((s, j) => s + (j.etoiles || 0), 0);
@@ -2043,6 +2044,8 @@ const totalEtoiles = () => Object.values(sauve.journees).reduce((s, j) => s + (j
 // reprendre (1 à 10) et score cumulé des journées terminées.
 const JEU = 'cabinet-du-veterinaire';
 let scorePartie = 0;
+// 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU, posé par le robot), sinon 0.
+let apercu = 0;
 // Meilleures étoiles des journées 1 à 10, gardées aussi par le site (le localStorage du jeu n'y marche pas).
 const etoilesJournees = () => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((j) => (sauve.journees[j] && sauve.journees[j].etoiles) || 0);
 (() => {
@@ -2059,13 +2062,13 @@ const etoilesJournees = () => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((j) => (sauve.
 })();
 JEL_SAVE.surFermeture(() => {
   // Pendant une journée seulement (le bilan a déjà enregistré la suivante).
-  if (jeuActif && !bilanOuvert && partie) JEL_SAVE.save(JEU, { niveau: partie.jour, score: scorePartie });
+  if (jeuActif && !bilanOuvert && partie && !apercu) JEL_SAVE.save(JEU, { niveau: partie.jour, score: scorePartie });
 });
 
 // ---------- Sons (Web Audio, créés seulement après une action du joueur) ----------
 let ac = null;
 function audio() {
-  if (!sauve.son) return null;
+  if (!sauve.son || apercu || window.JEL_AFFICHE) return null;
   if (!ac) {
     try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
   }
@@ -2424,6 +2427,7 @@ function dessinerFond(c, sansTable) {
     [[70, 60], [210, 36]].forEach(([x, y]) => { circ(c, x, y, 16, '#fff'); circ(c, x + 18, y - 6, 20, '#fff'); circ(c, x + 38, y, 15, '#fff'); });
     ell(c, 60, 330, 160, 60, '#a5dc8c'); ell(c, 320, 330, 170, 70, '#98d47e');
     c.fillStyle = '#8fd17a'; c.fillRect(-1500, 320, 3360, 1500);
+    if (apercu === 3) decorJardinLarge(c);
     c.fillStyle = '#8a5a35'; c.fillRect(22, 200, 16, 130); circ(c, 30, 180, 44, '#5fb35a'); circ(c, 58, 205, 30, '#57a852'); circ(c, 4, 205, 28, '#57a852');
     [[300, 350], [330, 372], [60, 366], [24, 352], [280, 380]].forEach(([x, y], i) => { circ(c, x, y, 6, i % 2 ? '#ff8fb1' : '#ffd23f'); circ(c, x, y, 2.5, '#fff'); });
   } else {
@@ -3545,12 +3549,241 @@ $('#b-salle').addEventListener('click', () => {
 });
 document.querySelectorAll('[data-retour]').forEach((b) => b.addEventListener('click', () => { son.clic(); allerAccueil(); }));
 
+// =====================================================================
+//  Affiche (jaquette du jeu)
+// =====================================================================
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Dans le cabinet baigné de
+// soleil, un chaton en grand sur la table d'examen : le stéthoscope doré écoute son cœur, la loupe
+// arc-en-ciel regarde son oreille ; un lapin et un poulain attendent leur tour, des bulles du bain flottent.
+function hasardFixe(graine) {
+  return () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function bulleSavon(c, x, y, r) {
+  c.fillStyle = 'rgba(214,241,255,.45)'; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+  c.strokeStyle = 'rgba(124,201,255,.95)'; c.lineWidth = Math.max(2, r * 0.07); c.stroke();
+  c.strokeStyle = 'rgba(255,170,220,.55)'; c.lineWidth = Math.max(1.5, r * 0.05); c.beginPath(); c.arc(x, y, r * 0.86, 2.2, 3.6); c.stroke();
+  ell(c, x - r * 0.38, y - r * 0.4, r * 0.22, r * 0.13, 'rgba(255,255,255,.95)', -0.7);
+}
+let toileAffiche = null;
+function dessinerAffiche() {
+  const L = Math.max(1, innerWidth), Hh = Math.max(1, innerHeight), d = Math.min(2, window.devicePixelRatio || 1);
+  toileAffiche.width = Math.round(L * d); toileAffiche.height = Math.round(Hh * d);
+  const x = toileAffiche.getContext('2d'), al = hasardFixe(20261124);
+  x.setTransform(d, 0, 0, d, 0, 0);
+  const k = Math.min(L / 600, Hh / 800);
+  x.translate((L - 600 * k) / 2, (Hh - 800 * k) / 2); x.scale(k, k);
+  // Mur rayé de la clinique (il continue jusqu'aux bords sur un écran large)
+  const mur = x.createLinearGradient(0, 0, 0, 600); mur.addColorStop(0, '#e6f8f3'); mur.addColorStop(1, '#c9ece3');
+  x.fillStyle = mur; x.fillRect(-3000, -3000, 6600, 3600);
+  x.fillStyle = 'rgba(175,222,211,.5)'; for (let i = -3000; i < 3600; i += 46) x.fillRect(i, -3000, 18, 3600);
+  // Fenêtre ensoleillée (la lumière de la scène)
+  x.fillStyle = '#fff'; rectArrondi(x, 26, 60, 200, 178, 14); x.fill();
+  const ciel = x.createLinearGradient(0, 70, 0, 228); ciel.addColorStop(0, '#7cc8f2'); ciel.addColorStop(1, '#d9f2ff');
+  x.fillStyle = ciel; x.fillRect(38, 72, 176, 154);
+  x.save(); x.beginPath(); x.rect(38, 72, 176, 154); x.clip();
+  const soleil = x.createRadialGradient(92, 122, 6, 92, 122, 90); soleil.addColorStop(0, '#fffbe0'); soleil.addColorStop(0.35, 'rgba(255,236,140,.85)'); soleil.addColorStop(1, 'rgba(255,236,140,0)');
+  x.fillStyle = soleil; x.fillRect(38, 72, 176, 154); circ(x, 92, 122, 26, '#ffe066');
+  [[150, 110], [176, 178]].forEach(([a, b]) => { circ(x, a, b, 13, '#fff'); circ(x, a + 15, b - 6, 17, '#fff'); circ(x, a + 32, b, 12, '#fff'); });
+  ell(x, 120, 236, 140, 26, '#9ad67f');
+  x.restore();
+  x.fillStyle = '#fff'; x.fillRect(122, 72, 7, 154); x.fillRect(38, 146, 176, 7);
+  // Rayons de soleil qui traversent la pièce jusqu'au chaton
+  x.save(); x.globalCompositeOperation = 'lighter';
+  [[60, 240, 0.12], [120, 380, 0.1], [180, 520, 0.08]].forEach(([a, b, o]) => {
+    x.fillStyle = `rgba(255,245,200,${o})`; x.beginPath(); x.moveTo(40, 80); x.lineTo(214, 80); x.lineTo(b + 260, 640); x.lineTo(a + 40, 640); x.closePath(); x.fill();
+  });
+  x.restore();
+  // Tableau à la patte et étagère de flacons, à droite
+  x.fillStyle = '#fff'; rectArrondi(x, 420, 58, 128, 140, 12); x.fill(); x.fillStyle = '#ffe9ef'; x.fillRect(432, 70, 104, 116);
+  circ(x, 484, 140, 22, '#f2a0b4'); [[-22, -26], [-8, -38], [8, -38], [22, -26]].forEach(([a, b]) => circ(x, 484 + a, 140 + b, 9, '#f2a0b4'));
+  x.fillStyle = '#c99868'; rectArrondi(x, 400, 300, 220, 12, 5); x.fill();
+  [[420, '#b76de0', 46], [458, '#f27aa0', 36], [490, '#7ccf8a', 52], [530, '#4fb2ff', 40], [566, '#ffd23f', 30]].forEach(([a, col, h]) => {
+    x.fillStyle = col; rectArrondi(x, a, 300 - h, 28, h, 7); x.fill();
+    x.fillStyle = 'rgba(255,255,255,.55)'; x.fillRect(a + 5, 300 - h + 8, 5, h - 16);
+    x.fillStyle = '#fff'; rectArrondi(x, a + 7, 300 - h - 9, 14, 11, 3); x.fill();
+  });
+  // Sol
+  const sol = x.createLinearGradient(0, 588, 0, 800); sol.addColorStop(0, '#efdfc2'); sol.addColorStop(1, '#d9bf96');
+  x.fillStyle = sol; x.fillRect(-3000, 588, 6600, 3000);
+  x.fillStyle = '#d7c19f'; x.fillRect(-3000, 582, 6600, 8);
+  // Au fond : un lapin et un poulain attendent leur tour sur un banc
+  x.fillStyle = '#b98a5a'; rectArrondi(x, -40, 528, 200, 18, 8); x.fill(); rectArrondi(x, 440, 528, 220, 18, 8); x.fill();
+  x.fillStyle = '#8f6840'; x.fillRect(-10, 546, 10, 44); x.fillRect(130, 546, 10, 44); x.fillRect(470, 546, 10, 44); x.fillRect(610, 546, 10, 44);
+  const fond = [['lapin', 78, 436, 0.56], ['poulain', 528, 440, 0.58]];
+  for (const [id, a, b, s] of fond) dessinerAnimal(x, creerPatient(ESPECES.find((e) => e.id === id), '', 'oreilles'), { x: a, y: b, s, humeur: 'content' });
+  // Voile léger : le fond recule
+  x.fillStyle = 'rgba(232,248,243,.28)'; x.fillRect(-3000, -3000, 6600, 3590);
+  // Halo de lumière derrière le héros
+  const halo = x.createRadialGradient(300, 300, 20, 300, 300, 300);
+  halo.addColorStop(0, 'rgba(255,252,225,.95)'); halo.addColorStop(0.5, 'rgba(255,246,200,.45)'); halo.addColorStop(1, 'rgba(255,246,200,0)');
+  x.fillStyle = halo; x.fillRect(-3000, -3000, 6600, 6600);
+  // Table d'examen
+  x.fillStyle = '#6fa6bd'; x.fillRect(150, 520, 16, 90); x.fillRect(434, 520, 16, 90);
+  ell(x, 300, 612, 190, 14, 'rgba(0,0,0,.12)');
+  x.fillStyle = '#8fcbe0'; rectArrondi(x, 104, 500, 392, 34, 16); x.fill();
+  x.fillStyle = '#c4e6f2'; rectArrondi(x, 116, 503, 368, 10, 5); x.fill();
+  // Le héros : un chaton heureux, en grand, avec un contour lumineux
+  const hx = 300, hy = 326, hs = 1.12;
+  const chaton = creerPatient(ESPECES[0], '', 'oreilles');
+  x.save(); x.shadowColor = 'rgba(255,255,255,.95)'; x.shadowBlur = 22 * k * (window.devicePixelRatio || 1);
+  dessinerAnimal(x, chaton, { x: hx, y: hy, s: hs, humeur: 'content' });
+  x.restore();
+  dessinerAnimal(x, chaton, { x: hx, y: hy, s: hs, humeur: 'content' });
+  // Stéthoscope doré posé sur son cœur, le tuyau part vers le vétérinaire (hors de l'image)
+  const cx0 = hx + 18 * hs, cy0 = hy + 64 * hs;
+  x.strokeStyle = 'rgba(70,200,120,.35)'; x.lineWidth = 14; x.beginPath(); x.arc(cx0, cy0, 70, 0, Math.PI * 2); x.stroke();
+  x.strokeStyle = '#3fae6a'; x.lineWidth = 6; x.beginPath(); x.arc(cx0, cy0, 44, 0, Math.PI * 2); x.stroke();
+  x.strokeStyle = '#b8860b'; x.lineWidth = 12; x.lineCap = 'round';
+  x.beginPath(); x.moveTo(cx0 + 14, cy0 + 4); x.bezierCurveTo(cx0 + 130, cy0 + 20, 500, 560, 680, 690); x.stroke();
+  x.strokeStyle = '#e8b923'; x.lineWidth = 7; x.stroke();
+  circ(x, cx0, cy0, 21, '#b8860b'); circ(x, cx0, cy0, 16, '#e9eef5'); circ(x, cx0 - 5, cy0 - 5, 5, '#fff');
+  // Gros cœur qui bat, et petits cœurs autour
+  x.save(); x.shadowColor = '#ff6b8f'; x.shadowBlur = 30 * k;
+  x.fillStyle = '#f2557a'; cheminCoeur(x, 300, 112, 30); x.fill(); x.restore();
+  x.strokeStyle = 'rgba(242,85,122,.45)'; x.lineWidth = 5; x.beginPath(); x.arc(300, 106, 52, 0, Math.PI * 2); x.stroke();
+  [[392, 150, 12], [212, 120, 10], [420, 230, 9], [372, 92, 8]].forEach(([a, b, s]) => { x.fillStyle = '#ff7fa0'; cheminCoeur(x, a, b, s); x.fill(); });
+  // Loupe arc-en-ciel sur l'oreille : on y voit le petit souci, grossi
+  const lx = 238, ly = 166, lr = 48;
+  x.save(); x.beginPath(); x.arc(lx, ly, lr, 0, Math.PI * 2); x.clip();
+  x.fillStyle = '#eaf8f4'; x.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
+  // Grossissement centré sur l'oreille du chaton, pour qu'on voie le souci dans la loupe.
+  x.translate(lx + 4, ly + 6); x.scale(1.8, 1.8); x.translate(-(hx - 44 * hs), -(hy - 128 * hs));
+  dessinerAnimal(x, creerPatient(ESPECES[0], '', 'oreilles'), { x: hx, y: hy, s: hs, humeur: 'content', symptome: 'oreilles' });
+  x.restore();
+  ell(x, lx - 16, ly - 20, 14, 8, 'rgba(255,255,255,.7)', -0.6);
+  const ca = Math.cos(-2.35), sa = Math.sin(-2.35);
+  x.strokeStyle = '#8a5a2b'; x.lineWidth = 18; x.lineCap = 'round';
+  x.beginPath(); x.moveTo(lx + ca * (lr + 6), ly + sa * (lr + 6)); x.lineTo(lx + ca * (lr + 92), ly + sa * (lr + 92)); x.stroke();
+  x.strokeStyle = '#b07a43'; x.lineWidth = 6; x.stroke();
+  ['#e5484d', '#f29d38', '#ffd23f', '#3fae6a', '#3b82c4', '#b76de0'].forEach((col, i) => { x.strokeStyle = col; x.lineWidth = 4; x.beginPath(); x.arc(lx, ly, lr + 2 + i * 3, 0, Math.PI * 2); x.stroke(); });
+  // Étincelles et confettis de la guérison
+  for (let i = 0; i < 26; i++) {
+    const a = al() * Math.PI * 2, r = 170 + al() * 120, px = 300 + Math.cos(a) * r, py = 300 + Math.sin(a) * r * 0.85;
+    if (py > 560 || (px > 180 && px < 420 && py > 140 && py < 520)) continue;
+    if (i % 3) { x.save(); x.translate(px, py); x.rotate(al() * 6); x.fillStyle = pioche(['#f2557a', '#ffd23f', '#3fae6a', '#3b82c4', '#b76de0']); x.fillRect(-6, -4, 12, 8); x.restore(); }
+    else etoile(x, px, py, 9, '#ffd23f');
+  }
+  // Premier plan : grosses bulles du bain, coupées par les bords
+  [[30, 640, 78], [138, 712, 40], [586, 548, 58], [500, 676, 34], [450, 380, 20], [150, 410, 24], [110, 330, 14], [470, 470, 14]].forEach(([a, b, r]) => bulleSavon(x, a, b, r));
+}
+function demarrerAffiche() {
+  const cacher = () => document.querySelectorAll('#jeu, .ecran, .voile, #tuto, #main, #onde, .jel-langue, button')
+    .forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  cacher(); setTimeout(cacher, 300); setTimeout(cacher, 1200);
+  toileAffiche = document.createElement('canvas');
+  toileAffiche.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:100;display:block';
+  document.body.append(toileAffiche);
+  // Hasard fixe : la même affiche à chaque capture.
+  Math.random = hasardFixe(777);
+  dessinerAffiche();
+  addEventListener('resize', dessinerAffiche);
+}
+
+// =====================================================================
+//  Images du jeu (page du jeu)
+// =====================================================================
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine consultation, avec sa vraie interface (journée, patient, points, fiche, consigne),
+// sans accueil, ni fenêtre « Continuer », ni annonce, ni tutoriel (CONSIGNES-JEU.md, section 5). La scène
+// est posée puis figée sans fenêtre de pause : ni son, ni sauvegarde, ni fin de partie.
+//   1 = journée 1 : la loupe cherche le souci dans l'oreille du lapin ;
+//   2 = journée 5 : le thermomètre mesure la fièvre du poulain qui va gigoter ;
+//   3 = journée 9, dans le jardin débloqué : le bain moussant de l'agneau, d'autres patients attendent.
+const SCENES_APERCU = {
+  1: { jour: 1, gueris: 1, score: 92, espece: 'lapin', mal: 'oreilles', etape: 'loupe',
+    indices: [['stetho', () => traduire('coeurCalme'), false]] },
+  2: { jour: 5, gueris: 2, score: 184, espece: 'poulain', mal: 'rhume', etape: 'thermo',
+    indices: [['stetho', () => traduire('coeurCalme'), false], ['loupe', () => TEXTE_LOUPE.nez, true]] },
+  3: { jour: 9, gueris: 3, score: 271, espece: 'agneau', mal: 'epine', etape: 'bulles', sale: true, indices: [] },
+};
+function ouvrirApercu(n) {
+  apercu = n;
+  const sc = SCENES_APERCU[n];
+  Math.random = hasardFixe(1234567 + n * 7919); // même image à chaque capture
+  // Progression neuve en mémoire seulement ; journée 9 : jardin et instruments débloqués.
+  Object.assign(sauve, { jourMax: 10, journees: {}, album: {}, salle: 'clinique' });
+  if (n === 3) { for (let j = 1; j <= 8; j++) sauve.journees[j] = { etoiles: 3, score: 400 }; sauve.salle = 'jardin'; }
+  Object.keys(TUTOS).forEach((cle) => tutosVus.add(cle));
+  demarrerJournee(sc.jour);
+  minuteurs = []; particules = []; textes = [];
+  const file = partie.file;
+  let i0 = file.findIndex((q, i) => i >= sc.gueris && !q.controle);
+  if (i0 < 0) i0 = 0;
+  for (let i = 0; i < i0; i++) { file[i].gueri = file[i].soigne = true; partie.gueris.push(file[i]); }
+  partie.score = sc.score;
+  const p = file[i0];
+  p.esp = ESPECES.find((e) => e.id === sc.espece); p.mal = sc.mal; p.controle = false; p.perte = 0;
+  p.sale = !!sc.sale;
+  p.boue = sc.sale ? [[-40, 60], [42, 105], [-22, -100], [34, -112], [-55, 118]].map(([a, b]) => ({ x: a, y: b, r: 18, a: 0 })) : [];
+  p.indices = sc.indices.map(([icon, txt, alerte]) => ({ icon, txt: txt(), alerte }));
+  patient = p; p.etapes = construireEtapes(p); p.iEtape = p.etapes.indexOf(sc.etape);
+  Object.assign(animal, { dx: 0, cible: 0, secoue: 0, gigote: false, joie: 0, bulle: '', bulleT: 0 });
+  viderCartes(); majIndices(); majHud();
+  lancerEtape(FABRIQUES[sc.etape]());
+  const e = etape;
+  if (n === 1) {
+    // La loupe arrive sur l'oreille : un endroit déjà vu (vert), le cercle jaune se remplit.
+    const bobo = e.pts.find((q) => q.nom === 'oreille'), autre = e.pts.find((q) => q.nom !== 'oreille');
+    if (autre) autre.etat = 'ok';
+    e.cx = e.lx = bobo.x + 6; e.cy = e.ly = bobo.y + 8; bobo.vu = 0.3;
+  } else if (n === 2) {
+    // Le thermomètre est à moitié : attention, le poulain va gigoter !
+    e.tient = true; e.prog = 0.56; e.phase = 'alerte'; e.tp = 1;
+  } else {
+    // Le bain : quelques bulles déjà éclatées, l'agneau est ravi.
+    e.bulles.splice(0, 2);
+    animal.joie = 5;
+    etincelles(250, 160, 8, '#a9dcf7'); coeurs(AX, AY - 90, 4);
+    for (const q of particules) { q.x += q.vx * 0.25; q.y += q.vy * 0.25; q.vie = 1; }
+  }
+  scoreAffiche = partie.score; $('#scorebox').textContent = traduire('pts', { n: partie.score });
+  enPause = true; // figé, sans fenêtre de pause
+  redimensionner(); dessiner();
+}
+// Image 3 (ordinateur) : le jardin continue sur les côtés de la table, avec d'autres patients qui attendent.
+function decorJardinLarge(c) {
+  [[-260, 60], [-110, 100], [420, 80], [600, 40], [-420, 30]].forEach(([a, b]) => { circ(c, a, b, 18, '#fff'); circ(c, a + 22, b - 8, 24, '#fff'); circ(c, a + 46, b, 17, '#fff'); });
+  ell(c, -220, 330, 240, 80, '#a5dc8c'); ell(c, -470, 330, 160, 60, '#98d47e'); ell(c, 580, 330, 240, 84, '#a5dc8c'); ell(c, 820, 330, 170, 60, '#98d47e');
+  c.fillStyle = '#8fd17a'; c.fillRect(-1500, 320, 3360, 1500);
+  // Barrière de bois
+  c.fillStyle = '#d9b88a';
+  for (const [a0, a1] of [[-480, -8], [368, 840]]) {
+    c.fillRect(a0, 286, a1 - a0, 7); c.fillRect(a0, 304, a1 - a0, 7);
+    for (let a = a0; a < a1; a += 34) { rectArrondi(c, a, 274, 12, 50, 4); c.fill(); }
+  }
+  // Arbres
+  [[-330, 1.1], [-60, 0.85], [430, 0.9], [700, 1.15]].forEach(([a, s]) => {
+    c.fillStyle = '#8a5a35'; c.fillRect(a - 8 * s, 330 - 130 * s, 16 * s, 130 * s);
+    circ(c, a, 330 - 150 * s, 44 * s, '#5fb35a'); circ(c, a + 28 * s, 330 - 125 * s, 30 * s, '#57a852'); circ(c, a - 26 * s, 330 - 125 * s, 28 * s, '#57a852');
+    circ(c, a + 10 * s, 330 - 165 * s, 6 * s, '#ff6b6b'); circ(c, a - 18 * s, 330 - 140 * s, 6 * s, '#ff6b6b');
+  });
+  // Bancs avec les patients qui attendent
+  for (const [a0, a1] of [[-300, -90], [450, 660]]) {
+    c.fillStyle = '#b98a5a'; rectArrondi(c, a0, 392, a1 - a0, 16, 7); c.fill();
+    c.fillStyle = '#8f6840'; c.fillRect(a0 + 16, 408, 9, 34); c.fillRect(a1 - 25, 408, 9, 34);
+  }
+  [['chiot', -250, 326, 0.4], ['caneton', -145, 334, 0.36], ['herisson', 500, 330, 0.38], ['perroquet', 610, 330, 0.38]].forEach(([id, a, b, s]) =>
+    dessinerAnimal(c, creerPatient(ESPECES.find((e) => e.id === id), '', 'oreilles'), { x: a, y: b, s, humeur: 'neutre' }));
+  // Massifs de fleurs
+  for (let i = 0; i < 18; i++) {
+    const a = i < 9 ? -440 + i * 46 : 380 + (i - 9) * 48, b = 420 + (i % 3) * 8;
+    c.fillStyle = '#4f9a5d'; c.fillRect(a - 1.5, b, 3, 16);
+    circ(c, a, b, 7, ['#ff8fb1', '#ffd23f', '#b76de0'][i % 3]); circ(c, a, b, 2.8, '#fff');
+  }
+}
+
 // ---------- Démarrage ----------
-new ResizeObserver(() => { redimensionner(); if (jeuActif) dessiner(); }).observe($('#zone'));
+new ResizeObserver(() => { if (window.JEL_AFFICHE) return; redimensionner(); if (jeuActif) dessiner(); }).observe($('#zone'));
 redimensionner();
 majBoutonsSon();
-allerAccueil();
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+else {
+  allerAccueil();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

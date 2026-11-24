@@ -964,6 +964,7 @@
   var ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   var DUREE = 60;
   var etat = null, ballons = [], dernier = 0, prochain = 0, tempsRestant = 0, rafId = 0;
+  var apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
   // Dessin d'un ballon en SVG inline
   function svgBallon(c) {
@@ -977,6 +978,7 @@
   // Sons simples en Web Audio (seulement après un geste du joueur)
   var ac = null;
   function bip(f, d) {
+    if (apercu) return; // image du jeu : aucun son
     try {
       if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
       var o = ac.createOscillator(), g = ac.createGain();
@@ -1084,7 +1086,7 @@
   // et à la fermeture ; la fin du chrono efface la sauvegarde.
   var JEU = 'ballons-des-lettres';
   function sauvegarder() {
-    if (etat) JEL_SAVE.save(JEU, { niveau: 1, score: etat.score, vague: etat.niveau, temps: Math.max(1, Math.ceil(tempsRestant)) });
+    if (etat && !apercu) JEL_SAVE.save(JEU, { niveau: 1, score: etat.score, vague: etat.niveau, temps: Math.max(1, Math.ceil(tempsRestant)) });
   }
   JEL_SAVE.surFermeture(sauvegarder);
   function jouer() {
@@ -1140,6 +1142,273 @@
   zoneEffacer.style.marginTop = '14px';
   document.getElementById('debut').appendChild(zoneEffacer);
   JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: zoneEffacer });
+
+  /* ---------- Affiche (jaquette du jeu) ---------- */
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Un grand ballon
+  // rouge rieur s'envole au soleil, entouré de ses amis ; à droite, un doigt éclate un ballon bleu
+  // dans une gerbe de confettis ; collines fleuries au premier plan. Les ballons de l'affiche ne
+  // portent pas de lettre (aucun texte dessiné).
+  function teinte(hex, f) {
+    var n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    var m = function (v) { return Math.round(f < 0 ? v * (1 + f) : v + (255 - v) * f); };
+    return 'rgb(' + m(r) + ',' + m(g) + ',' + m(b) + ')';
+  }
+  function arrondi(c, x, y, l, h, r) {
+    c.beginPath();
+    if (c.roundRect) c.roundRect(x, y, l, h, r); else c.rect(x, y, l, h);
+  }
+  // Ballon du jeu (même forme que svgBallon : ellipse 32 × 38, nœud, reflet), plus détaillé.
+  function ballonAffiche(c, x, y, r, col, o) {
+    o = o || {};
+    var ry = r * 38 / 32;
+    c.save();
+    if (o.angle) { c.translate(x, y); c.rotate(o.angle); c.translate(-x, -y); }
+    // Ficelle
+    c.strokeStyle = 'rgba(70,80,110,.75)'; c.lineWidth = Math.max(1.5, r * 0.035);
+    c.beginPath(); c.moveTo(x, y + ry + r * 0.2);
+    var lg = o.ficelle || r * 2.2;
+    c.bezierCurveTo(x - r * 0.35, y + ry + lg * 0.35, x + r * 0.35, y + ry + lg * 0.65, x - r * 0.1, y + ry + lg);
+    c.stroke();
+    // Nœud
+    c.fillStyle = teinte(col, -0.2);
+    c.beginPath(); c.moveTo(x, y + ry - r * 0.05); c.lineTo(x - r * 0.17, y + ry + r * 0.22); c.lineTo(x + r * 0.17, y + ry + r * 0.22); c.closePath(); c.fill();
+    // Corps éclairé en haut à gauche (le soleil)
+    var gr = c.createRadialGradient(x - r * 0.4, y - ry * 0.45, r * 0.1, x, y, r * 1.25);
+    gr.addColorStop(0, teinte(col, 0.35)); gr.addColorStop(0.55, col); gr.addColorStop(1, teinte(col, -0.35));
+    c.fillStyle = gr;
+    c.beginPath(); c.ellipse(x, y, r, ry, 0, 0, Math.PI * 2); c.fill();
+    // Contour clair côté soleil
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = r * 0.05;
+    c.beginPath(); c.ellipse(x, y, r * 0.97, ry * 0.97, 0, Math.PI * 1.05, Math.PI * 1.55); c.stroke();
+    // Reflet
+    c.fillStyle = 'rgba(255,255,255,.5)';
+    c.beginPath(); c.ellipse(x - r * 0.38, y - ry * 0.42, r * 0.22, r * 0.34, -0.5, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,255,255,.8)';
+    c.beginPath(); c.arc(x - r * 0.18, y - ry * 0.7, r * 0.07, 0, Math.PI * 2); c.fill();
+    if (o.visage) {
+      var ex = r * 0.3, ey = y - ry * 0.05, dx = o.regard || 0;
+      [-1, 1].forEach(function (s) {
+        c.fillStyle = '#fff';
+        c.beginPath(); c.ellipse(x + s * ex, ey, r * 0.15, r * 0.19, 0, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#1d3557';
+        c.beginPath(); c.arc(x + s * ex + dx * r * 0.06, ey + r * 0.02, r * 0.09, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#fff';
+        c.beginPath(); c.arc(x + s * ex + dx * r * 0.06 - r * 0.03, ey - r * 0.03, r * 0.035, 0, Math.PI * 2); c.fill();
+        // Joues
+        c.fillStyle = 'rgba(255,170,190,.7)';
+        c.beginPath(); c.ellipse(x + s * r * 0.55, y + ry * 0.2, r * 0.12, r * 0.08, 0, 0, Math.PI * 2); c.fill();
+        // Sourcils levés (joie)
+        c.strokeStyle = '#1d3557'; c.lineWidth = r * 0.045; c.lineCap = 'round';
+        c.beginPath(); c.arc(x + s * ex, ey - r * 0.2, r * 0.13, Math.PI * 1.2, Math.PI * 1.8); c.stroke();
+      });
+      // Grand sourire ouvert
+      c.fillStyle = '#7a1022';
+      c.beginPath(); c.moveTo(x - r * 0.32, y + ry * 0.18); c.quadraticCurveTo(x, y + ry * 0.75, x + r * 0.32, y + ry * 0.18); c.closePath(); c.fill();
+      c.fillStyle = '#ff8fa3';
+      c.beginPath(); c.ellipse(x, y + ry * 0.42, r * 0.14, r * 0.08, 0, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#fff';
+      c.beginPath(); c.moveTo(x - r * 0.27, y + ry * 0.2); c.lineTo(x + r * 0.27, y + ry * 0.2); c.lineTo(x + r * 0.22, y + ry * 0.28); c.lineTo(x - r * 0.22, y + ry * 0.28); c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+  function nuageAffiche(c, x, y, l, a) {
+    c.fillStyle = 'rgba(255,255,255,' + (a || 0.95) + ')';
+    [[0, 0, 0.32], [0.3, -0.12, 0.3], [0.58, 0.02, 0.26], [-0.28, 0.06, 0.24], [0.15, 0.12, 0.3]].forEach(function (p) {
+      c.beginPath(); c.arc(x + p[0] * l, y + p[1] * l, p[2] * l, 0, Math.PI * 2); c.fill();
+    });
+  }
+  function etoileAffiche(c, x, y, r, a) {
+    c.beginPath();
+    for (var i = 0; i < 10; i++) { var rr = i % 2 ? r * 0.45 : r, an = a + i * Math.PI / 5; c.lineTo(x + Math.cos(an) * rr, y + Math.sin(an) * rr); }
+    c.closePath();
+  }
+  var toile = null;
+  function dessinerAffiche() {
+    var W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    toile.width = Math.round(W * dpr); toile.height = Math.round(H * dpr);
+    var c = toile.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    var X = function (v) { return ox + v * k; }, Y = function (v) { return oy + v * k; };
+    // Ciel (toute la largeur)
+    var ciel = c.createLinearGradient(0, 0, 0, H);
+    ciel.addColorStop(0, '#3fa4f5'); ciel.addColorStop(0.55, '#9fd8ff'); ciel.addColorStop(1, '#e6f6ff');
+    c.fillStyle = ciel; c.fillRect(0, 0, W, H);
+    // Soleil en haut à gauche : la source de lumière
+    var sx = X(70), sy = Y(95);
+    var halo = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 420 * k);
+    halo.addColorStop(0, 'rgba(255,250,200,1)'); halo.addColorStop(0.25, 'rgba(255,236,150,.6)'); halo.addColorStop(1, 'rgba(255,236,150,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    c.save(); c.translate(sx, sy); c.fillStyle = 'rgba(255,240,170,.45)';
+    for (var i = 0; i < 12; i++) { c.rotate(Math.PI / 6); c.beginPath(); c.moveTo(0, 0); c.lineTo(-18 * k, 240 * k); c.lineTo(18 * k, 240 * k); c.closePath(); c.fill(); }
+    c.restore();
+    c.fillStyle = '#ffe066'; c.beginPath(); c.arc(sx, sy, 52 * k, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#fff6c2'; c.beginPath(); c.arc(sx - 10 * k, sy - 10 * k, 30 * k, 0, Math.PI * 2); c.fill();
+    // Nuages lointains, aussi sur les côtés d'un écran large
+    for (var n = -3; n <= 3; n++) nuageAffiche(c, X(300 + n * 230), Y(180 + (Math.abs(n) % 3) * 70), 110 * k, 0.75);
+    // Petits ballons lointains, pâles
+    var loin = ['#2a9d8f', '#f77f00', '#8338ec', '#ff5d8f', '#3a86ff', '#ffb703'];
+    for (var j = -6; j <= 9; j++) {
+      c.globalAlpha = 0.55;
+      ballonAffiche(c, X(20 + j * 70 + (j % 2) * 20), Y(250 + ((j * 37) % 90 + 90) % 90 - (j % 3 === 0 ? 120 : 0)), 16 * k, loin[(j + 12) % 6], { ficelle: 30 * k });
+    }
+    c.globalAlpha = 1;
+    // Collines (bas : décor sous le bandeau du titre)
+    c.fillStyle = '#9fdc7c';
+    c.beginPath(); c.moveTo(0, H); c.lineTo(0, Y(640)); c.quadraticCurveTo(X(150), Y(585), X(320), Y(650)); c.quadraticCurveTo(X(480), Y(700), W, Y(610)); c.lineTo(W, H); c.closePath(); c.fill();
+    c.fillStyle = '#6cc35a';
+    c.beginPath(); c.moveTo(0, H); c.lineTo(0, Y(720)); c.quadraticCurveTo(X(260), Y(660), X(420), Y(715)); c.quadraticCurveTo(X(540), Y(750), W, Y(700)); c.lineTo(W, H); c.closePath(); c.fill();
+    // Ballons amis, au second plan
+    ballonAffiche(c, X(480), Y(150), 58 * k, '#ffb703', { visage: true, regard: -1, angle: 0.12, ficelle: 120 * k });
+    ballonAffiche(c, X(105), Y(330), 54 * k, '#2a9d8f', { visage: true, regard: 1, angle: -0.15, ficelle: 120 * k });
+    // Le héros : grand ballon rouge rieur, qui regarde le ballon éclaté
+    ballonAffiche(c, X(268), Y(315), 128 * k, '#e63946', { visage: true, regard: 1, angle: -0.06, ficelle: 230 * k });
+    // Le ballon bleu qui éclate sous le doigt : morceaux, éclat, confettis
+    var px = X(470), py = Y(410);
+    c.fillStyle = 'rgba(255,255,255,.9)'; c.shadowColor = '#fff3a0'; c.shadowBlur = 30 * k;
+    etoileAffiche(c, px, py, 92 * k, 0.2); c.fill();
+    c.fillStyle = '#ffd93d'; etoileAffiche(c, px, py, 64 * k, 0.5); c.fill();
+    c.shadowBlur = 0;
+    c.fillStyle = '#3a86ff';
+    for (var m = 0; m < 7; m++) {
+      var a = m * 0.9 + 0.3, d = 70 * k + (m % 3) * 14 * k;
+      c.save(); c.translate(px + Math.cos(a) * d, py + Math.sin(a) * d); c.rotate(a);
+      c.beginPath(); c.moveTo(-14 * k, -7 * k); c.lineTo(12 * k, -4 * k); c.lineTo(6 * k, 8 * k); c.lineTo(-10 * k, 5 * k); c.closePath(); c.fill();
+      c.restore();
+    }
+    // Traits d'éclat
+    c.strokeStyle = '#fff'; c.lineWidth = 5 * k; c.lineCap = 'round';
+    for (var s2 = 0; s2 < 8; s2++) {
+      var b2 = s2 * Math.PI / 4 + 0.1;
+      c.beginPath(); c.moveTo(px + Math.cos(b2) * 100 * k, py + Math.sin(b2) * 100 * k); c.lineTo(px + Math.cos(b2) * 128 * k, py + Math.sin(b2) * 128 * k); c.stroke();
+    }
+    // Confettis
+    var conf = ['#e63946', '#ffb703', '#2a9d8f', '#8338ec', '#ff5d8f', '#3a86ff', '#f77f00'];
+    for (var q = 0; q < 34; q++) {
+      var aq = q * 2.399, dq = (40 + (q * 53) % 150) * k;
+      c.save(); c.translate(px + Math.cos(aq) * dq, py + Math.sin(aq) * dq * 0.9); c.rotate(aq * 3);
+      c.fillStyle = conf[q % conf.length]; c.fillRect(-6 * k, -3 * k, 12 * k, 6 * k);
+      c.restore();
+    }
+    // Le doigt qui touche, venu du bas à droite (manche jaune, main)
+    c.save();
+    c.translate(X(540), Y(560)); c.rotate(-0.72);
+    c.fillStyle = '#ffb703'; c.strokeStyle = '#d98c00'; c.lineWidth = 4 * k;
+    arrondi(c, -44 * k, 62 * k, 88 * k, 220 * k, 18 * k); c.fill(); c.stroke();
+    c.fillStyle = '#fff'; c.fillRect(-44 * k, 92 * k, 88 * k, 14 * k);
+    c.fillStyle = '#ffd4b0'; c.strokeStyle = '#d99a78';
+    // Doigts repliés, sur le côté de la paume
+    [-2, 18, 38].forEach(function (dy) { c.beginPath(); c.ellipse(30 * k, dy * k, 18 * k, 13 * k, 0, 0, Math.PI * 2); c.fill(); c.stroke(); });
+    // Paume
+    arrondi(c, -36 * k, -6 * k, 70 * k, 76 * k, 26 * k); c.fill(); c.stroke();
+    // Pouce
+    c.beginPath(); c.ellipse(-36 * k, 26 * k, 12 * k, 24 * k, -0.4, 0, Math.PI * 2); c.fill(); c.stroke();
+    // Index tendu
+    arrondi(c, -20 * k, -96 * k, 30 * k, 110 * k, 15 * k); c.fill(); c.stroke();
+    c.fillStyle = '#fff0e4'; c.beginPath(); c.ellipse(-5 * k, -82 * k, 8 * k, 10 * k, 0, 0, Math.PI * 2); c.fill();
+    c.restore();
+    // Premier plan : ballon violet coupé par le bord gauche, nuage coupé en bas à droite
+    ballonAffiche(c, X(-10), Y(575), 92 * k, '#8338ec', { angle: 0.2, ficelle: 200 * k });
+    nuageAffiche(c, X(560), Y(770), 170 * k, 1);
+    // Fleurs du premier plan
+    [[40, 760, '#ff5d8f'], [150, 785, '#ffb703'], [250, 745, '#e63946'], [380, 790, '#8338ec']].forEach(function (f) {
+      var fx = X(f[0]), fy = Y(f[1]);
+      c.fillStyle = f[2];
+      for (var p = 0; p < 5; p++) { var ap = p * 1.2566; c.beginPath(); c.arc(fx + Math.cos(ap) * 11 * k, fy + Math.sin(ap) * 11 * k, 8 * k, 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = '#fff3a0'; c.beginPath(); c.arc(fx, fy, 7 * k, 0, Math.PI * 2); c.fill();
+    });
+  }
+  function cacherLangue() {
+    var l = document.querySelectorAll('.jel-langue, jel-langue');
+    for (var i = 0; i < l.length; i++) l[i].style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    ['haut', 'debut', 'fin'].forEach(function (id) { document.getElementById(id).style.setProperty('display', 'none', 'important'); });
+    toile = document.createElement('canvas');
+    toile.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:50;display:block';
+    document.body.appendChild(toile);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+    cacherLangue();
+    document.addEventListener('DOMContentLoaded', cacherLangue);
+    setTimeout(cacherLangue, 300); setTimeout(cacherLangue, 1000);
+  }
+
+  /* ---------- Images du jeu (page du jeu) ---------- */
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine partie, avec sa vraie interface (score, lettre à trouver, chrono),
+  // sans écran titre ni fenêtre « Continuer » (CONSIGNES-JEU.md, section 5). Les ballons sont posés
+  // à la main puis figés : ni boucle, ni son, ni sauvegarde, ni fin de partie.
+  //   1 = début : lettre A, peu de ballons ;
+  //   2 = milieu : lettre M, plus de ballons, un bon ballon vient d'éclater (« +1 ») ;
+  //   3 = vers la fin (sur ordinateur) : lettre R, le ciel plein de ballons, nouvelle lettre fêtée.
+  // Ballon : [lettre, couleur, x (part de la largeur), y (part de la hauteur)].
+  var SCENES_APERCU = {
+    1: { lettre: 'A', score: 2, temps: 54, niveau: 0, ballons: [
+      ['A', 0, 0.12, 0.62], ['K', 3, 0.55, 0.78], ['A', 4, 0.68, 0.42], ['T', 1, 0.3, 0.32], ['E', 5, 0.2, 0.88], ['O', 2, 0.78, 0.66],
+      ['S', 1, 0.9, 0.22], ['A', 5, 0.42, 0.55], ['G', 3, 0.02, 0.28], ['R', 2, 0.88, 0.9]] },
+    2: { lettre: 'M', score: 13, temps: 31, niveau: 2, plus: [0.42, 0.36], ballons: [
+      ['M', 2, 0.08, 0.5], ['N', 1, 0.36, 0.7], ['W', 0, 0.7, 0.26], ['M', 4, 0.58, 0.58], ['H', 5, 0.18, 0.25], ['M', 3, 0.78, 0.84],
+      ['V', 0, 0.45, 0.9], ['B', 2, 0.25, 0.8], ['N', 4, 0.04, 0.17]] },
+    3: { lettre: 'R', score: 31, temps: 9, niveau: 6, fete: true, plus: [0.6, 0.3], extra: 16, ballons: [
+      ['R', 0, 0.06, 0.55], ['P', 1, 0.14, 0.3], ['B', 2, 0.22, 0.75], ['R', 3, 0.3, 0.42], ['K', 4, 0.38, 0.85], ['F', 5, 0.46, 0.25],
+      ['R', 2, 0.54, 0.62], ['D', 0, 0.62, 0.8], ['P', 3, 0.7, 0.38], ['R', 5, 0.78, 0.7], ['E', 1, 0.86, 0.28], ['B', 4, 0.92, 0.82],
+      ['Q', 0, 0.02, 0.88], ['L', 3, 0.5, 0.45], ['R', 1, 0.66, 0.18]] },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    var sc = SCENES_APERCU[numero];
+    etat = { score: sc.score, niveau: sc.niveau, lettre: sc.lettre, trouves: 0 };
+    tempsRestant = sc.temps;
+    document.getElementById('lettre').textContent = sc.lettre;
+    majScore();
+    document.getElementById('temps').textContent = '⏱ ' + sc.temps;
+    document.getElementById('debut').classList.add('cache');
+    document.getElementById('fin').classList.add('cache');
+    var L = jeu.clientWidth, Hh = jeu.clientHeight;
+    // Nuages en plus (même décor que la partie)
+    [[0.05, 0.4, 100], [0.7, 0.14, 80], [0.3, 0.75, 130], [0.82, 0.6, 90]].forEach(function (n) {
+      var d = document.createElement('div');
+      d.className = 'nuage';
+      d.style.cssText = 'left:' + (n[0] * 100) + '%;top:' + (n[1] * 100) + '%;width:' + n[2] + 'px;height:' + Math.round(n[2] * 0.27) + 'px';
+      jeu.insertBefore(d, document.getElementById('haut'));
+    });
+    // Ballons en plus (ciel bien rempli vers la fin), tirés avec un hasard à graine fixe
+    var graine = 97 + numero * 7919;
+    var hasard = function () { graine = (graine * 16807) % 2147483647; return (graine - 1) / 2147483646; };
+    var liste = sc.ballons.slice();
+    for (var e = 0; e < (sc.extra || 0); e++) {
+      liste.push([e % 3 === 0 ? sc.lettre : ALPHA[Math.floor(hasard() * 26)], Math.floor(hasard() * 6), 0.04 + (e % 8) * 0.125 + hasard() * 0.04, e < 8 ? 0.2 + hasard() * 0.25 : 0.6 + hasard() * 0.3]);
+    }
+    liste.forEach(function (d, i) {
+      var b = document.createElement('button');
+      b.className = 'ballon';
+      b.setAttribute('aria-label', t('lettreAria', { l: d[0] }));
+      b.innerHTML = svgBallon(COULEURS[d[1]]) + '<span>' + d[0] + '</span>';
+      var x = d[2] * Math.max(10, L - 80), y = d[3] * Hh - 48;
+      b.style.left = x + 'px';
+      b.style.transform = 'translate(' + (Math.sin(i * 1.7) * 10) + 'px,' + y + 'px)';
+      jeu.appendChild(b);
+      ballons.push({ el: b, lettre: d[0], x: x, y: y, v: 0, ph: 0, fini: false });
+    });
+    // Récompense qui monte (figée) au-dessus d'un bon ballon éclaté
+    if (sc.plus) {
+      var s = document.createElement('div');
+      s.className = 'etoile'; s.textContent = '+1';
+      s.style.cssText = 'animation:none;color:#e63946;font-size:34px;text-shadow:0 2px 0 #fff;left:' + (sc.plus[0] * L) + 'px;top:' + (sc.plus[1] * Hh) + 'px';
+      jeu.appendChild(s);
+    }
+    if (sc.fete) {
+      var f = document.createElement('div');
+      f.className = 'etoile'; f.textContent = '🎉';
+      f.style.cssText = 'animation:none;font-size:44px;left:' + (L / 2 + 70) + 'px;top:16px';
+      jeu.appendChild(f);
+    }
+  }
+
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if ([1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0) ouvrirApercu(Number(window.JEL_APERCU));
 })();
 </script>
 </body>
