@@ -165,7 +165,7 @@
   // Marcheurs gardés visibles par chaque calque.
   var VISIBLES = {
     feu: ['prefet'], dommages: ['ingenieur'], eau: [], attractivite: [], problemes: [],
-    stocks: ['livreur', 'charretier', 'acheteuse', 'vendeuse', 'bateau'], nourriture: ['vendeuse', 'acheteuse', 'livreur', 'bateau'],
+    stocks: ['livreur', 'charretier', 'acheteuse', 'vendeuse', 'bateau', 'caravane', 'navire', 'docker'], nourriture: ['vendeuse', 'acheteuse', 'livreur', 'bateau'],
     divertissement: ['comedien', 'lutteur', 'dompteur', 'acteur', 'gladiateur', 'lion'], religion: ['pretre'],
     education: ['instituteur', 'bibliothecaire', 'professeur'], sante: ['barbier', 'employe_bains', 'medecin', 'chirurgien'], impots: ['percepteur']
   };

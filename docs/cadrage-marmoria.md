@@ -1310,3 +1310,104 @@ Signalé : « problèmes visuels avec les aqueducs et les réservoirs ». Défau
 6. Le calque « Eau » montre maintenant les canalisations (section 17.3) : l'aqueduc à plat, bleu en eau, gris à sec.
 
 Vérifié dans Chromium : coudes, T, croix, croisement de route, réservoir vide et aqueduc sec, dans les 4 rotations, aux zooms 0,5 et 2, icônes du menu « Eau », calque « Eau » ; aucune erreur dans la console. Contrôles du site et tests de la simulation verts ; images du jeu refaites.
+
+### 23.6 Lot 3 « Commerce et empereur » (24 novembre 2026)
+
+Livré :
+
+- Carte de l'Empire, dans l'onglet « Commerce » du conseiller. La Méditerranée est dessinée par le code. On y voit Rome, la ville et 5 à 7 cités partenaires par mission, dont une cachée qu'un événement fait apparaître. Les routes terrestres sont en trait plein, les maritimes en pointillés, et l'or marque une route où passe un convoi. La fiche d'une cité donne le type de route, les biens qu'elle vend et achète (prix, échanges de l'année et quota) et le coût d'ouverture. Sous la carte, les cités sont aussi en gros boutons de 44 px.
+- Commerce : quatre statuts par bien.
+  - Aucun.
+  - Acheter, jusqu'à n charges.
+  - Vendre, en gardant n charges.
+  - Réserver : le bien n'est plus consommé, transformé ni vendu.
+
+  Chaque bien a un réglage de 0 à 32 charges (4 au départ).
+
+  Caravanes : une tous les 2 mois par route terrestre ouverte. Elle arrive par la route de Rome, échange 8 charges au plus dans les 3 entrepôts les plus proches de l'entrée, puis repart.
+
+  Navires : un tous les 2 mois par route maritime. Le navire attend au point de mer de la carte, puis accoste à un quai de commerce libre (nouveau bâtiment de 3 × 3 cases, sur la rive, 12 employés). Ses 3 dockers font la navette avec les entrepôts. Le navire repart après 12 charges, après 40 jours, ou après 3 jours sans rien à échanger.
+
+  Les quotas par cité et par bien (paliers 15, 25 et 40) repartent à zéro en janvier. Chaque charge est payée ou encaissée sur-le-champ (postes « Ventes » et « Achats »).
+- Empereur et gouverneur (sections 11.4 à 11.6 et 14.5) :
+  - faveur : départ à 50, érosion de −2 en janvier, −5 si le trésor est négatif en fin d'année, −5 pour un secours ;
+  - demandes : biens ou deniers, rappels à 6 mois et à 1 mois de l'échéance, puis 12 mois de retard avant d'être tenues pour ignorées (−8) ;
+  - expédition depuis le conseiller impérial ;
+  - présents : 10, 25 ou 50 % de la fortune du gouverneur, pour +2, +5 ou +10, moitié moins dans les 12 mois qui suivent un présent ;
+  - salaire du gouverneur : 10 deniers par rang au plus, réglable ;
+  - fortune gardée d'une mission à l'autre, même après une défaite ; elle peut renflouer le trésor ;
+  - tribut de janvier, intérêts de 10 % sur la dette, destitution.
+- Cotes (section 14) :
+  - culture : calculée chaque mois, au prorata de la couverture ;
+  - prospérité : calculée en janvier, plafonnée par la qualité de l'habitat ;
+  - paix : +5 par année sans incident ;
+  - faveur et population ;
+  - victoire dès que les cinq seuils sont atteints ensemble ; défaites : ville anéantie, destitution.
+- Dieux (section 9.1) :
+  - satisfaction de 0 à 100, qui se rapproche d'un point par mois de la part de la population couverte par leurs lieux de culte ;
+  - jalousie (−20) ;
+  - avertissement sous 20, colère sous 10 (la satisfaction remonte alors à 30), bienfait au-dessus de 90 (24 mois au moins entre deux bienfaits) ;
+  - les dix effets du tableau ;
+  - fêtes petite, grande et grandiose (la grandiose prend 2 charges de vin), préparées pendant 2 mois ;
+  - option « Bienfaits et colères des dieux » en construction libre.
+- Événements (section 15.2) : salaire de Rome, prix d'un bien, quota d'une cité, route fermée puis rouverte, nouvelle cité, mauvaise récolte, site d'extraction perdu, tremblement de terre (bande de cases fixée par la mission) et demandes de l'empereur. Chaque mission les déclare dans ses données (11 à 13 événements), à date fixe ou dans une fenêtre tirée avec la graine. Chacun laisse un message dans le journal.
+- Conseillers : 11 onglets.
+  - « En chef » : une ligne par domaine, en vert, en orange ou en rouge.
+  - « Cotes » : valeur, seuil, facteur le plus limitant en une phrase, points de culture par composante, plafond de la prospérité.
+  - « Empereur », « Commerce » et « Dieux ».
+  - « Finances » : les 12 postes, pour l'année en cours et l'année passée.
+
+  L'onglet de l'empereur n'apparaît qu'avec l'empereur, celui du commerce qu'avec des cités partenaires. Sur un écran bas (téléphone en paysage), les onglets tiennent sur une ligne qui défile.
+- Missions :
+  - Ravenne : 120 × 120, 5 cités par la terre, industrie et premières demandes ;
+  - Narbo : commerce maritime, 6 cités ;
+  - Massalia : pêche et exportation, 7 cités.
+
+  Chacune a sa présentation, ses cités, ses demandes, ses événements et les seuils de la section 16.2. Ostie et Pompéi restent sans empereur ni cotes.
+- Dessins : quai de commerce (dallage sur l'eau, entrepôt, grue), navire marchand, caravane (mules bâtées), docker. Les marcheurs du commerce apparaissent dans le calque « Stocks ».
+- Sauvegarde en version 3 ; une sauvegarde des lots 1 et 2 est complétée au chargement.
+- Gouverneur automatique des missions (`exemples.js`). Il pose des quartiers de 4 × 2 pâtés fermés par des barrières, un bloc de logistique, et des lots d'industrie près de leur source. Il construit par étapes, dans l'ordre du jeu, puis gère le commerce, les demandes, les fêtes, les présents, l'impôt et les salaires. Les réglages de chaque mission sont dans `PLANS_MISSIONS`.
+- Mode test (`?debug=1`) : `MM_DEBUG.importer(texte)` ouvre une sauvegarde exportée, `MM_DEBUG.info(id)` le panneau d'un bâtiment.
+- Textes : 228 clés de plus dans les 5 langues (865 en tout). La fiche du jeu annonce maintenant 5 missions, le commerce, les dieux et l'empereur. `version` 5.
+
+Mesures (sous Node, PC de développement) :
+
+| Critère (section 21) | Résultat |
+| --- | --- |
+| Les trois missions gagnées en difficulté normale | **Ravenne** : gagnée par le gouverneur automatique au mois 84, sur 126 pour l'étoile de la date. 2 étoiles : un secours de l'empereur reçu. 2 030 habitants, culture 49, prospérité 15, paix 35, faveur 47. **Narbo** : gagnée au mois 118, sur 177. 2 étoiles : un secours reçu. 2 492 habitants, culture 79, prospérité 25, paix 50, faveur 54. **Massalia : non gagnée** : au mois 360, 1 404 habitants pour 3 500 (au plus 1 946, au mois 273) et prospérité 14 pour 35 (au plus 22). Culture (90), paix (100) et faveur (56) sont atteintes. Voir « Massalia » ci-dessous. |
+| Un test par formule de cote | `tester-marmoria.mjs`, section « les cinq cotes ». Population (sans-abri exclus). Culture : points au prorata de la capacité, personnel exigé. Prospérité : bénéfice, chômage, salaire, habitat, alimentation et plafond de l'habitat. Paix : +5 par an, rien l'année d'un incident. Faveur : érosion, trésor négatif, secours, demande dans le délai, en retard, ignorée, présents et leur moitié dans les 12 mois. Plus des tests du tribut, des intérêts, de la destitution, du commerce (caravane, navire, quotas, réservation), des dieux, des fêtes et de chaque événement. |
+| Déterminisme et sauvegarde | Tenus, aussi pour une partie de mission avec commerce, demandes et dieux ; les sauvegardes des versions 1 et 2 se chargent. |
+| Cibles de la section 19.3, carte 160 × 160 remplie | 0,86 ms par tick en moyenne (lot 2 : 0,93 ms ; cible 4 ms), 18,7 ms au pire. |
+| Poids de `index.html` | 1 287 Ko (lot 2 : 1 078 Ko), repère du lot 3 : 2,6 Mo. |
+| Contrôles du site | `validate-games --jouer` (téléphone 844 × 390, ordinateur : 100 % de la largeur occupée, affiche, 3 images du jeu), `tester-sauvegarde`, `check-i18n` (5 langues, 865 clés, avec navigateur), `controle-taxonomie`, `regles-seo`, `verifier-seo` : tout est bon. Dans ce conteneur, `check-i18n` signale une erreur du lanceur dans ses essais du site (« Service worker is disabled… »), identique avec un autre jeu : elle vient du Chromium installé ici, pas de Marmoria. Interface essayée dans Chromium avec des parties des trois missions : en français sur ordinateur (1 280 × 720), en allemand sur téléphone en paysage (844 × 390). Les 11 onglets, la carte, la fiche d'une cité, les réglages des biens, le quai de commerce, un entrepôt et le journal s'affichent sans erreur dans la console et sans texte non traduit. |
+
+Écarts avec ce cahier (à valider ; les valeurs sont dans `donnees.json`) :
+
+1. Tribut (11.5) : le « bénéfice hors constructions » est calculé sans le secours de l'empereur ni les dons du gouverneur. Sinon, Rome reprenait chaque janvier 25 % de son propre secours. Calcul : impôts et ventes, moins les dépenses autres que les constructions. Le plancher reste population / 20.
+2. Destitution (2.4) : sans les légions, qui arrivent au lot 4. Après 12 mois de suite à une faveur de 10 ou moins, la mission est perdue. Le conseiller impérial affiche le compte à rebours et un message le rappelle chaque mois.
+3. Demandes (15.1) : une demande de nourriture compte aussi les greniers, puisqu'une ferme livre d'abord le grenier (écart 11 du lot 2). Une demande en retard reste ouverte 12 mois (`retardMois`) avant d'être tenue pour ignorée. Une demande de deniers est payée par le trésor (poste « Envois à l'empereur »). Les demandes de troupes attendent le lot 4.
+4. Mars : son bienfait (la prochaine invasion perd la moitié de ses troupes) et sa colère (moral des légions) sont gardés dans l'état de la partie. Ils restent sans effet jusqu'à l'armée du lot 4.
+5. Paix : seul le « +5 par année sans incident » joue. Émeutes et invasions viennent au lot 4.
+6. Prospérité : le « +2 » de l'habitat (30 % des habitants en villa ou palais) et le « +1 » de l'hippodrome sont impossibles avant le lot 4 (niveaux 13 à 20, hippodrome). La prospérité gagne donc au mieux +8 par an.
+7. Caravanes (12.3) : les « 3 entrepôts les plus proches sur son trajet » sont les 3 entrepôts en service les plus proches de l'entrée, en distance par la route. La caravane passe les barrières, comme un marcheur à destination : sans cela, elle ne voyait pas un entrepôt situé au-delà de l'entrée d'un quartier fermé.
+8. Navires (12.4) : le cahier ne dit pas quand un navire repart sans avoir échangé. Retenu : après 3 jours sans charge possible. Il attend au large au point de mer fixé par la carte (`mer`). La règle du pont bas est sans objet tant que le jeu n'a pas de ponts.
+9. Statuts (12.2) : réglage de 0 à 32 charges, 4 au départ. Un bien réservé n'est plus pris par les marchés, les maisons ni les ateliers.
+10. Fêtes (9.1) : la grandiose prend 2 charges de vin à l'entrepôt ; sans elles, elle est refusée.
+11. Bienfait de Mercure : un grenier et un entrepôt sont remplis avec les biens qu'ils acceptent ; colère : le grenier et l'entrepôt les plus pleins sont vidés.
+12. Conseiller en chef : le cahier n'en fixe pas le contenu. Retenu : 9 lignes (population, emploi, nourriture, santé, dieux, finances, empereur, commerce, objectifs), chacune en vert, orange ou rouge.
+13. Erratum de la section 23.4, écart 4 : les niveaux 13 à 20 arrivent au lot 4 (« Guerre et patriciens »), pas au lot 3.
+
+Massalia, le critère non atteint :
+
+- Le plafond de la prospérité est la valeur moyenne de la maison de chaque habitant (14.2). Un seuil de 35 exige donc que toute la ville, en moyenne, vive en casa (niveaux 7 et 8), le seuil du repère 11.2. Les villes du gouverneur automatique restent surtout faites de tentes, de cabanes et de masures. À Massalia, au mois 300, 1 918 habitants, dont 428 en casa et 138 en insula : plafond 17. À Ravenne et à Narbo, les seuils de 10 et 25 passent.
+- Sans les niveaux 13 à 20 (lot 4), la prospérité gagne au mieux 8 points par an, et seulement pour une ville qui garde un bénéfice. Atteindre 35 prend donc au moins 5 années sans faute, avec des quartiers de casae bien desservis.
+- Rien ne montre qu'un joueur ne peut pas la gagner : le gouverneur automatique ne sait pas faire monter de grands quartiers au-delà du niveau 6 (constat déjà fait au lot 2). Rien ne montre non plus qu'il le peut. Ma confiance qu'un joueur la gagne en l'état est faible.
+- Trois voies, au choix du propriétaire : jouer Massalia et juger (recommandé, aucun réglage à changer) ; baisser la prospérité de Massalia à 25 et sa population à 3 000 (`donnees.json`, objectifs de la mission) ; ou faire écrire au gouverneur automatique des quartiers de casae, ce qui prend du temps sans rien prouver pour un joueur. Le test laisse Massalia en mesure seule, sans bloquer.
+
+Constats de jeu (gouverneur automatique, à confirmer par une séance réelle) :
+
+- Les deux missions gagnées reçoivent chacune le secours de l'empereur au moins une fois : les premières années coûtent plus qu'elles ne rapportent. La deuxième étoile demande un départ plus prudent.
+- Le commerce porte le budget : à Narbo, les ventes rapportent de 3 500 à 4 900 deniers par an, contre 1 000 à 2 200 pour l'impôt, avec deux routes ouvertes (Tolosa par la terre, Tarraco par la mer).
+- Dans la partie de Narbo observée, les dieux sans temple restent vers 28 (la jalousie les tire vers le bas) : ils lancent des avertissements sans tomber en colère tant que le gouverneur organise des fêtes.
+
+Publication (section 22.2) : c'est la fin du lot 3, la décision revient au propriétaire. Le jeu se joue de bout en bout sur 5 missions sans guerre. Il reste une mission non éprouvée (Massalia) et aucune séance de jeu réelle du lot 3.

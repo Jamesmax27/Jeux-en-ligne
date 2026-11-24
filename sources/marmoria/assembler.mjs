@@ -15,7 +15,7 @@
 // 3. Lance scripts/i18n-jeu.mjs --assembler marmoria --sources sources/marmoria/textes :
 //    textes des 5 langues, modules communs du site (jel-i18n, jel-sauvegarde,
 //    jel-stockage) et textes de la fiche game.json.
-// 4. Affiche le poids de index.html (repères du cahier, section 21 : 1 Mo au lot 1, 1,8 Mo au lot 2).
+// 4. Affiche le poids de index.html (repères du cahier, section 21 : 1 Mo au lot 1, 1,8 Mo au lot 2, 2,6 Mo au lot 3).
 // ==========================================================================
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -92,4 +92,4 @@ if (r.status !== 0) process.exit(r.status || 1);
 
 const final = await readFile(SORTIE, 'utf8');
 const ko = Buffer.byteLength(final, 'utf8') / 1024;
-console.log(`✓ games/marmoria/index.html : ${ko.toFixed(0)} Ko (repère du lot 2 : 1,8 Mo)`);
+console.log(`✓ games/marmoria/index.html : ${ko.toFixed(0)} Ko (repère du lot 3 : 2,6 Mo)`);

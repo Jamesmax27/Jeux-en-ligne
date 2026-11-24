@@ -1162,6 +1162,32 @@
     }
   }
 
+  // Navire marchand (lot 3) : coque ronde et haute, voile carrée rayée, poupe en col de cygne.
+  function navire(ctx, x, y, pose) {
+    var o = pose ? 1 : 0;
+    ctx.strokeStyle = 'rgba(214,236,255,0.85)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x - 28 + o * 2, y + 2); ctx.lineTo(x - 18, y + 2); ctx.moveTo(x - 24 + o * 2, y + 5); ctx.lineTo(x - 12, y + 5); ctx.moveTo(x + 12, y + 5); ctx.lineTo(x + 22 - o * 2, y + 4); ctx.stroke();
+    poly(ctx, [[x - 20, y - 9], [x - 9, y - 5], [x + 9, y - 5.5], [x + 22, y - 12], [x + 16, y + 1], [x - 16, y + 1]], '#5e3a1e');
+    poly(ctx, [[x - 18.5, y - 7], [x - 9, y - 3.6], [x + 9, y - 4], [x + 20.5, y - 10], [x + 20, y - 8.4], [x + 9, y - 2.2], [x - 9, y - 1.8], [x - 18, y - 5.2]], '#a8322a');
+    poly(ctx, [[x - 20, y - 9], [x - 9, y - 12], [x + 9, y - 12.6], [x + 22, y - 12], [x + 9, y - 5.5], [x - 9, y - 5]], '#b98a52');
+    poly(ctx, [[x - 16, y - 9.2], [x - 9, y - 10.6], [x + 9, y - 11], [x + 17, y - 11.2], [x + 9, y - 7.4], [x - 9, y - 7.2]], '#8a6238');
+    // Poupe recourbée et proue.
+    ctx.strokeStyle = '#5e3a1e'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(x - 19, y - 9); ctx.quadraticCurveTo(x - 25, y - 15, x - 21, y - 20); ctx.stroke();
+    cercle(ctx, x - 21, y - 20.5, 1.6, C.or);
+    // Fret : amphores et ballots sur le pont.
+    amphore(ctx, x + 6, y - 10, '#c0643c', true); amphore(ctx, x + 10, y - 10.5, '#d9b27a', true);
+    ctx.fillStyle = '#d9c39a'; ctx.fillRect(x - 12, y - 14, 5, 4); ctx.fillStyle = '#c9a86a'; ctx.fillRect(x - 7, y - 13.5, 4, 3.5);
+    // Mât, vergue et voile carrée.
+    ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 0.2, y - 38, 2, 28);
+    ligne(ctx, [x - 10, y - 35], [x + 12, y - 36.5], '#4a3220', 1.6);
+    poly(ctx, [[x - 9.5, y - 34.6], [x + 11.5, y - 36], [x + 12.5 - o, y - 17], [x - 8.5 - o, y - 15.6]], '#f3e7c8');
+    for (var k = 0; k < 3; k++) { var u = k / 3 + 0.12; poly(ctx, [[x - 9.5 + u * 21, y - 34.6 - u * 1.4], [x - 9.5 + (u + 0.09) * 21, y - 34.6 - (u + 0.09) * 1.4], [x - 8.5 - o + (u + 0.09) * 21, y - 15.6 - (u + 0.09) * 1.4], [x - 8.5 - o + u * 21, y - 15.6 - u * 1.4]], '#b5443a'); }
+    ligne(ctx, [x + 1, y - 38], [x + 21, y - 12], '#6e4626', 0.8); ligne(ctx, [x + 1, y - 38], [x - 19, y - 10], '#6e4626', 0.8);
+    // Marin à la poupe, à la barre.
+    ctx.fillStyle = '#3d6f9c'; ctx.fillRect(x - 16, y - 16, 3.6, 5); cercle(ctx, x - 14.2, y - 17.6, 1.9, '#e1c8a8');
+    ligne(ctx, [x - 15, y - 12], [x - 20, y - 2], '#4a3220', 1.4);
+  }
+
   PEINTRES.ferme_legumes = function (ctx, P, t, etat) {
     var p = etat.prog || 0;
     sol(ctx, P, 0, 0, 3, 3, teinte(C.terre, 0.9));
@@ -1322,6 +1348,35 @@
     poteau(ctx, P, 1.9, 1.16, 4, 9, '#5a3e26', 2.4);
     // Barque amarrée devant le ponton.
     if (etat.bateau) { var bq = P(1.55, 1.58, 0); barque(ctx, bq[0], bq[1], false, 0); ligne(ctx, P(1.9, 1.16, 8), [bq[0] + 12, bq[1] - 8], '#d9c39a', 1); }
+  };
+
+  // Quai de commerce (lot 3) : môle de pierre sur le côté +u (la mer), grue de bois, hangar de
+  // transit à toit de tuiles, amphores et ballots en attente, bittes d'amarrage.
+  PEINTRES.quai_commerce = function (ctx, P, t, etat) {
+    var k;
+    sol(ctx, P, 1.95, 0, 3, 3, C.eau);
+    ctx.strokeStyle = C.eauClair; ctx.lineWidth = 1;
+    [[2.3, 0.4], [2.7, 0.9], [2.4, 2.4], [2.8, 2.1]].forEach(function (q) { var a = P(q[0], q[1], 0); ctx.beginPath(); ctx.moveTo(a[0] - 5, a[1]); ctx.lineTo(a[0] + 5, a[1]); ctx.stroke(); });
+    sol(ctx, P, 0, 0, 1.95, 3, C.pierre);
+    for (k = 1; k < 6; k++) ligne(ctx, P(k * 0.33, 0, 0), P(k * 0.33, 3, 0), C.pierreF, 0.8);
+    for (k = 1; k < 9; k++) ligne(ctx, P(0, k * 0.33, 0), P(1.95, k * 0.33, 0), C.pierreF, 0.6);
+    // Bord du môle (parement de grosses pierres sur l'eau).
+    poly(ctx, [P(1.95, 0, 0), P(1.95, 3, 0), P(1.95, 3, -4), P(1.95, 0, -4)], C.pierreF);
+    for (k = 0; k < 4; k++) poteau(ctx, P, 1.85, 0.35 + k * 0.75, 0, 5, '#4a3a2a', 2.6);
+    // Hangar de transit.
+    boite(ctx, P, 0.12, 0.15, 1.05, 1.35, 0, 16, C.enduit);
+    ouverture(ctx, P, 'u', 0.35, 1.15, 1.05, 0, 11, '#4a3624', true);
+    toit(ctx, P, 0.12, 0.15, 1.05, 1.35, 16, 7, C.tuile, 'u');
+    // Grue à roue (de bois) au bord du môle, crochet et ballot.
+    poteau(ctx, P, 1.55, 2.0, 0, 26, '#6e4a2c', 2.4);
+    ligne(ctx, P(1.55, 2.0, 25), P(2.35, 2.25, 22), '#6e4a2c', 2);
+    ligne(ctx, P(2.35, 2.25, 22), P(2.35, 2.25, 10), '#3a2a1a', 0.8);
+    var c = P(2.35, 2.25, 9); ctx.fillStyle = '#d9c39a'; ctx.fillRect(c[0] - 3, c[1] - 3, 6, 5);
+    var r = P(1.2, 2.3, 7); ctx.strokeStyle = '#5a3e26'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.ellipse(r[0], r[1], 5, 6, 0, 0, Math.PI * 2); ctx.stroke();
+    // Fret qui attend : amphores, ballots.
+    var a = P(0.4, 1.9, 0); amphore(ctx, a[0], a[1], '#c0643c', true); a = P(0.7, 2.0, 0); amphore(ctx, a[0], a[1], '#d9b27a', true);
+    a = P(0.45, 2.55, 0); amphore(ctx, a[0], a[1], '#8a5a3a', true);
+    a = P(1.0, 2.7, 0); ctx.fillStyle = '#c9a86a'; ctx.fillRect(a[0] - 4, a[1] - 6, 8, 6); ctx.fillStyle = '#a8864a'; ctx.fillRect(a[0] - 4, a[1] - 8, 8, 2);
   };
 
   PEINTRES.carriere_argile = function (ctx, P, t, etat) {
@@ -2043,17 +2098,37 @@
     charretier: ['#5f7d8c', '#e0c9a0'], instituteur: ['#3a8f82', '#e3cdb0'], bibliothecaire: ['#2f7392', '#e3cdb0'],
     professeur: ['#ece6d8', '#e1c8a8'], barbier: ['#e07b6c', '#e8cdb2'], employe_bains: ['#6aa5d6', '#e3cdb0'],
     medecin: ['#b9574c', '#e3cdb0'], chirurgien: ['#f2efe8', '#e1c8a8'], lutteur: ['#d9a27a', '#e0ae88'],
-    dompteur: ['#6a3a78', '#e1c8a8'], gladiateur: ['#8a2a22', '#d9a880']
+    dompteur: ['#6a3a78', '#e1c8a8'], gladiateur: ['#8a2a22', '#d9a880'],
+    // Lot 3.
+    caravane: ['#8a5a2a', '#e0c49a'], docker: ['#5a6a4a', '#e0c9a0']
   };
   // Image d'un marcheur : largeur, hauteur et point d'ancrage (pieds, ou ligne de flottaison du bateau).
   // Les personnages gardent 22 × 30 ancrés en (10, 26) ; le charretier tire sa charrette, d'où plus de largeur.
-  var FORMATS = { charretier: [38, 30, 19, 26], lion: [34, 26, 17, 22], bateau: [44, 34, 22, 27] };
+  var FORMATS = { charretier: [38, 30, 19, 26], docker: [38, 30, 19, 26], lion: [34, 26, 17, 22], bateau: [44, 34, 22, 27], navire: [60, 46, 30, 38], caravane: [44, 32, 24, 28] };
   function peindreMarcheur(ctx, type, pose, inverse) {
     var t = TENUES[type] || ['#888', '#ddd'], x = 10, y = 26;
     if (inverse) { ctx.translate(20, 0); ctx.scale(-1, 1); }
     if (type === 'lion') { peindreLion(ctx, x, y, 1, pose); return; }
     if (type === 'bateau') { barque(ctx, x, y, true, pose); return; }
-    if (type === 'charretier') {
+    if (type === 'navire') { navire(ctx, x, y, pose); return; }
+    if (type === 'caravane') {
+      // Mule bâtée (deux ballots, une amphore) menée par un muletier qui marche devant.
+      var j = pose ? 1.5 : -1.5;
+      ellipse(ctx, x - 9, y, 10, 2.4, 'rgba(30,30,20,0.3)');
+      ctx.strokeStyle = '#4a3828'; ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(x - 15, y - 8); ctx.lineTo(x - 15 + j, y); ctx.moveTo(x - 12, y - 8); ctx.lineTo(x - 12 - j, y); ctx.moveTo(x - 5, y - 8); ctx.lineTo(x - 5 + j, y); ctx.moveTo(x - 2.5, y - 8); ctx.lineTo(x - 2.5 - j, y); ctx.stroke();
+      ellipse(ctx, x - 8.5, y - 10, 8, 4, '#7a6250');
+      poly(ctx, [[x - 2, y - 12], [x + 2, y - 17], [x + 4.5, y - 15.5], [x + 1.5, y - 10]], '#7a6250');
+      ellipse(ctx, x + 3.6, y - 16.4, 2.6, 2, '#6a5444');
+      poly(ctx, [[x + 2.5, y - 19.5], [x + 3.2, y - 22.5], [x + 4, y - 19]], '#5a4434');
+      ligne(ctx, [x - 16.5, y - 11], [x - 18.5, y - 6], '#4a3828', 1.2);
+      ctx.fillStyle = '#c9a86a'; ctx.fillRect(x - 15, y - 17, 6.5, 6); ctx.fillStyle = '#a8864a'; ctx.fillRect(x - 15, y - 18, 6.5, 1.4);
+      ctx.fillStyle = '#d9c39a'; ctx.fillRect(x - 8, y - 17.5, 6, 6.5);
+      amphore(ctx, x - 9, y - 18, '#c0643c', true);
+      ligne(ctx, [x + 4, y - 15], [x + 9, y - 14], '#6e4a2c', 0.8);
+      x += 13;
+    }
+    if (type === 'charretier' || type === 'docker') {
       // Charrette à bras tirée derrière lui : caisse chargée, grande roue, brancards jusqu'aux mains.
       ellipse(ctx, x - 11, y, 7, 2, 'rgba(30,30,20,0.3)');
       ligne(ctx, [x - 7, y - 9], [x + 3, y - 11], '#6e4a2c', 1.5);
@@ -2186,14 +2261,16 @@
     amphitheatre: 18, colisee: 34, ecole_gladiateurs: 26, maison_lions: 24,
     temple_neptune: 32, temple_mercure: 32, temple_mars: 32, temple_venus: 32,
     grand_temple_ceres: 44, grand_temple_neptune: 44, grand_temple_mercure: 44, grand_temple_mars: 44, grand_temple_venus: 44, oracle: 32,
-    jardin: 20, statue_petite: 22, statue_moyenne: 24, statue_grande: 26 };
+    jardin: 20, statue_petite: 22, statue_moyenne: 24, statue_grande: 26,
+    // Lot 3.
+    quai_commerce: 34 };
   // Emprise prévue des dessins du lot 2 (repli des vignettes quand les données ne connaissent pas encore le type).
   var TAILLE = { ferme_legumes: 3, ferme_fruits: 3, ferme_porcs: 3, ferme_olives: 3, ferme_vigne: 3, quai_peche: 2,
     carriere_argile: 2, camp_bucherons: 2, mine_fer: 2, carriere_marbre: 2, atelier_poterie: 2, atelier_mobilier: 2, pressoir: 2, cave: 2,
     atelier_armes: 2, entrepot: 3, ecole: 2, bibliotheque: 2, academie: 3, barbier: 1, bains: 2, medecin: 1, hopital: 3,
     amphitheatre: 3, colisee: 5, ecole_gladiateurs: 3, maison_lions: 3, temple_neptune: 2, temple_mercure: 2, temple_mars: 2, temple_venus: 2,
     grand_temple_ceres: 3, grand_temple_neptune: 3, grand_temple_mercure: 3, grand_temple_mars: 3, grand_temple_venus: 3, oracle: 2,
-    jardin: 1, statue_petite: 1, statue_moyenne: 2, statue_grande: 3 };
+    jardin: 1, statue_petite: 1, statue_moyenne: 2, statue_grande: 3, quai_commerce: 3 };
   // Hauteur réservée au-dessus d'une maison : celle d'avant pour les niveaux 1 à 6, assez pour les immeubles ensuite.
   var HAUT_MAISON = { 7: 34, 8: 40, 9: 42, 10: 42, 11: 54, 12: 64 };
   function hautMaison(niv, t) { return niv <= 6 ? 30 + Math.max(0, niv - 4) * 8 : (HAUT_MAISON[niv] || 70); }

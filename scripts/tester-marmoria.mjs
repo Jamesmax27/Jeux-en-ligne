@@ -108,7 +108,7 @@ section('Données');
 ok(D.missions.length === 17 && D.maisons.length === 20, '17 missions et 20 niveaux de maison');
 try { nouveauMonde((d) => { d.maisons.pop(); }); ok(false, 'données sans le niveau 20 acceptées'); } catch (err) { ok(/Données invalides/.test(err.message), 'données invalides refusées avec un message'); }
 try { nouveauMonde((d) => { d.batiments.puits.cout = 'cinq'; }); ok(false, 'coût non numérique accepté'); } catch { ok(true, ''); }
-ok(D.missions.filter((m) => m.dispo).length === 2, 'lot 1 : missions 1 et 2 jouables');
+ok(D.missions.filter((m) => m.dispo).map((m) => m.id).join(',') === 'ostie,pompei,ravenne,narbo,massalia', 'lots 1 à 3 : Ostie, Pompéi, Ravenne, Narbo et Massalia jouables');
 
 // --------------------------------------------------------------------------
 section('Formules (une au moins par règle chiffrée du lot 1)');
@@ -643,10 +643,352 @@ section('Économie (lot 2) : insula de prestige en construction libre');
   let e1 = null;
   try { e1 = sim.importer(JSON.stringify(o)); } catch (err) { ok(false, `sauvegarde du lot 1 refusée : ${err.message}`); }
   if (e1) {
-    ok(e1.v === sim.VERSION_ETAT && e1.attract.length === e1.N * e1.N, 'sauvegarde du lot 1 relue et complétée (version 2)');
+    ok(e1.v === sim.VERSION_ETAT && e1.attract.length === e1.N * e1.N, 'sauvegarde du lot 1 relue et complétée (version actuelle)');
     let erreur = null;
     try { for (let k = 0; k < TM; k++) sim.pas(e1); } catch (err) { erreur = err; }
     ok(!erreur && sim.invariants(e1).length === 0, `la partie du lot 1 continue un mois sans erreur${erreur ? ' : ' + erreur.message : ''}`);
+  }
+}
+
+// --------------------------------------------------------------------------
+// Lot 3 « Commerce et empereur » (cahier, section 21) : un test par formule de cote (section 14),
+// commerce (caravanes, navires, quotas, réserves), empereur (demandes, faveur, tribut, dette,
+// présents, destitution), dieux et fêtes, événements, sauvegarde ; puis les missions Ravenne,
+// Narbo et Massalia jouées par le gouverneur automatique en difficulté normale.
+const Q = D.regles.maison.uniteParCharge;
+// Mission du lot 3 en partie normale (empereur, dieux), carte vide ; « libre » pour les tests
+// qui ne regardent que les cotes.
+function partieMission(id = 'ravenne', options = {}) {
+  const e = sim.nouvelle(id, { rang: 2, ...options });
+  e.tresor = 1e6;
+  if (!options.rang) e.salaireGouv = 0; // sans salaire du gouverneur : les comptes des tests tombent juste
+  return e;
+}
+// Bâtiment en service le long de la voie de Rome (accès direct), effectif complet.
+function batimentService(e, type, x) {
+  const R = ex.ligneRome(sim, e), t = D.batiments[type].taille;
+  const b = O.creerBatiment(e, type, x, R - t);
+  b.eff = D.batiments[type].effectif;
+  if (D.batiments[type].genre === 'spectacle') D.batiments[type].artistes.forEach((a) => { b.spects[a] = 30; });
+  return b;
+}
+function habitants(e, n, niveau = 4) {
+  const R = ex.ligneRome(sim, e), l = [];
+  let x = 2;
+  while (n > 0 && x < e.N - 2) {
+    for (const y of [R + 2, R + 3, R + 4]) {
+      if (n <= 0 || e.bat[y * e.N + x] || e.terrain[y * e.N + x] > 1) continue;
+      const h = O.creerBatiment(e, 'logement', x, y);
+      h.niv = niveau; h.hab = Math.min(n, sim.capacite(h)); n -= h.hab; l.push(h);
+    }
+    x++;
+  }
+  sim.majPopulation(e);
+  return l;
+}
+
+section('Lot 3 : les cinq cotes (une formule chacune, section 14)');
+{
+  // Culture (14.3) : 1 000 habitants ; un petit temple (750), un théâtre (500), une bibliothèque
+  // (800), une école (750), une académie (1 000), tous en service.
+  const e = partieMission('massalia', { libre: true });
+  habitants(e, 1000, 4);
+  ok(e.pop === 1000, `population : ${e.pop} habitants logés (1 000 attendus)`);
+  let x = 4;
+  for (const t of ['temple_ceres', 'theatre', 'bibliotheque', 'ecole', 'academie']) { batimentService(e, t, x); x += 4; }
+  const c = sim.cultureDetail(e);
+  ok(c.detail.religion.pts === 23 && c.detail.theatre.pts === 13 && c.detail.bibliotheque.pts === 16 && c.detail.ecole.pts === 11 && c.detail.academie.pts === 10 && c.total === 73,
+    `culture : religion ${c.detail.religion.pts}, théâtres ${c.detail.theatre.pts}, bibliothèques ${c.detail.bibliotheque.pts}, écoles ${c.detail.ecole.pts}, académies ${c.detail.academie.pts} = ${c.total} (23 + 13 + 16 + 11 + 10 = 73 attendus)`);
+  e.batiments.filter((b) => b.type === 'theatre').forEach((b) => { b.spects = {}; });
+  e.batiments.filter((b) => b.type === 'academie').forEach((b) => { b.eff = 0; });
+  const c2 = sim.cultureDetail(e);
+  ok(c2.detail.theatre.pts === 0 && c2.detail.academie.pts === 0, 'culture : un théâtre sans acteurs et une académie sans personnel ne comptent pas');
+}
+{
+  // Prospérité (14.2) : variations et plafond par la qualité de l'habitat.
+  const e = partieMission('ravenne', { libre: true });
+  const maisons = habitants(e, 400, 13); // villas (niveau 13, valeur 80) : habitat riche
+  maisons.forEach((h, k) => { h.viv = k % 2 ? { ble: 10, legumes: 10 } : { ble: 10 }; });
+  e.chomage = 3; e.salaire = e.salaireRome + 2;
+  const b = { ...e.finances.an, impots: 1000, exports: 500, salaires: 800, constructions: 200 };
+  const p = sim.prosperiteAnnee(e, b);
+  ok(p.detail.benefice === 5 && p.detail.chomage === 1 && p.detail.salaire === 1 && p.detail.habitat === 2 && p.detail.alimentation === 1 && p.variation === 10,
+    `prospérité : bénéfice +5, chômage sous 5 % +1, salaire +1, habitat riche +2, deux aliments +1 = ${p.variation} (+10 attendu)`);
+  ok(p.plafond === 80, `prospérité plafonnée par l'habitat : ${p.plafond} (villas : 80)`);
+  maisons.forEach((h) => { h.niv = 2; h.hab = Math.min(h.hab, sim.capacite(h)); h.viv = {}; });
+  sim.majPopulation(e);
+  e.chomage = 20; e.salaire = e.salaireRome - 1;
+  const p2 = sim.prosperiteAnnee(e, { ...b, exports: 0 });
+  ok(p2.detail.benefice === -3 && p2.detail.chomage === -1 && p2.detail.salaire === -1 && p2.detail.habitat === -2 && !p2.detail.alimentation && p2.plafond === 5,
+    `prospérité : déficit −3, chômage au-dessus de 15 % −1, salaire sous Rome −1, tentes −2, plafond ${p2.plafond} (5 attendu)`);
+  e.cotes.prosperite = 4; e.finances.an = { ...b, exports: 0 };
+  O.nouvelAn(e);
+  ok(e.cotes.prosperite === 0, `prospérité de janvier : 4 − 7, bornée à 0 (${e.cotes.prosperite})`);
+}
+{
+  // Paix (14.4) : +5 chaque janvier après une année sans incident.
+  const e = partieMission('ravenne');
+  e.cotes.paix = 10;
+  O.nouvelAn(e);
+  ok(e.cotes.paix === 15, `paix : +5 après une année sans incident (${e.cotes.paix})`);
+  e.incidentsAn = 1;
+  O.nouvelAn(e);
+  ok(e.cotes.paix === 15, 'paix : rien après une année avec un incident');
+}
+{
+  // Faveur (14.5) : départ, érosion, trésor négatif, secours, demandes, présents.
+  const e = partieMission('ravenne');
+  ok(e.cotes.faveur === 50, `faveur de départ : ${e.cotes.faveur} (50)`);
+  e.tresor = 1000;
+  O.anneeEmpereur(e, e.finances.prec);
+  ok(e.cotes.faveur === 48, `faveur : érosion de 2 chaque janvier (${e.cotes.faveur})`);
+  e.tresor = -2000;
+  O.anneeEmpereur(e, e.finances.prec);
+  ok(e.cotes.faveur === 41 && e.finances.an.interets === 200, `faveur : trésor négatif −5 et érosion −2 (${e.cotes.faveur}) ; intérêts de 10 % : ${e.finances.an.interets} (200)`);
+  const f0 = e.cotes.faveur, avant = e.tresor;
+  e.secoursRecu = false; e.tresor = -10;
+  O.nouveauMois(e);
+  ok(e.secoursRecu && e.cotes.faveur === f0 - 5, `secours de l'empereur : ${D.regles.secours.montant} deniers, faveur −5 (${f0} → ${e.cotes.faveur})`);
+  // Demandes : à temps +gain, en retard +2, ignorée −8.
+  e.tresor = 1e6;
+  const g = O.creerBatiment(e, 'grenier', 4, ex.ligneRome(sim, e) - 3);
+  g.stocks.ble = 500;
+  const dm = O.creerDemande(e, { bien: 'ble', charges: 3, delai: 12, faveur: 7 }, 0);
+  const f1 = e.cotes.faveur;
+  ok(sim.appliquer(e, { type: 'expedier', id: dm.id }).ok && e.cotes.faveur === f1 + 7 && g.stocks.ble === 200, `demande satisfaite à temps : +7 (${f1} → ${e.cotes.faveur}), 3 charges retirées du grenier`);
+  const dm2 = O.creerDemande(e, { bien: 'ble', charges: 1, delai: 6, faveur: 9 }, 0);
+  sim._outils.moisEmpire(e, 6);
+  ok(dm2.etat === 'retard', 'demande non satisfaite à l\'échéance : en retard (12 mois de plus)');
+  const f2 = e.cotes.faveur;
+  sim.appliquer(e, { type: 'expedier', id: dm2.id });
+  ok(e.cotes.faveur === f2 + 2, `demande satisfaite en retard : +2 (${f2} → ${e.cotes.faveur})`);
+  const dm3 = O.creerDemande(e, { deniers: 500, delai: 6, faveur: 6 }, 0);
+  sim._outils.moisEmpire(e, 6);
+  const f3 = e.cotes.faveur;
+  sim._outils.moisEmpire(e, 6 + D.regles.empereur.retardMois);
+  ok(dm3.etat === 'ignoree' && e.cotes.faveur === f3 - 8, `demande ignorée : −8 (${f3} → ${e.cotes.faveur})`);
+  // Présents : 10, 25, 50 % de la fortune pour +2, +5, +10 ; moitié moins dans les 12 mois.
+  e.fortune = 1000; e.presentT = -1;
+  const f4 = e.cotes.faveur;
+  sim.appliquer(e, { type: 'present', taille: 1 });
+  ok(e.fortune === 750 && e.cotes.faveur === f4 + 5, `présent généreux : 25 % de la fortune (1 000 → ${e.fortune}), +5`);
+  const f5 = e.cotes.faveur;
+  sim.appliquer(e, { type: 'present', taille: 2 });
+  ok(e.cotes.faveur === f5 + 5 && e.fortune === 375, `second présent dans les 12 mois : somptueux, moitié moins (+${e.cotes.faveur - f5})`);
+}
+{
+  // Tribut (11.5) et salaire du gouverneur (11.6).
+  const e = partieMission('ravenne');
+  habitants(e, 1000, 4);
+  const b = { ...e.finances.an, impots: 3000, exports: 1000, salaires: 1000, constructions: 5000 };
+  const t0 = e.tresor;
+  O.anneeEmpereur(e, b);
+  ok(e.finances.an.tribut === 750, `tribut : 25 % du bénéfice hors constructions (4 000 − 1 000 = 3 000 → ${e.finances.an.tribut})`);
+  const e2 = partieMission('ravenne');
+  habitants(e2, 1000, 4);
+  O.anneeEmpereur(e2, { ...e2.finances.an });
+  ok(e2.finances.an.tribut === 50, `tribut minimal : population / 20 (${e2.finances.an.tribut})`);
+  const e3 = partieMission('ravenne', { rang: 3 });
+  ok(e3.salaireGouv === 30 && sim.salaireGouvMax(e3) === 30, `salaire du gouverneur : 10 deniers par rang (rang 3 : ${e3.salaireGouv})`);
+  const fo = e3.fortune;
+  O.nouveauMois(e3);
+  ok(e3.fortune === fo + 30 && e3.finances.an.gouverneur === 30, 'le salaire du gouverneur passe du trésor à sa fortune');
+  ok(!sim.appliquer(e3, { type: 'reglage', cle: 'salaireGouv', valeur: 99 }).ok || e3.salaireGouv === 30, 'salaire plafonné');
+}
+{
+  // Destitution (2.4) : faveur ≤ 10 pendant 12 mois consécutifs.
+  const e = partieMission('ravenne');
+  e.cotes.faveur = 10;
+  for (let m = 1; m <= 11; m++) O.moisEmpire(e, m);
+  ok(!e.defaite, 'faveur à 10 pendant 11 mois : pas encore de destitution');
+  O.moisEmpire(e, 12);
+  ok(e.defaite && e.defaite.cause === 'destitution', 'faveur à 10 pendant 12 mois : destitution');
+}
+
+section('Lot 3 : commerce (section 12)');
+{
+  // Caravane : 3 charges exportées (stock 5, minimum 2), 4 importées (stock cible 4), payées sur-le-champ.
+  const e = partieMission('ravenne');
+  habitants(e, 100, 2); // des travailleurs pour l'entrepôt
+  const ent = batimentService(e, 'entrepot', 6);
+  ent.stocks.poterie = 5 * Q;
+  ok(!sim.appliquer(e, { type: 'ouvrirRoute', cite: 'aquileia' }).ok, 'une cité pas encore connue ne s\'ouvre pas');
+  const t0 = e.tresor;
+  ok(sim.appliquer(e, { type: 'ouvrirRoute', cite: 'bononia' }).ok && e.tresor === t0 - 900, 'route de Bononia ouverte : 900 deniers, paiement unique');
+  e.routes.bononia.x = 1e9; // le test envoie lui-même ses caravanes
+  sim.appliquer(e, { type: 'commerce', bien: 'poterie', statut: 'exporter', cible: 2 });
+  sim.appliquer(e, { type: 'commerce', bien: 'huile', statut: 'importer', cible: 4 });
+  const c = sim.citeDe(e, 'bononia'), t1 = e.tresor;
+  ok(O.envoyerCaravane(e, c), 'une caravane part vers l\'entrepôt le plus proche');
+  for (let k = 0; k < 6 * TM && e.marcheurs.some((w) => w.type === 'caravane'); k++) sim.pas(e);
+  const px = sim.prixBien(e, 'poterie').x, pi = sim.prixBien(e, 'huile').i;
+  ok(ent.stocks.poterie === 2 * Q && ent.stocks.huile === 4 * Q, `caravane : poterie 5 → ${ent.stocks.poterie / Q} charges (minimum 2), huile 0 → ${(ent.stocks.huile || 0) / Q} (cible 4)`);
+  ok(e.tresor === t1 + 3 * px - 4 * pi, `paiements : +3 × ${px} − 4 × ${pi} (trésor ${t1} → ${e.tresor})`);
+  ok(sim.echange(e, c, 'a', 'poterie') === 3 && sim.echange(e, c, 'v', 'huile') === 4, 'quotas : 3 charges achetées et 4 vendues par Bononia cette année');
+  // Quota presque épuisé : une seule charge de plus.
+  ent.stocks.poterie = 10 * Q;
+  e.routes.bononia.n['a:poterie'] = sim.quota(e, c, 'a', 'poterie') - 1;
+  O.envoyerCaravane(e, c);
+  for (let k = 0; k < 6 * TM && e.marcheurs.some((w) => w.type === 'caravane'); k++) sim.pas(e);
+  ok(ent.stocks.poterie === 9 * Q, `quota annuel respecté : 1 seule charge de plus (${ent.stocks.poterie / Q} charges restent)`);
+  O.nouvelAn(e);
+  ok(sim.echange(e, c, 'a', 'poterie') === 0, 'quotas remis à zéro en janvier');
+  // Bien réservé : ni consommé par les marchés, ni exporté.
+  sim.appliquer(e, { type: 'commerce', bien: 'poterie', statut: 'reserver', cible: 0 });
+  O.envoyerCaravane(e, c);
+  for (let k = 0; k < 6 * TM && e.marcheurs.some((w) => w.type === 'caravane'); k++) sim.pas(e);
+  ok(ent.stocks.poterie === 9 * Q, 'bien réservé : pas exporté');
+  ok(!sim.appliquer(e, { type: 'commerce', bien: 'poterie', statut: 'vendre' }).ok, 'statut inconnu refusé');
+}
+{
+  // Navire : route de mer seulement avec un quai de commerce ; il accoste, ses dockers font la
+  // navette, il repart après 40 jours au plus.
+  const e = partieMission('narbo');
+  ok(sim.appliquer(e, { type: 'ouvrirRoute', cite: 'tarraco' }).raison === 'quai', 'route de mer refusée sans quai de commerce en service');
+  const R = ex.ligneRome(sim, e);
+  habitants(e, 200, 2);
+  const quai = ex.poserPres(sim, e, 'quai_commerce', 60, 104, 30);
+  const ent = quai && ex.poserPres(sim, e, 'entrepot', quai.x + 1, quai.y - 4, 10);
+  if (ok(quai && ent, 'quai de commerce et entrepôt posés au bord de la mer')) {
+    quai.eff = 12; ent.eff = 6;
+    sim.repartirTravail(e);
+    quai.eff = 12; ent.eff = 6;
+    ok(sim.appliquer(e, { type: 'ouvrirRoute', cite: 'tarraco' }).ok, 'route de Tarraco ouverte avec le quai');
+    e.routes.tarraco.x = 1e9; // un seul navire, envoyé par le test
+    ent.stocks.armes = 6 * Q;
+    sim.appliquer(e, { type: 'commerce', bien: 'armes', statut: 'exporter', cible: 0 });
+    O.envoyerNavire(e, sim.citeDe(e, 'tarraco'));
+    let accoste = -1, parti = -1;
+    for (let k = 0; k < 4 * TM; k++) {
+      if (k % TJ === 0) { quai.eff = 12; ent.eff = 6; }
+      sim.pas(e);
+      const w = e.marcheurs.find((m) => m.type === 'navire');
+      if (w && w.phase === 'quai' && accoste < 0) accoste = k;
+      if (accoste >= 0 && !w && parti < 0) parti = k;
+    }
+    ok(accoste >= 0, `le navire accoste au quai (jour ${Math.round(accoste / TJ)})`);
+    ok(sim.echange(e, sim.citeDe(e, 'tarraco'), 'a', 'armes') > 0, `les dockers chargent ${sim.echange(e, sim.citeDe(e, 'tarraco'), 'a', 'armes')} charge(s) d'armes`);
+    ok(parti > 0 && (parti - accoste) / TJ <= D.regles.commerce.navireJours + 2, `le navire repart (${Math.round((parti - accoste) / TJ)} jours au quai, 40 au plus)`);
+  }
+}
+
+section('Lot 3 : dieux et fêtes (section 9.1)');
+{
+  const e = partieMission('ravenne');
+  habitants(e, 1500, 4);
+  batimentService(e, 'temple_ceres', 4);
+  const cu = sim.cultes(e);
+  ok(sim.cibleDieu(e, 'ceres', cu).cible === 50, `cible de Cérès : couverture 750 / 1 500 habitants = ${sim.cibleDieu(e, 'ceres', cu).cible}`);
+  batimentService(e, 'temple_venus', 8); batimentService(e, 'temple_mars', 12); batimentService(e, 'temple_mercure', 16);
+  const cu2 = sim.cultes(e), j = sim.cibleDieu(e, 'neptune', cu2);
+  ok(j.jaloux && j.cible === 0, 'jalousie : Neptune, seul sans temple, voit sa cible baisser de 20 (0 au plus bas)');
+  e.divins.ceres.s = 40;
+  O.moisDieux(e, 1);
+  ok(e.divins.ceres.s === 41, `la satisfaction se rapproche de la cible d'un point par mois (40 → ${e.divins.ceres.s})`);
+  // Colère sous 10, puis remontée à 30 ; bienfait au-dessus de 90, 24 mois au plus tôt.
+  e.divins.venus.s = 9; e.divins.venus.c = 9; const hum = e.humeur;
+  O.colereDieu(e, 'venus'); // effet seul
+  ok(e.humeur === hum - 10, `colère de Vénus : humeur −10 (${hum} → ${e.humeur})`);
+  e.divins.neptune.s = 5;
+  O.moisDieux(e, 2);
+  ok(e.divins.neptune.s === 30 && e.effets.quais === D.regles.dieux.quaisArretMois, 'satisfaction sous 10 : colère (quais à l\'arrêt), puis remontée à 30');
+  const f = O.creerBatiment(e, 'ferme_ble', 30, 10); f.prog = 0;
+  e.divins.ceres.s = 95; e.divins.ceres.b = -1000;
+  O.moisDieux(e, 3);
+  ok(f.prog === D.regles.ferme.progressionCharge, 'bienfait de Cérès au-dessus de 90 : récolte immédiate dans toutes les fermes');
+  f.prog = 0; e.divins.ceres.s = 95;
+  O.moisDieux(e, 10);
+  ok(f.prog === 0, 'pas de second bienfait avant 24 mois');
+  // Fêtes : coût par tranche de 100 habitants (50 au moins), effet 2 mois plus tard ; la grandiose exige du vin.
+  const cout = sim.coutFete(e, 'grande');
+  ok(cout === Math.max(50, Math.ceil(e.pop * 10 / 100)), `grande fête : ${cout} deniers pour ${e.pop} habitants`);
+  ok(sim.appliquer(e, { type: 'fete', dieu: 'grandiose' }).ok === false, 'fête d\'un dieu inconnu refusée');
+  ok(sim.appliquer(e, { type: 'fete', dieu: 'mars', taille: 'grandiose' }).raison === 'vin', 'fête grandiose refusée sans vin en entrepôt');
+  const s0 = e.divins.mars.s;
+  ok(sim.appliquer(e, { type: 'fete', dieu: 'mars', taille: 'grande' }).ok && sim.appliquer(e, { type: 'fete', dieu: 'mars', taille: 'petite' }).raison === 'fete', 'une fête à la fois');
+  e.tick += 2 * TM;
+  O.moisEmpire(e, 20);
+  ok(e.divins.mars.s >= s0 + 10 - 1 && !e.fete, `fête de Mars deux mois plus tard : +10 (${s0} → ${e.divins.mars.s})`);
+}
+
+section('Lot 3 : événements (section 15.2)');
+{
+  const e = partieMission('narbo');
+  const s0 = e.salaireRome;
+  O.evenement(e, { type: 'salaireRome', delta: 3 }, 5);
+  ok(e.salaireRome === s0 + 3, 'salaire de Rome : +3');
+  const p0 = sim.prixBien(e, 'armes').x;
+  O.evenement(e, { type: 'prix', bien: 'armes', delta: 25 }, 5);
+  ok(sim.prixBien(e, 'armes').x === p0 + 25, 'prix d\'un bien : +25 à l\'achat et à la vente');
+  const c = sim.citeDe(e, 'ostia');
+  O.evenement(e, { type: 'quota', cite: 'ostia', sens: 'a', bien: 'armes', pas: 1 }, 5);
+  ok(sim.quota(e, c, 'a', 'armes') === 40, `quota d'une cité : palier supérieur (25 → ${sim.quota(e, c, 'a', 'armes')})`);
+  O.evenement(e, { type: 'routeFermee', cite: 'ostia', duree: 3 }, 5);
+  e.routes.ostia.o = 1;
+  ok(!sim.routeActive(e, c), 'route fermée pendant 3 mois');
+  for (let m = 6; m < 9; m++) O.moisEmpire(e, m);
+  ok(sim.routeActive(e, c), 'route rouverte au bout de 3 mois');
+  ok(!e.routes.carthagonova.v, 'Carthago Nova inconnue au départ');
+  O.evenement(e, { type: 'nouvelleCite', cite: 'carthagonova' }, 5);
+  ok(e.routes.carthagonova.v === 1, 'nouvelle cité partenaire : la route devient ouvrable');
+  O.evenement(e, { type: 'mauvaiseRecolte', duree: 12 }, 5);
+  ok(e.effets.recolte === 12, 'mauvaise récolte : fertilité divisée par 2 pendant 12 mois');
+  const mine = ex.poserPres(sim, e, 'mine_fer', 14, 18, 20);
+  O.evenement(e, { type: 'sitePerdu' }, 5);
+  ok(mine && !e.batiments.includes(mine), 'site d\'extraction perdu : la mine est détruite');
+  const R = ex.ligneRome(sim, e);
+  const b = O.creerBatiment(e, 'grenier', 60, R - 3);
+  O.evenement(e, { type: 'seisme', zone: [59, R - 4, 63, R - 1] }, 5);
+  ok(!e.batiments.includes(b) && e.batiments.some((x) => x.type === 'ruines' && x.x === 60), 'tremblement de terre : les bâtiments de la bande deviennent des ruines');
+  // Script de la mission : dates tirées dans les fenêtres, chaque événement joué une fois.
+  const m = D.missions.find((x) => x.id === 'narbo'), e2 = sim.nouvelle('narbo', {});
+  ok(e2.script.length === m.evenements.length && e2.script.every((s, k) => { const ev = m.evenements[k]; return ev.mois !== undefined ? s.m === ev.mois : s.m >= ev.fenetre[0] && s.m <= ev.fenetre[1]; }),
+    'script de Narbo : une date par événement, dans sa fenêtre');
+  const e3 = sim.nouvelle('narbo', {});
+  ok(JSON.stringify(e3.script) === JSON.stringify(e2.script), 'même graine, mêmes dates');
+}
+
+section('Lot 3 : sauvegarde (version 3)');
+{
+  const e = partieMission('narbo');
+  habitants(e, 300, 3);
+  sim.appliquer(e, { type: 'commerce', bien: 'armes', statut: 'exporter', cible: 2 });
+  O.creerDemande(e, { bien: 'vin', charges: 4, delai: 12, faveur: 8 }, 0);
+  for (let k = 0; k < 3 * TM; k++) sim.pas(e);
+  const e2 = sim.importer(sim.exporter(e));
+  ok(sim.empreinte(e2) === sim.empreinte(e), 'partie du lot 3 : état identique après sauvegarde puis chargement');
+  for (let k = 0; k < 2000; k++) { sim.pas(e); sim.pas(e2); }
+  ok(sim.empreinte(e2) === sim.empreinte(e), 'partie du lot 3 : même état 2 000 ticks après le chargement');
+  // Sauvegarde du lot 2 (version 2) : complétée.
+  const o = JSON.parse(sim.exporter(sim.nouvelle('pompei', {})));
+  o.v = 2;
+  ['empereur', 'dieux', 'cotes', 'prosDetail', 'faveurBasse', 'incidentsAn', 'rang', 'fortune', 'salaireGouv', 'presentT', 'commerce', 'routes', 'prix', 'demandes', 'script', 'divins', 'fete', 'effets', 'mer'].forEach((k) => delete o[k]);
+  let e3 = null;
+  try { e3 = sim.importer(JSON.stringify(o)); } catch (err) { ok(false, `sauvegarde du lot 2 refusée : ${err.message}`); }
+  if (e3) {
+    let erreur = null;
+    try { for (let k = 0; k < TM; k++) sim.pas(e3); } catch (err) { erreur = err; }
+    ok(e3.v === sim.VERSION_ETAT && !erreur && sim.invariants(e3).length === 0, `sauvegarde du lot 2 complétée, la partie continue${erreur ? ' : ' + erreur.message : ''}`);
+  }
+}
+
+section('Lot 3 : missions jouées par le gouverneur automatique (difficulté normale)');
+{
+  const resultats = {};
+  for (const [id, rang, moisMax, exige] of [['ravenne', 2, 240, true], ['narbo', 3, 300, true], ['massalia', 4, 360, false]]) {
+    const plan = ex.planifierMission(sim, id), e = sim.nouvelle(id, { rang }), etat = {};
+    const t0 = Date.now();
+    let invariant = null;
+    for (let m = 0; m < moisMax && !e.victoire && !e.defaite; m++) {
+      for (let k = 0; k < TM; k++) { sim.pas(e); if (k === 0 || k === TM / 2) ex.jouerMission(sim, e, plan, etat); }
+      if (!invariant) { const pb = sim.invariants(e); if (pb.length) invariant = pb[0]; }
+    }
+    ok(!invariant, `${id} : invariants tenus${invariant ? ' : ' + invariant : ''}`);
+    const bilan = e.victoire ? `gagnée au mois ${e.victoire.mois}, ${e.victoire.etoiles} étoile(s)` : e.defaite ? `perdue (${e.defaite.cause})` : 'pas encore gagnée';
+    const texte = `${id} ${bilan} : ${e.pop} habitants, culture ${e.cotes.culture}, prospérité ${e.cotes.prosperite}, paix ${e.cotes.paix}, faveur ${e.cotes.faveur} ; ${((Date.now() - t0) / 1000).toFixed(0)} s`;
+    if (exige) ok(!!e.victoire, texte);
+    console.log('  ' + texte + (exige ? '' : ' (mesure seulement : voir le cahier, section 23.6)'));
+    resultats[id] = e.victoire ? e.victoire.mois : null;
   }
 }
 

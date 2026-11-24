@@ -60,19 +60,20 @@
   // ------------------------------------------------------------------------
   // Progression (JEL_SAVE) et options
   // ------------------------------------------------------------------------
-  var prog = { niveau: 1, gagnees: {}, options: { son: true, pauseCritique: false, defilement: 2, geste: false, auto: 0 } };
+  var prog = { niveau: 1, gagnees: {}, fortune: 0, options: { son: true, pauseCritique: false, defilement: 2, geste: false, auto: 0 } };
   var progChargee = false;
   function lireProg(d) {
     if (!d || typeof d !== 'object') return;
     if (d.gagnees && typeof d.gagnees === 'object') prog.gagnees = d.gagnees;
     if (d.options && typeof d.options === 'object') for (var k in d.options) if (k in prog.options) prog.options[k] = d.options[k];
     prog.niveau = Math.max(1, Math.min(MISSIONS.length, (d.niveau | 0) || 1));
+    prog.fortune = Math.max(0, d.fortune | 0); // fortune du gouverneur, gardée d'une mission à l'autre (section 11.6)
   }
   function chargerProg(d) { lireProg(d); progChargee = true; appliquerOptions(); }
   function totalEtoiles() { var s = 0; for (var k in prog.gagnees) s += prog.gagnees[k] | 0; return Math.min(MAX_ETOILES, s); }
   function sauverProg() {
     if (!progChargee) return;
-    try { window.JEL_SAVE.save(JEU, { niveau: prog.niveau, score: totalEtoiles(), options: prog.options, gagnees: prog.gagnees }); } catch (e) { /* sans stockage */ }
+    try { window.JEL_SAVE.save(JEU, { niveau: prog.niveau, score: totalEtoiles(), options: prog.options, gagnees: prog.gagnees, fortune: prog.fortune }); } catch (e) { /* sans stockage */ }
   }
   function appliquerOptions() { AUDIO.couper(!prog.options.son); majBoutonSon(); }
   // Lecture seule au lancement (son coupé, geste déjà vu) : jamais d'écriture depuis l'écran titre.
@@ -144,7 +145,8 @@
     else { var N = e.N, i = e.entree; rendu.centrerSur(Math.min(N - 1, (i % N) + 18), Math.floor(i / N)); }
   }
   function nouvelleMission(m) {
-    var e = SIM.nouvelle(m.id, {});
+    // Rang atteint (salaire du gouverneur) et fortune personnelle (section 11.6).
+    var e = SIM.nouvelle(m.id, { rang: Math.max(1, echelonsGagnes()), fortune: prog.fortune });
     demarrerEtat(e);
     AUDIO.jouer('etape');
   }
@@ -207,7 +209,7 @@
       partie.dernierMsg = j[j.length - 1];
       nouveaux.forEach(function (m) {
         if (m.cle === 'msg.etapeFaite' || m.cle === 'msg.bienvenue') return;
-        if (m.critique || m.cle === 'msg.nouvelleAnnee') toast(t(m.cle, m.vars), m.critique);
+        if (m.critique || m.cle === 'msg.nouvelleAnnee' || m.cle === 'msg.tribut') toast(texteMsg(m), m.critique);
         if (m.cle === 'msg.incendie') AUDIO.jouer('feu');
         else if (m.critique && m.cle !== 'msg.victoire') AUDIO.jouer('alerte');
         if (m.critique && prog.options.pauseCritique && m.cle !== 'msg.victoire') { partie.iv = 0; majHud(); }
@@ -603,6 +605,22 @@
   function fermerPanneau() { $('panneau').hidden = true; panneauVivant = null; rendu.selection = 0; }
   // « Nom : valeur » selon la typographie de la langue (espace avant les deux-points en français seulement).
   function deuxPoints(a, b) { return t('ui.deuxPoints', { a: a, b: b }); }
+  // Nom commun (bien, lieu de culture) au milieu d'une phrase : en minuscules, sauf en allemand.
+  function enPhrase(s) { var l = document.documentElement.lang || 'fr'; return /^de/.test(l) ? s : s.toLocaleLowerCase(l); }
+  // Texte d'un message du journal : les variables qui sont des identifiants (cité, bien, dieu,
+  // bâtiment) sont traduites ; une demande dit ce qu'elle réclame.
+  function texteMsg(m) {
+    var v = {}, k;
+    for (k in m.vars) v[k] = m.vars[k];
+    if (v.bien !== undefined && v.n !== undefined && /^msg\.demande/.test(m.cle)) v.quoi = v.bien ? t('demande.charges', { n: v.n, bien: enPhrase(t('bien.' + v.bien)) }) : t('demande.deniers', { n: nb(v.n) });
+    else if (v.bien) v.bien = enPhrase(t('bien.' + v.bien));
+    if (v.cite) v.cite = t('cite.' + v.cite);
+    if (v.dieu) v.dieu = t('dieu.' + v.dieu);
+    if (v.bat) v.bat = t('bat.' + v.bat + '.nom');
+    if (v.montant !== undefined) v.montant = nb(v.montant);
+    if (v.mois !== undefined) v.n = v.mois; // pluriels des messages qui comptent des mois
+    return t(m.cle, v);
+  }
   function ligne(a, b) { return el('div', { classe: 'ligne' }, [el('span', { texte: a }), el('strong', { texte: b })]); }
   function jauge(f) { var j = el('div', { classe: 'jauge' }, [el('i')]); j.firstChild.style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + '%'; return j; }
 
@@ -644,6 +662,15 @@
     }
     if (d.genre === 'atelier') p.appendChild(ligne(t('info.matiere') + ' · ' + t('bien.' + d.matiere), t('info.surTotal', { n: nb(b.mat / 100), max: D.regles.atelier.attenteMax })));
     if (d.genre === 'peche') { p.appendChild(ligne(t('info.bateau'), t(b.mb ? 'info.enMer' : 'info.auQuai'))); if (b.stock >= 1) p.appendChild(ligne(t('bien.poisson'), t('info.charges', { n: 1 }))); }
+    if (d.genre === 'quai') {
+      var nv = b.nav ? SIM.marcheur(e, b.nav) : null;
+      if (nv && nv.phase === 'quai') {
+        p.appendChild(ligne(t('info.navire'), t('cite.' + nv.cite)));
+        p.appendChild(ligne(t('info.charges0'), t('info.surTotal', { n: nv.n, max: D.regles.commerce.navireCharges })));
+        p.appendChild(ligne(t('info.joursQuai'), t('info.surTotal', { n: nv.jours, max: D.regles.commerce.navireJours })));
+      } else p.appendChild(ligne(t('info.navire'), t(nv ? 'info.navireArrive' : 'info.aucunNavire')));
+      p.appendChild(ligne(t('info.dockers'), nb((b.dk || []).length)));
+    }
     if (d.genre === 'ecole_art') { p.appendChild(ligne(t('info.formation') + ' · ' + t('marcheur.' + d.forme), nb(b.prog / 100) + ' %')); p.appendChild(jauge(b.prog / 10000)); }
     if (d.genre === 'grenier') {
       p.appendChild(ligne(t('info.stockTotal'), t('info.surTotal', { n: nb(SIM.totalStock(b) / 100), max: nb(D.regles.grenier.capacite / 100) })));
@@ -747,6 +774,7 @@
     var fam = D.marcheurs[w.type].famille;
     p.appendChild(ligne(t('info.destination'), c ? nomBat(c) : fam === 'errant' && !w.pompier ? t(w.retour ? 'info.retour' : 'info.tournee') : w.pompier ? t('info.versFeu') : t('info.sortie')));
     if (w.gens) p.appendChild(ligne(t('info.personnes'), nb(w.gens)));
+    if (w.cite) { p.appendChild(ligne(t('info.cite'), t('cite.' + w.cite))); p.appendChild(ligne(t('info.charges0'), nb(w.n))); }
   }
   function remplirTerrain(p, x, y) {
     var e = partie.e, i = y * e.N + x, tt = e.terrain[i];
@@ -762,19 +790,27 @@
 
   // Conseillers (section 17.4, lot 2) : un onglet par domaine ; tout se lit dans l'état, seules
   // les flèches (salaire, impôt, priorités) envoient des commandes.
-  var ONGLETS = ['general', 'travail', 'finances', 'population', 'sante', 'education', 'divertissement'];
-  var ongletConseil = 'general';
+  var ONGLETS = ['chef', 'cotes', 'imperial', 'commerce', 'religion', 'travail', 'finances', 'population', 'sante', 'education', 'divertissement'];
+  var ongletConseil = 'chef';
   function ouvrirConseil(onglet) {
     if (!partie) return;
     if (onglet) ongletConseil = onglet;
     ouvrirPanneau(function (p) {
       var e = partie.e;
       p.appendChild(el('h2', { texte: t('conseil.titre') }));
-      var barre = el('div', { classe: 'onglets' });
-      ONGLETS.forEach(function (o) {
+      var barre = el('div', { classe: 'onglets' }), liste = ongletsPartie(e);
+      if (liste.indexOf(ongletConseil) < 0) ongletConseil = liste[0];
+      liste.forEach(function (o) {
         barre.appendChild(el('button', { classe: 'onglet' + (o === ongletConseil ? ' actif' : ''), texte: t('conseil.onglet.' + o), clic: function () { AUDIO.jouer('clic'); ongletConseil = o; if (panneauVivant) panneauVivant(); } }));
       });
       p.appendChild(barre);
+      // Sur un écran bas, les onglets tiennent sur une ligne qui défile (CSS) : la position est
+      // gardée d'un rafraîchissement du panneau à l'autre et l'onglet actif reste visible.
+      var act = barre.querySelector('.actif'), x0 = barre.offsetLeft;
+      barre.scrollLeft = defilOnglets;
+      if (act && (act.offsetLeft - x0 < barre.scrollLeft || act.offsetLeft - x0 + act.offsetWidth > barre.scrollLeft + barre.clientWidth)) barre.scrollLeft = act.offsetLeft - x0 - 8;
+      defilOnglets = barre.scrollLeft;
+      barre.addEventListener('scroll', function () { defilOnglets = barre.scrollLeft; });
       CONSEILLERS[ongletConseil](p, e);
     });
   }
@@ -786,21 +822,6 @@
     p.appendChild(jauge(part));
   }
   var CONSEILLERS = {
-    general: function (p, e) {
-      p.appendChild(el('h3', { texte: t('conseil.objectifs') }));
-      if (e.libre) p.appendChild(el('p', { texte: t('conseil.aucunObjectif') }));
-      SIM.objectifs(e).forEach(function (o) { if (!e.libre) p.appendChild(el('p', { classe: o.fait ? 'ok' : 'ko', texte: t('obj.' + o.cle, { n: nb(o.cible), v: nb(o.valeur) }) })); });
-      p.appendChild(el('h3', { texte: t('conseil.cite') }));
-      p.appendChild(ligne(t('hud.population'), nb(e.pop)));
-      p.appendChild(ligne(t('conseil.places'), nb(SIM.placesLibres(e))));
-      p.appendChild(ligne(t('conseil.humeur'), t('info.surTotal', { n: e.humeur, max: 100 })));
-      p.appendChild(jauge(e.humeur / 100));
-      var det = SIM.variationHumeur(e).detail;
-      Object.keys(det).forEach(function (k) { p.appendChild(el('p', { classe: det[k] >= 0 ? 'ok' : 'ko', texte: t('humeur.' + k, { n: (det[k] > 0 ? '+' : '') + det[k] }) })); });
-      if (e.humeur < D.regles.immigration.humeurMin) p.appendChild(el('p', { classe: 'etat-ko', texte: t('conseil.immigrationArretee') }));
-      p.appendChild(ligne(t('conseil.chomage'), e.chomage + ' %'));
-      if (permet('medecin') || permet('barbier')) p.appendChild(ligne(t('conseil.santeVille'), t('info.surTotal', { n: e.sante, max: 100 })));
-    },
     travail: function (p, e) {
       p.appendChild(ligne(t('conseil.travailleurs'), nb(e.travailleurs)));
       p.appendChild(ligne(t('conseil.emplois'), t('info.surTotal', { n: nb(e.emplois), max: nb(e.emploisRequis) })));
@@ -821,12 +842,14 @@
       p.appendChild(ligne(t('hud.tresor'), nb(e.tresor)));
       p.appendChild(reglage(t('conseil.impot', { n: e.impot }), function (s) { commander({ type: 'reglage', cle: 'impot', valeur: e.impot + s }); }));
       var an = e.finances.an, prec = e.finances.prec;
-      p.appendChild(el('h3', { texte: t('conseil.recettes') }));
-      p.appendChild(ligne(t('conseil.impotsAn'), nb(an.impots)));
+      // Postes de l'année en cours et de la précédente (section 11.1) ; un poste vide les deux années est tu.
+      var poste = function (k) { if (an[k] || prec[k] || k === 'impots' || k === 'salaires') p.appendChild(ligne(t('budget.' + k), t('budget.deuxAns', { a: nb(an[k]), p: nb(prec[k]) }))); };
+      p.appendChild(el('div', { classe: 'ligne entete' }, [el('span', { texte: t('conseil.recettes') }), el('span', { texte: t('budget.colonnes') })]));
+      ['impots', 'exports', 'secours', 'dons'].forEach(poste);
       p.appendChild(el('h3', { texte: t('conseil.depenses') }));
-      p.appendChild(ligne(t('conseil.salairesAn'), nb(an.salaires)));
-      p.appendChild(ligne(t('conseil.constructionsAn'), nb(an.constructions)));
-      if (prec.impots || prec.salaires || prec.constructions) p.appendChild(ligne(t('conseil.anPasse'), t('conseil.bilan', { i: nb(prec.impots), s: nb(prec.salaires), c: nb(prec.constructions) })));
+      ['salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois'].forEach(poste);
+      var solde = SIM.recettes(prec) - SIM.depenses(prec);
+      if (prec.impots || prec.salaires) p.appendChild(el('p', { classe: solde >= 0 ? 'ok' : 'ko', texte: t(solde >= 0 ? 'budget.benefice' : 'budget.deficit', { n: nb(Math.abs(solde)) }) }));
     },
     population: function (p, e) {
       p.appendChild(ligne(t('hud.population'), nb(e.pop)));
@@ -881,6 +904,267 @@
       Object.keys(ecoles).forEach(function (k) { p.appendChild(ligne(t('bat.' + k + '.nom'), nb(ecoles[k]))); });
     }
   };
+  // ------------------------------------------------------------------------
+  // Lot 3 : conseillers de l'en-chef, des cotes, impérial, du commerce, de la religion ;
+  // carte de l'Empire (section 17.4). Tout se lit dans l'état ; seuls les boutons envoient
+  // des commandes.
+  // ------------------------------------------------------------------------
+  function quoiDemande(dm) { return dm.bien ? t('demande.charges', { n: dm.q, bien: enPhrase(t('bien.' + dm.bien)) }) : t('demande.deniers', { n: nb(dm.deniers) }); }
+  // Couleur d'une ligne de l'en-chef : 'ok' (vert), 'moyen' (orange), 'ko' (rouge).
+  function etatLigne(p, cle, niveau, vars) {
+    p.appendChild(el('p', { classe: niveau === 2 ? 'ok' : niveau === 1 ? 'moyen' : 'ko', texte: t('chef.' + cle + '.' + niveau, vars || {}) }));
+  }
+  CONSEILLERS.chef = function (p, e) {
+    var c = SIM.couverture(e), dern = e.finances.prec, ob = SIM.objectifs(e);
+    p.appendChild(el('h3', { texte: t('conseil.cite') }));
+    etatLigne(p, 'population', e.humeur >= D.regles.immigration.humeurMin && SIM.placesLibres(e) > 0 ? 2 : e.humeur >= D.regles.emigration.humeurMax ? 1 : 0, { n: nb(e.pop) });
+    etatLigne(p, 'emploi', e.chomage <= 5 ? 2 : e.chomage <= 15 ? 1 : 0, { n: e.chomage });
+    etatLigne(p, 'nourriture', !c.penurie ? 2 : c.penurie * 10 <= c.maisons ? 1 : 0, { n: c.penurie });
+    etatLigne(p, 'sante', e.sante >= 60 ? 2 : e.sante >= D.regles.sante.seuilEpidemie ? 1 : 0, { n: e.sante });
+    var bas = null;
+    D.regles.dieux.liste.forEach(function (g) { if (!bas || e.divins[g].s < e.divins[bas].s) bas = g; });
+    if (bas) etatLigne(p, 'religion', e.divins[bas].s >= 40 ? 2 : e.divins[bas].s >= D.regles.dieux.avertissement ? 1 : 0, { dieu: t('dieu.' + bas), n: e.divins[bas].s });
+    var solde = SIM.recettes(dern) - SIM.depenses(dern);
+    etatLigne(p, 'finances', e.tresor >= 0 && solde >= 0 ? 2 : e.tresor >= 0 ? 1 : 0, { n: nb(e.tresor) });
+    if (e.empereur) etatLigne(p, 'faveur', e.cotes.faveur >= 50 ? 2 : e.cotes.faveur > D.regles.empereur.destitution[0] + 10 ? 1 : 0, { n: e.cotes.faveur });
+    if (SIM.cites(e).length) {
+      var ouvertes = SIM.cites(e).filter(function (x) { return e.routes[x.id] && e.routes[x.id].o; }).length;
+      etatLigne(p, 'commerce', ouvertes && e.finances.an.exports + dern.exports > 0 ? 2 : ouvertes ? 1 : 0, { n: ouvertes });
+    }
+    if (!e.libre && ob.length) etatLigne(p, 'objectifs', ob.every(function (o) { return o.fait; }) ? 2 : ob.filter(function (o) { return o.fait; }).length * 2 >= ob.length ? 1 : 0, { n: ob.filter(function (o) { return o.fait; }).length, max: ob.length });
+    p.appendChild(el('h3', { texte: t('conseil.humeur') }));
+    p.appendChild(ligne(t('conseil.humeur'), t('info.surTotal', { n: e.humeur, max: 100 })));
+    p.appendChild(jauge(e.humeur / 100));
+    var det = SIM.variationHumeur(e).detail;
+    Object.keys(det).forEach(function (k) { p.appendChild(el('p', { classe: det[k] >= 0 ? 'ok' : 'ko', texte: t('humeur.' + k, { n: (det[k] > 0 ? '+' : '') + det[k] }) })); });
+    if (e.humeur < D.regles.immigration.humeurMin) p.appendChild(el('p', { classe: 'etat-ko', texte: t('conseil.immigrationArretee') }));
+  };
+  CONSEILLERS.cotes = function (p, e) {
+    var ob = SIM.objectifs(e), a = SIM.analyseCotes(e), seuils = {};
+    ob.forEach(function (o) { seuils[o.cle] = o.cible; });
+    if (e.libre) p.appendChild(el('p', { texte: t('conseil.aucunObjectif') }));
+    ['population', 'culture', 'prosperite', 'paix', 'faveur'].forEach(function (k) {
+      if (k === 'faveur' && !e.empereur) return;
+      var v = k === 'population' ? e.pop : e.cotes[k], s = seuils[k];
+      p.appendChild(el('h3', { texte: t('cote.' + k) }));
+      p.appendChild(ligne(s !== undefined ? t('cote.seuil', { n: nb(s) }) : t('cote.valeur'), nb(v)));
+      p.appendChild(jauge(s ? v / s : k === 'population' ? 0 : v / 100));
+      var f = a[k], vars = {};
+      for (var x in (f.vars || {})) vars[x] = f.vars[x];
+      if (vars.comp) vars.comp = enPhrase(t('culture.' + vars.comp));
+      if (vars.facteur) vars.facteur = t('prosperite.' + vars.facteur);
+      p.appendChild(el('p', { classe: 'aide', texte: t('cote.' + k + '.' + f.cle, vars) }));
+    });
+    var cu = SIM.cultureDetail(e).detail;
+    p.appendChild(el('h3', { texte: t('cote.cultureDetail') }));
+    Object.keys(cu).forEach(function (k) { p.appendChild(ligne(t('culture.' + k), t('info.surTotal', { n: cu[k].pts, max: cu[k].max }))); });
+    p.appendChild(ligne(t('cote.plafond'), nb(SIM.plafondProsperite(e))));
+  };
+  CONSEILLERS.imperial = function (p, e) {
+    var E = D.regles.empereur;
+    p.appendChild(ligne(t('cote.faveur'), t('info.surTotal', { n: e.cotes.faveur, max: 100 })));
+    p.appendChild(jauge(e.cotes.faveur / 100));
+    if (e.faveurBasse) p.appendChild(el('p', { classe: 'etat-ko', texte: t('imperial.destitution', { n: E.destitution[1] - e.faveurBasse }) }));
+    p.appendChild(el('h3', { texte: t('imperial.demandes') }));
+    var l = e.demandes.filter(function (dm) { return dm.etat === 'ouverte' || dm.etat === 'retard'; });
+    if (!l.length) p.appendChild(el('p', { classe: 'aide', texte: t('imperial.aucuneDemande') }));
+    var mois = Math.floor(e.tick / D.ticksParMois);
+    l.forEach(function (dm) {
+      var pret = SIM.demandePrete(e, dm), reste = (dm.etat === 'ouverte' ? dm.ech : dm.ech2) - mois;
+      p.appendChild(el('p', { classe: dm.etat === 'retard' ? 'ko' : '', texte: t(dm.etat === 'retard' ? 'imperial.demandeRetard' : 'imperial.demande', { quoi: quoiDemande(dm), n: Math.max(0, reste) }) }));
+      if (dm.bien) p.appendChild(ligne(t('imperial.enStock'), t('info.surTotal', { n: nb(SIM.stockVille(e, dm.bien) / 100), max: dm.q })));
+      p.appendChild(el('div', { classe: 'boutons' }, [bouton(t('imperial.expedier'), function () {
+        var r = commander({ type: 'expedier', id: dm.id });
+        AUDIO.jouer(r.ok ? 'pieces' : 'refus');
+        if (!r.ok) toast(t('refus.' + r.raison));
+        if (panneauVivant) panneauVivant();
+      }, pret ? 'gros or' : 'gros non')]));
+    });
+    p.appendChild(el('h3', { texte: t('imperial.gouverneur') }));
+    p.appendChild(ligne(t('imperial.fortune'), nb(e.fortune)));
+    p.appendChild(reglage(t('imperial.salaire', { n: e.salaireGouv, max: SIM.salaireGouvMax(e) }), function (s) { commander({ type: 'reglage', cle: 'salaireGouv', valeur: e.salaireGouv + s * 5 }); }));
+    p.appendChild(el('h3', { texte: t('imperial.presents') }));
+    var g = el('div', { classe: 'boutons' }), recent = e.presentT >= 0 && e.tick - e.presentT < E.presentMoitieMois * D.ticksParMois;
+    E.presents.forEach(function (pr, k) {
+      var m = Math.floor(e.fortune * pr[0] / 100), gain = recent ? Math.floor(pr[1] / 2) : pr[1];
+      g.appendChild(bouton(t('imperial.present' + k, { n: nb(m), gain: gain }), function () {
+        var r = commander({ type: 'present', taille: k });
+        AUDIO.jouer(r.ok ? 'etape' : 'refus');
+        if (!r.ok) toast(t('refus.' + r.raison));
+        if (panneauVivant) panneauVivant();
+      }, m >= 1 ? 'gros non' : 'gros non grise'));
+    });
+    p.appendChild(g);
+    if (recent) p.appendChild(el('p', { classe: 'aide', texte: t('imperial.presentRecent') }));
+    var quart = Math.floor(e.fortune / 4);
+    p.appendChild(el('div', { classe: 'boutons' }, [bouton(t('imperial.renflouer', { n: nb(quart) }), function () {
+      if (commander({ type: 'renflouer', montant: quart }).ok) AUDIO.jouer('pieces');
+      if (panneauVivant) panneauVivant();
+    }, 'gros non')]));
+    p.appendChild(el('p', { classe: 'aide', texte: t('imperial.aide', { tribut: E.tributPart }) }));
+  };
+  // Biens montrés au conseiller du commerce : ceux que la ville produit, stocke, ou qu'une cité
+  // connue vend ou achète.
+  function biensCommerce(e) {
+    var l = {};
+    SIM.cites(e).forEach(function (c) { if (!e.routes[c.id] || !e.routes[c.id].v) return; Object.keys(c.vend).concat(Object.keys(c.achete)).forEach(function (g) { l[g] = 1; }); });
+    e.batiments.forEach(function (b) { var d = D.batiments[b.type]; if (d.produit) l[d.produit] = 1; if (b.type === 'entrepot') for (var g in b.stocks) if (b.stocks[g] > 0) l[g] = 1; });
+    for (var g2 in e.commerce) l[g2] = 1;
+    return D.listeBiens.filter(function (g) { return l[g]; });
+  }
+  var STATUTS_SUIVANT = { aucun: 'importer', importer: 'exporter', exporter: 'reserver', reserver: 'aucun' };
+  var citeChoisie = null;
+  CONSEILLERS.commerce = function (p, e) {
+    carteEmpire(p, e);
+    if (citeChoisie) ficheCite(p, e, citeChoisie);
+    p.appendChild(el('h3', { texte: t('commerce.biens') }));
+    p.appendChild(el('div', { classe: 'ligne bien entete' }, [el('span', { texte: t('commerce.bien') }), el('span', { texte: t('commerce.statut') })]));
+    biensCommerce(e).forEach(function (g) {
+      var s = SIM.statutBien(e, g), n = SIM.cibleBien(e, g), px = SIM.prixBien(e, g);
+      var l = el('div', { classe: 'ligne bien' }, [el('span', { texte: t('bien.' + g) + ' · ' + nb(SIM.stockVille(e, g) / 100) })]);
+      l.appendChild(el('button', { classe: 'mini c-' + s, aria: deuxPoints(t('commerce.statut'), t('statut.' + s)), texte: t('statut.' + s), clic: function () {
+        AUDIO.jouer('clic'); commander({ type: 'commerce', bien: g, statut: STATUTS_SUIVANT[s] }); if (panneauVivant) panneauVivant();
+      } }));
+      p.appendChild(l);
+      // Réglage de la quantité sur sa propre ligne : la ligne du bien reste lisible sur téléphone.
+      if (s === 'importer' || s === 'exporter') {
+        p.appendChild(el('div', { classe: 'reglage petit' }, [
+          el('button', { classe: 'ico', texte: '−', aria: t('ui.moins'), clic: function () { AUDIO.jouer('clic'); commander({ type: 'commerce', bien: g, cible: Math.max(0, n - 1) }); if (panneauVivant) panneauVivant(); } }),
+          el('span', { texte: t(s === 'importer' ? 'commerce.jusqua' : 'commerce.garder', { n: n }) }),
+          el('button', { classe: 'ico', texte: '+', aria: t('ui.plus'), clic: function () { AUDIO.jouer('clic'); commander({ type: 'commerce', bien: g, cible: n + 1 }); if (panneauVivant) panneauVivant(); } })
+        ]));
+      }
+      p.appendChild(el('p', { classe: 'aide prix', texte: t('commerce.prix', { i: nb(px.i), x: nb(px.x) }) }));
+    });
+    p.appendChild(el('p', { classe: 'aide', texte: t('commerce.aide') }));
+  };
+  // Carte de l'Empire : la Méditerranée, Rome, la ville, les cités partenaires et leurs routes.
+  var MER = [[-5.6, 36.1], [-4.4, 36.7], [-2.1, 36.7], [-1, 37.6], [-0.5, 38.3], [0.2, 38.7], [-0.3, 39.5], [0.9, 40.7], [1.25, 41.1], [2.2, 41.4], [3.3, 42.3], [3.1, 43.1],
+    [3.7, 43.4], [4.6, 43.4], [5.4, 43.3], [5.9, 43.1], [7.3, 43.7], [8.9, 44.4], [9.8, 44.1], [10.3, 43.5], [10.5, 42.9], [12.3, 41.7], [13.6, 41.2], [14.3, 40.8], [14.8, 40.6],
+    [15.6, 40], [16, 39], [15.6, 38.1], [16, 37.9], [17.1, 39.1], [17.2, 40.5], [18, 40], [18.5, 40.1], [17.9, 40.6], [16.9, 41.1], [16.2, 41.9], [14.2, 42.5], [13.5, 43.6],
+    [12.6, 44.1], [12.3, 44.4], [12.5, 45], [12.3, 45.4], [13.8, 45.6], [13.6, 44.8], [14.4, 45.3], [15.2, 44.1], [16.4, 43.5], [18.1, 42.6], [19.4, 41.3], [19.4, 40.4],
+    [20, 39.5], [21.3, 38.3], [21.6, 37], [22.5, 36.4], [23, 36.5], [23.7, 37.9], [24, 38.5], [22.9, 40.6], [23.8, 40], [24.4, 40.9], [26.4, 40], [27.1, 38.4], [27.4, 37],
+    [29.1, 36.6], [30.7, 36.9], [32, 36.5], [34.6, 36.8], [36.2, 36.6], [35.8, 35.5], [35.5, 33.9], [35, 32.8], [34.4, 31.5], [32.3, 31.3], [29.9, 31.2], [27.2, 31.4],
+    [24, 32.1], [20.1, 32.1], [19, 30.3], [15.1, 32.4], [13.2, 32.9], [10.1, 33.9], [10.8, 34.7], [10.8, 35.8], [11, 37.1], [10.2, 36.8], [9.9, 37.3], [7.8, 36.9], [3.1, 36.8],
+    [-0.6, 35.7], [-2.9, 35.3], [-5.3, 35.9]];
+  var ILES = [[[12.4, 37.8], [13.4, 38.2], [15.6, 38.3], [15.1, 37], [14.3, 37], [12.6, 37.6]], [[8.4, 39], [8.2, 40.6], [9.2, 41.2], [9.8, 40.5], [9.6, 39.1], [9, 38.9]],
+    [[8.6, 41.4], [8.6, 42.4], [9.4, 43], [9.5, 42.1], [9.2, 41.4]], [[2.4, 39.6], [3.2, 39.95], [3.45, 39.7], [3, 39.3], [2.6, 39.4]],
+    [[23.5, 35.3], [24.3, 35.6], [26.3, 35.3], [26, 35], [24.7, 35]], [[32.3, 34.7], [33, 35.4], [34.6, 35.7], [34, 34.8], [33, 34.6]]];
+  function carteEmpire(p, e) {
+    var m = partie.m, em = m.empire;
+    if (!em) return;
+    var v = em.vue, L = 200, H = Math.round(L * (v[3] - v[1]) / (v[2] - v[0]) * 1.25);
+    var X = function (q) { return ((q[0] - v[0]) / (v[2] - v[0]) * L).toFixed(1); }, Y = function (q) { return ((v[3] - q[1]) / (v[3] - v[1]) * H).toFixed(1); };
+    var pts = function (l) { return l.map(function (q) { return X(q) + ',' + Y(q); }).join(' '); };
+    var s = '<svg viewBox="0 0 ' + L + ' ' + H + '" class="empire" role="img" aria-label="' + t('commerce.carte') + '">';
+    s += '<rect width="' + L + '" height="' + H + '" fill="#d8c79a"/><polygon points="' + pts(MER) + '" fill="#5f97b8" stroke="#3f6f8a" stroke-width="0.6"/>';
+    ILES.forEach(function (i) { s += '<polygon points="' + pts(i) + '" fill="#d8c79a" stroke="#3f6f8a" stroke-width="0.4"/>'; });
+    em.cites.forEach(function (c) {
+      var r = e.routes[c.id];
+      if (!r || !r.v) return;
+      var actif = SIM.routeActive(e, c);
+      s += '<line x1="' + X(em.ville) + '" y1="' + Y(em.ville) + '" x2="' + X(c.pos) + '" y2="' + Y(c.pos) + '" stroke="' + (actif ? '#b8862b' : r.o ? '#9a6a50' : '#7a7262') + '" stroke-width="' + (actif ? 1.6 : 0.9) + '"' + (c.route === 'mer' ? ' stroke-dasharray="3 2"' : '') + '/>';
+    });
+    var point = function (q, rayon, fond, contour) { return '<circle cx="' + X(q) + '" cy="' + Y(q) + '" r="' + rayon + '" fill="' + fond + '" stroke="' + contour + '" stroke-width="0.8"/>'; };
+    s += point(em.rome, 3.6, '#a8322a', '#f4e8c8') + point(em.ville, 3.6, '#f0c040', '#5a3a10');
+    em.cites.forEach(function (c) {
+      var r = e.routes[c.id];
+      if (!r || !r.v) return;
+      s += '<g data-cite="' + c.id + '" class="cite">' + point(c.pos, citeChoisie === c.id ? 4 : 3, r.o ? '#f4e8c8' : '#bdb39a', citeChoisie === c.id ? '#f0c040' : '#4a3a28') + '</g>';
+    });
+    var nom = function (q, texte, dy) {
+      var x = Number(X(q)), a = x < 16 ? 'start' : x > L - 16 ? 'end' : 'middle';
+      return '<text x="' + (a === 'start' ? Math.max(1, x - 3) : a === 'end' ? Math.min(L - 1, x + 3) : x).toFixed(1) + '" y="' + (Number(Y(q)) + dy).toFixed(1) + '" text-anchor="' + a + '" font-size="6.2" fill="#2a2018" stroke="#f4ead0" stroke-width="1.6" paint-order="stroke">' + texte + '</text>'; };
+    s += nom(em.rome, t('cite.rome'), -5.5) + nom(em.ville, t('mission.' + m.id + '.nom'), 9);
+    // Une cité trop près de Rome ou de la ville voit son nom écrit sous son point.
+    var pres = function (a, b) { return Math.abs(X(a) - X(b)) < 22 && Math.abs(Y(a) - Y(b)) < 10; };
+    em.cites.forEach(function (c) { var r = e.routes[c.id]; if (r && r.v) s += nom(c.pos, t('cite.' + c.id), pres(c.pos, em.rome) || pres(c.pos, em.ville) ? 9 : -5); });
+    s += '</svg>';
+    var boite = el('div', { classe: 'carte-empire' });
+    boite.innerHTML = s;
+    boite.querySelectorAll('.cite').forEach(function (g) {
+      g.addEventListener('click', function () { AUDIO.jouer('clic'); citeChoisie = g.getAttribute('data-cite'); if (panneauVivant) panneauVivant(); });
+    });
+    p.appendChild(el('h3', { texte: t('commerce.carte') }));
+    p.appendChild(boite);
+    // Cités en gros boutons (cibles tactiles de 44 px) sous la carte.
+    var g2 = el('div', { classe: 'boutons cites' });
+    em.cites.forEach(function (c) {
+      var r = e.routes[c.id];
+      if (!r || !r.v) return;
+      g2.appendChild(bouton(t('cite.' + c.id) + (r.o ? ' ✓' : ''), function () { citeChoisie = c.id; if (panneauVivant) panneauVivant(); }, citeChoisie === c.id ? 'gros or' : 'gros non'));
+    });
+    p.appendChild(g2);
+  }
+  function ficheCite(p, e, id) {
+    var c = SIM.citeDe(e, id), r = c && e.routes[id];
+    if (!c || !r || !r.v) return;
+    var f = el('div', { classe: 'fiche-cite' });
+    f.appendChild(el('h3', { texte: t('cite.' + id) }));
+    f.appendChild(ligne(t('commerce.route'), t(c.route === 'mer' ? 'commerce.mer' : 'commerce.terre')));
+    if (r.f > 0) f.appendChild(el('p', { classe: 'etat-ko', texte: t('commerce.fermee', { n: r.f }) }));
+    [['vend', 'v', 'importer'], ['achete', 'a', 'exporter']].forEach(function (q) {
+      var l = Object.keys(c[q[0]]);
+      if (!l.length) return;
+      f.appendChild(el('p', { classe: 'aide', texte: t('commerce.' + q[0]) }));
+      l.forEach(function (g) {
+        var px = SIM.prixBien(e, g);
+        f.appendChild(ligne(t('bien.' + g) + ' · ' + nb(q[1] === 'v' ? px.i : px.x), t('commerce.quota', { n: SIM.echange(e, c, q[1], g), max: SIM.quota(e, c, q[1], g) })));
+      });
+    });
+    if (!r.o) {
+      var mer = c.route === 'mer' && !SIM.quaiEnService(e);
+      if (mer) f.appendChild(el('p', { classe: 'etat-ko', texte: t('commerce.besoinQuai') }));
+      f.appendChild(el('div', { classe: 'boutons' }, [bouton(t('commerce.ouvrir', { n: nb(c.cout) }), function () {
+        var res = commander({ type: 'ouvrirRoute', cite: id });
+        AUDIO.jouer(res.ok ? 'pieces' : 'refus');
+        if (!res.ok) toast(t('refus.' + res.raison));
+        if (panneauVivant) panneauVivant();
+      }, mer ? 'gros non' : 'gros or')]));
+    } else f.appendChild(el('p', { classe: 'etat-ok', texte: t(c.route === 'mer' ? 'commerce.ouverteMer' : 'commerce.ouverteTerre', { n: D.regles.commerce.caravaneMois }) }));
+    p.appendChild(f);
+  }
+  CONSEILLERS.religion = function (p, e) {
+    var G = D.regles.dieux, cu = SIM.cultes(e);
+    if (!e.dieux) p.appendChild(el('p', { classe: 'aide', texte: t('religion.sansEffets') }));
+    G.liste.forEach(function (g) {
+      var st = e.divins[g], c = SIM.cibleDieu(e, g, cu);
+      p.appendChild(el('h3', { texte: t('dieu.' + g) + ' · ' + t('dieu.' + g + '.domaine') }));
+      p.appendChild(ligne(t('religion.satisfaction'), t('info.surTotal', { n: st.s, max: 100 })));
+      p.appendChild(jauge(st.s / 100));
+      p.appendChild(ligne(t('religion.temples', { n: cu.nb[g] }), t('religion.cible', { n: c.cible })));
+      if (c.jaloux) p.appendChild(el('p', { classe: 'ko', texte: t('religion.jaloux', { n: G.jalousie }) }));
+      if (st.s < G.avertissement) p.appendChild(el('p', { classe: 'etat-ko', texte: t('religion.colere') }));
+      else if (st.s > G.bienfait) p.appendChild(el('p', { classe: 'etat-ok', texte: t('religion.bienfait') }));
+    });
+    p.appendChild(el('h3', { texte: t('religion.fetes') }));
+    if (e.fete) {
+      p.appendChild(el('p', { classe: 'etat-ok', texte: t('religion.feteEnCours', { dieu: t('dieu.' + e.fete.dieu), n: Math.max(0, Math.ceil((e.fete.t - e.tick) / D.ticksParMois)) }) }));
+      return;
+    }
+    p.appendChild(el('p', { classe: 'aide', texte: t('religion.feteAide', { n: G.feteMois }) }));
+    var choix = el('div', { classe: 'boutons' });
+    G.liste.forEach(function (g) { choix.appendChild(bouton(t('dieu.' + g), function () { dieuFete = g; if (panneauVivant) panneauVivant(); }, dieuFete === g ? 'gros or' : 'gros non')); });
+    p.appendChild(choix);
+    var tailles = el('div', { classe: 'boutons' });
+    Object.keys(G.fetes).forEach(function (k) {
+      tailles.appendChild(bouton(t('religion.fete.' + k, { n: nb(SIM.coutFete(e, k)), gain: G.fetes[k][0] }), function () {
+        var r = commander({ type: 'fete', dieu: dieuFete, taille: k });
+        AUDIO.jouer(r.ok ? 'etape' : 'refus');
+        if (!r.ok) toast(t('refus.' + r.raison));
+        if (panneauVivant) panneauVivant();
+      }, 'gros non'));
+    });
+    p.appendChild(tailles);
+  };
+  var dieuFete = 'ceres';
+  var defilOnglets = 0;
+  // Onglets montrés : l'impérial seulement quand l'empereur est là, le commerce quand la
+  // mission a des cités partenaires.
+  function ongletsPartie(e) {
+    return ONGLETS.filter(function (o) { return (o !== 'imperial' || e.empereur) && (o !== 'commerce' || SIM.cites(e).length); });
+  }
+
   function reglage(texte, changer) {
     return el('div', { classe: 'reglage' }, [
       el('button', { classe: 'ico', texte: '−', aria: t('ui.moins'), clic: function () { AUDIO.jouer('clic'); changer(-1); if (panneauVivant) panneauVivant(); } }),
@@ -902,7 +1186,7 @@
       if (!l.length) p.appendChild(el('p', { texte: t('journal.vide') }));
       l.slice(0, 30).forEach(function (x) {
         var d = x.t;
-        var r = el('div', { classe: 'msg' + (x.critique ? ' critique' : '') }, [el('span', { texte: t(x.cle, x.vars) })]);
+        var r = el('div', { classe: 'msg' + (x.critique ? ' critique' : '') }, [el('span', { texte: texteMsg(x) })]);
         if (x.lieu >= 0) r.appendChild(el('button', { classe: 'ico', aria: t('journal.centrer'), title: t('journal.centrer'), texte: '⌖', clic: function () { rendu.centrerSur(x.lieu % e.N, Math.floor(x.lieu / e.N)); fermerPanneau(); } }));
         void d;
         p.appendChild(r);
@@ -1074,7 +1358,7 @@
   // Construction libre (section 17.6) : tous les bâtiments, sans objectif, sur la carte d'une
   // mission déjà ouverte ; fonds de départ et risques au choix.
   var FONDS_LIBRE = [10000, 30000, 100000];
-  var choixLibre = { carte: null, fonds: 1, risques: true };
+  var choixLibre = { carte: null, fonds: 1, risques: true, dieux: false };
   function ecranLibre() {
     var cartes = MISSIONS.filter(function (m) { return m.dispo && missionOuverte(m); });
     if (!choixLibre.carte || cartes.indexOf(mission(choixLibre.carte)) < 0) choixLibre.carte = cartes[0].id;
@@ -1090,7 +1374,8 @@
     FONDS_LIBRE.forEach(function (n, k) { f.appendChild(bouton(nb(n), function () { choixLibre.fonds = k; ecranLibre(); }, choixLibre.fonds === k ? 'gros or' : 'gros non')); });
     carte.appendChild(f);
     carte.appendChild(el('div', { classe: 'boutons' }, [
-      bouton(deuxPoints(t('libre.risques'), t(choixLibre.risques ? 'ui.oui' : 'ui.non')), function () { choixLibre.risques = !choixLibre.risques; ecranLibre(); }, 'gros non')
+      bouton(deuxPoints(t('libre.risques'), t(choixLibre.risques ? 'ui.oui' : 'ui.non')), function () { choixLibre.risques = !choixLibre.risques; ecranLibre(); }, 'gros non'),
+      bouton(deuxPoints(t('libre.dieux'), t(choixLibre.dieux ? 'ui.oui' : 'ui.non')), function () { choixLibre.dieux = !choixLibre.dieux; ecranLibre(); }, 'gros non')
     ]));
     carte.appendChild(el('div', { classe: 'boutons' }, [
       bouton(t('ui.retour'), ecranMissions, 'gros non'),
@@ -1099,7 +1384,7 @@
     ouvrirEcran(carte, { retour: ecranMissions });
   }
   function nouvelleLibre() {
-    var e = SIM.nouvelle(choixLibre.carte, { libre: true, tout: true, fonds: FONDS_LIBRE[choixLibre.fonds], risques: choixLibre.risques });
+    var e = SIM.nouvelle(choixLibre.carte, { libre: true, tout: true, fonds: FONDS_LIBRE[choixLibre.fonds], risques: choixLibre.risques, dieux: choixLibre.dieux });
     demarrerEtat(e);
     AUDIO.jouer('etape');
   }
@@ -1116,6 +1401,8 @@
     carte.appendChild(el('div', { classe: 'num', texte: t('missions.echelon', { n: m.echelon }) + ' · ' + t('rang.' + D.rangs[m.echelon - 1]) }));
     carte.appendChild(el('h1', { texte: t('mission.' + m.id + '.nom') }));
     carte.appendChild(el('p', { texte: t('mission.' + m.id + '.intro') }));
+    var nCites = ((m.empire && m.empire.cites) || []).filter(function (c) { return !c.cachee; }).length;
+    if (nCites) carte.appendChild(el('p', { texte: t('briefing.cites', { n: nCites }) }));
     carte.appendChild(el('h2', { texte: t('conseil.objectifs') }));
     var ul = el('div', { classe: 'objectifs' });
     Object.keys(m.objectifs).forEach(function (k) { ul.appendChild(el('p', { texte: '• ' + t('obj.' + k, { n: nb(m.objectifs[k]), v: '' }) })); });
@@ -1263,7 +1550,8 @@
     prog.gagnees[m.id] = Math.max(avant, n);
     prog.niveau = Math.max(prog.niveau, Math.min(MISSIONS.length, m.numero + 1));
     // Mission gagnée : progression enregistrée (niveau suivant), puis fin signalée au site.
-    try { window.JEL_SAVE.save(JEU, { niveau: prog.niveau, score: totalEtoiles(), options: prog.options, gagnees: prog.gagnees }); } catch (err) { /* sans stockage */ }
+    if (e.empereur) prog.fortune = e.fortune;
+    try { window.JEL_SAVE.save(JEU, { niveau: prog.niveau, score: totalEtoiles(), options: prog.options, gagnees: prog.gagnees, fortune: prog.fortune }); } catch (err) { /* sans stockage */ }
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: m.numero });
     var toutes = MISSIONS.every(function (x) { return prog.gagnees[x.id]; });
     if (toutes) { if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: MAX_ETOILES }); }
@@ -1293,6 +1581,7 @@
   function ecranDefaite() {
     var e = partie.e, m = partie.m;
     AUDIO.jouer('defaite');
+    if (e.empereur) { prog.fortune = e.fortune; sauverProg(); }
     if (window.FMG) window.FMG.reportEnd({ completed: false, level: m.numero });
     var carte = el('div', { classe: 'carte-ecran' }, [
       el('h1', { texte: t('defaite.titre') }),
@@ -1375,7 +1664,11 @@
       vue: function (x, y, z) { rendu.centrerSur(x, y); if (z) rendu.zoomerVers(z); },
       invariants: function () { return partie ? SIM.invariants(partie.e) : []; },
       // Une ville d'exemple (1 à 3) ouverte comme une vraie partie, pour essayer l'interface.
-      ville: function (n) { var e = chargerVille(n || 3); if (!e) return false; prog.options.geste = true; fermerEcran(); demarrerEtat(e); return true; }
+      ville: function (n) { var e = chargerVille(n || 3); if (!e) return false; prog.options.geste = true; fermerEcran(); demarrerEtat(e); return true; },
+      // Une partie enregistrée (texte d'une sauvegarde exportée) ouverte telle quelle.
+      importer: function (txt) { var e = SIM.importer(txt); prog.options.geste = true; fermerEcran(); demarrerEtat(e); return true; },
+      // Panneau d'information d'un bâtiment, par son numéro.
+      info: function (id) { if (!partie || !SIM.batiment(partie.e, id)) return false; rendu.selection = id; ouvrirPanneau(function (p) { remplirBatiment(p, id); }); return true; }
     };
   }
 

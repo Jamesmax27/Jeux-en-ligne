@@ -19,13 +19,14 @@
 (function (racine) {
   'use strict';
 
-  var VERSION_ETAT = 2; // 2 : lot 2 (économie) ; une sauvegarde de version 1 est complétée à l'import
+  var VERSION_ETAT = 3; // 3 : lot 3 (commerce, empereur, cotes, dieux) ; une sauvegarde de version 1 ou 2 est complétée à l'import
 
   // Énumérations (codes de couches, pas des règles de jeu).
   var T = { HERBE: 0, PRAIRIE: 1, ARBRES: 2, ROCHERS: 3, EAU: 4 };
   var R = { AUCUNE: 0, ROUTE: 1, BARRIERE: 2, ROME: 3, PLACE: 4 };
   var GENRES = ['maison', 'outil', 'route', 'barriere', 'puits', 'fontaine', 'reservoir', 'aqueduc', 'ferme', 'extraction', 'peche',
-    'atelier', 'grenier', 'entrepot', 'marche', 'service', 'spectacle', 'ecole_art', 'oracle', 'deco', 'place', 'ruines', 'incendie'];
+    'atelier', 'grenier', 'entrepot', 'marche', 'service', 'spectacle', 'ecole_art', 'oracle', 'deco', 'place', 'ruines', 'incendie', 'quai'];
+  var EVENEMENTS = ['demande', 'salaireRome', 'prix', 'quota', 'routeFermee', 'nouvelleCite', 'mauvaiseRecolte', 'sitePerdu', 'seisme', 'epidemie'];
 
   var D = null;          // données validées et préparées
   var MISSIONS = {};     // id → mission
@@ -50,7 +51,7 @@
       exige(typeof r[k] === 'number', 'regles.' + k + ' manquant');
     });
     ['maison', 'immigration', 'emigration', 'humeur', 'travail', 'salaire', 'impot', 'eau', 'feu', 'effondrement', 'marche', 'grenier', 'ferme', 'spectacle', 'vitesses',
-      'extraction', 'atelier', 'entrepot', 'peche', 'attractivite', 'sante'].forEach(function (k) {
+      'extraction', 'atelier', 'entrepot', 'peche', 'attractivite', 'sante', 'commerce', 'empereur', 'cotes', 'dieux'].forEach(function (k) {
       exige(r[k] && typeof r[k] === 'object', 'regles.' + k + ' manquant');
     });
     exige(Array.isArray(d.maisons) && d.maisons.length === 20, '20 niveaux de maison attendus');
@@ -98,6 +99,17 @@
         exige(Array.isArray(m.batiments), 'mission ' + m.id + ' : batiments');
         (m.batiments || []).concat(m.depart || []).forEach(function (k) { exige(!!b[k], 'mission ' + m.id + ' : bâtiment inconnu ' + k); });
         exige(typeof m.fonds === 'number', 'mission ' + m.id + ' : fonds');
+        ((m.empire && m.empire.cites) || []).forEach(function (c) {
+          exige(typeof c.id === 'string' && (c.route === 'terre' || c.route === 'mer') && typeof c.cout === 'number', 'mission ' + m.id + ' : cité ' + c.id);
+          [c.vend || {}, c.achete || {}].forEach(function (l) { Object.keys(l).forEach(function (g) { exige(!!(d.biens || {})[g] && Number.isInteger(l[g]), 'mission ' + m.id + ' : cité ' + c.id + ', bien ' + g); }); });
+        });
+        (m.evenements || []).forEach(function (ev, j) {
+          exige(EVENEMENTS.indexOf(ev.type) >= 0, 'mission ' + m.id + ' : événement ' + j + ' de type inconnu');
+          exige(Number.isInteger(ev.mois) || (Array.isArray(ev.fenetre) && ev.fenetre.length === 2), 'mission ' + m.id + ' : événement ' + j + ' sans date');
+          if (ev.bien) exige(!!(d.biens || {})[ev.bien], 'mission ' + m.id + ' : événement ' + j + ', bien inconnu');
+          if (ev.cite) exige(((m.empire && m.empire.cites) || []).some(function (c) { return c.id === ev.cite; }), 'mission ' + m.id + ' : événement ' + j + ', cité inconnue');
+          if (ev.type === 'demande') exige(Number.isInteger(ev.delai) && (ev.bien ? Number.isInteger(ev.charges) : Number.isInteger(ev.deniers)), 'mission ' + m.id + ' : demande ' + j);
+        });
         (m.tutoriel || []).forEach(function (e, j) {
           exige(typeof e.cle === 'string' && e.condition, 'mission ' + m.id + ' : étape ' + j);
           (e.debloque || []).forEach(function (k) { exige(!!b[k], 'mission ' + m.id + ' : déblocage inconnu ' + k); });
@@ -218,7 +230,8 @@
   }
 
   // Parcours unique vers plusieurs cibles : les n premières cibles atteintes, avec leur chemin.
-  function parcoursMulti(e, sources, passable, cible, max, n) {
+  // « traverser » : le parcours continue au-delà d'une cible (sinon une cible arrête la route).
+  function parcoursMulti(e, sources, passable, cible, max, n, traverser) {
     var N = e.N, B = tampons(N * N), tete = 0, queue = 0, i, k, trouves = [];
     for (k = 0; k < sources.length; k++) {
       i = sources[k];
@@ -227,7 +240,7 @@
     }
     while (tete < queue && trouves.length < n) {
       i = B.file[tete++];
-      if (cible(i)) { trouves.push(i); continue; }
+      if (cible(i)) { trouves.push(i); if (!traverser) continue; }
       var d = B.dist[i];
       if (d >= max) continue;
       var x = i % N, y = (i - x) / N;
@@ -370,6 +383,21 @@
     e.entree = ix(e, 0, ry0);
     e.sortie = ix(e, N - 1, ry0);
     placerBancs(e, p);
+    placerMer(e, p);
+  }
+
+  // Point de la voie maritime (arrivée et départ des navires) : case d'eau la plus proche du
+  // point donné par la carte, 6 cases au plus ; -1 sans voie maritime.
+  function placerMer(e, p) {
+    e.mer = -1;
+    var q = p.navires;
+    if (!q) return;
+    for (var r = 0; r <= 6; r++) {
+      for (var y = q[1] - r; y <= q[1] + r; y++) for (var x = q[0] - r; x <= q[0] + r; x++) {
+        if (Math.max(Math.abs(x - q[0]), Math.abs(y - q[1])) !== r || !dedans(e, x, y)) continue;
+        if (e.terrain[ix(e, x, y)] === T.EAU) { e.mer = ix(e, x, y); return; }
+      }
+    }
   }
 
   // Bancs de poissons (données de la carte) : chacun est posé sur la case d'eau la plus
@@ -400,6 +428,7 @@
     var libre = !!options.libre, tout = !!options.tout;
     var risques = options.risques === undefined ? !!m.risques : !!options.risques;
     var permis = tout ? Object.keys(D.batiments).filter(function (k) { return D.batiments[k].categorie; }) : m.batiments.slice();
+    var ci = m.cotes || {};
     var e = {
       v: VERSION_ETAT,
       mission: m.id,
@@ -449,9 +478,33 @@
       journal: [],
       finances: { an: nouveauBudget(), prec: nouveauBudget() },
       histo: [],
-      stats: { incendies: 0, effondrements: 0, epidemies: 0 }
+      stats: { incendies: 0, effondrements: 0, epidemies: 0, exports: 0, imports: 0 },
+      // Lot 3 : empereur (tribut, faveur, demandes, gouverneur), effets des dieux, cotes, commerce.
+      empereur: !libre && m.empereur !== false,
+      dieux: options.dieux !== undefined ? !!options.dieux : (!libre && m.dieux === true),
+      cotes: { culture: 0, prosperite: ci.prosperite || 0, paix: ci.paix || 0, faveur: ci.faveur !== undefined ? ci.faveur : D.regles.empereur.faveurDepart },
+      prosDetail: {},
+      faveurBasse: 0,
+      incidentsAn: 0,
+      rang: Math.max(1, options.rang | 0),
+      fortune: Math.max(0, options.fortune | 0),
+      salaireGouv: 0,
+      presentT: -1,
+      commerce: {},
+      routes: {},
+      prix: {},
+      demandes: [],
+      script: [],
+      divins: {},
+      fete: null,
+      effets: { neptune: 0, quais: 0, mars: 0, marsBienfait: 0, recolte: 0 },
+      mer: -1
     };
+    e.salaireGouv = salaireGouvMax(e);
+    ((m.empire && m.empire.cites) || []).forEach(function (c) { e.routes[c.id] = { o: c.ouverte ? 1 : 0, v: c.cachee ? 0 : 1, f: 0, n: {}, x: c.ouverte ? D.regles.commerce.premierDepartJours * D.temps.ticksParJour : 0, qv: {} }; });
+    D.regles.dieux.liste.forEach(function (g) { e.divins[g] = { s: D.regles.dieux.depart, c: 0, j: 0, b: -1000, av: 0 }; });
     e.alea = e.graine ^ 0x5bd1e995;
+    resoudreScript(e, m);
     reconstruireCaches(e);
     creerCarte(e, m.carte);
     versionRoutes(e);
@@ -461,8 +514,14 @@
     return e;
   }
 
+  // Postes du budget (section 11.1). Recettes : impôts, exportations, secours, dons du
+  // gouverneur ; dépenses : salaires, constructions, importations, tribut, intérêts, fêtes,
+  // salaire du gouverneur, envois à l'empereur.
+  var POSTES = ['impots', 'exports', 'secours', 'dons', 'salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois'];
   function nouveauBudget() {
-    return { impots: 0, salaires: 0, constructions: 0 };
+    var b = {};
+    POSTES.forEach(function (k) { b[k] = 0; });
+    return b;
   }
 
   function reconstruireCaches(e) {
@@ -494,6 +553,7 @@
       case 'maison': b.niv = 0; b.hab = 0; b.att = 0; b.viv = {}; b.svc = {}; b.pts = {}; b.ok = 0; b.manque = 0; b.sansRoute = 0; b.quar = 0; b.bloque = 0; break;
       case 'ferme': case 'extraction': b.prog = 0; b.stock = 0; break;
       case 'peche': b.stock = 0; b.mb = 0; b.sansBanc = 0; break;
+      case 'quai': b.nav = 0; b.dk = []; break;
       case 'atelier': b.prog = 0; b.mat = 0; b.matAtt = 0; b.stock = 0; break;
       case 'grenier': b.stocks = {}; b.attendu = 0; b.cons = {}; b.mc = 0; break;
       case 'entrepot': b.stocks = {}; b.attendus = {}; b.cons = {}; b.plaf = {}; b.mc = 0; break;
@@ -578,7 +638,7 @@
     }
     if (d.genre === 'maison' && !routeProche(e, { x: x, y: y, t: 1 }, D.regles.logementDistanceRoute)) return 'routeLoin';
     if (d.pres && !pres(e, { x: x, y: y, t: t }, d.pres)) return { eau: 'presEau', arbres: 'presArbres', rochers: 'presRochers' }[d.pres];
-    if (d.genre === 'peche' && quaiEau(e, { x: x, y: y, t: t }) < 0) return 'rive';
+    if ((d.genre === 'peche' || d.genre === 'quai') && quaiEau(e, { x: x, y: y, t: t }) < 0) return 'rive';
     if (d.marbre && marbreDispo(e) < d.marbre * D.regles.marbreParCharge) return 'marbre';
     return null;
   }
@@ -664,6 +724,12 @@
   //   { type: 'plafond', id, bien, valeur: 1 à 4 }   (entrepôt : quarts de la capacité)
   //   { type: 'interdit', id, bien, valeur: booléen } (marché)
   //   { type: 'priorite', categorie, valeur: 0 à 9 }  (0 : sans priorité ; 1 passe en premier)
+  //   { type: 'commerce', bien, statut?: 'aucun' | 'importer' | 'exporter' | 'reserver', cible?: charges }
+  //   { type: 'ouvrirRoute', cite }                  (paiement unique ; route de mer : quai de commerce en service)
+  //   { type: 'expedier', id }                       (demande de l'empereur)
+  //   { type: 'present', taille: 0 | 1 | 2 }         (modeste, généreux, somptueux : part de la fortune du gouverneur)
+  //   { type: 'renflouer', montant }                 (fortune du gouverneur → trésor)
+  //   { type: 'fete', dieu, taille: 'petite' | 'grande' | 'grandiose' }
 
   function appliquer(e, c) {
     var res = { ok: false, cout: 0, n: 0, raison: null };
@@ -742,9 +808,79 @@
     if (c.type === 'reglage') {
       if (c.cle === 'impot') e.impot = Math.max(0, Math.min(D.regles.impot.tauxMax, c.valeur | 0));
       else if (c.cle === 'salaire') e.salaire = Math.max(D.regles.salaire.min, Math.min(D.regles.salaire.max, c.valeur | 0));
+      else if (c.cle === 'salaireGouv' && e.empereur) e.salaireGouv = Math.max(0, Math.min(salaireGouvMax(e), c.valeur | 0));
       else { res.raison = 'reglage'; return res; }
       res.ok = true;
       return res;
+    }
+    return commandeEmpire(e, c, res);
+  }
+
+  // Commandes du lot 3 : commerce, empereur, fêtes.
+  function commandeEmpire(e, c, res) {
+    var Cm = D.regles.commerce, E = D.regles.empereur, G = D.regles.dieux, Q = charge(), ci, r, cout;
+    if (c.type === 'commerce') {
+      if (!D.biens[c.bien]) { res.raison = 'cible'; return res; }
+      var cur = e.commerce[c.bien] || { s: 'aucun', n: Cm.cibleDepart };
+      var s = c.statut !== undefined ? c.statut : cur.s, n = c.cible !== undefined ? c.cible | 0 : cur.n;
+      if (Cm.statuts.indexOf(s) < 0 || n < 0 || n > Cm.cibleMax) { res.raison = 'reglage'; return res; }
+      if (s === 'aucun' && n === Cm.cibleDepart) delete e.commerce[c.bien]; else e.commerce[c.bien] = { s: s, n: n };
+      res.ok = true; return res;
+    }
+    if (c.type === 'ouvrirRoute') {
+      ci = citeDe(e, c.cite); r = ci && e.routes[ci.id];
+      if (!ci || !r || r.o || !r.v) { res.raison = 'cible'; return res; }
+      if (ci.route === 'mer' && !quaiEnService(e)) { res.raison = 'quai'; return res; }
+      if (e.tresor - ci.cout < D.regles.detteMax) { res.raison = 'argent'; return res; }
+      e.tresor -= ci.cout; e.finances.an.constructions += ci.cout;
+      r.o = 1; r.x = e.tick + Cm.premierDepartJours * D.temps.ticksParJour;
+      noter(e, 'msg.routeOuverte', { cite: ci.id }, false);
+      res.ok = true; res.cout = ci.cout; return res;
+    }
+    if (c.type === 'expedier') {
+      var dm = null;
+      e.demandes.forEach(function (x) { if (x.id === (c.id | 0)) dm = x; });
+      if (!dm || !e.empereur || (dm.etat !== 'ouverte' && dm.etat !== 'retard')) { res.raison = 'cible'; return res; }
+      if (!demandePrete(e, dm)) { res.raison = dm.bien ? 'stock' : 'argent'; return res; }
+      if (dm.bien) prendreStock(e, dm.bien, dm.q * Q);
+      else { e.tresor -= dm.deniers; e.finances.an.envois += dm.deniers; }
+      var aTemps = dm.etat === 'ouverte';
+      dm.etat = aTemps ? 'faite' : 'faiteRetard';
+      changerFaveur(e, aTemps ? dm.gain : E.retard);
+      noter(e, aTemps ? 'msg.demandeFaite' : 'msg.demandeFaiteRetard', { bien: dm.bien || '', n: dm.bien ? dm.q : dm.deniers }, false);
+      res.ok = true; return res;
+    }
+    if (c.type === 'present') {
+      var pr = E.presents[c.taille | 0];
+      if (!pr || !e.empereur || c.taille < 0) { res.raison = 'cible'; return res; }
+      var montant = Math.floor(e.fortune * pr[0] / 100);
+      if (montant < 1) { res.raison = 'fortune'; return res; }
+      // Un second présent dans les 12 mois rapporte moitié moins (section 14.5).
+      var gain = e.presentT >= 0 && e.tick - e.presentT < E.presentMoitieMois * D.ticksParMois ? Math.floor(pr[1] / 2) : pr[1];
+      e.fortune -= montant; e.presentT = e.tick;
+      changerFaveur(e, gain);
+      noter(e, 'msg.present', { montant: montant, n: gain }, false);
+      res.ok = true; res.cout = montant; return res;
+    }
+    if (c.type === 'renflouer') {
+      var v = Math.min(e.fortune, Math.max(0, c.montant | 0));
+      if (v < 1 || !e.empereur) { res.raison = 'fortune'; return res; }
+      e.fortune -= v; e.tresor += v; e.finances.an.dons += v;
+      res.ok = true; res.cout = -v; return res;
+    }
+    if (c.type === 'fete') {
+      if (G.liste.indexOf(c.dieu) < 0 || !G.fetes[c.taille]) { res.raison = 'cible'; return res; }
+      if (e.fete) { res.raison = 'fete'; return res; }
+      cout = coutFete(e, c.taille);
+      if (e.tresor - cout < D.regles.detteMax) { res.raison = 'argent'; return res; }
+      if (c.taille === 'grandiose') {
+        if (stockVille(e, 'vin') < G.feteVin * Q) { res.raison = 'vin'; return res; }
+        prendreStock(e, 'vin', G.feteVin * Q);
+      }
+      e.tresor -= cout; e.finances.an.fetes += cout;
+      e.fete = { dieu: c.dieu, taille: c.taille, t: e.tick + G.feteMois * D.ticksParMois };
+      noter(e, 'msg.feteOrganisee', { dieu: c.dieu, mois: G.feteMois }, false);
+      res.ok = true; res.cout = cout; return res;
     }
     res.raison = 'commande';
     return res;
@@ -1003,6 +1139,8 @@
       var f = e._index.get(w.pompier);
       if (f && f.pompier === w.id) f.pompier = 0;
     }
+    if (w.type === 'navire' && w.cb) { var q = e._index.get(w.cb); if (q && q.nav === w.id) q.nav = 0; }
+    if (w.type === 'docker' && w.nav) { var nv = e._mIndex.get(w.nav); if (nv && nv.att && nv.att[w.cle] > 0) nv.att[w.cle]--; }
   }
 
   function allerVers(e, w, cible) {
@@ -1208,6 +1346,12 @@
       var o = e._index.get(w.o);
       if (!o) return false;
       p = parcours(e, [i], passableLibre(e), cibleAcces(e, o), 4 * N);
+    } else if (w.type === 'navire') {
+      if (w.phase === 'aller') p = parcours(e, [i], passableEau(e), function (j) { return j === w.quai; }, 6 * N);
+      else if (w.phase === 'depart') p = parcours(e, [i], passableEau(e), function (j) { return j === e.mer; }, 6 * N);
+    } else if (w.type === 'caravane') {
+      if (w.phase === 'retour') p = parcours(e, [i], passableRoute(e), function (j) { return j === e.entree; }, 8 * N);
+      else { var cv = e._index.get(w.cb); if (!cv) return false; p = parcours(e, [i], passableRoute(e), cibleAcces(e, cv), 6 * N); }
     } else if (w.type === 'bateau') {
       if (w.phase === 'aller') { var bancs = new Set(e.bancs); p = parcours(e, [i], passableEau(e), function (j) { return bancs.has(j); }, 4 * N); }
       else p = parcours(e, [i], passableEau(e), function (j) { return j === w.quai; }, 4 * N);
@@ -1286,6 +1430,9 @@
         }
         finir(e, w);
         return;
+      case 'caravane': atteintCaravane(e, w, i); return;
+      case 'navire': atteintNavire(e, w); return;
+      case 'docker': atteintDocker(e, w, i); return;
       case 'bateau':
         o = e._index.get(w.o);
         if (w.phase === 'aller') {
@@ -1431,7 +1578,7 @@
   // en vidant, il ne fait que déplacer le stock.
   function chercherPreneur(e, sources, g, q, exclu, depotsSeuls) {
     var N = e.N, etapes = [];
-    if (!depotsSeuls && D.matieres.indexOf(g) >= 0) etapes.push(function (b) { return def(b).genre === 'atelier'; });
+    if (!depotsSeuls && D.matieres.indexOf(g) >= 0 && !bienReserve(e, g)) etapes.push(function (b) { return def(b).genre === 'atelier'; });
     if (estAliment(g)) etapes.push(function (b) { return b.type === 'grenier'; });
     etapes.push(function (b) { return b.type === 'entrepot'; });
     for (var k = 0; k < etapes.length; k++) {
@@ -1480,7 +1627,7 @@
       cibles = new Map();
       e.batiments.forEach(function (t) {
         var dt = def(t);
-        if (dt.genre !== 'atelier' || taux(t) <= 0 || !((b.stocks[dt.matiere] || 0) >= Q) || placeDans(t, dt.matiere) < Q) return;
+        if (dt.genre !== 'atelier' || taux(t) <= 0 || bienReserve(e, dt.matiere) || !((b.stocks[dt.matiere] || 0) >= Q) || placeDans(t, dt.matiere) < Q) return;
         acces(e, t).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, t); });
       });
       if (cibles.size) {
@@ -1617,6 +1764,7 @@
       case 'maison': quotidienMaison(e, b); break;
       case 'service': if (!b.m && !b.cpt && (!d.eauRequise || b.actif)) emettreErrant(e, b, d.marcheur); break;
       case 'ferme': case 'extraction': case 'peche': quotidienProducteur(e, b, d); break;
+      case 'quai': quotidienQuai(e, b); break;
       case 'atelier': quotidienAtelier(e, b, d); break;
       case 'grenier': case 'entrepot': quotidienDepot(e, b); break;
       case 'marche': quotidienMarche(e, b); break;
@@ -1821,6 +1969,7 @@
           var n = 0; fert = 0;
           for (var y = b.y; y < b.y + b.t; y++) for (var x = b.x; x < b.x + b.t; x++) { fert += e.fertilite[ix(e, x, y)]; n++; }
           fert = fert / n;
+          if (e.effets && e.effets.recolte > 0) fert = fert / 2; // mauvaise récolte (section 15.2)
         }
         // Arrondi au-dessus et report du reste : 8 charges par an tombent juste, au jour près.
         b.prog += Math.ceil(fin * d.chargesParAn * r * fert / (D.joursParAn * 100));
@@ -1872,6 +2021,7 @@
       });
       for (var n = 0; n < besoins.length; n++) {
         var g = besoins[n], cibles = new Map();
+        if (bienReserve(e, g)) continue; // bien réservé (demande de l'empereur) : ni consommé ni exporté
         for (var j = 0; j < e.batiments.length; j++) {
           var dep = e.batiments[j];
           if ((dep.type !== 'grenier' && dep.type !== 'entrepot') || !((dep.stocks[g] || 0) > 0)) continue;
@@ -2121,10 +2271,17 @@
   function moisNourriture(e) { consommer(e); }
   function moisFinances(e) {
     finances(e);
+    // Salaire du gouverneur (section 11.6), versé à sa fortune personnelle.
+    if (e.empereur && e.salaireGouv > 0) {
+      var sg = Math.min(e.salaireGouv, salaireGouvMax(e));
+      e.tresor -= sg; e.fortune += sg; e.finances.an.gouverneur += sg;
+    }
     // Secours de l'empereur : premier passage sous 0 (section 11.4).
     if (e.tresor < 0 && !e.secoursRecu && D.regles.secours) {
       e.secoursRecu = true;
       e.tresor += D.regles.secours.montant;
+      e.finances.an.secours += D.regles.secours.montant;
+      if (e.empereur) changerFaveur(e, D.regles.secours.faveur);
       noter(e, 'msg.secours', { montant: D.regles.secours.montant }, true);
     }
   }
@@ -2145,11 +2302,12 @@
     e.histo.push({ m: moisEcoules, pop: e.pop, tresor: e.tresor, humeur: e.humeur, sante: e.sante, imm: e.flux.imm, emi: e.flux.emi, morts: e.flux.morts });
     e.flux = { imm: 0, emi: 0, morts: 0 };
     if (e.histo.length > 240) e.histo.shift();
-    if (moisEcoules > 0 && moisEcoules % D.temps.moisParAn === 0) {
-      e.finances.prec = e.finances.an;
-      e.finances.an = nouveauBudget();
+    // L'année du budget, des cotes annuelles et du tribut commence en janvier (sections 11.5, 14).
+    if (moisEcoules > 0 && date(e).mois === 0) {
+      nouvelAn(e);
       noter(e, 'msg.nouvelleAnnee', { annee: date(e).annee }, false);
     }
+    moisEmpire(e, moisEcoules);
     verifierFin(e, moisEcoules);
   }
   function nouveauMois(e) { moisNourriture(e); moisFinances(e); moisHumeur(e); moisBilan(e); }
@@ -2176,10 +2334,10 @@
   // Épidémie : santé sous le seuil, 5 % de risque par mois ; 1 à 3 maisons sans médecin ni
   // hôpital perdent leurs habitants et restent vides 2 mois. Seulement dans une partie avec
   // risques où médecin ou hôpital peuvent être construits.
-  function epidemie(e) {
+  function epidemie(e, force) {
     var S = D.regles.sante;
-    if (!e.epidemies || e.pop <= 0 || e.sante >= S.seuilEpidemie) return;
-    if (hasard(e, 100) >= S.risqueEpidemie) return;
+    if (!force && (!e.epidemies || e.pop <= 0 || e.sante >= S.seuilEpidemie)) return;
+    if (!force && hasard(e, 100) >= S.risqueEpidemie) return;
     var cibles = e.batiments.filter(function (h) { return estMaison(h) && h.hab > 0 && !(h.svc.medecin > 0) && !(h.svc.hopital > 0); });
     if (!cibles.length) return;
     var nb = S.maisonsEpidemie[0] + hasard(e, S.maisonsEpidemie[1] - S.maisonsEpidemie[0] + 1), lieu = -1;
@@ -2193,6 +2351,633 @@
     e.stats.epidemies++;
     majPopulation(e);
     noter(e, 'msg.epidemie', {}, true, lieu);
+  }
+
+  // ------------------------------------------------------------------------
+  // Commerce et carte de l'Empire (section 12)
+  //   Cités partenaires dans les données de la mission (empire.cites) : route de terre ou de
+  //   mer, coût d'ouverture, biens qu'elles vendent (« vend », la ville les importe) et
+  //   achètent (« achete », la ville les exporte), quota annuel par bien.
+  //   État : e.routes[cité] = { o: ouverte, v: visible, f: mois de fermeture restants,
+  //   n: charges échangées cette année (« v:bien », « a:bien »), x: tick du prochain départ,
+  //   qv: quotas changés par un événement } ; e.commerce[bien] = { s: statut, n: charges }.
+  // ------------------------------------------------------------------------
+
+  function cites(e) { var m = mission(e); return (m.empire && m.empire.cites) || []; }
+  function citeDe(e, id) { var l = cites(e); for (var k = 0; k < l.length; k++) if (l[k].id === id) return l[k]; return null; }
+  function statutBien(e, g) { var c = e.commerce[g]; return c ? c.s : 'aucun'; }
+  // Stock cible (importer) ou minimal (exporter), en charges.
+  function cibleBien(e, g) { var c = e.commerce[g]; return c ? c.n : D.regles.commerce.cibleDepart; }
+  function bienReserve(e, g) { return !!(e.commerce && e.commerce[g] && e.commerce[g].s === 'reserver'); }
+  // Stock de la ville pour le commerce et les demandes (unités) : entrepôts, et greniers
+  // pour la nourriture.
+  function stockVille(e, g) {
+    var n = 0, al = estAliment(g);
+    for (var k = 0; k < e.batiments.length; k++) {
+      var b = e.batiments[k];
+      if (b.type === 'entrepot' || (al && b.type === 'grenier')) n += b.stocks[g] || 0;
+    }
+    return n;
+  }
+  // Retire q unités de la ville (entrepôts, puis greniers), dans l'ordre de construction.
+  function prendreStock(e, g, q) {
+    var al = estAliment(g);
+    for (var k = 0; k < e.batiments.length && q > 0; k++) {
+      var b = e.batiments[k];
+      if (!(b.type === 'entrepot' || (al && b.type === 'grenier')) || !(b.stocks[g] > 0)) continue;
+      var p = Math.min(q, b.stocks[g]);
+      b.stocks[g] -= p; q -= p;
+    }
+  }
+  function prixBien(e, g) {
+    var p = D.biens[g], d = (e.prix && e.prix[g]) || 0;
+    return { i: Math.max(1, p['import'] + d), x: Math.max(1, p['export'] + d) };
+  }
+  // Quota annuel d'une cité pour un bien ; sens « v » : elle vend, « a » : elle achète.
+  function quota(e, c, sens, g) {
+    var base = (sens === 'v' ? c.vend : c.achete)[g];
+    if (base === undefined) return 0;
+    var r = e.routes[c.id], o = r && r.qv ? r.qv[sens + ':' + g] : undefined;
+    return o !== undefined ? o : base;
+  }
+  function echange(e, c, sens, g) { var r = e.routes[c.id]; return (r && r.n[sens + ':' + g]) || 0; }
+  function resteQuota(e, c, sens, g) { return Math.max(0, quota(e, c, sens, g) - echange(e, c, sens, g)); }
+  function routeActive(e, c) { var r = e.routes[c.id]; return !!(r && r.o && r.v && !(r.f > 0)); }
+  function quaiEnService(e) {
+    for (var k = 0; k < e.batiments.length; k++) { var b = e.batiments[k]; if (b.type === 'quai_commerce' && taux(b) > 0 && acces(e, b).length) return true; }
+    return false;
+  }
+  function compterEchange(e, c, sens, g) { var r = e.routes[c.id]; r.n[sens + ':' + g] = (r.n[sens + ':' + g] || 0) + 1; }
+  // La ville vend une charge (exportation), au prix doublé par Neptune sur mer (section 9.1).
+  function vendreCharge(e, c, g, mer) {
+    var p = prixBien(e, g).x * (mer && e.effets.neptune > 0 ? 2 : 1);
+    e.tresor += p; e.finances.an.exports += p;
+    compterEchange(e, c, 'a', g);
+    e.stats.exports = (e.stats.exports || 0) + 1;
+  }
+  function acheterCharge(e, c, g) {
+    var p = prixBien(e, g).i;
+    e.tresor -= p; e.finances.an.imports += p;
+    compterEchange(e, c, 'v', g);
+    e.stats.imports = (e.stats.imports || 0) + 1;
+  }
+  // Charges que la ville peut encore exporter vers c (stock au-dessus du minimum, quota).
+  function peutExporter(e, c, g, enCours) {
+    var Q = charge();
+    return statutBien(e, g) === 'exporter' && resteQuota(e, c, 'a', g) > enCours &&
+      stockVille(e, g) - (enCours + 1) * Q >= cibleBien(e, g) * Q;
+  }
+  function peutImporter(e, c, g, enCours) {
+    var Q = charge();
+    return statutBien(e, g) === 'importer' && resteQuota(e, c, 'v', g) > enCours &&
+      stockVille(e, g) + (enCours + 1) * Q <= cibleBien(e, g) * Q &&
+      e.tresor - (enCours + 1) * prixBien(e, g).i >= D.regles.detteMax;
+  }
+
+  // --- Caravanes (section 12.3) ----------------------------------------------
+  // Par la voie de Rome, elle visite les 3 entrepôts en service les plus proches, échange
+  // 8 charges au plus, payées sur-le-champ, puis repart vers Rome.
+  function envoyerCaravane(e, c) {
+    var C = D.regles.commerce, cibles = new Map();
+    e.batiments.forEach(function (b) {
+      if (b.type !== 'entrepot' || taux(b) <= 0) return;
+      acces(e, b).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, b); });
+    });
+    if (!cibles.size) return false;
+    var l = parcoursMulti(e, [e.entree], passableRoute(e), function (i) { return cibles.has(i); }, 8 * e.N, 64, true), ids = [], premier = null;
+    l.forEach(function (p) {
+      var b = cibles.get(p.fin);
+      if (ids.indexOf(b.id) >= 0 || ids.length >= C.caravaneEntrepots) return;
+      ids.push(b.id);
+      if (!premier) premier = p;
+    });
+    if (!premier) return false;
+    var w = creerMarcheur(e, 'caravane', e.entree, { cite: c.id, etapes: ids, et: 0, cb: ids[0], phase: 'aller', n: 0, ch: premier.chemin, k: 0 });
+    if (!w.ch.length) atteint(e, w);
+    return true;
+  }
+  function echangerCaravane(e, w, b, c) {
+    var C = D.regles.commerce, Q = charge(), g, k, l;
+    l = Object.keys(c.achete || {});
+    for (k = 0; k < l.length; k++) {
+      g = l[k];
+      while (w.n < C.caravaneCharges && (b.stocks[g] || 0) >= Q && peutExporter(e, c, g, 0)) { b.stocks[g] -= Q; vendreCharge(e, c, g, false); w.n++; }
+    }
+    l = Object.keys(c.vend || {});
+    for (k = 0; k < l.length; k++) {
+      g = l[k];
+      while (w.n < C.caravaneCharges && placeDans(b, g) >= Q && peutImporter(e, c, g, 0)) { deposer(b, g, Q); acheterCharge(e, c, g); w.n++; }
+    }
+  }
+  function atteintCaravane(e, w, i) {
+    var C = D.regles.commerce, N = e.N, c = citeDe(e, w.cite);
+    if (w.phase === 'retour') { finir(e, w); return; }
+    var b = e._index.get(w.cb);
+    if (b && b.type === 'entrepot' && c && routeActive(e, c)) echangerCaravane(e, w, b, c);
+    while (++w.et < w.etapes.length && w.n < C.caravaneCharges) {
+      var s = e._index.get(w.etapes[w.et]);
+      if (!s) continue;
+      var p = parcours(e, [i], passableRoute(e), cibleAcces(e, s), 6 * N);
+      if (!p) continue;
+      w.cb = s.id; w.ch = p.chemin; w.k = 0;
+      if (!w.ch.length) { atteintCaravane(e, w, i); return; }
+      suivreChemin(e, w, passableRoute(e));
+      return;
+    }
+    w.phase = 'retour'; w.cb = 0;
+    var pr = parcours(e, [i], passableRoute(e), function (j) { return j === e.entree; }, 8 * N);
+    if (!pr || !pr.chemin.length) { finir(e, w); return; }
+    w.ch = pr.chemin; w.k = 0;
+    suivreChemin(e, w, passableRoute(e));
+  }
+
+  // --- Navires (section 12.4) ------------------------------------------------
+  // Il arrive au point de la voie maritime (données de la carte), accoste à un quai de
+  // commerce libre, sinon attend au large. Les 3 dockers du quai font la navette avec les
+  // entrepôts ; il repart après 12 charges, 40 jours, ou quand plus rien ne s'échange.
+  function envoyerNavire(e, c) {
+    if (e.mer < 0) return false;
+    creerMarcheur(e, 'navire', e.mer, { cite: c.id, phase: 'attente', jours: 0, cb: 0, quai: -1, n: 0, att: {}, vide: 0, ch: null, k: 0, attente: 1e9 });
+    return true;
+  }
+  function quaiLibre(e, w) {
+    var cibles = new Map();
+    if (e.effets.quais > 0) return null;
+    e.batiments.forEach(function (b) {
+      if (b.type !== 'quai_commerce' || b.nav || taux(b) <= 0 || !acces(e, b).length) return;
+      var q = quaiEau(e, b);
+      if (q >= 0 && !cibles.has(q)) cibles.set(q, b);
+    });
+    if (!cibles.size) return null;
+    var p = parcours(e, [ix(e, w.x, w.y)], passableEau(e), function (j) { return cibles.has(j); }, 6 * e.N);
+    return p ? { b: cibles.get(p.fin), p: p } : null;
+  }
+  function accoster(e, w, q) {
+    q.b.nav = w.id;
+    w.cb = q.b.id; w.quai = q.p.fin; w.phase = 'aller'; w.attente = 0; w.prog = 0;
+    w.ch = q.p.chemin; w.k = 0;
+    if (!w.ch.length) atteintNavire(e, w);
+  }
+  function departNavire(e, w, b) {
+    if (b && b.nav === w.id) b.nav = 0;
+    w.phase = 'depart'; w.attente = 0; w.prog = 0; w.cb = 0;
+    var p = e.mer < 0 ? null : parcours(e, [ix(e, w.x, w.y)], passableEau(e), function (j) { return j === e.mer; }, 6 * e.N);
+    if (!p || !p.chemin.length) { finir(e, w); return; }
+    w.ch = p.chemin; w.k = 0;
+  }
+  function atteintNavire(e, w) {
+    if (w.phase === 'aller') {
+      var b = e._index.get(w.cb);
+      if (!b || b.nav !== w.id) { departNavire(e, w, null); return; }
+      w.phase = 'quai'; w.jours = 0; w.vide = 0; w.attente = 1e9;
+      return;
+    }
+    finir(e, w); // reparti au large
+  }
+  function quotidienQuai(e, b) {
+    var C = D.regles.commerce;
+    if (b.dk.length) b.dk = b.dk.filter(function (id) { var d = e._mIndex.get(id); return d && !d.fin; });
+    var w = b.nav ? e._mIndex.get(b.nav) : null;
+    if (!w || w.fin) { b.nav = 0; return; }
+    if (w.phase !== 'quai') return;
+    w.jours++;
+    var c = citeDe(e, w.cite), r = taux(b), envoye = false;
+    if (c && routeActive(e, c) && r > 0 && !(e.effets.quais > 0)) {
+      var max = Math.max(1, Math.ceil(C.dockers * r));
+      while (b.dk.length < max && w.n + b.dk.length < C.navireCharges && envoyerDocker(e, b, w, c)) envoye = true;
+    }
+    if (b.dk.length || envoye) w.vide = 0; else w.vide++;
+    if (w.jours >= C.navireJours || (!b.dk.length && (w.n >= C.navireCharges || w.vide >= C.navireAttenteVide))) departNavire(e, w, b);
+  }
+  // Un docker : va chercher une charge à exporter, ou porte une charge importée à un dépôt.
+  function envoyerDocker(e, b, w, c) {
+    var a = acces(e, b), Q = charge(), N = e.N, k, g, enc, l, d;
+    if (!a.length) return false;
+    l = Object.keys(c.achete || {});
+    for (k = 0; k < l.length; k++) {
+      g = l[k]; enc = w.att['a:' + g] || 0;
+      if (!peutExporter(e, c, g, enc)) continue;
+      var cibles = new Map(), al = estAliment(g);
+      for (var j = 0; j < e.batiments.length; j++) {
+        var t = e.batiments[j];
+        if (!(t.type === 'entrepot' || (al && t.type === 'grenier')) || !((t.stocks[g] || 0) >= Q)) continue;
+        acces(e, t).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, t); });
+      }
+      if (!cibles.size) continue;
+      var p = parcours(e, a, passableRoute(e), function (i) { return cibles.has(i); }, 6 * N);
+      if (!p) continue;
+      d = creerMarcheur(e, 'docker', p.depart, { o: b.id, cb: cibles.get(p.fin).id, phase: 'aller', mode: 'chercher', g: g, ld: null, ch: p.chemin, k: 0, nav: w.id, cle: 'a:' + g, achat: 0 });
+      w.att['a:' + g] = enc + 1; b.dk.push(d.id);
+      if (!d.ch.length) atteint(e, d);
+      return true;
+    }
+    l = Object.keys(c.vend || {});
+    for (k = 0; k < l.length; k++) {
+      g = l[k]; enc = w.att['v:' + g] || 0;
+      if (!peutImporter(e, c, g, enc)) continue;
+      var cb = chercherPreneur(e, a, g, Q, b, true);
+      if (!cb) continue;
+      d = creerMarcheur(e, 'docker', cb.depart, { o: b.id, cb: cb.b.id, phase: 'aller', mode: 'livrer', g: g, ld: { g: g, q: Q }, ch: cb.chemin, k: 0, nav: w.id, cle: 'v:' + g, achat: 1 });
+      reserver(cb.b, g, Q); d.res = [cb.b.id, g, Q];
+      w.att['v:' + g] = enc + 1; b.dk.push(d.id);
+      if (!d.ch.length) atteint(e, d);
+      return true;
+    }
+    return false;
+  }
+  function atteintDocker(e, w, i) {
+    var Q = charge(), o = e._index.get(w.o), c = e._index.get(w.cb), nav = w.nav ? e._mIndex.get(w.nav) : null;
+    var cite = nav ? citeDe(e, nav.cite) : null;
+    if (w.phase === 'aller') {
+      if (w.mode === 'chercher') {
+        if (c && c.stocks && (c.stocks[w.g] || 0) >= Q) { c.stocks[w.g] -= Q; w.ld = { g: w.g, q: Q }; }
+      } else if (w.ld) {
+        if (w.res && w.res[0] === w.cb) { if (c) liberer(c, w.res[1], w.res[2]); w.res = null; }
+        var mis = c ? deposer(c, w.ld.g, w.ld.q) : 0;
+        // Charge importée : payée dès qu'elle entre au dépôt (une fois, même déposée en deux fois).
+        if (mis > 0 && w.achat && cite) { acheterCharge(e, cite, w.ld.g); w.achat = 0; }
+        w.ld.q -= mis;
+        if (w.ld.q > 0) {
+          var g2 = chercherPreneur(e, [i], w.ld.g, w.ld.q, o, true);
+          if (g2) { allerAuPreneur(e, w, g2); return; }
+        } else w.ld = null;
+      }
+      if (!o) { finir(e, w); return; }
+      w.phase = 'retour';
+      if (!rechercher(e, w)) finir(e, w);
+      return;
+    }
+    if (w.ld && w.ld.q > 0 && w.mode === 'chercher') {
+      if (nav && !nav.fin && nav.phase === 'quai' && o && o.nav === nav.id && cite) { vendreCharge(e, cite, w.ld.g, true); nav.n++; w.ld = null; }
+      else {
+        // Le navire est parti : la charge retourne dans un dépôt.
+        var g3 = chercherPreneur(e, [i], w.ld.g, w.ld.q, o, true);
+        if (g3) { w.mode = 'livrer'; w.achat = 0; w.phase = 'aller'; allerAuPreneur(e, w, g3); return; }
+      }
+    }
+    // Charge importée non livrée : elle reste sur le navire (rien n'a été payé).
+    finir(e, w);
+  }
+
+  // Départs des caravanes et des navires ; navires au large (une fois par jour).
+  function commerceJour(e) {
+    var C = D.regles.commerce, TPM = D.ticksParMois;
+    cites(e).forEach(function (c) {
+      var r = e.routes[c.id];
+      if (!r || !r.o || !r.v || r.f > 0 || e.tick < r.x) return;
+      r.x = e.tick + (c.route === 'mer' ? C.navireMois : C.caravaneMois) * TPM;
+      if (c.route === 'mer') envoyerNavire(e, c); else envoyerCaravane(e, c);
+    });
+    for (var k = 0; k < e.marcheurs.length; k++) {
+      var w = e.marcheurs[k];
+      if (w.type !== 'navire' || w.fin) continue;
+      if (w.phase === 'attente') {
+        var q = quaiLibre(e, w);
+        if (q) accoster(e, w, q);
+        else if (++w.jours >= C.navireJours) finir(e, w);
+      } else if (w.phase === 'aller' || w.phase === 'quai') {
+        var b = e._index.get(w.cb);
+        if (!b || b.nav !== w.id) departNavire(e, w, null);
+      }
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // L'empereur : faveur, demandes, tribut, dette, gouverneur (sections 11, 14.5, 15.1)
+  // ------------------------------------------------------------------------
+
+  function changerFaveur(e, n) { e.cotes.faveur = Math.max(0, Math.min(100, e.cotes.faveur + n)); }
+  function salaireGouvMax(e) { return D.regles.empereur.salaireParRang * Math.max(1, e.rang); }
+
+  function creerDemande(e, ev, mois) {
+    var dm = { id: e.prochainId++, bien: ev.bien || null, q: ev.charges || 0, deniers: ev.deniers || 0, gain: ev.faveur || 5,
+      ech: mois + ev.delai, ech2: mois + ev.delai + D.regles.empereur.retardMois, etat: 'ouverte', debut: mois };
+    e.demandes.push(dm);
+    noter(e, 'msg.demande', { bien: dm.bien || '', n: dm.bien ? dm.q : dm.deniers, mois: ev.delai }, true);
+    return dm;
+  }
+  function demandePrete(e, dm) {
+    if (dm.etat !== 'ouverte' && dm.etat !== 'retard') return false;
+    return dm.bien ? stockVille(e, dm.bien) >= dm.q * charge() : e.tresor >= dm.deniers;
+  }
+  function moisDemandes(e, mois) {
+    var E = D.regles.empereur;
+    e.demandes.forEach(function (dm) {
+      if (dm.etat === 'ouverte') {
+        var reste = dm.ech - mois;
+        if (E.rappels.indexOf(reste) >= 0) noter(e, 'msg.demandeRappel', { bien: dm.bien || '', n: dm.bien ? dm.q : dm.deniers, mois: reste }, false);
+        if (reste <= 0) { dm.etat = 'retard'; noter(e, 'msg.demandeRetard', { bien: dm.bien || '', n: dm.bien ? dm.q : dm.deniers, mois: E.retardMois }, true); }
+      } else if (dm.etat === 'retard' && mois >= dm.ech2) {
+        dm.etat = 'ignoree';
+        changerFaveur(e, E.ignoree);
+        noter(e, 'msg.demandeIgnoree', { bien: dm.bien || '', n: dm.bien ? dm.q : dm.deniers }, true);
+      }
+    });
+    // Les demandes réglées depuis plus de 2 ans quittent la liste.
+    e.demandes = e.demandes.filter(function (dm) { return dm.etat === 'ouverte' || dm.etat === 'retard' || mois - dm.ech2 < 24; });
+  }
+
+  // Chaque janvier (section 11.5) : intérêts de la dette, faveur, tribut.
+  function anneeEmpereur(e, b) {
+    var E = D.regles.empereur, diff = D.difficultes[e.difficulte] || D.difficultes.normal;
+    if (e.tresor < 0) {
+      var it = Math.ceil(-e.tresor * E.interets / 100);
+      e.tresor -= it; e.finances.an.interets += it;
+      changerFaveur(e, E.tresorNegatif);
+      noter(e, 'msg.interets', { montant: it }, true);
+    }
+    changerFaveur(e, -Math.round(E.erosion * diff.faveur));
+    // Bénéfice hors constructions ; ni le secours de l'empereur ni les dons du gouverneur n'y
+    // comptent (écart au cahier : Rome reprendrait le quart de son propre secours).
+    var benef = b.impots + b.exports - (b.salaires + b.imports + b.tribut + b.interets + b.fetes + b.gouverneur + b.envois);
+    var tr = Math.max(Math.floor(Math.max(0, benef) * E.tributPart / 100), Math.floor(e.pop / E.tributHabitants));
+    if (tr > 0) {
+      e.tresor -= tr; e.finances.an.tribut += tr;
+      noter(e, 'msg.tribut', { montant: tr }, false);
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // Les cinq critères (section 14)
+  // ------------------------------------------------------------------------
+
+  function genreCulture(d) { return d.dieu ? 'temple' : d.genre; }
+  // Culture (14.3) : chaque composante rapporte ses points au prorata de sa couverture.
+  function cultureDetail(e) {
+    var l = D.regles.cotes.culture, det = {}, total = 0, pop = e.pop;
+    l.forEach(function (c) { det[c.cle] = { cap: 0, pts: 0, max: c.points, n: 0 }; });
+    for (var j = 0; j < e.batiments.length; j++) {
+      var b = e.batiments[j], d = def(b), gc = genreCulture(d);
+      for (var k = 0; k < l.length; k++) {
+        var c = l[k];
+        if (!((c.types && c.types.indexOf(b.type) >= 0) || (c.genres && c.genres.indexOf(gc) >= 0))) continue;
+        det[c.cle].n++;
+        if (d.couverture && cause(e, b) === null) det[c.cle].cap += d.couverture;
+      }
+    }
+    l.forEach(function (c) {
+      var x = det[c.cle];
+      x.pts = pop > 0 ? Math.round(c.points * Math.min(1, x.cap / pop)) : 0;
+      total += x.pts;
+    });
+    return { total: Math.min(100, total), detail: det };
+  }
+  // Plafond de la prospérité : valeur moyenne de la maison de chaque habitant (14.2).
+  function plafondProsperite(e) {
+    var H = D.regles.cotes.habitat, v = 0, n = 0;
+    for (var k = 0; k < e.batiments.length; k++) {
+      var h = e.batiments[k];
+      if (!estMaison(h) || h.hab <= 0) continue;
+      v += (H[niveauDef(h).groupe] || 0) * h.hab; n += h.hab;
+    }
+    return n ? Math.floor(v / n) : 0;
+  }
+  function recettes(b) { return b.impots + b.exports + b.secours + b.dons; }
+  function depenses(b) { return b.salaires + b.constructions + b.imports + b.tribut + b.interets + b.fetes + b.gouverneur + b.envois; }
+  // Variation de la prospérité sur l'année du budget b (14.2).
+  function prosperiteAnnee(e, b) {
+    var P = D.regles.cotes.prosperite, det = {}, v = 0, riche = 0, pauvre = 0, maisons = 0, deux = 0;
+    det.benefice = recettes(b) > depenses(b) ? P.benefice : P.deficit;
+    if (e.chomage < P.chomageBas[0]) det.chomage = P.chomageBas[1];
+    else if (e.chomage > P.chomageHaut[0]) det.chomage = P.chomageHaut[1];
+    var ds = e.salaire - e.salaireRome;
+    if (ds >= P.salaireEcart) det.salaire = P.salaire; else if (ds < 0) det.salaire = -P.salaire;
+    e.batiments.forEach(function (h) {
+      if (!estMaison(h) || h.hab <= 0) return;
+      var gr = niveauDef(h).groupe, t = 0;
+      maisons++;
+      if (P.habitatRiche.indexOf(gr) >= 0) riche += h.hab;
+      if (P.habitatPauvre.indexOf(gr) >= 0) pauvre += h.hab;
+      D.aliments.forEach(function (a) { if ((h.viv[a] || 0) > 0) t++; });
+      if (t >= P.alimentationTypes) deux++;
+    });
+    if (e.pop && riche * 100 >= e.pop * P.habitatPart) det.habitat = P.habitat;
+    else if (e.pop && pauvre * 100 >= e.pop * P.habitatPart) det.habitat = -P.habitat;
+    if (maisons && deux * 100 >= maisons * P.alimentationPart) det.alimentation = P.alimentation;
+    if (D.batiments.hippodrome && e.batiments.some(function (x) { return x.type === 'hippodrome' && cause(e, x) === null; })) det.hippodrome = P.hippodrome;
+    for (var k in det) v += det[k];
+    return { variation: v, detail: det, plafond: plafondProsperite(e) };
+  }
+
+  // Facteur le plus limitant de chaque cote, en une phrase (14.6) : { cle, vars }.
+  function analyseCotes(e) {
+    var m = mission(e), o = m.objectifs || {}, r = {}, cu = cultureDetail(e), pire = null, ecart = -1;
+    Object.keys(cu.detail).forEach(function (k) { var x = cu.detail[k], g = x.max - x.pts; if (g > ecart) { ecart = g; pire = k; } });
+    r.population = e.humeur < D.regles.immigration.humeurMin ? { cle: 'humeur' } : placesLibres(e) < 20 ? { cle: 'logements' } : { cle: 'croissance' };
+    r.culture = pire && ecart > 0 ? { cle: 'manque', vars: { comp: pire } } : { cle: 'complete' };
+    var pl = plafondProsperite(e), pd = e.prosDetail || {}, neg = null;
+    Object.keys(pd).forEach(function (k) { if (pd[k] < 0 && (!neg || pd[k] < pd[neg])) neg = k; });
+    r.prosperite = o.prosperite && pl < o.prosperite ? { cle: 'plafond', vars: { n: pl } } : neg ? { cle: 'negatif', vars: { facteur: neg } } : { cle: 'annuelle' };
+    r.paix = { cle: 'annuelle' };
+    var retard = e.demandes.some(function (d) { return d.etat === 'retard'; }), ouverte = e.demandes.some(function (d) { return d.etat === 'ouverte'; });
+    r.faveur = retard ? { cle: 'retard' } : e.tresor < 0 ? { cle: 'dette' } : ouverte ? { cle: 'demande' } : { cle: 'erosion' };
+    return r;
+  }
+
+  // ------------------------------------------------------------------------
+  // Les cinq dieux (section 9.1) : satisfaction, jalousie, fêtes, bienfaits et colères
+  // ------------------------------------------------------------------------
+
+  // Capacité des lieux de culte en service et nombre de temples, par dieu.
+  function cultes(e) {
+    var G = D.regles.dieux, r = { cap: {}, nb: {}, oracle: 0 };
+    G.liste.forEach(function (g) { r.cap[g] = 0; r.nb[g] = 0; });
+    e.batiments.forEach(function (b) {
+      var d = def(b);
+      if (d.dieu && r.nb[d.dieu] !== undefined) { r.nb[d.dieu]++; if (cause(e, b) === null) r.cap[d.dieu] += d.couverture || 0; }
+      else if (d.genre === 'oracle') r.oracle += d.couverture || 0;
+    });
+    return r;
+  }
+  function cibleDieu(e, g, cu) {
+    var G = D.regles.dieux, diff = D.difficultes[e.difficulte] || D.difficultes.normal;
+    var c = e.pop > 0 ? Math.min(100, Math.floor((cu.cap[g] + cu.oracle) * 100 / e.pop / diff.dieux)) : 0;
+    var jaloux = G.liste.every(function (h) { return h === g || cu.nb[g] < cu.nb[h]; });
+    return { cible: jaloux ? Math.max(0, c - G.jalousie) : c, jaloux: jaloux };
+  }
+  function moisDieux(e, mois) {
+    var G = D.regles.dieux, cu = cultes(e);
+    G.liste.forEach(function (g) {
+      var st = e.divins[g], c = cibleDieu(e, g, cu);
+      st.c = c.cible; st.j = c.jaloux ? 1 : 0;
+      if (st.s < st.c) st.s = Math.min(st.c, st.s + G.pas); else if (st.s > st.c) st.s = Math.max(st.c, st.s - G.pas);
+      if (!e.dieux) return;
+      if (st.s < G.avertissement) { if (!st.av) { st.av = 1; noter(e, 'msg.dieuFache', { dieu: g }, true); } }
+      else if (st.s >= G.avertissement + 5) st.av = 0;
+      if (st.s < G.colere) { colereDieu(e, g); st.s = G.apresColere; st.av = 0; }
+      else if (st.s > G.bienfait && mois - st.b >= G.bienfaitMois) { bienfaitDieu(e, g); st.b = mois; }
+    });
+  }
+  function coutFete(e, taille) {
+    var G = D.regles.dieux;
+    return Math.max(G.feteMin, Math.ceil(e.pop * G.fetes[taille][1] / 100));
+  }
+  function feteDue(e) {
+    var G = D.regles.dieux, f = e.fete;
+    if (!f || e.tick < f.t) return;
+    var st = e.divins[f.dieu];
+    st.s = Math.min(100, st.s + G.fetes[f.taille][0]);
+    e.fete = null;
+    noter(e, 'msg.fete', { dieu: f.dieu }, false);
+  }
+  function fermes(e) { return e.batiments.filter(function (b) { return def(b).genre === 'ferme'; }); }
+  // Dépôt rempli par Mercure : la place libre, en parts égales entre les biens qu'il contient
+  // (à défaut : blé pour un grenier, le premier bien que la ville produit pour un entrepôt).
+  function remplirDepot(e, b) {
+    var biens = Object.keys(b.stocks).filter(function (g) { return b.stocks[g] > 0; }), Q = charge(), g, k;
+    if (!biens.length) {
+      if (b.type === 'grenier') biens = ['ble'];
+      else for (k = 0; k < e.batiments.length && !biens.length; k++) { var pr = def(e.batiments[k]).produit; if (pr) biens = [pr]; }
+    }
+    for (var tour = 0; tour < 100; tour++) {
+      var mis = 0;
+      for (k = 0; k < biens.length; k++) { g = biens[k]; mis += deposer(b, g, Math.min(Q, placeDans(b, g, true)), true); }
+      if (!mis) break;
+    }
+  }
+  function depotExtreme(e, type, plein) {
+    var best = null, v = plein ? 0 : Infinity;
+    e.batiments.forEach(function (b) {
+      if (b.type !== type) return;
+      var s = totalStock(b);
+      if (plein ? s > v : s < v) { v = s; best = b; }
+    });
+    return best;
+  }
+  function bienfaitDieu(e, g) {
+    var G = D.regles.dieux, F = D.regles.ferme.progressionCharge, lieu = -1;
+    if (g === 'ceres') fermes(e).forEach(function (b) { b.prog = F; });
+    else if (g === 'neptune') e.effets.neptune = G.neptuneMois;
+    else if (g === 'mercure') {
+      ['grenier', 'entrepot'].forEach(function (t) { var b = depotExtreme(e, t, false); if (b) { remplirDepot(e, b); lieu = ix(e, b.x, b.y); } });
+    } else if (g === 'mars') e.effets.marsBienfait = 1;
+    else if (g === 'venus') e.humeur = Math.min(100, e.humeur + G.venus);
+    noter(e, 'msg.bienfait.' + g, {}, true, lieu);
+  }
+  function colereDieu(e, g) {
+    var G = D.regles.dieux, lieu = -1;
+    if (g === 'ceres') fermes(e).forEach(function (b) { b.prog = 0; });
+    else if (g === 'neptune') {
+      e.marcheurs.forEach(function (w) { if (w.type === 'navire' && !w.fin) finir(e, w); });
+      e.effets.quais = G.quaisArretMois;
+    } else if (g === 'mercure') {
+      ['grenier', 'entrepot'].forEach(function (t) {
+        var b = depotExtreme(e, t, true);
+        if (b) { for (var k in b.stocks) b.stocks[k] = 0; lieu = ix(e, b.x, b.y); }
+      });
+    } else if (g === 'mars') e.effets.mars = G.marsMois;
+    else if (g === 'venus') e.humeur = Math.max(0, e.humeur - G.venus);
+    noter(e, 'msg.colere.' + g, {}, true, lieu);
+  }
+
+  // ------------------------------------------------------------------------
+  // Événements de la mission (section 15) : script des données, résolu au départ
+  // (date fixe « mois » ou fenêtre « fenetre » tirée avec la graine).
+  // ------------------------------------------------------------------------
+
+  function resoudreScript(e, m) {
+    e.script = (m.evenements || []).map(function (ev, k) {
+      var mo = ev.mois !== undefined ? ev.mois : ev.fenetre[0] + hasard(e, ev.fenetre[1] - ev.fenetre[0] + 1);
+      return { k: k, m: mo, fait: 0 };
+    });
+  }
+  function centreDe(b) { return { x: b.x + (b.t >> 1), y: b.y + (b.t >> 1) }; }
+  function evenement(e, ev, mois) {
+    var C = D.regles.commerce, c, r, b, l, lieu = -1;
+    switch (ev.type) {
+      case 'demande': creerDemande(e, ev, mois); return;
+      case 'salaireRome':
+        e.salaireRome = Math.max(D.regles.salaire.min, Math.min(D.regles.salaire.max, e.salaireRome + ev.delta));
+        noter(e, ev.delta > 0 ? 'msg.evt.salaireHausse' : 'msg.evt.salaireBaisse', { n: e.salaireRome }, false); return;
+      case 'prix':
+        e.prix[ev.bien] = (e.prix[ev.bien] || 0) + ev.delta;
+        noter(e, ev.delta > 0 ? 'msg.evt.prixHausse' : 'msg.evt.prixBaisse', { bien: ev.bien, n: Math.abs(ev.delta) }, false); return;
+      case 'quota':
+        c = citeDe(e, ev.cite); r = c && e.routes[c.id];
+        if (!r) return;
+        var P = C.paliers, cur = quota(e, c, ev.sens, ev.bien), k = 0;
+        while (k < P.length - 1 && P[k] < cur) k++;
+        r.qv[ev.sens + ':' + ev.bien] = P[Math.max(0, Math.min(P.length - 1, k + (ev.pas > 0 ? 1 : -1)))];
+        noter(e, ev.pas > 0 ? 'msg.evt.quotaHausse' : 'msg.evt.quotaBaisse', { cite: c.id, bien: ev.bien }, false); return;
+      case 'routeFermee':
+        c = citeDe(e, ev.cite); r = c && e.routes[c.id];
+        if (!r) return;
+        r.f = ev.duree;
+        noter(e, 'msg.evt.routeFermee', { cite: c.id, mois: ev.duree }, true); return;
+      case 'nouvelleCite':
+        c = citeDe(e, ev.cite); r = c && e.routes[c.id];
+        if (!r || r.v) return;
+        r.v = 1;
+        noter(e, 'msg.evt.nouvelleCite', { cite: c.id }, true); return;
+      case 'mauvaiseRecolte':
+        e.effets.recolte = ev.duree || 12;
+        noter(e, 'msg.evt.mauvaiseRecolte', { mois: e.effets.recolte }, true); return;
+      case 'sitePerdu':
+        l = e.batiments.filter(function (x) { return ['mine_fer', 'carriere_marbre', 'carriere_argile'].indexOf(x.type) >= 0; });
+        if (!l.length) return;
+        b = l[hasard(e, l.length)];
+        lieu = ix(e, centreDe(b).x, centreDe(b).y);
+        noter(e, 'msg.evt.sitePerdu', { bat: b.type }, true, lieu);
+        remplacer(e, b, 'ruines');
+        majPopulation(e);
+        return;
+      case 'seisme':
+        var z = ev.zone, vus = {};
+        l = [];
+        for (var y = z[1]; y <= z[3]; y++) for (var x = z[0]; x <= z[2]; x++) {
+          b = batA(e, x, y);
+          if (b && !vus[b.id] && def(b).genre !== 'ruines') { vus[b.id] = 1; l.push(b); }
+        }
+        l.forEach(function (x) { remplacer(e, x, 'ruines'); });
+        calculerEau(e); majPopulation(e);
+        noter(e, 'msg.evt.seisme', { n: l.length }, true, ix(e, (z[0] + z[2]) >> 1, (z[1] + z[3]) >> 1));
+        return;
+      case 'epidemie': epidemie(e, true); return;
+      default: return;
+    }
+  }
+
+  // ------------------------------------------------------------------------
+  // Mois et année du lot 3 (appelés par le bilan du mois)
+  // ------------------------------------------------------------------------
+
+  function moisEmpire(e, mois) {
+    var E = D.regles.empereur;
+    e.cotes.culture = cultureDetail(e).total;
+    moisDieux(e, mois);
+    feteDue(e);
+    ['neptune', 'quais', 'mars', 'recolte'].forEach(function (k) { if (e.effets[k] > 0) e.effets[k]--; });
+    cites(e).forEach(function (c) {
+      var r = e.routes[c.id];
+      if (r && r.f > 0 && --r.f === 0) { r.x = Math.max(r.x, e.tick); noter(e, 'msg.evt.routeRouverte', { cite: c.id }, false); }
+    });
+    e.script.forEach(function (s) {
+      if (s.fait || s.m > mois) return;
+      s.fait = 1;
+      evenement(e, mission(e).evenements[s.k], mois);
+    });
+    if (!e.empereur) return;
+    moisDemandes(e, mois);
+    // Destitution (section 2.4) : faveur ≤ 10 pendant 12 mois consécutifs.
+    if (e.cotes.faveur <= E.destitution[0]) {
+      e.faveurBasse++;
+      if (e.faveurBasse === 1) noter(e, 'msg.faveurBasse', { mois: E.destitution[1] }, true);
+      if (e.faveurBasse >= E.destitution[1] && !e.victoire && !e.defaite && !e.libre) { e.defaite = { tick: e.tick, cause: 'destitution' }; noter(e, 'msg.defaite', {}, true); }
+    } else e.faveurBasse = 0;
+  }
+
+  // Janvier : prospérité et paix sur l'année écoulée, nouveau budget, quotas remis à zéro,
+  // puis dette, faveur et tribut.
+  function nouvelAn(e) {
+    var b = e.finances.an, pr = prosperiteAnnee(e, b);
+    e.prosDetail = pr.detail;
+    e.cotes.prosperite = Math.max(0, Math.min(100, pr.plafond, e.cotes.prosperite + pr.variation));
+    if (!e.incidentsAn) e.cotes.paix = Math.min(100, e.cotes.paix + D.regles.cotes.paix.annee);
+    e.incidentsAn = 0;
+    e.finances.prec = b;
+    e.finances.an = nouveauBudget();
+    for (var id in e.routes) e.routes[id].n = {};
+    if (e.empereur) anneeEmpereur(e, b);
   }
 
   // ------------------------------------------------------------------------
@@ -2271,7 +3056,7 @@
   }
 
   // Temps de la journée (ticks) où se font les calculs globaux, étalés pour éviter les à-coups.
-  var PHASES = { travail: 0, eau: 10, pompiers: 20, immigration: 25, bilan: 35, attractivite: 45, nourriture: 5, finances: 15, humeur: 30, mois: 40 };
+  var PHASES = { travail: 0, eau: 10, pompiers: 20, immigration: 25, commerce: 30, bilan: 35, attractivite: 45, nourriture: 5, finances: 15, humeur: 30, mois: 40 };
 
   function pas(e) {
     e.tick++;
@@ -2281,6 +3066,7 @@
     else if (phase === PHASES.eau) calculerEau(e);
     else if (phase === PHASES.pompiers) envoyerPompiers(e);
     else if (phase === PHASES.immigration) immigrer(e);
+    else if (phase === PHASES.commerce) commerceJour(e);
     else if (phase === PHASES.bilan) { majPopulation(e); verifierTutoriel(e); verifierVictoire(e); }
     else if (phase === PHASES.attractivite) calculerAttractivite(e);
     if (premierJour) {
@@ -2321,6 +3107,8 @@
     if (d.genre === 'fontaine' && !b.actif) return 'sansEau';
     if (d.eauRequise && !b.actif) return 'sansReservoir';
     if (d.genre === 'peche' && b.sansBanc && !b.mb) return 'sansBanc';
+    if (d.genre === 'quai' && e.effets && e.effets.quais > 0) return 'colereNeptune';
+    if (d.genre === 'quai' && !b.nav && !cites(e).some(function (c) { return c.route === 'mer' && routeActive(e, c); })) return 'sansRouteMer';
     if ((d.genre === 'ferme' || d.genre === 'extraction' || d.genre === 'peche' || d.genre === 'atelier') && b.stock >= 1 && !b.m) return 'sansPreneur';
     if (d.genre === 'atelier' && b.mat < charge() && b.stock < 1) return 'sansMatiere';
     if (d.genre === 'marche' && totalStock(b) <= 0 && !b.mA) return 'sansMarchandise';
@@ -2397,6 +3185,12 @@
       if (!dedans(e, w.x, w.y) || !dedans(e, w.nx, w.ny)) pb.push('marcheur ' + w.id + ' hors carte');
     });
     if (pop !== e.pop) pb.push('population ' + e.pop + ' ≠ somme des maisons ' + pop);
+    ['culture', 'prosperite', 'paix', 'faveur'].forEach(function (k) { var v = e.cotes[k]; if (!(v >= 0 && v <= 100)) pb.push('cote ' + k + ' hors de 0 à 100 : ' + v); });
+    if (!(e.fortune >= 0)) pb.push('fortune du gouverneur négative');
+    cites(e).forEach(function (c) {
+      ['v', 'a'].forEach(function (sens) { Object.keys(sens === 'v' ? c.vend || {} : c.achete || {}).forEach(function (g) { if (echange(e, c, sens, g) > quota(e, c, sens, g)) pb.push('quota dépassé : ' + c.id + ' ' + sens + ':' + g); }); });
+    });
+    D.regles.dieux.liste.forEach(function (g) { var st = e.divins[g]; if (!st || !(st.s >= 0 && st.s <= 100)) pb.push('dieu ' + g + ' : satisfaction hors de 0 à 100'); });
     return pb;
   }
 
@@ -2432,7 +3226,7 @@
   function importer(txt) {
     var o = typeof txt === 'string' ? JSON.parse(txt) : txt;
     if (!o || typeof o !== 'object') throw new Error('sauvegarde illisible');
-    if (o.v !== VERSION_ETAT && o.v !== 1) throw new Error('version de sauvegarde inconnue : ' + o.v);
+    if (o.v !== VERSION_ETAT && o.v !== 1 && o.v !== 2) throw new Error('version de sauvegarde inconnue : ' + o.v);
     if (!MISSIONS[o.mission]) throw new Error('mission inconnue : ' + o.mission);
     var e = {};
     Object.keys(o).forEach(function (k) {
@@ -2446,8 +3240,30 @@
     });
     reconstruireCaches(e);
     if (o.v === 1) completerV1(e);
+    if (o.v <= 2) completerV2(e);
     if (!e.attract || e.attract.length !== n) throw new Error('sauvegarde abîmée : attract');
     return e;
+  }
+
+  // Sauvegarde du lot 2 (ou du lot 1 déjà complétée) : champs du lot 3 avec leurs valeurs de départ.
+  function completerV2(e) {
+    var m = MISSIONS[e.mission], ci = m.cotes || {};
+    e.v = VERSION_ETAT;
+    e.empereur = !e.libre && m.empereur !== false;
+    e.dieux = !e.libre && m.dieux === true;
+    e.cotes = { culture: 0, prosperite: ci.prosperite || 0, paix: ci.paix || 0, faveur: ci.faveur !== undefined ? ci.faveur : D.regles.empereur.faveurDepart };
+    e.prosDetail = {}; e.faveurBasse = 0; e.incidentsAn = 0;
+    e.rang = 1; e.fortune = 0; e.salaireGouv = salaireGouvMax(e); e.presentT = -1;
+    e.commerce = {}; e.routes = {}; e.prix = {}; e.demandes = []; e.divins = {}; e.fete = null;
+    e.effets = { neptune: 0, quais: 0, mars: 0, marsBienfait: 0, recolte: 0 };
+    e.stats.exports = e.stats.exports || 0; e.stats.imports = e.stats.imports || 0;
+    ['an', 'prec'].forEach(function (k) { var b = e.finances[k] || {}; POSTES.forEach(function (p) { b[p] = b[p] || 0; }); e.finances[k] = b; });
+    ((m.empire && m.empire.cites) || []).forEach(function (c) { e.routes[c.id] = { o: c.ouverte ? 1 : 0, v: c.cachee ? 0 : 1, f: 0, n: {}, x: e.tick, qv: {} }; });
+    D.regles.dieux.liste.forEach(function (g) { e.divins[g] = { s: D.regles.dieux.depart, c: 0, j: 0, b: -1000, av: 0 }; });
+    var mois = Math.floor(e.tick / D.ticksParMois);
+    e.script = (m.evenements || []).map(function (ev, k) { return { k: k, m: ev.mois !== undefined ? ev.mois : ev.fenetre[0], fait: (ev.mois !== undefined ? ev.mois : ev.fenetre[0]) < mois ? 1 : 0 }; });
+    placerMer(e, m.carte);
+    e.cotes.culture = cultureDetail(e).total;
   }
 
   // Sauvegarde du lot 1 : champs du lot 2 ajoutés avec leurs valeurs de départ.
@@ -2526,12 +3342,21 @@
     travailCategories: travailCategories,
     calculerSante: calculerSante,
     quaiEau: quaiEau,
+    // Lot 3
+    cites: cites, citeDe: citeDe, statutBien: statutBien, cibleBien: cibleBien, stockVille: stockVille, prixBien: prixBien,
+    quota: quota, echange: echange, resteQuota: resteQuota, routeActive: routeActive, quaiEnService: quaiEnService,
+    cultureDetail: cultureDetail, plafondProsperite: plafondProsperite, prosperiteAnnee: prosperiteAnnee, analyseCotes: analyseCotes,
+    recettes: recettes, depenses: depenses, cultes: cultes, cibleDieu: cibleDieu, coutFete: coutFete, salaireGouvMax: salaireGouvMax,
+    demandePrete: demandePrete, POSTES: POSTES,
     // Outils réservés aux villes d'exemple (affiche, aperçus) et aux tests : jamais appelés par le joueur.
     _outils: {
       creerBatiment: creerBatiment, creerMarcheur: creerMarcheur, emettreErrant: emettreErrant, ix: ix, noter: noter,
       finances: finances, consommer: consommer, quotidien: quotidien, nouveauMois: nouveauMois, nouveauJour: nouveauJour,
       enflammer: enflammer, immigrer: immigrer, verifierTutoriel: verifierTutoriel, composantes: composantes,
-      deposer: deposer, agrandir: agrandir, diviser: diviser, epidemie: epidemie
+      deposer: deposer, agrandir: agrandir, diviser: diviser, epidemie: epidemie,
+      nouvelAn: nouvelAn, moisEmpire: moisEmpire, moisDieux: moisDieux, commerceJour: commerceJour, evenement: evenement,
+      bienfaitDieu: bienfaitDieu, colereDieu: colereDieu, changerFaveur: changerFaveur, envoyerCaravane: envoyerCaravane, envoyerNavire: envoyerNavire,
+      creerDemande: creerDemande, anneeEmpereur: anneeEmpereur
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
