@@ -19,11 +19,13 @@
 (function (racine) {
   'use strict';
 
-  var VERSION_ETAT = 1;
+  var VERSION_ETAT = 2; // 2 : lot 2 (économie) ; une sauvegarde de version 1 est complétée à l'import
 
   // Énumérations (codes de couches, pas des règles de jeu).
   var T = { HERBE: 0, PRAIRIE: 1, ARBRES: 2, ROCHERS: 3, EAU: 4 };
-  var R = { AUCUNE: 0, ROUTE: 1, BARRIERE: 2, ROME: 3 };
+  var R = { AUCUNE: 0, ROUTE: 1, BARRIERE: 2, ROME: 3, PLACE: 4 };
+  var GENRES = ['maison', 'outil', 'route', 'barriere', 'puits', 'fontaine', 'reservoir', 'aqueduc', 'ferme', 'extraction', 'peche',
+    'atelier', 'grenier', 'entrepot', 'marche', 'service', 'spectacle', 'ecole_art', 'oracle', 'deco', 'place', 'ruines', 'incendie'];
 
   var D = null;          // données validées et préparées
   var MISSIONS = {};     // id → mission
@@ -47,7 +49,8 @@
     ['detteMax', 'deblaiementCout', 'serviceRayon', 'serviceJours', 'porteeErrant', 'delaiMarcheurJours', 'divertissementMax'].forEach(function (k) {
       exige(typeof r[k] === 'number', 'regles.' + k + ' manquant');
     });
-    ['maison', 'immigration', 'emigration', 'humeur', 'travail', 'salaire', 'impot', 'eau', 'feu', 'effondrement', 'marche', 'grenier', 'ferme', 'spectacle', 'vitesses'].forEach(function (k) {
+    ['maison', 'immigration', 'emigration', 'humeur', 'travail', 'salaire', 'impot', 'eau', 'feu', 'effondrement', 'marche', 'grenier', 'ferme', 'spectacle', 'vitesses',
+      'extraction', 'atelier', 'entrepot', 'peche', 'attractivite', 'sante'].forEach(function (k) {
       exige(r[k] && typeof r[k] === 'object', 'regles.' + k + ' manquant');
     });
     exige(Array.isArray(d.maisons) && d.maisons.length === 20, '20 niveaux de maison attendus');
@@ -56,7 +59,12 @@
       exige(Number.isInteger(m.habitants) && m.habitants > 0, 'maison ' + (i + 1) + ' : habitants');
       exige(m.besoins && typeof m.besoins === 'object', 'maison ' + (i + 1) + ' : besoins');
       exige(typeof m.impot === 'number', 'maison ' + (i + 1) + ' : impot');
+      exige(Array.isArray(m.emet) && m.emet.length === 2, 'maison ' + (i + 1) + ' : emet');
+      Object.keys(m.besoins || {}).forEach(function (k) {
+        exige(['eau', 'nourriture', 'religion', 'divertissement'].indexOf(k) >= 0 || (d.biens || {})[k] || (d.batiments || {})[k], 'maison ' + (i + 1) + ' : besoin inconnu ' + k);
+      });
     });
+    exige(Array.isArray((d.regles || {}).consignes) && d.regles.consignes[0] === 'accepter', 'regles.consignes : « accepter » en premier');
     var b = d.batiments || {};
     exige(Object.keys(b).length > 0, 'aucun bâtiment');
     Object.keys(b).forEach(function (k) {
@@ -67,6 +75,19 @@
       exige(Number.isInteger(x.effectif) && x.effectif >= 0, k + ' : effectif');
       if (x.marcheur) exige(!!(d.marcheurs || {})[x.marcheur], k + ' : marcheur inconnu ' + x.marcheur);
       if (x.categorie) exige((d.categories || []).indexOf(x.categorie) >= 0, k + ' : catégorie inconnue ' + x.categorie);
+      exige(GENRES.indexOf(x.genre) >= 0, k + ' : genre inconnu ' + x.genre);
+      if (x.effectif) exige((r.travail && r.travail.categories || []).indexOf(x.travail) >= 0, k + ' : catégorie de travail');
+      if (x.produit) exige(!!(d.biens || {})[x.produit], k + ' : produit inconnu ' + x.produit);
+      if (x.matiere) exige(!!(d.biens || {})[x.matiere], k + ' : matière inconnue ' + x.matiere);
+      if (x.genre === 'ferme' || x.genre === 'extraction' || x.genre === 'atelier') exige(x.chargesParAn > 0 && !!x.produit, k + ' : production');
+      if (x.genre === 'atelier') exige(!!x.matiere, k + ' : matière');
+      if (x.genre === 'extraction') exige(['eau', 'arbres', 'rochers'].indexOf(x.pres) >= 0, k + ' : « pres »');
+      if (x.genre === 'spectacle') {
+        exige(Array.isArray(x.artistes) && x.artistes.length && Array.isArray(x.points) && x.points.length === x.artistes.length, k + ' : artistes et points');
+        (x.artistes || []).forEach(function (a) { exige(!!(d.marcheurs || {})[a], k + ' : artiste inconnu ' + a); });
+      }
+      if (x.genre === 'ecole_art') exige(!!(d.marcheurs || {})[x.forme], k + ' : artiste formé inconnu');
+      if (x.attractivite) exige(Array.isArray(x.attractivite) && x.attractivite.length === 2, k + ' : attractivité');
     });
     exige(Array.isArray(d.missions) && d.missions.length === 17, '17 missions attendues');
     (d.missions || []).forEach(function (m, i) {
@@ -96,6 +117,16 @@
       m.besoinsCumul = c;
       cumul = c;
     });
+    // Biens qu'une maison achète au marché : ceux de son niveau et du suivant (pour monter).
+    var nmax = d.regles.maison.niveauMax || d.maisons.length;
+    d.maisons.forEach(function (m, i) {
+      var cible = d.maisons[Math.min(i + 1, nmax - 1)];
+      m.biensVoulus = Object.keys(cible.besoinsCumul).filter(function (k) { return d.biens[k] && d.aliments.indexOf(k) < 0; });
+    });
+    d.niveauMax = nmax;
+    d.listeBiens = Object.keys(d.biens);
+    d.matieres = [];
+    Object.keys(d.batiments).forEach(function (k) { var x = d.batiments[k]; if (x.matiere && d.matieres.indexOf(x.matiere) < 0) d.matieres.push(x.matiere); });
     MISSIONS = {};
     d.missions.forEach(function (m) { MISSIONS[m.id] = m; });
     d.ticksParMois = d.temps.ticksParJour * d.temps.joursParMois;
@@ -137,7 +168,7 @@
   function def(b) { return D.batiments[b.type]; }
   function estMaison(b) { return b && b.type === 'logement'; }
   function niveauDef(h) { return D.maisons[Math.max(1, h.niv) - 1]; }
-  function capacite(h) { return h.niv <= 0 ? D.regles.maison.terrainVagueHabitants : niveauDef(h).habitants; }
+  function capacite(h) { return h.quar > 0 ? 0 : h.niv <= 0 ? D.regles.maison.terrainVagueHabitants : niveauDef(h).habitants; }
 
   function versionRoutes(e) { e._vRoutes = (e._vRoutes || 0) + 1; e._v = (e._v || 0) + 1; }
   function versionCarte(e) { e._v = (e._v || 0) + 1; }
@@ -338,6 +369,22 @@
     }
     e.entree = ix(e, 0, ry0);
     e.sortie = ix(e, N - 1, ry0);
+    placerBancs(e, p);
+  }
+
+  // Bancs de poissons (données de la carte) : chacun est posé sur la case d'eau la plus
+  // proche du point donné (6 cases au plus), pour suivre une rive tirée au hasard.
+  function placerBancs(e, p) {
+    e.bancs = [];
+    (p.poissons || []).forEach(function (q) {
+      for (var r = 0; r <= 6; r++) {
+        for (var y = q[1] - r; y <= q[1] + r; y++) for (var x = q[0] - r; x <= q[0] + r; x++) {
+          if (Math.max(Math.abs(x - q[0]), Math.abs(y - q[1])) !== r || !dedans(e, x, y)) continue;
+          var i = ix(e, x, y);
+          if (e.terrain[i] === T.EAU) { if (e.bancs.indexOf(i) < 0) e.bancs.push(i); return; }
+        }
+      }
+    });
   }
 
   // ------------------------------------------------------------------------
@@ -350,11 +397,19 @@
     if (!m || !m.dispo) throw new Error('mission indisponible : ' + idMission);
     var N = m.carte.taille, n = N * N;
     var diff = D.difficultes[options.difficulte || 'normal'] || D.difficultes.normal;
+    var libre = !!options.libre, tout = !!options.tout;
+    var risques = options.risques === undefined ? !!m.risques : !!options.risques;
+    var permis = tout ? Object.keys(D.batiments).filter(function (k) { return D.batiments[k].categorie; }) : m.batiments.slice();
     var e = {
       v: VERSION_ETAT,
       mission: m.id,
       difficulte: options.difficulte || 'normal',
-      libre: !!options.libre,
+      libre: libre,
+      tout: tout,
+      risques: risques,
+      // Attractivité (section 5.3) : ignorée dans les deux missions tutorielles, appliquée ailleurs.
+      attractivite: options.attractivite !== undefined ? !!options.attractivite : (libre || m.attractivite !== false),
+      epidemies: risques && (permis.indexOf('medecin') >= 0 || permis.indexOf('hopital') >= 0),
       graine: (options.graine === undefined ? m.carte.graine : options.graine) | 0,
       alea: 0,
       tick: 0,
@@ -366,11 +421,13 @@
       bat: new Int32Array(n),
       eauPuits: new Uint8Array(n),
       eauFontaine: new Uint8Array(n),
+      attract: new Int8Array(n),
+      bancs: [],
       entree: 0, sortie: 0,
       batiments: [],
       marcheurs: [],
       prochainId: 1,
-      tresor: Math.round(m.fonds * diff.fonds),
+      tresor: options.fonds !== undefined ? Math.round(options.fonds) : Math.round(m.fonds * diff.fonds),
       impot: D.regles.impot.tauxDepart,
       salaire: D.regles.salaire.rome,
       salaireRome: D.regles.salaire.rome,
@@ -379,9 +436,12 @@
       reliquat: 0,
       pop: 0,
       travailleurs: 0, emplois: 0, emploisRequis: 0, chomage: 0,
-      debloques: (m.tutoriel && m.tutoriel.length && !options.libre ? m.depart : m.batiments).slice(),
+      priorites: {},
+      sante: 0,
+      flux: { imm: 0, emi: 0, morts: 0 },
+      debloques: (m.tutoriel && m.tutoriel.length && !libre ? m.depart.slice() : permis),
       tuto: 0,
-      tutoFini: !(m.tutoriel && m.tutoriel.length) || !!options.libre,
+      tutoFini: !(m.tutoriel && m.tutoriel.length) || libre,
       secoursRecu: false,
       victoire: null,
       defaite: null,
@@ -389,13 +449,14 @@
       journal: [],
       finances: { an: nouveauBudget(), prec: nouveauBudget() },
       histo: [],
-      stats: { incendies: 0, effondrements: 0 }
+      stats: { incendies: 0, effondrements: 0, epidemies: 0 }
     };
     e.alea = e.graine ^ 0x5bd1e995;
     reconstruireCaches(e);
     creerCarte(e, m.carte);
     versionRoutes(e);
     calculerEau(e);
+    calculerAttractivite(e);
     noter(e, 'msg.bienvenue', {}, false);
     return e;
   }
@@ -430,11 +491,15 @@
     var d = D.batiments[type], t = taille || d.taille;
     var b = { id: e.prochainId++, type: type, x: x, y: y, t: t, eff: 0, feu: 0, dom: 0, cpt: 0, m: 0, sortie: 0 };
     switch (d.genre) {
-      case 'maison': b.niv = 0; b.hab = 0; b.att = 0; b.viv = {}; b.svc = {}; b.ok = 0; b.manque = 0; b.sansRoute = 0; break;
-      case 'ferme': b.prog = 0; b.stock = 0; break;
-      case 'grenier': b.stocks = {}; b.attendu = 0; break;
-      case 'marche': b.stocks = {}; b.mA = 0; b.mV = 0; b.cptV = 0; break;
-      case 'spectacle': b.spect = 0; b.attendu = 0; break;
+      case 'maison': b.niv = 0; b.hab = 0; b.att = 0; b.viv = {}; b.svc = {}; b.pts = {}; b.ok = 0; b.manque = 0; b.sansRoute = 0; b.quar = 0; b.bloque = 0; break;
+      case 'ferme': case 'extraction': b.prog = 0; b.stock = 0; break;
+      case 'peche': b.stock = 0; b.mb = 0; b.sansBanc = 0; break;
+      case 'atelier': b.prog = 0; b.mat = 0; b.matAtt = 0; b.stock = 0; break;
+      case 'grenier': b.stocks = {}; b.attendu = 0; b.cons = {}; b.mc = 0; break;
+      case 'entrepot': b.stocks = {}; b.attendus = {}; b.cons = {}; b.plaf = {}; b.mc = 0; break;
+      case 'marche': b.stocks = {}; b.mA = 0; b.mV = 0; b.cptV = 0; b.interdits = {}; b.dem = {}; b.der = {}; break;
+      case 'spectacle': b.spects = {}; b.attendus = {}; break;
+      case 'service': if (d.eauRequise) b.actif = 0; break;
       case 'ecole_art': b.prog = 0; break;
       case 'reservoir': b.plein = 0; break;
       case 'fontaine': b.actif = 0; break;
@@ -493,8 +558,9 @@
       if (e.bat[i]) return 'occupe';
       return (e.terrain[i] === T.HERBE || e.terrain[i] === T.PRAIRIE) ? null : 'terrain';
     }
-    if (d.genre === 'barriere') {
+    if (d.genre === 'barriere' || d.genre === 'place') {
       i = ix(e, x, y);
+      if (d.genre === 'place' && e.route[i] === R.PLACE) return 'occupe';
       return e.route[i] === R.ROUTE ? null : 'pasRoute';
     }
     if (d.genre === 'aqueduc') {
@@ -511,7 +577,50 @@
       if (d.terrain === 'prairie' && e.terrain[i] !== T.PRAIRIE) return 'prairie';
     }
     if (d.genre === 'maison' && !routeProche(e, { x: x, y: y, t: 1 }, D.regles.logementDistanceRoute)) return 'routeLoin';
+    if (d.pres && !pres(e, { x: x, y: y, t: t }, d.pres)) return { eau: 'presEau', arbres: 'presArbres', rochers: 'presRochers' }[d.pres];
+    if (d.genre === 'peche' && quaiEau(e, { x: x, y: y, t: t }) < 0) return 'rive';
+    if (d.marbre && marbreDispo(e) < d.marbre * D.regles.marbreParCharge) return 'marbre';
     return null;
+  }
+
+  // Terrain voulu (eau, arbres, rochers) à « presRayon » case(s) ou moins de l'emprise.
+  function pres(e, b, quoi) {
+    var r = D.regles.extraction.presRayon, cible = quoi === 'eau' ? T.EAU : quoi === 'arbres' ? T.ARBRES : T.ROCHERS;
+    for (var y = b.y - r; y < b.y + b.t + r; y++) for (var x = b.x - r; x < b.x + b.t + r; x++) {
+      if (dedans(e, x, y) && e.terrain[ix(e, x, y)] === cible) return true;
+    }
+    return false;
+  }
+
+  // Quai : un côté entier de l'emprise donne sur l'eau. Renvoie la première case d'eau de ce
+  // côté (là où le bateau s'amarre), ou -1. Côtés dans l'ordre nord, est, sud, ouest.
+  function quaiEau(e, b) {
+    var cotes = [[0, -1, 1, 0], [b.t, 0, 0, 1], [0, b.t, 1, 0], [-1, 0, 0, 1]];
+    for (var c = 0; c < 4; c++) {
+      var ok = true, x0 = b.x + cotes[c][0], y0 = b.y + cotes[c][1];
+      for (var k = 0; k < b.t && ok; k++) {
+        var x = x0 + cotes[c][2] * k, y = y0 + cotes[c][3] * k;
+        if (!dedans(e, x, y) || e.terrain[ix(e, x, y)] !== T.EAU) ok = false;
+      }
+      if (ok) return ix(e, x0, y0);
+    }
+    return -1;
+  }
+
+  // Marbre des entrepôts (grands temples et oracle le consomment à la pose).
+  function marbreDispo(e) {
+    var n = 0;
+    e.batiments.forEach(function (b) { if (b.type === 'entrepot') n += b.stocks.marbre || 0; });
+    return n;
+  }
+  function prendreMarbre(e, q, trace) {
+    for (var k = 0; k < e.batiments.length && q > 0; k++) {
+      var b = e.batiments[k];
+      if (b.type !== 'entrepot' || !(b.stocks.marbre > 0)) continue;
+      var p = Math.min(q, b.stocks.marbre);
+      b.stocks.marbre -= p; q -= p;
+      if (trace) trace.marbre.push([b.id, p]);
+    }
   }
 
   // Pose d'un élément sur une case, sans contrôle de l'argent (fait par l'appelant).
@@ -519,9 +628,11 @@
     var d = D.batiments[type], i = ix(e, x, y);
     if (d.genre === 'route') { e.route[i] = R.ROUTE; versionRoutes(e); trace.cases.push({ i: i, k: 'route' }); return; }
     if (d.genre === 'barriere') { e.route[i] = R.BARRIERE; versionRoutes(e); trace.cases.push({ i: i, k: 'barriere' }); return; }
+    if (d.genre === 'place') { e.route[i] = R.PLACE; versionRoutes(e); trace.cases.push({ i: i, k: 'place' }); return; }
     if (d.genre === 'aqueduc') { e.aqueduc[i] = 1; versionCarte(e); trace.cases.push({ i: i, k: 'aqueduc' }); return; }
     var b = creerBatiment(e, type, x, y);
     trace.bats.push(b.id);
+    if (d.marbre) prendreMarbre(e, d.marbre * D.regles.marbreParCharge, trace);
   }
 
   // Déblaiement d'une case : arbres, bâtiment, ruines, route, aqueduc (sans remboursement).
@@ -535,6 +646,7 @@
       calculerEau(e);
       return n;
     }
+    if (e.route[i] === R.PLACE) { e.route[i] = R.ROUTE; versionRoutes(e); return 1; } // la place redevient route
     if (e.route[i] && e.route[i] !== R.ROME) { e.route[i] = 0; versionRoutes(e); return 1; }
     if (e.aqueduc[i]) { e.aqueduc[i] = 0; versionCarte(e); calculerEau(e); return 1; }
     if (e.terrain[i] === T.ARBRES) { e.terrain[i] = T.HERBE; versionCarte(e); return 1; }
@@ -548,6 +660,10 @@
   //   { type: 'tracer', bat, cases: [[x, y], …] }   (routes, aqueducs, logements, déblaiement)
   //   { type: 'annuler' }                           (dernière construction, remboursée)
   //   { type: 'reglage', cle: 'impot' | 'salaire', valeur }
+  //   { type: 'consigne', id, bien, valeur: 'accepter' | 'refuser' | 'chercher' | 'vider' }  (grenier, entrepôt)
+  //   { type: 'plafond', id, bien, valeur: 1 à 4 }   (entrepôt : quarts de la capacité)
+  //   { type: 'interdit', id, bien, valeur: booléen } (marché)
+  //   { type: 'priorite', categorie, valeur: 0 à 9 }  (0 : sans priorité ; 1 passe en premier)
 
   function appliquer(e, c) {
     var res = { ok: false, cout: 0, n: 0, raison: null };
@@ -556,7 +672,7 @@
       var d = D.batiments[c.bat];
       if (!d) { res.raison = 'inconnu'; return res; }
       var cases = c.type === 'poser' ? [[c.x, c.y]] : (c.cases || []);
-      var trace = { tick: e.tick, cout: 0, cases: [], bats: [] };
+      var trace = { tick: e.tick, cout: 0, cases: [], bats: [], marbre: [] };
       var eauTouchee = false;
       for (var k = 0; k < cases.length; k++) {
         var x = cases[k][0] | 0, y = cases[k][1] | 0;
@@ -577,7 +693,7 @@
       }
       if (d.genre !== 'outil' && res.n) e.derniere = trace;
       if (eauTouchee) calculerEau(e);
-      if (res.n) { majPopulation(e); verifierTutoriel(e); }
+      if (res.n) { majPopulation(e); verifierTutoriel(e); calculerAttractivite(e); }
       res.ok = res.n > 0;
       return res;
     }
@@ -588,12 +704,39 @@
         if (cs.k === 'route' && e.route[cs.i] === R.ROUTE) { e.route[cs.i] = 0; versionRoutes(e); }
         if (cs.k === 'barriere' && e.route[cs.i] === R.BARRIERE) { e.route[cs.i] = R.ROUTE; versionRoutes(e); }
         if (cs.k === 'aqueduc' && e.aqueduc[cs.i]) { e.aqueduc[cs.i] = 0; versionCarte(e); }
+        if (cs.k === 'place' && e.route[cs.i] === R.PLACE) { e.route[cs.i] = R.ROUTE; versionRoutes(e); }
       });
       a.bats.forEach(function (id) { var b = e._index.get(id); if (b) retirerBatiment(e, b); });
+      (a.marbre || []).forEach(function (m) { var b = e._index.get(m[0]); if (b) b.stocks.marbre = (b.stocks.marbre || 0) + m[1]; });
       e.tresor += a.cout; e.finances.an.constructions -= a.cout;
       res.cout = -a.cout; res.ok = true;
       e.derniere = null;
-      calculerEau(e); majPopulation(e);
+      calculerEau(e); majPopulation(e); calculerAttractivite(e);
+      return res;
+    }
+    if (c.type === 'consigne' || c.type === 'plafond' || c.type === 'interdit') {
+      var cb = e._index.get(c.id | 0);
+      if (!cb || !D.biens[c.bien]) { res.raison = 'cible'; return res; }
+      var aliment = D.aliments.indexOf(c.bien) >= 0;
+      if (c.type === 'consigne') {
+        if (!(cb.type === 'entrepot' || (cb.type === 'grenier' && aliment)) || D.regles.consignes.indexOf(c.valeur) < 0) { res.raison = 'cible'; return res; }
+        if (c.valeur === 'accepter') delete cb.cons[c.bien]; else cb.cons[c.bien] = c.valeur;
+      } else if (c.type === 'plafond') {
+        var q = c.valeur | 0;
+        if (cb.type !== 'entrepot' || q < 1 || q > 4) { res.raison = 'cible'; return res; }
+        if (q === D.regles.entrepot.plafondDepart) delete cb.plaf[c.bien]; else cb.plaf[c.bien] = q;
+      } else {
+        if (cb.type !== 'marche') { res.raison = 'cible'; return res; }
+        if (c.valeur) cb.interdits[c.bien] = 1; else delete cb.interdits[c.bien];
+      }
+      res.ok = true;
+      return res;
+    }
+    if (c.type === 'priorite') {
+      var v = c.valeur | 0;
+      if (D.regles.travail.categories.indexOf(c.categorie) < 0 || v < 0 || v > 9) { res.raison = 'reglage'; return res; }
+      if (v) e.priorites[c.categorie] = v; else delete e.priorites[c.categorie];
+      res.ok = true;
       return res;
     }
     if (c.type === 'reglage') {
@@ -672,7 +815,55 @@
       }
       if (b.actif) couvrir(e, e.eauFontaine, b, b.eff >= def(b).effectif ? E.fontaineRayon : E.fontaineRayonReduit);
     });
+    // Bains : sur les canalisations, c'est-à-dire dans le rayon d'un réservoir plein (section 7.1).
+    e.batiments.forEach(function (b) {
+      if (!def(b).eauRequise) return;
+      b.actif = 0;
+      for (var k = 0; k < reservoirs.length; k++) {
+        if (reservoirs[k].plein && distRect(reservoirs[k], b.x, b.y) <= E.reservoirRayon) { b.actif = 1; break; }
+      }
+    });
     versionCarte(e);
+  }
+
+  // ------------------------------------------------------------------------
+  // Attractivité (section 5.3) : grille de -100 à +100, recalculée chaque jour et après
+  // chaque construction. Chaque source donne v à son contact, puis décroît linéairement
+  // jusqu'à 0 à r cases (« +4 sur 3 » : 4, 2, 1 aux distances 1, 2, 3).
+  // ------------------------------------------------------------------------
+
+  var ACC = null;
+  function emission(b) {
+    if (estMaison(b)) return b.hab > 0 ? niveauDef(b).emet : null;
+    return def(b).attractivite || null;
+  }
+  function rayonner(e, acc, x0, y0, t, v, r) {
+    var N = e.N;
+    for (var y = Math.max(0, y0 - r); y < Math.min(N, y0 + t + r); y++) for (var x = Math.max(0, x0 - r); x < Math.min(N, x0 + t + r); x++) {
+      var dx = x < x0 ? x0 - x : x >= x0 + t ? x - (x0 + t - 1) : 0;
+      var dy = y < y0 ? y0 - y : y >= y0 + t ? y - (y0 + t - 1) : 0;
+      var d = dx > dy ? dx : dy;
+      if (d === 0) continue; // un bâtiment ne compte pas pour lui-même
+      acc[y * N + x] += Math.trunc(v * (r + 1 - d) / r);
+    }
+  }
+  function calculerAttractivite(e) {
+    var N = e.N, n = N * N, A = D.regles.attractivite, i;
+    if (!ACC || ACC.length !== n) ACC = new Int32Array(n);
+    ACC.fill(0);
+    for (var k = 0; k < e.batiments.length; k++) {
+      var b = e.batiments[k], em = emission(b);
+      if (em && em[0] && em[1] > 0) rayonner(e, ACC, b.x, b.y, b.t, em[0], em[1]);
+    }
+    var pl = D.batiments.place && D.batiments.place.attractivite;
+    if (pl) for (i = 0; i < n; i++) if (e.route[i] === R.PLACE) rayonner(e, ACC, i % N, (i - i % N) / N, 1, pl[0], pl[1]);
+    for (i = 0; i < n; i++) e.attract[i] = Math.max(A.min, Math.min(A.max, ACC[i]));
+  }
+  // Attractivité d'un bâtiment : moyenne de ses cases.
+  function attractiviteDe(e, b) {
+    var s = 0;
+    for (var y = b.y; y < b.y + b.t; y++) for (var x = b.x; x < b.x + b.t; x++) s += e.attract[ix(e, x, y)];
+    return Math.trunc(s / (b.t * b.t));
   }
 
   // ------------------------------------------------------------------------
@@ -704,21 +895,32 @@
       if (!relie) { b.eff = 0; return; }
       demandes.push(b); total += d.effectif;
     });
-    var donnes = 0;
-    if (travailleurs >= total) {
-      demandes.forEach(function (b) { b.eff = def(b).effectif; });
-      donnes = total;
-    } else {
-      // Proportionnel ; le reste part une place à la fois, dans l'ordre des bâtiments.
-      demandes.forEach(function (b) { b.eff = Math.floor(def(b).effectif * travailleurs / total); donnes += b.eff; });
-      for (var k = 0; donnes < travailleurs && k < demandes.length; k++) {
-        if (demandes[k].eff < def(demandes[k]).effectif) { demandes[k].eff++; donnes++; }
-      }
-    }
+    // Catégories prioritaires d'abord (rang 1, puis 2…), servies en entier si possible ; le reste
+    // des travailleurs va aux autres bâtiments, proportionnellement (section 6.3).
+    var prio = e.priorites || {}, cats = Tr.categories, reste = travailleurs, donnes = 0;
+    var ordre = Object.keys(prio).filter(function (c) { return prio[c] > 0; })
+      .sort(function (a, b) { return prio[a] - prio[b] || cats.indexOf(a) - cats.indexOf(b); });
+    ordre.forEach(function (c) {
+      var g = distribuer(demandes.filter(function (b) { return def(b).travail === c; }), reste);
+      reste -= g; donnes += g;
+    });
+    donnes += distribuer(demandes.filter(function (b) { return !(prio[def(b).travail] > 0); }), reste);
     e.travailleurs = travailleurs;
     e.emplois = donnes;
     e.emploisRequis = total;
     e.chomage = travailleurs > 0 ? Math.round((travailleurs - donnes) * 100 / travailleurs) : 0;
+  }
+
+  // Répartit « dispo » travailleurs entre ces bâtiments : tous servis s'il y en a assez, sinon
+  // proportionnellement, le reste partant une place à la fois dans l'ordre des bâtiments.
+  function distribuer(liste, dispo) {
+    var tot = 0, k;
+    for (k = 0; k < liste.length; k++) tot += def(liste[k]).effectif;
+    if (dispo >= tot) { liste.forEach(function (b) { b.eff = def(b).effectif; }); return tot; }
+    var g = 0;
+    liste.forEach(function (b) { b.eff = tot ? Math.floor(def(b).effectif * dispo / tot) : 0; g += b.eff; });
+    for (k = 0; g < dispo && k < liste.length; k++) if (liste[k].eff < def(liste[k]).effectif) { liste[k].eff++; g++; }
+    return g;
   }
 
   // Taux de fonctionnement d'un bâtiment (0 à 1), 0 sous le seuil d'arrêt.
@@ -754,15 +956,19 @@
       if (o.m === w.id) { o.m = 0; o.cpt = Math.ceil(D.regles.delaiMarcheurJours / Math.max(0.2, taux(o) || 0.2)); }
       if (o.mA === w.id) o.mA = 0;
       if (o.mV === w.id) { o.mV = 0; o.cptV = D.regles.delaiMarcheurJours; }
-      if (d.genre === 'spectacle' && w.type === 'comedien') o.m = 0;
+      if (o.mc === w.id) o.mc = 0;
+      if (o.mb === w.id) o.mb = 0;
+      if (d.genre === 'spectacle' && w.type === d.marcheur) o.m = 0;
     }
+    // Place réservée chez la destination (ou chez soi pour « aller chercher ») : libérée.
+    if (w.res) { var rb = e._index.get(w.res[0]); if (rb) liberer(rb, w.res[1], w.res[2]); w.res = null; }
     if ((w.type === 'immigrant' || w.type === 'sansabri') && w.cb) {
       var h = e._index.get(w.cb);
       if (h && estMaison(h)) h.att = Math.max(0, h.att - w.gens);
     }
-    if (w.type === 'acteur' && w.cb) {
+    if (estArtiste(w.type) && w.cb) {
       var th = e._index.get(w.cb);
-      if (th && th.attendu) th.attendu = 0;
+      if (th && th.attendus && th.attendus[w.type] === w.id) th.attendus[w.type] = 0;
     }
     if (w.pompier) {
       var f = e._index.get(w.pompier);
@@ -806,8 +1012,11 @@
 
   // Passable pour un marcheur à destination sur route (les barrières laissent passer).
   function passableRoute(e) { return function (i) { return e.route[i] !== 0; }; }
-  // Passable pour un errant (les barrières l'arrêtent).
-  function passableErrant(e) { return function (i) { return e.route[i] === R.ROUTE || e.route[i] === R.ROME; }; }
+  // Passable pour un errant (les barrières l'arrêtent ; les places sont des routes).
+  function passableErrant(e) { return function (i) { var r = e.route[i]; return r === R.ROUTE || r === R.ROME || r === R.PLACE; }; }
+  // Passable pour un bateau : l'eau seulement.
+  function passableEau(e) { return function (i) { return e.terrain[i] === T.EAU; }; }
+  function estArtiste(type) { return type === 'acteur' || type === 'gladiateur' || type === 'lion'; }
   // Passable hors route : herbe, prairie, arbres, routes ; jamais l'eau, les rochers ou un bâtiment.
   function passableLibre(e) {
     return function (i) { var t = e.terrain[i]; return !e.bat[i] && t !== T.EAU && t !== T.ROCHERS; };
@@ -893,34 +1102,59 @@
         case 'ingenieur': b.dom = 0; break;
         case 'impot': if (estMaison(b) && b.hab > 0) b.svc.impot = jours; break;
         case 'religion': if (estMaison(b) && b.hab > 0) b.svc['dieu_' + def(o).dieu] = jours; break;
-        case 'spectacle': if (estMaison(b) && b.hab > 0) b.svc[o.type] = jours; break;
+        case 'spectacle': if (estMaison(b) && b.hab > 0) { b.svc[o.type] = jours; b.pts[o.type] = pointsSpectacle(o); } break;
         case 'vente': if (estMaison(b) && b.hab > 0) vendre(e, o, b); break;
-        default: break;
+        // Éducation et santé : le passage valide le besoin du même nom (école, bains…).
+        default: if (estMaison(b) && b.hab > 0) b.svc[svc] = jours; break;
       }
     }
   }
 
   function consoMois(h) { return Math.ceil(h.hab * D.regles.maison.nourritureParHabitantMois); }
 
-  // La vendeuse remplit la réserve de la maison (4 mois de consommation au plus).
+  // Points d'un lieu de spectacle : selon le nombre de types d'artistes en scène (section 9.2).
+  function pointsSpectacle(b) {
+    var d = def(b), n = 0;
+    d.artistes.forEach(function (a) { if ((b.spects[a] || 0) > 0) n++; });
+    return n ? d.points[Math.min(n, d.points.length) - 1] : 0;
+  }
+
+  // Biens qu'une maison veut acheter (niveau actuel et suivant) et sa réserve visée par bien.
+  function biensVoulus(h) { return h.niv >= 1 ? niveauDef(h).biensVoulus : []; }
+  function reserveBien(h) { return D.regles.maison.reserveMois * h.t * h.t * D.regles.maison.biensParCaseMois; }
+
+  // La vendeuse remplit la réserve de la maison (4 mois de consommation au plus) ; elle note
+  // les biens que la maison réclame, pour que l'acheteuse aille les chercher (section 7.4).
   function vendre(e, m, h) {
     var types = D.aliments.filter(function (a) { return (m.stocks[a] || 0) > 0; });
-    if (!types.length) return;
-    var cible = Math.ceil(D.regles.maison.reserveMois * consoMois(h) / types.length);
-    types.forEach(function (a) {
-      var manque = cible - (h.viv[a] || 0);
-      if (manque <= 0) return;
-      var q = Math.min(manque, m.stocks[a]);
-      m.stocks[a] -= q;
-      h.viv[a] = (h.viv[a] || 0) + q;
-    });
+    if (types.length) {
+      var cible = Math.ceil(D.regles.maison.reserveMois * consoMois(h) / types.length);
+      types.forEach(function (a) {
+        var manque = cible - (h.viv[a] || 0);
+        if (manque <= 0) return;
+        var q = Math.min(manque, m.stocks[a]);
+        m.stocks[a] -= q;
+        h.viv[a] = (h.viv[a] || 0) + q;
+      });
+    }
+    var veut = biensVoulus(h), rb = reserveBien(h);
+    for (var k = 0; k < veut.length; k++) {
+      var g = veut[k];
+      if (m.interdits[g]) continue;
+      m.dem[g] = D.regles.serviceJours;
+      var manque2 = rb - (h.viv[g] || 0);
+      if (manque2 <= 0 || !(m.stocks[g] > 0)) continue;
+      var q2 = Math.min(manque2, m.stocks[g]);
+      m.stocks[g] -= q2;
+      h.viv[g] = (h.viv[g] || 0) + q2;
+    }
   }
 
   // --- Marcheurs à destination -------------------------------------------------
 
   function arriveeDestination(e, w) {
     var fam = D.marcheurs[w.type];
-    var pass = (fam.horsRoute || w.pompier || w.retourLibre) ? passableLibre(e) : passableRoute(e);
+    var pass = fam.surEau ? passableEau(e) : (fam.horsRoute || w.pompier || w.retourLibre) ? passableLibre(e) : passableRoute(e);
     var r = suivreChemin(e, w, pass);
     if (r === true) return;
     if (r === false) { if (!rechercher(e, w)) finir(e, w); return; }
@@ -945,6 +1179,9 @@
       var o = e._index.get(w.o);
       if (!o) return false;
       p = parcours(e, [i], passableLibre(e), cibleAcces(e, o), 4 * N);
+    } else if (w.type === 'bateau') {
+      if (w.phase === 'aller') { var bancs = new Set(e.bancs); p = parcours(e, [i], passableEau(e), function (j) { return bancs.has(j); }, 4 * N); }
+      else p = parcours(e, [i], passableEau(e), function (j) { return j === w.quai; }, 4 * N);
     } else {
       var c = e._index.get(w.phase === 'retour' ? w.o : w.cb);
       if (!c) return false;
@@ -968,7 +1205,7 @@
             h.att = Math.max(0, h.att - w.gens);
             var place = capacite(h) - h.hab;
             var entrent = Math.min(place, w.gens);
-            if (entrent > 0) { h.hab += entrent; if (h.niv === 0) h.niv = 1; }
+            if (entrent > 0) { h.hab += entrent; if (h.niv === 0) h.niv = 1; if (w.type === 'immigrant') e.flux.imm += entrent; }
             var reste = w.gens - entrent;
             w.cb = 0; w.fin = 0;
             if (reste > 0) creerSansAbri(e, i, reste);
@@ -986,38 +1223,59 @@
         finir(e, w);
         return;
       case 'livreur':
+      case 'charretier':
         o = e._index.get(w.o);
         if (w.phase === 'aller') {
           c = e._index.get(w.cb);
-          if (c && c.type === 'grenier' && w.ld) {
-            c.attendu = Math.max(0, c.attendu - w.ld.q);
-            var libre = D.regles.grenier.capacite - totalStock(c);
-            var q = Math.min(libre, w.ld.q);
-            c.stocks[w.ld.g] = (c.stocks[w.ld.g] || 0) + q;
-            w.ld.q -= q;
+          if (w.mode === 'chercher') {
+            // Aller chercher : on charge chez la cible, puis retour chez soi (place déjà réservée).
+            if (c && c.stocks && (c.stocks[w.g] || 0) > 0) {
+              var pr = Math.min(D.regles.maison.uniteParCharge, c.stocks[w.g]);
+              c.stocks[w.g] -= pr;
+              w.ld = { g: w.g, q: pr };
+            }
+          } else if (w.ld) {
+            if (w.res && w.res[0] === w.cb) { if (c) liberer(c, w.res[1], w.res[2]); w.res = null; }
+            if (c) w.ld.q -= deposer(c, w.ld.g, w.ld.q);
+            if (w.ld.q > 0) {
+              // Destination disparue ou pleine : un autre preneur, sinon retour avec la charge.
+              var g2 = chercherPreneur(e, [i], w.ld.g, w.ld.q, o, w.type === 'charretier');
+              if (g2) { allerAuPreneur(e, w, g2); return; }
+            }
+            if (w.ld.q <= 0) w.ld = null;
           }
-          if (w.ld && w.ld.q > 0) {
-            // Grenier disparu ou plein : chercher un autre grenier.
-            var g = chercherGrenier(e, i, w.ld.q);
-            if (g) { w.cb = g.b.id; g.b.attendu += w.ld.q; w.ch = g.chemin; w.k = 0; suivreChemin(e, w, passableRoute(e)); return; }
-          }
-          w.ld = null;
           if (!o) { finir(e, w); return; }
           w.phase = 'retour';
           if (!rechercher(e, w)) finir(e, w);
           return;
         }
+        // Retour chez soi : une charge non livrée (ou rapportée) est remise en stock.
+        if (o && w.ld && w.ld.q > 0) {
+          if (w.res && w.res[0] === o.id) { liberer(o, w.res[1], w.res[2]); w.res = null; }
+          rentrer(o, w.ld.g, w.ld.q);
+          w.ld = null;
+        }
+        finir(e, w);
+        return;
+      case 'bateau':
+        o = e._index.get(w.o);
+        if (w.phase === 'aller') {
+          // Au banc : pêche pendant quelques jours, puis retour au quai.
+          var pq = parcours(e, [i], passableEau(e), function (j) { return j === w.quai; }, 4 * N);
+          if (!o || !pq) { finir(e, w); return; }
+          w.phase = 'retour'; w.ch = pq.chemin; w.k = 0;
+          w.attente = D.regles.peche.joursPeche * D.temps.ticksParJour;
+          return;
+        }
+        if (o && o.type === 'quai_peche') o.stock = 1;
         finir(e, w);
         return;
       case 'acheteuse':
         o = e._index.get(w.o);
         if (w.phase === 'aller') {
           c = e._index.get(w.cb);
-          if (c && c.type === 'grenier') {
-            var choix = null;
-            D.aliments.forEach(function (a) {
-              if ((c.stocks[a] || 0) > 0 && (!choix || (o && (o.stocks[a] || 0) < (o.stocks[choix] || 0)))) choix = a;
-            });
+          if (c && c.stocks && o) {
+            var choix = w.g && (c.stocks[w.g] || 0) > 0 ? w.g : choisirAchat(o, c);
             if (choix) {
               var pris = Math.min(D.regles.maison.uniteParCharge, c.stocks[choix]);
               c.stocks[choix] -= pris;
@@ -1033,8 +1291,10 @@
         finir(e, w);
         return;
       case 'acteur':
+      case 'gladiateur':
+      case 'lion':
         c = e._index.get(w.cb);
-        if (c && c.type === 'theatre') { c.spect = D.regles.spectacle.dureeJours; c.attendu = 0; }
+        if (c && c.spects && def(c).artistes.indexOf(w.type) >= 0) { c.spects[w.type] = D.regles.spectacle.dureeJours; c.attendus[w.type] = 0; }
         w.cb = 0;
         finir(e, w);
         return;
@@ -1078,19 +1338,181 @@
     return s;
   }
 
-  // Grenier le plus proche par la route qui a de la place pour q unités.
-  function chercherGrenier(e, depart, q) {
-    var N = e.N, cap = D.regles.grenier.capacite, cibles = new Map();
-    e.batiments.forEach(function (b) {
-      if (b.type !== 'grenier' || taux(b) <= 0) return;
-      if (totalStock(b) + b.attendu + q > cap) return;
-      acces(e, b).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, b); });
+  // ------------------------------------------------------------------------
+  // Stockage : greniers (nourriture), entrepôts (8 emplacements de 4 charges, un bien par
+  // emplacement), ateliers (matière en attente). Les quantités sont en unités (1 charge = 100).
+  // Les places promises à un marcheur en route sont réservées (attendu) jusqu'à son arrivée.
+  // ------------------------------------------------------------------------
+
+  function estAliment(g) { return D.aliments.indexOf(g) >= 0; }
+  function charge() { return D.regles.maison.uniteParCharge; }
+  function consigne(b, g) { return (b.cons && b.cons[g]) || 'accepter'; }
+  function accepte(b, g) { var c = consigne(b, g); return c === 'accepter' || c === 'chercher'; }
+
+  // Unités de g qu'un entrepôt peut encore recevoir (emplacements libres, plafond du bien).
+  function placeEntrepot(b, g) {
+    var E = D.regles.entrepot, cap = E.chargesParEmplacement * charge(), pris = 0, mien = 0;
+    for (var k in b.stocks) if (k !== g) pris += Math.ceil(((b.stocks[k] || 0) + (b.attendus[k] || 0)) / cap);
+    for (var k2 in b.attendus) if (k2 !== g && !(k2 in b.stocks)) pris += Math.ceil((b.attendus[k2] || 0) / cap);
+    mien = (b.stocks[g] || 0) + (b.attendus[g] || 0);
+    var plafond = (b.plaf[g] || E.plafondDepart) * E.emplacements * cap / 4;
+    return Math.max(0, Math.min((E.emplacements - pris) * cap, plafond) - mien);
+  }
+  // Place libre pour g (consigne comprise ; « force » ignore la consigne : rentrée chez soi).
+  function placeDans(b, g, force) {
+    if (b.type === 'grenier') {
+      if (!estAliment(g) || (!force && !accepte(b, g))) return 0;
+      return Math.max(0, D.regles.grenier.capacite - totalStock(b) - b.attendu);
+    }
+    if (b.type === 'entrepot') return (!force && !accepte(b, g)) ? 0 : placeEntrepot(b, g);
+    if (def(b).genre === 'atelier') return def(b).matiere === g ? Math.max(0, D.regles.atelier.attenteMax * charge() - b.mat - b.matAtt) : 0;
+    return 0;
+  }
+  function reserver(b, g, q) {
+    if (b.type === 'grenier') b.attendu += q;
+    else if (b.type === 'entrepot') b.attendus[g] = (b.attendus[g] || 0) + q;
+    else if (def(b).genre === 'atelier') b.matAtt += q;
+  }
+  function liberer(b, g, q) {
+    if (b.type === 'grenier') b.attendu = Math.max(0, b.attendu - q);
+    else if (b.type === 'entrepot') { var v = Math.max(0, (b.attendus[g] || 0) - q); if (v) b.attendus[g] = v; else delete b.attendus[g]; }
+    else if (def(b).genre === 'atelier') b.matAtt = Math.max(0, b.matAtt - q);
+  }
+  // Dépose au plus q unités de g ; renvoie la quantité acceptée.
+  function deposer(b, g, q, force) {
+    var n = Math.min(q, placeDans(b, g, force));
+    if (n <= 0) return 0;
+    if (def(b).genre === 'atelier') b.mat += n;
+    else b.stocks[g] = (b.stocks[g] || 0) + n;
+    return n;
+  }
+  // Une charge revient à son point de départ (producteur, atelier ou dépôt).
+  function rentrer(b, g, q) {
+    var d = def(b);
+    if (d.genre === 'ferme' || d.genre === 'extraction' || d.genre === 'peche' || d.genre === 'atelier') {
+      if (g === d.produit && q >= charge() && b.stock < 1) b.stock = 1;
+      return;
+    }
+    if (b.stocks) deposer(b, g, q, true);
+  }
+
+  // Preneur le plus proche par la route pour q unités de g : d'abord un atelier qui manque de
+  // cette matière (section 8.2), puis un grenier (nourriture), puis un entrepôt. « exclu » ne
+  // reçoit rien (le dépôt d'origine) ; « depotsSeuls » : un charretier ne livre pas d'atelier
+  // en vidant, il ne fait que déplacer le stock.
+  function chercherPreneur(e, sources, g, q, exclu, depotsSeuls) {
+    var N = e.N, etapes = [];
+    if (!depotsSeuls && D.matieres.indexOf(g) >= 0) etapes.push(function (b) { return def(b).genre === 'atelier'; });
+    if (estAliment(g)) etapes.push(function (b) { return b.type === 'grenier'; });
+    etapes.push(function (b) { return b.type === 'entrepot'; });
+    for (var k = 0; k < etapes.length; k++) {
+      var cibles = new Map(), filtre = etapes[k];
+      for (var j = 0; j < e.batiments.length; j++) {
+        var b = e.batiments[j];
+        if (b === exclu || !filtre(b) || taux(b) <= 0 || placeDans(b, g) < q) continue;
+        acces(e, b).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, b); });
+      }
+      if (!cibles.size) continue;
+      var p = parcours(e, sources, passableRoute(e), function (i) { return cibles.has(i); }, 6 * N);
+      if (p) return { b: cibles.get(p.fin), chemin: p.chemin, depart: p.depart };
+    }
+    return null;
+  }
+  function allerAuPreneur(e, w, cible) {
+    w.cb = cible.b.id;
+    reserver(cible.b, w.ld.g, w.ld.q);
+    w.res = [cible.b.id, w.ld.g, w.ld.q];
+    w.ch = cible.chemin; w.k = 0;
+    suivreChemin(e, w, passableRoute(e));
+  }
+  // Un producteur (ferme, extraction, quai, atelier) envoie sa charge au preneur le plus proche.
+  function livrer(e, b, g) {
+    var a = acces(e, b);
+    if (!a.length) return;
+    var q = charge(), cible = chercherPreneur(e, a, g, q, b, false);
+    if (!cible) return;
+    var w = creerMarcheur(e, 'livreur', cible.depart, { o: b.id, cb: cible.b.id, phase: 'aller', ld: { g: g, q: q }, ch: cible.chemin, k: 0 });
+    reserver(cible.b, g, q);
+    w.res = [cible.b.id, g, q];
+    b.m = w.id;
+    b.stock = 0;
+  }
+
+  // Charretier d'un grenier ou d'un entrepôt (section 8.3) : approvisionne un atelier en
+  // matière (entrepôt), vide un bien marqué « vider », ou va chercher un bien marqué « aller
+  // chercher » dans un autre dépôt. Une tâche à la fois.
+  function quotidienDepot(e, b) {
+    if (b.mc || taux(b) <= 0) return;
+    var a = acces(e, b);
+    if (!a.length) return;
+    var Q = charge(), N = e.N, k, g, cibles, p;
+    // 1. Ateliers qui manquent d'une matière que l'entrepôt détient.
+    if (b.type === 'entrepot') {
+      cibles = new Map();
+      e.batiments.forEach(function (t) {
+        var dt = def(t);
+        if (dt.genre !== 'atelier' || taux(t) <= 0 || !((b.stocks[dt.matiere] || 0) >= Q) || placeDans(t, dt.matiere) < Q) return;
+        acces(e, t).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, t); });
+      });
+      if (cibles.size) {
+        p = parcours(e, a, passableRoute(e), function (i) { return cibles.has(i); }, 6 * N);
+        if (p) { var at = cibles.get(p.fin), m = def(at).matiere; envoyerCharretier(e, b, at, m, Q, p, 'livrer'); return; }
+      }
+    }
+    // 2. Vider : la charge part vers un autre dépôt qui l'accepte.
+    var biens = Object.keys(b.stocks).sort();
+    for (k = 0; k < biens.length; k++) {
+      g = biens[k];
+      if (consigne(b, g) !== 'vider' || !(b.stocks[g] > 0)) continue;
+      var q = Math.min(Q, b.stocks[g]), c = chercherPreneur(e, a, g, q, b, true);
+      if (c) { envoyerCharretier(e, b, c.b, g, q, { chemin: c.chemin, depart: c.depart }, 'vider'); return; }
+    }
+    // 3. Aller chercher : dans le dépôt le plus proche qui en a et ne le cherche pas lui-même.
+    var voulus = Object.keys(b.cons).filter(function (x) { return b.cons[x] === 'chercher'; }).sort();
+    for (k = 0; k < voulus.length; k++) {
+      g = voulus[k];
+      if (placeDans(b, g) < Q) continue;
+      cibles = new Map();
+      for (var j = 0; j < e.batiments.length; j++) {
+        var t = e.batiments[j];
+        if (t === b || !t.stocks || (t.type !== 'grenier' && t.type !== 'entrepot') || !((t.stocks[g] || 0) > 0) || consigne(t, g) === 'chercher') continue;
+        acces(e, t).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, t); });
+      }
+      if (!cibles.size) continue;
+      p = parcours(e, a, passableRoute(e), function (i) { return cibles.has(i); }, 6 * N);
+      if (!p) continue;
+      var w = creerMarcheur(e, 'charretier', p.depart, { o: b.id, cb: cibles.get(p.fin).id, phase: 'aller', mode: 'chercher', g: g, ld: null, ch: p.chemin, k: 0 });
+      reserver(b, g, Q);
+      w.res = [b.id, g, Q];
+      b.mc = w.id;
+      return;
+    }
+  }
+  function envoyerCharretier(e, b, cible, g, q, p, mode) {
+    b.stocks[g] -= q;
+    var w = creerMarcheur(e, 'charretier', p.depart, { o: b.id, cb: cible.id, phase: 'aller', mode: mode, ld: { g: g, q: q }, ch: p.chemin, k: 0 });
+    reserver(cible, g, q);
+    w.res = [cible.id, g, q];
+    b.mc = w.id;
+  }
+
+  // Produits dont un marché a besoin : les aliments sous le seuil d'achat, et les biens qu'une
+  // maison desservie a réclamés, sous leur propre seuil ; jamais un produit interdit.
+  function besoinsMarche(m) {
+    var Mr = D.regles.marche, l = [];
+    D.aliments.forEach(function (a) { if (!m.interdits[a] && (m.stocks[a] || 0) < Mr.seuilAchat) l.push(a); });
+    Object.keys(m.dem).sort().forEach(function (g) { if (m.dem[g] > 0 && !m.interdits[g] && (m.stocks[g] || 0) < Mr.seuilBien) l.push(g); });
+    return l;
+  }
+  // Au dépôt : le produit utile le moins présent au marché (rapporté à son seuil).
+  function choisirAchat(m, c) {
+    var Mr = D.regles.marche, choix = null, meilleur = Infinity;
+    besoinsMarche(m).forEach(function (g) {
+      if (!((c.stocks[g] || 0) > 0)) return;
+      var r = (m.stocks[g] || 0) / (estAliment(g) ? Mr.seuilAchat : Mr.seuilBien);
+      if (r < meilleur) { meilleur = r; choix = g; }
     });
-    if (!cibles.size) return null;
-    var sources = Array.isArray(depart) ? depart : [depart];
-    var p = parcours(e, sources, passableRoute(e), function (i) { return cibles.has(i); }, 6 * N);
-    if (!p) return null;
-    return { b: cibles.get(p.fin), chemin: p.chemin, depart: p.depart };
+    return choix;
   }
 
   // Sans-abri : cherche une maison qui a de la place, sinon quitte la carte.
@@ -1151,7 +1573,7 @@
   function quotidien(e, b) {
     var d = def(b), m = mission(e), diff = D.difficultes[e.difficulte] || D.difficultes.normal;
     // Risques (feu, effondrement), si la mission les active.
-    if (m.risques && d.genre !== 'ruines' && d.genre !== 'incendie') {
+    if (e.risques && d.genre !== 'ruines' && d.genre !== 'incendie') {
       var climat = D.regles.feu.climats[m.climat] || 1;
       var hf = estMaison(b) ? (b.hab > 0 ? niveauDef(b).feu : 0) : (d.feu || 0);
       var hd = estMaison(b) ? (b.hab > 0 ? niveauDef(b).dommages : 0) : (d.dommages || 0);
@@ -1164,13 +1586,20 @@
     if (b.cpt > 0) b.cpt--;
     switch (d.genre) {
       case 'maison': quotidienMaison(e, b); break;
-      case 'service': if (!b.m && !b.cpt) emettreErrant(e, b, d.marcheur); break;
-      case 'ferme': quotidienFerme(e, b, d); break;
+      case 'service': if (!b.m && !b.cpt && (!d.eauRequise || b.actif)) emettreErrant(e, b, d.marcheur); break;
+      case 'ferme': case 'extraction': case 'peche': quotidienProducteur(e, b, d); break;
+      case 'atelier': quotidienAtelier(e, b, d); break;
+      case 'grenier': case 'entrepot': quotidienDepot(e, b); break;
       case 'marche': quotidienMarche(e, b); break;
-      case 'spectacle':
-        if (b.spect > 0) b.spect--;
-        if (b.spect > 0 && !b.m && !b.cpt) emettreErrant(e, b, d.marcheur);
+      case 'spectacle': {
+        var actif = false;
+        for (var k = 0; k < d.artistes.length; k++) {
+          var ar = d.artistes[k];
+          if (b.spects[ar] > 0) { b.spects[ar]--; if (b.spects[ar] > 0) actif = true; }
+        }
+        if (actif && !b.m && !b.cpt) emettreErrant(e, b, d.marcheur);
         break;
+      }
       case 'ecole_art': quotidienEcoleArt(e, b, d); break;
       case 'incendie': quotidienIncendie(e, b); break;
       default: break;
@@ -1191,7 +1620,8 @@
   function quotidienMaison(e, h) {
     var M = D.regles.maison;
     for (var k in h.svc) if (h.svc[k] > 0) h.svc[k]--;
-    if (h.hab <= 0) { h.ok = 0; h.manque = 0; return; }
+    if (h.quar > 0) h.quar--;
+    if (h.hab <= 0) { h.ok = 0; h.manque = 0; h.bloque = 0; return; }
     // Sans route proche : la maison se vide en un mois.
     if (!routeProche(e, h, D.regles.logementDistanceRoute)) {
       h.sansRoute++;
@@ -1205,22 +1635,106 @@
     }
     h.sansRoute = 0;
     var s = satisfaits(e, h);
-    var cur = niveauDef(h), suiv = D.maisons[h.niv];
-    if (!remplit(s, cur.besoinsCumul)) {
-      h.ok = 0; h.manque++;
-      if (h.manque >= M.joursDescente && h.niv > 1) {
-        h.niv--; h.manque = 0;
-        var trop = h.hab - capacite(h);
-        if (trop > 0) { h.hab -= trop; creerSansAbri(e, ix(e, h.x, h.y), trop); majPopulation(e); }
-        noter(e, 'msg.maisonDescend', { niveau: h.niv }, false, ix(e, h.x, h.y));
-      }
+    var cur = niveauDef(h), suiv = h.niv < D.niveauMax ? D.maisons[h.niv] : null;
+    if (!remplit(s, cur.besoinsCumul) || !attractiviteOk(e, s, cur)) {
+      h.ok = 0; h.manque++; h.bloque = 0;
+      if (h.manque >= M.joursDescente && h.niv > 1) descendre(e, h);
       return;
     }
     h.manque = 0;
-    if (suiv && suiv.emprise === 1 && remplit(s, suiv.besoinsCumul)) {
+    if (suiv && remplit(s, suiv.besoinsCumul) && attractiviteOk(e, s, suiv)) {
       h.ok++;
-      if (h.ok >= M.joursMontee) { h.niv++; h.ok = 0; }
-    } else h.ok = 0;
+      if (h.ok >= M.joursMontee) {
+        // Niveau d'une emprise plus grande (10, 15, 19) : la maison doit d'abord s'agrandir.
+        if (suiv.emprise === h.t || agrandir(e, h, suiv.emprise)) {
+          h.niv++; h.ok = 0; h.bloque = 0;
+          if (suiv.emprise !== cur.emprise) noter(e, 'msg.maisonAgrandie', { niveau: h.niv }, false, ix(e, h.x, h.y));
+        } else { h.ok = M.joursMontee; h.bloque = 1; }
+      }
+    } else { h.ok = 0; h.bloque = 0; }
+  }
+
+  function attractiviteOk(e, s, niveau) {
+    return !e.attractivite || niveau.attractivite === null || niveau.attractivite === undefined || s.attractivite >= niveau.attractivite;
+  }
+
+  function descendre(e, h) {
+    h.niv--; h.manque = 0;
+    if (niveauDef(h).emprise < h.t) diviser(e, h, niveauDef(h).emprise);
+    var trop = h.hab - capacite(h);
+    if (trop > 0) { h.hab -= trop; creerSansAbri(e, ix(e, h.x, h.y), trop); }
+    majPopulation(e);
+    noter(e, 'msg.maisonDescend', { niveau: h.niv }, false, ix(e, h.x, h.y));
+  }
+
+  // Agrandissement (section 5.1) : la maison forme un carré de k × k avec des maisons voisines de
+  // même niveau, des zones vides ou des jardins. Carrés essayés dans un ordre fixe (la maison
+  // en haut à gauche, puis en haut à droite, en bas à gauche, en bas à droite).
+  function agrandir(e, h, k) {
+    for (var oy = 0; oy < k; oy++) for (var ox = 0; ox < k; ox++) {
+      var sx = h.x - ox, sy = h.y - oy, autres = [], ok = true;
+      for (var y = sy; y < sy + k && ok; y++) for (var x = sx; x < sx + k && ok; x++) {
+        if (!dedans(e, x, y)) { ok = false; break; }
+        var b = bat(e, ix(e, x, y));
+        if (b === h) continue;
+        if (b && estMaison(b) && b.t === 1 && (b.hab === 0 || b.niv === h.niv) && !b.quar) { if (autres.indexOf(b) < 0) autres.push(b); }
+        else if (b && b.type === 'jardin') { if (autres.indexOf(b) < 0) autres.push(b); }
+        else ok = false;
+      }
+      if (!ok) continue;
+      autres.forEach(function (b) {
+        if (estMaison(b)) {
+          h.hab += b.hab;
+          for (var g in b.viv) h.viv[g] = (h.viv[g] || 0) + b.viv[g];
+          for (var s2 in b.svc) h.svc[s2] = Math.max(h.svc[s2] || 0, b.svc[s2]);
+          for (var p2 in b.pts) if (!(h.pts[p2] >= b.pts[p2])) h.pts[p2] = b.pts[p2];
+        }
+        retirerBatiment(e, b, true);
+      });
+      h.x = sx; h.y = sy; h.t = k;
+      for (y = sy; y < sy + k; y++) for (x = sx; x < sx + k; x++) e.bat[ix(e, x, y)] = h.id;
+      e._acces.delete(h.id);
+      versionCarte(e);
+      majPopulation(e);
+      return true;
+    }
+    return false;
+  }
+
+  // Division à la descente : la maison garde son coin haut-gauche de k × k ; les autres cases
+  // redeviennent des maisons d'une case, du niveau le plus haut possible à cette emprise.
+  function diviser(e, h, k) {
+    var niv1 = 0, cases = [], x, y;
+    for (var n = 0; n < D.maisons.length; n++) if (D.maisons[n].emprise === 1) niv1 = n + 1;
+    for (y = h.y; y < h.y + h.t; y++) for (x = h.x; x < h.x + h.t; x++) {
+      if (x < h.x + k && y < h.y + k) continue;
+      cases.push([x, y]);
+      e.bat[ix(e, x, y)] = 0;
+    }
+    h.t = k;
+    e._acces.delete(h.id);
+    var parts = [h], total = h.hab, viv = h.viv;
+    cases.forEach(function (c) {
+      var nb = creerBatiment(e, 'logement', c[0], c[1]);
+      nb.niv = Math.min(niv1, h.niv);
+      for (var s2 in h.svc) nb.svc[s2] = h.svc[s2];
+      for (var p2 in h.pts) nb.pts[p2] = h.pts[p2];
+      parts.push(nb);
+    });
+    // Habitants et réserves répartis en parts égales (le reste dans l'ordre des cases).
+    var hv = {};
+    parts.forEach(function (b, i) {
+      b.hab = Math.floor(total / parts.length) + (i < total % parts.length ? 1 : 0);
+      var cap = capacite(b);
+      if (b.hab > cap) { creerSansAbri(e, ix(e, b.x, b.y), b.hab - cap); b.hab = cap; }
+      if (b.hab === 0 && b !== h) b.niv = 0;
+    });
+    for (var g in viv) {
+      var q = viv[g], part = Math.floor(q / parts.length);
+      parts.forEach(function (b, i) { hv[b.id] = hv[b.id] || {}; hv[b.id][g] = part + (i === 0 ? q - part * parts.length : 0); });
+    }
+    parts.forEach(function (b) { b.viv = hv[b.id] || {}; });
+    versionCarte(e);
   }
 
   // Besoins satisfaits d'une maison (valeurs comparées aux besoins des données).
@@ -1230,16 +1744,17 @@
     var n = 0;
     D.aliments.forEach(function (a) { if ((h.viv[a] || 0) > 0) n++; });
     s.nourriture = n;
-    var dieux = 0, divert = 0;
+    var dieux = {}, nd = 0, divert = 0;
     for (var k in h.svc) {
       if (h.svc[k] <= 0) continue;
-      if (k.indexOf('dieu_') === 0) dieux++;
-      else if (D.batiments[k] && D.batiments[k].points) divert += D.batiments[k].points;
+      if (k.indexOf('dieu_') === 0) { if (!dieux[k]) { dieux[k] = 1; nd++; } }
+      else if (D.batiments[k] && D.batiments[k].points) divert += (h.pts && h.pts[k] !== undefined) ? h.pts[k] : D.batiments[k].points[0];
       else s[k] = 1;
     }
-    s.religion = dieux;
+    s.religion = nd;
     s.divertissement = Math.min(D.regles.divertissementMax, divert);
-    for (var g in h.viv) if (!D.biens[g] || D.aliments.indexOf(g) < 0) { if (h.viv[g] > 0) s[g] = 1; }
+    for (var g in h.viv) if (D.biens[g] && D.aliments.indexOf(g) < 0 && h.viv[g] > 0) s[g] = 1;
+    s.attractivite = attractiviteDe(e, h);
     return s;
   }
 
@@ -1250,60 +1765,100 @@
 
   // Pour le panneau d'information : besoins satisfaits et ce qui manque pour monter.
   function infosMaison(e, h) {
-    var s = satisfaits(e, h), suiv = h.niv >= 1 ? D.maisons[h.niv] : null, manque = [];
+    var s = satisfaits(e, h), suiv = h.niv >= 1 && h.niv < D.niveauMax ? D.maisons[h.niv] : null, manque = [];
     if (suiv) {
       var b = suiv.besoinsCumul;
       for (var k in b) if ((s[k] || 0) < b[k]) manque.push({ besoin: k, requis: b[k], actuel: s[k] || 0 });
+      if (!attractiviteOk(e, s, suiv)) manque.push({ besoin: 'attractivite', requis: suiv.attractivite, actuel: s.attractivite });
+      if (h.bloque) manque.push({ besoin: 'place', requis: suiv.emprise, actuel: h.t });
     }
-    return { satisfaits: s, manque: manque, suivant: suiv ? suiv.niveau : null, conso: consoMois(h) };
+    var cur = h.niv >= 1 ? niveauDef(h) : null;
+    return {
+      satisfaits: s, manque: manque, suivant: suiv ? suiv.niveau : null, conso: consoMois(h),
+      attractivite: s.attractivite, attractiviteActive: !!e.attractivite,
+      attractiviteRequise: cur && e.attractivite ? cur.attractivite : null,
+      biensVoulus: biensVoulus(h), reserveBien: reserveBien(h)
+    };
   }
 
-  function quotidienFerme(e, b, d) {
-    var fin = D.regles.ferme.progressionCharge;
-    var r = taux(b);
-    if (b.prog < fin && r > 0) {
-      var fert = 0, n = 0;
-      for (var y = b.y; y < b.y + b.t; y++) for (var x = b.x; x < b.x + b.t; x++) { fert += e.fertilite[ix(e, x, y)]; n++; }
-      fert = fert / n;
-      b.prog = Math.min(fin, b.prog + Math.floor(fin * d.chargesParAn * r * fert / (D.joursParAn * 100)));
+  // Ferme, extraction, quai de pêche : une charge prête part chez le preneur le plus proche.
+  function quotidienProducteur(e, b, d) {
+    var fin = D.regles.ferme.progressionCharge, r = taux(b);
+    if (d.genre === 'peche') quotidienPeche(e, b, r);
+    else {
+      if (b.prog < fin && r > 0) {
+        var fert = 100;
+        if (d.genre === 'ferme') {
+          var n = 0; fert = 0;
+          for (var y = b.y; y < b.y + b.t; y++) for (var x = b.x; x < b.x + b.t; x++) { fert += e.fertilite[ix(e, x, y)]; n++; }
+          fert = fert / n;
+        }
+        // Arrondi au-dessus et report du reste : 8 charges par an tombent juste, au jour près.
+        b.prog += Math.ceil(fin * d.chargesParAn * r * fert / (D.joursParAn * 100));
+      }
+      if (b.prog >= fin && b.stock < 1) { b.stock = 1; b.prog -= fin; }
+      if (b.prog > fin) b.prog = fin; // stock plein : la production attend le livreur
     }
-    if (b.prog >= fin && b.stock < 1) { b.stock = 1; b.prog = 0; }
-    if (b.stock >= 1 && !b.m && r > 0) {
-      var a = acces(e, b);
-      if (!a.length) return;
-      var q = D.regles.maison.uniteParCharge;
-      var g = chercherGrenier(e, a, q);
-      if (!g) return;
-      var w = creerMarcheur(e, 'livreur', g.depart, { o: b.id, cb: g.b.id, phase: 'aller', ld: { g: d.produit, q: q }, ch: g.chemin, k: 0 });
-      g.b.attendu += q;
-      b.m = w.id;
-      b.stock = 0;
+    if (b.stock >= 1 && !b.m && r > 0) livrer(e, b, d.produit);
+  }
+
+  // Quai de pêche : son bateau gagne le banc de poissons le plus proche par l'eau, y pêche
+  // quelques jours et rapporte une charge (section 7.2).
+  function quotidienPeche(e, b, r) {
+    if (r <= 0 || b.stock >= 1 || b.mb) return;
+    var quai = quaiEau(e, b);
+    var bancs = new Set(e.bancs);
+    var p = quai < 0 || !bancs.size ? null : parcours(e, [quai], passableEau(e), function (j) { return bancs.has(j); }, D.regles.peche.porteeBateau);
+    if (!p) { b.sansBanc = 1; return; }
+    b.sansBanc = 0;
+    var w = creerMarcheur(e, 'bateau', quai, { o: b.id, phase: 'aller', quai: quai, ch: p.chemin, k: 0 });
+    b.mb = w.id;
+  }
+
+  // Atelier : 1 charge de matière donne 1 charge de bien, 4 par an à plein effectif (section 8.2).
+  function quotidienAtelier(e, b, d) {
+    var fin = D.regles.ferme.progressionCharge, r = taux(b), Q = charge();
+    if (r > 0 && b.stock < 1 && b.mat >= Q) {
+      b.prog += Math.ceil(fin * d.chargesParAn * r / D.joursParAn);
+      if (b.prog >= fin) { b.prog = Math.min(fin, b.prog - fin); b.mat -= Q; b.stock = 1; }
     }
+    if (b.stock >= 1 && !b.m && r > 0) livrer(e, b, d.produit);
   }
 
   function quotidienMarche(e, b) {
     var Mr = D.regles.marche, r = taux(b);
     if (b.cptV > 0) b.cptV--;
+    for (var g0 in b.dem) if (--b.dem[g0] <= 0) delete b.dem[g0];
     if (r <= 0) return;
     var a = acces(e, b);
     if (!a.length) return;
-    // Acheteuse : au grenier le plus proche (40 cases de route au plus) qui a de la nourriture.
-    if (!b.mA && totalStock(b) < Mr.seuilAchat) {
-      var cibles = new Map();
-      e.batiments.forEach(function (g) {
-        if (g.type !== 'grenier' || totalStock(g) <= 0) return;
-        acces(e, g).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, g); });
+    // Acheteuse : le produit qui manque le plus d'abord (rapporté à son seuil ; à égalité, celui
+    // qui a été acheté il y a le plus longtemps), au grenier ou à l'entrepôt le plus proche qui en
+    // détient (40 cases de route au plus) ; sinon le suivant.
+    if (!b.mA) {
+      var der = b.der || (b.der = {});
+      var besoins = besoinsMarche(b).sort(function (x, y) {
+        return (b.stocks[x] || 0) / (estAliment(x) ? Mr.seuilAchat : Mr.seuilBien) - (b.stocks[y] || 0) / (estAliment(y) ? Mr.seuilAchat : Mr.seuilBien) ||
+          (der[x] || 0) - (der[y] || 0) || D.listeBiens.indexOf(x) - D.listeBiens.indexOf(y);
       });
-      if (cibles.size) {
-        var p = parcours(e, a, passableRoute(e), function (i) { return cibles.has(i); }, Mr.porteeAcheteuse);
-        if (p) {
-          var w = creerMarcheur(e, 'acheteuse', p.depart, { o: b.id, cb: cibles.get(p.fin).id, phase: 'aller', ld: null, ch: p.chemin, k: 0 });
-          b.mA = w.id;
+      for (var n = 0; n < besoins.length; n++) {
+        var g = besoins[n], cibles = new Map();
+        for (var j = 0; j < e.batiments.length; j++) {
+          var dep = e.batiments[j];
+          if ((dep.type !== 'grenier' && dep.type !== 'entrepot') || !((dep.stocks[g] || 0) > 0)) continue;
+          acces(e, dep).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, dep); });
         }
+        if (!cibles.size) continue;
+        var p = parcours(e, a, passableRoute(e), function (i) { return cibles.has(i); }, Mr.porteeAcheteuse);
+        if (!p) continue;
+        var w = creerMarcheur(e, 'acheteuse', p.depart, { o: b.id, cb: cibles.get(p.fin).id, phase: 'aller', g: g, ld: null, ch: p.chemin, k: 0 });
+        b.mA = w.id;
+        der[g] = e.tick;
+        break;
       }
     }
-    // Vendeuse : errante, tant que le marché a du stock.
-    if (!b.mV && !b.cptV && totalStock(b) > 0) {
+    // Vendeuse : errante ; même sans stock, elle relève ce que les maisons réclament.
+    if (!b.mV && !b.cptV) {
       var s = sortiesErrant(e, b);
       if (s.length) {
         var v = creerMarcheur(e, 'vendeuse', s[b.sortie % s.length], { o: b.id, pas: 0, portee: D.regles.porteeErrant, retour: 0, ch: null, k: 0 });
@@ -1320,11 +1875,11 @@
     if (b.prog < fin || b.m) return;
     var a = acces(e, b);
     if (!a.length) return;
-    // Lieu de spectacle qui manque d'artiste (spectacle fini ou presque, aucun artiste en route).
+    // Lieu de spectacle qui manque de cet artiste (spectacle fini ou presque, aucun en route).
     var cibles = new Map();
     e.batiments.forEach(function (t) {
       var dt = def(t);
-      if (dt.artiste !== d.forme || t.attendu || t.spect > S.rappelJours) return;
+      if (dt.genre !== 'spectacle' || dt.artistes.indexOf(d.forme) < 0 || t.attendus[d.forme] || (t.spects[d.forme] || 0) > S.rappelJours) return;
       acces(e, t).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, t); });
     });
     if (!cibles.size) return;
@@ -1332,7 +1887,7 @@
     if (!p) return;
     var th = cibles.get(p.fin);
     var w = creerMarcheur(e, d.forme, p.depart, { o: b.id, cb: th.id, phase: 'aller', ch: p.chemin, k: 0 });
-    th.attendu = w.id;
+    th.attendus[d.forme] = w.id;
     b.m = w.id;
     b.prog = 0;
   }
@@ -1460,7 +2015,7 @@
     maisons.sort(function (a, b) { return a.niv - b.niv || a.id - b.id; });
     for (var k = 0; k < maisons.length && n > 0; k++) {
       var h = maisons[k], q = Math.min(n, h.hab, Em.groupeMax);
-      h.hab -= q; n -= q;
+      h.hab -= q; n -= q; e.flux.emi += q;
       if (h.hab === 0) { h.niv = 0; h.viv = {}; }
       var i = pointDeSortie(e, ix(e, h.x, h.y));
       var w = creerMarcheur(e, 'emigrant', i, { gens: q, ch: null, k: 0 });
@@ -1484,6 +2039,9 @@
         var q = Math.min(part, h.viv[types[k]]);
         h.viv[types[k]] -= q; besoin -= q;
       }
+      // Biens : 1 unité par case occupée et par mois (section 5.1).
+      var parCase = D.regles.maison.biensParCaseMois * h.t * h.t;
+      for (var g in h.viv) if (!estAliment(g) && h.viv[g] > 0) h.viv[g] = Math.max(0, h.viv[g] - parCase);
     });
   }
 
@@ -1553,7 +2111,10 @@
   }
   function moisBilan(e) {
     var moisEcoules = Math.floor(e.tick / D.ticksParMois);
-    e.histo.push({ m: moisEcoules, pop: e.pop, tresor: e.tresor, humeur: e.humeur });
+    e.sante = calculerSante(e);
+    epidemie(e);
+    e.histo.push({ m: moisEcoules, pop: e.pop, tresor: e.tresor, humeur: e.humeur, sante: e.sante, imm: e.flux.imm, emi: e.flux.emi, morts: e.flux.morts });
+    e.flux = { imm: 0, emi: 0, morts: 0 };
     if (e.histo.length > 240) e.histo.shift();
     if (moisEcoules > 0 && moisEcoules % D.temps.moisParAn === 0) {
       e.finances.prec = e.finances.an;
@@ -1563,6 +2124,47 @@
     verifierFin(e, moisEcoules);
   }
   function nouveauMois(e) { moisNourriture(e); moisFinances(e); moisHumeur(e); moisBilan(e); }
+
+  // Santé de la ville (section 9.4), de 0 à 100 : maisons couvertes par un médecin ou un hôpital
+  // (50 points), par des bains (20), variété alimentaire (20 : 3 aliments ou plus = plein),
+  // absence de pénurie (10).
+  function calculerSante(e) {
+    var S = D.regles.sante, n = 0, med = 0, bains = 0, variete = 0, affamees = 0;
+    e.batiments.forEach(function (h) {
+      if (!estMaison(h) || h.hab <= 0) return;
+      n++;
+      if (h.svc.medecin > 0 || h.svc.hopital > 0) med++;
+      if (h.svc.bains > 0) bains++;
+      var t = 0;
+      D.aliments.forEach(function (a) { if ((h.viv[a] || 0) > 0) t++; });
+      variete += Math.min(t, S.varieteTypes) / S.varieteTypes;
+      if (niveauDef(h).besoinsCumul.nourriture && t === 0) affamees++;
+    });
+    if (!n) return 0;
+    return Math.round((S.medecin * med + S.bains * bains + S.variete * variete + S.penurie * (n - affamees)) / n);
+  }
+
+  // Épidémie : santé sous le seuil, 5 % de risque par mois ; 1 à 3 maisons sans médecin ni
+  // hôpital perdent leurs habitants et restent vides 2 mois. Seulement dans une partie avec
+  // risques où médecin ou hôpital peuvent être construits.
+  function epidemie(e) {
+    var S = D.regles.sante;
+    if (!e.epidemies || e.pop <= 0 || e.sante >= S.seuilEpidemie) return;
+    if (hasard(e, 100) >= S.risqueEpidemie) return;
+    var cibles = e.batiments.filter(function (h) { return estMaison(h) && h.hab > 0 && !(h.svc.medecin > 0) && !(h.svc.hopital > 0); });
+    if (!cibles.length) return;
+    var nb = S.maisonsEpidemie[0] + hasard(e, S.maisonsEpidemie[1] - S.maisonsEpidemie[0] + 1), lieu = -1;
+    for (var k = 0; k < nb && cibles.length; k++) {
+      var h = cibles.splice(hasard(e, cibles.length), 1)[0];
+      e.flux.morts += h.hab;
+      h.hab = 0; h.niv = 0; h.viv = {}; h.ok = 0; h.manque = 0;
+      h.quar = S.videMois * D.temps.joursParMois;
+      lieu = ix(e, h.x, h.y);
+    }
+    e.stats.epidemies++;
+    majPopulation(e);
+    noter(e, 'msg.epidemie', {}, true, lieu);
+  }
 
   // ------------------------------------------------------------------------
   // Tutoriel, victoire, défaite
@@ -1636,11 +2238,11 @@
   }
   function nouveauJour(e) {
     repartirTravail(e); calculerEau(e); envoyerPompiers(e); immigrer(e);
-    majPopulation(e); verifierTutoriel(e); verifierVictoire(e);
+    majPopulation(e); verifierTutoriel(e); verifierVictoire(e); calculerAttractivite(e);
   }
 
   // Temps de la journée (ticks) où se font les calculs globaux, étalés pour éviter les à-coups.
-  var PHASES = { travail: 0, eau: 10, pompiers: 20, immigration: 25, bilan: 35, nourriture: 5, finances: 15, humeur: 30, mois: 40 };
+  var PHASES = { travail: 0, eau: 10, pompiers: 20, immigration: 25, bilan: 35, attractivite: 45, nourriture: 5, finances: 15, humeur: 30, mois: 40 };
 
   function pas(e) {
     e.tick++;
@@ -1651,6 +2253,7 @@
     else if (phase === PHASES.pompiers) envoyerPompiers(e);
     else if (phase === PHASES.immigration) immigrer(e);
     else if (phase === PHASES.bilan) { majPopulation(e); verifierTutoriel(e); verifierVictoire(e); }
+    else if (phase === PHASES.attractivite) calculerAttractivite(e);
     if (premierJour) {
       if (phase === PHASES.nourriture) moisNourriture(e);
       else if (phase === PHASES.finances) moisFinances(e);
@@ -1682,15 +2285,59 @@
   // Cause de l'arrêt d'un bâtiment (section 8.4), ou null s'il est en service.
   function cause(e, b) {
     var d = def(b);
-    if (d.genre === 'maison' || d.genre === 'ruines' || d.genre === 'incendie' || d.genre === 'puits') return null;
+    if (d.genre === 'maison' || d.genre === 'ruines' || d.genre === 'incendie' || d.genre === 'puits' || d.genre === 'deco' || d.genre === 'oracle') return null;
     if (d.genre === 'reservoir') return b.plein ? null : 'sansEau';
     if (!d.sansRoute && !acces(e, b).length) return 'pasDeRoute';
     if (d.effectif && taux(b) <= 0) return 'pasDePersonnel';
     if (d.genre === 'fontaine' && !b.actif) return 'sansEau';
-    if (d.genre === 'ferme' && b.stock >= 1 && !b.m) return 'sansPreneur';
+    if (d.eauRequise && !b.actif) return 'sansReservoir';
+    if (d.genre === 'peche' && b.sansBanc && !b.mb) return 'sansBanc';
+    if ((d.genre === 'ferme' || d.genre === 'extraction' || d.genre === 'peche' || d.genre === 'atelier') && b.stock >= 1 && !b.m) return 'sansPreneur';
+    if (d.genre === 'atelier' && b.mat < charge() && b.stock < 1) return 'sansMatiere';
     if (d.genre === 'marche' && totalStock(b) <= 0 && !b.mA) return 'sansMarchandise';
-    if (d.genre === 'spectacle' && b.spect <= 0) return 'sansArtiste';
+    if (d.genre === 'spectacle' && !d.artistes.some(function (a) { return (b.spects[a] || 0) > 0; })) return 'sansArtiste';
     return null;
+  }
+
+  // Emplacements d'un entrepôt pour le dessin et le panneau : 8 cases [bien, quarts] ou null.
+  function emplacements(b) {
+    var E = D.regles.entrepot, cap = E.chargesParEmplacement * charge(), l = [];
+    D.listeBiens.forEach(function (g) {
+      var q = b.stocks[g] || 0;
+      while (q > 0 && l.length < E.emplacements) { var u = Math.min(cap, q); l.push([g, Math.max(1, Math.ceil(u * 4 / cap))]); q -= u; }
+    });
+    while (l.length < E.emplacements) l.push(null);
+    return l;
+  }
+
+  // Couverture des services (conseillers, section 17.4) : habitants et maisons desservis.
+  function couverture(e) {
+    var c = { maisons: 0, pop: 0, svc: {}, divert: 0, religion: [0, 0, 0, 0, 0, 0], niveaux: [], penurie: 0 };
+    for (var n = 0; n <= D.maisons.length; n++) c.niveaux.push(0);
+    ['ecole', 'bibliotheque', 'academie', 'barbier', 'bains', 'medecin', 'hopital', 'impot'].forEach(function (k) { c.svc[k] = { maisons: 0, pop: 0 }; });
+    e.batiments.forEach(function (h) {
+      if (!estMaison(h) || h.hab <= 0) return;
+      c.maisons++; c.pop += h.hab; c.niveaux[h.niv] += h.hab;
+      for (var k in c.svc) if (h.svc[k] > 0) { c.svc[k].maisons++; c.svc[k].pop += h.hab; }
+      var s = satisfaits(e, h);
+      c.divert += s.divertissement * h.hab;
+      c.religion[Math.min(5, s.religion)] += h.hab;
+      if (niveauDef(h).besoinsCumul.nourriture && s.nourriture === 0) c.penurie++;
+    });
+    c.divert = c.pop ? Math.round(c.divert / c.pop) : 0;
+    return c;
+  }
+
+  // Emplois par catégorie de travail (conseiller du travail).
+  function travailCategories(e) {
+    var t = {};
+    D.regles.travail.categories.forEach(function (k) { t[k] = { requis: 0, pourvus: 0, batiments: 0 }; });
+    e.batiments.forEach(function (b) {
+      var d = def(b);
+      if (!d.effectif || !t[d.travail]) return;
+      t[d.travail].requis += d.effectif; t[d.travail].pourvus += b.eff; t[d.travail].batiments++;
+    });
+    return t;
   }
 
   // Invariants vérifiés en mode test (section 19.5).
@@ -1705,6 +2352,15 @@
       }
       if (b.stocks) for (var s in b.stocks) if (b.stocks[s] < 0) pb.push(b.type + ' ' + b.id + ' : stock négatif');
       if (b.type === 'grenier' && totalStock(b) > D.regles.grenier.capacite) pb.push('grenier ' + b.id + ' : stock au-delà de la capacité');
+      if (b.type === 'entrepot') {
+        var E = D.regles.entrepot, cap = E.chargesParEmplacement * charge(), n = 0;
+        for (var g in b.stocks) n += Math.ceil(b.stocks[g] / cap);
+        if (n > E.emplacements) pb.push('entrepôt ' + b.id + ' : ' + n + ' emplacements occupés');
+      }
+      if (def(b).genre === 'atelier' && (b.mat < 0 || b.mat > D.regles.atelier.attenteMax * charge())) pb.push('atelier ' + b.id + ' : matière ' + b.mat);
+      for (var y = b.y; y < b.y + b.t; y++) for (var x = b.x; x < b.x + b.t; x++) {
+        if (!dedans(e, x, y) || e.bat[ix(e, x, y)] !== b.id) { pb.push(b.type + ' ' + b.id + ' : emprise abîmée'); y = b.y + b.t; break; }
+      }
     });
     e.marcheurs.forEach(function (w) {
       if (!dedans(e, w.x, w.y) || !dedans(e, w.nx, w.ny)) pb.push('marcheur ' + w.id + ' hors carte');
@@ -1727,7 +2383,7 @@
     for (var i = 0; i < s.length; i++) u8[i] = s.charCodeAt(i);
     return new Type(u8.buffer);
   }
-  var TYPES = { u8: Uint8Array, i32: Int32Array };
+  var TYPES = { u8: Uint8Array, i32: Int32Array, i8: Int8Array };
 
   function exporter(e) {
     var o = {};
@@ -1736,6 +2392,7 @@
       var v = e[k];
       if (v instanceof Uint8Array) o[k] = { __t: 'u8', d: versB64(v) };
       else if (v instanceof Int32Array) o[k] = { __t: 'i32', d: versB64(v) };
+      else if (v instanceof Int8Array) o[k] = { __t: 'i8', d: versB64(v) };
       else o[k] = v;
     });
     return JSON.stringify(o);
@@ -1744,7 +2401,7 @@
   function importer(txt) {
     var o = typeof txt === 'string' ? JSON.parse(txt) : txt;
     if (!o || typeof o !== 'object') throw new Error('sauvegarde illisible');
-    if (o.v !== VERSION_ETAT) throw new Error('version de sauvegarde inconnue : ' + o.v);
+    if (o.v !== VERSION_ETAT && o.v !== 1) throw new Error('version de sauvegarde inconnue : ' + o.v);
     if (!MISSIONS[o.mission]) throw new Error('mission inconnue : ' + o.mission);
     var e = {};
     Object.keys(o).forEach(function (k) {
@@ -1757,7 +2414,34 @@
       if (!e[k] || e[k].length !== n) throw new Error('sauvegarde abîmée : ' + k);
     });
     reconstruireCaches(e);
+    if (o.v === 1) completerV1(e);
+    if (!e.attract || e.attract.length !== n) throw new Error('sauvegarde abîmée : attract');
     return e;
+  }
+
+  // Sauvegarde du lot 1 : champs du lot 2 ajoutés avec leurs valeurs de départ.
+  function completerV1(e) {
+    var m = MISSIONS[e.mission];
+    e.v = VERSION_ETAT;
+    e.tout = false;
+    e.risques = !!m.risques;
+    e.attractivite = !!e.libre || m.attractivite !== false;
+    e.epidemies = e.risques && m.batiments.some(function (k) { return k === 'medecin' || k === 'hopital'; });
+    e.attract = new Int8Array(e.N * e.N);
+    e.priorites = {}; e.sante = 0; e.flux = { imm: 0, emi: 0, morts: 0 };
+    e.stats.epidemies = 0;
+    placerBancs(e, m.carte);
+    e.batiments.forEach(function (b) {
+      var g = def(b).genre;
+      if (g === 'maison') { b.pts = {}; b.quar = 0; b.bloque = 0; }
+      else if (g === 'grenier') { b.cons = {}; b.mc = 0; }
+      else if (g === 'marche') { b.interdits = {}; b.dem = {}; b.der = {}; }
+      else if (g === 'spectacle') { b.spects = { acteur: b.spect || 0 }; b.attendus = { acteur: b.attendu || 0 }; delete b.spect; delete b.attendu; }
+    });
+    e.marcheurs.forEach(function (w) {
+      if (w.type === 'livreur' && w.phase === 'aller' && w.ld && w.cb) w.res = [w.cb, w.ld.g, w.ld.q];
+    });
+    calculerAttractivite(e);
   }
 
   // Empreinte FNV-1a de l'état sérialisé (tests de déterminisme).
@@ -1799,11 +2483,23 @@
     majPopulation: majPopulation,
     calculerEau: calculerEau,
     repartirTravail: repartirTravail,
+    calculerAttractivite: calculerAttractivite,
+    attractiviteDe: attractiviteDe,
+    emplacements: emplacements,
+    placeDans: placeDans,
+    consigne: consigne,
+    besoinsMarche: besoinsMarche,
+    pointsSpectacle: pointsSpectacle,
+    couverture: couverture,
+    travailCategories: travailCategories,
+    calculerSante: calculerSante,
+    quaiEau: quaiEau,
     // Outils réservés aux villes d'exemple (affiche, aperçus) et aux tests : jamais appelés par le joueur.
     _outils: {
       creerBatiment: creerBatiment, creerMarcheur: creerMarcheur, emettreErrant: emettreErrant, ix: ix, noter: noter,
       finances: finances, consommer: consommer, quotidien: quotidien, nouveauMois: nouveauMois, nouveauJour: nouveauJour,
-      enflammer: enflammer, immigrer: immigrer, verifierTutoriel: verifierTutoriel, composantes: composantes
+      enflammer: enflammer, immigrer: immigrer, verifierTutoriel: verifierTutoriel, composantes: composantes,
+      deposer: deposer, agrandir: agrandir, diviser: diviser, epidemie: epidemie
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

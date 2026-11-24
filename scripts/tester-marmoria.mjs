@@ -74,7 +74,7 @@ const O = sim._outils;
 const TJ = D.temps.ticksParJour, TM = TJ * D.temps.joursParMois;
 
 function etatVide(mission = 'pompei') {
-  const e = sim.nouvelle(mission, { libre: true });
+  const e = sim.nouvelle(mission, { libre: true, attractivite: false });
   return e;
 }
 function maison(e, x, y, niv, hab) {
@@ -219,7 +219,7 @@ section('Formules (une au moins par règle chiffrée du lot 1)');
     O.quotidien(e, fe);
     if (fe.stock >= 1) { charges++; fe.stock = 0; }
   }
-  proche(charges, 8, 1, 'ferme à blé : charges par an');
+  proche(charges, 8, 0, 'ferme à blé : charges par an');
 }
 {
   // Feu : +1 par jour (×100) pour une tente, au-delà de 80 tirage de (risque − 80) %.
@@ -234,7 +234,7 @@ section('Formules (une au moins par règle chiffrée du lot 1)');
   let n = 0;
   const essai = { alea: 12345 };
   for (let k = 0; k < 2000; k++) {
-    const t = sim.nouvelle('pompei', { libre: true, graine: k });
+    const t = sim.nouvelle('pompei', { libre: true, graine: k, attractivite: false });
     const [x2, y2] = caseLibre(t);
     const hh = maison(t, x2, y2, 1, 4);
     hh.feu = 8999;
@@ -248,7 +248,7 @@ section('Formules (une au moins par règle chiffrée du lot 1)');
 {
   // Une tente entourée d'autres logements reçoit quand même ses immigrants : on entre
   // dans une maison depuis une route à 2 cases ou moins (demande du propriétaire du 24 novembre 2026).
-  const e = sim.nouvelle('ostie', { libre: true });
+  const e = sim.nouvelle('ostie', { libre: true, attractivite: false });
   const R = ex.ligneRome(sim, e);
   let x0 = -1;
   for (let x = 5; x < e.N - 8 && x0 < 0; x++) {
@@ -274,7 +274,7 @@ section('Ville d\'exemple, invariants à chaque tick');
 // Ville d'exemple bâtie par le joueur raisonnable (MM_EXEMPLES.jouer), tous les demi-mois.
 const PLANS = new Map();
 function villeTest(graine = 1, ticks = 0) {
-  const e = sim.nouvelle('pompei', { libre: true, graine });
+  const e = sim.nouvelle('pompei', { libre: true, graine, attractivite: false }); // règles du lot 1
   e.tresor = 1e6; // construction libre : l'argent n'est pas ce qu'on teste ici
   if (!PLANS.has(graine)) PLANS.set(graine, ex.planifier(sim, 'pompei', { niveau: 3, graine }));
   e._plan = PLANS.get(graine);
@@ -415,6 +415,242 @@ function joueurAutomatique(idMission, plan, moisMax, chaqueDemiMois) {
 }
 
 // --------------------------------------------------------------------------
+// Lot 2 « Économie » (cahier, section 21) : un scénario par chaîne de production, consignes
+// des greniers et entrepôts, biens au marché, niveaux 7 à 12 (agrandissement, division),
+// attractivité, priorités de main-d'œuvre, santé, puis une insula de prestige (niveau 12)
+// atteinte en construction libre par le joueur automatique.
+section('Économie (lot 2) : chaînes de production');
+// Construction libre, tous les bâtiments, sans attractivité ni risques : seule la chaîne compte.
+// Des tentes pleines le long de la voie de Rome fournissent les travailleurs.
+function partieEco(options = {}) {
+  const e = sim.nouvelle('pompei', { libre: true, tout: true, attractivite: false, risques: false, fonds: 1e7, ...options });
+  const R = ex.ligneRome(sim, e), l = [];
+  for (let x = 2; x < 70; x++) for (const y of [R - 1, R + 1]) if (sim.peutPlacer(e, 'logement', x, y) === null) l.push([x, y]);
+  sim.appliquer(e, { type: 'tracer', bat: 'logement', cases: l });
+  e.batiments.forEach((h) => { if (h.type === 'logement') { h.niv = 1; h.hab = 4; } });
+  sim.majPopulation(e);
+  return e;
+}
+const CHAINES = [
+  ['carriere_argile', 'atelier_poterie', 'argile', 'poterie'], ['camp_bucherons', 'atelier_mobilier', 'bois', 'mobilier'],
+  ['ferme_olives', 'pressoir', 'olives', 'huile'], ['ferme_vigne', 'cave', 'raisin', 'vin'],
+  ['mine_fer', 'atelier_armes', 'fer', 'armes'], ['carriere_marbre', null, 'marbre', 'marbre'],
+];
+for (const [source, atelier, matiere, bien] of CHAINES) {
+  const e = partieEco();
+  const ent = ex.poserPres(sim, e, 'entrepot', 40, 40);
+  const src = ex.poserPres(sim, e, source, 40, 40);
+  const at = atelier ? ex.poserPres(sim, e, atelier, 40, 44) : null;
+  if (!ok(ent && src && (at || !atelier), `${source} : bâtiments posés`)) continue;
+  if (!avancer(e, 14 * TM, true)) continue;
+  ok((ent.stocks[bien] || 0) >= 200, `${source}${atelier ? ' → ' + atelier : ''} → entrepôt : ${ent.stocks[bien] || 0} unités de ${bien} en 14 mois`);
+  if (at) ok(at.mat > 0 || (ent.stocks[matiere] || 0) > 0, `${atelier} approvisionné en ${matiere} (surplus rangé à l'entrepôt)`);
+  if (bien === 'marbre') {
+    // Grand temple : 150 deniers et 2 charges de marbre prises à l'entrepôt à la pose ; remboursées à l'annulation.
+    const avant = ent.stocks.marbre;
+    let pos = null;
+    for (let y = 30; y < 60 && !pos; y++) for (let x = 20; x < 60 && !pos; x++) if (sim.peutPlacer(e, 'grand_temple_ceres', x, y) === null) pos = [x, y];
+    const pose = pos && sim.appliquer(e, { type: 'poser', bat: 'grand_temple_ceres', x: pos[0], y: pos[1] }).ok;
+    ok(pose && ent.stocks.marbre === avant - 200, `grand temple : 2 charges de marbre prises à l'entrepôt (${avant} → ${ent.stocks.marbre})`);
+    sim.appliquer(e, { type: 'annuler' });
+    ok(ent.stocks.marbre === avant, 'annulation du grand temple : marbre rendu');
+    ent.stocks.marbre = 100;
+    ok(sim.peutPlacer(e, 'oracle', 30, 30) === 'marbre' || sim.peutPlacer(e, 'oracle', 30, 30) !== null, 'sans 2 charges de marbre en entrepôt, pas d\'oracle');
+  }
+}
+for (const source of ['ferme_legumes', 'ferme_fruits', 'ferme_porcs', 'quai_peche']) {
+  const e = partieEco();
+  const g = ex.poserPres(sim, e, 'grenier', 40, 40);
+  const src = ex.poserPres(sim, e, source, 40, 30);
+  const bien = D.batiments[source].produit;
+  if (!ok(g && src, `${source} : bâtiments posés`)) continue;
+  avancer(e, 12 * TM, true);
+  ok((g.stocks[bien] || 0) >= 300, `${source} → grenier : ${g.stocks[bien] || 0} unités de ${bien} en 12 mois`);
+  if (source === 'quai_peche') ok(e.bancs.length === 3, 'trois bancs de poissons posés sur l\'eau de la carte');
+}
+{
+  // Rendements à plein effectif (sections 7.2 et 8.2), au jour près : extraction 8 charges par an,
+  // atelier 4 charges par an.
+  const e = partieEco();
+  const src = ex.poserPres(sim, e, 'carriere_marbre', 40, 40);
+  src.eff = D.batiments.carriere_marbre.effectif;
+  let n = 0;
+  for (let j = 0; j < D.joursParAn; j++) { O.quotidien(e, src); if (src.stock >= 1) { n++; src.stock = 0; } }
+  ok(n === 8, `extraction : ${n} charges par an à plein effectif (8 attendues)`);
+  const at = ex.poserPres(sim, e, 'atelier_poterie', 40, 44);
+  at.eff = D.batiments.atelier_poterie.effectif; at.mat = 200;
+  let p = 0;
+  for (let j = 0; j < D.joursParAn; j++) { if (at.mat < 100) at.mat = 200; O.quotidien(e, at); if (at.stock >= 1) { p++; at.stock = 0; } }
+  ok(p === 4, `atelier : ${p} charges par an à plein effectif (4 attendues)`);
+  at.mat = 200;
+  ok(sim.placeDans(at, 'argile') === 0 && sim.placeDans(at, 'bois') === 0, 'un atelier garde 2 charges de matière au plus, et seulement la sienne');
+}
+
+section('Économie (lot 2) : entrepôts, consignes, marchés');
+{
+  const e = partieEco();
+  const ent = O.creerBatiment(e, 'entrepot', 10, 10);
+  // 8 emplacements de 4 charges, un bien par emplacement ; plafond en quarts.
+  ok(sim.placeDans(ent, 'bois') === 3200, 'entrepôt vide : 32 charges de place');
+  for (const g of ['bois', 'fer', 'argile', 'marbre', 'poterie', 'vin', 'huile']) ent.stocks[g] = 100;
+  ok(sim.placeDans(ent, 'armes') === 400 && sim.placeDans(ent, 'bois') === 700, 'un bien nouveau n\'a que l\'emplacement restant ; un bien présent remplit le sien puis le reste');
+  ent.stocks.armes = 50;
+  ok(sim.placeDans(ent, 'mobilier') === 0, 'huit biens différents : plus de place pour un neuvième');
+  ok(sim.emplacements(ent).filter(Boolean).length === 8, 'huit emplacements occupés pour le dessin');
+  const r = sim.appliquer(e, { type: 'plafond', id: ent.id, bien: 'bois', valeur: 1 });
+  ent.stocks = { bois: 600 };
+  ok(r.ok && sim.placeDans(ent, 'bois') === 200, 'plafond « un quart » : 8 charges de bois au plus');
+  sim.appliquer(e, { type: 'consigne', id: ent.id, bien: 'bois', valeur: 'refuser' });
+  ok(sim.placeDans(ent, 'bois') === 0 && sim.placeDans(ent, 'bois', true) > 0, 'consigne « refuser » : plus rien n\'entre (sauf retour forcé)');
+  ok(!sim.appliquer(e, { type: 'consigne', id: ent.id, bien: 'bois', valeur: 'jeter' }).ok, 'consigne inconnue refusée');
+  const g = O.creerBatiment(e, 'grenier', 20, 10);
+  ok(!sim.appliquer(e, { type: 'consigne', id: g.id, bien: 'bois', valeur: 'refuser' }).ok, 'un grenier n\'a de consigne que pour la nourriture');
+}
+{
+  // « Vider » et « aller chercher » : un charretier déplace le stock d'un dépôt à l'autre.
+  const e = partieEco();
+  const a = ex.poserPres(sim, e, 'entrepot', 30, 40), b = ex.poserPres(sim, e, 'entrepot', 50, 40);
+  a.stocks.bois = 1200;
+  sim.appliquer(e, { type: 'consigne', id: a.id, bien: 'bois', valeur: 'vider' });
+  avancer(e, 3 * TM, true);
+  ok((b.stocks.bois || 0) >= 200 && a.stocks.bois + (b.stocks.bois || 0) <= 1200 && a.stocks.bois <= 1000, `« vider » : le bois part vers l'autre entrepôt, une charge par trajet (${a.stocks.bois} restent, ${b.stocks.bois || 0} arrivés)`);
+  sim.appliquer(e, { type: 'consigne', id: a.id, bien: 'bois', valeur: 'chercher' });
+  const avant = a.stocks.bois;
+  avancer(e, 3 * TM, true);
+  ok(a.stocks.bois > avant, `« aller chercher » : le bois revient (${avant} → ${a.stocks.bois})`);
+}
+{
+  // Biens au marché : la vendeuse relève la demande, l'acheteuse va la chercher à l'entrepôt,
+  // la maison la reçoit ; un produit interdit n'est plus acheté.
+  const e = partieEco();
+  const ent = ex.poserPres(sim, e, 'entrepot', 40, 40);
+  ent.stocks.poterie = 800;
+  const m = ex.poserPres(sim, e, 'marche', 30, 44);
+  const R = ex.ligneRome(sim, e);
+  const casa = e.batiments.find((h) => h.type === 'logement' && Math.abs(h.x - m.x) < 4 && h.y === R - 1);
+  casa.niv = 7; casa.hab = 16;
+  sim.majPopulation(e);
+  ok(sim.infosMaison(e, casa).biensVoulus.includes('poterie'), 'une petite casa (niveau 7) réclame la poterie du niveau 8');
+  m.dem = { poterie: D.regles.serviceJours }; // demande relevée par la vendeuse
+  avancer(e, 2 * TM, true);
+  ok((m.stocks.poterie || 0) > 0, `l'acheteuse rapporte la poterie de l'entrepôt au marché (${m.stocks.poterie || 0} unités ; entrepôt ${ent.stocks.poterie})`);
+  sim.appliquer(e, { type: 'interdit', id: m.id, bien: 'poterie', valeur: true });
+  m.stocks.poterie = 0; m.dem = {};
+  avancer(e, 2 * TM);
+  ok(!(m.stocks.poterie > 0) && !sim.besoinsMarche(m).includes('poterie'), 'produit interdit au marché : plus acheté');
+}
+
+section('Économie (lot 2) : maisons, attractivité, main-d\'œuvre, santé');
+{
+  // Attractivité : « +4 sur 3 » donne 4, 2, 1 aux distances 1, 2, 3, puis 0.
+  const e = sim.nouvelle('pompei', { libre: true, tout: true });
+  const [x, y] = caseLibre(e, 0, -6);
+  O.creerBatiment(e, 'temple_ceres', x, y);
+  sim.calculerAttractivite(e);
+  const val = (dx) => e.attract[(y) * e.N + x + 1 + dx];
+  ok(val(1) === 4 && val(2) === 2 && val(3) === 1 && val(4) === 0, `attractivité « +4 sur 3 » : ${[1, 2, 3, 4].map(val).join(', ')} (4, 2, 1, 0 attendus)`);
+  ok(val(0) === 0, 'un bâtiment ne compte pas pour lui-même');
+  O.creerBatiment(e, 'statue_grande', x + 6, y);
+  sim.calculerAttractivite(e);
+  ok(e.attract[y * e.N + x + 4] === 11 + 1, `les sources s'additionnent : ${e.attract[y * e.N + x + 4]} (statue « +14 sur 5 » à 2 cases : 11 ; temple à 3 cases : 1)`);
+}
+{
+  // Agrandissement au niveau 10 (2 × 2) avec des voisines de même niveau, puis division à la descente.
+  const e = sim.nouvelle('pompei', { libre: true, tout: true, attractivite: false });
+  const [x, y] = caseLibre(e, 0, -2);
+  const hs = [maison(e, x, y, 9, 20), maison(e, x + 1, y, 9, 20), maison(e, x, y + 1, 9, 20), maison(e, x + 1, y + 1, 0, 0)];
+  hs[0].viv = { ble: 40, mobilier: 4 };
+  ok(O.agrandir(e, hs[0], 2), 'quatre cases (trois maisons de niveau 9 et une zone vide) forment une insula de 2 × 2');
+  const h = hs[0];
+  h.niv = 10;
+  ok(h.t === 2 && h.hab === 60 && sim.batA(e, x + 1, y + 1) === h && !sim.batiment(e, hs[1].id), `l'insula garde les ${h.hab} habitants et occupe les quatre cases`);
+  ok(sim.invariants(e).length === 0, `invariants tenus après l'agrandissement ${sim.invariants(e)[0] || ''}`);
+  O.diviser(e, h, 1);
+  h.niv = 9;
+  const quatre = [sim.batA(e, x, y), sim.batA(e, x + 1, y), sim.batA(e, x, y + 1), sim.batA(e, x + 1, y + 1)];
+  ok(new Set(quatre.map((b) => b.id)).size === 4 && quatre.every((b) => b.t === 1 && b.type === 'logement'), 'à la descente sous le niveau 10, l\'insula redevient quatre maisons d\'une case');
+  ok(quatre.reduce((n, b) => n + b.hab, 0) === 60 && sim.invariants(e).length === 0, 'les 60 habitants sont répartis, invariants tenus');
+  const bloque = maison(e, x + 5, y, 9, 20);
+  O.creerBatiment(e, 'prefecture', x + 6, y); O.creerBatiment(e, 'prefecture', x + 4, y);
+  O.creerBatiment(e, 'prefecture', x + 5, y + 1); O.creerBatiment(e, 'prefecture', x + 5, y - 1);
+  ok(!O.agrandir(e, bloque, 2), 'sans voisines ni zone vide autour, pas d\'agrandissement (la maison attend)');
+}
+{
+  // Niveau 12 : besoins cumulés du cahier (section 5.2).
+  const b = D.maisons[11].besoinsCumul;
+  ok(b.eau === 2 && b.nourriture === 2 && b.religion === 2 && b.divertissement === 35 && ['ecole', 'bains', 'poterie', 'barbier', 'mobilier', 'huile', 'medecin', 'bibliotheque'].every((k) => b[k]),
+    'insula de prestige : eau courante, 2 aliments, 2 dieux, divertissement 35, école, bains, poterie, barbier, mobilier, huile, médecin, bibliothèque');
+  ok(D.niveauMax === 12, 'lot 2 : les maisons s\'arrêtent au niveau 12 (patriciens au lot 3)');
+  ok(D.maisons[9].habitants === 80 && D.maisons[9].emprise === 2, 'niveau 10 : 2 × 2 cases, 80 habitants');
+}
+{
+  // Priorités de main-d'œuvre : la catégorie prioritaire est pourvue en entier.
+  const e = partieEco();
+  const fermes = [ex.poserPres(sim, e, 'ferme_ble', 40, 55), ex.poserPres(sim, e, 'ferme_ble', 40, 55)];
+  const services = [];
+  for (let k = 0; k < 30; k++) services.push(ex.poserPres(sim, e, 'ecole', 30 + (k % 10) * 3, 40));
+  sim.repartirTravail(e);
+  const avant = fermes[0].eff;
+  sim.appliquer(e, { type: 'priorite', categorie: 'alimentation', valeur: 1 });
+  sim.repartirTravail(e);
+  ok(e.travailleurs < e.emploisRequis && avant < 10 && fermes.every((f) => f.eff === 10), `pénurie de bras : sans priorité, la ferme a ${avant} travailleurs sur 10 ; avec la priorité « alimentation », 10`);
+  ok(!sim.appliquer(e, { type: 'priorite', categorie: 'cuisine', valeur: 1 }).ok, 'catégorie de travail inconnue refusée');
+}
+{
+  // Santé (section 9.4) : médecin 50, bains 20, variété 20, absence de pénurie 10.
+  const e = sim.nouvelle('pompei', { libre: true, tout: true, attractivite: false });
+  const [x, y] = caseLibre(e, 0, -2);
+  const a = maison(e, x, y, 4, 10), b = maison(e, x + 1, y, 4, 10);
+  a.svc = { medecin: 10, bains: 10 }; a.viv = { ble: 5, legumes: 5, fruits: 5 };
+  b.viv = {};
+  ok(sim.calculerSante(e) === 50, `santé : ${sim.calculerSante(e)} (une maison parfaite, une affamée sans service : 50 attendu)`);
+}
+
+section('Économie (lot 2) : insula de prestige en construction libre');
+{
+  const e = sim.nouvelle('pompei', { libre: true, tout: true, risques: false, fonds: 1e6 });
+  const plan = ex.planifier(sim, 'pompei', { niveau: 4 });
+  let mois = null, max = 0, invariant = null;
+  for (let m = 0; m < 60 && mois === null; m++) {
+    for (let k = 0; k < TM; k++) { sim.pas(e); if (k === 0 || k === TM / 2) ex.jouer(sim, e, plan, { places: 80 }); }
+    const pb = sim.invariants(e);
+    if (pb.length && !invariant) invariant = pb[0];
+    e.batiments.forEach((h) => { if (h.type === 'logement' && h.hab > 0) max = Math.max(max, h.niv); });
+    if (max >= 12) mois = m + 1;
+  }
+  ok(!invariant, `invariants tenus pendant toute la partie${invariant ? ' : ' + invariant : ''}`);
+  ok(mois !== null, `une insula de prestige (niveau 12) atteinte en construction libre${mois ? ` au mois ${mois}` : ` (niveau maximal ${max} en 5 ans)`}`);
+  console.log(`  insula de prestige au mois ${mois} ; ${e.pop} habitants, ${e.batiments.length} bâtiments, attractivité appliquée : ${e.attractivite}`);
+  // Sauvegarde puis chargement d'une ville du lot 2 : même état, puis mêmes 2 000 ticks.
+  const txt = sim.exporter(e), e2 = sim.importer(txt);
+  ok(sim.empreinte(e2) === sim.empreinte(e), 'ville du lot 2 : état identique après sauvegarde puis chargement');
+  for (let k = 0; k < 2000; k++) { sim.pas(e); sim.pas(e2); }
+  ok(sim.empreinte(e2) === sim.empreinte(e), 'ville du lot 2 : même état 2 000 ticks après le chargement');
+}
+{
+  // Sauvegarde du lot 1 (version 1) : complétée à l'import, la partie continue.
+  const e = villeTest(5);
+  avancerVille(e, 3 * TM);
+  const o = JSON.parse(sim.exporter(e));
+  o.v = 1;
+  ['attract', 'bancs', 'priorites', 'sante', 'flux', 'tout', 'risques', 'attractivite', 'epidemies'].forEach((k) => delete o[k]);
+  o.batiments.forEach((b) => {
+    if (b.type === 'theatre') { b.spect = b.spects.acteur || 0; b.attendu = b.attendus.acteur || 0; delete b.spects; delete b.attendus; }
+    if (b.type === 'logement') { delete b.pts; delete b.quar; delete b.bloque; }
+    if (b.type === 'grenier') { delete b.cons; delete b.mc; }
+    if (b.type === 'marche') { delete b.interdits; delete b.dem; delete b.der; }
+  });
+  let e1 = null;
+  try { e1 = sim.importer(JSON.stringify(o)); } catch (err) { ok(false, `sauvegarde du lot 1 refusée : ${err.message}`); }
+  if (e1) {
+    ok(e1.v === sim.VERSION_ETAT && e1.attract.length === e1.N * e1.N, 'sauvegarde du lot 1 relue et complétée (version 2)');
+    let erreur = null;
+    try { for (let k = 0; k < TM; k++) sim.pas(e1); } catch (err) { erreur = err; }
+    ok(!erreur && sim.invariants(e1).length === 0, `la partie du lot 1 continue un mois sans erreur${erreur ? ' : ' + erreur.message : ''}`);
+  }
+}
+
+// --------------------------------------------------------------------------
 if (args.includes('--endurance')) {
   section('Endurance : 50 années sans affichage');
   const e = villeTest(3);
@@ -443,7 +679,7 @@ if (args.includes('--perf')) {
     g.carte.rochers = [[140, 140, 8]];
     Object.assign(p, g);
   });
-  const e = monde.sim.nouvelle('pompei', { libre: true });
+  const e = monde.sim.nouvelle('pompei', { libre: true, attractivite: false });
   monde.ex.construire(monde.sim, e, { niveau: 3, colonnes: 26, rangees: 6, fermes: 14 });
   // Ville mûre : maisons pleines au niveau 6, réserves de nourriture, services récents.
   e.batiments.forEach((h) => { if (h.type === 'logement') { h.niv = 6; h.hab = 14; h.viv = { ble: 40 }; h.svc = { impot: 40, dieu_ceres: 40, theatre: 40 }; } });

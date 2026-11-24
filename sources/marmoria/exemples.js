@@ -6,7 +6,9 @@
    niveau → même ville. Trois niveaux (cahier des charges, section 18.3) :
      1 = village de début (logements, puits, ferme, grenier, marché) ;
      2 = bourg (préfecture, ingénieur, forum, temple en plus) ;
-     3 = ville de fin de lot (réservoirs, aqueduc, fontaines, théâtre, colonie d'acteurs).
+     3 = ville de fin de lot 1 (réservoirs, aqueduc, fontaines, théâtre, colonie d'acteurs) ;
+     4 = cité du lot 2 (industrie, entrepôt, écoles, santé, spectacles, quartier de prestige
+         entouré de places pavées, de jardins et de statues, où les insulae montent au niveau 12).
    Ce fichier n'utilise pas la page : il tourne aussi sous Node.
    ========================================================================== */
 (function (racine) {
@@ -118,6 +120,7 @@
    */
   function construire(sim, e, options) {
     options = options || {};
+    if ((options.niveau || 1) >= 4) return construireLot2(sim, e, options);
     var niveau = options.niveau || 1, N = e.N, R = ligneRome(sim, e);
     var nc = options.colonnes || (niveau === 1 ? 3 : niveau === 2 ? 4 : 6);
     var nr = options.rangees || (niveau === 1 ? 1 : niveau === 2 ? 2 : 2);
@@ -181,15 +184,157 @@
   }
 
   // ------------------------------------------------------------------------
+  // Cité du lot 2 (construction libre, tous les bâtiments) : 10 × 3 pâtés de part et d'autre
+  // de la voie de Rome. Le quartier de prestige (2 pâtés au centre, au nord) est bordé de places
+  // pavées, d'une bande de jardins, de statues, des temples, de la bibliothèque, des bains et du
+  // théâtre ; marchés, écoles, greniers et ateliers (qui font baisser l'attractivité) sont
+  // tenus à l'écart. Industrie près de ses ressources, fermes sur les prairies.
+  // ------------------------------------------------------------------------
+
+  function construireLot2(sim, e, options) {
+    var N = e.N, R = ligneRome(sim, e), D = sim.donnees();
+    if (options.illimite !== false) e.tresor = 1e9;
+    var cx = Math.floor(N / 2), x0 = cx - 25, x1 = x0 + 50, y0 = R - 10, y1 = R + 5;
+    function bloc(c, r) { return [x0 + 1 + c * PAS, y0 + 1 + r * PAS]; }
+    function poser(type, x, y) { degagerZone(x, y, D.batiments[type].taille); return cmd(sim, e, { type: 'poser', bat: type, x: x, y: y }).ok; }
+    function degagerZone(x, y, t) { var l = []; for (var yy = y; yy < y + t; yy++) for (var xx = x; xx < x + t; xx++) l.push([xx, yy]); degager(sim, e, l); }
+    // 1. Déblaiement de la grille et routes.
+    var zone = [];
+    for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) if (e.terrain[y * N + x] === sim.T.ARBRES) zone.push([x, y]);
+    cmd(sim, e, { type: 'tracer', bat: 'deblayer', cases: zone });
+    for (var ry = y0; ry <= y1; ry += PAS) if (ry !== R) cmd(sim, e, { type: 'tracer', bat: 'route', cases: ligne(x0, ry, x1, ry) });
+    for (var rx = x0; rx <= x1; rx += PAS) cmd(sim, e, { type: 'tracer', bat: 'route', cases: ligne(rx, y0, rx, y1) });
+    // 2. Eau : réservoir de la ville au nord du quartier de prestige, relié par aqueduc à un
+    // réservoir posé au bord de l'eau.
+    var pr = bloc(4, 0), vx = pr[0] + 3, vy = y0 - 5;
+    poser('reservoir', vx, vy);
+    var ville = sim.batA(e, vx, vy);
+    if (ville && ville.type === 'reservoir') relierReservoir(sim, e, ville);
+    // 3. Pâtés : rôle de chaque pâté (colonne, rangée) ; le reste en logements.
+    // Quartier fermé (colonnes 3 à 6 de la rangée nord, et la moitié haute de la rangée
+    // suivante) : tous les services des insulae y sont, à quelques cases des deux pâtés de
+    // prestige, et des barrières y retiennent leurs errants (section 4.4), sinon ils se perdent
+    // dans le reste de la ville. Statues et jardins au nord, hors des routes.
+    var ROLE = {
+      '4,0': 'prestige', '5,0': 'prestige',
+      '3,0': [['amphitheatre', 0, 0], ['jardin', 3, 0], ['jardin', 3, 1], ['jardin', 3, 2], ['jardin', 0, 3], ['jardin', 1, 3], ['medecin', 2, 3], ['barbier', 3, 3]],
+      '6,0': [['amphitheatre', 1, 0], ['jardin', 0, 0], ['jardin', 0, 1], ['prefecture', 0, 2], ['ingenieur', 0, 3], ['jardin', 1, 3], ['barbier', 2, 3], ['medecin', 3, 3]],
+      '3,1': [['temple_ceres', 0, 0], ['temple_venus', 2, 0], ['puits', 0, 3], ['prefecture', 3, 3]],
+      '4,1': [['marche', 0, 0], ['theatre', 2, 0], ['puits', 1, 3]],
+      '5,1': [['bains', 0, 0], ['marche', 2, 0], ['puits', 1, 3]],
+      '6,1': [['ecole', 0, 0], ['bibliotheque', 2, 0], ['puits', 1, 3]],
+      '4,2': [['grenier', 0, 0], ['prefecture', 3, 3]], '5,2': [['grenier', 0, 0], ['ingenieur', 3, 3]],
+      '2,0': [['marche', 0, 0], ['forum', 2, 0], ['fontaine', 3, 3]],
+      '7,0': [['ecole', 0, 0], ['puits', 3, 3], ['prefecture', 3, 0]],
+      '2,1': [['grenier', 0, 0], ['puits', 3, 3]],
+      '1,1': [['entrepot', 0, 0], ['prefecture', 3, 3]],
+      '0,1': [['grenier', 0, 0], ['puits', 3, 3]],
+      '7,1': [['grenier', 0, 0], ['puits', 3, 3]],
+      '8,1': [['marche', 0, 0], ['ingenieur', 3, 3]],
+      '9,1': [['ecole_gladiateurs', 0, 0], ['puits', 3, 3]],
+      '8,0': [['forum', 0, 0], ['puits', 3, 3], ['prefecture', 3, 0]],
+      '0,2': [['atelier_poterie', 0, 0], ['atelier_mobilier', 2, 0], ['pressoir', 0, 2], ['atelier_poterie', 2, 2]],
+      '1,0': [['colonie_acteurs', 0, 0], ['ingenieur', 3, 3]], '0,0': [['puits', 1, 1], ['prefecture', 3, 3]], '9,0': [['puits', 1, 1]],
+      '1,2': [['atelier_mobilier', 0, 0], ['puits', 3, 1], ['prefecture', 3, 3]], '2,2': [['puits', 1, 1]], '3,2': [['puits', 1, 1], ['ingenieur', 3, 3]],
+      '6,2': [['puits', 1, 1], ['ingenieur', 3, 3]],
+      '7,2': [['puits', 1, 1], ['prefecture', 3, 3]], '8,2': [['puits', 1, 1]], '9,2': [['puits', 1, 1], ['ingenieur', 3, 3]]
+    };
+    for (var r = 0; r < 3; r++) for (var c = 0; c < 10; c++) {
+      var o = bloc(c, r), role = ROLE[c + ',' + r] || [], pris = {};
+      if (o[1] + 3 > y1 || o[0] + 3 > x1) continue;
+      if (role === 'prestige') {
+        // Une fontaine dans un coin, 15 logements : trois coins peuvent devenir des insulae.
+        var fc = c === 4 ? [3, 3] : [0, 3];
+        poser('fontaine', o[0] + fc[0], o[1] + fc[1]);
+        pris[(o[0] + fc[0]) + ',' + (o[1] + fc[1])] = 1;
+        role = [];
+      }
+      role.forEach(function (q) {
+        var t = D.batiments[q[0]].taille;
+        if (poser(q[0], o[0] + q[1], o[1] + q[2])) for (var yy = 0; yy < t; yy++) for (var xx = 0; xx < t; xx++) pris[(o[0] + q[1] + xx) + ',' + (o[1] + q[2] + yy)] = 1;
+      });
+      var maisons = [];
+      for (var by = o[1]; by < o[1] + 4; by++) for (var bx = o[0]; bx < o[0] + 4; bx++) if (!pris[bx + ',' + by] && !e.bat[by * N + bx]) maisons.push([bx, by]);
+      if (maisons.length && !(c === 0 && r === 2)) cmd(sim, e, { type: 'tracer', bat: 'logement', cases: maisons });
+    }
+    // 4. Places pavées autour du quartier de prestige, jardins au nord de la route.
+    var p0 = bloc(4, 0), places = [];
+    for (var px = p0[0] - 1; px <= p0[0] + 9; px++) { places.push([px, p0[1] - 1]); places.push([px, p0[1] + 4]); }
+    for (var py = p0[1]; py < p0[1] + 4; py++) { places.push([p0[0] - 1, py]); places.push([p0[0] + 4, py]); places.push([p0[0] + 9, py]); }
+    cmd(sim, e, { type: 'tracer', bat: 'place', cases: places });
+    var jardins = [];
+    poser('statue_grande', p0[0] - 4, p0[1] - 5);
+    poser('statue_moyenne', p0[0] + 7, p0[1] - 4);
+    poser('statue_moyenne', p0[0] + 10, p0[1] - 4);
+    for (var jx = p0[0] - 6; jx <= p0[0] + 14; jx++) {
+      if (jx >= vx - 1 && jx <= vx + 3) continue;
+      jardins.push([jx, p0[1] - 2]);
+    }
+    degager(sim, e, jardins);
+    cmd(sim, e, { type: 'tracer', bat: 'jardin', cases: jardins });
+    // Barrières du quartier fermé : sur les deux routes est-ouest, aux sorties ouest et est ;
+    // sur chaque route nord-sud, sous la moitié haute de la rangée suivante ; sur les routes qui
+    // le rejoignent par le nord.
+    var bar = [[x0 + 14, y0], [x0 + 36, y0], [x0 + 14, y0 + PAS], [x0 + 36, y0 + PAS]];
+    for (var bx2 = x0 + 15; bx2 <= x0 + 35; bx2 += PAS) bar.push([bx2, y0 + PAS + 3]);
+    for (var nx = x0 + 15; nx <= x0 + 35; nx++) if (e.route[(y0 - 1) * N + nx] === sim.R.ROUTE) bar.push([nx, y0 - 1]);
+    bar.forEach(function (q) { if (e.route[q[1] * N + q[0]] === sim.R.ROUTE) cmd(sim, e, { type: 'poser', bat: 'barriere', x: q[0], y: q[1] }); });
+    // 5. Industrie près de ses ressources, puis fermes sur les prairies (au plus près de la ville).
+    var centre = [cx, R];
+    poserPres(sim, e, 'carriere_argile', ville ? ville.x : cx, ville ? ville.y - 6 : R - 20);
+    poserPres(sim, e, 'camp_bucherons', x0, R - 4);
+    // Un quai de pêche par banc de poissons (la carte en fixe la place).
+    (e.bancs || []).forEach(function (i) { poserPres(sim, e, 'quai_peche', i % N, Math.floor(i / N), 12); });
+    var fermes = options.fermes || ['ferme_ble', 'ferme_legumes', 'ferme_ble', 'ferme_legumes', 'ferme_ble', 'ferme_olives', 'ferme_ble', 'ferme_legumes', 'ferme_ble', 'ferme_fruits',
+      'ferme_ble', 'ferme_legumes', 'ferme_ble', 'ferme_ble', 'ferme_fruits', 'ferme_ble', 'ferme_legumes', 'ferme_ble'];
+    var deja = {};
+    e.batiments.forEach(function (b) { deja[b.type] = (deja[b.type] || 0) + 1; });
+    var compte = {};
+    fermes.forEach(function (type) {
+      compte[type] = (compte[type] || 0) + 1;
+      if ((deja[type] || 0) >= compte[type]) return;
+      poserPres(sim, e, type, centre[0], centre[1] + 8);
+    });
+    sim.calculerEau(e);
+    sim.calculerAttractivite(e);
+    sim.majPopulation(e);
+    return { x0: x0, y0: y0, x1: x1, y1: y1, centre: centre, prestige: [bloc(4, 0), bloc(5, 0)] };
+  }
+
+  // Réservoir au bord de l'eau le plus proche, relié par un aqueduc au réservoir de la ville.
+  function relierReservoir(sim, e, ville) {
+    var N = e.N, best = null, bd = 1e9, nres = 0;
+    e.batiments.forEach(function (b) { if (b.type === 'reservoir') nres++; });
+    if (nres >= 2) return;
+    for (var yy = 1; yy < N - 4; yy++) for (var xx = 1; xx < N - 4; xx++) {
+      var d = Math.abs(xx - ville.x) + Math.abs(yy - ville.y);
+      if (d >= bd || sim.peutPlacer(e, 'reservoir', xx, yy) !== null) continue;
+      var mouille = false;
+      for (var k = 0; k < 3 && !mouille; k++) {
+        var cs = [[xx + k, yy - 1], [xx + 3, yy + k], [xx + k, yy + 3], [xx - 1, yy + k]];
+        for (var c = 0; c < 4; c++) if (cs[c][0] >= 0 && cs[c][1] >= 0 && cs[c][0] < N && cs[c][1] < N && e.terrain[cs[c][1] * N + cs[c][0]] === sim.T.EAU) mouille = true;
+      }
+      if (mouille) { best = [xx, yy]; bd = d; }
+    }
+    if (!best) return;
+    cmd(sim, e, { type: 'poser', bat: 'reservoir', x: best[0], y: best[1] });
+    var a = ligne(best[0] + 1, best[1] + (best[1] < ville.y ? 3 : -1), ville.x + 1, ville.y + (best[1] < ville.y ? -1 : ville.t));
+    degager(sim, e, a);
+    cmd(sim, e, { type: 'tracer', bat: 'aqueduc', cases: a });
+  }
+
+  // ------------------------------------------------------------------------
   // Joueur raisonnable : rejoue le plan d'une ville d'exemple sur une vraie partie,
   // comme un joueur prudent (tests du tutoriel, villes mûries des aperçus).
   // ------------------------------------------------------------------------
 
-  var PRIORITE = { ferme_ble: 0, prefecture: 1, grenier: 2, marche: 3, ingenieur: 4, forum: 5, temple_ceres: 6, fontaine: 7, colonie_acteurs: 8, theatre: 9 };
+  var PRIORITE = { ferme_ble: 0, prefecture: 1, grenier: 2, marche: 3, ingenieur: 4, forum: 5, temple_ceres: 6, fontaine: 7, colonie_acteurs: 8, theatre: 9,
+    ferme_legumes: 10, ecole: 11, entrepot: 12, carriere_argile: 13, atelier_poterie: 14, bains: 15, barbier: 16, amphitheatre: 17, ecole_gladiateurs: 18,
+    camp_bucherons: 19, atelier_mobilier: 20, temple_venus: 21, medecin: 22, ferme_olives: 23, pressoir: 24, bibliotheque: 25, quai_peche: 26, ferme_fruits: 27 };
 
   // Relève le plan (liste de commandes) sur un état libre de la même mission.
   function planifier(sim, idMission, options) {
-    var brouillon = sim.nouvelle(idMission, { libre: true, graine: options && options.graine });
+    var brouillon = sim.nouvelle(idMission, { libre: true, tout: !!(options && options.niveau >= 4), graine: options && options.graine });
     var plan = [], orig = sim.appliquer;
     sim.appliquer = function (e, c) { plan.push(JSON.parse(JSON.stringify(c))); return orig(e, c); };
     try { construire(sim, brouillon, options); } finally { sim.appliquer = orig; }
@@ -203,7 +348,10 @@
     var rang = {}, cle = new Map();
     travail.forEach(function (c, k) {
       rang[c.bat] = (rang[c.bat] || 0) + 1;
-      cle.set(c, rang[c.bat] * 100 + (c.bat in PRIORITE ? PRIORITE[c.bat] : 9) + k / 10000);
+      // La nourriture d'abord : les fermes et les greniers passent devant le 1er exemplaire des
+      // autres services (une ville qui a faim perd son humeur, puis ses habitants).
+      var poids = (D.batiments[c.bat].genre === 'ferme' && D.batiments[c.bat].categorie === 'alimentation') || c.bat === 'quai_peche' ? 0.3 : c.bat === 'grenier' || c.bat === 'marche' ? 0.6 : 1;
+      cle.set(c, rang[c.bat] * 100 * poids + (c.bat in PRIORITE ? PRIORITE[c.bat] : 30) + k / 10000);
     });
     travail.sort(function (a, b) { return cle.get(a) - cle.get(b); });
     return { infra: infra, travail: travail, logements: logements };
@@ -232,11 +380,44 @@
       if (sim.appliquer(e, c).ok) emplois += d.effectif;
     });
     var libres = sim.placesLibres(e), k = 0, voulu = options.places || 40;
+    // Pas de nouveaux logements tant que plus d'une maison sur dix a faim (lot 2 : une ville
+    // trop peuplée pour ses fermes vide ses marchés et ses maisons ne montent plus).
+    // Ni quand le chômage dépasse 15 % : des tentes en plus n'apportent que des chômeurs.
+    if (sim.couverture) { var cv = sim.couverture(e); if (cv.maisons > 20 && (cv.penurie * 10 > cv.maisons || e.chomage > 15)) voulu = 0; }
+    // Ni au-delà de ce que les fermes bâties peuvent nourrir (0,5 unité par habitant et par mois).
+    if (e.tout) {
+      var cap = 0;
+      e.batiments.forEach(function (b) {
+        var d = D.batiments[b.type];
+        if (b.type === 'quai_peche') cap += 6 * 100 / 12;
+        else if (d.genre === 'ferme' && D.aliments.indexOf(d.produit) >= 0) {
+          var f = 0;
+          for (var yy = b.y; yy < b.y + b.t; yy++) for (var xx = b.x; xx < b.x + b.t; xx++) f += e.fertilite[yy * e.N + xx];
+          cap += d.chargesParAn * 100 / 12 * f / (b.t * b.t * 100);
+        }
+      });
+      if (e.pop > 150 + 2 * cap * 0.9) voulu = 0;
+    }
     while (libres < voulu && k < plan.logements.length) {
       var p = plan.logements[k++];
       if (sim.appliquer(e, { type: 'poser', bat: 'logement', x: p[0], y: p[1] }).ok) libres += D.regles.maison.terrainVagueHabitants;
     }
   }
 
-  racine.MM_EXEMPLES = { construire: construire, ligneRome: ligneRome, planifier: planifier, jouer: jouer };
+  // Cherche, par distance croissante au point (cx, cy), où poser ce bâtiment ; le pose et le
+  // relie à la route la plus proche. Renvoie le bâtiment, ou null.
+  function poserPres(sim, e, type, cx, cy, rayon) {
+    var N = e.N, t = sim.donnees().batiments[type].taille, best = null, bd = 1e9;
+    for (var y = 1; y < N - t; y++) for (var x = 1; x < N - t; x++) {
+      var d = Math.abs(x - cx) + Math.abs(y - cy);
+      if (d >= bd || d > (rayon || 2 * N)) continue;
+      if (sim.peutPlacer(e, type, x, y) === null) { best = [x, y]; bd = d; }
+    }
+    if (!best || !cmd(sim, e, { type: 'poser', bat: type, x: best[0], y: best[1] }).ok) return null;
+    var b = sim.batA(e, best[0], best[1]);
+    if (!sim.donnees().batiments[type].sansRoute) relier(sim, e, cotes(b).filter(function (c) { return c[0] >= 0 && c[1] >= 0 && c[0] < N && c[1] < N; }).map(function (c) { return c[1] * N + c[0]; }));
+    return b;
+  }
+
+  racine.MM_EXEMPLES = { construire: construire, ligneRome: ligneRome, planifier: planifier, jouer: jouer, poserPres: poserPres, relier: relier, cotes: cotes, ligne: ligne };
 })(typeof window !== 'undefined' ? window : globalThis);
