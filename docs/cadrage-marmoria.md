@@ -1239,3 +1239,60 @@ Publication : le jeu n'est pas publié au lot 1. La pull request reste ouverte j
    - nouveau calque « Stocks » : bâtiments aplatis, une colonne par grenier et par marché, d'autant plus haute et verte qu'il est plein, rouge quand il est presque vide ; seuls les livreurs, acheteuses et vendeuses restent visibles.
 4. Corrigé au passage : les colonnes des calques feu et dommages sortaient noires (couleur mal formée).
 5. Affiche : son héros est désormais toujours le temple (le forum ou le temple changeait selon la ville d'exemple) ; texte de la jaquette réécrit dans les 5 langues. `version` 2.
+
+### 23.4 Lot 2 « Économie » (24 novembre 2026)
+
+Livré :
+
+- Production : fermes à légumes, fruits, porcs, olives et raisin (les deux dernières dans l'industrie), quai de pêche (sur la rive ; son bateau gagne par l'eau le banc de poissons le plus proche, y pêche 20 jours et rapporte une charge), carrière d'argile (près de l'eau), camp de bûcherons (près des arbres), mine de fer et carrière de marbre (près des rochers), ateliers de poterie, de mobilier, pressoir, cave et atelier d'armes (1 charge de matière donne 1 charge de bien, 4 par an, 2 charges de matière en attente au plus). Bancs de poissons dans les données de la carte (`poissons`, 3 par carte).
+- Stockage : entrepôt de 8 emplacements de 4 charges (un bien par emplacement), consignes par produit des greniers et des entrepôts (accepter, refuser, aller chercher, vider), plafond par bien en quarts de l'entrepôt, charretier qui approvisionne les ateliers, vide ou va chercher. Le livreur sert d'abord un atelier demandeur, puis un grenier, puis un entrepôt ; une charge sans preneur revient à son point de départ.
+- Marchés : biens réclamés par les maisons desservies (poterie, mobilier, huile au lot 2), produit interdit depuis le panneau, acheteuse qui vise le produit qui manque le plus.
+- Maisons : niveaux 7 à 12, agrandissement en 2 × 2 au niveau 10 (maisons voisines du même niveau, zones vides, jardins), division à la descente, biens en réserve (4 mois, 1 unité par case et par mois).
+- Attractivité : grille de −100 à +100, émise par chaque bâtiment (« +4 sur 3 » : 4, 2, 1), exigée par les maisons (seuils du tableau 5.2) ; places pavées (sur une route), jardins, trois statues.
+- Services : école, bibliothèque, académie, barbier, bains (dans le rayon d'un réservoir plein), médecin, hôpital ; amphithéâtre (acteurs et gladiateurs : 10 points par type, 20 au plus), colisée (gladiateurs et lions : 12, 25 avec les deux), école de gladiateurs, maison des lions ; temples de Neptune, Mercure, Mars et Vénus, grands temples des cinq dieux et oracle (2 charges de marbre prises à l'entrepôt à la pose), sans humeur ni effets des dieux.
+- Santé de la ville (section 9.4) chaque mois, épidémies.
+- Priorités de main-d'œuvre par catégorie (1 à 9).
+- Interface : panneaux des nouveaux bâtiments (production, matière en attente, bateau, emplacements, consignes et plafonds touchés pour passer au réglage suivant, produits interdits au marché, artistes en scène, canalisations), maison (attractivité, biens en réserve, place pour s'agrandir), conseillers en 7 onglets (Cité, Travail avec priorités et salaire, Finances, Population avec la courbe des 24 derniers mois et les habitants par niveau, Santé, Éducation, Spectacles), calques nourriture, divertissement, éducation, santé, religion, impôts, attractivité (couleur de chaque case), problèmes, entrepôts dans le calque « Stocks ».
+- Construction libre (écran depuis la sélection des missions) : carte d'une mission ouverte, fonds de 10 000, 30 000 ou 100 000 deniers, incendies et effondrements au choix, tous les bâtiments, aucun objectif.
+- Dessins : environ 45 bâtiments, maisons 7 à 12, 13 marcheurs (dont le bateau et le lion), places pavées, icônes d'arrêt « pas de matière », « aucun banc de poissons », « hors du rayon d'un réservoir ».
+- Textes : 226 clés de plus dans les 5 langues.
+- Ville d'exemple du lot 2 (`exemples.js`, niveau 4) : cité de Pompéi en construction libre, quartier de prestige fermé par des barrières, entouré de places, de jardins, de statues, de temples, des bains, de la bibliothèque et des spectacles ; elle remplace la troisième ville embarquée (affiche, troisième aperçu, fond de l'écran titre).
+- Mode test (`?debug=1`) : `MM_DEBUG.ville(n)` ouvre une ville d'exemple comme une vraie partie.
+
+Mesures (sous Node, PC de développement) :
+
+| Critère (section 21) | Résultat |
+| --- | --- |
+| Insula de prestige (niveau 12) en construction libre | Atteinte au mois 25 par le joueur automatique (`tester-marmoria.mjs`, section « insula de prestige »), sur Pompéi, sans incendie. |
+| Un scénario de test par chaîne | Argile → poterie, bois → mobilier, olives → huile, raisin → vin, fer → armes, marbre (et grand temple), légumes, fruits, porc, poisson : chacun livre son produit en 12 à 14 mois ; rendements exacts au jour près (8 et 4 charges par an). Tests aussi des consignes, du plafond, de l'interdiction au marché, de l'agrandissement, de la division, de l'attractivité, des priorités et de la santé. |
+| Déterminisme et sauvegarde | Tenus, aussi pour une ville du lot 2 ; une sauvegarde du lot 1 (version 1) se charge et continue. |
+| Cibles 19.3 sur 160 × 160 remplie | 0,93 ms par tick en moyenne (lot 1 : 0,74 ms ; cible 4 ms), 18 ms au pire sur des ticks quelconques (ramasse-miettes). Le calcul quotidien de l'attractivité de toute la carte prend 0,5 ms. |
+| Poids de `index.html` | POIDS (repère du lot 2 : 1,8 Mo). |
+| Contrôles du site | CONTROLES |
+
+Écarts avec ce cahier (à valider ; les valeurs sont dans `donnees.json`) :
+
+1. Attractivité des maisons (5.3) : le cahier ne donne que les deux bouts (« −2 sur 2 » pour la tente, « +6 sur 4 » pour le palais). Retenu : tente −1 sur 1, cabane et masure 0, casa +1 sur 1, insula +2 sur 2, villa +4 sur 3, palais +6 sur 4. À −2 sur 2, une tente au milieu d'un pâté de tentes recevait −16 et ne passait jamais le niveau 2 (seuil −10) ; à −1 sur 1, un pâté monte du bord vers le centre.
+2. Attractivité recalculée sur toute la carte chaque jour et après chaque construction, plutôt que dans la seule zone touchée : 0,5 ms sur la plus grande carte. Elle est gardée dans la sauvegarde. Un bâtiment ne compte pas pour lui-même ; une maison de plusieurs cases prend la moyenne de ses cases.
+3. Attractivité sans effet dans les deux missions tutorielles (Ostie, Pompéi), validées au lot 1 sans elle ; elle s'applique en construction libre et dans les missions suivantes. Le panneau de la maison l'affiche avec la mention « sans effet dans cette mission ».
+4. Niveaux des maisons arrêtés à 12 au lot 2 (`maison.niveauMax`) : les patriciens (13 à 20) viennent au lot 3.
+5. Agrandissement : carrés essayés dans un ordre fixe (la maison en haut à gauche, puis à droite, en bas…). Faute de place, la maison attend (le panneau dit « De la place pour s'agrandir »). À la descente sous le niveau 10, l'insula redevient quatre maisons d'une case de niveau 9, habitants et réserves partagés.
+6. Grands temples et oracle : les 2 charges de marbre sont prises à l'entrepôt au moment de la pose (rendues à l'annulation) ; il n'y a pas encore de chantier livré par les charretiers.
+7. Oracle : sans marcheur, il ne donne pas d'accès aux dieux aux maisons ; sa couverture servira à la satisfaction des dieux (lot 3).
+8. Acheteuse du marché (7.4) : elle choisit d'abord le produit qui manque le plus au marché (rapporté à son seuil : 400 unités par aliment, 200 par bien ; à égalité, celui acheté il y a le plus longtemps), puis va au dépôt le plus proche qui en a. En allant simplement au dépôt le plus proche, elle rapportait toujours du blé et jamais la poterie de l'entrepôt.
+9. Vendeuse : elle part même quand le marché est vide, pour relever les biens que les maisons réclament (mémoire de 48 jours).
+10. Une maison achète les biens de son niveau et du suivant (sans quoi elle ne pourrait jamais monter) et consomme chaque mois 1 unité par case de chaque bien qu'elle a.
+11. Nourriture et entrepôts : une ferme livre d'abord un grenier, un entrepôt seulement si aucun grenier ne l'accepte.
+12. Production : la progression du jour est arrondie au-dessus et le reste reporté, pour tomber juste à 8 charges par an (extraction, blé) et 4 (atelier) ; la ferme à blé du lot 1 produit donc 8 charges au lieu de 7,7.
+13. Pêche : le cahier ne chiffre pas le voyage. Retenu : 20 jours de pêche au banc, 80 cases de portée ; un quai proche d'un banc rapporte 7 à 8 charges par an.
+14. « Près de l'eau, des arbres, des rochers » : à 1 case ou moins de l'emprise. Quai : un côté entier de l'emprise donne sur l'eau.
+15. Santé (9.4) : la variété alimentaire compte plein à 3 aliments. Épidémies seulement dans une partie avec risques où médecin ou hôpital peuvent être bâtis (sinon Pompéi en subirait sans pouvoir s'en protéger).
+16. Corrigé au passage (lot 1) : une charge en route vers un grenier disparu ou plein était perdue, et la place réservée dans le grenier ne se libérait pas si le livreur disparaissait ; la charge revient maintenant à son point de départ et la réservation est toujours libérée.
+17. Le calque criminalité attend la criminalité (lot 3).
+
+Constats de jeu (joueur automatique, à confirmer par une séance réelle) :
+
+- Le marché est souvent le goulot : son acheteuse rapporte une charge (100 unités) par trajet, alors que 1 000 habitants mangent 500 unités par mois. Un marché a besoin d'un grenier à quelques cases ; c'est la règle du cahier (7.4), à expliquer dans l'aide.
+- Les errants allant au hasard (4.2), les maisons de niveau 9 à 12 perdent par moments un service et redescendent, sauf si leurs services sont regroupés et retenus par des barrières (4.4) : c'est ce que fait la ville d'exemple. Le niveau 12 est atteint, puis tenu par intermittence.
+
+Publication : toujours pas avant la décision de la section 22.2 (fin du lot 3).

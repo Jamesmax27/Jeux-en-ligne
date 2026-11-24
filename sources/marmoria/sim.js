@@ -837,27 +837,32 @@
     if (estMaison(b)) return b.hab > 0 ? niveauDef(b).emet : null;
     return def(b).attractivite || null;
   }
+  // Boucle chaude (une fois par jour sur toute la ville) : entiers seulement, sans Math.
   function rayonner(e, acc, x0, y0, t, v, r) {
-    var N = e.N;
-    for (var y = Math.max(0, y0 - r); y < Math.min(N, y0 + t + r); y++) for (var x = Math.max(0, x0 - r); x < Math.min(N, x0 + t + r); x++) {
-      var dx = x < x0 ? x0 - x : x >= x0 + t ? x - (x0 + t - 1) : 0;
-      var dy = y < y0 ? y0 - y : y >= y0 + t ? y - (y0 + t - 1) : 0;
-      var d = dx > dy ? dx : dy;
-      if (d === 0) continue; // un bâtiment ne compte pas pour lui-même
-      acc[y * N + x] += Math.trunc(v * (r + 1 - d) / r);
+    var N = e.N, ya = y0 - r, yb = y0 + t + r, xa = x0 - r, xb = x0 + t + r, x, y, dx, dy, d, q;
+    if (ya < 0) ya = 0; if (xa < 0) xa = 0; if (yb > N) yb = N; if (xb > N) xb = N;
+    for (y = ya; y < yb; y++) {
+      dy = y < y0 ? y0 - y : y >= y0 + t ? y - (y0 + t - 1) : 0;
+      for (x = xa; x < xb; x++) {
+        dx = x < x0 ? x0 - x : x >= x0 + t ? x - (x0 + t - 1) : 0;
+        d = dx > dy ? dx : dy;
+        if (d === 0) continue; // un bâtiment ne compte pas pour lui-même
+        q = v * (r + 1 - d) / r;
+        acc[y * N + x] += q < 0 ? -((-q) | 0) : q | 0; // troncature vers zéro
+      }
     }
   }
   function calculerAttractivite(e) {
-    var N = e.N, n = N * N, A = D.regles.attractivite, i;
+    var N = e.N, n = N * N, A = D.regles.attractivite, lo = A.min, hi = A.max, i, v;
     if (!ACC || ACC.length !== n) ACC = new Int32Array(n);
     ACC.fill(0);
     for (var k = 0; k < e.batiments.length; k++) {
       var b = e.batiments[k], em = emission(b);
       if (em && em[0] && em[1] > 0) rayonner(e, ACC, b.x, b.y, b.t, em[0], em[1]);
     }
-    var pl = D.batiments.place && D.batiments.place.attractivite;
-    if (pl) for (i = 0; i < n; i++) if (e.route[i] === R.PLACE) rayonner(e, ACC, i % N, (i - i % N) / N, 1, pl[0], pl[1]);
-    for (i = 0; i < n; i++) e.attract[i] = Math.max(A.min, Math.min(A.max, ACC[i]));
+    var pl = D.batiments.place && D.batiments.place.attractivite, route = e.route, att = e.attract;
+    if (pl) for (i = 0; i < n; i++) if (route[i] === R.PLACE) rayonner(e, ACC, i % N, (i - i % N) / N, 1, pl[0], pl[1]);
+    for (i = 0; i < n; i++) { v = ACC[i]; att[i] = v < lo ? lo : v > hi ? hi : v; }
   }
   // Attractivité d'un bâtiment : moyenne de ses cases.
   function attractiviteDe(e, b) {
@@ -880,7 +885,7 @@
       }
     });
     var travailleurs = Math.floor(plebs * Tr.partTravailleurs);
-    var demandes = [], total = 0;
+    var demandes = [], total = 0, relies = e._relies = new Set(); // cache : bâtiments reliés aux maisons
     e.batiments.forEach(function (b) {
       var d = def(b);
       if (!d.effectif) return;
@@ -894,6 +899,7 @@
       }
       if (!relie) { b.eff = 0; return; }
       demandes.push(b); total += d.effectif;
+      relies.add(b.id);
     });
     // Catégories prioritaires d'abord (rang 1, puis 2…), servies en entier si possible ; le reste
     // des travailleurs va aux autres bâtiments, proportionnellement (section 6.3).
@@ -2335,7 +2341,9 @@
     e.batiments.forEach(function (b) {
       var d = def(b);
       if (!d.effectif || !t[d.travail]) return;
-      t[d.travail].requis += d.effectif; t[d.travail].pourvus += b.eff; t[d.travail].batiments++;
+      t[d.travail].batiments++;
+      if (e._relies && !e._relies.has(b.id)) { t[d.travail].isoles = (t[d.travail].isoles || 0) + 1; return; } // sans accès aux travailleurs
+      t[d.travail].requis += d.effectif; t[d.travail].pourvus += b.eff;
     });
     return t;
   }

@@ -133,7 +133,7 @@
     fermerPanneau();
     majTuto(false);
     majHud();
-    if (!options.figee) prog.niveau = Math.max(prog.niveau, partie.m.numero);
+    if (!options.figee && !e.libre) prog.niveau = Math.max(prog.niveau, partie.m.numero);
     if (!options.figee && !prog.options.geste) ecranGeste(0);
   }
   function centrerVille(e) {
@@ -278,9 +278,13 @@
     securite: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="#b03a2e" stroke="#6e1f17"/><path d="M12 8c2 2.5 3 4 3 5.5a3 3 0 0 1-6 0c0-1.5 1-3 3-5.5z" fill="#f8d24a"/>'
   };
   var categorieOuverte = null;
+  // Bâtiments permis : ceux de la mission, ou tous en construction libre.
+  var TOUS = Object.keys(D.batiments).filter(function (k) { return D.batiments[k].categorie; });
+  function permis() { return partie.e.tout ? TOUS : partie.m.batiments; }
+  function permet(k) { return permis().indexOf(k) >= 0; }
   function categoriesMission() {
-    var m = partie.m;
-    return D.categories.filter(function (c) { return m.batiments.some(function (b) { return D.batiments[b].categorie === c; }); });
+    var l = permis();
+    return D.categories.filter(function (c) { return l.some(function (b) { return D.batiments[b].categorie === c; }); });
   }
   function construireMenu() {
     var nav = $('menu-cat');
@@ -300,7 +304,7 @@
     if (!c) { sm.hidden = true; return; }
     vider(sm);
     sm.appendChild(el('h3', { texte: t('cat.' + c) }));
-    partie.m.batiments.filter(function (k) { return D.batiments[k].categorie === c; }).forEach(function (k) {
+    permis().filter(function (k) { return D.batiments[k].categorie === c; }).forEach(function (k) {
       var d = D.batiments[k], ouvert = partie.e.debloques.indexOf(k) >= 0;
       var cout = k === 'deblayer' ? t('outil.parCase', { n: nb(d.cout) }) : nb(d.cout);
       var b = el('button', { classe: 'choix' + (ouvert ? '' : ' verrou') + (outil && outil.type === k ? ' actif' : ''), 'data-bat': k }, [
@@ -617,6 +621,7 @@
   function nomBat(b) { return b.type === 'logement' ? t(b.hab > 0 ? 'maison.n' + b.niv : 'maison.vague') : t('bat.' + b.type + '.nom'); }
   function besoinTexte(k, v) {
     if (k === 'eau') return t(v >= 2 ? 'besoin.eau2' : 'besoin.eau1');
+    if (k === 'attractivite' || k === 'place') return t('besoin.' + k, { n: v });
     if (k === 'nourriture' || k === 'religion') return t('besoin.' + k, { n: v });
     if (k === 'divertissement') return t('besoin.divertissement', { n: v });
     return t('besoin.' + k);
@@ -631,41 +636,104 @@
     var cause = SIM.cause(e, b);
     if (d.genre !== 'ruines' && d.genre !== 'incendie') p.appendChild(el('p', { classe: cause ? 'etat-ko' : 'etat-ok', texte: cause ? t('info.arret', { cause: t('cause.' + cause) }) : t('info.enService') }));
     if (d.effectif) p.appendChild(ligne(t('info.effectif'), t('info.surTotal', { n: b.eff, max: d.effectif })));
-    if (d.genre === 'ferme') { p.appendChild(ligne(t('info.production'), nb(b.prog / 100) + ' %')); p.appendChild(jauge(b.prog / 10000)); }
-    if (d.genre === 'ecole_art') { p.appendChild(ligne(t('info.formation'), nb(b.prog / 100) + ' %')); p.appendChild(jauge(b.prog / 10000)); }
+    if (d.genre === 'ferme' || d.genre === 'extraction' || d.genre === 'atelier') {
+      p.appendChild(ligne(t('info.production') + ' · ' + t('bien.' + d.produit), nb(Math.min(100, b.prog / 100)) + ' %'));
+      p.appendChild(jauge(b.prog / 10000));
+    }
+    if (d.genre === 'atelier') p.appendChild(ligne(t('info.matiere') + ' · ' + t('bien.' + d.matiere), t('info.surTotal', { n: nb(b.mat / 100), max: D.regles.atelier.attenteMax })));
+    if (d.genre === 'peche') { p.appendChild(ligne(t('info.bateau'), t(b.mb ? 'info.enMer' : 'info.auQuai'))); if (b.stock >= 1) p.appendChild(ligne(t('bien.poisson'), t('info.charges', { n: 1 }))); }
+    if (d.genre === 'ecole_art') { p.appendChild(ligne(t('info.formation') + ' · ' + t('marcheur.' + d.forme), nb(b.prog / 100) + ' %')); p.appendChild(jauge(b.prog / 10000)); }
     if (d.genre === 'grenier') {
       p.appendChild(ligne(t('info.stockTotal'), t('info.surTotal', { n: nb(SIM.totalStock(b) / 100), max: nb(D.regles.grenier.capacite / 100) })));
       p.appendChild(jauge(SIM.totalStock(b) / D.regles.grenier.capacite));
+      p.appendChild(el('h3', { texte: t('info.consigne') }));
+      D.aliments.forEach(function (g) { p.appendChild(ligneDepot(b, g, false)); });
+      p.appendChild(el('p', { classe: 'aide', texte: t('consigne.aide') }));
     }
-    if (d.genre === 'grenier' || d.genre === 'marche') D.aliments.forEach(function (a) { if (b.stocks[a]) p.appendChild(ligne(t('bien.' + a), t('info.unites', { n: nb(b.stocks[a]) }))); });
-    if (d.genre === 'spectacle') p.appendChild(ligne(t('info.spectacle'), b.spect > 0 ? t('info.jours', { n: b.spect }) : t('info.aucunSpectacle')));
+    if (d.genre === 'entrepot') {
+      var occ = SIM.emplacements(b).filter(Boolean).length;
+      p.appendChild(ligne(t('info.emplacements'), t('info.surTotal', { n: occ, max: D.regles.entrepot.emplacements })));
+      p.appendChild(jauge(occ / D.regles.entrepot.emplacements));
+      p.appendChild(el('div', { classe: 'ligne bien entete' }, [el('span', { texte: t('info.produits') }), el('span', { texte: t('info.consigne') }), el('span', { texte: t('info.plafond') })]));
+      // Biens présents ou réglés d'abord, puis les autres (tous les biens peuvent y entrer).
+      var liste = D.listeBiens.slice().sort(function (x, y) { return poidsBien(b, y) - poidsBien(b, x) || D.listeBiens.indexOf(x) - D.listeBiens.indexOf(y); });
+      liste.forEach(function (g) { p.appendChild(ligneDepot(b, g, true)); });
+      p.appendChild(el('p', { classe: 'aide', texte: t('consigne.aide') }));
+    }
+    if (d.genre === 'marche') {
+      p.appendChild(el('h3', { texte: t('info.produits') }));
+      D.aliments.concat(BIENS_MAISONS).forEach(function (g) {
+        var interdit = !!b.interdits[g];
+        p.appendChild(el('div', { classe: 'ligne bien' }, [
+          el('span', { texte: t('bien.' + g) + (b.dem[g] > 0 ? ' · ' + t('info.demande') : '') }),
+          el('strong', { texte: interdit ? t('info.interdit') : t('info.unites', { n: b.stocks[g] || 0 }) }),
+          el('button', { classe: 'mini', clic: function () { AUDIO.jouer('clic'); commander({ type: 'interdit', id: b.id, bien: g, valeur: !interdit }); if (panneauVivant) panneauVivant(); } , texte: t(interdit ? 'info.autoriser' : 'info.interdire') })
+        ]));
+      });
+    }
+    if (d.genre === 'spectacle') {
+      d.artistes.forEach(function (a) {
+        var n = b.spects[a] || 0;
+        p.appendChild(el('p', { classe: n > 0 ? 'ok' : 'ko', texte: n > 0 ? t('info.artiste', { artiste: t('marcheur.' + a), n: n }) : t('info.sansArtiste', { artiste: t('marcheur.' + a) }) }));
+      });
+      p.appendChild(ligne(t('info.points'), nb(SIM.pointsSpectacle(b))));
+    }
+    if (d.eauRequise) p.appendChild(ligne(t('info.canalisations'), t(b.actif ? 'ui.oui' : 'ui.non')));
     if (d.genre === 'reservoir') p.appendChild(ligne(t('info.reservoir'), t(b.plein ? 'info.plein' : 'info.vide')));
     if (d.genre === 'incendie') p.appendChild(ligne(t('info.brule'), t('info.jours', { n: b.jours })));
-    if (d.genre !== 'ruines' && d.genre !== 'incendie' && partie.m.risques) {
+    if (d.genre !== 'ruines' && d.genre !== 'incendie' && partie.e.risques) {
       p.appendChild(ligne(t('info.risqueFeu'), nb(b.feu / 100) + ' %'));
       p.appendChild(ligne(t('info.dommages'), nb(b.dom / 100) + ' %'));
     }
+  }
+  // Biens que les maisons peuvent réclamer au marché (lot 2 : poterie, mobilier, huile).
+  var BIENS_MAISONS = [];
+  D.maisons.forEach(function (m) { (m.biensVoulus || []).forEach(function (g) { if (BIENS_MAISONS.indexOf(g) < 0) BIENS_MAISONS.push(g); }); });
+  function poidsBien(b, g) { return (b.stocks[g] || 0) + (b.cons[g] ? 1 : 0) + (b.plaf && b.plaf[g] ? 1 : 0); }
+  // Ligne d'un produit dans un dépôt : quantité, consigne (touchée : la suivante), plafond.
+  function ligneDepot(b, g, avecPlafond) {
+    var C = D.regles.consignes, c = SIM.consigne(b, g);
+    var l = el('div', { classe: 'ligne bien' }, [
+      el('span', { texte: t('bien.' + g) }),
+      el('strong', { texte: t('info.charges', { n: Math.round((b.stocks[g] || 0) / 10) / 10 }) }), // nombre brut : le module choisit le pluriel et le met en forme
+      el('button', { classe: 'mini c-' + c, aria: t('info.consigne') + ' : ' + t('consigne.' + c), clic: function () {
+        AUDIO.jouer('clic'); commander({ type: 'consigne', id: b.id, bien: g, valeur: C[(C.indexOf(c) + 1) % C.length] }); if (panneauVivant) panneauVivant();
+      }, texte: t('consigne.' + c) })
+    ]);
+    if (avecPlafond) {
+      var q = b.plaf[g] || D.regles.entrepot.plafondDepart;
+      l.appendChild(el('button', { classe: 'mini', aria: t('info.plafond') + ' : ' + t('plafond.' + q), clic: function () {
+        AUDIO.jouer('clic'); commander({ type: 'plafond', id: b.id, bien: g, valeur: q % 4 + 1 }); if (panneauVivant) panneauVivant();
+      }, texte: t('plafond.' + q) }));
+    }
+    return l;
   }
   function remplirMaison(p, h) {
     var e = partie.e, inf = SIM.infosMaison(e, h);
     if (h.hab <= 0) { p.appendChild(el('p', { texte: t('info.terrainVague') })); return; }
     p.appendChild(ligne(t('info.habitants'), t('info.surTotal', { n: h.hab, max: SIM.capacite(h) })));
     var viv = 0; D.aliments.forEach(function (a) { viv += h.viv[a] || 0; });
-    p.appendChild(ligne(t('info.reserve'), t('info.mois', { n: I18N.nombre(inf.conso ? Math.floor(viv * 10 / inf.conso) / 10 : 0) })));
-    if (partie.m.batiments.indexOf('forum') >= 0) p.appendChild(el('p', { classe: h.svc.impot > 0 ? 'ok' : 'ko', texte: t(h.svc.impot > 0 ? 'info.recensee' : 'info.nonRecensee') }));
+    p.appendChild(ligne(t('info.reserve'), t('info.mois', { n: inf.conso ? Math.floor(viv * 10 / inf.conso) / 10 : 0 })));
+    if (permet('forum')) p.appendChild(el('p', { classe: h.svc.impot > 0 ? 'ok' : 'ko', texte: t(h.svc.impot > 0 ? 'info.recensee' : 'info.nonRecensee') }));
+    p.appendChild(ligne(t(inf.attractiviteActive ? 'info.attractivite' : 'info.attractiviteSans'), nb(inf.attractivite)));
+    if (inf.biensVoulus.length) p.appendChild(ligne(t('info.biensReserve'), inf.biensVoulus.map(function (g) { return t('bien.' + g) + ' ' + nb(h.viv[g] || 0); }).join(' · ')));
     p.appendChild(el('h3', { texte: t('info.besoinsActuels') }));
     var actuels = D.maisons[h.niv - 1].besoinsCumul, aucun = true;
     Object.keys(actuels).forEach(function (k) {
       aucun = false;
       p.appendChild(el('p', { classe: (inf.satisfaits[k] || 0) >= actuels[k] ? 'ok' : 'ko', texte: besoinTexte(k, actuels[k]) }));
     });
+    if (inf.attractiviteRequise !== null && inf.attractiviteRequise !== undefined) {
+      aucun = false;
+      p.appendChild(el('p', { classe: inf.attractivite >= inf.attractiviteRequise ? 'ok' : 'ko', texte: besoinTexte('attractivite', inf.attractiviteRequise) }));
+    }
     if (aucun) p.appendChild(el('p', { texte: t('info.aucunBesoin') }));
     if (inf.suivant) {
       p.appendChild(el('h3', { texte: t('info.pourMonter', { niveau: t('maison.n' + inf.suivant) }) }));
       if (!inf.manque.length) p.appendChild(el('p', { classe: 'ok', texte: t('info.bientot') }));
       inf.manque.forEach(function (x) { p.appendChild(el('p', { classe: 'ko', texte: besoinTexte(x.besoin, x.requis) })); });
     }
-    if (partie.m.risques) { p.appendChild(ligne(t('info.risqueFeu'), nb(h.feu / 100) + ' %')); }
+    if (partie.e.risques) { p.appendChild(ligne(t('info.risqueFeu'), nb(h.feu / 100) + ' %')); }
   }
   function remplirMarcheur(p, id) {
     var e = partie.e, w = SIM.marcheur(e, id);
@@ -681,21 +749,45 @@
   function remplirTerrain(p, x, y) {
     var e = partie.e, i = y * e.N + x, tt = e.terrain[i];
     var noms = ['terrain.herbe', 'terrain.prairie', 'terrain.arbres', 'terrain.rochers', 'terrain.eau'];
-    p.appendChild(el('h2', { texte: e.route[i] ? t(e.route[i] === SIM.R.ROME ? 'terrain.rome' : e.route[i] === SIM.R.BARRIERE ? 'bat.barriere.nom' : 'bat.route.nom') : e.aqueduc[i] ? t('bat.aqueduc.nom') : t(noms[tt]) }));
+    p.appendChild(el('h2', { texte: e.route[i] ? t(e.route[i] === SIM.R.ROME ? 'terrain.rome' : e.route[i] === SIM.R.BARRIERE ? 'bat.barriere.nom' : e.route[i] === SIM.R.PLACE ? 'bat.place.nom' : 'bat.route.nom') : e.aqueduc[i] ? t('bat.aqueduc.nom') : t(noms[tt]) }));
     if (tt === SIM.T.PRAIRIE) p.appendChild(ligne(t('info.fertilite'), e.fertilite[i] + ' %'));
     if (e.route[i] === SIM.R.ROME) p.appendChild(el('p', { texte: t('terrain.romeAide') }));
     else if (e.route[i] === SIM.R.BARRIERE) p.appendChild(el('p', { texte: t('bat.barriere.aide') }));
     else p.appendChild(el('p', { texte: t(noms[tt] + 'Aide') }));
     if (e.eauFontaine[i] || e.eauPuits[i]) p.appendChild(el('p', { classe: 'ok', texte: t(e.eauFontaine[i] ? 'besoin.eau2' : 'besoin.eau1') }));
+    p.appendChild(ligne(t(e.attractivite ? 'info.attractivite' : 'info.attractiviteSans'), nb(e.attract[i])));
   }
 
-  function ouvrirConseil() {
+  // Conseillers (section 17.4, lot 2) : un onglet par domaine ; tout se lit dans l'état, seules
+  // les flèches (salaire, impôt, priorités) envoient des commandes.
+  var ONGLETS = ['general', 'travail', 'finances', 'population', 'sante', 'education', 'divertissement'];
+  var ongletConseil = 'general';
+  function ouvrirConseil(onglet) {
     if (!partie) return;
+    if (onglet) ongletConseil = onglet;
     ouvrirPanneau(function (p) {
       var e = partie.e;
       p.appendChild(el('h2', { texte: t('conseil.titre') }));
+      var barre = el('div', { classe: 'onglets' });
+      ONGLETS.forEach(function (o) {
+        barre.appendChild(el('button', { classe: 'onglet' + (o === ongletConseil ? ' actif' : ''), texte: t('conseil.onglet.' + o), clic: function () { AUDIO.jouer('clic'); ongletConseil = o; if (panneauVivant) panneauVivant(); } }));
+      });
+      p.appendChild(barre);
+      CONSEILLERS[ongletConseil](p, e);
+    });
+  }
+  function couvertureLigne(p, c, k) {
+    var n = 0;
+    partie.e.batiments.forEach(function (b) { if (D.batiments[b.type].marcheur && D.marcheurs[D.batiments[b.type].marcheur].service === k) n++; });
+    var part = c.pop ? c.svc[k].pop / c.pop : 0;
+    p.appendChild(ligne(t('bat.' + k + '.nom') + ' · ' + t('conseil.batiments', { n: n }), t('conseil.couverture', { n: Math.round(part * 100) })));
+    p.appendChild(jauge(part));
+  }
+  var CONSEILLERS = {
+    general: function (p, e) {
       p.appendChild(el('h3', { texte: t('conseil.objectifs') }));
-      SIM.objectifs(e).forEach(function (o) { p.appendChild(el('p', { classe: o.fait ? 'ok' : 'ko', texte: t('obj.' + o.cle, { n: nb(o.cible), v: nb(o.valeur) }) })); });
+      if (e.libre) p.appendChild(el('p', { texte: t('conseil.aucunObjectif') }));
+      SIM.objectifs(e).forEach(function (o) { if (!e.libre) p.appendChild(el('p', { classe: o.fait ? 'ok' : 'ko', texte: t('obj.' + o.cle, { n: nb(o.cible), v: nb(o.valeur) }) })); });
       p.appendChild(el('h3', { texte: t('conseil.cite') }));
       p.appendChild(ligne(t('hud.population'), nb(e.pop)));
       p.appendChild(ligne(t('conseil.places'), nb(SIM.placesLibres(e))));
@@ -704,20 +796,89 @@
       var det = SIM.variationHumeur(e).detail;
       Object.keys(det).forEach(function (k) { p.appendChild(el('p', { classe: det[k] >= 0 ? 'ok' : 'ko', texte: t('humeur.' + k, { n: (det[k] > 0 ? '+' : '') + det[k] }) })); });
       if (e.humeur < D.regles.immigration.humeurMin) p.appendChild(el('p', { classe: 'etat-ko', texte: t('conseil.immigrationArretee') }));
-      p.appendChild(el('h3', { texte: t('conseil.travail') }));
+      p.appendChild(ligne(t('conseil.chomage'), e.chomage + ' %'));
+      if (permet('medecin') || permet('barbier')) p.appendChild(ligne(t('conseil.santeVille'), t('info.surTotal', { n: e.sante, max: 100 })));
+    },
+    travail: function (p, e) {
       p.appendChild(ligne(t('conseil.travailleurs'), nb(e.travailleurs)));
       p.appendChild(ligne(t('conseil.emplois'), t('info.surTotal', { n: nb(e.emplois), max: nb(e.emploisRequis) })));
       p.appendChild(ligne(t('conseil.chomage'), e.chomage + ' %'));
       p.appendChild(reglage(t('conseil.salaire', { n: e.salaire, rome: e.salaireRome }), function (s) { commander({ type: 'reglage', cle: 'salaire', valeur: e.salaire + s }); }));
-      p.appendChild(el('h3', { texte: t('conseil.finances') }));
+      p.appendChild(el('h3', { texte: t('conseil.priorites') }));
+      p.appendChild(el('p', { classe: 'aide', texte: t('conseil.prioritesAide') }));
+      var tc = SIM.travailCategories(e);
+      D.regles.travail.categories.forEach(function (c) {
+        if (!tc[c].batiments) return;
+        var pr = e.priorites[c] || 0;
+        p.appendChild(ligne(t('travail.' + c), t('info.surTotal', { n: nb(tc[c].pourvus), max: nb(tc[c].requis) })));
+        p.appendChild(jauge(tc[c].requis ? tc[c].pourvus / tc[c].requis : 0));
+        p.appendChild(reglage(pr ? t('conseil.priorite', { n: pr }) : t('conseil.sansPriorite'), function (s) { commander({ type: 'priorite', categorie: c, valeur: Math.max(0, Math.min(9, pr + s)) }); }));
+      });
+    },
+    finances: function (p, e) {
+      p.appendChild(ligne(t('hud.tresor'), nb(e.tresor)));
       p.appendChild(reglage(t('conseil.impot', { n: e.impot }), function (s) { commander({ type: 'reglage', cle: 'impot', valeur: e.impot + s }); }));
       var an = e.finances.an, prec = e.finances.prec;
+      p.appendChild(el('h3', { texte: t('conseil.recettes') }));
       p.appendChild(ligne(t('conseil.impotsAn'), nb(an.impots)));
+      p.appendChild(el('h3', { texte: t('conseil.depenses') }));
       p.appendChild(ligne(t('conseil.salairesAn'), nb(an.salaires)));
       p.appendChild(ligne(t('conseil.constructionsAn'), nb(an.constructions)));
       if (prec.impots || prec.salaires || prec.constructions) p.appendChild(ligne(t('conseil.anPasse'), t('conseil.bilan', { i: nb(prec.impots), s: nb(prec.salaires), c: nb(prec.constructions) })));
-    });
-  }
+    },
+    population: function (p, e) {
+      p.appendChild(ligne(t('hud.population'), nb(e.pop)));
+      p.appendChild(ligne(t('conseil.places'), nb(SIM.placesLibres(e))));
+      var der = e.histo[e.histo.length - 1];
+      if (der) {
+        p.appendChild(ligne(t('conseil.arrives'), nb(der.imm || 0)));
+        p.appendChild(ligne(t('conseil.partis'), nb(der.emi || 0)));
+        if (der.morts) p.appendChild(ligne(t('conseil.morts'), nb(der.morts)));
+      }
+      // Courbe des 24 derniers mois (dessin, sans texte).
+      var h = e.histo.slice(-24);
+      if (h.length > 1) {
+        p.appendChild(el('h3', { texte: t('conseil.historique') }));
+        var max = Math.max.apply(null, h.map(function (x) { return x.pop; })) || 1, pts = h.map(function (x, k) { return (k * 200 / (h.length - 1)).toFixed(1) + ',' + (58 - x.pop * 54 / max).toFixed(1); }).join(' ');
+        var svg = el('div', { classe: 'courbe' });
+        svg.innerHTML = '<svg viewBox="0 0 200 60" preserveAspectRatio="none"><polyline points="' + pts + '" fill="none" stroke="#d9a93a" stroke-width="2"/><line x1="0" y1="58" x2="200" y2="58" stroke="#8a7a60"/></svg>';
+        p.appendChild(svg);
+      }
+      var c = SIM.couverture(e);
+      p.appendChild(el('h3', { texte: t('conseil.niveaux') }));
+      for (var n = 1; n < c.niveaux.length; n++) {
+        if (!c.niveaux[n]) continue;
+        p.appendChild(ligne(t('maison.n' + n), nb(c.niveaux[n])));
+        p.appendChild(jauge(c.pop ? c.niveaux[n] / c.pop : 0));
+      }
+    },
+    sante: function (p, e) {
+      p.appendChild(ligne(t('conseil.santeVille'), t('info.surTotal', { n: e.sante, max: 100 })));
+      p.appendChild(jauge(e.sante / 100));
+      p.appendChild(el('p', { classe: 'aide', texte: t('conseil.santeAide') }));
+      if (e.epidemies && e.sante < D.regles.sante.seuilEpidemie) p.appendChild(el('p', { classe: 'etat-ko', texte: t('conseil.epidemie') }));
+      var c = SIM.couverture(e);
+      ['barbier', 'bains', 'medecin', 'hopital'].forEach(function (k) { if (permet(k)) couvertureLigne(p, c, k); });
+    },
+    education: function (p, e) {
+      var c = SIM.couverture(e);
+      ['ecole', 'bibliotheque', 'academie'].forEach(function (k) { if (permet(k)) couvertureLigne(p, c, k); });
+    },
+    divertissement: function (p, e) {
+      var c = SIM.couverture(e);
+      p.appendChild(ligne(t('conseil.divertMoyen'), nb(c.divert)));
+      p.appendChild(el('h3', { texte: t('conseil.lieux') }));
+      e.batiments.forEach(function (b) {
+        var d = D.batiments[b.type];
+        if (d.genre !== 'spectacle') return;
+        var pts = SIM.pointsSpectacle(b);
+        p.appendChild(el('p', { classe: pts ? 'ok' : 'ko', texte: t('bat.' + b.type + '.nom') + ' · ' + (pts ? t('conseil.enScene') + ' (' + pts + ')' : t('conseil.relache')) }));
+      });
+      var ecoles = {};
+      e.batiments.forEach(function (b) { var d = D.batiments[b.type]; if (d.genre === 'ecole_art') ecoles[b.type] = (ecoles[b.type] || 0) + 1; });
+      Object.keys(ecoles).forEach(function (k) { p.appendChild(ligne(t('bat.' + k + '.nom'), nb(ecoles[k]))); });
+    }
+  };
   function reglage(texte, changer) {
     return el('div', { classe: 'reglage' }, [
       el('button', { classe: 'ico', texte: '−', aria: t('ui.moins'), clic: function () { AUDIO.jouer('clic'); changer(-1); if (panneauVivant) panneauVivant(); } }),
@@ -750,9 +911,16 @@
     if (!partie) return;
     ouvrirPanneau(function (p) {
       p.appendChild(el('h2', { texte: t('calque.titre') }));
-      [null, 'eau', 'feu', 'dommages', 'stocks'].forEach(function (c) {
-        if ((c === 'feu' || c === 'dommages') && !partie.m.risques) return;
-        if (c === 'stocks' && partie.m.batiments.indexOf('grenier') < 0 && partie.m.batiments.indexOf('marche') < 0) return;
+      // Un calque n'apparaît que si la partie permet ce qu'il montre.
+      var utile = {
+        feu: partie.e.risques, dommages: partie.e.risques, stocks: permet('grenier') || permet('marche') || permet('entrepot'),
+        nourriture: permet('marche'), divertissement: permet('theatre') || permet('amphitheatre') || permet('colisee'),
+        education: permet('ecole'), sante: permet('barbier') || permet('bains') || permet('medecin') || permet('hopital'),
+        religion: TOUS.some(function (k) { return D.batiments[k].dieu && permet(k); }), impots: permet('forum'),
+        attractivite: partie.e.attractivite, problemes: true, eau: true
+      };
+      [null, 'eau', 'feu', 'dommages', 'stocks', 'nourriture', 'divertissement', 'education', 'sante', 'religion', 'impots', 'attractivite', 'problemes'].forEach(function (c) {
+        if (c && !utile[c]) return;
         p.appendChild(el('button', { classe: 'choix' + (rendu.calque === c ? ' actif' : ''), clic: function () { AUDIO.jouer('clic'); rendu.calque = c; fermerPanneau(); $('b-calque').classList.toggle('actif', !!c); } }, [
           el('span', { classe: 'nom', texte: t('calque.' + (c || 'aucun')) })
         ]));
@@ -894,11 +1062,46 @@
     });
     carte.appendChild(grille);
     carte.appendChild(el('div', { classe: 'boutons' }, [
+      bouton(t('libre.bouton'), function () { ecranLibre(); }, 'gros non'),
       bouton(t('missions.charger'), function () { ecranSauvegardes('charger', ecranMissions); }, 'gros non'),
       bouton(t('ui.retour'), ecranTitre, 'gros non')
     ]));
     ouvrirEcran(carte, { retour: ecranTitre });
   }
+
+  // Construction libre (section 17.6) : tous les bâtiments, sans objectif, sur la carte d'une
+  // mission déjà ouverte ; fonds de départ et risques au choix.
+  var FONDS_LIBRE = [10000, 30000, 100000];
+  var choixLibre = { carte: null, fonds: 1, risques: true };
+  function ecranLibre() {
+    var cartes = MISSIONS.filter(function (m) { return m.dispo && missionOuverte(m); });
+    if (!choixLibre.carte || cartes.indexOf(mission(choixLibre.carte)) < 0) choixLibre.carte = cartes[0].id;
+    var carte = el('div', { classe: 'carte-ecran' });
+    carte.appendChild(el('h1', { texte: t('libre.titre') }));
+    carte.appendChild(el('p', { texte: t('libre.intro') }));
+    carte.appendChild(el('h2', { texte: t('libre.carte') }));
+    var g = el('div', { classe: 'boutons' });
+    cartes.forEach(function (m) { g.appendChild(bouton(t('mission.' + m.id + '.nom'), function () { choixLibre.carte = m.id; ecranLibre(); }, choixLibre.carte === m.id ? 'gros or' : 'gros non')); });
+    carte.appendChild(g);
+    carte.appendChild(el('h2', { texte: t('libre.fonds') }));
+    var f = el('div', { classe: 'boutons' });
+    FONDS_LIBRE.forEach(function (n, k) { f.appendChild(bouton(nb(n), function () { choixLibre.fonds = k; ecranLibre(); }, choixLibre.fonds === k ? 'gros or' : 'gros non')); });
+    carte.appendChild(f);
+    carte.appendChild(el('div', { classe: 'boutons' }, [
+      bouton(t('libre.risques') + ' : ' + t(choixLibre.risques ? 'ui.oui' : 'ui.non'), function () { choixLibre.risques = !choixLibre.risques; ecranLibre(); }, 'gros non')
+    ]));
+    carte.appendChild(el('div', { classe: 'boutons' }, [
+      bouton(t('ui.retour'), ecranMissions, 'gros non'),
+      bouton(t('libre.commencer'), function () { fermerEcran(); nouvelleLibre(); }, 'gros or')
+    ]));
+    ouvrirEcran(carte, { retour: ecranMissions });
+  }
+  function nouvelleLibre() {
+    var e = SIM.nouvelle(choixLibre.carte, { libre: true, tout: true, fonds: FONDS_LIBRE[choixLibre.fonds], risques: choixLibre.risques });
+    demarrerEtat(e);
+    AUDIO.jouer('etape');
+  }
+  function nomPartie() { return partie.e.libre && partie.e.tout ? t('libre.nom', { carte: t('mission.' + partie.m.id + '.nom') }) : t('mission.' + partie.m.id + '.nom'); }
   function toastEcran(texte) {
     var b = el('div', { classe: 'toast', texte: texte });
     b.style.position = 'absolute'; b.style.left = '50%'; b.style.top = '12px'; b.style.transform = 'translateX(-50%)'; b.style.zIndex = 20;
@@ -953,14 +1156,14 @@
     annulerOutil();
     var carte = el('div', { classe: 'carte-ecran' }, [
       el('h1', { texte: t('pause.titre') }),
-      el('p', { texte: t('mission.' + partie.m.id + '.nom') + ' · ' + t('hud.date', { mois: t('mois.' + SIM.date(partie.e).mois), annee: anneeTexte(SIM.date(partie.e).annee) }) }),
+      el('p', { texte: nomPartie() + ' · ' + t('hud.date', { mois: t('mois.' + SIM.date(partie.e).mois), annee: anneeTexte(SIM.date(partie.e).annee) }) }),
       el('div', { classe: 'boutons' }, [
         bouton(t('pause.reprendre'), fermerEcran, 'gros or'),
         bouton(t('pause.sauver'), function () { ecranSauvegardes('sauver', ecranPause); }, 'gros non'),
         bouton(t('pause.charger'), function () { ecranSauvegardes('charger', ecranPause); }, 'gros non'),
         bouton(t('pause.exporter'), exporterVille, 'gros non'),
         bouton(t('pause.options'), function () { ecranOptions(ecranPause); }, 'gros non'),
-        bouton(t('pause.recommencer'), function () { var m = partie.m; fermerEcran(); nouvelleMission(m); }, 'gros non'),
+        bouton(t('pause.recommencer'), function () { var m = partie.m, libre = partie.e.tout; fermerEcran(); if (libre) { choixLibre.carte = m.id; nouvelleLibre(); } else nouvelleMission(m); }, 'gros non'),
         bouton(t('pause.missions'), function () { sauverVilleAuto(); quitterVersMissions(); }, 'gros non'),
         bouton(t('pause.accueil'), function () { sauverVilleAuto(); sauverProg(); quitterPartie(); }, 'gros non')
       ])
@@ -998,7 +1201,7 @@
   function sauverVille(cle) {
     if (!STOCK || !partie || partie.figee) return Promise.reject({ code: 'indispo' });
     var e = partie.e, d = SIM.date(e);
-    var meta = { mission: e.mission, mois: d.mois, annee: d.annee, pop: e.pop, quand: Date.now() };
+    var meta = { mission: e.mission, libre: !!e.tout, mois: d.mois, annee: d.annee, pop: e.pop, quand: Date.now() };
     return STOCK.set(cle, SIM.exporter(e)).then(function () {
       return lireIndex().then(function (idx) { idx[cle] = meta; return STOCK.set('index', JSON.stringify(idx)); });
     });
@@ -1034,7 +1237,7 @@
       var cles = (mode === 'sauver' ? [] : ['auto-1', 'auto-2', 'auto-3']).concat(['ville-1', 'ville-2', 'ville-3', 'ville-4', 'ville-5']);
       cles.forEach(function (cle) {
         var m = idx[cle], nom = /^auto/.test(cle) ? t('sauve.auto', { n: cle.slice(5) }) : t('sauve.emplacement', { n: cle.slice(6) });
-        var desc = m ? t('sauve.resume', { mission: t('mission.' + m.mission + '.nom'), date: t('hud.date', { mois: t('mois.' + m.mois), annee: anneeTexte(m.annee) }), pop: nb(m.pop) }) : t('sauve.vide');
+        var desc = m ? t('sauve.resume', { mission: m.libre ? t('libre.nom', { carte: t('mission.' + m.mission + '.nom') }) : t('mission.' + m.mission + '.nom'), date: t('hud.date', { mois: t('mois.' + m.mois), annee: anneeTexte(m.annee) }), pop: nb(m.pop) }) : t('sauve.vide');
         var ligneE = el('div', { classe: 'emplacement' }, [el('strong', { texte: nom }), el('span', { texte: desc })]);
         if (mode === 'sauver') ligneE.appendChild(bouton(t('sauve.ecrire'), function () {
           sauverVille(cle).then(function () { toastEcran(t('sauve.ok')); AUDIO.jouer('pieces'); ecranSauvegardes(mode, retour); }).catch(function () { toastEcran(t('sauve.erreur')); });
@@ -1168,7 +1371,9 @@
       incendie: function () { if (partie) { var b = partie.e.batiments.filter(function (x) { return x.type === 'logement' && x.hab > 0; })[0]; if (b) SIM._outils.enflammer(partie.e, b); } },
       etat: function () { return partie && partie.e; },
       vue: function (x, y, z) { rendu.centrerSur(x, y); if (z) rendu.zoomerVers(z); },
-      invariants: function () { return partie ? SIM.invariants(partie.e) : []; }
+      invariants: function () { return partie ? SIM.invariants(partie.e) : []; },
+      // Une ville d'exemple (1 à 3) ouverte comme une vraie partie, pour essayer l'interface.
+      ville: function (n) { var e = chargerVille(n || 3); if (!e) return false; prog.options.geste = true; fermerEcran(); demarrerEtat(e); return true; }
     };
   }
 

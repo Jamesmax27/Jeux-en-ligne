@@ -543,7 +543,7 @@
   function peindreInsula(ctx, P, niv, v) {
     var k, e, m = 0.1, f = 1.9, fen = '#5b4632', fenS = '#4a3828';
     var prestige = niv === 12, et = niv === 10 ? 3 : 4, hE = 11, H = 12 + (et - 1) * hE;
-    var murs = prestige ? '#f0e4c8' : ['#dcae7a', '#e2bd8c', '#d8a874'][v % 3];
+    var murs = prestige ? ['#e8cf9e', '#ecd6aa', '#e4c894'][v % 3] : ['#dcae7a', '#e2bd8c', '#d8a874'][v % 3];
     var auvents = ['#b5443a', '#3f86b8', '#5b9c45', '#d9a93a'];
     sol(ctx, P, 0.03, 0.03, 1.97, 1.97, teinte(C.pierre, 1.06));
     boite(ctx, P, m, m, f, f, 0, H, murs, false);
@@ -557,14 +557,19 @@
     // Rez-de-chaussée : boutiques sous auvents (portique d'entrée pour la prestige).
     if (prestige) {
       bandeau(ctx, P, m, m, f, f, 0, 2.5, C.marbre);
-      ouverture(ctx, P, 'v', 0.72, 1.28, f, 0, 10, '#4a3424', 3);
-      fenetres(ctx, P, 'v', m, 0.62, f, 3, 9, 2, fen, 2); fenetres(ctx, P, 'v', 1.38, f, f, 3, 9, 2, fen, 2);
+      // Pilastres de marbre aux angles.
+      poly(ctx, [P(m, f, 0), P(m + 0.1, f, 0), P(m + 0.1, f, H), P(m, f, H)], C.marbre);
+      poly(ctx, [P(f - 0.1, f, 0), P(f, f, 0), P(f, f, H), P(f - 0.1, f, H)], C.marbre);
+      poly(ctx, [P(f, m, 0), P(f, m + 0.1, 0), P(f, m + 0.1, H), P(f, m, H)], teinte(C.marbre, 0.78));
+      fenetres(ctx, P, 'v', m + 0.1, 0.55, f, 3, 9, 2, fen, 2); fenetres(ctx, P, 'v', 1.45, f - 0.1, f, 3, 9, 2, fen, 2);
       for (k = 0; k < 3; k++) { var a0 = 0.3 + k * 0.5; ouverture(ctx, P, 'u', a0, a0 + 0.3, f, 0, 8, '#3b2a1c', 2); }
-      // Portique : colonnes de marbre et petit fronton devant l'entrée.
-      boite(ctx, P, 0.62, f, 1.38, f + 0.06, 0, 1.5, C.marbre);
-      for (k = 0; k < 4; k++) poteau(ctx, P, 0.68 + k * 0.213, f + 0.04, 1.5, 13, C.marbre, 3);
-      boite(ctx, P, 0.6, f - 0.02, 1.4, f + 0.08, 13, 15, C.marbre);
-      poly(ctx, [P(0.6, f + 0.08, 15), P(1.4, f + 0.08, 15), P(1.0, f + 0.08, 20)], teinte(C.marbre, 0.96));
+      // Portique : vestibule sombre, cinq colonnes de marbre, fronton.
+      ouverture(ctx, P, 'v', 0.6, 1.4, f, 0, 12, '#3b2a1c');
+      boite(ctx, P, 0.56, f, 1.44, f + 0.08, 0, 1.6, C.marbre);
+      for (k = 0; k < 5; k++) poteau(ctx, P, 0.62 + k * 0.19, f + 0.05, 1.6, 13, C.marbre, 3.4);
+      boite(ctx, P, 0.54, f - 0.02, 1.46, f + 0.1, 13, 15.5, C.marbre);
+      poly(ctx, [P(0.54, f + 0.1, 15.5), P(1.46, f + 0.1, 15.5), P(1.0, f + 0.1, 22)], teinte(C.marbre, 0.96));
+      poly(ctx, [P(0.7, f + 0.1, 16.5), P(1.3, f + 0.1, 16.5), P(1.0, f + 0.1, 20.4)], teinte(C.or, 1.2));
     } else {
       for (k = 0; k < 3; k++) {
         var b0 = 0.22 + k * 0.58;
@@ -574,8 +579,8 @@
         poly(ctx, [P(f, b0 - 0.04, 10.5), P(f, b0 + 0.4, 10.5), P(f + 0.13, b0 + 0.4, 7), P(f + 0.13, b0 - 0.04, 7)], teinte(auvents[(k + v + 2) % 4], 0.8));
       }
     }
-    // Balcons de bois sur la face gauche.
-    for (e = 1; e < (niv === 10 ? 2 : 3); e++) {
+    // Balcons de bois sur la face gauche (la prestige a des moulures de marbre à la place).
+    for (e = 1; e < (niv === 10 ? 2 : prestige ? 1 : 3); e++) {
       var hb2 = 12 + (e - 1) * hE;
       boite(ctx, P, 0.3, f, 1.7, f + 0.1, hb2, hb2 + 1.4, prestige ? C.marbre : C.bois);
       for (k = 0; k <= 10; k++) poteau(ctx, P, 0.3 + k * 0.14, f + 0.1, hb2 + 1.4, hb2 + 5, prestige ? C.marbre : C.bois, 1);
@@ -747,7 +752,7 @@
     temple_ceres: function (ctx, P) {
       sol(ctx, P, 0.05, 0.05, 1.95, 1.95, teinte(C.marbre, 0.94));
       boite(ctx, P, 0.15, 0.15, 1.85, 1.85, 0, 4, C.marbre);
-      boite(ctx, P, 0.45, 0.45, 1.55, 1.55, 4, 26, teinte(C.marbre, 0.92));
+      boite(ctx, P, 0.45, 0.45, 1.55, 1.55, 4, 26, nuance(C.marbre, 0.92));
       colonnes(ctx, P, 0.25, 0.25, 1.75, 1.75, 28, 4, C.marbre);
       toit(ctx, P, 0.2, 0.2, 1.8, 1.8, 28, 12, C.relig, 'u');
       var o = P(1.8, 1.0, 34); cercle(ctx, o[0] - 3, o[1], 3, C.or);
@@ -871,9 +876,20 @@
         });
       }
     } else if (f === 'paniers') {
-      [[0.28, 0.3], [0.72, 0.36], [0.34, 0.74]].forEach(function (s) {
-        for (var m = 0; m < q; m++) { var b = P(U(s[0]), V(s[1]), m * 4.6); panier(ctx, b[0], b[1], c); }
-      });
+      // Grand bac d'osier bas, chargement en tas qui monte avec les quarts : poissons, olives ou grappes.
+      var c0 = U(0.12), c1 = U(0.88), d0 = V(0.12), d1 = V(0.88);
+      boite(ctx, P, c0, d0, c1, d1, 0, 4, '#a87a3e', '#5a3e24');
+      ligne(ctx, P(c0, d1, 2), P(c1, d1, 2), '#c99a5a', 1); ligne(ctx, P(c1, d0, 2), P(c1, d1, 2), '#8a6230', 1);
+      p = P(U(0.5), V(0.5), 4);
+      tas(ctx, p[0], p[1], 12.5, 2 + q * 2.8, c, 9);
+      for (k = 0; k < 3 + q * 2; k++) {
+        var x = p[0] + (hachage(k, 21) - 0.5) * 18, y = p[1] - 1 - hachage(21, k) * (1 + q * 2.2);
+        if (bien === 'poisson') {
+          ellipse(ctx, x, y, 2.8, 1.1, '#c9d6de'); poly(ctx, [[x - 2.6, y], [x - 4.2, y - 1.3], [x - 4.2, y + 1.3]], '#9fb2bf');
+        } else if (bien === 'raisin') {
+          cercle(ctx, x - 1, y, 1.3, '#9a5aa8'); cercle(ctx, x + 1, y, 1.3, '#5a2468'); cercle(ctx, x, y + 1.6, 1.2, '#6a2f7a');
+        } else cercle(ctx, x, y, 1.2, k % 2 ? '#7f9a50' : '#2f3a22');
+      }
     } else if (f === 'tas') {
       p = P(U(0.5), V(0.55), 0); tas(ctx, p[0], p[1], 13, 3 + q * 3.4, c, 5);
     } else if (f === 'rondins') {
@@ -980,12 +996,12 @@
     boite(ctx, P, 0.22, 0.2, 1.78, 1.68, 3, 6, C.marbre);
     boite(ctx, P, 0.5, 0.45, 1.5, 1.3, 6, 26, nuance(C.marbre, 0.9));
     ouverture(ctx, P, 'v', 0.8, 1.2, 1.3, 6, 17, teinte(a, 0.62), 3);
-    colonnade(ctx, P, 0.3, 0.28, 1.7, 1.6, 6, 26, 4, 3, C.marbre);
-    boite(ctx, P, 0.26, 0.24, 1.74, 1.64, 26, 29, a);
+    colonnade(ctx, P, 0.3, 0.28, 1.7, 1.6, 6, 24, 4, 3, C.marbre);
+    boite(ctx, P, 0.26, 0.24, 1.74, 1.64, 24, 29, a);
     toit(ctx, P, 0.26, 0.24, 1.74, 1.64, 29, 12, C.relig, 'v');
     poly(ctx, [P(0.44, 1.72, 30.6), P(1.56, 1.72, 30.6), P(1.0, 1.72, 38.6)], teinte(a, 1.42));
     var s = P(1.0, 1.72, 41.5);
-    embleme(ctx, dieu, s[0], s[1], 0.95);
+    embleme(ctx, dieu, s[0], s[1], 1.2);
   }
   // Grand temple (3 × 3) : trois degrés, colonnade de 6 sur 5, statue du dieu tenant son emblème, autel.
   function peindreGrandTemple(ctx, P, dieu) {
@@ -997,8 +1013,8 @@
     boite(ctx, P, 0.26, 0.22, 2.74, 2.2, 6, 9, C.marbre);
     boite(ctx, P, 0.72, 0.6, 2.28, 1.78, 9, 38, nuance(C.marbre, 0.9));
     ouverture(ctx, P, 'v', 1.22, 1.78, 1.78, 9, 26, teinte(a, 0.62), 5);
-    colonnade(ctx, P, 0.36, 0.3, 2.64, 2.12, 9, 38, 6, 5, C.marbre);
-    boite(ctx, P, 0.3, 0.25, 2.7, 2.16, 38, 42, a);
+    colonnade(ctx, P, 0.36, 0.3, 2.64, 2.12, 9, 36, 6, 5, C.marbre);
+    boite(ctx, P, 0.3, 0.25, 2.7, 2.16, 36, 42, a);
     bandeau(ctx, P, 0.3, 0.25, 2.7, 2.16, 41, 1, '#f4e7c4');
     toit(ctx, P, 0.3, 0.25, 2.7, 2.16, 42, 16, C.relig, 'v');
     poly(ctx, [P(0.52, 2.24, 43.8), P(2.48, 2.24, 43.8), P(1.5, 2.24, 55)], teinte(a, 1.42));
@@ -1051,11 +1067,11 @@
     poly(ctx, [[x - 11, y - 6.2], [x - 6, y - 7.4], [x + 6, y - 7.8], [x + 12, y - 8], [x + 6, y - 5.2], [x - 6, y - 5]], '#8a6238');
     ctx.fillStyle = '#d9b27a'; ctx.fillRect(x - 3, y - 7.6, 2, 3.6);
     // Mât et voile latine (barque au quai : voile ferlée).
-    ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 1, y - (voile ? 27 : 20), 1.6, voile ? 21 : 14);
+    ctx.fillStyle = '#4a3220'; ctx.fillRect(x + 1, y - (voile ? 25 : 20), 1.6, voile ? 19 : 14);
     if (voile) {
-      poly(ctx, [[x + 2.6, y - 26], [x + 13 - o, y - 11], [x + 2.6, y - 10]], '#f1e6c8');
-      poly(ctx, [[x + 2.6, y - 26], [x + 8 - o * 0.5, y - 18], [x + 2.6, y - 18]], '#fbf4e2');
-      ligne(ctx, [x - 4, y - 23], [x + 14 - o, y - 10], '#6e4626', 1);
+      poly(ctx, [[x + 2.6, y - 24], [x + 13 - o, y - 11], [x + 2.6, y - 10]], '#f1e6c8');
+      poly(ctx, [[x + 2.6, y - 24], [x + 8 - o * 0.5, y - 17], [x + 2.6, y - 17]], '#fbf4e2');
+      ligne(ctx, [x - 3, y - 21.5], [x + 14 - o, y - 10], '#6e4626', 1);
       // Pêcheur à la poupe.
       ctx.fillStyle = '#3d6f9c'; ctx.fillRect(x - 10, y - 12, 3.6, 5);
       cercle(ctx, x - 8.2, y - 13.6, 1.9, '#e1c8a8');
@@ -1280,57 +1296,59 @@
   PEINTRES.mine_fer = function (ctx, P, t, etat) {
     var p = etat.prog || 0, k;
     sol(ctx, P, 0.03, 0.03, 1.97, 1.97, '#9a917f');
-    // Rocher à facettes au fond (base, sommet, face gauche claire, face droite sombre).
-    var B = [P(0.05, 0.05, 0), P(1.4, 0.08, 0), P(1.3, 1.25, 0), P(0.06, 1.5, 0)];
-    var S = [P(0.28, 0.25, 34), P(1.12, 0.3, 26), P(1.0, 0.98, 22), P(0.25, 1.16, 28)];
-    poly(ctx, [B[3], B[2], S[2], S[3]], '#9c968b');
-    poly(ctx, [B[2], B[1], S[1], S[2]], '#6f6a62');
-    poly(ctx, [S[0], S[1], S[2], S[3]], '#b3ada2');
-    poly(ctx, [S[3], S[2], [S[2][0] - 8, S[2][1] + 7], [S[3][0] + 4, S[3][1] + 10]], '#aaa498');
-    // Veines de minerai (rouille).
-    [[0.35, 1.3, 16], [0.8, 1.15, 9], [1.2, 0.6, 14]].forEach(function (q) { var a = P(q[0], q[1], q[2]); ellipse(ctx, a[0], a[1], 3, 1.5, '#8a4a30'); });
-    // Entrée de galerie, encadrée de bois, sur la face gauche.
-    var e0 = [B[3][0] + (B[2][0] - B[3][0]) * 0.32, B[3][1] + (B[2][1] - B[3][1]) * 0.32], e1 = [B[3][0] + (B[2][0] - B[3][0]) * 0.68, B[3][1] + (B[2][1] - B[3][1]) * 0.68];
-    poly(ctx, [e0, e1, [e1[0], e1[1] - 13], [(e0[0] + e1[0]) / 2, (e0[1] + e1[1]) / 2 - 17], [e0[0], e0[1] - 13]], '#1e1a18');
-    ctx.fillStyle = '#7a5232'; ctx.fillRect(e0[0] - 1, e0[1] - 14, 2.5, 14); ctx.fillRect(e1[0] - 1.5, e1[1] - 14, 2.5, 14);
-    ligne(ctx, [e0[0] - 2, e0[1] - 14], [e1[0] + 2, e1[1] - 14], '#7a5232', 2.5);
-    // Rails jusqu'au wagonnet.
-    var r0 = P(0.68, 1.42, 0);
-    ligne(ctx, P(0.6, 1.42, 0), P(0.6, 1.95, 0), '#4a4440', 1); ligne(ctx, P(0.82, 1.38, 0), P(0.82, 1.95, 0), '#4a4440', 1);
-    for (k = 0; k < 4; k++) ligne(ctx, P(0.55, 1.5 + k * 0.13, 0), P(0.87, 1.5 + k * 0.13, 0), '#6e4a2c', 1.5);
-    void r0;
-    // Wagonnet de minerai.
-    boite(ctx, P, 0.56, 1.58, 0.86, 1.86, 2, 8, '#4f4a48', '#3a3634');
-    [[0.6, 1.86], [0.82, 1.86]].forEach(function (q) { var a = P(q[0], q[1], 2); cercle(ctx, a[0], a[1], 1.8, '#2e2a28'); });
-    var w = P(0.71, 1.72, 8); tas(ctx, w[0], w[1], 6, 4, '#5a4a44', 4);
-    // Tas de minerai à droite (selon la production).
-    if (p > 0) { var b = P(1.55, 1.38, 0); tas(ctx, b[0], b[1], 7 + p * 7, 3 + p * 9, '#5c4c46', 7); for (k = 0; k < 4; k++) cercle(ctx, b[0] + (hachage(k, 1) - 0.5) * 10, b[1] - 2 - hachage(1, k) * p * 7, 1.2, '#9a5634'); }
-    // Lanterne à l'entrée.
-    var l = [e1[0] + 4, e1[1] - 10]; cercle(ctx, l[0], l[1], 2, '#f2c24a', '#7a5232');
+    // Petite remise à outils au fond à droite.
+    boite(ctx, P, 1.45, 0.15, 1.88, 0.6, 0, 10, C.boisC);
+    toit(ctx, P, 1.45, 0.15, 1.88, 0.6, 10, 5, C.indus, 'v');
+    // Massif rocheux brun-gris, veines de rouille.
+    var b = P(0.78, 0.72, 0), m = massif(ctx, b[0], b[1], 86, 44, '#8d8577', 3);
+    [[-0.3, 0.55], [-0.08, 0.3], [0.2, 0.5], [0.3, 0.3]].forEach(function (q) { ellipse(ctx, b[0] + q[0] * 86, b[1] - q[1] * 44, 3.2, 1.4, '#9a4f30'); });
+    // Entrée de galerie sur la face gauche : trou sombre, coffrage de bois, lanterne.
+    var e0 = [m.A[0] + (m.H[0] - m.A[0]) * 0.36, m.A[1] + (m.H[1] - m.A[1]) * 0.36], e1 = [m.A[0] + (m.H[0] - m.A[0]) * 0.76, m.A[1] + (m.H[1] - m.A[1]) * 0.76];
+    var em = [(e0[0] + e1[0]) / 2, (e0[1] + e1[1]) / 2];
+    poly(ctx, [e0, e1, [e1[0], e1[1] - 14], [em[0], em[1] - 18], [e0[0], e0[1] - 14]], '#1c1816');
+    ctx.fillStyle = '#7a5232'; ctx.fillRect(e0[0] - 1.5, e0[1] - 16, 3, 16); ctx.fillRect(e1[0] - 1.5, e1[1] - 16, 3, 16);
+    ligne(ctx, [e0[0] - 3, e0[1] - 16], [e1[0] + 3, e1[1] - 16], '#8a6238', 3);
+    cercle(ctx, e1[0] + 4.5, e1[1] - 11, 2.2, '#f2c24a', '#7a5232');
+    // Rails qui sortent de la galerie, wagonnet chargé.
+    var s = auSol(P, em[0], em[1]), u0 = s[0], v0 = s[1];
+    ligne(ctx, P(u0 - 0.1, v0, 0), P(u0 - 0.1, 1.96, 0), '#4a4440', 1.2); ligne(ctx, P(u0 + 0.1, v0, 0), P(u0 + 0.1, 1.96, 0), '#4a4440', 1.2);
+    for (k = 0; k < 5; k++) { var vk = v0 + 0.08 + k * (1.9 - v0) / 5; ligne(ctx, P(u0 - 0.16, vk, 0), P(u0 + 0.16, vk, 0), '#6e4a2c', 1.5); }
+    var vw = Math.min(1.72, v0 + 0.32);
+    boite(ctx, P, u0 - 0.15, vw - 0.14, u0 + 0.15, vw + 0.14, 2, 8, '#4f4a48', '#3a3634');
+    [[u0 - 0.11, vw + 0.14], [u0 + 0.11, vw + 0.14]].forEach(function (q) { var a = P(q[0], q[1], 2); cercle(ctx, a[0], a[1], 1.9, '#2e2a28'); });
+    var w = P(u0, vw, 8); tas(ctx, w[0], w[1], 6, 4, '#5a4a44', 4);
+    // Tas de minerai à droite (selon la production), éclats de rouille.
+    if (p > 0) {
+      var t2 = P(1.5, 1.38, 0); tas(ctx, t2[0], t2[1], 7 + p * 8, 3 + p * 10, '#5c4c46', 7);
+      for (k = 0; k < 5; k++) cercle(ctx, t2[0] + (hachage(k, 1) - 0.5) * 12, t2[1] - 2 - hachage(1, k) * p * 8, 1.3, '#a65a36');
+    }
   };
   PEINTRES.carriere_marbre = function (ctx, P, t, etat) {
-    var p = etat.prog || 0, k;
-    sol(ctx, P, 0.03, 0.03, 1.97, 1.97, '#bdb6a8');
-    // Front de taille : roche grise au fond, gradin taillé dont les coupes montrent le marbre blanc.
-    boite(ctx, P, 0.1, 0.1, 1.35, 0.7, 0, 30, '#9d978b', '#b6b0a3');
-    poly(ctx, [P(0.1, 0.1, 30), P(0.6, 0.1, 30), P(0.5, 0.3, 36), P(0.2, 0.25, 35)], '#a7a194');
-    poly(ctx, [P(0.75, 0.1, 30), P(1.25, 0.1, 30), P(1.1, 0.35, 34)], '#a39d90');
-    poly(ctx, [P(0.1, 0.7, 30), P(1.35, 0.7, 30), P(1.35, 0.7, 14), P(0.1, 0.7, 14)], '#e8e4da');
-    boite(ctx, P, 0.1, 0.7, 1.35, 1.1, 0, 14, '#e4dfd4', '#f2eee6');
-    ligne(ctx, P(0.4, 0.7, 26), P(0.9, 0.7, 18), '#c2bcb0', 1); ligne(ctx, P(0.5, 1.1, 10), P(1.0, 1.1, 4), '#c2bcb0', 1);
-    boite(ctx, P, 1.35, 0.1, 1.75, 0.55, 0, 20, '#99938a', '#aca69a');
-    // Grue de bois qui soulève un bloc.
-    var g = P(1.65, 0.95, 0), bras = P(0.85, 1.25, 30);
-    ligne(ctx, g, [g[0], g[1] - 34], '#6e4a2c', 2.5); ligne(ctx, [g[0], g[1] - 32], bras, '#6e4a2c', 2);
-    ligne(ctx, [g[0] - 6, g[1]], [g[0], g[1] - 20], '#6e4a2c', 1.5);
-    ligne(ctx, bras, [bras[0], bras[1] + 12], '#4a3a2a', 1);
-    var bl = [bras[0], bras[1] + 12];
-    poly(ctx, [[bl[0] - 5, bl[1]], [bl[0], bl[1] - 2.5], [bl[0] + 5, bl[1]], [bl[0] + 5, bl[1] + 4], [bl[0], bl[1] + 6.5], [bl[0] - 5, bl[1] + 4]], '#ece8e0');
-    poly(ctx, [[bl[0], bl[1] + 2.5], [bl[0] + 5, bl[1]], [bl[0] + 5, bl[1] + 4], [bl[0], bl[1] + 6.5]], '#cfc9bd');
+    var p = etat.prog || 0;
+    sol(ctx, P, 0.03, 0.03, 1.97, 1.97, '#c4beb2');
+    // Massif gris dont le front de taille, en gradins, montre le marbre blanc.
+    var b = P(0.72, 0.62, 0);
+    massif(ctx, b[0], b[1], 88, 44, '#a29c90', 5);
+    boite(ctx, P, 0.3, 0.66, 0.95, 0.9, 0, 15, '#e6e2d9', '#f6f3ed');
+    boite(ctx, P, 0.2, 0.9, 1.08, 1.22, 0, 7, '#e2ded4', '#f4f1ea');
+    ligne(ctx, P(0.42, 0.9, 13), P(0.72, 0.9, 9), '#c2bcb0', 1); ligne(ctx, P(0.4, 1.22, 5.5), P(0.8, 1.22, 2), '#c2bcb0', 1);
+    // Grue (bois) : mât, flèche inclinée, haubans, roue à marcher ; câble et bloc suspendu.
+    var pied = P(1.62, 1.36, 0), mat = P(1.62, 1.36, 42), fl = P(1.02, 1.66, 30);
+    ligne(ctx, mat, P(1.95, 1.05, 0), '#8a7a60', 1); ligne(ctx, mat, P(1.95, 1.7, 0), '#8a7a60', 1);
+    ligne(ctx, pied, mat, '#5a3e26', 3);
+    ligne(ctx, [pied[0], pied[1] - 5], fl, '#7a5232', 2.6);
+    ligne(ctx, mat, fl, '#8a7a60', 1);
+    var rw = P(1.78, 1.5, 9); ctx.strokeStyle = '#7a5232'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(rw[0], rw[1], 4.2, 8, 0, 0, Math.PI * 2); ctx.stroke();
+    ligne(ctx, [rw[0], rw[1] - 8], [rw[0], rw[1] + 8], '#7a5232', 1); ligne(ctx, [rw[0] - 4, rw[1]], [rw[0] + 4, rw[1]], '#7a5232', 1);
+    ligne(ctx, fl, [fl[0], fl[1] + 15], '#4a3a2a', 1);
+    var bl = [fl[0], fl[1] + 15];
+    poly(ctx, [[bl[0] - 6, bl[1]], [bl[0], bl[1] - 3], [bl[0] + 6, bl[1]], [bl[0] + 6, bl[1] + 5], [bl[0], bl[1] + 8], [bl[0] - 6, bl[1] + 5]], '#ece8e0');
+    poly(ctx, [[bl[0], bl[1] + 3], [bl[0] + 6, bl[1]], [bl[0] + 6, bl[1] + 5], [bl[0], bl[1] + 8]], '#cfc9bd');
     // Blocs taillés qui attendent (selon la production).
-    var pos = [[0.35, 1.45, 0], [0.75, 1.5, 0], [1.15, 1.55, 0], [0.55, 1.75, 0], [0.55, 1.47, 7]], n = 1 + Math.round(p * 4);
-    pos.slice(0, n).sort(function (a, b) { return a[2] - b[2] || (a[0] + a[1]) - (b[0] + b[1]); }).forEach(function (q) {
+    var pos = [[0.36, 1.48, 0], [0.72, 1.56, 0], [0.4, 1.82, 0], [0.8, 1.86, 0], [0.54, 1.52, 7]], n = 1 + Math.round(p * 4);
+    pos.slice(0, n).sort(function (a, b2) { return a[2] - b2[2] || (a[0] + a[1]) - (b2[0] + b2[1]); }).forEach(function (q) {
       boite(ctx, P, q[0] - 0.14, q[1] - 0.12, q[0] + 0.14, q[1] + 0.12, q[2], q[2] + 7, '#e3dfd5', '#f8f5ef');
+      ligne(ctx, P(q[0] - 0.1, q[1] + 0.12, q[2] + 5), P(q[0] + 0.06, q[1] + 0.12, q[2] + 2), '#c2bcb0', 1);
     });
   };
 
@@ -1421,17 +1439,20 @@
       ellipse(ctx, a[0] - 2, a[1] - 3, 3.5, 3.4, '#c27048');
       ellipse(ctx, a[0], a[1] - 6.4, 3.6, 1.6, '#7a3e26'); ellipse(ctx, a[0], a[1] - 6.4, 2.4, 1, '#2a1410');
     });
-    // Cuve de foulage : moût violet quand la cave travaille.
-    boite(ctx, P, 0.3, 1.2, 0.95, 1.65, 0, 5, '#c9bfa8', etat.actif ? '#5e2448' : '#8a7060');
-    if (etat.actif) for (k = 0; k < 4; k++) { var q = P(0.42 + hachage(k, 8) * 0.4, 1.3 + hachage(8, k) * 0.25, 5); cercle(ctx, q[0], q[1], 1.2, '#8f4fa0'); }
-    // Tonneaux couchés.
-    [[1.0, 1.75], [1.22, 1.75]].forEach(function (q) {
-      var a = P(q[0] - 0.08, q[1], 0), b = P(q[0] + 0.12, q[1], 0);
-      poly(ctx, [[a[0], a[1] - 8], [b[0], b[1] - 8], [b[0], b[1]], [a[0], a[1]]], '#8a5a32');
-      ellipse(ctx, b[0], b[1] - 4, 3.2, 4, '#a8743f'); ellipse(ctx, b[0], b[1] - 4, 1.4, 1.8, '#6e4a2c');
-      ligne(ctx, [a[0] + 2, a[1] - 8.4], [a[0] + 2, a[1] + 0.4], '#3a3634', 1); ligne(ctx, [b[0] - 2, b[1] - 8.4], [b[0] - 2, b[1] + 0.4], '#3a3634', 1);
+    // Cuve de foulage : margelle de pierre, moût violet quand la cave travaille, fond sec sinon.
+    boite(ctx, P, 0.28, 1.2, 0.95, 1.62, 0, 6, '#b9ad94', '#d8ceb6');
+    poly(ctx, [P(0.34, 1.26, 6), P(0.89, 1.26, 6), P(0.89, 1.56, 6), P(0.34, 1.56, 6)], etat.actif ? '#5e2448' : '#6a5a48');
+    poly(ctx, [P(0.34, 1.26, 6), P(0.89, 1.26, 6), P(0.89, 1.3, 4.5), P(0.38, 1.3, 4.5), P(0.38, 1.56, 4.5), P(0.34, 1.56, 6)], etat.actif ? '#3e1430' : '#4e4234');
+    if (etat.actif) for (k = 0; k < 5; k++) { var q = P(0.45 + hachage(k, 8) * 0.38, 1.33 + hachage(8, k) * 0.2, 5); cercle(ctx, q[0], q[1], 1.3, k % 2 ? '#8f4fa0' : '#6a2f7a'); }
+    // Tonneaux debout, cerclés de fer.
+    [[1.02, 1.7], [1.26, 1.76], [1.06, 1.94]].forEach(function (q) {
+      cylindre(ctx, P, q[0], q[1], 0.1, 0, 9, '#8a5a32', '#b07a44');
+      var a2 = P(q[0], q[1], 2), b2 = P(q[0], q[1], 7);
+      ctx.strokeStyle = '#3a3634'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(a2[0], a2[1], 4.5, 2.26, 0, 0, Math.PI); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(b2[0], b2[1], 4.5, 2.26, 0, 0, Math.PI); ctx.stroke();
     });
-    matieres(ctx, P, etat.matiere, 'raisin', [[1.3, 1.38, 1.72, 1.78], [0.38, 1.66, 0.82, 1.95]]);
+    matieres(ctx, P, etat.matiere, 'raisin', [[1.38, 1.3, 1.85, 1.7], [0.3, 1.66, 0.78, 1.96]]);
   };
   PEINTRES.atelier_armes = function (ctx, P, t, etat) {
     sol(ctx, P, 0.03, 0.03, 1.97, 1.97, teinte(C.terre, 1.05));
@@ -1541,24 +1562,25 @@
   };
 
   // --- Santé ---------------------------------------------------------------
-  // Enseigne de la santé : disque corail, bâton blanc et serpent vert (aucune lettre).
+  // Enseigne de la santé : disque corail, bol blanc d'où sort un brin d'herbe à trois feuilles.
   function enseigneSante(ctx, x, y, r) {
     cercle(ctx, x, y, r, C.sante, '#8a3a30');
-    ctx.fillStyle = '#f6f0e6'; ctx.fillRect(x - 0.7, y - r * 0.72, 1.4, r * 1.44);
-    ctx.save(); ctx.strokeStyle = '#2f6a3a'; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(x - r * 0.4, y + r * 0.55); ctx.quadraticCurveTo(x + r * 0.5, y + r * 0.3, x, y);
-    ctx.quadraticCurveTo(x - r * 0.5, y - r * 0.25, x + r * 0.15, y - r * 0.5); ctx.stroke(); ctx.restore();
-    cercle(ctx, x + r * 0.2, y - r * 0.55, 0.9, '#2f6a3a');
+    ctx.fillStyle = '#4f8a35'; ctx.fillRect(x - 0.5, y - r * 0.62, 1, r * 0.7);
+    ellipse(ctx, x - r * 0.3, y - r * 0.5, r * 0.28, r * 0.16, '#6fae48');
+    ellipse(ctx, x + r * 0.3, y - r * 0.32, r * 0.28, r * 0.16, '#6fae48');
+    ellipse(ctx, x, y - r * 0.7, r * 0.16, r * 0.24, '#6fae48');
+    ctx.fillStyle = '#f6f0e6'; ctx.beginPath(); ctx.moveTo(x - r * 0.62, y); ctx.lineTo(x + r * 0.62, y);
+    ctx.quadraticCurveTo(x + r * 0.5, y + r * 0.55, x, y + r * 0.55); ctx.quadraticCurveTo(x - r * 0.5, y + r * 0.55, x - r * 0.62, y); ctx.fill();
   }
-  // Vapeur des bains : volutes blanches qui montent (deux images).
+  // Vapeur des bains : bouffées blanches translucides qui montent (deux images).
   function vapeur(ctx, x, y, fr) {
-    var o = (fr || 0) % 2 ? 2 : 0;
-    ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    var o = (fr || 0) % 2 ? 1.5 : 0;
     for (var k = -1; k <= 1; k++) {
       var bx = x + k * 7;
-      ctx.beginPath(); ctx.moveTo(bx, y); ctx.quadraticCurveTo(bx - 3 + o, y - 4, bx, y - 7 - o); ctx.quadraticCurveTo(bx + 3 - o, y - 10, bx + 0.5, y - 13); ctx.stroke();
+      cercle(ctx, bx + o * 0.5, y - 3 - (k ? 0 : 2), 2.4, 'rgba(250,250,248,0.85)');
+      cercle(ctx, bx - 1 + o, y - 8 - (k ? 0 : 2), 3, 'rgba(250,250,248,0.7)');
+      if (!k) cercle(ctx, bx + 0.5 + o * 1.4, y - 15, 3.6, 'rgba(250,250,248,0.5)');
     }
-    ctx.restore();
   }
   PEINTRES.barbier = function (ctx, P) {
     sol(ctx, P, 0.05, 0.05, 0.95, 0.95, teinte(C.pierre, 1.08));
@@ -1682,7 +1704,7 @@
     if (actif) {
       // Fanions sur le haut du mur, au fond.
       for (k = 0; k < 7; k++) {
-        var an = Math.PI * (1.0 + k / 6) + Math.PI * 0.25, m = pt(1, an, H);
+        var an = Math.PI * (0.8 + k / 6 * 0.9), m = pt(1, an, H);
         ctx.fillStyle = '#5a4030'; ctx.fillRect(m[0] - 0.6, m[1] - 12, 1.2, 12);
         poly(ctx, [[m[0] + 0.6, m[1] - 12], [m[0] + 7, m[1] - 10], [m[0] + 0.6, m[1] - 8]], [C.divert, '#e6b43c', C.secu][k % 3]);
       }
@@ -1697,9 +1719,15 @@
   PEINTRES.colisee = function (ctx, P, t, etat) {
     sol(ctx, P, 0.03, 0.03, 4.97, 4.97, teinte(C.pierre, 1.04));
     arene(ctx, P, 2.5, 2.5, 2.4, 2.05, 42, 3, 6, etat.actif, '#d9cdb0');
-    // Mâts du velum sur le haut du mur, côté spectateur.
+    // Bannières violettes pendues à l'attique, côté spectateur.
+    for (var b = 0; b < 6; b++) {
+      var a0 = -0.35 + b * 0.5, a1 = a0 + 0.07;
+      var Q = function (a, h) { return P(2.5 + 2.4 * Math.cos(a), 2.5 + 2.05 * Math.sin(a), h); };
+      poly(ctx, [Q(a0, 40), Q(a1, 40), Q(a1, 31), Q((a0 + a1) / 2, 28.5), Q(a0, 31)], b % 2 ? C.divert : teinte(C.divert, 0.8));
+    }
+    // Mâts du velum sur le haut du mur, moitié du fond (ils se découpent sur le ciel).
     for (var k = 0; k < 9; k++) {
-      var an = Math.PI * (-0.25 + k / 8), m = P(2.5 + 2.4 * Math.cos(an), 2.5 + 2.05 * Math.sin(an), 42);
+      var an = Math.PI * (0.8 + k / 8 * 0.9), m = P(2.5 + 2.4 * Math.cos(an), 2.5 + 2.05 * Math.sin(an), 42);
       ctx.fillStyle = '#8a7a60'; ctx.fillRect(m[0] - 0.7, m[1] - 6, 1.4, 6);
       if (etat.actif && k % 2 === 0) poly(ctx, [[m[0] + 0.7, m[1] - 6], [m[0] + 6, m[1] - 4.5], [m[0] + 0.7, m[1] - 3]], C.divert);
     }
@@ -1806,19 +1834,20 @@
     cols.filter(function (q) { return q[0] + q[1] >= cu + cv; }).sort(function (a, b) { return (a[0] + a[1]) - (b[0] + b[1]); }).forEach(colonne);
     cylindre(ctx, P, cu, cv, 0.7, 25, 28, C.marbre);
     // Toit conique à tuiles rayonnantes, pomme dorée.
-    var b0 = P(cu, cv, 28), ap = P(cu, cv, 44), rx = 0.76 * 45.25, ry = 0.76 * 22.63;
+    var b0 = P(cu, cv, 28), ap = P(cu, cv, 50), rx = 0.72 * 45.25, ry = 0.72 * 22.63;
     var g = ctx.createLinearGradient(b0[0] - rx, 0, b0[0] + rx, 0);
     g.addColorStop(0, teinte(C.relig, 1.02)); g.addColorStop(1, teinte(C.relig, 0.7));
     ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(ap[0], ap[1]); ctx.lineTo(b0[0] - rx, b0[1]); ctx.ellipse(b0[0], b0[1], rx, ry, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = teinte(C.relig, 0.78); ctx.lineWidth = 1;
     for (k = 1; k < 6; k++) { var a = Math.PI * k / 6; ctx.beginPath(); ctx.moveTo(ap[0], ap[1]); ctx.lineTo(b0[0] - Math.cos(a) * rx, b0[1] + Math.sin(a) * ry); ctx.stroke(); }
+    ctx.strokeStyle = C.or; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(b0[0], b0[1], rx, ry, 0, 0, Math.PI); ctx.stroke();
     cercle(ctx, ap[0], ap[1] - 1.5, 2.5, C.or, teinte(C.or, 0.6));
     // Trépied de bronze et flamme sacrée, à l'angle avant.
     var tr = P(1.75, 1.75, 0);
     ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.moveTo(tr[0] - 4, tr[1]); ctx.lineTo(tr[0], tr[1] - 9); ctx.lineTo(tr[0] + 4, tr[1]); ctx.moveTo(tr[0], tr[1] + 1); ctx.lineTo(tr[0], tr[1] - 9); ctx.stroke();
     ellipse(ctx, tr[0], tr[1] - 9.5, 5, 2, '#b08a4a');
-    flamme(ctx, tr[0], tr[1] - 10, 1.3);
+    flamme(ctx, tr[0], tr[1] - 10, 1.5);
   };
 
   // --- Embellissement ---------------------------------------------------------
@@ -1829,24 +1858,30 @@
     for (i = 0; i < n; i++) for (j = 0; j < n; j++) if ((i + j) % 2) sol(ctx, P, u0 + i * du, v0 + j * dv, u0 + (i + 1) * du, v0 + (j + 1) * dv, teinte(c, 0.94));
     for (i = 1; i < n; i++) { ligne(ctx, P(u0 + i * du, v0), P(u0 + i * du, v1), teinte(c, 0.86), 1); ligne(ctx, P(u0, v0 + i * dv), P(u1, v0 + i * dv), teinte(c, 0.86), 1); }
   }
-  // Statue équestre de bronze : sabots en (x, y), cheval cabré tourné vers la droite.
+  // Statue équestre de bronze : sabots en (x, y), cheval cabré tourné vers la droite, cavalier bras levé.
   function cavalier(ctx, x, y, s, c) {
-    var cl = teinte(c, 1.18), cf = teinte(c, 0.72);
+    var cl = teinte(c, 1.2), cf = teinte(c, 0.7);
+    var pt = function (l) { return l.map(function (q) { return [x + q[0] * s, y + q[1] * s]; }); };
     ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    var trait = function (col, l, pts) { ctx.strokeStyle = col; ctx.lineWidth = l * s; ctx.beginPath(); ctx.moveTo(x + pts[0] * s, y + pts[1] * s); for (var i = 2; i < pts.length; i += 2) ctx.lineTo(x + pts[i] * s, y + pts[i + 1] * s); ctx.stroke(); };
-    trait(cf, 1.9, [-5, -7, -6, 0]); trait(cf, 1.9, [3.5, -7, 4.5, -3, 4, 0]);
-    trait(cf, 1.7, [-7, -10.5, -10, -8, -9.5, -3]);
-    ellipse(ctx, x, y - 9 * s, 7.6 * s, 3.8 * s, c);
-    ellipse(ctx, x - 1 * s, y - 10.8 * s, 5.4 * s, 1.5 * s, cl);
-    poly(ctx, [[x + 4.2 * s, y - 11.6 * s], [x + 6.4 * s, y - 17.4 * s], [x + 9.6 * s, y - 16.4 * s], [x + 11 * s, y - 13.4 * s], [x + 9.2 * s, y - 12.8 * s], [x + 7.6 * s, y - 9.6 * s]], c);
-    trait(cl, 1, [6.6, -17, 8.8, -16.2]);
-    trait(c, 1.9, [-3.5, -7, -3, 0]); trait(c, 1.9, [5, -8, 8, -10.5, 9.2, -7.5]);
-    trait(cf, 1.6, [0.6, -11, 1.8, -6.5]);
-    poly(ctx, [[x - 1.2 * s, y - 17.8 * s], [x - 5.4 * s, y - 12.6 * s], [x - 1.4 * s, y - 11.6 * s]], cf);
-    poly(ctx, [[x - 1.6 * s, y - 11.4 * s], [x - 1.2 * s, y - 18.2 * s], [x + 1.6 * s, y - 18.2 * s], [x + 1.9 * s, y - 11.4 * s]], c);
-    poly(ctx, [[x + 0.3 * s, y - 11.4 * s], [x + 0.3 * s, y - 18.2 * s], [x + 1.6 * s, y - 18.2 * s], [x + 1.9 * s, y - 11.4 * s]], cf);
-    trait(c, 1.6, [1.2, -17, 4.6, -22.6]);
-    cercle(ctx, x, y - 20 * s, 1.8 * s, c);
+    var jambe = function (col, l) { ctx.strokeStyle = col; ctx.lineWidth = 1.9 * s; ctx.beginPath(); var q = pt(l); ctx.moveTo(q[0][0], q[0][1]); for (var i = 1; i < q.length; i++) ctx.lineTo(q[i][0], q[i][1]); ctx.stroke(); };
+    // Pattes du côté loin (sombres), queue.
+    jambe(cf, [[5, -7.5], [6.4, -3.8], [6, 0]]); jambe(cf, [[-5.4, -7.6], [-6.6, -3.8], [-6, 0]]);
+    ctx.strokeStyle = cf; ctx.lineWidth = 1.8 * s; ctx.beginPath(); var tq = pt([[-8, -12], [-11.5, -9], [-10.5, -3.5]]);
+    ctx.moveTo(tq[0][0], tq[0][1]); ctx.quadraticCurveTo(tq[1][0], tq[1][1], tq[2][0], tq[2][1]); ctx.stroke();
+    // Corps, encolure et tête d'un seul tenant.
+    poly(ctx, pt([[-7.5, -13], [-2, -12.6], [3, -13.6], [5.2, -16.4], [7.4, -19.8], [8, -21.4], [9.2, -19.6], [11.6, -15.6], [10.6, -14.4], [8.2, -16.2],
+      [6.8, -13.2], [7, -9.6], [5.8, -6.8], [2, -6.2], [-4, -6.5], [-7.8, -8], [-8.6, -11.2]]), c);
+    poly(ctx, pt([[-7, -12.6], [-2, -12.2], [3, -13.2], [5, -15.8], [4, -13.6], [-2, -11.2], [-6.6, -11.4]]), cl);
+    poly(ctx, pt([[5.2, -16.4], [7.4, -19.8], [8, -21.4], [6.8, -20.6], [4.4, -16.6], [3, -13.6]]), cf);
+    // Pattes du côté proche : l'avant levé (cabré).
+    jambe(c, [[4.6, -7.6], [8.2, -6], [8.8, -3]]); jambe(c, [[-4.4, -7.6], [-4, -3.8], [-4.6, 0]]);
+    // Cavalier : cape au vent, jambe, buste, tête, bras levé.
+    poly(ctx, pt([[-1.2, -19.2], [-5.4, -14.2], [-1.4, -13.6]]), cf);
+    jambe(cf, [[0.6, -13.2], [1.8, -9.4], [1.2, -7.8]]);
+    poly(ctx, pt([[-1.4, -13], [-1, -19.6], [1.8, -19.6], [2, -13]]), c);
+    poly(ctx, pt([[0.5, -13], [0.5, -19.6], [1.8, -19.6], [2, -13]]), cf);
+    jambe(c, [[1.4, -18.6], [4.8, -23.6]]);
+    var tt = pt([[0.4, -21.4]])[0]; cercle(ctx, tt[0], tt[1], 1.8 * s, c);
     ctx.restore();
   }
   PEINTRES.jardin = function (ctx, P) {
@@ -1890,7 +1925,11 @@
     ctx.strokeStyle = C.eauClair; ctx.lineWidth = 1;
     [[0.8, 0.9], [2.0, 0.8], [0.9, 2.1], [2.2, 2.0], [1.6, 2.3]].forEach(function (q) { var a = P(q[0], q[1], 4); ctx.beginPath(); ctx.moveTo(a[0] - 4, a[1]); ctx.lineTo(a[0] + 4, a[1]); ctx.stroke(); });
     // Jets d'eau aux quatre coins du bassin.
-    [[0.62, 0.62], [2.38, 0.62], [0.62, 2.38], [2.38, 2.38]].forEach(function (q) { var a = P(q[0], q[1], 4); ctx.strokeStyle = '#d6ecff'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.quadraticCurveTo(a[0] + 3, a[1] - 10, a[0] + 7, a[1] - 2); ctx.stroke(); });
+    [[0.62, 0.62], [2.38, 0.62], [0.62, 2.38], [2.38, 2.38]].forEach(function (q) {
+      var a = P(q[0], q[1], 4);
+      poly(ctx, [[a[0] - 1, a[1]], [a[0] - 3, a[1] - 6], [a[0], a[1] - 10], [a[0] + 3, a[1] - 6], [a[0] + 1, a[1]]], 'rgba(220,240,255,0.75)');
+      ellipse(ctx, a[0], a[1], 4, 1.6, 'rgba(220,240,255,0.6)');
+    });
     // Haut socle mouluré, statue équestre de bronze.
     boite(ctx, P, 1.05, 1.05, 1.95, 1.95, 4, 8, nuance(C.marbre, 0.95));
     boite(ctx, P, 1.16, 1.16, 1.84, 1.84, 8, 26, C.marbre);
@@ -1959,28 +1998,28 @@
     else if (type === 'comedien' || type === 'acteur') cercle(ctx, x + 5, y - 18, 2.5, '#f6f0e0');
     else if (type === 'immigrant' || type === 'emigrant' || type === 'sansabri') ellipse(ctx, x - 5, y - 13, 3, 4, '#a08458');
     // Lot 2.
-    else if (type === 'instituteur') { ctx.fillStyle = '#efe2c0'; ctx.fillRect(x + 3, y - 13, 6, 2.6); cercle(ctx, x + 3, y - 11.7, 1.3, '#d9c08a'); cercle(ctx, x + 9, y - 11.7, 1.3, '#d9c08a'); }
-    else if (type === 'bibliothecaire') { for (var r = 0; r < 3; r++) { ctx.fillStyle = r % 2 ? '#e2c98e' : '#f2e6c6'; ctx.fillRect(x + 3, y - 10 - r * 2.4, 6.5, 2.2); cercle(ctx, x + 9.5, y - 8.9 - r * 2.4, 1.1, '#c9a86a'); } }
+    else if (type === 'instituteur') { ctx.fillStyle = '#efe2c0'; ctx.fillRect(x + 2.2, y - 13, 5, 2.6); cercle(ctx, x + 2.2, y - 11.7, 1.3, '#d9c08a'); cercle(ctx, x + 7.2, y - 11.7, 1.3, '#d9c08a'); }
+    else if (type === 'bibliothecaire') { for (var r = 0; r < 3; r++) { ctx.fillStyle = r % 2 ? '#e2c98e' : '#f2e6c6'; ctx.fillRect(x + 2.2, y - 10 - r * 2.4, 5, 2.2); cercle(ctx, x + 7.2, y - 8.9 - r * 2.4, 1.1, '#c9a86a'); } }
     else if (type === 'professeur') {
       poly(ctx, [[x - 3.6, y - 15.5], [x + 3.6, y - 9], [x + 3.9, y - 7.4], [x - 2.2, y - 12.8]], C.educ);
-      ctx.fillStyle = '#6e4a2c'; ctx.fillRect(x + 5, y - 25, 1.5, 24); cercle(ctx, x + 5.75, y - 25.5, 1.6, '#8a6238');
+      ctx.fillStyle = '#6e4a2c'; ctx.fillRect(x + 5, y - 23, 1.5, 22); cercle(ctx, x + 5.75, y - 23.4, 1.5, '#8a6238');
     }
-    else if (type === 'barbier') { ellipse(ctx, x + 6, y - 11, 3.2, 1.6, '#c98a4a'); ctx.fillStyle = '#f6f0e6'; ctx.fillRect(x - 6, y - 15, 2.2, 6); }
-    else if (type === 'employe_bains') { poly(ctx, [[x + 3.5, y - 11], [x + 9.5, y - 11], [x + 8.5, y - 5], [x + 4.5, y - 5]], '#8a6a48'); ellipse(ctx, x + 6.5, y - 11, 3, 1, C.eauClair); ctx.strokeStyle = '#5a4030'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(x + 6.5, y - 11, 3, Math.PI, 0); ctx.stroke(); }
-    else if (type === 'medecin') { poly(ctx, [[x + 3.5, y - 11], [x + 9, y - 11], [x + 9.5, y - 6], [x + 3, y - 6]], '#7a4a2a'); ctx.fillStyle = '#5a3a22'; ctx.fillRect(x + 5, y - 12.5, 3, 1.5); }
-    else if (type === 'chirurgien') { ctx.fillStyle = C.sante; ctx.fillRect(x - 3.4, y - 10, 6.8, 1.4); poly(ctx, [[x + 3.5, y - 11], [x + 9, y - 11], [x + 9.5, y - 6], [x + 3, y - 6]], '#6a2a22'); }
+    else if (type === 'barbier') { ellipse(ctx, x + 5.5, y - 11, 3, 1.6, '#c98a4a'); ctx.fillStyle = '#f6f0e6'; ctx.fillRect(x - 6, y - 15, 2.2, 6); }
+    else if (type === 'employe_bains') { poly(ctx, [[x + 3, y - 11], [x + 8.6, y - 11], [x + 7.8, y - 5], [x + 3.8, y - 5]], '#8a6a48'); ellipse(ctx, x + 5.8, y - 11, 2.8, 1, C.eauClair); ctx.strokeStyle = '#5a4030'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(x + 5.8, y - 11, 2.8, Math.PI, 0); ctx.stroke(); }
+    else if (type === 'medecin') { poly(ctx, [[x + 3.4, y - 11], [x + 8.2, y - 11], [x + 8.7, y - 6], [x + 3, y - 6]], '#7a4a2a'); ctx.fillStyle = '#5a3a22'; ctx.fillRect(x + 5, y - 12.5, 3, 1.5); }
+    else if (type === 'chirurgien') { ctx.fillStyle = C.sante; ctx.fillRect(x - 3.4, y - 10, 6.8, 1.4); poly(ctx, [[x + 3.4, y - 11], [x + 8.2, y - 11], [x + 8.7, y - 6], [x + 3, y - 6]], '#6a2a22'); }
     else if (type === 'lutteur') {
       ctx.fillStyle = '#6a3a2a'; ctx.fillRect(x - 4, y - 9.5, 8, 2.6);
-      ellipse(ctx, x + 6, y - 12, 3.8, 4.2, '#7a4a2a'); ellipse(ctx, x + 5.7, y - 12.2, 3, 3.4, '#c28a3a'); cercle(ctx, x + 5.7, y - 12.2, 1, C.or);
+      ellipse(ctx, x + 5.4, y - 12, 3.4, 4.2, '#7a4a2a'); ellipse(ctx, x + 5.1, y - 12.2, 2.6, 3.4, '#c28a3a'); cercle(ctx, x + 5.1, y - 12.2, 1, C.or);
     }
     else if (type === 'dompteur') {
       ctx.save(); ctx.strokeStyle = '#4a3020'; ctx.lineWidth = 1; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(x + 4, y - 12); ctx.lineTo(x + 6, y - 15);
-      ctx.quadraticCurveTo(x + 11, y - (pose ? 18 : 13), x + 11.5, y - (pose ? 8 : 5)); ctx.stroke(); ctx.restore();
+      ctx.beginPath(); ctx.moveTo(x + 4, y - 12); ctx.lineTo(x + 5.5, y - 15.5);
+      ctx.quadraticCurveTo(x + 8.6, y - (pose ? 21 : 14), x + 8, y - (pose ? 23 : 4)); ctx.stroke(); ctx.restore();
     }
     else if (type === 'gladiateur') {
       cercle(ctx, x, y - 19.5, 3.4, '#9aa0a8'); ctx.fillStyle = '#5a6068'; ctx.fillRect(x - 0.5, y - 20, 3.5, 1.2);
-      poly(ctx, [[x - 3, y - 22], [x, y - 26], [x + 3, y - 22.5], [x, y - 23]], C.secu);
+      poly(ctx, [[x - 3, y - 21.6], [x - 0.6, y - 25], [x + 3, y - 22.2], [x, y - 22.8]], C.secu);
       ligne(ctx, [x - 3, y - 12], [x - 8, y - 17], '#c8ccd2', 1.6);
       poly(ctx, [[x + 2.5, y - 17], [x + 8, y - 16], [x + 8, y - 6], [x + 2.5, y - 6.5]], C.secu, '#6a2018');
       cercle(ctx, x + 5.3, y - 11.5, 1.2, C.or);
@@ -2057,15 +2096,15 @@
   // --- Accès publics ----------------------------------------------------------
   // Hauteur réservée au-dessus de l'emprise (zoom 1), par type de dessin.
   var HAUT = { puits: 34, fontaine: 34, reservoir: 30, aqueduc: 30, barriere: 18, ferme_ble: 30, grenier: 52, marche: 30, temple_ceres: 50, theatre: 34, colonie_acteurs: 40, forum: 40, prefecture: 44, ingenieur: 40, ruines: 14, gravats: 14, incendie: 50,
-    // Lot 2.
-    ferme_legumes: 30, ferme_fruits: 34, ferme_porcs: 30, ferme_olives: 34, ferme_vigne: 30, quai_peche: 34,
-    carriere_argile: 30, camp_bucherons: 44, mine_fer: 46, carriere_marbre: 50,
-    atelier_poterie: 40, atelier_mobilier: 40, pressoir: 44, cave: 40, atelier_armes: 46, entrepot: 40,
-    ecole: 40, bibliotheque: 50, academie: 44, barbier: 34, bains: 50, medecin: 44, hopital: 50,
-    amphitheatre: 40, colisee: 70, ecole_gladiateurs: 36, maison_lions: 40,
-    temple_neptune: 64, temple_mercure: 64, temple_mars: 64, temple_venus: 64,
-    grand_temple_ceres: 82, grand_temple_neptune: 82, grand_temple_mercure: 82, grand_temple_mars: 82, grand_temple_venus: 82, oracle: 56,
-    jardin: 34, statue_petite: 44, statue_moyenne: 54, statue_grande: 70 };
+    // Lot 2 (hauteur utilisée au-dessus de l'emprise, plus 8 px de marge).
+    ferme_legumes: 20, ferme_fruits: 20, ferme_porcs: 20, ferme_olives: 20, ferme_vigne: 20, quai_peche: 18,
+    carriere_argile: 14, camp_bucherons: 18, mine_fer: 28, carriere_marbre: 32,
+    atelier_poterie: 20, atelier_mobilier: 22, pressoir: 14, cave: 20, atelier_armes: 32, entrepot: 28,
+    ecole: 22, bibliotheque: 34, academie: 32, barbier: 24, bains: 44, medecin: 24, hopital: 36,
+    amphitheatre: 18, colisee: 34, ecole_gladiateurs: 26, maison_lions: 24,
+    temple_neptune: 32, temple_mercure: 32, temple_mars: 32, temple_venus: 32,
+    grand_temple_ceres: 44, grand_temple_neptune: 44, grand_temple_mercure: 44, grand_temple_mars: 44, grand_temple_venus: 44, oracle: 32,
+    jardin: 20, statue_petite: 22, statue_moyenne: 24, statue_grande: 26 };
   // Emprise prévue des dessins du lot 2 (repli des vignettes quand les données ne connaissent pas encore le type).
   var TAILLE = { ferme_legumes: 3, ferme_fruits: 3, ferme_porcs: 3, ferme_olives: 3, ferme_vigne: 3, quai_peche: 2,
     carriere_argile: 2, camp_bucherons: 2, mine_fer: 2, carriere_marbre: 2, atelier_poterie: 2, atelier_mobilier: 2, pressoir: 2, cave: 2,
@@ -2074,7 +2113,8 @@
     grand_temple_ceres: 3, grand_temple_neptune: 3, grand_temple_mercure: 3, grand_temple_mars: 3, grand_temple_venus: 3, oracle: 2,
     jardin: 1, statue_petite: 1, statue_moyenne: 2, statue_grande: 3 };
   // Hauteur réservée au-dessus d'une maison : celle d'avant pour les niveaux 1 à 6, assez pour les immeubles ensuite.
-  function hautMaison(niv, t) { return niv <= 6 ? 30 + Math.max(0, niv - 4) * 8 : 30 + (niv - 4) * 8 + (t > 1 ? 0 : 0); }
+  var HAUT_MAISON = { 7: 34, 8: 40, 9: 42, 10: 42, 11: 54, 12: 64 };
+  function hautMaison(niv, t) { return niv <= 6 ? 30 + Math.max(0, niv - 4) * 8 : (HAUT_MAISON[niv] || 70); }
 
   racine.MM_DESSINS = {
     TW: TW, TH: TH,
@@ -2110,7 +2150,7 @@
       var ctx = c.getContext('2d');
       var bd = racine.MM_SIM ? racine.MM_SIM.donnees().batiments[type] : null;
       var tt = type === 'logement' ? 1 : (bd ? bd.taille : (TAILLE[type] || 1));
-      var haut = type === 'logement' ? hautMaison(niv || 5, 1) : (HAUT[type] || 40);
+      var haut = type === 'logement' ? ((niv || 5) > 6 ? hautMaison(niv, 1) : 30) : (HAUT[type] || 40);
       var w = tt * TW, h = tt * TH + haut, k = Math.min(taille / w, taille / h) * 0.95 * f;
       ctx.translate((taille * f - w * k) / 2, (taille * f - h * k) / 2);
       ctx.scale(k, k);

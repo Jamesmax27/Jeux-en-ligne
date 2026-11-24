@@ -134,13 +134,41 @@
     this.ctx.drawImage(s.c, sx + s.ox * z, sy + s.oy * z, s.w * z, s.h * z);
   };
 
-  // Remplissage d'un bâtiment de stockage (0 à 1), ou null : grenier, marché (et entrepôt au lot 2).
+  // Remplissage d'un bâtiment de stockage (0 à 1), ou null : grenier, marché, entrepôt.
   function remplissage(b) {
     var R = SIM.donnees().regles;
     if (b.type === 'grenier') return SIM.totalStock(b) / R.grenier.capacite;
-    if (b.type === 'marche') return SIM.totalStock(b) / R.marche.stockMax;
+    if (b.type === 'marche') return Math.min(1, SIM.totalStock(b) / R.marche.stockMax);
+    if (b.type === 'entrepot') return SIM.emplacements(b).filter(Boolean).length / R.entrepot.emplacements;
     return null;
   }
+  // Valeur d'une maison pour un calque de service (0 à 100), ou null (section 17.3).
+  function valeurMaison(e, h, calque) {
+    if (h.type !== 'logement' || h.hab <= 0) return null;
+    var D = SIM.donnees(), s;
+    switch (calque) {
+      case 'nourriture': {
+        var viv = 0;
+        D.aliments.forEach(function (a) { viv += h.viv[a] || 0; });
+        var conso = Math.ceil(h.hab * D.regles.maison.nourritureParHabitantMois);
+        return conso ? Math.min(100, viv * 100 / (conso * D.regles.maison.reserveMois)) : 100;
+      }
+      case 'divertissement': s = SIM.satisfaits(e, h); return Math.min(100, s.divertissement * 2);
+      case 'religion': s = SIM.satisfaits(e, h); return Math.min(100, s.religion * 20);
+      case 'education': return compter(h, ['ecole', 'bibliotheque', 'academie']) * 100 / 3;
+      case 'sante': return compter(h, ['barbier', 'bains', 'medecin', 'hopital']) * 25;
+      case 'impots': return h.svc.impot > 0 ? 100 : 0;
+      default: return null;
+    }
+  }
+  function compter(h, l) { var n = 0; l.forEach(function (k) { if (h.svc[k] > 0) n++; }); return n; }
+  // Marcheurs gardés visibles par chaque calque.
+  var VISIBLES = {
+    feu: ['prefet'], dommages: ['ingenieur'], eau: [], attractivite: [], problemes: [],
+    stocks: ['livreur', 'charretier', 'acheteuse', 'vendeuse', 'bateau'], nourriture: ['vendeuse', 'acheteuse', 'livreur', 'bateau'],
+    divertissement: ['comedien', 'lutteur', 'dompteur', 'acteur', 'gladiateur', 'lion'], religion: ['pretre'],
+    education: ['instituteur', 'bibliothecaire', 'professeur'], sante: ['barbier', 'employe_bains', 'medecin', 'chirurgien'], impots: ['percepteur']
+  };
   // 5 états visibles sur le dessin : vide, un quart, moitié, trois quarts, plein.
   function niveauStock(f) { return !f || f <= 0 ? 0 : Math.min(4, Math.ceil(f * 4 - 1e-9)); }
 
@@ -151,7 +179,14 @@
     var h = function (n) { return ('0' + n.toString(16)).slice(-2); };
     return '#' + h(r) + h(g) + h(60);
   }
-  var COULEUR_CAT = { logement: '#c9a06a', eau: '#4a86c0', alimentation: '#c98a2b', religion: '#efe7d6', divertissement: '#8e5aa8', administration: '#5a7397', securite: '#b03a2e', routes: '#c9bfa8' };
+  var COULEUR_CAT = { logement: '#c9a06a', eau: '#4a86c0', alimentation: '#c98a2b', religion: '#efe7d6', divertissement: '#8e5aa8', administration: '#5a7397', securite: '#b03a2e', routes: '#c9bfa8',
+    industrie: '#8a6a48', sante: '#d0605a', education: '#4f8f8a' };
+  // Attractivité d'une case (calque) : 11 teintes, du rouge (-100) au vert (+100).
+  function couleurAttractivite(v) {
+    var q = Math.max(-5, Math.min(5, Math.round(v / 10)));
+    if (q === 0) return null;
+    return q > 0 ? 'rgba(60,180,70,' + (0.12 + q * 0.09).toFixed(2) + ')' : 'rgba(210,60,50,' + (0.12 - q * 0.09).toFixed(2) + ')';
+  }
 
   // Colonne d'un calque : hauteur et couleur doublent l'information (section 17.7).
   Rendu.prototype.colonne = function (sx, sy, h, couleur) {
@@ -204,7 +239,11 @@
         v = this.detourner(rx + 1, ry); if (rx < N - 1 && e.route[v[1] * N + v[0]]) m |= 2;
         v = this.detourner(rx, ry + 1); if (ry < N - 1 && e.route[v[1] * N + v[0]]) m |= 4;
         v = this.detourner(rx - 1, ry); if (rx > 0 && e.route[v[1] * N + v[0]]) m |= 8;
-        this.poser(DS.route(m, e.route[i] === R.ROME, zc), p[0], p[1]);
+        this.poser(e.route[i] === R.PLACE && DS.place ? DS.place(m, zc) : DS.route(m, e.route[i] === R.ROME, zc), p[0], p[1]);
+      }
+      if (calque === 'attractivite') {
+        var ca = couleurAttractivite(e.attract[i]);
+        if (ca) this.poser(DS.losange(ca, ca, zc), p[0], p[1]);
       }
       if (calque === 'eau') {
         var c = e.eauFontaine[i] ? 'rgba(30,90,200,0.45)' : e.eauPuits[i] ? 'rgba(120,190,255,0.4)' : null;
@@ -216,7 +255,7 @@
     var bucket = this._bucket;
     bucket.clear();
     // Calques : seuls les marcheurs du service concerné restent visibles (section 17.3).
-    var visibles = calque === 'feu' ? ['prefet'] : calque === 'dommages' ? ['ingenieur'] : calque === 'eau' ? [] : calque === 'stocks' ? ['livreur', 'acheteuse', 'vendeuse'] : null;
+    var visibles = calque ? (VISIBLES[calque] || []) : null;
     for (var k = 0; k < e.marcheurs.length; k++) {
       var w = e.marcheurs[k];
       if (w.fin) continue;
@@ -249,7 +288,7 @@
               var hx = Math.min(c1[0], c2[0]), hy = Math.min(c1[1], c2[1]);
               var ph = ecranTuile(hx, hy);
               this.dessinerBatiment(bt, ph[0], ph[1], frame, frame2, calque);
-              if (!this.sansInterface && !calque) {
+              if (!this.sansInterface && (!calque || calque === 'problemes')) {
                 var cause = SIM.cause(e, bt);
                 if (cause) icones.push([cause, ph[0], ph[1] - (bt.t * 8 + 40) * z]);
               }
@@ -311,16 +350,22 @@
       // Calque : bâtiment aplati, colonne de couverture.
       var coul = COULEUR_CAT[d.categorie] || '#9a9184';
       for (var yy = 0; yy < b.t; yy++) for (var xx = 0; xx < b.t; xx++) {
-        var q = this.tourner(b.x + xx, b.y + yy), m = this.e;
+        var q = this.tourner(b.x + xx, b.y + yy);
         var p = [((q[0] - q[1]) * 32 - this.cam.x) * z + this.W / 2, ((q[0] + q[1]) * 16 - this.cam.y) * z + this.H / 2];
         this.poser(DS.losange('c' + coul, coul, zc), p[0], p[1]);
-        void m;
+        // Calque d'attractivité : la valeur de la case se lit aussi sous les bâtiments.
+        if (calque === 'attractivite') {
+          var ca = couleurAttractivite(e.attract[(b.y + yy) * e.N + b.x + xx]);
+          if (ca) this.poser(DS.losange(ca, ca, zc), p[0], p[1]);
+        }
       }
       var centre = [sx, sy + b.t * 16 * z];
       var v = null, coulCol = null;
       if (calque === 'feu' && d.genre !== 'ruines' && d.genre !== 'incendie' && (b.type !== 'logement' || b.hab > 0)) { v = b.feu / 100; coulCol = couleurRisque(v); }
       else if (calque === 'dommages' && d.genre !== 'ruines' && d.genre !== 'incendie' && (b.type !== 'logement' || b.hab > 0)) { v = b.dom / 100; coulCol = couleurRisque(v); }
       else if (calque === 'stocks' && remplissage(b) !== null) { v = Math.min(100, remplissage(b) * 100); coulCol = couleurRisque(100 - v); }
+      else if (valeurMaison(e, b, calque) !== null) { v = valeurMaison(e, b, calque); coulCol = couleurRisque(100 - v); }
+      else if (calque === 'problemes' && SIM.cause(e, b)) { v = 100; coulCol = '#c94a3a'; }
       else if (calque === 'eau' && b.type === 'logement' && b.hab > 0) {
         var i = b.y * e.N + b.x, niveau = e.eauFontaine[i] ? 2 : e.eauPuits[i] ? 1 : 0;
         v = niveau * 50; coulCol = niveau === 2 ? '#2b6fd6' : niveau === 1 ? '#7ec0ff' : '#c94a3a';
@@ -335,10 +380,22 @@
       case 'incendie': s = DS.incendie(b.t, frame, zc); break;
       case 'fontaine': s = DS.batiment('fontaine', 1, { actif: b.actif, frame: frame2, cle: '' + b.actif + frame2 }, zc); break;
       case 'reservoir': s = DS.batiment('reservoir', 3, { plein: b.plein, frame: frame2, cle: '' + b.plein + frame2 }, zc); break;
-      case 'ferme_ble': { var pr = Math.round(b.prog / 2500) / 4; s = DS.batiment('ferme_ble', 3, { prog: pr, cle: '' + pr }, zc); break; }
       // Greniers et marchés montrent leur remplissage sur le dessin même (sans clic).
       case 'marche': case 'grenier': { var n = niveauStock(remplissage(b)); s = DS.batiment(b.type, b.t, { niveau: n, cle: '' + n }, zc); break; }
-      default: s = DS.batiment(b.type, b.t, { cle: '' }, zc);
+      case 'entrepot': {
+        var em = SIM.emplacements(b), ce = em.map(function (x) { return x ? x[0] + x[1] : '-'; }).join(',');
+        s = DS.batiment('entrepot', 3, { emplacements: em, cle: ce }, zc); break;
+      }
+      default:
+        if (d.genre === 'ferme' || d.genre === 'extraction') { var pr = Math.min(1, Math.round(b.prog / 2500) / 4); s = DS.batiment(b.type, b.t, { prog: pr, cle: '' + pr }, zc); }
+        else if (d.genre === 'peche') s = DS.batiment(b.type, b.t, { bateau: b.mb ? 0 : 1, cle: b.mb ? '0' : '1' }, zc);
+        else if (d.genre === 'atelier') {
+          var mat = Math.min(2, Math.floor(b.mat / 100)), act = SIM.taux(b) > 0 && b.mat >= 100 ? 1 : 0;
+          s = DS.batiment(b.type, b.t, { matiere: mat, actif: act, frame: act ? frame2 : 0, cle: '' + mat + act + (act ? frame2 : 0) }, zc);
+        }
+        else if (d.eauRequise) s = DS.batiment(b.type, b.t, { actif: b.actif, frame: b.actif ? frame2 : 0, cle: '' + b.actif + (b.actif ? frame2 : 0) }, zc);
+        else if (d.genre === 'spectacle') { var on = SIM.pointsSpectacle(b) > 0 ? 1 : 0; s = DS.batiment(b.type, b.t, { actif: on, cle: '' + on }, zc); }
+        else s = DS.batiment(b.type, b.t, { cle: '' }, zc);
     }
     this.poser(s, sx, sy);
   };
