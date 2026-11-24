@@ -1258,6 +1258,7 @@ Livré :
 - Textes : 226 clés de plus dans les 5 langues.
 - Ville d'exemple du lot 2 (`exemples.js`, niveau 4) : cité de Pompéi en construction libre, quartier de prestige fermé par des barrières, entouré de places, de jardins, de statues, de temples, des bains, de la bibliothèque et des spectacles ; elle remplace la troisième ville embarquée (affiche, troisième aperçu, fond de l'écran titre).
 - Mode test (`?debug=1`) : `MM_DEBUG.ville(n)` ouvre une ville d'exemple comme une vraie partie.
+- Fiche du jeu réécrite dans les 5 langues (présentation, descriptions, texte de la jaquette : l'affiche montre maintenant les temples de Cérès et de Vénus de la cité du lot 2) ; `version` 3.
 
 Mesures (sous Node, PC de développement) :
 
@@ -1267,8 +1268,8 @@ Mesures (sous Node, PC de développement) :
 | Un scénario de test par chaîne | Argile → poterie, bois → mobilier, olives → huile, raisin → vin, fer → armes, marbre (et grand temple), légumes, fruits, porc, poisson : chacun livre son produit en 12 à 14 mois ; rendements exacts au jour près (8 et 4 charges par an). Tests aussi des consignes, du plafond, de l'interdiction au marché, de l'agrandissement, de la division, de l'attractivité, des priorités et de la santé. |
 | Déterminisme et sauvegarde | Tenus, aussi pour une ville du lot 2 ; une sauvegarde du lot 1 (version 1) se charge et continue. |
 | Cibles 19.3 sur 160 × 160 remplie | 0,93 ms par tick en moyenne (lot 1 : 0,74 ms ; cible 4 ms), 18 ms au pire sur des ticks quelconques (ramasse-miettes). Le calcul quotidien de l'attractivité de toute la carte prend 0,5 ms. |
-| Poids de `index.html` | POIDS (repère du lot 2 : 1,8 Mo). |
-| Contrôles du site | CONTROLES |
+| Poids de `index.html` | 1 078 Ko (lot 1 : 758 Ko), dont 3 villes d'exemple et les textes des 5 langues (repère du lot 2 : 1,8 Mo). |
+| Contrôles du site | `validate-games --jouer` (téléphone 844 × 390, ordinateur : 100 % de la largeur, affiche, 3 images du jeu), `tester-sauvegarde`, `tester-stockage`, `check-i18n` (5 langues, 637 clés), `controle-taxonomie`, `regles-seo`, `verifier-seo` : tout est bon. Interface essayée dans Chromium, sur ordinateur (1 280 × 720) et sur téléphone en paysage au toucher (844 × 390) : panneaux, conseillers, calques, construction libre, sans erreur dans la console. |
 
 Écarts avec ce cahier (à valider ; les valeurs sont dans `donnees.json`) :
 

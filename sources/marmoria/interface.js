@@ -601,6 +601,8 @@
     ouvrirCategorie(null);
   }
   function fermerPanneau() { $('panneau').hidden = true; panneauVivant = null; rendu.selection = 0; }
+  // « Nom : valeur » selon la typographie de la langue (espace avant les deux-points en français seulement).
+  function deuxPoints(a, b) { return t('ui.deuxPoints', { a: a, b: b }); }
   function ligne(a, b) { return el('div', { classe: 'ligne' }, [el('span', { texte: a }), el('strong', { texte: b })]); }
   function jauge(f) { var j = el('div', { classe: 'jauge' }, [el('i')]); j.firstChild.style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + '%'; return j; }
 
@@ -696,13 +698,13 @@
     var l = el('div', { classe: 'ligne bien' }, [
       el('span', { texte: t('bien.' + g) }),
       el('strong', { texte: t('info.charges', { n: Math.round((b.stocks[g] || 0) / 10) / 10 }) }), // nombre brut : le module choisit le pluriel et le met en forme
-      el('button', { classe: 'mini c-' + c, aria: t('info.consigne') + ' : ' + t('consigne.' + c), clic: function () {
+      el('button', { classe: 'mini c-' + c, aria: deuxPoints(t('info.consigne'), t('consigne.' + c)), clic: function () {
         AUDIO.jouer('clic'); commander({ type: 'consigne', id: b.id, bien: g, valeur: C[(C.indexOf(c) + 1) % C.length] }); if (panneauVivant) panneauVivant();
       }, texte: t('consigne.' + c) })
     ]);
     if (avecPlafond) {
       var q = b.plaf[g] || D.regles.entrepot.plafondDepart;
-      l.appendChild(el('button', { classe: 'mini', aria: t('info.plafond') + ' : ' + t('plafond.' + q), clic: function () {
+      l.appendChild(el('button', { classe: 'mini', aria: deuxPoints(t('info.plafond'), t('plafond.' + q)), clic: function () {
         AUDIO.jouer('clic'); commander({ type: 'plafond', id: b.id, bien: g, valeur: q % 4 + 1 }); if (panneauVivant) panneauVivant();
       }, texte: t('plafond.' + q) }));
     }
@@ -1088,7 +1090,7 @@
     FONDS_LIBRE.forEach(function (n, k) { f.appendChild(bouton(nb(n), function () { choixLibre.fonds = k; ecranLibre(); }, choixLibre.fonds === k ? 'gros or' : 'gros non')); });
     carte.appendChild(f);
     carte.appendChild(el('div', { classe: 'boutons' }, [
-      bouton(t('libre.risques') + ' : ' + t(choixLibre.risques ? 'ui.oui' : 'ui.non'), function () { choixLibre.risques = !choixLibre.risques; ecranLibre(); }, 'gros non')
+      bouton(deuxPoints(t('libre.risques'), t(choixLibre.risques ? 'ui.oui' : 'ui.non')), function () { choixLibre.risques = !choixLibre.risques; ecranLibre(); }, 'gros non')
     ]));
     carte.appendChild(el('div', { classe: 'boutons' }, [
       bouton(t('ui.retour'), ecranMissions, 'gros non'),
@@ -1175,14 +1177,14 @@
   function ecranOptions(retour) {
     var o = prog.options;
     var bascule = function (cle, nom) {
-      return bouton(t(nom) + ' : ' + t(o[cle] ? 'ui.oui' : 'ui.non'), function () { o[cle] = !o[cle]; if (cle === 'son') { AUDIO.couper(!o.son); majBoutonSon(); } sauverProg(); ecranOptions(retour); }, 'gros non');
+      return bouton(deuxPoints(t(nom), t(o[cle] ? 'ui.oui' : 'ui.non')), function () { o[cle] = !o[cle]; if (cle === 'son') { AUDIO.couper(!o.son); majBoutonSon(); } sauverProg(); ecranOptions(retour); }, 'gros non');
     };
     var carte = el('div', { classe: 'carte-ecran' }, [
       el('h1', { texte: t('options.titre') }),
       el('div', { classe: 'boutons' }, [
         bascule('son', 'options.son'),
         bascule('pauseCritique', 'options.pauseCritique'),
-        bouton(t('options.defilement') + ' : ' + t('options.defilement' + o.defilement), function () { o.defilement = (o.defilement + 1) % 4; sauverProg(); ecranOptions(retour); }, 'gros non'),
+        bouton(deuxPoints(t('options.defilement'), t('options.defilement' + o.defilement)), function () { o.defilement = (o.defilement + 1) % 4; sauverProg(); ecranOptions(retour); }, 'gros non'),
         bouton(t('options.revoirGestes'), function () { ecranGeste(0); }, 'gros non')
       ]),
       el('div', { classe: 'boutons' }, [bouton(t('ui.retour'), retour, 'gros or')])
