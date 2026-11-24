@@ -245,6 +245,30 @@ section('Formules (une au moins par règle chiffrée du lot 1)');
   proche(n / 2000, 0.1, 0.03, 'feu : probabilité de (risque − 80) %');
 }
 
+{
+  // Une tente entourée d'autres logements reçoit quand même ses immigrants : on entre
+  // dans une maison depuis une route à 2 cases ou moins (demande du propriétaire du 24 novembre 2026).
+  const e = sim.nouvelle('ostie', { libre: true });
+  const R = ex.ligneRome(sim, e);
+  let x0 = -1;
+  for (let x = 5; x < e.N - 8 && x0 < 0; x++) {
+    let bon = true;
+    for (let y = R - 4; y <= R - 1; y++) for (let x2 = x - 1; x2 < x + 4; x2++) { const t = e.terrain[y * e.N + x2]; if (t === sim.T.EAU || t === sim.T.ROCHERS) bon = false; }
+    if (bon) x0 = x;
+  }
+  // Pâté de 3 × 3 logements entre la voie de Rome et une route tracée au-dessus.
+  const cases = [], route = [];
+  for (let y = R - 3; y <= R - 1; y++) for (let x = x0; x < x0 + 3; x++) cases.push([x, y]);
+  for (let x = x0 - 1; x <= x0 + 3; x++) route.push([x, R - 4]);
+  sim.appliquer(e, { type: 'tracer', bat: 'deblayer', cases: cases.concat(route) });
+  sim.appliquer(e, { type: 'tracer', bat: 'route', cases: route });
+  ok(sim.appliquer(e, { type: 'tracer', bat: 'logement', cases }).n === 9, 'pâté de 9 logements posé');
+  const centre = sim.batA(e, x0 + 1, R - 2);
+  avancer(e, 3 * TM, true);
+  ok(centre && centre.hab > 0, `tente au centre d'un pâté de 3 × 3 habitée (${centre ? centre.hab : 'absente'} habitants)`);
+  ok(e.batiments.filter((b) => b.type === 'logement' && b.hab > 0).length === 9, 'les 9 logements du pâté sont habités');
+}
+
 // --------------------------------------------------------------------------
 section('Ville d\'exemple, invariants à chaque tick');
 // Ville d'exemple bâtie par le joueur raisonnable (MM_EXEMPLES.jouer), tous les demi-mois.
@@ -280,7 +304,10 @@ function avancerVille(e, n, avecInvariants = false) {
   ok(e.pop > 300, 'la ville se peuple');
   ok((niveaux[3] || 0) + (niveaux[4] || 0) + (niveaux[5] || 0) + (niveaux[6] || 0) > 10, 'des maisons montent au-delà du niveau 2');
   ok(Object.keys(niveaux).some((n) => n >= 5), 'des maisons atteignent le niveau 5 (fontaines)');
-  ok(e.marcheurs.some((w) => w.type === 'vendeuse') && e.marcheurs.some((w) => w.type === 'prefet'), 'vendeuses et préfets circulent');
+  // Marcheurs vus pendant un mois (une vendeuse peut être entre deux tournées à un instant donné).
+  const vus = new Set();
+  for (let k = 0; k < TM; k++) { sim.pas(e); e.marcheurs.forEach((w) => vus.add(w.type)); }
+  ok(vus.has('vendeuse') && vus.has('prefet') && vus.has('ingenieur') && vus.has('percepteur'), `vendeuses, préfets, ingénieurs et percepteurs circulent (${[...vus].sort().join(', ')})`);
   ok(e.batiments.some((b) => b.type === 'grenier' && sim.totalStock(b) > 0) || e.batiments.some((b) => b.type === 'marche' && sim.totalStock(b) > 0), 'la nourriture circule jusqu\'aux greniers et marchés');
 }
 

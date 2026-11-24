@@ -89,7 +89,7 @@ La carte est une grille de cases carrées vue en isométrie ; chaque bâtiment o
 
 - Tailles de carte : 80×80 (petite), 120×120 (moyenne), 160×160 (grande). Sur mobile, 120×120 au plus, à confirmer par les mesures du lot 1.
 - Projection isométrique 2:1, case de base de 64×32 px au zoom 1.
-- Zoom à 3 paliers (×0,5, ×1, ×2), défilement libre, mini-carte cliquable.
+- Zoom progressif de ×0,5 à ×2 (pincement, molette, boutons ; décision du 24 novembre 2026, au lieu de 3 paliers), défilement libre, mini-carte cliquable.
 - Rotation par quarts de tour. Les sprites restent identiques dans les 4 orientations ; seuls l'ordre d'affichage et les coordonnées changent.
 
 ### 3.2 Types de terrain
@@ -243,7 +243,7 @@ La population vient de l'immigration, attirée par les logements libres et reten
 
 - Places libres = capacité totale des maisons − population.
 - Chaque mois, si l'humeur atteint 50 et qu'il reste des places : arrivée de min(places libres, 10 % de la population + 20) immigrants.
-- Les immigrants entrent par la route de Rome et marchent vers une maison qui a de la place.
+- Les immigrants entrent par la route de Rome et marchent vers une maison qui a de la place. Ils y entrent depuis une route à 2 cases ou moins, ou depuis sa case : un bâtiment voisin ne bloque jamais une tente vide (décision du 24 novembre 2026). Les sans-abri font de même ; ceux qui partent sortent par cette route.
 - Humeur sous 40 : 5 % de la population émigre chaque mois, en commençant par les maisons de plus bas niveau.
 - Humeur sous 20 : des émeutiers apparaissent (section 10).
 
@@ -775,6 +775,7 @@ Un calque aplatit les bâtiments et remplace chaque maison par une colonne dont 
 | Eau | Canalisations, portée des puits et fontaines |
 | Feu, dommages, criminalité | Compteur de risque par bâtiment |
 | Problèmes | Bâtiments à l'arrêt et leur cause |
+| Stocks | Remplissage des greniers, marchés et entrepôts (décision du 24 novembre 2026) |
 | Nourriture | Réserve des maisons en mois |
 | Divertissement | Points par maison, total ou par type de lieu |
 | Éducation | École, bibliothèque, académie |
@@ -1207,7 +1208,7 @@ Mesures (sous Node, PC de développement) :
 | Tutoriels terminés sans aide | Un joueur automatique gagne Ostie (3 étoiles) et Pompéi ; à confirmer par une séance de jeu réelle. |
 | Endurance | 50 années sans exception ni invariant violé (7 s). |
 | Taille d'une ville sauvegardée | Environ 100 Ko (cible 1 Mo). |
-| Poids de `index.html` | 732 Ko, dont 3 villes d'exemple et les textes des 5 langues (repère du lot 1 : 1 Mo). |
+| Poids de `index.html` | 758 Ko, dont 3 villes d'exemple et les textes des 5 langues (repère du lot 1 : 1 Mo). |
 | Contrôles du site | `validate-games --jouer` (téléphone 844 × 390, ordinateur : 100 % de la largeur, affiche, 3 images du jeu), `tester-sauvegarde`, `tester-stockage`, `check-i18n` (5 langues), `controle-taxonomie`, `regles-seo`, `verifier-seo` : tout est bon. |
 
 Écarts avec ce cahier (à valider ; les valeurs sont dans `donnees.json`) :
@@ -1228,3 +1229,13 @@ Mesures (sous Node, PC de développement) :
 14. Page du jeu : les deux aperçus de téléphone sont capturés en 844 × 390 (dérogation) ; la bande d'images de la page, prévue pour des images de téléphone en portrait, est à adapter avant la publication.
 
 Publication : le jeu n'est pas publié au lot 1. La pull request reste ouverte jusqu'à la décision de la section 22.2 (fin du lot 3).
+
+### 23.3 Retours du propriétaire du 24 novembre 2026
+
+1. **Zoom progressif** (sections 3.1 et 17.5) : le pincement suit l'écart des deux doigts, la molette et le pavé tactile zooment en continu, les boutons par crans de 25 %, de ×0,5 à ×2. Les dessins restent en cache à 4 résolutions (×0,5, ×1, ×2, ×3 pour l'affiche) : chaque image prend la résolution juste au-dessus du zoom affiché. Les cases d'herbe, de prairie et d'eau débordent très légèrement, pour qu'aucun liseré n'apparaisse entre elles aux zooms intermédiaires.
+2. **Tentes inaccessibles** (section 6.1) : un immigrant devait marcher jusque sur la case de sa maison ; une tente entourée d'autres bâtiments (le milieu d'un pâté) ne recevait donc jamais personne. On entre maintenant depuis une route à 2 cases ou moins (la distance déjà exigée pour poser un logement). Effet mesuré sur la ville d'exemple de 2 ans : 1 386 habitants au lieu de 394. Test ajouté : un pâté de 3 × 3 logements est entièrement habité.
+3. **Stocks visibles sans clic** :
+   - sur le dessin même : le grenier laisse voir son tas de grain dans une grande ouverture de façade et aligne un sac devant sa porte par quart de remplissage ; le marché aligne 4 cagettes devant ses étals, pleines ou vides (5 états : vide, un quart, moitié, trois quarts, plein) ; l'entrepôt du lot 2 suivra le même principe ;
+   - nouveau calque « Stocks » : bâtiments aplatis, une colonne par grenier et par marché, d'autant plus haute et verte qu'il est plein, rouge quand il est presque vide ; seuls les livreurs, acheteuses et vendeuses restent visibles.
+4. Corrigé au passage : les colonnes des calques feu et dommages sortaient noires (couleur mal formée).
+5. Affiche : son héros est désormais toujours le temple (le forum ou le temple changeait selon la ville d'exemple) ; texte de la jaquette réécrit dans les 5 langues. `version` 2.

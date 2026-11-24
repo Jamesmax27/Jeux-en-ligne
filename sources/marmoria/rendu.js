@@ -10,7 +10,16 @@
 (function (racine) {
   'use strict';
 
+  // Zoom progressif de ×0,5 à ×2 (décision du propriétaire du 24 novembre 2026, au lieu de
+  // 3 paliers). Les dessins sont gardés en cache à quelques résolutions seulement (RESOLUTIONS) :
+  // chaque image prend la résolution juste au-dessus du zoom affiché, puis est réduite.
   var ZOOMS = [0.5, 1, 2];
+  var ZMIN = 0.5, ZMAX = 2;
+  var RESOLUTIONS = [0.5, 1, 2, 3];
+  function resolution(z) {
+    for (var k = 0; k < RESOLUTIONS.length; k++) if (RESOLUTIONS[k] >= z - 1e-6) return RESOLUTIONS[k];
+    return RESOLUTIONS[RESOLUTIONS.length - 1];
+  }
   var DS = null, SIM = null;
 
   function Rendu(canvas) {
@@ -86,11 +95,16 @@
     this.cam.x = Math.max(-N * 32, Math.min(N * 32, this.cam.x));
     this.cam.y = Math.max(0, Math.min(N * 32, this.cam.y));
   };
+  // Un cran de zoom (boutons, touches) : ×1,25 ou ÷1,25.
   Rendu.prototype.zoomer = function (sens, sx, sy) {
-    var k = ZOOMS.indexOf(this.cam.z), n = Math.max(0, Math.min(ZOOMS.length - 1, k + sens));
-    if (n === k) return false;
+    return this.zoomerVers(this.cam.z * (sens > 0 ? 1.25 : 0.8), sx, sy);
+  };
+  // Zoom continu vers z1 (pincement, molette) ; le point (sx, sy) de l'écran reste en place.
+  Rendu.prototype.zoomerVers = function (z1, sx, sy) {
+    z1 = Math.max(ZMIN, Math.min(ZMAX, z1));
+    if (Math.abs(z1 - this.cam.z) < 1e-4) return false;
     if (sx === undefined) { sx = this.W / 2; sy = this.H / 2; }
-    var z0 = this.cam.z, z1 = ZOOMS[n];
+    var z0 = this.cam.z;
     // Le point sous le doigt reste en place.
     var wx = (sx - this.W / 2) / z0 + this.cam.x, wy = (sy - this.H / 2) / z0 + this.cam.y;
     this.cam.z = z1;
@@ -120,10 +134,22 @@
     this.ctx.drawImage(s.c, sx + s.ox * z, sy + s.oy * z, s.w * z, s.h * z);
   };
 
+  // Remplissage d'un bâtiment de stockage (0 à 1), ou null : grenier, marché (et entrepôt au lot 2).
+  function remplissage(b) {
+    var R = SIM.donnees().regles;
+    if (b.type === 'grenier') return SIM.totalStock(b) / R.grenier.capacite;
+    if (b.type === 'marche') return SIM.totalStock(b) / R.marche.stockMax;
+    return null;
+  }
+  // 5 états visibles sur le dessin : vide, un quart, moitié, trois quarts, plein.
+  function niveauStock(f) { return !f || f <= 0 ? 0 : Math.min(4, Math.ceil(f * 4 - 1e-9)); }
+
+  // 0 → vert, 50 → jaune, 100 → rouge (code hexadécimal : DS.teinte en calcule les faces).
   function couleurRisque(v) {
-    // 0 → vert, 50 → jaune, 100 → rouge
-    var r = v < 50 ? Math.round(80 + v * 3.5) : 255, g = v < 50 ? 200 : Math.round(200 - (v - 50) * 3.2);
-    return 'rgb(' + r + ',' + Math.max(40, g) + ',60)';
+    v = Math.max(0, Math.min(100, v));
+    var r = v < 50 ? Math.round(80 + v * 3.5) : 255, g = Math.max(40, v < 50 ? 200 : Math.round(200 - (v - 50) * 3.2));
+    var h = function (n) { return ('0' + n.toString(16)).slice(-2); };
+    return '#' + h(r) + h(g) + h(60);
   }
   var COULEUR_CAT = { logement: '#c9a06a', eau: '#4a86c0', alimentation: '#c98a2b', religion: '#efe7d6', divertissement: '#8e5aa8', administration: '#5a7397', securite: '#b03a2e', routes: '#c9bfa8' };
 
@@ -139,7 +165,8 @@
   };
 
   Rendu.prototype.dessiner = function (alpha) {
-    var e = this.e, ctx = this.ctx, z = this.cam.z, W = this.W, H = this.H;
+    var e = this.e, ctx = this.ctx, z = this.cam.z, W = this.W, H = this.H, zc = resolution(z);
+    this._zc = zc;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.fillStyle = '#3a4a2e';
@@ -167,9 +194,9 @@
       if (p[0] < -marge || p[0] > W + marge || p[1] < -40 * z || p[1] > H + 10) continue;
       xy = this.detourner(rx, ry); x = xy[0]; y = xy[1]; i = y * N + x;
       var t = e.terrain[i], s;
-      if (t === T.EAU) s = DS.eau((frameEau + x + y) & 3, z);
-      else if (t === T.PRAIRIE) s = DS.prairie(e.fertilite[i] < 50 ? 0 : e.fertilite[i] < 80 ? 1 : 2, z);
-      else s = DS.herbe((x * 31 + y * 17) & 3, z);
+      if (t === T.EAU) s = DS.eau((frameEau + x + y) & 3, zc);
+      else if (t === T.PRAIRIE) s = DS.prairie(e.fertilite[i] < 50 ? 0 : e.fertilite[i] < 80 ? 1 : 2, zc);
+      else s = DS.herbe((x * 31 + y * 17) & 3, zc);
       this.poser(s, p[0], p[1]);
       if (e.route[i]) {
         var m = 0, v;
@@ -177,22 +204,23 @@
         v = this.detourner(rx + 1, ry); if (rx < N - 1 && e.route[v[1] * N + v[0]]) m |= 2;
         v = this.detourner(rx, ry + 1); if (ry < N - 1 && e.route[v[1] * N + v[0]]) m |= 4;
         v = this.detourner(rx - 1, ry); if (rx > 0 && e.route[v[1] * N + v[0]]) m |= 8;
-        this.poser(DS.route(m, e.route[i] === R.ROME, z), p[0], p[1]);
+        this.poser(DS.route(m, e.route[i] === R.ROME, zc), p[0], p[1]);
       }
       if (calque === 'eau') {
         var c = e.eauFontaine[i] ? 'rgba(30,90,200,0.45)' : e.eauPuits[i] ? 'rgba(120,190,255,0.4)' : null;
-        if (c) this.poser(DS.losange(c, c, z), p[0], p[1]);
+        if (c) this.poser(DS.losange(c, c, zc), p[0], p[1]);
       }
     }
 
     // 2. Marcheurs rangés par case d'affichage (la plus « avant » des deux cases du pas).
     var bucket = this._bucket;
     bucket.clear();
-    var service = calque === 'feu' ? 'prefet' : calque === 'dommages' ? 'ingenieur' : calque === 'eau' ? '-' : null;
+    // Calques : seuls les marcheurs du service concerné restent visibles (section 17.3).
+    var visibles = calque === 'feu' ? ['prefet'] : calque === 'dommages' ? ['ingenieur'] : calque === 'eau' ? [] : calque === 'stocks' ? ['livreur', 'acheteuse', 'vendeuse'] : null;
     for (var k = 0; k < e.marcheurs.length; k++) {
       var w = e.marcheurs[k];
       if (w.fin) continue;
-      if (service && w.type !== service) continue;
+      if (visibles && visibles.indexOf(w.type) < 0) continue;
       var a = this.tourner(w.x, w.y), b = this.tourner(w.nx, w.ny);
       var cle = (a[0] + a[1] >= b[0] + b[1]) ? a[1] * N + a[0] : b[1] * N + b[0];
       var l = bucket.get(cle);
@@ -229,16 +257,16 @@
           }
         } else if (!calque) {
           var tt = e.terrain[i];
-          if (tt === T.ARBRES) this.poser(DS.arbre((x * 7 + y * 3) % 3, z), p[0], p[1]);
-          else if (tt === T.ROCHERS) this.poser(DS.rocher((x + y) % 3, z), p[0], p[1]);
+          if (tt === T.ARBRES) this.poser(DS.arbre((x * 7 + y * 3) % 3, zc), p[0], p[1]);
+          else if (tt === T.ROCHERS) this.poser(DS.rocher((x + y) % 3, zc), p[0], p[1]);
         }
         if (e.aqueduc[i] && !calque) {
           var va = this.detourner(rx + 1, ry), vb = this.detourner(rx - 1, ry);
           var lie = function (q) { return q[0] >= 0 && q[1] >= 0 && q[0] < N && q[1] < N && (e.aqueduc[q[1] * N + q[0]] || (e.bat[q[1] * N + q[0]] && SIM.batiment(e, e.bat[q[1] * N + q[0]]).type === 'reservoir')); };
           var axe = (lie(va) || lie(vb)) ? 'u' : 'v';
-          this.poser(DS.batiment('aqueduc', 1, { axe: axe, eau: aqueducPlein ? 1 : 0, cle: axe + (aqueducPlein ? 1 : 0) }, z), p[0], p[1]);
+          this.poser(DS.batiment('aqueduc', 1, { axe: axe, eau: aqueducPlein ? 1 : 0, cle: axe + (aqueducPlein ? 1 : 0) }, zc), p[0], p[1]);
         }
-        if (e.route[i] === R.BARRIERE && !calque) this.poser(DS.batiment('barriere', 1, { cle: '' }, z), p[0], p[1]);
+        if (e.route[i] === R.BARRIERE && !calque) this.poser(DS.batiment('barriere', 1, { cle: '' }, zc), p[0], p[1]);
         var lw = bucket.get(ry * N + rx);
         if (lw) for (var j = 0; j < lw.length; j++) this.dessinerMarcheur(lw[j], alpha);
       }
@@ -250,7 +278,7 @@
       ap.cases.forEach(function (cs) {
         for (var yy = 0; yy < (ap.zone ? 1 : taille); yy++) for (var xx = 0; xx < (ap.zone ? 1 : taille); xx++) {
           var q = self.tourner(cs.x + xx, cs.y + yy), pp = ecranTuile(q[0], q[1]);
-          self.poser(DS.losange(cs.ok ? 'ok' : 'non', cs.ok ? 'rgba(70,200,90,0.5)' : 'rgba(220,60,50,0.5)', z), pp[0], pp[1]);
+          self.poser(DS.losange(cs.ok ? 'ok' : 'non', cs.ok ? 'rgba(70,200,90,0.5)' : 'rgba(220,60,50,0.5)', zc), pp[0], pp[1]);
         }
       });
     }
@@ -265,7 +293,7 @@
       }
     }
     var bob = Math.sin(temps / 300) * 2 * z;
-    for (var n = 0; n < icones.length; n++) this.poser(DS.icone(icones[n][0], z), icones[n][1], icones[n][2] + bob);
+    for (var n = 0; n < icones.length; n++) this.poser(DS.icone(icones[n][0], zc), icones[n][1], icones[n][2] + bob);
     if (this.effetAffiche) {
       // Affiche : soleil chaud venu du nord-ouest, bas assombri pour le bandeau du titre.
       var g = ctx.createRadialGradient(W * 0.15, H * 0.05, 0, W * 0.15, H * 0.05, Math.max(W, H) * 0.9);
@@ -278,37 +306,39 @@
   };
 
   Rendu.prototype.dessinerBatiment = function (b, sx, sy, frame, frame2, calque) {
-    var e = this.e, z = this.cam.z, d = SIM.donnees().batiments[b.type], s;
+    var e = this.e, z = this.cam.z, zc = this._zc || resolution(z), d = SIM.donnees().batiments[b.type], s;
     if (calque) {
       // Calque : bâtiment aplati, colonne de couverture.
       var coul = COULEUR_CAT[d.categorie] || '#9a9184';
       for (var yy = 0; yy < b.t; yy++) for (var xx = 0; xx < b.t; xx++) {
         var q = this.tourner(b.x + xx, b.y + yy), m = this.e;
         var p = [((q[0] - q[1]) * 32 - this.cam.x) * z + this.W / 2, ((q[0] + q[1]) * 16 - this.cam.y) * z + this.H / 2];
-        this.poser(DS.losange('c' + coul, coul, z), p[0], p[1]);
+        this.poser(DS.losange('c' + coul, coul, zc), p[0], p[1]);
         void m;
       }
       var centre = [sx, sy + b.t * 16 * z];
       var v = null, coulCol = null;
       if (calque === 'feu' && d.genre !== 'ruines' && d.genre !== 'incendie' && (b.type !== 'logement' || b.hab > 0)) { v = b.feu / 100; coulCol = couleurRisque(v); }
       else if (calque === 'dommages' && d.genre !== 'ruines' && d.genre !== 'incendie' && (b.type !== 'logement' || b.hab > 0)) { v = b.dom / 100; coulCol = couleurRisque(v); }
+      else if (calque === 'stocks' && remplissage(b) !== null) { v = Math.min(100, remplissage(b) * 100); coulCol = couleurRisque(100 - v); }
       else if (calque === 'eau' && b.type === 'logement' && b.hab > 0) {
         var i = b.y * e.N + b.x, niveau = e.eauFontaine[i] ? 2 : e.eauPuits[i] ? 1 : 0;
         v = niveau * 50; coulCol = niveau === 2 ? '#2b6fd6' : niveau === 1 ? '#7ec0ff' : '#c94a3a';
       }
-      if (b.type === 'incendie') this.poser(DS.incendie(b.t, frame, z), sx, sy);
+      if (b.type === 'incendie') this.poser(DS.incendie(b.t, frame, zc), sx, sy);
       if (v !== null) this.colonne(centre[0], centre[1], 6 + v * 0.5, coulCol);
       return;
     }
     var v2 = (b.x * 7 + b.y * 13) % 3;
     switch (b.type) {
-      case 'logement': s = DS.maison(b.hab > 0 ? b.niv : 0, v2, b.t, z); break;
-      case 'incendie': s = DS.incendie(b.t, frame, z); break;
-      case 'fontaine': s = DS.batiment('fontaine', 1, { actif: b.actif, frame: frame2, cle: '' + b.actif + frame2 }, z); break;
-      case 'reservoir': s = DS.batiment('reservoir', 3, { plein: b.plein, frame: frame2, cle: '' + b.plein + frame2 }, z); break;
-      case 'ferme_ble': { var pr = Math.round(b.prog / 2500) / 4; s = DS.batiment('ferme_ble', 3, { prog: pr, cle: '' + pr }, z); break; }
-      case 'marche': { var st = SIM.totalStock(b) > 0 ? 1 : 0; s = DS.batiment('marche', 2, { stock: st, cle: '' + st }, z); break; }
-      default: s = DS.batiment(b.type, b.t, { cle: '' }, z);
+      case 'logement': s = DS.maison(b.hab > 0 ? b.niv : 0, v2, b.t, zc); break;
+      case 'incendie': s = DS.incendie(b.t, frame, zc); break;
+      case 'fontaine': s = DS.batiment('fontaine', 1, { actif: b.actif, frame: frame2, cle: '' + b.actif + frame2 }, zc); break;
+      case 'reservoir': s = DS.batiment('reservoir', 3, { plein: b.plein, frame: frame2, cle: '' + b.plein + frame2 }, zc); break;
+      case 'ferme_ble': { var pr = Math.round(b.prog / 2500) / 4; s = DS.batiment('ferme_ble', 3, { prog: pr, cle: '' + pr }, zc); break; }
+      // Greniers et marchés montrent leur remplissage sur le dessin même (sans clic).
+      case 'marche': case 'grenier': { var n = niveauStock(remplissage(b)); s = DS.batiment(b.type, b.t, { niveau: n, cle: '' + n }, zc); break; }
+      default: s = DS.batiment(b.type, b.t, { cle: '' }, zc);
     }
     this.poser(s, sx, sy);
   };
@@ -322,7 +352,7 @@
     var pose = Math.floor(f * 4) % 2;
     // Petit décalage par marcheur : deux marcheurs sur la même case ne se superposent pas.
     var dec = ((w.id * 7) % 9 - 4) * this.cam.z;
-    this.poser(DS.marcheur(w.type, pose, gauche, this.cam.z), p[0] + dec, p[1] + dec * 0.3);
+    this.poser(DS.marcheur(w.type, pose, gauche, this._zc || resolution(this.cam.z)), p[0] + dec, p[1] + dec * 0.3);
   };
 
   // --- Mini-carte -------------------------------------------------------------
@@ -375,7 +405,7 @@
   };
 
   racine.MM_RENDU = {
-    ZOOMS: ZOOMS,
+    ZOOMS: ZOOMS, ZMIN: ZMIN, ZMAX: ZMAX,
     creer: function (canvas) {
       DS = racine.MM_DESSINS; SIM = racine.MM_SIM;
       return new Rendu(canvas);

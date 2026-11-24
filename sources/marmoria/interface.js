@@ -458,8 +458,9 @@
       var d = Math.hypot(l[0].x - l[1].x, l[0].y - l[1].y), mx = (l[0].x + l[1].x) / 2, my = (l[0].y + l[1].y) / 2;
       rendu.cam.x -= (mx - pince.mx) / rendu.cam.z; rendu.cam.y -= (my - pince.my) / rendu.cam.z; rendu.limiter();
       pince.mx = mx; pince.my = my;
-      if (d / pince.d > 1.4) { rendu.zoomer(1, mx, my); pince.d = d; }
-      else if (d / pince.d < 0.7) { rendu.zoomer(-1, mx, my); pince.d = d; }
+      // Zoom progressif : il suit l'écart des deux doigts, centré entre eux.
+      if (pince.d > 0 && d > 0) rendu.zoomerVers(rendu.cam.z * d / pince.d, mx, my);
+      pince.d = d;
       return;
     }
     if (outil) {
@@ -498,15 +499,12 @@
   canvas.addEventListener('pointerup', finPointeur);
   canvas.addEventListener('pointercancel', finPointeur);
   canvas.addEventListener('pointerleave', function () { if (outil && !outil.actif && !outil.attente) { rendu.apercu = null; $('bulle').hidden = true; } });
-  var molette = 0;
+  // Molette ou pavé tactile : zoom progressif autour du pointeur.
   canvas.addEventListener('wheel', function (ev) {
     ev.preventDefault();
     if (!partie) return;
-    var now = Date.now();
-    if (now - molette < 180) return;
-    molette = now;
-    var p = local(ev);
-    rendu.zoomer(ev.deltaY < 0 ? 1 : -1, p[0], p[1]);
+    var p = local(ev), pas = ev.deltaMode === 1 ? ev.deltaY * 16 : ev.deltaY;
+    rendu.zoomerVers(rendu.cam.z * Math.exp(-Math.max(-120, Math.min(120, pas)) * 0.0018), p[0], p[1]);
   }, { passive: false });
 
   // Mini-carte : toucher ou cliquer pour s'y rendre.
@@ -752,8 +750,9 @@
     if (!partie) return;
     ouvrirPanneau(function (p) {
       p.appendChild(el('h2', { texte: t('calque.titre') }));
-      [null, 'eau', 'feu', 'dommages'].forEach(function (c) {
+      [null, 'eau', 'feu', 'dommages', 'stocks'].forEach(function (c) {
         if ((c === 'feu' || c === 'dommages') && !partie.m.risques) return;
+        if (c === 'stocks' && partie.m.batiments.indexOf('grenier') < 0 && partie.m.batiments.indexOf('marche') < 0) return;
         p.appendChild(el('button', { classe: 'choix' + (rendu.calque === c ? ' actif' : ''), clic: function () { AUDIO.jouer('clic'); rendu.calque = c; fermerPanneau(); $('b-calque').classList.toggle('actif', !!c); } }, [
           el('span', { classe: 'nom', texte: t('calque.' + (c || 'aucun')) })
         ]));
@@ -1122,7 +1121,7 @@
     rendu.cam.z = 3;
     var cible = null, meilleur = -1;
     e.batiments.forEach(function (b) {
-      if (b.type !== 'temple_ceres' && b.type !== 'forum') return;
+      if (b.type !== 'temple_ceres') return; // le héros de l'affiche est toujours un temple (texte de la jaquette)
       var n = 0;
       e.batiments.forEach(function (h) { if (h.type === 'logement' && h.niv >= 4 && Math.abs(h.x - b.x) < 6 && Math.abs(h.y - b.y) < 6) n++; });
       if (n > meilleur) { meilleur = n; cible = b; }
@@ -1161,10 +1160,6 @@
   majBoutonSon();
   requestAnimationFrame(boucle);
 
-  if (window.JEL_AFFICHE) { dessinerAffiche(); return; }
-  if (window.JEL_APERCU) { ouvrirApercu(Number(window.JEL_APERCU) || 1); return; }
-  ecranTitre();
-
   // Outils de mise au point (cahier, section 19.5), seulement avec ?debug=1 dans le lanceur.
   if (window.JEL_DEBUG) {
     window.MM_DEBUG = {
@@ -1172,7 +1167,13 @@
       vitesse20: function () { D.temps.vitesses[D.temps.vitesses.length - 1] = 20; },
       incendie: function () { if (partie) { var b = partie.e.batiments.filter(function (x) { return x.type === 'logement' && x.hab > 0; })[0]; if (b) SIM._outils.enflammer(partie.e, b); } },
       etat: function () { return partie && partie.e; },
+      vue: function (x, y, z) { rendu.centrerSur(x, y); if (z) rendu.zoomerVers(z); },
       invariants: function () { return partie ? SIM.invariants(partie.e) : []; }
     };
   }
+
+  if (window.JEL_AFFICHE) { dessinerAffiche(); return; }
+  if (window.JEL_APERCU) { ouvrirApercu(Number(window.JEL_APERCU) || 1); return; }
+  ecranTitre();
+
 })();

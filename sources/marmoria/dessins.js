@@ -115,7 +115,7 @@
 
   // --- Sol -----------------------------------------------------------------
   function peindreHerbe(ctx, P, v) {
-    sol(ctx, P, 0, 0, 1, 1, C.herbe[v & 3]);
+    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, C.herbe[v & 3]); // léger débord : pas de liseré entre cases au zoom progressif
     for (var k = 0; k < 6; k++) {
       var a = hachage(v, k), b = hachage(k, v + 7);
       var p = P(0.15 + a * 0.7, 0.15 + b * 0.7);
@@ -124,7 +124,7 @@
     }
   }
   function peindrePrairie(ctx, P, f) {
-    sol(ctx, P, 0, 0, 1, 1, teinte(C.prairie, 0.9 + f * 0.06));
+    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, teinte(C.prairie, 0.9 + f * 0.06));
     ctx.strokeStyle = teinte(C.prairie, 0.78 + f * 0.05); ctx.lineWidth = 1;
     for (var k = 1; k < 4; k++) {
       var a = P(0.12, k / 4), b = P(0.88, k / 4);
@@ -132,7 +132,7 @@
     }
   }
   function peindreEau(ctx, P, fr) {
-    sol(ctx, P, 0, 0, 1, 1, C.eau);
+    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, C.eau);
     ctx.strokeStyle = C.eauClair; ctx.lineWidth = 1;
     for (var k = 0; k < 2; k++) {
       var o = ((fr + k * 2) % 4) / 4;
@@ -300,23 +300,52 @@
       var m = P(2.5, 0.5, 0);
       ellipse(ctx, m[0], m[1] - 6 * murs, 10, 8 * murs + 2, '#e0bf52');
     },
-    grenier: function (ctx, P) {
+    // Grenier : une grande ouverture de façade laisse voir le tas de grain, et des sacs
+    // s'alignent devant la porte : le remplissage se lit sans ouvrir le panneau (0 à 4).
+    grenier: function (ctx, P, t, etat) {
+      var n = etat.niveau || 0, hg = 3 + 17 * n / 4;
       sol(ctx, P, 0.05, 0.05, 2.95, 2.95, teinte(C.pierre, 1.0));
       boite(ctx, P, 0.25, 0.25, 2.75, 2.75, 0, 26, '#e3cf9e');
+      // Ouverture (intérieur sombre), puis le grain jusqu'à la hauteur du stock.
+      poly(ctx, [P(0.55, 2.75, 2), P(2.45, 2.75, 2), P(2.45, 2.75, 21), P(0.55, 2.75, 21)], '#3b2a1c');
+      if (n > 0) {
+        poly(ctx, [P(0.55, 2.75, 2), P(2.45, 2.75, 2), P(2.45, 2.75, hg), P(1.5, 2.75, hg + 2), P(0.55, 2.75, hg)], '#e6bd45');
+        ctx.strokeStyle = '#c9982c'; ctx.lineWidth = 1;
+        for (var r = 1; r < n * 2; r++) { var a = P(0.65, 2.75, 2 + r * 2), b = P(2.35, 2.75, 2 + r * 2); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+      }
+      // Poteaux de l'ouverture.
+      ctx.fillStyle = teinte(C.bois, 0.85);
+      [0.55, 1.18, 1.82, 2.45].forEach(function (u) { var a = P(u, 2.75, 0), b = P(u, 2.75, 22); ctx.fillRect(a[0] - 1.5, b[1], 3, a[1] - b[1]); });
       toit(ctx, P, 0.25, 0.25, 2.75, 2.75, 26, 18, C.alim, 'u');
-      ctx.fillStyle = teinte(C.bois, 0.6);
-      for (var k = 0; k < 3; k++) { var a = P(0.7 + k * 0.7, 2.75, 0); ctx.fillRect(a[0] - 3, a[1] - 14, 6, 13); }
-      var s = P(2.75, 1.5, 0); ctx.fillRect(s[0] - 2, s[1] - 18, 5, 6);
+      var w = P(2.75, 1.5, 0); ctx.fillStyle = teinte(C.bois, 0.6); ctx.fillRect(w[0] - 2, w[1] - 18, 5, 6);
+      // Sacs devant la façade : un par quart de remplissage.
+      for (var k = 0; k < n; k++) {
+        var q = P(0.75 + k * 0.5, 2.9, 0);
+        ellipse(ctx, q[0], q[1] - 4, 5, 5.5, '#d9c08a');
+        ellipse(ctx, q[0], q[1] - 9, 2.5, 1.5, '#a8844a');
+      }
     },
+    // Marché : 4 cagettes alignées devant les étals, pleines ou vides : une par quart du stock.
     marche: function (ctx, P, t, etat) {
+      var n = etat.niveau || 0;
       sol(ctx, P, 0.05, 0.05, 1.95, 1.95, teinte(C.pierre, 1.08));
       var couleurs = ['#c24a3a', '#e0b13c', '#3f86b8', '#5b9c45'];
-      [[0.25, 0.25], [1.05, 0.25], [0.25, 1.05], [1.05, 1.05]].forEach(function (q, k) {
-        boite(ctx, P, q[0] + 0.1, q[1] + 0.1, q[0] + 0.6, q[1] + 0.6, 0, 6, C.boisC);
-        toit(ctx, P, q[0], q[1], q[0] + 0.7, q[1] + 0.7, 12, 5, couleurs[k], 'v');
-        ctx.fillStyle = teinte(C.bois, 0.7); var a = P(q[0], q[1] + 0.7, 0); ctx.fillRect(a[0] - 1, a[1] - 12, 2, 12);
-        if (etat.stock) { var b = P(q[0] + 0.35, q[1] + 0.7, 6); cercle(ctx, b[0], b[1], 2.5, k % 2 ? '#e8c34a' : '#a3c34a'); }
+      [[0.25, 0.2], [1.05, 0.2], [0.25, 0.9], [1.05, 0.9]].forEach(function (q, k) {
+        boite(ctx, P, q[0] + 0.1, q[1] + 0.1, q[0] + 0.6, q[1] + 0.55, 0, 6, C.boisC);
+        toit(ctx, P, q[0], q[1], q[0] + 0.7, q[1] + 0.65, 12, 5, couleurs[k], 'v');
+        ctx.fillStyle = teinte(C.bois, 0.7); var a = P(q[0], q[1] + 0.65, 0); ctx.fillRect(a[0] - 1, a[1] - 12, 2, 12);
       });
+      var produits = [['#e8c34a', '#d9a93a', '#f0cf72'], ['#a3c34a', '#7fa83a', '#c24a3a'], ['#e07a3a', '#e8c34a', '#c9982c'], ['#b8d45a', '#e8c34a', '#a05a2c']];
+      for (var k = 0; k < 4; k++) {
+        var u0 = 0.2 + k * 0.42;
+        boite(ctx, P, u0, 1.62, u0 + 0.3, 1.9, 0, 6, '#9a6b3a');
+        var c = P(u0 + 0.15, 1.76, 6);
+        if (k < n) {
+          cercle(ctx, c[0] - 3, c[1], 2.8, produits[k][0]);
+          cercle(ctx, c[0] + 3, c[1], 2.8, produits[k][1]);
+          cercle(ctx, c[0], c[1] - 2.5, 2.8, produits[k][2]);
+        } else poly(ctx, [P(u0 + 0.04, 1.66, 6), P(u0 + 0.26, 1.66, 6), P(u0 + 0.26, 1.86, 6), P(u0 + 0.04, 1.86, 6)], '#4a3220');
+      }
     },
     temple_ceres: function (ctx, P) {
       sol(ctx, P, 0.05, 0.05, 1.95, 1.95, teinte(C.marbre, 0.94));
@@ -514,7 +543,7 @@
       else if (type === 'route') { peindreRoute(ctx, P, 10, false); }
       else if (type === 'deblayer') { peindreArbre(ctx, P, 0); ctx.strokeStyle = '#b03a2e'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(12, haut - 10); ctx.lineTo(52, haut + 26); ctx.stroke(); }
       else if (type === 'barriere') { peindreRoute(ctx, P, 10, false); PEINTRES.barriere(ctx, P); }
-      else if (PEINTRES[type]) PEINTRES[type](ctx, P, tt, { actif: 1, plein: 1, frame: 0, axe: 'u', eau: 1, prog: 0.8, stock: 1 });
+      else if (PEINTRES[type]) PEINTRES[type](ctx, P, tt, { actif: 1, plein: 1, frame: 0, axe: 'u', eau: 1, prog: 0.8, niveau: 3 });
       return c;
     }
   };
