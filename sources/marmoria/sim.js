@@ -826,6 +826,29 @@
     versionCarte(e);
   }
 
+  // Cases d'aqueduc en eau (pour le dessin) : reliées, de proche en proche, à un réservoir plein.
+  // Lecture seule, sans rien changer à l'état ; cache recalculé quand la carte change.
+  function aqueducsEnEau(e) {
+    if (e._aqEau && e._aqEauV === e._v) return e._aqEau;
+    var N = e.N, g = new Uint8Array(N * N), q = [], x, y, i;
+    e.batiments.forEach(function (b) {
+      if (b.type !== 'reservoir' || !b.plein) return;
+      for (y = b.y - 1; y <= b.y + b.t; y++) for (x = b.x - 1; x <= b.x + b.t; x++) {
+        var bord = (x === b.x - 1 || x === b.x + b.t) !== (y === b.y - 1 || y === b.y + b.t);
+        if (!bord || !dedans(e, x, y)) continue;
+        i = ix(e, x, y);
+        if (e.aqueduc[i] && !g[i]) { g[i] = 1; q.push(i); }
+      }
+    });
+    while (q.length) {
+      i = q.pop(); x = i % N; y = (i - x) / N;
+      var vs = [y > 0 ? i - N : -1, x < N - 1 ? i + 1 : -1, y < N - 1 ? i + N : -1, x > 0 ? i - 1 : -1];
+      for (var k = 0; k < 4; k++) { var j = vs[k]; if (j >= 0 && e.aqueduc[j] && !g[j]) { g[j] = 1; q.push(j); } }
+    }
+    e._aqEau = g; e._aqEauV = e._v;
+    return g;
+  }
+
   // ------------------------------------------------------------------------
   // Attractivité (section 5.3) : grille de -100 à +100, recalculée chaque jour et après
   // chaque construction. Chaque source donne v à son contact, puis décroît linéairement
@@ -2492,6 +2515,7 @@
     calculerEau: calculerEau,
     repartirTravail: repartirTravail,
     calculerAttractivite: calculerAttractivite,
+    aqueducsEnEau: aqueducsEnEau,
     attractiviteDe: attractiviteDe,
     emplacements: emplacements,
     placeDans: placeDans,

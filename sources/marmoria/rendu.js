@@ -221,6 +221,7 @@
     var cx = this.cam.x, cy = this.cam.y, hw = W / 2, hh = H / 2, marge = 70 * z;
     function ecranTuile(rx, ry) { return [((rx - ry) * 32 - cx) * z + hw, ((rx + ry) * 16 - cy) * z + hh]; }
     var calque = this.calque;
+    var aqEau = SIM.aqueducsEnEau(e); // cases d'aqueduc reliées à un réservoir plein
 
     // 1. Sol : terrain et routes.
     var rx, ry, p, x, y, i, xy;
@@ -248,6 +249,8 @@
       if (calque === 'eau') {
         var c = e.eauFontaine[i] ? 'rgba(30,90,200,0.45)' : e.eauPuits[i] ? 'rgba(120,190,255,0.4)' : null;
         if (c) this.poser(DS.losange(c, c, zc), p[0], p[1]);
+        // Canalisations (section 17.3) : l'aqueduc à plat, bleu en eau, gris à sec.
+        if (e.aqueduc[i]) { var ca2 = aqEau[i] ? '#1f5fc0' : '#8a8478'; this.poser(DS.losange('aq' + ca2, ca2, zc), p[0], p[1]); }
       }
     }
 
@@ -268,7 +271,8 @@
     }
 
     // 3. Objets par diagonales (ordre de profondeur).
-    var aqueducPlein = e.batiments.some(function (bb) { return bb.type === 'reservoir' && bb.plein; });
+    // Aqueduc relié à cette case (aqueduc ou réservoir), en coordonnées de la carte.
+    var relieAq = function (q) { if (q[0] < 0 || q[1] < 0 || q[0] >= N || q[1] >= N) return false; var j = q[1] * N + q[0]; if (e.aqueduc[j]) return true; var bj = e.bat[j] && SIM.batiment(e, e.bat[j]); return !!bj && bj.type === 'reservoir'; };
     var icones = [];
     for (var d = rxa + rya; d <= rxb + ryb; d++) {
       var r0 = Math.max(rxa, d - ryb), r1 = Math.min(rxb, d - rya);
@@ -300,10 +304,10 @@
           else if (tt === T.ROCHERS) this.poser(DS.rocher((x + y) % 3, zc), p[0], p[1]);
         }
         if (e.aqueduc[i] && !calque) {
-          var va = this.detourner(rx + 1, ry), vb = this.detourner(rx - 1, ry);
-          var lie = function (q) { return q[0] >= 0 && q[1] >= 0 && q[0] < N && q[1] < N && (e.aqueduc[q[1] * N + q[0]] || (e.bat[q[1] * N + q[0]] && SIM.batiment(e, e.bat[q[1] * N + q[0]]).type === 'reservoir')); };
-          var axe = (lie(va) || lie(vb)) ? 'u' : 'v';
-          this.poser(DS.batiment('aqueduc', 1, { axe: axe, eau: aqueducPlein ? 1 : 0, cle: axe + (aqueducPlein ? 1 : 0) }, zc), p[0], p[1]);
+          // Voisins reliés dans le sens de l'affichage (1 nord, 2 est, 4 sud, 8 ouest), comme les routes.
+          var ma = (relieAq(this.detourner(rx, ry - 1)) ? 1 : 0) | (relieAq(this.detourner(rx + 1, ry)) ? 2 : 0) | (relieAq(this.detourner(rx, ry + 1)) ? 4 : 0) | (relieAq(this.detourner(rx - 1, ry)) ? 8 : 0);
+          var we = aqEau[i] ? 1 : 0, ro = e.route[i] ? 1 : 0;
+          this.poser(DS.batiment('aqueduc', 1, { masque: ma, eau: we, route: ro, cle: ma + ':' + we + ro }, zc), p[0], p[1]);
         }
         if (e.route[i] === R.BARRIERE && !calque) this.poser(DS.batiment('barriere', 1, { cle: '' }, zc), p[0], p[1]);
         var lw = bucket.get(ry * N + rx);

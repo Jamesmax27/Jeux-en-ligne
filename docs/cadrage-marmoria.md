@@ -1297,3 +1297,16 @@ Constats de jeu (joueur automatique, à confirmer par une séance réelle) :
 - Les errants allant au hasard (4.2), les maisons de niveau 9 à 12 perdent par moments un service et redescendent, sauf si leurs services sont regroupés et retenus par des barrières (4.4) : c'est ce que fait la ville d'exemple. Le niveau 12 est atteint, puis tenu par intermittence.
 
 Publication : toujours pas avant la décision de la section 22.2 (fin du lot 3).
+
+### 23.5 Retours du propriétaire : aqueducs et réservoirs (24 novembre 2026)
+
+Signalé : « problèmes visuels avec les aqueducs et les réservoirs ». Défauts trouvés et corrigés (`version` 4) :
+
+1. L'aqueduc ne connaissait que deux directions : coudes, embranchements en T et croix restaient disjoints. Il se dessine maintenant comme les routes, d'après ses voisins reliés (aqueduc ou réservoir) dans les 4 directions de l'affichage : une pile au centre de chaque case, un bras vers chaque voisin, une arche à cheval sur la limite des cases.
+2. Le canal était peint au niveau du sol, au pied des piles, et le dessus restait vide (des murs creux avec une bande bleue en bas). Le canal court maintenant au sommet, d'un seul tenant, rebord de pierre et eau.
+3. Tous les aqueducs montraient de l'eau dès qu'un réservoir de la ville était plein, même ceux qui n'étaient reliés à rien. Seuls ceux reliés, de proche en proche, à un réservoir plein sont en eau (`MM_SIM.aqueducsEnEau`, lecture seule) ; les autres montrent un canal sec.
+4. Le réservoir paraissait enfoncé dans le sol : son dallage était peint après ses murs et les recouvrait. C'est désormais un bassin de pierre à pilastres, à la hauteur du canal de l'aqueduc (qui s'y déverse au niveau du rebord), eau sous le rebord, fond de terre sèche quand il est vide.
+5. Au-dessus d'une route, l'aqueduc droit passe sur une seule grande arche, et la rue reste visible dessous.
+6. Le calque « Eau » montre maintenant les canalisations (section 17.3) : l'aqueduc à plat, bleu en eau, gris à sec.
+
+Vérifié dans Chromium : coudes, T, croix, croisement de route, réservoir vide et aqueduc sec, dans les 4 rotations, aux zooms 0,5 et 2, icônes du menu « Eau », calque « Eau » ; aucune erreur dans la console. Contrôles du site et tests de la simulation verts ; images du jeu refaites.

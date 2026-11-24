@@ -629,6 +629,65 @@
     boite(ctx, P, m, f - 0.06, f, f, hp, hp + 3, C.marbre); boite(ctx, P, f - 0.06, m, f, f, hp, hp + 3, C.marbre);
   }
 
+  // --- Aqueduc ----------------------------------------------------------------
+  var H_EAU = 18;              // hauteur du canal de l'aqueduc et du rebord des réservoirs
+  var AQ = 0.15;               // demi-largeur de l'aqueduc (en cases)
+  // Ouverture d'arche dans une face verticale : l'axe court de lo à hi (coordonnée le long de la
+  // face), centre c, demi-portée a ; la clé de voûte monte à haut. fixe : l'autre coordonnée.
+  // long = 'u' : face v = fixe ; long = 'v' : face u = fixe.
+  function arche(ctx, P, long, fixe, c, a, haut, lo, hi, couleur) {
+    var pts = [], n = 14, pied = haut * 0.45, k, s, h;
+    var pt = function (s, h) { return long === 'u' ? P(s, fixe, h) : P(fixe, s, h); };
+    var courbe = function (s) { var x = (s - c) / a; return pied + (haut - pied) * Math.sqrt(Math.max(0, 1 - x * x)); };
+    var s0 = Math.max(lo, c - a), s1 = Math.min(hi, c + a);
+    if (s1 <= s0) return;
+    pts.push(pt(s0, 0));
+    for (k = 0; k <= n; k++) { s = s0 + (s1 - s0) * k / n; h = courbe(s); pts.push(pt(s, h)); }
+    pts.push(pt(s1, 0));
+    poly(ctx, pts, couleur);
+  }
+  function peindreAqueduc(ctx, P, m, eau, route) {
+    var H = H_EAU, a0 = 0.5 - AQ, a1 = 0.5 + AQ, pierre = C.pierreF, sombre = 'rgba(48,40,28,0.62)';
+    var droitU = m === 10, droitV = m === 5;
+    // Un bras : boîte du centre vers un bord, avec la moitié d'arche du côté du bord.
+    var bras = function (u0, v0, u1, v1, long, bordArche) {
+      boite(ctx, P, u0, v0, u1, v1, 0, H, pierre, nuance(pierre, 1.12));
+      if (long === 'u') arche(ctx, P, 'u', v1, bordArche, 0.3, H - 5, u0, u1, sombre);
+      else arche(ctx, P, 'v', u1, bordArche, 0.3, H - 5, v0, v1, sombre);
+    };
+    // Canal sur le dessus : rebord de pierre clair, puis l'eau (ou le fond sec) d'un seul tenant,
+    // du centre vers chaque côté relié.
+    var r = 0.055, w0 = a0 + r, w1 = a1 - r, fond = eau ? C.eau : '#7d6c52', clair = nuance(pierre, 1.2);
+    var dalle = function (u0, v0, u1, v1, c) { poly(ctx, [P(u0, v0, H), P(u1, v0, H), P(u1, v1, H), P(u0, v1, H)], c); };
+    var canal = function (cotes) {
+      dalle(a0, a0, a1, a1, clair);
+      if (cotes & 1) dalle(a0, 0, a1, a0, clair);
+      if (cotes & 8) dalle(0, a0, a0, a1, clair);
+      if (cotes & 2) dalle(a1, a0, 1, a1, clair);
+      if (cotes & 4) dalle(a0, a1, a1, 1, clair);
+      dalle(w0, w0, w1, w1, fond);
+      if (cotes & 1) dalle(w0, 0, w1, 0.5, fond);
+      if (cotes & 8) dalle(0, w0, 0.5, w1, fond);
+      if (cotes & 2) dalle(0.5, w0, 1, w1, fond);
+      if (cotes & 4) dalle(w0, 0.5, w1, 1, fond);
+    };
+    if (route && (droitU || droitV)) {
+      // Au-dessus d'une route : une seule grande arche, la rue passe dessous.
+      if (droitU) { boite(ctx, P, 0, a0, 1, a1, 0, H, pierre, nuance(pierre, 1.12)); arche(ctx, P, 'u', a1, 0.5, 0.36, H - 3, 0, 1, sombre); }
+      else { boite(ctx, P, a0, 0, a1, 1, 0, H, pierre, nuance(pierre, 1.12)); arche(ctx, P, 'v', a1, 0.5, 0.36, H - 3, 0, 1, sombre); }
+      canal(m);
+      return;
+    }
+    // Ombre au sol, puis bras de l'arrière (nord, ouest), pile, bras de l'avant (est, sud).
+    ellipse(ctx, P(0.5, 0.5)[0], P(0.5, 0.5)[1] + 2, 12, 5, 'rgba(30,30,20,0.18)');
+    if (m & 1) bras(a0, 0, a1, a0, 'v', 0);
+    if (m & 8) bras(0, a0, a0, a1, 'u', 0);
+    boite(ctx, P, a0 - 0.02, a0 - 0.02, a1 + 0.02, a1 + 0.02, 0, H, nuance(pierre, 0.96), nuance(pierre, 1.12));
+    if (m & 2) bras(a1, a0, 1, a1, 'u', 1);
+    if (m & 4) bras(a0, a1, a1, 1, 'v', 1);
+    canal(m); // un aqueduc isolé garde un petit bassin au sommet de sa pile
+  }
+
   // --- Bâtiments ------------------------------------------------------------
   var PEINTRES = {
     puits: function (ctx, P) {
@@ -655,31 +714,54 @@
         ctx.beginPath(); ctx.moveTo(b[0], b[1] - 22); ctx.quadraticCurveTo(b[0] + 8 + o, b[1] - 24, b[0] + 10, b[1] - 5); ctx.stroke();
       }
     },
+    // Réservoir : bassin de pierre plein (murs à la hauteur du canal de l'aqueduc, H_EAU), rebord,
+    // eau sous le rebord ; vide : fond de terre sèche, plus bas.
     reservoir: function (ctx, P, t, etat) {
-      boite(ctx, P, 0.1, 0.1, 2.9, 2.9, 0, 14, C.pierre, false);
-      sol(ctx, P, 0.1, 0.1, 2.9, 2.9, teinte(C.pierre, 1.12));
-      poly(ctx, [P(0.4, 0.4, 14), P(2.6, 0.4, 14), P(2.6, 2.6, 14), P(0.4, 2.6, 14)], etat.plein ? C.eau : '#8c8068');
+      var H = H_EAU, ep = 0.24, i0 = 0.1 + ep, i1 = 2.9 - ep;
+      sol(ctx, P, 0.02, 0.02, 2.98, 2.98, nuance(C.pierre, 0.88));
+      boite(ctx, P, 0.1, 0.1, 2.9, 2.9, 0, H, C.pierre, nuance(C.pierre, 1.14));
+      // Pilastres sur les deux faces visibles.
+      ctx.fillStyle = nuance(C.pierre, 0.78);
+      for (var k = 1; k < 6; k++) {
+        var f = 0.1 + k * 2.8 / 6, a1 = P(f, 2.9, 0), a2 = P(f, 2.9, H), b1 = P(2.9, f, 0), b2 = P(2.9, f, H);
+        ctx.fillRect(a1[0] - 1, a2[1], 2, a1[1] - a2[1]);
+        ctx.fillRect(b1[0] - 1, b2[1], 2, b1[1] - b2[1]);
+      }
+      // Intérieur : murs du fond (ombre), puis l'eau ou le fond sec, coupés par le rebord.
+      var bord = [P(i0, i0, H), P(i1, i0, H), P(i1, i1, H), P(i0, i1, H)];
+      poly(ctx, bord, nuance(C.pierre, 0.6));
+      ctx.save();
+      ctx.beginPath(); ctx.moveTo(bord[0][0], bord[0][1]); for (var j = 1; j < 4; j++) ctx.lineTo(bord[j][0], bord[j][1]); ctx.closePath(); ctx.clip();
       if (etat.plein) {
+        poly(ctx, [P(i0, i0, H - 4), P(i1, i0, H - 4), P(i1, i1, H - 4), P(i0, i1, H - 4)], C.eau);
         ctx.strokeStyle = C.eauClair; ctx.lineWidth = 1;
-        for (var k = 0; k < 3; k++) { var a = P(0.8 + k * 0.5, 1.2 + (etat.frame % 2) * 0.2, 14), bb = P(1.3 + k * 0.5, 1.2 + (etat.frame % 2) * 0.2, 14); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(bb[0], bb[1]); ctx.stroke(); }
-      }
-      [[0.1, 0.1], [2.9, 0.1], [2.9, 2.9], [0.1, 2.9]].forEach(function (q) { var a = P(q[0], q[1], 14); cercle(ctx, a[0], a[1] - 2, 4, C.marbre); });
-    },
-    aqueduc: function (ctx, P, t, etat) {
-      // Canal sur piliers ; orientation d'après les voisins (axe 'u' ou 'v').
-      var axe = etat.axe, h = 22;
-      if (axe === 'u') {
-        boite(ctx, P, 0, 0.38, 1, 0.62, 0, h, C.pierreF, false);
-        sol(ctx, P, 0, 0.38, 1, 0.62, etat.eau ? C.eau : C.pierre);
-        var a = P(0.5, 0.62, 0), b = P(0.5, 0.62, h - 6);
-        ctx.fillStyle = 'rgba(60,50,30,0.55)'; ctx.beginPath(); ctx.ellipse(a[0], (a[1] + b[1]) / 2 + 3, 7, 9, 0, Math.PI, 0); ctx.lineTo(a[0] + 7, a[1]); ctx.lineTo(a[0] - 7, a[1]); ctx.fill();
-        poly(ctx, [P(0, 0.38, h), P(1, 0.38, h), P(1, 0.62, h), P(0, 0.62, h)], null, teinte(C.pierreF, 0.8));
+        for (var r = 0; r < 4; r++) {
+          var o = (etat.frame % 2) * 0.15, a = P(i0 + 0.3 + r * 0.45 + o, i0 + 0.5 + r * 0.38, H - 4), bb = P(i0 + 0.75 + r * 0.45 + o, i0 + 0.5 + r * 0.38, H - 4);
+          ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(bb[0], bb[1]); ctx.stroke();
+        }
       } else {
-        boite(ctx, P, 0.38, 0, 0.62, 1, 0, h, C.pierreF, false);
-        sol(ctx, P, 0.38, 0, 0.62, 1, etat.eau ? C.eau : C.pierre);
-        var c = P(0.62, 0.5, 0), d = P(0.62, 0.5, h - 6);
-        ctx.fillStyle = 'rgba(60,50,30,0.55)'; ctx.beginPath(); ctx.ellipse(c[0], (c[1] + d[1]) / 2 + 3, 7, 9, 0, Math.PI, 0); ctx.lineTo(c[0] + 7, c[1]); ctx.lineTo(c[0] - 7, c[1]); ctx.fill();
+        poly(ctx, [P(i0, i0, H - 12), P(i1, i0, H - 12), P(i1, i1, H - 12), P(i0, i1, H - 12)], '#8c7a5c');
+        ctx.strokeStyle = '#6f5f45'; ctx.lineWidth = 1;
+        for (var c2 = 0; c2 < 5; c2++) {
+          var d1 = P(i0 + 0.3 + hachage(c2, 3) * 1.6, i0 + 0.3 + hachage(5, c2) * 1.6, H - 12), d2 = P(i0 + 0.5 + hachage(c2, 9) * 1.6, i0 + 0.4 + hachage(7, c2) * 1.6, H - 12);
+          ctx.beginPath(); ctx.moveTo(d1[0], d1[1]); ctx.lineTo(d2[0], d2[1]); ctx.stroke();
+        }
       }
+      ctx.restore();
+      // Bornes de marbre aux quatre coins du rebord.
+      [[0.22, 0.22], [2.78, 0.22], [2.78, 2.78], [0.22, 2.78]].forEach(function (q) {
+        var a = P(q[0], q[1], H), b2 = P(q[0], q[1], H + 7);
+        ctx.fillStyle = nuance(C.marbre, 0.9); ctx.fillRect(a[0] - 3, b2[1], 6, a[1] - b2[1]);
+        ellipse(ctx, b2[0], b2[1], 4, 2, C.marbre);
+      });
+    },
+    // Aqueduc : une pile au centre de la case, prolongée vers chaque voisin relié (aqueduc ou
+    // réservoir : etat.masque, 1 nord, 2 est, 4 sud, 8 ouest, dans le sens de l'affichage), avec une
+    // arche à cheval sur la limite des cases ; le canal court en haut, plein d'eau seulement s'il
+    // est relié à un réservoir plein (etat.eau). Au-dessus d'une route (etat.route), une seule
+    // grande arche laisse passer la rue.
+    aqueduc: function (ctx, P, t, etat) {
+      peindreAqueduc(ctx, P, etat.masque !== undefined ? etat.masque : (etat.axe === 'v' ? 5 : 10), !!etat.eau, !!etat.route);
     },
     barriere: function (ctx, P) {
       var a = P(0.2, 0.5, 0), b = P(0.8, 0.5, 0);
