@@ -273,7 +273,9 @@ jobs:
           fi
           nb=$(printf '%s\n' $jeux | { grep -c . || true; })
           # 6 depuis le test sur ordinateur (novembre 2026) : à 4, un lot de tous les jeux dépassait 40 minutes.
-          LOTS_MAX=6
+          # 8 depuis le 24 novembre 2026 : à 6, avec 217 jeux, un lot sur six dépassait encore 40 minutes
+          # (lots de 29 à plus de 40 minutes) ; seuls les passages qui testent tous les jeux sont concernés.
+          LOTS_MAX=8
           lots=$(( nb < LOTS_MAX ? nb : LOTS_MAX ))
           if [ "$lots" -gt 0 ]; then lots_json="[$(seq -s, 0 $((lots - 1)))]"; else lots_json="[]"; fi
           {
