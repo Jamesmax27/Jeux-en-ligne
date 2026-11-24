@@ -12,6 +12,8 @@
 
 > **Amis, présence, « Rejoindre », classement entre amis** : toute IA qui y touche lit d'abord **`docs/consigne-amis.md`** (consigne et choix retenus, section 8) ; valeurs réglables dans le bloc « Amis » de `public/profil-reglages.js`.
 
+> **Marmoria** (city-builder de cité romaine, développé par lots à partir de `sources/marmoria/`) : toute IA qui touche à `games/marmoria/`, `sources/marmoria/` ou `scripts/derogations-jeux.mjs` lit d'abord **`docs/cadrage-marmoria.md`** (cahier des charges du propriétaire, section 23 : organisation du code, réalisé et écarts par lot). On ne modifie jamais `games/marmoria/index.html` à la main : `node sources/marmoria/assembler.mjs`, puis `node scripts/tester-marmoria.mjs`.
+
 > Ce fichier donne à toute IA (Claude Code, Claude, autres agents) le contexte nécessaire pour travailler sur ce dépôt.
 > À placer à la racine du dépôt. Claude Code le lit automatiquement sous le nom `CLAUDE.md` ; pour d'autres IA, une copie nommée `AGENTS.md` peut être ajoutée.
 
@@ -632,6 +634,10 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
   - Cartes symétriques tirées de la graine pour 2 à 4 joueurs (chaque part identique) ; chacun se voit en turquoise (vue de l'état où son camp et le camp 0 sont échangés) ; « Tu es éliminé » (regarder ou quitter) ; bilan par camp.
   - Branché sur le moteur temps réel commun sans le changer : `"temps_reel": true`, `"places": 4`, blocs `jel-tr` et `jel-sim` (données + simulation) ; la campagne et le bac à sable passent toujours par le pilote local, inchangés ; `version` 9 ; textes dans les 5 langues.
   - Testé : `tester-temps-reel.mjs poussiere-d-empire` (complet et `--navigateur`), `tester-poussiere-d-empire.mjs`, 135 cartes contrôlées, parties entre robots dans chaque mode et chaque monde, captures dans Edge (téléphone). Reste (propriétaire) : essai à plusieurs téléphones après la fusion (le Worker se redéploie seul).
+- « Marmoria », city-builder de cité romaine, lot 1 « Ville vivante » — fait (branche `jeu-manuel/marmoria`, 24 novembre 2026), cahier des charges du propriétaire (`docs/cadrage-marmoria.md`, 5 lots ; réalisé, mesures et 14 écarts en section 23).
+  - Sources dans `sources/marmoria/` (données, simulation déterministe à pas fixe, villes d'exemple, dessins, rendu isométrique, sons, interface, textes des 5 langues), assemblées par `node sources/marmoria/assembler.mjs` dans `games/marmoria/` ; tests `scripts/tester-marmoria.mjs` (formules, invariants, déterminisme sur 10 000 ticks, sauvegarde, tutoriels gagnés par un joueur automatique, `--endurance`, `--perf`), branchés dans `validate.yml` avec un contrôle « jeu assemblé à jour des sources ».
+  - Trois dérogations décidées par le propriétaire (section 19.6) codées dans `scripts/derogations-jeux.mjs`, lu par `validate-games.mjs` et `apercus-jeu.mjs` : pas de limite de poids (repère 4 Mo, signalé au-delà), 17 niveaux (17 cartes, 51 étoiles), jeu en paysage (essais tactiles et images de téléphone en 844 × 390 ; téléphone tenu en portrait : affichage pivoté).
+  - Contenu : missions 1 (Ostie) et 2 (Pompéi) jouables avec leurs tutoriels, 15 autres « en préparation ». Non publié : la pull request reste ouverte jusqu'à la décision de publication (cahier, section 22.2, fin du lot 3). Reste : séance de jeu réelle, images par seconde sur téléphone, bande des images de la page du jeu pour des captures en paysage, lot 2.
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 
 *Mettre à jour la section 14 à chaque étape terminée.*

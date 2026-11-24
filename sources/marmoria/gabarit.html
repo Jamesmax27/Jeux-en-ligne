@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marmoria</title>
+<script type="application/json" id="jel-i18n-textes" data-coin="aucun">{}</script>
+<script id="jel-i18n"></script>
+<script id="jel-sauvegarde"></script>
+<script id="jel-stockage"></script>
+<!--
+  Marmoria — city-builder de cité romaine (docs/cadrage-marmoria.md).
+  Fichier assemblé par sources/marmoria/assembler.mjs à partir de sources/marmoria/ :
+  ne pas le modifier à la main (sauf les blocs jel-* remplis par scripts/i18n-jeu.mjs).
+  Trois couches séparées : simulation (mm-sim, données mm-donnees), rendu (mm-rendu,
+  dessins mm-dessins), interface (mm-interface).
+-->
+<style>
+  :root {
+    --marbre: #f4efe4; --marbre-f: #e5dccb; --encre: #2b2118; --encre-d: #5b4a3a;
+    --terre: #b9573a; --terre-f: #8f3c27; --or: #d9a93a; --or-c: #f0cf72; --nuit: #1f2a33;
+    --vert: #4f8a3c; --rouge: #b03a2e; --bleu: #3f7fb5;
+    --barre: 48px; --r: 10px;
+    --ombre: 0 4px 16px rgba(20, 12, 4, .35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #3a4a2e; color: var(--encre);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; touch-action: none; overscroll-behavior: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  #app { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: hidden; }
+  /* Téléphone tenu en portrait : l'affichage pivote d'un quart de tour (section 17.5). */
+  html.pivote #app { transform-origin: top left; transform: rotate(90deg) translateY(-100%); }
+  #carte { position: absolute; left: 0; top: 0; display: block; touch-action: none; }
+  [hidden] { display: none !important; }
+
+  /* --- Barre d'état ----------------------------------------------------------- */
+  #barre { position: absolute; left: 0; right: 0; top: 0; height: var(--barre); display: flex; align-items: center; gap: 4px;
+    padding: 2px 6px; background: linear-gradient(#f6f0e2, #e8dcc4); border-bottom: 2px solid var(--terre-f); box-shadow: var(--ombre); z-index: 5; }
+  .ico { min-width: 44px; height: 44px; border: 0; background: transparent; border-radius: 8px; display: inline-flex; align-items: center;
+    justify-content: center; padding: 0 6px; gap: 4px; font-weight: 600; font-size: 15px; }
+  .ico:hover, .ico:focus-visible { background: rgba(185, 87, 58, .14); outline: none; }
+  .ico.actif { background: var(--terre); color: #fff; }
+  .ico svg { width: 26px; height: 26px; flex: none; }
+  .info { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 15px; white-space: nowrap; padding: 0 4px; }
+  .info svg { width: 22px; height: 22px; }
+  .info.negatif { color: var(--rouge); }
+  #v-date { font-weight: 600; color: var(--encre-d); }
+  .vitesse { display: inline-flex; align-items: center; background: rgba(255, 255, 255, .55); border-radius: 10px; }
+  #v-vitesse { min-width: 40px; text-align: center; font-weight: 700; font-size: 15px; }
+  .espace { flex: 1; }
+  .langue-hote { display: inline-flex; }
+
+  /* --- Menu de construction ------------------------------------------------- */
+  #menu-cat { position: absolute; left: 6px; top: calc(var(--barre) + 8px); display: grid; grid-template-columns: 50px; gap: 4px; z-index: 4;
+    max-height: calc(100% - var(--barre) - 16px); }
+  #menu-cat.deux { grid-template-columns: 50px 50px; }
+  .cat { width: 50px; height: 46px; border-radius: 10px; border: 2px solid var(--terre-f); background: var(--marbre); box-shadow: var(--ombre);
+    display: flex; align-items: center; justify-content: center; padding: 0; }
+  .cat svg { width: 30px; height: 30px; }
+  .cat.actif { background: var(--terre); color: #fff; }
+  .cat.signal { animation: signal 1s ease-in-out infinite; }
+  @keyframes signal { 50% { box-shadow: 0 0 0 5px var(--or-c), var(--ombre); } }
+  #sous-menu { position: absolute; top: calc(var(--barre) + 8px); left: 66px; width: min(300px, 46vw); max-height: calc(100% - var(--barre) - 16px);
+    overflow-y: auto; background: var(--marbre); border: 2px solid var(--terre-f); border-radius: var(--r); box-shadow: var(--ombre); z-index: 4; padding: 6px; }
+  #menu-cat.deux ~ #sous-menu { left: 122px; }
+  #sous-menu h3 { margin: 2px 6px 6px; font-size: 16px; }
+  .choix { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; border: 0; border-radius: 8px; background: transparent; text-align: left; padding: 4px 6px; }
+  .choix:hover, .choix:focus-visible { background: rgba(185, 87, 58, .12); outline: none; }
+  .choix.actif { background: rgba(185, 87, 58, .25); }
+  .choix canvas { width: 44px; height: 44px; flex: none; }
+  .choix .nom { flex: 1; font-weight: 600; font-size: 15px; line-height: 1.2; }
+  .choix .cout { font-weight: 700; color: var(--terre-f); white-space: nowrap; font-size: 14px; }
+  .choix.verrou { opacity: .45; }
+
+  /* --- Panneaux --------------------------------------------------------------- */
+  #panneau { position: absolute; right: 6px; top: calc(var(--barre) + 8px); width: min(340px, 50vw); max-height: calc(100% - var(--barre) - 16px); overflow-y: auto;
+    background: var(--marbre); border: 2px solid var(--terre-f); border-radius: var(--r); box-shadow: var(--ombre); z-index: 6; padding: 10px 12px; font-size: 15px; }
+  #panneau h2 { margin: 0 40px 6px 0; font-size: 19px; }
+  #panneau h3 { margin: 10px 0 4px; font-size: 16px; }
+  #panneau p { margin: 4px 0; line-height: 1.35; }
+  #panneau .fermer { position: absolute; right: 4px; top: 4px; }
+  .ligne { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--marbre-f); }
+  .ok::before { content: "✔ "; color: var(--vert); font-weight: 700; }
+  .ko::before { content: "✘ "; color: var(--rouge); font-weight: 700; }
+  .etat-ko { color: var(--rouge); font-weight: 700; }
+  .etat-ok { color: var(--vert); font-weight: 700; }
+  .jauge { height: 10px; background: var(--marbre-f); border-radius: 5px; overflow: hidden; margin: 4px 0; }
+  .jauge > i { display: block; height: 100%; background: var(--or); }
+  .reglage { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 6px 0; }
+  .reglage .ico { border: 2px solid var(--terre-f); background: #fff; font-size: 20px; }
+  .msg { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--marbre-f); }
+  .msg.critique { color: var(--rouge); font-weight: 600; }
+  .msg span { flex: 1; }
+
+  /* --- Mini-carte, validation, bulles ------------------------------------------ */
+  #mini { position: absolute; right: 6px; bottom: 6px; width: 200px; height: 100px; background: rgba(31, 42, 51, .75); border: 2px solid var(--terre-f);
+    border-radius: 8px; z-index: 4; touch-action: none; }
+  #valider { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; z-index: 6;
+    background: var(--marbre); border: 2px solid var(--terre-f); border-radius: 12px; padding: 6px; box-shadow: var(--ombre); }
+  .gros { min-height: 48px; min-width: 110px; border-radius: 10px; border: 0; font-weight: 700; font-size: 17px; padding: 0 16px; }
+  .gros.oui { background: var(--vert); color: #fff; }
+  .gros.non { background: #e3d6bf; }
+  .gros.or { background: linear-gradient(#f0cf72, #d9a93a); color: var(--encre); box-shadow: 0 3px 0 #9c7420; }
+  #v-cout { font-weight: 700; padding: 0 8px; }
+  #b-annuler-derniere { position: absolute; left: 50%; bottom: 78px; transform: translateX(-50%); z-index: 6; }
+  #bulle { position: absolute; z-index: 7; pointer-events: none; background: rgba(31, 42, 51, .9); color: #fff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 14px; white-space: nowrap; }
+  #toasts { position: absolute; left: 50%; top: calc(var(--barre) + 8px); transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 6; pointer-events: none; width: min(460px, 60vw); }
+  .toast { background: rgba(31, 42, 51, .92); color: #fff; border-radius: 10px; padding: 8px 12px; font-weight: 600; font-size: 15px; animation: arrivee .3s ease-out; pointer-events: auto; }
+  .toast.critique { background: rgba(160, 40, 30, .95); }
+  @keyframes arrivee { from { transform: translateY(-10px); opacity: 0; } }
+
+  /* --- Tutoriel ----------------------------------------------------------------- */
+  #tuto { position: absolute; left: 66px; right: 216px; bottom: 8px; margin: 0 auto; max-width: 560px; z-index: 5; background: var(--marbre);
+    border: 2px solid var(--or); border-radius: 12px; box-shadow: var(--ombre); padding: 8px 10px 8px 12px; display: flex; gap: 8px; align-items: center; font-size: 15px; }
+  #tuto .texte { flex: 1; line-height: 1.3; }
+  #tuto .progres { font-weight: 800; color: var(--terre-f); white-space: nowrap; }
+  #tuto.fete { animation: fete .8s ease-out; }
+  @keyframes fete { 30% { transform: scale(1.04); background: var(--or-c); } }
+  #main { position: absolute; z-index: 8; width: 44px; height: 44px; pointer-events: none; animation: main 1s ease-in-out infinite; }
+  @keyframes main { 50% { transform: translate(-8px, -6px); } }
+
+  /* --- Écrans hors partie --------------------------------------------------------- */
+  #ecran { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 12px; }
+  #ecran:empty { display: none; }
+  #ecran.voile { background: rgba(20, 14, 8, .55); }
+  .carte-ecran { background: var(--marbre); border: 3px solid var(--terre-f); border-radius: 16px; box-shadow: var(--ombre); padding: 16px 20px;
+    max-width: min(720px, 96%); max-height: 96%; overflow-y: auto; text-align: center; }
+  .carte-ecran h1 { margin: 0 0 4px; font-size: 26px; }
+  .carte-ecran h2 { margin: 6px 0; font-size: 20px; }
+  .carte-ecran p { margin: 6px 0; line-height: 1.4; font-size: 16px; }
+  .boutons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+  .titre-jeu { text-align: center; color: #fff; text-shadow: 0 3px 12px rgba(0, 0, 0, .55); max-width: 680px; }
+  .titre-jeu h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(44px, 9vw, 88px); letter-spacing: .08em; margin: 0; color: #fff8e6; }
+  .titre-jeu .sous { font-size: clamp(17px, 2.6vw, 22px); font-weight: 700; margin: 2px 0 8px; color: var(--or-c); }
+  .titre-jeu .consigne { font-size: clamp(15px, 2.1vw, 18px); line-height: 1.4; margin: 6px auto 14px; max-width: 600px; background: rgba(31, 24, 16, .55); padding: 8px 12px; border-radius: 10px; }
+  .titre-jeu .age { font-size: 15px; font-weight: 700; margin-top: 10px; }
+  .titre-coin { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; }
+  .titre-coin .ico { background: rgba(255, 248, 230, .9); }
+  .grille-missions { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; text-align: left; }
+  .mission { border: 2px solid var(--terre-f); border-radius: 10px; background: #fff; padding: 8px; min-height: 76px; display: flex; flex-direction: column; gap: 2px; }
+  .mission .num { font-size: 13px; color: var(--encre-d); font-weight: 700; }
+  .mission .nom { font-weight: 800; font-size: 16px; }
+  .mission .etoiles { color: var(--or); font-size: 18px; letter-spacing: 2px; }
+  .mission.ferme { opacity: .5; background: var(--marbre-f); cursor: default; }
+  .mission.prochaine { box-shadow: 0 0 0 3px var(--or-c); }
+  .objectifs { display: inline-block; text-align: left; margin: 6px 0; }
+  .grosses-etoiles { font-size: 44px; color: var(--or); letter-spacing: 6px; }
+  .grosses-etoiles .vide { color: #cbbfa8; }
+  .emplacements { display: grid; gap: 6px; text-align: left; }
+  .emplacement { display: flex; align-items: center; gap: 8px; border: 1px solid var(--marbre-f); border-radius: 8px; padding: 6px 8px; background: #fff; }
+  .emplacement span { flex: 1; }
+  .geste { width: 200px; height: 120px; margin: 6px auto; position: relative; background: #7fa84a; border-radius: 12px; overflow: hidden; }
+  .geste .doigt { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: rgba(255, 255, 255, .85); box-shadow: 0 0 0 4px rgba(255,255,255,.35); }
+  .geste.g1 .doigt { left: 40px; top: 42px; animation: glisse 1.8s ease-in-out infinite; }
+  .geste.g2 .doigt.a { left: 70px; top: 42px; animation: pince-a 1.8s ease-in-out infinite; }
+  .geste.g2 .doigt.b { left: 100px; top: 42px; animation: pince-b 1.8s ease-in-out infinite; }
+  .geste.g3 .doigt { left: 30px; top: 70px; animation: trace 2.2s ease-in-out infinite; }
+  .geste .route { position: absolute; left: 38px; top: 82px; height: 12px; background: #c9bfa8; border-radius: 3px; animation: route 2.2s ease-in-out infinite; }
+  @keyframes glisse { 50% { transform: translate(110px, 0); } }
+  @keyframes pince-a { 50% { transform: translate(-40px, 0); } }
+  @keyframes pince-b { 50% { transform: translate(40px, 0); } }
+  @keyframes trace { 10% { transform: translate(0, 0); } 70%, 100% { transform: translate(130px, 0); } }
+  @keyframes route { 0%, 10% { width: 0; } 70%, 100% { width: 130px; } }
+
+  /* Petits écrans en paysage (844 × 390) : barre plus compacte, menu sur deux colonnes. */
+  @media (max-height: 520px) {
+    :root { --barre: 46px; }
+    #mini { width: 150px; height: 75px; }
+    #tuto { right: 162px; font-size: 14px; }
+    .carte-ecran { padding: 10px 14px; }
+    .carte-ecran h1 { font-size: 22px; }
+  }
+  @media (max-width: 700px) { .masque-etroit { display: none !important; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="carte"></canvas>
+  <div id="hud" hidden>
+    <header id="barre">
+      <button class="ico" id="b-menu" data-i18n-aria="ui.pause" data-i18n-title="ui.pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
+      <span class="info" id="i-tresor" data-i18n-title="hud.tresor"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="16" rx="8" ry="3.5" fill="#d9a93a" stroke="#8a6414"/><ellipse cx="12" cy="12" rx="8" ry="3.5" fill="#e8bd4a" stroke="#8a6414"/><ellipse cx="12" cy="8" rx="8" ry="3.5" fill="#f0cf72" stroke="#8a6414"/></svg><span id="v-tresor"></span></span>
+      <span class="info" id="i-pop" data-i18n-title="hud.population"><svg viewBox="0 0 24 24"><circle cx="8" cy="7" r="3" fill="#8f3c27"/><path d="M3 20c0-5 2-8 5-8s5 3 5 8z" fill="#b9573a"/><circle cx="16" cy="8" r="2.6" fill="#5b4a3a"/><path d="M12 20c0-4 1.8-7 4-7s5 3 5 7z" fill="#7a6650"/></svg><span id="v-pop"></span></span>
+      <span class="info masque-etroit" id="v-date"></span>
+      <span class="vitesse">
+        <button class="ico" id="b-lent" data-i18n-aria="ui.plusLent" data-i18n-title="ui.plusLent"><svg viewBox="0 0 24 24"><path d="M5 11h14v2H5z" fill="currentColor"/></svg></button>
+        <span id="v-vitesse"></span>
+        <button class="ico" id="b-vite" data-i18n-aria="ui.plusVite" data-i18n-title="ui.plusVite"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" fill="currentColor"/></svg></button>
+      </span>
+      <span class="espace"></span>
+      <button class="ico" id="b-calque" data-i18n-aria="ui.calques" data-i18n-title="ui.calques"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z" fill="#4a86c0"/><path d="M3 12l9 5 9-5" fill="none" stroke="#b9573a" stroke-width="2"/><path d="M3 16l9 5 9-5" fill="none" stroke="#d9a93a" stroke-width="2"/></svg></button>
+      <button class="ico" id="b-conseil" data-i18n-aria="ui.conseil" data-i18n-title="ui.conseil"><svg viewBox="0 0 24 24"><path d="M4 20h16v-2H4zM6 17h2V9H6zm5 0h2V9h-2zm5 0h2V9h-2zM3 8h18L12 3z" fill="#5a7397"/></svg></button>
+      <button class="ico" id="b-journal" data-i18n-aria="ui.journal" data-i18n-title="ui.journal"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2" fill="#efe2c4" stroke="#8f3c27" stroke-width="1.6"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#8f3c27" stroke-width="1.6"/></svg></button>
+      <button class="ico" id="b-tourner" data-i18n-aria="ui.tourner" data-i18n-title="ui.tourner"><svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-7 7h2a5 5 0 1 0 5-5v3L7 6l5-4z" fill="currentColor"/></svg></button>
+      <button class="ico masque-etroit" id="b-zoomm" data-i18n-aria="ui.zoomMoins" data-i18n-title="ui.zoomMoins"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 10h6M15 15l5 5" stroke="currentColor" stroke-width="2"/></svg></button>
+      <button class="ico masque-etroit" id="b-zoomp" data-i18n-aria="ui.zoomPlus" data-i18n-title="ui.zoomPlus"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 10h6M10 7v6M15 15l5 5" stroke="currentColor" stroke-width="2"/></svg></button>
+      <button class="ico" id="b-son" data-i18n-aria="ui.son" data-i18n-title="ui.son"></button>
+      <span class="langue-hote" id="langue-barre"></span>
+    </header>
+    <nav id="menu-cat"></nav>
+    <section id="sous-menu" hidden></section>
+    <div id="tuto" hidden><span class="texte" id="tuto-texte"></span><span class="progres" id="tuto-progres"></span></div>
+    <div id="main" hidden><svg viewBox="0 0 44 44" width="44" height="44"><path d="M8 22c0-3 4-3 4 0V8c0-3 5-3 5 0v10c0-3 5-3 5 0v2c0-3 5-3 5 0v2c0-3 5-3 5 0v8c0 7-5 10-11 10s-9-3-11-6z" fill="#fff8e6" stroke="#5b3a22" stroke-width="2" stroke-linejoin="round"/></svg></div>
+    <aside id="panneau" hidden></aside>
+    <canvas id="mini" width="400" height="200"></canvas>
+    <div id="valider" hidden><span id="v-cout"></span><button class="gros non" id="b-annul" data-i18n="outil.annuler"></button><button class="gros oui" id="b-ok" data-i18n="outil.valider"></button></div>
+    <button class="gros or" id="b-annuler-derniere" hidden data-i18n="outil.annulerDerniere"></button>
+    <div id="bulle" hidden></div>
+    <div id="toasts"></div>
+  </div>
+  <div id="ecran"></div>
+</div>
+<script type="application/json" id="mm-donnees">/*MM:DONNEES*/</script>
+<script type="application/json" id="mm-villes">/*MM:VILLES*/</script>
+<script id="mm-sim">/*MM:SIM*/</script>
+<script id="mm-exemples">/*MM:EXEMPLES*/</script>
+<script id="mm-dessins">/*MM:DESSINS*/</script>
+<script id="mm-rendu">/*MM:RENDU*/</script>
+<script id="mm-audio">/*MM:AUDIO*/</script>
+<script id="mm-interface">/*MM:INTERFACE*/</script>
+</body>
+</html>

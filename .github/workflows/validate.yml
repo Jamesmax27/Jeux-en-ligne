@@ -130,6 +130,9 @@ on:
       - "public/temps-reel/**"
       - "scripts/tester-temps-reel.mjs"
       - "scripts/tester-poussiere-d-empire.mjs"
+      - "scripts/tester-marmoria.mjs"
+      - "scripts/derogations-jeux.mjs"
+      - "sources/marmoria/**"
       - "scripts/idees.mjs"
       - "scripts/inspirations.mjs"
       - "scripts/tester-inspirations.mjs"
@@ -165,6 +168,7 @@ jobs:
       nuage: ${{ steps.quoi.outputs.nuage }}
       inspirations: ${{ steps.quoi.outputs.inspirations }}
       poussiere: ${{ steps.quoi.outputs.poussiere }}
+      marmoria: ${{ steps.quoi.outputs.marmoria }}
       jeux: ${{ steps.quoi.outputs.jeux }}
       lots: ${{ steps.quoi.outputs.lots }}
     steps:
@@ -214,7 +218,7 @@ jobs:
           tous=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then tous=1; fi
           # Modules communs de traduction et de sauvegarde : recopiés dans chaque jeu, donc tous les jeux sont concernés.
-          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|slugs-jeux\.mjs|classes-jeu\.mjs|jaquette-sans-texte\.mjs|apercus-jeu\.mjs|tester-sauvegarde\.mjs|tester-stockage\.mjs)|public/i18n/i18n\.js|public/save\.js|public/stockage(-lanceur)?\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|slugs-jeux\.mjs|classes-jeu\.mjs|jaquette-sans-texte\.mjs|apercus-jeu\.mjs|tester-sauvegarde\.mjs|tester-stockage\.mjs|derogations-jeux\.mjs)|public/i18n/i18n\.js|public/save\.js|public/stockage(-lanceur)?\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
           # Textes, taxonomie, gabarits (textes des catégories compris), générateur
           # des pages et pages du site : le site est testé avec un seul jeu.
           site=0
@@ -247,6 +251,12 @@ jobs:
           poussiere=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then poussiere=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^(games/poussiere-d-empire/|scripts/tester-poussiere-d-empire\.mjs$)'; then poussiere=1; fi
+          # Marmoria (docs/cadrage-marmoria.md) : simulation de la cité testée en Node, jeu assemblé à jour des sources.
+          marmoria=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then marmoria=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(games/marmoria/|sources/marmoria/|scripts/tester-marmoria\.mjs$)'; then marmoria=1; fi
+          # Sources de Marmoria modifiées : le jeu assemblé passe aussi au robot.
+          if printf '%s\n' "$fichiers" | grep -q '^sources/marmoria/'; then ids=$(printf '%s\n' $ids marmoria | sort -u | tr '\n' ' '); fi
           # Référencement de tout le site : tout ce qui précède, plus les règles et
           # le vérificateur du référencement (sans navigateur).
           seo=0
@@ -280,6 +290,7 @@ jobs:
             echo "nuage=$nuage"
             echo "inspirations=$inspirations"
             echo "poussiere=$poussiere"
+            echo "marmoria=$marmoria"
             echo "jeux=$jeux"
             echo "lots=$lots_json"
           } >> "$GITHUB_OUTPUT"
@@ -503,6 +514,16 @@ jobs:
       - name: Contrôler Poussière d'Empire
         if: needs.quoi.outputs.poussiere == '1'
         run: node scripts/tester-poussiere-d-empire.mjs --missions --cartes
+
+      # Marmoria (docs/cadrage-marmoria.md, sections 19.5 et 21) : simulation en Node, sans navigateur
+      # (données, formules, invariants, déterminisme, sauvegarde, tutoriels gagnés par un joueur automatique),
+      # puis le jeu réassemblé depuis sources/marmoria/ doit être identique à games/marmoria/.
+      - name: Contrôler Marmoria
+        if: needs.quoi.outputs.marmoria == '1'
+        run: |
+          node scripts/tester-marmoria.mjs
+          node sources/marmoria/assembler.mjs
+          git diff --exit-code -- games/marmoria/index.html games/marmoria/game.json || { echo "games/marmoria/ n'est pas à jour : lancer node sources/marmoria/assembler.mjs"; exit 1; }
 
       # Icônes des regroupements : le bloc généré de public/style.css doit
       # correspondre aux dessins de scripts/icones/sources (sans navigateur).
