@@ -88,6 +88,9 @@
         (x.artistes || []).forEach(function (a) { exige(!!(d.marcheurs || {})[a], k + ' : artiste inconnu ' + a); });
       }
       if (x.genre === 'ecole_art') exige(!!(d.marcheurs || {})[x.forme], k + ' : artiste formé inconnu');
+      // Un bâtiment qui se passe de route peut être hors de portée des préfets et des ingénieurs :
+      // il ne doit donc ni brûler ni s'abîmer (décision du 25 novembre 2026).
+      if (x.sansRoute) exige(!(x.feu > 0) && !(x.dommages > 0), k + ' : un bâtiment sans route ne prend ni feu ni dommages');
       if (x.attractivite) exige(Array.isArray(x.attractivite) && x.attractivite.length === 2, k + ' : attractivité');
     });
     exige(Array.isArray(d.missions) && d.missions.length === 17, '17 missions attendues');
@@ -1746,15 +1749,26 @@
   // Quotidien d'un bâtiment (étalé : chaque bâtiment a son tick du jour)
   // ------------------------------------------------------------------------
 
+  // Hausse quotidienne du risque d'incendie et des dommages d'un bâtiment (sections 10.1 et 10.2).
+  // Zéro pour ce qui ne brûle ni ne s'use : routes, jardins, aqueducs, tentes (dommages) et tout
+  // bâtiment qui se passe de route (puits, fontaine, réservoir, statues, oracle).
+  function tauxRisques(b) {
+    var d = def(b);
+    if (d.genre === 'ruines' || d.genre === 'incendie') return { feu: 0, dom: 0 };
+    if (estMaison(b)) return b.hab > 0 ? { feu: niveauDef(b).feu, dom: niveauDef(b).dommages } : { feu: 0, dom: 0 };
+    return { feu: d.feu || 0, dom: d.dommages || 0 };
+  }
+
   function quotidien(e, b) {
     var d = def(b), m = mission(e), diff = D.difficultes[e.difficulte] || D.difficultes.normal;
     // Risques (feu, effondrement), si la mission les active.
     if (e.risques && d.genre !== 'ruines' && d.genre !== 'incendie') {
-      var climat = D.regles.feu.climats[m.climat] || 1;
-      var hf = estMaison(b) ? (b.hab > 0 ? niveauDef(b).feu : 0) : (d.feu || 0);
-      var hd = estMaison(b) ? (b.hab > 0 ? niveauDef(b).dommages : 0) : (d.dommages || 0);
-      b.feu = Math.min(10000, b.feu + Math.round(hf * 100 * climat * diff.degradation));
-      b.dom = Math.min(10000, b.dom + Math.round(hd * 100 * diff.degradation));
+      var climat = D.regles.feu.climats[m.climat] || 1, tx = tauxRisques(b);
+      var hf = tx.feu, hd = tx.dom;
+      // Sans risque, le compteur reste à zéro (une ancienne sauvegarde où un puits s'était usé
+      // ne le fait donc plus s'effondrer).
+      b.feu = hf > 0 ? Math.min(10000, b.feu + Math.round(hf * 100 * climat * diff.degradation)) : 0;
+      b.dom = hd > 0 ? Math.min(10000, b.dom + Math.round(hd * 100 * diff.degradation)) : 0;
       var sf = D.regles.feu.seuil * 100, sd = D.regles.effondrement.seuil * 100;
       if (b.feu > sf && hasard(e, 10000) < b.feu - sf) { enflammer(e, b); return; }
       if (b.dom > sd && hasard(e, 10000) < b.dom - sd) { effondrer(e, b); return; }
@@ -3338,6 +3352,7 @@
     consigne: consigne,
     besoinsMarche: besoinsMarche,
     pointsSpectacle: pointsSpectacle,
+    tauxRisques: tauxRisques,
     couverture: couverture,
     travailCategories: travailCategories,
     calculerSante: calculerSante,

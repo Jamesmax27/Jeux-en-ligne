@@ -246,6 +246,39 @@ section('Formules (une au moins par règle chiffrée du lot 1)');
 }
 
 {
+  // Bâtiments qui se passent de route (puits, fontaine, réservoir, statues, oracle…) : aucun préfet ni
+  // ingénieur n'est sûr de les atteindre, ils ne brûlent ni ne s'abîment (décision du 25 novembre 2026).
+  const sansRoute = Object.keys(D.batiments).filter((k) => D.batiments[k].sansRoute);
+  const fautifs = sansRoute.filter((k) => D.batiments[k].feu > 0 || D.batiments[k].dommages > 0);
+  ok(!fautifs.length, `bâtiments sans route : ni feu ni dommages (${sansRoute.length} vérifiés${fautifs.length ? ', fautifs : ' + fautifs.join(', ') : ''})`);
+  try { nouveauMonde((d) => { d.batiments.puits.dommages = 0.3; }); ok(false, 'données : un puits qui s\'abîme est accepté'); } catch { ok(true, ''); }
+  // Sur la carte, loin de toute route : un puits, une fontaine, un réservoir, une statue et un oracle
+  // marqués comme très abîmés (ancienne sauvegarde) ne s'effondrent pas en deux ans et leurs compteurs
+  // retombent à zéro ; une préfecture, elle, s'use de 0,3 par jour.
+  const e = etatVide();
+  const poses = [];
+  let dx = 0;
+  for (const type of ['puits', 'fontaine', 'reservoir', 'statue_petite', 'oracle']) {
+    const t = D.batiments[type].taille;
+    const [x, y] = caseLibre(e, dx, -14);
+    dx = x - 10 + t + 2;
+    const b = O.creerBatiment(e, type, x, y);
+    b.feu = 9500; b.dom = 9500;
+    poses.push(b);
+  }
+  const [xp, yp] = caseLibre(e, dx + 2, -1);
+  const pref = O.creerBatiment(e, 'prefecture', xp, yp);
+  ok(poses.every((b) => !sim.acces(e, b).length), 'les bâtiments essayés sont loin de toute route');
+  for (let j = 0; j < D.temps.joursParMois * D.temps.moisParAn * 2; j++) {
+    poses.forEach((b) => { if (e._index.get(b.id)) O.quotidien(e, b); });
+    if (j === 0) ok(pref.dom === 0 && (O.quotidien(e, pref), pref.dom === 30), `préfecture : dommages +0,3 par jour (obtenu ${pref.dom / 100})`);
+  }
+  const debout = poses.filter((b) => e._index.get(b.id) === b);
+  ok(debout.length === poses.length, `sans route : aucun effondrement ni incendie en 2 ans (${debout.length} sur ${poses.length} debout)`);
+  ok(debout.every((b) => b.feu === 0 && b.dom === 0), 'sans route : compteurs de feu et de dommages ramenés à zéro');
+}
+
+{
   // Une tente entourée d'autres logements reçoit quand même ses immigrants : on entre
   // dans une maison depuis une route à 2 cases ou moins (demande du propriétaire du 24 novembre 2026).
   const e = sim.nouvelle('ostie', { libre: true, attractivite: false });

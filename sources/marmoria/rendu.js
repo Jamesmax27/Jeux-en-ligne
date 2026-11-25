@@ -365,8 +365,8 @@
       }
       var centre = [sx, sy + b.t * 16 * z];
       var v = null, coulCol = null;
-      if (calque === 'feu' && d.genre !== 'ruines' && d.genre !== 'incendie' && (b.type !== 'logement' || b.hab > 0)) { v = b.feu / 100; coulCol = couleurRisque(v); }
-      else if (calque === 'dommages' && d.genre !== 'ruines' && d.genre !== 'incendie' && (b.type !== 'logement' || b.hab > 0)) { v = b.dom / 100; coulCol = couleurRisque(v); }
+      if (calque === 'feu' && SIM.tauxRisques(b).feu > 0) { v = b.feu / 100; coulCol = couleurRisque(v); }
+      else if (calque === 'dommages' && SIM.tauxRisques(b).dom > 0) { v = b.dom / 100; coulCol = couleurRisque(v); }
       else if (calque === 'stocks' && remplissage(b) !== null) { v = Math.min(100, remplissage(b) * 100); coulCol = couleurRisque(100 - v); }
       else if (valeurMaison(e, b, calque) !== null) { v = valeurMaison(e, b, calque); coulCol = couleurRisque(100 - v); }
       else if (calque === 'problemes' && SIM.cause(e, b)) { v = 100; coulCol = '#c94a3a'; }

@@ -411,7 +411,7 @@ Chaque bâtiment accumule un risque d'incendie et des dommages ; seuls les passa
 
 ### 10.1 Incendie
 
-- Compteur de risque de 0 à 100 par bâtiment. Hausse quotidienne selon le type : 1 pour tentes et cabanes, 0,6 pour ateliers et entrepôts, 0,3 pour le reste, 0 pour routes, jardins, murailles, aqueducs, puits.
+- Compteur de risque de 0 à 100 par bâtiment. Hausse quotidienne selon le type : 1 pour tentes et cabanes, 0,6 pour ateliers et entrepôts, 0,3 pour le reste, 0 pour routes, jardins, murailles, aqueducs et tout bâtiment qui se passe de route (puits, fontaines, réservoirs, statues, oracle ; décision du 25 novembre 2026, section 23.7).
 - Coefficient de climat par mission : 0,75 au nord, 1 au centre, 1,5 en zone aride.
 - Le passage d'un préfet remet le compteur à 0.
 - Au-delà de 80, le bâtiment prend feu chaque jour avec une probabilité de (risque − 80) %.
@@ -421,7 +421,7 @@ Chaque bâtiment accumule un risque d'incendie et des dommages ; seuls les passa
 
 ### 10.2 Effondrement
 
-- Compteur de dommages de 0 à 100, hausse quotidienne de 0,3 pour tous les bâtiments sauf tentes, routes, jardins, murailles et aqueducs.
+- Compteur de dommages de 0 à 100, hausse quotidienne de 0,3 pour tous les bâtiments sauf tentes, routes, jardins, murailles, aqueducs et bâtiments qui se passent de route (puits, fontaines, réservoirs, statues, oracle) : loin d'une route, aucun ingénieur ne peut les atteindre (décision du 25 novembre 2026, section 23.7).
 - Le passage d'un ingénieur le remet à 0.
 - Au-delà de 80, même tirage que pour le feu ; le bâtiment devient un tas de gravats.
 
@@ -1478,3 +1478,40 @@ Constats de jeu (gouverneur automatique, à confirmer par une séance réelle) :
 - Dans la partie de Narbo observée, les dieux sans temple restent vers 28 (la jalousie les tire vers le bas) : ils lancent des avertissements sans tomber en colère tant que le gouverneur organise des fêtes.
 
 Publication (section 22.2) : c'est la fin du lot 3, la décision revient au propriétaire. Le jeu se joue de bout en bout sur 5 missions sans guerre. Il reste une mission non éprouvée (Massalia) et aucune séance de jeu réelle du lot 3.
+
+### 23.7 Retours du propriétaire : bâtiments sans route (25 novembre 2026)
+
+Signalé : « Les puits, les fontaines et les réservoirs ne sont pas censés être sensibles aux dommages. Contrôler l'ensemble de ces points, surtout les bâtiments qui n'ont pas besoin d'accès à la route. »
+
+Constat, bâtiment par bâtiment : douze types se posent sans route (`sansRoute` dans `donnees.json`). Cinq ne prenaient aucun risque : route, barrière, aqueduc, jardin, place. Sept s'usaient pourtant de 0,3 par jour :
+- le puits, la fontaine et le réservoir ;
+- les trois statues ;
+- l'oracle, qui pouvait en plus brûler.
+
+Un préfet ou un ingénieur sert les bâtiments à 2 cases ou moins de sa route. Posé plus loin, un de ces bâtiments finissait donc par s'effondrer sans que le joueur puisse rien y faire.
+
+Corrigé (`version` 7) :
+
+1. Règle (sections 10.1 et 10.2) : un bâtiment qui se passe de route ne brûle pas et ne s'abîme pas. Les 7 types ci-dessus passent à 0 pour le feu et les dommages.
+2. Garde-fou : la validation des données refuse désormais un bâtiment sans route qui aurait un risque de feu ou de dommages. Un oubli dans une future mission ne passera pas.
+3. Anciennes sauvegardes : le compteur d'un bâtiment qui n'est exposé à aucun risque revient à zéro chaque jour. Un puits déjà abîmé ne s'effondre donc plus.
+4. Interface : le panneau d'un bâtiment n'affiche que les risques qu'il court. Un puits n'affiche ni feu ni dommages ; une maison affiche maintenant ses dommages en plus du feu, sauf les tentes, qui ne s'usent pas. Les calques « Feu » et « Dommages » ne colorent que les bâtiments exposés.
+5. Tests (`tester-marmoria.mjs`) :
+   - aucun bâtiment sans route n'a de risque dans les données ;
+   - des données fautives sont refusées ;
+   - un puits, une fontaine, un réservoir, une statue et un oracle posés loin de toute route, et marqués très abîmés, restent debout deux ans, et leurs compteurs reviennent à zéro ;
+   - une préfecture s'use toujours de 0,3 par jour.
+
+Contrôlé au passage, sans changement nécessaire :
+- les bâtiments qui exigent une route s'usent tous de 0,3 par jour ; les ateliers, greniers et entrepôts brûlent à 0,6 ;
+- les tentes ne s'usent pas et brûlent à 1, comme les cabanes ;
+- une maison peut être à 2 cases d'une route, et un préfet ou un ingénieur sert justement jusqu'à 2 cases de sa route ; les grands bâtiments sont servis dès qu'une de leurs cases est à portée ;
+- un bâtiment qui exige une route et qui l'a perdue reste exposé aux risques : son panneau le signale (« pas de route »), et une route reconstruite permet de le servir de nouveau.
+
+Effet sur le gouverneur automatique (simulation déterministe, mais une ville sans effondrement de puits suit une autre histoire) :
+- Ravenne est gagnée au mois 96 (84 avant), toujours avec 2 étoiles ;
+- Narbo est gagnée au mois 178 (118 avant), avec 1 étoile : la date cible est de 177 ;
+- Massalia n'est toujours pas gagnée.
+
+La règle rend le jeu plus facile : ce retard vient du chemin pris par le gouverneur automatique, que le moindre changement modifie. Le critère du lot 3 reste tenu, puisque Ravenne et Narbo sont toujours gagnées.
+

@@ -712,10 +712,7 @@
     if (d.eauRequise) p.appendChild(ligne(t('info.canalisations'), t(b.actif ? 'ui.oui' : 'ui.non')));
     if (d.genre === 'reservoir') p.appendChild(ligne(t('info.reservoir'), t(b.plein ? 'info.plein' : 'info.vide')));
     if (d.genre === 'incendie') p.appendChild(ligne(t('info.brule'), t('info.jours', { n: b.jours })));
-    if (d.genre !== 'ruines' && d.genre !== 'incendie' && partie.e.risques) {
-      p.appendChild(ligne(t('info.risqueFeu'), nb(b.feu / 100) + ' %'));
-      p.appendChild(ligne(t('info.dommages'), nb(b.dom / 100) + ' %'));
-    }
+    if (partie.e.risques) lignesRisques(p, b);
   }
   // Biens que les maisons peuvent réclamer au marché (lot 2 : poterie, mobilier, huile).
   var BIENS_MAISONS = [];
@@ -764,7 +761,14 @@
       if (!inf.manque.length) p.appendChild(el('p', { classe: 'ok', texte: t('info.bientot') }));
       inf.manque.forEach(function (x) { p.appendChild(el('p', { classe: 'ko', texte: besoinTexte(x.besoin, x.requis) })); });
     }
-    if (partie.e.risques) { p.appendChild(ligne(t('info.risqueFeu'), nb(h.feu / 100) + ' %')); }
+    if (partie.e.risques) lignesRisques(p, h);
+  }
+  // Risque d'incendie et dommages, seulement si le bâtiment y est exposé (un puits, une statue ou
+  // une tente pour les dommages n'affichent rien).
+  function lignesRisques(p, b) {
+    var tx = SIM.tauxRisques(b);
+    if (tx.feu > 0) p.appendChild(ligne(t('info.risqueFeu'), nb(b.feu / 100) + ' %'));
+    if (tx.dom > 0) p.appendChild(ligne(t('info.dommages'), nb(b.dom / 100) + ' %'));
   }
   function remplirMarcheur(p, id) {
     var e = partie.e, w = SIM.marcheur(e, id);
