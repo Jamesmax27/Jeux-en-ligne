@@ -19,14 +19,15 @@
 (function (racine) {
   'use strict';
 
-  var VERSION_ETAT = 3; // 3 : lot 3 (commerce, empereur, cotes, dieux) ; une sauvegarde de version 1 ou 2 est complétée à l'import
+  var VERSION_ETAT = 4; // 4 : lot 4 (armée, âges, criminalité) ; une sauvegarde de version 1 à 3 est complétée à l'import
 
   // Énumérations (codes de couches, pas des règles de jeu).
   var T = { HERBE: 0, PRAIRIE: 1, ARBRES: 2, ROCHERS: 3, EAU: 4 };
   var R = { AUCUNE: 0, ROUTE: 1, BARRIERE: 2, ROME: 3, PLACE: 4 };
   var GENRES = ['maison', 'outil', 'route', 'barriere', 'puits', 'fontaine', 'reservoir', 'aqueduc', 'ferme', 'extraction', 'peche',
-    'atelier', 'grenier', 'entrepot', 'marche', 'service', 'spectacle', 'ecole_art', 'oracle', 'deco', 'place', 'ruines', 'incendie', 'quai'];
-  var EVENEMENTS = ['demande', 'salaireRome', 'prix', 'quota', 'routeFermee', 'nouvelleCite', 'mauvaiseRecolte', 'sitePerdu', 'seisme', 'epidemie'];
+    'atelier', 'grenier', 'entrepot', 'marche', 'service', 'spectacle', 'ecole_art', 'oracle', 'deco', 'place', 'ruines', 'incendie', 'quai',
+    'residence', 'muraille', 'tour', 'porte', 'caserne', 'academie_militaire', 'fort'];
+  var EVENEMENTS = ['demande', 'salaireRome', 'prix', 'quota', 'routeFermee', 'nouvelleCite', 'mauvaiseRecolte', 'sitePerdu', 'seisme', 'epidemie', 'invasion', 'troupes'];
 
   var D = null;          // données validées et préparées
   var MISSIONS = {};     // id → mission
@@ -51,7 +52,7 @@
       exige(typeof r[k] === 'number', 'regles.' + k + ' manquant');
     });
     ['maison', 'immigration', 'emigration', 'humeur', 'travail', 'salaire', 'impot', 'eau', 'feu', 'effondrement', 'marche', 'grenier', 'ferme', 'spectacle', 'vitesses',
-      'extraction', 'atelier', 'entrepot', 'peche', 'attractivite', 'sante', 'commerce', 'empereur', 'cotes', 'dieux'].forEach(function (k) {
+      'extraction', 'atelier', 'entrepot', 'peche', 'attractivite', 'sante', 'commerce', 'empereur', 'cotes', 'dieux', 'ages', 'crime', 'militaire'].forEach(function (k) {
       exige(r[k] && typeof r[k] === 'object', 'regles.' + k + ' manquant');
     });
     exige(Array.isArray(d.maisons) && d.maisons.length === 20, '20 niveaux de maison attendus');
@@ -82,6 +83,8 @@
       if (x.matiere) exige(!!(d.biens || {})[x.matiere], k + ' : matière inconnue ' + x.matiere);
       if (x.genre === 'ferme' || x.genre === 'extraction' || x.genre === 'atelier') exige(x.chargesParAn > 0 && !!x.produit, k + ' : production');
       if (x.genre === 'atelier') exige(!!x.matiere, k + ' : matière');
+      if (x.genre === 'fort') exige(!!((r.militaire || {}).unites || {})[x.unite], k + ' : unité inconnue');
+      if (x.unique) exige(typeof x.unique === 'string', k + ' : « unique » est un nom de groupe');
       if (x.genre === 'extraction') exige(['eau', 'arbres', 'rochers'].indexOf(x.pres) >= 0, k + ' : « pres »');
       if (x.genre === 'spectacle') {
         exige(Array.isArray(x.artistes) && x.artistes.length && Array.isArray(x.points) && x.points.length === x.artistes.length, k + ' : artistes et points');
@@ -93,6 +96,18 @@
       if (x.sansRoute) exige(!(x.feu > 0) && !(x.dommages > 0), k + ' : un bâtiment sans route ne prend ni feu ni dommages');
       if (x.attractivite) exige(Array.isArray(x.attractivite) && x.attractivite.length === 2, k + ' : attractivité');
     });
+    var Mi = r.militaire || {};
+    Object.keys(Mi.factions || {}).forEach(function (f) {
+      var dos = Mi.factions[f].dosage || {}, tot = 0;
+      Object.keys(dos).forEach(function (a) { exige(!!(Mi.ennemis || {})[a], 'faction ' + f + ' : archétype inconnu ' + a); tot += dos[a]; });
+      exige(tot === 100, 'faction ' + f + ' : dosage de 100 %');
+      exige(['proche', 'greniers', 'soldats', 'centre'].indexOf(Mi.factions[f].cible) >= 0, 'faction ' + f + ' : cible');
+    });
+    ['unites', 'ennemis'].forEach(function (g) {
+      Object.keys(Mi[g] || {}).forEach(function (u) { var x = Mi[g][u]; exige(x.pv > 0 && x.degats > 0 && x.portee >= 1 && !!(Mi.vitesses || {})[x.vitesse], g + ' ' + u + ' : caractéristiques'); });
+    });
+    var A = r.ages || {};
+    exige(Array.isArray(A.profilImmigrants) && Array.isArray(A.mortalite) && A.profilImmigrants.length === A.mortalite.length, 'regles.ages : tranches');
     exige(Array.isArray(d.missions) && d.missions.length === 17, '17 missions attendues');
     (d.missions || []).forEach(function (m, i) {
       exige(typeof m.id === 'string', 'mission ' + i + ' : id');
@@ -112,6 +127,8 @@
           if (ev.bien) exige(!!(d.biens || {})[ev.bien], 'mission ' + m.id + ' : événement ' + j + ', bien inconnu');
           if (ev.cite) exige(((m.empire && m.empire.cites) || []).some(function (c) { return c.id === ev.cite; }), 'mission ' + m.id + ' : événement ' + j + ', cité inconnue');
           if (ev.type === 'demande') exige(Number.isInteger(ev.delai) && (ev.bien ? Number.isInteger(ev.charges) : Number.isInteger(ev.deniers)), 'mission ' + m.id + ' : demande ' + j);
+          if (ev.type === 'invasion') exige(!!(Mi.factions || {})[ev.faction] && Number.isInteger(ev.effectif) && ev.effectif >= 8 && ev.effectif <= 150 && Array.isArray(ev.entree), 'mission ' + m.id + ' : invasion ' + j);
+          if (ev.type === 'troupes') exige(Number.isInteger(ev.delai) && Number.isInteger(ev.force) && Array.isArray(ev.pos), 'mission ' + m.id + ' : troupes ' + j);
         });
         (m.tutoriel || []).forEach(function (e, j) {
           exige(typeof e.cle === 'string' && e.condition, 'mission ' + m.id + ' : étape ' + j);
@@ -501,7 +518,11 @@
       divins: {},
       fete: null,
       effets: { neptune: 0, quais: 0, mars: 0, marsBienfait: 0, recolte: 0 },
-      mer: -1
+      mer: -1,
+      // Lot 4 : pyramide des âges, criminalité, armée.
+      ages: null, agesReste: [0, 0], paixEmeutes: 0,
+      unites: [], invasion: null, champ: null, legions: null,
+      invasions: options.invasions !== undefined ? !!options.invasions : !libre
     };
     e.salaireGouv = salaireGouvMax(e);
     ((m.empire && m.empire.cites) || []).forEach(function (c) { e.routes[c.id] = { o: c.ouverte ? 1 : 0, v: c.cachee ? 0 : 1, f: 0, n: {}, x: c.ouverte ? D.regles.commerce.premierDepartJours * D.temps.ticksParJour : 0, qv: {} }; });
@@ -520,7 +541,7 @@
   // Postes du budget (section 11.1). Recettes : impôts, exportations, secours, dons du
   // gouverneur ; dépenses : salaires, constructions, importations, tribut, intérêts, fêtes,
   // salaire du gouverneur, envois à l'empereur.
-  var POSTES = ['impots', 'exports', 'secours', 'dons', 'salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois'];
+  var POSTES = ['impots', 'exports', 'secours', 'dons', 'salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois', 'vols'];
   function nouveauBudget() {
     var b = {};
     POSTES.forEach(function (k) { b[k] = 0; });
@@ -532,6 +553,8 @@
     e.batiments.forEach(function (b) { e._index.set(b.id, b); });
     e._mIndex = new Map();
     e.marcheurs.forEach(function (w) { e._mIndex.set(w.id, w); });
+    e._uIndex = new Map();
+    (e.unites || []).forEach(function (u) { e._uIndex.set(u.id, u); });
     e._acces = new Map();
     e._vRoutes = (e._vRoutes || 0) + 1;
     e._v = (e._v || 0) + 1;
@@ -553,7 +576,10 @@
     var d = D.batiments[type], t = taille || d.taille;
     var b = { id: e.prochainId++, type: type, x: x, y: y, t: t, eff: 0, feu: 0, dom: 0, cpt: 0, m: 0, sortie: 0 };
     switch (d.genre) {
-      case 'maison': b.niv = 0; b.hab = 0; b.att = 0; b.viv = {}; b.svc = {}; b.pts = {}; b.ok = 0; b.manque = 0; b.sansRoute = 0; b.quar = 0; b.bloque = 0; break;
+      case 'maison': b.niv = 0; b.hab = 0; b.att = 0; b.viv = {}; b.svc = {}; b.pts = {}; b.ok = 0; b.manque = 0; b.sansRoute = 0; b.quar = 0; b.bloque = 0; b.crime = 0; break;
+      case 'caserne': b.prog = 0; b.mat = 0; b.matAtt = 0; break;
+      case 'fort': b.moral = 100; b.ordre = { t: 'garde', f: 'carre', i: -1 }; b.att = 0; b.ancre = -1; break;
+      case 'tour': case 'porte': b.cd = 0; break;
       case 'ferme': case 'extraction': b.prog = 0; b.stock = 0; break;
       case 'peche': b.stock = 0; b.mb = 0; b.sansBanc = 0; break;
       case 'quai': b.nav = 0; b.dk = []; break;
@@ -578,6 +604,7 @@
 
   function retirerBatiment(e, b, sansSansAbri) {
     if (estMaison(b) && b.hab > 0 && !sansSansAbri) creerSansAbri(e, ix(e, b.x, b.y), b.hab);
+    if (def(b).genre === 'fort' && e.unites) dissoudre(e, b);
     for (var yy = b.y; yy < b.y + b.t; yy++) for (var xx = b.x; xx < b.x + b.t; xx++) {
       var i = ix(e, xx, yy);
       if (e.bat[i] === b.id) e.bat[i] = 0;
@@ -632,6 +659,21 @@
       if (e.route[i] === R.BARRIERE) return 'occupe';
       return (e.terrain[i] === T.HERBE || e.terrain[i] === T.PRAIRIE) ? null : 'terrain';
     }
+    // Bâtiment unique (sénat, résidence, hippodrome) ; forts limités (section 13.1).
+    if (d.unique && e.batiments.some(function (o) { return def(o).unique === d.unique; })) return 'unique';
+    if (d.genre === 'fort' && e.batiments.filter(function (o) { return def(o).genre === 'fort'; }).length >= D.regles.militaire.fortsMax) return 'fortsMax';
+    // Porte fortifiée : posée en travers d'une route (au moins une case de route, le reste libre).
+    if (d.genre === 'porte') {
+      var nr = 0;
+      for (var py = y; py < y + t; py++) for (var px = x; px < x + t; px++) {
+        i = ix(e, px, py);
+        if (e.bat[i] || e.aqueduc[i]) return 'occupe';
+        if (e.route[i] && e.route[i] !== R.ROUTE) return 'occupe';
+        if (e.route[i]) nr++;
+        else if (e.terrain[i] !== T.HERBE && e.terrain[i] !== T.PRAIRIE) return 'terrain';
+      }
+      return nr ? null : 'pasRoute';
+    }
     for (var yy = y; yy < y + t; yy++) for (var xx = x; xx < x + t; xx++) {
       i = ix(e, xx, yy);
       if (e.bat[i] || e.route[i] || e.aqueduc[i]) return 'occupe';
@@ -643,7 +685,17 @@
     if (d.pres && !pres(e, { x: x, y: y, t: t }, d.pres)) return { eau: 'presEau', arbres: 'presArbres', rochers: 'presRochers' }[d.pres];
     if ((d.genre === 'peche' || d.genre === 'quai') && quaiEau(e, { x: x, y: y, t: t }) < 0) return 'rive';
     if (d.marbre && marbreDispo(e) < d.marbre * D.regles.marbreParCharge) return 'marbre';
+    if (d.genre === 'tour' && !contreMuraille(e, x, y, t)) return 'muraille';
     return null;
+  }
+
+  // Une tour se pose collée à une muraille (une case de muraille touche un côté de l'emprise).
+  function contreMuraille(e, x, y, t) {
+    for (var k = 0; k < t; k++) {
+      var l = [[x + k, y - 1], [x + k, y + t], [x - 1, y + k], [x + t, y + k]];
+      for (var j = 0; j < 4; j++) { var b = batA(e, l[j][0], l[j][1]); if (b && def(b).genre === 'muraille') return true; }
+    }
+    return false;
   }
 
   // Terrain voulu (eau, arbres, rochers) à « presRayon » case(s) ou moins de l'emprise.
@@ -733,6 +785,8 @@
   //   { type: 'present', taille: 0 | 1 | 2 }         (modeste, généreux, somptueux : part de la fortune du gouverneur)
   //   { type: 'renflouer', montant }                 (fortune du gouverneur → trésor)
   //   { type: 'fete', dieu, taille: 'petite' | 'grande' | 'grandiose' }
+  //   { type: 'cohorte', fort, ordre: 'aller', x, y } | { …, ordre: 'rentrer' } | { …, ordre: 'formation', f: 'ligne' | 'colonne' | 'carre' }
+  //   { type: 'envoyer', id, fort }                   (demande de troupes de l'empereur)
 
   function appliquer(e, c) {
     var res = { ok: false, cout: 0, n: 0, raison: null };
@@ -884,6 +938,27 @@
       e.fete = { dieu: c.dieu, taille: c.taille, t: e.tick + G.feteMois * D.ticksParMois };
       noter(e, 'msg.feteOrganisee', { dieu: c.dieu, mois: G.feteMois }, false);
       res.ok = true; res.cout = cout; return res;
+    }
+    if (c.type === 'cohorte') {
+      var fo = e._index.get(c.fort | 0);
+      if (!fo || def(fo).genre !== 'fort') { res.raison = 'cible'; return res; }
+      if (c.ordre === 'aller') {
+        if (!dedans(e, c.x | 0, c.y | 0)) { res.raison = 'horsCarte'; return res; }
+        if (enFuite(e, fo)) { res.raison = 'moral'; return res; }
+        fo.ordre = { t: 'aller', f: fo.ordre.f, i: ix(e, c.x | 0, c.y | 0) };
+      } else if (c.ordre === 'rentrer') fo.ordre = { t: 'garde', f: fo.ordre.f, i: -1 };
+      else if (c.ordre === 'formation' && ['ligne', 'colonne', 'carre'].indexOf(c.f) >= 0) fo.ordre.f = c.f;
+      else { res.raison = 'commande'; return res; }
+      placerCohorte(e, fo);
+      res.ok = true; return res;
+    }
+    if (c.type === 'envoyer') {
+      var dt = null, ft = e._index.get(c.fort | 0);
+      e.demandes.forEach(function (x) { if (x.id === (c.id | 0)) dt = x; });
+      if (!dt || !dt.troupes || dt.etat !== 'ouverte' || !ft || def(ft).genre !== 'fort') { res.raison = 'cible'; return res; }
+      if (!soldatsDe(e, ft).length) { res.raison = 'soldats'; return res; }
+      envoyerTroupes(e, dt, ft);
+      res.ok = true; return res;
     }
     res.raison = 'commande';
     return res;
@@ -1046,7 +1121,7 @@
         if (dedans(e, x, y)) { var c = comp[ix(e, x, y)]; if (c) avecMaison.add(c); }
       }
     });
-    var travailleurs = Math.floor(plebs * Tr.partTravailleurs);
+    var travailleurs = Math.floor(plebs * partActifs(e));
     var demandes = [], total = 0, relies = e._relies = new Set(); // cache : bâtiments reliés aux maisons
     e.batiments.forEach(function (b) {
       var d = def(b);
@@ -1119,6 +1194,7 @@
     if (o) {
       var d = def(o);
       if (o.m === w.id) { o.m = 0; o.cpt = Math.ceil(D.regles.delaiMarcheurJours / Math.max(0.2, taux(o) || 0.2)); }
+      if (o.m2 === w.id) o.m2 = 0;
       if (o.mA === w.id) o.mA = 0;
       if (o.mV === w.id) { o.mV = 0; o.cptV = D.regles.delaiMarcheurJours; }
       if (o.mc === w.id) o.mc = 0;
@@ -1143,6 +1219,8 @@
       if (f && f.pompier === w.id) f.pompier = 0;
     }
     if (w.type === 'navire' && w.cb) { var q = e._index.get(w.cb); if (q && q.nav === w.id) q.nav = 0; }
+    if (w.type === 'voleur' || w.type === 'emeutier') e._crim = Math.max(0, (e._crim || 0) - 1);
+    if (w.type === 'recrue' && w.fort) { var fo = e._index.get(w.fort); if (fo && fo.att > 0) fo.att--; }
     if (w.type === 'docker' && w.nav) { var nv = e._mIndex.get(w.nav); if (nv && nv.att && nv.att[w.cle] > 0) nv.att[w.cle]--; }
   }
 
@@ -1186,10 +1264,10 @@
   function passableErrant(e) { return function (i) { var r = e.route[i]; return r === R.ROUTE || r === R.ROME || r === R.PLACE; }; }
   // Passable pour un bateau : l'eau seulement.
   function passableEau(e) { return function (i) { return e.terrain[i] === T.EAU; }; }
-  function estArtiste(type) { return type === 'acteur' || type === 'gladiateur' || type === 'lion'; }
+  function estArtiste(type) { return type === 'acteur' || type === 'gladiateur' || type === 'lion' || type === 'char'; }
   // Passable hors route : herbe, prairie, arbres, routes ; jamais l'eau, les rochers ou un bâtiment.
   function passableLibre(e) {
-    return function (i) { var t = e.terrain[i]; return !e.bat[i] && t !== T.EAU && t !== T.ROCHERS; };
+    return function (i) { var t = e.terrain[i]; return (!e.bat[i] || e.route[i] !== 0) && t !== T.EAU && t !== T.ROCHERS; };
   }
 
   function suivreChemin(e, w, passable) {
@@ -1258,6 +1336,7 @@
   function servir(e, w) {
     var svc = D.marcheurs[w.type].service, r = D.regles.serviceRayon, o = e._index.get(w.o);
     if (!svc || !o) return;
+    if (svc === 'prefet' && e._crim > 0) arreter(e, w);
     VUS.length = 0;
     for (var y = w.y - r; y <= w.y + r; y++) for (var x = w.x - r; x <= w.x + r; x++) {
       if (!dedans(e, x, y)) continue;
@@ -1268,7 +1347,7 @@
       if (!b) continue;
       var jours = D.regles.serviceJours;
       switch (svc) {
-        case 'prefet': b.feu = 0; break;
+        case 'prefet': b.feu = 0; if (estMaison(b)) b.crime = Math.max(0, (b.crime || 0) - D.regles.crime.prefet); break;
         case 'ingenieur': b.dom = 0; break;
         case 'impot': if (estMaison(b) && b.hab > 0) b.svc.impot = jours; break;
         case 'religion': if (estMaison(b) && b.hab > 0) b.svc['dieu_' + def(o).dieu] = jours; break;
@@ -1355,6 +1434,9 @@
     } else if (w.type === 'caravane') {
       if (w.phase === 'retour') p = parcours(e, [i], passableRoute(e), function (j) { return j === e.entree; }, 8 * N);
       else { var cv = e._index.get(w.cb); if (!cv) return false; p = parcours(e, [i], passableRoute(e), cibleAcces(e, cv), 6 * N); }
+    } else if (w.type === 'voleur' || w.type === 'emeutier') {
+      if (w.phase !== 'fuite') return cibleCriminel(e, w);
+      p = parcours(e, [i], passableLibre(e), function (j) { return j === e.sortie; }, 8 * N);
     } else if (w.type === 'bateau') {
       if (w.phase === 'aller') { var bancs = new Set(e.bancs); p = parcours(e, [i], passableEau(e), function (j) { return bancs.has(j); }, 4 * N); }
       else p = parcours(e, [i], passableEau(e), function (j) { return j === w.quai; }, 4 * N);
@@ -1473,11 +1555,15 @@
       case 'acteur':
       case 'gladiateur':
       case 'lion':
+      case 'char':
         c = e._index.get(w.cb);
         if (c && c.spects && def(c).artistes.indexOf(w.type) >= 0) { c.spects[w.type] = D.regles.spectacle.dureeJours; c.attendus[w.type] = 0; }
         w.cb = 0;
         finir(e, w);
         return;
+      case 'voleur': atteintVoleur(e, w); return;
+      case 'emeutier': atteintEmeutier(e, w); return;
+      case 'recrue': atteintRecrue(e, w); return;
       default:
         if (w.pompier) {
           var f = e._index.get(w.pompier);
@@ -1539,30 +1625,33 @@
     return Math.max(0, Math.min((E.emplacements - pris) * cap, plafond) - mien);
   }
   // Place libre pour g (consigne comprise ; « force » ignore la consigne : rentrée chez soi).
+  // Ateliers et caserne (armes) reçoivent une matière livrée.
+  function recoitMatiere(b) { var g = def(b).genre; return g === 'atelier' || g === 'caserne'; }
+
   function placeDans(b, g, force) {
     if (b.type === 'grenier') {
       if (!estAliment(g) || (!force && !accepte(b, g))) return 0;
       return Math.max(0, D.regles.grenier.capacite - totalStock(b) - b.attendu);
     }
     if (b.type === 'entrepot') return (!force && !accepte(b, g)) ? 0 : placeEntrepot(b, g);
-    if (def(b).genre === 'atelier') return def(b).matiere === g ? Math.max(0, D.regles.atelier.attenteMax * charge() - b.mat - b.matAtt) : 0;
+    if (recoitMatiere(b)) return def(b).matiere === g ? Math.max(0, D.regles.atelier.attenteMax * charge() - b.mat - b.matAtt) : 0;
     return 0;
   }
   function reserver(b, g, q) {
     if (b.type === 'grenier') b.attendu += q;
     else if (b.type === 'entrepot') b.attendus[g] = (b.attendus[g] || 0) + q;
-    else if (def(b).genre === 'atelier') b.matAtt += q;
+    else if (recoitMatiere(b)) b.matAtt += q;
   }
   function liberer(b, g, q) {
     if (b.type === 'grenier') b.attendu = Math.max(0, b.attendu - q);
     else if (b.type === 'entrepot') { var v = Math.max(0, (b.attendus[g] || 0) - q); if (v) b.attendus[g] = v; else delete b.attendus[g]; }
-    else if (def(b).genre === 'atelier') b.matAtt = Math.max(0, b.matAtt - q);
+    else if (recoitMatiere(b)) b.matAtt = Math.max(0, b.matAtt - q);
   }
   // Dépose au plus q unités de g ; renvoie la quantité acceptée.
   function deposer(b, g, q, force) {
     var n = Math.min(q, placeDans(b, g, force));
     if (n <= 0) return 0;
-    if (def(b).genre === 'atelier') b.mat += n;
+    if (recoitMatiere(b)) b.mat += n;
     else b.stocks[g] = (b.stocks[g] || 0) + n;
     return n;
   }
@@ -1582,7 +1671,7 @@
   // en vidant, il ne fait que déplacer le stock.
   function chercherPreneur(e, sources, g, q, exclu, depotsSeuls) {
     var N = e.N, etapes = [];
-    if (!depotsSeuls && D.matieres.indexOf(g) >= 0 && !bienReserve(e, g)) etapes.push(function (b) { return def(b).genre === 'atelier'; });
+    if (!depotsSeuls && D.matieres.indexOf(g) >= 0 && !bienReserve(e, g)) etapes.push(function (b) { return recoitMatiere(b); });
     if (estAliment(g)) etapes.push(function (b) { return b.type === 'grenier'; });
     etapes.push(function (b) { return b.type === 'entrepot'; });
     for (var k = 0; k < etapes.length; k++) {
@@ -1631,7 +1720,7 @@
       cibles = new Map();
       e.batiments.forEach(function (t) {
         var dt = def(t);
-        if (dt.genre !== 'atelier' || taux(t) <= 0 || bienReserve(e, dt.matiere) || !((b.stocks[dt.matiere] || 0) >= Q) || placeDans(t, dt.matiere) < Q) return;
+        if (!recoitMatiere(t) || taux(t) <= 0 || bienReserve(e, dt.matiere) || !((b.stocks[dt.matiere] || 0) >= Q) || placeDans(t, dt.matiere) < Q) return;
         acces(e, t).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, t); });
       });
       if (cibles.size) {
@@ -1791,7 +1880,14 @@
     if (b.cpt > 0) b.cpt--;
     switch (d.genre) {
       case 'maison': quotidienMaison(e, b); break;
-      case 'service': if (!b.m && !b.cpt && (!d.eauRequise || b.actif)) emettreErrant(e, b, d.marcheur); break;
+      case 'service':
+        if (!b.cpt && (!d.eauRequise || b.actif)) {
+          if (!b.m) emettreErrant(e, b, d.marcheur);
+          else if (d.marcheurs > 1 && !b.m2) emettreErrant(e, b, d.marcheur, true); // sénat : 2 percepteurs
+        }
+        break;
+      case 'caserne': quotidienCaserne(e, b, d); break;
+      case 'fort': quotidienFort(e, b); break;
       case 'ferme': case 'extraction': case 'peche': quotidienProducteur(e, b, d); break;
       case 'quai': quotidienQuai(e, b); break;
       case 'atelier': quotidienAtelier(e, b, d); break;
@@ -1812,14 +1908,14 @@
     }
   }
 
-  function emettreErrant(e, b, type) {
+  function emettreErrant(e, b, type, second) {
     if (taux(b) <= 0) return null;
     var s = sortiesErrant(e, b);
     if (!s.length) return null;
     var dep = s[b.sortie % s.length];
     b.sortie++;
     var w = creerMarcheur(e, type, dep, { o: b.id, pas: 0, portee: D.regles.porteeErrant, retour: 0, ch: null, k: 0 });
-    b.m = w.id;
+    if (second) b.m2 = w.id; else b.m = w.id;
     return w;
   }
 
@@ -1855,6 +1951,15 @@
         if (suiv.emprise === h.t || agrandir(e, h, suiv.emprise)) {
           h.niv++; h.ok = 0; h.bloque = 0;
           if (suiv.emprise !== cur.emprise) noter(e, 'msg.maisonAgrandie', { niveau: h.niv }, false, ix(e, h.x, h.y));
+          // De l'insula à la villa (12 → 13) : la maison loge moins de monde, les autres
+          // repartent chercher un logement (section 5.2).
+          var trop = h.hab - capacite(h);
+          if (trop > 0) {
+            h.hab -= trop;
+            creerSansAbri(e, ix(e, h.x, h.y), trop);
+            majPopulation(e);
+            if (h.niv === D.regles.travail.plebeiensNiveauMax + 1) noter(e, 'msg.villa', { n: trop }, false, ix(e, h.x, h.y));
+          }
         } else { h.ok = M.joursMontee; h.bloque = 1; }
       }
     } else { h.ok = 0; h.bloque = 0; }
@@ -1876,14 +1981,16 @@
   // Agrandissement (section 5.1) : la maison forme un carré de k × k avec des maisons voisines de
   // même niveau, des zones vides ou des jardins. Carrés essayés dans un ordre fixe (la maison
   // en haut à gauche, puis en haut à droite, en bas à gauche, en bas à droite).
+  // Une villa de 2 × 2 devient grande villa de 3 × 3 (niveau 15), un palais de 3 × 3 grand palais
+  // de 4 × 4 (19) : le carré contient toujours toute l'ancienne emprise.
   function agrandir(e, h, k) {
-    for (var oy = 0; oy < k; oy++) for (var ox = 0; ox < k; ox++) {
+    for (var oy = 0; oy <= k - h.t; oy++) for (var ox = 0; ox <= k - h.t; ox++) {
       var sx = h.x - ox, sy = h.y - oy, autres = [], ok = true;
       for (var y = sy; y < sy + k && ok; y++) for (var x = sx; x < sx + k && ok; x++) {
         if (!dedans(e, x, y)) { ok = false; break; }
         var b = bat(e, ix(e, x, y));
         if (b === h) continue;
-        if (b && estMaison(b) && b.t === 1 && (b.hab === 0 || b.niv === h.niv) && !b.quar) { if (autres.indexOf(b) < 0) autres.push(b); }
+        if (b && estMaison(b) && b.x >= sx && b.y >= sy && b.x + b.t <= sx + k && b.y + b.t <= sy + k && (b.hab === 0 || b.niv === h.niv) && !b.quar) { if (autres.indexOf(b) < 0) autres.push(b); }
         else if (b && b.type === 'jardin') { if (autres.indexOf(b) < 0) autres.push(b); }
         else ok = false;
       }
@@ -2323,13 +2430,15 @@
     e.humeur = Math.max(0, Math.min(100, hum));
     e._humeurDetail = vh.detail;
     emigrer(e);
+    moisCrime(e);
   }
   function moisBilan(e) {
     var moisEcoules = Math.floor(e.tick / D.ticksParMois);
     e.sante = calculerSante(e);
     epidemie(e);
-    e.histo.push({ m: moisEcoules, pop: e.pop, tresor: e.tresor, humeur: e.humeur, sante: e.sante, imm: e.flux.imm, emi: e.flux.emi, morts: e.flux.morts });
-    e.flux = { imm: 0, emi: 0, morts: 0 };
+    moisAges(e);
+    e.histo.push({ m: moisEcoules, pop: e.pop, tresor: e.tresor, humeur: e.humeur, sante: e.sante, imm: e.flux.imm, emi: e.flux.emi, morts: e.flux.morts, nais: e.flux.nais || 0 });
+    e.flux = { imm: 0, emi: 0, morts: 0, nais: 0 };
     if (e.histo.length > 240) e.histo.shift();
     // L'année du budget, des cotes annuelles et du tribut commence en janvier (sections 11.5, 14).
     if (moisEcoules > 0 && date(e).mois === 0) {
@@ -2380,6 +2489,726 @@
     e.stats.epidemies++;
     majPopulation(e);
     noter(e, 'msg.epidemie', {}, true, lieu);
+  }
+
+  // ------------------------------------------------------------------------
+  // Armée (section 13, lot 4)
+  //   Unités (e.unites) : soldats (c = 0) et ennemis (c = 1). Une unité se tient sur une case
+  //   (i) et passe à la suivante en v ticks (p : ticks restants ; a : case quittée, pour le
+  //   dessin). Les soldats d'un fort se tiennent en formation autour de leur place d'armes
+  //   (ordre « garde ») ou de la case choisie par le joueur (« aller ») ; ils engagent seuls tout
+  //   ennemi à 4 cases ou moins. Les ennemis suivent un champ de distances (e.champ, recalculé
+  //   tous les 20 ticks pendant l'invasion et sauvegardé avec elle) vers leur cible : bâtiment le
+  //   plus proche, greniers et entrepôts, soldats, ou centre de la ville (légions). Un bâtiment
+  //   sur leur chemin coûte selon ses points de structure : ils le contournent ou l'abattent.
+  // ------------------------------------------------------------------------
+
+  var VOISINS8 = [[0, -1], [1, 0], [0, 1], [-1, 0], [1, -1], [1, 1], [-1, 1], [-1, -1]];
+  var INF = 0x3fffffff;
+
+  function structure(b) {
+    var S = D.regles.militaire.structure, g = def(b).genre;
+    return S[g] || S.defaut;
+  }
+  function pvBat(b) { return b.pv === undefined ? structure(b) : b.pv; }
+  function carac(u) { var Mi = D.regles.militaire; return u.c === 0 ? Mi.unites[u.k] : Mi.ennemis[u.k]; }
+  function uniteParId(e, id) { return id ? (e._uIndex.get(id) || null) : null; }
+
+  // Passage des unités, recalculé à chaque changement de la carte : 0 bloqué, 1 libre, 2 porte
+  // (libre pour les soldats, obstacle pour l'ennemi). Les ruines se traversent.
+  function grilleUnites(e) {
+    if (e._gU && e._gUv === e._v) return e._gU;
+    var n = e.N * e.N, g = e._gU && e._gU.length === n ? e._gU : new Uint8Array(n);
+    for (var i = 0; i < n; i++) {
+      var t = e.terrain[i], id = e.bat[i];
+      if (t === T.EAU || t === T.ROCHERS) g[i] = 0;
+      else if (!id) g[i] = 1;
+      else if (e.route[i]) g[i] = 2;
+      else { var b = e._index.get(id); g[i] = b && def(b).genre === 'ruines' ? 1 : 0; }
+    }
+    e._gU = g; e._gUv = e._v;
+    return g;
+  }
+  function libreSoldat(g, i) { return g[i] >= 1; }
+  function libreEnnemi(g, i) { return g[i] === 1; }
+
+  // Case libre la plus proche (spirale, ordre fixe), en dehors de « pris ».
+  function caseProche(e, x0, y0, libre, pris, rmax) {
+    var g = grilleUnites(e);
+    for (var r = 0; r <= rmax; r++) {
+      for (var y = y0 - r; y <= y0 + r; y++) for (var x = x0 - r; x <= x0 + r; x++) {
+        if (Math.max(Math.abs(x - x0), Math.abs(y - y0)) !== r || !dedans(e, x, y)) continue;
+        var i = ix(e, x, y);
+        if (libre(g, i) && (!pris || !pris.has(i))) return i;
+      }
+    }
+    return -1;
+  }
+
+  function creerUnite(e, c, k, i, props) {
+    var Mi = D.regles.militaire, car = c === 0 ? Mi.unites[k] : Mi.ennemis[k];
+    var u = { id: e.prochainId++, c: c, k: k, i: i, a: i, p: 0, v: Mi.vitesses[car.vitesse], pv: car.pv, pm: car.pv, cd: 0, entr: 0,
+      etat: 'champ', ch: null, ci: 0, but: -1, cible: 0, tir: -1000, tx: -1, combat: 0 };
+    if (props) for (var q in props) u[q] = props[q];
+    e.unites.push(u);
+    e._uIndex.set(u.id, u);
+    return u;
+  }
+  function nettoyerUnites(e) {
+    if (!e._morts) return;
+    e.unites = e.unites.filter(function (u) { if (u.mort) { e._uIndex.delete(u.id); return false; } return true; });
+    e._morts = 0;
+  }
+  function retirerUnite(e, u) { if (!u.mort) { u.mort = 1; e._morts = (e._morts || 0) + 1; } }
+
+  // --- Forts et cohortes -----------------------------------------------------
+
+  function soldatsDe(e, f, tous) {
+    return e.unites.filter(function (u) { return u.c === 0 && u.f === f.id && !u.mort && (tous || u.etat === 'champ'); });
+  }
+  function effectifFort(e, f) { return soldatsDe(e, f, true).length; }
+  // Place d'armes du fort : case libre la plus proche du milieu de son côté sud.
+  function ancreFort(e, f) {
+    var g = grilleUnites(e);
+    if (f.ancre >= 0 && libreSoldat(g, f.ancre)) return f.ancre;
+    f.ancre = caseProche(e, f.x + (f.t >> 1), f.y + f.t + 1, libreSoldat, null, 12);
+    return f.ancre;
+  }
+  function decalage(f, s) {
+    if (f === 'ligne') return [(s % 8) - 3, Math.floor(s / 8)];
+    if (f === 'colonne') return [s % 2, Math.floor(s / 2) - 3];
+    return [(s % 4) - 1, Math.floor(s / 4) - 1];
+  }
+  function placesFormation(e, ancre, f, n) {
+    var N = e.N, pris = new Set(), l = [], ax = ancre % N, ay = (ancre - ax) / N;
+    for (var s = 0; s < n; s++) {
+      var d = decalage(f, s), j = caseProche(e, borne(ax + d[0], 0, N - 1), borne(ay + d[1], 0, N - 1), libreSoldat, pris, 8);
+      if (j < 0) j = ancre;
+      pris.add(j); l.push(j);
+    }
+    return l;
+  }
+  function placerCohorte(e, f) {
+    var l = soldatsDe(e, f).sort(function (a, b) { return a.id - b.id; });
+    if (!l.length) return;
+    var ancre = f.ordre.t === 'aller' && f.ordre.i >= 0 ? f.ordre.i : ancreFort(e, f);
+    if (ancre < 0) return;
+    var places = placesFormation(e, ancre, f.ordre.f, l.length);
+    l.forEach(function (u, s) { u.but = places[s]; u.ch = null; });
+  }
+  function dissoudre(e, f) {
+    e.unites.forEach(function (u) { if (u.c === 0 && u.f === f.id) retirerUnite(e, u); });
+    nettoyerUnites(e);
+  }
+  function enFuite(e, f) { var Mi = D.regles.militaire; return f.moral < Mi.moralFuite || (e.effets && e.effets.mars > 0); }
+
+  function quotidienFort(e, f) {
+    var Mi = D.regles.militaire;
+    if (e.effets && e.effets.mars > 0) { f.moral = 0; return; }
+    if (f.ordre.t === 'garde' || !effectifFort(e, f)) f.moral = Math.min(100, f.moral + Mi.moralJour);
+  }
+
+  // Caserne : une recrue tous les 8 jours de travail plein, pour le premier fort incomplet ; un
+  // légionnaire prend une charge d'armes. La recrue passe par l'académie militaire s'il y en a une.
+  function quotidienCaserne(e, b) {
+    var Mi = D.regles.militaire, r = taux(b), Q = charge();
+    if (r <= 0 || b.m) return;
+    b.prog = Math.min(Mi.recrueJours, b.prog + r);
+    if (b.prog < Mi.recrueJours) return;
+    var a = acces(e, b);
+    if (!a.length) return;
+    var ac = null;
+    for (var k = 0; k < e.batiments.length && !ac; k++) { var x = e.batiments[k]; if (def(x).genre === 'academie_militaire' && taux(x) > 0 && acces(e, x).length) ac = x; }
+    for (k = 0; k < e.batiments.length; k++) {
+      var f = e.batiments[k];
+      if (def(f).genre !== 'fort' || effectifFort(e, f) + f.att >= Mi.cohorte) continue;
+      var armes = def(f).unite === 'legionnaire' ? Mi.armesParLegionnaire * Q : 0;
+      if (b.mat < armes) continue;
+      var but = ac || f, p = parcours(e, a, passableRoute(e), cibleAcces(e, but), 6 * e.N);
+      if (!p) continue;
+      b.mat -= armes;
+      var w = creerMarcheur(e, 'recrue', p.depart, { o: b.id, cb: but.id, fort: f.id, entr: 0, phase: ac ? 'academie' : 'aller', ch: p.chemin, k: 0 });
+      f.att++; b.m = w.id; b.prog = 0;
+      return;
+    }
+  }
+  function atteintRecrue(e, w) {
+    if (w.phase === 'academie') { w.entr = 1; w.phase = 'aller'; w.cb = w.fort; if (!rechercher(e, w)) finir(e, w); return; }
+    var f = e._index.get(w.fort);
+    if (f && def(f).genre === 'fort') {
+      creerUnite(e, 0, def(f).unite, ix(e, w.x, w.y), { f: f.id, entr: w.entr || 0 });
+      placerCohorte(e, f);
+    }
+    finir(e, w);
+  }
+
+  // --- Déplacement et combat ---------------------------------------------------
+
+  function bouger(e, u, j) { u.a = u.i; u.i = j; u.p = u.v; }
+  // Suit un chemin vers la case « but » (parcours en largeur, recalculé si la route se ferme).
+  function suivreVers(e, u, but, libre) {
+    if (u.i === but || but < 0) return false;
+    var g = grilleUnites(e);
+    if (!u.ch || u.ci >= u.ch.length || !libre(g, u.ch[u.ci]) || u.chB !== but) {
+      var p = parcours(e, [u.i], function (i) { return libre(g, i); }, function (i) { return i === but; }, 6 * e.N);
+      if (!p || !p.chemin.length) { u.ch = null; return false; }
+      u.ch = p.chemin; u.ci = 0; u.chB = but;
+    }
+    bouger(e, u, u.ch[u.ci++]);
+    return true;
+  }
+  // Un pas vers une case (8 voisins ; pas de diagonale entre deux obstacles).
+  function approcher(e, u, cible, libre) {
+    var N = e.N, g = grilleUnites(e), x = u.i % N, y = (u.i - x) / N, tx = cible % N, ty = (cible - tx) / N;
+    var best = -1, bd = (x - tx) * (x - tx) + (y - ty) * (y - ty);
+    for (var k = 0; k < 8; k++) {
+      var nx = x + VOISINS8[k][0], ny = y + VOISINS8[k][1];
+      if (!dedans(e, nx, ny)) continue;
+      var j = ix(e, nx, ny);
+      if (!libre(g, j)) continue;
+      if (k >= 4 && (!libre(g, ix(e, nx, y)) || !libre(g, ix(e, x, ny)))) continue;
+      var d = (nx - tx) * (nx - tx) + (ny - ty) * (ny - ty);
+      if (d < bd) { bd = d; best = j; }
+    }
+    if (best < 0) return false;
+    bouger(e, u, best);
+    u.ch = null;
+    return true;
+  }
+  // Ennemi le plus proche à « rayon » cases ou moins ; avec « zone » (un fort gardé), aussi
+  // tout ennemi à « rayon » cases ou moins de cette emprise.
+  function plusProche(e, u, rayon, zone) {
+    var N = e.N, x = u.i % N, y = (u.i - x) / N, best = null, bd = INF, l = e.unites;
+    for (var k = 0; k < l.length; k++) {
+      var o = l[k];
+      if (o.c === u.c || o.mort || o.etat !== 'champ') continue;
+      var ox = o.i % N, oy = (o.i - ox) / N, dx = Math.abs(ox - x), dy = Math.abs(oy - y);
+      if ((dx > rayon || dy > rayon) && !(zone && distRect(zone, ox, oy) <= rayon)) continue;
+      var d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = o; }
+    }
+    return best;
+  }
+  function aPortee(e, u, o) {
+    var N = e.N, P = carac(u).portee, x = u.i % N, y = (u.i - x) / N, ox = o.i % N, oy = (o.i - ox) / N;
+    if (P <= 1) return Math.abs(ox - x) <= 1 && Math.abs(oy - y) <= 1;
+    return (ox - x) * (ox - x) + (oy - y) * (oy - y) <= P * P;
+  }
+  function degats(u, contreMur) {
+    var Mi = D.regles.militaire, car = carac(u), d = car.degats * (1 + Mi.entrainementBonus * (u.entr || 0));
+    if (contreMur && car.murailles) d *= car.murailles;
+    return Math.round(d);
+  }
+  function tuer(e, o) {
+    if (o.mort) return;
+    retirerUnite(e, o);
+    if (o.c === 0) {
+      var f = e._index.get(o.f);
+      if (f) f.moral = Math.max(0, f.moral - D.regles.militaire.moralPerte);
+      e.stats.soldatsMorts = (e.stats.soldatsMorts || 0) + 1;
+    } else {
+      if (e.invasion && o.inv === e.invasion.id) e.invasion.morts++;
+      e.stats.ennemisTues = (e.stats.ennemisTues || 0) + 1;
+    }
+  }
+  function frapper(e, u, o) {
+    u.cd = D.regles.militaire.cadence; u.tir = e.tick; u.tx = o.i;
+    u.combat = 1; o.combat = 1;
+    o.pv -= degats(u, false);
+    if (o.pv <= 0) tuer(e, o);
+  }
+  function estDefense(b) { var g = def(b).genre; return g === 'muraille' || g === 'tour' || g === 'porte'; }
+  function frapperBatiment(e, u, b) {
+    var inv = e.invasion;
+    u.cd = D.regles.militaire.cadence; u.tir = e.tick; u.tx = ix(e, b.x + (b.t >> 1), b.y + (b.t >> 1));
+    // Les légions de l'empereur entrent en ville : la mission est perdue (section 2.4).
+    if (inv && inv.legions && !estDefense(b) && (inv.cibleEff !== 'centre' || cibleBat(b, 'centre')) && !e.defaite && !e.victoire) {
+      e.defaite = { tick: e.tick, cause: 'destitution' };
+      noter(e, 'msg.defaite', {}, true);
+    }
+    b.pv = pvBat(b) - degats(u, estDefense(b));
+    if (b.pv <= 0) detruitParEnnemi(e, b);
+  }
+  function detruitParEnnemi(e, b) {
+    var Mi = D.regles.militaire, inv = e.invasion, lieu = ix(e, b.x, b.y);
+    if (def(b).genre === 'fort') dissoudre(e, b);
+    remplacer(e, b, 'ruines');
+    calculerEau(e); majPopulation(e);
+    e.incidentsAn = (e.incidentsAn || 0) + 1;
+    e.stats.detruits = (e.stats.detruits || 0) + 1;
+    if (inv) {
+      if (!inv.detruits) noter(e, 'msg.detruitEnnemi', {}, true, lieu);
+      inv.detruits++;
+      if (inv.paix < Mi.paix.detruitMax) { inv.paix++; e.cotes.paix = Math.max(0, e.cotes.paix + Mi.paix.detruit); }
+    }
+  }
+
+  // --- Champ de distances des ennemis -----------------------------------------
+
+  function cibleBat(b, cible) {
+    var g = def(b).genre;
+    if (g === 'ruines' || g === 'incendie') return false;
+    if (cible === 'greniers') return g === 'grenier' || g === 'entrepot';
+    if (cible === 'centre') return D.regles.militaire.legions.cibles.indexOf(g === 'service' ? b.type : g) >= 0;
+    return true;
+  }
+  // Coût d'entrée dans une case pour l'ennemi : −1 infranchissable, 0 cible, sinon 1 (2 en forêt),
+  // plus les points de structure d'un bâtiment à abattre.
+  function coutEnnemi(e, g, i, cible) {
+    var t = e.terrain[i];
+    if (t === T.EAU || t === T.ROCHERS) return -1;
+    if (g[i] !== 1) {
+      var b = e._index.get(e.bat[i]);
+      if (!b) return 1;
+      if (cible !== 'soldats' && cibleBat(b, cible)) return 0;
+      return 1 + Math.ceil(pvBat(b) / D.regles.militaire.coutBatiment);
+    }
+    return t === T.ARBRES ? D.regles.militaire.coutArbres : 1;
+  }
+  var TAS = null;
+  function calculerChamp(e) {
+    var inv = e.invasion, N = e.N, n = N * N, g = grilleUnites(e);
+    if (!inv) { e.champ = null; return; }
+    // Cible effective : celle de la faction, sinon le bâtiment le plus proche.
+    var cible = inv.cible, src = [], i, k;
+    if (cible === 'soldats') {
+      e.unites.forEach(function (u) { if (u.c === 0 && !u.mort && u.etat === 'champ') src.push(u.i); });
+      e.batiments.forEach(function (b) { if (def(b).genre === 'fort') for (var y = b.y; y < b.y + b.t; y++) for (var x = b.x; x < b.x + b.t; x++) src.push(ix(e, x, y)); });
+    } else {
+      for (k = 0; k < e.batiments.length; k++) { var b = e.batiments[k]; if (cibleBat(b, cible)) for (var y = b.y; y < b.y + b.t; y++) for (var x = b.x; x < b.x + b.t; x++) src.push(ix(e, x, y)); }
+    }
+    if (!src.length && cible !== 'proche') {
+      cible = 'proche';
+      for (k = 0; k < e.batiments.length; k++) { var b2 = e.batiments[k]; if (cibleBat(b2, cible)) for (var y2 = b2.y; y2 < b2.y + b2.t; y2++) for (var x2 = b2.x; x2 < b2.x + b2.t; x2++) src.push(ix(e, x2, y2)); }
+    }
+    inv.cibleEff = cible;
+    var dist = e.champ && e.champ.length === n ? e.champ : new Int32Array(n);
+    dist.fill(INF);
+    var cout = e._cout && e._cout.length === n ? e._cout : (e._cout = new Int32Array(n));
+    for (i = 0; i < n; i++) cout[i] = coutEnnemi(e, g, i, cible);
+    // Dijkstra (tas binaire) depuis les cibles : dist[i] = coût pour atteindre une cible depuis i.
+    if (!TAS || TAS.k.length < 5 * n) TAS = { k: new Int32Array(5 * n), v: new Int32Array(5 * n) };
+    var hk = TAS.k, hv = TAS.v, h = 0;
+    function pousser(i, d) {
+      var j = h++;
+      while (j > 0) { var p = (j - 1) >> 1; if (hk[p] < d || (hk[p] === d && hv[p] <= i)) break; hk[j] = hk[p]; hv[j] = hv[p]; j = p; }
+      hk[j] = d; hv[j] = i;
+    }
+    function sortir() {
+      var top = hv[0], d = hk[--h], v = hv[h], j = 0;
+      while (true) {
+        var l = 2 * j + 1; if (l >= h) break;
+        var r = l + 1, m = (r < h && (hk[r] < hk[l] || (hk[r] === hk[l] && hv[r] < hv[l]))) ? r : l;
+        if (hk[m] > d || (hk[m] === d && hv[m] >= v)) break;
+        hk[j] = hk[m]; hv[j] = hv[m]; j = m;
+      }
+      hk[j] = d; hv[j] = v;
+      return top;
+    }
+    src.forEach(function (s) { if (dist[s] !== 0) { dist[s] = 0; pousser(s, 0); } });
+    while (h > 0) {
+      var d0 = hk[0], u = sortir();
+      if (d0 > dist[u]) continue;
+      var cu = cout[u] < 0 ? INF : cout[u];
+      if (cu >= INF) continue;
+      var x0 = u % N, y0 = (u - x0) / N;
+      for (k = 0; k < 4; k++) {
+        var nx = x0 + VOISINS8[k][0], ny = y0 + VOISINS8[k][1];
+        if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+        var j = ny * N + nx;
+        if (cout[j] < 0) continue;
+        var nd = d0 + cu;
+        if (nd < dist[j]) { dist[j] = nd; pousser(j, nd); }
+      }
+    }
+    e.champ = dist;
+  }
+
+  function agirEnnemi(e, u, nbS) {
+    var Mi = D.regles.militaire, inv = e.invasion, N = e.N;
+    if (!inv || u.inv !== inv.id) { retirerUnite(e, u); return; }
+    if (inv.fuite) {
+      if (u.i === inv.entree || !suivreVers(e, u, inv.entree, libreEnnemi)) { u.parti = 1; retirerUnite(e, u); }
+      return;
+    }
+    var o = null;
+    if (nbS) {
+      o = uniteParId(e, u.cible);
+      if (!o || o.mort || o.etat !== 'champ' || (e.tick + u.id) % 10 === 0) { o = plusProche(e, u, Mi.engagement); u.cible = o ? o.id : 0; }
+      if (o) {
+        if (aPortee(e, u, o)) { if (!u.cd) frapper(e, u, o); return; }
+        if (approcher(e, u, o.i, libreEnnemi)) return;
+      }
+    }
+    var champ = e.champ;
+    if (!champ) return;
+    var g = grilleUnites(e), x = u.i % N, y = (u.i - x) / N, best = -1, bv = INF, cible = inv.cibleEff || inv.cible;
+    for (var k = 0; k < 4; k++) {
+      var nx = x + VOISINS8[k][0], ny = y + VOISINS8[k][1];
+      if (!dedans(e, nx, ny)) continue;
+      var j = ix(e, nx, ny), c = coutEnnemi(e, g, j, cible);
+      if (c < 0 || champ[j] >= INF) continue;
+      var v = c + champ[j];
+      if (v < bv) { bv = v; best = j; }
+    }
+    if (best < 0) return;
+    if (libreEnnemi(g, best)) { bouger(e, u, best); return; }
+    var b = e._index.get(e.bat[best]);
+    if (b && !u.cd) frapperBatiment(e, u, b);
+  }
+
+  function agirSoldat(e, u, nbE) {
+    var Mi = D.regles.militaire, f = e._index.get(u.f);
+    if (!f || def(f).genre !== 'fort') { retirerUnite(e, u); return; }
+    var fuite = enFuite(e, f);
+    if (fuite && f.ordre.t !== 'garde') { f.ordre = { t: 'garde', f: f.ordre.f, i: -1 }; placerCohorte(e, f); }
+    if (!fuite && nbE) {
+      var o = uniteParId(e, u.cible);
+      if (!o || o.mort || o.etat !== 'champ' || (e.tick + u.id) % 10 === 0) { o = plusProche(e, u, Mi.engagement, f.ordre.t === 'garde' ? f : null); u.cible = o ? o.id : 0; }
+      if (o) {
+        if (aPortee(e, u, o)) { if (!u.cd) frapper(e, u, o); return; }
+        if (approcher(e, u, o.i, libreSoldat) || suivreVers(e, u, o.i, libreSoldat)) return;
+      }
+    }
+    if (u.but < 0) placerCohorte(e, f);
+    suivreVers(e, u, u.but, libreSoldat);
+  }
+
+  function tirerTours(e) {
+    var T2 = D.regles.militaire.tour, N = e.N;
+    if (!e._tours || e._toursV !== e._v) { e._tours = e.batiments.filter(function (b) { return def(b).genre === 'tour'; }); e._toursV = e._v; }
+    for (var k = 0; k < e._tours.length; k++) {
+      var b = e._tours[k];
+      if (taux(b) <= 0) continue;
+      if (b.cd > 0) { b.cd--; continue; }
+      var cx = b.x * 2 + b.t - 1, cy = b.y * 2 + b.t - 1, best = null, bd = INF, lim = 4 * T2.portee * T2.portee;
+      for (var j = 0; j < e.unites.length; j++) {
+        var o = e.unites[j];
+        if (o.c !== 1 || o.mort || o.etat !== 'champ') continue;
+        var ox = o.i % N, oy = (o.i - ox) / N, dx = ox * 2 - cx, dy = oy * 2 - cy, d = dx * dx + dy * dy;
+        if (d <= lim && (!best || d < bd)) { best = o; bd = d; }
+      }
+      if (!best) continue;
+      b.cd = T2.cadence; b.tir = e.tick; b.tx = best.i;
+      best.pv -= T2.degats;
+      if (best.pv <= 0) tuer(e, best);
+    }
+  }
+
+  function avancerArmee(e) {
+    var l = e.unites, inv = e.invasion, Mi = D.regles.militaire;
+    if (!l.length && !inv) return;
+    if (inv && (!e.champ || e.tick % Mi.champTicks === 0)) calculerChamp(e);
+    var nbE = 0, nbS = 0, k, u;
+    for (k = 0; k < l.length; k++) { u = l[k]; if (!u.mort && u.etat === 'champ') { if (u.c === 1) nbE++; else nbS++; } }
+    for (k = 0; k < l.length; k++) {
+      u = l[k];
+      if (u.mort || u.etat !== 'champ') continue;
+      if (u.cd > 0) u.cd--;
+      if (u.p > 0 && --u.p > 0) continue;
+      if (u.c === 0) agirSoldat(e, u, nbE); else agirEnnemi(e, u, nbS);
+    }
+    if (nbE) tirerTours(e);
+    nettoyerUnites(e);
+    if (e.invasion) suivreInvasion(e, e.invasion);
+  }
+
+  // --- Invasions -------------------------------------------------------------------
+
+  function lancerInvasion(e, ev, legions) {
+    var Mi = D.regles.militaire, fa = Mi.factions[ev.faction], diff = D.difficultes[e.difficulte] || D.difficultes.normal, N = e.N;
+    var n = Math.max(1, Math.round(ev.effectif * diff.ennemis));
+    if (!legions && e.effets.marsBienfait) { n = Math.max(1, Math.ceil(n / 2)); e.effets.marsBienfait = 0; noter(e, 'msg.marsInvasion', {}, false); }
+    var entree = caseProche(e, borne(ev.entree[0] | 0, 0, N - 1), borne(ev.entree[1] | 0, 0, N - 1), libreEnnemi, null, 20);
+    if (entree < 0) entree = e.entree;
+    var types = Object.keys(fa.dosage), comp = [], reste = n;
+    types.forEach(function (t, j) {
+      var q = j === types.length - 1 ? reste : Math.min(reste, Math.round(n * fa.dosage[t] / 100));
+      reste -= q;
+      for (var z = 0; z < q; z++) comp.push(t);
+    });
+    var pris = new Set(), cases = [], ex = entree % N, ey = (entree - ex) / N;
+    for (var z = 0; z < comp.length; z++) { var c = caseProche(e, ex, ey, libreEnnemi, pris, 12); if (c < 0) c = entree; pris.add(c); cases.push(c); }
+    var inv = { id: e.prochainId++, f: ev.faction, n: n, morts: 0, detruits: 0, paix: 0, entree: entree, debut: e.tick, fuite: 0, legions: legions ? 1 : 0, cible: fa.cible, cibleEff: fa.cible };
+    e.invasion = inv;
+    comp.forEach(function (t, j) { creerUnite(e, 1, t, cases[j], { inv: inv.id }); });
+    e.champ = null;
+    calculerChamp(e);
+    e.stats.invasionsSubies = (e.stats.invasionsSubies || 0) + 1;
+    noter(e, legions ? 'msg.legionsArrivent' : 'msg.invasion', { faction: ev.faction, n: n }, true, entree);
+    return inv;
+  }
+  function suivreInvasion(e, inv) {
+    var Mi = D.regles.militaire, vivants = 0;
+    for (var k = 0; k < e.unites.length; k++) { var u = e.unites[k]; if (u.c === 1 && u.inv === inv.id && !u.mort) vivants++; }
+    var dureeMax = Mi.dureeMaxJours * D.temps.ticksParJour;
+    if (!inv.fuite && vivants && (inv.morts * 100 >= Mi.retraite * inv.n || e.tick - inv.debut > dureeMax)) {
+      inv.fuite = 1;
+      e.unites.forEach(function (x) { if (x.c === 1 && x.inv === inv.id) { x.ch = null; x.cible = 0; } });
+      noter(e, 'msg.invasionFuite', {}, false);
+    }
+    if (vivants === 0) finInvasion(e, inv);
+  }
+  function finInvasion(e, inv) {
+    var Mi = D.regles.militaire;
+    e.invasion = null; e.champ = null;
+    e.stats.invasions = (e.stats.invasions || 0) + 1;
+    if (!inv.detruits) e.cotes.paix = Math.min(100, e.cotes.paix + Mi.paix.repoussee);
+    e.unites.forEach(function (u) { if (u.c === 0 && u.combat) { u.entr = Math.min(Mi.entrainementMax, (u.entr || 0) + 1); u.combat = 0; } });
+    if (inv.legions) {
+      e.cotes.faveur = Math.max(e.cotes.faveur, Mi.legions.faveurApres);
+      e.faveurBasse = 0; e.legions = null;
+      noter(e, 'msg.legionsRepoussees', {}, true);
+    } else noter(e, inv.detruits ? 'msg.invasionFinie' : 'msg.invasionRepoussee', { n: inv.morts, d: inv.detruits }, true);
+  }
+  // Invasions annoncées (conseiller militaire, carte de l'Empire) : mois restants.
+  function armees(e) {
+    var m = mission(e), mois = Math.floor(e.tick / D.ticksParMois), l = [], diff = D.difficultes[e.difficulte] || D.difficultes.normal;
+    (e.script || []).forEach(function (s) {
+      var ev = (m.evenements || [])[s.k];
+      if (!ev || ev.type !== 'invasion' || s.fait) return;
+      var reste = s.m - mois;
+      if (reste <= D.regles.militaire.annonces[0]) l.push({ faction: ev.faction, mois: Math.max(0, reste), n: Math.max(1, Math.round(ev.effectif * diff.ennemis)), depuis: ev.depuis || null });
+    });
+    if (e.legions && !e.invasion) l.push({ faction: 'rome', mois: Math.max(0, e.legions.mois - mois), n: D.regles.militaire.legions.effectif, depuis: (m.empire && m.empire.rome) || null, legions: true });
+    if (e.invasion) l.unshift({ faction: e.invasion.f, mois: 0, n: e.invasion.n - e.invasion.morts, depuis: null, active: true, legions: !!e.invasion.legions });
+    return l;
+  }
+  // Résumé des cohortes pour l'interface.
+  function cohortes(e) {
+    return e.batiments.filter(function (b) { return def(b).genre === 'fort'; }).map(function (f) {
+      var l = soldatsDe(e, f, true), ici = l.filter(function (u) { return u.etat === 'champ'; }), entr = 0;
+      l.forEach(function (u) { entr += u.entr || 0; });
+      return { id: f.id, unite: def(f).unite, n: l.length, ici: ici.length, attendus: f.att, moral: f.moral, entr: l.length ? Math.round(entr * 10 / l.length) / 10 : 0,
+        ordre: f.ordre.t, formation: f.ordre.f, absente: l.length > 0 && !ici.length, fuite: enFuite(e, f) };
+    });
+  }
+
+  // --- Demandes de troupes (section 13.7) ----------------------------------------------
+
+  function creerDemandeTroupes(e, ev, mois) {
+    var dm = { id: e.prochainId++, troupes: ev.force, gain: ev.faveur || 8, ech: mois + ev.delai, ech2: mois + ev.delai, etat: 'ouverte', debut: mois, pos: ev.pos, cite: ev.lieu || null };
+    e.demandes.push(dm);
+    noter(e, 'msg.demandeTroupes', { n: ev.force, mois: ev.delai }, true);
+    return dm;
+  }
+  function envoyerTroupes(e, dm, f) {
+    var Tp = D.regles.militaire.troupes, l = soldatsDe(e, f);
+    l.forEach(function (u) { u.etat = 'absent'; u.ch = null; u.cible = 0; u.p = 0; });
+    dm.etat = 'envoyee'; dm.fort = f.id; dm.n = l.length;
+    dm.retour = e.tick + (Tp.dureeMois[0] + hasard(e, Tp.dureeMois[1] - Tp.dureeMois[0] + 1)) * D.ticksParMois;
+    noter(e, 'msg.troupesParties', { n: l.length }, false);
+  }
+  function retourTroupes(e, dm) {
+    var Mi = D.regles.militaire, Tp = Mi.troupes, f = e._index.get(dm.fort);
+    var l = e.unites.filter(function (u) { return u.c === 0 && u.f === dm.fort && u.etat === 'absent' && !u.mort; }).sort(function (a, b) { return a.id - b.id; });
+    var force = 0;
+    l.forEach(function (u) { force += 1 + Mi.entrainementBonus * (u.entr || 0); });
+    var gagne = force >= dm.troupes, pertes = Math.round(l.length * (gagne ? Tp.pertesVictoire : Tp.pertesDefaite) / 100);
+    for (var k = 0; k < pertes && l.length; k++) { var u = l.splice(hasard(e, l.length), 1)[0]; retirerUnite(e, u); e.stats.soldatsMorts = (e.stats.soldatsMorts || 0) + 1; }
+    nettoyerUnites(e);
+    var ancre = f && def(f).genre === 'fort' ? ancreFort(e, f) : -1;
+    l.forEach(function (u) {
+      if (ancre < 0) { retirerUnite(e, u); return; }
+      u.etat = 'champ'; u.i = u.a = ancre; u.p = 0; u.but = -1;
+      if (gagne) u.entr = Math.min(Mi.entrainementMax, (u.entr || 0) + 1);
+    });
+    nettoyerUnites(e);
+    if (f && def(f).genre === 'fort') { f.ordre = { t: 'garde', f: f.ordre.f, i: -1 }; placerCohorte(e, f); }
+    dm.etat = gagne ? 'faite' : 'echouee';
+    changerFaveur(e, gagne ? dm.gain : Tp.defaite);
+    noter(e, gagne ? 'msg.troupesVictoire' : 'msg.troupesDefaite', { n: l.length, morts: pertes }, true);
+  }
+
+  // ------------------------------------------------------------------------
+  // Pyramide des âges (section 6.3, lot 4)
+  //   Toute la ville en tranches de 10 ans (e.ages). Les immigrants arrivent avec un profil fixe ;
+  //   chaque mois, une part de chaque tranche passe à la suivante, la mortalité suit la santé,
+  //   les naissances suivent la santé et la nourriture et ne se font que dans une maison qui a de
+  //   la place. Les travailleurs sont les plébéiens d'âge actif (20 à 49 ans).
+  // ------------------------------------------------------------------------
+
+  function profil() {
+    var p = D.regles.ages.profilImmigrants, t = 0;
+    for (var k = 0; k < p.length; k++) t += p[k];
+    return p.map(function (v) { return v / t; });
+  }
+  // Part d'âge actif dans une pyramide (fractions ou effectifs).
+  function actifsDans(p) {
+    var A = D.regles.ages, tot = 0, act = 0;
+    for (var k = 0; k < p.length; k++) { tot += p[k]; if (k >= A.actifs[0] && k <= A.actifs[1]) act += p[k]; }
+    return tot > 0 ? act / tot : -1;
+  }
+  // Part des plébéiens qui travaillent : 40 % (section 6.3) pour une ville au profil des
+  // immigrants, plus si elle compte plus d'adultes d'âge actif, moins si elle vieillit.
+  function partActifs(e) {
+    var ref = actifsDans(profil()), a = e.ages ? actifsDans(e.ages) : -1;
+    return D.regles.travail.partTravailleurs * (a < 0 ? 1 : a / ref);
+  }
+  function borne(v, a, b) { return v < a ? a : v > b ? b : v; }
+
+  // Une personne de moins, prise au hasard parmi les habitants (pondéré par maison).
+  function retirerHabitants(e, n) {
+    var l = [], tot = 0;
+    e.batiments.forEach(function (h) { if (estMaison(h) && h.hab > 0) { l.push(h); tot += h.hab; } });
+    var fait = 0;
+    while (fait < n && tot > 0) {
+      var r = hasard(e, tot), k = 0;
+      while (r >= l[k].hab) { r -= l[k].hab; k++; }
+      var h = l[k];
+      h.hab--; tot--; fait++;
+      if (h.hab <= 0) { h.niv = 0; h.viv = {}; h.ok = 0; h.manque = 0; h.crime = 0; }
+    }
+    return fait;
+  }
+  function ajouterNaissances(e, n) {
+    var l = [];
+    e.batiments.forEach(function (h) { if (estMaison(h) && h.hab > 0 && !h.sansRoute && capacite(h) - h.hab - h.att > 0) l.push(h); });
+    var fait = 0;
+    while (fait < n && l.length) {
+      var k = hasard(e, l.length), h = l[k];
+      h.hab++; fait++;
+      if (capacite(h) - h.hab - h.att <= 0) l.splice(k, 1);
+    }
+    return fait;
+  }
+
+  function moisAges(e) {
+    var A = D.regles.ages, n = A.profilImmigrants.length;
+    if (!e.ages) e.ages = new Array(n).fill(0);
+    var p = e.ages, P = majPopulation(e), S = 0, k;
+    for (k = 0; k < n; k++) S += p[k];
+    // Arrivées et départs du mois (immigrants, sans-abri partis, épidémies…).
+    if (P > S + 1e-9) { var pr = profil(), plus = P - S; for (k = 0; k < n; k++) p[k] += plus * pr[k]; }
+    else if (S > P && S > 0) { var f = P / S; for (k = 0; k < n; k++) p[k] *= f; }
+    if (P <= 0) { for (k = 0; k < n; k++) p[k] = 0; e.agesReste = [0, 0]; return; }
+    var reste = e.agesReste || (e.agesReste = [0, 0]);
+    var sante = e.sante || 0, mois = A.anneesTranche * D.temps.moisParAn;
+    var fMort = borne(1 + (A.santeRef - sante) / A.santeRef, A.facteurMin, A.facteurMax);
+    var affamees = 0, nm = 0;
+    e.batiments.forEach(function (h) { if (estMaison(h) && h.hab > 0) { nm++; if (niveauDef(h).besoinsCumul.nourriture && !D.aliments.some(function (a) { return (h.viv[a] || 0) > 0; })) affamees++; } });
+    var fNat = borne(sante / A.santeRef, A.facteurMin, 1.5) * (nm && affamees * 100 > nm * D.regles.humeur.penuriePart ? A.penurieNatalite : 1);
+    // Vieillissement, puis décès (les plus vieux sortent de la dernière tranche).
+    var morts = p[n - 1] / mois;
+    for (k = n - 1; k >= 0; k--) {
+      var passe = p[k] / mois;
+      if (k < n - 1) { p[k] -= passe; p[k + 1] += passe; } else p[k] -= passe;
+    }
+    for (k = 0; k < n; k++) { var m = p[k] * A.mortalite[k] / 100 / D.temps.moisParAn * fMort; p[k] -= m; morts += m; }
+    var parents = 0;
+    for (k = A.parents[0]; k <= A.parents[1]; k++) parents += p[k];
+    var nais = parents * A.natalite / 100 / D.temps.moisParAn * fNat;
+    reste[0] += morts; reste[1] += nais;
+    var nm2 = Math.floor(reste[0]), nn = Math.floor(reste[1]);
+    reste[0] -= nm2; reste[1] -= nn;
+    var mortsFaits = retirerHabitants(e, nm2), naisFaites = ajouterNaissances(e, nn);
+    p[0] += naisFaites;
+    e.flux.morts += mortsFaits;
+    e.flux.nais = (e.flux.nais || 0) + naisFaites;
+    majPopulation(e);
+    // La pyramide suit exactement la population logée.
+    S = 0; for (k = 0; k < n; k++) S += p[k];
+    if (S > 0) { var g = e.pop / S; for (k = 0; k < n; k++) p[k] *= g; }
+  }
+
+  // ------------------------------------------------------------------------
+  // Criminalité (section 10.3, lot 4)
+  //   Par maison, de 0 à 100, chaque mois : hausse de (50 − humeur) / 5 quand l'humeur est sous 50,
+  //   doublée pour les tentes et cabanes ; sinon baisse lente (écart noté). Un préfet retire 10
+  //   points à chaque passage et arrête les voleurs et émeutiers qu'il croise.
+  // ------------------------------------------------------------------------
+
+  function moisCrime(e) {
+    var C = D.regles.crime, hum = e.humeur, hausse = hum < C.humeur ? (C.humeur - hum) / C.diviseur : -C.baisse;
+    var voleurs = [], emeutiers = [];
+    e.batiments.forEach(function (h) {
+      if (!estMaison(h)) return;
+      if (h.hab <= 0) { h.crime = 0; return; }
+      var v = hausse > 0 && h.niv <= C.pauvresNiveauMax ? hausse * C.pauvres : hausse;
+      h.crime = borne((h.crime || 0) + v, 0, 100);
+      if (h.crime > C.emeutier && hum < C.humeurEmeute) emeutiers.push(h);
+      else if (h.crime > C.voleur) voleurs.push(h);
+    });
+    var n = 0;
+    emeutiers.forEach(function (h) { if (n < C.parMois && hasard(e, 100) < h.crime - C.emeutier + 10) { if (lancerCriminel(e, h, 'emeutier')) n++; } });
+    voleurs.forEach(function (h) { if (n < C.parMois && hasard(e, 100) < h.crime - C.voleur) { if (lancerCriminel(e, h, 'voleur')) n++; } });
+  }
+
+  // Cases libres autour d'un bâtiment (où un marcheur hors route s'arrête pour l'atteindre).
+  function abords(e, b) {
+    var l = [], pass = passableLibre(e);
+    for (var y = b.y - 1; y <= b.y + b.t; y++) for (var x = b.x - 1; x <= b.x + b.t; x++) {
+      if (x >= b.x && x < b.x + b.t && y >= b.y && y < b.y + b.t) continue;
+      if (dedans(e, x, y) && pass(ix(e, x, y))) l.push(ix(e, x, y));
+    }
+    return l;
+  }
+  function cibleCriminel(e, w) {
+    var cibles = new Map(), soi = w.o;
+    e.batiments.forEach(function (b) {
+      var d = def(b);
+      if (w.type === 'voleur' ? !d.vols : (b.id === soi || d.genre === 'ruines' || d.genre === 'incendie' || !(tauxRisques(b).feu > 0) || (w.brules || []).indexOf(b.id) >= 0)) return;
+      abords(e, b).forEach(function (i) { if (!cibles.has(i)) cibles.set(i, b); });
+    });
+    if (!cibles.size) return false;
+    var p = parcours(e, [ix(e, w.x, w.y)], passableLibre(e), function (i) { return cibles.has(i); }, 6 * e.N);
+    if (!p) return false;
+    w.cb = cibles.get(p.fin).id; w.ch = p.chemin; w.k = 0; w.phase = 'aller';
+    return true;
+  }
+  function lancerCriminel(e, h, type) {
+    var dep = pointDeSortie(e, ix(e, h.x, h.y));
+    var w = creerMarcheur(e, type, dep, { o: h.id, cb: 0, ch: null, k: 0, phase: 'aller', brules: [] });
+    e._crim = (e._crim || 0) + 1;
+    if (!cibleCriminel(e, w) || !w.ch.length) { finir(e, w); return false; }
+    return true;
+  }
+  function fuir(e, w) {
+    w.phase = 'fuite'; w.cb = 0;
+    var p = parcours(e, [ix(e, w.x, w.y)], passableLibre(e), function (j) { return j === e.sortie; }, 8 * e.N);
+    if (!p || !p.chemin.length) { finir(e, w); return; }
+    w.ch = p.chemin; w.k = 0;
+  }
+  function atteintVoleur(e, w) {
+    if (w.phase === 'fuite') { finir(e, w); return; }
+    var C = D.regles.crime, b = e._index.get(w.cb);
+    if (b && def(b).vols) {
+      var q = Math.min(Math.max(0, e.tresor), C.volMin + hasard(e, C.volMax - C.volMin + 1));
+      if (q > 0) { e.tresor -= q; e.finances.an.vols = (e.finances.an.vols || 0) + q; e.stats.vols = (e.stats.vols || 0) + q; }
+      noter(e, 'msg.vol', { n: q }, true, ix(e, b.x, b.y));
+    }
+    fuir(e, w);
+  }
+  function atteintEmeutier(e, w) {
+    var C = D.regles.crime, b = e._index.get(w.cb);
+    if (b && def(b).genre !== 'incendie' && def(b).genre !== 'ruines') {
+      if (!w.brules.length) emeute(e, b);
+      w.brules.push(b.id);
+      enflammer(e, b);
+    }
+    if (w.brules.length >= C.incendies || !cibleCriminel(e, w)) finir(e, w);
+  }
+  // Une émeute : la paix baisse de 5, 20 points au plus par an (section 14.4).
+  function emeute(e, b) {
+    var P = D.regles.cotes.paix;
+    e.stats.emeutes = (e.stats.emeutes || 0) + 1;
+    e.incidentsAn = (e.incidentsAn || 0) + 1;
+    var deja = e.paixEmeutes || 0, perte = Math.min(-P.emeute, P.emeutesMaxAn - deja);
+    if (perte > 0) { e.cotes.paix = Math.max(0, e.cotes.paix - perte); e.paixEmeutes = deja + perte; }
+    noter(e, 'msg.emeute', {}, true, ix(e, b.x, b.y));
+  }
+  // Un préfet arrête le voleur ou l'émeutier qui passe à 2 cases ou moins.
+  function arreter(e, p) {
+    var r = D.regles.serviceRayon;
+    for (var k = 0; k < e.marcheurs.length; k++) {
+      var w = e.marcheurs[k];
+      if (w.fin || (w.type !== 'voleur' && w.type !== 'emeutier')) continue;
+      if (Math.abs(w.x - p.x) <= r && Math.abs(w.y - p.y) <= r) {
+        finir(e, w);
+        e.stats.arrestations = (e.stats.arrestations || 0) + 1;
+        noter(e, 'msg.arrestation', {}, false, ix(e, w.x, w.y));
+      }
+    }
   }
 
   // ------------------------------------------------------------------------
@@ -2692,6 +3521,14 @@
   function moisDemandes(e, mois) {
     var E = D.regles.empereur;
     e.demandes.forEach(function (dm) {
+      if (dm.troupes) {
+        if (dm.etat === 'ouverte') {
+          var r = dm.ech - mois;
+          if (E.rappels.indexOf(r) >= 0) noter(e, 'msg.demandeTroupesRappel', { n: dm.troupes, mois: r }, false);
+          if (r <= 0) { dm.etat = 'ignoree'; changerFaveur(e, E.ignoree); noter(e, 'msg.demandeTroupesRefusee', {}, true); }
+        } else if (dm.etat === 'envoyee' && e.tick >= dm.retour) retourTroupes(e, dm);
+        return;
+      }
       if (dm.etat === 'ouverte') {
         var reste = dm.ech - mois;
         if (E.rappels.indexOf(reste) >= 0) noter(e, 'msg.demandeRappel', { bien: dm.bien || '', n: dm.bien ? dm.q : dm.deniers, mois: reste }, false);
@@ -2703,7 +3540,7 @@
       }
     });
     // Les demandes réglées depuis plus de 2 ans quittent la liste.
-    e.demandes = e.demandes.filter(function (dm) { return dm.etat === 'ouverte' || dm.etat === 'retard' || mois - dm.ech2 < 24; });
+    e.demandes = e.demandes.filter(function (dm) { return dm.etat === 'ouverte' || dm.etat === 'retard' || dm.etat === 'envoyee' || mois - dm.ech2 < 24; });
   }
 
   // Chaque janvier (section 11.5) : intérêts de la dette, faveur, tribut.
@@ -2915,6 +3752,11 @@
     var C = D.regles.commerce, c, r, b, l, lieu = -1;
     switch (ev.type) {
       case 'demande': creerDemande(e, ev, mois); return;
+      case 'invasion':
+        if (!e.invasions) return;
+        if (e.invasion) return 'reporter'; // une invasion à la fois : la suivante attend un mois
+        lancerInvasion(e, ev, false); return;
+      case 'troupes': if (e.empereur) creerDemandeTroupes(e, ev, mois); return;
       case 'salaireRome':
         e.salaireRome = Math.max(D.regles.salaire.min, Math.min(D.regles.salaire.max, e.salaireRome + ev.delta));
         noter(e, ev.delta > 0 ? 'msg.evt.salaireHausse' : 'msg.evt.salaireBaisse', { n: e.salaireRome }, false); return;
@@ -2980,19 +3822,37 @@
       var r = e.routes[c.id];
       if (r && r.f > 0 && --r.f === 0) { r.x = Math.max(r.x, e.tick); noter(e, 'msg.evt.routeRouverte', { cite: c.id }, false); }
     });
+    var Mi = D.regles.militaire;
     e.script.forEach(function (s) {
-      if (s.fait || s.m > mois) return;
+      var ev = mission(e).evenements[s.k];
+      if (s.fait) return;
+      // Invasions annoncées 12 mois et 3 mois avant (section 13.6).
+      if (ev.type === 'invasion' && e.invasions && Mi.annonces.indexOf(s.m - mois) >= 0 && !(s.an || []).includes(s.m - mois)) {
+        s.an = (s.an || []).concat([s.m - mois]);
+        var diff = D.difficultes[e.difficulte] || D.difficultes.normal;
+        noter(e, 'msg.invasionAnnonce', { faction: ev.faction, mois: s.m - mois, n: Math.max(1, Math.round(ev.effectif * diff.ennemis)) }, true);
+      }
+      if (s.m > mois) return;
       s.fait = 1;
-      evenement(e, mission(e).evenements[s.k], mois);
+      if (evenement(e, ev, mois) === 'reporter') { s.fait = 0; s.m = mois + 1; }
     });
     if (!e.empereur) return;
     moisDemandes(e, mois);
-    // Destitution (section 2.4) : faveur ≤ 10 pendant 12 mois consécutifs.
+    // Destitution (section 2.4) : faveur ≤ 10 pendant 12 mois consécutifs, puis les légions de
+    // l'empereur marchent sur la ville ; la mission est perdue à leur entrée en ville.
     if (e.cotes.faveur <= E.destitution[0]) {
       e.faveurBasse++;
       if (e.faveurBasse === 1) noter(e, 'msg.faveurBasse', { mois: E.destitution[1] }, true);
-      if (e.faveurBasse >= E.destitution[1] && !e.victoire && !e.defaite && !e.libre) { e.defaite = { tick: e.tick, cause: 'destitution' }; noter(e, 'msg.defaite', {}, true); }
+      if (e.faveurBasse >= E.destitution[1] && !e.victoire && !e.defaite && !e.libre && !e.legions) {
+        e.legions = { mois: mois + Mi.legions.delaiMois };
+        noter(e, 'msg.legionsAnnonce', { mois: Mi.legions.delaiMois }, true);
+      }
     } else e.faveurBasse = 0;
+    if (e.legions && !e.legions.lance && mois >= e.legions.mois && !e.invasion && !e.defaite && !e.victoire) {
+      var N = e.N, x = e.entree % N;
+      e.legions.lance = 1;
+      lancerInvasion(e, { faction: 'rome', effectif: Mi.legions.effectif, entree: [x, (e.entree - x) / N] }, true);
+    }
   }
 
   // Janvier : prospérité et paix sur l'année écoulée, nouveau budget, quotas remis à zéro,
@@ -3003,6 +3863,7 @@
     e.cotes.prosperite = Math.max(0, Math.min(100, pr.plafond, e.cotes.prosperite + pr.variation));
     if (!e.incidentsAn) e.cotes.paix = Math.min(100, e.cotes.paix + D.regles.cotes.paix.annee);
     e.incidentsAn = 0;
+    e.paixEmeutes = 0;
     e.finances.prec = b;
     e.finances.an = nouveauBudget();
     for (var id in e.routes) e.routes[id].n = {};
@@ -3114,6 +3975,7 @@
       }
     }
     avancerTous(e);
+    avancerArmee(e);
   }
 
   // ------------------------------------------------------------------------
@@ -3129,7 +3991,7 @@
   // Cause de l'arrêt d'un bâtiment (section 8.4), ou null s'il est en service.
   function cause(e, b) {
     var d = def(b);
-    if (d.genre === 'maison' || d.genre === 'ruines' || d.genre === 'incendie' || d.genre === 'puits' || d.genre === 'deco' || d.genre === 'oracle') return null;
+    if (d.genre === 'maison' || d.genre === 'ruines' || d.genre === 'incendie' || d.genre === 'puits' || d.genre === 'deco' || d.genre === 'oracle' || d.genre === 'muraille') return null;
     if (d.genre === 'reservoir') return b.plein ? null : 'sansEau';
     if (!d.sansRoute && !acces(e, b).length) return 'pasDeRoute';
     if (d.effectif && taux(b) <= 0) return 'pasDePersonnel';
@@ -3142,6 +4004,8 @@
     if (d.genre === 'atelier' && b.mat < charge() && b.stock < 1) return 'sansMatiere';
     if (d.genre === 'marche' && totalStock(b) <= 0 && !b.mA) return 'sansMarchandise';
     if (d.genre === 'spectacle' && !d.artistes.some(function (a) { return (b.spects[a] || 0) > 0; })) return 'sansArtiste';
+    if (d.genre === 'caserne' && !e.batiments.some(function (f) { return def(f).genre === 'fort'; })) return 'sansFort';
+    if (d.genre === 'fort' && !effectifFort(e, b) && !b.att) return 'sansSoldat';
     return null;
   }
 
@@ -3220,6 +4084,27 @@
       ['v', 'a'].forEach(function (sens) { Object.keys(sens === 'v' ? c.vend || {} : c.achete || {}).forEach(function (g) { if (echange(e, c, sens, g) > quota(e, c, sens, g)) pb.push('quota dépassé : ' + c.id + ' ' + sens + ':' + g); }); });
     });
     D.regles.dieux.liste.forEach(function (g) { var st = e.divins[g]; if (!st || !(st.s >= 0 && st.s <= 100)) pb.push('dieu ' + g + ' : satisfaction hors de 0 à 100'); });
+    // Lot 4 : armée, âges, criminalité.
+    var Mi = D.regles.militaire, parFort = {};
+    (e.unites || []).forEach(function (u) {
+      if (u.mort) pb.push('unité ' + u.id + ' morte restée dans la liste');
+      if (!(u.i >= 0 && u.i < e.N * e.N)) pb.push('unité ' + u.id + ' hors carte');
+      if (!(u.pv > 0 && u.pv <= u.pm)) pb.push('unité ' + u.id + ' : points de vie ' + u.pv);
+      if (u.c === 0) {
+        var f = e._index.get(u.f);
+        if (!f || def(f).genre !== 'fort') pb.push('soldat ' + u.id + ' sans fort');
+        else if (def(f).unite !== u.k) pb.push('soldat ' + u.id + ' : type différent de son fort');
+        parFort[u.f] = (parFort[u.f] || 0) + 1;
+        if (!(u.entr >= 0 && u.entr <= Mi.entrainementMax)) pb.push('soldat ' + u.id + ' : entraînement ' + u.entr);
+      } else if (!e.invasion || u.inv !== e.invasion.id) pb.push('ennemi ' + u.id + ' sans invasion en cours');
+      if (e._uIndex && e._uIndex.get(u.id) !== u) pb.push('unité ' + u.id + ' absente de l\'index');
+    });
+    for (var fid in parFort) if (parFort[fid] > Mi.cohorte) pb.push('fort ' + fid + ' : ' + parFort[fid] + ' soldats');
+    if (e.batiments.filter(function (b) { return def(b).genre === 'fort'; }).length > Mi.fortsMax) pb.push('plus de ' + Mi.fortsMax + ' forts');
+    var uniques = {};
+    e.batiments.forEach(function (b) { var u = def(b).unique; if (u) { uniques[u] = (uniques[u] || 0) + 1; if (uniques[u] === 2) pb.push('deux bâtiments « ' + u + ' »'); } });
+    e.batiments.forEach(function (b) { if (estMaison(b) && !((b.crime || 0) >= 0 && (b.crime || 0) <= 100)) pb.push('maison ' + b.id + ' : criminalité ' + b.crime); });
+    if (e.ages) { var sa = 0; e.ages.forEach(function (v) { if (v < -1e-9) pb.push('pyramide des âges négative'); sa += v; }); }
     return pb;
   }
 
@@ -3255,7 +4140,7 @@
   function importer(txt) {
     var o = typeof txt === 'string' ? JSON.parse(txt) : txt;
     if (!o || typeof o !== 'object') throw new Error('sauvegarde illisible');
-    if (o.v !== VERSION_ETAT && o.v !== 1 && o.v !== 2) throw new Error('version de sauvegarde inconnue : ' + o.v);
+    if (o.v !== VERSION_ETAT && o.v !== 1 && o.v !== 2 && o.v !== 3) throw new Error('version de sauvegarde inconnue : ' + o.v);
     if (!MISSIONS[o.mission]) throw new Error('mission inconnue : ' + o.mission);
     var e = {};
     Object.keys(o).forEach(function (k) {
@@ -3270,8 +4155,20 @@
     reconstruireCaches(e);
     if (o.v === 1) completerV1(e);
     if (o.v <= 2) completerV2(e);
+    if (o.v <= 3) completerV3(e);
     if (!e.attract || e.attract.length !== n) throw new Error('sauvegarde abîmée : attract');
     return e;
+  }
+
+  // Sauvegarde du lot 3 (ou plus ancienne, déjà complétée) : champs du lot 4.
+  function completerV3(e) {
+    e.v = VERSION_ETAT;
+    e.ages = null; e.agesReste = [0, 0]; e.paixEmeutes = 0;
+    e.unites = []; e.invasion = null; e.champ = null; e.legions = null; e.invasions = !e.libre;
+    e._uIndex = new Map();
+    e.batiments.forEach(function (b) { if (estMaison(b)) b.crime = 0; });
+    ['an', 'prec'].forEach(function (k) { if (e.finances[k]) e.finances[k].vols = e.finances[k].vols || 0; });
+    // Les missions militaires n'existaient pas : le script des événements reste celui d'origine.
   }
 
   // Sauvegarde du lot 2 (ou du lot 1 déjà complétée) : champs du lot 3 avec leurs valeurs de départ.
@@ -3378,6 +4275,9 @@
     cultureDetail: cultureDetail, plafondProsperite: plafondProsperite, prosperiteAnnee: prosperiteAnnee, analyseCotes: analyseCotes,
     recettes: recettes, depenses: depenses, cultes: cultes, cibleDieu: cibleDieu, coutFete: coutFete, salaireGouvMax: salaireGouvMax,
     demandePrete: demandePrete, POSTES: POSTES,
+    // Lot 4
+    armees: armees, cohortes: cohortes, structure: structure, pvBat: pvBat, partActifs: partActifs, grilleUnites: grilleUnites,
+    uniteParId: uniteParId, effectifFort: effectifFort, ancreFort: ancreFort, enFuite: enFuite,
     // Outils réservés aux villes d'exemple (affiche, aperçus) et aux tests : jamais appelés par le joueur.
     _outils: {
       creerBatiment: creerBatiment, creerMarcheur: creerMarcheur, emettreErrant: emettreErrant, ix: ix, noter: noter,
@@ -3386,7 +4286,10 @@
       deposer: deposer, agrandir: agrandir, diviser: diviser, epidemie: epidemie,
       nouvelAn: nouvelAn, moisEmpire: moisEmpire, moisDieux: moisDieux, commerceJour: commerceJour, evenement: evenement,
       bienfaitDieu: bienfaitDieu, colereDieu: colereDieu, changerFaveur: changerFaveur, envoyerCaravane: envoyerCaravane, envoyerNavire: envoyerNavire,
-      creerDemande: creerDemande, anneeEmpereur: anneeEmpereur
+      creerDemande: creerDemande, anneeEmpereur: anneeEmpereur,
+      lancerInvasion: lancerInvasion, creerUnite: creerUnite, calculerChamp: calculerChamp, avancerArmee: avancerArmee,
+      creerDemandeTroupes: creerDemandeTroupes, retourTroupes: retourTroupes, moisCrime: moisCrime, moisAges: moisAges,
+      lancerCriminel: lancerCriminel, quotidienCaserne: quotidienCaserne
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

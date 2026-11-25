@@ -651,7 +651,7 @@ section('Économie (lot 2) : maisons, attractivité, main-d\'œuvre, santé');
   const b = D.maisons[11].besoinsCumul;
   ok(b.eau === 2 && b.nourriture === 2 && b.religion === 2 && b.divertissement === 35 && ['ecole', 'bains', 'poterie', 'barbier', 'mobilier', 'huile', 'medecin', 'bibliotheque'].every((k) => b[k]),
     'insula de prestige : eau courante, 2 aliments, 2 dieux, divertissement 35, école, bains, poterie, barbier, mobilier, huile, médecin, bibliothèque');
-  ok(D.niveauMax === 12, 'lot 2 : les maisons s\'arrêtent au niveau 12 (patriciens au lot 3)');
+  ok(D.niveauMax === 20 && D.maisons[19].emprise === 4 && D.maisons[14].emprise === 3, 'lot 4 : 20 niveaux, 3 × 3 cases au niveau 15, 4 × 4 au niveau 19');
   ok(D.maisons[9].habitants === 80 && D.maisons[9].emprise === 2, 'niveau 10 : 2 × 2 cases, 80 habitants');
 }
 {
@@ -873,7 +873,13 @@ section('Lot 3 : les cinq cotes (une formule chacune, section 14)');
   for (let m = 1; m <= 11; m++) O.moisEmpire(e, m);
   ok(!e.defaite, 'faveur à 10 pendant 11 mois : pas encore de destitution');
   O.moisEmpire(e, 12);
-  ok(e.defaite && e.defaite.cause === 'destitution', 'faveur à 10 pendant 12 mois : destitution');
+  ok(!e.defaite && e.legions && e.legions.mois === 15, 'faveur à 10 pendant 12 mois : les légions de l\'empereur sont annoncées pour dans 3 mois (lot 4)');
+  for (let m = 13; m <= 15; m++) O.moisEmpire(e, m);
+  ok(e.invasion && e.invasion.legions && e.unites.filter((u) => u.c === 1).length === D.regles.militaire.legions.effectif, 'trois mois plus tard, les légions entrent sur la carte');
+  // Sans soldat, elles atteignent la ville : la mission est perdue.
+  O.creerBatiment(e, 'forum', 60, 60);
+  for (let k = 0; k < 20 * 60 * 6 && !e.defaite; k++) sim.pas(e);
+  ok(e.defaite && e.defaite.cause === 'destitution', 'les légions atteignent le forum : destitution');
 }
 
 section('Lot 3 : commerce (section 12)');
