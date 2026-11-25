@@ -12,6 +12,8 @@
 
 > **Amis, présence, « Rejoindre », classement entre amis** : toute IA qui y touche lit d'abord **`docs/consigne-amis.md`** (consigne et choix retenus, section 8) ; valeurs réglables dans le bloc « Amis » de `public/profil-reglages.js`.
 
+> **Vidéos de promotion** (TikTok, YouTube Shorts, Instagram Reels) : toute IA qui fabrique une vidéo, écrit une accroche, un texte ou un plan de capture, ou touche à `scripts/videos/` ou `marketing/`, lit d'abord **`marketing/LISEZ-MOI.md`** (commande unique, recettes, contrôles). Les vidéos produites ne sont jamais versionnées (`marketing/sorties/`) ; aucun jeu n'est modifié pour être filmé.
+
 > Ce fichier donne à toute IA (Claude Code, Claude, autres agents) le contexte nécessaire pour travailler sur ce dépôt.
 > À placer à la racine du dépôt. Claude Code le lit automatiquement sous le nom `CLAUDE.md` ; pour d'autres IA, une copie nommée `AGENTS.md` peut être ajoutée.
 
