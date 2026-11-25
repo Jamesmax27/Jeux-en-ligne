@@ -1515,3 +1515,67 @@ Effet sur le gouverneur automatique (simulation déterministe, mais une ville sa
 
 La règle rend le jeu plus facile : ce retard vient du chemin pris par le gouverneur automatique, que le moindre changement modifie. Le critère du lot 3 reste tenu, puisque Ravenne et Narbo sont toujours gagnées.
 
+### 23.8 Retours du propriétaire : relogement, fontaines, stocks du marché, personnages (25 novembre 2026)
+
+Quatre demandes, `version` 8.
+
+**1. Relogement des habitants qui doivent partir.** « Ceux qui partent parce que leur maison redescend doivent, s'il y a de la place dans une maison proche, y revenir en quelques secondes. »
+
+- Avant : chaque groupe allait dans la première maison libre de la liste, dans l'ordre de construction, souvent à l'autre bout de la ville. Les places retenues par des immigrants en route ne comptaient pas comme libres, et faute de place les habitants quittaient la ville.
+- Maintenant : chaque groupe marche vers la maison la plus proche à pied qui a de la place, et le groupe se répartit si une seule maison ne suffit pas. Une place retenue par des immigrants encore en route compte comme libre : les habitants passent avant eux, et l'immigrant qui trouve la maison pleine cherche ailleurs. Ils ne quittent la ville que si aucune maison n'a de place.
+- Valable pour tous les départs forcés : maison qui redescend, se divise, brûle, s'effondre ou perd sa route.
+- Test : une maison redescend avec 2 habitants de trop ; une maison à 3 cases a 6 places, toutes retenues par des immigrants ; une autre, plus loin, est vide. Les 2 habitants entrent dans la maison proche en moins de 10 secondes de jeu à vitesse ×1, la maison lointaine reste vide, et personne n'est perdu.
+- Effet sur le gouverneur automatique, sur 5 parties décalées par mission (victoires en 200 mois ou moins) :
+
+| Version | Ravenne | Narbo |
+| --- | --- | --- |
+| Avant (`version` 7) | 1 sur 5 | 4 sur 5 |
+| Maison la plus proche, places des immigrants exclues | 1 sur 5 | 2 sur 5 |
+| Retenue : maison la plus proche, places des immigrants comprises | 4 sur 5 | 4 sur 5 |
+
+La variante qui excluait les places des immigrants laissait partir plus d'habitants que l'ancienne règle ; elle est écartée. Dans la partie de référence du test, Ravenne est gagnée au mois 109 et Narbo au mois 226 : un seul échantillon, qui ne mesure pas la difficulté.
+
+**2. Fontaines sans route.** « Les fontaines ne doivent pas avoir besoin d'une route pour que des employés y travaillent. »
+
+- Avant : une fontaine ne recevait du personnel que si une route reliée aux maisons passait à 2 cases ou moins.
+- Maintenant : tout bâtiment qui se passe de route reçoit ses employés sans condition de route. Parmi eux, seule la fontaine emploie du personnel.
+- Test : une fontaine posée à plus de 3 cases de toute route reçoit ses 4 employés.
+
+**3. Stocks du marché en images.** « Il y a écrit blé, légumes : il faudrait des images. »
+
+- 16 images de biens dessinées par le code (`imageBien` de `dessins.js`), reconnaissables à la forme autant qu'à la couleur : gerbe de blé, chou et carottes, pomme et poire, jambon, poisson, rameau d'olivier, grappe, motte d'argile, rondins, lingots, bloc de marbre, vase, siège, amphore d'huile, amphore et coupe de vin, bouclier et glaive.
+- Marché : les étals deviennent des vignettes. Chacune montre l'image, la quantité et une jauge jusqu'au seuil d'achat, avec un liseré doré et l'étiquette « Réclamé » quand les maisons le demandent, et le bouton « Interdire ». Clé `info.reclame` dans les 5 langues.
+- Greniers, entrepôts et commerce : l'image précède le nom de chaque bien.
+
+**4. Personnages reconnaissables.** « Tête ronde et objet : on ne les reconnaît pas. »
+
+- Tous les marcheurs sont redessinés. Ils ont des jambes en marche et des sandales, une tunique ou une robe ombrée et ceinturée, deux bras, une tête de trois quarts (cheveux, œil, nez, parfois une barbe), et surtout une coiffe et un objet propres à chaque métier (`ALLURES` et `personnage` de `dessins.js`) :
+
+| Marcheur | Ce qui le distingue |
+| --- | --- |
+| Préfet | casque de bronze à cimier blanc, seau d'eau |
+| Ingénieur | bonnet de cuir, maillet sur l'épaule |
+| Prêtre | robe blanche à liseré d'or, tête voilée, coupe fumante |
+| Vendeuse | robe orange, foulard, panier plein sur la tête |
+| Acheteuse | robe verte, panier au bras |
+| Percepteur | toge, bourse d'or, tablette |
+| Acteur et comédien | masque tragique ou comique tenu près du visage |
+| Instituteur | tablette de cire |
+| Bibliothécaire | brassée de rouleaux |
+| Professeur | robe blanche, barbe grise, grand bâton |
+| Médecin | bâton au serpent, sacoche |
+| Chirurgien | tunique blanche, trousse |
+| Barbier | tablier, rasoir, serviette |
+| Employé des bains | serviette sur l'épaule, flacon d'huile |
+| Immigrant | chapeau de voyage, cape, baluchon |
+| Émigrant | capuche grise, baluchon |
+| Sans-abri | haillons, pieds nus, ballot |
+| Lutteur | torse nu, bouclier rond |
+| Gladiateur | casque à grille, bouclier rouge, glaive |
+| Dompteur | bonnet rouge, fouet |
+| Livreur, charretier, docker | charrette à bras, bonnet |
+| Muletier de la caravane | chapeau de voyage |
+
+- Les personnages passent de 22 × 30 à 26 × 36 pixels, pour que la coiffe et les outils levés tiennent.
+- Images du jeu refaites. Contrôlé sur une planche de tous les marcheurs, aux zooms 1 et 2,5 et dans les deux sens de marche, puis sur la carte d'une partie de Narbo aux zooms 1 et 2,2.
+

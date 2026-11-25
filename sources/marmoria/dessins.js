@@ -2089,24 +2089,153 @@
   }
 
   // --- Marcheurs ------------------------------------------------------------
-  var TENUES = {
-    immigrant: ['#8a6a48', '#d8c8a8'], emigrant: ['#7d7d7d', '#c8c8c8'], sansabri: ['#585450', '#9a948c'],
-    livreur: ['#9a6b38', '#e0c9a0'], acheteuse: ['#4f8a3c', '#e8d8a8'], vendeuse: ['#d27c2c', '#f1e1b0'],
-    prefet: ['#b03a2e', '#e8c9b0'], ingenieur: ['#3d6f9c', '#e1c8a8'], percepteur: ['#6b4a90', '#e3cdb0'],
-    pretre: ['#f2efe6', '#e3cdb0'], acteur: ['#d9b13a', '#e8cdb2'], comedien: ['#d65a8c', '#e8cdb2'],
-    // Lot 2.
-    charretier: ['#5f7d8c', '#e0c9a0'], instituteur: ['#3a8f82', '#e3cdb0'], bibliothecaire: ['#2f7392', '#e3cdb0'],
-    professeur: ['#ece6d8', '#e1c8a8'], barbier: ['#e07b6c', '#e8cdb2'], employe_bains: ['#6aa5d6', '#e3cdb0'],
-    medecin: ['#b9574c', '#e3cdb0'], chirurgien: ['#f2efe8', '#e1c8a8'], lutteur: ['#d9a27a', '#e0ae88'],
-    dompteur: ['#6a3a78', '#e1c8a8'], gladiateur: ['#8a2a22', '#d9a880'],
-    // Lot 3.
-    caravane: ['#8a5a2a', '#e0c49a'], docker: ['#5a6a4a', '#e0c9a0']
-  };
   // Image d'un marcheur : largeur, hauteur et point d'ancrage (pieds, ou ligne de flottaison du bateau).
-  // Les personnages gardent 22 × 30 ancrés en (10, 26) ; le charretier tire sa charrette, d'où plus de largeur.
-  var FORMATS = { charretier: [38, 30, 19, 26], docker: [38, 30, 19, 26], lion: [34, 26, 17, 22], bateau: [44, 34, 22, 27], navire: [60, 46, 30, 38], caravane: [44, 32, 24, 28] };
+  // Personnages : 26 × 36 ancrés en (13, 32), dessinés pieds en (10, 26) ; la coiffe et les outils
+  // levés montent jusqu'à 30 px au-dessus des pieds. Les charrettes et la caravane sont plus larges.
+  var FORMATS = { charretier: [40, 36, 19, 32], docker: [40, 36, 19, 32], livreur: [40, 36, 19, 32], lion: [34, 26, 17, 22], bateau: [44, 34, 22, 27], navire: [60, 46, 30, 38], caravane: [48, 38, 26, 34] };
+
+  // Allure de chaque métier (demande du propriétaire du 25 novembre 2026 : on doit les reconnaître
+  // d'un coup d'œil). tunique : couleur du vêtement ; robe : vêtement jusqu'aux pieds ; toge : pan
+  // de toge ; coiffe : casque, bonnet, petase (chapeau de voyage), voile, foulard, capuche, laurier ;
+  // barbe ; peau ; cheveux ; jambes nues par défaut.
+  var PEAUX = ['#e6b98f', '#cf956c', '#a8724e'];
+  var ALLURES = {
+    immigrant: { tunique: '#8a6a48', cape: '#6e5236', coiffe: 'petase', peau: 1 },
+    emigrant: { tunique: '#7d7a76', cape: '#5e5b58', coiffe: 'capuche', peau: 0 },
+    sansabri: { tunique: '#5a544e', coiffe: 'cheveux', cheveux: '#2a2420', haillons: 1, pieds: 'nus', peau: 2 },
+    livreur: { tunique: '#9a6b38', coiffe: 'bonnet', bonnet: '#7a5a3a', peau: 1 },
+    charretier: { tunique: '#5f7d8c', coiffe: 'bonnet', bonnet: '#4a3828', peau: 0 },
+    docker: { tunique: '#5a6a4a', coiffe: 'bonnet', bonnet: '#8a3a2a', bras: 'nus', peau: 2 },
+    vendeuse: { robe: '#d27c2c', coiffe: 'foulard', foulard: '#f4e6bc', peau: 1, femme: 1 },
+    acheteuse: { robe: '#4f8a3c', coiffe: 'foulard', foulard: '#e8d8a8', peau: 0, femme: 1 },
+    prefet: { tunique: '#b8392c', coiffe: 'casque', panache: '#f4f0e6', peau: 0 },
+    ingenieur: { tunique: '#3d6f9c', coiffe: 'bonnet', bonnet: '#6e4a2c', barbe: '#4a3020', peau: 1 },
+    percepteur: { tunique: '#6b4a90', toge: '#efe9dc', peau: 0, cheveux: '#3a2a1e' },
+    pretre: { robe: '#f4f0e6', liseré: '#c9a23a', coiffe: 'voile', peau: 0 },
+    acteur: { robe: '#e0b83a', liseré: '#b8392c', coiffe: 'laurier', peau: 1 },
+    comedien: { tunique: '#d65a8c', coiffe: 'bonnet', bonnet: '#f0c040', peau: 0 },
+    instituteur: { tunique: '#3a8f82', barbe: '#3a2a1e', peau: 2 },
+    bibliothecaire: { tunique: '#2f7392', toge: '#e8e0cc', peau: 0, cheveux: '#5a3a22' },
+    professeur: { robe: '#efe9dc', liseré: '#3a8f82', barbe: '#d8d4cc', cheveux: '#c8c4bc', peau: 0 },
+    barbier: { tunique: '#e07b6c', tablier: '#f6f2ea', peau: 1 },
+    employe_bains: { tunique: '#6aa5d6', peau: 2 },
+    medecin: { tunique: '#9a3f36', toge: '#efe9dc', barbe: '#4a3828', peau: 1 },
+    chirurgien: { tunique: '#f2efe8', ceinture: '#b8392c', peau: 0, cheveux: '#3a2a1e' },
+    lutteur: { torseNu: 1, pagne: '#7a3a22', peau: 1, cheveux: '#2a2420' },
+    dompteur: { tunique: '#6a3a78', coiffe: 'bonnet', bonnet: '#c0392b', barbe: '#2a2420', peau: 2 },
+    gladiateur: { tunique: '#8a2a22', coiffe: 'heaume', pagne: '#8a2a22', torseNu: 1, peau: 1 },
+    caravane: { tunique: '#8a5a2a', coiffe: 'petase', peau: 2 }
+  };
+
+  // Un personnage en pied, pieds en (x, y), tourné vers la droite de l'image. pose : 0 ou 1 (pas).
+  // main : position de la main droite (qui tient l'objet du métier) ; leve : main gauche levée vers
+  // la tête (panier sur la tête). Renvoie les repères utiles (tête, mains).
+  function personnage(ctx, x, y, a, pose, main, leve) {
+    var peau = PEAUX[a.peau || 0], peauF = teinte(peau, 0.8);
+    var habit = a.robe || a.tunique || peau, habitC = teinte(habit, 1.12), habitF = teinte(habit, 0.78);
+    var e = pose ? 1.7 : -1.7;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ellipse(ctx, x, y, 5.6, 2, 'rgba(30,30,20,0.35)');
+    // Cape de voyage, derrière le corps.
+    if (a.cape) poly(ctx, [[x - 3.4, y - 17], [x + 2.6, y - 17], [x + 1, y - 5.5], [x - 5.6, y - 6.5]], a.cape);
+    // Jambes (en pas) et sandales, ou bas de la robe.
+    if (!a.robe) {
+      ctx.strokeStyle = peauF; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x - 1.2, y - 8.5); ctx.lineTo(x - 1.2 + e, y - 1.2); ctx.moveTo(x + 1.2, y - 8.5); ctx.lineTo(x + 1.2 - e, y - 1.2); ctx.stroke();
+      if (a.pieds !== 'nus') { ctx.fillStyle = '#4a3020'; ctx.fillRect(x - 2.4 + e, y - 1.6, 2.8, 1.5); ctx.fillRect(x - 0.1 - e, y - 1.6, 2.8, 1.5); }
+    }
+    // Bras gauche (côté lointain), qui balance ou tient le panier sur la tête.
+    var mg = leve ? [x - 2.4, y - 26.5] : [x - 3.2 - e * 0.7, y - 9.6];
+    ctx.strokeStyle = a.torseNu || a.bras === 'nus' ? peauF : habitF; ctx.lineWidth = 1.9;
+    ctx.beginPath(); ctx.moveTo(x - 2.6, y - 16.2); ctx.lineTo(mg[0], mg[1]); ctx.stroke();
+    cercle(ctx, mg[0], mg[1], 1.05, peauF);
+    // Corps : tunique courte ceinturée, ou robe jusqu'aux pieds ; torse nu et pagne.
+    if (a.robe) {
+      poly(ctx, [[x - 3.1, y - 17.4], [x + 3.1, y - 17.4], [x + 4.8, y - 0.6], [x - 4.8, y - 0.6]], habitC);
+      poly(ctx, [[x + 0.4, y - 17.4], [x + 3.1, y - 17.4], [x + 4.8, y - 0.6], [x + 0.9, y - 0.6]], habit);
+      if (a.liseré) { ctx.fillStyle = a.liseré; ctx.fillRect(x - 4.7, y - 2, 9.4, 1.2); ctx.fillRect(x - 0.5, y - 17.2, 1.1, 15.4); }
+    } else if (a.torseNu) {
+      poly(ctx, [[x - 3.4, y - 17.4], [x + 3.4, y - 17.4], [x + 2.8, y - 9], [x - 2.8, y - 9]], peau);
+      poly(ctx, [[x + 0.5, y - 17.4], [x + 3.4, y - 17.4], [x + 2.8, y - 9], [x + 0.5, y - 9]], peauF);
+      poly(ctx, [[x - 3.2, y - 10], [x + 3.2, y - 10], [x + 3.6, y - 6.4], [x - 3.6, y - 6.4]], a.pagne || '#7a3a22');
+    } else {
+      var bas = a.haillons ? [[x - 4.2, y - 7.2], [x - 2.4, y - 8.4], [x - 0.8, y - 6.8], [x + 1, y - 8.2], [x + 2.6, y - 6.9], [x + 4.2, y - 7.6]] : [[x - 4.2, y - 7.2], [x + 4.2, y - 7.2]];
+      poly(ctx, [[x - 3.1, y - 17.4], [x + 3.1, y - 17.4]].concat(bas.slice().reverse()), habitC);
+      poly(ctx, [[x + 0.5, y - 17.4], [x + 3.1, y - 17.4], [x + 4.2, y - 7.4], [x + 0.6, y - 7.4]], habit);
+      ctx.fillStyle = a.ceinture || teinte(habit, 0.55); ctx.fillRect(x - 3.5, y - 12.4, 7, 1.3);
+    }
+    if (a.tablier) poly(ctx, [[x - 2.6, y - 12], [x + 2.8, y - 12], [x + 3.2, y - 5.6], [x - 3, y - 5.6]], a.tablier);
+    // Pan de toge sur l'épaule gauche, en écharpe jusqu'à la hanche droite.
+    if (a.toge) {
+      poly(ctx, [[x - 3.3, y - 17.6], [x - 0.6, y - 17.6], [x + 4.2, y - 9.4], [x + 4.4, y - 6.6], [x + 1.2, y - 8.4], [x - 3.4, y - 14.4]], a.toge);
+      ligne(ctx, [x - 1.6, y - 16.6], [x + 3.4, y - 8.6], teinte(a.toge, 0.82), 0.8);
+    }
+    // Cou et tête de trois quarts : cheveux, visage, œil, nez, barbe.
+    ctx.fillStyle = peauF; ctx.fillRect(x - 0.8, y - 19, 1.8, 2);
+    var tx = x + 0.3, ty = y - 21.4;
+    cercle(ctx, tx - 0.4, ty - 0.3, 3.4, a.cheveux || '#3a2a1e');
+    cercle(ctx, tx + 0.7, ty + 0.4, 2.85, peau);
+    poly(ctx, [[tx + 3.4, ty + 0.2], [tx + 4.3, ty + 1.3], [tx + 3.3, ty + 1.6]], peauF);
+    cercle(ctx, tx + 2, ty - 0.2, 0.55, '#1e1612');
+    if (a.barbe) poly(ctx, [[tx - 1.4, ty + 1], [tx + 3.4, ty + 1.8], [tx + 2.6, ty + 3.6], [tx + 0.2, ty + 3.8], [tx - 1.6, ty + 2.4]], a.barbe);
+    // Coiffe.
+    switch (a.coiffe) {
+      case 'casque': // casque de bronze à cimier (préfet, vigile)
+        ctx.beginPath(); ctx.arc(tx, ty - 0.4, 3.9, Math.PI, 0); ctx.closePath(); ctx.fillStyle = '#c9973a'; ctx.fill();
+        ctx.fillStyle = '#8a6420'; ctx.fillRect(tx - 4.4, ty - 0.6, 8.8, 1.2);
+        poly(ctx, [[tx - 3.6, ty - 3.4], [tx - 1.2, ty - 6.8], [tx + 2.8, ty - 6.6], [tx + 3.2, ty - 3.4]], a.panache || '#c0392b');
+        break;
+      case 'heaume': // casque fermé à grille (gladiateur)
+        cercle(ctx, tx + 0.2, ty, 4, '#a0a6ae'); ctx.fillStyle = '#6a7078'; ctx.fillRect(tx + 0.4, ty - 0.6, 3.8, 2.6);
+        ctx.fillStyle = '#c8ccd2'; for (var gx = 0; gx < 3; gx++) ctx.fillRect(tx + 0.9 + gx * 1.2, ty - 0.6, 0.5, 2.6);
+        poly(ctx, [[tx - 3, ty - 3], [tx - 0.6, ty - 7.4], [tx + 3, ty - 3.6]], '#c0392b');
+        break;
+      case 'bonnet':
+        ctx.beginPath(); ctx.arc(tx, ty - 0.6, 3.7, Math.PI * 1.05, -0.05); ctx.closePath(); ctx.fillStyle = a.bonnet || '#6e4a2c'; ctx.fill();
+        ctx.fillStyle = teinte(a.bonnet || '#6e4a2c', 0.7); ctx.fillRect(tx - 3.8, ty - 1, 7.4, 1.1);
+        break;
+      case 'petase': // chapeau de voyage à large bord
+        ellipse(ctx, tx, ty - 2.6, 6.2, 1.5, '#b8924e'); ellipse(ctx, tx, ty - 3.6, 3, 2.1, '#caa660'); ligne(ctx, [tx - 3, ty - 2.9], [tx + 3, ty - 2.9], '#7a5a2a', 0.9);
+        break;
+      case 'voile': // tête couverte (prêtre)
+        poly(ctx, [[tx - 4, ty + 4.6], [tx - 4, ty - 1.2], [tx - 1.6, ty - 4], [tx + 2.4, ty - 4], [tx + 3.6, ty - 1.6], [tx + 2.6, ty - 1.2], [tx - 1.6, ty - 1], [tx - 1.6, ty + 4.6]], a.robe || '#f4f0e6');
+        ligne(ctx, [tx - 1.6, ty - 1.2], [tx + 3.2, ty - 1.6], a.liseré || '#c9a23a', 0.8);
+        break;
+      case 'foulard':
+        poly(ctx, [[tx - 4.2, ty + 4], [tx - 4.2, ty - 1], [tx - 1.8, ty - 3.9], [tx + 2.6, ty - 3.9], [tx + 3.8, ty - 1.4], [tx - 1.2, ty - 0.8], [tx - 2, ty + 4]], a.foulard);
+        break;
+      case 'capuche':
+        poly(ctx, [[tx - 4.4, ty + 4.4], [tx - 4.4, ty - 1.2], [tx - 1.4, ty - 4.4], [tx + 2.6, ty - 4.2], [tx + 3.9, ty - 0.8], [tx + 2, ty - 1.6], [tx - 1, ty - 1], [tx - 2, ty + 4.4]], a.cape || habitF);
+        break;
+      case 'laurier':
+        ctx.strokeStyle = '#4e8a2e'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(tx, ty - 0.3, 3.5, Math.PI * 0.95, Math.PI * 2.05); ctx.stroke();
+        for (var fl = 0; fl < 5; fl++) cercle(ctx, tx - 3 + fl * 1.5, ty - 2.6 - Math.sin(fl / 4 * Math.PI) * 1.2, 0.8, '#6aac44');
+        break;
+    }
+    // Bras droit (côté proche), qui tient l'objet du métier.
+    var md = main || [x + 3.6 + e * 0.7, y - 9.6];
+    ctx.strokeStyle = a.torseNu || a.bras === 'nus' ? peau : habitC; ctx.lineWidth = 1.9;
+    ctx.beginPath(); ctx.moveTo(x + 2.6, y - 16.2); ctx.lineTo(md[0], md[1]); ctx.stroke();
+    cercle(ctx, md[0], md[1], 1.1, peau);
+    return { tete: [tx, ty], main: md, mainG: mg };
+  }
+
+  // Objets des métiers, tenus à la main droite (en (mx, my)).
+  function seau(ctx, mx, my, eau) {
+    poly(ctx, [[mx - 2.4, my + 0.6], [mx + 2.4, my + 0.6], [mx + 1.9, my + 4.6], [mx - 1.9, my + 4.6]], '#8a6238');
+    ctx.fillStyle = '#5a3e22'; ctx.fillRect(mx - 2.3, my + 2.2, 4.6, 0.8);
+    ellipse(ctx, mx, my + 0.6, 2.4, 0.8, eau ? '#7fc0e0' : '#5a3e22');
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.arc(mx, my + 0.6, 2.4, Math.PI, 0); ctx.stroke();
+  }
+  function panierTenu(ctx, mx, my, biens) {
+    ctx.strokeStyle = '#7a5428'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(mx, my + 1.4, 2.8, Math.PI, 0); ctx.stroke();
+    poly(ctx, [[mx - 3.2, my + 1.4], [mx + 3.2, my + 1.4], [mx + 2.6, my + 4.8], [mx - 2.6, my + 4.8]], '#b98a48');
+    ctx.fillStyle = '#9a6e34'; ctx.fillRect(mx - 3, my + 2.9, 6, 0.7);
+    (biens || []).forEach(function (c, i) { cercle(ctx, mx - 1.6 + i * 1.6, my + 1, 1.05, c); });
+  }
+
   function peindreMarcheur(ctx, type, pose, inverse) {
-    var t = TENUES[type] || ['#888', '#ddd'], x = 10, y = 26;
+    var a = ALLURES[type] || { tunique: '#888' }, x = 10, y = 26, r, e = pose ? 1.7 : -1.7;
     if (inverse) { ctx.translate(20, 0); ctx.scale(-1, 1); }
     if (type === 'lion') { peindreLion(ctx, x, y, 1, pose); return; }
     if (type === 'bateau') { barque(ctx, x, y, true, pose); return; }
@@ -2125,61 +2254,148 @@
       ctx.fillStyle = '#c9a86a'; ctx.fillRect(x - 15, y - 17, 6.5, 6); ctx.fillStyle = '#a8864a'; ctx.fillRect(x - 15, y - 18, 6.5, 1.4);
       ctx.fillStyle = '#d9c39a'; ctx.fillRect(x - 8, y - 17.5, 6, 6.5);
       amphore(ctx, x - 9, y - 18, '#c0643c', true);
-      ligne(ctx, [x + 4, y - 15], [x + 9, y - 14], '#6e4a2c', 0.8);
-      x += 13;
+      x += 14;
+      ligne(ctx, [x - 3.2 - e * 0.7, y - 9.6], [x - 9.6, y - 14.6], '#6e4a2c', 0.8);
+      personnage(ctx, x, y, a, pose, [x + 3.4, y - 12.6]);
+      ctx.fillStyle = '#6e4a2c'; ctx.fillRect(x + 3, y - 22, 1, 21.5);
+      return;
     }
-    if (type === 'charretier' || type === 'docker') {
+    if (type === 'charretier' || type === 'docker' || type === 'livreur') {
       // Charrette à bras tirée derrière lui : caisse chargée, grande roue, brancards jusqu'aux mains.
       ellipse(ctx, x - 11, y, 7, 2, 'rgba(30,30,20,0.3)');
-      ligne(ctx, [x - 7, y - 9], [x + 3, y - 11], '#6e4a2c', 1.5);
-      boite2d(ctx, x - 16, y - 13, 10, 6, '#8a6a48');
-      ctx.fillStyle = '#e0bf52'; ellipse(ctx, x - 13.5, y - 14, 3, 2.4, '#e0bf52'); ellipse(ctx, x - 9.5, y - 14.5, 2.6, 2.2, '#d9c08a');
-      amphore(ctx, x - 11.5, y - 12, '#c0643c', true);
-      cercle(ctx, x - 11, y - 4, 3.6, '#4a3828'); cercle(ctx, x - 11, y - 4, 1.2, '#a8743f');
+      boite2d(ctx, x - 17, y - 13, 10, 6, '#8a6a48');
+      if (type === 'livreur') { sac(ctx, x - 13.5, y - 12.6, '#e0c050'); sac(ctx, x - 9.6, y - 12.2, '#d9c08a'); }
+      else { ellipse(ctx, x - 14, y - 14, 3, 2.4, '#e0bf52'); amphore(ctx, x - 10.5, y - 12, '#c0643c', true); }
+      cercle(ctx, x - 12, y - 4, 3.8, '#4a3828'); cercle(ctx, x - 12, y - 4, 1.2, '#a8743f');
+      ligne(ctx, [x - 7, y - 9.4], [x - 2.6, y - 10.6], '#6e4a2c', 1.5);
+      personnage(ctx, x, y, a, pose, [x - 3.2, y - 10.4]);
+      return;
     }
-    ellipse(ctx, x, y, 5, 2, 'rgba(30,30,20,0.35)');
-    // Jambes (2 poses de marche).
-    ctx.strokeStyle = '#5a4030'; ctx.lineWidth = 2;
-    var e1 = pose ? 2 : -2;
-    ctx.beginPath(); ctx.moveTo(x - 1, y - 8); ctx.lineTo(x - 1 + e1, y - 1); ctx.moveTo(x + 1, y - 8); ctx.lineTo(x + 1 - e1, y - 1); ctx.stroke();
-    // Tunique.
-    poly(ctx, [[x - 4, y - 7], [x - 3, y - 16], [x + 3, y - 16], [x + 4, y - 7]], t[0]);
-    cercle(ctx, x, y - 19, 3, t[1]);
-    // Accessoire selon le métier.
-    if (type === 'livreur') { ctx.fillStyle = C.boisC; ctx.fillRect(x + 4, y - 10, 9, 6); cercle(ctx, x + 6, y - 3, 2, '#4a3828'); cercle(ctx, x + 11, y - 3, 2, '#4a3828'); ctx.fillStyle = '#e0bf52'; ctx.fillRect(x + 5, y - 13, 7, 3); }
-    else if (type === 'acheteuse' || type === 'vendeuse') ellipse(ctx, x + 5, y - 12, 3, 2.5, '#b98a48');
-    else if (type === 'prefet') { ctx.fillStyle = '#6a8fb5'; ctx.fillRect(x + 4, y - 12, 3, 4); }
-    else if (type === 'ingenieur') { ctx.fillStyle = '#5b4632'; ctx.fillRect(x + 4, y - 16, 1.5, 8); ctx.fillRect(x + 2.5, y - 17, 5, 2); }
-    else if (type === 'percepteur') cercle(ctx, x + 5, y - 11, 2, C.or);
-    else if (type === 'pretre') cercle(ctx, x, y - 23, 2, C.or);
-    else if (type === 'comedien' || type === 'acteur') cercle(ctx, x + 5, y - 18, 2.5, '#f6f0e0');
-    else if (type === 'immigrant' || type === 'emigrant' || type === 'sansabri') ellipse(ctx, x - 5, y - 13, 3, 4, '#a08458');
-    // Lot 2.
-    else if (type === 'instituteur') { ctx.fillStyle = '#efe2c0'; ctx.fillRect(x + 2.2, y - 13, 5, 2.6); cercle(ctx, x + 2.2, y - 11.7, 1.3, '#d9c08a'); cercle(ctx, x + 7.2, y - 11.7, 1.3, '#d9c08a'); }
-    else if (type === 'bibliothecaire') { for (var r = 0; r < 3; r++) { ctx.fillStyle = r % 2 ? '#e2c98e' : '#f2e6c6'; ctx.fillRect(x + 2.2, y - 10 - r * 2.4, 5, 2.2); cercle(ctx, x + 7.2, y - 8.9 - r * 2.4, 1.1, '#c9a86a'); } }
-    else if (type === 'professeur') {
-      poly(ctx, [[x - 3.6, y - 15.5], [x + 3.6, y - 9], [x + 3.9, y - 7.4], [x - 2.2, y - 12.8]], C.educ);
-      ctx.fillStyle = '#6e4a2c'; ctx.fillRect(x + 5, y - 23, 1.5, 22); cercle(ctx, x + 5.75, y - 23.4, 1.5, '#8a6238');
-    }
-    else if (type === 'barbier') { ellipse(ctx, x + 5.5, y - 11, 3, 1.6, '#c98a4a'); ctx.fillStyle = '#f6f0e6'; ctx.fillRect(x - 6, y - 15, 2.2, 6); }
-    else if (type === 'employe_bains') { poly(ctx, [[x + 3, y - 11], [x + 8.6, y - 11], [x + 7.8, y - 5], [x + 3.8, y - 5]], '#8a6a48'); ellipse(ctx, x + 5.8, y - 11, 2.8, 1, C.eauClair); ctx.strokeStyle = '#5a4030'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(x + 5.8, y - 11, 2.8, Math.PI, 0); ctx.stroke(); }
-    else if (type === 'medecin') { poly(ctx, [[x + 3.4, y - 11], [x + 8.2, y - 11], [x + 8.7, y - 6], [x + 3, y - 6]], '#7a4a2a'); ctx.fillStyle = '#5a3a22'; ctx.fillRect(x + 5, y - 12.5, 3, 1.5); }
-    else if (type === 'chirurgien') { ctx.fillStyle = C.sante; ctx.fillRect(x - 3.4, y - 10, 6.8, 1.4); poly(ctx, [[x + 3.4, y - 11], [x + 8.2, y - 11], [x + 8.7, y - 6], [x + 3, y - 6]], '#6a2a22'); }
-    else if (type === 'lutteur') {
-      ctx.fillStyle = '#6a3a2a'; ctx.fillRect(x - 4, y - 9.5, 8, 2.6);
-      ellipse(ctx, x + 5.4, y - 12, 3.4, 4.2, '#7a4a2a'); ellipse(ctx, x + 5.1, y - 12.2, 2.6, 3.4, '#c28a3a'); cercle(ctx, x + 5.1, y - 12.2, 1, C.or);
-    }
-    else if (type === 'dompteur') {
-      ctx.save(); ctx.strokeStyle = '#4a3020'; ctx.lineWidth = 1; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(x + 4, y - 12); ctx.lineTo(x + 5.5, y - 15.5);
-      ctx.quadraticCurveTo(x + 8.6, y - (pose ? 21 : 14), x + 8, y - (pose ? 23 : 4)); ctx.stroke(); ctx.restore();
-    }
-    else if (type === 'gladiateur') {
-      cercle(ctx, x, y - 19.5, 3.4, '#9aa0a8'); ctx.fillStyle = '#5a6068'; ctx.fillRect(x - 0.5, y - 20, 3.5, 1.2);
-      poly(ctx, [[x - 3, y - 21.6], [x - 0.6, y - 25], [x + 3, y - 22.2], [x, y - 22.8]], C.secu);
-      ligne(ctx, [x - 3, y - 12], [x - 8, y - 17], '#c8ccd2', 1.6);
-      poly(ctx, [[x + 2.5, y - 17], [x + 8, y - 16], [x + 8, y - 6], [x + 2.5, y - 6.5]], C.secu, '#6a2018');
-      cercle(ctx, x + 5.3, y - 11.5, 1.2, C.or);
+    switch (type) {
+      case 'immigrant': case 'emigrant': {
+        // Baluchon au bout d'un bâton, sur l'épaule.
+        r = personnage(ctx, x, y, a, pose, [x + 3, y - 14.6]);
+        ligne(ctx, [r.main[0] + 1.6, r.main[1] + 1.8], [x - 6.4, y - 21.6], '#6e4a2c', 1.1);
+        ellipse(ctx, x - 6.8, y - 20.4, 3, 2.6, type === 'immigrant' ? '#d8c8a8' : '#a8a49e');
+        ctx.fillStyle = type === 'immigrant' ? '#b8a07a' : '#8a8680'; ctx.fillRect(x - 7.4, y - 23.4, 1.4, 1.4);
+        break;
+      }
+      case 'sansabri':
+        r = personnage(ctx, x, y, a, pose, [x + 3.2, y - 11]);
+        ellipse(ctx, x + 4.6, y - 11.4, 3, 2.4, '#8a847c'); ligne(ctx, [x + 2.4, y - 12.6], [x + 6.6, y - 10], '#5a544e', 0.7);
+        break;
+      case 'vendeuse':
+        // Panier plein sur la tête, tenu d'une main.
+        r = personnage(ctx, x, y, a, pose, null, true);
+        poly(ctx, [[x - 4.6, y - 28.4], [x + 5.2, y - 28.4], [x + 4.2, y - 25.2], [x - 3.6, y - 25.2]], '#b98a48');
+        ctx.fillStyle = '#9a6e34'; ctx.fillRect(x - 4, y - 26.9, 8.4, 0.7);
+        cercle(ctx, x - 2.4, y - 29, 1.5, '#e0c050'); cercle(ctx, x + 0.4, y - 29.6, 1.5, '#5f9e3c'); cercle(ctx, x + 3, y - 29, 1.5, '#ee8a2a');
+        break;
+      case 'acheteuse':
+        r = personnage(ctx, x, y, a, pose, [x + 4.6, y - 11.6]);
+        panierTenu(ctx, r.main[0] + 0.6, r.main[1] - 0.4, []);
+        break;
+      case 'prefet':
+        r = personnage(ctx, x, y, a, pose, [x + 4.6, y - 11]);
+        seau(ctx, r.main[0] + 0.6, r.main[1], true);
+        break;
+      case 'ingenieur':
+        // Maillet sur l'épaule et règle de chantier.
+        r = personnage(ctx, x, y, a, pose, [x + 3.4, y - 15.6]);
+        ligne(ctx, [r.main[0] + 1, r.main[1] + 2], [x - 2.6, y - 25.6], '#6e4a2c', 1.3);
+        poly(ctx, [[x - 6.2, y - 27.4], [x - 1.2, y - 26.8], [x - 1.6, y - 23.4], [x - 6.6, y - 24]], '#8a8f96');
+        ctx.fillStyle = '#c9a23a'; ctx.fillRect(x - 4.6, y - 10.6, 1, 6);
+        break;
+      case 'percepteur':
+        r = personnage(ctx, x, y, a, pose, [x + 4.6, y - 11.4]);
+        ellipse(ctx, r.main[0] + 0.6, r.main[1] + 2.2, 2.4, 2.6, '#c9973a'); ctx.fillStyle = '#8a6420'; ctx.fillRect(r.main[0] - 0.6, r.main[1] - 0.4, 2.4, 1);
+        cercle(ctx, r.main[0] + 0.2, r.main[1] + 1.8, 0.7, '#f2d87a');
+        poly(ctx, [[x - 4.6, y - 15], [x - 1.8, y - 15.6], [x - 1.4, y - 10.4], [x - 4.2, y - 9.8]], '#7a5a3a'); poly(ctx, [[x - 4, y - 14.4], [x - 2.2, y - 14.8], [x - 1.9, y - 11], [x - 3.7, y - 10.6]], '#d9c08a');
+        break;
+      case 'pretre':
+        // Coupe d'offrande fumante, levée devant lui.
+        r = personnage(ctx, x, y, a, pose, [x + 5, y - 14]);
+        poly(ctx, [[r.main[0] - 2.6, r.main[1] - 0.8], [r.main[0] + 2.6, r.main[1] - 0.8], [r.main[0] + 1.4, r.main[1] + 0.9], [r.main[0] - 1.4, r.main[1] + 0.9]], '#d9a93a');
+        ctx.strokeStyle = 'rgba(200,200,200,0.85)'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(r.main[0], r.main[1] - 1); ctx.quadraticCurveTo(r.main[0] + 2, r.main[1] - (pose ? 4 : 3), r.main[0], r.main[1] - 6); ctx.stroke();
+        break;
+      case 'acteur': case 'comedien': {
+        // Masque de théâtre tenu près du visage.
+        var tragique = type === 'acteur';
+        r = personnage(ctx, x, y, a, pose, [x + 5, y - 17.6]);
+        ellipse(ctx, r.main[0] + 0.8, r.main[1] - 1.6, 2.5, 3, tragique ? '#f6f0e0' : '#f2d27a');
+        cercle(ctx, r.main[0] - 0.1, r.main[1] - 2.4, 0.5, '#1e1612'); cercle(ctx, r.main[0] + 1.7, r.main[1] - 2.4, 0.5, '#1e1612');
+        ctx.strokeStyle = '#1e1612'; ctx.lineWidth = 0.6; ctx.beginPath();
+        if (tragique) ctx.arc(r.main[0] + 0.8, r.main[1] + 0.4, 1, Math.PI * 1.15, Math.PI * 1.85); else ctx.arc(r.main[0] + 0.8, r.main[1] - 0.6, 1, Math.PI * 0.15, Math.PI * 0.85);
+        ctx.stroke();
+        break;
+      }
+      case 'instituteur':
+        // Tablette de cire et stylet.
+        r = personnage(ctx, x, y, a, pose, [x + 4.6, y - 12]);
+        poly(ctx, [[r.main[0] - 1.6, r.main[1] - 3.4], [r.main[0] + 3.4, r.main[1] - 3.4], [r.main[0] + 3.4, r.main[1] + 1.8], [r.main[0] - 1.6, r.main[1] + 1.8]], '#7a5232');
+        ctx.fillStyle = '#e8c870'; ctx.fillRect(r.main[0] - 0.9, r.main[1] - 2.7, 3.6, 3.8);
+        ligne(ctx, [r.main[0], r.main[1] - 1.4], [r.main[0] + 2, r.main[1] - 1.4], '#7a5232', 0.4);
+        break;
+      case 'bibliothecaire':
+        // Brassée de rouleaux.
+        r = personnage(ctx, x, y, a, pose, [x + 4.2, y - 11]);
+        for (var k = 0; k < 3; k++) {
+          var ry = r.main[1] - 3.6 + k * 1.9;
+          ctx.fillStyle = k % 2 ? '#e2c98e' : '#f2e6c6'; ctx.fillRect(r.main[0] - 3, ry, 6, 1.8);
+          cercle(ctx, r.main[0] + 3, ry + 0.9, 0.9, '#c9a86a'); cercle(ctx, r.main[0] - 3, ry + 0.9, 0.9, '#c9a86a');
+        }
+        break;
+      case 'professeur':
+        // Grand bâton de philosophe et rouleau.
+        r = personnage(ctx, x, y, a, pose, [x + 4.6, y - 13]);
+        ctx.fillStyle = '#6e4a2c'; ctx.fillRect(r.main[0] - 0.3, y - 29, 1.4, 28.4); cercle(ctx, r.main[0] + 0.4, y - 29.2, 1.4, '#8a6238');
+        break;
+      case 'barbier':
+        // Rasoir et serviette sur le bras.
+        r = personnage(ctx, x, y, a, pose, [x + 4.8, y - 12.4]);
+        ctx.fillStyle = '#d8dde2'; ctx.fillRect(r.main[0] + 0.6, r.main[1] - 3.4, 1.2, 3.4); ctx.fillStyle = '#5a3a22'; ctx.fillRect(r.main[0] + 0.6, r.main[1], 1.2, 2.2);
+        poly(ctx, [[x - 3.6, y - 14], [x - 1.8, y - 14], [x - 2.2, y - 7.6], [x - 4.2, y - 8.2]], '#f6f2ea');
+        break;
+      case 'employe_bains':
+        // Serviette sur l'épaule et flacon d'huile pendu à la main.
+        r = personnage(ctx, x, y, a, pose, [x + 4, y - 10.4]);
+        poly(ctx, [[x - 3.4, y - 18], [x + 0.4, y - 18.4], [x + 0.6, y - 16.8], [x - 3.6, y - 9.4], [x - 4.8, y - 10.4]], '#f6f2ea');
+        ligne(ctx, [r.main[0], r.main[1]], [r.main[0] + 0.4, r.main[1] + 2.2], '#5a3a22', 0.6); cercle(ctx, r.main[0] + 0.4, r.main[1] + 3.6, 1.8, '#d9a93a');
+        break;
+      case 'medecin':
+        // Bâton au serpent et sacoche.
+        r = personnage(ctx, x, y, a, pose, [x + 4.6, y - 13]);
+        ctx.fillStyle = '#6e4a2c'; ctx.fillRect(r.main[0] - 0.3, y - 26, 1.3, 25.4);
+        ctx.strokeStyle = '#3f8a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(r.main[0] + 0.4, y - 4);
+        for (var sn = 0; sn < 5; sn++) ctx.quadraticCurveTo(r.main[0] + (sn % 2 ? -2.2 : 3), y - 7 - sn * 4, r.main[0] + 0.4, y - 9 - sn * 4);
+        ctx.stroke(); cercle(ctx, r.main[0] + 1.4, y - 27, 0.9, '#3f8a3a');
+        poly(ctx, [[x - 5, y - 11], [x - 1.4, y - 11], [x - 1.2, y - 7.4], [x - 5.2, y - 7.4]], '#6a3a22');
+        break;
+      case 'chirurgien':
+        r = personnage(ctx, x, y, a, pose, [x + 4.8, y - 10.6]);
+        poly(ctx, [[r.main[0] - 1.8, r.main[1]], [r.main[0] + 3.6, r.main[1]], [r.main[0] + 3.6, r.main[1] + 4], [r.main[0] - 1.8, r.main[1] + 4]], '#7a2a22');
+        ctx.fillStyle = '#f2efe8'; ctx.fillRect(r.main[0] + 0.3, r.main[1] + 1.4, 1.4, 1.4);
+        break;
+      case 'lutteur':
+        // Bouclier rond de bronze.
+        r = personnage(ctx, x, y, a, pose, [x + 4.8, y - 12.4]);
+        cercle(ctx, r.main[0] + 1, r.main[1], 4, '#8a5a2a'); cercle(ctx, r.main[0] + 1, r.main[1], 3.1, '#c28a3a'); cercle(ctx, r.main[0] + 1, r.main[1], 1, C.or);
+        break;
+      case 'dompteur':
+        r = personnage(ctx, x, y, a, pose, [x + 4.4, y - 13.6]);
+        ctx.save(); ctx.strokeStyle = '#3a2418'; ctx.lineWidth = 0.9;
+        ctx.beginPath(); ctx.moveTo(r.main[0], r.main[1]); ctx.lineTo(r.main[0] + 1.6, r.main[1] - 4);
+        ctx.quadraticCurveTo(r.main[0] + 6, y - (pose ? 26 : 18), r.main[0] + 5, y - (pose ? 28 : 4)); ctx.stroke(); ctx.restore();
+        break;
+      case 'gladiateur':
+        // Bouclier rectangulaire rouge et glaive.
+        r = personnage(ctx, x, y, a, pose, [x + 4.6, y - 12]);
+        ligne(ctx, [x - 3.2, y - 11], [x - 8.6, y - 17.4], '#d8dde2', 1.5);
+        poly(ctx, [[r.main[0] - 1, r.main[1] - 6.4], [r.main[0] + 4.8, r.main[1] - 5.4], [r.main[0] + 4.8, r.main[1] + 5.6], [r.main[0] - 1, r.main[1] + 5]], '#a8322a', '#6a2018');
+        cercle(ctx, r.main[0] + 1.9, r.main[1], 1.3, C.or);
+        break;
+      default:
+        personnage(ctx, x, y, a, pose);
     }
   }
   // Petite caisse vue de trois quarts, en coordonnées d'écran (marcheurs) : face avant de (x, y), w × h.
@@ -2192,7 +2408,7 @@
     var k = 'm:' + type + ':' + pose + ':' + (inverse ? 1 : 0) + '@' + z;
     var s = cache.get(k);
     if (s) return s;
-    var f = z * DPR, c = document.createElement('canvas'), fm = FORMATS[type] || [22, 30, 10, 26];
+    var f = z * DPR, c = document.createElement('canvas'), fm = FORMATS[type] || [26, 36, 13, 32];
     c.width = Math.ceil(fm[0] * f); c.height = Math.ceil(fm[1] * f);
     var ctx = c.getContext('2d');
     ctx.scale(f, f);
@@ -2250,6 +2466,149 @@
     return s;
   }
 
+
+  // --- Biens : une image par bien (panneaux du marché, des greniers, des entrepôts, du commerce) ---
+  // Dessinés dans un carré de 24 × 24 (ombre au sol en bas), sans texte : on reconnaît le bien à sa
+  // forme (gerbe, poisson, amphore…) autant qu'à sa couleur (demande du propriétaire du 25 novembre 2026).
+  function peindreBien(ctx, g) {
+    var c = BIENS[g] || '#999';
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ellipse(ctx, 12, 21.5, 8, 1.8, 'rgba(40,30,20,0.22)');
+    var k, a;
+    switch (g) {
+      case 'ble': // gerbe liée
+        for (k = -3; k <= 3; k++) ligne(ctx, [12 + k * 0.5, 21], [12 + k * 2.1, 8], k % 2 ? '#b8902e' : '#cfa63c', 1.3);
+        for (k = -3; k <= 3; k++) {
+          ctx.save(); ctx.translate(12 + k * 2.35, 6.2 + Math.abs(k) * 0.6); ctx.rotate(k * 0.16);
+          ellipse(ctx, 0, 0, 1.5, 3.4, k % 2 ? '#e8c24a' : '#f2d466'); ligne(ctx, [0, -3], [0, -5.6], '#d9b03c', 0.6);
+          ctx.restore();
+        }
+        poly(ctx, [[8.6, 14], [15.4, 14], [15.6, 16.2], [8.4, 16.2]], '#8a5a2a');
+        break;
+      case 'legumes': // chou et carottes
+        poly(ctx, [[14, 9], [20.5, 7.5], [21, 9.6], [15.2, 12.5]], '#ee7d22'); poly(ctx, [[14.4, 13.4], [21, 11.6], [21.4, 13.6], [15.4, 16.6]], '#e06f1a');
+        ligne(ctx, [20.4, 8.4], [23, 5.6], '#4e8a2e', 1.4); ligne(ctx, [21, 12.5], [23.4, 10.6], '#4e8a2e', 1.4);
+        cercle(ctx, 9.5, 14.5, 6.6, '#4f8f34'); cercle(ctx, 8.6, 13.6, 5.2, '#6aac44');
+        ctx.strokeStyle = '#3f7a2a'; ctx.lineWidth = 0.9;
+        ctx.beginPath(); ctx.moveTo(9.5, 20.5); ctx.quadraticCurveTo(7.2, 14.5, 9.5, 8.2); ctx.moveTo(9.5, 20.5); ctx.quadraticCurveTo(13.5, 15, 13.6, 10); ctx.moveTo(9.5, 20.5); ctx.quadraticCurveTo(4.6, 16.5, 4, 12.2); ctx.stroke();
+        break;
+      case 'fruits': // poire et pomme
+        ellipse(ctx, 15.5, 15.4, 4.6, 5.2, '#d8bf3a'); cercle(ctx, 15.5, 10.4, 2.8, '#d8bf3a'); ellipse(ctx, 14.4, 14.4, 2, 2.8, '#ecd65a');
+        ligne(ctx, [15.5, 7.8], [16.2, 5.6], '#6e4a2c', 1);
+        cercle(ctx, 9, 15, 6, '#c8322a'); cercle(ctx, 7.6, 13.6, 2.4, '#e2554a');
+        ligne(ctx, [9, 9.4], [9.6, 6.6], '#6e4a2c', 1.1);
+        ellipse(ctx, 11.2, 7.4, 2.4, 1.2, '#5a9a3a');
+        break;
+      case 'porc': // jambon
+        ctx.save(); ctx.translate(12, 14); ctx.rotate(-0.55);
+        ellipse(ctx, -1.5, 0, 7.6, 5.4, '#b9505a'); ellipse(ctx, -2, -0.6, 6.4, 4.4, '#e07a84'); ellipse(ctx, -3.4, -1.6, 2.6, 1.6, '#f2a8ae');
+        ctx.fillStyle = '#f4ecdc'; ctx.fillRect(5, -1.2, 5, 2.4); cercle(ctx, 10.4, -1.4, 1.5, '#f4ecdc'); cercle(ctx, 10.4, 1.4, 1.5, '#f4ecdc');
+        ctx.restore();
+        break;
+      case 'poisson':
+        poly(ctx, [[4.5, 13.5], [1.2, 9], [1.6, 18], [4.5, 13.5]], '#5f7a8c');
+        ellipse(ctx, 12.4, 13.5, 8.6, 4.6, '#6f8fa3'); ellipse(ctx, 12.8, 15.2, 7, 2.4, '#c9d6de');
+        poly(ctx, [[10, 9.2], [13.4, 6.6], [15.6, 9.2]], '#5f7a8c');
+        cercle(ctx, 18.2, 12.4, 1.3, '#fff'); cercle(ctx, 18.4, 12.4, 0.7, '#1e2a30');
+        ctx.strokeStyle = '#4e6878'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(16, 13.5, 3.2, -1.1, 1.1); ctx.stroke();
+        break;
+      case 'olives': // rameau et olives
+        ctx.strokeStyle = '#6e4a2c'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(3, 19); ctx.quadraticCurveTo(11, 13, 21, 5); ctx.stroke();
+        [[7, 15, -0.9], [11, 12.2, 0.7], [14, 9.4, -0.8], [17.5, 7.4, 0.6], [9.6, 17.2, 0.9]].forEach(function (f) {
+          ctx.save(); ctx.translate(f[0], f[1]); ctx.rotate(f[2]); ellipse(ctx, 0, -3, 1.3, 3.6, '#6f8a4a'); ctx.restore();
+        });
+        cercle(ctx, 12.6, 16.2, 2.6, '#3c4a24'); cercle(ctx, 16.6, 13.4, 2.5, '#4f6a30'); cercle(ctx, 14.8, 18.6, 2.3, '#2e3a1c');
+        cercle(ctx, 12, 15.4, 0.8, '#7a8a5a'); cercle(ctx, 16, 12.6, 0.8, '#8a9a6a');
+        break;
+      case 'raisin': // grappe
+        ligne(ctx, [12, 7], [13.5, 3], '#6e4a2c', 1.3);
+        poly(ctx, [[13, 5], [19, 3], [21, 7], [16, 8.6]], '#5a8a3a');
+        a = [[9, 9], [12, 8.6], [15, 9], [7.6, 12], [10.5, 12], [13.5, 12], [16.4, 12], [9, 15], [12, 15], [15, 15], [10.5, 18], [13.5, 18], [12, 20.6]];
+        a.forEach(function (q, i) { cercle(ctx, q[0], q[1], 2, i % 3 ? '#7a3a8a' : '#62287a'); cercle(ctx, q[0] - 0.6, q[1] - 0.6, 0.6, '#b98ac8'); });
+        break;
+      case 'argile': // motte et briques crues
+        tas(ctx, 9, 20, 7, 9, '#a8583a', 3);
+        poly(ctx, [[13, 20], [13, 15.5], [21, 15.5], [21, 20]], '#b8683e'); poly(ctx, [[13, 15.5], [15, 14], [23, 14], [21, 15.5]], '#d08a58'); poly(ctx, [[21, 15.5], [23, 14], [23, 18.5], [21, 20]], '#8e4a2c');
+        break;
+      case 'bois': // trois rondins
+        [[7, 17], [17, 17], [12, 10.4]].forEach(function (q) {
+          cercle(ctx, q[0], q[1], 4.6, '#7a4a26'); cercle(ctx, q[0], q[1], 3.6, '#dcb27a');
+          ctx.strokeStyle = '#b98a52'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.arc(q[0], q[1], 2.2, 0, Math.PI * 2); ctx.stroke(); cercle(ctx, q[0], q[1], 0.7, '#b98a52');
+        });
+        break;
+      case 'fer': // lingots
+        [[3.5, 20, 0], [12.5, 20, 0], [8, 14, 1]].forEach(function (q) {
+          var x = q[0], y = q[1];
+          poly(ctx, [[x, y], [x + 1.5, y - 4.5], [x + 8, y - 4.5], [x + 9.5, y]], '#4a4e56');
+          poly(ctx, [[x + 1.5, y - 4.5], [x + 2.6, y - 6], [x + 7, y - 6], [x + 8, y - 4.5]], '#8a909a');
+          ligne(ctx, [x + 2.2, y - 3.4], [x + 7.6, y - 3.4], '#6a707a', 0.7);
+        });
+        break;
+      case 'marbre': // bloc veiné
+        poly(ctx, [[4, 10], [12, 6], [20, 10], [12, 14]], '#fbf8f2');
+        poly(ctx, [[4, 10], [12, 14], [12, 21.5], [4, 17.5]], '#e2dccf');
+        poly(ctx, [[12, 14], [20, 10], [20, 17.5], [12, 21.5]], '#cdc6b6');
+        ctx.strokeStyle = '#9a9488'; ctx.lineWidth = 0.7;
+        ctx.beginPath(); ctx.moveTo(6, 12); ctx.quadraticCurveTo(8, 16, 7, 19); ctx.moveTo(14, 15.5); ctx.quadraticCurveTo(17, 15, 18.5, 18); ctx.moveTo(8, 9.5); ctx.quadraticCurveTo(12, 9, 15, 10.6); ctx.stroke();
+        break;
+      case 'poterie': // vase à frise noire
+        ellipse(ctx, 12, 14.5, 6.4, 6, '#b8603a'); ellipse(ctx, 10.8, 13.6, 4.6, 4.6, '#d47a48');
+        ctx.fillStyle = '#2a1e18'; ctx.fillRect(6.2, 13, 11.6, 2); ctx.fillStyle = '#d47a48';
+        for (k = 0; k < 4; k++) ctx.fillRect(7.4 + k * 2.8, 13.4, 1.2, 1.2);
+        poly(ctx, [[9.6, 9], [14.4, 9], [13.6, 5.6], [10.4, 5.6]], '#c06a40');
+        ellipse(ctx, 12, 5.4, 3.4, 1.2, '#8a4428'); ellipse(ctx, 12, 20.4, 3, 0.9, '#8a4428');
+        ctx.strokeStyle = '#a0522e'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(7.6, 10, 2.2, Math.PI * 0.5, Math.PI * 1.5); ctx.stroke(); ctx.beginPath(); ctx.arc(16.4, 10, 2.2, -Math.PI * 0.5, Math.PI * 0.5); ctx.stroke();
+        break;
+      case 'mobilier': // tabouret à dossier
+        poly(ctx, [[5, 12], [15, 12], [19, 9.5], [9, 9.5]], '#a0683a');
+        poly(ctx, [[5, 12], [15, 12], [15, 13.6], [5, 13.6]], '#7a4a26');
+        poly(ctx, [[15, 12], [19, 9.5], [19, 11], [15, 13.6]], '#6a3e20');
+        ctx.fillStyle = '#6a3e20';
+        ctx.fillRect(5.4, 13.6, 1.6, 7); ctx.fillRect(13.2, 13.6, 1.6, 7.4); ctx.fillRect(17.2, 11, 1.4, 7.4);
+        ctx.fillRect(8.8, 2.6, 1.6, 7.6); ctx.fillRect(17.6, 2.6, 1.6, 7.6);
+        poly(ctx, [[8.8, 3], [19.2, 3], [19.2, 6.4], [8.8, 6.4]], '#b8784a');
+        break;
+      case 'huile': // amphore d'huile et goutte
+        ctx.save(); ctx.translate(10, 22); ctx.scale(1.45, 1.45); amphore(ctx, 0, 0, '#c9a24a', false); ctx.restore();
+        ctx.fillStyle = '#c2c050'; ctx.beginPath(); ctx.moveTo(18.5, 8); ctx.quadraticCurveTo(22.6, 13.8, 18.5, 15.6); ctx.quadraticCurveTo(14.4, 13.8, 18.5, 8); ctx.fill();
+        cercle(ctx, 17.6, 13, 0.8, '#eef08a');
+        break;
+      case 'vin': // amphore de vin et coupe
+        ctx.save(); ctx.translate(9.5, 22); ctx.scale(1.45, 1.45); amphore(ctx, 0, 0, '#a0522e', false); ctx.restore();
+        ctx.fillStyle = '#8e2335'; ctx.fillRect(5.6, 12.2, 7.6, 1.6);
+        poly(ctx, [[14.6, 12], [21.4, 12], [19.8, 15.4], [16.2, 15.4]], '#c8b070'); ellipse(ctx, 18, 12.1, 3.4, 1, '#8e2335');
+        ctx.fillStyle = '#c8b070'; ctx.fillRect(17.4, 15.4, 1.2, 4); ellipse(ctx, 18, 19.8, 2.4, 0.8, '#a8904a');
+        break;
+      case 'armes': // bouclier rond et glaive
+        ctx.save(); ctx.translate(12, 12); ctx.rotate(0.7);
+        ctx.fillStyle = '#d8dde2'; ctx.fillRect(-1.2, -11, 2.4, 14); poly(ctx, [[-1.2, -11], [0, -13], [1.2, -11]], '#d8dde2');
+        ctx.fillStyle = '#8a6a2a'; ctx.fillRect(-3.6, 3, 7.2, 1.6); ctx.fillStyle = '#5a3a20'; ctx.fillRect(-1, 4.6, 2, 4); cercle(ctx, 0, 9.4, 1.4, '#c9a23a');
+        ctx.restore();
+        cercle(ctx, 9, 14, 6.6, '#8a2a22'); cercle(ctx, 9, 14, 5.2, '#b03a2e'); cercle(ctx, 9, 14, 1.8, '#e0bf52');
+        ctx.strokeStyle = '#e0bf52'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.arc(9, 14, 3.6, 0, Math.PI * 2); ctx.stroke();
+        break;
+      default:
+        sac(ctx, 12, 20, c);
+    }
+  }
+  // Image d'un bien pour l'interface : un canvas neuf, taille × taille pixels CSS.
+  var IMAGES_BIENS = {};
+  function imageBien(g, taille) {
+    var f = Math.min(3, Math.max(1, window.devicePixelRatio || 1)), cle = g + '@' + f;
+    var src = IMAGES_BIENS[cle];
+    if (!src) {
+      src = document.createElement('canvas'); src.width = src.height = Math.ceil(48 * f);
+      var cx = src.getContext('2d'); cx.scale(2 * f, 2 * f); peindreBien(cx, g);
+      IMAGES_BIENS[cle] = src;
+    }
+    var c = document.createElement('canvas');
+    c.width = c.height = Math.ceil(taille * f);
+    c.style.width = c.style.height = taille + 'px';
+    c.className = 'bien-ico';
+    c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+    return c;
+  }
+
   // --- Accès publics ----------------------------------------------------------
   // Hauteur réservée au-dessus de l'emprise (zoom 1), par type de dessin.
   var HAUT = { puits: 34, fontaine: 34, reservoir: 30, aqueduc: 30, barriere: 18, ferme_ble: 30, grenier: 52, marche: 30, temple_ceres: 50, theatre: 34, colonie_acteurs: 40, forum: 40, prefecture: 44, ingenieur: 40, ruines: 14, gravats: 14, incendie: 50,
@@ -2300,6 +2659,7 @@
     incendie: function (t, fr, z) { return sprite('feu:' + t + ':' + fr, t, HAUT.incendie, function (ctx, P, tt) { peindreFlammes(ctx, P, tt, fr); }, z); },
     marcheur: marcheur,
     icone: icone,
+    imageBien: imageBien,
     // Tuile plate colorée (aperçu de pose, calques).
     losange: function (cle, couleur, z) { return sprite('l:' + cle, 1, 0, function (ctx, P) { sol(ctx, P, 0, 0, 1, 1, couleur, 'rgba(255,255,255,0.5)'); }, z); },
     // Dessin d'un bâtiment pour un bouton de menu (canvas de la taille demandée).

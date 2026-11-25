@@ -1053,12 +1053,9 @@
       if (!d.effectif) return;
       var relie = false, a = acces(e, b), k;
       for (k = 0; k < a.length && !relie; k++) if (avecMaison.has(comp[a[k]])) relie = true;
-      if (!relie && d.sansRoute) {
-        // Bâtiment posé sans route (fontaine) : une route à 2 cases ou moins suffit.
-        for (var yy = b.y - 2; yy < b.y + b.t + 2 && !relie; yy++) for (var xx = b.x - 2; xx < b.x + b.t + 2; xx++) {
-          if (dedans(e, xx, yy) && comp[ix(e, xx, yy)] && avecMaison.has(comp[ix(e, xx, yy)])) { relie = true; break; }
-        }
-      }
+      // Bâtiment qui se passe de route (fontaine) : ses employés viennent à pied, sans route
+      // (demande du propriétaire du 25 novembre 2026 ; avant, il fallait une route à 2 cases).
+      if (d.sansRoute) relie = true;
       if (!relie) { b.eff = 0; return; }
       demandes.push(b); total += d.effectif;
       relies.add(b.id);
@@ -1132,7 +1129,10 @@
     if (w.res) { var rb = e._index.get(w.res[0]); if (rb) liberer(rb, w.res[1], w.res[2]); w.res = null; }
     if ((w.type === 'immigrant' || w.type === 'sansabri') && w.cb) {
       var h = e._index.get(w.cb);
-      if (h && estMaison(h)) h.att = Math.max(0, h.att - w.gens);
+      if (h && estMaison(h)) {
+        h.att = Math.max(0, h.att - w.gens);
+        if (w.type === 'sansabri') h.attSa = Math.max(0, (h.attSa || 0) - w.gens);
+      }
     }
     if (estArtiste(w.type) && w.cb) {
       var th = e._index.get(w.cb);
@@ -1379,6 +1379,7 @@
           h = e._index.get(w.cb);
           if (h && estMaison(h) && arriveChezSoi(e, h, w.x, w.y)) {
             h.att = Math.max(0, h.att - w.gens);
+            if (w.type === 'sansabri') h.attSa = Math.max(0, (h.attSa || 0) - w.gens);
             var place = capacite(h) - h.hab;
             var entrent = Math.min(place, w.gens);
             if (entrent > 0) { h.hab += entrent; if (h.niv === 0) h.niv = 1; if (w.type === 'immigrant') e.flux.imm += entrent; }
@@ -1694,23 +1695,47 @@
     return choix;
   }
 
-  // Sans-abri : cherche une maison qui a de la place, sinon quitte la carte.
+  // Sans-abri (maison qui redescend, s'agrandit mal, brûle, s'effondre, perd sa route…) : chaque
+  // groupe marche vers la maison la plus proche qui a de la place, et y entre quelques secondes
+  // plus tard (demande du propriétaire du 25 novembre 2026). Une place retenue par des immigrants
+  // encore en route compte comme libre : les habitants passent avant eux (l'immigrant qui trouve
+  // la maison pleine cherche ailleurs). Personne pour les loger : ils quittent la carte.
   function creerSansAbri(e, i, gens) {
     var groupe = D.regles.emigration.groupeMax;
     i = pointDeSortie(e, i);
     while (gens > 0) {
+      var but = maisonProche(e, i);
+      if (!but) break;
+      var q = Math.min(groupe, gens, but.place);
+      creerMarcheur(e, 'sansabri', i, { gens: q, cb: but.h.id, ch: but.chemin, k: 0 });
+      but.h.att += q; but.h.attSa = (but.h.attSa || 0) + q;
+      gens -= q;
+    }
+    if (gens <= 0) return;
+    var ps = parcours(e, [i], passableLibre(e), function (j) { return j === e.sortie; }, 8 * e.N);
+    while (gens > 0) {
       var g = Math.min(groupe, gens);
       gens -= g;
-      var w = creerMarcheur(e, 'sansabri', i, { gens: g, cb: 0, ch: null, k: 0 });
-      var h = maisonLibre(e, g);
-      if (h) {
-        var portes = new Set(entreesMaison(e, h));
-        var p = parcours(e, [i], passableLibre(e), function (j) { return portes.has(j); }, 6 * e.N);
-        if (p) { w.cb = h.id; h.att += g; w.ch = p.chemin; w.k = 0; continue; }
-      }
-      var ps = parcours(e, [i], passableLibre(e), function (j) { return j === e.sortie; }, 8 * e.N);
-      if (ps) { w.ch = ps.chemin; w.k = 0; } else finir(e, w);
+      var w = creerMarcheur(e, 'sansabri', i, { gens: g, cb: 0, ch: ps ? ps.chemin.slice() : null, k: 0 });
+      if (!ps) finir(e, w);
     }
+  }
+
+  // Maison la plus proche à pied qui peut accueillir des sans-abri, avec le chemin pour y aller.
+  // Seules comptent les places déjà retenues pour d'autres sans-abri.
+  function maisonProche(e, i) {
+    var entrees = new Map();
+    e.batiments.forEach(function (h) {
+      if (!estMaison(h) || h.sansRoute > 0) return;
+      var place = capacite(h) - h.hab - (h.attSa || 0);
+      if (place <= 0) return;
+      entreesMaison(e, h).forEach(function (j) { if (!entrees.has(j)) entrees.set(j, { h: h, place: place }); });
+    });
+    if (!entrees.size) return null;
+    var p = parcours(e, [i], passableLibre(e), function (j) { return entrees.has(j); }, 6 * e.N);
+    if (!p) return null;
+    var c = entrees.get(p.fin);
+    return { h: c.h, place: c.place, chemin: p.chemin };
   }
 
   // On entre dans une maison depuis une route à 2 cases ou moins (la distance exigée pour
@@ -1733,16 +1758,6 @@
       if (e.route[ix(e, x, y)]) return ix(e, x, y);
     }
     return i;
-  }
-
-  function maisonLibre(e, g) {
-    var meilleur = null;
-    for (var k = 0; k < e.batiments.length; k++) {
-      var h = e.batiments[k];
-      if (!estMaison(h) || h.sansRoute > 0) continue;
-      if (capacite(h) - h.hab - h.att >= Math.min(g, 1)) { meilleur = h; break; }
-    }
-    return meilleur;
   }
 
   // ------------------------------------------------------------------------

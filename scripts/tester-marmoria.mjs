@@ -279,6 +279,44 @@ section('Formules (une au moins par règle chiffrée du lot 1)');
 }
 
 {
+  // Une maison qui redescend : ceux qui doivent partir vont à pied dans la maison la plus proche qui a
+  // de la place et y entrent en quelques secondes, même si cette place était retenue par des
+  // immigrants en route (demande du propriétaire du 25 novembre 2026).
+  const e = etatVide();
+  e.humeur = 45; // ni immigration ni émigration pendant l'essai
+  const [xa, ya] = caseLibre(e, 0, -1);
+  const a = maison(e, xa, ya, 3, D.maisons[2].habitants);
+  const [xl, yl] = caseLibre(e, 30, -1);
+  const loin = maison(e, xl, yl, 2, 0);   // loin : ne doit pas être choisie
+  const [xb, yb] = caseLibre(e, xa - 10 + 3, -1);
+  const pres = maison(e, xb, yb, 2, 0);   // à 3 cases : 6 places, toutes retenues par des immigrants
+  pres.att = 6;
+  const avant = e.pop;
+  a.manque = D.regles.maison.joursDescente;
+  O.quotidien(e, a);
+  const partants = D.maisons[2].habitants - D.maisons[1].habitants;
+  ok(a.niv === 2 && a.hab === D.maisons[1].habitants, `descente : ${partants} habitants doivent partir`);
+  let tic = 0;
+  while (pres.hab < partants && tic < 20 * 20) { sim.pas(e); tic++; }
+  ok(pres.hab === partants && loin.hab === 0, `relogés dans la maison la plus proche (${pres.hab} sur ${partants}, maison lointaine : ${loin.hab})`);
+  ok(tic <= 10 * 20, `relogés en ${(tic / 20).toFixed(1)} s de jeu à vitesse ×1 (10 s au plus)`);
+  ok(e.pop === avant, `aucun habitant perdu (${e.pop} sur ${avant})`);
+  ok(!e.marcheurs.some((w) => w.type === 'sansabri' && !w.fin), 'plus aucun sans-abri en route');
+}
+
+{
+  // Une fontaine reçoit ses employés sans route (demande du propriétaire du 25 novembre 2026).
+  const e = etatVide();
+  for (let k = 0; k < 4; k++) { const [x, y] = caseLibre(e, k * 2, -1); maison(e, x, y, 4, 10); }
+  const [xf, yf] = caseLibre(e, 0, -9);
+  const f = O.creerBatiment(e, 'fontaine', xf, yf);
+  let routeProche = false;
+  for (let y = yf - 3; y <= yf + 3; y++) for (let x = xf - 3; x <= xf + 3; x++) if (e.route[y * e.N + x]) routeProche = true;
+  sim.repartirTravail(e);
+  ok(!routeProche && f.eff === D.batiments.fontaine.effectif, `fontaine sans route : ${f.eff} employés sur ${D.batiments.fontaine.effectif}`);
+}
+
+{
   // Une tente entourée d'autres logements reçoit quand même ses immigrants : on entre
   // dans une maison depuis une route à 2 cases ou moins (demande du propriétaire du 24 novembre 2026).
   const e = sim.nouvelle('ostie', { libre: true, attractivite: false });

@@ -623,6 +623,9 @@
     if (v.mois !== undefined) v.n = v.mois; // pluriels des messages qui comptent des mois
     return t(m.cle, v);
   }
+  function nomBien(g, suite) {
+    return el('span', { classe: 'nom-bien' }, [DS.imageBien(g, 24), t('bien.' + g) + (suite || '')]);
+  }
   function ligne(a, b) { return el('div', { classe: 'ligne' }, [el('span', { texte: a }), el('strong', { texte: b })]); }
   function jauge(f) { var j = el('div', { classe: 'jauge' }, [el('i')]); j.firstChild.style.width = Math.round(Math.max(0, Math.min(1, f)) * 100) + '%'; return j; }
 
@@ -692,15 +695,24 @@
       p.appendChild(el('p', { classe: 'aide', texte: t('consigne.aide') }));
     }
     if (d.genre === 'marche') {
+      // Étals du marché en vignettes : image du bien, quantité, jauge jusqu'au seuil d'achat,
+      // liseré doré quand les maisons le réclament (demande du propriétaire du 25 novembre 2026).
       p.appendChild(el('h3', { texte: t('info.produits') }));
+      var grille = el('div', { classe: 'stock-grille' });
       D.aliments.concat(BIENS_MAISONS).forEach(function (g) {
-        var interdit = !!b.interdits[g];
-        p.appendChild(el('div', { classe: 'ligne bien' }, [
-          el('span', { texte: t('bien.' + g) + (b.dem[g] > 0 ? ' · ' + t('info.demande') : '') }),
-          el('strong', { texte: interdit ? t('info.interdit') : t('info.unites', { n: b.stocks[g] || 0 }) }),
-          el('button', { classe: 'mini', clic: function () { AUDIO.jouer('clic'); commander({ type: 'interdit', id: b.id, bien: g, valeur: !interdit }); if (panneauVivant) panneauVivant(); } , texte: t(interdit ? 'info.autoriser' : 'info.interdire') })
-        ]));
+        var interdit = !!b.interdits[g], q = b.stocks[g] || 0, demande = b.dem[g] > 0;
+        var seuil = D.aliments.indexOf(g) >= 0 ? D.regles.marche.seuilAchat : D.regles.marche.seuilBien;
+        var cs = el('div', { classe: 'stock-case' + (interdit ? ' interdit' : '') + (demande ? ' demande' : '') + (q > 0 ? '' : ' vide') }, [
+          DS.imageBien(g, 40),
+          el('span', { classe: 'nom', texte: t('bien.' + g) }),
+          el('strong', { texte: interdit ? t('info.interdit') : t('info.unites', { n: q }) }),
+          interdit ? null : jauge(q / seuil),
+          demande ? el('span', { classe: 'badge', title: t('info.demande'), texte: t('info.reclame') }) : null,
+          el('button', { classe: 'mini', aria: deuxPoints(t('bien.' + g), t(interdit ? 'info.autoriser' : 'info.interdire')), clic: function () { AUDIO.jouer('clic'); commander({ type: 'interdit', id: b.id, bien: g, valeur: !interdit }); if (panneauVivant) panneauVivant(); }, texte: t(interdit ? 'info.autoriser' : 'info.interdire') })
+        ]);
+        grille.appendChild(cs);
       });
+      p.appendChild(grille);
     }
     if (d.genre === 'spectacle') {
       d.artistes.forEach(function (a) {
@@ -722,7 +734,7 @@
   function ligneDepot(b, g, avecPlafond) {
     var C = D.regles.consignes, c = SIM.consigne(b, g);
     var l = el('div', { classe: 'ligne bien' }, [
-      el('span', { texte: t('bien.' + g) }),
+      nomBien(g),
       el('strong', { texte: t('info.charges', { n: Math.round((b.stocks[g] || 0) / 10) / 10 }) }), // nombre brut : le module choisit le pluriel et le met en forme
       el('button', { classe: 'mini c-' + c, aria: deuxPoints(t('info.consigne'), t('consigne.' + c)), clic: function () {
         AUDIO.jouer('clic'); commander({ type: 'consigne', id: b.id, bien: g, valeur: C[(C.indexOf(c) + 1) % C.length] }); if (panneauVivant) panneauVivant();
@@ -1027,7 +1039,7 @@
     p.appendChild(el('div', { classe: 'ligne bien entete' }, [el('span', { texte: t('commerce.bien') }), el('span', { texte: t('commerce.statut') })]));
     biensCommerce(e).forEach(function (g) {
       var s = SIM.statutBien(e, g), n = SIM.cibleBien(e, g), px = SIM.prixBien(e, g);
-      var l = el('div', { classe: 'ligne bien' }, [el('span', { texte: t('bien.' + g) + ' · ' + nb(SIM.stockVille(e, g) / 100) })]);
+      var l = el('div', { classe: 'ligne bien' }, [nomBien(g, ' · ' + nb(SIM.stockVille(e, g) / 100))]);
       l.appendChild(el('button', { classe: 'mini c-' + s, aria: deuxPoints(t('commerce.statut'), t('statut.' + s)), texte: t('statut.' + s), clic: function () {
         AUDIO.jouer('clic'); commander({ type: 'commerce', bien: g, statut: STATUTS_SUIVANT[s] }); if (panneauVivant) panneauVivant();
       } }));
