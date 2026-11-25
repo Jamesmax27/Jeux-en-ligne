@@ -1434,7 +1434,7 @@ Livré :
 - Dessins : quai de commerce (dallage sur l'eau, entrepôt, grue), navire marchand, caravane (mules bâtées), docker. Les marcheurs du commerce apparaissent dans le calque « Stocks ».
 - Sauvegarde en version 3 ; une sauvegarde des lots 1 et 2 est complétée au chargement.
 - Gouverneur automatique des missions (`exemples.js`). Il pose des quartiers de 4 × 2 pâtés fermés par des barrières, un bloc de logistique, et des lots d'industrie près de leur source. Il construit par étapes, dans l'ordre du jeu, puis gère le commerce, les demandes, les fêtes, les présents, l'impôt et les salaires. Les réglages de chaque mission sont dans `PLANS_MISSIONS`.
-- Mode test (`?debug=1`) : `MM_DEBUG.importer(texte)` ouvre une sauvegarde exportée, `MM_DEBUG.info(id)` le panneau d'un bâtiment.
+- Mode test (`?debug=1` dans l'adresse du lanceur) : toutes les missions jouables sont ouvertes, sans gagner les précédentes (`version` 6) ; `MM_DEBUG.importer(texte)` ouvre une sauvegarde exportée, `MM_DEBUG.info(id)` le panneau d'un bâtiment.
 - Textes : 228 clés de plus dans les 5 langues (865 en tout). La fiche du jeu annonce maintenant 5 missions, le commerce, les dieux et l'empereur. `version` 5.
 
 Mesures (sous Node, PC de développement) :

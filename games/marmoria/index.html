@@ -13657,7 +13657,9 @@
   }
   function rangTexte() { var n = echelonsGagnes(); return n ? t('rang.' + D.rangs[Math.min(n, D.rangs.length) - 1]) : t('rang.aucun'); }
   function missionOuverte(m) {
-    if (m.echelon === 1) return true;
+    // Mode test (?debug=1 dans l'adresse du lanceur) : toutes les missions jouables sont ouvertes,
+    // pour essayer directement Ravenne, Narbo ou Massalia.
+    if (m.echelon === 1 || window.JEL_DEBUG) return true;
     return MISSIONS.some(function (x) { return x.echelon === m.echelon - 1 && prog.gagnees[x.id]; });
   }
 
