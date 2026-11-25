@@ -23,7 +23,7 @@ Il reprend les mécaniques du genre popularisé par Caesar III (1998) : besoins 
 
 ### 1.2 Hors périmètre de la première version
 
-- Multijoueur.
+- Multijoueur, sauf le mode « Cités voisines » du lot 6 (section 16.7, décision du 25 novembre 2026) : ni ville partagée, ni partie en temps réel.
 - Éditeur de cartes ouvert aux joueurs (un éditeur interne suffit pour produire les missions).
 - Relief à plusieurs altitudes (falaises, plateaux).
 - Voix enregistrées.
@@ -39,7 +39,7 @@ Principe général, à faire confirmer par un juriste en cas de doute : les règ
 
 ### 1.4 Ampleur réelle du projet
 
-Ce cahier couvre environ 70 types de bâtiments, 35 types de marcheurs, 20 niveaux d'habitation et 17 cartes : un périmètre de production de studio. Le développer d'un bloc échouera. Le cahier impose donc 5 lots, chacun jouable et testable seul (section 21). Le lot 1 livre une petite ville vivante, sans commerce ni armée.
+Ce cahier couvre environ 70 types de bâtiments, 35 types de marcheurs, 20 niveaux d'habitation et 17 cartes : un périmètre de production de studio. Le développer d'un bloc échouera. Le cahier impose donc 5 lots, chacun jouable et testable seul (section 21), plus un sixième, à plusieurs, ajouté le 25 novembre 2026. Le lot 1 livre une petite ville vivante, sans commerce ni armée.
 
 ## 2. Boucle de jeu, victoire et défaite
 
@@ -748,6 +748,62 @@ Le jeu conserve les cartes gagnées, le rang, la fortune du gouverneur et les é
 
 La date cible vaut 1,5 fois la durée d'une partie de référence en difficulté normale : la troisième étoile reste accessible sans optimisation poussée. Chaque carte donne jusqu'à 3 étoiles, soit 51 au total. La campagne est terminée quand les 10 échelons sont gagnés ; rejouer un échelon dans l'autre province ajoute les étoiles de sa carte.
 
+### 16.7 Mode « Cités voisines » (lot 6)
+
+Seul mode à plusieurs du jeu, choisi par le propriétaire le 25 novembre 2026 et développé après le lot 5. Il ne touche ni la campagne ni la construction libre.
+
+**Principe**
+
+- De 2 à 4 joueurs forment une province. Chacun gouverne sa propre cité, sur sa propre carte et sur son propre appareil, à sa vitesse, pause comprise.
+- Sur la carte de l'Empire de chacun, les autres joueurs sont des cités partenaires : on ouvre une route vers eux, puis on leur vend et on leur achète avec les statuts de la section 12.2, comme à une cité de l'ordinateur.
+- Les joueurs n'ont pas besoin d'être en ligne en même temps : une province se joue sur plusieurs jours, chacun à son heure.
+
+**Calendriers indépendants : le comptoir de province**
+
+Chaque cité garde son propre calendrier ; aucune horloge n'est partagée. Les échanges passent par un comptoir de province que tient le serveur commun du site.
+
+- Vente : une caravane (ou un navire) qui part vers les voisins sort les charges des entrepôts et les dépose à l'étal de la cité, au comptoir. Elles restent à elle jusqu'à leur achat ; elle peut les reprendre avec sa caravane suivante.
+- Achat : une caravane qui arrive d'un voisin apporte, dans la limite de 8 charges, ce que les étals des voisins offrent parmi les biens que la cité importe. La cité paie à l'arrivée.
+- Paiement : le vendeur reçoit l'argent à sa prochaine connexion, au poste « Ventes aux voisins ».
+- Prix entre joueurs : la moyenne du prix d'importation et du prix d'exportation (section 20.6), par exemple 160 deniers pour une charge de poterie. Le vendeur gagne plus et l'acheteur paie moins qu'avec une cité de l'ordinateur.
+- Plafond : 40 charges par bien, par voisin et par année de la cité qui achète.
+
+**Ce que garantit le comptoir**
+
+- Il est la seule autorité. Chaque dépôt, achat ou paiement est une opération numérotée, appliquée une seule fois, même si le message arrive deux fois ou après une coupure. Aucune charge ni aucun denier n'y est créé ou perdu.
+- Ce qu'une cité reçoit entre dans sa simulation comme une commande datée (section 19.1, point 4) : le déterminisme et la sauvegarde restent tenus.
+- Le serveur ne garde que le comptoir : étals, soldes, statuts du commerce, pseudos et avancement affiché, quelques kilo-octets par province. La ville de chaque joueur reste sur son appareil.
+- Le jeu n'a toujours aucun accès réseau (section 19.1, point 7) : le lanceur du site fait le lien, comme pour les autres jeux à plusieurs.
+- Hors connexion, ou quota du serveur atteint : les routes vers les voisins sont fermées, comme pour l'événement « route fermée », et la cité continue avec les cités de l'ordinateur. Ce qu'elle a déposé reste au comptoir.
+
+**Provinces et cartes**
+
+- Cartes dessinées pour ce mode et complémentaires : chaque cité manque de matières qu'un voisin a en abondance (argile, olives, marbre, fer, poisson). L'échange entre joueurs rapporte ainsi plus que celui avec l'ordinateur.
+- Deux provinces de 4 cités au lot 6. Les cités de l'ordinateur y restent, avec des quotas plus bas.
+- Place libre, ou voisin absent depuis plus de 7 jours : sur les cartes des autres, une cité de l'ordinateur prend sa place (biens et quotas fixes, section 12.1), et son étal reste en vente. Le joueur reprend sa place à son retour. Le serveur ne simule aucune ville.
+
+**Rejoindre, voir les voisins**
+
+- Province privée, rejointe par un code ou par une invitation depuis la page Amis du site. Pas de province publique au hasard (point ouvert, section 22.2).
+- Chaque joueur voit de ses voisins : le pseudo de leur profil, leur population, leurs cotes et leur dernière visite. Aucun texte libre (règle du site).
+- Une province sans aucune visite pendant 30 jours est effacée du serveur.
+
+**Fin et récompenses**
+
+- Objectif de province, au choix du propriétaire (section 22.2). La fin est signalée par `FMG.reportEnd`, comme une mission.
+- Aucune récompense du profil joueur liée au commerce entre joueurs : seul le temps de jeu compte, comme en solo. Le serveur ne refait pas la simulation des villes : un appareil modifié pourrait déposer des charges inventées. Les provinces privées et le plafond de 40 charges limitent l'effet de cette triche à la province touchée.
+
+**Coût sur le serveur (estimation à mesurer au lot 6)**
+
+Une opération par caravane, soit au plus 3 messages par minute et par joueur à la vitesse ×4. Les écritures sont groupées : au plus une par minute et par province active. 25 provinces de 4 joueurs actifs une heure par jour font environ 18 000 messages, 900 requêtes, et de 1 500 à 6 000 lignes écrites selon que les voisins jouent ensemble ou à des heures différentes : loin des limites gratuites (100 000 requêtes et 100 000 lignes par jour, `docs/multijoueur.md`, section 7).
+
+**Côté site**
+
+- `game.json` : `"multijoueur": true` (étiquette « Multi » et rubrique « Multijoueur ») et `"places": 4`.
+- Quatrième dérogation (section 19.6), à coder dans le robot du site avant la demande de fusion : le robot contrôle le lien avec le comptoir au lieu des moteurs tour par tour ou temps réel.
+- Nouveau Durable Object « Province » dans le Worker commun, déployé par `multijoueur.yml` ; `docs/multijoueur.md` complété.
+- Politiques de confidentialité et de cookies : comptoir gardé 30 jours après la dernière visite, pseudos visibles par les voisins.
+
 ## 17. Interface et commandes
 
 L'écran de jeu tient en trois zones : une barre d'état en haut, le menu de construction (latéral, sur PC comme sur mobile) et la carte. Le détail passe par les panneaux d'information, les calques et les conseillers.
@@ -894,7 +950,7 @@ L'interface envoie des commandes, la simulation applique les règles lues dans l
 4. Commandes : toute action du joueur est un objet sérialisable appliqué à un tick donné. L'interface ne modifie jamais l'état directement.
 5. Données : bâtiments, biens, niveaux de maison, marcheurs, barèmes et missions vivent dans des fichiers validés au chargement. Aucun chiffre de règle dans le code.
 6. État entièrement sérialisable, avec un numéro de version.
-7. Aucun appel réseau en jeu : tous les fichiers sont locaux.
+7. Aucun appel réseau en jeu : tous les fichiers sont locaux. Au lot 6, les échanges entre cités voisines passent par le lanceur du site, jamais par le jeu (section 16.7).
 8. Bibliothèques tierces admises sous licence permissive (MIT, BSD, Apache). GPL et AGPL exclues.
 
 ### 19.2 Choix ouverts et recommandations
@@ -975,6 +1031,8 @@ Trois dérogations décidées par le propriétaire du site le 24 novembre 2026. 
 | `index.html` de moins de 2 Mo | Aucune limite si le besoin le justifie ; repère de 4 Mo | Contrôle « Fichiers » |
 | 20 niveaux au moins | 17 cartes en 10 échelons ; `window.JEL_NIVEAUX` et `niveaux` valent 17, `etoiles` vaut 51 | Contrôle « Niveaux » |
 | Téléphone en portrait d'abord | Jeu en paysage | Essai tactile et aperçus de téléphone en 844 × 390 |
+
+Le lot 6 demandera une quatrième dérogation (section 16.7) : un jeu marqué multijoueur qui n'utilise ni le moteur tour par tour du site ni son moteur temps réel.
 
 Deux écarts assumés avec le ressenti décrit par les consignes : une mission dure de 30 minutes à 3 heures, et le jeu demande plus de 10 secondes pour être compris. Les deux tutoriels compensent le second.
 
@@ -1092,7 +1150,7 @@ Repère d'équilibrage : un atelier exporte 4 charges par an, soit 560 à 720 de
 
 ## 21. Phasage et critères d'acceptation
 
-Le développement suit 5 lots dans l'ordre. Un lot ne démarre qu'une fois les critères du précédent atteints. Cinq est un plancher : en dessous, un lot devient trop gros pour être validé en une fois.
+Le développement suit 6 lots dans l'ordre (le lot 6, à plusieurs, est ajouté le 25 novembre 2026). Un lot ne démarre qu'une fois les critères du précédent atteints. Cinq est un plancher : en dessous, un lot devient trop gros pour être validé en une fois.
 
 | Lot | Contenu | Critères d'acceptation |
 | --- | --- | --- |
@@ -1101,6 +1159,7 @@ Le développement suit 5 lots dans l'ordre. Un lot ne démarre qu'une fois les c
 | 3. Commerce et empereur | Carte de l'Empire, caravanes, quais, navires ; demandes, faveur, tribut, dette ; cinq cotes, victoire et défaite ; cinq dieux, fêtes ; événements ; 5 conseillers (commerce, impérial, cotes, religion, en chef) ; missions Ravenne, Narbo et Massalia | Les trois missions se gagnent en difficulté normale ; un test par formule de cote ; `index.html` mesuré, repère de 2,6 Mo |
 | 4. Guerre et patriciens | Fortifications, caserne, académie, forts, 3 unités, commandement, combat ; 5 archétypes ennemis, invasions ; demandes de troupes ; destitution ; conseiller militaire ; niveaux 13 à 20 ; hippodrome, sénat, résidences ; pyramide des âges ; épidémies ; criminalité et émeutes ; niveaux de difficulté ; fortune du gouverneur ; missions Aquilée et Vindobona | Une invasion de 50 ennemis se joue aux cibles de performance ; un palais impérial (niveau 20) atteint en construction libre ; 10 000 habitants aux cibles de performance ; les deux missions se gagnent en difficulté normale ; `index.html` mesuré, repère de 3,4 Mo |
 | 5. Campagne et finitions | Les 10 cartes restantes ; équilibrage ; dates cibles des étoiles ; musique synthétisée ; affiche et aperçus ; aide intégrée ; textes de la page du jeu dans les 5 langues | La campagne se termine par les deux branches ; aucune chaîne non traduite ; tous les contrôles du site au vert ; `index.html` mesuré, repère de 4 Mo |
+| 6. Cités voisines | Mode à plusieurs de la section 16.7 : provinces de 2 à 4 joueurs, comptoir sur le serveur commun du site, cartes de deux provinces, cités de l'ordinateur aux places libres, province privée par code et par invitation d'un ami, carte de l'Empire et conseiller du commerce adaptés | Une province de 2 joueurs, sur deux appareils, à des vitesses différentes et avec un joueur absent 3 jours, atteint son objectif ; aucune charge ni aucun denier créé ou perdu sur 10 000 échanges simulés avec coupures, messages en double et rechargements ; déterminisme et sauvegarde tenus avec les commandes du comptoir ; coût sur le serveur mesuré pour 100 joueurs actifs par jour, dans le plan gratuit ; dérogation codée côté site ; contrôles du site au vert ; `index.html` mesuré, repère de 4,3 Mo |
 
 ### 21.1 Règles de conduite
 
@@ -1116,7 +1175,7 @@ Je n'ai aucune base fiable pour chiffrer la durée des lots avec un développeme
 
 ## 22. Risques et décisions à valider
 
-Les neuf décisions de cadrage sont prises, avec trois dérogations aux consignes du site. Deux points restent ouverts : les images embarquées et la date de publication.
+Les dix décisions de cadrage sont prises, avec trois dérogations aux consignes du site (une quatrième viendra au lot 6). Restent ouverts : les images embarquées, la date de publication et quatre points du mode « Cités voisines », à trancher au début du lot 6.
 
 ### 22.1 Décisions
 
@@ -1131,6 +1190,7 @@ Les neuf décisions de cadrage sont prises, avec trois dérogations aux consigne
 | 7 | Campagne | 17 cartes en 10 échelons, choix de la province à partir du quatrième, un rang gagné par échelon ; dérogation à la règle des 20 niveaux |
 | 8 | Étoiles | 3 étoiles par carte, la troisième accessible sans optimisation poussée (section 16.6) |
 | 9 | Nom | Marmoria, « la cité de marbre ». Aucun homonyme exact dans mes recherches du 24 novembre 2026, qui ne valent pas recherche de marque |
+| 10 | Multijoueur | Mode « Cités voisines » (section 16.7), au lot 6, après le lot 5 (décision du 25 novembre 2026) |
 
 Les dérogations aux consignes du site figurent en section 19.6.
 
@@ -1140,6 +1200,10 @@ Les dérogations aux consignes du site figurent en section 19.6.
 | --- | --- | --- |
 | Images embarquées | Dessin par le code seul ; images pour une partie des bâtiments | Essai sur 10 bâtiments avant le lot 2 (section 18.4) |
 | Publication | Attendre le lot 5 ; publier dès le lot 3 | La dérogation sur les niveaux rend possible une publication anticipée ; à décider à la fin du lot 3 |
+| Objectif d'une province (lot 6) | Commun : la province gagne quand chaque cité active atteint ses seuils ; course : la première cité à ses seuils gagne ; les deux, au choix du créateur de la province | Commun, avec la part de chacun affichée (ventes aux voisins, population) : le commerce entre joueurs profite alors à tous |
+| Rejoindre une province (lot 6) | Code et amis seulement ; aussi des provinces publiques au hasard | Code et amis seulement : une province dure des jours, et des inconnus l'abandonneraient |
+| Signaux entre voisins (lot 6) | Aucun ; liste fixe de demandes (« Je cherche du vin », « J'ai du marbre à vendre ») | Liste fixe : seule façon de se coordonner sans texte libre |
+| Durée de vie d'une province (lot 6) | 30 jours sans visite ; une durée fixe | 30 jours sans aucune visite |
 
 ### 22.3 Risques
 
@@ -1155,6 +1219,9 @@ Les dérogations aux consignes du site figurent en section 19.6.
 | Dérive entre le code et ce cahier | Moyen | Un test par formule ; liste des écarts à chaque lot |
 | Sauvegardes effacées par le navigateur | Moyen | Export par fichier ; stockage persistant demandé par le module du site |
 | Ressemblance jugée excessive avec le jeu d'origine | Faible si la section 1.3 est respectée | Nom, dessins, textes, cartes et campagne originaux |
+| Provinces abandonnées en cours de route (lot 6) | Élevé | Cité de l'ordinateur à la place d'un voisin absent ; objectif atteignable par les cités restées actives |
+| Mode « Cités voisines » dépendant du serveur commun et de son quota | Moyen | Routes vers les voisins fermées hors connexion ou quota atteint, partie solo intacte ; écritures groupées |
+| Triche sur le comptoir (lot 6) | Faible, provinces privées | Plafond de 40 charges, aucune récompense du profil liée au commerce entre joueurs |
 
 ### 22.4 Ce que ce cahier ne fixe pas
 
