@@ -191,7 +191,7 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
       if (!choix) throw new ErreurVideo(`Plan ${k + 1} du montage (${(n / IPS).toFixed(1)} s) : plus aucun passage exploitable dans ${file.join(', ')}. Ajouter des jeux ou choisir un rythme plus court.`);
       const fiche = await lireJeu(choix.id.split('@')[0]);
       const court = n / IPS < 1.5;
-      const vars = { ...variables, titre: fiche.titre, rang: k + 1 };
+      const vars = { ...variables, titre: titreCourt(fiche.titre), titre_complet: fiche.titre, rang: k + 1 };
       const tx = [];
       // Texte du haut et pastille du bas : un par plan, dans l'ordre de la variante (ou à tour de rôle).
       const pris = (liste) => (Array.isArray(liste) && liste.length ? (variante.en_boucle ? liste[k % liste.length] : liste[k]) : undefined);
@@ -244,6 +244,12 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
     recette: { type, nom, accroche, ...(type === 'presentation' ? { jeux, textes, rythme } : {}) },
     jeuxMontres: montres, ecartes: rushes.ecartes, chiffres: variables,
   };
+}
+
+/** Titre d'un jeu sans son sous-titre (« Gloups, le trou noir de la ville » → « Gloups ») : il doit se lire en 2 secondes. */
+export function titreCourt(titre) {
+  const court = String(titre).split(/\s*[:,–—]\s+/)[0].trim();
+  return court.length >= 4 ? court : titre;
 }
 
 function planDeJeu({ rush, depart }, cible) {

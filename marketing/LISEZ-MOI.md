@@ -89,7 +89,7 @@ Format d'une recette : une liste de `plans`, chacun avec sa `duree` (secondes) e
 Structure : accroche → montage de gameplay → écran de fin (logo, `freemicrogames.com`, appel à l'action). Durée : 20 à 35 secondes.
 
 - **Recettes** : `marketing/videos/presentations/<id>.json` = `{ "accroche", "jeux", "textes", "rythme" }`, les mêmes réglages que la commande.
-- **Textes** (`marketing/videos/textes/<variante>.json`) : `legendes` (texte du haut de chaque plan, dans l'ordre), `etiquettes` (pastille du bas ; par défaut le titre du jeu), `en_boucle`, `rafale` (texte posé sur les plans très courts), `fin` (`appel`, `detail`). Variables : `{titre}` (titre du jeu montré), `{rang}` (numéro du plan), `{site}`.
+- **Textes** (`marketing/videos/textes/<variante>.json`) : `legendes` (texte du haut de chaque plan, dans l'ordre), `etiquettes` (pastille du bas ; par défaut le titre du jeu), `en_boucle`, `rafale` (texte posé sur les plans très courts), `fin` (`appel`, `detail`). Variables : `{titre}` (titre du jeu montré, sans son sous-titre), `{titre_complet}`, `{rang}` (numéro du plan), `{site}`.
 - **Rythmes** (`gabarit.json`) : tempo de la musique, durée de chaque plan en temps (les coupes tombent sur les temps), transition (`coupe`, `zoom`, `glisse`), ambiance de la musique (`arcade`, `planant`, `tension`).
 - **Gabarit graphique** (`marketing/videos/gabarit.json`) : couleurs et polices du site (ciel indigo, lilas, or, Fredoka et Nunito), styles de texte, zone sûre, seuils de lisibilité. Les textes restent dans la zone sûre : TikTok, Reels et Shorts recouvrent le haut, le bas et, dans la moitié basse, une colonne de boutons à droite.
 
