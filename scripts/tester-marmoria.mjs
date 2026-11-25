@@ -108,7 +108,7 @@ section('Données');
 ok(D.missions.length === 17 && D.maisons.length === 20, '17 missions et 20 niveaux de maison');
 try { nouveauMonde((d) => { d.maisons.pop(); }); ok(false, 'données sans le niveau 20 acceptées'); } catch (err) { ok(/Données invalides/.test(err.message), 'données invalides refusées avec un message'); }
 try { nouveauMonde((d) => { d.batiments.puits.cout = 'cinq'; }); ok(false, 'coût non numérique accepté'); } catch { ok(true, ''); }
-ok(D.missions.filter((m) => m.dispo).map((m) => m.id).join(',') === 'ostie,pompei,ravenne,narbo,aquilee,massalia,vindobona', 'lots 1 à 4 : Ostie, Pompéi, Ravenne, Narbo, Aquilée, Massalia et Vindobona jouables');
+ok(D.missions.every((m) => m.dispo), 'lot 5 : les 17 missions jouables');
 
 // --------------------------------------------------------------------------
 section('Formules (une au moins par règle chiffrée du lot 1)');
@@ -1406,6 +1406,74 @@ section('Lot 4 : missions militaires jouées par le gouverneur automatique (diff
   ok(gagnees >= 2, `aquilee : ${gagnees} victoire(s) sur 3 départs du gouverneur automatique`);
   jouerMilitaire('vindobona', 4, 240, 0);
   console.log('  (Vindobona : mesure seulement, voir le cahier, section 23.9)');
+}
+
+section('Lot 5 : campagne complète, les 10 cartes des échelons 6 à 10');
+{
+  ok(D.rangs.length === 10, '10 rangs, de citoyen à princeps');
+  for (let n = 1; n <= 10; n++) {
+    const pr = D.missions.filter((m) => m.echelon === n).map((m) => m.province).sort().join(' et ');
+    ok(pr === (n <= 3 ? 'paisible' : 'militaire et paisible'), `échelon ${n} : ${pr}`);
+  }
+  // Seuils et dates cibles qui montent d'un échelon à l'autre, dans chaque province.
+  for (const br of ['paisible', 'militaire']) {
+    const l = D.missions.filter((m) => m.province === br || m.echelon <= 3).sort((a, b) => a.echelon - b.echelon);
+    ok(l.every((m, k) => !k || (m.objectifs.population >= l[k - 1].objectifs.population && m.dateCibleMois > l[k - 1].dateCibleMois)), `province ${br} : population et date cible croissantes`);
+  }
+  const NOUVELLES = ['ephese', 'burdigala', 'alexandrie', 'leptis', 'corinthe', 'colonia', 'antioche', 'palmyre', 'athenes', 'eburacum'];
+  // Ce que la carte permet de produire, et qui le paie (cités visibles dès le départ).
+  const SOURCE = { olives: 'prairie', raisin: 'prairie', huile: 'prairie', vin: 'prairie', ble: 'prairie', legumes: 'prairie', fruits: 'prairie', porc: 'prairie', argile: 'eau', poterie: 'eau', bois: 'arbres', mobilier: 'arbres', fer: 'rochers', armes: 'rochers', marbre: 'rochers', poisson: 'bancs' };
+  for (const id of NOUVELLES) {
+    const m = D.missions.find((x) => x.id === id), e = sim.nouvelle(id, {}), N = e.N;
+    const cnt = { prairie: 0, eau: 0, arbres: 0, rochers: 0, bancs: (e.bancs || []).length };
+    for (let i = 0; i < N * N; i++) { const t = e.terrain[i]; if (t === sim.T.PRAIRIE) cnt.prairie++; else if (t === sim.T.EAU) cnt.eau++; else if (t === sim.T.ARBRES) cnt.arbres++; else if (t === sim.T.ROCHERS) cnt.rochers++; }
+    const vendables = new Set();
+    m.empire.cites.filter((c) => !c.cachee).forEach((c) => Object.keys(c.achete).forEach((g) => { if (cnt[SOURCE[g]] > (SOURCE[g] === 'bancs' ? 0 : 20)) vendables.add(g); }));
+    ok(vendables.size >= 4, `${id} : ${vendables.size} biens à vendre aux cités voisines (${[...vendables].join(', ')})`);
+    ok(m.empire.cites.every((c) => c.route === 'terre' || e.mer >= 0), `${id} : une voie maritime pour chaque cité de la mer`);
+    // Chaque armée peut atteindre la ville : chemin à pied (ni eau, ni rocher) jusqu'à la voie de Rome.
+    const R = ex.ligneRome(sim, e), but = R * N + (N >> 1);
+    const atteint = (x0, y0) => {
+      const vu = new Uint8Array(N * N), file = [y0 * N + x0]; vu[file[0]] = 1;
+      for (let t = 0; t < file.length; t++) {
+        const i = file[t]; if (i === but) return true;
+        const x = i % N;
+        for (const v of [i - N, x < N - 1 ? i + 1 : -1, i + N, x > 0 ? i - 1 : -1]) if (v >= 0 && v < N * N && !vu[v] && e.terrain[v] !== sim.T.EAU && e.terrain[v] !== sim.T.ROCHERS) { vu[v] = 1; file.push(v); }
+      }
+      return false;
+    };
+    const inv = m.evenements.filter((ev) => ev.type === 'invasion');
+    ok(inv.every((ev) => e.terrain[ev.entree[1] * N + ev.entree[0]] !== sim.T.EAU && atteint(ev.entree[0], ev.entree[1])), `${id} : ${inv.length} invasion(s), chaque entrée relie la ville`);
+    ok(m.evenements.filter((ev) => ev.type === 'seisme').every((ev) => ev.zone[0] >= 0 && ev.zone[1] >= 0 && ev.zone[2] < N && ev.zone[3] < N && ev.zone[0] <= ev.zone[2] && ev.zone[1] <= ev.zone[3]), `${id} : zones des séismes dans la carte`);
+  }
+  // Deux années (militaires : jusqu'à la première invasion) jouées par le gouverneur automatique.
+  const t0 = Date.now();
+  for (const id of NOUVELLES) {
+    const m = D.missions.find((x) => x.id === id), plan = ex.planifierMission(sim, id), e = sim.nouvelle(id, { rang: m.echelon - 1 }), etat = {};
+    const mois = m.province === 'militaire' ? 26 : 24;
+    let erreur = null, invariant = null;
+    try {
+      for (let mo = 0; mo < mois; mo++) {
+        for (let k = 0; k < TM; k++) { sim.pas(e); if (k === 0 || k === TM / 2) ex.jouerMission(sim, e, plan, etat); if (k % TJ === TJ / 2) ex.piloterArmee(sim, e); }
+        if (!invariant) { const pb = sim.invariants(e); if (pb.length) invariant = pb[0]; }
+      }
+    } catch (err) { erreur = err; }
+    ok(!erreur && !invariant, `${id} : ${mois} mois du gouverneur sans erreur, invariants tenus${erreur ? ' : ' + erreur.message : invariant ? ' : ' + invariant : ''} (${e.pop} habitants)`);
+    if (m.province === 'militaire') ok((e.stats.invasionsSubies || 0) >= 1, `${id} : la première invasion arrive`);
+  }
+  console.log(`  10 cartes jouées en ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+  // Corinthe : le séisme rase les bâtiments de sa zone.
+  {
+    const id = 'corinthe', plan = ex.planifierMission(sim, id), e = sim.nouvelle(id, { rang: 7 }), etat = {};
+    for (let mo = 0; mo < 14; mo++) for (let k = 0; k < TM; k++) { sim.pas(e); if (k === 0 || k === TM / 2) ex.jouerMission(sim, e, plan, etat); }
+    const k = D.missions.find((x) => x.id === id).evenements.findIndex((ev) => ev.type === 'seisme'), z = D.missions.find((x) => x.id === id).evenements[k].zone;
+    const dansZone = () => e.batiments.filter((b) => b.x >= z[0] && b.x <= z[2] && b.y >= z[1] && b.y <= z[3] && !['ruines', 'gravats'].includes(b.type)).length;
+    const avant = dansZone();
+    e.script.find((s) => s.k === k).m = Math.floor(e.tick / TM) + 1;
+    for (let j = 0; j < 2 * TM; j++) sim.pas(e);
+    ok(e.journal.some((j) => j.cle === 'msg.evt.seisme') && avant > 0 && dansZone() < avant, `corinthe : le séisme rase sa zone (${avant} bâtiments avant, ${dansZone()} après)`);
+    ok(sim.invariants(e).length === 0, 'corinthe : invariants tenus après le séisme');
+  }
 }
 
 // --------------------------------------------------------------------------

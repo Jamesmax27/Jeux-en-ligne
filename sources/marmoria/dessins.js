@@ -28,7 +28,7 @@
     return '#' + m.map(function (x) { return ('0' + (+x).toString(16)).slice(-2); }).join('');
   }
   var C = {
-    herbe: ['#7fa84a', '#78a246', '#83ad4f', '#7aa548'], prairie: '#a9b64e', terre: '#b08a5a', sable: '#d8c48e',
+    herbe: ['#7fa84a', '#78a246', '#83ad4f', '#7aa548'], sableSol: ['#d9c08a', '#d2b880', '#dfc794', '#d5bc84'], prairie: '#a9b64e', terre: '#b08a5a', sable: '#d8c48e',
     eau: '#3f7fb5', eauClair: '#6aa5d6', pierre: '#c9bfa8', pierreF: '#a79e88', rome: '#9c937e',
     bois: '#8a5a32', boisC: '#a8743f', chaume: '#cfa64b', tuile: '#b9573a', tuileF: '#9c4630',
     enduit: '#e8d8b6', marbre: '#efeae0', toile: '#e9dcc0', rougeToile: '#b5443a',
@@ -367,6 +367,51 @@
   function reglerDPR(d) { if (d !== DPR) { DPR = d; vider(); } }
 
   // --- Sol -----------------------------------------------------------------
+  // Sol aride (missions au climat « aride ») : sable ocre, touffes sèches, cailloux.
+  function peindreSable(ctx, P, v) {
+    var base = C.sableSol[(v >> 2) & 3];
+    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, base);
+    var a0 = P(0, 0), a1 = P(1, 1), g = ctx.createLinearGradient(a0[0], a0[1], a1[0], a1[1]);
+    g.addColorStop(0, 'rgba(255,250,225,0.07)'); g.addColorStop(1, 'rgba(90,60,20,0.07)');
+    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, g);
+    for (var k = 0; k < 3; k++) {
+      var c = P(0.2 + hachage(v, k + 20) * 0.6, 0.2 + hachage(k + 21, v) * 0.6);
+      ellipse(ctx, c[0], c[1], 6 + hachage(v, k) * 5, 2 + hachage(k, v) * 2, k % 2 ? 'rgba(120,80,30,0.08)' : 'rgba(255,240,200,0.10)');
+    }
+    // Rides du vent, deux ou trois touffes sèches, un caillou.
+    for (k = 0; k < 2; k++) {
+      var r0 = P(0.15 + hachage(v, k + 30) * 0.3, 0.3 + k * 0.35), r1 = P(0.55 + hachage(k + 31, v) * 0.3, 0.3 + k * 0.35);
+      ligne(ctx, r0, r1, teinte(base, 0.9), 0.8);
+    }
+    for (k = 0; k < 2 + (v & 1); k++) {
+      var p = P(0.15 + hachage(v, k + 50) * 0.7, 0.15 + hachage(k + 51, v) * 0.7);
+      ctx.strokeStyle = k % 2 ? '#9a8a4a' : '#8a7a3e'; ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] - 1.6, p[1] - 2.6); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] + 0.2, p[1] - 3); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] + 1.8, p[1] - 2.2); ctx.stroke();
+    }
+    if ((v & 3) === 1) { var s = P(0.62, 0.45); ellipse(ctx, s[0], s[1], 1.8, 1.1, '#a8987a'); ellipse(ctx, s[0] - 0.4, s[1] - 0.4, 0.9, 0.5, '#c8b898'); }
+  }
+  // Palmier (arbres des missions arides).
+  function peindrePalmier(ctx, P, v) {
+    var n = 1 + (v % 2);
+    for (var k = 0; k < n; k++) {
+      var u = n === 1 ? 0.5 : 0.34 + k * 0.36, w = n === 1 ? 0.5 : 0.6 - k * 0.28;
+      var b = P(u, w, 0), h = 26 - k * 5 + v * 2, pench = (v + k) % 2 ? 3 : -3;
+      ellipse(ctx, b[0] + 5, b[1] + 1, 9, 3, 'rgba(80,55,20,0.28)');
+      // Stipe annelé, légèrement penché.
+      for (var j = 0; j < 6; j++) {
+        var y0 = b[1] - j * h / 6, x0 = b[0] + pench * j / 6;
+        ctx.fillStyle = j % 2 ? '#8a6a3e' : '#7a5a32'; ctx.fillRect(x0 - 1.8 + j * 0.1, y0 - h / 6 - 0.3, 3.6 - j * 0.2, h / 6 + 0.6);
+      }
+      var tx = b[0] + pench, ty = b[1] - h;
+      // Palmes : arcs verts retombants, la plus claire vers la lumière.
+      for (var f = 0; f < 7; f++) {
+        var a = -Math.PI + f * Math.PI / 6, lx = Math.cos(a) * 12, ly = Math.sin(a) * 5;
+        ctx.strokeStyle = f === 2 || f === 3 ? '#6fa046' : f % 2 ? '#4f7e30' : '#5a8a38'; ctx.lineWidth = 2.6;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo(tx + lx * 0.6, ty + ly - 6, tx + lx, ty + ly + 4); ctx.stroke();
+      }
+      cercle(ctx, tx - 1.2, ty + 1.5, 1.4, '#7a4a22'); cercle(ctx, tx + 1.4, ty + 1.8, 1.3, '#8a5426');
+    }
+  }
   function peindreHerbe(ctx, P, v) {
     var base = C.herbe[(v >> 2) & 3];
     sol(ctx, P, -0.02, -0.02, 1.02, 1.02, base); // léger débord : pas de liseré entre cases au zoom progressif
@@ -3076,6 +3121,8 @@
     teinte: teinte,
     couleurs: C,
     herbe: function (v, z) { return sprite('sol:h' + v, 1, 0, function (ctx, P) { peindreHerbe(ctx, P, v); }, z); },
+    sable: function (v, z) { return sprite('sol:s' + v, 1, 0, function (ctx, P) { peindreSable(ctx, P, v); }, z); },
+    palmier: function (v, z) { return sprite('palmier:' + v, 1, 40, function (ctx, P) { peindrePalmier(ctx, P, v); }, z); },
     prairie: function (f, z) { return sprite('sol:p' + f, 1, 0, function (ctx, P) { peindrePrairie(ctx, P, f); }, z); },
     eau: function (fr, z) { return sprite('sol:e' + fr, 1, 0, function (ctx, P) { peindreEau(ctx, P, fr); }, z); },
     rivage: function (masque, fr, z) { return sprite('sol:r' + masque + ':' + (fr & 1), 1, 0, function (ctx, P) { peindreRivage(ctx, P, masque, fr); }, z); },

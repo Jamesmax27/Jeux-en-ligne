@@ -249,6 +249,7 @@
     function ecranTuile(rx, ry) { return [((rx - ry) * 32 - cx) * z + hw, ((rx + ry) * 16 - cy) * z + hh]; }
     var calque = this.calque;
     var aqEau = SIM.aqueducsEnEau(e); // cases d'aqueduc reliées à un réservoir plein
+    var mi = SIM.mission(e), aride = !!(mi && mi.climat === 'aride'); // sable et palmiers (Alexandrie, Leptis Magna, Palmyre)
 
     // 1. Sol : terrain et routes.
     var rx, ry, p, x, y, i, xy;
@@ -259,7 +260,7 @@
       var t = e.terrain[i], s;
       if (t === T.EAU) s = DS.eau((frameEau + x + y) & 3, zc);
       else if (t === T.PRAIRIE) s = DS.prairie(e.fertilite[i] < 50 ? 0 : e.fertilite[i] < 80 ? 1 : 2, zc);
-      else s = DS.herbe(teinteHerbe(x, y) * 4 + ((x * 31 + y * 17) & 3), zc);
+      else s = (aride ? DS.sable : DS.herbe)(teinteHerbe(x, y) * 4 + ((x * 31 + y * 17) & 3), zc);
       this.poser(s, p[0], p[1]);
       if (t === T.EAU && DS.rivage) {
         // Rive : sable et écume du côté de la terre (dans le sens de l'affichage).
@@ -348,7 +349,7 @@
           }
         } else if (!calque) {
           var tt = e.terrain[i];
-          if (tt === T.ARBRES) this.poser(DS.arbre((x * 7 + y * 3) % 3, zc), p[0], p[1]);
+          if (tt === T.ARBRES) this.poser((aride ? DS.palmier : DS.arbre)((x * 7 + y * 3) % 3, zc), p[0], p[1]);
           else if (tt === T.ROCHERS) this.poser(DS.rocher((x + y) % 3, zc), p[0], p[1]);
         }
         if (e.aqueduc[i] && !calque) {
@@ -518,7 +519,8 @@
     var N = e.N, T = SIM.T;
     if (!this._miniImg || this._miniImg.width !== N) { this._miniImg = document.createElement('canvas'); this._miniImg.width = N; this._miniImg.height = N; }
     var ic = this._miniImg.getContext('2d'), img = ic.createImageData(N, N), d = img.data;
-    var COUL = { 0: [122, 162, 70], 1: [170, 180, 80], 2: [60, 100, 45], 3: [140, 135, 125], 4: [63, 127, 181] };
+    var mi = SIM.mission(e), aride = !!(mi && mi.climat === 'aride');
+    var COUL = { 0: aride ? [214, 190, 136] : [122, 162, 70], 1: [170, 180, 80], 2: aride ? [104, 140, 64] : [60, 100, 45], 3: [140, 135, 125], 4: [63, 127, 181] };
     for (var i = 0; i < N * N; i++) {
       var c = COUL[e.terrain[i]] || COUL[0];
       if (e.route[i]) c = [205, 196, 170];

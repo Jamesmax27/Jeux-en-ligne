@@ -1652,3 +1652,58 @@ Demande : améliorer la qualité graphique des bâtiments et du paysage, et fair
 - Tous les bâtiments : liseré d'ombre au pied des murs, arête éclairée en haut, rangs de tuiles et faîtière sur les toits, ombre portée au sol (vers le bas à droite de l'écran, plus longue pour un bâtiment plus grand). Ces changements passent par les outils de dessin communs : aucun bâtiment n'a été redessiné un par un.
 - Colons : chaque groupe d'immigrants arrive en chariot bâché tiré par un bœuf, un colon à pied à côté ; le dessin est 1,3 fois plus grand qu'un marcheur. La règle ne change pas : un chariot porte un groupe de 4 personnes au plus (section 6.1).
 - Les images de la page du jeu et l'affiche n'ont pas été refaites : elles le seront au lot 5 (« affiche et aperçus »).
+
+### 23.11 Lot 5 « Campagne et finitions » (25 novembre 2026)
+
+Livré :
+
+- **Les 10 dernières cartes** (16.1 à 16.3), toutes jouables : la campagne compte ses 17 cartes.
+
+  | Éch. | Province paisible | Province militaire |
+  | --- | --- | --- |
+  | 6 | **Éphèse** : port, peu de prairies (blé par la mer), marbre ; 7 cités, épidémie | **Burdigala** : vignes sur peu de prairies, Garonne ; Gaulois puis Germains (5 invasions, 14 à 52), 2 demandes de troupes |
+  | 7 | **Alexandrie** : climat aride, prairies le long du Nil seulement, blé de Memphis ; feu plus rapide | **Leptis Magna** : aride, olives ; cavaliers numides par le sud (5 invasions, 16 à 56) |
+  | 8 | **Corinthe** : deux séismes qui rasent une zone de la ville ; marbre, poterie | **Colonia Agrippina** : le Rhin ne se franchit que par le pont de la voie de Rome ; Germains (6 invasions, 20 à 90) |
+  | 9 | **Antioche** : carte de 160 × 160, quartiers patriciens, hippodrome, un séisme | **Palmyre** : oasis aride sur un oued, 160 × 160 ; Parthes (6 invasions, 20 à 84) |
+  | 10 | **Athènes** : 160 × 160, tous les systèmes, deux petites incursions germaniques, un séisme | **Eburacum** : 160 × 160, forêts ; Pictes (6 invasions, 20 à 90), 3 demandes de troupes |
+
+  Chaque carte a ses cités partenaires (6 ou 7, dont une qui apparaît en cours de partie), ses demandes de l'empereur, ses aléas (mauvaise récolte, route fermée, hausse des prix et des salaires de Rome, quotas) et sa présentation dans les 5 langues ; 43 cités nouvelles nommées dans les 5 langues.
+- **Climat aride** (Alexandrie, Leptis Magna, Palmyre) : sol de sable, touffes sèches et palmiers à la place de l'herbe et des arbres, mini-carte ocre ; le feu y gagne plus vite (règle `feu.climats` existante).
+- **Fin de campagne** (16.6) : la campagne est terminée quand les 10 échelons sont gagnés, par l'une ou l'autre province. L'écran de victoire l'annonce (rang de Princeps, étoiles sur 51) et propose de rejouer l'autre province d'un échelon ; la liste des missions l'indique. `FMG.reportComplete` part à ce moment, puis à chaque victoire suivante (le site garde le meilleur total). Avant ce lot, il ne partait que si les 17 cartes étaient gagnées. Après une victoire, « Mission suivante » propose l'échelon suivant dans la même province.
+- **Musique** (18.5) : motifs composés au fil de l'eau par Web Audio, sans fichier, en quatre ambiances choisies d'après la ville : petite ville (lyre en pentatonique), grande ville dès 1 500 habitants (lyre, aulos, nappe, mode mixolydien), menace quand une armée arrive dans 3 mois ou moins (bourdon grave, notes rares, mode phrygien), combat tant que des ennemis sont sur la carte (tambours, ostinato). L'ambiance change en fin de phrase. Réglage « Musique » dans les options, indépendant du son ; rien ne joue hors d'une partie.
+- **Aide intégrée** (17.6), depuis la pause, la liste des missions et le panneau de chaque bâtiment (« Fiche d'aide ») :
+  - 16 fiches « Comment ça marche » : premiers pas, routes et marcheurs, maisons, eau, nourriture, main-d'œuvre, industrie, feu et crime, finances, dieux, spectacles et santé, commerce, empereur, critères de victoire, armée, patriciens ;
+  - une fiche par bâtiment constructible (74), écrite d'après ses données : catégorie, taille, coût, personnel, accès, terrain, production, matière, marcheur, dieu, capacité, marbre, niveau de maison qui en a besoin, attractivité, risques d'incendie et d'effondrement.
+- **Affiche et images du jeu** refaites avec le graphisme du lot 4 ; la troisième ville d'exemple (affiche, image 3, fond de l'écran titre) reçoit un rempart et quatre tours à l'ouest.
+- **Page du jeu** : présentation mise à jour dans les 5 langues (17 cartes sur 10 échelons, choix d'une province dès le quatrième).
+- Textes : 132 clés de plus dans les 5 langues (1 138 en tout).
+- Tests : section « Lot 5 » de `scripts/tester-marmoria.mjs` (17 missions jouables, deux provinces par échelon dès le 4e, seuils et dates cibles croissants, au moins 4 biens vendables par carte, voie maritime pour chaque cité de la mer, chaque entrée d'invasion reliée à la ville à pied, zones de séisme dans la carte, 24 à 26 mois de gouverneur automatique par carte sans erreur ni invariant rompu, première invasion arrivée sur chaque carte militaire, séisme de Corinthe qui rase sa zone). En mode test (`?debug=1`), `MM_DEBUG.gagner()` et `MM_DEBUG.gagnees()` permettent d'essayer les écrans de fin.
+
+Mesures :
+
+| Critère (section 21) | Résultat |
+| --- | --- |
+| La campagne se termine par les deux branches | **Vérifié dans le jeu, pas en jouant** : dans Chromium (français sur ordinateur, allemand sur téléphone en paysage), avec 9 échelons gagnés par la branche militaire puis une victoire à Eburacum, et de même par la branche paisible jusqu'à Athènes, l'écran annonce la fin de campagne et `FMG.reportComplete` part avec 23 étoiles sur 51. **Aucune des 10 cartes n'a été gagnée par le gouverneur automatique** : sur 25 ans de jeu, il ne dépasse pas 1 050 habitants (Éphèse) et perd 6 cartes sur 10 (destitution, ou ville anéantie à Burdigala). C'était déjà sa limite à l'échelon 5 (23.6, 23.9). Que ces cartes se gagnent reste à vérifier en jouant. |
+| Aucune chaîne non traduite | `check-i18n` : 5 langues, 1 138 clés ; interface parcourue dans Chromium (90 fiches d'aide ouvertes une à une, écrans de fin, cartes arides) sans erreur ni avertissement dans la console. |
+| Tous les contrôles du site au vert | En local : `tester-marmoria --perf` (344 contrôles), `validate-games --jouer`, `tester-sauvegarde`, `check-i18n` (partie jeu), `controle-taxonomie`, `regles-seo`, `verifier-seo` : tout est bon. La partie « site » de `check-i18n` signale 5 erreurs `serviceWorker` dans le lanceur, identiques avec un autre jeu (`pommes-du-poney`) : elles viennent du Chromium de l'environnement de test (déjà vu au lot 1). |
+| `index.html` mesuré, repère de 4 Mo | 1 622 Ko (lot 4 : 1 484 Ko après le graphisme). |
+| Performances sur les cartes de 160 × 160 | 160 mois du gouverneur automatique, un seul processus : pire tick 27 ms à Palmyre (invasions parthes), 7 ms à Antioche ; la ville du lot 2 sur 160 × 160 reste sous 1 ms par tick en moyenne (`--perf`). |
+| Dates cibles des étoiles | Voir l'écart 2. |
+
+Écarts avec ce cahier (à valider ; les valeurs sont dans `donnees.json`) :
+
+1. **Seuils de prospérité des provinces paisibles 8 à 10** abaissés de 65, 70 et 75 à 60, 62 et 65. Le plafond de la prospérité est la valeur moyenne de la maison de chaque habitant (14.2) : une ville toute en insulae plafonne à 55. Pour 75, il faudrait 44 % des habitants en palais, ou 80 % en villas, et les patriciens ne travaillent pas : la ville d'Athènes (10 000 habitants) manquerait de bras. À 65, 22 % des habitants en palais suffisent. Calcul d'ordre de grandeur, pas une partie jouée : à revoir après une séance de jeu. Les provinces militaires gardent 45, 50 et 60.
+2. **Dates cibles** (troisième étoile) : 288, 324, 360, 396 et 432 mois pour les échelons 6 à 10, prolongées de la pente des échelons 3 à 5 (126 à 240 mois). La règle « 1,5 fois une partie de référence » ne peut pas s'appliquer : aucune partie de référence n'est gagnée.
+3. **Climat aride** : seulement un feu plus rapide et des prairies rares ; aucune règle de plus sur la nourriture (« nourriture importée » vient de la carte : à Alexandrie, Leptis Magna et Palmyre, 350 à 450 cases de prairie contre 1 000 à 1 400 ailleurs).
+4. **Tailles des cartes** : 120 × 120 pour les échelons 6 à 8, 160 × 160 pour les échelons 9 et 10 (seules tailles du moteur : 80, 120, 160).
+5. **Fonds de départ** : 7 500, 7 000, 6 500, 6 000 et 5 000 deniers en province paisible (repère 16.3) ; 10 000 à 12 000 en province militaire, comme Aquilée et Vindobona (écart 13 du lot 4).
+6. **Séismes** : zones fixes de 13 × 9 cases près du centre de la carte, où passe la voie de Rome. Un joueur qui bâtit ailleurs peut n'y rien perdre.
+7. **Athènes** : deux petites incursions germaniques (16 et 30 guerriers) pour que « tous les systèmes » comprenne l'armée.
+8. **Fiches d'aide des bâtiments** : la phrase de description déjà écrite pour chaque bâtiment, suivie de ses données ; pas de texte rédigé à la main bâtiment par bâtiment.
+9. **Musique** : sa qualité n'a pas été jugée à l'oreille (les essais tournent sans haut-parleur) ; repli prévu par le cahier : le réglage « Musique » la coupe, les effets restent.
+10. **Image 3 et affiche** : la ville du lot 2 avec ses insulae, plus un rempart hors du cadre de l'image. Une ville de fin de campagne (villas, palais, forts, hippodrome) demanderait un plan de construction automatique que je n'ai pas écrit (même limite que l'écart 12 du lot 4).
+
+Constats :
+
+- Le gouverneur automatique ne prouve plus rien à partir de l'échelon 5 : son plan pose des quartiers de tentes et de cabanes, son économie ne dépasse pas 2 500 habitants, et les cartes des échelons 6 à 10 partent avec moins d'argent. Le rendre capable de les gagner (quartiers d'insulae puis de patriciens, achats de nourriture planifiés) serait un chantier à part.
+- Chaque carte a au moins 4 biens à vendre aux cités visibles dès le départ, d'après son terrain (prairies, rive, arbres, rochers, bancs de poissons) : la carte elle-même ne bloque pas l'économie.

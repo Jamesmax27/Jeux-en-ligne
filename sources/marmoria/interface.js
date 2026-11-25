@@ -60,7 +60,7 @@
   // ------------------------------------------------------------------------
   // Progression (JEL_SAVE) et options
   // ------------------------------------------------------------------------
-  var prog = { niveau: 1, gagnees: {}, fortune: 0, options: { son: true, pauseCritique: false, defilement: 2, geste: false, auto: 0 } };
+  var prog = { niveau: 1, gagnees: {}, fortune: 0, options: { son: true, musique: true, pauseCritique: false, defilement: 2, geste: false, auto: 0 } };
   var progChargee = false;
   function lireProg(d) {
     if (!d || typeof d !== 'object') return;
@@ -75,15 +75,24 @@
     if (!progChargee) return;
     try { window.JEL_SAVE.save(JEU, { niveau: prog.niveau, score: totalEtoiles(), options: prog.options, gagnees: prog.gagnees, fortune: prog.fortune }); } catch (e) { /* sans stockage */ }
   }
-  function appliquerOptions() { AUDIO.couper(!prog.options.son); majBoutonSon(); }
+  function appliquerOptions() { AUDIO.couper(!prog.options.son); AUDIO.musiqueActive(prog.options.musique !== false); majBoutonSon(); }
   // Lecture seule au lancement (son coupé, geste déjà vu) : jamais d'écriture depuis l'écran titre.
   try { lireProg(window.JEL_SAVE.load(JEU)); } catch (e) { /* valeurs par défaut */ }
   AUDIO.couper(!prog.options.son);
+  AUDIO.musiqueActive(prog.options.musique !== false);
 
   function echelonsGagnes() {
     var vus = {};
     MISSIONS.forEach(function (m) { if (prog.gagnees[m.id]) vus[m.echelon] = 1; });
     return Object.keys(vus).length;
+  }
+  function campagneFinie() { return echelonsGagnes() >= D.rangs.length; }
+  // Mission proposée après une victoire : l'échelon suivant, dans la même province si possible ;
+  // sinon la première mission ouverte et pas encore gagnée.
+  function missionSuivante(m) {
+    var ouvertes = MISSIONS.filter(function (x) { return x.dispo && missionOuverte(x) && !prog.gagnees[x.id]; });
+    var suivantes = ouvertes.filter(function (x) { return x.echelon === m.echelon + 1; });
+    return suivantes.filter(function (x) { return x.province === m.province; })[0] || suivantes[0] || ouvertes[0] || null;
   }
   function rangTexte() { var n = echelonsGagnes(); return n ? t('rang.' + D.rangs[Math.min(n, D.rangs.length) - 1]) : t('rang.aucun'); }
   function missionOuverte(m) {
@@ -154,7 +163,7 @@
   }
   function quitterPartie() {
     finirOrdre();
-    partie = null;
+    partie = null; AUDIO.musique(null);
     hud.hidden = true;
     annulerOutil();
     ecranTitre();
@@ -240,6 +249,18 @@
     $('v-vitesse').textContent = v === 0 ? t('vitesse.pause') : t('vitesse.x', { v: I18N.nombre(v) });
     if (partie.derniere && Date.now() - partie.derniere > D.regles.annulationSecondes * 1000) { partie.derniere = 0; $('b-annuler-derniere').hidden = true; }
     majTutoProgres();
+    choisirMusique();
+  }
+  // Ambiance de la musique (section 18.5) : combat tant que des ennemis sont sur la carte, menace
+  // quand une armée arrive dans 3 mois ou moins, grande ville dès 1 500 habitants, sinon petite ville.
+  function choisirMusique() {
+    if (!partie || partie.figee) { AUDIO.musique(null); return; }
+    var e = partie.e, amb = 'petite';
+    var ennemis = (e.unites || []).some(function (u) { return u.c === 1 && !u.mort && u.etat !== 'absent'; });
+    if (e.invasion && ennemis) amb = 'combat';
+    else if (SIM.armees(e).some(function (a) { return a.mois <= 3; })) amb = 'menace';
+    else if (e.pop >= 1500) amb = 'grande';
+    AUDIO.musique(amb);
   }
   function changerVitesse(sens) {
     if (!partie) return;
@@ -668,6 +689,8 @@
     p.appendChild(el('h2', { texte: nomBat(b) }));
     if (b.type === 'logement') return remplirMaison(p, b);
     if (t('bat.' + b.type + '.aide')) p.appendChild(el('p', { texte: t('bat.' + b.type + '.aide') }));
+    var typeAide = b.type;
+    p.appendChild(el('button', { classe: 'lien-aide', texte: t('aide.fiche'), clic: function () { AUDIO.jouer('clic'); fermerPanneau(); ecranAide(fermerEcran, 'bat:' + typeAide); } }));
     var cause = SIM.cause(e, b);
     if (d.genre !== 'ruines' && d.genre !== 'incendie') p.appendChild(el('p', { classe: cause ? 'etat-ko' : 'etat-ok', texte: cause ? t('info.arret', { cause: t('cause.' + cause) }) : t('info.enService') }));
     if (d.effectif) p.appendChild(ligne(t('info.effectif'), t('info.surTotal', { n: b.eff, max: d.effectif })));
@@ -1431,7 +1454,7 @@
 
   function ecranTitre() {
     hud.hidden = true;
-    partie = null;
+    partie = null; AUDIO.musique(null);
     // Fond : la grande ville d'exemple, qui vit doucement.
     var e = chargerVille(3);
     if (e) {
@@ -1491,6 +1514,7 @@
     var carte = el('div', { classe: 'carte-ecran' });
     carte.appendChild(el('h1', { texte: t('missions.titre') }));
     carte.appendChild(el('p', { texte: t('missions.bilan', { rang: rangTexte(), n: totalEtoiles(), max: MAX_ETOILES }) }));
+    if (campagneFinie()) carte.appendChild(el('p', { classe: 'etat-ok', texte: t('missions.campagneFinie') }));
     var grille = el('div', { classe: 'grille-missions' });
     var prochaine = MISSIONS.filter(function (m) { return m.dispo && missionOuverte(m) && !prog.gagnees[m.id]; })[0];
     MISSIONS.forEach(function (m) {
@@ -1512,6 +1536,7 @@
     carte.appendChild(el('div', { classe: 'boutons' }, [
       bouton(t('libre.bouton'), function () { ecranLibre(); }, 'gros non'),
       bouton(t('missions.charger'), function () { ecranSauvegardes('charger', ecranMissions); }, 'gros non'),
+      bouton(t('aide.titre'), function () { ecranAide(ecranMissions); }, 'gros non'),
       bouton(t('ui.retour'), ecranTitre, 'gros non')
     ]));
     ouvrirEcran(carte, { retour: ecranTitre });
@@ -1624,6 +1649,7 @@
         bouton(t('pause.charger'), function () { ecranSauvegardes('charger', ecranPause); }, 'gros non'),
         bouton(t('pause.exporter'), exporterVille, 'gros non'),
         bouton(t('pause.options'), function () { ecranOptions(ecranPause); }, 'gros non'),
+        bouton(t('aide.titre'), function () { ecranAide(ecranPause); }, 'gros non'),
         bouton(t('pause.recommencer'), function () { var m = partie.m, libre = partie.e.tout; fermerEcran(); if (libre) { choixLibre.carte = m.id; nouvelleLibre(); } else nouvelleMission(m); }, 'gros non'),
         bouton(t('pause.missions'), function () { sauverVilleAuto(); quitterVersMissions(); }, 'gros non'),
         bouton(t('pause.accueil'), function () { sauverVilleAuto(); sauverProg(); quitterPartie(); }, 'gros non')
@@ -1631,23 +1657,111 @@
     ]);
     ouvrirEcran(carte, { retour: fermerEcran });
   }
-  function quitterVersMissions() { partie = null; hud.hidden = true; annulerOutil(); ecranMissions(); }
+  function quitterVersMissions() { partie = null; AUDIO.musique(null); hud.hidden = true; annulerOutil(); ecranMissions(); }
 
   function ecranOptions(retour) {
     var o = prog.options;
     var bascule = function (cle, nom) {
-      return bouton(deuxPoints(t(nom), t(o[cle] ? 'ui.oui' : 'ui.non')), function () { o[cle] = !o[cle]; if (cle === 'son') { AUDIO.couper(!o.son); majBoutonSon(); } sauverProg(); ecranOptions(retour); }, 'gros non');
+      return bouton(deuxPoints(t(nom), t(o[cle] !== false ? 'ui.oui' : 'ui.non')), function () {
+        o[cle] = o[cle] === false; if (cle === 'son') { AUDIO.couper(!o.son); majBoutonSon(); }
+        if (cle === 'musique') AUDIO.musiqueActive(o.musique);
+        sauverProg(); ecranOptions(retour);
+      }, 'gros non');
     };
     var carte = el('div', { classe: 'carte-ecran' }, [
       el('h1', { texte: t('options.titre') }),
       el('div', { classe: 'boutons' }, [
         bascule('son', 'options.son'),
+        bascule('musique', 'options.musique'),
         bascule('pauseCritique', 'options.pauseCritique'),
         bouton(deuxPoints(t('options.defilement'), t('options.defilement' + o.defilement)), function () { o.defilement = (o.defilement + 1) % 4; sauverProg(); ecranOptions(retour); }, 'gros non'),
         bouton(t('options.revoirGestes'), function () { ecranGeste(0); }, 'gros non')
       ]),
       el('div', { classe: 'boutons' }, [bouton(t('ui.retour'), retour, 'gros or')])
     ]);
+    ouvrirEcran(carte, { retour: retour });
+  }
+
+  // ------------------------------------------------------------------------
+  // Aide intégrée (section 17.6) : une fiche par mécanique (textes aide.<id>.*) et une fiche par
+  // bâtiment, écrite d'après ses données (taille, coût, personnel, accès, production, risques…).
+  // ------------------------------------------------------------------------
+  var MECANIQUES = ['debut', 'routes', 'maisons', 'eau', 'nourriture', 'travail', 'industrie', 'securite', 'finances', 'religion', 'culture', 'commerce', 'empereur', 'cotes', 'armee', 'patriciens'];
+  var BESOIN_SERVICE = { barbier: 'barbier', bains: 'bains', medecin: 'medecin', hopital: 'hopital', ecole: 'ecole', bibliotheque: 'bibliotheque', academie: 'academie', marche: 'nourriture', puits: 'eau', fontaine: 'eau' };
+  var aideOnglet = 'mecaniques';
+  function niveauBesoin(cle) { for (var k = 0; k < D.maisons.length; k++) if (D.maisons[k].besoins[cle]) return D.maisons[k].niveau; return 0; }
+  function cleBesoin(id, d) {
+    if (d.produit && niveauBesoin(d.produit)) return d.produit;
+    if (BESOIN_SERVICE[id]) return BESOIN_SERVICE[id];
+    if (d.dieu) return 'religion';
+    if (d.genre === 'spectacle') return 'divertissement';
+    return null;
+  }
+  function niveauRisque(v) { return t(!(v > 0) ? 'aide.aucun' : v >= 0.8 ? 'aide.eleve' : v >= 0.4 ? 'aide.moyen' : 'aide.faible'); }
+  function remplirFicheBatiment(p, id) {
+    var d = D.batiments[id];
+    p.appendChild(el('h2', { texte: t('bat.' + id + '.nom') }));
+    p.appendChild(el('p', { texte: t('bat.' + id + '.aide') }));
+    p.appendChild(ligne(t('aide.categorie'), t('cat.' + d.categorie)));
+    p.appendChild(ligne(t('aide.taille'), d.trace ? t('aide.trace') : t('aide.cases', { n: d.taille })));
+    if (d.cout) p.appendChild(ligne(t('aide.cout'), t(d.trace ? 'aide.parCase' : 'aide.deniers', { n: nb(d.cout) })));
+    if (d.effectif) p.appendChild(ligne(t('aide.employes'), nb(d.effectif)));
+    if (d.genre !== 'ruines' && d.genre !== 'incendie' && !d.trace) p.appendChild(ligne(t('aide.acces'), t(d.sansRoute ? 'aide.sansRoute' : 'aide.route')));
+    if (d.terrain === 'prairie') p.appendChild(ligne(t('aide.terrain'), t('aide.prairie')));
+    if (d.pres) p.appendChild(ligne(t('aide.terrain'), t('aide.pres.' + d.pres)));
+    if (d.produit) p.appendChild(ligne(t('aide.produit'), d.chargesParAn ? t('aide.parAn', { bien: t('bien.' + d.produit), n: d.chargesParAn }) : t('bien.' + d.produit)));
+    if (d.matiere) p.appendChild(ligne(t('aide.matiere'), t('bien.' + d.matiere)));
+    if (d.marcheur) p.appendChild(ligne(t('aide.marcheur'), t('marcheur.' + d.marcheur)));
+    if (d.dieu) p.appendChild(ligne(t('aide.dieu'), t('dieu.' + d.dieu)));
+    if (d.couverture) p.appendChild(ligne(t('aide.couverture'), t('aide.habitants', { n: nb(d.couverture) })));
+    if (d.marbre) p.appendChild(ligne(t('aide.marbre'), t('aide.charges', { n: d.marbre })));
+    var cb = cleBesoin(id, d), nv = cb ? niveauBesoin(cb) : 0;
+    if (nv) p.appendChild(ligne(t('aide.besoin'), t('aide.besoinNiveau', { n: nv })));
+    if (d.attractivite && d.attractivite[0]) p.appendChild(ligne(t('aide.attractivite'), t('aide.attractiviteVal', { v: (d.attractivite[0] > 0 ? '+' : '') + d.attractivite[0], r: d.attractivite[1] })));
+    if (d.feu !== undefined) p.appendChild(ligne(t('aide.feu'), niveauRisque(d.feu)));
+    if (d.dommages !== undefined) p.appendChild(ligne(t('aide.dommages'), niveauRisque(d.dommages)));
+    if (d.eauRequise) p.appendChild(el('p', { classe: 'aide', texte: t('aide.eauRequise') }));
+    if (d.unique) p.appendChild(el('p', { classe: 'aide', texte: t('aide.unique') }));
+  }
+  // retour : écran d'où l'on vient ; sujet : 'meca:<id>' ou 'bat:<type>' pour ouvrir une fiche.
+  function ecranAide(retour, sujet) {
+    var carte = el('div', { classe: 'carte-ecran aide-ecran' });
+    var rouvrir = function (s) { ecranAide(retour, s); };
+    if (sujet) {
+      var k = sujet.indexOf(':'), genre = sujet.slice(0, k), id = sujet.slice(k + 1);
+      if (genre === 'bat' && D.batiments[id]) remplirFicheBatiment(carte, id);
+      else {
+        carte.appendChild(el('h2', { texte: t('aide.' + id + '.titre') }));
+        carte.appendChild(el('p', { texte: t('aide.' + id + '.texte') }));
+      }
+      carte.appendChild(el('div', { classe: 'boutons' }, [
+        bouton(t('aide.retourListe'), function () { rouvrir(null); }, 'gros non'),
+        bouton(t('ui.retour'), retour, 'gros or')
+      ]));
+      ouvrirEcran(carte, { retour: function () { rouvrir(null); } });
+      return;
+    }
+    carte.appendChild(el('h1', { texte: t('aide.titre') }));
+    var barre = el('div', { classe: 'onglets' });
+    ['mecaniques', 'batiments'].forEach(function (o) {
+      barre.appendChild(el('button', { classe: 'onglet' + (o === aideOnglet ? ' actif' : ''), texte: t('aide.' + o), clic: function () { AUDIO.jouer('clic'); aideOnglet = o; rouvrir(null); } }));
+    });
+    carte.appendChild(barre);
+    var liste = el('div', { classe: 'liste-aide' });
+    if (aideOnglet === 'mecaniques') {
+      MECANIQUES.forEach(function (m) { liste.appendChild(bouton(t('aide.' + m + '.titre'), function () { rouvrir('meca:' + m); }, 'gros non')); });
+      carte.appendChild(liste);
+    } else {
+      D.categories.forEach(function (c) {
+        var ids = Object.keys(D.batiments).filter(function (b) { return D.batiments[b].categorie === c; });
+        if (!ids.length) return;
+        carte.appendChild(el('h3', { texte: t('cat.' + c) }));
+        var l = el('div', { classe: 'liste-aide' });
+        ids.forEach(function (b) { l.appendChild(bouton(t('bat.' + b + '.nom'), function () { rouvrir('bat:' + b); }, 'gros non')); });
+        carte.appendChild(l);
+      });
+    }
+    carte.appendChild(el('div', { classe: 'boutons' }, [bouton(t('ui.retour'), retour, 'gros or')]));
     ouvrirEcran(carte, { retour: retour });
   }
 
@@ -1718,19 +1832,21 @@
   function ecranVictoire() {
     var e = partie.e, m = partie.m, v = e.victoire, n = v.etoiles;
     AUDIO.jouer('victoire');
-    var avant = prog.gagnees[m.id] | 0;
+    var avant = prog.gagnees[m.id] | 0, finieAvant = campagneFinie();
     prog.gagnees[m.id] = Math.max(avant, n);
     prog.niveau = Math.max(prog.niveau, Math.min(MISSIONS.length, m.numero + 1));
     // Mission gagnée : progression enregistrée (niveau suivant), puis fin signalée au site.
     if (e.empereur) prog.fortune = e.fortune;
     try { window.JEL_SAVE.save(JEU, { niveau: prog.niveau, score: totalEtoiles(), options: prog.options, gagnees: prog.gagnees, fortune: prog.fortune }); } catch (err) { /* sans stockage */ }
     if (window.FMG) window.FMG.reportEnd({ completed: true, level: m.numero });
-    var toutes = MISSIONS.every(function (x) { return prog.gagnees[x.id]; });
-    if (toutes) { if (window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: MAX_ETOILES }); }
+    // Campagne terminée quand les 10 échelons sont gagnés, par l'une ou l'autre province (16.6) ;
+    // rappelé à chaque victoire suivante (le site garde le meilleur total d'étoiles).
+    var finie = campagneFinie(), premiere = finie && !finieAvant;
+    if (finie && window.FMG) window.FMG.reportComplete({ stars: totalEtoiles(), maxStars: MAX_ETOILES });
     sauverVilleAuto();
     var gros = el('div', { classe: 'grosses-etoiles', aria: t('missions.etoilesAria', { n: n, max: 3 }) });
     for (var k = 0; k < 3; k++) gros.appendChild(el('span', { classe: k < n ? '' : 'vide', texte: '★' }));
-    var suivante = MISSIONS.filter(function (x) { return x.dispo && missionOuverte(x) && !prog.gagnees[x.id]; })[0];
+    var suivante = missionSuivante(m);
     var carte = el('div', { classe: 'carte-ecran' }, [
       el('h1', { texte: t('victoire.titre') }),
       gros,
@@ -1740,7 +1856,9 @@
       el('p', { classe: e.secoursRecu ? 'ko' : 'ok', texte: t('victoire.etoile2') }),
       el('p', { classe: n >= 3 ? 'ok' : 'ko', texte: t('victoire.etoile3', { mois: m.dateCibleMois }) }),
       n > avant && avant ? el('p', { classe: 'etat-ok', texte: t('victoire.record') }) : null,
-      toutes ? el('p', { classe: 'etat-ok', texte: t('victoire.campagne') }) : null,
+      premiere ? el('h2', { texte: t('campagne.titre') }) : null,
+      premiere ? el('p', { classe: 'etat-ok', texte: t('campagne.texte', { n: totalEtoiles(), max: MAX_ETOILES }) }) : null,
+      premiere ? el('p', { texte: t('campagne.suite') }) : null,
       el('div', { classe: 'boutons' }, [
         suivante ? bouton(t('victoire.suivante'), function () { quitterVersMissions(); ecranBriefing(suivante); }, 'gros or') : null,
         bouton(t('victoire.continuer'), fermerEcran, 'gros non'),
@@ -1840,7 +1958,11 @@
       // Une partie enregistrée (texte d'une sauvegarde exportée) ouverte telle quelle.
       importer: function (txt) { var e = SIM.importer(txt); prog.options.geste = true; fermerEcran(); demarrerEtat(e); return true; },
       // Panneau d'information d'un bâtiment, par son numéro.
-      info: function (id) { if (!partie || !SIM.batiment(partie.e, id)) return false; rendu.selection = id; ouvrirPanneau(function (p) { remplirBatiment(p, id); }); return true; }
+      info: function (id) { if (!partie || !SIM.batiment(partie.e, id)) return false; rendu.selection = id; ouvrirPanneau(function (p) { remplirBatiment(p, id); }); return true; },
+      // Victoire immédiate de la mission en cours (essai des écrans de fin et de la fin de campagne).
+      gagner: function (n) { if (!partie) return false; partie.e.victoire = { tick: partie.e.tick, mois: Math.floor(partie.e.tick / D.ticksParMois), etoiles: n || 3 }; partie.finVue = false; apresTicks(); return true; },
+      // Missions gagnées (progression), par leurs identifiants : { ostie: 3, … }.
+      gagnees: function (g) { prog.gagnees = g || {}; progChargee = true; return echelonsGagnes(); }
     };
   }
 

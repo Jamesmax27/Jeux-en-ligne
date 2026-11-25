@@ -296,6 +296,17 @@
       if ((deja[type] || 0) >= compte[type]) return;
       poserPres(sim, e, type, centre[0], centre[1] + 8);
     });
+    // 6. Niveau 5 (ville de fin de campagne, lot 5) : rempart à l'ouest de la ville, ouvert sur la
+    // voie de Rome (une porte ne se pose pas sur la voie), une tour de chaque côté de l'ouverture.
+    if ((options.niveau || 4) >= 5) {
+      var mx = x0 - 4, mur = [];
+      for (var my = y0 - 8; my <= y1 + 6; my++) if (my < R - 1 || my > R + 1) mur.push([mx, my]);
+      degager(sim, e, mur);
+      // Tracé en deux lignes droites (une muraille se trace en ligne).
+      cmd(sim, e, { type: 'tracer', bat: 'muraille', cases: mur.filter(function (q) { return q[1] < R; }) });
+      cmd(sim, e, { type: 'tracer', bat: 'muraille', cases: mur.filter(function (q) { return q[1] > R; }) });
+      [[mx + 1, R - 4], [mx + 1, R + 3], [mx + 1, y0 - 7], [mx + 1, y1 + 4]].forEach(function (q) { degager(sim, e, [[q[0], q[1]], [q[0] + 1, q[1]], [q[0], q[1] + 1], [q[0] + 1, q[1] + 1]]); poser('tour', q[0], q[1]); });
+    }
     sim.calculerEau(e);
     sim.calculerAttractivite(e);
     sim.majPopulation(e);
@@ -469,7 +480,50 @@
       fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_fruits'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_porcs'), F3()],
       ateliers: [['mine_fer', 'atelier_armes', 'atelier_armes'], ['carriere_argile', 'atelier_poterie'], ['mine_fer', 'atelier_armes', 'atelier_armes'], ['camp_bucherons', 'atelier_mobilier'], ['atelier_poterie', 'atelier_poterie'], ['atelier_armes', 'atelier_armes'], ['ferme_vigne', 'cave'], ['ferme_olives', 'pressoir']],
       dieux: [['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars'], ['ceres', 'venus'], ['mercure', 'neptune']],
-      defense: { avant: 22, casernes: [13.2, 73], academie: 120, forts: [{ type: 'fort_javelots', ordre: 13.4 }, { type: 'fort_javelots', ordre: 48 }, { type: 'fort_cavaliers', ordre: 72 }, { type: 'fort_legionnaires', ordre: 90 }, { type: 'fort_legionnaires', ordre: 112 }] } }
+      defense: { avant: 22, casernes: [13.2, 73], academie: 120, forts: [{ type: 'fort_javelots', ordre: 13.4 }, { type: 'fort_javelots', ordre: 48 }, { type: 'fort_cavaliers', ordre: 72 }, { type: 'fort_legionnaires', ordre: 90 }, { type: 'fort_legionnaires', ordre: 112 }] } },
+    // Lot 5 : échelons 6 à 10. Les cartes arides (Alexandrie, Leptis Magna, Palmyre) ont peu de
+    // prairies : moins de fermes, le reste du blé s'achète (piloter importe quand des maisons ont faim).
+    ephese: { quartiers: 6, services: 4, gouverneur: { reserve: 200, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs')],
+      ateliers: [['quai_commerce'], ['carriere_marbre'], ['carriere_argile', 'atelier_poterie', 'atelier_poterie'], ['quai_peche'], ['camp_bucherons', 'atelier_mobilier'], ['ferme_vigne', 'cave'], ['ferme_olives', 'pressoir']] },
+    burdigala: { quartiers: 6, services: 4, gouverneur: { reserve: 200, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3()],
+      ateliers: [['ferme_vigne', 'cave', 'cave'], ['mine_fer', 'atelier_armes', 'atelier_armes'], ['ferme_vigne', 'cave', 'cave'], ['carriere_argile', 'atelier_poterie'], ['camp_bucherons', 'atelier_mobilier'], ['atelier_armes', 'atelier_armes']],
+      dieux: [['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars'], ['ceres', 'venus'], ['mercure', 'neptune']],
+      defense: { avant: 20, casernes: [13.2, 73], forts: [{ type: 'fort_javelots', ordre: 13.4 }, { type: 'fort_legionnaires', ordre: 48 }, { type: 'fort_legionnaires', ordre: 80 }, { type: 'fort_javelots', ordre: 110 }] } },
+    alexandrie: { quartiers: 6, services: 4, gouverneur: { reserve: 200, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits')],
+      ateliers: [['quai_commerce'], ['carriere_argile', 'atelier_poterie', 'atelier_poterie'], ['quai_peche'], ['atelier_poterie', 'atelier_poterie'], ['ferme_olives', 'pressoir']] },
+    leptis: { quartiers: 6, services: 4, gouverneur: { reserve: 200, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes')],
+      ateliers: [['ferme_olives', 'pressoir', 'pressoir'], ['quai_commerce'], ['ferme_olives', 'pressoir', 'pressoir'], ['mine_fer', 'atelier_armes', 'atelier_armes'], ['carriere_argile', 'atelier_poterie'], ['quai_peche']],
+      dieux: [['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars'], ['ceres', 'venus'], ['mercure', 'neptune']],
+      defense: { avant: 20, casernes: [13.2, 73], academie: 120, forts: [{ type: 'fort_javelots', ordre: 13.4 }, { type: 'fort_cavaliers', ordre: 48 }, { type: 'fort_javelots', ordre: 80 }, { type: 'fort_legionnaires', ordre: 110 }] } },
+    corinthe: { quartiers: 7, services: 4, gouverneur: { reserve: 400, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_fruits'), F3()],
+      ateliers: [['carriere_argile', 'atelier_poterie', 'atelier_poterie'], ['quai_commerce'], ['carriere_marbre'], ['ferme_vigne', 'cave'], ['camp_bucherons', 'atelier_mobilier'], ['ferme_olives', 'pressoir'], ['quai_peche']] },
+    colonia: { quartiers: 6, services: 4, gouverneur: { reserve: 200, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_fruits'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_porcs')],
+      ateliers: [['mine_fer', 'atelier_armes', 'atelier_armes'], ['camp_bucherons', 'atelier_mobilier'], ['mine_fer', 'atelier_armes', 'atelier_armes'], ['carriere_argile', 'atelier_poterie'], ['atelier_armes', 'atelier_armes'], ['ferme_vigne', 'cave']],
+      dieux: [['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars'], ['ceres', 'venus'], ['mercure', 'neptune']],
+      defense: { avant: 24, casernes: [13.2, 60, 90], academie: 100, forts: [{ type: 'fort_javelots', ordre: 13.4 }, { type: 'fort_legionnaires', ordre: 40 }, { type: 'fort_javelots', ordre: 62 }, { type: 'fort_legionnaires', ordre: 84 }, { type: 'fort_cavaliers', ordre: 104 }, { type: 'fort_legionnaires', ordre: 124 }] } },
+    antioche: { quartiers: 8, services: 4, gouverneur: { reserve: 400, marge: 40 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_fruits'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_porcs'), F3(), F3()],
+      ateliers: [['carriere_argile', 'atelier_poterie', 'atelier_poterie'], ['camp_bucherons', 'atelier_mobilier', 'atelier_mobilier'], ['ferme_olives', 'pressoir'], ['ferme_vigne', 'cave'], ['carriere_marbre'], ['mine_fer', 'atelier_armes'], ['ferme_vigne', 'cave']] },
+    palmyre: { quartiers: 6, services: 4, gouverneur: { reserve: 200, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits')],
+      ateliers: [['mine_fer', 'atelier_armes', 'atelier_armes'], ['carriere_argile', 'atelier_poterie'], ['mine_fer', 'atelier_armes', 'atelier_armes'], ['carriere_marbre'], ['atelier_poterie', 'atelier_poterie']],
+      dieux: [['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars'], ['ceres', 'venus'], ['mercure', 'neptune']],
+      defense: { avant: 24, casernes: [13.2, 60, 90], academie: 100, forts: [{ type: 'fort_javelots', ordre: 13.4 }, { type: 'fort_cavaliers', ordre: 40 }, { type: 'fort_javelots', ordre: 62 }, { type: 'fort_legionnaires', ordre: 84 }, { type: 'fort_cavaliers', ordre: 104 }, { type: 'fort_legionnaires', ordre: 124 }] } },
+    athenes: { quartiers: 8, services: 4, gouverneur: { reserve: 400, marge: 40 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_fruits'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_porcs')],
+      ateliers: [['ferme_olives', 'pressoir', 'pressoir'], ['quai_commerce'], ['carriere_marbre'], ['carriere_argile', 'atelier_poterie', 'atelier_poterie'], ['camp_bucherons', 'atelier_mobilier'], ['ferme_vigne', 'cave'], ['quai_peche']],
+      defense: { avant: 20, casernes: [40], forts: [{ type: 'fort_javelots', ordre: 41 }, { type: 'fort_legionnaires', ordre: 100 }] } },
+    eburacum: { quartiers: 7, services: 4, gouverneur: { reserve: 200, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_fruits'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_porcs'), F3()],
+      ateliers: [['mine_fer', 'atelier_armes', 'atelier_armes'], ['camp_bucherons', 'atelier_mobilier'], ['mine_fer', 'atelier_armes', 'atelier_armes'], ['carriere_argile', 'atelier_poterie'], ['camp_bucherons', 'atelier_mobilier'], ['atelier_armes', 'atelier_armes']],
+      dieux: [['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars'], ['ceres', 'venus'], ['mercure', 'neptune']],
+      defense: { avant: 24, casernes: [13.2, 60, 90], academie: 100, forts: [{ type: 'fort_javelots', ordre: 13.4 }, { type: 'fort_legionnaires', ordre: 40 }, { type: 'fort_javelots', ordre: 62 }, { type: 'fort_legionnaires', ordre: 84 }, { type: 'fort_cavaliers', ordre: 104 }, { type: 'fort_legionnaires', ordre: 124 }] } }
   };
   var DIEUX_QUARTIERS = [['ceres', 'venus'], ['mercure', 'neptune'], ['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars']];
 

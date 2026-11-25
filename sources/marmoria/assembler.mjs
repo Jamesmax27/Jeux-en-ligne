@@ -8,14 +8,14 @@
 //    (sim.js), les villes d'exemple (exemples.js), les dessins, le rendu, les
 //    sons et l'interface, chacun dans son propre bloc <script id="mm-…">.
 // 2. Bâtit les trois villes d'exemple embarquées (bloc mm-villes : aperçus de la
-//    page du jeu ; la troisième, cité du lot 2 avec son quartier de prestige, sert
+//    page du jeu ; la troisième, cité du lot 2 avec son quartier de prestige et ses remparts, sert
 //    aussi à l'affiche et au fond de l'écran titre), en jouant la simulation
 //    sous Node avec le « joueur raisonnable » de exemples.js : elles sont donc
 //    toujours à jour avec les règles.
 // 3. Lance scripts/i18n-jeu.mjs --assembler marmoria --sources sources/marmoria/textes :
 //    textes des 5 langues, modules communs du site (jel-i18n, jel-sauvegarde,
 //    jel-stockage) et textes de la fiche game.json.
-// 4. Affiche le poids de index.html (repères du cahier, section 21 : 1 Mo au lot 1, 1,8 Mo au lot 2, 2,6 Mo au lot 3).
+// 4. Affiche le poids de index.html (repères du cahier, section 21 : 1 Mo au lot 1, 1,8 Mo au lot 2, 2,6 Mo au lot 3, 3,4 Mo au lot 4, 4 Mo au lot 5).
 // ==========================================================================
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -51,9 +51,9 @@ function villes() {
   const D = sim.charger(JSON.parse(morceaux.DONNEES));
   const TM = D.temps.ticksParJour * D.temps.joursParMois;
   // [mission, niveau du plan, mois de jeu, trésor affiché, places libres visées par le joueur]
-  const plans = [['ostie', 1, 9, 6420, 40], ['pompei', 2, 18, 4180, 60], ['pompei', 4, 30, 9850, 80]];
+  const plans = [['ostie', 1, 9, 6420, 40], ['pompei', 2, 18, 4180, 60], ['pompei', 5, 30, 9850, 80]];
   return plans.map(([mission, niveau, mois, tresor, places]) => {
-    // Cité du lot 2 : construction libre (tous les bâtiments), sans incendie pour rester belle.
+    // Cité du lot 2, remparts du lot 5 (niveau 5) : construction libre (tous les bâtiments), sans incendie pour rester belle.
     // Les deux premières illustrent les missions tutorielles : sans attractivité, comme elles.
     const e = sim.nouvelle(mission, niveau >= 4 ? { libre: true, tout: true, risques: false } : { libre: true, attractivite: false });
     e.tresor = 1e7;
@@ -92,4 +92,4 @@ if (r.status !== 0) process.exit(r.status || 1);
 
 const final = await readFile(SORTIE, 'utf8');
 const ko = Buffer.byteLength(final, 'utf8') / 1024;
-console.log(`✓ games/marmoria/index.html : ${ko.toFixed(0)} Ko (repère du lot 4 : 3,4 Mo)`);
+console.log(`✓ games/marmoria/index.html : ${ko.toFixed(0)} Ko (repère du lot 5 : 4 Mo)`);
