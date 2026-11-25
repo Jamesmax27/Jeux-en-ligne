@@ -63,6 +63,9 @@ function carte(fiche, retenues) {
 export async function ecrireRevue() {
   const [accroches, presentations] = [await fiches('accroche'), await fiches('presentation')];
   const selection = existsSync(path.join(SOURCES, 'selection.json')) ? (await lireJson(path.join(SOURCES, 'selection.json'))).accroches || [] : [];
+  // Accroches dans l'ordre de la sélection, les autres ensuite.
+  const rang = (f) => (selection.includes(f.nom) ? selection.indexOf(f.nom) : selection.length);
+  accroches.sort((a, b) => rang(a) - rang(b));
   const toutes = [...accroches, ...presentations];
   const html = `<!doctype html>
 <html lang="fr">

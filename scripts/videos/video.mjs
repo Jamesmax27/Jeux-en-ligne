@@ -241,7 +241,7 @@ const commandes = {
         const rush = await capturer(navigateur, cible, { forcer: !!options.forcer, brouillon: !!options.brouillon });
         const n = Number(options.planche) || 10;
         const image = await plancheDuRush(rush, path.join(SORTIES, 'controle', 'rushes', `${cible.replace('@', '--')}${rush.brouillon ? '--brouillon' : ''}.jpg`), n);
-        dire(`  ${rush.exploitable ? '✓' : '✗'} ${cible}${rush.brouillon ? ' (brouillon)' : ''} : ${JSON.stringify(rush.resume)} fins ${JSON.stringify(rush.fins)}${rush.erreurs.length ? ` erreurs ${JSON.stringify(rush.erreurs)}` : ''}${rush.raisons.length ? `\n    inexploitable : ${rush.raisons.join(' ; ')}` : ''}\n    planche (${n} images, une toutes les ${(rush.images / rush.ips / n).toFixed(2)} s) : ${relatif(image)}`);
+        dire(`  ${rush.brouillon ? '•' : rush.exploitable ? '✓' : '✗'} ${cible}${rush.brouillon ? ' (brouillon, sans verdict)' : ''} : ${JSON.stringify(rush.resume)} fins ${JSON.stringify(rush.fins)}${rush.erreurs.length ? ` erreurs ${JSON.stringify(rush.erreurs)}` : ''}${rush.raisons.length ? `\n    inexploitable : ${rush.raisons.join(' ; ')}` : ''}\n    planche (${n} images, une toutes les ${(rush.images / rush.ips / n).toFixed(2)} s) : ${relatif(image)}`);
         ok = rush.exploitable && ok;
       }
     } finally { await navigateur.close(); }

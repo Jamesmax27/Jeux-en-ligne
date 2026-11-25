@@ -301,14 +301,14 @@ async function planJeu(p, k, i) {
   imageDuRush(p, p.depart + k + 1).catch(() => {}); // la suivante se prépare
   if (p.paysage) {
     ciel(i);
-    const l = 980, h = Math.round((l * 9) / 16), barre = 70, x0 = (L - l) / 2, y0 = 540, u = sortieDouce(borne((k + 1) / 9));
+    const l = 900, h = Math.round((l * 9) / 16), barre = 64, x0 = (L - l) / 2, y0 = 584, u = sortieDouce(borne((k + 1) / 9)); // entre le texte du haut et la pastille du bas
     g.save();
     g.translate(L / 2, y0 + (h + barre) / 2); g.scale(mel(0.86, 1, u), mel(0.86, 1, u)); g.translate(-L / 2, -(y0 + (h + barre) / 2));
     g.shadowColor = 'rgba(30, 14, 100, 0.9)'; g.shadowBlur = 60; g.shadowOffsetY = 24;
     g.fillStyle = C.surface; rectArrondi(x0, y0, x0 + l, y0 + barre + h, 30); g.fill();
     g.shadowColor = 'transparent';
     for (let q = 0; q < 3; q++) { g.fillStyle = rgba(C.craie_douce, 0.55); g.beginPath(); g.arc(x0 + 44 + q * 34, y0 + barre / 2, 9, 0, TOUR); g.fill(); }
-    g.fillStyle = rgba(C.nuit_profonde, 0.8); rectArrondi(x0 + 170, y0 + 14, x0 + l - 40, y0 + barre - 14, 21); g.fill();
+    g.fillStyle = rgba(C.nuit_profonde, 0.8); rectArrondi(x0 + 170, y0 + 12, x0 + l - 40, y0 + barre - 12, 20); g.fill();
     g.fillStyle = C.craie_douce; g.font = `800 28px "${G.polices.texte}"`; g.textBaseline = 'middle';
     g.fillText(M.site, x0 + 196, y0 + barre / 2 + 1);
     g.save(); rectArrondi(x0, y0 + barre, x0 + l, y0 + barre + h, 0); g.clip(); g.drawImage(im, x0, y0 + barre, l, h); g.restore();
@@ -361,11 +361,15 @@ async function planMur(p, k, i) {
 function planAttente(p, k, i) {
   ciel(i);
   const t = k / IPS, chute = p.chute !== undefined ? Math.max(0, k - p.chute) : 0;
-  const cx = L / 2, cy = 740, l = 800, h = 470, grand = 1.16; // fenêtre agrandie : elle occupe la zone sûre
+  const cx = L / 2, cy = 800, l = 800, h = 470, grand = 1.16; // fenêtre agrandie : elle occupe la zone sûre
   g.save();
   g.translate(cx + (chute ? Math.sin(chute * 1.9) * 16 * Math.max(0, 1 - chute / 6) : 0), cy + chute * chute * 9);
   g.rotate(chute * 0.022);
   g.scale(grand, grand);
+  // Grande roue d'attente au-dessus de la fenêtre : le signe « ça charge », lisible d'un coup d'œil.
+  g.lineCap = 'round'; g.lineWidth = 24;
+  g.strokeStyle = 'rgba(242, 239, 250, 0.12)'; g.beginPath(); g.arc(0, -h / 2 - 150, 84, 0, TOUR); g.stroke();
+  g.strokeStyle = C.lavande; g.beginPath(); g.arc(0, -h / 2 - 150, 84, t * 7.2, t * 7.2 + 1.5 * Math.PI); g.stroke();
   g.shadowColor = 'rgba(4, 2, 16, 0.6)'; g.shadowBlur = 50; g.shadowOffsetY = 20;
   g.fillStyle = 'rgba(26, 22, 56, 0.96)'; rectArrondi(-l / 2, -h / 2, l / 2, h / 2, 48); g.fill();
   g.shadowColor = 'transparent';

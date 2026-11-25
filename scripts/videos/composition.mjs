@@ -217,7 +217,7 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
       { texte: f.appel || 'Joue maintenant', style: 'bouton', position: 985, de: 0.8, entree: 'pop', son: 'pop' },
       ...(f.detail ? [{ texte: f.detail, style: 'petit', position: 1135, de: 1.15, entree: 'glisse' }] : []),
     ];
-    const planFin = { type: 'fin', n: plans.length, debut: finMontage, fin: finVideo, origine: 'fin', entree: 'coupe', jaquettes: montres.slice(0, 3).map((id) => `/jaquette/${id.split('@')[0]}`) };
+    const planFin = { type: 'fin', n: plans.length, debut: finMontage, fin: finVideo, origine: 'fin', entree: 'coupe', jaquettes: [...new Set(montres.map((id) => id.split('@')[0]))].slice(0, 3).map((id) => `/jaquette/${id}`) };
     planFin.textes = preparerTextes(txFin, variables, finVideo - finMontage, 'fin', accents, finMontage);
     plans.push(planFin);
     coupes.push(finMontage / IPS);
@@ -300,7 +300,7 @@ async function ouvrirPage(navigateur, adresse) {
 }
 
 /** Musique du montage, mise au bon niveau (-14 LUFS, crête à -1 dB) : fichier WAV. */
-async function sonoriser(son, piste, fichierWav) {
+export async function sonoriser(son, piste, fichierWav) {
   const brut = fichierWav.replace(/\.wav$/, '.brut.wav');
   await ecrireWav(brut, composer({ ...son, sansMusique: !!piste }));
   let entrees = ['-i', brut], filtre = '[0:a]anull[m]';
