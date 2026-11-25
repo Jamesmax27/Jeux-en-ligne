@@ -13,7 +13,7 @@
 // lui-même n'est jamais modifié.
 //
 // Remplacés dans la page : requestAnimationFrame, setTimeout, setInterval,
-// performance.now, Date, Math.random. Les animations CSS suivent la même
+// performance.now, Date, Math.random, requestFullscreen (sans effet). Les animations CSS suivent la même
 // horloge (mises en pause puis avancées à la main). window.FMG (fourni par le
 // lanceur sur le site) note ici les fins de partie, pour écarter les passages
 // où le jeu montre un écran de défaite.
@@ -21,6 +21,7 @@
 
 export function horlogeVirtuelle({ graine, sauvegardes }) {
   const VraieDate = Date;
+  const vraieImage = window.requestAnimationFrame.bind(window); // l'horloge réelle du navigateur, pour « souffle »
   const DEPART = 1795780800000; // 2026-11-27 12:00 UTC : une date fixe, la même à chaque capture
   let t = 0, suite = 1;
   const minuteries = new Map();
@@ -50,6 +51,12 @@ export function horlogeVirtuelle({ graine, sauvegardes }) {
     x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
     return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
   };
+
+  // Plein écran : la capture est déjà « plein cadre ». Sans cela, un jeu qui le demande au
+  // premier toucher fait passer le navigateur sans écran en 800 × 600 et sort du cadre filmé.
+  const sansPleinEcran = () => Promise.resolve();
+  Element.prototype.requestFullscreen = sansPleinEcran;
+  if ('webkitRequestFullscreen' in Element.prototype) Element.prototype.webkitRequestFullscreen = sansPleinEcran;
 
   // Fins de partie signalées par le jeu (sur le site : public/suivi.js).
   window.FMG = {
@@ -99,6 +106,13 @@ export function horlogeVirtuelle({ graine, sauvegardes }) {
       for (const x of lot) appeler(x.f, [t]);
       synchroniserAnimations();
     },
+    /**
+     * Laisse passer deux vraies images du navigateur. Chrome ne livre les mouvements du doigt
+     * ou de la souris qu'au début de l'image suivante : sans cette pause après un geste, le
+     * jeu les recevrait tantôt avant, tantôt après le pas de temps, et le même plan ne
+     * redonnerait pas la même partie.
+     */
+    souffle() { return new Promise((ok) => vraieImage(() => vraieImage(() => ok()))); },
     /** État lu par la capture : temps, fins de partie, erreurs du jeu. */
     etat() { return { t, fins: fins.slice(), erreurs: erreurs.splice(0, 20), attente: images.length + minuteries.size }; },
   };

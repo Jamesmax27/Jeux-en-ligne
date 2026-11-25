@@ -44,7 +44,8 @@ export async function plancheDuRush(rush, sortie, n = 8) {
   const pas = Math.max(1, Math.floor(rush.images / n));
   const paysage = rush.largeur > rush.hauteur;
   await ffmpeg(['-framerate', String(rush.ips || 30), '-start_number', '0', '-i', path.join(rush.dossier, '%05d.jpg'),
-    '-vf', `select='not(mod(n\\,${pas}))',scale=${paysage ? 480 : 250}:-1,tile=${paysage ? 4 : n}x${paysage ? Math.ceil(n / 4) : 1}`, '-frames:v', '1', '-q:v', '4', sortie]);
+    // Une image au milieu de chaque tranche : la dernière seconde du rush est montrée aussi.
+    '-vf', `select='not(mod(n+${Math.ceil(pas / 2)}\\,${pas}))',scale=${paysage ? 480 : 250}:-1,tile=${paysage ? 4 : n}x${paysage ? Math.ceil(n / 4) : 1}`, '-frames:v', '1', '-q:v', '4', sortie]);
   return sortie;
 }
 

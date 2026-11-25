@@ -20,7 +20,7 @@
 //       { "clic": "Jouer" },          bouton dont le texte correspond ("facultatif", "max" s d'attente)
 //       { "selecteur": "#go" },       ou sélecteur CSS
 //       { "toucher": [0.5, 0.6] },    ou point de l'écran (0 à 1)
-//       { "touche": "Enter" }         ou touche du clavier
+//       { "touche": "Enter" }         ou touche du clavier ("duree" : secondes de maintien)
 //     ],
 //     "duree": 8,                     secondes filmées
 //     "gestes": [                     pendant le film ; t = seconde depuis le début du film
@@ -48,7 +48,7 @@ import { elementsTouchables, horlogeVirtuelle } from './horloge.mjs';
 import { meilleurPassage, mesurer, resumer } from './analyse.mjs';
 
 /** À augmenter quand la façon de filmer change (les rushes gardés sont alors refaits). */
-export const MOTEUR_CAPTURE = 1;
+export const MOTEUR_CAPTURE = 2;
 const PAS_PAR_IMAGE = 2; // le jeu tourne à 60 pas par seconde, la vidéo à 30 images
 
 export const ECRANS = {
@@ -216,6 +216,8 @@ async function prise(navigateur, plan, html, graine, { surImage, explorer, chaqu
     const avancer = (n) => page.evaluate((k) => { for (let i = 0; i < k; i++) window.__fmgHorloge.avancer(1000 / 60); }, n);
     const attendre = async (secondes) => { for (let reste = Math.round(secondes * 60); reste > 0; reste -= 6) await avancer(Math.min(6, reste)); };
     const etat = () => page.evaluate(() => window.__fmgHorloge.etat());
+    // Après un geste du doigt ou de la souris : le jeu le reçoit avant le pas de temps suivant (horloge.mjs).
+    const souffle = () => page.evaluate(() => window.__fmgHorloge.souffle());
 
     // Doigts (écran tactile) ou souris (ordinateur).
     const doigts = new Map();
@@ -237,17 +239,17 @@ async function prise(navigateur, plan, html, graine, { surImage, explorer, chaqu
         await attendre(0.1);
       }
     };
-    const taper = async (p, d = 1) => { await pointeur.bas(d, p); await avancer(3); await pointeur.haut(d); };
+    const taper = async (p, d = 1) => { await pointeur.bas(d, p); await souffle(); await avancer(3); await pointeur.haut(d); await souffle(); };
 
     // 1. Préparation : jusqu'en pleine partie.
     for (const etape of plan.preparation || []) {
       if (etape.attendre !== undefined) { await attendre(etape.attendre); continue; }
-      if (etape.touche) { await page.keyboard.down(etape.touche); await avancer(4); await page.keyboard.up(etape.touche); await attendre(etape.apres ?? 0.3); continue; }
+      if (etape.touche) { await page.keyboard.down(etape.touche); await (etape.duree ? attendre(etape.duree) : avancer(4)); await page.keyboard.up(etape.touche); await attendre(etape.apres ?? 0.3); continue; }
       if (etape.toucher) { await taper(px(...etape.toucher)); await attendre(etape.apres ?? 0.3); continue; }
       if (etape.glisser) {
         const n = Math.max(2, Math.round((etape.duree ?? 0.4) * 30));
-        for (let i = 0; i <= n; i++) { const p = px(...pointDuTrace(etape.glisser, i / n, etape.lisse)); await (i ? pointeur.bouge(1, p) : pointeur.bas(1, p)); await avancer(PAS_PAR_IMAGE); }
-        await pointeur.haut(1); await attendre(etape.apres ?? 0.3); continue;
+        for (let i = 0; i <= n; i++) { const p = px(...pointDuTrace(etape.glisser, i / n, etape.lisse)); await (i ? pointeur.bouge(1, p) : pointeur.bas(1, p)); await souffle(); await avancer(PAS_PAR_IMAGE); }
+        await pointeur.haut(1); await souffle(); await attendre(etape.apres ?? 0.3); continue;
       }
       const cible = etape.selecteur ? { selecteur: etape.selecteur } : { texte: etape.clic };
       // "repeter" : le bouton est touché tant qu'il est là (pages d'un tutoriel), n fois au plus.
@@ -280,8 +282,10 @@ async function prise(navigateur, plan, html, graine, { surImage, explorer, chaqu
     // « scale » = échelle de l'écran : l'image sort en vrais pixels (1080 × 1920), pas en pixels CSS.
     // Brouillon (chaque > 1) : une image sur `chaque`, en pixels CSS — même partie, bien plus vite.
     const cadre = { x: 0, y: 0, width: ecran.largeur, height: ecran.hauteur, scale: chaque > 1 ? 1 : ecran.echelle };
+    const duPointeur = (ev) => ev.a === 'bas' || ev.a === 'bouge' || ev.a === 'haut';
     for (let i = 0; i < total; i++) {
       for (const ev of programme[i]) await jouer(ev);
+      if (programme[i].some(duPointeur)) await souffle();
       await avancer(PAS_PAR_IMAGE);
       if (i % chaque) continue;
       const { data } = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: chaque > 1 ? 80 : 93, clip: cadre, captureBeyondViewport: false, optimizeForSpeed: true });
