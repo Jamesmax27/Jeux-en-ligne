@@ -158,6 +158,7 @@
       case 'education': return compter(h, ['ecole', 'bibliotheque', 'academie']) * 100 / 3;
       case 'sante': return compter(h, ['barbier', 'bains', 'medecin', 'hopital']) * 25;
       case 'impots': return h.svc.impot > 0 ? 100 : 0;
+      case 'crime': return 100 - Math.round(h.crime || 0); // lot 4 : rouge quand la criminalité monte
       default: return null;
     }
   }
@@ -166,8 +167,9 @@
   var VISIBLES = {
     feu: ['prefet'], dommages: ['ingenieur'], eau: [], attractivite: [], problemes: [],
     stocks: ['livreur', 'charretier', 'acheteuse', 'vendeuse', 'bateau', 'caravane', 'navire', 'docker'], nourriture: ['vendeuse', 'acheteuse', 'livreur', 'bateau'],
-    divertissement: ['comedien', 'lutteur', 'dompteur', 'acteur', 'gladiateur', 'lion'], religion: ['pretre'],
-    education: ['instituteur', 'bibliothecaire', 'professeur'], sante: ['barbier', 'employe_bains', 'medecin', 'chirurgien'], impots: ['percepteur']
+    divertissement: ['comedien', 'lutteur', 'dompteur', 'acteur', 'gladiateur', 'lion', 'aurige', 'char'], religion: ['pretre'],
+    education: ['instituteur', 'bibliothecaire', 'professeur'], sante: ['barbier', 'employe_bains', 'medecin', 'chirurgien'], impots: ['percepteur'],
+    crime: ['prefet', 'voleur', 'emeutier']
   };
   // 5 états visibles sur le dessin : vide, un quart, moitié, trois quarts, plein.
   function niveauStock(f) { return !f || f <= 0 ? 0 : Math.min(4, Math.ceil(f * 4 - 1e-9)); }
@@ -269,6 +271,18 @@
       if (!l) bucket.set(cle, (l = []));
       l.push(w);
     }
+    // Unités militaires (lot 4), rangées de même.
+    var us = e.unites || [];
+    for (k = 0; k < us.length; k++) {
+      var u = us[k];
+      if (u.mort || u.etat !== 'champ') continue;
+      var ua = this.tourner(u.a % N, (u.a - u.a % N) / N), ub = this.tourner(u.i % N, (u.i - u.i % N) / N);
+      var cu = (ua[0] + ua[1] >= ub[0] + ub[1]) ? ua[1] * N + ua[0] : ub[1] * N + ub[0];
+      var lu = bucket.get(cu);
+      if (!lu) bucket.set(cu, (lu = []));
+      lu.push({ _u: u });
+    }
+    var tirs = [];
 
     // 3. Objets par diagonales (ordre de profondeur).
     // Aqueduc relié à cette case (aqueduc ou réservoir), en coordonnées de la carte.
@@ -311,7 +325,7 @@
         }
         if (e.route[i] === R.BARRIERE && !calque) this.poser(DS.batiment('barriere', 1, { cle: '' }, zc), p[0], p[1]);
         var lw = bucket.get(ry * N + rx);
-        if (lw) for (var j = 0; j < lw.length; j++) this.dessinerMarcheur(lw[j], alpha);
+        if (lw) for (var j = 0; j < lw.length; j++) { if (lw[j]._u) this.dessinerUnite(lw[j]._u, alpha, tirs); else this.dessinerMarcheur(lw[j], alpha); }
       }
     }
 
@@ -335,6 +349,19 @@
         ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.lineTo(pc[0], pc[1]); ctx.lineTo(pd[0], pd[1]); ctx.closePath(); ctx.stroke();
       }
     }
+    // Traits (javelots, flèches) et tirs des tours, au-dessus de tout.
+    var self2 = this;
+    e.batiments.forEach(function (bt) {
+      if (bt.type !== 'tour' || !(e.tick - (bt.tir || -1000) < 12) || !(bt.tx >= 0)) return;
+      var c = self2.monde(bt.x + bt.t / 2, bt.y + bt.t / 2), d = self2.monde(bt.tx % N + 0.5, (bt.tx - bt.tx % N) / N + 0.5);
+      tirs.push([self2.ecran(c[0], c[1] - 40), self2.ecran(d[0], d[1] - 8), (e.tick - bt.tir) / 12]);
+    });
+    tirs.forEach(function (tr) {
+      var a1 = tr[0], b1 = tr[1], f1 = Math.min(1, tr[2] * 1.4), hx = a1[0] + (b1[0] - a1[0]) * f1, hy = a1[1] + (b1[1] - a1[1]) * f1 - Math.sin(f1 * Math.PI) * 18 * z;
+      var dx = (b1[0] - a1[0]), dy = (b1[1] - a1[1]), n1 = Math.max(1, Math.hypot(dx, dy));
+      ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = Math.max(1, 1.4 * z);
+      ctx.beginPath(); ctx.moveTo(hx - dx / n1 * 7 * z, hy - dy / n1 * 7 * z); ctx.lineTo(hx, hy); ctx.stroke();
+    });
     var bob = Math.sin(temps / 300) * 2 * z;
     for (var n = 0; n < icones.length; n++) this.poser(DS.icone(icones[n][0], zc), icones[n][1], icones[n][2] + bob);
     if (this.effetAffiche) {
@@ -382,6 +409,13 @@
     switch (b.type) {
       case 'logement': s = DS.maison(b.hab > 0 ? b.niv : 0, v2, b.t, zc); break;
       case 'incendie': s = DS.incendie(b.t, frame, zc); break;
+      case 'muraille': {
+        // Tronçons reliés aux murailles, tours et portes voisines, dans le sens de l'affichage.
+        var self = this, q0 = this.tourner(b.x, b.y);
+        var mur = function (dx, dy) { var c = self.detourner(q0[0] + dx, q0[1] + dy); if (c[0] < 0 || c[1] < 0 || c[0] >= e.N || c[1] >= e.N) return false; var o = SIM.batA(e, c[0], c[1]); return !!o && (o.type === 'muraille' || o.type === 'tour' || o.type === 'porte'); };
+        var mk = (mur(0, -1) ? 1 : 0) | (mur(1, 0) ? 2 : 0) | (mur(0, 1) ? 4 : 0) | (mur(-1, 0) ? 8 : 0);
+        s = DS.batiment('muraille', 1, { masque: mk, cle: '' + mk }, zc); break;
+      }
       case 'fontaine': s = DS.batiment('fontaine', 1, { actif: b.actif, frame: frame2, cle: '' + b.actif + frame2 }, zc); break;
       case 'reservoir': s = DS.batiment('reservoir', 3, { plein: b.plein, frame: frame2, cle: '' + b.plein + frame2 }, zc); break;
       // Greniers et marchés montrent leur remplissage sur le dessin même (sans clic).
@@ -414,6 +448,30 @@
     // Petit décalage par marcheur : deux marcheurs sur la même case ne se superposent pas.
     var dec = ((w.id * 7) % 9 - 4) * this.cam.z;
     this.poser(DS.marcheur(w.type, pose, gauche, this._zc || resolution(this.cam.z)), p[0] + dec, p[1] + dec * 0.3);
+  };
+
+  // Unité : position entre la case quittée et la case visée, arme levée quand elle frappe,
+  // barre de vie si elle est touchée, ellipse dorée sous la cohorte choisie.
+  Rendu.prototype.dessinerUnite = function (u, alpha, tirs) {
+    var e = this.e, N = e.N, f = u.p > 0 ? Math.min(1, 1 - (u.p - alpha) / u.v) : 1;
+    var ax = u.a % N, ay = (u.a - ax) / N, bx = u.i % N, by = (u.i - bx) / N;
+    var fx = ax + (bx - ax) * f + 0.5, fy = ay + (by - ay) * f + 0.5;
+    var m = this.monde(fx, fy), p = this.ecran(m[0], m[1]), z = this.cam.z;
+    var dec = ((u.id * 7) % 9 - 4) * 0.8 * z, dec2 = ((u.id * 5) % 7 - 3) * 0.6 * z;
+    var cible = u.tx >= 0 ? this.monde(u.tx % N + 0.5, (u.tx - u.tx % N) / N + 0.5) : null;
+    var gauche = cible && e.tick - u.tir < 30 ? cible[0] < m[0] : this.monde(bx + 0.5, by + 0.5)[0] < this.monde(ax + 0.5, ay + 0.5)[0];
+    var frappe = e.tick - u.tir < 8, pose = u.p > 0 ? Math.floor(f * 4) % 2 : 0;
+    var faction = u.c === 0 ? 'rome' : (e.invasion ? (e.invasion.legions ? 'imperiale' : e.invasion.f) : 'gaulois');
+    var x = p[0] + dec, y = p[1] + dec2, ctx = this.ctx;
+    if (u.c === 0 && this.selection && u.f === this.selection) { ctx.fillStyle = 'rgba(255,226,122,0.55)'; ctx.beginPath(); ctx.ellipse(x, y, 9 * z, 4 * z, 0, 0, Math.PI * 2); ctx.fill(); }
+    this.poser(DS.unite(u.k, faction, pose, gauche, frappe, this._zc || resolution(z)), x, y);
+    if (u.pv < u.pm) {
+      var l = 14 * z, h = Math.max(2, 2.4 * z), hy = y - 34 * z;
+      ctx.fillStyle = 'rgba(20,16,12,0.7)'; ctx.fillRect(x - l / 2 - 1, hy - 1, l + 2, h + 2);
+      ctx.fillStyle = u.c === 0 ? '#5ec26a' : '#e2533e'; ctx.fillRect(x - l / 2, hy, l * Math.max(0, u.pv / u.pm), h);
+    }
+    // Trait d'un tireur (javelot, flèche) vers sa cible.
+    if (cible && e.tick - u.tir < 12 && SIM.donnees().regles.militaire[u.c === 0 ? 'unites' : 'ennemis'][u.k].portee > 1) tirs.push([[x, y - 18 * z], this.ecran(cible[0], cible[1] - 8), (e.tick - u.tir) / 12]);
   };
 
   // --- Mini-carte -------------------------------------------------------------

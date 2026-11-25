@@ -269,7 +269,7 @@ L'humeur va de 0 à 100, démarre à 60 et varie chaque mois selon ce barème.
 - En pénurie, la répartition suit les priorités fixées par le joueur chez le conseiller du travail. Sans priorité, elle est proportionnelle.
 - Neuf catégories de priorité : alimentation, industrie et commerce, ingénierie, eau, préfectures, militaire, divertissement, santé et éducation, administration et religion.
 
-Extension prévue au lot 4 : une pyramide des âges (naissances, vieillissement, décès) remplace le taux fixe de 40 %. La santé et la nourriture modifient alors natalité et mortalité.
+Extension réalisée au lot 4 : une pyramide des âges (naissances, vieillissement, décès) module le taux de 40 % ; la santé et la nourriture modifient natalité et mortalité (section 23.9, écart 3).
 
 ### 6.4 Chômage
 
@@ -1579,3 +1579,65 @@ La variante qui excluait les places des immigrants laissait partir plus d'habita
 - Les personnages passent de 22 × 30 à 26 × 36 pixels, pour que la coiffe et les outils levés tiennent.
 - Images du jeu refaites. Contrôlé sur une planche de tous les marcheurs, aux zooms 1 et 2,5 et dans les deux sens de marche, puis sur la carte d'une partie de Narbo aux zooms 1 et 2,2.
 
+
+### 23.9 Lot 4 « Guerre et patriciens » (25 novembre 2026)
+
+Le lot démarre sans que Massalia soit gagnée par le gouverneur automatique (critère du lot 3, section 23.6) : le propriétaire a demandé de poursuivre.
+
+Livré :
+
+- **Patriciens** (5.2, 11.2). Niveaux 13 à 20 : villas (13 à 16) et palais (17 à 20) dessinés. Au passage de 12 à 13, la maison perd ses habitants en trop, qui repartent chercher un logement. Agrandissement à 3 × 3 au niveau 15 et à 4 × 4 au niveau 19, sur des maisons vides ou des jardins ; l'ancienne emprise reste dans le nouveau carré. Les patriciens ne travaillent pas ; impôt à 12 pour les villas, 30 pour les palais.
+- **Sénat** (5 × 5, un par ville, deux percepteurs à la fois, cotes dans son panneau), **résidence du gouverneur** en trois tailles (une seule par ville, toutes tailles confondues), **hippodrome** et **fabrique de chars** (un hippodrome par ville, 30 points de divertissement, aurige errant).
+- **Pyramide des âges** (6.3). Dix tranches de dix ans pour toute la ville. Les immigrants arrivent avec un profil fixe. Chaque mois, chaque tranche vieillit d'un cent-vingtième ; la mortalité suit la santé, la natalité la santé et la nourriture. Un enfant ne naît que dans une maison qui a de la place. Le conseiller de la population montre la pyramide et la part d'âge actif.
+- **Criminalité** (10.3). Compteur par maison, hausse mensuelle de (50 − humeur) / 5 sous 50, doublée pour tentes et cabanes. Un préfet retire 10 points à chaque passage. Voleurs (50 à 200 deniers volés au forum ou au sénat le plus proche, poste « Vols » du budget) et émeutiers (jusqu'à 3 incendies). Un préfet arrête tout criminel à 2 cases ou moins. Paix −5 par émeute, 20 au plus par an. Calque « Criminalité ».
+- **Difficulté** (2.5) : facile, normale, difficile, choisie à la présentation des missions à partir de l'échelon 3 et gardée dans les options.
+- **Armée** (13) :
+  - muraille (tracée comme une route), tour collée à une muraille, porte fortifiée posée en travers d'une route (les habitants passent, l'ennemi doit l'abattre) ;
+  - caserne (une recrue tous les 8 jours de travail plein ; un légionnaire prend une charge d'armes, livrée comme une matière d'atelier), académie militaire (+1 d'entraînement au passage de la recrue), 3 forts de 16 soldats (légionnaires, lanceurs de javelots, cavaliers), 6 au plus ;
+  - commandement : toucher le fort ou un de ses soldats, puis « Envoyer » et un point de la carte ; formation en ligne, en colonne ou en carré ; « Rentrer au fort ». Les soldats engagent seuls tout ennemi à 4 cases ou moins ; au fort, ils défendent aussi le fort lui-même ;
+  - combat : un coup toutes les 20 ticks, dégâts × (1 + 0,1 × entraînement), tour à 8 points toutes les 40 ticks et 6 cases de portée, points de structure ;
+  - cinq archétypes ennemis, six factions et les légions de l'empereur ; l'ennemi suit un champ de distances vers sa cible et abat ce qui lui barre la route ; retraite à 70 % de pertes ;
+  - invasions annoncées 12 et 3 mois avant, armée en marche sur la carte de l'Empire, paix (−1 par bâtiment détruit, 30 au plus ; +5 pour une invasion repoussée sans perte de bâtiment), entraînement +1 aux soldats qui ont combattu ;
+  - Mars : son bienfait coupe de moitié la prochaine invasion, sa colère met le moral des cohortes à 0 pendant 6 mois ;
+  - demandes de troupes (13.7) : une cohorte part de 6 à 12 mois, l'issue suit son effectif et son entraînement ;
+  - destitution avec les légions (2.4) : après 12 mois de faveur à 10 ou moins, elles arrivent 3 mois plus tard ; si elles atteignent la ville, la mission est perdue ; repoussées, la faveur remonte à 20.
+- **Conseiller militaire** (17.4) : menaces annoncées, cohortes (effectif, moral, entraînement, ordre, boutons), armes à la caserne, cohortes parties. Le conseiller impérial envoie une cohorte pour une demande de troupes.
+- **Missions** Aquilée (échelon 4, Gaulois puis Germains, 5 invasions de 12 à 40, une demande de troupes) et Vindobona (échelon 5, Germains, 5 invasions de 12 à 50, deux demandes de troupes), chacune avec ses cités, ses demandes et ses événements.
+- **Gouverneur automatique militaire** (`exemples.js`) : casernes, forts tournés vers les points d'invasion, préfet et ingénieur à côté de chaque bâtiment militaire, temple de Mars dès le premier quartier ; pendant une invasion, toutes les cohortes marchent sur l'ennemi le plus proche du centre (`piloterArmee`, appelé chaque jour) ; il envoie la cohorte la plus forte aux demandes de troupes.
+- Dessins : villas, palais, sénat, résidences, hippodrome (piste, spina, quadriges), fabrique de chars, murailles reliées, tour, porte, caserne, académie, forts (palissade, tours d'angle, étendard à la couleur de l'arme), soldats et guerriers des six factions (cheval, éléphant, bélier), barres de vie, javelots et flèches.
+- Sauvegarde en version 4 ; une sauvegarde des lots 1 à 3 est complétée. Le champ de distances des ennemis est sauvegardé pendant une invasion : une partie rechargée en plein combat continue à l'identique.
+- Textes : 140 clés de plus dans les 5 langues (1 006 en tout) ; la fiche du jeu annonce sept missions et l'armée.
+
+Mesures (sous Node, PC de développement) :
+
+| Critère (section 21) | Résultat |
+| --- | --- |
+| Invasion de 50 ennemis aux cibles de performance | 50 Gaulois contre deux cohortes, sur toute l'invasion (1 644 ticks) : 0,30 ms par tick en moyenne, 6,0 ms au pire (cible 4 ms). 38 ennemis tués, 12 soldats morts, aucun bâtiment détruit ; les 12 survivants repartent. |
+| Palais impérial (niveau 20) en construction libre | Atteint par les règles de montée, au jour 37 d'un quartier de 16 logements entouré de places, d'un anneau de 12 grandes statues, de la résidence-palais et du sénat (attractivité 93) ; agrandissements 2 × 2, 3 × 3 puis 4 × 4. Dans ce test, les services, les biens et l'eau sont fournis chaque jour par le test, pas par les marcheurs : la montée par les vrais marcheurs n'est pas démontrée. Voir l'écart 12. |
+| 10 000 habitants aux cibles de performance | Carte de 160 × 160 couverte de tentes : 12 209 habitants, 4 298 bâtiments, 386 marcheurs, 0,96 ms par tick en moyenne, 23 ms au pire (cible 4 ms). La ville du lot 2 (33 794 habitants, 672 marcheurs) : 0,94 ms. |
+| Les deux missions gagnées en difficulté normale | **Aquilée** : gagnée par le gouverneur automatique dans 2 départs sur 3 au rang 3 (mois 244 et 225 ; le troisième reste à 2 639 habitants, prospérité 0 et faveur 40) ; sur un échantillon de 8 parties (rangs 2 et 3, quatre décalages de ses tours), 5 victoires, du mois 207 au mois 261. Toujours 1 étoile : un secours de l'empereur reçu. Les 5 invasions sont repoussées dans toutes les parties. Le test exige 2 victoires sur 3 départs. **Vindobona : non gagnée** : au mois 240, 1 304 habitants pour 3 500 ; paix 100, faveur 57, culture 59, prospérité 10 ; les 5 invasions (jusqu'à 50 Germains) repoussées. Même limite que Massalia (23.6) : le gouverneur automatique ne dépasse pas 2 500 habitants environ ; ici, il manque de bras pour les services, qui ouvrent les quartiers suivants. Le test mesure Vindobona sans bloquer. |
+| Poids de `index.html` | 1 473 Ko (lot 3 : 1 287 Ko), repère du lot 4 : 3,4 Mo. |
+| Contrôles du site | `validate-games --jouer`, `tester-sauvegarde`, `check-i18n` (5 langues, 1 006 clés), `controle-taxonomie`, `regles-seo`, `verifier-seo` : tout est bon. Interface parcourue dans Chromium (français sur ordinateur, allemand sur téléphone en paysage) : combat, panneau du fort, ordre donné au doigt, conseiller militaire, carte de l'Empire avec une armée annoncée, calque de criminalité, scène de tous les nouveaux bâtiments ; aucune erreur dans la console ni texte non traduit. |
+
+Écarts avec ce cahier (à valider ; les valeurs sont dans `donnees.json`) :
+
+1. Hippodrome (9.2) : 9 × 9 cases au lieu de 15 × 5. Le moteur ne pose que des emprises carrées ; 81 cases, contre 75. La piste est dessinée en ovale allongé.
+2. Criminalité (10.3) : quand l'humeur atteint 50, la criminalité baisse de 2 points par mois (le cahier ne dit pas comment elle redescend sans préfet). Tirages mensuels : un voleur avec une chance de (criminalité − 50) %, un émeutier de (criminalité − 70) % ; 4 criminels par mois au plus. Sans forum ni sénat, le voleur ne trouve rien à voler. L'émeutier vise le bâtiment inflammable le plus proche.
+3. Pyramide des âges (6.3) : la part de travailleurs vaut 40 % × (part d'âge actif de la ville / part d'âge actif du profil des immigrants), pour garder l'équilibre des lots 1 à 3 ; d'âge actif = 20 à 49 ans. Profil des immigrants, mortalité et natalité dans `regles.ages`.
+4. Difficulté (2.5) : la « force des ennemis » joue sur leur nombre (× 0,7 en facile, × 1,3 en difficile).
+5. Armes : seuls les légionnaires prennent une charge d'armes, comme l'écrit le tableau 13.1 ; javelots et cavaliers n'en demandent pas.
+6. Soldats au fort : ils se tiennent en formation sur la place d'armes, devant le fort, et engagent aussi tout ennemi à 4 cases du fort. Sans cela, un ennemi arrivé de l'autre côté abattait le fort sous leurs yeux.
+7. Contact = les 8 cases voisines ; portée des tireurs mesurée en ligne droite. Ennemis et soldats se croisent sans collision. Un bâtiment coûte 1 + ses points de structure / 5 cases de détour dans le champ de l'ennemi ; les ruines se traversent.
+8. Points de structure (13.4) : 100 pour tout bâtiment que le cahier ne cite pas.
+9. Invasions : une à la fois (la suivante attend un mois) ; au bout de 48 jours, les survivants repartent.
+10. Moral : −8 par soldat tué, +5 par jour au fort.
+11. Demandes de troupes : force de la cohorte = somme de (1 + 0,1 × entraînement) ; victoire si elle atteint la force demandée ; pertes 20 % ou 50 % ; défaite −4 de faveur. Les légions de l'empereur comptent 40 soldats ; la mission est perdue quand elles frappent un bâtiment de la ville (fortifications exceptées), d'abord la résidence, le sénat ou le forum.
+12. Palais impérial : voir les mesures. Construire un quartier complet (vin, hôpital, académie, cinq temples, théâtre, amphithéâtre, colisée et hippodrome qui couvrent les mêmes maisons, attractivité 90) avec le gouverneur automatique demande un plan dédié que je n'ai pas écrit.
+13. Fonds et routes des missions militaires : Aquilée part avec 10 000 deniers et la route de Vérone (acheteuse d'armes) ouverte ; Vindobona avec 12 000 deniers et celle de Carnuntum. Repère de la section 16.3 : environ 7 000. La défense (caserne, forts à 1 000) coûte plus de 2 000 deniers avant la première invasion.
+14. Une tour se passe de route ; elle reçoit ses gardes du réservoir unique de main-d'œuvre, et ne prend ni feu ni dommages (règle des bâtiments sans route, 23.7).
+
+Constats (gouverneur automatique) :
+
+- Sans préfecture posée tout de suite à côté des ateliers, l'argent parti dans l'armée les laissait brûler au bout de 11 mois ; sans ingénieur à côté, les forts posés loin de la ville s'effondraient.
+- Les rochers (fer) d'Aquilée et la carrière d'argile de Vindobona étaient d'abord sur le chemin des envahisseurs : ils les détruisaient. Les cartes les placent maintenant du côté de la ville.
+- Avec Mars hors des premiers temples, sa colère mettait le moral des cohortes à 0 juste avant une invasion.

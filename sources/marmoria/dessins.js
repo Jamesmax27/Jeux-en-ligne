@@ -472,17 +472,9 @@
     }
     if (niv <= 9) { peindreCasa(ctx, t > 1 ? echelle(P, t) : P, niv, v); return; }
     if (niv <= 12) { peindreInsula(ctx, echelle(P, t / 2), niv, v); return; }
-    // Niveaux 13 à 20 (lot 4) : bloc générique à l'échelle de l'emprise, en attendant villas et palais.
-    var etages = Math.min(5, 1 + Math.floor((niv - 5) / 2)), hh = 10 + etages * 9, m = 0.06, f = t - 0.06;
-    var mur = niv >= 13 ? C.marbre : murs;
-    sol(ctx, P, 0.03, 0.03, t - 0.03, t - 0.03, teinte(C.pierre, 1.05));
-    boite(ctx, P, m, m, f, f, 0, hh, mur);
-    for (var e = 0; e < etages; e++) {
-      var h0 = 6 + e * 9;
-      fenetres(ctx, P, 'v', m, f, f, h0, h0 + 5, 3 * t, '#5b4632');
-      fenetres(ctx, P, 'u', m, f, f, h0, h0 + 5, 3 * t, '#4a3828');
-    }
-    toit(ctx, P, m, m, f, f, hh, 8 + 3 * t, C.tuile, 'u');
+    // Niveaux 13 à 20 (lot 4) : villas (13 à 16) et palais (17 à 20), à l'échelle de l'emprise.
+    if (niv <= 16) peindreVilla(ctx, echelle(P, t / 2), niv, v);
+    else peindrePalais(ctx, echelle(P, t / 2), niv, v);
   }
 
   // Casae et petite insula (niveaux 7 à 9, 1 case) : enduit, tuiles, cour fermée, étages.
@@ -2419,6 +2411,111 @@
     return s;
   }
 
+  // --- Unités militaires (lot 4) ------------------------------------------------
+  // Soldats de Rome : tunique rouge, casque de bronze à cimier, bouclier rouge à umbo doré.
+  // Ennemis : même silhouette, aux couleurs de leur faction ; l'archétype choisit l'arme et la
+  // monture (cheval pour la cavalerie, éléphant pour le siège carthaginois, bélier sinon).
+  var FACTIONS = {
+    rome: { tunique: '#b8392c', bouclier: '#b8392c', coiffe: 'casque', panache: '#c0392b', peau: 0 },
+    imperiale: { tunique: '#6b2f7a', bouclier: '#6b2f7a', coiffe: 'casque', panache: '#f0c040', peau: 0 },
+    gaulois: { tunique: '#3f7a4a', bouclier: '#d8c060', coiffe: 'cheveux', cheveux: '#d9b25a', barbe: '#c89a48', peau: 0, braies: '#6a5a8a' },
+    germains: { tunique: '#6a4a2e', cape: '#8a6a44', bouclier: '#5a3a22', coiffe: 'cheveux', cheveux: '#c9a060', barbe: '#b08a48', peau: 0, bras: 'nus' },
+    carthaginois: { tunique: '#e6dcc4', liseré: '#7a2a6a', bouclier: '#7a2a6a', coiffe: 'casque', panache: '#f4f0e6', peau: 2 },
+    numides: { tunique: '#e8c88a', bouclier: '#a8723a', coiffe: 'foulard', foulard: '#f4ead0', peau: 2 },
+    parthes: { tunique: '#d0902a', bouclier: '#8a3a1e', coiffe: 'bonnet', bonnet: '#c04a20', barbe: '#2a2018', peau: 1 },
+    pictes: { tunique: '#3a5a8a', bouclier: '#2a3a5a', coiffe: 'cheveux', cheveux: '#8a3a1e', peau: 0, peinture: '#3a6ac0', bras: 'nus' }
+  };
+  function bouclier(ctx, x, y, c, rond) {
+    if (rond) { cercle(ctx, x, y, 3.6, c, teinte(c, 0.6)); cercle(ctx, x, y, 1, '#e0c070'); return; }
+    poly(ctx, [[x - 2.6, y - 4.6], [x + 2.6, y - 4.6], [x + 2.6, y + 4.4], [x - 2.6, y + 4.4]], c, teinte(c, 0.55));
+    ctx.fillStyle = teinte(c, 0.7); ctx.fillRect(x - 0.4, y - 4.4, 0.8, 8.6);
+    cercle(ctx, x, y, 1.1, '#e0c070');
+  }
+  function cheval(ctx, x, y, robe, pose) {
+    var j = pose ? 1.6 : -1.6;
+    ellipse(ctx, x, y, 9, 2.4, 'rgba(30,30,20,0.35)');
+    ctx.strokeStyle = teinte(robe, 0.7); ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+    [[-5, j], [-3, -j], [4, -j], [6, j]].forEach(function (p) { ctx.beginPath(); ctx.moveTo(x + p[0], y - 8); ctx.lineTo(x + p[0] + p[1], y - 0.8); ctx.stroke(); });
+    ellipse(ctx, x, y - 10, 7.6, 3.8, robe);
+    poly(ctx, [[x + 5, y - 12], [x + 7.6, y - 18.6], [x + 10.6, y - 17], [x + 8.6, y - 11]], robe);
+    poly(ctx, [[x + 8.6, y - 19], [x + 12.8, y - 17.6], [x + 12, y - 15.6], [x + 8.8, y - 16.4]], teinte(robe, 0.9));
+    ligne(ctx, [x + 6.6, y - 18.6], [x + 5, y - 13], '#2a1e14', 1.2);
+    ligne(ctx, [x - 7, y - 11], [x - 10, y - 6], teinte(robe, 0.6), 1.4);
+  }
+  function elephant(ctx, x, y, couverture, pose) {
+    var j = pose ? 1.4 : -1.4;
+    ellipse(ctx, x, y, 12, 3, 'rgba(30,30,20,0.35)');
+    ctx.fillStyle = '#8a8680';
+    [[-7, j], [-3, -j], [4, -j], [8, j]].forEach(function (p) { ctx.fillRect(x + p[0] - 1.6, y - 9, 3.2, 8.4); });
+    ellipse(ctx, x, y - 13, 11, 6.4, '#9a958e');
+    cercle(ctx, x + 10, y - 16, 4.6, '#9a958e');
+    ctx.strokeStyle = '#8a8680'; ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(x + 13, y - 14); ctx.quadraticCurveTo(x + 16, y - 8, x + 14, y - 3); ctx.stroke();
+    ligne(ctx, [x + 12, y - 12.4], [x + 15.6, y - 11.4], '#f4f0e6', 1.2);
+    poly(ctx, [[x - 6, y - 19], [x + 5, y - 19], [x + 6, y - 11], [x - 7, y - 11]], couverture);
+    poly(ctx, [[x - 4, y - 23.6], [x + 3, y - 23.6], [x + 3.4, y - 19], [x - 4.4, y - 19]], '#8a5a2a');
+    cercle(ctx, x + 11.4, y - 17.2, 0.7, '#1e1612');
+  }
+  function belier(ctx, x, y, bois, pose) {
+    ellipse(ctx, x, y, 11, 2.6, 'rgba(30,30,20,0.35)');
+    cercle(ctx, x - 6, y - 2.4, 2.4, '#4a3020'); cercle(ctx, x + 6, y - 2.4, 2.4, '#4a3020');
+    poly(ctx, [[x - 9, y - 6], [x + 9, y - 6], [x + 7, y - 13], [x - 7, y - 13]], bois, teinte(bois, 0.6));
+    poly(ctx, [[x - 8, y - 13], [x + 8, y - 13], [x, y - 19]], teinte(bois, 0.8));
+    ctx.fillStyle = '#5a5a60'; ctx.fillRect(x + 6 + (pose ? 1.5 : 0), y - 10.6, 6, 2.6);
+  }
+  function peindreUnite(ctx, k, faction, pose, inverse, attaque) {
+    var a = FACTIONS[faction] || FACTIONS.rome, x = 10, y = 26, e = pose ? 1.7 : -1.7;
+    if (inverse) { ctx.translate(20, 0); ctx.scale(-1, 1); }
+    var monte = k === 'cavalier' || k === 'cavalerie';
+    if (k === 'siege') {
+      if (faction === 'carthaginois') elephant(ctx, x, y, a.bouclier, pose);
+      else belier(ctx, x, y, '#8a6238', pose);
+      if (faction !== 'carthaginois') personnage(ctx, x - 12, y, a, pose);
+      return;
+    }
+    if (monte) { cheval(ctx, x - 1, y, faction === 'rome' || faction === 'imperiale' ? '#7a4a2a' : faction === 'numides' ? '#d8c8a8' : '#5a3a22', pose); y -= 9; }
+    var tenue = {};
+    for (var q in a) tenue[q] = a[q];
+    if (monte) tenue.pieds = 'nus';
+    // Bras d'arme : levé pour frapper.
+    var main = attaque ? [x + 5.4, y - 18.8] : null;
+    var r = personnage(ctx, x, y, tenue, monte ? 0 : pose, main);
+    if (a.peinture) { ctx.fillStyle = a.peinture; ctx.fillRect(r.tete[0] + 0.6, r.tete[1] - 0.4, 2.4, 0.8); }
+    var m = r.main;
+    switch (k) {
+      case 'legionnaire': case 'lourde':
+        ligne(ctx, [m[0], m[1]], [m[0] + (attaque ? 5 : 3), m[1] - (attaque ? 2 : 5)], '#d8dce0', 1.4); // glaive
+        bouclier(ctx, x - 2.4, y - 11.6, a.bouclier, faction !== 'rome' && faction !== 'imperiale' && faction !== 'carthaginois');
+        break;
+      case 'javelot': case 'legere':
+        ligne(ctx, [m[0] - 3, m[1] + 5], [m[0] + 3, m[1] - 11], '#8a6238', 1); ligne(ctx, [m[0] + 3, m[1] - 11], [m[0] + 3.8, m[1] - 13.4], '#c8ccd2', 1.4);
+        if (k === 'legere') bouclier(ctx, x - 2.6, y - 11, a.bouclier, true);
+        break;
+      case 'tireur':
+        ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.arc(m[0] + 0.6, m[1] - 2, 5, -1.2, 1.2); ctx.stroke();
+        ligne(ctx, [m[0] + 2.4, m[1] - 6.6], [m[0] + 2.4, m[1] + 2.6], '#e8e0cc', 0.5);
+        break;
+      default: // cavaliers : lance
+        ligne(ctx, [m[0] - 6, m[1] + 4], [m[0] + 8, m[1] - 6], '#8a6238', 1.1); ligne(ctx, [m[0] + 8, m[1] - 6], [m[0] + 10, m[1] - 7.4], '#c8ccd2', 1.4);
+        bouclier(ctx, x - 2.6, y - 11, a.bouclier, true);
+    }
+  }
+  function unite(k, faction, pose, inverse, attaque, z) {
+    var cle = 'u:' + k + ':' + faction + ':' + pose + (inverse ? 1 : 0) + (attaque ? 1 : 0) + '@' + z;
+    var s = cache.get(cle);
+    if (s) return s;
+    var gros = k === 'siege', monte = k === 'cavalier' || k === 'cavalerie';
+    var fm = gros ? [52, 44, 26, 38] : monte ? [40, 46, 20, 40] : [30, 38, 15, 33];
+    var f = z * DPR, c = document.createElement('canvas');
+    c.width = Math.ceil(fm[0] * f); c.height = Math.ceil(fm[1] * f);
+    var ctx = c.getContext('2d');
+    ctx.scale(f, f);
+    ctx.translate(fm[2] - 10, fm[3] - 26);
+    peindreUnite(ctx, k, faction, pose, inverse, attaque);
+    s = { c: c, ox: -fm[2], oy: -fm[3], w: fm[0], h: fm[1] };
+    cache.set(cle, s);
+    return s;
+  }
+
   // --- Icônes d'arrêt (au-dessus des bâtiments, sans texte) -------------------
   function peindreIcone(ctx, cause) {
     cercle(ctx, 12, 12, 11, '#fff8e8', '#7a2e22');
@@ -2609,6 +2706,223 @@
     return c;
   }
 
+  // --- Lot 4 : villas et palais (niveaux 13 à 20), dessinés pour 2 × 2 cases (P à l'échelle) ---------
+  // Villa : domus à atrium, corps principal au fond, deux ailes, cour à bassin, jardin devant.
+  // Palais : marbre, grande salle à fronton, ailes à colonnade, jardin à fontaine ; tours et coupole
+  // dorée pour les grands palais.
+  function peindreVilla(ctx, P, niv, v) {
+    var murs = ['#f1e4c8', '#efdcc0', '#f4e8d0'][v % 3], k;
+    sol(ctx, P, 0.03, 0.03, 1.97, 1.97, '#7fae58');
+    fleurs(ctx, P, 0.15, 1.55, 1.85, 1.92, 10 + niv, v + 3);
+    // Corps principal au fond, à étage dès le niveau 14.
+    var hp = niv >= 14 ? 22 : 16;
+    boite(ctx, P, 0.12, 0.12, 1.88, 0.72, 0, hp, murs);
+    bandeau(ctx, P, 0.12, 0.12, 1.88, 0.72, 0, 2.5, '#c9a46a');
+    fenetres(ctx, P, 'v', 0.12, 1.88, 0.72, hp - 9, hp - 4, 5, '#5b4632', 1.5);
+    toit(ctx, P, 0.12, 0.12, 1.88, 0.72, hp, 9, C.tuile, 'u');
+    // Cour à bassin entre deux ailes basses.
+    sol(ctx, P, 0.55, 0.72, 1.45, 1.5, teinte(C.pierre, 1.12));
+    sol(ctx, P, 0.82, 0.95, 1.18, 1.28, '#5c9ad0');
+    boite(ctx, P, 0.12, 0.72, 0.55, 1.5, 0, 12, murs);
+    toit(ctx, P, 0.12, 0.72, 0.55, 1.5, 12, 7, C.tuile, 'v');
+    colonnade(ctx, P, 0.6, 0.75, 1.4, 1.48, 0, 10, 4, 0, C.marbre);
+    boite(ctx, P, 1.45, 0.72, 1.88, 1.5, 0, 12, murs);
+    toit(ctx, P, 1.45, 0.72, 1.88, 1.5, 12, 7, C.tuile, 'v');
+    // Mur de clôture bas, portail.
+    boite(ctx, P, 0.12, 1.88, 1.88, 1.94, 0, 5, murs);
+    ouverture(ctx, P, 'v', 0.88, 1.12, 1.94, 0, 5, teinte(C.bois, 0.6));
+    // Jardin : arbres, cyprès, statue au niveau 16.
+    var a = P(0.3, 1.7, 0), b = P(1.7, 1.7, 0);
+    arbuste(ctx, a[0], a[1], 4.5, C.feuillage); arbuste(ctx, b[0], b[1], 4.5, C.feuillage);
+    if (niv >= 15) { var c1 = P(0.2, 0.3, 0), c2 = P(1.8, 0.3, 0); cypres(ctx, c1[0], c1[1], 16); cypres(ctx, c2[0], c2[1], 16); }
+    if (niv >= 16) { var s = P(1.0, 1.1, 0); poly(ctx, [[s[0] - 2, s[1]], [s[0] + 2, s[1]], [s[0] + 1.5, s[1] - 4], [s[0] - 1.5, s[1] - 4]], C.marbre); figure(ctx, s[0], s[1] - 4, 0.5, '#e8e4dc'); }
+    for (k = 0; k < 3; k++) { var f = P(0.9 + k * 0.1, 1.15, 0); cercle(ctx, f[0], f[1], 0.9, '#cfe6ff'); }
+  }
+  function peindrePalais(ctx, P, niv, v) {
+    var marbre = ['#f4f1ea', '#efe9de', '#f6f2ec'][v % 3], or = C.or, k;
+    var grand = niv >= 19;
+    sol(ctx, P, 0.02, 0.02, 1.98, 1.98, '#6fa64e');
+    sol(ctx, P, 0.08, 0.08, 1.92, 1.92, teinte(C.marbre, 0.94));
+    // Grande salle au fond : socle, colonnade, fronton à acrotère doré ; tours et coupole dorée
+    // pour les grands palais.
+    var H = niv >= 18 ? 30 : 26;
+    if (grand) [[0.06, 0.06], [1.66, 0.06]].forEach(function (q) { boite(ctx, P, q[0], q[1], q[0] + 0.28, q[1] + 0.28, 0, H + 6, marbre); toit(ctx, P, q[0], q[1], q[0] + 0.28, q[1] + 0.28, H + 6, 7, or, 'u'); });
+    boite(ctx, P, 0.12, 0.12, 1.88, 0.7, 0, 4, C.marbre);
+    boite(ctx, P, 0.34, 0.16, 1.66, 0.62, 4, H, marbre);
+    colonnade(ctx, P, 0.34, 0.16, 1.66, 0.7, 4, H - 2, 7, 0, C.marbre);
+    bandeau(ctx, P, 0.34, 0.16, 1.66, 0.7, H - 2, 2.5, or);
+    toit(ctx, P, 0.3, 0.12, 1.7, 0.72, H, 10, niv >= 20 ? or : C.tuile, 'u');
+    var ac = P(1.0, 0.72, H + 1); poly(ctx, [[ac[0] - 3, ac[1]], [ac[0], ac[1] - 5], [ac[0] + 3, ac[1]]], or);
+    if (niv >= 20) { var d = P(1.0, 0.4, H + 6); dome(ctx, d[0], d[1], 16, 14, or); }
+    // Jardin à fontaine au centre.
+    sol(ctx, P, 0.6, 0.7, 1.4, 1.45, '#7fae58');
+    sol(ctx, P, 0.85, 0.92, 1.15, 1.22, '#5c9ad0');
+    var fo = P(1.0, 1.07, 0); cylindre(ctx, P, 1.0, 1.07, 0.05, 0, 5, C.marbre); cercle(ctx, fo[0], fo[1] - 7, 1.4, '#cfe6ff');
+    fleurs(ctx, P, 0.62, 0.72, 1.38, 1.43, 16, v + 7);
+    // Ailes à colonnade.
+    boite(ctx, P, 0.12, 0.7, 0.6, 1.62, 0, 16, marbre);
+    colonnade(ctx, P, 0.12, 0.7, 0.6, 1.62, 0, 14, 0, 4, C.marbre);
+    toit(ctx, P, 0.12, 0.7, 0.6, 1.62, 16, 7, C.tuile, 'v');
+    boite(ctx, P, 1.4, 0.7, 1.88, 1.62, 0, 16, marbre);
+    toit(ctx, P, 1.4, 0.7, 1.88, 1.62, 16, 7, C.tuile, 'v');
+    // Façade d'entrée : portique et statues.
+    boite(ctx, P, 0.7, 1.62, 1.3, 1.88, 0, 3, C.marbre);
+    colonnade(ctx, P, 0.7, 1.62, 1.3, 1.88, 3, 16, 4, 0, C.marbre);
+    toit(ctx, P, 0.66, 1.6, 1.34, 1.9, 16, 6, C.tuile, 'v');
+    [[0.4, 1.85], [1.6, 1.85]].forEach(function (q) { var s = P(q[0], q[1], 0); poly(ctx, [[s[0] - 2.4, s[1]], [s[0] + 2.4, s[1]], [s[0] + 1.8, s[1] - 5], [s[0] - 1.8, s[1] - 5]], C.marbre); figure(ctx, s[0], s[1] - 5, 0.5, '#e0d8c8'); });
+    if (niv >= 17) { var c1 = P(0.25, 1.75, 0), c2 = P(1.75, 1.75, 0); cypres(ctx, c1[0] - 4, c1[1], 18); cypres(ctx, c2[0] + 4, c2[1], 18); }
+  }
+
+  // --- Lot 4 : sénat, résidences, hippodrome, fabrique de chars ---------------------------------
+  function peindreSenat(ctx, P) {
+    var Q = echelle(P, 2.5);
+    sol(ctx, Q, 0.02, 0.02, 1.98, 1.98, teinte(C.marbre, 0.9));
+    dallage(ctx, Q, 0.1, 1.2, 1.9, 1.95, 6, '#e6e0d4');
+    boite(ctx, Q, 0.15, 0.15, 1.85, 1.15, 0, 4, C.marbre);
+    boite(ctx, Q, 0.25, 0.22, 1.75, 1.05, 4, 32, '#efe9de');
+    colonnade(ctx, Q, 0.2, 0.18, 1.8, 1.12, 4, 30, 8, 5, C.marbre);
+    bandeau(ctx, Q, 0.2, 0.18, 1.8, 1.12, 30, 3, C.or);
+    toit(ctx, Q, 0.18, 0.16, 1.82, 1.14, 33, 12, C.admin, 'v');
+    var c = Q(1.0, 0.62, 45); dome(ctx, c[0], c[1], 12, 11, C.or);
+    // Marches et deux statues de magistrats.
+    for (var k = 0; k < 3; k++) boite(ctx, Q, 0.5 - k * 0.06, 1.15 + k * 0.05, 1.5 + k * 0.06, 1.2 + k * 0.05, 0, 3 - k, C.marbre);
+    [[0.35, 1.6], [1.65, 1.6]].forEach(function (q) { var s = Q(q[0], q[1], 0); poly(ctx, [[s[0] - 3, s[1]], [s[0] + 3, s[1]], [s[0] + 2, s[1] - 6], [s[0] - 2, s[1] - 6]], C.marbre); figure(ctx, s[0], s[1] - 6, 0.5, '#e0d8c8'); });
+  }
+  function peindreResidence(ctx, P, t, taille) {
+    var Q = echelle(P, t / 2);
+    if (taille === 3) peindrePalais(ctx, Q, 18, 1); else peindreVilla(ctx, Q, taille === 2 ? 16 : 14, 2);
+    var m = Q(1.85, 1.85, 0); ctx.fillStyle = '#5b4632'; ctx.fillRect(m[0] - 1, m[1] - 36, 2, 36);
+    poly(ctx, [[m[0] + 1, m[1] - 36], [m[0] + 12, m[1] - 32], [m[0] + 1, m[1] - 27]], '#b8392c');
+    cercle(ctx, m[0] + 4, m[1] - 32, 1.4, C.or);
+  }
+  function peindreHippodrome(ctx, P, t, e) {
+    sol(ctx, P, 0.05, 0.05, t - 0.05, t - 0.05, teinte(C.pierre, 1.05));
+    arene(ctx, P, t / 2, t / 2, t * 0.47, t * 0.3, 20, 2, 4, e && e.actif, '#d8c4a0');
+    // Piste de sable et spina centrale, bornes et obélisque.
+    var c = t / 2, l = t * 0.26;
+    sol(ctx, P, c - l, c - 0.18, c + l, c + 0.18, '#cdb48a');
+    boite(ctx, P, c - l, c - 0.12, c + l, c + 0.12, 0, 4, C.marbre);
+    [[c - l, c], [c + l, c]].forEach(function (q) { var p = P(q[0], q[1], 4); poly(ctx, [[p[0] - 2, p[1]], [p[0], p[1] - 9], [p[0] + 2, p[1]]], C.or); });
+    var o = P(c, c, 4); poly(ctx, [[o[0] - 1.6, o[1]], [o[0] - 0.8, o[1] - 22], [o[0] + 0.8, o[1] - 22], [o[0] + 1.6, o[1]]], '#c8b088');
+    if (e && e.actif) {
+      // Deux quadriges en course.
+      [[c - l * 0.6, c + 0.45], [c + l * 0.3, c - 0.45]].forEach(function (q, i) {
+        var p = P(q[0], q[1], 0);
+        ellipse(ctx, p[0], p[1], 7, 2, 'rgba(30,30,20,0.3)');
+        for (var k = 0; k < 2; k++) cavalier(ctx, p[0] + 4 + k * 3, p[1] - 1, 0.7, i ? '#3f86b8' : '#b8392c');
+      });
+    }
+  }
+  function peindreFabriqueChars(ctx, P) {
+    var Q = echelle(P, 1.5);
+    sol(ctx, Q, 0.05, 0.05, 1.95, 1.95, teinte(C.terre, 1.1));
+    boite(ctx, Q, 0.15, 0.15, 1.2, 1.1, 0, 16, '#d8c4a0');
+    toit(ctx, Q, 0.15, 0.15, 1.2, 1.1, 16, 9, C.tuile, 'u');
+    ouverture(ctx, Q, 'v', 0.4, 0.95, 1.1, 0, 11, '#3b2a1c', 3);
+    // Char en bois et roue posée contre le mur.
+    var r = Q(1.55, 1.45, 0);
+    poly(ctx, [[r[0] - 8, r[1] - 6], [r[0] + 4, r[1] - 6], [r[0] + 6, r[1] - 12], [r[0] - 6, r[1] - 12]], '#a8743f');
+    ctx.strokeStyle = '#5b3a22'; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(r[0] - 2, r[1] - 4, 4, 0, Math.PI * 2); ctx.stroke();
+    ligne(ctx, [r[0] - 6, r[1] - 4], [r[0] + 2, r[1] - 4], '#5b3a22', 1); ligne(ctx, [r[0] - 2, r[1] - 8], [r[0] - 2, r[1]], '#5b3a22', 1);
+    ligne(ctx, [r[0] + 4, r[1] - 8], [r[0] + 14, r[1] - 3], '#8a6238', 1.6);
+    var w = Q(1.25, 0.4, 0); ctx.beginPath(); ctx.arc(w[0] + 4, w[1] - 6, 5, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  // --- Lot 4 : fortifications et bâtiments militaires ------------------------------------------
+  // Muraille : tronçon de pierre relié aux voisins (masque : 1 nord, 2 est, 4 sud, 8 ouest).
+  function peindreMuraille(ctx, P, masque) {
+    var pierre = '#b5a88f', H = 22, a = 0.3, b = 0.7;
+    sol(ctx, P, 0.15, 0.15, 0.85, 0.85, 'rgba(60,50,40,0.18)');
+    var bras = [[1, a, 0, b, a], [2, b, a, 1, b], [4, a, b, b, 1], [8, 0, a, a, b]];
+    // D'abord ce qui est derrière (nord, ouest), puis le cœur, puis l'avant (est, sud).
+    [bras[0], bras[3]].forEach(function (q) { if (masque & q[0]) boite(ctx, P, q[1], q[2], q[3], q[4], 0, H, pierre); });
+    boite(ctx, P, a, a, b, b, 0, H + 2, pierre);
+    [bras[1], bras[2]].forEach(function (q) { if (masque & q[0]) boite(ctx, P, q[1], q[2], q[3], q[4], 0, H, pierre); });
+    // Créneaux sur le cœur.
+    for (var k = 0; k < 2; k++) boite(ctx, P, a + k * 0.22, a, a + k * 0.22 + 0.12, a + 0.12, H + 2, H + 6, '#c4b89e');
+    for (k = 0; k < 2; k++) boite(ctx, P, a, a + k * 0.22 + 0.2, a + 0.12, a + k * 0.22 + 0.32, H + 2, H + 6, '#c4b89e');
+  }
+  function peindreTour(ctx, P) {
+    var pierre = '#b5a88f';
+    sol(ctx, P, 0.1, 0.1, 1.9, 1.9, 'rgba(60,50,40,0.18)');
+    boite(ctx, P, 0.25, 0.25, 1.75, 1.75, 0, 44, pierre);
+    for (var k = 0; k < 4; k++) {
+      boite(ctx, P, 0.25 + k * 0.4, 0.25, 0.25 + k * 0.4 + 0.22, 0.42, 44, 50, '#c4b89e');
+      boite(ctx, P, 0.25, 0.25 + k * 0.4, 0.42, 0.25 + k * 0.4 + 0.22, 44, 50, '#c4b89e');
+    }
+    fenetres(ctx, P, 'v', 0.25, 1.75, 1.75, 30, 36, 2, '#2a2018');
+    fenetres(ctx, P, 'u', 0.25, 1.75, 1.75, 30, 36, 2, '#2a2018');
+    var m = P(1.0, 1.0, 50); ctx.fillStyle = '#5b4632'; ctx.fillRect(m[0] - 1, m[1] - 16, 2, 16);
+    poly(ctx, [[m[0] + 1, m[1] - 16], [m[0] + 10, m[1] - 13], [m[0] + 1, m[1] - 10]], '#b8392c');
+  }
+  function peindrePorte(ctx, P) {
+    var pierre = '#b5a88f';
+    sol(ctx, P, 0.05, 0.05, 1.95, 1.95, teinte(C.route || '#c9bfa8', 1));
+    boite(ctx, P, 0.1, 0.1, 0.55, 1.9, 0, 32, pierre);
+    boite(ctx, P, 1.45, 0.1, 1.9, 1.9, 0, 32, pierre);
+    boite(ctx, P, 0.55, 0.1, 1.45, 1.9, 22, 32, pierre);
+    ouverture(ctx, P, 'v', 0.6, 1.4, 1.9, 0, 18, '#3b2a1c', 4);
+    for (var k = 0; k < 4; k++) boite(ctx, P, 0.1 + k * 0.48, 0.1, 0.1 + k * 0.48 + 0.24, 0.3, 32, 37, '#c4b89e');
+  }
+  function peindreCaserne(ctx, P) {
+    var Q = echelle(P, 1.5), murs = '#d6c8a8';
+    sol(ctx, Q, 0.03, 0.03, 1.97, 1.97, teinte(C.terre, 1.15));
+    boite(ctx, Q, 0.1, 0.1, 1.9, 0.7, 0, 16, murs);
+    toit(ctx, Q, 0.1, 0.1, 1.9, 0.7, 16, 8, C.tuile, 'u');
+    boite(ctx, Q, 0.1, 0.7, 0.6, 1.9, 0, 14, murs);
+    toit(ctx, Q, 0.1, 0.7, 0.6, 1.9, 14, 7, C.tuile, 'v');
+    // Cour d'exercice : poteaux d'entraînement et râtelier d'armes.
+    for (var k = 0; k < 3; k++) poteau(ctx, Q, 0.9 + k * 0.32, 1.3, 0, 12, '#6e4a2c', 2.4);
+    var r = Q(1.6, 1.0, 0);
+    for (k = 0; k < 4; k++) ligne(ctx, [r[0] - 6 + k * 3, r[1]], [r[0] - 4 + k * 3, r[1] - 12], '#9aa0a6', 1.2);
+    ligne(ctx, [r[0] - 8, r[1] - 6], [r[0] + 6, r[1] - 6], '#6e4a2c', 1.6);
+    var m = Q(0.2, 0.2, 24); ctx.fillStyle = '#5b4632'; ctx.fillRect(m[0] - 1, m[1] - 16, 2, 16);
+    poly(ctx, [[m[0] + 1, m[1] - 16], [m[0] + 10, m[1] - 13], [m[0] + 1, m[1] - 10]], '#b8392c');
+  }
+  function peindreAcademieMilitaire(ctx, P) {
+    var Q = echelle(P, 1.5), murs = '#e6dcc4';
+    sol(ctx, Q, 0.03, 0.03, 1.97, 1.97, teinte(C.pierre, 1.05));
+    boite(ctx, Q, 0.15, 0.15, 1.85, 1.0, 0, 22, murs);
+    colonnade(ctx, Q, 0.15, 0.15, 1.85, 1.0, 0, 20, 6, 3, C.marbre);
+    toit(ctx, Q, 0.12, 0.12, 1.88, 1.02, 22, 10, '#8a2a22', 'u');
+    // Aigle d'or sur sa hampe.
+    var a = Q(1.0, 1.5, 0); ctx.fillStyle = '#6e4a2c'; ctx.fillRect(a[0] - 1, a[1] - 28, 2, 28);
+    poly(ctx, [[a[0] - 6, a[1] - 30], [a[0], a[1] - 27], [a[0] + 6, a[1] - 30], [a[0], a[1] - 33]], C.or);
+    dallage(ctx, Q, 0.2, 1.1, 1.8, 1.9, 5, '#d8cfba');
+  }
+  function peindreFort(ctx, P, unite) {
+    var Q = echelle(P, 2), bois = '#8a6238', c = unite === 'legionnaire' ? '#b8392c' : unite === 'javelot' ? '#3f6e9c' : '#c98a2a';
+    sol(ctx, Q, 0.02, 0.02, 1.98, 1.98, teinte(C.terre, 1.12));
+    // Palissade sur talus, tours d'angle, tentes alignées dans l'enceinte.
+    var pal = function (u0, v0, u1, v1) { boite(ctx, Q, u0, v0, u1, v1, 0, 10, bois, teinte(bois, 1.2)); };
+    pal(0.1, 0.1, 1.9, 0.18); pal(0.1, 0.1, 0.18, 1.9);
+    for (var r = 0; r < 2; r++) for (var k = 0; k < 3; k++) {
+      var u = 0.4 + k * 0.45, v = 0.45 + r * 0.55;
+      poly(ctx, [Q(u, v, 0), Q(u + 0.3, v, 0), Q(u + 0.15, v, 9)], '#efe2c4'); poly(ctx, [Q(u + 0.3, v, 0), Q(u + 0.3, v + 0.3, 0), Q(u + 0.15, v + 0.3, 9), Q(u + 0.15, v, 9)], '#d8c8a4');
+    }
+    pal(1.82, 0.1, 1.9, 1.9); pal(0.1, 1.82, 0.85, 1.9); pal(1.15, 1.82, 1.9, 1.9);
+    [[0.08, 0.08], [1.72, 0.08], [0.08, 1.72], [1.72, 1.72]].forEach(function (q) { boite(ctx, Q, q[0], q[1], q[0] + 0.2, q[1] + 0.2, 0, 18, bois, teinte(bois, 1.15)); });
+    // Étendard de la cohorte, à la couleur de son arme.
+    var m = Q(1.0, 1.55, 0); ctx.fillStyle = '#5b4632'; ctx.fillRect(m[0] - 1, m[1] - 34, 2, 34);
+    poly(ctx, [[m[0] - 6, m[1] - 34], [m[0] + 6, m[1] - 34], [m[0] + 6, m[1] - 24], [m[0], m[1] - 21], [m[0] - 6, m[1] - 24]], c);
+    cercle(ctx, m[0], m[1] - 29, 2, C.or);
+  }
+
+  PEINTRES.senat = function (ctx, P) { peindreSenat(ctx, P); };
+  PEINTRES.residence_maison = function (ctx, P, t) { peindreResidence(ctx, P, t, 1); };
+  PEINTRES.residence_villa = function (ctx, P, t) { peindreResidence(ctx, P, t, 2); };
+  PEINTRES.residence_palais = function (ctx, P, t) { peindreResidence(ctx, P, t, 3); };
+  PEINTRES.hippodrome = function (ctx, P, t, e) { peindreHippodrome(ctx, P, t, e); };
+  PEINTRES.fabrique_chars = function (ctx, P) { peindreFabriqueChars(ctx, P); };
+  PEINTRES.muraille = function (ctx, P, t, e) { peindreMuraille(ctx, P, (e && e.masque) || 0); };
+  PEINTRES.tour = function (ctx, P) { peindreTour(ctx, P); };
+  PEINTRES.porte = function (ctx, P) { peindrePorte(ctx, P); };
+  PEINTRES.caserne = function (ctx, P) { peindreCaserne(ctx, P); };
+  PEINTRES.academie_militaire = function (ctx, P) { peindreAcademieMilitaire(ctx, P); };
+  PEINTRES.fort_legionnaires = function (ctx, P) { peindreFort(ctx, P, 'legionnaire'); };
+  PEINTRES.fort_javelots = function (ctx, P) { peindreFort(ctx, P, 'javelot'); };
+  PEINTRES.fort_cavaliers = function (ctx, P) { peindreFort(ctx, P, 'cavalier'); };
+
   // --- Accès publics ----------------------------------------------------------
   // Hauteur réservée au-dessus de l'emprise (zoom 1), par type de dessin.
   var HAUT = { puits: 34, fontaine: 34, reservoir: 30, aqueduc: 30, barriere: 18, ferme_ble: 30, grenier: 52, marche: 30, temple_ceres: 50, theatre: 34, colonie_acteurs: 40, forum: 40, prefecture: 44, ingenieur: 40, ruines: 14, gravats: 14, incendie: 50,
@@ -2622,17 +2936,23 @@
     grand_temple_ceres: 44, grand_temple_neptune: 44, grand_temple_mercure: 44, grand_temple_mars: 44, grand_temple_venus: 44, oracle: 32,
     jardin: 20, statue_petite: 22, statue_moyenne: 24, statue_grande: 26,
     // Lot 3.
-    quai_commerce: 34 };
+    quai_commerce: 34,
+    // Lot 4.
+    senat: 104, residence_maison: 60, residence_villa: 80, residence_palais: 128, hippodrome: 40, fabrique_chars: 34,
+    muraille: 30, tour: 60, porte: 42, caserne: 40, academie_militaire: 54, fort_legionnaires: 48, fort_javelots: 48, fort_cavaliers: 48 };
   // Emprise prévue des dessins du lot 2 (repli des vignettes quand les données ne connaissent pas encore le type).
   var TAILLE = { ferme_legumes: 3, ferme_fruits: 3, ferme_porcs: 3, ferme_olives: 3, ferme_vigne: 3, quai_peche: 2,
     carriere_argile: 2, camp_bucherons: 2, mine_fer: 2, carriere_marbre: 2, atelier_poterie: 2, atelier_mobilier: 2, pressoir: 2, cave: 2,
     atelier_armes: 2, entrepot: 3, ecole: 2, bibliotheque: 2, academie: 3, barbier: 1, bains: 2, medecin: 1, hopital: 3,
     amphitheatre: 3, colisee: 5, ecole_gladiateurs: 3, maison_lions: 3, temple_neptune: 2, temple_mercure: 2, temple_mars: 2, temple_venus: 2,
     grand_temple_ceres: 3, grand_temple_neptune: 3, grand_temple_mercure: 3, grand_temple_mars: 3, grand_temple_venus: 3, oracle: 2,
-    jardin: 1, statue_petite: 1, statue_moyenne: 2, statue_grande: 3, quai_commerce: 3 };
+    jardin: 1, statue_petite: 1, statue_moyenne: 2, statue_grande: 3, quai_commerce: 3,
+    senat: 5, residence_maison: 3, residence_villa: 4, residence_palais: 5, hippodrome: 9, fabrique_chars: 3,
+    muraille: 1, tour: 2, porte: 2, caserne: 3, academie_militaire: 3, fort_legionnaires: 4, fort_javelots: 4, fort_cavaliers: 4 };
   // Hauteur réservée au-dessus d'une maison : celle d'avant pour les niveaux 1 à 6, assez pour les immeubles ensuite.
   var HAUT_MAISON = { 7: 34, 8: 40, 9: 42, 10: 42, 11: 54, 12: 64 };
-  function hautMaison(niv, t) { return niv <= 6 ? 30 + Math.max(0, niv - 4) * 8 : (HAUT_MAISON[niv] || 70); }
+  var HAUT_PATRICIENS = { 13: 30, 14: 34, 15: 34, 16: 36, 17: 44, 18: 48, 19: 66, 20: 70 };
+  function hautMaison(niv, t) { return niv <= 6 ? 30 + Math.max(0, niv - 4) * 8 : niv >= 13 ? Math.ceil(HAUT_PATRICIENS[niv] * t / 2) + 8 : (HAUT_MAISON[niv] || 70); }
 
   racine.MM_DESSINS = {
     TW: TW, TH: TH,
@@ -2658,6 +2978,7 @@
     },
     incendie: function (t, fr, z) { return sprite('feu:' + t + ':' + fr, t, HAUT.incendie, function (ctx, P, tt) { peindreFlammes(ctx, P, tt, fr); }, z); },
     marcheur: marcheur,
+    unite: unite,
     icone: icone,
     imageBien: imageBien,
     // Tuile plate colorée (aperçu de pose, calques).

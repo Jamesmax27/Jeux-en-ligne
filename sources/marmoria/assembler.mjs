@@ -92,4 +92,4 @@ if (r.status !== 0) process.exit(r.status || 1);
 
 const final = await readFile(SORTIE, 'utf8');
 const ko = Buffer.byteLength(final, 'utf8') / 1024;
-console.log(`✓ games/marmoria/index.html : ${ko.toFixed(0)} Ko (repère du lot 3 : 2,6 Mo)`);
+console.log(`✓ games/marmoria/index.html : ${ko.toFixed(0)} Ko (repère du lot 4 : 3,4 Mo)`);

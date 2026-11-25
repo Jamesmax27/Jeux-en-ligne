@@ -108,7 +108,7 @@ section('Données');
 ok(D.missions.length === 17 && D.maisons.length === 20, '17 missions et 20 niveaux de maison');
 try { nouveauMonde((d) => { d.maisons.pop(); }); ok(false, 'données sans le niveau 20 acceptées'); } catch (err) { ok(/Données invalides/.test(err.message), 'données invalides refusées avec un message'); }
 try { nouveauMonde((d) => { d.batiments.puits.cout = 'cinq'; }); ok(false, 'coût non numérique accepté'); } catch { ok(true, ''); }
-ok(D.missions.filter((m) => m.dispo).map((m) => m.id).join(',') === 'ostie,pompei,ravenne,narbo,massalia', 'lots 1 à 3 : Ostie, Pompéi, Ravenne, Narbo et Massalia jouables');
+ok(D.missions.filter((m) => m.dispo).map((m) => m.id).join(',') === 'ostie,pompei,ravenne,narbo,aquilee,massalia,vindobona', 'lots 1 à 4 : Ostie, Pompéi, Ravenne, Narbo, Aquilée, Massalia et Vindobona jouables');
 
 // --------------------------------------------------------------------------
 section('Formules (une au moins par règle chiffrée du lot 1)');
@@ -1070,6 +1070,345 @@ section('Lot 3 : missions jouées par le gouverneur automatique (difficulté nor
 }
 
 // --------------------------------------------------------------------------
+// Lot 4 « Guerre et patriciens » (cahier, section 21) : patriciens, sénat, résidences,
+// hippodrome, pyramide des âges, criminalité, difficulté, armée (caserne, forts, combat, tours,
+// murailles, invasions, demandes de troupes, légions), missions Aquilée et Vindobona.
+section('Lot 4 : patriciens (niveaux 13 à 20)');
+{
+  const e = partieMission('vindobona', { libre: true, tout: true });
+  const [x, y] = caseLibre(e, 0, 3);
+  // Une insula de prestige (2 × 2, 96 habitants) qui devient petite villa (40) : 56 sans-abri.
+  const h = O.creerBatiment(e, 'logement', x, y, 2);
+  h.niv = 12; h.hab = 96; sim.majPopulation(e);
+  O.monter(e, h, D.maisons[11], D.maisons[12]);
+  const partis = e.marcheurs.filter((w) => w.type === 'sansabri').reduce((n, w) => n + w.gens, 0);
+  ok(h.niv === 13 && h.hab === 40 && partis === 56, `12 → 13 : la villa garde 40 habitants, 56 repartent chercher un logement (${partis})`);
+  // Les patriciens ne travaillent pas.
+  const e2 = partieMission('vindobona', { libre: true, tout: true });
+  const [x2, y2] = caseLibre(e2, 0, 3);
+  const v = O.creerBatiment(e2, 'logement', x2, y2, 2); v.niv = 14; v.hab = 44;
+  const p = O.creerBatiment(e2, 'logement', x2 + 3, y2, 1); p.niv = 6; p.hab = 14;
+  sim.majPopulation(e2);
+  sim.repartirTravail(e2);
+  ok(e2.travailleurs === Math.floor(14 * sim.partActifs(e2)), `travailleurs : seuls les plébéiens comptent (${e2.travailleurs} pour 14 plébéiens et 44 patriciens)`);
+  ok(D.maisons[12].impot === 12 && D.maisons[16].impot === 30, 'impôt : coefficient 12 pour les villas, 30 pour les palais (section 11.2)');
+  // Agrandissement : une villa de 2 × 2 au niveau 14 s'étend à 3 × 3 sur des jardins.
+  const e3 = partieMission('vindobona', { libre: true, tout: true });
+  const [x3, y3] = caseLibre(e3, 0, 3);
+  const g = O.creerBatiment(e3, 'logement', x3, y3, 2); g.niv = 14; g.hab = 44;
+  for (let k = 0; k < 3; k++) O.creerBatiment(e3, 'jardin', x3 + 2, y3 + k);
+  O.creerBatiment(e3, 'jardin', x3, y3 + 2); O.creerBatiment(e3, 'jardin', x3 + 1, y3 + 2);
+  ok(O.agrandir(e3, g, 3) && g.t === 3 && g.x === x3 && g.y === y3, 'niveau 15 : la villa de 2 × 2 absorbe 5 jardins et passe à 3 × 3');
+  ok(sim.invariants(e3).length === 0, 'agrandissement à 3 × 3 : emprise cohérente (invariants)');
+  // Bâtiments uniques.
+  const e4 = partieMission('vindobona', { libre: true, tout: true });
+  const [x4, y4] = caseLibre(e4, 0, -12);
+  ok(sim.appliquer(e4, { type: 'poser', bat: 'residence_maison', x: x4, y: y4 }).ok, 'une résidence du gouverneur se pose');
+  const r2 = sim.appliquer(e4, { type: 'poser', bat: 'residence_palais', x: x4 + 8, y: y4 });
+  ok(!r2.ok && r2.raison === 'unique', 'une seconde résidence (même d\'une autre taille) est refusée : une par ville');
+}
+
+{
+  // Montée jusqu'au palais impérial (niveau 20, 4 × 4) en construction libre : un carré de
+  // 16 logements, un anneau de places, un anneau de grandes statues, la résidence et le sénat ;
+  // le test fournit chaque jour les services, les biens et l'eau (les marcheurs ne sont pas en
+  // cause ici, voir le cahier, section 23.9).
+  const e = sim.nouvelle('vindobona', { libre: true, tout: true, risques: false, fonds: 1e6 });
+  const N = e.N, R = ex.ligneRome(sim, e), x0 = 50, y0 = R - 16;
+  const zone = (x, y, t) => { const l = []; for (let j = y; j < y + t; j++) for (let i = x; i < x + t; i++) l.push([i, j]); return l; };
+  sim.appliquer(e, { type: 'tracer', bat: 'deblayer', cases: zone(x0 - 14, y0 - 14, 32).filter(([i, j]) => e.terrain[j * N + i] === sim.T.ARBRES) });
+  const places = []; // l'anneau de places sert de route (une maison doit avoir une route à 2 cases)
+  for (let i = x0 - 1; i <= x0 + 4; i++) { places.push([i, y0 - 1]); places.push([i, y0 + 4]); }
+  for (let j = y0; j < y0 + 4; j++) { places.push([x0 - 1, j]); places.push([x0 + 4, j]); }
+  sim.appliquer(e, { type: 'tracer', bat: 'route', cases: places });
+  sim.appliquer(e, { type: 'tracer', bat: 'place', cases: places });
+  sim.appliquer(e, { type: 'tracer', bat: 'logement', cases: zone(x0, y0, 4) });
+  const statues = [];
+  for (let i = x0 - 4; i <= x0 + 5; i += 3) { statues.push([i, y0 - 4]); statues.push([i, y0 + 5]); }
+  for (let j = y0 - 1; j <= y0 + 2; j += 3) { statues.push([x0 - 4, j]); statues.push([x0 + 5, j]); }
+  statues.forEach(([i, j]) => sim.appliquer(e, { type: 'poser', bat: 'statue_grande', x: i, y: j }));
+  sim.appliquer(e, { type: 'poser', bat: 'residence_palais', x: x0 + 8, y: y0 - 1 });
+  sim.appliquer(e, { type: 'poser', bat: 'senat', x: x0 - 9, y: y0 - 1 });
+  sim.calculerAttractivite(e);
+  const SVC = ['ecole', 'bains', 'barbier', 'medecin', 'bibliotheque', 'hopital', 'academie', 'impot', 'dieu_ceres', 'dieu_neptune', 'dieu_mercure', 'dieu_mars', 'dieu_venus'];
+  const PTS = { theatre: 15, amphitheatre: 20, colisee: 25, hippodrome: 30 };
+  const premiere = e.batiments.find((b) => b.type === 'logement');
+  premiere.hab = 4; premiere.niv = 1;
+  let max = 0, jour20 = null, t20 = 0;
+  for (let jour = 0; jour < 200 && max < 20; jour++) {
+    for (const h of e.batiments) if (h.type === 'logement' && h.hab > 0) {
+      SVC.forEach((k) => { h.svc[k] = 48; });
+      for (const k in PTS) { h.svc[k] = 48; h.pts[k] = PTS[k]; }
+      ['ble', 'legumes', 'fruits'].forEach((g) => { h.viv[g] = 2000; });
+      ['poterie', 'mobilier', 'huile', 'vin'].forEach((g) => { h.viv[g] = 400; });
+      h.hab = sim.capacite(h);
+      for (let j = h.y; j < h.y + h.t; j++) for (let i = h.x; i < h.x + h.t; i++) { e.eauFontaine[j * N + i] = 1; e.eauPuits[j * N + i] = 1; }
+    }
+    sim.majPopulation(e);
+    for (const h of e.batiments.slice()) if (h.type === 'logement' && h.hab > 0) O.quotidien(e, h);
+    e.batiments.forEach((h) => { if (h.type === 'logement' && h.hab > 0 && h.niv > max) { max = h.niv; if (max === 20) { jour20 = jour; t20 = h.t; } } });
+  }
+  ok(max === 20 && t20 === 4, `palais impérial (niveau 20, 4 × 4) atteint au jour ${jour20} : agrandissements 2 × 2, 3 × 3 puis 4 × 4 (niveau maximal ${max})`);
+  ok(sim.invariants(e).length === 0, 'montée au palais impérial : invariants tenus');
+}
+
+section('Lot 4 : sénat, hippodrome');
+{
+  const e = partieMission('vindobona', { libre: true, tout: true });
+  habitants(e, 300, 6);
+  const s = batimentService(e, 'senat', 30);
+  for (let k = 0; k < 3 * TJ; k++) sim.pas(e);
+  const perc = e.marcheurs.filter((w) => w.type === 'percepteur' && w.o === s.id).length;
+  ok(perc === 2, `le sénat envoie deux percepteurs à la fois (${perc})`);
+  const h = batimentService(e, 'hippodrome', 50);
+  h.spects = {};
+  ok(sim.cause(e, h) === 'sansArtiste', 'hippodrome sans char : relâche');
+  const f = batimentService(e, 'fabrique_chars', 70);
+  let arrive = false;
+  for (let k = 0; k < 40 * TJ && !arrive; k++) { sim.pas(e); arrive = (h.spects.char || 0) > 0; }
+  ok(arrive, 'la fabrique de chars envoie un char : l\'hippodrome ouvre ses courses');
+  ok(sim.pointsSpectacle(h) === 30, `hippodrome en course : 30 points (${sim.pointsSpectacle(h)})`);
+  void f;
+}
+
+section('Lot 4 : pyramide des âges (section 6.3)');
+{
+  const e = partieMission('ravenne', { libre: true });
+  habitants(e, 400, 4);
+  e.sante = 60;
+  O.moisAges(e);
+  const somme = e.ages.reduce((a, b) => a + b, 0);
+  proche(somme, e.pop, 0.01, 'la pyramide compte exactement la population logée');
+  proche(sim.partActifs(e), D.regles.travail.partTravailleurs, 0.02, 'ville au profil des immigrants : 40 % de travailleurs');
+  // Une ville qui vieillit perd des travailleurs.
+  const n = e.ages.length; e.ages = new Array(n).fill(0); e.ages[6] = e.pop * 0.6; e.ages[7] = e.pop * 0.4;
+  ok(sim.partActifs(e) === 0, 'une ville de sexagénaires n\'a plus de travailleurs');
+  // Mortalité : plus forte quand la santé est basse.
+  const morts = (sante) => { const x = partieMission('ravenne', { libre: true }); habitants(x, 600, 4); x.sante = sante; O.moisAges(x); let m = 0; for (let k = 0; k < 24; k++) { x.flux.morts = 0; O.moisAges(x); m += x.flux.morts; } return m; };
+  const mBas = morts(5), mHaut = morts(95);
+  ok(mBas > mHaut, `mortalité : ${mBas} décès en 2 ans avec une santé de 5, ${mHaut} avec 95`);
+  // Naissances seulement dans une maison qui a de la place.
+  const pleine = partieMission('ravenne', { libre: true });
+  habitants(pleine, 200, 4);
+  pleine.batiments.forEach((b) => { if (b.type === 'logement') b.hab = sim.capacite(b); });
+  sim.majPopulation(pleine);
+  const p0 = pleine.pop; pleine.sante = 100;
+  for (let k = 0; k < 12; k++) O.moisAges(pleine);
+  ok(pleine.pop <= p0 && pleine.histo.length === 0, `maisons pleines : aucune naissance (${p0} → ${pleine.pop})`);
+}
+
+section('Lot 4 : criminalité, voleurs, émeutes (section 10.3)');
+{
+  const e = partieMission('ravenne');
+  const l = habitants(e, 200, 6);
+  const tente = O.creerBatiment(e, 'logement', l[l.length - 1].x + 1, l[l.length - 1].y); tente.niv = 2; tente.hab = 6;
+  sim.majPopulation(e);
+  e.humeur = 30;
+  O.moisCrime(e);
+  proche(l[0].crime, 4, 0.001, 'humeur 30 : la criminalité d\'une masure monte de (50 − 30) / 5 = 4');
+  proche(tente.crime, 8, 0.001, '… doublée pour une tente : 8');
+  // Un voleur dérobe au forum, puis s'enfuit ; un préfet l'arrête.
+  const forum = batimentService(e, 'forum', 60);
+  l[0].crime = 100; e.tresor = 5000;
+  const t0 = e.tresor;
+  O.lancerCriminel(e, l[0], 'voleur');
+  for (let k = 0; k < 20 * TJ && !e.finances.an.vols; k++) sim.pas(e);
+  ok(e.finances.an.vols >= D.regles.crime.volMin && e.finances.an.vols <= D.regles.crime.volMax && e.tresor <= t0 - e.finances.an.vols + 1000, `un voleur dérobe ${e.finances.an.vols} deniers au forum (poste « Vols »)`);
+  void forum;
+  // Émeute : la paix baisse de 5, au plus 20 par an.
+  const e2 = partieMission('ravenne');
+  const l2 = habitants(e2, 400, 3);
+  batimentService(e2, 'theatre', 60); batimentService(e2, 'forum', 64); batimentService(e2, 'marche', 68);
+  e2.cotes.paix = 50; e2.humeur = 10;
+  let emeutes = 0;
+  for (let r = 0; r < 8; r++) { const w = l2[r]; w.crime = 100; O.lancerCriminel(e2, w, 'emeutier'); }
+  for (let k = 0; k < 30 * TJ; k++) sim.pas(e2);
+  emeutes = e2.stats.emeutes || 0;
+  ok(emeutes >= 1 && e2.stats.incendies >= 1, `des émeutiers incendient la ville (${emeutes} émeutes, ${e2.stats.incendies} incendies)`);
+  ok(e2.cotes.paix === 50 - Math.min(20, 5 * emeutes), `paix : −5 par émeute, 20 au plus par an (${e2.cotes.paix})`);
+  // Un préfet arrête un criminel croisé.
+  const e3 = partieMission('ravenne');
+  const l3 = habitants(e3, 100, 3);
+  const pf = batimentService(e3, 'prefecture', l3[0].x + 20);
+  batimentService(e3, 'forum', 80); // le voleur vise le forum
+  l3[0].crime = 100;
+  O.lancerCriminel(e3, l3[0], 'voleur'); // sa maison borde la voie de Rome : il part de la route
+  const w = e3.marcheurs.find((m) => m.type === 'voleur');
+  if (w) { const pr = O.creerMarcheur(e3, 'prefet', w.y * e3.N + w.x, { o: pf.id, pas: 0, portee: 26, retour: 0, ch: null, k: 0 }); void pr; }
+  for (let k = 0; k < 40 && !(e3.stats.arrestations > 0); k++) sim.pas(e3);
+  ok(e3.stats.arrestations === 1 && !e3.marcheurs.some((m) => m.type === 'voleur'), 'un préfet qui croise un voleur l\'arrête');
+}
+
+section('Lot 4 : armée (sections 13.1 à 13.6)');
+// Partie libre de Vindobona, deux forts pleins, une invasion de n ennemis à 40 cases au nord.
+function partieArmee(n, faction = 'gaulois', options = {}) {
+  const e = sim.nouvelle('vindobona', { libre: true, tout: true, fonds: 1e6, ...options });
+  const N = e.N, libre = (x, y, t) => { for (let j = y; j < y + t; j++) for (let i = x; i < x + t; i++) { const k = j * N + i; if (e.bat[k] || e.route[k] || e.terrain[k] >= 2) return false; } return true; };
+  const poser = (type, x0, y0) => { const t = D.batiments[type].taille; for (let r = 0; r < 30; r++) for (let y = y0 - r; y <= y0 + r; y++) for (let x = x0 - r; x <= x0 + r; x++) if (libre(x, y, t)) return O.creerBatiment(e, type, x, y); return null; };
+  const forts = (options.forts || ['fort_legionnaires', 'fort_javelots']).map((t, k) => poser(t, 50 + 7 * k, 44));
+  forts.forEach((f) => { for (let k = 0; k < 16; k++) O.creerUnite(e, 0, D.batiments[f.type].unite, sim.ancreFort(e, f), { f: f.id }); });
+  const maisons = []; for (let k = 0; k < 8; k++) maisons.push(poser('logement', 52 + k, 58));
+  if (n) O.lancerInvasion(e, { faction, effectif: n, entree: [56, 2] }, false);
+  return { e, forts, maisons, poser };
+}
+{
+  const { e } = partieArmee(50);
+  ok(e.unites.filter((u) => u.c === 1).length === 50, 'invasion : 50 ennemis entrent sur la carte');
+  const comp = {}; e.unites.forEach((u) => { if (u.c === 1) comp[u.k] = (comp[u.k] || 0) + 1; });
+  ok(comp.legere === 25 && comp.lourde === 10 && comp.tireur === 10 && comp.cavalerie === 5, `dosage des Gaulois : ${JSON.stringify(comp)}`);
+  let pire = 0;
+  const t0 = process.hrtime.bigint();
+  let ticks = 0, invariant = null;
+  while (e.invasion && ticks < 20 * TM) {
+    const a = process.hrtime.bigint(); sim.pas(e); const d = Number(process.hrtime.bigint() - a) / 1e6; if (d > pire) pire = d;
+    ticks++;
+    if (!invariant && ticks % 50 === 0) { const pb = sim.invariants(e); if (pb.length) invariant = pb[0]; }
+  }
+  const moy = Number(process.hrtime.bigint() - t0) / 1e6 / ticks;
+  ok(!invariant, `invariants tenus pendant le combat${invariant ? ' : ' + invariant : ''}`);
+  ok(!e.invasion, `l'invasion se termine (${ticks} ticks)`);
+  ok(moy < 4, `invasion de 50 ennemis : ${moy.toFixed(3)} ms par tick en moyenne (cible 4 ms), ${pire.toFixed(1)} ms au pire`);
+  console.log(`  invasion de 50 ennemis : ${moy.toFixed(3)} ms par tick en moyenne, ${pire.toFixed(1)} ms au pire, ${ticks} ticks ; ${e.stats.ennemisTues || 0} ennemis tués, ${e.stats.soldatsMorts || 0} soldats morts, ${e.stats.detruits || 0} bâtiments détruits, paix ${e.cotes.paix}`);
+  const entr = e.unites.filter((u) => u.c === 0 && u.combat === 0 && u.entr === 1).length;
+  ok(entr > 0, `entraînement : +1 aux soldats qui ont combattu (${entr})`);
+  ok(e.cotes.paix === (e.stats.detruits ? 0 : D.regles.militaire.paix.repoussee), 'paix : +5 pour une invasion repoussée sans bâtiment détruit');
+}
+{
+  // Retraite à 70 % de pertes : les survivants repartent par leur point d'entrée.
+  const { e } = partieArmee(20);
+  let fuite = false;
+  while (e.invasion && !fuite) { sim.pas(e); fuite = e.invasion && e.invasion.fuite; }
+  ok(fuite && e.invasion.morts * 100 >= 70 * e.invasion.n, 'l\'ennemi bat en retraite après 70 % de pertes');
+}
+{
+  // Sans défense, l'ennemi détruit : −1 de paix par bâtiment, 30 au plus.
+  const { e } = partieArmee(30, 'gaulois', { forts: [] });
+  e.cotes.paix = 60;
+  for (let k = 0; k < 30 * TJ && e.invasion; k++) sim.pas(e);
+  ok((e.stats.detruits || 0) > 0 && e.cotes.paix === 60 - Math.min(30, e.stats.detruits), `sans soldat, ${e.stats.detruits} bâtiments détruits ; paix ${e.cotes.paix}`);
+}
+{
+  // Caserne : une recrue tous les 8 jours ; un légionnaire prend une charge d'armes ; académie +1.
+  const e = sim.nouvelle('vindobona', { libre: true, tout: true, fonds: 1e6 });
+  habitants(e, 400, 6);
+  const c = batimentService(e, 'caserne', 20), f = batimentService(e, 'fort_javelots', 30), fl = batimentService(e, 'fort_legionnaires', 40);
+  for (let k = 0; k < 9 * TJ; k++) { c.eff = D.batiments.caserne.effectif; sim.pas(e); }
+  ok(sim.effectifFort(e, f) + f.att === 1 && sim.effectifFort(e, fl) + fl.att === 0, '8 jours : une recrue pour le fort de javelots ; sans armes, aucun légionnaire');
+  const e2 = sim.nouvelle('vindobona', { libre: true, tout: true, fonds: 1e6 });
+  habitants(e2, 400, 6);
+  const c2 = batimentService(e2, 'caserne', 20), fl2 = batimentService(e2, 'fort_legionnaires', 30), ac = batimentService(e2, 'academie_militaire', 40);
+  c2.mat = 2 * Q;
+  for (let k = 0; k < 30 * TJ && sim.effectifFort(e2, fl2) < 1; k++) { c2.eff = D.batiments.caserne.effectif; ac.eff = D.batiments.academie_militaire.effectif; sim.pas(e2); }
+  const s = e2.unites.find((u) => u.f === fl2.id);
+  ok(!!s && c2.mat === Q, 'un légionnaire recruté prend une charge d\'armes à la caserne');
+  ok(!!s && s.entr === 1, 'passé par l\'académie militaire, il arrive au niveau 1 d\'entraînement');
+}
+{
+  // Tour : tire à 6 cases au plus. Muraille : l'ennemi l'abat ou la contourne.
+  const e = sim.nouvelle('vindobona', { libre: true, tout: true, fonds: 1e6 });
+  const [x, y] = caseLibre(e, 10, -20);
+  for (let k = 0; k < 6; k++) O.creerBatiment(e, 'muraille', x + k, y);
+  ok(sim.peutPlacer(e, 'tour', x + 6, y) === null && sim.peutPlacer(e, 'tour', x + 10, y + 6) === 'muraille', 'une tour se pose collée à une muraille, pas ailleurs');
+  const t = O.creerBatiment(e, 'tour', x + 2, y + 1); t.eff = D.batiments.tour.effectif;
+  e.invasion = { id: 999, f: 'gaulois', n: 2, morts: 0, detruits: 0, paix: 0, entree: e.entree, debut: e.tick, fuite: 0, legions: 0, cible: 'proche', cibleEff: 'proche' };
+  const pres = O.creerUnite(e, 1, 'legere', (y + 6) * e.N + x + 3, { inv: 999 }), loin = O.creerUnite(e, 1, 'legere', (y + 12) * e.N + x + 3, { inv: 999 });
+  pres.p = loin.p = 1e9; // immobiles
+  for (let k = 0; k < 41; k++) { pres.p = loin.p = 1e9; sim.pas(e); }
+  ok(pres.pv < pres.pm && loin.pv === loin.pm, `la tour touche l'ennemi à 5 cases (${pres.pv}/${pres.pm}), pas celui à 11`);
+}
+{
+  // Moral : la colère de Mars le met à 0 et la cohorte rentre ; son bienfait coupe la prochaine invasion de moitié.
+  const { e, forts } = partieArmee(0);
+  sim.appliquer(e, { type: 'cohorte', fort: forts[0].id, ordre: 'aller', x: 56, y: 20 });
+  e.effets.mars = 6;
+  for (let k = 0; k < 2 * TJ; k++) sim.pas(e);
+  ok(forts[0].moral === 0 && forts[0].ordre.t === 'garde', 'colère de Mars : moral à 0, la cohorte rentre au fort');
+  ok(!sim.appliquer(e, { type: 'cohorte', fort: forts[0].id, ordre: 'aller', x: 56, y: 20 }).ok, 'une cohorte au moral brisé refuse de partir');
+  const { e: e2 } = partieArmee(0);
+  e2.effets.marsBienfait = 1;
+  O.lancerInvasion(e2, { faction: 'germains', effectif: 40, entree: [56, 2] }, false);
+  ok(e2.unites.filter((u) => u.c === 1).length === 20 && !e2.effets.marsBienfait, 'bienfait de Mars : la prochaine invasion arrive avec moitié moins de guerriers');
+  // Difficulté : ennemis × 0,7 en facile, × 1,3 en difficile.
+  const { e: ef } = partieArmee(0, 'gaulois', { difficulte: 'facile' }), { e: ed } = partieArmee(0, 'gaulois', { difficulte: 'difficile' });
+  O.lancerInvasion(ef, { faction: 'gaulois', effectif: 40, entree: [56, 2] }, false);
+  O.lancerInvasion(ed, { faction: 'gaulois', effectif: 40, entree: [56, 2] }, false);
+  ok(ef.unites.filter((u) => u.c === 1).length === 28 && ed.unites.filter((u) => u.c === 1).length === 52, 'difficulté : 40 ennemis deviennent 28 en facile, 52 en difficile');
+}
+{
+  // Ordres : aller (formation), rentrer.
+  const { e, forts } = partieArmee(0);
+  const f = forts[1];
+  ok(sim.appliquer(e, { type: 'cohorte', fort: f.id, ordre: 'formation', f: 'ligne' }).ok && f.ordre.f === 'ligne', 'formation en ligne');
+  sim.appliquer(e, { type: 'cohorte', fort: f.id, ordre: 'aller', x: 56, y: 30 });
+  for (let k = 0; k < 40 * TJ; k++) sim.pas(e);
+  const l = e.unites.filter((u) => u.f === f.id), ys = new Set(l.map((u) => Math.floor(u.i / e.N)));
+  ok(l.every((u) => Math.abs(u.i % e.N - 56) <= 5 && Math.abs(Math.floor(u.i / e.N) - 30) <= 3) && ys.size <= 3, `la cohorte rejoint la case visée, en ligne (${ys.size} rangs)`);
+  sim.appliquer(e, { type: 'cohorte', fort: f.id, ordre: 'rentrer' });
+  for (let k = 0; k < 40 * TJ; k++) sim.pas(e);
+  const a = sim.ancreFort(e, f);
+  ok(e.unites.filter((u) => u.f === f.id).every((u) => Math.abs(u.i % e.N - a % e.N) <= 4 && Math.abs(Math.floor(u.i / e.N) - Math.floor(a / e.N)) <= 4), 'rentrée : la cohorte retrouve sa place d\'armes');
+}
+{
+  // Demande de troupes (13.7) : envoyée, la cohorte quitte la carte puis revient ; refusée, −8.
+  const { e, forts } = partieArmee(0);
+  e.empereur = true; e.cotes.faveur = 50;
+  const dm = O.creerDemandeTroupes(e, { force: 12, delai: 12, faveur: 8, pos: [0, 0] }, 0);
+  ok(sim.appliquer(e, { type: 'envoyer', id: dm.id, fort: forts[0].id }).ok && e.unites.filter((u) => u.f === forts[0].id && u.etat === 'absent').length === 16, 'la cohorte part : 16 soldats quittent la carte');
+  e.tick = dm.retour;
+  O.moisEmpire(e, 13);
+  ok(dm.etat === 'faite' && e.cotes.faveur === 58 && e.unites.filter((u) => u.f === forts[0].id && u.etat === 'champ').length === 16 - Math.round(16 * D.regles.militaire.troupes.pertesVictoire / 100), `16 soldats contre 12 : victoire, faveur +8, ${Math.round(16 * D.regles.militaire.troupes.pertesVictoire / 100)} morts`);
+  const dm2 = O.creerDemandeTroupes(e, { force: 12, delai: 3, faveur: 8, pos: [0, 0] }, 20);
+  for (let m = 21; m <= 23; m++) O.moisEmpire(e, m);
+  ok(dm2.etat === 'ignoree' && e.cotes.faveur === 58 + D.regles.empereur.ignoree, 'aucune cohorte envoyée à temps : faveur −8');
+}
+{
+  // Légions repoussées : la faveur remonte à 20 et le compte repart de zéro.
+  const { e } = partieArmee(0, 'gaulois', { forts: ['fort_legionnaires', 'fort_javelots', 'fort_legionnaires', 'fort_cavaliers'] });
+  e.empereur = true; e.cotes.faveur = 5; e.faveurBasse = 12; e.legions = { mois: 0, lance: 1 };
+  O.lancerInvasion(e, { faction: 'rome', effectif: 12, entree: [56, 2] }, true);
+  for (let k = 0; k < 20 * TM && e.invasion && !e.defaite; k++) sim.pas(e);
+  ok(!e.defaite && e.cotes.faveur === D.regles.militaire.legions.faveurApres && e.faveurBasse === 0 && !e.legions, 'légions repoussées : faveur à 20, destitution repoussée');
+}
+
+section('Lot 4 : sauvegarde en pleine invasion (version 4)');
+{
+  const { e } = partieArmee(40, 'numides');
+  for (let k = 0; k < 437; k++) sim.pas(e);
+  const e2 = sim.importer(sim.exporter(e));
+  ok(sim.empreinte(e2) === sim.empreinte(e), 'état identique après sauvegarde puis chargement, en plein combat');
+  for (let k = 0; k < 1500; k++) { sim.pas(e); sim.pas(e2); }
+  ok(sim.empreinte(e2) === sim.empreinte(e), 'même état 1 500 ticks après le chargement');
+  const o = JSON.parse(sim.exporter(partieMission('narbo')));
+  o.v = 3; ['ages', 'agesReste', 'paixEmeutes', 'unites', 'invasion', 'champ', 'legions', 'invasions'].forEach((k) => delete o[k]);
+  let e3 = null;
+  try { e3 = sim.importer(JSON.stringify(o)); } catch (err) { ok(false, `sauvegarde du lot 3 refusée : ${err.message}`); }
+  if (e3) { let er = null; try { for (let k = 0; k < TM; k++) sim.pas(e3); } catch (err) { er = err; } ok(e3.v === sim.VERSION_ETAT && !er && sim.invariants(e3).length === 0, `sauvegarde du lot 3 complétée, la partie continue${er ? ' : ' + er.message : ''}`); }
+}
+
+section('Lot 4 : missions militaires jouées par le gouverneur automatique (difficulté normale)');
+{
+  // Une partie du gouverneur, ses tours décalés de « off » ticks dans le mois.
+  const jouerMilitaire = (id, rang, moisMax, off) => {
+    const plan = ex.planifierMission(sim, id), e = sim.nouvelle(id, { rang }), etat = {}, a = off % TM, b = (off + TM / 2) % TM;
+    const t0 = Date.now();
+    let invariant = null;
+    for (let m = 0; m < moisMax && !e.victoire && !e.defaite; m++) {
+      for (let k = 0; k < TM; k++) { sim.pas(e); if (k === a || k === b) ex.jouerMission(sim, e, plan, etat); if (k % TJ === TJ / 2) ex.piloterArmee(sim, e); }
+      if (!invariant) { const pb = sim.invariants(e); if (pb.length) invariant = pb[0]; }
+    }
+    ok(!invariant, `${id} (décalage ${off}) : invariants tenus${invariant ? ' : ' + invariant : ''}`);
+    const bilan = e.victoire ? `gagnée au mois ${e.victoire.mois}, ${e.victoire.etoiles} étoile(s)` : e.defaite ? `perdue (${e.defaite.cause})` : 'pas encore gagnée';
+    console.log(`  ${id} (décalage ${off}) ${bilan} : ${e.pop} habitants, culture ${e.cotes.culture}, prospérité ${e.cotes.prosperite}, paix ${e.cotes.paix}, faveur ${e.cotes.faveur}, ${e.stats.invasions || 0} invasions repoussées ; ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+    return e;
+  };
+  // Aquilée : trois départs ; le gouverneur doit en gagner deux au moins (cahier, section 23.9).
+  const gagnees = [0, 97, 333].map((off) => jouerMilitaire('aquilee', 3, 300, off)).filter((e) => e.victoire).length;
+  ok(gagnees >= 2, `aquilee : ${gagnees} victoire(s) sur 3 départs du gouverneur automatique`);
+  jouerMilitaire('vindobona', 4, 240, 0);
+  console.log('  (Vindobona : mesure seulement, voir le cahier, section 23.9)');
+}
+
+// --------------------------------------------------------------------------
 if (args.includes('--endurance')) {
   section('Endurance : 50 années sans affichage');
   const e = villeTest(3);
@@ -1116,6 +1455,18 @@ if (args.includes('--perf')) {
   const moy = Number(process.hrtime.bigint() - t0) / 1e6 / n;
   console.log(`  ${e.pop} habitants, ${e.batiments.length} bâtiments, ${e.marcheurs.length} marcheurs : ${moy.toFixed(3)} ms par tick en moyenne, ${pire.toFixed(2)} ms au pire`);
   ok(moy < 4, 'durée moyenne d\'un tick sous 4 ms (PC)');
+  // Lot 4 : la même carte avec 10 000 habitants (une tente de 3 habitants par logement).
+  const e10 = monde.sim.nouvelle('pompei', { libre: true, attractivite: false });
+  monde.ex.construire(monde.sim, e10, { niveau: 3, colonnes: 26, rangees: 6, fermes: 14 });
+  const lg = e10.batiments.filter((h) => h.type === 'logement'), par = Math.ceil(10000 / lg.length);
+  lg.forEach((h) => { h.niv = 1; h.hab = Math.min(4, par); h.viv = { ble: 400 }; h.svc = { impot: 40, dieu_ceres: 40, theatre: 40 }; });
+  monde.sim.majPopulation(e10);
+  for (let k = 0; k < 2000; k++) monde.sim.pas(e10);
+  let pire10 = 0; const t10 = process.hrtime.bigint();
+  for (let k = 0; k < n; k++) { const a = process.hrtime.bigint(); monde.sim.pas(e10); const d = Number(process.hrtime.bigint() - a) / 1e6; if (d > pire10) pire10 = d; }
+  const moy10 = Number(process.hrtime.bigint() - t10) / 1e6 / n;
+  console.log(`  ${e10.pop} habitants, ${e10.batiments.length} bâtiments, ${e10.marcheurs.length} marcheurs : ${moy10.toFixed(3)} ms par tick en moyenne, ${pire10.toFixed(2)} ms au pire`);
+  ok(e10.pop >= 10000 && moy10 < 4, 'lot 4 : 10 000 habitants, tick moyen sous 4 ms (PC)');
 }
 
 console.log(`\nMarmoria : ${reussites} contrôles réussis, ${echecs} échec(s)${depuisSources ? ' (sources)' : ''}.`);

@@ -1948,21 +1948,24 @@
       h.ok++;
       if (h.ok >= M.joursMontee) {
         // Niveau d'une emprise plus grande (10, 15, 19) : la maison doit d'abord s'agrandir.
-        if (suiv.emprise === h.t || agrandir(e, h, suiv.emprise)) {
-          h.niv++; h.ok = 0; h.bloque = 0;
-          if (suiv.emprise !== cur.emprise) noter(e, 'msg.maisonAgrandie', { niveau: h.niv }, false, ix(e, h.x, h.y));
-          // De l'insula à la villa (12 → 13) : la maison loge moins de monde, les autres
-          // repartent chercher un logement (section 5.2).
-          var trop = h.hab - capacite(h);
-          if (trop > 0) {
-            h.hab -= trop;
-            creerSansAbri(e, ix(e, h.x, h.y), trop);
-            majPopulation(e);
-            if (h.niv === D.regles.travail.plebeiensNiveauMax + 1) noter(e, 'msg.villa', { n: trop }, false, ix(e, h.x, h.y));
-          }
-        } else { h.ok = M.joursMontee; h.bloque = 1; }
+        if (suiv.emprise === h.t || agrandir(e, h, suiv.emprise)) monter(e, h, cur, suiv);
+        else { h.ok = M.joursMontee; h.bloque = 1; }
       }
     } else { h.ok = 0; h.bloque = 0; }
+  }
+
+  function monter(e, h, cur, suiv) {
+    h.niv++; h.ok = 0; h.bloque = 0;
+    if (suiv.emprise !== cur.emprise) noter(e, 'msg.maisonAgrandie', { niveau: h.niv }, false, ix(e, h.x, h.y));
+    // De l'insula à la villa (12 → 13) : la maison loge moins de monde, les autres repartent
+    // chercher un logement (section 5.2).
+    var trop = h.hab - capacite(h);
+    if (trop > 0) {
+      h.hab -= trop;
+      creerSansAbri(e, ix(e, h.x, h.y), trop);
+      majPopulation(e);
+      if (h.niv === D.regles.travail.plebeiensNiveauMax + 1) noter(e, 'msg.villa', { n: trop }, false, ix(e, h.x, h.y));
+    }
   }
 
   function attractiviteOk(e, s, niveau) {
@@ -2989,7 +2992,7 @@
   function creerDemandeTroupes(e, ev, mois) {
     var dm = { id: e.prochainId++, troupes: ev.force, gain: ev.faveur || 8, ech: mois + ev.delai, ech2: mois + ev.delai, etat: 'ouverte', debut: mois, pos: ev.pos, cite: ev.lieu || null };
     e.demandes.push(dm);
-    noter(e, 'msg.demandeTroupes', { n: ev.force, mois: ev.delai }, true);
+    noter(e, 'msg.demandeTroupes', { force: ev.force, mois: ev.delai }, true);
     return dm;
   }
   function envoyerTroupes(e, dm, f) {
@@ -3524,7 +3527,7 @@
       if (dm.troupes) {
         if (dm.etat === 'ouverte') {
           var r = dm.ech - mois;
-          if (E.rappels.indexOf(r) >= 0) noter(e, 'msg.demandeTroupesRappel', { n: dm.troupes, mois: r }, false);
+          if (E.rappels.indexOf(r) >= 0) noter(e, 'msg.demandeTroupesRappel', { force: dm.troupes, mois: r }, false);
           if (r <= 0) { dm.etat = 'ignoree'; changerFaveur(e, E.ignoree); noter(e, 'msg.demandeTroupesRefusee', {}, true); }
         } else if (dm.etat === 'envoyee' && e.tick >= dm.retour) retourTroupes(e, dm);
         return;
@@ -3830,7 +3833,7 @@
       if (ev.type === 'invasion' && e.invasions && Mi.annonces.indexOf(s.m - mois) >= 0 && !(s.an || []).includes(s.m - mois)) {
         s.an = (s.an || []).concat([s.m - mois]);
         var diff = D.difficultes[e.difficulte] || D.difficultes.normal;
-        noter(e, 'msg.invasionAnnonce', { faction: ev.faction, mois: s.m - mois, n: Math.max(1, Math.round(ev.effectif * diff.ennemis)) }, true);
+        noter(e, 'msg.invasionAnnonce', { faction: ev.faction, mois: s.m - mois, effectif: Math.max(1, Math.round(ev.effectif * diff.ennemis)) }, true);
       }
       if (s.m > mois) return;
       s.fait = 1;
@@ -4283,7 +4286,7 @@
       creerBatiment: creerBatiment, creerMarcheur: creerMarcheur, emettreErrant: emettreErrant, ix: ix, noter: noter,
       finances: finances, consommer: consommer, quotidien: quotidien, nouveauMois: nouveauMois, nouveauJour: nouveauJour,
       enflammer: enflammer, immigrer: immigrer, verifierTutoriel: verifierTutoriel, composantes: composantes,
-      deposer: deposer, agrandir: agrandir, diviser: diviser, epidemie: epidemie,
+      deposer: deposer, agrandir: agrandir, diviser: diviser, epidemie: epidemie, monter: monter,
       nouvelAn: nouvelAn, moisEmpire: moisEmpire, moisDieux: moisDieux, commerceJour: commerceJour, evenement: evenement,
       bienfaitDieu: bienfaitDieu, colereDieu: colereDieu, changerFaveur: changerFaveur, envoyerCaravane: envoyerCaravane, envoyerNavire: envoyerNavire,
       creerDemande: creerDemande, anneeEmpereur: anneeEmpereur,

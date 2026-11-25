@@ -148,11 +148,12 @@
   }
   function nouvelleMission(m) {
     // Rang atteint (salaire du gouverneur) et fortune personnelle (section 11.6).
-    var e = SIM.nouvelle(m.id, { rang: Math.max(1, echelonsGagnes()), fortune: prog.fortune });
+    var e = SIM.nouvelle(m.id, { rang: Math.max(1, echelonsGagnes()), fortune: prog.fortune, difficulte: m.echelon >= 3 ? (prog.options.difficulte || 'normal') : 'normal' });
     demarrerEtat(e);
     AUDIO.jouer('etape');
   }
   function quitterPartie() {
+    finirOrdre();
     partie = null;
     hud.hidden = true;
     annulerOutil();
@@ -279,7 +280,8 @@
     education: '<path d="M4 6h7a2 2 0 0 1 2 2v12a2 2 0 0 0-2-2H4z" fill="#efe2c4" stroke="#5b4a3a"/><path d="M20 6h-7v14a2 2 0 0 1 2-2h5z" fill="#e8d8b6" stroke="#5b4a3a"/>',
     divertissement: '<path d="M4 5h9v6a4.5 4.5 0 0 1-9 0z" fill="#f6f0e0" stroke="#5b4a3a"/><path d="M11 10h9v6a4.5 4.5 0 0 1-9 0z" fill="#d65a8c" stroke="#5b4a3a"/><circle cx="7" cy="8" r="1" fill="#333"/><circle cx="10" cy="8" r="1" fill="#333"/>',
     administration: '<path d="M3 9l9-6 9 6z" fill="#5a7397"/><path d="M5 9v9M9 9v9M15 9v9M19 9v9" stroke="#e6e0d2" stroke-width="2.4"/><rect x="3" y="18" width="18" height="3" fill="#5a7397"/>',
-    securite: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="#b03a2e" stroke="#6e1f17"/><path d="M12 8c2 2.5 3 4 3 5.5a3 3 0 0 1-6 0c0-1.5 1-3 3-5.5z" fill="#f8d24a"/>'
+    securite: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" fill="#b03a2e" stroke="#6e1f17"/><path d="M12 8c2 2.5 3 4 3 5.5a3 3 0 0 1-6 0c0-1.5 1-3 3-5.5z" fill="#f8d24a"/>',
+    militaire: '<path d="M4 20L18 4" stroke="#6e4a2c" stroke-width="2"/><path d="M17 3l4 0-1 4z" fill="#c8ccd2"/><rect x="5" y="7" width="10" height="13" rx="2" fill="#b8392c" stroke="#6e1f17"/><circle cx="10" cy="13.5" r="2" fill="#e0c070"/>'
   };
   var categorieOuverte = null;
   // Bâtiments permis : ceux de la mission, ou tous en construction libre.
@@ -496,6 +498,7 @@
       else { outil.attente = true; $('valider').hidden = false; $('b-annuler-derniere').hidden = true; majApercu(); }
       return;
     }
+    if (glisse && !glisse.bouge && Date.now() - q.t0 < 450 && ordreCohorte) { glisse = null; donnerOrdre(q.x, q.y); return; }
     if (glisse && !glisse.bouge && Date.now() - q.t0 < 450) {
       // Toucher bref : ferme le panneau ouvert ; à la souris, un clic ouvre l'information.
       if (q.type === 'mouse' && q.bouton === 0) ouvrirInfo(q.x, q.y);
@@ -530,6 +533,7 @@
   window.addEventListener('keydown', function (ev) {
     AUDIO.demarrer();
     var c = ev.code;
+    if (c === 'Escape' && ordreCohorte) { finirOrdre(); return; }
     if (c === 'Escape') {
       ev.preventDefault();
       if (!partie) return;
@@ -579,6 +583,7 @@
   $('b-journal').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirJournal(); });
   $('b-calque').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirCalques(); });
   $('b-ok').addEventListener('click', function () { validerOutil(); });
+  $('b-ordre-annul').addEventListener('click', function () { AUDIO.jouer('clic'); finirOrdre(); });
   $('b-annul').addEventListener('click', function () { AUDIO.jouer('clic'); if (outil) { outil.attente = false; outil.a = null; rendu.apercu = null; } $('valider').hidden = true; $('bulle').hidden = true; });
   $('b-annuler-derniere').addEventListener('click', annulerDerniere);
 
@@ -618,6 +623,7 @@
     else if (v.bien) v.bien = enPhrase(t('bien.' + v.bien));
     if (v.cite) v.cite = t('cite.' + v.cite);
     if (v.dieu) v.dieu = t('dieu.' + v.dieu);
+    if (v.faction) v.faction = t('faction.' + v.faction);
     if (v.bat) v.bat = t('bat.' + v.bat + '.nom');
     if (v.montant !== undefined) v.montant = nb(v.montant);
     if (v.mois !== undefined) v.n = v.mois; // pluriels des messages qui comptent des mois
@@ -635,6 +641,10 @@
     if (!c) return;
     var e = partie.e, b = SIM.batA(e, c[0], c[1]);
     AUDIO.jouer('menu');
+    var un = null;
+    (e.unites || []).forEach(function (u) { if (!un && !u.mort && u.etat === 'champ' && Math.abs(u.i % e.N - c[0]) <= 1 && Math.abs(Math.floor(u.i / e.N) - c[1]) <= 1) un = u; });
+    if (un && un.c === 0) { var fid = un.f; rendu.selection = fid; ouvrirPanneau(function (p) { remplirBatiment(p, fid); }); return; }
+    if (un) { var uid = un.id; ouvrirPanneau(function (p) { remplirUnite(p, uid); }); return; }
     if (b) { rendu.selection = b.id; ouvrirPanneau(function (p) { remplirBatiment(p, b.id); }); return; }
     // Marcheur proche (une case).
     var w = null;
@@ -724,6 +734,7 @@
     if (d.eauRequise) p.appendChild(ligne(t('info.canalisations'), t(b.actif ? 'ui.oui' : 'ui.non')));
     if (d.genre === 'reservoir') p.appendChild(ligne(t('info.reservoir'), t(b.plein ? 'info.plein' : 'info.vide')));
     if (d.genre === 'incendie') p.appendChild(ligne(t('info.brule'), t('info.jours', { n: b.jours })));
+    remplirLot4(p, e, b, d);
     if (partie.e.risques) lignesRisques(p, b);
   }
   // Biens que les maisons peuvent réclamer au marché (lot 2 : poterie, mobilier, huile).
@@ -773,6 +784,7 @@
       if (!inf.manque.length) p.appendChild(el('p', { classe: 'ok', texte: t('info.bientot') }));
       inf.manque.forEach(function (x) { p.appendChild(el('p', { classe: 'ko', texte: besoinTexte(x.besoin, x.requis) })); });
     }
+    if ((h.crime || 0) >= 1) p.appendChild(ligne(t('info.crime'), t('info.surTotal', { n: Math.round(h.crime), max: 100 })));
     if (partie.e.risques) lignesRisques(p, h);
   }
   // Risque d'incendie et dommages, seulement si le bâtiment y est exposé (un puits, une statue ou
@@ -808,7 +820,7 @@
 
   // Conseillers (section 17.4, lot 2) : un onglet par domaine ; tout se lit dans l'état, seules
   // les flèches (salaire, impôt, priorités) envoient des commandes.
-  var ONGLETS = ['chef', 'cotes', 'imperial', 'commerce', 'religion', 'travail', 'finances', 'population', 'sante', 'education', 'divertissement'];
+  var ONGLETS = ['chef', 'cotes', 'imperial', 'militaire', 'commerce', 'religion', 'travail', 'finances', 'population', 'sante', 'education', 'divertissement'];
   var ongletConseil = 'chef';
   function ouvrirConseil(onglet) {
     if (!partie) return;
@@ -865,7 +877,7 @@
       p.appendChild(el('div', { classe: 'ligne entete' }, [el('span', { texte: t('conseil.recettes') }), el('span', { texte: t('budget.colonnes') })]));
       ['impots', 'exports', 'secours', 'dons'].forEach(poste);
       p.appendChild(el('h3', { texte: t('conseil.depenses') }));
-      ['salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois'].forEach(poste);
+      ['salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois', 'vols'].forEach(poste);
       var solde = SIM.recettes(prec) - SIM.depenses(prec);
       if (prec.impots || prec.salaires) p.appendChild(el('p', { classe: solde >= 0 ? 'ok' : 'ko', texte: t(solde >= 0 ? 'budget.benefice' : 'budget.deficit', { n: nb(Math.abs(solde)) }) }));
     },
@@ -886,6 +898,19 @@
         var svg = el('div', { classe: 'courbe' });
         svg.innerHTML = '<svg viewBox="0 0 200 60" preserveAspectRatio="none"><polyline points="' + pts + '" fill="none" stroke="#d9a93a" stroke-width="2"/><line x1="0" y1="58" x2="200" y2="58" stroke="#8a7a60"/></svg>';
         p.appendChild(svg);
+      }
+      if (e.ages && e.pop) {
+        // Pyramide des âges (lot 4) : une barre par tranche de 10 ans, les actifs en or.
+        p.appendChild(el('h3', { texte: t('conseil.ages') }));
+        var A = D.regles.ages, mx = Math.max.apply(null, e.ages) || 1, svgA = '<svg viewBox="0 0 200 ' + (e.ages.length * 9) + '" class="pyramide">';
+        e.ages.forEach(function (v, k) {
+          var y = (e.ages.length - 1 - k) * 9, l = v / mx * 120, actif = k >= A.actifs[0] && k <= A.actifs[1];
+          svgA += '<rect x="' + (100 - l / 2).toFixed(1) + '" y="' + (y + 1) + '" width="' + l.toFixed(1) + '" height="7" fill="' + (actif ? '#d9a93a' : '#8a9aa8') + '"/>';
+          svgA += '<text x="2" y="' + (y + 7.5) + '" font-size="7" fill="#3a2a1e">' + (k * A.anneesTranche) + '</text>';
+        });
+        var bp = el('div', { classe: 'courbe' }); bp.innerHTML = svgA + '</svg>'; p.appendChild(bp);
+        p.appendChild(ligne(t('conseil.actifs'), Math.round(SIM.partActifs(e) * 100) + ' %'));
+        if (der && der.nais) p.appendChild(ligne(t('conseil.naissances'), nb(der.nais)));
       }
       var c = SIM.couverture(e);
       p.appendChild(el('h3', { texte: t('conseil.niveaux') }));
@@ -927,7 +952,7 @@
   // carte de l'Empire (section 17.4). Tout se lit dans l'état ; seuls les boutons envoient
   // des commandes.
   // ------------------------------------------------------------------------
-  function quoiDemande(dm) { return dm.bien ? t('demande.charges', { n: dm.q, bien: enPhrase(t('bien.' + dm.bien)) }) : t('demande.deniers', { n: nb(dm.deniers) }); }
+  function quoiDemande(dm) { if (dm.troupes) return t('demande.troupes', { n: dm.troupes }); return dm.bien ? t('demande.charges', { n: dm.q, bien: enPhrase(t('bien.' + dm.bien)) }) : t('demande.deniers', { n: nb(dm.deniers) }); }
   // Couleur d'une ligne de l'en-chef : 'ok' (vert), 'moyen' (orange), 'ko' (rouge).
   function etatLigne(p, cle, niveau, vars) {
     p.appendChild(el('p', { classe: niveau === 2 ? 'ok' : niveau === 1 ? 'moyen' : 'ko', texte: t('chef.' + cle + '.' + niveau, vars || {}) }));
@@ -990,6 +1015,7 @@
     l.forEach(function (dm) {
       var pret = SIM.demandePrete(e, dm), reste = (dm.etat === 'ouverte' ? dm.ech : dm.ech2) - mois;
       p.appendChild(el('p', { classe: dm.etat === 'retard' ? 'ko' : '', texte: t(dm.etat === 'retard' ? 'imperial.demandeRetard' : 'imperial.demande', { quoi: quoiDemande(dm), n: Math.max(0, reste) }) }));
+      if (dm.troupes) { boutonsTroupes(p, e, dm); return; }
       if (dm.bien) p.appendChild(ligne(t('imperial.enStock'), t('info.surTotal', { n: nb(SIM.stockVille(e, dm.bien) / 100), max: dm.q })));
       p.appendChild(el('div', { classe: 'boutons' }, [bouton(t('imperial.expedier'), function () {
         var r = commander({ type: 'expedier', id: dm.id });
@@ -1021,6 +1047,123 @@
     }, 'gros non')]));
     p.appendChild(el('p', { classe: 'aide', texte: t('imperial.aide', { tribut: E.tributPart }) }));
   };
+  // ------------------------------------------------------------------------
+  // Lot 4 : armée (sections 13 et 17.4). Conseiller militaire, panneau du fort, ordres aux
+  // cohortes : « Envoyer » met le jeu en attente d'un toucher sur la carte.
+  // ------------------------------------------------------------------------
+  function militaireUtile(e) {
+    return (e.unites && e.unites.length) || SIM.armees(e).length || TOUS.some(function (k) { return D.batiments[k].categorie === 'militaire' && permet(k); }) ||
+      e.demandes.some(function (dm) { return dm.troupes; });
+  }
+  function nomUnite(k) { return t('unite.' + k); }
+  function nomFaction(f) { return t('faction.' + f); }
+  var ordreCohorte = null; // { fort } : le prochain toucher sur la carte donne la destination
+  function majOrdre() {
+    var z = $('ordre');
+    if (!z) return;
+    z.hidden = !ordreCohorte;
+    if (ordreCohorte) $('ordre-texte').textContent = t('armee.ordreAide');
+  }
+  function commencerOrdre(fort) { ordreCohorte = { fort: fort }; fermerPanneau(); rendu.selection = fort; majOrdre(); AUDIO.jouer('clic'); }
+  function finirOrdre() { ordreCohorte = null; majOrdre(); }
+  function donnerOrdre(sx, sy) {
+    var c = rendu.versCase(sx, sy), f = ordreCohorte && ordreCohorte.fort;
+    finirOrdre();
+    if (!c || !f) return;
+    var r = commander({ type: 'cohorte', fort: f, ordre: 'aller', x: c[0], y: c[1] });
+    AUDIO.jouer(r.ok ? 'etape' : 'refus');
+    toast(r.ok ? t('armee.enRoute') : t('refus.' + r.raison));
+    rendu.selection = f;
+  }
+  function ligneCohorte(p, e, c, avecBoutons) {
+    p.appendChild(el('h3', { texte: t('unite.cohorte', { unite: nomUnite(c.unite) }) }));
+    p.appendChild(ligne(t('armee.soldats'), t('info.surTotal', { n: c.n, max: D.regles.militaire.cohorte }) + (c.attendus ? ' · ' + t('armee.recrues', { n: c.attendus }) : '')));
+    p.appendChild(ligne(t('armee.moral'), t('info.surTotal', { n: c.moral, max: 100 })));
+    p.appendChild(jauge(c.moral / 100));
+    p.appendChild(ligne(t('armee.entrainement'), t('info.surTotal', { n: c.entr, max: D.regles.militaire.entrainementMax })));
+    p.appendChild(ligne(t('armee.ordre'), c.absente ? t('armee.absente') : c.fuite ? t('armee.fuite') : t('armee.ordre.' + c.ordre)));
+    if (!avecBoutons || c.absente) return;
+    var b = el('div', { classe: 'boutons' });
+    b.appendChild(bouton(t('armee.envoyer'), function () { commencerOrdre(c.id); }, c.fuite || !c.ici ? 'gros non grise' : 'gros or'));
+    b.appendChild(bouton(t('armee.rentrer'), function () { commander({ type: 'cohorte', fort: c.id, ordre: 'rentrer' }); AUDIO.jouer('clic'); if (panneauVivant) panneauVivant(); }, 'gros non'));
+    p.appendChild(b);
+    var fm = el('div', { classe: 'boutons' });
+    ['ligne', 'colonne', 'carre'].forEach(function (k) {
+      fm.appendChild(bouton(t('armee.formation.' + k), function () { commander({ type: 'cohorte', fort: c.id, ordre: 'formation', f: k }); AUDIO.jouer('clic'); if (panneauVivant) panneauVivant(); }, c.formation === k ? 'gros or' : 'gros non'));
+    });
+    p.appendChild(fm);
+  }
+  function boutonsTroupes(p, e, dm) {
+    var l = SIM.cohortes(e).filter(function (c) { return !c.absente && c.ici > 0; });
+    if (dm.lieu) p.appendChild(el('p', { classe: 'aide', texte: t('demande.troupesLieu', { cite: t('cite.' + dm.cite) }) }));
+    if (!l.length) { p.appendChild(el('p', { classe: 'aide', texte: t('armee.aucuneCohorte') })); return; }
+    var b = el('div', { classe: 'boutons' });
+    l.forEach(function (c) {
+      b.appendChild(bouton(t('armee.envoyerCohorte', { unite: nomUnite(c.unite), n: c.ici }), function () {
+        var r = commander({ type: 'envoyer', id: dm.id, fort: c.id });
+        AUDIO.jouer(r.ok ? 'etape' : 'refus');
+        if (!r.ok) toast(t('refus.' + r.raison));
+        if (panneauVivant) panneauVivant();
+      }, 'gros or'));
+    });
+    p.appendChild(b);
+  }
+  CONSEILLERS.militaire = function (p, e) {
+    var a = SIM.armees(e);
+    p.appendChild(el('h3', { texte: t('armee.menaces') }));
+    if (!a.length) p.appendChild(el('p', { classe: 'aide', texte: t('armee.aucuneMenace') }));
+    a.forEach(function (x) {
+      var cle = x.active ? (x.legions ? 'armee.legionsLa' : 'armee.invasionLa') : (x.legions ? 'armee.legionsAnnonce' : 'armee.invasionAnnonce');
+      p.appendChild(el('p', { classe: x.active || x.mois <= 3 ? 'ko' : 'moyen', texte: t(cle, { faction: nomFaction(x.faction), effectif: x.n, n: x.mois }) }));
+    });
+    var cs = SIM.cohortes(e);
+    if (!cs.length) p.appendChild(el('p', { classe: 'aide', texte: t('armee.aucunFort') }));
+    cs.forEach(function (c) { ligneCohorte(p, e, c, true); });
+    var casernes = e.batiments.filter(function (b) { return b.type === 'caserne'; });
+    if (casernes.length) {
+      p.appendChild(el('h3', { texte: t('bat.caserne.nom') }));
+      var armes = 0; casernes.forEach(function (b) { armes += b.mat; });
+      p.appendChild(ligne(t('armee.armesCaserne'), t('info.charges', { n: nb(armes / 100) })));
+    }
+    var envoyees = e.demandes.filter(function (dm) { return dm.troupes && dm.etat === 'envoyee'; });
+    envoyees.forEach(function (dm) { p.appendChild(el('p', { texte: t('armee.troupesAbsentes', { effectif: dm.n, n: Math.max(0, Math.ceil((dm.retour - e.tick) / D.ticksParMois)) }) })); });
+    p.appendChild(el('p', { classe: 'aide', texte: t('armee.aide') }));
+  };
+  // Panneaux des bâtiments militaires et d'administration du lot 4.
+  function remplirLot4(p, e, b, d) {
+    if (d.genre === 'fort') { var c = SIM.cohortes(e).filter(function (x) { return x.id === b.id; })[0]; if (c) ligneCohorte(p, e, c, true); }
+    if (d.genre === 'caserne') {
+      p.appendChild(ligne(t('armee.armesCaserne'), t('info.surTotal', { n: nb(b.mat / 100), max: D.regles.atelier.attenteMax })));
+      p.appendChild(ligne(t('armee.prochaineRecrue'), Math.round(Math.min(1, b.prog / D.regles.militaire.recrueJours) * 100) + ' %'));
+      p.appendChild(jauge(b.prog / D.regles.militaire.recrueJours));
+    }
+    if (d.genre === 'tour' || d.genre === 'muraille' || d.genre === 'porte' || d.genre === 'fort') p.appendChild(ligne(t('armee.structure'), t('info.surTotal', { n: SIM.pvBat(b), max: SIM.structure(b) })));
+    if (b.type === 'senat') {
+      p.appendChild(el('h3', { texte: t('conseil.onglet.cotes') }));
+      ['culture', 'prosperite', 'paix', 'faveur'].forEach(function (k) { if (k !== 'faveur' || e.empereur) p.appendChild(ligne(t('cote.' + k), nb(e.cotes[k]))); });
+    }
+  }
+  function remplirUnite(p, id) {
+    var e = partie.e, u = SIM.uniteParId(e, id);
+    if (!u) { p.appendChild(el('p', { texte: t('info.disparu') })); return; }
+    p.appendChild(el('h2', { texte: u.c === 0 ? nomUnite(u.k) : t('unite.ennemi', { unite: t('ennemi.' + u.k), faction: nomFaction(e.invasion ? (e.invasion.legions ? 'rome' : e.invasion.f) : 'gaulois') }) }));
+    p.appendChild(ligne(t('armee.vie'), t('info.surTotal', { n: u.pv, max: u.pm })));
+    p.appendChild(jauge(u.pv / u.pm));
+    if (u.c === 0) p.appendChild(ligne(t('armee.entrainement'), t('info.surTotal', { n: u.entr, max: D.regles.militaire.entrainementMax })));
+  }
+  // Armées en marche sur la carte de l'Empire (section 13.6) : marque rouge, mois restants.
+  function armeesEmpire(e, X, Y, em) {
+    var s = '';
+    SIM.armees(e).forEach(function (a) {
+      if (!a.depuis || a.active) return;
+      var f = Math.max(0, Math.min(1, 1 - a.mois / 12)), q = [a.depuis[0] + (em.ville[0] - a.depuis[0]) * f, a.depuis[1] + (em.ville[1] - a.depuis[1]) * f];
+      s += '<line x1="' + X(a.depuis) + '" y1="' + Y(a.depuis) + '" x2="' + X(em.ville) + '" y2="' + Y(em.ville) + '" stroke="#a8322a" stroke-width="0.8" stroke-dasharray="1.5 1.5"/>';
+      s += '<path d="M' + X(q) + ' ' + (Number(Y(q)) - 6).toFixed(1) + 'l4 6h-8z" fill="#a8322a" stroke="#f4e8c8" stroke-width="0.6"/>';
+      s += '<text x="' + X(q) + '" y="' + (Number(Y(q)) - 7.5).toFixed(1) + '" text-anchor="middle" font-size="5.6" fill="#7a1a12" stroke="#f4ead0" stroke-width="1.4" paint-order="stroke">' + t('armee.moisCarte', { n: a.mois }) + '</text>';
+    });
+    return s;
+  }
+
   // Biens montrés au conseiller du commerce : ceux que la ville produit, stocke, ou qu'une cité
   // connue vend ou achète.
   function biensCommerce(e) {
@@ -1097,6 +1240,7 @@
     // Une cité trop près de Rome ou de la ville voit son nom écrit sous son point.
     var pres = function (a, b) { return Math.abs(X(a) - X(b)) < 22 && Math.abs(Y(a) - Y(b)) < 10; };
     em.cites.forEach(function (c) { var r = e.routes[c.id]; if (r && r.v) s += nom(c.pos, t('cite.' + c.id), pres(c.pos, em.rome) || pres(c.pos, em.ville) ? 9 : -5); });
+    s += armeesEmpire(e, X, Y, em);
     s += '</svg>';
     var boite = el('div', { classe: 'carte-empire' });
     boite.innerHTML = s;
@@ -1180,7 +1324,7 @@
   // Onglets montrés : l'impérial seulement quand l'empereur est là, le commerce quand la
   // mission a des cités partenaires.
   function ongletsPartie(e) {
-    return ONGLETS.filter(function (o) { return (o !== 'imperial' || e.empereur) && (o !== 'commerce' || SIM.cites(e).length); });
+    return ONGLETS.filter(function (o) { return (o !== 'imperial' || e.empereur) && (o !== 'commerce' || SIM.cites(e).length) && (o !== 'militaire' || militaireUtile(e)); });
   }
 
   function reglage(texte, changer) {
@@ -1221,9 +1365,9 @@
         nourriture: permet('marche'), divertissement: permet('theatre') || permet('amphitheatre') || permet('colisee'),
         education: permet('ecole'), sante: permet('barbier') || permet('bains') || permet('medecin') || permet('hopital'),
         religion: TOUS.some(function (k) { return D.batiments[k].dieu && permet(k); }), impots: permet('forum'),
-        attractivite: partie.e.attractivite, problemes: true, eau: true
+        attractivite: partie.e.attractivite, problemes: true, eau: true, crime: permet('prefecture') && partie.m.echelon >= 3
       };
-      [null, 'eau', 'feu', 'dommages', 'stocks', 'nourriture', 'divertissement', 'education', 'sante', 'religion', 'impots', 'attractivite', 'problemes'].forEach(function (c) {
+      [null, 'eau', 'feu', 'dommages', 'crime', 'stocks', 'nourriture', 'divertissement', 'education', 'sante', 'religion', 'impots', 'attractivite', 'problemes'].forEach(function (c) {
         if (c && !utile[c]) return;
         p.appendChild(el('button', { classe: 'choix' + (rendu.calque === c ? ' actif' : ''), clic: function () { AUDIO.jouer('clic'); rendu.calque = c; fermerPanneau(); $('b-calque').classList.toggle('actif', !!c); } }, [
           el('span', { classe: 'nom', texte: t('calque.' + (c || 'aucun')) })
@@ -1427,6 +1571,16 @@
     carte.appendChild(ul);
     if (prog.gagnees[m.id]) carte.appendChild(el('p', {}, [t('briefing.dejaGagnee') + ' ', etoilesTexte(prog.gagnees[m.id])]));
     carte.appendChild(el('p', { texte: t('briefing.etoiles', { mois: m.dateCibleMois }) }));
+    if (m.echelon >= 3) {
+      // Difficulté (section 2.5), gardée dans les options.
+      var diffs = el('div', { classe: 'boutons difficulte' });
+      ['facile', 'normal', 'difficile'].forEach(function (k) {
+        diffs.appendChild(bouton(t('difficulte.' + k), function () { prog.options.difficulte = k; sauverProg(); ecranBriefing(m); }, (prog.options.difficulte || 'normal') === k ? 'gros or' : 'gros non'));
+      });
+      carte.appendChild(el('h2', { texte: t('difficulte.titre') }));
+      carte.appendChild(diffs);
+      carte.appendChild(el('p', { classe: 'aide', texte: t('difficulte.' + (prog.options.difficulte || 'normal') + 'Aide') }));
+    }
     carte.appendChild(el('div', { classe: 'boutons' }, [
       bouton(t('ui.retour'), ecranMissions, 'gros non'),
       bouton(t('briefing.commencer'), function () { fermerEcran(); nouvelleMission(m); }, 'gros or')

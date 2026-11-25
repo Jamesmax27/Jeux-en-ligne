@@ -457,7 +457,19 @@
     massalia: { quartiers: 5, services: 4,
       fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_fruits'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_porcs'), F3()],
       ateliers: [['ferme_olives', 'pressoir', 'pressoir'], ['ferme_olives', 'pressoir', 'pressoir'], ['carriere_argile', 'atelier_poterie', 'atelier_poterie'], ['quai_commerce'],
-        ['ferme_olives', 'pressoir', 'pressoir'], ['carriere_marbre'], ['camp_bucherons', 'atelier_mobilier'], ['quai_peche'], ['ferme_vigne', 'cave']] }
+        ['ferme_olives', 'pressoir', 'pressoir'], ['carriere_marbre'], ['camp_bucherons', 'atelier_mobilier'], ['quai_peche'], ['ferme_vigne', 'cave']] },
+    // Missions militaires (lot 4) : defense = casernes, forts (type, ordre dans le plan) posés
+    // entre la ville et les points d'invasion, à « avant » cases du centre ; académie militaire.
+    aquilee: { quartiers: 5, services: 4, gouverneur: { reserve: 200, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_fruits'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_porcs')],
+      ateliers: [['mine_fer', 'atelier_armes', 'atelier_armes'], ['carriere_argile', 'atelier_poterie'], ['mine_fer', 'atelier_armes', 'atelier_armes'], ['camp_bucherons', 'atelier_mobilier'], ['atelier_poterie', 'atelier_poterie'], ['quai_commerce'], ['ferme_vigne', 'cave'], ['ferme_olives', 'pressoir']],
+      dieux: [['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars'], ['ceres', 'venus']],
+      defense: { avant: 20, casernes: [13.2], forts: [{ type: 'fort_javelots', ordre: 13.4 }, { type: 'fort_javelots', ordre: 48 }, { type: 'fort_legionnaires', ordre: 75 }, { type: 'fort_legionnaires', ordre: 105 }] } },
+    vindobona: { quartiers: 6, services: 4, gouverneur: { reserve: 200, marge: 30 },
+      fermes: [F3(), F3('ferme_ble', 'ferme_legumes'), F3('ferme_ble', 'ferme_fruits'), F3('ferme_ble', 'ferme_porcs'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_fruits'), F3(), F3('ferme_ble', 'ferme_ble', 'ferme_porcs'), F3()],
+      ateliers: [['mine_fer', 'atelier_armes', 'atelier_armes'], ['carriere_argile', 'atelier_poterie'], ['mine_fer', 'atelier_armes', 'atelier_armes'], ['camp_bucherons', 'atelier_mobilier'], ['atelier_poterie', 'atelier_poterie'], ['atelier_armes', 'atelier_armes'], ['ferme_vigne', 'cave'], ['ferme_olives', 'pressoir']],
+      dieux: [['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars'], ['ceres', 'venus'], ['mercure', 'neptune']],
+      defense: { avant: 22, casernes: [13.2, 73], academie: 120, forts: [{ type: 'fort_javelots', ordre: 13.4 }, { type: 'fort_javelots', ordre: 48 }, { type: 'fort_cavaliers', ordre: 72 }, { type: 'fort_legionnaires', ordre: 90 }, { type: 'fort_legionnaires', ordre: 112 }] } }
   };
   var DIEUX_QUARTIERS = [['ceres', 'venus'], ['mercure', 'neptune'], ['mars', 'ceres'], ['venus', 'mercure'], ['neptune', 'mars']];
 
@@ -595,7 +607,7 @@
         var x = q.x, yT = q.yT, yB = q.yB, far = q.nord ? 0 : 1, near = 1 - far;
         var bloc = function (c, r) { return [x + 1 + 5 * c, yT + 1 + 5 * r]; };
         var sF = bloc(2, far), sN = bloc(2, near), pN = bloc(1, near), pF = bloc(1, far);
-        var dieux = DIEUX_QUARTIERS[n % DIEUX_QUARTIERS.length];
+        var lesDieux = options.dieux || DIEUX_QUARTIERS, dieux = lesDieux[n % lesDieux.length];
         // Pâté de logements : un puits (1, 1) et une fontaine (2, 2) ; le reste en logements.
         var pate = function (c, r) {
           var o = bloc(c, r), m = [];
@@ -723,6 +735,9 @@
             } else { var b = pres(type, L ? L.x + 10 : cx, R); if (b && !src) src = b; }
           });
           if (src && !premiereSource && src.type !== 'quai_commerce') premiereSource = src;
+          // Missions militaires : la préfecture tout de suite (l'argent part aussi dans l'armée,
+          // et un atelier sans préfet brûle en moins d'un an).
+          if (src && options.defense && !e.batiments.some(function (b) { return b.type === 'prefecture' && Math.abs(b.x - src.x) + Math.abs(b.y - src.y) <= 6; })) pres('prefecture', src.x + 1, src.y + 1, 10);
           if (src && !e.batiments.some(function (b) { return b.type === 'entrepot' && Math.abs(b.x - src.x) + Math.abs(b.y - src.y) <= 16; })) pres('entrepot', src.x + 1, src.y + 1, 16);
         });
         etape('industrie' + k + '-garde', (k === 0 ? 15 : 18 + 25 * k) + 3, 'industrie' + k, function () {
@@ -732,6 +747,28 @@
           if (!proche('ingenieur', 12)) pres('ingenieur', src.x + 1, src.y + 1, 12);
         });
       });
+      // 5. Défense (missions militaires, lot 4) : casernes près de l'îlot de logistique, forts entre
+      // la ville et les points d'invasion (chacun vers l'un d'eux, à tour de rôle), académie.
+      var Df = options.defense;
+      if (Df) {
+        var entrees = [];
+        (sim.mission(e).evenements || []).forEach(function (ev) {
+          if (ev.type === 'invasion' && !entrees.some(function (p) { return p[0] === ev.entree[0] && p[1] === ev.entree[1]; })) entrees.push(ev.entree);
+        });
+        var gx = L ? L.x + 10 : cx;
+        // Un ingénieur et une préfecture à côté de chaque bâtiment militaire : sans eux, il
+        // s'effondre ou brûle au bout de quelques mois (sections 10.1 et 10.2).
+        var garder = function (b) { if (b) { pres('ingenieur', b.x + 1, b.y + 1, 8); pres('prefecture', b.x + 1, b.y + 1, 8); } };
+        (Df.casernes || []).forEach(function (o, k) { etape('defense-caserne' + k, o, null, function () { garder(pres('caserne', gx + 8 * k, R - 10, 30)); }); });
+        (Df.forts || []).forEach(function (f, k) {
+          var p = entrees.length ? entrees[k % entrees.length] : [cx, 0];
+          etape('defense-fort' + k, f.ordre, 'defense-caserne0', function () {
+            var dx = p[0] - cx, dy = p[1] - R, d = Math.max(1, Math.sqrt(dx * dx + dy * dy)), av = Math.max(4, Math.min(Df.avant, d - 6));
+            garder(pres(f.type, Math.round(cx + dx * av / d), Math.round(R + dy * av / d), 24));
+          });
+        });
+        if (Df.academie) etape('defense-academie', Df.academie, 'defense-caserne0', function () { pres('academie_militaire', gx, R - 10, 30); });
+      }
       // Le brouillon bâtit les étapes dans l'ordre de la partie et relève leurs commandes.
       decl.sort(function (a, b) { return a.ordre - b.ordre || a.k - b.k; });
       var etapes = decl.map(function (d) {
@@ -917,7 +954,9 @@
     // Commerce : exporter ce que la ville produit en surplus, importer les biens des maisons
     // et les matières des ateliers qu'elle ne produit pas.
     var produits = {}, matieres = {};
-    e.batiments.forEach(function (b) { var d = D.batiments[b.type]; if (d.produit) produits[d.produit] = (produits[d.produit] || 0) + 1; if (d.matiere) matieres[d.matiere] = 1; });
+    e.batiments.forEach(function (b) { var d = D.batiments[b.type]; if (d.produit) produits[d.produit] = (produits[d.produit] || 0) + 1; if (d.matiere && d.genre === 'atelier') matieres[d.matiere] = 1; });
+    // Armes : la caserne est servie d'abord par l'atelier ; le surplus s'exporte, 4 charges gardées.
+    var caserne = e.batiments.some(function (b) { return D.batiments[b.type].genre === 'caserne'; });
     var demandes = {};
     e.demandes.forEach(function (dm) { if ((dm.etat === 'ouverte' || dm.etat === 'retard') && dm.bien) demandes[dm.bien] = (demandes[dm.bien] || 0) + dm.q; });
     var vendus = {}, achetes = {};
@@ -931,6 +970,7 @@
       if (demandes[g] && !produits[g] && vendus[g]) { s = e.tresor - demandes[g] * sim.prixBien(e, g).i > 2000 ? 'importer' : 'aucun'; n = demandes[g]; }
       else if (demandes[g]) { s = 'reserver'; n = demandes[g]; }
       else if (produits[g] && achetes[g] && matieres[g]) { s = 'aucun'; } // matière de nos ateliers : gardée
+      else if (g === 'armes' && caserne && produits[g] && achetes[g]) { s = 'exporter'; n = 4; }
       else if (produits[g] && achetes[g] && D.aliments.indexOf(g) < 0) { s = 'exporter'; n = reclames[g] ? 3 : 0; }
       else if (produits[g] && achetes[g] && stock > 12) { s = 'exporter'; n = 8; }
       else if (vendus[g] && !produits[g] && reclames[g] && aise) { s = 'importer'; n = 2; }
@@ -992,7 +1032,15 @@
     var sg = e.tresor > 300 ? sim.salaireGouvMax(e) : 0;
     if (e.salaireGouv !== sg) sim.appliquer(e, { type: 'reglage', cle: 'salaireGouv', valeur: sg });
     // Demandes : expédiées dès que le stock suffit.
-    e.demandes.forEach(function (dm) { if (sim.demandePrete(e, dm) && (!dm.deniers || e.tresor - dm.deniers > 1500)) sim.appliquer(e, { type: 'expedier', id: dm.id }); });
+    e.demandes.forEach(function (dm) { if (!dm.troupes && sim.demandePrete(e, dm) && (!dm.deniers || e.tresor - dm.deniers > 1500)) sim.appliquer(e, { type: 'expedier', id: dm.id }); });
+    // Troupes : la cohorte la plus forte part, sauf si une invasion arrive dans les 4 mois.
+    var menace = sim.armees(e).some(function (a) { return a.mois <= 4; });
+    e.demandes.forEach(function (dm) {
+      if (!dm.troupes || dm.etat !== 'ouverte' || menace) return;
+      var best = null;
+      sim.cohortes(e).forEach(function (c) { if (!c.absente && !c.fuite && c.ici >= 12 && (!best || c.ici * (1 + c.entr / 10) > best.ici * (1 + best.entr / 10))) best = c; });
+      if (best) sim.appliquer(e, { type: 'envoyer', id: dm.id, fort: best.id });
+    });
     // Fêtes : pour le dieu le moins satisfait, sous 35.
     var bas = null;
     D.regles.dieux.liste.forEach(function (g) { if (!bas || e.divins[g].s < e.divins[bas].s) bas = g; });
@@ -1002,6 +1050,33 @@
     if (e.cotes.faveur < seuil + 6 && e.fortune >= 40 && (e.presentT < 0 || e.tick - e.presentT >= 12 * D.ticksParMois)) sim.appliquer(e, { type: 'present', taille: 1 });
   }
 
-  racine.MM_EXEMPLES = { construire: construire, ligneRome: ligneRome, planifier: planifier, jouer: jouer, poserPres: poserPres, relier: relier, cotes: cotes, ligne: ligne,
+  // Armée du gouverneur (appelée chaque jour) : pendant une invasion, toutes les cohortes marchent
+  // sur l'ennemi le plus proche du centre de la ville ; ensuite, elles rentrent au fort.
+  function piloterArmee(sim, e) {
+    var l = sim.cohortes(e), inv = e.invasion, N = e.N;
+    if (!l.length) return;
+    if (!inv || inv.fuite) {
+      l.forEach(function (c) { if (c.ordre === 'aller') sim.appliquer(e, { type: 'cohorte', fort: c.id, ordre: 'rentrer' }); });
+      return;
+    }
+    var sx = 0, sy = 0, n = 0;
+    e.batiments.forEach(function (h) { if (h.type === 'logement' && h.hab > 0) { sx += h.x; sy += h.y; n++; } });
+    var cx = n ? sx / n : N / 2, cy = n ? sy / n : N / 2, cible = null, bd = Infinity;
+    e.unites.forEach(function (u) {
+      if (u.c !== 1 || u.mort) return;
+      var x = u.i % N, y = (u.i - x) / N, d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+      if (d < bd) { bd = d; cible = u; }
+    });
+    if (!cible) return;
+    var tx = cible.i % N, ty = (cible.i - tx) / N;
+    l.forEach(function (c) {
+      if (c.fuite || c.absente || !c.ici) return;
+      var f = sim.batiment(e, c.id);
+      if (f.ordre.t === 'aller' && f.ordre.i >= 0 && Math.abs(f.ordre.i % N - tx) + Math.abs(Math.floor(f.ordre.i / N) - ty) <= 4) return;
+      sim.appliquer(e, { type: 'cohorte', fort: c.id, ordre: 'aller', x: tx, y: ty });
+    });
+  }
+
+  racine.MM_EXEMPLES = { piloterArmee: piloterArmee, construire: construire, ligneRome: ligneRome, planifier: planifier, jouer: jouer, poserPres: poserPres, relier: relier, cotes: cotes, ligne: ligne,
     planifierMission: planifierMission, jouerMission: jouerMission, piloter: piloter, placesVille: placesVille, besoinEtape: besoinEtape, PLANS_MISSIONS: PLANS_MISSIONS };
 })(typeof window !== 'undefined' ? window : globalThis);
