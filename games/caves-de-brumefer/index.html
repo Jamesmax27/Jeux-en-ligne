@@ -1583,6 +1583,8 @@
   @keyframes entree { from { transform: scale(.85); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes pulse { 50% { transform: scale(1.18); border-color: var(--or); } }
   @keyframes tremble { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+  /* Image du jeu sur ordinateur : la partie occupe toute la largeur */
+  #app.apercu-large { max-width: none; }
   @media (max-height: 640px) {
     #pad { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); }
     .case { width: 54px; height: 54px; } #inv { grid-template-columns: repeat(2, 54px); }
@@ -1707,6 +1709,8 @@ function melange(t) {
 }
 
 const CLE_SAUVE = 'caves-de-brumefer-v1';
+// 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU, posé par le robot), sinon 0
+let apercu = 0, apercuDebut = 0;
 const sauv = { debloque: 1, etoiles: [], scores: [], prof: 0, profScore: 0, son: true, vus: {}, fini: false };
 function charger() {
   try {
@@ -1730,6 +1734,7 @@ function charger() {
 // Total des meilleures étoiles des étages (3 au plus par étage)
 const etoilesEtages = () => sauv.etoiles.slice(0, NB_ETAGES).reduce((a, b) => a + Math.min(3, Number(b) || 0), 0);
 function sauver() {
+  if (apercu) return; // image du jeu : rien n'est enregistré
   try { localStorage.setItem(CLE_SAUVE, JSON.stringify(sauv)); } catch (e) { /* pas grave */ }
 }
 
@@ -1771,7 +1776,7 @@ function reprendre(d) {
   majHud(true);
 }
 JEL_SAVE.surFermeture(() => {
-  if (!S || S.fini || ecranCourant !== 'jeu') return;
+  if (apercu || !S || S.fini || ecranCourant !== 'jeu') return;
   // La cave est refaite à la reprise : on garde le sac, pas les points de l'étage en cours.
   sauverPartie(S.n, S.mode === 'prof' ? S.scoreAvant : 0, S.pv);
 });
@@ -1785,7 +1790,7 @@ function reveillerAudio() {
   if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
 }
 function ton(f, d, type = 'sine', v = 0.12, f2 = null, delai = 0) {
-  if (!sauv.son || !actx) return;
+  if (apercu || !sauv.son || !actx) return;
   const t = actx.currentTime + delai;
   const o = actx.createOscillator(), g = actx.createGain();
   o.type = type;
@@ -1798,7 +1803,7 @@ function ton(f, d, type = 'sine', v = 0.12, f2 = null, delai = 0) {
   o.start(t); o.stop(t + d + 0.03);
 }
 function bruit(d, v = 0.1, freq = 1500, delai = 0) {
-  if (!sauv.son || !actx) return;
+  if (apercu || !sauv.son || !actx) return;
   if (!bufBruit) {
     bufBruit = actx.createBuffer(1, actx.sampleRate * 0.5, actx.sampleRate);
     const ch = bufBruit.getChannelData(0);
@@ -2322,7 +2327,7 @@ function objectif() {
   return t('objEscalier');
 }
 function peutJouer() {
-  return S && ecranCourant === 'jeu' && !S.fini && $('intro').classList.contains('cache') && $('pause').classList.contains('cache');
+  return !apercu && S && ecranCourant === 'jeu' && !S.fini && $('intro').classList.contains('cache') && $('pause').classList.contains('cache');
 }
 function marchable(x, y) { return x >= 0 && y >= 0 && x < S.W && y < S.H && S.grid[idx(x, y)] !== 0; }
 function ennemiA(x, y) { return S.ens.find((e) => e.x === x && e.y === y); }
@@ -2658,6 +2663,7 @@ function redimensionner() {
   cw = z.clientWidth; ch = z.clientHeight;
   cv.width = Math.max(1, Math.round(cw * dpr)); cv.height = Math.max(1, Math.round(ch * dpr));
   ts = Math.max(30, Math.min(64, Math.floor(Math.min(cw / 9, ch / 10))));
+  if (apercu === 3) ts = Math.max(30, Math.min(64, Math.floor(ch / 7))); // image d'ordinateur : cases plus grandes
   const art = $('art');
   art.width = Math.round(art.clientWidth * dpr); art.height = Math.round(art.clientHeight * dpr);
   const fx = $('fx');
@@ -2691,7 +2697,13 @@ function dessinerJeu(t, dt) {
   h.ax *= 0.8; h.ay *= 0.8;
   S.secousse *= 0.88;
   const sx = (Math.random() - 0.5) * S.secousse, sy = (Math.random() - 0.5) * S.secousse;
-  const camX = h.px * ts + ts / 2 - cw / 2 + sx, camY = h.py * ts + ts / 2 - ch / 2 + sy;
+  let vx = h.px, vy = h.py;
+  if (S.camBornee) { // images du jeu : la vue reste dans la cave (pas de bande noire au bord)
+    const bx = cw / ts / 2 - 0.5, by = ch / ts / 2 - 0.5;
+    vx = S.W - 1 <= 2 * bx ? (S.W - 1) / 2 : Math.max(bx, Math.min(S.W - 1 - bx, vx));
+    vy = S.H - 1 <= 2 * by ? (S.H - 1) / 2 : Math.max(by, Math.min(S.H - 1 - by, vy));
+  }
+  const camX = vx * ts + ts / 2 - cw / 2 + sx, camY = vy * ts + ts / 2 - ch / 2 + sy;
   c.save(); c.translate(-Math.round(camX), -Math.round(camY));
   const x0 = Math.max(0, Math.floor(camX / ts) - 1), x1 = Math.min(S.W - 1, Math.ceil((camX + cw) / ts) + 1);
   const y0 = Math.max(0, Math.floor(camY / ts) - 1), y1 = Math.min(S.H - 1, Math.ceil((camY + ch) / ts) + 1);
@@ -2715,7 +2727,7 @@ function dessinerJeu(t, dt) {
       if (!S.seen[i]) continue;
       const it = S.items.get(i);
       if (it) dessItem(c, it, x * ts + ts / 2, y * ts + ts / 2, ts, t);
-      if (!S.vis[i]) { c.fillStyle = 'rgba(6,8,18,.6)'; c.fillRect(x * ts, y * ts, ts + 0.5, ts + 0.5); }
+      if (!S.vis[i]) { c.fillStyle = apercu ? 'rgba(6,8,18,.38)' : 'rgba(6,8,18,.6)'; /* images du jeu : un peu plus clair */ c.fillRect(x * ts, y * ts, ts + 0.5, ts + 0.5); }
     }
   }
   // Brumelins visibles
@@ -2765,7 +2777,7 @@ function dessinerJeu(t, dt) {
   // Halo de la lanterne
   const hx = (h.px + 0.5) * ts - camX, hy = (h.py + 0.5) * ts - camY;
   const g = c.createRadialGradient(hx, hy, ts * 1.5, hx, hy, ts * (S.vue + 1.6));
-  g.addColorStop(0, 'rgba(7,8,15,0)'); g.addColorStop(1, 'rgba(7,8,15,.55)');
+  g.addColorStop(0, 'rgba(7,8,15,0)'); g.addColorStop(1, apercu ? 'rgba(7,8,15,.35)' : 'rgba(7,8,15,.55)');
   c.fillStyle = g; c.fillRect(0, 0, cw, ch);
   // Éclair rouge (coup reçu) ou doré (parchemin)
   if (S.flash) {
@@ -3206,7 +3218,7 @@ $('bSuivant').addEventListener('click', () => {
 });
 $('bRejouer').addEventListener('click', () => { SON.clic(); if (S.mode === 'prof') lancer('prof', 1); else lancer('etage', S.n); });
 $('bCarte').addEventListener('click', () => { SON.clic(); montrer('etages'); });
-$('bPause').addEventListener('click', () => { if (!S || S.fini) return; SON.clic(); $('pause').classList.remove('cache'); });
+$('bPause').addEventListener('click', () => { if (apercu || !S || S.fini) return; SON.clic(); $('pause').classList.remove('cache'); });
 $('bReprendre').addEventListener('click', () => { SON.clic(); $('pause').classList.add('cache'); });
 $('bRecommencer').addEventListener('click', () => { SON.clic(); if (S.mode === 'prof') lancer('prof', 1); else lancer('etage', S.n); });
 $('bQuitter').addEventListener('click', () => { SON.clic(); montrer('etages'); });
@@ -3264,11 +3276,289 @@ function dessinerConfettis(dt) {
   confs = confs.filter((p) => p.y < h + 20);
 }
 
+// ---------- 11 bis. Affiche (jaquette) et images du jeu ----------
+// window.JEL_AFFICHE et window.JEL_APERCU sont posés par le robot du site, jamais par le jeu
+// (CONSIGNES-JEU.md, section 5).
+
+// Petite étoile à 4 branches (étincelle dessinée, jamais un caractère)
+function etincelle(c, x, y, r, coul) {
+  c.fillStyle = coul; c.beginPath();
+  c.moveTo(x, y - r); c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r);
+  c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fill();
+}
+function lueur(c, x, y, r, coul, a) {
+  const g = c.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(${coul},${a})`); g.addColorStop(1, `rgba(${coul},0)`);
+  c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+}
+
+// Affiche : le lutin, lanterne levée, fait éclater un gluant dans une salle pleine de gemmes ;
+// la chauve-souris et le feu follet arrivent, le Cristal brille au fond de la cave.
+// Scène composée sur 600 × 800 ; sur un écran plus large, la cave continue jusqu'aux bords.
+let afficheCv = null;
+function dessinerAffiche() {
+  const W = window.innerWidth, H = window.innerHeight, r = Math.min(2, window.devicePixelRatio || 1);
+  afficheCv.width = Math.round(W * r); afficheCv.height = Math.round(H * r);
+  const c = afficheCv.getContext('2d');
+  c.setTransform(r, 0, 0, r, 0, 0);
+  const T = 1200; // instant fixe des animations des dessins
+  // Fond de la cave, sur tout l'écran
+  const fond = c.createLinearGradient(0, 0, 0, H);
+  fond.addColorStop(0, '#2c2f5e'); fond.addColorStop(0.55, '#3a3570'); fond.addColorStop(1, '#1d2040');
+  c.fillStyle = fond; c.fillRect(0, 0, W, H);
+  const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  c.save(); c.translate(ox, oy); c.scale(k, k);
+  const gx = -ox / k, gw = W / k; // bords réels de l'écran, en unités de la scène
+  // Voûte : rochers du fond, plus pâles
+  c.fillStyle = '#4a4d86';
+  for (let x = Math.floor(gx / 90) * 90 - 90; x < gx + gw + 90; x += 90) {
+    const hh = 120 + ((Math.abs(x) * 7) % 70);
+    c.beginPath(); c.ellipse(x + 45, -10, 70, hh, 0, 0, Math.PI * 2); c.fill();
+  }
+  // Grande arche du fond, ouverte sur la salle du Cristal
+  const arche = c.createRadialGradient(300, 250, 10, 300, 250, 230);
+  arche.addColorStop(0, '#b48cff'); arche.addColorStop(0.35, '#6c56c4'); arche.addColorStop(1, '#2a2658');
+  c.fillStyle = arche; c.beginPath(); c.ellipse(300, 470, 210, 360, 0, Math.PI, 0); c.fill();
+  lueur(c, 300, 200, 260, '200,160,255', 0.55);
+  dessCristal(c, 300, 175, 170, T);
+  for (const [x, y, rr] of [[230, 120, 9], [372, 150, 7], [330, 90, 6], [262, 225, 5]]) etincelle(c, x, y, rr, '#f1e6ff');
+  // Brume claire
+  for (const [x, y, rr] of [[120, 380, 150], [480, 340, 170], [300, 440, 200], [40, 250, 120], [570, 220, 130]]) lueur(c, x, y, rr, '190,200,255', 0.16);
+  // Sol en dalles du jeu, en perspective
+  const sol = c.createLinearGradient(0, 470, 0, 800);
+  sol.addColorStop(0, '#565e86'); sol.addColorStop(1, '#3a4062');
+  c.fillStyle = sol; c.fillRect(gx, 470, gw, 330);
+  for (let rang = 0; rang < 5; rang++) {
+    const y = 470 + rang * rang * 9 + rang * 22, s = 46 + rang * 26;
+    for (let x = Math.floor((gx - 300) / s) * s + 300 - s * 0.5 * (rang % 2); x < gx + gw + s; x += s) {
+      c.strokeStyle = 'rgba(30,34,58,.45)'; c.lineWidth = 2; c.strokeRect(x, y, s, s * 0.5 + rang * 9);
+      if ((Math.round(x / s) + rang) % 3 === 0) disque(c, x + s * 0.3, y + s * 0.25, s * 0.05, '#4c5374');
+    }
+  }
+  // Murs de pierre du jeu, à gauche et à droite (premier plan coupé par les bords)
+  const colonne = (x0, sens) => {
+    for (let y = 120; y < 720; y += 110) for (let j = 0; j < 4; j++) dessMur(c, x0 + sens * j * 110, y, 110, true);
+  };
+  colonne(-80, -1); colonne(570, 1);
+  // Gemmes et objets au sol (la lanterne les fait briller)
+  dessGemme(c, 150, 545, 120, T, '#ff6fae');
+  dessGemme(c, 440, 470, 90, T, '#ffd75a');
+  dessGemme(c, 575, 640, 130, T, '#7dff8a');
+  dessCle(c, 120, 640, 130);
+  dessPotion(c, 395, 665, 110);
+  dessCoffre(c, 560, 455, 120, T, false);
+  // Champignon gardien de la clé, à gauche
+  dessChampi(c, 70, 470, 170, T, true);
+  // La chauve-souris et le feu follet arrivent
+  lueur(c, 120, 220, 110, '170,230,255', 0.5);
+  dessFollet(c, 120, 225, 160, T);
+  lueur(c, 470, 215, 130, '210,180,255', 0.55);
+  dessChauve(c, 470, 230, 200, 1430); // ailes grandes ouvertes
+  // Le gluant qui éclate sous le coup du lutin
+  const gx2 = 485, gy2 = 535;
+  lueur(c, gx2, gy2, 150, '140,255,140', 0.35);
+  dessGluant(c, gx2, gy2, 210, T);
+  c.globalAlpha = 0.25; disque(c, gx2, gy2 + 20, 70, '#ffffff'); c.globalAlpha = 1;
+  c.strokeStyle = '#d8ffd0'; c.lineWidth = 5;
+  for (const [dx, dy, rr] of [[-60, -80, 18], [10, -110, 26], [70, -70, 14], [95, -10, 20], [-90, -20, 12], [40, -150, 10], [-30, -140, 9]]) {
+    c.beginPath(); c.arc(gx2 + dx, gy2 + dy, rr, 0, Math.PI * 2); c.stroke();
+  }
+  for (const [dx, dy, rr] of [[-20, -60, 20], [60, -110, 14], [-75, -95, 11], [110, -55, 12]]) etincelle(c, gx2 + dx, gy2 + dy, rr, '#fff6b0');
+  // Le lutin, en grand, lanterne vers le gluant, l'épée de cristal levée
+  const hx = 245, hy = 445, hs = 430;
+  lueur(c, hx + 120, hy + 40, 330, '255,214,120', 0.45);
+  c.save(); c.translate(hx - 120, hy - 20); c.rotate(0.5); dessArme(c, 0, 0, 230, T, 'cristal'); c.restore();
+  lueur(c, hx - 150, hy - 110, 70, '160,230,255', 0.6);
+  dessHeros(c, hx, hy, hs, T, 1);
+  // Contour doré de la lanterne sur la capuche
+  lueur(c, hx + hs * 0.3, hy + hs * 0.12, 120, '255,240,170', 0.6);
+  c.restore();
+  // Vignette douce sur les bords
+  const v = c.createRadialGradient(W / 2, H * 0.45, Math.min(W, H) * 0.35, W / 2, H * 0.45, Math.max(W, H) * 0.8);
+  v.addColorStop(0, 'rgba(10,10,30,0)'); v.addColorStop(1, 'rgba(10,10,30,.45)');
+  c.fillStyle = v; c.fillRect(0, 0, W, H);
+}
+function cacherBoutonsAffiche() {
+  for (const el of document.querySelectorAll('#app, .jel-langue, jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherBoutonsAffiche();
+  afficheCv = document.createElement('canvas');
+  afficheCv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;z-index:100';
+  document.body.appendChild(afficheCv);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+  // Le bouton de langue peut être créé après ce script : on le cache encore un peu après.
+  for (const d of [100, 500, 1200]) setTimeout(cacherBoutonsAffiche, d);
+}
+
+// Images du jeu : une vraie partie, avec sa vraie interface (cœurs, gemmes, score, sac, croix),
+// sans écran titre, ni « Continuer », ni tutoriel. La cave est tirée avec un hasard fixe, le
+// lutin et les Brumelins sont posés, puis la partie reste figée (le jeu est au tour par tour).
+//   1 = étage 1 : premiers pas, la cave se dévoile, une gemme vient d'être ramassée ;
+//   2 = étage 5 : le lutin frappe le champignon qui garde la clé, un gluant éclate, coffre et grille ;
+//   3 = étage 10 (sur ordinateur) : le Gardien de Brumefer, ses gluants, le crapaud cracheur et le feu follet.
+function hasardFixe(graine) {
+  Math.random = () => {
+    graine = (graine + 0x6D2B79F5) | 0;
+    let q = Math.imul(graine ^ (graine >>> 15), 1 | graine);
+    q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q;
+    return ((q ^ (q >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// Cases libres autour de (x, y), de la plus proche à la plus lointaine (ordre fixe)
+function casesAutour(x, y, dmin, dmax) {
+  const res = [];
+  for (let yy = y - dmax; yy <= y + dmax; yy++) {
+    for (let xx = x - dmax; xx <= x + dmax; xx++) {
+      const d = Math.abs(xx - x) + Math.abs(yy - y);
+      if (d < dmin || d > dmax || !marchable(xx, yy)) continue;
+      const i = idx(xx, yy);
+      if (S.grid[i] !== 1 || S.items.has(i) || S.piq.has(i) || occupe(xx, yy)) continue;
+      res.push({ x: xx, y: yy, d });
+    }
+  }
+  return res.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x);
+}
+// Nombre de cases de sol autour d'une case (pour choisir une salle bien ouverte)
+function ouverture(x, y) {
+  let n = 0;
+  for (let yy = y - 2; yy <= y + 2; yy++) for (let xx = x - 2; xx <= x + 2; xx++) if (marchable(xx, yy)) n++;
+  return n;
+}
+// Mémoire de la cave : tout ce qui est à moins de dmax pas du départ (dmax < 0 : toute la cave)
+function memoireApercu(dist, dmax) {
+  for (let i = 0; i < S.grid.length; i++) {
+    if (S.grid[i] !== 0) { if (dmax < 0 || (dist[i] >= 0 && dist[i] <= dmax)) S.seen[i] = 1; }
+  }
+  for (let i = 0; i < S.grid.length; i++) {
+    if (S.grid[i] !== 0) continue;
+    const x = i % S.W, y = (i / S.W) | 0;
+    if (DIRS.some(([dx, dy]) => marchable(x + dx, y + dy) && S.seen[idx(x + dx, y + dy)])) S.seen[i] = 1;
+  }
+}
+function placerHeros(x, y, dir) {
+  Object.assign(S.h, { x, y, px: x, py: y, dir, ax: 0, ay: 0 });
+}
+// Déplace un objet (gemme…) ou un Brumelin vers une case libre de la liste
+function poserObjet(type, c2) {
+  for (const [i, it] of S.items) {
+    if (it.t !== type) continue;
+    const x = i % S.W, y = (i / S.W) | 0;
+    if (Math.abs(x - S.h.x) + Math.abs(y - S.h.y) <= 4) continue; // déjà près du lutin
+    S.items.delete(i); S.items.set(idx(c2.x, c2.y), it); return it;
+  }
+  const it = { t: type, c: pick(COUL_GEMMES) };
+  S.items.set(idx(c2.x, c2.y), it); return it;
+}
+function poserEnnemi(type, c2) {
+  let e = S.ens.find((g) => g.t === type && Math.abs(g.x - S.h.x) + Math.abs(g.y - S.h.y) > 6);
+  if (!e) { e = nouvelEnnemi(type, c2.x, c2.y); S.ens.push(e); }
+  Object.assign(e, { x: c2.x, y: c2.y, px: c2.x, py: c2.y, eveil: true });
+  return e;
+}
+function ouvrirApercu(n) {
+  apercu = n;
+  hasardFixe(20261125 + n * 7919);
+  for (const k of Object.keys(SCENES)) sauv.vus[k] = true; // aucun tutoriel (en mémoire seulement)
+  if (n === 3) $('app').classList.add('apercu-large');
+  lancer('etage', n === 1 ? 1 : n === 2 ? 5 : 10);
+  S.banniere = 0; S.camBornee = true;
+  const dep = { x: S.h.x, y: S.h.y };
+  const dist = bfs(S.grid, S.W, S.H, dep.x, dep.y);
+  let max = 0;
+  for (let i = 0; i < dist.length; i++) if (dist[i] > max) max = dist[i];
+  // Case du lutin : la plus ouverte à la bonne distance du départ (ou près du Gardien)
+  const gardien = S.ens.find((e) => e.t === 'gardien');
+  let best = null, bn = -1;
+  for (let i = 0; i < S.grid.length; i++) {
+    if (S.grid[i] !== 1 || S.items.has(i) || S.piq.has(i)) continue;
+    const x = i % S.W, y = (i / S.W) | 0;
+    if (ennemiA(x, y)) continue;
+    let ok;
+    if (n === 1) ok = dist[i] >= 6 && dist[i] <= 9;
+    else if (n === 2) ok = Math.abs(dist[i] - Math.round(max * 0.5)) <= 2;
+    else ok = y === gardien.y && Math.abs(x - gardien.x) === 2 && marchable((x + gardien.x) / 2, y);
+    if (!ok) continue;
+    const o = ouverture(x, y) * 100 - dist[i];
+    if (o > bn) { bn = o; best = { x, y }; }
+  }
+  if (!best && gardien) best = casesAutour(gardien.x, gardien.y, 2, 2)[0];
+  const dir = gardien && best.x > gardien.x ? -1 : 1;
+  placerHeros(best.x, best.y, dir);
+  const dh = dist[idx(best.x, best.y)];
+  memoireApercu(dist, n === 3 ? -1 : dh + 3);
+  calcVue();
+  const visibles = (dmin, dmax) => casesAutour(S.h.x, S.h.y, dmin, dmax).filter((q) => S.vis[idx(q.x, q.y)]);
+  const h = S.h;
+  if (n === 1) {
+    // Une gemme vient d'être ramassée ; trois autres brillent dans la salle.
+    const v = visibles(2, 4);
+    for (const q of [v[0], v[Math.floor(v.length / 2)], v[v.length - 1]]) if (q) poserObjet('gemme', q);
+    S.gemmes = 2; S.score = 20; S.tour = 9;
+    etincelles(h.x, h.y, '#ffd75a', 14); texte(h.x, h.y - 0.1, '+10', '#ffe27a');
+    msg(t('objEscalier'));
+  } else if (n === 2) {
+    // Le lutin frappe le champignon qui garde la clé ; un gluant vient d'éclater à côté.
+    const cote = [[dir, 0], [-dir, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({ x: h.x + dx, y: h.y + dy, d: 1 }))
+      .find((q) => marchable(q.x, q.y) && S.grid[idx(q.x, q.y)] === 1 && !occupe(q.x, q.y));
+    const champi = poserEnnemi('champi', cote);
+    S.items.delete(idx(cote.x, cote.y));
+    champi.pv = 1; champi.flash = 1; champi.alerte = true;
+    h.dir = Math.sign(cote.x - h.x) || h.dir; h.ax = (cote.x - h.x) * 0.3; h.ay = (cote.y - h.y) * 0.3;
+    texte(cote.x, cote.y - 0.3, '-2', '#ffffff');
+    const derriere = casesAutour(cote.x, cote.y, 1, 2).filter((q) => S.vis[idx(q.x, q.y)] && Math.abs(q.x - h.x) + Math.abs(q.y - h.y) > 1);
+    if (derriere[0]) poserObjet('cle', derriere[0]);
+    const v = visibles(3, 4);
+    if (v[0]) poserEnnemi('chauve', v[v.length - 1]);
+    if (v[1]) bulles(v[1].x, v[1].y, COUL_ENNEMI.gluant);
+    const v2 = visibles(2, 4);
+    if (v2[2]) poserObjet('coffre', v2[2]);
+    if (v2[4]) poserObjet('gemme', v2[4]);
+    if (v2[6]) poserObjet('gemme', v2[6]);
+    S.pv = 4; S.perdu = 1; S.gemmes = 4; S.score = 95; S.vaincus = 3; S.potions = 1; S.cles = 1; S.tour = 41;
+    msg(t('objCle'));
+  } else {
+    // Face au Gardien : il appelle ses gluants, le crapaud gonfle, le feu follet traverse le mur.
+    gardien.eveil = true; gardien.pv = 7; gardien.flash = 0.8;
+    h.ax = (gardien.x - h.x) * 0.12;
+    texte(gardien.x, gardien.y - 0.6, '-3', '#ffffff');
+    // Gluant appelé par le Gardien, de l'autre côté (le Gardien est dessiné en grand)
+    const g1 = casesAutour(gardien.x, gardien.y, 2, 2).filter((q) => S.vis[idx(q.x, q.y)] && Math.abs(q.x - h.x) + Math.abs(q.y - h.y) > 2)
+      .sort((a, b) => Math.abs(b.x - h.x) - Math.abs(a.x - h.x))[0];
+    if (g1) { poserEnnemi('gluant', g1); bulles(g1.x, g1.y, COUL_ENNEMI.gluant); }
+    // Crapaud aligné avec le lutin, prêt à cracher
+    const ligne = visibles(3, 4).find((q) => (q.x === h.x || q.y === h.y));
+    if (ligne) {
+      const cr = poserEnnemi('crapaud', ligne);
+      cr.charge = true; cr.dirTir = [Math.sign(h.x - cr.x), Math.sign(h.y - cr.y)];
+    }
+    // Feu follet : dans un mur voisin s'il y en a un, sinon dans la salle
+    let mur = null;
+    for (let d = 2; d <= 3 && !mur; d++) {
+      for (const [dx, dy] of [[0, -d], [0, d], [-dir * d, -1], [-dir * d, 1]]) {
+        const x = h.x + dx, y = h.y + dy;
+        if (x > 0 && y > 0 && x < S.W - 1 && y < S.H - 1 && S.grid[idx(x, y)] === 0 && S.vis[idx(x, y)]) { mur = { x, y }; break; }
+      }
+    }
+    const fo = poserEnnemi('follet', mur || visibles(2, 3).slice(-1)[0]);
+    fo.pv = 1;
+    const v = visibles(2, 4);
+    if (v[3]) poserObjet('gemme', v[3]);
+    if (v[7]) poserObjet('potion', v[7]);
+    S.arme = ARMES.cristal; S.pv = 5; S.perdu = 2; S.gemmes = 8; S.score = 310; S.vaincus = 9; S.potions = 2; S.parchemins = 0; S.tour = 120;
+    S.vue = 5; calcVue(); // un peu plus de lumière sur l'image d'ordinateur
+    msg(t('objBoss'));
+  }
+  majHud(true);
+}
+
 // ---------- 12. Démarrage ----------
 let tPrec = performance.now();
 function boucle(t) {
   const dt = Math.min(60, t - tPrec); tPrec = t;
-  if (ecranCourant === 'jeu') dessinerJeu(t, dt);
+  // Images du jeu : après la mise en place, le temps de la partie s'arrête (effets figés).
+  if (ecranCourant === 'jeu') dessinerJeu(t, apercu && t - apercuDebut > 350 ? 0 : dt);
   else if (ecranCourant === 'accueil') dessinerArt(t);
   dessinerIntro(t);
   dessinerConfettis(dt);
@@ -3278,10 +3568,20 @@ charger();
 preparerIcones();
 $('iGem').src = ICONES.gemme; $('iCle').src = ICONES.cle; $('iPotion').src = ICONES.potion; $('iParch').src = ICONES.parchemin;
 majSon();
-effacerSauvegarde = JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('accueil') });
-montrer('accueil');
-redimensionner();
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  const sansLangue = () => { for (const el of document.querySelectorAll('.jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important'); };
+  sansLangue(); for (const d of [100, 500, 1200]) setTimeout(sansLangue, d);
+  ouvrirApercu(numeroApercu);
+  apercuDebut = performance.now();
+  requestAnimationFrame(boucle);
+} else {
+  effacerSauvegarde = JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('accueil') });
+  montrer('accueil');
+  redimensionner();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>
