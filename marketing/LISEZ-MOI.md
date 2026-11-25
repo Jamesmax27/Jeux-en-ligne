@@ -103,7 +103,9 @@ Structure : accroche → montage de gameplay → écran de fin (logo, `freemicro
 
 1. `node scripts/videos/video.mjs explorer <jeu>` : boutons visibles et image de l'écran après la préparation ;
 2. `node scripts/videos/video.mjs capturer <jeu> --brouillon` : la même partie filmée vite, avec une planche à regarder ; corriger les gestes et recommencer ;
-3. `node scripts/videos/video.mjs capturer <jeu> --forcer` : le rush final, puis noter dans le plan `note` (ce qu'on voit) et `moments` (secondes des meilleurs passages).
+3. `node scripts/videos/video.mjs capturer <jeu> --forcer` : le rush final, puis noter dans le plan `note` (ce qu'on voit) et `moments` (secondes des meilleurs passages) ; ces deux champs ne font pas refilmer le jeu.
+
+Conseils tirés des premiers plans : préférer le clavier quand le jeu le permet (plans plus courts) ; partir loin des boutons pour un glissé ; viser un niveau du milieu avec `sauvegarde` ; le brouillon ne donne pas de verdict (il ne garde qu'une image sur trois), seul le rush final dit s'il est exploitable.
 
 Un rush est refusé s'il montre des images noires, une image figée plus de 0,7 s ou presque aucun mouvement, ou si la partie finit trop tôt ; le montage passe alors au jeu suivant et le signale.
 
@@ -156,5 +158,6 @@ scripts/videos/
 - La capture ne filme pas le son des jeux : la bande-son est la musique de la vidéo.
 - Un jeu réglé sur l'horloge du son, ou qui charge ses images en plusieurs fois, peut ne pas se filmer à l'identique ; il est alors écarté par les contrôles ou à écarter dans `jeux.json`.
 - Sans plan de capture écrit pour lui, un jeu est joué au hasard : le résultat est rarement flatteur.
+- Un jeu lent ou vu de très loin (tour par tour, plateau entier à l'écran) est refusé par le contrôle du mouvement, même bien joué.
 - D'une machine à l'autre, le dessin des polices et le rendu 3D peuvent différer de quelques pixels : même montage, mêmes textes, mêmes passages, mais pas le même fichier à l'octet près.
 - Les votes du site sont encore peu nombreux : le classement des jeux bouge vite, refaire le relevé avant une nouvelle série.

@@ -226,7 +226,14 @@ async function prise(navigateur, plan, html, graine, { surImage, explorer, chaqu
     const pointeur = ecran.tactile ? {
       async bas(d, p) { doigts.set(d, p); await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points() }); },
       async bouge(d, p) { if (!doigts.has(d)) return; doigts.set(d, p); await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: points() }); },
-      async haut(d) { if (!doigts.delete(d)) return; await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: points() }); },
+      // « touchEnd » relâche les points qu'on lui donne (aucun = tous) : on ne lui donne que le doigt
+      // levé quand un autre reste posé, sinon c'est l'autre que Chrome relâcherait.
+      async haut(d) {
+        const p = doigts.get(d);
+        if (!p) return;
+        doigts.delete(d);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: doigts.size ? [{ id: d, x: Math.round(p.x), y: Math.round(p.y), radiusX: 9, radiusY: 9, force: 1 }] : [] });
+      },
     } : {
       async bas(d, p) { doigts.set(d, p); await page.mouse.move(p.x, p.y); await page.mouse.down(); },
       async bouge(d, p) { if (!doigts.has(d)) return; await page.mouse.move(p.x, p.y); },
@@ -326,6 +333,15 @@ function juger(mesures, fins) {
 }
 
 /**
+ * Empreinte d'un rush : le jeu, le moteur et ce que le plan fait faire. « note » et
+ * « moments » n'y comptent pas : les retoucher ne fait pas refilmer le jeu.
+ */
+export function cleDuRush(plan, html) {
+  const { cible: _c, passePartout: _p, note: _n, moments: _m, _: _commentaire, ...filme } = plan;
+  return empreinte(String(MOTEUR_CAPTURE), html, filme);
+}
+
+/**
  * Rush d'un jeu (ou « jeu@variante ») : { dossier, images, largeur, hauteur,
  * mesures, fins, exploitable, raisons… }. Filmé si besoin, sinon relu.
  */
@@ -333,8 +349,7 @@ export async function capturer(navigateur, cible, { forcer = false, brouillon = 
   if (brouillon) return brouillonner(navigateur, cible);
   const plan = await lirePlan(cible);
   const html = await readFile(path.join(JEUX, plan.jeu, 'index.html'));
-  const { cible: _c, passePartout: _p, ...cleDuPlan } = plan;
-  const cle = empreinte(String(MOTEUR_CAPTURE), html, cleDuPlan);
+  const cle = cleDuRush(plan, html);
   const base = path.join(SORTIES, 'rushes', cible.replace('@', '--'));
   const dossier = path.join(base, cle);
   const fiche = path.join(dossier, 'rush.json');
