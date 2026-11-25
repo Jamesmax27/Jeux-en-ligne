@@ -4152,12 +4152,15 @@
   function geometrie(e, w, h) {
     const R0 = Math.max(60, Math.min(w, h) / 2 - Math.max(34, Math.min(w, h) * 0.12));
     const pas = 2 * Math.PI * R0 / e.N;
-    return { cx: w / 2, cy: h / 2, R: R0, pas: pas, ar: Math.min(pas * 0.44, 22), cs: Math.min(pas * 0.42, 18) };
+    // ex : anneau étiré en largeur, seulement pour l'image du jeu prise sur un ordinateur (JEL_APERCU = 3).
+    const ex = apercu === 3 && w > h * 1.3 ? Math.min(2, (w * 0.42) / R0) : 1;
+    const kz = ex > 1 ? 1.5 : 1;
+    return { cx: w / 2, cy: h / 2, R: R0, ex: ex, pas: pas * kz, ar: Math.min(pas * 0.44, 22) * kz, cs: Math.min(pas * 0.42, 18) * kz };
   }
   const angleCase = (e, c) => -Math.PI / 2 + 2 * Math.PI * c / e.N;
   function pointCase(g, e, c, dr) {
     const a = angleCase(e, c), r = g.R + (dr || 0);
-    return [g.cx + Math.cos(a) * r, g.cy + Math.sin(a) * r];
+    return [g.cx + Math.cos(a) * r * g.ex, g.cy + Math.sin(a) * r];
   }
 
   // Position d'un cargo : sur sa case, plusieurs cargos sur la même case se rangent vers l'intérieur.
@@ -4165,7 +4168,7 @@
     let rang = 0;
     for (let k = 0; k < s; k++) if (e.pos[k] === e.pos[s] && !(anim && anim.s === k)) rang++;
     const r = g.R - g.ar - g.cs * (0.7 + rang * 1.05);
-    return [g.cx + Math.cos(angle) * r, g.cy + Math.sin(angle) * r];
+    return [g.cx + Math.cos(angle) * (r + (g.R - r) * (1 - 1 / g.ex)) * g.ex, g.cy + Math.sin(angle) * r];
   }
 
   function dessinerJeu(t, dt) {
@@ -4184,7 +4187,7 @@
     soleil(c, g.cx, g.cy, Math.min(g.R * 0.2, 40), N2.etoile, t);
     // l'anneau
     c.strokeStyle = '#ffffff1c'; c.lineWidth = g.ar * 2.2;
-    rond(c, g.cx, g.cy, g.R); c.stroke();
+    c.beginPath(); c.ellipse(g.cx, g.cy, g.R * g.ex, g.R, 0, 0, Math.PI * 2); c.stroke();
     for (let k = 0; k < e.N; k++) {
       const p = pointCase(g, e, k);
       c.fillStyle = k % 5 === 0 ? '#ffffff55' : '#ffffff2a';
@@ -4345,11 +4348,13 @@
   // ---------------------------------------------------------------------
 
   let rafId = 0, tPrec = 0;
+  let apercu = 0;            // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU)
+  let apercuFige = false;    // image du jeu figée : plus rien ne bouge avant la capture
   function relancerBoucle() { if (!rafId) rafId = requestAnimationFrame(boucle); }
   function boucle(t) {
     rafId = 0;
     if (ecran !== 'jeu' || enPause) return;
-    const dt = Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
+    const dt = apercuFige ? 0 : Math.min(0.05, tPrec ? (t - tPrec) / 1000 : 0.016);
     tPrec = t;
     dessinerJeu(performance.now(), dt);
     majTemps();
@@ -5179,7 +5184,7 @@
 
   // Écran caché : pause automatique.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
+    if (document.visibilityState === 'hidden' && ecran === 'jeu' && !apercu && !enPause && !$('voile-fin').classList.contains('actif') && !salonOuvert() && !attenteTuto) ouvrirPause();
   });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie solo.
@@ -5187,17 +5192,266 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? vue.sc[partie.siege] : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(performance.now()); });
+  window.addEventListener('resize', () => {
+    if (ecran === 'affiche') dessinerAffiche();
+    else if (ecran !== 'jeu') dessinerTitre(performance.now());
+  });
+
+  // ---------------------------------------------------------------------
+  //  Affiche (jaquette du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le grand cargo
+  // orange, son pilote à la vitre, fonce vers un astéroïde doré et aspire ses cristaux d'un rayon
+  // turquoise ; l'étoile éclaire la ceinture, les cargos rivaux arrivent, un pirate robot guette,
+  // un trou noir tourbillonne. Le décor continue jusqu'aux bords sur un écran large.
+
+  // Pilote du cargo, vu à travers la vitre (repère du cargo, nez vers la droite).
+  function pilote(c, x, y, r, redresse) {
+    c.save(); c.translate(x, y);
+    const vitre = c.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
+    vitre.addColorStop(0, '#ffffff'); vitre.addColorStop(0.5, '#bdf1ff'); vitre.addColorStop(1, '#4fb6d8');
+    c.fillStyle = vitre; rond(c, 0, 0, r); c.fill();
+    c.lineWidth = r * 0.12; c.strokeStyle = '#a8480c'; c.stroke();
+    // visage tourné vers nous, droit à l'écran : casque blanc, joues, sourire
+    c.rotate(redresse || 0);
+    c.fillStyle = '#ffffff'; rond(c, 0, 0, r * 0.68); c.fill();
+    c.fillStyle = '#ffcf9e'; rond(c, 0, r * 0.05, r * 0.5); c.fill();
+    c.fillStyle = '#2a1a3a';
+    rond(c, -r * 0.18, -r * 0.02, r * 0.08); c.fill();
+    rond(c, r * 0.18, -r * 0.02, r * 0.08); c.fill();
+    c.fillStyle = '#fff'; rond(c, -r * 0.16, -r * 0.05, r * 0.03); c.fill(); rond(c, r * 0.2, -r * 0.05, r * 0.03); c.fill();
+    c.strokeStyle = '#2a1a3a'; c.lineWidth = r * 0.07; c.lineCap = 'round';
+    c.beginPath(); c.arc(0, r * 0.12, r * 0.2, 0.2, Math.PI - 0.2); c.stroke();
+    c.fillStyle = '#ff8fa8aa'; rond(c, -r * 0.32, r * 0.16, r * 0.08); c.fill(); rond(c, r * 0.32, r * 0.16, r * 0.08); c.fill();
+    c.restore();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const t = 0;
+    // Ciel de nébuleuse, sur toute la largeur.
+    const fondG = c.createLinearGradient(0, 0, 0, h);
+    fondG.addColorStop(0, '#5a2386'); fondG.addColorStop(0.45, '#3a1f78'); fondG.addColorStop(1, '#170c3a');
+    c.fillStyle = fondG; c.fillRect(0, 0, w, h);
+    const hz = graineHasard(2026);
+    const teintes = ['#ff7ae0', '#ffb35c', '#5fe0ef', '#b06bff'];
+    for (let i = 0; i < 9; i++) {
+      const x = hz() * w, y = hz() * h, r = (0.25 + hz() * 0.3) * Math.max(w, h);
+      const g = c.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, teintes[i % 4] + '55'); g.addColorStop(1, teintes[i % 4] + '00');
+      c.fillStyle = g; c.fillRect(0, 0, w, h);
+    }
+    ETOILES.forEach((s, i) => { c.globalAlpha = 0.5 + 0.5 * s[3]; c.fillStyle = '#fff'; c.fillRect(s[0] * w, s[1] * h, s[2] * 1.4, s[2] * 1.4); });
+    c.globalAlpha = 1;
+
+    // Scène 600 × 800 centrée, agrandie pour remplir la hauteur (ou la largeur).
+    const k = Math.min(w / 600, h / 800);
+    const ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+
+    // L'étoile, grande source de lumière, au centre de la ceinture.
+    const sx = X(250), sy = Y(205);
+    const lum = c.createRadialGradient(sx, sy, 0, sx, sy, 520 * k);
+    lum.addColorStop(0, '#fff4c8cc'); lum.addColorStop(0.35, '#ffb86b55'); lum.addColorStop(1, '#ff7ae000');
+    c.fillStyle = lum; c.fillRect(0, 0, w, h);
+
+    // Ceinture en perspective : arrière, étoile, avant.
+    const rx = 360 * k, ry = 118 * k, inc = -0.12;
+    const surAnneau = (a) => {
+      const x0 = Math.cos(a) * rx, y0 = Math.sin(a) * ry;
+      return [sx + x0 * Math.cos(inc) - y0 * Math.sin(inc), sy + x0 * Math.sin(inc) + y0 * Math.cos(inc)];
+    };
+    c.save(); c.translate(sx, sy); c.rotate(inc);
+    c.strokeStyle = '#ffffff2e'; c.lineWidth = 22 * k; c.beginPath(); c.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = '#ffe9b055'; c.lineWidth = 3 * k; c.beginPath(); c.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); c.stroke();
+    c.restore();
+    const objets = [];
+    for (let i = 0; i < 26; i++) objets.push({ a: i / 26 * Math.PI * 2 + 0.1, i: i });
+    const rivaux = { 17: 2, 19: 3, 21: 1 };
+    const peindre = (o) => {
+      const p = surAnneau(o.a), z = 0.65 + 0.55 * (Math.sin(o.a) + 1) / 2;
+      if (rivaux[o.i]) cargo(c, p[0], p[1] - 6 * k, 2.4 * z * k, o.a + Math.PI / 2, rivaux[o.i], rivaux[o.i] === 2 ? 1 : 0, 1);
+      else if (o.i % 6 === 2) asteroide(c, p[0], p[1], 15 * z * k, 5, o.i, true, t);
+      else asteroide(c, p[0], p[1], (10 + (o.i * 5) % 7) * z * k, 1 + o.i % 3, o.i, false, t);
+    };
+    objets.filter((o) => Math.sin(o.a) < 0).forEach(peindre);
+    soleil(c, sx, sy, 62 * k, '#ffd36b', t);
+    // rayons de l'étoile
+    c.save(); c.translate(sx, sy); c.globalAlpha = 0.25; c.fillStyle = '#fff3c0';
+    for (let i = 0; i < 12; i++) { c.rotate(Math.PI / 6); c.beginPath(); c.moveTo(-8 * k, 0); c.lineTo(0, -200 * k); c.lineTo(8 * k, 0); c.closePath(); c.fill(); }
+    c.restore(); c.globalAlpha = 1;
+    objets.filter((o) => Math.sin(o.a) >= 0).forEach(peindre);
+
+    // Trou noir (doubleur) en haut à droite, pirate robot qui guette.
+    trouNoir(c, X(505), Y(140), 42 * k, 'd', 300);
+    c.save(); c.shadowColor = '#ff4d5e'; c.shadowBlur = 18 * k;
+    pirate(c, X(520), Y(470), 38 * k, 0);
+    c.restore();
+
+    // L'astéroïde doré visé, ses cristaux aspirés par le rayon du cargo.
+    const ax = X(440), ay = Y(300), ar = 66 * k;
+    const halo = c.createRadialGradient(ax, ay, 0, ax, ay, ar * 2.2);
+    halo.addColorStop(0, '#ffe36b88'); halo.addColorStop(1, '#ffe36b00');
+    c.fillStyle = halo; rond(c, ax, ay, ar * 2.2); c.fill();
+    asteroide(c, ax, ay, ar, 5, 7, true, 0);
+
+    // Le grand cargo orange (le héros) : vers le haut et la droite, flamme en arrière.
+    const hx = X(235), hy = Y(485), angle = -0.72, z = 13.5 * k;
+    const nez = [hx + Math.cos(angle) * 13 * z, hy + Math.sin(angle) * 13 * z];
+    // rayon tracteur turquoise, du nez à l'astéroïde
+    const ray = c.createLinearGradient(nez[0], nez[1], ax, ay);
+    ray.addColorStop(0, '#9cf6ffdd'); ray.addColorStop(1, '#5fe0ef44');
+    const perp = [-(ay - nez[1]), ax - nez[0]], lp = Math.hypot(perp[0], perp[1]) || 1;
+    const pn = [perp[0] / lp, perp[1] / lp];
+    c.fillStyle = ray;
+    c.beginPath();
+    c.moveTo(nez[0] + pn[0] * 10 * k, nez[1] + pn[1] * 10 * k);
+    c.lineTo(ax + pn[0] * ar * 0.9, ay + pn[1] * ar * 0.9);
+    c.lineTo(ax - pn[0] * ar * 0.9, ay - pn[1] * ar * 0.9);
+    c.lineTo(nez[0] - pn[0] * 10 * k, nez[1] - pn[1] * 10 * k);
+    c.closePath(); c.fill();
+    // cristaux qui volent vers le cargo
+    for (let i = 0; i < 7; i++) {
+      const p = 0.15 + i * 0.11, ec = Math.sin(i * 2.3) * 18 * k;
+      const x = ax + (nez[0] - ax) * p + pn[0] * ec, y = ay + (nez[1] - ay) * p + pn[1] * ec;
+      c.save(); c.shadowColor = i % 3 ? '#9cf6ff' : '#ffe36b'; c.shadowBlur = 14 * k;
+      cristal(c, x, y, (15 - i) * k, i % 3 ? '#5fe0ef' : '#ffe36b');
+      c.restore();
+    }
+    // contour clair sur le héros
+    c.save(); c.shadowColor = '#fff3c0'; c.shadowBlur = 26 * k;
+    cargo(c, hx, hy, z, angle, 0, 0, 1);
+    c.restore();
+    cargo(c, hx, hy, z, angle, 0, 0, 0);
+    // conteneurs de cristaux sur la coque, puis le pilote à la vitre
+    c.save(); c.translate(hx, hy); c.rotate(angle); c.scale(z, z);
+    [[-6.5, -3.6], [-6.5, 0.9], [-2.4, -3.6], [-2.4, 0.9]].forEach(([u, v], i) => {
+      c.fillStyle = i % 2 ? '#5fe0ef' : '#ffe36b'; rr(c, u, v, 3.2, 2.7, 0.6); c.fill();
+      c.lineWidth = 0.25; c.strokeStyle = '#a8480c'; c.stroke();
+    });
+    c.fillStyle = '#ffffff66'; c.beginPath(); c.ellipse(5, -4.4, 4, 1, -0.15, 0, Math.PI * 2); c.fill();
+    pilote(c, 5.2, 0, 4.4, -angle);
+    c.restore();
+
+    // Premier plan : gros astéroïdes coupés par les bords, poussière d'étoiles.
+    asteroide(c, X(560), Y(790), 150 * k, 3, 3, false, 0);
+    asteroide(c, X(20), Y(35), 85 * k, 2, 11, false, 0);
+    asteroide(c, X(-10), Y(640), 60 * k, 1, 5, false, 0);
+    c.fillStyle = '#ffffff';
+    for (let i = 0; i < 18; i++) { const r2 = 1.5 + hz() * 3; c.globalAlpha = 0.6 + hz() * 0.4; etoile5(c, X(hz() * 600), Y(hz() * 600), r2 * k * 1.6, '#fff8d8'); }
+    c.globalAlpha = 1;
+  }
+
+  function demarrerAffiche() {
+    ecran = 'affiche';
+    const cacher = () => {
+      for (const el of document.querySelectorAll('.ecran, .voile, #toast, #confettis, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+    };
+    cacher();
+    setTimeout(cacher, 300); setTimeout(cacher, 1000);
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu)
+  // ---------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine partie solo, avec sa vraie interface (places et cristaux,
+  // secteur et tour, cartes, opérations, calcul en direct, trajet prévu sur l'anneau), sans écran
+  // titre, ni fenêtre « Continuer », ni démonstration. C'est mon tour, deux cartes sont choisies et
+  // visent un astéroïde ; un robot vient de miner. La partie n'avance pas (aucun robot ne joue),
+  // puis l'image est figée : ni victoire, ni défaite, ni son, ni sauvegarde, ni réseau.
+  //   1 = secteur 1 : additions, premiers astéroïdes ;
+  //   2 = secteur 10 : multiplication, astéroïde doré, trous noirs doubleur et diviseur ;
+  //   3 = secteur 20 (ordinateur) : pirates, balise d'un robot, tempête qui cache une carte,
+  //       astéroïdes qui tournent, trous noirs, le trajet passe par un trou noir.
+  const SCENES_APERCU = {
+    1: { niveau: 1, graine: 11, rd: 2, sc: [3, 2, 1, 2], op: '+', mineur: 2 },
+    2: { niveau: 10, graine: 23, rd: 3, sc: [8, 9, 5, 6], op: 'x', trou: true, mineur: 1 },
+    3: { niveau: 20, graine: 37, rd: 5, sc: [19, 17, 21, 12], op: 'x', trou: true, cachee: true, balise: 2, mineur: 2 }
+  };
+
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    const alea = graineHasard(900001 + sc.graine * 7919);
+    Math.random = alea;
+    session = 'solo';
+    niveau = sc.niveau;
+    enPartie = false;        // rien n'est écrit à la fermeture
+    const e = R.depart(alea, PLACES, { niveau: niveau });
+    e.tour = 0; e.prem = 1; e.rd = sc.rd; e.sc = sc.sc.slice();
+    for (let s = 1; s < PLACES; s++) e.pos[s] = O.mod(e.pos[s] + 1 + Math.floor(alea() * 4), e.N);
+    // Balise d'un robot sur un astéroïde (secteurs avancés).
+    if (sc.balise) {
+      const i = e.as.findIndex((a) => !a.t && a.v < 5 && O.mod(a.c - e.pos[0], e.N) > e.cmax);
+      if (i >= 0) { e.as[i].b = sc.balise; e.as[i].bt = e.rd + 2; }
+      e.bal[0] = 1;
+    }
+    // Le meilleur coup possible : deux cartes qui mènent pile sur un astéroïde.
+    let meilleur = null;
+    for (let x = e.cmin; x <= e.cmax; x++) {
+      for (let y = e.cmin; y <= e.cmax; y++) {
+        const r = O.resultat(sc.op, x, y);
+        if (r <= 0) continue;
+        const tj = O.trajet(e, e.pos[0], r), ia = O.astSur(e, tj.fin);
+        if (!O.minable(e, 0, ia)) continue;
+        let note = e.as[ia].v * 10 + (sc.trou && tj.trou >= 0 ? 60 : 0) + (x !== y ? 3 : 0) + (x > 1 && y > 1 ? 4 : 0) - (O.pirateProche(e, tj.fin) ? 8 : 0);
+        if (!meilleur || note > meilleur.note) meilleur = { note: note, x: x, y: y };
+      }
+    }
+    if (!meilleur) meilleur = { x: e.cmin, y: e.cmin + 1 };
+    let autre = e.cmin + Math.floor(alea() * (e.cmax - e.cmin + 1));
+    if (autre === meilleur.x || autre === meilleur.y) autre = autre < e.cmax ? autre + 1 : e.cmin;
+    e.m[0] = [meilleur.x, autre, meilleur.y];
+    e.h[0] = sc.cachee ? 1 : -1;
+    e.der = null;
+    vue = e;
+    // Partie posée à la main : c'est mon tour, les robots attendent (aucun réseau, aucune minuterie).
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 1, chef: -1, etat: e,
+      monTour: () => true, estChef: () => false, jouer: () => false, pause: () => {}, quitter: () => {},
+      recommencer: () => false, lancerManche: () => false,
+      sieges: () => [{ moi: true, humain: true }, { humain: false }, { humain: false }, { humain: false }]
+    };
+    anim = null; particules = []; flottants = []; mainCle = ''; choix = []; modeBalise = false; op = sc.op;
+    afficherEcran('jeu');
+    majInterface();
+    choix = [0, 2];
+    majInterface();
+    // Un robot vient de miner : éclat de cristaux et « +n » près de son cargo, puis tout est figé.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      dessinerJeu(performance.now(), 0);
+      if (geo && vue) {
+        const s = sc.mineur, p = posCargo(geo, vue, s, angleCase(vue, vue.pos[s]));
+        eclater(p[0], p[1], '#5fe0ef', 18, true);
+        flottants.push({ x: p[0], y: p[1] - geo.ar * 1.2, texte: '+' + nb(numero === 1 ? 1 : 2), coul: '#9cf6ff', vie: 1.3, taille: 22 });
+        for (let i = 0; i < 10; i++) dessinerJeu(performance.now(), 0.03);
+      }
+      apercuFige = true;
+    }));
+  }
 
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
-  try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else {
+    try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>

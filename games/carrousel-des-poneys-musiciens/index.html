@@ -3522,12 +3522,141 @@ window.JEL_SAVE.surFermeture(() => {
   if (enPartie) window.JEL_SAVE.save(JEU, donneesSauvegarde(etatJeu.niveau + 1, etatJeu.score));
 });
 
+// --------------------------------------------------------------------------
+// Affiche du jeu (jaquette) : avec window.JEL_AFFICHE (posé par le robot du
+// site, jamais par le jeu), une scène composée plein écran, sans écran titre,
+// ni bouton, ni texte, ni son, ni boucle de jeu (CONSIGNES-JEU.md, section 5).
+// Le poney de bois du premier rang lève la tête et chante sous la lanterne
+// dorée ; ses notes s'envolent, le manège brille derrière lui.
+// --------------------------------------------------------------------------
+function cacherInterfaceAffiche() {
+  for (const el of document.querySelectorAll('.ecran, .rond, #hud, #banniere, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+}
+function dessinerAffiche() {
+  redimensionner();
+  const U = Math.min(W / 600, H / 800);
+  const cx = W / 2;
+  // Fond : fête du village, ciel doré
+  geo.rx = 300 * U; geo.ry = 90 * U; geo.S = 270 * U; geo.cx = cx;
+  geo.cy = H * 0.5 + 140 * U; geo.toitY = geo.cy - 368 * U;
+  peindreFond(ctx, 0);
+  let g = ctx.createLinearGradient(0, 0, 0, H * 0.6);
+  g.addColorStop(0, 'rgba(255,120,180,.30)'); g.addColorStop(0.7, 'rgba(255,210,130,.18)'); g.addColorStop(1, 'rgba(255,230,160,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H * 0.6);
+  // Gerbes d'étincelles dans le ciel (sans chiffre ni lettre)
+  [[0.1, 0.09, '#ff5fa2'], [0.9, 0.12, '#3db7ff'], [0.07, 0.36, '#ffb703'], [0.93, 0.38, '#9b6fe0']].forEach(([px, py, col], n) => {
+    const x = W * px, y = H * py, r = 44 * U;
+    ctx.strokeStyle = col; ctx.lineWidth = 4 * U; ctx.lineCap = 'round';
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2 + n; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r * 0.35, y + Math.sin(a) * r * 0.35); ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); ctx.stroke(); }
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 5 * U, 0, Math.PI * 2); ctx.fill();
+  });
+  // Le manège, tout proche : le poney de devant est le héros
+  preparerManege(6);
+  manege.P = 0.1; manege.v = 0; manege.face = 1;
+  manege.tete[5] = 0.4; manege.chant[5] = 0.5;
+  const deco = progres.deco;
+  progres.deco = { selle: 'etoiles', pompon: 'arcenciel', robe: 'creme' };
+  dessinerManege(0.5, 0, []);
+  progres.deco = deco;
+  const hero = placePoney(0), yHero = hauteurPoney(0, 0.5, hero);
+  const xL = hero.x + geo.S * 0.55, yL = geo.toitY + geo.ry * 0.5 + 62 * U;
+  // Lumière dorée de la lanterne
+  g = ctx.createRadialGradient(xL, yL, 8 * U, xL, yL, 300 * U);
+  g.addColorStop(0, 'rgba(255,240,170,.8)'); g.addColorStop(0.3, 'rgba(255,214,100,.22)'); g.addColorStop(1, 'rgba(255,214,100,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // Le héros redessiné par-dessus, lumineux, tête levée vers la lanterne
+  dessinerPoney(ctx, hero.x, yHero, geo.S, 1, { robe: 'creme', selle: 'etoiles', pompon: 'rose', index: 0, selleCouleur: '#e8414b', tete: 0.75, chant: 1, lumiere: '#ffc93c' });
+  // La lanterne et sa corde
+  ctx.strokeStyle = '#8a5a12'; ctx.lineWidth = 3 * U;
+  ctx.beginPath(); ctx.moveTo(xL, geo.toitY); ctx.lineTo(xL, yL - 36 * U); ctx.stroke();
+  dessinerLanterne(ctx, xL, yL, 32 * U, '#ffc93c', 1);
+  // Les notes qui s'envolent du poney qui chante
+  const bx = hero.x + geo.S * 0.62, by = yHero - geo.S * 0.36;
+  [['C', 0, 0, 26], ['E', 0.22, -0.12, 24], ['G', 0.42, 0.02, 22], ['A', 0.3, -0.36, 20], ['B', 0.55, -0.24, 18]].forEach(([n, dx, dy, r]) => dessinerBulle(ctx, bx + dx * geo.S, by + dy * geo.S, r * U, COULEUR_NOTE[n], 1));
+  // Étincelles
+  [[0.6, 0.42, '#ffd23f', 16], [0.28, 0.4, '#ffffff', 12], [0.86, 0.5, '#ff9ec7', 12], [0.12, 0.6, '#ffd23f', 14], [0.42, 0.33, '#ffffff', 10], [0.95, 0.66, '#ffffff', 10]].forEach(([px, py, col, r]) => {
+    etoileChemin(ctx, W * px, H * py, r * U, r * 0.38 * U, 4); ctx.fillStyle = col; ctx.fill();
+  });
+  // Croches de premier plan, coupées par les bords
+  dessinerCroche(ctx, W * 0.03, H * 0.7, 70 * U, 'rgba(240,122,176,.9)');
+  dessinerCroche(ctx, W * 0.99, H * 0.74, 62 * U, 'rgba(91,141,239,.9)');
+  preparerManege(6);
+}
+function demarrerAffiche() {
+  cacherInterfaceAffiche();
+  setTimeout(cacherInterfaceAffiche, 200);
+  setTimeout(cacherInterfaceAffiche, 1000);
+  dessinerAffiche();
+  window.addEventListener('resize', () => requestAnimationFrame(dessinerAffiche));
+}
+
+// --------------------------------------------------------------------------
+// Images du jeu (page du jeu) : avec window.JEL_APERCU = 1, 2 ou 3 (posé par
+// le robot du site, jamais par le jeu), le jeu s'ouvre en pleine partie, avec
+// sa vraie interface, sans écran titre, ni « Continuer », ni tutoriel. Un
+// joueur adroit joue tout seul quelques secondes, puis la partie est figée
+// (sans fenêtre de pause) : ni son, ni sauvegarde, ni fin de partie.
+//   1 = tour 1, fête du village ;
+//   2 = tour 9 à la plage : manège qui accélère, poneys à deux notes, clochettes ;
+//   3 = tour 19, fête des lumières : deux lanternes, demi-tour, selles décorées.
+// --------------------------------------------------------------------------
+const SCENES_APERCU = {
+  1: { niveau: 0, note: 5, deco: { selle: 'unie', pompon: 'rouge', robe: 'creme' } },
+  2: { niveau: 8, note: 11, deco: { selle: 'fleurs', pompon: 'bleu', robe: 'pommele' } },
+  3: { niveau: 18, note: 14, deco: { selle: 'etoiles', pompon: 'arcenciel', robe: 'palomino' } }
+};
+function ouvrirApercu(numero) {
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 98765 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  // Aucun son, aucun tutoriel, rien d'enregistré
+  Son.init = () => {}; progres.son = false;
+  NIVEAUX.forEach((nv) => { if (nv.nouveau) progres.tutos[nv.nouveau] = 1; });
+  progres.deco = Object.assign({}, sc.deco);
+  redimensionner();
+  demarrerNiveau(sc.niveau);
+  enPartie = false; // ni sauvegarde à la fermeture, ni pause
+  etatJeu.attente = 0; etatJeu.apres = null;
+  phaseSuivante();
+  // Un joueur adroit joue jusqu'au moment choisi
+  const ph = etatJeu.ph;
+  const cible = ph.evts[Math.min(sc.note, ph.evts.length - 1)].s - 0.3;
+  const pas = 1 / 60;
+  let garde = 0;
+  while (etatJeu.ph === ph && ph.s < cible && garde++ < 6000) {
+    for (const e of ph.evts) {
+      if (e.etat === 0 && ph.s >= e.s - 0.02 && ph.s <= e.s + 0.1) {
+        appui(e.lan.u < 0 ? 'G' : e.lan.u > 0 ? 'D' : 'C', null, null);
+      }
+    }
+    temps += pas;
+    mettreAJour(pas);
+  }
+  // Figée sur ce moment, avec la vraie interface et sans fenêtre de pause
+  // (les effets à moitié effacés sont retirés : figés, ils feraient des fantômes)
+  for (let i = effets.length - 1; i >= 0; i--) if (effets[i].t / effets[i].vie > 0.3) effets.splice(i, 1);
+  etatJeu.banniereT = 0;
+  document.getElementById('banniere').classList.remove('visible');
+  enPause = true;
+  majHud();
+}
+
 // Démarrage
-chargerProgres();
-majBoutonSon();
-majTitre();
-redimensionner();
-requestAnimationFrame((t) => { dernier = t; requestAnimationFrame(boucle); });
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) {
+  demarrerAffiche();
+} else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  majBoutonSon();
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame((t) => { dernier = t; requestAnimationFrame(boucle); });
+} else {
+  chargerProgres();
+  majBoutonSon();
+  majTitre();
+  redimensionner();
+  requestAnimationFrame((t) => { dernier = t; requestAnimationFrame(boucle); });
+}
 </script>
 </body>
 </html>
