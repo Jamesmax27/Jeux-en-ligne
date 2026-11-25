@@ -3,7 +3,8 @@
 Chaîne de production réutilisable : à partir de recettes versionnées, un script filme le vrai gameplay des jeux du dépôt, monte la vidéo, compose la musique et sort un MP4 prêt à publier.
 
 - Format de toutes les vidéos : vertical 9:16, **1080 × 1920, 30 images par seconde, MP4 H.264 + audio AAC**.
-- Rien n'est inventé : le nombre de jeux, les titres et le logo sont lus dans le dépôt (`games/*/game.json`, `gabarits/morceaux/logo.html`).
+- Rien n'est inventé : les titres des jeux, les jaquettes et le logo sont lus dans le dépôt (`games/*/game.json`, `gabarits/morceaux/logo.html`).
+- **Aucun nombre de jeux à l'écran** (total, multijoueurs, nouveautés…) : le catalogue grandit chaque nuit, le chiffre serait faux dès le lendemain (décision du propriétaire). L'abondance se montre, elle ne se chiffre pas ; une recette qui écrit `{nb_jeux}` est refusée.
 - Musique originale, calculée par le script (ou piste déposée dans `marketing/videos/musique/`).
 - Aucun jeu n'est modifié. Les vidéos produites vont dans `marketing/sorties/`, ignoré par git.
 
@@ -72,7 +73,7 @@ Une accroche dure 2 à 3 secondes et doit arrêter le défilement dès la premi�
 
 | Accroche | Angle | Pourquoi |
 | --- | --- | --- |
-| `mur-de-jeux` | la quantité | un mur de vraies jaquettes et le nombre exact de jeux : la promesse se lit en une image |
+| `mur-de-jeux` | la quantité | un mur de vraies jaquettes qui défile : l'abondance se voit en une image, sans chiffre qui se périme |
 | `zero-attente` | l'immédiateté | on casse l'attente d'un téléchargement pour montrer qu'ici un clic suffit |
 | `en-pleine-action` | le gameplay spectaculaire | on entre au milieu d'un vrai jeu, le texte crée la surprise (« ça tourne dans un navigateur ? ») |
 
@@ -81,14 +82,14 @@ Une accroche dure 2 à 3 secondes et doit arrêter le défilement dès la premi�
 Format d'une recette : une liste de `plans`, chacun avec sa `duree` (secondes) et ses `textes`.
 
 - Types de plan : `mur` (jaquettes qui défilent), `attente` (fausse fenêtre de téléchargement, `titre`, `chute` = seconde où elle tombe), `jeu` (gameplay : `jeu`, `debut` en secondes ou `"auto"`), `ciel` (fond étoilé seul).
-- Texte : `texte` (`*mot*` = mot en or, `\n` = retour à la ligne, `{nb_jeux}` et les autres chiffres du dépôt), `style` (`geant`, `choc`, `titre`, `legende`, `etiquette`, `petit` : tailles dans `gabarit.json`), `position` (hauteur du centre en pixels, ou `haut`, `bas`, `pied`), `de` et `jusqu` (secondes dans le plan), `entree` (`pop`, `frappe`, `glisse`, `gauche`, `fondu`, `impact`, `aucune`), `son` (`pop`, `frappe`, `impact`, `refus`, `cloche`), `rotation`.
+- Texte : `texte` (`*mot*` = mot en or, `\n` = retour à la ligne, `{site}` = adresse du site), `style` (`geant`, `choc`, `titre`, `legende`, `etiquette`, `petit` : tailles dans `gabarit.json`), `position` (hauteur du centre en pixels, ou `haut`, `bas`, `pied`), `de` et `jusqu` (secondes dans le plan), `entree` (`pop`, `frappe`, `glisse`, `gauche`, `fondu`, `impact`, `aucune`), `son` (`pop`, `frappe`, `impact`, `refus`, `cloche`), `rotation`.
 
 ## 4. Les vidéos de présentation
 
 Structure : accroche → montage de gameplay → écran de fin (logo, `freemicrogames.com`, appel à l'action). Durée : 20 à 35 secondes.
 
 - **Recettes** : `marketing/videos/presentations/<id>.json` = `{ "accroche", "jeux", "textes", "rythme" }`, les mêmes réglages que la commande.
-- **Textes** (`marketing/videos/textes/<variante>.json`) : `legendes` (texte du haut de chaque plan, dans l'ordre), `etiquettes` (pastille du bas ; par défaut le titre du jeu), `en_boucle`, `rafale` (texte posé sur les plans très courts), `fin` (`appel`, `detail`). Variables : `{nb_jeux}`, `{nb_genres}`, `{nb_multi}`, `{titre}`, `{rang}`, `{site}`.
+- **Textes** (`marketing/videos/textes/<variante>.json`) : `legendes` (texte du haut de chaque plan, dans l'ordre), `etiquettes` (pastille du bas ; par défaut le titre du jeu), `en_boucle`, `rafale` (texte posé sur les plans très courts), `fin` (`appel`, `detail`). Variables : `{titre}` (titre du jeu montré), `{rang}` (numéro du plan), `{site}`.
 - **Rythmes** (`gabarit.json`) : tempo de la musique, durée de chaque plan en temps (les coupes tombent sur les temps), transition (`coupe`, `zoom`, `glisse`), ambiance de la musique (`arcade`, `planant`, `tension`).
 - **Gabarit graphique** (`marketing/videos/gabarit.json`) : couleurs et polices du site (ciel indigo, lilas, or, Fredoka et Nunito), styles de texte, zone sûre, seuils de lisibilité. Les textes restent dans la zone sûre : TikTok, Reels et Shorts recouvrent le haut, le bas et, dans la moitié basse, une colonne de boutons à droite.
 

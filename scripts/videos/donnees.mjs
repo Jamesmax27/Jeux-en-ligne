@@ -1,7 +1,8 @@
 // ==========================================================================
 // donnees.mjs — ce que les vidéos affirment vient du dépôt, rien n'est inventé
 //
-//   - jeux et chiffres : games/*/game.json (nombre de jeux, genres, titres) ;
+//   - jeux : games/*/game.json (titres, genres, âges, jaquettes) ; jamais de
+//     nombre de jeux à l'écran, il change avec le temps ;
 //   - emblème et mot-symbole : gabarits/morceaux/logo.html (le logo du site) ;
 //   - choix des jeux : votes (/api/scores) et jeux les plus joués
 //     (/api/tendances) du site, gardés dans marketing/videos/popularite.json
@@ -47,35 +48,28 @@ export async function lireJeu(id) {
 }
 
 /** Libellés français des genres (public/taxonomie.js, fichier de référence du site). */
-async function lireGenres() {
+export async function lireGenres() {
   const { GENRES, ID_AUTRE } = await import(pathToFileURL(path.join(RACINE, 'public', 'taxonomie.js')).href);
   const textes = await lireJson(path.join(RACINE, 'public', 'i18n', 'site', 'fr.json'));
   // « autre » est une valeur de repli, jamais affichée sur le site : pas un genre.
   return GENRES.filter((g) => g.id !== ID_AUTRE).map((g) => ({ id: g.id, libelle: textes[`genre.${g.id}`] || g.libelle || g.id }));
 }
 
-/** Chiffres utilisables dans les textes des recettes, sous la forme {nom}. */
+/**
+ * Variables utilisables dans les textes des recettes, sous la forme {nom}.
+ * Aucun nombre de jeux (total, multijoueurs, nouveautés…) : le catalogue grandit
+ * chaque nuit, une vidéo qui l'affiche serait fausse dès le lendemain (décision
+ * du propriétaire, 25 novembre 2026). L'abondance se montre (mur de jaquettes),
+ * elle ne se chiffre pas.
+ */
 export async function chiffres() {
-  const jeux = await lireJeux();
-  const genres = await lireGenres();
-  const parGenre = new Map();
-  for (const j of jeux) parGenre.set(j.genre, (parGenre.get(j.genre) || 0) + 1);
-  const derniere = jeux.map((j) => j.ajout).sort().pop() || '';
-  const ilYA30Jours = derniere ? new Date(Date.parse(derniere) - 30 * 86400000).toISOString().slice(0, 10) : '';
-  return {
-    nb_jeux: jeux.length,
-    nb_jeux_rond: Math.floor(jeux.length / 10) * 10,                    // « plus de 220 jeux » reste vrai quand le catalogue grandit
-    nb_genres: genres.filter((g) => parGenre.get(g.id)).length,
-    nb_multi: jeux.filter((j) => j.multijoueur).length,
-    nb_ados: jeux.filter((j) => j.ageMin >= 13).length,
-    nb_nouveaux_30j: jeux.filter((j) => j.ajout > ilYA30Jours).length,   // jeux ajoutés dans les 30 jours avant le dernier ajout
-    site: SITE.replace('https://', ''),
-  };
+  return { site: SITE.replace('https://', '') };
 }
 
-/** Remplace {nb_jeux}, {titre}… dans un texte de recette ; une variable inconnue est une erreur. */
+/** Remplace {titre}, {site}… dans un texte de recette ; une variable inconnue est une erreur. */
 export function remplir(texte, variables, ou = '') {
   return String(texte).replace(/\{([a-z0-9_]+)\}/g, (_, nom) => {
+    if (nom.startsWith('nb_')) throw new ErreurVideo(`${ou} : {${nom}} n'existe pas : une vidéo n'affiche jamais de nombre de jeux, il change avec le temps (marketing/LISEZ-MOI.md)`);
     if (!(nom in variables)) throw new ErreurVideo(`${ou} : variable inconnue {${nom}} (connues : ${Object.keys(variables).join(', ')})`);
     return String(variables[nom]);
   });
