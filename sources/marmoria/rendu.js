@@ -142,6 +142,31 @@
     if (b.type === 'entrepot') return SIM.emplacements(b).filter(Boolean).length / R.entrepot.emplacements;
     return null;
   }
+  // Teinte lente de l'herbe (0 à 3) : de grandes nappes plus claires ou plus sombres, sans damier.
+  function teinteHerbe(x, y) {
+    var v = Math.sin(x * 0.23) + Math.sin(y * 0.29) + Math.sin((x + y) * 0.13) + Math.sin((x - y) * 0.17);
+    return v < -1.2 ? 0 : v < 0 ? 1 : v < 1.2 ? 2 : 3;
+  }
+  // Ombre portée d'un bâtiment, vers le bas à droite de l'écran (soleil du nord-ouest) : enveloppe
+  // de son emprise et de l'emprise décalée.
+  function enveloppe(pts) {
+    pts.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var croix = function (o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); };
+    var bas = [], haut = [], k;
+    for (k = 0; k < pts.length; k++) { while (bas.length >= 2 && croix(bas[bas.length - 2], bas[bas.length - 1], pts[k]) <= 0) bas.pop(); bas.push(pts[k]); }
+    for (k = pts.length - 1; k >= 0; k--) { while (haut.length >= 2 && croix(haut[haut.length - 2], haut[haut.length - 1], pts[k]) <= 0) haut.pop(); haut.push(pts[k]); }
+    return bas.slice(0, -1).concat(haut.slice(0, -1));
+  }
+  var SANS_OMBRE = { route: 1, barriere: 1, place: 1, jardin: 1, aqueduc: 1, ruines: 1, incendie: 1, deco: 0 };
+  Rendu.prototype.ombre = function (b, longueur) {
+    var self = this, z = this.cam.z, coins = [[b.x, b.y], [b.x + b.t, b.y], [b.x + b.t, b.y + b.t], [b.x, b.y + b.t]];
+    var pts = [], dx = 30 * longueur * z, dy = 14 * longueur * z;
+    coins.forEach(function (c) { var m = self.monde(c[0], c[1]), p = self.ecran(m[0], m[1]); pts.push([p[0], p[1]]); pts.push([p[0] + dx, p[1] + dy]); });
+    var h = enveloppe(pts), ctx = this.ctx;
+    ctx.fillStyle = 'rgba(40,32,16,0.16)';
+    ctx.beginPath(); ctx.moveTo(h[0][0], h[0][1]); for (var k = 1; k < h.length; k++) ctx.lineTo(h[k][0], h[k][1]); ctx.closePath(); ctx.fill();
+  };
+
   // Valeur d'une maison pour un calque de service (0 à 100), ou null (section 17.3).
   function valeurMaison(e, h, calque) {
     if (h.type !== 'logement' || h.hab <= 0) return null;
@@ -234,8 +259,17 @@
       var t = e.terrain[i], s;
       if (t === T.EAU) s = DS.eau((frameEau + x + y) & 3, zc);
       else if (t === T.PRAIRIE) s = DS.prairie(e.fertilite[i] < 50 ? 0 : e.fertilite[i] < 80 ? 1 : 2, zc);
-      else s = DS.herbe((x * 31 + y * 17) & 3, zc);
+      else s = DS.herbe(teinteHerbe(x, y) * 4 + ((x * 31 + y * 17) & 3), zc);
       this.poser(s, p[0], p[1]);
+      if (t === T.EAU && DS.rivage) {
+        // Rive : sable et écume du côté de la terre (dans le sens de l'affichage).
+        var mr = 0, q2;
+        q2 = this.detourner(rx, ry - 1); if (ry > 0 && e.terrain[q2[1] * N + q2[0]] !== T.EAU) mr |= 1;
+        q2 = this.detourner(rx + 1, ry); if (rx < N - 1 && e.terrain[q2[1] * N + q2[0]] !== T.EAU) mr |= 2;
+        q2 = this.detourner(rx, ry + 1); if (ry < N - 1 && e.terrain[q2[1] * N + q2[0]] !== T.EAU) mr |= 4;
+        q2 = this.detourner(rx - 1, ry); if (rx > 0 && e.terrain[q2[1] * N + q2[0]] !== T.EAU) mr |= 8;
+        if (mr) this.poser(DS.rivage(mr, frameEau, zc), p[0], p[1]);
+      }
       if (e.route[i]) {
         var m = 0, v;
         v = this.detourner(rx, ry - 1); if (ry > 0 && e.route[v[1] * N + v[0]]) m |= 1;
@@ -406,6 +440,8 @@
       return;
     }
     var v2 = (b.x * 7 + b.y * 13) % 3;
+    var gb = d.genre;
+    if (!SANS_OMBRE[gb] && !SANS_OMBRE[b.type] && !(b.type === 'logement' && !(b.hab > 0))) this.ombre(b, Math.min(1.1, 0.3 + b.t * 0.18 + (b.type === 'logement' ? b.niv * 0.02 : 0.15)));
     switch (b.type) {
       case 'logement': s = DS.maison(b.hab > 0 ? b.niv : 0, v2, b.t, zc); break;
       case 'incendie': s = DS.incendie(b.t, frame, zc); break;

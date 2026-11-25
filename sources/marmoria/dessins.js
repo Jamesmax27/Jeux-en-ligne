@@ -65,27 +65,47 @@
     if (trait) { ctx.strokeStyle = trait; ctx.lineWidth = 1; ctx.stroke(); }
   }
   function sol(ctx, P, u0, v0, u1, v1, fond, trait) { poly(ctx, [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)], fond, trait); }
-  // Boîte (murs) : face gauche (vers +v) claire, face droite (vers +u) sombre, dessus.
+  // Boîte (murs) : face gauche (vers +v) claire, face droite (vers +u) sombre, dessus ; liseré
+  // d'ombre au pied des murs et arête éclairée en haut (passe graphique du 25 novembre 2026).
   function boite(ctx, P, u0, v0, u1, v1, h0, h1, c, dessus) {
     poly(ctx, [P(u0, v1, h0), P(u1, v1, h0), P(u1, v1, h1), P(u0, v1, h1)], teinte(c, 0.92));
     poly(ctx, [P(u1, v0, h0), P(u1, v1, h0), P(u1, v1, h1), P(u1, v0, h1)], teinte(c, 0.7));
+    if (h1 - h0 >= 6) {
+      var e = Math.min(2.5, (h1 - h0) * 0.12);
+      poly(ctx, [P(u0, v1, h0), P(u1, v1, h0), P(u1, v1, h0 + e), P(u0, v1, h0 + e)], 'rgba(30,20,10,0.16)');
+      poly(ctx, [P(u1, v0, h0), P(u1, v1, h0), P(u1, v1, h0 + e), P(u1, v0, h0 + e)], 'rgba(30,20,10,0.2)');
+    }
     if (dessus !== false) poly(ctx, [P(u0, v0, h1), P(u1, v0, h1), P(u1, v1, h1), P(u0, v1, h1)], dessus || teinte(c, 1.08));
+    if (h1 - h0 >= 6) { ligne(ctx, P(u0, v1, h1), P(u1, v1, h1), 'rgba(255,250,235,0.35)', 0.8); ligne(ctx, P(u1, v1, h1), P(u1, v0, h1), 'rgba(255,250,235,0.18)', 0.8); }
   }
-  // Toit à deux pentes, faîtage parallèle à u (axe 'u') ou à v.
+  // Toit à deux pentes, faîtage parallèle à u (axe 'u') ou à v ; rangs de tuiles et faîtière.
   function toit(ctx, P, u0, v0, u1, v1, h, hf, c, axe) {
-    var d = 0.08;
+    var d = 0.08, k, f;
     u0 -= d; v0 -= d; u1 += d; v1 += d;
+    var rang = teinte(c, 0.62);
     if (axe === 'v') {
       var um = (u0 + u1) / 2;
       poly(ctx, [P(u0, v0, h), P(um, v0, h + hf), P(um, v1, h + hf), P(u0, v1, h)], teinte(c, 1.05));
       poly(ctx, [P(um, v0, h + hf), P(u1, v0, h), P(u1, v1, h), P(um, v1, h + hf)], teinte(c, 0.72));
+      for (k = 1; k < 4; k++) {
+        f = k / 4;
+        ligne(ctx, P(u0 + (um - u0) * f, v0, h + hf * f), P(u0 + (um - u0) * f, v1, h + hf * f), 'rgba(80,30,20,0.22)', 0.7);
+        ligne(ctx, P(u1 - (u1 - um) * f, v0, h + hf * f), P(u1 - (u1 - um) * f, v1, h + hf * f), 'rgba(40,15,10,0.22)', 0.7);
+      }
       poly(ctx, [P(u0, v1, h), P(u1, v1, h), P(um, v1, h + hf)], teinte(c, 0.85));
+      ligne(ctx, P(um, v0, h + hf), P(um, v1, h + hf), teinte(c, 1.2), 1.2);
     } else {
       var vm = (v0 + v1) / 2;
       poly(ctx, [P(u0, v0, h), P(u1, v0, h), P(u1, vm, h + hf), P(u0, vm, h + hf)], teinte(c, 0.8));
       poly(ctx, [P(u0, vm, h + hf), P(u1, vm, h + hf), P(u1, v1, h), P(u0, v1, h)], teinte(c, 1.02));
+      for (k = 1; k < 4; k++) {
+        f = k / 4;
+        ligne(ctx, P(u0, vm + (v1 - vm) * f, h + hf * (1 - f)), P(u1, vm + (v1 - vm) * f, h + hf * (1 - f)), 'rgba(80,30,20,0.22)', 0.7);
+      }
       poly(ctx, [P(u1, v0, h), P(u1, v1, h), P(u1, vm, h + hf)], teinte(c, 0.66));
+      ligne(ctx, P(u0, vm, h + hf), P(u1, vm, h + hf), teinte(c, 1.2), 1.2);
     }
+    void rang;
   }
   function cercle(ctx, x, y, r, fond, trait) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -348,43 +368,86 @@
 
   // --- Sol -----------------------------------------------------------------
   function peindreHerbe(ctx, P, v) {
-    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, C.herbe[v & 3]); // léger débord : pas de liseré entre cases au zoom progressif
-    for (var k = 0; k < 6; k++) {
-      var a = hachage(v, k), b = hachage(k, v + 7);
-      var p = P(0.15 + a * 0.7, 0.15 + b * 0.7);
-      ctx.fillStyle = teinte(C.herbe[v & 3], k % 2 ? 0.86 : 1.12);
-      ctx.fillRect(p[0], p[1], 2, 1);
+    var base = C.herbe[(v >> 2) & 3];
+    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, base); // léger débord : pas de liseré entre cases au zoom progressif
+    // Ombre douce vers le bas de la case, taches de couleur, brins d'herbe, quelques fleurs.
+    var a0 = P(0, 0), a1 = P(1, 1), g = ctx.createLinearGradient(a0[0], a0[1], a1[0], a1[1]);
+    g.addColorStop(0, 'rgba(255,255,220,0.05)'); g.addColorStop(1, 'rgba(20,40,10,0.07)');
+    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, g);
+    for (var k = 0; k < 3; k++) {
+      var c = P(0.2 + hachage(v, k + 20) * 0.6, 0.2 + hachage(k + 21, v) * 0.6);
+      ellipse(ctx, c[0], c[1], 5 + hachage(v, k) * 5, 2 + hachage(k, v) * 2, k % 2 ? 'rgba(40,70,20,0.08)' : 'rgba(230,240,160,0.08)');
     }
+    for (k = 0; k < 12; k++) {
+      var p = P(0.08 + hachage(v, k) * 0.84, 0.08 + hachage(k, v + 7) * 0.84), h = 1.6 + hachage(k + 3, v) * 1.8;
+      ctx.strokeStyle = k % 3 ? teinte(base, 0.78) : teinte(base, 1.18); ctx.lineWidth = 0.9;
+      ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[0] - 0.6, p[1] - h); ctx.moveTo(p[0] + 0.8, p[1]); ctx.lineTo(p[0] + 1.4, p[1] - h * 0.8); ctx.stroke();
+    }
+    if ((v & 7) === 5) { var f = P(0.35 + hachage(v, 40) * 0.3, 0.35 + hachage(41, v) * 0.3); cercle(ctx, f[0], f[1] - 1, 1.1, '#f4ecd0'); cercle(ctx, f[0] + 3, f[1], 1, '#f2d24a'); }
+    if ((v & 7) === 2) { var s = P(0.6, 0.4); ellipse(ctx, s[0], s[1], 1.6, 1, '#a8a090'); }
   }
   function peindrePrairie(ctx, P, f) {
-    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, teinte(C.prairie, 0.9 + f * 0.06));
-    ctx.strokeStyle = teinte(C.prairie, 0.78 + f * 0.05); ctx.lineWidth = 1;
-    for (var k = 1; k < 4; k++) {
-      var a = P(0.12, k / 4), b = P(0.88, k / 4);
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    var base = teinte(C.prairie, 0.9 + f * 0.06), c = nuance(C.prairie, 0.9 + f * 0.06);
+    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, base);
+    // Rangs de culture : sillons sombres, épis clairs.
+    for (var k = 0; k < 5; k++) {
+      var t = (k + 0.5) / 5, a = P(0.06, t), b = P(0.94, t);
+      ligne(ctx, a, b, teinte(c, 0.8), 1.2);
+      for (var j = 0; j < 6; j++) {
+        var q = P(0.1 + j * 0.15 + hachage(k, j + f) * 0.04, t - 0.04);
+        ctx.strokeStyle = teinte(c, 1.18 + (j % 2) * 0.06); ctx.lineWidth = 0.9;
+        ctx.beginPath(); ctx.moveTo(q[0], q[1] + 1); ctx.lineTo(q[0] + 0.5, q[1] - 2.4); ctx.stroke();
+      }
     }
   }
   function peindreEau(ctx, P, fr) {
-    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, C.eau);
-    ctx.strokeStyle = C.eauClair; ctx.lineWidth = 1;
-    for (var k = 0; k < 2; k++) {
-      var o = ((fr + k * 2) % 4) / 4;
-      var a = P(0.2 + o * 0.3, 0.3 + k * 0.35), b = P(0.45 + o * 0.3, 0.3 + k * 0.35);
-      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    var a0 = P(0, 0), a1 = P(1, 1), g = ctx.createLinearGradient(a0[0], a0[1], a1[0], a1[1]);
+    g.addColorStop(0, '#4a8cc2'); g.addColorStop(1, '#356fa4');
+    sol(ctx, P, -0.02, -0.02, 1.02, 1.02, g);
+    // Vaguelettes en arcs qui glissent d'une image à l'autre, reflet du ciel.
+    ctx.strokeStyle = 'rgba(200,230,255,0.55)'; ctx.lineWidth = 1;
+    for (var k = 0; k < 3; k++) {
+      var o = ((fr + k * 3) % 8) / 8, p = P(0.15 + o * 0.6, 0.2 + k * 0.28);
+      ctx.beginPath(); ctx.arc(p[0], p[1] + 3, 4, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke();
     }
+    var r = P(0.3 + ((fr % 4) / 4) * 0.4, 0.55); cercle(ctx, r[0], r[1], 0.9, 'rgba(255,255,255,0.6)');
   }
-  // Route selon ses voisins (masque nord, est, sud, ouest dans l'orientation affichée).
+  function peindreRivage(ctx, P, masque, fr) {
+    var l = 0.2, sable = 'rgba(216,196,142,0.95)', ecume = 'rgba(255,255,255,' + (0.45 + (fr & 1) * 0.15) + ')';
+    var bande = function (u0, v0, u1, v1, f0, f1) {
+      sol(ctx, P, u0, v0, u1, v1, sable);
+      ligne(ctx, P(f0[0], f0[1]), P(f1[0], f1[1]), ecume, 1.4);
+    };
+    if (masque & 1) bande(0, 0, 1, l, [0, l], [1, l]);
+    if (masque & 2) bande(1 - l, 0, 1, 1, [1 - l, 0], [1 - l, 1]);
+    if (masque & 4) bande(0, 1 - l, 1, 1, [0, 1 - l], [1, 1 - l]);
+    if (masque & 8) bande(0, 0, l, 1, [l, 0], [l, 1]);
+  }
+  // Route selon ses voisins (masque nord, est, sud, ouest dans l'orientation affichée) : chaussée
+  // bordée de pierres et pavée de dalles ; la voie de Rome a de grandes dalles.
   function peindreRoute(ctx, P, masque, rome) {
-    var c = rome ? C.rome : C.pierre, l = 0.3;
+    var c = rome ? '#a89f88' : '#cbc1a8', bord = rome ? '#7f7663' : '#a69c84', l = 0.3;
     var morceau = function (u0, v0, u1, v1) { sol(ctx, P, u0, v0, u1, v1, c); };
+    var tour = function (u0, v0, u1, v1) { sol(ctx, P, u0 - 0.03, v0 - 0.03, u1 + 0.03, v1 + 0.03, bord); };
+    tour(0.5 - l, 0.5 - l, 0.5 + l, 0.5 + l);
+    if (masque & 1) tour(0.5 - l, 0, 0.5 + l, 0.5);
+    if (masque & 2) tour(0.5, 0.5 - l, 1, 0.5 + l);
+    if (masque & 4) tour(0.5 - l, 0.5, 0.5 + l, 1);
+    if (masque & 8) tour(0, 0.5 - l, 0.5, 0.5 + l);
     morceau(0.5 - l, 0.5 - l, 0.5 + l, 0.5 + l);
-    if (masque & 1) morceau(0.5 - l, 0, 0.5 + l, 0.5);
-    if (masque & 2) morceau(0.5, 0.5 - l, 1, 0.5 + l);
-    if (masque & 4) morceau(0.5 - l, 0.5, 0.5 + l, 1);
-    if (masque & 8) morceau(0, 0.5 - l, 0.5, 0.5 + l);
-    // Pavés.
-    ctx.fillStyle = teinte(c, 0.82);
-    for (var k = 0; k < 5; k++) { var p = P(0.3 + hachage(masque, k) * 0.4, 0.3 + hachage(k, masque) * 0.4); ctx.fillRect(p[0], p[1], 3, 1); }
+    if (masque & 1) morceau(0.5 - l, -0.02, 0.5 + l, 0.5);
+    if (masque & 2) morceau(0.5, 0.5 - l, 1.02, 0.5 + l);
+    if (masque & 4) morceau(0.5 - l, 0.5, 0.5 + l, 1.02);
+    if (masque & 8) morceau(-0.02, 0.5 - l, 0.5, 0.5 + l);
+    // Dalles : joints sombres en quinconce.
+    var n = rome ? 3 : 4, pas = 2 * l / n, k;
+    ctx.strokeStyle = teinte(nuance(c, 1), 0.82); ctx.lineWidth = 0.7;
+    for (k = 1; k < n; k++) {
+      ligne(ctx, P(0.5 - l, 0.5 - l + k * pas), P(0.5 + l, 0.5 - l + k * pas), teinte(c, 0.84), 0.7);
+      ligne(ctx, P(0.5 - l + k * pas, 0.5 - l), P(0.5 - l + k * pas, 0.5 + l), teinte(c, 0.88), 0.6);
+    }
+    ctx.fillStyle = teinte(c, 1.1);
+    for (k = 0; k < 4; k++) { var p = P(0.3 + hachage(masque, k) * 0.4, 0.3 + hachage(k, masque) * 0.4); ctx.fillRect(p[0], p[1], 2, 1); }
   }
   // Place dallée : plus claire qu'une route, damier de dalles et rosace au centre ; une bordure
   // de pierre sombre court sur les côtés sans voisin (même masque que les routes).
@@ -402,22 +465,40 @@
   }
 
   // --- Objets du terrain ---------------------------------------------------
+  // Feuillage en grappes : dessous sombre, dessus éclairé par le soleil du nord-ouest.
+  function frondaison(ctx, x, y, r, c) {
+    cercle(ctx, x + r * 0.25, y + r * 0.2, r, teinte(c, 0.72));
+    cercle(ctx, x - r * 0.45, y + r * 0.05, r * 0.72, teinte(c, 0.85));
+    cercle(ctx, x + r * 0.5, y - r * 0.15, r * 0.7, teinte(c, 0.9));
+    cercle(ctx, x - r * 0.1, y - r * 0.35, r * 0.82, c);
+    cercle(ctx, x - r * 0.35, y - r * 0.6, r * 0.45, teinte(c, 1.18));
+    cercle(ctx, x + r * 0.15, y - r * 0.75, r * 0.3, teinte(c, 1.3));
+  }
   function peindreArbre(ctx, P, v) {
     var n = 1 + (v % 2);
     for (var k = 0; k < n; k++) {
       var u = n === 1 ? 0.5 : 0.32 + k * 0.38, w = n === 1 ? 0.5 : 0.62 - k * 0.3;
-      var b = P(u, w, 0);
-      ellipse(ctx, b[0], b[1] + 1, 9, 4, 'rgba(40,60,20,0.35)');
-      ctx.fillStyle = C.bois; ctx.fillRect(b[0] - 1.5, b[1] - 14, 3, 14);
-      cercle(ctx, b[0], b[1] - 22, 11 - k * 2, C.feuillage);
-      cercle(ctx, b[0] - 3, b[1] - 25, 6 - k, C.feuillageC);
-      cercle(ctx, b[0] + 4, b[1] - 19, 5, teinte(C.feuillage, 0.8));
+      var b = P(u, w, 0), r = 10 - k * 2;
+      ellipse(ctx, b[0] + 4, b[1] + 1, r + 2, 4, 'rgba(30,50,15,0.3)');
+      if (v === 2 && k === 1) { cypres(ctx, b[0], b[1], 30); continue; }
+      // Tronc et deux branches.
+      ctx.fillStyle = '#6e4a2c'; ctx.fillRect(b[0] - 1.6, b[1] - 15, 3.2, 15);
+      ctx.fillStyle = '#5a3a22'; ctx.fillRect(b[0] + 0.4, b[1] - 15, 1.2, 15);
+      ligne(ctx, [b[0], b[1] - 11], [b[0] - 4, b[1] - 15], '#6e4a2c', 1.2);
+      ligne(ctx, [b[0], b[1] - 12], [b[0] + 4, b[1] - 16], '#6e4a2c', 1.2);
+      frondaison(ctx, b[0], b[1] - 22, r, v === 1 ? '#5a8a3a' : C.feuillage);
     }
   }
   function peindreRocher(ctx, P, v) {
-    var b = P(0.5, 0.5, 0);
-    poly(ctx, [[b[0] - 18, b[1]], [b[0] - 10, b[1] - 16 - v * 2], [b[0] + 4, b[1] - 20], [b[0] + 18, b[1] - 6], [b[0] + 12, b[1] + 4], [b[0] - 8, b[1] + 6]], C.roche);
-    poly(ctx, [[b[0] - 10, b[1] - 16 - v * 2], [b[0] + 4, b[1] - 20], [b[0] + 2, b[1] - 6], [b[0] - 8, b[1] - 4]], C.rocheC);
+    var b = P(0.5, 0.5, 0), h = 16 + v * 2;
+    ellipse(ctx, b[0] + 3, b[1] + 3, 20, 6, 'rgba(40,40,30,0.25)');
+    poly(ctx, [[b[0] - 18, b[1]], [b[0] - 10, b[1] - h], [b[0] + 4, b[1] - h - 4], [b[0] + 18, b[1] - 6], [b[0] + 12, b[1] + 4], [b[0] - 8, b[1] + 6]], '#857f74');
+    poly(ctx, [[b[0] - 10, b[1] - h], [b[0] + 4, b[1] - h - 4], [b[0] + 2, b[1] - 6], [b[0] - 8, b[1] - 4]], '#aaa59a');
+    poly(ctx, [[b[0] + 4, b[1] - h - 4], [b[0] + 18, b[1] - 6], [b[0] + 2, b[1] - 6]], '#97918a');
+    poly(ctx, [[b[0] - 18, b[1]], [b[0] - 10, b[1] - h], [b[0] - 8, b[1] - 4], [b[0] - 8, b[1] + 6]], '#7a746a');
+    ligne(ctx, [b[0] - 6, b[1] - 10], [b[0] + 1, b[1] - 13], '#6e685e', 0.8);
+    ellipse(ctx, b[0] - 12, b[1] - 2, 4, 2, 'rgba(90,120,50,0.5)');
+    if (v === 1) { poly(ctx, [[b[0] + 12, b[1] + 6], [b[0] + 16, b[1] - 2], [b[0] + 22, b[1] + 2], [b[0] + 20, b[1] + 7]], '#9a948a'); }
   }
 
   // --- Maisons (un dessin par niveau, variantes par paramètres) -------------
@@ -2084,7 +2165,7 @@
   // Image d'un marcheur : largeur, hauteur et point d'ancrage (pieds, ou ligne de flottaison du bateau).
   // Personnages : 26 × 36 ancrés en (13, 32), dessinés pieds en (10, 26) ; la coiffe et les outils
   // levés montent jusqu'à 30 px au-dessus des pieds. Les charrettes et la caravane sont plus larges.
-  var FORMATS = { charretier: [40, 36, 19, 32], docker: [40, 36, 19, 32], livreur: [40, 36, 19, 32], lion: [34, 26, 17, 22], bateau: [44, 34, 22, 27], navire: [60, 46, 30, 38], caravane: [48, 38, 26, 34] };
+  var FORMATS = { immigrant: [78, 58, 42, 46], charretier: [40, 36, 19, 32], docker: [40, 36, 19, 32], livreur: [40, 36, 19, 32], lion: [34, 26, 17, 22], bateau: [44, 34, 22, 27], navire: [60, 46, 30, 38], caravane: [48, 38, 26, 34] };
 
   // Allure de chaque métier (demande du propriétaire du 25 novembre 2026 : on doit les reconnaître
   // d'un coup d'œil). tunique : couleur du vêtement ; robe : vêtement jusqu'aux pieds ; toge : pan
@@ -2261,6 +2342,40 @@
       cercle(ctx, x - 12, y - 4, 3.8, '#4a3828'); cercle(ctx, x - 12, y - 4, 1.2, '#a8743f');
       ligne(ctx, [x - 7, y - 9.4], [x - 2.6, y - 10.6], '#6e4a2c', 1.5);
       personnage(ctx, x, y, a, pose, [x - 3.2, y - 10.4]);
+      return;
+    }
+    if (type === 'immigrant') {
+      // Colons (demande du propriétaire du 25 novembre 2026) : chariot bâché tiré par un bœuf,
+      // un colon marche à côté, baluchon à l'épaule.
+      var jb = pose ? 1.3 : -1.3;
+      ctx.save(); ctx.translate(x, y); ctx.scale(1.3, 1.3); ctx.translate(-x, -y); // plus grand qu'un marcheur : on le voit arriver
+      ellipse(ctx, x + 2, y + 0.5, 19, 3.2, 'rgba(30,30,20,0.3)');
+      // Bœuf (devant, à droite) : pattes en marche, corps, tête, cornes.
+      ctx.strokeStyle = '#5e4630'; ctx.lineWidth = 1.7; ctx.lineCap = 'round';
+      [[11, jb], [13.5, -jb], [17.5, -jb], [20, jb]].forEach(function (p) { ctx.beginPath(); ctx.moveTo(x + p[0], y - 6); ctx.lineTo(x + p[0] + p[1], y - 0.6); ctx.stroke(); });
+      ellipse(ctx, x + 15.5, y - 8.4, 6.6, 3.6, '#8a6a48');
+      ellipse(ctx, x + 14.5, y - 9.6, 4.8, 2, '#9c7a56');
+      poly(ctx, [[x + 20.5, y - 10.6], [x + 24.6, y - 9.4], [x + 24.2, y - 6.4], [x + 21, y - 6.8]], '#7a5a3c');
+      ligne(ctx, [x + 21, y - 10.8], [x + 19.6, y - 13], '#efe6cc', 1);
+      ligne(ctx, [x + 22.4, y - 10.8], [x + 24, y - 12.8], '#efe6cc', 1);
+      cercle(ctx, x + 22.8, y - 9.2, 0.5, '#1e1612');
+      // Timon et joug.
+      ligne(ctx, [x + 4, y - 7], [x + 12, y - 9], '#6e4a2c', 1.3);
+      // Chariot : caisse, roues à rayons, bâche cerclée.
+      poly(ctx, [[x - 13, y - 6.2], [x + 5, y - 6.2], [x + 6, y - 11.6], [x - 12, y - 11.6]], '#8a5a32', '#5a3a22');
+      [[-9, 0], [2, 0]].forEach(function (q) {
+        var rx = x + q[0], ry = y - 3.6;
+        cercle(ctx, rx, ry, 3.6, null, '#3a2818'); cercle(ctx, rx, ry, 0.9, '#3a2818');
+        ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 0.7;
+        for (var s = 0; s < 4; s++) { var an = s * Math.PI / 4 + (pose ? 0.4 : 0); ctx.beginPath(); ctx.moveTo(rx + Math.cos(an) * 3.3, ry + Math.sin(an) * 3.3); ctx.lineTo(rx - Math.cos(an) * 3.3, ry - Math.sin(an) * 3.3); ctx.stroke(); }
+      });
+      ctx.beginPath(); ctx.moveTo(x - 12.4, y - 11.4); ctx.bezierCurveTo(x - 12, y - 22, x + 5.4, y - 22, x + 5.6, y - 11.4); ctx.closePath();
+      ctx.fillStyle = '#efe6cc'; ctx.fill(); ctx.strokeStyle = '#b8a888'; ctx.lineWidth = 0.8; ctx.stroke();
+      for (var cb = 0; cb < 3; cb++) { var xc = x - 8 + cb * 5.4; ligne(ctx, [xc, y - 11.6], [xc + 0.4, y - 19.4], '#c8b898', 1); }
+      ctx.fillStyle = '#3a2a1e'; ctx.beginPath(); ctx.ellipse(x - 12.2, y - 14.6, 1.6, 3.2, 0, 0, Math.PI * 2); ctx.fill();
+      // Colon à pied, à côté du chariot.
+      r = personnage(ctx, x - 3, y + 3.4, a, pose, [x + 1.4, y - 9.6]);
+      ctx.restore();
       return;
     }
     switch (type) {
@@ -2963,6 +3078,7 @@
     herbe: function (v, z) { return sprite('sol:h' + v, 1, 0, function (ctx, P) { peindreHerbe(ctx, P, v); }, z); },
     prairie: function (f, z) { return sprite('sol:p' + f, 1, 0, function (ctx, P) { peindrePrairie(ctx, P, f); }, z); },
     eau: function (fr, z) { return sprite('sol:e' + fr, 1, 0, function (ctx, P) { peindreEau(ctx, P, fr); }, z); },
+    rivage: function (masque, fr, z) { return sprite('sol:r' + masque + ':' + (fr & 1), 1, 0, function (ctx, P) { peindreRivage(ctx, P, masque, fr); }, z); },
     route: function (masque, rome, z) { return sprite('route:' + masque + (rome ? 'r' : ''), 1, 0, function (ctx, P) { peindreRoute(ctx, P, masque, rome); }, z); },
     arbre: function (v, z) { return sprite('arbre:' + v, 1, 40, function (ctx, P) { peindreArbre(ctx, P, v); }, z); },
     rocher: function (v, z) { return sprite('rocher:' + v, 1, 26, function (ctx, P) { peindreRocher(ctx, P, v); }, z); },

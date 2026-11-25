@@ -1641,3 +1641,14 @@ Constats (gouverneur automatique) :
 - Sans préfecture posée tout de suite à côté des ateliers, l'argent parti dans l'armée les laissait brûler au bout de 11 mois ; sans ingénieur à côté, les forts posés loin de la ville s'effondraient.
 - Les rochers (fer) d'Aquilée et la carrière d'argile de Vindobona étaient d'abord sur le chemin des envahisseurs : ils les détruisaient. Les cartes les placent maintenant du côté de la ville.
 - Avec Mars hors des premiers temples, sa colère mettait le moral des cohortes à 0 juste avant une invasion.
+
+### 23.10 Retours du propriétaire : graphisme et colons (25 novembre 2026)
+
+Demande : améliorer la qualité graphique des bâtiments et du paysage, et faire arriver les colons de façon plus visible.
+
+- Terrain : l'herbe varie en grandes nappes plus claires ou plus sombres (plus de damier), avec des brins, des taches de couleur, quelques fleurs et cailloux. Les prairies fertiles montrent des sillons et des épis. L'eau a un dégradé, des vaguelettes qui glissent et un reflet ; une rive de sable bordée d'écume longe toute terre.
+- Arbres en grappes de feuillage éclairées par le soleil du nord-ouest, tronc et branches, ombre au sol ; quelques cyprès. Rochers à facettes, mousse, ombre.
+- Routes bordées de pierres et pavées de dalles en quinconce ; la voie de Rome a de grandes dalles.
+- Tous les bâtiments : liseré d'ombre au pied des murs, arête éclairée en haut, rangs de tuiles et faîtière sur les toits, ombre portée au sol (vers le bas à droite de l'écran, plus longue pour un bâtiment plus grand). Ces changements passent par les outils de dessin communs : aucun bâtiment n'a été redessiné un par un.
+- Colons : chaque groupe d'immigrants arrive en chariot bâché tiré par un bœuf, un colon à pied à côté ; le dessin est 1,3 fois plus grand qu'un marcheur. La règle ne change pas : un chariot porte un groupe de 4 personnes au plus (section 6.1).
+- Les images de la page du jeu et l'affiche n'ont pas été refaites : elles le seront au lot 5 (« affiche et aperçus »).
