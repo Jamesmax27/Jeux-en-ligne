@@ -133,7 +133,7 @@
   function demarrerEtat(e, options) {
     options = options || {};
     fond = null;
-    partie = { e: e, m: mission(e.mission), iv: D.temps.vitesseDepart, acc: 0, figee: !!options.figee, dernierMsg: e.journal[e.journal.length - 1] || null,
+    partie = { e: e, m: mission(e.mission) || SIM.mission(e), iv: D.temps.vitesseDepart, acc: 0, figee: !!options.figee, dernierMsg: e.journal[e.journal.length - 1] || null,
       tuto: e.tuto, annee: SIM.date(e).annee, log: [], derniere: 0, finVue: !!(e.victoire || e.defaite) };
     rendu.e = e;
     rendu.calque = null; rendu.apercu = null; rendu.selection = 0;
@@ -145,7 +145,11 @@
     fermerPanneau();
     majTuto(false);
     majHud();
-    if (!options.figee && !e.libre) prog.niveau = Math.max(prog.niveau, partie.m.numero);
+    if (!options.figee && !e.libre && !e.province) prog.niveau = Math.max(prog.niveau, partie.m.numero);
+    // Cité d'une province : bouton du panneau, première synchronisation tout de suite.
+    $('b-province').hidden = !e.province;
+    provinceSync = { enCours: false, dernier: 0, envoyes: e.province ? e.province.n : 0, signal: null, echecs: 0, reussite: 0 };
+    provinceOuvert = false;
     if (!options.figee && !prog.options.geste) ecranGeste(0);
   }
   function centrerVille(e) {
@@ -163,6 +167,7 @@
   }
   function quitterPartie() {
     finirOrdre();
+    if (partie && partie.e.province) synchroProvince(); // dernier envoi (la ville est enregistrée avant)
     partie = null; AUDIO.musique(null);
     hud.hidden = true;
     annulerOutil();
@@ -206,7 +211,7 @@
     rendu.temps = ts;
     rendu.dessiner(actif ? Math.min(1, partie.acc) : 0);
     if (partie) {
-      if (ts - dernierHud > 250) { majHud(); dernierHud = ts; if (panneauVivant) panneauVivant(); }
+      if (ts - dernierHud > 250) { majHud(); dernierHud = ts; if (panneauVivant) panneauVivant(); rythmeProvince(); }
       if (ts - derniereMini > 900) { rendu.dessinerMiniCarte(mini); derniereMini = ts; }
     }
   }
@@ -230,7 +235,7 @@
     if (e.tuto !== partie.tuto) { partie.tuto = e.tuto; majTuto(true); }
     var a = SIM.date(e).annee;
     if (a !== partie.annee) { partie.annee = a; sauverVilleAuto(); }
-    if (!partie.finVue && e.victoire) { partie.finVue = true; ecranVictoire(); }
+    if (!partie.finVue && e.victoire) { partie.finVue = true; if (e.victoire.province) ecranVictoireProvince(); else ecranVictoire(); }
     else if (!partie.finVue && e.defaite) { partie.finVue = true; ecranDefaite(); }
   }
 
@@ -601,6 +606,7 @@
   $('b-zoomp').addEventListener('click', function () { rendu.zoomer(1); AUDIO.jouer('clic'); });
   $('b-son').addEventListener('click', basculerSon);
   $('b-conseil').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirConseil(); });
+  $('b-province').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirProvince(); });
   $('b-journal').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirJournal(); });
   $('b-calque').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirCalques(); });
   $('b-ok').addEventListener('click', function () { validerOutil(); });
@@ -647,6 +653,8 @@
     if (v.faction) v.faction = t('faction.' + v.faction);
     if (v.bat) v.bat = t('bat.' + v.bat + '.nom');
     if (v.montant !== undefined) v.montant = nb(v.montant);
+    if (v.siege !== undefined && partie) v.voisin = nomSiege(partie.e, v.siege);
+    if (v.deniers !== undefined) v.deniers = nb(v.deniers);
     if (v.mois !== undefined) v.n = v.mois; // pluriels des messages qui comptent des mois
     return t(m.cle, v);
   }
@@ -1259,10 +1267,10 @@
     var nom = function (q, texte, dy) {
       var x = Number(X(q)), a = x < 16 ? 'start' : x > L - 16 ? 'end' : 'middle';
       return '<text x="' + (a === 'start' ? Math.max(1, x - 3) : a === 'end' ? Math.min(L - 1, x + 3) : x).toFixed(1) + '" y="' + (Number(Y(q)) + dy).toFixed(1) + '" text-anchor="' + a + '" font-size="6.2" fill="#2a2018" stroke="#f4ead0" stroke-width="1.6" paint-order="stroke">' + texte + '</text>'; };
-    s += nom(em.rome, t('cite.rome'), -5.5) + nom(em.ville, t('mission.' + m.id + '.nom'), 9);
+    s += nom(em.rome, t('cite.rome'), -5.5) + nom(em.ville, echapper(m.voisinage ? t('cite.' + m.id) : t('mission.' + m.id + '.nom')), 9);
     // Une cité trop près de Rome ou de la ville voit son nom écrit sous son point.
     var pres = function (a, b) { return Math.abs(X(a) - X(b)) < 22 && Math.abs(Y(a) - Y(b)) < 10; };
-    em.cites.forEach(function (c) { var r = e.routes[c.id]; if (r && r.v) s += nom(c.pos, t('cite.' + c.id), pres(c.pos, em.rome) || pres(c.pos, em.ville) ? 9 : -5); });
+    em.cites.forEach(function (c) { var r = e.routes[c.id]; if (r && r.v) s += nom(c.pos, echapper(nomVoisine(e, c)), pres(c.pos, em.rome) || pres(c.pos, em.ville) ? 9 : -5); });
     s += armeesEmpire(e, X, Y, em);
     s += '</svg>';
     var boite = el('div', { classe: 'carte-empire' });
@@ -1277,7 +1285,7 @@
     em.cites.forEach(function (c) {
       var r = e.routes[c.id];
       if (!r || !r.v) return;
-      g2.appendChild(bouton(t('cite.' + c.id) + (r.o ? ' ✓' : ''), function () { citeChoisie = c.id; if (panneauVivant) panneauVivant(); }, citeChoisie === c.id ? 'gros or' : 'gros non'));
+      g2.appendChild(bouton(nomVoisine(e, c) + (r.o ? ' ✓' : ''), function () { citeChoisie = c.id; if (panneauVivant) panneauVivant(); }, citeChoisie === c.id ? 'gros or' : 'gros non'));
     });
     p.appendChild(g2);
   }
@@ -1285,10 +1293,18 @@
     var c = SIM.citeDe(e, id), r = c && e.routes[id];
     if (!c || !r || !r.v) return;
     var f = el('div', { classe: 'fiche-cite' });
-    f.appendChild(el('h3', { texte: t('cite.' + id) }));
+    f.appendChild(el('h3', { texte: nomVoisine(e, c) }));
     f.appendChild(ligne(t('commerce.route'), t(c.route === 'mer' ? 'commerce.mer' : 'commerce.terre')));
     if (r.f > 0) f.appendChild(el('p', { classe: 'etat-ko', texte: t('commerce.fermee', { n: r.f }) }));
-    [['vend', 'v', 'importer'], ['achete', 'a', 'exporter']].forEach(function (q) {
+    // Cité d'un joueur de la province : commerce par le comptoir, à son étal.
+    var vj = e.province && c.voisin !== undefined ? e.province.voisins[c.voisin] : null;
+    if (vj && vj.pris && vj.actif) {
+      f.appendChild(el('p', { classe: 'aide', texte: t('voisins.ficheJoueur') }));
+      if (!e.province.enLigne) f.appendChild(el('p', { classe: 'etat-ko', texte: t('voisins.horsLigne') }));
+      var etal = Object.keys(vj.etal || {}).filter(function (g) { return vj.etal[g] > 0; });
+      f.appendChild(el('p', { classe: 'aide', texte: t(etal.length ? 'voisins.etal' : 'voisins.etalVide') }));
+      etal.forEach(function (g) { f.appendChild(ligne(t('bien.' + g) + ' · ' + nb(SIM.prixVoisin(g)), t('commerce.quota', { n: SIM.echange(e, c, 'v', g), max: D.regles.commerce.voisinPlafond }))); });
+    } else [['vend', 'v', 'importer'], ['achete', 'a', 'exporter']].forEach(function (q) {
       var l = Object.keys(c[q[0]]);
       if (!l.length) return;
       f.appendChild(el('p', { classe: 'aide', texte: t('commerce.' + q[0]) }));
@@ -1471,7 +1487,7 @@
       el('h1', { texte: t('titre') }),
       el('div', { classe: 'sous', texte: t('titre.sousTitre') }),
       el('p', { classe: 'consigne', texte: t('titre.consigne') }),
-      bouton(t('titre.jouer'), jouer, 'gros or'),
+      el('div', { classe: 'boutons' }, [bouton(t('titre.jouer'), jouer, 'gros or'), bouton(t('voisins.bouton'), ecranProvinces, 'gros non')]),
       el('div', { classe: 'age', texte: t('titre.age') })
     ]);
     var conteneur = el('div', {}, [bloc]);
@@ -1783,6 +1799,8 @@
   }
   function sauverVilleAuto() {
     if (!STOCK || !partie || partie.figee) return;
+    // Une cité de province s'enregistre seule, dans sa province (jamais une copie plus ancienne).
+    if (partie.e.province) { synchroProvince(); return; }
     prog.options.auto = ((prog.options.auto | 0) % 3) + 1;
     sauverVille('auto-' + prog.options.auto).catch(function () { /* stockage plein ou absent : le jeu continue */ });
     sauverProg();
@@ -1808,6 +1826,7 @@
     carte.appendChild(el('div', { classe: 'boutons' }, [bouton(t('ui.retour'), retour, 'gros non')]));
     ouvrirEcran(carte, { retour: retour });
     if (!STOCK) { liste.appendChild(el('p', { texte: t('sauve.indispo') })); return; }
+    if (mode === 'sauver' && partie && partie.e.province) { liste.appendChild(el('p', { texte: t('sauve.provinceSeule') })); synchroProvince(); return; }
     lireIndex().then(function (idx) {
       var cles = (mode === 'sauver' ? [] : ['auto-1', 'auto-2', 'auto-3']).concat(['ville-1', 'ville-2', 'ville-3', 'ville-4', 'ville-5']);
       cles.forEach(function (cle) {
@@ -1824,6 +1843,291 @@
         liste.appendChild(ligneE);
       });
     });
+  }
+
+  // ------------------------------------------------------------------------
+  // Cités voisines (lot 6, cahier 16.7 et 23.15) : provinces de 2 à 4 joueurs
+  //   Le jeu n'a aucun accès réseau : il demande au lanceur du site (messages
+  //   « jel-province », public/province/lanceur.js) de parler au comptoir.
+  //   Règle de sûreté : avant chaque envoi, la ville est enregistrée (clé
+  //   « province-<code> ») ; les opérations et l'accusé envoyés sont lus dans
+  //   l'état enregistré au même instant (SIM.provinceEnvoi, puis SIM.exporter).
+  // ------------------------------------------------------------------------
+  var VOISINAGES = D.voisinages || [], VOISINES = D.missionsVoisinage || [];
+  var RE_CODE = /^[A-HJ-NP-Z2-9]{6}$/;
+  var SYNC_MS = 45000, SYNC_OP_MS = 3000;
+  var demandesProvince = {}, numeroDemande = 0;
+  var provinceSync = { enCours: false, dernier: 0, envoyes: 0, signal: null, echecs: 0, reussite: 0 };
+  window.addEventListener('message', function (ev) {
+    var m = ev.data;
+    if (ev.source !== window.parent || !m || m.type !== 'jel-province' || !demandesProvince[m.id]) return;
+    var f = demandesProvince[m.id]; delete demandesProvince[m.id]; f(m);
+  });
+  function demanderProvince(op, donnees) {
+    return new Promise(function (ok) {
+      if (window.parent === window) { ok({ ok: false, erreur: 'hors-site' }); return; }
+      var id = 'p' + (++numeroDemande);
+      var minuterie = setTimeout(function () { if (demandesProvince[id]) { delete demandesProvince[id]; ok({ ok: false, erreur: 'injoignable' }); } }, 15000);
+      demandesProvince[id] = function (m) { clearTimeout(minuterie); ok(m); };
+      var msg = { type: 'jel-province', id: id, op: op };
+      for (var k in donnees) msg[k] = donnees[k];
+      try { window.parent.postMessage(msg, '*'); } catch (err) { delete demandesProvince[id]; clearTimeout(minuterie); ok({ ok: false, erreur: 'injoignable' }); }
+    });
+  }
+  function missionVoisine(id) { for (var k = 0; k < VOISINES.length; k++) if (VOISINES[k].id === id) return VOISINES[k]; return null; }
+  function voisinage(id) { for (var k = 0; k < VOISINAGES.length; k++) if (VOISINAGES[k].id === id) return VOISINAGES[k]; return null; }
+  function nomJoueur(v) { return v && v.pseudo ? v.pseudo : v && v.numero ? t('voisins.joueur', { n: v.numero }) : t('voisins.joueurSans'); }
+  // Nom d'une cité voisine, avec son joueur quand il commerce par le comptoir.
+  function nomVoisine(e, c) {
+    var v = e.province && c.voisin !== undefined ? e.province.voisins[c.voisin] : null;
+    return t('cite.' + c.id) + (v && v.pris && v.actif ? ' · ' + nomJoueur(v) : '');
+  }
+  function nomSiege(e, siege) {
+    var m = SIM.mission(e), pv = m && m.voisinage ? voisinage(m.voisinage.province) : null;
+    var c = pv ? { id: pv.cites[siege], voisin: siege } : null;
+    return c ? nomVoisine(e, c) : '';
+  }
+  function echapper(x) { return String(x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function erreurProvince(code) {
+    return t(code === 'introuvable' ? 'voisins.introuvable' : code === 'pleine' ? 'voisins.pleine' : 'voisins.serveur');
+  }
+  function depuisTexte(quand) {
+    var s = Math.max(0, (Date.now() - quand) / 1000);
+    if (s < 3600) return t('voisins.ilYaMin', { n: Math.max(1, Math.round(s / 60)) });
+    if (s < 86400 * 2) return t('voisins.ilYaHeures', { n: Math.round(s / 3600) });
+    return t('voisins.ilYaJours', { n: Math.round(s / 86400) });
+  }
+
+  // Enregistrement puis envoi au comptoir ; la réponse entre dans la simulation par une commande.
+  function synchroProvince() {
+    if (!partie || partie.figee || !partie.e.province || provinceSync.enCours || !STOCK) return;
+    var e = partie.e, P = e.province, d = SIM.date(e);
+    var envoi = SIM.provinceEnvoi(e), txt = SIM.exporter(e), cle = 'province-' + P.code;
+    var meta = { mission: e.mission, province: true, code: P.code, mois: d.mois, annee: d.annee, pop: e.pop, quand: Date.now() };
+    var signal = provinceSync.signal;
+    provinceSync.enCours = true; provinceSync.dernier = Date.now(); provinceSync.envoyes = P.n;
+    STOCK.set(cle, txt).then(function () {
+      return lireIndex().then(function (idx) { idx[cle] = meta; return STOCK.set('index', JSON.stringify(idx)); });
+    }).then(function () {
+      var corps = { code: envoi.code, siege: envoi.siege, jeton: envoi.jeton, ops: envoi.ops, accuse: envoi.accuse, infos: envoi.infos };
+      if (signal) corps.signal = signal;
+      return demanderProvince('sync', corps);
+    }).then(function (r) {
+      provinceSync.enCours = false;
+      if (!partie || partie.e !== e) return;
+      if (r && r.ok && r.donnees) {
+        if (signal && provinceSync.signal === signal) provinceSync.signal = null;
+        provinceSync.echecs = 0; provinceSync.reussite = Date.now();
+        commander({ type: 'province-sync', recu: r.donnees.recu, sortie: r.donnees.sortie, vue: r.donnees.vue });
+      } else {
+        provinceSync.echecs++;
+        commander({ type: 'province-reseau', enLigne: false });
+      }
+      if (panneauVivant && provinceOuvert) panneauVivant();
+    }).catch(function () { provinceSync.enCours = false; });
+  }
+  // Rythme : toutes les 45 s de jeu visible, 3 s après une nouvelle opération ; plus lent après des échecs.
+  function rythmeProvince() {
+    if (!partie || !partie.e.province || partie.figee || provinceSync.enCours) return;
+    var P = partie.e.province, ecart = Date.now() - provinceSync.dernier;
+    var attente = provinceSync.echecs ? Math.min(4, provinceSync.echecs) * 30000 : SYNC_MS;
+    if (ecart >= attente || ((P.n > provinceSync.envoyes || provinceSync.signal) && ecart >= SYNC_OP_MS && !provinceSync.echecs)) synchroProvince();
+  }
+
+  function lancerCiteVoisine(id, prov, vue) {
+    var e = SIM.nouvelle(id, { province: prov });
+    if (vue) SIM.appliquer(e, { type: 'province-sync', recu: 0, sortie: [], vue: vue });
+    rendu.sansInterface = false;
+    demarrerEtat(e);
+    AUDIO.jouer('etape');
+    toast(t('voisins.creee', { code: prov.code }));
+  }
+  function ecranAttenteProvince(retour) {
+    ouvrirEcran(el('div', { classe: 'carte-ecran' }, [el('h1', { texte: t('voisins.titre') }), el('p', { texte: t('voisins.attente') })]), { retour: retour });
+  }
+  function ecranErreurProvince(code, retour) {
+    ouvrirEcran(el('div', { classe: 'carte-ecran' }, [el('h1', { texte: t('voisins.titre') }), el('p', { classe: 'etat-ko', texte: erreurProvince(code) }),
+      el('div', { classe: 'boutons' }, [bouton(t('ui.retour'), retour, 'gros non')])]), { retour: retour });
+  }
+
+  // Écran « Cités voisines » : mes provinces, créer, rejoindre.
+  function ecranProvinces() {
+    AUDIO.demarrer();
+    var carte = el('div', { classe: 'carte-ecran' }, [el('h1', { texte: t('voisins.titre') }), el('p', { texte: t('voisins.intro') }), el('h2', { texte: t('voisins.mes') })]);
+    var liste = el('div', { classe: 'emplacements' });
+    carte.appendChild(liste);
+    carte.appendChild(el('div', { classe: 'boutons' }, [
+      bouton(t('voisins.creer'), ecranCreerProvince, 'gros oui'),
+      bouton(t('voisins.rejoindre'), function () { ecranRejoindreProvince(''); }, 'gros or'),
+      bouton(t('ui.retour'), ecranTitre, 'gros non')
+    ]));
+    ouvrirEcran(carte, { retour: ecranTitre });
+    lireIndex().then(function (idx) {
+      var cles = Object.keys(idx).filter(function (k) { return /^province-/.test(k) && idx[k]; }).sort(function (a, b) { return idx[b].quand - idx[a].quand; });
+      if (!cles.length) { liste.appendChild(el('p', { texte: t('voisins.aucune') })); return; }
+      cles.forEach(function (cle) {
+        var m = idx[cle], mv = missionVoisine(m.mission);
+        if (!mv) return;
+        var desc = t('voisins.resume', { province: t('province.' + mv.voisinage.province + '.nom'), code: m.code, pop: nb(m.pop), date: t('hud.date', { mois: t('mois.' + m.mois), annee: anneeTexte(m.annee) }) });
+        liste.appendChild(el('div', { classe: 'emplacement' }, [el('strong', { texte: t('cite.' + m.mission) }), el('span', { texte: desc }),
+          bouton(t('voisins.continuer'), function () { fermerEcran(); rendu.sansInterface = false; chargerVilleStock(cle).catch(function () { ecranProvinces(); }); }, 'gros oui')]));
+      });
+    });
+  }
+  function ecranCreerProvince() {
+    var carte = el('div', { classe: 'carte-ecran' }, [el('h1', { texte: t('voisins.creer') }), el('p', { texte: t('voisins.choisirCite') })]);
+    VOISINAGES.forEach(function (pv) {
+      carte.appendChild(el('h2', { texte: t('province.' + pv.id + '.nom') }));
+      carte.appendChild(el('p', { classe: 'aide', texte: t('province.' + pv.id + '.desc') }));
+      var g = el('div', { classe: 'grille-missions' });
+      pv.cites.forEach(function (id, siege) {
+        g.appendChild(el('button', { classe: 'mission', clic: function () { AUDIO.jouer('clic'); creerProvince(pv.id, siege); } }, [
+          el('span', { classe: 'nom', texte: t('cite.' + id) }), el('span', { classe: 'num', texte: t('mission.' + id + '.atouts') })]));
+      });
+      carte.appendChild(g);
+    });
+    carte.appendChild(el('div', { classe: 'boutons' }, [bouton(t('ui.retour'), ecranProvinces, 'gros non')]));
+    ouvrirEcran(carte, { retour: ecranProvinces });
+  }
+  function creerProvince(pid, siege) {
+    ecranAttenteProvince(ecranCreerProvince);
+    demanderProvince('creer', { carte: pid, siege: siege }).then(function (r) {
+      if (!r.ok) { ecranErreurProvince(r.erreur, ecranCreerProvince); return; }
+      var d = r.donnees, pv = voisinage(pid);
+      lancerCiteVoisine(pv.cites[d.siege], { code: d.code, siege: d.siege, jeton: d.jeton, vus: d.vue ? d.vue.maintenant : 0 }, d.vue);
+      ouvrirProvince();
+    });
+  }
+  // Rejoindre : le code (6 lettres ou chiffres), puis une cité libre de la province.
+  function ecranRejoindreProvince(code) {
+    var champ = el('input', { type: 'text', maxlength: '6', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', classe: 'champ-code', aria: t('voisins.saisirCode'), placeholder: 'ABC234' });
+    champ.value = code || '';
+    var info = el('p', { classe: 'aide', texte: t('voisins.saisirCode') });
+    var chercher = function () {
+      var c = champ.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!RE_CODE.test(c)) { info.textContent = t('voisins.codeInvalide'); info.className = 'etat-ko'; return; }
+      ecranAttenteProvince(function () { ecranRejoindreProvince(c); });
+      demanderProvince('lire', { code: c }).then(function (r) {
+        if (!r.ok) { ecranErreurProvince(r.erreur, function () { ecranRejoindreProvince(c); }); return; }
+        ecranCitesLibres(c, r.donnees);
+      });
+    };
+    champ.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') chercher(); });
+    var carte = el('div', { classe: 'carte-ecran' }, [el('h1', { texte: t('voisins.rejoindre') }), info, champ,
+      el('div', { classe: 'boutons' }, [bouton(t('voisins.chercher'), chercher, 'gros oui'), bouton(t('ui.retour'), ecranProvinces, 'gros non')])]);
+    ouvrirEcran(carte, { retour: ecranProvinces });
+  }
+  function rejoindreProvinceAmi(code) {
+    lireIndex().then(function (idx) {
+      if (idx['province-' + code]) { rendu.sansInterface = false; return chargerVilleStock('province-' + code); }
+      ecranAttenteProvince(ecranProvinces);
+      return demanderProvince('lire', { code: code }).then(function (r) {
+        if (!r.ok) ecranErreurProvince(r.erreur, ecranProvinces); else ecranCitesLibres(code, r.donnees);
+      });
+    }).catch(function () { ecranProvinces(); });
+  }
+  function ecranCitesLibres(code, lu) {
+    var pv = voisinage(lu.carte);
+    if (!pv) { ecranErreurProvince('introuvable', ecranProvinces); return; }
+    var carte = el('div', { classe: 'carte-ecran' }, [el('h1', { texte: t('province.' + pv.id + '.nom') + ' · ' + code }), el('p', { texte: t('voisins.choisirCite') })]);
+    var g = el('div', { classe: 'grille-missions' });
+    pv.cites.forEach(function (id, siege) {
+      var s = lu.sieges[siege];
+      var b = el('button', { classe: 'mission' + (s ? ' ferme' : ''), clic: function () {
+        if (s) return;
+        AUDIO.jouer('clic');
+        ecranAttenteProvince(function () { ecranCitesLibres(code, lu); });
+        demanderProvince('rejoindre', { code: code, siege: siege }).then(function (r) {
+          if (!r.ok) { ecranErreurProvince(r.erreur, ecranProvinces); return; }
+          var d = r.donnees;
+          lancerCiteVoisine(pv.cites[d.siege], { code: code, siege: d.siege, jeton: d.jeton, vus: d.vue ? d.vue.maintenant : 0 }, d.vue);
+          ouvrirProvince();
+        });
+      } }, [el('span', { classe: 'nom', texte: t('cite.' + id) }),
+        el('span', { classe: 'num', texte: s ? t('voisins.prise', { nom: nomJoueur(s) }) : t('mission.' + id + '.atouts') })]);
+      g.appendChild(b);
+    });
+    carte.appendChild(g);
+    carte.appendChild(el('div', { classe: 'boutons' }, [bouton(t('ui.retour'), ecranProvinces, 'gros non')]));
+    ouvrirEcran(carte, { retour: ecranProvinces });
+  }
+
+  // Panneau de la province : code, voisins, signaux.
+  var provinceOuvert = false;
+  var SIGNAUX = ['cherche', 'vend', 'merci', 'aide', 'route'], signalChoisi = null;
+  function ouvrirProvince() {
+    if (!partie || !partie.e.province) return;
+    provinceOuvert = true;
+    ouvrirPanneau(function (p) {
+      var e = partie.e, P = e.province, m = SIM.mission(e), pv = voisinage(m.voisinage.province);
+      p.appendChild(el('h2', { texte: t('province.' + pv.id + '.nom') }));
+      p.appendChild(ligne(t('voisins.code'), P.code));
+      p.appendChild(el('p', { classe: 'aide', texte: t('voisins.codeAide') }));
+      p.appendChild(el('p', { classe: P.enLigne ? 'ok' : 'ko', texte: t(P.enLigne ? 'voisins.enLigne' : 'voisins.horsLigne') }));
+      if (P.gagnee) p.appendChild(el('p', { classe: 'etat-ok', texte: t('voisins.gagneeTitre') }));
+      p.appendChild(el('p', { classe: P.objectif ? 'ok' : '', texte: t(P.objectif ? 'voisins.objectifFait' : 'voisins.objectifEnCours') }));
+      p.appendChild(ligne(t('budget.voisins'), nb(P.ventes)));
+      p.appendChild(ligne(t('voisins.achats'), nb(P.achats)));
+      var reserve = Object.keys(P.reserve).reduce(function (n, g) { return n + P.reserve[g]; }, 0);
+      if (reserve) p.appendChild(el('p', { classe: 'aide', texte: t('voisins.reserve', { n: Math.ceil(reserve / D.regles.maison.uniteParCharge) }) }));
+      p.appendChild(el('h3', { texte: t('voisins.voisins') }));
+      pv.cites.forEach(function (id, siege) {
+        if (siege === P.siege) return;
+        var v = P.voisins[siege];
+        var f = el('div', { classe: 'fiche-cite' });
+        f.appendChild(el('h3', { texte: nomVoisine(e, { id: id, voisin: siege }) }));
+        if (!v || !v.pris) { f.appendChild(el('p', { classe: 'aide', texte: t('voisins.ordinateur') })); p.appendChild(f); return; }
+        if (!v.actif) f.appendChild(el('p', { classe: 'aide', texte: t('voisins.absent') }));
+        f.appendChild(ligne(t('hud.population'), nb((v.infos && v.infos.pop) || 0)));
+        var co = (v.infos && v.infos.cotes) || {};
+        f.appendChild(ligne(t('voisins.cotes'), [co.culture, co.prosperite, co.paix, co.faveur].map(function (x) { return x | 0; }).join(' · ')));
+        f.appendChild(el('p', { classe: v.infos && v.infos.objectif ? 'ok' : 'aide', texte: t(v.infos && v.infos.objectif ? 'voisins.objectifFait' : 'voisins.objectifEnCours') }));
+        if (v.visite) f.appendChild(ligne(t('voisins.visite'), depuisTexte(v.visite)));
+        var etal = Object.keys(v.etal || {}).filter(function (g) { return v.etal[g] > 0; });
+        f.appendChild(el('p', { classe: 'aide', texte: t(etal.length ? 'voisins.etal' : 'voisins.etalVide') }));
+        etal.forEach(function (g) { f.appendChild(ligne(t('bien.' + g) + ' · ' + nb(SIM.prixVoisin(g)), t('voisins.charges', { n: v.etal[g] }))); });
+        (v.signaux || []).forEach(function (sg) { f.appendChild(el('p', { classe: 'msg', texte: '✉ ' + texteSignal(sg) })); });
+        p.appendChild(f);
+      });
+      p.appendChild(el('h3', { texte: t('voisins.envoyerSignal') }));
+      if (provinceSync.signal) p.appendChild(el('p', { classe: 'aide', texte: t('voisins.signalAttente', { s: texteSignal(provinceSync.signal) }) }));
+      var gs = el('div', { classe: 'boutons cites' });
+      SIGNAUX.forEach(function (sg) {
+        gs.appendChild(bouton(t('signal.' + sg + '.bouton'), function () {
+          if (sg === 'cherche' || sg === 'vend') { signalChoisi = sg; if (panneauVivant) panneauVivant(); return; }
+          envoyerSignal({ s: sg, b: null });
+        }, signalChoisi === sg ? 'gros or' : 'gros non'));
+      });
+      p.appendChild(gs);
+      if (signalChoisi) {
+        p.appendChild(el('p', { classe: 'aide', texte: t('voisins.choisirBien') }));
+        var gb = el('div', { classe: 'boutons cites' });
+        Object.keys(D.biens).forEach(function (g) { gb.appendChild(bouton(t('bien.' + g), function () { envoyerSignal({ s: signalChoisi, b: g }); }, 'gros non')); });
+        p.appendChild(gb);
+      }
+    });
+  }
+  function texteSignal(sg) { return t('signal.' + sg.s, { bien: sg.b ? enPhrase(t('bien.' + sg.b)) : '' }); }
+  function envoyerSignal(sg) {
+    provinceSync.signal = sg; signalChoisi = null;
+    toast(t('voisins.signalEnvoye'));
+    synchroProvince();
+    if (panneauVivant) panneauVivant();
+  }
+
+  // La province a gagné (objectif commun) : la part de chacun.
+  function ecranVictoireProvince() {
+    var e = partie.e, P = e.province, m = SIM.mission(e), pv = voisinage(m.voisinage.province);
+    AUDIO.jouer('victoire');
+    if (window.FMG) window.FMG.reportEnd({ completed: true, level: null });
+    var carte = el('div', { classe: 'carte-ecran' }, [el('h1', { texte: t('voisins.gagneeTitre') }), el('p', { texte: t('voisins.gagneeTexte') })]);
+    pv.cites.forEach(function (id, siege) {
+      var v = siege === P.siege ? { pris: true, infos: { pop: e.pop, ventes: P.ventes } } : P.voisins[siege];
+      if (!v || !v.pris) return;
+      carte.appendChild(el('p', { texte: t('voisins.part', { nom: siege === P.siege ? t('cite.' + id) + ' · ' + t('voisins.toi') : nomVoisine(e, { id: id, voisin: siege }), pop: nb((v.infos && v.infos.pop) || 0), ventes: nb((v.infos && v.infos.ventes) || 0) }) }));
+    });
+    carte.appendChild(el('div', { classe: 'boutons' }, [bouton(t('voisins.continuerBatir'), fermerEcran, 'gros oui'), bouton(t('ui.retour'), quitterPartie, 'gros non')]));
+    ouvrirEcran(carte, {});
   }
 
   // ------------------------------------------------------------------------
@@ -1969,5 +2273,7 @@
   if (window.JEL_AFFICHE) { dessinerAffiche(); return; }
   if (window.JEL_APERCU) { ouvrirApercu(Number(window.JEL_APERCU) || 1); return; }
   ecranTitre();
+  // Bouton « Rejoindre » de la page Amis : la province de l'ami (sa propre cité si on y joue déjà).
+  if (window.JEL_REJOINDRE && RE_CODE.test(String(window.JEL_REJOINDRE.province || ''))) rejoindreProvinceAmi(window.JEL_REJOINDRE.province);
 
 })();

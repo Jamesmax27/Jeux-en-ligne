@@ -143,7 +143,11 @@ async function controlerFiche(id, dossier) {
   // Jeu multijoueur (docs/multijoueur.md) : nombre fixe de places, de 2 à 10.
   if (f.multijoueur !== undefined && typeof f.multijoueur !== 'boolean') erreur(id, 'game.json : "multijoueur" doit valoir true ou false');
   if (f.multijoueur === true && !(Number.isInteger(f.places) && f.places >= 2 && f.places <= 10)) erreur(id, 'game.json : "places" (jeu multijoueur) doit être un nombre entier de 2 à 10, le même que dans les règles');
-  if (f.multijoueur !== true && f.temps_reel !== true && f.places !== undefined) erreur(id, 'game.json : "places" n\'existe que pour un jeu multijoueur ("multijoueur": true) ou en temps réel');
+  if (f.multijoueur !== true && f.temps_reel !== true && f.province !== true && f.places !== undefined) erreur(id, 'game.json : "places" n\'existe que pour un jeu multijoueur ("multijoueur": true), en temps réel ou à province');
+  // Jeu à province (dérogation, scripts/derogations-jeux.mjs) : 2 à 4 places, sans moteur du site.
+  if (f.province !== undefined && (f.province !== true || !derogation(id).province)) erreur(id, 'game.json : "province" vaut true, et seulement pour un jeu qui a cette dérogation (scripts/derogations-jeux.mjs)');
+  if (f.province === true && (f.multijoueur !== undefined || f.temps_reel !== undefined)) erreur(id, 'game.json : un jeu "province" n\'a ni "multijoueur" ni "temps_reel" (le catalogue ajoute "multijoueur" de lui-même)');
+  if (f.province === true && !(Number.isInteger(f.places) && f.places >= 2 && f.places <= 4)) erreur(id, 'game.json : "places" (jeu à province) : cités d\'une province, entier de 2 à 4');
   // Jeu en temps réel (docs/cadrage-temps-reel.md) : son propre moteur (jel-tr), jamais avec "multijoueur" ;
   // "places" (facultatif) : joueurs d'une partie en ligne au plus (2 par défaut).
   if (f.temps_reel === true && f.places !== undefined && !(Number.isInteger(f.places) && f.places >= 2 && f.places <= 8)) erreur(id, 'game.json : "places" (jeu en temps réel, facultatif) : joueurs d\'une partie en ligne au plus, entier de 2 à 8');

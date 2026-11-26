@@ -119,6 +119,8 @@ on:
       - "scripts/tester-profil.mjs"
       - "scripts/tester-sauvegardes-nuage.mjs"
       - "scripts/tester-amis.mjs"
+      - "scripts/tester-province.mjs"
+      - "public/province/**"
       - "scripts/d1-local.mjs"
       - "scripts/etoiles-jeu.mjs"
       - "public/profil*.js"
@@ -237,7 +239,7 @@ jobs:
           # sauvegarde, Worker multijoueur (ticket, résultats) : tests sans navigateur.
           profil=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then profil=1; fi
-          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/(profil|amis|avatars|sauvegardes)[a-z-]*\.js$|multijoueur/src/|scripts/(tester-profil|tester-amis|d1-local)\.mjs$)'; then profil=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/(profil|amis|avatars|sauvegardes)[a-z-]*\.js$|multijoueur/src/|public/province/|scripts/(tester-profil|tester-amis|tester-province|d1-local)\.mjs$)'; then profil=1; fi
           # Sauvegardes des jeux d'un appareil à l'autre (docs/cadrage-fidelisation.md, 14.13) :
           # lanceur et API du profil, deux appareils dans le navigateur.
           nuage=0
@@ -470,6 +472,13 @@ jobs:
       - name: Contrôler les amis
         if: needs.quoi.outputs.profil == '1'
         run: node scripts/tester-amis.mjs
+
+      # Comptoir de province des « Cités voisines » de Marmoria (multijoueur/src/province.js) :
+      # 10 000 échanges avec pertes, doublons et rechargements, sans charge ni denier créé
+      # ou perdu ; voir docs/cadrage-marmoria.md, section 23.15.
+      - name: Contrôler le comptoir de province
+        if: needs.quoi.outputs.profil == '1'
+        run: node scripts/tester-province.mjs
 
       # Sauvegardes des jeux d'un appareil à l'autre (public/sauvegardes-nuage.js) :
       # module de l'appareil, puis deux appareils dans le navigateur (lanceur, vraie

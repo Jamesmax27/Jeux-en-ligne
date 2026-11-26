@@ -230,3 +230,14 @@ Ce que le multijoueur fait pour rester dedans :
 - Pas de choix de partie ni de code de partie : les joueurs d'un même jeu se retrouvent au hasard, sauf avec le bouton « Rejoindre » de la page Amis (partie d'un ami, `docs/consigne-amis.md`).
 - Pas de limite par adresse IP (un abus remplirait au pire `MAX_JOUEURS`, puis tout le monde jouerait contre des robots locaux) ; piste : règle de limite de débit de Cloudflare sur `multi.freemicrogames.com/ws`.
 - Un déploiement du Worker coupe les parties en cours (elles continuent sur l'appareil).
+
+## 14. « Cités voisines » de Marmoria (comptoir de province)
+
+Un troisième mode à plusieurs, propre à Marmoria (dérogation `province` de `scripts/derogations-jeux.mjs`, `docs/cadrage-marmoria.md`, sections 16.7 et 23.15), sans moteur `jel-multi` ni `jel-tr` : de 2 à 4 joueurs forment une province, chacun bâtit sa cité sur son appareil, à son rythme, des jours durant, et les voisins commercent par un comptoir.
+- Serveur : Durable Object « Province » du même Worker (`multijoueur/src/province.js`, migration `v4`), un par province, nommé d'après un code de 6 caractères. Requêtes HTTP `POST /province` (texte JSON, sans pré-vol CORS, sites permis), pas de WebSocket : `creer`, `rejoindre`, `lire`, `sync`.
+- Opérations numérotées appliquées une seule fois (dépôt à l'étal, demande à l'étal d'un voisin, reprise) ; réponses gardées jusqu'à l'accusé du joueur (livraison, paiement, reprise). Aucune charge ni aucun denier créé ou perdu (`scripts/tester-province.mjs` : 10 000 échanges avec pertes, doublons, trous et rechargements).
+- Lanceur : `public/province/lanceur.js`, branché par `play.js` pour un jeu `"province": true` (catalogue : `multijoueur`, `province`, `rejoindre`, `places`). Le ticket signé du profil donne le pseudo, comme ici.
+- Amis : la présence porte `<jeu>.province-<code>` ; « Rejoindre » ouvre `&rejoindre=<jeu>.province-<code>`, et le jeu ouvre le choix d'une cité libre de cette province (ou la cité du joueur s'il y joue déjà).
+- Pas de classement des manches (aucune manche) ; aucune récompense du profil liée au commerce entre joueurs.
+- Coût (estimation de `tester-province.mjs --cout`) : 100 joueurs actifs une heure par jour font environ 9 200 requêtes au comptoir (autant au Worker) et 6 300 lignes écrites par jour. Province effacée 30 jours après la dernière visite.
+

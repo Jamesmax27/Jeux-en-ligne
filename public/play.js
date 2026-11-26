@@ -39,7 +39,7 @@ import { noter as noterSauvegarde } from './sauvegardes-nuage.js';
 import { brancherMultijoueur, verifierPartie, RE_PARTIE } from './multijoueur/lanceur.js';
 // Jeux en temps réel 1 contre 1 (docs/cadrage-temps-reel.md) : recherche, WebRTC, relais.
 import { brancherTempsReel } from './temps-reel/lanceur.js';
-import { brancherProvince } from './province/lanceur.js';
+import { brancherProvince, RE_PROVINCE_AMI } from './province/lanceur.js';
 import { annoncer } from './amis.js';
 // Grosses données des jeux (stockage.js : mondes, plusieurs parties, fichiers exportés) : IndexedDB du site.
 import { traiterStockage } from './stockage-lanceur.js';
@@ -87,7 +87,7 @@ let invitation = null;   // { partie } : partie d'un ami à rejoindre (bouton «
 // Bouton « Rejoindre » d'un ami (page Amis, classement entre amis) : nom de sa partie en ligne.
 const PARTIE_AMI = (() => {
   const nom = new URLSearchParams(location.search).get('rejoindre') || '';
-  return RE_PARTIE.test(nom) ? nom : null;
+  return RE_PARTIE.test(nom) || RE_PROVINCE_AMI.test(nom) ? nom : null;
 })();
 
 function afficherMessage(titre, texte) {
@@ -289,7 +289,13 @@ async function chargerJeu(jeu) {
   htmlJeu = await reponse.text();
   if (jeu.province) {
     // « Cités voisines » : comptoir de province (requêtes HTTP au Worker multijoueur, à la demande du jeu).
-    province = brancherProvince({ jeu, cadre: el.cadre, ticket: () => ticketMulti(jeu.id) });
+    province = brancherProvince({
+      jeu, cadre: el.cadre, ticket: () => ticketMulti(jeu.id),
+      surProvince: (nom) => annoncer({ etat: 'jeu', jeu: jeu.id, partie: nom }),
+    });
+    // Bouton « Rejoindre » d'un ami : sa province ; le jeu ouvre l'écran d'arrivée avec le code.
+    const ami = PARTIE_AMI && PARTIE_AMI.startsWith(`${jeu.id}.`) ? RE_PROVINCE_AMI.exec(PARTIE_AMI) : null;
+    if (ami) invitation = { province: ami[1] };
   } else if (jeu.temps_reel) {
     // Jeu en temps réel : son propre lanceur (le jeu ne parle pas le protocole du tour par tour).
     tempsReel = brancherTempsReel({ jeu, html: htmlJeu, cadre: el.cadre });

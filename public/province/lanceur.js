@@ -39,10 +39,13 @@ export function adresseProvince(lieu = location) {
  * ticket() : promesse du ticket signé du profil (ou null).
  * Renvoie { recevoir(message), fermer() }.
  */
-export function brancherProvince({ jeu, cadre, ticket }) {
+export const RE_PROVINCE_AMI = /^[a-z0-9]+(?:-[a-z0-9]+)*\.province-([A-HJ-NP-Z2-9]{6})$/;
+
+export function brancherProvince({ jeu, cadre, ticket, surProvince }) {
   const adresse = adresseProvince();
   let ticketVisite = null;   // ticket déjà envoyé pendant cette visite (une fois suffit)
   let ferme = false;
+  let annoncee = null;       // province annoncée aux amis (présence), une fois par code
 
   const repondre = (id, contenu) => {
     if (!ferme && cadre.contentWindow) cadre.contentWindow.postMessage({ type: 'jel-province', id, ...contenu }, '*');
@@ -90,7 +93,11 @@ export function brancherProvince({ jeu, cadre, ticket }) {
       corps.ticket = ticketVisite;
       ticketVisite = 'envoye';
     }
-    repondre(id, await envoyer(corps));
+    const r = await envoyer(corps);
+    // Province en cours (créée, rejointe ou jouée) : les amis voient « Rejoindre » sur la page Amis.
+    const code = r.ok ? (r.donnees.code || corps.code) : null;
+    if (code && m.op !== 'lire' && code !== annoncee && typeof surProvince === 'function') { annoncee = code; surProvince(`${jeu.id}.province-${code}`); }
+    repondre(id, r);
   }
 
   return {
