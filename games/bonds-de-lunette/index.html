@@ -2774,6 +2774,7 @@ function directionVoulue() {
 }
 
 function majJeu(dt) {
+  if (figeApercu) return; // image du jeu (JEL_APERCU) : partie figée sur son moment
   const pas = Math.min(dt, 1 / 30);
   tempsNiv += pas;
   if (sautDemande > 0) sautDemande -= pas;
@@ -3226,7 +3227,7 @@ window.addEventListener('keyup', (e) => {
   if (GAUCHE.includes(e.code)) touches.g = false;
   if (DROITE.includes(e.code)) touches.d = false;
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !apercuJeu) mettrePause(); });
 window.addEventListener('blur', () => { touches.g = touches.d = false; });
 
 $('ecran-tuto').addEventListener('click', (e) => { if (e.target.closest('jel-langue')) return; suiteTuto(); });
@@ -3266,7 +3267,162 @@ function redimensionner() {
 window.addEventListener('resize', redimensionner);
 redimensionner();
 majBoutonsSon();
-ecrans('ecran-titre');requestAnimationFrame(boucle);
+
+/* ---------- Affiche (jaquette du jeu) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Lunette, en grand, vient de
+// bondir d'un trampoline de gelée et tend la main vers l'étoile qu'elle rallume ; une comète passe,
+// des poussières d'étoile brillent, des lunes au premier plan et au loin.
+function dessinerAffiche() {
+  redimensionner();
+  const c = ctx, t = 1.2;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const k = Math.min(W / 600, H / 800);
+  const X = (x) => W / 2 + (x - 300) * k, Y = (y) => H / 2 + (y - 400) * k;
+  const dessin = (x, y, s, f) => { c.save(); c.translate(X(x), Y(y)); c.scale(s * k, s * k); f(); c.restore(); };
+  // Ciel du soir de l'espace : bleu vif en haut, violet puis rose en bas (toute la largeur)
+  const ciel = c.createLinearGradient(0, 0, 0, H);
+  ciel.addColorStop(0, '#1d2a6e'); ciel.addColorStop(0.45, '#4a3a9c'); ciel.addColorStop(0.8, '#8a4fa6'); ciel.addColorStop(1, '#c0609a');
+  c.fillStyle = ciel; c.fillRect(0, 0, W, H);
+  const neb = (x, y, r, col) => { const g = c.createRadialGradient(X(x), Y(y), 0, X(x), Y(y), r * k); g.addColorStop(0, col); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H); };
+  neb(80, 520, 330, 'rgba(90,200,255,.30)');
+  neb(560, 640, 300, 'rgba(255,143,200,.35)');
+  // Grande lueur dorée de l'étoile qui se rallume
+  neb(440, 215, 430, 'rgba(255,226,140,.55)');
+  neb(440, 215, 160, 'rgba(255,246,200,.75)');
+  // Petites étoiles du fond
+  const h = hasardGraine(31);
+  for (let i = 0; i < 230; i++) {
+    const x = h() * W, y = h() * H * 0.85, z = h();
+    c.globalAlpha = 0.45 + 0.5 * z; c.fillStyle = z > 0.85 ? '#ffe9a8' : '#ffffff';
+    const s = (1 + z * 2) * Math.max(1, k);
+    c.fillRect(x, y, s, s);
+  }
+  c.globalAlpha = 1;
+  for (let i = 0; i < 14; i++) { c.fillStyle = 'rgba(255,255,255,.85)'; scintille(c, h() * W, h() * H * 0.7, (4 + h() * 5) * k, h() * 3); c.fill(); }
+  // Constellation de la baleine, en partie rallumée, tout en haut
+  dessinerConstellation(c, X(40), Y(40), 330 * k, 150 * k, t, NIVEAUX.map((_, i) => i < 12));
+  // Au loin : la planète du tourbillon et une lune de glace, plus pâles
+  c.globalAlpha = 0.7;
+  dessin(95, 300, 1.6, () => dessinerTourbillon(c, { x: 0, y: 0, ro: 60, w: 2 }, t));
+  dessin(540, 470, 1.2, () => dessinerCorps(c, { x: 0, y: 0, r: 34, i: 2, type: 'i', h: 0, casse: 0, fissure: -1 }, t, false));
+  c.globalAlpha = 1;
+  // Comète qui file vers le bas à gauche
+  dessin(170, 175, 2.4, () => dessinerComete(c, { x: 0, y: 0, vx: -0.8, vy: 0.55 }, t));
+  // Astéroïde qui flotte, à mi-hauteur
+  dessin(70, 470, 1.6, () => dessinerCorps(c, { x: 0, y: 0, r: 26, i: 3, type: 'a', h: 0, casse: 0, fissure: -1 }, t, false));
+  // L'étoile qui se rallume, en grand, avec ses éclats
+  dessin(440, 215, 2.6, () => {
+    dessinerEtoileBut(c, 0, 0, t, true, null);
+    c.fillStyle = '#fff3c0';
+    for (let q = 0; q < 10; q++) { const a = q * 0.63 + 0.2, d = 46 + (q % 3) * 9; scintille(c, Math.cos(a) * d, Math.sin(a) * d, 4 + (q % 2) * 2, a); c.fill(); }
+  });
+  // Premier plan : grande lune en bas à gauche, coupée par les bords, avec son trampoline de gelée
+  const lx = 90, ly = 1020, lr = 400;
+  const halo = c.createRadialGradient(X(lx), Y(ly), lr * k, X(lx), Y(ly), (lr + 60) * k);
+  halo.addColorStop(0, 'rgba(200,210,255,.45)'); halo.addColorStop(1, 'rgba(200,210,255,0)');
+  c.fillStyle = halo; c.beginPath(); c.arc(X(lx), Y(ly), (lr + 60) * k, 0, 7); c.fill();
+  dessin(lx, ly, 1, () => dessinerCorps(c, { x: 0, y: 0, r: lr, i: 1, type: 'l', h: 0, casse: 0, fissure: -1 }, t, false));
+  const ap = -1.18; // angle du trampoline sur la grande lune
+  dessin(lx, ly, 2.2, () => dessinerPad(c, { x: 0, y: 0, r: lr / 2.2 }, { a: ap, anim: 0.4 }, t + 0.3));
+  // Lune de glace au premier plan, à droite, coupée par le bord
+  dessin(610, 760, 1, () => dessinerCorps(c, { x: 0, y: 0, r: 150, i: 4, type: 'i', h: 0, casse: 0, fissure: -1 }, t, false));
+  // Pointillés du saut : du trampoline jusqu'à Lunette
+  const px0 = lx + Math.cos(ap) * (lr + 30), py0 = ly + Math.sin(ap) * (lr + 30);
+  const lux = 300, luy = 380;
+  c.fillStyle = '#ffffff';
+  for (let q = 0; q <= 12; q++) {
+    const p = q / 12, x = px0 + (lux - 40 - px0) * p, y = py0 + (luy + 90 - py0) * p - Math.sin(p * Math.PI) * 60;
+    c.globalAlpha = 0.35 + 0.55 * p; c.beginPath(); c.arc(X(x), Y(y), (3 + p * 3) * k, 0, 7); c.fill();
+  }
+  c.globalAlpha = 1;
+  // Poussières d'étoile autour de Lunette (une vient d'être attrapée)
+  dessin(165, 395, 2.2, () => dessinerPoussiere(c, 0, 0, 0.4, 1.1));
+  dessin(520, 345, 2.0, () => dessinerPoussiere(c, 0, 0, 1.3, 1.1));
+  dessin(395, 560, 1.6, () => dessinerPoussiere(c, 0, 0, 2.1, 1));
+  c.fillStyle = '#ffe9a8';
+  for (let q = 0; q < 9; q++) { const a = q * 0.7; scintille(c, X(230 + Math.cos(a) * 34), Y(470 + Math.sin(a) * 30), 6 * k, a); c.fill(); }
+  // Lumière derrière Lunette, puis Lunette en grand, en plein bond vers l'étoile
+  neb(lux, luy - 30, 210, 'rgba(255,240,200,.55)');
+  c.save();
+  c.shadowColor = 'rgba(255,236,170,.75)'; c.shadowBlur = 14 * k;
+  dessinerLunette(c, X(lux), Y(luy), 0.28, 9.6 * k, { face: 1, air: true, tenue: 0, casque: 1 });
+  c.restore();
+  // Traînée d'étincelles derrière elle
+  for (let q = 0; q < 7; q++) {
+    c.globalAlpha = 0.9 - q * 0.11; c.fillStyle = q % 2 ? '#ff8fc8' : '#ffe48a';
+    scintille(c, X(lux - 95 - q * 18), Y(luy + 120 + q * 14), (9 - q) * k, q); c.fill();
+  }
+  c.globalAlpha = 1;
+}
+function demarrerAffiche() {
+  const cacher = () => {
+    for (const el of document.querySelectorAll('.ecran, #hud, #bulle, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+  };
+  cacher(); setTimeout(cacher, 50); setTimeout(cacher, 500);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---------- Images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (cœurs, poussières, interrupteurs, zones de
+// toucher), sans écran titre, ni « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). La partie
+// tourne un instant puis elle est figée : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = niveau 1 : Lunette marche sur sa première lune, les pointillés du saut vers la suivante ;
+//   2 = niveau 11 : interrupteurs à toucher dans l'ordre, barrière autour de l'étoile ;
+//   3 = niveau 22 : Lunette tourne dans un tourbillon, comètes, anneau propulseur, trampolines.
+let apercuJeu = 0, figeApercu = false;
+const MOMENTS_APERCU = {
+  1: { niveau: 0, lune: 0, angle: -100, dir: 1, secondes: 0.5, coeurs: 3, pous: [false, false, false] },
+  2: { niveau: 10, lune: 2, angle: -30, dir: -1, secondes: 0.3, coeurs: 3, pous: [true, true, false], inter: 1 },
+  3: { niveau: 21, tourb: 0, angle: -150, dir: 0, secondes: 0.4, coeurs: 2, pous: [true, false, false] },
+};
+function ouvrirApercu(numero) {
+  apercuJeu = numero;
+  const sc = MOMENTS_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  // Progression neuve en mémoire seulement (rien n'est enregistré), son coupé, tutoriels déjà vus.
+  prog = progDefaut(); prog.muet = true; prog.debloque = NIVEAUX.length;
+  for (const d of NIVEAUX) for (const n of d.nouveau || []) prog.vus[n] = 1;
+  majBoutonsSon();
+  lancerNiveau(sc.niveau);
+  partieEnCours = false; // pas d'écriture à la fermeture
+  if (sc.tourb != null) {
+    const v = monde.tourb[sc.tourb], j = monde.j;
+    j.mode = 'orbite'; j.v = sc.tourb; j.a = sc.angle * RAD;
+    j.x = v.x + Math.cos(j.a) * v.ro; j.y = v.y + Math.sin(j.a) * v.ro; j.haut = j.a;
+  } else {
+    monde.j = joueurSur(monde, sc.lune, sc.angle * RAD);
+  }
+  if (sc.inter) for (let q = 0; q < sc.inter; q++) inters[q].allume = true;
+  interIdx = sc.inter || 0;
+  pousPrises = sc.pous.slice();
+  // La partie tourne un instant (Lunette avance, les objets bougent), sans rien perdre.
+  invul = 99;
+  touches.g = sc.dir < 0; touches.d = sc.dir > 0;
+  const pas = Math.round(sc.secondes * 60);
+  for (let i = 0; i < pas; i++) majJeu(1 / 60);
+  particules = []; ondes = [];
+  invul = 0; coeurs = sc.coeurs; secousse = 0;
+  const j = monde.j;
+  cam.x = j.x + Math.cos(j.haut) * 50; cam.y = j.y + Math.sin(j.haut) * 50;
+  cam.rot = -Math.PI / 2 - j.haut; cam.zoom = j.mode === 'sol' ? 1 : 0.84;
+  $('bulle').classList.remove('vue');
+  figeApercu = true;
+}
+
+/* ---------- Démarrage ---------- */
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  ecrans('ecran-titre'); requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

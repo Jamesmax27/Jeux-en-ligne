@@ -3841,6 +3841,7 @@ button:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
 
   // ---------- Pause ----------
   function ouvrirPause() {
+    if (apercu) return; // image du jeu : jamais de fenêtre de pause
     if (ecranCourant !== 'duel' || pause || fenetreOuverte('f-fin')) return;
     pause = true;
     document.body.classList.add('en-pause');
@@ -4020,8 +4021,187 @@ button:focus-visible { outline: 3px solid var(--or); outline-offset: 2px; }
     if (enPartie && e) JEL_SAVE.save(JEU, donneesSauvegarde(niv + 1));
   });
 
+  // ==========================================================================
+  // 10. Affiche (jaquette du jeu) et images du jeu (page du jeu)
+  // ==========================================================================
+
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le moussaillon,
+  // en grand et tout content, brandit la carte qui gagne ; le capitaine pirate en reste bouche bée
+  // derrière un coffre ouvert d'où jaillit l'or, au soleil couchant.
+  function sansFond(svg) {
+    return svg.replace(/<svg[^>]*>/, '').replace('</svg>', '')
+      .replace('<rect width="100" height="100" fill="#9fd3f5"/>', '')
+      .replace('<path d="M0 92 Q25 84 50 92 T100 92 V100 H0Z" fill="#3d8fd6"/>', '');
+  }
+  // Grande carte sans chiffre : couleur, dessin et rangées de pièces (w = largeur).
+  function cartePoster(coul, force, w, effet) {
+    const h = w * 1.4, fond = { canot: '#3d8fd6', perroquet: '#3fae5a', ancre: '#d9534f', tresor: '#e6a92e' }[coul];
+    let s = `<rect x="${-w * 0.04}" y="${-w * 0.04}" width="${w * 1.08}" height="${h + w * 0.08}" rx="${w * 0.14}" fill="#fff8e7"/>` +
+      `<rect width="${w}" height="${h}" rx="${w * 0.12}" fill="${fond}"/>` +
+      `<rect x="${w * 0.07}" y="${w * 0.07}" width="${w * 0.86}" height="${h - w * 0.14}" rx="${w * 0.08}" fill="#fff6e0"/>` +
+      `<g transform="translate(${w * 0.12} ${w * 0.12}) scale(${w * 0.76 / 60})">${DESSINS[coul]}</g>`;
+    const r = w * 0.065;
+    for (let k = 0; k < force; k++) {
+      const parLigne = 4, col = k % parLigne, lig = Math.floor(k / parLigne);
+      const cx = w * 0.2 + col * w * 0.2, cy = w * 0.98 + lig * w * 0.16;
+      s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#f5c542" stroke="#b8860b" stroke-width="${w * 0.015}"/>`;
+    }
+    if (effet) s += `<g transform="translate(${w * 0.68} ${-w * 0.08}) scale(${w * 0.4 / 24})">${EFFETS[effet].replace(/<svg[^>]*>/, '').replace('</svg>', '')}</g>`;
+    return s;
+  }
+  function svgAffiche() {
+    const vagues = (y, amp) => { let d = `M-1200 ${y}`; for (let x = -1200; x < 1800; x += 120) d += ` Q${x + 30} ${y - amp} ${x + 60} ${y} T${x + 120} ${y}`; return d; };
+    const piece = (x, y, r, rot) => `<g transform="translate(${x} ${y}) rotate(${rot || 0}) scale(1 ${0.55 + 0.45 * Math.abs(Math.cos((rot || 0) / 30))})"><circle r="${r}" fill="#f5c542" stroke="#b8860b" stroke-width="${r * 0.18}"/><circle r="${r * 0.6}" fill="none" stroke="#d9a520" stroke-width="${r * 0.14}"/><path d="M${-r * 0.45} ${-r * 0.2} L${-r * 0.1} ${-r * 0.6}" stroke="#fff6c8" stroke-width="${r * 0.18}" stroke-linecap="round"/></g>`;
+    const etincelle = (x, y, r) => `<path d="M${x} ${y - r} Q${x + r * 0.15} ${y - r * 0.15} ${x + r} ${y} Q${x + r * 0.15} ${y + r * 0.15} ${x} ${y + r} Q${x - r * 0.15} ${y + r * 0.15} ${x - r} ${y} Q${x - r * 0.15} ${y - r * 0.15} ${x} ${y - r}Z" fill="#fffbe0"/>`;
+    const heros = sansFond(svgVisage({ peau: '#f6c9a0', chapeau: 'plume', couleur: '#8e44ad', cheveux: '#7a4a2a', habit: '#c0392b', boucle: true }, 'rit'));
+    const capitaine = sansFond(svgVisage(CAPITAINES[3], 'oh'));
+    const coffre = svgCoffre().replace(/<svg[^>]*>/, '').replace('</svg>', '')
+      .replace('class="couvercle"', 'transform="translate(0 -15) rotate(-6 30 22)"')
+      .replace(/<g class="cadenas">[\s\S]*?<\/g>/, '');
+    const navire = svgNavire('rayee', 'bandana').replace(/<svg[^>]*>/, '').replace('</svg>', '');
+    let s = `<svg viewBox="0 0 600 800" preserveAspectRatio="xMidYMid meet" aria-hidden="true" style="width:100%;height:100%;display:block;overflow:visible">` +
+      `<defs>` +
+      `<linearGradient id="aff-ciel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff9a52"/><stop offset=".35" stop-color="#ffc98a"/><stop offset=".62" stop-color="#ffe7b8"/><stop offset="1" stop-color="#9fdcf5"/></linearGradient>` +
+      `<linearGradient id="aff-mer" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3aa6dc"/><stop offset="1" stop-color="#0e4a6e"/></linearGradient>` +
+      `<radialGradient id="aff-soleil"><stop offset="0" stop-color="#fffbe0"/><stop offset=".35" stop-color="#ffe58a" stop-opacity=".9"/><stop offset="1" stop-color="#ffe58a" stop-opacity="0"/></radialGradient>` +
+      `<radialGradient id="aff-or"><stop offset="0" stop-color="#fff6c0"/><stop offset=".4" stop-color="#ffd84a" stop-opacity=".85"/><stop offset="1" stop-color="#ffb020" stop-opacity="0"/></radialGradient>` +
+      `<linearGradient id="aff-pont" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b07a48"/><stop offset="1" stop-color="#5a3519"/></linearGradient>` +
+      `</defs>` +
+      // Ciel et soleil couchant (le décor déborde sur les côtés pour les écrans larges)
+      `<rect x="-1200" y="-600" width="3000" height="1100" fill="url(#aff-ciel)"/>` +
+      `<circle cx="430" cy="300" r="250" fill="url(#aff-soleil)"/>` +
+      `<circle cx="430" cy="330" r="70" fill="#fff1a8"/>` +
+      // Nuages et mouettes
+      `<g fill="#fff3e0" opacity=".85"><ellipse cx="90" cy="110" rx="70" ry="18"/><ellipse cx="130" cy="96" rx="40" ry="20"/><ellipse cx="540" cy="150" rx="80" ry="16"/><ellipse cx="500" cy="138" rx="38" ry="16"/></g>` +
+      `<path d="M250 120 q12 -10 24 0 q12 -10 24 0 M300 160 q9 -8 18 0 q9 -8 18 0 M200 180 q8 -7 16 0 q8 -7 16 0" fill="none" stroke="#7a4a2a" stroke-width="3.5" stroke-linecap="round"/>` +
+      // Mer, île et navire au loin
+      `<rect x="-1200" y="388" width="3000" height="1000" fill="url(#aff-mer)"/>` +
+      `<path d="M330 396 Q430 386 530 396" stroke="#fff6c8" stroke-width="6" stroke-linecap="round" opacity=".8"/><path d="M360 414 Q430 406 500 414" stroke="#fff6c8" stroke-width="4" stroke-linecap="round" opacity=".6"/>` +
+      `<path d="M-60 400 Q20 340 120 360 Q170 372 190 400 Z" fill="#6cbf5a"/><path d="M70 366 Q66 322 78 296" fill="none" stroke="#8a5a34" stroke-width="7" stroke-linecap="round"/><path d="M78 296 q-20 -14 -38 0 M78 296 q20 -16 38 -2 M78 296 q-6 -20 -24 -22 M78 296 q12 -20 26 -20" fill="none" stroke="#2e8b3e" stroke-width="8" stroke-linecap="round"/>` +
+      `<g transform="translate(232 318) scale(.5)" opacity=".92">${navire}</g>` +
+      `<path d="${vagues(440, 10)}" fill="none" stroke="#bfe8ff" stroke-width="4" stroke-linecap="round" opacity=".6"/>` +
+      // Le capitaine, bouche bée, derrière le coffre
+      `<path d="M408 358 Q412 340 450 340 H538 Q576 340 580 358 L592 630 H396 Z" fill="#7f8c8d" stroke="#4d5656" stroke-width="3"/><path d="M470 342 L494 400 L518 342" fill="none" stroke="#fff" stroke-width="7"/><rect x="400" y="440" width="186" height="20" fill="#3a2a1a"/><rect x="478" y="436" width="30" height="28" rx="4" fill="none" stroke="#f5c542" stroke-width="5"/>` +
+      `<g transform="translate(366 104) scale(2.55)">${capitaine}</g>` +
+      // Lueur de l'or, qui éclaire tout le centre
+      `<circle cx="490" cy="480" r="190" fill="url(#aff-or)"/>` +
+      // Le moussaillon, en grand
+      `<g transform="translate(-34 262) scale(3.85)">${heros}</g>` +
+      // Son bras levé et la carte qui gagne
+      `<path d="M262 610 Q286 470 318 352" fill="none" stroke="#7a1d14" stroke-width="44" stroke-linecap="round"/>` +
+      `<path d="M262 610 Q286 470 318 352" fill="none" stroke="#c0392b" stroke-width="36" stroke-linecap="round"/>` +
+      `<g transform="translate(262 136) rotate(12)"><rect x="-22" y="-22" width="164" height="212" rx="26" fill="#ffe27a" opacity=".55"/><rect x="-12" y="-12" width="144" height="192" rx="22" fill="#fff3b0" opacity=".7"/>${cartePoster('tresor', 7, 120)}</g>` +
+      `<circle cx="320" cy="348" r="27" fill="#f6c9a0" stroke="#7a4a2a" stroke-width="3"/><path d="M300 336 q6 -16 20 -14 M308 360 q14 6 28 -4" fill="none" stroke="#c98a6a" stroke-width="3" stroke-linecap="round"/>` +
+      // Traits de mouvement et étincelles autour de la carte
+      `<path d="M246 150 l-30 -26 M232 214 l-40 -6 M392 112 l20 -28 M226 290 l-36 6" stroke="#fffbe0" stroke-width="6" stroke-linecap="round"/>` +
+      etincelle(410, 150, 16) + etincelle(214, 250, 11) + etincelle(392, 330, 10) +
+      // Pont du navire au premier plan
+      `<rect x="-1200" y="612" width="3000" height="400" fill="url(#aff-pont)"/>` +
+      `<path d="M-1200 612 H1800" stroke="#4e2e12" stroke-width="10"/><path d="M-1200 640 H1800" stroke="#f5c542" stroke-width="5"/>` +
+      `<g stroke="rgba(0,0,0,.18)" stroke-width="3"><path d="M-1200 700 H1800 M-1200 760 H1800"/></g>` +
+      // Le coffre ouvert, débordant d'or
+      `<g transform="translate(394 452) scale(3.3)">${coffre}</g>` +
+      `<g>${piece(460, 470, 16, 10)}${piece(500, 462, 16, -20)}${piece(540, 472, 15, 30)}${piece(480, 448, 15, 50)}${piece(522, 446, 15, -40)}</g>` +
+      // L'or qui jaillit du coffre
+      piece(436, 410, 15, 20) + piece(470, 386, 16, -30) + piece(560, 404, 14, 60) + piece(586, 370, 12, 10) + piece(410, 380, 12, -50) + piece(530, 384, 13, 70) +
+      etincelle(500, 410, 12) + etincelle(578, 440, 10) + etincelle(450, 362, 9) +
+      // Cartes en éventail et pièces au premier plan, coupées par les bords
+      `<g transform="translate(-40 690) rotate(-24)">${cartePoster('perroquet', 4, 96)}</g>` +
+      `<g transform="translate(30 672) rotate(-8)">${cartePoster('ancre', 5, 96, 'bourse')}</g>` +
+      `<g transform="translate(118 680) rotate(10)">${cartePoster('canot', 3, 96)}</g>` +
+      piece(250, 690, 16, 0) + piece(286, 702, 15, 40) + piece(580, 670, 18, -20) + piece(612, 700, 16, 30) +
+      `</svg>`;
+    return s;
+  }
+  function cacherPourImage() {
+    document.querySelectorAll('.ecran, .voile-fond, .toast, .jel-langue, .piece-vol, .confetti').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    cacherPourImage();
+    const d = document.createElement('div');
+    d.id = 'affiche';
+    d.setAttribute('aria-hidden', 'true');
+    d.style.cssText = 'position:fixed;inset:0;z-index:50;overflow:hidden;background:#0e4a6e';
+    d.innerHTML = svgAffiche();
+    document.body.appendChild(d);
+    // Le bouton de langue peut arriver après ce script : caché encore un peu après.
+    [50, 300, 1000].forEach((t) => setTimeout(() => document.querySelectorAll('.jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important')), t));
+  }
+
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement sur le duel, avec sa vraie interface (or, manches, vent, coffre, main),
+  // sans écran titre, ni fenêtre « Continuer », ni tutoriel. La scène est posée puis figée :
+  // aucun son, rien dans la sauvegarde, ni victoire ni défaite.
+  //   1 = île 1 : le capitaine ouvre la manche, le doigt montre la carte conseillée ;
+  //   2 = île 8 : le vent, le coffre, une manche que le moussaillon vient de gagner ;
+  //   3 = île 20 : le brouillard cache la carte du capitaine, manche au trésor, cagnotte, bourse.
+  let apercu = 0;
+  const SCENES_APERCU = {
+    1: {
+      niveau: 0, resultats: [1, -1], orJ: 1, orC: 1, cagnotte: 0, vent: null, suite: [],
+      main: ['c5', 'p2', 'a3', 't4'], mainC: 4, cap: { c: 'perroquet', f: 3 }, conseil: true, message: ['msgOuvreCap'],
+    },
+    2: {
+      niveau: 7, resultats: [1, -1, 0], orJ: 3, orC: 1, cagnotte: 0, vent: 'canot', suite: [4],
+      main: ['c6', 'a1', 't2t', 'p3'], mainC: 3, cap: { c: 'ancre', f: 5 }, joue: { c: 'canot', f: 4 }, gagne: true, message: ['msgGagne', { n: 2 }],
+    },
+    3: {
+      niveau: 19, resultats: [1, -1, 1, 0], orJ: 4, orC: 3, cagnotte: 1, vent: 'tresor', suite: [6, 7],
+      main: ['t5b', 'p8', 'c2t', 'a9b'], mainC: 4, cap: { c: 'ancre', f: 8 }, brume: true, selection: 1, message: ['msgOuvreCapBrume'],
+    },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 98765 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    // Progression neuve en mémoire seulement (rien n'est enregistré).
+    P = progressionNeuve();
+    P.son = false;
+    P.chapeau = numero === 3 ? 'couronne' : numero === 2 ? 'plume' : 'tricorne';
+    if (numero === 3) document.documentElement.style.cssText += ';--lt:min(22vw,150px,21vh);--l:min(21vw,104px,14vh)';
+    document.querySelectorAll('.ecran').forEach((s) => s.classList.remove('actif'));
+    niv = sc.niveau;
+    e = nouvellePartie(NIVEAUX[niv], P.paquet);
+    e.manche = sc.resultats.length;
+    e.resultats = sc.resultats.slice();
+    e.orJ = sc.orJ; e.orC = sc.orC; e.cagnotte = sc.cagnotte;
+    e.vent = sc.vent; e.suite = sc.suite.slice();
+    e.mainJ = sc.main.map((id) => nouvelleCarte(CARTES[id], id));
+    e.mainC = e.mainC.slice(0, sc.mainC);
+    enPartie = false; // pas de sauvegarde à la fermeture
+    montrer('duel');
+    majDuelComplet();
+    carteCapPosee = nouvelleCarte(sc.cap);
+    capCachee = !!sc.brume;
+    if (sc.joue) {
+      carteJPosee = nouvelleCarte(sc.joue);
+      e.resultats.push(1);
+      majInfos();
+      majTable();
+      $('slot-j').classList.add('gagnant');
+      $('slot-cap').classList.add('perdant');
+      $('d-avatar').innerHTML = svgMoussaillon(P.chapeau, 'rit');
+      $('d-portrait').innerHTML = svgVisage(CAPITAINES[niv], 'oh');
+    } else {
+      majTable();
+      if ($('d-main-cap').lastChild) $('d-main-cap').lastChild.remove();
+      choixEnAttente = () => {}; // la main attend le choix du joueur, rien ne se joue
+      if (sc.selection !== undefined) selection = sc.selection;
+      if (sc.conseil) conseil = choisir(e, e.mainJ, carteCapPosee, 1);
+      majMain();
+    }
+    message(traduire(sc.message[0], Object.assign({ nom: nomCap() }, sc.message[1] || {})));
+    pause = true; // aucun minuteur ne tourne : la scène reste figée
+  }
+
   majBoutonsSon();
-  allerTitre();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else allerTitre();
 })();
 </script>
 </body>

@@ -1394,6 +1394,13 @@ const EP_PAROI = 3;       // demi-épaisseur des parois du bac et du verre
 const PAS_TRAIT = 9;      // distance entre deux points d'un trait
 const CLE = 'chemin-eau-v1';
 
+// Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU = 1, 2 ou 3) :
+// posés seulement par le robot du site, jamais par le jeu.
+const AFFICHE = !!window.JEL_AFFICHE;
+const APERCU = AFFICHE ? 0 : ([1, 2, 3].indexOf(Number(window.JEL_APERCU)) + 1);
+let apercuFige = false;    // images du jeu : partie figée après sa mise en place
+let apercuLarge = false;   // image 3 (ordinateur) : la feuille couvre toute la largeur
+
 // ==========================================================================
 // Les niveaux. Verre : x = centre, y = fond, w/h = intérieur, besoin = gouttes.
 // « solution » : un chemin possible, montré par le bouton Indice.
@@ -1581,6 +1588,7 @@ let dernierPlic = 0, dejaPlein = [];
 const JEU = 'chemin-de-l-eau';
 let niveauGagne = false;   // niveau en cours réussi (la suite est déjà enregistrée)
 JEL_SAVE.surFermeture(() => {
+  if (AFFICHE || APERCU) return;   // affiche et images du jeu : rien d'écrit
   if (!modeDemo && !niveauGagne) JEL_SAVE.save(JEU, { niveau: niv + 1 });
 });
 // Étoiles par niveau gardées aussi dans JEL_SAVE (seul stockage dans le cadre du
@@ -1810,6 +1818,7 @@ function dansUnVerre(p) { return verres.some((v) => dansVerre(p, v)); }
 // ==========================================================================
 let derniersResultats = null;
 function finirNiveau(reussi) {
+  if (APERCU || AFFICHE) return;   // images du jeu : ni fin, ni sauvegarde, ni FMG
   etat = 'fini';
   if (modeDemo) { setTimeout(() => { if (modeDemo) chargerNiveau(niv, true); }, 1200); return; }
   majInterface();
@@ -1985,12 +1994,15 @@ function dessiner() {
   ctx.fillStyle = fond; ctx.fillRect(0, 0, vue.cw, vue.ch);
   ctx.setTransform(vue.dpr * vue.s, 0, 0, vue.dpr * vue.s, vue.dpr * vue.ox, vue.dpr * vue.oy);
 
-  // Feuille de cahier.
-  ctx.fillStyle = '#fbfaf3'; rectArrondi(0, 0, W, H, 14); ctx.fill();
-  ctx.save(); rectArrondi(0, 0, W, H, 14); ctx.clip();
+  // Feuille de cahier (image 3 sur ordinateur : elle couvre toute la largeur).
+  const fx0 = apercuLarge ? Math.floor(-vue.ox / vue.s / 20) * 20 - 20 : 0;
+  const fx1 = apercuLarge ? (vue.cw - vue.ox) / vue.s + 20 : W;
+  ctx.fillStyle = '#fbfaf3'; rectArrondi(fx0, 0, fx1 - fx0, H, 14); ctx.fill();
+  ctx.save(); rectArrondi(fx0, 0, fx1 - fx0, H, 14); ctx.clip();
   ctx.strokeStyle = 'rgba(80,140,220,.13)'; ctx.lineWidth = 1;
-  for (let y = 20; y < H; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-  for (let x = 20; x < W; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 20; y < H; y += 20) { ctx.beginPath(); ctx.moveTo(fx0, y); ctx.lineTo(fx1, y); ctx.stroke(); }
+  for (let x = fx0 + 20; x < fx1; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  if (apercuLarge) dessinerBordsFeuille(fx0, fx1);
 
   // Vent : bandes qui défilent.
   for (const v of N.vents || []) {
@@ -2423,20 +2435,356 @@ function boucle(maintenant) {
   // Pause pendant le choix du niveau ; l'eau reste figée sous le bilan.
   const pause = $('ecran-niveaux').classList.contains('visible') && !modeDemo;
   if (intro) intro.t += dt;
-  else if (!pause) {
+  else if (!pause && !apercuFige) {
     reserve += dt;
     while (reserve >= DT) { reserve -= DT; if (etat !== 'fini' || modeDemo) pasPhysique(); else temps += DT; }
   }
   if (tIndice > 0) tIndice -= dt;
   if (flashZone > 0) flashZone -= dt;
-  majEffets(dt);
+  if (!apercuFige) majEffets(dt);
   dessiner();
   requestAnimationFrame(boucle);
 }
 
-redimensionner();
-allerAccueil();
-requestAnimationFrame(boucle);
+// ==========================================================================
+// Dessins communs à l'affiche et aux images du jeu (sans texte ni emoji)
+// ==========================================================================
+// Goutte ronde, au style des gouttes du jeu.
+function goutteRonde(x, y, r) {
+  ctx.fillStyle = '#2f80e0'; ctx.beginPath(); ctx.arc(x, y, r + r * 0.28, 0, 7); ctx.fill();
+  ctx.fillStyle = '#58b2ff'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.3, 0, 7); ctx.fill();
+}
+// Goutte qui tombe (pointe en haut).
+function goutteChute(x, y, r) {
+  const forme = (rr) => {
+    ctx.beginPath(); ctx.moveTo(x, y - rr * 2.1);
+    ctx.quadraticCurveTo(x + rr * 1.05, y - rr * 0.6, x + rr, y);
+    ctx.arc(x, y, rr, 0, Math.PI);
+    ctx.quadraticCurveTo(x - rr * 1.05, y - rr * 0.6, x, y - rr * 2.1);
+  };
+  ctx.fillStyle = '#2f80e0'; forme(r * 1.25); ctx.fill();
+  ctx.fillStyle = '#58b2ff'; forme(r); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.beginPath(); ctx.ellipse(x - r * 0.38, y - r * 0.2, r * 0.22, r * 0.42, 0.3, 0, 7); ctx.fill();
+}
+// Crayon : pointe en (tx, ty), corps dans la direction « ang ».
+function dessinerCrayon(tx, ty, ang, L, e) {
+  ctx.save(); ctx.translate(tx, ty); ctx.rotate(ang);
+  const cone = e * 1.4, bague = L - e * 1.7;
+  // Ombre portée sur la feuille.
+  ctx.fillStyle = 'rgba(30,45,80,.16)';
+  ctx.beginPath(); ctx.moveTo(6, 12); ctx.lineTo(cone + 6, -e / 2 + 14); ctx.lineTo(L + 6, -e / 2 + 14); ctx.lineTo(L + 6, e / 2 + 14); ctx.lineTo(cone + 6, e / 2 + 14); ctx.fill();
+  // Bois taillé et mine.
+  ctx.fillStyle = '#f3cf98'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(cone, -e / 2); ctx.lineTo(cone, e / 2); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#2e3554'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(cone * 0.36, -e * 0.18); ctx.lineTo(cone * 0.36, e * 0.18); ctx.closePath(); ctx.fill();
+  // Corps jaune à facettes.
+  const gr = ctx.createLinearGradient(0, -e / 2, 0, e / 2);
+  gr.addColorStop(0, '#ffe98f'); gr.addColorStop(0.45, '#ffc928'); gr.addColorStop(1, '#e09a00');
+  ctx.fillStyle = gr; ctx.fillRect(cone, -e / 2, bague - cone, e);
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(cone, -e * 0.38, bague - cone, e * 0.12);
+  ctx.fillStyle = 'rgba(160,100,0,.25)'; ctx.fillRect(cone, e * 0.18, bague - cone, e * 0.08);
+  // Bord dentelé du bois.
+  ctx.fillStyle = '#ffc928';
+  for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(cone, -e / 2 + e / 8 + k * e / 4, e / 8, Math.PI / 2, Math.PI * 1.5, false); ctx.fill(); }
+  // Bague de métal et gomme.
+  const gm = ctx.createLinearGradient(0, -e / 2, 0, e / 2);
+  gm.addColorStop(0, '#eef2f7'); gm.addColorStop(0.5, '#a9b4c4'); gm.addColorStop(1, '#6f7c90');
+  ctx.fillStyle = gm; ctx.fillRect(bague, -e / 2 - 1, e * 0.7, e + 2);
+  ctx.strokeStyle = 'rgba(70,80,100,.6)'; ctx.lineWidth = 2;
+  for (let k = 1; k < 3; k++) { ctx.beginPath(); ctx.moveTo(bague + k * e * 0.23, -e / 2); ctx.lineTo(bague + k * e * 0.23, e / 2); ctx.stroke(); }
+  ctx.fillStyle = '#ff8fa3'; rectArrondi(bague + e * 0.7, -e / 2, e * 1.05, e, e * 0.3); ctx.fill();
+  ctx.restore();
+}
+// Petite étoile scintillante à quatre branches.
+function etincelle(x, y, r, couleur) {
+  ctx.fillStyle = couleur || '#ffc61a';
+  ctx.beginPath(); ctx.moveTo(x, y - r);
+  ctx.quadraticCurveTo(x, y, x + r, y); ctx.quadraticCurveTo(x, y, x, y + r);
+  ctx.quadraticCurveTo(x, y, x - r, y); ctx.quadraticCurveTo(x, y, x, y - r); ctx.fill();
+}
+
+// ==========================================================================
+// Images du jeu (window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement)
+// 1 : niveau 1, l'eau dévale le premier trait ; 2 : niveau 8, rayures rouges
+// et pierre brûlante ; 3 : niveau 15 (sur ordinateur), deux bacs, vent, pierre
+// et verre qui glisse. Le chemin dessiné est celui de l'indice ; la physique
+// tourne quelques instants (hasard à graine fixe), puis la partie est figée.
+// ==========================================================================
+const MOMENTS_APERCU = {
+  // Niveau 1 : une pente et un petit mur, tracés comme un joueur, qui mènent l'eau dans le verre.
+  1: { niv: 0, pas: 390, traits: [[[40, 168], [150, 222], [256, 282]], [[277, 236], [275, 404]]] },
+  2: { niv: 7, pas: 240 },
+  3: { niv: 14, pas: 250 },
+};
+function ouvrirApercu(n) {
+  let graine = 7919 * n + 12345;
+  Math.random = () => {
+    graine = (graine + 0x6D2B79F5) | 0;
+    let t = Math.imul(graine ^ (graine >>> 15), 1 | graine);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const m = MOMENTS_APERCU[n];
+  // Rien n'est lu ni écrit dans la sauvegarde : progression plausible, son coupé, présentations vues.
+  sauvegarde = { etoiles: [], scores: [], son: false, vus: ['tuto', 'planche', 'zone', 'pierre', 'glisse', 'vent', 'deux'] };
+  for (let i = 0; i < m.niv; i++) sauvegarde.etoiles[i] = i % 3 === 2 ? 2 : 3;
+  apercuLarge = n === 3;
+  cacherEcrans();
+  document.body.classList.remove('accueil');
+  redimensionner();
+  chargerNiveau(m.niv, false);
+  intro = null;
+  traits = copie(m.traits || N.solution);
+  calculerSegTraits();
+  verser();
+  for (let k = 0; k < m.pas; k++) pasPhysique();
+  apercuFige = true;
+  majInterface();
+}
+// Image 3 sur ordinateur : la feuille continue sur les côtés, avec le crayon,
+// la gomme et la règle posés dessus (en coordonnées du monde).
+function dessinerBordsFeuille(fx0, fx1) {
+  ctx.save();
+  // Marge rouge du cahier, à gauche.
+  ctx.strokeStyle = 'rgba(230,90,90,.35)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-24, 0); ctx.lineTo(-24, H); ctx.stroke();
+  if (fx0 < -120) {
+    dessinerCrayon(-70, 300, -2.3, 300, 30);
+    // Gomme et miettes.
+    ctx.save(); ctx.translate(-190, 450); ctx.rotate(-0.25);
+    ctx.fillStyle = 'rgba(30,45,80,.15)'; rectArrondi(-38, -14, 84, 40, 8); ctx.fill();
+    ctx.fillStyle = '#ff9fb1'; rectArrondi(-42, -20, 84, 40, 8); ctx.fill();
+    ctx.fillStyle = '#5aa9e6'; rectArrondi(-4, -20, 46, 40, 6); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#ffb3c1';
+    for (const [x, y] of [[-110, 470], [-120, 488], [-98, 492], [-135, 505]]) { ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill(); }
+    // Petit nuage griffonné.
+    ctx.strokeStyle = 'rgba(46,53,84,.35)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(-120, 150, 16, Math.PI, 0); ctx.arc(-88, 142, 20, Math.PI, 0); ctx.arc(-58, 152, 14, Math.PI, 0); ctx.lineTo(-136, 152); ctx.stroke();
+  }
+  if (fx1 > W + 120) {
+    // Règle en bois posée de biais (graduations sans chiffres).
+    ctx.save(); ctx.translate(W + 150, 110); ctx.rotate(0.35);
+    ctx.fillStyle = 'rgba(30,45,80,.15)'; ctx.fillRect(6, 8, 52, 400);
+    ctx.fillStyle = '#f0d39b'; ctx.fillRect(0, 0, 52, 400);
+    ctx.strokeStyle = '#a77b3c'; ctx.lineWidth = 2;
+    for (let k = 8; k < 400; k += 12) { ctx.beginPath(); ctx.moveTo(0, k); ctx.lineTo(k % 60 === 8 ? 22 : 12, k); ctx.stroke(); }
+    ctx.restore();
+    // Flaque de gouttes échappées.
+    ctx.fillStyle = 'rgba(88,178,255,.35)'; ctx.beginPath(); ctx.ellipse(W + 110, 500, 60, 16, 0, 0, 7); ctx.fill();
+    for (const [x, y, r] of [[W + 80, 494, 6], [W + 104, 498, 7], [W + 130, 492, 5.5], [W + 150, 502, 5]]) goutteRonde(x, y, r);
+    goutteChute(W + 96, 440, 7);
+  }
+  ctx.restore();
+}
+
+// ==========================================================================
+// Affiche du jeu (window.JEL_AFFICHE, posé par le robot seulement) : scène
+// composée 600 × 800, sans interface, sans texte, sans son.
+// ==========================================================================
+function demarrerAffiche() {
+  document.body.classList.add('affiche');
+  const style = document.createElement('style');
+  style.textContent = 'body.affiche .barre, body.affiche .barre-bas, body.affiche .accueil-haut, body.affiche .accueil-bas, body.affiche .ecran, body.affiche button, jel-langue, .jel-langue { display: none !important; }';
+  document.head.appendChild(style);
+  const cacherLangue = () => document.querySelectorAll('jel-langue, .jel-langue').forEach((e) => e.style.setProperty('display', 'none', 'important'));
+  cacherLangue();
+  [50, 300, 1000, 1800].forEach((d) => setTimeout(() => { cacherLangue(); dessinerAffiche(); }, d));
+  window.addEventListener('resize', dessinerAffiche);
+  dessinerAffiche();
+}
+function dessinerAffiche() {
+  redimensionner();
+  const s = Math.min(vue.cw / 600, vue.ch / 800);
+  const ox = (vue.cw - 600 * s) / 2, oy = (vue.ch - 800 * s) / 2;
+  ctx.setTransform(vue.dpr * s, 0, 0, vue.dpr * s, vue.dpr * ox, vue.dpr * oy);
+  const x0 = -ox / s - 2, x1 = (vue.cw - ox) / s + 2, y0 = -oy / s - 2, y1 = (vue.ch - oy) / s + 2;
+
+  // 1. Feuille de cahier baignée de soleil.
+  ctx.fillStyle = '#fbf5e2'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  const lum = ctx.createRadialGradient(505, 40, 20, 505, 40, 700);
+  lum.addColorStop(0, 'rgba(255,200,60,.9)'); lum.addColorStop(0.3, 'rgba(255,215,110,.45)'); lum.addColorStop(1, 'rgba(255,235,190,0)');
+  ctx.fillStyle = lum; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.save(); ctx.translate(505, 40);
+  for (let k = 0; k < 16; k++) {
+    ctx.rotate(Math.PI * 2 / 16);
+    ctx.fillStyle = 'rgba(255,205,80,.13)';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(1000, -80); ctx.lineTo(1000, 80); ctx.fill();
+  }
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(70,130,210,.17)'; ctx.lineWidth = 1.5;
+  for (let y = Math.floor(y0 / 30) * 30; y < y1; y += 30) { ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); }
+  for (let x = Math.floor(x0 / 30) * 30; x < x1; x += 30) { ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x, y1); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(230,90,90,.4)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(28, y0); ctx.lineTo(28, y1); ctx.stroke();
+  // Soleil.
+  ctx.save();
+  ctx.shadowColor = '#ffcc33'; ctx.shadowBlur = 60;
+  const gs = ctx.createRadialGradient(495, 30, 5, 505, 40, 62);
+  gs.addColorStop(0, '#fffbe0'); gs.addColorStop(0.6, '#ffdb4d'); gs.addColorStop(1, '#ffb81f');
+  ctx.fillStyle = gs; ctx.beginPath(); ctx.arc(505, 40, 62, 0, 7); ctx.fill();
+  ctx.restore();
+
+  // 2. Fond pâle : vent, planche et pierre brûlante des niveaux suivants.
+  ctx.save(); ctx.globalAlpha = 0.4; ctx.lineCap = 'round';
+  ctx.strokeStyle = '#46a0dc'; ctx.lineWidth = 5;
+  for (const [x, y] of [[50, 340], [85, 378], [40, 414], [92, 450]]) {
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 25, y - 10, x + 50, y); ctx.quadraticCurveTo(x + 70, y + 8, x + 62, y - 8); ctx.stroke();
+  }
+  ctx.strokeStyle = '#7a4a1e'; ctx.lineWidth = 16;
+  ctx.beginPath(); ctx.moveTo(470, 470); ctx.lineTo(590, 440); ctx.stroke();
+  ctx.strokeStyle = '#c4884a'; ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.moveTo(470, 470); ctx.lineTo(590, 440); ctx.stroke();
+  const gp = ctx.createLinearGradient(0, 560, 0, 588);
+  gp.addColorStop(0, '#ffb347'); gp.addColorStop(1, '#e2421b');
+  ctx.fillStyle = gp; rectArrondi(460, 560, 130, 28, 12); ctx.fill();
+  ctx.fillStyle = '#ff7a1a';
+  for (const x of [485, 525, 565]) {
+    ctx.beginPath(); ctx.moveTo(x, 520); ctx.quadraticCurveTo(x + 14, 545, x + 8, 560); ctx.lineTo(x - 8, 560); ctx.quadraticCurveTo(x - 14, 545, x, 520); ctx.fill();
+  }
+  ctx.restore();
+
+  // 3. Bureau en bois sous la feuille.
+  ctx.fillStyle = 'rgba(40,50,80,.18)'; ctx.fillRect(x0, 690, x1 - x0, 10);
+  const gb = ctx.createLinearGradient(0, 698, 0, y1);
+  gb.addColorStop(0, '#d39a5e'); gb.addColorStop(1, '#8d5426');
+  ctx.fillStyle = gb; ctx.fillRect(x0, 698, x1 - x0, y1 - 698);
+  ctx.strokeStyle = 'rgba(110,60,20,.35)'; ctx.lineWidth = 3;
+  for (let k = 0; k < 6; k++) {
+    const y = 720 + k * 22;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.bezierCurveTo(150, y - 8, 380, y + 10, x1, y - 4); ctx.stroke();
+  }
+
+  // 4. Le verre assoiffé (héros) sur son étagère.
+  const cx = 295, haut = 330, bas = 640, dh = 132, db = 106;
+  const bordX = (y, cote) => cx + cote * (dh + (db - dh) * (y - haut) / (bas - haut));
+  ctx.fillStyle = 'rgba(40,50,80,.2)'; rectArrondi(150, 652, 310, 14, 7); ctx.fill();
+  ctx.fillStyle = '#b07a46'; rectArrondi(140, 640, 310, 18, 6); ctx.fill();
+  ctx.fillStyle = '#d29b62'; rectArrondi(140, 640, 310, 6, 3); ctx.fill();
+  const formeVerre = () => {
+    ctx.beginPath(); ctx.moveTo(bordX(haut, -1), haut);
+    ctx.lineTo(bordX(bas - 22, -1), bas - 22); ctx.quadraticCurveTo(bordX(bas, -1), bas, bordX(bas, -1) + 22, bas);
+    ctx.lineTo(bordX(bas, 1) - 22, bas); ctx.quadraticCurveTo(bordX(bas, 1), bas, bordX(bas - 22, 1), bas - 22);
+    ctx.lineTo(bordX(haut, 1), haut);
+  };
+  ctx.fillStyle = 'rgba(205,232,255,.6)'; formeVerre(); ctx.fill();
+  // Eau dans le verre, avec vagues et bulles.
+  const niveau = 482;
+  ctx.save(); formeVerre(); ctx.clip();
+  const ge = ctx.createLinearGradient(0, niveau, 0, bas);
+  ge.addColorStop(0, '#6cc0ff'); ge.addColorStop(1, '#1f6fd0');
+  ctx.fillStyle = ge;
+  ctx.beginPath(); ctx.moveTo(100, niveau);
+  for (let x = 100; x <= 500; x += 40) ctx.quadraticCurveTo(x + 10, niveau - 12, x + 20, niveau), ctx.quadraticCurveTo(x + 30, niveau + 10, x + 40, niveau);
+  ctx.lineTo(500, 700); ctx.lineTo(100, 700); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  for (const [x, y, r] of [[230, 560, 7], [255, 600, 5], [340, 530, 6], [360, 590, 8], [300, 615, 4], [210, 520, 4]]) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+  ctx.restore();
+  // Ligne orange à atteindre.
+  ctx.strokeStyle = '#ff9d00'; ctx.lineWidth = 5; ctx.setLineDash([13, 9]);
+  ctx.beginPath(); ctx.moveTo(bordX(455, -1) + 8, 455); ctx.lineTo(bordX(455, 1) - 8, 455); ctx.stroke(); ctx.setLineDash([]);
+  // Parois du verre.
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,255,255,.9)'; ctx.shadowBlur = 10;
+  ctx.strokeStyle = '#3f64a0'; ctx.lineWidth = 11; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  formeVerre(); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(bordX(355, -1) + 20, 355); ctx.lineTo(bordX(600, -1) + 18, 600); ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(bordX(360, 1) - 18, 360); ctx.lineTo(bordX(420, 1) - 16, 420); ctx.stroke();
+  // Visage joyeux, bouche grande ouverte, yeux levés vers l'eau qui arrive.
+  ctx.fillStyle = 'rgba(255,110,140,.5)';
+  for (const sx of [-1, 1]) { ctx.beginPath(); ctx.ellipse(cx + sx * 78, 442, 18, 12, 0, 0, 7); ctx.fill(); }
+  for (const sx of [-1, 1]) {
+    const ex = cx + sx * 42;
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(ex, 392, 23, 27, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#23324f'; ctx.lineWidth = 3.5; ctx.stroke();
+    ctx.fillStyle = '#23324f'; ctx.beginPath(); ctx.arc(ex + 7, 384, 13, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(ex + 11, 379, 5, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex + 2, 390, 2.5, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#23324f'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(ex, 368, 22, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke();
+  }
+  ctx.save();
+  ctx.beginPath(); ctx.moveTo(cx - 34, 424); ctx.quadraticCurveTo(cx, 418, cx + 34, 424); ctx.arc(cx, 424, 34, 0, Math.PI); ctx.closePath();
+  ctx.fillStyle = '#23324f'; ctx.fill(); ctx.clip();
+  ctx.fillStyle = '#ff7a8a'; ctx.beginPath(); ctx.ellipse(cx, 456, 20, 12, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(cx - 22, 420, 44, 8);
+  ctx.restore();
+
+  // 5. Le bac en bois rempli de gouttes, trappe rouge ouverte.
+  const bx = 40, by = 95, bw = 210, bh = 110;
+  ctx.fillStyle = 'rgba(40,50,80,.16)'; ctx.fillRect(bx + 8, by + 12, bw, bh);
+  ctx.fillStyle = 'rgba(170,215,255,.55)'; ctx.fillRect(bx, by, bw, bh);
+  ctx.save(); ctx.beginPath(); ctx.rect(bx, by + 18, bw, bh - 18); ctx.clip();
+  for (let l = 0; l < 6; l++) for (let c = 0; c < 12; c++) goutteRonde(bx + 10 + c * 17.5 + (l % 2) * 8, by + bh - 9 - l * 15, 8);
+  ctx.restore();
+  ctx.strokeStyle = '#7a4a1e'; ctx.lineWidth = 12; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(bx, by - 14); ctx.lineTo(bx, by + bh); ctx.lineTo(bx + 108, by + bh); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx + 158, by + bh); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx + bw, by - 14); ctx.stroke();
+  ctx.strokeStyle = '#c4884a'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.moveTo(bx, by - 12); ctx.lineTo(bx, by + bh - 4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx + bw, by - 12); ctx.lineTo(bx + bw, by + bh - 4); ctx.stroke();
+  ctx.strokeStyle = 'rgba(122,74,30,.45)'; ctx.lineWidth = 4;
+  for (const f of [0.3, 0.7]) { ctx.beginPath(); ctx.moveTo(bx, by + bh * f); ctx.lineTo(bx + bw, by + bh * f); ctx.stroke(); }
+  ctx.strokeStyle = '#e94b4b'; ctx.lineWidth = 10;
+  ctx.beginPath(); ctx.moveTo(bx + 110, by + bh + 2); ctx.lineTo(bx + 98, by + bh + 44); ctx.stroke();
+
+  // 6. La rampe tracée au crayon, et l'eau qui la dévale.
+  const rampe = [[55, 240], [160, 262], [280, 290], [388, 318]];
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#2e3554'; ctx.lineWidth = 13;
+  ctx.beginPath(); rampe.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.3)'; ctx.lineWidth = 3;
+  ctx.beginPath(); rampe.forEach(([x, y], k) => (k ? ctx.lineTo(x, y - 3) : ctx.moveTo(x, y - 3))); ctx.stroke();
+  // Filet d'eau qui sort de la trappe.
+  for (const [y, r] of [[218, 7], [234, 7.5], [250, 8]]) goutteChute(bx + 133, y, r);
+  // Eau qui glisse sur le trait.
+  const surRampe = (x) => {
+    for (let k = 1; k < rampe.length; k++) {
+      const [ax, ay] = rampe[k - 1], [cx2, cy2] = rampe[k];
+      if (x <= cx2) return ay + (cy2 - ay) * (x - ax) / (cx2 - ax);
+    }
+    return rampe[rampe.length - 1][1];
+  };
+  ctx.strokeStyle = '#2f80e0'; ctx.lineWidth = 24;
+  ctx.beginPath(); for (let x = 165; x <= 386; x += 8) (x === 165 ? ctx.moveTo(x, surRampe(x) - 13) : ctx.lineTo(x, surRampe(x) - 13)); ctx.stroke();
+  ctx.strokeStyle = '#58b2ff'; ctx.lineWidth = 16;
+  ctx.beginPath(); for (let x = 165; x <= 386; x += 8) (x === 165 ? ctx.moveTo(x, surRampe(x) - 13) : ctx.lineTo(x, surRampe(x) - 13)); ctx.stroke();
+  for (let k = 0, x = 170; x < 390; x += 17, k++) goutteRonde(x, surRampe(x) - 15 - (k % 2) * 6, 7.5);
+
+  // 7. Le crayon qui vient de tracer la rampe (premier plan, coupé par le bord).
+  dessinerCrayon(396, 312, -0.62, 460, 42);
+
+  // 8. Cascade dans le verre, éclaboussures et étincelles.
+  for (const [x, y, r] of [[397, 344, 8], [400, 372, 9], [402, 404, 9.5], [404, 440, 10]]) goutteChute(x, y, r);
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.ellipse(404, niveau - 2, 26, 7, 0, 0, 7); ctx.stroke();
+  for (const [x, y, r] of [[374, 462, 5], [432, 460, 5], [366, 444, 4], [440, 440, 4], [404, 452, 4]]) goutteRonde(x, y, r);
+  for (const [x, y, r] of [[140, 330, 15], [455, 395, 13], [470, 352, 8], [118, 380, 9], [270, 238, 10], [210, 312, 8]]) etincelle(x, y, r);
+
+  // 9. Premier plan : grosses gouttes floues coupées par les bords.
+  ctx.save(); ctx.filter = 'blur(3px)';
+  goutteChute(16, 600, 34);
+  goutteChute(560, 650, 26);
+  goutteRonde(86, 676, 16);
+  ctx.restore();
+}
+
+// ==========================================================================
+// Démarrage
+// ==========================================================================
+if (AFFICHE) {
+  demarrerAffiche();
+} else if (APERCU) {
+  ouvrirApercu(APERCU);
+  requestAnimationFrame(boucle);
+} else {
+  redimensionner();
+  allerAccueil();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

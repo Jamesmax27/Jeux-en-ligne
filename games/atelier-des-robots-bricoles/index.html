@@ -1983,6 +1983,10 @@
     .piece canvas { width: 48px; height: 36px; }
     .piece { min-height: 72px; }
   }
+  /* Image 3 du jeu (window.JEL_APERCU = 3, écran d'ordinateur) : le jeu occupe toute la largeur. */
+  body.apercu-large #ecran-jeu > .colonne { width: 100%; padding: 8px 20px 12px; }
+  body.apercu-large #etabli { grid-template-columns: repeat(7, 1fr); }
+  body.apercu-large .piste-boite { flex: 1.5 1 0; }
   @media (max-height: 640px) {
     .piece { min-height: 52px; }
     .piece canvas { height: 22px; }
@@ -3600,7 +3604,7 @@
 
   // ---------- Pause ----------
   function ouvrirPause() {
-    if (etat.ecran !== 'jeu' || etat.pause) return;
+    if (etat.ecran !== 'jeu' || etat.pause || etat.fige) return;
     if ($('fin').classList.contains('ouvert') || $('bilan').classList.contains('ouvert')) return;
     etat.pause = true;
     if (ac) ac.suspend().catch(() => {});
@@ -3898,12 +3902,12 @@
     try {
       if (etat.ecran === 'titre') dessinerTitre();
       if (etat.ecran === 'jeu') {
-        if (!etat.pause) {
+        if (!etat.pause && !etat.fige) {
           if (etat.essai) etat.essai.maj(dt);
           else if (etat.apercu) etat.apercu.maj(dt);
           majTuto(dt);
         }
-        dessinerPisteJeu(etat.pause ? 0 : dt);
+        dessinerPisteJeu(etat.pause || etat.fige ? 0 : dt);
         dessinerAtelier(etat.pause ? 0 : dt);
       }
       if (etat.demo) { etat.demo.maj(dt); dessinerDemo(); }
@@ -3993,13 +3997,249 @@
     sauver(etat.niveauReprise);
   });
 
+  // ======================================================================
+  // 9. Affiche (jaquette) et images du jeu (page du jeu)
+  // ======================================================================
+
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le robot orange bondit
+  // sur son ressort au-dessus d'un trou, hélice qui tourne, lampe allumée, et son aimant attire les
+  // boulons dorés ; derrière lui, le grand hublot de la station, un soleil et une planète à anneau.
+  function dessinerAffiche() {
+    let cv = $('affiche');
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.id = 'affiche';
+      cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;z-index:60';
+      document.body.appendChild(cv);
+    }
+    const W = innerWidth, H = innerHeight;
+    const g = preparer(cv, W, H);
+    if (!g) return;
+    const u = Math.min(H / 800, W / 600 * 1.15);
+    const X = (x) => W / 2 + (x - 300) * u;
+    const Y = (y) => H / 2 + (y - 400) * u;
+    const L = (v) => v * u;
+    let s0 = 11;
+    const hasard = () => { s0 = (s0 * 16807) % 2147483647; return s0 / 2147483647; };
+
+    // Mur de la station
+    const mur = g.createLinearGradient(0, 0, 0, H);
+    mur.addColorStop(0, '#34449a'); mur.addColorStop(1, '#4a5cb0');
+    g.fillStyle = mur; g.fillRect(0, 0, W, H);
+    // panneaux du mur
+    g.strokeStyle = 'rgba(20,28,70,.35)'; g.lineWidth = L(3);
+    for (let k = -8; k < 9; k++) { const x = X(300 + k * 150); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, Y(600)); g.stroke(); }
+
+    // Grand hublot : espace, nébuleuse, soleil, planète à anneau
+    const hx = X(300), hy = Y(330), hr = L(292);
+    g.save(); g.beginPath(); g.arc(hx, hy, hr, 0, 7); g.clip();
+    const ciel = g.createLinearGradient(0, hy - hr, 0, hy + hr);
+    ciel.addColorStop(0, '#1d2a78'); ciel.addColorStop(1, '#3a2f8a');
+    g.fillStyle = ciel; g.fillRect(hx - hr, hy - hr, hr * 2, hr * 2);
+    [[200, 420, 230, 'rgba(232,110,196,.55)'], [450, 330, 200, 'rgba(70,200,235,.45)'], [330, 140, 180, 'rgba(160,120,255,.4)']].forEach(([x, y, r, c]) => {
+      const gr = g.createRadialGradient(X(x), Y(y), 0, X(x), Y(y), L(r));
+      gr.addColorStop(0, c); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(hx - hr, hy - hr, hr * 2, hr * 2);
+    });
+    for (let i = 0; i < 90; i++) {
+      const a = hasard(), b = hasard(), c = hasard();
+      g.fillStyle = 'rgba(255,255,255,' + (0.45 + 0.55 * c) + ')';
+      g.fillRect(hx - hr + a * hr * 2, hy - hr + b * hr * 2, L(1.5 + c * 2.5), L(1.5 + c * 2.5));
+    }
+    // soleil
+    const sx = X(120), sy = Y(150);
+    const halo = g.createRadialGradient(sx, sy, 0, sx, sy, L(260));
+    halo.addColorStop(0, 'rgba(255,250,220,1)'); halo.addColorStop(0.12, 'rgba(255,225,140,.95)');
+    halo.addColorStop(0.35, 'rgba(255,170,90,.35)'); halo.addColorStop(1, 'rgba(255,150,80,0)');
+    g.fillStyle = halo; g.fillRect(hx - hr, hy - hr, hr * 2, hr * 2);
+    g.fillStyle = '#fffbe8'; g.beginPath(); g.arc(sx, sy, L(34), 0, 7); g.fill();
+    // planète à anneau
+    const px = X(470), py = Y(210), pr = L(78);
+    g.strokeStyle = 'rgba(242,210,122,.9)'; g.lineWidth = L(9);
+    g.beginPath(); g.ellipse(px, py, pr * 1.75, pr * 0.38, -0.3, Math.PI, Math.PI * 2); g.stroke();
+    const pl = g.createRadialGradient(px - pr * 0.4, py - pr * 0.4, pr * 0.1, px, py, pr);
+    pl.addColorStop(0, '#b9a8ff'); pl.addColorStop(0.6, '#7a68e0'); pl.addColorStop(1, '#4a3aa8');
+    g.fillStyle = pl; g.beginPath(); g.arc(px, py, pr, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.ellipse(px - pr * 0.1, py + pr * 0.15, pr * 0.85, pr * 0.14, -0.3, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(255,224,140,.95)';
+    g.beginPath(); g.ellipse(px, py, pr * 1.75, pr * 0.38, -0.3, 0, Math.PI); g.stroke();
+    g.fillStyle = '#dfe4f2'; g.beginPath(); g.arc(X(395), Y(410), L(18), 0, 7); g.fill();
+    g.fillStyle = '#b8bfd6'; g.beginPath(); g.arc(X(390), Y(405), L(5), 0, 7); g.fill();
+    g.restore();
+    // cadre du hublot
+    g.strokeStyle = '#7a88c4'; g.lineWidth = L(28); g.beginPath(); g.arc(hx, hy, hr, 0, 7); g.stroke();
+    g.strokeStyle = '#b9c3ec'; g.lineWidth = L(5); g.beginPath(); g.arc(hx, hy, hr - L(12), Math.PI * 1.05, Math.PI * 1.7); g.stroke();
+    g.fillStyle = '#dde3f7';
+    for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8; g.beginPath(); g.arc(hx + Math.cos(a) * hr, hy + Math.sin(a) * hr, L(5), 0, 7); g.fill(); }
+    // rayons de lumière du soleil
+    g.save(); g.globalCompositeOperation = 'lighter';
+    [[0.55, 70], [0.75, 45], [0.95, 60]].forEach(([a, l]) => {
+      g.fillStyle = 'rgba(255,220,150,.07)';
+      g.beginPath(); g.moveTo(sx, sy);
+      g.lineTo(sx + Math.cos(a - 0.08) * L(900), sy + Math.sin(a - 0.08) * L(900));
+      g.lineTo(sx + Math.cos(a + 0.08) * L(900) + L(l), sy + Math.sin(a + 0.08) * L(900));
+      g.fill();
+    });
+    g.restore();
+
+    // Sol du parcours : plateforme de départ, trou avec son filet, marche d'arrivée
+    const solG = Y(610), solD = Y(570), trou0 = X(195), trou1 = X(335);
+    const solCouleur = (y0) => { const gr = g.createLinearGradient(0, y0, 0, H); gr.addColorStop(0, '#6a7cc4'); gr.addColorStop(1, '#3a4890'); return gr; };
+    g.fillStyle = '#0c1132'; g.fillRect(trou0, solD, trou1 - trou0, H - solD);
+    g.strokeStyle = '#f29a4a'; g.lineWidth = L(3);
+    const fy = Y(735);
+    g.beginPath();
+    for (let k = 0; k < 8; k++) { const x0 = trou0 + k * (trou1 - trou0) / 8; g.moveTo(x0, fy); g.lineTo(x0 + (trou1 - trou0) / 16, fy + L(12)); g.lineTo(x0 + (trou1 - trou0) / 8, fy); }
+    g.moveTo(trou0, fy); g.lineTo(trou1, fy); g.stroke();
+    g.fillStyle = solCouleur(solG); g.fillRect(-2, solG, trou0 + 2, H - solG);
+    g.fillStyle = '#c3ccef'; g.fillRect(-2, solG, trou0 + 2, L(9));
+    g.fillStyle = solCouleur(solD); g.fillRect(trou1, solD, W - trou1 + 2, H - solD);
+    g.fillStyle = '#c3ccef'; g.fillRect(trou1, solD, W - trou1 + 2, L(9));
+    // bande jaune et noire au bord de la marche
+    g.save(); g.beginPath(); g.rect(trou1, solD + L(9), L(14), H - solD); g.clip();
+    for (let k = 0; k < 20; k++) { g.fillStyle = k % 2 ? '#1b2142' : '#f2d27a'; g.fillRect(trou1, solD + L(9) + k * L(18), L(14), L(18)); }
+    g.restore();
+    g.fillStyle = 'rgba(0,0,0,.15)';
+    for (let k = -6; k < 10; k++) { const x = X(300 + k * 80); g.fillRect(x, (x < trou0 ? solG : solD) + L(26), L(3), H); }
+
+    // Drapeau d'arrivée (fond, à droite)
+    const mx = X(545);
+    g.strokeStyle = '#e6eaf5'; g.lineWidth = L(6); g.beginPath(); g.moveTo(mx, solD); g.lineTo(mx, Y(400)); g.stroke();
+    g.fillStyle = '#5cd18f'; g.beginPath(); g.moveTo(mx, Y(400)); g.quadraticCurveTo(mx + L(45), Y(410), mx + L(80), Y(425)); g.quadraticCurveTo(mx + L(40), Y(440), mx, Y(455)); g.fill();
+    g.fillStyle = '#f2d27a'; g.beginPath(); g.arc(mx + L(26), Y(426), L(9), 0, 7); g.fill();
+
+    // Étagère d'où l'aimant tire les boulons (gauche)
+    g.fillStyle = '#9aa4c8'; g.fillRect(X(-40), Y(395), L(150), L(10)); g.fillRect(X(85), Y(395), L(8), L(40));
+
+    // Héros : le robot en plein bond
+    const s = L(232);
+    const rx = X(268), ry = Y(520);
+    const pieces = new Set(['roues', 'ressort', 'bras', 'aimant', 'helice', 'lampe']);
+    const an = { helice: 0.35, roue: 0.9, ressort: 0, bras: 0.75, aimant: 0.3, lumiere: true, regard: 0.6, temps: 0.2 };
+    const Gm = geometrie(s, pieces, an);
+    // halo de lumière autour du robot
+    const hal = g.createRadialGradient(rx, ry + Gm.yb, s * 0.2, rx, ry + Gm.yb, s * 1.25);
+    hal.addColorStop(0, 'rgba(255,240,200,.55)'); hal.addColorStop(1, 'rgba(255,240,200,0)');
+    g.fillStyle = hal; g.fillRect(rx - s * 1.4, ry + Gm.yb - s * 1.4, s * 2.8, s * 2.8);
+    // traits de vitesse derrière lui
+    g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineCap = 'round';
+    [[-0.25, 0.75, 4], [-0.55, 0.6, 3], [-0.85, 0.85, 3.5], [-0.05, 0.5, 2.5]].forEach(([dy, l, w]) => {
+      g.lineWidth = L(w); g.beginPath(); g.moveTo(rx - s * 0.62, ry + dy * s); g.lineTo(rx - s * (0.62 + l), ry + dy * s + s * 0.12); g.stroke();
+    });
+    // nuage de poussière au bord du départ
+    g.fillStyle = 'rgba(230,235,255,.7)';
+    [[175, 600, 16], [150, 592, 12], [192, 588, 10], [128, 600, 8]].forEach(([x, y, r]) => { g.beginPath(); g.arc(X(x), Y(y), L(r), 0, 7); g.fill(); });
+    // faisceau de la lampe vers le drapeau
+    const lx = rx + 0.38 * s, ly = ry + Gm.haut - 0.02 * s;
+    const fais = g.createLinearGradient(lx, 0, lx + s * 1.6, 0);
+    fais.addColorStop(0, 'rgba(255,244,170,.75)'); fais.addColorStop(1, 'rgba(255,244,170,0)');
+    g.fillStyle = fais; g.beginPath(); g.moveTo(lx, ly - s * 0.03); g.lineTo(lx + s * 1.6, ly - s * 0.35); g.lineTo(lx + s * 1.6, ly + s * 0.75); g.lineTo(lx, ly + s * 0.05); g.fill();
+    g.save(); g.translate(rx, ry); g.rotate(-0.12); g.translate(-rx, -ry);
+    // contour clair (lumière du soleil sur le robot)
+    g.save(); g.shadowColor = 'rgba(255,236,180,.95)'; g.shadowBlur = L(18);
+    dessinerRobot(g, rx, ry, s, { pieces, decor: { peinture: 'orange', antenne: 'etoile', yeux: 'grands' } }, an);
+    g.restore();
+    // hélice qui tourne : traînées
+    const hx2 = rx + 0.05 * s, hy2 = ry + Gm.haut - 0.16 * s;
+    g.strokeStyle = 'rgba(160,235,255,.55)'; g.lineWidth = L(3);
+    g.beginPath(); g.ellipse(hx2, hy2, s * 0.24, s * 0.06, 0, Math.PI * 1.05, Math.PI * 1.95); g.stroke();
+    g.beginPath(); g.ellipse(hx2, hy2, s * 0.24, s * 0.06, 0, Math.PI * 0.05, Math.PI * 0.95); g.stroke();
+    // ondes de l'aimant
+    const ax = rx + Gm.ancres.aimant.x, ay = ry + Gm.ancres.aimant.y - 0.06 * s;
+    g.strokeStyle = 'rgba(120,230,255,.9)'; g.lineWidth = L(4);
+    for (let k = 1; k <= 3; k++) { g.beginPath(); g.arc(ax, ay, s * 0.07 * k, Math.PI * 0.95, Math.PI * 1.55); g.stroke(); }
+    g.restore();
+    // boulons attirés par l'aimant
+    [[0.3, 0.55], [0.62, 0.42], [0.88, 0.3]].forEach(([v, r]) => {
+      const bx = X(40) + (ax - X(40)) * v, by = Y(375) + (ay - Y(375)) * v - Math.sin(v * Math.PI) * L(40);
+      dessinerBoulon(g, bx, by, L(22) * r * 1.4, v > 0.5);
+    });
+    dessinerBoulon(g, X(40), Y(375), L(16), true);
+
+    // Premier plan : caisse et pièces de l'établi, coupées par les bords
+    const cxx = X(-10), cyy = Y(668), cw = L(170);
+    g.fillStyle = '#d4964f'; g.fillRect(cxx - cw / 2, cyy, cw, cw);
+    g.strokeStyle = '#7a4f22'; g.lineWidth = L(7); g.strokeRect(cxx - cw / 2, cyy, cw, cw);
+    g.beginPath(); g.moveTo(cxx - cw / 2, cyy); g.lineTo(cxx + cw / 2, cyy + cw); g.moveTo(cxx + cw / 2, cyy); g.lineTo(cxx - cw / 2, cyy + cw); g.stroke();
+    g.fillStyle = 'rgba(255,230,180,.25)'; g.fillRect(cxx - cw / 2, cyy, cw, L(10));
+    g.save(); g.translate(X(560), Y(720)); g.rotate(-0.35);
+    g.fillStyle = 'rgba(111,214,242,.2)'; g.beginPath(); g.arc(0, 0, L(80), 0, 7); g.fill();
+    dessinerPiece(g, 'chenilles', 0, 0, L(150));
+    g.restore();
+    g.save(); g.translate(X(450), Y(760)); g.rotate(0.25);
+    dessinerPiece(g, 'ressort', 0, 0, L(110));
+    g.restore();
+    dessinerBoulon(g, X(375), Y(765), L(16), true);
+    dessinerBoulon(g, X(130), Y(780), L(13), false);
+    // étincelles
+    g.fillStyle = '#fff3b0';
+    [[230, 230, 14], [420, 470, 10], [120, 470, 9], [380, 180, 8], [500, 520, 12], [340, 640, 8]].forEach(([x, y, r]) => { etoileForme(g, X(x), Y(y), L(r), 4); g.fill(); });
+  }
+  function cacherInterface() {
+    document.querySelectorAll('.ecran, .voile, #tuto, #fx, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  function demarrerAffiche() {
+    muet = true;
+    cacherInterface();
+    dessinerAffiche();
+    // le bouton de langue est parfois créé un peu après : le cacher encore
+    setTimeout(cacherInterface, 100); setTimeout(cacherInterface, 600);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (parcours, atelier, établi), pendant le test
+  // du robot : 1 = mission 1, le robot roule ; 2 = mission 10, il soulève une caisse après avoir attiré
+  // un boulon ; 3 = mission 20, sur un écran d'ordinateur, il traverse le tunnel sombre lampe allumée.
+  // L'essai est avancé jusqu'au bon moment puis figé : ni victoire, ni défaite, ni son, ni sauvegarde.
+  const APERCUS = {
+    1: { n: 0, p: ['roues'], decor: DECOR_DEFAUT, ok: (e) => e.k >= 2 && e.u > 0.5 },
+    2: { n: 9, p: ['roues', 'aimant', 'bras'], decor: { peinture: 'vert', antenne: 'double', yeux: 'grands' }, ok: (e) => e.etape && e.etape.type === 'caisse' && e.u > 0.42 },
+    3: { n: 19, p: ['chenilles', 'ressort', 'bras', 'aimant', 'helice', 'lampe'], decor: { peinture: 'orange', antenne: 'etoile', yeux: 'rieurs' }, ok: (e) => e.etape && e.etape.type === 'tunnel' && e.etape.de === 5 && e.u > 0.55 },
+  };
+  function ouvrirApercu(k) {
+    muet = true;
+    let s0 = 4242;
+    Math.random = () => { s0 = (s0 * 16807) % 2147483647; return s0 / 2147483647; };
+    const A = APERCUS[k];
+    PROG = progVide();
+    PROG.vus = NIVEAUX.map((x) => x.nouveau).filter(Boolean);
+    PROG.decor = Object.assign({}, A.decor);
+    if (k === 3) document.body.classList.add('apercu-large');
+    lancerNiveau(A.n);
+    etat.enPartie = false;
+    etat.pieces = new Set(A.p);
+    majAtelier();
+    etat.mode = 'test';
+    $('colonne-jeu').classList.add('verrouille');
+    const essai = new Essai(NIVEAUX[A.n], etat.pieces, PROG.decor);
+    essai.surFin = null;
+    etat.essai = essai;
+    for (let i = 0; i < 3000 && !A.ok(essai) && !essai.fini; i++) essai.maj(1 / 60);
+    etat.balayage = 0; etat.camCible = null;
+    $('glisse-aide').hidden = true;
+    $('info-case').textContent = t('aide.test');
+    etat.fige = true;
+    const placer = () => { const P = geoPiste(); etat.cam = Math.max(P.camMin, Math.min(P.camMax, essai.pose.x * P.T - P.W * 0.4)); };
+    placer();
+    window.addEventListener('resize', placer);
+  }
+
   // Démarrage
   try { effacerTitre = JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('titre-effacer'), apres: allerTitre }); } catch (e) { effacerTitre = null; }
   // Son coupé : choix gardé aussi dans la sauvegarde (le cadre du site n'a pas de stockage).
   try { const d = JEL_SAVE.load(JEU); if (d && d.options && d.options.son === false) muet = true; } catch (e) { /* pas de sauvegarde */ }
   majBoutonsSon();
-  allerTitre();
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    allerTitre();
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

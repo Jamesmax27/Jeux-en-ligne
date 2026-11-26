@@ -2032,6 +2032,7 @@
 (function () {
   'use strict';
   const JEU = 'atelier-des-fusees-en-couleurs';
+  let apercu = 0;        // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   const I18N = window.JEL_I18N;
   const tr = (cle, vars) => I18N.t(cle, vars);
   const nb = (x) => I18N.nombre(x);
@@ -2167,7 +2168,7 @@
   // ==========================================================================
   let audio = null;
   function ctxAudio() {
-    if (!S.son) return null;
+    if (!S.son || apercu || window.JEL_AFFICHE) return null;
     try {
       if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
       if (audio.state === 'suspended') audio.resume();
@@ -3677,9 +3678,9 @@
     boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('effacerTitre'), apres: () => { S.etoiles = NIVEAUX.map(() => 0); S.records = NIVEAUX.map(() => 0); S.vus = {}; S.tuto = false; S.repriseMax = 1; } });
   } catch (e) { /* rien */ }
 
-  window.JEL_SAVE.surFermeture(() => { if (enPartie) sauver(A.n + 1); });
+  window.JEL_SAVE.surFermeture(() => { if (enPartie && !apercu) sauver(A.n + 1); });
 
-  document.addEventListener('visibilitychange', () => { if (document.hidden && (ecran === 'vol' || ecran === 'atelier')) pause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu && (ecran === 'vol' || ecran === 'atelier')) pause(); });
 
   document.addEventListener('keydown', (e) => {
     touches[e.code] = true;
@@ -3706,6 +3707,195 @@
   window.addEventListener('resize', () => { if (ecran === 'atelier') redimRampe(); if (ecran === 'vol') redimVol(); if (ecran === 'titre') redimTitre(); });
 
   // ==========================================================================
+  // Affiche (jaquette du jeu)
+  // ==========================================================================
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). La fusée peinte du joueur
+  // décolle en grand dans un ciel lumineux, attrape une étoile filante, un astronaute salue, les
+  // planètes amies sourient autour d'elle.
+  const FUSEE_AFFICHE = {
+    c: [P('gros', 0), P('reservoir', 1, 0), P('reservoir', 2, 1), P('cabine', 11), P('bouclier', 10)],
+    g: [P('aileron', 5), P('propulseur', 6), P('panneau'), null, null, null, null, null],
+    d: [P('aileron', 5), P('propulseur', 6), P('panneau'), null, null, null, null, null],
+  };
+  function nuage(ctx, x, y, r, coul) {
+    ctx.fillStyle = coul;
+    [[0, 0, 1], [-0.9, 0.25, 0.75], [0.9, 0.2, 0.8], [-0.4, -0.45, 0.7], [0.45, -0.4, 0.65]].forEach((b) => {
+      ctx.beginPath(); ctx.arc(x + b[0] * r, y + b[1] * r, b[2] * r, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+  function etoileFilante(ctx, x, y, r, dx, dy) {
+    const g = ctx.createLinearGradient(x, y, x + dx, y + dy);
+    g.addColorStop(0, 'rgba(255,243,191,.95)'); g.addColorStop(1, 'rgba(255,243,191,0)');
+    ctx.strokeStyle = g; ctx.lineWidth = r * 0.9; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + dx, y + dy); ctx.stroke();
+    ctx.save(); ctx.shadowColor = '#ffe066'; ctx.shadowBlur = r * 1.6;
+    ctx.fillStyle = '#ffd43b'; etoile5(ctx, x, y, r, r * 0.45); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#fff9db'; etoile5(ctx, x, y, r * 0.45, r * 0.2); ctx.fill();
+  }
+  function dessinerAffiche() {
+    const cv = $('afficheCanvas'); if (!cv) return;
+    const W = window.innerWidth || 600, H = window.innerHeight || 800;
+    const ctx = preparer(cv, W, H), k = Math.min(W / 600, H / 800), cx = W / 2, t = 0.35;
+    const rnd = alea(2026);
+    // Ciel lumineux : bleu en haut, violet, puis rose au-dessus de la base
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#2f45b8'); g.addColorStop(0.45, '#6a55d8'); g.addColorStop(0.78, '#b36ad0'); g.addColorStop(1, '#ff9fc0');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // Nébuleuses douces
+    [[0.12, 0.42, 0.42, 'rgba(255,135,200,.35)'], [0.9, 0.55, 0.45, 'rgba(99,230,190,.28)'], [0.5, 0.05, 0.5, 'rgba(116,192,252,.35)']].forEach((n) => {
+      const x = cx + (n[0] - 0.5) * W, y = n[1] * H, r = n[2] * Math.max(W, H * 0.75);
+      const ng = ctx.createRadialGradient(x, y, 0, x, y, r); ng.addColorStop(0, n[3]); ng.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = ng; ctx.fillRect(0, 0, W, H);
+    });
+    // Petites étoiles, sur toute la largeur
+    const nEt = Math.round(140 * W / (600 * k));
+    for (let i = 0; i < nEt; i++) {
+      const x = rnd() * W, y = rnd() * H * 0.8, r = (0.8 + rnd() * 1.8) * k;
+      ctx.fillStyle = 'rgba(255,255,255,' + (0.45 + rnd() * 0.5) + ')';
+      if (rnd() < 0.15) { etoile5(ctx, x, y, r * 2.4, r * 0.8); ctx.fill(); } else { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+    }
+    // Grande lumière derrière la fusée
+    const lx = cx + 20 * k, ly = H * 0.36;
+    const halo = ctx.createRadialGradient(lx, ly, 10 * k, lx, ly, 330 * k);
+    halo.addColorStop(0, 'rgba(255,250,220,.95)'); halo.addColorStop(0.35, 'rgba(255,230,160,.5)'); halo.addColorStop(1, 'rgba(255,220,160,0)');
+    ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
+    // Rayons de lumière
+    ctx.save(); ctx.translate(lx, ly); ctx.fillStyle = 'rgba(255,248,214,.16)';
+    for (let i = 0; i < 12; i++) { ctx.rotate(Math.PI / 6); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.max(W, H) * 0.06, -Math.max(W, H)); ctx.lineTo(-Math.max(W, H) * 0.06, -Math.max(W, H)); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    // Planètes amies : au fond, puis plus près
+    planete(ctx, 1, cx - 190 * k, H * 0.22, 60 * k, t);
+    planete(ctx, 3, cx + 195 * k, H * 0.2, 40 * k, t + 1);
+    planete(ctx, 0, cx + 200 * k, H * 0.52, 52 * k, t + 2);
+    // Étoiles filantes qui tombent vers la fusée
+    etoileFilante(ctx, cx - 165 * k, H * 0.42, 17 * k, -70 * k, -120 * k);
+    etoileFilante(ctx, cx + 150 * k, H * 0.36, 14 * k, 60 * k, -110 * k);
+    etoileFilante(ctx, cx - 60 * k, H * 0.1, 12 * k, -40 * k, -90 * k);
+    // Fumée du décollage
+    const s = 72 * k, bas = H * 0.7, angle = 0.13;
+    for (let i = 0; i < 9; i++) {
+      const x = cx + (i - 4) * 70 * k + (rnd() - 0.5) * 30 * k, y = H * 0.86 + Math.abs(i - 4) * 8 * k;
+      nuage(ctx, x, y, (50 + rnd() * 25) * k, i % 2 ? 'rgba(255,240,250,.92)' : 'rgba(255,255,255,.95)');
+    }
+    // Lueur des flammes
+    const fx = cx - Math.sin(angle) * 40 * k, fy = bas + 70 * k;
+    const lf = ctx.createRadialGradient(fx, fy, 5 * k, fx, fy, 170 * k);
+    lf.addColorStop(0, 'rgba(255,236,153,.95)'); lf.addColorStop(0.4, 'rgba(255,169,77,.55)'); lf.addColorStop(1, 'rgba(255,107,107,0)');
+    ctx.fillStyle = lf; ctx.fillRect(0, 0, W, H);
+    // La fusée, en grand, qui décolle en penchant vers l'étoile filante
+    ctx.save(); ctx.shadowColor = 'rgba(255,250,220,.9)'; ctx.shadowBlur = 24 * k;
+    fusee(ctx, FUSEE_AFFICHE, cx, bas, s, { flammes: 1.9, t: t, angle: angle });
+    ctx.restore();
+    fusee(ctx, FUSEE_AFFICHE, cx, bas, s, { flammes: 1.9, t: t, angle: angle });
+    // Étoile attrapée au bout de la fusée : éclat doré
+    const ex = cx + 62 * k, ey = H * 0.14;
+    ctx.save(); ctx.shadowColor = '#ffe066'; ctx.shadowBlur = 30 * k;
+    ctx.fillStyle = '#ffd43b'; etoile5(ctx, ex, ey, 30 * k, 13 * k); ctx.fill(); ctx.restore();
+    ctx.fillStyle = '#fff9db'; etoile5(ctx, ex, ey, 13 * k, 6 * k); ctx.fill();
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2 + 0.3, d = (46 + (i % 3) * 12) * k;
+      ctx.fillStyle = ['#ffd43b', '#fff3bf', '#ff8787', '#63e6be', '#74c0fc'][i % 5];
+      etoile5(ctx, ex + Math.cos(a) * d, ey + Math.sin(a) * d, (5 + (i % 2) * 3) * k); ctx.fill();
+    }
+    // Astronaute qui flotte et salue, attaché à la fusée
+    const ax = cx - 150 * k, ay = H * 0.6;
+    ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 3 * k; ctx.setLineDash([7 * k, 6 * k]);
+    ctx.beginPath(); ctx.moveTo(ax + 20 * k, ay + 20 * k); ctx.quadraticCurveTo(cx - 110 * k, H * 0.68, cx - 60 * k, H * 0.6); ctx.stroke(); ctx.setLineDash([]);
+    ctx.save(); ctx.translate(ax, ay); ctx.rotate(-0.25);
+    astronaute(ctx, 0, 0, 82 * k, '#f783ac', 1.2); ctx.restore();
+    // Premier plan : grande planète guimauve coupée par le bord
+    planete(ctx, 2, cx - 255 * k, H * 0.9, 105 * k, t + 3);
+    nuage(ctx, cx + 260 * k, H * 0.97, 70 * k, 'rgba(255,255,255,.96)');
+  }
+  function cacherInterfaceAffiche() {
+    for (const el of document.querySelectorAll('#app, .jel-langue, jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+  }
+  function demarrerAffiche() {
+    const cv = document.createElement('canvas'); cv.id = 'afficheCanvas'; cv.setAttribute('aria-hidden', 'true');
+    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:50;display:block';
+    document.body.appendChild(cv);
+    cacherInterfaceAffiche();
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+    window.addEventListener('load', cacherInterfaceAffiche);
+    setTimeout(cacherInterfaceAffiche, 100); setTimeout(cacherInterfaceAffiche, 600);
+  }
+
+  // ==========================================================================
+  // Images du jeu (page du jeu)
+  // ==========================================================================
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface, sans écran titre, ni fenêtre « Continuer »,
+  // ni tutoriel, ni présentation (CONSIGNES-JEU.md, section 5). Rien n'est enregistré, aucun son.
+  //   1 = mission 1, l'atelier : on glisse la cabine sur la fusée (moteur et réservoir déjà posés) ;
+  //   2 = mission 9 (Citrouille), le vol : fusée peinte à propulseurs, étoiles filantes et cailloux ;
+  //   3 = mission 20 (Bulle), sur ordinateur : fusée à 2 étages, le 1er étage qui tombe, comètes.
+  const SCENES_APERCU = {
+    // objets : [type, x, y] en part de l'écran ; « eclat » : un caillou vient de rebondir sur le bouclier.
+    2: { n: 8, secondes: 13.5, s: 38, attrapes: 3, eclat: 0.8,
+      objets: [['etoile', 0.24, 0.3], ['etoile', 0.74, 0.47], ['etoile', 0.56, 0.13], ['caillou', 0.2, 0.55], ['caillou', 0.82, 0.24], ['caillou', 0.38, 0.08]],
+      F: { c: [P('gros', 6), P('reservoir', 1, 0), P('reservoir', 2, 1), P('reservoir', 1, 3), P('reservoir', 2), P('grandeCabine', 0), P('bouclier', 10)],
+        g: [P('aileron', 5), P('propulseur', 6), null, null, null, null, null, null], d: [P('aileron', 5), P('propulseur', 6), null, null, null, null, null, null] } },
+    3: { n: 19, apresSep: 1.0, pSep: 0.62, s: 46, attrapes: 5, eclat: 0.7,
+      objets: [['comete', 0.27, 0.32, 1], ['comete', 0.78, 0.52, -1], ['comete', 0.12, 0.12, 1], ['comete', 0.93, 0.3, -1],
+        ['caillou', 0.14, 0.64], ['caillou', 0.86, 0.18], ['caillou', 0.64, 0.12], ['caillou', 0.36, 0.7],
+        ['etoile', 0.4, 0.2], ['etoile', 0.7, 0.7], ['etoile', 0.06, 0.38], ['etoile', 0.95, 0.76], ['etoile', 0.22, 0.86], ['etoile', 0.56, 0.24]],
+      F: { c: [P('gros', 9), P('reservoir', 8, 0), P('separateur'), P('moteur', 7), P('reservoir', 4, 3), P('reservoir', 2, 6), P('grandeCabine', 11), P('bouclier', 10)],
+        g: [P('aileron', 5), P('propulseur', 6), null, P('pied', 5), P('propulseur', 0), null, null, null], d: [P('aileron', 5), P('propulseur', 6), null, P('pied', 5), P('propulseur', 0), null, null, null] } },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 98765 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    // Progression en mémoire seulement : nouveautés déjà vues, tutoriel fait.
+    ['base', 'peindre', 'ailerons', 'poids', 'bouclier', 'panneaux', 'equilibre', 'propulseurs', 'pieds', 'cometes', 'plateforme', 'etages', 'pilote', 'sepVue', 'atterrissageVu'].forEach((v) => { S.vus[v] = true; });
+    S.tuto = true;
+    S.etoiles = NIVEAUX.map((_, i) => (i < 9 ? 3 : i < 19 ? 2 : 0));
+    if (numero === 3) $('app').style.maxWidth = 'none'; // ordinateur : le ciel du vol remplit toute la largeur
+    if (numero === 1) {
+      lancerMission(0);
+      A.F = vide(); A.F.c = [P('moteur'), P('reservoir')];
+      majAtelier(true); redimRampe();
+      // La cabine glissée depuis la caisse, juste au-dessus de sa place (cadre vert).
+      const z = $('rampe').getBoundingClientRect(), app = $('app').getBoundingClientRect(), c = caseVers(1, A.F.c.length);
+      const x = z.left + c.x + A.s * 0.75, y = z.top + c.y + A.s * 0.1;
+      A.drag = { t: 'cabine', x0: x, y0: y + 200, x: x, y: y, bouge: true, id: 0, places: placesPossibles(A.F, 'cabine') };
+      const f = $('fantome'), fc = preparer(f, 64, 64);
+      piece(fc, P('cabine'), 6, 6, 52, null, { haut: true });
+      f.style.display = 'block'; f.style.left = (x - app.left + 18) + 'px'; f.style.top = (y - app.top - 6) + 'px';
+      return;
+    }
+    const sc = SCENES_APERCU[numero];
+    lancerMission(sc.n);
+    A.F = copier(sc.F);
+    demarrerVol(evaluer(A.F));
+    V.s = sc.s;
+    if (sc.pSep) V.pSep = sc.pSep;
+    const dt = 1 / 60;
+    if (sc.secondes) for (let i = 0; i < sc.secondes * 60 && V.actif; i++) boucleVol(dt);
+    if (sc.apresSep !== undefined) {
+      for (let i = 0; i < 1200 && V.actif && !V.sepFenetre; i++) boucleVol(dt);
+      V.sepParfaite = true; faireSeparation();
+      for (let i = 0; i < sc.apresSep * 60 && V.actif; i++) boucleVol(dt);
+    }
+    // Étoiles filantes, cailloux et comètes posés autour de la fusée.
+    V.objets = sc.objets.map((o, i) => ({ type: o[0], vu: true, fini: false, px: o[1] * V.W, y: o[2] * V.H, x: o[1], t: i * 0.7, dir: o[3] || 1, r: 0.6 }));
+    V.attrapes = sc.attrapes; V.x = V.cible = V.W / 2;
+    if (sc.eclat) {
+      V.eclat = sc.eclat; V.particules = [];
+      const hy = V.y - (V.F.c.length - V.de) * V.s;
+      for (let i = 0; i < 10; i++) V.particules.push({ x: V.x + (i - 5) * V.s * 0.25, y: hy - V.s * (0.3 + (i % 3) * 0.35), vx: 0, vy: 0, v: 0.5, c: i % 2 ? '#a5d8ff' : '#ffffff' });
+    }
+    hudAvant = ''; majHudVol();
+    // Puis le vol est figé sur ce moment, avec la vraie interface et sans fenêtre de pause.
+    clearTimeout(minuteAide); $('aideVol').textContent = '';
+    V.pause = true;
+  }
+
+  // ==========================================================================
   // Boucle d'animation
   // ==========================================================================
   let der = performance.now(), horloge = 0;
@@ -3722,6 +3912,9 @@
   window.addEventListener('load', () => { if (ecran === 'titre') redimTitre(); });
   setTimeout(() => { if (ecran === 'titre') redimTitre(); }, 200);
   I18N.surChangement(() => { if (ecran === 'titre') redimTitre(); });
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) { demarrerAffiche(); return; }
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
   requestAnimationFrame(boucle);
 })();
 </script>

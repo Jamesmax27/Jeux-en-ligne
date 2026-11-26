@@ -1919,6 +1919,8 @@
   .pulse { animation: pulse .7s ease-in-out infinite alternate; }
   @media (prefers-reduced-motion: reduce) { .mover, .jeton.saute, .pulse { animation-duration: 6s; } }
   @media (min-width: 700px) { .carte { width: calc((100% - 30px) / 6); } }
+  /* Image du jeu sur ordinateur (window.JEL_APERCU = 3 seulement) : cartes plus serrées, salle plus haute. */
+  @media (min-width: 1000px) { .apercu-ordi .carte { width: calc((100% - 54px) / 10); min-height: 54px; } .apercu-ordi .carte svg { width: 36px; height: 36px; } }
 </style>
 </head>
 <body>
@@ -2704,6 +2706,7 @@ const estIndicePlat = (c) => c.k === 'platInvite' || c.k === 'platGout' || c.k =
 // =====================================================================
 //  Partie
 // =====================================================================
+let apercu = 0;      // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 let B = null;        // banquet en cours (généré)
 let st = null;       // état de la partie
 let enCours = false; // une partie est en cours (sauvegarde à la fermeture)
@@ -3261,6 +3264,7 @@ const SCENES = {
   cloches: () => `<div style="left:90px;top:40px;width:100px;height:60px;border-radius:12px;background:#fff7e8;border:2px solid #e2cfa9;display:flex;align-items:center;justify-content:center;gap:2px"><div style="width:28px;height:28px">${visageSVG('hibou', '')}</div><div style="width:28px;height:28px">${relSVG('voisin')}</div><div style="width:28px;height:28px">${visageSVG('chat', '')}</div></div>${mover(`<div style="width:110px;height:76px">${ICONES.cloche}</div>`, 85, 30, 85, -40, true)}${elem(ICONES.main, 150, 84, 34)}`,
 };
 function ouvrirIntro(nouv, resto) {
+  if (apercu) return; // image du jeu : aucune présentation
   const boite = $('#boite-intro');
   let titre = nouv ? t('nouv.' + nouv + '.titre') : t('nouv.resto', { r: t('resto.' + resto) });
   let sous = nouv && resto && nouv !== 'base' ? `<p class="ligne-info or">${attr(t('nouv.resto', { r: t('resto.' + resto) }))}</p>` : '';
@@ -3498,10 +3502,194 @@ function brancher() {
   I18N.surChangement(() => { document.title = t('titre'); });
 }
 
+// =====================================================================
+//  Affiche (jaquette du jeu)
+// =====================================================================
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Girafe, gourmande, en grand,
+// une serviette nouée au cou, voit sa tarte aux cerises apparaître sous la cloche qu'on soulève ;
+// Hibou et Chat se boudent de chaque côté de la table, comme le dit la carte d'indice ; Girafe rêve
+// de sucré (bulle de goût). Lampe allumée, fanions, crêperie au soleil couchant.
+function sansFond(a) { return VISAGES[a].replace(/^<rect width="100" height="100" fill="[^"]*"\/>/, ''); }
+function medaillonAff(a, x, y, w, id) {
+  return `<svg x="${x}" y="${y}" width="${w}" height="${w}" viewBox="0 0 100 100"><clipPath id="${id}"><circle cx="50" cy="50" r="48"/></clipPath><g clip-path="url(#${id})">${VISAGES[a]}</g><circle cx="50" cy="50" r="47" fill="none" stroke="#fff" stroke-width="5"/></svg>`;
+}
+function eclatAff(x, y, r, c) { return `<path d="M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z" fill="${c}"/>`; }
+function assietteAff(d, cx, cy, r, bord = '#d9cbb4') {
+  return `<ellipse cx="${cx}" cy="${cy + r * 0.12}" rx="${r}" ry="${r * 0.9}" fill="rgba(0,0,0,.16)"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" stroke="${bord}" stroke-width="${Math.max(4, r * 0.1)}"/><circle cx="${cx}" cy="${cy}" r="${r * 0.78}" fill="none" stroke="#efe6d6" stroke-width="3"/><svg x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" viewBox="0 0 100 100">${ALIMENTS[d]}</svg>`;
+}
+function fanionsAff(y0, creux, decal) {
+  const couleurs = ['#ff5a6e', '#f7c62a', '#4fc3ff', '#3fa86b', '#9a6bff'];
+  let h = '';
+  for (let x0 = -1400; x0 < 2000; x0 += 600) {
+    h += `<path d="M${x0} ${y0} Q${x0 + 300} ${y0 + creux * 2} ${x0 + 600} ${y0}" stroke="#f2e2c4" stroke-width="4" fill="none"/>`;
+    for (let i = 0; i < 12; i++) {
+      const u = (i + 0.5) / 12, x = x0 + 600 * u, y = y0 + creux * 4 * u * (1 - u);
+      h += `<path d="M${x - 19} ${y} L${x + 19} ${y} L${x} ${y + 36} Z" fill="${couleurs[(i + decal) % 5]}" stroke="rgba(0,0,0,.12)" stroke-width="2"/>`;
+    }
+  }
+  return h;
+}
+function dessinAffiche() {
+  let rayures = '';
+  for (let x = -1400; x < 2000; x += 80) rayures += `<rect x="${x}" y="-1400" width="40" height="1780" fill="rgba(0,0,0,.05)"/>`;
+  let ourlet = 'M-120 2000 L-120 668';
+  for (let x = -120; x < 720; x += 60) ourlet += ` Q${x + 30} 700 ${x + 60} 668`;
+  ourlet += ' L720 2000 Z';
+  const lampe = (x, f) => `<line x1="${x}" y1="-1400" x2="${x}" y2="${70 * f}" stroke="#4a2a1a" stroke-width="4"/>
+    <circle cx="${x}" cy="${118 * f}" r="${70 * f}" fill="url(#aff-lueur)"/>
+    <path d="M${x - 44 * f} ${112 * f} L${x + 44 * f} ${112 * f} L${x + 22 * f} ${70 * f} L${x - 22 * f} ${70 * f} Z" fill="#f2b632" stroke="#b57f12" stroke-width="3"/>
+    <circle cx="${x}" cy="${116 * f}" r="${13 * f}" fill="#fffbe0"/>`;
+  const bulle = bulleGoutSVG('sucre').replace(/<\/?svg[^>]*>/g, '');
+  const cloche = ICONES.cloche.replace(/<\/?svg[^>]*>/g, '');
+  return `<svg viewBox="0 0 600 800" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" style="display:block;overflow:visible" aria-hidden="true">
+  <defs>
+    <linearGradient id="aff-mur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f4636"/><stop offset="1" stop-color="#d79c62"/></linearGradient>
+    <radialGradient id="aff-halo" cx="300" cy="240" r="330" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff6c8" stop-opacity="1"/><stop offset=".4" stop-color="#ffd884" stop-opacity=".55"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="aff-lueur"><stop offset="0" stop-color="#fffbe0" stop-opacity=".95"/><stop offset=".5" stop-color="#ffe27a" stop-opacity=".5"/><stop offset="1" stop-color="#ffe27a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="aff-tarte" cx="300" cy="600" r="170" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#fff8c0" stop-opacity="1"/><stop offset=".55" stop-color="#ffe27a" stop-opacity=".45"/><stop offset="1" stop-color="#ffe27a" stop-opacity="0"/></radialGradient>
+    <clipPath id="aff-nappe"><ellipse cx="300" cy="596" rx="372" ry="128"/></clipPath>
+  </defs>
+  <!-- Salle : mur, lambris, plancher (prolongés au-delà du cadre pour les écrans larges) -->
+  <rect x="-1400" y="-1400" width="3400" height="1800" fill="url(#aff-mur)"/>
+  ${rayures}
+  <rect x="-1400" y="378" width="3400" height="14" fill="#e3b27a"/>
+  <rect x="-1400" y="392" width="3400" height="2000" fill="#8c5730"/>
+  <rect x="-1400" y="470" width="3400" height="2000" fill="#6e3f22"/>
+  <!-- Fond : fenêtre et plante -->
+  <svg x="14" y="196" width="160" height="160" viewBox="0 0 100 100" opacity=".9">${REPERES.fenetre}</svg>
+  <svg x="452" y="214" width="130" height="130" viewBox="0 0 100 100" opacity=".9">${REPERES.plante}</svg>
+  <svg x="-260" y="196" width="160" height="160" viewBox="0 0 100 100" opacity=".9">${REPERES.fenetre}</svg>
+  <svg x="700" y="196" width="160" height="160" viewBox="0 0 100 100" opacity=".9">${REPERES.fenetre}</svg>
+  <!-- Grande lumière chaude derrière Girafe -->
+  <rect x="-1400" y="-1400" width="3400" height="3400" fill="url(#aff-halo)"/>
+  ${fanionsAff(14, 18, 0)}
+  ${lampe(500, 1)}${lampe(-160, 1)}${lampe(760, 1)}
+  <!-- Hibou (à gauche), boudeur -->
+  <g transform="translate(22 330) scale(1.6)">
+    <circle cx="50" cy="56" r="43" fill="#fff3cf" opacity=".7"/>
+    ${sansFond('hibou')}
+    <path d="M22 33 L46 43 M78 33 L54 43" stroke="#3b2414" stroke-width="5.5" stroke-linecap="round"/>
+  </g>
+  <!-- Chat (à droite), boudeur -->
+  <g transform="translate(436 340) scale(1.55)">
+    <circle cx="50" cy="56" r="39" fill="#fff3cf" opacity=".7"/>
+    ${sansFond('chat')}
+    <path d="M28 38 L47 45 M72 38 L53 45" stroke="#5a2c0c" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <!-- Girafe, l'héroïne : cou tacheté, serviette nouée, tête en grand -->
+  <path d="M252 300 Q244 420 236 540 L364 540 Q356 420 348 300 Z" fill="#f4c64e" stroke="#fff3cf" stroke-width="5"/>
+  <g fill="#d9943a"><path d="M262 330 q16 -8 28 4 q-4 18 -24 14 z"/><path d="M316 352 q20 -6 26 10 q-10 16 -26 8 z"/><path d="M270 392 q18 -6 26 8 q-6 16 -26 10 z"/><path d="M318 410 q16 -4 24 10 q-8 14 -26 6 z"/></g>
+  <path d="M232 436 L368 436 L300 530 Z" fill="#fff" stroke="#e24c4c" stroke-width="6" stroke-linejoin="round"/>
+  <circle cx="300" cy="438" r="12" fill="#e24c4c"/><path d="M290 440 L270 430 M310 440 L330 430" stroke="#e24c4c" stroke-width="8" stroke-linecap="round"/>
+  <g transform="translate(166 86) scale(2.68)">
+    <ellipse cx="50" cy="56" rx="33" ry="41" fill="#fff8d8" opacity=".85"/>
+    ${sansFond('girafe')}
+    <circle cx="36" cy="49" r="1.4" fill="#fff"/><circle cx="60" cy="49" r="1.4" fill="#fff"/>
+    <path d="M52 87 Q59 98 65 87 Z" fill="#ff6f8a" stroke="#c94a63" stroke-width="1"/>
+    <circle cx="27" cy="68" r="5" fill="#ff8fa3" opacity=".6"/><circle cx="73" cy="68" r="5" fill="#ff8fa3" opacity=".6"/>
+  </g>
+  <!-- Bulle de goût : Girafe veut du sucré -->
+  <svg x="420" y="128" width="118" height="118" viewBox="0 0 100 100">${bulle}</svg>
+  <!-- Carte d'indice : Hibou ne veut pas être à côté de Chat -->
+  <g transform="rotate(-7 128 160)">
+    <rect x="30" y="126" width="204" height="86" rx="16" fill="rgba(0,0,0,.25)"/>
+    <rect x="24" y="118" width="204" height="86" rx="16" fill="#fff7e8" stroke="#e7c27a" stroke-width="4"/>
+    ${medaillonAff('hibou', 32, 129, 64, 'aff-c1')}
+    <svg x="92" y="124" width="72" height="72" viewBox="0 0 100 100">${RELATIONS.voisin}${CROIX}</svg>
+    ${medaillonAff('chat', 158, 129, 64, 'aff-c2')}
+  </g>
+  <!-- Table : ombre, nappe, ourlet festonné -->
+  <ellipse cx="300" cy="650" rx="400" ry="140" fill="rgba(0,0,0,.28)"/>
+  <ellipse cx="300" cy="596" rx="372" ry="128" fill="#fbfaf5" stroke="#6b3e1f" stroke-width="8"/>
+  <g clip-path="url(#aff-nappe)"><path d="${ourlet}" fill="#e24c4c"/><path d="M-120 676 L720 676" stroke="#fff" stroke-width="3" stroke-dasharray="10 12" opacity=".7"/></g>
+  <!-- Plats des boudeurs -->
+  ${assietteAff('poisson', 112, 574, 50)}
+  ${assietteAff('pizza', 492, 578, 50)}
+  <!-- La tarte aux cerises qui brille, et la cloche qu'on soulève -->
+  <ellipse cx="300" cy="600" rx="170" ry="150" fill="url(#aff-tarte)"/>
+  ${assietteAff('tarte', 300, 604, 72, '#e2a92a')}
+  <path d="M262 528 Q252 512 262 496 M300 520 Q290 500 300 482 M338 528 Q328 512 338 496" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".85"/>
+  <g transform="translate(318 446) rotate(-16)">
+    <svg x="-86" y="-74" width="172" height="150" viewBox="0 0 100 100" preserveAspectRatio="none">${cloche}</svg>
+  </g>
+  <path d="M206 452 Q196 430 210 410 M412 470 Q428 450 418 426" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".8"/>
+  ${eclatAff(214, 540, 18, '#fff7b0')}${eclatAff(392, 532, 22, '#fff')}${eclatAff(236, 486, 12, '#ffe27a')}${eclatAff(380, 630, 14, '#ffe27a')}${eclatAff(206, 620, 11, '#fff')}
+  ${eclatAff(64, 300, 14, '#f7c62a')}${eclatAff(560, 300, 12, '#f7c62a')}
+  <!-- Premier plan : assiettes coupées par les bords -->
+  ${assietteAff('fraises', 24, 770, 96, '#4a8fd6')}
+  ${assietteAff('gateau', 586, 778, 96, '#e86fa1')}
+</svg>`;
+}
+function demarrerAffiche() {
+  const cacher = () => {
+    for (const el of document.querySelectorAll('.ecran, .voile, #confettis, .jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+  };
+  cacher();
+  setTimeout(cacher, 300); setTimeout(cacher, 1200);
+  const d = document.createElement('div');
+  d.id = 'affiche';
+  d.style.cssText = 'position:fixed;inset:0;z-index:9999;overflow:hidden;background:#6e3f22';
+  d.innerHTML = dessinAffiche(); // le SVG suit tout seul la taille de l'écran
+  document.body.appendChild(d);
+}
+
+// =====================================================================
+//  Images du jeu (page du jeu)
+// =====================================================================
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement dans un banquet, avec sa vraie interface (cartes d'indices, cœurs, salle, plateau,
+// « Servir »), sans écran titre, ni fenêtre « Continuer », ni présentation (CONSIGNES-JEU.md, section 5).
+// Une partie de la tablée est déjà posée (selon la solution), un objet est pris en main, puis tout reste
+// figé : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = banquet 1 (crêperie) : trois chaises, un invité installé, le suivant en main ;
+//   2 = banquet 10 (palais) : table ronde, flèches de gauche, grand plat à partager, une carte lue ;
+//   3 = banquet 19 (train-restaurant) : deux tables, indices sous les cloches (une levée).
+const SCENES_APERCU = {
+  1: { idx: 0, invites: 1, plats: 1, sel: 'inv', coeurs: 3, options: { nappe: 1, vaisselle: 0, deco: 1 } },
+  2: { idx: 9, invites: 4, plats: 3, grands: 1, vue: 1, coeurs: 2, options: { nappe: 3, vaisselle: 2, deco: 2 } },
+  3: { idx: 18, invites: 5, plats: 3, grands: 1, sel: 'plat', leve: 1, coeurs: 3, options: { nappe: 4, vaisselle: 3, deco: 4 } },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  if (numero === 3) document.body.classList.add('apercu-ordi');
+  sonActif = false;
+  prog = progNormale(null); // progression neuve en mémoire seulement (rien n'est enregistré)
+  Object.assign(prog.options, sc.options, { son: false });
+  lancerNiveau(sc.idx);
+  enCours = false; // ni sauvegarde à la fermeture, ni pause
+  if (chrono) { clearInterval(chrono); chrono = null; }
+  const sol = solutionPhase();
+  const invites = invitesPhase();
+  invites.slice(0, sc.invites).forEach((g, i) => {
+    st.pos[g] = sol.pos[g];
+    if (i < sc.plats) { const d = platsPhase().find((x) => sol.plats[x] === g); if (d) st.plat[g] = d; }
+  });
+  B.grands.slice(0, sc.grands || 0).forEach((d) => { st.grand[d] = sol.place[d]; });
+  if (sc.leve) Array.from(B.cloches).slice(0, sc.leve).forEach((id) => st.leves.add(id));
+  st.coeurs = sc.coeurs; st.temps = 40 * numero;
+  if (sc.sel === 'inv') { const g = invites.find((x) => st.pos[x] < 0); if (g) st.sel = { type: 'inv', id: g }; }
+  if (sc.sel === 'plat') {
+    const donnes = new Set(Object.values(st.plat).filter(Boolean));
+    const d = platsPhase().find((x) => !donnes.has(x)); if (d) st.sel = { type: 'plat', id: d };
+  }
+  if (sc.vue != null) {
+    const c = indicesPlacesVisibles().find((x) => x.a && x.b) || indicesPlacesVisibles()[0];
+    if (c) { st.vue = c.id; lecture(texteIndice(c)); }
+  } else lecture(t('lecture.defaut'));
+  rendreTout();
+  requestAnimationFrame(() => rendreSalle());
+}
+
+/* ---------- Démarrage ---------- */
 chargerProg();
 document.title = t('titre');
 $('#dessin-titre').innerHTML = dessinTitre('creperie');
 brancher();
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
 })();
 </script>
 </body>

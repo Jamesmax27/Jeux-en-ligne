@@ -1440,6 +1440,12 @@
 <script>
 'use strict';
 
+// Affiche (jaquette) et images du jeu (page du jeu) : window.JEL_AFFICHE et window.JEL_APERCU
+// (1, 2 ou 3) sont posés seulement par le robot du site, jamais par le jeu (section 12).
+const AFFICHE = !!window.JEL_AFFICHE;
+const APERCU = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+let apercuFige = false;     // image du jeu en place : la scène ne bouge plus
+
 // =====================================================================
 // 1. Les niveaux
 // =====================================================================
@@ -1743,6 +1749,7 @@ const JEU = 'chorale-des-grenouilles';
 let niveauJoue = -1;        // niveau lancé (le tutoriel n'a pas de numéro)
 let btEffacer = null;       // bouton « Effacer la sauvegarde » de l'accueil
 JEL_SAVE.surFermeture(() => {
+  if (AFFICHE || APERCU) return;   // affiche ou image du jeu : rien n'est écrit
   if ((ecran === 'tuto' || ecran === 'jeu' || ecran === 'pause') && niveauJoue >= 0) JEL_SAVE.save(JEU, { niveau: niveauJoue + 1 });
 });
 
@@ -1816,7 +1823,8 @@ function passerTuto() {
 
 // Position des voies à l'écran
 function dispo(voies) {
-  const lz = Math.min(W - 16, 460);
+  // Image du jeu sur ordinateur (JEL_APERCU = 3) : la chorale s'étale sur une plus grande largeur.
+  const lz = Math.min(W - 16, APERCU === 3 ? 820 : 460);
   const x0 = (W - lz) / 2, lw = lz / voies;
   const ligneY = H - Math.max(120, Math.min(175, H * .2));
   const r = Math.min(lw * .34, 44);
@@ -1955,10 +1963,21 @@ function surBeat(k) {
 
 function miseAJour(dt) {
   if (!P || !P.actif || P.enPause) return;
+  // Image du jeu : arrivée au moment choisi, la partie se fige (sans fenêtre de pause)
+  if (P.arretApres !== undefined && P.t >= P.arretApres) { P.enPause = true; apercuFige = true; return; }
   P.t += dt;
   const t = P.t;
   const k = Math.floor(t / P.beatMs);
   while (P.dernierBeat < k) { P.dernierBeat++; if (P.dernierBeat >= 0) surBeat(P.dernierBeat); }
+
+  // Image du jeu : un petit joueur automatique touche chaque luciole au bon moment
+  if (P.auto) {
+    for (let v = 0; v < 4; v++) grenouilles[v].appui = !!P.tenues[v];
+    for (const n of P.notes) {
+      if (n.t > t) break;
+      if (n.etat === 0 && n.type !== 'feuille') presser(n.voie);
+    }
+  }
 
   // Démonstration : le jeu joue tout seul, au temps parfait
   if (P.demo) {
@@ -2531,7 +2550,7 @@ function majSon() {
 }
 btSon.addEventListener('click', () => { initAudio(); rec.son = !rec.son; sauver(); majSon(); son.clic(); });
 majSon();
-document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && !APERCU) mettrePause(); });
 window.addEventListener('resize', redimensionner);
 
 // =====================================================================
@@ -2542,11 +2561,251 @@ function boucle(maintenant) {
   const dt = Math.min(50, maintenant - avant);
   avant = maintenant;
   miseAJour(dt);
-  dessiner(dt);
+  dessiner(apercuFige ? 0 : dt);
   requestAnimationFrame(boucle);
 }
+
+// =====================================================================
+// 12. Affiche (jaquette) et images du jeu (CONSIGNES-JEU.md, section 5)
+// =====================================================================
+// Affiche : une scène composée, sans texte ni bouton ni son. Au centre, la grenouille
+// au nœud rose, en grand, chante à pleine gorge sur son nénuphar ; les lucioles de
+// couleur descendent vers elle avec leur traînée, une luciole dorée arrive juste
+// devant elle ; derrière, le reste de la chorale chante sous une grande lune.
+// Le cadre 600 × 800 est centré ; le ciel, l'eau et les roseaux vont jusqu'aux bords.
+function cacherInterfaceAffiche() {
+  document.querySelectorAll('body > *:not(#scene):not(script), .jel-langue, jel-langue').forEach((el) => {
+    el.style.setProperty('display', 'none', 'important');
+  });
+}
+function noteMusique(x, y, h, couleur, rot) {
+  const c = cx;
+  c.save(); c.translate(x, y); c.rotate(rot || 0);
+  c.fillStyle = couleur; c.strokeStyle = couleur; c.lineWidth = h * .11; c.lineCap = 'round';
+  c.beginPath(); c.ellipse(0, 0, h * .26, h * .19, -.45, 0, 7); c.fill();
+  c.beginPath(); c.moveTo(h * .22, -h * .05); c.lineTo(h * .22, -h); c.stroke();
+  c.beginPath(); c.moveTo(h * .22, -h); c.quadraticCurveTo(h * .55, -h * .78, h * .5, -h * .48); c.stroke();
+  c.restore();
+}
+function dessinerAffiche() {
+  redimensionner();
+  const c = cx;
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const k = Math.min(H / 800, W / 600);
+  const ox = W / 2, oy = (H - 800 * k) / 2;
+  const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+  const r = alea(5);
+  const hz = Y(335);
+
+  // Ciel du soir : violet en haut, rose et pêche à l'horizon
+  let g = c.createLinearGradient(0, 0, 0, hz);
+  g.addColorStop(0, '#2c2275'); g.addColorStop(.45, '#5f43a6'); g.addColorStop(.82, '#c86fae'); g.addColorStop(1, '#ffbf8f');
+  c.fillStyle = g; c.fillRect(0, 0, W, hz + 2);
+  for (let i = 0; i < 90; i++) {
+    const sx = r() * W, sy = r() * hz * .7, sr = (r() * 1.4 + .5) * k;
+    c.fillStyle = `rgba(255,252,235,${.45 + r() * .5})`;
+    c.beginPath(); c.arc(sx, sy, sr, 0, 7); c.fill();
+  }
+  // Grande lune et son halo
+  const lx = X(170), ly = Y(118);
+  g = c.createRadialGradient(lx, ly, 10 * k, lx, ly, 280 * k);
+  g.addColorStop(0, 'rgba(255,244,205,.75)'); g.addColorStop(.35, 'rgba(255,230,200,.22)'); g.addColorStop(1, 'rgba(255,230,200,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(lx, ly, 280 * k, 0, 7); c.fill();
+  c.fillStyle = '#fff7dc'; c.beginPath(); c.arc(lx, ly, 60 * k, 0, 7); c.fill();
+  c.fillStyle = 'rgba(232,214,170,.3)';
+  for (const [a, b, rr] of [[-20, -10, 11], [22, 16, 8], [6, -30, 5]]) { c.beginPath(); c.arc(lx + a * k, ly + b * k, rr * k, 0, 7); c.fill(); }
+  // Collines lointaines puis bosquets plus proches
+  c.fillStyle = 'rgba(120,80,160,.85)';
+  c.beginPath(); c.moveTo(0, hz);
+  for (let x = 0; x <= W + 20; x += 20) c.lineTo(x, hz - 34 * k - Math.sin(x / k * .012) * 18 * k - Math.sin(x / k * .031) * 9 * k);
+  c.lineTo(W, hz); c.fill();
+  c.fillStyle = '#3d2f78';
+  c.beginPath(); c.moveTo(0, hz + 2);
+  for (let x = 0; x <= W + 20; x += 16) c.lineTo(x, hz - 12 * k - Math.abs(Math.sin(x / k * .045)) * 16 * k);
+  c.lineTo(W, hz + 2); c.fill();
+  // Eau de la mare
+  g = c.createLinearGradient(0, hz, 0, H);
+  g.addColorStop(0, '#8c86cf'); g.addColorStop(.18, '#4f86b8'); g.addColorStop(.6, '#2a6a86'); g.addColorStop(1, '#163f50');
+  c.fillStyle = g; c.fillRect(0, hz, W, H - hz);
+  // Reflet de la lune, qui scintille jusqu'à la chorale
+  for (let i = 0; i < 16; i++) {
+    const yy = hz + 8 * k + i * 15 * k, l = (30 + i * 5 + r() * 20) * k;
+    c.fillStyle = `rgba(255,240,205,${.5 - i * .025})`;
+    c.fillRect(lx - l / 2 + (r() - .5) * 14 * k, yy, l, 3 * k);
+  }
+  // Rides
+  c.strokeStyle = 'rgba(255,255,255,.13)'; c.lineWidth = 2 * k;
+  for (let i = 0; i < 26; i++) {
+    const yy = hz + 20 * k + r() * (H - hz), xx = r() * W, l = (20 + r() * 50) * k;
+    c.beginPath(); c.moveTo(xx - l, yy); c.quadraticCurveTo(xx, yy - 3 * k, xx + l, yy); c.stroke();
+  }
+
+  // Le reste de la chorale, plus loin, qui chante aussi
+  const g0 = (chant) => ({ chant, triste: 0, saut: 0, appui: false });
+  grenouille(X(-178), Y(298), 30 * k, 2, g0(.8), 0);
+  grenouille(X(232), Y(392), 54 * k, 3, g0(1), 0);
+  grenouille(X(-232), Y(408), 50 * k, 1, g0(.9), 0);
+
+  // Halo doré derrière l'héroïne : la lumière de la luciole dorée
+  const hx = X(0), hy = Y(372), s = 158 * k;
+  g = c.createRadialGradient(X(-60), Y(240), 10 * k, X(-60), Y(240), 260 * k);
+  g.addColorStop(0, 'rgba(255,222,120,.55)'); g.addColorStop(1, 'rgba(255,222,120,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(X(-60), Y(240), 260 * k, 0, 7); c.fill();
+  // Ronds dans l'eau autour de son nénuphar
+  c.strokeStyle = 'rgba(255,255,255,.28)'; c.lineWidth = 2.5 * k;
+  for (const m of [1.55, 1.85]) { c.beginPath(); c.ellipse(hx, hy + s * .82, s * m, s * m * .3, 0, 0, 7); c.stroke(); }
+
+  // Ondes du chant, de chaque côté
+  c.lineCap = 'round';
+  [1.08, 1.3, 1.52].forEach((m, i) => {
+    c.strokeStyle = `rgba(255,236,150,${.85 - i * .22})`; c.lineWidth = (7 - i * 1.5) * k;
+    c.beginPath(); c.arc(hx, hy - s * .02, s * m, -.42, .38); c.stroke();
+    c.beginPath(); c.arc(hx, hy - s * .02, s * m, Math.PI - .38, Math.PI + .42); c.stroke();
+  });
+
+  // L'héroïne : la grenouille au nœud rose, qui chante, gorge gonflée
+  grenouille(hx, hy, s, 0, g0(1), 0);
+  // Contour de lumière (lune en haut à droite, luciole dorée)
+  c.strokeStyle = 'rgba(255,246,210,.9)'; c.lineWidth = s * .035;
+  for (const cc of [-1, 1]) { c.beginPath(); c.arc(hx + cc * s * .42, hy - s * .35, s * .27, -2.1, -.3); c.stroke(); }
+  c.beginPath(); c.ellipse(hx, hy + s * .2, s * .92, s * .62, 0, -.75, -.15); c.stroke();
+  c.strokeStyle = 'rgba(255,246,210,.45)';
+  c.beginPath(); c.ellipse(hx, hy + s * .2, s * .92, s * .62, 0, Math.PI + .2, Math.PI + .6); c.stroke();
+  // Reflet brillant dans les yeux
+  c.fillStyle = 'rgba(255,255,255,.95)';
+  for (const cc of [-1, 1]) { c.beginPath(); c.arc(hx + cc * s * .42 - s * .06, hy - s * .43, s * .025, 0, 7); c.fill(); }
+
+  // Lucioles de couleur qui descendent en musique, avec leur traînée de lumière
+  const traine = (x0, y0, x1, y1, coul, l) => {
+    const gg = c.createLinearGradient(X(x0), Y(y0), X(x1), Y(y1));
+    gg.addColorStop(0, 'rgba(255,255,255,0)'); gg.addColorStop(1, coul);
+    c.strokeStyle = gg; c.lineWidth = l * k; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(X(x0), Y(y0)); c.quadraticCurveTo(X((x0 + x1) / 2 + 25), Y((y0 + y1) / 2), X(x1), Y(y1)); c.stroke();
+  };
+  const lucs = [
+    [-250, 10, -210, 128, '#ff8fb1', 27], [275, 110, 222, 236, '#8fe3ff', 25],
+    [-292, 160, -262, 262, '#c6a0ff', 19], [40, -20, 30, 78, '#ffd65c', 20], [300, 230, 272, 318, '#ff8fb1', 15]
+  ];
+  for (const [x0, y0, x1, y1, coul, rr] of lucs) {
+    traine(x0, y0, x1, y1, coul, rr * .55);
+    luciole(X(x1), Y(y1), rr * 1.5 * k, coul, 400, 1);
+  }
+  // La luciole dorée qui arrive devant elle
+  const dx = X(-96), dy = Y(196), dr = 34 * k;
+  traine(-50, 20, -96, 196, '#ffe08a', 20);
+  g = c.createRadialGradient(dx, dy, 2, dx, dy, dr * 2.4);
+  g.addColorStop(0, 'rgba(255,226,110,.95)'); g.addColorStop(1, 'rgba(255,214,92,0)');
+  c.fillStyle = g; c.beginPath(); c.arc(dx, dy, dr * 2.4, 0, 7); c.fill();
+  c.fillStyle = '#ffd65c'; c.strokeStyle = '#fff6c9'; c.lineWidth = 3 * k;
+  etoileForme(dx, dy, dr, dr * .45, 5, -Math.PI / 2); c.fill(); c.stroke();
+
+  // Notes de musique et étincelles qui s'envolent du chant
+  noteMusique(X(98), Y(232), 46 * k, '#fff3c4', .12);
+  noteMusique(X(52), Y(168), 32 * k, '#ffd1e0', -.1);
+  noteMusique(X(-150), Y(80), 30 * k, '#d9f6ff', -.15);
+  for (let i = 0; i < 24; i++) {
+    const a = r() * Math.PI * 2, d = (190 + r() * 120) * k;
+    const px = hx + Math.cos(a) * d * .9, py = Y(250) + Math.sin(a) * d * .55;
+    if (Math.abs(px - hx) < s * 1.15 && py > hy - s * .9 && py < hy + s * 1.2) continue;   // pas sur l'héroïne
+    c.fillStyle = ['#ffd65c', '#ff8fb1', '#8fe3ff', '#ffffff'][i % 4];
+    etoileForme(px, py, (4 + r() * 5) * k, (2 + r() * 2) * k, 4, r()); c.fill();
+  }
+
+  // Premier plan : grands nénuphars coupés par les bords, fleur rose, roseaux
+  const nenuphar = (x, y, rx, ry, a) => {
+    c.fillStyle = '#2a7d45';
+    c.beginPath(); c.ellipse(x, y, rx, ry, 0, a + .18, a + Math.PI * 2 - .02); c.lineTo(x, y); c.fill();
+    c.fillStyle = '#45ad62';
+    c.beginPath(); c.ellipse(x, y - ry * .12, rx * .9, ry * .8, 0, a + .22, a + Math.PI * 2 - .06); c.lineTo(x, y - ry * .12); c.fill();
+    c.strokeStyle = 'rgba(20,70,40,.5)'; c.lineWidth = 2 * k;
+    for (let j = 0; j < 6; j++) { const b = a + .5 + j; c.beginPath(); c.moveTo(x, y - ry * .12); c.lineTo(x + Math.cos(b) * rx * .8, y - ry * .12 + Math.sin(b) * ry * .65); c.stroke(); }
+  };
+  nenuphar(X(-250), Y(735), 190 * k, 62 * k, -.6);
+  nenuphar(X(285), Y(770), 170 * k, 56 * k, 3.6);
+  // Fleur de nénuphar rose
+  const fx = X(-200), fy = Y(690);
+  for (let j = 0; j < 8; j++) {
+    const b = j * Math.PI / 4;
+    c.fillStyle = j % 2 ? '#ff9ec0' : '#ffc6da';
+    c.beginPath(); c.ellipse(fx + Math.cos(b) * 20 * k, fy + Math.sin(b) * 9 * k, 22 * k, 10 * k, b, 0, 7); c.fill();
+  }
+  c.fillStyle = '#ffe07a'; c.beginPath(); c.arc(fx, fy - 2 * k, 9 * k, 0, 7); c.fill();
+  // Roseaux aux deux bords de l'écran
+  const roseau = (x, haut, pench, ep) => {
+    c.strokeStyle = '#1f5a3a'; c.lineWidth = ep * k;
+    c.beginPath(); c.moveTo(x, H + 4); c.quadraticCurveTo(x + pench * .5, H - haut * .5, x + pench, H - haut); c.stroke();
+    c.fillStyle = '#7a4a26';
+    c.beginPath(); c.ellipse(x + pench, H - haut + 20 * k, 8 * k, 24 * k, pench * .004, 0, 7); c.fill();
+  };
+  for (let i = 0; i < 4; i++) {
+    roseau(6 * k + i * 14 * k, (420 + r() * 120) * k, (12 - r() * 24) * k, 5);
+    roseau(W - 6 * k - i * 14 * k, (380 + r() * 140) * k, (-12 + r() * 24) * k, 5);
+  }
+  // Bas assombri, pour le bandeau du titre du site
+  g = c.createLinearGradient(0, Y(640), 0, H);
+  g.addColorStop(0, 'rgba(10,22,40,0)'); g.addColorStop(1, 'rgba(10,22,40,.45)');
+  c.fillStyle = g; c.fillRect(0, Y(640), W, H - Y(640));
+  // Lucioles d'ambiance
+  for (let i = 0; i < 30; i++) {
+    const px = r() * W, py = hz - 60 * k + r() * (H - hz);
+    if (Math.abs(px - hx) < s * 1.3 && py > hy - s * .9 && py < hy + s * 1.25) continue;   // pas sur l'héroïne
+    g =c.createRadialGradient(px, py, 0, px, py, 6 * k);
+    g.addColorStop(0, 'rgba(255,245,160,.95)'); g.addColorStop(1, 'rgba(255,245,160,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(px, py, 6 * k, 0, 7); c.fill();
+  }
+}
+function demarrerAffiche() {
+  cacherInterfaceAffiche();
+  [300, 1000, 1800].forEach((d) => setTimeout(cacherInterfaceAffiche, d));
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+// Images du jeu (page du jeu) : le jeu s'ouvre en pleine partie, avec sa vraie interface.
+// La partie est jouée d'avance par un petit joueur automatique (sans son : le son ne
+// s'allume qu'au premier toucher), jusqu'à un moment riche choisi dans la partition
+// (toujours la même : graine fixe), joue encore 0,9 s en direct puis se fige.
+//   1 = niveau 1 : deux grenouilles, premières lucioles ;
+//   2 = niveau 5 : trois grenouilles, longues lucioles, lucioles dorées, accords ;
+//   3 = niveau 12 (ordinateur) : quatre grenouilles, feuilles mortes et têtards sauteurs, tempo rapide.
+const MOMENTS_APERCU = {
+  1: { niv: 0, de: 9000, a: 24000 },
+  2: { niv: 4, de: 18000, a: 40000 },
+  3: { niv: 11, de: 25000, a: 60000, energie: 78 }
+};
+function choisirMomentApercu(m) {
+  let mieux = m.de, note = -1;
+  for (let t = m.de; t <= m.a; t += 50) {
+    const vues = P.notes.filter((n) => n.t > t + 200 && n.t - t < P.trajet * .95);
+    const types = new Set(vues.map((n) => n.type));
+    let s = vues.length + types.size * 3 + (vues.some((n) => n.accord) ? 3 : 0);
+    // une grenouille vient de chanter : on la voit gorge gonflée
+    if (P.notes.some((n) => n.type !== 'feuille' && n.t <= t && t - n.t < 160)) s += 4;
+    // un têtard en plein saut d'une voie à l'autre
+    if (P.notes.some((n) => n.type === 'tetard' && t > n.t - P.trajet * .45 + 60 && t < n.t - P.trajet * .45 + 200)) s += 4;
+    if (s > note) { note = s; mieux = t; }
+  }
+  return mieux;
+}
+function ouvrirApercu(n) {
+  const m = MOMENTS_APERCU[n];
+  demarrerPartie(m.niv);
+  niveauJoue = -1;                 // rien à reprendre : aucune sauvegarde
+  P.auto = true;
+  const cible = choisirMomentApercu(m);
+  while (P.t < cible - 900) miseAJour(20);
+  if (m.energie) P.energie = m.energie;
+  particules.length = 0; textes.length = 0;
+  P.scoreAff = P.score;
+  P.arretApres = cible;
+}
+
 redimensionner();
-allerAccueil();
-requestAnimationFrame(boucle);</script>
+if (AFFICHE) demarrerAffiche();
+else {
+  if (APERCU) ouvrirApercu(APERCU);
+  else allerAccueil();
+  requestAnimationFrame(boucle);
+}</script>
 </body>
 </html>
