@@ -1809,3 +1809,5 @@ Mesures et essais :
 4. La reprise de son étal (opération `reprise`) existe sur le serveur, mais l'interface ne la propose pas encore : un bien qui n'est plus « exporter » reste à l'étal jusqu'à son achat.
 5. Pas d'aide intégrée propre au mode (le panneau de la province et les messages l'expliquent).
 
+Publication (26 novembre 2026, demande du propriétaire « publier tout seul, tout ») : pull request #457 fusionnée (commit `5145078`), contrôles verts ; site publié par Cloudflare Pages ; Worker multijoueur redéployé par `multijoueur.yml` (contrôle du comptoir de province vert, déploiement et vérification de l'adresse réussis). Reste : essai réel à deux appareils sur freemicrogames.com.
+
