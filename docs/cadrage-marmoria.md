@@ -784,13 +784,14 @@ Chaque cité garde son propre calendrier ; aucune horloge n'est partagée. Les �
 
 **Rejoindre, voir les voisins**
 
-- Province privée, rejointe par un code ou par une invitation depuis la page Amis du site. Pas de province publique au hasard (point ouvert, section 22.2).
-- Chaque joueur voit de ses voisins : le pseudo de leur profil, leur population, leurs cotes et leur dernière visite. Aucun texte libre (règle du site).
+- Province privée, rejointe par un code ou par une invitation depuis la page Amis du site ; pas de province publique au hasard (décision du propriétaire, 26 novembre 2026).
+- On rejoint en cours de route, sans salon d'attente : un joueur crée la province et commence seul, ses voisins étant des cités de l'ordinateur ; un ami la rejoint plus tard, à n'importe quel moment, et prend une cité libre de la province. Un message prévient alors les joueurs déjà présents, à leur prochaine connexion s'ils ne sont pas en ligne (décision du propriétaire, 26 novembre 2026).
+- Chaque joueur voit de ses voisins : le pseudo de leur profil, leur population, leurs cotes et leur dernière visite. Aucun texte libre (règle du site) ; une liste fixe de signaux permet de se coordonner (« Je cherche du vin », « J'ai du marbre à vendre »).
 - Une province sans aucune visite pendant 30 jours est effacée du serveur.
 
 **Fin et récompenses**
 
-- Objectif de province, au choix du propriétaire (section 22.2). La fin est signalée par `FMG.reportEnd`, comme une mission.
+- Objectif commun (décision du propriétaire, 26 novembre 2026) : la province gagne quand chaque cité active atteint ses seuils ; la part de chacun est affichée (ventes aux voisins, population). La fin est signalée par `FMG.reportEnd`, comme une mission.
 - Aucune récompense du profil joueur liée au commerce entre joueurs : seul le temps de jeu compte, comme en solo. Le serveur ne refait pas la simulation des villes : un appareil modifié pourrait déposer des charges inventées. Les provinces privées et le plafond de 40 charges limitent l'effet de cette triche à la province touchée.
 
 **Coût sur le serveur (estimation à mesurer au lot 6)**
@@ -1204,6 +1205,8 @@ Les dérogations aux consignes du site figurent en section 19.6.
 | Rejoindre une province (lot 6) | Code et amis seulement ; aussi des provinces publiques au hasard | Code et amis seulement : une province dure des jours, et des inconnus l'abandonneraient |
 | Signaux entre voisins (lot 6) | Aucun ; liste fixe de demandes (« Je cherche du vin », « J'ai du marbre à vendre ») | Liste fixe : seule façon de se coordonner sans texte libre |
 | Durée de vie d'une province (lot 6) | 30 jours sans visite ; une durée fixe | 30 jours sans aucune visite |
+
+Décisions du propriétaire du 26 novembre 2026 : publication après ses propres essais du lot 5 ; lot 6 : objectif commun, province rejointe par un code ou par la page Amis, à n'importe quel moment de la partie (un message prévient les voisins), liste fixe de signaux, effacement après 30 jours sans visite (section 16.7).
 
 ### 22.3 Risques
 
@@ -1707,3 +1710,17 @@ Constats :
 
 - Le gouverneur automatique ne prouve plus rien à partir de l'échelon 5 : son plan pose des quartiers de tentes et de cabanes, son économie ne dépasse pas 2 500 habitants, et les cartes des échelons 6 à 10 partent avec moins d'argent. Le rendre capable de les gagner (quartiers d'insulae puis de patriciens, achats de nourriture planifiés) serait un chantier à part.
 - Chaque carte a au moins 4 biens à vendre aux cités visibles dès le départ, d'après son terrain (prairies, rive, arbres, rochers, bancs de poissons) : la carte elle-même ne bloque pas l'économie.
+
+### 23.12 Suites du lot 5 (26 novembre 2026)
+
+Décisions du propriétaire, prises sur questionnaire :
+
+- Seuils de prospérité des provinces paisibles 8 à 10 : 60, 62 et 65 gardés (écart 1 du lot 5).
+- Massalia et Vindobona : seuils inchangés jusqu'aux essais du propriétaire.
+- Publication : après ses essais (Éphèse, Leptis Magna, musique, aide sur téléphone).
+- Lot 6 : voir les sections 16.7 et 22.2.
+
+Fait le même jour :
+
+- Images du jeu de la page : un jeu qui se joue en paysage a ses 3 images en paysage (dérogation, section 19.6), alors que la page attendait 2 captures de téléphone en portrait. Sur ordinateur, les deux premières faisaient 196 × 91 px ; sur téléphone, chacune débordait de l'écran (725 px pour 390). Nouvelle disposition `tout-paysage` (`scripts/pages-seo.mjs`, `public/style.css`) : sur téléphone, une image à la fois (337 × 156 px à 390 px de large) et le bord de la suivante ; dès 720 px, les trois sur une ligne, à la même hauteur. Les autres jeux gardent leur disposition.
+- Humanizer (`.claude/skills/humanizer`, `scripts/humanizer.mjs`) : 10 textes réécrits sur 15 (la description du catalogue et une phrase de la présentation, dans les 5 langues), les 5 descriptions pour Google gardées ; contrôles du script passés. Les textes sont aussi rangés dans `sources/marmoria/textes/*.json`, sinon l'assemblage suivant les remettrait.
