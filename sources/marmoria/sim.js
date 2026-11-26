@@ -109,9 +109,19 @@
     var A = r.ages || {};
     exige(Array.isArray(A.profilImmigrants) && Array.isArray(A.mortalite) && A.profilImmigrants.length === A.mortalite.length, 'regles.ages : tranches');
     exige(Array.isArray(d.missions) && d.missions.length === 17, '17 missions attendues');
-    (d.missions || []).forEach(function (m, i) {
+    // Missions de la campagne, puis cités des provinces (lot 6, « Cités voisines ») : mêmes contrôles.
+    var toutes = (d.missions || []).map(function (m, i) { return [m, i, true]; })
+      .concat((d.missionsVoisinage || []).map(function (m, i) { return [m, i, false]; }));
+    toutes.forEach(function (x) {
+      var m = x[0], i = x[1];
       exige(typeof m.id === 'string', 'mission ' + i + ' : id');
-      exige(m.numero === i + 1, 'mission ' + m.id + ' : numéro');
+      if (x[2]) exige(m.numero === i + 1, 'mission ' + m.id + ' : numéro');
+      else {
+        var pv = (d.voisinages || []).filter(function (p) { return m.voisinage && p.id === m.voisinage.province; })[0];
+        exige(!!pv && pv.cites[m.voisinage.siege] === m.id, 'cité voisine ' + m.id + ' : province ou siège');
+        var vs = ((m.empire && m.empire.cites) || []).filter(function (c) { return c.voisin !== undefined; });
+        exige(!!pv && vs.length === pv.cites.length - 1 && vs.every(function (c) { return pv.cites[c.voisin] === c.id && c.route === 'terre'; }), 'cité voisine ' + m.id + ' : voisines de la carte de l\'Empire');
+      }
       if (m.dispo) {
         exige(m.carte && [80, 120, 160].indexOf(m.carte.taille) >= 0, 'mission ' + m.id + ' : taille de carte');
         exige(Array.isArray(m.batiments), 'mission ' + m.id + ' : batiments');
@@ -161,6 +171,7 @@
     Object.keys(d.batiments).forEach(function (k) { var x = d.batiments[k]; if (x.matiere && d.matieres.indexOf(x.matiere) < 0) d.matieres.push(x.matiere); });
     MISSIONS = {};
     d.missions.forEach(function (m) { MISSIONS[m.id] = m; });
+    (d.missionsVoisinage || []).forEach(function (m) { MISSIONS[m.id] = m; });
     d.ticksParMois = d.temps.ticksParJour * d.temps.joursParMois;
     d.joursParAn = d.temps.joursParMois * d.temps.moisParAn;
     return d;
@@ -525,6 +536,8 @@
       invasions: options.invasions !== undefined ? !!options.invasions : !libre
     };
     e.salaireGouv = salaireGouvMax(e);
+    // Cités voisines (lot 6) : la mission d'une province reçoit son siège, son code et son jeton.
+    e.province = m.voisinage && options.province ? nouvelleProvince(options.province) : null;
     ((m.empire && m.empire.cites) || []).forEach(function (c) { e.routes[c.id] = { o: c.ouverte ? 1 : 0, v: c.cachee ? 0 : 1, f: 0, n: {}, x: c.ouverte ? D.regles.commerce.premierDepartJours * D.temps.ticksParJour : 0, qv: {} }; });
     D.regles.dieux.liste.forEach(function (g) { e.divins[g] = { s: D.regles.dieux.depart, c: 0, j: 0, b: -1000, av: 0 }; });
     e.alea = e.graine ^ 0x5bd1e995;
@@ -541,7 +554,7 @@
   // Postes du budget (section 11.1). Recettes : impôts, exportations, secours, dons du
   // gouverneur ; dépenses : salaires, constructions, importations, tribut, intérêts, fêtes,
   // salaire du gouverneur, envois à l'empereur.
-  var POSTES = ['impots', 'exports', 'secours', 'dons', 'salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois', 'vols'];
+  var POSTES = ['impots', 'exports', 'voisins', 'secours', 'dons', 'salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois', 'vols'];
   function nouveauBudget() {
     var b = {};
     POSTES.forEach(function (k) { b[k] = 0; });
@@ -791,6 +804,12 @@
   function appliquer(e, c) {
     var res = { ok: false, cout: 0, n: 0, raison: null };
     if (!c || typeof c.type !== 'string') { res.raison = 'commande'; return res; }
+    // Cités voisines (lot 6) : réponses du comptoir ; serveur injoignable (routes vers les voisins fermées).
+    if (c.type === 'province-sync') { res.ok = synchroniserProvince(e, c); return res; }
+    if (c.type === 'province-reseau') {
+      if (e.province && e.province.enLigne !== !!c.enLigne) { e.province.enLigne = !!c.enLigne; if (!c.enLigne) noter(e, 'msg.prov.horsLigne', {}, false); }
+      res.ok = !!e.province; return res;
+    }
     if (c.type === 'poser' || c.type === 'tracer') {
       var d = D.batiments[c.bat];
       if (!d) { res.raison = 'inconnu'; return res; }
@@ -1189,6 +1208,8 @@
   function finir(e, w) {
     if (w.fin) return;
     w.fin = 1;
+    // Caravane de la province qui n'a pas tout déchargé : le reste attend dans la réserve.
+    if (w.liv && w.liv.length && e.province) { versReserve(e, w.liv); w.liv = null; }
     e._finis = (e._finis || 0) + 1;
     var o = w.o ? e._index.get(w.o) : null;
     if (o) {
@@ -3263,7 +3284,12 @@
   }
   function echange(e, c, sens, g) { var r = e.routes[c.id]; return (r && r.n[sens + ':' + g]) || 0; }
   function resteQuota(e, c, sens, g) { return Math.max(0, quota(e, c, sens, g) - echange(e, c, sens, g)); }
-  function routeActive(e, c) { var r = e.routes[c.id]; return !!(r && r.o && r.v && !(r.f > 0)); }
+  function routeActive(e, c) {
+    var r = e.routes[c.id];
+    // Cité d'un voisin (lot 6) : route fermée hors connexion, comme l'événement « route fermée ».
+    if (estVoisine(c) && !(e.province && e.province.enLigne)) return false;
+    return !!(r && r.o && r.v && !(r.f > 0));
+  }
   function quaiEnService(e) {
     for (var k = 0; k < e.batiments.length; k++) { var b = e.batiments[k]; if (b.type === 'quai_commerce' && taux(b) > 0 && acces(e, b).length) return true; }
     return false;
@@ -3298,7 +3324,7 @@
   // --- Caravanes (section 12.3) ----------------------------------------------
   // Par la voie de Rome, elle visite les 3 entrepôts en service les plus proches, échange
   // 8 charges au plus, payées sur-le-champ, puis repart vers Rome.
-  function envoyerCaravane(e, c) {
+  function envoyerCaravane(e, c, plus) {
     var C = D.regles.commerce, cibles = new Map();
     e.batiments.forEach(function (b) {
       if (b.type !== 'entrepot' || taux(b) <= 0) return;
@@ -3314,6 +3340,7 @@
     });
     if (!premier) return false;
     var w = creerMarcheur(e, 'caravane', e.entree, { cite: c.id, etapes: ids, et: 0, cb: ids[0], phase: 'aller', n: 0, ch: premier.chemin, k: 0 });
+    if (plus) { w.prov = 1; if (plus.liv) w.liv = plus.liv; }
     if (!w.ch.length) atteint(e, w);
     return true;
   }
@@ -3334,8 +3361,9 @@
     var C = D.regles.commerce, N = e.N, c = citeDe(e, w.cite);
     if (w.phase === 'retour') { finir(e, w); return; }
     var b = e._index.get(w.cb);
-    if (b && b.type === 'entrepot' && c && routeActive(e, c)) echangerCaravane(e, w, b, c);
-    while (++w.et < w.etapes.length && w.n < C.caravaneCharges) {
+    if (b && b.type === 'entrepot' && w.prov && e.province) echangerVoisin(e, w, b);
+    else if (b && b.type === 'entrepot' && c && routeActive(e, c)) echangerCaravane(e, w, b, c);
+    while (++w.et < w.etapes.length && (w.liv ? w.liv.length > 0 : w.n < C.caravaneCharges)) {
       var s = e._index.get(w.etapes[w.et]);
       if (!s) continue;
       var p = parcours(e, [i], passableRoute(e), cibleAcces(e, s), 6 * N);
@@ -3487,8 +3515,10 @@
       var r = e.routes[c.id];
       if (!r || !r.o || !r.v || r.f > 0 || e.tick < r.x) return;
       r.x = e.tick + (c.route === 'mer' ? C.navireMois : C.caravaneMois) * TPM;
-      if (c.route === 'mer') envoyerNavire(e, c); else envoyerCaravane(e, c);
+      if (voisinActif(e, c)) departVoisin(e, c);
+      else if (c.route === 'mer') envoyerNavire(e, c); else envoyerCaravane(e, c);
     });
+    if (e.province) rangerReserve(e);
     for (var k = 0; k < e.marcheurs.length; k++) {
       var w = e.marcheurs[k];
       if (w.type !== 'navire' || w.fin) continue;
@@ -3501,6 +3531,186 @@
         if (!b || b.nav !== w.id) departNavire(e, w, null);
       }
     }
+  }
+
+  // ------------------------------------------------------------------------
+  // Cités voisines (lot 6, sections 16.7 et 23.15) : comptoir de province
+  //   La province est tenue par le serveur commun du site (multijoueur/src/province.js) ;
+  //   la ville n'en voit que ce que lui apportent les commandes « province-sync »
+  //   (réponses du comptoir, vue des voisins) et « province-reseau » (hors connexion).
+  //   État : e.province = { code, siege, jeton, n: numéro de la dernière opération,
+  //     sortie: opérations à envoyer, m: dernière réponse appliquée, enLigne,
+  //     voisins: { siège: { pris, actif, pseudo, numero, etal, infos, visite, signaux } },
+  //     attente: { siège: n de la demande en cours }, reserve: { bien: unités },
+  //     objectif, gagnee, vus: date du dernier événement vu, ventes, achats }.
+  //   Une cité de la carte de l'Empire porte « voisin: siège » : tant que ce siège est libre
+  //   ou son joueur absent, elle commerce comme une cité de l'ordinateur (vend, achete) ;
+  //   sinon, par le comptoir : sa caravane prend aux entrepôts les biens « exporter » et les
+  //   pose à l'étal de la ville ; une demande part vers l'étal du voisin pour les biens
+  //   « importer » ; la livraison est payée à son arrivée, déchargée par une caravane, et ce
+  //   qui ne tient pas dans les entrepôts attend dans la réserve.
+  // ------------------------------------------------------------------------
+
+  function nouvelleProvince(o) {
+    return { code: o.code, siege: o.siege, jeton: o.jeton, n: 0, sortie: [], m: 0, enLigne: false,
+      voisins: {}, attente: {}, reserve: {}, objectif: false, gagnee: null, vus: o.vus || 0, ventes: 0, achats: 0 };
+  }
+  function estVoisine(c) { return c && c.voisin !== undefined && c.voisin !== null; }
+  // Le joueur de ce siège commerce par le comptoir (sinon : cité de l'ordinateur).
+  function voisinActif(e, c) {
+    var v = e.province && estVoisine(c) ? e.province.voisins[c.voisin] : null;
+    return !!(v && v.pris && v.actif);
+  }
+  // Prix d'une charge entre joueurs : moyenne des prix d'importation et d'exportation (section 20.6).
+  function prixVoisin(g) { var b = D.biens[g]; return Math.round((b['import'] + b['export']) / 2); }
+  function operation(e, op) {
+    var P = e.province;
+    P.n += 1; op.n = P.n;
+    P.sortie.push(op);
+    return op;
+  }
+  function peutDeposer(e, g) {
+    var Q = charge();
+    return statutBien(e, g) === 'exporter' && stockVille(e, g) - Q >= cibleBien(e, g) * Q;
+  }
+  // Charges de g voulues à l'étal d'un voisin : stock visé, plafond annuel, trésor.
+  function voulusDuVoisin(e, c, g, deja) {
+    var P = e.province, Q = charge(), v = P.voisins[c.voisin];
+    if (statutBien(e, g) !== 'importer' || !v || !v.etal || !(v.etal[g] > 0)) return 0;
+    var manque = Math.floor((cibleBien(e, g) * Q - stockVille(e, g) - (P.reserve[g] || 0)) / Q);
+    var plafond = D.regles.commerce.voisinPlafond - echange(e, c, 'v', g);
+    var argent = Math.floor((e.tresor - D.regles.detteMax) / prixVoisin(g)) - deja;
+    return Math.max(0, Math.min(v.etal[g], manque, plafond, argent));
+  }
+  // Départ vers un voisin actif (au rythme des caravanes) : demande à son étal, puis caravane
+  // qui prend aux entrepôts ce qui part à l'étal de la ville.
+  function departVoisin(e, c) {
+    var P = e.province, C = D.regles.commerce;
+    if (!P.attente[c.voisin]) {
+      var b = {}, total = 0;
+      Object.keys(D.biens).forEach(function (g) {
+        if (total >= C.caravaneCharges) return;
+        var q = Math.min(C.caravaneCharges - total, voulusDuVoisin(e, c, g, total));
+        if (q > 0) { b[g] = q; total += q; }
+      });
+      if (total > 0) P.attente[c.voisin] = operation(e, { t: 'demande', d: c.voisin, b: b }).n;
+    }
+    if (Object.keys(D.biens).some(function (g) { return peutDeposer(e, g); })) envoyerCaravane(e, c, { prov: 1 });
+  }
+  // Caravane de la province à un entrepôt : livraison déchargée, puis biens pris pour l'étal.
+  function echangerVoisin(e, w, b) {
+    var C = D.regles.commerce, Q = charge();
+    if (w.liv) {
+      w.liv.forEach(function (x) {
+        while (x[1] > 0 && placeDans(b, x[0]) >= Q) { deposer(b, x[0], Q); x[1]--; }
+      });
+      w.liv = w.liv.filter(function (x) { return x[1] > 0; });
+      if (!w.liv.length) w.liv = null;
+      return;
+    }
+    var pris = {};
+    Object.keys(D.biens).forEach(function (g) {
+      while (w.n < C.caravaneCharges && (b.stocks[g] || 0) >= Q && peutDeposer(e, g)) { b.stocks[g] -= Q; pris[g] = (pris[g] || 0) + 1; w.n++; }
+    });
+    Object.keys(pris).forEach(function (g) {
+      operation(e, { t: 'depot', g: g, q: pris[g], p: prixVoisin(g) });
+      e.stats.depotsVoisins = (e.stats.depotsVoisins || 0) + pris[g];
+    });
+  }
+  // Charges arrivées (livraison payée, ou reprise) : une caravane les décharge ; ce qui ne
+  // trouve pas de place attend dans la réserve de la ville.
+  function recevoirCharges(e, c, l) {
+    var liv = l.map(function (x) { return [x[0], x[1]]; }).filter(function (x) { return x[1] > 0; });
+    if (!liv.length) return;
+    if (!c || !envoyerCaravane(e, c, { prov: 1, liv: liv })) versReserve(e, liv);
+  }
+  function versReserve(e, liv) {
+    var Q = charge(), R = e.province.reserve;
+    liv.forEach(function (x) { if (x[1] > 0) R[x[0]] = (R[x[0]] || 0) + x[1] * Q; });
+  }
+  // Chaque jour : la réserve se range dans les entrepôts (greniers pour la nourriture) qui ont de la place.
+  function rangerReserve(e) {
+    var R = e.province.reserve;
+    Object.keys(R).forEach(function (g) {
+      var al = estAliment(g);
+      for (var k = 0; k < e.batiments.length && R[g] > 0; k++) {
+        var b = e.batiments[k];
+        if (b.type === 'entrepot' || (al && b.type === 'grenier')) R[g] -= deposer(b, g, R[g]);
+      }
+      if (!(R[g] > 0)) delete R[g];
+    });
+  }
+  function citeVoisine(e, siege) {
+    var l = cites(e);
+    for (var k = 0; k < l.length; k++) if (l[k].voisin === siege) return l[k];
+    return null;
+  }
+  // Une réponse du comptoir, appliquée une seule fois (numéro m croissant).
+  function reponseComptoir(e, o) {
+    var P = e.province, k, x, c;
+    if (o.t === 'livraison') {
+      if (P.attente[o.d] === o.ref) delete P.attente[o.d];
+      c = citeVoisine(e, o.d);
+      var total = 0, charges = 0;
+      for (k = 0; k < (o.l || []).length; k++) {
+        x = o.l[k];
+        total += x[1] * x[2]; charges += x[1];
+        if (c) for (var j = 0; j < x[1]; j++) compterEchange(e, c, 'v', x[0]);
+      }
+      if (!charges) return;
+      e.tresor -= total; e.finances.an.imports += total;
+      P.achats += total;
+      e.stats.imports = (e.stats.imports || 0) + charges;
+      recevoirCharges(e, c, o.l);
+      noter(e, 'msg.prov.livraison', { n: charges, siege: o.d, deniers: total }, false);
+    } else if (o.t === 'paiement') {
+      e.tresor += o.s; e.finances.an.voisins = (e.finances.an.voisins || 0) + o.s;
+      P.ventes += o.s;
+      e.stats.exports = (e.stats.exports || 0) + (o.l || []).reduce(function (a, y) { return a + y[1]; }, 0);
+      noter(e, 'msg.prov.paiement', { deniers: o.s, siege: o.de }, false);
+    } else if (o.t === 'reprise') {
+      recevoirCharges(e, cites(e).filter(estVoisine)[0] || null, o.l || []);
+      if (o.raison === 'plein') noter(e, 'msg.prov.etalPlein', {}, false);
+    }
+  }
+  // Commande « province-sync » : réponses du comptoir et vue des voisins.
+  function synchroniserProvince(e, c) {
+    var P = e.province;
+    if (!P) return false;
+    if (Number.isSafeInteger(c.recu)) P.sortie = P.sortie.filter(function (o) { return o.n > c.recu; });
+    (Array.isArray(c.sortie) ? c.sortie.slice() : []).sort(function (a, b) { return a.m - b.m; }).forEach(function (o) {
+      if (!o || !(o.m > P.m)) return;
+      P.m = o.m;
+      reponseComptoir(e, o);
+    });
+    var v = c.vue;
+    if (v && Array.isArray(v.sieges)) {
+      v.sieges.forEach(function (s) {
+        if (!s || s.siege === P.siege) return;
+        P.voisins[s.siege] = { pris: !!s.pris, actif: !!s.actif, pseudo: s.pseudo || null, numero: s.numero || null,
+          etal: s.etal || {}, infos: s.infos || {}, visite: s.visite || 0, signaux: s.signaux || [] };
+      });
+      (v.evenements || []).forEach(function (ev) {
+        if (!(ev.t > P.vus)) return;
+        P.vus = ev.t;
+        if (ev.type === 'arrivee' && ev.siege !== P.siege) noter(e, 'msg.prov.arrivee', { siege: ev.siege }, true);
+      });
+      if (v.gagnee && !P.gagnee) P.gagnee = v.gagnee;
+    }
+    if (!P.enLigne) { P.enLigne = true; noter(e, 'msg.prov.enLigne', {}, false); }
+    return true;
+  }
+  // Ce que l'interface envoie au comptoir, lu dans l'état au moment où la ville est enregistrée.
+  function provinceEnvoi(e) {
+    var P = e.province;
+    if (!P) return null;
+    var ob = objectifs(e);
+    return {
+      code: P.code, siege: P.siege, jeton: P.jeton,
+      ops: JSON.parse(JSON.stringify(P.sortie)), accuse: P.m,
+      infos: { pop: e.pop | 0, cotes: { culture: e.cotes.culture | 0, prosperite: e.cotes.prosperite | 0, paix: e.cotes.paix | 0, faveur: e.cotes.faveur | 0 },
+        objectif: !!(ob.length && ob.every(function (x) { return x.fait; })), ventes: P.ventes | 0, mois: Math.floor(e.tick / D.ticksParMois) }
+    };
   }
 
   // ------------------------------------------------------------------------
@@ -3601,7 +3811,7 @@
     }
     return n ? Math.floor(v / n) : 0;
   }
-  function recettes(b) { return b.impots + b.exports + b.secours + b.dons; }
+  function recettes(b) { return b.impots + b.exports + (b.voisins || 0) + b.secours + b.dons; }
   function depenses(b) { return b.salaires + b.constructions + b.imports + b.tribut + b.interets + b.fetes + b.gouverneur + b.envois; }
   // Variation de la prospérité sur l'année du budget b (14.2).
   function prosperiteAnnee(e, b) {
@@ -3923,7 +4133,7 @@
   function verifierFin(e, moisEcoules) {
     if (e.victoire || e.defaite || e.libre) return;
     var m = mission(e), ob = objectifs(e);
-    if (ob.length && ob.every(function (x) { return x.fait; })) {
+    if (!e.province && ob.length && ob.every(function (x) { return x.fait; })) {
       var etoiles = 1 + (e.secoursRecu ? 0 : 1) + (m.dateCibleMois && moisEcoules <= m.dateCibleMois ? 1 : 0);
       e.victoire = { tick: e.tick, mois: moisEcoules, etoiles: etoiles };
       noter(e, 'msg.victoire', {}, true);
@@ -3941,7 +4151,18 @@
   function verifierVictoire(e) {
     if (e.victoire || e.defaite || e.libre) return;
     var ob = objectifs(e);
-    if (ob.length && ob.every(function (x) { return x.fait; })) verifierFin(e, Math.floor(e.tick / D.ticksParMois));
+    var fait = !!(ob.length && ob.every(function (x) { return x.fait; }));
+    if (e.province) {
+      // Objectif commun (section 16.7) : la ville seule ne gagne pas ; la province gagne quand
+      // chaque cité active a atteint ses seuils (le comptoir le dit dans sa vue).
+      if (fait !== e.province.objectif) { e.province.objectif = fait; if (fait) noter(e, 'msg.prov.objectif', {}, true); }
+      if (e.province.gagnee) {
+        e.victoire = { tick: e.tick, mois: Math.floor(e.tick / D.ticksParMois), etoiles: 0, province: true };
+        noter(e, 'msg.prov.gagnee', {}, true);
+      }
+      return;
+    }
+    if (fait) verifierFin(e, Math.floor(e.tick / D.ticksParMois));
   }
   function nouveauJour(e) {
     repartirTravail(e); calculerEau(e); envoyerPompiers(e); immigrer(e);
@@ -4255,6 +4476,8 @@
     invariants: invariants,
     exporter: exporter,
     importer: importer,
+    provinceEnvoi: provinceEnvoi,
+    prixVoisin: prixVoisin,
     empreinte: empreinte,
     majPopulation: majPopulation,
     calculerEau: calculerEau,

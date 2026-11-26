@@ -10,7 +10,10 @@
 //   poidsRepere  au-delà, simple avertissement (le poids reste mesuré) ;
 //   niveauxMin   nombre minimum de niveaux (« niveaux », window.JEL_NIVEAUX) ;
 //   paysage      jeu en paysage : essais tactiles et images de téléphone
-//                en 844 × 390 au lieu de 390 × 844.
+//                en 844 × 390 au lieu de 390 × 844 ;
+//   province     jeu à plusieurs sans moteur du site (ni jel-multi ni jel-tr) :
+//                « Cités voisines », comptoir de province (multijoueur/src/province.js,
+//                public/province/lanceur.js) ; game.json : "province": true et "places".
 // ==========================================================================
 
 export const DEROGATIONS = {
@@ -22,6 +25,9 @@ export const DEROGATIONS = {
     poidsRepere: 4 * 1024 * 1024,
     niveauxMin: 17,
     paysage: true,
+    // Quatrième dérogation (cahier, sections 16.7 et 23.15 ; lot 6 lancé par le propriétaire le
+    // 26 novembre 2026) : jeu à plusieurs par le comptoir de province.
+    province: true,
   },
 };
 
