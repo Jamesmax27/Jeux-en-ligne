@@ -34,6 +34,9 @@
 #     d'un appareil à        (scripts/tester-sauvegardes-nuage.mjs : lanceur et vraie
 #     l'autre (profil.js,      API du profil, base en mémoire ; docs/cadrage-fidelisation.md,
 #     play.js, API du profil)  section 14.13) ;
+#   - bannière « Choisis     → accueil construit et vraie API du profil dans le navigateur
+#     ton pseudo » (accueil,   (scripts/tester-invite-pseudo.mjs : jours de visite, fenêtre,
+#     pastille, installer)     croix, « Installer l'appli » ; docs/cadrage-fidelisation.md, 14.14) ;
 #   - multijoueur (Worker,   → parties simulées, Worker avec de faux Durable Objects et jeux
 #     moteur, lanceur ou jeu   multijoueurs dans le lanceur (scripts/tester-multijoueur.mjs
 #     multijoueur)             --navigateur, docs/multijoueur.md) ; moteur modifié : les jeux
@@ -68,6 +71,8 @@ on:
       - "public/i18n/**"
       - "public/save.js"
       - "public/sauvegardes-nuage.js"
+      - "public/invite-pseudo.js"
+      - "public/installer.js"
       - "public/stockage.js"
       - "public/stockage-lanceur.js"
       - "public/taxonomie.js"
@@ -118,6 +123,7 @@ on:
       - "scripts/tester-stats.mjs"
       - "scripts/tester-profil.mjs"
       - "scripts/tester-sauvegardes-nuage.mjs"
+      - "scripts/tester-invite-pseudo.mjs"
       - "scripts/tester-amis.mjs"
       - "scripts/tester-province.mjs"
       - "public/province/**"
@@ -168,6 +174,7 @@ jobs:
       tr: ${{ steps.quoi.outputs.tr }}
       profil: ${{ steps.quoi.outputs.profil }}
       nuage: ${{ steps.quoi.outputs.nuage }}
+      pseudo: ${{ steps.quoi.outputs.pseudo }}
       inspirations: ${{ steps.quoi.outputs.inspirations }}
       poussiere: ${{ steps.quoi.outputs.poussiere }}
       marmoria: ${{ steps.quoi.outputs.marmoria }}
@@ -245,6 +252,11 @@ jobs:
           nuage=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then nuage=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^(public/(profil|profil-reglages|sauvegardes-nuage|play)\.js|functions/(_profil|api/profil)\.js|scripts/(tester-sauvegardes-nuage|d1-local)\.mjs)$'; then nuage=1; fi
+          # Bannière « Choisis ton pseudo » de l'accueil (docs/cadrage-fidelisation.md, 14.14) :
+          # site construit, vraie API du profil, dans le navigateur.
+          pseudo=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then pseudo=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(public/(invite-pseudo|installer)\.js|public/style\.css|public/(profil|avatars)[a-z-]*\.js|gabarits/accueil\.html|public/i18n/site/[a-z]+\.json|functions/(_profil|api/profil)\.js|scripts/(tester-invite-pseudo|d1-local|build-catalog|pages-seo)\.mjs)$'; then pseudo=1; fi
           # Saisons et tendances de la boucle de nuit (file d'idées, calendrier) : tests sans navigateur.
           inspirations=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then inspirations=1; fi
@@ -265,7 +277,7 @@ jobs:
           if [ "$tous" = 1 ] || [ "$site" = 1 ]; then seo=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^scripts/(regles-seo|verifier-seo)\.mjs$'; then seo=1; fi
           navigateur=0
-          if [ -n "$ids" ] || [ "$tous" = 1 ] || [ "$site" = 1 ] || [ "$stats" = 2 ] || [ "$multi" = 1 ] || [ "$nuage" = 1 ]; then navigateur=1; fi
+          if [ -n "$ids" ] || [ "$tous" = 1 ] || [ "$site" = 1 ] || [ "$stats" = 2 ] || [ "$multi" = 1 ] || [ "$nuage" = 1 ] || [ "$pseudo" = 1 ]; then navigateur=1; fi
           # Jeux à tester dans le navigateur, partagés entre LOTS_MAX machines au plus
           # (un jeu prend environ 50 s : robot, sauvegarde, 5 langues).
           if [ "$tous" = 1 ]; then
@@ -292,6 +304,7 @@ jobs:
             echo "tr=$tr"
             echo "profil=$profil"
             echo "nuage=$nuage"
+            echo "pseudo=$pseudo"
             echo "inspirations=$inspirations"
             echo "poussiere=$poussiere"
             echo "marmoria=$marmoria"
@@ -486,6 +499,13 @@ jobs:
       - name: Contrôler les sauvegardes d'un appareil à l'autre
         if: needs.quoi.outputs.nuage == '1'
         run: node scripts/tester-sauvegardes-nuage.mjs
+
+      # Bannière « Choisis ton pseudo » de l'accueil (public/invite-pseudo.js) : site
+      # construit, vraie API du profil (base en mémoire) ; jours de visite, fenêtre,
+      # croix, « Installer l'appli », 3 largeurs. Voir docs/cadrage-fidelisation.md, 14.14.
+      - name: Contrôler l'invitation au pseudo
+        if: needs.quoi.outputs.pseudo == '1'
+        run: node scripts/tester-invite-pseudo.mjs
 
       # Multijoueur (docs/multijoueur.md) : moteur et Worker (faux Durable Objects),
       # parties simulées de chaque jeu multijoueur, puis chacun dans le lanceur avec un
