@@ -2716,6 +2716,7 @@
   let morceaux = [], particules = [], popups = [], secousse = 0, flashs = [0, 0];
   let humeurChef = { nom: 'joie', jusqua: 0 };
   let rebondEtagere = [0, 0, 0, 0];
+  let apercu = 0, apercuFige = false; // image du jeu préparée pour sa page (window.JEL_APERCU)
 
   // Horloge du morceau : celle du son quand il marche (moins le retard de la sortie audio,
   // pour que l'aliment arrive dans le cercle au moment où l'on entend la note)
@@ -3293,6 +3294,7 @@
   // --------------------------------------------------------------------------
   const voieDe = (y) => (L.duo ? (y < (L.voies[0] + L.voies[1]) / 2 ? 0 : 1) : 0);
   scene.addEventListener('pointerdown', (e) => {
+    if (apercu) return;
     Son.init();
     if (mode !== 'jeu' || enPause || decompteFin || finDemandee) return;
     e.preventDefault();
@@ -3328,6 +3330,7 @@
   const TOUCHES_BAS = ['KeyJ', 'KeyK', 'KeyL', 'ArrowRight'];
   document.addEventListener('keydown', (e) => {
     const code = e.code;
+    if (apercu) return;
     if (mode === 'tuto') { if (code === 'Space' || code === 'Enter' || code === 'NumpadEnter') { e.preventDefault(); fermerTuto(); } return; }
     if (mode === 'pause') { if (code === 'Escape' || code === 'KeyP') { e.preventDefault(); Son.clic(); reprendre(); } return; }
     if (mode === 'titre') {
@@ -3360,7 +3363,7 @@
     const n = touchesTenues.get(e.code);
     if (n) { touchesTenues.delete(e.code); relacher(n); }
   });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) mettreEnPause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu) mettreEnPause(); });
   window.addEventListener('blur', () => { if (mode === 'jeu') relacherTout(); });
 
   // --------------------------------------------------------------------------
@@ -3464,7 +3467,11 @@
       }
     }
     if (mode === 'titre') tDemo += dt;
-    // effets
+    majEffets(dt);
+  }
+
+  // Effets (morceaux coupés, particules, textes, secousse, éclairs du cercle)
+  function majEffets(dt) {
     morceaux = morceaux.filter((p) => { p.vie -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 700 * dt; p.rot += p.vr * dt; return p.vie > 0; });
     particules = particules.filter((p) => {
       p.vie -= dt;
@@ -3721,7 +3728,7 @@
     const dt = Math.min(0.1, (maintenant - dernier) / 1000);
     dernier = maintenant;
     if (!L) miseEnPage();
-    mettreAJour(dt, maintenant);
+    if (!apercuFige) mettreAJour(dt, maintenant);
     dessiner(maintenant);
     dessinerTuto(maintenant);
     requestAnimationFrame(boucle);
@@ -3778,9 +3785,217 @@
     else if (mode === 'livre') ouvrirLivre();
   });
 
+  // --------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // --------------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le chef danse en
+  // grand, la louche levée ; une crêpe vole au-dessus de lui, la carotte est coupée dans le cercle
+  // lumineux, les aliments rieurs arrivent sur le plan de travail et les ustensiles sautent en musique.
+  function dessinerAffiche() {
+    redimensionner();
+    const c = cx;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const M = MONDES[0];
+    const k = Math.min(W / 600, H / 800);
+    const ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+    // Mur carrelé (sur toute la largeur)
+    c.fillStyle = M.mur; c.fillRect(0, 0, W, H);
+    c.strokeStyle = M.carreau; c.lineWidth = 2.5 * k;
+    const pas = 46 * k;
+    for (let x = ox % pas; x < W; x += pas) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H); c.stroke(); }
+    for (let y = oy % pas; y < H; y += pas) { c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
+    // Grande fenêtre ensoleillée, à gauche
+    const fx = X(30), fy = Y(118), fw = 230 * k, fh = 180 * k;
+    rrect(c, fx - 10 * k, fy - 10 * k, fw + 20 * k, fh + 20 * k, 16 * k); c.fillStyle = '#b8794a'; c.fill();
+    c.save(); rrect(c, fx, fy, fw, fh, 10 * k); c.clip();
+    const ciel = c.createLinearGradient(0, fy, 0, fy + fh); ciel.addColorStop(0, '#6ec6ff'); ciel.addColorStop(1, '#d8f3ff');
+    c.fillStyle = ciel; c.fillRect(fx, fy, fw, fh);
+    disque(c, fx + fw * 0.72, fy + fh * 0.3, 30 * k, '#ffd23f');
+    [[0.2, 0.25], [0.55, 0.55]].forEach(([a, b]) => { const nx = fx + fw * a, ny = fy + fh * b; disque(c, nx, ny, 16 * k, '#fff'); disque(c, nx + 18 * k, ny - 8 * k, 21 * k, '#fff'); disque(c, nx + 38 * k, ny, 15 * k, '#fff'); });
+    c.beginPath(); c.ellipse(fx + fw * 0.5, fy + fh + 30 * k, fw * 0.8, fh * 0.35, 0, 0, TAU); c.fillStyle = '#8fd46a'; c.fill();
+    c.restore();
+    c.beginPath(); c.moveTo(fx + fw / 2, fy); c.lineTo(fx + fw / 2, fy + fh); c.moveTo(fx, fy + fh / 2); c.lineTo(fx + fw, fy + fh / 2); trait(c, '#b8794a', 8 * k);
+    // Rayons de soleil qui entrent dans la cuisine
+    c.save(); c.globalAlpha = 0.22; c.fillStyle = '#fff6c8';
+    c.beginPath(); c.moveTo(fx + fw * 0.3, fy + fh); c.lineTo(fx + fw, fy + fh * 0.2); c.lineTo(X(560), Y(560)); c.lineTo(X(150), Y(600)); c.closePath(); c.fill();
+    c.restore();
+    // Lumière chaude derrière le chef
+    const chefX = X(345), chefY = Y(392), s = 300 * k;
+    const halo = c.createRadialGradient(chefX, chefY - 40 * k, 10 * k, chefX, chefY - 40 * k, 330 * k);
+    halo.addColorStop(0, 'rgba(255,214,110,.85)'); halo.addColorStop(0.5, 'rgba(255,190,90,.4)'); halo.addColorStop(1, 'rgba(255,214,120,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    // Rayons de fête qui tournent autour du chef
+    c.save(); c.globalAlpha = 0.18;
+    for (let i = 0; i < 14; i++) {
+      const a = i * TAU / 14 + 0.1;
+      c.beginPath(); c.moveTo(chefX, chefY - 30 * k);
+      c.lineTo(chefX + Math.cos(a) * 520 * k, chefY - 30 * k + Math.sin(a) * 520 * k);
+      c.lineTo(chefX + Math.cos(a + 0.12) * 520 * k, chefY - 30 * k + Math.sin(a + 0.12) * 520 * k);
+      c.closePath(); c.fillStyle = i % 2 ? '#ffffff' : '#ffc93c'; c.fill();
+    }
+    c.restore();
+    // Fanions en haut (toute la largeur)
+    const yF = Y(62);
+    c.beginPath(); c.moveTo(0, yF); c.quadraticCurveTo(W / 2, yF + 30 * k, W, yF); trait(c, '#8b5e3c', 3 * k);
+    const larg = 46 * k;
+    for (let i = 0; i < Math.ceil(W / larg) + 1; i++) {
+      const x = i * larg + larg / 2, u = x / W, y = yF + 4 * u * (1 - u) * 15 * k;
+      c.beginPath(); c.moveTo(x - 17 * k, y); c.lineTo(x + 17 * k, y); c.lineTo(x + Math.sin(i) * 4 * k, y + 32 * k); c.closePath();
+      c.fillStyle = ['#ff8c42', '#ffd23f', '#7bc950', '#e63946', '#5fc7ff'][i % 5]; c.fill();
+    }
+    // Étagère et ustensiles musiciens qui sautent, à droite
+    const ye = Y(206);
+    rrect(c, X(410), ye, W - X(410) + 20, 14 * k, 6 * k); c.fillStyle = '#a0683a'; c.fill();
+    c.fillStyle = '#7d4e29'; c.fillRect(X(440), ye + 14 * k, 10 * k, 20 * k); c.fillRect(X(570), ye + 14 * k, 10 * k, 20 * k);
+    dessinerUstensile(c, 'louche', X(470), ye - 34 * k, 70 * k, { rot: -0.2 });
+    dessinerUstensile(c, 'fouet', X(540), ye - 58 * k, 66 * k, { rot: 0.25 });
+    // Notes de musique qui s'envolent
+    [[470, 120, 34, '#e63946'], [560, 98, 28, '#2a9d8f'], [78, 350, 30, '#6a4c93'], [250, 250, 34, '#ff7a00'], [130, 92, 24, '#2f6fdb']].forEach(([x, y, t, col]) => {
+      c.save(); c.shadowColor = '#fff'; c.shadowBlur = 6 * k; noteMusique(c, X(x), Y(y), t * k, col); c.restore();
+    });
+    // Le chef, en grand : il danse, louche levée
+    c.save();
+    c.shadowColor = 'rgba(122,74,42,.45)'; c.shadowBlur = 16 * k;
+    dessinerChef(c, chefX, chefY, s, { humeur: 'fete', bras: 0.55, tablier: 'arcenciel', toque: 'haute', ustensile: 'poele' });
+    c.restore();
+    // La crêpe qui saute de la poêle du chef, avec sa traînée
+    c.save(); c.globalAlpha = 0.6;
+    for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(X(492 - i * 14), Y(400 - i * 32), (7 - i) * k, 0, TAU); c.fillStyle = '#fff'; c.fill(); }
+    c.restore();
+    dessinerAliment(c, 'crepe', X(440), Y(272), 116 * k, { rot: 0.35, sy: 0.75 });
+    // Une casserole musicienne qui chante et saute, à gauche
+    dessinerUstensile(c, 'casserole', X(118), Y(410), 116 * k, { rot: 0.18 });
+    // Étoiles dorées
+    [[230, 170, 16], [90, 250, 12], [420, 330, 13], [250, 470, 11], [560, 420, 14]].forEach(([x, y, r]) => {
+      c.save(); c.shadowColor = '#ffc93c'; c.shadowBlur = 12 * k; etoileForme(c, X(x), Y(y), r * k, '#ffc93c'); c.restore();
+    });
+    // Plan de travail au premier plan (toute la largeur)
+    const yp = Y(548), hp = 120 * k;
+    c.fillStyle = 'rgba(0,0,0,.12)'; c.fillRect(0, yp - 8 * k, W, 12 * k);
+    rrect(c, -20, yp, W + 40, hp, 22 * k); c.fillStyle = M.plan; c.fill();
+    rrect(c, -20, yp + 12 * k, W + 40, hp - 28 * k, 14 * k); c.fillStyle = M.tapis; c.fill();
+    c.save(); rrect(c, -20, yp + 12 * k, W + 40, hp - 28 * k, 14 * k); c.clip();
+    for (let x = -60 * k; x < W + 60 * k; x += 52 * k) { c.beginPath(); c.moveTo(x, yp + 12 * k); c.lineTo(x - 16 * k, yp + hp - 16 * k); trait(c, 'rgba(255,255,255,.25)', 5 * k); }
+    c.restore();
+    // Placards sous le plan (le bas porte le bandeau du titre du site)
+    c.fillStyle = '#c98b4e'; c.fillRect(0, yp + hp - 6 * k, W, H);
+    for (let x = ox % (150 * k) - 150 * k; x < W; x += 150 * k) {
+      rrect(c, x + 10 * k, yp + hp + 10 * k, 130 * k, H, 12 * k); c.fillStyle = '#d89a5c'; c.fill();
+      disque(c, x + 120 * k, yp + hp + 46 * k, 6 * k, '#7d4e29');
+    }
+    // Cercle lumineux et la carotte coupée en rythme
+    const ccx = X(132), ccy = yp + hp * 0.45;
+    c.save(); c.shadowColor = '#ffcf33'; c.shadowBlur = 40 * k;
+    c.beginPath(); c.arc(ccx, ccy, 54 * k, 0, TAU); c.fillStyle = 'rgba(255,255,255,.55)'; c.fill(); trait(c, '#ffcf33', 9 * k);
+    c.restore();
+    c.save(); c.beginPath(); c.rect(ccx - 120 * k, ccy - 200 * k, 120 * k, 260 * k); c.clip();
+    dessinerAliment(c, 'carotte', ccx - 22 * k, ccy - 46 * k, 100 * k, { rot: -0.6, face: false }); c.restore();
+    c.save(); c.beginPath(); c.rect(ccx, ccy - 200 * k, 140 * k, 260 * k); c.clip();
+    dessinerAliment(c, 'carotte', ccx + 22 * k, ccy - 56 * k, 100 * k, { rot: 0.5, face: false }); c.restore();
+    for (let i = 0; i < 12; i++) {
+      const a = i * TAU / 12, d = (60 + (i % 3) * 18) * k;
+      disque(c, ccx + Math.cos(a) * d, ccy - 40 * k + Math.sin(a) * d * 0.8, (4 + (i % 3) * 2) * k, i % 2 ? '#ff8c1a' : '#ffffff');
+    }
+    etoileForme(c, ccx, ccy - 112 * k, 26 * k, '#ffcf33');
+    // Les aliments rieurs qui arrivent vers le cercle
+    dessinerAliment(c, 'tomate', X(262), ccy - 6 * k, 96 * k);
+    dessinerAliment(c, 'oeuf', X(372), ccy - 10 * k, 92 * k);
+    dessinerAliment(c, 'fraise', X(478), ccy - 4 * k, 92 * k);
+    dessinerAliment(c, 'citron', X(590), ccy - 2 * k, 96 * k);
+    // Premier plan : la marmite de soupe, coupée par le bord, avec sa vapeur
+    dessinerPlat(c, 0, X(-10), Y(720), 190 * k, 1);
+    c.save(); c.globalAlpha = 0.7;
+    for (let i = 0; i < 3; i++) disque(c, X(-10 + i * 26), Y(650 - i * 26), (20 - i * 4) * k, '#ffffff');
+    c.restore();
+  }
+  function demarrerAffiche() {
+    const cacher = () => {
+      for (const el of document.querySelectorAll('.ecran, #hud, #decompte, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+    };
+    cacher();
+    setTimeout(cacher, 300); setTimeout(cacher, 1000);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // --------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // --------------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine recette, avec sa vraie interface (recette, bonne humeur, score), sans écran
+  // titre, ni fenêtre « Continuer », ni tutoriel. On choisit le moment où un aliment vient d'être réussi
+  // dans le cercle, avec d'autres aliments en vue, puis la partie est figée : ni victoire, ni défaite,
+  // ni son, ni sauvegarde.
+  //   1 = recette 1 : la soupe du potager au tambour ;
+  //   2 = recette 10 : la paella à la guitare, avec une chaussette ou un caillou à laisser passer ;
+  //   3 = recette 20 : la pizza, deux plans de travail, la vapeur et les crêpes fléchées (ordinateur).
+  const SCENES_APERCU = {
+    1: { niveau: 0, score: 1460, combo: 9, humeur: 92, rempli: 0.4, habits: {}, apres: 9.5 },
+    2: { niveau: 9, score: 4380, combo: 17, humeur: 76, rempli: 0.55, cherche: 'piege', habits: { tablier: 'vichy', toque: 'haute', ustensile: 'casserole' } },
+    3: { niveau: 19, score: 9240, combo: 24, humeur: 83, rempli: 0.7, cherche: 'glisse', duo: true, habits: { tablier: 'arcenciel', toque: 'doree', ustensile: 'poele' } },
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 98765 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    progres = normaliser(sc.habits); // progression en mémoire seulement (rien n'est enregistré)
+    niveau = sc.niveau;
+    morceau = genererMorceau(niveau);
+    partieEnCours = false; // aucune sauvegarde à la fermeture
+    enPause = false; decompteFin = 0; finDemandee = 0; annonceVite = true;
+    stats = { parfait: 0, bien: 0, rate: 0, evite: 0, justes: 0, combo: 0, comboMax: 0, score: 0, faits: 0 };
+    morceaux = []; particules = []; popups = []; secousse = 0;
+    mode = 'jeu';
+    miseEnPage();
+    montrer(null);
+    $('hud').hidden = false;
+    // Choix du moment : un aliment juste dans le cercle, au moins 3 autres en vue, la mécanique cherchée devant.
+    const vit = (W - L.cercleX + 40) / morceau.N.approche;
+    const vue = (W - L.cercleX) / vit * 0.9;
+    const debutJeu = Math.max(morceau.tempsDe(DEBUT + 4), sc.apres || 0);
+    const taps = morceau.notes.filter((n) => n.type === 'tap' && n.t > debutJeu);
+    // Le moment le plus rempli l'emporte (à égalité, le premier).
+    // Sous la vapeur (dernières recettes), un aliment ne se voit pas : il ne compte pas.
+    const v0 = L.cercleX + (W - L.cercleX) * 0.38 - L.hv * 0.5, v1 = L.cercleX + (W - L.cercleX) * 0.74 + L.hv * 0.8;
+    const visible = (m, t0) => { const x = L.cercleX + (m.t - t0) * vit; return !morceau.N.vapeur || x < v0 || x > v1; };
+    let cible = null, meilleur = -1;
+    for (const n of taps) {
+      const devant = morceau.notes.filter((m) => m.t > n.t + 0.15 && m.t < n.t + vue && visible(m, n.t));
+      if (morceau.notes.some((m) => m.type === 'long' && m.t < n.t && m.fin > n.t - 0.2)) continue;
+      let note = devant.length;
+      if (sc.cherche && devant.some((m) => m.type === sc.cherche)) note += 3;
+      if (sc.duo && devant.some((m) => m.voie === 0) && devant.some((m) => m.voie === 1)) note += 3;
+      if (note > meilleur) { meilleur = note; cible = n; }
+    }
+    if (!cible) cible = taps[Math.floor(taps.length / 3)] || morceau.notes[0];
+    tChanson = cible.t + 0.03;
+    morceau.notes.forEach((n) => { if (n !== cible && n.t < cible.t + 0.01) { n.etat = 1; n.finEtat = 1; n.vole = 1; } });
+    // Le geste qui vient d'être réussi : l'aliment est coupé, « Parfait » s'envole
+    cible.etat = 1;
+    reussite(cible, 'parfait');
+    stats.score = sc.score; stats.combo = sc.combo; stats.comboMax = sc.combo;
+    stats.justes = Math.round(morceau.gestes * sc.rempli);
+    humeur = sc.humeur;
+    humeurChef = { nom: numero === 1 ? 'joie' : 'fete', jusqua: Infinity };
+    majHud();
+    for (let i = 0; i < 8; i++) majEffets(1 / 60);
+    popups.forEach((p) => { p.y -= L.hv * 0.45; }); // « Parfait » au-dessus de la série, lisible
+    secousse = 0;
+    apercuFige = true; // la partie est figée sur ce moment, sans fenêtre de pause
+  }
+
   redimensionner();
   majBoutonsSon();
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else {
+    if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

@@ -954,6 +954,22 @@
   @keyframes sec{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
   @media (prefers-reduced-motion:reduce){.secoue{animation:none}}
   #etoiles{font-size:44px;margin:6px}
+  /* Affiche du jeu (window.JEL_AFFICHE, posé par le robot du site) */
+  #affiche{position:fixed;inset:0;width:100%;height:100%;display:block}
+  /* Image du jeu sur ordinateur (window.JEL_APERCU = 3) : la partie occupe toute la largeur */
+  .apercu-large #app{max-width:none;padding:24px 56px}
+  .apercu-large #haut{font-size:28px}
+  .apercu-large #consigne{font-size:32px;font-weight:700}
+  .apercu-large #collier{max-height:50vh}
+  .apercu-large #choix{max-width:none;gap:26px}
+  .apercu-large .opt{width:124px;height:124px;padding:12px;border-width:4px}
+  /* Images du jeu sur téléphone (window.JEL_APERCU = 1 ou 2) : commandes un peu plus grandes */
+  .apercu-tel #app{padding:12px 6px}
+  .apercu-tel #haut{font-size:24px;padding:0 8px}
+  .apercu-tel #consigne{font-size:26px;font-weight:700}
+  .apercu-tel #choix{gap:16px}
+  .apercu-tel #collier{max-height:none;margin:0 -2px}
+  .apercu-tel .opt{width:108px;height:108px;padding:10px;border-width:4px}
 </style>
 </head>
 <body>
@@ -992,7 +1008,9 @@ const MOTIFS = [
 
 let manche, points, erreurs, perles, suivant, bloque;
 const $ = id => document.getElementById(id);
-const alea = n => Math.floor(Math.random() * n);
+// Hasard du jeu (remplacé par un hasard à graine fixe pour les images du jeu, window.JEL_APERCU)
+let hasard = Math.random;
+const alea = n => Math.floor(hasard() * n);
 const melange = t => { for (let i = t.length - 1; i > 0; i--) { const j = alea(i + 1); [t[i], t[j]] = [t[j], t[i]]; } return t; };
 
 // Chemin SVG d'une forme centrée en (0,0), de rayon r
@@ -1163,6 +1181,268 @@ JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: zoneEffacer });
 
 $('bJouer').onclick = jouer;
 $('bRejouer').onclick = debut;
+
+// ---------------------------------------------------------------------------
+// Affiche du jeu : avec window.JEL_AFFICHE (posé par le robot du site, jamais par
+// le jeu), une scène composée plein écran, sans texte ni bouton, d'où le site
+// tire la jaquette. Composée sur 600 × 800 ; le décor continue jusqu'aux bords.
+// ---------------------------------------------------------------------------
+function cacherBoutonsAffiche() {
+  for (const e of document.querySelectorAll('.jel-langue, jel-langue, #app, button'))
+    e.style.setProperty('display', 'none', 'important');
+}
+// Hasard à graine fixe (même image à chaque capture)
+function graine(s) {
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+// Perle brillante dessinée sur le canvas (mêmes formes que le jeu, plus détaillées)
+function perleAffiche(ctx, x, y, r, p, opts) {
+  const o = opts || {};
+  ctx.save();
+  ctx.translate(x, y);
+  if (o.angle) ctx.rotate(o.angle);
+  const forme = new Path2D(chemin(p.f, r));
+  if (o.halo) { ctx.shadowColor = o.halo; ctx.shadowBlur = r * 0.9; }
+  ctx.fillStyle = p.c;
+  ctx.fill(forme);
+  ctx.shadowBlur = 0;
+  // relief : lumière en haut à gauche, ombre en bas à droite
+  const g = ctx.createRadialGradient(-r * 0.4, -r * 0.45, r * 0.05, 0, 0, r * 1.25);
+  g.addColorStop(0, 'rgba(255,255,255,0.75)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.12)');
+  g.addColorStop(0.75, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(40,0,60,0.45)');
+  ctx.fillStyle = g;
+  ctx.fill(forme);
+  ctx.lineWidth = Math.max(2, r * 0.1);
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#fff';
+  ctx.stroke(forme);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.beginPath(); ctx.ellipse(-r * 0.36, -r * 0.4, r * 0.2, r * 0.13, -0.6, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+// Petite étincelle à 4 branches
+function etincelle(ctx, x, y, r, couleur) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = couleur;
+  ctx.shadowColor = couleur; ctx.shadowBlur = r * 2;
+  ctx.beginPath();
+  ctx.moveTo(0, -r); ctx.quadraticCurveTo(0, 0, r, 0); ctx.quadraticCurveTo(0, 0, 0, r);
+  ctx.quadraticCurveTo(0, 0, -r, 0); ctx.quadraticCurveTo(0, 0, 0, -r);
+  ctx.fill();
+  ctx.restore();
+}
+function dessinerAffiche() {
+  const cv = $('affiche');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = window.innerWidth, H = window.innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const rnd = graine(7);
+
+  // Fond : nuit violette, grande lueur dorée derrière le pendentif
+  const fond = ctx.createLinearGradient(0, 0, 0, H);
+  fond.addColorStop(0, '#5b2a9e'); fond.addColorStop(0.55, '#7a3fb5'); fond.addColorStop(1, '#2b1457');
+  ctx.fillStyle = fond; ctx.fillRect(0, 0, W, H);
+
+  // Composition 600 × 800 centrée
+  const s = Math.min(W / 600, H / 800);
+  const ox = (W - 600 * s) / 2, oy = (H - 800 * s) / 2;
+  const X = x => ox + x * s, Y = y => oy + y * s;
+
+  const lueur = ctx.createRadialGradient(X(300), Y(360), 10 * s, X(300), Y(360), 420 * s);
+  lueur.addColorStop(0, 'rgba(255,236,160,0.95)');
+  lueur.addColorStop(0.25, 'rgba(255,190,120,0.55)');
+  lueur.addColorStop(0.6, 'rgba(230,120,255,0.18)');
+  lueur.addColorStop(1, 'rgba(120,60,200,0)');
+  ctx.fillStyle = lueur; ctx.fillRect(0, 0, W, H);
+
+  // Rayons de lumière magique
+  ctx.save();
+  ctx.translate(X(300), Y(360));
+  for (let i = 0; i < 14; i++) {
+    ctx.rotate(Math.PI * 2 / 14);
+    const rg = ctx.createLinearGradient(0, 0, 0, -520 * s);
+    rg.addColorStop(0, 'rgba(255,240,190,0.28)'); rg.addColorStop(1, 'rgba(255,240,190,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-30 * s, -560 * s); ctx.lineTo(30 * s, -560 * s); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+
+  // Fond lointain : perles floues et étoiles sur toute la largeur
+  for (let i = 0; i < Math.round(26 * W / (600 * s)); i++) {
+    const x = rnd() * W, y = rnd() * H * 0.8, r = (6 + rnd() * 12) * s;
+    ctx.globalAlpha = 0.35;
+    perleAffiche(ctx, x, y, r, { c: COULEURS[i % 5], f: FORMES[(i * 3) % 5] }, { angle: rnd() - 0.5 });
+  }
+  ctx.globalAlpha = 1;
+  for (let i = 0; i < Math.round(60 * W / (600 * s)); i++) {
+    etincelle(ctx, rnd() * W, rnd() * H * 0.85, (2 + rnd() * 4) * s, rnd() < 0.5 ? '#fff6c8' : '#ffd6ff');
+  }
+
+  // Le fil doré du collier : grande courbe qui descend vers le pendentif
+  const fil = t => {            // courbe de Bézier (t de 0 à 1)
+    const x0 = -60, y0 = 120, cx = 300, cy = 420, x1 = 660, y1 = 120;
+    const u = 1 - t;
+    return [u * u * x0 + 2 * u * t * cx + t * t * x1, u * u * y0 + 2 * u * t * cy + t * t * y1];
+  };
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#8a5a00'; ctx.lineWidth = 9 * s;
+  ctx.beginPath(); ctx.moveTo(X(-60) - 2000, Y(120) - 1500 * 0); ctx.lineTo(X(-60), Y(120));
+  ctx.quadraticCurveTo(X(300), Y(420), X(660), Y(120)); ctx.lineTo(X(660) + 2000, Y(120)); ctx.stroke();
+  ctx.strokeStyle = '#ffd86b'; ctx.lineWidth = 5 * s;
+  ctx.shadowColor = '#ffe9a0'; ctx.shadowBlur = 12 * s;
+  ctx.stroke();
+  ctx.restore();
+
+  // Perles enfilées : la suite rouge-rond, jaune-étoile, vert-cœur, bleu-carré
+  const suite = [
+    { c: COULEURS[0], f: 'rond' }, { c: COULEURS[1], f: 'etoile' },
+    { c: COULEURS[2], f: 'coeur' }, { c: COULEURS[3], f: 'carre' }
+  ];
+  const places = [0.05, 0.13, 0.21, 0.29, 0.37, 0.63, 0.71, 0.79, 0.87, 0.95];
+  let trou = null;
+  places.forEach((t, i) => {
+    const [x, y] = fil(t);
+    const r = 34;
+    if (i === 6) { trou = [x, y, r]; return; }  // la place vide du collier
+    perleAffiche(ctx, X(x), Y(y + 4), r * s, suite[i % 4], { halo: 'rgba(255,255,255,0.35)' });
+  });
+  // Extension du collier hors du cadre (écran large)
+  for (let k = 1; k < 12; k++) {
+    const xg = -60 - k * 78, xd = 660 + k * 78;
+    if (X(xg) > -60 * s) perleAffiche(ctx, X(xg), Y(124), 34 * s, suite[(12 - k) % 4]);
+    if (X(xd) < W + 60 * s) perleAffiche(ctx, X(xd), Y(124), 34 * s, suite[(k + 1) % 4]);
+  }
+
+  // La place vide : anneau doré pointillé qui attend sa perle
+  if (trou) {
+    const [x, y, r] = trou;
+    ctx.save();
+    ctx.setLineDash([9 * s, 7 * s]);
+    ctx.lineWidth = 5 * s; ctx.strokeStyle = '#ffd23f';
+    ctx.shadowColor = '#ffd23f'; ctx.shadowBlur = 18 * s;
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.beginPath(); ctx.arc(X(x), Y(y + 4), r * s * 1.05, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Le pendentif héros : grand cœur magique qui sourit
+  const px = 300, py = 392, pr = 168;
+  ctx.save();
+  // attache du pendentif
+  ctx.strokeStyle = '#ffd86b'; ctx.lineWidth = 8 * s;
+  ctx.beginPath(); ctx.arc(X(300), Y(298), 16 * s, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+  perleAffiche(ctx, X(px), Y(py), pr * s, { c: '#ff4d8d', f: 'coeur' }, { halo: 'rgba(255,220,140,0.95)' });
+  // visage : yeux brillants, joues, grand sourire
+  ctx.save();
+  ctx.translate(X(px), Y(py));
+  ctx.scale(s * pr / 150, s * pr / 150);
+  for (const sx of [-1, 1]) {
+    ctx.fillStyle = '#3a0a2a';
+    ctx.beginPath(); ctx.ellipse(sx * 40, 10, 17, 22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(sx * 40 - 6, 1, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(sx * 40 + 5, 18, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,170,200,0.8)';
+    ctx.beginPath(); ctx.ellipse(sx * 72, 46, 18, 10, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.fillStyle = '#3a0a2a';
+  ctx.beginPath(); ctx.moveTo(-26, 44); ctx.quadraticCurveTo(0, 86, 26, 44); ctx.quadraticCurveTo(0, 56, -26, 44); ctx.fill();
+  ctx.fillStyle = '#ff8fb0';
+  ctx.beginPath(); ctx.ellipse(0, 64, 11, 6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // L'action : la bonne perle (le cœur vert) vole vers la place vide
+  if (trou) {
+    const [tx, ty] = trou;
+    const vx = tx + 70, vy = ty + 150;   // perle en vol, avec sa traînée d'étoiles
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+      const t = i / 9;
+      const x = vx + 60 * (1 - t) + 10 * Math.sin(t * 6), y = vy + 150 * (1 - t);
+      etincelle(ctx, X(x + 40 - 4 * i), Y(y + 30), (11 - i) * s, i % 2 ? '#fff6c8' : '#ffd23f');
+    }
+    ctx.restore();
+    const enVol = suite[6 % 4];
+    perleAffiche(ctx, X(vx), Y(vy), 40 * s, enVol, { halo: '#ffe27a', angle: -0.25 });
+    // Flèche de mouvement : arc lumineux entre la perle et la place vide
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,240,180,0.85)'; ctx.lineWidth = 4 * s; ctx.setLineDash([4 * s, 10 * s]); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(X(vx - 10), Y(vy - 45)); ctx.quadraticCurveTo(X(tx + 40), Y(ty + 70), X(tx + 8), Y(ty + 44)); ctx.stroke();
+    ctx.restore();
+  }
+
+  // Étincelles autour du héros
+  const r2 = graine(42);
+  for (let i = 0; i < 16; i++) {
+    const a = r2() * Math.PI * 2, d = 170 + r2() * 70;
+    etincelle(ctx, X(px + Math.cos(a) * d), Y(py + Math.sin(a) * d * 0.9), (5 + r2() * 9) * s, i % 3 ? '#fff6c8' : '#ffb3ec');
+  }
+
+  // Premier plan : grosses perles coupées par les bords, un peu sombres
+  const avant = [
+    [40, 640, 95, { c: COULEURS[4], f: 'losange' }, -0.3],
+    [575, 600, 80, { c: COULEURS[3], f: 'carre' }, 0.35],
+    [470, 760, 70, { c: COULEURS[1], f: 'etoile' }, 0.2],
+    [130, 800, 60, { c: COULEURS[2], f: 'rond' }, 0]
+  ];
+  for (const [x, y, r, p, a] of avant) perleAffiche(ctx, X(x), Y(y), r * s, p, { angle: a, halo: 'rgba(255,255,255,0.25)' });
+  // Perles du premier plan prolongées sur écran large
+  for (let x = X(-160); x > -120 * s; x -= 210 * s) perleAffiche(ctx, x, Y(700), 75 * s, { c: COULEURS[0], f: 'coeur' }, { angle: 0.2 });
+  for (let x = X(760); x < W + 120 * s; x += 210 * s) perleAffiche(ctx, x, Y(690), 75 * s, { c: COULEURS[4], f: 'rond' });
+
+  // Bas plus sombre (bandeau du titre du site)
+  const bas = ctx.createLinearGradient(0, Y(600), 0, H);
+  bas.addColorStop(0, 'rgba(43,20,87,0)'); bas.addColorStop(1, 'rgba(30,12,64,0.55)');
+  ctx.fillStyle = bas; ctx.fillRect(0, Y(600), W, H - Y(600));
+}
+function demarrerAffiche() {
+  cacherBoutonsAffiche();
+  const cv = document.createElement('canvas');
+  cv.id = 'affiche';
+  cv.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(cv);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+  // Le bouton de langue peut être créé après ce script : on le cache aussi un peu après
+  for (const ms of [50, 300, 1000, 1800]) setTimeout(cacherBoutonsAffiche, ms);
+}
+
+// ---------------------------------------------------------------------------
+// Images du jeu : avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site,
+// jamais par le jeu), le jeu s'ouvre directement en pleine partie, avec sa vraie
+// interface, sans écran titre ni fenêtre ; rien n'est sauvegardé ni signalé.
+// 1 = premier collier, 2 = collier du milieu (couleurs et formes), 3 = dernier
+// collier (trois perles à trouver), vu sur un écran d'ordinateur.
+// ---------------------------------------------------------------------------
+const MOMENTS_APERCU = {
+  1: { manche: 0, points: 0, graine: 11, poses: 0 },
+  2: { manche: 6, points: 16, graine: 29, poses: 1 },
+  3: { manche: 9, points: 25, graine: 5, poses: 1 }
+};
+function ouvrirApercu(n) {
+  const m = MOMENTS_APERCU[n];
+  hasard = graine(m.graine);
+  document.documentElement.classList.add(n === 3 ? 'apercu-large' : 'apercu-tel');
+  manche = m.manche; points = m.points;
+  montre('jeu');
+  nouvelleManche();
+  // Une perle déjà posée dans les colliers du milieu et de la fin : la partie est en cours
+  suivant += m.poses;
+  afficheCollier(false);
+  // Partie figée : aucun clic ne fait gagner ni perdre avant la capture, rien n'est sauvegardé
+  bloque = true;
+}
+
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if ([1, 2, 3].includes(Number(window.JEL_APERCU))) ouvrirApercu(Number(window.JEL_APERCU));
 </script>
 </body>
 </html>

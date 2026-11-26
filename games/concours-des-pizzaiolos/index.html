@@ -4635,6 +4635,7 @@
   }
 
   function dessinerJeu(t) {
+    if (tempsFige) t = tempsFige;          // images du jeu : instant figé
     const cv = $('plateau'), zone = $('zone');
     const w = zone.clientWidth, h = zone.clientHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
     if (!w || !h) return;
@@ -5507,6 +5508,297 @@
   });
 
   // ---------------------------------------------------------------------
+  //  Affiche du jeu (jaquette) : window.JEL_AFFICHE, posé seulement par le
+  //  robot du site. Scène composée plein écran, sans texte, sans bouton, sans
+  //  son : le chef Tomate lance une pizza au-dessus de sa tête, les
+  //  ingrédients pleuvent dessus, les rivaux tendent la main vers le tapis.
+  // ---------------------------------------------------------------------
+
+  let modeAffiche = false;
+
+  // Bras d'un chef (manche blanche, main) : de l'épaule au coude puis à la main (repère du chef, boîte de 100).
+  function brasChef(c, s, x, y, r, ep, cou, mainP) {
+    c.save(); c.translate(x, y); c.scale(r / 50, r / 50);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    c.strokeStyle = '#c9c2b6'; c.lineWidth = 19;
+    c.beginPath(); c.moveTo(ep[0], ep[1]); c.quadraticCurveTo(cou[0], cou[1], mainP[0], mainP[1]); c.stroke();
+    c.strokeStyle = '#fff'; c.lineWidth = 15;
+    c.beginPath(); c.moveTo(ep[0], ep[1]); c.quadraticCurveTo(cou[0], cou[1], mainP[0], mainP[1]); c.stroke();
+    c.fillStyle = PEAU[s]; c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 2;
+    rond(c, mainP[0], mainP[1], 9); c.fill(); c.stroke();
+    c.restore();
+  }
+
+  // Pizza qui vole, vue un peu de biais (pas d'assiette).
+  function pizzaVolante(c, x, y, r, rot, t) {
+    c.save(); c.translate(x, y); c.rotate(rot);
+    c.save(); c.scale(1, 0.5);
+    c.fillStyle = 'rgba(120,50,10,.35)'; rond(c, 0, r * 0.18, r * 1.02); c.fill();
+    c.fillStyle = '#d99447'; rond(c, 0, 0, r); c.fill();
+    c.fillStyle = '#f0c27a'; rond(c, 0, -r * 0.04, r * 0.9); c.fill();
+    c.fillStyle = '#d9412b'; rond(c, 0, -r * 0.04, r * 0.76); c.fill();
+    c.fillStyle = 'rgba(255,214,90,.92)';
+    const al = graineHasard(21);
+    for (let i = 0; i < 11; i++) { const a = al() * Math.PI * 2, d = al() * r * 0.58; ell(c, Math.cos(a) * d, Math.sin(a) * d - r * 0.04, r * 0.16, r * 0.12, al() * 3); c.fill(); }
+    c.restore();
+    [['ba', -0.45, -0.06], ['ol', 0.35, -0.1], ['ch', 0.05, 0.1], ['ba', 0.5, 0.12], ['ol', -0.2, 0.14]].forEach((p) => dessinerIngr(c, p[0], p[1] * r, p[2] * r, r * 0.17, t));
+    c.restore();
+  }
+
+  // Traînée de mouvement (courbe blanche) derrière un ingrédient qui vole.
+  function trainee(c, x0, y0, xc, yc, x1, y1, ep) {
+    const g = c.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,.85)');
+    c.strokeStyle = g; c.lineWidth = ep; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(xc, yc, x1, y1); c.stroke();
+  }
+
+  function dessinerAffiche() {
+    const cv = $('fond'), w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const t = 400;
+    // Composition dessinée pour 600 × 800, centrée ; le décor continue jusqu'aux bords.
+    const k = Math.min(w / 600, h / 800), ox = (w - 600 * k) / 2, oy = (h - 800 * k) / 2;
+    const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+
+    // Ciel du soir et soleil couchant derrière la place
+    let g = c.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#ff9a5a'); g.addColorStop(0.35, '#ffd28c'); g.addColorStop(0.7, '#ffe6b8'); g.addColorStop(1, '#f2c48a');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    g = c.createRadialGradient(X(470), Y(120), 10 * k, X(470), Y(120), 260 * k);
+    g.addColorStop(0, 'rgba(255,250,215,1)'); g.addColorStop(0.25, 'rgba(255,236,160,.8)'); g.addColorStop(1, 'rgba(255,200,120,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+
+    // Façades de la place (fond pâle), répétées jusqu'aux bords
+    const coulsMur = ['#f3a76b', '#f7d18a', '#e9906b', '#f5bb7a'];
+    const largMur = 150 * k;
+    const debut = Math.floor((0 - X(0)) / largMur) - 1, fin = Math.ceil((w - X(0)) / largMur) + 1;
+    for (let i = debut; i <= fin; i++) {
+      const x = X(0) + i * largMur, haut = Y(150 + ((i % 2 + 2) % 2) * 40 - ((i % 3 + 3) % 3) * 18);
+      c.fillStyle = coulsMur[((i % 4) + 4) % 4]; c.fillRect(x, haut, largMur + 1, h);
+      for (let l = 0; l < 3; l++) for (let m = 0; m < 2; m++) {
+        const fx = x + largMur * (0.18 + m * 0.42), fy = haut + 22 * k + l * 62 * k;
+        c.fillStyle = '#8a5a36'; rr(c, fx, fy, largMur * 0.24, 40 * k, 5 * k); c.fill();
+        c.fillStyle = '#ffe9a8'; rr(c, fx + 3 * k, fy + 3 * k, largMur * 0.24 - 6 * k, 34 * k, 4 * k); c.fill();
+      }
+    }
+    // voile de lumière sur le fond (profondeur)
+    c.fillStyle = 'rgba(255,226,170,.42)'; c.fillRect(0, 0, w, h);
+
+    // Guirlandes de fanions
+    const coulsF = COUL.concat(['#ffffff']);
+    [[Y(118), Y(168), 0], [Y(205), Y(245), 3]].forEach((gu) => {
+      c.strokeStyle = '#6b3d1e'; c.lineWidth = 2.5 * k;
+      c.beginPath(); c.moveTo(0, gu[0]); c.quadraticCurveTo(w / 2, gu[1] + (gu[1] - gu[0]), w, gu[0]); c.stroke();
+      const n = Math.ceil(w / (34 * k));
+      for (let i = 0; i < n; i++) {
+        const p = (i + 0.5) / n, x = p * w, y = gu[0] + 2 * p * (1 - p) * 2 * (gu[1] - gu[0]);
+        c.fillStyle = coulsF[(i + gu[2]) % coulsF.length];
+        c.beginPath(); c.moveTo(x - 11 * k, y); c.lineTo(x + 11 * k, y); c.lineTo(x, y + 24 * k); c.closePath(); c.fill();
+      }
+    });
+
+    // Auvent rayé de la pizzeria, sur toute la largeur
+    const avY = Y(268), avH = 46 * k, bande = 50 * k;
+    const b0 = Math.floor(-X(0) / bande) - 1, b1 = Math.ceil((w - X(0)) / bande) + 1;
+    for (let i = b0; i <= b1; i++) {
+      const x = X(0) + i * bande;
+      c.fillStyle = ((i % 2) + 2) % 2 ? '#fff8ec' : '#d9412b';
+      c.fillRect(x, avY, bande + 1, avH);
+      c.beginPath(); c.arc(x + bande / 2, avY + avH, bande / 2, 0, Math.PI); c.fill();
+    }
+    c.fillStyle = 'rgba(0,0,0,.12)'; c.fillRect(0, avY + avH + bande / 2, w, 10 * k);
+
+    // Four à bois à gauche, qui rougeoie
+    const four = dessinerFour(c, X(-40), Y(330), 260 * k, 220 * k, 'brique', t, null, false);
+    g = c.createRadialGradient(four.mx + four.mw / 2, four.base - four.mh * 0.3, 5, four.mx + four.mw / 2, four.base - four.mh * 0.3, 260 * k);
+    g.addColorStop(0, 'rgba(255,150,40,.55)'); g.addColorStop(1, 'rgba(255,120,30,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+
+    // Chefs rivaux au fond (plus petits)
+    chef(c, 4, X(560), Y(400), 38 * k, 'uni');
+    chef(c, 3, X(470), Y(420), 44 * k, 'uni');
+
+    // Halo de lumière derrière le héros
+    g = c.createRadialGradient(X(300), Y(300), 20 * k, X(300), Y(300), 300 * k);
+    g.addColorStop(0, 'rgba(255,252,225,.95)'); g.addColorStop(0.45, 'rgba(255,240,180,.55)'); g.addColorStop(1, 'rgba(255,230,160,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    // rayons de lumière
+    c.save(); c.translate(X(300), Y(160));
+    for (let i = 0; i < 14; i++) {
+      c.rotate(Math.PI * 2 / 14);
+      c.fillStyle = i % 2 ? 'rgba(255,255,235,.22)' : 'rgba(255,220,120,.16)';
+      c.beginPath(); c.moveTo(0, 0); c.lineTo(-22 * k, -420 * k); c.lineTo(22 * k, -420 * k); c.closePath(); c.fill();
+    }
+    c.restore();
+
+    // Le héros : chef Tomate, bras levés, qui fait sauter la pizza
+    const hx = X(300), hy = Y(420), hr = 122 * k;
+    brasChef(c, 0, hx, hy, hr, [-30, 30], [-66, 0], [-44, -62]);
+    brasChef(c, 0, hx, hy, hr, [30, 30], [66, 0], [44, -62]);
+    chef(c, 0, hx, hy, hr, 'etoiles');
+    // bouche grande ouverte (joie du concours), sous la moustache
+    c.save(); c.translate(hx, hy); c.scale(hr / 50, hr / 50);
+    c.fillStyle = PEAU[0]; ell(c, 0, 10, 10, 6); c.fill();
+    c.fillStyle = '#7a1f14'; c.beginPath(); c.moveTo(-8, 9); c.quadraticCurveTo(0, 24, 8, 9); c.closePath(); c.fill();
+    c.fillStyle = '#ff7b7b'; ell(c, 0, 15.5, 4, 2.6); c.fill();
+    c.fillStyle = '#5a3518'; c.beginPath(); c.moveTo(0, 4); c.quadraticCurveTo(-14, 0, -18, 8); c.quadraticCurveTo(-8, 6, 0, 8); c.quadraticCurveTo(8, 6, 18, 8); c.quadraticCurveTo(14, 0, 0, 4); c.fill();
+    c.strokeStyle = '#5a3518'; c.lineWidth = 2.5; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(-13, -11); c.quadraticCurveTo(-8, -15, -3, -12); c.moveTo(3, -12); c.quadraticCurveTo(8, -15, 13, -11); c.stroke();
+    c.restore();
+
+    // La pizza qui vole au-dessus de lui, et les ingrédients qui pleuvent dessus
+    const px = X(300), py = Y(170);
+    c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 4 * k; c.lineCap = 'round';
+    [-1, 1].forEach((d) => { c.beginPath(); c.arc(px, py + 6 * k, 108 * k, Math.PI * (d < 0 ? 0.82 : 0.06), Math.PI * (d < 0 ? 0.94 : 0.18)); c.stroke(); });
+    pizzaVolante(c, px, py, 96 * k, -0.08, t);
+    const volants = [
+      ['fr', 150, 96, 34, [70, 170, 110, 70]], ['ch', 460, 92, 32, [540, 190, 500, 80]],
+      ['to', 112, 230, 30, [40, 330, 60, 250]], ['tr', 480, 238, 30, [560, 420, 560, 270]],
+      ['ba', 238, 62, 24, [200, 0, 220, 30]], ['ol', 372, 58, 24, [420, 0, 400, 30]]
+    ];
+    volants.forEach((v) => {
+      const tr0 = v[4];
+      trainee(c, X(tr0[0]), Y(tr0[1]), X(tr0[2]), Y(tr0[3]), X(v[1]), Y(v[2]), 9 * k);
+      dessinerIngr(c, v[0], X(v[1]), Y(v[2]), v[3] * k, t);
+    });
+    c.fillStyle = '#fff6b0';
+    [[300, 74, 14], [205, 140, 10], [400, 150, 11], [130, 300, 9], [470, 320, 12], [330, 268, 8]].forEach((p) => etincelle(c, X(p[0]), Y(p[1]), p[2] * k));
+
+    // Comptoir et tapis roulant au premier plan (coupés par les bords)
+    const cY = Y(540);
+    c.fillStyle = '#9a5a2b'; c.fillRect(0, cY, w, 22 * k);
+    c.fillStyle = '#7a4320'; c.fillRect(0, cY + 22 * k, w, h);
+    c.fillStyle = 'rgba(255,255,255,.1)'; for (let x = (X(0) % (70 * k)); x < w; x += 70 * k) c.fillRect(x, cY + 22 * k, 3 * k, h);
+    const tY = Y(560), tH = 92 * k;
+    c.fillStyle = '#3d4149'; rr(c, -20, tY, w + 40, tH, 14 * k); c.fill();
+    c.fillStyle = '#5d636d'; c.fillRect(-20, tY + 8 * k, w + 40, tH - 24 * k);
+    c.fillStyle = 'rgba(255,255,255,.18)'; c.fillRect(-20, tY + 8 * k, w + 40, 4 * k);
+    c.fillStyle = '#25282e'; for (let x = (X(0) % (40 * k)); x < w; x += 40 * k) { rond(c, x, tY + tH - 8 * k, 5 * k); c.fill(); }
+    const lot = ['pa', 'po', 'ja', 'an', 'bu', 'pi', 'ma', 'oi', 'fr', 'ch'];
+    const pas = 92 * k, i0 = Math.floor(-X(-40) / pas) - 1, i1 = Math.ceil((w - X(-40)) / pas) + 1;
+    for (let i = i0; i <= i1; i++) dessinerIngr(c, lot[((i % lot.length) + lot.length) % lot.length], X(-40) + i * pas, tY + tH * 0.42, 38 * k, t);
+
+    // Rivaux au premier plan, coupés par les bords, qui tendent la main vers le tapis
+    chef(c, 1, X(50), Y(500), 66 * k, 'uni');
+    brasChef(c, 1, X(50), Y(500), 66 * k, [30, 30], [60, 40], [74, 72]);
+    chef(c, 2, X(552), Y(500), 66 * k, 'uni');
+    brasChef(c, 2, X(552), Y(500), 66 * k, [-30, 30], [-60, 40], [-74, 72]);
+
+    // Assiette avec une pizza finie au bord du comptoir (premier plan)
+    dessinerPizza(c, X(300), Y(735), 70 * k, ['pa', 'to', 'fr', 'ch', 'po', 'ol'], t);
+    c.fillStyle = '#ffd23a';
+    [[70, 640], [535, 655], [180, 760], [430, 770]].forEach((p) => etincelle(c, X(p[0]), Y(p[1]), 12 * k));
+  }
+
+  function cacherPourAffiche() {
+    document.querySelectorAll('.ecran, .voile, .rond, #toast, #confettis, button, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+
+  function demarrerAffiche() {
+    modeAffiche = true;
+    ecran = 'affiche';
+    cacherPourAffiche();
+    $('fond').style.display = 'block';
+    dessinerAffiche();
+    // le bouton de langue peut arriver après ce script : on le cache encore un peu plus tard
+    [100, 400, 1000, 1800].forEach((d) => setTimeout(cacherPourAffiche, d));
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------
+  //  Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé
+  //  seulement par le robot. Le jeu s'ouvre en pleine partie solo, avec sa
+  //  vraie interface (cartes des chefs, tapis, « Bientôt », commande, four,
+  //  commande géante), à ton tour. L'état est tiré des vraies règles : des
+  //  robots jouent les premiers tours (hasard à graine fixe), puis la partie
+  //  reste figée : aucun robot ne joue, ni son, ni sauvegarde, ni FMG.
+  //   1 = niveau 1 : tapis de 5 cases, première commande ;
+  //   2 = niveau 9 : réserve, client pressé, four, truffe à réserver ;
+  //   3 = niveau 17 : commande géante, four à 2 places, piments, tablier et four débloqués.
+  // ---------------------------------------------------------------------
+
+  const SCENES_APERCU = {
+    1: { niveau: 1, coups: 20, tablier: 'uni', four: 'brique' },
+    2: { niveau: 9, coups: 30, tablier: 'rayures', four: 'pierre' },
+    3: { niveau: 17, coups: 45, tablier: 'etoiles', four: 'dore' }
+  };
+  let tempsFige = 0;           // images du jeu : l'écran est dessiné à cet instant, toujours le même
+
+  // Une partie jouée par les robots (toi compris) jusqu'à ton tour ; garde le dernier coup joué.
+  function etatApercu(sc, graine) {
+    const al = graineHasard(graine);
+    const e = R.depart(al, PLACES, { niveau: sc.niveau });
+    let n = 0, dernier = null;
+    while ((n < sc.coups || e.tour !== 0) && e.reste > PLACES * 2 && n < 200) {
+      const s = e.tour, a = R.bot(e, s, al, s === 0 ? 0.95 : e.fr);
+      dernier = { avant: JSON.parse(JSON.stringify(e)), s: s, a: a };
+      R.jouer(e, s, a, al);
+      n++;
+    }
+    e.ev = [];
+    return { e: e, dernier: dernier };
+  }
+
+  // Note d'un moment : tapis garni, scores, four occupé, commande géante, toi en tête.
+  function noteApercu(x) {
+    const e = x.e, moi = e.sc[0], max = Math.max.apply(null, e.sc);
+    if (e.tour !== 0 || O.manquants(e.j[0].o) < 1) return -1;
+    let v = e.tap.filter(Boolean).length * 3 + e.sc.filter((s) => s > 0).length * 1.5 + (moi > 0 ? 3 : 0) + (moi >= max ? 3 : 0);
+    if (e.k.four) v += Math.min(2, e.four.length) * 2;
+    if (e.k.gt && e.gt) v += 4 + e.gt.qui.filter((q) => q >= 0).length * 0.5;
+    if (e.k.res) v += Math.min(2, e.j[0].r.length);
+    if (e.file.some(O.estRare)) v += 2;
+    if (x.dernier && x.dernier.a.t === 'p' && x.dernier.s !== 0) v += 2;
+    return v;
+  }
+
+  function ouvrirApercu(n) {
+    const sc = SCENES_APERCU[n];
+    prog.options.son = false; // aucun son
+    prog.options.tablier = sc.tablier;
+    prog.options.four = sc.four;
+    // Moment choisi parmi des parties à graine fixe : toujours le même, vivant et lisible.
+    let choix = null, meilleure = -Infinity;
+    for (let gr = 1; gr <= 80; gr++) {
+      const x = etatApercu(sc, 1000 * n + gr), v = noteApercu(x);
+      if (v > meilleure) { meilleure = v; choix = x; }
+    }
+    const e = choix.e;
+    session = 'solo';
+    niveau = sc.niveau;
+    enPartie = false;          // rien n'est écrit à la fermeture
+    vue = e;
+    anim = nouvelleAnim();
+    tempsFige = 100000;
+    // Partie figée : même interface qu'une partie solo, mais aucun coup ne se joue.
+    partie = {
+      siege: 0, phase: 'jeu', mode: 'solo', manche: 1, etat: e,
+      sieges: () => { const l = []; for (let s = 0; s < PLACES; s++) l.push({ moi: s === 0, humain: s === 0, chef: false }); return l; },
+      monTour: () => true, jouer: () => false, pause: () => {}, quitter: () => {}, recommencer: () => false, lancerManche: () => false
+    };
+    afficherEcran('jeu');
+    // curseur posé sur un ingrédient dont ta commande a besoin (le geste du joueur)
+    const besoinIdx = e.tap.findIndex((code) => code && O.besoin(e.j[0].o, code) >= 0);
+    curseur = besoinIdx >= 0 ? { t: 'p', i: besoinIdx } : premierCurseur();
+    majInterface();
+    // L'ingrédient que le robot d'avant vient de prendre vole encore vers sa place (arrêté en l'air).
+    dessinerJeu(tempsFige);
+    const d = choix.dernier;
+    if (geo && d && d.a.t === 'p') {
+      const code = d.avant.tap[d.a.i], sl = geo.tapis.slots[d.a.i];
+      if (code && sl) {
+        const de = [sl.x + sl.w / 2, sl.y + geo.sz * 0.46];
+        let vers = cible(geo, d.avant, d.s, 0, d.a.d, code, d.avant);
+        if (vers[1] < 0) vers = [vers[0], geo.sz * 0.2];
+        anim.vols.push({ c: code, x0: de[0], y0: de[1], x1: vers[0], y1: vers[1], t0: tempsFige - 230, d: 520 });
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------
   //  Boutons et démarrage
   // ---------------------------------------------------------------------
 
@@ -5548,17 +5840,22 @@
     if (enPartie && session === 'solo') sauver(niveau, vue && partie && partie.siege >= 0 ? vue.sc[partie.siege] : 0);
   });
 
-  window.addEventListener('resize', () => { if (ecran !== 'jeu') dessinerTitre(); else fermerChoix(); });
+  window.addEventListener('resize', () => { if (modeAffiche) return; if (ecran !== 'jeu') dessinerTitre(); else fermerChoix(); });
 
   document.title = tr('titre');
   chargerProgression();
   construirePlaces();
   majBoutonsSon();
   try { boutonEffacer = window.JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: () => { remettreAZero(); majTitre(); } }); } catch (e) { boutonEffacer = null; }
-  afficherEcran('titre');
-  // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
-  // dans le salon de sa partie en ligne (le moteur la demande au serveur).
-  if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();                                  // affiche (robot du site)
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu); // images du jeu
+  else {
+    afficherEcran('titre');
+    // Ouvert par le bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : directement
+    // dans le salon de sa partie en ligne (le moteur la demande au serveur).
+    if (window.JEL_MULTI && window.JEL_MULTI.invitation()) lancerEnLigne();
+  }
 })();
 </script>
 </body>
