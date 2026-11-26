@@ -1754,6 +1754,13 @@
   /* Pause : tout s'arrête */
   body.en-pause #ecran-jeu * { animation-play-state: paused !important; }
 
+  /* Affiche (window.JEL_AFFICHE) et image du jeu sur ordinateur (window.JEL_APERCU = 3) */
+  #affiche { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 40; display: block; }
+  body.apercu-large .ecran { max-width: none; }
+  body.apercu-large #barre { padding: 8px 18px; }
+  body.apercu-large #panneau { width: min(760px, calc(100% - 32px)); }
+  body.apercu-large #jauge-aube { width: min(760px, calc(100% - 32px)); }
+
   @media (min-height: 760px) {
     .etoile { width: 62px; height: 62px; margin: -31px 0 0 -31px; font-size: 29px; }
     #panneau-dessin { width: 78px; height: 78px; flex-basis: 78px; }
@@ -2082,8 +2089,9 @@ const ICONES = {
 /* ---------- Sons (Web Audio, aucun son avant la 1re action) ---------- */
 let audio = null;
 let sonActif = true;
+let apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 function contexteAudio() {
-  if (!sonActif) return null;
+  if (!sonActif || apercu) return null;
   if (!audio) {
     try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
   }
@@ -2321,7 +2329,7 @@ function lancerNiveau(i) {
   viderCiel();
   $('cases').innerHTML = '';
   $('panneau-dessin').innerHTML = '';
-  if (def.nouveau) montrerNouveaute(def.nouveau, () => commencerMot());
+  if (def.nouveau && !apercu) montrerNouveaute(def.nouveau, () => commencerMot());
   else commencerMot();
 }
 
@@ -2435,7 +2443,7 @@ function commencerMot() {
   if (def.filantes) etat.prochaineFilante = horloge + hasard(5000, 9000);
   dessinerPositions();
   etat.actif = true;
-  if (etat.i === 0 && etat.iMot === 0) lancerTutoriel();
+  if (etat.i === 0 && etat.iMot === 0 && !apercu) lancerTutoriel();
 }
 
 // Positions au hasard, assez loin les unes des autres (repli : grille)
@@ -3018,10 +3026,11 @@ function jouer() {
 
 /* Sauvegarde à la fermeture de la page, seulement pendant une partie */
 JEL_SAVE.surFermeture(() => {
+  if (apercu) return; // image du jeu : rien n'est enregistré
   if (enJeu && etat && !etat.termine) JEL_SAVE.save(JEU, donneesSauvegarde(Math.max(etat.i + 1, progres.niveauMax)));
 });
 // Écran caché : pause automatique
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') mettrePause(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && !apercu) mettrePause(); });
 
 /* ---------- Clavier ---------- */
 document.addEventListener('keydown', (ev) => {
@@ -3130,7 +3139,184 @@ function demarrer() {
   });
   requestAnimationFrame(boucle);
 }
+
+/* ---------- Affiche (jaquette du jeu) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Zou, en grand, lève le bras
+// et touche la dernière étoile d'une constellation dorée qui s'allume au-dessus de lui ; la planète à
+// anneau, un nuage rose et une étoile filante au fond ; la fusée et la Lune au premier plan.
+// Les étoiles de l'affiche ne portent aucune lettre.
+function dessinZouAffiche() {
+  // Même Zou que dessinZou(), bras droit levé vers l'étoile, grand sourire.
+  return `
+    <line x1="38" y1="22" x2="28" y2="5" stroke="#5fcf86" stroke-width="4" stroke-linecap="round"/>
+    <line x1="62" y1="22" x2="72" y2="5" stroke="#5fcf86" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="28" cy="5" r="6.5" fill="#ffd86b"/><circle cx="72" cy="5" r="6.5" fill="#ff9ccf"/>
+    <circle cx="26" cy="3" r="2" fill="#fff" opacity=".8"/><circle cx="70" cy="3" r="2" fill="#fff" opacity=".8"/>
+    <ellipse cx="50" cy="72" rx="26" ry="22" fill="#5fcf86"/>
+    <ellipse cx="50" cy="76" rx="15" ry="12" fill="#9cf0b9" opacity=".55"/>
+    <ellipse cx="25" cy="74" rx="6" ry="10" fill="#5fcf86" transform="rotate(30 25 74)"/>
+    <ellipse cx="82" cy="50" rx="6.5" ry="15" fill="#5fcf86" transform="rotate(38 82 50)"/>
+    <circle cx="91" cy="37" r="6.5" fill="#7ee0a1"/>
+    <circle cx="50" cy="44" r="27" fill="#7ee0a1"/>
+    <path d="M30 30 Q40 18 56 19" stroke="#fff" stroke-width="3" fill="none" opacity=".5" stroke-linecap="round"/>
+    <ellipse cx="40" cy="41" rx="8" ry="10" fill="#fff"/><ellipse cx="60" cy="41" rx="8" ry="10" fill="#fff"/>
+    <circle cx="43" cy="39" r="4.8" fill="#24165e"/><circle cx="63" cy="39" r="4.8" fill="#24165e"/>
+    <circle cx="44.5" cy="37" r="1.7" fill="#fff"/><circle cx="64.5" cy="37" r="1.7" fill="#fff"/>
+    <path d="M38 54 Q50 70 62 54 Z" fill="#24165e"/><path d="M43 60 Q50 66 57 60 Q50 62 43 60 Z" fill="#ff7a9c"/>
+    <circle cx="31" cy="53" r="4.5" fill="#ff9ccf" opacity=".7"/><circle cx="69" cy="53" r="4.5" fill="#ff9ccf" opacity=".7"/>
+    <ellipse cx="40" cy="94" rx="9" ry="5" fill="#4bb873"/><ellipse cx="60" cy="94" rx="9" ry="5" fill="#4bb873"/>`;
+}
+function etoileAffiche(x, y, r, fort) {
+  // Étoile du jeu (boule dorée lumineuse et ses rayons), sans lettre.
+  const rayons = [0, 45, 90, 135].map((a) => `<rect x="${x - r * 1.9}" y="${y - r * 0.07}" width="${r * 3.8}" height="${r * 0.14}" rx="${r * 0.07}" fill="#fff6c9" opacity="${fort ? 0.9 : 0.55}" transform="rotate(${a} ${x} ${y})"/>`).join('');
+  return `<circle cx="${x}" cy="${y}" r="${r * 2.1}" fill="url(#aff-lueur)"/>${rayons}
+    <circle cx="${x}" cy="${y}" r="${r}" fill="url(#aff-etoile)"/>`;
+}
+function dessinerAffiche() {
+  const w = window.innerWidth || 600, h = window.innerHeight || 800;
+  const H = 800, Wv = Math.max(1, (H * w) / h), ox = (Wv - 600) / 2;
+  // Petites étoiles du fond (hasard fixe), sur toute la largeur
+  let fond = '';
+  let g = 7;
+  const alea = () => { g = (g * 16807) % 2147483647; return g / 2147483647; };
+  for (let k = 0; k < 130; k++) {
+    const x = alea() * Wv, y = alea() * 620, r = 0.8 + alea() * 2.2;
+    fond += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" opacity="${(0.45 + alea() * 0.5).toFixed(2)}"/>`;
+  }
+  // La constellation (déjà tracée jusqu'à l'étoile que Zou touche)
+  const pts = [[92, 318], [150, 205], [258, 142], [372, 168], [488, 236], [452, 345]];
+  const trait = pts.map((p) => p.join(',')).join(' ');
+  let etoiles = '';
+  pts.forEach(([x, y], i) => { if (i < pts.length - 1) etoiles += etoileAffiche(x, y, i % 2 ? 17 : 15, false); });
+  // Étoiles pas encore reliées
+  etoiles += etoileAffiche(48, 150, 10, false) + etoileAffiche(545, 120, 11, false);
+  const [fx, fy] = pts[pts.length - 1];
+  let eclats = '';
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2, d = 46 + (k % 3) * 12;
+    eclats += `<circle cx="${(fx + Math.cos(a) * d).toFixed(1)}" cy="${(fy + Math.sin(a) * d).toFixed(1)}" r="${k % 2 ? 4 : 6}" fill="${['#fff6b0', '#ff9ccf', '#9fd8ff'][k % 3]}"/>`;
+  }
+  const zx = 300 - 165, zy = 268, ze = 3.3; // Zou : 330 px de haut
+  const svg = `<svg id="affiche" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Wv.toFixed(1)} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <linearGradient id="aff-ciel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a3bb8"/><stop offset=".45" stop-color="#6a52d6"/><stop offset=".8" stop-color="#3d2f9e"/><stop offset="1" stop-color="#241c6e"/>
+    </linearGradient>
+    <radialGradient id="aff-halo"><stop offset="0" stop-color="#fff8d8" stop-opacity=".95"/><stop offset=".35" stop-color="#ffe08a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd86b" stop-opacity="0"/></radialGradient>
+    <radialGradient id="aff-rose"><stop offset="0" stop-color="#ff8fd0" stop-opacity=".7"/><stop offset="1" stop-color="#ff8fd0" stop-opacity="0"/></radialGradient>
+    <radialGradient id="aff-bleu"><stop offset="0" stop-color="#5fe0ff" stop-opacity=".55"/><stop offset="1" stop-color="#5fe0ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="aff-lueur"><stop offset="0" stop-color="#fff4b8" stop-opacity=".9"/><stop offset="1" stop-color="#ffd86b" stop-opacity="0"/></radialGradient>
+    <radialGradient id="aff-etoile" cx=".4" cy=".35"><stop offset="0" stop-color="#ffffff"/><stop offset=".5" stop-color="#fff4b8"/><stop offset="1" stop-color="#ffc83d"/></radialGradient>
+    <linearGradient id="aff-sol" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a7be8"/><stop offset=".25" stop-color="#5a4bc4"/><stop offset="1" stop-color="#2a2275"/></linearGradient>
+    <filter id="aff-flou" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#aff-ciel)"/>
+  <circle cx="${ox + 110}" cy="200" r="240" fill="url(#aff-rose)"/>
+  <circle cx="${ox + 540}" cy="430" r="260" fill="url(#aff-bleu)"/>
+  ${fond}
+  <g transform="translate(${ox} 0)">
+    <g transform="translate(395 20) scale(1.85)" opacity=".95">${DESSINS.planete}</g>
+    <g transform="translate(-10 60) scale(.9) rotate(-10 50 50)" opacity=".85">${DESSINS.comete}</g>
+    <g transform="translate(-60 395) scale(1.9)" opacity=".9">${ICONES.nuage.replace(/^<svg[^>]*>|<\/svg>$/g, '')}</g>
+    <circle cx="330" cy="330" r="330" fill="url(#aff-halo)"/>
+    <polyline points="${trait}" fill="none" stroke="#ffd86b" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" opacity=".45" filter="url(#aff-flou)"/>
+    <polyline points="${trait}" fill="none" stroke="#ffe680" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <polyline points="${trait}" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity=".8"/>
+    ${etoiles}
+    <path d="M0 640 Q300 560 600 640 L600 800 L0 800 Z" fill="url(#aff-sol)"/>
+    <ellipse cx="170" cy="690" rx="46" ry="12" fill="#3a2f95"/><ellipse cx="420" cy="720" rx="60" ry="15" fill="#3a2f95"/><ellipse cx="300" cy="760" rx="34" ry="9" fill="#3a2f95"/>
+    <ellipse cx="300" cy="596" rx="120" ry="20" fill="#2a2275" opacity=".55"/>
+    <g transform="translate(${zx} ${zy}) scale(${ze})">${dessinZouAffiche()}</g>
+    <circle cx="${fx}" cy="${fy}" r="70" fill="url(#aff-lueur)"/>
+    ${etoileAffiche(fx, fy, 24, true)}
+    ${eclats}
+    <g transform="translate(225 62) rotate(14)"><path d="M0 0 L-110 -7 L-110 7 Z" fill="#fff6b0" opacity=".6"/><path d="M0 -12 l4 9 10 1 -8 6 3 10 -9 -5 -9 5 3 -10 -8 -6 10 -1z" fill="#fff" stroke="#ffd86b" stroke-width="2"/></g>
+    <g transform="translate(-55 470) scale(2.5) rotate(28 50 50)">${DESSINS.fusee}</g>
+    <g transform="translate(455 545) scale(2.2)">${DESSINS.lune}</g>
+  </g>
+</svg>`;
+  const ancien = document.getElementById('affiche');
+  if (ancien) ancien.remove();
+  document.body.insertAdjacentHTML('beforeend', svg);
+}
+function cacherPourAffiche() {
+  for (const el of document.querySelectorAll('.ecran, .voile, .jel-langue, button')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherPourAffiche();
+  dessinerAffiche();
+  // Le bouton de langue peut être créé après ce script : on le cache aussi un peu plus tard.
+  setTimeout(cacherPourAffiche, 50);
+  setTimeout(cacherPourAffiche, 400);
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---------- Images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (niveau, score, boucliers, modèle du mot,
+// étoiles-lettres), sans écran titre, ni fenêtre « Continuer », ni nouveauté, ni tutoriel
+// (CONSIGNES-JEU.md, section 5). Quelques lettres sont déjà touchées, la partie tourne un instant,
+// puis elle est figée sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = niveau 1, 3e mot : la constellation commence ;
+//   2 = niveau 12 : étoiles en trop, nuages roses à souffler, ciel qui dérive ;
+//   3 = niveau 23 (écran d'ordinateur) : mot de mémoire, trou noir, aube qui monte, étoile filante.
+const SCENES_APERCU = {
+  1: { niveau: 0, mot: 2, prises: 3, score: 270, boucliers: 5, pas: 0 },
+  2: { niveau: 11, mot: 1, prises: 3, score: 180, boucliers: 3, pas: 45 },
+  3: { niveau: 22, mot: 2, prises: 3, score: 370, boucliers: 2, pas: 30, aube: 0.42, filante: [0.4, 0.62], trou: true },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 1234567 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  progres = { etoiles: [], records: [], carnet: [], niveauMax: 1 }; // en mémoire seulement
+  if (numero === 3) document.body.classList.add('apercu-large');
+  lancerNiveau(sc.niveau);
+  etat.iMot = sc.mot;
+  commencerMot();
+  taches = [];
+  // Trou noir posé loin des étoiles encore à toucher
+  const W = ciel.clientWidth, H = ciel.clientHeight;
+  if (etat.trou && sc.trou) {
+    let mieux = null, loin = -1;
+    for (let k = 0; k < 80; k++) {
+      const p = [hasard(70, W - 70), hasard(70, H - 70)];
+      const d = Math.min(...etat.etoiles.map((e) => Math.hypot(e.x - p[0], e.y - p[1])));
+      if (d > loin) { loin = d; mieux = p; }
+    }
+    etat.trou.x = mieux[0]; etat.trou.y = mieux[1];
+  }
+  // Les premières lettres du mot sont déjà touchées
+  for (let k = 0; k < sc.prises; k++) {
+    const e = etat.etoiles.find((x) => !x.prise && !x.intruse && x.l === etat.lettres[etat.prochaine]);
+    if (!e) break;
+    if (e.nuage) { e.nuage.el.remove(); etat.nuages = etat.nuages.filter((n) => n !== e.nuage); e.nuage = null; }
+    bonneEtoile(e);
+  }
+  if (sc.aube) etat.aube = sc.aube;
+  // La partie tourne un instant (ciel qui dérive, trou noir, aube)
+  for (let k = 0; k < sc.pas; k++) { horloge += 16; avancer(16); }
+  if (sc.aube) avancer(0);
+  if (sc.filante) {
+    lancerFilante();
+    const f = etat.filante;
+    f.x = W * sc.filante[0]; f.y = H * sc.filante[1];
+    f.el.style.transform = `translate(${f.x}px, ${f.y}px) rotate(15deg)`;
+  }
+  etat.score = sc.score; majScore();
+  etat.boucliers = sc.boucliers; majBoucliers();
+  dessinerPositions();
+  // Puis tout est figé sur ce moment, sans fenêtre de pause.
+  enPause = true;
+}
+
 demarrer();
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
 </script>
 </body>
 </html>
