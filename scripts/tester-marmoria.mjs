@@ -24,7 +24,7 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -1478,6 +1478,85 @@ section('Lot 5 : campagne complète, les 10 cartes des échelons 6 à 10');
 }
 
 // --------------------------------------------------------------------------
+section('Lot 6 : cités voisines, comptoir de province (sections 16.7 et 23.15)');
+{
+  // Deux villes de la Campanie commercent par le vrai comptoir (multijoueur/src/province.js),
+  // monté en mémoire : poterie de Capua vers Puteoli, payée au vendeur.
+  const { routeProvince, Province } = await import(pathToFileURL(path.join(RACINE, 'multijoueur', 'src', 'province.js')).href);
+  const objets = new Map();
+  const envW = { PROVINCE: { idFromName: (n) => n, get: (n) => ({ fetch: async (req) => {
+    if (!objets.has(n)) { const donnees = new Map(); objets.set(n, new Province({ storage: { get: async (k) => structuredClone(donnees.get(k)), put: async (k, v) => { donnees.set(k, structuredClone(v)); }, deleteAll: async () => donnees.clear(), setAlarm: async () => {} } }, {})); }
+    return objets.get(n).fetch(req);
+  } }) } };
+  const appel = async (corps) => {
+    const r = await routeProvince(new Request('https://multi/province', { method: 'POST', headers: { Origin: 'https://freemicrogames.com' }, body: JSON.stringify(corps) }), envW, '/province', ['https://freemicrogames.com']);
+    return r.json();
+  };
+  const { sim: S, ex: X, D: DD } = nouveauMonde();
+  ok(DD.voisinages.length === 2 && DD.missionsVoisinage.length === 8, 'deux provinces de 4 cités');
+  ok(DD.missionsVoisinage.every((m) => { const e = S.nouvelle(m.id, {}); return e.N === m.carte.taille && e.province === null; }), 'chaque cité se crée (sans province : comme une carte seule)');
+  const c0 = await appel({ a: 'creer', jeu: 'marmoria', carte: 'campanie', siege: 0 });
+  const c1 = await appel({ a: 'rejoindre', code: c0.code, siege: 1 });
+  const villes = [
+    S.nouvelle('capua', { libre: true, tout: true, risques: false, province: { code: c0.code, siege: 0, jeton: c0.jeton } }),
+    S.nouvelle('puteoli', { libre: true, tout: true, risques: false, province: { code: c0.code, siege: 1, jeton: c1.jeton } }),
+  ];
+  const Q = DD.regles.maison.uniteParCharge;
+  for (const e of villes) {
+    X.construire(S, e, { niveau: 2 });
+    const centre = e.batiments.find((b) => b.type === 'marche') || e.batiments[0];
+    X.poserPres(S, e, 'entrepot', centre.x, centre.y, 30);
+    for (let k = 0; k < 2 * DD.ticksParMois; k++) S.pas(e);
+  }
+  const [A, B] = villes;
+  const entA = A.batiments.find((b) => b.type === 'entrepot'), entB = B.batiments.find((b) => b.type === 'entrepot');
+  ok(entA && entB, 'un entrepôt dans chaque ville');
+  entA.stocks.poterie = 20 * Q;
+  S.appliquer(A, { type: 'commerce', bien: 'poterie', statut: 'exporter', cible: 2 });
+  S.appliquer(B, { type: 'commerce', bien: 'poterie', statut: 'importer', cible: 24 });
+  ok(S.appliquer(A, { type: 'ouvrirRoute', cite: 'puteoli' }).ok && S.appliquer(B, { type: 'ouvrirRoute', cite: 'capua' }).ok, 'routes ouvertes vers le voisin');
+  const unites = (e) => e.batiments.reduce((n, b) => n + ((b.stocks && b.stocks.poterie) || 0), 0) + (e.province.reserve.poterie || 0)
+    + e.marcheurs.filter((w) => !w.fin && w.liv).reduce((n, w) => n + w.liv.filter((x) => x[0] === 'poterie').reduce((a, x) => a + x[1] * Q, 0), 0);
+  const poterie0 = unites(A) + unites(B);
+  const synchro = async (e) => {
+    const env = S.provinceEnvoi(e);
+    const r = await appel({ a: 'sync', code: env.code, siege: env.siege, jeton: env.jeton, ops: env.ops, accuse: env.accuse, infos: env.infos });
+    return S.appliquer(e, { type: 'province-sync', recu: r.recu, sortie: r.sortie, vue: r.vue }).ok;
+  };
+  ok(await synchro(A) && await synchro(B) && A.province.enLigne && B.province.voisins[0].pris === true, 'vue des voisins reçue, routes ouvertes en ligne');
+  // Hors connexion : routes vers les voisins fermées.
+  S.appliquer(B, { type: 'province-reseau', enLigne: false });
+  const avantHors = B.province.sortie.length;
+  for (let k = 0; k < DD.ticksParMois * 3; k++) S.pas(B);
+  ok(B.province.sortie.length === avantHors, 'hors connexion : aucune demande envoyée aux voisins');
+  await synchro(B);
+  // 24 mois, une synchronisation tous les quarts de mois pour chaque ville ; une sauvegarde relue à mi-chemin.
+  let relu = false;
+  for (let mois = 0; mois < 24; mois++) {
+    for (let q = 0; q < 4; q++) {
+      for (const e of villes) for (let k = 0; k < DD.ticksParMois / 4; k++) S.pas(e);
+      await synchro(A); await synchro(B);
+    }
+    if (mois === 12 && !relu) { villes[1] = S.importer(S.exporter(B)); relu = true; }
+  }
+  const B2 = villes[1];
+  for (let k = 0; k < 3; k++) { for (const e of [A, B2]) for (let j = 0; j < DD.ticksParMois; j++) S.pas(e); await synchro(A); await synchro(B2); }
+  const p = await objets.get(`province:${c0.code}`).state.storage.get('p');
+  const etal = (p.sieges[0].etal.poterie || []).reduce((n, l) => n + l[0], 0) * Q;
+  console.log(`  Capua : ${A.stats.depotsVoisins || 0} charges posées à l'étal, ${A.province.ventes} deniers reçus ; Puteoli : ${B2.province.achats} deniers payés, ${unites(B2) / Q} charges de poterie`);
+  ok((A.stats.depotsVoisins || 0) > 0 && B2.province.achats > 0, 'poterie posée à l\'étal par Capua et achetée par Puteoli');
+  ok(A.province.ventes === B2.province.achats && A.province.ventes > 0, `vendeur payé exactement ce que l'acheteur a payé (${A.province.ventes} = ${B2.province.achats})`);
+  ok(unites(A) + unites(B2) + etal === poterie0, `poterie conservée (${poterie0} unités = ${unites(A)} + ${unites(B2)} + ${etal} à l'étal)`);
+  ok(Object.values(B2.routes.capua.n).every((x) => x <= DD.regles.commerce.voisinPlafond), 'plafond de 40 charges par bien et par voisin et par année');
+  ok(S.invariants(A).length === 0 && S.invariants(B2).length === 0, 'invariants tenus');
+  ok(A.province.sortie.length === 0 && B2.province.sortie.length === 0, 'toutes les opérations accusées par le comptoir');
+  // Objectif commun : la ville seule ne gagne pas ; la province gagnée fait gagner chaque ville.
+  const V = S.nouvelle('nola', { province: { code: c0.code, siege: 2, jeton: '0'.repeat(32) } });
+  S.appliquer(V, { type: 'province-sync', recu: 0, sortie: [], vue: { sieges: [], evenements: [], gagnee: 123 } });
+  for (let k = 0; k < DD.temps.ticksParJour; k++) S.pas(V);
+  ok(V.victoire && V.victoire.province === true, 'province gagnée : victoire de la ville (objectif commun)');
+}
+
 section('Musique : quatre morceaux écrits (sections 18.5 et 23.13)');
 {
   // Les partitions sont lues sans contexte audio : mesures complètes, notes dans le mode, voix valides.

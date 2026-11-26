@@ -898,7 +898,7 @@
       // Postes de l'année en cours et de la précédente (section 11.1) ; un poste vide les deux années est tu.
       var poste = function (k) { if (an[k] || prec[k] || k === 'impots' || k === 'salaires') p.appendChild(ligne(t('budget.' + k), t('budget.deuxAns', { a: nb(an[k]), p: nb(prec[k]) }))); };
       p.appendChild(el('div', { classe: 'ligne entete' }, [el('span', { texte: t('conseil.recettes') }), el('span', { texte: t('budget.colonnes') })]));
-      ['impots', 'exports', 'secours', 'dons'].forEach(poste);
+      ['impots', 'exports', 'voisins', 'secours', 'dons'].forEach(poste);
       p.appendChild(el('h3', { texte: t('conseil.depenses') }));
       ['salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois', 'vols'].forEach(poste);
       var solde = SIM.recettes(prec) - SIM.depenses(prec);
