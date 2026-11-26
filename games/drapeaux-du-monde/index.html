@@ -1387,6 +1387,16 @@ button:focus-visible{outline:3px solid #ffd23f;outline-offset:2px}
 @keyframes tombe{to{transform:translate(var(--dx),110vh) rotate(720deg)}}
 .eclat{position:absolute;width:10px;height:10px;border-radius:50%;animation:eclat .7s ease-out forwards}
 @keyframes eclat{to{transform:translate(var(--dx),var(--dy)) scale(.2);opacity:0}}
+/* Image du jeu sur ordinateur (window.JEL_APERCU = 3) : la partie occupe toute la largeur */
+body.apercu-large #app{max-width:none;padding:18px 48px}
+body.apercu-large #jeu{display:grid;grid-template-columns:1.15fr 1fr;grid-template-rows:auto auto auto auto 1fr auto;column-gap:48px;row-gap:12px;align-items:center}
+body.apercu-large .haut,body.apercu-large .barre,body.apercu-large .chrono,body.apercu-large .consigne,body.apercu-large .retour{grid-column:1/-1}
+body.apercu-large .haut{font-size:1.2rem}
+body.apercu-large .consigne{font-size:1.5rem}
+body.apercu-large #zoneDrap{grid-column:1;grid-row:5;display:flex;justify-content:center}
+body.apercu-large .drap{width:min(100%,87vh,560px)}
+body.apercu-large #choix{grid-column:2;grid-row:5;gap:16px}
+body.apercu-large .choix button{min-height:92px;font-size:1.35rem}
 @media (prefers-reduced-motion:reduce){.main,.montre,.confetti,.eclat{animation-duration:.01s}}
 </style>
 </head>
@@ -1880,7 +1890,7 @@ function sauvegarder(niveau) {
   JEL_SAVE.save(JEU, { niveau, score: totalEtoiles(partie.cont), options: { continent: partie.cont, son: sonActif }, progres });
 }
 // Fermeture de la page pendant une partie : on reprendra au niveau en cours.
-JEL_SAVE.surFermeture(() => { if ($('jeu').classList.contains('actif')) sauvegarder(partie.niv); });
+JEL_SAVE.surFermeture(() => { if (apercu) return; if ($('jeu').classList.contains('actif')) sauvegarder(partie.niv); });
 
 // ===== Accueil =====
 let contChoisi = 'eu';
@@ -2069,6 +2079,7 @@ function suite() {
 // Boucle du jeu : délais, chrono et dévoilement des drapeaux cachés s'arrêtent pendant la pause.
 let avant = 0;
 function boucle(maintenant) {
+  if (window.JEL_AFFICHE) return; // affiche du jeu : pas de boucle
   const dt = Math.min(.1, (maintenant - (avant || maintenant)) / 1000);
   avant = maintenant;
   if ($('jeu').classList.contains('actif') && !enPause && !tutoOuvert) {
@@ -2219,7 +2230,7 @@ function reprendre() {
   if (audioCtx && sonActif) audioCtx.resume().catch(() => {});
   jouerSon('clic');
 }
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') pause(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && !apercu) pause(); });
 
 // ===== Lancement (sauvegarde du site : « Continuer » ou « Nouvelle partie ») =====
 function jouer() {
@@ -2276,11 +2287,226 @@ document.addEventListener('keydown', e => {
   }
 });
 
-const depart = chargerProgres();
-if (depart.options && CONTINENTS.includes(depart.options.continent)) contChoisi = depart.options.continent;
-majBoutonsSon();
-$('vitrine').innerHTML = ['FR', 'JP', 'BR'].map(c => svg(DRAPEAUX.find(f => f.code === c), 'drap')).join('');
-afficherAccueil();
+// ===== Affiche (jaquette du jeu) =====
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Une petite exploratrice,
+// debout sur le globe, brandit un grand drapeau qui flotte au vent et reconnaît le drapeau du Japon
+// (anneau vert) ; d'autres drapeaux du jeu s'envolent du globe dans le soleil, guirlande au premier plan.
+const drapeauDe = code => DESSINS[code];
+// Drapeau posé en carte (bord blanc, ombre), centré en (x, y), largeur l, tourné de a degrés
+function carteAffiche(code, x, y, l, a, opts) {
+  const o = opts || {}, h = l * 2 / 3, b = l * 0.06;
+  let s = `<g transform="translate(${x} ${y}) rotate(${a})"${o.flou ? ' opacity=".75" filter="url(#aFlou)"' : ''}>`;
+  s += `<rect x="${-l/2-b+4}" y="${-h/2-b+8}" width="${l+2*b}" height="${h+2*b}" rx="${b*1.4}" fill="#0a1c40" opacity=".28"/>`;
+  if (o.anneau) s += `<rect x="${-l/2-b*3}" y="${-h/2-b*3}" width="${l+6*b}" height="${h+6*b}" rx="${b*3}" fill="none" stroke="#5dff8f" stroke-width="${b*1.3}" filter="url(#aLueur)"/>`;
+  s += `<rect x="${-l/2-b}" y="${-h/2-b}" width="${l+2*b}" height="${h+2*b}" rx="${b*1.4}" fill="#fff"/>`;
+  s += `<svg x="${-l/2}" y="${-h/2}" width="${l}" height="${h}" viewBox="0 0 90 60" preserveAspectRatio="none">${drapeauDe(code)}</svg>`;
+  s += `<rect x="${-l/2}" y="${-h/2}" width="${l}" height="${h}" fill="url(#aReflet)"/>`;
+  if (o.anneau) {
+    // Pastille verte « bonne réponse » : une coche dessinée (aucun texte)
+    const r = l * 0.15, cx = l / 2 + b, cy = -h / 2 - b;
+    s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#2fbf62" stroke="#fff" stroke-width="${r*0.22}"/>`;
+    s += `<path d="M${cx-r*.45} ${cy+r*.02}L${cx-r*.1} ${cy+r*.38}L${cx+r*.5} ${cy-r*.35}" stroke="#fff" stroke-width="${r*0.3}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+  return s + '</g>';
+}
+// Drapeau qui flotte au vent : découpe ondulée et plis ombrés
+function drapeauFlottant(code, x, y, l) {
+  const h = l * 2 / 3;
+  return `<g transform="translate(${x} ${y}) scale(${l/90} ${h/60})">
+    <clipPath id="aOnde"><path d="M0 2C15 -6 30 10 45 2S75 -6 90 4L90 62C75 54 60 70 45 62S15 54 0 60Z"/></clipPath>
+    <g clip-path="url(#aOnde)"><svg width="90" height="60" viewBox="0 0 90 60" preserveAspectRatio="none" overflow="visible">${drapeauDe(code)}</svg>
+    <rect x="-2" y="-8" width="94" height="76" fill="url(#aPlis)"/></g></g>`;
+}
+function etincelle(x, y, r, c) {
+  return `<path d="M${x} ${y-r}Q${x+r*.18} ${y-r*.18} ${x+r} ${y}Q${x+r*.18} ${y+r*.18} ${x} ${y+r}Q${x-r*.18} ${y+r*.18} ${x-r} ${y}Q${x-r*.18} ${y-r*.18} ${x} ${y-r}Z" fill="${c}"/>`;
+}
+function dessinerAffiche() {
+  const W = Math.max(1, innerWidth), H = Math.max(1, innerHeight);
+  // Composition de 600 x 800 au centre ; le décor continue jusqu'aux bords sur un écran plus large
+  const k = Math.min(W / 600, H / 800), vw = W / k, vh = H / k, x0 = (600 - vw) / 2, y0 = (800 - vh) / 2, x1 = x0 + vw, y1 = y0 + vh;
+  let s = `<svg viewBox="${x0} ${y0} ${vw} ${vh}" width="${W}" height="${H}" style="display:block">
+  <defs>
+    <linearGradient id="aCiel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f7fe8"/><stop offset=".55" stop-color="#7cc8ff"/><stop offset="1" stop-color="#bfe9ff"/></linearGradient>
+    <radialGradient id="aSoleil" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(300 250) scale(330)"><stop offset="0" stop-color="#fff8cc"/><stop offset=".35" stop-color="#ffe680" stop-opacity=".75"/><stop offset="1" stop-color="#ffe680" stop-opacity="0"/></radialGradient>
+    <radialGradient id="aGlobe" cx=".38" cy=".25" r=".8"><stop offset="0" stop-color="#5fc3ff"/><stop offset=".6" stop-color="#1f74d6"/><stop offset="1" stop-color="#0c3a8a"/></radialGradient>
+    <linearGradient id="aReflet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".4" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient>
+    <linearGradient id="aPlis" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".18"/><stop offset=".22" stop-color="#fff" stop-opacity=".22"/><stop offset=".45" stop-color="#000" stop-opacity=".16"/><stop offset=".7" stop-color="#fff" stop-opacity=".2"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></linearGradient>
+    <linearGradient id="aVeste" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6b4a"/><stop offset="1" stop-color="#d93a2b"/></linearGradient>
+    <filter id="aLueur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="f"/><feMerge><feMergeNode in="f"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="aFlou"><feGaussianBlur stdDeviation="1.6"/></filter>
+  </defs>
+  <rect x="${x0}" y="${y0}" width="${vw}" height="${vh}" fill="url(#aCiel)"/>`;
+  // Rayons du soleil, derrière l'exploratrice
+  for (let i = 0; i < 18; i++) {
+    const a = i / 18 * Math.PI * 2, a2 = a + 0.11, R = Math.max(vw, vh) * 1.2;
+    s += `<path d="M300 250L${300 + Math.cos(a) * R} ${250 + Math.sin(a) * R}L${300 + Math.cos(a2) * R} ${250 + Math.sin(a2) * R}Z" fill="#fff6c0" opacity="${i % 2 ? .1 : .2}"/>`;
+  }
+  s += `<rect x="${x0}" y="${y0}" width="${vw}" height="${vh}" fill="url(#aSoleil)"/>`;
+  // Nuages lointains, répétés sur toute la largeur
+  for (let cx = Math.floor(x0 / 260) * 260 - 40; cx < x1 + 200; cx += 260) {
+    const cy = 420 + ((cx / 260) % 2 ? 30 : -10);
+    s += `<g fill="#fff" opacity=".85"><ellipse cx="${cx}" cy="${cy}" rx="70" ry="24"/><circle cx="${cx - 28}" cy="${cy - 14}" r="24"/><circle cx="${cx + 12}" cy="${cy - 22}" r="30"/><circle cx="${cx + 44}" cy="${cy - 8}" r="20"/></g>`;
+  }
+  // Collines vertes à l'horizon
+  s += `<path d="M${x0} 610Q${x0 + vw * .25} 540 ${x0 + vw * .5} 600T${x1} 580L${x1} ${y1}L${x0} ${y1}Z" fill="#6fd17a"/>`;
+  s += `<path d="M${x0} 650Q${x0 + vw * .3} 600 ${x0 + vw * .6} 640T${x1} 630L${x1} ${y1}L${x0} ${y1}Z" fill="#45b25a"/>`;
+  // Drapeaux lointains, un peu flous
+  s += carteAffiche('SE', 120, 175, 62, -14, { flou: 1 }) + carteAffiche('AR', 505, 395, 58, 12, { flou: 1 }) + carteAffiche('GH', 80, 560, 56, 10, { flou: 1 }) + carteAffiche('IT', 545, 245, 52, -8, { flou: 1 });
+  // Le globe
+  s += `<g><circle cx="300" cy="880" r="345" fill="url(#aGlobe)"/>
+    <g fill="#4cd17a" stroke="#2c9a4e" stroke-width="4">
+      <path d="M90 640C130 590 205 585 235 615S250 690 205 705 120 720 95 690Z"/>
+      <path d="M300 575C350 560 420 570 455 600S470 660 430 672 360 650 330 640 270 600 300 575Z"/>
+      <path d="M480 690C510 670 560 680 575 710S560 770 525 770 470 730 480 690Z"/>
+      <path d="M250 720C280 705 320 715 330 745S300 800 265 790 235 745 250 720Z"/>
+    </g>
+    <g fill="none" stroke="#bfe6ff" stroke-opacity=".45" stroke-width="3">
+      <ellipse cx="300" cy="880" rx="345" ry="140"/><ellipse cx="300" cy="880" rx="345" ry="260"/><ellipse cx="300" cy="880" rx="170" ry="345"/>
+    </g>
+    <path d="M60 700A345 345 0 0 1 300 535" stroke="#fff" stroke-opacity=".55" stroke-width="10" fill="none" stroke-linecap="round"/>
+  </g>`;
+  // Traînées d'étincelles qui sortent du globe vers les drapeaux
+  const trainee = (ax, ay, bx, by, c) => { let t = ''; for (let i = 1; i <= 6; i++) { const p = i / 7; t += etincelle(ax + (bx - ax) * p, ay + (by - ay) * p - Math.sin(p * Math.PI) * 40, 4 + i * 1.6, c); } return t; };
+  s += trainee(170, 560, 110, 340, '#fff6a8') + trainee(430, 560, 505, 300, '#ffffff') + trainee(470, 600, 520, 470, '#fff6a8');
+  // Drapeaux qui s'envolent (premier plan moyen)
+  s += carteAffiche('IN', 510, 300, 118, 11) + carteAffiche('CA', 520, 470, 104, -9) + carteAffiche('ZA', 92, 465, 100, 9);
+  // ----- L'exploratrice, en grand (de 175 à 545 de haut) -----
+  s += `<g>
+    <ellipse cx="300" cy="545" rx="95" ry="14" fill="#0a1c40" opacity=".25"/>
+    <rect x="222" y="362" width="62" height="96" rx="18" fill="#7a4b2a"/><rect x="230" y="395" width="44" height="34" rx="8" fill="#9a6338"/>
+    <rect x="262" y="455" width="30" height="80" rx="13" fill="#f2c39b"/><rect x="306" y="455" width="30" height="80" rx="13" fill="#f2c39b"/>
+    <path d="M252 530h46a12 12 0 0 1 0 22h-46z" fill="#4a2c1a"/><path d="M300 530h48a12 12 0 0 1 0 22h-48z" fill="#4a2c1a"/>
+    <path d="M252 430h96l6 50h-46l-8-22-8 22h-46z" fill="#24508f"/>
+    <path d="M250 352Q300 335 350 352L360 445Q300 460 240 445Z" fill="url(#aVeste)"/>
+    <path d="M300 345V452" stroke="#b02b20" stroke-width="3"/>
+    <rect x="262" y="392" width="22" height="18" rx="4" fill="#ff8a6a"/><rect x="316" y="392" width="22" height="18" rx="4" fill="#ff8a6a"/>
+    <path d="M268 340Q300 362 332 340L326 360Q300 374 274 360Z" fill="#ffd23f"/><path d="M312 356l14 30-16-4z" fill="#ffd23f"/>
+    <path d="M258 362Q215 360 178 330" stroke="url(#aVeste)" stroke-width="30" stroke-linecap="round" fill="none"/>
+    <circle cx="170" cy="322" r="17" fill="#f2c39b"/><path d="M162 310l-8-14M171 306l-2-16M180 309l5-14" stroke="#f2c39b" stroke-width="8" stroke-linecap="round"/>
+    <path d="M392 388L432 108" stroke="#8a5a2b" stroke-width="9" stroke-linecap="round"/><circle cx="433" cy="102" r="9" fill="#ffd23f"/>
+    <path d="M342 362Q385 340 400 300" stroke="url(#aVeste)" stroke-width="30" stroke-linecap="round" fill="none"/>
+    <circle cx="404" cy="292" r="18" fill="#f2c39b"/>
+  </g>`;
+  // Le grand drapeau qui flotte (Brésil, aux couleurs franches)
+  s += drapeauFlottant('BR', 434, 106, 150);
+  // Tête
+  s += `<g>
+    <path d="M286 318h28v26h-28z" fill="#e8b48a"/>
+    <path d="M236 268Q232 330 262 340Q240 300 252 262Z" fill="#3b2314"/><path d="M364 268Q368 330 338 340Q360 300 348 262Z" fill="#3b2314"/>
+    <circle cx="300" cy="275" r="62" fill="#f2c39b"/>
+    <path d="M244 258Q262 222 300 226Q340 222 358 258Q330 242 300 246Q270 242 244 258Z" fill="#3b2314"/>
+    <ellipse cx="276" cy="276" rx="13" ry="15" fill="#fff"/><ellipse cx="322" cy="276" rx="13" ry="15" fill="#fff"/>
+    <circle cx="270" cy="272" r="8" fill="#2a1a10"/><circle cx="316" cy="272" r="8" fill="#2a1a10"/>
+    <circle cx="267" cy="268" r="3" fill="#fff"/><circle cx="313" cy="268" r="3" fill="#fff"/>
+    <path d="M260 254q14-8 26-2M308 252q14-6 26 2" stroke="#3b2314" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <circle cx="258" cy="302" r="10" fill="#ff8f8f" opacity=".6"/><circle cx="342" cy="302" r="10" fill="#ff8f8f" opacity=".6"/>
+    <g fill="#c98a5a"><circle cx="286" cy="294" r="2"/><circle cx="294" cy="298" r="2"/><circle cx="306" cy="298" r="2"/><circle cx="314" cy="294" r="2"/></g>
+    <path d="M280 306Q300 334 322 306Z" fill="#8a2a2a"/><path d="M286 308h30q-2 6-15 6t-15-6z" fill="#fff"/><path d="M290 322q11 6 22 0q-11-6-22 0z" fill="#ff7b7b"/>
+    <ellipse cx="300" cy="226" rx="96" ry="20" fill="#c9a26a"/>
+    <path d="M246 228Q248 176 300 172Q352 176 354 228Z" fill="#e0bd84"/>
+    <path d="M248 216Q300 226 352 216L353 228Q300 238 247 228Z" fill="#d93a2b"/>
+    <path d="M262 196Q284 180 310 182" stroke="#fff" stroke-opacity=".5" stroke-width="6" fill="none" stroke-linecap="round"/>
+  </g>`;
+  // Le drapeau reconnu, juste au-dessus de la main tendue
+  s += carteAffiche('JP', 120, 270, 120, -10, { anneau: 1 });
+  s += etincelle(58, 205, 14, '#fffbd0') + etincelle(196, 196, 10, '#fffbd0') + etincelle(206, 342, 9, '#fff');
+  // Guirlande de drapeaux au premier plan, sur toute la largeur
+  const ga = Math.max(vw / 2, 320);
+  const yg = x => 34 + 70 * (1 - Math.pow((x - 300) / ga, 2));
+  s += `<path d="M${x0} ${yg(x0)}${Array.from({ length: 40 }, (_, i) => { const x = x0 + vw * (i + 1) / 40; return `L${x} ${yg(x)}`; }).join('')}" stroke="#5a3a1f" stroke-width="3" fill="none"/>`;
+  const fanions = ['FR', 'JP', 'BR', 'IN', 'JM', 'KR', 'CH', 'GR', 'NG', 'MX', 'SE', 'KE', 'CA', 'IE', 'AR'];
+  let n = 0;
+  for (let x = Math.ceil((x0 + 10) / 52) * 52 - 26; x < x1; x += 52, n++) {
+    const pente = Math.atan2(yg(x + 1) - yg(x - 1), 2) * 180 / Math.PI;
+    s += `<g transform="translate(${x} ${yg(x)}) rotate(${pente})"><rect x="-21" y="2" width="42" height="28" fill="#0a1c40" opacity=".2"/><svg x="-20" y="0" width="40" height="27" viewBox="0 0 90 60" preserveAspectRatio="none">${drapeauDe(fanions[((n % fanions.length) + fanions.length) % fanions.length])}</svg></g>`;
+  }
+  // Confettis au premier plan, coupés par les bords
+  const conf = ['#ffd23f', '#4cd17a', '#ff7b7b', '#ffffff', '#c58bff', '#7bc8ff'];
+  for (let i = 0; i < 26; i++) {
+    const cx = x0 + ((i * 97.3) % vw), cy = 120 + ((i * 53.7) % 470), r = (i * 37) % 180;
+    if (cx > 200 && cx < 400 && cy > 160 && cy < 560) continue;
+    s += `<rect x="${cx}" y="${cy}" width="9" height="15" rx="2" fill="${conf[i % 6]}" transform="rotate(${r} ${cx} ${cy})"/>`;
+  }
+  s += '</svg>';
+  let el = document.getElementById('affiche');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'affiche';
+    el.style.cssText = 'position:fixed;inset:0;z-index:50;overflow:hidden';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = s;
+}
+function cacherPourAffiche() {
+  for (const el of document.querySelectorAll('#app, #fete, .ecran, .rond, .btn, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  cacherPourAffiche();
+  dessinerAffiche();
+  [100, 500, 1200].forEach(d => setTimeout(cacherPourAffiche, d));
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+// ===== Images du jeu (page du jeu) =====
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface, sans écran d'accueil, ni fenêtre « Continuer »,
+// ni tutoriel (CONSIGNES-JEU.md, section 5). La question est posée par le code, puis la partie est figée
+// sans fenêtre de pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+//   1 = Europe, niveau 1 : deux réponses, la bonne vient d'être touchée (bouton vert) ;
+//   2 = Afrique, niveau 9 : retrouver le drapeau d'après le nom du pays, cœurs ;
+//   3 = Monde entier, niveau 18, sur ordinateur : drapeau caché qui se dévoile, chrono, 6 réponses.
+let apercu = 0;
+const SCENES_APERCU = {
+  1: { cont: 'eu', niv: 1, idx: 3, points: 3, f: 'IT', type: 'nom', options: ['IT', 'IE'], bonne: true },
+  2: { cont: 'af', niv: 9, idx: 6, points: 5, vies: 2, f: 'KE', type: 'drapeau', options: ['ZA', 'KE', 'GH', 'NG'] },
+  3: { cont: 'monde', niv: 18, idx: 10, points: 9, vies: 2, f: 'BR', type: 'zoom', options: ['IN', 'BR', 'JM', 'MX', 'AR', 'ZA'], zoom: 1.5, temps: 5.6, zx: 34, zy: 16 },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const sc = SCENES_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 20261126 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  sonActif = false; // aucun son
+  progres = {};     // progression neuve en mémoire seulement (rien n'est enregistré)
+  if (numero === 3) document.body.classList.add('apercu-large');
+  if (NIVEAUX[sc.niv - 1].nouveau) marquerVu(NIVEAUX[sc.niv - 1].nouveau); // pas de tutoriel
+  demarrer(sc.cont, sc.niv);
+  const trouve = c => DRAPEAUX.find(d => d.code === c);
+  const q = { f: trouve(sc.f), type: sc.type, options: sc.options.map(trouve), zx: sc.zx || 0, zy: sc.zy || 0 };
+  partie.questions[sc.idx] = q;
+  partie.idx = sc.idx; partie.points = sc.points;
+  if (sc.vies !== undefined) { partie.vies = sc.vies; majVies(); }
+  poser();
+  if (sc.zoom) { zoomT = sc.zoom; majZoom(); }
+  if (sc.temps) { tempsReste = sc.temps; majChrono(); }
+  if (sc.bonne) {
+    // La bonne réponse vient d'être touchée : bouton vert, message, point compté
+    const i = q.options.indexOf(q.f);
+    partie.points++;
+    $('pts').textContent = T('points', { n: partie.points });
+    $('choix').children[i].classList.add('bon');
+    $('retour').textContent = T('bravoCoche');
+  }
+  // Figé : la boucle ne fait plus avancer ni le chrono ni le dévoilement, et aucune réponse n'est prise.
+  bloque = true; attente = null;
+  if (document.activeElement) document.activeElement.blur();
+}
+
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) {
+  demarrerAffiche();
+} else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  majBoutonsSon();
+  ouvrirApercu(numeroApercu);
+} else {
+  const depart = chargerProgres();
+  if (depart.options && CONTINENTS.includes(depart.options.continent)) contChoisi = depart.options.continent;
+  majBoutonsSon();
+  $('vitrine').innerHTML = ['FR', 'JP', 'BR'].map(c => svg(DRAPEAUX.find(f => f.code === c), 'drap')).join('');
+  afficherAccueil();
+}
 </script>
 </body>
 </html>

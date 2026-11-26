@@ -3496,10 +3496,11 @@ body.fige *, body.fige *::before, body.fige *::after { animation-play-state: pau
     }
   });
 
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') mettrePause(); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && !apercu) mettrePause(); });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie
   window.JEL_SAVE.surFermeture(function () {
+    if (apercu) return; // image du jeu : rien n'est enregistré
     if (etat.ecran === 'jeu' && !etat.libre && etat.cfg) {
       window.JEL_SAVE.save(JEU, { niveau: etat.niv + 1, score: totalPoints(), etoiles: progres.etoiles, records: progres.records, max: progres.max, options: { son: Son.actif } });
     }
@@ -3507,14 +3508,196 @@ body.fige *, body.fige *::before, body.fige *::after { animation-play-state: pau
 
   window.addEventListener('resize', function () { cadrerTitre(); if (etat.ecran === 'jeu' && etat.cfg) rendreAtelier(); });
 
+  /* ======================================================================
+     Affiche (jaquette du jeu)
+     Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+     interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Une danseuse en grand danse
+     sur le char du carnaval ; un pot de peinture lance sa couleur turquoise sur sa cape, sa bulle montre
+     la commande, des feux d'artifice et des lanternes éclairent la nuit de fête.
+     ====================================================================== */
+  function dessinerAffiche() {
+    var cf = ['#ffd23f', '#3d7ff0', '#3cb371', '#fff', '#9b59d0', '#ff7eb6', '#ff8c2a'];
+    var s = '<defs>' +
+      '<linearGradient id="aff-ciel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a1f86"/><stop offset=".5" stop-color="#c2477f"/><stop offset=".8" stop-color="#ff9a5c"/><stop offset="1" stop-color="#ffc27a"/></linearGradient>' +
+      '<radialGradient id="aff-halo"><stop offset="0" stop-color="#fff8d8" stop-opacity=".95"/><stop offset=".45" stop-color="#ffe08a" stop-opacity=".5"/><stop offset="1" stop-color="#ffb36b" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="aff-feu"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>' +
+      '<filter id="aff-contour" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#fff4c0" flood-opacity=".95"/></filter>' +
+      '</defs>';
+    // Ciel de fête, prolongé loin sur les côtés (écran large)
+    s += '<rect x="-1400" y="-200" width="3400" height="1200" fill="url(#aff-ciel)"/>';
+    for (var a = 0; a < 90; a++) s += '<circle cx="' + (((a * 97) % 1800) - 600) + '" cy="' + ((a * 53) % 330) + '" r="' + (1.2 + a % 2) + '" fill="#fff" opacity=".7"/>';
+    // Feux d'artifice : la vraie source de lumière de la nuit
+    [[110, 170, 70, '#ffd23f'], [500, 120, 58, '#7fe3ff'], [-160, 230, 80, '#ff7eb6'], [780, 260, 76, '#a8ff8a'], [-420, 120, 60, '#ffd23f'], [1020, 140, 64, '#ff8c2a']].forEach(function (f) {
+      s += '<circle cx="' + f[0] + '" cy="' + f[1] + '" r="' + (f[2] * 1.5) + '" fill="url(#aff-feu)" opacity=".55"/>';
+      for (var r = 0; r < 14; r++) {
+        var an = r * Math.PI / 7, x1 = f[0] + Math.cos(an) * f[2] * 0.25, y1 = f[1] + Math.sin(an) * f[2] * 0.25;
+        var x2 = f[0] + Math.cos(an) * f[2], y2 = f[1] + Math.sin(an) * f[2];
+        s += '<path d="M' + f1(x1) + ' ' + f1(y1) + ' L' + f1(x2) + ' ' + f1(y2) + '" stroke="' + f[3] + '" stroke-width="4" stroke-linecap="round"/>';
+        s += '<circle cx="' + f1(x2) + '" cy="' + f1(y2) + '" r="4.5" fill="#fff"/>';
+      }
+    });
+    // Guirlande de fanions
+    s += '<path d="M-700 40 Q300 150 1300 40" stroke="#3b2a1a" stroke-width="3" fill="none"/>';
+    for (var b = 0; b < 44; b++) {
+      var x = -690 + b * 46, y = 40 + 110 * (1 - Math.pow((x - 300) / 1000, 2)) * 0.55 + 2;
+      s += '<path d="M' + (x - 15) + ' ' + f1(y) + ' L' + (x + 15) + ' ' + f1(y) + ' L' + x + ' ' + f1(y + 30) + 'Z" fill="' + ['#ec4a43', '#ffd23f', '#3d7ff0', '#3cb371', '#ff7eb6', '#9b59d0'][(b + 600) % 6] + '" stroke="#3b2a1a" stroke-width="1.5"/>';
+    }
+    // Lanternes qui brillent
+    [[40, 250, '#ff8c2a'], [560, 235, '#ec4a43'], [-120, 260, '#ffd23f'], [720, 250, '#ff7eb6'], [-380, 240, '#ec4a43'], [960, 245, '#ffd23f']].forEach(function (l) {
+      s += '<circle class="lueur" cx="' + l[0] + '" cy="' + l[1] + '" r="58" fill="url(#g-lueur)"/>';
+      s += '<path d="M' + l[0] + ' ' + (l[1] - 70) + ' L' + l[0] + ' ' + (l[1] - 28) + '" stroke="#3b2a1a" stroke-width="3"/>';
+      s += '<path d="' + ell(l[0], l[1], 22, 27) + '" fill="' + l[2] + '" stroke="#3b2a1a" stroke-width="3"/>';
+      s += '<path d="M' + (l[0] - 22) + ' ' + l[1] + ' Q' + l[0] + ' ' + (l[1] + 8) + ' ' + (l[0] + 22) + ' ' + l[1] + '" stroke="#3b2a1a" stroke-width="2" fill="none" opacity=".5"/>';
+      s += '<path d="' + ell(l[0] - 7, l[1] - 8, 6, 9) + '" fill="#fff" opacity=".45"/>';
+    });
+    // Foule lointaine, en silhouettes pâles
+    for (var p = 0; p < 34; p++) { var px = -700 + p * 58, py = 610 + (p % 3) * 8; s += '<circle cx="' + px + '" cy="' + (py - 34) + '" r="16" fill="#7a3a7a" opacity=".55"/><path d="M' + (px - 22) + ' 700 Q' + (px - 20) + ' ' + (py - 18) + ' ' + px + ' ' + (py - 18) + ' Q' + (px + 20) + ' ' + (py - 18) + ' ' + (px + 22) + ' 700Z" fill="#7a3a7a" opacity=".55"/>'; }
+    // La rue
+    s += '<path d="M-1400 650 Q300 600 2000 650 L2000 1000 L-1400 1000Z" fill="#5e2a5e"/>';
+    s += '<path d="M-1400 700 Q300 660 2000 700" stroke="#ffd23f" stroke-width="5" stroke-dasharray="30 22" fill="none" opacity=".5"/>';
+    // Halo chaud derrière la danseuse
+    s += '<circle cx="300" cy="330" r="290" fill="url(#aff-halo)"/>';
+    // Le char décoré, sur lequel on danse (plateau à y = 550)
+    var leChar = { type: 'char', look: { corps: '#d9577f' }, pieces: {
+      guirlande: { forme: 'fleursGuirlande', couleur: 'jaune' }, drapeau: { forme: 'aronde', couleur: 'bleu', motif: 'etoile' },
+      lanterne: { forme: 'lanterneEtoile', couleur: 'orange', brille: true }, roues: { forme: 'roueFleur', couleur: 'violet' } } };
+    s += '<g transform="translate(110 470) scale(1.25)">' + svgChar(leChar, 0) + '</g>';
+    // Un danseur déjà costumé, derrière, à droite
+    var voisin = { look: { peau: '#8d5a3b', cheveux: '#1f1a24', coiffure: 0, tenue: '#e9fff4', collant: '#3a5a80' }, pieces: {
+      chapeau: { forme: 'hautForme', couleur: 'bleu', motif: 'etoile' }, masque: { forme: 'loup', couleur: 'orange' }, cape: { forme: 'franges', couleur: 'vert', motif: 'vague' },
+      collier: { forme: 'noeud', couleur: 'jaune' }, chaussures: { forme: 'bottines', couleur: 'rouge' } } };
+    s += '<g transform="translate(372 336) scale(.76) rotate(6 100 282)">' + svgDanseur(voisin, 1) + '</g>';
+    // La danseuse héroïne, en grand, qui danse sur le char
+    var heros = { look: { peau: '#e8b48f', cheveux: '#3b2416', coiffure: 2, tenue: '#fff1f6', collant: '#4a3b66' }, pieces: {
+      chapeau: { forme: 'plumes', couleur: 'rose' }, masque: { forme: 'papillon', couleur: 'jaune', motif: 'etoile' },
+      cape: { forme: 'capePaillettes', couleur: 'turquoise', motif: 'etoile', brille: true },
+      collier: { forme: 'collierOr', couleur: 'jaune', brille: true }, chaussures: { forme: 'ballerines', couleur: 'violet' } } };
+    s += '<g filter="url(#aff-contour)"><g transform="translate(150 141) scale(1.45) rotate(-5 100 282)">' + svgDanseur(heros, 0) + '</g></g>';
+    // L'action : le pot de peinture lance sa couleur sur la cape
+    s += '<path d="M72 512 Q86 380 168 400 Q196 408 212 440" stroke="#25c2c2" stroke-width="24" fill="none" stroke-linecap="round" opacity=".95"/>';
+    s += '<path d="M84 480 Q100 404 160 412" stroke="#bff6f6" stroke-width="6" fill="none" stroke-linecap="round" opacity=".8"/>';
+    [[218, 452, 13], [236, 436, 8], [200, 470, 9], [240, 470, 7], [190, 438, 6], [226, 488, 6], [252, 452, 5]].forEach(function (g) {
+      s += '<circle cx="' + g[0] + '" cy="' + g[1] + '" r="' + g[2] + '" fill="#25c2c2" stroke="#fff" stroke-width="2"/>';
+    });
+    // Le grand pot, au premier plan, coupé par le bord
+    s += '<g transform="translate(-36 470) rotate(28 80 80) scale(4)">' +
+      '<path d="M9 14 H31 L29 34 Q29 37 26 37 H14 Q11 37 11 34Z" fill="#f3eefa" stroke="#3a2850" stroke-width="1.4"/>' +
+      '<ellipse cx="20" cy="14" rx="11" ry="4" fill="#25c2c2" stroke="#3a2850" stroke-width="1.4"/>' +
+      '<path d="M13 16 Q14 26 18 24 Q20 30 23 22 Q26 26 27 16Z" fill="#25c2c2"/><path d="M14 20 L14 31" stroke="#fff" stroke-width="2" opacity=".6" stroke-linecap="round"/></g>';
+    // La bulle de commande de la danseuse (dessins seulement)
+    s += '<g transform="translate(408 150)">' +
+      '<path d="M0 18 Q0 0 18 0 L154 0 Q172 0 172 18 L172 74 Q172 92 154 92 L60 92 L30 122 L36 92 L18 92 Q0 92 0 74Z" fill="#fffdf7" stroke="#4a2a6a" stroke-width="4" stroke-linejoin="round"/>';
+    [['chapeau', { forme: 'plumes', couleur: 'rose' }, 10], ['cape', { forme: 'courte', couleur: 'turquoise', motif: 'etoile' }, 62], ['collier', { forme: 'perles', couleur: 'jaune' }, 114]].forEach(function (k, i) {
+      s += '<rect x="' + k[2] + '" y="16" width="48" height="60" rx="10" fill="#f3eefa"/>';
+      s += '<svg x="' + (k[2] + 2) + '" y="20" width="44" height="52" viewBox="' + CADRES[k[0]] + '">' + dessinPiece(k[0], k[1]) + '</svg>';
+      if (i !== 1) s += '<g transform="translate(' + (k[2] + 32) + ' 60)"><circle cx="9" cy="9" r="10" fill="#3cb371" stroke="#fff" stroke-width="2"/><path d="M4 9.5 L8 13.5 L14.5 5.5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>';
+    });
+    s += '</g>';
+    // Notes de musique et confettis au premier plan
+    [[470, 330, 1.6, -12], [82, 330, 1.3, 14], [540, 420, 1.2, 8]].forEach(function (n) {
+      s += '<g transform="translate(' + n[0] + ' ' + n[1] + ') rotate(' + n[3] + ') scale(' + n[2] + ')"><path d="M9 4 L20 2 V16 A3 3 0 1 1 17 13.2 V7 L11 8 V18 A3 3 0 1 1 8 15.2 V4Z" fill="#ffd23f" stroke="#7d2a6e" stroke-width="1.2"/></g>';
+    });
+    for (var c = 0; c < 70; c++) {
+      var cx = ((c * 83) % 1800) - 600, cy = 60 + (c * 71) % 640, gr = c % 9 === 0 ? 2.2 : 1;
+      s += '<rect x="' + cx + '" y="' + cy + '" width="' + (8 * gr) + '" height="' + (13 * gr) + '" rx="2" fill="' + cf[c % cf.length] + '" transform="rotate(' + (c * 41) + ' ' + cx + ' ' + cy + ')"/>';
+    }
+    // Serpentins coupés par les bords
+    s += '<path d="M-20 120 Q40 160 20 220 Q0 280 60 320" stroke="#ffd23f" stroke-width="9" fill="none" stroke-linecap="round"/>';
+    s += '<path d="M620 380 Q560 420 590 480 Q620 540 560 590" stroke="#ff7eb6" stroke-width="9" fill="none" stroke-linecap="round"/>';
+    var svg = $('affiche');
+    svg.innerHTML = s;
+  }
+  function cacherPourAffiche() {
+    Array.prototype.forEach.call(document.querySelectorAll('.ecran, .voile, #tuto, #effets, .jel-langue, jel-langue, button'), function (el) {
+      el.style.setProperty('display', 'none', 'important');
+    });
+  }
+  function demarrerAffiche() {
+    Son.actif = false;
+    var boite = document.createElement('div');
+    boite.innerHTML = '<svg id="affiche" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" style="position:fixed;inset:0;width:100%;height:100%;z-index:50;background:#c2477f"></svg>';
+    document.body.appendChild(boite.firstChild);
+    cacherPourAffiche();
+    setTimeout(cacherPourAffiche, 200);
+    setTimeout(cacherPourAffiche, 1000);
+    dessinerAffiche();
+  }
+
+  /* ======================================================================
+     Images du jeu (page du jeu)
+     Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+     directement en pleine partie, avec sa vraie interface (barre, bulle, atelier, barre de musique),
+     sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). Le costume
+     est à moitié posé, puis la partie est figée sans fenêtre de pause : ni son, ni sauvegarde.
+       1 = défilé 1 : un danseur, chapeau, collier, chaussures, aide avec les coches vertes ;
+       2 = défilé 10 : la nuit aux lanternes, pots de peinture, tampons, barre de musique ;
+       3 = défilé 18 : le char à décorer (fanion, guirlande, lanterne, roues), mélanges de couleurs.
+     ====================================================================== */
+  var apercu = 0;
+  var SCENES_APERCU = {
+    1: { niv: 0, etoiles: 1, manque: 1, iCmd: 0, score: 0, active: 0, blanc: false },
+    2: { niv: 9, etoiles: 27, manque: 1, iCmd: 1, score: 168, active: 0, blanc: true, temps: 0.62 },
+    3: { niv: 17, etoiles: 52, manque: 1, iCmd: 1, score: 388, active: 0, blanc: true, temps: 0.58 }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    var sc = SCENES_APERCU[numero];
+    Son.actif = false;
+    // Hasard fixe : la même image à chaque capture
+    var graine = 98765 + numero * 7919;
+    Math.random = function () { graine = (graine + 0x6D2B79F5) | 0; var t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    // Progression en mémoire seulement (rien n'est enregistré) : pas de tutoriel, trésors selon le moment
+    progres = progresVide();
+    var reste = sc.etoiles;
+    for (var i = 0; i < NB && reste > 0; i++) { progres.etoiles[i] = Math.min(3, reste); reste -= progres.etoiles[i]; }
+    progres.etoiles[sc.niv] = Math.max(1, progres.etoiles[sc.niv]);
+    demarrerNiveau(sc.niv);
+    viderTemps(); fermerTuto();
+    var pal = palettes(etat.cfg).base;
+    // Costumes à moitié posés : tout ce qui est demandé, sauf la dernière pièce
+    etat.cibles.forEach(function (c, ci) {
+      var cs = etat.commande[ci], pleins = cs.filter(function (k) { return !k.vide; });
+      pleins.forEach(function (k, j) {
+        var fs = formesDispo(k.slot);
+        var f = fs[(j + ci) % fs.length];
+        if (j < pleins.length - sc.manque) {
+          c.pieces[k.slot] = { forme: f.id, couleur: k.couleur || pal[(j + ci) % pal.length], motif: k.motif, brille: !!f.brille };
+        } else if (ci === sc.active && sc.blanc) {
+          // pièce tout juste posée, encore blanche : on va la teindre
+          c.pieces[k.slot] = { forme: f.id, couleur: 'blanc', motif: null, brille: !!f.brille };
+          etat.choisi = k.slot; etat.onglet = k.slot;
+        } else if (ci === sc.active) {
+          etat.onglet = k.slot;
+        }
+      });
+    });
+    etat.active = sc.active;
+    etat.iCmd = sc.iCmd; etat.score = sc.score;
+    etat.statuts = []; for (var s = 0; s < sc.iCmd; s++) etat.statuts.push('ok');
+    if (sc.temps && etat.cfg.temps) etat.temps = etat.cfg.temps * sc.temps;
+    etat.dx = 0; etat.anim = false; etat.enCours = true;
+    // écran d'ordinateur peu haut : la bulle garde sa hauteur entière (la scène se resserre)
+    $('zone-bulle').style.flex = 'none';
+    rendreTout(); majMusique();
+    $('b-defiler').disabled = false;
+    // Figée sur ce moment, sans fenêtre de pause
+    etat.pause = true;
+  }
+
   /* ---------- Démarrage ---------- */
   creerMotifs();
-  dessinTitre();
-  majTitre();
-  $('b-pause').innerHTML = IC.pause;
-  $('b-aide').innerHTML = IC.aide;
-  $('legende').innerHTML = legende();
-  requestAnimationFrame(boucle);
+  var numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) {
+    demarrerAffiche();
+  } else {
+    dessinTitre();
+    majTitre();
+    $('b-pause').innerHTML = IC.pause;
+    $('b-aide').innerHTML = IC.aide;
+    $('legende').innerHTML = legende();
+    if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>
