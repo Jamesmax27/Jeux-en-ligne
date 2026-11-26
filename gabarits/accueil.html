@@ -29,13 +29,24 @@
       // page ne bouge pas à son arrivée (app.js).
       document.documentElement.classList.add('avec-vitrine');
       try { if (navigator.onLine !== false && localStorage.getItem('tendances') === '1') document.documentElement.classList.add('avec-tendances'); } catch (e) { /* stockage refusé */ }
+      // Bannière « Choisis ton pseudo » (invite-pseudo.js) : sa place est gardée si
+      // elle était montrée à la visite précédente, que le pseudo est toujours celui
+      // de départ et que la croix ne la cache pas. Elle passe avant « Installer
+      // l'appli », dont la place n'est alors pas gardée (un seul encart à la fois).
+      var invite = false;
+      try {
+        var prof = JSON.parse(localStorage.getItem('fmg-profil') || 'null');
+        var inv = JSON.parse(localStorage.getItem('fmg-invite-pseudo') || 'null');
+        invite = !!(prof && prof.etat && !prof.etat.pseudo && inv && inv.montree && !(inv.masqueeJusqua > Date.now()));
+        if (invite) document.documentElement.classList.add('avec-invite-pseudo');
+      } catch (e) { /* stockage refusé */ }
       // Bannière « Installer l'appli » (installer.js) : sa place est gardée si elle
       // était montrée à la visite précédente et que rien ne la cache aujourd'hui
       // (fermée il y a moins de 3 jours, appli installée, site ouvert depuis l'appli).
       try {
         var appli = (window.matchMedia && matchMedia('(display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui), (display-mode: window-controls-overlay)').matches) || navigator.standalone === true;
         var inst = JSON.parse(localStorage.getItem('fmg-installer') || 'null');
-        if (!appli && inst && inst.montree && !inst.installee && !(inst.masqueeJusqua > Date.now())) document.documentElement.classList.add('avec-installer');
+        if (!invite && !appli && inst && inst.montree && !inst.installee && !(inst.masqueeJusqua > Date.now())) document.documentElement.classList.add('avec-installer');
       } catch (e) { /* stockage refusé */ }
     })();
   </script>
@@ -52,6 +63,68 @@
       <div class="entete-langue" id="langue">{{{langues}}}</div>
     </div>
   </header>
+
+  <!-- Bannière « Choisis ton pseudo » (public/invite-pseudo.js, docs/cadrage-fidelisation.md,
+       section 14.14) : pour un joueur encore « Joueur <nombre> » venu 3 jours différents ;
+       « Choisir » ouvre la fenêtre ci-dessous, ✕ la cache 3 jours. Elle passe avant
+       « Installer l'appli » (un seul encart à la fois). Avatar peint par le script. -->
+  <aside class="installer-banniere invite-banniere" id="invite-pseudo" aria-labelledby="invite-pseudo-banniere-titre" hidden>
+    <span class="invite-avatar" aria-hidden="true"></span>
+    <div class="installer-banniere-texte">
+      <strong id="invite-pseudo-banniere-titre" data-i18n="invitePseudo.titre">{{t:invitePseudo.titre}}</strong>
+      <span data-i18n="invitePseudo.banniere">{{t:invitePseudo.banniere}}</span>
+    </div>
+    <button type="button" class="installer-banniere-bouton" data-invite="choisir" data-i18n="invitePseudo.choisir">{{t:invitePseudo.choisir}}</button>
+    <button type="button" class="installer-croix" data-invite="masquer" aria-label="{{t:profil.fermer}}" data-i18n-aria="profil.fermer">✕</button>
+  </aside>
+
+  <!-- Fenêtre « Choisis ton pseudo » : saisie (règles et messages de la page du
+       profil), puis « Tout est dans ton avatar » : démonstration animée en CSS
+       (un doigt touche la pastille, le menu s'ouvre ; figée si l'appareil demande
+       moins de mouvement) et trois raccourcis. Mise en forme commune avec la
+       fenêtre « Installer l'appli » (classes installer-*). -->
+  <dialog class="installer-fenetre invite-fenetre" id="invite-pseudo-fenetre" aria-labelledby="invite-pseudo-titre">
+    <div class="installer-tete">
+      <span class="invite-tete-avatar" aria-hidden="true"></span>
+      <div>
+        <h2 id="invite-pseudo-titre" data-i18n="invitePseudo.titre">{{t:invitePseudo.titre}}</h2>
+        <p class="invite-actuel"></p>
+      </div>
+      <button type="button" class="installer-croix" data-invite="fermer" aria-label="{{t:profil.fermer}}" data-i18n-aria="profil.fermer">✕</button>
+    </div>
+    <form class="invite-form" novalidate>
+      <label for="invite-pseudo-champ" data-i18n="profil.pseudo.label">{{t:profil.pseudo.label}}</label>
+      <div class="invite-saisie">
+        <input id="invite-pseudo-champ" type="text" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-describedby="invite-pseudo-aide">
+        <button type="submit" class="installer-banniere-bouton" data-i18n="profil.pseudo.valider">{{t:profil.pseudo.valider}}</button>
+      </div>
+      <p class="invite-aide" id="invite-pseudo-aide" data-i18n="profil.pseudo.aide">{{t:profil.pseudo.aide}}</p>
+      <p class="invite-message" role="status" aria-live="polite"></p>
+    </form>
+    <div class="invite-reussi" role="status" hidden>
+      <span class="invite-reussi-avatar" aria-hidden="true"></span>
+      <p class="invite-reussi-texte"></p>
+    </div>
+    <h3 class="invite-filet" data-i18n="invitePseudo.astuce">{{t:invitePseudo.astuce}}</h3>
+    <p class="invite-astuce" data-i18n="invitePseudo.astuceTexte">{{t:invitePseudo.astuceTexte}}</p>
+    <div class="invite-demo" aria-hidden="true">
+      <div class="invite-demo-barre">
+        <span class="invite-demo-logo"></span>
+        <span class="invite-demo-pastille"><span class="invite-demo-avatar"></span><span class="invite-demo-niveau">1</span></span>
+      </div>
+      <div class="invite-demo-menu">
+        <span class="invite-demo-ligne">{{t:profil.apparence.changer}}</span>
+        <span class="invite-demo-ligne">{{t:profil.menu.badges}}</span>
+        <span class="invite-demo-ligne">{{t:classement.titre}}</span>
+      </div>
+      <svg class="invite-demo-doigt" viewBox="0 0 40 48" focusable="false"><path d="M15 25V7a4 4 0 0 1 8 0v13.5l7.2 1.6a5 5 0 0 1 3.9 5.7L32 39.5a8 8 0 0 1-7.9 6.5H19a8 8 0 0 1-6.3-3.1l-7.4-9.6a3.6 3.6 0 0 1 5.5-4.6L15 33z"/></svg>
+    </div>
+    <ul class="invite-raccourcis">
+      <li><a data-invite-lien="avatar"><span class="invite-raccourci-avatar" aria-hidden="true"></span><span data-i18n="profil.apparence.changer">{{t:profil.apparence.changer}}</span></a></li>
+      <li><a data-invite-lien="badges"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 2.5l4 6 4-6"/><circle cx="12" cy="15" r="6"/><path d="M12 12l.9 1.9 2.1.3-1.5 1.4.4 2.1-1.9-1-1.9 1 .4-2.1-1.5-1.4 2.1-.3z"/></svg><span data-i18n="profil.menu.badges">{{t:profil.menu.badges}}</span></a></li>
+      <li><a data-invite-lien="classement"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 21h18M5 21v-6h4v6M10 21V10h4v11M15 21v-8h4v8"/><path d="M12 3l.8 1.6 1.8.3-1.3 1.2.3 1.8-1.6-.9-1.6.9.3-1.8-1.3-1.2 1.8-.3z"/></svg><span data-i18n="classement.titre">{{t:classement.titre}}</span></a></li>
+    </ul>
+  </dialog>
 
   <!-- Bannière « Installer l'appli » (public/installer.js) : cachée tant que le
        script n'a pas vu que l'appareil peut installer le site et que rien ne

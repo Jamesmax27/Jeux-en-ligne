@@ -141,6 +141,12 @@ export const SIGNALER_NIVEAU_MIN = 3;         // niveau minimal pour signaler un
 export const NUMERO_MIN = 1000;               // nombre du pseudo par défaut (« Joueur 4821 ») : de…
 export const NUMERO_MAX = 99999;              // … à
 
+// --- Invitation au pseudo (public/invite-pseudo.js, docs/cadrage-fidelisation.md, 14.14) ---
+// Bannière « Choisis ton pseudo » en haut de l'accueil, pour un joueur encore
+// « Joueur <nombre> » qui revient : jamais obligatoire, une croix la cache.
+export const INVITE_PSEUDO_JOURS = 3;         // jours de visite différents (pas forcément de suite) avant de la montrer
+export const INVITE_PSEUDO_RAPPEL_JOURS = 3;  // croix : elle revient au bout de 3 jours (choix du propriétaire)
+
 // --- Amis, présence, rejoindre (docs/consigne-amis.md) ---------------------------
 // Une amitié relie deux profils anonymes ; on ajoute un ami par son pseudo
 // exact (pas de recherche), il accepte ou refuse. Tout est décidé par le serveur.
