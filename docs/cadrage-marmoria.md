@@ -1755,3 +1755,11 @@ Tests : section « Musique » de `scripts/tester-marmoria.mjs` (quatre morceaux,
 
 Reste : écoute du propriétaire (un extrait de 3 minutes lui a été envoyé) et essai sur téléphone ; sur un téléphone d'entrée de gamme, le calcul audio peut atteindre 20 à 30 % d'un cœur (estimation, à mesurer) ; si la musique saccade, retirer la salle ou réduire la polyphonie.
 
+### 23.14 Publication et téléphone en paysage (26 novembre 2026)
+
+- **Publié** sur décision du propriétaire (« On peut publier le jeu ») : pull request Jamesmax27/Jeux-en-ligne#444 fusionnée (commit `5fbd4b6`), contrôles verts, aucune pull request de la boucle de nuit ouverte.
+- Retour du propriétaire après un essai : « ça va pas ». Cause trouvée en rejouant dans le lanceur du site : sur un téléphone en paysage, la barre du site et celle du navigateur laissent au jeu 260 à 300 px de haut (iPhone SE 263, iPhone 13 285, Pixel 7 303), alors que le jeu avait été réglé sur 390 px. La fiche de la mission débordait (« Commencer » sous le bord, à faire défiler), les boutons « Passer » / « Suivant » de la prise en main sortaient de l'écran sur iPhone SE, et le bouton du son sortait à droite sur iPhone 13 (750 px de large).
+- Correction (`sources/marmoria/gabarit.html`, `version` 13) : les boutons d'une carte restent collés à son bas quand son texte défile ; sous 340 px de haut, cartes, titres, textes et démonstrations des gestes resserrés ; jusqu'à 820 px de large, la date et les loupes se cachent (on zoome en pinçant).
+- Vérifié dans le lanceur local, iPhone SE, iPhone 13 et Pixel 7 en paysage, iPhone 13 en portrait, ordinateur : écran titre, fiche de la mission, trois écrans de prise en main, barre du haut, pause, chaque bouton visible et touchable sans défiler.
+- Reste : sur iPhone, le bouton plein écran du lanceur ne cache pas la barre du navigateur (Safari ne le permet pas sur iPhone) ; l'appli installée sur l'écran d'accueil donne environ 50 px de plus.
+
