@@ -68,12 +68,13 @@
     if (d.options && typeof d.options === 'object') for (var k in d.options) if (k in prog.options) prog.options[k] = d.options[k];
     prog.niveau = Math.max(1, Math.min(MISSIONS.length, (d.niveau | 0) || 1));
     prog.fortune = Math.max(0, d.fortune | 0); // fortune du gouverneur, gardée d'une mission à l'autre (section 11.6)
+    if (d.vus && typeof d.vus === 'object') prog.vus = d.vus; // tutoriels de bâtiments déjà lus (cahier 23.16)
   }
   function chargerProg(d) { lireProg(d); progChargee = true; appliquerOptions(); }
   function totalEtoiles() { var s = 0; for (var k in prog.gagnees) s += prog.gagnees[k] | 0; return Math.min(MAX_ETOILES, s); }
   function sauverProg() {
     if (!progChargee) return;
-    try { window.JEL_SAVE.save(JEU, { niveau: prog.niveau, score: totalEtoiles(), options: prog.options, gagnees: prog.gagnees, fortune: prog.fortune }); } catch (e) { /* sans stockage */ }
+    try { window.JEL_SAVE.save(JEU, { niveau: prog.niveau, score: totalEtoiles(), options: prog.options, gagnees: prog.gagnees, fortune: prog.fortune, vus: prog.vus || {} }); } catch (e) { /* sans stockage */ }
   }
   function appliquerOptions() { AUDIO.couper(!prog.options.son); AUDIO.musiqueActive(prog.options.musique !== false); majBoutonSon(); }
   // Lecture seule au lancement (son coupé, geste déjà vu) : jamais d'écriture depuis l'écran titre.
@@ -166,6 +167,7 @@
     var e = SIM.nouvelle(m.id, { rang: Math.max(1, echelonsGagnes()), fortune: prog.fortune, difficulte: m.echelon >= 3 ? (prog.options.difficulte || 'normal') : 'normal' });
     demarrerEtat(e);
     AUDIO.jouer('etape');
+    presenterNouveaux(m);
   }
   function quitterPartie() {
     finirOrdre();
@@ -335,6 +337,7 @@
           if (outil && outil.type === seul) { AUDIO.jouer('menu'); annulerOutil(); ouvrirCategorie(null); return; }
           if (partie.e.debloques.indexOf(seul) < 0) { AUDIO.jouer('refus'); toast(t('outil.verrouille')); return; }
           AUDIO.jouer('menu');
+          if (estNouveau(seul)) { ecranTutoBatiment([seul], 0); return; }
           choisirOutil(seul, true);
           return;
         }
@@ -360,13 +363,16 @@
     permis().filter(function (k) { return D.batiments[k].categorie === c; }).forEach(function (k) {
       var d = D.batiments[k], ouvert = partie.e.debloques.indexOf(k) >= 0;
       var cout = k === 'deblayer' ? t('outil.parCase', { n: nb(d.cout) }) : nb(d.cout);
+      var nouveau = estNouveau(k);
       var b = el('button', { classe: 'choix' + (ouvert ? '' : ' verrou') + (outil && outil.type === k ? ' actif' : ''), 'data-bat': k }, [
-        DS.vignette(k, 44), el('span', { classe: 'nom', texte: t('bat.' + k + '.nom') }), el('span', { classe: 'cout', texte: cout })
+        DS.vignette(k, 44), el('span', { classe: 'nom' }, [t('bat.' + k + '.nom'), nouveau ? el('span', { classe: 'marque-nouveau', texte: t('tutoB.nouveau') }) : null]), el('span', { classe: 'cout', texte: cout })
       ]);
       b.addEventListener('click', function () {
         AUDIO.demarrer();
         if (!ouvert) { AUDIO.jouer('refus'); toast(t('outil.verrouille')); return; }
         AUDIO.jouer('menu');
+        // Bâtiment jamais vu dans la campagne : sa fiche de tutoriel d'abord (« Le construire »).
+        if (estNouveau(k)) { ouvrirCategorie(null); ecranTutoBatiment([k], 0); return; }
         choisirOutil(k);
       });
       sm.appendChild(b);
@@ -1620,7 +1626,146 @@
     }).catch(function () { /* pas de ville : le choix des missions reste affiché */ });
   }
 
+  // --- Carte de la campagne (retour du propriétaire du 26 novembre 2026, cahier 23.16) --------
+  // L'Europe romaine en grand, Rome au centre : chaque mission à la place de sa ville, reliée à la
+  // mission qui l'ouvre ; gagnée (or et étoiles), ouverte (anneau qui bat), fermée (grise). Le
+  // chiffre d'un point est l'échelon. Toucher une ville ouvre sa présentation ; la liste reste
+  // à un bouton. Positions en degrés (longitude, latitude), un peu écartées quand deux villes se
+  // touchent (Ostie et Rome, Corinthe et Athènes).
+  var POS_MISSIONS = { ostie: [11.7, 41.5], pompei: [14.49, 40.75], ravenne: [12.2, 44.42], narbo: [3.0, 43.18], aquilee: [13.37, 45.77],
+    massalia: [5.37, 43.3], vindobona: [16.37, 48.21], ephese: [27.34, 37.94], burdigala: [-0.58, 44.84], alexandrie: [29.92, 31.2], leptis: [14.29, 32.64],
+    corinthe: [21.6, 37.3], colonia: [6.96, 50.94], antioche: [36.16, 36.2], palmyre: [38.27, 34.55], athenes: [24.0, 38.3], eburacum: [-1.08, 53.96] };
+  var ROME_CAMPAGNE = [12.9, 42.3], EUROPE = [-10.5, 29.3, 41.5, 56.5]; // ouest, sud, est, nord
+  // Mers et îles hors de la Méditerranée (MER, ILES) : Atlantique et mer du Nord, Baltique, mer Noire ; Bretagne, Irlande.
+  var OCEANS = [
+    [[-12, 28], [-9.7, 30.4], [-9.2, 32.5], [-7.6, 33.6], [-6.8, 34.0], [-6.0, 35.5], [-5.6, 36.0], [-6.3, 36.5], [-7.4, 37.2], [-8.9, 37.0], [-8.8, 38.5], [-9.5, 38.8], [-8.9, 40.2],
+      [-8.7, 41.2], [-8.9, 42.1], [-9.3, 43.0], [-8.3, 43.6], [-7.0, 43.6], [-5.6, 43.6], [-3.8, 43.45], [-1.8, 43.4], [-1.5, 43.5], [-1.2, 44.6], [-1.2, 45.8], [-2.2, 47.2],
+      [-4.5, 47.8], [-4.8, 48.4], [-3.0, 48.8], [-1.6, 48.7], [-1.9, 49.7], [-1.2, 49.4], [0.1, 49.5], [1.6, 50.2], [1.6, 50.9], [2.5, 51.1], [3.6, 51.4], [4.2, 52.0], [4.7, 52.9],
+      [5.5, 53.4], [7.0, 53.6], [8.5, 53.6], [8.6, 54.3], [8.6, 55.0], [8.1, 55.6], [8.1, 58], [-12, 58]],
+    [[10.4, 58], [10.2, 55.6], [9.9, 54.8], [10.0, 54.4], [11.0, 54.0], [12.1, 54.2], [13.4, 54.6], [14.3, 53.9], [16.0, 54.25], [18.6, 54.4], [19.9, 54.6], [21.0, 55.3], [21.1, 58]],
+    [[27.5, 42.4], [28.0, 43.2], [28.6, 44.2], [29.7, 45.2], [30.7, 46.5], [31.9, 46.6], [33.6, 46.1], [33.4, 45.2], [33.5, 44.5], [34.4, 44.4], [35.5, 45.1], [36.6, 45.4],
+      [37.6, 44.8], [39.7, 43.6], [42, 41.8], [42, 41.0], [40.5, 41.0], [39.7, 41.0], [37.9, 41.0], [36.3, 41.3], [35.1, 42.0], [33.3, 41.9], [31.4, 41.3], [29.1, 41.2], [28.0, 41.6]]];
+  var TERRES = [
+    [[-5.7, 50.05], [-4.2, 50.35], [-3.4, 50.6], [-1.9, 50.7], [-0.8, 50.75], [1.0, 51.0], [1.4, 51.4], [0.9, 51.8], [1.75, 52.5], [1.3, 52.9], [0.3, 53.0], [0.1, 53.5], [-0.1, 54.1],
+      [-1.2, 54.6], [-1.6, 55.6], [-2.1, 56.0], [-2.5, 58], [-5.5, 58], [-4.9, 55.7], [-5.1, 55.0], [-3.4, 54.9], [-3.4, 54.3], [-3.0, 53.9], [-3.1, 53.4], [-4.5, 53.4], [-4.2, 52.9],
+      [-4.1, 52.3], [-5.3, 51.85], [-4.2, 51.6], [-3.2, 51.4], [-3.0, 51.25], [-4.2, 51.2]],
+    [[-6.2, 53.3], [-6.4, 52.2], [-8.5, 51.6], [-10.3, 51.9], [-9.9, 53.4], [-10.1, 54.3], [-8.4, 55.2], [-6.1, 55.2], [-5.5, 54.4], [-6.0, 53.8]],
+    [[11.0, 55.0], [12.6, 55.6], [12.3, 56.1], [11.2, 55.9]]];
+  var carteCampagneOuverte = null;
   function ecranMissions() {
+    var bloc = el('div', { classe: 'campagne' }), boite = el('div', { classe: 'cp-carte' }), cote = el('div', { classe: 'cp-cote' });
+    cote.appendChild(el('h1', { texte: t('missions.titre') }));
+    cote.appendChild(el('p', { texte: t('missions.bilan', { rang: rangTexte(), n: totalEtoiles(), max: MAX_ETOILES }) }));
+    if (campagneFinie()) cote.appendChild(el('p', { classe: 'etat-ok', texte: t('missions.campagneFinie') }));
+    var prochaine = MISSIONS.filter(function (m) { return m.dispo && missionOuverte(m) && !prog.gagnees[m.id]; })[0];
+    if (prochaine) {
+      cote.appendChild(el('div', { classe: 'prochaine-mission' }, [
+        el('span', { classe: 'num', texte: t('missions.prochaine') }),
+        el('strong', { texte: t('mission.' + prochaine.id + '.nom') }),
+        bouton(t('missions.jouer'), function () { AUDIO.demarrer(); AUDIO.jouer('clic'); ecranBriefing(prochaine); }, 'gros or')
+      ]));
+    }
+    cote.appendChild(el('p', { classe: 'aide', texte: t('missions.carteAide') }));
+    cote.appendChild(el('div', { classe: 'boutons' }, [
+      bouton(t('missions.liste'), ecranListeMissions, 'gros non'),
+      bouton(t('libre.bouton'), function () { ecranLibre(); }, 'gros non'),
+      bouton(t('missions.charger'), function () { ecranSauvegardes('charger', ecranMissions); }, 'gros non'),
+      bouton(t('aide.titre'), function () { ecranAide(ecranMissions); }, 'gros non'),
+      bouton(t('ui.retour'), ecranTitre, 'gros non')
+    ]));
+    bloc.appendChild(boite); bloc.appendChild(cote);
+    ouvrirEcran(bloc, { retour: ecranTitre });
+    carteCampagneOuverte = boite;
+    dessinerCarteCampagne(boite);
+  }
+  function dessinerCarteCampagne(boite) {
+    if (!boite || !boite.isConnected) { carteCampagneOuverte = null; return; }
+    // Fenêtre plus haute que large (ordinateur, fenêtre étroite) : la carte au-dessus du reste.
+    if (boite.parentNode) boite.parentNode.classList.toggle('colonne', W < H * 0.9);
+    var E = EUROPE, kx = Math.cos(43.5 * Math.PI / 180), lu = (E[2] - E[0]) * kx, lv = E[3] - E[1];
+    var dw = Math.max(200, boite.clientWidth || 400), dh = Math.max(140, boite.clientHeight || 280);
+    var sc = Math.min(dw / lu, dh / lv), L = Math.floor(lu * sc), H = Math.floor(lv * sc);
+    var X = function (q) { return (q[0] - E[0]) * kx * sc; }, Y = function (q) { return (E[3] - q[1]) * sc; };
+    var f1 = function (n) { return n.toFixed(1); };
+    var pts = function (l) { return l.map(function (q) { return f1(X(q)) + ',' + f1(Y(q)); }).join(' '); };
+    var fs = Math.round(Math.max(10, Math.min(16, L / 55))), rp = Math.max(7, Math.min(13, L / 70)), petit = L < 520;
+    var s = '<svg viewBox="0 0 ' + L + ' ' + H + '" width="' + L + '" height="' + H + '" role="img" aria-label="' + echapper(t('missions.titre')) + '">';
+    s += '<rect width="' + L + '" height="' + H + '" fill="#dccb9c"/>';
+    s += '<polygon points="' + pts(MER) + '" fill="#6aa2c2" stroke="#3f6f8a" stroke-width="1"/>';
+    OCEANS.forEach(function (o) { s += '<polygon points="' + pts(o) + '" fill="#6aa2c2" stroke="#3f6f8a" stroke-width="1"/>'; });
+    ILES.concat(TERRES).forEach(function (i) { s += '<polygon points="' + pts(i) + '" fill="#dccb9c" stroke="#3f6f8a" stroke-width="0.8"/>'; });
+    // Chemins : chaque mission reliée à celle qui l'ouvre (même province dès l'échelon 4).
+    var precedente = function (m) {
+      if (m.echelon <= 1) return null;
+      var l = MISSIONS.filter(function (x) { return x.echelon === m.echelon - 1; });
+      return l.filter(function (x) { return x.province === m.province; })[0] || l[0];
+    };
+    var etat = function (m) { return prog.gagnees[m.id] ? 'gagnee' : m.dispo && missionOuverte(m) ? 'ouverte' : 'fermee'; };
+    s += '<line x1="' + f1(X(ROME_CAMPAGNE)) + '" y1="' + f1(Y(ROME_CAMPAGNE)) + '" x2="' + f1(X(POS_MISSIONS.ostie)) + '" y2="' + f1(Y(POS_MISSIONS.ostie)) + '" stroke="#b8862b" stroke-width="2.5" stroke-linecap="round"/>';
+    MISSIONS.forEach(function (m) {
+      var p = precedente(m);
+      if (!p || !POS_MISSIONS[m.id] || !POS_MISSIONS[p.id]) return;
+      // Route courbe : faite (or), ouverte (tirets qui avancent), à venir (pointillés pâles).
+      var e1 = etat(m), fait = prog.gagnees[p.id], a1 = POS_MISSIONS[p.id], b1 = POS_MISSIONS[m.id];
+      var xa = X(a1), ya = Y(a1), xb = X(b1), yb = Y(b1), mx = (xa + xb) / 2 - (yb - ya) * 0.12, my = (ya + yb) / 2 + (xb - xa) * 0.12;
+      s += '<path d="M' + f1(xa) + ' ' + f1(ya) + ' Q' + f1(mx) + ' ' + f1(my) + ' ' + f1(xb) + ' ' + f1(yb) + '" fill="none"' +
+        ' stroke="' + (e1 === 'gagnee' ? '#b8862b' : fait ? '#c9793a' : '#6e6656') + '" stroke-width="' + (e1 === 'gagnee' ? 3 : fait ? 2.5 : 1.4) + '" stroke-linecap="round"' +
+        (e1 === 'gagnee' ? '' : fait ? ' stroke-dasharray="7 5" class="cp-route"' : ' stroke-dasharray="2 5" opacity="0.45"') + '/>';
+    });
+    // Étiquettes placées une à une, sans chevauchement quand c'est possible.
+    var pris = [];
+    MISSIONS.forEach(function (m) { var q = POS_MISSIONS[m.id]; if (q) pris.push([X(q) - rp - 2, Y(q) - rp - 2, 2 * rp + 4, 2 * rp + 4]); });
+    var chevauche = function (a) { var n = 0; pris.forEach(function (b) { var dx = Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0]), dy = Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]); if (dx > 0 && dy > 0) n += dx * dy; }); return n; };
+    var etiquette = function (q, texte, gras, coul, etoiles) {
+      var w = texte.length * fs * 0.56 + (etoiles >= 0 ? 3.4 * fs : 0) + 6, h = fs + 4, px = X(q), py = Y(q), d = rp + 3;
+      var cands = [[px + d, py - h / 2], [px - d - w, py - h / 2], [px - w / 2, py - d - h], [px - w / 2, py + d], [px + d, py - h - 2], [px + d, py + 2], [px - d - w, py - h - 2], [px - d - w, py + 2]];
+      var best = null, mn = Infinity;
+      cands.forEach(function (c) { var r = [Math.max(1, Math.min(L - w - 1, c[0])), Math.max(1, Math.min(H - h - 1, c[1])), w, h], n = chevauche(r); if (n < mn) { mn = n; best = r; } });
+      pris.push(best);
+      var et = etoiles >= 0 ? ' <tspan fill="#d9a020" stroke="#5a3a10" stroke-width="2">' + '★★★'.slice(0, etoiles) + '☆☆☆'.slice(0, 3 - etoiles) + '</tspan>' : '';
+      return '<text x="' + f1(best[0] + 3) + '" y="' + f1(best[1] + h - 4) + '" font-size="' + fs + '" font-weight="' + (gras ? 800 : 600) + '" fill="' + coul + '" stroke="rgba(246,238,214,0.92)" stroke-width="3" paint-order="stroke">' + echapper(texte) + et + '</text>';
+    };
+    var g = '';
+    g += '<circle cx="' + f1(X(ROME_CAMPAGNE)) + '" cy="' + f1(Y(ROME_CAMPAGNE)) + '" r="' + f1(rp * 0.8) + '" fill="#a8322a" stroke="#f4e8c8" stroke-width="2"/>';
+    pris.push([X(ROME_CAMPAGNE) - rp, Y(ROME_CAMPAGNE) - rp, 2 * rp, 2 * rp]);
+    var noms = etiquette(ROME_CAMPAGNE, t('cite.rome'), true, '#7a1a12');
+    MISSIONS.forEach(function (m) {
+      var q = POS_MISSIONS[m.id];
+      if (!q) return;
+      var e1 = etat(m), x = X(q), y = Y(q), n = prog.gagnees[m.id] | 0;
+      var fond = e1 === 'gagnee' ? '#f0c040' : e1 === 'ouverte' ? '#fff8e6' : '#bdb39a', bord = e1 === 'gagnee' ? '#6a4a10' : e1 === 'ouverte' ? '#b9573a' : '#7a7262';
+      g += '<g class="cp-ville ' + e1 + '" data-mission="' + m.id + '" tabindex="0" role="button" aria-label="' + echapper(t('mission.' + m.id + '.nom') + ' · ' + t('missions.echelon', { n: m.echelon })) + '">';
+      g += '<circle cx="' + f1(x) + '" cy="' + f1(y) + '" r="' + f1(Math.max(rp + 6, 20)) + '" fill="transparent"/>';
+      if (e1 === 'ouverte') g += '<circle class="cp-pouls" cx="' + f1(x) + '" cy="' + f1(y) + '" r="' + f1(rp + 4) + '" fill="none" stroke="#b9573a" stroke-width="2"/>';
+      g += '<circle cx="' + f1(x) + '" cy="' + f1(y) + '" r="' + f1(rp) + '" fill="' + fond + '" stroke="' + bord + '" stroke-width="2"/>';
+      g += '<text x="' + f1(x) + '" y="' + f1(y + rp * 0.42) + '" text-anchor="middle" font-size="' + f1(rp * 1.15) + '" font-weight="800" fill="' + (e1 === 'fermee' ? '#5e584a' : '#3a2410') + '">' + m.echelon + '</text>';
+      g += '</g>';
+      if (!petit || e1 !== 'fermee') noms += etiquette(q, t('mission.' + m.id + '.nom'), e1 !== 'fermee', e1 === 'fermee' ? '#5e584a' : '#2a2018', e1 === 'gagnee' && !petit ? n : -1);
+    });
+    s += g + noms + '</svg>';
+    vider(boite);
+    var cadre = el('div', { classe: 'cp-cadre' });
+    cadre.style.width = L + 'px'; cadre.style.height = H + 'px';
+    cadre.innerHTML = s;
+    var ouvrir = function (id) {
+      var m = mission(id);
+      AUDIO.demarrer();
+      if (!m || !(m.dispo && missionOuverte(m))) { AUDIO.jouer('refus'); toastEcran(t(m && m.dispo ? 'missions.verrouilleeAide' : 'missions.bientotAide')); return; }
+      AUDIO.jouer('clic');
+      carteCampagneOuverte = null;
+      ecranBriefing(m);
+    };
+    cadre.querySelectorAll('.cp-ville').forEach(function (v) {
+      v.addEventListener('click', function () { ouvrir(v.getAttribute('data-mission')); });
+      v.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ouvrir(v.getAttribute('data-mission')); } });
+    });
+    boite.appendChild(cadre);
+  }
+  window.addEventListener('resize', function () { if (carteCampagneOuverte) setTimeout(function () { dessinerCarteCampagne(carteCampagneOuverte); }, 60); });
+
+  // Liste des missions (l'ancien écran), à un bouton de la carte.
+  function ecranListeMissions() {
+    carteCampagneOuverte = null;
     var carte = el('div', { classe: 'carte-ecran' });
     carte.appendChild(el('h1', { texte: t('missions.titre') }));
     carte.appendChild(el('p', { texte: t('missions.bilan', { rang: rangTexte(), n: totalEtoiles(), max: MAX_ETOILES }) }));
@@ -1644,12 +1789,10 @@
     });
     carte.appendChild(grille);
     carte.appendChild(el('div', { classe: 'boutons' }, [
-      bouton(t('libre.bouton'), function () { ecranLibre(); }, 'gros non'),
-      bouton(t('missions.charger'), function () { ecranSauvegardes('charger', ecranMissions); }, 'gros non'),
-      bouton(t('aide.titre'), function () { ecranAide(ecranMissions); }, 'gros non'),
-      bouton(t('ui.retour'), ecranTitre, 'gros non')
+      bouton(t('missions.carte'), ecranMissions, 'gros or'),
+      bouton(t('ui.retour'), ecranMissions, 'gros non')
     ]));
-    ouvrirEcran(carte, { retour: ecranTitre });
+    ouvrirEcran(carte, { retour: ecranMissions });
   }
 
   // Construction libre (section 17.6) : tous les bâtiments, sans objectif, sur la carte d'une
@@ -1730,7 +1873,7 @@
       { cle: estTactile ? 'geste.zoomTactile' : 'geste.zoomSouris', classe: 'g2', doigts: 2 },
       { cle: estTactile ? 'geste.construireTactile' : 'geste.construireSouris', classe: 'g3', doigts: 1, route: true }
     ];
-    if (n >= GESTES.length) { prog.options.geste = true; sauverProg(); fermerEcran(); return; }
+    if (n >= GESTES.length) { prog.options.geste = true; sauverProg(); fermerEcran(); if (partie) presenterNouveaux(partie.m); return; }
     var g = GESTES[n], demo = el('div', { classe: 'geste ' + g.classe });
     if (g.route) demo.appendChild(el('div', { classe: 'route' }));
     demo.appendChild(el('div', { classe: 'doigt' + (g.doigts === 2 ? ' a' : '') }));
@@ -1808,6 +1951,148 @@
     return null;
   }
   function niveauRisque(v) { return t(!(v > 0) ? 'aide.aucun' : v >= 0.8 ? 'aide.eleve' : v >= 0.4 ? 'aide.moyen' : 'aide.faible'); }
+  // --- Tutoriels des bâtiments (retour du propriétaire du 26 novembre 2026, cahier 23.16) ----
+  // Dans la campagne, chaque bâtiment jamais lu porte la marque « Nouveau » dans le menu ; le
+  // toucher ouvre d'abord sa fiche : à quoi il sert (texte du bâtiment) et ce qu'il faut faire
+  // (étapes tirées de ses données : où le poser, route, employés, ce qu'il lui faut, ce qu'il
+  // produit et pour qui), avec « Le construire ». Au début d'une mission, un écran présente
+  // les nouveaux bâtiments. Ostie a son propre tutoriel pas à pas : ses bâtiments comptent
+  // comme lus. Les fiches lues sont gardées dans la progression (prog.vus).
+  var BASIQUES = { logement: 1, deblayer: 1, route: 1 };
+  function tutoActif() { return !!partie && !partie.e.libre && !partie.e.province && !partie.figee; }
+  function estNouveau(k) { return tutoActif() && !BASIQUES[k] && !(prog.vus && prog.vus[k]); }
+  function marquerVu(k) { prog.vus = prog.vus || {}; if (!prog.vus[k]) { prog.vus[k] = 1; sauverProg(); } }
+  function presenterNouveaux(m) {
+    if (!tutoActif()) return;
+    if (m.id === 'ostie') { m.batiments.forEach(marquerVu); return; }
+    // Dans l'ordre du menu de construction (catégories, puis ordre de la mission).
+    var l = m.batiments.filter(estNouveau).sort(function (a, b) { return D.categories.indexOf(D.batiments[a].categorie) - D.categories.indexOf(D.batiments[b].categorie) || m.batiments.indexOf(a) - m.batiments.indexOf(b); });
+    if (!l.length || (ecran.childNodes.length && ecran.dataset.bloque === '1')) return;
+    ecranNouveaux(l);
+  }
+  function ecranNouveaux(l) {
+    var carte = el('div', { classe: 'carte-ecran tuto-bat' });
+    carte.appendChild(el('h1', { texte: t('tutoB.nouveauxTitre') }));
+    carte.appendChild(el('p', { texte: t('tutoB.nouveauxIntro', { n: l.length }) }));
+    var g = el('div', { classe: 'grille-nouveaux' });
+    l.forEach(function (k, i) {
+      var b = el('button', { classe: 'choix' }, [DS.vignette(k, 44), el('span', { classe: 'nom', texte: t('bat.' + k + '.nom') })]);
+      b.addEventListener('click', function () { AUDIO.demarrer(); AUDIO.jouer('clic'); ecranTutoBatiment(l, i); });
+      g.appendChild(b);
+    });
+    carte.appendChild(g);
+    carte.appendChild(el('p', { classe: 'aide', texte: t('tutoB.menuAide') }));
+    carte.appendChild(el('div', { classe: 'boutons' }, [
+      bouton(t('tutoB.unParUn'), function () { ecranTutoBatiment(l, 0); }, 'gros or'),
+      bouton(t('tutoB.plusTard'), fermerEcran, 'gros non')
+    ]));
+    ouvrirEcran(carte, { retour: fermerEcran });
+  }
+  function ecranTutoBatiment(l, i) {
+    var k = l[i];
+    marquerVu(k);
+    var carte = el('div', { classe: 'carte-ecran tuto-bat' });
+    carte.appendChild(el('div', { classe: 'num', texte: l.length > 1 ? t('tutoB.titreN', { i: i + 1, n: l.length }) : t('tutoB.titre') }));
+    carte.appendChild(el('div', { classe: 'tuto-tete' }, [DS.vignette(k, 64), el('h1', { texte: t('bat.' + k + '.nom') })]));
+    carte.appendChild(el('h2', { texte: t('tutoB.sert') }));
+    carte.appendChild(el('p', { texte: t('bat.' + k + '.aide') }));
+    carte.appendChild(el('h2', { texte: t('tutoB.faire') }));
+    var ol = el('ol', { classe: 'tuto-etapes' });
+    etapesBatiment(k).forEach(function (x) { ol.appendChild(el('li', { texte: x })); });
+    carte.appendChild(ol);
+    var b = [];
+    if (partie && permet(k) && partie.e.debloques.indexOf(k) >= 0) b.push(bouton(t('tutoB.construire'), function () { fermerEcran(); choisirOutil(k); }, 'gros or'));
+    if (i + 1 < l.length) b.push(bouton(t('tutoB.suivant'), function () { ecranTutoBatiment(l, i + 1); }, 'gros oui'));
+    b.push(bouton(t(i + 1 < l.length ? 'tutoB.plusTard' : 'tutoB.compris'), function () { fermerEcran(); construireMenu(); }, 'gros non'));
+    carte.appendChild(el('div', { classe: 'boutons' }, b));
+    ouvrirEcran(carte, { retour: function () { fermerEcran(); construireMenu(); } });
+  }
+  // Étapes « Ce qu'il faut faire », tirées des données du bâtiment.
+  function etapesBatiment(k) {
+    var d = D.batiments[k], l = [], B = D.batiments;
+    var nomB = function (b) { return t('bat.' + b + '.nom'); }, bien = function (g) { return enPhrase(t('bien.' + g)); };
+    // Bâtiment de la mission d'abord (sinon le premier des données) qui répond au critère.
+    var trouver = function (f) { var ids = Object.keys(B).filter(function (b) { return f(B[b]); }); var p = partie ? ids.filter(permet) : []; return (p.length ? p : ids)[0] || null; };
+    var route = function () { if (!d.sansRoute && !d.trace) l.push(t('tutoB.route')); };
+    var employes = function () { if (d.effectif) l.push(t('tutoB.employes', { n: d.effectif })); };
+    var atelierPour = function (g) { return trouver(function (x) { return x.genre === 'atelier' && x.matiere === g; }); };
+    switch (d.genre) {
+      case 'ferme': {
+        l.push(t('tutoB.prairie')); route(); employes();
+        var at = atelierPour(d.produit);
+        if (D.aliments.indexOf(d.produit) >= 0 || !at) l.push(t('tutoB.fermeAliment', { bien: bien(d.produit) }));
+        else l.push(t('tutoB.fermeMatiere', { bien: bien(d.produit), atelier: nomB(at), produit: bien(B[at].produit) }));
+        break;
+      }
+      case 'peche': l.push(t('tutoB.peche')); route(); employes(); l.push(t('tutoB.pecheGrenier')); break;
+      case 'extraction': {
+        if (d.pres) l.push(t('tutoB.pres.' + d.pres));
+        route(); employes();
+        l.push(t('tutoB.extraction', { bien: bien(d.produit), n: d.chargesParAn || 0 }));
+        var at2 = atelierPour(d.produit);
+        l.push(at2 ? t('tutoB.versAtelier', { atelier: nomB(at2), bien: bien(d.produit), produit: bien(B[at2].produit) }) : t('tutoB.vendre'));
+        break;
+      }
+      case 'atelier': {
+        route(); employes();
+        var src = trouver(function (x) { return x.produit === d.matiere && (x.genre === 'extraction' || x.genre === 'ferme'); });
+        l.push(src && (!partie || permet(src)) ? t('tutoB.atelier', { matiere: bien(d.matiere), produit: bien(d.produit), source: nomB(src) }) : t('tutoB.atelierImport', { matiere: bien(d.matiere), produit: bien(d.produit) }));
+        l.push(t('tutoB.entrepotAtelier'));
+        break;
+      }
+      case 'entrepot': route(); employes(); l.push(t('tutoB.entrepot1'), t('tutoB.entrepot2')); break;
+      case 'grenier': route(); employes(); l.push(t('tutoB.grenier')); break;
+      case 'marche': route(); employes(); l.push(t('tutoB.marche1'), t('tutoB.marche2')); break;
+      case 'service': {
+        route(); employes();
+        l.push(t('tutoB.service', { marcheur: enPhrase(t('marcheur.' + d.marcheur)) }));
+        var svc = D.marcheurs[d.marcheur].service;
+        if (svc === 'prefet') l.push(t('tutoB.prefet'));
+        else if (svc === 'ingenieur') l.push(t('tutoB.ingenieur'));
+        else if (svc === 'impot') l.push(t('tutoB.impot'));
+        else if (svc === 'religion') l.push(t('tutoB.religion', { dieu: t('dieu.' + d.dieu) }));
+        else if (d.categorie === 'education') l.push(t('tutoB.education'));
+        else if (d.categorie === 'sante') l.push(t('tutoB.sante'));
+        if (d.marbre) l.push(t('tutoB.marbre', { n: d.marbre }));
+        if (d.eauRequise) l.push(t('tutoB.eau'));
+        if (d.unique) l.push(t('tutoB.unique'));
+        l.push(t('tutoB.calque'));
+        break;
+      }
+      case 'spectacle': {
+        route(); employes();
+        var ecoles = (d.artistes || []).map(function (a) { return trouver(function (x) { return x.genre === 'ecole_art' && x.forme === a; }); }).filter(Boolean).map(nomB);
+        l.push(t('tutoB.spectacle', { ecoles: ecoles.join(' », « '), marcheur: enPhrase(t('marcheur.' + d.marcheur)) }));
+        if (d.unique) l.push(t('tutoB.unique'));
+        break;
+      }
+      case 'ecole_art': {
+        route(); employes();
+        var lieux = Object.keys(B).filter(function (b) { return B[b].genre === 'spectacle' && (B[b].artistes || []).indexOf(d.forme) >= 0 && (!partie || permet(b)); }).map(nomB);
+        l.push(t('tutoB.ecoleArt', { artiste: enPhrase(t('marcheur.' + d.forme)), lieux: lieux.join(' », « ') }));
+        break;
+      }
+      case 'puits': l.push(t('tutoB.puits')); break;
+      case 'fontaine': l.push(t('tutoB.fontaine')); employes(); break;
+      case 'reservoir': l.push(t('tutoB.reservoir1'), t('tutoB.reservoir2')); break;
+      case 'aqueduc': l.push(t('tutoB.aqueduc')); break;
+      case 'deco': l.push(t('tutoB.deco')); break;
+      case 'place': l.push(t('tutoB.place'), t('tutoB.deco')); break;
+      case 'barriere': l.push(t('tutoB.barriere')); break;
+      case 'residence': l.push(t('tutoB.residence')); break;
+      case 'oracle': l.push(t('tutoB.oracle'), t('tutoB.marbre', { n: d.marbre || 0 })); break;
+      case 'quai': l.push(t('tutoB.quai1')); route(); employes(); l.push(t('tutoB.quai2')); break;
+      case 'caserne': route(); employes(); l.push(t('tutoB.caserne')); break;
+      case 'academie_militaire': route(); employes(); l.push(t('tutoB.academieMil')); break;
+      case 'fort': l.push(t('tutoB.fort', { unite: enPhrase(t('unite.' + d.unite)) })); route(); break;
+      case 'tour': l.push(t('tutoB.tour')); employes(); break;
+      case 'muraille': l.push(t('tutoB.muraille')); break;
+      case 'porte': l.push(t('tutoB.porte')); break;
+      default: route(); employes(); break;
+    }
+    return l;
+  }
+
   function remplirFicheBatiment(p, id) {
     var d = D.batiments[id];
     p.appendChild(el('h2', { texte: t('bat.' + id + '.nom') }));

@@ -1214,10 +1214,10 @@
     var o = w.o ? e._index.get(w.o) : null;
     if (o) {
       var d = def(o);
-      if (o.m === w.id) { o.m = 0; o.cpt = Math.ceil(D.regles.delaiMarcheurJours / Math.max(0.2, taux(o) || 0.2)); }
+      if (o.m === w.id) { o.m = 0; o.cpt = Math.ceil(D.regles.delaiMarcheurJours * (w.rien ? D.regles.guidage.attenteSansBesoin : 1) / Math.max(0.2, taux(o) || 0.2)); }
       if (o.m2 === w.id) o.m2 = 0;
       if (o.mA === w.id) o.mA = 0;
-      if (o.mV === w.id) { o.mV = 0; o.cptV = D.regles.delaiMarcheurJours; }
+      if (o.mV === w.id) { o.mV = 0; o.cptV = D.regles.delaiMarcheurJours * (w.rien ? D.regles.guidage.attenteSansBesoin : 1); }
       if (o.mc === w.id) o.mc = 0;
       if (o.mb === w.id) o.mb = 0;
       if (d.genre === 'spectacle' && w.type === d.marcheur) o.m = 0;
@@ -1328,7 +1328,10 @@
         var r2 = suivreChemin(e, w, passableErrant(e));
         if (r2 === true) return;
       }
-      var c = choisirCibleErrant(e, w, o, w.portee - w.pas);
+      // Préfet en patrouille sans cible : il ne cherche de nouveau qu'après quelques pas.
+      var c = w.rc > 0 ? null : choisirCibleErrant(e, w, o, w.portee - w.pas);
+      if (w.rc > 0) w.rc--;
+      else if (!c) w.rc = D.regles.guidage.pasSansCible;
       if (c) {
         w.cible = c.id; w.ch = c.chemin; w.k = 0;
         (w.sv || (w.sv = [])).push(c.id);
@@ -1336,8 +1339,9 @@
         if (suivreChemin(e, w, passableErrant(e)) === true) return;
       }
       w.cible = 0; w.ch = null;
-      // Rien à faire à portée : il rentre ; le préfet, lui, patrouille (il court aux incendies).
-      if (D.marcheurs[w.type].service !== 'prefet') w.pas = w.portee;
+      // Rien à faire à portée : il rentre (et le suivant attend plus longtemps) ; le préfet,
+      // lui, patrouille (il court aux incendies).
+      if (D.marcheurs[w.type].service !== 'prefet') { w.pas = w.portee; w.rien = 1; }
     }
     if (w.pas >= w.portee) {
       w.retour = 1;
@@ -1402,11 +1406,11 @@
   function besoinErrant(e, svc, o, b) {
     var G = D.regles.guidage, J = D.regles.serviceJours, u = 0;
     if (svc === 'prefet' || svc === 'ingenieur') {
-      var tx = tauxRisques(b);
+      // Le compteur ne monte que pour un bâtiment qui a un risque : pas besoin de son taux.
       if (svc === 'prefet') {
-        if (tx.feu > 0) u = b.feu / (D.regles.feu.seuil * 100);
-        if (estMaison(b) && b.hab > 0) u = Math.max(u, (b.crime || 0) / 100);
-      } else if (tx.dom > 0) u = b.dom / (D.regles.effondrement.seuil * 100);
+        if (b.feu > 0) u = b.feu / (D.regles.feu.seuil * 100);
+        if (b.crime > 0 && b.hab > 0) u = Math.max(u, b.crime / 100);
+      } else if (b.dom > 0) u = b.dom / (D.regles.effondrement.seuil * 100);
       return u >= G.seuilRisque ? u : 0;
     }
     if (!estMaison(b) || !(b.hab > 0)) return 0;
@@ -1419,8 +1423,28 @@
     }
     return u >= G.seuil ? u : 0;
   }
-  // Cases déjà regardées pendant un choix de cible (réutilisées d'un choix à l'autre).
-  var CASES = null;
+  // Bâtiments à portée de service (2 cases) d'une case de route, gardés tant que la carte ne
+  // change pas (version e._v) : le choix d'une cible ne relit pas 25 cases par case parcourue.
+  var AUTOUR = { e: null, v: -1, l: null };
+  function batimentsAutour(e, i) {
+    var v = e._v || 0;
+    if (AUTOUR.e !== e || AUTOUR.v !== v) AUTOUR = { e: e, v: v, l: new Map() };
+    var l = AUTOUR.l.get(i);
+    if (l) return l;
+    l = [];
+    var N = e.N, r = D.regles.serviceRayon, cx = i % N, cy = (i - cx) / N;
+    for (var y = cy - r; y <= cy + r; y++) {
+      if (y < 0 || y >= N) continue;
+      for (var x = cx - r; x <= cx + r; x++) {
+        if (x < 0 || x >= N) continue;
+        var id = e.bat[y * N + x];
+        if (id && l.indexOf(id) < 0) l.push(id);
+      }
+    }
+    AUTOUR.l.set(i, l);
+    return l;
+  }
+  var VUS_CIBLE = new Map();
   function choisirCibleErrant(e, w, o, R) {
     if (R <= 0) return null;
     var svc = D.marcheurs[w.type].service, cle = cleErrant(w, o), G = D.regles.guidage, N = e.N, r = D.regles.serviceRayon;
@@ -1430,24 +1454,21 @@
       if (w2 !== w && !w2.fin && w2.cible && w2.type === w.type && w2.cle === cle) pris[w2.cible] = 1;
     }
     w.cle = cle;
-    if (!CASES || CASES.n !== N * N) CASES = { n: N * N, vu: new Uint32Array(N * N), gen: 0 };
-    CASES.gen++;
-    if (CASES.gen >= 0xfffffff0) { CASES.vu.fill(0); CASES.gen = 1; }
     var B = tampons(N * N), pe = passableErrant(e), i0 = ix(e, w.x, w.y), tete = 0, queue = 0;
     B.vu[i0] = B.gen; B.prev[i0] = -1; B.dist[i0] = 0; B.file[queue++] = i0;
-    // Les cases autour du marcheur viennent d'être servies : elles ne comptent pas.
-    for (y = w.y - r; y <= w.y + r; y++) for (x = w.x - r; x <= w.x + r; x++) if (dedans(e, x, y)) CASES.vu[y * N + x] = CASES.gen;
-    var vus = {}, meilleur = -1, mid = 0, ms = 0;
+    // Les bâtiments autour du marcheur viennent d'être servis : ils ne comptent pas.
+    var vus = VUS_CIBLE, meilleur = -1, mid = 0, ms = 0, l0 = batimentsAutour(e, i0);
+    vus.clear();
+    for (k = 0; k < l0.length; k++) vus.set(l0[k], 1);
     while (tete < queue) {
       var i = B.file[tete++], d = B.dist[i], cx = i % N, cy = (i - cx) / N;
-      for (y = cy - r; y <= cy + r; y++) for (x = cx - r; x <= cx + r; x++) {
-        if (!dedans(e, x, y)) continue;
-        var j = y * N + x;
-        if (CASES.vu[j] === CASES.gen) continue;
-        CASES.vu[j] = CASES.gen;
-        var id = e.bat[j];
-        if (!id || vus[id] || pris[id] || (w.sv && w.sv.indexOf(id) >= 0)) continue;
-        vus[id] = 1;
+      // Une cible trouvée tout près suffit : la recherche ne s'étend pas plus loin (le plus proche d'abord).
+      if (meilleur >= 0 && d > G.rayonProche) break;
+      var la = batimentsAutour(e, i);
+      for (var n = 0; n < la.length; n++) {
+        var id = la[n];
+        if (vus.has(id) || pris[id] || (w.sv && w.sv.indexOf(id) >= 0)) continue;
+        vus.set(id, 1);
         var b = e._index.get(id);
         if (!b) continue;
         var u = besoinErrant(e, svc, o, b);

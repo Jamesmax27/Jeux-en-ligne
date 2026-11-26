@@ -1580,6 +1580,27 @@ section('Lot 5 : campagne complète, les 10 cartes des échelons 6 à 10');
 }
 
 // --------------------------------------------------------------------------
+section('Tutoriels des bâtiments et carte de la campagne (cahier 23.16)');
+{
+  // L'interface est dans le jeu assemblé (ou dans les sources) : on y lit les genres traités.
+  const ui = depuisSources ? await readFile(path.join(SOURCES, 'interface.js'), 'utf8') : await readFile(JEU, 'utf8');
+  const corps = ui.slice(ui.indexOf('function etapesBatiment('), ui.indexOf('function remplirFicheBatiment('));
+  const traites = new Set([...corps.matchAll(/case '([a-z_]+)'/g)].map((m) => m[1]));
+  const sansFiche = new Set(['maison', 'outil', 'route', 'ruines', 'incendie']);
+  const genres = new Set(Object.values(D.batiments).map((b) => b.genre).filter((g) => !sansFiche.has(g)));
+  const manquants = [...genres].filter((g) => !traites.has(g));
+  ok(!manquants.length, `tutoriels : chaque genre de bâtiment a ses étapes « Ce qu'il faut faire » (${manquants.join(', ') || 'tous'})`);
+  const cles = new Set([...corps.matchAll(/t\('(tutoB\.[A-Za-z.]+)'/g)].map((m) => m[1]));
+  const fr = JSON.parse(await readFile(path.join(SOURCES, 'textes', 'fr.json'), 'utf8')).textes;
+  const absentes = [...cles].filter((k) => !(k in fr) && !k.endsWith('.'));
+  ok(!absentes.length, `tutoriels : ${cles.size} textes d'étapes présents (${absentes.join(', ') || 'aucun manquant'})`);
+  // Chaque mission de la campagne a sa place sur la carte de l'Europe.
+  const places = ui.slice(ui.indexOf('var POS_MISSIONS'), ui.indexOf('var ROME_CAMPAGNE'));
+  const sansPlace = D.missions.filter((m) => !new RegExp(`\\b${m.id}: \\[`).test(places)).map((m) => m.id);
+  ok(!sansPlace.length, `carte de la campagne : les ${D.missions.length} missions placées (${sansPlace.join(', ') || 'toutes'})`);
+}
+
+// --------------------------------------------------------------------------
 section('Lot 6 : cités voisines, comptoir de province (sections 16.7 et 23.15)');
 {
   // Deux villes de la Campanie commercent par le vrai comptoir (multijoueur/src/province.js),
