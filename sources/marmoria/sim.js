@@ -1322,6 +1322,23 @@
       return;
     }
     w.pas++;
+    if (w.pas < w.portee) {
+      // Errant guidé : il suit son chemin vers la cible choisie, puis en choisit une autre.
+      if (w.ch && w.k < w.ch.length) {
+        var r2 = suivreChemin(e, w, passableErrant(e));
+        if (r2 === true) return;
+      }
+      var c = choisirCibleErrant(e, w, o, w.portee - w.pas);
+      if (c) {
+        w.cible = c.id; w.ch = c.chemin; w.k = 0;
+        (w.sv || (w.sv = [])).push(c.id);
+        if (w.sv.length > D.regles.guidage.memoire) w.sv.shift();
+        if (suivreChemin(e, w, passableErrant(e)) === true) return;
+      }
+      w.cible = 0; w.ch = null;
+      // Rien à faire à portée : il rentre ; le préfet, lui, patrouille (il court aux incendies).
+      if (D.marcheurs[w.type].service !== 'prefet') w.pas = w.portee;
+    }
     if (w.pas >= w.portee) {
       w.retour = 1;
       if (acces(e, o).indexOf(i) >= 0) { finir(e, w); return; }
@@ -1330,7 +1347,7 @@
       w.ch = pr.chemin; w.k = 0; suivreChemin(e, w, passableErrant(e));
       return;
     }
-    // Intersection : direction au hasard, sans demi-tour sauf en impasse.
+    // Patrouille du préfet sans cible : direction au hasard, sans demi-tour sauf en impasse.
     var opts = [], x = w.x, y = w.y, pe = passableErrant(e);
     var vs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
     for (var k = 0; k < 4; k++) {
@@ -1352,6 +1369,110 @@
     return function (i) { return l.indexOf(i) >= 0; };
   }
 
+  // --- Errants guidés (retour du propriétaire du 26 novembre 2026, cahier 23.16) -------
+  // À chaque étape, l'errant cherche, dans ses pas restants, le bâtiment qui a le plus besoin
+  // de son service (compteur de service bas, risque d'incendie, dommages, impôts dus), le plus
+  // proche à besoin égal, et y va par le plus court chemin en servant au passage. Une zone sans
+  // besoin n'est plus parcourue. Un bâtiment déjà visé par un autre marcheur du même service
+  // est laissé à celui-ci ; le marcheur ne revise pas un bâtiment visé pendant sa tournée.
+  // Tout est déterministe : parcours en largeur dans l'ordre nord, est, sud, ouest.
+  function cleErrant(w, o) {
+    var svc = D.marcheurs[w.type].service;
+    if (svc === 'religion') return 'religion:' + (o ? def(o).dieu : '');
+    if (svc === 'spectacle') return 'spectacle:' + (o ? o.type : '');
+    return svc;
+  }
+  // Besoin de la maison en nourriture et en biens que le marché peut lui donner (0 à 1). Sans
+  // stock, un bien voulu compte à moitié tant que la demande n'a pas été relevée récemment.
+  function besoinVente(h, m) {
+    var M = D.regles.maison, conso = consoMois(h), u = 0, viv = 0, stock = false, J = D.regles.serviceJours;
+    D.aliments.forEach(function (a) { viv += h.viv[a] || 0; if (m.stocks[a] > 0) stock = true; });
+    if (stock && conso) u = 1 - viv / (M.reserveMois * conso);
+    var veut = biensVoulus(h), rb = reserveBien(h);
+    for (var k = 0; k < veut.length; k++) {
+      var g = veut[k];
+      if (m.interdits[g]) continue;
+      var manque = 1 - (h.viv[g] || 0) / rb;
+      if (m.stocks[g] > 0) u = Math.max(u, manque);
+      else if (!(m.dem[g] > J / 2)) u = Math.max(u, manque / 2);
+    }
+    return u;
+  }
+  // Besoin d'un bâtiment pour ce service (0 : rien à faire).
+  function besoinErrant(e, svc, o, b) {
+    var G = D.regles.guidage, J = D.regles.serviceJours, u = 0;
+    if (svc === 'prefet' || svc === 'ingenieur') {
+      var tx = tauxRisques(b);
+      if (svc === 'prefet') {
+        if (tx.feu > 0) u = b.feu / (D.regles.feu.seuil * 100);
+        if (estMaison(b) && b.hab > 0) u = Math.max(u, (b.crime || 0) / 100);
+      } else if (tx.dom > 0) u = b.dom / (D.regles.effondrement.seuil * 100);
+      return u >= G.seuilRisque ? u : 0;
+    }
+    if (!estMaison(b) || !(b.hab > 0)) return 0;
+    switch (svc) {
+      case 'impot': u = Math.max(1 - (b.svc.impot || 0) / J, Math.min(1, (b.dm || 0) / G.moisImpot)); break;
+      case 'religion': u = 1 - (b.svc['dieu_' + def(o).dieu] || 0) / J; break;
+      case 'spectacle': u = 1 - (b.svc[o.type] || 0) / J; break;
+      case 'vente': u = besoinVente(b, o); break;
+      default: u = 1 - (b.svc[svc] || 0) / J; break;
+    }
+    return u >= G.seuil ? u : 0;
+  }
+  // Cases déjà regardées pendant un choix de cible (réutilisées d'un choix à l'autre).
+  var CASES = null;
+  function choisirCibleErrant(e, w, o, R) {
+    if (R <= 0) return null;
+    var svc = D.marcheurs[w.type].service, cle = cleErrant(w, o), G = D.regles.guidage, N = e.N, r = D.regles.serviceRayon;
+    var pris = {}, k, x, y;
+    for (k = 0; k < e.marcheurs.length; k++) {
+      var w2 = e.marcheurs[k];
+      if (w2 !== w && !w2.fin && w2.cible && w2.type === w.type && w2.cle === cle) pris[w2.cible] = 1;
+    }
+    w.cle = cle;
+    if (!CASES || CASES.n !== N * N) CASES = { n: N * N, vu: new Uint32Array(N * N), gen: 0 };
+    CASES.gen++;
+    if (CASES.gen >= 0xfffffff0) { CASES.vu.fill(0); CASES.gen = 1; }
+    var B = tampons(N * N), pe = passableErrant(e), i0 = ix(e, w.x, w.y), tete = 0, queue = 0;
+    B.vu[i0] = B.gen; B.prev[i0] = -1; B.dist[i0] = 0; B.file[queue++] = i0;
+    // Les cases autour du marcheur viennent d'être servies : elles ne comptent pas.
+    for (y = w.y - r; y <= w.y + r; y++) for (x = w.x - r; x <= w.x + r; x++) if (dedans(e, x, y)) CASES.vu[y * N + x] = CASES.gen;
+    var vus = {}, meilleur = -1, mid = 0, ms = 0;
+    while (tete < queue) {
+      var i = B.file[tete++], d = B.dist[i], cx = i % N, cy = (i - cx) / N;
+      for (y = cy - r; y <= cy + r; y++) for (x = cx - r; x <= cx + r; x++) {
+        if (!dedans(e, x, y)) continue;
+        var j = y * N + x;
+        if (CASES.vu[j] === CASES.gen) continue;
+        CASES.vu[j] = CASES.gen;
+        var id = e.bat[j];
+        if (!id || vus[id] || pris[id] || (w.sv && w.sv.indexOf(id) >= 0)) continue;
+        vus[id] = 1;
+        var b = e._index.get(id);
+        if (!b) continue;
+        var u = besoinErrant(e, svc, o, b);
+        if (u <= 0) continue;
+        var sc = u * (1 - G.poidsDistance * d / (R + 1));
+        if (sc > ms) { ms = sc; meilleur = i; mid = id; }
+      }
+      if (d >= R) continue;
+      for (k = 0; k < 4; k++) {
+        var v;
+        if (k === 0) { if (cy === 0) continue; v = i - N; }
+        else if (k === 1) { if (cx === N - 1) continue; v = i + 1; }
+        else if (k === 2) { if (cy === N - 1) continue; v = i + N; }
+        else { if (cx === 0) continue; v = i - 1; }
+        if (B.vu[v] === B.gen || !pe(v)) continue;
+        B.vu[v] = B.gen; B.prev[v] = i; B.dist[v] = d + 1; B.file[queue++] = v;
+      }
+    }
+    if (meilleur < 0) return null;
+    var ch = [], q = meilleur;
+    while (B.prev[q] !== -1) { ch.push(q); q = B.prev[q]; }
+    ch.reverse();
+    return { id: mid, chemin: ch };
+  }
+
   // Service rendu à chaque case parcourue : bâtiments à 2 cases ou moins.
   var VUS = [];
   function servir(e, w) {
@@ -1370,7 +1491,7 @@
       switch (svc) {
         case 'prefet': b.feu = 0; if (estMaison(b)) b.crime = Math.max(0, (b.crime || 0) - D.regles.crime.prefet); break;
         case 'ingenieur': b.dom = 0; break;
-        case 'impot': if (estMaison(b) && b.hab > 0) b.svc.impot = jours; break;
+        case 'impot': if (estMaison(b) && b.hab > 0) { b.svc.impot = jours; percevoir(e, b); } break;
         case 'religion': if (estMaison(b) && b.hab > 0) b.svc['dieu_' + def(o).dieu] = jours; break;
         case 'spectacle': if (estMaison(b) && b.hab > 0) { b.svc[o.type] = jours; b.pts[o.type] = pointsSpectacle(o); } break;
         case 'vente': if (estMaison(b) && b.hab > 0) vendre(e, o, b); break;
@@ -1944,7 +2065,7 @@
     var M = D.regles.maison;
     for (var k in h.svc) if (h.svc[k] > 0) h.svc[k]--;
     if (h.quar > 0) h.quar--;
-    if (h.hab <= 0) { h.ok = 0; h.manque = 0; h.bloque = 0; return; }
+    if (h.hab <= 0) { h.ok = 0; h.manque = 0; h.bloque = 0; h.du = 0; h.dm = 0; return; }
     // Sans route proche : la maison se vide en un mois.
     if (!routeProche(e, h, D.regles.logementDistanceRoute)) {
       h.sansRoute++;
@@ -2024,6 +2145,7 @@
           h.hab += b.hab;
           for (var g in b.viv) h.viv[g] = (h.viv[g] || 0) + b.viv[g];
           for (var s2 in b.svc) h.svc[s2] = Math.max(h.svc[s2] || 0, b.svc[s2]);
+          if (b.du > 0) { h.du = (h.du || 0) + b.du; h.dm = Math.max(h.dm || 0, b.dm || 0); }
           for (var p2 in b.pts) if (!(h.pts[p2] >= b.pts[p2])) h.pts[p2] = b.pts[p2];
         }
         retirerBatiment(e, b, true);
@@ -2386,19 +2508,38 @@
 
   function groupeDe(h) { return h.niv > 0 ? niveauDef(h).groupe : null; }
 
+  // Impôt d'un mois d'une maison au taux en vigueur (section 11.2).
+  function impotMois(e, h) { return h.hab * niveauDef(h).impot * e.impot / D.regles.impot.diviseur / D.temps.moisParAn; }
+
+  // Chaque mois (retour du propriétaire du 26 novembre 2026, cahier 23.16) : une maison occupée
+  // ajoute l'impôt du mois à ses arriérés (h.du, en deniers ; h.dm, en mois), au plus
+  // I.arrieresMois mois ; c'est le percepteur qui les prélève en passant (percevoir).
   function finances(e) {
-    var I = D.regles.impot, S = D.regles.salaire, total = 0;
+    var I = D.regles.impot, S = D.regles.salaire;
     e.batiments.forEach(function (h) {
-      if (!estMaison(h) || h.hab <= 0 || !(h.svc.impot > 0)) return;
-      total += h.hab * niveauDef(h).impot * e.impot / I.diviseur / D.temps.moisParAn;
+      if (!estMaison(h) || h.hab <= 0) return;
+      var m = impotMois(e, h);
+      h.du = Math.min((h.du || 0) + m, m * I.arrieresMois);
+      h.dm = Math.min(I.arrieresMois, (h.dm || 0) + 1);
     });
     var salaires = e.emplois * e.salaire / S.diviseur;
-    var net = total - salaires + e.reliquat;
+    var net = e.reliquat - salaires;
     var entier = Math.floor(net);
     e.reliquat = net - entier;
     e.tresor += entier;
-    e.finances.an.impots += total;
     e.finances.an.salaires += salaires;
+  }
+  // Passage du percepteur : tous les arriérés de la maison entrent au trésor.
+  function percevoir(e, h) {
+    var du = h.du || 0;
+    h.dm = 0; h.du = 0;
+    if (!(du > 0)) return 0;
+    var net = du + e.reliquat, entier = Math.floor(net);
+    e.reliquat = net - entier;
+    e.tresor += entier;
+    e.finances.an.impots += du;
+    if (e._gains) { e._gains.push({ i: ix(e, h.x, h.y), n: Math.round(du), t: e.tick }); if (e._gains.length > 60) e._gains.shift(); }
+    return du;
   }
 
   function variationHumeur(e) {
@@ -4507,7 +4648,7 @@
     // Outils réservés aux villes d'exemple (affiche, aperçus) et aux tests : jamais appelés par le joueur.
     _outils: {
       creerBatiment: creerBatiment, creerMarcheur: creerMarcheur, emettreErrant: emettreErrant, ix: ix, noter: noter,
-      finances: finances, consommer: consommer, quotidien: quotidien, nouveauMois: nouveauMois, nouveauJour: nouveauJour,
+      finances: finances, percevoir: percevoir, choisirCibleErrant: choisirCibleErrant, besoinErrant: besoinErrant, consommer: consommer, quotidien: quotidien, nouveauMois: nouveauMois, nouveauJour: nouveauJour,
       enflammer: enflammer, immigrer: immigrer, verifierTutoriel: verifierTutoriel, composantes: composantes,
       deposer: deposer, agrandir: agrandir, diviser: diviser, epidemie: epidemie, monter: monter,
       nouvelAn: nouvelAn, moisEmpire: moisEmpire, moisDieux: moisDieux, commerceJour: commerceJour, evenement: evenement,

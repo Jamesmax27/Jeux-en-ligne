@@ -399,6 +399,24 @@
     });
     var bob = Math.sin(temps / 300) * 2 * z;
     for (var n = 0; n < icones.length; n++) this.poser(DS.icone(icones[n][0], zc), icones[n][1], icones[n][2] + bob);
+    // Impôt prélevé par un percepteur (cahier 23.16) : pièce et somme qui montent au-dessus de la maison.
+    if (e._gains && e._gains.length && !this.sansInterface && !this.effetAffiche) {
+      var DUREE = 60;
+      e._gains = e._gains.filter(function (g) { return e.tick - g.t < DUREE && e.tick >= g.t; });
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold ' + Math.round(Math.max(11, 13 * Math.min(1.4, z))) + 'px system-ui, sans-serif';
+      for (var gi = 0; gi < e._gains.length; gi++) {
+        var gn = e._gains[gi], f2 = (e.tick - gn.t) / DUREE, pg = this.versEcran(gn.i % N, (gn.i - gn.i % N) / N);
+        var gx = pg[0], gy = pg[1] - (26 + f2 * 30) * z;
+        ctx.globalAlpha = f2 < 0.7 ? 1 : (1 - f2) / 0.3;
+        ctx.fillStyle = '#f0c040'; ctx.strokeStyle = '#6a4a10'; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(gx - 12 * z, gy, 5 * z, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(40,24,8,0.8)'; ctx.strokeText('+' + gn.n, gx + 6 * z, gy);
+        ctx.fillStyle = '#ffe27a'; ctx.fillText('+' + gn.n, gx + 6 * z, gy);
+      }
+      ctx.restore();
+    }
     if (this.effetAffiche) {
       // Affiche : soleil chaud venu du nord-ouest, bas assombri pour le bandeau du titre.
       var g = ctx.createRadialGradient(W * 0.15, H * 0.05, 0, W * 0.15, H * 0.05, Math.max(W, H) * 0.9);
@@ -410,8 +428,24 @@
     }
   };
 
+  // Calques : les bâtiments qui portent le service du calque restent dessinés tels quels (retour
+  // du propriétaire du 26 novembre 2026, cahier 23.16) : préfectures sur le calque du feu,
+  // greniers, marchés et fermes sur celui de la nourriture, temples sur celui de la religion…
+  var SOURCES_CALQUE = {
+    feu: { m: ['prefet'] }, crime: { m: ['prefet'] }, dommages: { m: ['ingenieur'] }, impots: { m: ['percepteur'] },
+    religion: { c: ['religion'] }, education: { c: ['education'] }, sante: { c: ['sante'] }, divertissement: { c: ['divertissement'] },
+    nourriture: { c: ['alimentation'] }, eau: { c: ['eau'] }, stocks: { g: ['entrepot', 'grenier', 'marche', 'quai'] },
+    attractivite: { g: ['deco', 'place', 'residence'] }
+  };
+  function sourceCalque(calque, d) {
+    var s = SOURCES_CALQUE[calque];
+    if (!s || !d) return false;
+    return (s.m && s.m.indexOf(d.marcheur) >= 0) || (s.c && s.c.indexOf(d.categorie) >= 0) || (s.g && s.g.indexOf(d.genre) >= 0);
+  }
+
   Rendu.prototype.dessinerBatiment = function (b, sx, sy, frame, frame2, calque) {
     var e = this.e, z = this.cam.z, zc = this._zc || resolution(z), d = SIM.donnees().batiments[b.type], s;
+    if (calque && sourceCalque(calque, d)) calque = null;
     if (calque) {
       // Calque : bâtiment aplati, colonne de couverture.
       var coul = COULEUR_CAT[d.categorie] || '#9a9184';

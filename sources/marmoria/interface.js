@@ -136,6 +136,7 @@
     partie = { e: e, m: mission(e.mission) || SIM.mission(e), iv: D.temps.vitesseDepart, acc: 0, figee: !!options.figee, dernierMsg: e.journal[e.journal.length - 1] || null,
       tuto: e.tuto, annee: SIM.date(e).annee, log: [], derniere: 0, finVue: !!(e.victoire || e.defaite) };
     rendu.e = e;
+    e._gains = [];
     rendu.calque = null; rendu.apercu = null; rendu.selection = 0;
     rendu.cam.z = 1;
     centrerVille(e);
@@ -148,6 +149,7 @@
     if (!options.figee && !e.libre && !e.province) prog.niveau = Math.max(prog.niveau, partie.m.numero);
     // Cité d'une province : bouton du panneau, première synchronisation tout de suite.
     $('b-province').hidden = !e.province;
+    $('b-commerce').hidden = !(partie.m.empire && partie.m.empire.cites && partie.m.empire.cites.length);
     provinceSync = { enCours: false, dernier: 0, envoyes: e.province ? e.province.n : 0, signal: null, echecs: 0, reussite: 0 };
     provinceOuvert = false;
     if (!options.figee && !prog.options.geste) ecranGeste(0);
@@ -324,14 +326,33 @@
     categoriesMission().forEach(function (c) {
       var b = el('button', { classe: 'cat', 'data-cat': c, aria: t('cat.' + c), title: t('cat.' + c) });
       b.innerHTML = '<svg viewBox="0 0 24 24">' + ICONES_CAT[c] + '</svg>';
-      b.addEventListener('click', function () { AUDIO.demarrer(); AUDIO.jouer('menu'); ouvrirCategorie(categorieOuverte === c ? null : c); });
+      b.addEventListener('click', function () {
+        AUDIO.demarrer();
+        // Catégorie à un seul choix (zone de logement, déblayer) : l'outil est pris d'un clic,
+        // sans sous-menu ; un second clic le repose (retour du propriétaire, cahier 23.16).
+        var seul = choixUnique(c);
+        if (seul) {
+          if (outil && outil.type === seul) { AUDIO.jouer('menu'); annulerOutil(); ouvrirCategorie(null); return; }
+          if (partie.e.debloques.indexOf(seul) < 0) { AUDIO.jouer('refus'); toast(t('outil.verrouille')); return; }
+          AUDIO.jouer('menu');
+          choisirOutil(seul, true);
+          return;
+        }
+        AUDIO.jouer('menu');
+        ouvrirCategorie(categorieOuverte === c ? null : c);
+      });
       nav.appendChild(b);
     });
     ouvrirCategorie(null);
   }
+  function choixUnique(c) {
+    var l = permis().filter(function (k) { return D.batiments[k].categorie === c; });
+    return l.length === 1 ? l[0] : null;
+  }
   function ouvrirCategorie(c) {
     categorieOuverte = c;
-    document.querySelectorAll('.cat').forEach(function (b) { b.classList.toggle('actif', b.dataset.cat === c); });
+    // Bouton allumé : la catégorie ouverte, ou celle de l'outil à un seul choix tenu en main.
+    document.querySelectorAll('.cat').forEach(function (b) { b.classList.toggle('actif', b.dataset.cat === c || (!c && !!outil && choixUnique(b.dataset.cat) === outil.type)); });
     var sm = $('sous-menu');
     if (!c) { sm.hidden = true; return; }
     vider(sm);
@@ -357,15 +378,16 @@
   // Outil de construction : aperçu vert ou rouge, coût, validation
   // ------------------------------------------------------------------------
   var outil = null; // { type, d, a, b, actif (tracé en cours), attente (mobile : Valider / Annuler) }
-  function choisirOutil(type) {
+  function choisirOutil(type, direct) {
     outil = { type: type, d: D.batiments[type], a: null, b: null, actif: false, attente: false };
     ouvrirCategorie(null);
     fermerPanneau();
     $('valider').hidden = true;
-    toast(t(estTactile ? 'outil.aideTactile' : 'outil.aideSouris', { nom: t('bat.' + type + '.nom') }));
+    if (!direct) toast(t(estTactile ? 'outil.aideTactile' : 'outil.aideSouris', { nom: t('bat.' + type + '.nom') }));
   }
   function annulerOutil() {
     outil = null;
+    document.querySelectorAll('.cat.actif').forEach(function (b) { if (b.dataset.cat !== categorieOuverte) b.classList.remove('actif'); });
     rendu.apercu = null;
     $('valider').hidden = true;
     $('bulle').hidden = true;
@@ -607,6 +629,7 @@
   $('b-son').addEventListener('click', basculerSon);
   $('b-conseil').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirConseil(); });
   $('b-province').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirProvince(); });
+  $('b-commerce').addEventListener('click', function () { AUDIO.jouer('menu'); if (panneauVivant && $('panneau').classList.contains('grand')) fermerPanneau(); else ouvrirCommerce(); });
   $('b-journal').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirJournal(); });
   $('b-calque').addEventListener('click', function () { AUDIO.jouer('menu'); ouvrirCalques(); });
   $('b-ok').addEventListener('click', function () { validerOutil(); });
@@ -629,14 +652,15 @@
   // Panneaux : information, conseiller, journal, calques
   // ------------------------------------------------------------------------
   var panneauVivant = null;
-  function ouvrirPanneau(remplir) {
+  function ouvrirPanneau(remplir, classe) {
     var p = $('panneau');
+    p.classList.toggle('grand', classe === 'grand');
     panneauVivant = function () { var h = p.scrollTop; vider(p); p.appendChild(el('button', { classe: 'ico fermer', aria: t('info.fermer'), clic: fermerPanneau, texte: '✕' })); remplir(p); p.scrollTop = h; };
-    panneauVivant();
     p.hidden = false;
+    panneauVivant();
     ouvrirCategorie(null);
   }
-  function fermerPanneau() { $('panneau').hidden = true; panneauVivant = null; rendu.selection = 0; }
+  function fermerPanneau() { var p = $('panneau'); p.hidden = true; p.classList.remove('grand'); panneauVivant = null; rendu.selection = 0; }
   // « Nom : valeur » selon la typographie de la langue (espace avant les deux-points en français seulement).
   function deuxPoints(a, b) { return t('ui.deuxPoints', { a: a, b: b }); }
   // Nom commun (bien, lieu de culture) au milieu d'une phrase : en minuscules, sauf en allemand.
@@ -796,7 +820,11 @@
     p.appendChild(ligne(t('info.habitants'), t('info.surTotal', { n: h.hab, max: SIM.capacite(h) })));
     var viv = 0; D.aliments.forEach(function (a) { viv += h.viv[a] || 0; });
     p.appendChild(ligne(t('info.reserve'), t('info.mois', { n: inf.conso ? Math.floor(viv * 10 / inf.conso) / 10 : 0 })));
-    if (permet('forum')) p.appendChild(el('p', { classe: h.svc.impot > 0 ? 'ok' : 'ko', texte: t(h.svc.impot > 0 ? 'info.recensee' : 'info.nonRecensee') }));
+    if (permet('forum')) {
+      p.appendChild(el('p', { classe: h.svc.impot > 0 ? 'ok' : 'ko', texte: t(h.svc.impot > 0 ? 'info.recensee' : 'info.nonRecensee') }));
+      // Impôt accumulé depuis le dernier passage du percepteur (cahier 23.16).
+      if (h.dm > 0) p.appendChild(el('p', { classe: 'aide', texte: t('info.impotDu', { d: nb(Math.floor(h.du || 0)), n: h.dm }) }));
+    }
     p.appendChild(ligne(t(inf.attractiviteActive ? 'info.attractivite' : 'info.attractiviteSans'), nb(inf.attractivite)));
     if (inf.biensVoulus.length) p.appendChild(ligne(t('info.biensReserve'), inf.biensVoulus.map(function (g) { return t('bien.' + g) + ' ' + nb(h.viv[g] || 0); }).join(' · ')));
     p.appendChild(el('h3', { texte: t('info.besoinsActuels') }));
@@ -907,6 +935,9 @@
       var poste = function (k) { if (an[k] || prec[k] || k === 'impots' || k === 'salaires') p.appendChild(ligne(t('budget.' + k), t('budget.deuxAns', { a: nb(an[k]), p: nb(prec[k]) }))); };
       p.appendChild(el('div', { classe: 'ligne entete' }, [el('span', { texte: t('conseil.recettes') }), el('span', { texte: t('budget.colonnes') })]));
       ['impots', 'exports', 'voisins', 'secours', 'dons'].forEach(poste);
+      var attente = 0;
+      e.batiments.forEach(function (h) { if (h.type === 'logement' && h.du > 0) attente += h.du; });
+      if (attente >= 1) p.appendChild(el('p', { classe: 'aide', texte: t('conseil.impotsAttente', { n: nb(Math.floor(attente)) }) }));
       p.appendChild(el('h3', { texte: t('conseil.depenses') }));
       ['salaires', 'constructions', 'imports', 'tribut', 'interets', 'fetes', 'gouverneur', 'envois', 'vols'].forEach(poste);
       var solde = SIM.recettes(prec) - SIM.depenses(prec);
@@ -1206,9 +1237,12 @@
   }
   var STATUTS_SUIVANT = { aucun: 'importer', importer: 'exporter', exporter: 'reserver', reserver: 'aucun' };
   var citeChoisie = null;
+  // Onglet du Gouvernement : un bouton ouvre la carte en grand ; les réglages des biens suivent.
   CONSEILLERS.commerce = function (p, e) {
-    carteEmpire(p, e);
-    if (citeChoisie) ficheCite(p, e, citeChoisie);
+    if (partie.m.empire) p.appendChild(el('div', { classe: 'boutons' }, [bouton(t('commerce.ouvrirCarte'), ouvrirCommerce, 'gros or')]));
+    reglagesBiens(p, e);
+  };
+  function reglagesBiens(p, e) {
     p.appendChild(el('h3', { texte: t('commerce.biens') }));
     p.appendChild(el('div', { classe: 'ligne bien entete' }, [el('span', { texte: t('commerce.bien') }), el('span', { texte: t('commerce.statut') })]));
     biensCommerce(e).forEach(function (g) {
@@ -1229,7 +1263,114 @@
       p.appendChild(el('p', { classe: 'aide prix', texte: t('commerce.prix', { i: nb(px.i), x: nb(px.x) }) }));
     });
     p.appendChild(el('p', { classe: 'aide', texte: t('commerce.aide') }));
-  };
+  }
+
+  // --- Grand écran du commerce (retour du propriétaire du 26 novembre 2026, cahier 23.16) -------
+  // Bouton de la barre du haut : la carte de l'Empire en grand. À côté de chaque cité, les biens
+  // qu'elle achète (flèche verte : la ville peut les lui vendre) et ceux qu'elle vend (flèche
+  // bleue : la ville peut les lui acheter) ; à droite, la fiche de la cité touchée (ouverture de
+  // la route, quotas) et les réglages des biens. La carte est dessinée à la taille de l'écran.
+  var URL_BIENS = {}, defilCommerce = 0;
+  function urlBien(g) { return URL_BIENS[g] || (URL_BIENS[g] = DS.imageBien(g, 40).toDataURL()); }
+  function ouvrirCommerce() {
+    if (!partie || !partie.m.empire) return;
+    ouvrirPanneau(function (p) {
+      var e = partie.e;
+      p.appendChild(el('h2', { texte: t('commerce.carte') }));
+      var gauche = el('div', { classe: 'cg-carte' }), droite = el('div', { classe: 'cg-cote' });
+      p.appendChild(el('div', { classe: 'commerce-grand' }, [gauche, droite]));
+      grandeCarteEmpire(gauche, e);
+      var leg = el('p', { classe: 'aide legende-commerce' });
+      leg.innerHTML = '<span class="fl-achete">▲</span> ' + echapper(t('commerce.legendeAchete')) + ' &nbsp; <span class="fl-vend">▼</span> ' + echapper(t('commerce.legendeVend'));
+      droite.appendChild(leg);
+      if (citeChoisie && SIM.citeDe(e, citeChoisie)) ficheCite(droite, e, citeChoisie);
+      else droite.appendChild(el('p', { classe: 'aide', texte: t('commerce.toucheCite') }));
+      reglagesBiens(droite, e);
+      droite.scrollTop = defilCommerce;
+      droite.addEventListener('scroll', function () { defilCommerce = droite.scrollTop; });
+    }, 'grand');
+  }
+  // Biens montrés à côté d'une cité : [achetés par elle, vendus par elle]. Cité d'un joueur de la
+  // province : ce qu'il a mis à son étal (il n'achète que par ses demandes).
+  function biensCite(e, c) {
+    var vj = e.province && c.voisin !== undefined && c.voisin !== null ? e.province.voisins[c.voisin] : null;
+    if (vj && vj.pris && vj.actif) return [[], Object.keys(vj.etal || {}).filter(function (g) { return vj.etal[g] > 0; })];
+    return [Object.keys(c.achete || {}), Object.keys(c.vend || {})];
+  }
+  function grandeCarteEmpire(box, e) {
+    var m = partie.m, em = m.empire, v = em.vue;
+    if (!em) return;
+    var ratio = (v[3] - v[1]) / (v[2] - v[0]) * 1.25;
+    var dw = Math.max(200, box.clientWidth || 300), dh = Math.max(140, box.clientHeight || 220);
+    var L = Math.floor(Math.min(dw, dh / ratio)), H = Math.floor(L * ratio), k = L / 200;
+    var fs = Math.round(Math.max(10, Math.min(15, L / 46))), is = Math.round(Math.max(13, Math.min(24, L / 30)));
+    var X = function (q) { return (q[0] - v[0]) / (v[2] - v[0]) * L; }, Y = function (q) { return (v[3] - q[1]) / (v[3] - v[1]) * H; };
+    var f1 = function (n) { return n.toFixed(1); };
+    var pts = function (l) { return l.map(function (q) { return f1(X(q)) + ',' + f1(Y(q)); }).join(' '); };
+    var s = '<svg viewBox="0 0 ' + L + ' ' + H + '" width="' + L + '" height="' + H + '" class="empire" role="img" aria-label="' + echapper(t('commerce.carte')) + '">';
+    s += '<rect width="' + L + '" height="' + H + '" fill="#d8c79a"/><polygon points="' + pts(MER) + '" fill="#5f97b8" stroke="#3f6f8a" stroke-width="' + f1(0.6 * k) + '"/>';
+    ILES.forEach(function (i) { s += '<polygon points="' + pts(i) + '" fill="#d8c79a" stroke="#3f6f8a" stroke-width="' + f1(0.4 * k) + '"/>'; });
+    var visibles = em.cites.filter(function (c) { var r = e.routes[c.id]; return r && r.v; });
+    visibles.forEach(function (c) {
+      var r = e.routes[c.id], actif = SIM.routeActive(e, c);
+      s += '<line x1="' + f1(X(em.ville)) + '" y1="' + f1(Y(em.ville)) + '" x2="' + f1(X(c.pos)) + '" y2="' + f1(Y(c.pos)) + '" stroke="' + (actif ? '#b8862b' : r.o ? '#9a6a50' : '#7a7262') + '" stroke-width="' + f1((actif ? 2.4 : 1.2) * Math.min(k, 2)) + '"' + (c.route === 'mer' ? ' stroke-dasharray="6 4"' : '') + '/>';
+    });
+    s += armeesEmpire(e, function (q) { return f1(X(q)); }, function (q) { return f1(Y(q)); }, em).replace(/font-size="5.6"/g, 'font-size="' + fs + '"');
+    // Étiquettes : placées une à une, sans se chevaucher quand c'est possible.
+    var pris = [], etiq = '', pointsSvg = '';
+    var largeur = function (txt) { return txt.length * fs * 0.56; };
+    var chevauche = function (a) { var n = 0; pris.forEach(function (b) { var dx = Math.min(a[0] + a[2], b[0] + b[2]) - Math.max(a[0], b[0]), dy = Math.min(a[1] + a[3], b[1] + b[3]) - Math.max(a[1], b[1]); if (dx > 0 && dy > 0) n += dx * dy; }); return n; };
+    var placer = function (px, py, w, h) {
+      var d = 7, cands = [[px + d, py - h / 2], [px - d - w, py - h / 2], [px - w / 2, py - d - h], [px - w / 2, py + d], [px + d, py - h - 2], [px + d, py + 2], [px - d - w, py - h - 2], [px - d - w, py + 2],
+        [px + 3 * d, py - h / 2], [px - 3 * d - w, py - h / 2], [px - w / 2, py - 3 * d - h], [px - w / 2, py + 3 * d]];
+      var meilleur = null, mn = Infinity;
+      cands.forEach(function (c) {
+        var r = [Math.max(2, Math.min(L - w - 2, c[0])), Math.max(2, Math.min(H - h - 2, c[1])), w, h], n = chevauche(r);
+        if (n < mn) { mn = n; meilleur = r; }
+      });
+      pris.push(meilleur);
+      return meilleur;
+    };
+    var point = function (q, rayon, fond, contour) { pris.push([X(q) - rayon, Y(q) - rayon, 2 * rayon, 2 * rayon]); return '<circle cx="' + f1(X(q)) + '" cy="' + f1(Y(q)) + '" r="' + rayon + '" fill="' + fond + '" stroke="' + contour + '" stroke-width="1.5"/>'; };
+    pointsSvg += point(em.rome, 6, '#a8322a', '#f4e8c8') + point(em.ville, 6, '#f0c040', '#5a3a10');
+    visibles.forEach(function (c) { var r = e.routes[c.id]; pointsSvg += '<g data-cite="' + c.id + '" class="cite">' + point(c.pos, citeChoisie === c.id ? 7 : 5.5, r.o ? '#f4e8c8' : '#bdb39a', citeChoisie === c.id ? '#f0c040' : '#4a3a28') + '</g>'; });
+    var nomSimple = function (q, texte, coul) {
+      var w = largeur(texte) + 10, h = fs + 8, r = placer(X(q), Y(q), w, h);
+      return '<g pointer-events="none"><rect x="' + f1(r[0]) + '" y="' + f1(r[1]) + '" width="' + f1(w) + '" height="' + h + '" rx="5" fill="rgba(244,234,208,0.92)" stroke="' + coul + '" stroke-width="1.2"/>' +
+        '<text x="' + f1(r[0] + 5) + '" y="' + f1(r[1] + h / 2 + fs * 0.36) + '" font-size="' + fs + '" font-weight="700" fill="#2a2018">' + echapper(texte) + '</text></g>';
+    };
+    etiq += nomSimple(em.rome, t('cite.rome'), '#a8322a');
+    etiq += nomSimple(em.ville, m.voisinage ? t('cite.' + m.id) : t('mission.' + m.id + '.nom'), '#5a3a10');
+    visibles.forEach(function (c) {
+      var r = e.routes[c.id], bc = biensCite(e, c), nom = nomVoisine(e, c), choisie = citeChoisie === c.id;
+      var lignes = [['achete', bc[0]], ['vend', bc[1]]].filter(function (x) { return x[1].length; });
+      var w = Math.max(largeur(nom), Math.max.apply(null, lignes.map(function (x) { return 12 + x[1].length * (is + 2); }).concat([0]))) + 10;
+      var h = fs + 8 + lignes.length * (is + 3) + (lignes.length ? 2 : 0), b = placer(X(c.pos), Y(c.pos), w, h);
+      var bord = choisie ? '#f0c040' : SIM.routeActive(e, c) ? '#b8862b' : r.o ? '#9a6a50' : '#7a7262';
+      var g = '<g data-cite="' + c.id + '" class="cite" tabindex="0" role="button" aria-label="' + echapper(nom) + '">';
+      // Trait de rappel quand l'étiquette est loin de son point.
+      var cx = Math.max(b[0], Math.min(b[0] + w, X(c.pos))), cy = Math.max(b[1], Math.min(b[1] + h, Y(c.pos)));
+      if (Math.hypot(cx - X(c.pos), cy - Y(c.pos)) > 12) g += '<line x1="' + f1(X(c.pos)) + '" y1="' + f1(Y(c.pos)) + '" x2="' + f1(cx) + '" y2="' + f1(cy) + '" stroke="#4a3a28" stroke-width="1"/>';
+      g += '<rect x="' + f1(b[0]) + '" y="' + f1(b[1]) + '" width="' + f1(w) + '" height="' + f1(h) + '" rx="6" fill="' + (r.o ? 'rgba(255,250,236,0.95)' : 'rgba(236,228,206,0.92)') + '" stroke="' + bord + '" stroke-width="' + (choisie ? 2.6 : 1.4) + '"' + (r.o ? '' : ' stroke-dasharray="4 3"') + '/>';
+      g += '<text x="' + f1(b[0] + 5) + '" y="' + f1(b[1] + fs + 2) + '" font-size="' + fs + '" font-weight="700" fill="#2a2018">' + echapper(nom) + (r.o ? ' ✓' : '') + '</text>';
+      lignes.forEach(function (x, j) {
+        var y0 = b[1] + fs + 6 + j * (is + 3);
+        g += '<text x="' + f1(b[0] + 4) + '" y="' + f1(y0 + is * 0.78) + '" font-size="' + Math.round(is * 0.72) + '" fill="' + (x[0] === 'achete' ? '#2f7a3a' : '#2c5f8f') + '">' + (x[0] === 'achete' ? '▲' : '▼') + '</text>';
+        x[1].forEach(function (gb, n) { g += '<image href="' + urlBien(gb) + '" x="' + f1(b[0] + 14 + n * (is + 2)) + '" y="' + f1(y0) + '" width="' + is + '" height="' + is + '"><title>' + echapper(t('bien.' + gb)) + '</title></image>'; });
+      });
+      etiq += g + '</g>';
+    });
+    s += pointsSvg + etiq + '</svg>';
+    var boite = el('div', { classe: 'carte-empire grande' });
+    boite.style.width = L + 'px'; boite.style.height = H + 'px';
+    boite.innerHTML = s;
+    var choisir = function (id) { AUDIO.jouer('clic'); citeChoisie = id; defilCommerce = 0; if (panneauVivant) panneauVivant(); };
+    boite.querySelectorAll('.cite').forEach(function (g) {
+      g.addEventListener('click', function () { choisir(g.getAttribute('data-cite')); });
+      g.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); choisir(g.getAttribute('data-cite')); } });
+    });
+    box.appendChild(boite);
+  }
   // Carte de l'Empire : la Méditerranée, Rome, la ville, les cités partenaires et leurs routes.
   var MER = [[-5.6, 36.1], [-4.4, 36.7], [-2.1, 36.7], [-1, 37.6], [-0.5, 38.3], [0.2, 38.7], [-0.3, 39.5], [0.9, 40.7], [1.25, 41.1], [2.2, 41.4], [3.3, 42.3], [3.1, 43.1],
     [3.7, 43.4], [4.6, 43.4], [5.4, 43.3], [5.9, 43.1], [7.3, 43.7], [8.9, 44.4], [9.8, 44.1], [10.3, 43.5], [10.5, 42.9], [12.3, 41.7], [13.6, 41.2], [14.3, 40.8], [14.8, 40.6],
@@ -1242,53 +1383,6 @@
   var ILES = [[[12.4, 37.8], [13.4, 38.2], [15.6, 38.3], [15.1, 37], [14.3, 37], [12.6, 37.6]], [[8.4, 39], [8.2, 40.6], [9.2, 41.2], [9.8, 40.5], [9.6, 39.1], [9, 38.9]],
     [[8.6, 41.4], [8.6, 42.4], [9.4, 43], [9.5, 42.1], [9.2, 41.4]], [[2.4, 39.6], [3.2, 39.95], [3.45, 39.7], [3, 39.3], [2.6, 39.4]],
     [[23.5, 35.3], [24.3, 35.6], [26.3, 35.3], [26, 35], [24.7, 35]], [[32.3, 34.7], [33, 35.4], [34.6, 35.7], [34, 34.8], [33, 34.6]]];
-  function carteEmpire(p, e) {
-    var m = partie.m, em = m.empire;
-    if (!em) return;
-    var v = em.vue, L = 200, H = Math.round(L * (v[3] - v[1]) / (v[2] - v[0]) * 1.25);
-    var X = function (q) { return ((q[0] - v[0]) / (v[2] - v[0]) * L).toFixed(1); }, Y = function (q) { return ((v[3] - q[1]) / (v[3] - v[1]) * H).toFixed(1); };
-    var pts = function (l) { return l.map(function (q) { return X(q) + ',' + Y(q); }).join(' '); };
-    var s = '<svg viewBox="0 0 ' + L + ' ' + H + '" class="empire" role="img" aria-label="' + t('commerce.carte') + '">';
-    s += '<rect width="' + L + '" height="' + H + '" fill="#d8c79a"/><polygon points="' + pts(MER) + '" fill="#5f97b8" stroke="#3f6f8a" stroke-width="0.6"/>';
-    ILES.forEach(function (i) { s += '<polygon points="' + pts(i) + '" fill="#d8c79a" stroke="#3f6f8a" stroke-width="0.4"/>'; });
-    em.cites.forEach(function (c) {
-      var r = e.routes[c.id];
-      if (!r || !r.v) return;
-      var actif = SIM.routeActive(e, c);
-      s += '<line x1="' + X(em.ville) + '" y1="' + Y(em.ville) + '" x2="' + X(c.pos) + '" y2="' + Y(c.pos) + '" stroke="' + (actif ? '#b8862b' : r.o ? '#9a6a50' : '#7a7262') + '" stroke-width="' + (actif ? 1.6 : 0.9) + '"' + (c.route === 'mer' ? ' stroke-dasharray="3 2"' : '') + '/>';
-    });
-    var point = function (q, rayon, fond, contour) { return '<circle cx="' + X(q) + '" cy="' + Y(q) + '" r="' + rayon + '" fill="' + fond + '" stroke="' + contour + '" stroke-width="0.8"/>'; };
-    s += point(em.rome, 3.6, '#a8322a', '#f4e8c8') + point(em.ville, 3.6, '#f0c040', '#5a3a10');
-    em.cites.forEach(function (c) {
-      var r = e.routes[c.id];
-      if (!r || !r.v) return;
-      s += '<g data-cite="' + c.id + '" class="cite">' + point(c.pos, citeChoisie === c.id ? 4 : 3, r.o ? '#f4e8c8' : '#bdb39a', citeChoisie === c.id ? '#f0c040' : '#4a3a28') + '</g>';
-    });
-    var nom = function (q, texte, dy) {
-      var x = Number(X(q)), a = x < 16 ? 'start' : x > L - 16 ? 'end' : 'middle';
-      return '<text x="' + (a === 'start' ? Math.max(1, x - 3) : a === 'end' ? Math.min(L - 1, x + 3) : x).toFixed(1) + '" y="' + (Number(Y(q)) + dy).toFixed(1) + '" text-anchor="' + a + '" font-size="6.2" fill="#2a2018" stroke="#f4ead0" stroke-width="1.6" paint-order="stroke">' + texte + '</text>'; };
-    s += nom(em.rome, t('cite.rome'), -5.5) + nom(em.ville, echapper(m.voisinage ? t('cite.' + m.id) : t('mission.' + m.id + '.nom')), 9);
-    // Une cité trop près de Rome ou de la ville voit son nom écrit sous son point.
-    var pres = function (a, b) { return Math.abs(X(a) - X(b)) < 22 && Math.abs(Y(a) - Y(b)) < 10; };
-    em.cites.forEach(function (c) { var r = e.routes[c.id]; if (r && r.v) s += nom(c.pos, echapper(nomVoisine(e, c)), pres(c.pos, em.rome) || pres(c.pos, em.ville) ? 9 : -5); });
-    s += armeesEmpire(e, X, Y, em);
-    s += '</svg>';
-    var boite = el('div', { classe: 'carte-empire' });
-    boite.innerHTML = s;
-    boite.querySelectorAll('.cite').forEach(function (g) {
-      g.addEventListener('click', function () { AUDIO.jouer('clic'); citeChoisie = g.getAttribute('data-cite'); if (panneauVivant) panneauVivant(); });
-    });
-    p.appendChild(el('h3', { texte: t('commerce.carte') }));
-    p.appendChild(boite);
-    // Cités en gros boutons (cibles tactiles de 44 px) sous la carte.
-    var g2 = el('div', { classe: 'boutons cites' });
-    em.cites.forEach(function (c) {
-      var r = e.routes[c.id];
-      if (!r || !r.v) return;
-      g2.appendChild(bouton(nomVoisine(e, c) + (r.o ? ' ✓' : ''), function () { citeChoisie = c.id; if (panneauVivant) panneauVivant(); }, citeChoisie === c.id ? 'gros or' : 'gros non'));
-    });
-    p.appendChild(g2);
-  }
   function ficheCite(p, e, id) {
     var c = SIM.citeDe(e, id), r = c && e.routes[id];
     if (!c || !r || !r.v) return;
