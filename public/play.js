@@ -26,6 +26,9 @@
 // (&rejoindre=<nom de sa partie>) : pour un jeu "rejoindre", on vérifie que sa
 // partie a une place, puis le jeu l'ouvre directement (window.JEL_REJOINDRE) ;
 // sinon, un message clair et « Ouvrir le jeu quand même ».
+// Et le comptoir de province (province/lanceur.js) : pour un jeu "province"
+// (« Cités voisines » de Marmoria), les échanges avec les cités voisines,
+// envoyés quand le jeu les demande (message « jel-province »).
 // ==========================================================================
 
 import { monVote, voter, votesEnAttente, envoyerEnAttente } from './votes.js';
@@ -36,6 +39,7 @@ import { noter as noterSauvegarde } from './sauvegardes-nuage.js';
 import { brancherMultijoueur, verifierPartie, RE_PARTIE } from './multijoueur/lanceur.js';
 // Jeux en temps réel 1 contre 1 (docs/cadrage-temps-reel.md) : recherche, WebRTC, relais.
 import { brancherTempsReel } from './temps-reel/lanceur.js';
+import { brancherProvince } from './province/lanceur.js';
 import { annoncer } from './amis.js';
 // Grosses données des jeux (stockage.js : mondes, plusieurs parties, fichiers exportés) : IndexedDB du site.
 import { traiterStockage } from './stockage-lanceur.js';
@@ -77,6 +81,7 @@ let htmlJeu = null;      // code du jeu, gardé pour le relancer dans une autre 
 let message = null;      // { titre, texte } : clés du message affiché à la place du jeu
 let multi = null;        // connexion multijoueur du jeu affiché (jeux "multijoueur" seulement)
 let tempsReel = null;    // connexions d'un jeu en temps réel ("temps_reel" seulement)
+let province = null;     // comptoir de province d'un jeu "province" (« Cités voisines »)
 let invitation = null;   // { partie } : partie d'un ami à rejoindre (bouton « Rejoindre »), une seule fois
 
 // Bouton « Rejoindre » d'un ami (page Amis, classement entre amis) : nom de sa partie en ligne.
@@ -282,7 +287,10 @@ async function chargerJeu(jeu) {
   const reponse = await fetch(jeu.play); // ex. « games/saut-obstacles/?v=1 »
   if (!reponse.ok) throw Object.assign(new Error(`HTTP ${reponse.status}`), { statut: reponse.status });
   htmlJeu = await reponse.text();
-  if (jeu.temps_reel) {
+  if (jeu.province) {
+    // « Cités voisines » : comptoir de province (requêtes HTTP au Worker multijoueur, à la demande du jeu).
+    province = brancherProvince({ jeu, cadre: el.cadre, ticket: () => ticketMulti(jeu.id) });
+  } else if (jeu.temps_reel) {
     // Jeu en temps réel : son propre lanceur (le jeu ne parle pas le protocole du tour par tour).
     tempsReel = brancherTempsReel({ jeu, html: htmlJeu, cadre: el.cadre });
     addEventListener('pagehide', () => tempsReel?.fermer());
@@ -331,10 +339,16 @@ function garderPourHorsLigne(jeu) {
 // - « jel-sauvegarde » (save.js) : progression du jeu à garder sur l'appareil ;
 // - « jel-stockage » (stockage.js) : grosses données du jeu (IndexedDB du site), fichier à exporter ;
 // - « jel-multi » (multijoueur/moteur.js) : partie en ligne d'un jeu multijoueur ;
-// - « jel-tr » (temps-reel/moteur.js) : partie en ligne d'un jeu en temps réel.
+// - « jel-tr » (temps-reel/moteur.js) : partie en ligne d'un jeu en temps réel ;
+// - « jel-province » : échanges d'un jeu « province » avec son comptoir (province/lanceur.js).
 addEventListener('message', (evenement) => {
   if (evenement.source !== el.cadre.contentWindow) return;
   const donnees = evenement.data;
+  if (donnees?.type === 'jel-province' && typeof donnees.op === 'string') {
+    if (province) province.recevoir(donnees);
+    else el.cadre.contentWindow.postMessage({ type: 'jel-province', id: donnees.id, ok: false, erreur: 'jeu' }, '*');
+    return;
+  }
   if (donnees?.type === 'jel-tr' && typeof donnees.op === 'string') {
     if (tempsReel) tempsReel.recevoir(donnees);
     else el.cadre.contentWindow.postMessage({ type: 'jel-tr', etat: 'solo', raison: 'jeu' }, '*');

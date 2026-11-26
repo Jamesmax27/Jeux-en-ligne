@@ -193,6 +193,9 @@ async function lireJeu(nomDossier) {
     // Jeu en temps réel 1 contre 1 (docs/cadrage-temps-reel.md) : multijoueur aux yeux du site
     // (étiquette, rubrique), avec son propre lanceur (public/temps-reel/lanceur.js).
     ...(fiche.temps_reel === true && fiche.multijoueur !== true ? { multijoueur: true, temps_reel: true, places: Number.isInteger(fiche.places) ? fiche.places : 2 } : {}),
+    // « Cités voisines » de Marmoria (docs/cadrage-marmoria.md, section 16.7) : multijoueur aux yeux
+    // du site (étiquette, rubrique), avec son propre lanceur (public/province/lanceur.js) : comptoir de province.
+    ...(fiche.province === true && fiche.multijoueur !== true ? { multijoueur: true, province: true, places: Number.isInteger(fiche.places) ? fiche.places : 4 } : {}),
     // Bouton « Rejoindre » d'un ami (docs/consigne-amis.md) : le jeu sait ouvrir la même partie en ligne.
     ...(fiche.multijoueur === true && fiche.rejoindre === true ? { rejoindre: true } : {}),
     // Profil joueur (docs/cadrage-fidelisation.md) : étoiles possibles du jeu (le serveur
