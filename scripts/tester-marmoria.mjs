@@ -117,16 +117,29 @@ section('Formules (une au moins par règle chiffrée du lot 1)');
   // Temps : 1 jour = 50 ticks, 1 mois = 16 jours, 1 mois = 40 s à 20 ticks/s.
   ok(TJ === 50 && TM === 800 && TM / D.temps.ticksParSeconde === 40, 'temps : 50 ticks par jour, mois de 40 s');
 
-  // Impôt : habitants × coefficient × taux / 20, par douzièmes ; salaires : emplois × salaire / 120.
+  // Impôt : habitants × coefficient × taux / 20, par douzièmes, accumulé chaque mois dans la
+  // maison et prélevé au passage du percepteur (cahier 23.16) ; salaires : emplois × salaire / 120.
   const e = etatVide();
   const [x, y] = caseLibre(e);
   const h = maison(e, x, y, 7, 100); // casa : coefficient 3
-  h.svc.impot = 10;
   e.impot = 7; e.emplois = 0; e.reliquat = 0;
-  const t0 = e.tresor;
+  const t0 = e.tresor, mois = 100 * 3 * 7 / 20 / 12;
   O.finances(e);
-  proche(e.tresor - t0, Math.floor(100 * 3 * 7 / 20 / 12), 0, 'impôt mensuel d\'une casa de 100 habitants à 7 %');
-  h.svc.impot = 0; e.emplois = 100; e.salaire = 30; e.reliquat = 0;
+  ok(e.tresor === t0 && h.dm === 1, 'impôt : rien n\'entre au trésor sans passage du percepteur, 1 mois d\'arriérés');
+  proche(h.du, mois, 1e-9, 'impôt mensuel d\'une casa de 100 habitants à 7 % accumulé dans la maison');
+  for (let k = 0; k < 5; k++) O.finances(e);
+  O.percevoir(e, h);
+  proche(e.tresor - t0, Math.floor(6 * mois), 1, 'percepteur passé après 6 mois : 6 mois d\'impôts prélevés');
+  ok(h.du === 0 && h.dm === 0, 'impôt : arriérés remis à zéro au passage');
+  const t2 = e.tresor;
+  O.finances(e); O.percevoir(e, h);
+  proche(e.tresor - t2, Math.round(mois), 1, 'percepteur repassé un mois plus tard : un mois prélevé');
+  for (let k = 0; k < 30; k++) O.finances(e);
+  ok(h.dm === D.regles.impot.arrieresMois && Math.abs(h.du - mois * D.regles.impot.arrieresMois) < 1e-6, `impôt : ${D.regles.impot.arrieresMois} mois d'arriérés au plus`);
+  e.impot = 14; h.du = 0; h.dm = 0; e.reliquat = 0;
+  O.finances(e);
+  proche(h.du, 2 * mois, 1e-9, 'impôt : le taux du mois compte (14 % : le double)');
+  h.svc.impot = 0; h.du = 0; e.impot = 7; e.emplois = 100; e.salaire = 30; e.reliquat = 0;
   const t1 = e.tresor;
   O.finances(e);
   proche(t1 - e.tresor, 25, 0, 'masse salariale : 100 emplois × 30 / 120');
@@ -342,6 +355,89 @@ section('Formules (une au moins par règle chiffrée du lot 1)');
 }
 
 // --------------------------------------------------------------------------
+section('Marcheurs guidés vers les besoins, impôts au passage (cahier 23.16)');
+{
+  // Une rue de 25 cases : le bâtiment de service au milieu, les maisons à l'ouest, rien à l'est.
+  const rue = () => {
+    const e = etatVide();
+    e.tresor = 1e6;
+    const N = e.N;
+    const libre = (x, y, w, h) => { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) { const k = j * N + i; if (i < 0 || j < 0 || i >= N || j >= N || e.bat[k] || e.route[k] || e.terrain[k] >= sim.T.ROCHERS) return false; } return true; };
+    let zx = -1, zy = -1;
+    for (let y = 5; y < N - 10 && zx < 0; y++) for (let x = 5; x < N - 30; x++) if (libre(x, y, 25, 5)) { zx = x; zy = y; break; }
+    // Les arbres de la zone sont abattus : l'essai ne dépend pas du terrain.
+    for (let j = zy; j < zy + 5; j++) for (let i = zx; i < zx + 25; i++) e.terrain[j * N + i] = sim.T.HERBE;
+    const yR = zy + 2;
+    const r = sim.appliquer(e, { type: 'tracer', bat: 'route', cases: Array.from({ length: 25 }, (_, k) => [zx + k, yR]) });
+    return { e, zx, yR, ok: zx >= 0 && r.ok };
+  };
+  const service = (e, type, x, y) => { const b = O.creerBatiment(e, type, x, y); b.eff = D.batiments[type].effectif; return b; };
+
+  // Préfet : il va vers la maison la plus menacée, jamais vers la partie vide de la rue.
+  {
+    const { e, zx, yR, ok: pret } = rue();
+    ok(pret, 'rue d\'essai de 25 cases tracée');
+    const pref = service(e, 'prefecture', zx + 12, yR - 1);
+    const a = maison(e, zx + 2, yR - 1, 2, 6), b = maison(e, zx + 6, yR + 1, 2, 6);
+    a.feu = 7000; b.feu = 3000;
+    const w = O.emettreErrant(e, pref, 'prefet');
+    const c = O.choisirCibleErrant(e, w, pref, D.regles.porteeErrant);
+    ok(c && c.id === a.id, `préfet : la maison la plus menacée est visée d'abord (${c ? c.id : 'aucune'} pour ${a.id})`);
+    ok(c && c.chemin.every((i) => i % e.N <= zx + 12), 'préfet : son chemin part vers les maisons, pas vers la partie vide');
+    const w2 = O.emettreErrant(e, pref, 'prefet', true);
+    w.cible = c.id;
+    const c2 = O.choisirCibleErrant(e, w2, pref, D.regles.porteeErrant);
+    ok(c2 && c2.id === b.id, 'deux préfets : le second prend l\'autre maison (pas de doublon)');
+    e.marcheurs = e.marcheurs.filter((x) => x !== w2); e._mIndex.delete(w2.id); pref.m2 = 0;
+    let maxX = 0, jours = 0;
+    while ((a.feu > 0 || b.feu > 0) && jours < 30) { for (let k = 0; k < TJ; k++) { sim.pas(e); e.marcheurs.forEach((x) => { if (x.type === 'prefet' && (a.feu > 0 || b.feu > 0)) maxX = Math.max(maxX, x.x); }); } jours++; }
+    ok(a.feu < 3000 && b.feu < 3000, `préfet : les deux maisons visitées en ${jours} jours (risque ${a.feu}, ${b.feu})`);
+    ok(maxX <= zx + 13, `préfet : il n'est pas allé dans la partie vide de la rue (x max ${maxX - zx} pour 13)`);
+    a.feu = 0; b.feu = 0;
+    ok(O.besoinErrant(e, 'prefet', pref, a) === 0, 'préfet : une maison sans risque n\'est pas une cible');
+  }
+  // Vendeuse : la maison qui a faim, pas celle dont la réserve est pleine ; marché sans vivres : aucune.
+  {
+    const { e, zx, yR } = rue();
+    const m = service(e, 'marche', zx + 12, yR - 2);
+    m.stocks.ble = 800;
+    const pleine = maison(e, zx + 16, yR + 1, 3, 8), faim = maison(e, zx + 4, yR + 1, 3, 8);
+    pleine.viv = { ble: 1000 }; faim.viv = {};
+    const v = O.creerMarcheur(e, 'vendeuse', yR * e.N + zx + 12, { o: m.id, pas: 0, portee: D.regles.porteeErrant, retour: 0, ch: null, k: 0 });
+    const c = O.choisirCibleErrant(e, v, m, D.regles.porteeErrant);
+    ok(c && c.id === faim.id, 'vendeuse : elle va vers la maison qui manque de nourriture');
+    ok(O.besoinErrant(e, 'vente', m, pleine) === 0, 'vendeuse : une maison bien servie n\'est pas une cible');
+    m.stocks.ble = 0;
+    ok(O.besoinErrant(e, 'vente', m, faim) === 0, 'vendeuse : sans vivres au marché, la faim d\'une tente ne l\'attire pas');
+  }
+  // Percepteur : la maison aux arriérés les plus anciens ; impôts entrés au trésor en passant.
+  {
+    const { e, zx, yR } = rue();
+    const f = service(e, 'forum', zx + 12, yR - 2);
+    const vieille = maison(e, zx + 3, yR + 1, 7, 16), recente = maison(e, zx + 20, yR + 1, 7, 16);
+    vieille.dm = 6; vieille.du = 30; vieille.svc.impot = 0;
+    recente.dm = 1; recente.du = 5; recente.svc.impot = 40;
+    const p = O.emettreErrant(e, f, 'percepteur');
+    const c = O.choisirCibleErrant(e, p, f, D.regles.porteeErrant);
+    ok(c && c.id === vieille.id, 'percepteur : il va d\'abord vers la maison qui n\'a pas payé depuis 6 mois');
+    const t0 = e.tresor, i0 = e.finances.an.impots;
+    let jours = 0;
+    while (vieille.du > 0 && jours < 20) { for (let k = 0; k < TJ; k++) sim.pas(e); jours++; }
+    ok(vieille.du === 0 && vieille.dm === 0 && e.finances.an.impots - i0 >= 30, `percepteur : 6 mois prélevés en passant (${Math.round(e.finances.an.impots - i0)} deniers, ${jours} jours)`);
+    ok(e.tresor > t0 - 100, 'percepteur : le trésor reçoit les arriérés');
+  }
+  // Aucun besoin : la tournée s'arrête aussitôt (pas de marche dans le vide).
+  {
+    const { e, zx, yR } = rue();
+    const ing = service(e, 'ingenieur', zx + 12, yR - 1);
+    const w = O.emettreErrant(e, ing, 'ingenieur');
+    let fin = false;
+    for (let k = 0; k < 3 * D.regles.vitesses.normale && !fin; k++) { sim.pas(e); fin = !e._mIndex.has(w.id); }
+    ok(fin, 'ingénieur sans bâtiment abîmé : il rentre aussitôt');
+  }
+}
+
+// --------------------------------------------------------------------------
 section('Ville d\'exemple, invariants à chaque tick');
 // Ville d'exemple bâtie par le joueur raisonnable (MM_EXEMPLES.jouer), tous les demi-mois.
 const PLANS = new Map();
@@ -377,10 +473,16 @@ function avancerVille(e, n, avecInvariants = false) {
   ok((niveaux[3] || 0) + (niveaux[4] || 0) + (niveaux[5] || 0) + (niveaux[6] || 0) > 10, 'des maisons montent au-delà du niveau 2');
   ok(Object.keys(niveaux).some((n) => n >= 5), 'des maisons atteignent le niveau 5 (fontaines)');
   // Marcheurs vus pendant un mois (une vendeuse peut être entre deux tournées à un instant donné).
+  // Stocks vus pendant le même mois : les vendeuses guidées (cahier 23.16) vident vite les
+  // marchés vers les maisons, un instant donné ne suffit plus.
   const vus = new Set();
-  for (let k = 0; k < TM; k++) { sim.pas(e); e.marcheurs.forEach((w) => vus.add(w.type)); }
+  let stockVu = false;
+  for (let k = 0; k < TM; k++) {
+    sim.pas(e); e.marcheurs.forEach((w) => vus.add(w.type));
+    if (!stockVu && k % TJ === 0) stockVu = e.batiments.some((b) => (b.type === 'grenier' || b.type === 'marche') && sim.totalStock(b) > 0);
+  }
   ok(vus.has('vendeuse') && vus.has('prefet') && vus.has('ingenieur') && vus.has('percepteur'), `vendeuses, préfets, ingénieurs et percepteurs circulent (${[...vus].sort().join(', ')})`);
-  ok(e.batiments.some((b) => b.type === 'grenier' && sim.totalStock(b) > 0) || e.batiments.some((b) => b.type === 'marche' && sim.totalStock(b) > 0), 'la nourriture circule jusqu\'aux greniers et marchés');
+  ok(stockVu, 'la nourriture circule jusqu\'aux greniers et marchés');
 }
 
 // --------------------------------------------------------------------------
@@ -1475,6 +1577,27 @@ section('Lot 5 : campagne complète, les 10 cartes des échelons 6 à 10');
     ok(e.journal.some((j) => j.cle === 'msg.evt.seisme') && avant > 0 && dansZone() < avant, `corinthe : le séisme rase sa zone (${avant} bâtiments avant, ${dansZone()} après)`);
     ok(sim.invariants(e).length === 0, 'corinthe : invariants tenus après le séisme');
   }
+}
+
+// --------------------------------------------------------------------------
+section('Tutoriels des bâtiments et carte de la campagne (cahier 23.16)');
+{
+  // L'interface est dans le jeu assemblé (ou dans les sources) : on y lit les genres traités.
+  const ui = depuisSources ? await readFile(path.join(SOURCES, 'interface.js'), 'utf8') : await readFile(JEU, 'utf8');
+  const corps = ui.slice(ui.indexOf('function etapesBatiment('), ui.indexOf('function remplirFicheBatiment('));
+  const traites = new Set([...corps.matchAll(/case '([a-z_]+)'/g)].map((m) => m[1]));
+  const sansFiche = new Set(['maison', 'outil', 'route', 'ruines', 'incendie']);
+  const genres = new Set(Object.values(D.batiments).map((b) => b.genre).filter((g) => !sansFiche.has(g)));
+  const manquants = [...genres].filter((g) => !traites.has(g));
+  ok(!manquants.length, `tutoriels : chaque genre de bâtiment a ses étapes « Ce qu'il faut faire » (${manquants.join(', ') || 'tous'})`);
+  const cles = new Set([...corps.matchAll(/t\('(tutoB\.[A-Za-z.]+)'/g)].map((m) => m[1]));
+  const fr = JSON.parse(await readFile(path.join(SOURCES, 'textes', 'fr.json'), 'utf8')).textes;
+  const absentes = [...cles].filter((k) => !(k in fr) && !k.endsWith('.'));
+  ok(!absentes.length, `tutoriels : ${cles.size} textes d'étapes présents (${absentes.join(', ') || 'aucun manquant'})`);
+  // Chaque mission de la campagne a sa place sur la carte de l'Europe.
+  const places = ui.slice(ui.indexOf('var POS_MISSIONS'), ui.indexOf('var ROME_CAMPAGNE'));
+  const sansPlace = D.missions.filter((m) => !new RegExp(`\\b${m.id}: \\[`).test(places)).map((m) => m.id);
+  ok(!sansPlace.length, `carte de la campagne : les ${D.missions.length} missions placées (${sansPlace.join(', ') || 'toutes'})`);
 }
 
 // --------------------------------------------------------------------------

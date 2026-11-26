@@ -138,7 +138,7 @@ Les marcheurs portent tous les services et tous les biens : un bâtiment n'agit 
 
 1. Un bâtiment de service émet un marcheur dès qu'il a du personnel. Le suivant part après le retour du précédent et un délai qui s'allonge si le personnel manque.
 2. Le marcheur part d'une case de route adjacente. Les départs successifs alternent entre les sorties possibles.
-3. À chaque intersection, il choisit une direction au hasard, sans demi-tour sauf en impasse.
+3. À chaque intersection, il choisit une direction au hasard, sans demi-tour sauf en impasse. *Modifié le 26 novembre 2026 (section 23.16) : il va vers le bâtiment qui a le plus besoin de lui, le plus proche d'abord ; seul le préfet sans cible patrouille encore au hasard.*
 4. Après sa portée (26 cases par défaut, réglable par type), il rentre par le plus court chemin et continue de servir sur le retour.
 5. À chaque case parcourue, il sert tous les bâtiments situés à 2 cases ou moins.
 6. Servir une maison remet au maximum le compteur du service concerné (48 jours). Le compteur perd 1 par jour ; le service est acquis tant qu'il dépasse 0.
@@ -448,6 +448,7 @@ Le trésor se compte en deniers. L'impôt des maisons recensées et l'exportatio
 
 - Une maison paie seulement si un percepteur est passé dans les 48 derniers jours.
 - Impôt annuel d'une maison = habitants × coefficient de niveau × taux en % / 20, prélevé par douzièmes chaque mois.
+- *Modifié le 26 novembre 2026 (section 23.16) : chaque douzième s'accumule dans la maison (un an au plus) et le percepteur prélève tous les arriérés à son passage.*
 - Coefficients : tentes 1, cabanes 1, masures 2, casae 3, insulae 5, villas 12, palais 30.
 - Taux réglable de 0 à 25 %, 7 % au départ. Son effet sur l'humeur figure en section 6.2.
 - Repère : 2 500 habitants en casae à 7 % rapportent environ 2 600 deniers par an, pour une masse salariale d'environ 3 000.
@@ -1811,3 +1812,36 @@ Mesures et essais :
 
 Publication (26 novembre 2026, demande du propriétaire « publier tout seul, tout ») : pull request #457 fusionnée (commit `5145078`), contrôles verts ; site publié par Cloudflare Pages ; Worker multijoueur redéployé par `multijoueur.yml` (contrôle du comptoir de province vert, déploiement et vérification de l'adresse réussis). Reste : essai réel à deux appareils sur freemicrogames.com.
 
+
+### 23.16 Retours du propriétaire : marcheurs, impôt, commerce, calques, campagne et tutoriels (26 novembre 2026)
+
+Demandes du propriétaire après ses essais (26 novembre 2026), toutes faites dans la même pull request :
+
+1. **Marcheurs plus intelligents** (règles 4.2.3 et 4.2.4 modifiées) : un errant ne choisit plus sa direction au hasard. À chaque étape, il cherche, dans ses pas restants, le bâtiment qui a le plus besoin de son service, et y va par le plus court chemin en servant tout ce qu'il croise. Le plus proche passe devant à besoin égal (score = besoin × (1 − 0,5 × distance / pas restants) ; recherche arrêtée dès qu'une cible est trouvée à 8 pas). Besoin : compteur de service bas (moins de 36 jours sur 48) pour les maisons habitées ; risque d'incendie ou criminalité pour le préfet, dommages pour l'ingénieur (dès 10 % du seuil) ; nourriture et biens que le marché peut donner pour la vendeuse (un bien sans stock compte à moitié, tant que la demande n'est pas relevée) ; mois d'impôt dus pour le percepteur. Une rue sans besoin n'est plus parcourue : sans cible, l'errant rentre et le suivant attend 3 fois plus longtemps. Le préfet, lui, patrouille au hasard sans cible (il doit pouvoir courir aux incendies) et ne recherche qu'après 6 pas. Un bâtiment déjà visé par un autre marcheur du même service lui est laissé ; un marcheur ne revise pas un bâtiment visé pendant sa tournée. Réglages : `regles.guidage` de `donnees.json`.
+2. **Impôt au passage du percepteur** (règle 11.2 modifiée) : chaque mois, une maison habitée ajoute l'impôt du mois, au taux du mois, à ses arriérés (`du` en deniers, `dm` en mois), un an au plus (`regles.impot.arrieresMois` = 12) ; le percepteur prélève tous les arriérés en passant. Six mois sans passage : six mois prélevés ; un mois plus tard : un mois. Une maison vidée perd ses arriérés ; deux maisons qui fusionnent les additionnent. Pièce et somme montent au-dessus de la maison (`e._gains`, hors sauvegarde) ; arriérés dans le panneau d'une maison et dans le conseiller des finances.
+3. **Commerce** : bouton « Commerce » (amphore) dans la barre du haut, carte de l'Empire en grand, dessinée à la taille de l'écran ; à côté de chaque cité, les images des biens qu'elle achète (flèche verte) et vend (flèche bleue), étiquettes placées sans se chevaucher quand c'est possible ; à droite, la fiche de la cité touchée (ouverture de la route) et les réglages des biens. L'onglet Commerce du Gouvernement ouvre la même carte. Les cités de l'ordinateur et les places de voisins libres ouvrent leurs routes comme avant. La date et les loupes se cachent jusqu'à 900 px de large (820 avant), pour faire place au bouton.
+4. **Calques** : le bâtiment qui porte le service du calque reste dessiné tel quel (préfecture sur « Feu » et « Criminalité », poste d'ingénieur sur « Dommages », forum et sénat sur « Impôts », greniers, marchés, fermes et pêche sur « Nourriture », temples, écoles, santé, spectacles, eau, entrepôts sur « Stocks », embellissements sur « Attractivité »).
+5. **Menu** : une catégorie à un seul choix (zone de logement, déblayer) prend l'outil d'un clic, sans sous-menu ni message ; un second clic le repose.
+6. **Carte de la campagne** : l'Europe romaine, Rome au centre ; chaque mission à la place de sa ville, reliée par une route courbe à la mission qui l'ouvre (or si faite, tirets qui avancent si ouverte, pointillés pâles sinon) ; gagnée (or et étoiles), ouverte (anneau qui bat), fermée (grise) ; le chiffre est l'échelon ; toucher une ville ouvre sa présentation ; « Prochaine mission » et les autres boutons à droite ; la liste d'avant reste à un bouton. Ostie et Rome, Corinthe et Athènes sont un peu écartées pour rester lisibles. Mers et côtes au-delà de la Méditerranée (Atlantique, Manche, mer du Nord, Baltique, mer Noire, Bretagne, Irlande) dessinées à grands traits.
+7. **Tutoriels des bâtiments** : dans la campagne, chaque bâtiment jamais lu porte la marque « Nouveau » dans le menu ; le toucher ouvre d'abord sa fiche : à quoi il sert (texte du bâtiment), ce qu'il faut faire (étapes tirées de ses données : où le poser, route, employés, ce qu'il lui faut, ce qu'il produit et pour qui, quel bâtiment le complète), « Le construire », « Suivant ». Au début d'une mission, l'écran « Nouveaux bâtiments » les présente (« Les découvrir un par un » ou « Plus tard »), après l'aide aux gestes. Ostie a son propre tutoriel pas à pas : ses bâtiments comptent comme lus. Fiches lues gardées dans la progression (`vus`). Pas de marque en construction libre ni en province.
+
+Mesures (contrôles et essais du 26 novembre 2026) :
+
+| Mesure | Avant | Après |
+| --- | --- | --- |
+| Gouverneur automatique, Ravenne gagnée | mois 152 | mois 125 |
+| Narbo gagnée | mois 274 | mois 154 |
+| Aquilée (3 départs) | 2 gagnées | 3 gagnées |
+| Massalia (non gagnée), habitants | 1 458 | 2 928 |
+| 6 villes d'exemple sur 3 ans : incendies | 228 | 119 |
+| Jours de bâtiments au-delà de 60 de risque (2e et 3e années) | 1 893 | 321 |
+| Maisons recensées pour l'impôt | 73 % | 98 % |
+| Habitants (moyenne des 6 villes) | 724 | 700 |
+| Tick sur la carte de 160 × 160 remplie | 0,78 ms | 0,88 ms |
+| `index.html` | 1 729 Ko | 1 805 Ko |
+
+Écarts :
+1. Les arriérés d'impôt sont plafonnés à un an (choix de Claude) : sans plafond, un quartier jamais visité rapporterait autant qu'un quartier bien servi, et le percepteur ne servirait plus qu'à encaisser plus tôt.
+2. Le préfet sans cible garde la patrouille au hasard : il doit rester dans les rues pour courir aux incendies (section 10.1).
+3. Les fiches de tutoriel sont écrites à partir des données des bâtiments et de phrases types (une par genre de bâtiment), pas bâtiment par bâtiment : elles restent justes si les données changent, mais leurs phrases sont génériques.
+4. Ravenne présente 48 bâtiments nouveaux à un joueur qui n'a fait qu'Ostie et Pompéi : l'écran les montre tous, la marque « Nouveau » permet de les lire au moment de les bâtir.
