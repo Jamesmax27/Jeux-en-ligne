@@ -7240,7 +7240,10 @@ function sleepEnt(e){ const k=CK(Math.floor(e.x)>>4,Math.floor(e.z)>>4); let l=S
 function findSpawn(){
   let c=[ORIG,ORIG];
   if(!legacy){ const v=nearestVillageSite(ORIG,ORIG); if(v){ const a=hInt(v.cx,v.cz,seed)%628/100, d=v.R+v.BL+8; c=[Math.round(v.cx+Math.cos(a)*d),Math.round(v.cz+Math.sin(a)*d)]; } }
-  for(const strict of [true,false]) for(let rad=0;rad<120;rad++){ const n=Math.max(1,rad*6); for(let a=0;a<n;a++){
+  // plaine ou forêt d'abord, puis tout sol où marcher (herbe, neige, sable). Nouveau monde : plaine ou forêt cherchée
+  // à 40 blocs du point visé seulement, pour que le départ reste près du village (choix du 26 novembre 2026 : neige
+  // ou sable à côté du village plutôt qu'herbe à 80 blocs). Ancienne zone : 120 blocs, comme avant.
+  for(const [strict,max] of [[true,legacy?120:40],[false,120]]) for(let rad=0;rad<max;rad++){ const n=Math.max(1,rad*6); for(let a=0;a<n;a++){
     const ang=a/n*Math.PI*2, x=Math.round(c[0]+Math.cos(ang)*rad), z=Math.round(c[1]+Math.sin(ang)*rad);
     terrain(x,z); const bi=T_BI;
     if(strict&&bi!==PLAINS&&bi!==FOREST) continue;

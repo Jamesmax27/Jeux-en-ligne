@@ -20,6 +20,13 @@ Déjà dans le jeu avant ce chantier (demande publique #347, 15 novembre 2026) :
 - Mémoire : morceaux chargés autour du joueur (`GEN.donneesMin`), libérés au-delà. Les animaux loin de tout joueur s'endorment (`SLEEP`) et se réveillent à son retour.
 - Modifications : `edits` (classe `Modifs`), rangées par morceau, avec l'**origine de chaque bloc** (`ORIGINE.joueur`, `village`, `nature`). Un villageois ne doit jamais toucher un bloc posé par un joueur.
 - Sauvegarde au format 3 (`serialize`) ; une sauvegarde au format 2 est convertie à la lecture (`migrateV2`).
+- **Départ d'un nouveau monde** (`findSpawn`) : le jeu vise un point à `R + BL + 8` blocs du village le plus proche du centre (26 à 36 blocs), puis cherche en spirale autour de ce point. Il prend d'abord une plaine ou une forêt, puis tout sol où marcher (herbe, neige, sable), à 120 blocs au plus.
+  - Choix du propriétaire du 26 novembre 2026 : dans un nouveau monde, la plaine ou la forêt n'est cherchée qu'à 40 blocs du point visé. Le joueur commence alors sur la neige ou le sable à côté du village, plutôt que sur l'herbe à 80 blocs, où le brouillard de la vue normale (52 blocs) cachait le village.
+  - Mesure sur les graines 1 à 200, en distance au centre du village le plus proche :
+    - avant : minimum 12, médiane 31, 90 % à 44 au plus, maximum 85 ; 2 mondes à 80 blocs ou plus ;
+    - après : minimum 12, médiane 30, 90 % à 39 au plus, maximum 65 ; 13 mondes changent de départ (11 départs sur la neige au lieu de 2, 4 sur le sable au lieu de 0).
+    - Sur 1 000 graines, le maximum passe de 111 à 69 blocs.
+  - Un arbre est toujours planté près du départ. Rien ne change pour les parties sauvegardées (elles gardent leur départ, `spawn`) ni pour l'ancienne zone (120 blocs, comme avant). Le monde des essais (graine 2026, départ à 33 blocs) ne change pas.
 
 ## 3. Emplacements de sauvegarde (étape 2)
 
