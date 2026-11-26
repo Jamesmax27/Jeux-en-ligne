@@ -51,6 +51,7 @@ import { problemesClassementJeu, RAPPEL_LISTES } from './controle-taxonomie.mjs'
 import { REJOINDRE_DEPUIS } from '../public/profil-reglages.js';
 import { problemesSlugs } from './slugs-jeux.mjs';
 import { problemesClasses } from './classes-jeu.mjs';
+import { derogation, ecranTelephone } from './derogations-jeux.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
@@ -66,6 +67,8 @@ const TAILLE_MAX_JAQUETTE = 300 * 1024;
 const PORT_TEST = 8123;
 // Consignes de 2026 (game.json "consignes": 2) : voir CONSIGNES-JEU.md.
 const NIVEAUX_MIN = 20;
+// Dérogations accordées à un jeu précis (poids, niveaux, paysage) : scripts/derogations-jeux.mjs.
+const niveauxMin = (id) => derogation(id).niveauxMin || NIVEAUX_MIN;
 const fiches = new Map();        // id → contenu de game.json (pour le test dans le navigateur)
 const consignes2 = (id) => Number(fiches.get(id)?.consignes) >= 2;
 // Jeux ajoutés depuis cette date (game.json "added") : écran d'ordinateur rempli et affiche
@@ -170,7 +173,7 @@ async function controlerFiche(id, dossier) {
   // longueur et les autres textes de la page du jeu : scripts/regles-seo.mjs).
   if (f.consignes !== undefined && (!Number.isInteger(f.consignes) || f.consignes < 1)) erreur(id, 'game.json : "consignes" doit être un entier (2 pour les nouveaux jeux)');
   if (Number(f.consignes) >= 2) {
-    if (!Number.isInteger(f.niveaux) || f.niveaux < NIVEAUX_MIN) erreur(id, `game.json : "niveaux" doit indiquer le nombre de niveaux du jeu, ${NIVEAUX_MIN} au moins`);
+    if (!Number.isInteger(f.niveaux) || f.niveaux < niveauxMin(id)) erreur(id, `game.json : "niveaux" doit indiquer le nombre de niveaux du jeu, ${niveauxMin(id)} au moins`);
     if (typeof f.presentation !== 'string' || !f.presentation.trim()) {
       erreur(id, 'game.json : "presentation" obligatoire (« À propos du jeu », 70 à 150 mots : voir CONSIGNES-JEU.md)');
     }
@@ -182,7 +185,11 @@ async function controlerJeu(id, dossier) {
   if (!existsSync(chemin)) return erreur(id, 'index.html manquant');
 
   const taille = (await stat(chemin)).size;
-  if (taille > TAILLE_MAX_JEU) erreur(id, `index.html trop lourd (${(taille / 1048576).toFixed(2)} Mo, maximum 2 Mo)`);
+  const der = derogation(id);
+  if (der.poidsMax === null) {
+    // Dérogation : pas de limite de poids, mais un repère au-delà duquel on prévient.
+    if (der.poidsRepere && taille > der.poidsRepere) avertir(id, `index.html pèse ${(taille / 1048576).toFixed(2)} Mo, au-delà du repère de ${(der.poidsRepere / 1048576).toFixed(0)} Mo (${der.source})`);
+  } else if (taille > (der.poidsMax || TAILLE_MAX_JEU)) erreur(id, `index.html trop lourd (${(taille / 1048576).toFixed(2)} Mo, maximum ${((der.poidsMax || TAILLE_MAX_JEU) / 1048576).toFixed(0)} Mo)`);
 
   const html = await readFile(chemin, 'utf8');
   if (!/<html[\s>]/i.test(html)) erreur(id, 'index.html : balise <html> absente');
@@ -451,7 +458,7 @@ async function testerNavigateur(ids) {
     for (const id of ids) {
       if (!publies.has(id)) { erreur(id, 'le jeu n\'apparaît pas dans le catalogue construit'); continue; }
 
-      const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR' });
+      const contexte = await navigateur.newContext({ viewport: ecranTelephone(id), isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR' });
       const page = await contexte.newPage();
       const problemes = [];
       page.on('pageerror', (e) => problemes.push(`erreur JavaScript : ${e.message}`));
@@ -483,7 +490,7 @@ async function testerNavigateur(ids) {
           const n = await cadre.evaluate(() => window.JEL_NIVEAUX).catch(() => undefined);
           const annonce = fiches.get(id).niveaux;
           if (!Number.isInteger(n)) erreur(id, 'window.JEL_NIVEAUX absent : le jeu doit donner son nombre réel de niveaux (ex. window.JEL_NIVEAUX = NIVEAUX.length)');
-          else if (n < NIVEAUX_MIN) erreur(id, `le jeu n'a que ${n} niveaux (window.JEL_NIVEAUX) : ${NIVEAUX_MIN} au moins`);
+          else if (n < niveauxMin(id)) erreur(id, `le jeu n'a que ${n} niveaux (window.JEL_NIVEAUX) : ${niveauxMin(id)} au moins`);
           else if (n !== annonce) erreur(id, `nombre de niveaux différent : ${n} dans le jeu (window.JEL_NIVEAUX), ${annonce} dans game.json ("niveaux")`);
         }
 
@@ -532,7 +539,7 @@ async function testerNavigateur(ids) {
       // titre ni tutoriel (scripts/apercus-jeu.mjs). Avec --jouer : captures/<id>/10-apercu-<n>.png.
       const { aDesApercus, capturerApercus } = await import('./apercus-jeu.mjs');
       if (aDesApercus(await readFile(path.join(dossier, 'index.html'), 'utf8'))) {
-        const { images, problemes } = await capturerApercus(navigateur, `${base}/games/${id}/`);
+        const { images, problemes } = await capturerApercus(navigateur, `${base}/games/${id}/`, { paysage: !!derogation(id).paysage });
         if (avecPartie) for (const im of images) await writeFile(path.join(RACINE, 'captures', id, `10-apercu-${im.n}.png`), im.png);
         for (const p of problemes) signalerApercus(id, `images du jeu (window.JEL_APERCU) : ${p}`);
         console.log(`  📷 ${id} : images du jeu capturées (${images.map((im) => `occupée ${Math.round(im.mesures.details * 100)} %`).join(', ')})`);
@@ -617,7 +624,8 @@ async function testerOrdinateur(navigateur, base, id) {
 // Il doit s'afficher et réagir sans erreur, sans tenter le moindre appel réseau.
 async function testerHorsLigne(navigateur, id) {
   const html = await readFile(path.join(DOSSIER_JEUX, id, 'index.html'), 'utf8');
-  const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR', offline: true });
+  const ecranTel = ecranTelephone(id);
+  const contexte = await navigateur.newContext({ viewport: ecranTel, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR', offline: true });
   const page = await contexte.newPage();
   const problemes = [];
   page.on('pageerror', (e) => problemes.push(`hors ligne : erreur JavaScript : ${e.message}`));
@@ -628,9 +636,9 @@ async function testerHorsLigne(navigateur, id) {
     await page.setContent(html, { waitUntil: 'load', timeout: 15000 });
     await page.waitForTimeout(1500);
     if (!(await ecranVisible(page.mainFrame()))) problemes.push('hors ligne : écran vide au démarrage');
-    await page.touchscreen.tap(195, 422);
+    await page.touchscreen.tap(ecranTel.width / 2, ecranTel.height / 2);
     await page.waitForTimeout(400);
-    await page.touchscreen.tap(195, 590);
+    await page.touchscreen.tap(ecranTel.width / 2, ecranTel.height * 0.7);
     await page.keyboard.press('Space');
     await page.waitForTimeout(1000);
   } catch (e) {
@@ -658,7 +666,7 @@ async function jouerPartie(navigateur, base, id) {
   const capturer = async (page, nom) => { await page.screenshot({ path: path.join(dossier, nom) }); nbCaptures++; };
 
   // Téléphone : accueil, démarrage (tutoriel attendu), puis 100 actions au hasard (≈ 30 s).
-  const tel = await navigateur.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR' });
+  const tel = await navigateur.newContext({ viewport: ecranTelephone(id), isMobile: true, hasTouch: true, deviceScaleFactor: 2, locale: 'fr-FR' });
   const page = await tel.newPage();
   surveiller(page);
   await page.goto(`${base}/play.html?id=${id}`);
