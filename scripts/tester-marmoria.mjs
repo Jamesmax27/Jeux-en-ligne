@@ -38,6 +38,7 @@ async function chargerCode() {
       donnees: await readFile(path.join(SOURCES, 'donnees.json'), 'utf8'),
       sim: await readFile(path.join(SOURCES, 'sim.js'), 'utf8'),
       exemples: await readFile(path.join(SOURCES, 'exemples.js'), 'utf8'),
+      audio: await readFile(path.join(SOURCES, 'audio.js'), 'utf8'),
     };
   }
   const html = await readFile(JEU, 'utf8');
@@ -46,7 +47,7 @@ async function chargerCode() {
     if (!m) throw new Error(`bloc ${id} absent de games/marmoria/index.html`);
     return m[1];
   };
-  return { donnees: bloc('mm-donnees'), sim: bloc('mm-sim'), exemples: bloc('mm-exemples') };
+  return { donnees: bloc('mm-donnees'), sim: bloc('mm-sim'), exemples: bloc('mm-exemples'), audio: bloc('mm-audio') };
 }
 
 const code = await chargerCode();
@@ -1473,6 +1474,32 @@ section('Lot 5 : campagne complète, les 10 cartes des échelons 6 à 10');
     for (let j = 0; j < 2 * TM; j++) sim.pas(e);
     ok(e.journal.some((j) => j.cle === 'msg.evt.seisme') && avant > 0 && dansZone() < avant, `corinthe : le séisme rase sa zone (${avant} bâtiments avant, ${dansZone()} après)`);
     ok(sim.invariants(e).length === 0, 'corinthe : invariants tenus après le séisme');
+  }
+}
+
+// --------------------------------------------------------------------------
+section('Musique : quatre morceaux écrits (sections 18.5 et 23.13)');
+{
+  // Les partitions sont lues sans contexte audio : mesures complètes, notes dans le mode, voix valides.
+  const ctxA = vm.createContext({ console });
+  vm.runInContext(code.audio, ctxA, { filename: 'mm-audio' });
+  const P = ctxA.MM_AUDIO.partitions();
+  ok(['petite', 'grande', 'menace', 'combat'].every((k) => P[k]) && Object.keys(P).length === 4, 'quatre morceaux : petite ville, grande ville, menace, combat');
+  for (const [nom, M] of Object.entries(P)) {
+    const mesures = M.mesures;
+    ok(mesures.length >= 8 && mesures.length % 4 === 0 && mesures.every((m) => m.chant.croches === 8), `${nom} : ${mesures.length} mesures de 8 croches au chant`);
+    ok(mesures.every((m) => !m.cuivre || m.cuivre.croches === 0 || m.cuivre.croches === 8), `${nom} : cuivres écrits en mesures complètes`);
+    const hors = [];
+    mesures.forEach((m, i) => [...m.chant.notes, ...(m.cuivre ? m.cuivre.notes : [])].forEach((n) => {
+      if (!M.mode.includes(((n.m - M.racine) % 12 + 12) % 12)) hors.push(`mesure ${i + 1} : ${n.m}`);
+    }));
+    ok(!hors.length, `${nom} : toutes les notes dans le mode${hors.length ? ' (' + hors.join(', ') + ')' : ''}`);
+    const chant = mesures.flatMap((m) => m.chant.notes.map((n) => n.m));
+    ok(Math.min(...chant) >= 52 && Math.max(...chant) <= 86, `${nom} : chant entre mi 3 et ré 6`);
+    ok(mesures.every((m) => m.accord && m.accord.tons.length === 8), `${nom} : un accord par mesure`);
+    ok(M.passages.length >= 2 && M.passages.every((p) => ['aulos', 'lyre', 'orgue'].includes(p.chant)
+      && ['tambour', 'tambourFin', 'grosse', 'metal'].every((k) => !p[k] || /^[DTtGSC.]{16}$/.test(p[k]))
+      && (!p.arpege || (p.arpege.length === 8 && p.arpege.every((x) => x === null || x === 's' || (x >= 0 && x <= 7))))), `${nom} : ${M.passages.length} passages aux voix valides`);
   }
 }
 

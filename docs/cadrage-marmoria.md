@@ -924,7 +924,7 @@ La dérogation de poids permet de remplacer une partie des dessins par des image
 - Tous les sons sont générés avec Web Audio ; aucun fichier audio.
 - Effets : construction, destruction, incendie, alerte, victoire, interface.
 - Ambiances synthétisées selon ce que montre l'écran : marché, atelier, eau, foule.
-- Musique : motifs courts générés par le code, 4 ambiances (petite ville, grande ville, menace, combat). Qualité à juger au lot 5 ; repli possible sur les seules ambiances.
+- Musique : motifs courts générés par le code, 4 ambiances (petite ville, grande ville, menace, combat). Qualité à juger au lot 5 ; repli possible sur les seules ambiances. Refaite le 26 novembre 2026 (section 23.13) : quatre morceaux écrits, instruments antiques imités, toujours sans fichier audio.
 - Bouton pour couper le son, visible et mémorisé. Aucun son avant la première action du joueur.
 
 ### 18.6 Langues
@@ -1724,3 +1724,34 @@ Fait le même jour :
 
 - Images du jeu de la page : un jeu qui se joue en paysage a ses 3 images en paysage (dérogation, section 19.6), alors que la page attendait 2 captures de téléphone en portrait. Sur ordinateur, les deux premières faisaient 196 × 91 px ; sur téléphone, chacune débordait de l'écran (725 px pour 390). Nouvelle disposition `tout-paysage` (`scripts/pages-seo.mjs`, `public/style.css`) : sur téléphone, une image à la fois (337 × 156 px à 390 px de large) et le bord de la suivante ; dès 720 px, les trois sur une ligne, à la même hauteur. Les autres jeux gardent leur disposition.
 - Humanizer (`.claude/skills/humanizer`, `scripts/humanizer.mjs`) : 10 textes réécrits sur 15 (la description du catalogue et une phrase de la présentation, dans les 5 langues), les 5 descriptions pour Google gardées ; contrôles du script passés. Les textes sont aussi rangés dans `sources/marmoria/textes/*.json`, sinon l'assemblage suivant les remettrait.
+
+### 23.13 Musique plus romaine (26 novembre 2026)
+
+Retour du propriétaire : musique « trop basique », à rendre « beaucoup plus romaine ». La bibliothèque Kenney n'a pas de musique antique (ses musiques sont de courts jingles, et le site kenney.nl n'est pas joignable depuis l'environnement de travail) ; choix du propriétaire sur questionnaire : refaire la synthèse.
+
+Réalisé (`sources/marmoria/audio.js`, toujours sans fichier audio) :
+
+- Quatre morceaux écrits à la main au lieu de notes tirées au hasard, en parties de 4 mesures, avec plusieurs passages qui changent l'instrument du chant :
+  - petite ville : ré dorien, 72 à la noire, forme A A' B A' (16 mesures, 53 s) ; passages : aulos et bourdon, cithare seule, aulos avec arpèges et sistres ;
+  - grande ville : sol mixolydien, 96, forme A A' B A' (40 s) ; hydraulis, cithare grattée, tambour sur cadre en rythme de danse, sistres ; un passage où l'hydraulis chante, un autre avec fanfares de cornu ;
+  - menace : mi phrygien, 60, 8 mesures ; bourdon d'orgue grave, cœur qui bat au tambour, appels de cornu au loin (plus de salle), aulos qui descend d'une octave au second passage ;
+  - combat : mi phrygien dominant, 132, 8 mesures ; tambours en doubles croches, grosse caisse, sistres à contretemps, appels de cuivres, appuis de cuivres au second passage.
+- Instruments imités : cithare par synthèse de Karplus-Strong (corde rendue une fois par hauteur à 22 050 Hz et gardée, caisse de bois) ; aulos double (anche nasale jouée liée, mordants, glissés, coups de langue, vibrato tardif, souffle ; second tuyau en bourdon) ; hydraulis (jeux de flûtes, attaque soufflée, tremblement de l'eau) ; cornu et tuba (deux sonneurs, note prise par-dessous, embouchure qui s'ouvre) ; tympanum (doum, tek, tek léger), grosse caisse, sistre, crotales.
+- Salle : réverbération d'une cour de marbre (réponse calculée de 2,3 s, premières réflexions, graves coupés à l'envoi).
+- Étape, victoire et défaite jouées par les mêmes instruments (cithare ; fanfare de cornu sur les harmoniques de do ; appel grave qui descend), hors du réglage « Musique ».
+- L'ambiance change à la fin d'une mesure ; à la sortie d'une partie, la musique s'arrête en moins d'une demi-seconde (sources programmées arrêtées), les effets continuent.
+- API inchangée pour l'interface (`musique`, `musiqueActive`, `ambiance`) ; `MM_AUDIO.partitions()` lit les morceaux pour les tests. `version` 12.
+
+Mesures (rendu hors ligne dans Chromium, 44,1 kHz) :
+
+| Critère | Résultat |
+| --- | --- |
+| Niveau moyen à la sortie | −33 dB (petite ville), −31 dB (grande ville), −32,5 dB (menace), −30 dB (combat) ; crête 0,46 au plus |
+| Équilibre | chant vers −36 dB, accompagnement vers −40 dB, réverbération 9 dB sous le son direct |
+| Calcul audio | 5 % (petite ville) à 9 % (combat) d'un cœur de serveur à 2,1 GHz, dont la moitié pour la salle |
+| Arrêt et changements | petite ville → combat à la fin de la mesure, arrêt complet en 0,5 s, reprise sans erreur |
+
+Tests : section « Musique » de `scripts/tester-marmoria.mjs` (quatre morceaux, mesures de 8 croches, cuivres en mesures complètes, notes dans le mode, tessiture du chant, un accord par mesure, passages aux voix valides).
+
+Reste : écoute du propriétaire (un extrait de 3 minutes lui a été envoyé) et essai sur téléphone ; sur un téléphone d'entrée de gamme, le calcul audio peut atteindre 20 à 30 % d'un cœur (estimation, à mesurer) ; si la musique saccade, retirer la salle ou réduire la polyphonie.
+
