@@ -181,7 +181,7 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
     const file = [];
     for (const id of jeux) { const rush = await rushes.de(id); if (rush.exploitable) file.push(id); }
     if (!file.length) throw new ErreurVideo(`Aucun des jeux demandés n'est exploitable : ${rushes.ecartes.map((e) => `${e.jeu} (${e.raison})`).join(' ; ')}`);
-    let battement = 0, tour = 0;
+    let battement = 0, tour = 0, rangTexte = 0;
     const courts = [];
     for (const [k, duree] of r.plans.entries()) {
       const debut = imageDuTemps(battement), fin = imageDuTemps(battement + duree), n = fin - debut;
@@ -198,7 +198,9 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
       const vars = { ...variables, titre: titreCourt(fiche.titre), titre_complet: fiche.titre, rang: k + 1 };
       const tx = [];
       // Texte du haut et pastille du bas : un par plan, dans l'ordre de la variante (ou à tour de rôle).
-      const pris = (liste) => (Array.isArray(liste) && liste.length ? (variante.en_boucle ? liste[k % liste.length] : liste[k]) : undefined);
+      // Les plans très courts n'ont pas de texte à eux : ils ne consomment pas de légende.
+      const q = court ? -1 : rangTexte++;
+      const pris = (liste) => (q >= 0 && Array.isArray(liste) && liste.length ? (variante.en_boucle ? liste[q % liste.length] : liste[q]) : undefined);
       const legende = pris(variante.legendes);
       const pastille = variante.etiquettes === false ? null : Array.isArray(variante.etiquettes) ? pris(variante.etiquettes) : '{titre}';
       if (legende && !court) tx.push({ texte: legende, style: variante.style_legende || 'titre', position: 'haut', de: 5 / IPS, entree: k % 2 ? 'glisse' : 'pop', son: 'pop' });
@@ -228,11 +230,19 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
     curseur = finVideo;
     musique = { bpm: r.bpm, depart: dureeAccroche, fin: finMontage / IPS, ambiance: r.ambiance || 'arcade' };
 
-    // Plans très courts de la fin du montage : un seul texte par-dessus toute la rafale.
+    // Plans très courts : un seul texte par-dessus chaque rafale (suite de plans courts qui
+    // se touchent). « rafale » peut être une liste : un texte par rafale, à tour de rôle.
     if (courts.length && variante.rafale) {
-      const de = courts[0].debut, a = courts[courts.length - 1].fin;
-      globaux.push(...preparerTextes([{ texte: variante.rafale, style: variante.style_legende || 'titre', position: 'haut', de: 4 / IPS, entree: 'pop', son: 'pop' }], variables, a - de, 'rafale', accents, de)
-        .map((t) => ({ ...t, de: t.de + de, a })));
+      const groupes = [];
+      for (const c of courts) {
+        const dernier = groupes[groupes.length - 1];
+        if (dernier && dernier.a === c.debut) dernier.a = c.fin; else groupes.push({ de: c.debut, a: c.fin });
+      }
+      const liste = Array.isArray(variante.rafale) ? variante.rafale : [variante.rafale];
+      groupes.forEach(({ de, a }, g) => {
+        globaux.push(...preparerTextes([{ texte: liste[g % liste.length], style: variante.style_legende || 'titre', position: 'haut', de: 4 / IPS, entree: 'pop', son: 'pop' }], variables, a - de, `rafale-${g}`, accents, de)
+          .map((t) => ({ ...t, de: t.de + de, a })));
+      });
     }
   }
 
