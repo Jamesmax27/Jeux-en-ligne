@@ -1951,6 +1951,7 @@
       try { const d = JEL_SAVE.load(JEU); return !!(d && d.options && d.options.sonCoupe); } catch (e) { return false; }
     })(),
     init() {
+      if (apercu || window.JEL_AFFICHE) return; // affiche et images du jeu : aucun son
       if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); return; }
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -2422,6 +2423,7 @@
   // État du jeu
   // ------------------------------------------------------------------------
   let mode = 'titre';           // titre, menu, tuto, jeu, compte, pause, bilan
+  let apercu = 0;               // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   let niveau = 0;               // indice 0…19
   let morceau = null;
   let origine = 0;              // performance.now() au temps 0 du morceau
@@ -2437,7 +2439,7 @@
   let criActif = null;
   const appuis = new Map();     // pointeurs : { x, y, oeufFait }
 
-  const tempsChanson = () => (mode === 'jeu' ? (performance.now() - origine) / 1000 : tempsFige);
+  const tempsChanson = () => (mode === 'jeu' && !apercu ? (performance.now() - origine) / 1000 : tempsFige);
 
   function nouvellesStats() {
     return { score: 0, affiche: 0, combo: 0, serieMax: 0, parfaits: 0, biens: 0, rates: 0, energie: 100, fossiles: 0, vides: 0 };
@@ -2710,7 +2712,7 @@
   }
 
   function mettreEnPause() {
-    if (mode !== 'jeu' && mode !== 'compte') return;
+    if (apercu || (mode !== 'jeu' && mode !== 'compte')) return;
     tempsFige = tempsChanson();
     // Une note longue tenue pendant la pause est comptée réussie (on ne pénalise pas l'enfant)
     morceau.notes.forEach((n) => { if (n.tenu) { n.tenu = null; n.queue = 1; compter('parfait', n, true); } });
@@ -2782,7 +2784,7 @@
 
   // Appui : toucher, clic ou touche
   function appui(source, estHaut) {
-    if (mode !== 'jeu') return;
+    if (mode !== 'jeu' || apercu) return;
     const now = tempsChanson();
     eclatTambour = 1;
     // Flèche vers le haut : pousse un œuf s'il y en a un sur le cercle
@@ -2814,7 +2816,7 @@
   function tempsDeDebut() { return morceau.notes.length ? morceau.notes[0].temps : 0; }
 
   function relacher(source) {
-    if (mode !== 'jeu' || !morceau) return;
+    if (mode !== 'jeu' || !morceau || apercu) return;
     const now = tempsChanson();
     morceau.notes.forEach((n) => {
       if (n.tenu !== source) return;
@@ -2954,6 +2956,7 @@
     const dt = Math.min(0.05, (ms - derniere) / 1000); derniere = ms;
     const temps = ms / 1000;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (apercu) { secousse = 0; eclatCible = 0.7; eclatTambour = 0.55; } // image du jeu : moment figé, sans secousse
 
     if (mode === 'compte' && performance.now() >= compteFin) { mode = 'jeu'; origine = performance.now() - tempsFige * 1000; }
     if (mode === 'jeu') majJeu(tempsChanson());
@@ -2984,12 +2987,13 @@
       dessinerDecor(ctx, now, defile, L.sol, volcanForce);
       for (const k in frappes) frappes[k] = Math.max(0, frappes[k] - dt * 3);
       if (saut > 0) saut = Math.max(0, saut - dt * 2.2);
+      if (apercu) for (let i = 0; i < 7; i++) frappes[i] = Math.max(0, Math.sin(temps * 5 + i * 1.3)); // les musiciens jouent
       dessinerParade(ctx, especesDuNiveau(niveau), now, beat, L.sol, L.echelle, frappes, saut, false);
       dessinerPiste(now, beat);
     }
 
     // Effets
-    dessinerEffets(dt);
+    dessinerEffets(apercu ? 0 : dt); // image du jeu : étincelles et messages figés
     ctx.restore();
 
     if (mode === 'compte') {
@@ -3201,7 +3205,7 @@
   document.addEventListener('keyup', (e) => { if (mode === 'jeu') relacher('k' + e.code); });
 
   // Pause automatique quand l'écran est caché
-  document.addEventListener('visibilitychange', () => { if (document.hidden) mettreEnPause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !apercu) mettreEnPause(); });
 
   // Boutons
   document.querySelectorAll('.b-son').forEach((b) => b.addEventListener('click', () => { Son.init(); Son.basculer(); Son.clic(); }));
@@ -3252,9 +3256,162 @@
     if (!$('ecran-collection').hidden) majCollection();
   });
 
+  // ------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le Tricératops, en grand,
+  // frappe son tambour : les notes s'envolent, le Diplodocus souffle dans son cor, le Ptéranodon joue
+  // de la flûte, le Tyrannosaure fait claquer ses cymbales, le volcan crache sa lave sous les fanions.
+  function hasardFixe(graine) {
+    let g = graine | 0;
+    return () => { g = (g + 0x6D2B79F5) | 0; let x = Math.imul(g ^ (g >>> 15), 1 | g); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  }
+  function noteMusique(c, x, y, r, couleur, rot) { // croche dessinée (forme, pas un caractère)
+    c.save(); c.translate(x, y); c.rotate(rot);
+    c.shadowColor = couleur; c.shadowBlur = r * 1.2;
+    ellipse(c, 0, 0, r, r * 0.74, couleur, -0.4);
+    rect(c, r * 0.62, -r * 3.3, r * 0.34, r * 3.3, r * 0.15, couleur);
+    poly(c, [r * 0.62, -r * 3.3, r * 2.1, -r * 2.4, r * 2.0, -r * 1.7, r * 0.96, -r * 2.5], couleur);
+    c.restore();
+  }
+  function dessinerAffiche(temps) {
+    const c = ctx;
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const k = Math.min(W / 600, H / 800), cx = W / 2;
+    const sol = Math.round(H * 0.6);
+    dessinerDecor(c, temps, 40, sol, 0.8);
+    // Grande lumière chaude derrière le héros
+    const hx = cx + 12 * k, hy = H * 0.74, s = 4.2 * k;
+    const halo = c.createRadialGradient(hx - 40 * k, hy - 160 * k, 10 * k, hx - 40 * k, hy - 160 * k, 360 * k);
+    halo.addColorStop(0, 'rgba(255,246,200,.65)'); halo.addColorStop(0.5, 'rgba(255,220,150,.25)'); halo.addColorStop(1, 'rgba(255,220,150,0)');
+    c.fillStyle = halo; c.fillRect(0, 0, W, H);
+    // Rayons de lumière qui partent du tambour
+    c.save(); c.globalAlpha = 0.1; c.fillStyle = '#fff6c8';
+    for (let i = 0; i < 9; i++) { const a = -Math.PI + i * Math.PI / 8 + Math.sin(temps * 0.6) * 0.04; c.beginPath(); c.moveTo(hx + 46 * k, hy - 150 * k); c.lineTo(hx + 46 * k + Math.cos(a - 0.07) * 700 * k, hy - 150 * k + Math.sin(a - 0.07) * 700 * k); c.lineTo(hx + 46 * k + Math.cos(a + 0.07) * 700 * k, hy - 150 * k + Math.sin(a + 0.07) * 700 * k); c.closePath(); c.fill(); }
+    c.restore();
+    // Musiciens du fond : Tyrannosaure (cymbales), Diplodocus (cor doré), Ptéranodon (flûte)
+    const frappe = (d) => Math.max(0, Math.sin(temps * 6 + d));
+    dessinerDino(c, 6, cx + 250 * k, sol + 6 * k, 1.9 * k, temps * 0.4, 0.4 + 0.6 * frappe(1), 'haut', temps, false);
+    dessinerDino(c, 1, cx + 150 * k, sol - 4 * k, 2.3 * k, temps * 0.4 + 0.3, 1, 'fleurs', temps, false);
+    dessinerDino(c, 3, W * 0.2, H * 0.2 + Math.sin(temps * 1.3) * 6 * k, 2.6 * k, 0, 1, 'helice', temps, false);
+    // Notes qui sortent du cor et de la flûte
+    noteMusique(c, cx - 20 * k, H * 0.15, 11 * k, '#fff3a0', 0.2);
+    noteMusique(c, cx + 40 * k, H * 0.12, 9 * k, '#ffb0d6', -0.15);
+    noteMusique(c, W * 0.06, H * 0.24, 8 * k, '#bfe8ff', 0.1);
+    // Le héros : le Tricératops et son tambour, contour clair
+    c.save(); c.shadowColor = 'rgba(80,30,10,.35)'; c.shadowBlur = 0; c.shadowOffsetY = 0;
+    dessinerDino(c, 0, hx, hy, s, temps * 0.4, 1, 'cone', temps, false);
+    c.restore();
+    // Le coup de tambour : ondes dorées et étincelles autour du tambour
+    const tx = hx + 11 * s, ty = hy - 38 * s;
+    for (let i = 0; i < 3; i++) {
+      const p = ((temps * 0.9 + i / 3) % 1);
+      c.strokeStyle = `rgba(255,236,140,${0.6 * (1 - p)})`; c.lineWidth = 4 * k;
+      c.beginPath(); c.ellipse(tx, ty - 30 * k, (70 + p * 150) * k, (26 + p * 56) * k, 0, 0, Math.PI * 2); c.stroke();
+    }
+    const couleurs = ['#ffe066', '#ff7aa8', '#7fe07a', '#5fc7ff', '#c08bff'];
+    for (let i = 0; i < 14; i++) { const a = -Math.PI * 0.95 + i * 0.13, d = (70 + (i % 3) * 30) * k; c.fillStyle = couleurs[i % 5]; etoileChemin(c, tx + Math.cos(a) * d * 1.4, ty + Math.sin(a) * d, (5 + (i % 3) * 2) * k, 4); c.fill(); }
+    // Notes qui jaillissent du tambour
+    [[40, -150, 16, '#ffe066', 0.25], [130, -120, 13, '#ff7aa8', -0.2], [-10, -210, 12, '#7fe07a', 0.1], [170, -200, 11, '#5fc7ff', 0.3], [90, -250, 10, '#c08bff', -0.1]]
+      .forEach(([dx, dy, r, col, rot], i) => noteMusique(c, tx + dx * k, ty + (dy + Math.sin(temps * 2 + i) * 6) * k, r * k, col, rot));
+    // Piste d'empreintes au sol, vers le cercle lumineux
+    const py = H * 0.84;
+    c.strokeStyle = 'rgba(255,255,255,.95)'; c.lineWidth = 6 * k; c.beginPath(); c.arc(W * 0.27, py, 34 * k, 0, Math.PI * 2); c.stroke();
+    for (let i = 0; i < 5; i++) { const ex = W * 0.27 + (80 + i * 90) * k; if (ex < W + 30) empreinte(c, ex, py, 18 * k, i === 2 ? '#f2b705' : '#5b3a1e'); }
+    // Premier plan : grandes fougères coupées par les coins du bas
+    const fougere = (x, y, f, sens) => { for (let j = 0; j < 7; j++) { c.save(); c.translate(x, y); c.rotate(-Math.PI / 2 + sens * (j - 3) * 0.24 + Math.sin(temps + j) * 0.03); ellipse(c, 70 * f, 0, 80 * f, 20 * f, j % 2 ? '#2f8a48' : '#3fa85a'); for (let q = 0; q < 6; q++) { ellipse(c, (24 + q * 20) * f, -14 * f, 11 * f, 5 * f, '#56c46f', -0.6); ellipse(c, (24 + q * 20) * f, 14 * f, 11 * f, 5 * f, '#56c46f', 0.6); } c.restore(); } };
+    fougere(-20 * k, H + 10 * k, 1.5 * k, 1);
+    fougere(W + 20 * k, H + 20 * k, 1.3 * k, -1);
+    // Confettis de fête
+    const r = hasardFixe(77);
+    for (let i = 0; i < 40; i++) { const x = r() * W, y = ((r() * H * 0.7 + temps * 30 * (0.5 + r())) % (H * 0.75)); c.save(); c.translate(x, y); c.rotate(r() * 6 + temps); rect(c, -5 * k, -3 * k, 10 * k, 6 * k, 1, couleurs[i % 5]); c.restore(); }
+  }
+  function demarrerAffiche() {
+    Math.random = hasardFixe(20261127); // fumée du volcan toujours la même
+    const cacher = () => { for (const el of document.querySelectorAll('.ecran, #hud, button, .jel-langue, jel-langue')) el.style.setProperty('display', 'none', 'important'); };
+    cacher(); setTimeout(cacher, 200); setTimeout(cacher, 1000);
+    for (let i = 0; i < 160; i++) dessinerDecor(ctx, 0, 40, Math.round(H * 0.6), 0.8); // la fumée monte déjà
+    const image = (ms) => { dessinerAffiche(ms / 1000); requestAnimationFrame(image); };
+    requestAnimationFrame(image);
+  }
+
+  // ------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // ------------------------------------------------------------------------
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre en
+  // pleine partie, avec sa vraie interface (niveau, progression, score, cœur de la parade, piste, tambour),
+  // sans écran titre, ni fenêtre « Continuer », ni tutoriel. Le morceau est figé juste après un coup réussi :
+  // ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1 : le Tricératops seul, premières empreintes ;
+  //   2 = niveau 16 : six musiciens, le volcan entre en éruption et la musique accélère ;
+  //   3 = niveau 20 : la parade complète, fougères sur la piste, le chef joue un rythme (bande violette)
+  //       qu'il faudra répéter de mémoire.
+  const SCENES_APERCU = {
+    1: { niveau: 0, de: 3, a: 10, energie: 92, combo: 9, chapeaux: {} },
+    2: { niveau: 15, volcan: true, energie: 78, combo: 21, oeufs: 2, chapeaux: { triceratops: 'cone', diplodocus: 'fleurs', pteranodon: 'noeud' } },
+    3: { niveau: 19, memoire: 1, energie: 68, combo: 34, oeufs: 4, chapeaux: { triceratops: 'couronne', diplodocus: 'fleurs', tyrannosaure: 'haut', pteranodon: 'helice', stegosaure: 'noeud', parasaurolophus: 'plumes' } },
+  };
+  // Instant de la capture : après une éruption, pendant un appel du chef, ou juste après une empreinte
+  // frappée là où la piste montre le plus d'empreintes à venir.
+  function instantApercu(sc) {
+    if (sc.volcan && morceau.eruptions.length) return { now: morceau.eruptions[0].temps + 0.35, frappee: null };
+    if (sc.memoire !== undefined) {
+      const appels = morceau.sections.filter((s) => s.type === 'appel');
+      const a = appels[Math.min(sc.memoire, appels.length - 1)];
+      return { now: a.debut + (a.fin - a.debut) * 0.3, frappee: null };
+    }
+    const avance = NIVEAUX[niveau].avance;
+    const joueur = morceau.notes.filter((n) => !n.chef);
+    let meilleure = null, max = -1;
+    joueur.forEach((n) => {
+      if (n.type !== 'tap' || n.temps < morceau.tempsDe(DEBUT + sc.de * 4) || n.temps > morceau.tempsDe(DEBUT + sc.a * 4)) return;
+      const vues = joueur.filter((m) => m.temps > n.temps + 0.05 && m.temps < n.temps + avance * 0.95).length;
+      if (vues > max) { max = vues; meilleure = n; }
+    });
+    meilleure = meilleure || joueur[0];
+    return { now: meilleure.temps + 0.04, frappee: meilleure };
+  }
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    Math.random = hasardFixe(1234567 + numero * 7919); // la même image à chaque capture
+    progres.chapeaux = Object.assign({}, sc.chapeaux); // en mémoire seulement : rien n'est enregistré
+    niveau = sc.niveau;
+    morceau = construireMorceau(niveau);
+    stats = nouvellesStats();
+    effets = []; textes = []; confettis = []; frappes = {}; appuis.clear();
+    oeufsAuNid = sc.oeufs || 0;
+    partieEnCours = false; // pas de sauvegarde à la fermeture
+    const { now, frappee } = instantApercu(sc);
+    let passees = 0;
+    morceau.notes.forEach((n) => {
+      if (n.temps <= now) { n.etat = n.chef ? 3 : 1; n.vu = true; if (n.type === 'long') n.queue = 1; if (!n.chef) passees++; }
+    });
+    prochainChef = morceau.notes.findIndex((n) => n.temps > now); if (prochainChef < 0) prochainChef = morceau.notes.length;
+    morceau.eruptions.forEach((e) => { e.alerteFaite = now >= e.alerte; e.fait = now >= e.temps + 1; });
+    stats.score = Math.round(passees * 88 / 10) * 10; stats.affiche = stats.score;
+    stats.combo = Math.min(passees, sc.combo); stats.serieMax = stats.combo; stats.energie = sc.energie;
+    tempsFige = now;
+    mode = 'jeu';
+    $('hud-niveau').textContent = t('hud.niveau', { n: niveau + 1, nom: nomNiveau(niveau) });
+    montrer(null);
+    // Le coup qui vient d'être frappé : étincelles et message « Parfait »
+    if (frappee) { ajouterTexte(t('juge.parfait'), '#ffe066'); eclats(L.cibleX, L.piste, frappee.doree ? '#ffd84d' : '#fff3a0', 16); }
+    majJeu(now); // le volcan du niveau 20 entre en éruption ; le chef vient de jouer (étincelles violettes)
+    for (let i = 0; i < 18; i++) dessinerEffets(1 / 60); // les étincelles s'écartent un peu, puis tout est figé
+    majHud();
+    requestAnimationFrame(boucle);
+  }
+
   majBoutonsSon();
-  montrer('ecran-titre');
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  else {
+    montrer('ecran-titre');
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

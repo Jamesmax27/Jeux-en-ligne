@@ -2400,6 +2400,21 @@ button.puce { min-height: 44px; }
   .etagere { display: none; }
 }
 @media (min-width: 641px) { body { background: #2d4a33; } }
+
+/* --- Affiche (window.JEL_AFFICHE, posé par le robot du site) --- */
+#affiche { position: fixed; inset: 0; z-index: 100; background: #c98f5a; }
+#affiche svg { display: block; width: 100%; height: 100%; }
+
+/* --- Image du jeu sur ordinateur (window.JEL_APERCU = 3) : la boutique prend toute la largeur --- */
+.apercu-large .ecran { max-width: none; }
+.apercu-large .ecureuil { left: calc(50% - 360px); font-size: 92px; }
+.apercu-large .col-client { right: calc(50% - 380px); }
+.apercu-large .client { font-size: 104px; }
+.apercu-large .bulle { left: calc(50% - 250px); right: calc(50% - 250px); bottom: 26px; font-size: 17px; }
+.apercu-large .etagere { font-size: 26px; height: 40px; }
+.apercu-large .comptoir { gap: 10px; }
+.apercu-large .panneau { align-items: center; }
+.apercu-large .panneau > * { width: min(100%, 780px); }
 </style>
 </head>
 <body>
@@ -2627,6 +2642,9 @@ button.puce { min-height: 44px; }
     return l;
   }
   function svgGland() { return '<svg class="gl" aria-hidden="true"><use href="#gland"/></svg>'; }
+  // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU, posé par le robot) ;
+  // rien n'est alors enregistré ni joué (aucun son).
+  var apercu = 0;
 
   // ------------------------------------------------------------------------
   // Données : produits, rayons, clients, enseignes
@@ -2734,7 +2752,7 @@ button.puce { min-height: 44px; }
     var lu = JSON.parse(localStorage.getItem(CLE) || 'null');
     if (lu && typeof lu === 'object') for (var k in sauve) if (lu[k] !== undefined) sauve[k] = lu[k];
   } catch (e) { /* stockage indisponible */ }
-  function sauver() { try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* stockage refusé */ } }
+  function sauver() { if (apercu) return; try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* stockage refusé */ } }
   function totalEtoiles() { var s = 0; for (var i = 0; i < NIVEAUX.length; i++) s += sauve.etoiles[i] || 0; return s; }
 
   // Sauvegarde de la progression sur le site (module JEL_SAVE) : journée où
@@ -2757,7 +2775,7 @@ button.puce { min-height: 44px; }
     }
   } catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
   JEL_SAVE.surFermeture(function () {
-    if (ecranCourant !== 'jeu') return;
+    if (apercu || ecranCourant !== 'jeu') return;
     if (etat.phase === 'fin' && journeeGagnee === etat.niv) return; // déjà enregistrée
     JEL_SAVE.save(JEU, { niveau: etat.niv + 1 });
   });
@@ -2767,7 +2785,7 @@ button.puce { min-height: 44px; }
   // ------------------------------------------------------------------------
   var actx = null, sonPret = false;
   function contexte() {
-    if (!sauve.son || !sonPret || etat.pause) return null;
+    if (apercu || !sauve.son || !sonPret || etat.pause) return null;
     try {
       if (!actx) { var C = window.AudioContext || window.webkitAudioContext; if (!C) return null; actx = new C(); }
       if (actx.state === 'suspended') actx.resume();
@@ -3932,6 +3950,7 @@ button.puce { min-height: 44px; }
   var tuto = { actif: false, etapes: [], i: 0 };
   var tutosVusSession = {};
   function tutoriels(cles) {
+    if (apercu) return;
     var etapes = [];
     cles.forEach(function (k) {
       if (sauve.tutos[k] || tutosVusSession[k] || !TUTOS[k]) return;
@@ -4126,6 +4145,273 @@ button.puce { min-height: 44px; }
   $('#ecran-jeu').addEventListener('mousedown', function (e) { if (e.target.closest('button')) e.preventDefault(); });
 
   majBoutonsSon();
+
+  // ------------------------------------------------------------------------
+  // Affiche (jaquette du jeu) : avec window.JEL_AFFICHE (posé par le robot du
+  // site, jamais par le jeu), une scène composée sans interface ni texte
+  // (CONSIGNES-JEU.md, section 5). L'écureuil épicier, en grand derrière son
+  // comptoir, brandit une pièce dorée devant un lapin client ; la lumière du
+  // soleil entre par la grande fenêtre ronde de la boutique.
+  // ------------------------------------------------------------------------
+  function svgPiece(x, y, r, angle) {
+    // Pièce de glands vue de face ou un peu de biais (sans chiffre).
+    var sx = Math.max(0.25, Math.abs(Math.cos(angle || 0)));
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + sx + ' 1)">' +
+      '<circle r="' + r + '" fill="#9a6a0a"/>' +
+      '<circle r="' + (r * 0.94) + '" fill="url(#af-or)"/>' +
+      '<circle r="' + (r * 0.72) + '" fill="none" stroke="#c98f12" stroke-width="' + (r * 0.07) + '"/>' +
+      '<use href="#gland" x="' + (-r * 0.5) + '" y="' + (-r * 0.5) + '" width="' + r + '" height="' + r + '"/>' +
+      '<ellipse cx="' + (-r * 0.35) + '" cy="' + (-r * 0.45) + '" rx="' + (r * 0.28) + '" ry="' + (r * 0.14) + '" fill="#fff" opacity=".7" transform="rotate(-30 ' + (-r * 0.35) + ' ' + (-r * 0.45) + ')"/>' +
+      '</g>';
+  }
+  function svgEtincelle(x, y, r) {
+    return '<path d="M' + x + ' ' + (y - r) + ' Q' + x + ' ' + y + ' ' + (x + r) + ' ' + y + ' Q' + x + ' ' + y + ' ' + x + ' ' + (y + r) +
+      ' Q' + x + ' ' + y + ' ' + (x - r) + ' ' + y + ' Q' + x + ' ' + y + ' ' + x + ' ' + (y - r) + 'Z" fill="#fffbe0"/>';
+  }
+  function svgPot(x, y, coul, k) {
+    k = k || 1;
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + k + ')">' +
+      '<rect x="-14" y="-30" width="28" height="30" rx="7" fill="' + coul + '"/>' +
+      '<rect x="-10" y="-24" width="7" height="16" rx="3" fill="#fff" opacity=".35"/>' +
+      '<rect x="-16" y="-38" width="32" height="10" rx="3" fill="#f4f0e6"/>' +
+      '<path d="M-16 -33 h32" stroke="#d0473f" stroke-width="3" stroke-dasharray="4 4"/></g>';
+  }
+  function svgChampi(x, y, k) {
+    k = k || 1;
+    return '<g transform="translate(' + x + ' ' + y + ') scale(' + k + ')">' +
+      '<path d="M-6 0 v-14 h12 v14z" fill="#fff5e6"/><path d="M-17 -12 q17 -26 34 0z" fill="#d0473f"/>' +
+      '<circle cx="-6" cy="-19" r="3" fill="#fff"/><circle cx="6" cy="-17" r="2.4" fill="#fff"/><circle cx="1" cy="-25" r="2" fill="#fff"/></g>';
+  }
+  function dessinerAffiche() {
+    var boite = document.getElementById('affiche');
+    if (!boite) {
+      boite = document.createElement('div');
+      boite.id = 'affiche';
+      boite.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(boite);
+    }
+    var s = [];
+    s.push('<svg viewBox="0 0 600 800" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">');
+    s.push('<defs>' +
+      '<linearGradient id="af-mur" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3d3a4"/><stop offset="1" stop-color="#d9a46a"/></linearGradient>' +
+      '<linearGradient id="af-ciel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fd3ff"/><stop offset="1" stop-color="#e9fbe6"/></linearGradient>' +
+      '<radialGradient id="af-halo" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff8c8" stop-opacity=".95"/><stop offset=".55" stop-color="#ffe9a0" stop-opacity=".4"/><stop offset="1" stop-color="#ffe9a0" stop-opacity="0"/></radialGradient>' +
+      '<radialGradient id="af-or" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff6b8"/><stop offset=".5" stop-color="#f6c63e"/><stop offset="1" stop-color="#c98f12"/></radialGradient>' +
+      '<radialGradient id="af-queue" cx=".45" cy=".4" r=".7"><stop offset="0" stop-color="#f7b56a"/><stop offset="1" stop-color="#b9561a"/></radialGradient>' +
+      '<radialGradient id="af-tete" cx=".42" cy=".35" r=".7"><stop offset="0" stop-color="#f3a45a"/><stop offset="1" stop-color="#cf6f28"/></radialGradient>' +
+      '<radialGradient id="af-lapin" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d8cfc6"/></radialGradient>' +
+      '<linearGradient id="af-comptoir" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a8703f"/><stop offset="1" stop-color="#6d4423"/></linearGradient>' +
+      '<linearGradient id="af-caisse" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#55b066"/><stop offset="1" stop-color="#2b6a38"/></linearGradient>' +
+      '<linearGradient id="af-rayon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6c0" stop-opacity=".55"/><stop offset="1" stop-color="#fff6c0" stop-opacity="0"/></linearGradient>' +
+      '<pattern id="af-store" width="60" height="70" patternUnits="userSpaceOnUse"><rect width="30" height="70" fill="#d0473f"/><rect x="30" width="30" height="70" fill="#fff4e0"/></pattern>' +
+      '<pattern id="af-planches" width="70" height="800" patternUnits="userSpaceOnUse"><rect width="70" height="800" fill="url(#af-mur)"/><rect width="3" height="800" fill="#b98250" opacity=".35"/></pattern>' +
+      '</defs>');
+    // Mur de planches (prolongé sur les côtés pour les écrans larges)
+    s.push('<rect x="-1400" y="-400" width="3400" height="1600" fill="url(#af-planches)"/>');
+    // Grande fenêtre ronde : forêt et soleil, la source de lumière
+    s.push('<circle cx="300" cy="250" r="168" fill="#6d4423"/><circle cx="300" cy="250" r="156" fill="url(#af-ciel)"/>');
+    s.push('<clipPath id="af-vitre"><circle cx="300" cy="250" r="156"/></clipPath><g clip-path="url(#af-vitre)">' +
+      '<circle cx="372" cy="170" r="44" fill="#fff3a0"/><circle cx="372" cy="170" r="62" fill="#fff3a0" opacity=".35"/>' +
+      '<circle cx="180" cy="160" r="20" fill="#fff" opacity=".9"/><circle cx="204" cy="152" r="26" fill="#fff" opacity=".9"/><circle cx="230" cy="162" r="18" fill="#fff" opacity=".9"/>' +
+      '<ellipse cx="170" cy="360" rx="110" ry="90" fill="#6cbf63"/><ellipse cx="430" cy="350" rx="120" ry="80" fill="#5fae5f"/>' +
+      '<rect x="190" y="250" width="14" height="80" fill="#7a4f2a"/><circle cx="197" cy="240" r="34" fill="#3f8f4f"/>' +
+      '<rect x="410" y="240" width="14" height="90" fill="#7a4f2a"/><circle cx="417" cy="228" r="38" fill="#4f9a50"/>' +
+      '</g>');
+    s.push('<path d="M300 94 V406 M144 250 H456" stroke="#6d4423" stroke-width="10"/>');
+    // Rayons du soleil qui entrent dans la boutique
+    s.push('<g opacity=".55"><path d="M352 130 L392 130 L560 640 L430 640 Z" fill="url(#af-rayon)"/><path d="M410 150 L440 160 L700 640 L600 640 Z" fill="url(#af-rayon)"/><path d="M300 130 L330 130 L330 640 L230 640 Z" fill="url(#af-rayon)"/></g>');
+    s.push('<ellipse cx="290" cy="330" rx="300" ry="300" fill="url(#af-halo)"/>');
+    // Étagères pleines à gauche et à droite (prolongées vers les bords)
+    function etagere(x0, x1, y) {
+      var e = '<rect x="' + x0 + '" y="' + y + '" width="' + (x1 - x0) + '" height="12" rx="3" fill="#8a5a33"/><rect x="' + x0 + '" y="' + (y + 12) + '" width="' + (x1 - x0) + '" height="6" fill="#5e3a1d" opacity=".5"/>';
+      var coul = ['#e45b6c', '#8e5bc9', '#f2b632', '#e45b6c'];
+      for (var x = x0 + 22, i = 0; x < x1 - 10; x += 42, i++) {
+        if (i % 3 === 0) e += svgPot(x, y, coul[(i / 3) % 4]);
+        else if (i % 3 === 1) e += svgChampi(x, y);
+        else e += '<use href="#gland" x="' + (x - 15) + '" y="' + (y - 32) + '" width="30" height="30"/>';
+      }
+      return e;
+    }
+    s.push(etagere(-1400, 118, 200), etagere(-1400, 118, 320), etagere(482, 2000, 200), etagere(482, 2000, 320));
+    // Store rayé de la boutique en haut
+    s.push('<rect x="-1400" y="-400" width="3400" height="470" fill="url(#af-store)"/>');
+    var fest = '';
+    for (var fx = -1410; fx < 2000; fx += 30) fest += '<circle cx="' + (fx + 15) + '" cy="70" r="15" fill="' + (((fx + 1410) / 30) % 2 ? '#fff4e0' : '#d0473f') + '"/>';
+    s.push(fest, '<rect x="-1400" y="66" width="3400" height="5" fill="#000" opacity=".08"/>');
+    // Le lapin client (plan moyen, à droite)
+    s.push('<g>' +
+      '<ellipse cx="478" cy="248" rx="20" ry="72" fill="url(#af-lapin)" transform="rotate(-12 478 248)"/><ellipse cx="478" cy="252" rx="9" ry="54" fill="#f7b8c4" transform="rotate(-12 478 252)"/>' +
+      '<ellipse cx="530" cy="250" rx="20" ry="72" fill="url(#af-lapin)" transform="rotate(14 530 250)"/><ellipse cx="530" cy="254" rx="9" ry="54" fill="#f7b8c4" transform="rotate(14 530 254)"/>' +
+      '<ellipse cx="505" cy="490" rx="70" ry="90" fill="url(#af-lapin)"/>' +
+      '<circle cx="505" cy="370" r="60" fill="url(#af-lapin)"/>' +
+      '<circle cx="482" cy="362" r="10" fill="#2b1a0e"/><circle cx="522" cy="360" r="10" fill="#2b1a0e"/>' +
+      '<circle cx="485" cy="358" r="3.5" fill="#fff"/><circle cx="525" cy="356" r="3.5" fill="#fff"/>' +
+      '<ellipse cx="502" cy="384" rx="8" ry="6" fill="#f08aa0"/>' +
+      '<path d="M490 394 q12 14 24 0" stroke="#5a2c10" stroke-width="3" fill="#c0475e" stroke-linecap="round"/>' +
+      '<circle cx="466" cy="384" r="9" fill="#f7a4b4" opacity=".7"/><circle cx="540" cy="382" r="9" fill="#f7a4b4" opacity=".7"/>' +
+      // bras tendu vers la pièce
+      '<path d="M462 450 Q430 420 420 380" stroke="#ece5dc" stroke-width="24" fill="none" stroke-linecap="round"/><circle cx="420" cy="378" r="15" fill="#fff"/>' +
+      // écharpe
+      '<path d="M455 420 q50 22 100 0 v18 q-50 22 -100 0z" fill="#3b6fb6"/>' +
+      '</g>');
+    // L'écureuil épicier, en grand
+    s.push('<g>' +
+      // queue en panache
+      '<path d="M215 560 C40 560 20 330 110 240 C170 180 270 200 262 270 C256 320 190 322 196 280" fill="url(#af-queue)" stroke="#a24f15" stroke-width="8" stroke-linejoin="round"/>' +
+      '<path d="M120 300 C90 360 100 450 160 510" stroke="#ffd29a" stroke-width="10" fill="none" stroke-linecap="round" opacity=".7"/>' +
+      // corps et tablier
+      '<ellipse cx="290" cy="500" rx="100" ry="120" fill="#d9782f"/>' +
+      '<path d="M222 420 q68 26 136 0 v170 h-136z" fill="#fffdf7"/>' +
+      '<path d="M222 420 q68 26 136 0" stroke="#3f8f4f" stroke-width="9" fill="none"/>' +
+      '<rect x="262" y="470" width="56" height="40" rx="8" fill="#e9f5ea" stroke="#3f8f4f" stroke-width="4"/>' +
+      '<use href="#gland" x="276" y="474" width="28" height="28"/>' +
+      // tête
+      '<path d="M220 250 L208 150 L268 214 Z" fill="#cf6f28"/><path d="M226 236 L220 176 L254 214 Z" fill="#f7b8a0"/><path d="M208 150 l-8 -22 l14 14z" fill="#a24f15"/>' +
+      '<path d="M340 214 L388 140 L380 246 Z" fill="#cf6f28"/><path d="M348 216 L380 170 L374 236 Z" fill="#f7b8a0"/><path d="M388 140 l6 -24 l4 22z" fill="#a24f15"/>' +
+      '<circle cx="298" cy="300" r="92" fill="url(#af-tete)"/>' +
+      '<path d="M210 300 a92 92 0 0 1 80 -91" stroke="#fff3c0" stroke-width="5" fill="none" opacity=".8" stroke-linecap="round"/>' +
+      '<ellipse cx="302" cy="338" rx="50" ry="38" fill="#f6c99a"/>' +
+      '<ellipse cx="262" cy="290" rx="17" ry="20" fill="#2b1a0e"/><ellipse cx="342" cy="290" rx="17" ry="20" fill="#2b1a0e"/>' +
+      '<circle cx="268" cy="282" r="6.5" fill="#fff"/><circle cx="348" cy="282" r="6.5" fill="#fff"/><circle cx="258" cy="298" r="3" fill="#fff"/><circle cx="338" cy="298" r="3" fill="#fff"/>' +
+      '<path d="M240 262 q20 -12 38 -2" stroke="#7a3a12" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M326 260 q20 -10 38 2" stroke="#7a3a12" stroke-width="5" fill="none" stroke-linecap="round"/>' +
+      '<ellipse cx="302" cy="322" rx="12" ry="9" fill="#5a2c10"/>' +
+      '<path d="M278 344 Q302 378 326 344 Z" fill="#7a2c1a"/><path d="M290 358 q12 10 24 0 q-12 -8 -24 0z" fill="#f08a8a"/>' +
+      '<rect x="294" y="344" width="8" height="9" rx="2" fill="#fff"/><rect x="303" y="344" width="8" height="9" rx="2" fill="#fff"/>' +
+      '<circle cx="238" cy="334" r="14" fill="#f29a8a" opacity=".65"/><circle cx="366" cy="334" r="14" fill="#f29a8a" opacity=".65"/>' +
+      // bras levé qui brandit la pièce dorée
+      '<path d="M352 446 Q424 420 432 318" stroke="#a24f15" stroke-width="38" fill="none" stroke-linecap="round"/>' +
+      '<path d="M352 446 Q424 420 432 318" stroke="#d9782f" stroke-width="30" fill="none" stroke-linecap="round"/>' +
+      // bras posé sur la caisse
+      '<path d="M222 460 Q190 500 178 520" stroke="#d9782f" stroke-width="30" fill="none" stroke-linecap="round"/><circle cx="176" cy="524" r="17" fill="#e08a3c"/>' +
+      '</g>');
+    // La pièce dorée brandie, qui brille, et les pièces qui volent vers le lapin
+    s.push('<circle cx="434" cy="276" r="70" fill="url(#af-halo)"/>');
+    s.push(svgPiece(434, 278, 40, 0));
+    s.push('<circle cx="414" cy="312" r="13" fill="#e08a3c"/><circle cx="452" cy="312" r="13" fill="#e08a3c"/><ellipse cx="433" cy="320" rx="22" ry="14" fill="#e08a3c"/>');
+    s.push(svgPiece(500, 196, 18, 0.9), svgPiece(462, 160, 13, 0.3), svgPiece(536, 140, 11, 1.1));
+    s.push(svgEtincelle(384, 232, 14), svgEtincelle(486, 262, 11), svgEtincelle(420, 120, 9), svgEtincelle(510, 214, 8), svgEtincelle(150, 150, 10), svgEtincelle(560, 120, 9));
+    // Comptoir au premier plan
+    s.push('<rect x="-1400" y="560" width="3400" height="700" fill="url(#af-comptoir)"/>');
+    s.push('<rect x="-1400" y="548" width="3400" height="24" rx="6" fill="#c48a55"/><rect x="-1400" y="568" width="3400" height="6" fill="#5e3a1d" opacity=".4"/>');
+    var pl = '';
+    for (var px = -1400; px < 2000; px += 90) pl += '<rect x="' + px + '" y="574" width="4" height="700" fill="#5e3a1d" opacity=".35"/>';
+    s.push(pl);
+    // Caisse enregistreuse verte (écran sans chiffre), tiroir ouvert plein de pièces
+    s.push('<g>' +
+      '<path d="M70 548 L96 452 L226 452 L246 548 Z" fill="url(#af-caisse)"/>' +
+      '<rect x="102" y="418" width="110" height="38" rx="8" fill="#233a2a"/><rect x="110" y="426" width="94" height="22" rx="5" fill="#9ef0a8" opacity=".55"/>' +
+      '<circle cx="120" cy="478" r="8" fill="#fff"/><circle cx="146" cy="478" r="8" fill="#fff"/><circle cx="172" cy="478" r="8" fill="#fff"/><circle cx="198" cy="478" r="8" fill="#f2b632"/>' +
+      '<circle cx="114" cy="504" r="8" fill="#fff"/><circle cx="141" cy="504" r="8" fill="#fff"/><circle cx="168" cy="504" r="8" fill="#fff"/><circle cx="195" cy="504" r="8" fill="#d0473f"/>' +
+      '<rect x="58" y="552" width="200" height="40" rx="6" fill="#2b6a38"/><rect x="66" y="556" width="184" height="22" rx="4" fill="#1d4426"/>' +
+      '</g>');
+    s.push(svgPiece(90, 562, 15, 0), svgPiece(122, 560, 15, 0), svgPiece(156, 562, 15, 0), svgPiece(190, 560, 15, 0), svgPiece(226, 562, 15, 0));
+    // Courses du lapin sur le comptoir
+    s.push(svgPot(400, 552, '#e45b6c', 1.5), svgChampi(452, 552, 1.6), svgPot(560, 552, '#8e5bc9', 1.4));
+    s.push('<use href="#gland" x="480" y="510" width="44" height="44"/>');
+    // Premier plan coupé par les bords : panier de courses et gros glands
+    s.push('<g>' +
+      '<path d="M430 690 q90 -110 190 0" stroke="#8a5a33" stroke-width="14" fill="none"/>' +
+      '<circle cx="470" cy="690" r="34" fill="#d0473f"/><circle cx="520" cy="680" r="34" fill="#f2b632"/><circle cx="574" cy="690" r="32" fill="#8e5bc9"/>' +
+      '<path d="M420 690 h220 l-20 130 h-180z" fill="#c48a55" stroke="#8a5a33" stroke-width="6"/>' +
+      '<path d="M432 722 h196 M436 756 h188 M440 790 h180" stroke="#8a5a33" stroke-width="5"/>' +
+      '</g>');
+    s.push('<use href="#gland" x="-30" y="640" width="150" height="150"/><use href="#gland" x="90" y="700" width="96" height="96"/>');
+    s.push('</svg>');
+    boite.innerHTML = s.join('');
+  }
+  function cacherPourAffiche() {
+    Array.prototype.forEach.call(document.body.children, function (e) {
+      if (e.id !== 'affiche' && e.tagName !== 'SCRIPT' && e.tagName !== 'svg' && e.tagName !== 'SVG') e.style.setProperty('display', 'none', 'important');
+    });
+    document.querySelectorAll('.jel-langue, button').forEach(function (e) { e.style.setProperty('display', 'none', 'important'); });
+  }
+  function demarrerAffiche() {
+    dessinerAffiche();
+    cacherPourAffiche();
+    setTimeout(cacherPourAffiche, 100);
+    setTimeout(cacherPourAffiche, 600);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ------------------------------------------------------------------------
+  // Images du jeu (page du jeu) : avec window.JEL_APERCU = 1, 2 ou 3 (posé par
+  // le robot du site, jamais par le jeu), le jeu s'ouvre directement en pleine
+  // journée, avec sa vraie interface, sans écran titre, ni fenêtre, ni
+  // tutoriel (CONSIGNES-JEU.md, section 5). La scène est posée par le code,
+  // puis figée sans fenêtre de pause : ni son, ni sauvegarde, ni FMG.
+  //   1 = jour 1, matin : un lapin, un produit déjà passé en caisse ;
+  //   2 = jour 5, après-midi : un renard pressé, promotion, monnaie à rendre ;
+  //   3 = jour 12, après-midi (ordinateur) : la licorne, client rare, passe une
+  //       commande avec un bon de réduction, rayon gourmand et enseigne royale.
+  // ------------------------------------------------------------------------
+  var SCENES_APERCU = {
+    1: { niv: 0, enseigne: 0, score: 20, coeurs: 5, num: 2, temps: 26, animal: ['lapin', '🐰'],
+      articles: ['confiture', 'champignon'], recu: [5], scanner: 1 },
+    2: { niv: 9, enseigne: 3, score: 115, coeurs: 4, num: 4, temps: 98, animal: ['renard', '🦊'], promo: 'myrtille',
+      presse: 0.55, articles: ['myrtille', 'myrtille', 'myrtille', 'cerise', 'noisette'], recu: [5, 5, 2, 2], plateau: [2, 2] },
+    3: { niv: 23, enseigne: 6, score: 340, coeurs: 4, num: 6, temps: 214, rare: 11, coupon: 3,
+      articles: ['muffin', 'muffin', 'miel', 'tarte'], prises: ['muffin', 'muffin', 'miel'] }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    var sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    var graine = 98765 + numero * 7919;
+    Math.random = function () {
+      graine = (graine + 0x6D2B79F5) | 0;
+      var x = Math.imul(graine ^ (graine >>> 15), 1 | graine);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+    // Progression en mémoire seulement (rien n'est enregistré) : enseigne débloquée, tutoriels déjà vus.
+    var tous = {};
+    Object.keys(TUTOS).forEach(function (k) { tous[k] = true; });
+    var et = []; for (var i = 0; i < NIVEAUX.length; i++) et.push(i <= sc.niv ? 3 : 0);
+    sauve = { debloque: sc.niv + 1, etoiles: et, records: [], rares: [], enseigne: sc.enseigne, son: false, tutos: tous };
+    if (numero === 3) document.body.classList.add('apercu-large');
+    lancerNiveau(sc.niv);
+    $('#ov-intro').classList.remove('visible');
+    if (sc.promo) etat.promoProd = sc.promo;
+    // Le client de la scène, fabriqué selon les règles du niveau puis ajusté.
+    var c = fabriquerClient(0, null, sc.rare !== undefined ? RARES[sc.rare] : null);
+    c.articles = sc.articles.slice();
+    var p = prixTicket(c.articles);
+    c.brut = p.brut; c.offert = p.offert; c.total = p.brut - p.offert;
+    c.coupon = sc.coupon || 0; c.total -= c.coupon;
+    c.commande = !!sc.prises; c.optimal = false; c.presse = !!sc.presse;
+    c.recu = sc.recu || [c.total]; c.paye = somme(c.recu); c.rendu = c.paye - c.total;
+    if (sc.animal) { c.nom = 'animal.' + sc.animal[0]; c.e = sc.animal[1]; }
+    etat.file = [c]; etat.iFile = 0;
+    etat.numClient = sc.num - 1; etat.score = sc.score; etat.coeurs = sc.coeurs;
+    etat.erreurs = 5 - sc.coeurs; etat.temps = sc.temps; etat.servis = sc.num - 1;
+    etat.actif = true;
+    evenementSuivant();
+    // Le client est arrivé : on passe tout de suite à la caisse (ou à la commande).
+    etat.minuteries = [];
+    if (c.commande) phaseCommande(); else phaseCaisse();
+    if (c.presse) { c.patience = c.patienceMax * sc.presse; majPatience(); }
+    if (sc.scanner) for (var k = 0; k < sc.scanner; k++) scanner(k);
+    if (sc.plateau) {
+      c.articles.forEach(function (x, k) { scanner(k); });
+      etat.saisie = String(c.total);
+      validerTotal();
+      etat.minuteries = [];
+      phaseMonnaie();
+      sc.plateau.forEach(function (v) { ajouterPiece(v); });
+    }
+    if (sc.prises) sc.prises.forEach(function (x) {
+      var b = document.querySelector('#comptoir .article[data-p="' + x + '"]');
+      prendre(x, b);
+    });
+    majHud();
+    // Puis la journée est figée sur ce moment, sans fenêtre de pause.
+    etat.minuteries = [];
+    etat.pause = true;
+  }
+
+  var numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
 })();
 </script>
 </body>
