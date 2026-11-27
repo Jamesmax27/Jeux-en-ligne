@@ -18,7 +18,7 @@
 //     "preparation": [                avant de filmer (non filmé)
 //       { "attendre": 1 },            secondes de jeu
 //       { "clic": "Jouer" },          bouton dont le texte correspond ("facultatif", "max" s d'attente)
-//       { "selecteur": "#go" },       ou sélecteur CSS
+//       { "selecteur": "#go" },       ou sélecteur CSS (accepté aussi dans "gestes" : utile quand deux éléments portent le même texte)
 //       { "toucher": [0.5, 0.6] },    ou point de l'écran (0 à 1)
 //       { "touche": "Enter" }         ou touche du clavier ("duree" : secondes de maintien)
 //     ],
