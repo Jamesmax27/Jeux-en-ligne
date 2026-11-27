@@ -8398,6 +8398,7 @@ const Main = {
     // Sauvegarde à la fermeture de la page, seulement pendant une partie (jamais depuis l'écran titre).
     JEL_SAVE.surFermeture(() => { if (this.mode !== 'title') Save.write(); });
     document.addEventListener('visibilitychange', () => {
+      if (this.frozen) return;
       if (!document.hidden) { this.last = performance.now(); return; }
       if (this.started && !UI.cur && !Camp.over() && !G.player.dead) UI.open('pause');
     });
@@ -8506,29 +8507,51 @@ window.addEventListener('load', () => { Main.boot(); });
    JEL_AFFICHE : scène composée, héros en grand face à un colosse. JEL_APERCU 1 à 3 : une épreuve en pleine action, figée. */
 const Preview = {
   open(n) {
-    const P = { 1: { lvl: 1, el: 'feu', tier: 1, wave: 1, t: 2.6, cry: 35 }, 2: { lvl: 10, el: 'glace', tier: 3, wave: 1, t: 3.4, cry: 640 }, 3: { lvl: 20, el: 'foudre', tier: 4, wave: 2, t: 3.6, cry: 2480 } }[+n] || { lvl: 1, el: 'feu', tier: 1, wave: 0, t: 2.6, cry: 35 };
-    Main.show(null); G.spectate = null; Main.mode = 'play'; Main.started = true;
-    S.el = P.el; S.tiers[P.el] = P.tier; S.equip = { el: P.el, tier: P.tier }; S.crystals = P.cry; S.camp.lvl = P.lvl;
-    for (let i = 0; i < P.lvl - 1; i++) S.camp.stars[i] = 3 - (i % 3 === 2 ? 1 : 0);
-    if (P.lvl > 1) { S.auras.vitesse = 2; S.aura = 'vitesse'; S.items.push('p_renard', 't_etoiles'); S.pet = 'p_renard'; S.trail = 't_etoiles'; }
-    $('hud').classList.remove('hidden');
-    Camp.start(P.lvl, true, P.wave); UI.elColor(); $('announce').classList.remove('on'); clearTimeout(UI.annT);
-    const p = G.player, c = Camp.cur;
-    p.ai = Camp.botAi(0.85);
-    for (let i = 0; i < P.t * 30; i++) {
-      G.time += 1 / 30; G.inst.update(1 / 30); Camp.update(1 / 30);
-      if (p.hp < 62) p.hp = 62; c.hp = p.hp; c.taken = Math.min(c.taken, c.L.s3 - 2);
-      if (c.end || !Camp.cur) break;
-    }
-    p.ai = null;
-    for (let i = 0; i < 12; i++) R.frame(0.1);
-    R.frame(0); UI.hud(1); UI.hudT = 0; UI.hud(1);
+    const P = { 1: { lvl: 1, el: 'feu', tier: 1, wave: 1, t: 2.6, cry: 35 }, 2: { lvl: 13, el: 'glace', tier: 3, wave: 1, t: 3.4, cry: 640 }, 3: { lvl: 20, el: 'foudre', tier: 4, wave: 2, t: 3.6, cry: 2480 } }[+n] || { lvl: 1, el: 'feu', tier: 1, wave: 0, t: 2.6, cry: 35 };
+    this.show(P, 1000 + (+n || 0) * 97);
+  },
+  /* Hasard fixé par une graine : la même image sur toutes les machines. Si l'épreuve se termine pendant la mise en place
+     (cas rare), on recommence avec la graine suivante : l'image montre toujours une partie en cours. */
+  show(P, seed) {
+    const R0 = Math.random;
+    try {
+      Main.show(null); G.spectate = null; Main.mode = 'play'; Main.started = true;
+      S.el = P.el; S.tiers[P.el] = P.tier; S.equip = { el: P.el, tier: P.tier }; S.crystals = P.cry; S.camp.lvl = P.lvl;
+      for (let i = 0; i < P.lvl - 1; i++) S.camp.stars[i] = 3 - (i % 3 === 2 ? 1 : 0);
+      if (P.lvl > 1 && S.items.indexOf('p_renard') < 0) { S.auras.vitesse = 2; S.aura = 'vitesse'; S.items.push('p_renard', 't_etoiles'); S.pet = 'p_renard'; S.trail = 't_etoiles'; }
+      $('hud').classList.remove('hidden');
+      UIH.levelEnd = () => {};
+      for (let k = 0; k < 8; k++) {
+        Math.random = mulberry(seed + k * 31);
+        Camp.start(P.lvl, true, P.wave);
+        const p = G.player, c = Camp.cur;
+        p.ai = Camp.botAi(0.85);
+        for (let i = 0; i < P.t * 30 && !c.end; i++) {
+          if (p.hp < 80) p.hp = 80; c.hp = p.hp; c.taken = Math.min(c.taken, c.L.s3 - 2);
+          G.time += 1 / 30; G.inst.update(1 / 30); Camp.update(1 / 30);
+        }
+        p.ai = null;
+        if (!c.end && !p.dead) break;
+      }
+      UI.elColor(); $('announce').classList.remove('on'); clearTimeout(UI.annT);
+      for (const id of ['end', 'brief', 'death', 'loot', 'panel']) $(id).classList.add('hidden');
+      for (let i = 0; i < 12; i++) R.frame(0.1);
+      R.frame(0); UI.hud(1); UI.hudT = 0; UI.hud(1); $('announce').classList.remove('on');
+    } finally { Math.random = R0; }
+    // L'image reste figée, mais elle est redessinée en continu : un redimensionnement de la page efface le canvas.
+    if (!Main.frozen) { Main.frozen = true; const again = () => { R.frame(0); requestAnimationFrame(again); }; requestAnimationFrame(again); }
   }
 };
 
 const Poster = {
   draw() {
     for (const k of ['title', 'create', 'hub', 'hud', 'panel', 'brief', 'end', 'death', 'loot']) $(k).classList.add('hidden');
+    Main.frozen = true; this.paint();
+    // Un redimensionnement de la page efface le canvas : on redessine l'affiche.
+    window.addEventListener('resize', () => this.paint());
+    for (const ms of [300, 900, 1600]) setTimeout(() => this.paint(), ms);
+  },
+  paint() {
     const g = R.g, W = R.W, H = R.H, k = Math.max(W / 600, H / 800);
     g.setTransform(R.dpr * k, 0, 0, R.dpr * k, R.dpr * (W - 600 * k) / 2, R.dpr * (H - 800 * k) / 2);
     const rng = mulberry(77), glow = (x, y, r, c, a = 1) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, c); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.globalAlpha = a; g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); g.globalAlpha = 1; };
