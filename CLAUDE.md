@@ -692,6 +692,9 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
   - Cinq plans de 26 secondes joués par le moteur du jeu, sans fichier vidéo (météores, galerie qui s'ouvre, nuée et matriarche, colons qui s'abritent, défenseur devant le sas) ; sous-titres dans les 5 langues, sons du jeu.
   - D'elle-même à la première partie seul, puis bouton « Revoir l'invasion » de l'écran titre ; « Passer », Échap, Entrée ou Espace la coupent. Jamais en ligne.
   - `version` 6. Reste : la voir sur un vrai téléphone (rythme, lisibilité des sous-titres).
+- « Le Dernier Sas », tourelles, défenseurs, armes et détails — fait (même branche, 27 novembre 2026), demande du propriétaire. Détail : `docs/cadrage-dernier-sas.md`, section 12.
+  - Tourelles fabriquées par le code : socle fixe, tête qui tourne seule, canons qui reculent, trois niveaux visibles. Défenseurs animés qui tiennent leur vraie arme. Cinq armes détaillées, vues à la première personne avec les mains, replacées plus loin et plus bas.
+  - Sacs de sable, projecteurs et caisses devant le bunker. Simulation inchangée ; les modèles Kenney de la tourelle, de l'astronaute et des armes ne servent plus.
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 
 *Mettre à jour la section 14 à chaque étape terminée.*

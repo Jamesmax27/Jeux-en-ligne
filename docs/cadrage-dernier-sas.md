@@ -182,3 +182,13 @@ Demande du propriétaire : une cinématique au début du jeu, avec une invasion,
 - Bandes de cinéma, sous-titres (`cine.1` à `cine.6`), fondus entre les plans ; sons du jeu (`SAS_SON`). Rien ne touche à la simulation. Le robot du site ne la voit pas pour l'affiche ni les images du jeu (`POUR_LE_ROBOT`).
 - Essais : `window.SAS_JEU.cine` (`t`, `fige`) permet de sauter à un instant et de figer l'image.
 
+## 12. Tourelles, défenseurs, armes et détails du camp (version 6, 27 novembre 2026)
+
+Demande du propriétaire : améliorer les tourelles, le détail d'ensemble, et le placement des personnages et des armes. Tout est fabriqué par le code (script du jeu, « 2 quater », `fabriquerMateriel`) ; les modèles Kenney de la tourelle, de l'astronaute et des cinq armes ne servent plus.
+
+- **Tourelles** : un socle fixe (dalle, trois béquilles, colonne, boîtier, voyant) et une tête qui seule tourne vers la cible (`tourelle-socle`, `tourelle-<type>-<niveau>`). Mitrailleuse : canons jumelés (quatre au niveau 3), tambour, masque, viseur ; lourde : gros canon à frein de bouche, vérins, chargeur. Les niveaux 2 et 3 ajoutent des plaques et des liserés. Les canons reculent à chaque tir (animation `glissement`, pilotée par « ampli »). Avant, tout le modèle pivotait, socle compris.
+- **Défenseurs** (`defenseur`, `colon`) : combinaison, plastron, sac dorsal, casque à visière dorée ; jambes animées d'après la distance parcourue, bras en position de tir. Les coéquipiers tiennent leur vraie arme (`poserArmeTenue`, point d'attache `ATTACHE_ARME`). Les colons de la cinématique courent bras libres.
+- **Armes** : cinq modèles détaillés (`ajouterArme`), les mêmes en main des coéquipiers et à la première personne, où s'ajoutent les mains et les avant-bras du joueur (`ajouterMains`). Placement refait (`PLACES`) : l'arme est plus loin, plus bas et plus à droite, légèrement tournée vers le centre, au lieu de couvrir le bas de l'écran ; la bouche du canon (éclair du tir) suit le modèle (`BOUCHES`).
+- **Détails du camp** : sacs de sable de part et d'autre du sas, deux projecteurs sur mât, caisses de munitions (sans collision, contre la façade).
+- Simulation inchangée (les tourelles gardent leur place, leur portée et leur rayon).
+

@@ -5499,7 +5499,7 @@ void main() {
       // métal : usure, rayures plus mates, salissures
       float use = smoothstep(0.45, 0.8, d.r);
       alb *= 0.46 + 0.18 * d.r;
-      rug = clamp(rug + 0.28 * use - 0.1 * (1.0 - smoothstep(0.0, 0.08, d.a)), 0.12, 1.0);
+      rug = clamp(rug + 0.10 * use - 0.06 * (1.0 - smoothstep(0.0, 0.08, d.a)), 0.12, 1.0);
       alb = mix(alb, alb * vec3(0.55, 0.42, 0.36), (1.0 - smoothstep(0.0, 0.05, d.a)) * 0.25 * pres);
       relief = 0.35;
     } else if (mat == 3) {
@@ -9352,6 +9352,7 @@ void main() {
     for (const nom of Object.keys(modeles.modeles)) MAILLES[nom] = moteur.modele(nom);
     fabriquerObjets();
     fabriquerRoches();
+    fabriquerMateriel();
     construireDecor();
     return true;
   }
@@ -9533,8 +9534,8 @@ void main() {
       }
       case FX.TOURELLE: {
         const T = E.tu[f[2]], p = CARTE.tourelles[f[2]], lourde = T.t === 2;
-        const h = lourde ? 1.5 : 1.25;
-        moteur.traceur(p[0] + T.dx * 0.9, h, p[1] + T.dy * 0.9, f[3], 0.7, f[4], lourde ? 0.12 : 0.045, 1, lourde ? 0.5 : 0.8, 0.3, lourde ? 0.16 : 0.07);
+        const ech = echelleTourelle(T), h = 0.15 + 1.1 * ech;
+        moteur.traceur(p[0] + T.dx * ech, h, p[1] + T.dy * ech, f[3], 0.7, f[4], lourde ? 0.12 : 0.045, 1, lourde ? 0.5 : 0.8, 0.3, lourde ? 0.16 : 0.07);
         moteur.lumiere(p[0] + T.dx, h, p[1] + T.dy, 2.2, 1.4, 0.5, lourde ? 9 : 5);
         etincelles(p[0] + T.dx * 1.1, h, p[1] + T.dy * 1.1, lourde ? 8 : 2, 1, 0.8, 0.4, 3);
         tirsTourelles[f[2]] = tempsJeu;
@@ -9764,12 +9765,11 @@ void main() {
         continue;
       }
       const lourde = T.t === 2, D2 = D.tourelles[T.t];
-      const ech = (lourde ? 2.9 : 1.9) * (1 + (T.n - 1) * 0.12);
+      const ech = echelleTourelle(T);
       const recul = Math.max(0, 1 - (tempsJeu - tirsTourelles[i]) * (lourde ? 3 : 14));
-      const lacet = Math.atan2(T.dx, T.dy);
-      // La tourelle lourde est plus grosse et sombre ; le niveau 3 est doré.
-      const teinte = lourde ? (T.n === 3 ? [0.85, 0.6, 0.4] : [0.55, 0.5, 0.62]) : (T.n === 3 ? [1.2, 1.05, 0.7] : [1, 1, 1]);
-      moteur.poser(MAILLES['turret-double'], p[0] - T.dx * recul * 0.12, 0, p[1] - T.dy * recul * 0.12, lacet + ORIENTATION_TOURELLE, ech, teinte[0], teinte[1], teinte[2], recul * 0.25, 0, 0, 0, 1);
+      // socle fixe, tête qui suit la cible ; les canons reculent à chaque tir
+      moteur.poser(MAILLES['tourelle-socle'], p[0], 0.15, p[1], i * 1.1, ech, 1, 1, 1, 0, 0, 0, 0, 1);
+      moteur.poser(MAILLES['tourelle-' + T.t + '-' + T.n], p[0], 0.15, p[1], Math.atan2(T.dx, T.dy), ech, 1, 1, 1, recul * 0.12, 0, recul, 0, 1);
       ombreSol(p[0], p[1], 1.5, 0.4);
       const sante = T.pv / D2.pv[T.n - 1];
       if (sante < 0.45 && Math.random() < 0.25) moteur.particule(p[0] + hasard(-0.3, 0.3), 1.4, p[1] + hasard(-0.3, 0.3), 0, 1.6, 0, 1.2, 0.3, 0.9, 0.15, 0.13, 0.15, 0.5, 0.3, 0);
@@ -9788,7 +9788,7 @@ void main() {
     else moteur.lumiere(0, 3.2, 2.6, 0.25, 0.7, 0.9, 10);
     if (pv < 0.6 && Math.random() < (0.6 - pv) * 0.5) etincelles(hasard(-3, 3), hasard(0.5, 3.4), 1.2, 2, 1, 0.8, 0.5, 2.5);
   }
-  let ORIENTATION_TOURELLE = 0;   // réglé avec le décor (sens du modèle Kenney)
+  const echelleTourelle = (T) => (T.t === 2 ? 1.3 : 1) * (1 + (T.n - 1) * 0.1);
 
   // Les coéquipiers : leur position n'arrive qu'une dizaine de fois par seconde (ordres BOUGER), elle
   // est donc lissée ici ; une étiquette de leur couleur flotte au-dessus d'eux.
@@ -9802,15 +9802,21 @@ void main() {
       const el = elMarqueurs[c];
       if ((c === partie.camp && !modeDemo) || !J.on) { vuesEquipe[c] = null; if (el) el.hidden = true; continue; }
       let v = vuesEquipe[c];
-      if (!v || Math.abs(v.x - J.x) + Math.abs(v.z - J.y) > 8) v = vuesEquipe[c] = { x: J.x, z: J.y, la: J.la };
+      if (!v || Math.abs(v.x - J.x) + Math.abs(v.z - J.y) > 8) v = vuesEquipe[c] = { x: J.x, z: J.y, la: J.la, d: 0, pas: 0 };
       const k = Math.min(1, dtImage * 14);
+      const ax = v.x, az = v.z;
       v.x += (J.x - v.x) * k; v.z += (J.y - v.z) * k; v.la += ecartAngle(v.la, J.la) * k;
       const x = v.x, z = v.z;
-      const m = MAILLES['astronaut-a'];
-      if (!m) continue;
+      // la marche : les jambes suivent la distance parcourue, et se posent quand il s'arrête
+      const fait = Math.hypot(x - ax, z - az);
+      v.d += fait;
+      v.pas += ((dtImage > 0 && fait / dtImage > 0.6 ? 1 : 0) - v.pas) * Math.min(1, dtImage * 10);
+      const m = MAILLES.defenseur;
       const C = COULEURS_JOUEURS[c];
-      if (J.at === 0) moteur.poser(m, x, 0, z, v.la + ORIENTATION_ASTRONAUTE, 2.25, C[0], C[1], C[2], 0, 0, 0, J.bo > 0 ? 0.35 : 0, 1);
-      else moteur.poserMat(m, matriceCouche(x, z, v.la), 0.7, 0.7, 0.7, 0, 0, 0, 0, J.at === 2 ? 0.4 : 1);
+      if (J.at === 0) {
+        moteur.poser(m, x, 0, z, v.la, 1, C[0], C[1], C[2], 0, v.d * TAU / 1.5, v.pas, J.bo > 0 ? 0.35 : 0, 1);
+        poserArmeTenue(J.ac, x, 0, z, v.la, 1);
+      } else moteur.poserMat(m, matriceCouche(x, z, v.la), 0.7, 0.7, 0.7, 0, 0, 0, 0, J.at === 2 ? 0.4 : 1);
       ombreSol(x, z, 0.6, 0.4);
       if (J.bo > 0) moteur.anneau(x, z, 1, 0.08, 0.4, 0.9, 1, 0.8);
       // À terre : un anneau rouge qui bat, visible de loin ; il se remplit pendant qu'on le relève.
@@ -9838,12 +9844,17 @@ void main() {
       e2.style.transform = `translate(${Math.round(p[0])}px, ${Math.round(p[1])}px) translate(-50%, -100%)`;
     }
   }
-  let ORIENTATION_ASTRONAUTE = 0;
+  // L'arme d'un défenseur debout en (x, h, z), tourné de « lacet » : posée dans ses mains.
+  function poserArmeTenue(n, x, h, z, lacet, ech) {
+    const m = MAILLES['arme-' + n] || MAILLES['arme-0'];
+    const s = Math.sin(lacet), c = Math.cos(lacet), A = ATTACHE_ARME;
+    moteur.poser(m, x + (c * A[0] + s * A[2]) * ech, h + A[1] * ech, z + (-s * A[0] + c * A[2]) * ech, lacet, ech, 1, 1, 1, 0, 0, 0, 0, 1);
+  }
   const COULEURS_JOUEURS = [[1, 1, 1], [0.6, 1, 0.7], [1, 0.8, 0.5], [0.8, 0.7, 1]];
   const COULEURS_CSS = ['#ffffff', '#9dffb2', '#ffcc80', '#cbb3ff'];
   const matCouche = new Float32Array(16), matRot = new Float32Array(16);
   function matriceCouche(x, z, lacet) {
-    moteur.mat.trs(matCouche, x, 0.3, z, lacet, 2.25, 2.25, 2.25);
+    moteur.mat.trs(matCouche, x, 0.2, z, lacet, 1, 1, 1);
     moteur.mat.rotX(matRot, Math.PI / 2);
     moteur.mat.mul(matTemp, matCouche, matRot);
     return matTemp;
@@ -10121,6 +10132,323 @@ void main() {
   }
 
   // ==========================================================================
+  // 2 quater. Matériel fabriqué par le code : tourelles (socle fixe, tête qui
+  // tourne, canons qui reculent), défenseurs (jambes et bras animés), armes
+  // (tenues par les défenseurs et vues à la première personne, avec les mains),
+  // sacs de sable, projecteurs, caisses. Tout regarde vers +z, en mètres.
+  // ==========================================================================
+  const ACIER = [0.17, 0.18, 0.21], NOIR = [0.07, 0.07, 0.09], KAKI = [0.33, 0.37, 0.31], ARDOISE = [0.24, 0.27, 0.34];
+  const ORANGE = [0.95, 0.5, 0.1], CYAN = [0.4, 0.9, 1], ROUGE = [1, 0.22, 0.15], JAUNE = [0.95, 0.74, 0.12];
+  const tubeZ = (g, x, y, z0, z1, r, n) => g.tube([[x, y, z0], [x, y, z1]], r, n || 8);
+  const bloc = (g, x, y, z, lx, ly, lz, fx, fz) => g.pousser().deplacer(x, y, z).boite(lx, ly, lz, fx, fz).depiler();
+  // Anneau (frette, bague, collier) autour de l'axe z.
+  const bague = (g, x, y, z, r, l, n) => tubeZ(g, x, y, z - l / 2, z + l / 2, r, n || 8);
+
+  // --- Tourelles ------------------------------------------------------------------------------
+  // Socle fixe : dalle à six pans, trois béquilles, colonne, boîtier, voyant.
+  function fabriquerSocle() {
+    const g = moteur.geo().matiere('metal').lisser(40);
+    g.couleur(...NOIR).cylindre(0.78, 0.7, 0.07, 6);
+    g.pousser().deplacer(0, 0.07, 0).couleur(...ARDOISE).cylindre(0.6, 0.5, 0.1, 6).depiler();
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * TAU + 0.52;
+      g.pousser().tournerY(a);
+      g.couleur(...ACIER).tube([[0, 0.62, 0.16], [0, 0.3, 0.55], [0, 0.06, 0.86]], [0.05, 0.045, 0.04], 6);
+      bloc(g.couleur(...NOIR), 0, 0.04, 0.9, 0.2, 0.06, 0.26);
+      g.couleur(...JAUNE).matiere('peinture'); bloc(g, 0, 0.36, 0.48, 0.105, 0.03, 0.12); g.matiere('metal');
+      g.depiler();
+    }
+    g.pousser().deplacer(0, 0.17, 0).couleur(...ACIER).cylindre(0.2, 0.17, 0.62, 10).depiler();
+    g.pousser().deplacer(0, 0.3, 0).couleur(...NOIR).cylindre(0.235, 0.235, 0.05, 10).depiler();
+    g.pousser().deplacer(0, 0.72, 0).couleur(...NOIR).cylindre(0.27, 0.3, 0.1, 12).depiler();
+    // boîtier de commande et câble
+    bloc(g.couleur(...KAKI).matiere('peinture'), -0.34, 0.3, -0.2, 0.22, 0.26, 0.18);
+    g.matiere('metal').couleur(...NOIR).tube([[-0.3, 0.2, -0.12], [-0.2, 0.12, 0.02], [-0.12, 0.3, 0.1]], 0.022, 5);
+    g.emissif(1).couleur(0.3, 1, 0.45).matiere('cristal'); bloc(g, -0.34, 0.37, -0.105, 0.05, 0.05, 0.02);
+    return g.maillage();
+  }
+  // Tête : berceau, blindage, canons (ils reculent avec « ampli »), tambour, viseur. Pivot à y = 0,82.
+  function fabriquerTete(lourde, niveau) {
+    const g = moteur.geo().matiere('metal').lisser(40);
+    const corps = lourde ? ARDOISE : KAKI, accent = lourde ? ROUGE : ORANGE;
+    const Y = 1.1;                                          // hauteur de l'axe des canons
+    g.pousser().deplacer(0, 0.82, 0).couleur(...ACIER).cylindre(0.3, 0.24, 0.1, 12).depiler();
+    g.symetrie(() => {
+      g.couleur(...ACIER); bloc(g, 0.27, 1.02, -0.02, 0.07, 0.34, 0.3, 0.8, 0.7);
+      g.couleur(...NOIR).tube([[0.24, Y, 0], [0.33, Y, 0]], 0.07, 8);
+    });
+    // berceau et capot
+    g.matiere('peinture').couleur(...corps);
+    bloc(g, 0, Y, -0.05, 0.44, 0.3, 0.62, 0.86, 0.9);
+    bloc(g, 0, Y + 0.17, -0.12, 0.34, 0.07, 0.4, 0.8, 0.8);
+    // masque incliné à l'avant, plaques de côté aux niveaux 2 et 3
+    g.pousser().deplacer(0, Y + 0.01, 0.3).tournerX(0.32); bloc(g, 0, 0, 0, 0.5, 0.36, 0.05); g.depiler();
+    if (niveau >= 2) g.symetrie(() => { g.pousser().deplacer(0.27, Y, 0.02).tournerY(0.2); bloc(g, 0, 0, 0, 0.04, 0.3, 0.5); g.depiler(); });
+    g.couleur(...accent); bloc(g, 0, Y + 0.115, 0.335, 0.5, 0.035, 0.03);
+    if (niveau >= 3) { g.couleur(...JAUNE); bloc(g, 0, Y - 0.15, 0.3, 0.52, 0.03, 0.03); g.symetrie(() => bloc(g, 0.225, Y + 0.21, -0.12, 0.03, 0.02, 0.4)); }
+    g.matiere('metal');
+    // arrière : radiateur à ailettes
+    g.couleur(...NOIR);
+    for (let k = 0; k < 5; k++) bloc(g, 0, Y - 0.1 + k * 0.05, -0.4, 0.36, 0.018, 0.1);
+    // viseur : boîtier, lentille, antenne
+    g.couleur(...ACIER); bloc(g, 0.16, Y + 0.26, 0.02, 0.1, 0.1, 0.2);
+    g.matiere('cristal').emissif(1).couleur(...(lourde ? ROUGE : CYAN));
+    g.pousser().deplacer(0.16, Y + 0.26, 0.125).sphere(0.036, 8, 4).depiler();
+    g.emissif(0).matiere('metal').lueur(0.16, Y + 0.26, 0.16, 0.3, ...(lourde ? ROUGE : CYAN), 0.4);
+    g.couleur(...NOIR).tube([[-0.15, Y + 0.2, -0.2], [-0.17, Y + 0.62, -0.26]], [0.012, 0.006], 4);
+    if (!lourde) {
+      // tambour de munitions et sa bande
+      g.couleur(...ACIER).tube([[-0.24, Y - 0.02, -0.08], [-0.44, Y - 0.02, -0.08]], 0.15, 12);
+      g.couleur(...accent).tube([[-0.445, Y - 0.02, -0.08], [-0.46, Y - 0.02, -0.08]], 0.08, 10);
+      // canons jumelés (quatre au niveau 3), frettes et cache-flammes
+      g.glissement([0, 0, -1], Math.PI / 2, 0.11, 1);
+      const places = niveau >= 3 ? [[0.085, 0.045], [-0.085, 0.045], [0.085, -0.055], [-0.085, -0.055]] : [[0.085, 0], [-0.085, 0]];
+      for (const [x, dy] of places) {
+        g.couleur(...NOIR); tubeZ(g, x, Y + dy, 0.2, 0.98, 0.03, 8);
+        g.couleur(...ACIER); tubeZ(g, x, Y + dy, 0.3, 0.62, 0.043, 8);
+        bague(g, x, Y + dy, 0.72, 0.04, 0.03);
+        g.couleur(...NOIR); tubeZ(g, x, Y + dy, 0.94, 1.03, 0.042, 8);
+      }
+      g.fixe();
+    } else {
+      // chargeur sur le dessus
+      g.matiere('peinture').couleur(...corps); bloc(g, -0.1, Y + 0.28, -0.14, 0.2, 0.16, 0.34); g.matiere('metal');
+      // gros canon : manchon, vérins de recul, frein de bouche à évents
+      g.couleur(...ACIER); tubeZ(g, 0, Y, 0.2, 0.52, 0.13, 12);
+      g.symetrie(() => { g.couleur(...NOIR); tubeZ(g, 0.15, Y - 0.1, 0.1, 0.5, 0.03, 6); });
+      g.glissement([0, 0, -1], Math.PI / 2, 0.2, 1);
+      g.couleur(...NOIR); tubeZ(g, 0, Y, 0.3, 1.18, 0.075, 10);
+      g.couleur(...ACIER); bague(g, 0, Y, 0.7, 0.088, 0.05, 10); bague(g, 0, Y, 0.88, 0.088, 0.05, 10);
+      tubeZ(g, 0, Y, 1.14, 1.34, 0.115, 10);
+      g.couleur(...NOIR); bloc(g, 0, Y, 1.24, 0.25, 0.05, 0.1);
+      if (niveau >= 2) { g.couleur(...ACIER); tubeZ(g, 0, Y + 0.12, 0.3, 0.8, 0.028, 6); }
+      if (niveau >= 3) { g.couleur(...JAUNE); bague(g, 0, Y, 0.56, 0.09, 0.04, 10); bague(g, 0, Y, 1.1, 0.09, 0.03, 10); }
+      g.fixe();
+    }
+    return g.maillage();
+  }
+
+  // --- Armes ------------------------------------------------------------------------------------
+  // Origine : le haut de la poignée ; canon vers +z. Renvoie la position de la bouche [x, y, z].
+  function ajouterArme(g, n) {
+    g.matiere('metal').lisser(40);
+    if (n === 0) {                                          // pistolet blaster
+      g.couleur(...ACIER); bloc(g, 0, 0.035, 0.06, 0.042, 0.062, 0.25);
+      g.couleur(...ARDOISE); bloc(g, 0, 0.073, 0.05, 0.036, 0.02, 0.2, 0.8, 1);
+      g.couleur(...NOIR).matiere('peinture');
+      g.pousser().deplacer(0, -0.06, -0.035).tournerX(0.3); bloc(g, 0, 0, 0, 0.038, 0.14, 0.055); g.depiler();
+      g.matiere('metal').tube([[0, 0, 0.02], [0, -0.045, 0.045], [0, -0.012, 0.085]], 0.007, 4);
+      tubeZ(g.couleur(...NOIR), 0, 0.04, 0.17, 0.215, 0.017, 8);
+      bloc(g, 0, 0.09, 0.15, 0.008, 0.016, 0.014); bloc(g, 0, 0.09, -0.04, 0.02, 0.014, 0.012);
+      g.matiere('cristal').emissif(1).couleur(...ORANGE); g.symetrie(() => bloc(g, 0.0225, 0.035, 0.1, 0.004, 0.022, 0.07));
+      g.emissif(0);
+      return [0, 0.04, 0.22];
+    }
+    if (n === 1) {                                          // fusil d'assaut
+      g.couleur(...ACIER); bloc(g, 0, 0.035, 0.08, 0.055, 0.085, 0.4);
+      g.couleur(...NOIR).matiere('peinture');
+      bloc(g, 0, 0.03, 0.4, 0.052, 0.06, 0.26);
+      g.pousser().deplacer(0, -0.065, -0.05).tournerX(0.32); bloc(g, 0, 0, 0, 0.04, 0.13, 0.05); g.depiler();
+      g.pousser().deplacer(0, -0.1, 0.1).tournerX(-0.2); bloc(g.couleur(...ARDOISE), 0, 0, 0, 0.034, 0.17, 0.07); g.depiler();
+      // crosse
+      g.couleur(...NOIR).tube([[0, 0.04, -0.12], [0, 0.03, -0.36]], 0.02, 6);
+      bloc(g, 0, 0.0, -0.39, 0.04, 0.12, 0.05);
+      g.matiere('metal');
+      for (let k = 0; k < 4; k++) bloc(g.couleur(...ACIER), 0, 0.064, 0.31 + k * 0.06, 0.03, 0.01, 0.03);
+      g.couleur(...NOIR); tubeZ(g, 0, 0.035, 0.5, 0.74, 0.014, 8); tubeZ(g, 0, 0.035, 0.7, 0.78, 0.022, 8);
+      // viseur à point rouge
+      g.couleur(...ACIER); bloc(g, 0, 0.1, 0.08, 0.04, 0.045, 0.1);
+      g.matiere('cristal').emissif(1).couleur(...ROUGE).pousser().deplacer(0, 0.1, 0.132).sphere(0.013, 6, 3).depiler();
+      g.emissif(0).matiere('metal');
+      g.couleur(...JAUNE).matiere('peinture'); bloc(g, 0, 0.035, -0.11, 0.057, 0.03, 0.02); g.matiere('metal');
+      return [0, 0.035, 0.79];
+    }
+    if (n === 2) {                                          // fusil à dispersion
+      g.couleur(...ACIER); bloc(g, 0, 0.03, 0.06, 0.07, 0.085, 0.34);
+      g.couleur(0.3, 0.17, 0.1).matiere('peinture');         // bois
+      g.tube([[0, 0.02, -0.1], [0, -0.01, -0.38]], [0.03, 0.04], 6, 0.6, [1, 0, 0]);
+      bloc(g, 0, -0.015, 0.4, 0.075, 0.045, 0.2);
+      g.pousser().deplacer(0, -0.06, -0.06).tournerX(0.45); bloc(g, 0, 0, 0, 0.04, 0.12, 0.05); g.depiler();
+      g.matiere('metal').couleur(...NOIR);
+      g.symetrie(() => { tubeZ(g, 0.024, 0.04, 0.2, 0.72, 0.022, 8); });
+      bloc(g.couleur(...ACIER), 0, 0.04, 0.6, 0.085, 0.02, 0.03); bloc(g, 0, 0.04, 0.3, 0.085, 0.02, 0.03);
+      g.couleur(...ROUGE).matiere('peinture');
+      for (let k = 0; k < 4; k++) g.tube([[0.04, 0.05, 0.0 + k * 0.045], [0.04, -0.005, 0.0 + k * 0.045]], 0.012, 6);
+      g.matiere('metal');
+      return [0, 0.04, 0.73];
+    }
+    if (n === 3) {                                          // fusil de précision
+      g.couleur(...ACIER); bloc(g, 0, 0.03, 0.1, 0.05, 0.08, 0.5);
+      g.couleur(...NOIR).matiere('peinture');
+      g.tube([[0, 0.03, -0.14], [0, 0.02, -0.42]], [0.028, 0.035], 6, 0.6, [1, 0, 0]);
+      bloc(g, 0, 0.07, -0.3, 0.04, 0.03, 0.16);
+      bloc(g, 0, -0.02, -0.44, 0.045, 0.13, 0.04);
+      g.pousser().deplacer(0, -0.065, -0.05).tournerX(0.3); bloc(g, 0, 0, 0, 0.038, 0.13, 0.05); g.depiler();
+      bloc(g, 0, 0.0, 0.48, 0.045, 0.045, 0.3);
+      bloc(g.couleur(...ARDOISE), 0, -0.07, 0.14, 0.03, 0.1, 0.06);
+      g.matiere('metal').couleur(...NOIR);
+      tubeZ(g, 0, 0.035, 0.34, 1.08, 0.013, 8);
+      g.couleur(...ACIER); tubeZ(g, 0, 0.035, 1.05, 1.17, 0.024, 8);
+      // lunette et ses bagues
+      g.couleur(...NOIR); tubeZ(g, 0, 0.115, -0.04, 0.3, 0.024, 8); tubeZ(g, 0, 0.115, 0.24, 0.34, 0.034, 8); tubeZ(g, 0, 0.115, -0.08, -0.02, 0.03, 8);
+      g.couleur(...ACIER); bloc(g, 0, 0.085, 0.04, 0.02, 0.03, 0.03); bloc(g, 0, 0.085, 0.2, 0.02, 0.03, 0.03);
+      g.matiere('cristal').emissif(1).couleur(...CYAN).pousser().deplacer(0, 0.115, 0.342).echelle(1, 1, 0.3).sphere(0.03, 8, 4).depiler();
+      g.emissif(0).matiere('metal');
+      // bipied replié
+      g.symetrie(() => g.couleur(...ACIER).tube([[0.02, -0.02, 0.6], [0.035, -0.035, 0.34]], 0.008, 4));
+      return [0, 0.035, 1.18];
+    }
+    // lance-plasma : corps trapu, bobines lumineuses, cœur à l'avant, réservoir
+    g.couleur(...ARDOISE).matiere('peinture'); tubeZ(g, 0, 0.05, -0.1, 0.42, 0.085, 10);
+    g.matiere('metal').couleur(...NOIR);
+    g.pousser().deplacer(0, -0.07, -0.04).tournerX(0.3); bloc(g, 0, 0, 0, 0.042, 0.13, 0.055); g.depiler();
+    bloc(g, 0, -0.06, 0.3, 0.045, 0.1, 0.05);
+    g.tube([[0, 0.14, 0.02], [0, 0.2, 0.1], [0, 0.2, 0.24], [0, 0.14, 0.32]], 0.014, 5);
+    g.couleur(...ACIER); tubeZ(g, 0, 0.05, 0.42, 0.6, 0.065, 10); tubeZ(g, 0, 0.05, 0.6, 0.66, 0.085, 10);
+    g.matiere('cristal').emissif(0.55).couleur(...CYAN);
+    for (let k = 0; k < 4; k++) bague(g, 0, 0.05, 0.02 + k * 0.1, 0.092, 0.022, 10);
+    g.emissif(1);
+    g.pousser().deplacer(0, 0.05, 0.655).sphere(0.055, 8, 5).depiler();
+    g.tube([[0.06, 0.02, -0.24], [0.06, 0.02, -0.1]], 0.04, 8);
+    g.emissif(0).matiere('metal').lueur(0, 0.05, 0.68, 0.5, ...CYAN, 0.45);
+    g.couleur(...NOIR).tube([[0, 0.05, -0.1], [0, 0.03, -0.34]], [0.04, 0.03], 6);
+    bloc(g, 0, 0.01, -0.36, 0.05, 0.12, 0.04);
+    return [0, 0.05, 0.7];
+  }
+  // Les mains du joueur sur l'arme (vue à la première personne) : gant, manchette, avant-bras.
+  function ajouterMains(g, n) {
+    const manche = [0.5, 0.52, 0.57], gant = [0.12, 0.12, 0.14];
+    const bras = (main, coude) => {
+      g.matiere('peinture').couleur(...gant).pousser().deplacer(main[0], main[1], main[2]).ellipsoide(0.04, 0.045, 0.055, 8, 4).depiler();
+      const d = [coude[0] - main[0], coude[1] - main[1], coude[2] - main[2]];
+      const p = (k) => [main[0] + d[0] * k, main[1] + d[1] * k, main[2] + d[2] * k];
+      g.couleur(...NOIR).tube([p(0.06), p(0.16)], 0.048, 8);
+      g.couleur(...manche).tube([p(0.14), p(0.55), p(1)], [0.046, 0.056, 0.07], 8);
+      g.couleur(...ORANGE).tube([p(0.3), p(0.34)], 0.054, 8);
+    };
+    bras([0.005, -0.075, -0.035], [0.14, -0.34, -0.5]);
+    if (n !== 0) bras([-0.01, -0.035, n === 3 ? 0.46 : n === 4 ? 0.3 : 0.4], [-0.2, -0.4, 0.0]);
+    g.matiere('metal');
+  }
+
+  // --- Défenseurs ---------------------------------------------------------------------------
+  // Un défenseur en combinaison, 1,82 m. arme : bras en position de tir (l'arme est posée à part, ATTACHE_ARME) ;
+  // sinon bras libres qui se balancent. Jambes et bras suivent « marche » et « ampli ».
+  const ATTACHE_ARME = [0.13, 1.2, 0.34];
+  function fabriquerDefenseur(arme) {
+    const g = moteur.geo().matiere('peinture').lisser(50);
+    const tissu = [0.82, 0.84, 0.88], plaque = [0.56, 0.6, 0.68], sombre = [0.16, 0.17, 0.21];
+    // jambes
+    g.symetrie((c) => {
+      g.balancier([0.125, 0.94, 0], [1, 0, 0], c > 0 ? 0 : Math.PI, 0.55, 1, false);
+      g.couleur(...tissu).tube([[0.125, 0.94, 0], [0.13, 0.52, 0.035], [0.125, 0.14, 0]], [0.13, 0.105, 0.09], 8);
+      g.couleur(...plaque).pousser().deplacer(0.13, 0.52, 0.09).ellipsoide(0.085, 0.1, 0.06, 6, 3).depiler();
+      bloc(g, 0.125, 0.76, 0.115, 0.15, 0.2, 0.03, 0.8, 1);
+      g.couleur(...sombre); bloc(g, 0.125, 0.08, 0.05, 0.19, 0.16, 0.36, 0.9, 0.75);
+      g.fixe();
+    });
+    // bassin, ceinture, torse, plastron
+    g.couleur(...tissu).pousser().deplacer(0, 0.97, 0).ellipsoide(0.25, 0.15, 0.18, 8, 4).depiler();
+    g.couleur(...sombre).pousser().deplacer(0, 1.03, 0).cylindre(0.25, 0.25, 0.07, 10).depiler();
+    g.symetrie(() => bloc(g, 0.17, 1.0, 0.1, 0.08, 0.1, 0.07));
+    g.couleur(...tissu).pousser().deplacer(0, 1.26, 0).ellipsoide(0.31, 0.32, 0.21, 10, 5).depiler();
+    g.couleur(...plaque); bloc(g, 0, 1.34, 0.17, 0.44, 0.26, 0.1, 0.85, 0.7);
+    bloc(g, 0, 1.14, 0.17, 0.32, 0.1, 0.07, 0.9, 0.8);
+    g.matiere('cristal').emissif(1).couleur(...CYAN); bloc(g, 0.11, 1.38, 0.225, 0.06, 0.035, 0.01);
+    g.emissif(0).matiere('peinture');
+    // sac dorsal : caisson, deux bouteilles, antenne
+    g.couleur(...sombre); bloc(g, 0, 1.3, -0.25, 0.4, 0.46, 0.18, 0.9, 0.8);
+    g.matiere('metal').couleur(...plaque);
+    g.symetrie(() => g.pousser().deplacer(0.11, 1.1, -0.37).cylindre(0.06, 0.06, 0.4, 8).depiler());
+    g.couleur(...NOIR).tube([[-0.15, 1.5, -0.28], [-0.17, 2.02, -0.32]], [0.01, 0.005], 4);
+    g.matiere('cristal').emissif(1).couleur(...ROUGE).pousser().deplacer(-0.17, 2.03, -0.32).sphere(0.018, 5, 3).depiler();
+    g.emissif(0).matiere('peinture');
+    // col, casque, visière dorée
+    g.couleur(...sombre).pousser().deplacer(0, 1.5, 0).cylindre(0.15, 0.17, 0.08, 10).depiler();
+    g.couleur(...tissu).pousser().deplacer(0, 1.71, 0).ellipsoide(0.2, 0.21, 0.215, 12, 6).depiler();
+    g.couleur(...plaque); g.symetrie(() => g.pousser().deplacer(0.195, 1.7, -0.01).ellipsoide(0.035, 0.075, 0.075, 6, 3).depiler());
+    g.matiere('cristal').emissif(0.35).couleur(1, 0.66, 0.22);
+    g.pousser().deplacer(0, 1.715, 0.095).ellipsoide(0.165, 0.12, 0.14, 10, 5).depiler();
+    g.emissif(0).matiere('peinture');
+    // épaules et bras
+    g.symetrie((c) => {
+      const epaule = [0.35, 1.44, 0];
+      g.couleur(...plaque).pousser().deplacer(0.36, 1.47, 0).ellipsoide(0.14, 0.12, 0.15, 8, 4).depiler();
+      let coude, main;
+      if (arme) {
+        // main droite à la poignée, main gauche sous le fût
+        // (pour le bras gauche, le repère est en miroir : sa main passe du côté de l'arme, x négatif)
+        coude = c > 0 ? [0.36, 1.15, 0.1] : [0.3, 1.18, 0.3];
+        main = c > 0 ? [0.14, 1.15, 0.31] : [-0.12, 1.19, 0.6];
+      } else {
+        g.balancier(epaule, [1, 0, 0], c > 0 ? Math.PI : 0, 0.5, 1, false);
+        coude = [0.39, 1.15, -0.02]; main = [0.37, 0.9, 0.06];
+      }
+      g.couleur(...tissu).tube([epaule, coude, main], [0.095, 0.08, 0.065], 8);
+      g.couleur(...sombre).pousser().deplacer(main[0], main[1], main[2]).ellipsoide(0.062, 0.068, 0.068, 6, 3).depiler();
+      g.fixe();
+    });
+    return g.maillage();
+  }
+
+  // --- Détails du camp --------------------------------------------------------------------
+  function fabriquerMateriel() {
+    MAILLES['tourelle-socle'] = fabriquerSocle();
+    for (const lourde of [false, true]) for (let n = 1; n <= 3; n++) MAILLES['tourelle-' + (lourde ? 2 : 1) + '-' + n] = fabriquerTete(lourde, n);
+    for (let n = 0; n < 5; n++) {
+      let g = moteur.geo();
+      const bouche = ajouterArme(g, n);
+      MAILLES['arme-' + n] = g.maillage();
+      g = moteur.geo();
+      ajouterArme(g, n); ajouterMains(g, n);
+      MAILLES['arme-vue-' + n] = g.maillage();
+      BOUCHES[n] = bouche;
+    }
+    MAILLES.defenseur = fabriquerDefenseur(true);
+    MAILLES.colon = fabriquerDefenseur(false);
+
+    // muret de sacs de sable en arc (rayon 1,5 m)
+    let g = moteur.geo().matiere('beton').lisser(60).bruit(0.012);
+    for (let rang = 0; rang < 3; rang++) {
+      const nb = 6 - rang;
+      for (let i = 0; i < nb; i++) {
+        const a = ((i + 0.5 + rang * 0.5) / 6 - 0.5) * 1.9, k = 0.85 + hasardEntier(rang, i, 3) * 0.3;
+        g.couleur(0.5 * k, 0.42 * k, 0.3 * k);
+        g.pousser().deplacer(Math.sin(a) * 1.5, 0.11 + rang * 0.2, Math.cos(a) * 1.5).tournerY(a).ellipsoide(0.3, 0.12, 0.17, 8, 4).depiler();
+      }
+    }
+    MAILLES['sacs-de-sable'] = g.maillage();
+
+    // projecteur sur mât : trépied, mât, deux lampes allumées
+    g = moteur.geo().matiere('metal').lisser(40);
+    for (let k = 0; k < 3; k++) { const a = (k / 3) * TAU; g.couleur(...NOIR).tube([[0, 0.9, 0], [Math.cos(a) * 0.55, 0, Math.sin(a) * 0.55]], 0.025, 5); }
+    g.couleur(...ACIER).tube([[0, 0.5, 0], [0, 3.6, 0]], [0.045, 0.035], 6);
+    bloc(g.couleur(...NOIR), 0, 3.6, 0, 0.9, 0.05, 0.05);
+    g.symetrie(() => {
+      g.pousser().deplacer(0.32, 3.66, 0.02).tournerX(0.5);
+      g.couleur(...JAUNE).matiere('peinture'); bloc(g, 0, 0, 0, 0.3, 0.22, 0.14);
+      g.matiere('cristal').emissif(1).couleur(1, 0.93, 0.75); bloc(g, 0, 0, 0.075, 0.25, 0.17, 0.02);
+      g.emissif(0).matiere('metal').depiler();
+    });
+    g.lueur(0, 3.6, 0.2, 1.6, 1, 0.9, 0.7, 0.35);
+    MAILLES.projecteur = g.maillage();
+
+    // caisses de munitions empilées
+    g = moteur.geo().matiere('peinture');
+    const caisse = (x, y, z, la, c) => {
+      g.pousser().deplacer(x, y, z).tournerY(la);
+      g.couleur(...c); bloc(g, 0, 0.17, 0, 0.7, 0.34, 0.42);
+      g.couleur(c[0] * 0.6, c[1] * 0.6, c[2] * 0.6); bloc(g, 0, 0.35, 0, 0.72, 0.03, 0.44);
+      g.symetrie(() => bloc(g, 0.36, 0.17, 0, 0.02, 0.1, 0.16));
+      g.couleur(...JAUNE); bloc(g, 0, 0.2, 0.213, 0.3, 0.08, 0.008);
+      g.depiler();
+    };
+    caisse(0, 0, 0, 0.1, KAKI); caisse(0.78, 0, 0.1, -0.2, ARDOISE); caisse(0.3, 0.36, 0.04, 0.35, KAKI);
+    MAILLES.caisses = g.maillage();
+  }
+  const BOUCHES = [];
+
+  // ==========================================================================
   // 2 bis. Le décor : bunker et son sas, canyon, galeries des aliens, rochers
   // Modèles Kenney (CC0) mis à l'échelle ; rien ici ne touche à la simulation
   // (les obstacles, eux, sont dans ses données : CARTE.obstacles).
@@ -10208,16 +10536,20 @@ void main() {
       decor('cristaux-1', G[0] + 5.2, -0.1, G[1] + 1.2, h() * TAU, 2.4, [0.85, 0.8, 0.85]);
     }
 
-    ORIENTATION_TOURELLE = 0;
-    ORIENTATION_ASTRONAUTE = 0;
+    // Devant le bunker : projecteurs, caisses de munitions, sacs de sable de part et d'autre du sas.
+    decor('projecteur', -9.6, 0, 2.5, 0.25, 1);
+    decor('projecteur', 9.6, 0, 2.5, -0.25, 1);
+    decor('caisses', -6.4, 0, 2.2, 0.2, 1);
+    decor('caisses', 15.2, 0, 2.4, -0.4, 1.1);
+    decor('sacs-de-sable', -5.2, 0, 2.3, -0.25, 1);
+    decor('sacs-de-sable', 5.2, 0, 2.3, 0.25, 1);
     // Arme en main : [modèle, échelle, x, y, z, rotation Y, bouche du canon x, y, z] (repère de la caméra).
-    VUE_ARMES.push(
-      ['blaster-b', 0.4, 0.17, -0.15, 0.42, Math.PI, 0, 0.03, 0.12],
-      ['blaster-d', 0.4, 0.17, -0.16, 0.48, Math.PI, 0, 0.03, 0.22],
-      ['blaster-q', 0.42, 0.17, -0.16, 0.46, Math.PI, 0, 0.03, 0.2],
-      ['blaster-e', 0.36, 0.16, -0.15, 0.6, Math.PI, 0, 0.03, 0.52],
-      ['blaster-o', 0.5, 0.18, -0.17, 0.44, Math.PI, 0, 0.03, 0.2]
-    );
+    // [modèle, échelle, x, y, z, rotation Y, puis la bouche du canon x, y, z] : l'arme pointe un peu vers le centre.
+    const PLACES = [[0.8, 0.24, -0.2, 0.62], [0.7, 0.26, -0.24, 0.75], [0.7, 0.26, -0.24, 0.75], [0.7, 0.25, -0.24, 0.72], [0.7, 0.27, -0.26, 0.72]];
+    for (let n = 0; n < 5; n++) {
+      const [e, x, y, z] = PLACES[n];
+      VUE_ARMES.push(['arme-vue-' + n, e, x, y, z, -0.03, BOUCHES[n][0] * e, BOUCHES[n][1] * e, BOUCHES[n][2] * e]);
+    }
   }
 
   // Le sas : il s'assombrit et rougit quand il est abîmé.
@@ -11941,14 +12273,12 @@ void main() {
     // Le défenseur, en grand, de trois quarts, arme épaulée vers la matriarche.
     const DX = 3.1, DZ = 11.2;
     const laD = Math.atan2(MX - DX, MZ - DZ) - 0.1;
-    if (MAILLES['astronaut-a']) moteur.poser(MAILLES['astronaut-a'], DX, 0, DZ, laD + ORIENTATION_ASTRONAUTE, 2.45, 0.95, 0.97, 1.05, 0, 0, 0, 0, 1);
+    moteur.poser(MAILLES.defenseur, DX, 0, DZ, laD, 1.09, 0.95, 0.97, 1.05, 0, 0.5, 0.5, 0, 1);
+    poserArmeTenue(1, DX, 0, DZ, laD, 1.09);
     ombreSol(DX, DZ, 0.75, 0.5);
-    // Son fusil (modèle du jeu), tenu à hauteur d'épaule ; le canon regarde vers le monstre.
+    // La bouche de son fusil (l'arme est dans ses mains).
     const s = Math.sin(laD), c = Math.cos(laD);
-    const ax = DX + s * 1.2 - c * 0.22, az = DZ + c * 1.2 + s * 0.22, ay = 1.1;
-    const mA = new Float32Array(16);
-    moteur.mat.trs(mA, ax, ay, az, laD + Math.PI, 1.0, 1.0, 1.0);
-    if (MAILLES['blaster-e']) moteur.poserMat(MAILLES['blaster-e'], mA, 1, 1, 1, 0, 0, 0, 0, 1);
+    const ax = DX + (c * ATTACHE_ARME[0] + s * (ATTACHE_ARME[2] + 0.8)) * 1.09, az = DZ + (-s * ATTACHE_ARME[0] + c * (ATTACHE_ARME[2] + 0.8)) * 1.09, ay = (ATTACHE_ARME[1] + 0.035) * 1.09;
     // Bouche du canon : éclair, rafale de traits lumineux jusqu'au monstre, éclaboussures d'acide sur lui.
     const bx = ax + s * 0.08, bz = az + c * 0.08, by = ay + 0.04;
     moteur.lumiere(bx, by + 0.2, bz, 1, 0.75, 0.35, 4);
@@ -12264,7 +12594,8 @@ void main() {
     // deux tourelles déjà en place
     for (const n of [0, 1]) {
       const p = CARTE.tourelles[n], tir = t > 17 && Math.sin(t * 9 + n * 2) > 0.55;
-      moteur.poser(MAILLES['turret-double'], p[0], 0, p[1], ORIENTATION_TOURELLE + (n ? -0.12 : 0.12), 1.9, 1, 1, 1, tir ? 0.2 : 0, 0, 0, 0, 1);
+      moteur.poser(MAILLES['tourelle-socle'], p[0], 0.15, p[1], n * 1.1, 1, 1, 1, 1, 0, 0, 0, 0, 1);
+      moteur.poser(MAILLES['tourelle-1-1'], p[0], 0.15, p[1], n ? -0.12 : 0.12, 1, 1, 1, 1, tir ? 0.1 : 0, 0, tir ? 1 : 0, 0, 1);
       ombreSol(p[0], p[1], 1.5, 0.4);
       if (tir) {
         const cx = (n ? 5 : -7) + Math.sin(t * 13) * 4, cz = 30 + Math.cos(t * 11) * 6;
@@ -12276,11 +12607,11 @@ void main() {
 
     if (plan === 0) {
       // des colons au travail devant le bunker, sans se douter de rien
-      const m = MAILLES['astronaut-a'];
+      const m = MAILLES.colon;
       [[-3.5, 9.5, 0.6], [4.2, 11.5, -2.2], [1.2, 15, 3.0], [-7.5, 13, 1.4]].forEach(([x, z, la], i) => {
         // au premier impact, ils se retournent vers le fond du canyon
         const vers = doux(3.0, 3.8, t);
-        moteur.poser(m, x, 0, z, la * (1 - vers) + ORIENTATION_ASTRONAUTE, 2.25, COULEURS_JOUEURS[i][0], COULEURS_JOUEURS[i][1], COULEURS_JOUEURS[i][2], 0, 0, 0, 0, 1);
+        moteur.poser(m, x, 0, z, la * (1 - vers), 1, COULEURS_JOUEURS[i][0], COULEURS_JOUEURS[i][1], COULEURS_JOUEURS[i][2], 0, 0, 0, 0, 1);
         ombreSol(x, z, 0.6, 0.4);
       });
     } else if (plan === 1) {
@@ -12306,12 +12637,12 @@ void main() {
       if (k > 0.2) { ombreSol(1.5, mz, 3.4, 0.45); moteur.lumiere(1.5, 3.2, mz - 3.2, 0.9, 0.3, 0.8, 9); }
     } else if (plan === 3) {
       // les colons courent vers le sas (ils rapetissent en passant la porte)
-      const m = MAILLES['astronaut-a'];
+      const m = MAILLES.colon;
       [[-6, 17], [5, 20], [1.5, 24], [-2.5, 28]].forEach(([x0, z0], i) => {
         const k = borner((t - d0 + 0.6) * 6.5 / Math.hypot(x0, z0 - 2), 0, 1);
         const x = x0 * (1 - k), z = z0 + (2 - z0) * k;
         if (k >= 1) return;
-        moteur.poser(m, x, Math.abs(Math.sin(t * 11 + i)) * 0.16, z, Math.atan2(-x0, 2 - z0) + ORIENTATION_ASTRONAUTE, 2.25, COULEURS_JOUEURS[i][0], COULEURS_JOUEURS[i][1], COULEURS_JOUEURS[i][2], 0, 0, 0, 0, 1 - doux(0.85, 1, k));
+        moteur.poser(m, x, Math.abs(Math.sin(t * 9 + i)) * 0.05, z, Math.atan2(-x0, 2 - z0), 1, COULEURS_JOUEURS[i][0], COULEURS_JOUEURS[i][1], COULEURS_JOUEURS[i][2], 0, k * Math.hypot(x0, z0 - 2) * TAU / 2.2 + i, 1, 0, 1 - doux(0.85, 1, k));
         ombreSol(x, z, 0.6, 0.4);
         if (!cine.fige && Math.random() < 0.2) moteur.particule(x, 0.15, z, 0, 0.4, 0, 0.7, 0.3, 1.1, 0.62, 0.38, 0.26, 0.3, 0.2, 0);
       });
