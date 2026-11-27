@@ -190,7 +190,11 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
       for (let essai = 0; essai < file.length && !choix; essai++) {
         const id = file[(tour + essai) % file.length];
         const p = await rushes.passage(id, n);
-        if (p) { choix = { id, p }; tour = tour + essai + 1; }
+        if (p) {
+          // Un jeu remplacé par un autre se dit : il figure parmi les jeux écartés de la fiche.
+          if (essai) rushes.ecartes.push({ jeu: file[tour % file.length], raison: `plan ${k + 1} (${(n / IPS).toFixed(1)} s) : aucun passage exploitable de cette durée, remplacé par ${id}` });
+          choix = { id, p }; tour = tour + essai + 1;
+        }
       }
       if (!choix) throw new ErreurVideo(`Plan ${k + 1} du montage (${(n / IPS).toFixed(1)} s) : plus aucun passage exploitable dans ${file.join(', ')}. Ajouter des jeux ou choisir un rythme plus court.`);
       const fiche = await lireJeu(choix.id.split('@')[0]);
