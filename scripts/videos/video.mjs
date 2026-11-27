@@ -230,7 +230,7 @@ const commandes = {
 
   async revue() {
     const r = await ecrireRevue();
-    dire(`Page de revue : ${r.chemin} (${r.accroches} accroches, ${r.presentations} présentations)`);
+    dire(`Page de revue : ${r.chemin} (${r.accroches} accroches, ${r.trailers} bandes-annonces, ${r.presentations} présentations)`);
     return true;
   },
 
