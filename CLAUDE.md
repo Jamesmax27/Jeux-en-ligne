@@ -688,6 +688,10 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
   - Trois niveaux de qualité (`moteur.qualite`) : 2 sur ordinateur, 1 sur téléphone, 0 pour « Qualité : basse », un rendu sans carte graphique ou un appareil trop lent (descente automatique avant de réduire la finesse de l'image).
   - Affiche et images du jeu refaites ; `version` 5.
   - Reste : **vitesse non mesurée sur de vrais téléphones et ordinateurs** (essai du propriétaire) ; réglages `EXPOSITION`, `FORCE_HALO`, `BOITE_OMBRE` en tête de `creer`.
+- « Le Dernier Sas », cinématique d'ouverture — fait (branche `ccr-ec0c8912-lcc6vz`, 27 novembre 2026), demande du propriétaire (une invasion, en courtes séquences). Détail : `docs/cadrage-dernier-sas.md`, section 11.
+  - Cinq plans de 26 secondes joués par le moteur du jeu, sans fichier vidéo (météores, galerie qui s'ouvre, nuée et matriarche, colons qui s'abritent, défenseur devant le sas) ; sous-titres dans les 5 langues, sons du jeu.
+  - D'elle-même à la première partie seul, puis bouton « Revoir l'invasion » de l'écran titre ; « Passer », Échap, Entrée ou Espace la coupent. Jamais en ligne.
+  - `version` 6. Reste : la voir sur un vrai téléphone (rythme, lisibilité des sous-titres).
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 
 *Mettre à jour la section 14 à chaque étape terminée.*

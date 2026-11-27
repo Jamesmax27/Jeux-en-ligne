@@ -172,3 +172,13 @@ Un appareil qui passe sous 33 images par seconde descend d'abord d'un niveau, pu
 
 **Mesures** (26 novembre 2026, Chromium sans carte graphique, 1 280 × 720, image 2 du jeu) : 3,8 images par seconde avant ; 2,5 au niveau 0, 1,0 au niveau 2 (d'où la qualité simple choisie d'office sans carte graphique). Fichier : 875 Ko → 940 Ko environ. **Non mesuré : la vitesse sur de vrais téléphones et de vrais ordinateurs** (à essayer ; les réglages sont en tête de `creer` : `EXPOSITION`, `FORCE_HALO`, `BOITE_OMBRE`).
 
+## 11. Cinématique d'ouverture (version 6, 27 novembre 2026)
+
+Demande du propriétaire : une cinématique au début du jeu, avec une invasion, faite de courtes séquences. Choix de Claude : elle est **jouée par le moteur du jeu** (mêmes modèles, même décor, même lumière), pas par des fichiers vidéo : poids négligeable, sous-titres dans les 5 langues, même qualité que la partie sur chaque appareil.
+
+- **Cinq plans, 26 secondes** (script du jeu, section 7 ; `CINE_PLANS`, `CINE_TEXTES`, `CINE_METEORES`, `CINE_SONS`) : le canyon au calme puis les météores qui tombent au fond ; une galerie d'où sortent les premiers rampants ; la nuée qui déferle (96 aliens) et la matriarche dans la poussière ; les colons qui courent se mettre à l'abri pendant que les tourelles tirent ; le défenseur, seul devant le sas, qui lève son arme.
+- **Quand** : d'elle-même à la toute première partie seul (option gardée `cine`), avant la démonstration des commandes ; ensuite à la demande, bouton « Revoir l'invasion » de l'écran titre. Jamais en ligne, ni à la reprise d'une partie gardée. La partie est créée avant, le temps arrêté : fermer la page pendant la cinématique garde bien la partie.
+- **La passer** : bouton « Passer » (en haut à droite) ou Échap, Entrée, Espace.
+- Bandes de cinéma, sous-titres (`cine.1` à `cine.6`), fondus entre les plans ; sons du jeu (`SAS_SON`). Rien ne touche à la simulation. Le robot du site ne la voit pas pour l'affiche ni les images du jeu (`POUR_LE_ROBOT`).
+- Essais : `window.SAS_JEU.cine` (`t`, `fige`) permet de sauter à un instant et de figer l'image.
+
