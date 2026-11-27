@@ -400,8 +400,10 @@ jobs:
     needs: [quoi, jeux]
     if: ${{ always() && needs.quoi.result == 'success' }}
     runs-on: ubuntu-latest
-    # 60 min : quand le lanceur change, tous les jeux multijoueurs et temps réel passent au navigateur (environ 20 min à eux seuls)
-    timeout-minutes: 60
+    # 90 min : quand le lanceur change, tous les jeux multijoueurs et temps réel passent au navigateur (environ 20 min à eux seuls) ;
+    # à chaque push sur main, les simulations de Poussière d'Empire, de Marmoria et de Cosmoria (une dizaine de minutes chacune)
+    # s'y ajoutent. Mesuré le 27 novembre 2026 : 42 min pour une pull request qui ne lance que Cosmoria.
+    timeout-minutes: 90
     permissions:
       contents: read
     steps:
