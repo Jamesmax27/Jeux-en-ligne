@@ -20,21 +20,24 @@ node scripts/videos/video.mjs presentation --accroche mur-de-jeux --jeux tobogga
 | --- | --- |
 | `--accroche <id>` | accroche du début, prise dans `marketing/videos/selection.json` (`auto` : chacune à son tour) |
 | `--jeux <a,b,c>` | jeux montrés, dans l'ordre ; un jeu qui se filme mal est sauté et signalé |
-| `--textes <variante>` | textes à l'écran : fichier de `marketing/videos/textes/` (`direct`, `defi`, `titres`) |
-| `--rythme <nom>` | `express` (6 plans courts, par défaut), `pose` (4 plans longs) ou `crescendo` (plans de plus en plus courts) : `rythmes` de `gabarit.json` |
+| `--textes <variante>` | textes à l'écran : fichier de `marketing/videos/textes/` (`direct`, `defi`, `titres`, `questions`, `minimal`, `challenge`, `leger` ; bandes-annonces : `trio-clic`, `trio-gratuit`, `trio-defi`, `flash-clic`, `flash-gratuit`) |
+| `--rythme <nom>` | présentations : `express` (6 plans courts, par défaut), `pose` (4 plans longs), `crescendo` (plans de plus en plus courts), `duo` (2 longs puis 4 moyens), `saccade` (9 plans, longs et très courts alternés) ; bandes-annonces : `eclair` (3 plans, par défaut), `triple` (3 plans plus lents), `flash` (4 éclairs puis 1 plan) : `rythmes` de `gabarit.json` |
 | `--nom <nom>` | nom du fichier produit (par défaut : accroche, textes et rythme accolés) |
 | `--musique <fichier>` | piste de `marketing/videos/musique/` à la place de la musique générée |
 
 Résultat : `marketing/sorties/presentations/<nom>.mp4`, sa fiche `<nom>.json` (recette, déroulé, contrôles) et la page de revue mise à jour.
 
+Une bande-annonce courte (8 à 15 s) se fabrique de la même façon, avec les mêmes options : `node scripts/videos/video.mjs trailer --accroche c-est-combien --jeux le-dernier-sas,merge-hollywood,toboggan-turbo@pc --textes trio-gratuit --rythme eclair` (résultat dans `marketing/sorties/trailers/`).
+
 Autres commandes (`node scripts/videos/video.mjs <commande>`, ou `npm run video -- <commande>`) :
 
 | Commande | Effet |
 | --- | --- |
-| `tout` (ou `npm run videos`) | les accroches, les vidéos de `presentations/`, les contrôles, la page de revue |
+| `tout [--nouvelles]` (ou `npm run videos`) | les accroches, les bandes-annonces de `trailers/`, les vidéos de `presentations/`, les contrôles, la page de revue ; `--nouvelles` ne refait pas les vidéos déjà produites et bonnes |
 | `presentation <id>` | la vidéo décrite par `marketing/videos/presentations/<id>.json` |
+| `trailer <id>` | la bande-annonce décrite par `marketing/videos/trailers/<id>.json` |
 | `accroche [<id>…]` | les accroches seules (2 à 3 s chacune), pour les comparer |
-| `apercu <id> [--images 0,1.5,20]` | quelques images d'une accroche ou d'une présentation, sans tout rendre (mise au point d'une recette) |
+| `apercu <id> [--images 0,1.5,20]` | quelques images d'une accroche, d'une bande-annonce ou d'une présentation, sans tout rendre (mise au point d'une recette) |
 | `verifier` | recontrôle les vidéos déjà produites |
 | `revue` | refait `marketing/sorties/revue.html` |
 | `jeux [--actualiser]` | jeux classés d'après les votes et les jeux les plus joués du site |
@@ -76,12 +79,21 @@ Une accroche dure 2 à 3 secondes et doit arrêter le défilement dès la premi�
 | `mur-de-jeux` | la quantité | un mur de vraies jaquettes qui défile : l'abondance se voit en une image, sans chiffre qui se périme |
 | `zero-attente` | l'immédiateté | on casse l'attente d'un téléchargement pour montrer qu'ici un clic suffit |
 | `en-pleine-action` | le gameplay spectaculaire | on entre au milieu d'un vrai jeu, le texte crée la surprise (« ça tourne dans un navigateur ? ») |
+| `tu-t-ennuies` | la question directe | la question que chacun se pose en faisant défiler ; la réponse est déjà à l'image |
+| `sans-console` | aucun matériel | un monde en 3D qu'on croirait réservé à une console : un navigateur suffit |
+| `pc-et-telephone` | partout | le même jeu sur un écran d'ordinateur puis sur un téléphone, en deux plans |
+| `en-rafale` | la variété | quatre jeux très différents en moins de trois secondes, sans chiffre |
+| `tiens-bon` | le défi | un jeu d'esquive et une question qui pique l'orgueil |
+| `sans-compte` | sans inscription | le formulaire d'inscription balayé d'un tampon |
+| `c-est-combien` | le prix | la première question devant un jeu, et « 0 € » en très gros |
+| `stockage-plein` | le stockage | le téléphone plein : rien à installer, donc rien à supprimer |
 
 **Choisir celles qu'on garde** : ouvrir `marketing/sorties/revue.html`, puis modifier à la main la liste de `marketing/videos/selection.json`. Une vidéo de présentation ne peut commencer que par une accroche de cette liste ; n'importe laquelle convient, rien n'est à refaire à la main.
 
 Format d'une recette : une liste de `plans`, chacun avec sa `duree` (secondes) et ses `textes`.
 
-- Types de plan : `mur` (jaquettes qui défilent), `attente` (fausse fenêtre de téléchargement, `titre`, `chute` = seconde où elle tombe), `jeu` (gameplay : `jeu`, `debut` en secondes ou `"auto"`), `ciel` (fond étoilé seul).
+- Types de plan : `mur` (jaquettes qui défilent), `attente` (fausse fenêtre, `genre` : `telechargement` par défaut, `compte` ou `stockage` ; `titre`, `chute` = seconde où elle tombe), `jeu` (gameplay : `jeu`, `debut` en secondes ou `"auto"`), `ciel` (fond étoilé seul).
+- `textes` à la racine de la recette : textes posés par-dessus plusieurs plans (accroche en rafale), `de` et `jusqu` comptés depuis le début de l'accroche.
 - Texte : `texte` (`*mot*` = mot en or, `\n` = retour à la ligne, `{site}` = adresse du site), `style` (`geant`, `choc`, `titre`, `legende`, `etiquette`, `petit` : tailles dans `gabarit.json`), `position` (hauteur du centre en pixels, ou `haut`, `bas`, `pied`), `de` et `jusqu` (secondes dans le plan), `entree` (`pop`, `frappe`, `glisse`, `gauche`, `fondu`, `impact`, `aucune`), `son` (`pop`, `frappe`, `impact`, `refus`, `cloche`), `rotation`.
 
 ## 4. Les vidéos de présentation
@@ -89,9 +101,13 @@ Format d'une recette : une liste de `plans`, chacun avec sa `duree` (secondes) e
 Structure : accroche → montage de gameplay → écran de fin (logo, `freemicrogames.com`, appel à l'action). Durée : 20 à 35 secondes.
 
 - **Recettes** : `marketing/videos/presentations/<id>.json` = `{ "accroche", "jeux", "textes", "rythme" }`, les mêmes réglages que la commande.
-- **Textes** (`marketing/videos/textes/<variante>.json`) : `legendes` (texte du haut de chaque plan, dans l'ordre), `etiquettes` (pastille du bas ; par défaut le titre du jeu), `en_boucle`, `rafale` (texte posé sur les plans très courts), `fin` (`appel`, `detail`). Variables : `{titre}` (titre du jeu montré, sans son sous-titre), `{titre_complet}`, `{rang}` (numéro du plan), `{site}`.
+- **Textes** (`marketing/videos/textes/<variante>.json`) : `legendes` (texte du haut de chaque plan, dans l'ordre), `etiquettes` (pastille du bas ; par défaut le titre du jeu), `en_boucle`, `rafale` (texte posé sur chaque suite de plans très courts, moins de 1,5 s ; une liste donne un texte par suite ; ces plans ne consomment pas de légende), `fin` (`appel`, `detail`). Variables : `{titre}` (titre du jeu montré, sans son sous-titre), `{titre_complet}`, `{rang}` (numéro du plan), `{site}`.
 - **Rythmes** (`gabarit.json`) : tempo de la musique, durée de chaque plan en temps (les coupes tombent sur les temps), transition (`coupe`, `zoom`, `glisse`), ambiance de la musique (`arcade`, `planant`, `tension`).
 - **Gabarit graphique** (`marketing/videos/gabarit.json`) : couleurs et polices du site (ciel indigo, lilas, or, Fredoka et Nunito), styles de texte, zone sûre, seuils de lisibilité. Les textes restent dans la zone sûre : TikTok, Reels et Shorts recouvrent le haut, le bas et, dans la moitié basse, une colonne de boutons à droite.
+
+### Bandes-annonces
+
+Format court pour tester une accroche : accroche → 3 à 5 plans de jeu très courts → écran de fin. Durée : 8 à 15 secondes. Recettes dans `marketing/videos/trailers/<id>.json`, même format que les présentations ; rythmes `eclair`, `triple` et `flash` ; variantes de texte à 3 légendes (`trio-…`) ou à une rafale et une légende (`flash-…`).
 
 ## 5. Les jeux
 
@@ -120,7 +136,7 @@ Chaque vidéo est contrôlée à la fabrication (`verifier` les refait) :
 | Contrôle | Règle |
 | --- | --- |
 | format | MP4, H.264 yuv420p, 1080 × 1920, 30 i/s, AAC stéréo 48 kHz |
-| durée | 2 à 3 s (accroche), 20 à 35 s (présentation) |
+| durée | 2 à 3 s (accroche), 8 à 15 s (bande-annonce), 20 à 35 s (présentation) |
 | images noires | aucune |
 | images figées | aucun plan de jeu arrêté plus de 0,7 s, aucune image arrêtée plus de 1 s ailleurs |
 | textes | dans la zone sûre, 46 px au moins, contraste de 4,5 au moins, affichés assez longtemps pour être lus |
@@ -137,6 +153,7 @@ marketing/
 │  ├─ accroches/<id>.json     recettes des accroches
 │  ├─ selection.json          accroches retenues (à modifier à la main)
 │  ├─ presentations/<id>.json recettes des vidéos de présentation
+│  ├─ trailers/<id>.json      recettes des bandes-annonces courtes
 │  ├─ textes/<variante>.json  variantes de texte
 │  ├─ captures/<jeu>.json     plans de capture des jeux
 │  ├─ gabarit.json            gabarit graphique, rythmes, seuils
