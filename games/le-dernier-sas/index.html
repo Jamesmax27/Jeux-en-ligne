@@ -5007,7 +5007,12 @@ body.tactile #prep { bottom: calc(210px + env(safe-area-inset-bottom)); }
  *   Un modèle regarde vers +z, pieds à y = 0. Matrices : Float32Array(16), colonnes d'abord.
  *
  * MOTEUR
- *   const moteur = SAS_GL.creer(canvas, { modeles, antialias: true });   // null sans WebGL2
+ *   const moteur = SAS_GL.creer(canvas, { modeles, qualite: 2 });   // null sans WebGL2
+ *   moteur.qualite(n) -> niveau en service : 0 = simple (ni ombres, ni HDR, ni détail des matières),
+ *                        1 = ombres portées, matières, halo, courbe de film ; 2 = le tout + occlusion ambiante.
+ *                        Sans image HDR possible sur l'appareil, le niveau reste 0.
+ *   moteur.ombres -> vrai quand le soleil projette des ombres (le jeu allège alors ses taches de contact)
+ *   moteur.logiciel -> vrai quand le rendu est calculé par le processeur (pas de carte graphique)
  *   moteur.redimensionner(largeurCss, hauteurCss, dpr)
  *   moteur.modele(nom) -> maillage Kenney { nom, min, max, rayon, triangles } ou null
  *   moteur.geo() -> constructeur de géométrie (voir plus bas)
@@ -5032,9 +5037,10 @@ body.tactile #prep { bottom: calc(210px + env(safe-area-inset-bottom)); }
  *   SAS_GL.erreur : message du compilateur si un shader est refusé (creer renvoie alors null)
  *
  *   Précisions
- *   - poser : echelle uniforme ; poserMat pour une échelle par axe. Instances derrière la caméra écartées.
- *   - eclat (0..1) blanchit l'instance ; emissif (0..1) lui ajoute sa propre couleur comme lumière ;
+ *   - poser : echelle uniforme ; poserMat pour une échelle par axe.
+ *   - eclat (0..1) illumine l'instance (blanche à 1) ; emissif (0..1) lui ajoute sa propre couleur comme lumière ;
  *     fondu < 1 la dissout par tramage (pas de tri, pas de transparence).
+ *   - Une instance derrière la caméra est gardée jusqu'à 32 m quand il y a des ombres (elle peut en projeter une).
  *   - marche (radians) et ampli (0..1) n'agissent que sur les maillages animés (geo().patte, etc.).
  *   - disque : bord doux ; anneau : epaisseur en mètres ; tache : contour irrégulier, s'efface en « vie » s.
  *   - particule : taille = diamètre en mètres ; gravite > 0 fait retomber et rebondir sur le sol ;
@@ -5055,6 +5061,9 @@ body.tactile #prep { bottom: calc(210px + env(safe-area-inset-bottom)); }
  *
  * CONSTRUCTEUR DE GÉOMÉTRIE : const g = moteur.geo(); toutes les méthodes renvoient g sauf maillage()
  *   État : g.couleur(r, v, b) (sRGB 0..1) ; g.emissif(e = 1) (0..1, partie qui brille) ;
+ *          g.matiere(nom) : 'peinture' (défaut), 'roche', 'metal', 'chitine', 'chair', 'cristal', 'os', 'beton' ;
+ *          g.finesse(k = 1) : multiplie les facettes des formes rondes (cylindre, ellipsoïde, tube) ;
+ *          g.lisser(degres = 0) : les faces voisines dont l'angle est sous ce seuil partagent leur normale ;
  *          g.bruit(amplitude = 0) (bosselage aléatoire répétable des sommets, en unités locales)
  *   Repère : g.pousser(), g.depiler(), g.deplacer(x, y, z), g.tournerX(a), g.tournerY(a), g.tournerZ(a)
  *            (mêmes sens que mat.rotX/Y/Z), g.echelle(sx, sy = sx, sz = sx) (négatif permis : miroir),
@@ -5084,6 +5093,8 @@ body.tactile #prep { bottom: calc(210px + env(safe-area-inset-bottom)); }
  *         aplati < 1 écrase la section (lame) dans la direction ref ([x, y, z])
  *     g.segment(a, b, r1, r2 = r1, n = 5), g.pointe(a, b, r, n = 4)
  *     g.face(points, dedans = null, deuxFaces = false)  polygone plan ; dedans : point situé derrière
+ *     g.libre(points, triangles, couleurs = null)       surface quelconque [[x, y, z], …], [[a, b, c], …],
+ *         normale de chaque triangle (b − a) × (c − a) vers l'extérieur ; normales lissées, couleur par point
  *   Halo : g.lueur(x, y, z, taille, r, v, b, alpha = 0.5) : lueur douce dessinée à chaque instance
  *   Fin : g.triangles() -> nombre ; g.maillage() -> maillage { min, max, rayon, triangles, anime }
  *
@@ -5163,32 +5174,105 @@ body.tactile #prep { bottom: calc(210px + env(safe-area-inset-bottom)); }
   }
 
   // ------------------------------------------------------------------ shaders
-  const GL_SORTIE = `
+  // Morceau commun aux shaders de la scène : réglages, courbe d'écran, ombre du soleil, brume, reflet du ciel.
+  // uRegl : x = 1 quand le shader applique lui-même la courbe d'écran (qualité 0, sans rendu HDR),
+  //         y = ombres portées (0 non, 1 douces à 4 lectures, 2 douces à 9 lectures),
+  //         z = détail des matières (0 ou 1), w = pas de la carte d'ombre (1 / taille).
+  const GL_COMMUN = `
+precision highp float;
+precision highp sampler2DShadow;
+uniform vec3 uCam;
+uniform float uTemps;
+uniform vec3 uSoleilDir, uSoleilCoul, uSoleilCiel, uAmbCiel, uAmbSol, uContre, uCielHaut, uCielBas;
+uniform vec4 uBrume;
+uniform vec4 uRegl;
+uniform sampler2DShadow uOmbre;
+uniform mat4 uOmbreVP;
 vec3 sortie(vec3 c, vec2 px) {
   c = max(c, 0.0);
-  vec3 x = max(c - 0.6, 0.0);
-  c = min(c, 0.6) + 0.4 * (1.0 - exp(-x * 2.5));
-  c = pow(c, vec3(0.4545));
-  float t = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
-  return c + (t - 0.5) / 255.0;
+  if (uRegl.x > 0.5) {
+    vec3 x = max(c - 0.6, 0.0);
+    c = min(c, 0.6) + 0.4 * (1.0 - exp(-x * 2.5));
+    c = pow(c, vec3(0.4545));
+    float t = fract(52.9829189 * fract(dot(px, vec2(0.06711056, 0.00583715))));
+    c += (t - 0.5) / 255.0;
+  }
+  return c;
+}
+float ombre(vec3 p, vec3 n) {
+  if (uRegl.y < 0.5) return 1.0;
+  float ndl = clamp(dot(n, uSoleilDir), 0.0, 1.0);
+  vec4 q = uOmbreVP * vec4(p + n * (0.035 + 0.10 * (1.0 - ndl)), 1.0);
+  vec3 s = q.xyz * 0.5 + 0.5;
+  if (s.x <= 0.002 || s.x >= 0.998 || s.y <= 0.002 || s.y >= 0.998 || s.z >= 1.0 || s.z <= 0.0) return 1.0;
+  s.z -= 0.0006;
+  float t = uRegl.w, o;
+  if (uRegl.y > 1.5) {
+    o = 0.0;
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) o += texture(uOmbre, vec3(s.xy + vec2(float(i), float(j)) * t * 1.25, s.z));
+    o /= 9.0;
+  } else {
+    o = texture(uOmbre, vec3(s.xy + vec2(-0.6, -0.6) * t, s.z)) + texture(uOmbre, vec3(s.xy + vec2(0.6, -0.6) * t, s.z))
+      + texture(uOmbre, vec3(s.xy + vec2(-0.6, 0.6) * t, s.z)) + texture(uOmbre, vec3(s.xy + vec2(0.6, 0.6) * t, s.z));
+    o *= 0.25;
+  }
+  return o;
+}
+// Brume : plus dense près du sol, éclairée par le soleil quand on regarde vers lui.
+vec3 couleurBrume(vec3 dir) {
+  float sd = max(dot(dir, uSoleilDir), 0.0);
+  float s2 = sd * sd, s8 = s2 * s2 * s2 * s2;
+  return uBrume.rgb + uSoleilCiel * (s8 * 0.22 + s2 * 0.05);
+}
+float quantiteBrume(vec3 dir, float dist) {
+  float t = 0.055 * dir.y * dist;
+  float k = abs(t) > 0.001 ? (1.0 - exp(-t)) / t : 1.0;
+  return 1.0 - exp(-dist * uBrume.w * 1.1 * exp(-0.055 * max(uCam.y, 0.0)) * k);
+}
+vec3 brume(vec3 c, vec3 p) {
+  vec3 v = p - uCam;
+  float d = length(v);
+  v /= max(d, 0.0001);
+  return mix(c, couleurBrume(v), quantiteBrume(v, d));
+}
+// Ce que l'on verrait dans la direction r : le ciel, l'horizon brumeux, le sol ; plus flou quand rug grandit.
+vec3 reflet(vec3 r, float rug) {
+  float h = r.y;
+  vec3 c = mix(uCielBas, uCielHaut, 1.0 - exp(-max(h, 0.0) * 3.3));
+  c = mix(c, uBrume.rgb, exp(-abs(h) * 7.0) * 0.85);
+  vec3 sol = uAmbSol * 0.85 + uSoleilCoul * vec3(0.060, 0.022, 0.010);
+  c = mix(sol, c, smoothstep(-0.12 - rug * 0.6, 0.06 + rug * 0.6, h));
+  float sd = max(dot(r, uSoleilDir), 0.0);
+  c += uSoleilCiel * (pow(sd, mix(48.0, 3.0, rug)) * mix(1.6, 0.25, rug));
+  return c;
 }`;
 
   const GL_LUMIERES = `
 uniform int uNbLum;
 uniform vec4 uLum[${MAX_LUMIERES}];
 uniform vec3 uLumCoul[${MAX_LUMIERES}];
-vec3 lumieres(vec3 p, vec3 n) {
+// Lumières ponctuelles : renvoie la part diffuse ; « brill » (exposant) et « spec » pour le reflet.
+vec3 lumieres(vec3 p, vec3 n, vec3 vue, float brill, out vec3 spec) {
   vec3 s = vec3(0.0);
+  spec = vec3(0.0);
   for (int i = 0; i < uNbLum; i++) {
     vec3 l = uLum[i].xyz - p;
     float d2 = dot(l, l);
     float a = max(1.0 - d2 * uLum[i].w, 0.0);
-    float ndl = dot(n, l) * inversesqrt(d2 + 0.0001);
-    s += uLumCoul[i] * (a * a * max(ndl * 0.75 + 0.25, 0.0));
+    a *= a;
+    l *= inversesqrt(d2 + 0.0001);
+    float ndl = dot(n, l);
+    s += uLumCoul[i] * (a * max(ndl * 0.75 + 0.25, 0.0));
+    if (brill > 0.0) {
+      float ndh = max(dot(n, normalize(l + vue)), 0.0);
+      spec += uLumCoul[i] * (a * max(ndl, 0.0) * min(pow(ndh, brill) * (brill + 2.0) * 0.125, 3.0) * 0.35);
+    }
   }
   return s;
 }`;
 
+  // Matières (4 bits de poids fort de l'octet « animation » de chaque sommet) :
+  // 0 peinture et plastique, 1 roche, 2 métal, 3 chitine, 4 chair et membranes, 5 cristal, 6 os et corne, 7 béton.
   const VS_MAILLAGE = `
 precision highp float;
 layout(location=0) in vec3 aPos;
@@ -5205,16 +5289,16 @@ layout(location=8) in vec4 iM2;
 layout(location=9) in vec4 iTeinte;
 layout(location=10) in vec4 iParam;
 uniform mat4 uVP;
-uniform vec3 uCam;
 uniform float uTemps;
-uniform vec3 uSoleilDir, uSoleilCoul, uAmbCiel, uAmbSol, uContre;
-uniform vec4 uBrume;
-out vec3 vCoul;
-out vec3 vAlbedo;
+#ifndef PROFONDEUR
+out vec3 vAlb;
 out vec3 vPos;
-flat out vec3 vN;
-out float vBrume;
-flat out float vFondu;
+out vec3 vN;
+out vec3 vLoc;
+out vec3 vNL;
+out vec4 vPar;
+flat out float vMat;
+#endif
 #ifdef ANIME
 vec3 tourner(vec3 v, vec3 k, float a) {
   float c = cos(a), s = sin(a);
@@ -5224,8 +5308,9 @@ vec3 tourner(vec3 v, vec3 k, float a) {
 void main() {
   vec3 p = aPos;
   vec3 n = aNorm.xyz;
+  int octet = int(aCoul.a * 255.0 + 0.5);
 #ifdef ANIME
-  int mode = int(aCoul.a * 255.0 + 0.5);
+  int mode = octet & 15;
   if (mode != 0) {
     float marche = iParam.x, ampli = iParam.y;
     vec3 r = p - aPivot;
@@ -5256,50 +5341,201 @@ void main() {
 #endif
   vec4 p4 = vec4(p, 1.0);
   vec3 pm = vec3(dot(iM0, p4), dot(iM1, p4), dot(iM2, p4));
-  vec3 nm = normalize(vec3(dot(iM0.xyz, n), dot(iM1.xyz, n), dot(iM2.xyz, n)));
-  vec3 alb = pow(aCoul.rgb, vec3(2.2)) * iTeinte.rgb;
-  vec3 vue = uCam - pm;
-  float dist = length(vue);
-  vue /= max(dist, 0.0001);
-  float occ = 0.7 + 0.3 * smoothstep(0.0, 0.7, pm.y);
-  vec3 lum = uSoleilCoul * max(dot(nm, uSoleilDir), 0.0) + mix(uAmbSol, uAmbCiel, nm.y * 0.5 + 0.5);
-  float rasant = 1.0 - max(dot(nm, vue), 0.0);
-  lum += uContre * (rasant * rasant * 1.6);
-  lum *= occ;
-  float e = aNorm.w;
-  float face = max(dot(nm, vue), 0.0);
-  vec3 c = alb * (lum * (1.0 - e) + e * (0.5 + 1.15 * face) + iParam.z * 1.3);
-  c += uContre * (rasant * rasant * rasant * 0.10 * (1.0 - e) * occ);
-  c = mix(c, vec3(1.6), iTeinte.a);
-  vCoul = c;
-  vAlbedo = alb * (1.0 - e);
-  vPos = pm;
-  vN = nm;
-  vBrume = (1.0 - exp(-dist * uBrume.w)) * (1.0 - 0.55 * e);
-  vFondu = iParam.w;
   gl_Position = uVP * vec4(pm, 1.0);
+#ifdef PROFONDEUR
+  if (iParam.w < 0.5) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+#else
+  vN = vec3(dot(iM0.xyz, n), dot(iM1.xyz, n), dot(iM2.xyz, n));
+  vAlb = pow(aCoul.rgb, vec3(2.2)) * iTeinte.rgb;
+  vPos = pm;
+  // repère de l'objet, en mètres : le détail des matières reste collé à l'objet qui bouge
+  vec3 ech = vec3(length(vec3(iM0.x, iM1.x, iM2.x)), length(vec3(iM0.y, iM1.y, iM2.y)), length(vec3(iM0.z, iM1.z, iM2.z)));
+  vLoc = aPos * ech;
+  vNL = aNorm.xyz;
+  vPar = vec4(iTeinte.a, iParam.z, iParam.w, aNorm.w);
+  vMat = float(octet >> 4);
+#endif
 }`;
 
-  const FS_MAILLAGE = `
+  const FS_PROFONDEUR = `
 precision highp float;
-in vec3 vCoul;
-in vec3 vAlbedo;
+void main() {}`;
+
+  const FS_MAILLAGE = `
+${GL_COMMUN}
+in vec3 vAlb;
 in vec3 vPos;
-flat in vec3 vN;
-in float vBrume;
-flat in float vFondu;
-uniform vec4 uBrume;
+in vec3 vN;
+in vec3 vLoc;
+in vec3 vNL;
+in vec4 vPar;
+flat in float vMat;
+uniform sampler2D uBruit;
 out vec4 oCoul;
-${GL_SORTIE}
 ${GL_LUMIERES}
 void main() {
-  if (vFondu < 0.999) {
+  if (vPar.z < 0.999) {
     float t = fract(52.9829189 * fract(dot(gl_FragCoord.xy + 17.0, vec2(0.06711056, 0.00583715))));
-    if (t >= vFondu) discard;
+    if (t >= vPar.z) discard;
   }
-  vec3 c = vCoul;
-  if (uNbLum > 0) c += vAlbedo * lumieres(vPos, vN);
-  c = mix(c, uBrume.rgb, vBrume);
+  vec3 ng = normalize(vN);
+  vec3 n = ng;
+  vec3 vue = uCam - vPos;
+  float dist = length(vue);
+  vue /= max(dist, 0.0001);
+  int mat = int(vMat + 0.5);
+  float e = vPar.w;
+  vec3 alb = vAlb * 0.88;
+
+  // --- la matière : rugosité, reflet de face (f0), part métallique, diffusion sous la surface, relief
+  float rug = 0.6, f0 = 0.04, metal = 0.0, sous = 0.0;
+  if (mat == 1) { rug = 0.95; f0 = 0.02; }
+  else if (mat == 2) { rug = 0.42; metal = 0.6; f0 = 0.3; }
+  else if (mat == 3) { rug = 0.30; f0 = 0.07; sous = 0.25; }
+  else if (mat == 4) { rug = 0.22; f0 = 0.05; sous = 0.55; }
+  else if (mat == 5) { rug = 0.08; f0 = 0.14; sous = 0.35; }
+  else if (mat == 6) { rug = 0.42; f0 = 0.05; sous = 0.15; }
+  else if (mat == 7) { rug = 0.9; f0 = 0.03; }
+
+#ifndef SIMPLE
+  if (uRegl.z > 0.5 && e < 0.9) {
+    // Trois lectures du bruit (une par axe de l'objet), mêlées selon l'orientation de la face.
+    vec3 w = abs(vNL);
+    w *= w; w *= w;
+    w /= w.x + w.y + w.z + 0.0001;
+    float fin = mat == 1 || mat == 7 ? 0.21 : mat == 3 || mat == 4 || mat == 6 ? 1.9 : 0.75;
+    vec3 q = vLoc * fin;
+    vec4 tx = texture(uBruit, q.zy + vec2(0.31, 0.17));
+    vec4 ty = texture(uBruit, q.xz + vec2(0.63, 0.49));
+    vec4 tz = texture(uBruit, q.xy + vec2(0.11, 0.83));
+    vec4 d = tx * w.x + ty * w.y + tz * w.z;
+    vec3 pente = w.x * vec3(0.0, tx.b - 0.5, tx.g - 0.5) + w.y * vec3(ty.g - 0.5, 0.0, ty.b - 0.5) + w.z * vec3(tz.g - 0.5, tz.b - 0.5, 0.0);
+    float pres = 1.0 - smoothstep(20.0, 60.0, dist);
+    float relief = 0.25;
+    if (mat == 1) {
+      // roche : grandes plages, strates couchées, fissures, grain
+      vec3 q2 = vLoc * 0.045;
+      vec4 lx = texture(uBruit, q2.zy), ly = texture(uBruit, q2.xz), lz = texture(uBruit, q2.xy);
+      float large = lx.r * w.x + ly.r * w.y + lz.r * w.z;
+      // relief à grande échelle, encore visible de loin
+      vec3 penteL = w.x * vec3(0.0, lx.b - 0.5, lx.g - 0.5) + w.y * vec3(ly.g - 0.5, 0.0, ly.b - 0.5) + w.z * vec3(lz.g - 0.5, lz.b - 0.5, 0.0);
+      n = normalize(n - penteL * (2.2 * (1.0 - smoothstep(90.0, 220.0, dist))));
+      float strate = sin(vPos.y * 2.3 + large * 9.0 + d.r * 2.5) * 0.5 + 0.5;
+      strate = smoothstep(0.25, 0.75, strate) * (1.0 - w.y);
+      alb *= 0.62 + 0.55 * large + 0.22 * (d.r - 0.5);
+      alb = mix(alb, alb * vec3(0.62, 0.52, 0.50), strate * 0.55);
+      alb = mix(alb, alb * vec3(1.22, 1.05, 0.86), smoothstep(0.62, 0.9, large) * 0.5);
+      float fiss = (1.0 - smoothstep(0.0, 0.07, d.a)) * pres;
+      alb *= 1.0 - 0.55 * fiss;
+      // poussière posée sur les faces tournées vers le haut
+      alb = mix(alb, vec3(0.36, 0.16, 0.075), smoothstep(0.55, 0.95, ng.y) * 0.55);
+      relief = 1.5 + 2.0 * fiss;
+      pente.y += (strate - 0.5) * 0.12;
+    } else if (mat == 2) {
+      // métal : usure, rayures plus mates, salissures
+      float use = smoothstep(0.45, 0.8, d.r);
+      alb *= 0.46 + 0.18 * d.r;
+      rug = clamp(rug + 0.28 * use - 0.1 * (1.0 - smoothstep(0.0, 0.08, d.a)), 0.12, 1.0);
+      alb = mix(alb, alb * vec3(0.55, 0.42, 0.36), (1.0 - smoothstep(0.0, 0.05, d.a)) * 0.25 * pres);
+      relief = 0.35;
+    } else if (mat == 3) {
+      // chitine : mouchetures sombres, sillons luisants
+      float tache = smoothstep(0.55, 0.8, d.r);
+      alb *= 0.72 + 0.5 * d.r;
+      alb = mix(alb, alb * 0.45, tache * 0.6);
+      rug = clamp(rug + 0.25 * tache, 0.1, 1.0);
+      float sillon = 1.0 - smoothstep(0.0, 0.09, d.a);
+      alb *= 1.0 - 0.45 * sillon * pres;
+      relief = 0.9 + 1.2 * sillon;
+    } else if (mat == 4) {
+      // chair : veines plus sombres, surface humide et bosselée
+      float veine = 1.0 - smoothstep(0.0, 0.10, d.a);
+      alb *= 0.85 + 0.3 * d.r;
+      alb = mix(alb, alb * vec3(0.55, 0.30, 0.42), veine * 0.6 * pres);
+      relief = 0.8;
+    } else if (mat == 5) {
+      alb *= 0.85 + 0.3 * d.r;
+      relief = 0.15;
+    } else if (mat == 6) {
+      float strie = 1.0 - smoothstep(0.0, 0.12, d.a);
+      alb *= 0.82 + 0.3 * d.r;
+      alb = mix(alb, alb * vec3(0.6, 0.5, 0.4), strie * 0.5 * pres);
+      relief = 0.5;
+    } else if (mat == 7) {
+      // béton : taches, coulures, éclats
+      vec3 q2 = vLoc * 0.05;
+      float large = texture(uBruit, q2.zy).r * w.x + texture(uBruit, q2.xz).r * w.y + texture(uBruit, q2.xy).r * w.z;
+      alb *= 0.70 + 0.35 * large + 0.2 * (d.r - 0.5);
+      float fiss = (1.0 - smoothstep(0.0, 0.045, d.a)) * pres;
+      alb *= 1.0 - 0.5 * fiss;
+      relief = 0.9 + 1.5 * fiss;
+    } else {
+      // peinture : grain léger, éclats
+      alb *= 0.93 + 0.14 * d.r;
+      rug = clamp(rug + 0.3 * (d.r - 0.5), 0.2, 1.0);
+      float eclat = (1.0 - smoothstep(0.0, 0.03, d.a)) * smoothstep(0.6, 0.8, d.r) * pres;
+      alb = mix(alb, alb * 0.6, eclat * 0.6);
+      relief = 0.2;
+    }
+    // Les objets posés au sol prennent sa poussière (sauf les créatures et l'arme tenue en main).
+    if (mat != 3 && mat != 4 && mat != 5 && mat != 6 && uBrume.w > 0.0) {
+      float pied = (1.0 - smoothstep(0.0, 0.55 + 0.5 * d.r, vPos.y)) * 0.6;
+      alb = mix(alb, vec3(0.30, 0.125, 0.055) * (0.8 + 0.4 * d.r), pied);
+      rug = mix(rug, 0.95, pied);
+      metal *= 1.0 - pied;
+    }
+    n = normalize(n - pente * (relief * pres));
+  }
+#endif
+
+  // --- la lumière
+  float ndv = max(dot(n, vue), 0.0);
+  float ndl = dot(n, uSoleilDir);
+  float om = ombre(vPos, ng);
+  float dif = mix(max(ndl, 0.0), max((ndl + 0.45) / 1.45, 0.0), sous);
+  float occ = 0.72 + 0.28 * smoothstep(0.0, 0.7, vPos.y);
+  vec3 ciel = mix(uAmbSol, uAmbCiel, n.y * 0.5 + 0.5);
+  vec3 lum = uSoleilCoul * (dif * om) + ciel * occ;
+  float rasant = 1.0 - ndv;
+  lum += uContre * (rasant * rasant * 1.1 * occ);
+  // lumière qui traverse les membranes et les cristaux, à contre-jour
+  if (sous > 0.0) lum += uSoleilCoul * (sous * 0.35 * pow(max(dot(-vue, uSoleilDir), 0.0), 3.0) * (0.3 + 0.7 * om));
+
+#ifdef SIMPLE
+  // qualité 0 : ni reflets ni détail ; le métal garde un peu de lumière diffuse pour ne pas noircir
+  metal *= 0.4;
+  float brill = 0.0;
+  vec3 spec = vec3(0.0), fres = vec3(0.0);
+#else
+  float a2 = rug * rug;
+  float brill = clamp(2.0 / (a2 * a2 + 0.0002) - 2.0, 1.0, 2000.0);
+  vec3 F0 = mix(vec3(f0), alb * 0.8, metal);
+  vec3 h = normalize(uSoleilDir + vue);
+  float ndh = max(dot(n, h), 0.0);
+  vec3 fres = F0 + (1.0 - F0) * pow(max(1.0 - dot(h, vue), 0.0), 5.0);
+  vec3 spec = uSoleilCoul * fres * (om * max(ndl, 0.0) * min(pow(ndh, brill) * (brill + 2.0) * 0.125, 40.0));
+  vec3 fenv = F0 + (max(vec3(1.0 - rug), F0) - F0) * pow(rasant, 5.0);
+  spec += reflet(reflect(-vue, n), rug) * fenv * (occ * (0.45 + 0.55 * om));
+#endif
+
+  vec3 specL = vec3(0.0), difL = vec3(0.0);
+  if (uNbLum > 0) {
+    difL = lumieres(vPos, n, vue, brill, specL);
+    // tout près d'une lumière forte (bouche du canon), on garde la couleur au lieu de tout blanchir
+    difL *= 1.0 / (1.0 + max(difL.r, max(difL.g, difL.b)) * 0.45);
+    specL *= 1.0 / (1.0 + max(specL.r, max(specL.g, specL.b)) * 1.2);
+    spec += specL * fres;
+  }
+
+  vec3 c = alb * (1.0 - metal) * (lum + difL) * (1.0 - e) + spec * (1.0 - e);
+  // parties lumineuses : plus fortes en HDR, pour que leur halo déborde
+  float gain = mix(2.6, 1.0, uRegl.x);
+  c += vAlb * ((e * (0.5 + 1.15 * ndv) + vPar.y * 1.3) * gain);
+  // éclat (coup reçu, tir) : la surface s'illumine, et ne blanchit tout à fait que pour un éclat entier
+  float ec = vPar.x;
+  if (uRegl.x > 0.5) c = mix(c, vec3(1.6), ec);
+  else c = mix(c * (1.0 + 3.0 * ec), vec3(1.5), ec * ec * ec);
+  c = mix(c, couleurBrume(-vue), quantiteBrume(-vue, dist) * (1.0 - 0.55 * e));
   oCoul = vec4(sortie(c, gl_FragCoord.xy), 1.0);
 }`;
 
@@ -5316,18 +5552,16 @@ void main() {
 }`;
 
   const FS_SOL = `
-precision highp float;
+${GL_COMMUN}
 in vec3 vPos;
 uniform sampler2D uBruit;
-uniform vec3 uCam;
-uniform vec3 uSoleilDir, uSoleilCoul, uAmbCiel, uAmbSol;
-uniform vec4 uBrume;
 out vec4 oCoul;
-${GL_SORTIE}
 ${GL_LUMIERES}
 void main() {
   vec2 p = vPos.xz;
-  float dist = distance(vPos, uCam);
+  vec3 vue = uCam - vPos;
+  float dist = length(vue);
+  vue /= max(dist, 0.0001);
   // Quatre lectures de la même texture de bruit, à des échelles et des angles sans rapport simple.
   vec4 A = texture(uBruit, p * 0.0173 + vec2(0.37, 0.11));
   vec2 pb = vec2(p.x * 0.8 - p.y * 0.6, p.x * 0.6 + p.y * 0.8);
@@ -5365,12 +5599,27 @@ void main() {
   vec3 n = normalize(vec3(-pente.x * 1.5, 1.0, -pente.y * 1.5));
 
   // moitié relief, moitié sol plat : le soleil rasant ne doit pas noircir chaque creux
+  float om = ombre(vPos, vec3(0.0, 1.0, 0.0));
   float ecl = max(mix(uSoleilDir.y, dot(n, uSoleilDir), 0.5), 0.0);
-  vec3 lum = uSoleilCoul * ecl * 1.5 + mix(uAmbSol, uAmbCiel, 0.85);
+  vec3 lum = uSoleilCoul * (ecl * 1.5 * om) + mix(uAmbSol, uAmbCiel, 0.85) * (0.9 + 0.1 * om);
   vec3 alb = c;
   c *= lum;
-  if (uNbLum > 0) c += alb * lumieres(vPos, n) * 3.0;
-  c = mix(c, uBrume.rgb, 1.0 - exp(-dist * uBrume.w));
+  // reflet rasant du soleil et du ciel sur les plaques de sable durci
+  vec3 specL;
+#ifdef SIMPLE
+  if (uNbLum > 0) c += alb * lumieres(vPos, n, vue, 0.0, specL) * 3.0;
+#else
+  float rasant = 1.0 - max(dot(n, vue), 0.0);
+  float r2 = rasant * rasant;
+  vec3 h = normalize(uSoleilDir + vue);
+  c += uSoleilCoul * (om * pow(max(dot(n, h), 0.0), 40.0) * (0.10 + 0.5 * plaques) * max(dot(n, uSoleilDir), 0.0));
+  c += reflet(reflect(-vue, n), 0.7) * (r2 * r2 * rasant * (0.10 + 0.25 * plaques));
+  if (uNbLum > 0) {
+    vec3 difL = lumieres(vPos, n, vue, 24.0, specL);
+    c += alb * difL * 3.0 + specL * (0.05 + 0.25 * plaques);
+  }
+#endif
+  c = mix(c, couleurBrume(-vue), quantiteBrume(-vue, dist));
   oCoul = vec4(sortie(c, gl_FragCoord.xy), 1.0);
 }`;
 
@@ -5385,16 +5634,15 @@ void main() {
 }`;
 
   const FS_CIEL = `
-precision highp float;
+${GL_COMMUN}
 in vec3 vDir;
-uniform vec3 uCielHaut, uCielBas, uBrume, uSoleilDir, uSoleilCoul, uMont;
-uniform float uNuit, uTemps;
+uniform vec3 uMont;
+uniform float uNuit;
 uniform vec4 uAstreP[3];
 uniform vec3 uAstreR[3];
 uniform vec3 uAstreU[3];
 uniform vec3 uAstreS[3];
 out vec4 oCoul;
-${GL_SORTIE}
 float h11(float p) {
   p = fract(p * 0.1031);
   p *= p + 33.33;
@@ -5411,12 +5659,23 @@ float bruitP(float x, float per) {
   f = f * f * (3.0 - 2.0 * f);
   return mix(h11(mod(i, per) + 3.7), h11(mod(i + 1.0, per) + 3.7), f);
 }
+float h21(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+float bruit2(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
 void main() {
   vec3 d = normalize(vDir);
   float pix = length(fwidth(d)) + 0.00001;
   float h = max(d.y, 0.0);
   vec3 c = mix(uCielBas, uCielHaut, 1.0 - exp(-h * 3.3));
   vec3 fond = c;
+  float hdr = 1.0 - uRegl.x;
 
   // Étoiles : une par case d'une grille 3D traversée par la sphère des directions.
   float vis = smoothstep(0.04, 0.4, d.y);
@@ -5428,7 +5687,7 @@ void main() {
     float dist = length(fract(p) - (0.25 + 0.5 * r.xyz));
     float s = (1.0 - smoothstep(0.0, 0.11 + 0.13 * b, dist)) * b;
     s *= 0.72 + 0.28 * sin(uTemps * (1.5 + r.x * 3.0) + r.y * 40.0);
-    c += mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.86, 0.7), r.z) * (s * vis * mix(0.55, 1.9, uNuit));
+    c += mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.86, 0.7), r.z) * (s * vis * mix(0.55, 1.9, uNuit) * (1.0 + hdr * 0.8));
   }
 
   // Astres : la planète à anneaux (0) et deux lunes (1, 2).
@@ -5450,12 +5709,31 @@ void main() {
         if (i == 0) {
           float b = q.y * 0.914 - q.x * 0.407;
           float l = q.x * 0.914 + q.y * 0.407;
-          float bandes = sin(b * 10.0 + sin(b * 27.0 + l * 1.3) * 0.5 + sin(l * 3.0) * 0.25);
+          // bandes de nuages déformées par des tourbillons
+#ifdef SIMPLE
+          float tour = 0.75;
+#else
+          float tour = bruit2(vec2(l * 3.0, b * 9.0)) + 0.5 * bruit2(vec2(l * 7.0 + 3.0, b * 21.0));
+#endif
+          float bandes = sin(b * 10.0 + sin(b * 27.0 + l * 1.3) * 0.5 + sin(l * 3.0) * 0.25 + (tour - 0.75) * 1.6);
           teinte = mix(vec3(0.20, 0.42, 0.50), vec3(0.62, 0.55, 0.42), 0.5 + 0.5 * bandes);
-          teinte = mix(teinte, vec3(0.13, 0.17, 0.38), smoothstep(0.55, 0.95, sin(b * 4.3 + 1.0)) * 0.7);
+          teinte = mix(teinte, vec3(0.13, 0.17, 0.38), smoothstep(0.55, 0.95, sin(b * 4.3 + 1.0 + (tour - 0.75) * 0.6)) * 0.7);
+          teinte *= 0.85 + 0.3 * tour;
+          // assombrissement du bord et fine atmosphère
+          teinte *= 0.45 + 0.55 * z;
+          teinte += vec3(0.25, 0.45, 0.60) * (pow(1.0 - z, 3.0) * 0.5);
         } else {
-          vec4 t = h43(floor(vec3(q * 3.3 + 7.0, float(i))));
-          teinte = (i == 1 ? vec3(0.55, 0.42, 0.40) : vec3(0.42, 0.46, 0.55)) * (0.8 + 0.3 * t.x);
+          // lunes : mers sombres et cratères
+          vec2 uvl = q * 2.6 + float(i) * 7.0;
+#ifdef SIMPLE
+          float mer = 0.5;
+#else
+          float mer = bruit2(uvl) * 0.6 + bruit2(uvl * 2.3) * 0.3 + bruit2(uvl * 5.1) * 0.1;
+#endif
+          vec4 t = h43(floor(vec3(q * 5.0 + 7.0, float(i))));
+          float crat = smoothstep(0.32, 0.22, length(fract(q * 5.0 + 7.0) - 0.5 - (t.xy - 0.5) * 0.4)) * step(0.5, t.z);
+          teinte = (i == 1 ? vec3(0.55, 0.42, 0.40) : vec3(0.42, 0.46, 0.55)) * (0.62 + 0.55 * mer - 0.18 * crat);
+          teinte *= 0.55 + 0.45 * z;
         }
         vec3 astre = mix(fond * 0.72 + vec3(0.004, 0.004, 0.010), teinte * 1.25, jour);
         astre = mix(astre, fond, 0.22);
@@ -5468,30 +5746,42 @@ void main() {
           float bz = bord * 3.0;
           float dens = smoothstep(1.28, 1.34 + bz, rho) * (1.0 - smoothstep(2.34 - bz, 2.42, rho));
           dens *= 0.62 + 0.38 * sin(rho * 41.0) * sin(rho * 13.0 + 1.0);
+          dens *= 0.8 + 0.2 * sin(rho * 173.0);
           dens *= 1.0 - 0.9 * (smoothstep(1.80, 1.84 + bz, rho) - smoothstep(1.90, 1.94 + bz, rho));
           vec3 Q = vec3(q, -a.y / 0.27 * 0.963);
           float t = dot(Q, S);
           vec3 perp = Q - S * t;
-          float ombre = t < 0.0 ? smoothstep(0.85, 1.1, length(perp)) : 1.0;
+          float ombreA = t < 0.0 ? smoothstep(0.85, 1.1, length(perp)) : 1.0;
           vec3 anneau = mix(vec3(0.80, 0.62, 0.46), vec3(0.50, 0.56, 0.66), smoothstep(1.4, 2.3, rho));
-          anneau = mix(fond * 0.8, anneau * 1.15, 0.15 + 0.85 * ombre);
+          anneau = mix(fond * 0.8, anneau * 1.15, 0.15 + 0.85 * ombreA);
           c = mix(c, anneau, dens * 0.78);
         }
       }
     }
   }
 
-  // Soleil bas et sa lueur.
+  // Voiles de poussière en altitude, étirés par le vent, dorés du côté du soleil.
   float sd = max(dot(d, uSoleilDir), 0.0);
   float sd2 = sd * sd, sd8 = sd2 * sd2 * sd2 * sd2;
-  c += uSoleilCoul * (sd8 * 0.10 + pow(sd8, 12.0) * 0.30);
-  c += uSoleilCoul * (smoothstep(0.99955, 0.99985, sd) * 2.5);
+#ifndef SIMPLE
+  if (d.y > 0.02) {
+    vec2 uvn = d.xz / (d.y + 0.18);
+    float v = bruit2(uvn * vec2(0.9, 2.6) + vec2(uTemps * 0.006, 0.0)) * 0.55 + bruit2(uvn * vec2(2.1, 6.3) + 4.0) * 0.30 + bruit2(uvn * vec2(5.0, 13.0) + 9.0) * 0.15;
+    float voile = smoothstep(0.50, 0.82, v) * smoothstep(0.02, 0.18, d.y) * (1.0 - smoothstep(0.45, 0.9, d.y));
+    vec3 cv = mix(uCielBas * 1.15, uSoleilCiel * 1.3 + uCielBas * 0.4, sd2 * 0.8);
+    c = mix(c, cv, voile * 0.42 * (1.0 - 0.6 * uNuit));
+  }
+#endif
+
+  // Soleil bas et sa lueur.
+  c += uSoleilCiel * (sd8 * 0.10 + pow(sd8, 12.0) * 0.30);
+  c += uSoleilCiel * (smoothstep(0.99955, 0.99985, sd) * mix(2.5, 30.0, hdr));
 
   // Brume lumineuse de l'horizon.
-  c = mix(c, uBrume, exp(-h * 9.0) * 0.92);
-  c += uSoleilCoul * (exp(-h * 16.0) * sd8 * 0.25);
+  c = mix(c, uBrume.rgb, exp(-h * 9.0) * 0.92);
+  c += uSoleilCiel * (exp(-h * 16.0) * sd8 * 0.25);
 
-  // Deux rangées de mesas au loin.
+  // Deux rangées de mesas au loin, éclairées de côté par le soleil.
   float az = atan(d.x, d.z) * 0.15915494 + 0.5;
   float x = az * 64.0;
   float m = bruitP(x, 64.0) * 0.55 + bruitP(x * 2.0 + 5.3, 128.0) * 0.30 + bruitP(x * 4.0 + 1.7, 256.0) * 0.15;
@@ -5500,13 +5790,28 @@ void main() {
   float m2 = bruitP(x2 + 11.0, 96.0) * 0.6 + bruitP(x2 * 2.0 + 3.1, 192.0) * 0.4;
   float h2 = 0.004 + 0.050 * smoothstep(0.42, 0.74, m2) + 0.006 * bruitP(x2 * 4.0 + 9.0, 384.0);
   float aa = pix * 1.5;
-  vec3 loin = mix(uBrume, uMont, 0.20 + 0.16 * smoothstep(0.0, h1, d.y));
+  vec3 cb = couleurBrume(d);
+  float pan1 = bruitP(x * 6.0 + 0.5, 384.0), pan2 = bruitP(x2 * 5.0 + 2.5, 480.0);
+  float strates1 = 0.85 + 0.15 * sin(d.y * 900.0 + pan1 * 6.0);
+  vec3 roc = uMont + uSoleilCoul * vec3(0.050, 0.020, 0.010);
+  vec3 loin = mix(cb, roc * strates1 * (0.75 + 0.5 * pan1), 0.20 + 0.16 * smoothstep(0.0, h1, d.y));
   c = mix(c, loin, 1.0 - smoothstep(h1 - aa, h1 + aa, d.y));
-  vec3 pres = mix(uBrume, uMont, 0.34 + 0.24 * smoothstep(0.0, h2, d.y));
+  float strates2 = 0.8 + 0.2 * sin(d.y * 1400.0 + pan2 * 7.0);
+  vec3 pres = mix(cb, roc * strates2 * (0.7 + 0.6 * pan2), 0.34 + 0.24 * smoothstep(0.0, h2, d.y));
   c = mix(c, pres, 1.0 - smoothstep(h2 - aa, h2 + aa, d.y));
-  c = mix(c, uBrume, 1.0 - smoothstep(-0.004, 0.003, d.y));
+  c = mix(c, cb, 1.0 - smoothstep(-0.004, 0.003, d.y));
   oCoul = vec4(sortie(c, gl_FragCoord.xy), 1.0);
 }`;
+
+  // Décalques, traceurs et particules : dessinés sans tampon de profondeur attaché ; la profondeur de la scène
+  // est lue dans sa texture (uProf), ce qui permet aussi d'adoucir les particules là où elles touchent le décor.
+  // uDoux : x = 1 quand la texture est lue (0 : test de profondeur ordinaire), y = PROCHE, z = LOIN,
+  //         w = 1 quand les couleurs doivent être rendues linéaires (rendu HDR).
+  const GL_PROFONDEUR = `
+uniform sampler2D uProf;
+uniform vec4 uDoux;
+float metres(float z) { return uDoux.y * uDoux.z / (uDoux.z - z * (uDoux.z - uDoux.y)); }
+float decor() { return metres(texelFetch(uProf, ivec2(gl_FragCoord.xy), 0).r); }`;
 
   const VS_DECALQUE = `
 precision highp float;
@@ -5517,23 +5822,30 @@ layout(location=3) in float iGraine;
 uniform mat4 uVP;
 uniform vec3 uCam;
 uniform vec4 uBrume;
+uniform vec4 uDoux;
 out vec2 vUV;
 out vec4 vCoul;
+out float vProf;
 flat out vec2 vForme;
 void main() {
   vec3 p = vec3(iA.x + aCoin.x * iA.z, 0.02, iA.y + aCoin.y * iA.z);
   vUV = aCoin;
   float brume = 1.0 - exp(-distance(p, uCam) * uBrume.w);
-  vCoul = vec4(iB.rgb, iB.a * (1.0 - brume));
+  vec3 c = iB.rgb;
+  if (uDoux.w > 0.5) c = pow(c, vec3(2.2)) * (1.0 + 1.5 * step(0.35, max(c.r, max(c.g, c.b))));
+  vCoul = vec4(c, iB.a * (1.0 - brume));
   vForme = vec2(iA.w, iGraine);
   gl_Position = uVP * vec4(p, 1.0);
+  vProf = gl_Position.w;
 }`;
 
   const FS_DECALQUE = `
 precision highp float;
 in vec2 vUV;
 in vec4 vCoul;
+in float vProf;
 flat in vec2 vForme;
+${GL_PROFONDEUR}
 out vec4 oCoul;
 void main() {
   float r = length(vUV);
@@ -5550,6 +5862,7 @@ void main() {
   }
   a *= vCoul.a;
   if (a < 0.003) discard;
+  if (uDoux.x > 0.5 && vProf > decor() * 1.0015 + 0.01) discard;
   oCoul = vec4(vCoul.rgb * a, a);
 }`;
 
@@ -5562,9 +5875,11 @@ layout(location=3) in vec3 iParam;
 uniform mat4 uVP;
 uniform vec3 uCam, uDroite, uHaut, uFumee;
 uniform vec4 uBrume;
+uniform vec4 uDoux;
 out vec2 vUV;
 out vec4 vCoul;
-flat out vec2 vForme;
+out float vProf;
+flat out vec3 vForme;
 void main() {
   vec3 centre = iPos.xyz;
   vec3 vers = uCam - centre;
@@ -5575,19 +5890,23 @@ void main() {
   float brume = 1.0 - exp(-dist * uBrume.w);
   vec3 c = iCoul.rgb;
   float a = iCoul.a;
+  if (uDoux.w > 0.5) c = pow(c, vec3(2.2)) * (iParam.z > 0.0 ? 0.55 : iParam.x > 0.5 ? 1.35 : 1.0);
   if (iParam.x > 0.5) a *= 1.0 - 0.6 * brume;
   else c = mix(c * uFumee, uBrume.rgb, brume * 0.85);
   vUV = aCoin;
   vCoul = vec4(c, a);
-  vForme = iParam.xy;
+  vForme = vec3(iParam.xy, taille);
   gl_Position = uVP * vec4(p, 1.0);
+  vProf = gl_Position.w;
 }`;
 
   const FS_PARTICULE = `
 precision highp float;
 in vec2 vUV;
 in vec4 vCoul;
-flat in vec2 vForme;
+in float vProf;
+flat in vec3 vForme;
+${GL_PROFONDEUR}
 out vec4 oCoul;
 void main() {
   float r2 = dot(vUV, vUV);
@@ -5607,7 +5926,13 @@ void main() {
     a = k * k;
   }
   a *= vCoul.a;
-  oCoul = vec4(vCoul.rgb * a + vec3(blanc * vCoul.a), a * (1.0 - vForme.x));
+  if (uDoux.x > 0.5) {
+    // particule douce : elle s'efface en approchant du décor au lieu d'être coupée net
+    float ecart = decor() - vProf;
+    if (ecart <= 0.0) discard;
+    a *= clamp(ecart / (0.08 + vForme.z * 0.35), 0.0, 1.0);
+  }
+  oCoul = vec4(vCoul.rgb * a + vec3(blanc * vCoul.a * (1.0 + 0.6 * uDoux.w)), a * (1.0 - vForme.x));
 }`;
 
   const VS_TRACEUR = `
@@ -5618,8 +5943,10 @@ layout(location=2) in vec4 iB;
 layout(location=3) in vec3 iCoul;
 uniform mat4 uVP;
 uniform vec3 uCam;
+uniform vec4 uDoux;
 out vec2 vUV;
 out vec4 vCoul;
+out float vProf;
 void main() {
   vec3 p = mix(iA.xyz, iB.xyz, aCoin.x);
   vec3 dir = iB.xyz - iA.xyz;
@@ -5628,21 +5955,208 @@ void main() {
   cote = l > 0.00001 ? cote / l : vec3(0.0, 1.0, 0.0);
   p += cote * (aCoin.y * iA.w * 0.5);
   vUV = aCoin;
-  vCoul = vec4(iCoul, iB.w);
+  vec3 c = iCoul;
+  if (uDoux.w > 0.5) c = pow(c, vec3(2.2)) * 2.6;
+  vCoul = vec4(c, iB.w);
   gl_Position = uVP * vec4(p, 1.0);
+  vProf = gl_Position.w;
 }`;
 
   const FS_TRACEUR = `
 precision highp float;
 in vec2 vUV;
 in vec4 vCoul;
+in float vProf;
+${GL_PROFONDEUR}
 out vec4 oCoul;
 void main() {
+  if (uDoux.x > 0.5 && vProf > decor()) discard;
   float v2 = vUV.y * vUV.y;
   float bouts = smoothstep(0.0, 0.04, vUV.x) * (1.0 - smoothstep(0.985, 1.0, vUV.x));
   float a = (exp(-v2 * 5.0) - 0.0067) * bouts * vCoul.a * (0.45 + 0.55 * vUV.x);
   float coeur = exp(-v2 * 60.0) * bouts * vCoul.a;
-  oCoul = vec4(vCoul.rgb * a + vec3(coeur * 0.8), 0.0);
+  oCoul = vec4(vCoul.rgb * a + vec3(coeur * (0.8 + 2.0 * uDoux.w)), 0.0);
+}`;
+
+  // ------------------------------------------------------------------ shaders de l'image finale
+  const VS_ECRAN = `
+precision highp float;
+layout(location=0) in vec2 aCoin;
+out vec2 vUV;
+void main() {
+  vUV = aCoin * 0.5 + 0.5;
+  gl_Position = vec4(aCoin, 0.0, 1.0);
+}`;
+
+  // Occlusion ambiante : les creux et le pied des objets reçoivent moins de lumière du ciel.
+  // uProj : x, y = tangentes du demi-angle de vue (largeur, hauteur), z = PROCHE, w = LOIN.
+  const FS_OCCLUSION = `
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uProf;
+uniform vec4 uProj;
+uniform vec2 uPas;
+out vec4 oCoul;
+float metres(float z) { return uProj.z * uProj.w / (uProj.w - z * (uProj.w - uProj.z)); }
+vec3 pos(vec2 uv) {
+  float d = metres(textureLod(uProf, uv, 0.0).r);
+  return vec3((uv * 2.0 - 1.0) * uProj.xy * d, d);
+}
+void main() {
+  float z = textureLod(uProf, vUV, 0.0).r;
+  if (z >= 0.99995) { oCoul = vec4(1.0); return; }
+  vec3 P = pos(vUV);
+  if (P.z > 90.0) { oCoul = vec4(1.0); return; }
+  vec3 dx1 = pos(vUV + vec2(uPas.x, 0.0)) - P, dx2 = P - pos(vUV - vec2(uPas.x, 0.0));
+  vec3 dy1 = pos(vUV + vec2(0.0, uPas.y)) - P, dy2 = P - pos(vUV - vec2(0.0, uPas.y));
+  vec3 dx = abs(dx1.z) < abs(dx2.z) ? dx1 : dx2;
+  vec3 dy = abs(dy1.z) < abs(dy2.z) ? dy1 : dy2;
+  vec3 N = normalize(cross(dx, dy));
+  if (N.z > 0.0) N = -N;
+  float rayon = 0.75;
+  vec2 ech = min(vec2(rayon) / (P.z * uProj.xy) * 0.5, vec2(0.12));
+  float tour = 6.2831853 * fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+  float occ = 0.0;
+  for (int i = 0; i < 10; i++) {
+    float a = tour + float(i) * 2.3999632, r = sqrt((float(i) + 0.5) / 10.0);
+    vec3 v = pos(vUV + vec2(cos(a), sin(a)) * r * ech) - P;
+    float d2 = dot(v, v);
+    occ += max(dot(v, N) * inversesqrt(d2 + 0.0001) - 0.12, 0.0) / (1.0 + d2 / (rayon * rayon) * 2.0);
+  }
+  float ao = clamp(1.0 - occ / 10.0 * 2.6, 0.0, 1.0);
+  oCoul = vec4(ao, P.z / 100.0, 0.0, 1.0);
+}`;
+
+  // Occlusion appliquée à l'image (multiplication), lissée sans baver d'un objet sur l'autre.
+  const FS_OCCLUSION_POSE = `
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uOcc;
+uniform vec2 uPas;
+uniform float uBrumeD;
+out vec4 oCoul;
+void main() {
+  vec2 c = texture(uOcc, vUV).rg;
+  float s = 0.0, w = 0.0;
+  for (int j = -1; j <= 2; j++) for (int i = -1; i <= 2; i++) {
+    vec2 t = texture(uOcc, vUV + (vec2(float(i), float(j)) - 0.5) * uPas).rg;
+    float k = 1.0 / (0.02 + abs(t.g - c.g) * 60.0);
+    s += t.r * k; w += k;
+  }
+  float ao = s / w;
+  ao = mix(ao, 1.0, 1.0 - exp(-c.g * 100.0 * uBrumeD * 2.0));
+  ao = mix(1.0, ao, 0.85);
+  oCoul = vec4(vec3(ao * ao * (3.0 - 2.0 * ao) * 0.35 + ao * 0.65), 1.0);
+}`;
+
+  // Halo des lumières fortes : extraction, réductions puis agrandissements successifs.
+  const FS_HALO_SEUIL = `
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uImage;
+uniform vec2 uPas;
+out vec4 oCoul;
+vec3 lire(vec2 d) {
+  vec3 c = min(texture(uImage, vUV + d * uPas).rgb, vec3(60.0));
+  float l = max(c.r, max(c.g, c.b));
+  float k = max(l - 0.85, 0.0);
+  c *= k / (l + 0.0001) * (k / (k + 0.35) + 0.25);
+  return c / (1.0 + dot(c, vec3(0.2126, 0.7152, 0.0722)));
+}
+void main() {
+  vec3 c = lire(vec2(-1.0, -1.0)) + lire(vec2(1.0, -1.0)) + lire(vec2(-1.0, 1.0)) + lire(vec2(1.0, 1.0));
+  c *= 0.25;
+  oCoul = vec4(c / max(1.0 - dot(c, vec3(0.2126, 0.7152, 0.0722)), 0.02), 1.0);
+}`;
+
+  const FS_HALO_REDUIRE = `
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uImage;
+uniform vec2 uPas;
+out vec4 oCoul;
+void main() {
+  vec3 c = texture(uImage, vUV).rgb * 4.0;
+  c += texture(uImage, vUV + vec2(-1.0, -1.0) * uPas).rgb + texture(uImage, vUV + vec2(1.0, -1.0) * uPas).rgb;
+  c += texture(uImage, vUV + vec2(-1.0, 1.0) * uPas).rgb + texture(uImage, vUV + vec2(1.0, 1.0) * uPas).rgb;
+  oCoul = vec4(c * 0.125, 1.0);
+}`;
+
+  const FS_HALO_AGRANDIR = `
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uImage;
+uniform vec2 uPas;
+uniform float uForce;
+out vec4 oCoul;
+void main() {
+  vec3 c = texture(uImage, vUV + vec2(-2.0, 0.0) * uPas).rgb + texture(uImage, vUV + vec2(2.0, 0.0) * uPas).rgb;
+  c += texture(uImage, vUV + vec2(0.0, -2.0) * uPas).rgb + texture(uImage, vUV + vec2(0.0, 2.0) * uPas).rgb;
+  c += (texture(uImage, vUV + vec2(-1.0, -1.0) * uPas).rgb + texture(uImage, vUV + vec2(1.0, -1.0) * uPas).rgb
+    + texture(uImage, vUV + vec2(-1.0, 1.0) * uPas).rgb + texture(uImage, vUV + vec2(1.0, 1.0) * uPas).rgb) * 2.0;
+  oCoul = vec4(c * (uForce / 12.0), 1.0);
+}`;
+
+  // Image finale : halo, exposition, courbe de film, étalonnage, vignette, grain ; la luminance va dans alpha.
+  const FS_COMPOSER = `
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uImage, uHalo;
+uniform vec4 uPose;       // x : exposition, y : force du halo, z : vignette, w : temps
+uniform vec3 uVoile;      // teinte ajoutée aux lumières très fortes (poussière en suspension)
+out vec4 oCoul;
+vec3 film(vec3 x) {
+  // courbe ACES approchée (Narkowicz)
+  return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+}
+void main() {
+  vec3 c = texture(uImage, vUV).rgb;
+  vec3 h = texture(uHalo, vUV).rgb;
+  c += h * uPose.y;
+  c += uVoile * dot(h, vec3(0.3333)) * 0.25;
+  c *= uPose.x;
+  c = film(c);
+  // un peu de contraste et de saturation, ombres légèrement froides
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  c = mix(vec3(l), c, 1.10);
+  c = mix(c, c * c * (3.0 - 2.0 * c), 0.20);
+  c += vec3(-0.004, 0.0, 0.010) * (1.0 - l);
+  c = pow(max(c, 0.0), vec3(0.4545));
+  vec2 q = vUV - 0.5;
+  c *= 1.0 - uPose.z * smoothstep(0.25, 0.95, dot(q, q) * 2.0);
+  float g = fract(52.9829189 * fract(dot(gl_FragCoord.xy + fract(uPose.w) * 61.0, vec2(0.06711056, 0.00583715))));
+  c += (g - 0.5) * (0.022 * (1.0 - 0.6 * l));
+  c = clamp(c, 0.0, 1.0);
+  oCoul = vec4(c, dot(c, vec3(0.299, 0.587, 0.114)));
+}`;
+
+  // Anticrénelage FXAA (luminance lue dans alpha, ou calculée si uLuma = 0).
+  const FS_LISSAGE = `
+precision highp float;
+in vec2 vUV;
+uniform sampler2D uImage;
+uniform vec2 uPas;
+uniform float uLuma;
+out vec4 oCoul;
+float lu(vec4 c) { return uLuma > 0.5 ? c.a : dot(c.rgb, vec3(0.299, 0.587, 0.114)); }
+void main() {
+  vec4 M = texture(uImage, vUV);
+  float lM = lu(M);
+  float lNO = lu(texture(uImage, vUV + vec2(-1.0, -1.0) * uPas)), lNE = lu(texture(uImage, vUV + vec2(1.0, -1.0) * uPas));
+  float lSO = lu(texture(uImage, vUV + vec2(-1.0, 1.0) * uPas)), lSE = lu(texture(uImage, vUV + vec2(1.0, 1.0) * uPas));
+  float lMin = min(lM, min(min(lNO, lNE), min(lSO, lSE)));
+  float lMax = max(lM, max(max(lNO, lNE), max(lSO, lSE)));
+  if (lMax - lMin < max(0.03, lMax * 0.10)) { oCoul = vec4(M.rgb, 1.0); return; }
+  vec2 dir = vec2(-((lNO + lNE) - (lSO + lSE)), (lNO + lSO) - (lNE + lSE));
+  float red = max((lNO + lNE + lSO + lSE) * 0.03125, 0.0078125);
+  float inv = 1.0 / (min(abs(dir.x), abs(dir.y)) + red);
+  dir = clamp(dir * inv, vec2(-8.0), vec2(8.0)) * uPas;
+  vec3 A = 0.5 * (texture(uImage, vUV + dir * (1.0 / 3.0 - 0.5)).rgb + texture(uImage, vUV + dir * (2.0 / 3.0 - 0.5)).rgb);
+  vec4 b1 = texture(uImage, vUV + dir * -0.5), b2 = texture(uImage, vUV + dir * 0.5);
+  vec3 B = A * 0.5 + 0.25 * (b1.rgb + b2.rgb);
+  float lB = uLuma > 0.5 ? (lu(texture(uImage, vUV + dir * (1.0 / 3.0 - 0.5))) + lu(texture(uImage, vUV + dir * (2.0 / 3.0 - 0.5)))) * 0.25 + 0.25 * (b1.a + b2.a)
+    : dot(B, vec3(0.299, 0.587, 0.114));
+  oCoul = vec4(lB < lMin || lB > lMax ? A : B, 1.0);
 }`;
 
   // ------------------------------------------------------------------ géométrie par le code
@@ -5651,6 +6165,17 @@ void main() {
     h = Math.imul(h ^ (h >>> 13), 1274126177);
     h ^= h >>> 16;
     return (h >>> 0) / 4294967296;
+  }
+
+  // Matières (voir FS_MAILLAGE) : nom → numéro.
+  const MATIERES = { peinture: 0, roche: 1, metal: 2, chitine: 3, chair: 4, cristal: 5, os: 6, beton: 7 };
+  // Modèles Kenney : matière d'après le nom (le reste : peinture).
+  function matiereModele(nom) {
+    if (/^(rock|rocks|meteor|crater)/.test(nom)) return 1;
+    if (/^(blaster|grenade|turret|craft|rover|satellite|chimney|machine|barrel|st-container|st-computer)/.test(nom)) return 2;
+    if (/^bones/.test(nom)) return 6;
+    if (/^(st-wall|platform)/.test(nom)) return 7;
+    return 0;
   }
 
   class Geo {
@@ -5665,12 +6190,19 @@ void main() {
       this._anim = null;
       this._anime = false;
       this._lueurs = [];
+      this._m = 0;            // matière des sommets émis ensuite
+      this._fin = 1;          // finesse : multiplie le nombre de facettes des formes rondes
+      this._cosLisse = 2;     // lissage des normales : cosinus de l'angle maximal entre deux faces (2 = facettes)
+      this._seuils = [];
     }
 
     // --- état
     couleur(r, v, b) { this._c = [r, v, b]; return this; }
     emissif(e) { this._e = e === undefined ? 1 : e; return this; }
     bruit(a) { this._bruit = a || 0; return this; }
+    matiere(m) { this._m = MATIERES[m] === undefined ? (m | 0) : MATIERES[m]; return this; }
+    finesse(k) { this._fin = k > 0 ? k : 1; return this; }
+    lisser(degres) { this._cosLisse = degres > 0 ? Math.cos((degres * Math.PI) / 180) : 2; return this; }
 
     // --- repère
     pousser() { this._pile.push(new Float32Array(this._mat)); return this; }
@@ -5772,7 +6304,8 @@ void main() {
         const p = T[ordre[i]];
         this._pos.push(p[0], p[1], p[2]);
         this._nor.push(nx, ny, nz, this._e);
-        this._col.push(c[0], c[1], c[2], an ? an.mode : 0);
+        this._col.push(c[0], c[1], c[2], (an ? an.mode : 0) + 16 * this._m);
+        this._seuils.push(this._cosLisse);
         if (an) this._ani.push(an.p[0], an.p[1], an.p[2], an.a[0], an.a[1], an.a[2], an.phase, an.y, an.l, an.f);
         else this._ani.push(0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
       }
@@ -5800,7 +6333,7 @@ void main() {
         [[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]);
     }
     cylindre(r1, r2, h, n) {
-      n = n || 8;
+      n = Math.max(3, Math.round((n || 8) * this._fin));
       const pts = [], faces = [];
       const anneau = (r, y) => {
         const d = pts.length;
@@ -5827,7 +6360,7 @@ void main() {
         [[0, 1, 2, 3], [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]], [0, h * 0.3, 0]);
     }
     ellipsoide(rx, ry, rz, n, m, bas, haut) {
-      n = n || 8; m = m || 5;
+      n = Math.max(3, Math.round((n || 8) * this._fin)); m = Math.max(1, Math.round((m || 5) * this._fin));
       const l0 = Math.asin(Math.max(-1, bas === undefined ? -1 : bas)), l1 = Math.asin(Math.min(1, haut === undefined ? 1 : haut));
       const pts = [], anneaux = [], faces = [];
       for (let j = 0; j <= m; j++) {
@@ -5901,7 +6434,7 @@ void main() {
       return this._emettre(pts, faces, dedans);
     }
     tube(points, rayons, n, aplati, ref) {
-      n = n || 5;
+      n = Math.max(3, Math.round((n || 5) * this._fin));
       if (aplati === undefined) aplati = 1;
       const np = points.length;
       const R = (i) => (typeof rayons === 'number' ? rayons : rayons[Math.min(i, rayons.length - 1)]);
@@ -5960,9 +6493,63 @@ void main() {
       this._lueurs.push(p[0], p[1], p[2], taille * this._taille(), r, v, b, alpha === undefined ? 0.5 : alpha);
       return this;
     }
+    // Surface libre : points [[x, y, z], …], triangles [[a, b, c], …] (faces vues de l'extérieur dans le sens
+    // direct), couleurs facultatives [[r, v, b], …] par point ; normales lissées sur toute la surface.
+    libre(points, tris, couleurs) {
+      const T = points.map((p) => this._brut(p)), N = T.map(() => [0, 0, 0]);
+      const signe = this._signe();
+      for (const t of tris) {
+        const a = T[t[0]], b = T[t[1]], c = T[t[2]];
+        const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+        const nx = (uy * vz - uz * vy) * signe, ny = (uz * vx - ux * vz) * signe, nz = (ux * vy - uy * vx) * signe;
+        for (const k of t) { N[k][0] += nx; N[k][1] += ny; N[k][2] += nz; }
+      }
+      const base = this._pos.length / 3, an = this._anim;
+      for (let i = 0; i < T.length; i++) {
+        const p = T[i], n = N[i], l = Math.hypot(n[0], n[1], n[2]) || 1, c = (couleurs && couleurs[i]) || this._c;
+        this._pos.push(p[0], p[1], p[2]);
+        this._nor.push(n[0] / l, n[1] / l, n[2] / l, this._e);
+        this._col.push(c[0], c[1], c[2], (an ? an.mode : 0) + 16 * this._m);
+        this._seuils.push(2);
+        if (an) this._ani.push(an.p[0], an.p[1], an.p[2], an.a[0], an.a[1], an.a[2], an.phase, an.y, an.l, an.f);
+        else this._ani.push(0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
+      }
+      for (const t of tris) {
+        if (signe > 0) this._idx.push(base + t[0], base + t[1], base + t[2]);
+        else this._idx.push(base + t[0], base + t[2], base + t[1]);
+      }
+      return this;
+    }
+    // Normales lissées : en un même point, les faces dont l'angle est sous le seuil partagent leur normale.
+    _lisserNormales() {
+      const ns = this._pos.length / 3, S = this._seuils, P = this._pos, N = this._nor;
+      const cases = new Map();
+      for (let i = 0; i < ns; i++) {
+        if (S[i] > 1) continue;
+        const cle = Math.round(P[i * 3] * 4000) + ',' + Math.round(P[i * 3 + 1] * 4000) + ',' + Math.round(P[i * 3 + 2] * 4000);
+        const l = cases.get(cle);
+        if (l) l.push(i); else cases.set(cle, [i]);
+      }
+      const R = new Float32Array(ns * 3);
+      for (const l of cases.values()) {
+        if (l.length < 2) continue;
+        for (const i of l) {
+          let x = 0, y = 0, z = 0;
+          for (const j of l) {
+            if (N[i * 4] * N[j * 4] + N[i * 4 + 1] * N[j * 4 + 1] + N[i * 4 + 2] * N[j * 4 + 2] >= S[i]) { x += N[j * 4]; y += N[j * 4 + 1]; z += N[j * 4 + 2]; }
+          }
+          const d = Math.hypot(x, y, z);
+          if (d > 1e-6) { R[i * 3] = x / d; R[i * 3 + 1] = y / d; R[i * 3 + 2] = z / d; }
+        }
+      }
+      for (let i = 0; i < ns; i++) {
+        if (R[i * 3] || R[i * 3 + 1] || R[i * 3 + 2]) { N[i * 4] = R[i * 3]; N[i * 4 + 1] = R[i * 3 + 1]; N[i * 4 + 2] = R[i * 3 + 2]; }
+      }
+    }
     triangles() { return this._idx.length / 3; }
 
     maillage() {
+      this._lisserNormales();
       const ns = this._pos.length / 3, anime = this._anime, pas = anime ? 52 : 20;
       const tampon = new ArrayBuffer(ns * pas);
       const F = new Float32Array(tampon), I8 = new Int8Array(tampon), U8 = new Uint8Array(tampon);
@@ -6064,7 +6651,7 @@ void main() {
     let gl = null;
     try {
       gl = canvas.getContext('webgl2', {
-        alpha: false, antialias: options.antialias !== false, depth: true, stencil: false,
+        alpha: false, antialias: false, depth: true, stencil: false,
         premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance',
       });
     } catch (e) { gl = null; }
@@ -6077,18 +6664,24 @@ void main() {
     let perdu = false, detruit = false;
     let bruitSol = null;            // gardé pour le retour d'un contexte perdu
     let P = null;                   // programmes et objets WebGL
+    let niveau = options.qualite === undefined ? 2 : Math.max(0, Math.min(2, options.qualite | 0));
+    let hdrPossible = false;        // le rendu HDR demande EXT_color_buffer_float
+    const mOmbre = new Float32Array(16);   // monde -> carte d'ombre du soleil
+    const EXPOSITION = 0.9, FORCE_HALO = 0.45;
+    // Volume couvert par la carte d'ombre : l'esplanade, la façade et les parois du canyon.
+    const BOITE_OMBRE = [-35, -1, -10, 35, 24, 69];
 
     // --- ambiance
     const A = {
       cielHaut: [0.09, 0.07, 0.25], cielBas: [0.93, 0.47, 0.36], brume: [0.80, 0.44, 0.33], densiteBrume: 0.012,
-      soleilDir: [-0.92, 0.30, 0.10], soleilCouleur: [1.0, 0.72, 0.48],
+      soleilDir: [-0.84, 0.50, 0.21], soleilCouleur: [1.0, 0.74, 0.50],
       ambianteCiel: [0.36, 0.38, 0.60], ambianteSol: [0.44, 0.26, 0.18], nuit: 0,
     };
     const E = {                    // valeurs dérivées (linéaires, nuit comprise)
       cielHaut: new Float32Array(3), cielBas: new Float32Array(3), brume: new Float32Array(3), mont: new Float32Array(3),
       soleilDir: new Float32Array(3), soleil: new Float32Array(3), soleilCiel: new Float32Array(3),
       ambCiel: new Float32Array(3), ambSol: new Float32Array(3), contre: new Float32Array(3),
-      brumeEcran: new Float32Array(3), fumee: new Float32Array(3),
+      brumeEcran: new Float32Array(3), fumee: new Float32Array(3), fumeeClaire: new Float32Array(3),
       astreP: new Float32Array(12), astreR: new Float32Array(9), astreU: new Float32Array(9), astreS: new Float32Array(9),
     };
     const ASTRES = [[0.36, 0.44, 0.82, 0.165], [-0.50, 0.60, 0.62, 0.030], [-0.10, 0.215, 0.97, 0.016]];
@@ -6108,6 +6701,8 @@ void main() {
         E.mont[k] = [0.05, 0.018, 0.045][k] * (1 - 0.8 * n);
         E.brumeEcran[k] = versEcran(E.brume[k]);
         E.fumee[k] = 1 - 0.72 * n;
+        // fumée et poussière en rendu HDR : éclairées par le soleil et le ciel du moment
+        E.fumeeClaire[k] = (E.soleil[k] * 0.42 + E.ambCiel[k] * 0.9 + E.ambSol[k] * 0.5) * 1.15;
       }
       let l = Math.hypot(A.soleilDir[0], A.soleilDir[1], A.soleilDir[2]) || 1;
       for (let k = 0; k < 3; k++) E.soleilDir[k] = A.soleilDir[k] / l;
@@ -6127,6 +6722,24 @@ void main() {
         E.astreS[i * 3 + 1] = s[0] * ux + s[1] * uy + s[2] * uz;
         E.astreS[i * 3 + 2] = -(s[0] * px + s[1] * py + s[2] * pz);
       }
+      // Carte d'ombre : vue droite (sans perspective) depuis le soleil, ajustée à la boîte de la scène.
+      const sx = E.soleilDir[0], sy = E.soleilDir[1], sz = E.soleilDir[2];
+      let rx = sz, rz = -sx;
+      const lr = Math.hypot(rx, rz) || 1; rx /= lr; rz /= lr;
+      const ux = sy * rz, uy = sz * rx - sx * rz, uz = -sy * rx;
+      let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity, c0 = Infinity, c1 = -Infinity;
+      for (let k = 0; k < 8; k++) {
+        const x = BOITE_OMBRE[k & 1 ? 3 : 0], y = BOITE_OMBRE[k & 2 ? 4 : 1], z = BOITE_OMBRE[k & 4 ? 5 : 2];
+        const a = rx * x + rz * z, b = ux * x + uy * y + uz * z, c = sx * x + sy * y + sz * z;
+        if (a < a0) a0 = a; if (a > a1) a1 = a;
+        if (b < b0) b0 = b; if (b > b1) b1 = b;
+        if (c < c0) c0 = c; if (c > c1) c1 = c;
+      }
+      const ka = 2 / (a1 - a0), kb = 2 / (b1 - b0), kc = -2 / (c1 - c0);
+      mOmbre[0] = rx * ka; mOmbre[4] = 0; mOmbre[8] = rz * ka; mOmbre[12] = -(a0 + a1) / (a1 - a0);
+      mOmbre[1] = ux * kb; mOmbre[5] = uy * kb; mOmbre[9] = uz * kb; mOmbre[13] = -(b0 + b1) / (b1 - b0);
+      mOmbre[2] = sx * kc; mOmbre[6] = sy * kc; mOmbre[10] = sz * kc; mOmbre[14] = (2 * c1) / (c1 - c0) - 1;
+      mOmbre[3] = 0; mOmbre[7] = 0; mOmbre[11] = 0; mOmbre[15] = 1;
     }
     function ambiance(o) {
       if (o) for (const k in o) if (k in A && o[k] !== undefined) A[k] = typeof o[k] === 'number' ? o[k] : [o[k][0], o[k][1], o[k][2]];
@@ -6230,7 +6843,7 @@ void main() {
       const info = donnees && donnees.modeles && donnees.modeles[nom];
       if (!info) return null;
       if (!octetsS) { octetsS = versOctets(donnees.sommets); octetsI = versOctets(donnees.indices); }
-      const ns = info.v[1], ni = info.i[1];
+      const ns = info.v[1], ni = info.i[1], matiere = matiereModele(nom);
       const src = new DataView(octetsS.buffer, octetsS.byteOffset + info.v[0] * 12, ns * 12);
       const tampon = new ArrayBuffer(ns * 20);
       const F = new Float32Array(tampon), U8 = new Uint8Array(tampon);
@@ -6241,7 +6854,7 @@ void main() {
           U8[c + 12 + k] = src.getUint8(o + 6 + k);
           U8[c + 16 + k] = src.getUint8(o + 9 + k);
         }
-        U8[c + 15] = 0; U8[c + 19] = 0;
+        U8[c + 15] = 0; U8[c + 19] = matiere * 16;
       }
       const isrc = new DataView(octetsI.buffer, octetsI.byteOffset + info.i[0] * 2, ni * 2);
       const indices = new Uint16Array(ni);
@@ -6252,6 +6865,8 @@ void main() {
     }
 
     // --- objets WebGL
+    const PROGRAMMES = ['maillage', 'maillageAnime', 'sol', 'ciel', 'decalque', 'particule', 'traceur', 'profondeur', 'profondeurAnime',
+      'occlusion', 'occlusionPose', 'haloSeuil', 'haloReduire', 'haloAgrandir', 'composer', 'lissage'];
     function programme(vs, fs, define) {
       const tete = '#version 300 es\n' + (define ? '#define ' + define + '\n' : '');
       const p = gl.createProgram();
@@ -6301,7 +6916,31 @@ void main() {
       P.decalque = programme(VS_DECALQUE, FS_DECALQUE, '');
       P.particule = programme(VS_PARTICULE, FS_PARTICULE, '');
       P.traceur = programme(VS_TRACEUR, FS_TRACEUR, '');
-      const ok = P.maillage.ok && P.maillageAnime.ok && P.sol.ok && P.ciel.ok && P.decalque.ok && P.particule.ok && P.traceur.ok;
+      P.profondeur = programme(VS_MAILLAGE, FS_PROFONDEUR, 'PROFONDEUR');
+      P.profondeurAnime = programme(VS_MAILLAGE, FS_PROFONDEUR, 'PROFONDEUR\n#define ANIME');
+      P.occlusion = programme(VS_ECRAN, FS_OCCLUSION, '');
+      P.occlusionPose = programme(VS_ECRAN, FS_OCCLUSION_POSE, '');
+      P.haloSeuil = programme(VS_ECRAN, FS_HALO_SEUIL, '');
+      P.haloReduire = programme(VS_ECRAN, FS_HALO_REDUIRE, '');
+      P.haloAgrandir = programme(VS_ECRAN, FS_HALO_AGRANDIR, '');
+      P.composer = programme(VS_ECRAN, FS_COMPOSER, '');
+      P.lissage = programme(VS_ECRAN, FS_LISSAGE, '');
+      let ok = true;
+      for (const k of PROGRAMMES) ok = ok && P[k].ok;
+      // images à grande plage de lumière : extension complète, ou sa version « demi-flottants » (bien des téléphones)
+      hdrPossible = !!(gl.getExtension('EXT_color_buffer_float') || gl.getExtension('EXT_color_buffer_half_float'));
+      // rendu calculé par le processeur (pas de carte graphique) : le jeu choisit alors la qualité simple
+      let nomCarte = '';
+      try {
+        const info = gl.getExtension('WEBGL_debug_renderer_info');
+        nomCarte = String((info && gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) || gl.getParameter(gl.RENDERER) || '');
+      } catch (e) { nomCarte = ''; }
+      moteur.logiciel = /swiftshader|llvmpipe|software|softpipe/i.test(nomCarte);
+      C = null; ciblesRefusees = false;
+      // carte d'ombre vide (tout est éclairé) : le shader a toujours une texture à lire
+      P.ombreVide = texture2D(gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, 1, 1, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
 
       // quad -1..1 (particules, décalques) et 0..1 x -1..1 (traceurs)
       P.quad = gl.createBuffer();
@@ -6509,7 +7148,8 @@ void main() {
       const s = echelle === undefined ? 1 : echelle;
       if (fondu === undefined) fondu = 1;
       if (fondu <= 0) return;
-      if ((x - camX) * avX + (y - camY) * avY + (z - camZ) * avZ < -m.rayon * s) return;
+      const derriere = (x - camX) * avX + (y - camY) * avY + (z - camZ) * avZ + m.rayon * s;
+      if (derriere < (moteur.ombres ? -32 : 0)) return;
       const o = m.n * NI;
       if (o + NI > m.inst.length) agrandir(m);
       if (m.n === 0) utilises[nbUtilises++] = m;
@@ -6534,7 +7174,8 @@ void main() {
       if (fondu === undefined) fondu = 1;
       if (fondu <= 0) return;
       const ech = Math.max(Math.hypot(M[0], M[1], M[2]), Math.hypot(M[4], M[5], M[6]), Math.hypot(M[8], M[9], M[10]));
-      if ((M[12] - camX) * avX + (M[13] - camY) * avY + (M[14] - camZ) * avZ < -m.rayon * ech) return;
+      const derriere = (M[12] - camX) * avX + (M[13] - camY) * avY + (M[14] - camZ) * avZ + m.rayon * ech;
+      if (derriere < (moteur.ombres ? -32 : 0)) return;
       const o = m.n * NI;
       if (o + NI > m.inst.length) agrandir(m);
       if (m.n === 0) utilises[nbUtilises++] = m;
@@ -6615,7 +7256,96 @@ void main() {
       return sortie;
     }
 
-    function reglerScene(pr, vp, densite) {
+    // --- cibles de rendu (créées à la demande, refaites quand la taille ou la qualité change)
+    // scène : couleur (HDR si possible) + profondeur en texture ; ombre : carte de profondeur vue du soleil ;
+    // occ : occlusion ambiante à demi-taille ; halo : pyramide de lueurs ; ecran : image finale avant lissage.
+    let C = null, ciblesRefusees = false;
+    function texture2D(interne, format, type, w, h, filtre) {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, interne, w, h, 0, format, type, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filtre);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filtre);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return t;
+    }
+    function cible(tex, prof) {
+      const f = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      if (tex) gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      else { gl.drawBuffers([gl.NONE]); gl.readBuffer(gl.NONE); }
+      if (prof) gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, prof, 0);
+      return f;
+    }
+    function libererCibles() {
+      if (!C) return;
+      if (!perdu) {
+        for (const t of C.textures) gl.deleteTexture(t);
+        for (const f of C.fbos) gl.deleteFramebuffer(f);
+      }
+      C = null;
+    }
+    function preparerCibles(W, H) {
+      if (ciblesRefusees) return null;
+      const n = hdrPossible ? niveau : 0;
+      if (C && C.W === W && C.H === H && C.niveau === n) return C;
+      libererCibles();
+      const c = { W, H, niveau: n, hdr: n >= 1, textures: [], fbos: [], halo: [], ombre: null, occ: null, ecran: null };
+      const T = (interne, format, type, w, h, filtre) => { const t = texture2D(interne, format, type, w, h, filtre); c.textures.push(t); return t; };
+      const F = (tex, prof) => { const f = cible(tex, prof); c.fbos.push(f); return f; };
+      c.coul = c.hdr ? T(gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, W, H, gl.LINEAR) : T(gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, W, H, gl.LINEAR);
+      c.prof = T(gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, W, H, gl.NEAREST);
+      c.fboA = F(c.coul, c.prof);
+      const complet = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE || gl.isContextLost();
+      c.fboB = F(c.coul, null);
+      if (!complet) {
+        C = c; libererCibles();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        // image HDR refusée : on réessaie en qualité simple ; refusée aussi : dessin direct dans la toile, comme avant
+        if (c.hdr) { hdrPossible = false; return preparerCibles(W, H); }
+        ciblesRefusees = true; moteur.ombres = false;
+        return null;
+      }
+      if (c.hdr) {
+        c.ecran = T(gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, W, H, gl.LINEAR);
+        c.ecranFbo = F(c.ecran, null);
+        let w = W, h = H;
+        for (let i = 0; i < 6; i++) {
+          w = Math.max(1, w >> 1); h = Math.max(1, h >> 1);
+          const t = T(gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT, w, h, gl.LINEAR);
+          c.halo.push({ t, f: F(t, null), w, h });
+          if (w < 12 || h < 12) break;
+        }
+        const taille = n >= 2 ? 2048 : 1024;
+        const t = T(gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, taille, taille, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
+        c.ombre = { t, f: F(null, t), taille };
+        if (n >= 2) {
+          const w2 = Math.max(1, W >> 1), h2 = Math.max(1, H >> 1);
+          const o = T(gl.RG16F, gl.RG, gl.HALF_FLOAT, w2, h2, gl.LINEAR);
+          c.occ = { t: o, f: F(o, null), w: w2, h: h2 };
+        }
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      C = c;
+      moteur.ombres = !!c.ombre;
+      return C;
+    }
+
+    // Qualité 0 : variantes simples des shaders de la scène, compilées la première fois qu'elles servent.
+    function simples() {
+      if (!P.simple) {
+        P.simple = {
+          maillage: programme(VS_MAILLAGE, FS_MAILLAGE, 'SIMPLE'), maillageAnime: programme(VS_MAILLAGE, FS_MAILLAGE, 'SIMPLE\n#define ANIME'),
+          sol: programme(VS_SOL, FS_SOL, 'SIMPLE'), ciel: programme(VS_CIEL, FS_CIEL, 'SIMPLE'),
+        };
+        if (!(P.simple.maillage.ok && P.simple.maillageAnime.ok && P.simple.sol.ok && P.simple.ciel.ok)) P.simple = P;
+      }
+      return P.simple;
+    }
+    function reglerScene(pr, vp, densite, lin, ombres) {
       const u = pr.u;
       gl.useProgram(pr.p);
       gl.uniformMatrix4fv(u.uVP, false, vp);
@@ -6623,76 +7353,118 @@ void main() {
       gl.uniform1f(u.uTemps, temps);
       gl.uniform3fv(u.uSoleilDir, E.soleilDir);
       gl.uniform3fv(u.uSoleilCoul, E.soleil);
+      gl.uniform3fv(u.uSoleilCiel, E.soleilCiel);
       gl.uniform3fv(u.uAmbCiel, E.ambCiel);
       gl.uniform3fv(u.uAmbSol, E.ambSol);
       gl.uniform3fv(u.uContre, E.contre);
+      gl.uniform3fv(u.uCielHaut, E.cielHaut);
+      gl.uniform3fv(u.uCielBas, E.cielBas);
       gl.uniform4f(u.uBrume, E.brume[0], E.brume[1], E.brume[2], densite);
+      gl.uniform4f(u.uRegl, lin ? 0 : 1, ombres ? (niveau >= 2 ? 2 : 1) : 0, niveau >= 1 ? 1 : 0, ombres ? 1 / ombres.taille : 1);
+      gl.uniformMatrix4fv(u.uOmbreVP, false, mOmbre);
+      gl.uniform1i(u.uBruit, 0);
+      gl.uniform1i(u.uOmbre, 1);
       gl.uniform1i(u.uNbLum, nbLum);
       if (nbLum) { gl.uniform4fv(u.uLum, lumPos); gl.uniform3fv(u.uLumCoul, lumCoul); }
     }
+    let numImage = 0;
     function dessinerInstances(m, donnees, n) {
       gl.bindVertexArray(m.vao);
-      gl.bindBuffer(gl.ARRAY_BUFFER, m.ivbo);
-      if (donnees.length > m._cap) { m._cap = donnees.length; gl.bufferData(gl.ARRAY_BUFFER, m._cap * 4, gl.DYNAMIC_DRAW); }
-      gl.bufferSubData(gl.ARRAY_BUFFER, 0, donnees, 0, n * NI);
+      // les instances d'un maillage ne sont envoyées qu'une fois par image (ombres puis scène)
+      if (donnees !== m.inst || m._image !== numImage) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.ivbo);
+        if (donnees.length > m._cap) { m._cap = donnees.length; gl.bufferData(gl.ARRAY_BUFFER, m._cap * 4, gl.DYNAMIC_DRAW); }
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, donnees, 0, n * NI);
+        m._image = donnees === m.inst ? numImage : -1;
+      }
       gl.drawElementsInstanced(gl.TRIANGLES, m._i.length, m._i.BYTES_PER_ELEMENT === 4 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, 0, n);
       st.appels++;
     }
+    function pleinEcran(pr) {
+      gl.useProgram(pr.p);
+      gl.bindVertexArray(P.cielVao);
+      return pr.u;
+    }
+    function texUnite(unite, t) { gl.activeTexture(gl.TEXTURE0 + unite); gl.bindTexture(gl.TEXTURE_2D, t); }
 
     function fin() {
       st.instances = 0; st.appels = 0; st.particules = nbPart;
       if (perdu || detruit || !P) return;
+      numImage++;
       const W = canvas.width, H = canvas.height;
-      gl.viewport(0, 0, W, H);
+      const c = preparerCibles(W, H);
+      const lin = !!(c && c.hdr), ombres = c ? c.ombre : null;
+      const S = lin ? P : simples();          // shaders de la scène
+      const th = Math.tan((fov * Math.PI) / 360), ta = th * (W / Math.max(1, H));
+
       gl.disable(gl.BLEND);
       gl.enable(gl.DEPTH_TEST);
       gl.depthFunc(gl.LESS);
       gl.depthMask(true);
-      gl.clearColor(E.brumeEcran[0], E.brumeEcran[1], E.brumeEcran[2], 1);
+
+      // 0. carte d'ombre : la scène vue du soleil (profondeur seule)
+      if (ombres) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, ombres.f);
+        gl.viewport(0, 0, ombres.taille, ombres.taille);
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        gl.disable(gl.CULL_FACE);
+        gl.enable(gl.POLYGON_OFFSET_FILL);
+        gl.polygonOffset(1.5, 3);
+        for (let passe = 0; passe < 2; passe++) {
+          const pr = passe ? P.profondeurAnime : P.profondeur;
+          let pret = false;
+          for (let i = 0; i < nbUtilises; i++) {
+            const m = utilises[i];
+            if (m.anime !== (passe === 1) || !m.n || !m.vao || m.sansOmbre) continue;
+            if (!pret) { gl.useProgram(pr.p); gl.uniformMatrix4fv(pr.u.uVP, false, mOmbre); gl.uniform1f(pr.u.uTemps, temps); pret = true; }
+            dessinerInstances(m, m.inst, m.n);
+          }
+        }
+        gl.disable(gl.POLYGON_OFFSET_FILL);
+      }
+
+      // 1. la scène
+      gl.bindFramebuffer(gl.FRAMEBUFFER, c ? c.fboA : null);
+      gl.viewport(0, 0, W, H);
+      const fondClair = lin ? E.brume : E.brumeEcran;
+      gl.clearColor(fondClair[0], fondClair[1], fondClair[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       gl.enable(gl.CULL_FACE);
       gl.cullFace(gl.BACK);
       gl.frontFace(gl.CW);
+      texUnite(1, ombres ? ombres.t : P.ombreVide);
+      texUnite(2, P.bruit);
+      texUnite(0, P.bruit);
 
-      // 1. maillages, un appel par maillage, les fixes puis les animés
+      // maillages, un appel par maillage, les fixes puis les animés
       for (let passe = 0; passe < 2; passe++) {
         let pret = false;
         for (let i = 0; i < nbUtilises; i++) {
           const m = utilises[i];
           if (m.anime !== (passe === 1) || !m.n || !m.vao) continue;
-          if (!pret) { reglerScene(passe ? P.maillageAnime : P.maillage, mVP, A.densiteBrume); pret = true; }
+          if (!pret) { reglerScene(passe ? S.maillageAnime : S.maillage, mVP, A.densiteBrume, lin, ombres); pret = true; }
           dessinerInstances(m, m.inst, m.n);
           st.instances += m.n;
         }
       }
 
-      // 2. sol
+      // sol
       gl.disable(gl.CULL_FACE);
-      reglerScene(P.sol, mVP, A.densiteBrume);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, P.bruit);
-      gl.uniform1i(P.sol.u.uBruit, 0);
+      reglerScene(S.sol, mVP, A.densiteBrume, lin, ombres);
       gl.bindVertexArray(P.solVao);
       gl.drawElements(gl.TRIANGLES, P.solNb, gl.UNSIGNED_SHORT, 0);
       st.appels++;
 
-      // 3. ciel, au fond
+      // ciel, au fond
       gl.depthFunc(gl.LEQUAL);
       gl.depthMask(false);
-      let u = P.ciel.u;
-      gl.useProgram(P.ciel.p);
-      const th = Math.tan((fov * Math.PI) / 360), ta = th * (W / Math.max(1, H));
+      reglerScene(S.ciel, mVP, A.densiteBrume, lin, null);
+      let u = S.ciel.u;
       gl.uniform3f(u.uAvant, avX, avY, avZ);
       gl.uniform3f(u.uDroite, drX * ta, drY * ta, drZ * ta);
       gl.uniform3f(u.uHaut, haX * th, haY * th, haZ * th);
-      gl.uniform3fv(u.uCielHaut, E.cielHaut);
-      gl.uniform3fv(u.uCielBas, E.cielBas);
-      gl.uniform3fv(u.uBrume, E.brume);
       gl.uniform3fv(u.uMont, E.mont);
-      gl.uniform3fv(u.uSoleilDir, E.soleilDir);
-      gl.uniform3fv(u.uSoleilCoul, E.soleilCiel);
       gl.uniform1f(u.uNuit, A.nuit);
-      gl.uniform1f(u.uTemps, temps);
       gl.uniform4fv(u.uAstreP, E.astreP);
       gl.uniform3fv(u.uAstreR, E.astreR);
       gl.uniform3fv(u.uAstreU, E.astreU);
@@ -6701,7 +7473,41 @@ void main() {
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       st.appels++;
 
-      // 4. taches, disques et anneaux du sol
+      // 2. occlusion ambiante, calculée à demi-taille puis multipliée dans l'image
+      if (c && c.occ) {
+        gl.disable(gl.DEPTH_TEST);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, c.occ.f);
+        gl.viewport(0, 0, c.occ.w, c.occ.h);
+        texUnite(2, c.prof);
+        u = pleinEcran(P.occlusion);
+        gl.uniform1i(u.uProf, 2);
+        gl.uniform4f(u.uProj, ta, th, PROCHE, LOIN);
+        gl.uniform2f(u.uPas, 1 / W, 1 / H);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, c.fboB);
+        gl.viewport(0, 0, W, H);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.DST_COLOR, gl.ZERO);
+        texUnite(3, c.occ.t);
+        u = pleinEcran(P.occlusionPose);
+        gl.uniform1i(u.uOcc, 3);
+        gl.uniform2f(u.uPas, 1 / c.occ.w, 1 / c.occ.h);
+        gl.uniform1f(u.uBrumeD, A.densiteBrume);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        st.appels += 2;
+        gl.enable(gl.DEPTH_TEST);
+      }
+
+      // 3. ce qui est transparent : sans tampon de profondeur attaché, la profondeur de la scène est lue en texture
+      if (c) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, c.fboB);
+        gl.disable(gl.DEPTH_TEST);
+        texUnite(2, c.prof);
+      }
+      const doux = c ? 1 : 0, clair = lin ? 1 : 0;
+      const brumeP = lin ? E.brume : E.brumeEcran;
+
+      // taches, disques et anneaux du sol
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       let nt = 0;
@@ -6722,6 +7528,8 @@ void main() {
         gl.uniformMatrix4fv(u.uVP, false, mVP);
         gl.uniform3f(u.uCam, camX, camY, camZ);
         gl.uniform4f(u.uBrume, 0, 0, 0, A.densiteBrume);
+        gl.uniform1i(u.uProf, 2);
+        gl.uniform4f(u.uDoux, doux, PROCHE, LOIN, clair);
         gl.bindVertexArray(P.decVao);
         gl.bindBuffer(gl.ARRAY_BUFFER, P.decVbo);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, tamponD, (MAX_TACHES - nt) * ND, (nt + nbDecalques) * ND);
@@ -6729,7 +7537,7 @@ void main() {
         st.appels++;
       }
 
-      // 5. traceurs
+      // traceurs
       if (nbTrac > 0) {
         for (let i = 0; i < nbTrac; i++) {
           const o = i * NTC, q = i * NT;
@@ -6742,6 +7550,8 @@ void main() {
         gl.useProgram(P.traceur.p);
         gl.uniformMatrix4fv(u.uVP, false, mVP);
         gl.uniform3f(u.uCam, camX, camY, camZ);
+        gl.uniform1i(u.uProf, 2);
+        gl.uniform4f(u.uDoux, doux, PROCHE, LOIN, clair);
         gl.bindVertexArray(P.tracVao);
         gl.bindBuffer(gl.ARRAY_BUFFER, P.tracVbo);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, tamponT, 0, nbTrac * NT);
@@ -6749,7 +7559,7 @@ void main() {
         st.appels++;
       }
 
-      // 6. halos puis particules, d'un seul appel
+      // halos puis particules, d'un seul appel
       let q = nbHalos * NP;
       for (let i = 0; i < nbPart; i++, q += NP) {
         const o = i * NPC, k = part[o + 6] / part[o + 7], add = part[o + 15];
@@ -6764,8 +7574,10 @@ void main() {
       gl.uniform3f(u.uCam, camX, camY, camZ);
       gl.uniform3f(u.uDroite, drX, drY, drZ);
       gl.uniform3f(u.uHaut, haX, haY, haZ);
-      gl.uniform3fv(u.uFumee, E.fumee);
-      gl.uniform4f(u.uBrume, E.brumeEcran[0], E.brumeEcran[1], E.brumeEcran[2], A.densiteBrume);
+      gl.uniform3fv(u.uFumee, lin ? E.fumeeClaire : E.fumee);
+      gl.uniform4f(u.uBrume, brumeP[0], brumeP[1], brumeP[2], A.densiteBrume);
+      gl.uniform1i(u.uProf, 2);
+      gl.uniform4f(u.uDoux, doux, PROCHE, LOIN, clair);
       gl.bindVertexArray(P.partVao);
       gl.bindBuffer(gl.ARRAY_BUFFER, P.partVbo);
       if (nbHalos + nbPart > 0) {
@@ -6775,8 +7587,10 @@ void main() {
         st.appels++;
       }
 
-      // 7. arme en vue subjective, par-dessus le monde
+      // 4. arme en vue subjective, par-dessus le monde
       if (nbArmes > 0 || nbEclairs > 0) {
+        if (c) { gl.bindFramebuffer(gl.FRAMEBUFFER, c.fboA); texUnite(2, P.bruit); }
+        gl.enable(gl.DEPTH_TEST);
         gl.disable(gl.BLEND);
         gl.depthMask(true);
         gl.depthFunc(gl.LESS);
@@ -6785,17 +7599,19 @@ void main() {
         for (let i = 0; i < nbArmes; i++) {
           const a = armes[i];
           if (!a.m.vao) continue;
-          reglerScene(a.m.anime ? P.maillageAnime : P.maillage, mVPArme, 0);
+          reglerScene(a.m.anime ? S.maillageAnime : S.maillage, mVPArme, 0, lin, ombres);
           dessinerInstances(a.m, a.inst, 1);
           st.instances++;
         }
         if (nbEclairs > 0) {
           gl.disable(gl.CULL_FACE);
           gl.enable(gl.BLEND);
+          gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
           gl.depthMask(false);
           gl.useProgram(P.particule.p);
           gl.uniformMatrix4fv(u.uVP, false, mVPArme);
           gl.uniform4f(u.uBrume, 0, 0, 0, 0);
+          gl.uniform4f(u.uDoux, 0, PROCHE, LOIN, clair);
           gl.bindVertexArray(P.partVao);
           gl.bindBuffer(gl.ARRAY_BUFFER, P.partVbo);
           gl.bufferSubData(gl.ARRAY_BUFFER, 0, eclairs, 0, nbEclairs * NP);
@@ -6803,9 +7619,79 @@ void main() {
           st.appels++;
         }
       }
-      gl.bindVertexArray(null);
       gl.depthMask(true);
       gl.disable(gl.BLEND);
+      gl.disable(gl.CULL_FACE);
+
+      // 5. l'image finale : halo des lumières fortes, courbe de film, anticrénelage
+      if (c) {
+        gl.disable(gl.DEPTH_TEST);
+        texUnite(2, P.bruit);
+        let source = c.coul, luma = 0;
+        if (lin) {
+          const Hh = c.halo;
+          gl.bindFramebuffer(gl.FRAMEBUFFER, Hh[0].f);
+          gl.viewport(0, 0, Hh[0].w, Hh[0].h);
+          texUnite(3, c.coul);
+          u = pleinEcran(P.haloSeuil);
+          gl.uniform1i(u.uImage, 3);
+          gl.uniform2f(u.uPas, 0.5 / Hh[0].w, 0.5 / Hh[0].h);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+          u = pleinEcran(P.haloReduire);
+          gl.uniform1i(u.uImage, 3);
+          for (let i = 1; i < Hh.length; i++) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, Hh[i].f);
+            gl.viewport(0, 0, Hh[i].w, Hh[i].h);
+            texUnite(3, Hh[i - 1].t);
+            gl.uniform2f(u.uPas, 1 / Hh[i - 1].w, 1 / Hh[i - 1].h);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+          }
+          gl.enable(gl.BLEND);
+          gl.blendFunc(gl.ONE, gl.ONE);
+          u = pleinEcran(P.haloAgrandir);
+          gl.uniform1i(u.uImage, 3);
+          gl.uniform1f(u.uForce, 1);
+          for (let i = Hh.length - 1; i >= 1; i--) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, Hh[i - 1].f);
+            gl.viewport(0, 0, Hh[i - 1].w, Hh[i - 1].h);
+            texUnite(3, Hh[i].t);
+            gl.uniform2f(u.uPas, 0.5 / Hh[i].w, 0.5 / Hh[i].h);
+            gl.drawArrays(gl.TRIANGLES, 0, 3);
+          }
+          gl.disable(gl.BLEND);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, c.ecranFbo);
+          gl.viewport(0, 0, W, H);
+          texUnite(3, c.coul);
+          texUnite(4, Hh[0].t);
+          u = pleinEcran(P.composer);
+          gl.uniform1i(u.uImage, 3);
+          gl.uniform1i(u.uHalo, 4);
+          gl.uniform4f(u.uPose, EXPOSITION, FORCE_HALO / Hh.length, 0.34, temps);
+          gl.uniform3fv(u.uVoile, E.brume);
+          gl.drawArrays(gl.TRIANGLES, 0, 3);
+          st.appels += 2 + Hh.length * 2;
+          source = c.ecran; luma = 1;
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, W, H);
+        texUnite(3, source);
+        u = pleinEcran(P.lissage);
+        gl.uniform1i(u.uImage, 3);
+        gl.uniform2f(u.uPas, 1 / W, 1 / H);
+        gl.uniform1f(u.uLuma, luma);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        st.appels++;
+        texUnite(3, null);
+        texUnite(4, null);
+        gl.activeTexture(gl.TEXTURE0);
+      }
+      gl.bindVertexArray(null);
+    }
+
+    // Qualité : 0 = simple (ni ombres ni HDR), 1 = ombres, matières, halo, 2 = le tout avec occlusion ambiante.
+    function qualite(n) {
+      if (n !== undefined) niveau = Math.max(0, Math.min(2, n | 0));
+      return hdrPossible ? niveau : 0;
     }
 
     function vider() { nbPart = 0; nbTrac = 0; nbTaches = 0; tourPart = tourTrac = tourTaches = 0; }
@@ -6816,7 +7702,10 @@ void main() {
       canvas.removeEventListener('webglcontextrestored', surRetour, false);
       if (!perdu && P) {
         for (const m of maillages) { if (m.vao) { gl.deleteVertexArray(m.vao); gl.deleteBuffer(m.vbo); gl.deleteBuffer(m.ibo); gl.deleteBuffer(m.ivbo); m.vao = null; } }
-        for (const k of ['maillage', 'maillageAnime', 'sol', 'ciel', 'decalque', 'particule', 'traceur']) gl.deleteProgram(P[k].p);
+        for (const k of PROGRAMMES) gl.deleteProgram(P[k].p);
+        if (P.simple && P.simple !== P) for (const k in P.simple) gl.deleteProgram(P.simple[k].p);
+        libererCibles();
+        gl.deleteTexture(P.ombreVide);
         for (const k of ['quad', 'quadT', 'cielVbo', 'solVbo', 'solIbo', 'partVbo', 'decVbo', 'tracVbo']) gl.deleteBuffer(P[k]);
         for (const k of ['cielVao', 'solVao', 'partVao', 'decVao', 'tracVao']) gl.deleteVertexArray(P[k]);
         gl.deleteTexture(P.bruit);
@@ -6825,7 +7714,7 @@ void main() {
     }
 
     const moteur = {
-      mat, perdu: false,
+      mat, perdu: false, ombres: false, logiciel: false, qualite,
       redimensionner, modele, geo: () => new Geo(fabrique), ambiance, debut, poser, poserMat,
       disque, anneau, tache, particule, traceur, lumiere, vueArme, eclairArme, projeter, fin,
       stats: () => st, liberer, vider, detruire,
@@ -6861,6 +7750,7 @@ void main() {
 (function () {
   'use strict';
   const PI = Math.PI;
+  let FINESSE = 1;
 
   // Patte en trois points (hanche, genou, pied), pointe au sol ; phase en radians.
   function patte(g, hanche, genou, pied, r, phase, balance, lever, cotes) {
@@ -6885,26 +7775,26 @@ void main() {
 
   // ---------------------------------------------------------------- rampant
   function rampant(moteur) {
-    const g = moteur.geo();
+    const g = moteur.geo().finesse(FINESSE).lisser(62);
     const chitine = [0.17, 0.27, 0.26], plaque = [0.27, 0.42, 0.36], os = [0.80, 0.78, 0.58], acide = [0.40, 1.0, 0.12];
     g.bruit(0.012).glissement([0, 1, 0], 0, 0.018, 2);
-    g.couleur(...chitine);
+    g.matiere('chitine').couleur(...chitine);
     g.pousser().deplacer(0, 0.29, -0.2).tournerX(0.1).ellipsoide(0.25, 0.16, 0.32, 8, 4).depiler();
-    g.couleur(...plaque);
+    g.matiere('chitine').couleur(...plaque);
     for (let k = 0; k < 3; k++) g.pousser().deplacer(0, 0.33 - k * 0.012, -0.03 - k * 0.15).tournerX(0.32).ellipsoide(0.245 - k * 0.035, 0.13, 0.12, 6, 2, 0.05, 1).depiler();
-    g.couleur(...chitine);
+    g.matiere('chitine').couleur(...chitine);
     g.pousser().deplacer(0, 0.27, 0.14).ellipsoide(0.2, 0.14, 0.2, 8, 4).depiler();
-    g.couleur(...plaque);
+    g.matiere('chitine').couleur(...plaque);
     g.pousser().deplacer(0, 0.25, 0.36).tournerX(-0.15).ellipsoide(0.15, 0.1, 0.15, 6, 3).depiler();
-    g.couleur(...os).pointe([0, 0.36, -0.42], [0, 0.42, -0.56], 0.045, 4);
-    g.bruit(0).emissif(1).couleur(...acide);
+    g.matiere('os').couleur(...os).pointe([0, 0.36, -0.42], [0, 0.42, -0.56], 0.045, 4);
+    g.bruit(0).emissif(1).matiere('cristal').couleur(...acide);
     g.symetrie(() => yeux(g, [[0.085, 0.295, 0.445, 0.048], [0.04, 0.325, 0.475, 0.028], [0.125, 0.265, 0.40, 0.026]]));
     g.emissif(0).lueur(0, 0.31, 0.47, 0.55, ...acide, 0.55);
     g.symetrie(() => {
       g.balancier([0.07, 0.21, 0.45], [0, 1, 0], 0, 0.38, 9, true);
-      g.couleur(...os).tube([[0.075, 0.21, 0.44], [0.135, 0.19, 0.55], [0.045, 0.165, 0.655]], [0.036, 0.03, 0], 4, 0.6, [0, 1, 0]);
+      g.matiere('os').couleur(...os).tube([[0.075, 0.21, 0.44], [0.135, 0.19, 0.55], [0.045, 0.165, 0.655]], [0.036, 0.03, 0], 4, 0.6, [0, 1, 0]);
     });
-    g.couleur(...chitine);
+    g.matiere('chitine').couleur(...chitine);
     g.symetrie((c) => {
       const d = c < 0 ? PI : 0;
       patte(g, [0.15, 0.26, 0.25], [0.35, 0.50, 0.42], [0.48, 0, 0.60], 0.04, d, 0.42, 0.5);
@@ -6916,48 +7806,48 @@ void main() {
 
   // ---------------------------------------------------------------- guerrier et guerrier après sa mue
   function guerrier(moteur, mue) {
-    const g = moteur.geo();
+    const g = moteur.geo().finesse(FINESSE).lisser(62);
     const chitine = mue ? [0.52, 0.34, 0.36] : [0.25, 0.13, 0.29];
     const plaque = mue ? [0.66, 0.47, 0.44] : [0.38, 0.20, 0.40];
     const vieille = [0.17, 0.10, 0.20];
     const os = [0.90, 0.82, 0.68], magenta = [1.0, 0.16, 0.72], voile = [0.92, 0.12, 0.62], bile = [0.62, 1.0, 0.16];
     g.bruit(0.02).glissement([0, 1, 0], 0, 0.03, 2);
     // abdomen long et bas
-    g.couleur(...chitine);
+    g.matiere('chitine').couleur(...chitine);
     g.pousser().deplacer(0, 0.57, -0.44).tournerX(0.1).ellipsoide(0.27, 0.22, 0.46, 8, 5).depiler();
     g.pointe([0, 0.50, -0.80], [0, 0.58, -0.97], 0.09, 4);
     if (!mue) {
-      g.couleur(...plaque);
+      g.matiere('chitine').couleur(...plaque);
       for (let k = 0; k < 3; k++) g.pousser().deplacer(0, 0.62 - k * 0.012, -0.24 - k * 0.19).tournerX(0.3).ellipsoide(0.265 - k * 0.035, 0.19, 0.14, 6, 2, 0.1, 1).depiler();
     } else {
       // vieille carapace fendue, ouverte de chaque côté
-      g.couleur(...vieille);
+      g.matiere('chitine').couleur(...vieille);
       g.symetrie(() => {
         g.pousser().deplacer(0.12, 0.60, -0.44).tournerZ(0.6).tournerX(0.1).ellipsoide(0.28, 0.25, 0.48, 8, 3, 0.3, 1).depiler();
         g.pousser().deplacer(0.09, 0.95, 0.14).tournerZ(0.7).tournerX(-0.85).ellipsoide(0.2, 0.19, 0.3, 6, 2, 0.35, 1).depiler();
       });
     }
     // thorax dressé, comme une mante
-    g.couleur(...chitine).tube([[0, 0.58, -0.10], [0, 0.82, 0.13], [0, 1.07, 0.29], [0, 1.2, 0.37]], [0.22, 0.215, 0.16, 0.12], 6);
-    g.couleur(...plaque);
+    g.matiere('chitine').couleur(...chitine).tube([[0, 0.58, -0.10], [0, 0.82, 0.13], [0, 1.07, 0.29], [0, 1.2, 0.37]], [0.22, 0.215, 0.16, 0.12], 6);
+    g.matiere('chitine').couleur(...plaque);
     g.pousser().deplacer(0, 0.86, 0.27).tournerX(1.0).ellipsoide(0.2, 0.07, 0.2, 6, 2, 0, 1).depiler();
     // tête triangulaire
     g.pousser().deplacer(0, 1.25, 0.46).tournerX(-0.55).ellipsoide(0.21, 0.10, 0.17, 6, 2).depiler();
     g.pointe([0, 1.21, 0.55], [0, 1.07, 0.66], 0.075, 4);
     g.bruit(0);
-    g.emissif(1).couleur(...magenta);
+    g.emissif(1).matiere('cristal').couleur(...magenta);
     g.symetrie(() => yeux(g, [[0.175, 1.29, 0.50, mue ? 0.05 : 0.072]], 6));
     g.emissif(0);
     if (!mue) {
       // crête dorsale et sa voile lumineuse, fentes des flancs, taches de la poitrine
       const crete = [[1.10, 0.25, 0.26], [0.92, 0.10, 0.30], [0.78, -0.12, 0.30], [0.77, -0.40, 0.26], [0.71, -0.66, 0.20]];
       const pointes = crete.map(([y, z, h]) => [[0, y - 0.05, z], [0, y + h * 0.85, z - h * 0.6]]);
-      g.couleur(...plaque);
+      g.matiere('chitine').couleur(...plaque);
       for (const [a, b] of pointes) g.tube([a, b], [0.07, 0], 4, 0.4, [1, 0, 0]);
-      g.emissif(0.6).couleur(...voile);
+      g.emissif(0.6).matiere('chair').couleur(...voile);
       const mi = (p, k) => [0, p[0][1] + (p[1][1] - p[0][1]) * k, p[0][2] + (p[1][2] - p[0][2]) * k];
       for (let i = 0; i + 1 < pointes.length; i++) g.face([pointes[i][0], mi(pointes[i], 0.62), mi(pointes[i + 1], 0.62), pointes[i + 1][0]], null, true);
-      g.emissif(1).couleur(...magenta);
+      g.emissif(1).matiere('cristal').couleur(...magenta);
       g.symetrie(() => {
         for (let k = 0; k < 3; k++) g.pousser().deplacer(0.245 - k * 0.03, 0.58 - k * 0.012, -0.24 - k * 0.19).tournerY(0.2).boite(0.05, 0.06, 0.13).depiler();
         yeux(g, [[0.10, 0.84, 0.33, 0.04], [0.085, 1.0, 0.41, 0.034]], 5);
@@ -6967,12 +7857,12 @@ void main() {
     } else {
       // gorge gonflée
       const c = [0, 0.97, 0.46];
-      g.emissif(0.95).couleur(...bile).pulsation([0, 0.97, 0.36], 0, 0.09, 4.5);
+      g.emissif(0.95).matiere('chair').couleur(...bile).pulsation([0, 0.97, 0.36], 0, 0.09, 4.5);
       g.pousser().deplacer(c[0], c[1], c[2]).ellipsoide(0.22, 0.24, 0.21, 8, 4).depiler();
-      g.emissif(0).couleur(...vieille);
+      g.emissif(0).matiere('chitine').couleur(...vieille);
       nervures(g, c, 0.228, 0.248, 0.218, 2, 0.018, -0.9, PI + 0.9, 0.4);
       g.glissement([0, 1, 0], 0, 0.03, 2);
-      g.emissif(0.8).couleur(...bile);
+      g.emissif(0.8).matiere('chair').couleur(...bile);
       g.symetrie(() => { for (let k = 0; k < 3; k++) g.pousser().deplacer(0.25 - k * 0.03, 0.58 - k * 0.012, -0.24 - k * 0.19).tournerY(0.2).boite(0.05, 0.07, 0.14).depiler(); });
       g.emissif(0);
       g.lueur(0, 0.98, 0.52, 1.3, ...bile, 0.5).lueur(0, 1.28, 0.54, 0.45, ...magenta, 0.35);
@@ -6980,21 +7870,21 @@ void main() {
     // mandibules
     g.symetrie(() => {
       g.balancier([0.05, 1.13, 0.6], [0, 1, 0], 1, 0.3, 7, true);
-      g.couleur(...os).tube([[0.05, 1.14, 0.60], [0.09, 1.06, 0.69], [0.02, 1.0, 0.75]], [0.03, 0.025, 0], 4, 0.6, [0, 1, 0]);
+      g.matiere('os').couleur(...os).tube([[0.05, 1.14, 0.60], [0.09, 1.06, 0.69], [0.02, 1.0, 0.75]], [0.03, 0.025, 0], 4, 0.6, [0, 1, 0]);
     });
     // bras-faux levés
     g.symetrie((c) => {
       const epaule = [0.19, 1.0, 0.28], coude = mue ? [0.50, 1.16, 0.34] : [0.50, 1.36, 0.36];
       g.balancier(epaule, [1, 0, 0], c < 0 ? PI : 0, 0.22, 1, false);
-      g.couleur(...chitine).tube([epaule, coude], [0.08, 0.065], 5);
-      g.couleur(...os);
+      g.matiere('chitine').couleur(...chitine).tube([epaule, coude], [0.08, 0.065], 5);
+      g.matiere('os').couleur(...os);
       const lame = mue
         ? [coude, [0.54, 1.10, 0.58], [0.48, 0.86, 0.76], [0.38, 0.60, 0.78]]
         : [coude, [0.53, 1.40, 0.62], [0.45, 1.20, 0.86], [0.31, 0.86, 0.95]];
       g.tube(lame, [0.075, 0.10, 0.075, 0], 4, 0.42, [1, 0, 0.35]);
     });
     // pattes
-    g.couleur(...chitine);
+    g.matiere('chitine').couleur(...chitine);
     g.symetrie((c) => {
       const d = c < 0 ? PI : 0;
       patte(g, [0.2, 0.58, 0.02], [0.50, 0.84, 0.2], [0.58, 0, 0.4], 0.075, d, 0.36, 0.42);
@@ -7005,30 +7895,30 @@ void main() {
 
   // ---------------------------------------------------------------- cracheur
   function cracheur(moteur) {
-    const g = moteur.geo();
+    const g = moteur.geo().finesse(FINESSE).lisser(62);
     const corps = [0.31, 0.33, 0.15], plaque = [0.46, 0.46, 0.21], sombre = [0.13, 0.15, 0.06], bile = [0.62, 1.0, 0.16];
     g.bruit(0.018).glissement([0, 1, 0], 0, 0.02, 2);
-    g.couleur(...corps);
+    g.matiere('chitine').couleur(...corps);
     g.pousser().deplacer(0, 0.42, -0.2).ellipsoide(0.30, 0.24, 0.40, 8, 4).depiler();
     g.pointe([0, 0.36, -0.52], [0, 0.22, -0.7], 0.09, 4);
     g.tube([[0, 0.42, 0.06], [0, 0.80, 0.20], [0, 1.12, 0.17], [0, 1.33, 0.27]], [0.23, 0.20, 0.17, 0.15], 6);
-    g.couleur(...plaque);
+    g.matiere('chitine').couleur(...plaque);
     for (let k = 0; k < 3; k++) g.pousser().deplacer(0, 0.62 + k * 0.24, 0.33 - k * 0.025).tournerX(1.25).ellipsoide(0.2 - k * 0.02, 0.07, 0.13, 6, 2, 0, 1).depiler();
     // gueule en tube
     g.tube([[0, 1.32, 0.24], [0, 1.385, 0.44], [0, 1.34, 0.66]], [0.155, 0.12, 0.10], 6);
     g.pousser().deplacer(0, 1.34, 0.64).tournerX(-1.57 - 0.2).cylindre(0.10, 0.14, 0.06, 6).depiler();
-    g.bruit(0).emissif(1).couleur(...bile);
+    g.bruit(0).emissif(1).matiere('chair').couleur(...bile);
     g.pousser().deplacer(0, 1.333, 0.69).tournerX(-1.57 - 0.2).cylindre(0.085, 0.085, 0.01, 6).depiler();
     g.symetrie(() => yeux(g, [[0.115, 1.43, 0.36, 0.04], [0.09, 1.47, 0.27, 0.028]]));
     // poche dorsale
     const c = [0, 1.13, -0.2];
     g.pulsation(c, 0, 0.065, 2.6).emissif(0.9);
     g.pousser().deplacer(c[0], c[1], c[2]).ellipsoide(0.34, 0.41, 0.34, 9, 5).depiler();
-    g.emissif(0).couleur(...sombre);
+    g.emissif(0).matiere('chitine').couleur(...sombre);
     nervures(g, c, 0.352, 0.428, 0.352, 3, 0.03, -0.45, PI + 0.45, 0.3);
     g.emissif(0).lueur(0, 1.15, -0.2, 1.9, ...bile, 0.42).lueur(0, 1.34, 0.72, 0.45, ...bile, 0.5);
     // pattes
-    g.couleur(...corps).bruit(0);
+    g.matiere('chitine').couleur(...corps).bruit(0);
     g.symetrie((s) => {
       const d = s < 0 ? PI : 0;
       patte(g, [0.22, 0.42, 0.0], [0.50, 0.64, 0.12], [0.56, 0, 0.26], 0.07, d, 0.32, 0.4);
@@ -7039,40 +7929,40 @@ void main() {
 
   // ---------------------------------------------------------------- blindé
   function blinde(moteur) {
-    const g = moteur.geo();
+    const g = moteur.geo().finesse(FINESSE).lisser(62);
     const acier = [0.20, 0.46, 0.74], clair = [0.40, 0.70, 0.95], sombre = [0.11, 0.25, 0.44];
     const chair = [0.84, 0.56, 0.46], chairClaire = [0.98, 0.76, 0.58], orange = [1.0, 0.55, 0.10], membre = [0.17, 0.21, 0.30], os = [0.82, 0.80, 0.74];
     g.glissement([0, 1, 0], 0, 0.03, 2);
     // corps tendre (point faible), visible de côté, de dos et de dessus
-    g.bruit(0.05).couleur(...chair);
+    g.bruit(0.05).matiere('chair').couleur(...chair);
     g.pousser().deplacer(0, 0.95, -0.42).tournerX(-0.06).ellipsoide(0.92, 0.64, 1.16, 10, 5).depiler();
     g.pointe([0, 0.9, -1.45], [0, 0.72, -1.6], 0.2, 5);
-    g.couleur(...chairClaire).emissif(0.25).bruit(0.02);
+    g.matiere('chair').couleur(...chairClaire).emissif(0.25).bruit(0.02);
     [[0, 1.50, -1.0, 0.30], [0.36, 1.50, -0.5, 0.33], [-0.36, 1.50, -0.5, 0.33], [0, 1.52, 0.0, 0.30], [0.62, 1.2, -1.0, 0.24], [-0.62, 1.2, -1.0, 0.24]].forEach(([x, y, z, r], i) => {
       g.pulsation([x, y - 0.15, z], i * 1.7, 0.07, 2.2);
       g.pousser().deplacer(x, y, z).ellipsoide(r, r * 0.62, r, 7, 3).depiler();
     });
     g.emissif(0).glissement([0, 1, 0], 0, 0.03, 2);
     // tête basse, sous le bouclier
-    g.bruit(0.02).couleur(...sombre);
+    g.bruit(0.02).matiere('chitine').couleur(...sombre);
     g.pousser().deplacer(0, 0.56, 1.12).ellipsoide(0.44, 0.30, 0.40, 8, 3).depiler();
-    g.bruit(0).emissif(1).couleur(...orange);
+    g.bruit(0).emissif(1).matiere('cristal').couleur(...orange);
     g.symetrie(() => yeux(g, [[0.15, 0.62, 1.47, 0.06], [0.30, 0.58, 1.37, 0.045]], 5));
     g.emissif(0).lueur(0, 0.62, 1.52, 0.8, ...orange, 0.5);
     g.symetrie(() => {
       g.balancier([0.14, 0.42, 1.4], [0, 1, 0], 0, 0.25, 5, true);
-      g.couleur(...os).tube([[0.16, 0.44, 1.38], [0.24, 0.34, 1.52], [0.10, 0.28, 1.6]], [0.06, 0.05, 0], 4, 0.6, [0, 1, 0]);
+      g.matiere('os').couleur(...os).tube([[0.16, 0.44, 1.38], [0.24, 0.34, 1.52], [0.10, 0.28, 1.6]], [0.06, 0.05, 0], 4, 0.6, [0, 1, 0]);
     });
     // bouclier frontal : calotte à grandes facettes, pôle vers l'avant
     g.glissement([0, 1, 0], 0, 0.03, 2).bruit(0.03);
     g.pousser().deplacer(0, 1.22, 0.60).tournerX(-PI / 2 + 0.30);
-    g.couleur(...acier).ellipsoide(1.30, 0.97, 0.90, 8, 3, 0.17, 1);
-    g.couleur(...clair).pousser().deplacer(0, 0.06, -0.12).ellipsoide(0.70, 0.99, 0.52, 6, 2, 0.45, 1).depiler();
-    g.couleur(...sombre).ellipsoide(1.36, 0.30, 0.96, 8, 1, -0.2, 0.55);
+    g.matiere('chitine').couleur(...acier).ellipsoide(1.30, 0.97, 0.90, 8, 3, 0.17, 1);
+    g.matiere('chitine').couleur(...clair).pousser().deplacer(0, 0.06, -0.12).ellipsoide(0.70, 0.99, 0.52, 6, 2, 0.45, 1).depiler();
+    g.matiere('chitine').couleur(...sombre).ellipsoide(1.36, 0.30, 0.96, 8, 1, -0.2, 0.55);
     g.depiler();
     g.bruit(0);
     g.symetrie(() => {
-      g.couleur(...os);
+      g.matiere('os').couleur(...os);
       g.pointe([0.82, 1.78, 0.86], [1.22, 2.10, 1.28], 0.13, 4);
       g.pointe([1.20, 1.2, 0.74], [1.60, 1.22, 1.14], 0.11, 4);
       g.pointe([0.34, 1.98, 0.90], [0.42, 2.12, 1.22], 0.09, 4);
@@ -7082,10 +7972,10 @@ void main() {
       const d = c < 0 ? PI : 0;
       [[0.45, 0.2], [-0.3, 0], [-1.0, -0.25]].forEach(([z, dz], i) => {
         const hanche = [0.72, 0.8, z], genou = [1.22, 1.14, z + dz * 0.5], pied = [1.36, 0, z + dz];
-        g.couleur(...membre);
+        g.matiere('chitine').couleur(...membre);
         patte(g, hanche, genou, pied, 0.17, d + (i % 2) * PI, 0.32, 0.26, 5);
         g.patte(hanche, pied, d + (i % 2) * PI, 0.32, 0.26);
-        g.couleur(...acier).pousser().deplacer(genou[0] + 0.03, genou[1] + 0.02, genou[2]).ellipsoide(0.23, 0.19, 0.23, 5, 2, 0, 1).depiler();
+        g.matiere('chitine').couleur(...acier).pousser().deplacer(genou[0] + 0.03, genou[1] + 0.02, genou[2]).ellipsoide(0.23, 0.19, 0.23, 5, 2, 0, 1).depiler();
         g.fixe();
       });
     });
@@ -7094,25 +7984,25 @@ void main() {
 
   // ---------------------------------------------------------------- bombardier
   function bombardier(moteur) {
-    const g = moteur.geo();
+    const g = moteur.geo().finesse(FINESSE).lisser(62);
     const braise = [1.0, 0.33, 0.07], vif = [1.0, 0.80, 0.25], sombre = [0.20, 0.06, 0.06], membre = [0.20, 0.12, 0.14];
     const c = [0, 0.74, 0];
-    g.pulsation(c, 0, 0.07, 6).bruit(0.02).emissif(0.85).couleur(...braise);
+    g.pulsation(c, 0, 0.07, 6).bruit(0.02).emissif(0.85).matiere('chair').couleur(...braise);
     g.pousser().deplacer(c[0], c[1], c[2]).ellipsoide(0.41, 0.40, 0.41, 9, 6).depiler();
-    g.bruit(0).emissif(1).couleur(...vif);
+    g.bruit(0).emissif(1).matiere('chair').couleur(...vif);
     [[0.25, 0.25, 0.25], [-0.3, 0.1, 0.2], [0.1, -0.2, 0.34], [-0.15, 0.32, -0.2], [0.3, -0.05, -0.28], [-0.33, -0.15, -0.15]].forEach(([x, y, z]) => {
       g.pousser().deplacer(c[0] + x, c[1] + y, c[2] + z).sphere(0.085, 6, 3).depiler();
     });
-    g.emissif(0).couleur(...sombre);
+    g.emissif(0).matiere('chitine').couleur(...sombre);
     nervures(g, c, 0.425, 0.415, 0.425, 3, 0.028, -1.2, PI + 1.2, 0.5);
     g.pointe([0, 1.1, 0], [0, 1.2, -0.03], 0.05, 4).pointe([0.12, 1.06, 0.1], [0.2, 1.17, 0.14], 0.04, 4).pointe([-0.13, 1.07, -0.08], [-0.22, 1.16, -0.14], 0.04, 4);
     g.lueur(0, 0.74, 0, 1.8, ...braise, 0.5);
     // petite tête sous la boule
-    g.glissement([0, 1, 0], 0, 0.02, 2).couleur(...membre);
+    g.glissement([0, 1, 0], 0, 0.02, 2).matiere('chitine').couleur(...membre);
     g.pousser().deplacer(0, 0.44, 0.33).tournerX(-0.3).ellipsoide(0.13, 0.09, 0.15, 6, 3).depiler();
-    g.emissif(1).couleur(...vif);
+    g.emissif(1).matiere('chair').couleur(...vif);
     g.symetrie(() => yeux(g, [[0.07, 0.47, 0.44, 0.03]]));
-    g.emissif(0).couleur(...membre);
+    g.emissif(0).matiere('chitine').couleur(...membre);
     g.symetrie((s) => {
       const d = s < 0 ? PI : 0;
       patte(g, [0.18, 0.46, 0.14], [0.50, 0.78, 0.36], [0.56, 0, 0.52], 0.034, d, 0.4, 0.5);
@@ -7123,16 +8013,16 @@ void main() {
 
   // ---------------------------------------------------------------- matriarche
   function matriarche(moteur) {
-    const g = moteur.geo();
+    const g = moteur.geo().finesse(FINESSE).lisser(62);
     const chitine = [0.30, 0.10, 0.18], plaque = [0.47, 0.16, 0.26], voile = [0.62, 0.14, 0.30];
     const os = [0.86, 0.77, 0.63], poche = [0.86, 0.36, 1.0], vert = [0.45, 1.0, 0.25];
     g.bruit(0.06).glissement([0, 1, 0], 0, 0.05, 2);
     // abdomen et ses plaques
-    g.couleur(...chitine);
+    g.matiere('chitine').couleur(...chitine);
     g.pousser().deplacer(0, 1.75, -1.1).tournerX(-0.12).ellipsoide(1.35, 1.2, 1.85, 10, 6).depiler();
-    g.couleur(...plaque);
+    g.matiere('chitine').couleur(...plaque);
     for (let k = 0; k < 4; k++) g.pousser().deplacer(0, 2.2 - k * 0.08, 0.1 - k * 0.72).tournerX(0.25).ellipsoide(1.2 - k * 0.14, 0.85, 0.52, 8, 2, 0.15, 1).depiler();
-    g.couleur(...os).bruit(0);
+    g.matiere('os').couleur(...os).bruit(0);
     for (let k = 0; k < 5; k++) g.pointe([0, 2.9 - k * 0.1, 0.0 - k * 0.6], [0, 3.45 - k * 0.14, -0.3 - k * 0.66], 0.13, 4);
     g.pointe([0, 1.3, -2.75], [0, 0.6, -3.0], 0.3, 5);
     // poches lumineuses de l'abdomen
@@ -7142,7 +8032,7 @@ void main() {
       poches.push([1.18 * k, 1.5 + (i % 2) * 0.28, z, 0.40 - i * 0.02], [-1.18 * k, 1.5 + (i % 2) * 0.28, z, 0.40 - i * 0.02]);
     }
     poches.push([0.5, 1.25, -2.55, 0.36], [-0.5, 1.25, -2.55, 0.36], [0, 2.0, -2.8, 0.34], [0.75, 0.75, -1.2, 0.34], [-0.75, 0.75, -1.2, 0.34]);
-    g.emissif(0.92).couleur(...poche);
+    g.emissif(0.92).matiere('chair').couleur(...poche);
     poches.forEach(([x, y, z, r], i) => {
       g.pulsation([x * 0.8, y, z], i * 1.3, 0.09, 2.4);
       g.pousser().deplacer(x, y, z).ellipsoide(r, r, r, 6, 4).depiler();
@@ -7150,10 +8040,10 @@ void main() {
     g.emissif(0).glissement([0, 1, 0], 0, 0.05, 2);
     g.lueur(1.4, 1.6, -1.2, 3.4, ...poche, 0.3).lueur(-1.4, 1.6, -1.2, 3.4, ...poche, 0.3).lueur(0, 1.6, -2.9, 2.6, ...poche, 0.3);
     // thorax, cou, tête
-    g.bruit(0.05).couleur(...chitine);
+    g.bruit(0.05).matiere('chitine').couleur(...chitine);
     g.pousser().deplacer(0, 2.05, 0.95).ellipsoide(1.0, 0.9, 0.95, 8, 5).depiler();
     g.tube([[0, 2.2, 1.5], [0, 2.5, 1.9]], [0.6, 0.5], 6);
-    g.couleur(...plaque);
+    g.matiere('chitine').couleur(...plaque);
     g.pousser().deplacer(0, 2.58, 2.05).tournerX(-0.3).ellipsoide(0.62, 0.52, 0.68, 8, 4).depiler();
     g.bruit(0);
     // collerette : pointes en éventail et voile entre elles
@@ -7165,9 +8055,9 @@ void main() {
       rayons.push([base, bout]);
     }
     g.balancier(centre, [1, 0, 0], 0, 0.06, 1.3, true);
-    g.couleur(...os);
+    g.matiere('os').couleur(...os);
     for (const [a, b] of rayons) g.tube([a, b], [0.14, 0], 4, 0.4, [0, 0, 1]);
-    g.couleur(...voile).emissif(0.3);
+    g.matiere('chair').couleur(...voile).emissif(0.3);
     for (let i = 0; i + 1 < rayons.length; i++) {
       const a = rayons[i], b = rayons[i + 1];
       const m = (p, k) => [p[0][0] + (p[1][0] - p[0][0]) * k, p[0][1] + (p[1][1] - p[0][1]) * k, p[0][2] + (p[1][2] - p[0][2]) * k];
@@ -7175,19 +8065,19 @@ void main() {
     }
     g.emissif(0).glissement([0, 1, 0], 0, 0.05, 2);
     // grappe d'yeux verts
-    g.emissif(1).couleur(...vert);
+    g.emissif(1).matiere('cristal').couleur(...vert);
     g.symetrie(() => yeux(g, [[0.2, 2.78, 2.62, 0.115], [0.42, 2.62, 2.42, 0.095], [0.13, 2.56, 2.72, 0.085], [0.36, 2.93, 2.38, 0.075]], 6));
     yeux(g, [[0, 2.98, 2.48, 0.07]], 6);
     g.emissif(0).lueur(0, 2.75, 2.7, 1.9, ...vert, 0.5);
     // mandibules géantes
     g.symetrie(() => {
       g.balancier([0.4, 2.3, 2.4], [0, 1, 0], 0, 0.22, 2.2, true);
-      g.couleur(...os).tube([[0.42, 2.3, 2.38], [0.86, 2.0, 2.78], [0.60, 1.56, 2.98], [0.16, 1.3, 2.9]], [0.2, 0.18, 0.11, 0], 4, 0.45, [0, 1, 0]);
+      g.matiere('os').couleur(...os).tube([[0.42, 2.3, 2.38], [0.86, 2.0, 2.78], [0.60, 1.56, 2.98], [0.16, 1.3, 2.9]], [0.2, 0.18, 0.11, 0], 4, 0.45, [0, 1, 0]);
       g.balancier([0.2, 2.2, 2.5], [0, 1, 0], 1.5, 0.3, 3.1, true);
       g.tube([[0.2, 2.22, 2.55], [0.36, 2.0, 2.8], [0.1, 1.8, 2.86]], [0.09, 0.075, 0], 4, 0.5, [0, 1, 0]);
     });
     // dix pattes
-    g.couleur(...chitine);
+    g.matiere('chitine').couleur(...chitine);
     g.symetrie((c) => {
       const d = c < 0 ? PI : 0;
       [[1.45, 0.7], [0.85, 0.3], [0.2, 0], [-0.5, -0.3], [-1.2, -0.7]].forEach(([z, dz], i) => {
@@ -7195,8 +8085,8 @@ void main() {
         const ph = d + (i % 2) * PI;
         g.patte(hanche, pied, ph, 0.26, 0.22);
         const cheville = [genou[0] + 0.5, 1.3, genou[2] + dz * 0.5];
-        g.couleur(...chitine).tube([hanche, genou, cheville], [0.24, 0.19, 0.12], 5);
-        g.couleur(...os).tube([cheville, pied], [0.12, 0], 4);
+        g.matiere('chitine').couleur(...chitine).tube([hanche, genou, cheville], [0.24, 0.19, 0.12], 5);
+        g.matiere('os').couleur(...os).tube([cheville, pied], [0.12, 0], 4);
         g.fixe();
       });
     });
@@ -7205,9 +8095,9 @@ void main() {
 
   // ---------------------------------------------------------------- crachat (centré sur son origine)
   function crachat(moteur) {
-    const g = moteur.geo();
+    const g = moteur.geo().finesse(FINESSE).lisser(62);
     const bile = [0.62, 1.0, 0.16];
-    g.emissif(1).couleur(...bile).pulsation([0, 0, 0.05], 0, 0.12, 14);
+    g.emissif(1).matiere('chair').couleur(...bile).pulsation([0, 0, 0.05], 0, 0.12, 14);
     g.pousser().deplacer(0, 0, 0.06).ellipsoide(0.09, 0.09, 0.11, 6, 4).depiler();
     g.tube([[0, 0, 0.03], [0, 0, -0.08], [0, 0, -0.18]], [0.078, 0.045, 0], 6);
     g.pousser().deplacer(0.03, 0.03, -0.13).sphere(0.025, 4, 2).depiler();
@@ -7218,12 +8108,12 @@ void main() {
 
   // ---------------------------------------------------------------- œuf
   function oeuf(moteur) {
-    const g = moteur.geo();
+    const g = moteur.geo().finesse(FINESSE).lisser(62);
     const coque = [0.40, 0.23, 0.50], racine = [0.20, 0.10, 0.24], veine = [0.92, 0.42, 1.0];
     const c = [0, 0.3, 0];
-    g.pulsation([0, 0.1, 0], 0, 0.04, 2.2).bruit(0.012).couleur(...coque);
+    g.pulsation([0, 0.1, 0], 0, 0.04, 2.2).bruit(0.012).matiere('chair').couleur(...coque);
     g.tube([[0, 0.0, 0], [0, 0.07, 0], [0, 0.2, 0], [0, 0.34, 0], [0, 0.5, 0], [0, 0.63, 0], [0, 0.71, 0]], [0.12, 0.2, 0.258, 0.262, 0.215, 0.13, 0], 8);
-    g.bruit(0).emissif(1).couleur(...veine);
+    g.bruit(0).emissif(1).matiere('chair').couleur(...veine);
     for (let k = 0; k < 5; k++) {
       const a = (k / 5) * PI * 2, pts = [];
       for (let i = 0; i <= 5; i++) {
@@ -7232,14 +8122,16 @@ void main() {
       }
       g.tube(pts, [0.02, 0.018, 0.016, 0.013, 0.01, 0], 3);
     }
-    g.emissif(0).fixe().couleur(...racine);
+    g.emissif(0).fixe().matiere('chitine').couleur(...racine);
     for (let k = 0; k < 5; k++) { const a = (k / 5) * PI * 2 + 0.3; g.tube([[Math.cos(a) * 0.14, 0.1, Math.sin(a) * 0.14], [Math.cos(a) * 0.3, 0.04, Math.sin(a) * 0.3], [Math.cos(a + 0.3) * 0.42, 0, Math.sin(a + 0.3) * 0.42]], [0.05, 0.035, 0], 4); }
     g.lueur(0, 0.38, 0, 1.1, ...veine, 0.32);
     return { maillage: g.maillage(), rayon: 0.3, hauteur: 0.7, foulee: 1, lueur: veine };
   }
 
   window.SAS_CREATURES = {
-    creer(moteur) {
+    // finesse : 1 = facettes d'origine ; 2 = formes rondes deux fois plus fines (quatre fois plus de triangles)
+    creer(moteur, finesse) {
+      FINESSE = finesse > 0 ? finesse : 1;
       return {
         rampant: rampant(moteur), guerrier: guerrier(moteur, false), guerrierMue: guerrier(moteur, true),
         cracheur: cracheur(moteur), blinde: blinde(moteur), bombardier: bombardier(moteur),
@@ -8374,38 +9266,52 @@ void main() {
   const precParId = new Map();
   let precK = -1;
 
+  // Qualité du rendu : 2 = tout (ombres, matières, halo, occlusion ambiante), 1 = sans l'occlusion (téléphones),
+  // 0 = simple (option « Qualité : basse », ou appareil trop lent : baisseQualite).
+  let baisseQualite = 0;
+  function niveauVoulu() {
+    const n = meta.options.qualite ? (TACTILE ? 1 : 2) : 0;
+    if (moteur && moteur.logiciel && !POUR_LE_ROBOT) return 0;      // sans carte graphique : qualité simple d'emblée
+    return Math.max(0, n - baisseQualite);
+  }
+  // Ombre de contact : simple tache sombre sans ombres portées, discrète quand le soleil en projette de vraies.
+  function ombreSol(x, z, rayon, alpha) {
+    if (moteur.ombres) moteur.disque(x, z, rayon * 0.8, 0, 0, 0, alpha * 0.45);
+    else moteur.disque(x, z, rayon, 0, 0, 0, alpha);
+  }
   function chargerMoteur() {
     let modeles = null;
     try { modeles = JSON.parse($('sas-modeles').textContent); } catch (e) { modeles = null; }
-    moteur = modeles && window.SAS_GL ? window.SAS_GL.creer(toile, { modeles }) : null;
+    moteur = modeles && window.SAS_GL ? window.SAS_GL.creer(toile, { modeles, qualite: niveauVoulu() }) : null;
     if (!moteur) return false;
-    CREA = window.SAS_CREATURES.creer(moteur);
+    CREA = window.SAS_CREATURES.creer(moteur, !meta.options.qualite ? 1 : TACTILE ? 1.5 : 2);
     for (const nom of Object.keys(modeles.modeles)) MAILLES[nom] = moteur.modele(nom);
     fabriquerObjets();
+    fabriquerRoches();
     construireDecor();
     return true;
   }
 
   // Petits objets fabriqués par le code (mine, boule de plasma).
   function fabriquerObjets() {
-    let g = moteur.geo();
+    let g = moteur.geo().matiere('metal').finesse(2).lisser(40);
     g.couleur(0.25, 0.27, 0.33); g.cylindre(0.34, 0.27, 0.13, 8);
     g.deplacer(0, 0.13, 0); g.couleur(1, 0.2, 0.15); g.emissif(1); g.cylindre(0.09, 0.06, 0.07, 6);
     MAILLES.mine = g.maillage();
-    g = moteur.geo();
+    g = moteur.geo().finesse(2).lisser(60);
     g.couleur(0.55, 0.88, 1); g.emissif(1); g.sphere(0.3, 8, 5);
     MAILLES.plasma = g.maillage();
 
     // Barricade : trois blocs de béton, bandes de signalisation, poutres croisées tournées vers le nord.
-    g = moteur.geo();
+    g = moteur.geo().matiere('beton');
     const bloc = (x, lacet) => {
       g.pousser(); g.deplacer(x, 0.6, 0); g.tournerY(lacet);
       g.couleur(0.4, 0.4, 0.46); g.boite(1.25, 1.2, 0.85, 0.62, 0.5);
-      g.couleur(0.95, 0.72, 0.12); g.deplacer(0, 0.62, 0); g.boite(0.8, 0.06, 0.44);
-      g.depiler();
+      g.matiere('peinture').couleur(0.95, 0.72, 0.12); g.deplacer(0, 0.62, 0); g.boite(0.8, 0.06, 0.44);
+      g.matiere('beton').depiler();
     };
     bloc(-1.3, 0.22); bloc(0, 0); bloc(1.3, -0.22);
-    g.couleur(0.2, 0.2, 0.25);
+    g.matiere('metal').couleur(0.2, 0.2, 0.25);
     for (const x of [-0.65, 0.65]) {
       g.pousser(); g.deplacer(x, 0.75, 0.75); g.tournerX(-0.75); g.boite(0.13, 2.1, 0.13); g.depiler();
       g.pousser(); g.deplacer(x, 0.75, 0.75); g.tournerX(0.75); g.boite(0.13, 2.1, 0.13); g.depiler();
@@ -8413,7 +9319,7 @@ void main() {
     MAILLES.barricade = g.maillage();
 
     // Le sas : porte blindée à deux vantaux, cadre épais, bandes de danger, joint et rampe lumineux.
-    g = moteur.geo();
+    g = moteur.geo().matiere('metal');
     const dl = CARTE.sas.demiLargeur;
     g.couleur(0.2, 0.21, 0.27);
     for (const s of [-1, 1]) { g.pousser(); g.deplacer(s * (dl + 0.4), 2.25, 0); g.boite(0.8, 4.5, 1); g.depiler(); }
@@ -8717,7 +9623,7 @@ void main() {
       if (e.sl > 0) { tr = 0.6; tv = 0.75; tb = 1.5; }
       if (e.t === 5 && e.ph === 3) { tr = 1.6; tv = 0.6; tb = 0.6; emissif = 0.25; }
       moteur.poser(C.maillage, x, h, z, v.lacet, ech, tr, tv, tb, v.eclat, marche, ampli, emissif, 1);
-      moteur.disque(x, z, A.rayon * 1.25 * ech, 0, 0, 0, 0.38);
+      ombreSol(x, z, A.rayon * 1.25 * ech, 0.38);
     }
     // Vues des aliens disparus sans effet de mort (éclosion, fin de partie) : oubliées.
     if (vues.size > E.e.length + 40) for (const [id, v] of vues) if (v.vu < vus - 40) vues.delete(id);
@@ -8767,7 +9673,7 @@ void main() {
       if (p.genre === 1) {
         const h = melange(p.y0, 0.2, k) + Math.sin(k * Math.PI) * 3.2;
         moteur.poser(MAILLES['grenade-a'], x, h, z, k * 20, 1.6, 1, 1, 1, 0, 0, 0, 0.2, 1);
-        moteur.disque(x, z, 0.3, 0, 0, 0, 0.4);
+        ombreSol(x, z, 0.3, 0.4);
       } else if (p.genre === 5) {
         moteur.poser(MAILLES.plasma, x, 1.3, z, tempsJeu * 9, 1, 1, 1, 1, 0, 0, 0, 1, 1);
         moteur.lumiere(x, 1.3, z, 0.6, 1.2, 2.2, 7);
@@ -8800,7 +9706,7 @@ void main() {
       // La tourelle lourde est plus grosse et sombre ; le niveau 3 est doré.
       const teinte = lourde ? (T.n === 3 ? [0.85, 0.6, 0.4] : [0.55, 0.5, 0.62]) : (T.n === 3 ? [1.2, 1.05, 0.7] : [1, 1, 1]);
       moteur.poser(MAILLES['turret-double'], p[0] - T.dx * recul * 0.12, 0, p[1] - T.dy * recul * 0.12, lacet + ORIENTATION_TOURELLE, ech, teinte[0], teinte[1], teinte[2], recul * 0.25, 0, 0, 0, 1);
-      moteur.disque(p[0], p[1], 1.5, 0, 0, 0, 0.4);
+      ombreSol(p[0], p[1], 1.5, 0.4);
       const sante = T.pv / D2.pv[T.n - 1];
       if (sante < 0.45 && Math.random() < 0.25) moteur.particule(p[0] + hasard(-0.3, 0.3), 1.4, p[1] + hasard(-0.3, 0.3), 0, 1.6, 0, 1.2, 0.3, 0.9, 0.15, 0.13, 0.15, 0.5, 0.3, 0);
       if (prepa) moteur.anneau(p[0], p[1], D2.portee[T.n - 1], 0.08, 0.45, 0.85, 1, 0.22);
@@ -8810,7 +9716,7 @@ void main() {
       if (B.pv <= 0) { if (prepa && gradeJoueur >= D.boutique[12].grade) moteur.anneau(p[0], p[1], 1.6, 0.1, 0.5, 0.9, 1, 0.4); continue; }
       const sante = B.pv / D.barricade.pv;
       moteur.poser(MAILLES.barricade, p[0], 0, p[1], 0, 1.15, 1, 0.55 + sante * 0.45, 0.55 + sante * 0.45, 0, 0, 0, 0, 1);
-      moteur.disque(p[0], p[1], 2.2, 0, 0, 0, 0.35);
+      ombreSol(p[0], p[1], 2.2, 0.35);
     }
     // Le sas : lueur d'alarme quand il est presque détruit.
     const pv = E.sas / E.sasMax;
@@ -8841,7 +9747,7 @@ void main() {
       const C = COULEURS_JOUEURS[c];
       if (J.at === 0) moteur.poser(m, x, 0, z, v.la + ORIENTATION_ASTRONAUTE, 2.25, C[0], C[1], C[2], 0, 0, 0, J.bo > 0 ? 0.35 : 0, 1);
       else moteur.poserMat(m, matriceCouche(x, z, v.la), 0.7, 0.7, 0.7, 0, 0, 0, 0, J.at === 2 ? 0.4 : 1);
-      moteur.disque(x, z, 0.6, 0, 0, 0, 0.4);
+      ombreSol(x, z, 0.6, 0.4);
       if (J.bo > 0) moteur.anneau(x, z, 1, 0.08, 0.4, 0.9, 1, 0.8);
       // À terre : un anneau rouge qui bat, visible de loin ; il se remplit pendant qu'on le relève.
       if (J.at === 1) {
@@ -8901,6 +9807,256 @@ void main() {
   }
 
   // ==========================================================================
+  // 2 ter. Roches fabriquées par le code : parois du canyon, rochers, pierres,
+  // cristaux, bords des galeries. Surfaces lissées, relief tiré d'un bruit
+  // répétable (le décor est le même à chaque partie et sur tous les appareils
+  // d'une partie en ligne ; rien ici ne touche à la simulation).
+  // ==========================================================================
+  function hasardEntier(x, y, z) {
+    let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 1274126177)) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+  function bruit3(x, y, z) {
+    const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+    let fx = x - xi, fy = y - yi, fz = z - zi;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); fz = fz * fz * (3 - 2 * fz);
+    const c000 = hasardEntier(xi, yi, zi), c100 = hasardEntier(xi + 1, yi, zi), c010 = hasardEntier(xi, yi + 1, zi), c110 = hasardEntier(xi + 1, yi + 1, zi);
+    const c001 = hasardEntier(xi, yi, zi + 1), c101 = hasardEntier(xi + 1, yi, zi + 1), c011 = hasardEntier(xi, yi + 1, zi + 1), c111 = hasardEntier(xi + 1, yi + 1, zi + 1);
+    const x00 = c000 + (c100 - c000) * fx, x10 = c010 + (c110 - c010) * fx;
+    const x01 = c001 + (c101 - c001) * fx, x11 = c011 + (c111 - c011) * fx;
+    const y0 = x00 + (x10 - x00) * fy, y1 = x01 + (x11 - x01) * fy;
+    return y0 + (y1 - y0) * fz;
+  }
+  // Bruit en octaves, entre 0 et 1 (moyenne 0,5).
+  function bruitOctaves(x, y, z, octaves) {
+    let s = 0, a = 0.5, t = 0;
+    for (let o = 0; o < octaves; o++) { s += bruit3(x, y, z) * a; t += a; a *= 0.5; x = x * 2.03 + 11.7; y = y * 2.03 + 5.3; z = z * 2.03 + 3.1; }
+    return s / t;
+  }
+  const lisse01 = (a, b, x) => { const t = borner((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+  // Sphère à facettes triangulaires régulières (icosaèdre subdivisé) : { pts, tris }.
+  function icosphere(niveaux) {
+    const t = (1 + Math.sqrt(5)) / 2;
+    let pts = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]];
+    let tris = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+      [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+    const unite = (p) => { const l = Math.hypot(p[0], p[1], p[2]); return [p[0] / l, p[1] / l, p[2] / l]; };
+    pts = pts.map(unite);
+    for (let n = 0; n < niveaux; n++) {
+      const milieux = new Map(), suivants = [];
+      const milieu = (a, b) => {
+        const cle = a < b ? a * 100000 + b : b * 100000 + a;
+        let i = milieux.get(cle);
+        if (i === undefined) { i = pts.length; pts.push(unite([pts[a][0] + pts[b][0], pts[a][1] + pts[b][1], pts[a][2] + pts[b][2]])); milieux.set(cle, i); }
+        return i;
+      };
+      for (const [a, b, c] of tris) {
+        const ab = milieu(a, b), bc = milieu(b, c), ca = milieu(c, a);
+        suivants.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]);
+      }
+      tris = suivants;
+    }
+    return { pts, tris };
+  }
+  // Met chaque triangle dans le sens attendu par geo().libre : sa normale du côté de « dehors(centre du triangle) ».
+  function orienter(pts, tris, dehors) {
+    for (const t of tris) {
+      const a = pts[t[0]], b = pts[t[1]], c = pts[t[2]];
+      const nx = (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]);
+      const ny = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]);
+      const nz = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      const d = dehors([(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3]);
+      if (nx * d[0] + ny * d[1] + nz * d[2] < 0) { const k = t[1]; t[1] = t[2]; t[2] = k; }
+    }
+    return tris;
+  }
+
+  const TONS_ROCHE = [[0.60, 0.31, 0.22], [0.73, 0.44, 0.29], [0.82, 0.58, 0.41], [0.44, 0.23, 0.19], [0.66, 0.36, 0.27]];
+  function tonRoche(k) {
+    const n = TONS_ROCHE.length, x = ((k % n) + n) % n, i = Math.floor(x), f = x - i;
+    const a = TONS_ROCHE[i], b = TONS_ROCHE[(i + 1) % n], s = f * f * (3 - 2 * f);
+    return [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s];
+  }
+
+  // Un rocher : boule bosselée, taillée par quelques plans (cassures nettes), posée à plat. Rayon 1 environ,
+  // base à y = 0, hauteur 1,3 environ. « g » : constructeur de géométrie où l'ajouter (repère courant).
+  function ajouterRocher(g, graine, niveaux, sombre) {
+    const { pts, tris } = icosphere(niveaux);
+    const r = (k) => hasardEntier(graine, k, 77);
+    const plans = [];
+    for (let k = 0; k < 9; k++) {
+      const a = r(k * 3) * TAU, y = r(k * 3 + 1) * 1.5 - 0.35, l = Math.hypot(1, y);
+      plans.push([Math.cos(a) / l, y / l, Math.sin(a) / l, 0.62 + r(k * 3 + 2) * 0.3]);
+    }
+    const ox = r(40) * 50, oy = r(41) * 50, oz = r(42) * 50;
+    const sx = 0.85 + r(43) * 0.3, sz = 0.85 + r(44) * 0.3;
+    const P = [], coul = [];
+    for (const p of pts) {
+      const large = bruitOctaves(p[0] * 1.2 + ox, p[1] * 1.2 + oy, p[2] * 1.2 + oz, 4);
+      const fin = bruitOctaves(p[0] * 4.5 + oz, p[1] * 4.5 + ox, p[2] * 4.5 + oy, 3);
+      const rayon = 1 + (large - 0.5) * 0.85 + (fin - 0.5) * 0.16;
+      let x = p[0] * rayon, y = p[1] * rayon, z = p[2] * rayon;
+      let taille = 0;
+      for (const [nx, ny, nz, d] of plans) {
+        const t = x * nx + y * ny + z * nz - d;
+        if (t > 0) { x -= nx * t * 0.93; y -= ny * t * 0.93; z -= nz * t * 0.93; taille = 1; }
+      }
+      if (y < -0.3) y = -0.3 + (y + 0.3) * 0.12;
+      P.push([x * sx, (y + 0.3) * 1.05 - 0.05, z * sz]);
+      const c = tonRoche(y * 2.2 + large * 3 + r(45) * 5);
+      const k = (0.72 + 0.5 * large + (taille ? 0.1 : 0)) * (sombre ? 0.6 : 1);
+      coul.push([c[0] * k, c[1] * k, c[2] * k]);
+    }
+    orienter(P, tris, (c) => [c[0], c[1] - 0.4, c[2]]);
+    g.libre(P, tris, coul);
+  }
+
+  // Une gerbe de cristaux violets : prismes à six pans, pointus, qui luisent.
+  function ajouterCristaux(g, graine, nombre, taille) {
+    const r = (k) => hasardEntier(graine, k, 91);
+    g.matiere('cristal').lisser(0);
+    for (let i = 0; i < nombre; i++) {
+      const a = r(i * 5) * TAU, d = i === 0 ? 0 : 0.15 + r(i * 5 + 1) * 0.55;
+      const h = taille * (i === 0 ? 1.25 : 0.4 + r(i * 5 + 2) * 0.75), l = taille * (0.11 + r(i * 5 + 3) * 0.09) * (i === 0 ? 1.3 : 1);
+      const k = 0.75 + r(i * 5 + 4) * 0.5;
+      g.pousser().deplacer(Math.cos(a) * d * taille, -0.05, Math.sin(a) * d * taille).tournerY(a).tournerZ(-d * 0.75).tournerY(r(i * 7) * 3);
+      g.emissif(0.22).couleur(0.42 * k, 0.24 * k, 0.86 * k).cylindre(l, l * 0.86, h, 6);
+      g.deplacer(0, h, 0).emissif(0.5).couleur(0.66 * k, 0.42 * k, 1.0 * k).cone(l * 0.86, l * 1.9, 6);
+      g.depiler();
+    }
+    g.emissif(0).lueur(0, taille * 0.7, 0, taille * 2.4, 0.6, 0.35, 1.0, 0.22);
+    g.matiere('roche').lisser(0);
+  }
+
+  // Le bord relevé d'une galerie : bourrelet de terre et de roche éclatée, rayon 1 à sa crête.
+  function fabriquerCratere() {
+    const NU = 56, NV = 9, P = [], coul = [], tris = [];
+    for (let i = 0; i < NU; i++) {
+      const a = (i / NU) * TAU, ca = Math.cos(a), sa = Math.sin(a);
+      const bosse = bruitOctaves(ca * 2.2 + 9, sa * 2.2 + 4, 1.5, 3);
+      for (let j = 0; j <= NV; j++) {
+        const v = j / NV, rr = 0.66 + v * 1.25 + (bruitOctaves(ca * 3 + v * 2, sa * 3, 7.7, 2) - 0.5) * 0.14;
+        const e = (rr - 1) / (rr < 1 ? 0.16 : 0.36);
+        let y = 0.22 * Math.exp(-e * e) * (0.55 + 0.9 * bosse) + (bruitOctaves(ca * rr * 5, sa * rr * 5, 2.2, 2) - 0.5) * 0.05;
+        if (j === 0 || j === NV) y = -0.03;
+        P.push([ca * rr, y, sa * rr]);
+        const c = tonRoche(bosse * 4 + v), k = j === 0 ? 0.25 : 0.55 + 0.4 * bosse;
+        coul.push([c[0] * k, c[1] * k, c[2] * k]);
+      }
+    }
+    for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) {
+      const a = i * (NV + 1) + j, b = ((i + 1) % NU) * (NV + 1) + j;
+      tris.push([a, b, a + 1], [b, b + 1, a + 1]);
+    }
+    orienter(P, tris, () => [0, 1, 0]);
+    const g = moteur.geo().matiere('roche');
+    g.libre(P, tris, coul);
+    return g.maillage();
+  }
+
+  // Les parois du canyon, d'un seul tenant autour de l'esplanade (le bunker est adossé à la paroi sud).
+  // Tracé : un rectangle aux coins arrondis ; chaque tranche monte du pied (éboulis) au plateau.
+  const PAROI = { a: 28.5, b: 35.5, cz: 28.5, puissance: 8 };
+  function hauteurParoi(x, z) {
+    let h = 8.5 + 9 * bruitOctaves(x * 0.045 + 3.3, 0.5, z * 0.045 + 8.1, 3);
+    h *= 0.56 + 0.44 * lisse01(-30, -6, x);                    // côté du soleil : paroi plus basse, moins d'ombre sur l'esplanade
+    if (z < 6) h = Math.max(h, 13 + 5 * bruit3(x * 0.07, 2.2, 0.4)) * (0.75 + 0.25 * lisse01(6, -4, z)) + 2;   // derrière le bunker
+    return h;
+  }
+  function fabriquerParoi() {
+    const NU = 360, NV = 36, n = PAROI.puissance, P = [], coul = [], tris = [];
+    for (let i = 0; i < NU; i++) {
+      const th = (i / NU) * TAU, cs = Math.cos(th), sn = Math.sin(th);
+      const r0 = Math.pow(Math.pow(Math.abs(cs / PAROI.a), n) + Math.pow(Math.abs(sn / PAROI.b), n), -1 / n);
+      const bx = cs * r0, bz = PAROI.cz + sn * r0;
+      let nx = Math.sign(cs) * Math.pow(Math.abs(cs * r0 / PAROI.a), n - 1) / PAROI.a, nz = Math.sign(sn) * Math.pow(Math.abs(sn * r0 / PAROI.b), n - 1) / PAROI.b;
+      const ln = Math.hypot(nx, nz) || 1; nx /= ln; nz /= ln;
+      const H = hauteurParoi(bx, bz);
+      // gorges verticales et contreforts : ne dépendent que de la place le long de la paroi
+      const gorge = 1 - Math.abs(2 * bruitOctaves(bx * 0.16 + 1.7, 3.3, bz * 0.16 + 6.1, 3) - 1);
+      const y1 = 2.2 + 2.2 * bruit3(bx * 0.06, 5.5, bz * 0.06), y2 = y1 + 2.6 + 2.5 * bruit3(bx * 0.05, 9.1, bz * 0.05);
+      // strates : bancs de roche en retrait les uns sur les autres, de hauteurs inégales
+      const bancs = [];
+      for (let k = 0, yk = 1.3 + 1.2 * bruit3(bx * 0.05, 5.5, bz * 0.05); yk < H - 0.6; k++) {
+        bancs.push([yk, 0.35 + 0.75 * bruit3(bx * 0.07 + k * 3.1, k * 7.7, bz * 0.07)]);
+        yk += 1.3 + 1.9 * bruit3(bx * 0.04 + k * 5.3, 9.1 + k, bz * 0.04);
+      }
+      const recul = (t, y) => {
+        let d = -2.4 * Math.pow(1 - t, 3) + 0.6 * t;                            // éboulis au pied
+        for (const [yk, l] of bancs) d += l * lisse01(-0.1, 0.1, y - yk);       // corniches
+        d += (1.1 - 2.0 * gorge * gorge) * Math.sin(Math.PI * Math.min(1, t * 1.15)) * 0.9;
+        const large = bruitOctaves((bx + nx * d) * 0.11, y * 0.11, (bz + nz * d) * 0.11, 3) - 0.5;
+        const fin = bruitOctaves(bx * 0.42, y * 0.9, bz * 0.42, 3) - 0.5;
+        return d + (large * 2.4 + fin * 0.8) * Math.min(1, t * 4 + 0.25);
+      };
+      const dHaut = recul(1, H);
+      for (let j = 0; j <= NV; j++) {
+        const v = j / NV;
+        let y, d;
+        if (v <= 0.86) {
+          const t = v / 0.86;
+          y = H * Math.pow(t, 0.92);
+          d = recul(t, y);
+        } else {
+          const t = (v - 0.86) / 0.14;
+          y = H + 1.2 * t + (bruitOctaves(bx * 0.2, t * 2, bz * 0.2, 2) - 0.5) * 1.2 * t;
+          d = dHaut + 0.6 + 15 * t;
+        }
+        P.push([bx + nx * d, y, bz + nz * d]);
+        // strates colorées, un peu ondulées
+        const onde = bruitOctaves(bx * 0.05, 0.7, bz * 0.05, 2);
+        const c = tonRoche(y * 0.52 + onde * 3.2);
+        const k = 0.74 + 0.36 * bruitOctaves(bx * 0.3, y * 0.3, bz * 0.3, 2) - 0.16 * gorge * (v < 0.86 ? 1 : 0);
+        coul.push([c[0] * k, c[1] * k, c[2] * k]);
+      }
+    }
+    for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) {
+      const a = i * (NV + 1) + j, b = ((i + 1) % NU) * (NV + 1) + j;
+      tris.push([a, b, a + 1], [b, b + 1, a + 1]);
+    }
+    // face visible : celle qui regarde l'esplanade (et le ciel)
+    orienter(P, tris, (c) => [-c[0], 30, PAROI.cz - c[2]]);
+    const g = moteur.geo().matiere('roche');
+    g.libre(P, tris, coul);
+    return g.maillage();
+  }
+
+  function fabriquerRoches() {
+    let g;
+    for (let k = 0; k < 4; k++) {
+      g = moteur.geo().matiere('roche');
+      ajouterRocher(g, 100 + k * 17, 3, k === 3);
+      MAILLES['roche-' + k] = g.maillage();
+    }
+    // rocher coiffé de cristaux (près des galeries, et deux obstacles)
+    for (let k = 0; k < 2; k++) {
+      g = moteur.geo().matiere('roche');
+      ajouterRocher(g, 300 + k * 31, 3, true);
+      g.pousser().deplacer(0.15 - k * 0.3, 0.75, 0.1); ajouterCristaux(g, 500 + k, 7, 0.85); g.depiler();
+      g.pousser().deplacer(-0.75 + k * 0.2, 0.2, 0.45).tournerZ(0.5); ajouterCristaux(g, 520 + k, 4, 0.5); g.depiler();
+      g.pousser().deplacer(0.7, 0.15, -0.5 + k * 0.3).tournerZ(-0.55); ajouterCristaux(g, 540 + k, 4, 0.45); g.depiler();
+      MAILLES['cristaux-' + k] = g.maillage();
+    }
+    // semis de pierres : quelques petits rochers dans un cercle de 1 m
+    for (let k = 0; k < 2; k++) {
+      g = moteur.geo().matiere('roche');
+      const nb = 5 + k * 2;
+      for (let i = 0; i < nb; i++) {
+        const a = hasardEntier(k, i, 5) * TAU, d = Math.sqrt(hasardEntier(k, i, 6)) * 0.85, e = 0.09 + hasardEntier(k, i, 7) * 0.2;
+        g.pousser().deplacer(Math.cos(a) * d, 0, Math.sin(a) * d).tournerY(a * 3).echelle(e, e * (0.6 + hasardEntier(k, i, 8) * 0.5), e);
+        ajouterRocher(g, 700 + k * 50 + i, 1, false);
+        g.depiler();
+      }
+      MAILLES['pierres-' + k] = g.maillage();
+    }
+    MAILLES.cratere = fabriquerCratere();
+    MAILLES.paroi = fabriquerParoi();
+  }
+
+  // ==========================================================================
   // 2 bis. Le décor : bunker et son sas, canyon, galeries des aliens, rochers
   // Modèles Kenney (CC0) mis à l'échelle ; rien ici ne touche à la simulation
   // (les obstacles, eux, sont dans ses données : CARTE.obstacles).
@@ -8945,40 +10101,47 @@ void main() {
     for (const p of CARTE.tourelles) decor('platform-large', p[0], 0.02, p[1], 0, [1.25, 1.4, 1.25], [0.6, 0.6, 0.68]);
 
     // --- Obstacles de la simulation : rochers, cristaux, caisses, épave -------
-    const MODELES_OBSTACLES = ['rock-large-a', 'rock-crystals-large-a', 'craft-cargo-a', 'rock-large-b', 'rock-crystals-large-b', 'meteor-detailed',
-      'st-container-wide', 'st-container-wide', 'rock-large-a', 'rock-large-b', 'rock-crystals-large-a', 'rock-large-a'];
+    const MODELES_OBSTACLES = ['roche-0', 'cristaux-0', 'craft-cargo-a', 'roche-1', 'cristaux-1', 'roche-3',
+      'st-container-wide', 'st-container-wide', 'roche-2', 'roche-1', 'cristaux-0', 'roche-0'];
     CARTE.obstacles.forEach((O, i) => {
       const nom = MODELES_OBSTACLES[i % MODELES_OBSTACLES.length], m = MAILLES[nom];
       if (!m) return;
       const large = Math.max(m.max[0] - m.min[0], m.max[2] - m.min[2]);
       const e = O[2] * 2.15 / large;
       const caisse = nom.startsWith('st-'), epave = nom.startsWith('craft');
-      decor(nom, O[0], epave ? -0.3 : 0, O[1], h() * TAU, caisse ? [e * 0.9, e * 0.55, e * 0.9] : epave ? e * 0.85 : [e, e * (1.3 + h() * 0.9), e], caisse || epave ? [1, 1, 1] : TEINTE_ROCHE);
-      if (!caisse && !epave) decor('rocks-small-a', O[0] + O[2] * 1.1, 0, O[1] + O[2] * 0.6, h() * TAU, 2.6, TEINTE_ROCHE);
+      decor(nom, O[0], epave ? -0.3 : 0, O[1], h() * TAU, caisse ? [e * 0.9, e * 0.55, e * 0.9] : epave ? e * 0.85 : [e, e * (0.95 + h() * 0.6), e], [1, 1, 1]);
+      if (!caisse && !epave) {
+        decor('pierres-0', O[0] + O[2] * 1.15, 0, O[1] + O[2] * 0.6, h() * TAU, 1.6 + h());
+        decor('pierres-1', O[0] - O[2] * 0.9, 0, O[1] - O[2] * 0.95, h() * TAU, 1.3 + h());
+      }
     });
 
-    // --- Parois du canyon : gros rochers tout autour ----------------------------
-    const paroi = (x, z) => {
-      const e = 9 + h() * 9;
-      decor(h() < 0.5 ? 'rock-large-a' : 'rock-large-b', x + (h() - 0.5) * 3, -0.5, z + (h() - 0.5) * 3, h() * TAU, [e, e * (1.2 + h() * 1.6), e], h() < 0.3 ? TEINTE_SOMBRE : TEINTE_ROCHE);
-    };
-    for (let z = 2; z <= 64; z += 6.5) { paroi(-29.5, z); paroi(29.5, z); }
-    for (let x = -24; x <= 24; x += 6.5) { if (Math.abs(x) > 5) paroi(x, 66); }
-    for (let i = 0; i < 10; i++) paroi((h() < 0.5 ? -1 : 1) * (36 + h() * 14), h() * 70);
-    // Petits cailloux et cristaux semés sur l'esplanade (sans collision).
-    for (let i = 0; i < 26; i++) {
-      const x = (h() - 0.5) * 44, z = 6 + h() * 50;
-      decor(h() < 0.7 ? 'rocks-small-b' : 'rocks-small-a', x, 0, z, h() * TAU, 1.2 + h() * 1.6, TEINTE_ROCHE);
+    // --- Parois du canyon : une seule surface autour de l'esplanade, et des pitons au loin ----
+    decor('paroi', 0, 0, 0, 0, 1);
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * TAU + h() * 0.3, d = 52 + h() * 34, e = 7 + h() * 9;
+      decor('roche-' + (i % 3), Math.cos(a) * d, -1, 28 + Math.sin(a) * d, h() * TAU, [e, e * (1.6 + h() * 2.2), e]);
+    }
+    // Rochers tombés au pied des parois.
+    for (let i = 0; i < 16; i++) {
+      const cote = i % 2 ? 1 : -1, z = 5 + h() * 54, e = 0.9 + h() * 1.7;
+      decor('roche-' + (i % 4), cote * (24.6 + h() * 1.6), -0.15, z, h() * TAU, [e, e * (0.7 + h() * 0.6), e]);
+    }
+    for (let i = 0; i < 8; i++) { const e = 1 + h() * 1.6, x = (h() - 0.5) * 44; if (Math.abs(x) > 4) decor('roche-' + (i % 4), x, -0.15, 60.6 + h() * 1.4, h() * TAU, [e, e * (0.7 + h() * 0.6), e]); }
+    // Pierres semées sur l'esplanade (sans collision).
+    for (let i = 0; i < 46; i++) {
+      const x = (h() - 0.5) * 46, z = 5 + h() * 54;
+      decor(h() < 0.6 ? 'pierres-0' : 'pierres-1', x, 0, z, h() * TAU, 0.8 + h() * 1.7);
     }
     decor('bones', -15, 0, 33, 1.2, 3.4, [0.9, 0.85, 0.8]);
     decor('bones', 17, 0, 46, -0.6, 2.8, [0.9, 0.85, 0.8]);
 
-    // --- Galeries des aliens : cratères sombres encadrés de cristaux --------------
+    // --- Galeries des aliens : bord de terre soulevée, rochers à cristaux de chaque côté ------
     for (let i = 0; i < 3; i++) {
       const G = CARTE.galeries[i];
-      decor('crater-large', G[0], 0, G[1], h() * TAU, 9.5, TEINTE_SOMBRE);
-      decor('rock-crystals-large-a', G[0] - 5, 0, G[1] + 1.5, h() * TAU, 7, TEINTE_SOMBRE);
-      decor('rock-crystals-large-b', G[0] + 5, 0, G[1] + 1.5, h() * TAU, 7, TEINTE_SOMBRE);
+      decor('cratere', G[0], 0, G[1], h() * TAU, [3.75, 4.4, 3.75], TEINTE_SOMBRE);
+      decor('cristaux-0', G[0] - 5.2, -0.1, G[1] + 1.2, h() * TAU, 2.6, [0.85, 0.8, 0.85]);
+      decor('cristaux-1', G[0] + 5.2, -0.1, G[1] + 1.2, h() * TAU, 2.4, [0.85, 0.8, 0.85]);
     }
 
     ORIENTATION_TOURELLE = 0;
@@ -9005,8 +10168,8 @@ void main() {
     // Fond sombre des galeries.
     for (let i = 0; i < 3; i++) { const G = CARTE.galeries[i]; moteur.disque(G[0], G[1], 3.4, 0.03, 0.01, 0.04, 0.92); }
     if (brecheVue < 0.02) return;
-    const G = CARTE.galeries[3], m = MAILLES['crater-large'];
-    if (m) moteur.poser(m, G[0], -0.4 * (1 - brecheVue), G[1], 1.3, 8 * brecheVue, 0.55, 0.36, 0.34, 0, 0, 0, 0, 1);
+    const G = CARTE.galeries[3], m = MAILLES.cratere;
+    if (m) moteur.poser(m, G[0], -0.4 * (1 - brecheVue), G[1], 1.3, 3.2 * brecheVue, 0.55, 0.36, 0.34, 0, 0, 0, 0, 1);
     moteur.disque(G[0], G[1], 2.9 * brecheVue, 0.03, 0.01, 0.04, 0.92);
     if (Math.random() < 0.2) moteur.particule(G[0] + hasard(-2, 2), 0.3, G[1] + hasard(-2, 2), 0, 1.5, 0, 1.4, 0.4, 1.2, 0.3, 0.2, 0.2, 0.35, 0.3, 0);
   }
@@ -9127,7 +10290,7 @@ void main() {
         elManette.firstElementChild.style.transform = '';
       } else if (regard.id < 0) { regard.id = p.identifier; regard.x = p.clientX; regard.y = p.clientY; }
     }
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
   }
   function bougeToucher(e) {
     if (etatJeu !== 'jeu') return;
@@ -9144,7 +10307,7 @@ void main() {
         ref.x = p.clientX; ref.y = p.clientY;
       }
     }
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
   }
   function finToucher(e) {
     for (const p of e.changedTouches) {
@@ -9166,7 +10329,7 @@ void main() {
     tirId = p.identifier; tirPos.x = p.clientX; tirPos.y = p.clientY; tirTactile = true;
     $('b-tir').classList.add('actif');
     SON.demarrer();
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
   }, { passive: false });
   $('b-tir').addEventListener('touchmove', bougeToucher, { passive: false });
   $('b-tir').addEventListener('touchend', finToucher);
@@ -9175,7 +10338,7 @@ void main() {
 
   function boutonTactile(id, action) {
     const b = $(id);
-    const faire = (e) => { e.preventDefault(); SON.demarrer(); if (etatJeu === 'jeu') action(); };
+    const faire = (e) => { if (e.cancelable) e.preventDefault(); SON.demarrer(); if (etatJeu === 'jeu') action(); };
     b.addEventListener('touchstart', faire, { passive: false });
     b.addEventListener('click', (e) => { if (!TACTILE) faire(e); });
   }
@@ -9675,7 +10838,7 @@ void main() {
       b.type = 'button'; b.className = 'capacite';
       b.setAttribute('aria-label', t('capacite.' + C.id));
       b.innerHTML = `<svg><use href="#${icones[n]}"/></svg><i class="voile-cd"></i><kbd>${lettres[n]}</kbd>`;
-      const faire = (e) => { e.preventDefault(); if (etatJeu === 'jeu') utiliserCapacite(n); };
+      const faire = (e) => { if (e.cancelable) e.preventDefault(); if (etatJeu === 'jeu') utiliserCapacite(n); };
       b.addEventListener('touchstart', faire, { passive: false });
       b.addEventListener('click', (e) => { if (!TACTILE) faire(e); });
       bloc.appendChild(b);
@@ -10573,7 +11736,8 @@ void main() {
   let echelleRendu = 1, cumulImages = 0, nImages = 0;
   function redimensionner() {
     if (!moteur) return;
-    const max = meta.options.qualite ? (TACTILE ? 1.75 : 2) : 1;
+    const max = meta.options.qualite && !(moteur.logiciel && !POUR_LE_ROBOT) ? (TACTILE ? 1.75 : 2) : 1;
+    moteur.qualite(niveauVoulu());
     moteur.redimensionner(innerWidth, innerHeight, Math.min(window.devicePixelRatio || 1, max) * echelleRendu);
   }
   window.addEventListener('resize', redimensionner);
@@ -10592,9 +11756,14 @@ void main() {
     tempsJeu += dt;
 
     // Appareil trop lent : on dessine moins de points (une fois ou deux, pas plus).
-    cumulImages += dtReel; nImages += 1;
-    if (nImages >= 90 && !APERCU) {
-      if (cumulImages / nImages > 0.03 && echelleRendu > 0.6 && !document.hidden) { echelleRendu *= 0.8; redimensionner(); }
+    // (les deux premières secondes ne comptent pas : les shaders se préparent)
+    if (ts > 2000) { cumulImages += dtReel; nImages += 1; }
+    if ((nImages >= 90 || (nImages >= 12 && cumulImages > 4)) && !APERCU) {
+      if (cumulImages / nImages > 0.03 && !document.hidden) {
+        // d'abord les effets les plus chers (occlusion, puis ombres et HDR), ensuite seulement la finesse de l'image
+        if (niveauVoulu() > 0) { baisseQualite++; redimensionner(); }
+        else if (echelleRendu > 0.6) { echelleRendu *= 0.8; redimensionner(); }
+      }
       cumulImages = 0; nImages = 0;
     }
 
@@ -10662,14 +11831,14 @@ void main() {
     // La matriarche, au centre, qui charge vers le défenseur (poches lumineuses).
     const MX = 0.6, MZ = 19.5, M = CREA.matriarche;
     moteur.poser(M.maillage, MX, 0, MZ, Math.PI - 0.12, 1.32, 1.15, 1, 1.1, 0, 2.2, 1, 0.12, 1);
-    moteur.disque(MX, MZ, 3.6, 0, 0, 0, 0.45);
+    ombreSol(MX, MZ, 3.6, 0.45);
     moteur.lumiere(MX - 0.4, 3.4, MZ - 3.4, 0.95, 0.3, 0.8, 9);   // lueur magenta qui éclaire le monstre de face
     // Les rampants qui déferlent devant elle, et deux guerriers sur les côtés.
     const RAMPANTS = [[-3.2, 15.5, 0.3], [-1.6, 14.2, -0.2], [2.4, 14.6, 0.1], [4.8, 16.6, -0.5], [-5.6, 17.6, 0.6], [0.2, 16.2, 0], [-2.4, 17.6, 0.2], [6.3, 19, -0.3], [-0.6, 13.2, 0.4]];
     RAMPANTS.forEach(([x, z, la], i) => {
       const saut = i === 1 || i === 8 ? 0.5 : 0;
       moteur.poser(CREA.rampant.maillage, x, saut, z, Math.PI + la, 1.15, 1, 1, 1, 0, i * 1.7, 1, 0, 1);
-      moteur.disque(x, z, 0.7, 0, 0, 0, 0.4);
+      ombreSol(x, z, 0.7, 0.4);
     });
     moteur.poser(CREA.guerrier.maillage, -6.8, 0, 21.5, Math.PI + 0.35, 1.25, 1, 1, 1, 0, 1.1, 1, 0, 1);
     moteur.poser(CREA.guerrier.maillage, 7.6, 0, 22.5, Math.PI - 0.4, 1.25, 1, 1, 1, 0, 2.9, 1, 0, 1);
@@ -10692,7 +11861,7 @@ void main() {
     const DX = 3.1, DZ = 11.2;
     const laD = Math.atan2(MX - DX, MZ - DZ) - 0.1;
     if (MAILLES['astronaut-a']) moteur.poser(MAILLES['astronaut-a'], DX, 0, DZ, laD + ORIENTATION_ASTRONAUTE, 2.45, 0.95, 0.97, 1.05, 0, 0, 0, 0, 1);
-    moteur.disque(DX, DZ, 0.75, 0, 0, 0, 0.5);
+    ombreSol(DX, DZ, 0.75, 0.5);
     // Son fusil (modèle du jeu), tenu à hauteur d'épaule ; le canon regarde vers le monstre.
     const s = Math.sin(laD), c = Math.cos(laD);
     const ax = DX + s * 1.2 - c * 0.22, az = DZ + c * 1.2 + s * 0.22, ay = 1.1;
@@ -10718,8 +11887,8 @@ void main() {
       moteur.particule(x, 0.3 + h() * 1.2, z, 0, 0, 0, 1, 1 + h() * 1.4, 1, 0.62, 0.38, 0.26, 0.35, 0, 0);
     }
     // Premier plan : cailloux coupés par le bord du bas.
-    if (MAILLES['rocks-small-a']) moteur.poser(MAILLES['rocks-small-a'], -1.2, 0, 8.4, 0.7, 3.2, 0.78, 0.5, 0.42, 0, 0, 0, 0, 1);
-    if (MAILLES['rock-large-b']) moteur.poser(MAILLES['rock-large-b'], -4.2, -0.3, 8.6, 1.9, 2.2, 0.55, 0.36, 0.34, 0, 0, 0, 0, 1);
+    moteur.poser(MAILLES['pierres-1'], -1.2, 0, 8.4, 0.7, 1.9, 1, 1, 1, 0, 0, 0, 0, 1);
+    moteur.poser(MAILLES['roche-1'], -4.4, -0.2, 8.9, 1.9, 1.15, 0.8, 0.75, 0.8, 0, 0, 0, 0, 1);
     moteur.fin();
   }
 

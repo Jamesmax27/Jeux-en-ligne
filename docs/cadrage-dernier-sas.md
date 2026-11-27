@@ -137,3 +137,38 @@ Le moteur temps réel du site savait déjà réunir 2 à 8 camps, relier les jou
 1. **Pull request 1 — jeu solo** (`dernier-sas-solo`, fusionnée le 13 novembre 2026) : `games/le-dernier-sas/`, ce document, `CLAUDE.md`.
 2. **Interface tactile** (`dernier-sas-mobile`, 14 novembre 2026) : boutons agrandis, plein écran, aide à la visée ; version 2.
 3. **Coopération** (`dernier-sas-coop`, 14 novembre 2026, par-dessus la précédente) : `"temps_reel": true`, blocs `jel-tr` et `jel-sim`, menus et salon, code de salon dans le moteur, réanimation, textes, robot de contrôle, politique de confidentialité ; version 3. Le moteur à 4 joueurs prévu en pull request à part existait déjà (modes à plusieurs du 12 novembre).
+4. **Graphismes** (`ccr-ec0c8912-lcc6vz`, 26 novembre 2026) : rendu refait, roches fabriquées par le code ; version 5 (section 10).
+
+## 10. Graphismes (version 5, 26 novembre 2026)
+
+Demande du propriétaire : « améliorer les graphismes et le réalisme », sans limite de poids du fichier (le jeu reste pourtant sous les 2 Mo : rien n'a été ajouté en images, tout est calculé). La simulation (`jel-sim`), les commandes et l'interface ne changent pas ; seuls changent le moteur de rendu (`sas-gl`), les modèles des aliens (`sas-creatures`) et le décor du script du jeu.
+
+**Moteur (`sas-gl`)**
+
+- **Lumière calculée à chaque point de l'image** (avant : à chaque sommet, en aplats) : soleil, ciel, reflet du ciel et du sol, reflets des lumières ponctuelles (tirs, explosions, plasma).
+- **Matières** (`g.matiere('roche')`… ; 4 bits de l'octet d'animation de chaque sommet) : peinture, roche, métal, chitine, chair, cristal, os, béton. Chacune a sa rugosité, son reflet et son **détail** tiré de la texture de bruit lue sur les trois axes de l'objet (strates et fissures de la roche, rayures du métal, mouchetures de la chitine, veines de la chair) ; les objets posés au sol prennent sa poussière. Les modèles Kenney reçoivent leur matière d'après leur nom (`matiereModele`).
+- **Ombres portées du soleil** : une carte de profondeur vue du soleil (2 048 points de côté, 1 024 sur téléphone), couvrant l'esplanade et les parois (`BOITE_OMBRE`), relue avec un bord doux. Le soleil a été relevé (de 17° à 30° environ) pour que l'ombre des parois ne couvre pas toute l'esplanade. Les taches sombres sous les aliens deviennent une ombre de contact discrète (`ombreSol` dans le jeu).
+- **Rendu HDR** : la scène est dessinée dans une image à grande plage de lumière, puis viennent le **halo** des lumières fortes (yeux, poches, cristaux, tirs, soleil), l'exposition, une courbe de film, un peu de vignette et de grain, et l'**anticrénelage** (FXAA ; la toile n'a plus d'anticrénelage matériel).
+- **Occlusion ambiante** (ordinateur) : les creux et le pied des objets sont assombris d'après la profondeur de l'image.
+- **Particules douces** : fumée, poussière et lueurs s'effacent en approchant du décor au lieu d'être coupées net (la profondeur de la scène est lue en texture ; décalques, traceurs et particules sont dessinés sans tampon de profondeur attaché).
+- **Brume** plus dense près du sol et dorée du côté du soleil ; **ciel** : voiles de poussière, tourbillons de la planète, mers et cratères des lunes, mesas éclairées.
+- **Géométrie** : `g.finesse(k)` (formes rondes plus fines), `g.lisser(angle)` (normales lissées sous cet angle), `g.libre(points, triangles, couleurs)` (surface quelconque lissée).
+
+**Qualité** (`moteur.qualite(n)`, choisie par le jeu : `niveauVoulu`)
+
+| Niveau | Quand | Contenu |
+| --- | --- | --- |
+| 2 | ordinateur, option « Qualité : haute » | tout |
+| 1 | téléphone, option « Qualité : haute » | tout sauf l'occlusion ambiante, carte d'ombre de 1 024 |
+| 0 | option « Qualité : basse », appareil sans `EXT_color_buffer_float`, rendu sans carte graphique (`moteur.logiciel`) | ni ombres, ni HDR, ni détail, ni reflets (shaders `SIMPLE`) ; anticrénelage gardé |
+
+Un appareil qui passe sous 33 images par seconde descend d'abord d'un niveau, puis encore d'un, et seulement ensuite réduit la finesse de l'image (comme avant). Si le rendu hors écran est refusé, le moteur dessine directement dans la toile.
+
+**Décor** (script du jeu, « 2 ter »)
+
+- **Parois du canyon** : une seule surface fermée autour de l'esplanade (`fabriquerParoi` : tracé en rectangle arrondi, éboulis au pied, bancs de roche en retrait, gorges verticales, plateau), plus basse du côté du soleil, haute derrière le bunker qui s'y adosse. Elle remplace les blocs Kenney agrandis.
+- **Rochers** (`ajouterRocher` : boule bosselée taillée par des plans), **pierres**, **cristaux** violets lumineux (`ajouterCristaux`), **bord des galeries** (`fabriquerCratere`), pitons au loin. Les obstacles gardent leur place et leur rayon (données de la simulation) : seul leur dessin change. Le hasard du décor est fixe (même décor pour tous).
+- **Aliens** : mêmes formes, deux fois plus fines (une fois et demie sur téléphone), lissées, en chitine, chair, os et cristal.
+
+**Mesures** (26 novembre 2026, Chromium sans carte graphique, 1 280 × 720, image 2 du jeu) : 3,8 images par seconde avant ; 2,5 au niveau 0, 1,0 au niveau 2 (d'où la qualité simple choisie d'office sans carte graphique). Fichier : 875 Ko → 940 Ko environ. **Non mesuré : la vitesse sur de vrais téléphones et de vrais ordinateurs** (à essayer ; les réglages sont en tête de `creer` : `EXPOSITION`, `FORCE_HALO`, `BOITE_OMBRE`).
+

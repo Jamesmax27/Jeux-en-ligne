@@ -682,6 +682,12 @@ Seules les étapes b et e (et `idee-jeu.yml`) écrivent dans `idees.json` et `id
   - Un seul encart à la fois : elle passe avant « Installer l'appli », qui attend la visite suivante ; place gardée au chargement (`avec-invite-pseudo`). Rien de nouveau sur le serveur ; mémoire `fmg-invite-pseudo` (politique de cookies fr, en) ; coquille `v28`.
   - Fichiers : `public/invite-pseudo.js`, `public/profil-pastille.js`, `public/installer.js`, `gabarits/accueil.html`, `public/style.css`, `public/profil-reglages.js` (`INVITE_PSEUDO_JOURS`, `INVITE_PSEUDO_RAPPEL_JOURS`), textes `invitePseudo.*` (5 langues). Test : `scripts/tester-invite-pseudo.mjs` (navigateur, vraie API du profil, `--captures`), dans `validate.yml`.
   - Reste : essai sur un vrai téléphone.
+- « Le Dernier Sas », graphismes et réalisme — fait (branche `ccr-ec0c8912-lcc6vz`, 26 novembre 2026), demande du propriétaire (sans limite de poids ; le fichier reste pourtant sous 1 Mo, tout est calculé). Détail : `docs/cadrage-dernier-sas.md`, section 10.
+  - Moteur `sas-gl` : lumière calculée à chaque point, matières (roche, métal, chitine, chair, cristal, os, béton, peinture) avec détail en relief, ombres portées du soleil, rendu HDR avec halo, courbe de film et anticrénelage FXAA, occlusion ambiante, particules douces, brume et ciel enrichis.
+  - Décor fabriqué par le code : parois du canyon d'un seul tenant, rochers, pierres, cristaux, bords des galeries ; aliens lissés et deux fois plus fins. Simulation, commandes et interface inchangées.
+  - Trois niveaux de qualité (`moteur.qualite`) : 2 sur ordinateur, 1 sur téléphone, 0 pour « Qualité : basse », un rendu sans carte graphique ou un appareil trop lent (descente automatique avant de réduire la finesse de l'image).
+  - Affiche et images du jeu refaites ; `version` 5.
+  - Reste : **vitesse non mesurée sur de vrais téléphones et ordinateurs** (essai du propriétaire) ; réglages `EXPOSITION`, `FORCE_HALO`, `BOITE_OMBRE` en tête de `creer`.
 Jeux existants à intégrer en priorité : série de jeux sur les chevaux (saut d'obstacles, toilettage, habillage de poney, cross, dressage en rythme, quiz du cavalier) et « Quiz du judoka ».
 
 *Mettre à jour la section 14 à chaque étape terminée.*
