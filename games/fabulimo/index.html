@@ -1091,6 +1091,11 @@ body.touch #touch{display:block}
 <div id="fade"></div><div id="flash"></div>
 <script>
 'use strict';
+/* Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU = 1, 2 ou 3) : posés par le robot du site
+   seulement. Dans ces deux modes, le hasard suit une graine fixe (même image à chaque capture) et rien n'est sauvegardé. */
+const MODE_AFFICHE=!!window.JEL_AFFICHE;
+const MODE_APERCU=MODE_AFFICHE?0:([1,2,3].includes(Number(window.JEL_APERCU))?Number(window.JEL_APERCU):0);
+if(MODE_AFFICHE||MODE_APERCU)Math.random=mulberry32(4100+MODE_APERCU);
 /* ================= TRADUCTION =================
    Tous les textes visibles passent par T('cle', { variables }) : module commun
    jel-i18n (window.JEL_I18N). La langue est fixée au chargement de la page
@@ -1532,7 +1537,7 @@ function personCanvas(look,dir,frame,s){
   const key=JSON.stringify(look)+dir+frame+s;let c=PERSON_CACHE.get(key);if(c)return c;
   c=document.createElement('canvas');c.width=c.height=s;drawPerson(c.getContext('2d'),s,look,dir,frame);PERSON_CACHE.set(key,c);return c;
 }
-function drawPerson(ctx,s,L,dir,frame){
+function drawPerson(ctx,s,L,dir,frame,pose){
   const u=s/32;ctx.save();ctx.scale(u,u);
   if(L.small){ctx.translate(16,30);ctx.scale(0.85,0.85);ctx.translate(-16,-30)}
   ctx.lineWidth=1.3;ctx.strokeStyle='#2a2034';ctx.lineJoin='round';
@@ -1548,7 +1553,9 @@ function drawPerson(ctx,s,L,dir,frame){
   else R(9.5,15.5,13,10,L.shirt,3);
   if(L.cape&&dir===1){R(9,15,14,13,L.cape,2)}
   // bras
-  if(dir<2){R(6.5,16+lo*0.5,3.6,7.5,shade(L.shirt,-0.1));R(21.9,16-lo*0.5,3.6,7.5,shade(L.shirt,-0.1))}
+  if(dir<2&&pose==='lance'){R(6.5,16,3.6,7.5,shade(L.shirt,-0.1)); // affiche : bras levé vers la créature
+    ctx.save();ctx.translate(23.4,16.8);ctx.rotate(-2.35);R(-1.8,-0.6,3.6,8.6,shade(L.shirt,-0.1));C(0,9,2.3,L.skin);ctx.restore()}
+  else if(dir<2){R(6.5,16+lo*0.5,3.6,7.5,shade(L.shirt,-0.1));R(21.9,16-lo*0.5,3.6,7.5,shade(L.shirt,-0.1))}
   else{R(14+(dir===2?-lo:lo)*0.8,16.5,4,7.5,shade(L.shirt,-0.12))}
   // tête
   C(16,10,7.8,L.skin);
@@ -2060,7 +2067,7 @@ const JEU='fabulimo'; // identifiant du jeu sur le site (sauvegarde save_fabulim
 function etatSauvegarde(){const prop=m=>{const c=Object.assign({},m);delete c.st;delete c.stg;delete c.sleepT;if(c.ot===S.name)delete c.ot;if(!c.shiny)delete c.shiny;if(!c.status)delete c.status;if(c.bonus&&!Object.keys(c.bonus).length)delete c.bonus;return c};
   return Object.assign({},S,{team:S.team.map(prop),box:S.box.map(prop)})}
 // « niveau » = étape de l'aventure (badges gagnés + 1), « score » = Fabulimos capturés.
-function saveGame(silent){if(!S)return;let ok=false;try{ok=JEL_SAVE.save(JEU,{niveau:S.badges.filter(Boolean).length+1,score:Object.keys(S.dex.caught).length,options:{muet:SON.muet?1:0},etat:etatSauvegarde()})}catch(e){ok=false}
+function saveGame(silent){if(!S||MODE_AFFICHE||MODE_APERCU)return;let ok=false;try{ok=JEL_SAVE.save(JEU,{niveau:S.badges.filter(Boolean).length+1,score:Object.keys(S.dex.caught).length,options:{muet:SON.muet?1:0},etat:etatSauvegarde()})}catch(e){ok=false}
   if(!silent)toast(T(ok?'e.save.ok':'e.save.fail'))}
 function loadSave(){try{const d=JEL_SAVE.load(JEU);return d&&d.etat&&typeof d.etat==='object'?d.etat:null}catch(e){return null}}
 function hasSave(){return !!loadSave()}
@@ -3061,7 +3068,132 @@ function boot(hotState){
   requestAnimationFrame(loop);
   start(hotState);
 }
+/* ================= AFFICHE DU JEU (window.JEL_AFFICHE) =================
+   Scène composée plein écran, sans interface ni texte : le héros lance une Capsule
+   vers un Fabulimo sauvage qui jaillit des herbes hautes, son compagnon à ses pieds. */
+function cacherPourImage(tout){
+  const sel=tout?'#topbar,#touch,#hint,#banner,#screens,#dialog,#toast,#fade,#flash,.jel-langue,button':'.jel-langue,#hint,#toast';
+  for(const el of document.querySelectorAll(sel))el.style.setProperty('display','none','important')}
+function demarrerAffiche(){
+  G.cv=$('#cv');G.ctx=G.cv.getContext('2d');
+  const peindre=()=>{cacherPourImage(true);dessinerAffiche()};
+  peindre();addEventListener('resize',peindre);setTimeout(peindre,400);setTimeout(peindre,1200);
+}
+function dessinerAffiche(){
+  const cv=G.cv,dpr=Math.min(window.devicePixelRatio||1,2);G.dpr=dpr;const W=innerWidth,H=innerHeight;
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);cv.style.width=W+'px';cv.style.height=H+'px';
+  const x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.lineJoin='round';x.lineCap='round';
+  const u=Math.min(H/800,W/520),cx=W/2,r=mulberry32(77);
+  // ciel lumineux
+  let g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,'#2f86ee');g.addColorStop(.38,'#8fd4ff');g.addColorStop(.6,'#fff0c4');x.fillStyle=g;x.fillRect(0,0,W,H);
+  // soleil (source de lumière) et rayons
+  const sx=cx-190*u,sy=120*u;
+  x.save();x.translate(sx,sy);for(let i=0;i<16;i++){x.rotate(Math.PI/8);x.fillStyle=i%2?'rgba(255,248,200,.22)':'rgba(255,255,255,.12)';x.beginPath();x.moveTo(0,0);x.lineTo(W*1.4,-90*u);x.lineTo(W*1.4,90*u);x.closePath();x.fill()}x.restore();
+  g=x.createRadialGradient(sx,sy,0,sx,sy,170*u);g.addColorStop(0,'#fffef0');g.addColorStop(.28,'#ffe680');g.addColorStop(.45,'rgba(255,230,128,.45)');g.addColorStop(1,'rgba(255,230,128,0)');
+  x.fillStyle=g;x.beginPath();x.arc(sx,sy,170*u,0,7);x.fill();
+  // nuages
+  const nuage=(nx,ny,s)=>{x.fillStyle='rgba(255,255,255,.92)';x.strokeStyle='rgba(42,32,52,.25)';x.lineWidth=3*u;x.beginPath();
+    for(const [a,b,c] of [[-1,0,.7],[-.35,-.35,.85],[.35,-.25,.8],[1,0,.65],[0,.15,.8]])x.arc(nx+a*s,ny+b*s,c*s,0,7);x.fill()};
+  for(let i=-3;i<=3;i++)nuage(cx+i*230*u+(r()-.5)*60*u,150*u+(r()-.5)*90*u+(i%2?60*u:0),(34+r()*20)*u);
+  // collines lointaines et village de Bourg-Plume
+  const colline=(base,amp,col,ph)=>{x.fillStyle=col;x.beginPath();x.moveTo(0,H);for(let px=0;px<=W+20;px+=20){x.lineTo(px,base+Math.sin(px/(170*u)+ph)*amp)}x.lineTo(W,H);x.closePath();x.fill()};
+  colline(H*.44,26*u,'#b7e3a8',0.4);
+  const maison=(hx,hy,T,type,roof)=>{x.save();x.translate(hx,hy);drawBuilding(x,{w:3,h:3,x:0,y:0,door:{x:1,y:2},type,roof},T);x.restore()};
+  for(let i=-4;i<=4;i++){const t=['home','center','shop','home','arena','home','house','home','lab'][i+4];maison(cx+i*150*u-36*u,H*.4-30*u+((i+9)%3)*8*u,24*u,t)}
+  colline(H*.5,22*u,'#8fd16a',2.1);
+  // arbres de lisière
+  for(let i=0;i<14;i++){const tx=(i/13)*W+(r()-.5)*40*u,ty=H*.5+(r()-.2)*20*u,s=(26+r()*16)*u;x.fillStyle='#6a4a2a';x.fillRect(tx-4*u,ty,8*u,s*.8);
+    x.fillStyle=i%2?'#46a844':'#3a9a3c';x.strokeStyle='#2a2034';x.lineWidth=2.5*u;x.beginPath();x.arc(tx,ty-s*.2,s*.8,0,7);x.fill();x.stroke();x.fillStyle='rgba(255,255,255,.25)';x.beginPath();x.arc(tx-s*.25,ty-s*.45,s*.3,0,7);x.fill()}
+  // prairie du milieu
+  g=x.createLinearGradient(0,H*.55,0,H);g.addColorStop(0,'#84c862');g.addColorStop(1,'#4f9e3c');x.fillStyle=g;x.beginPath();x.moveTo(0,H);x.lineTo(0,H*.6);
+  x.quadraticCurveTo(cx,H*.52,W,H*.6);x.lineTo(W,H);x.closePath();x.fill();
+  // touffes d'herbes hautes (comme dans le jeu, en plus grand)
+  const touffe=(tx,ty,s,c1,c2)=>{x.lineWidth=2.2*u;x.strokeStyle='#2a2034';for(let k=-2;k<=2;k++){x.fillStyle=k%2?c1:c2;x.beginPath();const bx=tx+k*s*.28;
+    x.moveTo(bx-s*.16,ty);x.quadraticCurveTo(bx-s*.05,ty-s*.55,bx+k*s*.08,ty-s*(1-Math.abs(k)*.12));x.quadraticCurveTo(bx+s*.05,ty-s*.5,bx+s*.16,ty);x.closePath();x.fill();x.stroke()}};
+  // créature sauvage qui jaillit des herbes, entourée d'éclairs (accent vif)
+  const sauvage=SPECIES.find(s=>s&&s.name==='Fulgurion')||SPECIES[5];
+  const wx=cx+165*u,wy=225*u,ws=235*u;
+  g=x.createRadialGradient(wx,wy,0,wx,wy,ws*.85);g.addColorStop(0,'rgba(255,255,210,.95)');g.addColorStop(.45,'rgba(255,226,62,.55)');g.addColorStop(1,'rgba(255,226,62,0)');x.fillStyle=g;x.beginPath();x.arc(wx,wy,ws*.85,0,7);x.fill();
+  const eclair=(ex,ey,a,l)=>{x.save();x.translate(ex,ey);x.rotate(a);x.beginPath();x.moveTo(0,0);x.lineTo(l*.35,l*.12);x.lineTo(l*.3,-l*.08);x.lineTo(l,0);
+    x.strokeStyle='#fff';x.lineWidth=9*u;x.stroke();x.strokeStyle='#ffd23a';x.lineWidth=5*u;x.stroke();x.restore()};
+  for(let i=0;i<7;i++){const a=i*0.9+0.3;eclair(wx+Math.cos(a)*ws*.42,wy+Math.sin(a)*ws*.42,a,ws*.3)}
+  const cw=creatureCanvas(sauvage.id,Math.round(ws*dpr),false,false);
+  x.save();x.shadowColor='#fff7b0';x.shadowBlur=24*u;x.drawImage(cw,wx-ws/2,wy-ws/2,ws,ws);x.restore();
+  // trajectoire de la Capsule, de la main du héros vers la créature
+  const hs=400*u,hx=cx-130*u-hs/2,hy=H*.75-hs*.93;
+  const mx=hx+hs*(23.4+6.3)/32,my=hy+hs*(16.8-6.8)/32;
+  const bxp=mx+60*u,byp=my-125*u;
+  x.save();x.setLineDash([2*u,16*u]);x.strokeStyle='rgba(255,255,255,.95)';x.lineWidth=9*u;x.beginPath();x.moveTo(mx+8*u,my-20*u);x.quadraticCurveTo(mx+10*u,byp+10*u,bxp-30*u,byp+12*u);x.stroke();x.restore();
+  for(let i=0;i<6;i++){x.save();x.fillStyle='#fffbd0';x.shadowColor='#fff';x.shadowBlur=10*u;const a=i*1.05,rr=48*u;starPath(x,bxp+Math.cos(a)*rr,byp+Math.sin(a)*rr,9*u,3.5*u);x.fill();x.restore()}
+  x.save();x.shadowColor='rgba(255,255,255,.9)';x.shadowBlur=18*u;drawCapsuleIcon(x,bxp,byp,34*u,'#ff5a7a');x.restore();
+  // héros (contour clair, bras levé)
+  x.fillStyle='rgba(30,60,20,.35)';x.beginPath();x.ellipse(hx+hs/2,hy+hs*.93,hs*.26,hs*.06,0,0,7);x.fill();
+  const hc=document.createElement('canvas');hc.width=hc.height=Math.round(hs*dpr);drawPerson(hc.getContext('2d'),hc.width,LOOKS.hero_m,0,0,'lance');
+  x.save();x.shadowColor='rgba(255,252,220,.95)';x.shadowBlur=16*u;x.drawImage(hc,hx,hy,hs,hs);x.restore();
+  // compagnon : Braisou qui bondit, flammes vives
+  const comp=FAMS[1].ids[0],ps=230*u,px=cx+70*u,py=H*.75-ps*.92;
+  x.fillStyle='rgba(30,60,20,.35)';x.beginPath();x.ellipse(px+ps/2,H*.755,ps*.3,ps*.06,0,0,7);x.fill();
+  g=x.createRadialGradient(px+ps/2,py+ps/2,0,px+ps/2,py+ps/2,ps*.7);g.addColorStop(0,'rgba(255,190,90,.55)');g.addColorStop(1,'rgba(255,150,60,0)');x.fillStyle=g;x.beginPath();x.arc(px+ps/2,py+ps/2,ps*.7,0,7);x.fill();
+  x.save();x.shadowColor='rgba(255,240,200,.9)';x.shadowBlur=14*u;x.drawImage(creatureCanvas(comp,Math.round(ps*dpr),true,false),px,py-26*u,ps,ps);x.restore();
+  // herbes hautes devant les personnages, puis premier plan coupé par les bords
+  for(let i=0;i<9;i++)touffe(cx-300*u+i*80*u+(r()-.5)*20*u,H*.78+(i%2)*10*u,62*u,'#3f9e3a','#2f7f30');
+  g=x.createLinearGradient(0,H*.78,0,H);g.addColorStop(0,'#3f8a34');g.addColorStop(1,'#2c6a2a');x.fillStyle=g;x.fillRect(0,H*.8,W,H*.2);
+  for(let i=0;i<Math.ceil(W/(70*u))+2;i++)touffe(i*70*u-20*u,H*.84+((i*7)%3)*14*u,(70+((i*5)%3)*18)*u,'#2f7f30','#256a28');
+  const fleur=(fx,fy,s,col)=>{x.strokeStyle='#2a2034';x.lineWidth=2*u;x.fillStyle=col;for(let k=0;k<5;k++){const a=k*1.2566;x.beginPath();x.arc(fx+Math.cos(a)*s*.5,fy+Math.sin(a)*s*.5,s*.42,0,7);x.fill();x.stroke()}
+    x.fillStyle='#ffd23a';x.beginPath();x.arc(fx,fy,s*.34,0,7);x.fill();x.stroke()};
+  for(let i=0;i<Math.ceil(W/(110*u))+1;i++)fleur(i*110*u+30*u+((i*37)%50)*u,H*.9+((i*13)%5)*10*u,13*u,['#ff6a8a','#ffffff','#ff9a3a','#c88aff'][i%4]);
+  touffe(-10*u,H*.995,190*u,'#286e2a','#1f5a22');touffe(W+10*u,H*.995,200*u,'#286e2a','#1f5a22');
+}
+
+/* ================= IMAGES DU JEU (window.JEL_APERCU = 1, 2 ou 3) =================
+   1 : la route 1 au début, un dresseur repère le héros dans les herbes hautes ;
+   2 : combat sauvage sur la plage, une Capsule vole vers le Fabulimo affaibli ;
+   3 : (ordinateur) combat d'arène au volcan contre le Champion du Feu, choix des attaques.
+   Aucun son, rien de sauvegardé ; la partie est figée (G.lock) après la mise en place. */
+function ouvrirApercu(n){
+  G.cv=$('#cv');G.ctx=G.cv.getContext('2d');resize();addEventListener('resize',()=>{resize()});
+  WORLD=genWorld();for(const b of WORLD.blds)WORLD.warps[b.door.x+','+b.door.y]={bld:b.id};
+  setupTrades();setupTouch();pushHandler(worldHandler);
+  $('#btnSound').classList.toggle('muted',SON.muet);
+  cacherPourImage(false);setTimeout(()=>cacherPourImage(false),300);setTimeout(()=>cacherPourImage(false),1000);
+  S=newState('Milo','m');S.opts={sound:0,music:0};S.flags.starter=1;S.starterFam=1;REGIONS.forEach(r=>S.visited[r.k]=1);S.respawn={map:'world',x:0,y:0};
+  if(n===1){
+    S.team=[makeMon(FAMS[1].ids[0],6)];S.money=1150;markDex(S.team[0].sp,true);
+    // dresseur de la route 1 dont le regard croise une case libre (herbes hautes de préférence)
+    let best=null;const M=WORLD;
+    for(const t of M.npcs){if(!t.trainer||!t.sight||t.gone||REGIONS[M.reg[t.y*M.w+t.x]].k!=='B')continue;const [dx,dy]=DIRV[t.dir];
+      for(let s=2;s<=Math.min(3,t.sight);s++){const qx=t.x+dx*s,qy=t.y+dy*s;if(!walkable(M,qx,qy))break;let sc=(tileTall(M.g[qy*M.w+qx])?10:0)+s;
+        for(let yy=-3;yy<=3;yy++)for(let xx=-3;xx<=3;xx++){const i=(qy+yy)*M.w+qx+xx;if(i>=0&&i<M.g.length&&tileTall(M.g[i]))sc+=0.3}
+        if(!best||sc>best.sc)best={sc,t,qx,qy,d:[1,0,3,2][t.dir]}}}
+    if(best){setMap('world',best.qx,best.qy,best.d);G.emotes.push({npc:best.t,t:1e9})}else setMap('world',RK.B.x,RK.B.y,1);
+    const ban=$('#banner');ban.textContent=curRegion().n;ban.style.animation='none';ban.style.transform='none';
+    G.started=true;G.lock=1;requestAnimationFrame(loop);return}
+  // combats : la carte du monde reste derrière (biome de la région), l'écran de combat la couvre
+  const rk=n===2?'F':'K';const reg=RK[rk];setMap('world',reg.x,reg.y,0);G.started=true;G.lock=1;requestAnimationFrame(loop);
+  let foes,trainer=null,wild=null;
+  if(n===2){S.team=[makeMon(FAMS[1].ids[1],18),makeMon(FAMS[3].ids[0],14)];wild=rollWild('F');foes=[wild];}
+  else{S.team=[makeMon(FAMS[2].ids[2],41),makeMon(FAMS[1].ids[2],39),makeMon(FAMS[4].ids[0],38)];S.badges=[1,1,1,1,0,0,0,0];
+    trainer={name:T('w.champion',{nom:GYMS[4].leader}),leader:4};foes=gymTeam(4).map(([sp,lv])=>makeMon(sp,lv));foes[0].hp=0}
+  S.team.forEach(m=>markDex(m.sp,true));foes.forEach(m=>markDex(m.sp));
+  B={wild,trainer,npc:null,foes,fi:n===3?1:0,legend:false,part:new Set(),escapes:0,potions:0,bio:BIOMES[reg.b]||BIOMES[0]};
+  B.foe=B.foes[B.fi];B.mi=0;B.me=S.team[0];for(const m of [...S.team,...B.foes]){m.stg={atk:0,def:0,spd:0};m.sleepT=0}
+  B.me.xp=Math.round(xpFor(B.me.lvl)+(xpFor(B.me.lvl+1)-xpFor(B.me.lvl))*0.6);
+  if(n===2){B.foe.hp=Math.max(1,Math.round(B.foe.st.hp*0.22));B.me.hp=Math.round(B.me.st.hp*0.78)}else{B.foe.hp=Math.round(B.foe.st.hp*0.48);B.me.hp=Math.round(B.me.st.hp*0.86)}
+  buildBattleUI();updInfo('foe');updInfo('me');
+  if(n===2){B.el.querySelector('.bt-msg').textContent=T('b.ball.throw',{nom:S.name,objet:ITEMS.capsule.n});
+    requestAnimationFrame(()=>{const sc=B.el.querySelector('.bt-scene'),ball=document.createElement('canvas'),bs=Math.round(46*G.dpr);ball.width=ball.height=bs;
+      drawCapsuleIcon(ball.getContext('2d'),bs/2,bs/2,bs*0.36,'#2ab0c8');ball.className='ballfx land';
+      const scR=sc.getBoundingClientRect(),fr=B.el.querySelector('.bt-spr.foe').getBoundingClientRect();
+      const x0=scR.width*0.12,y0=scR.height*0.78,x1=fr.left-scR.left+fr.width/2-23,y1=fr.top-scR.top+fr.height*0.6;
+      ball.style.setProperty('--x1',(x0+(x1-x0)*0.72)+'px');ball.style.setProperty('--y1',(Math.min(y0,y1)-90+(y1-Math.min(y0,y1))*0.5)+'px');ball.style.filter='drop-shadow(0 0 10px #fff6a0)';sc.appendChild(ball)})}
+  else{B.el.querySelector('.bt-balls').innerHTML=B.foes.map(m=>`<span class="${m.hp<=0?'ko':''}"></span>`).join('');
+    chooseAction();const f=B.el.querySelector('.bt-actions .fight');if(f)f.click();
+    const box=B.el.querySelector('.bt-spr.foe'),fx=document.createElement('div');fx.className='hitfx';fx.style.setProperty('--tc',TYPES.eau.c);fx.style.animation='none';fx.style.opacity='.75';box.appendChild(fx)}
+}
+
 (function(){
+  if(MODE_AFFICHE){demarrerAffiche();return}
+  if(MODE_APERCU){ouvrirApercu(MODE_APERCU);return}
   const hot=window.claude&&window.claude.hot;
   try{if(hot&&hot.snapshot)hot.snapshot(()=>S&&G.started?{S:JSON.parse(JSON.stringify(S))}:{})}catch(e){}
   const begin=d=>boot(d&&d.S?d.S:null);

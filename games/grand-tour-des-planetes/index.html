@@ -2162,7 +2162,10 @@ try {
     if (o.album && typeof o.album === 'object') sauve.album = o.album;
   }
 } catch (e) { /* pas de stockage : on joue sans sauvegarde */ }
+// Image du jeu (window.JEL_APERCU) ou affiche (window.JEL_AFFICHE) : ni son, ni sauvegarde.
+const MODE_IMAGE = !!window.JEL_AFFICHE || [1, 2, 3].includes(Number(window.JEL_APERCU));
 function enregistrer() {
+  if (MODE_IMAGE) return;
   try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* ignoré */ }
 }
 
@@ -2206,6 +2209,7 @@ const SONS = {
   clic: (c) => note(c, 500, 0, 0.06, 'sine', 0.08),
 };
 function son(nom) {
+  if (MODE_IMAGE) return;
   const c = audio();
   if (!c) return;
   try { SONS[nom](c); } catch (e) { /* ignoré */ }
@@ -2317,7 +2321,7 @@ function jouer() {
   });
 }
 JEL_SAVE.surFermeture(() => {
-  if (etat && !$('partie').classList.contains('cache') && $('bilan').classList.contains('cache')) JEL_SAVE.save(JEU, { niveau: etat.n + 1 });
+  if (!MODE_IMAGE && etat && !$('partie').classList.contains('cache') && $('bilan').classList.contains('cache')) JEL_SAVE.save(JEU, { niveau: etat.n + 1 });
 });
 $('btn-jouer').addEventListener('click', () => { son('clic'); jouer(); });
 $('btn-album').addEventListener('click', () => { son('clic'); ouvrirAlbum(); });
@@ -3057,9 +3061,239 @@ function confettis() {
   requestAnimationFrame(anim);
 }
 
+// =====================================================================
+// Affiche (jaquette du jeu)
+// =====================================================================
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+// sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Saturne, en grand
+// et toute contente, file vers sa place dorée sur son orbite ; le Soleil éclaire la scène depuis
+// le coin, Jupiter passe au premier plan, une comète traverse le ciel.
+// Astre peint sur un canvas, aux couleurs des astres du jeu (mêmes dégradés que le CSS).
+const COULEURS_ASTRES = {
+  mercure: ['#dcd8d0', '#8f8a82'], venus: ['#fdebb8', '#d99b45'], terre: ['#69b4ff', '#1d4db8'],
+  mars: ['#f59466', '#a83a1b'], jupiter: ['#f3dfbd', '#b9774b'], saturne: ['#f8eabd', '#c9a75a'],
+  uranus: ['#d8fcff', '#58b8c6'], neptune: ['#93b3ff', '#2342ae'], lune: ['#f1f1ee', '#a3a39e'],
+};
+function peindreAstre(c, id, x, y, r) {
+  const [clair, fonce] = COULEURS_ASTRES[id];
+  c.save();
+  c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.clip();
+  const g = c.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.05, x - r * 0.3, y - r * 0.3, r * 1.5);
+  g.addColorStop(0, clair); g.addColorStop(0.75, fonce); g.addColorStop(1, fonce);
+  c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+  const tache = (dx, dy, rr, col) => { c.fillStyle = col; c.beginPath(); c.arc(x + dx * r, y + dy * r, rr * r, 0, Math.PI * 2); c.fill(); };
+  if (id === 'jupiter') {
+    const bandes = ['#e9cfa3', '#c98c55', '#f3dfbd', '#b9774b', '#efd6ad', '#c4834f', '#ecd2a8', '#b97a4c', '#e5c79a'];
+    const hauts = [0, 0.14, 0.22, 0.34, 0.41, 0.55, 0.62, 0.78, 0.85, 1];
+    bandes.forEach((col, i) => { c.fillStyle = col; c.fillRect(x - r, y - r + hauts[i] * 2 * r, r * 2, (hauts[i + 1] - hauts[i]) * 2 * r + 1); });
+    c.fillStyle = '#c4492e'; c.beginPath(); c.ellipse(x + 0.28 * r, y + 0.32 * r, 0.3 * r, 0.17 * r, 0, 0, Math.PI * 2); c.fill();
+  } else if (id === 'terre') {
+    tache(-0.4, -0.16, 0.3, '#48b85a'); tache(0.28, 0.32, 0.36, '#48b85a'); tache(0.4, -0.48, 0.14, '#ffffff');
+  } else if (id === 'mars') {
+    tache(0.2, -0.24, 0.18, '#8a2e14');
+  } else if (id === 'mercure' || id === 'lune') {
+    tache(0.24, 0.2, 0.2, '#7d7870'); tache(-0.32, 0.28, 0.14, '#857f77');
+  } else if (id === 'neptune') {
+    tache(0.24, 0.16, 0.18, '#1a2f86');
+  } else if (id === 'saturne') {
+    [[-0.5, 0.05, '#e9cf8a'], [-0.1, 0.06, '#f4e3b0'], [0.32, 0.07, '#d9b86a'], [0.62, 0.05, '#e7cd8c']].forEach(([dy, h, col]) => {
+      c.fillStyle = col; c.globalAlpha = 0.7; c.fillRect(x - r, y + dy * r, r * 2, h * r); c.globalAlpha = 1;
+    });
+  }
+  // Ombre du côté opposé au Soleil, puis liseré de lumière
+  const o = c.createRadialGradient(x - r * 0.45, y - r * 0.45, r * 0.6, x - r * 0.2, y - r * 0.2, r * 1.6);
+  o.addColorStop(0, 'rgba(0,0,0,0)'); o.addColorStop(1, 'rgba(10,6,40,.6)');
+  c.fillStyle = o; c.fillRect(x - r, y - r, r * 2, r * 2);
+  c.restore();
+  c.strokeStyle = 'rgba(255,240,200,.75)'; c.lineWidth = Math.max(1.5, r * 0.04);
+  c.beginPath(); c.arc(x, y, r - c.lineWidth / 2, Math.PI * 0.95, Math.PI * 1.6); c.stroke();
+}
+// Petite étoile à 4 branches (scintillement)
+function etincelleAffiche(c, x, y, r, col) {
+  c.fillStyle = col; c.shadowColor = col; c.shadowBlur = r * 1.5;
+  c.beginPath();
+  c.moveTo(x, y - r); c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r);
+  c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fill();
+  c.shadowBlur = 0;
+}
+function dessinerAffiche() {
+  const cv = $('affiche');
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const W = window.innerWidth, H = window.innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const c = cv.getContext('2d');
+  if (!c) return;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const k = Math.min(W / 600, H / 800);
+  const ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  const X = (v) => ox + v * k, Y = (v) => oy + v * k, R = (v) => v * k;
+  // Ciel : bleu nuit qui passe au violet, nébuleuses rose et turquoise (jusqu'aux bords)
+  const ciel = c.createLinearGradient(0, 0, 0, H);
+  ciel.addColorStop(0, '#2b3486'); ciel.addColorStop(0.55, '#3d3592'); ciel.addColorStop(1, '#2a1f66');
+  c.fillStyle = ciel; c.fillRect(0, 0, W, H);
+  [[520, 560, 330, 'rgba(255,120,200,.35)'], [120, 640, 300, 'rgba(90,220,255,.25)'], [560, 120, 260, 'rgba(160,120,255,.35)']].forEach(([x, y, r, col]) => {
+    const n = c.createRadialGradient(X(x), Y(y), 0, X(x), Y(y), R(r));
+    n.addColorStop(0, col); n.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = n; c.fillRect(0, 0, W, H);
+  });
+  // Étoiles du fond (positions fixes, même image à chaque fois)
+  let graine = 7;
+  const hasard = () => { graine = (graine * 16807) % 2147483647; return graine / 2147483647; };
+  for (let i = 0; i < 140; i++) {
+    const x = hasard() * W, y = hasard() * H, r = 0.6 + hasard() * 1.6;
+    c.fillStyle = 'rgba(255,255,255,' + (0.5 + hasard() * 0.5) + ')';
+    c.beginPath(); c.arc(x, y, r * Math.max(1, k), 0, Math.PI * 2); c.fill();
+  }
+  // Le Soleil, dans le coin en haut à gauche : grande lueur qui éclaire tout
+  const sx = X(40), sy = Y(120);
+  const lueur = c.createRadialGradient(sx, sy, R(60), sx, sy, R(560));
+  lueur.addColorStop(0, 'rgba(255,214,110,.85)'); lueur.addColorStop(0.35, 'rgba(255,170,70,.35)'); lueur.addColorStop(1, 'rgba(255,150,60,0)');
+  c.fillStyle = lueur; c.fillRect(0, 0, W, H);
+  // Orbites en pointillés autour du Soleil
+  c.setLineDash([R(6), R(9)]); c.lineWidth = R(2.2);
+  [230, 330, 440, 560, 690, 830].forEach((r, i) => {
+    c.strokeStyle = i === 3 ? 'rgba(255,220,120,.75)' : 'rgba(255,255,255,.32)';
+    c.beginPath(); c.arc(sx, sy, R(r), 0, Math.PI * 2); c.stroke();
+  });
+  c.setLineDash([]);
+  const soleil = c.createRadialGradient(sx, sy, 0, sx, sy, R(160));
+  soleil.addColorStop(0, '#fffbd6'); soleil.addColorStop(0.4, '#ffd34d'); soleil.addColorStop(0.72, '#ff9a1f'); soleil.addColorStop(1, '#ff7a12');
+  c.shadowColor = '#ffae3a'; c.shadowBlur = R(70);
+  c.fillStyle = soleil; c.beginPath(); c.arc(sx, sy, R(160), 0, Math.PI * 2); c.fill();
+  c.shadowBlur = 0;
+  // Petites planètes déjà rangées sur leurs orbites (fond)
+  peindreAstre(c, 'mercure', X(40 + 230 * Math.cos(0.55)), Y(120 + 230 * Math.sin(0.55)), R(17));
+  peindreAstre(c, 'venus', X(40 + 330 * Math.cos(-0.05)), Y(120 + 330 * Math.sin(-0.05)), R(27));
+  peindreAstre(c, 'terre', X(40 + 440 * Math.cos(0.12)), Y(120 + 440 * Math.sin(0.12)), R(31));
+  peindreAstre(c, 'mars', X(40 + 560 * Math.cos(1.0)), Y(120 + 560 * Math.sin(1.0)), R(22));
+  // Comète turquoise qui traverse le ciel en haut à droite
+  const cx0 = X(500), cy0 = Y(60);
+  const queue = c.createLinearGradient(cx0, cy0, cx0 + R(190), cy0 - R(70));
+  queue.addColorStop(0, 'rgba(199,244,255,.95)'); queue.addColorStop(1, 'rgba(199,244,255,0)');
+  c.fillStyle = queue;
+  c.beginPath(); c.moveTo(cx0, cy0 - R(13)); c.lineTo(cx0 + R(200), cy0 - R(80)); c.lineTo(cx0 + R(180), cy0 - R(40)); c.lineTo(cx0, cy0 + R(13)); c.closePath(); c.fill();
+  c.shadowColor = '#a6ecff'; c.shadowBlur = R(30);
+  const tete = c.createRadialGradient(cx0 - R(4), cy0 - R(4), 0, cx0, cy0, R(16));
+  tete.addColorStop(0, '#ffffff'); tete.addColorStop(1, '#a6ecff');
+  c.fillStyle = tete; c.beginPath(); c.arc(cx0, cy0, R(16), 0, Math.PI * 2); c.fill();
+  c.shadowBlur = 0;
+  // Place dorée qui attend Saturne sur son orbite (cercle en pointillés qui brille)
+  const pa = 0.5, px = X(40 + 560 * Math.cos(pa)), py = Y(120 + 560 * Math.sin(pa));
+  const halo = c.createRadialGradient(px, py, R(60), px, py, R(190));
+  halo.addColorStop(0, 'rgba(255,215,106,.55)'); halo.addColorStop(1, 'rgba(255,215,106,0)');
+  c.fillStyle = halo; c.fillRect(0, 0, W, H);
+  c.setLineDash([R(14), R(10)]); c.lineWidth = R(6); c.strokeStyle = '#ffd76a';
+  c.shadowColor = '#ffd76a'; c.shadowBlur = R(18);
+  c.beginPath(); c.arc(px, py, R(135), 0, Math.PI * 2); c.stroke();
+  c.setLineDash([]); c.shadowBlur = 0;
+  // Saturne, l'héroïne : elle arrive d'en bas à gauche, traînée d'étincelles derrière elle
+  const hx = X(300), hy = Y(395), hr = R(128);
+  for (let i = 0; i < 5; i++) {
+    c.strokeStyle = 'rgba(255,236,170,' + (0.55 - i * 0.08) + ')'; c.lineWidth = R(10 - i * 1.4); c.lineCap = 'round';
+    const dy = (i - 2) * R(48);
+    c.beginPath(); c.moveTo(hx - R(150) - i * R(8), hy + R(120) + dy); c.lineTo(hx - R(310) - i * R(14), hy + R(260) + dy); c.stroke();
+  }
+  [[-210, 175, 14, '#ffd76a'], [-260, 250, 10, '#9fe7ff'], [-170, 260, 9, '#ff9fd0'], [-300, 190, 8, '#ffffff'], [-150, 120, 11, '#ffffff'], [-230, 320, 12, '#ffd76a']].forEach(([dx, dy, r, col]) => {
+    etincelleAffiche(c, hx + R(dx), hy + R(dy), R(r), col);
+  });
+  const anneau = (debut, fin) => {
+    c.save(); c.translate(hx, hy); c.rotate(-0.28);
+    [[1.95, 0.5, 18, 'rgba(234,215,160,.9)'], [1.66, 0.43, 12, 'rgba(201,167,90,.85)'], [1.45, 0.37, 7, 'rgba(250,236,196,.8)']].forEach(([rx, ry, ep, col]) => {
+      c.strokeStyle = col; c.lineWidth = R(ep);
+      c.beginPath(); c.ellipse(0, 0, hr * rx, hr * ry, 0, debut, fin); c.stroke();
+    });
+    c.restore();
+  };
+  anneau(Math.PI, Math.PI * 2);   // moitié de l'anneau derrière la planète
+  c.shadowColor = 'rgba(255,220,130,.8)'; c.shadowBlur = R(40);
+  c.fillStyle = '#e8d08f'; c.beginPath(); c.arc(hx, hy, hr, 0, Math.PI * 2); c.fill();
+  c.shadowBlur = 0;
+  peindreAstre(c, 'saturne', hx, hy, hr);
+  // Visage joyeux : grands yeux tournés vers sa place, sourire, joues roses
+  const oeil = (ex, ey) => {
+    c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(hx + ex * hr, hy + ey * hr, 0.17 * hr, 0.21 * hr, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#2b1d4a'; c.beginPath(); c.arc(hx + (ex + 0.06) * hr, hy + (ey - 0.05) * hr, 0.11 * hr, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffffff'; c.beginPath(); c.arc(hx + (ex + 0.1) * hr, hy + (ey - 0.1) * hr, 0.04 * hr, 0, Math.PI * 2); c.fill();
+  };
+  oeil(-0.28, -0.18); oeil(0.2, -0.2);
+  c.fillStyle = 'rgba(255,120,130,.55)';
+  c.beginPath(); c.ellipse(hx - 0.5 * hr, hy + 0.12 * hr, 0.13 * hr, 0.08 * hr, 0, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.ellipse(hx + 0.42 * hr, hy + 0.1 * hr, 0.13 * hr, 0.08 * hr, 0, 0, Math.PI * 2); c.fill();
+  c.fillStyle = '#6b2a2a';
+  c.beginPath(); c.moveTo(hx - 0.22 * hr, hy + 0.08 * hr); c.quadraticCurveTo(hx - 0.02 * hr, hy + 0.48 * hr, hx + 0.2 * hr, hy + 0.06 * hr); c.closePath(); c.fill();
+  c.fillStyle = '#ff8a8a';
+  c.beginPath(); c.ellipse(hx - 0.01 * hr, hy + 0.23 * hr, 0.1 * hr, 0.06 * hr, 0, 0, Math.PI * 2); c.fill();
+  anneau(0, Math.PI);             // moitié de devant
+  // Étincelles dorées autour de la place qui l'attend
+  [[0, -170, 16], [140, -70, 12], [-120, -120, 10], [160, 90, 14], [60, 150, 9]].forEach(([dx, dy, r]) => etincelleAffiche(c, px + R(dx), py + R(dy), R(r), '#fff2b0'));
+  // Premier plan : Jupiter, géante, coupée par le bord en bas à droite, et la Lune en bas à gauche
+  peindreAstre(c, 'jupiter', X(590), Y(770), R(200));
+  peindreAstre(c, 'lune', X(40), Y(760), R(90));
+}
+function demarrerAffiche() {
+  const cacher = () => {
+    for (const el of document.querySelectorAll('#jeu, #btn-son, #coin-langue, .jel-langue, .voile, #confettis, button')) el.style.setProperty('display', 'none', 'important');
+  };
+  const cv = document.createElement('canvas');
+  cv.id = 'affiche';
+  cv.setAttribute('aria-hidden', 'true');
+  Object.assign(cv.style, { position: 'fixed', inset: '0', width: '100%', height: '100%', zIndex: '60', display: 'block' });
+  document.body.appendChild(cv);
+  cacher();
+  setTimeout(cacher, 300); setTimeout(cacher, 1000);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+// =====================================================================
+// Images du jeu (page du jeu)
+// =====================================================================
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (niveau, mission, score, orbites, réserve),
+// sans accueil, ni fenêtre « Continuer », ni tutoriel. Quelques astres sont déjà rangés, un autre est
+// choisi, puis la partie est figée (etat.pause) : rien ne se gagne, ni son, ni sauvegarde.
+//   1 = niveau 1 : trois planètes, ombres dans les places, Mercure rangée, Vénus choisie ;
+//   2 = niveau 7 : les huit planètes, la boîte à intrus, la Lune choisie pour y aller ;
+//   3 = niveau 12 (ordinateur) : devinettes à la place des planètes, intrus, comète à battre.
+const MOMENTS_APERCU = {
+  1: { niv: 0, ranges: ['mercure'], choisie: 'venus', score: 100, info: 'mercure' },
+  2: { niv: 6, ranges: ['mercure', 'venus', 'terre', 'mars', 'jupiter'], intrusRanges: 1, choisie: 'intrus', score: 780, info: 'jupiter' },
+  3: { niv: 11, ranges: ['mercure', 'venus', 'terre', 'jupiter', 'neptune'], choisie: 'mars', score: 720, info: 'neptune', chrono: 0.38, large: true },
+};
+function ouvrirApercu(n) {
+  const m = MOMENTS_APERCU[n];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + n * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  Object.keys(INTROS).forEach((cle) => { sauve.vus[cle] = 1; });   // pas de tutoriel (en mémoire seulement)
+  if (m.large) $('jeu').style.maxWidth = 'none';                  // écran d'ordinateur : toute la largeur
+  demarrerNiveau(m.niv);
+  const e = etat;
+  const ranger = (k) => {
+    const p = e.pieces[k];
+    p.place = true; p.el.remove();
+    const j = e.ordre.indexOf(p.id);
+    if (j >= 0) e.places[j].pleine = true;
+  };
+  m.ranges.forEach((id) => ranger(e.pieces.findIndex((p) => p.id === id)));
+  for (let k = 0; k < (m.intrusRanges || 0); k++) ranger(e.pieces.findIndex((p) => !p.place && ASTRES[p.id].intrus));
+  e.score = m.score; e.serie = m.ranges.length;
+  $('score').textContent = e.score;
+  const sel = e.pieces.findIndex((p) => !p.place && (m.choisie === 'intrus' ? ASTRES[p.id].intrus : p.id === m.choisie));
+  if (sel >= 0) { e.sel = sel; e.pieces[sel].el.classList.add('choisie'); }
+  infoAstre(m.info);
+  if (m.chrono && e.cfg.chrono) { e.temps = e.cfg.chrono * m.chrono; $('comete-chrono').style.left = (m.chrono * 100) + '%'; }
+  e.pause = true;   // partie figée, sans fenêtre de pause
+  requestAnimationFrame(placerPlateau);
+  setTimeout(placerPlateau, 200);
+}
+
 // ---------- Démarrage ----------
 majSon();
-afficherAccueil();
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+else afficherAccueil();
 </script>
 </body>
 </html>
