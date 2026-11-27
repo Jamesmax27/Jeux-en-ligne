@@ -14,8 +14,10 @@
 //
 // Autres commandes :
 //   presentation <id>       vidéo décrite par marketing/videos/presentations/<id>.json
+//   trailer <id>            bande-annonce courte décrite par marketing/videos/trailers/<id>.json (mêmes options que presentation)
 //   accroche <id> [<id>…]   une accroche seule (2 à 3 s), pour la revue
-//   tout                    les accroches, les présentations de presentations/, contrôles, page de revue
+//   tout [--nouvelles]      les accroches, les bandes-annonces, les présentations, contrôles, page de revue
+//                           (--nouvelles : sans refaire les vidéos déjà produites et bonnes)
 //   apercu <id> [--images <s,s,…>]   quelques images d'une accroche ou d'une présentation, sans tout rendre
 //   verifier                recontrôle les vidéos déjà produites
 //   revue                   refait la page marketing/sorties/revue.html
@@ -66,11 +68,17 @@ function lireArgs(argv) {
 // Fabrication d'une vidéo : montage, rendu, contrôles, fiche.
 // --------------------------------------------------------------------------
 
-const dossierDe = (type) => path.join(SORTIES, type === 'accroche' ? 'accroches' : 'presentations');
+/** Les trois sortes de vidéos : dossier (des recettes et des sorties), nom affiché, images de la planche de contrôle. */
+const SORTES = {
+  accroche: { dossier: 'accroches', nom: 'Accroche', planche: 6 },
+  trailer: { dossier: 'trailers', nom: 'Bande-annonce', planche: 8 },
+  presentation: { dossier: 'presentations', nom: 'Présentation', planche: 12 },
+};
+const dossierDe = (type) => path.join(SORTIES, SORTES[type].dossier);
 
 async function controler(fichier, fiche, gabarit) {
   const { ok, sonde, controles } = await verifier(fichier, fiche, gabarit);
-  const image = await planche(fichier, path.join(SORTIES, 'controle', `${fiche.type}-${fiche.nom}.jpg`), fiche.images, fiche.type === 'accroche' ? 6 : 12);
+  const image = await planche(fichier, path.join(SORTIES, 'controle', `${fiche.type}-${fiche.nom}.jpg`), fiche.images, SORTES[fiche.type].planche);
   for (const c of controles) dire(`     ${c.ok ? '✓' : '✗'} ${c.nom} : ${c.detail}`);
   dire(`     planche : ${relatif(image)}`);
   return { ...fiche, ok, sonde, controles };
@@ -79,7 +87,7 @@ async function controler(fichier, fiche, gabarit) {
 /** Fabrique une vidéo et la contrôle. Renvoie sa fiche (aussi écrite à côté du MP4). */
 async function fabriquer(navigateur, demande) {
   const gabarit = await lireGabarit();
-  dire(`\n▶ ${demande.type === 'accroche' ? 'Accroche' : 'Présentation'} « ${demande.nom} »`);
+  dire(`\n▶ ${SORTES[demande.type].nom} « ${demande.nom} »`);
   const plan = await construire({ ...demande, navigateur });
   const fichier = path.join(dossierDe(demande.type), `${demande.nom}.mp4`);
   const rendu = await rendre(navigateur, plan, fichier, { piste: demande.musique || null });
@@ -98,14 +106,14 @@ async function fabriquer(navigateur, demande) {
   return complete;
 }
 
-async function demandeDePresentation(libres, options) {
+async function demandeDePresentation(libres, options, type = 'presentation') {
   let recette = {}, nom = options.nom;
   if (libres[0]) {
-    recette = await lireJson(path.join(SOURCES, 'presentations', `${libres[0]}.json`));
+    recette = await lireJson(path.join(SOURCES, SORTES[type].dossier, `${libres[0]}.json`));
     nom = nom || libres[0];
   }
   const jeux = options.jeux ? String(options.jeux).split(',').map((x) => x.trim()).filter(Boolean) : recette.jeux;
-  const textes = options.textes || recette.textes, rythme = options.rythme || recette.rythme || 'express', musique = options.musique || recette.musique;
+  const textes = options.textes || recette.textes, rythme = options.rythme || recette.rythme || (type === 'trailer' ? 'eclair' : 'express'), musique = options.musique || recette.musique;
   let accroche = options.accroche || recette.accroche;
   if (!accroche || !jeux?.length || !textes) {
     throw new ErreurVideo('Il faut une accroche, des jeux et une variante de texte :\n  node scripts/videos/video.mjs presentation --accroche <id> --jeux <a,b,c> --textes <variante> [--rythme express|pose|crescendo] [--nom <nom>]\n  ou : node scripts/videos/video.mjs presentation <id>   (marketing/videos/presentations/<id>.json)');
@@ -116,7 +124,7 @@ async function demandeDePresentation(libres, options) {
   if (!retenues.includes(accroche)) throw new ErreurVideo(`L'accroche « ${accroche} » n'est pas retenue dans marketing/videos/selection.json (retenues : ${retenues.join(', ')})`);
   if (!existsSync(path.join(SOURCES, 'textes', `${textes}.json`))) throw new ErreurVideo(`Variante de texte inconnue « ${textes} » (${(await listerRecettes(path.join(SOURCES, 'textes'))).join(', ')})`);
   if (!/^[a-z0-9][a-z0-9-]*$/.test(nom)) throw new ErreurVideo(`Nom de vidéo « ${nom} » : minuscules, chiffres et tirets seulement`);
-  return { type: 'presentation', nom, accroche, jeux, textes, rythme, musique };
+  return { type, nom, accroche, jeux, textes, rythme, musique };
 }
 
 // --------------------------------------------------------------------------
@@ -126,6 +134,14 @@ async function demandeDePresentation(libres, options) {
 const commandes = {
   async presentation(libres, options) {
     const demande = await demandeDePresentation(libres, options);
+    await trouverFfmpeg();
+    const navigateur = await ouvrirNavigateur();
+    try { const fiche = await fabriquer(navigateur, demande); await ecrireRevue(); return fiche.ok; } finally { await navigateur.close(); }
+  },
+
+  /** Bande-annonce courte (8 à 15 s) : accroche, 2 à 4 plans de jeu très courts, écran de fin. Mêmes options que « presentation ». */
+  async trailer(libres, options) {
+    const demande = await demandeDePresentation(libres, options, 'trailer');
     await trouverFfmpeg();
     const navigateur = await ouvrirNavigateur();
     try { const fiche = await fabriquer(navigateur, demande); await ecrireRevue(); return fiche.ok; } finally { await navigateur.close(); }
@@ -144,13 +160,22 @@ const commandes = {
   },
 
   /** Tout ce qui est décrit dans marketing/videos/ : accroches, présentations, contrôles, revue. */
-  async tout() {
+  async tout(libres, options) {
     await trouverFfmpeg();
     const navigateur = await ouvrirNavigateur();
     const fiches = [];
+    // --nouvelles : ne refait pas une vidéo déjà produite et contrôlée (pour ajouter une série sans tout rendre).
+    const dejaBonne = async (type, id) => {
+      const fiche = path.join(dossierDe(type), `${id}.json`);
+      if (!options.nouvelles || !existsSync(fiche) || !existsSync(fiche.replace(/\.json$/, '.mp4'))) return null;
+      const f = await lireJson(fiche);
+      return f.ok ? f : null;
+    };
     try {
-      for (const id of await listerRecettes(path.join(SOURCES, 'accroches'))) fiches.push(await fabriquer(navigateur, { type: 'accroche', nom: id, accroche: id }));
-      for (const id of await listerRecettes(path.join(SOURCES, 'presentations'))) fiches.push(await fabriquer(navigateur, await demandeDePresentation([id], {})));
+      for (const id of await listerRecettes(path.join(SOURCES, 'accroches'))) fiches.push(await dejaBonne('accroche', id) || await fabriquer(navigateur, { type: 'accroche', nom: id, accroche: id }));
+      for (const type of ['trailer', 'presentation']) {
+        for (const id of await listerRecettes(path.join(SOURCES, SORTES[type].dossier))) fiches.push(await dejaBonne(type, id) || await fabriquer(navigateur, await demandeDePresentation([id], {}, type)));
+      }
     } finally { await navigateur.close(); }
     const revue = await ecrireRevue();
     const ecartes = new Map(fiches.flatMap((f) => f.ecartes).map((e) => [e.jeu, e.raison]));
@@ -163,7 +188,8 @@ const commandes = {
   /** Quelques images d'une vidéo, sans la rendre en entier : pour mettre au point une recette. */
   async apercu(libres, options) {
     const estAccroche = !options.presentation && existsSync(path.join(SOURCES, 'accroches', `${libres[0]}.json`));
-    const demande = estAccroche ? { type: 'accroche', nom: libres[0], accroche: libres[0] } : await demandeDePresentation(libres, options);
+    const estTrailer = !estAccroche && existsSync(path.join(SOURCES, 'trailers', `${libres[0]}.json`));
+    const demande = estAccroche ? { type: 'accroche', nom: libres[0], accroche: libres[0] } : await demandeDePresentation(libres, options, estTrailer ? 'trailer' : 'presentation');
     await trouverFfmpeg();
     const navigateur = await ouvrirNavigateur();
     try {
@@ -186,7 +212,7 @@ const commandes = {
   async verifier() {
     const gabarit = await lireGabarit();
     let ok = true, n = 0;
-    for (const type of ['accroche', 'presentation']) {
+    for (const type of Object.keys(SORTES)) {
       for (const id of await listerRecettes(dossierDe(type))) {
         const fichier = path.join(dossierDe(type), `${id}.mp4`);
         if (!existsSync(fichier)) continue;

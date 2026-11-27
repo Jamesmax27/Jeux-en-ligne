@@ -135,6 +135,7 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
   const recetteAccroche = await lireAccroche(accroche);
   const semence = graine ?? graineDe(nom);
   const plans = [], accents = [], coupes = [];
+  const globaux = [];
   let curseur = 0;
 
   // a) L'accroche : ses plans, tels que la recette les décrit.
@@ -150,6 +151,7 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
       plan.colonnes = await colonnesDuMur(graineDe(`${accroche}-mur`));
     } else if (def.type === 'attente') {
       plan.titre = remplir(def.titre || '', variables, prefixe);
+      plan.genre = def.genre || 'telechargement';
       if (chute !== undefined) plan.chute = images(chute);
     } else if (def.type !== 'ciel') throw new ErreurVideo(`Accroche « ${accroche} » : type de plan inconnu « ${def.type} »`);
     plan.textes = preparerTextes(tx, variables, n, prefixe, accents, curseur);
@@ -164,9 +166,11 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
   }
 
   let musique = { bpm: 110, depart: dureeAccroche, fin: null, ambiance: 'arcade' };
-  let globaux = [];
   const montres = [];
-  if (type === 'presentation') {
+  // Textes de l'accroche posés par-dessus plusieurs de ses plans (accroche en rafale).
+  globaux.push(...preparerTextes(recetteAccroche.textes, variables, finAccroche, 'accroche-g', accents, 0));
+
+  if (type !== 'accroche') { // présentation (20 à 35 s) ou bande-annonce (8 à 15 s) : même fabrication, rythmes différents
     const r = gabarit.rythmes[rythme];
     if (!r || !r.plans) throw new ErreurVideo(`Rythme inconnu « ${rythme} » (gabarit.json : ${Object.keys(gabarit.rythmes).filter((x) => x !== '_').join(', ')})`);
     const variante = await lireJson(path.join(SOURCES, 'textes', `${textes}.json`));
@@ -227,8 +231,8 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
     // Plans très courts de la fin du montage : un seul texte par-dessus toute la rafale.
     if (courts.length && variante.rafale) {
       const de = courts[0].debut, a = courts[courts.length - 1].fin;
-      globaux = preparerTextes([{ texte: variante.rafale, style: variante.style_legende || 'titre', position: 'haut', de: 4 / IPS, entree: 'pop', son: 'pop' }], variables, a - de, 'rafale', accents, de)
-        .map((t) => ({ ...t, de: t.de + de, a }));
+      globaux.push(...preparerTextes([{ texte: variante.rafale, style: variante.style_legende || 'titre', position: 'haut', de: 4 / IPS, entree: 'pop', son: 'pop' }], variables, a - de, 'rafale', accents, de)
+        .map((t) => ({ ...t, de: t.de + de, a })));
     }
   }
 
@@ -236,12 +240,12 @@ export async function construire({ type, nom, accroche, jeux = [], textes, rythm
   const montage = {
     nom, type, largeur: L, hauteur: H, ips: IPS, images: total, graine: semence, gabarit,
     site: variables.site, logo: await lireLogo(), plans, textes: globaux,
-    filigrane: type === 'presentation' ? { texte: variables.site, de: finAccroche, a: plans[plans.length - 1].debut } : null,
+    filigrane: type !== 'accroche' ? { texte: variables.site, de: finAccroche, a: plans[plans.length - 1].debut } : null,
   };
   return {
     montage,
     son: { duree: total / IPS, ...musique, coupes, accents, graine: semence },
-    recette: { type, nom, accroche, ...(type === 'presentation' ? { jeux, textes, rythme } : {}) },
+    recette: { type, nom, accroche, ...(type !== 'accroche' ? { jeux, textes, rythme } : {}) },
     jeuxMontres: montres, ecartes: rushes.ecartes, chiffres: variables,
   };
 }

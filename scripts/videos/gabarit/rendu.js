@@ -368,8 +368,10 @@ function planAttente(p, k, i) {
   g.scale(grand, grand);
   // Grande roue d'attente au-dessus de la fenêtre : le signe « ça charge », lisible d'un coup d'œil.
   g.lineCap = 'round'; g.lineWidth = 24;
-  g.strokeStyle = 'rgba(242, 239, 250, 0.12)'; g.beginPath(); g.arc(0, -h / 2 - 150, 84, 0, TOUR); g.stroke();
-  g.strokeStyle = C.lavande; g.beginPath(); g.arc(0, -h / 2 - 150, 84, t * 7.2, t * 7.2 + 1.5 * Math.PI); g.stroke();
+  if (p.genre === 'telechargement') {
+    g.strokeStyle = 'rgba(242, 239, 250, 0.12)'; g.beginPath(); g.arc(0, -h / 2 - 150, 84, 0, TOUR); g.stroke();
+    g.strokeStyle = C.lavande; g.beginPath(); g.arc(0, -h / 2 - 150, 84, t * 7.2, t * 7.2 + 1.5 * Math.PI); g.stroke();
+  }
   g.shadowColor = 'rgba(4, 2, 16, 0.6)'; g.shadowBlur = 50; g.shadowOffsetY = 20;
   g.fillStyle = 'rgba(26, 22, 56, 0.96)'; rectArrondi(-l / 2, -h / 2, l / 2, h / 2, 48); g.fill();
   g.shadowColor = 'transparent';
@@ -379,7 +381,15 @@ function planAttente(p, k, i) {
   g.fillStyle = rgba(C.lavande, 0.16); rectArrondi(ix, iy, ix + ic, iy + ic, 30); g.fill();
   g.strokeStyle = C.lavande; g.lineWidth = 12; g.lineCap = 'round'; g.lineJoin = 'round';
   const saut = Math.sin(t * 5) * 5;
-  g.beginPath(); g.moveTo(ix + ic / 2, iy + 30 + saut); g.lineTo(ix + ic / 2, iy + 84 + saut); g.moveTo(ix + ic / 2 - 26, iy + 60 + saut); g.lineTo(ix + ic / 2, iy + 86 + saut); g.lineTo(ix + ic / 2 + 26, iy + 60 + saut); g.moveTo(ix + 34, iy + 106); g.lineTo(ix + ic - 34, iy + 106); g.stroke();
+  g.beginPath();
+  if (p.genre === 'compte') { // une silhouette : « crée un compte »
+    g.arc(ix + ic / 2, iy + 48, 20, 0, TOUR); g.moveTo(ix + 30, iy + 108); g.quadraticCurveTo(ix + ic / 2, iy + 58, ix + ic - 30, iy + 108);
+  } else if (p.genre === 'stockage') { // trois galettes empilées : la mémoire du téléphone
+    for (let q = 0; q < 3; q++) { g.moveTo(ix + 32, iy + 38 + q * 28); g.lineTo(ix + ic - 32, iy + 38 + q * 28); }
+  } else { // une flèche vers le bas : le téléchargement
+    g.moveTo(ix + ic / 2, iy + 30 + saut); g.lineTo(ix + ic / 2, iy + 84 + saut); g.moveTo(ix + ic / 2 - 26, iy + 60 + saut); g.lineTo(ix + ic / 2, iy + 86 + saut); g.lineTo(ix + ic / 2 + 26, iy + 60 + saut); g.moveTo(ix + 34, iy + 106); g.lineTo(ix + ic - 34, iy + 106);
+  }
+  g.stroke();
   // Titre de la fenêtre, à droite de l'icône.
   g.fillStyle = C.craie; g.font = `800 60px "${G.polices.texte}"`; g.textBaseline = 'middle';
   g.fillText(p.titre, ix + ic + 40, iy + ic / 2 + 2);
@@ -387,12 +397,23 @@ function planAttente(p, k, i) {
     const lt = g.measureText(p.titre).width * grand, x0 = cx + (ix + ic + 40) * grand, y0 = cy + (iy + ic / 2 - 36) * grand;
     RAPPORT.textes.push({ id: `${p.n}-titre`, plan: p.n, type: 'attente', texte: p.titre, style: 'fenetre', taille: Math.round(60 * grand), boite: { x0: Math.round(x0), y0: Math.round(y0), x1: Math.round(x0 + lt), y1: Math.round(y0 + 72 * grand) }, contraste: Number(contraste(luminance(...rvb(C.craie)), luminance(26, 22, 56)).toFixed(1)), fond: 'verre', images: p.chute ?? (p.fin - p.debut), tourne: false });
   }
-  // Barre qui n'avance presque pas.
-  const bx = -l / 2 + 70, by = h / 2 - 118, bl = l - 140, bh = 30, plein = 0.05 + 0.012 * Math.sin(t * 2.2) + 0.004 * t;
-  g.fillStyle = 'rgba(242, 239, 250, 0.13)'; rectArrondi(bx, by, bx + bl, by + bh, 15); g.fill();
-  g.fillStyle = C.lavande; rectArrondi(bx, by, bx + Math.max(bh, bl * plein), by + bh, 15); g.fill();
-  // Trois points d'attente.
-  for (let q = 0; q < 3; q++) { g.fillStyle = rgba(C.craie_douce, 0.35 + 0.65 * (Math.floor(t * 4) % 3 === q ? 1 : 0)); g.beginPath(); g.arc(bx + 12 + q * 34, by + 74, 9, 0, TOUR); g.fill(); }
+  const bx = -l / 2 + 70, by = h / 2 - 118, bl = l - 140, bh = 30;
+  if (p.genre === 'compte') {
+    // Deux champs à remplir : des pastilles qui s'ajoutent une à une, comme un mot de passe qu'on tape.
+    for (let c = 0; c < 2; c++) {
+      const y = by - 96 + c * 92;
+      g.fillStyle = 'rgba(242, 239, 250, 0.1)'; rectArrondi(bx, y, bx + bl, y + 68, 20); g.fill();
+      g.lineWidth = 3; g.strokeStyle = rgba(C.lavande, c === 1 ? 0.7 : 0.25); rectArrondi(bx + 1.5, y + 1.5, bx + bl - 1.5, y + 66.5, 20); g.stroke();
+      const n = c === 0 ? 9 : Math.min(8, Math.floor(t * 9));
+      for (let q = 0; q < n; q++) { g.fillStyle = rgba(C.craie_douce, 0.8); g.beginPath(); g.arc(bx + 34 + q * 30, y + 34, 8, 0, TOUR); g.fill(); }
+    }
+  } else {
+    // Barre : presque vide et qui n'avance pas (téléchargement), ou pleine à craquer (stockage).
+    const plein = p.genre === 'stockage' ? 0.955 + 0.012 * Math.sin(t * 6) : 0.05 + 0.012 * Math.sin(t * 2.2) + 0.004 * t;
+    g.fillStyle = 'rgba(242, 239, 250, 0.13)'; rectArrondi(bx, by, bx + bl, by + bh, 15); g.fill();
+    g.fillStyle = p.genre === 'stockage' ? C.or : C.lavande; rectArrondi(bx, by, bx + Math.max(bh, bl * plein), by + bh, 15); g.fill();
+    for (let q = 0; q < 3; q++) { g.fillStyle = rgba(C.craie_douce, 0.35 + 0.65 * (Math.floor(t * 4) % 3 === q ? 1 : 0)); g.beginPath(); g.arc(bx + 12 + q * 34, by + 74, 9, 0, TOUR); g.fill(); }
+  }
   g.restore();
 }
 

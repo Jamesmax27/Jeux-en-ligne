@@ -16,11 +16,12 @@ const echapper = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').r
 const secondes = (imagesOuS, enImages = true) => `${(enImages ? imagesOuS / FORMAT.ips : imagesOuS).toFixed(1).replace('.', ',')} s`;
 
 async function fiches(type) {
-  const dossier = path.join(SORTIES, type === 'accroche' ? 'accroches' : 'presentations');
+  const nomDossier = { accroche: 'accroches', trailer: 'trailers', presentation: 'presentations' }[type];
+  const dossier = path.join(SORTIES, nomDossier);
   const liste = [];
   for (const id of await listerRecettes(dossier)) {
     if (!existsSync(path.join(dossier, `${id}.mp4`))) continue;
-    liste.push({ ...(await lireJson(path.join(dossier, `${id}.json`))), fichier: `${type === 'accroche' ? 'accroches' : 'presentations'}/${id}.mp4` });
+    liste.push({ ...(await lireJson(path.join(dossier, `${id}.json`))), fichier: `${nomDossier}/${id}.mp4` });
   }
   return liste;
 }
@@ -45,7 +46,7 @@ function carte(fiche, retenues) {
   return `
   <article class="carte ${estAccroche ? 'accroche' : 'presentation'}">
     <header>
-      <span class="genre">${estAccroche ? 'Accroche' : 'Présentation'}</span>
+      <span class="genre">${estAccroche ? 'Accroche' : fiche.type === 'trailer' ? 'Bande-annonce' : 'Présentation'}</span>
       <h2>${echapper(fiche.nom)}</h2>
       <span class="duree">${secondes(fiche.sonde.duree, false)}</span>
       ${estAccroche ? `<span class="etat ${retenue ? 'oui' : 'non'}">${retenue ? 'retenue' : 'non retenue'}</span>` : ''}
@@ -61,12 +62,12 @@ function carte(fiche, retenues) {
 }
 
 export async function ecrireRevue() {
-  const [accroches, presentations] = [await fiches('accroche'), await fiches('presentation')];
+  const [accroches, trailers, presentations] = [await fiches('accroche'), await fiches('trailer'), await fiches('presentation')];
   const selection = existsSync(path.join(SOURCES, 'selection.json')) ? (await lireJson(path.join(SOURCES, 'selection.json'))).accroches || [] : [];
   // Accroches dans l'ordre de la sélection, les autres ensuite.
   const rang = (f) => (selection.includes(f.nom) ? selection.indexOf(f.nom) : selection.length);
   accroches.sort((a, b) => rang(a) - rang(b));
-  const toutes = [...accroches, ...presentations];
+  const toutes = [...accroches, ...trailers, ...presentations];
   const html = `<!doctype html>
 <html lang="fr">
 <head>
@@ -118,7 +119,7 @@ export async function ecrireRevue() {
 </head>
 <body>
 <h1>Revue des vidéos</h1>
-<p class="chapeau">${accroches.length} accroche${accroches.length > 1 ? 's' : ''} et ${presentations.length} vidéo${presentations.length > 1 ? 's' : ''} de présentation, au format ${FORMAT.largeur} × ${FORMAT.hauteur}, ${FORMAT.ips} images par seconde. Les vidéos démarrent sans le son : elles doivent se comprendre ainsi.
+<p class="chapeau">${accroches.length} accroche${accroches.length > 1 ? 's' : ''}, ${trailers.length} bande${trailers.length > 1 ? 's' : ''}-annonce${trailers.length > 1 ? 's' : ''} et ${presentations.length} vidéo${presentations.length > 1 ? 's' : ''} de présentation, au format ${FORMAT.largeur} × ${FORMAT.hauteur}, ${FORMAT.ips} images par seconde. Les vidéos démarrent sans le son : elles doivent se comprendre ainsi.
 Pour garder ou écarter une accroche, modifie la liste de <code>marketing/videos/selection.json</code> ; les prochaines vidéos de présentation ne peuvent commencer que par une accroche de cette liste.</p>
 <div class="commandes">
   <button type="button" id="lire">Tout lire</button>
@@ -143,5 +144,5 @@ ${toutes.map((f) => carte(f, selection)).join('\n')}
 `;
   const fichier = path.join(SORTIES, 'revue.html');
   await writeFile(fichier, html);
-  return { fichier, accroches: accroches.length, presentations: presentations.length, chemin: relatif(fichier) };
+  return { fichier, accroches: accroches.length, trailers: trailers.length, presentations: presentations.length, chemin: relatif(fichier) };
 }
