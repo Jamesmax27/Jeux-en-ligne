@@ -2023,7 +2023,7 @@ function jouerTour(f, e0, action) {
 }
 // </LOGIQUE>
 
-// <NIVEAUX> — 20 jardins. theme : 0 potager, 1 verger, 2 parc, 3 automne.
+// <NIVEAUX> — 60 jardins (1 à 20, puis 21 à 60 qui reprennent les quatre décors en combinant les pièges). theme : 0 potager, 1 verger, 2 parc, 3 automne.
 // par : nombre minimal de tours (calculé par un solveur) ; nouveau : mécanique présentée.
 var NIVEAUX = [
   { theme: 0, nouveau: 'pas', carte: ['##F##', '#...#', '#.#.#', '#.#.#', '#...#', '#.#.#', '#.H.#'] },
@@ -2045,10 +2045,52 @@ var NIVEAUX = [
   { theme: 3, carte: ['#######', '#F.b..#', '5......', '#.#.#^#', '#.D..^#', '#....^#', '#<<<..#', '#b..H.#', '#######'] },
   { theme: 3, nouveau: 'familles', carte: ['#######', '#..F..#', '#.....#', '#.#.#.#', '1......', '#.#.#.#', '#b...b#', '#H...G#', '#######'] },
   { theme: 3, carte: ['#######', '#F...F#', '#..b..#', '#.pOp.#', '#.....#', '......1', '#.#.#.#', '#H.b.G#', '#######'], arroseurs: [{ dir: 2, long: 3 }] },
-  { theme: 3, carte: ['#######', '#F.b.F#', '5......', '#.^#p.#', '#.^.O.#', '#.^.D.#', '#a....6', '#H.b.G#', '#######'], arroseurs: [{ dir: 3, long: 2 }] }
+  { theme: 3, carte: ['#######', '#F.b.F#', '5......', '#.^#p.#', '#.^.O.#', '#.^.D.#', '#a....6', '#H.b.G#', '#######'], arroseurs: [{ dir: 3, long: 2 }] },
+  // Jardins 21 à 60 : les quatre décors reviennent, avec les pièges combinés.
+  { theme: 0, carte: ['#######', '#.F...#', '#.....#', '#...1.#', '#...b.#', '1......', '#.b...#', '#...H.#', '#######'] },
+  { theme: 0, carte: ['#F#####', '#.....#', '#..1..#', '#.....#', '#....b#', '#b#.b.#', '1......', '#...H.#', '#######'] },
+  { theme: 0, carte: ['#######', '#....F#', '#O....#', '#...#.#', '#.....#', '......2', '#b....#', '#.b.H.#', '#######'], arroseurs: [{ dir: 2, long: 3 }] },
+  { theme: 0, carte: ['#######', '#..F..#', '#..2..#', '#.#3#.#', '#.b...#', '#.....#', '#.....#', '#b...H#', '#######'] },
+  { theme: 0, carte: ['#######', '#..F..#', '......2', '#.#.#.#', '#O....#', '#b....#', '#.....#', '#..b..#', '#.b..H#', '#######'], arroseurs: [{ dir: 1, long: 3 }] },
+  { theme: 0, carte: ['####F##', '#.....#', '#.....#', '#1....#', '#.....#', '#b#.#.#', '......2', '......2', '#H...b#', '#######'] },
+  { theme: 0, carte: ['#######', '#..F.O#', '#....b#', '#.#...#', '#.##b.#', '#..O..#', '#..#..#', '#....H#', '#######'], arroseurs: [{ dir: 1, long: 2 }, { dir: 1, long: 1 }] },
+  { theme: 0, carte: ['####F##', '#.....#', '#....O#', '#.#...#', '#.....#', '1......', '#..b..#', '1......', '#H...b#', '#######'], arroseurs: [{ dir: 1, long: 1, sens: -1 }] },
+  { theme: 0, carte: ['#######', '#F....#', '#.....#', '#O....#', '#....4#', '1......', '#..bb.#', '#.#...#', '#.H.b.#', '#######'], arroseurs: [{ dir: 3, long: 3 }] },
+  { theme: 0, carte: ['###F###', '#.....#', '#..1..#', '#.b...#', '1......', '#.#.O.#', '#...b.#', '1......', '#b...H#', '#######'], arroseurs: [{ dir: 1, long: 2 }] },
+  { theme: 1, carte: ['#######', '#..F..#', '#...1.#', '#..b#b#', '......2', '#.#.#.#', '#...a.#', '#D..H.#', '#######'] },
+  { theme: 1, carte: ['#######', '#b.F..#', '#.....#', '#.#.#.#', '#DD.b.#', '1......', '#...b.#', '#H....#', '#######'] },
+  { theme: 1, carte: ['#F#####', '#.....#', '......2', '#D.b..#', '1......', '#O....#', '##...b#', '##.#..#', '#..H..#', '#######'], arroseurs: [{ dir: 2, long: 2 }] },
+  { theme: 1, carte: ['#######', '#F....#', '#....1#', '#.ab#.#', '#D....#', '......2', '#...b.#', '#b#.#.#', '#.aH..#', '#######'] },
+  { theme: 1, carte: ['#######', '#F.O..#', '#...4b#', '#.#...#', '#D....#', '#.#b..#', '#.....#', '#.#..a#', '#..H..#', '#######'], arroseurs: [{ dir: 3, long: 2 }] },
+  { theme: 1, carte: ['##F####', '#.....#', '......2', '#.#..b#', '#...1.#', '#b#..b#', '1......', '#.#.#a#', '#D..H.#', '#######'] },
+  { theme: 1, carte: ['#######', '#O.F..#', '#....b#', '#.#.#.#', '#..b..#', '#.#O#.#', '#...a.#', '#.#b#.#', '#H...D#', '#######'], arroseurs: [{ dir: 3, long: 2 }, { dir: 0, long: 3 }] },
+  { theme: 1, carte: ['#######', '#D..F.#', '......2', '#.#.#O#', '#D...b#', '1......', '#..b..#', '#.#a#.#', '#..H..#', '#######'], arroseurs: [{ dir: 0, long: 3 }] },
+  { theme: 1, carte: ['####F##', '#.a...#', '#...b.#', '#..#..#', '#..#.b#', '#...2.#', '#.#D.##', '#.....#', '#4.b..#', '#....H#', '#######'] },
+  { theme: 1, carte: ['#######', '#F....#', '#.a..D#', '#.bO#.#', '#....1#', '#.b.#D#', '#...2.#', '#.#.#.#', '......2', '#b.H..#', '#######'], arroseurs: [{ dir: 2, long: 3 }] },
+  { theme: 2, carte: ['#######', '#....F#', '......6', '#.#.#b#', '1......', '#b#pO.#', '#.....#', '#....H#', '#######'], arroseurs: [{ dir: 2, long: 1 }] },
+  { theme: 2, carte: ['#####F#', '#.....#', '#.....#', '#.#b#a#', '......6', '#.#.#.#', '#..b..#', '......6', '#....H#', '#######'] },
+  { theme: 2, carte: ['#######', '#.F...#', '#...O.#', '#p#.#.#', '#..2..#', '#.#.#.#', '#b..pb#', '#.#.#.#', '#..O.H#', '#######'], arroseurs: [{ dir: 0, long: 2 }, { dir: 2, long: 1, sens: -1 }] },
+  { theme: 2, carte: ['#####F#', '#.....#', '##.#b.#', '5......', '#D....#', '#..#..#', '#bp#b.#', '......2', '#..H..#', '#######'] },
+  { theme: 2, carte: ['#######', '#...F.#', '#Oa...#', '#b....#', '#.6...#', '#.p..b#', '5......', '##....#', '#..H..#', '#######'], arroseurs: [{ dir: 2, long: 3 }] },
+  { theme: 2, carte: ['#F#####', '#....b#', '###...#', '##D...#', '#....##', '#bp8..#', '#b...O#', '#.#...#', '#...H.#', '#######'], arroseurs: [{ dir: 3, long: 3 }] },
+  { theme: 2, carte: ['#######', '#.b.F.#', '##....#', '#....##', '#..6..#', '#p#...#', '......2', '#b.a..#', '5......', '#.H.b.#', '#######'] },
+  { theme: 2, carte: ['####F##', '#.....#', '#....O#', '#.D..b#', '#.O...#', '#....1#', '#.b.p.#', '#.#...#', '......6', '#..H.p#', '#######'], arroseurs: [{ dir: 0, long: 1 }, { dir: 0, long: 3, sens: -1 }] },
+  { theme: 2, carte: ['#F#####', '#..b.D#', '#..a.##', '5......', '#..pb.#', '#6....#', '#.b#..#', '#.....#', '#.....#', '#.H..O#', '#######'], arroseurs: [{ dir: 0, long: 3 }] },
+  { theme: 2, carte: ['###F###', '#b.p.b#', '1......', '#..a..#', '#..D..#', '#..O.##', '5......', '#.....#', '#....6#', '#b.H..#', '#######'], arroseurs: [{ dir: 2, long: 3 }] },
+  { theme: 3, carte: ['#######', '#F....#', '#....1#', '#>#b#.#', '#b....#', '#.#.#.#', '#.b...#', '......2', '#.H...#', '#######'] },
+  { theme: 3, carte: ['#######', '#...F.#', '#.....#', '......6', '#....D#', '#.#...#', '#...bv#', '#.#.#v#', '#b.H.v#', '#######'] },
+  { theme: 3, carte: ['#######', '#.F...#', '#.1...#', '#.#..##', '#...5.#', '#...b.#', '#....2#', '#H..G.#', '#######'] },
+  { theme: 3, carte: ['#####F#', '#.....#', '......2', '#>#.#.#', '#.O..b#', '#b#.#.#', '#.....#', '#...#.#', '#b.H.p#', '#######'], arroseurs: [{ dir: 0, long: 2 }] },
+  { theme: 3, carte: ['#######', '#.F...#', '#.....#', '#..6..#', '#...bO#', '#.#.#.#', '#.....#', '#.H..G#', '#######'], arroseurs: [{ dir: 2, long: 3 }] },
+  { theme: 3, carte: ['###F###', '#.....#', '#..b..#', '#.a.#<#', '#..v..#', '#.2...#', '#..b.D#', '#.5...#', '#b....#', '#..H..#', '#######'] },
+  { theme: 3, carte: ['#######', '#F..F.#', '#.....#', '#.....#', '#b#.D<#', '......2', '##....#', '#G..H.#', '#######'] },
+  { theme: 3, carte: ['#######', '#.F..F#', '##...##', '#...5.#', '#..b#.#', '#O.p.##', '#1....#', '#G..H.#', '#######'], arroseurs: [{ dir: 1, long: 3, sens: -1 }] },
+  { theme: 3, carte: ['#F#####', '#....^#', '#.b...#', '5......', '#vO...#', '5......', '#b....#', '#.#.#b#', '#...a.#', '#D..H.#', '#######'], arroseurs: [{ dir: 2, long: 1, sens: -1 }] },
+  { theme: 3, carte: ['#######', '#D..F.#', '#.O#..#', '......2', '#b.v###', '5......', '#...###', '#H...G#', '#######'], arroseurs: [{ dir: 1, long: 2 }] }
 ];
 // Nombre minimal de tours de chaque jardin, calculé par un solveur (recherche en largeur sur tous les états).
-var PARS = [8, 8, 14, 16, 9, 9, 12, 15, 18, 16, 8, 29, 14, 16, 26, 13, 16, 16, 20, 15];
+var PARS = [8, 8, 14, 16, 9, 9, 12, 15, 18, 16, 8, 29, 14, 16, 26, 13, 16, 16, 20, 15,
+  16, 20, 17, 17, 20, 24, 16, 21, 18, 24, 20, 21, 21, 23, 20, 27, 25, 20, 22, 21, 24, 21, 25, 28, 25, 32, 28, 23, 28, 29, 23, 22, 20, 29, 31, 24, 27, 26, 31, 32];
 NIVEAUX.forEach(function (n, i) { n.par = PARS[i]; });
 // </NIVEAUX>
 window.JEL_NIVEAUX = NIVEAUX.length;
@@ -2105,7 +2147,10 @@ window.JEL_NIVEAUX = NIVEAUX.length;
       if (Array.isArray(d.sauves)) prog.sauves = d.sauves.filter((x) => Number.isInteger(x) && x >= 0 && x < totalPetits);
       prog.debloque = Math.max(1, Math.min(NIVEAUX.length, Math.max(d.debloque | 0, d.niveau | 0)));
       if (Number.isInteger(d.nid) && d.nid >= 0 && d.nid < NIDS.length) prog.nid = d.nid;
-      prog.termine = !!d.termine;
+      // Un jardin gagné ouvre toujours le suivant (les parties d'avant les jardins 21 à 60
+      // s'arrêtaient au jardin 20) ; « terminé » seulement si tous les jardins sont gagnés.
+      for (let k = 0; k < NIVEAUX.length - 1; k++) if (prog.etoiles[k] > 0 && prog.debloque < k + 2) prog.debloque = k + 2;
+      prog.termine = !!d.termine && NIVEAUX.every((n, k) => prog.etoiles[k] > 0);
       if (avecSon && d.options && typeof d.options.son === 'boolean') prog.son = d.options.son;
     }
     if (avecSon) try { const s = localStorage.getItem('traversee-herissons-son'); if (s === '0') prog.son = false; if (s === '1') prog.son = true; } catch (e) { /* stockage refusé */ }
@@ -3111,7 +3156,13 @@ window.JEL_NIVEAUX = NIVEAUX.length;
     if (!window.JEL_SAVE) { lireProg(); lancerNiveau(0); return; }
     window.JEL_SAVE.reprise({
       jeu: JEU,
-      onContinuer: (d) => { lireProg(); lancerNiveau(Math.min(NIVEAUX.length, Math.max(1, d.niveau | 0)) - 1); },
+      onContinuer: (d) => {
+        lireProg();
+        let n = Math.min(NIVEAUX.length, Math.max(1, d.niveau | 0));
+        // Ancienne partie arrêtée au jardin 20 déjà gagné : reprendre au premier nouveau jardin.
+        if (prog.etoiles[n - 1] > 0 && prog.debloque > n) n = prog.debloque;
+        lancerNiveau(n - 1);
+      },
       onNouvelle: () => { lireProg(); lancerNiveau(0); },
       onEffacer: () => { lireProg(); majBoutonsSon(); lancerNiveau(0); }
     });
