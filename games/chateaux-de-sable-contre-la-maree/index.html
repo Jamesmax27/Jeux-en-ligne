@@ -172,6 +172,25 @@
   .points-tuto { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
   .points-tuto i { width: 9px; height: 9px; border-radius: 50%; background: #e5c98f; }
   .points-tuto i.on { background: #ff8a3d; }
+
+  /* ---- Image du jeu n° 3 (window.JEL_APERCU = 3, écran d'ordinateur) : la plage au milieu,
+          l'interface sur les côtés, le décor de la plage jusqu'aux bords ---- */
+  body.apercu-ordi #jeu {
+    max-width: none; display: grid; column-gap: 28px; row-gap: 10px; padding: 14px 32px;
+    grid-template-columns: minmax(0, 1fr) 560px minmax(0, 1fr); grid-template-rows: auto auto auto 1fr auto;
+    grid-template-areas: "barre plage outils" "annonce plage outils" "message plage outils" ". plage outils" ". plage actions";
+  }
+  body.apercu-ordi #barre { grid-area: barre; flex-wrap: wrap; }
+  body.apercu-ordi #titre-niveau { order: -1; flex: 1 1 100%; font-size: 18px; }
+  body.apercu-ordi #annonce { grid-area: annonce; margin: 0; }
+  body.apercu-ordi #message { grid-area: message; margin: 0; font-size: 16px; padding: 8px 10px; }
+  body.apercu-ordi #zone-plage { grid-area: plage; margin: 0; }
+  body.apercu-ordi #outils { grid-area: outils; flex-direction: column; align-self: start; align-items: stretch; max-width: 240px; width: 100%; justify-self: center; gap: 8px; }
+  body.apercu-ordi .outil { max-width: none; flex: none; min-height: 72px; }
+  body.apercu-ordi .outil canvas { width: 38px; height: 38px; }
+  body.apercu-ordi .outil .nom { font-size: 14px; }
+  body.apercu-ordi .outil .cout { font-size: 12px; }
+  body.apercu-ordi #actions { grid-area: actions; margin: 0; max-width: 240px; width: 100%; justify-self: center; }
 </style>
 <script type="application/json" id="jel-i18n-textes" data-coin="aucun">
 {
@@ -2403,7 +2422,7 @@
     });
     for (var iJel = 0; iJel < NIVEAUX.length; iJel++) if (SAUVE.etoiles[iJel] > 0) SAUVE.debloque = Math.max(SAUVE.debloque || 1, Math.min(NIVEAUX.length, iJel + 2));
   } catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
-  function sauver() { try { localStorage.setItem(CLE, JSON.stringify(SAUVE)); } catch (e) { /* ignoré */ } }
+  function sauver() { if (apercu) return; try { localStorage.setItem(CLE, JSON.stringify(SAUVE)); } catch (e) { /* ignoré */ } }
   function totalEtoiles() { return SAUVE.etoiles.reduce(function (s, e) { return s + (e || 0); }, 0); }
   function palette() { return PALETTES[SAUVE.plage] || PALETTES[0]; }
 
@@ -2412,6 +2431,7 @@
   // ==========================================================================
   var audio = null, bruitBuf = null;
   function demarrerAudio() {
+    if (apercu || window.JEL_AFFICHE) return;   // image du jeu ou affiche : aucun son
     if (audio) { if (audio.state === 'suspended' && !S.pause) audio.resume().catch(function () {}); return; }
     try {
       var AC = window.AudioContext || window.webkitAudioContext;
@@ -2478,6 +2498,7 @@
     curseur: { r: 6, c: 3 }, curseurVisible: false, chasses: 0, pause: false, horloge: 0,
     eauA: [], fantome: {}, secousse: {}, particules: [], textes: [], tremble: 0, finA: 0, issue: null, demarre: false
   };
+  var apercu = 0;   // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 
   // ==========================================================================
   // DESSIN — fonctions communes (plage, tutoriel, icônes, accueil)
@@ -3506,6 +3527,7 @@
   // FIN DU NIVEAU
   // ==========================================================================
   function defaite(iNoye) {
+    if (apercu) return;   // image du jeu : la partie est figée, rien ne se perd
     if (window.FMG) window.FMG.reportEnd({ completed: false, level: S.n + 1 });
     S.phase = 'fin'; S.issue = 'defaite'; S.finA = S.horloge + 1400; S.iNoye = iNoye;
     majActions();
@@ -3519,6 +3541,7 @@
   }
 
   function afficherFin() {
+    if (apercu) return;   // image du jeu : rien ne se gagne
     var gagne = S.issue === 'victoire', n = S.n, niv = S.niv;
     S.crabes = [];
     var etoiles = gagne ? 1 + (S.seaux >= niv.s2 ? 1 : 0) + (S.seaux >= niv.s3 ? 1 : 0) : 0;
@@ -3590,7 +3613,7 @@
     montrer(tuto ? 'ecran-carte' : null);
     if (tuto) montrer('ecran-carte');
   }
-  document.addEventListener('visibilitychange', function () { if (document.hidden) mettrePause(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && !apercu) mettrePause(); });
 
   // ==========================================================================
   // DESSIN DE LA PLAGE (chaque image)
@@ -3784,27 +3807,30 @@
   // ==========================================================================
   // BOUCLE PRINCIPALE
   // ==========================================================================
+  // Un pas de la partie (marée, crabes, effets)
+  function majJeu(dt) {
+    S.horloge += dt;
+    if (S.phase === 'maree') {
+      if (S.anim) { if (S.horloge >= S.anim.fin) finirVague(); }
+      else {
+        S.attente -= dt;
+        if (S.attente <= 0) lancerVague();
+      }
+      $('attente-barre').style.width = (S.anim ? 100 : Math.max(0, 100 - S.attente / S.attenteMax * 100)) + '%';
+    }
+    if (S.phase === 'maree' || S.phase === 'construction') majCrabes(dt);
+    if (S.phase === 'fin' && S.finA && S.horloge >= S.finA) { S.finA = 0; afficherFin(); }
+    S.particules.forEach(function (p) { p.vie += dt; p.x += p.vx; p.y += p.vy; p.vy += 0.12; });
+    S.particules = S.particules.filter(function (p) { return p.vie < p.duree; });
+    S.textes.forEach(function (t2) { t2.vie += dt; });
+    S.textes = S.textes.filter(function (t2) { return t2.vie < 1000; });
+  }
+
   var dernier = performance.now();
   function boucle(maintenant) {
     var dt = Math.min(50, maintenant - dernier); dernier = maintenant;
     if (S.ecran === 'jeu') {
-      if (!S.pause && $('ecran-carte').hidden) {
-        S.horloge += dt;
-        if (S.phase === 'maree') {
-          if (S.anim) { if (S.horloge >= S.anim.fin) finirVague(); }
-          else {
-            S.attente -= dt;
-            if (S.attente <= 0) lancerVague();
-          }
-          $('attente-barre').style.width = (S.anim ? 100 : Math.max(0, 100 - S.attente / S.attenteMax * 100)) + '%';
-        }
-        if (S.phase === 'maree' || S.phase === 'construction') majCrabes(dt);
-        if (S.phase === 'fin' && S.finA && S.horloge >= S.finA) { S.finA = 0; afficherFin(); }
-        S.particules.forEach(function (p) { p.vie += dt; p.x += p.vx; p.y += p.vy; p.vy += 0.12; });
-        S.particules = S.particules.filter(function (p) { return p.vie < p.duree; });
-        S.textes.forEach(function (t2) { t2.vie += dt; });
-        S.textes = S.textes.filter(function (t2) { return t2.vie < 1000; });
-      }
+      if (!S.pause && $('ecran-carte').hidden) majJeu(dt);
       dessinerPlage();
     } else dessinerFond(maintenant);
     if (tuto && !$('ecran-carte').hidden) dessinerTuto(maintenant);
@@ -3832,6 +3858,7 @@
   }
   // Fermeture de la page : seulement pendant une marée (pas sur l'accueil ni le choix des niveaux).
   JEL_SAVE.surFermeture(function () {
+    if (apercu) return;   // image du jeu : rien n'est écrit
     if (S.ecran !== 'jeu' || !S.niv) return;
     if (S.issue === 'victoire') { if (S.n < NIVEAUX.length - 1) JEL_SAVE.save(JEU, { niveau: S.n + 2, score: scorePartie }); return; }
     JEL_SAVE.save(JEU, { niveau: S.n + 1, score: scorePartie });
@@ -3922,6 +3949,271 @@
   });
 
   // ==========================================================================
+  // AFFICHE (jaquette du jeu)
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une
+  // scène composée, sans interface ni texte, d'où sort la jaquette
+  // (CONSIGNES-JEU.md, section 5). Le château de sable, en grand, tient bon :
+  // une vague géante s'enroule au-dessus de lui et vient s'écraser sur sa tour,
+  // un petit crabe surpris regarde, le soleil brille derrière.
+  // ==========================================================================
+  function dessinerAffiche() {
+    redimensionner();
+    var ctx = ctxF, W = window.innerWidth, H = window.innerHeight, P = PALETTES[0], t = 900;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var k = Math.min(W / 600, H / 800), ox = W / 2 - 300 * k, oy = H / 2 - 400 * k;
+    function X(v) { return ox + v * k; }
+    function Y(v) { return oy + v * k; }
+    var gauche = Math.min(0, X(0)) - 30, droite = Math.max(W, X(600)) + 30;
+    // Ciel
+    var gr = ctx.createLinearGradient(0, Y(0), 0, Y(330));
+    gr.addColorStop(0, '#4fb0f2'); gr.addColorStop(1, '#d9f2ff');
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+    // Soleil et ses rayons (la lumière vient d'en haut à droite)
+    var sx = X(505), sy = Y(105);
+    ctx.save(); ctx.translate(sx, sy); ctx.fillStyle = 'rgba(255,246,190,.28)';
+    for (var r = 0; r < 12; r++) {
+      ctx.rotate(Math.PI / 6);
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-30 * k, -520 * k); ctx.lineTo(30 * k, -520 * k); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    var halo = ctx.createRadialGradient(sx, sy, 10 * k, sx, sy, 200 * k);
+    halo.addColorStop(0, 'rgba(255,250,200,1)'); halo.addColorStop(0.3, 'rgba(255,240,160,.6)'); halo.addColorStop(1, 'rgba(255,240,160,0)');
+    ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff2a0'; ctx.beginPath(); ctx.arc(sx, sy, 50 * k, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fffbe0'; ctx.beginPath(); ctx.arc(sx - 12 * k, sy - 12 * k, 26 * k, 0, Math.PI * 2); ctx.fill();
+    // Nuages
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    [[420, 220, 1.1], [560, 180, 0.8], [-40, 60, 1], [660, 40, 1.2]].forEach(function (n) {
+      var nx = X(n[0]), ny = Y(n[1]), f = n[2] * k;
+      ctx.beginPath(); ctx.arc(nx, ny, 26 * f, 0, Math.PI * 2); ctx.arc(nx + 30 * f, ny - 12 * f, 32 * f, 0, Math.PI * 2); ctx.arc(nx + 62 * f, ny, 24 * f, 0, Math.PI * 2); ctx.fill();
+    });
+    // Mer au loin, puis la plage
+    dessinerMer(ctx, gauche, Y(300), droite - gauche, 110 * k, P, t);
+    var gs = ctx.createLinearGradient(0, Y(410), 0, Y(800));
+    gs.addColorStop(0, P.sable); gs.addColorStop(1, P.sableFonce);
+    ctx.fillStyle = gs; ctx.fillRect(0, Y(410), W, H - Y(410));
+    for (var g = 0; g < 160; g++) {
+      ctx.fillStyle = P.grain; ctx.globalAlpha = 0.35;
+      ctx.fillRect(gauche + hasard(g) * (droite - gauche), Y(420) + hasard(g + 9) * (H - Y(420)), 3 * k, 3 * k);
+    }
+    ctx.globalAlpha = 1;
+    // La vague géante qui s'enroule au-dessus du château
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(gauche, Y(480));
+    ctx.lineTo(gauche, Y(250));
+    ctx.bezierCurveTo(X(40), Y(200), X(150), Y(100), X(285), Y(104));
+    ctx.bezierCurveTo(X(360), Y(106), X(405), Y(160), X(378), Y(214));
+    ctx.bezierCurveTo(X(360), Y(246), X(312), Y(232), X(310), Y(196));
+    ctx.bezierCurveTo(X(290), Y(236), X(300), Y(340), X(330), Y(450));
+    ctx.lineTo(X(330), Y(480));
+    ctx.closePath();
+    var gv = ctx.createLinearGradient(X(0), Y(100), X(250), Y(480));
+    gv.addColorStop(0, '#7fd6ff'); gv.addColorStop(0.45, '#2a9ae0'); gv.addColorStop(1, '#155fa8');
+    ctx.fillStyle = gv; ctx.fill();
+    ctx.clip();
+    // Reflets sur la face de la vague
+    ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 5 * k; ctx.lineCap = 'round';
+    for (var l = 0; l < 6; l++) {
+      ctx.beginPath(); ctx.moveTo(X(-20 + l * 20), Y(300 + l * 28)); ctx.quadraticCurveTo(X(120 + l * 25), Y(200 + l * 30), X(280 + l * 6), Y(250 + l * 34)); ctx.stroke();
+    }
+    // Creux de la vague, plus sombre
+    ctx.fillStyle = 'rgba(10,60,120,.45)';
+    ctx.beginPath(); ctx.ellipse(X(330), Y(205), 34 * k, 24 * k, -0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // Écume sur la crête et sur la lèvre
+    ctx.fillStyle = '#ffffff';
+    for (var e = 0; e < 18; e++) {
+      var p = e / 17;
+      var ex = X(70 + p * 220), ey = Y(190 - Math.sin(p * Math.PI * 0.55) * 86);
+      ctx.beginPath(); ctx.arc(ex, ey, (8 + hasard(e) * 9) * k, 0, Math.PI * 2); ctx.fill();
+    }
+    // La lèvre qui s'enroule (arc d'écume autour du creux)
+    for (e = 0; e < 12; e++) {
+      var an = -Math.PI * 0.55 + e / 11 * Math.PI * 1.15;
+      ctx.beginPath(); ctx.arc(X(335 + Math.cos(an) * 46), Y(160 + Math.sin(an) * 52), (7 + hasard(e + 20) * 7) * k, 0, Math.PI * 2); ctx.fill();
+    }
+    // Gouttes qui jaillissent de la lèvre vers le château
+    for (e = 0; e < 22; e++) {
+      var dx = X(370 + hasard(e + 40) * 110), dy = Y(150 + hasard(e + 70) * 140), rr = (4 + hasard(e + 90) * 8) * k;
+      ctx.fillStyle = e % 3 ? '#ffffff' : '#bfe8ff';
+      ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.fill();
+    }
+    // Pied de la vague : l'eau déferle sur le sable vers le château
+    ctx.fillStyle = P.eau; ctx.globalAlpha = 0.85;
+    ctx.beginPath(); ctx.moveTo(gauche, Y(470));
+    ctx.bezierCurveTo(X(120), Y(462), X(250), Y(470), X(330), Y(478));
+    ctx.bezierCurveTo(X(250), Y(540), X(140), Y(560), X(70), Y(600));
+    ctx.lineTo(gauche, Y(610)); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(255,255,255,.9)';
+    for (e = 0; e < 18; e++) {
+      var fp = e / 17, fx = X(-20 + fp * 340), fy = Y(476 + fp * 6 + Math.sin(e * 1.7) * 5);
+      ctx.beginPath(); ctx.arc(fx, fy, (6 + hasard(e + 5) * 5) * k, 0, Math.PI * 2); ctx.fill();
+    }
+    // Lumière chaude derrière le château
+    var hx = X(330), hy = Y(400);
+    var hc = ctx.createRadialGradient(hx, hy, 20 * k, hx, hy, 260 * k);
+    hc.addColorStop(0, 'rgba(255,244,200,.55)'); hc.addColorStop(1, 'rgba(255,244,200,0)');
+    ctx.fillStyle = hc; ctx.fillRect(0, 0, W, H);
+    // Le château de sable, en grand (même dessin que l'accueil du jeu)
+    var cx = X(330), cy = Y(490), s = 95 * k, C = couleursMur(P);
+    ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.beginPath(); ctx.ellipse(cx, cy + s * 1.05, s * 2.8, s * 0.32, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.moyen; ctx.fillRect(cx - s * 1.9, cy, s * 3.8, s);
+    ctx.fillStyle = C.clair; ctx.fillRect(cx - s * 1.9, cy, s * 3.8, s * 0.16);
+    ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(cx + s * 1.4, cy, s * 0.5, s);
+    for (var cr = 0; cr < 9; cr++) { ctx.fillStyle = C.moyen; ctx.fillRect(cx - s * 1.9 + cr * s * 0.44, cy - s * 0.2, s * 0.26, s * 0.22); }
+    ctx.fillStyle = '#6b4a22'; ctx.beginPath(); ctx.arc(cx, cy + s * 0.62, s * 0.28, Math.PI, 0); ctx.fillRect(cx - s * 0.28, cy + s * 0.62, s * 0.56, s * 0.38); ctx.fill();
+    dessinerTour(ctx, cx - s * 2.5, cy - s * 0.55, s * 1.3, { pv: 4, coqs: 0, deco: true }, P, 1);
+    dessinerTour(ctx, cx + s * 1.2, cy - s * 0.55, s * 1.3, { pv: 4, coqs: 0, deco: true }, P, 1);
+    dessinerDonjon(ctx, cx - s * 0.9, cy - s * 1.7, s * 1.8, P, t, false);
+    dessinerDrapeau(ctx, cx - s * 1.85, cy - s * 0.45, s * 0.8, 1, t + 300);
+    dessinerDrapeau(ctx, cx + s * 1.85, cy - s * 0.45, s * 0.8, 2, t + 600);
+    // Coquillages qui renforcent la muraille
+    dessinerCoquillage(ctx, cx - s * 1.2, cy + s * 0.45, s * 0.3);
+    dessinerCoquillage(ctx, cx + s * 1.2, cy + s * 0.45, s * 0.3, '#fff3c4');
+    // La vague s'écrase sur la tour de gauche : gerbe d'eau
+    var gx = cx - s * 2.5, gy = cy + s * 0.1;
+    ctx.fillStyle = 'rgba(255,255,255,.95)';
+    for (e = 0; e < 16; e++) {
+      var a = -Math.PI * (0.55 + hasard(e + 200) * 0.75), d = (20 + hasard(e + 300) * 80) * k;
+      ctx.beginPath(); ctx.arc(gx + Math.cos(a) * d, gy + Math.sin(a) * d * 0.9, (5 + hasard(e + 400) * 9) * k, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(191,232,255,.9)';
+    ctx.beginPath(); ctx.ellipse(gx - 4 * k, gy + 26 * k, 30 * k, 16 * k, 0, 0, Math.PI * 2); ctx.fill();
+    // Le fossé, plein d'eau, devant le château
+    ctx.fillStyle = P.sableFonce; ctx.beginPath(); ctx.ellipse(cx, cy + s * 1.45, s * 1.9, s * 0.28, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = P.eau; ctx.beginPath(); ctx.ellipse(cx, cy + s * 1.48, s * 1.75, s * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 3 * k;
+    ctx.beginPath(); ctx.moveTo(cx - s * 1.1, cy + s * 1.46); ctx.quadraticCurveTo(cx - s * 0.8, cy + s * 1.4, cx - s * 0.5, cy + s * 1.46); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + s * 0.3, cy + s * 1.5); ctx.quadraticCurveTo(cx + s * 0.6, cy + s * 1.44, cx + s * 0.9, cy + s * 1.5); ctx.stroke();
+    // Un crabe surpris regarde la vague
+    dessinerCrabe(ctx, X(530), Y(612), 120 * k, false, 400, true);
+    // Mouettes
+    ctx.strokeStyle = '#2f4256'; ctx.lineWidth = 4 * k; ctx.lineCap = 'round';
+    [[440, 290, 1], [520, 260, 0.8], [200, 60, 0.7]].forEach(function (m) {
+      var mx2 = X(m[0]), my2 = Y(m[1]), f = m[2] * k;
+      ctx.beginPath(); ctx.moveTo(mx2 - 18 * f, my2 - 6 * f); ctx.quadraticCurveTo(mx2 - 7 * f, my2 - 14 * f, mx2, my2); ctx.quadraticCurveTo(mx2 + 7 * f, my2 - 14 * f, mx2 + 18 * f, my2 - 6 * f); ctx.stroke();
+    });
+    // Premier plan : le seau rouge, la pelle bleue et des coquillages, coupés par les bords
+    dessinerSeau(ctx, X(40), Y(735), 210 * k, '#ff5a5a');
+    ctx.strokeStyle = '#2f8fdc'; ctx.lineWidth = 14 * k; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(X(600), Y(600)); ctx.lineTo(X(520), Y(760)); ctx.stroke();
+    ctx.fillStyle = '#2f8fdc'; ctx.beginPath(); ctx.ellipse(X(508), Y(790), 34 * k, 48 * k, 0.45, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(X(500), Y(780), 12 * k, 26 * k, 0.45, 0, Math.PI * 2); ctx.fill();
+    dessinerCoquillage(ctx, X(220), Y(720), 70 * k);
+    dessinerCoquillage(ctx, X(330), Y(760), 54 * k, '#fff3c4');
+    dessinerCoquillage(ctx, X(150), Y(640), 40 * k, '#ffe0b8');
+  }
+  function cacherInterfaceAffiche() {
+    Array.prototype.forEach.call(document.querySelectorAll('.ecran, #jeu, .rond, .bouton, .jel-langue, jel-langue'), function (el) { el.style.setProperty('display', 'none', 'important'); });
+  }
+  function demarrerAffiche() {
+    cacherInterfaceAffiche();
+    setTimeout(cacherInterfaceAffiche, 0);
+    setTimeout(cacherInterfaceAffiche, 400);
+    setTimeout(cacherInterfaceAffiche, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ==========================================================================
+  // IMAGES DU JEU (page du jeu)
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le
+  // jeu) : le jeu s'ouvre directement en pleine marée, avec sa vraie interface,
+  // sans écran titre, ni fenêtre « Continuer », ni carte de présentation
+  // (CONSIGNES-JEU.md, section 5). Les murs sont posés, la marée tourne un
+  // instant, puis la partie est figée : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = marée 1 : le donjon entouré de murets, la première vague envahit la plage ;
+  //   2 = marée 13 : rochers, coquillages, une tour ; un crabe creuse un trou dans un muret ;
+  //   3 = marée 23 au coucher du soleil (écran d'ordinateur) : deux donjons,
+  //       rigoles, tours décorées, crabes rapides, une grande vague double.
+  // ==========================================================================
+  var SCENES_APERCU = {
+    1: { n: 0, plage: 0, drapeau: 0, tour: 0, passees: 0, attente: 0, duree: 1500,
+      murs: [['muret', 8, 2], ['muret', 8, 3], ['muret', 8, 4], ['muret', 9, 2], ['muret', 9, 4]] },
+    2: { n: 12, plage: 0, drapeau: 1, tour: 0, passees: 1, attente: 2500, duree: 400, ramasses: [[3, 5]],
+      murs: [['tour', 8, 1], ['muret', 8, 0], ['muret', 9, 0], ['muret', 8, 2], ['muret', 9, 2]],
+      crabes: [{ r: 8, c: 3, cible: [8, 2], creuse: 1700 }, { r: 3.2, c: 6, marche: true }] },
+    3: { n: 22, plage: 1, drapeau: 3, tour: 1, passees: 3, attente: 0, duree: 1350, ramasses: [[5, 0]], renforts: [[8, 1]],
+      murs: [['rigole', 2, 3], ['rigole', 3, 3], ['tour', 8, 1], ['tour', 8, 5], ['muret', 9, 0], ['muret', 9, 2], ['muret', 9, 4], ['muret', 9, 6], ['fosse', 6, 3]],
+      crabes: [{ r: 6, c: 5, rapide: true, marche: true }, { r: 3.4, c: 0.6, rapide: true, marche: true }] }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    var sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture
+    var graine = 20261125 + numero * 7919;
+    Math.random = function () {
+      graine = (graine + 0x6D2B79F5) | 0;
+      var x = Math.imul(graine ^ (graine >>> 15), 1 | graine);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+    // Progression neuve, en mémoire seulement (sauver() n'écrit rien pendant l'aperçu)
+    SAUVE.son = true;   // bouton du son dans son état normal ; aucun son ne joue (demarrerAudio)
+    SAUVE.plage = sc.plage; SAUVE.drapeau = sc.drapeau; SAUVE.tour = sc.tour;
+    SAUVE.debloque = sc.n + 1; SAUVE.tutos = {};
+    if (numero === 3) document.body.classList.add('apercu-ordi');
+    commencerNiveau(sc.n);
+    tuto = null; montrer(null);
+    majBoutonsSon();
+    // Les constructions du joueur
+    sc.murs.forEach(function (m) { construire(S.g, m[1], m[2], m[0]); S.seaux -= COUT[m[0]]; });
+    (sc.ramasses || []).forEach(function (p) { S.g[idx(p[0], p[1])].coq = false; S.coqs++; });
+    (sc.renforts || []).forEach(function (p) { construire(S.g, p[0], p[1], 'coquillage'); });
+    // Vagues déjà passées
+    for (var v = 0; v < sc.passees; v++) vague(S.g, S.niv.vagues[v]);
+    S.vagueN = sc.passees;
+    S.phase = 'maree'; S.historique = [];
+    S.attente = sc.attente; S.attenteMax = sc.passees ? ATTENTE_VAGUE : 1800;
+    // Crabes déjà sur la plage
+    (sc.crabes || []).forEach(function (d) {
+      var cr = { r: d.r, c: d.c, chemin: [], etat: 'marche', rapide: !!d.rapide, cible: -1, creuse: 0, vu: true };
+      if (d.cible) { cr.etat = 'creuse'; cr.cible = idx(d.cible[0], d.cible[1]); cr.creuse = d.creuse; }
+      S.crabes.push(cr);
+    });
+    majCompteurs(); majAnnonce(); majActions();
+    message(T(sc.crabes ? 'msg_crabe_arrive' : 'msg_maree_monte'));
+    // La marée tourne un instant (l'eau avance, les crabes marchent), puis tout est figé
+    redimensionner();
+    for (var ms = 0; ms < sc.duree; ms += 16) majJeu(16);
+    if (sc.passees && !S.anim) message(T('msg_crabe_arrive'));
+    S.pause = true;
+    if (numero === 3) {
+      dessinerPlageOrdi();
+      window.addEventListener('resize', function () { setTimeout(dessinerPlageOrdi, 0); });
+    }
+  }
+  // Image n° 3 : la plage continue jusqu'aux bords de l'écran d'ordinateur
+  function dessinerPlageOrdi() {
+    var ctx = ctxF, W = window.innerWidth, H = window.innerHeight, P = palette(), t = 800;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var b = cvPlage.getBoundingClientRect(), mer = b.top + geo.s * PLAGE0;
+    var gr = ctx.createLinearGradient(0, 0, 0, mer);
+    gr.addColorStop(0, P.mer); gr.addColorStop(1, P.merClair);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, W, mer);
+    dessinerMer(ctx, 0, b.top, W, geo.s * PLAGE0, P, t);
+    var gs = ctx.createLinearGradient(0, mer, 0, H);
+    gs.addColorStop(0, P.sable); gs.addColorStop(1, P.sableFonce);
+    ctx.fillStyle = gs; ctx.fillRect(0, mer + 4, W, H - mer);
+    for (var g = 0; g < 220; g++) { ctx.fillStyle = P.grain; ctx.globalAlpha = 0.35; ctx.fillRect(hasard(g) * W, mer + 10 + hasard(g + 9) * (H - mer), 3, 3); }
+    ctx.globalAlpha = 1;
+    // Décor de plage sur les côtés : petits châteaux, seau, pelle, coquillages
+    var s = 70, gx = W * 0.14, gy = H - 150;
+    dessinerTour(ctx, gx - s * 1.1, gy, s, { pv: 4, coqs: 0, deco: true }, P, SAUVE.tour);
+    dessinerTour(ctx, gx + s * 0.2, gy + 10, s * 0.9, { pv: 4, coqs: 0, deco: true }, P, SAUVE.tour);
+    dessinerSeau(ctx, gx + s * 1.6, gy + 50, s * 0.9, '#ff5a5a');
+    dessinerCoquillage(ctx, gx - s * 1.5, gy + 100, 30);
+    dessinerCoquillage(ctx, W * 0.86, H - 60, 34, '#fff3c4');
+    dessinerCoquillage(ctx, W * 0.94, H - 110, 26);
+    ctx.strokeStyle = '#2f8fdc'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(W * 0.96, H - 230); ctx.lineTo(W * 0.92, H - 150); ctx.stroke();
+    ctx.fillStyle = '#2f8fdc'; ctx.beginPath(); ctx.ellipse(W * 0.915, H - 135, 14, 20, 0.4, 0, Math.PI * 2); ctx.fill();
+    document.body.style.background = P.corps;
+  }
+
+  // ==========================================================================
   // DÉMARRAGE
   // ==========================================================================
   Array.prototype.forEach.call(document.querySelectorAll('canvas[data-ico]'), function (cv) { dessinerIcone(cv, cv.dataset.ico); });
@@ -3933,8 +4225,15 @@
   I18N.creerSelecteur({ conteneur: $('langue-pause'), isole: true });
   majBoutonsSon();
   redimensionner();
-  allerAccueil();
-  requestAnimationFrame(boucle);})();
+  var numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    allerAccueil();
+    requestAnimationFrame(boucle);
+  }})();
 </script>
 </body>
 </html>

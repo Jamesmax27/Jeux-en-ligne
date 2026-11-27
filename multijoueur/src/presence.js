@@ -32,6 +32,8 @@ import {
 const TICKET_PRESENCE = '@presence';
 const ID_JEU = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const RE_PARTIE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+// « Cités voisines » de Marmoria (src/province.js) : la province de l'ami, « <jeu>.province-<code> ».
+const RE_PROVINCE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.province-[A-HJ-NP-Z2-9]{6}$/;
 const CORPS_MAX = 2000;           // caractères d'un signal
 const PROFILS_MAX = 50000;        // profils gardés en même temps au plus (les plus anciens sont oubliés)
 
@@ -80,7 +82,7 @@ export async function routePresence(request, env, chemin, origines) {
   const etat = ['site', 'jeu', 'hors'].includes(corps.etat) ? corps.etat : null;
   if (!etat) return json({ erreur: 'invalide' }, 400, cors);
   const jeu = etat === 'jeu' && typeof corps.jeu === 'string' && ID_JEU.test(corps.jeu) ? corps.jeu : null;
-  const partie = jeu && typeof corps.partie === 'string' && RE_PARTIE.test(corps.partie) && corps.partie.startsWith(`${jeu}.`) ? corps.partie : null;
+  const partie = jeu && typeof corps.partie === 'string' && (RE_PARTIE.test(corps.partie) || RE_PROVINCE.test(corps.partie)) && corps.partie.startsWith(`${jeu}.`) ? corps.partie : null;
   const reponse = await stub(env).fetch('https://presence/signal', {
     method: 'POST',
     body: JSON.stringify({ profil: ticket.profil, etat: jeu ? 'jeu' : (etat === 'hors' ? 'hors' : 'site'), jeu, partie }),

@@ -17,6 +17,9 @@
 // (profil.js), affiche les gains (niveau, badges, jeu terminé), le message de
 // bienvenue au retour d'un jour à l'autre (accueil) et le check vert des jeux
 // terminés sur les vignettes de la page.
+// Elle compte les jours de visite et, sur l'accueil, lance l'invitation à
+// choisir un pseudo (invite-pseudo.js, docs/cadrage-fidelisation.md, 14.14),
+// qui rouvre ensuite ce menu une fois (ouvrirMenu).
 // Chargée par toutes les pages générées (scripts/pages-seo.mjs) et par le lanceur.
 // ==========================================================================
 
@@ -28,6 +31,7 @@ import { peindreAvatar } from './avatars.js';
 import { chargerTextes, t, langue, surChangementLangue } from './profil-textes.js';
 import { urlProfil, urlClassement, urlAmis, urlJeu } from './chemins.js';
 import { annoncer as annoncerPresence } from './amis.js';
+import { compterJour, demarrer as demarrerInvite } from './invite-pseudo.js';
 
 const DUREE_TOAST = 4500;
 let bouton = null;
@@ -83,6 +87,14 @@ function creerPastille() {
   // Un lien vers un bloc de la page de profil déjà ouverte ne change pas de page : on ferme.
   menu.addEventListener('click', (e) => { if (e.target.closest('a')) fermer(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !menu.hidden) { fermer(); bouton.focus(); } });
+}
+
+// Ouvre le menu sans toucher la pastille (après un pseudo choisi dans l'invitation).
+function ouvrirMenu() {
+  if (!menu) return;
+  menu.hidden = false;
+  bouton.setAttribute('aria-expanded', 'true');
+  menu.querySelector('a')?.focus();
 }
 
 function afficher() {
@@ -286,6 +298,9 @@ async function demarrer() {
     requestAnimationFrame(() => { prevu = false; marquerTermines(document, t('profil.termine')); });
   }).observe(document.body, { childList: true, subtree: true });
   if (!derniereVisite()) noterVisite(new Date().toISOString().slice(0, 10));
+  // Jours de visite (toutes les pages) et, sur l'accueil, « Choisis ton pseudo ».
+  compterJour();
+  if (document.getElementById('invite-pseudo')) demarrerInvite({ ouvrirMenu });
   await rafraichir();
   // Présence « en ligne » pour les amis (le lanceur annonce lui-même « en jeu »).
   if (!document.querySelector('.barre-jeu')) annoncerPresence({ etat: 'site' });

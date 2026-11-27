@@ -12,6 +12,8 @@
 //   GET /partie?jeu=<id>&nom=<nom>   la partie d'un ami peut-elle être
 //               rejointe ? { etat: 'ouverte' | 'pleine' | 'introuvable' | 'complet' }
 //   POST /presence, /presence/lire   présence des amis (src/presence.js)
+//   POST /province   comptoir de province des « Cités voisines » de Marmoria
+//               (src/province.js, docs/cadrage-marmoria.md section 16.7)
 //   /tr/…       jeux en temps réel 1 contre 1 (src/temps-reel/routes.js,
 //               docs/cadrage-temps-reel.md) : recherche, partie, compteurs
 // Le préfixe /multi est aussi accepté (/multi/ws…), pour une route sur le
@@ -31,11 +33,13 @@ import { JEUX, ORIGINES, VERSION } from './jeux.js';
 import { PROTOCOLE } from './moteur.js';
 import { appelerAccueil } from './accueil.js';
 import { routePresence } from './presence.js';
+import { routeProvince } from './province.js';
 import { routeTempsReel, infosTempsReel } from './temps-reel/routes.js';
 
 export { Partie } from './partie.js';
 export { Accueil } from './accueil.js';
 export { Presence } from './presence.js';
+export { Province } from './province.js';
 export { Rencontre } from './temps-reel/rencontre.js';
 export { Duel } from './temps-reel/duel.js';
 export { Budget } from './temps-reel/budget.js';
@@ -74,6 +78,10 @@ export default {
 
     const presence = await routePresence(request, env, chemin, origines);
     if (presence) return presence;
+
+    // Comptoir de province (« Cités voisines » de Marmoria) : requêtes HTTP, pas de WebSocket.
+    const province = await routeProvince(request, env, chemin, origines);
+    if (province) return province;
 
     // Jeux en temps réel (recherche, partie, compteurs) : adresses séparées, le tour par tour n'y passe pas.
     const tempsReel = await routeTempsReel(request, env, chemin, origines);

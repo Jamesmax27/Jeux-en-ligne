@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cosmoria</title>
+<script type="application/json" id="jel-i18n-textes" data-coin="aucun">{}</script>
+<script id="jel-i18n"></script>
+<script id="jel-sauvegarde"></script>
+<script id="jel-stockage"></script>
+<!--
+  Cosmoria — city-builder de colonie spatiale (docs/cadrage-cosmoria.md), sur le moteur de Marmoria.
+  Fichier assemblé par sources/cosmoria/assembler.mjs à partir de sources/cosmoria/ :
+  ne pas le modifier à la main (sauf les blocs jel-* remplis par scripts/i18n-jeu.mjs).
+  Trois couches séparées : simulation (cm-sim, données cm-donnees), rendu (cm-rendu,
+  dessins cm-dessins), interface (cm-interface).
+-->
+<style>
+  :root {
+    /* Les noms des variables viennent de Marmoria (marbre = fond des panneaux, terre = accent). */
+    --marbre: rgba(15, 23, 42, .95); --marbre-f: #26375a; --encre: #e9f2ff; --encre-d: #9fb4d4;
+    --terre: #1596b8; --terre-f: #2e7fa6; --or: #ffcf6b; --or-c: #ffe29a; --nuit: #0b1220;
+    --vert: #2fae78; --rouge: #ff7a6a; --bleu: #4aa8ff; --case: #1b2947; --lueur: #7df3ff;
+    --barre: 48px; --r: 12px;
+    --ombre: 0 6px 22px rgba(0, 6, 20, .6), inset 0 0 0 1px rgba(125, 243, 255, .1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0a14; color: var(--encre);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-user-select: none; user-select: none;
+    -webkit-tap-highlight-color: transparent; touch-action: none; overscroll-behavior: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  #app { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; overflow: hidden; }
+  /* Téléphone tenu en portrait : l'affichage pivote d'un quart de tour (section 17.5). */
+  html.pivote #app { transform-origin: top left; transform: rotate(90deg) translateY(-100%); }
+  #carte { position: absolute; left: 0; top: 0; display: block; touch-action: none; }
+  [hidden] { display: none !important; }
+  * { scrollbar-color: #3a5a8a transparent; scrollbar-width: thin; }
+
+  /* --- Barre d'état ----------------------------------------------------------- */
+  #barre { position: absolute; left: 0; right: 0; top: 0; height: var(--barre); display: flex; align-items: center; gap: 4px;
+    padding: 2px 6px; background: linear-gradient(rgba(24, 36, 62, .96), rgba(12, 19, 36, .96)); border-bottom: 1px solid var(--lueur); box-shadow: var(--ombre); z-index: 5; }
+  .ico { min-width: 44px; height: 44px; border: 0; background: transparent; border-radius: 8px; display: inline-flex; align-items: center;
+    justify-content: center; padding: 0 6px; gap: 4px; font-weight: 600; font-size: 15px; }
+  .ico:hover, .ico:focus-visible { background: rgba(125, 243, 255, .16); outline: none; }
+  .ico.actif { background: var(--terre); color: #fff; box-shadow: 0 0 12px rgba(125, 243, 255, .5); }
+  .ico svg { width: 26px; height: 26px; flex: none; }
+  .info { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-size: 15px; white-space: nowrap; padding: 0 4px; }
+  .info svg { width: 22px; height: 22px; }
+  .info.negatif { color: var(--rouge); }
+  #v-date { font-weight: 600; color: var(--encre-d); }
+  #v-tresor { color: var(--or-c); }
+  .vitesse { display: inline-flex; align-items: center; background: rgba(125, 243, 255, .1); border-radius: 10px; }
+  #v-vitesse { min-width: 40px; text-align: center; font-weight: 700; font-size: 15px; }
+  .espace { flex: 1; }
+  .langue-hote { display: inline-flex; }
+
+  /* --- Menu de construction ------------------------------------------------- */
+  #menu-cat { position: absolute; left: 6px; top: calc(var(--barre) + 8px); display: grid; grid-template-columns: 50px; gap: 4px; z-index: 4;
+    max-height: calc(100% - var(--barre) - 16px); }
+  #menu-cat.deux { grid-template-columns: 50px 50px; }
+  .cat { width: 50px; height: 46px; border-radius: 10px; border: 2px solid var(--terre-f); background: var(--marbre); box-shadow: var(--ombre);
+    display: flex; align-items: center; justify-content: center; padding: 0; }
+  .cat svg { width: 30px; height: 30px; }
+  .cat.actif { background: #12506a; border-color: var(--lueur); box-shadow: 0 0 14px rgba(125, 243, 255, .55), var(--ombre); }
+  .cat.signal { animation: signal 1s ease-in-out infinite; }
+  @keyframes signal { 50% { box-shadow: 0 0 0 5px var(--or-c), var(--ombre); } }
+  #sous-menu { position: absolute; top: calc(var(--barre) + 8px); left: 66px; width: min(300px, 46vw); max-height: calc(100% - var(--barre) - 16px);
+    overflow-y: auto; background: var(--marbre); border: 2px solid var(--terre-f); border-radius: var(--r); box-shadow: var(--ombre); z-index: 4; padding: 6px; }
+  #menu-cat.deux ~ #sous-menu { left: 122px; }
+  #sous-menu h3 { margin: 2px 6px 6px; font-size: 16px; }
+  .choix { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; border: 0; border-radius: 8px; background: transparent; text-align: left; padding: 4px 6px; }
+  .choix:hover, .choix:focus-visible { background: rgba(125, 243, 255, .12); outline: none; }
+  .choix.actif { background: rgba(125, 243, 255, .24); }
+  .choix canvas { width: 44px; height: 44px; flex: none; }
+  .choix .nom { flex: 1; font-weight: 600; font-size: 15px; line-height: 1.2; }
+  .choix .cout { font-weight: 700; color: var(--or); white-space: nowrap; font-size: 14px; }
+  .choix.verrou { opacity: .45; }
+
+  /* --- Panneaux --------------------------------------------------------------- */
+  #panneau { position: absolute; right: 6px; top: calc(var(--barre) + 8px); width: min(340px, 50vw); max-height: calc(100% - var(--barre) - 16px); overflow-y: auto;
+    background: var(--marbre); border: 2px solid var(--terre-f); border-radius: var(--r); box-shadow: var(--ombre); z-index: 6; padding: 10px 12px; font-size: 15px; }
+  #panneau h2 { margin: 0 40px 6px 0; font-size: 19px; }
+  #panneau h3 { margin: 10px 0 4px; font-size: 16px; }
+  #panneau p { margin: 4px 0; line-height: 1.35; }
+  #panneau .fermer { position: absolute; right: 4px; top: 4px; }
+  .ligne { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--marbre-f); }
+  .ok::before { content: "✔ "; color: #5fe0a0; font-weight: 700; }
+  .ko::before { content: "✘ "; color: var(--rouge); font-weight: 700; }
+  .etat-ko { color: var(--rouge); font-weight: 700; }
+  .etat-ok { color: #5fe0a0; font-weight: 700; }
+  .jauge { height: 10px; background: var(--marbre-f); border-radius: 5px; overflow: hidden; margin: 4px 0; }
+  .jauge > i { display: block; height: 100%; background: var(--or); }
+  .reglage { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 6px 0; }
+  .reglage .ico { border: 2px solid var(--terre-f); background: var(--case); font-size: 20px; }
+  /* Lot 2 : onglets des conseillers, lignes de produits avec consigne, courbe de population. */
+  .onglets { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; }
+  .onglet { min-height: 44px; padding: 0 10px; border: 2px solid var(--marbre-f); border-radius: 8px; background: var(--case); font: inherit; font-size: 14px; font-weight: 600; }
+  .onglet.actif { background: var(--terre-f); border-color: var(--terre-f); color: #fff; }
+  .ligne.bien { align-items: center; }
+  .ligne.bien > span { flex: 1; }
+  .ligne.bien.entete { font-size: 14px; font-weight: 700; opacity: .8; }
+  .ligne.bien.entete > span + span { flex: none; text-align: right; }
+  .mini { min-height: 44px; min-width: 44px; padding: 0 8px; border: 2px solid var(--terre-f); border-radius: 8px; background: var(--case); font: inherit; font-size: 14px; font-weight: 600; }
+  .mini.c-refuser { border-color: var(--rouge); color: var(--rouge); }
+  .mini.c-chercher { border-color: #5fe0a0; color: #5fe0a0; }
+  .mini.c-vider { border-color: var(--or); color: var(--or); }
+  /* Lot 3 : statuts du commerce, carte de l'Empire, fiche d'une cité, lignes en orange. */
+  .mini.c-importer { border-color: #6fc0ff; color: #6fc0ff; }
+  .mini.c-exporter { border-color: #5fe0a0; color: #5fe0a0; }
+  .mini.c-reserver { border-color: var(--or); color: var(--or); }
+  .mini.c-aucun { border-color: var(--marbre-f); color: var(--encre-d); }
+  .reglage.petit { justify-content: flex-end; gap: 4px; margin: 0; }
+  .reglage.petit span { min-width: 92px; text-align: center; font-size: 14px; font-weight: 600; }
+  #panneau p.aide.prix { font-size: 13px; margin: 0 0 4px; padding-bottom: 4px; border-bottom: 1px solid var(--marbre-f); }
+  .moyen::before { content: "● "; color: #ffb347; font-weight: 700; }
+  .gros.grise { opacity: .55; }
+  .carte-empire { border: 2px solid var(--terre-f); border-radius: 10px; overflow: hidden; background: #0a1222; }
+  .carte-empire svg { display: block; width: 100%; height: auto; }
+  .carte-empire .cite { cursor: pointer; }
+  .boutons.cites { margin-top: 8px; gap: 6px; }
+  .boutons.cites .gros { min-width: 0; min-height: 44px; font-size: 15px; padding: 0 10px; }
+  .fiche-cite { background: var(--case); border: 2px solid var(--or); border-radius: 10px; padding: 4px 10px 8px; margin-top: 10px; }
+  .fiche-cite h3 { margin-top: 4px; }
+  /* Grand écran du commerce (cahier 23.16) : la carte à gauche, la fiche et les biens à droite. */
+  #panneau.grand { left: 6px; right: 6px; width: auto; bottom: 6px; max-height: none; display: flex; flex-direction: column; overflow: hidden; padding: 8px 10px; }
+  #panneau.grand > h2 { flex: none; }
+  .commerce-grand { flex: 1; min-height: 0; display: flex; gap: 10px; }
+  .cg-carte { flex: 1.7; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .cg-cote { flex: 1; min-width: 210px; max-width: 380px; overflow-y: auto; padding-right: 2px; }
+  .carte-empire.grande { flex: none; }
+  .carte-empire.grande svg { width: 100%; height: 100%; }
+  .carte-empire.grande .cite { cursor: pointer; }
+  .carte-empire.grande .cite:focus { outline: none; }
+  .carte-empire.grande .cite:focus rect { stroke: #f0c040; stroke-width: 3; }
+  .legende-commerce { margin-top: 0 !important; }
+  .fl-achete { color: #5fe0a0; font-weight: 700; }
+  .fl-vend { color: #7fc4ff; font-weight: 700; }
+  /* Images des biens : étals du marché en vignettes, image devant le nom ailleurs. */
+  .nom-bien { display: flex; align-items: center; gap: 6px; }
+  .nom-bien .bien-ico { flex: none; }
+  .stock-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(94px, 1fr)); gap: 6px; }
+  .stock-case { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px 4px; background: var(--case); border: 2px solid var(--marbre-f); border-radius: 10px; text-align: center; }
+  .stock-case .nom { font-size: 13px; font-weight: 600; line-height: 1.15; }
+  .stock-case strong { font-size: 13px; }
+  .stock-case .jauge { width: 100%; margin: 2px 0; }
+  .stock-case .mini { width: 100%; min-height: 44px; font-size: 13px; }
+  .stock-case.vide .bien-ico { opacity: .45; }
+  .stock-case.interdit { background: #141d33; }
+  .stock-case.interdit .bien-ico { opacity: .3; filter: grayscale(1); }
+  .stock-case.demande { border-color: var(--or); }
+  .stock-case .badge { position: absolute; top: 3px; right: 3px; background: var(--or); color: #1b1405; font-size: 11px; font-weight: 700; border-radius: 6px; padding: 0 4px; }
+  /* Téléphone en paysage : onglets des conseillers sur une seule ligne qui défile. */
+  @media (max-height: 500px) {
+    .onglets { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-bottom: 4px; }
+    .onglet { flex: none; }
+  }
+  #panneau p.aide { font-size: 14px; opacity: .85; }
+  /* Aide intégrée : listes de fiches et fiche d'un bâtiment. */
+  .aide-ecran { width: min(720px, 96%); }
+  .aide-ecran h3 { margin: 10px 0 4px; font-size: 16px; text-align: left; }
+  .aide-ecran .ligne { text-align: left; font-size: 15px; }
+  .aide-ecran .ligne strong { text-align: right; }
+  .aide-ecran p { text-align: left; }
+  .aide-ecran p.aide { font-size: 14px; opacity: .85; }
+  .liste-aide { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; }
+  .liste-aide .gros { min-width: 0; min-height: 44px; font-size: 15px; padding: 4px 10px; line-height: 1.2; }
+  .lien-aide { min-height: 44px; margin: 2px 0 6px; padding: 0 12px; border: 2px solid var(--marbre-f); border-radius: 8px; background: var(--case); font: inherit; font-size: 14px; font-weight: 600; }
+  .courbe { height: 70px; background: rgba(125,243,255,.08); border-radius: 8px; padding: 4px; }
+  .courbe svg { width: 100%; height: 100%; display: block; }
+  .msg { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--marbre-f); }
+  .msg.critique { color: var(--rouge); font-weight: 600; }
+  .msg span { flex: 1; }
+
+  /* --- Mini-carte, validation, bulles ------------------------------------------ */
+  #mini { position: absolute; right: 6px; bottom: 6px; width: 200px; height: 100px; background: rgba(8, 14, 28, .82); border: 1px solid var(--lueur);
+    border-radius: 8px; z-index: 4; touch-action: none; }
+  #valider { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; z-index: 6;
+    background: var(--marbre); border: 2px solid var(--terre-f); border-radius: 12px; padding: 6px; box-shadow: var(--ombre); }
+  .gros { min-height: 48px; min-width: 110px; border-radius: 10px; border: 0; font-weight: 700; font-size: 17px; padding: 0 16px; }
+  .gros.oui { background: linear-gradient(#3fd092, #24996a); color: #fff; box-shadow: 0 3px 0 #17694a; }
+  .gros.non { background: #2b3c62; color: var(--encre); }
+  .gros.or { background: linear-gradient(#ffe29a, #ffbf4a); color: #1b1405; box-shadow: 0 3px 0 #a8741c, 0 0 18px rgba(255, 207, 107, .35); }
+  #v-cout { font-weight: 700; padding: 0 8px; }
+  #b-annuler-derniere { position: absolute; left: 50%; bottom: 78px; transform: translateX(-50%); z-index: 6; }
+  #ordre { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; z-index: 6;
+    background: var(--marbre); border: 2px solid var(--rouge); border-radius: 12px; padding: 6px 6px 6px 12px; box-shadow: var(--ombre); font-weight: 700; max-width: 92vw; }
+  .pyramide { width: 100%; height: auto; }
+  .difficulte .gros { min-width: 0; flex: 1; }
+  #bulle { position: absolute; z-index: 7; pointer-events: none; background: rgba(8, 14, 28, .92); border: 1px solid rgba(125, 243, 255, .4); color: #fff; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 14px; white-space: nowrap; }
+  #toasts { position: absolute; left: 50%; top: calc(var(--barre) + 8px); transform: translateX(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 6; pointer-events: none; width: min(460px, 60vw); }
+  .toast { background: rgba(10, 18, 36, .94); border: 1px solid rgba(125, 243, 255, .35); color: #fff; border-radius: 10px; padding: 8px 12px; font-weight: 600; font-size: 15px; animation: arrivee .3s ease-out; pointer-events: auto; }
+  .toast.critique { background: rgba(150, 34, 34, .95); border-color: #ff9a8a; }
+  @keyframes arrivee { from { transform: translateY(-10px); opacity: 0; } }
+
+  /* --- Tutoriel ----------------------------------------------------------------- */
+  #tuto { position: absolute; left: 66px; right: 216px; bottom: 8px; margin: 0 auto; max-width: 560px; z-index: 5; background: var(--marbre);
+    border: 2px solid var(--or); border-radius: 12px; box-shadow: var(--ombre); padding: 8px 10px 8px 12px; display: flex; gap: 8px; align-items: center; font-size: 15px; }
+  #tuto .texte { flex: 1; line-height: 1.3; }
+  #tuto .progres { font-weight: 800; color: var(--or); white-space: nowrap; }
+  #tuto.fete { animation: fete .8s ease-out; }
+  @keyframes fete { 30% { transform: scale(1.04); box-shadow: 0 0 0 4px var(--or-c), var(--ombre); } }
+  #main { position: absolute; z-index: 8; width: 44px; height: 44px; pointer-events: none; animation: main 1s ease-in-out infinite; }
+  @keyframes main { 50% { transform: translate(-8px, -6px); } }
+
+  /* --- Écrans hors partie --------------------------------------------------------- */
+  #ecran { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 12px; }
+  #ecran:empty { display: none; }
+  #ecran.voile { background: rgba(4, 8, 20, .66); }
+  .carte-ecran { background: var(--marbre); border: 3px solid var(--terre-f); border-radius: 16px; box-shadow: var(--ombre); padding: 16px 20px;
+    max-width: min(720px, 96%); max-height: 96%; overflow-y: auto; text-align: center; }
+  .carte-ecran h1 { margin: 0 0 4px; font-size: 26px; }
+  .carte-ecran h2 { margin: 6px 0; font-size: 20px; }
+  .carte-ecran p { margin: 6px 0; line-height: 1.4; font-size: 16px; }
+  .boutons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+  /* Boutons d'une carte toujours visibles : collés au bas de la carte quand son texte défile
+     (téléphone en paysage dans le lanceur du site : 260 à 300 px de haut). La carte n'a pas de
+     marge basse, ce sont les boutons qui la portent. */
+  .carte-ecran:has(> .boutons:last-child) { padding-bottom: 0; }
+  .carte-ecran > .boutons:last-child { position: sticky; bottom: 0; z-index: 1; margin: 12px -20px 0; padding: 8px 20px 16px;
+    background: var(--marbre); border-radius: 0 0 13px 13px; }
+  .titre-jeu { text-align: center; color: #fff; text-shadow: 0 3px 14px rgba(0, 4, 16, .8); max-width: 680px; }
+  .titre-jeu h1 { font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; font-weight: 300; font-size: clamp(40px, 8.4vw, 84px); letter-spacing: .26em; margin: 0 -.26em 0 0; text-transform: uppercase; color: #f2fbff;
+    text-shadow: 0 0 18px rgba(125, 243, 255, .75), 0 0 46px rgba(74, 168, 255, .55), 0 3px 12px rgba(0, 4, 16, .9); }
+  /* Voile sombre derrière le titre : il reste lisible sur la colonie animée du fond. */
+  .titre-jeu { position: relative; z-index: 0; }
+  .titre-jeu::before { content: ""; position: absolute; inset: -46px -90px; z-index: -1; pointer-events: none;
+    background: radial-gradient(closest-side, rgba(6, 10, 24, .82), rgba(6, 10, 24, .5) 62%, rgba(6, 10, 24, 0)); }
+  .titre-jeu .sous { text-shadow: 0 0 12px rgba(0, 4, 16, .95), 0 2px 4px rgba(0, 4, 16, .9); font-size: clamp(17px, 2.6vw, 22px); font-weight: 700; margin: 2px 0 8px; color: var(--or-c); }
+  .titre-jeu .consigne { font-size: clamp(15px, 2.1vw, 18px); line-height: 1.4; margin: 6px auto 14px; max-width: 600px; background: rgba(8, 14, 28, .62); border: 1px solid rgba(125, 243, 255, .25); padding: 8px 12px; border-radius: 10px; }
+  .titre-jeu .age { font-size: 15px; font-weight: 700; margin-top: 10px; }
+  /* Cités voisines (lot 6) : saisie du code d'une province. */
+  .champ-code { display: block; margin: 8px auto; width: 9em; min-height: 48px; font: inherit; font-size: 26px; font-weight: 800; letter-spacing: .2em;
+    text-align: center; text-transform: uppercase; border: 2px solid var(--terre-f); border-radius: 10px; background: var(--case); color: var(--encre);
+    -webkit-user-select: text; user-select: text; }
+  .mission.ferme .num { font-weight: 700; }
+  .titre-coin { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; }
+  .titre-coin .ico { background: rgba(16, 26, 46, .9); border: 1px solid rgba(125, 243, 255, .4); color: var(--encre); }
+  /* Carte de la campagne (cahier 23.16) : la carte à gauche, le bilan et les boutons à droite. */
+  .campagne { width: 100%; height: 100%; display: flex; gap: 10px; background: var(--marbre); border: 3px solid var(--terre-f); border-radius: 16px; box-shadow: var(--ombre); padding: 8px; }
+  .cp-carte { flex: 1; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .cp-cadre { flex: none; border: 2px solid var(--terre-f); border-radius: 10px; overflow: hidden; }
+  .cp-cadre svg { display: block; width: 100%; height: 100%; }
+  .cp-cote { flex: none; width: clamp(200px, 30%, 330px); overflow-y: auto; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+  .cp-cote h1 { margin: 0; font-size: 22px; }
+  .cp-cote p { margin: 0; }
+  .cp-cote .boutons { flex-direction: column; align-items: stretch; margin-top: 4px; }
+  .cp-cote .boutons .gros { width: 100%; }
+  .campagne.colonne { flex-direction: column; }
+  .campagne.colonne .cp-carte { flex: 0 0 auto; height: 42%; }
+  .campagne.colonne .cp-cote { width: auto; flex: 1; }
+  .prochaine-mission { background: var(--case); border: 2px solid var(--or); border-radius: 10px; padding: 6px 10px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .prochaine-mission .num { font-size: 13px; font-weight: 700; color: var(--encre-d); }
+  .prochaine-mission strong { font-size: 18px; }
+  .cp-ville { cursor: pointer; }
+  .cp-ville:focus { outline: none; }
+  .cp-ville:focus circle:nth-of-type(2), .cp-ville:focus circle:last-of-type { stroke: #f0c040; stroke-width: 3.5; }
+  .cp-pouls { transform-box: fill-box; transform-origin: center; animation: cp-pouls 1.6s ease-out infinite; }
+  @keyframes cp-pouls { 0% { transform: scale(.8); opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
+  .cp-route { animation: cp-route 1.2s linear infinite; }
+  @keyframes cp-route { to { stroke-dashoffset: -24; } }
+  /* Tutoriels des bâtiments (cahier 23.16). */
+  .marque-nouveau { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 9px; background: var(--or); color: #1b1405; font-size: 12px; font-weight: 800; vertical-align: 2px; }
+  .tuto-bat { max-width: 620px; text-align: left; }
+  .tuto-bat .num { font-weight: 700; color: var(--encre-d); }
+  .tuto-tete { display: flex; align-items: center; gap: 12px; margin: 4px 0; }
+  .tuto-tete canvas { width: 64px; height: 64px; flex: none; }
+  .tuto-tete h1 { margin: 0; }
+  .tuto-bat h2 { font-size: 17px; margin: 10px 0 2px; }
+  .tuto-etapes { margin: 4px 0 6px; padding-left: 22px; }
+  .tuto-etapes li { margin: 3px 0; line-height: 1.35; }
+  .grille-nouveaux { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; margin: 8px 0; }
+  .grille-nouveaux .choix { min-height: 52px; }
+  .grille-missions { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; text-align: left; }
+  .mission { border: 2px solid var(--terre-f); border-radius: 10px; background: var(--case); padding: 8px; min-height: 76px; display: flex; flex-direction: column; gap: 2px; }
+  .mission .num { font-size: 14px; color: var(--encre-d); font-weight: 700; }
+  .mission .nom { font-weight: 800; font-size: 16px; }
+  .mission .etoiles { color: var(--or); font-size: 18px; letter-spacing: 2px; }
+  .mission.ferme { opacity: .5; background: #141d33; cursor: default; }
+  .mission.prochaine { box-shadow: 0 0 0 3px var(--or-c); }
+  .objectifs { display: inline-block; text-align: left; margin: 6px 0; }
+  .grosses-etoiles { font-size: 44px; color: var(--or); letter-spacing: 6px; }
+  .grosses-etoiles .vide { color: #3a4a6a; }
+  .emplacements { display: grid; gap: 6px; text-align: left; }
+  .emplacement { display: flex; align-items: center; gap: 8px; border: 1px solid var(--marbre-f); border-radius: 8px; padding: 6px 8px; background: var(--case); }
+  .emplacement span { flex: 1; }
+  .geste { width: 200px; height: 120px; margin: 6px auto; position: relative; background: #a9644b; border-radius: 12px; overflow: hidden; }
+  .geste .doigt { position: absolute; width: 36px; height: 36px; border-radius: 50%; background: rgba(255, 255, 255, .85); box-shadow: 0 0 0 4px rgba(255,255,255,.35); }
+  .geste.g1 .doigt { left: 40px; top: 42px; animation: glisse 1.8s ease-in-out infinite; }
+  .geste.g2 .doigt.a { left: 70px; top: 42px; animation: pince-a 1.8s ease-in-out infinite; }
+  .geste.g2 .doigt.b { left: 100px; top: 42px; animation: pince-b 1.8s ease-in-out infinite; }
+  .geste.g3 .doigt { left: 30px; top: 70px; animation: trace 2.2s ease-in-out infinite; }
+  .geste .route { position: absolute; left: 38px; top: 82px; height: 12px; background: #97a4b8; box-shadow: 0 0 8px rgba(125, 243, 255, .7); border-radius: 3px; animation: route 2.2s ease-in-out infinite; }
+  @keyframes glisse { 50% { transform: translate(110px, 0); } }
+  @keyframes pince-a { 50% { transform: translate(-40px, 0); } }
+  @keyframes pince-b { 50% { transform: translate(40px, 0); } }
+  @keyframes trace { 10% { transform: translate(0, 0); } 70%, 100% { transform: translate(130px, 0); } }
+  @keyframes route { 0%, 10% { width: 0; } 70%, 100% { width: 130px; } }
+
+  /* Petits écrans en paysage (844 × 390) : barre plus compacte, menu sur deux colonnes. */
+  @media (max-height: 520px) {
+    :root { --barre: 46px; }
+    #mini { width: 150px; height: 75px; }
+    #tuto { right: 162px; font-size: 14px; }
+    .carte-ecran { padding: 10px 14px; }
+    .carte-ecran h1 { font-size: 22px; }
+    .carte-ecran > .boutons:last-child { margin: 8px -14px 0; padding: 6px 14px 10px; }
+  }
+  /* Téléphone en paysage dans le lanceur du site (barre du site + barre du navigateur) :
+     il reste 260 à 300 px de haut. Cartes, textes et démonstrations des gestes resserrés. */
+  @media (max-height: 340px) {
+    #panneau.grand > h2 { display: none; }
+    .cp-cote h1 { font-size: 18px; }
+    .prochaine-mission strong { font-size: 15px; }
+    .cp-cote .aide { display: none; }
+    #ecran { padding: 6px; }
+    .carte-ecran { padding: 8px 12px; max-height: 100%; }
+    .carte-ecran h1 { font-size: 19px; }
+    .carte-ecran h2 { font-size: 17px; margin: 2px 0; }
+    .carte-ecran p { font-size: 14px; margin: 3px 0; line-height: 1.3; }
+    .carte-ecran > .boutons:last-child { margin: 6px -12px 0; padding: 6px 12px 8px; }
+    .gros { min-height: 44px; font-size: 16px; }
+    .geste { transform: scale(.62); margin: -23px auto; }
+    .grosses-etoiles { font-size: 32px; }
+    .titre-jeu h1 { font-size: 40px; }
+    .titre-jeu .consigne { font-size: 14px; margin: 4px auto 8px; padding: 6px 10px; }
+    .titre-jeu .age { margin-top: 4px; }
+  }
+  /* Barre du haut trop étroite pour tout montrer (jusqu'à 900 px : téléphones en paysage, depuis
+     le bouton du commerce) : la date et les loupes se cachent (on zoome aussi en pinçant). */
+  @media (max-width: 900px) { .masque-etroit { display: none !important; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="carte"></canvas>
+  <div id="hud" hidden>
+    <header id="barre">
+      <button class="ico" id="b-menu" data-i18n-aria="ui.pause" data-i18n-title="ui.pause"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
+      <span class="info" id="i-tresor" data-i18n-title="hud.tresor"><svg viewBox="0 0 24 24"><path d="M12 2.5l8 4.6v9.8l-8 4.6-8-4.6V7.1z" fill="#ffcf6b" stroke="#a8741c"/><path d="M12 6.5l4.6 2.7v5.6L12 17.5l-4.6-2.7V9.2z" fill="none" stroke="#a8741c" stroke-width="1.4"/><circle cx="12" cy="12" r="1.8" fill="#a8741c"/></svg><span id="v-tresor"></span></span>
+      <span class="info" id="i-pop" data-i18n-title="hud.population"><svg viewBox="0 0 24 24"><circle cx="8.5" cy="9" r="5" fill="#f4f6fa"/><ellipse cx="9.8" cy="9.3" rx="3" ry="2.6" fill="#16304a"/><circle cx="10.8" cy="8.4" r=".8" fill="#fff"/><path d="M3 21c0-4 2.4-6 5.5-6s5.5 2 5.5 6z" fill="#dfe6ef"/><circle cx="17" cy="11" r="3.8" fill="#bfeaff"/><ellipse cx="18" cy="11.2" rx="2.2" ry="1.9" fill="#16304a"/><path d="M13.4 21c.2-3 1.6-4.6 3.6-4.6s4 1.6 4 4.6z" fill="#9fc6e6"/></svg><span id="v-pop"></span></span>
+      <span class="info masque-etroit" id="v-date"></span>
+      <span class="vitesse">
+        <button class="ico" id="b-lent" data-i18n-aria="ui.plusLent" data-i18n-title="ui.plusLent"><svg viewBox="0 0 24 24"><path d="M5 11h14v2H5z" fill="currentColor"/></svg></button>
+        <span id="v-vitesse"></span>
+        <button class="ico" id="b-vite" data-i18n-aria="ui.plusVite" data-i18n-title="ui.plusVite"><svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" fill="currentColor"/></svg></button>
+      </span>
+      <span class="espace"></span>
+      <button class="ico" id="b-calque" data-i18n-aria="ui.calques" data-i18n-title="ui.calques"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z" fill="#4aa8ff"/><path d="M3 12l9 5 9-5" fill="none" stroke="#ff6fb5" stroke-width="2"/><path d="M3 16l9 5 9-5" fill="none" stroke="#ffcf6b" stroke-width="2"/></svg></button>
+      <button class="ico" id="b-commerce" hidden data-i18n-aria="ui.commerce" data-i18n-title="ui.commerce"><svg viewBox="0 0 24 24"><path d="M5 9l7-3.5L19 9v7l-7 3.5L5 16z" fill="#ffa53a" stroke="#ffd9a8" stroke-linejoin="round"/><path d="M5 9l7 3.5L19 9M12 12.5v7" fill="none" stroke="#7a4a10" stroke-width="1.2"/><path d="M1.5 7l3-3v2h3v2h-3v2zM22.5 17l-3 3v-2h-3v-2h3v-2z" fill="#5fe0a0"/></svg></button>
+      <button class="ico" id="b-province" hidden data-i18n-aria="voisins.panneau" data-i18n-title="voisins.panneau"><svg viewBox="0 0 24 24"><circle cx="6" cy="7" r="3" fill="#ff8a6a"/><circle cx="18" cy="7" r="3" fill="#4aa8ff"/><circle cx="6" cy="17" r="3" fill="#5fe0a0"/><circle cx="18" cy="17" r="3" fill="#ffcf6b"/><path d="M9 7h6M6 10v4M18 10v4M9 17h6" stroke="#9fb4d4" stroke-width="1.6"/></svg></button>
+      <button class="ico" id="b-conseil" data-i18n-aria="ui.conseil" data-i18n-title="ui.conseil"><svg viewBox="0 0 24 24"><path d="M12 2.5l8 3v6.2c0 4.8-3.4 8-8 9.8-4.6-1.8-8-5-8-9.8V5.5z" fill="#6f8cff" stroke="#dfe6ff"/><path d="M12 7l1.5 3.2 3.5.4-2.6 2.4.7 3.5L12 14.7l-3.1 1.8.7-3.5L7 10.6l3.5-.4z" fill="#fff"/></svg></button>
+      <button class="ico" id="b-journal" data-i18n-aria="ui.journal" data-i18n-title="ui.journal"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.4" fill="#16203a" stroke="#7df3ff" stroke-width="1.5"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#7df3ff" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      <button class="ico" id="b-tourner" data-i18n-aria="ui.tourner" data-i18n-title="ui.tourner"><svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 1-7 7h2a5 5 0 1 0 5-5v3L7 6l5-4z" fill="currentColor"/></svg></button>
+      <button class="ico masque-etroit" id="b-zoomm" data-i18n-aria="ui.zoomMoins" data-i18n-title="ui.zoomMoins"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 10h6M15 15l5 5" stroke="currentColor" stroke-width="2"/></svg></button>
+      <button class="ico masque-etroit" id="b-zoomp" data-i18n-aria="ui.zoomPlus" data-i18n-title="ui.zoomPlus"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 10h6M10 7v6M15 15l5 5" stroke="currentColor" stroke-width="2"/></svg></button>
+      <button class="ico" id="b-son" data-i18n-aria="ui.son" data-i18n-title="ui.son"></button>
+      <span class="langue-hote" id="langue-barre"></span>
+    </header>
+    <nav id="menu-cat"></nav>
+    <section id="sous-menu" hidden></section>
+    <div id="tuto" hidden><span class="texte" id="tuto-texte"></span><span class="progres" id="tuto-progres"></span></div>
+    <div id="main" hidden><svg viewBox="0 0 44 44" width="44" height="44"><path d="M8 22c0-3 4-3 4 0V8c0-3 5-3 5 0v10c0-3 5-3 5 0v2c0-3 5-3 5 0v2c0-3 5-3 5 0v8c0 7-5 10-11 10s-9-3-11-6z" fill="#eaf8ff" stroke="#16304a" stroke-width="2" stroke-linejoin="round"/></svg></div>
+    <aside id="panneau" hidden></aside>
+    <canvas id="mini" width="400" height="200"></canvas>
+    <div id="valider" hidden><span id="v-cout"></span><button class="gros non" id="b-annul" data-i18n="outil.annuler"></button><button class="gros oui" id="b-ok" data-i18n="outil.valider"></button></div>
+    <button class="gros or" id="b-annuler-derniere" hidden data-i18n="outil.annulerDerniere"></button>
+    <div id="ordre" hidden><span id="ordre-texte"></span><button class="gros non" id="b-ordre-annul" data-i18n="armee.annulerOrdre"></button></div>
+    <div id="bulle" hidden></div>
+    <div id="toasts"></div>
+  </div>
+  <div id="ecran"></div>
+</div>
+<script type="application/json" id="cm-donnees">/*CM:DONNEES*/</script>
+<script type="application/json" id="cm-villes">/*CM:VILLES*/</script>
+<script id="cm-sim">/*CM:SIM*/</script>
+<script id="cm-exemples">/*CM:EXEMPLES*/</script>
+<script id="cm-dessins">/*CM:DESSINS*/</script>
+<script id="cm-rendu">/*CM:RENDU*/</script>
+<script id="cm-audio">/*CM:AUDIO*/</script>
+<script id="cm-interface">/*CM:INTERFACE*/</script>
+</body>
+</html>

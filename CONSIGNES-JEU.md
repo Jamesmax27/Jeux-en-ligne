@@ -60,6 +60,7 @@ Un nouveau jeu est **complet et travaillé, jamais un simple prototype** : il do
 - Aucune erreur dans la console, au démarrage comme pendant la partie.
 - **Suivi des parties : seulement `FMG.reportEnd` dans le jeu** (ci-dessous). Le lanceur place lui-même, en tête de chaque jeu (anciens comme nouveaux), le script commun de suivi (`SCRIPT_SUIVI` dans `public/suivi.js`), qui lui signale les erreurs JavaScript et fournit `window.FMG.reportEnd` ; il mesure aussi le temps de jeu et envoie le tout au site (« Tendances » de l'accueil, onglet « Stats » de la page privée). Le jeu ne contient donc **aucun code réseau** (`fetch`, `sendBeacon`… : bloqués par la règle de sécurité) et ne doit pas empêcher les erreurs d'arriver jusqu'à `window` (pas de `stopImmediatePropagation()` sur l'événement `error`) ; `window.onerror` reste utilisable.
 - Code lisible et commenté en français.
+- **Dérogations** : une exception à ces règles (poids, nombre de niveaux, orientation) n'existe que sur décision écrite du propriétaire pour un jeu précis ; elle est inscrite dans `scripts/derogations-jeux.mjs`, que lisent les robots. Exemple : Marmoria (`docs/cadrage-marmoria.md`, section 19.6).
 
 ### Ordinateur (obligatoire)
 

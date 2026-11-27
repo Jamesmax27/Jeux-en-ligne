@@ -28,6 +28,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { convertir, mesurerImage } from './jaquette-sans-texte.mjs';
+import { derogation } from './derogations-jeux.mjs';
 
 const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -36,9 +37,11 @@ export const APERCUS = {
   nombre: 3,
   fichier: (n) => `apercu-${n}.webp`,
   // Écran de chaque image : téléphone en portrait (488 × 1055 px) pour 1 et 2, ordinateur (1280 × 720 px) pour 3.
-  ecran: (n) => (n === 3
+  // Jeu en paysage (dérogation, scripts/derogations-jeux.mjs) : téléphone tenu à l'horizontale, 844 × 390.
+  ecran: (n, paysage) => (n === 3
     ? { largeur: 1280, hauteur: 720, echelle: 1, mobile: false }
-    : { largeur: 390, hauteur: 844, echelle: 1.25, mobile: true }),
+    : paysage ? { largeur: 844, hauteur: 390, echelle: 1.25, mobile: true }
+      : { largeur: 390, hauteur: 844, echelle: 1.25, mobile: true }),
   qualite: 78,
   langue: 'en',
   attendre: 2500,                   // le jeu met son moment en place, puis capture
@@ -88,10 +91,10 @@ function boutonsDeMenu() {
  * Capture les 3 images d'un jeu servi à `adresse` (le jeu seul, comme à games/<id>/).
  * Renvoie { images: [{ n, png, webp, mesures, menus }], problemes: [] }.
  */
-export async function capturerApercus(navigateur, adresse) {
+export async function capturerApercus(navigateur, adresse, options = {}) {
   const images = [], problemes = [];
   for (let n = 1; n <= APERCUS.nombre; n++) {
-    const e = APERCUS.ecran(n);
+    const e = APERCUS.ecran(n, options.paysage);
     const contexte = await navigateur.newContext({
       viewport: { width: e.largeur, height: e.hauteur },
       deviceScaleFactor: e.echelle, isMobile: e.mobile, hasTouch: e.mobile, locale: 'en-US',
@@ -164,7 +167,7 @@ async function principal() {
       }
       const serveur = await servirJeu(dossier);
       try {
-        const { images, problemes } = await capturerApercus(navigateur, serveur.adresse);
+        const { images, problemes } = await capturerApercus(navigateur, serveur.adresse, { paysage: !!derogation(id).paysage });
         for (const im of images) {
           if (!verifier) await writeFile(path.join(dossier, APERCUS.fichier(im.n)), im.webp);
           console.log(`  📷 ${id} : image ${im.n}${verifier ? '' : ` → ${APERCUS.fichier(im.n)}`} (${Math.round(im.webp.length / 1024)} Ko ; occupée ${Math.round(im.mesures.details * 100)} %, contraste ${im.mesures.contraste}, luminosité ${im.mesures.luminosite})`);

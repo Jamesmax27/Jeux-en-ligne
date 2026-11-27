@@ -1052,20 +1052,22 @@ function perdre(txt) {
 function dessiner(now) {
   var sol = H - 60;
   ctx.fillStyle = '#cdeefb'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#fff'; // nuages
-  [[60, 50], [220, 30], [340, 70]].forEach(function (n, i) {
-    var x = ((n[0] - scroll * 0.2 * (i + 1)) % (W + 80) + W + 80) % (W + 80) - 40;
+  ctx.fillStyle = '#fff'; // nuages (une série par tranche de 400 px : une seule dans le jeu)
+  for (var r = 0; r * 400 < W; r++) [[60, 50], [220, 30], [340, 70]].forEach(function (n, i) {
+    var x = ((n[0] + r * 400 - scroll * 0.2 * (i + 1)) % (W + 80) + W + 80) % (W + 80) - 40;
     ctx.beginPath(); ctx.arc(x, n[1], 18, 0, 7); ctx.arc(x + 20, n[1] + 4, 14, 0, 7); ctx.arc(x - 18, n[1] + 6, 12, 0, 7); ctx.fill();
   });
-  ctx.fillStyle = '#7fc46b'; // collines
-  for (var i = 0; i < 4; i++) {
-    var hx = ((i * 140 - scroll * 0.5) % 560 + 560) % 560 - 80;
+  ctx.fillStyle = '#7fc46b'; // collines (4 sur 560 px dans le jeu, plus si la scène est plus large)
+  var nbC = Math.ceil((W + 160) / 140), perC = nbC * 140;
+  for (var i = 0; i < nbC; i++) {
+    var hx = ((i * 140 - scroll * 0.5) % perC + perC) % perC - 80;
     ctx.beginPath(); ctx.arc(hx, sol, 70, Math.PI, 0); ctx.fill();
   }
   ctx.fillStyle = '#5aa84a'; ctx.fillRect(0, sol, W, H - sol);
   ctx.fillStyle = '#8b5a2b'; ctx.fillRect(0, sol + 18, W, H - sol - 18);
   ctx.fillStyle = '#6e4620';
-  for (var k = 0; k < 10; k++) ctx.fillRect(((k * 50 - scroll) % 500 + 500) % 500 - 40, sol + 38, 22, 5);
+  var nbT = Math.ceil((W + 100) / 50), perT = nbT * 50;
+  for (var k = 0; k < nbT; k++) ctx.fillRect(((k * 50 - scroll) % perT + perT) % perT - 40, sol + 38, 22, 5);
 
   // Obstacle : une bûche
   if (obst && obst.x > -60) {
@@ -1089,6 +1091,7 @@ function dessiner(now) {
 var dernier = 0;
 function boucle(now) {
   requestAnimationFrame(boucle);
+  if (apercu) { dessiner(1000); return; } // image du jeu : moment figé
   var dt = Math.min(50, now - (dernier || now)); dernier = now;
   if (etat === 'course') {
     var reste = Math.max(0, 1 - (now - t0) / duree);
@@ -1120,6 +1123,7 @@ function boucle(now) {
 
 // Clavier : touches 1 à 4 pour répondre, Entrée pour jouer
 document.addEventListener('keydown', function (e) {
+  if (apercu || affiche) return;
   var n = parseInt(e.key);
   if (etat === 'course' && n >= 1 && n <= 4) {
     var b = $('ans').children[n - 1]; if (b) b.click();
@@ -1128,9 +1132,234 @@ document.addEventListener('keydown', function (e) {
   }
 });
 
+/* ---------- Affiche (jaquette du site) ---------- */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+// sans interface, sans texte, sans son : le renard bondit par-dessus la bûche, au soleil.
+var affiche = !!window.JEL_AFFICHE;
+var apercu = 0;
+
+function etoile(c, x, y, r, coul) {
+  c.fillStyle = coul; c.beginPath();
+  for (var i = 0; i < 10; i++) {
+    var a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r;
+    c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+  }
+  c.closePath(); c.fill();
+}
+function nuage(c, x, y, s) {
+  c.beginPath(); c.arc(x, y, 30 * s, 0, 7); c.arc(x + 34 * s, y + 6 * s, 24 * s, 0, 7);
+  c.arc(x - 30 * s, y + 10 * s, 20 * s, 0, 7); c.arc(x + 8 * s, y - 16 * s, 24 * s, 0, 7); c.fill();
+}
+// Renard dessiné (même renard roux que le jeu, en grand), tourné vers la droite, en plein saut.
+function dessinerRenard(c) {
+  var OR = '#ef8a2e', FONCE = '#9a4a12', CREME = '#fff4e2', BRUN = '#4a2810';
+  c.lineJoin = 'round'; c.lineCap = 'round';
+  // Queue touffue, pointe blanche
+  c.fillStyle = OR; c.strokeStyle = FONCE; c.lineWidth = 5;
+  c.beginPath(); c.moveTo(-70, -5);
+  c.bezierCurveTo(-120, -10, -170, -60, -215, -110);
+  c.bezierCurveTo(-200, -40, -160, 20, -70, 30); c.closePath(); c.fill(); c.stroke();
+  c.fillStyle = CREME; c.beginPath(); c.moveTo(-178, -60);
+  c.bezierCurveTo(-195, -80, -205, -95, -215, -110); c.bezierCurveTo(-212, -80, -205, -55, -190, -40); c.closePath(); c.fill();
+  // Pattes arrière tendues
+  c.strokeStyle = OR; c.lineWidth = 26;
+  c.beginPath(); c.moveTo(-50, 25); c.lineTo(-125, 52); c.stroke();
+  c.beginPath(); c.moveTo(-30, 30); c.lineTo(-100, 72); c.stroke();
+  c.strokeStyle = BRUN; c.lineWidth = 24;
+  c.beginPath(); c.moveTo(-120, 50); c.lineTo(-148, 58); c.stroke();
+  c.beginPath(); c.moveTo(-95, 69); c.lineTo(-122, 82); c.stroke();
+  // Corps
+  c.fillStyle = OR; c.strokeStyle = FONCE; c.lineWidth = 5;
+  c.beginPath(); c.ellipse(0, 0, 95, 52, -0.12, 0, 7); c.fill(); c.stroke();
+  c.fillStyle = CREME; c.beginPath(); c.ellipse(15, 26, 62, 22, -0.15, 0, 7); c.fill();
+  // Pattes avant tendues vers l'avant
+  c.strokeStyle = OR; c.lineWidth = 24;
+  c.beginPath(); c.moveTo(60, 10); c.lineTo(130, 40); c.stroke();
+  c.beginPath(); c.moveTo(45, 20); c.lineTo(110, 62); c.stroke();
+  c.strokeStyle = BRUN; c.lineWidth = 22;
+  c.beginPath(); c.moveTo(125, 38); c.lineTo(150, 48); c.stroke();
+  c.beginPath(); c.moveTo(105, 59); c.lineTo(128, 74); c.stroke();
+  // Tête
+  c.save(); c.translate(105, -62); c.rotate(-0.08);
+  c.fillStyle = OR; c.strokeStyle = FONCE; c.lineWidth = 5;
+  [[-36, -30, -52, -108, -2, -48], [8, -44, 18, -118, 42, -36]].forEach(function (o) {
+    c.beginPath(); c.moveTo(o[0], o[1]); c.lineTo(o[2], o[3]); c.lineTo(o[4], o[5]); c.closePath(); c.fill(); c.stroke();
+  });
+  c.fillStyle = BRUN;
+  c.beginPath(); c.moveTo(-30, -38); c.lineTo(-46, -92); c.lineTo(-10, -48); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(14, -46); c.lineTo(20, -100); c.lineTo(34, -42); c.closePath(); c.fill();
+  c.fillStyle = OR; c.beginPath(); c.ellipse(0, 0, 60, 52, 0, 0, 7); c.fill(); c.stroke();
+  // Museau blanc pointu et joues
+  c.fillStyle = CREME; c.beginPath(); c.moveTo(-10, 10);
+  c.bezierCurveTo(20, -8, 70, 0, 100, 8); c.bezierCurveTo(80, 40, 30, 52, -20, 40); c.closePath(); c.fill();
+  c.strokeStyle = FONCE; c.lineWidth = 4; c.stroke();
+  c.fillStyle = '#1e1208'; c.beginPath(); c.ellipse(98, 8, 11, 9, 0, 0, 7); c.fill();
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(95, 4, 3, 0, 7); c.fill();
+  // Grand sourire, bouche ouverte de joie
+  c.fillStyle = '#7a1f1f'; c.beginPath(); c.moveTo(50, 26); c.quadraticCurveTo(72, 46, 92, 22); c.quadraticCurveTo(72, 30, 50, 26); c.fill();
+  c.fillStyle = '#ff7a8a'; c.beginPath(); c.ellipse(70, 34, 9, 5, 0, 0, 7); c.fill();
+  // Œil rieur et sourcil
+  c.fillStyle = '#1e1208'; c.beginPath(); c.ellipse(26, -12, 11, 14, 0, 0, 7); c.fill();
+  c.fillStyle = '#fff'; c.beginPath(); c.arc(30, -17, 4.5, 0, 7); c.fill(); c.beginPath(); c.arc(22, -6, 2, 0, 7); c.fill();
+  c.strokeStyle = FONCE; c.lineWidth = 4; c.beginPath(); c.moveTo(12, -34); c.quadraticCurveTo(28, -42, 42, -32); c.stroke();
+  c.fillStyle = 'rgba(255,120,120,.45)'; c.beginPath(); c.ellipse(10, 18, 12, 7, 0, 0, 7); c.fill();
+  c.restore();
+}
+
+function dessinerAffiche() {
+  var cAf = $('affiche');
+  var w = window.innerWidth, h = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+  cAf.width = Math.round(w * dpr); cAf.height = Math.round(h * dpr);
+  var c = cAf.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  var s = Math.min(w / 600, h / 800), ox = (w - 600 * s) / 2, oy = (h - 800 * s) / 2;
+  // Ciel sur tout l'écran
+  var g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, '#4fb6ec'); g.addColorStop(0.55, '#a9e2fa'); g.addColorStop(1, '#fff1c9');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  c.save(); c.translate(ox, oy); c.scale(s, s);
+  var gauche = -ox / s, droite = 600 + ox / s; // décor prolongé jusqu'aux bords
+  // Soleil et sa lueur
+  var gs = c.createRadialGradient(470, 150, 20, 470, 150, 260);
+  gs.addColorStop(0, 'rgba(255,240,150,1)'); gs.addColorStop(0.3, 'rgba(255,220,110,.55)'); gs.addColorStop(1, 'rgba(255,220,110,0)');
+  c.fillStyle = gs; c.fillRect(gauche, -200, droite - gauche, 700);
+  c.fillStyle = '#ffe066'; c.beginPath(); c.arc(470, 150, 56, 0, 7); c.fill();
+  c.strokeStyle = 'rgba(255,224,102,.8)'; c.lineWidth = 8; c.lineCap = 'round';
+  for (var i = 0; i < 12; i++) {
+    var a = i * Math.PI / 6;
+    c.beginPath(); c.moveTo(470 + Math.cos(a) * 72, 150 + Math.sin(a) * 72); c.lineTo(470 + Math.cos(a) * 98, 150 + Math.sin(a) * 98); c.stroke();
+  }
+  // Nuages
+  c.fillStyle = 'rgba(255,255,255,.95)';
+  for (var x0 = gauche - 300; x0 < droite + 300; x0 += 600) {
+    nuage(c, x0 + 120, 120, 1.1); nuage(c, x0 + 330, 230, 0.8); nuage(c, x0 + 560, 300, 0.7);
+  }
+  // Collines lointaines puis proches
+  c.fillStyle = '#a6dc8c';
+  for (var hx = gauche - 200; hx < droite + 200; hx += 230) { c.beginPath(); c.ellipse(hx, 560, 170, 120, 0, Math.PI, 0); c.fill(); }
+  c.fillStyle = '#7fc46b';
+  for (hx = gauche - 100; hx < droite + 200; hx += 260) { c.beginPath(); c.ellipse(hx + 90, 600, 190, 110, 0, Math.PI, 0); c.fill(); }
+  // Sapins au loin
+  for (hx = gauche - 40; hx < droite + 40; hx += 95) {
+    var th = 70 + ((hx * 7) % 30 + 30) % 30;
+    c.fillStyle = '#3f8f45'; c.beginPath(); c.moveTo(hx, 590 - th); c.lineTo(hx - 26, 590); c.lineTo(hx + 26, 590); c.closePath(); c.fill();
+  }
+  // Sol : herbe puis chemin de terre, comme dans le jeu
+  c.fillStyle = '#5aa84a'; c.fillRect(gauche, 590, droite - gauche, 260);
+  c.fillStyle = '#8b5a2b'; c.fillRect(gauche, 625, droite - gauche, 230);
+  c.fillStyle = '#6e4620';
+  for (hx = gauche; hx < droite; hx += 70) c.fillRect(hx, 680, 30, 8);
+  // Ombre du renard sur le sol
+  c.fillStyle = 'rgba(40,20,0,.25)'; c.beginPath(); c.ellipse(300, 640, 150, 16, 0, 0, 7); c.fill();
+  // La bûche à sauter
+  c.fillStyle = '#7a4a1e'; c.strokeStyle = '#4e2c0e'; c.lineWidth = 5;
+  c.beginPath(); c.roundRect ? c.roundRect(200, 560, 200, 76, 20) : c.rect(200, 560, 200, 76); c.fill(); c.stroke();
+  c.strokeStyle = '#5e3814'; c.lineWidth = 3;
+  c.beginPath(); c.moveTo(220, 585); c.lineTo(360, 585); c.moveTo(230, 610); c.lineTo(380, 610); c.stroke();
+  c.fillStyle = '#d9a566'; c.strokeStyle = '#4e2c0e'; c.lineWidth = 5;
+  c.beginPath(); c.ellipse(400, 598, 22, 38, 0, 0, 7); c.fill(); c.stroke();
+  c.strokeStyle = '#a8743c'; c.lineWidth = 3;
+  c.beginPath(); c.ellipse(400, 598, 12, 22, 0, 0, 7); c.stroke();
+  c.fillStyle = '#5aa84a'; c.beginPath(); c.ellipse(260, 560, 18, 7, 0, 0, 7); c.fill();
+  // Poussière du bond et traînée d'étoiles dorées
+  c.fillStyle = 'rgba(255,248,230,.8)';
+  [[110, 625, 22], [80, 612, 16], [140, 640, 14]].forEach(function (p) { c.beginPath(); c.arc(p[0], p[1], p[2], 0, 7); c.fill(); });
+  c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 6;
+  [[60, 330, 150, 345], [40, 380, 120, 390], [70, 430, 140, 432]].forEach(function (l) { c.beginPath(); c.moveTo(l[0], l[1]); c.lineTo(l[2], l[3]); c.stroke(); });
+  etoile(c, 90, 270, 20, '#ffd23f'); etoile(c, 150, 220, 13, '#ffe680'); etoile(c, 520, 330, 18, '#ffd23f');
+  etoile(c, 470, 420, 11, '#fff2a8'); etoile(c, 60, 470, 10, '#fff2a8');
+  // Le renard, en grand, au sommet du saut, avec une lueur dorée
+  c.save(); c.translate(305, 392); c.rotate(-0.18); c.scale(1.25, 1.25);
+  c.shadowColor = 'rgba(255,230,140,.9)'; c.shadowBlur = 30;
+  dessinerRenard(c);
+  c.restore();
+  // Premier plan : herbes et fleurs coupées par les bords
+  c.fillStyle = '#3f9a3a';
+  for (hx = gauche - 20; hx < droite + 20; hx += 26) {
+    var hh = 40 + ((hx * 13) % 40 + 40) % 40;
+    c.beginPath(); c.moveTo(hx, 800); c.quadraticCurveTo(hx + 8, 800 - hh, hx + 16, 800 - hh - 10); c.quadraticCurveTo(hx + 12, 800 - hh / 2, hx + 22, 800); c.fill();
+  }
+  [[30, 750, '#ff6b8b'], [570, 760, '#ffd23f'], [520, 740, '#ffffff'], [80, 775, '#ffd23f']].forEach(function (f) {
+    c.fillStyle = f[2];
+    for (var p = 0; p < 5; p++) { var a = p * Math.PI * 2 / 5; c.beginPath(); c.arc(f[0] + Math.cos(a) * 11, f[1] + Math.sin(a) * 11, 8, 0, 7); c.fill(); }
+    c.fillStyle = '#e9893a'; c.beginPath(); c.arc(f[0], f[1], 6, 0, 7); c.fill();
+  });
+  c.restore();
+}
+
+function cacherBoutons() {
+  var l = document.querySelectorAll('.jel-langue, jel-sauvegarde-effacer, button, #app');
+  for (var i = 0; i < l.length; i++) l[i].style.setProperty('display', 'none', 'important');
+}
+function demarrerAffiche() {
+  var cAf = document.createElement('canvas');
+  cAf.id = 'affiche';
+  cAf.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;z-index:10';
+  document.body.appendChild(cAf);
+  cacherBoutons();
+  [0, 100, 400, 1000].forEach(function (d) { setTimeout(cacherBoutons, d); });
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ---------- Images du jeu (page du jeu) ---------- */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : la course
+// s'ouvre directement, avec sa vraie interface (cœurs, niveau, score, question, barre de temps,
+// 4 réponses), puis reste figée : ni son, ni sauvegarde, ni fin de partie.
+//   1 = niveau 1, tables de 2 et 3 : la bûche approche, la barre est encore verte ;
+//   2 = niveau 4 : bonne réponse touchée, le renard saute la bûche ;
+//   3 = niveau 9, toutes les tables mélangées, un seul cœur : la barre est rouge (sur ordinateur).
+var MOMENTS_APERCU = {
+  1: { niveau: 1, score: 24, vies: 3, bonnes: 2, a: 3, b: 4, choix: [15, 12, 8, 16], reste: 0.36, scroll: 120, bucheX: 162 },
+  2: { niveau: 4, score: 236, vies: 2, bonnes: 16, a: 6, b: 7, choix: [48, 35, 42, 49], reste: 0.6, scroll: 610, saut: true, bucheX: 96 },
+  3: { niveau: 9, score: 702, vies: 1, bonnes: 41, a: 8, b: 7, choix: [63, 56, 48, 54], reste: 0.2, scroll: 1340, bucheX: 190 },
+};
+function cadrerApercu() {
+  var cw = cv.clientWidth || 400, ch = cv.clientHeight || 300, k;
+  // Ordinateur : un peu moins de ciel, pour que le renard et la bûche restent bien visibles.
+  if (apercu === 3) { H = 220; W = Math.max(300, Math.round(H * cw / ch)); k = cw / W; }
+  else { H = 300; W = 400; k = 3; }
+  cv.width = Math.round(W * k); cv.height = Math.round(H * k);
+  ctx.setTransform(k, 0, 0, k, 0, 0);
+  obst = { x: MOMENTS_APERCU[apercu].bucheX };
+}
+function ouvrirApercu(n) {
+  apercu = n;
+  var m = MOMENTS_APERCU[n];
+  $('accueil').classList.add('cache'); $('fin').classList.add('cache');
+  etat = 'apercu'; figee = true;
+  niveau = m.niveau; score = m.score; vies = m.vies; bonnes = m.bonnes; scroll = m.scroll;
+  question = { a: m.a, b: m.b, bon: m.a * m.b };
+  $('q').textContent = m.a + ' × ' + m.b + ' = ?';
+  var zone = $('ans'); zone.innerHTML = '';
+  m.choix.forEach(function (v) {
+    var bt = document.createElement('button');
+    bt.textContent = v;
+    if (m.saut && v === question.bon) bt.className = 'ok';
+    zone.appendChild(bt);
+  });
+  if (n === 3) {
+    // Ordinateur : la course occupe toute la largeur, les 4 réponses sur une ligne.
+    $('app').style.maxWidth = 'none';
+    zone.style.gridTemplateColumns = 'repeat(4, 1fr)';
+  }
+  $('barin').style.width = (m.reste * 100) + '%';
+  $('barin').style.background = m.reste < 0.3 ? '#e53935' : '#4caf50';
+  if (m.saut) renardY = 62;
+  majHud();
+  cadrerApercu();
+  window.addEventListener('resize', cadrerApercu);
+}
+
 $('jouer').onclick = jouer; $('rejouer').onclick = function () { demarrer(); };
 JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('accueil') });
-majHud(); requestAnimationFrame(boucle);
+var numeroApercu = Number(window.JEL_APERCU);
+if (affiche) demarrerAffiche();
+else {
+  majHud();
+  if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

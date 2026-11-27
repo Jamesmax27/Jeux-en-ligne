@@ -3031,18 +3031,314 @@ window.addEventListener('resize', () => { if (ecran === 'jeu') redimensionner();
 // Sauvegarde à la fermeture, seulement pendant une partie.
 if (window.JEL_SAVE) {
   JEL_SAVE.surFermeture(() => {
+    if (window.JEL_APERCU || window.JEL_AFFICHE) return; // image du jeu ou affiche : rien d'écrit
     if (partie && ecran === 'jeu') JEL_SAVE.save(JEU, donneesSauvegarde(partie.i + 1));
   });
+}
+
+/* ---------- Affiche du jeu (window.JEL_AFFICHE, posé par le robot seulement) ---------- */
+// Scène composée plein écran, sans texte ni bouton : le soleil naît de la fusion
+// de deux fleurs, au-dessus d'un plateau de jeu vu en perspective.
+function cacherLangue() {
+  document.querySelectorAll('jel-langue, .jel-langue').forEach((el) => { el.style.setProperty('display', 'none', 'important'); });
+}
+function etincelle(c, x, y, s, coul, alpha) {
+  c.save();
+  c.globalAlpha = alpha == null ? 1 : alpha;
+  c.translate(x, y);
+  c.fillStyle = coul;
+  c.shadowColor = coul; c.shadowBlur = s * 1.2;
+  etoileChemin(c, 4, s, 0.28, 0);
+  c.fill();
+  c.restore();
+}
+function visageSoleil(c, x, y, s) {
+  c.save();
+  c.translate(x, y);
+  // joues roses
+  c.fillStyle = 'rgba(255,120,150,.55)';
+  c.beginPath(); c.ellipse(-s * 0.55, s * 0.18, s * 0.17, s * 0.11, 0, 0, Math.PI * 2); c.fill();
+  c.beginPath(); c.ellipse(s * 0.55, s * 0.18, s * 0.17, s * 0.11, 0, 0, Math.PI * 2); c.fill();
+  // yeux brillants
+  for (const sx of [-1, 1]) {
+    c.fillStyle = '#5a2a10';
+    c.beginPath(); c.ellipse(sx * s * 0.34, -s * 0.14, s * 0.13, s * 0.19, 0, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.arc(sx * s * 0.34 - s * 0.04, -s * 0.22, s * 0.055, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(sx * s * 0.34 + s * 0.04, -s * 0.07, s * 0.025, 0, Math.PI * 2); c.fill();
+  }
+  // grand sourire ouvert
+  c.beginPath();
+  c.moveTo(-s * 0.3, s * 0.12);
+  c.quadraticCurveTo(0, s * 0.62, s * 0.3, s * 0.12);
+  c.quadraticCurveTo(0, s * 0.24, -s * 0.3, s * 0.12);
+  c.closePath();
+  c.fillStyle = '#8a2a1a'; c.fill();
+  c.beginPath(); c.ellipse(0, s * 0.34, s * 0.12, s * 0.07, 0, 0, Math.PI * 2); c.fillStyle = '#ff7a8a'; c.fill();
+  c.lineWidth = s * 0.04; c.strokeStyle = '#6a2010'; c.lineJoin = 'round';
+  c.beginPath(); c.moveTo(-s * 0.3, s * 0.12); c.quadraticCurveTo(0, s * 0.62, s * 0.3, s * 0.12); c.stroke();
+  c.restore();
+}
+let afficheCanvas = null;
+function dessinerAffiche(temps) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (afficheCanvas.width !== Math.round(W * dpr) || afficheCanvas.height !== Math.round(H * dpr)) {
+    afficheCanvas.width = Math.round(W * dpr); afficheCanvas.height = Math.round(H * dpr);
+  }
+  const c = afficheCanvas.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // affiche virtuelle de 600 × 800 centrée ; le décor continue jusqu'aux bords
+  const B = Math.min(W, H * 0.75), u = B / 600;
+  const ox = (W - B) / 2, oy = (H - B / 0.75) / 2;
+  const P = (x, y) => [ox + x * u, oy + y * u];
+  const [sx, sy] = P(300, 300);
+  // ciel : grande lumière chaude autour du soleil
+  const fond = c.createRadialGradient(sx, sy, 0, sx, sy, Math.max(W, H) * 0.95);
+  fond.addColorStop(0, '#fff6c8'); fond.addColorStop(0.12, '#ffd36b'); fond.addColorStop(0.3, '#ff8fb0');
+  fond.addColorStop(0.55, '#8f66e8'); fond.addColorStop(0.85, '#4a37b0'); fond.addColorStop(1, '#2e2380');
+  c.fillStyle = fond; c.fillRect(0, 0, W, H);
+  // rayons de lumière
+  c.save(); c.translate(sx, sy); c.rotate(temps * 0.06);
+  for (let k = 0; k < 18; k++) {
+    c.rotate((Math.PI * 2) / 18);
+    c.fillStyle = k % 2 ? 'rgba(255,250,220,.16)' : 'rgba(255,220,150,.09)';
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.max(W, H) * 1.2, -60 * u); c.lineTo(Math.max(W, H) * 1.2, 60 * u); c.closePath(); c.fill();
+  }
+  c.restore();
+  // petites étoiles et formes lointaines, pâles, sur toute la largeur
+  for (let k = 0; k < 70; k++) {
+    const x = (k * 137.7) % W, y = (k * 89.3) % (H * 0.7);
+    c.globalAlpha = 0.45 + 0.35 * Math.sin(temps * 2 + k);
+    c.fillStyle = '#ffffff';
+    c.fillRect(x, y, 2.5, 2.5);
+  }
+  c.globalAlpha = 1;
+  for (let k = 0; k < 14; k++) {
+    const x = ((k * 211.3) % (W + 80)) - 40, y = ((k * 97.1) % (H * 0.62)) + 10;
+    if (Math.hypot(x - sx, y - sy) < 240 * u) continue;
+    dessinerForme(c, 1 + (k % 9), x, y + Math.sin(temps + k) * 4 * u, (12 + (k % 4) * 5) * u, 0.4, temps);
+  }
+  // anneau d'orbite (moitié arrière)
+  c.save();
+  c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 3 * u; c.setLineDash([10 * u, 12 * u]);
+  c.beginPath(); c.ellipse(sx, sy + 20 * u, 255 * u, 78 * u, -0.12, Math.PI, Math.PI * 2); c.stroke();
+  c.restore();
+  // formes en orbite derrière le soleil
+  const orbite = [[1, 3.55], [2, 4.15], [3, 4.75], [4, 5.4], [5, 6.05]];
+  const surOrbite = (t, a, s) => {
+    const ex = Math.cos(a) * 255 * u, ey = Math.sin(a) * 78 * u, rot = -0.12;
+    const x = sx + ex * Math.cos(rot) - ey * Math.sin(rot), y = sy + 20 * u + ex * Math.sin(rot) + ey * Math.cos(rot);
+    dessinerTuile(c, t, x, y, s * u, 1, temps);
+  };
+  orbite.forEach(([t, a]) => surOrbite(t, a + temps * 0.05, 58));
+  // ondes de choc de la fusion
+  for (let k = 0; k < 3; k++) {
+    const r = (190 + k * 34 + ((temps * 40) % 34)) * u;
+    c.beginPath(); c.arc(sx, sy, r, 0, Math.PI * 2);
+    c.strokeStyle = `rgba(255,255,240,${0.5 - k * 0.14})`; c.lineWidth = (6 - k * 1.5) * u; c.stroke();
+  }
+  // halo puis le héros : le soleil joyeux
+  const halo = c.createRadialGradient(sx, sy, 60 * u, sx, sy, 260 * u);
+  halo.addColorStop(0, 'rgba(255,240,160,.9)'); halo.addColorStop(1, 'rgba(255,200,90,0)');
+  c.fillStyle = halo; c.beginPath(); c.arc(sx, sy, 260 * u, 0, Math.PI * 2); c.fill();
+  const R = 168 * u * (1 + 0.025 * Math.sin(temps * 2.4));
+  c.save(); c.translate(sx, sy); c.rotate(Math.sin(temps * 0.8) * 0.04); c.translate(-sx, -sy);
+  dessinerForme(c, 10, sx, sy, R, 1, temps);
+  c.restore();
+  visageSoleil(c, sx, sy + 6 * u, R * 0.5);
+  // les deux fleurs qui foncent l'une vers l'autre, avec leurs traînées
+  for (const cote of [-1, 1]) {
+    const [fx, fy] = P(300 + cote * 232, 318 + cote * 10);
+    c.save();
+    for (let k = 0; k < 5; k++) {
+      const g = c.createLinearGradient(fx, 0, fx + cote * 260 * u, 0);
+      g.addColorStop(0, 'rgba(255,255,255,.75)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      c.strokeStyle = g; c.lineWidth = (9 - k) * u; c.lineCap = 'round';
+      const dy = (k - 2) * 22 * u;
+      c.beginPath(); c.moveTo(fx + cote * 60 * u, fy + dy); c.lineTo(fx + cote * (220 + k * 20) * u, fy + dy); c.stroke();
+    }
+    c.restore();
+    c.save(); c.translate(fx, fy); c.rotate(cote * -0.18); c.translate(-fx, -fy);
+    dessinerTuile(c, 9, fx, fy, 150 * u, 1, temps);
+    c.restore();
+    // étincelles au point de contact
+    const [ex, ey] = P(300 + cote * 150, 322);
+    const couls = ['#ffffff', '#ffe27a', '#ff9be0', '#9ff3ff'];
+    for (let k = 0; k < 7; k++) {
+      const a = k * 0.9 + cote, d = (16 + (k * 13) % 40) * u;
+      etincelle(c, ex + Math.cos(a) * d, ey + Math.sin(a) * d, (7 + (k % 3) * 5) * u * (1 + 0.2 * Math.sin(temps * 6 + k)), couls[k % 4], 0.95);
+    }
+  }
+  // grosses formes du premier plan, coupées par les bords
+  dessinerTuile(c, 8, ox + 560 * u + Math.max(0, W - ox - 600 * u) * 0.3, oy + 105 * u, 150 * u, 1, temps);
+  dessinerTuile(c, 7, ox + 28 * u - Math.max(0, ox) * 0.3, oy + 160 * u, 120 * u, 1, temps);
+  // plateau de jeu en perspective (bas de l'affiche)
+  const rangs = [[560, 0.62], [628, 0.8], [712, 1.0], [812, 1.24]];
+  const contenu = [
+    ['f1', 'f2', '', 'f3', '#', 'f1', 'f2'],
+    ['n', 'f4', 'g5', '', 'f6', 'j', 'f3'],
+    ['f2', 'f6', 'j', '', 'f4', 'n', 'f1'],
+    ['f5', '', 'f3', 'f1', 'g2', 'f7', 'f4'],
+  ];
+  const [, y0] = P(0, 520);
+  const plan = c.createLinearGradient(0, y0, 0, H);
+  plan.addColorStop(0, 'rgba(40,28,110,.0)'); plan.addColorStop(0.15, 'rgba(40,28,110,.85)'); plan.addColorStop(1, 'rgba(22,16,70,.98)');
+  c.fillStyle = plan; c.fillRect(0, y0, W, H - y0);
+  rangs.forEach(([ry, k], r) => {
+    const cs = 104 * u * k;
+    const [, y] = P(0, ry);
+    const n = Math.ceil(W / cs / 2) + 1;
+    for (let i = -n; i <= n; i++) {
+      const x = sx + i * cs + (r % 2 ? cs * 0.0 : 0);
+      c.save(); c.translate(x, y); c.scale(1, 0.72);
+      c.fillStyle = 'rgba(255,255,255,.12)';
+      rectRond(c, -cs * 0.46, -cs * 0.46, cs * 0.92, cs * 0.92, cs * 0.15); c.fill();
+      c.restore();
+      const code = contenu[r][((i % 7) + 7 + r * 2) % 7];
+      if (!code) continue;
+      const yy = y - cs * 0.12;
+      if (code === '#') dessinerRocher(c, x, yy, cs);
+      else if (code === 'n') dessinerNuage(c, x, yy, cs, 1, temps);
+      else if (code === 'j') dessinerJoker(c, x, yy, cs, 1, temps);
+      else if (code[0] === 'g') { dessinerTuile(c, +code[1], x, yy, cs, 1, temps); dessinerGlace(c, x, yy, cs, 1, 1); }
+      else dessinerTuile(c, +code[1], x, yy, cs, 1, temps);
+    }
+  });
+  // formes en orbite devant le soleil (moitié avant de l'anneau)
+  c.save();
+  c.strokeStyle = 'rgba(255,255,255,.6)'; c.lineWidth = 3 * u; c.setLineDash([10 * u, 12 * u]);
+  c.beginPath(); c.ellipse(sx, sy + 20 * u, 255 * u, 78 * u, -0.12, 0, Math.PI); c.stroke();
+  c.restore();
+  [[2, 0.9], [7, 2.2]].forEach(([t, a]) => surOrbite(t, a + temps * 0.05, 70));
+  // petites étincelles dorées dans l'air
+  for (let k = 0; k < 16; k++) {
+    const a = k * 2.4 + temps * 0.3, d = (200 + (k * 37) % 120) * u;
+    etincelle(c, sx + Math.cos(a) * d, sy + Math.sin(a) * d * 0.8, (4 + (k % 3) * 2) * u, k % 2 ? '#fff3b0' : '#ffffff', 0.85);
+  }
+}
+function demarrerAffiche() {
+  ['ecran-titre', 'ecran-niveaux', 'ecran-jeu', 'tuto', 'pause', 'fin', 'bilan'].forEach((id) => { const el = $(id); if (el) el.classList.add('cache'); });
+  document.querySelectorAll('button').forEach((b) => { b.style.display = 'none'; });
+  cacherLangue();
+  setTimeout(cacherLangue, 100); setTimeout(cacherLangue, 600); setTimeout(cacherLangue, 1500);
+  afficheCanvas = document.createElement('canvas');
+  afficheCanvas.setAttribute('aria-hidden', 'true');
+  afficheCanvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;z-index:50';
+  document.body.appendChild(afficheCanvas);
+  const t0 = performance.now();
+  const tour = (m) => { dessinerAffiche((m - t0) / 1000 + 1.2); requestAnimationFrame(tour); };
+  requestAnimationFrame(tour);
+}
+
+/* ---------- Images du jeu (window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement) ---------- */
+// Une vraie partie, ouverte directement, avec sa vraie interface, puis figée.
+const MOMENTS_APERCU = {
+  // niveau 1 : premières gouttes et anneaux
+  1: { i: 0, coups: 7, score: 20, max: 3, retours: 3, burst: [2, 0],
+       objets: [[0, 0, 'f1'], [0, 2, 'f2'], [1, 1, 'f1'], [2, 0, 'f3'], [2, 2, 'f2'], [2, 3, 'f1'], [3, 3, 'f1']] },
+  // niveau 8 : rochers et formes prises dans la glace
+  2: { i: 7, coups: 18, score: 76, max: 5, retours: 2, burst: [2, 2], fondu: [[0, 2]],
+       objets: [[0, 1, 'f4'], [1, 0, 'f3'], [1, 3, 'f1'], [2, 2, 'f5'], [3, 3, 'f2'], [1, 1, 'f1']] },
+  // niveau 20 : trous, glace double, nuages et étoile arc-en-ciel
+  3: { i: 19, coups: 41, score: 520, max: 7, retours: 2, burst: [2, 1], fissure: [[0, 2]],
+       objets: [[0, 1, 'f7'], [1, 0, 'f1'], [2, 1, 'f7'], [2, 4, 'j'], [3, 0, 'f4'], [3, 1, 'f5'], [4, 1, 'f3'], [4, 3, 'f2'], [0, 3, 'f1']] },
+};
+function graine(n) {
+  let a = n >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+function decorOrdinateur() {
+  // sur un écran large : le ciel et la chaîne des formes remplissent les côtés
+  const ej = $('ecran-jeu');
+  const cv = document.createElement('canvas');
+  cv.setAttribute('aria-hidden', 'true');
+  cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none';
+  ej.insertBefore(cv, ej.firstChild);
+  Array.from(ej.children).forEach((el) => { if (el !== cv) { if (getComputedStyle(el).position === 'static') el.style.position = 'relative'; el.style.zIndex = '1'; } });
+  const peindre = () => {
+    const W = window.innerWidth, H = window.innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    const c = cv.getContext('2d');
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (let k = 0; k < 90; k++) {
+      c.globalAlpha = 0.3 + (k % 5) * 0.1; c.fillStyle = '#e8e2ff';
+      c.fillRect((k * 97.3) % W, (k * 151.7) % H, 2, 2);
+    }
+    c.globalAlpha = 1;
+    const cote = Math.max(0, (W - 620) / 2);
+    if (cote < 80) return;
+    for (const sens of [-1, 1]) {
+      const cx = W / 2 + sens * (310 + cote / 2), cy = H * 0.52;
+      const R = Math.min(cote * 0.42, H * 0.36);
+      const halo = c.createRadialGradient(cx, cy, 0, cx, cy, R * 1.2);
+      halo.addColorStop(0, sens < 0 ? 'rgba(255,207,63,.28)' : 'rgba(199,125,255,.28)'); halo.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = halo; c.fillRect(cx - R * 1.3, cy - R * 1.3, R * 2.6, R * 2.6);
+      c.save(); c.strokeStyle = 'rgba(196,181,253,.3)'; c.lineWidth = 2; c.setLineDash([4, 8]);
+      c.beginPath(); c.ellipse(cx, cy, R, R * 0.9, 0, 0, Math.PI * 2); c.stroke(); c.restore();
+      dessinerForme(c, sens < 0 ? 10 : 12, cx, cy, R * 0.34, 0.9, 0);
+      const formes = sens < 0 ? [1, 2, 3, 4, 5, 6] : [7, 8, 9, 11, 6, 3];
+      formes.forEach((t, k) => {
+        const a = (k * Math.PI * 2) / formes.length + (sens < 0 ? 0.3 : 1.1);
+        const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R * 0.9;
+        dessinerTuile(c, t, x, y, R * 0.36, 1, 0);
+      });
+    }
+  };
+  peindre();
+  window.addEventListener('resize', peindre);
+}
+function ouvrirApercu(n) {
+  const m = MOMENTS_APERCU[n] || MOMENTS_APERCU[1];
+  Math.random = graine(1000 + n); // capture toujours identique
+  NIVEAUX.forEach((d) => { if (d.nouveau) prog.vus[d.nouveau] = true; });
+  if (n === 3) decorOrdinateur();
+  lancerNiveau(m.i);
+  const e = partie.etat;
+  for (const [r, c, code] of m.objets) {
+    if (e.fixe[r][c] || e.grille[r][c]) continue;
+    e.grille[r][c] = code === 'j' ? nouvelObjet('j') : nouvelObjet('f', +code.slice(1));
+  }
+  (m.fondu || []).forEach(([r, c]) => { const o = e.grille[r][c]; if (o) o.g = 0; });
+  (m.fissure || []).forEach(([r, c]) => { const o = e.grille[r][c]; if (o) o.g = 1; });
+  e.coups = m.coups; e.score = m.score; e.max = m.max;
+  partie.retours = m.retours;
+  partie.pile = [copierEtat(e)];
+  partie.faits = objectifs(e, partie.def).filter((o) => o.fait).length;
+  pops = new Map();
+  let k = 0;
+  e.grille.forEach((l) => l.forEach((o) => { if (o) pops.set(o.id, { debut: horloge + (k++) * 0.02, type: 'arrivee' }); }));
+  majHUD(true);
+  // une fusion vient d'avoir lieu : étincelles et points qui s'envolent, puis on fige
+  setTimeout(() => {
+    if (!partie) return;
+    const [r, c] = m.burst;
+    const o = partie.etat.grille[r][c];
+    if (o) {
+      pops.set(o.id, { debut: horloge, type: 'fusion' });
+      const [x, y] = centreCase(r, c);
+      eclabousser(x, y, COULEURS[o.t] || '#ffffff', 10 + (o.t || 1) * 2);
+      textesVolants.push({ x, y: y - geo.cs * 0.3, texte: T('points', { n: nb(pointsForme(o.t || 1)) }), vie: 1, coul: COULEURS[o.t] || '#ffffff' });
+    }
+  }, 700);
+  setTimeout(() => { enPause = true; }, 880); // figé, sans fenêtre de pause
 }
 
 /* ---------- Démarrage ---------- */
 chargerProgression();
 majBoutonsSon();
-montrerEcran('titre');
-requestAnimationFrame(boucle);
-// les textes traduits peuvent changer la hauteur du titre : on remesure
-setTimeout(redimTitre, 120);
-window.addEventListener('load', redimTitre);
+if (window.JEL_AFFICHE) {
+  demarrerAffiche();
+} else if (window.JEL_APERCU) {
+  ouvrirApercu(Number(window.JEL_APERCU));
+  requestAnimationFrame(boucle);
+} else {
+  montrerEcran('titre');
+  requestAnimationFrame(boucle);
+  // les textes traduits peuvent changer la hauteur du titre : on remesure
+  setTimeout(redimTitre, 120);
+  window.addEventListener('load', redimTitre);
+}
 </script>
 </body>
 </html>

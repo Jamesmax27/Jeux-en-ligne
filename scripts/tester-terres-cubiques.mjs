@@ -139,6 +139,7 @@ async function attendreVillage(c, vid, secondes, cond = 'false', maxMs = 240000)
     if (await T(c, `vie(VILLAGES.get(${vid})).t`) - t0 >= secondes) return false; }
   return false;
 }
+const MONDE = 2026; // graine du monde des sections 2 à 16 (départ à 33 blocs du village le plus proche)
 const empreintes = `(()=>{ const h=[]; for(let cz=0;cz<16;cz++) for(let cx=0;cx<16;cx++){ const c=ensureChunk(cx+LO/16,cz+LO/16); let a=0; for(let y=0;y<H;y++) for(let lz=0;lz<16;lz++) for(let lx=0;lx<16;lx++) a=(Math.imul(a,31)+c.b[(y<<8)|(lz<<4)|lx])|0; h.push(a); } return h; })()`;
 
 try {
@@ -158,21 +159,29 @@ try {
   ok(r <= 12, `raccord avec le terrain généré autour : ${r} blocs d'écart au plus`);
 
   console.log('2. nouveau monde');
-  await T(c, `setState('title')`); await c.locator('#tSurv').click(); await attendre(2500);
+  // Monde de graine fixe (MONDE), préparé comme le fait l'écran titre pour son monde d'aperçu : « Nouveau monde »
+  // le reprend au lieu d'en tirer un au hasard. Avec une graine tirée à chaque essai, les mêmes contrôles
+  // passaient ou non selon le monde (départ à 85 blocs du village pour 2 graines sur 200, emplacement des
+  // chantiers…), et un échec ne se reproduisait pas.
+  await T(c, `setState('title')`); await attendre(300);
+  await T(c, `(()=>{ loadWorld(${MONDE},'survival',false); spawnPos=findSpawn(); playingWorld=false; curSlot=-1; previewSeed=seed; computeTitleCam(); refreshTitle(); })()`);
+  await c.locator('#tSurv').click(); await attendre(2500);
   r = await T(c, `(()=>{ const hash=b=>{ let a=0; for(let i=0;i<b.length;i++) a=(Math.imul(a,31)+b[i])|0; return a; };
     const cx=Math.floor(P.x/16)+3, cz=Math.floor(P.z/16)-2, h1=hash(baseOf(cx,cz).b); BASES.clear(); CAVES.clear(); DONJONS.clear(); const h2b=hash(baseOf(cx,cz).b);
     let fer=0; for(let k=0;k<20;k++){ const b=baseOf(Math.floor(ORIG/16)+k*7-100,Math.floor(ORIG/16)+k*5-70).b; for(let i=0;i<b.length;i++) if(b[i]===IRON_ORE&&(i>>8)<=20) fer++; }
     const d=[]; for(let cj=120;cj<136;cj++) for(let ci=120;ci<136;ci++){ const v=villageInfo(ci,cj); if(v) d.push([v.cx,v.cz]); }
     let dmin=1e9; for(let a=0;a<d.length;a++) for(let b=a+1;b<d.length;b++) dmin=Math.min(dmin,Math.hypot(d[a][0]-d[b][0],d[a][1]-d[b][1]));
-    const vs=nearestVillageSite(P.x,P.z); return {legacy,cur:curSlot,same:h1===h2b,fer:fer/20,n:d.length,dmin,dv:vs?Math.hypot(vs.cx-P.x,vs.cz-P.z):-1}; })()`);
-  ok(!r.legacy && r.cur === 1, 'nouvelle partie dans l\'emplacement 2, sans ancienne zone');
+    const vs=nearestVillageSite(P.x,P.z); return {graine:seed,legacy,cur:curSlot,same:h1===h2b,fer:fer/20,n:d.length,dmin,dv:vs?Math.hypot(vs.cx-P.x,vs.cz-P.z):-1}; })()`);
+  ok(!r.legacy && r.cur === 1 && r.graine === MONDE, `nouvelle partie dans l'emplacement 2, sans ancienne zone (monde ${r.graine})`);
   ok(r.same, 'même graine, même morceau (génération reproductible)');
   ok(r.n >= 30 && r.dmin >= 200, `${r.n} villages sur 16 × 16 cases, ${Math.round(r.dmin)} blocs au moins entre deux`);
   ok(r.dv > 0 && r.dv < 80, `un village près du départ (${Math.round(r.dv)} blocs)`);
   ok(r.fer >= 2, `fer en profondeur : ${r.fer.toFixed(1)} blocs par morceau`);
   const or = await T(c, `(()=>{ const x=Math.floor(P.x)+3, z=Math.floor(P.z), y=surfaceY(x,z)+1; setBlock(x,y,z,GOLD_BLOCK); const o=[x,y,z,P.x,P.z]; P.fly=true; P.x+=1000; loadAround(P.x,P.z); return o; })()`);
-  await attendre(4000);
-  ok(await T(c, `!chunkAt(${or[0]}>>4,${or[2]}>>4)`), 'à 1 000 blocs : les morceaux du départ sont libérés');
+  // les morceaux se libèrent au fil des images : on attend (20 s au plus) au lieu d'une attente fixe de 4 s
+  let libres = false;
+  for (let k = 0; k < 40 && !libres; k++) { await attendre(500); libres = await T(c, `!chunkAt(${or[0]}>>4,${or[2]}>>4)`); }
+  ok(libres, 'à 1 000 blocs : les morceaux du départ sont libérés');
   ok(await T(c, `(()=>{ P.x=${or[3]}; P.z=${or[4]}; loadAround(P.x,P.z); return getB(${or[0]},${or[1]},${or[2]})===GOLD_BLOCK; })()`), 'retour : le bloc posé est intact');
   await T(c, `(async()=>{ saveNow(); await saving; })()`);
   c = await ouvrir(); await attendre(800);
@@ -575,11 +584,20 @@ try {
       pop:v.pop?[...v.pop].map(([s,f])=>[s,f.nom,f.age,f.naissance,f.metier,f.maison,f.humeur,JSON.stringify(f.famille),f.memoire.length,JSON.stringify(f.inv),JSON.stringify(f.dettes||{}),f.mort|0,f.parti|0]):null,
       chantier:e.s?[e.s.t,e.s.p,e.s.x,e.s.z,JSON.stringify(e.s.credit||{})]:null,h:(e.h||[]).length,houses:v.houses.length,
       rep:w.rel?[w.rel.rep,w.rel.actes,w.rel.reparer.length,JSON.stringify(w.rel.quete||null)]:null,etal:w.etal&&Object.keys(w.etal).length?w.etal:null,troc:w.troc&&(w.troc.n||w.troc.refus||w.troc.marche)?w.troc:null,t:Math.round(w.t),prog:Math.round(w.prog),jour:w.jour,
-      mine:JSON.stringify(w.mine||null),foret:JSON.stringify(w.foret||null),vu:w.vu===undefined?null:+w.vu.toFixed(3)}; } return JSON.stringify(o); })()`;
+      mine:JSON.stringify(w.mine||null),foret:JSON.stringify(w.foret||null),vu:w.vu===undefined?null:Math.round(w.vu*1e4)/1e4}; } return JSON.stringify(o); })()`; // vu : arrondi comme dans la sauvegarde (lireVie), sinon 0,16549 → « 0,165 » avant et 0,1655 → « 0,166 » après
   await attendreVillage(c, v6.id, 400, 'false', 120000);
   // le joueur s'éloigne : les villages sont figés, rien ne bouge entre la sauvegarde et la relecture
-  const loin = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.fly=true; P.x=v.cx+700.5; P.z=v.cz+.5; P.y=terrain(Math.floor(P.x),Math.floor(P.z))+20; loadAround(P.x,P.z); return [P.x,P.y,P.z]; })()`); await attendre(1500);
-  ok(await T(c, `![...VILLAGES.values()].some(v=>v.sim)`), 'loin des villages : tous figés');
+  // point d'arrivée à 150 blocs au moins de tout village, fondé ou prévu par la carte (ils sont espacés d'environ
+  // 200 blocs : à 700 blocs tout droit, on pouvait tomber à côté d'un autre village, qui continuait de vivre)
+  const loin = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); let x=v.cx+700.5, z=v.cz+.5;
+    const libre=(x,z)=>{ const n=nearestVillageSite(x,z); if(n&&Math.hypot(n.cx-x,n.cz-z)<150) return false; for(const o of VILLAGES.values()) if(Math.hypot(o.cx-x,o.cz-z)<150) return false; return true; };
+    for(let k=0;k<200&&!libre(x,z);k++){ x=v.cx+700.5+(k%14)*50; z=v.cz+.5+Math.floor(k/14)*50; }
+    P.fly=true; P.x=x; P.z=z; P.y=terrain(Math.floor(P.x),Math.floor(P.z))+20; loadAround(P.x,P.z); return [P.x,P.y,P.z,libre(x,z)]; })()`);
+  // les villages se figent au fil des images : sur une machine lente, une attente fixe de 1,5 s ne suffisait pas
+  let figes = false;
+  for (let k = 0; k < 60 && !figes; k++) { await attendre(500); figes = await T(c, `![...VILLAGES.values()].some(v=>v.sim)`); }
+  await attendre(500); // une image de plus : la dernière simulation est bien close
+  ok(loin[3] && figes, `loin des villages : tous figés${loin[3] ? '' : ' (aucun point à 150 blocs de tout village)'}`);
   const avant = JSON.parse(await T(c, SIG)), vids = Object.keys(avant);
   await T(c, `(async()=>{ saveNow(); await saving; })()`);
   c = await ouvrir('&debug=1'); await continuer(c);
@@ -594,13 +612,16 @@ try {
     const w=vie(v), eco=vilEco(v); if(v.sim) return {err:'village encore simulé'}; if(w.vu===undefined) return {err:'pas de date de dernière simulation'};
     for(const r of ['ble','graines','carotte','poisson','viande','laine','charbon','minerai']) w.stock[r]=0; w.stock.bois=200; w.stock.pierre=200;
     if(!eco.s){ const S=siteBat(v,'abri'); if(S) eco.s=S; } const S=eco.s; if(S&&!S.plan) planChantier(v,S); const p0=S?S.p:0;
+    /* morceaux du chantier chargés, comme au retour du joueur : un entrepôt peut être bâti à plus de 3 morceaux du centre */
+    if(S&&S.plan) for(let k=S.p;k<S.plan.length;k++) ensureChunk(S.plan[k][0]>>4,S.plan[k][2]>>4);
+    const finiAvant=!!(S&&S.plan&&S.p>=S.plan.length);
     if(!w.rel) rel(v); w.rel.rep=-20; const st0=JSON.stringify(w.stock), cap={}; for(const r in CIBLES) cap[r]=Math.max(w.stock[r]|0,Math.ceil(CIBLES[r](habitants(v))*RATTRAPAGE.plafond));
     jourJeu+=2; // deux jours du jeu loin du village
     const orig=chercherChemin; let chemins=0; chercherChemin=(...a)=>{ chemins++; return orig(...a); };
     let b; try { b=rattraperVillage(v); } finally { chercherChemin=orig; }
     const trop=Object.keys(CIBLES).filter(r=>stockDe(v,r)>cap[r]);
     const metiers=fichesVivantes(v).filter(([,f])=>f.age==='adulte'&&RATTRAPAGE.recolte[f.metier]&&moyensRecolte(v,f.metier)).map(([,f])=>f.metier);
-    return {b,chemins,trop,metiers,st0,st1:JSON.stringify(w.stock),rep:w.rel.rep,chantier:S?[S.t,p0,S.p,S.manque||null,S.bloque||null]:null}; })()`);
+    return {b,chemins,trop,metiers,st0,st1:JSON.stringify(w.stock),rep:w.rel.rep,chantier:S&&!finiAvant?[S.t,p0,S.p,S.manque||null,S.bloque||null]:null}; })()`);
   ok(!ra.err && ra.b && Math.abs(ra.b.j - 2) < 0.05, ra.err || (ra.b ? `deux jours rattrapés d'un coup (${ra.b.j} j)` : 'aucun rattrapage'));
   if (ra.b) {
     ok(ra.metiers.length === 0 || Object.keys(ra.b.recolte).length > 0, `récolte des ${ra.metiers.length} récoltants : ${JSON.stringify(ra.b.recolte)}`);
@@ -619,6 +640,9 @@ try {
 
   console.log('16. rendu des villageois');
   { if (await T(c, `state`) !== 'play') await T(c, `resume()`);
+  // le joueur au village ; ses villageois reviennent au fil des images (20 s au plus)
+  await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z); })()`);
+  for (let k = 0; k < 40 && !(await T(c, `VILS.some(x=>x.vil===${v6.id}&&!x.puppet&&!(x.dead>0))`)); k++) await attendre(500);
   // --- rendu des villageois : boîtes fusionnées, détails cachés de loin, pas d'animation hors de la vue
   const ru = await T(c, `(()=>{ const v=VILLAGES.get(${v6.id}); P.fly=true; P.x=v.cx+.5; P.z=v.cz+.5; P.y=v.h0+14; loadAround(P.x,P.z);
     const o=VILS.find(x=>x.vil===v.id&&!x.puppet&&!(x.dead>0)); if(!o) return null; ensureMesh(o); const p=o.parts; let n=0; o.mesh.traverse(m=>{ if(m.isMesh&&!p.item.children.includes(m)) n++; });

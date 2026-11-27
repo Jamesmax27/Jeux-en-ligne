@@ -34,6 +34,9 @@
 #     d'un appareil à        (scripts/tester-sauvegardes-nuage.mjs : lanceur et vraie
 #     l'autre (profil.js,      API du profil, base en mémoire ; docs/cadrage-fidelisation.md,
 #     play.js, API du profil)  section 14.13) ;
+#   - bannière « Choisis     → accueil construit et vraie API du profil dans le navigateur
+#     ton pseudo » (accueil,   (scripts/tester-invite-pseudo.mjs : jours de visite, fenêtre,
+#     pastille, installer)     croix, « Installer l'appli » ; docs/cadrage-fidelisation.md, 14.14) ;
 #   - multijoueur (Worker,   → parties simulées, Worker avec de faux Durable Objects et jeux
 #     moteur, lanceur ou jeu   multijoueurs dans le lanceur (scripts/tester-multijoueur.mjs
 #     multijoueur)             --navigateur, docs/multijoueur.md) ; moteur modifié : les jeux
@@ -68,6 +71,8 @@ on:
       - "public/i18n/**"
       - "public/save.js"
       - "public/sauvegardes-nuage.js"
+      - "public/invite-pseudo.js"
+      - "public/installer.js"
       - "public/stockage.js"
       - "public/stockage-lanceur.js"
       - "public/taxonomie.js"
@@ -118,7 +123,10 @@ on:
       - "scripts/tester-stats.mjs"
       - "scripts/tester-profil.mjs"
       - "scripts/tester-sauvegardes-nuage.mjs"
+      - "scripts/tester-invite-pseudo.mjs"
       - "scripts/tester-amis.mjs"
+      - "scripts/tester-province.mjs"
+      - "public/province/**"
       - "scripts/d1-local.mjs"
       - "scripts/etoiles-jeu.mjs"
       - "public/profil*.js"
@@ -130,6 +138,11 @@ on:
       - "public/temps-reel/**"
       - "scripts/tester-temps-reel.mjs"
       - "scripts/tester-poussiere-d-empire.mjs"
+      - "scripts/tester-marmoria.mjs"
+      - "scripts/derogations-jeux.mjs"
+      - "sources/marmoria/**"
+      - "scripts/tester-cosmoria.mjs"
+      - "sources/cosmoria/**"
       - "scripts/idees.mjs"
       - "scripts/inspirations.mjs"
       - "scripts/tester-inspirations.mjs"
@@ -163,8 +176,11 @@ jobs:
       tr: ${{ steps.quoi.outputs.tr }}
       profil: ${{ steps.quoi.outputs.profil }}
       nuage: ${{ steps.quoi.outputs.nuage }}
+      pseudo: ${{ steps.quoi.outputs.pseudo }}
       inspirations: ${{ steps.quoi.outputs.inspirations }}
       poussiere: ${{ steps.quoi.outputs.poussiere }}
+      marmoria: ${{ steps.quoi.outputs.marmoria }}
+      cosmoria: ${{ steps.quoi.outputs.cosmoria }}
       jeux: ${{ steps.quoi.outputs.jeux }}
       lots: ${{ steps.quoi.outputs.lots }}
     steps:
@@ -214,7 +230,7 @@ jobs:
           tous=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then tous=1; fi
           # Modules communs de traduction et de sauvegarde : recopiés dans chaque jeu, donc tous les jeux sont concernés.
-          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|slugs-jeux\.mjs|classes-jeu\.mjs|jaquette-sans-texte\.mjs|apercus-jeu\.mjs|tester-sauvegarde\.mjs|tester-stockage\.mjs)|public/i18n/i18n\.js|public/save\.js|public/stockage(-lanceur)?\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(scripts/(validate-games\.mjs|controle-taxonomie\.mjs|check-i18n\.js|i18n-jeu\.mjs|slugs-jeux\.mjs|classes-jeu\.mjs|jaquette-sans-texte\.mjs|apercus-jeu\.mjs|tester-sauvegarde\.mjs|tester-stockage\.mjs|derogations-jeux\.mjs)|public/i18n/i18n\.js|public/save\.js|public/stockage(-lanceur)?\.js|\.github/workflows/validate\.yml)$'; then tous=1; fi
           # Textes, taxonomie, gabarits (textes des catégories compris), générateur
           # des pages et pages du site : le site est testé avec un seul jeu.
           site=0
@@ -233,12 +249,17 @@ jobs:
           # sauvegarde, Worker multijoueur (ticket, résultats) : tests sans navigateur.
           profil=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then profil=1; fi
-          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/(profil|amis|avatars|sauvegardes)[a-z-]*\.js$|multijoueur/src/|scripts/(tester-profil|tester-amis|d1-local)\.mjs$)'; then profil=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(functions/|migrations/|schema\.sql$|public/(profil|amis|avatars|sauvegardes)[a-z-]*\.js$|multijoueur/src/|public/province/|scripts/(tester-profil|tester-amis|tester-province|d1-local)\.mjs$)'; then profil=1; fi
           # Sauvegardes des jeux d'un appareil à l'autre (docs/cadrage-fidelisation.md, 14.13) :
           # lanceur et API du profil, deux appareils dans le navigateur.
           nuage=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then nuage=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^(public/(profil|profil-reglages|sauvegardes-nuage|play)\.js|functions/(_profil|api/profil)\.js|scripts/(tester-sauvegardes-nuage|d1-local)\.mjs)$'; then nuage=1; fi
+          # Bannière « Choisis ton pseudo » de l'accueil (docs/cadrage-fidelisation.md, 14.14) :
+          # site construit, vraie API du profil, dans le navigateur.
+          pseudo=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then pseudo=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(public/(invite-pseudo|installer)\.js|public/style\.css|public/(profil|avatars)[a-z-]*\.js|gabarits/accueil\.html|public/i18n/site/[a-z]+\.json|functions/(_profil|api/profil)\.js|scripts/(tester-invite-pseudo|d1-local|build-catalog|pages-seo)\.mjs)$'; then pseudo=1; fi
           # Saisons et tendances de la boucle de nuit (file d'idées, calendrier) : tests sans navigateur.
           inspirations=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then inspirations=1; fi
@@ -247,13 +268,24 @@ jobs:
           poussiere=0
           if [ "${{ github.event_name }}" != "pull_request" ]; then poussiere=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^(games/poussiere-d-empire/|scripts/tester-poussiere-d-empire\.mjs$)'; then poussiere=1; fi
+          # Marmoria (docs/cadrage-marmoria.md) : simulation de la cité testée en Node, jeu assemblé à jour des sources.
+          marmoria=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then marmoria=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(games/marmoria/|sources/marmoria/|scripts/tester-marmoria\.mjs$)'; then marmoria=1; fi
+          # Sources de Marmoria modifiées : le jeu assemblé passe aussi au robot.
+          if printf '%s\n' "$fichiers" | grep -q '^sources/marmoria/'; then ids=$(printf '%s\n' $ids marmoria | sort -u | tr '\n' ' '); fi
+          # Cosmoria (docs/cadrage-cosmoria.md) : colonie spatiale sur le moteur de Marmoria ; mêmes contrôles.
+          cosmoria=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then cosmoria=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(games/cosmoria/|sources/cosmoria/|scripts/tester-cosmoria\.mjs$)'; then cosmoria=1; fi
+          if printf '%s\n' "$fichiers" | grep -q '^sources/cosmoria/'; then ids=$(printf '%s\n' $ids cosmoria | sort -u | tr '\n' ' '); fi
           # Référencement de tout le site : tout ce qui précède, plus les règles et
           # le vérificateur du référencement (sans navigateur).
           seo=0
           if [ "$tous" = 1 ] || [ "$site" = 1 ]; then seo=1; fi
           if printf '%s\n' "$fichiers" | grep -Eq '^scripts/(regles-seo|verifier-seo)\.mjs$'; then seo=1; fi
           navigateur=0
-          if [ -n "$ids" ] || [ "$tous" = 1 ] || [ "$site" = 1 ] || [ "$stats" = 2 ] || [ "$multi" = 1 ] || [ "$nuage" = 1 ]; then navigateur=1; fi
+          if [ -n "$ids" ] || [ "$tous" = 1 ] || [ "$site" = 1 ] || [ "$stats" = 2 ] || [ "$multi" = 1 ] || [ "$nuage" = 1 ] || [ "$pseudo" = 1 ]; then navigateur=1; fi
           # Jeux à tester dans le navigateur, partagés entre LOTS_MAX machines au plus
           # (un jeu prend environ 50 s : robot, sauvegarde, 5 langues).
           if [ "$tous" = 1 ]; then
@@ -263,7 +295,9 @@ jobs:
           fi
           nb=$(printf '%s\n' $jeux | { grep -c . || true; })
           # 6 depuis le test sur ordinateur (novembre 2026) : à 4, un lot de tous les jeux dépassait 40 minutes.
-          LOTS_MAX=6
+          # 8 depuis le 24 novembre 2026 : à 6, avec 217 jeux, un lot sur six dépassait encore 40 minutes
+          # (lots de 29 à plus de 40 minutes) ; seuls les passages qui testent tous les jeux sont concernés.
+          LOTS_MAX=8
           lots=$(( nb < LOTS_MAX ? nb : LOTS_MAX ))
           if [ "$lots" -gt 0 ]; then lots_json="[$(seq -s, 0 $((lots - 1)))]"; else lots_json="[]"; fi
           {
@@ -278,8 +312,11 @@ jobs:
             echo "tr=$tr"
             echo "profil=$profil"
             echo "nuage=$nuage"
+            echo "pseudo=$pseudo"
             echo "inspirations=$inspirations"
             echo "poussiere=$poussiere"
+            echo "marmoria=$marmoria"
+            echo "cosmoria=$cosmoria"
             echo "jeux=$jeux"
             echo "lots=$lots_json"
           } >> "$GITHUB_OUTPUT"
@@ -458,12 +495,26 @@ jobs:
         if: needs.quoi.outputs.profil == '1'
         run: node scripts/tester-amis.mjs
 
+      # Comptoir de province des « Cités voisines » de Marmoria (multijoueur/src/province.js) :
+      # 10 000 échanges avec pertes, doublons et rechargements, sans charge ni denier créé
+      # ou perdu ; voir docs/cadrage-marmoria.md, section 23.15.
+      - name: Contrôler le comptoir de province
+        if: needs.quoi.outputs.profil == '1'
+        run: node scripts/tester-province.mjs
+
       # Sauvegardes des jeux d'un appareil à l'autre (public/sauvegardes-nuage.js) :
       # module de l'appareil, puis deux appareils dans le navigateur (lanceur, vraie
       # API du profil, base en mémoire, Turnstile imité). Voir docs/cadrage-fidelisation.md, 14.13.
       - name: Contrôler les sauvegardes d'un appareil à l'autre
         if: needs.quoi.outputs.nuage == '1'
         run: node scripts/tester-sauvegardes-nuage.mjs
+
+      # Bannière « Choisis ton pseudo » de l'accueil (public/invite-pseudo.js) : site
+      # construit, vraie API du profil (base en mémoire) ; jours de visite, fenêtre,
+      # croix, « Installer l'appli », 3 largeurs. Voir docs/cadrage-fidelisation.md, 14.14.
+      - name: Contrôler l'invitation au pseudo
+        if: needs.quoi.outputs.pseudo == '1'
+        run: node scripts/tester-invite-pseudo.mjs
 
       # Multijoueur (docs/multijoueur.md) : moteur et Worker (faux Durable Objects),
       # parties simulées de chaque jeu multijoueur, puis chacun dans le lanceur avec un
@@ -503,6 +554,25 @@ jobs:
       - name: Contrôler Poussière d'Empire
         if: needs.quoi.outputs.poussiere == '1'
         run: node scripts/tester-poussiere-d-empire.mjs --missions --cartes
+
+      # Marmoria (docs/cadrage-marmoria.md, sections 19.5 et 21) : simulation en Node, sans navigateur
+      # (données, formules, invariants, déterminisme, sauvegarde, tutoriels gagnés par un joueur automatique),
+      # puis le jeu réassemblé depuis sources/marmoria/ doit être identique à games/marmoria/.
+      - name: Contrôler Marmoria
+        if: needs.quoi.outputs.marmoria == '1'
+        run: |
+          node scripts/tester-marmoria.mjs
+          node sources/marmoria/assembler.mjs
+          git diff --exit-code -- games/marmoria/index.html games/marmoria/game.json || { echo "games/marmoria/ n'est pas à jour : lancer node sources/marmoria/assembler.mjs"; exit 1; }
+
+      # Cosmoria (docs/cadrage-cosmoria.md) : même moteur que Marmoria, mêmes contrôles (simulation en Node,
+      # puis le jeu réassemblé depuis sources/cosmoria/ doit être identique à games/cosmoria/).
+      - name: Contrôler Cosmoria
+        if: needs.quoi.outputs.cosmoria == '1'
+        run: |
+          node scripts/tester-cosmoria.mjs
+          node sources/cosmoria/assembler.mjs
+          git diff --exit-code -- games/cosmoria/index.html games/cosmoria/game.json || { echo "games/cosmoria/ n'est pas à jour : lancer node sources/cosmoria/assembler.mjs"; exit 1; }
 
       # Icônes des regroupements : le bloc généré de public/style.css doit
       # correspondre aux dessins de scripts/icones/sources (sans navigateur).

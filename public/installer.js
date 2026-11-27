@@ -29,6 +29,9 @@
 // fmg-installer = { masqueeJusqua: ms, installee: bool, montree: bool }
 // (montree : la bannière était là, sa place est gardée à la visite suivante
 // par le script de tête de l'accueil, classe avec-installer).
+// Un seul encart à la fois : la bannière « Choisis ton pseudo »
+// (invite-pseudo.js) passe avant ; montrée ou attendue pendant cette visite,
+// celle-ci attend la visite suivante, sans changer sa mémoire.
 // ==========================================================================
 
 (function () {
@@ -93,6 +96,15 @@
 
   // --- Bannière --------------------------------------------------------------
 
+  // « Choisis ton pseudo » prend la place pendant cette visite (place gardée par
+  // le script de tête, ou bannière montrée par invite-pseudo.js).
+  var placePrise = false;
+  function invitePseudoLa() {
+    var b = document.getElementById('invite-pseudo');
+    if (racine.classList.contains('avec-invite-pseudo') || (b && !b.hidden)) placePrise = true;
+    return placePrise;
+  }
+
   function bannierePermise() {
     var v = lire();
     if (dansLAppli() || v.installee) return false;
@@ -115,6 +127,12 @@
 
   function decider() {
     if (!banniere) return;
+    if (invitePseudoLa()) {
+      // Cachée pour cette visite seulement : montree reste tel quel.
+      banniere.hidden = true;
+      racine.classList.remove('avec-installer');
+      return;
+    }
     if (bannierePermise()) montrerBanniere();
     else cacherBanniere();
   }
@@ -229,6 +247,9 @@
   }
 
   liensPied.forEach(function (li) { li.hidden = false; });
+
+  // La bannière « Choisis ton pseudo » vient d'apparaître : celle-ci laisse la place.
+  document.addEventListener('fmg-invite-pseudo', decider);
 
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault(); // notre bannière à la place de celle du navigateur

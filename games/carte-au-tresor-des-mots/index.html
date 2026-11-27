@@ -1788,6 +1788,15 @@ h1 {
   .reponses { min-height: 0; padding-bottom: 10px; }
   .consigne { font-size: 15px; }
 }
+/* Image du jeu sur ordinateur (window.JEL_APERCU = 3 seulement) : défi en grand. */
+.apercu-large .ligne-image { gap: 28px; }
+.apercu-large .ligne-image .cadre-image { width: 180px; height: 180px; font-size: 120px; border-radius: 34px; }
+.apercu-large .coffre { width: 180px; height: 144px; }
+.apercu-large .ligne-cases { gap: 12px; }
+.apercu-large .case { min-width: 70px; height: 86px; font-size: 54px; }
+.apercu-large .case.large { min-width: 130px; }
+.apercu-large .tuile { min-height: 86px; min-width: 96px; padding: 0 26px; font-size: 50px; border-radius: 22px; }
+.apercu-large .consigne-jeu { font-size: 20px; }
 @media (prefers-reduced-motion: reduce) {
   .titre-navire svg.navire, #ecran-bilan .navire, .vagues { animation: none; }
 }
@@ -2083,6 +2092,9 @@ h1 {
   // ------------------------------------------------------------------------
   // 3. Sauvegarde (le jeu marche aussi sans stockage)
   // ------------------------------------------------------------------------
+  // Affiche (jaquette) et images du jeu : posés seulement par le robot.
+  const AFFICHE = !!window.JEL_AFFICHE;
+  const APERCU = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
   const CLE = 'jel-carte-tresor-mots-v1';
   const sauve = { debloque: 1, etoiles: [], records: [], tutos: {}, son: true };
   try {
@@ -2090,6 +2102,7 @@ h1 {
     if (lu && typeof lu === 'object') Object.assign(sauve, lu);
   } catch (e) { /* stockage indisponible */ }
   function enregistrer() {
+    if (AFFICHE || APERCU) return;
     try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* stockage indisponible */ }
   }
   const ileFaite = (k) => (sauve.etoiles[2 * k] || 0) > 0 && (sauve.etoiles[2 * k + 1] || 0) > 0;
@@ -2114,6 +2127,7 @@ h1 {
   let reprendreA = 0;  // niveau à reprendre pendant cette visite (0 = aucune partie lancée)
   let scorePartie = 0;
   JEL_SAVE.surFermeture(() => {
+    if (AFFICHE || APERCU) return;
     if (reprendreA && etat.ecran !== 'ecran-titre') JEL_SAVE.save(JEU, { niveau: reprendreA, score: scorePartie });
   });
 
@@ -2258,6 +2272,7 @@ h1 {
     tresor: () => [523, 659, 784, 1047, 784, 1047, 1319, 1568].forEach((f, i) => { note(f, i * 0.12, 0.3, 'triangle', 0.18); note(f / 2, i * 0.12, 0.3, 'sine', 0.08); })
   };
   function jouer(nom, arg) {
+    if (AFFICHE || APERCU) return;
     if (!sauve.son || !audio()) return;
     try { SONS[nom](arg || 0); } catch (e) { /* son impossible : on continue */ }
   }
@@ -2271,7 +2286,7 @@ h1 {
     } catch (e) { return null; }
   }
   function parler(texte) {
-    if (!sauve.son) return;
+    if (!sauve.son || AFFICHE || APERCU) return;
     const v = voixFr();
     if (!v) return;
     try {
@@ -3093,7 +3108,7 @@ h1 {
   $('#p-recommencer').addEventListener('click', () => { jouer('toucher'); lancerNiveau(etat.niveau); });
   $('#p-carte').addEventListener('click', () => { jouer('toucher'); afficherCarte(); });
   $('#p-accueil').addEventListener('click', () => { jouer('toucher'); afficherAccueil(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) mettrePause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && !APERCU) mettrePause(); });
 
   // ------------------------------------------------------------------------
   // 11. Fin de niveau, défaite, trésor
@@ -3289,7 +3304,7 @@ h1 {
   $('#coco').addEventListener('click', aideCoco);
   window.addEventListener('resize', () => { if (etat.ecran === 'ecran-carte') dessinerChemin(); });
   // Le premier geste réveille le son (jamais avant).
-  const reveil = () => { if (sauve.son) audio(); };
+  const reveil = () => { if (sauve.son && !AFFICHE && !APERCU) audio(); };
   window.addEventListener('pointerdown', reveil, { once: true });
   window.addEventListener('keydown', reveil, { once: true });
 
@@ -3342,9 +3357,231 @@ h1 {
   });
 
   // ------------------------------------------------------------------------
-  // 14. Démarrage
+  // 14. Affiche (window.JEL_AFFICHE, posé par le robot seulement)
+  //   Coco s'envole en grand avec la carte au trésor, devant le navire des
+  //   gentils pirates ; soleil, île au coffre ouvert, bouteilles qui flottent.
+  //   Aucun texte, aucun emoji, aucun bouton, aucun son.
+  // ------------------------------------------------------------------------
+  function cacherLangue() {
+    document.querySelectorAll('.jel-langue, jel-langue').forEach((e) => { e.style.setProperty('display', 'none', 'important'); });
+  }
+  function etincelle(x, y, r, c) {
+    return `<path d="M${x} ${y - r}Q${x + r * 0.18} ${y - r * 0.18} ${x + r} ${y}Q${x + r * 0.18} ${y + r * 0.18} ${x} ${y + r}Q${x - r * 0.18} ${y + r * 0.18} ${x - r} ${y}Q${x - r * 0.18} ${y - r * 0.18} ${x} ${y - r}Z" fill="${c || '#fff6c8'}"/>`;
+  }
+  function plume(x, y, long, larg, angle, c, bord) {
+    return `<ellipse cx="${x + long / 2}" cy="${y}" rx="${long / 2}" ry="${larg / 2}" transform="rotate(${angle} ${x} ${y})" fill="${c}" stroke="${bord || '#1f7a3a'}" stroke-width="2.5"/>`;
+  }
+  function bouteilleAffiche(x, y, s, a) {
+    return `<g transform="translate(${x} ${y}) rotate(${a}) scale(${s})">
+      <ellipse cx="0" cy="70" rx="120" ry="14" fill="#0b4f7d" opacity=".35"/>
+      <path d="M-95 -40Q-110 0 -95 40L60 40Q80 40 88 22L120 14L120 -14L88 -22Q80 -40 60 -40Z" fill="url(#aff-verre)" stroke="#1f6e5c" stroke-width="5"/>
+      <rect x="118" y="-17" width="30" height="34" rx="6" fill="#b07436" stroke="#5e3a1a" stroke-width="4"/>
+      <path d="M-70 -18Q-10 -30 50 -18L50 18Q-10 30 -70 18Z" fill="#fbefcf" stroke="#c99a4a" stroke-width="4"/>
+      <circle cx="-62" cy="0" r="14" fill="#f4e2b4" stroke="#c99a4a" stroke-width="3"/><circle cx="44" cy="0" r="14" fill="#f4e2b4" stroke="#c99a4a" stroke-width="3"/>
+      <path d="M-88 -30Q-40 -38 40 -32" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".75" fill="none"/>
+      <path d="M-160 46q30 -14 60 0t60 0 60 0 60 0 60 0" stroke="#e9f8ff" stroke-width="7" fill="none" stroke-linecap="round" opacity=".85"/>
+    </g>`;
+  }
+  function palmier(x, y, s, a) {
+    const feuille = (r) => `<path d="M0 0Q60 -40 130 -6Q70 -16 0 0Z" transform="rotate(${r})" fill="#3fae5a" stroke="#22783a" stroke-width="3"/>`;
+    return `<g transform="translate(${x} ${y}) scale(${s}) rotate(${a})">
+      <path d="M-6 0Q-20 -70 4 -150L16 -150Q-4 -70 8 0Z" fill="#a8693a" stroke="#5e3a1a" stroke-width="3"/>
+      <g transform="translate(10 -150)">${[-200, -160, -120, -60, -20, 20].map(feuille).join('')}
+      <circle cx="-4" cy="6" r="9" fill="#8b5a2b"/><circle cx="10" cy="8" r="9" fill="#7a4b22"/></g>
+    </g>`;
+  }
+  function coffreAffiche(x, y, s) {
+    return `<g transform="translate(${x} ${y}) scale(${s})">
+      <circle cx="0" cy="-30" r="90" fill="url(#aff-lueur)"/>
+      <path d="M-44 -10L-44 -44Q0 -84 44 -44L44 -10Z" fill="#a8693a" stroke="#5e3a1a" stroke-width="4" transform="rotate(-28 -44 -10)"/>
+      <circle cx="-16" cy="-16" r="9" fill="#f5c542" stroke="#b8871c" stroke-width="2"/><circle cx="4" cy="-20" r="10" fill="#f5c542" stroke="#b8871c" stroke-width="2"/><circle cx="22" cy="-14" r="9" fill="#f5c542" stroke="#b8871c" stroke-width="2"/>
+      <path d="M-8 -38l5 9 10 1-7 7 2 10-10-5-9 5 2-10-7-7 10-1z" fill="#9be7ff" stroke="#3a8fb8" stroke-width="1.5"/>
+      <rect x="-44" y="-10" width="88" height="46" rx="6" fill="#8b5a2b" stroke="#5e3a1a" stroke-width="4"/>
+      <rect x="-32" y="-10" width="10" height="46" fill="#f5c542"/><rect x="22" y="-10" width="10" height="46" fill="#f5c542"/>
+      <rect x="-8" y="-6" width="16" height="18" rx="4" fill="#f5c542" stroke="#b8871c" stroke-width="2"/>
+    </g>`;
+  }
+  function cocoAffiche() {
+    // Grand Coco en vol (mêmes couleurs que dans le jeu), la carte dans les pattes.
+    const aileArriere = [0, 1, 2, 3, 4].map((k) => plume(300, 330, 150 - k * 12, 34, -58 + k * 13, k < 2 ? '#2f6fd6' : '#3fbf5a', k < 2 ? '#1d4c9e' : '#1f7a3a')).join('') +
+      [0, 1, 2].map((k) => plume(290, 336, 80, 28, -50 + k * 15, '#f5c542', '#b8871c')).join('');
+    const queue = [0, 1, 2].map((k) => plume(250, 470, 170 - k * 20, 30, 118 + k * 12, k === 1 ? '#e2574c' : '#2f6fd6', k === 1 ? '#9e2f26' : '#1d4c9e')).join('');
+    const aileAvant = [0, 1, 2, 3, 4, 5].map((k) => plume(212, 410, 200 - k * 14, 40, 142 + k * 10, k < 2 ? '#2f6fd6' : k < 4 ? '#3fbf5a' : '#6fd36a', k < 2 ? '#1d4c9e' : '#1f7a3a')).join('') +
+      [0, 1, 2, 3].map((k) => plume(214, 410, 104, 32, 150 + k * 11, '#f5c542', '#b8871c')).join('') +
+      [0, 1, 2].map((k) => plume(216, 410, 58, 30, 152 + k * 14, '#e2574c', '#9e2f26')).join('');
+    return `<g>
+      ${aileArriere}${queue}
+      <g transform="rotate(-14 240 410)">
+        <ellipse cx="240" cy="410" rx="74" ry="104" fill="#3fbf5a" stroke="#1f7a3a" stroke-width="4"/>
+        <ellipse cx="225" cy="425" rx="44" ry="74" fill="#7ad86b"/>
+        <path d="M300 360Q318 410 296 470" stroke="#fff6c8" stroke-width="7" fill="none" stroke-linecap="round" opacity=".8"/>
+      </g>
+      <!-- Pattes et carte au trésor -->
+      <path d="M230 500l-6 26M262 494l2 28" stroke="#9a6b10" stroke-width="8" stroke-linecap="round"/>
+      <g transform="rotate(-8 270 560)">
+        <path d="M180 520L360 520L360 600L180 600Z" fill="#fbefcf" stroke="#c99a4a" stroke-width="5"/>
+        <rect x="168" y="512" width="22" height="96" rx="11" fill="#f4e2b4" stroke="#c99a4a" stroke-width="4"/>
+        <rect x="350" y="512" width="22" height="96" rx="11" fill="#f4e2b4" stroke="#c99a4a" stroke-width="4"/>
+        <path d="M205 585Q225 540 260 565T330 545" stroke="#e2574c" stroke-width="6" stroke-dasharray="10 9" fill="none" stroke-linecap="round"/>
+        <path d="M210 548q12 -10 24 0q-12 10 -24 0z" fill="#7cc87a"/><path d="M290 585q16 -12 32 0q-16 12 -32 0z" fill="#7cc87a"/>
+        ${etincelle(334, 544, 18, '#f5c542')}
+      </g>
+      <path d="M216 522q8 -10 18 0M252 520q8 -10 18 0" stroke="#9a6b10" stroke-width="6" fill="none" stroke-linecap="round"/>
+      ${aileAvant}
+      <!-- Tête -->
+      <circle cx="222" cy="282" r="66" fill="#e2574c" stroke="#9e2f26" stroke-width="4"/>
+      <path d="M278 240Q298 280 280 324" stroke="#ffd7a8" stroke-width="7" fill="none" stroke-linecap="round" opacity=".85"/>
+      <path d="M190 222q14 -40 40 -42q-6 20 4 30q10 -26 34 -26q-12 22 -4 40z" fill="#e2574c" stroke="#9e2f26" stroke-width="3"/>
+      <ellipse cx="202" cy="276" rx="30" ry="32" fill="#fff7e6"/>
+      <circle cx="200" cy="274" r="17" fill="#222"/><circle cx="206" cy="267" r="6" fill="#fff"/><circle cx="194" cy="280" r="3" fill="#fff"/>
+      <path d="M176 246q20 -12 42 -2" stroke="#7a2d23" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <!-- Bec ouvert, joyeux -->
+      <path d="M176 292Q140 284 116 306Q132 300 150 312Q166 318 182 312Z" fill="#f5c542" stroke="#9a6b10" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M180 318Q156 330 136 324Q150 344 186 334Z" fill="#d99a1e" stroke="#9a6b10" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M160 318q10 6 20 2" stroke="#f08a9a" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="238" cy="312" r="12" fill="#f7a6c1" opacity=".55"/>
+    </g>`;
+  }
+  function dessinerAffiche() {
+    cacherLangue();
+    app.style.display = 'none';
+    let zone = document.getElementById('affiche');
+    if (!zone) {
+      zone = el('div');
+      zone.id = 'affiche';
+      zone.setAttribute('aria-hidden', 'true');
+      Object.assign(zone.style, { position: 'fixed', inset: '0', zIndex: '2147483646', background: '#2a9fd6', overflow: 'hidden' });
+      document.body.appendChild(zone);
+    }
+    // Cadre 600 × 800 au centre ; sur un écran plus large ou plus haut, le décor continue.
+    const W = Math.max(1, window.innerWidth), H = Math.max(1, window.innerHeight);
+    let vw = 600, vh = 800;
+    if (W / H > 600 / 800) vw = 800 * W / H; else vh = 600 * H / W;
+    const vx = (600 - vw) / 2, vy = (800 - vh) / 2;
+    let rayons = '';
+    for (let k = 0; k < 14; k++) {
+      const a = k * Math.PI * 2 / 14;
+      const a1 = a - 0.09, a2 = a + 0.09;
+      rayons += `<path d="M470 150L${470 + Math.cos(a1) * 700} ${150 + Math.sin(a1) * 700}L${470 + Math.cos(a2) * 700} ${150 + Math.sin(a2) * 700}Z"/>`;
+    }
+    const navire = navireSVG('affiche').replace(/<g transform="translate\(176 6\) scale\(\.55\)">[\s\S]*?<\/g>/, '')
+      .replace('<svg class="navire" viewBox="0 0 320 240" aria-hidden="true">', '<svg x="270" y="232" width="360" height="270" viewBox="0 0 320 240">');
+    zone.innerHTML = `<svg viewBox="${vx} ${vy} ${vw} ${vh}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block">
+      <defs>
+        <linearGradient id="aff-ciel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4fbdf0"/><stop offset=".6" stop-color="#9fe2fb"/><stop offset="1" stop-color="#ffe7a3"/></linearGradient>
+        <linearGradient id="aff-mer" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3cb4e6"/><stop offset=".4" stop-color="#2289c4"/><stop offset="1" stop-color="#0f5f94"/></linearGradient>
+        <radialGradient id="aff-soleil"><stop offset="0" stop-color="#fffbe0"/><stop offset=".35" stop-color="#fff1a8" stop-opacity=".9"/><stop offset="1" stop-color="#ffe27a" stop-opacity="0"/></radialGradient>
+        <radialGradient id="aff-lueur"><stop offset="0" stop-color="#fff3b0" stop-opacity=".95"/><stop offset="1" stop-color="#ffd34d" stop-opacity="0"/></radialGradient>
+        <linearGradient id="aff-verre" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dcfff0"/><stop offset="1" stop-color="#5fc0a4"/></linearGradient>
+      </defs>
+      <rect x="-4000" y="-4000" width="9000" height="4430" fill="url(#aff-ciel)"/>
+      <g fill="#fff6c8" opacity=".28">${rayons}</g>
+      <circle cx="470" cy="150" r="190" fill="url(#aff-soleil)"/>
+      <circle cx="470" cy="150" r="62" fill="#fff7c2" stroke="#ffe27a" stroke-width="8"/>
+      <g fill="#fff" opacity=".92">
+        <ellipse cx="90" cy="170" rx="70" ry="22"/><ellipse cx="120" cy="152" rx="44" ry="26"/><ellipse cx="60" cy="158" rx="30" ry="18"/>
+        <ellipse cx="640" cy="300" rx="80" ry="20"/><ellipse cx="610" cy="286" rx="40" ry="22"/>
+        <ellipse cx="-120" cy="260" rx="70" ry="18"/>
+      </g>
+      <!-- Île du trésor, au loin -->
+      <ellipse cx="-30" cy="436" rx="300" ry="20" fill="#6fb6d8" opacity=".6"/>
+      <path d="M-200 438Q-60 380 60 396Q150 404 220 438Z" fill="#f3d9a0" stroke="#d9b56e" stroke-width="3"/>
+      <path d="M-150 420Q-40 384 60 398Q120 404 160 424Q60 414 -150 420Z" fill="#6cc46f"/>
+      ${palmier(-10, 412, 0.62, -8)}${palmier(40, 404, 0.5, 6)}
+      ${coffreAffiche(118, 400, 0.62)}
+      ${etincelle(150, 340, 10)}${etincelle(92, 356, 7)}
+      <!-- Mer -->
+      <rect x="-4000" y="430" width="9000" height="5000" fill="url(#aff-mer)"/>
+      <path d="M-600 470q40 -10 80 0t80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0 80 0" stroke="#bfeaff" stroke-width="4" fill="none" opacity=".5"/>
+      <path d="M-640 540q50 -14 100 0t100 0 100 0 100 0 100 0 100 0 100 0 100 0 100 0 100 0 100 0 100 0 100 0 100 0" stroke="#bfeaff" stroke-width="5" fill="none" opacity=".4"/>
+      <path d="M-680 640q60 -16 120 0t120 0 120 0 120 0 120 0 120 0 120 0 120 0 120 0 120 0 120 0 120 0" stroke="#bfeaff" stroke-width="6" fill="none" opacity=".35"/>
+      <!-- Navire des gentils pirates -->
+      <ellipse cx="450" cy="496" rx="190" ry="18" fill="#0b4f7d" opacity=".35"/>
+      ${navire}
+      <!-- Coco, en grand -->
+      ${cocoAffiche()}
+      ${etincelle(330, 250, 14)}${etincelle(370, 610, 12, '#f5c542')}${etincelle(120, 470, 10)}
+      <!-- Premier plan : bouteilles et feuilles coupées par les bords -->
+      ${bouteilleAffiche(70, 690, 1.15, -14)}
+      ${bouteilleAffiche(540, 720, 0.75, 12)}
+      ${etincelle(170, 640, 14, '#fff6c8')}${etincelle(470, 660, 10, '#fff6c8')}
+      <g transform="translate(-30 -20)">
+        <path d="M0 0Q120 30 190 120Q110 70 0 70Z" fill="#2f9a4a" stroke="#1d6b33" stroke-width="4"/>
+        <path d="M0 20Q70 90 90 200Q40 120 -10 110Z" fill="#3fae5a" stroke="#1d6b33" stroke-width="4"/>
+      </g>
+      <g transform="translate(630 -10) scale(-1 1)">
+        <path d="M0 0Q100 20 150 90Q90 60 0 60Z" fill="#2f9a4a" stroke="#1d6b33" stroke-width="4"/>
+      </g>
+    </svg>`;
+  }
+
+  // ------------------------------------------------------------------------
+  // 15. Images du jeu (window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement)
+  //   1 : île 1, bouteilles à lire ; 2 : île 6, carte de l'île à suivre ;
+  //   3 : île 12, coffre à syllabes pendant que la marée monte (sur ordinateur).
+  //   Hasard à graine fixe ; partie figée (rien ne se gagne ni ne se perd),
+  //   ni son, ni sauvegarde, ni tutoriel.
+  // ------------------------------------------------------------------------
+  function ouvrirApercu(k) {
+    let graine = [0, 20261125, 7311, 4242][k] >>> 0;
+    Math.random = () => {
+      graine = (graine + 0x6D2B79F5) >>> 0;
+      let x = graine;
+      x = Math.imul(x ^ (x >>> 15), x | 1);
+      x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+    ['A', 'B', 'C', 'C2', 'D', 'E', 'G', 'G2', 'H', 'J', 'K', 'coco', 'choix4', 'derive', 'pieges', 'intrus', 'maree', 'brume', 'negation']
+      .forEach((id) => { sauve.tutos[id] = 1; });
+    const reglage = {
+      1: { niveau: 0, qi: 2, type: 'A', score: 340, bouees: 3, maree: 0 },
+      2: { niveau: 10, qi: 4, type: 'G', score: 865, bouees: 2, maree: 0 },
+      3: { niveau: 21, qi: 6, type: 'E', score: 1420, bouees: 2, maree: 0.62 }
+    }[k];
+    if (k === 3) { app.style.maxWidth = 'none'; app.classList.add('apercu-large'); }
+    lancerNiveau(reglage.niveau);
+    etat.qi = reglage.qi;
+    etat.types[reglage.qi] = reglage.type;
+    questionSuivante();
+    etat.score = reglage.score;
+    majScore(false);
+    etat.bouees = reglage.bouees;
+    majBouees(false);
+    if (reglage.type === 'E') {
+      // Première syllabe déjà posée dans le coffre.
+      const q = etat.q;
+      const b = q.tuilesEl.find((x) => x.dataset.valeur === q.sequence[0]);
+      q.cases[0].textContent = q.sequence[0];
+      q.cases[0].classList.remove('vide');
+      q.cases[0].classList.add('pleine');
+      if (b) { b.classList.add('utilisee'); b.disabled = true; b.style.display = 'none'; }
+      q.etape = 1;
+    }
+    etat.maree = reglage.maree;
+    majMaree();
+    // Partie figée : la marée et la brume n'avancent plus.
+    etat.fini = true;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+
+  // ------------------------------------------------------------------------
+  // 16. Démarrage
   // ------------------------------------------------------------------------
   majBoutonsSon();
+  if (AFFICHE) {
+    const style = document.createElement('style');
+    style.textContent = 'jel-langue,.jel-langue{display:none!important}';
+    document.head.appendChild(style);
+    dessinerAffiche();
+    [0, 200, 800, 1500].forEach((ms) => setTimeout(cacherLangue, ms));
+    window.addEventListener('resize', dessinerAffiche);
+    return;
+  }
+  if (APERCU) {
+    ouvrirApercu(APERCU);
+    requestAnimationFrame(boucle);
+    return;
+  }
   afficherAccueil();
   requestAnimationFrame(boucle);
 })();

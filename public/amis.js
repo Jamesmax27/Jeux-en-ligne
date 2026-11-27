@@ -210,6 +210,7 @@ export function lienRejoindre(presence, fiche, lang) {
   if (!presence || presence.etat !== 'jeu' || !fiche) return null;
   const href = urlLanceur(fiche.id, lang);
   if (fiche.multijoueur === true && fiche.rejoindre === true && presence.partie) {
+    // Partie en ligne, ou province des « Cités voisines » (Marmoria) : même lien.
     return { href: `${href}&rejoindre=${encodeURIComponent(presence.partie)}`, type: 'partie' };
   }
   return { href, type: fiche.multijoueur === true ? 'multi' : 'solo' };

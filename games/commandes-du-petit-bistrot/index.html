@@ -3398,6 +3398,195 @@
     if (etat.ecran === 'titre' && !voileOuvert() && (e.code === 'Enter' || e.code === 'Space') && document.activeElement === document.body) { e.preventDefault(); $('b-jouer').click(); }
   });
 
+  // ==========================================================================
+  // Affiche (jaquette) et images du jeu : modes posés seulement par le robot
+  // ==========================================================================
+  const AFFICHE = !!window.JEL_AFFICHE;
+  const APERCU = [1, 2, 3].indexOf(Number(window.JEL_APERCU)) >= 0 ? Number(window.JEL_APERCU) : 0;
+
+  // Hasard à graine fixe (même image à chaque capture)
+  function graine(s) {
+    let a = s >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let x = Math.imul(a ^ (a >>> 15), 1 | a);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function cacherLangue() {
+    document.querySelectorAll('.jel-langue').forEach((el) => { el.style.setProperty('display', 'none', 'important'); });
+  }
+
+  // Un animal du jeu, placé dans l'affiche
+  const animalA = (type, humeur, chemise, x, y, l) =>
+    svgAnimal(type, humeur, chemise).replace('<svg class="perso" viewBox="0 0 120 140" aria-hidden="true">',
+      `<svg x="${x}" y="${y}" width="${l}" height="${(l * 140 / 120).toFixed(1)}" viewBox="0 0 120 140">`);
+  const platA = (id, x, y, l, extra) => `<svg x="${x}" y="${y}" width="${l}" height="${l}" viewBox="0 0 100 100" ${extra || ''}>${PLATS[id]}</svg>`;
+  const scintille = (x, y, r, c) => `<path d="M${x} ${y - r} Q${x + r * 0.18} ${y - r * 0.18} ${x + r} ${y} Q${x + r * 0.18} ${y + r * 0.18} ${x} ${y + r} Q${x - r * 0.18} ${y + r * 0.18} ${x - r} ${y} Q${x - r * 0.18} ${y - r * 0.18} ${x} ${y - r}Z" fill="${c || '#fff6c4'}" stroke="#f4b62a" stroke-width="1.5"/>`;
+
+  function svgAffiche() {
+    // Cadre de 600 × 800 ; le mur, les lampions et le comptoir continuent au-delà (écrans larges).
+    let rayures = '';
+    for (let x = -900; x < 1500; x += 50) rayures += `<rect x="${x}" y="-400" width="24" height="940" fill="#f3d2a6"/>`;
+    let planches = '';
+    for (let x = -900; x < 1500; x += 90) planches += `<path d="M${x} 560 v700" stroke="#9c5b32" stroke-width="4"/>`;
+    const lampions = [-600, 0, 600].map((dx) => `<g transform="translate(${dx} 0)">${dessinLampions('arcenciel', 600, 34)}</g>`).join('');
+    let halos = '';
+    for (let i = -8; i < 17; i++) halos += `<circle cx="${20 + i * 70}" cy="62" r="26" fill="url(#aHalo)"/>`;
+    const rayons = [[300, 560], [140, 600], [-40, 520]].map(([x, y], k) =>
+      `<path d="M400 150 L560 150 L${x + 200} ${y} L${x} ${y}Z" fill="#fff4c2" opacity="${[0.32, 0.22, 0.16][k]}"/>`).join('');
+    return `<svg viewBox="0 0 600 800" preserveAspectRatio="xMidYMid meet" width="100%" height="100%" aria-hidden="true">
+      <defs>
+        <radialGradient id="aSoleil" cx="0.78" cy="0.2" r="0.9"><stop offset="0" stop-color="#fff3c8"/><stop offset="0.45" stop-color="#f9dfb2"/><stop offset="1" stop-color="#eebf86"/></radialGradient>
+        <radialGradient id="aHalo"><stop offset="0" stop-color="#fff3b0" stop-opacity=".9"/><stop offset="1" stop-color="#fff3b0" stop-opacity="0"/></radialGradient>
+        <radialGradient id="aAura"><stop offset="0" stop-color="#fffbe6" stop-opacity="1"/><stop offset="0.6" stop-color="#fff1c2" stop-opacity=".7"/><stop offset="1" stop-color="#fff1c2" stop-opacity="0"/></radialGradient>
+        <linearGradient id="aCiel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cc3f2"/><stop offset="1" stop-color="#c8ecff"/></linearGradient>
+        <linearGradient id="aBois" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9854a"/><stop offset="1" stop-color="#7a4424"/></linearGradient>
+        <linearGradient id="aPlateau" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#b9c4cf"/></linearGradient>
+      </defs>
+      <rect x="-900" y="-600" width="2400" height="2000" fill="#f2cf9c"/>
+      <rect x="-900" y="-400" width="2400" height="940" fill="url(#aSoleil)"/>
+      ${rayures}
+      <rect x="-900" y="-400" width="2400" height="940" fill="url(#aSoleil)" opacity=".55"/>
+      <!-- Fenêtre ensoleillée (source de lumière) -->
+      <rect x="392" y="140" width="176" height="176" rx="12" fill="url(#aCiel)" stroke="#7a4a26" stroke-width="10"/>
+      <circle cx="520" cy="190" r="34" fill="#fff6b0"/><circle cx="520" cy="190" r="24" fill="#ffd84a"/>
+      <ellipse cx="440" cy="250" rx="30" ry="12" fill="#fff"/><ellipse cx="462" cy="242" rx="22" ry="12" fill="#fff"/>
+      <path d="M480 140 v176 M392 228 h176" stroke="#7a4a26" stroke-width="7"/>
+      <path d="M380 128 q14 90 0 196 h26 q-8 -100 8 -196z M580 128 q-14 90 0 196 h-26 q8 -100 -8 -196z" fill="#d9473b" stroke="#9c2a22" stroke-width="3"/>
+      <rect x="370" y="120" width="220" height="14" rx="5" fill="#7a4a26"/>
+      ${rayons}
+      <!-- Étagère et gâteaux du fond -->
+      <rect x="20" y="230" width="170" height="12" rx="4" fill="#7a4a26"/><path d="M36 242 l10 20 M174 242 l-10 20" stroke="#7a4a26" stroke-width="6"/>
+      ${platA('gateau', 22, 158, 84)}${platA('tarte-pommes', 102, 168, 76)}
+      <!-- Lampions allumés -->
+      ${halos}${lampions}
+      <!-- Clients qui attendent leur tour -->
+      <g opacity=".9">${animalA('panda', 'neutre', '#3f9b57', -34, 352, 168)}${animalA('lapin', 'content', '#9b59b6', 492, 346, 168)}</g>
+      <!-- Bulle de commande -->
+      <ellipse cx="300" cy="420" rx="250" ry="220" fill="url(#aAura)"/>
+      <g>
+        <path d="M262 236 l-30 52 l66 -44z" fill="#fff" stroke="#3a2a1a" stroke-width="7" stroke-linejoin="round"/>
+        <rect x="52" y="96" width="496" height="150" rx="40" fill="#fff" stroke="#3a2a1a" stroke-width="8"/>
+        <path d="M264 238 h40" stroke="#fff" stroke-width="10"/>
+        ${platA('soupe', 74, 106, 136)}${platA('crepe', 232, 104, 136)}
+        <g opacity=".42">${platA('jus-orange', 392, 104, 136)}</g>
+        ${scintille(486, 126, 14)}${scintille(420, 228, 10)}${scintille(530, 210, 8)}
+      </g>
+      <!-- Le héros : un chat ravi au comptoir -->
+      ${animalA('chat', 'content', '#3d7fd1', 96, 196, 408)}
+      ${scintille(150, 300, 16)}${scintille(456, 290, 12)}
+      <!-- Comptoir au premier plan -->
+      <rect x="-900" y="540" width="2400" height="800" fill="url(#aBois)"/>
+      ${planches}
+      <rect x="-900" y="532" width="2400" height="22" rx="6" fill="#8a4f28"/><path d="M-900 536 h2400" stroke="#d9925a" stroke-width="4"/>
+      <g fill="#f2a65a" stroke="#b8692a" stroke-width="4"><ellipse cx="190" cy="540" rx="34" ry="20"/><ellipse cx="410" cy="540" rx="34" ry="20"/></g>
+      <path d="M176 532 v14 M190 530 v16 M204 532 v14 M396 532 v14 M410 530 v16 M424 532 v14" stroke="#b8692a" stroke-width="3" stroke-linecap="round"/>
+      <!-- Plateau : deux plats posés, le troisième arrive -->
+      <ellipse cx="290" cy="622" rx="176" ry="38" fill="#5a3420" opacity=".35"/>
+      <ellipse cx="290" cy="606" rx="176" ry="40" fill="url(#aPlateau)" stroke="#7d8a97" stroke-width="5"/>
+      <ellipse cx="290" cy="600" rx="150" ry="28" fill="none" stroke="#fff" stroke-width="4" opacity=".7"/>
+      ${platA('soupe', 140, 512, 120)}${platA('crepe', 262, 510, 120)}
+      <path d="M560 360 q-40 40 -90 130" stroke="#fff6c4" stroke-width="10" fill="none" stroke-linecap="round" opacity=".85" stroke-dasharray="2 22"/>
+      <path d="M578 400 q-30 40 -70 100" stroke="#fff6c4" stroke-width="7" fill="none" stroke-linecap="round" opacity=".7" stroke-dasharray="2 20"/>
+      ${platA('jus-orange', 404, 396, 118, 'transform="rotate(16 463 455)"')}
+      ${scintille(418, 404, 14)}${scintille(540, 450, 11)}${scintille(366, 520, 9)}
+      <!-- Premier plan coupé par les bords -->
+      ${platA('croissant', -66, 600, 220)}
+      ${platA('limonade', 470, 588, 200)}
+    </svg>`;
+  }
+  function dessinerAffiche() {
+    $('app').style.display = 'none';
+    let a = document.getElementById('affiche-bistrot');
+    if (!a) {
+      a = document.createElement('div');
+      a.id = 'affiche-bistrot';
+      a.style.cssText = 'position:fixed;inset:0;z-index:50;background:#f2cf9c;overflow:hidden';
+      document.body.appendChild(a);
+    }
+    a.innerHTML = svgAffiche();
+    cacherLangue();
+  }
+
+  // Images du jeu : vraie partie posée au bon moment, puis figée (rien de gagné ni de perdu)
+  const MOMENTS_APERCU = {
+    1: { niveau: 0, graine: 11, g: 1, score: 10, justes: 1, coeurs: 3, deco: { nappe: 'carreaux', lampions: 'rouges', vitrine: 'aucune' } },
+    2: { niveau: 8, graine: 23, g: 2, score: 45, justes: 2, coeurs: 2, change: true, deco: { nappe: 'pois', lampions: 'arcenciel', vitrine: 'gateau' } },
+    3: { niveau: 17, graine: 37, g: 1, score: 30, justes: 2, coeurs: 3, deco: { nappe: 'fleurs', lampions: 'etoiles', vitrine: 'piece' } },
+  };
+  function ouvrirApercu(n) {
+    const m = MOMENTS_APERCU[n];
+    Math.random = graine(m.graine);
+    progres.son = false;
+    NIVEAUX.forEach((d) => { if (d.tuto) progres.tutos[d.tuto] = 1; });
+    progres.deco = Object.assign({}, m.deco);
+    if (n === 3) {
+      // Écran d'ordinateur : le bistrot prend toute la largeur
+      $('app').style.maxWidth = 'none';
+    }
+    lancerNiveau(m.niveau);
+    oublierTaches();
+    fermerVoile('annonce');
+    if (n === 3) $('comptoir').style.gridTemplateColumns = 'repeat(8, 1fr)';
+    etat.g = Math.min(m.g, etat.groupes.length - 1);
+    etat.score = m.score; etat.justes = m.justes; etat.servis = m.justes + (COEURS - m.coeurs); etat.coeurs = m.coeurs;
+    majHud();
+    const groupe = etat.groupes[etat.g];
+    etat.actif = 0; etat.plateau = [];
+    const zone = $('clients');
+    zone.innerHTML = '';
+    groupe.forEach((c) => {
+      const el = document.createElement('div');
+      el.className = 'client';
+      el.innerHTML = svgAnimal(c.type, 'neutre', c.chemise);
+      el.setAttribute('role', 'img');
+      el.setAttribute('aria-label', t('client.aria', { animal: t('animal.' + c.type) }));
+      zone.appendChild(el);
+      c.el = el;
+    });
+    ajusterEchelle();
+    // Ordinateur : clients et bulles plus grands, pour remplir la salle élargie
+    if (n === 3) zone.style.setProperty('--e', '1.75');
+    if (m.change) {
+      const c = groupe[0];
+      if (!c.change) {
+        const dispo = etat.comptoir.map((p) => p.id).filter((x) => !c.commande.includes(x));
+        c.change = { retire: c.commande[0], ajoute: dispo[0] || null };
+      }
+      etat.phase = 'change';
+      const ajout = c.change.ajoute ? `<span class="fleche">${ICONES.fleche}</span><span class="item">${svgPlat(c.change.ajoute)}</span>` : '';
+      bulle(c, `<div class="items"><span class="item barre">${svgPlat(c.change.retire)}</span>${ajout}</div>`, 'change', 2600);
+      message(t('msg.change'), 60000);
+    } else {
+      etat.phase = 'bulle';
+      groupe.forEach((c) => bulle(c, itemsHtml(c.commande), '', tempsBulle(groupe)));
+      message(t(groupe.length > 1 ? 'msg.regardeDeux' : 'msg.regarde'), 60000);
+    }
+    majPlateau(); majComptoir();
+    // Figé : ni horloge, ni son, ni sauvegarde à la fermeture
+    etat.enPause = true;
+    etat.enPartie = false;
+    setTimeout(() => $('ecran-jeu').classList.add('fige'), 900);
+  }
+
+  if (AFFICHE || APERCU) {
+    Son.pret = () => {};
+    Son.note = () => {};
+  }
+  if (AFFICHE) {
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+    setTimeout(cacherLangue, 300);
+    setTimeout(cacherLangue, 1200);
+    return;
+  }
+  if (APERCU) {
+    ouvrirApercu(APERCU);
+    return;
+  }
+
   requestAnimationFrame(boucle);
 })();
 </script>

@@ -3556,14 +3556,351 @@
     for (const r of m.coureurs) if (Math.random() < 0.4) particules.push({ sol: true, x: r.x + (Math.random() - 0.5) * 20, y: r.y - 14, vx: 0, vy: 0, vie: 0.5, max: 0.5, s: 3 + Math.random() * 3, c: 'rgba(255,255,255,.7)' });
   }
 
+  // ==========================================================================
+  // Affiche (jaquette du jeu)
+  // ==========================================================================
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). L'enfant sur sa
+  // bouée rouge et blanche dévale le toboggan vers nous, un bras levé pour attraper une goutte ;
+  // l'eau gicle, deux adversaires le suivent depuis la tour de départ, un canard flotte devant.
+  function goutteAffiche(g, x, y, r) {
+    const halo = g.createRadialGradient(x, y, r * 0.3, x, y, r * 2.2);
+    halo.addColorStop(0, 'rgba(190,240,255,.85)'); halo.addColorStop(1, 'rgba(190,240,255,0)');
+    g.fillStyle = halo; g.beginPath(); g.arc(x, y, r * 2.2, 0, 7); g.fill();
+    g.fillStyle = '#2fa6ff'; g.strokeStyle = '#0f6cc0'; g.lineWidth = r * 0.16;
+    g.beginPath(); g.moveTo(x, y - r * 1.45);
+    g.bezierCurveTo(x + r * 0.45, y - r * 0.7, x + r, y - r * 0.1, x + r, y + r * 0.33);
+    g.arc(x, y + r * 0.33, r, 0, Math.PI);
+    g.bezierCurveTo(x - r, y - r * 0.1, x - r * 0.45, y - r * 0.7, x, y - r * 1.45);
+    g.fill(); g.stroke();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(x - r * 0.33, y + r * 0.2, r * 0.26, r * 0.38, -0.4, 0, 7); g.fill();
+  }
+  function anneauAffiche(g, rx, ry, ep, a0, a1, c1, c2) {
+    const n = 12;
+    for (let q = 0; q < n; q++) {
+      const d = Math.max(q * 6.2832 / n, a0), f = Math.min((q + 1) * 6.2832 / n, a1);
+      if (f <= d) continue;
+      g.strokeStyle = q % 2 ? c2 : c1; g.lineWidth = ep;
+      g.beginPath(); g.ellipse(0, 0, rx, ry, 0, d, f + 0.012); g.stroke();
+    }
+  }
+  // Enfant assis dans sa bouée, vu de trois quarts face (il descend vers nous).
+  // opt : { anneau, bande, maillot, peau, cheveux, brasHaut }
+  function enfantAffiche(g, x, y, s, opt) {
+    g.save(); g.translate(x, y); g.scale(s, s);
+    g.lineCap = 'round'; g.lineJoin = 'round';
+    const rx = 118, ry = 46, ep = 40;
+    // ombre et écume sous la bouée
+    g.fillStyle = 'rgba(0,70,140,.28)'; g.beginPath(); g.ellipse(6, 30, rx + 26, ry + 16, 0, 0, 7); g.fill();
+    // moitié arrière de la bouée
+    anneauAffiche(g, rx, ry, ep, Math.PI, 6.2832, opt.anneau, opt.bande);
+    // jambes (derrière l'avant de la bouée)
+    g.strokeStyle = opt.peau; g.lineWidth = 24;
+    g.beginPath(); g.moveTo(-22, -12); g.lineTo(-50, 30); g.moveTo(22, -12); g.lineTo(50, 30); g.stroke();
+    // corps
+    g.fillStyle = opt.maillot; g.beginPath(); g.ellipse(0, -52, 46, 62, 0, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.ellipse(14, -70, 14, 30, 0.3, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(0,0,0,.12)'; g.lineWidth = 6; g.beginPath(); g.arc(0, -52, 40, 0.3, 2.8); g.stroke();
+    // bras droit (à droite de l'image) : il salue
+    g.strokeStyle = opt.peau; g.lineWidth = 22;
+    g.beginPath(); g.moveTo(36, -88); g.lineTo(92, -108); g.lineTo(116, -158); g.stroke();
+    g.fillStyle = opt.peau; g.beginPath(); g.arc(118, -166, 17, 0, 7); g.fill();
+    // bras gauche : levé vers la goutte
+    if (opt.brasHaut) {
+      g.beginPath(); g.moveTo(-36, -92); g.lineTo(-78, -150); g.lineTo(-98, -222); g.stroke();
+      g.beginPath(); g.arc(-100, -232, 18, 0, 7); g.fill();
+      g.beginPath(); g.ellipse(-86, -244, 7, 12, 0.5, 0, 7); g.fill();
+    } else {
+      g.beginPath(); g.moveTo(-36, -88); g.lineTo(-92, -108); g.lineTo(-116, -158); g.stroke();
+      g.beginPath(); g.arc(-118, -166, 17, 0, 7); g.fill();
+    }
+    // tête
+    g.fillStyle = opt.peau;
+    g.beginPath(); g.arc(-52, -146, 12, 0, 7); g.arc(52, -146, 12, 0, 7); g.fill();
+    g.beginPath(); g.arc(0, -150, 54, 0, 7); g.fill();
+    // cheveux
+    g.fillStyle = opt.cheveux;
+    g.beginPath(); g.arc(0, -156, 57, Math.PI * 1.02, Math.PI * 1.98); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(-56, -160); g.quadraticCurveTo(-30, -150, -20, -176); g.quadraticCurveTo(0, -158, 14, -180); g.quadraticCurveTo(34, -156, 56, -162); g.lineTo(52, -190); g.lineTo(-52, -190); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(-4, -206); g.quadraticCurveTo(10, -232, 30, -222); g.quadraticCurveTo(14, -218, 10, -204); g.closePath(); g.fill();
+    // lumière du soleil sur la tête
+    g.strokeStyle = 'rgba(255,250,215,.5)'; g.lineWidth = 4; g.beginPath(); g.arc(0, -150, 51, -0.7, 0.4); g.stroke();
+    // visage : yeux grands ouverts, sourcils levés, grand sourire
+    g.fillStyle = '#ffffff';
+    g.beginPath(); g.ellipse(-20, -150, 12, 14, 0, 0, 7); g.ellipse(20, -150, 12, 14, 0, 0, 7); g.fill();
+    g.fillStyle = '#2a1a0e'; g.beginPath(); g.arc(-18, -148, 7.5, 0, 7); g.arc(22, -148, 7.5, 0, 7); g.fill();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(-15, -151, 2.6, 0, 7); g.arc(25, -151, 2.6, 0, 7); g.fill();
+    g.strokeStyle = opt.cheveux; g.lineWidth = 4.5;
+    g.beginPath(); g.arc(-20, -166, 12, -2.5, -0.7); g.stroke(); g.beginPath(); g.arc(20, -166, 12, -2.4, -0.6); g.stroke();
+    g.fillStyle = 'rgba(255,110,120,.45)'; g.beginPath(); g.arc(-34, -126, 9, 0, 7); g.arc(34, -126, 9, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(120,60,30,.5)'; g.lineWidth = 3; g.beginPath(); g.arc(1, -136, 5, 0.3, 2.8); g.stroke();
+    g.fillStyle = '#7a2230';
+    g.beginPath(); g.moveTo(-24, -126); g.quadraticCurveTo(0, -122, 24, -126); g.quadraticCurveTo(20, -96, 0, -96); g.quadraticCurveTo(-20, -96, -24, -126); g.fill();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(-20, -125); g.quadraticCurveTo(0, -121, 20, -125); g.lineTo(18, -118); g.quadraticCurveTo(0, -115, -18, -118); g.closePath(); g.fill();
+    g.fillStyle = '#ff7a8a'; g.beginPath(); g.ellipse(0, -103, 11, 6, 0, 0, 7); g.fill();
+    // moitié avant de la bouée, reflets
+    anneauAffiche(g, rx, ry, ep, 0, Math.PI, opt.anneau, opt.bande);
+    g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 7; g.beginPath(); g.ellipse(0, -8, rx - 6, ry - 4, 0, 0.35, 1.3); g.stroke();
+    g.strokeStyle = 'rgba(0,0,0,.14)'; g.lineWidth = 8; g.beginPath(); g.ellipse(0, 12, rx, ry, 0, 0.2, Math.PI - 0.2); g.stroke();
+    // pieds posés sur l'avant de la bouée
+    g.fillStyle = opt.peau;
+    g.beginPath(); g.ellipse(-54, 40, 15, 11, -0.3, 0, 7); g.ellipse(54, 40, 15, 11, 0.3, 0, 7); g.fill();
+    g.restore();
+  }
+  function palmeAffiche(g, x, y, a, l, c1, c2) {
+    g.save(); g.translate(x, y); g.rotate(a);
+    g.fillStyle = c1;
+    g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(l * 0.5, -l * 0.22, l, 0); g.quadraticCurveTo(l * 0.5, l * 0.22, 0, 0); g.fill();
+    g.strokeStyle = c2; g.lineWidth = l * 0.025; g.beginPath(); g.moveTo(0, 0); g.lineTo(l * 0.96, 0); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = l * 0.012;
+    for (let i = 1; i < 9; i++) { const u = i / 9 * l; g.beginPath(); g.moveTo(u, 0); g.lineTo(u + l * 0.05, -l * 0.16 * Math.sin(Math.PI * i / 9)); g.stroke(); }
+    g.restore();
+  }
+  function parasolAffiche(g, x, y, s, c) {
+    g.save(); g.translate(x, y); g.scale(s, s);
+    g.fillStyle = 'rgba(0,60,0,.18)'; g.beginPath(); g.ellipse(6, 4, 46, 9, 0, 0, 7); g.fill();
+    g.strokeStyle = '#7a5a3a'; g.lineWidth = 4; g.beginPath(); g.moveTo(0, 2); g.lineTo(0, -62); g.stroke();
+    for (let k = 0; k < 6; k++) {
+      g.fillStyle = k % 2 ? '#ffffff' : c;
+      g.beginPath(); g.moveTo(0, -84); g.lineTo(-54 + k * 18, -58); g.quadraticCurveTo(-45 + k * 18, -52, -36 + k * 18, -58); g.closePath(); g.fill();
+    }
+    g.restore();
+  }
+  function dessinerAffiche() {
+    redimensionner();
+    const g = ctx;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.clearRect(0, 0, W, H);
+    const k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+    g.setTransform(DPR * k, 0, 0, DPR * k, DPR * ox, DPR * oy);
+    const xa = -ox / k - 2, xb = (W - ox) / k + 2, ya = -oy / k - 2, yb = (H - oy) / k + 2;
+    const HORIZON = 262;
+    // ciel
+    const ciel = g.createLinearGradient(0, ya, 0, HORIZON);
+    ciel.addColorStop(0, '#3fb6ff'); ciel.addColorStop(1, '#d4f4ff');
+    g.fillStyle = ciel; g.fillRect(xa, ya, xb - xa, HORIZON - ya + 1);
+    // soleil (source de lumière, en haut à droite)
+    const sx = 500, sy = 92;
+    const lueur = g.createRadialGradient(sx, sy, 20, sx, sy, 260);
+    lueur.addColorStop(0, 'rgba(255,250,200,.95)'); lueur.addColorStop(0.35, 'rgba(255,240,170,.45)'); lueur.addColorStop(1, 'rgba(255,240,170,0)');
+    g.fillStyle = lueur; g.fillRect(xa, ya, xb - xa, 420 - ya);
+    g.fillStyle = 'rgba(255,230,120,.55)';
+    for (let i = 0; i < 12; i++) { const a = i * 0.5236 + 0.2; g.beginPath(); g.moveTo(sx + Math.cos(a - 0.09) * 60, sy + Math.sin(a - 0.09) * 60); g.lineTo(sx + Math.cos(a) * 110, sy + Math.sin(a) * 110); g.lineTo(sx + Math.cos(a + 0.09) * 60, sy + Math.sin(a + 0.09) * 60); g.closePath(); g.fill(); }
+    const disque = g.createRadialGradient(sx - 12, sy - 12, 6, sx, sy, 50);
+    disque.addColorStop(0, '#fffbe0'); disque.addColorStop(1, '#ffd23f');
+    g.fillStyle = disque; g.beginPath(); g.arc(sx, sy, 48, 0, 7); g.fill();
+    // nuages
+    nuage(g, 110, 118, 2.6); nuage(g, 270, 62, 1.5); g.globalAlpha = 0.8; nuage(g, xb - 40, 190, 1.8); nuage(g, xa + 20, 210, 1.4); g.globalAlpha = 1;
+    // collines lointaines et palmiers
+    g.fillStyle = '#a6e08a'; g.beginPath(); g.moveTo(xa, HORIZON + 2);
+    for (let x = xa; x <= xb + 20; x += 20) g.lineTo(x, HORIZON - 18 - 14 * Math.sin(x * 0.012) - 8 * Math.sin(x * 0.031));
+    g.lineTo(xb, HORIZON + 2); g.closePath(); g.fill();
+    [[40, 0.9], [205, 0.7], [560, 1], [xa + 10, 0.8], [xb - 15, 0.85]].forEach(function (p) {
+      const px = p[0], s = p[1];
+      g.strokeStyle = '#8a6a44'; g.lineWidth = 6 * s; g.beginPath(); g.moveTo(px, HORIZON); g.quadraticCurveTo(px + 8 * s, HORIZON - 40 * s, px + 4 * s, HORIZON - 78 * s); g.stroke();
+      for (let i = 0; i < 6; i++) palmeAffiche(g, px + 4 * s, HORIZON - 78 * s, -Math.PI + i * 0.62 + 0.1, 44 * s, '#4fae57', '#2f7a34');
+    });
+    // pelouse en bandes
+    g.fillStyle = '#8fd96a'; g.fillRect(xa, HORIZON, xb - xa, yb - HORIZON);
+    g.fillStyle = '#7cc95a';
+    for (let i = 0, yy = HORIZON + 6; yy < yb; i++) { const h = 6 + i * 6; if (i % 2 === 0) g.fillRect(xa, yy, xb - xa, h); yy += h; }
+    // piscine lointaine
+    g.fillStyle = '#f3e6c8'; g.beginPath(); g.ellipse(110, HORIZON + 18, 90, 14, 0, 0, 7); g.fill();
+    g.fillStyle = '#5fd0ff'; g.beginPath(); g.ellipse(110, HORIZON + 18, 80, 10, 0, 0, 7); g.fill();
+    // toboggan en perspective : loin (t = 0, en haut à droite) jusqu'à nous (t = 1, sous le cadre)
+    const P = function (t) {
+      return { x: 300 - 100 * Math.sin(t * 3.3 - 1.65) * (1 - 0.45 * t), y: 148 + 690 * Math.pow(t, 1.25), h: 14 + 340 * Math.pow(t, 1.7) };
+    };
+    // tour de départ
+    const p0 = P(0);
+    g.fillStyle = '#e8eef5'; g.fillRect(p0.x - 34, p0.y - 4, 7, HORIZON + 12 - p0.y); g.fillRect(p0.x + 27, p0.y - 4, 7, HORIZON + 12 - p0.y);
+    g.strokeStyle = '#c3cfdb'; g.lineWidth = 3;
+    for (let yy = p0.y + 18; yy < HORIZON + 8; yy += 20) { g.beginPath(); g.moveTo(p0.x - 28, yy); g.lineTo(p0.x + 28, yy + 12); g.stroke(); }
+    g.fillStyle = '#f3e2c0'; g.fillRect(p0.x - 44, p0.y - 14, 88, 14);
+    g.fillStyle = '#ff8b3d'; g.fillRect(p0.x - 44, p0.y - 2, 88, 5);
+    [[-38, '#ff4d4d'], [38, '#3a8dff']].forEach(function (f) {
+      g.fillStyle = '#7a5a3a'; g.fillRect(p0.x + f[0] - 1.5, p0.y - 48, 3, 36);
+      g.fillStyle = f[1]; g.beginPath(); g.moveTo(p0.x + f[0] + 1.5, p0.y - 48); g.lineTo(p0.x + f[0] + 22, p0.y - 41); g.lineTo(p0.x + f[0] + 1.5, p0.y - 34); g.closePath(); g.fill();
+    });
+    // piliers sous la partie lointaine
+    for (let t = 0.06; t < 0.4; t += 0.08) {
+      const p = P(t);
+      g.fillStyle = '#dfe7ef'; g.fillRect(p.x - p.h * 0.08, p.y, p.h * 0.16, p.h * 1.2 + 6);
+    }
+    // ombre, bords et eau du toboggan
+    const N = 90;
+    const bord = function (t, e) { const p = P(t); return [p.x - p.h - e * (p.h * 0.16 + 2), p.x + p.h + e * (p.h * 0.16 + 2), p.y]; };
+    const forme = function (e, dx, dy) {
+      g.beginPath();
+      for (let i = 0; i <= N; i++) { const b = bord(i / N * 1.08, e); g.lineTo(b[0] + dx, b[2] + dy); }
+      for (let i = N; i >= 0; i--) { const b = bord(i / N * 1.08, e); g.lineTo(b[1] + dx, b[2] + dy); }
+      g.closePath();
+    };
+    g.fillStyle = 'rgba(0,60,0,.2)'; forme(1.1, 14, 22); g.fill();
+    g.fillStyle = '#d9621f'; forme(1.1, 0, 6); g.fill();
+    g.fillStyle = '#ff8b3d'; forme(1, 0, 0); g.fill();
+    g.fillStyle = '#ffb27a'; forme(0.45, 0, -2); g.fill();
+    const eau = g.createLinearGradient(0, 150, 0, 800);
+    eau.addColorStop(0, '#9fe6ff'); eau.addColorStop(1, '#2fb4f0');
+    g.fillStyle = eau; forme(0, 0, 0); g.fill();
+    // reflets de l'eau qui file
+    g.lineCap = 'round';
+    [-0.62, -0.28, 0.12, 0.5, 0.78].forEach(function (u, n) {
+      for (let s0 = 0.05 + n * 0.031; s0 < 1.05; s0 += 0.11) {
+        g.strokeStyle = 'rgba(255,255,255,.6)';
+        g.beginPath();
+        for (let t = s0; t < s0 + 0.06; t += 0.01) { const p = P(t); g.lineTo(p.x + u * p.h, p.y); }
+        const pf = P(s0 + 0.03); g.lineWidth = 1 + pf.h * 0.035; g.stroke();
+      }
+    });
+    g.lineCap = 'butt';
+    // lumière douce derrière le héros
+    const TH = 0.6, ph = P(TH), hx = ph.x, hy = ph.y, S = 1.14;
+    const chaud = g.createRadialGradient(hx, hy - 170, 20, hx, hy - 170, 300);
+    chaud.addColorStop(0, 'rgba(255,250,210,.55)'); chaud.addColorStop(1, 'rgba(255,250,210,0)');
+    g.fillStyle = chaud; g.fillRect(hx - 320, hy - 480, 640, 640);
+    // adversaires qui suivent, plus loin
+    [[0.13, '#2fbf71', '#ffffff', '#3a8dff', '#e0a878', '#1d1d1d'], [0.25, '#a463f2', '#ffffff', '#ff5fa2', '#8a5532', '#2a1a0e']].forEach(function (a) {
+      const p = P(a[0]);
+      g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(p.x - p.h * 0.7, p.y - p.h * 0.6); g.lineTo(p.x, p.y + p.h * 0.1); g.lineTo(p.x + p.h * 0.7, p.y - p.h * 0.6); g.stroke();
+      enfantAffiche(g, p.x, p.y, p.h / 150, { anneau: a[1], bande: a[2], maillot: a[3], peau: a[4], cheveux: a[5], brasHaut: false });
+    });
+    // gouttes qui volent vers la main levée
+    [[hx - 140, hy - 330, 15], [hx - 205, hy - 250, 13], [hx - 245, hy - 160, 12], [hx - 30, hy - 395, 11]].forEach(function (d) { goutteAffiche(g, d[0], d[1], d[2]); });
+    // le héros, en grand
+    enfantAffiche(g, hx, hy, S, { anneau: '#ff4d4d', bande: '#ffffff', maillot: '#ffd23f', peau: '#f1c79b', cheveux: '#6b3e1e', brasHaut: true });
+    goutteAffiche(g, hx - 100 * S, hy - 290 * S, 21);
+    g.fillStyle = '#fff6b0';
+    for (let i = 0; i < 6; i++) { const a = i * 1.047 + 0.3; etoile(g, hx - 100 * S + Math.cos(a) * 46, hy - 290 * S + Math.sin(a) * 46, 8, 3, 4); g.fill(); }
+    // gerbes d'eau de chaque côté de la bouée
+    for (let cote = -1; cote <= 1; cote += 2) {
+      for (let i = 0; i < 16; i++) {
+        const f = i / 15, x = hx + cote * (120 * S + f * 150), y = hy + 20 - Math.sin(f * Math.PI * 0.9) * 120 + f * 40;
+        g.fillStyle = i % 3 ? 'rgba(255,255,255,.92)' : 'rgba(170,230,255,.95)';
+        g.beginPath(); g.arc(x + Math.sin(i * 7) * 8, y + Math.cos(i * 5) * 8, 4 + (1 - f) * 9, 0, 7); g.fill();
+      }
+    }
+    // écume devant la bouée
+    g.fillStyle = 'rgba(255,255,255,.9)';
+    for (let i = 0; i < 13; i++) { const a = 0.15 + i * 0.22; g.beginPath(); g.arc(hx + Math.cos(a) * 140 * S, hy + 22 + Math.sin(a) * 56 * S, 10 + 6 * Math.sin(i * 2.1), 0, 7); g.fill(); }
+    // canard en caoutchouc qui flotte devant (obstacle), à gauche
+    const dp = P(0.74), dx = dp.x - dp.h * 0.55, dy = dp.y + 8;
+    g.save(); g.translate(dx, dy); g.scale(1.9, 1.9);
+    g.fillStyle = 'rgba(0,60,120,.25)'; g.beginPath(); g.ellipse(2, 14, 30, 8, 0, 0, 7); g.fill();
+    g.fillStyle = '#ffd23f'; g.beginPath(); g.ellipse(0, 2, 26, 15, 0, 0, 7); g.fill();
+    g.beginPath(); g.moveTo(20, -4); g.quadraticCurveTo(34, -14, 30, 2); g.closePath(); g.fill();
+    g.beginPath(); g.arc(-12, -16, 13, 0, 7); g.fill();
+    g.fillStyle = '#ff8b3d'; g.beginPath(); g.ellipse(-27, -13, 9, 4.5, 0.15, 0, 7); g.fill();
+    g.fillStyle = '#1d1d1d'; g.beginPath(); g.arc(-15, -20, 2.6, 0, 7); g.fill();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(-14, -21, 0.9, 0, 7); g.fill();
+    g.fillStyle = '#f0b400'; g.beginPath(); g.ellipse(4, 2, 12, 7, -0.25, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,.5)'; g.beginPath(); g.ellipse(-8, -22, 4, 2.5, -0.5, 0, 7); g.fill();
+    g.restore();
+    // parasols et fleurs sur la pelouse
+    parasolAffiche(g, 52, 360, 0.9, '#ff5a5a');
+    parasolAffiche(g, 556, 430, 1.1, '#4fa8ff');
+    [[30, 560, 2.2, '#ff7ab0'], [70, 610, 1.8, '#ffffff'], [575, 620, 2.4, '#ffe14d'], [540, 680, 2, '#ff7ab0'], [20, 700, 2.4, '#ffd23f']].forEach(function (f) {
+      g.save(); g.translate(f[0], f[1]); g.scale(f[2], f[2]); fleur(g, 0, 0, f[3]); g.restore();
+    });
+    // premier plan : grandes palmes coupées par les bords
+    palmeAffiche(g, xa - 30, ya - 20, 0.75, 250, '#2f9e4f', '#1f7a3a');
+    palmeAffiche(g, xa - 40, ya + 40, 0.3, 220, '#3fae5f', '#1f7a3a');
+    palmeAffiche(g, xa - 20, ya - 40, 1.2, 200, '#4fbf6a', '#2a8448');
+    palmeAffiche(g, xb + 30, yb + 20, -2.6, 260, '#2f9e4f', '#1f7a3a');
+    palmeAffiche(g, xb + 30, yb - 60, -2.95, 220, '#3fae5f', '#1f7a3a');
+  }
+  function cacherPourAffiche() {
+    document.querySelectorAll('.ecran, #hud, #compte, #bulle-info, button, .jel-langue').forEach(function (el) { el.style.setProperty('display', 'none', 'important'); });
+  }
+  function demarrerAffiche() {
+    etat = 'affiche';
+    cacherPourAffiche();
+    setTimeout(cacherPourAffiche, 50); setTimeout(cacherPourAffiche, 400);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ==========================================================================
+  // Images du jeu (page du jeu)
+  // ==========================================================================
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine course, avec sa vraie interface (place, gouttes, barre de
+  // progression, bouton turbo), sans écran titre, ni fenêtre « Continuer », ni carte d'avant-course
+  // (CONSIGNES-JEU.md, section 5). La course est avancée jusqu'au moment choisi, tourne encore
+  // une seconde, puis elle est figée sans fenêtre de pause : ni son, ni sauvegarde, ni FMG.
+  //   1 = niveau 1, la Piscine : premières gouttes, adversaires au coude à coude ;
+  //   2 = niveau 10, le Glacier : glace qui fait déraper et boule de neige qui roule ;
+  //   3 = niveau 21, l'Arc-en-ciel : le champion à la couronne d'or, turbo allumé.
+  const MOMENTS_APERCU = {
+    1: { niveau: 0, type: 'goutte', apres: 1400, avant: 190, bouee: 0, jauge: 0, rivaux: [[150, -0.35], [-110, 0.45], [380, 0.3]] },
+    2: { niveau: 9, type: 'boule', apres: 2500, avant: 330, bouee: 1, jauge: 5, rivaux: [[120, 0.4], [-150, -0.4], [-60, 0.5]] },
+    3: { niveau: 20, type: 'champi', apres: 3000, avant: 300, bouee: 5, jauge: 0, turbo: true, rivaux: [[170, 0.3, true], [-130, -0.45], [-280, 0.2]] }
+  };
+  function ouvrirApercu(numero) {
+    const sc = MOMENTS_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 4242 + numero * 977;
+    Math.random = function () { graine = (graine + 0x6D2B79F5) | 0; let t = Math.imul(graine ^ (graine >>> 15), 1 | graine); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    sonActif = false;
+    niveauCourant = sc.niveau; niveauReprise = sc.niveau + 1; partieEnCours = false;
+    const def = NIVEAUX[sc.niveau];
+    monde = creerMonde(def, { ev: function () {}, style: sc.bouee, peau: '#f1c79b', cheveux: '#6b3e1e' });
+    const m = monde, j = m.joueur;
+    particules = []; ecranParts = [];
+    let yCible = sc.apres;
+    const liste = sc.type === 'boule' ? m.boules : m.objets;
+    for (const o of liste) if (o.type === sc.type && o.y > sc.apres) { yCible = o.y - sc.avant; break; }
+    // Le joueur est piloté comme un adversaire adroit jusqu'au moment choisi.
+    m.depart = true;
+    j.bot = true; j.gourmand = true; j.skill = 1; j.agilite = 1; j.f = 1.05;
+    let garde = 0;
+    while (j.y < yCible && garde++ < 30000) avancer(m, 1 / 60);
+    // Quelques adversaires tout près, pour une vraie course.
+    const bots = m.coureurs.filter(function (r) { return r !== j; });
+    const champion = bots.filter(function (r) { return r.champion; })[0];
+    const autres = bots.filter(function (r) { return !r.champion; });
+    sc.rivaux.forEach(function (rv, i) {
+      const r = rv[2] && champion ? champion : autres[i % autres.length];
+      if (!r) return;
+      r.y = j.y + rv[0]; r.x = cxA(m, r.y) + rv[1] * hwA(m, r.y); r.tx = r.x; r.vx = 0; r.v = VBASE * 0.95; r.f = 0.95; r.fEff = 0.95;
+    });
+    j.f = 1; j.fEff = 1;
+    if (sc.turbo) j.turbo = DUREE_TURBO; else j.jauge = sc.jauge;
+    // Vraie interface de la course.
+    montrer(null);
+    preparerHud();
+    $('hud').hidden = false;
+    // La course tourne encore une seconde (traînées d'eau, gouttes ramassées), puis se fige.
+    m.ev = surEvenement;
+    etat = 'course';
+    for (let i = 0; i < 54; i++) { avancer(m, 1 / 60); traineeCoureurs(m); majParticules(1 / 60); }
+    j.bot = false;
+    if (sc.turbo) j.turbo = Math.max(j.turbo, 1.5); else j.jauge = sc.jauge;
+    ecranParts = []; secousse = 0;
+    clearTimeout(info.minuteur); $('bulle-info').hidden = true; $('compte').hidden = true;
+    camY = j.y - (H / vuePrincipale(0).k) * 0.3;
+    majHud(true);
+    etat = 'pause';   // figée : la boucle dessine sans faire avancer la course
+    window.addEventListener('resize', function () { camY = j.y - (H / vuePrincipale(0).k) * 0.3; });
+  }
+
   // Démarrage
   I18N.surChangement(function () { majSon(); majTitre(); });
   majSon();
-  mondeTitre = creerMondeTitre();
-  camY = mondeTitre.coureurs[1].y - (H / vuePrincipale(0).k) * 0.34;
-  majTitre();
-  montrer('ecran-titre');
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) {
+    demarrerAffiche();
+  } else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+    ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  } else {
+    mondeTitre = creerMondeTitre();
+    camY = mondeTitre.coureurs[1].y - (H / vuePrincipale(0).k) * 0.34;
+    majTitre();
+    montrer('ecran-titre');
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

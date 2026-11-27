@@ -42,7 +42,7 @@ const RACINE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DOSSIER_JEUX = path.join(RACINE, 'games');
 const SORTIE = path.join(RACINE, 'multijoueur', 'src', 'jeux.js');
 const SOURCES_WORKER = [
-  ...['index.js', 'partie.js', 'accueil.js', 'moteur.js', 'presence.js', 'ticket.js', 'profil.js'].map((f) => path.join(RACINE, 'multijoueur', 'src', f)),
+  ...['index.js', 'partie.js', 'accueil.js', 'moteur.js', 'presence.js', 'ticket.js', 'profil.js', 'province.js'].map((f) => path.join(RACINE, 'multijoueur', 'src', f)),
   ...['moteur-tr.js', 'routes.js', 'rencontre.js', 'duel.js', 'budget.js'].map((f) => path.join(RACINE, 'multijoueur', 'src', 'temps-reel', f)),
   path.join(RACINE, 'public', 'temps-reel', 'moteur.js'),     // moteur temps réel : simulation des parties relayées
   path.join(RACINE, 'multijoueur', 'wrangler.toml'),          // un nouveau Durable Object (présence des amis) demande aussi un déploiement

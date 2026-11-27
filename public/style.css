@@ -2548,6 +2548,28 @@ main.catalogue {
   .apercus-liste.avec-ordi .apercu img { width: 100%; height: auto; }
 }
 
+/* Jeu qui se joue en paysage (classe tout-paysage, dérogation de Marmoria) : 2 images de téléphone tenu
+   à l'horizontale (1055 × 488) et une d'ordinateur (1280 × 720). Sur téléphone, la bande qui défile, une
+   image à la fois et le bord de la suivante, toutes à la même hauteur ; dès 720 px, les trois sur une
+   ligne, à la même hauteur (colonnes proportionnelles : 1055/488 et 1280/720). */
+.apercus-liste.tout-paysage .apercu { width: auto; max-width: none; }
+
+.apercus-liste.tout-paysage .apercu img {
+  width: auto;
+  height: min(40vw, 240px);
+  aspect-ratio: auto;
+}
+
+@media (min-width: 720px) {
+  .apercus-liste.tout-paysage {
+    display: grid;
+    grid-template-columns: 2.162fr 2.162fr 1.778fr;
+    align-items: start;
+  }
+
+  .apercus-liste.tout-paysage .apercu img { width: 100%; height: auto; }
+}
+
 /* Page d'une catégorie. */
 .categorie h1,
 .introuvable h1 {
@@ -5004,7 +5026,7 @@ button.bouton.bouton-secondaire { border: 1px solid var(--orbite); }
 @media (min-width: 1232px) {
   .installer-banniere { margin-left: auto; margin-right: auto; }
 }
-html.avec-installer .installer-banniere[hidden] { display: flex !important; visibility: hidden; }
+html.avec-installer #installer-banniere[hidden] { display: flex !important; visibility: hidden; }
 
 .installer-banniere img { flex: none; border-radius: 10px; }
 
@@ -5143,3 +5165,215 @@ html.avec-installer .installer-banniere[hidden] { display: flex !important; visi
   .installer-banniere-bouton { padding: 0 12px; }
   .installer-banniere .installer-croix { width: 40px; }
 }
+
+/* --------------------------------------------------------------------------
+   « Choisis ton pseudo » (public/invite-pseudo.js, docs/cadrage-fidelisation.md,
+   section 14.14) : bannière fine en haut de l'accueil et fenêtre, jumelles de
+   « Installer l'appli » (mêmes classes installer-* pour la mise en forme
+   commune), liseré doré comme « Bon retour ! ». Démonstration animée de la
+   pastille : figée, menu ouvert, si l'appareil demande moins de mouvement.
+   -------------------------------------------------------------------------- */
+
+.invite-banniere { border-color: rgba(255, 216, 138, .45); }
+html.avec-invite-pseudo #invite-pseudo[hidden] { display: flex !important; visibility: hidden; }
+
+/* Le cadre déborde de 16 % (comme dans la pastille) : disques plus petits que leur place. */
+.invite-avatar { --trait-cadre: 5px; flex: none; width: 36px; height: 36px; margin: 0 4px; font-size: 21px; }
+.invite-tete-avatar { --trait-cadre: 6px; flex: none; width: 42px; height: 42px; margin: 4px; font-size: 25px; }
+
+.invite-fenetre .installer-tete h2 { line-height: 1.2; }
+.invite-fenetre .installer-tete p { margin-top: 2px; font-size: 14px; line-height: 1.35; }
+
+.invite-form label { display: block; margin: 2px 0 6px; font-weight: 700; }
+.invite-saisie { display: flex; gap: 8px; }
+.invite-saisie input {
+  flex: 1;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--orbite);
+  border-radius: var(--r-commande);
+  background: var(--nuit-profonde);
+  color: var(--craie);
+  font: inherit;
+  font-size: 17px; /* 16 px au moins : pas de zoom sur iPhone */
+}
+.invite-saisie input:focus { border-color: var(--lavande); outline: 2px solid var(--lavande); outline-offset: 1px; }
+.invite-saisie .installer-banniere-bouton { min-height: 48px; }
+.invite-saisie .installer-banniere-bouton:disabled { opacity: .6; cursor: wait; }
+.invite-aide { margin: 8px 0 0; color: var(--craie-douce); font-size: 13px; line-height: 1.35; }
+/* Place gardée pour le message : rien ne saute quand il apparaît. */
+.invite-message { min-height: 1.4em; margin: 6px 0 0; color: var(--or); font-size: 14px; font-weight: 700; line-height: 1.4; }
+
+.invite-reussi {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 216, 138, .45);
+  border-radius: var(--r-commande);
+  background: rgba(255, 216, 138, .08);
+}
+.invite-reussi-avatar { --trait-cadre: 6px; flex: none; width: 42px; height: 42px; margin: 4px; font-size: 25px; }
+.invite-reussi-texte { margin: 0; font-family: var(--police-titre); font-size: 19px; font-weight: 600; line-height: 1.25; }
+
+.invite-filet { display: flex; align-items: center; gap: 10px; margin: 8px 0 6px; color: var(--lavande); font-size: 15px; }
+.invite-filet::before,
+.invite-filet::after { content: ""; flex: 1; height: 1px; background: var(--lisere); }
+.invite-astuce { margin: 0 0 10px; color: var(--craie-douce); font-size: 14px; line-height: 1.4; }
+
+/* Démonstration : une petite barre d'en-tête, la pastille à droite ; un doigt
+   la touche, le menu se déplie et ses lignes s'allument l'une après l'autre.
+   Positions du doigt (translate) calculées depuis le coin haut droit de la scène. */
+.invite-demo {
+  position: relative;
+  height: 196px;
+  margin: 0 0 12px;
+  overflow: hidden;
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-commande);
+  background: radial-gradient(circle at 85% 0%, rgba(196, 181, 253, .14), transparent 60%), var(--nuit);
+}
+.invite-demo-barre {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--lisere);
+}
+.invite-demo-logo { width: 88px; height: 12px; border-radius: 6px; background: var(--surface-choisie); }
+.invite-demo-pastille {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 36px;
+  padding: 0 10px 0 3px;
+  border: 1px solid var(--orbite);
+  border-radius: 18px;
+  background: rgba(242, 239, 250, .06);
+  color: var(--craie);
+  font-size: 14px;
+  font-weight: 800;
+  animation: invite-pastille 6s ease-in-out infinite;
+}
+.invite-demo-avatar { --trait-cadre: 5px; width: 26px; height: 26px; margin: 0 3px; font-size: 15px; }
+.invite-demo-menu {
+  position: absolute;
+  top: 58px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  min-width: 176px;
+  padding: 5px;
+  border: 1px solid var(--lisere);
+  border-radius: 14px;
+  background: var(--surface-relevee);
+  box-shadow: var(--ombre-flottante);
+  transform-origin: 100% 0;
+  animation: invite-menu 6s ease-in-out infinite;
+}
+.invite-demo-ligne {
+  display: flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: var(--craie);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  animation: 6s ease-in-out infinite;
+}
+.invite-demo-ligne:nth-child(1) { animation-name: invite-ligne-1; }
+.invite-demo-ligne:nth-child(2) { animation-name: invite-ligne-2; }
+.invite-demo-ligne:nth-child(3) { animation-name: invite-ligne-3; }
+/* Bout du doigt en (16 px, 3 px) de son dessin, posé dans le coin haut droit. */
+.invite-demo-doigt {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 34px;
+  height: 41px;
+  fill: var(--craie);
+  stroke: var(--nuit-profonde);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 4px 6px rgba(4, 2, 16, .55));
+  transform-origin: 16px 3px;
+  animation: invite-doigt 6s ease-in-out infinite;
+}
+
+@keyframes invite-doigt {
+  0% { opacity: 0; transform: translate(-150px, 150px); }
+  8% { opacity: 1; }
+  22% { transform: translate(-23px, 23px) scale(1); }
+  26% { transform: translate(-23px, 23px) scale(.84); }
+  30% { transform: translate(-23px, 23px) scale(1); }
+  40%, 50% { transform: translate(-14px, 78px); }
+  56%, 66% { transform: translate(-14px, 112px); }
+  72%, 86% { opacity: 1; transform: translate(-14px, 146px); }
+  96%, 100% { opacity: 0; transform: translate(-150px, 150px); }
+}
+@keyframes invite-pastille {
+  0%, 22% { border-color: var(--orbite); box-shadow: 0 0 0 0 rgba(255, 216, 138, 0); }
+  27% { border-color: var(--or); box-shadow: 0 0 0 5px rgba(255, 216, 138, .45); }
+  38%, 100% { border-color: var(--orbite); box-shadow: 0 0 0 0 rgba(255, 216, 138, 0); }
+}
+@keyframes invite-menu {
+  0%, 28% { opacity: 0; transform: scale(.6); }
+  36%, 88% { opacity: 1; transform: scale(1); }
+  96%, 100% { opacity: 0; transform: scale(.6); }
+}
+@keyframes invite-ligne-1 {
+  0%, 38%, 54%, 100% { background: transparent; color: var(--craie); }
+  41%, 51% { background: var(--surface-choisie); color: var(--lavande-claire); }
+}
+@keyframes invite-ligne-2 {
+  0%, 54%, 70%, 100% { background: transparent; color: var(--craie); }
+  57%, 67% { background: var(--surface-choisie); color: var(--lavande-claire); }
+}
+@keyframes invite-ligne-3 {
+  0%, 70%, 90%, 100% { background: transparent; color: var(--craie); }
+  73%, 87% { background: var(--surface-choisie); color: var(--lavande-claire); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .invite-demo-pastille,
+  .invite-demo-menu,
+  .invite-demo-ligne,
+  .invite-demo-doigt { animation: none; }
+  .invite-demo-doigt { transform: translate(-14px, 78px); }
+  .invite-demo-ligne:first-child { background: var(--surface-choisie); color: var(--lavande-claire); }
+}
+
+/* Trois raccourcis : ce que cache la pastille. */
+.invite-raccourcis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 10px; padding: 0; list-style: none; }
+.invite-raccourcis a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 80px;
+  padding: 10px 4px;
+  border: 1px solid var(--lisere);
+  border-radius: var(--r-commande);
+  background: var(--surface-relevee);
+  color: var(--craie);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+}
+.invite-raccourcis a:hover,
+.invite-raccourcis a:focus-visible { border-color: var(--lavande); }
+.invite-raccourcis svg { width: 28px; height: 28px; fill: none; stroke: var(--lavande); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.invite-raccourci-avatar { --trait-cadre: 4px; width: 26px; height: 26px; margin: 1px; font-size: 15px; }
