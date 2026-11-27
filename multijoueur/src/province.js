@@ -38,7 +38,7 @@ import { verifierTicket } from './ticket.js';
 
 export const PROVINCE = {
   SIEGES: 4,
-  CARTES: { marmoria: ['campanie', 'hispanie'] }, // provinces dessinées, par jeu
+  CARTES: { marmoria: ['campanie', 'hispanie'], cosmoria: ['campanie', 'hispanie'] }, // provinces dessinées, par jeu (Cosmoria garde les identifiants du moteur de Marmoria)
   CODE: /^[A-HJ-NP-Z2-9]{6}$/,                    // sans I, O, 0, 1 (confusions)
   ALPHABET: 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789',
   CARAVANE_MAX: 8,                                // charges par caravane

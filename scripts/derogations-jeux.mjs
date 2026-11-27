@@ -29,6 +29,17 @@ export const DEROGATIONS = {
     // 26 novembre 2026) : jeu à plusieurs par le comptoir de province.
     province: true,
   },
+  // Cosmoria (colonie spatiale sur le moteur de Marmoria) : docs/cadrage-cosmoria.md, section 5. Le propriétaire a
+  // demandé le 27 novembre 2026 « la même chose que Marmoria » dans un univers de science-fiction : le jeu hérite donc
+  // des quatre dérogations de son modèle (17 cartes, paysage, poids, « Colonies voisines » par le comptoir de province).
+  cosmoria: {
+    source: 'docs/cadrage-cosmoria.md, section 5 (demande du propriétaire du 27 novembre 2026 : même principe que Marmoria)',
+    poidsMax: null,
+    poidsRepere: 4 * 1024 * 1024,
+    niveauxMin: 17,
+    paysage: true,
+    province: true,
+  },
 };
 
 /** Dérogations d'un jeu ({} s'il n'en a pas). */
