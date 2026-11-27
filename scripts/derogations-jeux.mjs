@@ -40,6 +40,13 @@ export const DEROGATIONS = {
     paysage: true,
     province: true,
   },
+  // Les Petits Cuistots (cuisine en 3D pour les petits) : jeu conçu en paysage, pour que la scène et les
+  // cibles restent grandes sous le doigt d'un enfant de 4 ans. Décision du propriétaire du site du
+  // 27 novembre 2026, à l'ajout du jeu (pull request « Nouveau jeu : Les Petits Cuistots »).
+  'les-petits-cuistots': {
+    source: 'décision du propriétaire du 27 novembre 2026 (ajout du jeu, compétence ajouter-jeu-site, étape 4)',
+    paysage: true,
+  },
 };
 
 /** Dérogations d'un jeu ({} s'il n'en a pas). */
