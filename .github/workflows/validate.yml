@@ -141,6 +141,8 @@ on:
       - "scripts/tester-marmoria.mjs"
       - "scripts/derogations-jeux.mjs"
       - "sources/marmoria/**"
+      - "scripts/tester-cosmoria.mjs"
+      - "sources/cosmoria/**"
       - "scripts/idees.mjs"
       - "scripts/inspirations.mjs"
       - "scripts/tester-inspirations.mjs"
@@ -178,6 +180,7 @@ jobs:
       inspirations: ${{ steps.quoi.outputs.inspirations }}
       poussiere: ${{ steps.quoi.outputs.poussiere }}
       marmoria: ${{ steps.quoi.outputs.marmoria }}
+      cosmoria: ${{ steps.quoi.outputs.cosmoria }}
       jeux: ${{ steps.quoi.outputs.jeux }}
       lots: ${{ steps.quoi.outputs.lots }}
     steps:
@@ -271,6 +274,11 @@ jobs:
           if printf '%s\n' "$fichiers" | grep -Eq '^(games/marmoria/|sources/marmoria/|scripts/tester-marmoria\.mjs$)'; then marmoria=1; fi
           # Sources de Marmoria modifiées : le jeu assemblé passe aussi au robot.
           if printf '%s\n' "$fichiers" | grep -q '^sources/marmoria/'; then ids=$(printf '%s\n' $ids marmoria | sort -u | tr '\n' ' '); fi
+          # Cosmoria (docs/cadrage-cosmoria.md) : colonie spatiale sur le moteur de Marmoria ; mêmes contrôles.
+          cosmoria=0
+          if [ "${{ github.event_name }}" != "pull_request" ]; then cosmoria=1; fi
+          if printf '%s\n' "$fichiers" | grep -Eq '^(games/cosmoria/|sources/cosmoria/|scripts/tester-cosmoria\.mjs$)'; then cosmoria=1; fi
+          if printf '%s\n' "$fichiers" | grep -q '^sources/cosmoria/'; then ids=$(printf '%s\n' $ids cosmoria | sort -u | tr '\n' ' '); fi
           # Référencement de tout le site : tout ce qui précède, plus les règles et
           # le vérificateur du référencement (sans navigateur).
           seo=0
@@ -308,6 +316,7 @@ jobs:
             echo "inspirations=$inspirations"
             echo "poussiere=$poussiere"
             echo "marmoria=$marmoria"
+            echo "cosmoria=$cosmoria"
             echo "jeux=$jeux"
             echo "lots=$lots_json"
           } >> "$GITHUB_OUTPUT"
@@ -555,6 +564,15 @@ jobs:
           node scripts/tester-marmoria.mjs
           node sources/marmoria/assembler.mjs
           git diff --exit-code -- games/marmoria/index.html games/marmoria/game.json || { echo "games/marmoria/ n'est pas à jour : lancer node sources/marmoria/assembler.mjs"; exit 1; }
+
+      # Cosmoria (docs/cadrage-cosmoria.md) : même moteur que Marmoria, mêmes contrôles (simulation en Node,
+      # puis le jeu réassemblé depuis sources/cosmoria/ doit être identique à games/cosmoria/).
+      - name: Contrôler Cosmoria
+        if: needs.quoi.outputs.cosmoria == '1'
+        run: |
+          node scripts/tester-cosmoria.mjs
+          node sources/cosmoria/assembler.mjs
+          git diff --exit-code -- games/cosmoria/index.html games/cosmoria/game.json || { echo "games/cosmoria/ n'est pas à jour : lancer node sources/cosmoria/assembler.mjs"; exit 1; }
 
       # Icônes des regroupements : le bloc généré de public/style.css doit
       # correspondre aux dessins de scripts/icones/sources (sans navigateur).
