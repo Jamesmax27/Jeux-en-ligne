@@ -3038,6 +3038,7 @@ body.debug-ouvert #hud { top: 0; }
       cache: -1, refuge: false, etat: 'suivre', t: 0, recharge: 0, stock: 0, cdFromage: 0,
       pousse: 0, pousseCase: -1, porteRecente: -1, porteT: -99, ordre: 'suis', calme: 0,
       reflexion: 0, pas: 0, vitesse: 1, cacheVoulue: false, bloqueDir: -1, mode: '', prec: -1, precTmp: -1,
+      cede: -1, // cachette que l'allié doit laisser au joueur
     };
   }
 
@@ -3256,6 +3257,9 @@ body.debug-ouvert #hud { top: 0; }
     if (e.cache >= 0 && e.bloqueDir === d && !m.bot) return -1;
     e.bloqueDir = -1;
     const v = voisin(m, e.c, d);
+    // L'allié s'est arrêté dans cette cachette en suivant le joueur : il lui laisse la place
+    const a = m.allie;
+    if (v >= 0 && m.t[v] === CACHE && a !== e && a.cache === v && !a.cacheVoulue && a.n < 0) { a.cede = v; a.reflexion = 0; }
     if (peutEntrer(m, e, v)) return v;
     if (e.dirMouv >= 0 && (d + e.dirMouv) % 2 === 1) {
       const v2 = voisin(m, e.c, e.dirMouv);
@@ -3769,9 +3773,28 @@ body.debug-ouvert #hud { top: 0; }
     return null;
   }
 
+  // Case voisine où l'allié quitte une cachette qu'il ne voulait pas (jamais la case du joueur)
+  function sortirCache(m, a) {
+    const j = m.joueur;
+    let best = -1, bd = Infinity;
+    for (let d = 0; d < 4; d++) {
+      const q = voisin(m, a.c, d);
+      if (q < 0 || m.t[q] === CACHE || q === j.c || q === j.n || !peutEntrer(m, a, q)) continue;
+      const dq = distCases(m, q, j.c);
+      if (dq < bd) { bd = dq; best = q; }
+    }
+    return best;
+  }
+
   // Décision de l'allié : renvoie la case suivante (ou -1 : rester)
   function choisirAllie(m, a) {
     if (a.etat !== 'suivre' || a.refuge) return -1;
+    // Le joueur veut la cachette où l'allié s'est arrêté en le suivant : il sort
+    if (a.cede >= 0) {
+      const c = a.cede;
+      a.cede = -1;
+      if (a.c === c && a.cache >= 0 && !a.cacheVoulue) { const q = sortirCache(m, a); if (q >= 0) { a.mode = 'suit'; return q; } }
+    }
     a.mode = '';
     const p = prudence(m, a, a.ordre === 'cache' && !m.herseOuverte);
     if (p) return p.n;
@@ -3800,8 +3823,10 @@ body.debug-ouvert #hud { top: 0; }
     const d = res.dist[cj];
     if (!isFinite(d)) return -1;
     const pas = bfs(m, a.c, (q) => peutEntrer(m, a, q)).dist[cj];
-    if (pas <= 2 || (pas <= 3 && !a.bouge)) return -1;
-    if (m.t[cj] === CACHE && pas <= 3) return -1;
+    // En suivant, l'allié ne s'arrête jamais dans une cachette : il la laisse libre pour le joueur
+    const arret = a.cache >= 0 && !a.cacheVoulue ? sortirCache(m, a) : -1;
+    if (pas <= 2 || (pas <= 3 && !a.bouge)) return arret;
+    if (m.t[cj] === CACHE && pas <= 3) return arret;
     return premierPas(res.prev, a.c, cj);
   }
 
