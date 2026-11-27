@@ -61,6 +61,8 @@
   "jardin13": "Le canyon",
   "jardin14": "L'aurore boréale",
   "jardin15": "Le jardin des étoiles",
+  "jardin16": "La lagune de corail",
+  "jardin17": "Le jardin arc-en-ciel",
   "victoire": "Bravo !",
   "victoireTexte": "Toutes les flèches sont sorties !",
   "defaite": "Oh non !",
@@ -180,6 +182,8 @@
   "jardin13": "The canyon",
   "jardin14": "The northern lights",
   "jardin15": "The garden of stars",
+  "jardin16": "The coral lagoon",
+  "jardin17": "The rainbow garden",
   "victoire": "Well done!",
   "victoireTexte": "All the arrows are out!",
   "defaite": "Oh no!",
@@ -299,6 +303,8 @@
   "jardin13": "El cañón",
   "jardin14": "La aurora boreal",
   "jardin15": "El jardín de las estrellas",
+  "jardin16": "La laguna de coral",
+  "jardin17": "El jardín arcoíris",
   "victoire": "¡Bravo!",
   "victoireTexte": "¡Todas las flechas han salido!",
   "defaite": "¡Oh, no!",
@@ -418,6 +424,8 @@
   "jardin13": "O cânion",
   "jardin14": "A aurora boreal",
   "jardin15": "O jardim das estrelas",
+  "jardin16": "A lagoa de coral",
+  "jardin17": "O jardim arco-íris",
   "victoire": "Muito bem!",
   "victoireTexte": "Todas as flechas saíram!",
   "defaite": "Ah, não!",
@@ -537,6 +545,8 @@
   "jardin13": "Die Schlucht",
   "jardin14": "Das Polarlicht",
   "jardin15": "Der Sternengarten",
+  "jardin16": "Die Korallenlagune",
+  "jardin17": "Der Regenbogengarten",
   "victoire": "Super!",
   "victoireTexte": "Alle Pfeile sind draußen!",
   "defaite": "Oh nein!",
@@ -1768,6 +1778,8 @@
     { ciel: ['#ffd9b0', '#d98a5a'], cadre: '#6a3a22', c1: '#f3c69a', c2: '#ebb98a', deco: '#a8532a', motif: 'goutte' },
     { ciel: ['#1d2b55', '#2f6f6a'], cadre: '#1b2440', c1: '#3a5b7a', c2: '#34526f', deco: '#7dffcf', motif: 'etoile' },
     { ciel: ['#141a3a', '#3b2d6b'], cadre: '#120f2b', c1: '#3c3f7a', c2: '#34376e', deco: '#ffe58a', motif: 'etoile' },
+    { ciel: ['#b5f0ee', '#ffb8a8'], cadre: '#4c5a7a', c1: '#bfe8e2', c2: '#afdfd8', deco: '#ff7f6e', motif: 'bulle' },
+    { ciel: ['#c9b6ff', '#ffe2a8'], cadre: '#5a4a8a', c1: '#e6dcff', c2: '#dacdfb', deco: '#ff5fa2', motif: 'fleur' },
   ];
   const COULEURS = [
     { clair: '#ff6b6b', fonce: '#b83a3a' }, { clair: '#ffa94d', fonce: '#c26a12' }, { clair: '#ffd43b', fonce: '#b38600' },
@@ -1779,10 +1791,10 @@
   const COULEURS_TERRIERS = ['#b07cff', '#29c5d6'];
 
   // =====================================================================
-  //  Les 300 niveaux : réglages tirés du numéro, plateau produit par le
+  //  Les 340 niveaux : réglages tirés du numéro, plateau produit par le
   //  générateur (graine fixe). Les nouveautés arrivent à des niveaux précis.
   // =====================================================================
-  const NB_NIVEAUX = 300;
+  const NB_NIVEAUX = 340;
   const TUTOS_NIVEAU = {
     1: ['base'], 2: ['choc'], 6: ['coude'], 10: ['rocher'], 12: ['coeur'], 14: ['glace'], 17: ['jumelles'],
     23: ['haies'], 27: ['feuilles'], 30: ['defi'], 31: ['terriers'], 36: ['sablier'], 41: ['glace2'],
@@ -1849,6 +1861,11 @@
     else if (n > 38 && (n % 5 === 1 || (n > 150 && n % 5 === 3))) P.sablier = true;
     // Défi : un seul cœur
     if (n >= 30 && n % 10 === 0) { P.coeursMax = 1; P.sablier = false; }
+    // Jardins 16 et 17 (niveaux 301 à 340) : jumelles et terriers doublés plus souvent
+    if (n > 300) {
+      if (P.jumelles) P.jumelles = 2;
+      if (n % 8 === 3) P.terriers = Math.max(P.terriers, 2);
+    }
     if (respire) { P.sablier = false; P.jumelles = Math.min(P.jumelles, 1); }
     return P;
   }
@@ -2423,6 +2440,8 @@
     if (s.debloque) prog.debloque = Math.max(prog.debloque, Math.min(NB_NIVEAUX, s.debloque | 0));
     if (s.niveau) prog.debloque = Math.max(prog.debloque, Math.min(NB_NIVEAUX, s.niveau | 0));
     if (Array.isArray(s.tutos)) s.tutos.forEach((k) => { prog.tutos[k] = true; });
+    // Un niveau gagné ouvre le suivant (une sauvegarde faite avec 300 niveaux s'arrêtait au 300e)
+    for (let k = 0; k < NB_NIVEAUX; k++) if (prog.etoiles[k] > 0) prog.debloque = Math.max(prog.debloque, Math.min(NB_NIVEAUX, k + 2));
     if (s.options && typeof s.options.son === 'boolean') prog.son = s.options.son;
   }
   function ecrireLocal() { if (apercu) return; try { localStorage.setItem(CLE_PROGRES, JSON.stringify(prog)); } catch (e) { /* rien */ } }
