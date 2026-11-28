@@ -1837,7 +1837,7 @@
   // ==========================================================================
   let ac = null, maitre = null, bruit = null;
   function audio() {
-    if (prog.options.muet) return null;
+    if (prog.options.muet || apercu) return null;
     if (!ac) {
       try {
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -1936,6 +1936,7 @@
     victoire: false
   };
   const gele = () => etat.pause || etat.tuto;
+  let apercu = 0;       // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   let horloge = 0;      // temps de jeu (ms), gelé en pause et au tutoriel
   let anim = 0;         // temps des animations (ms), gelé seulement en pause
   let minuteurs = [];
@@ -3095,7 +3096,7 @@
     canvas.focus();
     if (etat.tuto) etapeTuto();
   }
-  document.addEventListener('visibilitychange', () => { if (document.hidden && etat.ecran === 'jeu' && $('fin').hidden) mettrePause(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && etat.ecran === 'jeu' && $('fin').hidden && !apercu) mettrePause(); });
 
   // ==========================================================================
   // Tutoriel animé
@@ -3256,7 +3257,7 @@
   // Sauvegarde à la fermeture de la page, seulement pendant une partie.
   if (window.JEL_SAVE) {
     window.JEL_SAVE.surFermeture(() => {
-      if (etat.enPartie) sauver(etat.niv + 1);
+      if (etat.enPartie && !apercu) sauver(etat.niv + 1);
     });
   }
 
@@ -3267,7 +3268,202 @@
   majBoutonsSon();
   window.addEventListener('resize', redimensionner);
   redimensionner();
-  requestAnimationFrame(boucle);
+
+  // ==========================================================================
+  // Affiche (jaquette du jeu)
+  // ==========================================================================
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+  // interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Dans la grotte aux
+  // cristaux, le bébé dragon rose chante en grand sous la lumière de la luciole, ses notes
+  // s'envolent ; à côté, un dragon orange a le hoquet et souffle une étincelle, les autres dorment.
+  function cristal(c, x, y, hgt, lg, ang, col) {
+    c.save(); c.translate(x, y); c.rotate(ang);
+    const gl = c.createRadialGradient(0, -hgt / 2, 2, 0, -hgt / 2, hgt);
+    gl.addColorStop(0, col + '77'); gl.addColorStop(1, col + '00');
+    c.fillStyle = gl; c.fillRect(-hgt, -hgt * 1.5, hgt * 2, hgt * 2);
+    c.fillStyle = col; c.globalAlpha = 0.92;
+    c.beginPath(); c.moveTo(-lg / 2, 0); c.lineTo(-lg / 2, -hgt * 0.75); c.lineTo(0, -hgt); c.lineTo(lg / 2, -hgt * 0.75); c.lineTo(lg / 2, 0); c.closePath(); c.fill();
+    c.fillStyle = '#ffffff'; c.globalAlpha = 0.45;
+    c.beginPath(); c.moveTo(-lg / 2, 0); c.lineTo(-lg / 2, -hgt * 0.75); c.lineTo(0, -hgt); c.lineTo(0, 0); c.closePath(); c.fill();
+    c.restore(); c.globalAlpha = 1;
+  }
+  // Note de musique dessinée (tête, hampe, crochet) : un signe, pas une lettre.
+  function noteMusique(c, x, y, s, col, rot) {
+    c.save(); c.translate(x, y); c.rotate(rot || 0);
+    c.shadowColor = col; c.shadowBlur = s * 0.8;
+    c.fillStyle = col; c.strokeStyle = col; c.lineWidth = s * 0.16; c.lineCap = 'round';
+    c.beginPath(); c.ellipse(0, 0, s * 0.5, s * 0.36, -0.45, 0, 7); c.fill();
+    c.beginPath(); c.moveTo(s * 0.42, -s * 0.1); c.lineTo(s * 0.42, -s * 1.6); c.stroke();
+    c.beginPath(); c.moveTo(s * 0.42, -s * 1.6); c.quadraticCurveTo(s * 1.05, -s * 1.25, s * 0.95, -s * 0.7); c.stroke();
+    c.restore(); c.shadowBlur = 0;
+  }
+  function dessinerAffiche() {
+    redimensionner();
+    dessinerFond(0); fondGrotte = 0;
+    const c = ctx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(fond, 0, 0);
+    c.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const k = Math.min(W / 600, H / 800);
+    const cx = W / 2;
+    const r = 138 * k, hx = cx, hy = H * 0.48;   // le héros
+    const lx = cx + 62 * k, ly = H * 0.17;       // la luciole
+    // Grande lueur dorée et rose autour du héros : la lumière de la luciole.
+    let gl = c.createRadialGradient(lx, ly + 60 * k, 10 * k, hx, hy - r * 0.4, H * 0.55);
+    gl.addColorStop(0, 'rgba(255,246,200,.95)'); gl.addColorStop(0.3, 'rgba(255,190,225,.55)');
+    gl.addColorStop(0.65, 'rgba(160,120,255,.22)'); gl.addColorStop(1, 'rgba(120,90,220,0)');
+    c.fillStyle = gl; c.fillRect(0, 0, W, H);
+    // Faisceau de lumière qui descend de la luciole sur le dragon.
+    gl = c.createLinearGradient(0, ly, 0, hy + r);
+    gl.addColorStop(0, 'rgba(255,248,200,.55)'); gl.addColorStop(1, 'rgba(255,248,200,0)');
+    c.fillStyle = gl;
+    c.beginPath(); c.moveTo(lx - 12 * k, ly); c.lineTo(lx + 12 * k, ly); c.lineTo(hx + r * 1.3, hy + r); c.lineTo(hx - r * 1.3, hy + r); c.closePath(); c.fill();
+    // Paillettes de la grotte.
+    const ra = alea(4242);
+    for (let i = 0; i < 70; i++) {
+      const a = ra();
+      c.fillStyle = 'rgba(255,250,220,' + (0.35 + a * 0.6) + ')';
+      c.beginPath(); c.arc(ra() * W, ra() * H * 0.8, (1 + a * 2.2) * k, 0, 7); c.fill();
+    }
+    // Fond : le dragon violet dort tout au fond.
+    const petit = (d, x, y, rr, o) => {
+      dessinerCouverture(c, x, y + rr * 0.78, rr * 1.05, rr * 0.32, o.couv);
+      dessinerDragon(c, x, y, rr, DRAGONS[d], o);
+    };
+    c.globalAlpha = 0.85;
+    petit(5, cx - 160 * k, H * 0.42, 30 * k, { ouvert: 0, t: 300, couv: 3 });
+    c.globalAlpha = 1;
+    // Plan du milieu : bleu endormi à gauche, orange qui a le hoquet à droite.
+    const bx = cx - 205 * k, by = H * 0.6, br = 62 * k;
+    const ox = cx + 205 * k, oy = H * 0.58, or = 60 * k;
+    petit(4, bx, by, br, { ouvert: 0, t: 900, couv: 1 });
+    petit(1, ox, oy, or, { ouvert: 1, t: 1200, saut: 0.7, couv: 2 });
+    // Bulles de sommeil du dragon bleu.
+    for (let i = 0; i < 3; i++) {
+      c.fillStyle = 'rgba(225,235,255,' + (0.85 - i * 0.2) + ')';
+      c.beginPath(); c.arc(bx + br * (0.4 + i * 0.32), by - br * (1.15 + i * 0.5), br * (0.07 + i * 0.05), 0, 7); c.fill();
+    }
+    // Hoquet : bulles et étincelle qui file en arc vers le héros.
+    c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 2 * k;
+    c.beginPath(); c.arc(ox + or * 0.55, oy - or * 1.15, or * 0.08, 0, 7); c.stroke();
+    c.beginPath(); c.arc(ox + or * 0.75, oy - or * 1.45, or * 0.06, 0, 7); c.stroke();
+    const ex = ox - 70 * k, ey = H * 0.37;
+    c.strokeStyle = 'rgba(255,190,110,.55)'; c.lineWidth = 5 * k; c.setLineDash([4 * k, 9 * k]); c.lineCap = 'round';
+    c.beginPath(); c.moveTo(ox - or * 0.1, oy - or * 0.9); c.quadraticCurveTo(ox - 10 * k, ey - 10 * k, ex, ey); c.stroke();
+    c.setLineDash([]); c.lineCap = 'butt';
+    gl = c.createRadialGradient(ex, ey, 1, ex, ey, 36 * k);
+    gl.addColorStop(0, 'rgba(255,252,215,1)'); gl.addColorStop(0.3, 'rgba(255,165,60,.95)'); gl.addColorStop(1, 'rgba(255,120,40,0)');
+    c.fillStyle = gl; c.beginPath(); c.arc(ex, ey, 36 * k, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 3 * k;
+    for (let i = 0; i < 4; i++) {
+      const a = 0.4 + i * Math.PI / 2;
+      c.beginPath(); c.moveTo(ex + Math.cos(a) * 12 * k, ey + Math.sin(a) * 12 * k); c.lineTo(ex + Math.cos(a) * 22 * k, ey + Math.sin(a) * 22 * k); c.stroke();
+    }
+    // Le héros : le bébé dragon rose qui chante, en grand, sur sa couverture.
+    dessinerCouverture(c, hx, hy + r * 0.78, r * 1.1, r * 0.34, 4);
+    dessinerDragon(c, hx, hy, r, DRAGONS[0], { ouvert: 1, t: 250, lueur: 0.9, chante: 1 });
+    // Ses notes s'envolent vers la luciole.
+    const coulNotes = ['#ff8fbd', '#ffdf5e', '#70b9ff', '#7fdc8c', '#b890ff', '#ffab5e'];
+    [[-1.35, -1.1, 30], [-1.0, -1.75, 24], [1.25, -1.35, 28], [1.55, -0.65, 22], [-1.7, -0.45, 20], [0.95, -2.0, 18]].forEach(([dx, dy, s], i) => {
+      noteMusique(c, hx + dx * r, hy + dy * r, s * k, coulNotes[i], (i % 2 ? 0.25 : -0.2));
+    });
+    // Étoiles de lumière autour de la tête.
+    c.fillStyle = '#fff6c0';
+    for (let i = 0; i < 8; i++) {
+      const a = i * 0.8 + 0.3, d = r * (1.0 + (i % 3) * 0.18);
+      etoileChemin(c, hx + Math.cos(a) * d, hy - r * 0.6 + Math.sin(a) * d * 0.75, (5 + (i % 3) * 2) * k, a); c.fill();
+    }
+    // La luciole, grande et brillante.
+    dessinerLuciole(c, lx, ly, 17 * k, '#fff19a', 1, 900);
+    // Premier plan : grands cristaux coupés par les bords.
+    [[-0.01, 1.02, 300, 54, 0.35, '#7fe7ff'], [0.07, 1.03, 230, 44, 0.12, '#ff9ee0'], [0.15, 1.04, 150, 34, -0.1, '#c4a6ff'],
+     [1.01, 1.02, 320, 56, -0.35, '#c4a6ff'], [0.93, 1.03, 220, 42, -0.12, '#8cffd4'], [0.85, 1.04, 140, 32, 0.15, '#7fe7ff']].forEach(([fx, fy, hh, ll, a, col]) => {
+      cristal(c, cx - 300 * k + fx * 600 * k, H * fy, hh * k, ll * k, a, col);
+    });
+    // Cristaux qui pendent du plafond, coupés par le haut.
+    [[0.04, -0.02, 170, 40, Math.PI + 0.3, '#ff9ee0'], [0.14, -0.02, 110, 30, Math.PI + 0.1, '#7fe7ff'],
+     [0.96, -0.02, 180, 42, Math.PI - 0.3, '#8cffd4'], [0.86, -0.02, 100, 28, Math.PI - 0.1, '#c4a6ff']].forEach(([fx, fy, hh, ll, a, col]) => {
+      cristal(c, cx - 300 * k + fx * 600 * k, H * fy, hh * k, ll * k, a, col);
+    });
+  }
+  function demarrerAffiche() {
+    const cacher = () => {
+      for (const el of document.querySelectorAll('.ecran, .voile, #hud, #bandeau, #toast, #tuto, button, .jel-langue')) el.style.setProperty('display', 'none', 'important');
+    };
+    cacher(); setTimeout(cacher, 300); setTimeout(cacher, 1200);
+    dessinerAffiche();
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ==========================================================================
+  // Images du jeu (page du jeu)
+  // ==========================================================================
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+  // directement en pleine partie, avec sa vraie interface (niveau, couplet, lunes, score, bandeau),
+  // sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). La scène
+  // est posée, les étincelles de lumière s'envolent un instant, puis tout est figé sans fenêtre de
+  // pause : ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = niveau 1, grotte aux cristaux : trois dragons, « À toi ! », le dragon jaune chante ;
+  //   2 = niveau 9, grotte aux champignons : cinq dragons, note double (deux lucioles), la chouette ;
+  //   3 = niveau 19, nid dans les nuages : six dragons, orage, vent, étincelle du hoquet en vol.
+  const SCENES_APERCU = {
+    1: { niv: 0, couplet: 1, phase: 'joue', score: 70, lunes: 4, couv: 0, veil: 0, chante: [1], sommeil: 0.25, bandeau: ['bandeau.atoi', null, true] },
+    2: { niv: 8, couplet: 2, phase: 'ecoute', score: 245, lunes: 2, couv: 1, veil: 1, chante: [1, 3], double: true, chouette: 'vite', sommeil: 0.45, bandeau: ['bandeau.vite'] },
+    3: { niv: 18, couplet: 3, phase: 'joue', score: 610, lunes: 2, couv: 4, veil: 4, chante: [2], sommeil: 0.55, etincelle: true, vent: true, chouette: 'lent', flash: 0.18, bandeau: ['bandeau.atoi', null, true] }
+  };
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 98765 + numero * 7919;
+    Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+    // Réglages en mémoire seulement (rien n'est enregistré) ; niveau déjà vu : pas de tutoriel.
+    prog.options.couverture = sc.couv; prog.options.veilleuse = sc.veil;
+    prog.etoiles[sc.niv] = Math.max(1, prog.etoiles[sc.niv]);
+    lancerNiveau(sc.niv);
+    minuteurs = []; etat.jeton++;
+    const cfg = etat.cfg;
+    etat.couplet = sc.couplet; etat.phase = sc.phase; etat.score = sc.score; etat.lunes = sc.lunes; etat.premierCoup = sc.couplet;
+    etat.mesure = cfg.tempo; etat.mesureT0 = horloge - cfg.tempo * 0.15;
+    if (sc.vent) { melanger(etat.places); placerDragons(true); etat.ventT = horloge - 450; }
+    etat.places.forEach((d) => { vues[d].sommeil = vues[d].sommeilCible = sc.sommeil; });
+    if (sc.chouette) { etat.chouette = sc.chouette; etat.chouetteT = horloge - (sc.chouette === 'vite' ? 350 : 2500); }
+    const chanteurs = sc.chante.map((p) => etat.places[p]);
+    luciole.x = luciole.cx = luciole.hx; luciole.y = luciole.cy = luciole.hy;
+    if (sc.double) {
+      const v1 = vues[chanteurs[0]], v2 = vues[chanteurs[1]];
+      luciole.x = luciole.cx = v1.cx; luciole.y = luciole.cy = v1.cy - v1.r * 1.35;
+      luciole2.x = luciole2.cx = v2.cx; luciole2.y = luciole2.cy = v2.cy - v2.r * 1.35;
+      luciole2.vu = luciole2.vuCible = 1;
+    }
+    chanteurs.forEach((d) => { const v = vues[d]; eclater(v.x, v.y - v.r * 0.6, 12, [DRAGONS[d].coul, '#ffffff', '#fff3a0'], true); });
+    eclater(luciole.x, luciole.y, 8, ['#fff6b0', '#ffffff'], true);
+    // Les étincelles de lumière s'envolent un instant…
+    for (let i = 0; i < 22; i++) majVisuels(16);
+    // … puis tout est figé, avec la vraie interface et sans fenêtre de pause.
+    chanteurs.forEach((d) => { const v = vues[d]; v.lueur = 1; v.chante = 1; });
+    luciole.eclat = 1; luciole2.eclat = 1;
+    if (sc.etincelle) {
+      const d = etat.hoqueteurs[0] != null ? etat.hoqueteurs[0] : etat.places[0];
+      const p = placeDe(d), n = etat.places.length;
+      const cible = etat.places[p === 0 ? 1 : p === n - 1 ? n - 2 : p + 1];
+      const v = vues[d];
+      v.saut = 0.6;
+      etincelles = [{ de: d, vers: cible, t0: horloge - cfg.vol * 0.45, duree: cfg.vol, x0: v.x, y0: v.y - v.r * 0.9 }];
+    }
+    if (sc.flash) etat.flash = sc.flash;
+    majHud();
+    bandeau.apply(null, sc.bandeau);
+    etat.pause = true;
+  }
+
+  // Lancement : affiche, image du jeu, ou écran titre habituel.
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else {
+    if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>
