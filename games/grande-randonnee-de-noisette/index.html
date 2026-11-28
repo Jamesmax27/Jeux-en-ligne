@@ -2713,9 +2713,29 @@ function dessinerGrotte(px, py, eclairee) {
   ctx.beginPath(); ctx.moveTo(px + cs * 0.12, py + cs); ctx.lineTo(px + cs * 0.12, py + cs * 0.45); ctx.quadraticCurveTo(px + cs * 0.5, py - cs * 0.05, px + cs * 0.88, py + cs * 0.45); ctx.lineTo(px + cs * 0.88, py + cs); ctx.fill();
   if (eclairee) { const g = ctx.createRadialGradient(px + cs / 2, py + cs * 0.7, 2, px + cs / 2, py + cs * 0.7, cs * 0.5); g.addColorStop(0, 'rgba(255,220,120,.6)'); g.addColorStop(1, 'rgba(255,220,120,0)'); ctx.fillStyle = g; ctx.fillRect(px, py, cs, cs); }
 }
+// Images du jeu (window.JEL_APERCU, posé par le robot) : le décor de la région
+// continue autour de la carte jusqu'aux bords de l'écran (ordinateur surtout).
+function dessinerBordsApercu() {
+  if (!window.JEL_APERCU) return;
+  const x0 = -Math.ceil(ox / cs) - 1, x1 = an.cols + Math.ceil((W - ox - cs * an.cols) / cs) + 1;
+  const y0 = -Math.ceil(oy / cs) - 1, y1 = an.lignes + Math.ceil((H - oy - cs * an.lignes) / cs) + 1;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    if (x >= 0 && y >= 0 && x < an.cols && y < an.lignes) continue;
+    const px = ox + x * cs, py = oy + y * cs, r = bruitCase(x, y);
+    let tu = r > 0.62 ? '#' : '.';
+    if (N.region === 'foret' && r > 0.42 && r <= 0.62) tu = 'f';
+    if (N.region === 'montagne' && r > 0.45 && r <= 0.62) tu = 'p';
+    if (N.region === 'mer') tu = x < -3 ? '~' : (r > 0.7 ? '#' : r > 0.45 ? 'd' : 's');
+    dessinerSol(x, y, tu === '#' ? (N.region === 'mer' ? 's' : '.') : tu, px, py);
+    if (tu === '#') dessinerObstacle(x, y, px, py);
+  }
+  // le décor autour reste un peu plus doux que la carte
+  ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(0, 0, W, H);
+}
 function dessinerCarte() {
   const P = pal();
   ctx.fillStyle = P.ciel; ctx.fillRect(0, 0, W, H);
+  dessinerBordsApercu();
   // bord décoratif de la carte (papier)
   ctx.fillStyle = 'rgba(80,50,20,.25)'; rrect(ox - 6, oy - 6, cs * an.cols + 12, cs * an.lignes + 12, 12); ctx.fill();
   let dx = 0, dy = 0;
@@ -3216,7 +3236,8 @@ function boucle(maintenant) {
   else { dessinerCarte(); dessinerParticules(); }
   requestAnimationFrame(boucle);
 }
-requestAnimationFrame(boucle);
+// L'affiche (window.JEL_AFFICHE) est un dessin fixe : pas de boucle de jeu.
+if (!window.JEL_AFFICHE) requestAnimationFrame(boucle);
 
 // --------------------------------------------------------------------------
 // Commandes : doigt, souris, clavier
@@ -3482,6 +3503,167 @@ window.JEL_SAVE.surFermeture(() => {
   if (partieEnCours) sauver(Math.max(prog.niveau, niv + 1));
 });
 majBoutonsSon();
+
+// --------------------------------------------------------------------------
+// Affiche du jeu (window.JEL_AFFICHE, posé par le robot seulement) :
+// Noisette saute de pierre en pierre sur un gué, en route vers un ami qui
+// l'attend sur la colline ; aucun texte, aucun bouton, aucun son.
+// --------------------------------------------------------------------------
+function dessinerAffiche() {
+  const u = Math.min(W / 600, H / 800), cx = W / 2, cy = H / 2;
+  const X = (v) => cx + (v - 300) * u, Y = (v) => cy + (v - 400) * u;
+  const rep = (f) => { for (let k = -4; k <= 4; k++) { const d = k * 600 * u; if (X(-150) + d < W && X(750) + d > 0) f(d); } };
+  ctx.save();
+  // ciel
+  const ciel = ctx.createLinearGradient(0, 0, 0, Y(420));
+  ciel.addColorStop(0, '#5fbdf3'); ciel.addColorStop(0.6, '#bfe8ff'); ciel.addColorStop(1, '#fff0c4');
+  ctx.fillStyle = ciel; ctx.fillRect(0, 0, W, H);
+  // soleil et rayons (la lumière vient de la gauche)
+  const sx = X(110), sy = Y(170);
+  ctx.save(); ctx.translate(sx, sy);
+  for (let i = 0; i < 16; i++) {
+    ctx.rotate(Math.PI / 8);
+    ctx.fillStyle = i % 2 ? 'rgba(255,248,200,.22)' : 'rgba(255,236,150,.16)';
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(900 * u, -60 * u); ctx.lineTo(900 * u, 60 * u); ctx.fill();
+  }
+  ctx.restore();
+  const halo = ctx.createRadialGradient(sx, sy, 10 * u, sx, sy, 230 * u);
+  halo.addColorStop(0, 'rgba(255,250,210,.95)'); halo.addColorStop(1, 'rgba(255,240,170,0)');
+  ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx, sy, 230 * u, 0, 7); ctx.fill();
+  ovale(sx, sy, 50 * u, 50 * u, '#ffe98a'); ovale(sx, sy, 38 * u, 38 * u, '#fff6c8');
+  // nuages
+  const nuage = (x, y, k) => { ovale(x, y, 60 * k, 20 * k, 'rgba(255,255,255,.95)'); ovale(x + 30 * k, y - 14 * k, 40 * k, 22 * k, 'rgba(255,255,255,.95)'); ovale(x - 26 * k, y - 8 * k, 30 * k, 16 * k, 'rgba(255,255,255,.95)'); };
+  rep((d) => { nuage(X(300) + d, Y(95), u); nuage(X(520) + d, Y(150), 0.8 * u); nuage(X(20) + d, Y(300), 0.7 * u); });
+  // au loin : la mer, la forêt et les montagnes du voyage
+  rep((d) => {
+    ctx.fillStyle = '#62b8e6'; ctx.fillRect(X(-150) + d, Y(386), 330 * u, 22 * u);
+    ctx.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 6; i++) ctx.fillRect(X(-120 + i * 50) + d, Y(394 + (i % 2) * 6), 18 * u, 2.5 * u);
+    const mont = (x, h, w, c) => {
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(X(x - w) + d, Y(410)); ctx.lineTo(X(x) + d, Y(410 - h)); ctx.lineTo(X(x + w) + d, Y(410)); ctx.fill();
+      ctx.fillStyle = 'rgba(70,80,110,.18)'; ctx.beginPath(); ctx.moveTo(X(x) + d, Y(410 - h)); ctx.lineTo(X(x + w) + d, Y(410)); ctx.lineTo(X(x + w * 0.25) + d, Y(410)); ctx.fill();
+      ctx.fillStyle = '#fbfdff'; ctx.beginPath(); ctx.moveTo(X(x - w * 0.28) + d, Y(410 - h * 0.72)); ctx.lineTo(X(x) + d, Y(410 - h)); ctx.lineTo(X(x + w * 0.28) + d, Y(410 - h * 0.72)); ctx.lineTo(X(x + w * 0.1) + d, Y(410 - h * 0.66)); ctx.lineTo(X(x - w * 0.06) + d, Y(410 - h * 0.76)); ctx.fill();
+    };
+    mont(560, 150, 150, '#b4c2d8'); mont(420, 190, 160, '#a3b3cc'); mont(300, 120, 120, '#b0bed4');
+    for (let i = 0; i < 9; i++) {
+      const x = X(90 + i * 24) + d, h = (38 + (i % 3) * 12) * u;
+      ctx.fillStyle = i % 2 ? '#4f8f58' : '#5c9c63';
+      ctx.beginPath(); ctx.moveTo(x, Y(412) - h); ctx.lineTo(x + 14 * u, Y(414)); ctx.lineTo(x - 14 * u, Y(414)); ctx.fill();
+    }
+  });
+  // collines et prairie
+  rep((d) => {
+    ovale(X(140) + d, Y(470), 380 * u, 80 * u, '#a3d76c');
+    ovale(X(500) + d, Y(468), 300 * u, 70 * u, '#96cf61');
+  });
+  const pre = ctx.createLinearGradient(0, Y(470), 0, H);
+  pre.addColorStop(0, '#8ccb5a'); pre.addColorStop(1, '#5c9f3b');
+  ctx.fillStyle = pre; ctx.fillRect(0, Y(482), W, H);
+  // l'ami qui attend sur la colline (et un autre plus loin)
+  dessinerPoney(ctx, X(540), Y(456), 100 * u, { corps: AMIS[3][0], criniere: AMIS[3][1], sens: -1 });
+  coeurForme(X(572), Y(378), 15 * u, '#ff5c8a');
+  dessinerPoney(ctx, X(40), Y(446), 50 * u, { corps: AMIS[1][0], criniere: AMIS[1][1], sens: 1 });
+  // haies au bord de la prairie
+  rep((d) => { for (let i = 0; i < 5; i++) { const x = X(-40 + i * 150) + d, y = Y(492 + (i % 2) * 8); ovale(x, y, 40 * u, 18 * u, '#4f8a3c'); ovale(x + 12 * u, y - 10 * u, 24 * u, 14 * u, '#5f9e4a'); ovale(x - 8 * u, y - 6 * u, 6 * u, 6 * u, '#e94b5a'); } });
+  // le chemin tracé du doigt : il part du bas, passe le gué et monte vers l'ami
+  const tracer = () => { ctx.beginPath(); ctx.moveTo(X(60), Y(860)); ctx.bezierCurveTo(X(110), Y(720), X(250), Y(660), X(330), Y(600)); ctx.bezierCurveTo(X(420), Y(540), X(500), Y(520), X(540), Y(466)); };
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#d6bc7c'; ctx.lineWidth = 58 * u; tracer(); ctx.stroke();
+  ctx.strokeStyle = '#ecd9a4'; ctx.lineWidth = 46 * u; tracer(); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 9 * u; ctx.setLineDash([16 * u, 20 * u]); tracer(); ctx.stroke(); ctx.setLineDash([]);
+  // le ruisseau et ses pierres de gué
+  const ruisseau = (dy) => { ctx.beginPath(); ctx.moveTo(-10, Y(572 + dy)); ctx.bezierCurveTo(X(150), Y(552 + dy), X(420), Y(612 + dy), W + 10, Y(586 + dy)); };
+  ctx.save(); ruisseau(0); ctx.lineTo(W + 10, Y(680)); ctx.bezierCurveTo(X(420), Y(706), X(150), Y(646), -10, Y(666)); ctx.closePath();
+  const eau = ctx.createLinearGradient(0, Y(560), 0, Y(690)); eau.addColorStop(0, '#7fd0f7'); eau.addColorStop(1, '#3d9fd6');
+  ctx.fillStyle = eau; ctx.fill(); ctx.restore();
+  ctx.strokeStyle = '#4f8a3c'; ctx.lineWidth = 6 * u; ruisseau(0); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 3 * u;
+  for (let i = 0; i < 14; i++) { const x = (i * 97 + 30) % (W + 60) - 30, y = Y(600 + (i % 4) * 18 + Math.sin(i) * 6); ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 14 * u, y - 7 * u, x + 28 * u, y); ctx.stroke(); }
+  const pierre = (x, y, r) => { ovale(X(x), Y(y + 6), r * 1.1 * u, r * 0.45 * u, 'rgba(20,60,90,.25)'); ovale(X(x), Y(y), r * u, r * 0.5 * u, '#9e9c92'); ovale(X(x - r * 0.2), Y(y - r * 0.15), r * 0.5 * u, r * 0.2 * u, '#cfccc0'); };
+  pierre(120, 664, 34); pierre(210, 628, 40); pierre(420, 618, 38); pierre(520, 600, 30);
+  // éclaboussures de la pierre qu'elle vient de quitter
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 3 * u;
+  ctx.beginPath(); ctx.ellipse(X(210), Y(630), 56 * u, 16 * u, 0, 0, 7); ctx.stroke();
+  for (let i = 0; i < 9; i++) { const a = Math.PI * (1.1 + i * 0.1); ovale(X(210) + Math.cos(a) * 60 * u, Y(612) + Math.sin(a) * 40 * u, 5 * u, 6 * u, '#e9f8ff'); }
+  // ombre sur l'eau sous Noisette en plein saut
+  ovale(X(300), Y(682), 120 * u, 14 * u, 'rgba(10,50,80,.22)');
+  // Noisette, en grand, en plein saut au-dessus de l'eau, avec un liseré de lumière
+  // (la même silhouette en clair, décalée du côté du soleil)
+  const s = 390 * u, nx = X(285), ny = Y(688), bond = 80 * u;
+  dessinerPoney(ctx, nx - 6 * u, ny - 4 * u, s, { sens: 1, bond, jambe: Math.PI / 2, corps: '#fff1c8', criniere: '#fff1c8', museau: '#fff1c8' });
+  dessinerPoney(ctx, nx, ny, s, { sens: 1, bond, jambe: Math.PI / 2, licol: LICOLS[0].c, tapis: TAPIS[2], sacoche: SACOCHES[0] });
+  // grand œil brillant
+  const ey = ny - bond;
+  ovale(nx + s * 0.4, ey - s * 0.69, s * 0.034, s * 0.036, '#ffffff');
+  ovale(nx + s * 0.405, ey - s * 0.69, s * 0.024, s * 0.027, '#1e140c');
+  ovale(nx + s * 0.413, ey - s * 0.7, s * 0.009, s * 0.009, '#ffffff');
+  // traits de vitesse derrière elle
+  ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 5 * u;
+  for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(X(70 - i * 10), Y(380 + i * 34)); ctx.lineTo(X(140 - i * 6), Y(380 + i * 34)); ctx.stroke(); }
+  // le fer à cheval doré qui brille au-dessus du gué
+  const fx = X(548), fy = Y(170);
+  const lueur = ctx.createRadialGradient(fx, fy, 4 * u, fx, fy, 90 * u);
+  lueur.addColorStop(0, 'rgba(255,230,120,.9)'); lueur.addColorStop(1, 'rgba(255,230,120,0)');
+  ctx.fillStyle = lueur; ctx.beginPath(); ctx.arc(fx, fy, 90 * u, 0, 7); ctx.fill();
+  dessinerFer(fx, fy, 140 * u);
+  etoileForme(fx - 52 * u, fy - 40 * u, 12 * u, '#fff7c2'); etoileForme(fx + 56 * u, fy + 30 * u, 9 * u, '#fff7c2'); etoileForme(fx + 20 * u, fy - 62 * u, 7 * u, '#ffffff');
+  // premier plan : botte de foin, pomme, buisson et fleurs coupés par les bords
+  dessinerFoin(X(20), Y(735), 250 * u);
+  dessinerPomme(X(150), Y(770), 150 * u);
+  rep((d) => {
+    ovale(X(620) + d, Y(740), 110 * u, 80 * u, '#3e7330'); ovale(X(580) + d, Y(700), 70 * u, 54 * u, '#4f8a3c'); ovale(X(640) + d, Y(690), 60 * u, 46 * u, '#5f9e4a');
+    ovale(X(560) + d, Y(705), 8 * u, 8 * u, '#e94b5a'); ovale(X(610) + d, Y(672), 8 * u, 8 * u, '#e94b5a');
+    for (let i = 0; i < 12; i++) { const x = X(40 + i * 47) + d, y = Y(700 + ((i * 37) % 90)); ovale(x, y, 6 * u, 6 * u, i % 3 ? '#ffffff' : '#ff8fb1'); ovale(x, y, 2.5 * u, 2.5 * u, '#ffd54a'); }
+  });
+  // papillons
+  [[X(160), Y(300), '#ff9f43'], [X(540), Y(560), '#b48ef0']].forEach(([x, y, c]) => { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x - 9 * u, y, 11 * u, 7 * u, 0.4, 0, 7); ctx.ellipse(x + 9 * u, y, 11 * u, 7 * u, -0.4, 0, 7); ctx.fill(); });
+  ctx.restore();
+}
+function cacherInterfaceAffiche() {
+  fermerEcrans();
+  document.querySelectorAll('button, .jel-langue, #barre, #bulle, #toast, #consigne-scene').forEach((el) => { el.style.setProperty('display', 'none', 'important'); });
+}
+function demarrerAffiche() {
+  cacherInterfaceAffiche();
+  [200, 700, 1500].forEach((d) => setTimeout(cacherInterfaceAffiche, d));
+  window.addEventListener('resize', dessinerAffiche);
+  dessinerAffiche();
+}
+
+// --------------------------------------------------------------------------
+// Images du jeu (window.JEL_APERCU = 1, 2 ou 3, posé par le robot seulement) :
+// une vraie étape en cours, chemin déjà tracé ; rien n'est sauvegardé ni joué.
+// --------------------------------------------------------------------------
+const MOMENTS_APERCU = {
+  // 1 : première étape du bocage, en route vers le fer à cheval doré
+  1: { niveau: 0, pas: [[4, 8], [4, 7], [4, 6]], chemin: [[4, 5], [4, 4], [5, 4], [5, 3]], options: { licol: 0, tapis: 0, sacoche: 0 } },
+  // 2 : montagne, la pomme est dans les sacoches, l'âne têtu et le berger attendent
+  2: { niveau: 8, pas: [[4, 7], [5, 7], [5, 6], [5, 5]], chemin: [[5, 4], [4, 4], [3, 4], [3, 3]], options: { licol: 1, tapis: 1, sacoche: 1 } },
+  // 3 : bord de mer dans le brouillard, lanterne allumée et agneau qui suit
+  3: { niveau: 19, pas: [[3, 7], [2, 7], [1, 7], [1, 6], [1, 5], [1, 4], [1, 3]], chemin: [[2, 3], [3, 3], [4, 3], [4, 2], [4, 1], [4, 0]], options: { licol: 3, tapis: 2, sacoche: 2 } }
+};
+function ouvrirApercu(n) {
+  const m = MOMENTS_APERCU[n] || MOMENTS_APERCU[1];
+  prog = progVide();
+  Object.assign(prog.options, m.options, { son: false });
+  commencerNiveau(m.niveau);
+  partieEnCours = false;            // ni sauvegarde à la fermeture, ni pause
+  tutos = []; tuto = null; cacherBulle();
+  for (const [x, y] of m.pas) {
+    const r = essai(N, an, et, x, y);
+    if (!r.ok) break;
+    if (x !== et.x) regard = x > et.x ? 1 : -1;
+    const avant = { x: et.x, y: et.y };
+    et = avancer(N, an, et, x, y, r.cout).etat;
+    if (et.agneau) agneauSuit = avant;
+    devoiler();
+  }
+  chemin = [];
+  for (const [x, y] of m.chemin) { if (!ajouterCase({ x, y })) break; }
+  attente = 0; anim = null; finPrevue = null;
+  document.getElementById('toast').classList.remove('visible');
+}
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (window.JEL_APERCU) ouvrirApercu(Number(window.JEL_APERCU));
 </script>
 </body>
 </html>

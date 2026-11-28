@@ -1971,6 +1971,7 @@
   let partie = null;          // partie en cours (ou dernière jouée)
   let partieEnCours = false;  // pour la sauvegarde à la fermeture
   let ecran = 'titre';
+  let apercu = 0;             // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
   const parts = [];           // particules
   const etiquettes = [];      // « Parfait ! », « Raté »…
   let decorAvance = 0, pasCaravane = 0, elan = 0, temps = 0;
@@ -2441,16 +2442,33 @@
     // décor sous le ciel du jeu
     const pont = def.bpm[1] > def.bpm[0];
     ctx.fillStyle = '#140a24'; ctx.fillRect(-10, 0, W + 20, H);
-    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, G.sceneH); ctx.clip();
-    dessinerDecor(def.r, G.sceneH, decorAvance, pont);
-    const echelle = limiter(G.sceneH * 0.16, 22, 38);
-    caravane(W * 0.5 - echelle, G.sceneH * 0.82 + 6, echelle, def.r);
-    if (P.etat === 'marche') etal(W * 0.84, G.sceneH * 0.82 + 6, echelle, def.r);
-    ctx.restore();
+    // Image du jeu sur ordinateur (window.JEL_APERCU = 3, écran large) : la contrée remplit tout
+    // l'écran, la caravane marche à gauche des pistes ; sinon le décor reste dans la bande du haut.
+    const decorPlein = apercu === 3 && W > H * 1.1;
+    if (decorPlein) {
+      dessinerDecor(def.r, H, decorAvance, pont);
+      const ech = limiter(H * 0.075, 30, 62);
+      caravane(G.pisteX * 0.62 - ech * 0.6, H * 0.8 + ech * 0.25, ech, def.r);
+      ctx.save(); ctx.shadowColor = 'rgba(255,220,150,.9)'; ctx.shadowBlur = 18;
+      const cn = ['#fff0b8', '#ffd0e0', '#c8f4ff'];
+      for (let k = 0; k < 5; k++) noteFlottante(G.pisteX * (0.22 + k * 0.16), H * (0.58 - Math.sin(k * 1.3) * 0.06 - k * 0.025), ech * 0.42, cn[k % 3]);
+      const xd = G.pisteX + G.pisteL;
+      for (let k = 0; k < 4; k++) noteFlottante(xd + (W - xd) * (0.2 + k * 0.2), H * (0.5 + Math.sin(k * 1.7) * 0.05), ech * 0.4, cn[(k + 1) % 3]);
+      ctx.restore();
+    } else {
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, G.sceneH); ctx.clip();
+      dessinerDecor(def.r, G.sceneH, decorAvance, pont);
+      const echelle = limiter(G.sceneH * 0.16, 22, 38);
+      caravane(W * 0.5 - echelle, G.sceneH * 0.82 + 6, echelle, def.r);
+      if (P.etat === 'marche') etal(W * 0.84, G.sceneH * 0.82 + 6, echelle, def.r);
+      ctx.restore();
+    }
     // pistes
-    const fond = ctx.createLinearGradient(0, G.sceneH, 0, H);
-    fond.addColorStop(0, R.ciel[0]); fond.addColorStop(1, '#120820');
-    ctx.fillStyle = fond; ctx.fillRect(0, G.sceneH, W, H - G.sceneH);
+    if (!decorPlein) {
+      const fond = ctx.createLinearGradient(0, G.sceneH, 0, H);
+      fond.addColorStop(0, R.ciel[0]); fond.addColorStop(1, '#120820');
+      ctx.fillStyle = fond; ctx.fillRect(0, G.sceneH, W, H - G.sceneH);
+    }
     ctx.fillStyle = R.piste; ctx.fillRect(G.pisteX, G.sceneH, G.pisteL, H - G.sceneH);
     for (let l = 0; l < 3; l++) {
       const gx = ctx.createLinearGradient(0, G.haut, 0, G.frappe);
@@ -2855,6 +2873,7 @@
 
   // Pause
   function mettreEnPause() {
+    if (apercu) return; // image du jeu figée : jamais de fenêtre de pause
     if (!partie || partie.pause || ecran !== 'jeu' || partie.etat === 'fin') return;
     partie.pause = true; Son.geler();
     $('ecran-pause').classList.remove('cache');
@@ -3048,7 +3067,7 @@
   $('b-bilan-accueil').addEventListener('click', () => { Son.clic(); allerAccueil(); });
 
   // Sauvegarde à la fermeture de la page, seulement pendant une partie
-  JEL_SAVE.surFermeture(() => { if (partieEnCours && partie) JEL_SAVE.save(JEU, donneesSauvegarde(partie.i + 1)); });
+  JEL_SAVE.surFermeture(() => { if (!apercu && partieEnCours && partie) JEL_SAVE.save(JEU, donneesSauvegarde(partie.i + 1)); });
 
   // Changement de langue sur place : textes calculés par le jeu
   I18N.surChangement(() => {
@@ -3059,6 +3078,225 @@
   });
 
   // ---------------------------------------------------------------------------
+  // Affiche (jaquette du jeu)
+  // Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée,
+  // sans interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Au coucher du
+  // soleil, le grand chameau de tête avance d'un pas dansant, une petite musicienne joue du luth
+  // sur sa bosse, et les perles colorées du jeu s'envolent en musique ; la caravane suit derrière.
+  // ---------------------------------------------------------------------------
+  function cacherInterface() {
+    document.querySelectorAll('.ecran, #hud, #message, .rond, .btn, .jel-langue, jel-langue').forEach((el) => el.style.setProperty('display', 'none', 'important'));
+  }
+  // Petite musicienne assise sur la bosse, avec son luth (repère du chameau, échelle s)
+  function musicienne(s) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    // jambe pendante
+    ctx.strokeStyle = '#3d6fb8'; ctx.lineWidth = s * 0.1;
+    ctx.beginPath(); ctx.moveTo(0.02 * s, -1.5 * s); ctx.lineTo(0.18 * s, -1.28 * s); ctx.lineTo(0.16 * s, -1.08 * s); ctx.stroke();
+    ctx.fillStyle = '#6b3a1f'; ctx.beginPath(); ctx.ellipse(0.19 * s, -1.05 * s, 0.07 * s, 0.035 * s, 0, 0, Math.PI * 2); ctx.fill();
+    // tunique
+    ctx.fillStyle = '#e8508a';
+    ctx.beginPath(); ctx.moveTo(-0.16 * s, -1.5 * s); ctx.lineTo(0.16 * s, -1.5 * s); ctx.lineTo(0.1 * s, -1.98 * s); ctx.lineTo(-0.1 * s, -1.98 * s); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffd36b'; ctx.fillRect(-0.15 * s, -1.62 * s, 0.3 * s, 0.05 * s);
+    // tête, visage souriant, turban
+    ctx.fillStyle = '#c98d62'; ctx.beginPath(); ctx.arc(0.01 * s, -2.1 * s, 0.14 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a1a10';
+    ctx.beginPath(); ctx.arc(0.06 * s, -2.12 * s, 0.018 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0.12 * s, -2.12 * s, 0.016 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#7a2a20'; ctx.lineWidth = s * 0.018;
+    ctx.beginPath(); ctx.arc(0.09 * s, -2.07 * s, 0.045 * s, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,120,120,.5)'; ctx.beginPath(); ctx.arc(0.13 * s, -2.06 * s, 0.025 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f6c445'; ctx.beginPath(); ctx.ellipse(-0.01 * s, -2.22 * s, 0.17 * s, 0.1 * s, -0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4fd1c5'; ctx.beginPath(); ctx.arc(0.08 * s, -2.27 * s, 0.035 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#f6c445'; ctx.lineWidth = s * 0.05;
+    ctx.beginPath(); ctx.moveTo(-0.15 * s, -2.2 * s); ctx.quadraticCurveTo(-0.32 * s, -2.12 * s, -0.36 * s, -1.96 * s); ctx.stroke();
+    // luth tenu en travers, manche vers le ciel
+    ctx.save(); ctx.translate(0.14 * s, -1.78 * s); ctx.rotate(-0.75);
+    ctx.fillStyle = '#c98a4b'; ctx.beginPath(); ctx.ellipse(0, 0, 0.2 * s, 0.14 * s, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#7a4a24'; ctx.beginPath(); ctx.arc(0.02 * s, 0, 0.045 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8a5a30'; ctx.fillRect(0.16 * s, -0.025 * s, 0.34 * s, 0.05 * s);
+    ctx.fillRect(0.48 * s, -0.045 * s, 0.08 * s, 0.09 * s);
+    ctx.strokeStyle = 'rgba(255,240,200,.8)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-0.1 * s, -0.012 * s); ctx.lineTo(0.5 * s, -0.012 * s); ctx.moveTo(-0.1 * s, 0.012 * s); ctx.lineTo(0.5 * s, 0.012 * s); ctx.stroke();
+    ctx.restore();
+    // bras : un sur le manche, un qui gratte les cordes
+    ctx.strokeStyle = '#c98d62'; ctx.lineWidth = s * 0.06;
+    ctx.beginPath(); ctx.moveTo(0.06 * s, -1.9 * s); ctx.lineTo(0.3 * s, -1.92 * s); ctx.lineTo(0.36 * s, -2.05 * s); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-0.04 * s, -1.88 * s); ctx.lineTo(0.02 * s, -1.74 * s); ctx.lineTo(0.12 * s, -1.76 * s); ctx.stroke();
+    ctx.restore();
+  }
+  // Visage expressif du grand chameau (œil brillant, cils, sourire)
+  function visageChameau(s, ph) {
+    const dy = Math.sin(ph * 2) * 0.03 * s;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0.97 * s, -1.715 * s + dy, 0.05 * s, 0.045 * s, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2a1a10'; ctx.beginPath(); ctx.arc(0.985 * s, -1.71 * s + dy, 0.03 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0.995 * s, -1.722 * s + dy, 0.011 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2a1a10'; ctx.lineWidth = s * 0.012; ctx.lineCap = 'round';
+    for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo((0.94 + k * 0.03) * s, -1.755 * s + dy); ctx.lineTo((0.93 + k * 0.035) * s, -1.79 * s + dy); ctx.stroke(); }
+    ctx.lineWidth = s * 0.016;
+    ctx.beginPath(); ctx.arc(1.08 * s, -1.66 * s + dy, 0.06 * s, 0.1 * Math.PI, 0.75 * Math.PI); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,120,110,.45)'; ctx.beginPath(); ctx.arc(1.04 * s, -1.65 * s + dy, 0.03 * s, 0, Math.PI * 2); ctx.fill();
+  }
+  function dessinerAffiche() {
+    miseEnPage();
+    temps = 0.6;
+    const u = Math.min(W / 600, H / 800);
+    const cx = W / 2;
+    // ciel du couchant
+    const g = ctx.createLinearGradient(0, 0, 0, H * 0.7);
+    g.addColorStop(0, '#3b2370'); g.addColorStop(0.45, '#b8457a'); g.addColorStop(0.8, '#f58a54'); g.addColorStop(1, '#ffd18a');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // étoiles du soir
+    for (let k = 0; k < 40; k++) { const x = (k * 137.5) % W, y = (k * 53.3) % (H * 0.25); ctx.fillStyle = 'rgba(255,255,255,' + (0.35 + 0.4 * ((k * 7) % 5) / 5) + ')'; ctx.fillRect(x, y, 2 * u, 2 * u); }
+    // grand soleil, la source de lumière, derrière le héros
+    const sx = cx + 70 * u, sy = H * 0.43, sr = 150 * u;
+    const halo = ctx.createRadialGradient(sx, sy, sr * 0.5, sx, sy, sr * 2.6);
+    halo.addColorStop(0, 'rgba(255,236,170,.75)'); halo.addColorStop(1, 'rgba(255,200,140,0)');
+    ctx.fillStyle = halo; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(sx, sy); ctx.fillStyle = 'rgba(255,240,190,.16)';
+    for (let k = 0; k < 14; k++) { ctx.rotate(Math.PI / 7); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(sr * 3, -sr * 0.22); ctx.lineTo(sr * 3, sr * 0.22); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    const gs = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr);
+    gs.addColorStop(0, '#fffbe6'); gs.addColorStop(0.7, '#ffe7a0'); gs.addColorStop(1, '#ffc970');
+    ctx.fillStyle = gs; ctx.beginPath(); ctx.arc(sx, sy, sr, 0, Math.PI * 2); ctx.fill();
+    // dunes lointaines, cité en fête à l'horizon
+    dune(H * 0.6, 22 * u, 0.006 / u, 120, '#d97a62');
+    ctx.save(); ctx.globalAlpha = 0.55; ctx.fillStyle = '#7a3a6a';
+    for (let k = 0; k < 6; k++) { const x = W * 0.02 + k * 34 * u, hh = (30 + ((k * 37) % 4) * 12) * u, b = H * 0.585; ctx.fillRect(x, b - hh, 26 * u, hh); ctx.beginPath(); ctx.arc(x + 13 * u, b - hh, 13 * u, Math.PI, 0); ctx.fill(); }
+    ctx.restore();
+    dune(H * 0.66, 26 * u, 0.008 / u, 300, '#e69a62');
+    // la caravane qui suit, plus loin
+    palmier(W * 0.08, H * 0.665, 110 * u);
+    palmier(W - 40 * u, H * 0.66, 130 * u);
+    const s = 150 * u;
+    const ph = 0.7;
+    const xc = cx - 0.12 * s, yc = H * 0.76;
+    ctx.save(); ctx.globalAlpha = 0.9;
+    marchand(xc - 2.35 * s, H * 0.695, s * 0.42, 1.6, '#2e86c1');
+    chameau(xc - 3.2 * s, H * 0.7, s * 0.45, 2.4, ['#2e86c1', '#e67e22']);
+    ctx.restore();
+    chameau(xc - 1.75 * s, H * 0.73, s * 0.62, 1.2, ['#f1c40f', '#c0392b']);
+    // dune du héros
+    dune(H * 0.765, 18 * u, 0.007 / u, 40, '#eab36a');
+    // héros : le grand chameau éclairé à contre-jour, sa musicienne sur la bosse
+    ctx.save(); ctx.translate(xc, yc);
+    ctx.shadowColor = 'rgba(255,226,150,.95)'; ctx.shadowBlur = 26 * u;
+    ctx.save(); ctx.translate(-xc, -yc);
+    chameau(xc, yc, s, ph, ['#c0392b', '#f1c40f']);
+    ctx.restore();
+    ctx.shadowBlur = 14 * u;
+    musicienne(s);
+    ctx.shadowBlur = 0;
+    visageChameau(s, ph);
+    // lanterne accrochée à la selle
+    ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 2 * u; ctx.beginPath(); ctx.moveTo(0.3 * s, -1.02 * s); ctx.lineTo(0.3 * s, -0.86 * s); ctx.stroke();
+    const gl = ctx.createRadialGradient(0.3 * s, -0.76 * s, 0, 0.3 * s, -0.76 * s, 0.3 * s);
+    gl.addColorStop(0, 'rgba(255,230,140,.9)'); gl.addColorStop(1, 'rgba(255,190,90,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0.3 * s, -0.76 * s, 0.3 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffcf5a'; ctx.beginPath(); ctx.ellipse(0.3 * s, -0.76 * s, 0.07 * s, 0.1 * s, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8a5a30'; ctx.fillRect(0.25 * s, -0.88 * s, 0.1 * s, 0.03 * s);
+    ctx.restore();
+    // palmes du premier plan, coupées en haut à droite
+    ctx.save(); ctx.translate(W + 10 * u, -10 * u); ctx.fillStyle = '#1f5e3a';
+    for (let k = 0; k < 4; k++) { ctx.save(); ctx.rotate(1.75 + k * 0.32); ctx.beginPath(); ctx.ellipse(130 * u, 0, 140 * u, 24 * u, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    ctx.restore();
+    // la musique s'envole du luth : notes et perles colorées en spirale
+    const ox = xc + 0.45 * s, oy = yc - 2.0 * s;
+    ctx.save(); ctx.shadowColor = 'rgba(70,16,70,.85)'; ctx.shadowBlur = 7 * u;
+    const cNotes = ['#ffe08a', '#ff7aa8', '#7ff0e0', '#d6b0ff'];
+    for (let k = 0; k < 9; k++) {
+      const a = k / 8;
+      const x = ox + a * 230 * u + Math.sin(a * 6) * 30 * u;
+      const y = oy - a * 190 * u + Math.cos(a * 5) * 24 * u;
+      if (k % 2) perle(x, y, (11 + a * 9) * u, COULEURS_PISTES[k % 3], null);
+      else noteFlottante(x, y, (26 + a * 14) * u, cNotes[(k / 2) % 4]);
+    }
+    for (let k = 0; k < 5; k++) noteFlottante(xc - (1.4 + k * 0.55) * s + 20 * u, H * (0.36 + Math.sin(k * 1.9) * 0.05), (18 + (k % 2) * 6) * u, cNotes[k % 4]);
+    ctx.restore();
+    // éclats de lumière autour du luth
+    ctx.fillStyle = 'rgba(255,250,220,.95)';
+    [[30, -20, 5], [-25, -45, 4], [60, 15, 3.5], [10, -70, 3]].forEach(([dx, dy, r]) => {
+      const x = ox + dx * u, y = oy + dy * u, rr = r * u;
+      ctx.beginPath(); ctx.moveTo(x, y - rr * 3); ctx.lineTo(x + rr * 0.7, y - rr * 0.7); ctx.lineTo(x + rr * 3, y); ctx.lineTo(x + rr * 0.7, y + rr * 0.7); ctx.lineTo(x, y + rr * 3); ctx.lineTo(x - rr * 0.7, y + rr * 0.7); ctx.lineTo(x - rr * 3, y); ctx.lineTo(x - rr * 0.7, y - rr * 0.7); ctx.closePath(); ctx.fill();
+    });
+    // premier plan : dune dorée coupée par les bords, touffes et cailloux
+    dune(H * 0.84, 22 * u, 0.005 / u, 500, '#f0c27a');
+    ctx.fillStyle = 'rgba(160,96,50,.55)';
+    for (let k = 0; k < 7; k++) { ctx.beginPath(); ctx.ellipse((k * 97 + 30) % W, H * (0.9 + (k % 3) * 0.03), (8 + k % 3 * 4) * u, 4 * u, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = '#7a8a3a'; ctx.lineWidth = 3 * u; ctx.lineCap = 'round';
+    [[W * 0.04, H * 0.86], [W * 0.93, H * 0.87]].forEach(([x, y]) => { for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + k * 6 * u, y - 20 * u, x + k * 14 * u, y - 34 * u); ctx.stroke(); } });
+  }
+  function demarrerAffiche() {
+    cacherInterface();
+    dessinerAffiche();
+    setTimeout(cacherInterface, 300); setTimeout(cacherInterface, 1200);
+    window.addEventListener('resize', dessinerAffiche);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Images du jeu (page du jeu)
+  // Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu
+  // s'ouvre directement en pleine partie, avec sa vraie interface (étape, score, moral, avancée),
+  // sans écran titre, ni fenêtre « Continuer », ni tutoriel (CONSIGNES-JEU.md, section 5). La
+  // partition est avancée jusqu'au moment choisi, une perle vient d'être jouée, puis tout est figé :
+  // ni victoire, ni défaite, ni son, ni sauvegarde.
+  //   1 = étape 1, le désert : premières perles ;
+  //   2 = étape 7, les montagnes : notes longues, glissades et accords ;
+  //   3 = étape 19, la cité en fête : notes voyageuses, contre-temps, feux d'artifice (sur ordinateur).
+  // ---------------------------------------------------------------------------
+  const SCENES_APERCU = {
+    1: { niveau: 0, score: 1850, combo: 14, moral: 94, de: 8, a: 20 },
+    2: { niveau: 6, score: 7420, combo: 23, moral: 81, de: 14, a: 40 },
+    3: { niveau: 18, score: 18960, combo: 37, moral: 72, de: 16, a: 42 },
+  };
+  let apercuFige = false;
+  function ouvrirApercu(numero) {
+    apercu = numero;
+    const sc = SCENES_APERCU[numero];
+    // Hasard fixe : la même image à chaque capture.
+    let graine = 987654 + numero * 7919;
+    Math.random = () => { graine = (graine * 1103515245 + 12345) >>> 0; return graine / 4294967296; };
+    prog = progresVide(); // progression neuve en mémoire seulement (rien n'est enregistré)
+    prog.tu = ['tap', 'long', 'tempete', 'marche', 'accord', 'pont', 'glisse', 'contre', 'voy', 'brume'];
+    lancerNiveau(sc.niveau);
+    partieEnCours = false;
+    cacherMessage();
+    const P = partie;
+    // Moment le plus riche de la partition entre « de » et « a » secondes : beaucoup de perles
+    // visibles, de types variés, et aucune perle sur la ligne des lanternes.
+    let meilleur = sc.de, note = -1;
+    for (let s = sc.de; s <= sc.a; s += 0.05) {
+      if (P.marches.some((m) => m.t <= s + 0.5 && m.t > s - 6)) continue;
+      const vues = P.notes.filter((n) => n.t > s + 0.12 && n.t < s + P.def.app * 0.92);
+      if (P.notes.some((n) => (n.type === 'long' || n.type === 'glisse') && n.t < s && n.fin > s)) continue;
+      const types = new Set(vues.map((n) => (n.contre ? 'contre' : n.accord >= 0 ? 'accord' : n.type)));
+      const v = vues.length + types.size * 3;
+      if (v > note) { note = v; meilleur = s; }
+    }
+    // Une perle vient d'être jouée juste avant ce moment : « Perfect! » et lanterne allumée.
+    const jouee = [...P.notes].reverse().find((n) => n.t <= meilleur && n.type === 'tap');
+    P.temps = meilleur;
+    P.notes.forEach((n) => { if (n.t <= meilleur) n.etat = 2; });
+    P.marches.forEach((m) => { if (m.t <= meilleur) m.fait = true; });
+    P.demi = P.T.findIndex((t) => t > meilleur + 0.2);
+    P.score = sc.score; P.combo = sc.combo; P.comboMax = sc.combo; P.moral = sc.moral;
+    P.parfaits = sc.combo; P.attente = 0;
+    if (jouee) {
+      const l = jouee.piste;
+      lumieres[l] = 1;
+      etiquette(tr('jug.parfait'), xPiste(l), '#ffe08a');
+      etiquettes[etiquettes.length - 1].y -= 10;
+      eclater(xPiste(l), G.frappe, COULEURS_PISTES[l], 16);
+      parts.forEach((q) => { q.x += q.vx * 0.12; q.y += (q.vy + 30) * 0.12; });
+    }
+    elan = 1; pasCaravane = 1.1; decorAvance = 140; temps = 1.3;
+    majHud();
+    $('avance').style.width = (limiter(meilleur / P.fin, 0, 1) * 100).toFixed(1) + '%';
+    apercuFige = true; // tout reste figé sur ce moment
+  }
+
+  // ---------------------------------------------------------------------------
   // Démarrage
   // ---------------------------------------------------------------------------
   chargerProgres();
@@ -3066,7 +3304,7 @@
   majBoutonsSon();
   let avant = performance.now();
   function boucle(m) {
-    const dt = Math.min(0.05, Math.max(0, (m - avant) / 1000)); avant = m;
+    const dt = apercuFige ? 0 : Math.min(0.05, Math.max(0, (m - avant) / 1000)); avant = m;
     maj(dt);
     if (ecran === 'jeu' && partie) dessinerPartie();
     else if (partie && (ecran === 'fin')) dessinerPartie();
@@ -3074,7 +3312,12 @@
     if (ecranTuto) dessinerDemo();
     requestAnimationFrame(boucle);
   }
-  requestAnimationFrame(boucle);
+  const numeroApercu = Number(window.JEL_APERCU);
+  if (window.JEL_AFFICHE) demarrerAffiche();
+  else {
+    if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) ouvrirApercu(numeroApercu);
+    requestAnimationFrame(boucle);
+  }
 })();
 </script>
 </body>

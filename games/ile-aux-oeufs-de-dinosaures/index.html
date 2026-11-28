@@ -1961,7 +1961,8 @@ try {
   }
 } catch (e) { /* sauvegarde illisible : valeurs par défaut */ }
 function etoilesNiveaux() { return NIVEAUX.map((_, i) => sauve.etoiles[i] || 0); }
-function enregistrer() { try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* rien */ } }
+let apercu = 0;  // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
+function enregistrer() { if (apercu) return; try { localStorage.setItem(CLE, JSON.stringify(sauve)); } catch (e) { /* rien */ } }
 function totalEtoiles() { return sauve.etoiles.reduce((s, v) => s + (v || 0), 0); }
 function totalScore() { return sauve.meilleurs.reduce((s, v) => s + (v || 0), 0); }
 const aPouvoir = (k) => sauve.debloque > k;  // pouvoir du bébé de la zone k (1 à 10)
@@ -2087,9 +2088,9 @@ function dessinerDino(c, x, y, s, o = {}) {
   c.restore();
 }
 
-function dessinerOeuf(c, x, y, r, coul, angle = 0) {
+function dessinerOeuf(c, x, y, r, coul, angle = 0, sansOmbre = false) {
   c.save(); c.translate(x, y); c.rotate(angle);
-  ellipse(c, 0, r * 0.95, r * 0.75, r * 0.2, 'rgba(0,0,0,.18)');
+  if (!sansOmbre) ellipse(c, 0, r * 0.95, r * 0.75, r * 0.2, 'rgba(0,0,0,.18)');
   c.fillStyle = coul; c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = Math.max(1.5, r * 0.08);
   c.beginPath(); c.ellipse(0, 0, r * 0.72, r * 0.95, 0, 0, Math.PI * 2); c.fill(); c.stroke();
   ellipse(c, -r * 0.2, -r * 0.25, r * 0.15, r * 0.12, assombrir(coul, 0.7));
@@ -2510,7 +2511,8 @@ function boucle(ts) {
   requestAnimationFrame(boucle);
   const dt = Math.min(0.05, Math.max(0, (ts - dernier) / 1000)); dernier = ts;
   if (ecran === 'jeu' && L) {
-    if (!enPause && !tutoActif) maj(dt);
+    if (apercu) horloge += dt;  // image du jeu : partie figée, seul le décor bouge
+    else if (!enPause && !tutoActif) maj(dt);
     dessinerJeu();
   } else if (ecran === 'accueil') { horloge += dt; dessinerDecor(); }
   else if (ecran === 'carte') { horloge += dt; dessinerCarte(); }
@@ -2717,7 +2719,7 @@ function basculerPause(forcer) {
   if (enPause) { if (actx && actx.state === 'running') actx.suspend().catch(() => {}); if (tutoActif) finirTuto(); }
   else if (actx && sauve.son) actx.resume().catch(() => {});
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden && ecran === 'jeu' && !enPause) basculerPause(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && ecran === 'jeu' && !enPause && !apercu) basculerPause(true); });
 
 /* ===================== Bilan de zone ===================== */
 function montrerBilan() {
@@ -2897,7 +2899,7 @@ function reprendreZone(d) {
   chargerNiveau(n - 1);
 }
 JEL_SAVE.surFermeture(() => {
-  if (ecran === 'jeu' && L && !L.fini) JEL_SAVE.save(JEU, { niveau: niv + 1 });
+  if (ecran === 'jeu' && L && !L.fini && !apercu) JEL_SAVE.save(JEU, { niveau: niv + 1 });
 });
 const boutonEffacer = JEL_SAVE.boutonEffacer({ jeu: JEU });
 $('jel-place-accueil').before(boutonEffacer);
@@ -2944,9 +2946,216 @@ window.addEventListener('resize', () => {
   else if (ecran === 'carte') construireCarte();
 });
 
+/* ===================== Affiche (jaquette du jeu) ===================== */
+// Avec window.JEL_AFFICHE (posé par le robot du site, jamais par le jeu) : une scène composée, sans
+// interface ni texte, d'où sort la jaquette (CONSIGNES-JEU.md, section 5). Le petit dino explorateur
+// bondit en grand, deux œufs dans les bras levés, vers le nid où brille l'œuf vert déjà rentré ;
+// l'ami tricératops l'acclame, un bébé ptéranodon vole, le volcan fume sous le soleil.
+function etincelle(c, x, y, r, coul) {
+  c.fillStyle = coul; c.beginPath();
+  for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, rr = k % 2 ? r * 0.28 : r; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+  c.closePath(); c.fill();
+}
+function dessinerAffiche() {
+  let cv = $('afficheJeu');
+  if (!cv) {
+    cv = document.createElement('canvas'); cv.id = 'afficheJeu';
+    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:50;display:block';
+    document.body.appendChild(cv);
+  }
+  const W = window.innerWidth, H = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const k = Math.min(W / 600, H / 800), t = 1.2;
+  const X = (u) => W / 2 + (u - 300) * k, Y = (v) => H / 2 + (v - 400) * k;
+  // Ciel lumineux et soleil
+  const ciel = c.createLinearGradient(0, Y(0), 0, Y(440));
+  ciel.addColorStop(0, '#3fb4ee'); ciel.addColorStop(0.6, '#8fd8f6'); ciel.addColorStop(1, '#fff0c2');
+  c.fillStyle = ciel; c.fillRect(0, 0, W, H);
+  const sx = X(470), sy = Y(130);
+  const halo = c.createRadialGradient(sx, sy, 10 * k, sx, sy, 330 * k);
+  halo.addColorStop(0, 'rgba(255,250,210,1)'); halo.addColorStop(0.3, 'rgba(255,236,160,.6)'); halo.addColorStop(1, 'rgba(255,236,160,0)');
+  c.fillStyle = halo; c.fillRect(0, 0, W, H);
+  c.save(); c.translate(sx, sy); c.fillStyle = 'rgba(255,245,190,.35)';
+  for (let r = 0; r < 12; r++) { c.rotate(Math.PI / 6); c.beginPath(); c.moveTo(0, 0); c.lineTo(260 * k, -22 * k); c.lineTo(260 * k, 22 * k); c.closePath(); c.fill(); }
+  c.restore();
+  ellipse(c, sx, sy, 52 * k, 52 * k, '#fff6b8');
+  ellipse(c, sx, sy, 40 * k, 40 * k, '#ffe36b');
+  // Nuages doux
+  [[90, 110, 1], [330, 70, 0.8], [560, 260, 0.7]].forEach(([u, v, f]) => {
+    [[-40, 6, 34], [0, -10, 44], [42, 4, 32], [10, 14, 38]].forEach(([a, b, r]) => ellipse(c, X(u + a * f), Y(v + b * f), r * f * k, r * f * k * 0.8, 'rgba(255,255,255,.9)'));
+  });
+  // Volcan au loin, qui fume gentiment, avec une lueur orange au cratère
+  c.fillStyle = '#9a7564'; c.beginPath(); c.moveTo(X(-120), Y(450)); c.lineTo(X(130), Y(255)); c.lineTo(X(210), Y(255)); c.lineTo(X(420), Y(450)); c.fill();
+  c.fillStyle = '#7d5c4d'; c.beginPath(); c.moveTo(X(170), Y(255)); c.lineTo(X(210), Y(255)); c.lineTo(X(420), Y(450)); c.lineTo(X(250), Y(450)); c.fill();
+  ellipse(c, X(170), Y(257), 42 * k, 9 * k, '#ff9a3c');
+  ellipse(c, X(170), Y(258), 26 * k, 5 * k, '#ffd35c');
+  for (let n = 0; n < 6; n++) { const p = n / 6; ellipse(c, X(165 - p * 70 + Math.sin(n * 1.7) * 14), Y(232 - p * 150), (22 + p * 40) * k, (20 + p * 34) * k, 'rgba(236,236,240,' + (0.9 - p * 0.45) + ')'); }
+  // Mer et vagues
+  c.fillStyle = '#2aa3d2'; c.fillRect(0, Y(440), W, H - Y(440));
+  c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 3 * k;
+  for (let n = 0; n < 3; n++) { c.beginPath(); for (let x = 0; x <= W; x += 8) { const y = Y(455 + n * 18) + Math.sin(x * 0.03 / k + n * 2) * 3 * k; x ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); }
+  // Île : collines de jungle, palmier, plage
+  ellipse(c, X(300), Y(545), Math.max(W * 0.62, 460 * k), 85 * k, '#4cb050');
+  ellipse(c, X(70), Y(500), 140 * k, 50 * k, '#3c9a43');
+  ellipse(c, X(540), Y(505), 120 * k, 44 * k, '#41a148');
+  [[20, 490, 1], [585, 500, 0.85]].forEach(([u, v, f]) => {
+    const x = X(u), y = Y(v);
+    c.strokeStyle = '#8b5a2b'; c.lineWidth = 13 * k * f; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + 22 * k * f, y - 80 * k * f, x + 6 * k * f, y - 170 * k * f); c.stroke();
+    for (let n = 0; n < 7; n++) { c.save(); c.translate(x + 6 * k * f, y - 170 * k * f); c.rotate(n * 0.9 + 0.2); ellipse(c, 48 * k * f, 0, 54 * k * f, 13 * k * f, n % 2 ? '#2f8a35' : '#3fa63f'); c.restore(); }
+  });
+  c.fillStyle = '#f5dfa2'; c.beginPath(); c.ellipse(X(300), Y(860), Math.max(W * 0.75, 560 * k), 300 * k, 0, 0, Math.PI * 2); c.fill();
+  c.fillRect(0, Y(860), W, H);
+  ellipse(c, X(300), Y(800), Math.max(W * 0.7, 520 * k), 190 * k, '#f9e7b5');
+  // Bébé ptéranodon qui vole au-dessus de la scène
+  dessinerDino(c, X(95), Y(345), 105 * k, { type: 'ailes', couleur: '#f4a261', sens: 1, bat: 6 });
+  // L'ami tricératops, sur la colline, qui acclame (petits cœurs-étincelles)
+  dessinerDino(c, X(528), Y(462), 160 * k, { type: 'cornes', couleur: '#9b87d6', sens: -1 });
+  etincelle(c, X(470), Y(390), 13 * k, '#ffd84a'); etincelle(c, X(585), Y(380), 10 * k, '#ff94c8');
+  // Le nid, où l'œuf vert est déjà rentré : il brille, des confettis volent
+  const nx = X(470), ny = Y(612);
+  const lueur = c.createRadialGradient(nx, ny - 20 * k, 5 * k, nx, ny - 20 * k, 140 * k);
+  lueur.addColorStop(0, 'rgba(255,255,200,.95)'); lueur.addColorStop(1, 'rgba(255,255,200,0)');
+  c.fillStyle = lueur; c.fillRect(nx - 160 * k, ny - 180 * k, 320 * k, 320 * k);
+  dessinerNid(c, nx, ny, 240 * k, '#8fe063', true, 0.2);
+  const conf = ['#ff6b6b', '#ffd84a', '#62c4f7', '#8fe063', '#ff94c8', '#b892ff'];
+  for (let n = 0; n < 22; n++) {
+    const a = -Math.PI / 2 + (n / 21 - 0.5) * 2.6, d = (60 + (n * 37) % 90) * k;
+    c.save(); c.translate(nx + Math.cos(a) * d * 1.2, ny - 40 * k + Math.sin(a) * d); c.rotate(n * 1.3);
+    c.fillStyle = conf[n % 6]; c.fillRect(-7 * k, -3.5 * k, 14 * k, 7 * k); c.restore();
+  }
+  // Le petit dino explorateur, en grand, qui bondit avec deux œufs dans les bras levés
+  const hx = X(255), hy = Y(430), s = 470 * k;
+  ellipse(c, hx + 10 * k, Y(650), 140 * k, 24 * k, 'rgba(120,80,30,.25)');
+  c.save(); c.shadowColor = 'rgba(255,255,225,.95)'; c.shadowBlur = 26 * k;
+  dessinerDino(c, hx, hy, s, { chapeau: true, sens: 1 });
+  c.restore();
+  dessinerDino(c, hx, hy, s, { chapeau: true, sens: 1 });
+  // bras levés qui tiennent les œufs
+  const oeufs = [[hx - 0.02 * s, hy - 0.42 * s, '#62c4f7', -0.25], [hx + 0.34 * s, hy - 0.42 * s, '#ff94c8', 0.25]];
+  c.save(); c.shadowColor = 'rgba(255,255,255,.95)'; c.shadowBlur = 20 * k;
+  for (const [ex, ey, coul, a] of oeufs) dessinerOeuf(c, ex, ey, 0.15 * s, coul, a, true);
+  c.restore();
+  // bras levés (contour foncé, puis vert) et petites mains sous les œufs
+  [[[hx + 0.02 * s, hy + 0.04 * s], [hx - 0.1 * s, hy - 0.12 * s], [hx - 0.03 * s, hy - 0.27 * s]],
+   [[hx + 0.24 * s, hy + 0.08 * s], [hx + 0.46 * s, hy - 0.06 * s], [hx + 0.35 * s, hy - 0.27 * s]]].forEach(([a, b, e]) => {
+    c.lineCap = 'round';
+    c.strokeStyle = '#3e7f29'; c.lineWidth = 0.075 * s; c.beginPath(); c.moveTo(a[0], a[1]); c.quadraticCurveTo(b[0], b[1], e[0], e[1]); c.stroke();
+    c.strokeStyle = '#6cc24a'; c.lineWidth = 0.05 * s; c.beginPath(); c.moveTo(a[0], a[1]); c.quadraticCurveTo(b[0], b[1], e[0], e[1]); c.stroke();
+    ellipse(c, e[0], e[1], 0.05 * s, 0.035 * s, '#4f9b33');
+  });
+  etincelle(c, hx - 0.17 * s, hy - 0.62 * s, 20 * k, '#ffffff');
+  etincelle(c, hx + 0.52 * s, hy - 0.7 * s, 16 * k, '#fff3a0');
+  etincelle(c, hx + 0.18 * s, hy - 0.8 * s, 12 * k, '#ffffff');
+  // traits de mouvement sous le saut
+  c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 5 * k;
+  [[-0.42, 0.2], [-0.5, 0.3], [-0.38, 0.4]].forEach(([a, b]) => { c.beginPath(); c.moveTo(hx + a * s, hy + b * s); c.lineTo(hx + (a - 0.16) * s, hy + (b + 0.03) * s); c.stroke(); });
+  // Premier plan : fougères géantes coupées par les bords, fossile qui brille dans le sable
+  dessinerFougere(c, X(-10), Y(700), 290 * k, 0.4);
+  dessinerFougere(c, X(625), Y(690), 270 * k, 1.1);
+  dessinerFossile(c, X(130), Y(705), 120 * k, 0.3);
+  etincelle(c, X(150), Y(680), 11 * k, '#ffffff');
+  dessinerOeuf(c, X(60), Y(640), 26 * k, '#ffe08a', 0.3);
+}
+function demarrerAffiche() {
+  const cacher = () => {
+    for (const el of document.querySelectorAll('.ecran, .voile, button, .jel-langue, #message')) el.style.setProperty('display', 'none', 'important');
+  };
+  cacher(); setTimeout(cacher, 100); setTimeout(cacher, 600);
+  dessinerAffiche();
+  window.addEventListener('resize', dessinerAffiche);
+}
+
+/* ===================== Images du jeu (page du jeu) ===================== */
+// Avec window.JEL_APERCU = 1, 2 ou 3 (posé par le robot du site, jamais par le jeu) : le jeu s'ouvre
+// directement en pleine partie, avec sa vraie interface (zone, œufs, fossiles, pas, pouvoirs), sans
+// écran d'accueil, ni fenêtre « Continuer », ni tutoriel. Les vrais pas du dino sont joués en un instant,
+// puis la partie est figée (seule l'animation du décor continue) : ni victoire, ni son, ni sauvegarde.
+//   1 = zone 1, la plage : l'œuf bleu vient d'être rangé dans son nid (confettis) ;
+//   2 = zone 6, la falaise : pont de lianes réparé, deux œufs portés, l'ami tricératops, le Vol prêt ;
+//   3 = zone 10, le volcan (écran d'ordinateur) : tronc poussé dans la rivière, geysers, Flair qui montre le chemin.
+const MOMENTS_APERCU = {
+  1: { zone: 0, avant: [[1, 0], [0, -1], [0, -1], [0, -1], [-1, 0], [-1, 0], [-1, 0], [0, 1]], apres: [[0, 1], [0, -1], [0, -1]] },
+  2: { zone: 5, avant: [[1, 0], [1, 0], [1, 0], [0, -1], [-1, 0], [-1, 0], [-1, 0], [1, 0], [1, 0], [0, -1], [0, -1], [0, -1]], apres: [[0, -1]], vol: true },
+  3: { zone: 9, avant: [[1, 0], [1, 0], [1, 0], [0, -1], [-1, 0], [0, -1], [0, -1], [0, -1], [1, 0], [-1, 0]], apres: [[0, -1]], flair: true, temps: 0.65, bords: true },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  const m = MOMENTS_APERCU[numero];
+  // Hasard fixe : la même image à chaque capture.
+  let graine = 4242 + numero * 7919;
+  Math.random = () => { graine = (graine + 0x6D2B79F5) | 0; let x = Math.imul(graine ^ (graine >>> 15), 1 | graine); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
+  // Progression en mémoire seulement : zones d'avant réussies (pouvoirs acquis), tutoriels vus, son coupé.
+  sauve = { debloque: m.zone + 1, etoiles: [], meilleurs: [], son: false, tutos: NIVEAUX.map((_, n) => n) };
+  chargerNiveau(m.zone);
+  finirTuto(); // la zone 1 relance toujours son tutoriel : pas de tutoriel sur l'image
+  const jouerPas = (liste) => { for (const [dx, dy] of liste) { pas(dx, dy); L.anim = null; } };
+  jouerPas(m.avant);
+  particules = [];
+  jouerPas(m.apres);
+  for (let n = 0; n < 18; n++) maj(1 / 60);
+  if (m.vol) armerVol();
+  if (m.flair) flair();
+  if (m.temps) tempsJeu = m.temps;
+  L.secousse = 0; L.refus = null; L.cogne = null;
+  majInfos();
+  clearTimeout(minuteurMessage); $('message').classList.remove('vu');
+  if (m.bords) {
+    // Sur un écran large, l'île continue de chaque côté du plateau (pas de bandes vides).
+    const cv = document.createElement('canvas'); cv.id = 'bordsApercu';
+    cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:0';
+    $('plateau').prepend(cv);
+    toile.style.position = 'relative'; toile.style.zIndex = '1';
+    dessinerBordsApercu();
+    window.addEventListener('resize', () => requestAnimationFrame(dessinerBordsApercu));
+  }
+}
+function dessinerBordsApercu() {
+  const cv = $('bordsApercu'); if (!cv || !L) return;
+  const r = $('plateau').getBoundingClientRect(), tr = toile.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const ox = tr.left - r.left, oy = tr.top - r.top, th = L.theme, carte = NIVEAUX[niv].carte;
+  c.fillStyle = th.fond; c.fillRect(0, 0, r.width, r.height);
+  let graine = 99;
+  const alea = () => { graine = (graine * 16807) % 2147483647; return graine / 2147483647; };
+  c.save(); c.translate(ox, oy);
+  const i0 = Math.floor(-ox / T) - 1, i1 = Math.ceil((r.width - ox) / T) + 1;
+  const j0 = Math.floor(-oy / T) - 1, j1 = Math.ceil((r.height - oy) / T) + 1;
+  const fougeres = [];
+  for (let j = j0; j < j1; j++) for (let i = i0; i < i1; i++) {
+    if (i >= 0 && i < L.larg && j >= 0 && j < L.haut) continue;
+    const ligne = j >= 0 && j < L.haut ? carte[j] : null;
+    const bord = ligne ? (i < 0 ? ligne[0] : ligne[ligne.length - 1]) : '#';
+    const v = alea();
+    let tu;
+    if (ligne && bord === 'x') tu = 'x';
+    else if (ligne && (ligne.match(/~/g) || []).length >= 4) tu = v < 0.15 ? '#' : '~';
+    else tu = v < 0.45 ? '#' : v < 0.9 ? '.' : 'g';
+    dessinerCase(c, i, j, T, tu, th, horloge, tu === 'x' ? 'x' : '.');
+    if (tu === '.' && alea() < 0.18) fougeres.push([i, j]);
+  }
+  for (const [i, j] of fougeres) dessinerFougere(c, i * T + T / 2, j * T + T / 2, T, 0.5);
+  c.restore();
+  // Les bords sont un peu plus sombres : le plateau de jeu reste au centre de l'attention.
+  const g = c.createRadialGradient(r.width / 2, r.height / 2, Math.min(r.width, r.height) * 0.3, r.width / 2, r.height / 2, r.width * 0.65);
+  g.addColorStop(0, 'rgba(20,10,5,.32)'); g.addColorStop(1, 'rgba(20,10,5,.6)');
+  c.fillStyle = g; c.fillRect(0, 0, r.width, r.height);
+}
+
+/* ===================== Démarrage ===================== */
 majBoutonsSon();
-redimDecor();
-requestAnimationFrame(boucle);
+const numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  redimDecor();
+  requestAnimationFrame(boucle);
+}
 </script>
 </body>
 </html>

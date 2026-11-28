@@ -2848,6 +2848,7 @@ function dessinerTuto() {
 // --- Scène complète ---
 function dessiner() {
   const g = ctx;
+  if (affiche) { dessinerAffiche(); return; }
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.clearRect(0, 0, cw, ch);
   let sx = 0, sy = 0;
@@ -2872,7 +2873,10 @@ function dessiner() {
     if (etape.def.four) dessinerThermometre(362, 34, 140, tuto && tuto.cle === 'chaleur' ? (tuto.t * 0.3) % 1 : etape.chaleur);
     if (etape.type === 'tarte') dessinerTarte(CX, CY, 128, etape.motif, etape.cibles, false);
     else dessinerGrille(CX, CY, etape.def.cols, etape.def.rows, etape.taille, etape.motif, etape.cibles, false);
-  } else dessinerTable();
+  } else {
+    if (modeApercu === 3) decorLarge(x0, vw);
+    dessinerTable();
+  }
   // Feuilles posées.
   etape.cibles.forEach((c) => {
     const f = c.feuille; if (!f) return;
@@ -2897,6 +2901,7 @@ function dessiner() {
   }
   volants.forEach((v) => { const e = v.u; dessinerIngr(ctx, v.id, lerp(v.x0, v.x1, e), lerp(v.y0, v.y1, e) - Math.sin(e * Math.PI) * 60, 44, 1 - e * 0.3); });
   if (glisse && glisse.bouge) dessinerIngr(ctx, glisse.id, glisse.x, glisse.y - 26, 54);
+  if (modeApercu === 1 && glisse) dessinerMain(glisse.x + 6, glisse.y + 8, true);
   dessinerParticules();
   popups.forEach((p) => {
     g.globalAlpha = Math.min(1, p.vie * 2);
@@ -3329,9 +3334,237 @@ if (window.JEL_SAVE) {
 if (I18N.surChangement) I18N.surChangement(() => { majSon(); majHUD(); });
 window.addEventListener('resize', redimensionner);
 
+// =====================================================================
+//  Affiche (window.JEL_AFFICHE) et images du jeu (window.JEL_APERCU)
+//  Ces deux drapeaux sont posés seulement par le robot du site.
+// =====================================================================
+let affiche = false;   // scène d'affiche plein écran, sans interface
+let modeApercu = 0;    // 1, 2 ou 3 : moment de partie figé pour la page du jeu
+
+function cacherInterface() {
+  ECRANS.forEach((e) => document.getElementById(e).classList.add('cache'));
+  ['hud', 'bandeau', 'message'].forEach((id) => document.getElementById(id).classList.add('cache'));
+  document.querySelectorAll('.jel-langue, jel-langue, button').forEach((b) => { b.style.setProperty('display', 'none', 'important'); });
+}
+function demarrerAffiche() {
+  affiche = true; enPause = true; muet = true;
+  cacherInterface();
+  setTimeout(cacherInterface, 300);
+  setTimeout(cacherInterface, 1200);
+}
+
+// Scène composée en 600 × 800 ; sur écran large, le décor continue jusqu'aux bords.
+function dessinerAffiche() {
+  const g = ctx;
+  const AW = 600, AH = 800;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, cw, ch);
+  const e = Math.min(cw / AW, ch / AH);
+  const ax = (cw - AW * e) / 2, ay = (ch - AH * e) / 2;
+  g.setTransform(dpr * e, 0, 0, dpr * e, dpr * ax, dpr * ay);
+  const x0 = -ax / e - 10, y0 = -ay / e - 10, vw = cw / e + 20, vh = ch / e + 20;
+  const r = alea(2026);
+
+  // Ciel du soir, doux et lumineux.
+  const ciel = g.createLinearGradient(0, y0, 0, 470);
+  ciel.addColorStop(0, '#5b3f8f'); ciel.addColorStop(0.42, '#d8687e'); ciel.addColorStop(1, '#ffc46e');
+  g.fillStyle = ciel; g.fillRect(x0, y0, vw, vh);
+  // Grand soleil couchant derrière Capucine.
+  const sol = g.createRadialGradient(300, 300, 20, 300, 300, 360);
+  sol.addColorStop(0, 'rgba(255,244,200,1)'); sol.addColorStop(0.25, 'rgba(255,214,130,.85)'); sol.addColorStop(1, 'rgba(255,170,90,0)');
+  g.fillStyle = sol; g.fillRect(x0, y0, vw, vh);
+  // Collines et verger au loin.
+  g.fillStyle = '#e39a5e';
+  g.beginPath(); g.moveTo(x0, 400);
+  for (let x = x0; x <= x0 + vw + 40; x += 40) g.lineTo(x, 392 - Math.sin(x / 90) * 22);
+  g.lineTo(x0 + vw, 470); g.lineTo(x0, 470); g.fill();
+  for (let x = Math.floor(x0 / 110) * 110 - 30; x < x0 + vw + 60; x += 110) {
+    const y = 400 - Math.sin(x / 90) * 18;
+    g.fillStyle = '#9a6a48'; g.fillRect(x - 4, y - 10, 8, 30);
+    cercle(x, y - 26, 26, '#a7a65a'); cercle(x - 16, y - 14, 18, '#b4b062'); cercle(x + 16, y - 16, 19, '#9d9d52');
+    [[-10, -32], [8, -24], [16, -10], [-18, -8]].forEach(([a, b]) => cercle(x + a, y + b, 3.5, '#e0503c'));
+  }
+  // Guirlande lumineuse de la grande cour.
+  [[90, 30], [150, 40]].forEach(([base, amp], rang) => {
+    g.strokeStyle = 'rgba(60,30,30,.75)'; g.lineWidth = 3;
+    g.beginPath();
+    for (let x = x0; x <= x0 + vw; x += 10) { const yy = base + Math.abs(Math.sin((x + rang * 60) / 120)) * amp; if (x === x0) g.moveTo(x, yy); else g.lineTo(x, yy); }
+    g.stroke();
+    for (let x = Math.floor(x0 / 46) * 46 + rang * 23; x < x0 + vw; x += 46) {
+      const yy = base + 6 + Math.abs(Math.sin((x + rang * 60) / 120)) * amp;
+      const halo = g.createRadialGradient(x, yy, 1, x, yy, 22);
+      halo.addColorStop(0, 'rgba(255,236,170,.9)'); halo.addColorStop(1, 'rgba(255,200,110,0)');
+      g.fillStyle = halo; g.fillRect(x - 22, yy - 22, 44, 44);
+      cercle(x, yy, 7, ['#ffd84a', '#ff9a3c', '#fff1b0', '#ff6f6f'][Math.abs(Math.floor(x / 46)) % 4]);
+    }
+  });
+  // Feuilles du fond, plus petites et plus pâles.
+  for (let i = 0; i < 14; i++) {
+    const x = x0 + r() * vw, y = 170 + r() * 220;
+    g.save(); g.globalAlpha = 0.7; g.translate(x, y); g.rotate(r() * 6);
+    feuilleForme(0, 0, 7 + r() * 4, 0, ['#d9572b', '#e8962a', '#b8362a', '#c9a227'][i % 4]); g.restore();
+  }
+
+  // Capucine en grand, auréolée de lumière.
+  g.save();
+  g.shadowColor = 'rgba(255,236,180,.95)'; g.shadowBlur = 26 * dpr * e;
+  dessinerAnimal('dinde', 300, 312, 150, 1);
+  g.restore();
+  dessinerAnimal('dinde', 300, 312, 150, 1);
+
+  // Les amis, assis à table.
+  const amis = [['hibou', 30, 428, 50], ['herisson', 112, 430, 58], ['ecureuil', 196, 428, 48], ['lapin', 410, 430, 48], ['souris', 490, 428, 54], ['renard', 572, 430, 48]];
+  amis.forEach(([id, x, y, rr2]) => dessinerAnimal(id, x, y, rr2, 1));
+
+  // La table nappée, vue en grand.
+  g.fillStyle = 'rgba(60,20,10,.35)'; g.fillRect(x0, 452, vw, 10);
+  remplirNappe('carreaux', x0, 458, vw, AH - 458 + 40 + vh);
+  const lum = g.createLinearGradient(0, 458, 0, 800);
+  lum.addColorStop(0, 'rgba(255,230,170,.35)'); lum.addColorStop(1, 'rgba(80,30,10,.25)');
+  g.fillStyle = lum; g.fillRect(x0, 458, vw, vh);
+  g.fillStyle = 'rgba(255,250,235,.6)'; g.fillRect(x0, 458, vw, 3);
+
+  // Bougies, plats et la grande tarte.
+  dessinerDeco('bougie', 92, 500, 1.5);
+  dessinerDeco('bougie', 508, 500, 1.5);
+  dessinerAssiette('blanche', 140, 578, 52); dessinerIngr(ctx, 'mais', 128, 572, 62); dessinerIngr(ctx, 'mais', 152, 580, 58);
+  dessinerAssiette('blanche', 462, 582, 52); dessinerIngr(ctx, 'pomme', 448, 574, 46); dessinerIngr(ctx, 'noix', 478, 590, 38); dessinerIngr(ctx, 'pomme', 470, 560, 36);
+  const motif = ['citrouille', 'pomme', 'citrouille', 'pomme', 'citrouille', 'pomme'];
+  const cibles = motif.map((m, i) => ({ poses: i === 0 ? [] : [m], besoin: [m], non: 0, anim: 0 }));
+  dessinerTarte(300, 548, 104, motif, cibles, false);
+  // La part vide brille : la pomme arrive !
+  const pa = -Math.PI / 2 + 0.5 * Math.PI / 3;
+  const px = 300 + Math.cos(pa) * 62, py = 548 + Math.sin(pa) * 62;
+  const brille = g.createRadialGradient(px, py, 2, px, py, 44);
+  brille.addColorStop(0, 'rgba(255,240,170,.95)'); brille.addColorStop(1, 'rgba(255,210,110,0)');
+  g.fillStyle = brille; g.fillRect(px - 44, py - 44, 88, 88);
+  // Trajectoire étincelante de la pomme lancée.
+  for (let i = 0; i < 16; i++) {
+    const u = i / 15;
+    const tx = lerp(560, 404, u), ty = lerp(338, 432, u) - Math.sin(u * Math.PI) * 40;
+    cercle(tx + (r() - 0.5) * 10, ty + (r() - 0.5) * 10, 2 + u * 4, u > 0.5 ? '#fff4c0' : 'rgba(255,214,110,.8)');
+  }
+  [[372, 448], [388, 474], [352, 430], [410, 500]].forEach(([sx, sy]) => {
+    g.strokeStyle = '#fff6cf'; g.lineWidth = 3; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(sx - 8, sy); g.lineTo(sx + 8, sy); g.moveTo(sx, sy - 8); g.lineTo(sx, sy + 8); g.stroke();
+  });
+  g.save(); g.shadowColor = 'rgba(255,240,190,1)'; g.shadowBlur = 18 * dpr * e;
+  dessinerIngr(ctx, 'pomme', 392, 432, 70);
+  g.restore();
+  dessinerIngr(ctx, 'pomme', 392, 432, 70);
+  // Cœurs de joie au-dessus des amis.
+  [[112, 352, 1.4], [410, 350, 1.2], [196, 360, 1]].forEach(([hx, hy, s]) => {
+    g.save(); g.translate(hx, hy); g.scale(s * 1.6, s * 1.6);
+    g.fillStyle = '#ff5a72'; g.beginPath();
+    g.moveTo(0, 6); g.bezierCurveTo(-12, -2, -6, -12, 0, -4); g.bezierCurveTo(6, -12, 12, -2, 0, 6); g.fill();
+    g.restore();
+  });
+
+  // Premier plan : grosses courges coupées par les bords, feuilles qui volent.
+  dessinerIngr(ctx, 'citrouille', 30, 748, 230);
+  dessinerIngr(ctx, 'courge', 580, 742, 210);
+  dessinerIngr(ctx, 'canneberge', 182, 690, 70);
+  dessinerIngr(ctx, 'poire', 420, 688, 76);
+  [[40, 140, 30, 0.6, '#d9572b'], [560, 210, 26, 2.2, '#e8962a'], [520, 70, 18, 1.2, '#c9a227'], [74, 300, 20, 4, '#b8362a'], [250, 660, 22, 3.2, '#e8962a']].forEach(([fx, fy, fr, rot, c]) => {
+    g.save(); g.translate(fx, fy); g.rotate(rot);
+    ellipse(4, 6, fr * 1.1, fr * 0.7, 0, 'rgba(0,0,0,.12)');
+    feuilleForme(0, 0, fr, 0, c); g.restore();
+  });
+}
+
+// Grandes tables à gauche et à droite (image 3, écran d'ordinateur) :
+// la tablée continue jusqu'aux bords, avec d'autres invités déjà servis.
+function decorLarge(x0, vw) {
+  const g = ctx, d = progression.decor;
+  const ids = ['ourson', 'hibou', 'renard', 'lapin', 'souris', 'herisson', 'ecureuil'];
+  const plats = { ourson: 'poire', hibou: 'chataigne', renard: 'canneberge', lapin: 'carotte', souris: 'mais', herisson: 'pomme', ecureuil: 'noix' };
+  const gauche = [], droite = [];
+  for (let x = -44; x > x0 - 30; x -= 86) gauche.push(x);
+  for (let x = 444; x < x0 + vw + 30; x += 86) droite.push(x);
+  const toutes = gauche.concat(droite);
+  // Lanternes et bottes de foin au sol.
+  toutes.forEach((x, k) => {
+    if (k % 2 === 0) { g.fillStyle = '#e2b04a'; rr(x - 34, 548, 68, 52, 8); g.fill(); g.strokeStyle = '#b9862c'; g.lineWidth = 2; for (let i = 1; i < 5; i++) { g.beginPath(); g.moveTo(x - 30, 548 + i * 10); g.lineTo(x + 30, 548 + i * 10); g.stroke(); } dessinerIngr(ctx, 'citrouille', x, 532, 40); }
+    else { dessinerIngr(ctx, k % 4 === 1 ? 'courge' : 'citrouille', x - 14, 590, 44); dessinerIngr(ctx, 'citrouille', x + 18, 596, 36); dessinerDeco('lanterne', x + 4, 540, 1.1); }
+  });
+  // Invités du fond.
+  toutes.forEach((x, k) => dessinerAnimal(ids[k % ids.length], x, 120, 27, 1));
+  // Tables nappées.
+  [[x0 - 20, -6 - x0 + 20], [406, x0 + vw + 20 - 406]].forEach(([x, w]) => {
+    if (w <= 0) return;
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(x, 202, w, 248);
+    g.save(); rr(x, 196, w, 248, 18); g.clip(); remplirNappe(d.nappe, x, 196, w, 248); g.restore();
+  });
+  toutes.forEach((x, k) => {
+    g.fillStyle = '#7b4a2c'; if (k % 2 === 0) g.fillRect(x - 7, 444, 14, 24);
+    const a = ids[k % ids.length], b = ids[(k + 3) % ids.length];
+    dessinerAssiette(d.assiette, x, 250, 32); dessinerIngr(ctx, plats[a], x, 250, 38);
+    dessinerAssiette(d.assiette, x, 400, 32); dessinerIngr(ctx, plats[b], x, 400, 38);
+    if (k % 2 === 1) dessinerDeco(d.deco, x, 314, 0.9);
+    else { dessinerIngr(ctx, 'mais', x - 18, 326, 30); dessinerIngr(ctx, 'pomme', x + 16, 330, 28); }
+  });
+  // Invités du premier rang.
+  toutes.forEach((x, k) => dessinerAnimal(ids[(k + 3) % ids.length], x, 482, 27, 1));
+  // Voile léger : la table où l'on joue reste au centre de l'attention.
+  g.fillStyle = 'rgba(40,20,10,.28)';
+  g.fillRect(x0 - 20, 186, -6 - x0 + 20, 700);
+  g.fillRect(406, 186, x0 + vw + 20 - 406, 700);
+}
+
+// Ouvre directement un vrai moment de partie, figé, sans fenêtre ni son,
+// sans rien écrire dans la sauvegarde (enCours reste faux).
+function ouvrirApercu(n) {
+  modeApercu = n >= 1 && n <= 3 ? n : 1;
+  muet = true;
+  const r = alea(4242 + modeApercu);
+  const plan = [null, { niv: 0, et: 0 }, { niv: 6, et: 0 }, { niv: 19, et: 3 }][modeApercu];
+  if (modeApercu === 2) progression.decor = { nappe: 'rayures', assiette: 'bleue', deco: 'bouquet' };
+  if (modeApercu === 3) progression.decor = { nappe: 'feuilles', assiette: 'doree', deco: 'lanterne' };
+  niv = plan.niv; etapeIdx = plan.et;
+  mode = 'jeu'; enCours = false; tuto = null; clavier = false; oeilUtilise = false;
+  particules = []; popups = []; volants = []; glisse = null; choix = -1; curseur = -1;
+  etape = construireEtape(NIVEAUX[niv].etapes[etapeIdx], niv, etapeIdx);
+  phase = 'jeu';
+  const cs = etape.cibles;
+  const couleurs = ['#d9572b', '#e8962a', '#b8362a', '#c9a227'];
+  if (modeApercu === 1) {
+    coeurs = 5; score = 20;
+    cs[0].poses = cs[0].besoin.slice(); cs[2].poses = cs[2].besoin.slice(); cs[2].anim = 0.5;
+    for (let i = 0; i < 10; i++) { const a = r() * 6.28, v = 20 + r() * 40; particules.push({ x: cs[2].x + Math.cos(a) * v, y: cs[2].y + Math.sin(a) * v, vx: 0, vy: 0, vie: 0.6, max: 0.8, type: 'etincelle', c: ['#f2b632', '#fff4e0', '#e8822a'][i % 3], rot: 0, vr: 0, s: 1 }); }
+    popups.push({ x: cs[2].x, y: cs[2].y - 40, texte: t('pop.points', { n: 10 }), vie: 0.9 });
+    const id = cs[1].besoin[0];
+    choix = etape.panier.indexOf(id);
+    const src = posPanier(choix);
+    glisse = { id: id, x: lerp(src.x, cs[1].x, 0.62), y: lerp(src.y, cs[1].y + 26, 0.62), sx: src.x, sy: src.y, bouge: true, pid: -1 };
+  } else if (modeApercu === 2) {
+    coeurs = 4; score = 45;
+    [0, 2, 3].forEach((k) => { cs[k].poses = cs[k].besoin.slice(); });
+    cs[4].feuille = { posee: true, u: 1, x0: cs[4].x - 160, y0: cs[4].y - 240, rot: 0.7, couleur: '#d9572b', secoue: 0 };
+    choix = etape.panier.indexOf(cs[1].besoin[0]);
+    for (let i = 0; i < 9; i++) particules.push({ x: 20 + r() * 360, y: 120 + r() * 330, vx: 0, vy: 0, vie: 2, max: 2.4, type: 'feuille', c: couleurs[i % 4], rot: r() * 6, vr: 0, s: 1 + r() * 0.5 });
+  } else {
+    coeurs = 4; score = 310;
+    [0, 2, 3, 5, 6].forEach((k) => { if (cs[k]) cs[k].poses = cs[k].besoin.slice(); });
+    const dbl = cs.findIndex((c, k) => c.besoin.length > 1 && !(c.poses.length));
+    if (dbl >= 0) cs[dbl].poses = [cs[dbl].besoin[0]];
+    const libre = cs.findIndex((c) => !c.poses.length);
+    if (libre >= 0) cs[libre].feuille = { posee: true, u: 1, x0: 0, y0: 0, rot: 2.1, couleur: '#e8962a', secoue: 0 };
+    [2, 5].forEach((k) => { if (cs[k]) for (let i = 0; i < 3; i++) particules.push({ x: cs[k].invite.x + (i - 1) * 16, y: cs[k].invite.y - 34 - i * 8, vx: 0, vy: 0, vie: 1, max: 1.2, type: 'coeur', c: '#e0475b', rot: 0, vr: 0, s: 1 }); });
+    for (let i = 0; i < 6; i++) particules.push({ x: -300 + r() * 1000, y: 60 + r() * 120, vx: 0, vy: 0, vie: 2, max: 2.4, type: 'feuille', c: couleurs[i % 4], rot: r() * 6, vr: 0, s: 1.2 });
+  }
+  montrer(null);
+  document.getElementById('bandeau').classList.add('cache');
+  document.getElementById('hud').classList.remove('cache');
+  calculerEchelle();
+  majHUD();
+  enPause = true;   // partie figée, sans fenêtre de pause
+}
+
 lireProgression();
 majSon();
 redimensionner();
+if (window.JEL_AFFICHE) demarrerAffiche();
+else if (window.JEL_APERCU) ouvrirApercu(Number(window.JEL_APERCU));
 requestAnimationFrame(boucle);
 })();
 </script>

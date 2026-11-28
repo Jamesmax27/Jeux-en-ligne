@@ -2335,7 +2335,12 @@ const etat = {
 };
 const maintenant = () => performance.now() / 1000;
 let tv = 0; // horloge des animations (s), figée pendant la pause
+// Image du jeu (window.JEL_APERCU, posé par le robot) : temps de la chanson figé
+let apercuT = null;
+// Affiche du jeu (window.JEL_AFFICHE, posé par le robot) : scène composée, sans interface
+let afficheActive = false;
 function tempsChanson() {
+  if (apercuT !== null) return apercuT;
   if (etat.ecran === 'pause') return (etat.pauseDebut - etat.t0 - etat.pauseCumul);
   return maintenant() - etat.t0 - etat.pauseCumul;
 }
@@ -2481,7 +2486,7 @@ function candidate(tt) {
 }
 // Début d'un geste (doigt posé ou touche enfoncée)
 function appui(source, y, haut) {
-  if (etat.ecran !== 'jeu' || etat.fini) return;
+  if (etat.ecran !== 'jeu' || etat.fini || apercuT !== null) return;
   const tt = tempsChanson();
   const n = candidate(tt);
   const G = geo();
@@ -2565,7 +2570,7 @@ function lancerConfettis() {
 
 /* ---------- Pause ---------- */
 function pause() {
-  if (etat.ecran !== 'jeu') return;
+  if (etat.ecran !== 'jeu' || apercuT !== null) return;
   etat.ecran = 'pause'; etat.pauseDebut = maintenant();
   // Un équilibre en cours est compté tel quel : on ne punit pas la pause
   if (etat.tenu) { const tn = etat.tenu; etat.tenu = null; tn.n.enCours = false; juger(tn.n, tn.ecart); }
@@ -2865,8 +2870,10 @@ function image() {
   requestAnimationFrame(image);
 }
 function boucle(m, dt) {
+  if (afficheActive) { dessinerAffiche(m); return; }
   const G = geo();
-  if (etat.ecran === 'jeu') miseAJour(dt);
+  if (apercuT !== null) tenirApercu(m, G);
+  else if (etat.ecran === 'jeu') miseAJour(dt);
   // Dessin
   ctx.save();
   if (etat.secousse > 0) { etat.secousse -= dt; ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 6); }
@@ -3064,7 +3071,167 @@ window.JEL_SAVE.surFermeture(() => { if (etat.enCours) enregistrer(etat.index + 
 // Changement de langue : textes remplis par le script
 if (window.JEL_I18N.surChangement) window.JEL_I18N.surChangement(() => { majBoutonSon(); if (etat.part) majHud(); if (etat.ecran === 'niveaux') ouvrirNiveaux(); if (etat.ecran === 'vestiaire') remplirVestiaire(); });
 
+/* ---------- Affiche du jeu (window.JEL_AFFICHE, posé par le robot) ----------
+   Scène composée, sans interface ni texte : Lila en grand écart sauté sous le
+   projecteur du chapiteau, son ruban en spirale, Nino qui rattrape un ballon. */
+function etincelle(x, y, s, c) {
+  ctx.fillStyle = c;
+  ctx.beginPath(); ctx.moveTo(x, y - s * 2); ctx.lineTo(x + s * 0.5, y - s * 0.5); ctx.lineTo(x + s * 2, y); ctx.lineTo(x + s * 0.5, y + s * 0.5);
+  ctx.lineTo(x, y + s * 2); ctx.lineTo(x - s * 0.5, y + s * 0.5); ctx.lineTo(x - s * 2, y); ctx.lineTo(x - s * 0.5, y - s * 0.5); ctx.closePath(); ctx.fill();
+}
+// Ruban en spirale autour de l'acrobate : moitié arrière (devant = false) ou avant
+function spiraleRuban(cx, cy, rx, ry, monte, tours, couleur, larg, phase, m, devant) {
+  const N = 140;
+  ctx.strokeStyle = couleur; ctx.lineCap = 'round';
+  let prec = null;
+  for (let i = 0; i <= N; i++) {
+    const k = i / N;
+    const a = phase + k * tours * Math.PI * 2 + m * 0.7;
+    const ond = 1 + 0.1 * Math.sin(k * 11 + m * 3);
+    const p = { x: cx + Math.cos(a) * rx * ond * (0.55 + 0.45 * k), y: cy - k * monte + Math.sin(a) * ry * ond, d: Math.sin(a) > 0 };
+    if (prec && prec.d === devant && p.d === devant) {
+      ctx.lineWidth = larg * (0.3 + 0.7 * k);
+      ctx.beginPath(); ctx.moveTo(prec.x, prec.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    }
+    prec = p;
+  }
+}
+function dessinerAffiche(m) {
+  const S = Math.min(W, H * 0.75);     // échelle des personnages
+  const cx = W / 2;
+  const g = ctx;
+  g.save();
+  decor(1, m);                         // chapiteau rayé, guirlandes
+  // Projecteur (source de lumière) et son faisceau sur Lila
+  const lx = cx + S * 0.12, ly = H * 0.015, hx = cx + S * 0.03, hy = H * 0.4;
+  let gr = g.createLinearGradient(0, 0, 0, H * 0.75);
+  gr.addColorStop(0, 'rgba(255,252,225,.55)'); gr.addColorStop(1, 'rgba(255,240,190,.12)');
+  g.fillStyle = gr;
+  g.beginPath(); g.moveTo(lx - S * 0.05, ly); g.lineTo(cx - S * 0.55, H * 0.74); g.lineTo(cx + S * 0.55, H * 0.74); g.lineTo(lx + S * 0.05, ly); g.closePath(); g.fill();
+  gr = g.createRadialGradient(hx, hy, 0, hx, hy, S * 0.7);
+  gr.addColorStop(0, 'rgba(255,248,210,.5)'); gr.addColorStop(0.4, 'rgba(255,225,140,.25)'); gr.addColorStop(1, 'rgba(255,210,130,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  gr = g.createRadialGradient(lx, ly, 0, lx, ly, S * 0.16);
+  gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.3, 'rgba(255,248,200,.95)'); gr.addColorStop(1, 'rgba(255,240,180,0)');
+  g.fillStyle = gr; g.beginPath(); g.arc(lx, ly, S * 0.16, 0, 7); g.fill();
+  g.fillStyle = '#5b5f73'; arrondi(lx - S * 0.06, ly - S * 0.07, S * 0.12, S * 0.07, S * 0.02); g.fill();
+  // Piste et grand tapis rose en perspective
+  const yTapis = H * 0.66;
+  g.fillStyle = '#b8326d';
+  g.beginPath(); g.moveTo(cx - S * 0.62, yTapis); g.lineTo(cx + S * 0.62, yTapis); g.lineTo(cx + S * 0.95, H * 0.9); g.lineTo(cx - S * 0.95, H * 0.9); g.closePath(); g.fill();
+  g.fillStyle = '#ff8cc0';
+  g.beginPath(); g.moveTo(cx - S * 0.57, yTapis + H * 0.012); g.lineTo(cx + S * 0.57, yTapis + H * 0.012); g.lineTo(cx + S * 0.86, H * 0.875); g.lineTo(cx - S * 0.86, H * 0.875); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 3;
+  g.beginPath(); g.ellipse(cx, H * 0.77, S * 0.38, H * 0.05, 0, 0, 7); g.stroke();
+  // Rubans-figures qui descendent au loin (comme pendant la partie)
+  g.globalAlpha = 0.95;
+  dessinerNote({ type: 'roue' }, cx - S * 0.38, H * 0.17 + Math.sin(m * 2) * 4, S * 0.055, m);
+  dessinerNote({ type: 'saut' }, cx + S * 0.4, H * 0.13 + Math.cos(m * 2) * 4, S * 0.05, m);
+  dessinerNote({ type: 'roue', echo: true }, cx + S * 0.3, H * 0.27, S * 0.04, m);
+  g.globalAlpha = 1;
+  // Ombre de Lila sur le tapis (elle est en l'air)
+  g.fillStyle = 'rgba(120,20,70,.3)'; g.beginPath(); g.ellipse(hx, H * 0.72, S * 0.2, H * 0.02, 0, 0, 7); g.fill();
+  // Nino, plus loin à gauche, qui rattrape un ballon
+  const tenueNino = { j: { corps: '#3aa0ff', accent: '#d6ecff' }, r: RUBANS[0] };
+  const hN = S * 0.38, sN = H * 0.75, xN = cx - S * 0.34;
+  g.shadowColor = 'rgba(40,40,110,.6)'; g.shadowBlur = 8;
+  acrobate(xN, sN, hN, { bg: 2.75, bd: 2.45, jg: 0.22, jd: 0.22, dy: -0.4 }, tenueNino, true, m);
+  g.shadowBlur = 0;
+  dessinerNote({ type: 'rattraper' }, xN + hN * 0.02, sN - hN * 1.38 + Math.sin(m * 3) * 3, S * 0.06, m);
+  // Lila : grand écart sauté, ruban en spirale (arrière, corps, avant)
+  const tenue = { j: JUSTAUCORPS[0], r: RUBANS[0] };
+  const hL = S * 0.66, uL = hL / 10;
+  const hanche = H * 0.14 + 6.3 * uL;
+  const solL = hanche + 4.4 * uL;
+  const rubans = [['#ff4f9a', 0], ['#a066ff', 3.1]];
+  rubans.forEach(([c, ph]) => spiraleRuban(hx, hanche + uL * 3, S * 0.5, H * 0.045, H * 0.3, 1.25, c, S * 0.022, ph, m, false));
+  g.shadowColor = 'rgba(110,20,70,.75)'; g.shadowBlur = 10;
+  const pose = { rot: -0.12, dy: 0, bg: 2.45, bd: 1.95, jg: 1.0, jd: 1.5, rubanDir: 1 };
+  acrobate(hx, solL, hL, pose, tenue, false, m);
+  g.shadowBlur = 0;
+  spiraleRuban(hx, hanche + uL * 3, S * 0.5, H * 0.045, H * 0.3, 1.25, rubans[0][0], S * 0.018, rubans[0][1], m, true);
+  // Premier plan : grand cerceau doré et ballon, coupés par les bords
+  g.save();
+  g.translate(cx + S * 0.5, H * 0.8); g.rotate(-0.35);
+  g.strokeStyle = '#e0a400'; g.lineWidth = S * 0.05;
+  g.beginPath(); g.ellipse(0, 0, S * 0.22, S * 0.17, 0, 0, 7); g.stroke();
+  g.strokeStyle = '#ffd23f'; g.lineWidth = S * 0.034;
+  g.beginPath(); g.ellipse(0, 0, S * 0.22, S * 0.17, 0, 0, 7); g.stroke();
+  g.strokeStyle = '#fff6c9'; g.lineWidth = S * 0.012;
+  g.beginPath(); g.ellipse(0, 0, S * 0.22, S * 0.17, 0, 3.6, 4.6); g.stroke();
+  g.restore();
+  dessinerNote({ type: 'lancer' }, cx - S * 0.56, H * 0.6, S * 0.11, m);
+  // Confettis et étincelles (positions fixes, petit scintillement)
+  const r = alea(2026);
+  const couleurs = ['#ff5fa2', '#ffd23f', '#3ed17a', '#3aa0ff', '#a066ff'];
+  for (let i = 0; i < 46; i++) {
+    const x = cx + (r() - 0.5) * W, y = r() * H * 0.68 + Math.sin(m * 1.5 + i) * 3, a = r() * 6 + m * (r() - 0.5);
+    g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = couleurs[i % 5]; g.fillRect(-S * 0.011, -S * 0.006, S * 0.022, S * 0.012); g.restore();
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = cx + (r() - 0.5) * S * 1.1, y = H * (0.08 + r() * 0.55);
+    etincelle(x, y, S * (0.006 + 0.004 * Math.sin(m * 3 + i)) + S * 0.004, '#fff6b0');
+  }
+  g.restore();
+}
+function cacherLangue() {
+  document.querySelectorAll('jel-langue, .jel-langue').forEach((e) => { e.style.setProperty('display', 'none', 'important'); });
+}
+function demarrerAffiche() {
+  afficheActive = true;
+  etat.ecran = 'affiche';
+  ECRANS.forEach((e) => $(e).classList.remove('visible'));
+  $('hud').classList.remove('visible');
+  document.querySelectorAll('button').forEach((b) => { b.style.display = 'none'; });
+  cacherLangue();
+  [100, 400, 1000, 1800].forEach((d) => setTimeout(cacherLangue, d));
+}
+
+/* ---------- Images du jeu (window.JEL_APERCU = 1, 2 ou 3, posé par le robot) ----------
+   Vraie partie, vraie interface, chanson figée à un instant choisi : rien ne se gagne
+   ni ne se perd, aucun son, rien d'écrit dans la sauvegarde. */
+const MOMENTS_APERCU = {
+  1: { niveau: 0, figure: 6, anim: 'roue', phase: 0.3, score: 940, combo: 6, energie: 96 },     // gymnase, premières roues
+  2: { niveau: 7, figure: 16, anim: 'cerceau', phase: 0.5, score: 3120, combo: 11, energie: 84 }, // chapiteau, ballons et cerceaux
+  3: { niveau: 17, figure: 28, anim: 'saut', phase: 0.5, nino: 'saut', score: 7480, combo: 19, energie: 78 }, // compétition, duo en écho
+};
+function ouvrirApercu(n) {
+  const c = MOMENTS_APERCU[n];
+  etat.index = c.niveau;
+  etat.part = construirePartition(c.niveau);
+  etat.musique = null; etat.iMusique = 0;
+  Object.assign(etat, { energie: c.energie, score: c.score, scoreAffiche: c.score, combo: c.combo, comboMax: c.combo, parfait: 0, bien: 0, rate: 0, anim: null, animNino: null, tenu: null, glisse: null, cle: null, effets: [], textes: [], ballon: null, fini: false, enCours: false });
+  const notes = etat.part.notes;
+  const k = Math.min(notes.length - 1, c.figure);
+  apercuT = notes[k].t - 0.04;
+  notes.forEach((x, i) => {
+    if (x.t >= apercuT - FEN_BIEN) return;
+    if (x.type === 'equilibre' && x.fin > apercuT) { x.enCours = true; etat.tenu = { n: x, ecart: 0, source: 'doigt' }; return; }
+    x.etat = i % 5 === 3 ? 'bien' : 'parfait'; etat[x.etat]++;
+    if (x.type === 'lancer' && x.lien) x.lien.cache = false;
+  });
+  const segs = etat.part.tempo.segs;
+  etat.segTempo = 0; segs.forEach((s, i) => { if (s.t <= apercuT) etat.segTempo = i; });
+  etat.anim = { type: c.anim, debut: 0, duree: 0.55, phase: c.phase, sens: 1 };
+  if (c.nino) etat.animNino = { type: c.nino, debut: 0, duree: 0.55, phase: 0.4, sens: -1 };
+  etat.textes.push({ s: t('juge.parfait'), c: '#ffe27a', x: 0, y: 0, vie: 0.8 });
+  etat.eclat = 1;
+  etat.ecran = 'jeu';
+  montrer(null);
+  majHud();
+  $('hud-score').textContent = nombre(c.score);
+}
+// À chaque image : on garde la pose, l'éclat du cercle et le mot « Parfait »
+function tenirApercu(m, G) {
+  etat.eclat = Math.max(etat.eclat, 0.6);
+  [etat.anim, etat.animNino].forEach((a) => { if (a) a.debut = m - a.phase * a.duree; });
+  etat.textes.forEach((x) => { x.vie = 0.8; x.x = G.cx + G.r * 2.2; x.y = G.cy - G.r * 0.4; });
+}
+
 majBoutonSon();
+const APERCU_N = [1, 2, 3].includes(Number(window.JEL_APERCU)) ? Number(window.JEL_APERCU) : 0;
+if (APERCU_N) ouvrirApercu(APERCU_N);
+else if (window.JEL_AFFICHE) demarrerAffiche();
 requestAnimationFrame(image);
 </script>
 </body>

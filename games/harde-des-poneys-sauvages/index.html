@@ -2982,6 +2982,7 @@ function construireNiveaux() {
    ========================================================================= */
 var jeu = { n: 0, etat: null, hist: [], vue: {}, modeBarriere: false, curseur: null, fini: false, reprise: 1, pause: false, refus: null, secousse: 0, particules: [], confettis: [] };
 var partieEnCours = false;
+var apercu = 0; // 1, 2 ou 3 : image du jeu préparée pour sa page (window.JEL_APERCU), sinon 0
 var plateau = $('plateau'), gp = plateau.getContext('2d');
 var C = 40;
 
@@ -3047,7 +3048,7 @@ function rester() {
   var r = Logique.jouer(jeu.etat, { rester: true });
   if (r.etat) appliquer(r);
 }
-function actionPossible() { return ecranActif === 'jeu' && !!jeu.etat && !jeu.fini && !jeu.etat.fini && !fenetreOuverte(); }
+function actionPossible() { return !apercu && ecranActif === 'jeu' && !!jeu.etat && !jeu.fini && !jeu.etat.fini && !fenetreOuverte(); }
 
 function appliquer(r) {
   // Le premier pas range la bulle d'information (les nouveaux messages la rouvrent).
@@ -3426,6 +3427,7 @@ function fermerFenetres() {
 
 // ---------- Pause ----------
 function ouvrirPause() {
+  if (apercu) return;
   if (ecranActif !== 'jeu' || !$('fen-fin').hidden || !$('fen-tuto').hidden || !$('fen-pause').hidden) return;
   jeu.pause = true;
   Son.figer(true);
@@ -3765,6 +3767,230 @@ $('b-barriere').addEventListener('click', basculerBarriere);
 document.querySelectorAll('.b-son').forEach(function (b) { b.addEventListener('click', basculerSon); });
 
 /* =========================================================================
+   Affiche du jeu (jaquette) : window.JEL_AFFICHE, posé par le robot du site,
+   jamais par le jeu. Une scène composée plein écran, sans interface ni texte :
+   la jument meneuse au galop traverse le gué en tête de sa harde, un poulain
+   la rejoint, l'écurie brille au soleil, un petit nuage d'orage arrive.
+   ========================================================================= */
+var afficheCanvas = null;
+function demarrerAffiche() {
+  var cacher = function () {
+    document.querySelectorAll('.ecran, .voile, button, .rond, .jel-langue, jel-langue, jel-sauvegarde').forEach(function (el) {
+      el.style.setProperty('display', 'none', 'important');
+    });
+  };
+  cacher(); setTimeout(cacher, 200); setTimeout(cacher, 1000);
+  afficheCanvas = document.createElement('canvas');
+  afficheCanvas.setAttribute('aria-hidden', 'true');
+  afficheCanvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;display:block;z-index:5';
+  document.body.appendChild(afficheCanvas);
+  var image = function (temps) {
+    var dpr = Math.min(2, window.devicePixelRatio || 1), W = window.innerWidth, H = window.innerHeight;
+    if (afficheCanvas.width !== Math.round(W * dpr) || afficheCanvas.height !== Math.round(H * dpr)) { afficheCanvas.width = Math.round(W * dpr); afficheCanvas.height = Math.round(H * dpr); }
+    var g = afficheCanvas.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    dessinerAffiche(g, W, H, temps);
+    requestAnimationFrame(image);
+  };
+  requestAnimationFrame(image);
+}
+
+// Gouttes d'eau projetées par un sabot (arcs blancs et bleus).
+function eclabousser(g, x, y, r) {
+  for (var k = 0; k < 9; k++) {
+    var a = Math.PI * (1.05 + k * 0.11), d = r * (0.6 + hasard(k, 4) * 0.7);
+    cercle(g, x + Math.cos(a) * d, y + Math.sin(a) * d * 0.9, r * (0.06 + hasard(k, 5) * 0.06), k % 3 ? 'rgba(255,255,255,.95)' : '#bfe6ff');
+  }
+  g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = r * 0.07; g.lineCap = 'round';
+  g.beginPath(); g.ellipse(x, y + r * 0.05, r * 0.9, r * 0.22, 0, Math.PI * 0.05, Math.PI * 0.95); g.stroke();
+}
+function coeur(g, x, y, s, c) {
+  g.fillStyle = c; g.beginPath(); g.moveTo(x, y + s * 0.3);
+  g.bezierCurveTo(x - s, y - s * 0.4, x - s * 0.4, y - s, x, y - s * 0.4);
+  g.bezierCurveTo(x + s * 0.4, y - s, x + s, y - s * 0.4, x, y + s * 0.3); g.fill();
+}
+// Poney avec un liseré de lumière (contre-jour du soleil).
+function poneyLumineux(g, x, y, s, robe, o, lueur) {
+  g.save(); g.shadowColor = lueur || 'rgba(255,240,190,.95)'; g.shadowBlur = s * 0.09;
+  dessinerPoney(g, x, y, s, robe, o); g.restore();
+  dessinerPoney(g, x, y, s, robe, o);
+}
+
+function dessinerAffiche(g, W, H, temps) {
+  // Cadre de composition 600 × 800, centré ; le décor continue jusqu'aux bords.
+  var k = Math.min(W / 600, H / 800), ox = (W - 600 * k) / 2, oy = (H - 800 * k) / 2;
+  function X(v) { return ox + v * k; }
+  function Y(v) { return oy + v * k; }
+  // Ciel lumineux de fin d'après-midi.
+  var ciel = g.createLinearGradient(0, 0, 0, Y(430));
+  ciel.addColorStop(0, '#4fa6ea'); ciel.addColorStop(0.55, '#9fd6ff'); ciel.addColorStop(1, '#ffe4a6');
+  g.fillStyle = ciel; g.fillRect(0, 0, W, H);
+  // Soleil et rayons.
+  var sx = X(470), sy = Y(150);
+  g.save(); g.translate(sx, sy); g.rotate(temps / 9000);
+  g.fillStyle = 'rgba(255,236,150,.35)';
+  for (var r = 0; r < 12; r++) { g.rotate(Math.PI / 6); g.beginPath(); g.moveTo(-14 * k, 0); g.lineTo(14 * k, 0); g.lineTo(0, -330 * k); g.closePath(); g.fill(); }
+  g.restore();
+  var halo = g.createRadialGradient(sx, sy, 10 * k, sx, sy, 170 * k);
+  halo.addColorStop(0, 'rgba(255,248,200,.95)'); halo.addColorStop(0.35, 'rgba(255,226,130,.55)'); halo.addColorStop(1, 'rgba(255,226,130,0)');
+  g.fillStyle = halo; g.fillRect(sx - 170 * k, sy - 170 * k, 340 * k, 340 * k);
+  cercle(g, sx, sy, 52 * k, '#ffe27a'); cercle(g, sx - 10 * k, sy - 10 * k, 36 * k, '#fff3b8');
+  // Petits nuages blancs.
+  [[60, 70, 1], [300, 50, 0.8], [560, 95, 0.9], [-120, 120, 0.9], [760, 60, 1]].forEach(function (n) {
+    var nx = X(n[0]), ny = Y(n[1]), s = n[2] * k;
+    ovale(g, nx, ny, 55 * s, 15 * s, 'rgba(255,255,255,.9)'); ovale(g, nx + 22 * s, ny - 12 * s, 32 * s, 16 * s, 'rgba(255,255,255,.9)');
+  });
+  // Montagnes enneigées au loin (elles continuent sur les côtés).
+  g.fillStyle = '#8ea4d2'; g.beginPath(); g.moveTo(0, Y(400));
+  var sommets = [[-400, 300], [-250, 230], [-90, 320], [80, 215], [230, 300], [360, 205], [520, 310], [680, 230], [840, 320], [1000, 240]];
+  sommets.forEach(function (p) { g.lineTo(X(p[0]), Y(p[1])); });
+  g.lineTo(W, Y(320)); g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.fill();
+  g.fillStyle = '#ffffff';
+  sommets.forEach(function (p, i) {
+    if (i % 2) return;
+    var mx = X(p[0]), my = Y(p[1]);
+    g.beginPath(); g.moveTo(mx, my); g.lineTo(mx - 34 * k, my + 30 * k); g.lineTo(mx - 10 * k, my + 24 * k); g.lineTo(mx + 6 * k, my + 34 * k); g.lineTo(mx + 34 * k, my + 30 * k); g.closePath(); g.fill();
+  });
+  // Petit nuage d'orage qui arrive, à gauche (la menace du jeu), avec son éclair.
+  dessinerNuage(g, X(10), Y(140), 150 * k, 170 * (Math.PI * 2000.5 - X(10)), true);
+  // Collines.
+  g.fillStyle = '#7cc35c'; g.beginPath(); g.moveTo(0, Y(380));
+  g.quadraticCurveTo(X(150), Y(330), X(330), Y(372)); g.quadraticCurveTo(X(500), Y(410), W, Y(350)); g.lineTo(W, H); g.lineTo(0, H); g.fill();
+  g.fillStyle = '#8fd46a'; g.beginPath(); g.moveTo(0, Y(450));
+  g.quadraticCurveTo(X(300), Y(400), W, Y(440)); g.lineTo(W, H); g.lineTo(0, H); g.fill();
+  // L'écurie de l'abri, porte ouverte et lumineuse, sur la colline.
+  dessinerArbre(g, X(610), Y(330), 80 * k, SAISONS[0], 0, 8, 0);
+  var ab = 118 * k;
+  var lueurAbri = g.createRadialGradient(X(552), Y(390), 5, X(552), Y(390), 110 * k);
+  lueurAbri.addColorStop(0, 'rgba(255,220,120,.6)'); lueurAbri.addColorStop(1, 'rgba(255,220,120,0)');
+  g.fillStyle = lueurAbri; g.fillRect(X(442), Y(280), 220 * k, 220 * k);
+  dessinerAbri(g, X(493), Y(328), ab, true, 0);
+  // Harde au loin qui suit la meneuse (de plus en plus proche).
+  dessinerArbre(g, X(-30), Y(300), 110 * k, SAISONS[0], 0, 3, 0);
+  dessinerPoney(g, X(70), Y(420), 60 * k, 4, { sens: 1, bob: 0.6, patte: 0.7 });
+  dessinerPoney(g, X(135), Y(440), 78 * k, 1, { sens: 1, bob: -0.6, patte: -0.8 });
+  // Rivière et gué.
+  g.fillStyle = '#3f9be0'; g.beginPath(); g.moveTo(0, Y(500));
+  g.quadraticCurveTo(X(300), Y(470), W, Y(510)); g.lineTo(W, Y(600)); g.quadraticCurveTo(X(300), Y(565), 0, Y(600)); g.closePath(); g.fill();
+  g.fillStyle = '#62b6f0'; g.beginPath(); g.moveTo(0, Y(500));
+  g.quadraticCurveTo(X(300), Y(470), W, Y(510)); g.lineTo(W, Y(522)); g.quadraticCurveTo(X(300), Y(484), 0, Y(514)); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.6)'; g.lineWidth = 4 * k; g.lineCap = 'round';
+  for (var v = 0; v < 9; v++) {
+    var vx = X(-100 + v * 100 + (v % 2) * 30), vy = Y(530 + (v % 3) * 18), d = Math.sin(temps / 500 + v) * 8 * k;
+    g.beginPath(); g.moveTo(vx + d, vy); g.quadraticCurveTo(vx + 20 * k + d, vy - 8 * k, vx + 40 * k + d, vy); g.stroke();
+  }
+  [[40, 556], [110, 548], [470, 552], [540, 560]].forEach(function (p) {
+    ovale(g, X(p[0]), Y(p[1]) + 4 * k, 26 * k, 11 * k, 'rgba(0,0,0,.2)');
+    ovale(g, X(p[0]), Y(p[1]), 26 * k, 11 * k, '#d9cfb8');
+    ovale(g, X(p[0]) - 6 * k, Y(p[1]) - 3 * k, 11 * k, 4 * k, '#f2ead8');
+  });
+  // Un poney pie et le poulain qui galopent derrière la meneuse, éclaboussures.
+  poneyLumineux(g, X(92), Y(500), 150 * k, 2, { sens: 1, bob: 1, patte: -1 });
+  eclabousser(g, X(80), Y(556), 45 * k);
+  poneyLumineux(g, X(196), Y(560), 118 * k, 5, { sens: 1, bob: -1, patte: 0.9 });
+  coeur(g, X(225), Y(470), 18 * k, '#ff6b8a'); coeur(g, X(256), Y(450), 12 * k, '#ff8fab'); coeur(g, X(200), Y(446), 9 * k, '#ff8fab');
+  // La jument meneuse en grand, au galop dans l'eau, clochette dorée au cou.
+  var mx = X(330), my = Y(400), ms = 380 * k;
+  g.save(); g.globalAlpha = 0.35; ovale(g, mx, my + ms * 0.43, ms * 0.42, ms * 0.06, '#1d5f96'); g.restore();
+  poneyLumineux(g, mx, my, ms, 0, { sens: 1, bob: -1.2, patte: 1, meneuse: true, clochette: 1 }, 'rgba(255,244,200,1)');
+  eclabousser(g, mx - ms * 0.22, my + ms * 0.4, 70 * k);
+  eclabousser(g, mx + ms * 0.26, my + ms * 0.4, 60 * k);
+  // Reflet du soleil sur la clochette.
+  g.save(); g.translate(mx, my); g.scale(ms / 40, ms / 40);
+  cercle(g, 10.6, -2.6 - 1.2, 0.7, '#fffbe0'); g.restore();
+  // Bulle « j'ai faim » au-dessus du poney pie : la harde veut brouter.
+  dessinerFaim(g, X(120), Y(405), 120 * k, 0);
+  // Premier plan : prairie, hautes herbes coupées par les bords, fleurs.
+  g.fillStyle = '#6fbf4f'; g.beginPath(); g.moveTo(0, Y(640));
+  g.quadraticCurveTo(X(300), Y(600), W, Y(645)); g.lineTo(W, H); g.lineTo(0, H); g.closePath(); g.fill();
+  g.fillStyle = '#5daa40'; g.fillRect(0, Y(720), W, H);
+  for (var f = 0; f < 40; f++) {
+    cercle(g, X(-200 + hasard(f, 11) * 1000), Y(655 + hasard(f, 12) * 140), 4 * k, SAISONS[0].fleurs[f % 3]);
+  }
+  dessinerHerbe(g, X(-60), Y(600), 200 * k, 2, SAISONS[0], 1, 0);
+  dessinerHerbe(g, X(470), Y(610), 190 * k, 2, SAISONS[0], 2, 0);
+  dessinerHerbe(g, X(240), Y(660), 130 * k, 1, SAISONS[0], 5, 0);
+  // Arbre en fleurs au premier plan, coupé par le bord gauche.
+  dessinerArbre(g, X(-140), Y(120), 250 * k, SAISONS[0], 0, 11, 0);
+  // Pétales qui volent.
+  for (var p = 0; p < 14; p++) {
+    var px = X(hasard(p, 21) * 600), py = Y(180 + hasard(p, 22) * 380);
+    ovale(g, px, py, 6 * k, 3.5 * k, p % 2 ? '#ffd1e3' : '#ffffff', hasard(p, 23) * 3);
+  }
+}
+
+/* =========================================================================
+   Images du jeu (page du jeu) : window.JEL_APERCU = 1, 2 ou 3, posé par le
+   robot du site, jamais par le jeu. Le jeu s'ouvre en pleine partie, avec sa
+   vraie interface, sans écran titre, fenêtre ni tutoriel ; les pas sont joués
+   par le code puis les commandes sont figées : ni son, ni sauvegarde, ni fin.
+     1 = niveau 1 : la meneuse vient de brouter, le poney suit, il a faim ;
+     2 = niveau 7 (été) : nuages d'orage, un poulain vient de rejoindre la harde ;
+     3 = niveau 20 (hiver) : pont de glace sous la meneuse, rivières gelées,
+         boue, barrière posée, poulain à ramener, nuage tout proche.
+   ========================================================================= */
+var SCENES_APERCU = {
+  1: { niveau: 0, pas: 'uu' },
+  2: { niveau: 6, pas: 'ull' },
+  3: { niveau: 19, pas: 'uuuuru', barrieres: [[4, 7]], decor: true },
+};
+function ouvrirApercu(numero) {
+  apercu = numero;
+  var sc = SCENES_APERCU[numero];
+  Son.activer(false);
+  var D = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
+  var e = Logique.charger(NIVEAUX[sc.niveau]);
+  sc.pas.split('').forEach(function (c) { var r = Logique.jouer(e, { dx: D[c][0], dy: D[c][1] }); if (r.etat) e = r.etat; });
+  (sc.barrieres || []).forEach(function (b) { var r = Logique.barriere(e, b[0], b[1]); if (r.etat) e = r.etat; });
+  jeu.n = sc.niveau; jeu.etat = e; jeu.hist = [e]; jeu.vue = {};
+  jeu.modeBarriere = false; jeu.curseur = null; jeu.fini = false; jeu.particules = []; jeu.confettis = []; jeu.refus = null;
+  montrer('jeu');
+  synchroniserVue(true);
+  // La meneuse regarde dans le sens de son dernier pas.
+  var dernierPas = sc.pas.charAt(sc.pas.length - 1);
+  e.poneys.forEach(function (p) { if (jeu.vue[p.id]) jeu.vue[p.id].sens = dernierPas === 'l' ? -1 : 1; });
+  majHud();
+  if (sc.decor) {
+    // Écran large : la vallée continue de part et d'autre du plateau.
+    var z = $('zone-plateau'), cv = document.createElement('canvas');
+    cv.setAttribute('aria-hidden', 'true');
+    cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none';
+    z.insertBefore(cv, z.firstChild);
+    plateau.style.position = 'relative'; plateau.style.zIndex = '1';
+    var peindre = function () { dessinerDecorApercu(cv, z, e); };
+    peindre(); setTimeout(peindre, 100);
+    window.addEventListener('resize', function () { setTimeout(peindre, 30); });
+  }
+}
+function dessinerDecorApercu(cv, z, e) {
+  var dpr = Math.min(2, window.devicePixelRatio || 1), W = z.clientWidth, Hz = z.clientHeight;
+  if (!W || !Hz) return;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(Hz * dpr);
+  var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  var rz = z.getBoundingClientRect(), rp = plateau.getBoundingClientRect();
+  var bx = rp.left - rz.left, by = rp.top - rz.top;
+  var c0 = Math.ceil(bx / C) + 1, r0 = Math.ceil(by / C) + 1;
+  var Lx = Math.ceil(W / C) + 3, Hx = Math.ceil(Hz / C) + 3;
+  var P = { L: Lx, H: Hx, saison: e.def.saison, sol: [], herbe: [], herbeMax: [], repousse: [], repousseMax: 0, barrieres: [], glaceFoulee: [], abriOuvert: false, pluie: false, possibles: [] };
+  for (var y = 0; y < Hx; y++) for (var x = 0; x < Lx; x++) {
+    var gx = x - c0, gy = y - r0, s = '.', h = 0;
+    if (gy >= 0 && gy < HAUTEUR && gx >= 0 && gx < LARGEUR) s = e.sol[gy * LARGEUR + gx] === 'A' ? '.' : e.sol[gy * LARGEUR + gx];
+    else if (gy >= 0 && gy < HAUTEUR && '~=i'.indexOf(e.def.carte[gy].charAt(0)) >= 0 && '~=i'.indexOf(e.def.carte[gy].charAt(LARGEUR - 1)) >= 0) s = '~';
+    else if (gy >= 0 && gy < HAUTEUR && '~=i'.indexOf(e.def.carte[gy].charAt(gx < 0 ? 0 : LARGEUR - 1)) >= 0) s = '~';
+    else {
+      var a = hasard(gx + 50, gy + 50);
+      if (a < 0.13) s = 'T'; else if (a < 0.18) s = '#'; else if (a < 0.28) h = 1; else if (a < 0.32) h = 2; else if (a < 0.36) s = 'm';
+    }
+    P.sol.push(s); P.herbe.push(h); P.herbeMax.push(h); P.repousse.push(0); P.barrieres.push(false); P.glaceFoulee.push(false);
+  }
+  g.save(); g.translate(bx - c0 * C, by - r0 * C);
+  dessinerVallee(g, C, P, { poneys: [], poulains: [], nuages: [] }, 0);
+  g.restore();
+  // Léger voile : le plateau de jeu reste le centre de l'image.
+  g.fillStyle = 'rgba(14,34,22,.28)'; g.fillRect(0, 0, W, Hz);
+}
+
+/* =========================================================================
    Démarrage
    ========================================================================= */
 fusionner(lireLocal());
@@ -3779,8 +4005,15 @@ JEL_SAVE.boutonEffacer({ jeu: JEU, conteneur: $('place-effacer'), apres: functio
 JEL_SAVE.surFermeture(function () {
   if (partieEnCours) JEL_SAVE.save(JEU, { niveau: jeu.reprise, score: scoreTotal(), progres: progres });
 });
-montrer('titre');
-requestAnimationFrame(boucle);
+var numeroApercu = Number(window.JEL_APERCU);
+if (window.JEL_AFFICHE) { Son.activer(false); demarrerAffiche(); }
+else if (numeroApercu === 1 || numeroApercu === 2 || numeroApercu === 3) {
+  ouvrirApercu(numeroApercu);
+  requestAnimationFrame(boucle);
+} else {
+  montrer('titre');
+  requestAnimationFrame(boucle);
+}
 
 </script>
 </body>
