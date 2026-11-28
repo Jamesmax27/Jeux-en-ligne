@@ -172,3 +172,23 @@ Un appareil qui passe sous 33 images par seconde descend d'abord d'un niveau, pu
 
 **Mesures** (26 novembre 2026, Chromium sans carte graphique, 1 280 × 720, image 2 du jeu) : 3,8 images par seconde avant ; 2,5 au niveau 0, 1,0 au niveau 2 (d'où la qualité simple choisie d'office sans carte graphique). Fichier : 875 Ko → 940 Ko environ. **Non mesuré : la vitesse sur de vrais téléphones et de vrais ordinateurs** (à essayer ; les réglages sont en tête de `creer` : `EXPOSITION`, `FORCE_HALO`, `BOITE_OMBRE`).
 
+## 11. Cinématique d'ouverture (version 6, 27 novembre 2026)
+
+Demande du propriétaire : une cinématique au début du jeu, avec une invasion, faite de courtes séquences. Choix de Claude : elle est **jouée par le moteur du jeu** (mêmes modèles, même décor, même lumière), pas par des fichiers vidéo : poids négligeable, sous-titres dans les 5 langues, même qualité que la partie sur chaque appareil.
+
+- **Cinq plans, 26 secondes** (script du jeu, section 7 ; `CINE_PLANS`, `CINE_TEXTES`, `CINE_METEORES`, `CINE_SONS`) : le canyon au calme puis les météores qui tombent au fond ; une galerie d'où sortent les premiers rampants ; la nuée qui déferle (96 aliens) et la matriarche dans la poussière ; les colons qui courent se mettre à l'abri pendant que les tourelles tirent ; le défenseur, seul devant le sas, qui lève son arme.
+- **Quand** : d'elle-même à la toute première partie seul (option gardée `cine`), avant la démonstration des commandes ; ensuite à la demande, bouton « Revoir l'invasion » de l'écran titre. Jamais en ligne, ni à la reprise d'une partie gardée. La partie est créée avant, le temps arrêté : fermer la page pendant la cinématique garde bien la partie.
+- **La passer** : bouton « Passer » (en haut à droite) ou Échap, Entrée, Espace.
+- Bandes de cinéma, sous-titres (`cine.1` à `cine.6`), fondus entre les plans ; sons du jeu (`SAS_SON`). Rien ne touche à la simulation. Le robot du site ne la voit pas pour l'affiche ni les images du jeu (`POUR_LE_ROBOT`).
+- Essais : `window.SAS_JEU.cine` (`t`, `fige`) permet de sauter à un instant et de figer l'image.
+
+## 12. Tourelles, défenseurs, armes et détails du camp (version 6, 27 novembre 2026)
+
+Demande du propriétaire : améliorer les tourelles, le détail d'ensemble, et le placement des personnages et des armes. Tout est fabriqué par le code (script du jeu, « 2 quater », `fabriquerMateriel`) ; les modèles Kenney de la tourelle, de l'astronaute et des cinq armes ne servent plus.
+
+- **Tourelles** : un socle fixe (dalle, trois béquilles, colonne, boîtier, voyant) et une tête qui seule tourne vers la cible (`tourelle-socle`, `tourelle-<type>-<niveau>`). Mitrailleuse : canons jumelés (quatre au niveau 3), tambour, masque, viseur ; lourde : gros canon à frein de bouche, vérins, chargeur. Les niveaux 2 et 3 ajoutent des plaques et des liserés. Les canons reculent à chaque tir (animation `glissement`, pilotée par « ampli »). Avant, tout le modèle pivotait, socle compris.
+- **Défenseurs** (`defenseur`, `colon`) : combinaison, plastron, sac dorsal, casque à visière dorée ; jambes animées d'après la distance parcourue, bras en position de tir. Les coéquipiers tiennent leur vraie arme (`poserArmeTenue`, point d'attache `ATTACHE_ARME`). Les colons de la cinématique courent bras libres.
+- **Armes** : cinq modèles détaillés (`ajouterArme`), les mêmes en main des coéquipiers et à la première personne, où s'ajoutent les mains et les avant-bras du joueur (`ajouterMains`). Placement refait (`PLACES`) : l'arme est plus loin, plus bas et plus à droite, légèrement tournée vers le centre, au lieu de couvrir le bas de l'écran ; la bouche du canon (éclair du tir) suit le modèle (`BOUCHES`).
+- **Détails du camp** : sacs de sable de part et d'autre du sas, deux projecteurs sur mât, caisses de munitions (sans collision, contre la façade).
+- Simulation inchangée (les tourelles gardent leur place, leur portée et leur rayon).
+
